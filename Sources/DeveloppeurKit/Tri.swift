@@ -6,6 +6,11 @@ import Vision
 /// point de mise au point de l'appareil), exposition, visages, note esthétique, empreinte (photos
 /// semblables), mots-clés proposés.
 public struct PhotoTriee {
+    /// Un défaut mesuré, par genre : le plafond de note en dépend (`Notation.plafond`).
+    public enum Defaut: Equatable {
+        case floue, miseAuPointManquee, miseAuPointSignalee, yeuxFermes, presqueNoire, brulee
+    }
+
     /// Au point de mise au point, vu dans la vignette.
     public struct MiseAuPoint {
         public var point: CGPoint
@@ -20,8 +25,11 @@ public struct PhotoTriee {
     /// Note et drapeau déjà posés dans Lightroom (pas de proposition par-dessus).
     public var note: Int?
     public var drapeau: String?
+    /// Format du fichier (RAW, DNG, JPG…) : une exposition ratée se rattrape mieux sur un RAW.
+    public var format: String?
     /// Pile de Lightroom (empilage à la main, ou automatique par heure de prise de vue) :
-    /// l'identifiant de la photo du dessus. Une seule photo proposée par pile.
+    /// l'identifiant de la photo du dessus. La meilleure de la pile est nommée ; les autres ne
+    /// montent pas à 4 (`Notation.plafond`).
     public var pile: Int?
     public var detail: DetailMeasurements?
     public var mesures: PhotoMeasurements?
@@ -57,33 +65,45 @@ public struct PhotoTriee {
         return "yeux fermés ou plissés : \(fermes.count) visage\(fermes.count > 1 ? "s" : "") sur \(sujets.count)"
     }
 
-    /// Ce qui la fait écarter : floue, mise au point manquée, yeux fermés, presque noire, brûlée.
-    /// Seuils de netteté de `Detail` (relevés à 1024 px : moins de 15 floue, plus de 35 nette).
-    public var defauts: [String] {
-        if let erreur { return ["vignette illisible : \(erreur)"] }
-        var liste: [String] = []
+    /// Les défauts mesurés, par genre : floue, mise au point manquée ou signalée manquée par
+    /// l'appareil, yeux fermés, presque noire, brûlée. Seuils de netteté de `Detail` (relevés à
+    /// 1024 px : moins de 15 floue, plus de 35 nette).
+    public var defautsMesures: [(genre: Defaut, texte: String)] {
+        var liste: [(genre: Defaut, texte: String)] = []
         if let detail, detail.sharpest < 15 {
-            liste.append("floue : aucune zone nette (netteté \(Self.r(detail.sharpest)))")
+            liste.append((.floue, "floue : aucune zone nette (netteté \(Self.r(detail.sharpest)))"))
         } else if let af, let auPoint = af.nettete, let detail, auPoint < 15, detail.sharpest >= 35 {
-            liste.append("mise au point manquée : floue au point AF (\(Self.r(auPoint))), nette ailleurs (\(Self.r(detail.sharpest)))")
+            liste.append((.miseAuPointManquee, "mise au point manquée : floue au point AF (\(Self.r(auPoint))), nette ailleurs (\(Self.r(detail.sharpest)))"))
         }
-        if let af, af.avertissement, (nettete ?? 0) < 35, !liste.contains(where: { $0.hasPrefix("floue") || $0.hasPrefix("mise au point") }) {
-            liste.append("mise au point signalée manquée par l'appareil")
+        if let af, af.avertissement, (nettete ?? 0) < 35, liste.isEmpty {
+            liste.append((.miseAuPointSignalee, "mise au point signalée manquée par l'appareil"))
         }
-        if let yeux = yeuxFermes { liste.append(yeux) }
+        if let yeux = yeuxFermes { liste.append((.yeuxFermes, yeux)) }
         if let mesures {
-            if mesures.medianL < 6 { liste.append("presque noire (L* médian \(Self.r(mesures.medianL)))") }
-            if mesures.pureWhite > 35 { liste.append("brûlée (\(Self.r(mesures.pureWhite)) % de blanc pur)") }
+            if mesures.medianL < 6 { liste.append((.presqueNoire, "presque noire (L* médian \(Self.r(mesures.medianL)))")) }
+            if mesures.pureWhite > 35 { liste.append((.brulee, "brûlée (\(Self.r(mesures.pureWhite)) % de blanc pur)")) }
         }
         return liste
     }
 
-    /// Une photo floue ou ratée passe derrière ; puis la note esthétique et la qualité du meilleur visage.
+    /// Ce qui la fait écarter, en clair (vignette illisible comprise).
+    public var defauts: [String] {
+        if let erreur { return ["vignette illisible : \(erreur)"] }
+        return defautsMesures.map(\.texte)
+    }
+
+    /// Ordre de lecture d'une séance (classement, photos seules), pas une note : une photo floue ou
+    /// ratée passe derrière, puis la netteté et la note esthétique de Vision (à demi-poids : elle
+    /// va de −1 à 1, et ne compare que des photos d'une même sortie). La qualité des visages n'y
+    /// entre pas : elle ne compare que des prises d'un même visage (`scoreDansGroupe`).
     public var score: Double {
         let net = min((nettete ?? 0) / 60, 1)
-        let visage = vision?.faces.compactMap(\.quality).max() ?? 0
-        return net + (vision?.aesthetics ?? 0) + 0.5 * visage - Double(defauts.count)
+        return net + Tri.poidsEsthetique * (vision?.aesthetics ?? 0) - Double(defauts.count)
     }
+
+    /// Départage les photos d'une même rafale ou pile (même sujet) : seulement là, la qualité du
+    /// meilleur visage compte.
+    var scoreDansGroupe: Double { score + 0.5 * (vision?.faces.compactMap(\.quality).max() ?? 0) }
 
     public var pourquoi: String {
         var parties: [String] = []
@@ -98,7 +118,7 @@ public struct PhotoTriee {
     /// Une ligne par photo, pour `details`.
     var json: JSONValue {
         var item: [String: JSONValue] = ["id": .number(Double(id)), "fichier": .string(fichier),
-                                         "score": .number((score * 100).rounded() / 100), "mesures": .string(pourquoi)]
+                                         "ordre": .number((score * 100).rounded() / 100), "mesures": .string(pourquoi)]
         if let detail { item["nettete_max"] = .number((detail.sharpest * 10).rounded() / 10) }
         if let bruit = detail?.noise { item["bruit"] = .number((bruit * 100).rounded() / 100) }
         let liste = defauts
@@ -116,14 +136,14 @@ public struct PhotoTriee {
     }
 }
 
-/// Bilan d'une séance : photos floues ou ratées, rafales avec la meilleure de chacune,
-/// classement, et propositions de drapeaux et de notes que Claude présente avant de les poser
-/// (set_metadata).
+/// Bilan d'une séance : photos floues ou ratées, rafales avec la meilleure de chacune, ordre de
+/// lecture, plafonds de note mesurés (le plancher technique du standard de notation) et
+/// proposition de rejet, que Claude présente avant de la poser (set_metadata). Aucune étoile : elles
+/// se proposent par propose_ratings, après avoir regardé les photos.
 public enum Tri {
-    /// Part des photos sans défaut proposées retenues (les meilleures de chaque groupe d'abord).
-    static let partRetenue = 0.4
-    /// Part des photos sans défaut proposées à 4 étoiles (au moins une).
-    static let partQuatreEtoiles = 0.1
+    /// Poids de la note esthétique de Vision dans l'ordre de lecture (elle va de −1 à 1, la netteté
+    /// de 0 à 1) : un indice d'Impact, pas un critère du standard.
+    static let poidsEsthetique = 0.5
     static let tailleClassement = 15
     /// Deux photos consécutives sont de la même rafale si Vision y voit la même scène et si elles
     /// sont prises à moins de `ecartRafale` secondes l'une de l'autre. Relevé le 17 octobre 2026
@@ -213,35 +233,51 @@ public enum Tri {
         return nil
     }
 
+    /// Groupes (rafales et piles), la meilleure de chacun, et le plafond de chaque photo (par indice).
+    struct Analyse {
+        var groupes: [(membres: [Int], pile: Int?)]
+        var meilleures: [Int: Int]   // groupe → indice
+        var plafonds: [Int: Notation.Plafond]
+    }
+
+    static func analyser(_ photos: [PhotoTriee]) -> Analyse {
+        let groupes = Self.groupes(photos)
+        // La meilleure de chaque rafale : sans défaut si possible, au meilleur score dans le groupe
+        // (la qualité des visages y départage des prises du même sujet).
+        var meilleures: [Int: Int] = [:]
+        var autres: Set<Int> = []
+        for (g, groupe) in groupes.enumerated() {
+            let candidates = groupe.membres.filter { photos[$0].defauts.isEmpty }
+            let pool = candidates.isEmpty ? groupe.membres : candidates
+            let meilleure = pool.max { photos[$0].scoreDansGroupe < photos[$1].scoreDansGroupe }
+            meilleures[g] = meilleure
+            autres.formUnion(groupe.membres.filter { $0 != meilleure })
+        }
+        var plafonds: [Int: Notation.Plafond] = [:]
+        for i in photos.indices {
+            plafonds[i] = Notation.plafond(photos[i], doublon: autres.contains(i))
+        }
+        return Analyse(groupes: groupes, meilleures: meilleures, plafonds: plafonds)
+    }
+
+    /// Le plafond de chaque photo mesurée, par identifiant (sans les vignettes illisibles).
+    public static func plafonds(_ photos: [PhotoTriee]) -> [Int: Notation.Plafond] {
+        var parPhoto: [Int: Notation.Plafond] = [:]
+        for (i, plafond) in analyser(photos).plafonds { parPhoto[photos[i].id] = plafond }
+        return parPhoto
+    }
+
     public static func bilan(_ photos: [PhotoTriee], details: Bool = false) -> JSONValue {
-        let tous = Self.groupes(photos)
+        let analyse = analyser(photos)
+        let tous = analyse.groupes
         let groupes = tous.map(\.membres)
-        var dansUnGroupe: [Int: Int] = [:]   // indice → groupe
-        for (g, membres) in groupes.enumerated() { for i in membres { dansUnGroupe[i] = g } }
+        let meilleures = analyse.meilleures
         let sansDefaut = photos.indices.filter { photos[$0].defauts.isEmpty }
 
-        // La meilleure de chaque rafale : sans défaut si possible, au meilleur score.
-        var meilleures: [Int: Int] = [:]   // groupe → indice
-        for (g, membres) in groupes.enumerated() {
-            let candidates = membres.filter { photos[$0].defauts.isEmpty }
-            let pool = candidates.isEmpty ? membres : candidates
-            meilleures[g] = pool.max { photos[$0].score < photos[$1].score }
-        }
-
-        // Retenues : les meilleures des groupes (sans défaut), puis les photos seules, par score,
-        // jusqu'à la part voulue des photos sans défaut.
-        let objectif = max(1, Int((Double(sansDefaut.count) * partRetenue).rounded()))
-        var retenues = Set(meilleures.values.filter { photos[$0].defauts.isEmpty })
-        let seules = sansDefaut.filter { dansUnGroupe[$0] == nil }.sorted { photos[$0].score > photos[$1].score }
-        for i in seules where retenues.count < objectif { retenues.insert(i) }
-        let quatre = Set(sansDefaut.sorted { photos[$0].score > photos[$1].score }
-            .prefix(max(1, Int((Double(sansDefaut.count) * partQuatreEtoiles).rounded()))))
-            .intersection(retenues)
-
         func ids(_ indices: [Int]) -> JSONValue { .array(indices.sorted().map { .number(Double(photos[$0].id)) }) }
-        func libres(_ indices: [Int], drapeau: Bool) -> [Int] {
-            indices.filter { i in drapeau ? (photos[i].drapeau ?? "aucun") == "aucun" : (photos[i].note ?? 0) == 0 }
-        }
+        // Une seule règle pour toute proposition : la photo ne porte ni note ni drapeau (le drapeau
+        // revient du module en « rejetée », avec l'accent : « aucun » est le seul repère sûr).
+        func libre(_ i: Int) -> Bool { (photos[i].note ?? 0) == 0 && (photos[i].drapeau ?? "aucun") == "aucun" }
 
         let ratees = photos.indices.filter { !photos[$0].defauts.isEmpty }
         var resultat: [String: JSONValue] = [
@@ -257,7 +293,7 @@ public enum Tri {
             }),
             "classement": .array(sansDefaut.sorted { photos[$0].score > photos[$1].score }.prefix(tailleClassement).map { i in
                 ["id": .number(Double(photos[i].id)), "fichier": .string(photos[i].fichier),
-                 "score": .number((photos[i].score * 100).rounded() / 100), "pourquoi": .string(photos[i].pourquoi)]
+                 "ordre": .number((photos[i].score * 100).rounded() / 100), "pourquoi": .string(photos[i].pourquoi)]
             }),
         ]
 
@@ -272,30 +308,32 @@ public enum Tri {
         let yeux = photos.indices.filter { photos[$0].yeuxFermes != nil }
         if !yeux.isEmpty { resultat["yeux_fermes"] = ids(yeux) }
 
+        // Plafonds : seulement ceux qui bornent la note, ou qui demandent une vérification.
+        var plafonds: [String: JSONValue] = [:]
+        for (i, plafond) in analyse.plafonds where plafond.note < Notation.noteMaximale || plafond.aVerifier {
+            var item: [String: JSONValue] = ["note_max": .number(Double(plafond.note)), "pourquoi": .string(plafond.raison)]
+            if plafond.aVerifier { item["a_verifier"] = true }
+            plafonds[String(photos[i].id)] = .object(item)
+        }
+        if !plafonds.isEmpty { resultat["plafonds"] = .object(plafonds) }
+
+        // Le standard n'a qu'un drapeau, Rejeter : pour un défaut majeur seulement, à confirmer à l'œil.
         var propositions: [JSONValue] = []
-        let aRejeter = libres(ratees, drapeau: true)
+        let aRejeter = photos.indices.filter { analyse.plafonds[$0]?.rejet == true && libre($0) }
         if !aRejeter.isEmpty {
-            propositions.append(["flag": "reject", "photo_ids": ids(aRejeter), "pourquoi": "floues, ratées ou aux yeux fermés (floues_ou_ratees)"])
-        }
-        let aRetenir = libres(Array(retenues), drapeau: true)
-        if !aRetenir.isEmpty {
-            propositions.append(["flag": "pick", "photo_ids": ids(aRetenir),
-                                 "pourquoi": "la meilleure de chaque rafale ou pile, puis les meilleures photos seules"])
-        }
-        let aNoter = libres(Array(quatre), drapeau: false)
-        if !aNoter.isEmpty {
-            propositions.append(["rating": 4, "photo_ids": ids(aNoter), "pourquoi": "les meilleures de la séance (classement)"])
+            propositions.append(["flag": "reject", "photo_ids": ids(aRejeter),
+                                 "pourquoi": "défaut majeur (floue, mise au point manquée, yeux fermés : floues_ou_ratees), à confirmer à l'œil ; la seule photo de sa scène : plutôt 1 étoile à vérifier (propose_ratings, to_check)"])
         }
         let doublons = groupes.enumerated().flatMap { g, membres in
-            membres.filter { $0 != meilleures[g] && photos[$0].defauts.isEmpty && !retenues.contains($0) }
+            membres.filter { $0 != meilleures[g] && photos[$0].defauts.isEmpty }
         }
         if !doublons.isEmpty {
             resultat["rafales_moins_bonnes"] = ids(doublons)
         }
         resultat["propositions"] = .array(propositions)
-        let dejaClassees = photos.filter { ($0.drapeau ?? "aucun") != "aucun" || ($0.note ?? 0) > 0 }.count
+        let dejaClassees = photos.indices.filter { !libre($0) }.count
         if dejaClassees > 0 {
-            resultat["deja_classees"] = .string("\(dejaClassees) photo(s) portent déjà un drapeau ou une note : les propositions ne les touchent pas.")
+            resultat["deja_classees"] = .string("\(dejaClassees) photo(s) portent déjà un drapeau ou une note : aucune proposition ne les touche.")
         }
 
         let motsCles = photos.flatMap { $0.motsCles.map(\.mot) }
@@ -312,7 +350,13 @@ public enum Tri {
                 resultat["mots_cles_par_photo"] = .object(parPhoto)
             }
         }
-        if details { resultat["photos"] = .array(photos.map(\.json)) }
+        if details {
+            resultat["photos"] = .array(photos.indices.map { i in
+                guard var ligne = photos[i].json.object else { return photos[i].json }
+                if let plafond = analyse.plafonds[i] { ligne["plafond"] = .number(Double(plafond.note)) }
+                return .object(ligne)
+            })
+        }
         return .object(resultat)
     }
 }

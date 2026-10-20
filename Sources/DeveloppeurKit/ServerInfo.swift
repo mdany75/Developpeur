@@ -37,7 +37,8 @@ public enum ServerInfo {
     Bruit fort (mesure au-dessus de 1,5, ISO élevé, ombres relevées) : enhance_photo (denoise de 20 à 50), avant netteté, \
     masques IA et retouch_spots ; super résolution seulement pour un grand tirage ou un fort recadrage. \
     Série : copy_settings depuis une référence, puis match_series ; trier une séance : \
-    cull_photos (propositions à poser par set_metadata après accord ; show_photo avec filter pour montrer le résultat), contact_sheet ; classer : find_photos, set_metadata, \
+    cull_photos (propositions à poser par set_metadata après accord ; show_photo avec filter pour montrer le résultat), contact_sheet ; noter : propose_ratings (standard developpeur://notation, jamais 5 ★) ; \
+    classer : find_photos, set_metadata, \
     manage_collections ; undo_last défait aussi un classement. Avant une longue série (des centaines de photos) : proposer une sauvegarde du catalogue (get_status, request_backup). \
     Interprétations : compare_variants, puis choose_variant. \
     Partager ou imprimer : export_photos (list = true d'abord, dossier choisi avec l'utilisateur, choose_folder pour une fenêtre). Goûts : remember_style (le lire ; n'y ajouter qu'après accord) ; corrections_utilisateur (ses retouches à la main) : en tenir compte, proposer de les retenir. \

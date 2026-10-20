@@ -12,6 +12,7 @@ local Commandes = require 'Commandes'
 local Recadrage = require 'Recadrage'
 local Geometrie = require 'Geometrie'
 local Locaux = require 'Locaux'
+local Notation = require 'Notation'
 
 local reussis, echecs = 0, 0
 
@@ -19,6 +20,8 @@ local function test(nom, fonction)
     S.reinitialiser()
     Liaison.pause = false
     Liaison.journal = {}
+    Notation.oublier()
+    Notation.observateurs = {}
     local ok, erreur = pcall(fonction)
     if ok then
         reussis = reussis + 1
@@ -4393,6 +4396,453 @@ test("photo agrandie : copier le recadrage vers elle ne l'efface pas", function(
     local resultat = Commandes.executer('copier', { source = 4, photos = { 7 }, cles = {}, inclure = { recadrage = true }, etape = 'copie' })
     proche(cible.reglages.CropLeft, -0.2, "agrandissement gardé")
     egal(contient(resultat.resultats[1].remarques or {}, "Recadrage non copié"), true, "dit pourquoi")
+end)
+
+-- Version 1.1 : notation ---------------------------------------------------------------
+
+local function proposer(propositions, params)
+    params = params or {}
+    params.action = 'proposer'
+    params.propositions = Json.tableau(propositions)
+    return Commandes.executer('notation', params)
+end
+
+local CRITERES = { impact = "Arrête l'œil", qualites = "Lumière rasante", plancher = "Nette (52)" }
+
+local function etapes(photo)
+    return #Json.decode(photo.proprietes.etapesClaude or '[]')
+end
+
+test("notation : proposer range les propositions sans rien écrire ; 5 étoiles refusées ; photo absente isolée", function()
+    local a, b = photoRaw(), photoJpeg()
+    a.brut.rating, b.brut.pickStatus = 2, 1
+    local ecritures, privees = #S.ecritures, S.ecrituresPrivees
+    local r = proposer({
+        { photo = 1, note = 3, drapeau = 'aucun', criteres = { impact = "Arrête l'œil", qualites = "Lumière", plancher = "Nette", finition = "" },
+            plafond = 4, raison = "Sujet clair, fond calme.", a_verifier = false },
+        { photo = 2, note = 0, drapeau = 'rejetee', criteres = CRITERES, raison = "Floue." },
+        { photo = 777, note = 2, criteres = CRITERES, raison = "?" },
+    })
+    egal(#S.ecritures, ecritures, "rien d'écrit dans le catalogue")
+    egal(S.ecrituresPrivees, privees, "ni dans la mémoire des photos")
+    egal(a.brut.rating, 2)
+    egal(r.seance, Json.null, "aucune séance ouverte")
+    egal(#r.propositions, 2)
+    egal(r.propositions[1].photo, 1)
+    egal(r.propositions[1].fichier, 'DSC_0412.NEF')
+    egal(r.propositions[1].note_avant, 2)
+    egal(r.propositions[1].drapeau_avant, 'aucun')
+    egal(r.propositions[2].drapeau_avant, 'retenue')
+    egal(r.propositions[1].etat, 'proposee')
+    egal(#r.refusees, 1, "la photo absente ne bloque pas les autres")
+    egal(r.refusees[1].photo, 777)
+    egal(r.refusees[1].raison:find("777", 1, true) ~= nil, true, r.refusees[1].raison)
+    local p = Notation.proposition(1)
+    egal(getmetatable(p), nil, "copie neuve")
+    egal(p.note, 3)
+    egal(p.uuid, 'uuid-1')
+    egal(p.criteres.impact, "Arrête l'œil")
+    egal(p.criteres.finition, nil, "critère vide")
+    egal(p.plafond, 4)
+    egal(p.raison, "Sujet clair, fond calme.")
+    egal(p.seance, nil)
+    p.note = 0
+    egal(Notation.proposition(1).note, 3, "la copie ne touche pas le registre")
+    local rejet = Notation.proposition(2)
+    egal(rejet.drapeau, 'rejetee')
+    egal(rejet.note, nil, "un rejet sans note (le serveur envoie 0)")
+    egal(Liaison.journal[#Liaison.journal]:find("Notation : 2 propositions", 1, true) ~= nil, true, Liaison.journal[#Liaison.journal])
+
+    local version = Notation.version
+    echoue(function() proposer({ { photo = 2, note = 5, criteres = CRITERES } }) end, "jamais 5 étoiles")
+    echoue(function() proposer({ { photo = 1, note = 2 }, { photo = 2, note = 6 } }) end, "jamais 5 étoiles")
+    egal(Notation.proposition(1).note, 3, "rien de rangé quand une note est refusée")
+    egal(Notation.version, version)
+    echoue(function() proposer({ { photo = 1, note = 2.5 } }) end, "Note invalide")
+    echoue(function() proposer({ { photo = 1, note = 3, drapeau = 'retenue' } }) end, "Drapeau invalide")
+    echoue(function() proposer({ { photo = 1 } }) end, "le drapeau « rejetee »")
+    echoue(function() proposer({}) end, "Aucune proposition")
+    echoue(function() Commandes.executer('notation', { action = 'effacer' }) end, "Action de notation inconnue")
+    local sansRefus = Json.encode(proposer({ { photo = 1, note = 3, criteres = CRITERES } }))
+    egal(sansRefus:find('"refusees":[]', 1, true) ~= nil, true, sansRefus)
+end)
+
+test("notation : rattachée à la séance active, remplacée par une nouvelle proposition", function()
+    photoRaw(); photoJpeg(); photoFuji()
+    local id = Notation.ouvrirSeance{ titre = "Lac Brome", source = { portee = 'selection' }, photos = { 1, 2, 1 } }
+    egal(type(id), 'string')
+    egal(Notation.seanceActive(), id)
+    egal(#Notation.seance(id).photos, 2, "photos sans doublon")
+    egal(Notation.seance().titre, "Lac Brome", "sans identifiant : la séance active")
+    local r = proposer({ { photo = 1, note = 3, criteres = CRITERES }, { photo = 4, note = 2, criteres = CRITERES } }, { passe = 2 })
+    egal(r.seance, id)
+    egal(r.propositions[1].hors_seance, nil)
+    egal(r.propositions[2].hors_seance, true, "photo hors de la séance")
+    egal(Notation.proposition(1).seance, id)
+    egal(Notation.proposition(1).passe, 2)
+    egal(Notation.proposition(4).seance, nil)
+    proposer({ { photo = 1, note = 4, criteres = CRITERES, raison = "Meilleure vue de son moment." } })
+    local p = Notation.proposition(1)
+    egal(p.note, 4, "la nouvelle proposition remplace l'ancienne")
+    egal(p.raison, "Meilleure vue de son moment.")
+    egal(p.passe, 1, "sans passe donnée : celle de la séance")
+    egal(#Notation.propositions(id), 1)
+    egal(getmetatable(Notation.propositions(id)), nil)
+    proposer({ { photo = 2, note = 1, criteres = CRITERES, a_verifier = true } })
+    egal(Notation.proposition(2).etat, 'a_verifier', "un cas douteux attend « à vérifier »")
+    egal(#Notation.propositions(id), 2, "dans l'ordre des photos de la séance")
+    egal(Notation.propositions(id)[2].photo, 2)
+    echoue(function() proposer({ { photo = 1, note = 2 } }, { seance = 'inconnue' }) end, "Séance de notation inconnue")
+    echoue(function() proposer({ { photo = 1, note = 2 } }, { passe = 7 }) end, "Passe invalide")
+    -- Une nouvelle séance prend les propositions encore à décider de ses photos.
+    local id2 = Notation.ouvrirSeance{ photos = { 4 } }
+    egal(Notation.seanceActive(), id2)
+    egal(Notation.proposition(4).seance, id2)
+    egal(Notation.seance(id2).titre:find("Séance du", 1, true), 1, "titre par défaut")
+    egal(Notation.seance(id).titre, "Lac Brome", "l'ancienne séance reste")
+    local r2 = proposer({ { photo = 1, note = 3, criteres = CRITERES } }, { seance = id })
+    egal(r2.seance, id, "séance donnée plutôt que l'active")
+    egal(Notation.proposition(1).seance, id)
+    echoue(function() Notation.ouvrirSeance{ photos = {} } end, "Aucune photo")
+end)
+
+test("notation : lire et seance, passes, comptes et décisions de l'utilisateur", function()
+    photoRaw(); photoJpeg(); photoFuji()
+    local vide = Commandes.executer('notation', { action = 'seance' })
+    egal(vide.id, Json.null)
+    egal(vide.message:find("Aucune séance", 1, true) ~= nil, true)
+    local id = Notation.ouvrirSeance{ titre = "Sortie", source = { portee = 'collection', collection = 900 }, photos = { 1, 2, 4 } }
+    local s = Commandes.executer('notation', { action = 'seance' })
+    egal(s.id, id)
+    egal(s.titre, "Sortie")
+    egal(Json.encode(s.photos), '[1,2,4]')
+    egal(s.passe, 1)
+    egal(s.source.collection, 900)
+    egal(s.comptes.sans_proposition, 3)
+    Notation.choisirPasse(id, 2)
+    egal(Commandes.executer('notation', { action = 'seance' }).passe, 2)
+    echoue(function() Notation.choisirPasse(id, 5) end, "Passe invalide")
+    echoue(function() Notation.choisirPasse('x', 1) end, "inconnue")
+    proposer({ { photo = 1, note = 3, criteres = CRITERES }, { photo = 2, drapeau = 'rejetee', criteres = CRITERES },
+        { photo = 4, note = 2, criteres = CRITERES } })
+    egal(Notation.decider(4, 'ecartee', { commentaire = "Doublon de la 1" }), true)
+    egal(Notation.decider(2, 'a_verifier'), true)
+    local ok, raison = Notation.decider(99, 'ecartee')
+    egal(ok, nil)
+    egal(raison:find("Aucune proposition", 1, true) ~= nil, true)
+    egal((Notation.decider(1, 'acceptee')), nil, "accepter passe par poser")
+    local c = Notation.compter(id)
+    egal(c.proposees, 1)
+    egal(c.a_verifier, 1)
+    egal(c.ecartees, 1)
+    egal(c.acceptees, 0)
+    egal(c.total, 3)
+    egal(c.photos, 3)
+    egal(c.sans_proposition, 0)
+    egal(c.par_passe[2].total, 3, "proposées pendant la passe 2")
+    egal(c.par_passe[1].total, 0)
+    egal(Notation.compter('inconnue').total, 0)
+    local l = Commandes.executer('notation', { action = 'lire' })
+    egal(l.seance_active, id)
+    egal(#l.seances, 1)
+    egal(l.seances[1].photos, 3)
+    egal(l.seances[1].comptes.ecartees, 1)
+    egal(#l.propositions, 3)
+    egal(l.propositions[3].etat, 'ecartee')
+    egal(l.propositions[3].commentaire, "Doublon de la 1")
+    egal(l.propositions[1].uuid, nil, "l'uuid reste dans le module")
+    egal(Json.decode(Json.encode(l)).propositions[2].drapeau, 'rejetee')
+    egal(#Commandes.executer('notation', { action = 'lire', photos = Json.tableau({ 2 }) }).propositions, 1)
+    egal(#Commandes.executer('notation', { action = 'lire', seance = id }).propositions, 3)
+    echoue(function() Commandes.executer('notation', { action = 'lire', seance = 'x' }) end, "inconnue")
+    -- Une photo retirée du catalogue, ou dont l'identifiant désigne une autre photo : proposition perdue.
+    S.photos[4] = nil
+    S.photos[2].brut.uuid = 'uuid-autre'
+    local l2 = Commandes.executer('notation', { action = 'lire' })
+    egal(l2.perdues, 2)
+    egal(#l2.propositions, 1)
+    egal(Notation.proposition(4), nil)
+    egal(Notation.proposition(2), nil)
+end)
+
+test("notation : poser des propositions acceptées et changées, une écriture, une étape par photo, undo_last sur une photo", function()
+    local a, b, c = photoRaw(), photoJpeg(), photoFuji()
+    local d = S.Photo(5, {}, { fileName = 'DSC_0500.NEF', fileFormat = 'RAW' }, { pickStatus = -1 })
+    a.brut.pickStatus, b.brut.rating = 1, 2
+    Notation.ouvrirSeance{ photos = { 1, 2, 4, 5 } }
+    proposer({ { photo = 1, note = 3, criteres = CRITERES, raison = "Sujet clair." }, { photo = 2, note = 0, drapeau = 'rejetee', criteres = CRITERES },
+        { photo = 4, note = 2, criteres = CRITERES }, { photo = 5, note = 2, criteres = CRITERES } })
+    local vus = {}
+    Notation.abonner('essai', function(quoi) vus[#vus + 1] = quoi end)
+    local version = Notation.version
+    local ecritures = #S.ecritures
+    local r = Notation.poser({ { photo = 1 }, { photo = 2 }, { photo = 4, note = 5, drapeau = 'retenue' }, { photo = 5 } })
+    egal(r.ok, true, tostring(r.erreur))
+    egal(#S.ecritures, ecritures + 1, "une seule écriture")
+    egal(S.ecritures[#S.ecritures], "Claude · notation")
+    egal(a.brut.rating, 3)
+    egal(a.brut.pickStatus, 1, "le drapeau Retenue de l'utilisateur reste")
+    egal(b.brut.pickStatus, -1)
+    egal(b.brut.rating, 2, "un rejet accepté laisse les étoiles")
+    egal(c.brut.rating, 5, "5 étoiles posées par l'utilisateur")
+    egal(c.brut.pickStatus, 1)
+    egal(d.brut.rating, 2)
+    egal(d.brut.pickStatus, 0, "accepter une note retire un rejet déjà posé")
+    egal(Notation.proposition(1).etat, 'acceptee')
+    egal(Notation.proposition(2).etat, 'acceptee')
+    egal(Notation.proposition(5).etat, 'acceptee')
+    local changee = Notation.proposition(4)
+    egal(changee.etat, 'changee')
+    egal(changee.note_choisie, 5)
+    egal(changee.drapeau_choisi, 'retenue')
+    egal(changee.note, 2, "la proposition de Claude reste lisible")
+    egal(r.resultats[3].etat, 'changee')
+    egal(r.resultats[3].note, 5)
+    egal(#r.resultats[1].changements, 1)
+    egal(Notation.version, version + 1)
+    egal(vus[#vus], 'pose')
+    egal(etapes(a), 1)
+    egal(etapes(c), 1)
+    egal(a.proprietes.retoucheeParClaude, nil, "une note n'est pas une retouche")
+    local journal = Commandes.executer('journal', { photos = { 1 } }).photos[1].entrees
+    egal(journal[#journal].type, 'classement')
+    egal(journal[#journal].raison, "Sujet clair.", "la raison de Claude au journal")
+    Commandes.executer('annuler', { photos = { 4 } })
+    egal(c.brut.rating, nil)
+    egal(c.brut.pickStatus, 0)
+    egal(a.brut.rating, 3, "les autres photos gardent leur note")
+    -- Changer… de nouveau, à la note que Claude proposait : acceptée.
+    egal(Notation.poser({ { photo = 4, note = 2, drapeau = 'aucun' } }).resultats[1].etat, 'acceptee')
+    egal(Notation.proposition(4).note_choisie, nil)
+    -- Changer… une photo sans proposition : écrite, sans état.
+    local e = S.Photo(6, {}, { fileName = 'X.JPG' })
+    local sans = Notation.poser({ { photo = 6, note = 1 } })
+    egal(sans.ok, true)
+    egal(e.brut.rating, 1)
+    egal(sans.resultats[1].etat, nil)
+    egal(Notation.proposition(6), nil)
+    egal(Notation.poser({ { photo = 6 } }).erreur:find("Aucune proposition", 1, true) ~= nil, true, "rien à accepter")
+    -- Erreurs par photo : introuvable, sans bloquer les autres.
+    local manque = Notation.poser({ { photo = 777 }, { photo = 1, note = 4 } })
+    egal(manque.ok, true)
+    egal(manque.resultats[1].erreur:find("777", 1, true) ~= nil, true)
+    egal(a.brut.rating, 4)
+    version = Notation.version
+    egal(Notation.poser({ { photo = 777 } }).ok, false)
+    egal(Notation.poser({}).ok, false)
+    egal(Notation.version, version, "rien de changé")
+    -- La photo n'est plus celle que Claude a notée (autre uuid) : rien d'écrit, proposition retirée.
+    proposer({ { photo = 1, note = 2, criteres = CRITERES } })
+    a.brut.uuid = 'uuid-autre'
+    local autre = Notation.poser({ { photo = 1 } })
+    egal(autre.ok, false)
+    egal(autre.erreur:find("n'est plus celle", 1, true) ~= nil, true)
+    egal(a.brut.rating, 4)
+    egal(Notation.proposition(1), nil)
+end)
+
+test("notation : poser lève la pause et « Proposer d'abord », jamais les garde-fous", function()
+    local a = photoRaw()
+    proposer({ { photo = 1, note = 3, criteres = CRITERES } })
+    Liaison.pause = true
+    S.prefs.mode, S.prefs.accordDansLightroom = 'proposer', true
+    local r = Notation.poser({ { photo = 1 } })
+    egal(r.ok, true, tostring(r.erreur))
+    egal(a.brut.rating, 3)
+    egal(Liaison.propositionEnAttente, nil, "aucun accord demandé dans la fenêtre de suivi")
+    local Bibliotheque = require 'Bibliotheque'
+    echoue(function() Bibliotheque.noter({ notes = { { photo = 1, note = 2 } } }) end, "pause")
+    Liaison.pause = false
+    echoue(function() Bibliotheque.noter({ notes = { { photo = 1, note = 2 } } }) end, "Proposer d'abord")
+    S.prefs.mode, S.prefs.accordDansLightroom = nil, nil
+
+    proposer({ { photo = 1, note = 4, criteres = CRITERES } })
+    S.prefs.copiesSeulement = true
+    local refus = Notation.poser({ { photo = 1 } })
+    egal(refus.ok, false)
+    egal(refus.erreur:find("pas une copie virtuelle", 1, true) ~= nil, true, refus.erreur)
+    egal(refus.resultats[1].erreur, refus.erreur)
+    egal(a.brut.rating, 3, "rien d'écrit")
+    egal(Notation.proposition(1).etat, 'proposee', "rien de marqué")
+    S.prefs.copiesSeulement = false
+    S.prefs.rejeteesProtegees = true
+    a.brut.pickStatus = -1
+    egal(Notation.poser({ { photo = 1, note = 5 } }).erreur:find("rejetée", 1, true) ~= nil, true)
+    S.prefs.rejeteesProtegees = false
+    a.brut.pickStatus = 0
+    S.prefs.libelleProtege, a.meta.label = 'rouge', 'Rouge'
+    egal(Notation.poser({ { photo = 1 } }).erreur:find("libellé rouge protégé", 1, true) ~= nil, true)
+    S.prefs.libelleProtege, a.meta.label = 'aucun', nil
+
+    -- Plafond de photos : Tout accepter est l'accord de l'utilisateur ; sans lui, refusé.
+    local ids = plusieurs(21)
+    local liste, notes = {}, {}
+    for i, id in ipairs(ids) do
+        liste[i] = { photo = id, note = 2, criteres = CRITERES }
+        notes[i] = { photo = id, note = 2 }
+    end
+    echoue(function() Bibliotheque.noter({ notes = notes, depuisLightroom = true }) end, "plafond de 20")
+    proposer(liste)
+    local ecritures = #S.ecritures
+    local tout = Notation.poser((function() local l = {} for i, id in ipairs(ids) do l[i] = { photo = id } end return l end)())
+    egal(tout.ok, true, tostring(tout.erreur))
+    egal(#S.ecritures, ecritures + 1, "21 photos en une écriture")
+    egal(S.photos[521].brut.rating, 2)
+    echoue(function() Bibliotheque.noter({ notes = { { photo = 1, note = 7 } }, depuisLightroom = true }) end, "Note invalide")
+    echoue(function() Bibliotheque.noter({ notes = { { photo = 1, drapeau = 'jaune' } }, depuisLightroom = true }) end, "Drapeau invalide")
+    echoue(function() Bibliotheque.noter({ notes = { { photo = 1 } }, depuisLightroom = true }) end, "Rien à poser")
+    echoue(function() Bibliotheque.noter({ notes = {}, depuisLightroom = true }) end, "Aucune note")
+end)
+
+test("notation : Tout accepter par lots d'écritures ; au plus 500 photos par écriture", function()
+    local ids = plusieurs(5)
+    local liste, accepter = {}, {}
+    for i, id in ipairs(ids) do
+        liste[i] = { photo = id, note = 2, criteres = CRITERES }
+        accepter[i] = { photo = id }
+    end
+    proposer(liste)
+    local lot = Notation.LOT
+    Notation.LOT = 2
+    local ecritures = #S.ecritures
+    local r = Notation.poser(accepter)
+    Notation.LOT = lot
+    egal(r.ok, true, tostring(r.erreur))
+    egal(#S.ecritures, ecritures + 3, "5 photos par lots de 2")
+    egal(S.photos[505].brut.rating, 2)
+    egal(Notation.compter().acceptees, 0, "hors séance")
+    egal(Notation.proposition(505).etat, 'acceptee')
+    local trop = {}
+    for i, id in ipairs(plusieurs(501)) do
+        trop[i] = { photo = id, note = 1 }
+    end
+    echoue(function() require('Bibliotheque').noter({ notes = trop, depuisLightroom = true, confirme = true }) end, "au plus 500")
+end)
+
+test("notation : une photo donnée deux fois ne compte qu'une fois, avec sa dernière note", function()
+    local a = photoRaw()
+    local Bibliotheque = require 'Bibliotheque'
+    local r = Bibliotheque.noter({ notes = { { photo = 1, note = 2 }, { photo = '1', note = 4, raison = "Finalement." } },
+        etape = 'notation', depuisLightroom = true, confirme = true })
+    egal(#r.resultats, 1)
+    egal(a.brut.rating, 4)
+    egal(contient(r.resultats[1].remarques, "plusieurs fois"), true)
+    egal(etapes(a), 1, "une seule étape")
+    local journal = Json.decode(a.proprietes.journalClaude)
+    egal(journal[#journal].raison, "Finalement.")
+    Commandes.executer('annuler', { photos = { 1 } })
+    egal(a.brut.rating, nil, "l'annulation remet la note d'avant")
+    proposer({ { photo = 1, note = 3, criteres = CRITERES } })
+    local p = Notation.poser({ { photo = 1 }, { photo = 1 } })
+    egal(p.ok, true)
+    egal(etapes(a), 1)
+    egal(a.brut.rating, 3)
+end)
+
+test("notation : registre gardé dans notation.json, propre au catalogue ouvert", function()
+    photoRaw()
+    proposer({ { photo = 1, note = 3, criteres = CRITERES } })
+    local id = Notation.ouvrirSeance{ titre = "Gardée", photos = { 1 } }
+    Notation.choisirPasse(id, 3)
+    local fichier = Notation.fichier()
+    egal(fichier, S.home .. '/Library/Application Support/Developpeur/notation.json')
+    local relu = Json.decode(S.fichiers[fichier])
+    egal(relu.catalogue, '/Users/test/Images/Catalogue.lrcat')
+    egal(relu.propositions['1'].note, 3, "clés des photos en texte")
+    Notation.oublier()
+    egal(Notation.proposition(1).note, 3, "relue du fichier")
+    egal(Notation.proposition('1').note, 3)
+    egal(Notation.seanceActive(), id)
+    local s = Notation.seance(id)
+    egal(s.titre, "Gardée")
+    egal(s.passe, 3)
+    egal(getmetatable(s.photos), nil, "tableau relu : copie neuve sans métatable")
+    egal(Notation.propositions(id)[1].seance, id)
+    -- Un autre catalogue : registre vide, et le fichier ne change pas avant sa première proposition.
+    S.cheminCatalogue = '/Users/test/Images/Autre.lrcat'
+    egal(Notation.proposition(1), nil)
+    egal(Notation.seanceActive(), nil)
+    Notation.oublier()
+    egal(Notation.proposition(1), nil, "relu, toujours pour l'autre catalogue")
+    egal(S.fichiers[fichier]:find('Catalogue.lrcat', 1, true) ~= nil, true)
+    S.cheminCatalogue = '/Users/test/Images/Catalogue.lrcat'
+    egal(Notation.proposition(1).note, 3, "le premier catalogue retrouve son registre")
+    S.cheminCatalogue = '/Users/test/Images/Autre.lrcat'
+    proposer({ { photo = 1, note = 1, criteres = CRITERES } })
+    egal(Json.decode(S.fichiers[fichier]).catalogue, '/Users/test/Images/Autre.lrcat')
+    S.fichiers[fichier] = '{ pas du JSON'
+    Notation.oublier()
+    egal(Notation.proposition(1), nil, "fichier illisible : registre vide")
+end)
+
+test("notation : abonnés prévenus à chaque changement ; registre élagué", function()
+    photoRaw(); photoJpeg(); photoFuji()
+    local vus = {}
+    Notation.abonner('essai', function(quoi) vus[#vus + 1] = quoi end)
+    Notation.abonner('casse', function() error("fenêtre fermée") end)
+    local version = Notation.version
+    proposer({ { photo = 1, note = 3, criteres = CRITERES } })
+    egal(Notation.version, version + 1)
+    egal(vus[1], 'propositions', "un abonné qui échoue ne gêne pas les autres")
+    Notation.ouvrirSeance{ photos = { 1 } }
+    egal(vus[2], 'seance')
+    Notation.decider(1, 'a_verifier')
+    egal(vus[3], 'decision')
+    Notation.desabonner('essai')
+    Notation.decider(1, 'ecartee')
+    egal(#vus, 3)
+    local maxP, maxS = Notation.MAX_PROPOSITIONS, Notation.MAX_SEANCES
+    Notation.MAX_PROPOSITIONS, Notation.MAX_SEANCES = 2, 2
+    proposer({ { photo = 1, note = 3, criteres = CRITERES }, { photo = 2, note = 3, criteres = CRITERES }, { photo = 4, note = 3, criteres = CRITERES } })
+    egal(Notation.proposition(1), nil, "la plus ancienne sort")
+    egal(Notation.proposition(4).note, 3)
+    local premiere = Notation.ouvrirSeance{ photos = { 1 } }
+    Notation.ouvrirSeance{ photos = { 2 } }
+    local active = Notation.ouvrirSeance{ photos = { 4 } }
+    egal(Notation.seance(premiere), nil, "la plus ancienne séance sort")
+    egal(Notation.seanceActive(), active)
+    Notation.MAX_PROPOSITIONS, Notation.MAX_SEANCES = maxP, maxS
+end)
+
+test("notation : Notation se charge sans l'interface ni la Bibliothèque (la fenêtre s'en sert)", function()
+    local f = assert(io.open(dossierModule .. 'Notation.lua', 'r'))
+    local source = f:read('*a')
+    f:close()
+    for ligne in source:gmatch('[^\n]+') do
+        local module = ligne:match("^local%s+[%w_]+%s*=%s*require%s*%(?%s*'([%w_]+)'") or ligne:match("^local%s+[%w_]+%s*=%s*import%s*'([%w_]+)'")
+        if module then
+            egal(module == 'Bibliotheque' or module == 'LrApplicationView' or module == 'LrView' or module == 'LrDialogs', false, ligne)
+        end
+    end
+end)
+
+test("Vignettes.demander : un JPEG par photo dans le dossier donné, une erreur par photo", function()
+    local a, b = photoRaw(), photoJpeg()
+    b.vignetteImpossible = "aperçu introuvable"
+    local Vignettes = require 'Vignettes'
+    local dossier = S.home .. '/Library/Application Support/Developpeur/Temporaire/Notation/s1'
+    local chemins, erreurs = Vignettes.demander({ a, 2, 777 }, 300, dossier)
+    egal(S.fichiers[dossier], 'dossier', "dossier créé")
+    egal(chemins[1], dossier .. '/1.jpg')
+    egal(S.fichiers[chemins[1]], 'JPEG 1 300')
+    egal(erreurs[1], nil)
+    egal(chemins[2], nil)
+    egal(erreurs[2]:find("aperçu introuvable", 1, true) ~= nil, true, erreurs[2])
+    egal(erreurs[777]:find("777", 1, true) ~= nil, true, "photo inconnue, sans bloquer les autres")
+    egal(#S.vignettesDemandees, 2)
+    egal(S.vignettesDemandees[1].largeur, 300)
+    -- Taille bornée, dossier temporaire par défaut, rappels différés attendus.
+    S.vignettesDifferees = true
+    local autres = Vignettes.demander({ 1 }, 50)
+    egal(autres[1]:match('^/tmp/Developpeur/vignettes%-%d+/1%.jpg$') ~= nil, true, tostring(autres[1]))
+    egal(S.vignettesDemandees[3].largeur, 128)
+    a.vignetteJamais = true
+    local delai = Vignettes.DELAI
+    Vignettes.DELAI = 1
+    local _, attente = Vignettes.demander({ a }, 512, dossier)
+    Vignettes.DELAI = delai
+    egal(attente[1]:find("Pas de vignette après", 1, true) ~= nil, true)
+    egal(#S.ecritures, 0, "rien d'écrit dans le catalogue")
 end)
 
 print(string.format("%d tests réussis, %d en échec", reussis, echecs))

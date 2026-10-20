@@ -65,8 +65,13 @@ final class Version24Tests: XCTestCase {
         XCTAssertEqual(piles.first?["meilleure"]?.int, 2)
         XCTAssertEqual(piles.first?["dessus"]?.int, 1)
         XCTAssertEqual(bilan["rafales"]?.array?.count, 0)
-        let retenues = (bilan["propositions"]?.array ?? []).first { $0["flag"]?.string == "pick" }?["photo_ids"]?.array?.compactMap(\.int) ?? []
-        XCTAssertEqual(retenues.filter { [1, 2, 3].contains($0) }, [2], "une seule photo de la pile")
+        // 1.1 : plus de proposition « retenue » ; la meilleure de la pile est nommée, les autres
+        // sont des doublons, plafonnés à 3 (un 4 est la meilleure vue de son moment).
+        XCTAssertNil((bilan["propositions"]?.array ?? []).first { $0["flag"]?.string == "pick" })
+        XCTAssertEqual(bilan["rafales_moins_bonnes"]?.array?.compactMap(\.int), [1, 3])
+        XCTAssertEqual(bilan["plafonds"]?["1"]?["note_max"]?.int, 3)
+        XCTAssertEqual(bilan["plafonds"]?["3"]?["note_max"]?.int, 3)
+        XCTAssertNil(bilan["plafonds"]?["2"], "la meilleure de la pile")
     }
 
     // MARK: set_metadata

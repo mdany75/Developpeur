@@ -35,7 +35,7 @@ public enum Prompts {
         return texte
     }
 
-    public static let all: [PromptTemplate] = [retouchePro, harmoniserSerie, triSeance, portrait, paysage, noirEtBlanc, nuitIsoEleve, partage]
+    public static let all: [PromptTemplate] = [retouchePro, harmoniserSerie, triSeance, noter, portrait, paysage, noirEtBlanc, nuitIsoEleve, partage]
 
     private static let styleArgument = PromptTemplate.Argument(
         name: "style",
@@ -78,7 +78,7 @@ public enum Prompts {
             """
             Harmonise les photos sélectionnées dans Lightroom Classic pour qu'elles forment une série cohérente.\(styleSentence(arguments))
 
-            1. list_selection pour voir les photos, contact_sheet pour les voir d'un coup d'œil (12 par planche), puis analyze_photos pour les mesurer toutes. Pour écarter les floues, les yeux fermés et les doublons d'une rafale ou d'une pile, cull_photos.
+            1. list_selection pour voir les photos, contact_sheet pour les voir d'un coup d'œil (\(ToolHandler.maxContactSheet) par planche), puis analyze_photos pour les mesurer toutes. Pour écarter les floues, les yeux fermés et les doublons d'une rafale ou d'une pile, cull_photos.
             2. view_photo sur un échantillon de 6 à 8 photos : repère les écarts de balance des blancs, d'exposition et de contraste.
             3. Choisis la photo de référence (dis laquelle et pourquoi) et retouche-la d'abord, en deux passes vérifiées, puis au plus deux passes correctives, seulement sur un défaut constaté.
             4. copy_settings depuis la référence vers les autres photos (profil et réglages communs). Upright : copy_settings copie le mode, que Lightroom recalcule pour chaque photo ; le module coche « Contraindre le recadrage », et Lightroom resserre le cadre de chacune pour ne laisser aucun coin vide. Poussière du capteur sur toute la série : propose la suppression de la poussière de Lightroom (Suppression des distractions › Poussière), à faire à la main sur une photo, puis Copier et Coller de Lightroom avec la case Poussière (Lightroom la refait pour chaque photo ; copy_settings ne le peut pas).
@@ -99,22 +99,58 @@ public enum Prompts {
 
     public static let triSeance = PromptTemplate(
         name: "tri_seance",
-        description: "Trier une séance : photos floues ou ratées, doublons de rafale, meilleures photos ; puis proposer drapeaux et notes, posés après accord.",
+        description: "Trier une séance : photos floues ou ratées, doublons de rafale, plafonds de note ; rejets et notes proposés selon le standard de notation, posés après accord.",
         arguments: [
             .init(name: "photos", description: "Où sont les photos : « la sélection », le nom d'une collection ou le chemin d'un dossier."),
-            .init(name: "garder", description: "Part à retenir, par exemple « 30 % » ou « les 20 meilleures »."),
+            .init(name: "garder", description: "Combien en garder pour un album ou un partage, par exemple « 30 % » ou « les 20 meilleures » : une collection, pas une note."),
         ],
         render: { arguments in
             let ou = argument(arguments, "photos").map { "Photos : \($0)." } ?? "Photos : la sélection de Lightroom (sinon, demande où elles sont)."
-            let garder = argument(arguments, "garder").map { " À retenir : \($0)." } ?? ""
+            let garder = argument(arguments, "garder").map { " À garder : \($0) (dans une collection ; les notes suivent le standard, sans quota)." } ?? ""
             return """
             Trie une séance dans Lightroom Classic. \(ou)\(garder)
 
-            1. cull_photos sur ces photos (selection, collection ou folder) : photos floues ou à la mise au point manquée, aux yeux fermés ou plissés, presque noires ou brûlées, rafales et piles de Lightroom (une seule photo proposée par pile), classement, propositions de drapeaux et de notes, mots-clés fréquents. Une longue séance (des centaines de photos) : proposer d'abord une sauvegarde du catalogue (get_status, request_backup).
-            2. contact_sheet pour regarder les meilleures, puis chaque rafale, d'un coup d'œil ; view_photo (avec region sur le visage ou le sujet) pour une photo douteuse, et pour confirmer des yeux fermés (un sourire qui plisse les yeux peut être voulu). Une photo volontairement floue ou sombre n'est pas un défaut : juge l'intention.
-            3. Présente le tri à l'utilisateur, chiffres à l'appui : à rejeter (et pourquoi), à retenir (la meilleure de chaque rafale, puis les plus fortes), à noter 4 ou 5 étoiles. Rien ne change sans son accord ; une photo déjà classée par lui garde son classement, sauf s'il le demande.
-            4. Avec son accord : set_metadata (flag reject ou pick, rating) par groupes, avec une reason ; au besoin une collection « Claude › Sélection » (manage_collections) et des mots-clés proposés par cull_photos (seulement ceux qu'il approuve). Puis montrer le résultat dans Lightroom : show_photo avec folder ou collection et filter (flag pick) ; restore_filter remet son filtre ensuite.
-            5. Résume : combien de rejetées, de retenues, de notées ; comment les afficher dans Lightroom (filtre d'attributs de la Bibliothèque) ; undo_last défait un classement photo par photo.
+            1. cull_photos sur ces photos (selection, collection ou folder) : photos floues ou à la mise au point manquée, aux yeux fermés ou plissés, presque noires ou brûlées, rafales et piles de Lightroom (la meilleure de chacune), plafonds de note mesurés, rejets proposés, mots-clés fréquents. Une longue séance (des centaines de photos) : proposer d'abord une sauvegarde du catalogue (get_status, request_backup).
+            2. contact_sheet par planches de 24 à 30 (offset) pour voir la séance d'un coup d'œil, puis chaque rafale ; view_photo (avec region sur le visage ou le sujet) pour une photo douteuse, et pour confirmer des yeux fermés (un sourire qui plisse les yeux peut être voulu). Une photo volontairement floue ou sombre n'est pas un défaut : juge l'intention.
+            3. Les notes suivent le standard de notation (propose_ratings avec read_standard) : propose_ratings range des notes proposées de 0 à \(Notation.noteMaximale) étoiles, avec une raison par critère, sans dépasser les plafonds de cull_photos ; 5 étoiles restent à l'utilisateur, qui accepte les notes dans Lightroom (carte Note, Séance de notation). Pour noter toute la séance passe par passe : l'invite noter.
+            4. Présente le tri à l'utilisateur, chiffres à l'appui : à rejeter (et pourquoi), la meilleure de chaque rafale, les notes proposées. Rien ne change sans son accord ; une photo déjà classée par lui garde son classement, sauf s'il le demande.
+            5. Avec son accord : set_metadata (flag reject) pour les rejets, avec une reason ; au besoin une collection « Claude › Sélection » (manage_collections) pour les photos à garder, et des mots-clés proposés par cull_photos (seulement ceux qu'il approuve). Puis montrer le résultat dans Lightroom : show_photo avec folder ou collection et filter (rating_min, par exemple 3) ; restore_filter remet son filtre ensuite.
+            6. Résume : combien de rejetées, de notes proposées ; comment les afficher dans Lightroom (filtre d'attributs de la Bibliothèque) ; undo_last défait un classement photo par photo.
+            """
+        })
+
+    /// Une passe du standard de notation, telle que l'invite noter la donne.
+    private static func passeNotation(_ arguments: [String: String]) -> String {
+        guard let passe = argument(arguments, "passe") else { return " Toutes les passes du standard, une question à la fois (pass = 1, puis 2, puis 3)." }
+        switch passe {
+        case "1", "2", "3": return " Passe \(passe) du standard (« Les passes ») : pass = \(passe) dans propose_ratings."
+        case "4": return " Passe 4 : 5 étoiles, l'utilisateur seul ; ne propose rien, montre-lui les candidates."
+        default: return " Passe : \(passe)."
+        }
+    }
+
+    public static let noter = PromptTemplate(
+        name: "noter",
+        description: "Noter des photos selon le standard de notation, passe par passe, avec une raison par critère : des notes proposées, que l'utilisateur accepte dans Lightroom (jamais 5 étoiles).",
+        arguments: [
+            .init(name: "photos", description: "Où sont les photos : « la sélection », le nom d'une collection ou le chemin d'un dossier."),
+            .init(name: "passe", description: "La passe : 1 (rejeter ou non), 2 (3 étoiles ou non), 3 (monter à 4 étoiles), ou une consigne (« revoir les 3 étoiles »)."),
+        ],
+        render: { arguments in
+            let ou = argument(arguments, "photos").map { "Photos : \($0)." }
+                ?? "Photos : la séance de notation ouverte dans Lightroom, sinon la sélection (sinon, demande où elles sont)."
+            return """
+            Note des photos de Lightroom Classic selon le standard de notation, reproduit plus bas. \(ou)\(passeNotation(arguments))
+
+            1. cull_photos sur ces photos : le plancher technique (défauts, plafonds de note), les rafales et les piles, les rejets proposés. Une photo de nuit ou au bruit fort se note après le débruitage.
+            2. contact_sheet par planches de 24 à 30 (offset ; les numéros continuent d'une planche à l'autre) : l'Impact et les Qualités se jugent sur toute la sortie vue d'un coup.
+            3. view_photo, avec region sur le sujet, pour les candidates à 4 étoiles (nette à 100 % sur le sujet, meilleure vue de son moment) et pour les cas douteux ; la Finition ne se juge que là (les vignettes peuvent dater d'avant la dernière retouche).
+            4. propose_ratings, avec pass : une note de 0 à \(Notation.noteMaximale) ou flag reject, une raison par critère (impact, qualities, technical_floor ; finish pour une photo développée), une phrase (reason), to_check pour un cas douteux ; jamais au-dessus du plafond de cull_photos, sauf un défaut voulu et maîtrisé, dit dans technical_floor, avec to_check. Jamais 5 étoiles : l'utilisateur seul les pose.
+            5. Résume : combien par note, les cas à vérifier, et que l'utilisateur accepte, change ou met à vérifier dans Lightroom (carte Note, Séance de notation). Jamais set_metadata pour une note sans sa demande ; une photo déjà notée par lui garde sa note, sauf s'il le demande.
+
+            Standard de notation (aussi : ressource developpeur://notation, propose_ratings avec read_standard) :
+
+            \(Notation.standard)
             """
         })
 

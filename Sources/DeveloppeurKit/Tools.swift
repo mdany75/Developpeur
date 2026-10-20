@@ -43,8 +43,9 @@ public struct ToolResult: Equatable {
 /// répartis par thème : retouche globale (Tools+Retouche), retouches locales (Tools+Locales),
 /// aperçu et mesures (Tools+Analyse), profils, paramètres prédéfinis, copie et journal
 /// (Tools+Gestion), Bibliothèque (Tools+Bibliotheque), tri d'une séance et planche contact
-/// (Tools+Tri), guide de style (Tools+Style), livraison en fichiers (Tools+Livraison), variantes
-/// (Tools+Variantes) et harmonisation d'une série (Tools+Serie).
+/// (Tools+Tri), notes proposées selon le standard de notation (Tools+Notation), guide de style
+/// (Tools+Style), livraison en fichiers (Tools+Livraison), variantes (Tools+Variantes) et
+/// harmonisation d'une série (Tools+Serie).
 public final class ToolHandler {
     let lightroom: LightroomServing
     let lookProfiles: LookProfileLibrary
@@ -61,6 +62,9 @@ public final class ToolHandler {
     /// Grilles de recalage déjà calculées, par photo et empreinte de sa géométrie (nil : image trop
     /// uniforme pour en calculer une). Voir Tools+Recalage.swift.
     var recalagesConnus: [String: Recalage.Grille?] = [:]
+    /// Plafond de note de chaque photo au dernier cull_photos de cette session, que propose_ratings
+    /// fait respecter (Tools+Notation.swift).
+    var dernierTri: [Int: Notation.Plafond] = [:]
     /// Contexte de l'appel en cours (progression d'une série, annulation par le client) : les
     /// appels passent un à un (FileOutils), un seul contexte à la fois.
     var contexte = ContexteAppel()
@@ -113,7 +117,7 @@ public final class ToolHandler {
         "apply_settings", "preview_settings", "enhance_photo", "add_mask", "edit_mask", "retouch_spots", "copy_settings",
         "list_profiles", "list_presets", "save_preset", "undo_last", "revert_to_original", "export_journal",
         "find_photos", "set_metadata", "list_keywords", "manage_collections", "create_virtual_copy", "show_photo",
-        "cull_photos", "contact_sheet", "remove_distractions", "remember_style",
+        "cull_photos", "contact_sheet", "propose_ratings", "remove_distractions", "remember_style",
         "export_photos", "compare_variants", "choose_variant", "match_series",
     ]
 
@@ -157,7 +161,7 @@ public final class ToolHandler {
                  properties: targetProperties, required: []),
         ]
         return core + analysisDefinitions + developDefinitions + localDefinitions + managementDefinitions + libraryDefinitions + cullDefinitions
-            + styleDefinitions + deliveryDefinitions + variantDefinitions + seriesDefinitions
+            + notationDefinitions + styleDefinitions + deliveryDefinitions + variantDefinitions + seriesDefinitions
     }
 
     /// Titre lisible de chaque outil (annotations MCP, `title`), que le client montre à la place
@@ -171,18 +175,20 @@ public final class ToolHandler {
         "undo_last": "Annuler la dernière retouche", "revert_to_original": "Revenir à l'état d'avant Claude", "export_journal": "Journal des retouches",
         "find_photos": "Chercher des photos", "set_metadata": "Classer des photos", "list_keywords": "Mots-clés",
         "manage_collections": "Collections", "create_virtual_copy": "Créer une copie virtuelle", "show_photo": "Montrer dans Lightroom",
-        "cull_photos": "Trier une séance", "contact_sheet": "Planche contact", "remove_distractions": "Supprimer les reflets",
+        "cull_photos": "Trier une séance", "contact_sheet": "Planche contact", "propose_ratings": "Proposer des notes",
+        "remove_distractions": "Supprimer les reflets",
         "remember_style": "Guide de style", "export_photos": "Exporter des photos", "compare_variants": "Comparer des variantes",
         "choose_variant": "Choisir une variante", "match_series": "Harmoniser une série",
     ]
     /// Outils qui ne changent rien aux photos ni au catalogue (`readOnlyHint`) : le client peut les
-    /// laisser passer sans demander. Une proposition (preview_settings) passe par l'Historique : pas ici.
+    /// laisser passer sans demander. Une proposition (preview_settings) passe par l'Historique : pas ici ;
+    /// des notes proposées (propose_ratings) vont au registre du module, hors du catalogue : ici.
     /// get_status n'en est pas : il peut demander une sauvegarde du catalogue. view_photo en est,
     /// même avec compare : les deux étapes « Claude · comparaison » de l'Historique laissent la photo
     /// telle qu'elle était (choix de la 2.4, dit dans sa description).
     static let readOnlyTools: Set<String> = [
         "list_selection", "view_photo", "measure_angle", "analyze_photos", "get_settings", "list_profiles",
-        "list_presets", "export_journal", "find_photos", "list_keywords", "cull_photos", "contact_sheet",
+        "list_presets", "export_journal", "find_photos", "list_keywords", "cull_photos", "contact_sheet", "propose_ratings",
     ]
     /// Outils qui défont des retouches (`destructiveHint`) : le client peut demander confirmation.
     static let destructiveTools: Set<String> = ["revert_to_original", "undo_last"]
@@ -357,6 +363,7 @@ public final class ToolHandler {
             default:
                 if let result = try callLibrary(name, args) { return result }
                 if let result = try callCull(name, args) { return result }
+                if let result = try callNotation(name, args) { return result }
                 return ToolResult(text: "Outil inconnu : \(name)", isError: true)
             }
         } catch {
@@ -399,9 +406,11 @@ public final class ToolHandler {
             "analyze_photos": schema("Mesures de chaque photo, photos semblables, écarts avec une référence.",
                                      ["photos": liste, "photos_semblables": liste, "reference": objet]),
             "find_photos": schema("Photos du catalogue qui répondent aux critères, par page.", ["total": nombre, "photos": liste]),
-            "cull_photos": schema("Bilan d'une séance : photos à défaut, rafales, classement, propositions de drapeaux et de notes.",
+            "cull_photos": schema("Bilan d'une séance : photos à défaut, rafales, ordre de lecture, plafonds de note mesurés, proposition de rejet.",
                                   ["photos_analysees": nombre, "floues_ou_ratees": liste, "rafales": liste, "classement": liste,
-                                   "propositions": liste, "vignettes": objet]),
+                                   "plafonds": objet, "propositions": liste, "vignettes": objet]),
+            "propose_ratings": schema("Propositions rangées pour la carte Note et la Séance de notation ; ou le standard de notation.",
+                                      ["seance": ["type": ["string", "null"]], "propositions": liste, "refusees": liste, "standard": texte]),
             "apply_settings": ecriture,
             "add_mask": ecriture,
             "edit_mask": schema("Masques de la photo, ou résultat d'une écriture.", ["mode": texte, "resultats": liste, "masques": liste]),

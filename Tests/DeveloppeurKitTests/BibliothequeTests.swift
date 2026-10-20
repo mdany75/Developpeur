@@ -39,6 +39,18 @@ final class BibliothequeTests: XCTestCase {
         XCTAssertEqual(reply["resultats"]?.array?.first?["changements"]?.array?.first?["libelle"]?.string, "Note")
     }
 
+    /// 1.1 : Claude ne propose jamais 5 étoiles (propose_ratings), mais l'utilisateur peut les lui
+    /// demander : set_metadata les pose toujours.
+    func testSetMetadataStillSetsFiveStarsWhenAsked() {
+        let result = tools.call(name: "set_metadata", arguments: ["rating": 5, "photo_ids": [12], "confirm": true])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertEqual(fake.lastParams["note"], 5)
+        let refus = tools.call(name: "propose_ratings", arguments: ["ratings": [["photo_id": 12, "rating": 5, "reason": "x",
+                                                                                "criteria": ["impact": "a", "qualities": "b", "technical_floor": "c"]]]])
+        XCTAssertTrue(refus.isError)
+        XCTAssertEqual(fake.commands, ["metadonnees"])
+    }
+
     func testSetMetadataRefusesInvalidOrEmptyRequests() {
         for (arguments, expected) in [
             ([:], "Rien à changer"),

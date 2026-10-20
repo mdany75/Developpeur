@@ -284,8 +284,15 @@ final class LivraisonTests: XCTestCase {
             Prompts.texte(Prompts.all.first { $0.name == nom }!, arguments, guide: "- Noirs denses")
         }
         XCTAssertTrue(texte("tri_seance", ["photos": "la collection Vacances", "garder": "30 %"]).contains("cull_photos"))
-        XCTAssertTrue(texte("tri_seance", ["garder": "30 %"]).contains("À retenir : 30 %."))
+        XCTAssertTrue(texte("tri_seance", ["garder": "30 %"]).contains("À garder : 30 % (dans une collection"))
         XCTAssertFalse(texte("tri_seance").contains("Guide de style"), "le tri ne retouche pas")
+        // 1.1 : le tri suit le standard de notation ; plus de 4 ou 5 étoiles à proposer, plus de pick.
+        XCTAssertFalse(texte("tri_seance").contains("4 ou 5 étoiles"))
+        XCTAssertFalse(texte("tri_seance").contains("pick"))
+        XCTAssertTrue(texte("tri_seance").contains("propose_ratings"))
+        XCTAssertTrue(texte("tri_seance").contains("5 étoiles restent à l'utilisateur"))
+        XCTAssertFalse(texte("noter").contains("Guide de style"), "noter ne retouche pas")
+        XCTAssertTrue(texte("harmoniser_serie").contains("(\(ToolHandler.maxContactSheet) par planche)"))
         XCTAssertTrue(texte("portrait").contains("face_skin"))
         XCTAssertTrue(texte("portrait").contains("Guide de style de l'utilisateur"))
         XCTAssertTrue(texte("paysage").contains("measure_angle"))

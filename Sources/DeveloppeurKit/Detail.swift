@@ -38,12 +38,15 @@ public struct DetailMeasurements: Equatable {
         }
     }
 
+    /// Au-delà, le bruit est fort (relevé à 1024 px) : la photo se débruite, et se note après.
+    static let bruitFort = 1.5
+
     /// Seuils relevés à 1024 px : une image propre donne de 0,2 à 0,5, des ombres relevées vers 1.
     public var noiseReading: String {
         let level = max(noise, shadowNoise ?? 0)
         switch level {
         case ..<0.6: return "faible"
-        case ..<1.5: return "visible, surtout dans les ombres : à vérifier par un zoom à 100 %"
+        case ..<Self.bruitFort: return "visible, surtout dans les ombres : à vérifier par un zoom à 100 %"
         default: return "fort : réduction du bruit à prévoir (vérifier par un zoom à 100 %)"
         }
     }

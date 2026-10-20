@@ -1,8 +1,8 @@
 import Foundation
 
-/// Guide de style personnel (`remember_style`) et ressources MCP : le guide, l'aperçu et le journal
-/// d'une photo. La lecture d'une ressource qui touche Lightroom passe par la file des outils, comme
-/// un appel d'outil (MCPServer).
+/// Guide de style personnel (`remember_style`) et ressources MCP : le guide, le standard de
+/// notation, l'aperçu et le journal d'une photo. La lecture d'une ressource qui touche Lightroom
+/// passe par la file des outils, comme un appel d'outil (MCPServer).
 extension ToolHandler {
     var styleDefinitions: [JSONValue] {
         [
@@ -36,6 +36,7 @@ extension ToolHandler {
     // MARK: Ressources
 
     static let ressourceGuide = "developpeur://guide-de-style"
+    static let ressourceNotation = "developpeur://notation"
     static let ressourceApercuActif = "developpeur://photo/active/apercu"
 
     /// Ressources fixes (`resources/list`).
@@ -43,6 +44,8 @@ extension ToolHandler {
         [
             ["uri": .string(Self.ressourceGuide), "name": "guide-de-style", "title": "Guide de style",
              "description": "Les goûts de l'utilisateur en retouche (remember_style).", "mimeType": "text/markdown"],
+            ["uri": .string(Self.ressourceNotation), "name": "standard-de-notation", "title": "Standard de notation",
+             "description": "Ce que vaut chaque note, de 1 à 5 étoiles, et comment noter une sortie (propose_ratings).", "mimeType": "text/markdown"],
             ["uri": .string(Self.ressourceApercuActif), "name": "apercu-photo-active", "title": "Aperçu de la photo active",
              "description": "La photo active de Lightroom, telle qu'elle est développée (JPEG de 1344 px).", "mimeType": "image/jpeg"],
         ]
@@ -65,6 +68,8 @@ extension ToolHandler {
             if uri == Self.ressourceGuide {
                 let texte = guideStyle.lire() ?? "# Guide de style\n\nPas encore de préférence enregistrée.\n"
                 contents = [["uri": .string(uri), "mimeType": "text/markdown", "text": .string(texte)]]
+            } else if uri == Self.ressourceNotation {
+                contents = [["uri": .string(uri), "mimeType": "text/markdown", "text": .string(Notation.standard)]]
             } else if let (id, quoi) = Self.photoDeRessource(uri) {
                 switch quoi {
                 case "apercu":

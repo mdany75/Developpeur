@@ -2,8 +2,9 @@
 -- une section par sujet :
 --   - la liaison avec Claude : état, boutons, mode « Proposer d'abord », réglages, garde-fous et
 --     diagnostic ;
---   - la fenêtre Claude : chemins de Claude Code et du connecteur MCP-Développeur, taille de la
---     fenêtre, fermeture de Claude Code après inactivité, raccourci clavier, dossiers.
+--   - la fenêtre Claude : chemins de Claude Code et du connecteur MCP-Développeur, taille et
+--     disposition de la fenêtre, fermeture de Claude Code après inactivité, raccourci clavier,
+--     dossiers.
 -- Les deux sections lisent et écrivent les mêmes préférences du module (Preferences.lua,
 -- Chemins.prefs).
 
@@ -16,6 +17,7 @@ local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
 
 local Chemins = require 'Chemins'
+local Dispositions = require 'Dispositions'
 local Fichiers = require 'Fichiers'
 local Liaison = require 'Liaison'
 
@@ -32,8 +34,9 @@ local function diagnostic()
         string.format("Mode : %s ; accord dans Lightroom : %s ; copies virtuelles seulement : %s ; libellé protégé : %s ; rejetées protégées : %s ; plafond : %s photos ; retour visuel : %s",
             tostring(prefs.mode), tostring(prefs.accordDansLightroom), tostring(prefs.copiesSeulement), tostring(prefs.libelleProtege),
             tostring(prefs.rejeteesProtegees), tostring(prefs.plafondPhotos), tostring(prefs.retourVisuel)),
-        string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s",
-            tostring(prefs.cheminClaude), tostring(prefs.cheminConnecteur), tostring(prefs.modele)),
+        string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s ; disposition %s, taille %s",
+            tostring(prefs.cheminClaude), tostring(prefs.cheminConnecteur), tostring(prefs.modele),
+            tostring(prefs.disposition), tostring(prefs.taille)),
         "Journaux : " .. select(2, Liaison.cheminJournal()) .. " et " .. Chemins.journal(),
         "",
         "Derniers événements :",
@@ -208,6 +211,9 @@ local function sectionFenetre(f, prefs, ligne)
                 { title = "Grande (grand écran)", value = 'grande' },
             } },
             f:static_text { title = "prise en compte à la prochaine ouverture de la fenêtre" }),
+        ligne("Disposition :",
+            f:popup_menu { value = bind 'disposition', items = Dispositions.items() },
+            f:static_text { title = "aussi par le menu Disposition de la fenêtre Claude" }),
         ligne("Fermer Claude Code après :",
             f:popup_menu { value = bind 'inactivite', items = {
                 { title = "5 minutes sans demande", value = 5 },

@@ -1266,6 +1266,78 @@ function Bibliotheque.metadonnees(params)
     return resultat
 end
 
+-- Notes posées depuis la fenêtre Claude (Notation.poser) : params.notes = { { photo, note (0 à 5)
+-- ou nil, drapeau ('aucun', 'rejetee', 'retenue') ou nil, raison } }, chaque photo avec sa note,
+-- en une écriture ; une étape par photo, que undo_last défait, avec sa raison au journal. Une
+-- photo donnée deux fois ne compte qu'une fois, avec sa dernière valeur : dans une écriture,
+-- Lightroom relit un champ du module avec sa valeur d'avant (constaté le 20 octobre 2026), la
+-- seconde étape effacerait la première. Les garde-fous des photos restent, même avec
+-- depuisLightroom (qui ne lève que la pause et l'accord dans Lightroom).
+local MAX_NOTES = 500
+
+function Bibliotheque.noter(params)
+    verifierPause(params)
+    local prefs = Preferences.lire()
+    verifierAccord(prefs, params, 'set_metadata')
+    local demandes = {}
+    for _, n in ipairs(type(params.notes) == 'table' and params.notes or {}) do
+        if type(n) ~= 'table' or n.photo == nil then
+            echouer("Note sans photo.")
+        end
+        local d = { ajouter = {}, retirer = {}, raison = type(n.raison) == 'string' and n.raison ~= '' and n.raison or nil }
+        if n.note ~= nil then
+            d.note = tonumber(n.note)
+            if not d.note or d.note < 0 or d.note > 5 or d.note ~= math.floor(d.note) then
+                echouer("Note invalide : un entier de 0 (sans note) à 5 est attendu.")
+            end
+        end
+        if n.drapeau ~= nil then
+            d.drapeau = DRAPEAUX[tostring(n.drapeau)]
+            if d.drapeau == nil then
+                echouer("Drapeau invalide : « retenue », « rejetee » ou « aucun ».")
+            end
+        end
+        if d.note == nil and d.drapeau == nil then
+            echouer("Rien à poser pour la photo " .. tostring(n.photo) .. " : une note ou un drapeau.")
+        end
+        demandes[#demandes + 1] = { photo = photoParId(n.photo), d = d }
+    end
+    if #demandes == 0 then
+        echouer("Aucune note à poser.")
+    end
+    local photos, plans, parId = {}, {}, {}
+    for _, demande in ipairs(demandes) do
+        local plan = parId[demande.photo.localIdentifier]
+        if plan then
+            plan.demande = demande.d
+            plan.double = true
+        else
+            plan = nouveauClassement(demande.photo)
+            plan.demande = demande.d
+            parId[demande.photo.localIdentifier] = plan
+            plans[#plans + 1] = plan
+            photos[#photos + 1] = demande.photo
+        end
+    end
+    if #photos > MAX_NOTES then
+        echouer(string.format("%d photos à noter : au plus %d par écriture.", #photos, MAX_NOTES))
+    end
+    local etape = nomEtape(params, "notation")
+    verifierProtection(photos, prefs, params, 'set_metadata')
+    ecrire(etape, function()
+        for _, plan in ipairs(plans) do
+            classer(plan, plan.demande, {}, {})
+            memoriser(plan, etape, { raison = plan.demande.raison })
+        end
+    end)
+    for _, plan in ipairs(plans) do
+        if plan.double then
+            plan.notes[#plan.notes + 1] = "Photo donnée plusieurs fois : seule la dernière note compte."
+        end
+    end
+    return { mode = modeTexte(prefs), resultats = resultatsPlans(plans, etape, params) }
+end
+
 -- Mots-clés du catalogue, par chemin, avec le nombre de photos de chacun.
 function Bibliotheque.motsCles(params)
     local filtre = type(params.filtre) == 'string' and minuscules(params.filtre) or nil

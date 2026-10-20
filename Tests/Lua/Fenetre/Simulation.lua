@@ -104,8 +104,9 @@ modules.LrDate = {
     timeToUserFormat = function(t, format) return os.date(format, math.floor(t)) end,
 }
 
--- Une photo simulée : nom de fichier, dimensions recadrées, nom par modèle de noms, champs du
--- module (`proprietes`), qui ne s'écrivent que dans une écriture du catalogue.
+-- Une photo simulée : nom de fichier, dimensions recadrées, nom par modèle de noms, note et
+-- drapeau posés (champs `note` et `pickStatus` de la photo, à poser par l'essai), champs du module
+-- (`proprietes`), qui ne s'écrivent que dans une écriture du catalogue.
 function S.photo(id, nom, largeur, hauteur)
     local proprietes = {}
     return {
@@ -121,9 +122,13 @@ function S.photo(id, nom, largeur, hauteur)
             proprietes[cle] = valeur
         end,
         getFormattedMetadata = function(_, cle) return cle == 'fileName' and nom or nil end,
-        getRawMetadata = function(_, cle)
+        getRawMetadata = function(self, cle)
             if cle == 'croppedDimensions' then
                 return { width = largeur or 6240, height = hauteur or 4160 }
+            elseif cle == 'rating' then
+                return self.note
+            elseif cle == 'pickStatus' then
+                return self.pickStatus
             end
         end,
         getNameViaPreset = function(_, idModele, texte, sequence)
@@ -208,6 +213,22 @@ modules.LrSocket = {
     bind = function() error("LrSocket.bind : la liaison ne démarre pas dans la suite de la fenêtre") end,
 }
 
+-- Toute table donnée à Lightroom (éléments d'une liste ou d'un menu, valeur d'une propriété) est
+-- neuve : une table relue par Json.decode porte une métatable, sur laquelle Lightroom bloque
+-- (constaté par la liaison, voir docs/SPEC.md, Profil).
+local function neuve(valeur, quoi)
+    if type(valeur) ~= 'table' or valeur.liaison then
+        return
+    end
+    assert(getmetatable(valeur) == nil, quoi .. " : table avec une métatable (relue par Json.decode ?)")
+    for _, element in ipairs(valeur) do
+        if type(element) == 'table' then
+            assert(getmetatable(element) == nil, quoi .. " : élément avec une métatable (relu par Json.decode ?)")
+        end
+    end
+end
+S.neuve = neuve
+
 -- Vues : chaque fabrique rend { genre, args } ; le test parcourt l'arbre.
 S.GENRES_VUES = {
     row = true, column = true, view = true, group_box = true, tab_view = true, tab_view_item = true, scrolled_view = true,
@@ -223,7 +244,11 @@ local fabrique = setmetatable({}, {
         end
         assert(S.GENRES_VUES[genre], "vue inconnue du SDK : " .. tostring(genre))
         return function(_, args)
-            return { genre = genre, args = args or {} }
+            args = args or {}
+            neuve(args.items, genre .. '.items')
+            -- Un bouton radio sans valeur cochée ne se coche jamais.
+            assert(genre ~= 'radio_button' or args.checked_value ~= nil, "radio_button sans checked_value : " .. tostring(args.title))
+            return { genre = genre, args = args }
         end
     end,
 })
@@ -251,6 +276,7 @@ local function tableProprietes()
     return setmetatable(t, {
         __index = valeurs,
         __newindex = function(_, cle, valeur)
+            neuve(valeur, 'propriété ' .. tostring(cle))
             local ancienne = valeurs[cle]
             valeurs[cle] = valeur
             if ancienne ~= valeur then
@@ -279,10 +305,15 @@ modules.LrDialogs = {
         return S.reponseModal or 'cancel'
     end,
     -- La fenêtre flottante : le test la parcourt pendant S.pendantFenetre, puis elle se ferme.
+    -- `close` (demandé par la fenêtre, pour la rouvrir) et `toFront` sont comptés ; la fermeture
+    -- (windowWillClose) vient après S.pendantFenetre.
     presentFloatingDialog = function(_, args)
         S.fenetre = args
         if args.onShow then
-            args.onShow({ toFront = function() end, close = function() end })
+            args.onShow({
+                toFront = function() S.devant = (S.devant or 0) + 1 end,
+                close = function() S.fermetures = (S.fermetures or 0) + 1 end,
+            })
         end
         if S.pendantFenetre then
             S.pendantFenetre(args)

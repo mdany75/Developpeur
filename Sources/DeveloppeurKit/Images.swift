@@ -69,17 +69,19 @@ public enum PreviewImages {
         return jpeg(scaled(combined, maxSide: maxSide))
     }
 
-    /// Colonnes d'une planche contact de `nombre` vignettes : 2 jusqu'à 4, 3 jusqu'à 9, puis 4.
+    /// Colonnes d'une planche contact de `nombre` vignettes : 2 jusqu'à 4, 3 jusqu'à 9, 4 jusqu'à
+    /// 16, 5 jusqu'à 25, puis 6 (30 vignettes en 6 × 5).
     public static func colonnesPlanche(_ nombre: Int) -> Int {
-        nombre <= 4 ? 2 : (nombre <= 9 ? 3 : 4)
+        nombre <= 4 ? 2 : nombre <= 9 ? 3 : nombre <= 16 ? 4 : nombre <= 25 ? 5 : 6
     }
 
     /// Planche contact : les vignettes en grille, sur fond gris foncé comme la grille de Lightroom,
-    /// chacune dans une case 3:2, numérotée (de 1 à n, dans l'ordre donné) et légendée de son nom
-    /// de fichier (coupé au milieu s'il est trop long). Grand côté au plus `maxSide`. Une vignette
-    /// absente laisse sa case vide, numéro et nom compris.
+    /// chacune dans une case 3:2, numérotée (de `premierNumero` à la suite, dans l'ordre donné : les
+    /// numéros continuent d'une planche à l'autre) et légendée de son nom de fichier (coupé au
+    /// milieu s'il est trop long). Grand côté au plus `maxSide`. Une vignette absente laisse sa
+    /// case vide, numéro et nom compris.
     public static func planche(_ vignettes: [(image: CGImage?, legende: String)], colonnes demandees: Int? = nil,
-                               maxSide: Int = maxSide) -> Data? {
+                               premierNumero: Int = 1, maxSide: Int = maxSide) -> Data? {
         guard !vignettes.isEmpty, let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
         let colonnes = max(1, min(demandees ?? colonnesPlanche(vignettes.count), vignettes.count))
         let lignes = (vignettes.count + colonnes - 1) / colonnes
@@ -111,14 +113,15 @@ public enum PreviewImages {
                 let w = Double(image.width) * echelle, h = Double(image.height) * echelle
                 context.draw(image, in: CGRect(x: zone.midX - w / 2, y: zone.midY - h / 2, width: w, height: h))
             }
-            // Numéro dans une pastille, en haut à gauche de la case.
+            // Numéro dans une pastille, en haut à gauche de la case, élargie pour deux ou trois chiffres.
+            let numero = premierNumero + index
             let tailleNumero = max(18, (caseL * 0.07).rounded())
-            let pastille = CGRect(x: x + 6, y: haut - 6 - tailleNumero * 1.5, width: tailleNumero * (index + 1 >= 10 ? 2.1 : 1.5),
-                                  height: tailleNumero * 1.5)
+            let pastille = CGRect(x: x + 6, y: haut - 6 - tailleNumero * 1.5,
+                                  width: tailleNumero * (numero >= 100 ? 2.7 : numero >= 10 ? 2.1 : 1.5), height: tailleNumero * 1.5)
             context.setFillColor(CGColor(red: 0.85, green: 0.33, blue: 0.1, alpha: 0.95))
             context.addPath(CGPath(roundedRect: pastille, cornerWidth: tailleNumero * 0.4, cornerHeight: tailleNumero * 0.4, transform: nil))
             context.fillPath()
-            texte("\(index + 1)", dans: context, centreX: pastille.midX, baseY: pastille.minY + tailleNumero * 0.38,
+            texte("\(numero)", dans: context, centreX: pastille.midX, baseY: pastille.minY + tailleNumero * 0.38,
                   taille: tailleNumero, gras: true, couleur: blanc, largeurMax: pastille.width)
             texte(vignette.legende, dans: context, centreX: x + caseL / 2, baseY: haut - imageH - texteH * 0.78,
                   taille: texteH * 0.62, gras: false, couleur: gris, largeurMax: caseL - 8)

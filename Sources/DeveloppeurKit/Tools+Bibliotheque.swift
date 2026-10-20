@@ -81,7 +81,7 @@ extension ToolHandler {
             tool("set_metadata",
                  "Classe des photos dans la Bibliothèque : note, drapeau, libellé de couleur, titre, légende, droits d'auteur, texte alternatif et description longue (accessibilité : rédigés d'après view_photo, ils partent à l'exportation), champs IPTC (lieu, événement, personnes), position GPS (donnée, ou celle d'une photo de téléphone prise au même moment : gps_from), mots-clés à ajouter ou retirer, paramètre prédéfini de métadonnées. Un mot-clé se donne par son nom ou son chemin (« Lieux > Canada > Montréal ») : un mot-clé existant est réutilisé, un nouveau est créé à cet endroit (un mot de Vision reçoit son nom anglais en synonyme) ; un nom ambigu demande le chemin (list_keywords). Une étape « Claude · <step_name> » par photo, que undo_last et revert_to_original défont. Trier une série est une écriture : en mode « Proposer d'abord », présenter les changements, puis rappeler avec confirm.",
                  properties: [
-                    ("rating", prop("integer", "Note de 0 (sans note) à 5.")),
+                    ("rating", prop("integer", "Note de 0 (sans note) à 5 (5 : à la demande de l'utilisateur ; des notes proposées passent par propose_ratings).")),
                     ("flag", enumProp(Self.flags.map(\.name), "Drapeau : pick = retenue, reject = rejetée, none = l'enlever.")),
                     ("color_label", enumProp(Self.colorLabels.map(\.name), "Libellé de couleur (none = l'enlever).")),
                     ("title", prop("string", "Titre (texte vide = l'effacer).")),

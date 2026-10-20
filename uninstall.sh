@@ -3,14 +3,14 @@
 # uninstall.sh — retire « Développeur » : l'inscription du serveur « MCP-Developpeur » dans
 # Claude Desktop et Claude Code, le serveur mcp-developpeur, le module « Développeur » de
 # Lightroom Classic et ses paramètres prédéfinis invisibles (Lightroom fermé seulement), et les
-# fichiers de travail que le module refait seul (sessions de Claude Code, dossier de travail,
-# configuration MCP et consignes de la fenêtre Claude).
+# fichiers de travail que le module refait seul (sessions de Claude Code et leurs consignes,
+# dossier de travail, configuration MCP de la fenêtre Claude).
 #
 # Usage : bash uninstall.sh [--tout]
 #         --tout : retire aussi ce que le module et le serveur ont gardé pour l'utilisateur, qui
 #                  reste sans cette option : guide de style, conversations de la fenêtre Claude,
-#                  profils de publication, registre de consommation, et les journaux
-#                  (~/Library/Logs/Developpeur)
+#                  profils de publication, registre de consommation, notes proposées et séances
+#                  de notation, et les journaux (~/Library/Logs/Developpeur)
 #
 # Le catalogue et les photos ne sont jamais touchés : les retouches déjà faites restent (elles
 # s'annulent dans le panneau Historique).
@@ -31,6 +31,7 @@ TRAVAIL=(
     "${DEST_DIR}/Atelier"
     "${DEST_DIR}/Temporaire"
     "${DEST_DIR}/connecteur.json"
+    # Consignes communes de la 1.0 (depuis la 1.1, chaque session a les siennes dans Sessions/).
     "${DEST_DIR}/consignes.md"
 )
 
@@ -90,7 +91,7 @@ else
         rmdir "${DEST_DIR}" 2>/dev/null && printf 'Supprimé : %s\n' "${DEST_DIR}"
     fi
     GARDES=()
-    [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, profils de publication, consommation)")
+    [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, profils de publication, consommation, notes proposées)")
     [[ -d "${JOURNAUX}" ]] && GARDES+=("${JOURNAUX} (journaux)")
     if [[ ${#GARDES[@]} -gt 0 ]]; then
         printf 'Gardé pour vous :\n'

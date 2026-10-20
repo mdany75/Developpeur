@@ -2,14 +2,16 @@ import CoreGraphics
 import Foundation
 
 /// Trier une séance : `cull_photos` (photos floues ou ratées, rafales et la meilleure de chacune,
-/// classement, propositions de drapeaux et de notes) et `contact_sheet` (planche contact
-/// numérotée). Les deux travaillent sur les vignettes du cache d'aperçus de Lightroom (commande
-/// vignettes), sans exporter chaque photo ; une photo sans vignette est rendue comme un aperçu.
+/// ordre de lecture, plafonds de note mesurés, proposition de rejet) et `contact_sheet` (planche
+/// contact numérotée, de quoi juger l'Impact d'une sortie sur 20 à 30 vignettes). Les deux
+/// travaillent sur les vignettes du cache d'aperçus de Lightroom (commande vignettes), sans
+/// exporter chaque photo ; une photo sans vignette est rendue comme un aperçu.
 extension ToolHandler {
     static let maxCulledPhotos = 500
     static let thumbnailsPerCommand = 25
     static let cullThumbnailSize = Detail.side
-    static let maxContactSheet = 12
+    /// Une planche de 20 à 30 vignettes : le standard de notation y cherche les photos vues en premier.
+    static let maxContactSheet = 30
     static let contactSheetThumbnailSize = 512
     /// Une vignette plus petite que ce grand côté ne suffit pas aux seuils de netteté (relevés à 1024 px).
     static let minimumCullSide = 900
@@ -30,17 +32,17 @@ extension ToolHandler {
         ]
         return [
             tool("cull_photos",
-                 "Trie une séance (jusqu'à \(Self.maxCulledPhotos) photos) sur les vignettes du cache d'aperçus de Lightroom, sans rien changer : photos floues ou ratées (netteté, mise au point manquée au point AF lu dans les RAW et JPEG Fujifilm, yeux fermés ou plissés, presque noires, brûlées), rafales (photos consécutives semblables, prises coup sur coup) et piles de Lightroom, avec la meilleure de chacune (une seule proposée par pile), classement par netteté, note esthétique et qualité des visages, et propositions de drapeaux et de notes (propositions : photo_ids par drapeau ou note). Les présenter à l'utilisateur, puis, après son accord, les poser avec set_metadata (un appel par proposition) ; undo_last les défait. Avec keywords, des mots-clés proposés par Vision, en français. Long sur une grande séance : la progression se suit photo par photo.",
+                 "Trie une séance (jusqu'à \(Self.maxCulledPhotos) photos) sur les vignettes du cache d'aperçus de Lightroom, sans rien changer : photos floues ou ratées (netteté, mise au point manquée au point AF lu dans les RAW et JPEG Fujifilm, yeux fermés ou plissés, presque noires, brûlées), rafales (photos consécutives semblables, prises coup sur coup) et piles de Lightroom, avec la meilleure de chacune, ordre de lecture (classement : netteté et note esthétique, pas une note), plafonds de note mesurés (plafonds : le plancher technique du standard de notation, qui borne la note sans la donner ; propose_ratings les fait respecter) et proposition de rejet (flag reject, pour un défaut majeur). Aucune étoile : elles se proposent par propose_ratings, après avoir regardé les photos. Présenter les rejets à l'utilisateur, puis, après son accord, les poser avec set_metadata ; undo_last les défait. Avec keywords, des mots-clés proposés par Vision, en français. Long sur une grande séance : la progression se suit photo par photo.",
                  properties: series + [
                     ("keywords", prop("boolean", "true = proposer aussi des mots-clés par photo (Vision, traduits en français), à poser avec set_metadata après accord.")),
-                    ("details", prop("boolean", "true = une ligne de mesures par photo (score, défauts, point AF, mots-clés).")),
+                    ("details", prop("boolean", "true = une ligne de mesures par photo (ordre de lecture, plafond, défauts, point AF, mots-clés).")),
                  ],
                  required: []),
             tool("contact_sheet",
-                 "Planche contact : une seule image de \(Self.maxContactSheet) vignettes au plus, numérotées, avec le nom de chaque fichier, pour voir une série d'un coup d'œil (choisir, comparer, harmoniser) en bien moins de jetons qu'une image par photo. Vignettes du cache d'aperçus de Lightroom (elles peuvent dater d'avant la dernière retouche) ; légende : numéro, id, fichier, note, drapeau. Pour la suite d'une sélection ou d'une collection : offset.",
+                 "Planche contact : une seule image de \(Self.maxContactSheet) vignettes au plus, numérotées, avec le nom de chaque fichier, pour voir une série d'un coup d'œil (choisir, comparer, harmoniser, juger l'Impact sur 20 à 30 vignettes) en bien moins de jetons qu'une image par photo. Vignettes du cache d'aperçus de Lightroom (elles peuvent dater d'avant la dernière retouche : la netteté et la finition se jugent par view_photo) ; légende : numéro, id, fichier, note, drapeau (au-delà de 20 vignettes, les noms se lisent mal sur l'image : la légende fait foi). Pour la suite d'une sélection ou d'une collection : offset, et les numéros continuent d'une planche à l'autre.",
                  properties: series + [
                     ("offset", prop("integer", "Avec selection, collection ou folder : photos à sauter (planche suivante : offset + \(Self.maxContactSheet)).")),
-                    ("columns", prop("integer", "Colonnes (défaut : 2 jusqu'à 4 photos, 3 jusqu'à 9, puis 4).")),
+                    ("columns", prop("integer", "Colonnes (défaut : 2 jusqu'à 4 photos, 3 jusqu'à 9, 4 jusqu'à 16, 5 jusqu'à 25, puis 6).")),
                  ],
                  required: []),
         ]
@@ -167,6 +169,9 @@ extension ToolHandler {
             photos += mesurees.compactMap { $0 }
         }
         var bilan = Tri.bilan(photos, details: args.bool("details") == true).object ?? [:]
+        // Les plafonds de ce tri remplacent ceux d'un tri précédent des mêmes photos (propose_ratings).
+        let plafonds = Tri.plafonds(photos)
+        for photo in photos { dernierTri[photo.id] = plafonds[photo.id] }
         if total > ids.count {
             bilan["photos_non_triees"] = .string("\(total - ids.count) photo(s) de plus dans la série : au plus \(Self.maxCulledPhotos) par appel.")
         }
@@ -175,7 +180,7 @@ extension ToolHandler {
         }
         bilan["vignettes"] = ["cache_de_lightroom": .number(Double(depuisCache)), "apercus_rendus": .number(Double(rendues)),
                               "duree": .string(FileOutils.duree(Date().timeIntervalSince(debut)))]
-        bilan["base"] = .string("Mesures sur les vignettes du cache d'aperçus de Lightroom, réduites à \(Detail.side) px (celles d'une photo retouchée depuis peuvent dater d'avant) ; une photo sans vignette assez grande est rendue comme un aperçu. Netteté : 95e centile du laplacien, ramenée à l'échelle d'un aperçu exporté (moins de 15 floue, plus de 35 nette), au point AF de l'appareil quand le fichier le donne (Fujifilm), sinon dans la zone la plus nette. Yeux : fermés ou plissés si l'œil le plus ouvert d'un sujet (visage d'au moins la moitié du plus grand) a une ouverture sous \(DevelopCatalogue.format(VisionAnalysis.closedEyesThreshold)) (hauteur sur largeur du contour de Vision), seulement pour un visage assez grand ; à confirmer par un zoom. Rafales : photos consécutives où Vision voit la même scène, prises à moins de 4 s d'intervalle ; piles : celles de Lightroom, une seule photo proposée par pile. Propositions à présenter à l'utilisateur, puis à poser après accord avec set_metadata (photo_ids et flag ou rating) ; une photo qui porte déjà un drapeau ou une note n'est pas proposée. À confirmer à l'œil (contact_sheet, view_photo).")
+        bilan["base"] = .string("Mesures sur les vignettes du cache d'aperçus de Lightroom, réduites à \(Detail.side) px (celles d'une photo retouchée depuis peuvent dater d'avant) ; une photo sans vignette assez grande est rendue comme un aperçu. Netteté : 95e centile du laplacien, ramenée à l'échelle d'un aperçu exporté (moins de 15 floue, plus de 35 nette), au point AF de l'appareil quand le fichier le donne (Fujifilm), sinon dans la zone la plus nette. Yeux : fermés ou plissés si l'œil le plus ouvert d'un sujet (visage d'au moins la moitié du plus grand) a une ouverture sous \(DevelopCatalogue.format(VisionAnalysis.closedEyesThreshold)) (hauteur sur largeur du contour de Vision), seulement pour un visage assez grand ; à confirmer par un zoom. Rafales : photos consécutives où Vision voit la même scène, prises à moins de 4 s d'intervalle ; piles : celles de Lightroom, la meilleure de chacune nommée. Classement (ordre) : un ordre de lecture (netteté, note esthétique de Vision à demi-poids), pas une note. Plafonds, d'après le standard de notation (propose_ratings avec read_standard, ou developpeur://notation) : défaut majeur (floue, mise au point manquée, yeux fermés) 0 et rejet proposé ; douce ou mise au point signalée manquée par l'appareil 3 ; presque noire ou brûlée 2, à vérifier (rattrapable par la retouche) ; capture ou document selon Vision 1 ; pas la meilleure de sa rafale ou de sa pile 3 ; sinon \(Notation.noteMaximale) (5 : l'utilisateur seul) ; bruit fort : à noter après le débruitage. Un plafond borne la note, il ne la donne pas ; les étoiles se proposent par propose_ratings. Rejets à présenter à l'utilisateur, puis à poser après accord avec set_metadata (photo_ids et flag reject) ; une photo qui porte déjà un drapeau ou une note n'est pas proposée. À confirmer à l'œil (contact_sheet, view_photo).")
         return .object(bilan)
     }
 
@@ -186,6 +191,7 @@ extension ToolHandler {
         photo.date = Tri.date(description["date"]?.string)
         photo.note = description["note"]?.int
         photo.drapeau = description["drapeau"]?.string
+        photo.format = description["format"]?.string
         photo.pile = description["pile"]?["dessus"]?.int
         guard let source = vignette.image else {
             photo.erreur = vignette.erreur ?? "pas de vignette"
@@ -218,6 +224,9 @@ extension ToolHandler {
     func contactSheet(_ args: Arguments) throws -> ToolResult {
         let decalage = max(0, args.int("offset") ?? 0)
         let (ids, total) = try seriesPhotos(args, maximum: Self.maxContactSheet, decalage: decalage)
+        // Numéros suivis d'une planche à l'autre : la photo 13 d'une sélection porte 13 sur la
+        // deuxième planche (photo_ids : la liste donnée, numérotée depuis 1).
+        let premier = (try args.intList("photo_ids"))?.isEmpty == false ? 1 : decalage + 1
         guard !ids.isEmpty else { throw LightroomError.invalid("Aucune photo pour la planche.") }
         if let colonnes = args.int("columns"), !(1...6).contains(colonnes) {
             throw LightroomError.invalid("« columns » va de 1 à 6.")
@@ -225,12 +234,12 @@ extension ToolHandler {
         var vignettes: [Vignette] = []
         try thumbnails(ids, taille: Self.contactSheetThumbnailSize, minimum: 128, message: "planche contact") { vignettes += $0 }
         guard let image = PreviewImages.planche(vignettes.map { ($0.image, $0.description["fichier"]?.string ?? "photo \($0.id)") },
-                                                colonnes: args.int("columns")) else {
+                                                colonnes: args.int("columns"), premierNumero: premier) else {
             throw LightroomError.plugin("Planche contact impossible à dessiner.")
         }
         var legende: [JSONValue] = []
         for (index, vignette) in vignettes.enumerated() {
-            var item: [String: JSONValue] = ["numero": .number(Double(index + 1)), "id": .number(Double(vignette.id))]
+            var item: [String: JSONValue] = ["numero": .number(Double(premier + index)), "id": .number(Double(vignette.id))]
             for cle in ["fichier", "note", "drapeau", "libelle", "date"] {
                 if let valeur = vignette.description[cle], !valeur.isNull { item[cle] = valeur }
             }
@@ -242,6 +251,7 @@ extension ToolHandler {
         if decalage + ids.count < total {
             info["suite"] = .string("\(total - decalage - ids.count) photo(s) de plus : rappeler avec offset = \(decalage + ids.count).")
         }
-        return ToolResult(content: [.image(base64: image.base64EncodedString(), mimeType: "image/jpeg"), .text(JSONCoding.pretty(.object(info)))])
+        // Recompressée au besoin : Claude Desktop refuse une réponse d'environ 1 Mo.
+        return ToolResult(content: [Self.imageContent(image), .text(JSONCoding.pretty(.object(info)))])
     }
 }

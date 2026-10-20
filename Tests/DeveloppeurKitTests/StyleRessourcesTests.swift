@@ -64,7 +64,8 @@ final class StyleRessourcesTests: XCTestCase {
         let init_ = try call(server, #"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}"#)
         XCTAssertNotNil(init_["result"]?["capabilities"]?["resources"])
         let liste = try call(server, #"{"jsonrpc":"2.0","id":2,"method":"resources/list"}"#)
-        XCTAssertEqual(liste["result"]?["resources"]?.array?.compactMap { $0["uri"]?.string }, ["developpeur://guide-de-style", "developpeur://photo/active/apercu"])
+        XCTAssertEqual(liste["result"]?["resources"]?.array?.compactMap { $0["uri"]?.string },
+                       ["developpeur://guide-de-style", "developpeur://notation", "developpeur://photo/active/apercu"])
         let modeles = try call(server, #"{"jsonrpc":"2.0","id":3,"method":"resources/templates/list"}"#)
         XCTAssertEqual(modeles["result"]?["resourceTemplates"]?.array?.count, 2)
 
@@ -77,6 +78,13 @@ final class StyleRessourcesTests: XCTestCase {
         XCTAssertEqual(fake.calls.last { $0.command == "apercu" }?.params["photo"]?.int, 12)
         let journal = try call(server, #"{"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"developpeur://photo/7/journal"}}"#)
         XCTAssertTrue(journal["result"]?["contents"]?.array?.first?["text"]?.string?.contains("Sous-exposée.") == true)
+        // 1.1 : le standard de notation, sans passer par Lightroom.
+        let avant = fake.calls.count
+        let standard = try call(server, #"{"jsonrpc":"2.0","id":8,"method":"resources/read","params":{"uri":"developpeur://notation"}}"#)
+        let texte = try XCTUnwrap(standard["result"]?["contents"]?.array?.first)
+        XCTAssertEqual(texte["text"]?.string, Notation.standard)
+        XCTAssertEqual(texte["mimeType"]?.string, "text/markdown")
+        XCTAssertEqual(fake.calls.count, avant)
         let inconnue = try call(server, #"{"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"developpeur://ailleurs"}}"#)
         XCTAssertEqual(inconnue["error"]?["code"]?.int, -32002)
     }

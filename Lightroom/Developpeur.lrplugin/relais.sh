@@ -10,9 +10,10 @@
 # Usage : relais.sh <dossier> <claude> <modèle> <session à reprendre ou ""> <dossier de travail>
 #                   <config MCP> <consignes> <pid de Lightroom ou 0>
 #
-# Fichiers dans <dossier> : entree.jsonl (écrit par la fenêtre), sortie.jsonl, erreurs.log,
-# relais.pid, claude.pid ; « arreter » (créé par la fenêtre) ferme Claude Code ; fin.code (écrit
-# à la fin) contient son code de sortie.
+# Fichiers dans <dossier> : entree.jsonl (écrit par la fenêtre), consignes.md (les consignes de
+# cette session, passées en <consignes>), sortie.jsonl, erreurs.log, relais.pid, claude.pid ;
+# « arreter » (créé par la fenêtre) ferme Claude Code ; fin.code (écrit à la fin) contient son code
+# de sortie.
 
 dossier=$1
 claude=$2

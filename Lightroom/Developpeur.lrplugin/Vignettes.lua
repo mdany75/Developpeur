@@ -6,7 +6,8 @@
 -- minimum, l'aperçu rendu peut être plus grand. Le rappel reçoit le JPEG (un texte), ou nil et la
 -- raison. La requête doit rester référencée jusqu'au rappel. Le module les demande toutes à la
 -- fois, attend les rappels, puis écrit chaque JPEG dans un dossier temporaire propre à la
--- commande (le serveur lit puis efface, comme pour un aperçu).
+-- commande (le serveur lit puis efface, comme pour un aperçu). La Séance de notation de la
+-- fenêtre Claude passe par Vignettes.demander, sans la description ni la commande.
 
 local LrDate = import 'LrDate'
 local LrFileUtils = import 'LrFileUtils'
@@ -69,23 +70,19 @@ local function decrireVignette(photo, d)
     return d
 end
 
-function Vignettes.vignettes(params)
-    local ids = type(params.photos) == 'table' and params.photos or {}
-    if #ids == 0 then
-        echouer("Aucune photo : donner photos.")
-    end
-    if #ids > Vignettes.MAX_PAR_COMMANDE then
-        echouer(string.format("Au plus %d photos par commande vignettes.", Vignettes.MAX_PAR_COMMANDE))
-    end
-    local taille = math.floor(math.min(math.max(tonumber(params.taille) or 1024, TAILLE_MIN), TAILLE_MAX))
-    local racine = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'Developpeur')
-    local dossier = LrPathUtils.child(racine, string.format('vignettes-%d', math.floor(LrDate.currentTime() * 1000) % 1000000000))
-    LrFileUtils.createAllDirectories(dossier)
-
+-- Demande la vignette de chaque photo (photo de Lightroom, ou identifiant), toutes à la fois, puis
+-- attend les rappels (Vignettes.DELAI au plus). Une photo introuvable ou une requête refusée finit
+-- aussitôt, avec son erreur, sans bloquer les autres.
+local function demanderTout(liste, taille)
     local demandes = {}
-    for _, id in ipairs(ids) do
-        local demande = { id = tonumber(id) }
-        local ok, photo = LrTasks.pcall(photoParId, id)
+    for _, element in ipairs(liste) do
+        local demande = { id = type(element) == 'table' and element.localIdentifier or tonumber(element) }
+        local ok, photo
+        if type(element) == 'table' then
+            ok, photo = true, element
+        else
+            ok, photo = LrTasks.pcall(photoParId, element)
+        end
         if not ok then
             demande.fini, demande.erreur = true, Liaison.messageErreur(photo)
         else
@@ -118,6 +115,73 @@ function Vignettes.vignettes(params)
     while restantes() > 0 and LrDate.currentTime() - debut < Vignettes.DELAI do
         LrTasks.sleep(0.05)
     end
+    return demandes
+end
+
+-- Écrit le JPEG d'une demande dans le dossier (<id>.jpg) : rend son chemin, ou nil et la raison.
+local function ecrireJpeg(demande, dossier)
+    local chemin, erreur
+    if type(demande.jpeg) == 'string' and #demande.jpeg > 0 then
+        chemin = LrPathUtils.child(dossier, string.format('%d.jpg', demande.id))
+        local fichier = io.open(chemin, 'wb')
+        if fichier then
+            fichier:write(demande.jpeg)
+            fichier:close()
+        else
+            chemin, erreur = nil, "Vignette impossible à écrire dans " .. dossier
+        end
+    elseif demande.erreur then
+        erreur = demande.erreur
+    elseif demande.fini then
+        erreur = "Lightroom n'a pas rendu de vignette" .. (demande.raison and (" : " .. tostring(demande.raison)) or "")
+    else
+        erreur = string.format("Pas de vignette après %d s", Vignettes.DELAI)
+    end
+    demande.requete = nil
+    return chemin, erreur
+end
+
+local function tailleDemandee(taille)
+    return math.floor(math.min(math.max(tonumber(taille) or 1024, TAILLE_MIN), TAILLE_MAX))
+end
+
+-- Dossier temporaire propre à une demande (le serveur lit puis efface).
+local function dossierTemporaire()
+    local racine = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'Developpeur')
+    return LrPathUtils.child(racine, string.format('vignettes-%d', math.floor(LrDate.currentTime() * 1000) % 1000000000))
+end
+
+-- Vignettes de ces photos (photos de Lightroom, ou identifiants) écrites dans `dossier` (créé au
+-- besoin ; sans dossier, un dossier temporaire), pour une planche de la fenêtre. Rend deux
+-- tables par identifiant : { [id] = chemin du JPEG }, et les erreurs { [id] = raison }. À appeler
+-- dans une tâche (les rappels s'attendent par LrTasks.sleep). Le JPEG peut être plus grand que la
+-- taille demandée (un minimum) : le réduire avant de l'afficher dans un cadre fixe.
+function Vignettes.demander(photos, taille, dossier)
+    dossier = dossier or dossierTemporaire()
+    LrFileUtils.createAllDirectories(dossier)
+    local chemins, erreurs = {}, {}
+    for _, demande in ipairs(demanderTout(type(photos) == 'table' and photos or {}, tailleDemandee(taille))) do
+        local chemin, erreur = ecrireJpeg(demande, dossier)
+        if demande.id then
+            chemins[demande.id], erreurs[demande.id] = chemin, erreur
+        end
+    end
+    return chemins, erreurs
+end
+
+function Vignettes.vignettes(params)
+    local ids = type(params.photos) == 'table' and params.photos or {}
+    if #ids == 0 then
+        echouer("Aucune photo : donner photos.")
+    end
+    if #ids > Vignettes.MAX_PAR_COMMANDE then
+        echouer(string.format("Au plus %d photos par commande vignettes.", Vignettes.MAX_PAR_COMMANDE))
+    end
+    local taille = tailleDemandee(params.taille)
+    local dossier = dossierTemporaire()
+    LrFileUtils.createAllDirectories(dossier)
+
+    local demandes = demanderTout(ids, taille)
 
     -- Les descriptions d'abord, par lectures groupées (Photos.decrireTout).
     local trouvees = {}
@@ -140,24 +204,8 @@ function Vignettes.vignettes(params)
                 item = description
             end
         end
-        if type(demande.jpeg) == 'string' and #demande.jpeg > 0 then
-            local chemin = LrPathUtils.child(dossier, string.format('%d.jpg', demande.id))
-            local fichier = io.open(chemin, 'wb')
-            if fichier then
-                fichier:write(demande.jpeg)
-                fichier:close()
-                item.vignette = chemin
-            else
-                item.erreur = "Vignette impossible à écrire dans " .. dossier
-            end
-        elseif demande.erreur then
-            item.erreur = demande.erreur
-        elseif demande.fini then
-            item.erreur = "Lightroom n'a pas rendu de vignette" .. (demande.raison and (" : " .. tostring(demande.raison)) or "")
-        else
-            item.erreur = string.format("Pas de vignette après %d s", Vignettes.DELAI)
-        end
-        demande.requete = nil
+        local chemin, erreur = ecrireJpeg(demande, dossier)
+        item.vignette, item.erreur = chemin, erreur
         liste[#liste + 1] = item
     end
     return { taille = taille, dossier = dossier, photos = liste }

@@ -42,12 +42,12 @@ final class MCPServerTests: XCTestCase {
         XCTAssertNil(try call(#"{"jsonrpc":"2.0","id":2,"method":"initialize","params":{}}"#)["result"]?["serverInfo"]?["title"], "sans titre donné, pas de title")
 
         let outils = try call(#"{"jsonrpc":"2.0","id":3,"method":"tools/list"}"#)["result"]?["tools"]?.array ?? []
-        XCTAssertEqual(outils.count, 33)
+        XCTAssertEqual(outils.count, 34)
         XCTAssertFalse(ToolHandler.toolNames.contains("expand_photo"))
         let refus = try call(#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"expand_photo","arguments":{}}}"#)
         XCTAssertEqual(refus["error"]?["code"]?.int, JSONRPCError.invalidParams, "outil inconnu")
         let invites = (try call(#"{"jsonrpc":"2.0","id":5,"method":"prompts/list"}"#)["result"]?["prompts"]?.array ?? []).compactMap { $0["name"]?.string }
-        XCTAssertEqual(invites, ["retouche_pro", "harmoniser_serie", "tri_seance", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
+        XCTAssertEqual(invites, ["retouche_pro", "harmoniser_serie", "tri_seance", "noter", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
         let annonce = (ServerInfo.instructions + JSONCoding.line(.array(outils))
             + Prompts.all.map { Prompts.texte($0, [:], guide: nil) + $0.description }.joined()).lowercased()
         for mot in ["photoshop", "expand_photo", "firefly", "agrandissement", "galerie", "gallery", "concours", "mariage", "crédit adobe"] {
@@ -89,7 +89,7 @@ final class MCPServerTests: XCTestCase {
     func testPromptsListAndGet() throws {
         let list = try call(#"{"jsonrpc":"2.0","id":6,"method":"prompts/list"}"#)
         let names = try XCTUnwrap(list["result"]?["prompts"]?.array).compactMap { $0["name"]?.string }
-        XCTAssertEqual(names, ["retouche_pro", "harmoniser_serie", "tri_seance", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
+        XCTAssertEqual(names, ["retouche_pro", "harmoniser_serie", "tri_seance", "noter", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
 
         let prompt = try call(#"{"jsonrpc":"2.0","id":7,"method":"prompts/get","params":{"name":"retouche_pro","arguments":{"style":"chaud et doux"}}}"#)
         let message = try XCTUnwrap(prompt["result"]?["messages"]?.array?.first)
@@ -114,6 +114,26 @@ final class MCPServerTests: XCTestCase {
         XCTAssertTrue(ServerInfo.instructions.contains("passe corrective ciblée sur ce seul défaut"))
         XCTAssertTrue(ServerInfo.instructions.contains("deux au plus"))
         XCTAssertTrue(ServerInfo.instructions.contains("jamais de passe sans défaut constaté"))
+    }
+
+    /// 1.1 : noter passe par propose_ratings, selon le standard, jamais 5 étoiles ; l'invite noter
+    /// porte le standard (la fenêtre Claude ne lit pas les ressources) et ne retouche rien.
+    func testRatingIsAnnouncedInInstructionsAndThePrompt() throws {
+        XCTAssertTrue(ServerInfo.instructions.contains("noter : propose_ratings (standard developpeur://notation, jamais 5 ★) ;"))
+        let reponse = try call(#"{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{"name":"noter","arguments":{"photos":"la collection Été","passe":"3"}}}"#)
+        let texte = try XCTUnwrap(reponse["result"]?["messages"]?.array?.first?["content"]?["text"]?.string)
+        XCTAssertTrue(texte.contains("Photos : la collection Été."))
+        XCTAssertTrue(texte.contains("pass = 3 dans propose_ratings"))
+        XCTAssertTrue(texte.hasSuffix(Notation.standard), "le standard, en entier, à la fin")
+        for etape in ["cull_photos", "contact_sheet par planches de 24 à 30", "view_photo", "propose_ratings", "Jamais 5 étoiles",
+                      "Jamais set_metadata pour une note sans sa demande"] {
+            XCTAssertTrue(texte.contains(etape), etape)
+        }
+        XCTAssertFalse(Prompts.noter.avecGuide, "noter ne retouche pas")
+        XCTAssertTrue(Prompts.noter.render(["passe": "4"]).contains("ne propose rien"))
+        XCTAssertTrue(Prompts.noter.render([:]).contains("Toutes les passes"))
+        XCTAssertTrue(Prompts.noter.render(["passe": "revoir les 3 étoiles"]).contains("Passe : revoir les 3 étoiles."))
+        XCTAssertEqual(Prompts.noter.arguments.map(\.name), ["photos", "passe"])
     }
 
     func testInstructionsFitWhatClaudeCodeKeeps() {

@@ -1,10 +1,13 @@
 -- Conversation.lua : une conversation de la fenêtre = une session Claude Code, reprise par
--- `--resume` : des éléments `dany`, `claude`, `outil`, `apercu`, `proposition` et `note`, dans
--- l'ordre du fil. Les dates sont en secondes Unix.
+-- `--resume` : des éléments `dany`, `claude`, `outil`, `apercu`, `proposition`, `notation` et
+-- `note`, dans l'ordre du fil. Les dates sont en secondes Unix. Une conversation de séance de
+-- notation (genre = 'notation', fenêtre « Claude · Séance de notation ») a son titre dès sa
+-- création et n'est jamais la conversation ouverte de la fenêtre Claude.
 --
 -- Élément : id, genre, texte, date, outil, appel, etat ('enCours', 'fait', 'erreur', 'enAttente',
--- 'acceptee', 'refusee'), detail, images (chemins relatifs au dossier de la conversation),
--- changements ({ libelle, avant, apres }), partiel (texte en train d'arriver).
+-- 'acceptee', 'refusee', 'ajustee'), detail, images (chemins relatifs au dossier de la
+-- conversation), changements ({ libelle, avant, apres }), partiel (texte en train d'arriver) ;
+-- pour une notation : passe, seance, notes (voir Conversation.notesDemandees).
 
 require 'Compat'
 local Consignes = require 'Consignes'
@@ -15,6 +18,11 @@ local Conversation = {}
 
 Conversation.PREFIXE_OUTILS = 'mcp__developpeur__'
 Conversation.TITRE_PAR_DEFAUT = "Nouvelle conversation"
+Conversation.TITRE_SEANCE = "Séance de notation"
+-- Genre d'une conversation de séance de notation (absent pour une retouche).
+Conversation.GENRE_SEANCE = 'notation'
+-- Claude ne propose jamais 5 étoiles (standard de notation) : une note lue au-dessus est ramenée.
+Conversation.NOTE_MAXIMALE = 4
 
 local compteur = 0
 
@@ -34,6 +42,22 @@ function Conversation.nouvelle(maintenant)
         modifiee = maintenant,
         elements = {},
     }
+end
+
+-- Une conversation de séance de notation : son titre est choisi (pas de rappel du titre, pas de
+-- titre tiré d'une photo). `seance` : l'identifiant de la séance dans le registre des notes.
+function Conversation.nouvelleSeance(titre, seance, maintenant)
+    local c = Conversation.nouvelle(maintenant)
+    c.genre = Conversation.GENRE_SEANCE
+    local propre = Texte.nettoyer(type(titre) == 'string' and titre or '')
+    c.titre = propre ~= '' and propre or Conversation.TITRE_SEANCE
+    c.titreChoisi = true
+    c.seance = seance
+    return c
+end
+
+function Conversation.estSeance(c)
+    return type(c) == 'table' and c.genre == Conversation.GENRE_SEANCE
 end
 
 local function nouvelElement(genre, champs, date)
@@ -233,11 +257,14 @@ end
 
 -- Outils et propositions ----------------------------------------------------------------------
 
--- « view_photo », « apply_settings · passe 1 : lumière », « view_photo · photo 53636309 ».
+-- « view_photo », « apply_settings · passe 1 : lumière », « view_photo · photo 53636309 »,
+-- « propose_ratings · 14 photos ».
 function Conversation.resumeOutil(nom, entree)
     entree = type(entree) == 'table' and entree or {}
     local precision
-    if type(entree.step_name) == 'string' then
+    if type(entree.ratings) == 'table' and #entree.ratings > 0 then
+        precision = #entree.ratings == 1 and '1 photo' or (#entree.ratings .. ' photos')
+    elseif type(entree.step_name) == 'string' then
         precision = entree.step_name
     elseif type(entree.photo_id) == 'number' then
         precision = 'photo ' .. Texte.nombre(entree.photo_id)
@@ -323,6 +350,114 @@ function Conversation.changementsLus(textes)
     return nil
 end
 
+-- Notes proposées -----------------------------------------------------------------------------
+-- Un élément `notation` suit un appel de propose_ratings, pour le fil seulement : le registre du
+-- module (Notation.lua) reste la source des fenêtres Note et Séance.
+
+local function chaine(v)
+    if type(v) ~= 'string' then
+        return nil
+    end
+    local t = Texte.nettoyer(v)
+    return t ~= '' and t or nil
+end
+
+-- La clé d'une photo (identifiant du catalogue), en texte : nombre et texte se rejoignent.
+function Conversation.clePhoto(photo)
+    if type(photo) == 'number' then
+        return string.format('%d', photo)
+    end
+    return photo ~= nil and tostring(photo) or ''
+end
+
+-- Les notes demandées par Claude (entrée de propose_ratings) :
+--   { photo, note (0 à 4) | nil, drapeau ('rejetee') | nil, criteres = { impact, qualites, plancher,
+--     finition }, raison, a_verifier, etat = 'demandee' }
+-- puis, d'après la réponse du connecteur : fichier, note_avant, drapeau_avant, etat 'proposee' ou
+-- 'refusee' (refus : la raison). Une note au-dessus de 4 est ramenée à 4 (le connecteur la refuse).
+function Conversation.notesDemandees(entree)
+    local notes = {}
+    entree = type(entree) == 'table' and entree or {}
+    for _, r in ipairs(type(entree.ratings) == 'table' and entree.ratings or {}) do
+        if type(r) == 'table' then
+            local criteres = type(r.criteria) == 'table' and r.criteria or {}
+            local note = tonumber(r.rating)
+            if note then
+                note = math.max(0, math.min(Conversation.NOTE_MAXIMALE, math.floor(note)))
+            end
+            notes[#notes + 1] = {
+                photo = r.photo_id,
+                note = note,
+                drapeau = r.flag == 'reject' and 'rejetee' or nil,
+                criteres = { impact = chaine(criteres.impact), qualites = chaine(criteres.qualities),
+                    plancher = chaine(criteres.technical_floor), finition = chaine(criteres.finish) },
+                raison = chaine(r.reason) or '',
+                a_verifier = r.to_check == true,
+                etat = 'demandee',
+            }
+        end
+    end
+    return notes
+end
+
+-- La réponse du connecteur à propose_ratings (`propositions` : photo, fichier, note_avant,
+-- drapeau_avant, etat ; `refusees` : photo, raison), par clé de photo ; nil sans.
+function Conversation.notesLues(textes)
+    for _, texte in ipairs(textes or {}) do
+        local ok, json = pcall(Json.decode, texte)
+        if ok and type(json) == 'table' and (type(json.propositions) == 'table' or type(json.refusees) == 'table') then
+            local lues = { seance = json.seance ~= Json.null and json.seance or nil, propositions = {}, refusees = {} }
+            for _, p in ipairs(type(json.propositions) == 'table' and json.propositions or {}) do
+                if type(p) == 'table' and p.photo ~= nil then
+                    lues.propositions[Conversation.clePhoto(p.photo)] = { fichier = chaine(p.fichier),
+                        note_avant = tonumber(p.note_avant), drapeau_avant = chaine(p.drapeau_avant), etat = chaine(p.etat) }
+                end
+            end
+            for _, r in ipairs(type(json.refusees) == 'table' and json.refusees or {}) do
+                if type(r) == 'table' and r.photo ~= nil then
+                    lues.refusees[Conversation.clePhoto(r.photo)] = chaine(r.raison) or "refusée"
+                end
+            end
+            return lues
+        end
+    end
+    return nil
+end
+
+-- Complète un élément `notation` par le résultat de son appel : refusé en entier (erreur du
+-- connecteur), ou photo par photo.
+function Conversation.completerNotation(e, r)
+    if r.erreur then
+        e.etat = 'erreur'
+        e.texte = Texte.nettoyer(table.concat(r.textes or {}, ' '))
+        for _, x in ipairs(e.notes or {}) do
+            x.etat = 'refusee'
+        end
+        return
+    end
+    e.etat = 'fait'
+    local lues = Conversation.notesLues(r.textes) or { propositions = {}, refusees = {} }
+    if type(lues.seance) == 'string' and lues.seance ~= '' then
+        e.seance = lues.seance
+    end
+    for _, x in ipairs(e.notes or {}) do
+        local cle = Conversation.clePhoto(x.photo)
+        local p = lues.propositions[cle]
+        if lues.refusees[cle] then
+            x.etat = 'refusee'
+            x.refus = lues.refusees[cle]
+        else
+            -- Une réponse sans la photo (ou illisible) : l'outil a réussi, la note est rangée.
+            x.etat = 'proposee'
+            if p then
+                x.fichier = p.fichier or x.fichier
+                x.note_avant = p.note_avant
+                x.drapeau_avant = p.drapeau_avant
+            end
+        end
+    end
+end
+
 -- Événements de Claude Code -------------------------------------------------------------------
 
 local function dernier(c)
@@ -396,6 +531,15 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                         or (type(bloc.entree.step_name) == 'string' and bloc.entree.step_name) or ''
                     c.elements[#c.elements + 1] = nouvelElement('proposition', { texte = raison, outil = court, appel = bloc.id,
                         etat = 'enAttente', changements = Conversation.changementsDemandes(bloc.entree) }, date)
+                elseif court == 'propose_ratings' then
+                    -- Les notes sont dans l'entrée : visibles dans le fil avant la réponse. Le
+                    -- standard seul (read_standard sans ratings) ne range rien ; avec des ratings,
+                    -- le connecteur les range aussi.
+                    local notes = Conversation.notesDemandees(bloc.entree)
+                    if #notes > 0 then
+                        c.elements[#c.elements + 1] = nouvelElement('notation', { outil = court, appel = bloc.id, etat = 'enCours',
+                            passe = tonumber(bloc.entree.pass), seance = chaine(bloc.entree.session), notes = notes }, date)
+                    end
                 end
             end
         end
@@ -416,6 +560,10 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                 e.detail = (e.detail or '') .. '\n\n— Réponse —\n' .. (reponse == '' and '(images seulement)' or reponse)
             end
             local p = dernierIndice(c, function(e) return e.genre == 'proposition' and e.appel == r.idOutil end)
+            local n = dernierIndice(c, function(e) return e.genre == 'notation' and e.appel == r.idOutil end)
+            if n then
+                Conversation.completerNotation(c.elements[n], r)
+            end
             if p then
                 local e = c.elements[p]
                 e.images = chemins
@@ -438,7 +586,7 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                 e.texte = Conversation.texteAffiche(e)
                 e.partiel = false
             end
-            if e.genre == 'outil' and e.etat == 'enCours' then
+            if (e.genre == 'outil' or e.genre == 'notation') and e.etat == 'enCours' then
                 e.etat = ev.interrompue and 'erreur' or 'fait'
             end
             if not (e.genre == 'claude' and (e.texte or '') == '') then

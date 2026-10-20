@@ -1,6 +1,6 @@
--- Lightroom.lua : ce que la fenêtre lit de Lightroom et de son entourage : photo active et
--- sélection, état de la liaison et mode « Proposer d'abord » (lus directement : la liaison est
--- dans ce même module), connexion de Claude Code. À appeler depuis une tâche.
+-- Lightroom.lua : ce que la fenêtre lit de Lightroom et de son entourage : photo active (avec sa
+-- note posée) et sélection, état de la liaison et mode « Proposer d'abord » (lus directement : la
+-- liaison est dans ce même module), connexion de Claude Code. À appeler depuis une tâche.
 
 local LrApplication = import 'LrApplication'
 local LrPathUtils = import 'LrPathUtils'
@@ -16,7 +16,12 @@ local Texte = require 'Texte'
 
 local Lightroom = {}
 
--- Photo active ({ id, nom }) et nombre de photos sélectionnées.
+-- Drapeau (pickStatus : 1, 0 ou −1), en mots.
+local DRAPEAUX = { [1] = 'retenue', [0] = 'aucun', [-1] = 'rejetee' }
+
+-- Photo active ({ id, nom, note, drapeau }) et nombre de photos sélectionnées. La note (0 à 5) et
+-- le drapeau ('retenue', 'aucun', 'rejetee') posés, pour la carte Note de la fenêtre ; nil si la
+-- photo ne les donne pas.
 function Lightroom.photos()
     local info = { selection = 0 }
     local ok = LrTasks.pcall(function()
@@ -25,6 +30,13 @@ function Lightroom.photos()
         if active then
             info.active = { id = active.localIdentifier, nom = active:getFormattedMetadata('fileName') or '' }
             info.selection = #catalogue:getTargetPhotos()
+            local okNote, note, drapeau = LrTasks.pcall(function()
+                return active:getRawMetadata('rating'), active:getRawMetadata('pickStatus')
+            end)
+            if okNote then
+                info.active.note = math.floor(tonumber(note) or 0)
+                info.active.drapeau = DRAPEAUX[tonumber(drapeau) or 0] or 'aucun'
+            end
         end
     end)
     if not ok then
@@ -36,6 +48,12 @@ end
 -- « DSCF4961 » pour DSCF4961.RAF.
 function Lightroom.nomCourt(nom)
     return (tostring(nom or ''):gsub('%.[^.]*$', ''))
+end
+
+-- « ★★★☆☆ » pour 3 (de 0 à 5 étoiles).
+function Lightroom.etoiles(note)
+    local n = math.max(0, math.min(5, math.floor(tonumber(note) or 0)))
+    return string.rep('★', n) .. string.rep('☆', 5 - n)
 end
 
 -- La ligne de contexte jointe à chaque demande.

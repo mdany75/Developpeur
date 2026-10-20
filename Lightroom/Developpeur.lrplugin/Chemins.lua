@@ -3,11 +3,14 @@
 --   ~/Library/Application Support/Developpeur/
 --       mcp-developpeur                        le connecteur MCP-Développeur (installé par install.sh)
 --       Conversations/<id>/conversation.json   le fil, et les images que Claude a regardées
---       Sessions/<id>-<date>-<n>/              échanges avec un processus Claude Code (relais.sh)
+--       Sessions/<id>-<date>-<n>/              échanges avec un processus Claude Code (relais.sh), et
+--                                              ses consignes (consignes.md, écrites à son lancement)
 --       Atelier/                               dossier de travail de Claude Code (vide)
---       Temporaire/                            fichiers de passage (images collées, sorties de commandes)
---       connecteur.json, consignes.md          configuration MCP et consignes, écrites à chaque lancement
+--       Temporaire/                            fichiers de passage (images collées, sorties de
+--                                              commandes, vignettes de la séance de notation)
+--       connecteur.json                        configuration MCP, écrite à chaque lancement
 --       consommation.json, publication.json    jetons comptés, profils de publication de l'utilisateur
+--       notation.json                          notes proposées par Claude et séances de notation
 --   ~/Library/Logs/Developpeur/conversation.log   (à côté de module.log, le journal de la liaison)
 
 local LrFileUtils = import 'LrFileUtils'
@@ -34,7 +37,6 @@ function Chemins.conversations() return LrPathUtils.child(Chemins.racine(), 'Con
 function Chemins.sessions() return LrPathUtils.child(Chemins.racine(), 'Sessions') end
 function Chemins.atelier() return LrPathUtils.child(Chemins.racine(), 'Atelier') end
 function Chemins.configMCP() return LrPathUtils.child(Chemins.racine(), 'connecteur.json') end
-function Chemins.consignes() return LrPathUtils.child(Chemins.racine(), 'consignes.md') end
 function Chemins.temporaire() return LrPathUtils.child(Chemins.racine(), 'Temporaire') end
 function Chemins.journaux() return sous('Library', 'Logs', 'Developpeur') end
 function Chemins.journal() return LrPathUtils.child(Chemins.journaux(), 'conversation.log') end
@@ -98,6 +100,9 @@ end
 Chemins.defauts = {
     -- 'petite', 'moyenne' ou 'grande' (prise en compte à la prochaine ouverture de la fenêtre).
     taille = 'moyenne',
+    -- 'atelier', 'conversation' ou 'panneau' (Dispositions.lua) : choisie dans le Gestionnaire de
+    -- modules externes ou par le menu Disposition de la fenêtre, qui se rouvre aussitôt.
+    disposition = 'conversation',
     modele = 'opus',
     -- Style du menu Style (valeur de Consignes.styles), joint à chaque demande ; « standard »
     -- n'ajoute rien.

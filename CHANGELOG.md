@@ -1,5 +1,9 @@
 # Changements
 
+## 1.1 — 2026-10-20
+
+(à rédiger)
+
 ## 1.0 — 2026-10-20
 
 Première version de Développeur. Elle réunit dans un seul projet, et une seule installation, le

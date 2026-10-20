@@ -75,6 +75,10 @@
 --                                          affiner un masque ; retirer les masques vides
 --   progression {id, titre?, fait?, total?, message?, fin?} → barre de progression de Lightroom
 --                                          pendant une série ; annulee si l'utilisateur l'a arrêtée
+--   notation    {action, seance?, passe?, propositions?, photos?} → notes proposées par Claude,
+--                                          rangées pour la fenêtre sans rien écrire dans le
+--                                          catalogue : proposer (jamais 5 étoiles), lire, seance
+--                                          (la séance de notation ouverte dans Lightroom)
 --
 -- Sans « photo » ni « photos » ni « selection », la commande vise la photo active.
 -- Les erreurs sont levées avec error(message, 0) : le message part tel quel vers Claude.
@@ -93,6 +97,7 @@
 --   Variantes.lua    variantes
 --   Masques.lua      masques
 --   Progression.lua  progression
+--   Notation.lua     notation
 -- Elles s'appuient sur Photos.lua (photos visées, mémoire de Claude), Reglages.lua (valeurs de
 -- développement), Recalage.lua (géométrie et grille du serveur), Plans.lua (ce qu'une retouche
 -- changera), Ecriture.lua (écriture dans le catalogue, étapes, journal) et Profils.lua (profil
@@ -104,6 +109,7 @@ local Bibliotheque = require 'Bibliotheque'
 local Lecture = require 'Lecture'
 local Livraison = require 'Livraison'
 local Masques = require 'Masques'
+local Notation = require 'Notation'
 local Progression = require 'Progression'
 local Rendu = require 'Rendu'
 local Retouche = require 'Retouche'
@@ -152,6 +158,7 @@ local table_commandes = {
     variantes = Variantes.variantes,
     masques = Masques.masques,
     progression = Progression.progression,
+    notation = Notation.commande,
 }
 
 function Commandes.executer(nom, params)

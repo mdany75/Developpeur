@@ -16,7 +16,8 @@ var caracteres: [String] = []
 for code in 32...126 { caracteres.append(String(UnicodeScalar(code)!)) }
 for code in 160...255 { caracteres.append(String(UnicodeScalar(code)!)) }
 caracteres += ["’", "‘", "“", "”", "«", "»", "—", "–", "…", "•", "✓", "✕", "●", "○", "›", "▲", "▼", "▣", "ⓘ",
-               "€", "œ", "Œ", "→", "←", "↑", "↓", "·", "≈", "≤", "≥", "−", "\u{202F}", "\u{2009}"]
+               "€", "œ", "Œ", "→", "←", "↑", "↓", "·", "≈", "≤", "≥", "−", "\u{202F}", "\u{2009}",
+               "★", "☆", "⚑"]
 
 func echapper(_ c: String) -> String {
     switch c {

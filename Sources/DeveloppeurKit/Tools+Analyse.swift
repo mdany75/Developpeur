@@ -260,11 +260,13 @@ extension ToolHandler {
         var vision: VisionReport?
         var featurePrint: VNFeaturePrintObservation?
 
-        /// Une photo floue passe derrière ; puis la note esthétique et la qualité du meilleur visage.
+        /// Une photo floue passe derrière ; puis la note esthétique (à demi-poids, comme l'ordre de
+        /// lecture du tri) et la qualité du meilleur visage, qui départage des photos semblables
+        /// (même sujet) : comme `PhotoTriee.scoreDansGroupe`.
         var score: Double {
             let sharp = min((detail?.sharpest ?? 0) / 60, 1)
             let face = vision?.faces.compactMap(\.quality).max() ?? 0
-            return sharp + (vision?.aesthetics ?? 0) + 0.5 * face
+            return sharp + Tri.poidsEsthetique * (vision?.aesthetics ?? 0) + 0.5 * face
         }
 
         var reason: String {

@@ -1,15 +1,25 @@
-// images-vides.swift — dessine les images « aucun aperçu » de la fenêtre (une par taille de
-// fenêtre), au fond des vignettes (2B2B2B), en PNG à 72 ppp : le SDK de Lightroom affiche une
-// image à sa taille en points.
+// images-vides.swift — dessine les images « aucun aperçu » de la fenêtre Claude, une par cadre
+// d'aperçu de Dispositions.TAILLES (carrés de la Conversation claire et du Panneau, cadres 3:2 de
+// l'Atelier : vide-270.png, vide-600x400.png), au fond des vignettes (2B2B2B), en PNG à 72 ppp :
+// le SDK de Lightroom affiche une image à sa taille en points. Les essais de la fenêtre vérifient
+// qu'il y en a une pour chaque disposition dans chaque taille.
 //
 // Usage : swift scripts/images-vides.swift Lightroom/Developpeur.lrplugin
 
 import AppKit
 
 let dossier = CommandLine.arguments.dropFirst().first ?? "."
-for cote in [230, 270, 320] {
-    let taille = NSSize(width: cote, height: cote)
-    guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: cote, pixelsHigh: cote, bitsPerSample: 8,
+
+// Largeur et hauteur de chaque cadre ; un carré garde son nom d'origine (vide-230.png).
+let cadres: [(Int, Int)] = [
+    (120, 120), (160, 160), (200, 200),     // Panneau
+    (230, 230), (270, 270), (320, 320),     // Conversation claire
+    (450, 300), (600, 400), (720, 480),     // Atelier
+]
+
+for (largeur, hauteur) in cadres {
+    let taille = NSSize(width: largeur, height: hauteur)
+    guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: largeur, pixelsHigh: hauteur, bitsPerSample: 8,
                                      samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                                      bytesPerRow: 0, bitsPerPixel: 0) else { exit(1) }
     rep.size = taille
@@ -19,15 +29,18 @@ for cote in [230, 270, 320] {
     NSRect(origin: .zero, size: taille).fill()
     let style = NSMutableParagraphStyle()
     style.alignment = .center
+    // Un petit cadre (moins de 200 points) : le texte court, en plus petit.
+    let petit = min(largeur, hauteur) < 200
     let attributs: [NSAttributedString.Key: Any] = [
-        .font: NSFont(name: "Helvetica Neue", size: 13) ?? NSFont.systemFont(ofSize: 13),
+        .font: NSFont(name: "Helvetica Neue", size: petit ? 11 : 13) ?? NSFont.systemFont(ofSize: petit ? 11 : 13),
         .foregroundColor: NSColor(white: 0.62, alpha: 1),
         .paragraphStyle: style,
     ]
-    let texte = "Aucun aperçu pour l'instant\n\nLes images que Claude regarde\ns'affichent ici." as NSString
-    let hauteur: CGFloat = 80
-    texte.draw(in: NSRect(x: 10, y: (CGFloat(cote) - hauteur) / 2, width: CGFloat(cote) - 20, height: hauteur), withAttributes: attributs)
+    let texte = (petit ? "Aucun aperçu\npour l'instant" : "Aucun aperçu pour l'instant\n\nLes images que Claude regarde\ns'affichent ici.") as NSString
+    let boite: CGFloat = petit ? 30 : 80
+    texte.draw(in: NSRect(x: 10, y: (CGFloat(hauteur) - boite) / 2, width: CGFloat(largeur) - 20, height: boite), withAttributes: attributs)
     NSGraphicsContext.restoreGraphicsState()
     guard let png = rep.representation(using: .png, properties: [:]) else { exit(1) }
-    try png.write(to: URL(fileURLWithPath: dossier).appendingPathComponent("vide-\(cote).png"))
+    let nom = largeur == hauteur ? "vide-\(largeur).png" : "vide-\(largeur)x\(hauteur).png"
+    try png.write(to: URL(fileURLWithPath: dossier).appendingPathComponent(nom))
 }

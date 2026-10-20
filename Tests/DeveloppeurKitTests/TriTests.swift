@@ -102,11 +102,18 @@ final class TriTests: XCTestCase {
         let propositions = try XCTUnwrap(bilan["propositions"]?.array)
         let rejet = try XCTUnwrap(propositions.first { $0["flag"]?.string == "reject" })
         XCTAssertEqual(rejet["photo_ids"]?.array?.compactMap(\.int), [3])
-        let retenues = try XCTUnwrap(propositions.first { $0["flag"]?.string == "pick" })
-        XCTAssertFalse(retenues["photo_ids"]?.array?.compactMap(\.int).contains(3) ?? true)
-        XCTAssertNotNil(propositions.first { $0["rating"]?.int == 4 })
+        // 1.1 : le standard n'a que Rejeter ; les étoiles passent par propose_ratings.
+        XCTAssertEqual(propositions.count, 1, "plus de pick ni de note : \(JSONCoding.line(.array(propositions)))")
+        XCTAssertNil(propositions.first { $0["rating"] != nil })
+        XCTAssertEqual(bilan["plafonds"]?["3"]?["note_max"]?.int, 0, "floue : plafond 0")
+        XCTAssertEqual(tools.dernierTri[3]?.note, 0, "gardé pour propose_ratings")
+        XCTAssertEqual(tools.dernierTri.count, 26)
         XCTAssertEqual(bilan["vignettes"]?["cache_de_lightroom"]?.int, 26)
         XCTAssertTrue(bilan["base"]?.string?.contains("set_metadata") == true)
+        XCTAssertTrue(bilan["base"]?.string?.contains("propose_ratings") == true)
+        XCTAssertTrue(bilan["base"]?.string?.contains("ordre de lecture") == true)
+        XCTAssertNil(bilan["classement"]?.array?.first?["score"], "un ordre de lecture, pas une note")
+        XCTAssertNotNil(bilan["classement"]?.array?.first?["ordre"])
     }
 
     func testCullFallsBackToARenderedPreviewAndLeavesClassifiedPhotos() throws {
@@ -119,12 +126,47 @@ final class TriTests: XCTestCase {
         XCTAssertEqual(bilan["vignettes"]?["apercus_rendus"]?.int, 1)
         let propositions = bilan["propositions"]?.array ?? []
         XCTAssertNil(propositions.first { $0["flag"]?.string == "reject" }, "la photo floue porte déjà un drapeau : pas de proposition")
-        for proposition in propositions where proposition["rating"] != nil {
-            XCTAssertFalse(proposition["photo_ids"]?.array?.compactMap(\.int).contains(1) ?? true, "déjà notée")
-        }
         XCTAssertNotNil(bilan["deja_classees"])
         XCTAssertEqual(bilan["photos"]?.array?.count, 4, "details : une ligne par photo")
-        XCTAssertNotNil(bilan["photos"]?.array?.first?["nettete_max"])
+        let ligne = try XCTUnwrap(bilan["photos"]?.array?.first)
+        XCTAssertNotNil(ligne["nettete_max"])
+        XCTAssertNotNil(ligne["ordre"])
+        XCTAssertNil(ligne["score"])
+        XCTAssertEqual(bilan["photos"]?.array?[1]["plafond"]?.int, 0, "details : le plafond de la photo floue")
+    }
+
+    /// E5 : une seule règle pour toute proposition. Une photo floue déjà notée par l'utilisateur
+    /// (sans drapeau) n'est pas proposée au rejet, une photo floue retenue non plus ; une photo
+    /// floue libre, oui.
+    func testRejectIsOnlyProposedForPhotosWithoutRatingNorFlag() throws {
+        preparerVignettes(floues: [2, 3, 5], notes: [3: 2], drapeaux: [2: "retenue"])
+        let bilan = try JSONCoding.parse(tools.call(name: "cull_photos", arguments: ["photo_ids": [1, 2, 3, 4, 5]]).text)
+        let rejets = (bilan["propositions"]?.array ?? []).filter { $0["flag"]?.string == "reject" }
+            .flatMap { $0["photo_ids"]?.array?.compactMap(\.int) ?? [] }
+        XCTAssertEqual(rejets, [5])
+        XCTAssertEqual(bilan["plafonds"]?["3"]?["note_max"]?.int, 0, "le plafond reste dit, même sans proposition")
+    }
+
+    /// E4 : la qualité d'un visage ne compare que des prises d'un même visage. Dans l'ordre de
+    /// lecture, un portrait ne passe pas devant un paysage aussi net ; dans une pile, le meilleur
+    /// visage l'emporte.
+    func testFaceQualityOnlyBreaksTiesInsideAGroup() {
+        func photo(_ id: Int, visage: Double?) -> PhotoTriee {
+            var p = PhotoTriee(id: id, fichier: "DSCF\(id).RAF")
+            p.detail = DetailMeasurements(zones: Array(repeating: 50, count: 9), noise: 0.3, shadowNoise: nil, side: 1024)
+            let faces = visage.map { [VisionReport.Face(box: CGRect(x: 0.4, y: 0.3, width: 0.2, height: 0.2), pupils: [], eyeWidth: nil,
+                                                        quality: $0, eyeOpenness: nil)] } ?? []
+            p.vision = VisionReport(faces: faces, aesthetics: 0.2, utility: false, salientArea: nil)
+            p.pile = 1
+            return p
+        }
+        let portrait = photo(1, visage: 0.9), paysage = photo(2, visage: nil)
+        XCTAssertEqual(portrait.score, paysage.score, accuracy: 1e-9)
+        XCTAssertGreaterThan(portrait.scoreDansGroupe, paysage.scoreDansGroupe)
+        let bilan = Tri.bilan([paysage, portrait])
+        XCTAssertEqual(bilan["piles"]?.array?.first?["meilleure"]?.int, 1, "dans la pile, le meilleur visage")
+        XCTAssertEqual(bilan["plafonds"]?["2"]?["note_max"]?.int, 3, "pas la meilleure de sa pile : 3 au plus")
+        XCTAssertNil(bilan["plafonds"]?["1"], "la meilleure, sans défaut : rien ne la borne sous 4")
     }
 
     func testCullTargetsSelectionCollectionAndFolder() throws {
@@ -171,7 +213,43 @@ final class TriTests: XCTestCase {
         XCTAssertEqual(photos.map { $0["numero"]?.int }, [1, 2, 3, 4, 5])
         XCTAssertEqual(photos[2]["id"]?.int, 3)
         XCTAssertNotNil(photos[2]["vignette"], "vignette absente : dit dans la légende")
-        XCTAssertTrue(tools.call(name: "contact_sheet", arguments: ["photo_ids": .array((1...13).map { .number(Double($0)) })]).isError)
+        XCTAssertTrue(tools.call(name: "contact_sheet", arguments: ["photo_ids": .array((1...31).map { .number(Double($0)) })]).isError)
+    }
+
+    /// 1.1 : une planche de 30 vignettes (6 colonnes, deux lots de vignettes), recompressée comme un
+    /// aperçu si elle est trop lourde.
+    func testContactSheetHoldsThirtyThumbnails() throws {
+        preparerVignettes()
+        let result = tools.call(name: "contact_sheet", arguments: ["photo_ids": .array((1...30).map { .number(Double($0)) })])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertEqual(fake.calls.filter { $0.command == "vignettes" }.count, 2)
+        guard case .image(let base64, _) = result.content.first else { return XCTFail("pas d'image") }
+        let data = try XCTUnwrap(Data(base64Encoded: base64))
+        XCTAssertEqual(data, ToolHandler.compact(data, maxBytes: ToolHandler.maxPreviewBytes), "passée par imageContent")
+        let image = try XCTUnwrap(PreviewImages.image(data))
+        XCTAssertEqual(image.width, 1600)
+        XCTAssertGreaterThan(image.width, image.height, "6 colonnes, 5 lignes")
+        let numeros = try JSONCoding.parse(result.text)["photos"]?.array?.compactMap { $0["numero"]?.int }
+        XCTAssertEqual(numeros, Array(1...30))
+
+        // Des vignettes de bruit pur : une planche bien plus lourde que 600 Ko, recompressée.
+        var graine: UInt32 = 7
+        var pixels = [UInt8](repeating: 255, count: 300 * 200 * 4)
+        for i in pixels.indices where i % 4 != 3 { graine = graine &* 1_664_525 &+ 1_013_904_223; pixels[i] = UInt8(graine >> 24) }
+        let bruit = Self.encode(pixels, width: 300, height: 200)
+        fake.onSend = { [unowned fake] command, params in
+            guard let fake, command == "vignettes" else { return }
+            let ids = (params["photos"]?.array ?? []).compactMap(\.int)
+            fake.replies["vignettes"] = ["photos": .array(ids.map { ["id": .number(Double($0)), "fichier": .string("DSCF\($0).RAF"),
+                                                                     "vignette": .string(TestSupport.previewFile(bruit))] })]
+        }
+        let lourde = tools.call(name: "contact_sheet", arguments: ["photo_ids": .array((1...30).map { .number(Double($0)) })])
+        guard case .image(let envoye, _) = lourde.content.first else { return XCTFail("pas d'image") }
+        let image300 = try XCTUnwrap(PreviewImages.image(bruit))
+        let brute = try XCTUnwrap(PreviewImages.planche((1...30).map { (image300, "DSCF\($0).RAF") }))
+        XCTAssertGreaterThan(brute.count, ToolHandler.maxPreviewBytes)
+        XCTAssertEqual(Data(base64Encoded: envoye), ToolHandler.compact(brute, maxBytes: ToolHandler.maxPreviewBytes))
+        XCTAssertLessThan(Data(base64Encoded: envoye)?.count ?? .max, brute.count, "recompressée comme un aperçu")
     }
 
     func testContactSheetOffsetsThroughACollection() throws {
@@ -181,16 +259,25 @@ final class TriTests: XCTestCase {
         XCTAssertFalse(result.isError, result.text)
         XCTAssertEqual(fake.calls.first { $0.command == "chercher" }?.params["decalage"]?.int, 12)
         XCTAssertTrue(result.text.contains("offset = 24"))
+        // Numéros suivis : la deuxième planche commence à 13, comme la treizième photo de la séance.
+        let numeros = try JSONCoding.parse(result.text)["photos"]?.array?.compactMap { $0["numero"]?.int }
+        XCTAssertEqual(numeros, Array(13...24))
     }
 
     func testPlancheLayout() throws {
         XCTAssertEqual(PreviewImages.colonnesPlanche(4), 2)
         XCTAssertEqual(PreviewImages.colonnesPlanche(9), 3)
         XCTAssertEqual(PreviewImages.colonnesPlanche(12), 4)
+        XCTAssertEqual(PreviewImages.colonnesPlanche(16), 4)
+        XCTAssertEqual(PreviewImages.colonnesPlanche(20), 5)
+        XCTAssertEqual(PreviewImages.colonnesPlanche(25), 5)
+        XCTAssertEqual(PreviewImages.colonnesPlanche(30), 6)
         let image = try XCTUnwrap(PreviewImages.image(Self.damier(width: 300, height: 200)))
         let data = try XCTUnwrap(PreviewImages.planche([(image, "un nom de fichier très très long à couper au milieu.RAF"), (nil, "absente")]))
         let planche = try XCTUnwrap(PreviewImages.image(data))
         XCTAssertEqual(planche.width, 1600)
+        // Trois chiffres : la pastille s'élargit, rien ne déborde.
+        XCTAssertNotNil(PreviewImages.planche([(image, "DSCF0099.RAF"), (image, "DSCF0100.RAF")], premierNumero: 99))
     }
 
     // MARK: Point de mise au point

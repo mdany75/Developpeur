@@ -15,8 +15,8 @@ require 'Simulation'
 local AVEC_ETAT = { Liaison = true, Preferences = true, Suivi = true }
 
 -- Champs d'état d'un module par ailleurs vérifié : posés pendant que Lightroom tourne (la
--- conversation ouverte de la fenêtre Claude), vides au chargement.
-local CHAMPS_ETAT = { Moteur = { courante = true } }
+-- conversation ouverte de la fenêtre Claude, celle où Claude travaille), vides au chargement.
+local CHAMPS_ETAT = { Moteur = { courante = true, enCours = true } }
 
 -- Le code seul : commentaires et contenu des chaînes remplacés par des espaces (« Geometrie.lua »
 -- dans un commentaire n'est pas un champ lu). Les chaînes gardent leurs guillemets, pour require.

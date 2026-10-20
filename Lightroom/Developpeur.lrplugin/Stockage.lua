@@ -1,5 +1,6 @@
 -- Stockage.lua : les conversations sur le disque, une par dossier
--- (Conversations/<id>/conversation.json et ses images).
+-- (Conversations/<id>/conversation.json et ses images), séances de notation comprises
+-- (genre = 'notation').
 
 local LrPathUtils = import 'LrPathUtils'
 
@@ -48,6 +49,14 @@ local function pourJson(c)
             changements[j] = ch
         end
         x.changements = changements
+        -- Les notes proposées d'une notation : un tableau, même vide.
+        if e.notes ~= nil or e.genre == 'notation' then
+            local notes = Json.tableau()
+            for j, note in ipairs(e.notes or {}) do
+                notes[j] = note
+            end
+            x.notes = notes
+        end
         elements[i] = x
     end
     copie.elements = elements
@@ -76,7 +85,10 @@ function Stockage.lire(id)
         e.partiel = false
         e.images = e.images or {}
         e.changements = e.changements or {}
-        if e.genre == 'outil' and e.etat == 'enCours' then
+        if e.genre == 'notation' then
+            e.notes = e.notes or {}
+        end
+        if (e.genre == 'outil' or e.genre == 'notation') and e.etat == 'enCours' then
             e.etat = 'erreur'
         end
     end

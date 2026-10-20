@@ -955,8 +955,9 @@ function catalogue:setSelectedPhotos(active, autres)
     S.qualiteJusqua = S.chargementJusqua + S.delaiQualite
 end
 
+-- Chemin du catalogue ouvert (S.cheminCatalogue, pour essayer un autre catalogue).
 function catalogue:getPath()
-    return '/Users/test/Images/Catalogue.lrcat'
+    return S.cheminCatalogue
 end
 
 -- Écriture privée (SDK 9.0) : seulement les champs du module, sans opération dans Édition ›
@@ -2188,6 +2189,7 @@ function S.reinitialiser()
     S.lecturesGroupees = 0
     S.jeuLibellesIllisible = false
     S.fuseau = 0
+    S.cheminCatalogue = '/Users/test/Images/Catalogue.lrcat'
 end
 
 S.reinitialiser()

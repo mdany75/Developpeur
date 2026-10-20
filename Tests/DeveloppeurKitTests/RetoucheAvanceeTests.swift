@@ -167,6 +167,8 @@ final class RetoucheAvanceeTests: XCTestCase {
         XCTAssertEqual(annotations("revert_to_original")?["destructiveHint"]?.bool, true)
         XCTAssertEqual(annotations("set_metadata")?["destructiveHint"]?.bool, false)
         XCTAssertEqual(annotations("contact_sheet")?["title"]?.string, "Planche contact")
+        XCTAssertEqual(annotations("propose_ratings")?["title"]?.string, "Proposer des notes")
+        XCTAssertEqual(annotations("propose_ratings")?["readOnlyHint"]?.bool, true, "des propositions, hors du catalogue")
         for definition in definitions {
             XCTAssertNotNil(definition["title"]?.string, "titre pour \(definition["name"]?.string ?? "?")")
         }

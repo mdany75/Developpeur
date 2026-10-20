@@ -1,12 +1,20 @@
 -- Fenetre.lua : la fenêtre « Claude » du module Développeur (fenêtre flottante, non bloquante) :
--- les conversations à gauche, le fil au centre avec les appels d'outils, les invites en raccourcis
--- et la demande ; à droite, ce que Claude regarde, sa proposition à accepter, refuser ou ajuster,
--- et en bas les versions du module et du connecteur MCP-Développeur.
+-- une conversation avec Claude Code (le fil avec les appels d'outils, les invites en raccourcis et
+-- la demande), ce que Claude regarde, sa proposition à accepter, refuser ou ajuster, la note qu'il
+-- propose pour la photo active, et les versions du module et du connecteur MCP-Développeur.
+--
+-- Trois dispositions au choix (préférence `disposition`, dans le Gestionnaire de modules externes
+-- ou le menu Disposition de la fenêtre) : Atelier, Conversation claire, Panneau. Dispositions.lua
+-- les assemble des pièces de Vues.lua ; ce fichier garde l'état, ce qui remplit les propriétés
+-- liées (rafraichir…), les actions, la boucle, l'ouverture et la réouverture. Les pièces ne
+-- connaissent que les propriétés : une clé sans vue dans une disposition ne gêne pas.
 --
 -- Le SDK ne sait ni ajouter de vues à une fenêtre ouverte ni la faire défiler par programme, et
 -- une vue masquée garde sa place : le fil est une grille de lignes fixes (Fil.lua), remplie à
 -- chaque changement et parcourue par les boutons ▲ ▼ ; chaque ligne superpose une variante par
--- genre (police, couleur), dont une seule est visible.
+-- genre (police, couleur), dont une seule est visible. Les onglets sont une rangée de boutons
+-- radio au-dessus de variantes superposées de même largeur. Changer de disposition ferme la
+-- fenêtre et la rouvre (Fenetre.rouvrir).
 
 local LrBinding = import 'LrBinding'
 local LrColor = import 'LrColor'
@@ -17,8 +25,10 @@ local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
 
 local Chemins = require 'Chemins'
+local Composants = require 'Composants'
 local Consignes = require 'Consignes'
 local Conversation = require 'Conversation'
+local Dispositions = require 'Dispositions'
 local Fil = require 'Fil'
 local Images = require 'Images'
 local Journal = require 'Journal'
@@ -26,20 +36,13 @@ local Json = require 'Json'
 local Lightroom = require 'Lightroom'
 local Metriques = require 'Metriques'
 local Moteur = require 'Moteur'
+local Notation = require 'Notation'
 local Stockage = require 'Stockage'
 local Texte = require 'Texte'
-local Composants = require 'Composants'
 
-local Fenetre = { ouverte = false, defilement = 0, jointes = {}, cache = {}, vignettes = {} }
+local Fenetre = { ouverte = false, defilement = 0, jointes = {}, cache = {}, vignettes = {}, generation = 0 }
 
--- lignes : lignes du fil montrées ; fil : largeur de la colonne centrale ; liste : colonne des
--- conversations ; droite : colonne des aperçus ; apercu : côté de l'aperçu (et de son image vide).
-Fenetre.TAILLES = {
-    petite = { lignes = 22, fil = 560, liste = 190, droite = 250, apercu = 230 },
-    moyenne = { lignes = 30, fil = 760, liste = 220, droite = 290, apercu = 270 },
-    grande = { lignes = 40, fil = 900, liste = 250, droite = 340, apercu = 320 },
-}
-
+-- Couleurs, polices, icônes et variantes des lignes, pour les pièces (Vues.lua).
 local COULEURS = {
     texte = LrColor(0.11, 0.11, 0.12),
     dany = LrColor(0.04, 0.32, 0.72),
@@ -50,6 +53,7 @@ local COULEURS = {
     rouge = LrColor(0.82, 0.18, 0.18),
     bleu = LrColor(0.10, 0.42, 0.85),
 }
+Fenetre.COULEURS = COULEURS
 
 local function police(cle, taille)
     local m = Metriques[cle]
@@ -63,9 +67,10 @@ local POLICES = {
     titre = police('gras', 15),
     petit = police('texte', 11),
 }
+Fenetre.POLICES = POLICES
 
 -- Icônes de la colonne de gauche du fil.
-local ICONES = {
+Fenetre.ICONES = {
     { cle = 'dany', glyphe = '›', couleur = 'dany' },
     { cle = 'ok', glyphe = '✓', couleur = 'vert' },
     { cle = 'cours', glyphe = '●', couleur = 'orange' },
@@ -76,7 +81,7 @@ local ICONES = {
 }
 
 -- Variantes de texte d'une ligne, selon son genre.
-local STYLES = {
+Fenetre.STYLES = {
     { genres = { claude = true, vide = true }, police = 'texte', couleur = 'texte' },
     { genres = { titre = true }, police = 'gras', couleur = 'texte' },
     { genres = { dany = true }, police = 'texte', couleur = 'dany' },
@@ -87,17 +92,22 @@ local STYLES = {
 }
 
 -- Pastilles des voyants (Claude Code, Lightroom, mode).
-local PASTILLES = { ok = 'vert', attention = 'orange', erreur = 'rouge', neutre = 'gris', bleu = 'bleu' }
+Fenetre.PASTILLES = { ok = 'vert', attention = 'orange', erreur = 'rouge', neutre = 'gris', bleu = 'bleu' }
 
 local bind = LrView.bind
+Fenetre.bind = bind
 
-local function egal(cle, valeur)
+function Fenetre.egal(cle, valeur)
     return bind { key = cle, transform = function(v) return v == valeur end }
+end
+
+function Fenetre.non(cle)
+    return bind { key = cle, transform = function(v) return not v end }
 end
 
 -- Les fenêtres modales et le choix de fichiers s'ouvrent depuis une tâche, pas depuis l'action
 -- d'un bouton.
-local function enTache(fn, ...)
+function Fenetre.enTache(fn, ...)
     local arguments = { ... }
     LrTasks.startAsyncTask(function()
         local ok, erreur = LrTasks.pcall(fn, unpack(arguments))
@@ -105,6 +115,26 @@ local function enTache(fn, ...)
             Journal.noter("Fenêtre :", tostring(erreur))
         end
     end)
+end
+local enTache = Fenetre.enTache
+
+-- Les actions des boutons passés par Fenetre.bouton (les essais vérifient que tous y passent).
+local parBouton = setmetatable({}, { __mode = 'k' })
+
+-- Tout bouton de la fenêtre passe par ici : son clic valide aussi le champ de demande (constaté),
+-- qui ne doit pas partir ensuite ; le bouton décide.
+function Fenetre.bouton(f, args)
+    local action = args.action
+    args.action = function(...)
+        Fenetre.annulerEnvoiAuto()
+        return action(...)
+    end
+    parBouton[args.action] = true
+    return f:push_button(args)
+end
+
+function Fenetre.parBouton(action)
+    return parBouton[action] == true
 end
 
 -- Change une propriété seulement si sa valeur change (moins de travail pour Lightroom).
@@ -147,6 +177,12 @@ end
 
 -- Liste des conversations ---------------------------------------------------------------------
 
+-- Les conversations d'une séance de notation (FenetreNotation.lua) n'y figurent pas : elles ont
+-- leur fenêtre.
+local function estSeance(c)
+    return c ~= nil and c.genre == 'notation'
+end
+
 local function periode(t, maintenant)
     maintenant = maintenant or os.time()
     if os.date('%Y%m%d', t) == os.date('%Y%m%d', maintenant) then
@@ -171,7 +207,7 @@ function Fenetre.elementsListe(recherche)
         if c == courante then
             dejaVue = true
         end
-        if Conversation.correspond(c, recherche or '') then
+        if not estSeance(c) and Conversation.correspond(c, recherche or '') then
             local p = periode(c.modifiee or c.creee or os.time())
             if p ~= derniere then
                 items[#items + 1] = { title = p, value = '§' .. p }
@@ -180,8 +216,29 @@ function Fenetre.elementsListe(recherche)
             items[#items + 1] = { title = "   " .. tostring(c.titre or ''), value = c.id }
         end
     end
-    if courante and not dejaVue then
+    if courante and not dejaVue and not estSeance(courante) then
         table.insert(items, 1, { title = "   " .. tostring(courante.titre or Conversation.TITRE_PAR_DEFAUT), value = courante.id })
+    end
+    return items
+end
+
+-- Conversations du menu (Atelier, Panneau) : les plus récentes.
+Fenetre.MAX_MENU = 40
+
+-- Éléments du menu des conversations : sans en-têtes (un menu n'a pas d'élément inactif), la
+-- conversation montrée toujours dedans ; tables neuves.
+function Fenetre.elementsMenu()
+    local items = {}
+    local courante = Moteur.courante
+    local dejaVue = false
+    for _, c in ipairs(Moteur.conversations) do
+        if not estSeance(c) and #items < Fenetre.MAX_MENU then
+            items[#items + 1] = { title = tostring(c.titre or ''), value = c.id }
+            dejaVue = dejaVue or c == courante
+        end
+    end
+    if courante and not dejaVue and not estSeance(courante) then
+        table.insert(items, 1, { title = tostring(courante.titre or Conversation.TITRE_PAR_DEFAUT), value = courante.id })
     end
     return items
 end
@@ -192,8 +249,13 @@ function Fenetre.rafraichirListe()
         return
     end
     local items = Fenetre.elementsListe(p.recherche)
+    local menu = Fenetre.elementsMenu()
     local morceaux = {}
     for _, item in ipairs(items) do
+        morceaux[#morceaux + 1] = tostring(item.value) .. '\1' .. item.title
+    end
+    morceaux[#morceaux + 1] = '\3'
+    for _, item in ipairs(menu) do
         morceaux[#morceaux + 1] = tostring(item.value) .. '\1' .. item.title
     end
     morceaux[#morceaux + 1] = Moteur.courante and Moteur.courante.id or ''
@@ -205,13 +267,15 @@ function Fenetre.rafraichirListe()
     Fenetre.signatureListe = signature
     Fenetre.majListe = true
     p.listeConversations = items
+    p.menuConversations = menu
     if Moteur.courante then
         p.selectionListe = { Moteur.courante.id }
+        p.conversationChoisie = Moteur.courante.id
     end
     Fenetre.majListe = false
 end
 
--- Choix dans la liste : ouvre la conversation (un en-tête, ou un refus, remet la sélection).
+-- Choix dans la liste ou le menu : ouvre la conversation (un en-tête, ou un refus, remet le choix).
 function Fenetre.choisirDansListe(valeur)
     if Fenetre.majListe then
         return
@@ -235,6 +299,17 @@ function Fenetre.choisirDansListe(valeur)
     Fenetre.defilement = 0
     Fenetre.indiceImage = nil
     Fenetre.p.message = ''
+end
+
+function Fenetre.nouvelle()
+    local ok, raison = Moteur.nouvelle()
+    if not ok and Fenetre.p then
+        Fenetre.p.message = raison or ''
+        return
+    end
+    Fenetre.defilement = 0
+    Fenetre.indiceImage = nil
+    Fenetre.aRafraichir = true
 end
 
 -- Fil -----------------------------------------------------------------------------------------
@@ -292,7 +367,7 @@ function Fenetre.defiler(pas)
     Fenetre.rafraichirFil()
 end
 
--- Clic sur une ligne : une image s'affiche à droite, un outil montre son détail.
+-- Clic sur une ligne : une image s'affiche dans l'aperçu, un outil montre son détail.
 function Fenetre.cliquerLigne(i)
     Fenetre.annulerEnvoiAuto()
     local l = Fenetre.lignes and Fenetre.lignes[(Fenetre.premiere or 1) + i - 1]
@@ -306,6 +381,7 @@ function Fenetre.cliquerLigne(i)
             end
         end
         Fenetre.rafraichirApercu()
+        Fenetre.choisirOnglet('apercu')
         return
     end
     local c = Moteur.courante
@@ -332,10 +408,28 @@ function Fenetre.montrerDetail(e)
     }
 end
 
+-- Onglets -------------------------------------------------------------------------------------
+
+-- Montre un onglet de la disposition (s'il y est) sans annuler l'envoi automatique : c'est la
+-- fenêtre qui change d'onglet, pas un clic.
+function Fenetre.choisirOnglet(valeur)
+    local p, T = Fenetre.p, Fenetre.T
+    if not p or not valeur or not T or not T.onglets then
+        return
+    end
+    for _, onglet in ipairs(T.onglets) do
+        if onglet.valeur == valeur and p.onglet ~= valeur then
+            Fenetre.ongletAuto = true
+            p.onglet = valeur
+            Fenetre.ongletAuto = false
+        end
+    end
+end
+
 -- Aperçus -------------------------------------------------------------------------------------
 
 function Fenetre.imageVide()
-    return Chemins.ressource('vide-' .. Fenetre.T.apercu .. '.png')
+    return Chemins.ressource(Dispositions.imageVide(Fenetre.T))
 end
 
 function Fenetre.rafraichirApercu()
@@ -361,17 +455,18 @@ function Fenetre.rafraichirApercu()
     local image = Fenetre.images[indice]
     local nature = image.outil == 'jointe' and "photo jointe" or (image.outil or "aperçu")
     poser(p, 'legendeApercu', string.format("%d sur %d · %s", indice, n, nature))
-    local cle = c.id .. '/' .. image.chemin .. '/' .. T.apercu
+    local hauteur = T.apercuHauteur or T.apercu
+    local cle = c.id .. '/' .. image.chemin .. '/' .. T.apercu .. 'x' .. hauteur
     local deja = Fenetre.vignettes[cle]
     if deja then
         poser(p, 'imageApercu', deja)
         return
     end
     LrTasks.startAsyncTask(function()
-        local chemin = Images.vignette(Stockage.dossier(c.id), image.chemin, T.apercu)
+        local chemin = Images.vignette(Stockage.dossier(c.id), image.chemin, T.apercu, hauteur)
         if chemin then
             Fenetre.vignettes[cle] = chemin
-            if Fenetre.p and Moteur.courante == c then
+            if Fenetre.p and Fenetre.T == T and Moteur.courante == c then
                 Fenetre.p.imageApercu = chemin
             end
         end
@@ -424,6 +519,13 @@ function Fenetre.rafraichirProposition()
     local c = Moteur.courante
     local prop = c and Conversation.propositionEnAttente(c)
     poser(p, 'enAttente', prop ~= nil and not Moteur.travaille)
+    poser(p, 'aProposition', prop ~= nil)
+    -- Une proposition qui arrive se montre (onglet Proposition, ou Retoucher du Panneau) ; une
+    -- seule fois, pour ne pas reprendre la main à chaque rafraîchissement.
+    if prop and prop.id ~= Fenetre.propositionVue then
+        Fenetre.propositionVue = prop.id
+        Fenetre.choisirOnglet(Fenetre.T.ongletProposition)
+    end
     if not prop then
         poser(p, 'propositionTexte', "Aucune proposition en attente.\n\nEn mode « Proposer d'abord », Claude montre ici ce qu'il compte changer et attend votre accord.")
         return
@@ -433,6 +535,10 @@ function Fenetre.rafraichirProposition()
         lignes[#lignes + 1] = string.format("%s : %s → %s", ch.libelle or '?', ch.avant or '—', ch.apres or '—')
     end
     poser(p, 'propositionTexte', table.concat(lignes, '\n'))
+end
+
+function Fenetre.repondreProposition(acceptee)
+    LrTasks.startAsyncTask(function() Moteur.repondre(acceptee) end)
 end
 
 function Fenetre.ajuster()
@@ -469,6 +575,247 @@ function Fenetre.ajuster()
     end
 end
 
+-- Note de la photo active ----------------------------------------------------------------------
+-- La carte « Note » lit le registre des notes proposées (Notation.lua, rempli par la commande
+-- `notation` de la liaison quand Claude appelle propose_ratings) et la note posée de la photo
+-- active. Accepter et Changer… écrivent par Notation.poser, sans Claude ni quota ; Dany peut poser
+-- 5 ★, Claude ne le propose jamais.
+
+local ETATS_NOTE = {
+    proposee = "proposée",
+    acceptee = "acceptée",
+    changee = "changée",
+    a_verifier = "à vérifier",
+    ecartee = "écartée",
+}
+
+local COULEURS_NOTE = { proposee = 'orange', acceptee = 'vert', changee = 'vert', a_verifier = 'rouge', ecartee = 'gris' }
+
+local CRITERES = {
+    { cle = 'impact', titre = "Impact" },
+    { cle = 'qualites', titre = "Qualités" },
+    { cle = 'plancher', titre = "Plancher technique" },
+    { cle = 'finition', titre = "Finition" },
+}
+
+Fenetre.AIDE_NOTATION = "Noter : Claude propose une note selon le standard, critère par critère (impact, qualités, "
+    .. "plancher technique, finition). Vous l'acceptez, la changez ou la gardez à vérifier ; 5 ★ reste à vous seul."
+
+local function texteChamp(v)
+    return type(v) == 'string' and Texte.nettoyer(v) or ''
+end
+
+-- « Note posée : ★★☆☆☆ · rejetée ».
+function Fenetre.texteNotePosee(active)
+    if not active then
+        return "Aucune photo active"
+    end
+    if active.note == nil then
+        return "Note posée : —"
+    end
+    local texte = active.note > 0 and ("Note posée : " .. Lightroom.etoiles(active.note)) or "Note posée : aucune, pas encore jugée"
+    if active.drapeau == 'rejetee' then
+        texte = texte .. " · rejetée"
+    elseif active.drapeau == 'retenue' then
+        texte = texte .. " · retenue"
+    end
+    return texte
+end
+
+-- « Claude propose : ★★★☆☆ » (ou de la rejeter).
+function Fenetre.texteNoteProposee(prop)
+    if prop.drapeau == 'rejetee' then
+        return "Claude propose : rejeter"
+    end
+    local n = tonumber(prop.note) or 0
+    return "Claude propose : " .. (n > 0 and Lightroom.etoiles(n) or "0 ★, pas encore jugée")
+end
+
+-- « proposée · passe 2 », « changée : ★★★★★ ».
+function Fenetre.texteEtatNote(prop)
+    local texte = ETATS_NOTE[prop.etat] or tostring(prop.etat or '')
+    if prop.etat == 'changee' then
+        if prop.drapeau_choisi == 'rejetee' then
+            texte = texte .. " : rejetée"
+        elseif tonumber(prop.note_choisie) then
+            texte = texte .. " : " .. Lightroom.etoiles(prop.note_choisie)
+        end
+    elseif prop.etat == 'proposee' and prop.a_verifier == true then
+        texte = texte .. " · à vérifier"
+    end
+    if tonumber(prop.passe) then
+        texte = texte .. " · passe " .. tostring(math.floor(tonumber(prop.passe)))
+    end
+    return texte
+end
+
+-- Les critères, du plus lourd au plus léger, puis le plafond mesuré par cull_photos.
+function Fenetre.texteCriteres(prop)
+    local criteres = type(prop.criteres) == 'table' and prop.criteres or {}
+    local lignes = {}
+    for _, critere in ipairs(CRITERES) do
+        local texte = texteChamp(criteres[critere.cle])
+        if texte ~= '' then
+            lignes[#lignes + 1] = critere.titre .. " : " .. texte
+        end
+    end
+    if tonumber(prop.plafond) then
+        lignes[#lignes + 1] = "Plafond mesuré : " .. tostring(math.floor(tonumber(prop.plafond))) .. " ★"
+    end
+    return table.concat(lignes, '\n')
+end
+
+function Fenetre.rafraichirNotation()
+    local p = Fenetre.p
+    if not p then
+        return
+    end
+    Fenetre.versionNotation = Notation.version
+    local active = Fenetre.info and Fenetre.info.active
+    local prop
+    if active then
+        local ok, r = LrTasks.pcall(Notation.proposition, active.id)
+        prop = ok and r or nil
+    end
+    Fenetre.propositionNote = prop
+    poser(p, 'notationNom', active and Lightroom.nomCourt(active.nom) or "Aucune photo active")
+    poser(p, 'notationPosee', Fenetre.texteNotePosee(active))
+    if prop then
+        poser(p, 'notationProposee', Fenetre.texteNoteProposee(prop))
+        poser(p, 'notationCouleur', COULEURS_NOTE[prop.etat] or 'gris')
+        poser(p, 'notationEtat', Fenetre.texteEtatNote(prop))
+        poser(p, 'notationCriteres', Fenetre.texteCriteres(prop))
+        poser(p, 'notationRaison', texteChamp(prop.raison))
+    else
+        poser(p, 'notationProposee', "Aucune note proposée")
+        poser(p, 'notationCouleur', 'gris')
+        poser(p, 'notationEtat', '')
+        poser(p, 'notationCriteres', Fenetre.AIDE_NOTATION)
+        poser(p, 'notationRaison', '')
+    end
+    -- Les écritures de la fenêtre échappent à la file du connecteur : pas pendant que Claude
+    -- travaille, ni pendant une écriture déjà demandée.
+    local libre = not Moteur.travaille and not Fenetre.noteEnCours
+    poser(p, 'peutAccepterNote', libre and prop ~= nil and (prop.etat == 'proposee' or prop.etat == 'a_verifier'))
+    poser(p, 'peutChangerNote', libre and active ~= nil)
+    poser(p, 'peutVerifierNote', prop ~= nil and prop.etat == 'proposee')
+    -- Une proposition qui arrive pour la photo montrée se montre (onglet Note), une seule fois ; une
+    -- autre photo choisie ne change pas d'onglet.
+    local cle = prop and (tostring(prop.photo) .. '/' .. tostring(prop.le) .. '/' .. tostring(prop.seance)) or nil
+    local photo = active and active.id
+    if prop and prop.etat == 'proposee' and cle ~= Fenetre.noteVue and Fenetre.notePhoto == photo then
+        Fenetre.choisirOnglet(Fenetre.T.ongletNotation)
+    end
+    Fenetre.noteVue, Fenetre.notePhoto = cle, photo
+end
+
+-- Écrit une note dans le catalogue (Notation.poser), depuis une tâche, puis relit la photo : une
+-- écriture à la fois, jamais pendant que Claude travaille.
+function Fenetre.poserNote(choix)
+    if Moteur.travaille or Fenetre.noteEnCours then
+        return
+    end
+    Fenetre.noteEnCours = true
+    Fenetre.rafraichirNotation()
+    local ok, r = LrTasks.pcall(Notation.poser, { choix })
+    Fenetre.noteEnCours = false
+    if Fenetre.p then
+        if not ok then
+            Fenetre.p.message = "La note n'a pas été posée : " .. tostring(r)
+        elseif not r.ok then
+            Fenetre.p.message = "La note n'a pas été posée : " .. tostring(r.erreur or "raison inconnue")
+        end
+    end
+    Fenetre.photoChangee = true
+    Fenetre.aRafraichirNotation = true
+end
+
+-- Accepter : la proposition de Claude telle quelle (Notation.poser sans note ni drapeau : sa
+-- note, ou le drapeau Rejeter pour un rejet ; un drapeau Retenue de Dany reste). Depuis une tâche.
+function Fenetre.accepterNote()
+    local prop = Fenetre.propositionNote
+    if not prop then
+        return
+    end
+    Fenetre.poserNote({ photo = prop.photo })
+end
+
+-- Changer… : de 0 à 5 ★ et le drapeau, dans une fenêtre modale (depuis une tâche). Le drapeau
+-- reste tel quel sauf choix contraire.
+function Fenetre.changerNote()
+    local active = Fenetre.info and Fenetre.info.active
+    if not active or Moteur.travaille then
+        return
+    end
+    local prop = Fenetre.propositionNote
+    local f = LrView.osFactory()
+    local choix
+    LrFunctionContext.callWithContext('Claude · changer la note', function(context)
+        local q = LrBinding.makePropertyTable(context)
+        q.note = tonumber(prop and prop.note) or active.note or 0
+        q.drapeau = prop and prop.drapeau == 'rejetee' and 'rejetee' or 'inchange'
+        local notes = { { title = "0 ★, pas encore jugée", value = 0 } }
+        for n = 1, 5 do
+            notes[#notes + 1] = { title = Lightroom.etoiles(n), value = n }
+        end
+        local reponse = LrDialogs.presentModalDialog {
+            title = "Changer la note",
+            contents = f:column {
+                bind_to_object = q,
+                spacing = f:control_spacing(),
+                f:static_text { title = "Note de " .. Lightroom.nomCourt(active.nom) .. " (5 ★ : vous seul la posez) :" },
+                f:popup_menu { value = bind 'note', items = notes, width = 220 },
+                f:popup_menu { value = bind 'drapeau', width = 220, items = {
+                    { title = "Drapeau inchangé", value = 'inchange' },
+                    { title = "Sans drapeau", value = 'aucun' },
+                    { title = "Retenue", value = 'retenue' },
+                    { title = "Rejetée", value = 'rejetee' },
+                } },
+            },
+            actionVerb = "Poser",
+        }
+        if reponse == 'ok' then
+            choix = { photo = active.id, note = tonumber(q.note) or 0, raison = "Note choisie dans la fenêtre Claude",
+                drapeau = q.drapeau ~= 'inchange' and q.drapeau or nil }
+        end
+    end)
+    if choix then
+        Fenetre.poserNote(choix)
+    end
+end
+
+-- À vérifier : la proposition reste à revoir ; rien n'est écrit dans le catalogue.
+function Fenetre.verifierNote()
+    local prop = Fenetre.propositionNote
+    if not prop then
+        return
+    end
+    local ok, fait, raison = LrTasks.pcall(Notation.decider, prop.photo, 'a_verifier')
+    if (not ok or not fait) and Fenetre.p then
+        Fenetre.p.message = "Pas mise à vérifier : " .. tostring(ok and raison or fait)
+    end
+    Fenetre.aRafraichirNotation = true
+end
+
+-- La séance de notation (FenetreNotation.lua), dans sa fenêtre.
+function Fenetre.seance(options)
+    require('FenetreNotation').afficher(options)
+end
+
+-- Noter : Claude propose une note pour la photo active ; plusieurs photos sélectionnées, c'est
+-- une séance de notation (depuis une tâche : lecture du catalogue).
+function Fenetre.noter()
+    local info = Lightroom.photos()
+    Fenetre.info = info
+    if (info.selection or 0) > 1 then
+        Fenetre.seance({ portee = 'selection' })
+    elseif info.active then
+        Fenetre.envoyer(Consignes.noterPhoto)
+    elseif Fenetre.p then
+        Fenetre.p.message = "Aucune photo active : choisissez une photo dans Lightroom, puis cliquez Noter."
+    end
+end
+
 -- Voyants -------------------------------------------------------------------------------------
 
 function Fenetre.rafraichirMode()
@@ -479,6 +826,11 @@ function Fenetre.rafraichirMode()
     local mode = Lightroom.mode()
     poser(p, 'texteMode', mode == 'proposer' and "Proposer d'abord" or "Appliquer directement")
     poser(p, 'etatMode', mode == 'proposer' and 'bleu' or 'neutre')
+end
+
+function Fenetre.basculerMode()
+    Lightroom.basculerMode()
+    Fenetre.rafraichirMode()
 end
 
 -- Claude Code (commandes du système : dans une tâche) et la liaison avec le serveur, lue
@@ -524,7 +876,7 @@ function Fenetre.demarrerLiaison()
     Fenetre.verifier(false)
 end
 
--- Les deux versions en bas à droite (Composants.lignes).
+-- Les deux versions en bas (Composants.lignes).
 function Fenetre.rafraichirVersions(lignes)
     local p = Fenetre.p
     if not p then
@@ -560,8 +912,8 @@ function Fenetre.montrerAide()
     end
 end
 
--- Ce que montre le bandeau de la ligne du Style : un message, sinon l'aide d'un voyant rouge,
--- sinon les photos jointes, sinon le rappel du style.
+-- Ce que montre le bandeau : un message, sinon l'aide d'un voyant rouge, sinon les photos
+-- jointes, sinon le rappel du style.
 function Fenetre.etatBandeau(p)
     if (p.message or '') ~= '' then
         return 'message'
@@ -573,17 +925,20 @@ function Fenetre.etatBandeau(p)
     return 'rappel'
 end
 
+-- La photo active et la sélection (gardées pour la carte Note).
 function Fenetre.majPhoto()
     local p = Fenetre.p
     if not p then
         return
     end
     local info = Lightroom.photos()
+    Fenetre.info = info
     if info.active then
         p.infoPhoto = string.format("Active : %s     Sélection : %d", Lightroom.nomCourt(info.active.nom), info.selection)
     else
         p.infoPhoto = "Aucune photo active"
     end
+    Fenetre.rafraichirNotation()
 end
 
 -- Tout ce qui dépend du moteur.
@@ -602,6 +957,7 @@ function Fenetre.rafraichir()
     Fenetre.rafraichirApercu()
     Fenetre.rafraichirProposition()
     Fenetre.rafraichirListe()
+    Fenetre.rafraichirNotation()
 end
 
 -- Demandes ------------------------------------------------------------------------------------
@@ -652,18 +1008,19 @@ end
 -- Retour, et au clic d'un bouton, juste avant l'action du bouton (constaté dans Lightroom 15.6 ;
 -- avec immediate = true, Retour ne se voit pas du tout). Un texte reçu part donc tout seul après un
 -- court délai, sauf si un clic de bouton le suit : le bouton décide (Envoyer l'envoie, les autres
--- le laissent dans le champ, pour une photo jointe par exemple).
+-- le laissent dans le champ, pour une photo jointe par exemple). Une fenêtre rouverte entre-temps
+-- (autre disposition) ne l'envoie pas.
 Fenetre.DELAI_RETOUR = 0.3
 
 function Fenetre.saisieValidee(valeur)
     if Fenetre.ignorerSaisie or type(valeur) ~= 'string' or Texte.nettoyer(valeur) == '' then
         return
     end
-    local jeton = {}
+    local jeton, generation = {}, Fenetre.generation
     Fenetre.envoiAuto = jeton
     LrTasks.startAsyncTask(function()
         LrTasks.sleep(Fenetre.DELAI_RETOUR)
-        if Fenetre.envoiAuto ~= jeton or not Fenetre.ouverte or not Fenetre.p then
+        if Fenetre.envoiAuto ~= jeton or Fenetre.generation ~= generation or not Fenetre.ouverte or not Fenetre.p then
             return
         end
         Fenetre.envoiAuto = nil
@@ -671,7 +1028,7 @@ function Fenetre.saisieValidee(valeur)
     end)
 end
 
--- Un clic de bouton, un choix dans la liste ou le menu : pas d'envoi automatique.
+-- Un clic de bouton, un choix dans la liste ou un menu : pas d'envoi automatique.
 function Fenetre.annulerEnvoiAuto()
     Fenetre.envoiAuto = nil
 end
@@ -778,289 +1135,71 @@ function Fenetre.supprimer()
     end
 end
 
--- Construction --------------------------------------------------------------------------------
-
-local function ligneFil(f, i, largeur)
-    local icones = { place = 'overlapping', width = 16 }
-    for _, ic in ipairs(ICONES) do
-        icones[#icones + 1] = f:static_text { title = ic.glyphe, font = POLICES.texte, text_color = COULEURS[ic.couleur],
-            visible = egal('i' .. i, ic.cle) }
-    end
-    local textes = { place = 'overlapping' }
-    for _, st in ipairs(STYLES) do
-        local genres = st.genres
-        textes[#textes + 1] = f:static_text {
-            title = bind('t' .. i),
-            width = largeur,
-            font = POLICES[st.police],
-            text_color = COULEURS[st.couleur],
-            truncation = 'tail',
-            visible = bind { key = 'g' .. i, transform = function(v) return genres[v] == true end },
-            mouse_down = function() Fenetre.cliquerLigne(i) end,
-        }
-    end
-    return f:row { spacing = 4, f:column(icones), f:column(textes) }
+-- Les autres fenêtres du module (le menu Fichier est réduit quand une fenêtre du module est devant).
+function Fenetre.publication()
+    require('FenetrePublication').afficher()
 end
 
--- Une ligne de version : le nom à gauche, le numéro à droite, en gris ou en orange (alerte).
-local function ligneVersion(f, i, largeur)
-    local alerte = bind('versionAlerte' .. i)
-    local normal = bind { key = 'versionAlerte' .. i, transform = function(v) return not v end }
-    return f:row {
-        spacing = 0,
-        f:column {
-            place = 'overlapping',
-            f:static_text { title = bind('versionNom' .. i), font = POLICES.petit, text_color = COULEURS.gris, width = largeur - 46, truncation = 'tail', visible = normal },
-            f:static_text { title = bind('versionNom' .. i), font = POLICES.petit, text_color = COULEURS.orange, width = largeur - 46, truncation = 'tail', visible = alerte },
-        },
-        f:column {
-            place = 'overlapping',
-            f:static_text { title = bind('version' .. i), font = POLICES.petit, text_color = COULEURS.gris, alignment = 'right', width = 46, visible = normal },
-            f:static_text { title = bind('version' .. i), font = POLICES.petit, text_color = COULEURS.orange, alignment = 'right', width = 46, visible = alerte },
-        },
-    }
+function Fenetre.consommation()
+    require('FenetreConsommation').afficher()
 end
 
-local function voyant(f, cleEtat, cleTexte, action, infobulle)
-    local pastilles = { place = 'overlapping' }
-    for etat, couleur in pairs(PASTILLES) do
-        pastilles[#pastilles + 1] = f:static_text { title = '●', font = POLICES.petit, text_color = COULEURS[couleur], visible = egal(cleEtat, etat) }
+-- Disposition ---------------------------------------------------------------------------------
+
+-- Menu Disposition : la préférence change, puis la fenêtre se rouvre (depuis une tâche).
+function Fenetre.changerDisposition(valeur)
+    if not Dispositions.TAILLES[valeur] or valeur == Fenetre.disposition then
+        return
     end
-    return f:row {
-        spacing = 3,
-        f:column(pastilles),
-        f:static_text { title = bind(cleTexte), font = POLICES.petit, mouse_down = action, tooltip = infobulle, width = 150, truncation = 'tail' },
-    }
+    Chemins.prefs().disposition = valeur
+    enTache(Fenetre.rouvrir)
 end
 
--- Le bandeau de la ligne du Style, une seule ligne : il remplace la rangée « photos jointes,
--- Retirer » et la ligne de message qui suivaient le champ de demande, pour que le champ finisse au
--- niveau des colonnes voisines. Un clic sur les photos jointes les retire ; sur l'aide, l'affiche
--- en entier.
-local function bandeau(f, largeur)
-    return f:column {
-        place = 'overlapping',
-        f:static_text { title = "ajouté à chaque demande, invites comprises", font = POLICES.petit, text_color = COULEURS.gris,
-            width = largeur, visible = egal('bandeau', 'rappel') },
-        f:static_text { title = bind { key = 'jointes', transform = function(v) return tostring(v or '') .. "  ·  cliquer pour retirer" end },
-            font = POLICES.petit, text_color = COULEURS.gris, width = largeur, truncation = 'middle', visible = egal('bandeau', 'jointes'),
-            tooltip = "Cliquer pour retirer les photos jointes",
-            mouse_down = function()
-                Fenetre.annulerEnvoiAuto()
-                Fenetre.retirerJointes()
-            end },
-        f:static_text { title = bind 'message', font = POLICES.petit, text_color = COULEURS.orange, width = largeur, truncation = 'tail',
-            visible = egal('bandeau', 'message') },
-        f:static_text { title = bind 'aide', font = POLICES.petit, text_color = COULEURS.rouge, width = largeur, truncation = 'tail',
-            visible = egal('bandeau', 'aide'), tooltip = "Cliquer pour lire l'aide en entier",
-            mouse_down = function()
-                Fenetre.annulerEnvoiAuto()
-                enTache(Fenetre.montrerAide)
-            end },
-    }
+-- Ferme la fenêtre pour la rouvrir dans la disposition et la taille des préférences (une fenêtre
+-- ouverte ne change pas de structure) : la demande tapée revient dans le champ, sans partir.
+function Fenetre.rouvrir()
+    if not Fenetre.ouverte then
+        Fenetre.afficher()
+        return
+    end
+    Fenetre.annulerEnvoiAuto()
+    if Fenetre.p and not Fenetre.aRouvrir then
+        Fenetre.brouillon = Fenetre.p.saisie
+    end
+    Fenetre.aRouvrir = true
+    if Fenetre.controle and Fenetre.controle.close then
+        Fenetre.controle.close()
+    end
 end
 
-function Fenetre.construire(f, p, T)
-    local hauteurFil = T.lignes * 17
-    -- Le clic d'un bouton valide aussi le champ de demande : il ne doit pas l'envoyer.
-    local function bouton(args)
-        local action = args.action
-        args.action = function(...)
-            Fenetre.annulerEnvoiAuto()
-            return action(...)
-        end
-        return f:push_button(args)
-    end
+-- Construction ---------------------------------------------------------------------------------
 
-    -- Colonne des conversations.
-    local gauche = f:column {
-        spacing = 8,
-        width = T.liste,
-        fill_vertical = 1,
-        bouton { title = "Nouvelle conversation", width = T.liste, enabled = bind 'libre',
-            action = function()
-                Moteur.nouvelle()
-                Fenetre.defilement = 0
-                Fenetre.indiceImage = nil
-                Fenetre.aRafraichir = true
-            end },
-        f:edit_field { value = bind 'recherche', immediate = true, width = T.liste, placeholder_string = "Rechercher" },
-        f:simple_list { items = bind 'listeConversations', value = bind 'selectionListe', allows_multiple_selection = false,
-            width = T.liste, height = hauteurFil + 93, enabled = bind 'libre' },
-        f:row {
-            bouton { title = "Renommer…", size = 'small', action = function() enTache(Fenetre.renommer) end },
-            bouton { title = "Supprimer…", size = 'small', enabled = bind 'libre', action = function() enTache(Fenetre.supprimer) end },
-        },
-    }
-
-    -- Grille du fil.
-    local grille = { spacing = 0 }
-    for i = 1, T.lignes do
-        grille[#grille + 1] = ligneFil(f, i, Fenetre.largeurTexte())
-    end
-
-    local invites = { spacing = 6 }
-    for _, invite in ipairs(Consignes.invites) do
-        invites[#invites + 1] = bouton {
-            title = invite.titre,
-            tooltip = invite.message,
-            enabled = bind 'libre',
-            action = function() Fenetre.envoyer(invite.message, invite.modele) end,
-        }
-    end
-
-    local modeles = {}
-    for _, m in ipairs(Consignes.modeles) do
-        modeles[#modeles + 1] = { title = m.title, value = m.value }
-    end
-    local styles = {}
-    for _, st in ipairs(Consignes.styles) do
-        styles[#styles + 1] = { title = st.title, value = st.value }
-    end
-
-    local centre = f:column {
-        spacing = 6,
-        width = T.fil,
-        fill_vertical = 1,
-        f:row {
-            f:static_text { title = bind 'titre', font = POLICES.titre, width = T.fil - 280, truncation = 'tail' },
-            bouton { title = "✎", size = 'small', tooltip = "Renommer la conversation", action = function() enTache(Fenetre.renommer) end },
-            f:spacer { fill_horizontal = 1 },
-            f:static_text { title = bind 'infoPhoto', text_color = COULEURS.gris, alignment = 'right', width = 210, truncation = 'middle' },
-        },
-        f:row {
-            spacing = 12,
-            voyant(f, 'etatClaude', 'texteClaude', nil, "Claude Code, avec votre forfait claude.ai (pas de clé d'API)"),
-            voyant(f, 'etatLightroom', 'texteLightroom', function()
-                Fenetre.annulerEnvoiAuto()
-                Fenetre.demarrerLiaison()
-            end, "Liaison de ce module avec le connecteur MCP-Développeur ; arrêtée, un clic la démarre"),
-            voyant(f, 'etatMode', 'texteMode', function()
-                Fenetre.annulerEnvoiAuto()
-                Lightroom.basculerMode()
-                Fenetre.rafraichirMode()
-            end, "Mode du connecteur ; un clic bascule entre « Proposer d'abord » et « Appliquer directement »"),
-        },
-        f:separator { fill_horizontal = 1 },
-        f:column(grille),
-        f:row {
-            spacing = 4,
-            bouton { title = "▲", size = 'small', tooltip = "Remonter dans le fil", enabled = bind 'peutMonter',
-                action = function() Fenetre.defiler(math.floor(T.lignes * 0.8)) end },
-            bouton { title = "▼", size = 'small', tooltip = "Redescendre", enabled = bind 'peutDescendre',
-                action = function() Fenetre.defiler(-math.floor(T.lignes * 0.8)) end },
-            bouton { title = "Fin", size = 'small', tooltip = "Aller au dernier message", enabled = bind 'peutDescendre',
-                action = function() Fenetre.defiler('fin') end },
-            f:static_text { title = bind 'positionFil', font = POLICES.petit, text_color = COULEURS.gris, width = 150 },
-            f:spacer { fill_horizontal = 1 },
-            f:column {
-                place = 'overlapping',
-                f:static_text { title = bind 'activite', text_color = COULEURS.orange, alignment = 'right', width = 300, visible = bind 'travaille' },
-                f:static_text { title = bind 'forfait', font = POLICES.petit, text_color = COULEURS.gris, alignment = 'right', width = 300,
-                    visible = bind { key = 'travaille', transform = function(v) return not v end } },
-            },
-        },
-        -- Ne grandit que si une autre colonne est plus haute (petite taille). La liste des
-        -- conversations (hauteurFil + 93) finit au niveau du champ de demande.
-        f:spacer { fill_vertical = 1 },
-        f:separator { fill_horizontal = 1 },
-        f:row(invites),
-        f:row {
-            spacing = 8,
-            f:static_text { title = "Style" },
-            f:popup_menu { items = styles, value = bind 'style', width = 220, enabled = bind 'libre',
-                tooltip = "Style de retouche joint à chaque demande (Standard : rien d'ajouté)" },
-            bandeau(f, T.fil - 300),
-        },
-        f:row {
-            spacing = 6,
-            f:column {
-                spacing = 2,
-                bouton { title = "📎", tooltip = "Joindre une photo du disque à la demande", enabled = bind 'libre', action = function() enTache(Fenetre.joindre) end },
-                bouton { title = "📋", tooltip = "Coller l'image du presse-papiers (capture d'écran, image copiée, photo copiée dans le Finder)", enabled = bind 'libre',
-                    action = function() enTache(Fenetre.coller) end },
-            },
-            f:edit_field { value = bind 'saisie', immediate = false, height_in_lines = 3, width = T.fil - 250, enabled = bind 'libre',
-                placeholder_string = "Demander à Claude… (par exemple : « Retouche la photo active, rendu naturel »)",
-                tooltip = "Retour envoie la demande. Dictée : touche 🌐 deux fois." },
-            f:column {
-                spacing = 6,
-                f:popup_menu { items = modeles, value = bind 'modele', width = 170, enabled = bind 'libre' },
-                bouton { title = bind 'titreEnvoyer', width = 170, action = function() Fenetre.boutonPrincipal() end },
-            },
-        },
-    }
-
-    -- Colonne des aperçus et de la proposition.
-    local droite = f:column {
-        spacing = 8,
-        width = T.droite,
-        fill_vertical = 1,
-        f:static_text { title = "Ce que Claude voit", font = POLICES.gras },
-        f:picture { value = bind 'imageApercu', width = T.apercu, height = T.apercu },
-        f:row {
-            spacing = 4,
-            bouton { title = "◀", size = 'small', enabled = bind 'peutPrecedente', action = function() Fenetre.changerImage(-1) end },
-            f:static_text { title = bind 'legendeApercu', font = POLICES.petit, alignment = 'center', width = T.apercu - 80, truncation = 'middle' },
-            bouton { title = "▶", size = 'small', enabled = bind 'peutSuivante', action = function() Fenetre.changerImage(1) end },
-        },
-        bouton { title = "Agrandir", enabled = bind 'aImage', action = function() Fenetre.agrandir() end },
-        f:group_box {
-            title = "Proposition de Claude",
-            width = T.droite,
-            f:static_text { title = bind 'propositionTexte', width = T.droite - 24, height_in_lines = 10 },
-            f:row {
-                spacing = 4,
-                bouton { title = "Accepter", enabled = bind 'enAttente', action = function()
-                    LrTasks.startAsyncTask(function() Moteur.repondre(true) end)
-                end },
-                bouton { title = "Refuser", enabled = bind 'enAttente', action = function()
-                    LrTasks.startAsyncTask(function() Moteur.repondre(false) end)
-                end },
-                bouton { title = "Ajuster…", enabled = bind 'enAttente', action = function() enTache(Fenetre.ajuster) end },
-            },
-        },
-        f:row {
-            spacing = 6,
-            bouton { title = "Publication…", tooltip = "Publier des photos en fichiers, sans Claude ni quota",
-                action = function() require('FenetrePublication').afficher() end },
-            bouton { title = "Consommation…", tooltip = "Jetons de la semaine, budget, relevé du forfait",
-                action = function() require('FenetreConsommation').afficher() end },
-        },
-        -- Les versions en bas, au niveau du champ de demande.
-        f:spacer { fill_vertical = 1 },
-        f:separator { fill_horizontal = 1 },
-        ligneVersion(f, 1, T.droite),
-        ligneVersion(f, 2, T.droite),
-    }
-
-    return f:row {
-        bind_to_object = p,
-        margin = 12,
-        spacing = 12,
-        gauche,
-        f:separator { fill_vertical = 1 },
-        centre,
-        f:separator { fill_vertical = 1 },
-        droite,
-    }
+function Fenetre.construire(f, p, D)
+    Fenetre.p = p
+    return Dispositions.construire(f, Fenetre, D)
 end
 
 -- Ouverture -----------------------------------------------------------------------------------
 
 -- Le nom du cadre enregistré de la fenêtre. Lightroom rend sa taille enregistrée à la fenêtre et
 -- ne la rapetisse pas quand le contenu devient plus petit (bande vide en bas, constaté) : une
--- taille de fenêtre a son propre cadre, et FORME augmente quand le contenu rapetisse.
+-- disposition dans une taille a son propre cadre, et FORME augmente quand le contenu rapetisse.
 Fenetre.FORME = 1
 
-function Fenetre.cadre(taille)
-    return 'DeveloppeurClaude-' .. tostring(taille or 'moyenne') .. '-' .. Fenetre.FORME
+function Fenetre.cadre(disposition, taille)
+    return 'DeveloppeurClaude-' .. tostring(disposition or Dispositions.DEFAUT) .. '-' .. tostring(taille or 'moyenne') .. '-' .. Fenetre.FORME
 end
 
--- Boucle de la fenêtre : rafraîchit ce que le moteur a changé, l'activité, et les voyants.
-local function boucle()
+function Fenetre.desabonner()
+    Moteur.desabonner('fenetre')
+    Notation.desabonner('fenetre')
+end
+
+-- Boucle d'une fenêtre (sa génération : une fenêtre rouverte a la sienne, l'ancienne boucle
+-- s'arrête) : rafraîchit ce que le moteur a changé, la note, l'activité, et les voyants.
+function Fenetre.boucle(generation)
     local tic = 0
-    while Fenetre.ouverte do
+    while Fenetre.ouverte and Fenetre.generation == generation do
         tic = tic + 1
         local p = Fenetre.p
         if p then
@@ -1075,6 +1214,13 @@ local function boucle()
                 Fenetre.photoChangee = false
                 LrTasks.pcall(Fenetre.majPhoto)
             end
+            if Fenetre.aRafraichirNotation or Notation.version ~= Fenetre.versionNotation then
+                Fenetre.aRafraichirNotation = false
+                local ok, erreur = LrTasks.pcall(Fenetre.rafraichirNotation)
+                if not ok then
+                    Journal.noter("Note :", tostring(erreur))
+                end
+            end
             poser(p, 'activite', Moteur.texteTravail(math.floor(tic / 2)))
             poser(p, 'travaille', Moteur.travaille)
             -- Voyants et photo active toutes les 2 s (la liaison, lue dans ce module sans commande
@@ -1088,33 +1234,64 @@ local function boucle()
     end
 end
 
+-- Valeurs des propriétés de la carte Note avant l'ouverture (rafraichirNotation les remplit).
+local function initialiserNotation(p)
+    p.notationNom = ''
+    p.notationPosee = ''
+    p.notationProposee = ''
+    p.notationCouleur = 'gris'
+    p.notationEtat = ''
+    p.notationCriteres = ''
+    p.notationRaison = ''
+    p.peutAccepterNote = false
+    p.peutChangerNote = false
+    p.peutVerifierNote = false
+end
+
 function Fenetre.afficher()
     if Fenetre.ouverte then
-        if Fenetre.controle and Fenetre.controle.toFront then
+        -- Disposition ou taille changée dans le Gestionnaire de modules externes : rouverte.
+        local prefs = Chemins.prefs()
+        local voulue = Dispositions.dimensions(prefs.disposition, prefs.taille)
+        if Fenetre.T and (voulue.nom ~= Fenetre.T.nom or voulue.taille ~= Fenetre.T.taille) then
+            Fenetre.rouvrir()
+        elseif Fenetre.controle and Fenetre.controle.toFront then
             Fenetre.controle.toFront()
         end
         return
     end
     Fenetre.ouverte = true
+    Fenetre.generation = Fenetre.generation + 1
+    local generation = Fenetre.generation
 
     LrFunctionContext.postAsyncTaskWithContext('Claude · fenêtre', function(context)
         context:addFailureHandler(function(_, erreur)
-            Fenetre.ouverte = false
-            Fenetre.p = nil
-            Moteur.desabonner('fenetre')
+            if Fenetre.generation == generation then
+                Fenetre.ouverte = false
+                Fenetre.aRouvrir = false
+                Fenetre.p = nil
+                Fenetre.desabonner()
+            end
             Journal.noter("Fenêtre :", tostring(erreur))
             LrDialogs.message("La fenêtre Claude n'a pas pu s'ouvrir", tostring(erreur), 'critical')
         end)
 
         Moteur.charger()
         local prefs = Chemins.prefs()
-        local T = Fenetre.TAILLES[prefs.taille] or Fenetre.TAILLES.moyenne
-        Fenetre.T = T
+        local D = Dispositions.dimensions(prefs.disposition, prefs.taille)
+        Fenetre.T = D
+        Fenetre.disposition = D.nom
+        Fenetre.aRouvrir = false
         Fenetre.cache = {}
         Fenetre.vignettes = {}
         Fenetre.conversationAffichee = nil
         Fenetre.signatureListe = nil
         Fenetre.defilement = 0
+        Fenetre.indiceImage = nil
+        Fenetre.propositionVue = nil
+        Fenetre.info = nil
+        Fenetre.noteVue, Fenetre.notePhoto = nil, nil
+        Fenetre.noteEnCours = false
 
         local f = LrView.osFactory()
         local p = LrBinding.makePropertyTable(context)
@@ -1124,6 +1301,8 @@ function Fenetre.afficher()
         p.jointes = Fenetre.texteJointes()
         p.modele = prefs.modele
         p.style = Consignes.style(prefs.styleChoisi) and prefs.styleChoisi or 'standard'
+        p.disposition = D.nom
+        p.onglet = D.onglets and D.onglets[1].valeur or 'aucun'
         p.libre = not Moteur.travaille
         p.travaille = Moteur.travaille
         p.forfait = Moteur.texteForfait()
@@ -1136,6 +1315,7 @@ function Fenetre.afficher()
         p.infoPhoto = ''
         p.imageApercu = Fenetre.imageVide()
         p.legendeApercu = ''
+        p.aProposition = false
         p.aide = ''
         p.bandeau = Fenetre.etatBandeau(p)
         for i, l in ipairs(Composants.lignes(Composants.module(), '…')) do
@@ -1144,14 +1324,21 @@ function Fenetre.afficher()
         p.activite = Moteur.texteTravail(0)
         p.listeConversations = {}
         p.selectionListe = {}
-        for i = 1, T.lignes do
+        p.menuConversations = {}
+        p.conversationChoisie = ''
+        for i = 1, D.lignes do
             p['t' .. i] = ''
             p['g' .. i] = 'vide'
             p['i' .. i] = ''
         end
+        initialiserNotation(p)
         Fenetre.p = p
 
         p:addObserver('selectionListe', function(_, _, valeur)
+            Fenetre.annulerEnvoiAuto()
+            Fenetre.choisirDansListe(valeur)
+        end)
+        p:addObserver('conversationChoisie', function(_, _, valeur)
             Fenetre.annulerEnvoiAuto()
             Fenetre.choisirDansListe(valeur)
         end)
@@ -1167,40 +1354,72 @@ function Fenetre.afficher()
             Fenetre.annulerEnvoiAuto()
             Chemins.prefs().styleChoisi = valeur
         end)
+        -- Un clic sur un onglet ou le menu Disposition n'envoie pas la demande validée par le clic.
+        p:addObserver('onglet', function()
+            if not Fenetre.ongletAuto then
+                Fenetre.annulerEnvoiAuto()
+            end
+        end)
+        p:addObserver('disposition', function(_, _, valeur)
+            Fenetre.annulerEnvoiAuto()
+            Fenetre.changerDisposition(valeur)
+        end)
         p:addObserver('saisie', function(_, _, valeur) Fenetre.saisieValidee(valeur) end)
         for _, cle in ipairs({ 'message', 'aide', 'jointes' }) do
             p:addObserver(cle, function(proprietes) poser(proprietes, 'bandeau', Fenetre.etatBandeau(proprietes)) end)
         end
 
-        local contenu = Fenetre.construire(f, p, T)
+        local contenu = Fenetre.construire(f, p, D)
+        -- La demande tapée avant une réouverture revient dans le champ, sans partir.
+        local brouillon = Fenetre.brouillon
+        Fenetre.brouillon = nil
+        if type(brouillon) == 'string' and brouillon ~= '' then
+            Fenetre.ignorerSaisie = true
+            p.saisie = brouillon
+            Fenetre.ignorerSaisie = false
+        end
         Fenetre.rafraichir()
         Fenetre.majPhoto()
         Fenetre.rafraichirMode()
         Moteur.abonner('fenetre', function() Fenetre.aRafraichir = true end)
+        Notation.abonner('fenetre', function() Fenetre.aRafraichirNotation = true end)
 
-        LrTasks.startAsyncTask(boucle)
+        LrTasks.startAsyncTask(function() Fenetre.boucle(generation) end)
         LrTasks.startAsyncTask(function() LrTasks.pcall(Fenetre.verifier, true) end)
 
         LrDialogs.presentFloatingDialog(_PLUGIN, {
             title = "Claude",
             contents = contenu,
-            save_frame = Fenetre.cadre(prefs.taille),
+            save_frame = Fenetre.cadre(D.nom, D.taille),
             blockTask = true,
-            onShow = function(controle) Fenetre.controle = controle end,
+            onShow = function(controle)
+                if Fenetre.generation == generation then
+                    Fenetre.controle = controle
+                end
+            end,
             selectionChangeObserver = function() Fenetre.photoChangee = true end,
             windowWillClose = function()
+                if Fenetre.generation ~= generation then
+                    return
+                end
                 Fenetre.ouverte = false
                 Fenetre.annulerEnvoiAuto()
                 Fenetre.controle = nil
-                Moteur.desabonner('fenetre')
+                Fenetre.desabonner()
             end,
         })
 
         -- Au cas où blockTask ne bloquerait pas : garder le contexte (et la table) en vie.
-        while Fenetre.ouverte do
+        while Fenetre.ouverte and Fenetre.generation == generation do
             LrTasks.sleep(0.5)
         end
-        Fenetre.p = nil
+        if Fenetre.generation == generation then
+            Fenetre.p = nil
+            if Fenetre.aRouvrir then
+                Fenetre.aRouvrir = false
+                LrTasks.startAsyncTask(Fenetre.afficher)
+            end
+        end
     end)
 end
 

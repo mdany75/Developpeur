@@ -56,22 +56,39 @@ function Images.enregistrer(image, dossier)
     return ok and Fichiers.existe(destination) and nom or nil
 end
 
--- Une réduction carrée de `cote` points, l'image centrée sur le fond (le cadre des vues du SDK
--- ne change pas de taille) ; créée à la première demande dans <dossier>/.vignettes.
-function Images.vignette(dossier, nom, cote)
+-- Une réduction de `cote` points de côté (ou de `cote` × `hauteur`, l'aperçu 3:2 de l'Atelier),
+-- l'image entière centrée sur le fond (le cadre des vues du SDK ne change pas de taille) ; créée à
+-- la première demande dans <dossier>/.vignettes.
+function Images.vignette(dossier, nom, cote, hauteur)
     local source = LrPathUtils.child(dossier, nom)
     if not Fichiers.existe(source) then
         return nil
     end
+    hauteur = hauteur or cote
     local base = LrPathUtils.removeExtension(LrPathUtils.leafName(nom))
-    local destination = LrPathUtils.child(LrPathUtils.child(dossier, '.vignettes'), base .. '-' .. cote .. '.jpg')
-    if not Fichiers.existe(destination) then
-        Fichiers.creerDossier(LrPathUtils.parent(destination))
-        local ok = executer(string.format('/usr/bin/sips -s format jpeg -Z %d %s --out %s >/dev/null 2>&1 && /usr/bin/sips -p %d %d --padColor %s %s --out %s >/dev/null 2>&1',
-            cote, q(source), q(destination), cote, cote, Images.FOND, q(destination), q(destination)))
-        if not ok then
+    local fichier = hauteur == cote and (base .. '-' .. cote .. '.jpg') or string.format('%s-cadre-%dx%d.jpg', base, cote, hauteur)
+    local destination = LrPathUtils.child(LrPathUtils.child(dossier, '.vignettes'), fichier)
+    if Fichiers.existe(destination) then
+        return destination
+    end
+    Fichiers.creerDossier(LrPathUtils.parent(destination))
+    local reduction
+    if hauteur == cote then
+        reduction = string.format('/usr/bin/sips -s format jpeg -Z %d %s --out %s >/dev/null 2>&1', cote, q(source), q(destination))
+    else
+        -- Un cadre qui n'est pas carré : l'échelle vient des dimensions de l'image.
+        local l, h = Images.dimensions(source)
+        if not l or not h then
             return nil
         end
+        local echelle = math.min(cote / l, hauteur / h)
+        reduction = string.format('/usr/bin/sips -s format jpeg -z %d %d %s --out %s >/dev/null 2>&1',
+            math.max(1, math.floor(h * echelle + 0.5)), math.max(1, math.floor(l * echelle + 0.5)), q(source), q(destination))
+    end
+    local ok = executer(reduction .. string.format(' && /usr/bin/sips -p %d %d --padColor %s %s --out %s >/dev/null 2>&1',
+        hauteur, cote, Images.FOND, q(destination), q(destination)))
+    if not ok then
+        return nil
     end
     return destination
 end

@@ -1,7 +1,9 @@
 -- Consignes.lua : ce que la fenêtre Claude ajoute aux consignes de Claude Code
--- (`--append-system-prompt-file`), les invites en raccourcis et les réponses aux propositions.
--- La méthode de retouche reste celle du connecteur MCP-Développeur (ses consignes MCP) : ici,
--- seulement ce qui tient à la fenêtre et à celui qui s'en sert.
+-- (`--append-system-prompt-file`), celles d'une séance de notation, les invites en raccourcis,
+-- les messages des passes de notation et les réponses aux propositions.
+-- La méthode de retouche et le standard de notation restent ceux du connecteur MCP-Développeur
+-- (ses consignes MCP, la ressource developpeur://notation) : ici, seulement ce qui tient à la
+-- fenêtre et à celui qui s'en sert.
 
 local Consignes = {}
 
@@ -34,6 +36,10 @@ proposition avec preview_settings (compare = true), puis arrête-toi et attends.
 Accepter, Refuser et Ajuster ; Dany répond par un message. Seulement après « J'accepte » : l'outil \
 avec confirm = true.
 - save_preset et remember_style (ajout) : seulement si Dany le demande dans le message.
+- Notes (étoiles et drapeau Rejeter) : propose-les par propose_ratings, selon le standard de \
+notation (developpeur://notation, ou propose_ratings avec read_standard = true), avec la raison \
+critère par critère. Dany les accepte ou les change dans la fenêtre : jamais set_metadata pour une \
+note ou un drapeau sans qu'il le demande dans le message. Jamais 5 ★ : Dany seul les pose.
 - Une préférence de Dany remarquée (corrections_utilisateur, demandes répétées) : propose-la sur \
 une ligne à elle « Suggestion pour le guide : <la préférence en une phrase> » ; ne l'ajoute pas \
 toi-même.
@@ -61,8 +67,47 @@ Après une tâche sur plusieurs photos, donne aussi les numéros des photos à r
 est dans l'Historique de Lightroom sous « Claude · … ».
 ]]
 
--- Les lignes coupées par « \ » dans le texte ci-dessus sont recollées.
+-- Ajouté aux consignes d'une conversation de séance de notation (fenêtre « Claude · Séance de
+-- notation ») : chaque passe arrive par un message tout fait (Consignes.passes).
+Consignes.texteNotation = [[
+# Séance de notation
+
+Cette conversation est une séance de notation, ouverte dans la fenêtre « Claude · Séance de \
+notation » de Lightroom. Chaque demande commence par « [Lightroom : séance de notation « … », \
+N photos ; passe n] » au lieu de la photo active ; la demande donne les photos (identifiants du \
+catalogue) et la passe.
+
+## Méthode
+- Le standard de notation fait foi : lis-le une fois au début (developpeur://notation, ou \
+propose_ratings avec read_standard = true). Une passe pose une seule question.
+- Le plancher technique : cull_photos (netteté, exposition, yeux, bruit, rafales). Ses plafonds \
+bornent la note ; ils ne la donnent pas.
+- Regarde par planches (contact_sheet, 24 à 30 photos), view_photo seulement pour les \
+candidates à 4 ★ (passe 3) ou un doute précis.
+- Propose par propose_ratings, avec pass et session tels que la demande les donne, les quatre \
+critères et une raison courte ; les cas douteux avec to_check = true. Une photo de nuit se note \
+après le débruitage : dis-le plutôt que de la noter.
+- Rien ne change dans le catalogue pendant une séance : Dany accepte, change ou met à vérifier \
+dans la fenêtre. Jamais set_metadata, jamais de retouche, sauf s'il le demande. Jamais 5 ★.
+- Pas de ligne [titre : …] : la séance a déjà son titre.
+
+## Réponse
+Quelques lignes : combien de propositions, lesquelles sont à vérifier et pourquoi, en une phrase \
+chacune. Les détails sont dans la fenêtre : ne répète pas chaque note.
+]]
+
+-- Les lignes coupées par « \ » dans les textes ci-dessus sont recollées.
 Consignes.texte = Consignes.texte:gsub('\\\n', '')
+Consignes.texteNotation = Consignes.texteNotation:gsub('\\\n', '')
+
+-- Les consignes d'une conversation : celles de la fenêtre, et pour une séance de notation
+-- (c.genre == 'notation'), celles de la séance en plus.
+function Consignes.pour(c)
+    if type(c) == 'table' and c.genre == 'notation' then
+        return Consignes.texte .. '\n' .. Consignes.texteNotation
+    end
+    return Consignes.texte
+end
 
 -- Les invites en raccourcis (d'après les invites du connecteur). `modele` : modèle conseillé
 -- (nil : celui choisi dans la fenêtre).
@@ -139,6 +184,77 @@ Consignes.refuser = "Je refuse cette proposition : ne l'applique pas. Dis-moi ce
 function Consignes.ajuster(texte)
     return "Ajuste la proposition avant de l'appliquer : " .. texte .. ". Montre-moi la nouvelle proposition."
 end
+
+-- Notes ----------------------------------------------------------------------------------------
+
+-- Le bouton Noter de la carte Note, pour la photo active (une seule photo).
+Consignes.noterPhoto = "Note la photo active selon le standard de notation : son plancher technique avec cull_photos, puis regarde-la (view_photo), et propose sa note par propose_ratings avec la raison critère par critère. Ne pose rien toi-même ; jamais 5 ★."
+
+-- « 53636309, 53636310 » : les identifiants des photos d'une séance.
+local function identifiants(photos)
+    local liste = {}
+    for _, id in ipairs(type(photos) == 'table' and photos or {}) do
+        liste[#liste + 1] = type(id) == 'number' and string.format('%d', id) or tostring(id)
+    end
+    return table.concat(liste, ', ')
+end
+
+-- Les photos visées par une passe : la séance (Notation.seance : id, titre, source, photos), sa
+-- collection s'il y en a une, et les identifiants.
+local function cible(seance)
+    seance = type(seance) == 'table' and seance or {}
+    local photos = type(seance.photos) == 'table' and seance.photos or {}
+    local n = #photos
+    local titre = type(seance.titre) == 'string' and seance.titre ~= '' and (" « " .. seance.titre .. " »") or ''
+    local source = type(seance.source) == 'table' and seance.source or {}
+    local collection = ''
+    if source.portee == 'collection' and source.collection ~= nil then
+        collection = " (collection " .. identifiants({ source.collection }) .. ")"
+    end
+    return string.format("Séance%s%s, %s : %s.", titre, collection,
+        n == 1 and "1 photo" or (n .. " photos"), n > 0 and identifiants(photos) or "aucune photo")
+end
+
+-- Où ranger les propositions d'une passe. L'identifiant de la séance est écrit comme une valeur
+-- de paramètre (entre guillemets droits), pour que Claude le passe tel quel.
+local function ranger(seance, passe)
+    local id = type(seance) == 'table' and seance.id or nil
+    if id ~= nil then
+        return string.format(' Propositions par propose_ratings avec pass = %d et session = "%s".', passe, tostring(id))
+    end
+    return string.format(" Propositions par propose_ratings avec pass = %d.", passe)
+end
+
+-- Les quatre passes de la Séance de notation, une question chacune (standard de notation) :
+-- titre et question pour la fenêtre, message(seance) envoyé à Claude par « Lancer la passe ».
+Consignes.passes = {
+    { numero = 1, titre = "1 · Rejets", question = "Rejeter ? Les douteux : à vérifier.",
+        message = function(seance)
+            return "Passe 1 de la séance de notation : rejeter ou non ? " .. cible(seance) .. ranger(seance, 1)
+                .. " Mesure d'abord le plancher technique (cull_photos), puis regarde les photos par planches (contact_sheet)."
+                .. " Propose le drapeau reject pour un défaut majeur, involontaire et confirmé à l'œil ; les cas douteux (groupe, nuit, flou peut-être voulu) avec to_check = true ;"
+                .. " la seule photo de sa scène : plutôt 1 ★ à vérifier. Rien pour les photos gardées : elles attendent la passe 2."
+        end },
+    { numero = 2, titre = "2 · Trois étoiles", question = "3 ★ ou non ? Sinon : 2 ★.",
+        message = function(seance)
+            return "Passe 2 de la séance de notation : 3 ★ ou non ? " .. cible(seance) .. ranger(seance, 2)
+                .. " Pour chaque photo gardée (sans drapeau Rejeter) : 3 ★ si elle tient seule devant quelqu'un qui ne connaît ni les gens ni le lieu,"
+                .. " sinon 2 ★ (1 ★ au passage), dans les plafonds de cull_photos. Regarde par planches (contact_sheet)."
+        end },
+    { numero = 3, titre = "3 · Quatre étoiles", question = "Parmi les 3 ★, monter à 4 ?",
+        message = function(seance)
+            return "Passe 3 de la séance de notation : parmi les 3 ★ (posées dans le catalogue ou proposées à la passe 2), monter à 4 ★ ? " .. cible(seance) .. ranger(seance, 3)
+                .. " Regarde toute la sortie (contact_sheet), puis les candidates à 100 % (view_photo)."
+                .. " 4 ★ seulement pour une photo qui a de l'impact, nette à 100 % sur le sujet et meilleure vue de son moment ; souvent 5 à 10 % d'une sortie, sans quota."
+                .. " Les autres gardent leur note : ne les propose pas de nouveau."
+        end },
+    { numero = 4, titre = "4 · Cinq étoiles", question = "5 ★ ? Après le développement, vous seul.",
+        message = function(seance)
+            return "Passe 4 de la séance de notation : 5 ★ ? " .. cible(seance)
+                .. " Le 5 ★ est à Dany seul, après le développement : ne propose aucune note."
+                .. " Pour les photos à 4 ★, dis seulement ce que la finition laisse voir (halos aux bords des masques, peau plastique, saturation) et ce qui resterait à corriger."
+        end },
+}
 
 -- Ajustements d'un clic de la fenêtre Ajuster.
 Consignes.ajustementsRapides = { "Moins chaud", "Peau plus naturelle", "Garder le ciel", "Plus de contraste" }

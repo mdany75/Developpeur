@@ -283,6 +283,6 @@ final class RetoucheMasquesTests: XCTestCase {
         let names = tools.definitions.compactMap { $0["name"]?.string }
         XCTAssertTrue(names.contains("edit_mask"))
         XCTAssertEqual(names.count, ToolHandler.toolNames.count)
-        XCTAssertEqual(names.count, 33)
+        XCTAssertEqual(names.count, 34)
     }
 }

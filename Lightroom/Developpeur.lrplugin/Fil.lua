@@ -7,6 +7,8 @@
 -- Ligne : { genre, texte, icone, element (indice dans le fil), image (chemin relatif) }
 --   genres : 'dany', 'claude', 'titre', 'outil', 'apercu', 'proposition', 'note', 'vide'
 --   icones : 'dany', 'ok', 'cours', 'erreur', 'apercu', 'proposition', 'note' ou nil
+-- Un élément `notation` (notes proposées) reprend les genres `proposition` (titre) et `outil` (une
+-- ligne par photo) : un genre de plus ajouterait une vue à chaque ligne de la fenêtre.
 
 local Conversation = require 'Conversation'
 local Metriques = require 'Metriques'
@@ -23,6 +25,9 @@ Fil.polices = {
 -- Marge gardée à droite de chaque ligne : la chasse mesurée ne tient pas compte de tous les
 -- réglages de rendu de Lightroom.
 Fil.MARGE = 10
+
+-- Photos montrées d'une notation ; les autres se résument en « … et N autres ».
+Fil.NOTES_MONTREES = 12
 
 -- Largeur d'un texte dans une police.
 function Fil.largeur(texte, police)
@@ -89,6 +94,41 @@ function Fil.couper(texte, largeur, police, retrait)
         pousser(courante)
     end
     return lignes
+end
+
+-- Un texte sur une seule ligne : coupé par « … » s'il dépasse.
+local function uneLigne(texte, largeur, police)
+    local coupe = Fil.couper(texte, largeur, police)
+    local montre = coupe[1]
+    if #coupe > 1 then
+        montre = Texte.debut(montre, math.max(1, Texte.longueur(montre) - 1)) .. '…'
+    end
+    return montre
+end
+
+-- « ★★★☆☆ » : une note de 0 à 5 étoiles.
+function Fil.etoiles(note)
+    local n = math.max(0, math.min(5, math.floor(tonumber(note) or 0)))
+    return string.rep('★', n) .. string.rep('☆', 5 - n)
+end
+
+-- Une note proposée sur une ligne : « ★★★☆☆ DSCF4961.RAF · à vérifier · raison »,
+-- « ⚑ Rejeter photo 53636310 · raison », « ✕ ★★☆☆☆ DSCF4962.RAF · photo introuvable ». Claude ne
+-- propose jamais 5 étoiles : une note lue au-dessus de 4 se montre à 4.
+function Fil.texteNote(x)
+    local tete = x.drapeau == 'rejetee' and '⚑ Rejeter' or Fil.etoiles(math.min(tonumber(x.note) or 0, Conversation.NOTE_MAXIMALE))
+    if x.etat == 'refusee' then
+        tete = '✕ ' .. tete
+    end
+    local suite = { type(x.fichier) == 'string' and x.fichier ~= '' and x.fichier or ('photo ' .. Conversation.clePhoto(x.photo)) }
+    if x.a_verifier == true then
+        suite[#suite + 1] = 'à vérifier'
+    end
+    local raison = x.etat == 'refusee' and x.refus or x.raison
+    if type(raison) == 'string' and Texte.nettoyer(raison) ~= '' then
+        suite[#suite + 1] = Texte.nettoyer(raison)
+    end
+    return tete .. ' ' .. table.concat(suite, ' · ')
 end
 
 -- Markdown léger d'une ligne de Claude : genre et texte à montrer, retrait des lignes de suite.
@@ -180,12 +220,7 @@ function Fil.lignesElement(e, i, largeur)
     elseif g == 'outil' then
         local icone = e.etat == 'erreur' and 'erreur' or (e.etat == 'enCours' and 'cours' or 'ok')
         local texte = e.texte ~= '' and e.texte or (e.outil or 'outil')
-        local coupe = Fil.couper(texte, largeur, 'mono')
-        local montre = coupe[1]
-        if #coupe > 1 then
-            montre = Texte.debut(montre, math.max(1, Texte.longueur(montre) - 1)) .. '…'
-        end
-        lignes[1] = { genre = 'outil', texte = montre, element = i, icone = icone }
+        lignes[1] = { genre = 'outil', texte = uneLigne(texte, largeur, 'mono'), element = i, icone = icone }
     elseif g == 'apercu' then
         for n, chemin in ipairs(e.images or {}) do
             lignes[#lignes + 1] = { genre = 'apercu', texte = (#e.images > 1 and ("Aperçu " .. n) or "Aperçu") .. " de Claude · cliquer pour l'agrandir",
@@ -206,10 +241,44 @@ function Fil.lignesElement(e, i, largeur)
             lignes[#lignes + 1] = { genre = 'apercu', texte = (n == 1 and "Avant / après" or ("Rendu " .. n)) .. " · cliquer pour l'agrandir",
                 element = i, image = chemin, icone = 'apercu' }
         end
+    elseif g == 'notation' then
+        -- « Notes proposées · passe 2 · 14 photos », puis une ligne par photo.
+        local notes = e.notes or {}
+        local icone = e.etat == 'erreur' and 'erreur' or (e.etat == 'enCours' and 'cours' or 'proposition')
+        local titre = e.etat == 'erreur' and "Notes non rangées" or "Notes proposées"
+        if tonumber(e.passe) then
+            titre = titre .. " · passe " .. Texte.nombre(tonumber(e.passe))
+        end
+        titre = titre .. " · " .. (#notes == 1 and "1 photo" or (#notes .. " photos"))
+        if e.etat == 'erreur' and Texte.nettoyer(e.texte or '') ~= '' then
+            titre = titre .. " : " .. Texte.nettoyer(e.texte)
+        end
+        ajouterTexte(lignes, titre, 'proposition', largeur, i, icone)
+        for n, x in ipairs(notes) do
+            if n > Fil.NOTES_MONTREES then
+                local reste = #notes - Fil.NOTES_MONTREES
+                lignes[#lignes + 1] = { genre = 'outil', texte = '  … et ' .. reste .. (reste == 1 and ' autre' or ' autres'), element = i }
+                break
+            end
+            lignes[#lignes + 1] = { genre = 'outil', texte = uneLigne('  ' .. Fil.texteNote(x), largeur - 16, 'mono'), element = i }
+        end
     elseif g == 'note' then
         ajouterTexte(lignes, e.texte or '', 'note', largeur, i, 'note')
     end
     return lignes
+end
+
+-- Ce qui change l'affichage des notes d'une notation (pour la signature du cache).
+local function signatureNotes(e)
+    if type(e.notes) ~= 'table' then
+        return ''
+    end
+    local morceaux = { tostring(e.passe), #e.notes }
+    for _, x in ipairs(e.notes) do
+        morceaux[#morceaux + 1] = table.concat({ Conversation.clePhoto(x.photo), tostring(x.note), x.drapeau or '', x.etat or '',
+            tostring(x.a_verifier), x.fichier or '', x.refus or '', x.raison or '' }, '\2')
+    end
+    return table.concat(morceaux, '\3')
 end
 
 -- Vrai si deux éléments voisins se suivent sans ligne vide (outils et aperçus d'une même série).
@@ -226,7 +295,7 @@ function Fil.lignes(c, largeur, cache)
     local precedent
     for i, e in ipairs(c.elements or {}) do
         local signature = table.concat({ largeur, e.genre or '', e.etat or '', tostring(e.partiel), #(e.images or {}),
-            #(e.changements or {}), e.style or '', e.texte or '' }, '\1')
+            #(e.changements or {}), e.style or '', e.texte or '', signatureNotes(e) }, '\1')
         local siennes
         if cache and cache[e.id] and cache[e.id].signature == signature then
             siennes = cache[e.id].lignes
