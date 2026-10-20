@@ -368,7 +368,9 @@ final class TriTests: XCTestCase {
     func testLongSeriesSendsRealProgressWithTheTotal() throws {
         preparerVignettes()
         let server = TestSupport.makeServer(fake)
-        server.progressInterval = 30
+        // Seule la vraie progression ici : sur une machine lente, un lot peut durer plus de 30 s, et
+        // le battement (0,01 entre deux lots) partirait avant elle.
+        server.progressInterval = 3600
         let verrou = NSLock()
         var notifications: [JSONValue] = []
         server.notifier = { verrou.lock(); notifications.append($0); verrou.unlock() }
