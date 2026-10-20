@@ -474,7 +474,8 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   puis notarise l'archive (profil `notarisation` de `notarytool`). `SKIP_NOTARIZE=1` pour un essai
   rapide ; ne jamais publier une archive non notarisée, ni construite avec `--sans-tests`.
 - Avant de pousser une fonctionnalité : README et `CHANGELOG.md` à jour, capture d'écran refaite
-  dans Lightroom si l'interface a changé (`docs/capture.png` : la fenêtre Claude ;
+  dans Lightroom si l'interface a changé (`docs/capture.png` : la fenêtre Claude en Conversation
+  claire ; `atelier.png`, `panneau.png` : ses deux autres dispositions ; `seance.png`,
   `publication.png`, `consommation.png`, `suivi.png` : les autres fenêtres), et une nouvelle
   version si ce qu'on installe a changé.
 - Pousser sur `main` directement.
@@ -494,4 +495,4 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
 - `.github/workflows/tests.yml` : syntaxe des scripts et les deux suites à chaque envoi sur `main` (macOS)
 - `build.sh` (tests, compilation, signature, archive notarisée), `install.sh`, `uninstall.sh`
 - `Resources/Info.plist` : identifiant `com.danymenard.mcp-developpeur` et version (incrusté par `-sectcreate` dans `Package.swift`)
-- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, et la fenêtre Claude (architecture, contraintes du SDK, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude, capture principale du README), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de suivi de la liaison)
+- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, et la fenêtre Claude (architecture, contraintes du SDK, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude en Conversation claire, capture principale du README), `atelier.png` et `panneau.png` (les deux autres dispositions), `seance.png` (la Séance de notation), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de suivi de la liaison)

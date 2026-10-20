@@ -318,6 +318,8 @@ Une fenêtre à part, « Claude · Séance de notation », pour noter une sortie
 passe : Séance de notation… dans le menu du module (Fichier et Bibliothèque › Module externe -
 Extras), Séance… dans la carte Note, ou Noter quand plusieurs photos sont sélectionnées.
 
+![La Séance de notation](docs/seance.png)
+
 - En haut, les photos à noter : la sélection ou une collection (pas une collection dynamique ; ↻
   relit les collections). Ouvrir la séance fige la liste, rangée par date de prise de vue. La
   séance reste ouverte jusqu'à la suivante : refermer la fenêtre ne la perd pas.
