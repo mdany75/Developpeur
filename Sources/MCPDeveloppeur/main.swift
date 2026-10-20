@@ -1,0 +1,268 @@
+import Foundation
+import DeveloppeurKit
+
+// Point d'entrée : sans argument, le serveur MCP parle JSON-RPC sur stdin/stdout.
+// Les journaux vont sur stderr, jamais sur stdout (réservé au protocole).
+
+func log(_ message: String) {
+    FileHandle.standardError.write(Data("[mcp-developpeur] \(message)\n".utf8))
+}
+
+// Les réponses (fil principal, ou fil d'attente d'un appel d'outil) et les notifications de
+// progression (leur propre fil) ne doivent pas se mêler sur stdout.
+let sortie = NSLock()
+
+func print(line: String) {
+    sortie.lock()
+    defer { sortie.unlock() }
+    FileHandle.standardOutput.write(Data((line + "\n").utf8))
+}
+
+func executablePath() -> String {
+    let url = Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])
+    return url.resolvingSymlinksInPath().path
+}
+
+let pluginPath = FileManager.default.homeDirectoryForCurrentUser
+    .appendingPathComponent("Library/Application Support/Adobe/Lightroom/Modules/Developpeur.lrplugin").path
+
+func usage() {
+    print(line: """
+    mcp-developpeur \(ServerInfo.version) — MCP-Développeur, le serveur MCP du module Développeur de Lightroom Classic
+
+    Usage : mcp-developpeur              lance le serveur (stdio, pour Claude)
+            mcp-developpeur --install    inscrit cet exécutable dans Claude Desktop et Claude Code
+            mcp-developpeur --uninstall  retire l'inscription
+            mcp-developpeur --status     inscriptions, module Lightroom, liaison et mise à jour (par gh)
+            mcp-developpeur --version
+
+    Pour le développement (parle au module Lightroom directement) :
+            mcp-developpeur --call <outil> ['{"json": …}'] [--image <fichier.jpg>]
+                appelle un outil comme le ferait Claude (et enregistre les images qu'il renvoie)
+            mcp-developpeur --module <commande> ['{"json": …}']   commande brute du module (diagnostic…)
+            mcp-developpeur --recalage <id photo>   mesure le recalage des positions sur la géométrie actuelle
+                (deux rendus) : zones fiables, écarts moyen, maximal et près des bords, en pixels du fichier
+            mcp-developpeur --dump [<id photo>]   tous les réglages bruts de la photo (active par défaut),
+                à plat, une clé par ligne et triés : à comparer avec diff avant et après un essai
+            mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--original] [--images <dossier>]
+                recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
+                (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
+                garde les étapes de la recette
+    DEVELOPPEUR_PORT=<port> change le port des commandes (les réponses sur le port suivant ;
+    défaut \(LightroomBridge.defaultRequestPort) et \(LightroomBridge.defaultReplyPort), comme dans le module).
+    DEVELOPPEUR_VERBOSE=1 journalise la durée des réponses et de chaque commande du module (stderr).
+    DEVELOPPEUR_LIMITE=<s> change la limite d'un appel d'outil sans jeton de progression, après laquelle
+    le serveur répond d'attendre (défaut 50 s, sous les 60 s de Claude Desktop).
+    """)
+}
+
+let verbose = ProcessInfo.processInfo.environment["DEVELOPPEUR_VERBOSE"] == "1"
+
+func serve() {
+    let server = MCPServer(name: ServerInfo.name, title: ServerInfo.title, version: ServerInfo.version,
+                           instructions: ServerInfo.instructions,
+                           tools: ToolHandler(lightroom: LightroomBridge.fromEnvironment()))
+    server.notifier = { print(line: JSONCoding.line($0)) }
+    if let text = ProcessInfo.processInfo.environment["DEVELOPPEUR_LIMITE"], let seconds = Double(text), seconds > 0 {
+        server.toolBudget = seconds
+    }
+    log("démarré (version \(ServerInfo.version))")
+
+    // Le fil principal lit sans arrêt : les appels d'outils passent un à un vers Lightroom, dans
+    // la file du serveur, et leur réponse part de leur propre fil (ping et listes répondent pendant
+    // un long rendu).
+    while let line = readLine(strippingNewline: true) {
+        let started = Date()
+        server.receive(line: line) { response in
+            print(line: response)
+            if verbose { log(String(format: "réponse en %.2f s", Date().timeIntervalSince(started))) }
+        }
+    }
+    log("fin de l'entrée : arrêt")
+}
+
+func status() {
+    print(line: "Version : \(ServerInfo.version)")
+    if let miseAJour = MiseAJour.ligne(installee: ServerInfo.version, derniere: MiseAJour.derniereVersion()) {
+        print(line: miseAJour)
+    }
+    print(line: "Exécutable : \(executablePath())")
+    let installe = ClaudeRegistration.installedExecutable().path
+    for target in ClaudeRegistration.defaultTargets() {
+        let command = ClaudeRegistration.registeredCommand(in: target)
+        let ailleurs = command.map { $0 != installe } ?? false
+        print(line: "\(target.label) : \(command.map { "inscrit (\($0))" } ?? "non inscrit")"
+            + (ailleurs ? " ; ce n'est pas l'exécutable installé (\(installe))" : ""))
+        if ClaudeRegistration.ancienInscrit(in: target) {
+            print(line: "\(target.label) : l'ancien connecteur « \(ClaudeRegistration.ancienneCle) » (MCP Lightroom) est encore inscrit ; "
+                + "quitter Claude Desktop, puis lancer \(installe) --install, qui le retire")
+        }
+    }
+    let pluginInstalled = FileManager.default.fileExists(atPath: pluginPath)
+    print(line: "Module Lightroom : \(pluginInstalled ? "installé (\(pluginPath))" : "absent de \(pluginPath)")")
+    let bridge = LightroomBridge.fromEnvironment()
+    do {
+        let state = try bridge.send("etat", [:], timeout: 10)
+        print(line: "Liaison : active (ports \(bridge.requestPort) et \(bridge.replyPort))")
+        print(line: JSONCoding.pretty(state))
+    } catch {
+        print(line: "Liaison : \(error.localizedDescription)")
+        exit(1)
+    }
+}
+
+let arguments = Array(CommandLine.arguments.dropFirst())
+
+switch arguments.first {
+case nil:
+    serve()
+case "--version", "-v":
+    print(line: ServerInfo.version)
+case "--help", "-h":
+    usage()
+case "--install":
+    do {
+        for line in try ClaudeRegistration.register(executable: executablePath(), targets: ClaudeRegistration.defaultTargets()) {
+            print(line: line)
+        }
+        print(line: "Redémarrer Claude Desktop pour que le connecteur apparaisse ; Claude Code le voit à sa prochaine session.")
+    } catch {
+        log("échec de l'inscription : \(error.localizedDescription)")
+        exit(1)
+    }
+case "--uninstall":
+    do {
+        for line in try ClaudeRegistration.unregister(targets: ClaudeRegistration.defaultTargets()) {
+            print(line: line)
+        }
+    } catch {
+        log("échec du retrait : \(error.localizedDescription)")
+        exit(1)
+    }
+case "--status":
+    status()
+case "--call":
+    guard arguments.count >= 2 else { usage(); exit(2) }
+    var rest = Array(arguments.dropFirst(2))
+    var imagePath: String?
+    if let index = rest.firstIndex(of: "--image") {
+        guard index + 1 < rest.count else { usage(); exit(2) }
+        imagePath = rest[index + 1]
+        rest.removeSubrange(index...(index + 1))
+    }
+    do {
+        let params = try rest.first.map { try JSONCoding.parse($0).object ?? [:] } ?? [:]
+        let result = ToolHandler(lightroom: LightroomBridge.fromEnvironment()).call(name: arguments[1], arguments: params)
+        var saved = 0
+        for block in result.content {
+            switch block {
+            case .text(let text): print(line: text)
+            case .image(let data, let mimeType):
+                if let imagePath, let bytes = Data(base64Encoded: data) {
+                    let url = URL(fileURLWithPath: imagePath)
+                    let target = saved == 0 ? url : url.deletingPathExtension().appendingPathExtension("\(saved + 1).\(url.pathExtension)")
+                    try bytes.write(to: target)
+                    saved += 1
+                    print(line: "[image \(mimeType) enregistrée : \(target.path)]")
+                } else {
+                    print(line: "[image \(mimeType), \(data.count * 3 / 4 / 1024) Ko]")
+                }
+            }
+        }
+        if result.isError { exit(1) }
+    } catch {
+        log("arguments JSON illisibles ou image non enregistrée : \(error.localizedDescription)")
+        exit(2)
+    }
+case "--recalage":
+    // Écarts du recalage (Recalage.swift) sur la géométrie actuelle d'une photo, pour essayer des
+    // corrections (Upright, perspective forte) : l'historique garde les deux rendus du recalage.
+    guard arguments.count >= 2, let id = Int(arguments[1]) else { usage(); exit(2) }
+    do {
+        let bridge = LightroomBridge.fromEnvironment()
+        let rendus = try bridge.send("geometrie", ["photos": [.number(Double(id))], "rendre": true, "taille": 2048], timeout: 120)
+        guard let info = rendus["photos"]?.array?.first, info["active"]?.bool == true else {
+            print(line: "Pas de correction géométrique active sur cette photo : rien à recaler.")
+            exit(0)
+        }
+        let corrigee = (try? ToolHandler.readPreview(info["chemin_corrige"]?.string)).flatMap(PreviewImages.image)
+        let origine = (try? ToolHandler.readPreview(info["chemin_origine"]?.string)).flatMap(PreviewImages.image)
+        guard let corrigee, let origine, let resultat = Recalage.calculer(corrigee: corrigee, origine: origine) else {
+            log("rendus illisibles ou image trop uniforme")
+            exit(1)
+        }
+        // Largeur du fichier (pas du cadre) : la géométrie que donne la commande « vignettes ».
+        let vignette = try? bridge.send("vignettes", ["photos": [.number(Double(id))], "taille": 128], timeout: 60)
+        if let chemin = vignette?["photos"]?.array?.first?["vignette"]?.string { try? FileManager.default.removeItem(atPath: chemin) }
+        let largeur = vignette?["photos"]?.array?.first?["geometrie"]?["largeur"]?.double ?? 2048
+        func px(_ part: Double) -> String { String(format: "%.1f px", part * largeur) }
+        print(line: "Zones fiables : \(resultat.zonesFiables) sur \(resultat.zonesEssayees)")
+        print(line: "Déplacement maximal corrigé : \(px(resultat.ecartMax))")
+        print(line: "Écart du modèle : moyen \(px(resultat.residu)), maximal \(px(resultat.residuMax)), près des bords \(px(resultat.residuBords))")
+        print(line: "(en pixels d'un fichier de \(Int(largeur)) px de large)")
+    } catch {
+        log(error.localizedDescription)
+        exit(1)
+    }
+case "--dump":
+    // Réglages bruts à plat (« MaskGroupBasedCorrections.1.CorrectionAmount = 1 »), pour diff.
+    var params: [String: JSONValue] = ["toutes": true, "cles": []]
+    if arguments.count >= 2 {
+        guard let id = Int(arguments[1]) else { usage(); exit(2) }
+        params["photo"] = .number(Double(id))
+    }
+    do {
+        let reponse = try LightroomBridge.fromEnvironment().send("reglages", params, timeout: 60)
+        for ligne in ReglagesAPlat.lignes(reponse["tous"] ?? .null) { print(line: ligne) }
+    } catch {
+        log(error.localizedDescription)
+        exit(1)
+    }
+case "--module":
+    // Commande brute du module (diagnostic…), pour explorer ce que le SDK de Lightroom offre.
+    guard arguments.count >= 2 else { usage(); exit(2) }
+    do {
+        let params = arguments.count >= 3 ? (try JSONCoding.parse(arguments[2]).object ?? [:]) : [:]
+        print(line: JSONCoding.pretty(try LightroomBridge.fromEnvironment().send(arguments[1], params, timeout: 60)))
+    } catch {
+        log(error.localizedDescription)
+        exit(1)
+    }
+case "--recette":
+    var raw: Int?, jpeg: Int?, flash: Int?, profondeur: Int?, yeuxRouges: Int?, xt20: Int?, images: URL?, originaux = false
+    var rest = Array(arguments.dropFirst())
+    while !rest.isEmpty {
+        let item = rest.removeFirst()
+        func next() -> String { guard !rest.isEmpty else { usage(); exit(2) }; return rest.removeFirst() }
+        switch item {
+        case "--jpeg": jpeg = Int(next())
+        case "--flash": flash = Int(next())
+        case "--profondeur": profondeur = Int(next())
+        case "--yeux-rouges": yeuxRouges = Int(next())
+        case "--x-t20": xt20 = Int(next())
+        case "--images": images = URL(fileURLWithPath: next())
+        case "--original": originaux = true
+        default:
+            guard let id = Int(item) else { log("argument inconnu : \(item)"); usage(); exit(2) }
+            raw = id
+        }
+    }
+    guard raw != nil || jpeg != nil || flash != nil || profondeur != nil || yeuxRouges != nil || xt20 != nil else { usage(); exit(2) }
+    let folder = images ?? FileManager.default.temporaryDirectory.appendingPathComponent("recette-mcp-developpeur-\(Int(Date().timeIntervalSince1970))")
+    print(line: originaux
+        ? "Recette de MCP-Développeur \(ServerInfo.version) : originaux acceptés (--original), chaque photo remise à l'origine à la fin."
+        : "Recette de MCP-Développeur \(ServerInfo.version) : copies virtuelles seulement, chacune remise à l'origine à la fin.")
+    print(line: "Images à regarder : \(folder.path)")
+    let recette = Recette(lightroom: LightroomBridge.fromEnvironment(), images: folder, originaux: originaux) { etape in
+        let seconds = String(format: "%.1f", etape.duree).replacingOccurrences(of: ".", with: ",")
+        print(line: "\(etape.reussie ? "✔" : "✘") \(etape.photo) · \(etape.nom) — \(etape.detail) (\(seconds) s)")
+    }
+    recette.lancer(raw: raw, jpeg: jpeg, flash: flash, profondeur: profondeur, yeuxRouges: yeuxRouges, xt20: xt20)
+    let failures = recette.etapes.filter { !$0.reussie }.count
+    print(line: failures == 0 ? "Recette réussie : \(recette.etapes.count) étapes." : "Recette en échec : \(failures) étape(s) sur \(recette.etapes.count).")
+    exit(recette.reussie ? 0 : 1)
+default:
+    log("option inconnue : \(arguments[0])")
+    usage()
+    exit(2)
+}

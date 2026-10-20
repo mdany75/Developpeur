@@ -1,0 +1,26 @@
+# Les deux suites de tests à chaque envoi sur main : le serveur (swift test, avec le faux module)
+# et le module Lightroom « Développeur » (LuaJIT, avec le SDK simulé : liaison et fenêtre
+# Claude), plus la syntaxe des scripts de construction et d'installation. Aucune ne touche
+# Lightroom, Claude ni les fichiers de Claude. Environ une minute de macOS par envoi.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: LuaJIT
+        run: brew install luajit
+      - name: Scripts (syntaxe)
+        run: for script in build.sh install.sh uninstall.sh; do bash -n "${script}"; done
+      - name: Serveur (swift test)
+        run: swift test
+      - name: Module Lightroom (LuaJIT)
+        run: scripts/tester-module.sh

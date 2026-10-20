@@ -1,0 +1,3 @@
+-- MenuPublication.lua : Fichier (ou Bibliothèque) › Module externe - Extras › Publication…
+
+require('FenetrePublication').afficher()

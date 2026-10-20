@@ -1,0 +1,150 @@
+-- Images.lua : les images de la conversation (aperçus que Claude regarde, photos jointes).
+-- Le décodage base64 et les réductions passent par les outils du Mac (base64, sips), lancés par
+-- LrTasks.execute, qui ne bloque que la tâche en cours et pas l'interface de Lightroom.
+-- À appeler depuis une tâche (LrTasks.startAsyncTask).
+
+local LrPathUtils = import 'LrPathUtils'
+local LrTasks = import 'LrTasks'
+
+local Chemins = require 'Chemins'
+local Conversation = require 'Conversation'
+local Fichiers = require 'Fichiers'
+local Journal = require 'Journal'
+local Texte = require 'Texte'
+
+local Images = {}
+
+-- Fond des vignettes, proche de celui de Lightroom (l'image est centrée dans un carré).
+Images.FOND = '2B2B2B'
+
+local q = Texte.shell
+
+local function executer(commande)
+    local code = LrTasks.execute(commande)
+    if code ~= 0 then
+        Journal.noter("Commande en échec (" .. tostring(code) .. ") :", commande)
+    end
+    return code == 0
+end
+
+local function extension(typeMedia)
+    if typeMedia == 'image/png' then
+        return 'png'
+    elseif typeMedia == 'image/webp' then
+        return 'webp'
+    elseif typeMedia == 'image/gif' then
+        return 'gif'
+    end
+    return 'jpg'
+end
+
+-- Range une image reçue de Claude Code ({ donnees = base64, type }) dans le dossier de la
+-- conversation ; rend son nom (chemin relatif), nil en cas d'échec.
+function Images.enregistrer(image, dossier)
+    Fichiers.creerDossier(dossier)
+    local nom = 'image-' .. Conversation.identifiant() .. '.' .. extension(image.type)
+    local destination = LrPathUtils.child(dossier, nom)
+    local provisoire = destination .. '.b64'
+    local f = io.open(provisoire, 'wb')
+    if not f then
+        return nil
+    end
+    f:write(image.donnees)
+    f:close()
+    local ok = executer('/usr/bin/base64 -D -i ' .. q(provisoire) .. ' -o ' .. q(destination))
+    Fichiers.supprimer(provisoire)
+    return ok and Fichiers.existe(destination) and nom or nil
+end
+
+-- Une réduction carrée de `cote` points, l'image centrée sur le fond (le cadre des vues du SDK
+-- ne change pas de taille) ; créée à la première demande dans <dossier>/.vignettes.
+function Images.vignette(dossier, nom, cote)
+    local source = LrPathUtils.child(dossier, nom)
+    if not Fichiers.existe(source) then
+        return nil
+    end
+    local base = LrPathUtils.removeExtension(LrPathUtils.leafName(nom))
+    local destination = LrPathUtils.child(LrPathUtils.child(dossier, '.vignettes'), base .. '-' .. cote .. '.jpg')
+    if not Fichiers.existe(destination) then
+        Fichiers.creerDossier(LrPathUtils.parent(destination))
+        local ok = executer(string.format('/usr/bin/sips -s format jpeg -Z %d %s --out %s >/dev/null 2>&1 && /usr/bin/sips -p %d %d --padColor %s %s --out %s >/dev/null 2>&1',
+            cote, q(source), q(destination), cote, cote, Images.FOND, q(destination), q(destination)))
+        if not ok then
+            return nil
+        end
+    end
+    return destination
+end
+
+-- Largeur et hauteur en pixels (nil si illisible).
+function Images.dimensions(chemin)
+    local sortie = LrPathUtils.child(Chemins.temporaire(), 'dimensions-' .. Conversation.identifiant() .. '.txt')
+    Fichiers.creerDossier(Chemins.temporaire())
+    executer('/usr/bin/sips -g pixelWidth -g pixelHeight ' .. q(chemin) .. ' > ' .. q(sortie) .. ' 2>/dev/null')
+    local texte = Fichiers.lire(sortie) or ''
+    Fichiers.supprimer(sortie)
+    local l, h = tonumber(texte:match('pixelWidth:%s*(%d+)')), tonumber(texte:match('pixelHeight:%s*(%d+)'))
+    return l, h
+end
+
+-- La version à montrer en grand, qui tient dans largeur × hauteur : chemin, largeur, hauteur.
+function Images.grande(dossier, nom, largeurMax, hauteurMax)
+    local source = LrPathUtils.child(dossier, nom)
+    local l, h = Images.dimensions(source)
+    if not l or not h then
+        return nil
+    end
+    local echelle = math.min(largeurMax / l, hauteurMax / h, 1)
+    local lf, hf = math.floor(l * echelle), math.floor(h * echelle)
+    local base = LrPathUtils.removeExtension(LrPathUtils.leafName(nom))
+    local destination = LrPathUtils.child(LrPathUtils.child(dossier, '.vignettes'), string.format('%s-%dx%d.jpg', base, lf, hf))
+    if not Fichiers.existe(destination) then
+        Fichiers.creerDossier(LrPathUtils.parent(destination))
+        if not executer(string.format('/usr/bin/sips -s format jpeg -z %d %d %s --out %s >/dev/null 2>&1', hf, lf, q(source), q(destination))) then
+            return nil
+        end
+    end
+    return destination, lf, hf
+end
+
+-- Une photo du disque jointe à une demande : réduite à 1568 points au plus (la taille que Claude
+-- regarde), copiée dans le dossier de la conversation. Rend son nom et l'image pour Claude
+-- ({ donnees = base64, type }), ou nil et la raison.
+function Images.joindre(chemin, dossier)
+    Fichiers.creerDossier(dossier)
+    local nom = 'jointe-' .. Conversation.identifiant() .. '.jpg'
+    local destination = LrPathUtils.child(dossier, nom)
+    if not executer(string.format('/usr/bin/sips -s format jpeg -s formatOptions 85 -Z 1568 %s --out %s >/dev/null 2>&1', q(chemin), q(destination))) then
+        return nil, "Image illisible : " .. LrPathUtils.leafName(chemin)
+    end
+    local b64 = destination .. '.b64'
+    executer('/usr/bin/base64 -i ' .. q(destination) .. ' -o ' .. q(b64))
+    local donnees = Fichiers.lire(b64)
+    Fichiers.supprimer(b64)
+    if not donnees or donnees == '' then
+        return nil, "Image illisible : " .. LrPathUtils.leafName(chemin)
+    end
+    return nom, { donnees = (donnees:gsub('%s', '')), type = 'image/jpeg' }
+end
+
+-- Les images du presse-papiers du Mac (presse-papiers.js) : fichiers d'image copiés dans le Finder,
+-- ou image copiée (capture d'écran…) écrite dans Temporaire/Collees. Rend la liste des chemins
+-- (vide s'il n'y a pas d'image). `nomPressePapiers` : un presse-papiers nommé (essais).
+function Images.coller(nomPressePapiers)
+    local dossier = Fichiers.creerDossier(LrPathUtils.child(Chemins.temporaire(), 'Collees'))
+    local sortie = LrPathUtils.child(Chemins.temporaire(), 'presse-papiers-' .. Conversation.identifiant() .. '.txt')
+    executer(string.format('/usr/bin/osascript -l JavaScript %s %s %s > %s 2>/dev/null', q(Chemins.ressource('presse-papiers.js')),
+        q(dossier), nomPressePapiers and q(nomPressePapiers) or '', q(sortie)))
+    local texte = Fichiers.lire(sortie) or ''
+    Fichiers.supprimer(sortie)
+    local chemins = {}
+    for ligne in texte:gmatch('[^\n]+') do
+        local chemin = Texte.nettoyer(ligne)
+        if chemin ~= '' and Fichiers.existe(chemin) then
+            chemins[#chemins + 1] = chemin
+        end
+    end
+    return chemins
+end
+
+return Images

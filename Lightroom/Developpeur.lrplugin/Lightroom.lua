@@ -1,0 +1,119 @@
+-- Lightroom.lua : ce que la fenêtre lit de Lightroom et de son entourage : photo active et
+-- sélection, état de la liaison et mode « Proposer d'abord » (lus directement : la liaison est
+-- dans ce même module), connexion de Claude Code. À appeler depuis une tâche.
+
+local LrApplication = import 'LrApplication'
+local LrPathUtils = import 'LrPathUtils'
+local LrTasks = import 'LrTasks'
+
+local Chemins = require 'Chemins'
+local Conversation = require 'Conversation'
+local Fichiers = require 'Fichiers'
+local Json = require 'Json'
+local Liaison = require 'Liaison'
+local Preferences = require 'Preferences'
+local Texte = require 'Texte'
+
+local Lightroom = {}
+
+-- Photo active ({ id, nom }) et nombre de photos sélectionnées.
+function Lightroom.photos()
+    local info = { selection = 0 }
+    local ok = LrTasks.pcall(function()
+        local catalogue = LrApplication.activeCatalog()
+        local active = catalogue:getTargetPhoto()
+        if active then
+            info.active = { id = active.localIdentifier, nom = active:getFormattedMetadata('fileName') or '' }
+            info.selection = #catalogue:getTargetPhotos()
+        end
+    end)
+    if not ok then
+        info.active = nil
+    end
+    return info
+end
+
+-- « DSCF4961 » pour DSCF4961.RAF.
+function Lightroom.nomCourt(nom)
+    return (tostring(nom or ''):gsub('%.[^.]*$', ''))
+end
+
+-- La ligne de contexte jointe à chaque demande.
+function Lightroom.contexte(info)
+    if not info.active then
+        return "[Lightroom : aucune photo active ni sélectionnée]"
+    end
+    local selection = info.selection == 1 and "1 photo" or (tostring(info.selection) .. " photos")
+    return string.format("[Lightroom : photo active %s (%s) ; sélection : %s]", tostring(info.active.id), info.active.nom, selection)
+end
+
+-- État de la liaison avec le serveur : 'active', 'erreur' (ports tenus par un autre Lightroom,
+-- par exemple) ou 'arretee', et l'erreur s'il y en a une.
+function Lightroom.liaison()
+    if not Liaison.actif then
+        return 'arretee'
+    elseif Liaison.erreur then
+        return 'erreur', Liaison.erreur
+    end
+    return 'active'
+end
+
+-- Démarre la liaison si elle est arrêtée, ou la relance après une erreur (clic sur le voyant de
+-- la fenêtre).
+function Lightroom.demarrerLiaison()
+    if Liaison.actif and Liaison.erreur then
+        Liaison.arreter()
+    end
+    if not Liaison.actif then
+        Liaison.demarrer()
+    end
+end
+
+-- Mode de la liaison : 'proposer' (Proposer d'abord) ou 'appliquer'.
+function Lightroom.mode()
+    local ok, prefs = pcall(Preferences.lire)
+    if ok and prefs and prefs.mode == 'proposer' then
+        return 'proposer'
+    end
+    return 'appliquer'
+end
+
+function Lightroom.basculerMode()
+    Preferences.lire().mode = Lightroom.mode() == 'proposer' and 'appliquer' or 'proposer'
+    return Lightroom.mode()
+end
+
+-- Connexion de Claude Code (`claude auth status`) : { installe, connecte, forfait, texte }.
+function Lightroom.etatClaude(claude)
+    if not Fichiers.existe(claude) then
+        return { installe = false, connecte = false, texte = "Claude Code introuvable" }
+    end
+    Fichiers.creerDossier(Chemins.temporaire())
+    local sortie = LrPathUtils.child(Chemins.temporaire(), 'auth-' .. Conversation.identifiant() .. '.json')
+    LrTasks.execute('/usr/bin/env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_BASE_URL ' .. Texte.shell(claude)
+        .. ' auth status > ' .. Texte.shell(sortie) .. ' 2>/dev/null')
+    local texte = Fichiers.lire(sortie) or ''
+    Fichiers.supprimer(sortie)
+    local ok, json = pcall(Json.decode, texte)
+    if not ok or type(json) ~= 'table' then
+        return { installe = true, connecte = nil, texte = "Claude Code" }
+    end
+    if json.loggedIn ~= true then
+        return { installe = true, connecte = false, texte = "Claude Code · non connecté" }
+    end
+    local forfait = json.authMethod == 'claude.ai'
+    return { installe = true, connecte = true, forfait = forfait, texte = forfait and "Claude Code · forfait" or "Claude Code · " .. tostring(json.authMethod) }
+end
+
+-- Sélectionne une photo du catalogue par son identifiant (numéros cités par Claude).
+function Lightroom.selectionner(id)
+    LrTasks.pcall(function()
+        local catalogue = LrApplication.activeCatalog()
+        local photo = catalogue:getPhotoByLocalId(tonumber(id))
+        if photo then
+            catalogue:setSelectedPhotos(photo, {})
+        end
+    end)
+end
+
+return Lightroom

@@ -1,0 +1,3 @@
+-- MenuConsommation.lua : Fichier (ou Bibliothèque) › Module externe - Extras › Consommation…
+
+require('FenetreConsommation').afficher()
