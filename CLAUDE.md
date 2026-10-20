@@ -73,9 +73,11 @@ Dans cet ordre :
    connecteur Claude Docs) : retirer ce que la version vient de livrer et corriger ce qui est
    devenu faux.
 
-Une version par étape de la feuille de route (1.1 rendu plus juste, 1.2 apprendre en regardant
-Claude, 1.3 une sortie entière, 1.4 finitions et impression, 1.5 style appris), publiée après un
-essai réel ; entre deux, seulement des correctifs (`X.Y.Z`).
+Une version par étape de la feuille de route (1.1 rendu plus juste, 1.2 noter avec un standard,
+1.3 apprendre en regardant Claude, 1.4 une sortie entière, 1.5 finitions et impression, 1.6 style
+appris), publiée après un essai réel ; entre deux, seulement des correctifs (`X.Y.Z`). Le standard
+de notation (une étoile = un niveau de qualité fixe, 0 ★ = pas encore jugée, rejeter = drapeau,
+Claude ne propose jamais 5 ★) est décrit dans la feuille de route, section 1.2.
 
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 
