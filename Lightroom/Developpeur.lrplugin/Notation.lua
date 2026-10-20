@@ -2,7 +2,8 @@
 -- notation), et des séances de notation de la fenêtre Claude. Rien n'y est écrit dans le
 -- catalogue : Claude propose, l'utilisateur accepte, change, met à vérifier ou écarte dans la
 -- fenêtre ; seule une note acceptée ou changée s'écrit, par Notation.poser (Bibliotheque.noter,
--- une écriture, une étape par photo que undo_last défait).
+-- une écriture, une étape par photo que undo_last défait). Le registre ne voit pas l'annulation :
+-- les fenêtres le recalent sur la note qu'elles relisent (Notation.recaler).
 --
 -- La liaison (commande du serveur) et la fenêtre (cartes Note, Séance de notation) sont le même
 -- module : elles voient la même table. Le registre est aussi rangé dans notation.json (à côté de
@@ -62,6 +63,11 @@ local function echouer(message)
 end
 
 local registre
+
+-- Écritures de Notation.poser en cours. Elles rendent la main (écriture dans le catalogue, relecture
+-- des photos) : une fenêtre a pu relever une photo avant que sa note y soit posée, et rien ne se
+-- recale tant qu'elles durent (Notation.recaler).
+local ecrituresEnCours = 0
 
 function Notation.fichier()
     return LrPathUtils.child(Chemins.racine(), 'notation.json')
@@ -233,7 +239,7 @@ function Notation.desabonner(nom)
     Notation.observateurs[nom] = nil
 end
 
--- quoi : 'propositions', 'seance', 'decision' ou 'pose'.
+-- quoi : 'propositions', 'seance', 'decision', 'pose' ou 'recalage'.
 function Notation.signaler(quoi)
     for _, fn in pairs(Notation.observateurs) do
         pcall(fn, quoi)
@@ -669,51 +675,112 @@ function Notation.poser(liste)
 
     local Bibliotheque = require 'Bibliotheque'
     local erreur
-    for debut = 1, #aPoser, Notation.LOT do
-        local lot, notes = {}, {}
-        for i = debut, math.min(debut + Notation.LOT - 1, #aPoser) do
-            lot[#lot + 1] = aPoser[i]
-            notes[#notes + 1] = aPoser[i].note
-        end
-        local ok, reponse = LrTasks.pcall(Bibliotheque.noter, { notes = notes, etape = 'notation', depuisLightroom = true, confirme = true })
-        if not ok then
-            -- Rien de ce lot ni des suivants n'est écrit.
-            erreur = Liaison.messageErreur(reponse)
-            for i = debut, #aPoser do
-                aPoser[i].res.erreur = erreur
+    local function ecrireLots()
+        for debut = 1, #aPoser, Notation.LOT do
+            local lot, notes = {}, {}
+            for i = debut, math.min(debut + Notation.LOT - 1, #aPoser) do
+                lot[#lot + 1] = aPoser[i]
+                notes[#notes + 1] = aPoser[i].note
             end
-            break
-        end
-        change = true
-        local parId = {}
-        for _, resultat in ipairs(reponse.resultats or {}) do
-            parId[cleDe(resultat.photo and resultat.photo.id)] = resultat
-        end
-        for _, a in ipairs(lot) do
-            local res, photo, p = a.res, a.photo, a.proposition
-            local ecrit = parId[cleDe(photo.localIdentifier)] or {}
-            res.changements, res.remarques = ecrit.changements, ecrit.remarques
-            res.note, res.drapeau = tonumber(Photos.brut(photo, 'rating')) or 0, drapeauDe(photo)
-            -- Une proposition remplacée pendant l'écriture n'est pas celle que l'utilisateur a vue.
-            if p and r.propositions[cleDe(photo.localIdentifier)] == p then
-                local telleQuelle
-                if p.drapeau == 'rejetee' then
-                    telleQuelle = res.drapeau == 'rejetee'
-                else
-                    telleQuelle = res.note == p.note and res.drapeau ~= 'rejetee'
+            local ok, reponse = LrTasks.pcall(Bibliotheque.noter, { notes = notes, etape = 'notation', depuisLightroom = true, confirme = true })
+            if not ok then
+                -- Rien de ce lot ni des suivants n'est écrit.
+                erreur = Liaison.messageErreur(reponse)
+                for i = debut, #aPoser do
+                    aPoser[i].res.erreur = erreur
                 end
-                p.etat = telleQuelle and 'acceptee' or 'changee'
-                p.note_choisie = not telleQuelle and res.note or nil
-                p.drapeau_choisi = not telleQuelle and res.drapeau or nil
-                p.decide_le = os.time()
-                res.etat = p.etat
+                return
+            end
+            change = true
+            local parId = {}
+            for _, resultat in ipairs(reponse.resultats or {}) do
+                parId[cleDe(resultat.photo and resultat.photo.id)] = resultat
+            end
+            for _, a in ipairs(lot) do
+                local res, photo, p = a.res, a.photo, a.proposition
+                local ecrit = parId[cleDe(photo.localIdentifier)] or {}
+                res.changements, res.remarques = ecrit.changements, ecrit.remarques
+                res.note, res.drapeau = tonumber(Photos.brut(photo, 'rating')) or 0, drapeauDe(photo)
+                -- Une proposition remplacée pendant l'écriture n'est pas celle que l'utilisateur a vue.
+                if p and r.propositions[cleDe(photo.localIdentifier)] == p then
+                    local telleQuelle
+                    if p.drapeau == 'rejetee' then
+                        telleQuelle = res.drapeau == 'rejetee'
+                    else
+                        telleQuelle = res.note == p.note and res.drapeau ~= 'rejetee'
+                    end
+                    p.etat = telleQuelle and 'acceptee' or 'changee'
+                    p.note_choisie = not telleQuelle and res.note or nil
+                    p.drapeau_choisi = not telleQuelle and res.drapeau or nil
+                    p.decide_le = os.time()
+                    res.etat = p.etat
+                end
             end
         end
     end
+    ecrituresEnCours = ecrituresEnCours + 1
+    local ok, echec = LrTasks.pcall(ecrireLots)
+    ecrituresEnCours = ecrituresEnCours - 1
+    if not ok then
+        error(echec, 0)
+    end
+    -- La version change aussitôt (avant que changer ne rende la main) : un relevé fait avant
+    -- l'écriture ne recale rien.
     if change then
         changer('pose')
     end
     return { ok = erreur == nil, erreur = erreur, resultats = resultats }
+end
+
+-- Recaler ----------------------------------------------------------------------------
+
+local MOTS_DRAPEAU = { retenue = true, aucun = true, rejetee = true }
+
+-- La photo porte-t-elle encore ce que la proposition acceptée ou changée y a posé ?
+local function encorePosee(p, note, drapeau)
+    if p.etat == 'acceptee' then
+        if p.drapeau == 'rejetee' then
+            return drapeau == 'rejetee'
+        end
+        return note == (tonumber(p.note) or 0) and drapeau ~= 'rejetee'
+    end
+    return (tonumber(p.note_choisie) == nil or note == tonumber(p.note_choisie))
+        and (p.drapeau_choisi == nil or drapeau == p.drapeau_choisi)
+end
+
+-- Recale le registre sur ce que portent les photos, lu dans Lightroom par une fenêtre (carte Note,
+-- planche et fiche de la Séance) : releves = { { photo = id, note = 0 à 5, drapeau = 'retenue',
+-- 'aucun', 'rejetee' (ou pickStatus 1, 0, −1) } }. Le registre ne voit pas une annulation
+-- (undo_last, ⌘Z) : la note quitte le catalogue, la proposition restait « acceptée » (constaté le
+-- 20 octobre 2026). Une proposition acceptée ou changée dont la note ou le drapeau posés ne sont
+-- plus là repasse donc à « proposee » (note et drapeau choisis effacés). `version` :
+-- Notation.version lue avant les relevés ; si le registre a changé depuis (une note posée
+-- entre-temps par une autre tâche), ou pendant une écriture de Notation.poser, rien n'est recalé :
+-- la lecture suivante le fera. Une seule écriture du registre pour tous les relevés (une page de
+-- la planche). Rend le nombre de propositions recalées.
+function Notation.recaler(releves, version)
+    -- Vérifié après le chargement, qui peut rendre la main ; la suite ne la rend pas.
+    local r = charger()
+    if ecrituresEnCours > 0 or (version ~= nil and version ~= Notation.version) then
+        return 0
+    end
+    local n = 0
+    for _, x in ipairs(type(releves) == 'table' and releves or {}) do
+        local p = r.propositions[cleDe(x.photo)]
+        local note = entier(x.note)
+        local drapeau = DRAPEAUX[tonumber(x.drapeau)] or x.drapeau
+        if p and (p.etat == 'acceptee' or p.etat == 'changee') and note and MOTS_DRAPEAU[drapeau]
+            and not encorePosee(p, note, drapeau) then
+            p.etat, p.note_choisie, p.drapeau_choisi, p.decide_le = 'proposee', nil, nil, nil
+            n = n + 1
+        end
+    end
+    if n > 0 then
+        local s = n > 1 and "s" or ""
+        Liaison.noter(string.format("Notation : %d note%s retirée%s dans Lightroom, de nouveau à décider", n, s, s))
+        changer('recalage')
+    end
+    return n
 end
 
 return Notation

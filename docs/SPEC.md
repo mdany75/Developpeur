@@ -351,6 +351,14 @@ sont ignorés (`Evenements.lua`).
   une fois : on ne peut pas ajouter de vues à une fenêtre ouverte.
 - Une vue masquée (`visible = false`) garde sa place dans la mise en page (doc du SDK) : seules
   des variantes superposées (`place = 'overlapping'`) de même taille peuvent alterner.
+- `visible` lié ne masque qu'une vue simple (texte, bouton, image, menu, champ, case, liste,
+  séparateur) : posé sur un conteneur (`row`, `column`, `view`, `group_box`, `tab_view`,
+  `scrolled_view`), il reste sans effet et tout le contenu reste montré (constaté le 20 octobre
+  2026, voir plus bas). La simulation de la fenêtre le refuse (« visible sur un conteneur : sans
+  effet dans Lightroom (constaté) »). Toute condition de visibilité des pièces passe par
+  `Fenetre.condition`, `egal`, `non` ou `si`, qui gardent leurs conditions (clé et test) pour que
+  `Fenetre.et` les combine en une liaison à plusieurs clés (`LrView.bind{keys, operation}`,
+  `LrBinding.kUnsupportedDirection` pour le sens de la vue vers la table).
 - Pas de défilement par programme d'un `scrolled_view` ou d'une `simple_list`.
 
 D'où le fil en grille de lignes fixes (`Fil.lua`) : chaque ligne superpose une variante par genre
@@ -366,11 +374,21 @@ pas de taille ; `Images.vignette(dossier, nom, cote, hauteur)`).
 
 Les onglets (Conversation claire, Panneau) sont une rangée de `radio_button` (clé `onglet`,
 chacun avec son `checked_value`) au-dessus de variantes superposées de même largeur
-(`place = 'overlapping'`), et non un `tab_view`, dont le comportement n'a pas été constaté. La
-fenêtre ne change d'onglet d'elle-même qu'au passage de faux à vrai, une fois par arrivée
-(`Fenetre.choisirOnglet`, `Fenetre.ongletAuto`) : vers Proposition (ou Retoucher) quand une
-proposition arrive, vers Note quand une note est proposée pour la photo montrée (pas quand une
-autre photo est choisie) ; un clic sur une ligne d'image revient à Aperçu.
+(`place = 'overlapping'`), et non un `tab_view`, dont le comportement n'a pas été constaté. Les
+colonnes des variantes ne portent pas `visible` : leur contenu se crée par une fabrique masquable
+(`Vues.masquable(f, F, condition)`, appelée par `variante` de `Dispositions.lua`), qui pose la
+condition de l'onglet (`onglet` égal à sa valeur) sur chaque vue simple que les pièces créent, et
+la combine avec un `visible` déjà posé (couleurs de la carte Note, pastilles des voyants, lignes
+du fil, états du bandeau) ; une boîte de groupe y devient une colonne à titre gras (son cadre et
+son titre resteraient montrés). Les fabriques s'emboîtent : dans Retoucher (Panneau), les invites
+et le Style portent aussi `aProposition` faux, la proposition `aProposition` vrai. Conteneurs,
+espaces et écarts passent tels quels. Les colonnes des variantes restent donc là, vides, les unes
+sur les autres : la dernière (Note, Noter) couvre celles d'avant, et rien ne dit encore qu'elle
+laisse passer les clics vers leurs boutons (à constater, point 7 plus bas). La fenêtre ne change
+d'onglet d'elle-même qu'au passage de faux à vrai, une fois par arrivée (`Fenetre.choisirOnglet`,
+`Fenetre.ongletAuto`) : vers Proposition (ou Retoucher) quand une proposition arrive, vers Note
+quand une note est proposée pour la photo montrée (pas quand une autre photo est choisie) ; un
+clic sur une ligne d'image revient à Aperçu.
 
 - Champ de demande (`immediate = false`) : constaté dans Lightroom 15.6, Retour ne fait pas de saut
   de ligne ; il valide le champ (le texte passe à la table de propriétés, puis est tout sélectionné).
@@ -442,9 +460,10 @@ actions, la boucle, l'ouverture et la réouverture ; `Vues.lua` les pièces (`Vu
 `defilement`, `voyants`, `bandeau`, `versions`, `titre`, `listeConversations`,
 `menuConversations`, `boutonsConversation`, `boutonNoter`, `boutonSeance`, `invites`, `style`,
 `saisie`, `envoi`, `apercu`, `navigationApercu`, `agrandir`, `proposition`, `notation`,
-`autresFenetres`, `disposition`, `onglets`), chacune liée aux propriétés de la fenêtre, sans
-`require 'Fenetre'` ni couleur créée au chargement (couleurs, polices, `bind`, `egal`, `bouton`
-et les actions arrivent par `F`) ; `Dispositions.lua` les trois assemblages
+`autresFenetres`, `disposition`, `onglets`, et la fabrique `masquable` des onglets), chacune liée
+aux propriétés de la fenêtre, sans `require 'Fenetre'` ni couleur créée au chargement (couleurs,
+polices, `bind`, `egal`, `bouton` et les actions arrivent par `F`) ; `Dispositions.lua` les trois
+assemblages
 (`Dispositions.atelier`, `conversation`, `panneau`, appelés par `Dispositions.construire`). Une
 propriété sans vue dans une disposition ne gêne pas. Chaque cadre d'aperçu a son image « aucun
 aperçu » (`Dispositions.imageVide` : `vide-<côté>.png` ou `vide-<largeur>x<hauteur>.png`) ; le
@@ -473,7 +492,8 @@ son cadre enregistré (`Fenetre.cadre(disposition, taille)` :
 ### Carte Note (1.1)
 
 `Vues.notation` : un `group_box` « Note » pour la photo active, dans les trois dispositions (colonne
-Note de l'Atelier, onglet Note de Conversation claire, onglet Noter du Panneau). Il montre :
+Note de l'Atelier, onglet Note de Conversation claire, onglet Noter du Panneau ; dans un onglet,
+une colonne à titre gras, par `Vues.masquable`). Il montre :
 
 - le nom de la photo et sa note posée (`Fenetre.texteNotePosee` : « Note posée : ★★☆☆☆ ·
   rejetée », « aucune, pas encore jugée »), lue par `Lightroom.photos()` (`rating` et
@@ -506,7 +526,10 @@ Accepter et Changer… sont désactivés pendant que Claude travaille (`Moteur.t
 écriture de la fenêtre est en cours (`Fenetre.noteEnCours`), et `Fenetre.poserNote` le revérifie :
 ces écritures ne passent pas par la file du connecteur, et une commande de Claude peut écrire au
 même moment. La fenêtre s'abonne au registre (`Notation.abonner('fenetre', …)`, retiré par
-`Fenetre.desabonner`) et compare aussi `Notation.version` à chaque tour de sa boucle.
+`Fenetre.desabonner`) et compare aussi `Notation.version` à chaque tour de sa boucle. Quand elle
+relit la photo active (`Fenetre.majPhoto`, toutes les 2 s et après une écriture), elle recale le
+registre sur sa note et son drapeau (`Notation.recaler`, avec la version lue avant) : une note
+annulée (undo_last, ⌘Z) rend la proposition de nouveau à décider.
 
 ### Séance de notation (1.1)
 
@@ -592,8 +615,12 @@ ne touche ni `vignettesEnCours` ni le rafraîchissement de la nouvelle fenêtre.
 
 **Boucle.** Toutes les 0,25 s (`FenetreNotation.tour`) : ce que le registre, le moteur ou la
 sélection ont changé ; toutes les 2 s, la planche relue (une note posée à la main dans
-Lightroom). Abonnements `'seance'` au registre (`Notation.abonner`) et au moteur
-(`Moteur.abonner`), retirés à la fermeture et en cas d'échec de l'ouverture.
+Lightroom). La planche lit la note et le drapeau de ses 12 photos et de la photo de la fiche,
+puis recale le registre en un seul appel (`Notation.recaler`, une écriture pour la page, avec la
+version lue avant les photos) : une note acceptée ou changée qui n'y est plus (undo_last, ⌘Z)
+remet sa proposition à « proposee », et la fenêtre se relit alors une fois
+(`FenetreNotation.rafraichir(true)`). Abonnements `'seance'` au registre (`Notation.abonner`) et
+au moteur (`Moteur.abonner`), retirés à la fermeture et en cas d'échec de l'ouverture.
 
 ### Fichiers
 
@@ -741,14 +768,30 @@ suffit pas.
   Disposition).
 - Publication : JPEG 5 Mpx d'un RAF de X-H2S, 2738 × 1825, sRGB, sans position GPS ; dossier créé,
   bilan et « Afficher dans le Finder ».
+- 20 octobre 2026 (1.1, premier essai réel) : `visible` lié posé sur un conteneur est sans effet.
+  Dans la Conversation claire, les trois onglets (Aperçu, Proposition, Note : colonnes à
+  `visible = F.egal('onglet', …)`) s'affichaient tous ensemble, superposés ; même chose pour les
+  colonnes `aProposition` du Panneau, et une boîte de groupe dans un onglet ne se masque pas non
+  plus. Sur une vue simple, il marche : la Séance de notation masque bien ses cases vides
+  (`static_text` et `f:picture`), comme les variantes de la 1.0 (bandeau, voyants, lignes du fil).
+  D'où `Vues.masquable` (voir Contraintes du SDK) ; la simulation de la fenêtre refuse `visible`
+  sur un conteneur.
+- 20 octobre 2026 (1.1) : après Accepter dans la Séance de notation puis `undo_last`, la note
+  quitte bien le catalogue, mais la planche et la fiche montraient encore « acceptée » ★★★ : le
+  registre ne voit pas l'annulation. D'où `Notation.recaler`, appelé par la planche et la fiche de
+  la Séance et par la carte Note (voir Le registre).
+- 20 octobre 2026 (1.1), vus fonctionner : la Séance de notation (planche, fiche, Accepter,
+  `undo_last` qui retire la note, réouverture par ↻), le Gestionnaire de modules externes avec le
+  menu Disposition, et une passe 1 avec le vrai Claude.
 
 ### À constater dans Lightroom (1.1)
 
-Rien de ce qui suit n'a encore été vu dans Lightroom ni avec le vrai Claude : la 1.1 a été
-construite et vérifiée le 20 octobre 2026 par les deux suites (`swift test`,
-`scripts/tester-module.sh`, essais `essais-*.lua` compris), sans rien lancer contre le vrai
-Lightroom. Ces points sont à vérifier à l'essai réel, avant la publication ; ce qui sera
-constaté passera dans sa section, avec sa règle dans la simulation de sa suite.
+La 1.1 a été construite et vérifiée le 20 octobre 2026 par les deux suites (`swift test`,
+`scripts/tester-module.sh`, essais `essais-*.lua` compris), puis essayée une première fois dans
+Lightroom le même jour : ce qui y a été vu est dans la section précédente, et ses deux défauts
+(onglets, registre après une annulation) sont corrigés. Le reste est à vérifier à l'essai réel,
+avant la publication ; ce qui sera constaté passera dans sa section, avec sa règle dans la
+simulation de sa suite.
 
 1. Relancer Lightroom avant tout : `Notation.lua`, `Vues.lua`, `Dispositions.lua`,
    `FenetreNotation.lua` et `MenuNotation.lua` sont nouveaux, et `Commandes.lua` requiert
@@ -773,14 +816,24 @@ constaté passera dans sa section, avec sa règle dans la simulation de sa suite
 6. Rendu des glyphes ★ ☆ ⚑ ▸ ◀ ▶ ↻ dans les `static_text` et les titres de boutons (Helvetica
    Neue 13, gras, Menlo 11). Les largeurs de `Metriques.lua` viennent de NSString : vérifier
    qu'aucune ligne n'est coupée autrement.
-7. Onglets en boutons radio au-dessus de variantes superposées (Conversation claire, Panneau) :
-   `visible` lié masque tout le contenu, et la colonne prend la hauteur de la plus grande
-   variante. Un clic sur un bouton radio ou un choix dans un `popup_menu` valide-t-il le champ de
-   demande, et avant ou après l'observateur qui annule l'envoi ?
+7. Onglets par vues simples (`Vues.masquable`, depuis le constat du 20 octobre) : chaque onglet
+   ne montre que ses vues, sans cadre de boîte de groupe ; les liaisons à plusieurs clés (couleur
+   de la carte Note, pastilles, lignes du fil et bandeau dans Retoucher) suivent leurs deux clés ;
+   la colonne prend la hauteur de la plus grande variante. Les clics passent-ils à travers les
+   colonnes superposées, vides mais toujours là (aucune variante de la 1.0 ne superposait de
+   conteneur à boutons) ? Essayer les boutons d'un onglet couvert par un autre : ◀ ▶ Agrandir
+   (Aperçu) et Accepter, Refuser, Ajuster… (Proposition), sous la colonne Note de la Conversation
+   claire ; tout Retoucher (invites, ▲ ▼, 📎 📋, champ de demande, menus, Envoyer) sous la colonne
+   Noter du Panneau. S'ils ne répondent pas, ce mécanisme ne suffit pas : passer à un `tab_view`
+   du SDK (`tab_view_item` par onglet, `value` liée à `onglet`), dont Lightroom masque lui-même
+   les onglets non choisis. Un clic sur un bouton radio ou un choix dans un `popup_menu`
+   valide-t-il le champ de demande, et avant ou après l'observateur qui annule l'envoi ? Après
+   Accepter puis `undo_last`, la planche, la fiche et la carte Note repassent à « proposée » dans
+   les 2 s.
 8. Réouverture : `controle.close()` lancé depuis une tâche, puis réouverture (menu Disposition,
-   Gestionnaire de modules externes, ↻ de la séance). `windowWillClose` est appelé, une seule
-   boucle tourne (journal sans doublons), le brouillon validé est rendu sans partir. Voir ce que
-   devient un texte tapé mais pas encore validé.
+   Gestionnaire de modules externes ; ↻ de la séance rouvre bien sa fenêtre, constaté).
+   `windowWillClose` est appelé, une seule boucle tourne (journal sans doublons), le brouillon
+   validé est rendu sans partir. Voir ce que devient un texte tapé mais pas encore validé.
 9. `popup_menu` des conversations (Atelier, Panneau) dont les éléments liés changent pendant que
    la fenêtre est ouverte, avec une valeur posée par programme. `push_button` à titre lié
    (« Lancer la passe n », « Tout accepter · passe n (N) », « Accepter ★★★★☆ ») qui change
@@ -802,16 +855,16 @@ constaté passera dans sa section, avec sa règle dans la simulation de sa suite
 13. Vignettes de la séance : `requestJpegThumbnail` depuis la tâche de la fenêtre, puis `sips` en
     120 et 300 px. Durée pour une page de 12, nouvelle demande après une retouche (`editCount`).
     `selectionChangeObserver` met à jour le nombre de photos de la source.
-14. Avec le vrai Claude dans la séance : `consignes.md` de la session bien lu ; passage de la
-    fenêtre Claude à la séance par `--resume` (temps de démarrage, bonne session, coût du cache,
-    grilles de recalage perdues). Claude passe `session` tel quel, ne pose aucune note par
-    `set_metadata` et n'écrit pas de ligne `[titre : …]` ; « Lancer la passe 4 » reste désactivé.
-    Les lignes « Notes proposées » s'affichent dans le fil des trois dispositions. Dans Claude
-    Desktop, l'invite `noter` sans précision lit la séance ouverte (`propose_ratings` avec
-    `read_session`).
-15. Gestionnaire de modules externes : le menu Disposition s'affiche, et un changement s'applique
-    à « Ouvrir la fenêtre Claude » ou à ⌃⌥C sur une fenêtre ouverte. Coût de la réécriture de
-    `notation.json` à chaque décision avec quelques centaines de propositions.
+14. Avec le vrai Claude dans la séance (une passe 1 a marché le 20 octobre, constaté) :
+    `consignes.md` de la session bien lu ; passage de la fenêtre Claude à la séance par
+    `--resume` (temps de démarrage, bonne session, coût du cache, grilles de recalage perdues).
+    Claude passe `session` tel quel, ne pose aucune note par `set_metadata` et n'écrit pas de
+    ligne `[titre : …]` ; « Lancer la passe 4 » reste désactivé. Les lignes « Notes proposées »
+    s'affichent dans le fil des trois dispositions. Dans Claude Desktop, l'invite `noter` sans
+    précision lit la séance ouverte (`propose_ratings` avec `read_session`).
+15. Gestionnaire de modules externes (le menu Disposition s'y affiche, constaté) : un changement
+    s'applique à « Ouvrir la fenêtre Claude » ou à ⌃⌥C sur une fenêtre ouverte. Coût de la
+    réécriture de `notation.json` à chaque décision avec quelques centaines de propositions.
 16. Captures 1.1 à refaire avant le tag : `docs/capture.png` (la Conversation claire, capture
     principale du README, encore celle de la 1.0), et au besoin une par autre disposition (Atelier,
     Panneau) et une de la Séance de notation, à ajouter au README et à la liste des captures de
@@ -2002,7 +2055,7 @@ séance active. Le fichier se charge dans les deux simulations et sans l'interfa
 n'est requis qu'au moment d'écrire. Tout ce qui sort vers une vue est une table neuve, sans
 métatable. `Notation.version` augmente à chaque changement ; `Notation.abonner(nom, fn)`,
 `Notation.desabonner(nom)` et `Notation.signaler(quoi)` (`propositions`, `seance`, `decision`,
-`pose`) préviennent les fenêtres abonnées (`fenetre`, `seance`).
+`pose`, `recalage`) préviennent les fenêtres abonnées (`fenetre`, `seance`).
 
 Une proposition : `{photo, uuid, fichier, note (0 à 4, nil pour un rejet), drapeau ('aucun' ou
 'rejetee'), criteres = {impact, qualites, plancher, finition}, plafond, raison, a_verifier, passe,
@@ -2020,7 +2073,8 @@ de ses photos), `Notation.compter(id)` (`proposees`, `acceptees` — changées c
 `changees`, `a_verifier`, `ecartees`, `total`, `photos`, `sans_proposition`, `par_passe[n]`),
 `Notation.proposition(idPhoto)`, `Notation.decider(idPhoto, etat, details)` (`a_verifier`,
 `ecartee`, ou `proposee` pour revenir sur la décision ; le mot de l'utilisateur gardé dans
-`commentaire` ; rien dans le catalogue ; rend vrai, ou nil et la raison).
+`commentaire` ; rien dans le catalogue ; rend vrai, ou nil et la raison),
+`Notation.recaler(releves, version)` (voir l'annulation, plus bas).
 
 **Commande `notation`** (`Commandes.lua` → `Notation.commande`). Rien n'est écrit dans le
 catalogue : ni la pause, ni l'accord, ni les garde-fous ne s'y appliquent, comme pour `vignettes`.
@@ -2085,8 +2139,30 @@ l'utilisateur : elle n'entre pas dans `avantClaude` (`memoriser` sans `fusionner
 `revert_to_original` comme « Revenir à « Avant Claude » » la laissent en place (une photo qui ne
 porte que des notes posées ainsi n'a pas de retouche de Claude à défaire). Une note que Claude
 aurait posée par `set_metadata` avant, sur la même photo, reste dans `avantClaude` : le retour à
-l'origine remet la note d'avant celle-là. Le registre, lui, ne change pas à l'annulation : la
-proposition reste `acceptee` ou `changee`.
+l'origine remet la note d'avant celle-là.
+
+Le registre ne voit pas l'annulation : la note quitte le catalogue, la proposition restait
+`acceptee` (constaté le 20 octobre 2026, planche et fiche de la Séance). Les fenêtres le recalent
+donc sur ce qu'elles relisent : `Notation.recaler(releves, version)`, `releves = {{photo, note (0
+à 5), drapeau ('retenue', 'aucun', 'rejetee', ou pickStatus 1, 0, −1)}}`, appelé par la carte Note
+(`Fenetre.majPhoto`, la photo active) et par la planche de la Séance (ses 12 photos et celle de la
+fiche, en un seul appel). Une proposition `acceptee` dont la photo ne porte plus ce qu'elle
+proposait (sa note sans rejet ; pour un rejet, le drapeau Rejeter seul : les étoiles ne comptent
+pas, et un drapeau Retenue de l'utilisateur sur une note acceptée non plus), ou `changee` dont la
+note ou le drapeau choisis ne sont plus là (une autre note posée à la main compte aussi), repasse à
+`proposee` : `note_choisie`, `drapeau_choisi` et `decide_le` effacés ; `a_verifier` reste (une
+proposition dont Claude doutait se montre de nouveau « à vérifier »). Une note illisible, un
+drapeau inconnu, une photo sans proposition ou une proposition à décider ne changent rien.
+`version` est `Notation.version` lue avant les relevés : si le registre a changé depuis (une note
+posée entre-temps par une autre tâche, relevé périmé), rien n'est recalé, et la lecture suivante le
+fera ; de même pendant une écriture de `Notation.poser` (elle rend la main pendant l'écriture et la
+relecture des photos : une fenêtre a pu relever une photo avant que sa note y soit posée), dont la
+version ne change qu'à la fin. Ces deux conditions se vérifient après le chargement du registre,
+qui peut lui aussi rendre la main ; le reste du recalage ne la rend pas. Une seule écriture de
+`notation.json` pour tous les relevés (`changer('recalage')`, une ligne au journal de la
+liaison) ; aucune sans changement. Rend le nombre de propositions recalées. Seules les fenêtres
+recalent : sans fenêtre Claude ni Séance ouverte, la commande `notation` (`lire`) rend encore
+l'état gardé, jusqu'à la prochaine lecture d'une fenêtre.
 
 ## Recette dans Lightroom
 

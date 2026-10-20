@@ -7,7 +7,10 @@
 --
 -- Tout bouton passe par F.bouton : son clic valide aussi le champ de demande, qui ne doit pas
 -- partir ensuite. Ce qui varie passe par des propriétés liées et des variantes superposées de même
--- largeur (`place = 'overlapping'`) : une fenêtre ouverte ne change pas de structure.
+-- largeur (`place = 'overlapping'`) : une fenêtre ouverte ne change pas de structure. Seule une vue
+-- simple se masque (`visible` sur un conteneur reste sans effet, constaté), et toujours par une
+-- condition de F (F.egal, F.non, F.si, F.condition) : Vues.masquable la combine avec celle d'un
+-- onglet.
 
 local Consignes = require 'Consignes'
 
@@ -33,7 +36,7 @@ function Vues.ligneFil(f, F, i, largeur)
             font = P[st.police],
             text_color = C[st.couleur],
             truncation = 'tail',
-            visible = bind { key = 'g' .. i, transform = function(v) return genres[v] == true end },
+            visible = F.condition('g' .. i, function(v) return genres[v] == true end),
             mouse_down = function() F.cliquerLigne(i) end,
         }
     end
@@ -58,7 +61,7 @@ function Vues.defilement(f, F, D)
     local activite = f:column {
         place = 'overlapping',
         f:static_text { title = bind 'activite', text_color = C.orange, alignment = 'right', width = largeurActivite, truncation = 'tail',
-            visible = bind 'travaille' },
+            visible = F.si 'travaille' },
         f:static_text { title = bind 'forfait', font = P.petit, text_color = C.gris, alignment = 'right', width = largeurActivite,
             truncation = 'tail', visible = F.non 'travaille' },
     }
@@ -148,7 +151,7 @@ end
 -- Une ligne de version : le nom à gauche, le numéro à droite, en gris ou en orange (alerte).
 function Vues.ligneVersion(f, F, i, largeur)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    local alerte = bind('versionAlerte' .. i)
+    local alerte = F.si('versionAlerte' .. i)
     local normal = F.non('versionAlerte' .. i)
     return f:row {
         spacing = 0,
@@ -434,13 +437,56 @@ function Vues.disposition(f, F, largeur, items)
         tooltip = "Disposition de la fenêtre Claude : elle se rouvre aussitôt, la demande tapée gardée" }
 end
 
--- Les onglets : une rangée de boutons radio (clé `onglet`) au-dessus de variantes superposées.
+-- Les onglets : une rangée de boutons radio (clé `onglet`) au-dessus de variantes superposées, dont
+-- le contenu se crée par Vues.masquable.
 function Vues.onglets(f, F, liste)
     local r = { spacing = 12 }
     for _, onglet in ipairs(liste) do
         r[#r + 1] = f:radio_button { title = onglet.titre, value = F.bind 'onglet', checked_value = onglet.valeur }
     end
     return f:row(r)
+end
+
+-- Ce qui passe tel quel par une fabrique masquable : conteneurs, espaces, écarts.
+local SANS_CONDITION = { row = true, column = true, view = true, scrolled_view = true, tab_view = true, tab_view_item = true,
+    spacer = true, control_spacing = true, dialog_spacing = true, label_spacing = true }
+
+-- Une fabrique qui masque tout ce qu'elle crée quand `condition` (une condition de F) est fausse.
+-- Lightroom ignore `visible` lié sur un conteneur : la colonne d'un onglet restait montrée, et les
+-- trois onglets de la Conversation claire s'affichaient superposés (constaté le 20 octobre 2026) ;
+-- sur une vue simple, il marche. La fabrique pose donc la condition sur chaque vue simple créée par
+-- les pièces (texte, bouton, image, menu, champ, case, liste, séparateur…), combinée à son propre
+-- `visible` (couleurs de la carte Note, pastilles, lignes du fil) en une liaison à plusieurs clés
+-- (F.et) ; une boîte de groupe, dont le cadre et le titre resteraient montrés, y devient une
+-- colonne à titre gras. Les conteneurs restent sans `visible`. Une fabrique masquable s'enveloppe
+-- dans une autre (Panneau : Retoucher, puis les invites ou la proposition).
+function Vues.masquable(f, F, condition)
+    local fm = {}
+    return setmetatable(fm, {
+        __index = function(_, genre)
+            if genre == 'group_box' then
+                return function(_, args)
+                    local colonne = { spacing = 4, fm:static_text { title = args.title, font = F.POLICES.gras } }
+                    for cle, valeur in pairs(args) do
+                        if type(cle) == 'string' and cle ~= 'title' then
+                            colonne[cle] = valeur
+                        end
+                    end
+                    for _, vue in ipairs(args) do
+                        colonne[#colonne + 1] = vue
+                    end
+                    return f:column(colonne)
+                end
+            elseif SANS_CONDITION[genre] then
+                return function(_, ...) return f[genre](f, ...) end
+            end
+            return function(_, args)
+                args = args or {}
+                args.visible = args.visible ~= nil and F.et(args.visible, condition) or F.et(condition)
+                return f[genre](f, args)
+            end
+        end,
+    })
 end
 
 return Vues

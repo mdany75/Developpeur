@@ -149,10 +149,13 @@ end
 
 -- Assemblages -----------------------------------------------------------------------------------
 
--- Une variante superposée, de largeur `largeur`, montrée quand l'onglet vaut `valeur`.
-local function variante(f, F, largeur, valeur, contenu)
+-- Une variante superposée, de largeur `largeur`, montrée quand l'onglet vaut `valeur` :
+-- `pieces(fm)` rend la table de sa colonne, ses vues créées par la fabrique masquable `fm`, qui
+-- pose la condition de l'onglet sur chaque vue simple. La colonne ne porte pas `visible` :
+-- Lightroom l'ignore sur un conteneur (constaté, voir Vues.masquable).
+local function variante(f, F, largeur, valeur, pieces)
+    local contenu = pieces(Vues.masquable(f, F, F.egal('onglet', valeur)))
     contenu.width = largeur
-    contenu.visible = F.egal('onglet', valeur)
     return f:column(contenu)
 end
 
@@ -242,15 +245,17 @@ function Dispositions.conversation(f, F, D)
         Vues.onglets(f, F, D.onglets),
         f:column {
             place = 'overlapping',
-            variante(f, F, D.droite, 'apercu', {
-                spacing = 8,
-                f:static_text { title = "Ce que Claude voit", font = P.gras },
-                Vues.apercu(f, F, D),
-                Vues.navigationApercu(f, F, D.legende),
-                Vues.agrandir(f, F),
-            }),
-            variante(f, F, D.droite, 'proposition', { Vues.proposition(f, F, D.droite, D.propLignes) }),
-            variante(f, F, D.droite, 'notation', { Vues.notation(f, F, D.droite, D) }),
+            variante(f, F, D.droite, 'apercu', function(fm)
+                return {
+                    spacing = 8,
+                    fm:static_text { title = "Ce que Claude voit", font = P.gras },
+                    Vues.apercu(fm, F, D),
+                    Vues.navigationApercu(fm, F, D.legende),
+                    Vues.agrandir(fm, F),
+                }
+            end),
+            variante(f, F, D.droite, 'proposition', function(fm) return { Vues.proposition(fm, F, D.droite, D.propLignes) } end),
+            variante(f, F, D.droite, 'notation', function(fm) return { Vues.notation(fm, F, D.droite, D) } end),
         },
         Vues.autresFenetres(f, F),
         Vues.disposition(f, F, D.droite, Dispositions.items("Disposition : ")),
@@ -288,24 +293,29 @@ function Dispositions.panneau(f, F, D)
             f:row { spacing = 4, Vues.navigationApercu(f, F), Vues.agrandir(f, F, true) },
         },
     }
-    local retoucher = variante(f, F, L, 'retoucher', {
-        spacing = 6,
-        Vues.voyants(f, F, 'rangee', D.voyant, 6),
-        f:separator { fill_horizontal = 1 },
-        Vues.grille(f, F, D),
-        Vues.defilement(f, F, D),
-        f:separator { fill_horizontal = 1 },
-        -- La proposition, compacte, prend la place des invites et du style le temps d'y répondre.
-        f:column {
-            place = 'overlapping',
-            f:column { width = L, spacing = 6, visible = F.non 'aProposition', Vues.invites(f, F, D), Vues.style(f, F, D) },
-            f:column { width = L, visible = bind 'aProposition', Vues.proposition(f, F, L, D.propLignes) },
-        },
-        Vues.bandeau(f, F, L),
-        Vues.saisie(f, F, D),
-        Vues.envoi(f, F, D),
-    })
-    local noter = variante(f, F, L, 'notation', { Vues.notation(f, F, L, D) })
+    local retoucher = variante(f, F, L, 'retoucher', function(fm)
+        -- La proposition, compacte, prend la place des invites et du style le temps d'y répondre :
+        -- deux fabriques masquables dans celle de l'onglet.
+        local sansProposition = Vues.masquable(fm, F, F.non 'aProposition')
+        local avecProposition = Vues.masquable(fm, F, F.si 'aProposition')
+        return {
+            spacing = 6,
+            Vues.voyants(fm, F, 'rangee', D.voyant, 6),
+            fm:separator { fill_horizontal = 1 },
+            Vues.grille(fm, F, D),
+            Vues.defilement(fm, F, D),
+            fm:separator { fill_horizontal = 1 },
+            f:column {
+                place = 'overlapping',
+                f:column { width = L, spacing = 6, Vues.invites(sansProposition, F, D), Vues.style(sansProposition, F, D) },
+                f:column { width = L, Vues.proposition(avecProposition, F, L, D.propLignes) },
+            },
+            Vues.bandeau(fm, F, L),
+            Vues.saisie(fm, F, D),
+            Vues.envoi(fm, F, D),
+        }
+    end)
+    local noter = variante(f, F, L, 'notation', function(fm) return { Vues.notation(fm, F, L, D) } end)
     return f:column {
         bind_to_object = F.p,
         margin = 12,

@@ -464,10 +464,7 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
                 if type(cle) == 'string' then
                     vrai(PROPRIETES[cle], 'propriété inconnue du SDK : ' .. cle .. ' (' .. v.genre .. ')')
                     if type(valeur) == 'table' and valeur.liaison then
-                        vrai(p[valeur.key] ~= nil, 'liaison sans valeur : ' .. valeur.key .. ' (' .. v.genre .. '.' .. cle .. ')')
-                        if valeur.transform then
-                            valeur.transform(p[valeur.key], true)
-                        end
+                        S.verifierLiaison(valeur, p, v.genre .. '.' .. cle)
                     end
                     if cle == 'font' and type(valeur) == 'table' then
                         vrai(valeur.name and valeur.size, 'police incomplète')
@@ -725,10 +722,7 @@ essai('Fenêtre : les trois dispositions dans les trois tailles', function()
                         if type(cle) == 'string' then
                             vrai(PROPRIETES[cle], nom .. ' : propriété inconnue du SDK : ' .. cle .. ' (' .. v.genre .. ')')
                             if type(valeur) == 'table' and valeur.liaison then
-                                vrai(p[valeur.key] ~= nil, nom .. ' : liaison sans valeur : ' .. valeur.key .. ' (' .. v.genre .. '.' .. cle .. ')')
-                                if valeur.transform then
-                                    valeur.transform(p[valeur.key], true)
-                                end
+                                S.verifierLiaison(valeur, p, nom .. ' : ' .. v.genre .. '.' .. cle)
                             end
                             if cle == 'font' and type(valeur) == 'table' then
                                 vrai(valeur.name and valeur.size, 'police incomplète')
@@ -786,8 +780,10 @@ essai('Fenêtre : les trois dispositions dans les trois tailles', function()
                 vrai(textes.texteLightroom and textes.texteLightroom.args.mouse_down, nom .. ' : voyant de la liaison cliquable')
                 local bandeau = 0
                 parcourir(args.contents, function(v)
-                    if v.genre == 'static_text' and type(v.args.visible) == 'table' and v.args.visible.key == 'bandeau' then
-                        bandeau = bandeau + 1
+                    if v.genre == 'static_text' and type(v.args.visible) == 'table' then
+                        for _, k in ipairs(S.cles(v.args.visible)) do
+                            bandeau = bandeau + (k == 'bandeau' and 1 or 0)
+                        end
                     end
                 end)
                 egal(4, bandeau, nom .. ' : les quatre états du bandeau')
@@ -861,10 +857,7 @@ local function verifierVues(contenu, p)
             if type(cle) == 'string' then
                 vrai(PROPRIETES[cle] or cle == 'checked_value', 'propriété inconnue du SDK : ' .. cle .. ' (' .. v.genre .. ')')
                 if type(valeur) == 'table' and valeur.liaison then
-                    vrai(p[valeur.key] ~= nil, 'liaison sans valeur : ' .. valeur.key .. ' (' .. v.genre .. '.' .. cle .. ')')
-                    if valeur.transform then
-                        valeur.transform(p[valeur.key], true)
-                    end
+                    S.verifierLiaison(valeur, p, v.genre .. '.' .. cle)
                 end
             end
         end

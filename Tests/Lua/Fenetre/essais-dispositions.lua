@@ -365,6 +365,161 @@ essai('Onglets : une proposition ou une note qui arrive se montre, une seule foi
     S.pendantFenetre = nil
 end)
 
+-- Les vues simples d'un arbre (ni conteneur ni espace) : celles que Lightroom sait masquer.
+local function simples(contenu)
+    local liste = {}
+    for _, v in ipairs(vues(contenu)) do
+        if not S.CONTENEURS[v.genre] and v.genre ~= 'spacer' then
+            liste[#liste + 1] = v
+        end
+    end
+    return liste
+end
+
+-- Les variantes des onglets : la colonne superposée qui suit la rangée des boutons radio (clé
+-- `onglet`) ; nil sans onglets (Atelier).
+local function variantesOnglets(contenu)
+    for _, v in ipairs(vues(contenu)) do
+        for i, e in ipairs(v.args) do
+            if type(e) == 'table' and e.genre == 'row' and type(e.args[1]) == 'table' and e.args[1].genre == 'radio_button'
+                and e.args[1].args.value.key == 'onglet' then
+                return v.args[i + 1]
+            end
+        end
+    end
+end
+
+local function aCle(vue, cle)
+    if type(vue.args.visible) ~= 'table' then
+        return false
+    end
+    for _, k in ipairs(S.cles(vue.args.visible)) do
+        if k == cle then
+            return true
+        end
+    end
+    return false
+end
+
+-- La première vue simple de ce genre dont le titre (ou la valeur) suit cette clé.
+local function vueLiee(contenu, genre, cle)
+    for _, v in ipairs(vues(contenu)) do
+        local lien = v.args.title or v.args.value
+        if v.genre == genre and type(lien) == 'table' and lien.liaison and lien.key == cle then
+            return v
+        end
+    end
+    error(genre .. ' lié à ' .. cle .. ' introuvable', 2)
+end
+
+essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conteneur ne se masque (constaté)', function()
+    local C = Fenetre.COULEURS
+    photoActive(4961, 'DSCF4961.RAF', 2, 0)
+    for _, disposition in ipairs(Dispositions.LISTE) do
+        for _, taille in ipairs({ 'petite', 'moyenne', 'grande' }) do
+            local nom = disposition.value .. ' ' .. taille
+            prefs.disposition, prefs.taille = disposition.value, taille
+            local D = Dispositions.dimensions(disposition.value, taille)
+            local construite = false
+            S.pendantFenetre = function(args)
+                construite = true
+                local p = Fenetre.p
+                Fenetre.rafraichir()
+                -- Lightroom ignore `visible` sur un conteneur (la simulation le refuse aussi).
+                for _, v in ipairs(vues(args.contents)) do
+                    vrai(not (S.CONTENEURS[v.genre] and v.args.visible ~= nil), nom .. ' : visible sur un ' .. v.genre)
+                end
+                local variantes = variantesOnglets(args.contents)
+                if not D.onglets then
+                    egal(nil, variantes, nom .. ' : pas d\'onglets')
+                    return
+                end
+                vrai(variantes and variantes.args.place == 'overlapping', nom .. ' : variantes superposées sous les onglets')
+                egal(#D.onglets, #variantes.args, nom .. ' : une variante par onglet')
+                -- Chaque vue simple d'un onglet est masquée quand un autre onglet est choisi ; pas de
+                -- boîte de groupe dans un onglet (son cadre et son titre resteraient montrés), ni de
+                -- vue défilante ou de tab_view (leur cadre aussi).
+                for i, onglet in ipairs(D.onglets) do
+                    p.onglet = onglet.valeur
+                    for j, variante in ipairs(variantes.args) do
+                        local quoi = nom .. ' : onglet ' .. D.onglets[j].valeur
+                        local montrees = 0
+                        for _, v in ipairs(vues(variante)) do
+                            vrai(v.genre ~= 'group_box' and v.genre ~= 'scrolled_view' and v.genre ~= 'tab_view',
+                                quoi .. ' : ' .. v.genre .. ' dans un onglet')
+                        end
+                        for _, v in ipairs(simples(variante)) do
+                            vrai(aCle(v, 'onglet'), quoi .. ' : ' .. v.genre .. ' sans la condition de son onglet')
+                            if S.montree(v, p) then
+                                vrai(i == j, quoi .. ' : ' .. v.genre .. ' montré dans l\'onglet ' .. onglet.valeur)
+                                montrees = montrees + 1
+                            end
+                        end
+                        vrai(i ~= j or montrees > 0, quoi .. ' : rien de montré')
+                    end
+                end
+                -- Le premier onglet (Aperçu, Retoucher) : l'aperçu montré, la carte Note et la
+                -- proposition masquées.
+                p.onglet, p.aProposition = D.onglets[1].valeur, false
+                local apercu
+                for _, v in ipairs(vues(args.contents)) do
+                    apercu = apercu or (v.genre == 'picture' and v)
+                end
+                egal(true, S.montree(apercu, p), nom .. ' : aperçu montré')
+                egal(false, S.montree(vueLiee(args.contents, 'static_text', 'notationCriteres'), p), nom .. ' : critères de la note masqués')
+                egal(false, S.montree(vueLiee(args.contents, 'static_text', 'propositionTexte'), p), nom .. ' : proposition masquée')
+                egal(false, S.montree(bouton(args.contents, p, 'Accepter', 'peutAccepterNote'), p), nom .. ' : Accepter de la note masqué')
+                egal(true, S.montree(vueLiee(args.contents, 'static_text', 'infoPhoto'), p), nom .. ' : hors des onglets, toujours montré')
+                -- Une variante de couleur dans un onglet : sa couleur et l'onglet, combinés.
+                local titres = {}
+                for _, v in ipairs(vues(args.contents)) do
+                    if v.genre == 'static_text' and type(v.args.title) == 'table' and v.args.title.key == 'notationProposee' then
+                        titres[#titres + 1] = v
+                    end
+                end
+                egal(4, #titres, nom .. ' : quatre couleurs de la note proposée')
+                p.notationCouleur = 'vert'
+                for _, v in ipairs(titres) do
+                    vrai(aCle(v, 'notationCouleur') and aCle(v, 'onglet'), nom .. ' : couleur et onglet dans la même condition')
+                    egal(false, S.montree(v, p), nom .. ' : couleur masquée hors de l\'onglet Note')
+                    -- `visible` ne va que de la table vers la vue.
+                    egal(S.modules.LrBinding.kUnsupportedDirection, v.args.visible.operation({}, {}, false), nom .. ' : sens inverse')
+                end
+                p.onglet = D.ongletNotation
+                local montrees = {}
+                for _, v in ipairs(titres) do
+                    if S.montree(v, p) then
+                        montrees[#montrees + 1] = v
+                    end
+                end
+                egal(1, #montrees, nom .. ' : une seule couleur montrée')
+                egal(C.vert, montrees[1].args.text_color, nom .. ' : la couleur de l\'état')
+                egal(true, S.montree(vueLiee(args.contents, 'static_text', 'notationCriteres'), p), nom .. ' : critères montrés')
+                egal(false, S.montree(apercu, p) and disposition.value == 'conversation', nom .. ' : aperçu de l\'onglet masqué')
+                if disposition.value == 'panneau' then
+                    -- Onglets imbriqués : dans Retoucher, la proposition prend la place des invites.
+                    local invite = bouton(args.contents, p, Consignes.invites[1].titre)
+                    local saisie = vueLiee(args.contents, 'edit_field', 'saisie')
+                    egal(false, S.montree(saisie, p), nom .. ' : demande masquée dans Noter')
+                    p.onglet = 'retoucher'
+                    egal(true, S.montree(saisie, p), nom .. ' : demande montrée')
+                    egal(true, S.montree(invite, p), nom .. ' : invites montrées sans proposition')
+                    p.aProposition = true
+                    egal(false, S.montree(invite, p), nom .. ' : invites masquées par la proposition')
+                    egal(true, S.montree(vueLiee(args.contents, 'static_text', 'propositionTexte'), p), nom .. ' : proposition montrée')
+                    p.onglet = 'notation'
+                    egal(false, S.montree(vueLiee(args.contents, 'static_text', 'propositionTexte'), p), nom .. ' : proposition masquée dans Noter')
+                    p.aProposition = false
+                end
+            end
+            Fenetre.afficher()
+            vrai(construite, nom .. ' : fenêtre construite')
+        end
+    end
+    prefs.disposition, prefs.taille = 'conversation', 'moyenne'
+    S.pendantFenetre = nil
+end)
+
 -- Carte Note ------------------------------------------------------------------------------------
 
 essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, À vérifier, rejet', function()
@@ -577,8 +732,7 @@ essai('Gestionnaire de modules externes : les sections se construisent, menu Dis
                 if type(cle) == 'string' then
                     vrai(PROPRIETES[cle], 'propriété inconnue du SDK : ' .. cle .. ' (' .. v.genre .. ')')
                     if type(valeur) == 'table' and valeur.liaison then
-                        local objet = valeur.bind_to_object or section.bind_to_object
-                        vrai(objet[valeur.key] ~= nil, 'liaison sans valeur : ' .. valeur.key)
+                        S.verifierLiaison(valeur, section.bind_to_object, v.genre .. '.' .. cle)
                     end
                 end
             end

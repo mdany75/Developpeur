@@ -237,6 +237,11 @@ S.GENRES_VUES = {
     color_well = true, picture = true, catalog_photo = true,
 }
 
+-- Lightroom ignore `visible` lié posé sur un conteneur : ses vues restent montrées (constaté le 20
+-- octobre 2026 : les trois onglets de la Conversation claire s'affichaient superposés). Seules les
+-- vues simples se masquent (Vues.masquable).
+S.CONTENEURS = { row = true, column = true, view = true, group_box = true, tab_view = true, scrolled_view = true }
+
 local fabrique = setmetatable({}, {
     __index = function(_, genre)
         if genre == 'control_spacing' or genre == 'dialog_spacing' or genre == 'label_spacing' then
@@ -248,21 +253,89 @@ local fabrique = setmetatable({}, {
             neuve(args.items, genre .. '.items')
             -- Un bouton radio sans valeur cochée ne se coche jamais.
             assert(genre ~= 'radio_button' or args.checked_value ~= nil, "radio_button sans checked_value : " .. tostring(args.title))
+            assert(not (S.CONTENEURS[genre] and args.visible ~= nil),
+                "visible sur un conteneur : sans effet dans Lightroom (constaté) : " .. genre)
             return { genre = genre, args = args }
         end
     end,
 })
 
+-- Une liaison : une clé (et son transform), ou plusieurs (`keys`, chaque clé un texte ou
+-- { key, bind_to_object }) et leur `operation(binder, values, fromTable)`.
 modules.LrView = {
     osFactory = function() return fabrique end,
     bind = function(x)
         if type(x) == 'string' then
             return { liaison = true, key = x }
         end
+        if x.keys ~= nil then
+            assert(type(x.keys) == 'table' and #x.keys > 0, "liaison à plusieurs clés sans clés")
+            for _, k in ipairs(x.keys) do
+                assert(type(k) == 'string' or (type(k) == 'table' and type(k.key) == 'string'), "clé de liaison invalide : " .. tostring(k))
+            end
+            assert(type(x.operation) == 'function', "liaison à plusieurs clés sans operation")
+            return { liaison = true, keys = x.keys, operation = x.operation, transform = x.transform, bind_to_object = x.bind_to_object }
+        end
+        assert(type(x.key) == 'string', "liaison sans clé")
         return { liaison = true, key = x.key, transform = x.transform, bind_to_object = x.bind_to_object }
     end,
     share = function(nom) return { partage = nom } end,
 }
+
+-- Les clés d'une liaison : la sienne, ou ses `keys`.
+function S.cles(liaison)
+    if liaison.keys then
+        local cles = {}
+        for i, k in ipairs(liaison.keys) do
+            cles[i] = type(k) == 'table' and k.key or k
+        end
+        return cles
+    end
+    return { liaison.key }
+end
+
+-- La valeur qu'une vue reçoit d'une liaison, lue dans `objet` (ou son bind_to_object) : la valeur
+-- de sa clé passée par son transform, ou l'operation d'une liaison à plusieurs clés (values
+-- indexées par clé, de la table vers la vue).
+function S.evaluer(liaison, objet)
+    objet = liaison.bind_to_object or objet
+    if liaison.operation then
+        local valeurs = {}
+        for _, k in ipairs(S.cles(liaison)) do
+            valeurs[k] = objet[k]
+        end
+        local valeur = liaison.operation({}, valeurs, true)
+        if liaison.transform then
+            return liaison.transform(valeur, true)
+        end
+        return valeur
+    end
+    if liaison.transform then
+        return liaison.transform(objet[liaison.key], true)
+    end
+    return objet[liaison.key]
+end
+
+-- Contrôle d'une liaison posée sur une vue : chacune de ses clés a une valeur avant l'ouverture
+-- (Lightroom l'exige), son transform ou son operation s'évaluent. Rend la valeur évaluée.
+function S.verifierLiaison(liaison, objet, quoi)
+    local o = liaison.bind_to_object or objet
+    for _, k in ipairs(S.cles(liaison)) do
+        if o[k] == nil then
+            error('liaison sans valeur : ' .. tostring(k) .. (quoi and (' (' .. quoi .. ')') or ''), 2)
+        end
+    end
+    return S.evaluer(liaison, objet)
+end
+
+-- Une vue est-elle montrée ? Sans `visible`, oui ; liée, d'après les valeurs de `objet`.
+function S.montree(vue, objet)
+    local v = vue.args.visible
+    if type(v) == 'table' and v.liaison then
+        v = S.evaluer(v, objet)
+    end
+    return v == nil or v == true
+end
 
 -- Table de propriétés : observateurs appelés quand une valeur change.
 local function tableProprietes()
@@ -290,7 +363,9 @@ end
 
 local contexte = { addFailureHandler = function() end, addCleanupHandler = function() end }
 
-modules.LrBinding = { makePropertyTable = function() return tableProprietes() end }
+-- kUnsupportedDirection : ce que rend une operation pour un sens qu'elle ne prend pas en charge
+-- (ici, de la vue vers la table).
+modules.LrBinding = { makePropertyTable = function() return tableProprietes() end, kUnsupportedDirection = { sens = 'non pris en charge' } }
 
 modules.LrFunctionContext = {
     callWithContext = function(_, fn, ...) return fn(contexte, ...) end,

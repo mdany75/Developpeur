@@ -440,6 +440,69 @@ essai('Registre relu du disque : décisions gardées, proposition hors séance p
     contient(Consignes.pour({ genre = 'notation' }), '# Séance de notation')
 end)
 
+essai('Après undo_last : la carte Note et la planche relisent la note réelle (constaté), une écriture du registre', function()
+    vrai(idSeance, 'essais précédents')
+    for _, id in ipairs({ 2001, 2002, 2003 }) do
+        egal('acceptee', Notation.proposition(id).etat, 'photo ' .. id)
+    end
+    local Fichiers = require 'Fichiers'
+    local ecrire, ecrits = Fichiers.ecrire, 0
+    Fichiers.ecrire = function(chemin, ...)
+        if chemin == Notation.fichier() then
+            ecrits = ecrits + 1
+        end
+        return ecrire(chemin, ...)
+    end
+    -- undo_last retire la note de 2003 (acceptée par la carte) : Lightroom n'a plus de note, la
+    -- carte la relit et la proposition est de nouveau à décider.
+    PHOTOS[2003].note = 0
+    S.photoActive = PHOTOS[2003]
+    S.selection = { PHOTOS[2003] }
+    S.taches = {}
+    local erreur
+    S.pendantFenetre = function()
+        local ok, e = xpcall(function()
+            local p = Fenetre.p
+            Fenetre.majPhoto()
+            egal('proposee', Notation.proposition(2003).etat, 'la carte recale le registre')
+            egal(nil, Notation.proposition(2003).note_choisie)
+            egal('Note posée : aucune, pas encore jugée', p.notationPosee)
+            egal('orange', p.notationCouleur)
+            egal('proposée · à vérifier · passe 1', p.notationEtat)
+            egal(true, p.peutAccepterNote, 'de nouveau à accepter')
+            Fenetre.majPhoto()
+        end, debug.traceback)
+        erreur = not ok and e or nil
+    end
+    Fenetre.afficher()
+    S.pendantFenetre = nil
+    if erreur then
+        Fichiers.ecrire = ecrire
+        error(erreur, 0)
+    end
+    egal(1, ecrits, 'une écriture pour la carte')
+    -- undo_last sur les deux photos de Tout accepter (une étape par photo) : la planche.
+    PHOTOS[2001].note = 0
+    PHOTOS[2002].drapeau = 0
+    local ok, e = pcall(ouvrirSeance, function(p)
+        egal('proposee', Notation.proposition(2001).etat)
+        egal('proposee', Notation.proposition(2002).etat)
+        -- Cases : 2004, 2003, 2002, 2001 (ordre de la prise de vue).
+        egal('rouge', p.couleur2, '2003 : à vérifier, comme Claude l\'a proposée')
+        egal('orange', p.couleur3)
+        egal('⚑ Rejeter', p.etoiles3)
+        contient(p.etatTexte3, 'proposée')
+        egal('orange', p.couleur4)
+        egal('★★★☆☆', p.etoiles4)
+        contient(p.etatTexte4, 'proposée')
+        egal('Tout accepter · passe 1 (2)', p.titreToutAccepter, 'de nouveau dans Tout accepter')
+    end)
+    Fichiers.ecrire = ecrire
+    vrai(ok, e)
+    egal(2, ecrits, 'une écriture pour la page')
+    sansErreur()
+end)
+
 print(string.format('\n%d essais réussis, %d en échec', reussis, echecs))
 if os.getenv('GARDER_ESSAI') == nil then
     S.executer('rm -rf ' .. S.q(S.home))

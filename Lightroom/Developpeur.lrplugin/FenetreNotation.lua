@@ -464,8 +464,9 @@ end
 
 -- Rafraîchissement --------------------------------------------------------------------------------
 
--- Tout ce qui dépend du registre et du catalogue : séance, passes, planche, fiche.
-function FenetreNotation.rafraichir()
+-- Tout ce qui dépend du registre et du catalogue : séance, passes, planche, fiche. `recale` : le
+-- registre vient d'être recalé sur les notes relues par la planche (tout se relit une fois).
+function FenetreNotation.rafraichir(recale)
     local p = FenetreNotation.p
     if not p then
         return
@@ -527,7 +528,9 @@ function FenetreNotation.rafraichir()
     poser(p, 'titreToutAccepter', n > 0 and string.format("Tout accepter · passe %d (%d)", passe, n) or "Tout accepter")
 
     local manquantes = {}
-    FenetreNotation.rafraichirPlanche(manquantes)
+    if FenetreNotation.rafraichirPlanche(manquantes, recale) then
+        return FenetreNotation.rafraichir(true)
+    end
     FenetreNotation.rafraichirFiche(manquantes)
     FenetreNotation.preparerVignettes(manquantes)
     FenetreNotation.majBoutons()
@@ -548,12 +551,38 @@ local function vignette(id, info, cle, manquantes)
     return nil
 end
 
-function FenetreNotation.rafraichirPlanche(manquantes)
+-- La planche relit la note et le drapeau posés de ses photos et de la fiche, et recale le
+-- registre (Notation.recaler, une écriture pour la page) : une note retirée dans Lightroom
+-- (undo_last, ⌘Z) remet sa proposition à décider. Rend vrai si le registre a changé (sans
+-- `recale`) : la fenêtre se relit alors une fois, sans rien poser ici.
+function FenetreNotation.rafraichirPlanche(manquantes, recale)
     local p = FenetreNotation.p
     local visibles = FenetreNotation.visibles()
     FenetreNotation.liste = visibles
     local pages = math.max(1, math.ceil(#visibles / FenetreNotation.CASES))
     FenetreNotation.page = math.max(1, math.min(FenetreNotation.page or 1, pages))
+    local debut = (FenetreNotation.page - 1) * FenetreNotation.CASES
+    -- La version du registre avant de lire les photos : une note posée entre-temps n'est pas défaite.
+    local version = Notation.version
+    local infos, releves = {}, {}
+    local function lire(id)
+        if id and infos[id] == nil then
+            infos[id] = FenetreNotation.lirePhoto(id) or false
+            if infos[id] then
+                releves[#releves + 1] = { photo = id, note = infos[id].note, drapeau = infos[id].drapeau }
+            end
+        end
+    end
+    for k = 1, FenetreNotation.CASES do
+        lire(visibles[debut + k])
+    end
+    lire(FenetreNotation.choisie)
+    if not recale and #releves > 0 then
+        local ok, n = LrTasks.pcall(Notation.recaler, releves, version)
+        if ok and n > 0 then
+            return true
+        end
+    end
     local total = FenetreNotation.seance and #FenetreNotation.seance.photos or 0
     if total == 0 then
         poser(p, 'pageTexte', '')
@@ -565,11 +594,10 @@ function FenetreNotation.rafraichirPlanche(manquantes)
     end
     FenetreNotation.pages = pages
     FenetreNotation.cases = {}
-    local debut = (FenetreNotation.page - 1) * FenetreNotation.CASES
     for k = 1, FenetreNotation.CASES do
         local id = visibles[debut + k]
         FenetreNotation.cases[k] = id
-        local info = id and FenetreNotation.lirePhoto(id)
+        local info = id and infos[id] or nil
         if id then
             local prop = FenetreNotation.props[tostring(id)]
             local nom = nomCourt(info and info.nom or (prop and prop.fichier) or tostring(id))

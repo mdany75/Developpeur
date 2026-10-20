@@ -12,9 +12,11 @@
 -- Le SDK ne sait ni ajouter de vues à une fenêtre ouverte ni la faire défiler par programme, et
 -- une vue masquée garde sa place : le fil est une grille de lignes fixes (Fil.lua), remplie à
 -- chaque changement et parcourue par les boutons ▲ ▼ ; chaque ligne superpose une variante par
--- genre (police, couleur), dont une seule est visible. Les onglets sont une rangée de boutons
--- radio au-dessus de variantes superposées de même largeur. Changer de disposition ferme la
--- fenêtre et la rouvre (Fenetre.rouvrir).
+-- genre (police, couleur), dont une seule est visible. Lightroom ne masque que les vues simples
+-- (`visible` sur un conteneur reste sans effet, constaté) : les onglets sont une rangée de
+-- boutons radio au-dessus de variantes superposées de même largeur, dont chaque vue simple porte
+-- la condition de son onglet (Vues.masquable). Changer de disposition ferme la fenêtre et la
+-- rouvre (Fenetre.rouvrir).
 
 local LrBinding = import 'LrBinding'
 local LrColor = import 'LrColor'
@@ -97,12 +99,75 @@ Fenetre.PASTILLES = { ok = 'vert', attention = 'orange', erreur = 'rouge', neutr
 local bind = LrView.bind
 Fenetre.bind = bind
 
+-- Conditions de visibilité. Lightroom ne masque que les vues simples : `visible` lié sur un
+-- conteneur reste sans effet (constaté). Toute liaison `visible` des pièces se fait ici et garde
+-- ses conditions (clé et test), pour que Vues.masquable la combine avec celle d'un onglet en une
+-- liaison à plusieurs clés (Fenetre.et).
+local conditions = setmetatable({}, { __mode = 'k' })
+
+local function lier(liste)
+    local liaison
+    if #liste == 1 then
+        local c = liste[1]
+        liaison = bind { key = c.cle, transform = function(v) return c.test(v) end }
+    else
+        local cles, vues = {}, {}
+        for _, c in ipairs(liste) do
+            if not vues[c.cle] then
+                vues[c.cle] = true
+                cles[#cles + 1] = c.cle
+            end
+        end
+        liaison = bind {
+            keys = cles,
+            operation = function(_, valeurs, depuisTable)
+                if not depuisTable then
+                    return LrBinding.kUnsupportedDirection
+                end
+                for _, c in ipairs(liste) do
+                    if not c.test(valeurs[c.cle]) then
+                        return false
+                    end
+                end
+                return true
+            end,
+        }
+    end
+    conditions[liaison] = liste
+    return liaison
+end
+
+-- Vrai quand test(valeur de la clé) l'est.
+function Fenetre.condition(cle, test)
+    return lier({ { cle = cle, test = function(v) return test(v) == true end } })
+end
+
 function Fenetre.egal(cle, valeur)
-    return bind { key = cle, transform = function(v) return v == valeur end }
+    return Fenetre.condition(cle, function(v) return v == valeur end)
 end
 
 function Fenetre.non(cle)
-    return bind { key = cle, transform = function(v) return not v end }
+    return Fenetre.condition(cle, function(v) return not v end)
+end
+
+function Fenetre.si(cle)
+    return Fenetre.condition(cle, function(v) return v ~= nil and v ~= false end)
+end
+
+-- Une liaison neuve, vraie quand toutes les conditions de ces liaisons le sont (faites par
+-- Fenetre.condition, egal, non, si ou et).
+function Fenetre.et(...)
+    local liste = {}
+    for i = 1, select('#', ...) do
+        local sienne = conditions[select(i, ...)]
+        if not sienne then
+            error("Condition de visibilité inconnue : passer par Fenetre.condition, egal, non ou si.", 2)
+        end
+        for _, c in ipairs(sienne) do
+            liste[#liste + 1] = c
+        end
+    end
+    return lier(liste)
 end
 
 -- Les fenêtres modales et le choix de fichiers s'ouvrent depuis une tâche, pas depuis l'action
@@ -931,10 +996,16 @@ function Fenetre.majPhoto()
     if not p then
         return
     end
+    -- La version du registre avant de lire la photo : une note posée entre-temps n'est pas défaite.
+    local version = Notation.version
     local info = Lightroom.photos()
     Fenetre.info = info
     if info.active then
         p.infoPhoto = string.format("Active : %s     Sélection : %d", Lightroom.nomCourt(info.active.nom), info.selection)
+        -- Une note acceptée ou changée qui n'est plus sur la photo (undo_last, ⌘Z) : la proposition
+        -- redevient à décider.
+        local active = info.active
+        LrTasks.pcall(Notation.recaler, { { photo = active.id, note = active.note, drapeau = active.drapeau } }, version)
     else
         p.infoPhoto = "Aucune photo active"
     end

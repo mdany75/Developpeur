@@ -97,7 +97,7 @@ local function changerRegistre(quoi)
 end
 function Notation.reinitialiser()
     Notation.seances, Notation.props, Notation.active = {}, {}, nil
-    Notation.appels = { ouvrirSeance = {}, choisirPasse = {}, poser = {}, decider = {} }
+    Notation.appels = { ouvrirSeance = {}, choisirPasse = {}, poser = {}, decider = {}, recaler = {} }
     Notation.version = Notation.version + 1
 end
 function Notation.abonner(nom, fn) Notation.observateurs[nom] = fn end
@@ -158,6 +158,23 @@ function Notation.decider(idPhoto, etat, details)
     changerRegistre('decision')
     return true
 end
+-- Ce qu'une proposition acceptée ou changée a posé sur sa photo (comme Notation.poser) : la note
+-- proposée, ou le drapeau Rejeter pour un rejet ; la note et le drapeau choisis.
+local PICK = { retenue = 1, aucun = 0, rejetee = -1 }
+local function poserSurPhoto(p)
+    local ph = PHOTOS[p.photo]
+    if p.etat == 'acceptee' then
+        if p.drapeau == 'rejetee' then
+            ph.drapeau = -1
+        else
+            ph.note = p.note
+            ph.drapeau = ph.drapeau == -1 and 0 or ph.drapeau
+        end
+    elseif p.etat == 'changee' then
+        ph.note = p.note_choisie or ph.note
+        ph.drapeau = PICK[p.drapeau_choisi] or ph.drapeau
+    end
+end
 -- Pose comme le registre : sans note ni drapeau, la proposition telle quelle.
 function Notation.poser(liste)
     table.insert(Notation.appels.poser, copie(liste))
@@ -166,19 +183,53 @@ function Notation.poser(liste)
         local p = Notation.props[tostring(item.photo)]
         if item.note == nil and item.drapeau == nil then
             p.etat = 'acceptee'
-            PHOTOS[item.photo].note = p.note
+            poserSurPhoto(p)
         else
             if p then
                 p.etat, p.note_choisie, p.drapeau_choisi = 'changee', item.note, item.drapeau
             end
             PHOTOS[item.photo].note = item.note
+            PHOTOS[item.photo].drapeau = PICK[item.drapeau] or PHOTOS[item.photo].drapeau
         end
         resultats[#resultats + 1] = { photo = item.photo, etat = p and p.etat }
     end
     changerRegistre('pose')
     return { ok = true, resultats = resultats }
 end
--- Pour les essais : une proposition de Claude dans la séance active.
+-- Recale comme le registre : une proposition acceptée ou changée dont la note ou le drapeau posés
+-- ne sont plus sur la photo repasse à « proposee » ; un registre changé depuis les relevés
+-- (`version`) ne recale rien. Les relevés reçus sont gardés.
+function Notation.recaler(releves, version)
+    table.insert(Notation.appels.recaler, { releves = copie(releves), version = version })
+    if version ~= nil and version ~= Notation.version then
+        return 0
+    end
+    local n = 0
+    for _, r in ipairs(releves) do
+        local p = Notation.props[tostring(r.photo)]
+        local drapeau = ({ [1] = 'retenue', [0] = 'aucun', [-1] = 'rejetee' })[tonumber(r.drapeau)] or r.drapeau
+        local encore = true
+        if p and p.etat == 'acceptee' then
+            if p.drapeau == 'rejetee' then
+                encore = drapeau == 'rejetee'
+            else
+                encore = r.note == (p.note or 0) and drapeau ~= 'rejetee'
+            end
+        elseif p and p.etat == 'changee' then
+            encore = (p.note_choisie == nil or r.note == p.note_choisie) and (p.drapeau_choisi == nil or drapeau == p.drapeau_choisi)
+        end
+        if not encore then
+            p.etat, p.note_choisie, p.drapeau_choisi = 'proposee', nil, nil
+            n = n + 1
+        end
+    end
+    if n > 0 then
+        changerRegistre('recalage')
+    end
+    return n
+end
+-- Pour les essais : une proposition de Claude dans la séance active ; acceptée ou changée, sa
+-- note est posée sur la photo.
 function Notation.proposer(photo, champs)
     local p = { photo = photo, fichier = PHOTOS[photo].nom, note = 3, drapeau = 'aucun', passe = 1, etat = 'proposee',
         seance = Notation.active, criteres = {}, raison = '' }
@@ -186,6 +237,7 @@ function Notation.proposer(photo, champs)
         p[cle] = valeur
     end
     Notation.props[tostring(photo)] = p
+    poserSurPhoto(p)
     changerRegistre('propositions')
     return p
 end
@@ -355,10 +407,7 @@ local function verifierVues(contenu, p)
             if type(cle) == 'string' then
                 vrai(PROPRIETES[cle], 'propriété inconnue du SDK : ' .. cle .. ' (' .. v.genre .. ')')
                 if type(valeur) == 'table' and valeur.liaison then
-                    vrai(p[valeur.key] ~= nil, 'liaison sans valeur : ' .. valeur.key .. ' (' .. v.genre .. '.' .. cle .. ')')
-                    if valeur.transform then
-                        valeur.transform(p[valeur.key], true)
-                    end
+                    S.verifierLiaison(valeur, p, v.genre .. '.' .. cle)
                 end
                 if cle == 'font' then
                     vrai(type(valeur) == 'table' and valeur.name and valeur.size, 'police incomplète (' .. v.genre .. ')')
@@ -854,6 +903,62 @@ essai('Séance : Tout accepter pose les propositions de la passe en un seul appe
         egal(2, Notation.appels.choisirPasse[1][2])
         egal('Tout accepter · passe 2 (1)', p.titreToutAccepter)
         egal('Lancer la passe 2', p.titreLancer)
+    end)
+    S.reponseConfirm = nil
+    sansErreur()
+end)
+
+essai('Séance : une note retirée par undo_last remet sa case à « proposée » (constaté) ; un recalage par page', function()
+    reinitialiser()
+    seance(14)
+    for id = 1001, 1014 do
+        Notation.proposer(id, { note = 3, passe = 1 })
+    end
+    Notation.proposer(1003, { drapeau = 'rejetee', note = nil, passe = 1 })
+    ouvrir(function(p, args)
+        S.reponseConfirm = 'ok'
+        cliquer(args.contents, 'titreToutAccepter')
+        lancerTaches()
+        tourner()
+        egal('vert', p.couleur2)
+        egal('vert', p.couleur3)
+        egal(-1, PHOTOS[1003].drapeau)
+        -- Chaque rafraîchissement relève la note et le drapeau des 12 cases (la fiche comprise) en
+        -- un seul appel, avec la version du registre lue avant.
+        local appels = #Notation.appels.recaler
+        FenetreNotation.aRafraichir = true
+        FenetreNotation.tour(1)
+        egal(appels + 1, #Notation.appels.recaler, 'un recalage par rafraîchissement')
+        local dernier = Notation.appels.recaler[#Notation.appels.recaler]
+        egal(12, #dernier.releves, 'les 12 cases de la page')
+        egal(1001, dernier.releves[1].photo)
+        egal(3, dernier.releves[1].note)
+        egal(0, dernier.releves[1].drapeau)
+        egal(Notation.version, dernier.version)
+        -- undo_last (une étape par photo) retire trois notes du catalogue, dont le rejet : une seule
+        -- écriture du registre pour la page, et la planche se relit aussitôt.
+        PHOTOS[1002].note, PHOTOS[1003].drapeau, PHOTOS[1011].note = nil, 0, nil
+        local version = Notation.version
+        FenetreNotation.tour(8)
+        lancerTaches()
+        egal(version + 1, Notation.version, 'une écriture du registre pour la page')
+        for _, k in ipairs({ 2, 3, 11 }) do
+            egal('orange', p['couleur' .. k], 'case ' .. k .. ' : de nouveau proposée')
+            contient(p['etatTexte' .. k], 'proposée', 'case ' .. k)
+        end
+        egal('★★★☆☆', p.etoiles2, 'la note proposée')
+        egal('⚑ Rejeter', p.etoiles3)
+        egal('vert', p.couleur1, 'une note toujours posée reste acceptée')
+        egal('Tout accepter · passe 1 (3)', p.titreToutAccepter, 'de nouveau dans Tout accepter')
+        egal('proposee', Notation.props['1003'].etat)
+        tourner()
+        egal(version + 1, Notation.version, 'plus rien à recaler')
+        -- Page 2 : ses deux cases et la fiche (1001, restée choisie).
+        cliquer(args.contents, '▶')
+        tourner()
+        local releves = Notation.appels.recaler[#Notation.appels.recaler].releves
+        egal(3, #releves)
+        egal('1013 1014 1001', releves[1].photo .. ' ' .. releves[2].photo .. ' ' .. releves[3].photo)
     end)
     S.reponseConfirm = nil
     sansErreur()

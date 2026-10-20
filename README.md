@@ -302,7 +302,8 @@ fin de l'invite `noter`.
 - Accepter et Changer… attendent que Claude ait fini de travailler. Le clic vaut accord, même en
   mode « Proposer d'abord » ; les photos protégées du Gestionnaire de modules externes restent
   protégées. Une note posée s'annule comme un classement (Annuler la dernière retouche, ou ⌘Z) ;
-  c'est la vôtre : revenir à « Avant Claude » la laisse en place.
+  annulée, sa proposition redevient à décider, dans la carte comme dans la Séance. C'est votre
+  note : revenir à « Avant Claude » la laisse en place.
 
 **La Séance de notation**
 

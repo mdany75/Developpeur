@@ -4778,6 +4778,105 @@ test("notation : une note posée par l'utilisateur reste au retour à l'origine 
     egal(etapes(b), 0)
 end)
 
+test("notation : recaler le registre sur la note réelle après undo_last (constaté) ; une écriture pour plusieurs photos", function()
+    local a, b, c = photoRaw(), photoJpeg(), photoFuji()
+    local d = S.Photo(5, {}, { fileName = 'DSC_0500.NEF', fileFormat = 'RAW' })
+    proposer({ { photo = 1, note = 3, criteres = CRITERES }, { photo = 2, note = 0, drapeau = 'rejetee', criteres = CRITERES },
+        { photo = 4, note = 2, criteres = CRITERES }, { photo = 5, note = 2, criteres = CRITERES } })
+    local r = Notation.poser({ { photo = 1 }, { photo = 2 }, { photo = 4, note = 5, drapeau = 'retenue' }, { photo = 5 } })
+    egal(r.ok, true, tostring(r.erreur))
+    -- Ce qu'une fenêtre lit dans Lightroom : note (nil sans étoiles) et drapeau (pickStatus).
+    local function releves(...)
+        local liste = {}
+        for _, photo in ipairs({ ... }) do
+            liste[#liste + 1] = { photo = photo.localIdentifier, note = tonumber(photo.brut.rating) or 0, drapeau = tonumber(photo.brut.pickStatus) or 0 }
+        end
+        return liste
+    end
+    local Fichiers = require 'Fichiers'
+    local ecrire, ecrits = Fichiers.ecrire, 0
+    Fichiers.ecrire = function(chemin, ...)
+        if chemin == Notation.fichier() then
+            ecrits = ecrits + 1
+        end
+        return ecrire(chemin, ...)
+    end
+    local vus = {}
+    Notation.abonner('essai', function(quoi) vus[#vus + 1] = quoi end)
+    -- Les notes posées sont toujours là : rien ne change, rien n'est écrit.
+    local version = Notation.version
+    egal(Notation.recaler(releves(a, b, c, d)), 0)
+    egal(Notation.version, version)
+    egal(ecrits, 0, "rien d'écrit sans changement")
+    -- undo_last sur trois photos (constaté le 20 octobre 2026 : la note quitte le catalogue, le
+    -- registre restait « acceptée ») : une seule écriture du registre pour les trois.
+    Commandes.executer('annuler', { photos = { 1, 2, 4 } })
+    egal(a.brut.rating, nil)
+    egal(tonumber(b.brut.pickStatus) or 0, 0, "le rejet accepté est défait")
+    egal(c.brut.rating, nil)
+    egal(Notation.recaler(releves(a, b, c, d), Notation.version), 3)
+    egal(ecrits, 1, "une écriture pour toute la page")
+    egal(Notation.version, version + 1)
+    egal(vus[#vus], 'recalage')
+    for _, id in ipairs({ 1, 2, 4 }) do
+        local p = Notation.proposition(id)
+        egal(p.etat, 'proposee', "photo " .. id .. " : de nouveau à décider")
+        egal(p.note_choisie, nil)
+        egal(p.drapeau_choisi, nil)
+        egal(p.decide_le, nil)
+    end
+    egal(Notation.proposition(4).note, 2, "la proposition de Claude reste")
+    egal(Notation.proposition(5).etat, 'acceptee', "une note toujours posée reste acceptée")
+    egal(Json.decode(S.fichiers[Notation.fichier()]).propositions['1'].etat, 'proposee', "rangé dans notation.json")
+    -- Relue de nouveau : plus rien à recaler.
+    egal(Notation.recaler(releves(a, b, c, d)), 0)
+    egal(ecrits, 1)
+    -- Une autre note posée à la main remplace l'acceptée ; un Retenue de l'utilisateur sur une note
+    -- acceptée ne la défait pas ; un rejet accepté ne regarde que le drapeau.
+    egal(Notation.poser({ { photo = 1 }, { photo = 2 } }).ok, true)
+    a.brut.pickStatus, b.brut.rating = 1, 4
+    egal(Notation.recaler(releves(a, b)), 0)
+    a.brut.rating = 4
+    egal(Notation.recaler(releves(a, b)), 1)
+    egal(Notation.proposition(1).etat, 'proposee')
+    egal(Notation.proposition(2).etat, 'acceptee')
+    -- Une changée : sa note et son drapeau choisis.
+    egal(Notation.poser({ { photo = 4, note = 1, drapeau = 'aucun' } }).resultats[1].etat, 'changee')
+    egal(Notation.recaler({ { photo = 4, note = 1, drapeau = 'aucun' } }), 0)
+    egal(Notation.recaler({ { photo = 4, note = 1, drapeau = 'retenue' } }), 1, "drapeau changé")
+    egal(Notation.proposition(4).etat, 'proposee')
+    -- Rien de recalé : une note illisible, un drapeau inconnu, une proposition à décider, une photo
+    -- sans proposition, ou un registre changé depuis la lecture (une note posée entre-temps).
+    egal(Notation.poser({ { photo = 5, note = 3 } }).ok, true)
+    egal(Notation.recaler({ { photo = 5, note = nil, drapeau = 0 }, { photo = 5, note = 0, drapeau = 'jaune' },
+        { photo = 1, note = 0, drapeau = 0 }, { photo = 777, note = 0, drapeau = 0 } }), 0)
+    egal(Notation.recaler({ { photo = 5, note = 0, drapeau = 0 } }, Notation.version - 1), 0, "relevé plus vieux que le registre")
+    egal(Notation.proposition(5).etat, 'changee')
+    egal(Notation.recaler({ { photo = 5, note = 0, drapeau = 'aucun' } }, Notation.version), 1)
+    -- Pendant une écriture (Tout accepter), une fenêtre a pu relever une photo avant que sa note y
+    -- soit posée : rien ne se recale tant qu'elle dure, même avec la version du moment.
+    egal(Notation.proposition(1).etat, 'proposee')
+    egal(Notation.proposition(5).etat, 'proposee')
+    local avant = Notation.version
+    local lire, recales = d.getRawMetadata, 0
+    d.getRawMetadata = function(self, cle)
+        if cle == 'rating' then
+            recales = recales + Notation.recaler({ { photo = 1, note = 0, drapeau = 0 } }, avant)
+        end
+        return lire(self, cle)
+    end
+    local pose = Notation.poser({ { photo = 1 }, { photo = 5 } })
+    d.getRawMetadata = lire
+    egal(pose.ok, true, tostring(pose.erreur))
+    egal(recales, 0, "rien de recalé pendant l'écriture")
+    egal(Notation.proposition(1).etat, 'acceptee')
+    egal(Notation.proposition(5).etat, 'acceptee')
+    egal(Notation.recaler({ { photo = 1, note = 0, drapeau = 0 } }, avant), 0, "relevé d'avant l'écriture")
+    egal(Notation.proposition(1).etat, 'acceptee')
+    Fichiers.ecrire = ecrire
+    Notation.desabonner('essai')
+end)
+
 test("notation : registre gardé dans notation.json, propre au catalogue ouvert", function()
     photoRaw()
     proposer({ { photo = 1, note = 3, criteres = CRITERES } })

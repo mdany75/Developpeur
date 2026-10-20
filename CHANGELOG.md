@@ -35,7 +35,8 @@ propose selon un standard clair, que vous acceptez ou changez dans Lightroom.
   photos »).
 - Une note acceptée ou changée s'écrit dans Lightroom sans repasser par Claude, donc sans rien
   dépenser de votre forfait, et jamais pendant que Claude travaille ; elle s'annule comme un
-  classement. C'est votre note : revenir à « Avant Claude » la laisse en place.
+  classement, et sa proposition redevient alors à décider. C'est votre note : revenir à « Avant
+  Claude » la laisse en place.
 - Les notes proposées et les séances restent sur le Mac (`notation.json`) : `uninstall.sh` les
   garde, `uninstall.sh --tout` les retire.
 
