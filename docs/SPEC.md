@@ -276,7 +276,7 @@ Options vérifiées avec Claude Code 2.1.303 : seulement le connecteur, nommé `
 rien qui demande une permission, ni compétences ni réglages de l'utilisateur. relais.sh retire
 `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` et les fournisseurs Bedrock et
 Vertex de l'environnement : le forfait est toujours employé (constaté le 19 octobre 2026 :
-`apiKeySource: none`, connecteur `connected`, 33 outils). `consignes.md` (`Consignes.texte`) ne dit
+`apiKeySource: none`, connecteur `connected`, 33 outils ; le 20 octobre, 34 avec la 1.1). `consignes.md` (`Consignes.texte`) ne dit
 que ce qui tient à la fenêtre (pour qui, mise en forme en texte simple, ligne de contexte, style,
 titre, garde-fous ; depuis la 1.1, une puce « Notes » : les notes se proposent par
 `propose_ratings`, selon le standard que `read_standard` donne, jamais `set_metadata` pour une
