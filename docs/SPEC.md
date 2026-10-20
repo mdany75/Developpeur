@@ -1984,8 +1984,10 @@ Arguments :
   `{photo_id, rating (0 à 4) ou flag: "reject", criteria: {impact, qualities, technical_floor,
   finish}, reason, to_check}`. `rating` ou `flag`, pas les deux (`flag` seul : le rejet) ;
   `impact`, `qualities` et `technical_floor` obligatoires et non vides, `finish` facultatif (une
-  photo développée) ; 200 caractères au plus par critère (`longueurCritere`), 300 pour `reason`
-  (`longueurRaison`) ; `to_check` : un cas douteux, à vérifier par l'utilisateur.
+  photo développée) ; 200 caractères demandés par critère (`longueurCritere`), 300 pour `reason`
+  (`longueurRaison`), refusés seulement au-delà de 300 et 400 (`toleranceCritere`,
+  `toleranceRaison` : Claude dépasse de peu en comptant mal, constaté ; la carte coupe le
+  surplus) ; `to_check` : un cas douteux, à vérifier par l'utilisateur.
 - `pass` : la passe de la séance, de 1 à 3 ; 4 (5 ★, l'utilisateur seul) est refusée avec des
   `ratings` (« Passe 4 : 5 étoiles, l'utilisateur seul ; rien à proposer. »), et le module la
   refuse encore.

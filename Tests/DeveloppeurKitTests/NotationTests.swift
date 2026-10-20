@@ -185,6 +185,14 @@ final class NotationTests: XCTestCase {
         XCTAssertNil(fake.lastParams["passe"])
         XCTAssertNil(fake.lastParams["seance"])
         XCTAssertEqual(fake.calls.count, 2)
+
+        // Un critère un peu plus long que demandé passe (constaté : 209 caractères pour 200).
+        let unPeuLong = String(repeating: "é", count: 260)
+        let toleree = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 2, criteres: [
+            "impact": .string(unPeuLong), "qualities": "b", "technical_floor": "c"], raison: String(repeating: "a", count: 350))]])
+        XCTAssertFalse(toleree.isError, toleree.text)
+        XCTAssertEqual(fake.lastParams["propositions"]?.array?.first?["criteres"]?["impact"]?.string, unPeuLong)
+        XCTAssertEqual(fake.calls.count, 3)
     }
 
     /// read_session : la séance ouverte dans Lightroom (commande notation, action seance), rendue
@@ -243,7 +251,7 @@ final class NotationTests: XCTestCase {
     }
 
     func testOtherInvalidProposalsAreRefusedWithoutSendingAnything() {
-        let long = String(repeating: "é", count: 201)
+        let long = String(repeating: "é", count: 301)
         for (arguments, attendu) in [
             ([:], "« ratings »"),
             (["ratings": []], "read_standard = true donne le standard"),
@@ -256,11 +264,11 @@ final class NotationTests: XCTestCase {
             (["ratings": [proposition(12, rating: 3, criteres: ["impact": "a", "qualities": " ", "technical_floor": "c"])]], "« criteria.qualities » vide"),
             (["ratings": [proposition(12, rating: 3, criteres: ["impact": "a", "qualities": "b"])]], "« criteria.technical_floor » vide"),
             (["ratings": [proposition(12, rating: 3, criteres: ["impact": .string(long), "qualities": "b", "technical_floor": "c"])]],
-             "trop long (201 caractères, 200 au plus)"),
+             "trop long (301 caractères, 200 demandés)"),
             (["ratings": [proposition(12, rating: 3, criteres: ["impact": "a", "qualities": "b", "technical_floor": "c", "finish": .string(long)])]],
              "« criteria.finish » trop long"),
             (["ratings": [proposition(12, rating: 3, raison: " ")]], "« reason »"),
-            (["ratings": [proposition(12, rating: 3, raison: String(repeating: "a", count: 301))]], "trop longue (301 caractères, 300 au plus)"),
+            (["ratings": [proposition(12, rating: 3, raison: String(repeating: "a", count: 401))]], "trop longue (401 caractères, 300 demandés)"),
             (["ratings": [.object(proposition(12, rating: 3).object!.merging(["to_check": "oui"]) { $1 })]], "« to_check »"),
             (["ratings": [proposition(12, rating: 3), proposition(12, rating: 2)]], "photo 12 proposée deux fois"),
             (["ratings": [proposition(12, rating: 3)], "pass": 5], "« pass »"),

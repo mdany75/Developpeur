@@ -9,7 +9,14 @@ professionnelle sans être un pro. Deux pièces : le connecteur MCP-Développeur
 (*Model Context Protocol*) écrit en Swift, et le module « Développeur » de Lightroom Classic, qui
 exécute ses demandes et porte la fenêtre Claude.
 
-![La fenêtre Claude dans Lightroom Classic](docs/capture.png)
+![La fenêtre Claude dans Lightroom Classic, disposition Conversation claire](docs/capture.png)
+
+Les deux autres dispositions de la fenêtre Claude, l'Atelier et le Panneau :
+
+<p>
+  <img src="docs/atelier.png" alt="La fenêtre Claude, disposition Atelier" width="74%">
+  <img src="docs/panneau.png" alt="La fenêtre Claude, disposition Panneau" width="24%">
+</p>
 
 ## Fonctions
 

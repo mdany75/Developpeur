@@ -171,16 +171,16 @@ extension ToolHandler {
                 }
                 continue
             }
-            guard texte.count <= Notation.longueurCritere else {
-                throw LightroomError.invalid("« criteria.\(critere.nom) » trop long (\(texte.count) caractères, \(Notation.longueurCritere) au plus).")
+            guard texte.count <= Notation.toleranceCritere else {
+                throw LightroomError.invalid("« criteria.\(critere.nom) » trop long (\(texte.count) caractères, \(Notation.longueurCritere) demandés).")
             }
             versModule[critere.module] = .string(texte)
         }
 
         let raison = p.string("reason")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !raison.isEmpty else { throw LightroomError.invalid("« reason » : la raison en une phrase.") }
-        guard raison.count <= Notation.longueurRaison else {
-            throw LightroomError.invalid("« reason » trop longue (\(raison.count) caractères, \(Notation.longueurRaison) au plus).")
+        guard raison.count <= Notation.toleranceRaison else {
+            throw LightroomError.invalid("« reason » trop longue (\(raison.count) caractères, \(Notation.longueurRaison) demandés).")
         }
         var aVerifier = false
         if p.has("to_check") {

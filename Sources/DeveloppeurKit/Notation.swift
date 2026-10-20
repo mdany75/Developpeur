@@ -84,9 +84,13 @@ public enum Notation {
     static let criteres: [(nom: String, module: String, obligatoire: Bool)] = [
         ("impact", "impact", true), ("qualities", "qualites", true), ("technical_floor", "plancher", true), ("finish", "finition", false),
     ]
-    /// Longueur d'un critère et de la raison d'une proposition, en caractères.
+    /// Longueur d'un critère et de la raison d'une proposition, en caractères : celle demandée à
+    /// Claude (la carte de note la montre entière), et celle refusée au-delà (Claude dépasse de peu
+    /// en comptant mal : constaté, 209 pour 200 ; la carte coupe le surplus, le fil le garde).
     static let longueurCritere = 200
     static let longueurRaison = 300
+    static let toleranceCritere = 300
+    static let toleranceRaison = 400
 
     /// Ce que le plancher technique mesuré permet au plus.
     public struct Plafond: Equatable {

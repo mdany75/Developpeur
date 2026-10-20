@@ -786,7 +786,8 @@ essai('Fenêtre : les trois dispositions dans les trois tailles', function()
                         end
                     end
                 end)
-                egal(4, bandeau, nom .. ' : les quatre états du bandeau')
+                -- Le Panneau en a un sous le Style et un sous la proposition, l'un ou l'autre montré.
+                egal(disposition.value == 'panneau' and 8 or 4, bandeau, nom .. ' : les quatre états du bandeau')
                 vrai(textes.versionNom1 and textes.versionNom2 and not textes.versionNom3, nom .. ' : deux versions')
                 vrai(textes.message and textes.aide, nom .. ' : message et aide')
                 -- Le fil : D.lignes lignes, une variante par style.

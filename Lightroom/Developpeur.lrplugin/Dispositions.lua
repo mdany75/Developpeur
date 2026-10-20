@@ -295,7 +295,8 @@ function Dispositions.panneau(f, F, D)
     }
     local retoucher = variante(f, F, L, 'retoucher', function(fm)
         -- La proposition, compacte, prend la place des invites et du style le temps d'y répondre :
-        -- deux fabriques masquables dans celle de l'onglet.
+        -- deux fabriques masquables dans celle de l'onglet. Le bandeau suit chacune (sous le
+        -- Style, il ne flotte pas sous la place laissée à la proposition, plus haute).
         local sansProposition = Vues.masquable(fm, F, F.non 'aProposition')
         local avecProposition = Vues.masquable(fm, F, F.si 'aProposition')
         return {
@@ -307,10 +308,11 @@ function Dispositions.panneau(f, F, D)
             fm:separator { fill_horizontal = 1 },
             f:column {
                 place = 'overlapping',
-                f:column { width = L, spacing = 6, Vues.invites(sansProposition, F, D), Vues.style(sansProposition, F, D) },
-                f:column { width = L, Vues.proposition(avecProposition, F, L, D.propLignes) },
+                f:column { width = L, spacing = 6, Vues.invites(sansProposition, F, D), Vues.style(sansProposition, F, D),
+                    Vues.bandeau(sansProposition, F, L) },
+                f:column { width = L, spacing = 6, Vues.proposition(avecProposition, F, L, D.propLignes),
+                    Vues.bandeau(avecProposition, F, L) },
             },
-            Vues.bandeau(fm, F, L),
             Vues.saisie(fm, F, D),
             Vues.envoi(fm, F, D),
         }
