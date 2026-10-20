@@ -113,3 +113,11 @@ luajit "${TESTS_DIR}/Liaison/tests.lua"
 printf '\nFenêtre Claude\n'
 cd "${TESTS_DIR}/Fenetre"
 PLUGIN_DIR="${PLUGIN_DIR}" luajit tests.lua
+
+# Essais à part (essais-*.lua) : chacun charge la simulation et ses propres aides, et sort en échec
+# s'il en a un.
+for essais in essais-*.lua; do
+    [[ -e "${essais}" ]] || continue
+    printf '\n%s\n' "${essais%.lua}"
+    PLUGIN_DIR="${PLUGIN_DIR}" luajit "${essais}"
+done
