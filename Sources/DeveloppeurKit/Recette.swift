@@ -390,6 +390,12 @@ public final class Recette {
                                                          "confirm": true, "reason": "Recette automatisée du module."])
             let resultat = info["resultats"]?.array?.first
             let remarques = (resultat?["remarques"]?.array ?? []).compactMap(\.string).joined(separator: " ; ")
+            // Une copie qui porte déjà la Réduction du bruit de son original : Lightroom n'offre
+            // pas la super résolution avec elle (constaté), et rien n'est posé.
+            if resultat?["amelioration"]?["superRes"]?.bool != true, remarques.contains("Réduction du bruit") {
+                try verifierEgal(try etat(id), auto)
+                return "sautée : la photo porte déjà la Réduction du bruit (\(remarques))"
+            }
             try verifier(resultat?["amelioration"]?["superRes"]?.bool == true, "super résolution absente après le calcul\(remarques.isEmpty ? "" : " : " + remarques)")
             try verifier(!(resultat?["changements"]?.array ?? []).isEmpty, "aucune étape de super résolution à annuler\(remarques.isEmpty ? "" : " : " + remarques)")
             let (annulation, _) = try appel("undo_last", ["photo_ids": [.number(Double(id))]])
@@ -551,6 +557,15 @@ public final class Recette {
             let depart = try etat(id)
             let ajout = try retouche("add_mask", ["masks": [["kind": "person", "person": 1, "adjustments": ["Exposure": 0.2], "name": "Personne recette"]]])
             let notesAjout = remarques(ajout)
+            // Photo de groupe : Lightroom exige les cadres de toutes les personnes, et Vision en
+            // manque parfois (constaté : 2 sur 4) ; le masque est alors retiré et l'utilisateur
+            // prévenu. Un portrait seul reste vérifié.
+            if let note = notesAjout.first(where: { $0.contains("n'a pas reconnu la personne") }),
+               let n = note.range(of: #"sur (\d+) trouvées"#, options: .regularExpression).flatMap({ Int(note[$0].filter(\.isNumber)) }), n >= 2 {
+                try annuler()
+                try verifierEgal(try etat(id), depart)
+                return "sautée, photo de groupe : \(note) ; annulé"
+            }
             let liste = try appel("edit_mask", ["photo_id": photoID, "action": "list"]).0
             let composant = liste["masques"]?.array?.last?["composants"]?.array?.first
             let recalcul = try retouche("edit_mask", ["action": "recompute", "mask": "Personne recette"])
@@ -611,7 +626,14 @@ public final class Recette {
             let (pleine, _) = try appel("export_photos", ["photo_ids": [photoID], "folder": .string(dossier.path), "subfolder": "pleine",
                                                           "profile": .string(profilPlein), "confirm": true])
             let grand = pleine["fichiers"]?.array?.first?["fichier"]?.string ?? ""
-            try verifierEgal(try etat(id), depart)
+            // Une livraison est une vraie exportation : une photo jamais exportée le devient
+            // (Photos.exportee), le reste ne change pas.
+            var livree = depart
+            if var classement = depart.classement.object {
+                classement["exportee"] = true
+                livree.classement = .object(classement)
+            }
+            try verifierEgal(try etat(id), livree)
             try verifier(autre != fichier && FileManager.default.fileExists(atPath: autre), "seconde livraison : \(autre)")
             try verifier((try? Data(contentsOf: URL(fileURLWithPath: fichier))) == avant, "le premier fichier a changé")
             let (l1, h1) = ToolHandler.dimensions(fichier) ?? (0, 0), (l2, h2) = ToolHandler.dimensions(grand) ?? (0, 0)
@@ -719,7 +741,9 @@ public final class Recette {
             let part = Self.partChangee(try Data(contentsOf: URL(fileURLWithPath: sans)), try Data(contentsOf: URL(fileURLWithPath: avec)))
             let octets = (try? FileManager.default.attributesOfItem(atPath: leger))?[.size] as? Int ?? 0
             try verifierEgal(try etat(id), depart)
-            try verifier(part > 0.005, "filigrane invisible : \(Self.nombre(part * 100)) % des pixels changés")
+            // Seuil bas : sur un fond clair, le filigrane des droits change peu de pixels (constaté :
+            // 0,21 % à 800 px, bien visible) ; sans filigrane, deux livraisons sont identiques.
+            try verifier(part > 0.001, "filigrane invisible : \(Self.nombre(part * 100)) % des pixels changés")
             try verifier(octets > 0 && octets < poidsSans && (octets <= limite * 1024 || signale != nil),
                          "poids : \(octets) octets pour \(limite) Ko (sans limite : \(poidsSans)), rien de signalé")
             return "filigrane « \(essai?.nom ?? "copyright") » : \(Self.nombre(part * 100)) % des pixels changés ; \(limite) Ko demandés : "
@@ -1248,7 +1272,14 @@ public final class Recette {
             if !remise {
                 try? etape(photo, "remise à l'origine après l'échec") {
                     _ = try appel("revert_to_original", ["photo_ids": [.number(Double(id))]])
-                    try verifierEgal(try etat(id), depart)
+                    // Une livraison faite avant l'échec reste une exportation : revenir ne l'efface pas.
+                    let apres = try etat(id)
+                    var attendu = depart
+                    if var classement = depart.classement.object, let exportee = apres.classement["exportee"] {
+                        classement["exportee"] = exportee
+                        attendu.classement = .object(classement)
+                    }
+                    try verifierEgal(apres, attendu)
                     return "réglages identiques à ceux du départ" + (try remettreDansLaCollection(id, dansCollection))
                 }
             }

@@ -319,6 +319,14 @@ essai('Onglets : une proposition ou une note qui arrive se montre, une seule foi
         p.onglet = 'apercu'
         Fenetre.rafraichirNotation()
         egal('apercu', p.onglet, 'une seule fois')
+        -- Une nouvelle proposition « à vérifier » se montre aussi (constaté : la plus fréquente
+        -- dans Lightroom, et celle qu'il faut regarder).
+        proposer(4961, { note = 3, drapeau = 'aucun', criteres = { impact = 'Fort.' }, raison = 'Tient seule.', le = 102, etat = 'a_verifier' })
+        Fenetre.rafraichirNotation()
+        egal('notation', p.onglet, 'une proposition à vérifier se montre')
+        p.onglet = 'apercu'
+        Fenetre.rafraichirNotation()
+        egal('apercu', p.onglet, 'une seule fois, à vérifier comprise')
         -- Une autre photo choisie, qui a déjà sa proposition : l'onglet ne change pas.
         proposer(4962, { note = 2, drapeau = 'aucun', criteres = {}, raison = '', le = 101 })
         photoActive(4962, 'DSCF4962.RAF', 0, 0)

@@ -764,11 +764,13 @@ function Fenetre.rafraichirNotation()
     poser(p, 'peutAccepterNote', libre and prop ~= nil and (prop.etat == 'proposee' or prop.etat == 'a_verifier'))
     poser(p, 'peutChangerNote', libre and active ~= nil)
     poser(p, 'peutVerifierNote', prop ~= nil and prop.etat == 'proposee')
-    -- Une proposition qui arrive pour la photo montrée se montre (onglet Note), une seule fois ; une
-    -- autre photo choisie ne change pas d'onglet.
+    -- Une proposition qui arrive pour la photo montrée se montre (onglet Note), une seule fois, « à
+    -- vérifier » comprise (la plus fréquente, constaté) ; une autre photo choisie ne change pas
+    -- d'onglet.
     local cle = prop and (tostring(prop.photo) .. '/' .. tostring(prop.le) .. '/' .. tostring(prop.seance)) or nil
     local photo = active and active.id
-    if prop and prop.etat == 'proposee' and cle ~= Fenetre.noteVue and Fenetre.notePhoto == photo then
+    local nouvelle = prop and (prop.etat == 'proposee' or prop.etat == 'a_verifier')
+    if nouvelle and cle ~= Fenetre.noteVue and Fenetre.notePhoto == photo then
         Fenetre.choisirOnglet(Fenetre.T.ongletNotation)
     end
     Fenetre.noteVue, Fenetre.notePhoto = cle, photo
