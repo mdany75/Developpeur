@@ -88,7 +88,7 @@ end
 -- Doubles ---------------------------------------------------------------------------------------
 
 -- Registre des notes (Notation.lua) : séances, propositions par photo (clé texte), appels gardés.
-local Notation = { version = 0, observateurs = {} }
+local Notation = { version = 0, observateurs = {}, LOT = 500 }
 local function changerRegistre(quoi)
     Notation.version = Notation.version + 1
     for _, fn in pairs(Notation.observateurs) do
@@ -226,21 +226,28 @@ function Moteur.envoyer(texte, options)
     return true
 end
 function Moteur.interrompre() Moteur.interrompu = Moteur.interrompu + 1 end
+-- Comme le vrai : sans vue (nil), la conversation ouverte ; false, aucune.
 function Moteur.texteTravail(_, vue)
     if not Moteur.travaille then
         return ''
     end
+    if vue == nil then
+        vue = Moteur.courante
+    end
     return Moteur.enCours ~= vue and "Claude travaille · dans la fenêtre Claude" or "Claude travaille · 2 outils faits"
 end
 
--- Les passes : un message qui donne la séance, ses photos et la passe.
+-- Les passes : un message qui donne la séance, ses photos et la passe ; la passe 4 (5 ★, à
+-- l'utilisateur seul) sans message, comme la vraie.
 local Consignes = { passes = {} }
-for n = 1, 4 do
+for n = 1, 3 do
     Consignes.passes[n] = { titre = n .. ' · Passe ' .. n, question = "Question de la passe " .. n .. " ?",
         message = function(seance)
             return string.format("Passe %d de la séance %s (passe enregistrée %s) : %s", n, seance.id, tostring(seance.passe), table.concat(seance.photos, ', '))
         end }
 end
+local SEUL = "À vous seul : revoyez vos 4 ★ après le développement."
+Consignes.passes[4] = { titre = '4 · Passe 4', question = "Question de la passe 4 ?", seul = SEUL }
 
 -- Le fil : une ligne par élément.
 local Fil = { appels = 0 }
@@ -271,10 +278,14 @@ function Publication.photos(portee, idCollection)
 end
 function Publication.collections() return { { title = 'Développeur › Essais', value = 900 } } end
 
--- Vignettes de Lightroom : un chemin par photo, sauf celles de Vignettes.sans.
+-- Vignettes de Lightroom : un chemin par photo, sauf celles de Vignettes.sans. Vignettes.pendant,
+-- s'il est donné, s'exécute pendant l'attente des aperçus.
 local Vignettes = {}
 function Vignettes.demander(photos, taille, dossier)
     table.insert(Vignettes.demandes, { photos = copie(photos), taille = taille, dossier = dossier })
+    if Vignettes.pendant then
+        Vignettes.pendant()
+    end
     local chemins, erreurs = {}, {}
     for _, id in ipairs(photos) do
         if Vignettes.sans[id] then
@@ -414,7 +425,7 @@ end
 local function reinitialiser()
     Notation.reinitialiser()
     Moteur.reinitialiser()
-    Vignettes.demandes, Vignettes.sans = {}, {}
+    Vignettes.demandes, Vignettes.sans, Vignettes.pendant = {}, {}, nil
     Images.reductions = {}
     Fil.appels = 0
     for _, ph in pairs(PHOTOS) do
@@ -496,6 +507,19 @@ essai('Séance : construction (liaisons, boutons, titre, cadre gardé)', functio
         local vues = verifierVues(args.contents, p)
         vrai(vues > 300, vues .. ' vues')
         egal('Aucune séance ouverte', p.titreSeance)
+        -- Chaque cadre a son image « aucun aperçu », à son côté : cases de 120, fiche de 300.
+        egal(Chemins.ressource('vide-120.png'), p.vignette1)
+        egal(Chemins.ressource('vide-300.png'), p.ficheImage)
+        vrai(Fichiers.existe(p.vignette1) and Fichiers.existe(p.ficheImage), 'images « aucun aperçu » de la séance')
+        -- La passe 4 (l'utilisateur seul) dit pourquoi en deux lignes, à la place de ses comptes.
+        local function comptes(n)
+            return trouver(args.contents, function(v)
+                return v.genre == 'static_text' and type(v.args.title) == 'table' and v.args.title.key == 'comptes' .. n
+            end)
+        end
+        egal(2, comptes(4).args.height_in_lines)
+        egal('tail', comptes(1).args.truncation)
+        egal(SEUL, p.comptes4, 'même sans séance')
         egal('2 photos sélectionnées.', p.textePhotos)
         egal(true, p.peutOuvrir)
         egal(false, p.peutLancer, 'pas de passe sans séance')
@@ -655,6 +679,37 @@ essai('Séance : planche par pages de 12, vignettes demandées une fois par reto
     egal(false, Fichiers.existe(FenetreNotation.dossier()), 'vignettes effacées à la fermeture')
 end)
 
+essai("Séance : une tâche de vignettes d'une fenêtre fermée n'écrit pas dans la fenêtre rouverte", function()
+    reinitialiser()
+    seance(3)
+    FenetreNotation.idSeance = 'seance-1'
+    FenetreNotation.vignettes, FenetreNotation.vignettesEnCours = {}, false
+    -- La première fenêtre demande une vignette ; Lightroom rend encore l'aperçu.
+    FenetreNotation.preparerVignettes({ { id = 1001, edition = 1, cle = 'petite' } })
+    local ancienne = table.remove(S.taches)
+    vrai(ancienne, 'tâche des vignettes')
+    local cacheAncien = FenetreNotation.vignettes
+    -- Pendant l'attente, la fenêtre est fermée puis rouverte sans ↻ : nouvelle génération, nouveau
+    -- cache, et sa propre tâche en cours, déjà finie pour cette photo. Le lot de l'ancienne tâche
+    -- est effacé : Lightroom n'a rien pu y écrire.
+    Vignettes.pendant = function()
+        Vignettes.pendant = nil
+        FenetreNotation.generation = FenetreNotation.generation + 1
+        FenetreNotation.vignettes = { [1001] = { edition = 1, source = 'nouvelle.jpg', petite = 'nouvelle-120.jpg' } }
+        FenetreNotation.vignettesEnCours = true
+        FenetreNotation.aRafraichir = false
+        Vignettes.sans[1001] = true
+    end
+    ancienne()
+    egal('nouvelle-120.jpg', FenetreNotation.vignettes[1001].petite, 'la vignette de la fenêtre rouverte reste')
+    egal(nil, FenetreNotation.vignettes[1001].erreur, 'aucune erreur posée dans la fenêtre rouverte')
+    egal(true, FenetreNotation.vignettesEnCours, 'la tâche de la fenêtre rouverte reste en cours')
+    egal(false, FenetreNotation.aRafraichir)
+    egal('aperçu manquant', cacheAncien[1001].erreur, 'le résultat va dans le cache de la fenêtre fermée')
+    FenetreNotation.vignettes, FenetreNotation.vignettesEnCours, FenetreNotation.idSeance = {}, false, nil
+    sansErreur()
+end)
+
 essai('Séance : choisir une case montre sa fiche', function()
     reinitialiser()
     seance(14)
@@ -760,13 +815,20 @@ essai('Séance : Tout accepter pose les propositions de la passe en un seul appe
         egal(true, p.peutToutAccepter)
         egal('3 proposées · 1 acceptée · 1 à vérifier', p.comptes1)
         egal('1 proposée', p.comptes2)
-        egal('Claude ne propose aucune note ici.', p.comptes4)
+        egal(SEUL, p.comptes4, 'la passe 4 est à l\'utilisateur seul')
         egal('⚑ Rejeter', p.etoiles2)
-        -- Refusé à la confirmation : rien.
+        -- Refusé à la confirmation : rien. Au-delà d'un lot (500 photos), une écriture par lot.
         S.reponseConfirm = 'cancel'
+        Notation.LOT = 2
         cliquer(args.contents, 'titreToutAccepter')
         lancerTaches()
         egal(0, #Notation.appels.poser)
+        egal('Poser les 3 notes proposées de la passe 1 ?', S.confirmation[1])
+        contient(S.confirmation[2], '2 écritures (une par lot de 2 photos), une étape par photo')
+        Notation.LOT = 500
+        cliquer(args.contents, 'titreToutAccepter')
+        lancerTaches()
+        contient(S.confirmation[2], 'Une écriture, une étape par photo')
         S.reponseConfirm = 'ok'
         cliquer(args.contents, 'titreToutAccepter')
         lancerTaches()
@@ -959,10 +1021,10 @@ essai('Séance : lancer une passe envoie son message dans la conversation de la 
         egal('courante', Moteur.courante.id, 'la conversation de la fenêtre Claude ne change pas')
         egal(1, Moteur.seancesCreees)
         egal(false, p.libre)
-        -- La passe suivante reprend la même conversation. Partie, la demande désactive les boutons
+        -- Une autre passe reprend la même conversation. Partie, la demande désactive les boutons
         -- avant même que le moteur travaille (pas de second envoi par un double clic).
         Moteur.travaille = false
-        p.passe = 4
+        p.passe = 2
         lancerTaches()
         tourner()
         egal(true, p.peutLancer)
@@ -974,7 +1036,24 @@ essai('Séance : lancer une passe envoie son message dans la conversation de la 
         egal(2, #Moteur.envois)
         egal(c, Moteur.envois[2].options.conversation)
         egal(1, Moteur.seancesCreees)
-        contient(Moteur.envois[2].options.contexte, 'passe 4]')
+        contient(Moteur.envois[2].options.contexte, 'passe 2]')
+        -- La passe 4 (5 ★) est à l'utilisateur seul : elle ne se lance pas, et la fenêtre le dit.
+        Moteur.travaille = false
+        p.passe = 4
+        lancerTaches()
+        tourner()
+        egal('Lancer la passe 4', p.titreLancer)
+        egal(false, p.peutLancer, 'Lancer la passe désactivé')
+        egal(SEUL, p.comptes4)
+        egal(false, FenetreNotation.lancerPasse(), 'même appelée directement')
+        lancerTaches()
+        egal(2, #Moteur.envois, 'rien envoyé à Claude')
+        egal(SEUL, p.message)
+        egal(4, Notation.seances['seance-1'].passe, 'la passe choisie est gardée')
+        p.passe = 3
+        lancerTaches()
+        tourner()
+        egal(true, p.peutLancer, 'une autre passe se lance de nouveau')
     end)
     sansErreur()
 end)

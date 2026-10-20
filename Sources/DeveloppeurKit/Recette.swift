@@ -812,7 +812,8 @@ public final class Recette {
             return "une image, \(legende["photos"]?.array?.count ?? 0) vignette numérotée"
         }
         // 1.1 : une note proposée se range dans le registre du module, hors du catalogue ; 5 étoiles
-        // sont refusées avant d'atteindre Lightroom. À vérifier (to_check) : le plafond du tri ne gêne pas.
+        // sont refusées avant d'atteindre Lightroom. À vérifier (to_check) : le plafond du tri ne gêne
+        // pas, et le module la range dans l'état « a_verifier ». read_session lit la séance ouverte.
         try etape(photo, "note proposée (propose_ratings), photo inchangée") {
             let criteres: JSONValue = ["impact": "Recette.", "qualities": "Recette.", "technical_floor": "Recette."]
             let cinq = tools.call(name: "propose_ratings", arguments: ["ratings": [["photo_id": photoID, "rating": 5, "criteria": criteres,
@@ -821,9 +822,11 @@ public final class Recette {
             let (reponse, _) = try appel("propose_ratings", ["ratings": [["photo_id": photoID, "rating": 2, "to_check": true, "criteria": criteres,
                                                                            "reason": "Recette automatisée du module."]]])
             let proposee = reponse["propositions"]?.array?.first
-            try verifier(proposee?["photo"]?.int == id && proposee?["etat"]?.string == "proposee", "proposition non rangée : \(JSONCoding.line(reponse))")
+            try verifier(proposee?["photo"]?.int == id && proposee?["etat"]?.string == "a_verifier", "proposition non rangée : \(JSONCoding.line(reponse))")
+            let (seance, _) = try appel("propose_ratings", ["read_session": true])
+            try verifier(seance["id"] != nil, "séance ouverte illisible : \(JSONCoding.line(seance))")
             try verifierEgal(try etat(id), depart)
-            return "rangée pour \(proposee?["fichier"]?.string ?? "?") (séance \(reponse["seance"]?.string ?? "aucune")) ; rien n'a changé sur la photo"
+            return "rangée pour \(proposee?["fichier"]?.string ?? "?") (séance \(reponse["seance"]?.string ?? "aucune")), à vérifier ; séance ouverte : \(seance["titre"]?.string ?? "aucune") ; rien n'a changé sur la photo"
         }
         // Constaté le 17 octobre 2026 : filtre « Reflections » (FilterID 3), intensité dans BlendParams ;
         // changeReflectionRemovalAmount ne change pas le filtre rangé.

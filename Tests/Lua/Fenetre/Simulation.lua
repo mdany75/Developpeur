@@ -299,7 +299,10 @@ modules.LrFunctionContext = {
 
 modules.LrDialogs = {
     message = function(titre, detail) S.messages[#S.messages + 1] = { titre, detail } end,
-    confirm = function() return S.reponseConfirm or 'cancel' end,
+    confirm = function(...)
+        S.confirmation = { ... }
+        return S.reponseConfirm or 'cancel'
+    end,
     presentModalDialog = function(args)
         S.dialogues[#S.dialogues + 1] = args
         return S.reponseModal or 'cancel'

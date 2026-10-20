@@ -517,7 +517,7 @@ function FenetreNotation.rafraichir()
     end
     for n = 1, FenetreNotation.PASSES do
         local parPasse = c and c.par_passe[n]
-        local vide = n == FenetreNotation.PASSES and "Claude ne propose aucune note ici." or (s and "Pas encore de proposition." or '')
+        local vide = Consignes.passes[n].seul or (s and "Pas encore de proposition." or '')
         poser(p, 'comptes' .. n, FenetreNotation.texteComptes(parPasse, vide))
     end
     local passe = tonumber(p.passe) or 1
@@ -691,7 +691,9 @@ function FenetreNotation.majBoutons()
     poser(p, 'aSeance', s ~= nil)
     poser(p, 'peutOuvrir', libre and (FenetreNotation.nombreSource or 0) > 0)
     poser(p, 'peutChoisirPasse', libre and s ~= nil)
-    poser(p, 'peutLancer', libre and s ~= nil)
+    -- La passe 4 (5 ★, l'utilisateur seul) ne se lance pas : Claude n'y a rien à faire.
+    local passe = Consignes.passes[tonumber(p.passe) or 1]
+    poser(p, 'peutLancer', libre and s ~= nil and passe ~= nil and passe.message ~= nil)
     poser(p, 'peutAccepter', libre and prop ~= nil and prop.etat ~= 'acceptee')
     poser(p, 'peutChanger', libre and s ~= nil and FenetreNotation.choisie ~= nil and FenetreNotation.infoChoisie ~= nil)
     poser(p, 'peutVerifier', prop ~= nil and (prop.etat == 'proposee' and not aVerifier(prop) or prop.etat == 'ecartee'))
@@ -753,33 +755,40 @@ end
 -- Vignettes -------------------------------------------------------------------------------------
 
 -- Demande à Lightroom les vignettes qui manquent (une tâche à la fois ; ce qui manque encore se
--- redemande au rafraîchissement suivant).
+-- redemande au rafraîchissement suivant). La tâche écrit dans le cache de la fenêtre qui l'a
+-- lancée : fenêtre fermée puis rouverte (sans ↻), ses résultats vont dans une table orpheline,
+-- sans toucher aux vignettes ni à l'état de la nouvelle fenêtre.
 function FenetreNotation.preparerVignettes(manquantes)
     if #manquantes == 0 or FenetreNotation.vignettesEnCours then
         return
     end
     FenetreNotation.vignettesEnCours = true
     local seance = FenetreNotation.idSeance
+    local cache, generation = FenetreNotation.vignettes, FenetreNotation.generation
     LrTasks.startAsyncTask(function()
-        local ok, erreur = LrTasks.pcall(FenetreNotation.chargerVignettes, manquantes, seance)
-        FenetreNotation.vignettesEnCours = false
+        local ok, erreur = LrTasks.pcall(FenetreNotation.chargerVignettes, manquantes, seance, cache)
         if not ok then
             Journal.noter("Séance de notation, vignettes :", tostring(erreur))
             for _, m in ipairs(manquantes) do
-                FenetreNotation.vignettes[m.id] = { edition = m.edition, erreur = tostring(erreur) }
+                cache[m.id] = { edition = m.edition, erreur = tostring(erreur) }
             end
         end
-        FenetreNotation.aRafraichir = true
+        if FenetreNotation.generation == generation then
+            FenetreNotation.vignettesEnCours = false
+            FenetreNotation.aRafraichir = true
+        end
     end)
 end
 
 -- Les JPEG de Lightroom (Vignettes.demander), puis les carrés de la case et de la fiche
--- (Images.vignette). Chaque lot a son dossier : un nom de fichier déjà réduit ne resservira pas
--- après une retouche (le nombre de modifications change).
-function FenetreNotation.chargerVignettes(manquantes, seance)
+-- (Images.vignette), rangés dans `cache` (par défaut, celui de la fenêtre). Chaque lot a son
+-- dossier : un nom de fichier déjà réduit ne resservira pas après une retouche (le nombre de
+-- modifications change).
+function FenetreNotation.chargerVignettes(manquantes, seance, cache)
+    cache = cache or FenetreNotation.vignettes
     local aDemander, vues = {}, {}
     for _, m in ipairs(manquantes) do
-        local v = FenetreNotation.vignettes[m.id]
+        local v = cache[m.id]
         if not (v and v.edition == m.edition and v.source) and not vues[m.id] then
             vues[m.id] = true
             aDemander[#aDemander + 1] = m.id
@@ -796,14 +805,14 @@ function FenetreNotation.chargerVignettes(manquantes, seance)
         end
         for _, id in ipairs(aDemander) do
             if chemins[id] then
-                FenetreNotation.vignettes[id] = { edition = editions[id], source = chemins[id] }
+                cache[id] = { edition = editions[id], source = chemins[id] }
             else
-                FenetreNotation.vignettes[id] = { edition = editions[id], erreur = erreurs[id] or "Lightroom n'a pas rendu de vignette" }
+                cache[id] = { edition = editions[id], erreur = erreurs[id] or "Lightroom n'a pas rendu de vignette" }
             end
         end
     end
     for _, m in ipairs(manquantes) do
-        local v = FenetreNotation.vignettes[m.id]
+        local v = cache[m.id]
         if v and v.source and not v[m.cle] then
             local cote = m.cle == 'grande' and FenetreNotation.FICHE or FenetreNotation.CASE
             v[m.cle] = Images.vignette(LrPathUtils.parent(v.source), LrPathUtils.leafName(v.source), cote)
@@ -920,8 +929,11 @@ function FenetreNotation.toutAccepter()
         FenetreNotation.dire(string.format("Aucune proposition à accepter pour la passe %d.", passe), 'info')
         return false
     end
+    -- Notation.poser écrit par lots (Bibliotheque.noter : 500 photos au plus par écriture).
+    local lots = math.ceil(#liste / Notation.LOT)
+    local ecritures = lots == 1 and "Une écriture" or string.format("%d écritures (une par lot de %d photos)", lots, Notation.LOT)
     local reponse = LrDialogs.confirm(string.format("Poser les %d notes proposées de la passe %d ?", #liste, passe),
-        "Une écriture, une étape par photo dans l'Historique. Les photos à vérifier ne sont pas posées.", "Tout accepter", "Annuler")
+        ecritures .. ", une étape par photo dans l'Historique. Les photos à vérifier ne sont pas posées.", "Tout accepter", "Annuler")
     if reponse ~= 'ok' then
         return false
     end
@@ -1061,7 +1073,7 @@ function FenetreNotation.envoyer(texte, passe)
 end
 
 -- Lancer la passe choisie : son message tout fait (Consignes.passes), avec les photos de la
--- séance et la passe.
+-- séance et la passe. La passe 4, sans message (l'utilisateur seul), ne part pas.
 function FenetreNotation.lancerPasse()
     local p = FenetreNotation.p
     if Moteur.travaille then
@@ -1076,6 +1088,10 @@ function FenetreNotation.lancerPasse()
     local n = tonumber(p.passe) or 1
     local passe = Consignes.passes[n]
     if not passe then
+        return false
+    end
+    if not passe.message then
+        FenetreNotation.dire(passe.seul, 'info')
         return false
     end
     if tonumber(s.passe) ~= n then
@@ -1255,9 +1271,11 @@ function FenetreNotation.construire(f, p)
                 f:spacer { width = 18 },
                 f:static_text { title = passe.question, font = POLICES.petit, text_color = C.gris, width = G - 22, height_in_lines = 2 },
             },
+            -- La passe 4 (l'utilisateur seul) montre `seul` à la place des comptes : deux lignes.
             f:row {
                 f:spacer { width = 18 },
-                f:static_text { title = bind('comptes' .. n), font = POLICES.petit, width = G - 22, truncation = 'tail' },
+                passe.seul and f:static_text { title = bind('comptes' .. n), font = POLICES.petit, width = G - 22, height_in_lines = 2 }
+                    or f:static_text { title = bind('comptes' .. n), font = POLICES.petit, width = G - 22, truncation = 'tail' },
             },
         }
     end
@@ -1414,8 +1432,9 @@ function FenetreNotation.tour(tic)
         FenetreNotation.aRafraichirFil = false
         LrTasks.pcall(FenetreNotation.rafraichirFil)
     end
+    -- Sans conversation de séance (false, pas nil) : un travail en cours est dans la fenêtre Claude.
     local c = FenetreNotation.conversation(FenetreNotation.seance, false)
-    poser(p, 'activite', Moteur.texteTravail(math.floor((tic or 0) / 2), c))
+    poser(p, 'activite', Moteur.texteTravail(math.floor((tic or 0) / 2), c or false))
     if p.travaille ~= (Moteur.travaille == true) then
         FenetreNotation.aRafraichirFil = true
     end
@@ -1527,7 +1546,7 @@ function FenetreNotation.afficher(options)
             p['i' .. i] = ''
         end
         p.ficheNom, p.ficheRang, p.ficheAttente, p.fichePosee, p.ficheProposee, p.ficheDecision = '', '', '', '', '', ''
-        p.ficheImage = Chemins.ressource('vide-230.png')
+        p.ficheImage = Chemins.ressource('vide-' .. FenetreNotation.FICHE .. '.png')
         p.aFicheImage = false
         p.ficheCouleur = 'gris'
         p.ficheCriteres, p.fichePlafond, p.ficheRaison = '', '', ''

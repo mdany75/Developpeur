@@ -1,6 +1,7 @@
 // images-vides.swift — dessine les images « aucun aperçu » de la fenêtre Claude, une par cadre
 // d'aperçu de Dispositions.TAILLES (carrés de la Conversation claire et du Panneau, cadres 3:2 de
-// l'Atelier : vide-270.png, vide-600x400.png), au fond des vignettes (2B2B2B), en PNG à 72 ppp :
+// l'Atelier : vide-270.png, vide-600x400.png), et celles de la Séance de notation (cases de 120,
+// fiche de 300), au fond des vignettes (2B2B2B), en PNG à 72 ppp :
 // le SDK de Lightroom affiche une image à sa taille en points. Les essais de la fenêtre vérifient
 // qu'il y en a une pour chaque disposition dans chaque taille.
 //
@@ -15,6 +16,7 @@ let cadres: [(Int, Int)] = [
     (120, 120), (160, 160), (200, 200),     // Panneau
     (230, 230), (270, 270), (320, 320),     // Conversation claire
     (450, 300), (600, 400), (720, 480),     // Atelier
+    (300, 300),                             // fiche de la Séance de notation (ses cases : 120)
 ]
 
 for (largeur, hauteur) in cadres {

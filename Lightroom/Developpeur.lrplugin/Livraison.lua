@@ -51,8 +51,6 @@ local TAILLES = { longEdge = true, shortEdge = true, megapixels = true }
 local SUPPORTS = { screen = true, matte = true, glossy = true }
 -- Qualité de 0 à 1, comme jpeg_quality (avif_quality vaut 0,7 par défaut dans AgExportSettings).
 local CLES_QUALITE = { JPEG = 'LR_jpeg_quality', JXL = 'LR_jxl_quality', AVIF = 'LR_avif_quality' }
--- Filigrane simple des droits d'auteur de la photo (AgExportSettings, ExportWatermarkingSection).
-local FILIGRANE_DROITS = '<simpleCopyrightWatermark>'
 -- Grand côté d'un aperçu dynamique (référence du SDK : smartPreviewInfo ; aide d'Adobe).
 local COTE_APERCU_DYNAMIQUE = 2560
 
@@ -152,8 +150,9 @@ local function reglagesExport(params, dossier)
         reglages.LR_jpeg_useLimitSize = true
         reglages.LR_jpeg_limitSize = math.floor(tonumber(r.poids_max_ko))
     end
-    -- Filigrane : celui des droits d'auteur, ou un filigrane de l'utilisateur par son identifiant
-    -- (fichier de Watermarks) ; ni l'original ni le DNG n'en portent (AgExportSettings).
+    -- Filigrane : celui des droits d'auteur (« <simpleCopyrightWatermark> », donné par le serveur),
+    -- ou un filigrane de l'utilisateur par son identifiant (fichier de Watermarks) ; ni l'original
+    -- ni le DNG n'en portent (AgExportSettings).
     if type(r.filigrane) == 'string' and r.filigrane ~= '' and format ~= 'DNG' and format ~= 'ORIGINAL' then
         reglages.LR_useWatermark = true
         reglages.LR_watermarking_id = r.filigrane

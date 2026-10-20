@@ -3,10 +3,11 @@
 Développeur relie Claude à Lightroom Classic sur Mac : vous écrivez à Claude dans une fenêtre de
 Lightroom (ou dans Claude Desktop ou Claude Code), et il regarde vos photos, les mesure et les
 retouche avec la méthode d'un retoucheur professionnel, en vous disant ce qu'il change et pourquoi.
-Il est fait pour le photographe amateur qui veut des photos d'allure professionnelle sans être un
-pro. Deux pièces : le connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit
-en Swift, et le module « Développeur » de Lightroom Classic, qui exécute ses demandes et porte la
-fenêtre Claude.
+Il propose aussi une note pour chaque photo, selon un standard clair, et vous l'acceptez ou la
+changez dans Lightroom. Il est fait pour le photographe amateur qui veut des photos d'allure
+professionnelle sans être un pro. Deux pièces : le connecteur MCP-Développeur, un serveur MCP
+(*Model Context Protocol*) écrit en Swift, et le module « Développeur » de Lightroom Classic, qui
+exécute ses demandes et porte la fenêtre Claude.
 
 ![La fenêtre Claude dans Lightroom Classic](docs/capture.png)
 
@@ -17,20 +18,40 @@ fenêtre Claude.
 - Une fenêtre flottante : Fichier › Module externe - Extras › Ouvrir la fenêtre Claude (même entrée
   dans le menu Bibliothèque, et raccourci ⌃⌥C une fois posé). Elle reste ouverte pendant que vous
   travaillez, dans tous les modules de Lightroom.
+- Trois dispositions, au choix dans Fichier › Gestionnaire de modules externes › Développeur (avec
+  la taille de la fenêtre : petite, moyenne ou grande), ou par le menu Disposition de la fenêtre,
+  qui la rouvre aussitôt dans la nouvelle disposition, la demande tapée gardée :
+  - **Conversation claire**, par défaut, la plus proche de la 1.0 : les conversations à gauche, le
+    fil au centre, et à droite trois onglets, Aperçu (ce que Claude voit), Proposition et Note. La
+    fenêtre passe d'elle-même à l'onglet Proposition quand Claude propose une retouche, et à
+    l'onglet Note quand il propose une note pour la photo active.
+  - **Atelier**, la photo d'abord : ce que Claude regarde, en grand, avec sa proposition dessous ;
+    la carte Note dans une colonne à côté ; la conversation dans une colonne étroite à droite. Les
+    conversations se choisissent dans un menu, avec Nouvelle, Supprimer…, Noter et Séance…
+    au-dessus de la photo.
+  - **Panneau**, une fenêtre étroite et haute à garder à côté de Lightroom : en haut l'aperçu, le
+    menu des conversations, la photo active et sa note ; dessous deux onglets, Retoucher (le fil,
+    les invites et la demande) et Noter (la carte Note). Une proposition de retouche prend la place
+    des invites et du style le temps d'y répondre.
 - Claude y travaille par Claude Code et votre forfait claude.ai, avec les seuls outils du
   connecteur : ni fichiers, ni terminal, ni web.
-- Les conversations à gauche, rangées par période (aujourd'hui, cette semaine, plus ancien), avec
-  une recherche dans leurs titres et leurs messages, sans tenir compte des accents. Chacune est une
+- Les conversations : dans la Conversation claire, une colonne rangée par période (aujourd'hui,
+  cette semaine, plus ancien), avec une recherche dans leurs titres et leurs messages, sans tenir
+  compte des accents ; dans l'Atelier et le Panneau, un menu des plus récentes. Chacune est une
   session Claude Code, reprise telle quelle à la réouverture. Renommer, supprimer (à la corbeille
   du Finder ; les retouches faites dans Lightroom restent).
 - Un titre tiré de ce que Claude voit sur la première photo (« Flamant rose au bord de l'eau »).
-- Le fil au centre : vos demandes, les réponses de Claude (titres et listes mis en forme), et
-  chaque appel d'outil sur une ligne (✓ fait, ● en cours, ✕ erreur) ; un clic sur un outil montre
-  ce que Claude a demandé au connecteur et sa réponse. ▲, ▼ et Fin pour s'y déplacer.
-- « Ce que Claude voit », à droite : les aperçus qu'il regarde et les photos jointes, à parcourir
-  avec ◀ ▶ et à agrandir.
+- Le fil : vos demandes, les réponses de Claude (titres et listes mis en forme), chaque appel
+  d'outil sur une ligne (✓ fait, ● en cours, ✕ erreur), et les notes que Claude propose (« Notes
+  proposées · passe 2 · 14 photos », puis une ligne par photo) ; un clic sur un outil montre ce que
+  Claude a demandé au connecteur et sa réponse. ▲, ▼ et Fin pour s'y déplacer.
+- « Ce que Claude voit » : les aperçus qu'il regarde et les photos jointes, à parcourir avec ◀ ▶ et
+  à agrandir.
 - Claude reçoit avec chaque demande la photo active et la sélection de Lightroom.
-- Six invites en raccourcis : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Sports.
+- Six invites en raccourcis : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Sports ; et
+  le bouton Noter (voir Noter vos photos).
+- Une carte Note dans chaque disposition : la note posée de la photo active et celle que Claude
+  propose, à accepter ou à changer sans repasser par Claude (voir Noter vos photos).
 - Un style joint à chaque demande, invites comprises : Standard (rien d'ajouté), Ambre et éclat,
   Or et peau douce, Or rose et éclat, Éclatant et peau douce, Neutre, Rose froid et peau douce.
   « Peau douce » passe par un masque de la peau, jamais par un réglage de toute la photo.
@@ -43,21 +64,20 @@ fenêtre Claude.
   la démarre), mode du connecteur (un clic bascule entre « Proposer d'abord » et « Appliquer
   directement »), et le dernier relevé du forfait (5 heures et semaine). Une aide en rouge dit quoi
   faire quand quelque chose manque.
-- En bas à droite, les versions du module et du connecteur, en orange si elles ne vont plus
-  ensemble.
+- En bas, les versions du module et du connecteur, en orange si elles ne vont plus ensemble.
 - Fermer la fenêtre n'arrête pas Claude : le travail continue et se retrouve à la réouverture.
   Claude Code reste ouvert entre deux demandes (réponses plus rapides) et se ferme après 15 minutes
   sans demande (5 minutes ou 1 heure au choix) ou quand Lightroom quitte.
 
 ### Ce que Claude sait faire par le connecteur
 
-Les mêmes 33 outils servent dans la fenêtre Claude, dans Claude Desktop et dans Claude Code. Huit
+Les mêmes 34 outils servent dans la fenêtre Claude, dans Claude Desktop et dans Claude Code. Neuf
 invites prêtes à l'emploi s'y ajoutent, dans le menu « + » de Claude Desktop et parmi les commandes
 « / » de Claude Code : `retouche_pro` (une photo, en deux passes vérifiées, puis au plus deux passes
-correctives si un défaut reste), `harmoniser_serie`, `tri_seance`, `portrait`, `paysage`,
-`noir_et_blanc`, `nuit_iso_eleve` et `partage` (écran, web, Instagram, impression), chacune avec
-ses précisions au choix (style, photos, destination) ; celles qui retouchent suivent votre guide de
-style.
+correctives si un défaut reste), `harmoniser_serie`, `tri_seance`, `noter` (une sortie, selon le
+standard de notation, passe par passe), `portrait`, `paysage`, `noir_et_blanc`, `nuit_iso_eleve` et
+`partage` (écran, web, Instagram, impression), chacune avec ses précisions au choix (style, photos,
+garder, passe, destination) ; celles qui retouchent suivent votre guide de style.
 
 **Regarder et mesurer**
 
@@ -136,14 +156,22 @@ style.
 
 - Trier une séance, jusqu'à 500 photos (sélection, collection ou dossier), sur les vignettes que
   Lightroom garde déjà en cache, sans exporter chaque photo : photos floues, mise au point manquée
-  (au point de mise au point lu dans les RAW et
-  JPEG Fujifilm), yeux fermés ou plissés, photos presque noires ou brûlées, rafales et piles de
-  Lightroom avec la meilleure de chacune, classement par netteté, note esthétique et qualité des
-  visages.
-- Claude propose drapeaux, notes et mots-clés (ceux de Vision, traduits en français), et ne les
-  pose qu'après votre accord ; une photo que vous avez déjà classée n'est pas touchée.
-- Planche contact : douze vignettes numérotées en une seule image, pour voir une série d'un coup
-  d'œil.
+  (au point de mise au point lu dans les RAW et JPEG Fujifilm), yeux fermés ou plissés, photos
+  presque noires ou brûlées, rafales et piles de Lightroom avec la meilleure de chacune, et un ordre
+  de lecture (netteté et note esthétique ; la qualité des visages ne départage que les photos d'une
+  même rafale ou pile).
+- Le tri ne propose pas d'étoiles : il donne à chaque photo un plafond de note mesuré, le plancher
+  technique du standard de notation (voir Noter vos photos). Floue, mise au point manquée ou yeux
+  fermés : rejet proposé. Douce, ou mise au point signalée manquée par l'appareil : 3 ★ au plus.
+  Presque noire ou brûlée : 2 ★ au plus et « à vérifier », sans rejet proposé, car la retouche la
+  rattrape souvent (surtout en RAW). Capture d'écran ou document : 1 ★. Pas la meilleure de sa
+  rafale ou de sa pile : 3 ★. Bruit fort : à noter après le débruitage. Sans défaut mesuré : 4 ★
+  au plus.
+- Claude propose les rejets et des mots-clés (ceux de Vision, traduits en français), et ne les pose
+  qu'après votre accord ; une photo que vous avez déjà notée ou marquée d'un drapeau n'est pas
+  touchée.
+- Planche contact : jusqu'à trente vignettes numérotées en une seule image, pour voir une série
+  d'un coup d'œil ; d'une planche à l'autre, les numéros continuent.
 - Mesurer une série et la comparer à une photo de référence ; repérer les photos semblables
   (rafales, quasi-doublons) et la meilleure de chaque groupe.
 - Harmoniser une série sur une photo de référence, en chiffres : exposition, balance des blancs et
@@ -154,6 +182,19 @@ style.
   progression de Lightroom, et s'arrête proprement si vous l'interrompez (Échap dans Claude Code,
   croix de la barre dans Lightroom). Avant des centaines de photos, Claude propose une sauvegarde du
   catalogue, que Lightroom fait à sa prochaine fermeture.
+
+**Noter**
+
+- Proposer une note par photo selon le standard de notation (`propose_ratings`) : de 0 à 4 ★, ou le
+  rejet, avec la raison critère par critère (impact, qualités, plancher technique, finition) et une
+  phrase. Rien ne change sur les photos : les propositions attendent votre décision dans la carte
+  Note et la Séance de notation.
+- Jamais 5 ★ : vous seul les posez. Une note au-dessus du plafond mesuré au tri est refusée, sauf
+  un défaut voulu et maîtrisé, que Claude nomme et vous laisse « à vérifier ». Claude ne pose une
+  note lui-même (`set_metadata`) que si vous le lui demandez.
+- L'invite `noter` : une sortie notée passe par passe (le tri, des planches de 24 à 30 vignettes,
+  les candidates à 4 ★ regardées à 100 %, puis les propositions). Sans précision, elle note la
+  Séance de notation ouverte dans Lightroom, que Claude lit par le connecteur, sinon la sélection.
 
 **Bibliothèque**
 
@@ -205,6 +246,89 @@ style.
 - Annuler la dernière retouche de Claude, ou revenir à l'état d'avant Claude : seulement ce qu'il a
   changé, vos retouches faites à la main restent.
 - Champ « Retouchée par Claude » dans les métadonnées, pour filtrer ces photos dans la Bibliothèque.
+
+### Noter vos photos
+
+Claude propose, vous décidez : chaque note proposée attend dans Lightroom, et l'accepter ou la
+changer ne repasse pas par Claude, donc ne dépense rien de votre forfait.
+
+**Le standard de notation**
+
+Une étoile dit un niveau de qualité, et rien d'autre, avec le même sens d'une sortie à l'autre.
+Rejeter, c'est le drapeau Rejeter ; les doublons d'une rafale vont dans une pile sous la meilleure
+vue ; la valeur affective, dans un mot-clé ou une collection. 0 ★ veut dire « pas encore jugée »,
+jamais « mauvaise ».
+
+- Rejet (drapeau) : un défaut majeur, involontaire, confirmé à l'œil. La seule photo de sa scène
+  reçoit plutôt 1 ★, à vérifier.
+- 1 ★ : gardée, mais pas au niveau du 2 ★.
+- 2 ★ : correcte, sans défaut visible à la taille d'usage (écran, album) ; elle a besoin de l'album
+  ou du récit pour exister.
+- 3 ★ : elle tient seule devant quelqu'un qui ne connaît ni les gens ni le lieu.
+- 4 ★ : une 3 ★ qui a de l'impact : vue en premier sur une planche de 20 à 30 vignettes, nette à
+  100 % sur le sujet, meilleure vue de son moment. Souvent 5 à 10 % d'une sortie, sans proportion
+  imposée : une sortie faible peut n'en avoir aucune.
+- 5 ★ : elle tient à côté de vos meilleures photos, toutes sorties confondues, développement fini.
+  Vous seul la posez : Claude ne propose jamais 5 ★.
+
+Les critères, du plus lourd au plus léger : l'impact (la photo arrête l'œil ; aucune mesure ne le
+voit), les qualités de l'image (lumière, sujet clair, composition, moment, couleur), le plancher
+technique (netteté, exposition, yeux, bruit, mesurés au tri : il plafonne la note sans la donner)
+et, pour le 5 ★ seulement, la finition (halos aux bords des masques, peau plastique, saturation).
+Un défaut visible à la taille d'usage plafonne la note à 2 ★, un défaut visible seulement à 100 %
+à 3 ★ ; un défaut voulu et maîtrisé ne compte pas, ni l'effort de la prise de vue, ni la valeur
+affective. Une sortie se note en quatre passes, une question chacune : rejeter ou non ; 3 ★ ou
+non ; parmi les 3 ★, monter à 4 ; 5 ★, après le développement, vous seul.
+
+Le standard entier (selon le genre, ce que valent les mesures, les photos étalons d'une collection
+« Développeur › Étalons ») : la ressource `developpeur://notation` du connecteur, reprise aussi à la
+fin de l'invite `noter`.
+
+**La carte Note**
+
+- Dans chaque disposition de la fenêtre Claude (onglet Note de la Conversation claire, colonne du
+  milieu de l'Atelier, onglet Noter du Panneau) : la note posée de la photo active (étoiles et
+  drapeau), la note que Claude propose, en couleur selon son état (orange : proposée ; vert :
+  acceptée ou changée ; rouge : à vérifier), sa passe, sa raison critère par critère (Impact,
+  Qualités, Plancher technique, Finition), le plafond mesuré au tri et une phrase.
+- Noter : Claude note la photo active (plancher technique, regard sur la photo, proposition).
+  Plusieurs photos sélectionnées : Noter ouvre la Séance de notation sur la sélection.
+- Accepter pose la note proposée dans Lightroom (le drapeau Rejeter pour un rejet ; votre drapeau
+  Retenue reste).
+- Changer… pose une autre note, de 0 à 5 ★, et au besoin un drapeau (sans drapeau, retenue,
+  rejetée).
+- À vérifier garde la proposition à revoir, sans rien poser.
+- Séance… ouvre la Séance de notation.
+- Accepter et Changer… attendent que Claude ait fini de travailler. Le clic vaut accord, même en
+  mode « Proposer d'abord » ; les photos protégées du Gestionnaire de modules externes restent
+  protégées. Une note posée s'annule comme un classement (Annuler la dernière retouche, ou ⌘Z) ;
+  c'est la vôtre : revenir à « Avant Claude » la laisse en place.
+
+**La Séance de notation**
+
+Une fenêtre à part, « Claude · Séance de notation », pour noter une sortie entière passe par
+passe : Séance de notation… dans le menu du module (Fichier et Bibliothèque › Module externe -
+Extras), Séance… dans la carte Note, ou Noter quand plusieurs photos sont sélectionnées.
+
+- En haut, les photos à noter : la sélection ou une collection (pas une collection dynamique ; ↻
+  relit les collections). Ouvrir la séance fige la liste, rangée par date de prise de vue. La
+  séance reste ouverte jusqu'à la suivante : refermer la fenêtre ne la perd pas.
+- À gauche, les quatre passes, une question chacune, avec leurs comptes : 1 · Rejets, 2 · Trois
+  étoiles, 3 · Quatre étoiles, 4 · Cinq étoiles. Lancer la passe envoie à Claude un message tout
+  fait avec les photos de la séance. La passe 4 ne se lance pas : le 5 ★ est à vous seul (« À vous
+  seul : revoyez vos 4 ★ après le développement »). Dessous, un rappel du standard.
+- Au centre, la planche : douze vignettes par page (◀ ▶), chacune avec la note proposée et son
+  état ; un clic sur un nom choisit la photo. Dessous, l'échange avec Claude, dans une conversation
+  propre à la séance (elle n'apparaît pas dans la liste de la fenêtre Claude).
+- À droite, la fiche de la photo choisie : une grande vignette, la note posée, la proposition, les
+  critères, le plafond et la raison ; Accepter, Changer… (de 0 à 5 ★, case Drapeau Rejeter), À
+  vérifier, et Écarter (la proposition est mise de côté, rien n'est posé).
+- En bas, Tout accepter : toutes les notes encore proposées de la passe, en une écriture (une par
+  lot de 500 photos), après confirmation ; les photos « à vérifier » n'en font pas partie. Un filtre (Toutes,
+  Proposées, À vérifier, Acceptées), et un champ pour demander à Claude (« Pourquoi pas 4 ★ pour
+  la 7 ? »), avec Envoyer et Arrêter.
+- Rien ne s'écrit pendant que Claude travaille. Les vignettes viennent du cache de Lightroom et
+  restent sur le Mac.
 
 ### Publication
 
@@ -265,9 +389,10 @@ Une fenêtre à part (Consommation…) pour suivre ce que la fenêtre Claude con
   changement, puis attend votre accord. Le module refuse toute écriture que Claude ne présente pas
   comme approuvée (retouche, masque, tache, classement, collection, exportation), et Claude ne le
   fait qu'après votre « oui ».
-- Dans la fenêtre Claude, la proposition s'affiche à droite (réglages avant → après) avec
-  Accepter, Refuser et Ajuster… : un texte libre, ou un ajustement d'un clic (Moins chaud, Peau
-  plus naturelle, Garder le ciel, Plus de contraste).
+- Dans la fenêtre Claude, la proposition s'affiche (réglages avant → après) dans l'onglet
+  Proposition de la Conversation claire, sous la photo dans l'Atelier, à la place des invites dans
+  le Panneau, avec Accepter, Refuser et Ajuster… : un texte libre, ou un ajustement d'un clic
+  (Moins chaud, Peau plus naturelle, Garder le ciel, Plus de contraste).
 - Pour que l'accord ne vienne que de vous : la case « l'accord se donne ici » du Gestionnaire de
   modules externes. Seul le bouton Accepter de la fenêtre de suivi compte alors, pour une seule
   écriture, dans les 10 minutes.
@@ -281,7 +406,7 @@ Ce qui part chez Anthropic quand Claude regarde ou classe :
 - les aperçus JPEG que Lightroom rend pour lui (1344 px de grand côté par défaut, 2048 au plus), y
   compris les avant/après, les propositions et les variantes ;
 - les zooms à 100 % : un extrait de la photo en pleine résolution, 1600 px au plus ;
-- les planches contact (douze vignettes) ;
+- les planches contact (jusqu'à trente vignettes) ;
 - les photos que vous joignez ou collez dans la fenêtre Claude (réduites à 1568 px) ;
 - la description des photos : nom du fichier, appareil, objectif, réglages de prise de vue, date,
   dimensions, note, drapeau, libellé, réglages de développement ;
@@ -295,11 +420,13 @@ Ce qui reste sur le Mac :
 
 - le catalogue et les originaux : Claude ne reçoit jamais un fichier original ;
 - le calcul des mesures et l'analyse de Vision, faits sur le Mac, sans réseau ; le tri lit les
-  vignettes du cache de Lightroom sur le Mac et n'en envoie que les résultats ;
+  vignettes du cache de Lightroom sur le Mac et n'en envoie que les résultats ; les vignettes de la
+  Séance de notation ne servent qu'à sa fenêtre ;
 - les fichiers exportés, et toute la fenêtre Publication, qui ne parle jamais à Claude ;
 - les conversations de la fenêtre Claude (avec les images que Claude a regardées), le guide de
-  style, les profils de publication et le registre de consommation, dans
-  `~/Library/Application Support/Developpeur/` ; les journaux dans `~/Library/Logs/Developpeur/`.
+  style, les profils de publication, le registre de consommation, et les notes proposées avec les
+  séances de notation (`notation.json`), dans `~/Library/Application Support/Developpeur/` ; les
+  journaux dans `~/Library/Logs/Developpeur/`.
   Claude Code garde aussi ses propres sessions dans `~/.claude`.
 
 Le module et le connecteur se parlent par deux ports de cet ordinateur seulement (54770 et 54771,
@@ -362,7 +489,7 @@ Le script, sans droits d'administrateur :
 5. dit si Claude Code manque pour la fenêtre Claude.
 
 Ce qui est déjà là reste : guide de style, conversations, profils de publication, registre de
-consommation, journaux. Le catalogue et les photos ne sont jamais touchés.
+consommation, notes proposées, journaux. Le catalogue et les photos ne sont jamais touchés.
 
 Ensuite :
 
@@ -400,9 +527,9 @@ Pour désinstaller : `bash uninstall.sh` (dans le dossier décompressé, ou depu
 Claude Desktop fermé comme pour l'installation (sinon, le script dit quoi vérifier). Il
 retire l'inscription dans Claude, le connecteur, le module, ses paramètres prédéfinis invisibles
 (Lightroom fermé) et ses fichiers de travail, et garde votre guide de style, vos conversations,
-vos profils de publication, le registre de consommation et les journaux ; `bash uninstall.sh
---tout` les retire aussi. Les retouches déjà faites restent dans le catalogue (elles s'annulent
-dans le panneau Historique).
+vos profils de publication, le registre de consommation, les notes proposées et les journaux ;
+`bash uninstall.sh --tout` les retire aussi. Les retouches déjà faites restent dans le catalogue
+(elles s'annulent dans le panneau Historique).
 
 ### Premiers pas
 
@@ -411,8 +538,8 @@ active, rendu naturel et un peu chaud », « Passe-la en CLASSIC CHROME et redre
 « Assombris le ciel sans toucher au bâtiment », « Efface les poussières du capteur », « Débruite
 cette photo de nuit », « Montre-moi d'abord ce que tu proposes », « Montre-moi trois
 interprétations : naturelle, chaude et noir et blanc », « Harmonise cette série sur la troisième
-photo », « Trie la séance et propose-moi les meilleures » ou « Prépare la sélection pour
-Instagram ».
+photo », « Trie la séance et propose-moi les meilleures », « Note cette photo selon le standard »
+ou « Prépare la sélection pour Instagram ». Pour noter toute une sortie : la Séance de notation.
 
 Claude regarde la photo, pose un diagnostic chiffré, applique une première passe (profil, balance
 des blancs, tonalité), vérifie le rendu, puis fait les finitions, dans l'ordre que recommande
@@ -495,8 +622,9 @@ scripts/tester-module.sh
 
 Le module, avec LuaJIT : forme du module, syntaxe et globales de chaque fichier, syntaxe de
 `relais.sh`, liens entre les fichiers, puis deux suites, chacune sur son Lightroom simulé :
-`Tests/Lua/Liaison` (les commandes du connecteur) et `Tests/Lua/Fenetre` (la fenêtre Claude avec un
-faux Claude Code, Publication et Consommation).
+`Tests/Lua/Liaison` (les commandes du connecteur, notes proposées comprises) et `Tests/Lua/Fenetre`
+(la fenêtre Claude dans ses trois dispositions avec un faux Claude Code, la Séance de notation,
+Publication et Consommation ; les essais `essais-*.lua` y tournent après `tests.lua`).
 
 Aucun test ne touche Lightroom, Claude, vos photos ni les fichiers de Claude, et aucun ne consomme
 de quota. Les deux suites tournent aussi à chaque envoi sur `main` (GitHub Actions).
@@ -520,12 +648,12 @@ Pour la mise au point, Lightroom ouvert et liaison démarrée, l'exécutable ins
 ## Organisation
 
 - `Sources/DeveloppeurKit/` : le connecteur (protocole MCP, outils, invites, catalogue des
-  réglages, mesures et Vision, liaison TCP avec le module)
+  réglages, standard de notation, mesures et Vision, liaison TCP avec le module)
 - `Sources/MCPDeveloppeur/main.swift` : l'exécutable `mcp-developpeur` (options de ligne de
   commande, boucle stdio)
 - `Lightroom/Developpeur.lrplugin/` : le module Lightroom Classic, en Lua 5.1 (liaison avec le
-  connecteur, fenêtre Claude et `relais.sh` qui lance Claude Code, Publication, Consommation,
-  fenêtre de suivi)
+  connecteur, registre des notes proposées, fenêtre Claude en trois dispositions et `relais.sh` qui
+  lance Claude Code, Séance de notation, Publication, Consommation, fenêtre de suivi)
 - `Tests/DeveloppeurKitTests/` : tests du connecteur, avec un faux Lightroom et un faux module TCP
 - `Tests/Lua/Liaison/`, `Tests/Lua/Fenetre/` : tests du module, chacun sur son Lightroom simulé
 - `scripts/` : `tester-module.sh` ; `metriques.swift` et `images-vides.swift`, qui produisent des

@@ -4459,9 +4459,15 @@ test("notation : proposer range les propositions sans rien écrire ; 5 étoiles 
     egal(Notation.proposition(1).note, 3, "rien de rangé quand une note est refusée")
     egal(Notation.version, version)
     echoue(function() proposer({ { photo = 1, note = 2.5 } }) end, "Note invalide")
+    echoue(function() proposer({ { photo = 1, note = -1 } }) end, "Note invalide")
+    echoue(function() proposer({ { note = 2, criteres = CRITERES } }) end, "Proposition sans photo")
     echoue(function() proposer({ { photo = 1, note = 3, drapeau = 'retenue' } }) end, "Drapeau invalide")
     echoue(function() proposer({ { photo = 1 } }) end, "le drapeau « rejetee »")
     echoue(function() proposer({}) end, "Aucune proposition")
+    -- La passe 4 (5 étoiles) est à l'utilisateur seul : second garde-fou, après le serveur.
+    echoue(function() proposer({ { photo = 1, note = 2, criteres = CRITERES } }, { passe = 4 }) end, "rien à proposer")
+    egal(Notation.proposition(1).note, 3, "rien de rangé")
+    egal(Notation.version, version, "registre inchangé par les refus")
     echoue(function() Commandes.executer('notation', { action = 'effacer' }) end, "Action de notation inconnue")
     local sansRefus = Json.encode(proposer({ { photo = 1, note = 3, criteres = CRITERES } }))
     egal(sansRefus:find('"refusees":[]', 1, true) ~= nil, true, sansRefus)
@@ -4492,7 +4498,7 @@ test("notation : rattachée à la séance active, remplacée par une nouvelle pr
     egal(Notation.proposition(2).etat, 'a_verifier', "un cas douteux attend « à vérifier »")
     egal(#Notation.propositions(id), 2, "dans l'ordre des photos de la séance")
     egal(Notation.propositions(id)[2].photo, 2)
-    echoue(function() proposer({ { photo = 1, note = 2 } }, { seance = 'inconnue' }) end, "Séance de notation inconnue")
+    echoue(function() proposer({ { photo = 1, note = 2 } }, { seance = 'inconnue' }) end, "read_session = true donne la séance ouverte")
     echoue(function() proposer({ { photo = 1, note = 2 } }, { passe = 7 }) end, "Passe invalide")
     -- Une nouvelle séance prend les propositions encore à décider de ses photos.
     local id2 = Notation.ouvrirSeance{ photos = { 4 } }
@@ -4511,6 +4517,9 @@ test("notation : lire et seance, passes, comptes et décisions de l'utilisateur"
     local vide = Commandes.executer('notation', { action = 'seance' })
     egal(vide.id, Json.null)
     egal(vide.message:find("Aucune séance", 1, true) ~= nil, true)
+    local inconnue = Commandes.executer('notation', { action = 'seance', seance = 'x' })
+    egal(inconnue.id, Json.null)
+    egal(inconnue.message, "Séance de notation inconnue : x.")
     local id = Notation.ouvrirSeance{ titre = "Sortie", source = { portee = 'collection', collection = 900 }, photos = { 1, 2, 4 } }
     local s = Commandes.executer('notation', { action = 'seance' })
     egal(s.id, id)
@@ -4691,6 +4700,7 @@ test("notation : poser lève la pause et « Proposer d'abord », jamais les gard
     echoue(function() Bibliotheque.noter({ notes = { { photo = 1, note = 7 } }, depuisLightroom = true }) end, "Note invalide")
     echoue(function() Bibliotheque.noter({ notes = { { photo = 1, drapeau = 'jaune' } }, depuisLightroom = true }) end, "Drapeau invalide")
     echoue(function() Bibliotheque.noter({ notes = { { photo = 1 } }, depuisLightroom = true }) end, "Rien à poser")
+    echoue(function() Bibliotheque.noter({ notes = { { note = 2 } }, depuisLightroom = true }) end, "Note sans photo")
     echoue(function() Bibliotheque.noter({ notes = {}, depuisLightroom = true }) end, "Aucune note")
 end)
 
@@ -4737,6 +4747,35 @@ test("notation : une photo donnée deux fois ne compte qu'une fois, avec sa dern
     egal(p.ok, true)
     egal(etapes(a), 1)
     egal(a.brut.rating, 3)
+end)
+
+test("notation : une note posée par l'utilisateur reste au retour à l'origine ; undo_last la défait", function()
+    local a, b = photoRaw(), photoJpeg()
+    S.active = a
+    appliquer({ reglages = { Exposure2012 = 0.5 } })
+    proposer({ { photo = 1, note = 3, criteres = CRITERES }, { photo = 2, note = 2, criteres = CRITERES } })
+    local r = Notation.poser({ { photo = 1 }, { photo = 2, note = 4 } })
+    egal(r.ok, true, tostring(r.erreur))
+    egal(a.brut.rating, 3)
+    egal(b.brut.rating, 4)
+    egal(Json.decode(a.proprietes.avantClaude).Bibliotheque, nil, "la note de l'utilisateur n'entre pas dans l'état d'avant Claude")
+    egal(Json.decode(a.proprietes.avantClaude).Exposure2012, 0, "la retouche de Claude, si")
+    egal(b.proprietes.avantClaude, nil, "rien d'écrit pour une photo que Claude n'a pas retouchée")
+    egal(etapes(a), 2)
+    -- Revenir à « Avant Claude » (ou revert_to_original) : la retouche part, la note reste.
+    local remise = {}
+    for _, resultat in ipairs(Commandes.executer('revenir', { photos = { 1, 2 } }).resultats) do
+        remise[resultat.photo.id] = resultat
+    end
+    egal(remise[1].remise, true)
+    egal(a.reglages.Exposure2012, 0, "la retouche de Claude est défaite")
+    egal(a.brut.rating, 3, "la note posée par l'utilisateur reste")
+    egal(remise[2].sans_retouche, true, "une note seule n'est pas une retouche à défaire")
+    egal(b.brut.rating, 4)
+    -- undo_last défait la note, étape par étape.
+    Commandes.executer('annuler', { photos = { 2 } })
+    egal(b.brut.rating, nil, "undo_last remet la note d'avant")
+    egal(etapes(b), 0)
 end)
 
 test("notation : registre gardé dans notation.json, propre au catalogue ouvert", function()

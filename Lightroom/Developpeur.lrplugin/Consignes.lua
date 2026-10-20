@@ -2,8 +2,9 @@
 -- (`--append-system-prompt-file`), celles d'une séance de notation, les invites en raccourcis,
 -- les messages des passes de notation et les réponses aux propositions.
 -- La méthode de retouche et le standard de notation restent ceux du connecteur MCP-Développeur
--- (ses consignes MCP, la ressource developpeur://notation) : ici, seulement ce qui tient à la
--- fenêtre et à celui qui s'en sert.
+-- (ses consignes MCP ; le standard par propose_ratings avec read_standard, Claude Code n'ayant
+-- dans la fenêtre ni ressources ni invites) : ici, seulement ce qui tient à la fenêtre et à celui
+-- qui s'en sert.
 
 local Consignes = {}
 
@@ -37,8 +38,8 @@ Accepter, Refuser et Ajuster ; Dany répond par un message. Seulement après « 
 avec confirm = true.
 - save_preset et remember_style (ajout) : seulement si Dany le demande dans le message.
 - Notes (étoiles et drapeau Rejeter) : propose-les par propose_ratings, selon le standard de \
-notation (developpeur://notation, ou propose_ratings avec read_standard = true), avec la raison \
-critère par critère. Dany les accepte ou les change dans la fenêtre : jamais set_metadata pour une \
+notation (propose_ratings avec read_standard = true le donne), avec la raison critère par \
+critère. Dany les accepte ou les change dans la fenêtre : jamais set_metadata pour une \
 note ou un drapeau sans qu'il le demande dans le message. Jamais 5 ★ : Dany seul les pose.
 - Une préférence de Dany remarquée (corrections_utilisateur, demandes répétées) : propose-la sur \
 une ligne à elle « Suggestion pour le guide : <la préférence en une phrase> » ; ne l'ajoute pas \
@@ -78,8 +79,8 @@ N photos ; passe n] » au lieu de la photo active ; la demande donne les photos 
 catalogue) et la passe.
 
 ## Méthode
-- Le standard de notation fait foi : lis-le une fois au début (developpeur://notation, ou \
-propose_ratings avec read_standard = true). Une passe pose une seule question.
+- Le standard de notation fait foi : lis-le une fois au début (propose_ratings avec \
+read_standard = true). Une passe pose une seule question.
 - Le plancher technique : cull_photos (netteté, exposition, yeux, bruit, rafales). Ses plafonds \
 bornent la note ; ils ne la donnent pas.
 - Regarde par planches (contact_sheet, 24 à 30 photos), view_photo seulement pour les \
@@ -169,15 +170,6 @@ Consignes.modeles = {
     { value = 'haiku', title = "Haiku · rapide" },
 }
 
-function Consignes.titreModele(valeur)
-    for _, m in ipairs(Consignes.modeles) do
-        if m.value == valeur then
-            return m.title
-        end
-    end
-    return tostring(valeur)
-end
-
 -- Réponses aux propositions (boutons du panneau Proposition).
 Consignes.accepter = "J'accepte la proposition : applique-la (confirm = true)."
 Consignes.refuser = "Je refuse cette proposition : ne l'applique pas. Dis-moi ce que tu proposerais d'autre, sans rien appliquer."
@@ -226,7 +218,9 @@ local function ranger(seance, passe)
 end
 
 -- Les quatre passes de la Séance de notation, une question chacune (standard de notation) :
--- titre et question pour la fenêtre, message(seance) envoyé à Claude par « Lancer la passe ».
+-- titre et question pour la fenêtre, message(seance) envoyé à Claude par « Lancer la passe ». La
+-- passe 4 (5 ★) est à l'utilisateur seul : sans message, elle ne se lance pas, et la fenêtre
+-- montre `seul` à sa place.
 Consignes.passes = {
     { numero = 1, titre = "1 · Rejets", question = "Rejeter ? Les douteux : à vérifier.",
         message = function(seance)
@@ -249,11 +243,7 @@ Consignes.passes = {
                 .. " Les autres gardent leur note : ne les propose pas de nouveau."
         end },
     { numero = 4, titre = "4 · Cinq étoiles", question = "5 ★ ? Après le développement, vous seul.",
-        message = function(seance)
-            return "Passe 4 de la séance de notation : 5 ★ ? " .. cible(seance)
-                .. " Le 5 ★ est à Dany seul, après le développement : ne propose aucune note."
-                .. " Pour les photos à 4 ★, dis seulement ce que la finition laisse voir (halos aux bords des masques, peau plastique, saturation) et ce qui resterait à corriger."
-        end },
+        seul = "À vous seul : revoyez vos 4 ★ après le développement." },
 }
 
 -- Ajustements d'un clic de la fenêtre Ajuster.

@@ -341,9 +341,9 @@ Il retient les photos d'après la netteté du sujet, la netteté des yeux et les
 rejette les problèmes d'exposition, les photos ratées, les documents et les reçus. Il empile
 automatiquement et applique des actions par lots (marqueur, note, libellé, suppression). Il est en
 accès anticipé ; le panneau Visages est arrivé en 15.4. `cull_photos` mesure la netteté (au point
-AF des Fujifilm), les visages, les yeux fermés ou plissés, une note esthétique, et
-regroupe les rafales et les piles de Lightroom (une seule photo proposée par pile) ; le tri assisté
-reste utile pour juger la netteté des yeux et pour ses actions par lots.
+AF des Fujifilm), les visages, les yeux fermés ou plissés, une note esthétique, et regroupe les
+rafales et les piles de Lightroom (la meilleure vue de chaque pile ; les autres plafonnées à 3 ★) ;
+le tri assisté reste utile pour juger la netteté des yeux et pour ses actions par lots.
 
 ### 3.9 Dépannage
 

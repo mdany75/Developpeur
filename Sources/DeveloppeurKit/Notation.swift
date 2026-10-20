@@ -75,6 +75,9 @@ public enum Notation {
 
     /// Claude propose de 0 à 4 étoiles : 5 est posé par l'utilisateur seul.
     public static let noteMaximale = 4
+    /// Les passes du standard ; la dernière (5 étoiles) est à l'utilisateur seul : Claude n'y
+    /// propose rien.
+    public static let passes = 4
 
     /// Les critères d'une proposition, du plus lourd au plus léger : nom dans propose_ratings, nom
     /// pour le module (commande notation), obligatoire ou non (la Finition ne compte que pour un 5).

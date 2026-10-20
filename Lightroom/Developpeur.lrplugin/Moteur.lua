@@ -99,6 +99,7 @@ function Moteur.charger()
     Moteur.courante = plusRecente() or Conversation.nouvelle()
 end
 
+-- Une conversation par son identifiant (séances de notation comprises), nil sinon.
 function Moteur.trouver(id)
     for _, c in ipairs(Moteur.conversations) do
         if c.id == id then
@@ -109,11 +110,6 @@ function Moteur.trouver(id)
         return Moteur.courante
     end
     return nil
-end
-
--- Une conversation par son identifiant (séances de notation comprises), nil sinon.
-function Moteur.conversation(id)
-    return Moteur.trouver(id)
 end
 
 -- La conversation d'une séance de notation, sans changer la conversation ouverte de la fenêtre
@@ -495,7 +491,8 @@ end
 
 -- « Claude travaille… · 3 outils faits · 1 min 05 » (vide s'il ne travaille pas), compté dans
 -- la conversation qui travaille. `vue` : la conversation montrée par la fenêtre qui affiche ce
--- texte (la conversation ouverte par défaut) ; si Claude travaille ailleurs, le texte dit où.
+-- texte (nil : la conversation ouverte ; false : aucune, une séance sans conversation) ; si
+-- Claude travaille ailleurs, le texte dit où.
 function Moteur.texteTravail(tic, vue)
     if not Moteur.travaille then
         return ''
@@ -504,7 +501,9 @@ function Moteur.texteTravail(tic, vue)
     if Moteur.interruptionLe then
         morceaux[1] = "Arrêt demandé" .. string.rep('.', (tic or 0) % 4)
     end
-    vue = vue or Moteur.courante
+    if vue == nil then
+        vue = Moteur.courante
+    end
     if Moteur.enCours and Moteur.enCours ~= vue then
         morceaux[#morceaux + 1] = Conversation.estSeance(Moteur.enCours) and "dans la séance de notation" or "dans la fenêtre Claude"
     end

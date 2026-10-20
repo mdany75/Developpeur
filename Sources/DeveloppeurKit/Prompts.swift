@@ -138,7 +138,7 @@ public enum Prompts {
         ],
         render: { arguments in
             let ou = argument(arguments, "photos").map { "Photos : \($0)." }
-                ?? "Photos : la séance de notation ouverte dans Lightroom, sinon la sélection (sinon, demande où elles sont)."
+                ?? "Photos : la séance de notation ouverte dans Lightroom (propose_ratings avec read_session = true donne ses photos et sa passe), sinon la sélection (sinon, demande où elles sont)."
             return """
             Note des photos de Lightroom Classic selon le standard de notation, reproduit plus bas. \(ou)\(passeNotation(arguments))
 

@@ -187,6 +187,35 @@ final class NotationTests: XCTestCase {
         XCTAssertEqual(fake.calls.count, 2)
     }
 
+    /// read_session : la séance ouverte dans Lightroom (commande notation, action seance), rendue
+    /// telle quelle, sans rien ranger ; avec session, cette séance-là.
+    func testReadSessionReturnsTheOpenSessionWithoutStoringAnything() throws {
+        let reponse: JSONValue = ["id": "s-12", "titre": "Sortie aux dunes", "source": ["portee": "collection", "collection": 900],
+                                  "photos": [53636309, 53636310], "passe": 2, "cree": 1_792_000_000,
+                                  "comptes": ["proposees": 1, "acceptees": 0, "changees": 0, "a_verifier": 0, "ecartees": 0, "total": 1,
+                                              "photos": 2, "sans_proposition": 1]]
+        fake.replies["notation"] = reponse
+        let result = tools.call(name: "propose_ratings", arguments: ["read_session": true])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertEqual(fake.commands, ["notation"], "une seule commande")
+        XCTAssertEqual(fake.lastParams, ["action": "seance"], "la séance ouverte, rien d'autre")
+        XCTAssertEqual(try JSONCoding.parse(result.text), reponse, "la réponse du module, telle quelle")
+        XCTAssertEqual(result.structured, reponse)
+
+        // Une séance donnée, et le standard en plus ; sans séance ouverte, id null et un message.
+        fake.replies["notation"] = ["id": .null, "message": "Séance de notation inconnue : s-9."]
+        let donnee = tools.call(name: "propose_ratings", arguments: ["read_session": true, "session": " s-9 ", "read_standard": true])
+        XCTAssertFalse(donnee.isError, donnee.text)
+        XCTAssertEqual(fake.lastParams, ["action": "seance", "seance": "s-9"])
+        XCTAssertEqual(donnee.structured?["id"], .null)
+        XCTAssertEqual(donnee.structured?["standard"]?.string, Notation.standard)
+        XCTAssertEqual(fake.calls.count, 2)
+        let definition = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "propose_ratings" })
+        XCTAssertEqual(definition["inputSchema"]?["properties"]?["read_session"]?["type"]?.string, "boolean")
+        XCTAssertTrue(definition["description"]?.string?.contains("read_session = true") == true)
+        XCTAssertTrue(Prompts.noter.render([:]).contains("propose_ratings avec read_session = true donne ses photos et sa passe"))
+    }
+
     func testFiveStarsAreRefusedWithoutSendingAnything() {
         for note in [5, 6] {
             let result = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 2), proposition(13, rating: note)]])
@@ -235,7 +264,19 @@ final class NotationTests: XCTestCase {
             (["ratings": [.object(proposition(12, rating: 3).object!.merging(["to_check": "oui"]) { $1 })]], "« to_check »"),
             (["ratings": [proposition(12, rating: 3), proposition(12, rating: 2)]], "photo 12 proposée deux fois"),
             (["ratings": [proposition(12, rating: 3)], "pass": 5], "« pass »"),
+            (["ratings": [proposition(12, rating: 3)], "pass": 4], "Passe 4 : 5 étoiles, l'utilisateur seul ; rien à proposer."),
             (["ratings": [proposition(12, rating: 3)], "session": ""], "« session »"),
+            (["ratings": [proposition(12, rating: 3)], "read_session": true], "« read_session » se demande seul"),
+            (["ratings": .array(Array(repeating: proposition(1, rating: 2), count: 501))], "Au plus 500 propositions"),
+            (["ratings": ["12:3"]], "une proposition est un objet"),
+            (["ratings": [.object(proposition(12, rating: 3).object!.filter { $0.key != "photo_id" })]], "« photo_id » : l'identifiant de la photo"),
+            (["ratings": [.object(proposition(12, rating: 3).object!.merging(["photo_id": "douze"]) { $1 })]], "« photo_id » : l'identifiant de la photo"),
+            (["ratings": [.object(proposition(12, rating: 3).object!.filter { $0.key != "criteria" })]],
+             "« criteria » : {impact, qualities, technical_floor, finish}"),
+            (["ratings": [.object(proposition(12, rating: 3).object!.merging(["criteria": "bon"]) { $1 })]],
+             "« criteria » : {impact, qualities, technical_floor, finish}"),
+            (["ratings": [proposition(12, rating: 3, criteres: ["impact": 3, "qualities": "b", "technical_floor": "c"])]],
+             "« criteria.impact » doit être un texte"),
         ] as [([String: JSONValue], String)] {
             let result = tools.call(name: "propose_ratings", arguments: arguments)
             XCTAssertTrue(result.isError, "\(arguments)")

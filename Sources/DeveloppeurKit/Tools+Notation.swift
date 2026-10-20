@@ -35,13 +35,14 @@ extension ToolHandler {
         ], required: ["photo_id", "criteria", "reason"])
         return [
             tool("propose_ratings",
-                 "Range des notes proposées selon le standard de notation (read_standard = true le donne ; le lire avant de noter) pour la carte Note et la Séance de notation de la fenêtre Claude dans Lightroom : de 0 à \(Notation.noteMaximale) étoiles, ou flag reject, avec une raison par critère (impact, qualities, technical_floor ; finish pour une photo développée) et une phrase (reason). Jamais 5 étoiles : l'utilisateur seul les pose. Rien ne change sur les photos ni dans le catalogue : l'utilisateur accepte, change ou met à vérifier dans Lightroom ; set_metadata seulement s'il le demande. Regarder les photos d'abord (contact_sheet ; view_photo à 100 % pour un 4). Une note au-dessus du plafond mesuré par le dernier cull_photos est refusée, sauf un défaut voulu et maîtrisé, dit dans technical_floor, avec to_check = true. Une proposition pour une photo remplace la précédente.",
+                 "Range des notes proposées selon le standard de notation (read_standard = true le donne ; le lire avant de noter) pour la carte Note et la Séance de notation de la fenêtre Claude dans Lightroom : de 0 à \(Notation.noteMaximale) étoiles, ou flag reject, avec une raison par critère (impact, qualities, technical_floor ; finish pour une photo développée) et une phrase (reason). Jamais 5 étoiles : l'utilisateur seul les pose. Rien ne change sur les photos ni dans le catalogue : l'utilisateur accepte, change ou met à vérifier dans Lightroom ; set_metadata seulement s'il le demande. Regarder les photos d'abord (contact_sheet ; view_photo à 100 % pour un 4). Une note au-dessus du plafond mesuré par le dernier cull_photos est refusée, sauf un défaut voulu et maîtrisé, dit dans technical_floor, avec to_check = true. Une proposition pour une photo remplace la précédente. read_session = true donne la séance de notation ouverte dans Lightroom (ses photos, sa passe).",
                  properties: [
                     ("ratings", ["type": "array", "items": proposition,
                                  "description": .string("Les propositions, une par photo (\(Self.maxRatings) au plus par appel).")]),
-                    ("pass", prop("integer", "Passe de la séance : 1 rejeter ou non, 2 trois étoiles ou non, 3 monter à quatre parmi les trois, 4 cinq étoiles (l'utilisateur seul).")),
+                    ("pass", prop("integer", "Passe de la séance : 1 rejeter ou non, 2 trois étoiles ou non, 3 monter à quatre parmi les trois (la passe 4, cinq étoiles, est à l'utilisateur seul : rien à proposer).")),
                     ("session", prop("string", "Séance de notation, par son identifiant ; défaut : la séance ouverte dans Lightroom, sinon aucune.")),
                     ("read_standard", prop("boolean", "true = renvoyer le standard de notation (seul : rien n'est rangé ; avec ratings, en plus des propositions).")),
+                    ("read_session", prop("boolean", "true = renvoyer la séance de notation ouverte dans Lightroom (ou celle de session) : id, titre, photos (leurs identifiants, dans l'ordre de la séance), passe et comptes ; sans séance, id null. Sans ratings : rien n'est rangé.")),
                  ],
                  required: []),
         ]
@@ -55,9 +56,11 @@ extension ToolHandler {
     }
 
     /// Valide toutes les propositions avant d'envoyer quoi que ce soit (un refus ne range rien),
-    /// puis une seule commande notation au module ; sa réponse est rendue telle quelle.
+    /// puis une seule commande notation au module ; sa réponse est rendue telle quelle. Avec
+    /// read_session seul, la séance ouverte (commande notation, action seance), sans rien ranger.
     func proposeRatings(_ args: Arguments) throws -> JSONValue {
         let lireStandard = args.bool("read_standard") == true
+        let lireSeance = args.bool("read_session") == true
         var liste: [JSONValue] = []
         if args.has("ratings") {
             guard let items = args.array("ratings") else {
@@ -65,9 +68,26 @@ extension ToolHandler {
             }
             liste = items
         }
+        var seance: String?
+        if args.has("session") {
+            guard let valeur = args.string("session")?.trimmingCharacters(in: .whitespacesAndNewlines), !valeur.isEmpty else {
+                throw LightroomError.invalid("« session » : l'identifiant de la séance, en texte. Rien n'a été rangé.")
+            }
+            seance = valeur
+        }
+        if lireSeance {
+            guard liste.isEmpty else {
+                throw LightroomError.invalid("« read_session » se demande seul, sans ratings : lire la séance, puis proposer. Rien n'a été rangé.")
+            }
+            var params: [String: JSONValue] = ["action": "seance"]
+            if let seance { params["seance"] = .string(seance) }
+            var reponse = try lightroom.send("notation", params, timeout: Self.notationTimeout).object ?? [:]
+            if lireStandard { reponse["standard"] = .string(Notation.standard) }
+            return .object(reponse)
+        }
         guard !liste.isEmpty else {
             guard lireStandard else {
-                throw LightroomError.invalid("« ratings » : une proposition par photo (photo_id, rating de 0 à \(Notation.noteMaximale) ou flag reject, criteria, reason) ; read_standard = true donne le standard de notation.")
+                throw LightroomError.invalid("« ratings » : une proposition par photo (photo_id, rating de 0 à \(Notation.noteMaximale) ou flag reject, criteria, reason) ; read_standard = true donne le standard de notation, read_session = true la séance ouverte.")
             }
             return ["standard": .string(Notation.standard)]
         }
@@ -76,17 +96,15 @@ extension ToolHandler {
         }
         var params: [String: JSONValue] = ["action": "proposer"]
         if args.has("pass") {
-            guard let passe = args.int("pass"), (1...4).contains(passe) else {
-                throw LightroomError.invalid("« pass » : la passe de la séance, de 1 à 4. Rien n'a été rangé.")
+            guard let passe = args.int("pass"), (1...Notation.passes).contains(passe) else {
+                throw LightroomError.invalid("« pass » : la passe de la séance, de 1 à \(Notation.passes - 1) (la passe \(Notation.passes), 5 étoiles, est à l'utilisateur seul). Rien n'a été rangé.")
+            }
+            guard passe < Notation.passes else {
+                throw LightroomError.invalid("Passe \(Notation.passes) : 5 étoiles, l'utilisateur seul ; rien à proposer. Rien n'a été rangé.")
             }
             params["passe"] = .number(Double(passe))
         }
-        if args.has("session") {
-            guard let seance = args.string("session")?.trimmingCharacters(in: .whitespacesAndNewlines), !seance.isEmpty else {
-                throw LightroomError.invalid("« session » : l'identifiant de la séance, en texte. Rien n'a été rangé.")
-            }
-            params["seance"] = .string(seance)
-        }
+        if let seance { params["seance"] = .string(seance) }
         var propositions: [JSONValue] = [], erreurs: [String] = [], vues: Set<Int> = []
         for (index, item) in liste.enumerated() {
             do {

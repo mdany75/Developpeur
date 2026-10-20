@@ -30,8 +30,10 @@ Dispositions.LISTE = {
 
 -- Par taille de fenêtre. Atelier : `photo` (colonne de la photo, aperçu 3:2), `note` (colonne de
 -- la carte Note), `menu` (menu des conversations). Conversation claire : celles de la 1.0, la
--- colonne de droite (`droite`) à onglets. Panneau : `largeur` du contenu (fenêtre de 24 de plus).
--- `propLignes` : lignes de la proposition ; `criteres` : lignes des critères de la carte Note.
+-- colonne de droite (`droite`) à onglets. Panneau : `largeur` du contenu (fenêtre de 24 de plus) ;
+-- en grande taille, 20 lignes de fil pour tenir en hauteur sur un écran de 1080 points (environ
+-- 1 050 avec la barre de titre, estimé). `propLignes` : lignes de la proposition ; `criteres` :
+-- lignes des critères de la carte Note.
 Dispositions.TAILLES = {
     atelier = {
         petite = { lignes = 20, fil = 330, photo = 470, apercu = 450, apercuHauteur = 300, note = 250, menu = 150, propLignes = 5, criteres = 9 },
@@ -46,7 +48,7 @@ Dispositions.TAILLES = {
     panneau = {
         petite = { lignes = 12, largeur = 380, apercu = 120, propLignes = 5, criteres = 12 },
         moyenne = { lignes = 18, largeur = 406, apercu = 160, propLignes = 5, criteres = 16 },
-        grande = { lignes = 30, largeur = 460, apercu = 200, propLignes = 6, criteres = 20 },
+        grande = { lignes = 20, largeur = 460, apercu = 200, propLignes = 6, criteres = 20 },
     },
 }
 

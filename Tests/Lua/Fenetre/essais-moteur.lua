@@ -106,14 +106,16 @@ essai('Consignes : les quatre passes, une question chacune', function()
     for n, passe in ipairs(Consignes.passes) do
         egal(titres[n], passe.titre)
         vrai(type(passe.question) == 'string' and passe.question ~= '', 'question de la passe ' .. n)
-        local m = passe.message(SEANCE)
-        contient(m, 'Passe ' .. n .. ' de la séance de notation', 'passe ' .. n)
-        contient(m, 'Séance « Sortie aux dunes » (collection 900), 3 photos : 53636309, 53636310, 53636311.', 'passe ' .. n)
         if n < 4 then
+            local m = passe.message(SEANCE)
+            contient(m, 'Passe ' .. n .. ' de la séance de notation', 'passe ' .. n)
+            contient(m, 'Séance « Sortie aux dunes » (collection 900), 3 photos : 53636309, 53636310, 53636311.', 'passe ' .. n)
             contient(m, 'propose_ratings avec pass = ' .. n .. ' et session = "seance-essai".', 'passe ' .. n)
+            egal(nil, passe.seul)
         else
-            vrai(not m:find('propose_ratings', 1, true), 'passe 4 : aucune proposition')
-            contient(m, 'ne propose aucune note', 'passe 4')
+            -- 5 ★ : l'utilisateur seul ; la passe ne se lance pas (aucun message pour Claude).
+            egal(nil, passe.message, 'passe 4 : rien à envoyer à Claude')
+            egal('À vous seul : revoyez vos 4 ★ après le développement.', passe.seul)
         end
     end
     contient(Consignes.passes[1].message(SEANCE), 'to_check = true', 'passe 1 : les douteux')
@@ -424,9 +426,9 @@ essai('Moteur : une séance de notation ne change pas la conversation ouverte', 
     egal(principale, Moteur.courante, 'conversation ouverte inchangée')
     egal('notation', seance.genre)
     egal('Sortie aux dunes', seance.titre)
-    egal(seance, Moteur.conversation(seance.id))
-    egal(principale, Moteur.conversation(principale.id))
-    egal(nil, Moteur.conversation('inconnue'))
+    egal(seance, Moteur.trouver(seance.id))
+    egal(principale, Moteur.trouver(principale.id))
+    egal(nil, Moteur.trouver('inconnue'))
     egal(seance, Moteur.nouvelleSeance({ seance = 'seance-essai' }), 'la conversation de la séance est reprise')
     vrai(Moteur.nouvelleSeance({ seance = 'autre-seance' }) ~= seance, 'une autre séance, une autre conversation')
     local ancienne = Moteur.session
@@ -529,6 +531,17 @@ essai("Moteur : refus pendant que Claude travaille dans l'autre conversation", f
     egal('', Moteur.texteTravail(0))
 end)
 
+essai("Moteur : vue d'une séance sans conversation, un travail de la fenêtre Claude se dit ailleurs", function()
+    local travaille, enCours = Moteur.travaille, Moteur.enCours
+    Moteur.travaille, Moteur.enCours = true, Moteur.courante
+    local ok, erreur = pcall(function()
+        contient(Moteur.texteTravail(0, false), 'Claude travaille · dans la fenêtre Claude', 'séance sans conversation')
+        vrai(not Moteur.texteTravail(0):find('dans la', 1, true), 'vu de la fenêtre Claude')
+    end)
+    Moteur.travaille, Moteur.enCours = travaille, enCours
+    vrai(ok, tostring(erreur))
+end)
+
 essai('Moteur : séance introuvable ou ouverte comme conversation', function()
     local ok, raison = Moteur.envoyer('x', { conversation = 'inconnue' })
     vrai(not ok)
@@ -554,7 +567,7 @@ essai("Moteur : au chargement, une séance n'est jamais la conversation ouverte"
     Moteur.charger()
     egal('notation', Moteur.conversations[1].genre, 'la séance est la plus récente')
     egal(principale.id, Moteur.courante.id, 'la conversation de retouche s\'ouvre')
-    local relue = Moteur.conversation(seance.id)
+    local relue = Moteur.trouver(seance.id)
     vrai(relue and relue.genre == 'notation', 'séance rechargée')
     egal(relue, Moteur.nouvelleSeance({ seance = 'seance-essai' }), 'reprise après une relance')
     principale, seance = Moteur.courante, relue
@@ -571,7 +584,7 @@ essai('Moteur : supprimer la conversation ouverte ne rouvre pas une séance', fu
     vrai(not Conversation.estSeance(Moteur.courante), 'pas de séance ouverte')
     egal(0, #Moteur.courante.elements, 'une nouvelle conversation')
     vrai(Moteur.supprimer(seance.id))
-    egal(nil, Moteur.conversation(seance.id))
+    egal(nil, Moteur.trouver(seance.id))
     egal(false, Fichiers.existe(Stockage.dossier(seance.id)), 'à la corbeille')
 end)
 

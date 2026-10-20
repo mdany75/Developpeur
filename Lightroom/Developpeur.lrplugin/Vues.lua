@@ -396,7 +396,7 @@ function Vues.notation(f, F, largeur, D, sansNoter)
         f:column(titres),
         f:static_text { title = bind 'notationEtat', font = P.petit, text_color = C.gris, width = interieur, truncation = 'tail' },
         f:static_text { title = bind 'notationCriteres', width = interieur, height_in_lines = D.criteres },
-        f:static_text { title = bind 'notationRaison', text_color = C.mono, width = interieur, height_in_lines = D.raisonLignes or 3 },
+        f:static_text { title = bind 'notationRaison', text_color = C.mono, width = interieur, height_in_lines = 3 },
         f:row {
             spacing = 4,
             F.bouton(f, { title = "Accepter", size = petit, enabled = bind 'peutAccepterNote',

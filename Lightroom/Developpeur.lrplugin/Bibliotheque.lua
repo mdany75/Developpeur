@@ -479,8 +479,10 @@ local function changer(plan, cle, avant, apres)
     plan.changements[#plan.changements + 1] = { cle = cle, avant = avant, apres = apres }
 end
 
--- Garde l'étape, l'état d'avant Claude et l'entrée du journal (dans l'écriture).
-local function memoriser(plan, etape, params)
+-- Garde l'étape, l'état d'avant Claude et l'entrée du journal (dans l'écriture). Avec
+-- `sansOriginal` (une note posée par l'utilisateur, Bibliotheque.noter), l'état d'avant Claude ne
+-- change pas : le retour à l'origine laisse cette note en place ; undo_last la défait toujours.
+local function memoriser(plan, etape, params, sansOriginal)
     if next(plan.avant) == nil then
         return
     end
@@ -488,10 +490,12 @@ local function memoriser(plan, etape, params)
     while #plan.etapes > MAX_ETAPES do
         table.remove(plan.etapes, 1)
     end
-    fusionnerOriginal(plan.original, plan.avant)
     plan.entreeJournal = { etape = etape, type = 'classement', raison = params.raison, changements = plan.changements }
     ajouterJournal(plan.journal, plan.entreeJournal)
-    garder(plan.photo, 'avantClaude', Json.encode(plan.original))
+    if not sansOriginal then
+        fusionnerOriginal(plan.original, plan.avant)
+        garder(plan.photo, 'avantClaude', Json.encode(plan.original))
+    end
     garder(plan.photo, 'etapesClaude', Json.encode(Json.tableau(plan.etapes)))
     garder(plan.photo, 'journalClaude', Json.encode(Json.tableau(plan.journal)))
 end
@@ -1271,8 +1275,10 @@ end
 -- en une écriture ; une étape par photo, que undo_last défait, avec sa raison au journal. Une
 -- photo donnée deux fois ne compte qu'une fois, avec sa dernière valeur : dans une écriture,
 -- Lightroom relit un champ du module avec sa valeur d'avant (constaté le 20 octobre 2026), la
--- seconde étape effacerait la première. Les garde-fous des photos restent, même avec
--- depuisLightroom (qui ne lève que la pause et l'accord dans Lightroom).
+-- seconde étape effacerait la première. Les garde-fous des photos restent (copies virtuelles
+-- seulement, libellé protégé, photos rejetées), même avec depuisLightroom et confirme, qui lèvent
+-- la pause, « Proposer d'abord » et le plafond de photos par écriture. Une note de l'utilisateur
+-- n'entre pas dans l'état d'avant Claude : le retour à l'origine la laisse en place.
 local MAX_NOTES = 500
 
 function Bibliotheque.noter(params)
@@ -1327,7 +1333,7 @@ function Bibliotheque.noter(params)
     ecrire(etape, function()
         for _, plan in ipairs(plans) do
             classer(plan, plan.demande, {}, {})
-            memoriser(plan, etape, { raison = plan.demande.raison })
+            memoriser(plan, etape, { raison = plan.demande.raison }, true)
         end
     end)
     for _, plan in ipairs(plans) do

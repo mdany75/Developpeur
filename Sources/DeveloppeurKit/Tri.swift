@@ -153,9 +153,9 @@ public enum Tri {
     /// Sans date, une ressemblance plus stricte (même photo, ou presque).
     static let distanceSansDate = 0.35
 
-    /// Groupes dont une seule photo est proposée : les rafales, et les piles de Lightroom (une pile
-    /// et une rafale qui se touchent n'en font qu'un). `pile` : la photo du dessus, si le groupe
-    /// porte une pile.
+    /// Groupes dont seule la meilleure vue échappe au plafond de 3 ★ : les rafales, et les piles de
+    /// Lightroom (une pile et une rafale qui se touchent n'en font qu'un). `pile` : la photo du
+    /// dessus, si le groupe porte une pile.
     static func groupes(_ photos: [PhotoTriee]) -> [(membres: [Int], pile: Int?)] {
         var parent = Array(photos.indices)
         func racine(_ i: Int) -> Int { var i = i; while parent[i] != i { i = parent[i] }; return i }

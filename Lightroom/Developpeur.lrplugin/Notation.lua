@@ -457,13 +457,17 @@ function Notation.proposer(params)
     local s
     if params.seance ~= nil then
         s = r.seances[tostring(params.seance)]
-            or echouer("Séance de notation inconnue : " .. tostring(params.seance) .. ". La commande notation (action « seance ») donne la séance ouverte.")
+            or echouer("Séance de notation inconnue : " .. tostring(params.seance) .. ". propose_ratings avec read_session = true donne la séance ouverte.")
     else
         s = seanceDe(r, nil)
     end
     local passe = entier(params.passe)
     if passe and (passe < 1 or passe > Notation.PASSES) then
         echouer(string.format("Passe invalide : de 1 à %d.", Notation.PASSES))
+    end
+    -- La dernière passe (5 étoiles) est à l'utilisateur seul : rien à y proposer.
+    if passe == Notation.PASSES then
+        echouer(string.format("Passe %d : 5 étoiles, l'utilisateur seul ; rien à proposer.", Notation.PASSES))
     end
     local dansSeance = membres(s)
 
@@ -580,11 +584,13 @@ local function lire(params)
         perdues = perdues > 0 and perdues or nil }
 end
 
--- Commande « seance » : la séance active (ou donnée), pour que Claude sache quelles photos noter.
+-- Commande « seance » (propose_ratings avec read_session) : la séance active (ou donnée), pour que
+-- Claude sache quelles photos noter.
 local function seanceCommande(params)
     local s = seanceDe(charger(), params.seance)
     if not s then
-        return { id = Json.null, message = "Aucune séance de notation ouverte dans Lightroom (fenêtre Claude › Séance…)." }
+        return { id = Json.null, message = params.seance ~= nil and ("Séance de notation inconnue : " .. tostring(params.seance) .. ".")
+            or "Aucune séance de notation ouverte dans Lightroom (fenêtre Claude › Séance…)." }
     end
     local photos = Json.tableau()
     for i, id in ipairs(s.photos) do

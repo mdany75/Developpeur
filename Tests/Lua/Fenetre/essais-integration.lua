@@ -280,7 +280,7 @@ essai('Séance : ouverte sur la sélection, passe 1 envoyée avec le vrai identi
         egal('notation', c.genre)
         egal(idSeance, c.seance)
         vrai(c ~= Moteur.courante, 'la conversation de la fenêtre Claude ne change pas')
-        egal(c, Moteur.conversation(c.id), 'rangée dans le moteur')
+        egal(c, Moteur.trouver(c.id), 'rangée dans le moteur')
         egal('[Lightroom : séance de notation « ' .. s.titre .. ' », 4 photos ; passe 1]', envoi.options.contexte)
         egal(c, Moteur.nouvelleSeance { titre = 'autre', seance = idSeance }, 'reprise à la passe suivante')
 
