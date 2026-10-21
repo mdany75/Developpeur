@@ -190,8 +190,9 @@ final class ToolsAvancesTests: XCTestCase {
 
     func testAddMaskPosesALightroomLocalEffect() throws {
         let effects = TestSupport.localEffects().effects
-        XCTAssertEqual(effects.map(\.name), ["Blanchissement des dents", "Peau douce maison", "Iris Enhance"],
-                       "le blanchiment livré avec Lightroom n'est pas répété")
+        XCTAssertEqual(effects.map(\.name), ["Blanchissement des dents", "Peau douce maison", "Iris Enhance",
+                                             "Peau du visage lisse", "Adoucir la peau (Lite)"],
+                       "le blanchiment livré avec Lightroom n'est pas répété ; la dose d'Adobe pour la peau vient en dernier")
         XCTAssertEqual(effects[0].locaux, ["LocalExposure2012": 0.1, "LocalSaturation": -0.6],
                        "sans les clés d'avant 2012 ni une teinte sans saturation")
         XCTAssertEqual(effects[1].locaux["LocalToningHue"], 30)
@@ -211,7 +212,10 @@ final class ToolsAvancesTests: XCTestCase {
         XCTAssertEqual(masks[0]["nom"]?.string, "Claude · Blanchissement des dents")
         XCTAssertEqual(masks[1]["locaux"]?["LocalSaturation"]?.double, 0.2, "adjustments remplace le réglage de l'effet")
         XCTAssertEqual(masks[1]["locaux"]?["LocalClarity2012"]?.double, 0.1)
-        XCTAssertTrue(result.text.contains("Effet « Blanchissement des dents » : exposition +0,4 IL, saturation −60"), result.text)
+        XCTAssertTrue(result.text.contains("Effet « Blanchissement des dents » : exposition +0,4 IL, saturation −60 ; à 70 % : exposition +0,28 IL, saturation −42."),
+                      result.text)
+        XCTAssertTrue(result.text.contains("Effet « Iris Enhance » : exposition +0,35 IL, clarté +10, saturation +40."),
+                      "à 100 % : l'effet seul, sans dose réduite")
 
         let unknown = call("add_mask", ["masks": [["kind": "subject", "effect": "Peau de pêche"]], "step_name": "x"])
         XCTAssertTrue(unknown.isError && unknown.text.contains("Blanchissement des dents"), unknown.text)
