@@ -62,8 +62,9 @@ func usage() {
             mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--original] [--images <dossier>]
                 recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
                 (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
-                garde les étapes de la recette. --portrait : la peau dosée sur un portrait ; --mixte : une photo à
-                deux lumières (lampe et fenêtre), en lecture seule. D'abord la liaison fermée et l'écran nommé
+                garde les étapes de la recette ; d'abord la liaison fermée et l'écran nommé, en lecture seule.
+                --portrait : la peau dosée sur un portrait ; --mixte : une photo à deux lumières (lampe et fenêtre)
+                lue mixte, puis le RAW lu à une seule lumière, en lecture seule
     Les commandes portent le jeton privé de la liaison (liaison.jeton, écrit par le module à chaque démarrage
     de la liaison) ; le serveur ne le crée jamais et ne le dit jamais.
     DEVELOPPEUR_PORT=<port> change le port des commandes (les réponses sur le port suivant ;
@@ -341,6 +342,8 @@ case "--recette":
         let seconds = String(format: "%.1f", etape.duree).replacingOccurrences(of: ".", with: ",")
         print(line: "\(etape.reussie ? "✔" : "✘") \(etape.photo) · \(etape.nom) — \(etape.detail) (\(seconds) s)")
     }
+    // L'étape « écran nommé » lit l'écran du Mac (la recette n'en lit aucun par défaut).
+    recette.lireEcran = Ecran.lire
     recette.lancer(raw: raw, jpeg: jpeg, flash: flash, profondeur: profondeur, yeuxRouges: yeuxRouges, xt20: xt20,
                    portrait: portrait, mixte: mixte)
     let failures = recette.etapes.filter { !$0.reussie }.count

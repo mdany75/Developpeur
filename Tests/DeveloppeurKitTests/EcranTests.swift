@@ -369,7 +369,7 @@ final class EcranTests: XCTestCase {
         defer { plugin.stop() }
         let jeton = String(repeating: "ab", count: 32)
         plugin.jetonAttendu = jeton
-        var fermee = true
+        var fermee = true, fuite = false
         plugin.handler = { requete in
             let id = requete["id"] ?? .null
             switch requete["command"]?.string {
@@ -377,6 +377,7 @@ final class EcranTests: XCTestCase {
             case "etat":
                 var etat: [String: JSONValue] = ["module": "Développeur"]
                 if fermee { etat["liaison_fermee"] = true }
+                if fuite { etat["jeton"] = .string(jeton) }
                 return [JSONCoding.line(["id": id, "result": .object(etat)])]
             default: return [JSONCoding.line(["id": id, "error": "commande inattendue"])]
             }
@@ -401,6 +402,15 @@ final class EcranTests: XCTestCase {
         XCTAssertEqual(jetons.last, jeton)
         XCTAssertEqual(Set(plugin.received), ["ping", "etat"])
 
+        // Un module qui donnerait son jeton dans l'état : signalé.
+        fuite = true
+        let bavard = Recette(lightroom: pont)
+        bavard.lireEcran = { Ecran.Etat(principal: Self.odyssey) }
+        bavard.lancer(raw: nil, jpeg: nil, flash: nil)
+        XCTAssertEqual(bavard.etapes.map(\.reussie), [false, true])
+        XCTAssertTrue(bavard.etapes[0].detail.contains("le jeton est dans get_status"), bavard.etapes[0].detail)
+        fuite = false
+
         // Un module d'avant la 1.2 : rien d'autre essayé, l'écran se dit quand même.
         fermee = false
         plugin.jetonAttendu = nil
@@ -411,13 +421,25 @@ final class EcranTests: XCTestCase {
         XCTAssertEqual(ancienne.etapes.map(\.reussie), [false, true])
         XCTAssertTrue(ancienne.etapes[0].detail.contains("d'avant la 1.2"), ancienne.etapes[0].detail)
         XCTAssertFalse(plugin.jetonsRecus.dropFirst(avant).contains { $0 != jeton }, "aucune commande sans le jeton de la liaison")
+
+        // Par défaut, la recette ne lit aucun écran, même avec le vrai pont : main.swift pose
+        // Ecran.lire pour --recette ; swift test ne lit jamais le vrai écran.
+        XCTAssertNil(Recette(lightroom: FakeLightroom()).lireEcran())
+        let sansEcran = Recette(lightroom: pont)
+        sansEcran.lancer(raw: nil, jpeg: nil, flash: nil)
+        XCTAssertEqual(sansEcran.etapes.map(\.nom), ["liaison fermée (jeton privé)", "écran nommé (get_status)"])
+        XCTAssertFalse(sansEcran.etapes[1].reussie)
+        XCTAssertTrue(sansEcran.etapes[1].detail.contains("aucun écran lu"), sansEcran.etapes[1].detail)
     }
 
     // MARK: - Lecture réelle
 
     /// Les vrais écrans (le Mac, ou le macOS de GitHub, avec un écran virtuel ou sans écran) : la
-    /// lecture finit vite et ne plante pas ; aucune valeur précise n'est attendue.
-    func testLectureReelleSansPlantage() {
+    /// lecture finit vite et ne plante pas ; aucune valeur précise n'est attendue. Sur demande
+    /// seulement (DEVELOPPEUR_ECRAN_REEL=1 swift test) : swift test ne lit jamais le vrai écran.
+    func testLectureReelleSansPlantage() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["DEVELOPPEUR_ECRAN_REEL"] == "1",
+                          "lecture du vrai écran sur demande seulement (DEVELOPPEUR_ECRAN_REEL=1)")
         let debut = Date()
         let etat = Ecran.lire()
         XCTAssertLessThan(Date().timeIntervalSince(debut), 2)
