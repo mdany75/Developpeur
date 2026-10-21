@@ -25,8 +25,10 @@ final class EclairageTests: XCTestCase {
         return (srgb(lineaire(c.0) * gains.0), srgb(lineaire(c.1) * gains.1), srgb(lineaire(c.2) * gains.2))
     }
 
-    /// Une balance bien plus froide que la lumière (3 200 K sur une scène de jour), et moins forte.
+    /// Une balance bien plus froide que la lumière (3 200 K sur une scène de jour), et moins forte ;
+    /// de même, bien plus chaude, et un peu.
     static let froide = (0.72, 0.97, 1.55), unPeuFroide = (0.82, 0.98, 1.3)
+    static let chaude = (1.4, 1.0, 0.65), unPeuChaude = (1.2, 1.0, 0.8)
 
     /// Image de synthèse sans compression : chaque pixel prend la couleur donnée pour (x, y), depuis
     /// le coin haut gauche.
@@ -340,29 +342,45 @@ final class EclairageTests: XCTestCase {
 
     /// Relevé du 20 octobre 2026 : sous une autre balance (3 200 K), la borne absolue (C* < 12) ne
     /// lisait plus aucune case. Autour du point neutre de l'image, deux lumières restent mixtes et
-    /// une seule lumière reste simple, avec le même écart à 25 % près.
+    /// une seule lumière reste simple, avec le même écart à 25 % près, sous une dominante froide
+    /// comme chaude, quand elle éloigne du gris la lumière majoritaire (le point neutre la suit).
+    /// Limite connue, non couverte ici (`Eclairage.toleranceNeutre`) : une dominante qui rapproche
+    /// du gris la lumière majoritaire fait sortir l'autre de la borne.
     func testUneDominanteGlobaleNeChangePasLeVerdict() throws {
-        let deux = try XCTUnwrap(Eclairage.mesurer(Self.tiersGauche(Self.lampe, reste: Self.fenetre)))
         let une = try XCTUnwrap(Eclairage.mesurer(Self.image { _, _ in Self.gris }))
-        XCTAssertTrue(deux.mixte)
         XCTAssertFalse(une.mixte)
-        let ecart = try XCTUnwrap(deux.ecartRegions)
-        for (nom, gains) in [("froide", Self.froide), ("un peu froide", Self.unPeuFroide)] {
+        for (nom, gains, lampeMajoritaire) in [("froide", Self.froide, false), ("un peu froide", Self.unPeuFroide, false),
+                                               ("chaude", Self.chaude, true), ("un peu chaude", Self.unPeuChaude, true)] {
+            // La lampe au tiers gauche (fenêtre majoritaire) sous une dominante froide ; aux deux
+            // tiers de droite (lampe majoritaire) sous une dominante chaude.
+            func scene(_ lampe: Couleur, _ fenetre: Couleur) -> CGImage {
+                lampeMajoritaire ? Self.tiersGauche(fenetre, reste: lampe) : Self.tiersGauche(lampe, reste: fenetre)
+            }
+            let deux = try XCTUnwrap(Eclairage.mesurer(scene(Self.lampe, Self.fenetre)))
+            XCTAssertTrue(deux.mixte, nom)
+            let ecart = try XCTUnwrap(deux.ecartRegions)
+
             let lampe = Self.dominante(Self.lampe, gains), fenetre = Self.dominante(Self.fenetre, gains), gris = Self.dominante(Self.gris, gains)
             // La dominante pousse les tons neutres au-delà de la borne autour du gris : sans le point
-            // neutre de l'image, la fenêtre (les deux tiers) et le gris ne se liraient plus.
-            XCTAssertGreaterThan(hypot(Self.lab(fenetre).a, Self.lab(fenetre).b), Eclairage.chromaMax, nom)
-            if nom == "froide" {
-                XCTAssertGreaterThan(hypot(Self.lab(gris).a, Self.lab(gris).b), Eclairage.chromaMax, "le gris non plus")
+            // neutre de l'image, la lumière majoritaire (les deux tiers) ne se lirait plus.
+            let majoritaire = Self.lab(lampeMajoritaire ? lampe : fenetre)
+            XCTAssertGreaterThan(hypot(majoritaire.a, majoritaire.b), Eclairage.chromaMax, nom)
+            if nom == "froide" || nom == "chaude" {
+                XCTAssertGreaterThan(hypot(Self.lab(gris).a, Self.lab(gris).b), Eclairage.chromaMax, "\(nom) : le gris non plus")
             }
 
-            let mixte = try XCTUnwrap(Eclairage.mesurer(Self.tiersGauche(lampe, reste: fenetre)))
+            let mixte = try XCTUnwrap(Eclairage.mesurer(scene(lampe, fenetre)))
             XCTAssertTrue(mixte.mixte, "\(nom) : deux lumières restent mixtes (\(mixte.lecture))")
             XCTAssertEqual(mixte.regions.compactMap { $0 }.count, 9, nom)
             XCTAssertEqual(try XCTUnwrap(mixte.ecartRegions), ecart, accuracy: 0.25 * ecart, "\(nom) : le même écart à 25 % près")
-            XCTAssertEqual(mixte.groupes.first?.cases, [0, 3, 6], "\(nom) : la lampe reste la plus chaude")
-            XCTAssertLessThan(mixte.neutre.b, -Eclairage.toleranceNeutre, "\(nom) : le point neutre suit la dominante")
-            XCTAssertLessThan(mixte.centre.b, 0, nom)
+            XCTAssertEqual(mixte.groupes.first?.cases, lampeMajoritaire ? [1, 2, 4, 5, 7, 8] : [0, 3, 6], "\(nom) : la lampe reste la plus chaude")
+            if lampeMajoritaire {
+                XCTAssertGreaterThan(mixte.neutre.b, Eclairage.toleranceNeutre, "\(nom) : le point neutre suit la dominante")
+                XCTAssertGreaterThan(mixte.centre.b, 0, nom)
+            } else {
+                XCTAssertLessThan(mixte.neutre.b, -Eclairage.toleranceNeutre, "\(nom) : le point neutre suit la dominante")
+                XCTAssertLessThan(mixte.centre.b, 0, nom)
+            }
 
             let simple = try XCTUnwrap(Eclairage.mesurer(Self.image { _, _ in gris }))
             XCTAssertFalse(simple.mixte, nom)

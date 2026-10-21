@@ -898,10 +898,6 @@ final class BilanTests: XCTestCase {
         let sansComparaison = try JSONCoding.parse(tools.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 1]]).text)
         XCTAssertNil(sansComparaison["bilan"])
         XCTAssertNotNil(sansComparaison["mesures_proposition"]?["eclairage"])
-        // Un grain proposé : un bruit en hausse serait voulu.
-        XCTAssertTrue(ToolHandler.grainAjoute(.array([["cle": "GrainAmount", "avant": 0, "apres": 25]])))
-        XCTAssertFalse(ToolHandler.grainAjoute(.array([["cle": "GrainAmount", "avant": 25, "apres": 0]])))
-        XCTAssertFalse(ToolHandler.grainAjoute(nil))
     }
 
     /// Le résultat gardé par FileOutils (réponse d'attente, puis le même appel) : la vue n'est

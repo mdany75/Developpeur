@@ -201,9 +201,20 @@ final class AnalyseTests: XCTestCase {
         XCTAssertNotNil(eclairage["conseil"])
         XCTAssertEqual(eclairage["regions_3x3"]?.array?.count, 3)
         XCTAssertEqual(eclairage["groupes"]?.array?.count, 2)
-        if let balance = eclairage["balance_proposee"] {
-            // Vision a vu une zone d'intérêt : la balance part de la Temperature brute de la réponse.
-            XCTAssertNotNil(balance["Temperature"]?.double)
+        // La balance proposée part de la Temperature brute de la réponse (en kelvins), pas des
+        // réglages regroupés de `info`, qui l'ont perdue : la même que balanceProposee sur la réponse
+        // du module, dès que Vision donne une zone d'intérêt (sur cette image, il en donne une).
+        let decodee = try XCTUnwrap(PreviewImages.image(image))
+        let vision = VisionAnalysis.analyze(decodee)
+        let mesure = try XCTUnwrap(Eclairage.mesurer(PreviewImages.scaled(decodee, maxSide: Measurements.maxSide),
+                                                     visages: vision?.faces.map(\.box) ?? [], sujet: vision?.salientArea))
+        let reponse: JSONValue = ["echelle_temperature": "kelvins (RAW : 2000 à 50000)", "reglages": ["Temperature": 5000, "Tint": 0]]
+        if let attendue = ToolHandler.balanceProposee(mesure, reponse: reponse) {
+            let balance = try XCTUnwrap(eclairage["balance_proposee"], "\(eclairage)")
+            XCTAssertEqual(try XCTUnwrap(balance["Temperature"]?.double), attendue.temperature, accuracy: 0.5)
+            XCTAssertNotEqual(attendue.temperature, 5000, "la lumière du sujet n'est pas neutre")
+        } else {
+            XCTAssertNil(eclairage["balance_proposee"], "sans zone d'intérêt ni visage : pas de lumière du sujet")
         }
         XCTAssertNotNil(info["vision"]?["visages"], "vision reste à sa place")
         XCTAssertNotNil(info["mesures"]?["luminosite_L"])

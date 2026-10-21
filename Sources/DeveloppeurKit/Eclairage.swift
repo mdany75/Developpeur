@@ -253,8 +253,14 @@ public enum Eclairage {
     /// 0,1 près, et sur ces cinq aperçus, à leur balance et sous sept dominantes simulées (gains en
     /// lumière linéaire), 38 lectures sur 40 gardent au moins 7 cases sur 9 (30 sur 40 autour du
     /// gris seul). Le verdict sous une forte dominante reste fragile (la mesure a*b* elle-même varie,
-    /// même sur les mêmes pixels). Provisoire : à relever dans Lightroom (`--eclairage --essai`,
-    /// 3 200 et 6 500 K, ±30 en relatif).
+    /// même sur les mêmes pixels). Limite connue : une dominante qui rapproche du gris la lumière
+    /// majoritaire (le portrait, à lumière chaude majoritaire, sous une balance trop froide) laisse
+    /// le point neutre près du gris, et l'autre lumière sort de la borne : l'éclairage se lit
+    /// simple (portrait sous trois dominantes froides simulées : 3,4 à 4,5). Relu le 21 octobre
+    /// 2026 sur les mêmes aperçus : aucun autre centre essayé (gris seul, point neutre sans
+    /// tolérance, milieu des quartiles ou des déciles, avec ou sans tolérance) ne tient mieux à la
+    /// fois la balance de la photo et les dominantes. Provisoire : à relever dans Lightroom
+    /// (`--eclairage --essai`, 3 200 et 6 500 K, ±30 en relatif).
     static let toleranceNeutre = 10.0
     /// Écart a*b* entre ombres et hautes lumières à partir duquel il se lit. Provisoire, à relever.
     public static let seuilTonal = 8.0

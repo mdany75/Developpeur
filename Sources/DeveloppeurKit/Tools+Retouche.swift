@@ -320,21 +320,12 @@ extension ToolHandler {
                     avant: actuel.mesures, apres: proposition.mesures, detailAvant: nil, detailApres: nil,
                     depuis: "l'état actuel : la proposition n'est pas appliquée",
                     conseil: "Une « regression » se corrige dans la proposition avant de l'appliquer.",
-                    grainAjoute: Self.grainAjoute(result["changements"]),
                     cadreChange: actuel.largeur != proposition.largeur || actuel.hauteur != proposition.hauteur)
             }
         }
         if let proposition { info["mesures_proposition"] = proposition.json }
         info["rien_n_est_applique"] = "La photo a été remise comme avant ; apply_settings applique la proposition."
         return ToolResult(content: [Self.imageContent(image), .text(JSONCoding.pretty(.object(info)))])
-    }
-
-    /// La proposition ajoute du grain (GrainAmount en hausse) : un bruit en hausse est alors voulu.
-    static func grainAjoute(_ changements: JSONValue?) -> Bool {
-        (changements?.array ?? []).contains { changement in
-            guard changement["cle"]?.string == "GrainAmount", let apres = changement["apres"]?.double else { return false }
-            return apres > (changement["avant"]?.double ?? 0)
-        }
     }
 
     /// Les paramètres de retouche globale, vérifiés, sous la forme qu'attend le module, et les
