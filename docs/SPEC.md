@@ -20,6 +20,15 @@ l'aperçu de la photo active avec son point de mise au point et la proposition p
 l'ouverture (voir Fenêtre Claude), le point de mise au point sur un zoom de `view_photo` (voir Tri
 d'une séance) et le masque d'une personne seule gardé (voir Masques : pistes de la 2.1).
 
+La 1.3 (apprendre en regardant Claude), en cours sur la branche `version-1.3` et pas encore
+publiée (`CHANGELOG.md`, « Non publié »), a cinq chantiers, chacun dans sa section : Pourquoi ? :
+l'avant/après des étapes, Leçon de la photo, Je le fais, Composition lue, Carnet de progrès ; ce
+qui en reste à voir dans Lightroom est dans À constater dans Lightroom (1.3). Elle porte aussi la
+fenêtre B, l'allure de la maquette « B · Conversation claire », agrandie à la demande de Dany
+(voir Fenêtre Claude › Fenêtre B), et les corrections tirées des mesures du 21 octobre 2026 dans
+Lightroom (photo active remise, texture au point de mise au point, faux visages, ligne affinée,
+empreinte des étapes, registre des notes remis par la recette).
+
 ## Architecture
 
 Deux pièces :
@@ -27,13 +36,16 @@ Deux pièces :
 - le connecteur MCP-Développeur : `mcp-developpeur`, serveur MCP natif en Swift
   (`serverInfo.name` MCP-Developpeur, `title` « MCP-Développeur », bundle
   `com.danymenard.mcp-developpeur`), installé dans `~/Library/Application Support/Developpeur/`
-  et inscrit sous la clé `MCP-Developpeur` dans Claude Desktop et Claude Code ; 34 outils et
-  9 invites ;
+  et inscrit sous la clé `MCP-Developpeur` dans Claude Desktop et Claude Code ; 36 outils (34
+  jusqu'à la 1.2 ; la 1.3 ajoute `read_composition` après `measure_angle` et `photo_lesson` à la
+  fin, tous deux en lecture seule) et 9 invites ;
 - le module Lightroom « Développeur » (`Lightroom/Developpeur.lrplugin`, identifiant
   `com.danymenard.developpeur`, Lightroom Classic 13.3 au moins), qui porte la liaison avec le
   serveur (`Liaison.lua`), la fenêtre Claude (voir Fenêtre Claude), les fenêtres Publication et
-  Consommation, le registre des notes proposées (`Notation.lua`, voir Notation) et la fenêtre de
-  suivi de la liaison. Journaux : `~/Library/Logs/Developpeur/`
+  Consommation, le registre des notes proposées (`Notation.lua`, voir Notation), depuis la 1.3
+  l'avant/après des étapes (`Etapes.lua`) et le carnet de progrès avec les leçons des photos
+  (`Carnet.lua`, `carnet.json`), et la fenêtre de suivi de la liaison. Journaux :
+  `~/Library/Logs/Developpeur/`
   (`module.log` pour la liaison, `conversation.log` pour la fenêtre).
 
 ```
@@ -113,7 +125,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `etat` | `sauvegarde?` | versions, catalogue, mode, pause, limites, photo active, `liaison_fermee` (1.2 : vrai) ; avec `sauvegarde`, la sauvegarde du catalogue demandée pour la fermeture suivante |
 | `selection` | `limite` | `total`, `renvoyees`, `photos` (id, fichier, données de prise de vue, note, drapeau, libellé, pile, `active`) |
 | `reglages` | `photo?`, `cles`, `details?`, `toutes?` | `reglages` (valeurs des clés demandées), `photo` (id, fichier, `copie_virtuelle`), `echelle_temperature`, `version_processus`, `profil`, `intensite_profil`, `appareil`, `recadrage` (angle, dimensions, orientation) ; avec `details` : `courbes_par_points`, `masques` (composants avec leur mode), `couleurs_ponctuelles`, `taches`, `yeux_rouges`, `filtres_calcules`, `amelioration` (photo affichée dans le module Développement seulement), `classement` (note, drapeau, libellé, titre, mots-clés) ; avec `toutes` : `tous`, tout ce que Lightroom range |
-| `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier ; après la 1.1.1, sur un zoom `region` aussi, jamais sur un avant/après), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point ; avec `point_af` aussi (1.2), `etapes_claude` (`nombre`, `derniere` : les étapes de Claude gardées pour la photo, `etapesClaude`, lues seulement), pour le bilan de `view_photo` (voir Bilan d'une passe à l'autre) |
+| `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?`, `entier?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier ; après la 1.1.1, sur un zoom `region` aussi, jamais sur un avant/après), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point ; avec `point_af` aussi (1.2), `etapes_claude` (`nombre`, `derniere` : les étapes de Claude gardées pour la photo, `etapesClaude`, lues seulement), pour le bilan de `view_photo` (voir Bilan d'une passe à l'autre) ; avec `comparer = versionClaude` (1.3), `chemin_avant` est la version de Claude de l'exercice, et `exercice` = `{instantane, le, ecarts [{cle, depart, claude, vous}], listes {masques, taches, yeux_rouges = {depart, vous}}, restent, rien_change}` (voir Je le fais) ; avec `entier` (1.3, `read_composition`), l'image entière sans son cadre, `image_entiere` = vrai, `dimensions` {`largeur`, `hauteur`}, `cadre_actuel` (absent sans recadrage), refusé avec `comparer` ou `point_af` (voir Composition lue) |
 | `appliquer` | `photos?` ou `selection?`, `reglages`, `booleens?`, `looks_traitement?`, `profil?`, `profil_marque?`, `profil_variantes?`, `profil_look?`, `recadrage?`, `recalages?`, `courbes?`, `couleurs_ponctuelles?`, `balance?`, `auto_ton?`, `preset?`, `plages`, `libelles`, `relatif`, `etape`, `raison?`, `confirme` | par photo : `changements` (`cle`, `avant`, `apres`) et `remarques` ; `a_recadrer` et `etape_ecrite` quand un cadre demandé reste à placer (voir Recadrage) |
 | `recadrer` | `photos`, `recadrage`, `recalages`, `completer?`, `etape`, `raison?`, `confirme` | comme `appliquer` (changements du cadre seulement) |
 | `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
@@ -121,12 +133,12 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `retoucher` | `photo?`, `taches`, `yeux`, `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
 | `geometrie` | `photo?`, `photos?` ou `selection?`, `rendre?`, `taille?` | `photos` : par photo, `active` (correction géométrique), `transformation` (Upright, perspective ou distorsion manuelle), `empreinte` ; avec `rendre`, `chemin_corrige` et `chemin_origine` (voir Recalage de la géométrie) |
 | `copier` | `source`, `photos?` ou `selection?`, `cles`, `inclure`, `etape`, `raison?`, `confirme` | comme `appliquer`, sans la photo source |
-| `essayer` | `action` (`appliquer`, `masquer`, `retoucher`), `photo?`, `taille`, `comparer?`, `instantane?`, et les paramètres de l'action | `chemin` (et `chemin_actuel`), `changements`, `remarques` ; avec `instantane`, l'état proposé est rangé en instantané « Claude · <nom> » avant le rendu (`instantane` dans la réponse) ; la photo est remise comme avant |
+| `essayer` | `action` (`appliquer`, `masquer`, `retoucher`), `photo?`, `taille`, `comparer?`, `instantane?`, `exercice?`, `sans_rendu?`, `entier?`, et les paramètres de l'action | `chemin` (et `chemin_actuel`), `changements`, `remarques` ; avec `instantane`, l'état proposé est rangé en instantané « Claude · <nom> » avant le rendu (`instantane` dans la réponse) ; la photo est remise comme avant. 1.3 : `exercice` (exige `instantane`) range aussi le départ et la version de Claude dans la mémoire de la variante, l'entrée `exercice` au journal, et rend `exercice = {instantane}` et `raw` ; une proposition qui ne change rien est refusée ; `sans_rendu` : aucun rendu, ni `chemin` (voir Je le fais). `entier`, avec un recadrage proposé (action `appliquer`, ni `sans_rendu` ni `exercice`) : `cadre_propose` (le cadre que Lightroom a gardé, relu), `dimensions` et `chemin_entier` (troisième étape « Claude · essai : image entière ») ; sans image entière, la remarque « Image entière non rendue : … » (voir Composition lue) |
 | `presets` | `filtre?`, `limite` | `total`, `presets` (dossier, nom, UUID) |
 | `creerPreset` | `nom`, `photo?`, `cles`, `inclure` | `reglages` de la photo, dont le serveur fait un fichier XMP |
-| `journal` | `photos?` ou `selection?` | par photo : `entrees` (date, étape, raison, changements ou note) |
+| `journal` | `photos?` ou `selection?`, `detaille?` | par photo : `entrees` (date, étape, raison, changements ou note ; `etape_id` depuis la 1.3) ; avec `detaille` (1.3, `photo_lesson`), la photo décrite en entier et `prise_de_vue_plus` `{compensation, flash, programme, mesure}`, chacune omise si Lightroom la refuse ou la rend vide (voir Leçon de la photo) |
 | `diagnostic` | `modules?`, `methodes?`, `cles?`, `valeurs?` | fonctions offertes par le SDK de cette version de Lightroom : celles des modules, des méthodes cherchées par leur nom sur le catalogue, la photo active, le premier mot-clé, la première collection et le premier ensemble (sans les appeler), et le type des métadonnées brutes de la photo active ; avec `valeurs`, des valeurs lues sans rien écrire : jeu de libellés, filtre de la Bibliothèque et ses paramètres prédéfinis, original et aperçu dynamique de la photo active |
-| `annuler` | `photos?` ou `selection?` | par photo : étape annulée et réglages remis |
+| `annuler` | `photos?` ou `selection?` | par photo : étape annulée et réglages remis ; depuis la 1.3, `etape_id` de l'étape défaite (null pour une étape d'avant la 1.3) |
 | `revenir` | `photos?` ou `selection?` | par photo : réglages remis à l'état d'avant Claude |
 | `metadonnees` | `photos?` ou `selection?`, `note?`, `drapeau?` (`retenue`, `rejetee`, `aucun`), `libelle?` (`rouge`… `violet`, `aucun`), `titre?`, `legende?`, `droits?`, `ajouter?`, `retirer?` (mots-clés, par nom ou chemin « A > B »), `preset_metadonnees?` (nom ou identifiant), `etape`, `raison?`, `confirme` | comme `appliquer` ; `mots_cles_crees` (chemins) quand il en a créé (voir Bibliothèque) |
 | `motsCles` | `filtre?`, `limite` | `total`, `mots_cles` (chemin, nombre de photos) |
@@ -146,7 +158,19 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `masques` | `photo?`, `action` (`lister`, `masquer`, `afficher`, `retirer`, `dupliquer`, `recalculer`, `affiner`, `retirer_vides`), `masque?`, `inverser?`, `nom?`, `contour?`, `decalage?`, `etape`, `raison?`, `confirme` | `lister` : `photo`, `masques` ; sinon `resultats` comme `appliquer`, et `masques` (la liste après l'écriture) ; voir Masques : pistes de la 2.1 |
 | `progression` | `id`, `titre?`, `fait?`, `total?`, `message?`, `fin?` | `annulee` (croix de la barre de Lightroom), `fermee` à la fin |
 | `variantes` | `photo?`, `action` (`lister`, `choisir`, `effacer`), `nom?`, `noms?`, `effacer_autres?`, `etape`, `raison?`, `confirme` | `lister` : `variantes` (nom, réglages touchés, date) ; `choisir` : `etape`, `instantane`, `changements`, `effaces` ; `effacer` : `effaces` ; voir Variantes |
-| `notation` | `action` (`proposer`, `lire`) ; `proposer` : `propositions` (`photo`, `note` de 0 à 4, `drapeau` `aucun` ou `rejetee`, `criteres` `{impact, qualites, plancher, finition?}`, `plafond?`, `raison`, `a_verifier`), `passe?`, `poser?` ; `lire` : `photos?` | `proposer` : `propositions` (`photo`, `fichier`, `note_avant`, `drapeau_avant`, `etat`, toujours `a_verifier` depuis la 1.1.1), `refusees` (`photo`, `raison`) ; avec `poser`, `posees` (`photo`, `etat`, `note`, `drapeau`, `erreur`, `remarques`) et `erreur_pose?` ; `lire` : `propositions`, `perdues?`. Sans `poser`, rien n'est écrit dans le catalogue (voir Notation) |
+| `notation` | `action` (`proposer`, `lire`) ; `proposer` : `propositions` (`photo`, `note` de 0 à 4, `drapeau` `aucun` ou `rejetee`, `criteres` `{impact, qualites, plancher, finition?}`, `plafond?`, `raison`, `a_verifier`), `passe?`, `poser?` ; `lire` : `photos?` | `proposer` : `propositions` (`photo`, `fichier`, `note_avant`, `drapeau_avant`, `etat`, toujours `a_verifier` depuis la 1.1.1), `refusees` (`photo`, `raison`) ; avec `poser`, `posees` (`photo`, `etat`, `note`, `drapeau`, `erreur`, `remarques`) et `erreur_pose?` ; `lire` : `propositions`, `perdues?`. Sans `poser`, rien n'est écrit dans le catalogue (voir Notation). 1.3 : `remettre` (`photo`, `proposition` ou null ; la recette seulement, jamais un outil) remet la proposition lue avant une étape de la recette, ou la retire, sans rien écrire au catalogue |
+| `lecon` (1.3) | `action` (`garder`, `lire`, `retirer`) ; `garder` : `photo?`, `lecon` = `{points, indices?}` (trois points, un par axe : `lumiere`, `couleur`, `composition`) ; `lire` : `photos?` ; `retirer` : `photo` ou `photos` | `garder` : `{photo, original, fichier, rangee, remplacee, mois, prise_le, sans_date, remarque?}` ; `lire` : `{lecons, perdues?}` (une photo disparue ou d'un autre uuid perd sa leçon) ; `retirer` : `{retirees}`. Rien dans le catalogue, pas d'arrêt par la pause, jamais rejouée (voir Leçon de la photo) |
+| `carnet` (1.3) | `action` (`constater`, `lire`, `retirer`) ; `constater` : `photo`, `vue` = `{cherches, defauts [{code, mesure?, texte?}]}` ou `angle` = `{inclinaison, code, source?}`, `vocabulaire`, `essai_recette?` ; `lire` : `resume?` ; `retirer` : `photos` | `constater` : `{note = true, constat, photo, original, fichier, mois, prise_le, sans_date, remplacee, remarque?}` ou `{note = false, motif (preference, essai, etapes, geometrie), raison, photo}` ; `lire` : `{catalogue, nombre, photos, resume?}` (leçons comprises) ; `retirer` : `{retirees, absentes?}` (un original ou une copie). Rien dans le catalogue, pas d'arrêt par la pause, jamais rejouée (voir Carnet de progrès) |
+| `etapes` (1.3) | `photo?` | `{photo, etapes [{id, nom, en_memoire, avant, apres, etat, raison}]}` : les étapes de la mémoire, puis celles qui ne restent que sur le disque ; lecture seule, rejouée (voir Pourquoi ? : l'avant/après des étapes) |
+
+Étapes (1.3) : chaque résultat d'une commande qui écrit une étape de Claude (`appliquer`,
+`recadrer` — le même id que l'étape qu'il complète —, `masquer`, `retoucher`, `copier`,
+`masques`, `ameliorer`, `supprimer`, `metadonnees`, `collections`) porte `etape_id`, null sans
+étape ; `variantes` `choisir` le rend à plat. Deux paramètres de plus pour toute commande qui écrit
+une étape : `avant_apres` (la recette seulement, jamais un outil : force l'avant/après, même hors
+de la photo active) et `sans_avant_apres` (`match_series` : jamais d'avant/après). Les lectures
+que le serveur rejoue une fois après une coupure (`LightroomBridge.lectures`) gagnent `etapes` ;
+`lecon` et `carnet` n'y sont pas : ils écrivent `carnet.json`.
 
 Sans `photo`, `photos` ni `selection`, la commande vise la photo active. L'aperçu est rendu dans
 un dossier temporaire propre à chaque demande ; le serveur lit le fichier, l'envoie à Claude en
@@ -381,6 +405,32 @@ La méthode du tireur n'existe qu'à un endroit, `Prompts.Tireur` (voir Éclairc
 dosage de la peau, qu'à `Peau.dosage` (voir Peau) : les invites et les descriptions les reprennent,
 jamais une copie des chiffres.
 
+**1.3.** Les consignes du connecteur ne gagnent que « Recadrer (read_composition) seulement sur
+demande ou si la composition y gagne nettement, et le dire. » (« (read_composition) » ajouté) :
+3 787 caractères (UTF-16) pour 3 796. Une réserve de 19 caractères était gardée pour un repli de la
+leçon (« …et pourquoi, puis photo_lesson. ») si Claude Desktop n'appelait pas `photo_lesson` : non
+fait, faute de mesure qui le demande ; une ligne « journal et carnet » a été refusée (le titre
+d'`export_journal` et sa propriété `notebook` suffisent). Le reste de la 1.3 passe par :
+
+- les descriptions d'outils : `photo_lesson` (1 200 caractères au plus, garde de
+  `PriseDeVueTests` et `LeconTests`), `read_composition` (1 000 au plus), `export_journal` avec sa
+  propriété `notebook` (450 au plus, `CarnetTests`), `preview_settings` (« (trois avec crop) »,
+  sous sa garde de 600 ; propriétés `my_turn` et `overlay` hors garde), la propriété `compare` de
+  `view_photo` (`claude_version`, hors garde de 1 850), et `reason`, répétée dans chaque outil qui
+  écrit : `ToolHandler.descriptionRaison`, 160 caractères au plus (« Pourquoi, en une phrase
+  simple : le défaut vu, puis ce que l'étape y fait. Gardé au journal (export_journal) ; la
+  fenêtre Claude le montre avec l'étape cliquée. ») ;
+- les invites : `Prompts.Lecon.phrase` (« Enfin photo_lesson : … »), seule copie, finit l'étape 9
+  de `retouche_pro` et `finRetouche` (`portrait`, `paysage`, `noir_et_blanc`, `nuit_iso_eleve`) ;
+  `read_composition` entre à l'étape 4 de `retouche_pro` (le cadre montré par `preview_settings`,
+  l'accord attendu), à la fin de l'étape 3 de `portrait` (les yeux sur le tiers haut, de l'espace
+  devant le regard) et dans une étape 5 « Composition » de `paysage` (le tireur passe à
+  l'étape 6). Rien dans `harmoniser_serie`, `tri_seance`, `noter` ni `partage` ;
+- le vocabulaire des défauts de la prise de vue, `PriseDeVue.defauts`, seule liste (voir Leçon de
+  la photo), et le texte que le serveur rend quand il sert (faits de la leçon, `a_faire` et écarts
+  de « Je le fais », lecture de la composition, `constats_prise_de_vue`) ;
+- `Consignes.lua`, pour la fenêtre (voir Fenêtre Claude › Claude Code).
+
 ## Fenêtre Claude
 
 La fenêtre Claude du module (Fichier › Module externe - Extras › Ouvrir la fenêtre Claude,
@@ -405,6 +455,17 @@ bilan et la méthode du tireur (voir Voyants et liaison, et Claude Code). Captur
 `docs/capture.png` (la fenêtre Claude, en Conversation claire), `docs/publication.png`,
 `docs/consommation.png` et `docs/suivi.png` (la fenêtre de suivi de la liaison) ;
 `docs/atelier.png` et `docs/panneau.png`, les deux autres dispositions, sont retirées avec elles.
+
+En 1.3, la Conversation claire prend l'allure de la maquette « B · Conversation claire » (la
+fenêtre B, lots B0 à B5), agrandie à 1 497 × 1 200 à la demande de Dany (voir Fenêtre B) : volet
+des conversations à gauche (le Carnet de progrès en tête de sa liste), au centre l'en-tête avec le
+Mode en boutons radio, le fil B, sa barre et la saisie, à droite quatre onglets (Aperçu,
+Proposition, Note, Leçon), l'aperçu commun et la carte de l'onglet ; apparence claire ou sombre.
+Les sections Disposition, Voyants et liaison, Carte Note et Bas de la fenêtre décrivent la 1.2 :
+ce qui y a changé est dit en tête de chacune. Les cinq chantiers de la 1.3 ont chacun leur partie
+« dans la fenêtre » dans leur section (Pourquoi ?, Leçon de la photo, Je le fais, Composition lue,
+Carnet de progrès). `docs/capture.png` montre encore la fenêtre de la 1.2 : à refaire, comme la
+capture de la page Carnet de progrès (`docs/carnet.png`, prévue).
 
 ### Relais vers Claude Code
 
@@ -511,13 +572,36 @@ l'en-tête laisse la méthode de retouche au connecteur ; l'intention du boîtie
 non plus : la fenêtre reçoit les mêmes descriptions et les mêmes résultats d'outils que Claude
 Desktop.
 
+En 1.3, `Consignes.texte` gagne quatre sections et une puce : « ## Composition » (398 caractères
+pour une part de 400, entre Garde-fous et Je le fais : la règle dans `reason`, la façon de la tenir
+à la prise de vue dans la réponse), « ## Je le fais » (594 pour 600 : il s'appuie sur
+`corrections_utilisateur.exercice` du serveur sans la redire), « ## Raison de chaque étape » (395
+pour 400, entre Style et Fin d'une tâche), « ## Leçon de la photo » (597 pour 600, après Fin
+d'une tâche : résumé court, proposition de cadre s'il y en a une, puis `photo_lesson` en dernier ;
+un réglage du boîtier cité seulement s'il est lu ; une leçon par photo et par conversation, même
+après « J'ai fini » ; pas de leçon après une proposition seulement montrée, une notation, un
+classement ou une série, ni avec la ligne « [Sans leçon] » ; la fenêtre la montre dans l'onglet
+Leçon), et la puce Carnet des garde-fous (250 au plus : les défauts se notent seuls ; si Dany
+demande ses progrès, `export_journal` avec `notebook = true`, puis trois puces). « ## Fin d'une
+tâche » dit « fais un résumé » et finit par « Puis la leçon (voir Leçon de la photo). » ; la puce
+Proposer d'abord dit « Accepter, Refuser, Ajuster et Je le fais ». `Consignes.texte` fait
+7 466 caractères pour un plafond de 7 500, vérifié par un essai d'`essais-moteur.lua` (5 064 en
+1.2) : ce qui dépasse va aux descriptions d'outils. Hors du plafond, les messages des boutons
+(400 au plus chacun) : `Consignes.jeLeFais(avecProposition)`, `Consignes.jaiFini(photo)`,
+`Consignes.carnet` (la ligne d'action du carnet, « Ne retouche rien. »),
+`Consignes.ajustementsCadre` (Plus serré, Plus large, Horizon au tiers haut, Format 4:5,
+Seulement redresser) et `Consignes.sansLecon` (« [Sans leçon] », joint par `Moteur.envoyer`
+quand la case Leçon est décochée, après la ligne de style, sans relancer Claude Code). Les
+invites passent de 6 à 7, Composition avant Sports, sans chiffre.
+
 Depuis la 1.1, `consignes.md` est écrit dans le dossier de chaque session (`Session:lancer` ;
 huitième argument de `relais.sh` depuis la 1.1.1, septième en 1.1), plus à la racine : Claude
 Code le lit un peu après son lancement en
 arrière-plan, et un fichier commun pourrait être réécrit entre-temps. Son texte est
 `Consignes.texte` (en 1.1, `Consignes.pour(c)` y ajoutait `Consignes.texteNotation` pour une
 conversation de séance ; retirés en 1.1.1). Les boutons d'invites de la fenêtre
-(`Consignes.invites` : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Sports)
+(`Consignes.invites` : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Composition
+depuis la 1.3, Sports)
 envoient une demande toute faite, d'après les invites du connecteur ; après la 1.1.1,
 `Consignes.proposerOuverture` est celle que la fenêtre envoie d'elle-même à l'ouverture (voir
 Proposition préparée à l'ouverture). Le bouton Noter de la 1.1
@@ -592,11 +676,12 @@ sont ignorés (`Evenements.lua`).
 - Une vue masquée (`visible = false`) garde sa place dans la mise en page (doc du SDK) : seules
   des variantes superposées (`place = 'overlapping'`) de même taille peuvent alterner.
 - `visible` lié ne masque qu'une vue simple (texte, bouton, image, menu, champ, case, liste,
-  séparateur) : posé sur un conteneur (`row`, `column`, `view`, `group_box`, `tab_view`,
-  `scrolled_view`), il reste sans effet et tout le contenu reste montré (constaté le 20 octobre
-  2026, voir plus bas). La simulation de la fenêtre le refuse (« visible sur un conteneur : sans
-  effet dans Lightroom (constaté) »). Toute condition de visibilité des pièces passe par
-  `Fenetre.condition`, `egal`, `non` ou `si`, qui gardent leurs conditions (clé et test) pour que
+  séparateur) et, depuis le constat du 21 octobre 2026 (D10, voir Constaté dans Lightroom Classic
+  15.6 (21 octobre 2026, fenêtre B)), un `f:view` : posé sur un autre conteneur (`row`, `column`,
+  `group_box`, `tab_view`, `scrolled_view`), il reste sans effet et tout le contenu reste montré
+  (constaté le 20 octobre 2026, voir plus bas). La simulation de la fenêtre refuse ces cinq-là
+  (« visible sur un conteneur : sans effet dans Lightroom (constaté) »). Toute condition de
+  visibilité des pièces passe par `Fenetre.condition`, `egal`, `non` ou `si`, qui gardent leurs conditions (clé et test) pour que
   `Fenetre.et` les combine en une liaison à plusieurs clés (`LrView.bind{keys, operation}`,
   `LrBinding.kUnsupportedDirection` pour le sens de la vue vers la table).
 - Pas de défilement par programme d'un `scrolled_view` ou d'une `simple_list`.
@@ -604,10 +689,11 @@ sont ignorés (`Evenements.lua`).
 D'où le fil en grille de lignes fixes (`Fil.lua`) : chaque ligne superpose une variante par genre
 (police, couleur) et une icône par état ; seul le texte et le genre changent. Les lignes sont
 coupées à la largeur de la colonne d'après la chasse des caractères mesurée par AppKit dans les
-polices données à Lightroom (Helvetica Neue 13, Helvetica Neue Bold 13, Menlo 11 :
-`scripts/metriques.swift` → `Metriques.lua`), moins une marge de 10 points, avec troncature en fin
-de ligne au cas où. Depuis la 1.1.1, une ponctuation haute (; : ! ? ») reste avec le mot d'avant,
-et « avec celui d'après : `Fil.couper` les lie par une espace insécable, comptée comme une espace
+polices données à Lightroom (jusqu'à la 1.2, Helvetica Neue 13, Helvetica Neue Bold 13, Menlo 11 ;
+depuis la fenêtre B, la police du système, voir Fenêtre B : `scripts/metriques.swift` →
+`Metriques.lua`), moins une marge de 10 points, avec troncature en fin de ligne au cas où.
+Depuis la 1.1.1, une ponctuation haute (; : ! ? ») reste avec le mot d'avant, et « avec celui
+d'après : `Fil.couper` les lie par une espace insécable, comptée comme une espace
 et rendue ordinaire dans la ligne (une ligne de la carte Note commençait par « ; mais », vu sur la
 capture). La grille montre la fin du fil ; ▲ ▼ Fin déplacent la fenêtre de lecture, qui
 reste en place quand des lignes arrivent pendant qu'on lit plus haut. Les images ne peuvent pas
@@ -616,7 +702,8 @@ sur fond 2B2B2B faite par `sips`, carrée, le cadre de la vue ne changeant pas d
 `Images.vignette(dossier, nom, cote, hauteur)`, où `hauteur` servait au cadre 3:2 de l'Atelier,
 retiré après la 1.1.1).
 
-De même, depuis la 1.1.1, le texte de la carte Note (`notationTexte`) et celui de la Proposition
+De même, depuis la 1.1.1, le texte de la carte Note (`notationTexte` jusqu'à la 1.2 ; en 1.3, la
+grille des critères, voir Carte Note B) et celui de la Proposition
 (`propositionTexte`) sont des `static_text` de hauteur fixe, montrés page par page : coupés en
 lignes comme le fil (`Fenetre.lignesCarte` : `Fil.couper` dans la police `P.texte`, largeurs
 `D.largeurNote` et `D.largeurProposition`, moins la marge du fil ; paragraphes et lignes vides
@@ -628,11 +715,14 @@ une ligne, la dernière ligne vue gardée (`Fenetre.defilerTexte(cle, sens)` ; p
 `noteMonte`, `noteDescend`, `propositionMonte`, `propositionDescend`) ; la dernière page est
 pleine. Un nouveau texte revient à la première page.
 
-Les onglets, Note (par défaut) et Proposition (`D.onglets`), sont une rangée de `radio_button`
-(clé `onglet`, chacun avec son `checked_value`) au-dessus de variantes superposées de même
-largeur (`place = 'overlapping'`), et non un `tab_view`, dont le comportement n'a pas été
-constaté. Le Panneau avait les siens, Retoucher et Noter : retirés avec lui après la 1.1.1. Les
-colonnes des variantes ne portent pas `visible` : leur contenu se crée par une fabrique masquable
+Les onglets de la 1.2, Note (par défaut) et Proposition (`D.onglets`), sont une rangée de
+`radio_button` (clé `onglet`, chacun avec son `checked_value`) au-dessus de variantes superposées
+de même largeur (`place = 'overlapping'`), et non un `tab_view` (rendu correct, constaté le
+21 octobre 2026, C3, mais non retenu). En 1.3, la rangée devient quatre segments en images sous
+calques (Aperçu, Proposition, Note, Leçon : voir Fenêtre B) ; les variantes superposées et
+`Vues.masquable` restent (constaté le 21 octobre 2026, D11 : seule la variante montrée répond).
+Le Panneau avait les siens, Retoucher et Noter : retirés avec lui après la 1.1.1. Les colonnes des
+variantes ne portent pas `visible` : leur contenu se crée par une fabrique masquable
 (`Vues.masquable(f, F, condition)`, appelée par `variante` de `Dispositions.lua`), qui pose la
 condition de l'onglet (`onglet` égal à sa valeur) sur chaque vue simple que les pièces créent, et
 la combine avec un `visible` déjà posé (couleurs de la carte Note ; en 1.1.1, dans Retoucher du
@@ -665,7 +755,12 @@ depuis la 1.1.1 (en 1.1, ce clic la ramenait à l'onglet Aperçu).
   des conversations (Atelier, Panneau), ni réouverture quand la disposition changeait. Une
   fenêtre fermée entre-temps ne l'envoie pas : l'envoi automatique compare la génération de la
   fenêtre (`Fenetre.generation`). Le champ est désactivé pendant que Claude travaille (il perd
-  ainsi le focus et se vide).
+  ainsi le focus et se vide). Constaté le 21 octobre 2026 (D1 à D3) : Retour dans le champ (sans
+  bouton par défaut) donne l'observateur, puis l'envoi automatique 0,3 s après ; un clic (calque,
+  radio, segment, bouton) valide d'abord le champ, puis agit, et annule l'envoi ; avec un bouton
+  par défaut, Retour dans un champ `immediate = true` (« Rechercher ») déclencherait aussi son
+  action. D'où, en 1.3, aucun bouton par défaut dans la fenêtre : Envoyer est un bouton bleu en
+  image sous calque (voir Fenêtre B), et Retour passe toujours par l'observateur.
 - Toute table passée à Lightroom est neuve (une table relue par `Json.decode` porte une métatable,
   sur laquelle Lightroom bloque : constaté par la liaison, voir Profil).
 - `LrTasks.execute` ne bloque que la tâche : base64, sips, `osascript`, `mcp-developpeur --version`
@@ -675,7 +770,13 @@ depuis la 1.1.1 (en 1.1, ce clic la ramenait à l'onglet Aperçu).
 
 ### Voyants et liaison
 
-Sous le titre de la conversation, quatre voyants depuis la 1.2 (trois avant), en rangée
+En 1.3 (fenêtre B), trois voyants en pastilles PNG (`Vues.voyant`, `F.PASTILLES`) : Claude Code
+et Lightroom dans l'en-tête, sous le titre (`Vues.voyantClaude`, `Vues.voyantLightroom`), Écran
+en bas du volet (`Vues.voyantEcran`) ; le voyant Mode est retiré (`texteMode`, `etatMode`) : le
+mode se choisit par les trois boutons radio de l'en-tête (voir Fenêtre B). Leur lecture est celle
+de la 1.2, décrite ici.
+
+Sous le titre de la conversation, quatre voyants en 1.2 (trois avant), en rangée
 (`Vues.voyants(f, F, largeur)`, `D.voyant` = 150 points chacun). Claude Code : `claude auth
 status`, lu à l'ouverture de la fenêtre (forfait, autre connexion, non connecté, introuvable).
 Lightroom : la liaison, qui est dans ce même module ; la fenêtre la lit directement
@@ -706,7 +807,12 @@ l'ouverture, `texteEcran` vaut « Écran » et `etatEcran` `neutre`. Une panne d
 le voyant gris, et la suite de `Fenetre.verifier` passe. Le clic, comme tout bouton, annule l'envoi
 automatique de la demande tapée.
 
-### Disposition (1.1 ; une seule après la 1.1.1)
+### Disposition (1.1 ; une seule après la 1.1.1 ; fenêtre B en 1.3)
+
+Cette section décrit la Conversation claire jusqu'à la 1.2 ; en 1.3, sa mise en page, ses
+dimensions, ses pièces et son image « aucun aperçu » sont celles de la fenêtre B (voir Fenêtre B).
+Restent valables : une seule disposition (`Dispositions.NOM`, `conversation`), l'aperçu de la
+photo active et son carré de mise au point, et la génération de chaque ouverture.
 
 Après la 1.1.1, une seule disposition : la Conversation claire (`Dispositions.NOM`,
 `conversation`), toujours en grande taille (demandé par Dany le 20 octobre 2026). La 1.1 et la
@@ -838,8 +944,9 @@ ne servait qu'aux deux autres : `menuConversations`, `boutonsConversation`, `env
 en colonne, les invites par rangées de trois (`D.invitesParRangee`), l'activité sous ▲ ▼
 (`D.activiteDessous`), le cadre non carré de l'aperçu (`D.apercuHauteur`) et les boutons en petit
 d'Agrandir et des autres fenêtres ; Envoyer est toujours à côté du champ (plus de
-`D.envoiACote`). L'image « aucun aperçu » du cadre (`Dispositions.imageVide`) est `vide-320.png`,
-seule dans le module, dessinée par `scripts/images-vides.swift`, qui n'en dessine plus qu'une ;
+`D.envoiACote`). L'image « aucun aperçu » du cadre (`Dispositions.imageVide`) était en 1.2
+`vide-320.png`, seule dans le module, dessinée par `scripts/images-vides.swift` (retirée en 1.3 :
+`images/vide-405x270.png` et `images/sombre/vide-405x270.png`, voir Fenêtre B) ;
 `vide-200.png` (Panneau) et `vide-720x480.png` (Atelier) sont retirées après la 1.1.1, comme en
 1.1.1 celles des petite et moyenne tailles et `vide-300`, faite pour la fiche de la Séance de
 notation. La liste ne montre pas les conversations des anciennes séances de notation
@@ -861,10 +968,201 @@ s'arrête dès qu'une autre fenêtre est ouverte, il n'en tourne jamais deux, et
 d'une fenêtre fermée ne part pas. « Ouvrir la fenêtre Claude » (ou ⌃⌥C) sur une fenêtre ouverte la
 met devant, remontre la photo active et, sur une conversation vide, fait préparer une proposition
 (voir Proposition préparée à l'ouverture). Le cadre enregistré (`Fenetre.cadre()`, sans argument :
-`DeveloppeurClaude-conversation-grande-<Fenetre.FORME>`, `FORME` à 1) porte le nom qu'avait celui
+`DeveloppeurClaude-conversation-grande-<Fenetre.FORME>`, `FORME` à 1 jusqu'à la 1.2, 2 pour la
+fenêtre B de 1 280 × 800, 3 pour la fenêtre agrandie de la 1.3) porte le nom qu'avait celui
 de la Conversation claire en 1.1.1 : le cadre déjà enregistré sert encore (en 1.1.1,
 `Fenetre.cadre(disposition)` : `DeveloppeurClaude-<disposition>-grande-<FORME>` ; en 1.1,
 `DeveloppeurClaude-<disposition>-<taille>-<FORME>`).
+
+### Fenêtre B (1.3)
+
+La Conversation claire de la 1.3 suit la maquette « B · Conversation claire » (1 280 × 800 ;
+`Dispositions.lua`, `Vues.lua`, lots B0 à B5), agrandie à la demande de Dany le 21 octobre 2026 :
+son écran fait 3 440 × 1 440, et il a voulu « la partie de gauche peut-être doublée, celle du
+milieu 33 % plus large, celle de droite parfaite, la hauteur 33 % plus haute ». Un premier
+agrandissement à 1 671 × 1 064 a été arrêté ; retenu, sur la suggestion de Claude choisie par
+Dany : 1 497 × 1 200 (environ 1 940 points laissés à Lightroom, des lignes de fil d'environ 103
+caractères). Écart voulu avec la maquette, qui reste la référence de l'allure. Elle n'a pas encore
+été vue dans Lightroom (voir À constater dans Lightroom (1.3)).
+
+**Dimensions** (`Dispositions.TAILLES`, puis `Dispositions.dimensions()`, qui en tire le reste) :
+
+- la fenêtre de 1 497 × 1 200 et son cadre constaté (D7 : barre de titre de 33, 32 blancs et un
+  filet ; marge de 1 à gauche, à droite et en bas, aucune en haut) : contenu de 1 495 × 1 166
+  (constaté à 1 280 × 800, extrapolé ici) ;
+- trois colonnes et deux filets de 1 : volet 270 (marges de 10 : 250 utiles), centre 760 (marges
+  de 20 : 720 utiles), droite 463 (le panneau de 435, à 14 du bord) ;
+- au centre : en-tête de 68 et son filet, fil (le reste : 920), barre de 30, saisie de 147. Le fil :
+  des lignes de 21 sous une marge de 20 et au-dessus d'au moins 16 ; leur nombre se calcule
+  (`D.lignes`, 42 ; la grille fait 882). Chaque ligne : la colonne auteur de 60, un écart de 12,
+  le texte de 648 (`D.texteFil`, `Fenetre.largeurTexte()`) ;
+- la liste des conversations : des cases de 40, autant que sa place en tient (`D.cases`, 22 dans
+  915) ;
+- à droite : le panneau en image (435 × 1 146), son intérieur de 405, l'aperçu commun en 3:2 de
+  405 × 270 (sa vignette en 2x, 810 × 540, `Images.vignette`), la rangée ◀ légende ▶ · ⤢ Agrandir,
+  puis la place des cartes (`D.placeCartes`, 782) : carte Note de 621 (l'onglet Note la remplit),
+  cartes Proposition, Aperçu (étape) et Leçon de 701 ; leur intérieur de 379 (`D.carte`, textes
+  en 12). Les lignes des cartes : `criteres` 34 (une grille de 35 lignes de 16), `propLignes` 40,
+  `etapeLignes` 40, `leconLignes` 41 : le plus grand nombre qui laisse au moins 12 points sous le
+  contenu estimé (`essais-fenetre-b.lua` le vérifie, et échoue en disant quoi changer si la
+  hauteur change) ;
+- `Fenetre.FORME` 3 : le cadre enregistré `DeveloppeurClaude-conversation-grande-3`.
+
+La fenêtre construite (simulation) compte 2 317 vues, dont 1 490 simples (1 368 et 857 à
+1 280 × 800) : son temps d'ouverture est à mesurer. Elle ne tient pas sur un écran de portable
+(1 440 × 900) : son contenu est de taille fixe, sans défilement.
+
+**Volet** (`Vues.volet`) : « ＋ Nouvelle conversation » (bezel 26), la loupe devant
+« Rechercher » (champ `immediate = true`), la liste en cases, puis Renommer… et Supprimer…, un
+filet, Publication… et Consommation… (venus de la colonne droite), les deux lignes des versions
+(`Vues.versions`) et le voyant Écran. La liste (`Vues.caseListe`, `Fenetre.casesListe`, pure) :
+une case par conversation (titre en gras si elle est choisie, sous-titre « 19 h 46 · 1 photo » ou
+« 12 oct. · 48 photos », `Fenetre.sousTitreListe`), des en-têtes de jour (Aujourd'hui, Hier,
+« Plus tôt en <mois> », « <Mois> <année> », `Fenetre.periodeListe`, mois de `Carnet.MOIS`),
+jamais en bout de page, et « Plus anciennes… » ou « Plus récentes… » toujours dans la dernière
+case ; la page se garde (`Fenetre.pageListe`), remise à 1 par la recherche et par Nouvelle. La case
+du Carnet de progrès vient en tête (`Fenetre.CARNET`, voir Carnet de progrès). Chaque case porte
+un calque (`Fenetre.cliquerListe`, refusé pendant que Claude travaille : le bandeau le dit) et une
+infobulle liée qui donne le titre entier. La `simple_list` de la 1.2 est retirée, avec
+`selectionListe`, `listeConversations` et leur observateur.
+
+**En-tête** (`Vues.entete`) : le titre de la conversation (gras 16, `D.titre` = 720 − 320 laissés
+au Mode ; plus de ✎ : Renommer… suffit), puis le Mode (`Vues.mode`) : trois `radio_button` liés à
+la clé `mode` par `Fenetre.lierRadio` (un clic, même sur le radio déjà coché, annule l'envoi
+automatique de la demande que ce clic a validée) : Appliquer et Proposer d'abord (le mode de la
+liaison), Je le fais (l'exercice, voir Je le fais). Grisés pendant que Claude travaille
+(`enabled = libre`, décision de Dany : le voyant Mode de la 1.2 basculait à tout moment) ; Je le
+fais suit `peutJeLeFais`. La valeur montrée est tirée de l'état (`Fenetre.modeMontre`) et posée sous
+la garde `Fenetre.modeAuto` ; `Fenetre.changerMode` ne suit qu'un vrai clic (pendant un exercice,
+Appliquer ou Proposer d'abord change le mode et le bandeau dit « L'exercice continue ; liaison :
+… »). Constaté D12 : un radio inactif coché par sa valeur se dessine sans point à la première
+ouverture ; `Fenetre.reposerMode` repose donc la valeur (par `aucun`) au 2e tour de la boucle
+(`Fenetre.TOUR_REPOSER_MODE`). Dessous : les voyants Claude Code et Lightroom, et la photo active
+(`infoPhoto`, texte riche : « Active : <EM>nom (copie)</EM> · Sélection : <EM>N</EM> »).
+
+**Fil B** (`Vues.ligneFil`, `Fil.lua`) : chaque ligne est une `f:row` de 21 points ; la colonne
+auteur en variantes selon `a..i` (« Vous » en gras 12 bleu, « Claude » en gras 12, l'heure `h..i`
+en petit gris, posées par `Fil.lignes` sur des copies, jamais dans le cache ; « 19 h 42 » sur la
+ligne qui suit l'auteur) ; puis le texte, ses variantes par genre (`Fenetre.STYLES`), les genres à
+icône (`appel`, `apercu`, `proposition`, `note`) en retrait de 20 (`Fil.RETRAITS`). La ligne d'un
+appel d'outil (genre `appel`, nouveau) est un texte riche : « <EM>apply_settings</EM>  description »
+en 12 gris, le nom en Menlo 11 (`Fil.uneLigneOutil`) ; pour une étape, « étape « Claude · <but> » ·
+N réglages » ; les autres variantes lisent le texte sans balise (`transform`, `Fenetre.sansBalises` :
+une variante cachée ne voit jamais une balise qu'elle ne sait pas montrer). « Pourquoi ? » (carré
+small de 80, bezel de 15 dans la case de 21, constaté D6) se montre par `q..i` au bout d'une ligne
+d'étape (`Fil.PLACE_POURQUOI` laissé libre ; `Fil.SUFFIXE_ETAPE` de la 1.3 avant B4 est retiré),
+dans une `f:row` poussée par `margin_left` : constaté D6, la rangée ne prend pas les clics du texte.
+Le tour de Claude qui a noté ou donné une leçon finit par une ligne `actions` (`x..i`) : « ☆ Voir
+la note » (`Fenetre.voirNote` → `montrerNote` : l'onglet Note, comme un vrai clic ;
+`Fenetre.NOTE_AUTRE_PHOTO` au bandeau si la photo active n'est pas celle notée), « Leçon de la
+photo » (`Fenetre.voirLecon` → `montrerLecon`), ou les deux. La barre (`Vues.defilement`) : ▲ ▼ en
+icônes, Fin, la position dans le fil, et à droite l'activité de Claude (orange) ou le relevé du
+forfait. Un clic sur une ligne se répartit par `Fenetre.sorteDeClic` (`Fenetre.clics`) : image,
+ligne du carnet, leçon, étape, sinon détail de l'outil.
+
+**Saisie** (`Vues.saisie`) : les sept invites en carrés (bezel 24, `Vues.invites` ; ni « ★ Noter »
+ni séparateur), le champ de demande sur deux lignes (`immediate = false`), puis 📎 et 📋 (carrés à
+icône seule, `image_name`), l'étiquette « Style » et son menu (décision de Dany après le lot B3 :
+comme la maquette, à la place du « sans étiquette » du 20 octobre 2026), le bandeau, et Envoyer.
+Pas de menu Modèle (décision de Dany : Modèle et Effort sont dans le Gestionnaire de modules
+externes). Envoyer (`Vues.envoi`) est un bouton bleu en image (`Vues.boutonBleu`), Arrêter un carré
+superposé, montré pendant le travail ; aucun bouton par défaut (repli décidé après D1). Le bandeau
+(`Vues.bandeau`, à la place du menu Modèle de la maquette, `D.bandeau` 308) : deux lignes de petit
+texte (`Fenetre.LIGNES_BANDEAU`), coupées d'après la chasse mesurée (`Fenetre.texteBandeau`, « … »
+au bout de la seconde) ; l'infobulle donne le message entier, un clic l'aide entière. Les messages
+de la fenêtre sont des constantes raccourcies pour y tenir (`CHOISIR_CONVERSATION`,
+`EXERCICE_CONTINUE`, `PAS_D_IMAGE`, `NOTE_AUTRE_PHOTO`, `NOTE_EN_COURS`, `AUCUNE_PHOTO`,
+`PAS_CINQ`, et trois refus de `Moteur.lua`) ; l'essai « Bandeau » d'`essais-fenetre-b.lua` les
+mesure.
+
+**Colonne droite** (`droite` de `Dispositions.lua`) : le panneau en image, les segments Aperçu |
+Proposition | Note | Leçon centrés à cheval sur son bord (`Vues.segments` : chacun son image et sa
+variante bleue `-actif`, sous un calque, `Fenetre.choisirSegment`, un vrai clic ; ni survol ni
+focus), l'aperçu (`Vues.apercu`, sur un aplat du fond des vignettes, 2B2B2B dans les deux
+apparences), la rangée ◀ légende ▶ · ⤢ Agrandir commune aux quatre onglets
+(`Vues.navigationApercu` ; la légende de la photo active est un texte riche, « <EM>nom
+(copie)</EM> · appareil · date », lue par `Lightroom.legende` seulement quand la photo active
+change, à l'heure locale), puis quatre variantes superposées, chacune sur sa carte en image :
+l'étape dans Aperçu (`Vues.etape`, carte-etape), la proposition (`Vues.proposition`,
+carte-proposition), la carte Note (`Vues.notation`, sa grille au-dessus de carte-note) et la leçon
+(`Vues.lecon`, carte-lecon). Clés d'onglet : `apercu`, `proposition`, `notation` (par défaut,
+montré à l'ouverture) et `lecon` ; `Fenetre.apercuOnglet` et `Fenetre.surOnglet` passent sous la
+clé `apercu` (l'ancien `etape`). Bascules d'elle-même, une par arrivée : vers Proposition quand une
+proposition (ou une liste « Je le fais », ou une comparaison) arrive, sauf celle préparée à
+l'ouverture ; vers Note quand une note arrive pour la photo active ; vers Leçon une fois par leçon
+arrivée (`Fenetre.leconVue`), jamais quand une proposition attend ou qu'un exercice est en cours ;
+jamais vers Aperçu. L'aperçu appartient à l'onglet (`Fenetre.apercuOnglet`, demandé d'abord par
+`rafraichirApercu` ; nil : l'aperçu commun) ; un clic sur une ligne d'image reste prioritaire
+jusqu'à un autre onglet, une image nouvelle, une autre conversation ou un clic sur une étape.
+
+**Contrôles** (constats du 21 octobre 2026, voir plus bas) :
+
+- fonds et filets : des aplats (`Vues.aplat`, un `f:picture` sans image à `background_color`) ;
+  `background_color` est sans effet sur `row`, `column`, `view`, `group_box` et sur la fenêtre
+  (A1, A5), et `primary_line_color` d'un séparateur aussi (A6) ;
+- images : `Dispositions.IMAGES`, seule source de leurs tailles en points, un seul PNG en 2x
+  (144 ppp) chacune, toujours avec `width` et `height` ; chemin par `Fenetre.image` (jamais
+  `images/<nom>.png` écrit en dur), dans le jeu de l'apparence ;
+- tout clic sur une image passe par un calque (`Fenetre.calque` : un texte vide de taille fixe
+  posé dessus, registre `Fenetre.parCalque`) : `mouse_down` sur un `f:picture` ne reçoit rien
+  (C1). Un calque n'a pas d'`enabled` : son gestionnaire vérifie l'état lui-même ;
+- tout bouton passe par `Fenetre.bouton` (`push_button`, ou `square_button` avec `carre` : le
+  rectangle blanc à bord fin de la maquette, B3) : `icone` pose une image par `image_name`, sans
+  titre (une icône chevauche le titre, B3) ; `bezel` donne la hauteur visible, le cadre en a 2 de
+  plus (D5, `Dispositions.cadreBouton`). Les boutons à icône et titre de la maquette portent donc
+  un glyphe dans leur titre (＋ ☆ ⚑ ⊗ ? ⤢) ;
+- les boutons bleus (`Vues.boutonBleu` : Envoyer, Accepter, Accepter N ★) : trois images (normal,
+  enfoncé 0,15 s par `Fenetre.enfoncer`, inactif), le titre blanc par-dessus (éteint quand il est
+  inactif : `titreInactif` de la palette), un calque qui ne fait rien quand sa clé d'état est
+  fausse ; ni survol, ni focus clavier ;
+- un élément de la maquette sans fonction est posé grisé, sans action, infobulle « À venir »
+  (`Vues.inactif`, `Fenetre.A_VENIR`) : « ? À vérifier » de la carte Note ;
+- texte riche : `<EM>` exige `emphasis_font` (sans lui, ni gras ni couleur, D4) ; une emphase plus
+  grande que la police du texte coupe la dernière ligne de `height_in_lines` (D4) : emphase de même
+  taille partout ; `text_color` et `emphasis_color` vont ensemble ; ni `&lt;` ni `&amp;` (affichés
+  tels quels) ; une balise seule disparaît. `Fil.largeur` ignore les balises et mesure la partie
+  balisée dans sa police d'emphase ; `Fil.couper` ne coupe jamais une balise : il ferme le passage
+  en fin de ligne et le rouvre à la suivante. Les textes venus de Claude perdent leurs balises ;
+- polices : celle du système (`'<system>'` en 13, 12 et 11, `'<system/bold>'` en 13, 12, 11 et
+  16) et Menlo 11, mesurées par `scripts/metriques.swift` (clés `texte`, `texte12`, `petit`,
+  `gras`, `gras12`, `gras11`, `titre`, `mono` ; ＋ ⊗ ⤢ ajoutés aux caractères mesurés) : l'encre
+  de Lightroom fait 1 à 2 points de moins que la chasse NSFont (D9) ; `Fenetre.largeurLibelle`
+  ajoute 2 points à un libellé fixe ;
+- `visible` lié sur un `f:view` le cache et le montre (D10) ; les variantes superposées par
+  `Vues.masquable` ne laissent répondre que la variante montrée (D11).
+
+**Apparence** : préférence `apparence` (`Chemins.defauts`, `claire`) et menu Apparence de la
+section Fenêtre Claude du Gestionnaire de modules externes (« de la fenêtre Claude, à sa prochaine
+ouverture ; boutons et champs suivent macOS »), que le diagnostic dit. `Dispositions.APPARENCES`
+(`claire` → `images`, `sombre` → `images/sombre`), `Dispositions.PALETTES` (la seule table des
+couleurs : 37 clés par palette, textes, aplats, filets, aperçu, images ; la claire est la
+maquette, avec l'orange, le rouge et Menlo de la 1.2), `Dispositions.apparence` (une valeur inconnue
+retombe sur `claire`, à l'emploi, comme `Moteur.modeleEtEffort`), `Dispositions.image(nom,
+apparence)`, `Dispositions.couleurs(apparence)` (triplets neufs, sans `LrColor`). La fenêtre les
+reprend à chaque ouverture (`Fenetre.preparerApparence`, `Fenetre.COULEURS`). La palette sombre :
+fonds #1E1E1E, #2A2A2A et #323232 (comme macOS en sombre), textes #E8E8E8, bleu des textes
+#5AA2F6, bleu des boutons #1F6FDB (titre blanc à 4,8:1), titre d'un bouton bleu inactif #7F8EA3 sur
+#2B3F5C (3,2:1 : il paraît éteint) ; chacun de ses textes se lit au moins aussi bien que dans la
+claire sur les mêmes fonds (`essais-images.lua`). Les contrôles natifs suivent l'apparence de
+macOS, quelle que soit celle choisie ici. Les images : `luajit scripts/gabarits.lua | swift
+scripts/images-fenetre.swift Lightroom/Developpeur.lrplugin` (les deux jeux, d'après
+`Dispositions.IMAGES` et `Dispositions.PALETTES` ; refus, avant d'écrire, d'une couleur absente ou
+invalide, d'un dossier invalide), et l'image « aucun aperçu » par `luajit scripts/gabarits.lua |
+swift scripts/images-vides.swift Lightroom/Developpeur.lrplugin` : `images/vide-405x270.png` et
+`images/sombre/vide-405x270.png` (`Dispositions.nomImageVide`, `Dispositions.imageVide(apparence)`),
+du fond et du texte de chaque palette. `vide-320.png` (1.2) et `vide-330x220.png` (fenêtre B de
+1 280 × 800) sont retirées.
+
+**Écarts voulus ou inévitables avec la maquette** : barre de titre native « Développeur », blanche,
+de 33 ; fond de la fenêtre #EFEFEF, non réglable, visible seulement dans la marge de 1 ; filets
+sans relief ; boutons blancs à coins carrés ; un glyphe à la place des icônes au trait des boutons
+à titre ; pas d'état enfoncé natif ni de focus pour les boutons et segments en images ; pas de
+défilement natif de la liste ni du fil (cases et lignes fixes, ▲ ▼) ; une seule emphase par texte
+riche ; « Passe 2 · à vérifier. » à la place d'un oui ou non par passe ; éléments ajoutés pour ne
+rien perdre de la 1.2 et de la 1.3 (voyant Écran, bandeau, position dans le fil, ▲ ▼ des cartes,
+◀ ▶ des images, invite Composition, contenu des onglets que la maquette ne dessine pas) ; non
+posés, par décision de Dany : « ★ Noter » et le menu Modèle (et le ✎ du titre) ; les étoiles de
+« Votre note » sans état grisé pendant le travail (le clic est refusé et le bandeau le dit).
 
 ### Proposition préparée à l'ouverture (après la 1.1.1)
 
@@ -892,6 +1190,9 @@ propose d'abord (voir Carte Note) fait encore passer à l'onglet Note, comme tou
 pour la photo montrée (`Fenetre.rafraichirNotation`).
 
 ### Carte Note (1.1, revue en 1.1.1)
+
+Jusqu'à la 1.2 ; en 1.3, son allure et ses boutons sont ceux de la carte Note B (section
+suivante).
 
 `Vues.notation` : un `group_box` « Note » pour la photo active, dans l'onglet Note, sous l'aperçu
 (dans un onglet, une colonne à titre gras, par `Vues.masquable`) ; en 1.1 et 1.1.1, aussi dans la
@@ -946,6 +1247,64 @@ relit la photo active (`Fenetre.majPhoto`, toutes les 2 s et après une écritur
 registre sur sa note et son drapeau (`Notation.recaler`, avec la version lue avant) : une note
 acceptée ou changée puis annulée (undo_last, ⌘Z) rend la proposition de nouveau « à vérifier ».
 
+### Carte Note B (1.3)
+
+En 1.3, la carte Note suit la maquette (`Vues.notation`, lot B5) ; la section précédente reste
+vraie pour ce qu'elle fait au registre (`Notation.poser`, `Notation.recaler`, abonnement). Une
+grille d'étiquettes grises de 12 alignées à droite sur 70 points (`D.etiquetteNote` ; « Votre
+note : » mesure 66,6) :
+
+- « Passes : » (`Vues.passes`) : les quatre passes du standard (`Fenetre.PASSES` : « Rejeter ? »,
+  « 3 ★ ou non ? », « Monter à 4 ? », « 5 ★ ? (vous) »), d'après `notePasse` (`Fenetre.etatPasse`,
+  ramenée à 3 au plus : la passe 4 est à Dany) : la coche verte devant une passe faite, la passe en
+  cours en gras 11, les autres en gris 11, un chevron entre deux ; largeurs mesurées (327 points) ;
+- « Votre note : » : cinq étoiles de 24 sous des calques de 30 (`Vues.etoilesNote`, constaté C4 :
+  le clic sur la 3e pose 3 ★) qui appellent `Fenetre.poserEtoile(k)` ; un clic sur la note posée
+  la retire (0 ★) ; 5 ★ se pose (Dany seul). À droite, `notePoseeTitre` (le sens du standard,
+  `Fenetre.SENS_NOTES` : « Pas encore jugée », « Correcte », « Tient seule »…) et `notePoseeSous`
+  (« 2 ★ · drapeau Retenue ») ;
+- « Drapeau : » : « ⚑ Retenir » et « ⊗ Rejeter » (carrés de bezel 24, `Fenetre.poserDrapeau` : le
+  drapeau, ou aucun si la photo l'a déjà ; les étoiles restent. Retenir, ou retirer un drapeau, ne
+  décide rien de la proposition de Claude ; Rejeter la décide : changée, ou acceptée si Claude
+  proposait le rejet), et « ? À vérifier » posé grisé (`Vues.inactif`). Question encore ouverte
+  à Dany : le remettre comme « remettre à vérifier » par `Notation.decider`, qui existe ;
+- « Claude propose » (gras 12) : cinq petites étoiles (etoile12) d'après `noteClaude` (0 à 4),
+  « rejeter » en rouge, ou « rien pour l'instant » ; à droite, « critères du plus lourd au plus
+  léger » ;
+- la carte des critères (`Vues.carteCriteres`, sur carte-note) : une grille de `D.criteres` + 1
+  lignes de 16 (`Vues.ligneCritere`, variantes selon `ng..k` : `plein`, `etat` — la première ligne,
+  « <EM>Passe 2 · à vérifier.</EM> raison », l'emphase de la couleur de `notationCouleur`, une
+  variante par teinte de `Fenetre.TEINTES_NOTE` —, `critere` — l'étiquette en gras 12 sur 120
+  points, `ne..k`, puis le texte sur 251, `nt..k`, son verdict en `<EM>` : `Fenetre.verdict`, deux
+  mots au plus jusqu'au premier point —), lue page par page (`Fenetre.lignesCriteres(prop,
+  largeurs)` à la place de `Fenetre.texteNote`, `CARTES.note` en grille, `montrerPage` avec ses
+  lignes déjà faites) ; puis le filet et la ligne du plafond (`Vues.lignePlafond` : l'avertissement,
+  « <EM>Plafond N ★</EM> : mesuré au tri, pas plus. » en gras ambre, et « Voir à 100 % ») ;
+- en bas : ▲ ▼ (`Vues.fleches 'note'`), « Laisser à N ★ » ou « Laisser rejetée » (`titreLaisser` :
+  `Fenetre.laisserNote`, `Notation.decider` `ecartee`, rien dans le catalogue ; la proposition passe
+  en gris et Accepter se grise), « Changer… », et « Accepter N ★ » ou « Accepter le rejet », un
+  bouton bleu (`Vues.boutonBleu`, clé `peutAccepterNote`). Jamais « Accepter 5 ★ »
+  (`Fenetre.noteDeCinq` rend la carte inactive, `accepterNote` refuse : `Fenetre.PAS_CINQ`).
+
+« Voir à 100 % » (décision de Dany du 21 octobre 2026) : le zoom que Claude a pris pour noter la
+photo, c'est-à-dire la plus récente image d'un appel réussi de `view_photo` avec `region` sur cette
+photo dans la conversation (`Conversation.dernierZoom`, pur ; la photo vient de `photo_id`, sinon
+de la réponse), gardé par `Fenetre.zoomDeLaNote` ; `Fenetre.voirZoom` le montre dans l'aperçu comme
+un clic sur sa ligne d'image (Agrandir : en grand), sans Claude ni Lightroom. Sans zoom, le même
+bouton grisé, infobulle `Fenetre.SANS_ZOOM` (deux carrés superposés : une infobulle liée n'est
+pas constatée). Toute la ligne suit `aPlafond`.
+
+Étoiles, drapeaux, Laisser, Changer… et Accepter passent par une tâche et sont refusés pendant que
+Claude travaille (`Fenetre.CLAUDE_TRAVAILLE`), pendant une note en cours
+(`Fenetre.NOTE_EN_COURS`) ou sans photo active (`Fenetre.AUCUNE_PHOTO`), et le bandeau le dit ; ils
+écrivent par `Notation.poser` (le clic vaut accord) ou `Bibliotheque.noter`, une étape
+« Claude · notation » que `undo_last` défait. `Fenetre.rafraichirNotation` pose `notePasse`,
+`noteCatalogue`, `notePoseeTitre`, `notePoseeSous`, `noteClaude`, `notationCouleur`, la grille,
+`aPlafond`, `plafondTexte`, `peutVoirZoom`, `titreAccepterNote`, `titreLaisser`,
+`peutAccepterNote` et `peutChangerNote`. Toujours ni Noter ni Évaluer (`Fenetre.verifierNote` reste
+nil). Petit écart laissé : Laisser suit `peutAccepterNote`, faux pour une proposition de 5 ★, que
+le connecteur et le registre refusent déjà.
+
 ### Séance de notation (1.1, retirée en 1.1.1)
 
 La 1.1 avait une fenêtre à part pour noter une sortie entière, passe par passe (« Claude · Séance
@@ -965,7 +1324,8 @@ a été constaté sur elle reste plus bas, comme historique.
 ### Nouvelle conversation par photo (1.1.1)
 
 Quand l'utilisateur choisit une autre photo active ou une autre sélection, la fenêtre commence une
-nouvelle conversation (`Fenetre.suivreSelection`, demandé par Dany le 20 octobre 2026). Elle est
+nouvelle conversation (`Fenetre.suivreSelection`, demandé par Dany le 20 octobre 2026), sauf
+pendant un exercice « Je le fais » (1.3 : Dany peut regarder d'autres photos sans le perdre). Elle est
 appelée par `Fenetre.majPhoto`, toutes les 2 s (`Fenetre.periodique`) et à chaque changement de
 sélection que signale `selectionChangeObserver`. La clé de la sélection (`info.cle`, faite par
 `Lightroom.photos()`) réunit l'identifiant de la photo active, le nombre de photos sélectionnées et
@@ -1020,10 +1380,23 @@ ancienne conversation ne la rouvre pas.
     consommation.json, publication.json     jetons comptés, profils de publication de l'utilisateur
     notation.json                           notes proposées par Claude (registre, format 2, propre
                                             au catalogue ouvert ; voir Notation)
+    carnet.json                             carnet de progrès et leçons des photos (1.3, format 1 :
+                                            vocabulaire en tête, une table par catalogue, une entrée
+                                            par original ; voir Carnet de progrès) ;
+                                            carnet-illisible-<date>.json : un fichier illisible
+                                            mis de côté, jamais écrasé
+    Etapes/<uuid>/                          avant/après des étapes de Claude (1.3) : <id>-avant.jpg,
+                                            <id>-apres.jpg, <id>.json ; vue.jpg et prepare-<n>.jpg,
+                                            d'une session (voir Pourquoi ? : l'avant/après des
+                                            étapes)
     guide-de-style.md                       guide de style (remember_style)
 ~/Library/Logs/Developpeur/module.log         journal de la liaison
 ~/Library/Logs/Developpeur/conversation.log   journal de la fenêtre
 ```
+
+Dans le module (1.3) : `images/` et `images/sombre/`, les images de la fenêtre B, un jeu par
+apparence (voir Fenêtre B). `uninstall.sh` garde `carnet.json` et `Etapes/` ; `--tout` retire
+tout le dossier, eux compris.
 
 ### Préférences
 
@@ -1058,6 +1431,22 @@ suivante (voir Claude Code). Le diagnostic du Gestionnaire donne `pointMiseAuPoi
 mise au point en tout temps ») avec les réglages de la liaison, et le modèle, l'effort,
 `nouvelleParPhoto` et, après la 1.1.1, `propositionAOuverture` (« proposition à l'ouverture »)
 avec ceux de la fenêtre (la disposition, qu'il donnait en 1.1.1, n'y est plus).
+
+1.3 : `Preferences.defauts` gagne `carnet` (vrai par défaut : case « Carnet » de la section
+Liaison, après Mise au point, « Carnet de progrès : noter les défauts vus à la prise de vue, avant
+la première retouche de Claude » ; décochée, `carnet constater` refuse avec le motif `preference`,
+voir Carnet de progrès) ; `Chemins.defauts` gagne `avantApresEtapes` (vrai : case « Avant/après »,
+« Garder l'avant/après de chaque étape de Claude (un rendu de plus par étape, photo active
+seulement) »), `leconFinRetouche` (vrai : case « Leçon », « Claude finit chaque retouche par la
+leçon de la photo » ; décochée, `Moteur.envoyer` joint « [Sans leçon] ») et `apparence`
+(`claire` : menu « Apparence », après Effort, voir Fenêtre B). Les deux cases suivent « À
+l'ouverture ». Le diagnostic les dit au bout de leur ligne, sans en changer le début, que lisent
+les essais : « ; carnet de progrès : true (N photos) » sur la ligne Mode (`Carnet.nombre`, « ? »
+s'il ne se lit pas), et « ; avant/après des étapes : … ; leçon en fin de retouche : … ;
+apparence : claire » sur la ligne Fenêtre Claude (une apparence inconnue est dite à côté de celle
+sur laquelle elle retombe). La case Carnet ne vise que les constats : `lecon garder` ne la lit
+pas, et une leçon se range encore dans `carnet.json` quand elle est décochée (question ouverte à
+Dany : doit-elle couper aussi les leçons ?).
 
 ### Coller une image
 
@@ -1096,7 +1485,8 @@ Budget (2 M par défaut) : alerte à 80 %, refus des demandes à 100 %. Les barr
 
 ### Versions
 
-En bas de la colonne de droite (en 1.1 et 1.1.1, aussi de la colonne Note de l'Atelier et de la
+En 1.3, en bas du volet, au-dessus du voyant Écran, en gris des en-têtes (`Vues.versions`). Jusqu'à
+la 1.2, en bas de la colonne de droite (en 1.1 et 1.1.1, aussi de la colonne Note de l'Atelier et de la
 fenêtre du Panneau, retirés), deux lignes (`Composants.lua`, `Vues.versions`), lues à
 l'ouverture de la fenêtre : « Développeur », ce module (`VERSION` de son `Info.lua`), et
 « MCP-Développeur », le connecteur (`mcp-developpeur --version`, cinq secondes au plus). Les deux
@@ -1105,6 +1495,10 @@ orange « à mettre à jour » (réinstaller Développeur) ; un connecteur absen
 « MCP-Développeur · introuvable ».
 
 ### Bas de la fenêtre
+
+Jusqu'à la 1.2. En 1.3, chaque colonne a sa hauteur fixe dans le contenu de 1 166 (voir Fenêtre
+B) : plus d'espace élastique ni de `D.hauteurListe` tiré des lignes du fil ; le bandeau tient sur
+deux lignes dans la rangée du bas de la saisie, à gauche d'Envoyer.
 
 Dans la Conversation claire (la disposition de la 1.0, seule après la 1.1.1), les trois
 colonnes finissent sur la même ligne : Renommer et Supprimer à gauche, le champ de demande et
@@ -1227,7 +1621,116 @@ suffit pas.
   rangée (les rangées des boutons des deux cartes portent depuis `fill_horizontal = 1` ; sans
   objet pour l'Atelier, retiré après la 1.1.1).
 
+### Constaté dans Lightroom Classic 15.6 (21 octobre 2026, fenêtre B)
+
+Dans un module d'essai hors du dépôt (« Essai de la fenêtre B », blocs A à C le matin, D l'après-midi
+avec « … cadre D7 »), ouvert par la recherche du menu Aide, clics et frappes dans ces fenêtres
+seulement, aucune photo touchée ; le module d'essai est ensuite allé à la Corbeille. Mesures sur
+captures (écran principal de Dany à 1x : un pixel de capture vaut un point). Chaque constat a sa
+règle dans `Tests/Lua/Fenetre/Simulation.lua` et son essai dans `Tests/Lua/Fenetre` (lot B2).
+« Relevé » veut dire lu dans le code de Lightroom (AgUI, AgPictureView), pas vu.
+
+- A1 · `background_color` de `presentFloatingDialog` : sans effet ; fond mesuré #EFEFEF (gris par
+  défaut). La simulation le refuse.
+- A2 · `scrolled_view` : `background_color` appliqué, bord « bezel » ; les liaisons vivent dedans.
+- A3 · Une image sous un contenu (`place = 'overlapping'`, l'image d'abord) : la carte arrondie
+  bordée en PNG reste dessous, le bouton posé dessus reçoit le clic.
+- A4 · `f:picture` : `background_color` sans `value` fait un aplat ; `scaling = 'stretch'` étire
+  une tuile ; `frame_width` et `frame_color` font un rectangle bordé. La simulation exige `width`
+  et `height` (relevé dans AgPictureView : sans eux, la taille en pixels) et refuse un `f:picture`
+  sans image ni fond.
+- A5 · `background_color` sur `row` ou `view` : sans effet (refusé aussi sur `column` et
+  `group_box`).
+- A6 · `primary_line_color` d'un séparateur : sans effet (la ligne reste #DBDBDB) ; refusé.
+- B1 · Texte riche `<EM>` dans un `static_text` : passage en gras et en couleur avec
+  `emphasis_font` ; une balise `<EM>` seule (non fermée) disparaît : aucune étiquette n'en contient.
+  Polices `'<system>'`, `'<system/bold>'`, `{ name = '<system/bold>', size = 16 }`, Helvetica Neue
+  Medium 12, Menlo 11 : toutes rendues.
+- B2 · Boutons natifs : tailles, gras et glyphes rendus.
+- B3 · Bouton par défaut (`default = true`) : le bleu de macOS ; `text_color` sur un
+  `push_button` : appliqué ; `image_name` d'un bouton : l'icône se pose mais chevauche le titre
+  (refusé avec un titre) ; `square_button` : un rectangle blanc à bord fin, coins carrés.
+- B4 · Bouton bleu en image, texte blanc, sous un calque : clic reçu.
+- B5 · Champ de deux lignes avec texte indicatif, menu Style, trois `radio_button` du Mode : rendus.
+- B6 · Pastilles et icônes PNG en 2x : nettes.
+- C1 · `mouse_down` posé sur un `f:picture` : aucun effet ; un calque (`static_text` vide de taille
+  fixe posé sur l'image) reçoit le clic. La simulation refuse `mouse_down` sur un `f:picture`.
+- C2 · Onglets segmentés en images sur un panneau en image : un clic choisit l'onglet (en bleu).
+- C3 · `tab_view` natif : rendu macOS correct, valeur liée lue (non retenu : D11 répond).
+- C4 · Étoiles en images sous calques : un clic sur la 3e donne « Votre note : 3 ★ ».
+- C5 · Liste groupée par jour sur deux lignes : fond de sélection en image, titre en gras, un clic
+  sur une ligne la choisit.
+- Barre de titre : 32 points blancs, un filet, puis le fond.
+- D1 · Retour dans un champ `immediate = false` avec Envoyer `default = true` : l'observateur du
+  champ, puis l'action d'Envoyer 1 ms après, qui lit la valeur validée ; un seul envoi. Retour dans
+  « Rechercher » (`immediate = true`) déclenche aussi l'action du bouton par défaut. Sans bouton
+  par défaut : Retour donne l'observateur, puis l'envoi automatique 0,308 s après ; Retour dans
+  « Rechercher » ne déclenche rien. D'où le repli : aucun bouton par défaut dans la fenêtre. La
+  simulation imite la frappe et Retour (`S.taper`, `S.retour`) et refuse plus d'un `default`.
+- D2 · Envoyer inactif ou masqué : Retour ne le déclenche plus (ni Arrêter, montré à sa place) ;
+  l'observateur, puis l'envoi automatique (0,306 s).
+- D3 · Texte tapé sans Retour, puis un clic sur un calque, un radio, un segment ou un bouton :
+  l'observateur du champ d'abord (le clic valide le champ), puis le clic, 1 à 3 ms après ; le texte
+  reste ; aucun envoi automatique (chaque clic l'annule). `S.cliquer` l'imite.
+- D4 · `<EM>` en gras 12 sur `<system>` 12 : même interligne (15 points) que le texte sans balise ;
+  une balise sur deux lignes les met toutes deux en gras. Police 11 et emphase gras 12 : la dernière
+  ligne de `height_in_lines` est coupée. « < » et « & » bruts s'affichent tels quels, « &lt; » et
+  « &amp; » ne sont pas décodés. `emphasis_color` seule, sans `emphasis_font` : aucun effet.
+  `text_color` gris avec `emphasis_font` gras et `emphasis_color` ambre : l'emphase reste ambre et
+  grasse, le reste gris (le relevé dans AgUI disait le contraire : démenti). Un titre lié balisé
+  garde son balisage à chaque nouvelle valeur. La simulation refuse une balise non fermée ou
+  imbriquée, une entité, `emphasis_color` sans `emphasis_font`, et une emphase plus grande que le
+  texte quand `height_in_lines` est juste.
+- D5 · `square_button` : sans hauteur, bezel visible de 17 (regular), 15 (small), 11 (mini) ;
+  `height` imposée : 2 de moins (22 donne 20) ; glyphes ☆ ⚑ ⊗ ? ⤢ + rendus (⚑ et ⤢ plus petits) ;
+  icônes PNG 2x de 12, 14 et 16 nettes, grisées quand le bouton est inactif ; « ? À vérifier »
+  inactif : titre et bord grisés.
+- D6 · Trois cases de 21 : 63 points exactement ; « Pourquoi ? » small : bezel de 15, 3 points
+  au-dessus et au-dessous ; posé dans une `f:row` à `margin_left` ou seul à `place_horizontal = 1`,
+  il répond ; la rangée posée sur le texte ne lui prend pas ses clics ; bouton masqué : le clic va
+  au texte.
+- D7 · Fenêtre de 1 280 × 799 pour un contenu demandé de 1 278 × 765 : barre de titre de 33 (32
+  blancs et un filet #E0E0E0), contenu juste dessous, marge de 1 à gauche, à droite et en bas,
+  aucune en haut ; volet 183, centre 630, droite 463 : largeurs exactes ; filets de 1 aux places
+  prévues. Couleurs lues à travers le profil de l'écran (#D2D2D2 → #DADADA, #ECECEC → #EFEFEF…).
+  Coins du bas arrondis par la fenêtre. Ouverture : construite en 0 ms, montrée en 13 ms. D'où, pour
+  1 280 × 800, un contenu de 1 278 × 766 (`S.contenuPourFenetre`).
+- D8 · Apparence claire : champ, bouton, carré, menu, case et radio natifs lisibles sur blanc et
+  sur #F2F2F2. Sombre : non fait (l'apparence du système n'a pas été basculée).
+- D9 · Tailles de police appliquées ; l'encre de Lightroom fait 1 à 2 points de moins que la chasse
+  NSFont (`'<system>'` 236 contre 237,8 ; `{ '<system/bold>', 12 }` 235 contre 237,0…) : les
+  chasses de `Metriques.lua` restent justes.
+- D10 · `visible` lié sur un `f:view` : il se cache et se montre (caché à la création, il ne se voit
+  pas ; la place reste) ; un `f:view` posé sur une autre vue, caché, laisse passer le clic dessous.
+  La simulation l'accepte ; `row`, `column`, `group_box`, `tab_view` et `scrolled_view` restent
+  refusés (constat du 20 octobre 2026).
+- D11 · Quatre variantes superposées par `Vues.masquable` : sous Aperçu (la variante du dessous),
+  Note et Leçon (celle du dessus), le bouton, le carré, le calque bleu et le texte de la carte
+  montrée répondent, aucun d'une carte cachée ; une pastille liée à deux clés se cache et se montre.
+  Les onglets restent donc des variantes superposées. La simulation refuse un geste sur une vue
+  masquée ou inactive.
+- D12 · `radio_button` inactif coché par sa valeur : à la première ouverture, un disque gris sans
+  point ; après la valeur reposée, et dès la création à la seconde ouverture, grisé et coché. D'où
+  `Fenetre.reposerMode` (`S.RADIO_INACTIF_A_REPOSER` dans la simulation).
+
+Relevés dans le code de Lightroom, non vus : au plus un bouton par défaut par fenêtre
+(`setDefaultButtonCell`) ; `f:picture` sans `width` ni `height` prend la taille en pixels de son
+image. Non constatés : un clic sur une vue inactive (la simulation le refuse) ; la police par
+défaut d'un `static_text` (13 points, supposée) ; un `default` lié qui change fenêtre ouverte (sans
+objet : aucun bouton par défaut).
+
+Décisions de Dany le même jour : la fenêtre B d'après la maquette, puis agrandie (voir Fenêtre B) ;
+l'étiquette « Style » devant son menu ; Appliquer et Proposer d'abord grisés pendant que Claude
+travaille ; ni Noter ni Évaluer, ni menu Modèle ; « ? À vérifier » posé grisé ; « Voir à 100 % »
+montre dans l'aperçu le zoom que Claude a pris pour noter ; l'apparence claire ou sombre choisie au
+Gestionnaire de modules externes.
+
 ### À constater dans Lightroom (1.1, 1.1.1 et après)
+
+En 1.3, la fenêtre B change plusieurs points ci-dessous : les onglets en boutons radio (3), les
+hauteurs de la Conversation claire (6) et la rangée de quatre voyants (15) sont sans objet ; ce
+qui reste à voir de la fenêtre B et des chantiers de la 1.3 est dans À constater dans Lightroom
+(1.3).
 
 La 1.1 a été construite et vérifiée le 20 octobre 2026 par les deux suites (`swift test`,
 `scripts/tester-module.sh`, essais `essais-*.lua` compris), puis essayée dans Lightroom le même
@@ -2970,6 +3473,23 @@ distance sous 0,35). Constaté sur une séance de 329 photos en intérieur : san
 photos semblables de proche en proche formaient un groupe de 193 photos (même salle, même éclairage) ;
 avec lui, 61 rafales, dont une de 59 photos prises en continu.
 
+**Texture au point de mise au point (1.3).** Constaté le 21 octobre 2026 (mesures de la 1.3, vues
+de 1 344 px des huit copies d'Essais) : deux fausses « mise au point manquée », au tri comme au
+carnet, le point posé sur du sable lisse (netteté 12,6, la voiture et la dune nettes) et sur un
+nuage (6,6, toute la scène nette) : une zone sans texture paraît floue. `Detail.autour` mesure
+dans le carré de la netteté une texture (75e centile de l'écart entre blocs voisins de 8 × 8 px,
+à 1 024 px). Sous `DetailMeasurements.textureMin` (18 : le sable à 11,2 et 11,6, mesuré le carré
+vert du point AF effacé), la mise au point est « non jugée » (`PhotoTriee.MiseAuPoint.jugeable`) :
+pas de « manquée », pas de plafond, et le carnet ne la cherche pas, sauf si l'appareil l'a
+signalée (la zone la plus nette la confirme alors). De 18 à `textureDouteuse` (30 : le bord du
+nuage à 23,6 et 24,1, autant qu'un petit visage flou, 21,3 à 27,2), une mise au point manquée n'est
+qu'un doute (`douteuse`) : `Notation.plafond` donne 2, à vérifier par un zoom à 100 %, sans rejet
+proposé, et le carnet ne la compte pas. Les sujets nets relevés vont de 28,4 à 64,6 (un petit
+visage net de 25,8 à 28,4). `view_photo` (`point_af.mise_au_point`) et `cull_photos` (`point_af`,
+`pourquoi`) disent « non jugée : zone sans texture autour du point » ou « à vérifier : texture
+faible autour du point » ; `--constats` a sa colonne texture. Seuils choisis sur ces seuls
+relevés : à relever sur un ciel uni, un mur, de la neige et une vraie mise au point manquée.
+
 Depuis la 1.1, le bilan suit le standard de notation (voir Notation) :
 
 - `plafonds` (`{"<id>": {note_max, pourquoi, a_verifier?}}`, seulement pour une photo plafonnée
@@ -3337,8 +3857,19 @@ pause, ni l'accord, ni les garde-fous ne s'y appliquent, comme pour `vignettes`.
 - `lire` (`photos?`) : `{propositions (sans l'uuid), perdues?}` ; les propositions dont la photo
   a disparu ou changé sont retirées et comptées dans `perdues`.
 
-`propose_ratings` envoie `proposer` ; aucun outil n'envoie `lire` (les essais de la liaison
-l'emploient, et `--module`).
+- `remettre` (1.3 ; la recette seulement, jamais un outil) : `{photo, proposition}` remet la
+  proposition d'une photo telle que `lire` l'a rendue avant une étape de la recette (ses champs
+  gardés, l'uuid de la photo repris), ou la retire (`proposition` absente ou null) ; refuse plus
+  de 4 étoiles, un état inconnu ou une autre photo, sans rien changer ; rien n'est écrit dans le
+  catalogue. Réponse : `{photo, proposition}`. Constaté le 21 octobre 2026 : la recette posait
+  avec `apply` puis défaisait par `undo_last` une note de 2 ★ sur une copie qui avait déjà 2 ★ ;
+  le registre ne voit pas l'annulation et `Notation.recaler` n'y trouvait rien à reprendre (la note
+  était là) : la proposition restait « acceptee », comme si Dany l'avait acceptée, et `view_photo`
+  le disait. La recette lit donc le registre avant l'étape « note proposée… » et le remet après,
+  même après un échec (`Recette.garderRegistreDesNotes`).
+
+`propose_ratings` envoie `proposer` ; aucun outil n'envoie `lire` ni `remettre` (les essais de la
+liaison et la recette les emploient, et `--module`).
 
 ### Poser une note (`Notation.poser`, `Bibliotheque.noter`) et l'annuler
 
@@ -3461,10 +3992,11 @@ inchangée ; puis posée sur demande et annulée » (son nom depuis la 1.1.1) : 
 (état « a_verifier », celui de toute proposition depuis la 1.1.1), la photo inchangée ; depuis la
 1.1.1, la même proposition avec `apply` : 2 ★ posées (`posees`, état « acceptee », note relue dans
 le classement), puis `undo_last`, après quoi la photo est de nouveau comme au départ (en 1.1,
-l'étape lisait la séance ouverte par `read_session`, retiré). Elle laisse une proposition pour la
-photo d'essai dans `notation.json` (aucune commande ne retire une proposition), « acceptee »
-jusqu'à ce que la carte Note relise cette photo, puis de nouveau « a_verifier »
-(`Notation.recaler`).
+l'étape lisait la séance ouverte par `read_session`, retiré). Jusqu'à la 1.2, elle laissait une
+proposition pour la photo d'essai dans `notation.json`, « acceptee » (constaté le 21 octobre
+2026 : `Notation.recaler` n'y voit rien quand la photo avait déjà cette note) ; depuis la 1.3, la
+recette lit le registre avant l'étape et le remet après, même après un échec (commande `notation`,
+action `remettre`, `Recette.garderRegistreDesNotes` ; voir Le registre).
 Depuis la 1.1.1, avec `--x-t20`, l'étape « point de mise au point dessiné pour noter (view_photo,
 af_point) » : `view_photo` avec `af_point = true` à 1024 px ; une image, l'évaluation dite
 (`evaluation`), le chemin de l'original absent de la réponse ; un point lu (`point_af`) doit porter
@@ -3567,6 +4099,71 @@ code 0, de 02:19 à 02:25. Pour la 1.2 :
   balance proposée Temperature 5558, Tint 15, mesure en 155 ms (version de débogage) ; le témoin à
   une seule lumière n'a pas tourné (même photo que le RAW de la recette).
 
+Depuis la 1.3 (`Recette+13.swift`, appelée par `sequenceRAW` et `lancer` ; essais
+`Recette13Tests.swift` sur un module simulé à état) :
+
+- copie d'un RAW, après le bilan : « avant/après d'une étape gardé sans autre rendu (Pourquoi ?),
+  puis annulé » (`etapePourquoi` : la vue gardée par `apercu` avec `avant_apres`, l'étape écrite par
+  `appliquer` avec `avant_apres`, Exposure2012 +0,5 ; l'étape retrouvée par l'`etape_id` de la
+  réponse, jamais par sa place dans la liste, qui garde aussi les étapes défaites ; l'après attendu
+  par la commande `etapes`, en lectures bornées, 30 s au plus ; état « pret », une étape de plus en
+  mémoire, l'avant aux dimensions de la vue, donc sans second rendu, l'après plus clair ; la durée
+  lue dans `<id>.json` ; puis `undo_last`, l'étape dite hors de la mémoire) ; « leçon de la photo
+  (photo_lesson) : indices lus, rangée, relue, retirée ; photo inchangée » (`etapeLecon` :
+  Exposure2012 = max(départ, actuel) + 0,7 et Temperature = min(départ, actuel) − 500 K, calculés
+  depuis le départ de la séquence ; `read_facts` doit donner `underexposed` et `color_cast` ; puis
+  les trois points, `lecon lire`, `lecon retirer` et `undo_last` ; une leçon déjà rangée pour la
+  copie arrête l'étape avant toute écriture) ; « carnet de progrès : photo d'essai refusée, notée
+  pour la recette (essai_recette), exportée, retirée » (`sequenceCarnet`, sautée hors de
+  « Développeur › Essais » : une vue sans `essai_recette` doit être refusée de motif `essai`, tout
+  autre motif arrête l'étape sans rien envoyer d'autre ; puis l'angle de `measure_angle` avec
+  `essai_recette`, sous l'entrée de la copie ; le mois, et `find_photos` qui retrouve la photo au
+  jour de sa prise de vue et pas la veille ; `carnet lire`, `export_journal` avec `notebook`
+  (« # Carnet de progrès »), et `carnet retirer {photos = [copie]}`, même après un échec) ;
+- après les variantes : « « Je le fais » : ma version rangée sans rien appliquer, réglages changés,
+  comparée côte à côte, puis effacée » (`sequenceJeLeFais` : `my_turn` Exposure2012 +0,3 et
+  Vibrance +10 en relatif ; rien d'appliqué ni de rendu, `a_faire` Exposition puis Vibrance,
+  « Claude · ma version » rangée, l'entrée `exercice` au journal ; `apply_settings` à la place de
+  Dany, +0,8 et Shadows2012 +20 ; `view_photo` avec `claude_version` : une image, Exposure2012
+  `plus_fort`, Shadows2012 `ajoute`, Vibrance `oublie` ; `undo_last`, puis « ma version » effacée,
+  même après un échec ; une « ma version » déjà rangée arrête l'étape) ;
+- l'étape du débruitage vérifie aussi la photo active, lue par `get_status` avant et après
+  (`Recette.ecartPhotoActive`, voir Bibliothèque) ;
+- `--horizon <id>` (`sequenceHorizon`, `--hauteur-horizon` de 0,05 à 0,95, 0,5 par défaut ; une
+  copie avec Upright ou une perspective est refusée d'emblée) : « composition lue, cadre proposé en
+  pointillés, photo inchangée » (le cadre gardé égal au crop : centre à 0,003, largeur et ratio à
+  0,5 %, angle à 0,01° ; les `Crop*` inchangés au millionième) ; « cadre actuel lu sur l'image
+  entière (recadrée en 4:5, tournée de 2°) » (le recadrage d'essai du contrat de la composition :
+  le cadre actuel égal à celui posé, les `Crop*` remis exactement, l'horizon retombé à sa place) ;
+  « cadre proposé appliqué : horizon droit, sur le tiers du bas (measure_angle) », puis deux
+  `undo_last`. Sans horizon net à cette hauteur (une mesure qui n'est pas « affinée »), les deux
+  premières réussissent et le disent, la troisième est sautée avec sa raison (« choisir pour
+  --horizon une copie d'Essais qui a un vrai horizon »), le recadrage d'essai annulé ; sans
+  `--horizon`, la recette dit que la composition n'est pas vérifiée.
+
+La recette retire toujours ce qu'elle range hors du catalogue (la leçon, l'entrée du carnet de la
+copie, l'instantané « Claude · ma version », la proposition de notes remise), même après un échec ;
+elle ne remplace jamais une leçon déjà rangée ni une « ma version » d'avant (l'étape s'arrête
+avant toute écriture) ; elle n'envoie `essai_recette`, ni `carnet retirer`, qu'après un refus de
+motif `essai` (un angle irait sinon à l'entrée de l'original, et retirer l'effacerait).
+
+**Recette de la 1.3, le 21 octobre 2026** (Lightroom Classic 15.6, code d'essai de la 1.3 avant
+les corrections du lot 18 ; `--recette 53709912 --jpeg 53709534 --x-t20 53709579 --portrait
+53709912 --mixte 53709912 --horizon 53709786`, 380 s) : 91 étapes, 90 réussies. Pourquoi ? :
+l'avant est la vue de 1 344 × 896, sans second rendu, l'après plus clair (L* 36,8 → 45,3), prêt
+1,54 s après la réponse, capture en 1,02 s. Leçon : `underexposed` et `color_cast`, rangée (prise de
+vue 2026-01), relue, retirée. Carnet : la vue refusée « Photo d'essai (Développeur › Essais) : le
+carnet ne compte que les vraies prises de vue. » (`estPhotoDEssai` constaté sur une vraie copie),
+l'angle noté avec `essai_recette` au jour de sa prise de vue, exporté, retiré, catalogue inchangé.
+Je le fais : `a_faire` Exposition puis Vibrance, écarts `plus_fort`, `ajoute`, `oublie`, « ma
+version » effacée. Composition : les deux premières étapes réussies ; la troisième en échec,
+l'horizon penché de 0,55° au lieu de 0,33° : la dune n'a pas d'horizon à mi-hauteur, et la mesure
+« affinée » s'accrochait aux rides du sable (d'où `LineAngle.ecartMax` et l'étape sautée). Toutes
+les étapes de la 1.2 passent. La proposition de notes de la recette restait « acceptee » (d'où
+`remettre`), et la photo active d'avant n'était pas remise après les passages au module
+Développement (d'où `Bibliotheque.remettreSelection`). Il manque à « Développeur › Essais » une
+copie qui a un vrai horizon pour `--horizon`.
+
 `get_settings` avec `all_keys` ajoute tout ce que Lightroom range (`toutes` côté module) : pour
 explorer un outil appliqué à la main (flou d'objectif, réduction du bruit…).
 
@@ -3655,6 +4252,597 @@ liste (Fenêtre Claude › À constater dans Lightroom).
 8. Consignes et descriptions : une session de Claude Code voit les consignes du connecteur entières
    (3 768 caractères) et les descriptions d'outils longues (`add_mask` 1 559, `view_photo` 1 783)
    sans les couper : pour une description d'outil, jamais constaté.
+
+## Pourquoi ? : l'avant/après des étapes (1.3)
+
+Dans la fenêtre Claude, chaque étape de Claude montre pourquoi elle a été faite (sa raison) et son
+avant/après. Lightroom ne rend que l'état actuel d'une photo (`LrExportSession` prend les réglages
+du moment) : ni un état de l'Historique ni un instantané ne se rendent sans être posés sur la
+photo. L'avant/après se garde donc au moment de l'étape, au rendu, jamais par une écriture dans
+le catalogue.
+
+**Identité des étapes** (`Ecriture.lua`). `Ecriture.idEtape()` fabrique un identifiant
+`%X-%04X-%d` (l'heure, un tirage, un compteur), qui sert aussi de nom de fichier ;
+`Ecriture.nouvelleEtape(etapes, nom, avant)` ajoute `{ id, nom, avant, le }` à la mémoire
+(`etapesClaude`, 20 au plus) et rend l'id : toute étape nouvelle passe par lui (`ecrirePlans` —
+appliquer, masquer, retoucher, copier, masques, la poussière —, `Amelioration`, `Suppression`,
+`Variantes.choisir`, `Bibliotheque.memoriser`). `etape_id` va dans l'entrée du journal et dans
+chaque résultat (voir Messages entre le serveur et le module) ; quand Lightroom n'a rien lancé
+(débruitage, reflets), la mémoire est remise et la réponse n'a pas d'`etape_id`. `recadrer` garde
+l'id de l'étape qu'il complète. `annuler` rend l'`etape_id` de l'étape défaite (null pour une
+étape d'avant la 1.3, qui s'annule par son rang).
+
+**Capture** (`Etapes.lua`, sans `LrView` ni couleur ; chargé par la liaison et la fenêtre).
+`Liaison.recevoir`, après le jeton, appelle `Etapes.avantCommande(nom, params)`, puis, une fois la
+réponse partie, `Etapes.apresCommande`, ou `Etapes.abandonner` sur une erreur ; ces crochets ne
+laissent passer aucune erreur. Conditions : la case Avant/après cochée (`avantApresEtapes`, défaut
+de `Chemins.defauts`) et la fenêtre Claude ouverte ou son Claude au travail (`Etapes.actifPour`,
+posé par `Fenetre.afficher` : `Fenetre.etapesActives` ; sans fenêtre, Claude Desktop seul, aucune
+capture), ou `avant_apres = true` (la recette seulement, jamais un outil, qui lève aussi la
+condition suivante) ; une commande qui écrit une étape sur une seule photo, la photo active ; ni
+`sans_avant_apres` (`match_series`), ni pause, ni refus prévisible (« Proposer d'abord » sans
+accord, photo protégée : `Ecriture.verifierProtection`). Commandes : `appliquer`, `masquer`,
+`retoucher`, `copier`, `ameliorer`, `supprimer`, `masques` (hors `lister`) et `variantes`
+`choisir` font une étape nouvelle ; `recadrer` complète l'étape précédente pour les photos de
+`completer`. Les classements (`metadonnees`, `collections`, `notation`) n'ont pas d'avant/après.
+
+- L'avant : la vue, c'est-à-dire le dernier rendu connu de la photo dans le même état (l'image
+  entière de l'état actuel que `Rendu.apercu` garde, `Etapes.garderVue`, jamais un zoom, un
+  `chemin_avant`, un `essayer` ni une image entière de `read_composition` ; ou l'après de l'étape
+  précédente), reconnue par une empreinte ; à défaut (une retouche à la main entre-temps), un rendu
+  juste avant l'écriture, gardé comme vue.
+- L'après : rendu une fois la réponse partie, pendant que Claude écrit son appel suivant, puis il
+  devient la vue. Avec `a_recadrer`, l'avant est rangé tout de suite et `<id>.json` dit `en_cours` :
+  `recadrer` complète l'après.
+- L'empreinte : `Locaux.empreinte(Json.encode(sansVolatils(réglages)))`, puis `|` et
+  l'orientation. `sansVolatils` retire, à toute profondeur, les clés en `…Digest` et
+  `…DigestVersion`, `UprightTransform*`, `LensProfileName`, `LensProfileFilename` et
+  `LensProfileIsEmbedded`, et tient une table vide sous une clé texte pour une clé absente (un
+  élément vide d'une liste garde sa place). Si l'empreinte change pendant le rendu (E1 et E2
+  différentes), l'après est jeté (raison `changee`).
+- Jamais un rendu quand Lightroom a encore des calculs IA à faire (après `calculerAvantRendu`, ou
+  `needsUpdateAISettings`) : un rendu que Claude n'a pas demandé ne doit pas ouvrir la fenêtre
+  « Mises à jour IA recommandées » (raison `calculs_ia`).
+- Une capture à la fois : toute commande hors `Etapes.SANS_ATTENTE` (`ping`, `etat`, `selection`,
+  `progression`, `notation`, `etapes`, `lecon`, `carnet`, `journal`, `reglages`, `diagnostic`)
+  attend sa fin, `ATTENTE` (8 s) au plus ; une capture de plus de `PERIMEE` (120 s) est tenue pour
+  interrompue.
+- Fichiers, dans `Chemins.etapes()/<uuid>/` (une copie virtuelle a le sien) : `<id>-avant.jpg`,
+  `<id>-apres.jpg` (côté `COTE`, 1 024 px ; l'avant est la vue de 1 344 quand elle a servi),
+  `<id>.json` (`{ etat = pret | manque | en_cours, raison?, detail?, duree?, photo, etape, le }`),
+  `vue.jpg` et `prepare-<n>.jpg`. Raisons en mots : `Etapes.RAISONS` (`calculs_ia`, `changee`,
+  `rendu`, `sans_avant`, `interrompue`). Ménage au chargement du module (`Etapes.menage`, dans son
+  propre `LrTasks.pcall` d'`Init.lua`) : la vue et les préparations d'une session passée, puis les
+  fichiers de plus de 30 jours (`JOURS`), puis les plus anciens au-delà de 500 Mo (`MAX_OCTETS`),
+  et les dossiers vidés. Ces images ne partent jamais vers Claude ni vers le connecteur, sauf les
+  chemins de la commande `etapes` (la recette).
+- `etapes {photo?}` : les étapes de la mémoire, puis celles qui ne restent que sur le disque
+  (`en_memoire = false`), avec leurs images et leur état ; lecture seule, rejouée.
+  `Etapes.images(photoId, etapeId)` rend une table neuve à la fenêtre ; `Etapes.version` change à
+  chaque avant/après rangé ou manqué.
+
+Un plan B (une capture à 1 568 px reprise par `view_photo`) était prévu si les captures
+ralentissaient trop Claude : non nécessaire (mesures ci-dessous).
+
+**Dans la fenêtre.** Une étape (`Conversation.OUTILS_ETAPES` : `apply_settings`, `add_mask`,
+`edit_mask`, `retouch_spots`, `copy_settings`, `enhance_photo`, `remove_distractions`,
+`choose_variant`, `match_series`, `set_metadata`, `manage_collections`) appelée sans `preview`
+garde `raison` (`reason`) et `etape` (`step_name`) ; à la réponse, `e.etapes`
+(`Conversation.etapesLues` : `{ photo, id, nom, fichier, changements }` pour chaque résultat qui
+porte un `etape_id`), `e.annule` pour `undo_last`, `e.revenu` pour `revert_to_original` ; `Stockage`
+les écrit en tableaux, même vides. `Conversation.estEtape(e)`, `Conversation.etapes(c, photo)` (une
+étape est « annulée » par un `undo_last` suivant, par son id, sinon par son nom ; « défaite » par un
+`revert_to_original` suivant) ; une conversation de la 1.2 se relit dans `detail`
+(`Conversation.infoEtape`, sans id). Sa ligne du fil porte le bouton « Pourquoi ? » (voir Fenêtre
+B) : `Fenetre.pourquoi(i)` relit la ligne, puis `Fenetre.montrerEtape` ouvre l'onglet Aperçu, jamais
+par une bascule automatique. `Fenetre.etape` = `{ conversation, photo, id, element, vue, suivre }`
+(l'id de l'élément, pas son indice), remis à nil quand la conversation change. La carte
+(`Vues.etape`) : « Étape n sur N · but » (sans étape : « Pourquoi ? », `Fenetre.TITRE_ETAPE`, et
+l'aide `Fenetre.AIDE_ETAPE`), le sous-titre (fichier · outil · « annulée ensuite (undo_last) »,
+« défaite ensuite (revert_to_original) » ou « en cours »), la raison, ce qui a changé, et « Pas
+d'avant/après : … » ou « Avant/après incomplet : … » (`Fenetre.SANS_IMAGES`, `Etapes.RAISONS`),
+page par page (`etapeTexte`, `D.etapeLignes`). L'aperçu montre l'après (« Étape n sur N · après »,
+ou avant, « avant/après en préparation… », « pas d'avant/après ») ; ses ◀ ▶ sont coupés ; ◀ ▶ de la
+carte passent d'une étape à l'autre de la même photo (la dernière reprend le mode suivre, qui suit
+la dernière étape à mesure que Claude travaille) ; Voir l'avant / Voir l'après (`titreBascule`) ;
+Détail… (l'appel et sa réponse) ; Agrandir montre l'avant et l'après côte à côte
+(`Fenetre.agrandirDeux`, chaque image dans 540 × 700, `Fenetre.GRANDE_DEUX`, titre « Claude ·
+<titre> »), ou la seule image qui existe. Les images se lisent par `Etapes.images` dans une tâche,
+réduites par `Images.vignette`, gardées par étape (`Fenetre.imagesEtapes`) et relues quand
+`Etapes.version` change. Un vrai clic sur le segment Aperçu sans étape choisie montre la dernière
+étape de la photo active, sinon de la conversation.
+
+**Consignes.** La raison de chaque retouche : `ToolHandler.descriptionRaison` (160 caractères au
+plus), répétée dans chaque outil qui écrit ; dans la fenêtre, la section « ## Raison de chaque
+étape » (voir Fenêtre Claude › Claude Code).
+
+**Constaté le 21 octobre 2026** (Lightroom Classic 15.6, deux copies d'Essais, 13 étapes
+capturées par la commande brute du module avec `avant_apres`, puis défaites) : une capture prend
+0,51 à 1,06 s (masques IA compris), sous la 1,5 s visée ; la réponse à Claude ne change pas quand
+une vue de l'état existe (0,24 contre 0,25 s : +4 %), et prend +0,8 s sans elle (l'avant rendu
+avant l'écriture) ; 0,6 à 0,9 Mo par étape (500 Mo : 600 à 800 étapes) ; un `view_photo` qui suit
+une capture l'attend (environ 1,1 s), sans erreur. `COTE` 1 024 et `ATTENTE` 8 sont gardés. Un
+masque IA posé par `add_mask` est calculé avant la capture : pas de raison `calculs_ia`, pas de
+fenêtre IA. Lightroom ne change seul aucune clé (à 0, 1 et 5 s, après un aperçu, une proposition,
+un débruitage relu) ; seules les écritures du module en changent (`GlobalInputDigest` du
+débruitage). Mais `MaskGroupBasedCorrections` passait d'absente à `{}` (retour de `view_photo`
+`compare = before_claude`, annulation de l'étape qui posait des masques) puis de `{}` à absente
+(rendus du recalage), sans effet sur l'image : d'où la table vide tenue pour absente dans
+`sansVolatils`. La simulation de la liaison fait tomber un `MaskGroupBasedCorrections` vide à une
+écriture de `LensProfileEnable` ou de `PerspectiveUpright` (les rendus du recalage) : le
+déclencheur exact est supposé, et dit comme tel.
+
+## Leçon de la photo (1.3)
+
+À la fin d'une retouche, la leçon de la photo : trois points, Lumière, Couleur et Composition,
+chacun avec ce qui manquait et ce qui l'aurait évité à la prise de vue, rangés dans
+`carnet.json` ; Claude les écrit, le connecteur les vérifie et lui donne les faits.
+
+**Le vocabulaire des défauts** (`PriseDeVue.swift`, sans Vision) : `PriseDeVue.defauts` est la
+seule liste des défauts de la prise de vue (la leçon, le carnet, les indices). Seize codes, chacun
+avec sa clé anglaise (l'énumération de `photo_lesson`), son axe de leçon (`lumiere`, `couleur`,
+`composition`), son domaine de carnet (`lumiere`, `nettete`, `couleur`, `composition`), son
+libellé (40 caractères au plus), son conseil à la prise de vue (140 au plus) et s'il est mesuré :
+`horizon_penche`, `verticales_fuyantes`, `cadrage_large`, `sujet_centre`, `bords_encombres`
+(composition) ; `sous_exposition`, `surexposition`, `ciel_brule`, `ombres_bouchees`,
+`contraste_plat`, `bruit`, `flou`, `mise_au_point` (lumière, les trois derniers au domaine
+netteté) ; `dominante`, `eclairage_mixte`, `couleurs_ternes` (couleur). Six sont mesurés
+(`horizon_penche`, `sous_exposition`, `ciel_brule`, `bruit`, `flou`, `mise_au_point`) : le
+carnet les compte. `PriseDeVue.vocabulaire`, un tableau JSON dans l'ordre de la liste, part avec
+chaque constat du carnet : le module n'écrit aucune liste de défauts.
+
+**L'outil** (`photo_lesson`, `Tools+Lecon.swift` ; partie pure dans `Lecon.swift`), en lecture
+seule (`readOnlyTools`) : ni la photo ni le catalogue ne changent ; la leçon va dans `carnet.json`
+par la commande `lecon`. Sans points ni `read_facts`, un refus qui explique les trois points ; les
+deux à la fois, refusé aussi. Les points sont validés avant tout envoi (`Lecon.points`) : trois,
+chaque axe (`light`, `color`, `composition`) une fois, rendus dans l'ordre des axes ;
+`at_capture` obligatoire, `missing` facultatif (absent : rien ne manquait) ; chaque moitié 140
+caractères au plus (`Lecon.longueurPoint`) et 600 octets (`Carnet.LONGUEUR_TEXTE`) ; chaque défaut
+connu et de l'axe de son point. Une clé inconnue est refusée à la main par `ToolHandler.nommer`,
+avec son nom proche ; un refus nomme le point fautif et dit « Rien n'a été rangé ». Puis `journal
+{photos, detaille: true}` (60 s), le départ (`departDeLaSession` : la plus ancienne vue de
+`vuesMesurees` pour cette photo, toutes tailles), et `lecon {action garder, photo, lecon}` (30 s).
+Toute erreur de ce seul envoi donne `rangee = false` et une remarque (un module d'avant la 1.3 :
+« Leçon non rangée : le module de Lightroom chargé ne connaît pas encore la commande lecon… »),
+jamais une erreur d'outil. Réponse : `lecon {photo, fichier, rangee, remplacee, mois, prise_le,
+sans_date}`, `texte` (« Leçon de la photo · <fichier> », une ligne par axe), `faits`,
+`remarques` (« Mesuré : … ; la leçon ne nomme pas « … » : à revoir »). Avec `read_facts`,
+`{photo, faits, rangee: false}`, et seule la commande `journal` part.
+
+**Les faits** : `prise_de_vue` (la description de la photo, et `prise_de_vue_plus`
+`{compensation, flash, programme, mesure}`, lus un à un par `Photos.meta` sous `LrTasks.pcall`,
+jamais dans `CLES_FORMATEES` ni une lecture groupée : `Lecture.journal` avec `detaille`) ;
+`corrections` (`Lecon.correctionsNettes` : retouches, classements et exercices s'empilent ; une
+annulation retire l'entrée de même `etape_id`, sinon la dernière dont l'étape est le nom entre
+« », sinon la dernière ; un retour vide la pile ; par clé, la première valeur d'avant et la
+dernière d'après, les écarts nuls retirés ; un exercice marque `exercice = true`, que rien ne
+défait) ; `depart` (la vue : L* médian, hautes lumières écrêtées, ombres bouchées, tons neutres,
+dominante, `etapes_claude` à ce moment, ou un texte sans vue) ; `indices` (`Lecon.indices`, des
+remarques, jamais des refus, chacun avec sa preuve chiffrée en français : « Exposition +1,10 IL
+(0,00 → 1,10) ») et `seuils`. Seuils provisoires (`Lecon.Seuils`) : exposition ±0,5 IL ; hautes
+lumières −40 ou blancs −30 si le départ est écrêté à 0,5 % ou plus ; ombres +40 ou noirs +25 si le
+départ est bouché à 2 % ou plus ; correction du voile +10 ; débruitage lancé, ou réduction du bruit
+de luminance +20 ; température 400 K (10 en relatif, JPEG), teinte 10, ou une dominante nette au
+départ (seulement sans retouche de Claude) ; `CropAngle` 0,5° ; Upright posé ou perspective
+verticale de 10 ; surface du cadre sous 0,85 et resserrée par Claude, seulement sans rotation ni
+Upright. Limite connue : les corrections viennent du journal de Claude, pas de l'état actuel ; une
+copie remise hors de Claude (Historique, ⌘Z) garde au journal des corrections qui n'y sont plus, d'où
+de faux indices (constaté le 21 octobre 2026 : 15 corrections lues sur une copie revenue à sa
+référence, indices `underexposed` et `color_cast` faux). À recouper un jour avec les réglages
+actuels.
+
+**Le module** (`Carnet.lua`, commande `lecon`) : `garder` vérifie tout avant de toucher au registre
+(trois points, un par axe ; `prise_de_vue` obligatoire ; codes `^[a-z_]+$`, 12 au plus par point ;
+20 indices au plus ; textes bornés en octets), puis range la leçon sous l'original de la photo
+(voir Carnet de progrès : une leçon par photo, la nouvelle remplace l'ancienne) ; `lire` vérifie
+l'uuid des photos demandées ; `retirer` retire aussi l'entrée qui n'a plus rien. Ni le catalogue
+ni la pause, jamais rejouée.
+
+**Invites** : `Prompts.Lecon.phrase` (seule copie) finit l'étape 9 de `retouche_pro` et
+`finRetouche` (voir Consignes et invites).
+
+**Dans la fenêtre.** L'élément `lecon` se fait de l'entrée de `photo_lesson`, jamais pour
+`read_facts` (`Conversation.AXES_LECON`, `leconDemandee` : tables neuves dans l'ordre des axes, un
+axe inconnu écarté, textes sur une ligne sans `**` ni accents graves) ; `leconLue` lit la réponse
+(seulement la remarque de rangement, jamais « Mesuré : … », qui est pour Claude) ;
+`completerLecon` (états en cours, fait, erreur) ; `outilDeLAppel` (l'élément outil du même
+appel). `Stockage` écrit points et défauts en tableaux, et relit une leçon restée en cours en
+erreur. Plus de carte Leçon dans le fil depuis le lot B4 : l'onglet Leçon (`Vues.lecon` sur
+carte-lecon, `Fil.texteLecon` et `Fil.titreLecon`, `CARTES.lecon` en 12 et gras 12, axes en
+`<EM>`, `D.leconLignes`) montre la leçon choisie (`Fenetre.leconChoisie`, remise à nil par une
+autre conversation), sinon la dernière de la photo active, sinon l'aide (`Fenetre.AUCUNE_LECON`) ;
+Détail… ouvre l'appel et sa réponse (`Fenetre.detailLecon`). Une seule bascule par leçon arrivée
+(`Fenetre.leconVue`), jamais quand une proposition attend ou qu'un exercice est en cours ; à
+l'ouverture, ou sur une autre conversation, les leçons déjà là sont marquées vues. Le tour de
+Claude finit par « Leçon de la photo » (voir Fenêtre B). La case Leçon décochée : « [Sans leçon] »
+(`Consignes.sansLecon`) joint par `Moteur.envoyer`. Une leçon refusée ou interrompue dit « Leçon
+non rangée : … ». La recherche des conversations cherche aussi dans les leçons (axe, manque, prise
+de vue).
+
+**Constaté le 21 octobre 2026** : `getFormattedMetadata` rend les quatre clés de
+`CLES_PRISE_DE_VUE_PLUS` sur les copies lues (X-H2S, X-T20 en RAF et en JPEG, iPhone 13 Pro),
+aucune refusée, en textes traduits dans la langue de Lightroom (« 0 EV », « Non déclenché »,
+« Priorité d'ouverture », « Priorité d'obturation », « Normal », « Moyenne pondérée », « Motif ») ;
+la simulation rend ces textes. Le format d'une compensation non nulle n'est pas relevé (aucune
+copie n'en a) ; rien ne l'analyse, le texte passe tel quel à Claude. `mois` et `prise_le` sont à
+l'heure locale (`timeToUserFormat`), y compris pour deux photos dont l'UTC tombe le lendemain.
+Commande `journal` avec `detaille` : 0,01 à 0,22 s ; `lecon garder` et `retirer` : 0,22 s (le pas
+de la boucle de réception de la liaison).
+
+## Je le fais (1.3)
+
+Dany fait lui-même la retouche que Claude propose, pour apprendre : Claude range sa version sans
+rien appliquer et donne la liste des réglages ; quand Dany a fini, il compare les deux versions.
+
+**Le connecteur.** `preview_settings` avec `my_turn = true` (`monTour`, `Tools+Retouche.swift`,
+après `developParameters`, la balance sur un point et les recalages) envoie une seule commande
+`essayer` : action `appliquer`, étape « ma version (je le fais) », `instantane` « ma version »,
+`exercice` et `sans_rendu`, jamais `entier`, `taille` ni `comparer` (`compare`, `size` et
+`overlay` sont sans effet, `remarques_serveur` le dit). Réponse en texte seul, sans image (elle ne
+consomme donc pas la remarque de l'écran) : `a_faire`, `instantane`, `photo`, `mode`, `etape`,
+`remarques`, `rien_n_est_applique`, `base` et `ensuite` (« Quand l'utilisateur a fini : view_photo
+avec compare = claude_version. »). Un module sans `exercice` dans sa réponse est refusé, ses
+aperçus effacés. `view_photo` avec `compare = claude_version` (`ToolHandler.comparaisons` :
+`before_claude` → `avantClaude`, `previous_step` → `etapePrecedente`, `claude_version` →
+`versionClaude`) : les deux versions côte à côte (« À gauche ma version (Claude), à droite la
+vôtre. »), `bilan.depuis` « ma version (Claude, à gauche) » avec un conseil propre à l'exercice,
+et `exercice` enrichi par `JeLeFais.enrichir` sur les mesures des deux images ; toujours en
+lecture seule, sans `point_af` ; un module qui ne rend pas `exercice` est refusé.
+`corrections_utilisateur`, tant que l'exercice est la dernière commande de Claude sur la photo,
+est annoté `exercice` (« ce n'est pas une préférence à retenir »).
+
+**`JeLeFais.swift`** (pur) :
+
+- `panneaux`, seule table de l'ordre et des noms des panneaux, ceux de Lightroom Classic 15.6 en
+  français (constaté le 21 octobre 2026, voir `docs/aide-adobe-developpement.md` § 1) : Paramètres
+  prédéfinis ; Réglages de base (Traitement, Profil, Balance des blancs, Tonalité, Présence, HDR) ;
+  Courbe des tonalités ; Mélangeur de couleurs (TSL, Noir et blanc, Couleur de point) ; Color
+  Grading ; Détail ; Corrections de l'objectif ; Transformation ; Outil Recadrage (un outil de la
+  bande, après Transformation : choisir un mode Upright remet le recadrage à zéro) ; Flou de
+  l'objectif ; Effets ; Etalonnage (Processus, puis les curseurs) ; Autres en dernier. Les sections
+  de Réglages de base restent à relever (panneau replié). `groupes` range chaque groupe du
+  catalogue ; les clés hors catalogue sont rangées à la main ;
+- `aFaire` : `{n, panneau, section, reglage, cle, de, a, texte, avant, apres}` ; les cinq clés du
+  cadre font une ligne (`Crop`, avec `cles`) ; textes à la virgule décimale, au vrai signe moins
+  (« Réglages de base › Tonalité › Exposition : 0 → +0,35 », « 5 600 K », « −1,2° ») ;
+- `tolerance` (provisoires, à juger sur les trois premiers exercices de Dany) : exposition
+  0,1 IL ; température 150 K pour un RAW, 3 sinon ; teinte 3 ; plages −100 à +100 : 5 ; 0 à 100 :
+  3 ; teintes 5° ; angles 0,3° ; bords du cadre 1 % ; modes : toute différence ; autres : 3 % de la
+  plage ;
+- `classer` : sept sortes (`comme_claude`, `plus_fort`, `moins_fort`, `a_l_inverse`, `oublie`,
+  `ajoute`, `autre_choix`) ; un mode, une teinte ou un profil donne « autre choix » ; une table
+  arrive « changée » ou « inchangée » ;
+- `principal` : l'écart mesuré le plus grand une fois ramené à son seuil du bilan (aucun seuil
+  nouveau ; la dominante seulement avec assez de tons neutres), puis le réglage de sa famille dont
+  l'écart dépasse le plus sa tolérance, une courbe en dernier ; toujours un objet :
+  `{visible: true, mesure, claude, vous, ecart, seuil, fois_le_seuil, reglage, texte}` ou
+  `{visible: false, texte}`.
+
+**Le module** (`Variantes.lua`, `Rendu.lua`). `essayer` avec `exercice` : le départ lu avant toute
+écriture (`departExercice` : `etatSimple`, plus des copies de Look, des quatre courbes, de
+`PointColors` et `#RemoveAreas`, et le départ des tables de Claude d'après `plan.avant`) ; une
+proposition qui ne change rien refusée (« Rien à faire : la proposition est l'état actuel. Rien
+n'a été écrit. ») ; l'instantané « Claude · ma version » (`createDevelopSnapshot` sur un nom
+existant le met à jour, constaté), sa mémoire `exercice = { depart, claude (relue après
+l'application), le }` et l'entrée du journal (`etape` « Claude · je le fais », type `exercice`,
+raison, changements, note « non appliquée ») dans la même écriture ; « Claude · fin de l'essai »,
+puis `noterEtatFinal` : `apresClaude` devient le départ. `essayer` n'est pas une étape (`Etapes`
+ne le capture pas). `apercu` avec `comparer = versionClaude` rend la version de Claude par le chemin
+des comparaisons (`rendreAvant`, `valeursAComparer`) : `valeursClaude` (la version de Claude, plus
+le départ des réglages que Dany a changés hors d'elle : simples, profil et Look, courbes, couleurs
+ponctuelles ; une liste vide pour les masques, yeux rouges, traits d'affinage et taches qu'il a
+ajoutés à un départ qui n'en avait pas, sauf les taches de l'outil Supprimer, et `restent` : les
+listes qu'on ne peut défaire) et `ecartsExercice` (`{cle, depart, claude, vous}` pour les réglages
+changés ; Look par son nom ; une autre table « inchangée », « changée » ou « changée autrement » ;
+les réglages que Lightroom résout lui-même exclus). Sans exercice : « Aucune version de Claude
+rangée pour « Je le fais » sur cette photo : preview_settings avec my_turn = true la prépare. »
+`choose_variant` « ma version » ajoute à l'étape les réglages que Dany a changés (simples, tables,
+listes, `RemoveAreas` avec `RetouchAreas`), et `undo_last` les lui rend ; l'exercice survit à
+`revert_to_original` et s'efface par `choose_variant` avec `delete`. `Ecriture.difference` est la
+seule comparaison entre états simples. Limite : une table que Dany change à la main hors de Look,
+des courbes et de `PointColors` (un flou d'objectif fait à la main) n'est pas vue, et reste dans les
+deux images. Le contrat entre le serveur et le module est figé dans `Tests/Contrats/je-le-fais.json`,
+lu par `ContratJeLeFaisTests.swift` et `essais-jelefais.lua` : un changement voulu se fait des deux
+côtés.
+
+**Dans la fenêtre.** `preview_settings` avec `my_turn` fait un élément `exercice`, jamais une
+proposition à accepter : `enCours`, puis `aFaire` à la réponse (sa liste en tables neuves, avec
+`instantane`, `photo`, `fichier`), `comparee` après `view_photo` avec `claude_version` (`ecarts`,
+`commeClaude`, `resume`, `principal`, `aSavoir`), ou `erreur` ; une proposition en attente devant
+une liste qui arrive passe à `faite` (« à faire vous-même »). `Stockage` écrit les listes en
+tableaux, et relit un exercice resté en cours en erreur. La carte Proposition le montre
+(`Fenetre.texteExercice` : la liste groupée par panneau, ✓ ou ○ devant chaque réglage ; comparé :
+le résumé, l'écart principal, les écarts, ce qui reste dans les deux images, l'instantané), sauf si
+une proposition est arrivée après lui ; `exerciceEtat` (« À vous · 1 réglage fait sur 5 »). Le
+suivi (`Fenetre.suivreExercice`, toutes les 2 s par `Fenetre.periodique`) lit `getDevelopSettings`
+sans rien écrire (`Lightroom.valeurs`, `Lightroom.lireValeurs` : comme le module décrit les
+réglages ; `Lightroom.NON_SUIVIS` n'est jamais coché) ; la page ne revient pas en tête quand un
+réglage se coche. Le bouton (`titreJeLeFais` : « Je le fais », ou « J'ai fini » pendant un
+exercice ; `peutJeLeFais` : Claude libre et un exercice, une proposition en attente ou une photo
+active) et le Mode « Je le fais » mènent à `Fenetre.jeLeFais` : `Moteur.jaiFini` pendant un
+exercice, sinon `Moteur.jeLeFais` (la proposition en attente passe à `faite`, puis
+`Consignes.jeLeFais(avecProposition)` ; refusé sans photo active ni proposition). Une bascule vers
+l'onglet Proposition par liste et par comparaison (`Fenetre.cleExerciceVu`) ; l'aperçu de l'onglet
+montre la comparaison, légendée « Claude | vous · fichier », sans ◀ ▶ (`Fenetre.apercuExercice`),
+et Agrandir la montre en grand. Pas de nouvelle conversation par photo pendant un exercice.
+
+**Constaté le 21 octobre 2026** (mesure 4, sur une copie d'Essais) : `my_turn` en 0,28 s, sans
+image, `a_faire` dans l'ordre des panneaux, « Claude · ma version » apparu, réglages inchangés
+(`--dump` identique) ; `claude_version` en 4,01 s, une image côte à côte, retour exact ;
+`choose_variant` « ma version » puis `undo_last` : retour exact à l'état « de Dany ». Le changement
+« à la main » a été fait par `apply_settings` : `corrections_utilisateur`, les noms à l'écran, le
+survol de l'instantané et un vrai exercice restent à voir. Un petit désaccord d'arrondi entre
+l'écart (0,55 IL) et son texte (« 0,54 IL ») n'est pas traité.
+
+## Composition lue (1.3)
+
+Claude lit la composition sur l'image entière, même recadrée, et propose un cadre, montré avant
+d'être appliqué.
+
+**`read_composition`** (`Tools+Composition.swift`, en lecture seule ; partie pure dans
+`Composition.swift`, sans Vision ni SDK). Tout est vérifié avant l'envoi (clés de `horizon` et de
+`subject` à la main par `nommer`, énumérations, `size`, `min_size`, `aspect`). La commande `apercu`
+part avec `{taille 1344, cles, entier: true, photo?}` (120 s) ; une réponse sans `image_entiere`
+(module d'avant la 1.3) est refusée, son fichier effacé. Les points donnés dans l'image de
+`view_photo` passent dans l'image entière (`Composition.versImageEntiere`, d'après `cadre_actuel`,
+repère d'aspect A, axes e1 = (cos θ, sin θ) et e2 = (−sin θ, cos θ), la formule de
+`cadreDansZone`). L'horizon se mesure par `LineAngle` sur l'image entière, décodée une fois : un
+angle absolu. Le sujet : celui donné, sinon les visages (au moins 25 % de l'aire du plus grand ; un
+visage renversé, roulis au-delà de `roulisRenverse` 3π/4, est écarté avant), sinon la zone
+d'intérêt de Vision si elle ne couvre pas plus de `zoneInteretMax` (0,5) de l'image, sinon aucun
+(`sujet {source: « aucun », raison}`). Le regard : `facing` donné, sinon le lacet du visage
+principal (`seuilLacet` 0,26 rad, `signeLacet` +1 : un lacet positif regarde vers la droite de
+l'image). Le cadre proposé (`Composition.proposer`) : le centre affine en w ; la boîte englobante
+dans l'image, les coins du sujet à 3 % des bords du cadre (`margeSujet`) ; la plus grande largeur
+(au moins `min_size`), ou la taille imposée, × 0,998 (`margeArrondis`, pour les arrondis du module) ;
+sans solution, lâcher dans l'ordre : sujet sur le tiers, sujet centré, horizon sur le tiers, puis
+le plus grand cadre centré ; l'angle : −inclinaison, ou l'angle actuel s'il garde l'horizon droit,
+sinon 0. Réponse sans image : `image_entiere`, `cadre_actuel` (crop équivalent et résumé, ou
+« aucun »), `horizon` (inclinaison, angles de recadrage, hauteurs, mesure), `sujet` (source,
+cadre, centre, regard), `lecture` (phrases simples, seuil 0,06), `crop` (prêt pour
+`preview_settings` et `apply_settings`), `cadre_propose` (résumé « 3:2 (format d'origine), redressé
+de 1,4°, 82 % de la largeur gardée », règles tenues et lâchées, conseil si presque identique),
+`rien_n_est_applique`. `view_photo` donne aussi le `regard` de chaque visage.
+
+**`preview_settings` avec `crop`** : `entier` part quand il y a un recadrage (sauf retrait, `overlay
+= false` ou `my_turn`). `surimpressionDuCadre` lit `chemin_entier` en premier (le fichier est
+effacé même si la suite échoue) et dessine `PreviewImages.cadrePropose` : le hors-cadre assombri
+(noir à 0,5), les tiers tournés avec le cadre (blanc à 0,7 sur un trait sombre, 0,35 % du grand
+côté, `traitTiersPart`), le cadre en pointillés blancs sur un trait sombre (0,4 %,
+`traitCadrePart` ; tiret d'environ un quarantième du côté). L'image montrée devient l'image entière
+dessinée (avec `compare` : l'état actuel à gauche) ; la réponse gagne `resume_cadre` et
+`cadre_propose` en chiffres, sans `chemin_entier` ni `dimensions` ; sans cadre gardé, ou illisible,
+`remarque_cadre` le dit et l'image recadrée reste. Les mesures et le bilan restent ceux de l'image
+recadrée.
+
+**Le module** (`Rendu.lua`). `apercu` avec `entier` : refusé avec `comparer` ou `point_af`, sur une
+photo agrandie (`Reglages.estAgrandie`), sur une photo recadrée aux dimensions inconnues, et sur un
+original absent sans aperçu dynamique, sans rien écrire ; une photo ni recadrée ni contrainte se
+rend telle quelle, sans écriture ; sinon l'écriture temporaire du cadre retiré (`sansRecadrage` :
+`Recadrage.AUCUN` et `CropConstrainToWarp` à 0, partagé avec le recalage), deux étapes « Claude ·
+composition (image entière) » et « Claude · composition (retour) » (le retour même si le rendu
+échoue), comme le recalage ; la pause n'est vérifiée que s'il faut écrire. `cadre_actuel` vient des
+`Crop*` lus avant l'écriture ; `Etapes` n'est jamais appelé. `essayer` avec `entier` : le cadre
+que Lightroom a gardé est relu après le rendu de la proposition (`cadre_propose`, dimensions),
+puis la troisième étape « Claude · essai : image entière » ; le dessin suit ce cadre relu, jamais la
+demande ; à la remise, les clés posées et absentes de `plan.avant` reprennent leur valeur d'avant,
+`CropConstrainToWarp` compris. Le contrat est figé dans `Tests/Contrats/composition.json` (lire,
+proposer, proposer sans image entière, refus d'une photo agrandie), lu par
+`ContratCompositionTests.swift` et `essais-composition.lua`.
+
+**Dans la fenêtre.** L'invite Composition (avant Sports, sans chiffre). `preview_settings` avec un
+`crop` (sauf `reset`) fait une proposition de recadrage : la ligne « Recadrage » demandée
+(`Conversation.cadreDemande`, `Conversation.LIBELLE_RECADRAGE`), remplacée à la réponse par ce que
+Lightroom a gardé (`Conversation.cadreLu` : `resume_cadre`, image entière dessinée ou non). La carte
+Proposition dit la raison, « Cadre : <résumé> » et ce que montre l'aperçu (`Fenetre.CADRE_DESSINE`,
+ou « Rien ne change avant Accepter. » seul), puis les autres réglages. Un vrai clic sur l'onglet
+Proposition remontre l'image de la proposition en attente (`Fenetre.montrerImageProposition`),
+gardée jusqu'à ◀ ▶, une image nouvelle, une autre conversation ou la proposition décidée ; une
+bascule ne la demande pas. Ajuster… offre `Consignes.ajustementsCadre`. Section des consignes
+« ## Composition ».
+
+**Constaté le 21 octobre 2026** (mesure 5, copies d'Essais, défait ensuite) : `read_composition`
+en 0,66 à 2,22 s (1,19 s avec un recadrage à retirer) ; sur la dune recadrée en 4:5 et tournée de
+2°, puis sur une copie verticale, `cadre_actuel` exact et les `Crop*` identiques au millionième
+après la lecture ; la proposition acceptée pose les `Crop*` montrés, sans « Cadre réduit »
+(`margeArrondis` validée) ; le lacet de Vision (révision 3, par pas de π/4) : `signeLacet` +1
+confirmé à l'œil, `seuilLacet` gardé ; la calandre d'une voiture prise pour un visage (roulis −π)
+faisait un cadre à 100 % : `roulisRenverse`. Un filtre de qualité sous 0,3 n'est pas fait : il
+écarterait de vrais visages (0,12 à 0,28 la nuit). Une zone d'intérêt de 67 % sur une photo sans
+sujet : `zoneInteretMax`. Les tiers à 0,25 % pâlissaient sur un fond clair réduit à 320 px :
+0,35 %. Sur les rides du sable, une mesure « affinée » s'accrochait au bruit (écart moyen 10 à
+13 px) : `LineAngle.ecartMax` 3 px (au-delà, `contourIrregulier` : l'angle vient des deux points,
+et `measure_angle` comme `read_composition` le disent). Aucune copie d'Essais n'a de vrai horizon :
+la dernière étape de `--recette --horizon` (le cadre appliqué) se saute avec sa raison.
+
+## Carnet de progrès (1.3)
+
+Les défauts de la prise de vue, comptés par mois de prise de vue : ce qui progresse, ce qui recule,
+quoi travailler à la prochaine sortie. Rien n'est écrit dans le catalogue.
+
+**Le connecteur** (`Carnet.swift`, pur). Seuils : `horizonMin` 0,5° ; `angleNul` 0,005° (le même
+que `Carnet.ANGLE_NUL` du module) ; provisoires : `medianeSousExposee` 28 et `p95SousExposee` 80
+(sous-exposition si les deux, sauf compensation de −0,6 IL ou moins, scène ou mode de nuit),
+`partBlancPurHaut` 3 % (ciel brûlé : le tiers haut de la réduction à 512 px en blanc pur, trois
+canaux à 254 ou plus) ; flou, mise au point et bruit fort par les seuils relevés de `Detail` (15,
+35, 1,5), seulement à 1 024 px au moins, et par la seule copie de ces règles,
+`PhotoTriee.defautsNettete` (la mise au point demande un point lu, sur une zone qui a de la
+texture : voir Tri d'une séance). `constatsVue` rend `{cherches, defauts [{code, mesure, texte}]}`
+dans l'ordre de `PriseDeVue` (`horizon_penche` n'est cherché que sur une géométrie intacte) ;
+`constatHorizon` ne rend rien pour une verticale, sous 0,5°, ou sur une géométrie touchée
+(`geometrieIntacte` : recadrage tourné de moins de 0,005°, ni Upright, ni perspective, ni
+distorsion manuelle, les 9 clés de `Recalage.transformationActive`). Le carnet ne se remplit que
+par le serveur que lance Claude (`noterAuCarnet`, vrai seulement dans `serve()` : ni `--call`, ni
+la recette, ni les tests) :
+
+- `view_photo`, aperçu entier d'une photo sans étape de Claude (`etapes_claude.nombre` 0) : la vue
+  est jugée avant le carré du point de mise au point, puis `carnet constater {photo, vue,
+  vocabulaire}` (10 s) ; `constats_prise_de_vue` (textes) seulement si le module répond `note =
+  true` avec des défauts ; toute erreur est tue (un module 1.2 : `view_photo` réussit) ;
+- `measure_angle` et `read_composition` : `{photo, angle {inclinaison au centième, code
+  horizon_penche, source}, vocabulaire}` ; l'aperçu d'une ligne ne demande les 9 clés de la
+  géométrie que quand `noterAuCarnet` est vrai. Ces trois outils restent en lecture seule : ils
+  n'écrivent que `carnet.json` ;
+- `export_journal` avec `notebook` : `carnet lire {resume: true}` (30 s), puis `{markdown, carnet,
+  catalogue?, remarque?}` ; le Markdown (`Carnet.markdown`) reprend tels quels les titres et les
+  phrases du module (tableau « Défaut | mois… » en n/sur, « — » sans recherche, l'année dans
+  l'en-tête quand elle change ; Ce qui progresse, Ce qui recule, À travailler) ; les entrées et
+  leurs leçons ne vont jamais à Claude ; un module d'avant la 1.3 : « Le module de Lightroom ne
+  connaît pas encore le carnet de progrès : installer Développeur 1.3, puis quitter et relancer
+  Lightroom. »
+
+**Le module** (`Carnet.lua`, registre `carnet.json`, format 1). Un fichier pour tous les
+catalogues, chacun sa table sous son chemin ; une entrée par original (`masterPhoto`) : `{photo,
+uuid, fichier, prise 'AAAA-MM', prise_le 'AAAA-MM-JJ HH:MM' (heure locale), sans_date, le, vue?,
+angle?, lecons}` ; 3 000 originaux au plus par catalogue (`MAX_PHOTOS`, les plus anciens sortent) ;
+un fichier illisible est mis de côté avant la première écriture ; tout ce qui sort vers une vue est
+une copie neuve, vers le serveur des tableaux JSON même vides ; `Carnet.version` et
+`Carnet.abonner` pour la fenêtre. `constater` : contrôles avant toute lecture (vue ou angle, pas
+les deux ; vocabulaire obligatoire, 40 défauts au plus ; codes connus, 12 au plus ; au moins un
+défaut cherché ; mesures finies ; textes de 200 octets au plus) ; puis les refus, dans cet ordre :
+`preference` (la case Carnet décochée, avant toute lecture du catalogue ; `Preferences` et
+`Recalage` ne sont requis qu'ici), `essai` (la photo ou son original dans « Développeur ›
+Essais », `Carnet.estPhotoDEssai`, sauf `essai_recette`, que seule la recette envoie : la copie a
+alors son entrée à elle), `etapes` (une vue sur une photo qui a des étapes de Claude), `geometrie`
+(un angle sur une géométrie touchée ; accepté après une passe de tonalité). Comme `garder` : tout
+lire, puis changer le registre d'un coup. Une nouvelle vue remplace l'ancienne, un nouvel angle
+aussi ; les leçons restent. Le vocabulaire reçu est rangé en tête du fichier : aucune liste de
+défauts n'est écrite dans le module. `Carnet.resumer(maintenant)` : les six derniers mois de prise
+de vue qui ont des photos (une photo sans date compte au mois de son constat ; une photo datée après
+aujourd'hui n'est pas comptée, une remarque le dit) ; par défaut cherché, `par_mois {n, sur}` (une
+base propre à chaque défaut) ; la tendance compare les 2 derniers mois aux 3 d'avant, « progresse »
+ou « recule » dès 15 points d'écart avec au moins 5 photos de chaque côté ; `a_travailler` : 20 %
+des photos récentes et au moins 2, trois au plus, avec le conseil et « À la prise de vue : … » ;
+une remarque sous 5 photos. Les phrases du résumé n'existent que dans `Carnet.lua` (`Carnet.TITRES`,
+`Carnet.MOIS`, `Carnet.MOIS_COURTS`). `Carnet.photosDuDefaut(code, maintenant)` et
+`Carnet.vocabulaire()` servent la fenêtre.
+
+La case Carnet (préférence `carnet`) ne coupe que les constats : `lecon garder` ne la lit pas
+(question ouverte à Dany). Rejouée, une commande `lecon` ou `carnet` réécrirait `carnet.json` :
+aucune n'est dans `LightroomBridge.lectures`.
+
+**Dans la fenêtre.** L'entrée « Carnet de progrès » est la première case de la liste
+(`Fenetre.CARNET` = `'¶carnet'`, distinct de la marque « § » des en-têtes, comparée sur tous ses
+octets ; la recherche la trouve par « carnet » ou « progres »). La choisir passe `Fenetre.vue` à
+`'carnet'` (`Fenetre.ouvrirCarnet`) et lit le résumé dans une tâche (`Fenetre.lireCarnet`) ; la
+page (`Fil.lignesCarnet`, avec les seuls genres de lignes qui existent : titre, note, outil,
+claude, apercu, vide ; pas de barres ▁…█, qui demanderaient de remesurer les polices) : le titre,
+la note et la remarque, le tableau en Menlo resserré à la largeur (`Fil.tableauCarnet` : colonne
+Défaut de 14 caractères au moins), Ce qui progresse, Ce qui recule, À travailler, puis la ligne
+bleue « Demander à Claude ce qu'il en pense › ». Elle se lit depuis son haut (`Fenetre.hautCarnet`),
+▲ ▼ la font défiler. Un clic sur une rangée (`defaut`) ouvre, dans une tâche, la fenêtre des photos
+du défaut (`Fenetre.montrerDefaut` : mois, fichier, constat, leçon ; le conseil ; la leçon de la
+photo choisie ; « Retirer du carnet… » en `otherVerb`, puis une confirmation, puis un appel direct
+à `Carnet.commande {action retirer, photos = {id de l'original}}`, jamais une ligne TCP). La ligne
+d'action (`action = 'demander'`) ouvre une nouvelle conversation titrée « Avis de Claude sur le
+carnet de progrès » (`Fenetre.TITRE_DEMANDE_CARNET`) et lui envoie `Consignes.carnet`. Sur la
+page : Renommer… et Supprimer… ne font rien (le bandeau dit de choisir une conversation) ; une
+conversation choisie, Nouvelle conversation, Envoyer, une invite ou Claude qui travaille (Accepter,
+Je le fais) ramènent au fil (`Fenetre.quitterCarnet`, `Fenetre.revenirAuFil`) ; une autre photo
+choisie prépare la nouvelle conversation sans quitter la page (`Fenetre.nouvelle(garderPage)`) ;
+la boucle relit la page quand `Carnet.version` change.
+
+**Constaté le 21 octobre 2026** (lecture seule par `--constats` sur les huit copies d'Essais, 14 s,
+rien noté) : aucun faux constat de sous-exposition (deux photos très sombres écartées par le 95e
+centile : une scène sur fond noir, une nuit éclairée), aucun vrai cas non plus ; aucun ciel brûlé
+(1,3 % au plus) : les seuils restent provisoires. Deux fausses « mise au point manquée » (le point
+sur du sable lisse, sur un nuage), communes au tri : d'où la texture au point de mise au point
+(voir Tri d'une séance). Le tri donne une netteté 11 à 23 % au-dessus de l'aperçu, mais classe
+pareil. La recette a constaté `estPhotoDEssai` sur une vraie copie (refus de motif `essai`), un
+angle noté avec `essai_recette` au jour de la prise de vue, exporté puis retiré. Une scène sur fond
+noir (L* médian 3,9) reste dite « presque noire » au tri : à revoir dans `Notation.plafond`, hors de
+la 1.3.
+
+## À constater dans Lightroom (1.3)
+
+Les cinq chantiers et la fenêtre B passent les deux suites (`swift test` : 525 tests, dont 1 sauté
+sans `DEVELOPPEUR_ECRAN_REEL=1` ; `scripts/tester-module.sh` : liaison 240, `essais-carnet` 20,
+`essais-composition` 19, `essais-etapes` 28, `essais-jelefais` 20, `essais-lecon` 6,
+`essais-registre` 19 ; fenêtre 64, `essais-carnet` 13, `essais-composition` 11,
+`essais-dispositions` 26, `essais-fenetre-b` 43, `essais-gestionnaire` 5, `essais-images` 15,
+`essais-integration` 9, `essais-jelefais` 18, `essais-lecon` 18, `essais-moteur` 18,
+`essais-pourquoi` 15). Les mesures du 21 octobre 2026 (ligne de commande, copies d'Essais, défaites
+ensuite) et la recette (91 étapes, une en échec : l'horizon de la dune, d'où `LineAngle.ecartMax` et
+l'étape sautée) sont dans la section de chaque chantier. Restent à voir :
+
+1. La fenêtre B entière, jamais ouverte dans Lightroom : la taille réelle (1 497 × 1 200, contenu
+   1 495 × 1 166, cadre `…-grande-3` ; D7 n'a été mesuré qu'à 1 280 × 800), sa place sur l'écran de
+   3 440 × 1 440 (sous la barre des menus, hors du Dock), le temps d'ouverture avec 2 317 vues ;
+   comparée côte à côte avec la maquette : fonds, filets, panneau, cartes, segments, polices,
+   couleurs, alignements. Puis caler sur la capture `barreTitre`, `margeDialogue`, `hauteurLigne`,
+   les marges, `criteres`, `propLignes`, `etapeLignes`, `leconLignes` et les hauteurs des images
+   (`Dispositions.IMAGES`, images régénérées), et `Fenetre.FORME` si le contenu rapetisse.
+2. Les hauteurs données à des `f:row` et `f:column` (en-tête, fil, barre, grille, liste) et au champ
+   Rechercher : respectées, marges comprises ? `place_vertical = 0.5` (titre blanc du bouton bleu,
+   pastilles, Mode, Style, bandeau) ; les rangées sans `fill_horizontal`.
+3. Les 42 lignes de 21 du fil et la marge du bas ; la colonne auteur, l'heure une ligne plus bas ; le
+   texte riche d'une ligne d'appel (Menlo 11 dans du 12, largeur réelle contre `Metriques`) ;
+   « Pourquoi ? » en police 11 explicite dans la case de 21 ; les boutons d'actions et le clic du
+   texte quand ils sont cachés ; aucun clignotement d'un genre à l'autre (`transform`).
+4. Lisibilité des lignes de 648 points (environ 103 caractères ; une réponse ordinaire de Claude
+   va à 108) : un centre de 680 à 720 garderait moins de 100 caractères (une seule valeur,
+   `TAILLES.centre`).
+5. Les cartes de 40 et 41 lignes en 12 (interligne de 15 constaté sur 12 lignes) et la grille de 35
+   lignes de 16 de la carte Note ; leurs boutons au-dessus du bas ; textes 12 et emphases
+   colorées ; les largeurs des carrés (« Laisser rejetée », « J'ai fini »).
+6. Le Mode : la valeur reposée au 2e tour de la boucle (D12) dessine-t-elle « Je le fais » inactif
+   et coché à la première ouverture ? Le `transform` de `Fenetre.lierRadio` sur un radio déjà coché.
+   Le menu Style choisi après une demande tapée sans Retour (la simulation ne sait pas choisir dans
+   un `popup_menu`).
+7. Les infobulles liées (cases de la liste, bandeau) ; le bandeau de deux lignes dans une rangée de
+   boutons de 26 ; les messages raccourcis entiers à l'écran.
+8. Les clics sur les calques (cases, segments, étoiles, Envoyer, Accepter) ; Arrêter ou Envoyer
+   quand l'autre est masqué ; les deux « Voir à 100 % » superposés.
+9. La vignette JPEG de 810 × 540 dans un `f:picture` de 405 × 270 (réduite et nette) ; l'aperçu
+   bord à bord dans le panneau ; les grandes images en 2x (panneau de 870 × 2 292 px, cartes de
+   810 × 1 402 et 810 × 1 242).
+10. La légende de la photo active (`Lightroom.legende` : copie, appareil, date à l'heure locale) et
+    `infoPhoto`, en texte riche, `truncation = 'middle'` sur un nom long.
+11. L'apparence sombre, seulement si Dany bascule lui-même son Mac : panneau, cartes, sélection,
+    image « aucun aperçu », titre éteint #7F8EA3 sur #2B3F5C, emphase ambre, teintes de l'état de
+    la note ; et la fenêtre quand son apparence diffère de celle de macOS (icônes `image_name` sur
+    un bouton natif, titres des radios sur les aplats) ; `Chemins.ressource('images/sombre/…')`
+    passé à `LrPathUtils.child`. Le menu Apparence avec une préférence inconnue : vide ou le premier
+    élément ?
+12. Carte Note : les étoiles posent la note (une étape « Claude · notation » que `undo_last` défait),
+    un clic sur la note posée la retire, 5 ★ se posent ; Retenir et Rejeter ; Laisser n'écrit rien
+    et grise Accepter ; « Accepter N ★ » change son titre blanc ; « Voir à 100 % » après une vraie
+    notation avec un zoom. Sur une copie d'Essais, défait ensuite.
+13. Pourquoi ? : une capture avec la fenêtre ouverte et la photo active ; `match_series` sans capture
+    (`sans_avant_apres`) ; Claude Desktop seul, fenêtre fermée : aucune capture ; une capture pendant
+    un `preview_settings` d'un autre client ; le ménage du dossier `Etapes` au chargement suivant ;
+    la capture sautée pour calculs IA (sans modèles IA, non provocable) ; le déclencheur exact de
+    `MaskGroupBasedCorrections` vide ; les images de l'étape dans l'aperçu, Voir l'avant, Agrandir.
+14. Leçon : avec le vrai Claude, la leçon en fin de retouche, une seule, rien après une proposition
+    seule ; la bascule vers l'onglet Leçon pendant un vrai travail, et son absence quand une
+    proposition attend ; « [Sans leçon] » respecté ; dans Claude Desktop, `photo_lesson` appelé par
+    les invites (sinon, le repli des consignes du connecteur) ; le format d'une compensation non
+    nulle ; les seuils des indices jugés contre une vraie retouche.
+15. Je le fais : les noms des sections de Réglages de base ; un vrai exercice, avec des changements
+    faits à la main (Exposition, Ombres, masque IA Ciel, courbe), la liste cochée sans saccade
+    toutes les 2 s, la reprise après 15 minutes, `corrections_utilisateur`, la comparaison et un
+    `MaskGroupBasedCorrections` vide sans fenêtre IA ; le survol de « Claude · ma version » dans le
+    Navigateur ; les tolérances sur les trois premiers exercices de Dany.
+16. Composition : `--horizon` avec une copie d'Essais qui a un vrai horizon net (mer, lac, plaine ;
+    à ajouter à la collection) ; les étapes « Claude · composition » à l'Historique ; le dessin du
+    cadre (tiers à 0,35 %) dans l'aperçu de 405 et dans Agrandir, sur fond clair et sombre ; le
+    roulis de Vision sur d'autres faux visages ; la zone d'intérêt sur des paysages sans sujet.
+17. Carnet : la page dans la grille du fil (tableau Menlo aligné, « — », mois accentués) ; la
+    fenêtre des photos d'un défaut (`otherVerb` de `presentModalDialog`, jamais employé ailleurs,
+    puis `LrDialogs.confirm` dans la même tâche) ; « Retirer du carnet… » sur une vraie photo
+    désignée par Dany ; « Demander à Claude ce qu'il en pense » ; la durée de `Carnet.resumer` et
+    la taille de `carnet.json` avec quelques centaines de photos ; les cas manquants (une vraie
+    sous-exposition, de la neige ou un haut blanc, une photo voulue sombre à −2/3 IL, du DR400, un
+    horizon penché) ; le plancher de texture sur un ciel uni, un mur, de la neige, et une vraie mise
+    au point manquée sur un sujet.
+18. La photo active et la sélection revenues après un débruitage, son annulation, une variante, une
+    copie virtuelle et le TIFF réimporté retiré par la recette (l'étape « débruitage » de la recette
+    le vérifie ; pas encore les autres) ; `DELAI_SOURCE` (3 s) suffisant pour une collection ;
+    aucune ligne « Photo active d'avant non remise » au journal. La recette ne remet pas à la fin la
+    photo active d'avant elle (`show_photo` la change) : à décider.
+19. Le registre des notes après la recette : la proposition de la copie RAW remise telle qu'avant
+    l'étape (`notation remettre`) ; celle laissée « acceptee » le 21 octobre 2026, avant la
+    correction, à remettre « à vérifier » une fois.
 
 ## Bibliothèque
 
@@ -3763,7 +4951,18 @@ hors du film fixe fait afficher son dossier (`setActiveSources`). Rien n'est éc
 encore la photo du dossier affiché (`create_virtual_copy` et `enhance_photo` échouaient sur une
 photo hors du film fixe, puis réussissaient au second essai, le dossier étant affiché) ; la
 sélection se refait donc pendant 3 s au plus (`selectionnerAvecSource`, `DELAI_SOURCE`), et la
-simulation ne rend une photo sélectionnable qu'un moment après l'affichage de son dossier. Essayé dans
+simulation ne rend une photo sélectionnable qu'un moment après l'affichage de son dossier. Il en va
+de même de la source remise (constaté le 21 octobre 2026, mesures de la 1.3 : après un débruitage,
+son annulation ou une variante choisie sur une copie d'Essais, la photo active d'avant, hors du
+dossier de la copie, ne revenait pas : trois fois une autre photo est restée active). D'où
+`Bibliotheque.remettreSelection` (la source remise si elle a changé, puis la photo active et la
+sélection refaites pendant `DELAI_SOURCE`, la photo active relue, et « Photo active d'avant non
+remise » au journal si elle ne revient pas), seul chemin de `Amelioration.remettreVue` (débruitage,
+détails bruts, super résolution, variantes), de `copieVirtuelle` et de `retirerReimportees` (qui
+remet aussi la vue après un échec). Règle de la simulation de la liaison (`setActiveSources`) : un
+dossier affiché à la place d'une source connue fait sortir du film fixe les photos hors de lui ;
+la source revenue, ses photos ne se sélectionnent qu'après `S.delaiSource` (`S.visiblesSous`).
+L'étape « débruitage » de la recette compare la photo active avant et après. Essayé dans
 Lightroom Classic 15.6 (16 octobre 2026) : module Développement, puis Bibliothèque en loupe, sans
 erreur. Vues relevées dans `LrApplicationView.lua` de Lightroom Classic 15.6 : `loupe`, `grid`,
 `compare`, `survey`, `people`, `develop_loupe`, `develop_before_after_horiz`,
@@ -3803,17 +5002,32 @@ Champs privés du module, dans le catalogue, pour chaque photo :
   restent au retour à l'origine, voir Notation), sous
   la clé `Rotation` les quarts de tour à refaire pour revenir
   (version 2.1) ;
-- `etapesClaude` : les 20 dernières retouches, avec les valeurs qu'elles ont remplacées ;
+- `etapesClaude` : les 20 dernières retouches, avec les valeurs qu'elles ont remplacées ; depuis
+  la 1.3, chacune est `{ id, nom, avant, le }` (`Ecriture.nouvelleEtape`, seul chemin d'une étape
+  nouvelle ; `id` : `Ecriture.idEtape`, voir Pourquoi ? : l'avant/après des étapes) ; une étape
+  écrite avant la 1.3, sans `id`, s'annule toujours par son rang, et reçoit un `id` si `recadrer`
+  la complète ;
 - `journalClaude` : les 200 dernières entrées du journal (date, étape, raison, changements),
-  annulations et retours compris ; il reste après un retour à l'état d'avant Claude ;
+  annulations et retours compris ; il reste après un retour à l'état d'avant Claude. Depuis la
+  1.3, chaque entrée d'une étape porte son `etape_id` ; l'annulation, l'`etape_id` de l'étape
+  défaite ; le retour, `etape_ids`. « Je le fais » y ajoute une entrée `exercice` (« Claude · je le
+  fais », sans `etape_id` : rien n'est appliqué, aucune annulation ne la défait) ;
 - `retoucheeParClaude` : « oui », visible et filtrable dans la Bibliothèque ;
 - `proprietaireMemoire` : uuid de la photo à qui appartiennent ces champs (schéma 3) ;
 - `variantesClaude` : pour chaque instantané de variante « Claude · <nom> », les réglages qu'il
-  touche et sa date (schéma 4, version 2.0 ; voir Variantes) ;
+  touche et sa date (schéma 4, version 2.0 ; voir Variantes) ; depuis la 1.3, celle de
+  « Claude · ma version » porte aussi `exercice = { depart, claude, le }` (voir Je le fais) : un
+  exercice n'ajoute aucun champ de mémoire ;
 - `apresClaude` : l'état où la dernière commande de Claude a laissé la photo (étape, `editCount`,
   `lastEditTime`, réglages simples), écrit par `withPrivateWriteAccessDo`, pour relever les
   corrections faites ensuite à la main (schéma 5, version 2.1 ; voir Retouche globale : pistes de
-  la 2.1).
+  la 2.1). Après `preview_settings` avec `my_turn` (1.3), c'est le départ de l'exercice :
+  `corrections_utilisateur` rapporte alors le travail de l'utilisateur dans « Je le fais », annoté
+  comme tel (`JeLeFais.annoterCorrections`), et non une préférence à retenir.
+
+L'avant/après des étapes (1.3) n'est pas dans la mémoire : il se garde au rendu, dans
+`~/Library/Application Support/Developpeur/Etapes/`, jamais par une écriture (voir Pourquoi ? :
+l'avant/après des étapes). `etape_id` n'est pas un réglage.
 
 Sous la clé `Bibliotheque`, le classement garde aussi `iptc` (champs IPTC d'avant un paramètre
 prédéfini de métadonnées, remis tels quels).
@@ -4062,13 +5276,22 @@ changé depuis, hors de ceux de la variante, ne se défait pas. `effacer` (ou `e
 efface les instantanés de variantes de Claude ; un nom donné avec le préfixe « Claude · »
 s'efface même sans mémoire.
 
+1.3 : l'entrée du journal de `choisir` s'écrivait avant la pose, donc sans ses changements
+(`export_journal` ne les montrait pas) ; elle est réécrite après la pose avec ses changements, par
+une écriture privée, et retirée avec l'étape si la pose ne prend pas. La comparaison
+(`rendreAvant`) remet aussi `RetouchInfo` au retour. L'exercice « Je le fais » est une variante,
+« Claude · ma version », avec sa mémoire `exercice` ; `choisir` « ma version » touche aussi les
+réglages que Dany a changés depuis (voir Je le fais). La photo active d'avant revient par
+`Bibliotheque.remettreSelection` (voir Bibliothèque).
+
 ## Harmonisation d'une série (`match_series`)
 
 Le serveur mesure la référence et chaque photo sur un aperçu d'analyse (`apercu`, avec
 `Temperature` et `Tint`), calcule les écarts (exposition par la luminance médiane, dominante a* et
 b* des tons neutres, contraste P95 − P5), puis propose des corrections relatives (`appliquer`,
 `relatif`). Avec `confirm`, deux passes : après la première, une nouvelle mesure, puis une
-correction de l'écart restant.
+correction de l'écart restant. Depuis la 1.3, ses `appliquer` portent `sans_avant_apres` : une
+série n'est jamais ralentie par l'avant/après des étapes (voir Pourquoi ?).
 
 Relevé le 17 octobre 2026 dans Lightroom Classic 15.6, par des propositions mesurées sur un RAW de
 X-H2S (5050 K, Teinte 14) et un JPEG d'essai : RAW, +600 K (−21 mired) montent b* de 4,5 et a*

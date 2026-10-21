@@ -1,5 +1,151 @@
 # Changements
 
+## Non publié
+
+La 1.3 : apprendre en regardant Claude. Claude dit pourquoi il fait chaque étape et en garde
+l'avant/après, finit une retouche par la leçon de la photo (ce qui manquait, et ce qui l'aurait
+évité à la prise de vue), vous laisse faire la retouche vous-même avec sa liste de réglages puis
+compare vos deux versions, lit la composition et propose un cadre, et tient un carnet de progrès
+de vos prises de vue, mois par mois. La fenêtre Claude prend l'allure de la maquette « B ·
+Conversation claire », agrandie à votre demande à 1 497 × 1 200 points, en apparence claire ou
+sombre. Après l'installation : quitter et relancer Lightroom (le module a deux fichiers nouveaux,
+`Etapes.lua` et `Carnet.lua` : recharger le module ne suffit pas), rouvrir Claude Desktop (à
+quitter pendant l'installation) et ouvrir une nouvelle session de Claude Code, pour avoir les 36
+outils.
+La fenêtre B n'a pas encore été vue dans Lightroom : ses tailles viennent de la maquette et de
+constats faits le 21 octobre 2026 sur une fenêtre d'essai. La capture du README
+(`docs/capture.png`) montre encore la fenêtre de la 1.2 ; elle sera refaite.
+
+### Ajouté
+- « Pourquoi ? » sur chaque étape : dans le fil de la fenêtre Claude, chaque étape de Claude a un
+  bouton « Pourquoi ? ». Il ouvre l'onglet Aperçu sur cette étape : son avant/après dans l'aperçu
+  (Voir l'avant, Voir l'après), la raison que Claude a donnée, les réglages changés, ◀ ▶ pour
+  passer d'une étape à l'autre de la même photo, Détail… pour son appel au connecteur, et Agrandir
+  pour l'avant et l'après côte à côte. Les images se gardent pendant le travail de Claude, sans
+  rien écrire dans le catalogue (un rendu de plus par étape, environ une seconde, pendant que
+  Claude écrit son appel suivant), dans `~/Library/Application Support/Developpeur/Etapes/` ; le
+  module y fait le ménage à son chargement (30 jours, 500 Mo au plus). Pas d'avant/après pour une
+  étape faite fenêtre fermée, sur plusieurs photos ou sur une autre photo que la photo active, ni
+  pour un classement. Case « Avant/après » du Gestionnaire de modules externes (section Fenêtre
+  Claude), cochée par défaut. Chaque retouche demande à Claude une raison simple : le défaut vu,
+  puis ce que l'étape y fait ; elle reste au journal (`export_journal`).
+- La leçon de la photo : à la fin d'une retouche, Claude range la leçon de la photo
+  (`photo_lesson`) en trois points, Lumière, Couleur et Composition : ce qui manquait, chiffres à
+  l'appui, et ce qui l'aurait évité à la prise de vue (ou, si rien ne manquait, ce qu'il faut
+  refaire). Elle se lit dans l'onglet Leçon de la fenêtre Claude (la fenêtre y passe une fois à son
+  arrivée, pas quand une proposition attend ou qu'un exercice est en cours), ou par « Leçon de la
+  photo » à la fin du tour de Claude dans le fil ; Détail… montre les faits mesurés. Le connecteur
+  vérifie les trois points avant de les ranger, et donne à Claude les faits : la prise de vue
+  (compensation, flash, mode et mesure d'exposition, lus en français dans Lightroom), ses propres
+  corrections nettes (d'après son journal) et des indices à seuils provisoires. Une leçon par photo
+  et par conversation ; pas de leçon après une proposition seulement montrée, une notation, un
+  classement ou une série. Case « Leçon » du Gestionnaire de modules externes, cochée par défaut ;
+  dans Claude Desktop, les invites qui retouchent finissent par la leçon.
+- « Je le fais » : vous faites la retouche vous-même, pour apprendre. Le bouton Je le fais (carte
+  Proposition, ou le Mode « Je le fais » en tête de la fenêtre) demande à Claude sa liste de
+  réglages dans l'ordre des panneaux du module Développement, sous leurs noms de Lightroom Classic
+  15.6 en français (« Réglages de base › Tonalité › Exposition : 0 → +0,35 », Color Grading,
+  Etalonnage, Flou de l'objectif après Transformation, le noir et blanc dans le Mélangeur de
+  couleurs, « Outil Recadrage »). Rien n'est appliqué : sa version est rangée dans l'instantané
+  « Claude · ma version ». La liste se coche toute seule, toutes les 2 secondes, à mesure que vous
+  réglez la photo (« À vous · 3 réglages faits sur 7 ») ; vous pouvez regarder d'autres photos
+  pendant l'exercice. J'ai fini : Claude compare les deux versions côte à côte (« Claude | vous »
+  dans l'aperçu ; Agrandir en grand), d'abord ce qui est comme lui, puis l'écart qui se voit le
+  plus, ramené aux seuils du bilan, et le réglage qui l'explique. Sa version ne se pose sur la
+  photo que si vous le demandez (`choose_variant`), et `undo_last` vous rend la vôtre. Dans Claude
+  Desktop : `preview_settings` avec `my_turn`, puis `view_photo` avec `compare = claude_version`.
+- La composition lue : Claude lit la composition sur l'image entière, même recadrée
+  (`read_composition` : horizon, tiers, sujet, regard des visages, espace devant le sujet) et
+  propose un cadre : horizon droit et sur un tiers, sujet sur un tiers avec de l'espace devant lui,
+  la règle dite en une phrase. La proposition montre l'image entière, le cadre en pointillés, les
+  tiers et le hors-cadre assombri ; rien ne change avant Accepter. Ajuster… offre alors Plus
+  serré, Plus large, Horizon au tiers haut, Format 4:5 et Seulement redresser. Une invite
+  « Composition » s'ajoute aux raccourcis de la fenêtre (avant Sports). Sur une photo recadrée, la
+  lecture passe par deux étapes « Claude · composition » dans l'Historique (le cadre retiré le
+  temps du rendu, puis remis tel quel), et la proposition par une étape « Claude · essai : image
+  entière ». `view_photo` dit aussi vers où regarde chaque visage.
+- Le carnet de progrès : les défauts de vos prises de vue (horizon penché, sous-exposition, ciel
+  brûlé, flou, mise au point manquée, bruit fort), notés tout seuls quand Claude regarde une photo
+  pas encore retouchée, ou mesure une ligne penchée, et comptés par mois de prise de vue. La
+  fenêtre Claude le montre en tête de la liste des conversations : un tableau des six derniers mois
+  (« 2/9 » : 2 photos sur les 9 où le défaut a été cherché), ce qui progresse ou recule (deux mois
+  contre les trois d'avant, 15 points d'écart, assez de photos de chaque côté) et quoi travailler
+  à la prochaine sortie, avec un conseil pour la prise de vue. Un clic sur une ligne ouvre ses
+  photos, leurs constats et leurs leçons, avec « Retirer du carnet… » ; « Demander à Claude ce
+  qu'il en pense › » ouvre une conversation où Claude le lit, sans rien retoucher. `export_journal`
+  (« Journal et carnet de progrès ») le rend en Markdown avec `notebook`. Rangé dans
+  `~/Library/Application Support/Developpeur/carnet.json`, à part du catalogue : une entrée par
+  photo originale (ses copies virtuelles comprises), une table par catalogue. Les photos de
+  « Développeur › Essais » n'y entrent pas. Case « Carnet » du Gestionnaire de modules externes
+  (section Liaison avec Claude), cochée par défaut : décochée, plus aucun défaut n'est noté ; les
+  leçons, elles, se rangent encore dans ce fichier (c'est la case Leçon qui les coupe, dans la
+  fenêtre). Seuils de la sous-exposition et du ciel brûlé provisoires : aucun vrai cas parmi les
+  photos d'essai.
+- L'apparence claire ou sombre de la fenêtre Claude, au choix dans le Gestionnaire de modules
+  externes (section Fenêtre Claude, menu Apparence), à son ouverture suivante. Elle règle les fonds,
+  les textes et les images de la fenêtre ; les boutons, champs et menus suivent l'apparence de
+  macOS.
+
+### Changé
+- La fenêtre Claude, à l'allure de la maquette « B · Conversation claire », agrandie à
+  1 497 × 1 200 points (le volet des conversations doublé, le centre plus large, la hauteur plus
+  grande : environ 1 940 points laissés à Lightroom sur votre écran de 3 440 × 1 440) :
+  - à gauche, le volet : « ＋ Nouvelle conversation », Rechercher, la liste par jour (Aujourd'hui,
+    Hier…) avec l'heure et le nombre de photos de chaque conversation, 22 par page, le Carnet de
+    progrès en tête ; en bas, Renommer… et Supprimer…, Publication… et Consommation…, les
+    versions et le voyant Écran ;
+  - au centre, l'en-tête : le titre, le Mode en trois boutons radio (Appliquer, Proposer d'abord,
+    Je le fais ; grisés pendant que Claude travaille), les voyants Claude Code et Lightroom, et la
+    photo active avec la sélection ; le fil de 42 lignes, chaque tour marqué « Vous » ou « Claude »
+    avec son heure, les outils nommés en Menlo ; ▲ ▼ Fin, avec ce que fait Claude ou le relevé du
+    forfait ; puis les invites, le champ de demande, 📎, 📋, « Style » et son menu, le bandeau des
+    messages sur deux lignes, et Envoyer, un bouton bleu (Retour dans le champ envoie aussi) ;
+  - à droite, les onglets Aperçu, Proposition, Note et Leçon, l'aperçu de 405 × 270 commun aux
+    quatre, ◀ légende ▶ et ⤢ Agrandir, puis la carte de l'onglet, plus haute. La légende de la
+    photo active dit son nom, son appareil et sa date.
+- La carte Note : les passes du standard, vos étoiles et vos drapeaux cliquables (posés dans
+  Lightroom sans Claude ni forfait ; un clic sur la note posée la retire ; 5 ★ restent à vous),
+  la note que Claude propose en petites étoiles, ses critères en grille, le plafond mesuré au tri
+  et « Voir à 100 % », qui montre dans l'aperçu le zoom que Claude a pris pour noter (grisé sans
+  zoom). En bas : Laisser à N ★ (la proposition écartée, rien n'est écrit dans Lightroom),
+  Changer… et Accepter N ★, jamais Accepter 5 ★. « ? À vérifier » est posé, grisé.
+- La carte Proposition et la carte de l'étape (onglet Aperçu) sur leurs fonds ; Accepter en bleu,
+  Refuser, Ajuster… et Je le fais (J'ai fini pendant l'exercice) à côté. Les messages de la fenêtre
+  sont plus courts, pour tenir sur les deux lignes du bandeau ; l'infobulle donne le texte entier.
+- Le connecteur passe à 36 outils, avec `read_composition` (« Lire la composition ») et
+  `photo_lesson` (« Leçon de la photo »), en lecture seule : ils ne changent ni les photos ni le
+  catalogue. `export_journal` s'appelle « Journal et carnet de progrès ». Les invites
+  `retouche_pro`, `portrait` et `paysage` lisent la composition avant de recadrer, et celles qui
+  retouchent finissent par la leçon.
+- Une mise au point manquée sur une zone de faible texture (le bord d'un nuage) n'est plus qu'un
+  doute : la note plafonne à 2, à vérifier par un zoom à 100 %, sans rejet proposé, et le carnet
+  ne la compte pas.
+- Les lignes des tiers du cadre proposé sont plus épaisses, pour rester visibles sur un fond clair
+  dans l'aperçu de la fenêtre.
+- `uninstall.sh` garde le carnet de progrès (`carnet.json`, leçons comprises) et l'avant/après des
+  étapes (`Etapes/`) ; `uninstall.sh --tout` les retire avec le reste.
+
+### Retiré
+- Le voyant Mode : le mode se choisit par les boutons radio de l'en-tête. Les voyants Claude Code
+  et Lightroom sont dans l'en-tête, Écran en bas du volet.
+- Les onglets en boutons radio de la 1.2 (Note et Proposition) : quatre onglets en tête de la
+  colonne de droite, Note par défaut.
+
+### Corrigé
+- La photo active revient après un débruitage ou son annulation, une variante choisie (que
+  Lightroom calcule dans le module Développement) et une copie virtuelle : le module remet la
+  source et la sélection d'avant, le temps que Lightroom les affiche (constaté le 21 octobre 2026 :
+  une autre photo restait active).
+- Une mise au point posée sur une zone sans texture (sable lisse, ciel uni) n'est plus jugée
+  manquée, au tri comme au carnet : elle est « non jugée » (constaté le 21 octobre 2026 sur deux
+  photos d'essai nettes, rejet proposé à tort).
+- Le devant d'une voiture n'est plus pris pour un visage à l'envers, et une zone d'intérêt qui
+  couvre plus de la moitié de l'image n'est plus prise pour le sujet.
+- Une ligne mesurée sur un contour irrégulier (les rides du sable) ne se dit plus « affinée » :
+  `measure_angle` et `read_composition` le disent, et l'angle vient des deux points donnés.
+- `export_journal` montre maintenant les réglages d'une variante choisie (`choose_variant`) : son
+  entrée de journal s'écrivait avant la pose, sans ses changements.
+
 ## 1.2 — 2026-10-21
 
 Un rendu plus juste sur chaque photo. Claude lit ce que vous avez choisi au boîtier (fichiers
