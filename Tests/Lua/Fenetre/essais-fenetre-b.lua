@@ -1855,7 +1855,9 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
     end)
     Moteur.travaille, Moteur.courante, Moteur.conversations = travaille, courante, conversations
     assert(ok, erreur)
-    egal("Claude travaille : attendez la fin. | Aucune photo active : choisissez-la dans Lightroom. | "
+    -- Le refus d'un envoi pendant le travail est celui des autres refus du moteur (Arrêter compris).
+    egal(Fenetre.CLAUDE_TRAVAILLE, refus[1], "le refus d'un envoi, comme les autres")
+    egal("Claude travaille : attendez la fin, ou cliquez Arrêter. | Aucune photo active : choisissez-la dans Lightroom. | "
         .. "Une ancienne séance de notation ne s'ouvre plus.", table.concat(refus, ' | '), 'les refus du moteur, raccourcis')
     local messages = { Fenetre.CLAUDE_TRAVAILLE, Fenetre.CHOISIR_CONVERSATION, Fenetre.NOTE_AUTRE_PHOTO, Fenetre.PAS_D_IMAGE,
         Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE.proposer .. '.', Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE.appliquer .. '.',
@@ -2442,10 +2444,10 @@ essai('Étoiles de « Votre note » : la k-e pose k ★ (5 comprises) par Notati
     end)
 end)
 
-essai('Drapeaux : Retenir et Rejeter posent leur drapeau (ou le retirent) par Notation.poser, sans toucher les étoiles ; grisés et refusés pendant le travail', function()
+essai('Drapeaux : Retenir et Rejeter posent leur drapeau (ou le retirent) par Notation.poser, sans toucher les étoiles ; Retenir ne décide rien de la proposition ; grisés et refusés pendant le travail', function()
     local photo = photoNotee(4961, 'DSCF4961.RAF', 2, 0)
     Moteur.nouvelle()
-    avecRegistre(copieProposition(), function(recus)
+    avecRegistre(copieProposition(), function(recus, changer)
         ouvrirFenetre(function(p, contenu)
             Fenetre.rafraichir()
             local note = variantes(contenu).notation
@@ -2477,6 +2479,26 @@ essai('Drapeaux : Retenir et Rejeter posent leur drapeau (ou le retirent) par No
             S.cliquer(rejeter)
             lancerDepuis(taches)
             egal('retenue rejetee aucun aucun', drapeaux())
+            -- Retenir et les drapeaux retirés laissent la proposition à décider (Notation.decider la
+            -- remet « à vérifier » après la pose) ; Rejeter la décide (aucun retour).
+            local function decisions()
+                local r = {}
+                for _, d in ipairs(recus.decisions) do
+                    egal(4961, d.photo)
+                    r[#r + 1] = d.etat
+                end
+                return table.concat(r, ' ')
+            end
+            egal('a_verifier a_verifier a_verifier', decisions(), 'Retenir, puis deux drapeaux retirés')
+            -- Un rejet proposé : tout drapeau le décide, Retenir compris.
+            changer(copieProposition({ drapeau = 'rejetee', note = 0 }))
+            photo.pickStatus = 0
+            Fenetre.majPhoto()
+            S.cliquer(retenir)
+            lancerDepuis(taches)
+            egal('a_verifier a_verifier a_verifier', decisions(), 'Retenir sur un rejet proposé : une décision')
+            egal(5, #recus.poses)
+            changer(copieProposition())
             -- Pendant le travail : grisés, le clic refusé ; appelé quand même, refusé et dit.
             Moteur.travaille = true
             Fenetre.rafraichirNotation()
@@ -2491,7 +2513,7 @@ essai('Drapeaux : Retenir et Rejeter posent leur drapeau (ou le retirent) par No
             egal(Fenetre.NOTE_EN_COURS, p.message)
             Fenetre.noteEnCours = false
             p.message = ''
-            egal(4, #recus.poses)
+            egal(5, #recus.poses)
             Fenetre.rafraichirNotation()
         end)
     end)
@@ -2529,10 +2551,18 @@ essai('Laisser à N ★ : Notation.decider(photo, « ecartee »), rien dans le c
             egal('gris', p.notationCouleur)
             vrai(p.nt1:find('<EM>Passe 2 · écartée.</EM>', 1, true), p.nt1)
             refuse(function() S.cliquer(laisser) end, 'inactive', 'plus rien à laisser')
-            -- Une note en cours : la tâche ne décide rien.
+            -- Une note en cours, ou Claude au travail depuis le clic : la tâche ne décide rien, et le
+            -- bandeau le dit.
             Fenetre.noteEnCours = true
             Fenetre.ecarterNote(4961)
             Fenetre.noteEnCours = false
+            egal(Fenetre.NOTE_EN_COURS, p.message)
+            p.message = ''
+            Moteur.travaille = true
+            Fenetre.ecarterNote(4961)
+            Moteur.travaille = false
+            egal(Fenetre.CLAUDE_TRAVAILLE, p.message)
+            p.message = ''
             egal(1, #recus.decisions)
         end)
     end)
@@ -2637,7 +2667,7 @@ essai('Voir à 100 % : Conversation.dernierZoom rend le dernier zoom d\'une phot
     egal(nil, Conversation.dernierZoom(c, nil))
 end)
 
-essai('Voir à 100 % dans la carte : le zoom de la photo en grand (Images.grande, sans Claude ni Lightroom) ; sans zoom, d\'une autre photo ou un aperçu entier : grisé, l\'infobulle dit pourquoi', function()
+essai('Voir à 100 % dans la carte : le zoom de la photo montré dans l\'aperçu (décision de Dany), Agrandir le montre en grand, sans Claude ni Lightroom ; sans zoom, d\'une autre photo ou un aperçu entier : grisé, l\'infobulle dit pourquoi', function()
     photoNotee(4961, 'DSCF4961.RAF', 0, 0)
     Moteur.nouvelle()
     local c = Moteur.courante
@@ -2670,36 +2700,62 @@ essai('Voir à 100 % dans la carte : le zoom de la photo en grand (Images.grande
             avecVues(c, { { id = 'e1', entree = { photo_id = 4961, size = 1568 } }, { id = 'z2', entree = { photo_id = 4962, region = ZONE } } })
             Fenetre.rafraichir()
             egal('grisé', etat(), "un aperçu entier ou le zoom d'une autre photo")
-            -- Le zoom de la photo : actif ; un clic le montre en grand, sans Claude ni Lightroom.
-            avecVues(c, { { id = 'z3', entree = { photo_id = 4961, region = ZONE } } })
+            -- Le zoom de la photo : actif. Puis un aperçu entier, la dernière image, montré dans
+            -- l'aperçu : « Voir à 100 % » y remet le zoom, comme un clic sur sa ligne d'image (décision
+            -- de Dany du 21 octobre 2026 : « dans l'aperçu »), sans fenêtre à part, sans Claude ni
+            -- Lightroom ; Agrandir le montre ensuite en grand.
+            avecVues(c, { { id = 'z3', entree = { photo_id = 4961, region = ZONE } }, { id = 'e4', entree = { photo_id = 4961, size = 1568 } } })
             Fenetre.rafraichir()
             egal(true, p.peutVoirZoom)
             egal('actif', etat())
-            local demandes, envois = {}, 0
-            avec(Images, 'grande', function(dossier, nom, l, h)
-                demandes[#demandes + 1] = { dossier = dossier, nom = nom, l = l, h = h }
-                return dossier .. '/' .. nom, 600, 400
+            local function montree()
+                local image = Fenetre.images[Fenetre.indiceImage or #Fenetre.images]
+                return image and image.chemin
+            end
+            egal('e4.jpg', montree(), "la dernière image de la conversation dans l'aperçu")
+            local vignettes, demandes, envois = {}, {}, 0
+            avec(Images, 'vignette', function(dossier, nom)
+                vignettes[#vignettes + 1] = nom
+                return dossier .. '/petite-' .. nom
             end, function()
-                avec(Moteur, 'envoyer', function() envois = envois + 1 end, function()
-                    local photos, lire = 0, Lightroom.photos
-                    Lightroom.photos = function(...) photos = photos + 1; return lire(...) end
-                    local champ = liee(contenu, 'edit_field', 'saisie')
-                    local taches, dialogues = #S.taches, #S.dialogues
-                    S.taper(champ, 'texte')
-                    S.cliquer(actif)
-                    egal(nil, Fenetre.envoiAuto, "« Voir à 100 % » n'envoie pas la demande")
-                    p.saisie = ''
-                    lancerDepuis(taches)
-                    Lightroom.photos = lire
-                    egal(1, #demandes)
-                    egal(Stockage.dossier(c.id), demandes[1].dossier)
-                    egal('z3.jpg', demandes[1].nom)
-                    egal(dialogues + 1, #S.dialogues, 'la fenêtre du zoom')
-                    egal('Claude · zoom à 100 % · DSCF4961.RAF', S.dialogues[#S.dialogues].title)
-                    egal(0, envois, 'sans Claude')
-                    egal(0, photos, 'sans rien demander à Lightroom')
+                avec(Images, 'grande', function(dossier, nom, l, h)
+                    demandes[#demandes + 1] = { dossier = dossier, nom = nom, l = l, h = h }
+                    return dossier .. '/' .. nom, 600, 400
+                end, function()
+                    avec(Moteur, 'envoyer', function() envois = envois + 1 end, function()
+                        local photos, lire = 0, Lightroom.photos
+                        Lightroom.photos = function(...) photos = photos + 1; return lire(...) end
+                        local champ = liee(contenu, 'edit_field', 'saisie')
+                        local taches, dialogues = #S.taches, #S.dialogues
+                        S.taper(champ, 'texte')
+                        S.cliquer(actif)
+                        egal(nil, Fenetre.envoiAuto, "« Voir à 100 % » n'envoie pas la demande")
+                        p.saisie = ''
+                        egal(true, Fenetre.imageCliquee, 'comme un clic sur sa ligne d\'image')
+                        egal('z3.jpg', montree(), "le zoom dans l'aperçu")
+                        vrai(p.legendeApercu:find('view_photo', 1, true), p.legendeApercu)
+                        lancerDepuis(taches)
+                        egal('z3.jpg', vignettes[#vignettes], "sa vignette, réduite au cadre de l'aperçu")
+                        egal(Stockage.dossier(c.id) .. '/petite-z3.jpg', p.imageApercu)
+                        egal(dialogues, #S.dialogues, 'aucune fenêtre à part')
+                        egal(0, #demandes)
+                        -- Le rafraîchissement de la fenêtre le garde ; Agrandir le montre en grand.
+                        Fenetre.rafraichir()
+                        egal('z3.jpg', montree(), 'gardé au rafraîchissement')
+                        taches = #S.taches
+                        Fenetre.agrandir()
+                        lancerDepuis(taches)
+                        egal(1, #demandes)
+                        egal(Stockage.dossier(c.id), demandes[1].dossier)
+                        egal('z3.jpg', demandes[1].nom)
+                        egal(dialogues + 1, #S.dialogues, 'Agrandir : la fenêtre du zoom')
+                        Lightroom.photos = lire
+                        egal(0, envois, 'sans Claude')
+                        egal(0, photos, 'sans rien demander à Lightroom')
+                    end)
                 end)
             end)
+            egal(true, Fenetre.voirZoom(), 'rend vrai avec un zoom')
             -- Le plafond absent : toute la ligne masquée, le bouton aussi.
             avec(Notation, 'proposition', function()
                 local x = copieProposition()

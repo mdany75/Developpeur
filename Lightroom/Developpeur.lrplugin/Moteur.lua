@@ -222,7 +222,7 @@ function Moteur.envoyer(texte, options)
         return false, "Écrivez une demande avant d'envoyer."
     end
     if Moteur.travaille then
-        return false, "Claude travaille : attendez la fin."
+        return false, "Claude travaille : attendez la fin, ou cliquez Arrêter."
     end
     local okBudget, niveau = pcall(Consommation.niveau)
     if okBudget and niveau == 'arret' then

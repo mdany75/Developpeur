@@ -2948,13 +2948,15 @@ end
 -- quand Claude appelle propose_ratings) et la note posée de la photo active : les passes du
 -- standard, la note et le drapeau posés (étoiles et drapeaux cliquables), la note que Claude
 -- propose, ses critères page par page (Fenetre.lignesCriteres), le plafond mesuré au tri et le zoom
--- que Claude a pris pour noter (« Voir à 100 % », Fenetre.voirZoom), puis Laisser, Changer… et
--- Accepter. Ce qui écrit passe par une tâche et Notation.poser (Fenetre.poserNote : étoiles,
--- drapeaux, Accepter, Changer…) ou Notation.decider (Laisser : rien dans le catalogue), sans Claude
--- ni quota, jamais pendant que Claude travaille ni pendant une autre écriture de la carte (le
--- bandeau dit pourquoi : un calque n'a pas d'enabled). Dany peut poser 5 ★ (étoiles, Changer…) ;
--- Claude ne le propose jamais, et la carte n'offre jamais « Accepter 5 ★ ». « ? À vérifier » est
--- posé grisé (Vues.inactif : le bouton avait été retiré en 1.1.1 ; question posée à Dany).
+-- que Claude a pris pour noter (« Voir à 100 % », montré dans l'aperçu : Fenetre.voirZoom), puis
+-- Laisser, Changer… et Accepter. Ce qui écrit passe par une tâche et Notation.poser
+-- (Fenetre.poserNote : étoiles, drapeaux, Accepter, Changer…) ou Notation.decider (Laisser : rien
+-- dans le catalogue), sans Claude ni quota, jamais pendant que Claude travaille ni pendant une autre
+-- écriture de la carte (le bandeau dit pourquoi : un calque n'a pas d'enabled). Retenir, ou retirer
+-- un drapeau, ne décide rien de la note que Claude propose (Fenetre.poserDrapeau). Dany peut poser
+-- 5 ★ (étoiles, Changer…) ; Claude ne le propose jamais, et la carte n'offre jamais « Accepter
+-- 5 ★ ». « ? À vérifier » est posé grisé (Vues.inactif : décision de Dany du 21 octobre 2026 ; le
+-- bouton avait été retiré en 1.1.1).
 
 local ETATS_NOTE = {
     proposee = "proposée",
@@ -3024,8 +3026,9 @@ Fenetre.NOTE_EN_COURS = "Une note s'écrit déjà : un instant."
 Fenetre.AUCUNE_PHOTO = "Aucune photo active : choisissez-la dans Lightroom."
 Fenetre.PAS_CINQ = "Claude ne propose jamais 5 ★ : posez-les vous-même."
 
--- Les infobulles de « Voir à 100 % » : le zoom de Claude, ou pourquoi le bouton est grisé.
-Fenetre.INFOBULLE_ZOOM = "Le zoom à 100 % que Claude a pris pour noter cette photo"
+-- Les infobulles de « Voir à 100 % » : le zoom de Claude, montré dans l'aperçu, ou pourquoi le
+-- bouton est grisé.
+Fenetre.INFOBULLE_ZOOM = "Montrer dans l'aperçu le zoom à 100 % que Claude a pris pour noter cette photo (Agrandir : en grand)"
 Fenetre.SANS_ZOOM = "Claude n'a pas pris de zoom de cette photo"
 
 local function texteChamp(v)
@@ -3135,7 +3138,7 @@ function Fenetre.verdict(texte)
 end
 
 -- Les lignes de la grille de la carte Note (Vues.ligneCritere) pour une proposition (nil : l'aide,
--- Fenetre.AIDE_NOTATION, en lignes pleine largeur), à `largeurs` { plein (379), critere (253) } :
+-- Fenetre.AIDE_NOTATION, en lignes pleine largeur), à `largeurs` { plein (379), critere (251) } :
 -- d'abord l'état et la raison (« <EM>Passe 2 · à vérifier.</EM> Tient seule… » ; sa première
 -- ligne en genre 'etat', son gras de la couleur de l'état, les suivantes 'plein'), puis chaque
 -- critère, du plus lourd au plus léger, son étiquette sur sa première ligne et son texte coupé à
@@ -3207,29 +3210,20 @@ function Fenetre.zoomDeLaNote()
     return zoom
 end
 
--- « Voir à 100 % » (dans une tâche) : le zoom que Claude a pris pour noter la photo de la carte,
--- en grand dans une fenêtre à part, comme Agrandir (Images.grande) : sans nouvel appel à Claude,
--- sans rien demander à Lightroom. Rend faux sans zoom (le bouton est alors grisé).
+-- « Voir à 100 % » : le zoom que Claude a pris pour noter la photo de la carte, montré dans
+-- l'aperçu (décision de Dany du 21 octobre 2026 : « Montre dans l'aperçu le zoom que Claude a pris
+-- pour noter, s'il y en a un dans la conversation ; grisé sinon »), comme un clic sur sa ligne
+-- d'image dans le fil (Fenetre.clics.image) : il y reste jusqu'à un autre onglet, une image
+-- nouvelle, une autre conversation ou une autre photo active, et Agrandir le montre en grand. Sans
+-- nouvel appel à Claude, sans rien demander à Lightroom. Rend faux sans zoom (le bouton est alors
+-- grisé).
 function Fenetre.voirZoom()
-    local c = Moteur.courante
-    local zoom = Fenetre.zoomDeLaNote()
-    if not (c and zoom) then
+    local zoom = Moteur.courante and Fenetre.zoomDeLaNote()
+    if not zoom then
         return false
     end
-    local chemin, l, h = Images.grande(Stockage.dossier(c.id), zoom.chemin, 1100, 740)
-    if not chemin then
-        LrDialogs.message("Aperçu illisible", zoom.chemin, 'warning')
-        return false
-    end
-    local prop, active = Fenetre.propositionNote, Fenetre.info and Fenetre.info.active
-    local nom = sansBalises(prop and prop.fichier or (active and active.nom) or '')
-    LrDialogs.presentModalDialog {
-        title = "Claude · zoom à 100 %" .. (nom ~= '' and (" · " .. nom) or ''),
-        contents = LrView.osFactory():picture { value = chemin, width = l, height = h },
-        actionVerb = "Fermer",
-        cancelVerb = '< exclude >',
-    }
-    return true
+    Fenetre.clics.image({ image = zoom.chemin })
+    return Fenetre.imageCliquee == true
 end
 
 function Fenetre.rafraichirNotation()
@@ -3255,7 +3249,7 @@ function Fenetre.rafraichirNotation()
     poser(p, 'noteClaude', Fenetre.noteClaude(prop))
     poser(p, 'notationCouleur', prop and COULEURS_NOTE[prop.etat] or 'gris')
     -- La grille des critères, page par page (la même revient à la même page).
-    local lignes = Fenetre.lignesCriteres(prop, { plein = T and T.largeurNote or 379, critere = T and T.texteCritere or 253 })
+    local lignes = Fenetre.lignesCriteres(prop, { plein = T and T.largeurNote or 379, critere = T and T.texteCritere or 251 })
     Fenetre.montrerPage('note', signature(lignes), nil, lignes)
     -- Le plafond mesuré au tri, et le zoom que Claude a pris pour noter.
     local plafond = prop and tonumber(prop.plafond)
@@ -3306,8 +3300,11 @@ local function carteLibre()
 end
 
 -- Écrit une note dans le catalogue (Notation.poser), depuis une tâche, puis relit la photo : une
--- écriture à la fois, jamais pendant que Claude travaille (le bandeau le dit).
-function Fenetre.poserNote(choix)
+-- écriture à la fois, jamais pendant que Claude travaille (le bandeau le dit). `etatGarde` (un
+-- drapeau qui ne décide rien, Fenetre.poserDrapeau) : la proposition de Claude revient à cet état
+-- une fois le drapeau posé (Notation.poser l'aurait dite acceptée ou changée), dans la même tâche,
+-- sans rien écrire de plus dans le catalogue.
+function Fenetre.poserNote(choix, etatGarde)
     if Moteur.travaille or Fenetre.noteEnCours then
         if Fenetre.p then
             Fenetre.p.message = Moteur.travaille and Fenetre.CLAUDE_TRAVAILLE or Fenetre.NOTE_EN_COURS
@@ -3317,6 +3314,9 @@ function Fenetre.poserNote(choix)
     Fenetre.noteEnCours = true
     Fenetre.rafraichirNotation()
     local ok, r = LrTasks.pcall(Notation.poser, { choix })
+    if ok and r.ok and etatGarde then
+        LrTasks.pcall(Notation.decider, choix.photo, etatGarde)
+    end
     Fenetre.noteEnCours = false
     if Fenetre.p then
         if not ok then
@@ -3346,14 +3346,23 @@ function Fenetre.poserEtoile(i)
 end
 
 -- « ⚑ Retenir » ou « ⊗ Rejeter » : ce drapeau posé dans Lightroom, ou retiré (« aucun ») si la
--- photo l'a déjà ; les étoiles restent. Dans une tâche ; rend vrai si le drapeau part.
+-- photo l'a déjà ; les étoiles restent. Dans une tâche ; rend vrai si le drapeau part. Retenir, ou
+-- retirer un drapeau, ne décide rien de la note que Claude propose : sa proposition à décider le
+-- reste (sans quoi Notation.poser la dirait changée, la note du catalogue prise pour celle de Dany).
+-- Rejeter décide (la proposition est changée, ou acceptée si Claude proposait le rejet), comme tout
+-- drapeau sur un rejet proposé.
 function Fenetre.poserDrapeau(drapeau)
     local active = carteLibre()
     if not active then
         return false
     end
-    enTache(Fenetre.poserNote, { photo = active.id, drapeau = active.drapeau == drapeau and 'aucun' or drapeau,
-        raison = Fenetre.RAISON_DRAPEAU })
+    local nouveau = active.drapeau == drapeau and 'aucun' or drapeau
+    local prop = Fenetre.propositionNote
+    local garder
+    if prop and (prop.etat == 'a_verifier' or prop.etat == 'proposee') and prop.drapeau ~= 'rejetee' and nouveau ~= 'rejetee' then
+        garder = prop.etat
+    end
+    enTache(Fenetre.poserNote, { photo = active.id, drapeau = nouveau, raison = Fenetre.RAISON_DRAPEAU }, garder)
     return true
 end
 
@@ -3368,8 +3377,13 @@ function Fenetre.laisserNote()
     return true
 end
 
+-- La tâche de Laisser : refusée (et dite au bandeau, comme Fenetre.poserNote) si Claude s'est mis au
+-- travail ou qu'une note s'écrit depuis le clic.
 function Fenetre.ecarterNote(photo)
     if Moteur.travaille or Fenetre.noteEnCours then
+        if Fenetre.p then
+            Fenetre.p.message = Moteur.travaille and Fenetre.CLAUDE_TRAVAILLE or Fenetre.NOTE_EN_COURS
+        end
         return
     end
     local ok, fait, raison = LrTasks.pcall(Notation.decider, photo, 'ecartee')

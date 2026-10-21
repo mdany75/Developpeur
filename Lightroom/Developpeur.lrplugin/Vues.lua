@@ -938,9 +938,10 @@ end
 
 -- La ligne du plafond, sous son filet : l'avertissement, « <EM>Plafond 3 ★</EM> : … » (gras ambre,
 -- `plafondTexte`), et « Voir à 100 % » (décision de Dany du 21 octobre 2026) : le zoom que Claude
--- a pris pour noter la photo, en grand (F.voirZoom, sans Claude ni Lightroom) ; sans un tel zoom,
--- le même bouton grisé, avec une infobulle qui dit pourquoi (deux boutons superposés : une infobulle
--- liée n'est pas constatée). Toute la ligne suit `aPlafond`.
+-- a pris pour noter la photo, montré dans l'aperçu (F.voirZoom, sans Claude ni Lightroom ; Agrandir
+-- le montre en grand) ; sans un tel zoom, le même bouton grisé, avec une infobulle qui dit pourquoi
+-- (deux boutons superposés : une infobulle liée n'est pas constatée). Toute la ligne suit
+-- `aPlafond`.
 function Vues.lignePlafond(f, F, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local function plafond()
@@ -956,7 +957,7 @@ function Vues.lignePlafond(f, F, D)
         f:column {
             place = 'overlapping',
             F.bouton(f, { carre = true, bezel = 22, title = "Voir à 100 %", font = P.systeme11, width = D.zoom, tooltip = F.INFOBULLE_ZOOM,
-                visible = F.et(plafond(), F.si 'peutVoirZoom'), action = function() F.enTache(F.voirZoom) end }),
+                visible = F.et(plafond(), F.si 'peutVoirZoom'), action = function() F.voirZoom() end }),
             F.bouton(f, { carre = true, bezel = 22, title = "Voir à 100 %", font = P.systeme11, width = D.zoom, tooltip = F.SANS_ZOOM,
                 enabled = false, visible = F.et(plafond(), F.non 'peutVoirZoom'), action = function() end }),
         },

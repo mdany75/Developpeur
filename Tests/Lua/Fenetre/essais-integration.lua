@@ -586,6 +586,60 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
     sansErreur()
 end)
 
+-- Les drapeaux de la carte Note (fenêtre B, lot B5), par le vrai registre : Retenir, ou retirer un
+-- drapeau, ne décide rien de la note que Claude propose (Notation.poser la dirait sinon « changée »,
+-- la note du catalogue prise pour celle de Dany) ; Rejeter la change ; sur un rejet proposé, tout
+-- drapeau décide.
+essai('Carte Note : Retenir ne décide rien de la proposition de Claude ; Rejeter la change ; un rejet proposé se décide par le drapeau', function()
+    PHOTOS[2006].note, PHOTOS[2006].drapeau = 0, 0
+    local function proposer(note, drapeau)
+        Notation.commande(Json.decode(Json.encode({ action = 'proposer', passe = 2, propositions = {
+            { photo = 2006, note = note, drapeau = drapeau, a_verifier = true, raison = "Tient seule.",
+                criteres = { impact = "Moyen.", qualites = "Bonnes.", plancher = "Nette (44)." } } } })))
+    end
+    proposer(3, 'aucun')
+    S.photoActive = PHOTOS[2006]
+    S.selection = { PHOTOS[2006] }
+    Moteur.courante = Conversation.nouvelle()
+    ouvrirFenetre(function(p)
+        local function drapeau(d)
+            Fenetre.majPhoto()
+            Fenetre.rafraichirNotation()
+            local avant = #S.taches
+            vrai(Fenetre.poserDrapeau(d), 'le drapeau part')
+            for i = avant + 1, #S.taches do
+                S.taches[i]()
+            end
+        end
+        drapeau('retenue')
+        egal(1, PHOTOS[2006].drapeau, 'retenue dans le catalogue')
+        egal(0, PHOTOS[2006].note, 'les étoiles restent')
+        egal('a_verifier', Notation.proposition(2006).etat, 'Retenir ne décide rien')
+        drapeau('retenue')
+        egal(0, PHOTOS[2006].drapeau, 'retiré')
+        egal('a_verifier', Notation.proposition(2006).etat, 'retirer un drapeau ne décide rien')
+        Fenetre.majPhoto()
+        Fenetre.rafraichirNotation()
+        egal(true, p.peutAccepterNote, 'toujours à accepter')
+        egal('Accepter 3 ★', p.titreAccepterNote)
+        drapeau('rejetee')
+        egal(-1, PHOTOS[2006].drapeau)
+        egal('changee', Notation.proposition(2006).etat, 'Rejeter décide : la proposition est changée')
+        egal('rejetee', Notation.proposition(2006).drapeau_choisi)
+        -- Un rejet proposé : Retenir le change, Rejeter l'accepte.
+        PHOTOS[2006].drapeau = 0
+        proposer(0, 'rejetee')
+        drapeau('retenue')
+        egal('changee', Notation.proposition(2006).etat, 'Retenir contre un rejet proposé : changée')
+        proposer(0, 'rejetee')
+        drapeau('rejetee')
+        egal('acceptee', Notation.proposition(2006).etat, 'Rejeter un rejet proposé : acceptée')
+        Fenetre.majPhoto()
+    end)
+    PHOTOS[2006].note, PHOTOS[2006].drapeau = 0, 0
+    sansErreur()
+end)
+
 -- En dernier : il remet les photos 2001 à 2003 à « proposée ».
 essai('« Note ces photos » refusé (pause) : le fil dit « Notes non posées », avec la raison sur chaque ligne', function()
     local Bibliotheque = package.loaded.Bibliotheque
