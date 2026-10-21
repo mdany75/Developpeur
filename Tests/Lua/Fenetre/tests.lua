@@ -1015,6 +1015,11 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         -- À vérifier (demandé par Dany le 20 octobre 2026).
         egal(nil, boutons['Évaluer'], nom .. ' : plus de bouton Évaluer')
         egal(nil, boutons['Noter'], nom .. ' : plus de bouton Noter')
+        -- Ni sous un autre titre (« ★ Noter » de la maquette), en push_button comme en
+        -- square_button : pas de bouton Noter (décision de Dany).
+        for titre in pairs(boutons) do
+            vrai(not titre:find('Noter', 1, true) and not titre:find('Évaluer', 1, true), nom .. ' : bouton « ' .. titre .. ' »')
+        end
         egal(nil, boutons['À vérifier'], nom .. ' : plus de bouton À vérifier')
         egal(nil, boutons['Séance…'], nom .. ' : plus de Séance de notation (1.1.1)')
         egal('Note posée : ★★☆☆☆', p.notationPosee)
@@ -1383,12 +1388,15 @@ essai("Simulation : f:picture sans clic (C1), avec width et height (AgPictureVie
     egal(1, recus, 'le calque reçoit le clic')
 end)
 
-essai("Simulation : background_color sans effet sur row, column, view et group_box (A5) et sur la fenêtre (A1) ; "
-    .. "permis sur scrolled_view et picture", function()
+essai("Simulation : background_color sans effet sur row et view (A5), column et group_box (relevé dans AgUI) et sur la "
+    .. "fenêtre (A1) ; permis sur scrolled_view et picture", function()
     local f = fabriqueVues
     local rose = S.modules.LrColor(1, 0.8, 0.8)
-    for _, genre in ipairs({ 'row', 'column', 'view', 'group_box' }) do
-        refuse(function() f[genre](f, { background_color = rose, f:static_text { title = 'x' } }) end, 'A5', genre)
+    -- Chaque refus dit sa source : constaté pour row et view, relevé seulement pour les deux autres.
+    local sources = { row = 'constaté le 21 octobre 2026, A5', view = 'constaté le 21 octobre 2026, A5', column = 'relevé dans AgUI',
+        group_box = 'relevé dans AgUI' }
+    for genre, source in pairs(sources) do
+        refuse(function() f[genre](f, { background_color = rose, f:static_text { title = 'x' } }) end, '(' .. source .. ')', genre)
     end
     f:scrolled_view { background_color = rose, horizontal_scroller = false, f:static_text { title = 'x' } }
     f:picture { width = 10, height = 10, background_color = rose }
@@ -1454,11 +1462,44 @@ essai('Simulation : un seul bouton par défaut par fenêtre (relevé dans AgUI :
     p.parDefaut = false
     ok, erreur = ouvrirEssai(contenu(), function()
         egal('Envoyer', S.titreDe(S.boutonParDefaut()), 'le bouton par défaut de la fenêtre')
+        -- Le second qui le devient, fenêtre ouverte : refusé aussi.
+        refuse(function() p.parDefaut = true end, 'setDefaultButtonCell', 'le second par une nouvelle valeur')
+        egal(1, #S.refusDeLaFenetre(), 'refus gardé')
+        p.parDefaut = false
     end)
     assert(ok, erreur)
     refuse(function()
         S.modules.LrDialogs.presentModalDialog { title = 'Essai', contents = f:row { defaut('Un'), defaut('Deux') } }
     end, 'setDefaultButtonCell', 'fenêtre modale')
+    -- Un default lié se relit à chaque Retour, comme toute liaison : faux à l'ouverture, puis vrai.
+    local q = S.modules.LrBinding.makePropertyTable()
+    q.saisie, q.envoiParDefaut = '', false
+    local recus = 0
+    local champ = f:edit_field { value = lier 'saisie' }
+    local envoyer = f:push_button { title = 'Envoyer', default = lier 'envoiParDefaut', action = function() recus = recus + 1 end }
+    ok, erreur = ouvrirEssai(f:column { bind_to_object = q, champ, envoyer }, function()
+        egal(nil, S.boutonParDefaut(), "aucun à l'ouverture")
+        vrai(not S.retour(champ), "Retour sans bouton par défaut")
+        q.envoiParDefaut = true
+        egal(envoyer, S.boutonParDefaut(), 'devenu le bouton par défaut')
+        vrai(S.retour(champ), 'il prend Retour')
+        q.envoiParDefaut = false
+        vrai(not S.retour(champ), 'il ne le prend plus')
+    end)
+    assert(ok, erreur)
+    egal(1, recus)
+end)
+
+essai("Simulation : une fenêtre se ferme même quand l'essai qui la manipule échoue", function()
+    local f = fabriqueVues
+    local ouvertes = #S.fenetresOuvertes
+    local ok, erreur = ouvrirEssai(f:column { f:push_button { title = 'Envoyer', default = true, action = rien } }, function()
+        egal(ouvertes + 1, #S.fenetresOuvertes, 'ouverte pendant l\'essai')
+        error('échec exprès')
+    end)
+    vrai(not ok and tostring(erreur):find('échec exprès', 1, true), tostring(erreur))
+    egal(ouvertes, #S.fenetresOuvertes, 'fermée après l\'échec')
+    egal(nil, S.boutonParDefaut(), 'son bouton par défaut ne compte plus')
 end)
 
 essai('Simulation : texte riche <EM> — balises fermées, emphasis_font, ni entité, ni dernière ligne coupée (B1, D4)', function()
@@ -1495,6 +1536,11 @@ essai('Simulation : texte riche <EM> — balises fermées, emphasis_font, ni ent
     refuse(function() f:static_text { title = quatre, font = '<system/small>', emphasis_font = gras12, height_in_lines = 4 } end, 'coupée',
         "emphase de 12 sur '<system/small>'")
     f:static_text { title = quatre, font = texte11, emphasis_font = gras12, height_in_lines = 5 }
+    -- Tailles connues : '<system>' 13, '<system/small>' 11 (D9) ; « mini » ni documenté ni constaté.
+    egal(13, S.taillePolice('<system/bold>'))
+    egal(11, S.taillePolice('<system/small/bold>'))
+    egal(nil, S.taillePolice('<system/mini>'), 'mini : taille inconnue')
+    f:static_text { title = quatre, font = '<system/small>', emphasis_font = '<system/mini/bold>', height_in_lines = 4 }
     f:static_text { title = quatre, font = texte11, emphasis_font = { name = '<system/bold>', size = 11 }, height_in_lines = 4 }
     f:static_text { title = quatre, font = texte12, emphasis_font = gras12, height_in_lines = 4 }
     -- Un titre lié : sa valeur à l'ouverture, puis chaque nouvelle valeur, qui garde son balisage
@@ -1768,7 +1814,6 @@ essai("Fenêtre : sans bouton par défaut, Retour dans « Rechercher » n'envoie
         vrai(not S.retour(recherche), 'Retour dans « Rechercher » ne déclenche rien')
         egal(taches, #S.taches, 'aucune tâche')
         egal(nil, Fenetre.envoiAuto, 'aucun envoi prévu')
-        S.taper(recherche, '')
         p.recherche = ''
         -- Retour dans la demande : le champ validé, puis l'envoi automatique, qui vide le champ.
         S.taper(champ, 'Bonjour')
@@ -2122,6 +2167,15 @@ end)
 -- Presse-papiers ------------------------------------------------------------------------------
 
 local Images = require 'Images'
+
+-- La garde de la simulation, éprouvée par /usr/bin/true : même sans elle, rien ne lirait le vrai
+-- presse-papiers.
+essai('Simulation : presse-papiers.js ne part qu\'avec un presse-papiers nommé (jamais le vrai)', function()
+    local execute = S.modules.LrTasks.execute
+    refuse(function() execute("/usr/bin/true '/m/presse-papiers.js' '/t/Collees'  > /dev/null") end, 'presse-papiers nommé',
+        'sans nom')
+    egal(0, execute("/usr/bin/true '/m/presse-papiers.js' '/t/Collees' 'DeveloppeurEssai' > /dev/null"), 'avec un nom')
+end)
 
 essai('Coller : image et fichier du presse-papiers (presse-papiers nommé, jamais le vrai)', function()
     local nom = 'DeveloppeurEssai'

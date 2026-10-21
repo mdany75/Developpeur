@@ -87,6 +87,13 @@ modules.LrFileUtils = {
 
 modules.LrTasks = {
     execute = function(commande)
+        -- Jamais le vrai presse-papiers du Mac (règle de CLAUDE.md) : presse-papiers.js ne se lance
+        -- ici qu'avec un presse-papiers nommé, son troisième argument (Images.coller(nom)). Sans lui
+        -- (le clic sur 📋 dans un essai de la fenêtre), la commande est refusée avant de partir.
+        if commande:find('presse-papiers.js', 1, true) and not commande:match("presse%-papiers%.js' '[^']*' '[^']+'") then
+            error("presse-papiers.js sans presse-papiers nommé : il lirait le vrai presse-papiers du Mac (jamais dans un essai) : "
+                .. commande, 2)
+        end
         S.dernieresCommandes = S.dernieresCommandes or {}
         S.dernieresCommandes[#S.dernieresCommandes + 1] = commande
         return executer(commande) and 0 or 1
@@ -256,10 +263,16 @@ S.BOUTONS = { push_button = true, square_button = true }
 -- place (constaté le 21 octobre 2026, D10), ses vues avec lui.
 S.CONTENEURS = { row = true, column = true, group_box = true, tab_view = true, scrolled_view = true }
 
--- `background_color` reste sans effet sur ces conteneurs (constaté le 21 octobre 2026, A5 : row et
--- view ; relevé dans AgUI : aucun NSView ordinaire n'a de couleur de fond). Il agit sur un
--- scrolled_view (constaté, A2) et sur un f:picture (aplat, constaté, A4).
-S.SANS_FOND = { row = true, column = true, view = true, group_box = true }
+-- `background_color` reste sans effet sur ces conteneurs, chacun avec sa source : row et view
+-- constatés (21 octobre 2026, A5), column et group_box relevés dans AgUI (aucun NSView ordinaire
+-- n'a de couleur de fond), sans avoir été vus. Il agit sur un scrolled_view (constaté, A2) et sur
+-- un f:picture (aplat, constaté, A4).
+S.SANS_FOND = {
+    row = 'constaté le 21 octobre 2026, A5',
+    view = 'constaté le 21 octobre 2026, A5',
+    column = 'relevé dans AgUI',
+    group_box = 'relevé dans AgUI',
+}
 
 -- Les attributs d'une static_text qui décident de son texte riche (<EM>), et celui d'un bouton qui
 -- pose une icône : vérifiés à la création s'ils sont tous donnés tels quels, sinon à l'ouverture de
@@ -268,13 +281,17 @@ local ATTRIBUTS_TEXTE = { 'title', 'font', 'emphasis_font', 'emphasis_color', 'h
 
 -- Taille en points d'une police de LrView : un nom réservé du système (« small » : 11 points,
 -- constaté le 21 octobre 2026, D9 ; sinon la taille du système de macOS, 13), ou une table
--- { name, size }. Une static_text sans `font` est en '<system>'. Nil si la taille n'est pas connue.
+-- { name, size }. Une static_text sans `font` est en '<system>'. Nil si la taille n'est pas connue,
+-- dont « mini », ni documenté ni constaté.
 local function taillePolice(police)
     if police == nil then
         return 13
     elseif type(police) == 'table' then
         return police.size or (type(police.name) == 'string' and police.name:match('^<system') and taillePolice(police.name)) or nil
     elseif type(police) == 'string' and police:match('^<system') then
+        if police:find('mini', 1, true) then
+            return nil
+        end
         return police:find('small', 1, true) and 11 or 13
     end
 end
@@ -295,7 +312,8 @@ function S.refusEmphase(v)
     end
     -- Chaque <EM> se ferme par </EM> avant la suivante : seule, la balise disparaît sans rien
     -- d'autre (constaté le 21 octobre 2026, B1). Une balise peut se fermer sur la ligne suivante
-    -- (les deux lignes passent en gras, constaté, D4).
+    -- (les deux lignes passent en gras, constaté, D4). Deux <EM> de suite et un </EM> seul n'ont
+    -- été ni vus ni relevés : refusés plutôt que devinés.
     local ouverte, debut = false, 1
     while true do
         local a, b, fin = titre:find('<(/?)EM>', debut)
@@ -303,9 +321,9 @@ function S.refusEmphase(v)
             break
         end
         if fin == '' and ouverte then
-            return "<EM> ouverte deux fois sans </EM> : " .. titre
+            return "<EM> ouverte deux fois sans </EM> (non constaté) : " .. titre
         elseif fin == '/' and not ouverte then
-            return "</EM> sans <EM> : " .. titre
+            return "</EM> sans <EM> (non constaté) : " .. titre
         end
         ouverte = fin == ''
         debut = b + 1
@@ -365,10 +383,11 @@ local function verifierCreation(genre, args)
     assert(not (S.CONTENEURS[genre] and args.visible ~= nil),
         "visible sur un conteneur : sans effet dans Lightroom (constaté le 20 octobre 2026) : " .. genre)
     assert(not (S.SANS_FOND[genre] and args.background_color ~= nil),
-        "background_color sur un " .. genre .. " : sans effet (constaté le 21 octobre 2026, A5) ; un aplat (f:picture) dessous")
+        "background_color sur un " .. genre .. " : sans effet (" .. tostring(S.SANS_FOND[genre]) .. ") ; un aplat (f:picture) dessous")
     -- Sans effet sur un séparateur, la ligne restée #DBDBDB (constaté le 21 octobre 2026, A6) :
-    -- un filet se fait par un aplat de 1 point.
-    assert(args.primary_line_color == nil, "primary_line_color : sans effet (constaté le 21 octobre 2026, A6) : " .. genre)
+    -- un filet se fait par un aplat de 1 point. Refusé aussi ailleurs, où rien ne dit qu'il agirait.
+    assert(args.primary_line_color == nil,
+        "primary_line_color : sans effet sur un séparateur (constaté le 21 octobre 2026, A6), refusé partout : " .. genre)
     if genre == 'picture' then
         -- Aucun clic ne parvient à un f:picture (constaté le 21 octobre 2026, C1) : un calque
         -- (static_text vide de taille fixe) posé dessus le reçoit.
@@ -536,8 +555,8 @@ end
 
 -- Bezel d'un square_button, mesuré d'un bord #B4B4B4 à l'autre (constaté le 21 octobre 2026, D5) :
 -- sans height, 17 points en regular, 15 en small, 11 en mini ; avec height, toujours 2 de moins
--- (22, 24 et 26 donnent 20, 22 et 24, en regular comme en small). Un bezel de N points demande
--- height = N + S.MARGE_BEZEL.
+-- (22, 24 et 26 donnent 20, 22 et 24, en regular comme en small ; en mini avec height, non relevé,
+-- supposé de même). Un bezel de N points demande height = N + S.MARGE_BEZEL.
 S.BEZEL_NATUREL = { regular = 17, small = 15, mini = 11 }
 S.MARGE_BEZEL = 2
 
@@ -562,11 +581,16 @@ S.ENCRE_SOUS_CHASSE = { min = 1, max = 2 }
 -- première tâche (lot B3). La simulation ne dessine rien : aucune règle.
 S.RADIO_INACTIF_A_REPOSER = true
 
+-- Sans règle non plus (constaté le 21 octobre 2026) : une rangée posée sur un texte ne lui prend
+-- pas ses clics, et un bouton masqué laisse le clic au texte dessous (D6) ; la simulation clique la
+-- vue visée, sans géométrie. Les contrôles natifs sont lisibles sur blanc et sur #F2F2F2 en
+-- apparence claire (D8) ; l'apparence sombre n'a pas été essayée.
+
 -- Fenêtres ouvertes ----------------------------------------------------------------------------
 
 -- Les fenêtres flottantes ouvertes, la dernière au-dessus : chacune avec l'index de ses vues
--- (parent et table de propriétés héritée de bind_to_object), son bouton par défaut, le champ qui a
--- le focus et le texte tapé sans être validé.
+-- (parent et table de propriétés héritée de bind_to_object), ses vues qui portent `default`, le
+-- champ qui a le focus et le texte tapé sans être validé.
 S.fenetresOuvertes = {}
 
 local CHAMPS = { edit_field = true, password_field = true, combo_box = true }
@@ -662,9 +686,32 @@ local function refusTexte(fenetre, vue)
     end
 end
 
+-- Les vues de la fenêtre dont `default` vaut vrai à cet instant : une valeur liée se relit à
+-- chaque fois, comme toute liaison (non constaté pour default, qui n'est pas documenté).
+local function parDefaut(fenetre)
+    local liste = {}
+    for _, vue in ipairs(fenetre.avecDefaut) do
+        local ok, defaut = pcall(evaluerAttribut, vue.args.default, fenetre.vues[vue].objet)
+        if ok and defaut == true then
+            liste[#liste + 1] = vue
+        end
+    end
+    return liste
+end
+
+-- Un seul bouton par défaut : la fenêtre n'en garde qu'un (relevé dans AgUI :
+-- setDefaultButtonCell). Rend nil, ou la raison du refus.
+local function refusDefaut(fenetre)
+    local n = #parDefaut(fenetre)
+    if n > 1 then
+        return string.format("%d boutons default = true dans une fenêtre : elle n'en garde qu'un (relevé dans AgUI, "
+            .. "setDefaultButtonCell)", n)
+    end
+end
+
 -- Ouverture d'une fenêtre : l'index de ses vues, puis ce qui ne se voit qu'avec les valeurs.
 local function ouvrirFenetre(args)
-    local fenetre = { args = args, vues = {}, saisies = {}, libres = {}, refus = {}, ouverte = true }
+    local fenetre = { args = args, vues = {}, saisies = {}, libres = {}, refus = {}, avecDefaut = {}, ouverte = true }
     local function indexer(vue, parent, objet)
         objet = vue.args.bind_to_object or objet
         fenetre.vues[vue] = { parent = parent, objet = objet }
@@ -678,48 +725,51 @@ local function ouvrirFenetre(args)
     if liste[1] then
         indexer(liste[1], nil, nil)
     end
-    -- Un seul bouton par défaut : la fenêtre n'en garde qu'un (relevé dans AgUI :
-    -- setDefaultButtonCell). Lu à l'ouverture, liaison comprise.
-    local defauts = {}
-    for _, vue in ipairs(liste) do
-        local ok, defaut = pcall(evaluerAttribut, vue.args.default, fenetre.vues[vue].objet)
-        if ok and defaut == true then
-            defauts[#defauts + 1] = vue
+    -- Ce qui se relit à chaque nouvelle valeur d'une clé liée : suivies[table][clé] = vérifications.
+    local suivies = {}
+    local function suivre(lien, objet, verifier)
+        local o = lien.bind_to_object or objet
+        if type(o) == 'table' and type(rawget(o, 'addObserver')) == 'function' then
+            for _, k in ipairs(S.cles(lien)) do
+                suivies[o] = suivies[o] or {}
+                suivies[o][k] = suivies[o][k] or {}
+                table.insert(suivies[o][k], verifier)
+            end
         end
     end
-    assert(#defauts <= 1, string.format("%d boutons default = true dans une fenêtre : elle n'en garde qu'un (relevé dans AgUI, "
-        .. "setDefaultButtonCell)", #defauts))
-    fenetre.defaut = defauts[1]
+    -- Le bouton par défaut : un seul à l'ouverture, puis à chaque nouvelle valeur liée.
+    for _, vue in ipairs(liste) do
+        if vue.args.default ~= nil then
+            fenetre.avecDefaut[#fenetre.avecDefaut + 1] = vue
+            if type(vue.args.default) == 'table' and vue.args.default.liaison then
+                suivre(vue.args.default, fenetre.vues[vue].objet, function() return refusDefaut(fenetre) end)
+            end
+        end
+    end
+    local refus = refusDefaut(fenetre)
+    assert(not refus, refus)
     -- Texte riche et icônes liés : leurs valeurs à l'ouverture, puis chaque nouvelle valeur (un
     -- titre lié balisé garde son balisage quand il change, constaté le 21 octobre 2026, D4).
-    local suivies = {}
     for _, vue in ipairs(liste) do
         if vue.genre == 'static_text' or S.BOUTONS[vue.genre] then
-            local refus = refusTexte(fenetre, vue)
+            refus = refusTexte(fenetre, vue)
             assert(not refus, refus)
             for _, cle in ipairs(ATTRIBUTS_TEXTE) do
                 local lien = vue.args[cle]
                 if type(lien) == 'table' and lien.liaison then
-                    local o = lien.bind_to_object or fenetre.vues[vue].objet
-                    if type(o) == 'table' and type(rawget(o, 'addObserver')) == 'function' then
-                        for _, k in ipairs(S.cles(lien)) do
-                            suivies[o] = suivies[o] or {}
-                            suivies[o][k] = suivies[o][k] or {}
-                            table.insert(suivies[o][k], vue)
-                        end
-                    end
+                    suivre(lien, fenetre.vues[vue].objet, function() return refusTexte(fenetre, vue) end)
                 end
             end
         end
     end
     for o, cles in pairs(suivies) do
-        for k, vues in pairs(cles) do
+        for k, verifications in pairs(cles) do
             o:addObserver(k, function()
                 if not fenetre.ouverte then
                     return
                 end
-                for _, vue in ipairs(vues) do
-                    local refus = refusTexte(fenetre, vue)
+                for _, verifier in ipairs(verifications) do
+                    local refus = verifier()
                     if refus then
                         -- Gardé aussi pour la fermeture : une tâche du module (LrTasks.pcall)
                         -- n'avalera pas le refus.
@@ -752,10 +802,10 @@ function S.refusDeLaFenetre()
     return refus
 end
 
--- Le bouton par défaut de la fenêtre ouverte du dessus (nil s'il n'y en a pas).
+-- Le bouton par défaut de la fenêtre ouverte du dessus, à cet instant (nil s'il n'y en a pas).
 function S.boutonParDefaut()
     local fenetre = S.fenetresOuvertes[#S.fenetresOuvertes]
-    return fenetre and fenetre.defaut
+    return fenetre and parDefaut(fenetre)[1]
 end
 
 -- Une vue est montrée si elle l'est, et toutes les vues qui la contiennent : un f:view caché
@@ -895,7 +945,7 @@ function S.retour(champ)
     if champ.args.immediate ~= true then
         valider(fenetre, champ)
     end
-    local defaut = fenetre.defaut
+    local defaut = parDefaut(fenetre)[1]
     if defaut and montreeDans(fenetre, defaut) and active(fenetre, defaut) then
         defaut.args.action(defaut)
         return true
