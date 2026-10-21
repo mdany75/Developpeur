@@ -11,8 +11,13 @@
 --                                          (chemin d'un fichier temporaire, que le serveur lit puis
 --                                          efface) ; taille 0 = pleine résolution ; comparer =
 --                                          'avantClaude' ou 'etapePrecedente' rend aussi l'état d'avant
---                                          (chemin_avant) ; point_af : la photo décrite comme pour les
---                                          vignettes (point de mise au point) et point_af_toujours
+--                                          (chemin_avant) ; comparer = 'versionClaude' (« Je le fais »,
+--                                          1.3) : chemin_avant est la version de Claude de l'exercice,
+--                                          et exercice = { instantane, le, ecarts = [{ cle, depart,
+--                                          claude, vous }], listes = { masques, taches, yeux_rouges =
+--                                          { depart, vous } }, restent, rien_change } ; point_af : la
+--                                          photo décrite comme pour les vignettes (point de mise au
+--                                          point) et point_af_toujours
 --   appliquer   {photos?|selection?, reglages, booleens?, profil?, profil_marque?, profil_variantes?, profil_absent_sur?, profil_look?,
 --                recadrage?, recalages?, courbes?, couleurs_ponctuelles?, balance?, auto_ton?, flou_objectif?,
 --                preset?, quantite_preset?, melange_nb_auto?, profil_objectif?, reperes?, rotation?,
@@ -29,11 +34,20 @@
 --                                          rendre, les deux rendus du recalage
 --   recadrer    {photos, recadrage, recalages, completer?, etape, raison?, confirme} → cadre demandé,
 --                                          sans les coins vides d'Upright et de la perspective
---   essayer     {action, photo?, taille, comparer?, …} → applique, rend, puis remet comme avant
+--   essayer     {action, photo?, taille, comparer?, instantane?, exercice?, sans_rendu?, …} → applique,
+--                                          rend, puis remet comme avant ; instantane : rangée aussi
+--                                          en instantané (variante) ; exercice (« Je le fais », 1.3,
+--                                          exige instantane) : départ et version de Claude gardés dans
+--                                          la mémoire de la variante, entrée 'exercice' au journal,
+--                                          état d'après Claude noté ; refusé si rien ne change ;
+--                                          réponse exercice = { instantane } et raw ; sans_rendu :
+--                                          aucun rendu (chemin absent)
 --   presets     {filtre?, limite}       → paramètres prédéfinis de développement
 --   creerPreset {nom, photo?, cles, inclure} → réglages d'une photo, pour un paramètre prédéfini
 --   diagnostic  {modules?}              → fonctions du SDK offertes par cette version de Lightroom
---   journal     {photos?|selection?}    → journal des retouches de Claude
+--   journal     {photos?|selection?, detaille?} → journal des retouches de Claude ; detaille (la
+--                                          leçon, 1.3) : la photo décrite en entier, avec
+--                                          prise_de_vue_plus
 --   annuler     {photos?|selection?}    → défait la dernière retouche de Claude
 --   revenir     {photos?|selection?}    → remet l'état d'avant la première retouche de Claude
 --   metadonnees {photos?|selection?, note?, drapeau?, libelle?, titre?, legende?, droits?, iptc?, gps?,
@@ -71,7 +85,9 @@
 --                                          vient d'y réimporter (même session, 30 min)
 --   variantes   {photo?, action, nom?, noms?, effacer_autres?, etape, raison?, confirme} → variantes
 --                                          rangées en instantanés : lister, choisir, effacer
---                                          (essayer avec `instantane` les prépare)
+--                                          (essayer avec `instantane` les prépare) ; choisir « ma
+--                                          version » d'un exercice touche aussi les réglages que Dany
+--                                          a changés (undo_last les lui rend)
 --   masques     {photo?, action, masque?, inverser?, nom?, contour?, decalage?, etape, raison?, confirme}
 --                                       → lister, masquer, afficher, retirer, dupliquer, recalculer,
 --                                          affiner un masque ; retirer les masques vides
@@ -86,9 +102,12 @@
 --                                          trois points, un par axe, lumiere, couleur,
 --                                          composition ; la nouvelle remplace l'ancienne), lire,
 --                                          retirer
---   carnet      {action, photos?}       → carnet de progrès (1.3), carnet.json : lire (les
---                                          originaux du catalogue ouvert, leçons comprises),
---                                          retirer
+--   carnet      {action, photo?, photos?, vue?, angle?, vocabulaire?, essai_recette?, resume?}
+--                                       → carnet de progrès (1.3), carnet.json : constater (photo,
+--                                          la photo mesurée, obligatoire ; vue ou angle ;
+--                                          vocabulaire ; essai_recette, la recette seulement), lire
+--                                          (les originaux du catalogue ouvert, leçons comprises ;
+--                                          resume : avec le résumé), retirer (photos)
 --   etapes      {photo?}                → étapes de Claude gardées pour la photo et leurs images
 --                                          avant/après (1.3, Etapes.lua) : { photo, etapes = [{ id,
 --                                          nom, en_memoire, avant, apres, etat, raison }] ; lecture
