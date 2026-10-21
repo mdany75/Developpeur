@@ -94,7 +94,7 @@ Fenetre.STYLES = {
     { genres = { note = true }, police = 'texte', couleur = 'gris' },
 }
 
--- Pastilles des voyants (Claude Code, Lightroom, mode).
+-- Pastilles des voyants (Claude Code, Lightroom, mode, écran).
 Fenetre.PASTILLES = { ok = 'vert', attention = 'orange', erreur = 'rouge', neutre = 'gris', bleu = 'bleu' }
 
 local bind = LrView.bind
@@ -1059,12 +1059,19 @@ function Fenetre.verifier(avecClaude)
     end
     if avecClaude then
         Fenetre.rafraichirVersions(Composants.lire())
+        -- L'écran principal du Mac, lu par le connecteur (une commande du système, 5 s au plus) : à
+        -- l'ouverture et au clic sur son voyant seulement, jamais toutes les 2 s.
+        Fenetre.poserEcran(Lightroom.etatEcran(prefs.cheminConnecteur))
     end
     local liaison, erreur = Lightroom.liaison()
     poser(p, 'texteLightroom', liaison == 'active' and "Lightroom"
         or (liaison == 'erreur' and "Lightroom · liaison en erreur" or "Lightroom · liaison arrêtée"))
     poser(p, 'etatLightroom', liaison == 'active' and 'ok' or 'erreur')
-    if liaison == 'erreur' then
+    if liaison == 'erreur' and tostring(erreur):find('jeton', 1, true) then
+        -- Le jeton privé de la liaison (1.2) n'a pas pu être préparé : la liaison refuse tout.
+        Fenetre.aideLiaison = "La liaison avec Claude n'a pas pu préparer son jeton privé (" .. tostring(erreur)
+            .. ") : cliquez le voyant Lightroom pour la relancer ; le détail est dans ~/Library/Logs/Developpeur/module.log."
+    elseif liaison == 'erreur' then
         Fenetre.aideLiaison = "La liaison avec Claude est en erreur (" .. tostring(erreur)
             .. ") : un autre Lightroom ouvert tient peut-être ses ports. Fermez-le, puis cliquez le voyant Lightroom."
     elseif liaison == 'arretee' then
@@ -1082,6 +1089,24 @@ end
 function Fenetre.demarrerLiaison()
     Lightroom.demarrerLiaison()
     Fenetre.verifier(false)
+end
+
+-- Le voyant Écran (Lightroom.etatEcran) ; son détail est gardé pour la boîte du clic.
+function Fenetre.poserEcran(ecran)
+    Fenetre.detailEcran = ecran.detail
+    local p = Fenetre.p
+    if not p then
+        return
+    end
+    poser(p, 'texteEcran', ecran.texte)
+    poser(p, 'etatEcran', ecran.etat)
+end
+
+-- Clic sur le voyant Écran (dans une tâche) : l'écran se relit (un autre a pu être branché), puis
+-- son détail : profil de couleur, et comment juger les couleurs.
+function Fenetre.montrerEcran()
+    Fenetre.poserEcran(Lightroom.etatEcran(Chemins.prefs().cheminConnecteur))
+    LrDialogs.message("Claude · écran", Fenetre.detailEcran or "Écran pas encore lu.", 'info')
 end
 
 -- Les deux versions en bas (Composants.lignes).
@@ -1459,7 +1484,8 @@ end
 -- Boucle d'une fenêtre (sa génération : une fenêtre rouverte a la sienne, l'ancienne boucle
 -- s'arrête) : rafraîchit ce que le moteur a changé, la note, l'activité, et les voyants.
 -- Toutes les 2 s : les voyants et la photo active (la liaison, lue dans ce module sans commande
--- du système, peut démarrer ou s'arrêter par le menu).
+-- du système, peut démarrer ou s'arrêter par le menu). Claude Code et l'écran, lus par des
+-- commandes du système, ne se relisent qu'à l'ouverture (et l'écran au clic sur son voyant).
 function Fenetre.periodique()
     LrTasks.pcall(Fenetre.verifier, false)
     LrTasks.pcall(Fenetre.majPhoto)
@@ -1573,6 +1599,9 @@ function Fenetre.afficher()
         p.etatLightroom = 'neutre'
         p.texteMode = ''
         p.etatMode = 'neutre'
+        -- Gris tant que le connecteur ne l'a pas dit (Fenetre.verifier, à l'ouverture).
+        p.texteEcran = "Écran"
+        p.etatEcran = 'neutre'
         p.infoPhoto = ''
         p.imageApercu = Fenetre.imageVide()
         p.legendeApercu = ''

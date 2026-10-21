@@ -94,8 +94,8 @@ function Vues.voyant(f, F, cleEtat, cleTexte, action, infobulle, largeur)
     }
 end
 
--- Claude Code, la liaison (un clic la démarre) et le mode (un clic le bascule), en rangée, chaque
--- texte à `largeur`.
+-- Claude Code, la liaison (un clic la démarre), le mode (un clic le bascule) et l'écran principal
+-- du Mac (un clic le relit et donne son détail), en rangée, chaque texte à `largeur`.
 function Vues.voyants(f, F, largeur)
     local liste = {
         Vues.voyant(f, F, 'etatClaude', 'texteClaude', nil, "Claude Code, avec votre forfait claude.ai (pas de clé d'API)", largeur),
@@ -107,6 +107,10 @@ function Vues.voyants(f, F, largeur)
             F.annulerEnvoiAuto()
             F.basculerMode()
         end, "Mode du connecteur ; un clic bascule entre « Proposer d'abord » et « Appliquer directement »", largeur),
+        Vues.voyant(f, F, 'etatEcran', 'texteEcran', function()
+            F.annulerEnvoiAuto()
+            F.enTache(F.montrerEcran)
+        end, "Écran principal du Mac et son profil de couleur ; un clic donne le détail", largeur),
     }
     liste.spacing = 12
     return f:row(liste)

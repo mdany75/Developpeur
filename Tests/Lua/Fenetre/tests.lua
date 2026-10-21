@@ -531,6 +531,10 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
             end
         end)
         vrai(voyantLiaison and voyantLiaison.args.mouse_down, 'voyant de la liaison cliquable')
+        -- Le voyant Écran : gris tant que le connecteur ne l'a pas dit (Fenetre.verifier(true), dans
+        -- la tâche de l'ouverture, pas encore lancée ici).
+        egal('Écran', p.texteEcran)
+        egal('neutre', p.etatEcran)
         local demarrer, demarree = Liaison.demarrer, false
         Liaison.demarrer = function() demarree = true; Liaison.actif = true end
         voyantLiaison.args.mouse_down()
@@ -950,6 +954,235 @@ end)
 essai('Fenêtre : texte JSON rendu lisible', function()
     egal('{\n  "a": 1,\n  "b": [\n    2\n  ]\n}', Fenetre.lisible('{"b":[2],"a":1}'))
     egal('pas du json', Fenetre.lisible('pas du json'))
+end)
+
+-- Écran (1.2) ----------------------------------------------------------------------------------
+
+-- Un faux connecteur qui ne répond qu'à --ecran, par la ligne JSON rangée dans S.home/ecran.json
+-- (celle de `mcp-developpeur --ecran`) ; tout autre argument est refusé. Un connecteur d'avant la
+-- 1.2 répond à une option inconnue par son aide, sur stdout, et le code 2.
+local reponseEcran = S.home .. '/ecran.json'
+
+local function script(nom, contenu)
+    local chemin = S.home .. '/' .. nom
+    Fichiers.ecrire(chemin, contenu)
+    S.executer('chmod +x ' .. S.q(chemin))
+    return chemin
+end
+
+local function fauxConnecteurEcran(reponse)
+    Fichiers.ecrire(reponseEcran, reponse)
+    return script('connecteur-ecran', '#!/bin/sh\n[ "$#" -eq 1 ] && [ "$1" = "--ecran" ] || { echo "option refusée : $*" >&2; exit 2; }\n'
+        .. 'cat ' .. S.q(reponseEcran) .. '\n')
+end
+
+local function connecteurAncien()
+    return script('connecteur-1.1.1', '#!/bin/sh\necho "option inconnue : $1" >&2\n'
+        .. "printf 'mcp-developpeur 1.1.1 — MCP-Développeur\\n\\nUsage : mcp-developpeur --status\\n'\nexit 2\n")
+end
+
+-- Les réponses de --ecran : un écran d'usine (relevé sur le Mac de Dany), un écran mesuré par une
+-- sonde, un profil personnalisé (mesure null), aucun écran.
+local ECRAN_USINE = [[{"autres":[],"detail":"Écran principal : Odyssey G85SD (gamut large).\nProfil de couleur : « Odyssey G85SD », le profil d'usine de l'écran, non mesuré sur ce Mac.","principal":{"chemin":"/Library/ColorSync/Profiles/Displays/Odyssey G85SD-60EC80AD.icc","etalonnage":"usine","gamut_large":true,"integre":false,"mesure":false,"nom":"Odyssey G85SD","profil":"Odyssey G85SD","texte":"Odyssey G85SD · profil d'usine, non mesuré sur ce Mac"}}
+]]
+local ECRAN_SONDE = [[{"autres":[],"detail":"Écran principal : ColorEdge CS2400S.\nProfil de couleur : « CS2400S D65 », mesuré par une sonde (DisplayCAL), profil du 3 mars 2026.","principal":{"etalonnage":"sonde","mesure":true,"logiciel":"DisplayCAL","nom":"ColorEdge CS2400S","texte":"ColorEdge CS2400S · profil mesuré par une sonde (DisplayCAL), du 3 mars 2026"}}
+]]
+local ECRAN_DOUTE = [[{"autres":[],"principal":{"etalonnage":"personnalise","mesure":null,"nom":"DELL U2723QE","texte":"DELL U2723QE · profil personnalisé « Mon profil », sans trace d'une sonde"}}
+]]
+
+-- Un faux Claude Code connecté (`claude auth status`), qui ne lit rien sur son entrée.
+local function claudeConnecte()
+    return script('claude-connecte', '#!/bin/sh\n[ "$1" = auth ] && [ "$2" = status ] && echo \'{"loggedIn":true,"authMethod":"claude.ai"}\'\n')
+end
+
+-- Ce que rend Lightroom.etatEcran : une table neuve de textes, sans le chemin du profil.
+local function verifierEcran(ecran, texte, etat, quoi)
+    S.neuve(ecran, quoi)
+    egal(texte, ecran.texte, quoi .. ' : texte')
+    egal(etat, ecran.etat, quoi .. ' : état')
+    vrai(type(ecran.detail) == 'string' and ecran.detail ~= '', quoi .. ' : détail')
+    for cle, valeur in pairs(ecran) do
+        vrai(type(valeur) == 'string' or type(valeur) == 'boolean', quoi .. ' : ' .. cle .. ' de type ' .. type(valeur))
+    end
+end
+
+essai('Écran : lu par le connecteur (--ecran, 5 s au plus) ; absent ou ancien, voyant gris sans erreur', function()
+    local Lightroom = require 'Lightroom'
+    local faux = fauxConnecteurEcran(ECRAN_USINE)
+    local avant = #(S.dernieresCommandes or {})
+    local ecran = Lightroom.etatEcran(faux)
+    verifierEcran(ecran, 'Écran · non étalonné', 'attention', 'usine')
+    egal(true, ecran.lu)
+    vrai(ecran.detail:find("le profil d'usine de l'écran, non mesuré sur ce Mac", 1, true), ecran.detail)
+    egal(avant + 1, #S.dernieresCommandes, 'une commande du système')
+    local commande = S.dernieresCommandes[#S.dernieresCommandes]
+    vrai(commande:find("alarm 5", 1, true) and commande:find(S.q(faux) .. ' --ecran >', 1, true), commande)
+    -- Le fichier de sortie est retiré.
+    local restes = S.lireCommande('ls ' .. S.q(Chemins.temporaire()) .. ' 2>/dev/null')
+    vrai(not restes:find('ecran%-'), 'sortie de --ecran laissée : ' .. restes)
+
+    Fichiers.ecrire(reponseEcran, ECRAN_SONDE)
+    ecran = Lightroom.etatEcran(faux)
+    verifierEcran(ecran, 'Écran · étalonné', 'ok', 'sonde')
+    vrai(ecran.detail:find('mesuré par une sonde (DisplayCAL)', 1, true), ecran.detail)
+
+    -- mesure null (Json.decode efface la clé) : « étalonné ? », et le texte de l'écran pour détail.
+    Fichiers.ecrire(reponseEcran, ECRAN_DOUTE)
+    ecran = Lightroom.etatEcran(faux)
+    verifierEcran(ecran, 'Écran · étalonné ?', 'neutre', 'personnalisé')
+    vrai(ecran.detail:find('sans trace d\'une sonde', 1, true), ecran.detail)
+
+    -- Aucun écran lu (session sans écran) : gris, et dit tel quel.
+    Fichiers.ecrire(reponseEcran, '{"lu":false}\n')
+    ecran = Lightroom.etatEcran(faux)
+    verifierEcran(ecran, 'Écran', 'neutre', 'aucun écran')
+    egal(false, ecran.lu)
+    egal(Lightroom.ECRAN_AUCUN, ecran.detail)
+
+    -- Réponse vide ou coupée (alarme de 5 s) : gris, « pas répondu dans les 5 s », jamais
+    -- « introuvable » (le connecteur est là).
+    Fichiers.ecrire(reponseEcran, '{"principal":{"mesure":fa')
+    ecran = Lightroom.etatEcran(faux)
+    verifierEcran(ecran, 'Écran', 'neutre', 'réponse coupée')
+    egal(Lightroom.ECRAN_ILLISIBLE, ecran.detail, 'réponse coupée : détail')
+    vrai(not ecran.detail:find('introuvable', 1, true), ecran.detail)
+    -- Une commande du système en échec : gris, sans erreur.
+    local executer = S.modules.LrTasks.execute
+    S.modules.LrTasks.execute = function() error('commande impossible') end
+    local okPanne, enPanne = pcall(Lightroom.etatEcran, faux)
+    S.modules.LrTasks.execute = executer
+    vrai(okPanne, tostring(enPanne))
+    verifierEcran(enPanne, 'Écran', 'neutre', 'commande en échec')
+    egal(Lightroom.ECRAN_ILLISIBLE, enPanne.detail, 'commande en échec : détail')
+
+    -- Connecteur 1.1.1 (son aide sur stdout) : gris, « plus ancien que la 1.2 ».
+    ecran = Lightroom.etatEcran(connecteurAncien())
+    verifierEcran(ecran, 'Écran', 'neutre', 'connecteur 1.1.1')
+    egal(Lightroom.ECRAN_ILLISIBLE, ecran.detail, 'connecteur 1.1.1 : détail')
+    vrai(ecran.detail:find('plus ancien que la 1.2', 1, true), ecran.detail)
+    -- Connecteur introuvable : gris, « introuvable », et rien n'est lancé.
+    avant = #S.dernieresCommandes
+    ecran = Lightroom.etatEcran(S.home .. '/introuvable/mcp-developpeur')
+    verifierEcran(ecran, 'Écran', 'neutre', 'connecteur introuvable')
+    egal(false, ecran.lu)
+    egal(Lightroom.ECRAN_INTROUVABLE, ecran.detail)
+    vrai(not ecran.detail:find('plus ancien', 1, true), ecran.detail)
+    egal(avant, #S.dernieresCommandes, 'rien lancé sans connecteur')
+    ecran = Lightroom.etatEcran(nil)
+    verifierEcran(ecran, 'Écran', 'neutre', 'sans chemin')
+    egal(Lightroom.ECRAN_INTROUVABLE, ecran.detail, 'sans chemin : détail')
+    verifierEcran(Lightroom.decrireEcran({ principal = 'texte' }), 'Écran', 'neutre', 'principal illisible')
+end)
+
+essai("Fenêtre : le voyant Écran, lu à l'ouverture ; un clic le relit et donne son détail, sans envoyer la demande", function()
+    S.photoActive = S.photo(53636309, 'DSCF4961.RAF')
+    S.selection = { S.photoActive }
+    local prefs = Chemins.prefs()
+    local connecteur, claude = prefs.cheminConnecteur, prefs.cheminClaude
+    local construite = false
+    S.pendantFenetre = function(args)
+        construite = true
+        local p = Fenetre.p
+        egal('Écran', p.texteEcran)
+        egal('neutre', p.etatEcran)
+        -- Quatre voyants, l'écran en dernier, chacun à la largeur des voyants.
+        local voyants, voyant = {}, nil
+        parcourir(args.contents, function(v)
+            local t = v.args.title
+            if v.genre == 'static_text' and type(t) == 'table' and t.liaison
+                and (t.key == 'texteClaude' or t.key == 'texteLightroom' or t.key == 'texteMode' or t.key == 'texteEcran') then
+                voyants[#voyants + 1] = t.key
+                egal(Fenetre.T.voyant, v.args.width, t.key)
+                if t.key == 'texteEcran' then
+                    voyant = v
+                end
+            end
+        end)
+        egal('texteClaude texteLightroom texteMode texteEcran', table.concat(voyants, ' '))
+        vrai(voyant and voyant.args.mouse_down and voyant.args.tooltip:find('profil de couleur', 1, true), "voyant de l'écran cliquable")
+        -- À l'ouverture (Fenetre.verifier(true)) : l'écran d'usine du Mac de Dany, non étalonné.
+        prefs.cheminConnecteur = fauxConnecteurEcran(ECRAN_USINE)
+        prefs.cheminClaude = claudeConnecte()
+        Fenetre.verifier(true)
+        egal('ok', p.etatClaude, 'faux Claude Code connecté')
+        egal('Écran · non étalonné', p.texteEcran)
+        egal('attention', p.etatEcran)
+        vrai(not p.aide:find('cran', 1, true), "l'écran n'est pas une aide du bandeau : " .. p.aide)
+        -- Toutes les 2 s, l'écran ne se relit pas.
+        local commandes = #S.dernieresCommandes
+        Fenetre.periodique()
+        for i = commandes + 1, #S.dernieresCommandes do
+            vrai(not S.dernieresCommandes[i]:find('--ecran', 1, true), "l'écran relu toutes les 2 s")
+        end
+        -- Un clic : la demande validée par ce clic ne part pas ; l'écran se relit dans une tâche (un
+        -- autre a pu être branché), puis la boîte « Claude · écran » donne son détail.
+        Fichiers.ecrire(reponseEcran, ECRAN_SONDE)
+        p.saisie = 'Texte validé par le clic'
+        vrai(Fenetre.envoiAuto, 'envoi prévu')
+        local taches, messages = #S.taches, #S.messages
+        voyant.args.mouse_down()
+        egal(nil, Fenetre.envoiAuto, "le clic du voyant annule l'envoi automatique")
+        egal(taches + 1, #S.taches, 'relu dans une tâche')
+        S.taches[#S.taches]()
+        egal(messages + 1, #S.messages, 'une boîte')
+        egal('Claude · écran', S.messages[#S.messages][1])
+        vrai(S.messages[#S.messages][2]:find('mesuré par une sonde (DisplayCAL)', 1, true), S.messages[#S.messages][2])
+        egal('Écran · étalonné', p.texteEcran)
+        egal('ok', p.etatEcran)
+        -- Un connecteur d'avant la 1.2 : gris, sans erreur ; le clic dit pourquoi.
+        prefs.cheminConnecteur = connecteurAncien()
+        Fenetre.verifier(true)
+        egal('Écran', p.texteEcran)
+        egal('neutre', p.etatEcran)
+        voyant.args.mouse_down()
+        S.taches[#S.taches]()
+        vrai(S.messages[#S.messages][2]:find('plus ancien que la 1.2', 1, true), S.messages[#S.messages][2])
+        p.saisie = ''
+    end
+    local ok, erreur = pcall(Fenetre.afficher)
+    prefs.cheminConnecteur, prefs.cheminClaude = connecteur, claude
+    S.pendantFenetre = nil
+    Fenetre.ouverte = false
+    assert(ok, erreur)
+    vrai(construite, 'fenêtre construite')
+end)
+
+-- Jeton de la liaison (1.2) --------------------------------------------------------------------
+
+essai("Fenêtre : voyant Lightroom, une erreur du jeton privé de la liaison a sa propre aide", function()
+    local Liaison = require 'Liaison'
+    local construite = false
+    S.pendantFenetre = function()
+        construite = true
+        local p = Fenetre.p
+        Liaison.actif, Liaison.erreur = true, 'jeton de la liaison : aléa du système illisible (/dev/urandom)'
+        Fenetre.verifier(false)
+        egal('Lightroom · liaison en erreur', p.texteLightroom)
+        egal('erreur', p.etatLightroom)
+        vrai(Fenetre.aideLiaison:find('jeton privé', 1, true) and Fenetre.aideLiaison:find('/dev/urandom', 1, true), Fenetre.aideLiaison)
+        vrai(Fenetre.aideLiaison:find('module.log', 1, true), Fenetre.aideLiaison)
+        vrai(not Fenetre.aideLiaison:find('un autre Lightroom', 1, true), Fenetre.aideLiaison)
+        vrai(p.aide:find('jeton privé', 1, true), p.aide)
+        -- Une autre erreur garde l'aide des ports tenus par un autre Lightroom.
+        Liaison.erreur = 'adresse déjà utilisée'
+        Fenetre.verifier(false)
+        vrai(Fenetre.aideLiaison:find('un autre Lightroom', 1, true) and not Fenetre.aideLiaison:find('jeton', 1, true), Fenetre.aideLiaison)
+        Liaison.actif, Liaison.erreur = false, nil
+    end
+    local ok, erreur = pcall(Fenetre.afficher)
+    Liaison.actif, Liaison.erreur = false, nil
+    S.pendantFenetre = nil
+    Fenetre.ouverte = false
+    assert(ok, erreur)
+    vrai(construite, 'fenêtre construite')
+end)
+
+essai('Relais : connecteur.json et relais.sh ne portent jamais le jeton de la liaison', function()
+    local config = Session.configMCP('/x/mcp-developpeur')
+    vrai(not config:find('jeton', 1, true) and not config:find('env', 1, true), config)
+    egal('/x/mcp-developpeur', Json.decode(config).mcpServers[Session.SERVEUR].command)
+    local relais = Fichiers.lire(S.plugin .. '/relais.sh')
+    vrai(relais and relais ~= '' and not relais:find('jeton', 1, true), 'relais.sh ne passe aucun jeton')
 end)
 
 -- Vérifie l'arbre d'une fenêtre : vues et propriétés connues du SDK, liaisons avec une valeur,
