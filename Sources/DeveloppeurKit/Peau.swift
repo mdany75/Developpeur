@@ -69,18 +69,23 @@ public enum Peau {
     // MARK: Garde-fou
 
     /// Vrai si le masque lisse de la peau : son premier composant est la peau (person_part ou person,
-    /// part face_skin ou body_skin), non inversé ; ou l'un de ses composants combinés l'est, ajouté ou
-    /// intersecté, non inversé. Un composant soustrait ou inversé ne compte pas (il retire la peau),
-    /// ni un masque Sujet ou Personne entière.
+    /// part face_skin ou body_skin), non inversé ; ou l'un de ses composants combinés la garde : la
+    /// peau ajoutée ou intersectée, non inversée, ou la peau inversée soustraite (A − non B = A ∩ B,
+    /// comme Lightroom range une intersection : Locaux.combiner). La peau soustraite, ou inversée puis
+    /// ajoutée ou intersectée, la retire ; un masque Sujet ou Personne entière ne compte pas.
     static func surLaPeau(_ masque: [String: JSONValue]) -> Bool {
         func peau(_ zone: [String: JSONValue]) -> Bool {
-            ["person_part", "person"].contains(zone["kind"]?.string ?? "")
-                && parties.contains(zone["part"]?.string ?? "") && zone["invert"]?.bool != true
+            ["person_part", "person"].contains(zone["kind"]?.string ?? "") && parties.contains(zone["part"]?.string ?? "")
         }
-        if peau(masque) { return true }
+        if peau(masque) && masque["invert"]?.bool != true { return true }
         return (masque["combine"]?.array ?? []).contains { composant in
-            guard let objet = composant.object else { return false }
-            return ["add", "intersect"].contains(objet["mode"]?.string ?? "") && peau(objet)
+            guard let objet = composant.object, peau(objet) else { return false }
+            let inverse = objet["invert"]?.bool == true
+            switch objet["mode"]?.string {
+            case "add", "intersect": return !inverse
+            case "subtract": return inverse
+            default: return false
+            }
         }
     }
 

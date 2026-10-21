@@ -148,8 +148,13 @@ final class PeauTests: XCTestCase {
                                            "combine": [["mode": "intersect", "kind": "person_part", "part": "face_skin"]]]),
             ("ajout de la peau", ["kind": "subject", "adjustments": ["Texture": -40],
                                   "combine": [["mode": "add", "kind": "person_part", "part": "body_skin"]]]),
+            // Soustraire la peau inversée, c'est l'intersecter (la description d'invert le dit).
+            ("soustraction de la peau inversée", ["kind": "subject", "adjustments": ["Clarity": -50],
+                                                  "combine": [["mode": "subtract", "kind": "person_part", "part": "face_skin", "invert": true]]]),
             ("netteté négative", ["kind": "person_part", "part": "face_skin", "adjustments": ["Sharpness": -10]]),
             ("intensité comprise", ["kind": "person_part", "part": "face_skin", "adjustments": ["Texture": -71], "amount": 50]),
+            // L'effet et ses réglages remplacés comptent ensemble : clarté −30 au lieu de −10.
+            ("effet renforcé", ["kind": "person_part", "part": "face_skin", "effect": "Peau du visage lisse", "adjustments": ["Clarity": -30]]),
             ("drapeau à false", ["kind": "person_part", "part": "face_skin", "adjustments": ["Clarity": -20], "smoothing_requested": false]),
         ]
         for (cas, donne) in refuses {
@@ -219,9 +224,18 @@ final class PeauTests: XCTestCase {
         XCTAssertTrue(Peau.auDessusDuDefaut(Peau.Dose(texture: -20, clarte: -12)))
         XCTAssertFalse(Peau.auDessusDuDefaut(Peau.parDefaut))
         XCTAssertEqual(Peau.chiffres(Peau.forte), "clarté −100, netteté +25")
+        // La dose réduite d'un effet : tout suit l'intensité, sauf la teinte d'une couleur (un angle).
+        XCTAssertEqual(ToolHandler.describe(["LocalTexture": -0.35, "LocalToningHue": 30, "LocalToningSaturation": 0.1], facteur: 0.5),
+                       "texture −17,5, couleur : teinte 30, couleur : saturation +5")
         XCTAssertTrue(Peau.surLaPeau(["kind": "person", "person": 2, "part": "body_skin"]))
         XCTAssertFalse(Peau.surLaPeau(["kind": "person", "person": 2]), "personne entière : pas couverte")
         XCTAssertFalse(Peau.surLaPeau(["kind": "subject", "combine": [["mode": "subtract", "kind": "person_part", "part": "face_skin"]]]))
+        XCTAssertTrue(Peau.surLaPeau(["kind": "subject", "combine": [["mode": "subtract", "kind": "person", "person": 1, "part": "face_skin", "invert": true]]]),
+                      "A − non B = A ∩ B, comme Locaux.combiner")
+        XCTAssertFalse(Peau.surLaPeau(["kind": "subject", "combine": [["mode": "add", "kind": "person_part", "part": "face_skin", "invert": true]]]),
+                       "ajouter tout sauf la peau ne lisse pas la peau")
+        XCTAssertTrue(Peau.surLaPeau(["kind": "person_part", "part": "face_skin", "combine": [["mode": "subtract", "kind": "radial"]]]),
+                      "la peau du visage, moins une zone : toujours la peau")
     }
 
     // MARK: Ce que Claude lit
