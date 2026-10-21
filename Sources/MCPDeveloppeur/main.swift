@@ -64,12 +64,15 @@ func usage() {
                 (au point de mise au point aussi), bruit, boîtier, géométrie, puis les défauts que view_photo
                 noterait ; lecture seule (aperçus comme view_photo, rien n'est noté au carnet) ; un fichier JPEG se
                 mesure sans Lightroom
-            mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--original] [--images <dossier>]
+            mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--horizon <id> [--hauteur-horizon <0 à 1>]] [--original] [--images <dossier>]
                 recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
                 (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
                 garde les étapes de la recette ; d'abord la liaison fermée et l'écran nommé, en lecture seule.
+                Le RAW passe aussi par la 1.3 : avant/après d'une étape, leçon, carnet de progrès (copie d'essai
+                notée puis retirée), « Je le fais ».
                 --portrait : la peau dosée sur un portrait ; --mixte : une photo à deux lumières (lampe et fenêtre)
-                lue mixte, puis le RAW lu à une seule lumière, en lecture seule
+                lue mixte, puis le RAW lu à une seule lumière, en lecture seule ; --horizon : une photo qui a un
+                horizon (la dune), pour la composition lue, à --hauteur-horizon dans l'image (0,5 par défaut)
     Les commandes portent le jeton privé de la liaison (liaison.jeton, écrit par le module à chaque démarrage
     de la liaison) ; le serveur ne le crée jamais et ne le dit jamais.
     DEVELOPPEUR_PORT=<port> change le port des commandes (les réponses sur le port suivant ;
@@ -339,7 +342,8 @@ case "--module":
         exit(1)
     }
 case "--recette":
-    var raw: Int?, jpeg: Int?, flash: Int?, profondeur: Int?, yeuxRouges: Int?, xt20: Int?, portrait: Int?, mixte: Int?
+    var raw: Int?, jpeg: Int?, flash: Int?, profondeur: Int?, yeuxRouges: Int?, xt20: Int?, portrait: Int?, mixte: Int?, horizon: Int?
+    var hauteurHorizon: Double?
     var images: URL?, originaux = false
     var rest = Array(arguments.dropFirst())
     while !rest.isEmpty {
@@ -353,6 +357,14 @@ case "--recette":
         case "--x-t20": xt20 = Int(next())
         case "--portrait": portrait = Int(next())
         case "--mixte": mixte = Int(next())
+        case "--horizon": horizon = Int(next())
+        case "--hauteur-horizon":
+            // La virgule française comme le point.
+            guard let y = Double(next().replacingOccurrences(of: ",", with: ".")), (0.05...0.95).contains(y) else {
+                log("--hauteur-horizon : la hauteur de l'horizon dans l'image, de 0,05 à 0,95 depuis le haut")
+                exit(2)
+            }
+            hauteurHorizon = y
         case "--images": images = URL(fileURLWithPath: next())
         case "--original": originaux = true
         default:
@@ -360,20 +372,25 @@ case "--recette":
             raw = id
         }
     }
-    guard [raw, jpeg, flash, profondeur, yeuxRouges, xt20, portrait, mixte].contains(where: { $0 != nil }) else { usage(); exit(2) }
+    guard [raw, jpeg, flash, profondeur, yeuxRouges, xt20, portrait, mixte, horizon].contains(where: { $0 != nil }) else { usage(); exit(2) }
+    if hauteurHorizon != nil, horizon == nil { log("--hauteur-horizon va avec --horizon <id>"); usage(); exit(2) }
     let folder = images ?? FileManager.default.temporaryDirectory.appendingPathComponent("recette-mcp-developpeur-\(Int(Date().timeIntervalSince1970))")
     print(line: originaux
         ? "Recette de MCP-Développeur \(ServerInfo.version) : originaux acceptés (--original), chaque photo remise à l'origine à la fin."
         : "Recette de MCP-Développeur \(ServerInfo.version) : copies virtuelles seulement, chacune remise à l'origine à la fin.")
     print(line: "Images à regarder : \(folder.path)")
+    if horizon == nil {
+        print(line: "Sans --horizon : la composition lue (1.3) n'est pas vérifiée (une photo qui a un horizon, comme la dune).")
+    }
     let recette = Recette(lightroom: LightroomBridge.fromEnvironment(), images: folder, originaux: originaux) { etape in
         let seconds = String(format: "%.1f", etape.duree).replacingOccurrences(of: ".", with: ",")
         print(line: "\(etape.reussie ? "✔" : "✘") \(etape.photo) · \(etape.nom) — \(etape.detail) (\(seconds) s)")
     }
     // L'étape « écran nommé » lit l'écran du Mac (la recette n'en lit aucun par défaut).
     recette.lireEcran = Ecran.lire
+    if let hauteurHorizon { recette.hauteurHorizon = hauteurHorizon }
     recette.lancer(raw: raw, jpeg: jpeg, flash: flash, profondeur: profondeur, yeuxRouges: yeuxRouges, xt20: xt20,
-                   portrait: portrait, mixte: mixte)
+                   portrait: portrait, mixte: mixte, horizon: horizon)
     let failures = recette.etapes.filter { !$0.reussie }.count
     print(line: failures == 0 ? "Recette réussie : \(recette.etapes.count) étapes." : "Recette en échec : \(failures) étape(s) sur \(recette.etapes.count).")
     exit(recette.reussie ? 0 : 1)
