@@ -245,6 +245,9 @@ public enum Eclairage {
     /// Peau : L* de 25 à 92, C* de 6 à 50, pixels non écrêtés.
     static let peauLumineux = 25.0...92.0
     static let peauChroma = 6.0...50.0
+    /// Pixels de peau au moins pour la lire. Provisoire, à relever (visages de 53709912 et
+    /// 53709833).
+    static let pixelsMinPeau = 20
     /// Pixels de l'anneau à moins de cette distance a*b* de la peau (cou, mains) : écartés.
     static let distancePeau = 10.0
     /// Anneau lu à partir de 100 px et 3 % de tons neutres ; sinon la case du visage.
@@ -318,12 +321,16 @@ public enum Eclairage {
             !ecarte[i] && chroma[i] < chromaMax && l[i] >= Eclairage.lumineuxMin && l[i] <= Eclairage.lumineuxMax
         }
 
-        /// Pixels d'un cadre (fractions de l'image, depuis le haut gauche), bornés à l'image.
+        /// Pixels d'un cadre (fractions de l'image, depuis le haut gauche), bornés à l'image ; nil
+        /// pour un cadre vide, hors de l'image ou non fini. Les fractions sont bornées avant la
+        /// conversion en entier, qui planterait sur un cadre infini (`CGRect.null`) ou démesuré.
         func plage(_ cadre: CGRect) -> (x: Range<Int>, y: Range<Int>)? {
-            let x0 = max(0, Int((Double(cadre.minX) * Double(largeur)).rounded(.down)))
-            let x1 = min(largeur, Int((Double(cadre.maxX) * Double(largeur)).rounded(.up)))
-            let y0 = max(0, Int((Double(cadre.minY) * Double(hauteur)).rounded(.down)))
-            let y1 = min(hauteur, Int((Double(cadre.maxY) * Double(hauteur)).rounded(.up)))
+            guard Eclairage.fini(cadre) else { return nil }
+            func borne(_ part: CGFloat) -> Double { min(max(Double(part), 0), 1) }
+            let x0 = Int((borne(cadre.minX) * Double(largeur)).rounded(.down))
+            let x1 = Int((borne(cadre.maxX) * Double(largeur)).rounded(.up))
+            let y0 = Int((borne(cadre.minY) * Double(hauteur)).rounded(.down))
+            let y1 = Int((borne(cadre.maxY) * Double(hauteur)).rounded(.up))
             guard x1 > x0, y1 > y0 else { return nil }
             return (x0..<x1, y0..<y1)
         }
@@ -381,7 +388,17 @@ public enum Eclairage {
         cadre.insetBy(dx: -cadre.width * CGFloat(margeVisage), dy: -cadre.height * CGFloat(margeVisage))
     }
 
-    static func mesurer(_ p: PixelsLab, visages cadres: [CGRect], sujet: CGRect?, chromaMax: Double) -> MesureEclairage {
+    /// Un cadre utilisable : fini et non vide (ni `CGRect.null`, ni NaN).
+    static func fini(_ cadre: CGRect) -> Bool {
+        !cadre.isNull && !cadre.isInfinite
+            && [cadre.minX, cadre.minY, cadre.width, cadre.height].allSatisfy { $0.isFinite }
+            && cadre.width > 0 && cadre.height > 0
+    }
+
+    static func mesurer(_ p: PixelsLab, visages: [CGRect], sujet: CGRect?, chromaMax: Double) -> MesureEclairage {
+        // Un cadre non fini ne se mesure pas (et ferait planter la conversion des positions).
+        let cadres = visages.filter(fini)
+        let sujet = sujet.flatMap { fini($0) ? $0 : nil }
         let w = p.largeur, h = p.hauteur, total = w * h
         // Les visages (agrandis) hors des cases et des zones tonales.
         var exclus = [Bool](repeating: false, count: total)
@@ -454,7 +471,7 @@ public enum Eclairage {
                         ls.append(p.l[i]); as_.append(p.a[i]); bs.append(p.b[i])
                     }
                 }
-                if ls.count >= 20 {
+                if ls.count >= pixelsMinPeau {
                     let a = mediane(as_), b = mediane(bs)
                     visage.peau = MesureEclairage.Peau(l: mediane(ls), a: a, b: b, teinte: atan2(b, a) * 180 / .pi)
                 }
@@ -480,8 +497,8 @@ public enum Eclairage {
                 }
             }
             if visage.lumiere == nil {
-                let cx = min(w - 1, max(0, Int(Double(cadre.midX) * Double(w))))
-                let cy = min(h - 1, max(0, Int(Double(cadre.midY) * Double(h))))
+                let cx = min(w - 1, Int(min(max(Double(cadre.midX), 0), 1) * Double(w)))
+                let cy = min(h - 1, Int(min(max(Double(cadre.midY), 0), 1) * Double(h)))
                 if let region = regions[ligne[cy] * 3 + colonne[cx]] {
                     visage.lumiere = region
                     visage.source = "case"
@@ -679,7 +696,11 @@ extension Eclairage {
             if let zone = vision?.salientArea {
                 ligneVision += " ; zone d'intérêt x \(e(Double(zone.minX), 2)) y \(e(Double(zone.minY), 2)) l \(e(Double(zone.width), 2)) h \(e(Double(zone.height), 2))"
             }
-            ligneVision += " ; scène : " + scene(photo.image).map { "\($0.0) \(e($0.1, 2))" }.joined(separator: " · ")
+            if let scenes = scene(photo.image) {
+                ligneVision += " ; scène : " + scenes.map { "\($0.0) \(e($0.1, 2))" }.joined(separator: " · ")
+            } else {
+                ligneVision += " ; scène non lue (Vision)"
+            }
             dire(ligneVision)
 
             guard let pixels = pixelsLab(photo.image) else {
@@ -760,10 +781,12 @@ extension Eclairage {
         guard let data = capture.apercu ?? images.first, let image = PreviewImages.image(data) else {
             throw LightroomError.plugin("aperçu de la proposition illisible")
         }
-        // La balance de l'aperçu : celle de l'essai, sur celle de la photo.
+        // La balance de l'aperçu : celle de l'essai, sur celle de la photo. Inconnue si l'essai la
+        // fait calculer (white_balance, white_balance_point) ou peut la changer (un paramètre
+        // prédéfini, posé avant les réglages) : pas de balance qui neutralise la lumière du sujet.
         var reglages = lue["reglages"]?.object ?? [:]
         let relative = essai["relative"]?.bool == true
-        var balanceConnue = essai["white_balance"] == nil && essai["white_balance_point"] == nil
+        var balanceConnue = ["white_balance", "white_balance_point", "preset"].allSatisfy { essai[$0] == nil }
         for cle in ["Temperature", "Tint"] {
             guard let valeur = essai["settings"]?[cle]?.double else { continue }
             if relative {
@@ -785,10 +808,10 @@ extension Eclairage {
                         image: image, reponse: balanceConnue ? .object(reponse) : nil)
     }
 
-    /// Confiance de Vision pour les scènes de `scenesReleve`.
-    static func scene(_ image: CGImage) -> [(String, Double)] {
+    /// Confiance de Vision pour les scènes de `scenesReleve` ; nil si Vision échoue.
+    static func scene(_ image: CGImage) -> [(String, Double)]? {
         let requete = VNClassifyImageRequest()
-        guard (try? VNImageRequestHandler(cgImage: image, options: [:]).perform([requete])) != nil else { return [] }
+        guard (try? VNImageRequestHandler(cgImage: image, options: [:]).perform([requete])) != nil else { return nil }
         var confiances: [String: Double] = [:]
         for observation in requete.results ?? [] { confiances[observation.identifier] = Double(observation.confidence) }
         return scenesReleve.map { ($0, confiances[$0] ?? 0) }

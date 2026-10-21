@@ -16,17 +16,7 @@ final class EclairageTests: XCTestCase {
     /// Image de synthèse sans compression : chaque pixel prend la couleur donnée pour (x, y), depuis
     /// le coin haut gauche.
     static func image(width: Int = 300, height: Int = 200, _ couleur: (Int, Int) -> Couleur) -> CGImage {
-        var pixels = [UInt8](repeating: 255, count: width * height * 4)
-        for y in 0..<height {
-            for x in 0..<width {
-                let i = (y * width + x) * 4
-                (pixels[i], pixels[i + 1], pixels[i + 2]) = couleur(x, y)
-            }
-        }
-        return pixels.withUnsafeMutableBytes { buffer -> CGImage in
-            CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!.makeImage()!
-        }
+        TestSupport.imagePixels(width: width, height: height, couleur)
     }
 
     static func lab(_ c: Couleur) -> (l: Double, a: Double, b: Double) { Measurements.lab(c.0, c.1, c.2) }
@@ -169,14 +159,42 @@ final class EclairageTests: XCTestCase {
         XCTAssertEqual(centre.b, Self.lab(Self.fenetre).b, accuracy: 1, "la case du visage n'est pas tirée vers la peau")
         XCTAssertEqual(mesure.sujetSource, "visages")
         XCTAssertEqual(try XCTUnwrap(mesure.lumiereSujet).b, Self.lab(Self.fenetre).b, accuracy: 1)
+        // La lumière froide autour du visage, le fond chaud : deux lumières, le visage dans la froide.
+        XCTAssertTrue(mesure.mixte, mesure.lecture)
+        XCTAssertEqual(visage.groupe, 1, "le groupe de la lumière plus froide (le second)")
+        XCTAssertTrue(mesure.lecture.hasSuffix("visages dans la lumière plus froide"), mesure.lecture)
 
         let json = mesure.json(balance: nil)
         XCTAssertEqual(json["visages"]?.array?.first?["lumiere_mesuree"], "autour du visage")
         XCTAssertNotNil(json["visages"]?.array?.first?["peau"]?["teinte_deg"])
-        if mesure.mixte {
-            XCTAssertNotNil(json["visages"]?.array?.first?["dans_la_lumiere"])
-            XCTAssertTrue(json["conseil"]?.string?.contains("lumière des visages") == true)
-        }
+        XCTAssertEqual(json["visages"]?.array?.first?["dans_la_lumiere"], "plus froide")
+        XCTAssertTrue(json["conseil"]?.string?.contains("lumière des visages") == true)
+        XCTAssertFalse(json["conseil"]?.string?.contains("zone d'intérêt") == true)
+    }
+
+    /// Un cadre non fini (CGRect.null, NaN) ou démesuré ne fait pas planter la mesure : sans la
+    /// garde, la conversion des positions en entiers s'arrête sur une erreur fatale.
+    func testUnCadreNonFiniNeFaitPasPlanter() throws {
+        let image = Self.tiersGauche(Self.lampe, reste: Self.fenetre)
+        let cadres = [CGRect.null, CGRect(x: .nan, y: 0.2, width: 0.2, height: 0.2),
+                      CGRect(x: .infinity, y: 0.2, width: 0.2, height: 0.2), CGRect(x: 1e300, y: 0.2, width: 0.2, height: 0.2)]
+        let mesure = try XCTUnwrap(Eclairage.mesurer(image, visages: cadres, sujet: .null))
+        XCTAssertTrue(mesure.mixte, "les cases se lisent comme sans visage")
+        XCTAssertEqual(mesure.visages.count, 1, "seul le cadre fini (même hors de l'image) reste")
+        XCTAssertEqual(mesure.visages.first?.source, "case", "hors de l'image : ni peau ni anneau, la case la plus proche")
+        XCTAssertNil(mesure.visages.first?.peau)
+        XCTAssertFalse(Eclairage.fini(CGRect(x: 0.1, y: 0.1, width: 0, height: 0.2)), "un cadre vide n'est pas mesuré")
+    }
+
+    /// Assez de cases lues, mais aucune partition ne laisse `partMinGroupe` % de chaque côté.
+    func testUneZonePortePresqueTout() {
+        let lue = MesureEclairage.Dominante(a: 0, b: 0, part: 50, pixels: 1000)
+        let mesure = MesureEclairage(tonales: [nil, lue, nil], regions: [lue, lue, lue] + [MesureEclairage.Dominante?](repeating: nil, count: 6),
+                                     groupes: [], ecartRegions: nil, ecartTonal: nil, visages: [], lumiereSujet: nil,
+                                     sujetSource: nil, borne: Eclairage.chromaMax)
+        XCTAssertFalse(mesure.mixte)
+        XCTAssertTrue(mesure.lecture.hasPrefix("une zone porte presque tous les tons neutres"), mesure.lecture)
+        XCTAssertNil(mesure.json(balance: (5000, 0))["conseil"])
     }
 
     /// Sans tons neutres autour du visage, sa lumière est celle de sa case.
@@ -343,7 +361,9 @@ final class EclairageTests: XCTestCase {
         XCTAssertEqual(fake.lastParams["taille"]?.int, ToolHandler.defaultPreviewSize, "la taille de view_photo")
         XCTAssertFalse(lignes.contains { $0.hasPrefix("✘") }, lignes.joined(separator: "\n"))
         XCTAssertTrue(lignes.contains { $0.contains("ESSAI.RAF") && $0.contains("Temperature 5000") })
-        XCTAssertTrue(lignes.contains { $0.contains("Vision :") && $0.contains("scène :") && $0.contains("interior_room") })
+        // Les scènes de Vision (ou, si Vision échoue sur la machine d'essai, qu'elles n'ont pas été lues).
+        XCTAssertTrue(lignes.contains { $0.contains("Vision :") && ($0.contains("scène : interior_room") || $0.contains("scène non lue")) },
+                      lignes.joined(separator: "\n"))
         for borne in Eclairage.bornesReleve {
             XCTAssertTrue(lignes.contains { $0.hasPrefix("  C* < \(Eclairage.nombre(borne)) :") }, "borne \(borne)")
         }
@@ -371,6 +391,33 @@ final class EclairageTests: XCTestCase {
         XCTAssertFalse(lignes.contains { $0.hasPrefix("✘") }, lignes.joined(separator: "\n"))
         XCTAssertTrue(lignes.contains { $0.contains("essai : Temperature 5000 → 3200") && $0.contains("Temperature 3200") },
                       lignes.joined(separator: "\n"))
+    }
+
+    /// La balance de l'aperçu sous un essai : celle de l'essai, ajoutée à celle de la photo s'il est
+    /// relatif ; inconnue s'il la fait calculer (pas de balance qui neutralise le sujet).
+    func testBalanceDeLEssai() throws {
+        func fake() -> FakeLightroom {
+            let fake = FakeLightroom()
+            fake.replies["reglages"] = ["photo": ["id": 7, "fichier": "ESSAI.RAF (Essai)", "copie_virtuelle": true],
+                                        "echelle_temperature": "kelvins (RAW : 2000 à 50000)", "reglages": ["Temperature": 5000, "Tint": 4]]
+            fake.onSend = { [unowned fake] command, _ in
+                if command == "essayer" {
+                    fake.replies["essayer"] = ["chemin": .string(TestSupport.previewFile(Self.apercuMixte())), "photo": ["id": 7]]
+                }
+            }
+            return fake
+        }
+        let relative = try Eclairage.apercu(id: 7, lightroom: fake(), essai: ["relative": true, "settings": ["Temperature": 300]])
+        XCTAssertEqual(relative.reponse?["reglages"]?["Temperature"], 5300)
+        XCTAssertEqual(relative.reponse?["reglages"]?["Tint"], 4, "la teinte de la photo reste")
+        XCTAssertEqual(relative.reponse?["echelle_temperature"], "kelvins (RAW : 2000 à 50000)")
+        let absolue = try Eclairage.apercu(id: 7, lightroom: fake(), essai: ["settings": ["Temperature": 3200, "Tint": -5]])
+        XCTAssertEqual(absolue.reponse?["reglages"]?["Temperature"], 3200)
+        XCTAssertEqual(absolue.reponse?["reglages"]?["Tint"], -5)
+        let automatique = try Eclairage.apercu(id: 7, lightroom: fake(), essai: ["white_balance": "auto"])
+        XCTAssertNil(automatique.reponse, "balance calculée par Lightroom : inconnue")
+        let prereglee = try Eclairage.apercu(id: 7, lightroom: fake(), essai: ["preset": "Chaud", "settings": ["Temperature": 3200]])
+        XCTAssertNil(prereglee.reponse, "un paramètre prédéfini peut changer la teinte")
     }
 
     func testReleveRefuseLEssaiSurUnOriginal() {

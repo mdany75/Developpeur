@@ -78,10 +78,9 @@ enum TestSupport {
         return output as Data
     }
 
-    /// JPEG dont chaque pixel prend la couleur donnée pour (x, y), depuis le coin haut gauche : un
-    /// aperçu de synthèse à plusieurs zones (deux lumières, un visage…).
-    static func jpegPixels(width: Int = 300, height: Int = 200, quality: Double = 1.0,
-                           _ couleur: (_ x: Int, _ y: Int) -> (UInt8, UInt8, UInt8)) -> Data {
+    /// Image sRGB sans compression dont chaque pixel prend la couleur donnée pour (x, y), depuis le
+    /// coin haut gauche : un aperçu de synthèse à plusieurs zones (deux lumières, un visage…).
+    static func imagePixels(width: Int = 300, height: Int = 200, _ couleur: (_ x: Int, _ y: Int) -> (UInt8, UInt8, UInt8)) -> CGImage {
         var pixels = [UInt8](repeating: 255, count: width * height * 4)
         for y in 0..<height {
             for x in 0..<width {
@@ -89,11 +88,16 @@ enum TestSupport {
                 (pixels[i], pixels[i + 1], pixels[i + 2]) = couleur(x, y)
             }
         }
-        let image = pixels.withUnsafeMutableBytes { buffer -> CGImage? in
+        return pixels.withUnsafeMutableBytes { buffer -> CGImage? in
             CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)?.makeImage()
         }!
-        return PreviewImages.jpeg(image, quality: quality)!
+    }
+
+    /// La même image en JPEG, comme les aperçus du module.
+    static func jpegPixels(width: Int = 300, height: Int = 200, quality: Double = 1.0,
+                           _ couleur: (_ x: Int, _ y: Int) -> (UInt8, UInt8, UInt8)) -> Data {
+        PreviewImages.jpeg(imagePixels(width: width, height: height, couleur), quality: quality)!
     }
 
     /// Écrit un aperçu dans son propre dossier temporaire, comme le module, et renvoie son chemin.
