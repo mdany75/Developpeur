@@ -7,7 +7,8 @@ couleurs, Tri assisté, Nouveautés et trois pages de dépannage. Les pages sont
 mots, pas recopiées. Pour chaque réglage, la clé du connecteur vient de
 `Sources/DeveloppeurKit/Catalogue.swift`, et le paramètre, de la description des outils ;
 « hors connecteur » veut dire que le connecteur ne sait pas le faire (revu pour Développeur 1.2,
-le 21 octobre 2026). Adobe refuse les lectures automatiques (`curl`, WebFetch : 403) : les pages se
+le 21 octobre 2026 ; l'ordre et les noms des panneaux, § 1, constatés à l'écran le même jour pour
+la 1.3). Adobe refuse les lectures automatiques (`curl`, WebFetch : 403) : les pages se
 relisent dans un navigateur.
 
 Des chiffres que l'aide ne donne pas viennent des fichiers livrés avec Lightroom Classic 15.6, lus
@@ -17,11 +18,23 @@ Lightroom ».
 
 ## 1. Ordre d'utilisation
 
-Adobe ne donne pas de marche à suivre complète. L'ordre des panneaux du module Développement
-(Réglages de base, Courbe, Mélangeur de couleurs, Color Grading, Détail, Flou de l'objectif,
-Correction de l'objectif, Transformation, Effets, Étalonnage) est un ordre d'affichage, que
-l'utilisateur peut changer, et non un ordre de travail. L'ordre ci-dessous réunit ce que les pages
-disent explicitement (marqué **Adobe**) et ce qu'on en déduit (le reste).
+Adobe ne donne pas de marche à suivre complète. L'ordre des panneaux du module Développement est
+un ordre d'affichage, que l'utilisateur peut changer, et non un ordre de travail. Constaté à
+l'écran le 21 octobre 2026 (Lightroom Classic 15.6 en français, panneau de droite, ordre par
+défaut) : Réglages de base, Courbe des tonalités, Mélangeur de couleurs, Color Grading (le nom
+anglais est gardé dans l'interface française), Détail, Corrections de l'objectif, Transformation,
+Flou de l'objectif (après Transformation, et non avant les corrections de l'objectif comme le
+laissait lire l'aide), Effets, Etalonnage (sans accent). Il n'y a pas de panneau Noir et blanc :
+le mélange des gris est une section du Mélangeur de couleurs, à la place de TSL sur une photo en
+noir et blanc. Le recadrage n'est pas un panneau mais un outil de la bande sous l'histogramme
+(Outil Recadrage, R), comme Suppression, Yeux rouges et Masquage ; les paramètres prédéfinis sont
+dans le panneau de gauche. Les sections de Réglages de base n'ont pas été relevées (panneau
+replié). « Je le fais » (1.3) donne ses réglages dans cet ordre et sous ces noms
+(`JeLeFais.panneaux`, seule copie), précédés des paramètres prédéfinis, avec la ligne du
+recadrage juste après Transformation : choisir un mode Upright remet le recadrage à zéro.
+
+L'ordre ci-dessous réunit ce que les pages disent explicitement (marqué **Adobe**) et ce qu'on en
+déduit (le reste).
 
 1. **Trier** : `cull_photos` (yeux fermés, rafales, piles), ou le tri assisté de Lightroom. Rien
    n'est supprimé sans l'utilisateur.
@@ -272,6 +285,12 @@ diffèrent entre RAW et non-RAW.
   perspective ou la distorsion manuelle ; posée par le SDK, Lightroom resserre le cadre (constaté).
 - Copie : « Mode Upright » (recalculé par photo, scènes différentes), « Transformations Upright »
   (identique, pour un bracketing), « Réglages Upright » (les curseurs).
+
+**Recadrage** (Outil Recadrage, un outil de la bande et non un panneau, constaté le 21 octobre
+2026). L'aide ne dit rien de la composition (tiers, horizon, espace devant le sujet) : c'est le
+connecteur qui la lit (`read_composition`, 1.3), sur l'image entière d'une photo déjà recadrée, et
+propose un cadre par `crop` (format, angle, taille, centre), montré avant d'être appliqué ; il
+vient après Upright, qui remet le recadrage à zéro (§ 1, point 7).
 
 **Champ plat** (Bibliothèque) : retire un vignetage asymétrique ou teinté à partir d'une image
 d'étalonnage prise avec la même optique ; produit des DNG ; une option supprime les originaux
