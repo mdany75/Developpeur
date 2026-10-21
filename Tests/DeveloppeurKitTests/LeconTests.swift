@@ -151,6 +151,23 @@ final class LeconTests: XCTestCase {
         XCTAssertNil(try Lecon.points(points(lumiere: ["axis": "light", "missing": "", "at_capture": "x"]).array!)[0].manque)
     }
 
+    /// Une moitié tient aussi dans les 600 octets que le module accepte (Carnet.LONGUEUR_TEXTE) :
+    /// trente émojis composés font trente caractères vus mais 750 octets. Refusée par l'outil, avant
+    /// tout envoi, plutôt que par le module (leçon non rangée).
+    func testHalfPointAlsoFitsTheModuleBytes() throws {
+        repondreJournal([])
+        let famille = String(repeating: "👨‍👩‍👧‍👦", count: 30)
+        XCTAssertEqual(famille.count, 30)
+        XCTAssertGreaterThan(famille.utf8.count, Lecon.octetsPoint)
+        let resultat = appeler(["points": points(lumiere: ["axis": "light", "missing": .string(famille), "at_capture": "x"])])
+        XCTAssertTrue(resultat.isError)
+        XCTAssertTrue(resultat.text.contains("« missing » trop long (750 octets, 600 au plus"), resultat.text)
+        XCTAssertTrue(resultat.text.contains("Rien n'a été rangé"), resultat.text)
+        XCTAssertTrue(fake.calls.isEmpty, "\(fake.commands)")
+        XCTAssertTrue(fake.lecons.isEmpty)
+        XCTAssertEqual(Lecon.octetsPoint, 600, "Carnet.LONGUEUR_TEXTE du module")
+    }
+
     /// Une clé inconnue d'un point est refusée à la main, avec son nom proche (parametresInconnus
     /// ne voit que le premier niveau).
     func testUnknownPointKeyIsRefusedWithItsNearName() {
@@ -266,6 +283,14 @@ final class LeconTests: XCTestCase {
         XCTAssertTrue(appliquee[1].exercice)
         // Un retour vide aussi l'exercice.
         XCTAssertTrue(Lecon.correctionsNettes([passe1, exercice, entree("retour", "Retour à l'état d'avant Claude")]).isEmpty)
+
+        // Une annulation qui porte l'identifiant d'un exercice ne le retire pas, et ne retire rien
+        // d'autre à sa place (ni la passe de même nom, ni la dernière).
+        let passeId = entree("retouche", "Claude · je le fais", [changement("Shadows2012", 0, 30)], id: "p1")
+        let exerciceId = entree("exercice", "Claude · je le fais", [changement("Exposure2012", 0, 0.8)], id: "x1")
+        let parId = Lecon.correctionsNettes([passeId, exerciceId, entree("annulation", "Annulation de « Claude · je le fais »", id: "x1")])
+        XCTAssertEqual(parId.map(\.cle), ["Shadows2012", "Exposure2012"])
+        XCTAssertTrue(parId[1].exercice)
     }
 
     // MARK: Indices
@@ -312,6 +337,13 @@ final class LeconTests: XCTestCase {
         XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: 0, apres: -9)], depart: nil)), [])
         XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: 5000, apres: 5399)], depart: nil)), [])
         XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Tint", avant: 0, apres: -10)], depart: nil)), ["color_cast"])
+        // Sans valeur d'avant, la balance de la prise de vue est inconnue : pas d'écart (0 → 5 000 K
+        // n'est pas une correction de 5 000 K).
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: .null, apres: 5000)], depart: nil)), [])
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Tint", avant: .null, apres: 25)], depart: nil)), [])
+        // Une autre clé sans valeur d'avant part de 0, la valeur par défaut du curseur.
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Exposure2012", avant: .null, apres: 0.7)], depart: nil)),
+                       ["underexposed"])
     }
 
     /// Les hautes lumières et les ombres ne comptent que si la vue de départ les montre (ou s'il n'y
@@ -355,6 +387,17 @@ final class LeconTests: XCTestCase {
                        [], "86 % : sous le seuil")
         XCTAssertEqual(indices(cadre + [Lecon.Correction(cle: "CropAngle", avant: 0, apres: 1.2)]), ["tilted_horizon"], "resserré par la rotation")
         XCTAssertEqual(indices(cadre + [Lecon.Correction(cle: "PerspectiveUpright", avant: 0, apres: 1)]), ["converging_verticals"])
+        // Toute géométrie touchée : Lightroom resserre le cadre lui-même (« Contraindre le
+        // recadrage »), même sous les seuils de l'horizon et des verticales.
+        for geometrie in [Lecon.Correction(cle: "CropAngle", avant: 0, apres: 0.3),
+                          Lecon.Correction(cle: "PerspectiveVertical", avant: 0, apres: -5),
+                          Lecon.Correction(cle: "PerspectiveHorizontal", avant: 0, apres: 4),
+                          Lecon.Correction(cle: "LensManualDistortionAmount", avant: 0, apres: 8),
+                          Lecon.Correction(cle: "CropConstrainToWarp", avant: 0, apres: 1)] {
+            XCTAssertEqual(indices(cadre + [geometrie]), [], geometrie.cle)
+        }
+        XCTAssertEqual(indices(cadre + [Lecon.Correction(cle: "LensProfileEnable", avant: 0, apres: 1)]), ["loose_framing"],
+                       "le profil d'objectif seul ne transforme pas l'image")
         XCTAssertEqual(indices([Lecon.Correction(cle: "CropLeft", avant: 0.2, apres: 0.1)]), [], "cadre élargi")
         XCTAssertEqual(indices([Lecon.Correction(cle: "Exposure2012", avant: "x", apres: .array([]))]), [], "valeurs illisibles")
     }
@@ -549,8 +592,10 @@ final class LeconTests: XCTestCase {
             XCTAssertLessThanOrEqual(indice.preuve.utf8.count, 400, indice.preuve)
             XCTAssertLessThanOrEqual(indice.defaut.libelle.utf8.count, 200)
         }
-        // 140 caractères accentués tiennent dans les 600 octets d'une moitié.
-        XCTAssertLessThanOrEqual(String(repeating: "é", count: Lecon.longueurPoint).utf8.count * 2, 600)
+        // 140 caractères accentués, ou d'un seul signe de quatre octets, tiennent dans les 600
+        // octets d'une moitié : la borne en octets ne gêne que les signes composés.
+        XCTAssertLessThanOrEqual(String(repeating: "é", count: Lecon.longueurPoint).utf8.count, Lecon.octetsPoint)
+        XCTAssertLessThanOrEqual(String(repeating: "📷", count: Lecon.longueurPoint).utf8.count, Lecon.octetsPoint)
     }
 
     // MARK: Les invites

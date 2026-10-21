@@ -13,9 +13,12 @@ import Foundation
 /// Vision et l'éclairage sous les yeux. Un indice que la leçon ne nomme pas donne une remarque,
 /// jamais un refus : un choix de style ou une intention du boîtier suivie n'est pas un défaut.
 enum Lecon {
-    /// Chaque moitié d'un point (missing, at_capture) : une phrase simple. Le module accepte 600
-    /// octets (Carnet.LONGUEUR_TEXTE) : 140 caractères y tiennent toujours.
+    /// Chaque moitié d'un point (missing, at_capture) : une phrase simple, en caractères vus
+    /// (String.count). Le module la borne en octets UTF-8 (Carnet.LONGUEUR_TEXTE, 600) : un
+    /// caractère vu peut en peser bien plus de quatre (émoji composé, lettres à accents combinés),
+    /// d'où la seconde borne, vérifiée ici avant tout envoi plutôt que refusée par le module.
     static let longueurPoint = 140
+    static let octetsPoint = 600
     /// Une preuve d'indice tient sur une ligne ; le module en accepte 400 octets.
     static let longueurPreuve = 160
 
@@ -101,7 +104,7 @@ enum Lecon {
     }
 
     /// Une moitié de point : nil si elle est absente ou vide après nettoyage ; refusée si ce n'est
-    /// pas un texte ou si elle dépasse `longueurPoint` caractères.
+    /// pas un texte, ou si elle dépasse `longueurPoint` caractères ou `octetsPoint` octets.
     static func moitie(_ p: Arguments, _ cle: String) throws -> String? {
         guard let valeur = p.raw[cle], !valeur.isNull else { return nil }
         guard let brut = valeur.string else { throw LightroomError.invalid("« \(cle) » : un texte, une phrase simple.") }
@@ -109,6 +112,9 @@ enum Lecon {
         guard !texte.isEmpty else { return nil }
         guard texte.count <= longueurPoint else {
             throw LightroomError.invalid("« \(cle) » trop long (\(texte.count) caractères, \(longueurPoint) au plus) : une phrase simple.")
+        }
+        guard texte.utf8.count <= octetsPoint else {
+            throw LightroomError.invalid("« \(cle) » trop long (\(texte.utf8.count) octets, \(octetsPoint) au plus : émojis ou signes composés) : une phrase simple, en lettres.")
         }
         return texte
     }
@@ -140,7 +146,8 @@ enum Lecon {
     /// - 'exercice' (« Je le fais ») aussi, mais ses valeurs sont la version de Claude, jamais
     ///   appliquée (`exercice`) ; aucune annulation ne la défait, faute d'avoir été appliquée ;
     /// - 'annulation' retire l'entrée de même etape_id, sinon la dernière dont l'étape est le nom
-    ///   entre « » (une mémoire sans identifiant, d'avant la 1.3), sinon la dernière ;
+    ///   entre « » (une mémoire sans identifiant, d'avant la 1.3), sinon la dernière ; jamais un
+    ///   exercice (un identifiant d'exercice ne retire rien) ;
     /// - 'retour' (revert_to_original) vide la pile.
     /// Les clés revenues à leur valeur d'avant sont retirées.
     static func correctionsNettes(_ entrees: [JSONValue]) -> [Correction] {
@@ -160,7 +167,9 @@ enum Lecon {
                                    changements: objet["changements"]?.array ?? []))
             case "annulation":
                 if let id = identifiant(objet["etape_id"]), let i = pile.lastIndex(where: { $0.id == id }) {
-                    pile.remove(at: i)
+                    // L'identifiant désigne l'entrée : un exercice, jamais appliqué, reste ; rien
+                    // d'autre n'est retiré à sa place.
+                    if pile[i].annulable { pile.remove(at: i) }
                 } else if let nom = etapeAnnulee(objet["etape"]?.string),
                           let i = pile.lastIndex(where: { $0.annulable && $0.etape == nom }) {
                     pile.remove(at: i)
@@ -258,7 +267,8 @@ enum Lecon {
         static let angle = 0.5
         /// PerspectiveVertical : des verticales redressées à la main.
         static let perspective = 10.0
-        /// Surface du cadre recadré par Claude (fraction de l'image), sans rotation ni Upright.
+        /// Surface du cadre recadré par Claude (fraction de l'image), sans rotation, Upright,
+        /// perspective ni distorsion manuelle (Lightroom resserre alors le cadre lui-même).
         static let surfaceCadre = 0.85
     }
 
@@ -268,9 +278,10 @@ enum Lecon {
     static func indices(corrections: [Correction], depart: Bilan.Vue?) -> [Indice] {
         var parCle: [String: Correction] = [:]
         for c in corrections where parCle[c.cle] == nil { parCle[c.cle] = c }
-        func ecart(_ cle: String) -> (avant: Double, apres: Double, ecart: Double)? {
-            guard let c = parCle[cle], let apres = nombre(c.apres) else { return nil }
-            let avant = nombre(c.avant) ?? 0
+        // Une valeur d'avant absente vaut celle par défaut du curseur (0) ; nil quand ce défaut ne
+        // veut rien dire (balance des blancs : celle de la prise de vue).
+        func ecart(_ cle: String, avantParDefaut: Double? = 0) -> (avant: Double, apres: Double, ecart: Double)? {
+            guard let c = parCle[cle], let apres = nombre(c.apres), let avant = nombre(c.avant) ?? avantParDefaut else { return nil }
             return (avant, apres, apres - avant)
         }
         func libelle(_ cle: String) -> String { DevelopCatalogue.label(for: cle) ?? cle }
@@ -325,13 +336,13 @@ enum Lecon {
         noter("noise", bruit)
         // Dominante : balance des blancs corrigée, ou vue de départ nettement colorée.
         var dominante: [String] = []
-        if let e = ecart("Temperature") {
+        if let e = ecart("Temperature", avantParDefaut: nil) {
             let enKelvins = max(abs(e.avant), abs(e.apres)) > Seuils.kelvins
             if abs(e.ecart) >= (enKelvins ? Seuils.temperatureKelvins : Seuils.temperatureRelative) {
                 dominante.append(change("Temperature", e, unite: enKelvins ? " K" : ""))
             }
         }
-        if let e = ecart("Tint"), abs(e.ecart) >= Seuils.teinte { dominante.append(change("Tint", e)) }
+        if let e = ecart("Tint", avantParDefaut: nil), abs(e.ecart) >= Seuils.teinte { dominante.append(change("Tint", e)) }
         // La vue de départ ne dit la dominante de la prise de vue que si Claude n'y avait encore
         // rien changé.
         if let depart, (depart.etapes ?? 0) == 0, depart.mesures.neutralShare >= PhotoMeasurements.partNeutreMin,
@@ -345,16 +356,20 @@ enum Lecon {
         if let angle, penche { noter("tilted_horizon", [change("CropAngle", angle, decimales: 1, unite: "°")]) }
         // Verticales : Upright posé, ou la perspective verticale corrigée à la main.
         var verticales: [String] = []
-        var upright = false
         if let c = parCle["PerspectiveUpright"], (nombre(c.avant) ?? 0) == 0, let apres = nombre(c.apres), apres != 0 {
-            upright = true
             verticales.append("\(libelle("PerspectiveUpright").components(separatedBy: " (").first ?? "Upright") posé (0 → \(Bilan.nombre(apres, decimales: 0)))")
         }
         if let e = ecart("PerspectiveVertical"), abs(e.ecart) >= Seuils.perspective { verticales.append(change("PerspectiveVertical", e)) }
         noter("converging_verticals", verticales)
-        // Cadrage : le cadre resserré par Claude, sans rotation ni Upright (qui resserrent d'eux-mêmes).
+        // Cadrage : le cadre resserré par Claude, sans géométrie touchée. Une rotation, Upright, la
+        // perspective ou la distorsion manuelle (les clés de transformationActive, Recalage.lua) font
+        // resserrer le cadre par Lightroom lui-même (« Contraindre le recadrage », que le module coche
+        // alors) ; ce cadre relu va au journal (relireCadres, Ecriture.lua) sans être un cadrage.
+        let geometrie = parCle.keys.contains { cle in
+            cle == "CropAngle" || cle == "CropConstrainToWarp" || cle == "LensManualDistortionAmount" || cle.hasPrefix("Perspective")
+        }
         let bords = ["CropLeft", "CropTop", "CropRight", "CropBottom"]
-        if !penche, !upright, bords.contains(where: { parCle[$0] != nil }) {
+        if !geometrie, bords.contains(where: { parCle[$0] != nil }) {
             func bord(_ cle: String, apres: Bool) -> Double {
                 let defaut = cle == "CropLeft" || cle == "CropTop" ? 0.0 : 1.0
                 guard let c = parCle[cle] else { return defaut }
