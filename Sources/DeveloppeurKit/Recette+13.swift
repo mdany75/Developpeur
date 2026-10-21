@@ -12,7 +12,7 @@ import Foundation
 ///   vérification échoue ;
 /// - « Je le fais » : la version de Claude rangée sans rien appliquer, des réglages faits « à la
 ///   main », la comparaison côte à côte et ses écarts, puis la version effacée ;
-/// - la composition lue (`--horizon`, une photo qui a un horizon, comme la dune) : le cadre proposé
+/// - la composition lue (`--horizon`, une photo qui a un vrai horizon) : le cadre proposé
 ///   montré tel quel, le cadre actuel lu sur l'image entière, puis le cadre proposé appliqué et
 ///   l'horizon mesuré, droit et sur le tiers du bas.
 /// Les quatre premiers vont dans la séquence du RAW (sequenceApprendre, après le bilan ;
@@ -552,7 +552,7 @@ extension Recette {
         return largeur / hauteur
     }
 
-    /// La composition lue sur une photo qui a un horizon (`--horizon`, la dune de « Développeur ›
+    /// La composition lue sur une photo qui a un horizon (`--horizon`, une copie de « Développeur ›
     /// Essais » ; à `hauteurHorizon` dans l'image que montre view_photo), en trois étapes :
     /// - read_composition, puis son crop montré tel quel par preview_settings (une image, le cadre
     ///   gardé par Lightroom égal au crop), la photo inchangée ;
@@ -563,11 +563,18 @@ extension Recette {
     ///   read_composition), droit à 0,2° près (measure_angle, sur une ligne affinée) ; les deux
     ///   recadrages annulés.
     /// Une copie qui porte Upright ou une perspective est refusée d'abord : Lightroom y resserre le
-    /// cadre, qui ne serait plus celui proposé.
+    /// cadre, qui ne serait plus celui proposé. Une photo sans horizon net à `hauteurHorizon` (la
+    /// ligne lue n'est pas affinée : LineAngle.ecartMax) ne fait pas échouer la recette : les deux
+    /// premières étapes, qui n'en dépendent pas, le disent, et la troisième est sautée avec sa raison
+    /// (constaté le 21 octobre 2026 : la dune n'a pas d'horizon à mi-hauteur, et la mesure accrochée
+    /// aux rides du sable faisait échouer l'étape sur du bruit ; il faut une copie d'Essais avec un
+    /// vrai horizon pour --horizon).
     func sequenceHorizon(_ id: Int, _ depart: Etat, _ photo: String) throws {
         let photoID = JSONValue.number(Double(id))
         let y = hauteurHorizon
         var horizon = Horizon(milieu: .zero, inclinaison: 0, aspect: 1)
+        // La ligne lue à hauteurHorizon est-elle un horizon (mesure affinée) ? Sinon, sa raison.
+        var sansHorizon: String?
         try etape(photo, "composition lue, cadre proposé en pointillés, photo inchangée (read_composition, preview_settings)") {
             let geometrie = Carnet.clesGeometrie.filter { cle in
                 Self.valeur(depart, cle).map { $0 != (cle == "PerspectiveScale" ? 100 : 0) } == true
@@ -584,8 +591,10 @@ extension Recette {
             guard let lu = lecture["horizon"], let inclinaison = lu["inclinaison"]?.double, let hauteur = lu["hauteur"]?.double else {
                 throw Echec(description: "horizon non lu : \(JSONCoding.line(lecture))")
             }
-            try verifier(lu["mesure"]?.string?.hasPrefix("affinée") == true,
-                         "aucun contour net le long de l'horizon donné (y = \(Self.nombre(y))) : donner sa hauteur dans l'image par --hauteur-horizon")
+            if lu["mesure"]?.string?.hasPrefix("affinée") != true {
+                sansHorizon = "pas d'horizon net à \(Self.nombre(y)) de la hauteur (\(lu["mesure"]?.string ?? "mesure absente")) : "
+                    + "choisir pour --horizon une copie d'Essais qui a un vrai horizon, et sa hauteur par --hauteur-horizon"
+            }
             // Le cadre actuel de la copie (aucun, d'ordinaire) : l'horizon donné passe dans l'image entière.
             let cadreDepart = lecture["cadre_actuel"]?.object == nil ? nil : Self.cadre(crop: lecture["cadre_actuel"], aspectImage: aspect)
             let milieu = Composition.versImageEntiere(CGPoint(x: 0.5, y: y), cadre: cadreDepart, aspect: aspect)
@@ -607,7 +616,8 @@ extension Recette {
             }
             let ecarts = Self.ecartsDeCadre(garde, attendu)
             try verifier(ecarts.isEmpty, "le cadre gardé par Lightroom n'est pas le crop proposé : " + ecarts.joined(separator: " ; "))
-            return "horizon penché de \(Self.nombre(inclinaison))° à \(Self.nombre(hauteur)) de la hauteur ; "
+            return (sansHorizon == nil ? "horizon penché de \(Self.nombre(inclinaison))° à \(Self.nombre(hauteur)) de la hauteur ; "
+                    : "\(sansHorizon ?? "") ; ")
                 + "proposé : \(lecture["cadre_propose"]?["resume"]?.string ?? "?") ; montré tel quel (\(proposition["resume_cadre"]?.string ?? "?"))"
         }
         var cropPropose: JSONValue = .null
@@ -649,6 +659,13 @@ extension Recette {
                 + "nouveau cadre proposé : \(lecture["cadre_propose"]?["resume"]?.string ?? "?")"
         }
         try etape(photo, "cadre proposé appliqué : horizon droit, sur le tiers du bas (measure_angle), puis annulé") {
+            // Sans horizon net, rien à redresser ni à placer : le recadrage d'essai est annulé, la
+            // photo revient, et l'étape dit pourquoi elle est sautée.
+            if let sansHorizon {
+                _ = try appel("undo_last", ["photo_ids": [photoID]])
+                try verifierEgal(try etat(id), depart)
+                return "sautée : " + sansHorizon + " ; recadrage d'essai annulé"
+            }
             try ecrire("apply_settings", id, ["crop": cropPropose])
             let (relecture, _) = try appel("read_composition", ["photo_id": photoID])
             let lu = Self.cadre(crop: relecture["cadre_actuel"], aspectImage: horizon.aspect)

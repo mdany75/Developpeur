@@ -131,7 +131,7 @@ public enum Notation {
         }
         let signalee = photo.defautsMesures.contains { $0.genre == .miseAuPointSignalee }
         if !rejet, !signalee, let nettete = photo.nettete, nettete < DetailMeasurements.seuilNet {
-            limites.append((3, "douce (netteté \(PhotoTriee.r(nettete))\(photo.af?.nettete != nil ? " au point AF" : "") ; nette à partir de \(PhotoTriee.r(DetailMeasurements.seuilNet)))"))
+            limites.append((3, "douce (netteté \(PhotoTriee.r(nettete))\(photo.af?.netteteJugee != nil ? " au point AF" : "") ; nette à partir de \(PhotoTriee.r(DetailMeasurements.seuilNet)))"))
         }
         if photo.vision?.utility == true {
             limites.append((1, "capture ou document selon Vision"))

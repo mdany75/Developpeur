@@ -15,6 +15,9 @@ public struct LineMeasurement: Equatable {
     public var residual: Double?
 
     public var angle: Double { refinedAngle ?? pointsAngle }
+    /// Un contour a été suivi le long du segment, mais trop irrégulier pour affiner l'angle (écart
+    /// moyen au-delà de `LineAngle.ecartMax`) : l'angle vient des deux points.
+    public var contourIrregulier: Bool { refinedAngle == nil && residual != nil }
     public var vertical: Bool { abs(pointsAngle) > 45 }
 
     /// Écart à l'horizontale ou à la verticale, en degrés (positif : la ligne tourne dans le sens
@@ -30,6 +33,14 @@ public struct LineMeasurement: Equatable {
 }
 
 public enum LineAngle {
+    /// Écart moyen (pixels, aux moindres carrés) au-delà duquel le contour suivi n'est pas une
+    /// ligne : l'angle n'est pas affiné, il vient des deux points (« d'après les deux points »).
+    /// Relevé le 21 octobre 2026 sur la dune de « Développeur › Essais » (vue de 1 344 px) : la crête,
+    /// un vrai contour, 0,9 et 1,8 px ; les rides du sable, prises pour un horizon à mi-hauteur, 10 à
+    /// 13 px, et 11,3 px sur le portrait d'essai, dits « affinés » à tort (de 0,1 à 0,3° sur du bruit,
+    /// d'où l'échec de l'étape « horizon » de la recette).
+    public static let ecartMax = 3.0
+
     /// Mesure la ligne de `from` à `to` (fractions de l'image, depuis le coin haut gauche).
     public static func measure(_ data: Data, from: CGPoint, to: CGPoint) -> LineMeasurement? {
         guard let image = PreviewImages.image(data), let (w, h, v) = Detail.luminance(image) else { return nil }
@@ -119,6 +130,11 @@ public enum LineAngle {
         // Un contour retenu loin de la ligne voulue (plus de 3° d'écart) : on garde les points.
         let difference = abs(remainder(refined - pointsAngle, 180))
         guard difference <= 3 else { return measurement }
+        // Un contour trop irrégulier (rides, feuillage, vagues) n'affine rien : l'angle des deux
+        // points, avec l'écart moyen pour le dire.
+        guard residual <= ecartMax else {
+            return LineMeasurement(pointsAngle: pointsAngle, refinedAngle: nil, edgePoints: kept.count, residual: residual)
+        }
         return LineMeasurement(pointsAngle: pointsAngle, refinedAngle: refined, edgePoints: kept.count, residual: residual)
     }
 }

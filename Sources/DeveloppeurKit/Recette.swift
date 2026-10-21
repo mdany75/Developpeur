@@ -459,7 +459,11 @@ public final class Recette {
             try verifier(profondeur != nil && vue["a_savoir"] == nil, "carte de profondeur pas calculée : \(vue["a_savoir"]?.string ?? "")")
             return "anneau posé, profondeur \(tous?["DepthMapInfo"] != nil ? "calculée dès la retouche" : "calculée avant le rendu"), sans fenêtre ; annulé"
         }
+        // Constaté le 21 octobre 2026 : après un débruitage et son annulation (deux passages au module
+        // Développement), la photo active d'avant ne revenait pas (Amelioration.remettreVue) ; elle
+        // doit être la même avant et après.
         try etape(photo, "débruitage, puis son annulation") {
+            let activeAvant = try photoActive()
             let (info, _) = try appel("enhance_photo", ["photo_id": .number(Double(id)), "denoise": 30, "step_name": "recette",
                                                          "confirm": true, "reason": "Recette automatisée du module."])
             let resultat = info["resultats"]?.array?.first
@@ -471,7 +475,10 @@ public final class Recette {
             let annulee = annulation["resultats"]?.array?.first
             try verifier(annulee?["annulee"]?.bool == true, "débruitage non annulé : \(annulee?["raison"]?.string ?? "?")")
             try verifierEgal(try etat(id), auto)
-            return remarques.isEmpty ? "calculé, puis retiré" : "calculé, puis retiré (\(remarques))"
+            let ecart = Self.ecartPhotoActive(avant: activeAvant, apres: try photoActive())
+            try verifier(ecart == nil, ecart ?? "")
+            let active = activeAvant == nil ? "" : " ; photo active d'avant revenue"
+            return (remarques.isEmpty ? "calculé, puis retiré" : "calculé, puis retiré (\(remarques))") + active
         }
         // Constaté dans Lightroom Classic 15.6 : la super résolution coche aussi les détails bruts,
         // et Lightroom refuse d'y toucher tant qu'elle est active (l'annulation de la 1.5 échouait).
@@ -932,24 +939,30 @@ public final class Recette {
         // sont refusées avant d'atteindre Lightroom. À vérifier (to_check) : le plafond du tri ne gêne
         // pas, et le module la range dans l'état « a_verifier ». 1.1.1 : avec apply (« note ces
         // photos »), la note est posée, une étape que undo_last défait.
+        // Le registre des notes (notation.json) est remis comme la recette l'a trouvé : il ne voit
+        // pas undo_last, et la note posée puis défaite y restait « acceptee » (constaté le 21 octobre
+        // 2026), comme si Dany l'avait acceptée.
         try etape(photo, "note proposée (propose_ratings), photo inchangée ; puis posée sur demande et annulée") {
-            let criteres: JSONValue = ["impact": "Recette.", "qualities": "Recette.", "technical_floor": "Recette."]
-            let cinq = tools.call(name: "propose_ratings", arguments: ["ratings": [["photo_id": photoID, "rating": 5, "criteria": criteres,
-                                                                                    "reason": "Recette automatisée du module."]]])
-            try verifier(cinq.isError && cinq.text.contains("jamais 5 étoiles"), "5 étoiles acceptées : \(cinq.text)")
-            let (reponse, _) = try appel("propose_ratings", ["ratings": [["photo_id": photoID, "rating": 2, "to_check": true, "criteria": criteres,
-                                                                           "reason": "Recette automatisée du module."]]])
-            let proposee = reponse["propositions"]?.array?.first
-            try verifier(proposee?["photo"]?.int == id && proposee?["etat"]?.string == "a_verifier", "proposition non rangée : \(JSONCoding.line(reponse))")
-            try verifierEgal(try etat(id), depart)
-            let (pose, _) = try appel("propose_ratings", ["apply": true, "ratings": [["photo_id": photoID, "rating": 2, "to_check": true, "criteria": criteres,
-                                                                                    "reason": "Recette automatisée du module."]]])
-            let posee = pose["posees"]?.array?.first
-            let note = try etat(id).classement["note"]?.int
-            _ = try appel("undo_last", ["photo_ids": [photoID]])
-            try verifierEgal(try etat(id), depart)
-            try verifier(posee?["etat"]?.string == "acceptee" && note == 2, "note pas posée : \(JSONCoding.line(pose))")
-            return "rangée pour \(proposee?["fichier"]?.string ?? "?"), à vérifier, rien de changé ; avec apply, 2 ★ posées, puis annulées"
+            let detail = try garderRegistreDesNotes(id) { () throws -> String in
+                let criteres: JSONValue = ["impact": "Recette.", "qualities": "Recette.", "technical_floor": "Recette."]
+                let cinq = tools.call(name: "propose_ratings", arguments: ["ratings": [["photo_id": photoID, "rating": 5, "criteria": criteres,
+                                                                                        "reason": "Recette automatisée du module."]]])
+                try verifier(cinq.isError && cinq.text.contains("jamais 5 étoiles"), "5 étoiles acceptées : \(cinq.text)")
+                let (reponse, _) = try appel("propose_ratings", ["ratings": [["photo_id": photoID, "rating": 2, "to_check": true, "criteria": criteres,
+                                                                               "reason": "Recette automatisée du module."]]])
+                let proposee = reponse["propositions"]?.array?.first
+                try verifier(proposee?["photo"]?.int == id && proposee?["etat"]?.string == "a_verifier", "proposition non rangée : \(JSONCoding.line(reponse))")
+                try verifierEgal(try etat(id), depart)
+                let (pose, _) = try appel("propose_ratings", ["apply": true, "ratings": [["photo_id": photoID, "rating": 2, "to_check": true, "criteria": criteres,
+                                                                                        "reason": "Recette automatisée du module."]]])
+                let posee = pose["posees"]?.array?.first
+                let note = try etat(id).classement["note"]?.int
+                _ = try appel("undo_last", ["photo_ids": [photoID]])
+                try verifierEgal(try etat(id), depart)
+                try verifier(posee?["etat"]?.string == "acceptee" && note == 2, "note pas posée : \(JSONCoding.line(pose))")
+                return "rangée pour \(proposee?["fichier"]?.string ?? "?"), à vérifier, rien de changé ; avec apply, 2 ★ posées, puis annulées"
+            }
+            return detail + " ; registre des notes remis comme la recette l'a trouvé"
         }
         // Constaté le 17 octobre 2026 : filtre « Reflections » (FilterID 3), intensité dans BlendParams ;
         // changeReflectionRemovalAmount ne change pas le filtre rangé.
@@ -1987,6 +2000,55 @@ public final class Recette {
         }
         if resultat.isError { throw Echec(description: texte) }
         return ((try? JSONCoding.parse(texte)) ?? .string(texte), images)
+    }
+
+    /// La photo active de Lightroom (son identifiant), lue par get_status ; nil sans photo active.
+    func photoActive() throws -> Int? {
+        try appel("get_status", [:]).0["photo_active"]?["id"]?.int
+    }
+
+    /// L'écart de la photo active après un passage au module Développement : nil si celle d'avant
+    /// est revenue (ou s'il n'y en avait pas). Constaté le 21 octobre 2026 : sans la remise de la
+    /// sélection après celle de la source (Bibliotheque.remettreSelection), une autre photo restait
+    /// active.
+    static func ecartPhotoActive(avant: Int?, apres: Int?) -> String? {
+        guard let avant, apres != avant else { return nil }
+        return "photo active \(apres.map(String.init) ?? "aucune") au lieu de \(avant) après le passage au module Développement "
+            + "(la vue d'avant n'est pas remise)"
+    }
+
+    /// La proposition de note d'une photo dans le registre du module (notation.json), telle que la
+    /// commande notation lire la rend ; nil sans proposition. Lecture seule.
+    func propositionDuRegistre(_ id: Int) throws -> JSONValue? {
+        let reponse = try tools.lightroom.send("notation", ["action": "lire", "photos": [.number(Double(id))]], timeout: 30)
+        return reponse["propositions"]?.array?.first { $0["photo"]?.int == id }
+    }
+
+    /// Remet la proposition d'une photo telle qu'elle a été lue (nil : aucune, retirée), par la
+    /// commande notation remettre ; rien n'est écrit dans le catalogue.
+    func remettreProposition(_ id: Int, _ proposition: JSONValue?) throws {
+        _ = try tools.lightroom.send("notation", ["action": "remettre", "photo": .number(Double(id)), "proposition": proposition ?? .null],
+                                     timeout: 30)
+    }
+
+    /// Fait `corps` (une étape qui propose et pose des notes), puis remet le registre des notes de la
+    /// photo comme il était avant, même après un échec, et vérifie qu'il l'est. Le registre ne voit
+    /// pas undo_last : la note posée puis défaite par la recette y restait « acceptee » (constaté le
+    /// 21 octobre 2026, 53709912), comme si Dany l'avait acceptée.
+    func garderRegistreDesNotes<T>(_ id: Int, _ corps: () throws -> T) throws -> T {
+        let avant = try propositionDuRegistre(id)
+        let resultat: T
+        do {
+            resultat = try corps()
+        } catch {
+            try? remettreProposition(id, avant)
+            throw error
+        }
+        try remettreProposition(id, avant)
+        let apres = try propositionDuRegistre(id)
+        try verifier(apres == avant, "registre des notes pas remis : \(apres.map(JSONCoding.line) ?? "aucune proposition") "
+                     + "au lieu de \(avant.map(JSONCoding.line) ?? "aucune proposition")")
+        return resultat
     }
 
     /// Retouche réelle : nom d'étape « recette », accord donné (la recette est lancée à la main).

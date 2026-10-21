@@ -218,12 +218,15 @@ extension ToolHandler {
                 info["bilan"] = bilan
             }
             let af = Self.pointAF(boitier, description: result["photo"])
-            let netteteAF = af.flatMap { Detail.nettete(decodee, autour: $0.point) }
+            // Netteté et texture autour du point, mesurées avant le carré : sur une zone sans texture
+            // (ciel, sable lisse), la mise au point ne se juge pas (DetailMeasurements.textureMin).
+            let miseAuPoint = af.map { PhotoTriee.MiseAuPoint.mesuree(decodee, point: $0.point, avertissement: $0.avertissement) }
+            let netteteAF = miseAuPoint?.nettete
             // Le carnet de progrès (1.3) : sur une photo que Claude n'a pas encore retouchée, les
             // défauts de la prise de vue, mesurés avant le carré du point de mise au point ; dits à
             // Claude seulement si le module les a notés.
             if let constats = noterLaVue(apercu: result, mesures: measures, detail: detail, reduite: reduite,
-                                         af: af.map { PhotoTriee.MiseAuPoint(point: $0.point, nettete: netteteAF, avertissement: $0.avertissement) },
+                                         af: miseAuPoint,
                                          intention: boitier?.intention), !constats.isEmpty {
                 info["constats_prise_de_vue"] = .array(constats.map(JSONValue.string))
             }
@@ -233,6 +236,9 @@ extension ToolHandler {
             if let af {
                 var point = Self.pointAFJSON(af.point, avertissement: af.avertissement)
                 if let nettete = netteteAF { point["nettete"] = .number((nettete * 10).rounded() / 10) }
+                if miseAuPoint?.jugeable == false {
+                    point["mise_au_point"] = "non jugée : zone sans texture autour du point (ciel, sable, mur) ; regarder la netteté du sujet"
+                }
                 if args.bool("af_point") == true || afToujours, let marquee = PreviewImages.marquerPoint(decodee, af.point, manque: af.avertissement) {
                     image = marquee
                     point["carre"] = .string(af.avertissement ? "rouge, sur l'image" : "vert, sur l'image")
@@ -424,6 +430,8 @@ extension ToolHandler {
         if let refined = line.refinedAngle {
             output["angle_mesure"] = r(refined)
             output["mesure"] = .string("affinée sur \(line.edgePoints) points du contour (écart moyen \(DevelopCatalogue.format(((line.residual ?? 0) * 10).rounded() / 10).replacingOccurrences(of: ".", with: ",")) px)")
+        } else if line.contourIrregulier {
+            output["mesure"] = .string("d'après les deux points seulement : le contour le long du segment est trop irrégulier pour être une ligne (écart moyen \(DevelopCatalogue.format(((line.residual ?? 0) * 10).rounded() / 10).replacingOccurrences(of: ".", with: ",")) px, au-delà de \(DevelopCatalogue.format(LineAngle.ecartMax).replacingOccurrences(of: ".", with: ",")) px), vérifier par un zoom")
         } else {
             output["mesure"] = .string("d'après les deux points seulement : aucun contour net le long du segment, vérifier par un zoom")
         }

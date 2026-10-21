@@ -154,19 +154,13 @@ local function refusAmelioration(nom, etat)
         (type(raison) == 'string' and raison ~= '') and (" : " .. raison) or ".")
 end
 
+-- Remet la vue d'avant afficherEnDeveloppement : la source affichée, puis la photo active et la
+-- sélection (Bibliotheque.remettreSelection : la sélection se refait le temps que Lightroom affiche
+-- la source remise ; sans cette attente, la photo active d'avant ne revenait pas, constaté le
+-- 21 octobre 2026), puis le module.
 local function remettreVue(vue)
-    local cat = catalogue()
-    if vue.sourceChangee and vue.sources then
-        LrTasks.pcall(cat.setActiveSources, cat, vue.sources)
-    end
-    if vue.selectionChangee and vue.active then
-        local autres = {}
-        for _, autre in ipairs(vue.selection or {}) do
-            if autre.localIdentifier ~= vue.active.localIdentifier then
-                autres[#autres + 1] = autre
-            end
-        end
-        LrTasks.pcall(cat.setSelectedPhotos, cat, vue.active, autres)
+    if vue.sourceChangee or vue.selectionChangee then
+        Bibliotheque.remettreSelection(vue.active, vue.selection, vue.sourceChangee and vue.sources or nil)
     end
     if vue.module and vue.module ~= 'develop' then
         LrTasks.pcall(LrApplicationView.switchToModule, vue.module)

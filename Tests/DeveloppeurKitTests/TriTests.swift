@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreImage
 import ImageIO
 import Vision
 import XCTest
@@ -44,6 +45,42 @@ final class TriTests: XCTestCase {
             }
         }
         for i in stride(from: 3, to: pixels.count, by: 4) { pixels[i] = 255 }
+        return encode(pixels, width: width, height: height)
+    }
+
+    /// Comme `damierLocal`, avec en plus, autour de (`fx`, `fy`), un sujet qui a de la texture (des
+    /// carrés de 24 px) mais flou (gaussien de 4 px) : une vraie mise au point manquée, que la
+    /// texture laisse juger (`DetailMeasurements.textureMin`, relevé le 21 octobre 2026), quand un
+    /// gris uni ne se juge pas.
+    static func damierLocalEtSujetFlou(cx: Double, cy: Double, cote: Double, fx: Double, fy: Double,
+                                       width: Int = 1200, height: Int = 800) -> Data {
+        let demi = Int(cote * Double(min(width, height)) / 2)
+        let x0 = Int(fx * Double(width)), y0 = Int(fy * Double(height))
+        let sujet = TestSupport.imagePixels(width: width, height: height) { x, y in
+            guard abs(x - x0) < demi, abs(y - y0) < demi else { return (128, 128, 128) }
+            let v: UInt8 = ((x / 24) + (y / 24)) % 2 == 0 ? 60 : 190
+            return (v, v, v)
+        }
+        let source = CIImage(cgImage: sujet)
+        let flou = CIContext().createCGImage(source.clampedToExtent().applyingGaussianBlur(sigma: 4).cropped(to: source.extent),
+                                             from: source.extent)!
+        let base = PreviewImages.image(damierLocal(cx: cx, cy: cy, cote: cote, width: width, height: height))!
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        var flous = [UInt8](repeating: 0, count: width * height * 4)
+        for (image, tampon) in [(base, 0), (flou, 1)] {
+            let dessin = { (buffer: UnsafeMutableRawBufferPointer) in
+                let contexte = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                         space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+                contexte.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            }
+            if tampon == 0 { pixels.withUnsafeMutableBytes(dessin) } else { flous.withUnsafeMutableBytes(dessin) }
+        }
+        for y in max(0, y0 - demi - 12)..<min(height, y0 + demi + 12) {
+            for x in max(0, x0 - demi - 12)..<min(width, x0 + demi + 12) {
+                let i = (y * width + x) * 4
+                pixels[i] = flous[i]; pixels[i + 1] = flous[i + 1]; pixels[i + 2] = flous[i + 2]
+            }
+        }
         return encode(pixels, width: width, height: height)
     }
 
@@ -466,6 +503,85 @@ final class TriTests: XCTestCase {
                                            pureWhite: 0, crushedShadows: 60, clippedChannels: [0, 0, 0], meanChroma: 1, saturatedShare: 0,
                                            neutralA: 0, neutralB: 0, neutralShare: 0, pixelCount: 100)
         XCTAssertEqual(sombre.defautsMesures.map(\.genre), [.floue, .presqueNoire])
+    }
+
+    // MARK: Mise au point sur une zone sans texture (relevé le 21 octobre 2026)
+
+    /// Deux faux « mise au point manquée » relevés le 21 octobre 2026 : le point AF sur du sable
+    /// lisse (netteté 12,6, texture 12,9 ; nette ailleurs 37,4) et sur un nuage (6,6 et 14,4 ; nette
+    /// ailleurs 171,9). Sous le plancher de texture, la mise au point est non jugée et ne plafonne pas
+    /// la note ; au-dessus, une vraie mise au point manquée reste un défaut majeur.
+    func testUnPointAFSansTextureNEstPasUneMiseAuPointManquee() throws {
+        XCTAssertEqual(DetailMeasurements.textureMin, 18)
+        func photo(nettete: Double, auPoint: Double, texture: Double?, avertissement: Bool = false) -> PhotoTriee {
+            var p = PhotoTriee(id: 1, fichier: "DSCF1595.RAF")
+            p.format = "RAW"
+            p.detail = DetailMeasurements(zones: Array(repeating: nettete, count: 9), noise: 0.4, shadowNoise: nil, side: 1024)
+            p.af = .init(point: CGPoint(x: 0.5, y: 0.395), nettete: auPoint, avertissement: avertissement, texture: texture)
+            return p
+        }
+        let sable = photo(nettete: 37.4, auPoint: 12.6, texture: 12.9)
+        XCTAssertFalse(try XCTUnwrap(sable.af).jugeable)
+        XCTAssertEqual(sable.defautsMesures.count, 0, "\(sable.defauts)")
+        XCTAssertEqual(sable.nettete, 37.4, "la netteté qui compte : la zone la plus nette")
+        XCTAssertTrue(sable.pourquoi.contains("mise au point non jugée"), sable.pourquoi)
+        XCTAssertEqual(sable.json["point_af"]?["mise_au_point"]?.string, "non jugée : zone sans texture autour du point")
+        let plafondSable = try XCTUnwrap(Notation.plafond(sable, doublon: false))
+        XCTAssertFalse(plafondSable.rejet, "pas de rejet proposé")
+        XCTAssertGreaterThan(plafondSable.note, 0, plafondSable.raison)
+        XCTAssertFalse(plafondSable.raison.contains("au point AF"), plafondSable.raison)
+
+        let nuage = photo(nettete: 171.9, auPoint: 6.6, texture: 14.4)
+        XCTAssertEqual(nuage.defautsMesures.count, 0)
+        XCTAssertEqual(try XCTUnwrap(Notation.plafond(nuage, doublon: false)).note, Notation.noteMaximale)
+
+        // Un vrai sujet flou au point (de la texture) : mise au point manquée, 0 et rejet proposé.
+        let manquee = photo(nettete: 60, auPoint: 8, texture: 30)
+        XCTAssertEqual(manquee.defautsMesures.map(\.genre), [.miseAuPointManquee])
+        XCTAssertEqual(try XCTUnwrap(Notation.plafond(manquee, doublon: false)).note, 0)
+        XCTAssertNil(manquee.json["point_af"]?["mise_au_point"])
+        XCTAssertEqual(photo(nettete: 60, auPoint: 8, texture: DetailMeasurements.textureMin).defautsMesures.map(\.genre), [.miseAuPointManquee],
+                       "au plancher : jugée")
+        // Sans texture mesurée (un ancien appel) : jugée, comme avant.
+        XCTAssertEqual(photo(nettete: 60, auPoint: 8, texture: nil).defautsMesures.map(\.genre), [.miseAuPointManquee])
+        // Signalée manquée par l'appareil sur une zone sans texture : confirmée par la zone la plus
+        // nette (douce ailleurs : 3 ; nette ailleurs : rien).
+        XCTAssertEqual(photo(nettete: 30, auPoint: 6, texture: 10, avertissement: true).defautsMesures.map(\.genre), [.miseAuPointSignalee])
+        XCTAssertEqual(photo(nettete: 60, auPoint: 6, texture: 10, avertissement: true).defautsMesures.map(\.genre), [])
+    }
+
+    /// Detail.autour sur des images de synthèse : un ciel en dégradé n'a pas de texture ; un motif
+    /// flou garde la sienne quand sa netteté tombe sous le seuil du flou (une vraie mise au point
+    /// manquée reste jugée).
+    func testLaTextureAutourDuPointSurvitAuFlouPasAuCiel() throws {
+        let ciel = TestSupport.imagePixels(width: 1344, height: 896) { x, y in
+            let v = UInt8(120 + (x + y) / 40)
+            return (v, v, v + 20)
+        }
+        let mesureCiel = try XCTUnwrap(Detail.autour(ciel, point: CGPoint(x: 0.5, y: 0.5)))
+        XCTAssertLessThan(mesureCiel.texture, DetailMeasurements.textureMin)
+        XCTAssertLessThan(mesureCiel.nettete, DetailMeasurements.seuilFlou)
+        // Un motif de carrés de 32 px (60 et 190), net, puis flou (gaussien de 4 px à 1 344 px, 3 px
+        // à la taille de la mesure : une mise au point bien manquée).
+        let net = TestSupport.imagePixels(width: 1344, height: 896) { x, y in
+            let v: UInt8 = ((x / 32) + (y / 32)) % 2 == 0 ? 60 : 190
+            return (v, v, v)
+        }
+        let mesureNet = try XCTUnwrap(Detail.autour(net, point: CGPoint(x: 0.5, y: 0.5)))
+        XCTAssertGreaterThanOrEqual(mesureNet.nettete, DetailMeasurements.seuilNet)
+        XCTAssertGreaterThanOrEqual(mesureNet.texture, DetailMeasurements.textureMin)
+        let source = CIImage(cgImage: net)
+        let floue = source.clampedToExtent().applyingGaussianBlur(sigma: 4).cropped(to: source.extent)
+        let flou = try XCTUnwrap(CIContext().createCGImage(floue, from: source.extent))
+        let mesureFlou = try XCTUnwrap(Detail.autour(flou, point: CGPoint(x: 0.5, y: 0.5)))
+        XCTAssertLessThan(mesureFlou.nettete, DetailMeasurements.seuilFlou, "flou au point")
+        XCTAssertGreaterThanOrEqual(mesureFlou.texture, DetailMeasurements.textureMin, "le motif flou garde sa texture : jugé")
+        // La même mesure que Detail.nettete, et MiseAuPoint.mesuree ramène la netteté d'une vignette.
+        XCTAssertEqual(Detail.nettete(flou, autour: CGPoint(x: 0.5, y: 0.5)), mesureFlou.nettete)
+        let vignette = PhotoTriee.MiseAuPoint.mesuree(flou, point: CGPoint(x: 0.5, y: 0.5), avertissement: false, facteur: 1.13)
+        XCTAssertEqual(try XCTUnwrap(vignette.nettete), mesureFlou.nettete * 1.13, accuracy: 1e-9)
+        XCTAssertEqual(vignette.texture, mesureFlou.texture, "la texture n'est pas ramenée")
+        XCTAssertNil(Detail.autour(flou, point: CGPoint(x: 1.2, y: 0.5)))
     }
 
     // MARK: Mots-clés proposés

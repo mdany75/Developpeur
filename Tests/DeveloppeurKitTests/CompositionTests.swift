@@ -331,6 +331,31 @@ final class CompositionTests: XCTestCase {
         XCTAssertNil(PreviewImages.cadrePropose(Self.gris(128), coins: Array(coins.prefix(3))))
     }
 
+    /// Relevé le 21 octobre 2026 : réduites à 320 px (l'aperçu de la fenêtre Claude), les lignes des
+    /// tiers à 0,25 % du grand côté étaient pâles sur un fond clair (le sable de la dune d'essai) ;
+    /// à 0,35 %, leur liseré sombre se voit encore. Le cadre garde 0,4 %.
+    func testLesTiersSeVoientA320PxSurUnFondClair() throws {
+        XCTAssertEqual(PreviewImages.traitTiersPart, 0.0035)
+        XCTAssertEqual(PreviewImages.traitCadrePart, 0.004)
+        let coins = [CGPoint(x: 0.2, y: 0.2), CGPoint(x: 0.8, y: 0.2), CGPoint(x: 0.8, y: 0.8), CGPoint(x: 0.2, y: 0.8)]
+        let sable: UInt8 = 205
+        let dessinee = try XCTUnwrap(PreviewImages.image(try XCTUnwrap(PreviewImages.cadrePropose(Self.gris(sable), coins: coins))))
+        let reduite = PreviewImages.scaled(dessinee, maxSide: 320)
+        XCTAssertEqual(reduite.width, 320)
+        // Le long d'une rangée du cadre (à 0,3 de la hauteur, loin des tiers horizontaux), autour du
+        // tiers vertical de gauche (x = 0,4) : le plus sombre, contre le fond au milieu du cadre.
+        let y = Int(0.3 * Double(reduite.height))
+        let fond = Self.niveau(reduite, Int(0.5 * Double(reduite.width)), y)
+        XCTAssertEqual(fond, Double(sable), accuracy: 6, "fond inchangé dans le cadre")
+        let autour = (Int(0.37 * 320)...Int(0.43 * 320)).map { Self.niveau(reduite, $0, y) }
+        let ecart = fond - (autour.min() ?? fond)
+        // L'assombrissement cumulé sur la largeur de la ligne (niveaux × pixels) : ce que l'œil voit.
+        // Mesuré ainsi : 72 à 0,25 % (le plus sombre 32 niveaux sous le fond), 102 à 0,35 % (37).
+        let cumule = autour.map { max(0, fond - $0) }.reduce(0, +)
+        XCTAssertGreaterThanOrEqual(cumule, 85, "tiers pâles à 320 px sur fond clair : assombrissement cumulé \(cumule) (le plus sombre \(ecart) niveaux sous le fond)")
+        XCTAssertGreaterThan(ecart, 30)
+    }
+
     // MARK: read_composition
 
     /// Le faux module rend l'image entière : l'horizon de synthèse qui monte de 2° vers la droite.
@@ -552,6 +577,54 @@ final class CompositionTests: XCTestCase {
         rapport.faces[0].yaw = 0
         XCTAssertEqual(try lire([:])["sujet"]?["regard"]?.string, "de face (lu par Vision, à vérifier)")
         XCTAssertEqual(try lire(["facing": "none"])["sujet"]?["regard"]?.string, "de face (facing)")
+    }
+
+    /// Relevé le 21 octobre 2026 (53709912) : le devant d'une voiture orange pris pour un visage par
+    /// Vision (roulis −π, qualité 0,23, lacet −π/2) entrait dans le sujet, qui faisait 0,15 × 0,68 au
+    /// lieu de 0,09 × 0,14, et donnait le regard. Un visage à l'envers est écarté ; un vrai visage de
+    /// faible qualité (petit, dans la nuit) reste.
+    func testUnFauxVisageALEnversNEstNiLeSujetNiLeRegard() throws {
+        let vrai = VisionReport.Face(box: CGRect(x: 0.317, y: 0.239, width: 0.092, height: 0.138), pupils: [], eyeWidth: nil,
+                                     quality: 0.74, eyeOpenness: nil, yaw: 0, roll: 0)
+        let voiture = VisionReport.Face(box: CGRect(x: 0.262, y: 0.843, width: 0.048, height: 0.07), pupils: [], eyeWidth: nil,
+                                        quality: 0.23, eyeOpenness: nil, yaw: -Double.pi / 2, roll: -Double.pi)
+        XCTAssertTrue(Composition.visagePlausible(vrai))
+        XCTAssertFalse(Composition.visagePlausible(voiture))
+        XCTAssertFalse(Composition.visagePlausible(VisionReport.Face(box: .zero, pupils: [], eyeWidth: nil, quality: nil, eyeOpenness: nil,
+                                                                     roll: Double.pi)), "+π aussi")
+        XCTAssertTrue(Composition.visagePlausible(VisionReport.Face(box: .zero, pupils: [], eyeWidth: nil, quality: 0.12, eyeOpenness: nil,
+                                                                    roll: Double.pi / 6)), "tête penchée, faible qualité : un vrai visage")
+        XCTAssertTrue(Composition.visagePlausible(VisionReport.Face(box: .zero, pupils: [], eyeWidth: nil, quality: nil, eyeOpenness: nil)),
+                      "sans roulis lu : gardé")
+        // Dans read_composition : le sujet est le vrai visage seul, regardé de face.
+        let rapport = VisionReport(faces: [vrai, voiture], aesthetics: nil, utility: nil, salientArea: nil)
+        repondreApercu(Self.entiere, image: TestSupport.jpeg(red: 120, green: 120, blue: 120, width: 1344, height: 896))
+        let lu = try tools.readComposition(Arguments(raw: [:]), vision: { _ in rapport })
+        XCTAssertEqual(lu["sujet"]?["source"]?.string, "visages")
+        XCTAssertEqual(try XCTUnwrap(lu["sujet"]?["cadre"]?["height"]?.double), 0.138, accuracy: 0.001, "la voiture n'agrandit pas le sujet")
+        XCTAssertEqual(lu["sujet"]?["regard"]?.string, "de face (lu par Vision, à vérifier)")
+        // Seule, la voiture n'est pas un sujet : la zone d'intérêt prend sa place.
+        let seule = VisionReport(faces: [voiture], aesthetics: nil, utility: nil, salientArea: CGRect(x: 0.2, y: 0.3, width: 0.3, height: 0.3))
+        repondreApercu(Self.entiere, image: TestSupport.jpeg(red: 120, green: 120, blue: 120, width: 1344, height: 896))
+        let zone = try tools.readComposition(Arguments(raw: [:]), vision: { _ in seule })
+        XCTAssertEqual(zone["sujet"]?["source"]?.string, "zone_d_interet")
+        XCTAssertNil(zone["sujet"]?["regard"])
+    }
+
+    /// Relevé le 21 octobre 2026 (53709534) : une zone d'intérêt de 0,78 × 0,86 (67 % de l'image, le
+    /// ciel) n'est pas un sujet ; read_composition le dit au lieu de placer un « sujet au centre ».
+    func testUneZoneDInteretQuiCouvrePresqueToutNEstPasUnSujet() throws {
+        XCTAssertTrue(Composition.zoneEstUnSujet(CGRect(x: 0.26, y: 0.09, width: 0.42, height: 0.84)), "35 % : un sujet")
+        XCTAssertFalse(Composition.zoneEstUnSujet(CGRect(x: 0.10, y: 0.14, width: 0.78, height: 0.86)), "67 % : pas un sujet")
+        XCTAssertFalse(Composition.zoneEstUnSujet(CGRect(x: 0.01, y: 0.06, width: 0.90, height: 0.66)), "59 % : pas un sujet")
+        let rapport = VisionReport(faces: [], aesthetics: nil, utility: nil, salientArea: CGRect(x: 0.096, y: 0.135, width: 0.783, height: 0.864))
+        repondreApercu(Self.entiere, image: TestSupport.jpeg(red: 120, green: 120, blue: 120, width: 1344, height: 896))
+        let lu = try tools.readComposition(Arguments(raw: [:]), vision: { _ in rapport })
+        XCTAssertEqual(lu["sujet"]?["source"]?.string, "aucun")
+        XCTAssertTrue(lu["sujet"]?["raison"]?.string?.contains("68 % de l'image") == true, JSONCoding.line(lu["sujet"] ?? .null))
+        XCTAssertNil(lu["sujet"]?["cadre"])
+        XCTAssertFalse(lu["lecture"]?.array?.contains { $0.string?.hasPrefix("Le sujet") == true } == true, JSONCoding.line(lu["lecture"] ?? .null))
+        XCTAssertTrue(lu["lecture"]?.array?.contains { $0.string?.contains("ni sujet trouvé") == true } == true, JSONCoding.line(lu["lecture"] ?? .null))
     }
 
     // MARK: preview_settings, surimpression

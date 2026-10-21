@@ -18,13 +18,30 @@ public enum Composition {
     public static let seuilLecture = 0.06
     /// Inclinaison sous laquelle l'horizon ne se voit pas penché (degrés), comme pour measure_angle.
     public static let seuilInclinaison = 0.5
-    /// Lacet d'un visage (radians) sous lequel il est « de face » : provisoire. Constaté sur ce Mac
-    /// (révision 3 de Vision) : les observations de VNDetectFaceLandmarksRequest portent le lacet,
-    /// le même que VNDetectFaceRectanglesRequest, par pas de π/4 (0 et −π/2 relevés).
+    /// Lacet d'un visage (radians) sous lequel il est « de face ». Constaté sur ce Mac (révision 3
+    /// de Vision) : les observations de VNDetectFaceLandmarksRequest portent le lacet, le même que
+    /// VNDetectFaceRectanglesRequest, par pas de π/4. Relevé le 21 octobre 2026 sur les vues de
+    /// 1 344 px des huit copies d'Essais : 0, ±π/4 et ±π/2 seulement ; tout seuil entre 0 et π/4
+    /// (0,785) donne le même résultat : 0,26 est gardé (π/8, 0,39, serait le milieu).
     public static let seuilLacet = 0.26
-    /// Signe du lacet de Vision pour un visage tourné vers la droite de l'image : à constater sur
-    /// des portraits (un visage tourné relevé dans Lightroom) ; +1 en attendant.
+    /// Signe du lacet de Vision pour un visage tourné vers la droite de l'image. Confirmé le
+    /// 21 octobre 2026 (même relevé) : lacet positif = visage tourné vers la droite de l'image (une
+    /// femme à −π/4 tournée vers la gauche, un garçon de profil à +π/2 vers la droite, jugés à l'œil ;
+    /// un visage penché et sombre lu +π/2 à tort).
     public static let signeLacet = 1.0
+    /// Roulis (radians) au-delà duquel un « visage » de Vision est à l'envers : un faux visage
+    /// (le devant d'une voiture orange sur 53709912, roulis −π, relevé le 21 octobre 2026 ; les vrais
+    /// visages des huit copies d'Essais : roulis 0 ou π/6). Écarté avant le sujet et le regard de
+    /// read_composition : retenu, il faisait du sujet un cadre de 0,15 × 0,68 au lieu de 0,09 × 0,14.
+    /// La qualité du visage n'y sert pas : de vrais visages, petits ou dans la nuit, sont sous 0,3
+    /// (0,12 à 0,28 sur 53709724, 0,24 sur 53709579), comme la voiture (0,23).
+    public static let roulisRenverse = 3 * Double.pi / 4
+    /// Part de l'image au-delà de laquelle la zone d'intérêt de Vision n'est pas un sujet : elle
+    /// couvre alors presque toute l'image (relevé le 21 octobre 2026 : 0,78 × 0,86, soit 67 %, sur le
+    /// ciel de 53709534, où read_composition disait le sujet « au centre » sans intérêt). Sur les
+    /// huit copies d'Essais, les zones jugées justes (ou un peu larges) couvrent de 15 à 35 % ; au-delà
+    /// de 50 %, presque toute l'image (57 à 67 %), ou un groupe (53 %), dont les visages font le sujet.
+    public static let zoneInteretMax = 0.5
     /// Marge du sujet dans le cadre, en part du cadre.
     public static let margeSujet = 0.03
     /// Le cadre proposé est réduit de 0,2 % : arrondis du module (taille au dix-millième, angle au
@@ -387,6 +404,19 @@ public enum Composition {
         return abs(propose.centreX - reference.centreX) < 0.01 && abs(propose.centreY - reference.centreY) < 0.01
             && abs(propose.largeur - reference.largeur) < 0.02 && abs(propose.angle - reference.angle) < 0.2
             && abs(propose.ratio - reference.ratio) <= 0.01 * reference.ratio
+    }
+
+    /// Un visage de Vision qui peut être un sujet : pas à l'envers (roulis sous `roulisRenverse` ;
+    /// sans roulis lu, gardé).
+    public static func visagePlausible(_ visage: VisionReport.Face) -> Bool {
+        guard let roulis = visage.roll, roulis.isFinite else { return true }
+        return abs(roulis) < roulisRenverse
+    }
+
+    /// La zone d'intérêt de Vision peut-elle être un sujet ? Pas quand elle couvre plus de
+    /// `zoneInteretMax` de l'image.
+    public static func zoneEstUnSujet(_ zone: CGRect) -> Bool {
+        Double(zone.width * zone.height) <= zoneInteretMax
     }
 
     /// Sens du regard d'après le lacet d'un visage (Vision) : +1 vers la droite de l'image, −1 vers

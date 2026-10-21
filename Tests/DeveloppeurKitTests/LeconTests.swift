@@ -45,7 +45,7 @@ final class LeconTests: XCTestCase {
             "photo": ["id": .number(Double(id)), "fichier": .string(fichier), "copie_virtuelle": false, "appareil": "X-H2S",
                       "objectif": "XF16-55mmF2.8 R LM WR", "iso": "ISO 400", "vitesse": "1/250 s", "ouverture": "ƒ/8,0",
                       "focale": "23 mm", "date": "2026-06-30 18:42:10", "format": "RAW",
-                      "prise_de_vue_plus": ["compensation": "-0,7 IL", "flash": "Le flash ne s'est pas déclenché"]],
+                      "prise_de_vue_plus": ["compensation": "0 EV", "flash": "Non déclenché"]],
             "entrees": .array(entrees),
         ]]]
     }
@@ -452,7 +452,7 @@ final class LeconTests: XCTestCase {
 
         let faits = try XCTUnwrap(reponse["faits"])
         XCTAssertEqual(faits["prise_de_vue"]?["iso"], "ISO 400")
-        XCTAssertEqual(faits["prise_de_vue"]?["prise_de_vue_plus"]?["compensation"], "-0,7 IL")
+        XCTAssertEqual(faits["prise_de_vue"]?["prise_de_vue_plus"]?["compensation"], "0 EV", "texte traduit par Lightroom, tel quel (constaté le 21 octobre 2026)")
         let corrections = faits["corrections"]?.array ?? []
         XCTAssertEqual(corrections.map { $0["cle"]?.string }, ["Exposure2012", "CropAngle", "Highlights2012"], "valeurs simples seulement")
         XCTAssertEqual(corrections[0]["libelle"], "Exposition")

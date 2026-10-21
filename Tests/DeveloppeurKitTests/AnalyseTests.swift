@@ -136,6 +136,49 @@ final class AnalyseTests: XCTestCase {
                      "segment trop court")
     }
 
+    /// Relevé le 21 octobre 2026 : sur la dune d'essai, un segment à mi-hauteur s'accrochait aux rides
+    /// du sable et rendait une mesure « affinée » (écart moyen de 10 à 13 px) sur du bruit. Au-delà de
+    /// `LineAngle.ecartMax` (3 px), l'angle vient des deux points, et la mesure le dit ; une vraie ligne
+    /// (la crête : 0,9 et 1,8 px) reste affinée.
+    func testUnContourIrregulierNEstPasUneLigneAffinee() throws {
+        XCTAssertEqual(LineAngle.ecartMax, 3)
+        // Des rides : une limite qui ondule de ±10 px autour de y = 448, sur toute la largeur.
+        let rides = Self.render { context in
+            context.setFillColor(gray: 0.2, alpha: 1)
+            context.move(to: CGPoint(x: 0, y: 0))
+            for x in stride(from: 0, through: 1344, by: 4) {
+                context.addLine(to: CGPoint(x: Double(x), y: 448 + 10 * sin(Double(x) * 0.37)))
+            }
+            context.addLine(to: CGPoint(x: 1344, y: 0))
+            context.closePath()
+            context.fillPath()
+        }
+        let ligne = try XCTUnwrap(LineAngle.measure(rides, from: CGPoint(x: 0.1, y: 0.5), to: CGPoint(x: 0.9, y: 0.5)))
+        XCTAssertNil(ligne.refinedAngle, "pas affinée sur des rides")
+        XCTAssertTrue(ligne.contourIrregulier)
+        XCTAssertGreaterThan(try XCTUnwrap(ligne.residual), LineAngle.ecartMax)
+        XCTAssertEqual(ligne.angle, ligne.pointsAngle)
+        // Une vraie ligne nette : affinée, à moins de 3 px.
+        let droite = try XCTUnwrap(LineAngle.measure(Self.tiltedHorizon(degrees: 1), from: CGPoint(x: 0.1, y: 0.54), to: CGPoint(x: 0.9, y: 0.53)))
+        XCTAssertNotNil(droite.refinedAngle)
+        XCTAssertLessThanOrEqual(try XCTUnwrap(droite.residual), LineAngle.ecartMax)
+        XCTAssertFalse(droite.contourIrregulier)
+        // measure_angle le dit, et ne commence pas par « affinée ».
+        fake.onSend = { [unowned fake] command, _ in
+            if command == "apercu" {
+                fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(rides)), "photo": ["id": 3, "fichier": "A.RAF"],
+                                          "recadrage": ["angle": 0]]
+            }
+        }
+        let result = tools.call(name: "measure_angle", arguments: ["photo_id": 3, "x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5])
+        XCTAssertFalse(result.isError, result.text)
+        let info = try JSONCoding.parse(result.text)
+        let mesure = try XCTUnwrap(info["mesure"]?.string)
+        XCTAssertFalse(mesure.hasPrefix("affinée"), mesure)
+        XCTAssertTrue(mesure.contains("trop irrégulier"), mesure)
+        XCTAssertNil(info["angle_mesure"])
+    }
+
     func testMeasureAngleToolAddsTheCorrectionToTheCurrentAngle() throws {
         let image = Self.tiltedHorizon(degrees: 2)
         fake.onSend = { [unowned fake] command, _ in

@@ -3313,6 +3313,71 @@ test("photo hors du film fixe : son dossier s'affiche le temps du débruitage, p
     egal(S.active, affichee, "la photo active revient")
 end)
 
+-- Constaté le 21 octobre 2026 (mesures de la 1.3) : la photo active d'avant ne revenait pas après
+-- un débruitage, son annulation ou une variante retenue ; remise aussitôt après setActiveSources,
+-- sa sélection n'était pas prise (règle de la simulation, setActiveSources).
+test("photo hors du film fixe : après un débruitage puis son annulation, la photo active et la sélection d'avant reviennent", function()
+    local affichee, autre = photoRaw(), photoJpeg()
+    local cachee = photoFuji()
+    cachee.brut.path = '/Volumes/Photos/Gaspesie/DSCF0001.RAF'
+    local essais = { { nom = 'Développeur › Essais' } }
+    S.sources = essais
+    S.active, S.selection = affichee, { affichee, autre }
+    S.invisibles[cachee.localIdentifier] = true
+    debruiter({ photo = cachee.localIdentifier, ameliorations = demande('denoise', true, 30) })
+    egal(cachee.amelioration.denoise, true)
+    egal(S.sources, essais, "la source d'avant revient")
+    egal(S.active, affichee, "la photo active d'avant revient")
+    egal(#S.selection, 2, "avec la sélection d'avant")
+    egal(S.selection[2], autre)
+    egal(S.invisibles[cachee.localIdentifier], true, "la photo traitée ressort du film fixe")
+    -- L'annulation repasse par le module Développement (Amelioration.remettreAmelioration).
+    local resultat = Commandes.executer('annuler', { photos = { cachee.localIdentifier } })
+    egal(resultat.resultats[1].annulee, true)
+    egal(cachee.amelioration.denoise, false, "débruitage retiré")
+    egal(S.sources, essais)
+    egal(S.active, affichee, "la photo active d'avant revient après l'annulation")
+    egal(#S.selection, 2)
+    egal(contient(Liaison.journal, "non remise"), false)
+end)
+
+test("photo active d'avant sortie du film fixe entre-temps : rien ne la force, le journal le dit", function()
+    local affichee = photoRaw()
+    local cachee = photoFuji()
+    cachee.brut.path = '/Volumes/Photos/Gaspesie/DSCF0001.RAF'
+    local essais = { { nom = 'Développeur › Essais' } }
+    S.sources = essais
+    S.active, S.selection = affichee, { affichee }
+    S.invisibles[cachee.localIdentifier] = true
+    local horloge = S.horloge
+    -- Pendant le traitement, la photo d'avant quitte la source (filtre changé à la main).
+    S.pendantAttente = function()
+        if S.visiblesSous[essais] then
+            S.visiblesSous[essais][affichee.localIdentifier] = nil
+        end
+    end
+    debruiter({ photo = cachee.localIdentifier, ameliorations = demande('denoise', true, 30) })
+    S.pendantAttente = nil
+    egal(S.sources, essais, "la source d'avant revient quand même")
+    egal(S.active ~= affichee, true)
+    egal(contient(Liaison.journal, "Photo active d'avant non remise : « DSC_0412.NEF »"), true)
+    egal(S.horloge - horloge < 30, true, "l'attente est bornée")
+end)
+
+test("copie virtuelle d'une photo hors du film fixe : la photo active et la source d'avant reviennent", function()
+    local affichee = photoRaw()
+    local cachee = photoFuji()
+    cachee.brut.path = '/Volumes/Photos/Gaspesie/DSCF0001.RAF'
+    local essais = { { nom = 'Développeur › Essais' } }
+    S.sources = essais
+    S.active, S.selection = affichee, { affichee }
+    S.invisibles[cachee.localIdentifier] = true
+    local resultat = Commandes.executer('copieVirtuelle', { photos = { cachee.localIdentifier } })
+    egal(#resultat.copies, 1)
+    egal(S.sources, essais, "la source d'avant revient")
+    egal(S.active, affichee, "la photo active d'avant revient")
+end)
+
 
 test("liaison : une photo active changée part une fois avec la réponse suivante, avec la nouvelle photo", function()
     local premiere, seconde = photoRaw(), photoFuji()
@@ -4663,6 +4728,32 @@ test("2.5 : réimportée et empilée, la livraison va dans le dossier de l'origi
     egal(S.dernierExport.exportSettings.LR_reimport_stackWithOriginal, false)
 end)
 
+-- Constaté le 21 octobre 2026 : après la recette, la photo active était une photo du dossier de la
+-- livraison réimportée puis retirée ; la vue d'avant est remise (source, puis photo active).
+test("recette : la photo réimportée retirée hors du film fixe, la photo active et la source d'avant reviennent", function()
+    local photo = photoHdr()
+    local resultat = Commandes.executer('exporter', { photos = { 4 }, reglages = { format = 'TIFF', reimporter = 'pile' } })
+    local chemin, id = resultat.fichiers[1].chemin, resultat.fichiers[1].reimportee
+    local affichee = photoRaw()
+    local essais = { { nom = 'Développeur › Essais' } }
+    S.sources = essais
+    S.active, S.selection = affichee, { affichee }
+    S.invisibles[id] = true
+    Commandes.executer('retirerReimportees', { chemins = { chemin } })
+    egal(S.photos[id], nil, "retirée du catalogue")
+    egal(S.sourcesChangees[#S.sourcesChangees - 1][1].chemin, '/Volumes/Photos/2025/Gaspesie', "son dossier affiché le temps du retrait")
+    egal(S.sources, essais, "la source d'avant revient")
+    egal(S.active, affichee, "la photo active d'avant revient")
+    egal(photo.retireeDuCatalogue, nil, "l'original reste")
+    -- Même après un échec : la vue revient.
+    resultat = Commandes.executer('exporter', { photos = { 4 }, reglages = { format = 'TIFF', reimporter = 'pile' } })
+    chemin, id = resultat.fichiers[1].chemin, resultat.fichiers[1].reimportee
+    S.invisibles[id] = true
+    echoue(function() Commandes.executer('retirerReimportees', { chemins = { chemin, '/Volumes/Photos/autre.tif' } }) end, "pas été réimporté")
+    egal(S.sources, essais)
+    egal(S.active, affichee, "la photo active d'avant revient après l'échec")
+end)
+
 test("2.5 : original débranché, livraison depuis l'aperçu dynamique jusqu'à 2560 px", function()
     local photo = photoHdr()
     photo.reglages.HDREditMode = 0
@@ -5255,6 +5346,56 @@ test("notation : recaler le registre sur la note réelle après undo_last (const
     egal(Notation.proposition(1).etat, 'acceptee')
     Fichiers.ecrire = ecrire
     Notation.desabonner('essai')
+end)
+
+-- Constaté le 21 octobre 2026 : après l'étape de notation de la recette (proposée, posée avec apply,
+-- défaite par undo_last), la proposition de 53709912 restait « acceptee » dans notation.json, et
+-- le recalage n'y voyait rien (la photo avait déjà 2 ★). La recette remet le registre comme elle
+-- l'a trouvé (action remettre), sans écrire au catalogue.
+test("notation remettre : la recette remet la proposition qu'elle a trouvée, ou la retire ; rien d'écrit au catalogue", function()
+    local a = photoRaw()
+    photoJpeg()
+    a.brut.rating = 2
+    proposer({ { photo = 1, note = 3, criteres = CRITERES, raison = "D'avant la recette." } })
+    local function lire1()
+        return Commandes.executer('notation', { action = 'lire', photos = Json.tableau({ 1 }) }).propositions[1]
+    end
+    local avant = lire1()
+    -- Comme le serveur la renvoie : relue du JSON.
+    local avantJson = Json.decode(Json.encode(avant))
+    -- L'étape de la recette : proposée, posée avec apply (2 ★, déjà la note de la photo), défaite.
+    proposer({ { photo = 1, note = 2, criteres = CRITERES, a_verifier = true, raison = "Recette." } }, { poser = true })
+    egal(Notation.proposition(1).etat, 'acceptee')
+    Commandes.executer('annuler', { photos = { 1 } })
+    egal(a.brut.rating, 2)
+    egal(Notation.recaler({ { photo = 1, note = 2, drapeau = 0 } }, Notation.version), 0, "rien à recaler : la note est là")
+    egal(Notation.proposition(1).etat, 'acceptee', "le registre ne voit pas l'annulation (constaté)")
+    local ecritures, privees = #S.ecritures, S.ecrituresPrivees
+    local r = Commandes.executer('notation', { action = 'remettre', photo = 1, proposition = avantJson })
+    egal(#S.ecritures, ecritures, "rien d'écrit au catalogue")
+    egal(S.ecrituresPrivees, privees)
+    egal(r.proposition.etat, 'a_verifier')
+    egal(Json.encode(lire1()), Json.encode(avant), "la proposition d'avant, telle quelle")
+    local p = Notation.proposition(1)
+    egal(p.uuid, 'uuid-1', "avec l'uuid de la photo")
+    egal(getmetatable(p.criteres), nil, "tables neuves")
+    egal(Json.decode(S.fichiers[Notation.fichier()]).propositions['1'].raison, "D'avant la recette.", "rangée dans notation.json")
+    -- Aucune proposition au départ : retirée.
+    Commandes.executer('notation', { action = 'remettre', photo = 1, proposition = Json.null })
+    egal(Notation.proposition(1), nil)
+    egal(Commandes.executer('notation', { action = 'remettre', photo = 1 }).proposition, Json.null)
+    -- Refus, sans rien changer.
+    local version = Notation.version
+    echoue(function() Commandes.executer('notation', { action = 'remettre', photo = 1, proposition = { photo = 1, etat = 'a_verifier', note = 5 } }) end,
+        "jamais 5 étoiles")
+    echoue(function() Commandes.executer('notation', { action = 'remettre', photo = 1, proposition = { photo = 2, etat = 'a_verifier', note = 1 } }) end,
+        "invalide")
+    echoue(function() Commandes.executer('notation', { action = 'remettre', photo = 1, proposition = { photo = 1, etat = 'posee', note = 1 } }) end,
+        "invalide")
+    echoue(function() Commandes.executer('notation', { action = 'remettre', proposition = Json.null }) end, "Photo manquante")
+    echoue(function() Commandes.executer('notation', { action = 'remettre', photo = 777, proposition = Json.null }) end, "777")
+    egal(Notation.version, version)
+    egal(Notation.proposition(1), nil)
 end)
 
 test("notation : registre gardé dans notation.json, propre au catalogue ouvert", function()

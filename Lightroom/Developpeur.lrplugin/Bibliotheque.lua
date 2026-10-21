@@ -137,6 +137,50 @@ local function selectionnerAvecSource(photos)
     return false, true, sources
 end
 
+-- Remet la vue d'avant une sélection faite par le module (débruitage, variantes, copie virtuelle,
+-- photo réimportée retirée par la recette) : la source affichée d'abord, si elle a changé, puis la
+-- photo active et la sélection. Comme pour selectionnerAvecSource, Lightroom met un moment à
+-- afficher la source remise : aussitôt après setActiveSources, setSelectedPhotos ne sélectionne
+-- rien (constaté en 2.3) ; la sélection se refait donc pendant DELAI_SOURCE secondes, puis la photo
+-- active se relit. Constaté le 21 octobre 2026 (mesures de la 1.3, Lightroom Classic 15.6) : remise
+-- sans attendre, la photo active d'avant, hors du dossier de la copie d'essai visée, ne revenait
+-- pas après un débruitage, son annulation ou une variante retenue (trois fois : une autre photo est
+-- restée active). Rend vrai si la photo active d'avant est revenue (ou s'il n'y en avait pas).
+local function remettreSelection(active, selection, sources)
+    local cat = catalogue()
+    if sources then
+        LrTasks.pcall(cat.setActiveSources, cat, sources)
+    end
+    if not active then
+        return true
+    end
+    local photos = { active }
+    for _, autre in ipairs(selection or {}) do
+        if autre.localIdentifier ~= active.localIdentifier then
+            photos[#photos + 1] = autre
+        end
+    end
+    local fin = LrDate.currentTime() + DELAI_SOURCE
+    while not selectionner(photos) do
+        if LrDate.currentTime() > fin then
+            -- La sélection entière ne revient pas (une photo filtrée entre-temps) : au moins la
+            -- photo active.
+            if #photos > 1 then
+                selectionner({ active })
+            end
+            break
+        end
+        LrTasks.sleep(0.2)
+    end
+    local cible = cat:getTargetPhoto()
+    local revenue = cible ~= nil and cible.localIdentifier == active.localIdentifier
+    if not revenue then
+        Liaison.noter("Photo active d'avant non remise : « " .. nomFichier(active) .. " » (autre photo active : "
+            .. (cible and ("« " .. nomFichier(cible) .. " »") or "aucune") .. ")")
+    end
+    return revenue
+end
+
 -- Mots-clés ----------------------------------------------------------------------------
 
 -- « Lieux > Canada > Montréal » (aussi avec › ou |) → { 'Lieux', 'Canada', 'Montréal' }.
@@ -1898,18 +1942,7 @@ function Bibliotheque.copieVirtuelle(params)
         end
         selectionner(copies)
     else
-        if sourceChangee and sources then
-            LrTasks.pcall(cat.setActiveSources, cat, sources)
-        end
-        if vue.active then
-            local autres = {}
-            for _, p in ipairs(vue.selection or {}) do
-                if p.localIdentifier ~= vue.active.localIdentifier then
-                    autres[#autres + 1] = p
-                end
-            end
-            LrTasks.pcall(cat.setSelectedPhotos, cat, vue.active, autres)
-        end
+        remettreSelection(vue.active, vue.selection, sourceChangee and sources or nil)
     end
     Liaison.noter(string.format("%d copie(s) virtuelle(s) « %s » créée(s) %s", #nouvelles, nom,
         horsEcriture and "hors d'une écriture" or "dans une écriture"))
@@ -2108,5 +2141,6 @@ end
 
 
 Bibliotheque.selectionnerAvecSource = selectionnerAvecSource
+Bibliotheque.remettreSelection = remettreSelection
 
 return Bibliotheque

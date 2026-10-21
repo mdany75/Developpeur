@@ -299,8 +299,13 @@ end
 -- compensation d'exposition, flash, programme et mesure de la lumière. Lues une à une par
 -- Photos.meta (getFormattedMetadata sous LrTasks.pcall) : une clé que Lightroom refuse, ou vide,
 -- donne nil sans gêner les autres. Jamais dans une lecture groupée (CLES_FORMATEES de Photos.lua,
--- batchGetFormattedMetadata) : une clé refusée y ferait échouer tout le lot. Ce que Lightroom
--- Classic 15.6 rend pour chacune reste à constater (mesure 3 de la 1.3).
+-- batchGetFormattedMetadata) : une clé refusée y ferait échouer tout le lot. Constaté le
+-- 21 octobre 2026 (Lightroom Classic 15.6, mesure 3 de la 1.3, cinq copies d'Essais : RAF de X-H2S
+-- et de X-T20, JPEG de X-T20, HEIC d'iPhone) : aucune des quatre n'est refusée, et chacune rend un
+-- texte traduit dans la langue de Lightroom, pas un code : « 0 EV », « Non déclenché »,
+-- « Priorité d'ouverture », « Priorité d'obturation », « Normal », « Moyenne pondérée », « Motif ».
+-- Rien ne les analyse : le texte va tel quel à Claude. Le format d'une compensation non nulle n'est
+-- pas relevé (aucune copie d'Essais n'en a).
 local CLES_PRISE_DE_VUE_PLUS = {
     { 'compensation', 'exposureBias' },
     { 'flash', 'flash' },

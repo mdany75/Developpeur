@@ -389,32 +389,51 @@ function Livraison.retirerReimportees(params)
     local cat = Photos.catalogue()
     local LrSelection = import 'LrSelection'
     local retires = Json.tableau()
-    for _, chemin in ipairs(type(params.chemins) == 'table' and params.chemins or {}) do
-        local quand = reimporteesSession[chemin]
-        if not quand or LrDate.currentTime() - quand > DUREE_RETRAIT then
-            echouer("« " .. tostring(chemin) .. " » n'a pas été réimporté par Claude dans cette session : rien n'est retiré.")
-        end
-        local ok, photo = LrTasks.pcall(cat.findPhotoByPath, cat, chemin)
-        if ok and photo then
-            if not Bibliotheque.selectionnerAvecSource({ photo }) then
-                echouer("Lightroom n'a pas sélectionné « " .. chemin .. " » : rien n'est retiré.")
+    -- La vue d'avant, remise à la fin (même après un échec) : sans elle, la photo active restait une
+    -- photo du dossier de la photo retirée (constaté le 21 octobre 2026 après la recette).
+    local vue = { active = cat:getTargetPhoto(), selection = cat:getTargetPhotos() }
+    local sourcesLues, sourcesAvant = LrTasks.pcall(cat.getActiveSources, cat)
+    if not sourcesLues then
+        sourcesAvant = nil
+    end
+    local selectionChangee, sourceChangee = false, false
+    local ok, erreur = LrTasks.pcall(function()
+        for _, chemin in ipairs(type(params.chemins) == 'table' and params.chemins or {}) do
+            local quand = reimporteesSession[chemin]
+            if not quand or LrDate.currentTime() - quand > DUREE_RETRAIT then
+                echouer("« " .. tostring(chemin) .. " » n'a pas été réimporté par Claude dans cette session : rien n'est retiré.")
             end
-            LrSelection.removeFromCatalog()
-            local fin = LrDate.currentTime() + 5
-            repeat
-                LrTasks.sleep(0.25)
-                local _, encore = LrTasks.pcall(cat.findPhotoByPath, cat, chemin)
-                if not encore then
-                    break
+            local trouvee, photo = LrTasks.pcall(cat.findPhotoByPath, cat, chemin)
+            if trouvee and photo then
+                selectionChangee = true
+                local fait, changee = Bibliotheque.selectionnerAvecSource({ photo })
+                sourceChangee = sourceChangee or changee
+                if not fait then
+                    echouer("Lightroom n'a pas sélectionné « " .. chemin .. " » : rien n'est retiré.")
                 end
-            until LrDate.currentTime() > fin
-            local _, encore = LrTasks.pcall(cat.findPhotoByPath, cat, chemin)
-            if encore then
-                echouer("Lightroom n'a pas retiré « " .. chemin .. " » du catalogue.")
+                LrSelection.removeFromCatalog()
+                local fin = LrDate.currentTime() + 5
+                repeat
+                    LrTasks.sleep(0.25)
+                    local _, encore = LrTasks.pcall(cat.findPhotoByPath, cat, chemin)
+                    if not encore then
+                        break
+                    end
+                until LrDate.currentTime() > fin
+                local _, encore = LrTasks.pcall(cat.findPhotoByPath, cat, chemin)
+                if encore then
+                    echouer("Lightroom n'a pas retiré « " .. chemin .. " » du catalogue.")
+                end
             end
+            reimporteesSession[chemin] = nil
+            retires[#retires + 1] = chemin
         end
-        reimporteesSession[chemin] = nil
-        retires[#retires + 1] = chemin
+    end)
+    if selectionChangee then
+        Bibliotheque.remettreSelection(vue.active, vue.selection, sourceChangee and sourcesAvant or nil)
+    end
+    if not ok then
+        error(erreur, 0)
     end
     return { retires = retires }
 end

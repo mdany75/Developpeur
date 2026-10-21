@@ -18,7 +18,11 @@ extension ToolHandler {
     /// La netteté d'une vignette du cache, ramenée à celle d'un aperçu exporté, sur laquelle les
     /// seuils ont été relevés : relevé le 17 octobre 2026 sur les six photos d'essai (aperçus du
     /// cache de 1720 px, réduits à 1024), de 0,84 à 0,93 fois la netteté de l'aperçu exporté
-    /// (moyenne 0,88) ; le bruit est le même (0,83 à 1,15 fois).
+    /// (moyenne 0,88) ; le bruit est le même (0,83 à 1,15 fois). Gardé après le relevé du 21 octobre
+    /// 2026 (cull_photos contre --constats sur six copies d'Essais) : le tri donne de 11 à 23 % de plus
+    /// que l'aperçu de 1 344 px, au point AF comme au plus net, mais les deux classent pareil (mêmes
+    /// photos sous 15 et au-dessus de 35) ; une baisse d'environ 15 % les rapprocherait, à relever sur
+    /// plus de photos avant de le changer.
     static let thumbnailSharpnessFactor = 1.13
     /// Photos mesurées en même temps (Vision, netteté).
     static let parallelMeasures = 2
@@ -208,7 +212,7 @@ extension ToolHandler {
         photo.vision = VisionAnalysis.analyze(image)
         photo.empreinte = VisionAnalysis.featurePrint(image)
         if let af = Self.pointAF(description, lecteur: pointsAF) {
-            photo.af = .init(point: af.point, nettete: Detail.nettete(image, autour: af.point).map { $0 * facteur }, avertissement: af.avertissement)
+            photo.af = .mesuree(image, point: af.point, avertissement: af.avertissement, facteur: facteur)
         }
         if motsCles { photo.motsCles = MotsClesVision.proposer(image) }
         return photo

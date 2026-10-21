@@ -246,8 +246,12 @@ enum Lecon {
     }
 
     /// Seuils des indices, provisoires : déduits des corrections de Claude, ils peuvent compter un
-    /// choix de style comme un défaut (d'où des remarques, jamais des refus). À relever sur les
-    /// huit copies « Essai » (mesure 3), puis à noter dans SPEC.
+    /// choix de style comme un défaut (d'où des remarques, jamais des refus). Gardés tels quels après
+    /// le relevé du 21 octobre 2026 (mesure 3, Lightroom Classic 15.6) : faute d'une vraie retouche de
+    /// chaque copie d'Essais, ils n'ont pas été jugés contre Claude et Dany. Les corrections nettes
+    /// viennent du journal de Claude, pas de l'état actuel : une copie remise hors de Claude
+    /// (Historique, ⌘Z) garde au journal des corrections qui n'y sont plus (relevé : 15 corrections et
+    /// des indices underexposed et color_cast faux sur une copie revenue à sa référence).
     enum Seuils {
         /// Exposure2012 remontée (sous-exposée) ou baissée (surexposée), en IL.
         static let exposition = 0.5

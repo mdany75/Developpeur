@@ -50,9 +50,15 @@ local Photos = require 'Photos'
 local Preferences = require 'Preferences'
 
 local Etapes = {
-    -- Côté des images de l'après (pixels), comme les rendus d'analyse.
+    -- Côté des images de l'après (pixels), comme les rendus d'analyse. Gardé après la mesure du
+    -- 21 octobre 2026 (Lightroom Classic 15.6, deux copies d'Essais, 13 étapes) : une capture prend
+    -- de 0,51 à 1,06 s (masques IA compris), sous la 1,5 s visée ; la réponse à Claude ne change pas
+    -- quand une vue de l'état existe (+4 %), +0,8 s sans elle (l'avant rendu avant l'écriture) ;
+    -- 0,6 à 0,9 Mo par étape.
     COTE = 1024,
-    -- Attente d'une capture en cours par la commande suivante (secondes).
+    -- Attente d'une capture en cours par la commande suivante (secondes). Gardée après la même
+    -- mesure : une commande suivante (view_photo) a attendu la fin de la capture environ 1,1 s, sans
+    -- jamais toucher ce plafond.
     ATTENTE = 8,
     -- Une capture plus longue que cela est tenue pour interrompue (secondes).
     PERIMEE = 120,
@@ -203,13 +209,26 @@ end
 -- l'empreinte, à toute profondeur. Les matrices UprightTransform_* (et UprightTransformCount),
 -- Lightroom les calcule au rendu d'après les autres réglages (constaté ; comme pour
 -- Recalage.empreinteGeometrie) : comptées, elles changeraient l'empreinte pendant le rendu de
--- l'après de toute étape qui pose Upright. Provisoire : à compléter d'après les relevés (mesure 1
--- de la 1.3, --dump avant et après une écriture).
+-- l'après de toute étape qui pose Upright. Liste gardée après le relevé du 21 octobre 2026
+-- (--dump avant et après, Lightroom Classic 15.6, deux copies d'Essais) : à 0, 1 et 5 s, après un
+-- aperçu, une proposition ou un débruitage relu, Lightroom n'a changé seul aucune clé, pas même
+-- une de celles-ci ; seules les écritures du module en ont changé (GlobalInputDigest du débruitage).
 local VOLATILES = { LensProfileName = true, LensProfileFilename = true, LensProfileIsEmbedded = true }
 
 local function volatile(cle)
     return type(cle) == 'string' and (VOLATILES[cle] or cle:match('Digest$') ~= nil or cle:match('DigestVersion$') ~= nil
         or cle:match('^UprightTransform') ~= nil)
+end
+
+-- Une table vide vaut une clé absente. Constaté le 21 octobre 2026 (même relevé) : sur une photo
+-- sans masque, MaskGroupBasedCorrections passait d'absente à {} (retour de view_photo compare =
+-- before_claude, annulation de l'étape qui posait des masques) puis de {} à absente (rendus du
+-- recalage), sans rien changer à l'image ; comptée, la vue gardée ne valait plus et l'étape suivante
+-- rendait de nouveau son avant. RetouchInfo (taches vidées, aRemettre), RetouchAreas, RedEyeInfo et
+-- DepthBasedCorrections sont des listes de la même sorte. Seulement sous une clé texte : un élément
+-- vide d'une liste garde sa place.
+local function vide(valeur)
+    return type(valeur) == 'table' and valeur ~= Json.null and next(valeur) == nil
 end
 
 local function sansVolatils(valeur)
@@ -218,7 +237,7 @@ local function sansVolatils(valeur)
     end
     local copie = {}
     for cle, element in pairs(valeur) do
-        if not volatile(cle) then
+        if not volatile(cle) and not (type(cle) == 'string' and vide(element)) then
             copie[cle] = sansVolatils(element)
         end
     end

@@ -156,6 +156,24 @@ final class CarnetTests: XCTestCase {
         XCTAssertFalse(v.cherches.contains("mise_au_point"), "\(v.cherches)")
         XCTAssertTrue(v.cherches.contains("flou"))
 
+        // Relevé le 21 octobre 2026 : le point AF sur du sable lisse (12,6, texture 12,9) ou un nuage
+        // (6,6, texture 14,4) disait la mise au point manquée sur des photos nettes. Sous le plancher
+        // de texture, elle n'est ni trouvée ni cherchée (non jugée) ; signalée par l'appareil, elle
+        // se cherche encore.
+        let sable = PhotoTriee.MiseAuPoint(point: CGPoint(x: 0.5, y: 0.395), nettete: 12.6, avertissement: false, texture: 12.9)
+        v = vue(detail: detail(nettete: 37.4), af: sable)
+        XCTAssertEqual(codes(v), [])
+        XCTAssertFalse(v.cherches.contains("mise_au_point"), "non jugée : \(v.cherches)")
+        XCTAssertTrue(v.cherches.contains("flou"))
+        let nuage = PhotoTriee.MiseAuPoint(point: CGPoint(x: 0.5, y: 0.5), nettete: 6.6, avertissement: false, texture: 14.4)
+        XCTAssertEqual(codes(vue(detail: detail(nettete: 171.9), af: nuage)), [])
+        let texture = PhotoTriee.MiseAuPoint(point: CGPoint(x: 0.5, y: 0.5), nettete: 6.6, avertissement: false, texture: 30)
+        XCTAssertEqual(codes(vue(detail: detail(nettete: 171.9), af: texture)), ["mise_au_point"], "de la texture : jugée")
+        let signalee = PhotoTriee.MiseAuPoint(point: CGPoint(x: 0.5, y: 0.5), nettete: 6.6, avertissement: true, texture: 10)
+        v = vue(detail: detail(nettete: 30), af: signalee)
+        XCTAssertEqual(codes(v), ["mise_au_point"])
+        XCTAssertTrue(v.cherches.contains("mise_au_point"))
+
         v = vue(detail: detail(bruit: 1.6))
         XCTAssertEqual(codes(v), ["bruit"])
         XCTAssertEqual(v.defauts.first?.texte, "bruit fort : 1,60 (seuil 1,5)")
@@ -382,8 +400,9 @@ final class CarnetTests: XCTestCase {
     func testViewPhotoCompteLaMiseAuPointManqueeAvantLeCarre() throws {
         tools.noterAuCarnet = true
         fake.replies["carnet"] = ["note": true]
-        // Net en haut à gauche seulement ; l'appareil a fait la mise au point en bas à droite.
-        repondreApercu(TriTests.damierLocal(cx: 0.25, cy: 0.3, cote: 0.2),
+        // Net en haut à gauche seulement ; l'appareil a fait la mise au point en bas à droite, sur un
+        // sujet flou qui a de la texture (sur un gris uni, elle ne se jugerait pas : plus bas).
+        repondreApercu(TriTests.damierLocalEtSujetFlou(cx: 0.25, cy: 0.3, cote: 0.2, fx: 0.75, fy: 0.7),
                        photo: ["id": 7, "fichier": "DSCF2402.RAF", "marque": "FUJIFILM", "chemin_original": "/Volumes/Photos/DSCF2402.RAF",
                                "geometrie": ["largeur": 1200, "hauteur": 800, "orientation": "AB"]])
         tools.lecteurBoitier = LecteurBoitier(delai: 1) { _ in
@@ -400,6 +419,23 @@ final class CarnetTests: XCTestCase {
         XCTAssertTrue(info["constats_prise_de_vue"]?.array?.first?.string?.hasPrefix("mise au point manquée") == true)
         // La netteté au point, mesurée une fois, est la même dans point_af et dans le constat.
         XCTAssertEqual(info["point_af"]?["nettete"]?.double, params["vue"]?["defauts"]?.array?.first?["mesure"]?.double)
+        XCTAssertNil(info["point_af"]?["mise_au_point"])
+
+        // Le point sur un gris uni (un ciel, du sable lisse : relevé le 21 octobre 2026) : non jugée,
+        // ni cherchée au carnet ; view_photo le dit dans point_af.
+        let dejaNotees = fake.carnets.count
+        repondreApercu(TriTests.damierLocal(cx: 0.25, cy: 0.3, cote: 0.2),
+                       photo: ["id": 8, "fichier": "DSCF1595.RAF", "marque": "FUJIFILM", "chemin_original": "/Volumes/Photos/DSCF1595.RAF",
+                               "geometrie": ["largeur": 1200, "hauteur": 800, "orientation": "AB"]])
+        let uni = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertFalse(uni.isError, uni.text)
+        XCTAssertEqual(fake.carnets.count, dejaNotees + 1)
+        let vueUni = try XCTUnwrap(fake.carnets.last?["vue"])
+        XCTAssertFalse(vueUni["cherches"]?.array?.contains("mise_au_point") == true, JSONCoding.line(vueUni))
+        XCTAssertEqual(vueUni["defauts"]?.array?.count, 0)
+        let infoUni = try JSONCoding.parse(uni.text)
+        XCTAssertTrue(infoUni["point_af"]?["mise_au_point"]?.string?.hasPrefix("non jugée : zone sans texture") == true, uni.text)
+        XCTAssertNil(infoUni["constats_prise_de_vue"])
     }
 
     // MARK: measure_angle et read_composition
