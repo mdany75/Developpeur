@@ -290,8 +290,19 @@ function Variantes.valeursClaude(ex, actuels)
     return valeurs, restent
 end
 
+-- Le nom d'une Look, avec son intensité quand elle n'est pas de 100 % (comme les changements d'un
+-- plan, Plans.lua : « Adobe Color (60 %) ») : une intensité changée, par Claude ou par Dany, est un
+-- écart même si le profil reste le même.
 local function nomLook(look)
-    return lookVide(look) and "aucune" or tostring(look.Name)
+    if lookVide(look) then
+        return "aucune"
+    end
+    local nom = tostring(look.Name)
+    local quantite = tonumber(look.Amount)
+    if quantite and math.abs(quantite - 1) > 1e-6 then
+        nom = string.format('%s (%d %%)', nom, math.floor(quantite * 100 + 0.5))
+    end
+    return nom
 end
 
 local function nul(valeur)
@@ -301,12 +312,23 @@ local function nul(valeur)
     return valeur
 end
 
--- Les écarts de l'exercice (fonction pure) : Json.tableau de {cle, depart, claude, vous}, par clé,
--- sur les réglages que Claude ou Dany ont changés depuis le départ. Look : le nom de la Look. Une
--- autre table (courbe, couleurs ponctuelles, flou d'objectif…) : « inchangée » ou « changée »
--- (vous : « changée » comme Claude, « changée autrement » sinon). Les listes vont à part (listes :
--- masques, taches, yeux_rouges = { depart, vous }, leurs nombres). Troisième résultat : vrai si
--- Dany n'a rien changé.
+-- Le nom sous lequel Claude voit un réglage : la balance des blancs d'un JPEG, d'un TIFF ou d'un
+-- HEIC (IncrementalTemperature, IncrementalTint) sous Temperature et Tint, comme dans les
+-- changements d'une proposition (la liste a_faire) et dans view_photo (Reglages.cleReelle).
+local NOMS_CLAUDE = { IncrementalTemperature = 'Temperature', IncrementalTint = 'Tint' }
+
+local function nomClaude(cle)
+    return NOMS_CLAUDE[cle] or cle
+end
+
+-- Les écarts de l'exercice (fonction pure) : Json.tableau de {cle, depart, claude, vous}, par clé
+-- (le nom que voit Claude, nomClaude : Temperature pour la balance d'un JPEG), sur les réglages
+-- que Claude ou Dany ont changés depuis le départ. Look : le nom de la Look, avec son intensité si
+-- elle n'est pas de 100 % (nomLook). Une autre table (courbe, couleurs ponctuelles, flou
+-- d'objectif…) : « inchangée » ou « changée » (vous : « changée » comme Claude, « changée
+-- autrement » sinon). Les listes vont à part (listes : masques, taches, yeux_rouges = { depart,
+-- vous }, leurs nombres). Troisième résultat : vrai si Dany n'a rien changé (ni réglage, ni table,
+-- ni liste).
 function Variantes.ecartsExercice(ex, actuels)
     local depart, claude = ex.depart or {}, ex.claude or {}
     local simples, tables, listesChangees, maintenant = changementsDeDany(ex, actuels)
@@ -326,7 +348,7 @@ function Variantes.ecartsExercice(ex, actuels)
     end
     for cle in pairs(simples) do ajouter(cle) end
     for cle in pairs(tables) do ajouter(cle) end
-    table.sort(cles)
+    table.sort(cles, function(a, b) return nomClaude(a) < nomClaude(b) end)
     local ecarts = Json.tableau()
     local rienChange = true
     for _, cle in ipairs(cles) do
@@ -360,14 +382,16 @@ function Variantes.ecartsExercice(ex, actuels)
             rienChange = false
         end
         if not egal(c, d) or not egal(v, d) then
-            ecarts[#ecarts + 1] = { cle = cle, depart = nul(d), claude = nul(c), vous = nul(v) }
+            ecarts[#ecarts + 1] = { cle = nomClaude(cle), depart = nul(d), claude = nul(c), vous = nul(v) }
         end
     end
     local listes = {}
     for _, l in ipairs(LISTES_MONTREES) do
         listes[l.nom] = { depart = nombre(depart, l.cle), vous = nombre(maintenant, l.cle) }
     end
-    if next(listesChangees) then
+    -- Une liste, ou une table (la Look : un autre détail que son nom et son intensité), changée par
+    -- Dany sans écart visible dans ecarts : il a quand même changé quelque chose.
+    if next(listesChangees) or next(tables) then
         rienChange = false
     end
     return ecarts, listes, rienChange

@@ -204,6 +204,64 @@ test("version de Claude : le profil tel que Lightroom l'a rangé ; la Look qu'il
     egal(photo:getDevelopSettings().CameraProfile, 'Adobe Standard', "l'état de Dany remis")
 end)
 
+test("écarts : l'intensité du profil compte, celle de Claude comme celle de Dany (même Look)", function()
+    -- Claude garde Adobe Color à 60 % : la liste a_faire le dit (« Adobe Color (60 %) »), la
+    -- comparaison aussi.
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    jeLeFais({}, { profil_look = { nom = 'Adobe Color', intensite = 0.6, candidats = Json.tableau({
+        { restriction = '', raw_seulement = false, look = { Name = 'Adobe Color', UUID = photo.reglages.Look.UUID, SupportsAmount = true,
+            Parameters = { CameraProfile = 'Adobe Standard' } } } }) } })
+    egal(photo.reglages.Look.Amount, 1, "remise")
+    local r = comparer()
+    proche(S.rendus[#S.rendus - 1].reglagesRendus.Look.Amount, 0.6, "la version de Claude, à 60 %")
+    local look = ecart(r.exercice, 'Look')
+    egal(look ~= nil, true, "une intensité changée est un écart, même profil")
+    egal(look.depart, 'Adobe Color')
+    egal(look.claude, 'Adobe Color (60 %)')
+    egal(look.vous, 'Adobe Color', "Dany ne l'a pas fait")
+    egal(r.exercice.rien_change, true)
+
+    -- Dany ne change que l'intensité : un écart, et il a changé quelque chose.
+    local autre = photoFuji()
+    S.active, S.selection = autre, { autre }
+    jeLeFais({ Vibrance = 15 })
+    local sienne = Reglages.pourLightroom(autre.reglages.Look)
+    sienne.Amount = 1.5
+    aLaMain(autre, { Look = sienne })
+    r = comparer()
+    egal(S.rendus[#S.rendus - 1].reglagesRendus.Look.Amount, 1, "la version de Claude garde l'intensité de départ")
+    look = ecart(r.exercice, 'Look')
+    egal(look ~= nil, true)
+    egal(look.claude, 'Adobe Color')
+    egal(look.vous, 'Adobe Color (150 %)')
+    egal(r.exercice.rien_change, false)
+    egal(autre.reglages.Look.Amount, 1.5, "l'état de Dany remis")
+end)
+
+test("écarts d'un JPEG : la balance sous les noms que voit Claude (Temperature, Tint), comme a_faire", function()
+    local photo = photoJpeg()
+    photo.reglages.Shadows2012 = 0
+    S.active, S.selection = photo, { photo }
+    local r = jeLeFais({ Temperature = 12, Tint = -4 }, { plages = { Temperature = { -100, 100 }, Tint = { -100, 100 } } })
+    egal(changement(r.changements, 'Temperature') ~= nil, true, "les changements (la liste a_faire) disent Temperature")
+    aLaMain(photo, { IncrementalTemperature = 20, WhiteBalance = 'Custom', Shadows2012 = 15 })
+    local ex = comparer().exercice
+    local temperature = ecart(ex, 'Temperature')
+    egal(temperature ~= nil, true, "Temperature, pas IncrementalTemperature")
+    egal(temperature.claude, 12)
+    egal(temperature.vous, 20)
+    egal(ecart(ex, 'Tint').claude, -4)
+    egal(ecart(ex, 'Tint').vous, 0, "Dany ne l'a pas fait")
+    egal(ecart(ex, 'IncrementalTemperature'), nil)
+    egal(ecart(ex, 'IncrementalTint'), nil)
+    egal(ecart(ex, 'Shadows2012').vous, 15)
+    -- Triés par le nom que voit Claude (Shadows2012 avant Temperature et Tint).
+    for i = 2, #ex.ecarts do
+        egal(ex.ecarts[i - 1].cle < ex.ecarts[i].cle, true, "écarts triés")
+    end
+end)
+
 test("comparaison : une mémoire d'exercice sans réglage est refusée avec sa raison", function()
     local photo = photoDEssai()
     photo.proprietes.variantesClaude = Json.encode({ ['Claude · ma version'] = { cles = Json.tableau(), le = '',
@@ -644,6 +702,14 @@ test("Variantes.valeursClaude et ecartsExercice : fonctions pures", function()
     egal(#ecarts, 1)
     egal(ecarts[1].cle, 'LensProfileEnable')
     egal(ecarts[1].claude, 1)
+
+    -- Une Look de même nom et de même intensité, mais autre (un autre profil du même nom) : pas
+    -- « rien changé ».
+    local autreLook = {}
+    for cle, valeur in pairs(base) do autreLook[cle] = valeur end
+    autreLook.Look = { Name = 'Adobe Color', Amount = 1, UUID = 'AUTRE' }
+    ecarts, listes, rien = Variantes.ecartsExercice(ex, autreLook)
+    egal(rien, false, "une Look changée compte")
 end)
 
 A.bilan()
