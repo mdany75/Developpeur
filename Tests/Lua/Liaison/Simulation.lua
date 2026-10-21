@@ -74,7 +74,9 @@ local function calculsIAEnAttente(reglages)
 end
 
 -- Dossier personnel simulé : ses fichiers restent en mémoire (S.fichiers), jamais sur le disque ;
--- de même les fichiers temporaires du module (vignettes, sous /tmp/Developpeur).
+-- de même les fichiers temporaires du module (vignettes, sous /tmp/Developpeur). Leur date de
+-- modification (S.datesFichiers, l'heure de la simulation S.horloge, comme LrDate.currentTime) est
+-- posée à chaque écriture ; un essai la change pour vieillir un fichier.
 S.home = '/simulation/home'
 local ouvrir = io.open
 io.open = function(chemin, mode)
@@ -99,6 +101,7 @@ io.open = function(chemin, mode)
             end,
             close = function()
                 S.fichiers[chemin] = table.concat(morceaux)
+                S.datesFichiers[chemin] = S.horloge
                 return true
             end,
         }
@@ -1959,9 +1962,15 @@ local modules = {
         parent = function(chemin) return chemin:match('^(.*)/[^/]*$') end,
     },
     LrFileUtils = {
-        -- Un dossier est rangé dans S.fichiers avec la valeur 'dossier'.
+        -- Un dossier est rangé dans S.fichiers avec la valeur 'dossier' ; comme dans Lightroom, chaque
+        -- dossier du chemin qui manque est créé.
         createAllDirectories = function(chemin)
-            if chemin and S.fichiers[chemin] == nil then S.fichiers[chemin] = 'dossier' end
+            local dossier = chemin
+            while dossier and dossier ~= '' and S.fichiers[dossier] == nil do
+                S.fichiers[dossier] = 'dossier'
+                S.datesFichiers[dossier] = S.horloge
+                dossier = dossier:match('^(.*)/[^/]*$')
+            end
             return true
         end,
         exists = function(chemin)
@@ -1970,15 +1979,45 @@ local modules = {
             return valeur == 'dossier' and 'directory' or 'file'
         end,
         delete = function(chemin)
-            S.fichiers[chemin] = nil
+            S.fichiers[chemin], S.datesFichiers[chemin] = nil, nil
             return true
         end,
+        -- fileModificationDate : secondes de LrDate (comparées à LrDate.currentTime, Session.menage).
         fileAttributes = function(chemin)
-            return S.fichiers[chemin] and { fileSize = #S.fichiers[chemin] } or nil
+            if not S.fichiers[chemin] then
+                return nil
+            end
+            return { fileSize = #S.fichiers[chemin], fileModificationDate = S.datesFichiers[chemin] or S.horloge }
         end,
         move = function(de, vers)
             S.fichiers[vers], S.fichiers[de] = S.fichiers[de], nil
+            S.datesFichiers[vers], S.datesFichiers[de] = S.datesFichiers[de], nil
             return true
+        end,
+        -- Un fichier copié garde sa date. Une destination déjà là n'est pas écrasée (supposé, comme
+        -- NSFileManager : à constater) ; un dossier ne se copie pas ici.
+        copy = function(de, vers)
+            local contenu = S.fichiers[de]
+            if contenu == nil or contenu == 'dossier' or S.fichiers[vers] ~= nil then
+                return false
+            end
+            S.fichiers[vers], S.datesFichiers[vers] = contenu, S.datesFichiers[de]
+            return true
+        end,
+        -- Les fichiers et dossiers d'un dossier (un niveau), triés.
+        directoryEntries = function(dossier)
+            local liste = {}
+            for chemin in pairs(S.fichiers) do
+                if chemin:sub(1, #dossier + 1) == dossier .. '/' and not chemin:sub(#dossier + 2):find('/', 1, true) then
+                    liste[#liste + 1] = chemin
+                end
+            end
+            table.sort(liste)
+            local i = 0
+            return function()
+                i = i + 1
+                return liste[i]
+            end
         end,
         files = function(dossier)
             local liste = {}
@@ -2190,6 +2229,7 @@ function S.reinitialiser()
     S.synchroAuto = false
     S.pendantAttente = nil
     S.fichiers = {}
+    S.datesFichiers = {}
     S.clicUtilisateur = true
     S.fenetresIA = {}
     S.renduImpossible = nil

@@ -4,8 +4,9 @@
 # (Lua 5.1, comme Lightroom) : la forme du module (fichiers nommés dans Info.lua, noms requis),
 # la syntaxe et les globales de chaque fichier, la syntaxe de relais.sh, les liens entre les
 # fichiers, puis les deux suites de tests, chacune sur son Lightroom simulé
-# (Tests/Lua/<suite>/Simulation.lua) :
-#   - Liaison : les commandes du serveur MCP (retouche, masques, tri, livraison…) ;
+# (Tests/Lua/<suite>/Simulation.lua), avec ses essais à part (Tests/Lua/<suite>/essais-*.lua) :
+#   - Liaison : les commandes du serveur MCP (retouche, masques, tri, livraison, carnet…), aides
+#     communes dans Tests/Lua/Liaison/Aides.lua ;
 #   - Fenetre : la fenêtre Claude (relais.sh et le moteur avec un faux Claude Code, ni Claude ni
 #     quota), Publication et Consommation.
 # Aucune ne touche Lightroom, Claude ni les fichiers de Claude : les fichiers vont dans un dossier
@@ -107,6 +108,14 @@ luajit "${TESTS_DIR}/Liaison/liens.lua" "${PLUGIN_DIR}"/*.lua
 
 printf '\nLiaison\n'
 luajit "${TESTS_DIR}/Liaison/tests.lua"
+
+# Essais à part de la liaison (essais-*.lua) : chacun charge la simulation et Aides.lua, et sort en
+# échec s'il en a un.
+for essais in "${TESTS_DIR}/Liaison"/essais-*.lua; do
+    [[ -e "${essais}" ]] || continue
+    printf '\n%s\n' "$(basename "${essais}" .lua)"
+    luajit "${essais}"
+done
 
 # Suite de la fenêtre Claude (Tests/Lua/Fenetre) ---------------------------------------------------
 
