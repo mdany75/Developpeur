@@ -53,7 +53,8 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 - Claude y travaille par Claude Code et votre forfait claude.ai, avec les seuls outils du
   connecteur : ni fichiers, ni terminal, ni web.
 - Les conversations : la liste les range par jour (Aujourd'hui, Hier, puis par mois), chacune avec
-  son heure ou sa date et son nombre de photos, 22 par page (« Plus anciennes… » au bout) ; la
+  son heure ou sa date et son nombre de photos, page par page (« Plus anciennes… » en bas,
+  « Plus récentes… » en haut) ; la
   recherche cherche dans leurs titres et leurs messages, sans tenir compte des accents. Chacune est
   une session Claude Code, reprise telle quelle à la réouverture. Renommer, supprimer (à la
   corbeille du Finder ; les retouches faites dans Lightroom restent). Le Carnet de progrès est en
@@ -160,10 +161,11 @@ vous-même.
 - L'aperçu montre l'après de l'étape ; Voir l'avant et Voir l'après passent de l'un à l'autre,
   Agrandir les montre côte à côte en grand, ◀ ▶ passent d'une étape à l'autre de la même photo, et
   Détail… montre l'appel de l'outil et sa réponse.
-- Les images se gardent pendant que Claude travaille, sur la photo active, fenêtre ouverte : un
-  rendu de plus par étape (environ une seconde, pendant que Claude écrit son appel suivant), rien
-  d'écrit dans le catalogue. Pas d'avant/après pour une étape faite fenêtre fermée (Claude Desktop
-  seul), sur plusieurs photos ou sur une autre photo que la photo active, ni pour un classement ;
+- Les images se gardent pendant que Claude travaille sur la photo active, fenêtre ouverte (ou
+  fermée pendant que le Claude de la fenêtre travaille) : un rendu de plus par étape (environ une
+  seconde, pendant que Claude écrit son appel suivant), rien d'écrit dans le catalogue. Pas
+  d'avant/après pour une étape faite par Claude Desktop ou Claude Code pendant que la fenêtre est
+  fermée, sur plusieurs photos ou sur une autre photo que la photo active, ni pour un classement ;
   la carte le dit. La case Avant/après du Gestionnaire de modules externes coupe ces rendus.
 
 **La leçon de la photo**

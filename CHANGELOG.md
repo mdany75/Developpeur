@@ -25,10 +25,11 @@ constats faits le 21 octobre 2026 sur une fenêtre d'essai. La capture du README
   rien écrire dans le catalogue (un rendu de plus par étape, environ une seconde, pendant que
   Claude écrit son appel suivant), dans `~/Library/Application Support/Developpeur/Etapes/` ; le
   module y fait le ménage à son chargement (30 jours, 500 Mo au plus). Pas d'avant/après pour une
-  étape faite fenêtre fermée, sur plusieurs photos ou sur une autre photo que la photo active, ni
-  pour un classement. Case « Avant/après » du Gestionnaire de modules externes (section Fenêtre
-  Claude), cochée par défaut. Chaque retouche demande à Claude une raison simple : le défaut vu,
-  puis ce que l'étape y fait ; elle reste au journal (`export_journal`).
+  étape faite par Claude Desktop ou Claude Code pendant que la fenêtre est fermée, sur plusieurs
+  photos ou sur une autre photo que la photo active, ni pour un classement. Case « Avant/après »
+  du Gestionnaire de modules externes (section Fenêtre Claude), cochée par défaut. Chaque retouche
+  demande à Claude une raison simple : le défaut vu, puis ce que l'étape y fait ; elle reste au
+  journal (`export_journal`).
 - La leçon de la photo : à la fin d'une retouche, Claude range la leçon de la photo
   (`photo_lesson`) en trois points, Lumière, Couleur et Composition : ce qui manquait, chiffres à
   l'appui, et ce qui l'aurait évité à la prise de vue (ou, si rien ne manquait, ce qu'il faut
@@ -63,7 +64,9 @@ constats faits le 21 octobre 2026 sur une fenêtre d'essai. La capture du README
   « Composition » s'ajoute aux raccourcis de la fenêtre (avant Sports). Sur une photo recadrée, la
   lecture passe par deux étapes « Claude · composition » dans l'Historique (le cadre retiré le
   temps du rendu, puis remis tel quel), et la proposition par une étape « Claude · essai : image
-  entière ». `view_photo` dit aussi vers où regarde chaque visage.
+  entière ». Un « visage » que Vision voit à l'envers (l'avant d'une voiture, sur une photo
+  d'essai) et une zone d'intérêt qui couvre plus de la moitié de l'image ne sont pas pris pour le
+  sujet. `view_photo` dit aussi vers où regarde chaque visage.
 - Le carnet de progrès : les défauts de vos prises de vue (horizon penché, sous-exposition, ciel
   brûlé, flou, mise au point manquée, bruit fort), notés tout seuls quand Claude regarde une photo
   pas encore retouchée, ou mesure une ligne penchée, et comptés par mois de prise de vue. La
@@ -88,12 +91,13 @@ constats faits le 21 octobre 2026 sur une fenêtre d'essai. La capture du README
 
 ### Changé
 - La fenêtre Claude, à l'allure de la maquette « B · Conversation claire », agrandie à
-  1 497 × 1 200 points (le volet des conversations doublé, le centre plus large, la hauteur plus
-  grande : environ 1 940 points laissés à Lightroom sur votre écran de 3 440 × 1 440) :
+  1 497 × 1 200 points (le volet des conversations, le centre et la hauteur plus grands que dans la
+  maquette, la colonne de droite inchangée : environ 1 940 points laissés à Lightroom sur votre
+  écran de 3 440 × 1 440) :
   - à gauche, le volet : « ＋ Nouvelle conversation », Rechercher, la liste par jour (Aujourd'hui,
-    Hier…) avec l'heure et le nombre de photos de chaque conversation, 22 par page, le Carnet de
-    progrès en tête ; en bas, Renommer… et Supprimer…, Publication… et Consommation…, les
-    versions et le voyant Écran ;
+    Hier…) avec l'heure et le nombre de photos de chaque conversation, page par page (« Plus
+    anciennes… » en bas, « Plus récentes… » en haut), le Carnet de progrès en tête ; en bas,
+    Renommer… et Supprimer…, Publication… et Consommation…, les versions et le voyant Écran ;
   - au centre, l'en-tête : le titre, le Mode en trois boutons radio (Appliquer, Proposer d'abord,
     Je le fais ; grisés pendant que Claude travaille), les voyants Claude Code et Lightroom, et la
     photo active avec la sélection ; le fil de 42 lignes, chaque tour marqué « Vous » ou « Claude »
@@ -113,15 +117,11 @@ constats faits le 21 octobre 2026 sur une fenêtre d'essai. La capture du README
   Refuser, Ajuster… et Je le fais (J'ai fini pendant l'exercice) à côté. Les messages de la fenêtre
   sont plus courts, pour tenir sur les deux lignes du bandeau ; l'infobulle donne le texte entier.
 - Le connecteur passe à 36 outils, avec `read_composition` (« Lire la composition ») et
-  `photo_lesson` (« Leçon de la photo »), en lecture seule : ils ne changent ni les photos ni le
-  catalogue. `export_journal` s'appelle « Journal et carnet de progrès ». Les invites
-  `retouche_pro`, `portrait` et `paysage` lisent la composition avant de recadrer, et celles qui
-  retouchent finissent par la leçon.
-- Une mise au point manquée sur une zone de faible texture (le bord d'un nuage) n'est plus qu'un
-  doute : la note plafonne à 2, à vérifier par un zoom à 100 %, sans rejet proposé, et le carnet
-  ne la compte pas.
-- Les lignes des tiers du cadre proposé sont plus épaisses, pour rester visibles sur un fond clair
-  dans l'aperçu de la fenêtre.
+  `photo_lesson` (« Leçon de la photo »), qui ne changent pas vos photos : la leçon va dans le
+  carnet de progrès, à part du catalogue, et la lecture d'une photo recadrée ne laisse que ses deux
+  étapes « Claude · composition » dans l'Historique. `export_journal` s'appelle « Journal et carnet
+  de progrès ». Les invites `retouche_pro`, `portrait` et `paysage` lisent la composition avant de
+  recadrer, et celles qui retouchent finissent par la leçon.
 - `uninstall.sh` garde le carnet de progrès (`carnet.json`, leçons comprises) et l'avant/après des
   étapes (`Etapes/`) ; `uninstall.sh --tout` les retire avec le reste.
 
@@ -132,15 +132,16 @@ constats faits le 21 octobre 2026 sur une fenêtre d'essai. La capture du README
   colonne de droite, Note par défaut.
 
 ### Corrigé
-- La photo active revient après un débruitage ou son annulation, une variante choisie (que
-  Lightroom calcule dans le module Développement) et une copie virtuelle : le module remet la
-  source et la sélection d'avant, le temps que Lightroom les affiche (constaté le 21 octobre 2026 :
-  une autre photo restait active).
-- Une mise au point posée sur une zone sans texture (sable lisse, ciel uni) n'est plus jugée
-  manquée, au tri comme au carnet : elle est « non jugée » (constaté le 21 octobre 2026 sur deux
-  photos d'essai nettes, rejet proposé à tort).
-- Le devant d'une voiture n'est plus pris pour un visage à l'envers, et une zone d'intérêt qui
-  couvre plus de la moitié de l'image n'est plus prise pour le sujet.
+- La photo active revient après un passage par le module Développement (débruitage, suppression
+  des reflets, variante choisie, et leur annulation) et après une copie virtuelle : le module
+  remet la source et la sélection d'avant, le temps que Lightroom les affiche (constaté le
+  21 octobre 2026 : une autre photo restait active).
+- La mise au point ne se juge plus sur une zone sans détail : posée sur du sable lisse ou un ciel
+  uni, elle est « non jugée » ; sur une texture faible (le bord d'un nuage), une mise au point
+  manquée n'est plus qu'un doute : 2 ★ au plus, à vérifier par un zoom à 100 %, sans rejet
+  proposé, et le carnet ne la compte pas. Constaté le 21 octobre 2026 sur deux photos d'essai
+  nettes, que le tri proposait à tort de rejeter. Revers connu : un petit visage vraiment flou
+  passe lui aussi pour un doute.
 - Une ligne mesurée sur un contour irrégulier (les rides du sable) ne se dit plus « affinée » :
   `measure_angle` et `read_composition` le disent, et l'angle vient des deux points donnés.
 - `export_journal` montre maintenant les réglages d'une variante choisie (`choose_variant`) : son

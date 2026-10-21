@@ -1019,9 +1019,10 @@ filet, Publication… et Consommation… (venus de la colonne droite), les deux 
 une case par conversation (titre en gras si elle est choisie, sous-titre « 19 h 46 · 1 photo » ou
 « 12 oct. · 48 photos », `Fenetre.sousTitreListe`), des en-têtes de jour (Aujourd'hui, Hier,
 « Plus tôt en <mois> », « <Mois> <année> », `Fenetre.periodeListe`, mois de `Carnet.MOIS`),
-jamais en bout de page, et « Plus anciennes… » ou « Plus récentes… » toujours dans la dernière
-case ; la page se garde (`Fenetre.pageListe`), remise à 1 par la recherche et par Nouvelle. La case
-du Carnet de progrès vient en tête (`Fenetre.CARNET`, voir Carnet de progrès). Chaque case porte
+jamais en bout de page, « Plus récentes… » dans la première case d'une page qui en suit une
+autre et « Plus anciennes… » toujours dans la dernière case ; la page se garde
+(`Fenetre.pageListe`), remise à 1 par la recherche et par Nouvelle. La case du Carnet de progrès
+vient en tête (`Fenetre.CARNET`, voir Carnet de progrès). Chaque case porte
 un calque (`Fenetre.cliquerListe`, refusé pendant que Claude travaille : le bandeau le dit) et une
 infobulle liée qui donne le titre entier. La `simple_list` de la 1.2 est retirée, avec
 `selectionListe`, `listeConversations` et leur observateur.

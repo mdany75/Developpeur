@@ -853,18 +853,15 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   `S.BOUTONS` des essais) et tout calque annulent l'envoi automatique (un clic valide d'abord le
   champ, constaté D3), et les essais le vérifient pour chacun : un `f:push_button` créé à part
   enverrait la demande tapée.
-- Mise en page de la fenêtre B : le volet (« ＋ Nouvelle conversation », Rechercher, la liste en
-  cases — `Fenetre.casesListe` pure, `Fenetre.cliquerListe`, pages `Fenetre.pageListe` avec « Plus
-  anciennes… » ou « Plus récentes… » en dernière case, en-têtes de jour `Fenetre.periodeListe`,
-  sous-titres `Fenetre.sousTitreListe`, le Carnet de progrès en première case —, Renommer…,
-  Supprimer…, Publication…, Consommation…, les versions, le voyant Écran) ; l'en-tête (le titre en
-  gras 16, le Mode, les voyants Claude Code et Lightroom, `infoPhoto` en texte riche) ; le fil ; la
-  barre (▲ ▼ Fin, la position, l'activité ou le forfait) ; la saisie (sept invites en carrés, le
-  champ, 📎 et 📋 à icône seule, l'étiquette « Style » et son menu, le bandeau, Envoyer). L'étiquette
-  « Style » est devant son menu, comme dans la maquette (décision de Dany après le lot B3, qui
-  remplace le « sans étiquette » du 20 octobre 2026) ; pas de menu Modèle (Modèle et Effort sont au
-  Gestionnaire de modules externes). Trois voyants en pastilles PNG : Claude Code et Lightroom dans
-  l'en-tête, Écran en bas du volet ; plus de voyant Mode. Le Mode : trois `radio_button` liés à
+- Mise en page de la fenêtre B (le détail pièce par pièce : `docs/SPEC.md`, Fenêtre B) : la
+  liste des conversations en cases fixes (`Fenetre.casesListe`, pure : le Carnet de progrès en
+  première case de la première page, « Plus récentes… » en tête d'une page qui en suit une autre,
+  « Plus anciennes… » toujours en dernière case ; page gardée par `Fenetre.pageListe`) ; sept
+  invites en carrés. L'étiquette « Style » est devant son menu, sous le champ, comme dans la
+  maquette (décision de Dany après le lot B3, qui remplace le « sans étiquette » du 20 octobre
+  2026) ; pas de menu Modèle (Modèle et Effort sont au Gestionnaire de modules externes). Trois
+  voyants en pastilles PNG : Claude Code et Lightroom dans l'en-tête, Écran en bas du volet ; plus
+  de voyant Mode. Le Mode : trois `radio_button` liés à
   `mode` (Appliquer, Proposer d'abord, Je le fais) par `Fenetre.lierRadio` (un clic, même sur le
   radio déjà coché, annule l'envoi automatique), grisés pendant que Claude travaille (décision de
   Dany), la valeur tirée de l'état (`Fenetre.modeMontre`, garde `Fenetre.modeAuto`) et reposée au
