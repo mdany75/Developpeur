@@ -25,7 +25,9 @@
 -- (Note, Proposition, Pourquoi ?) ; l'aperçu appartient à l'onglet (Fenetre.apercuOnglet), un vrai
 -- clic sur un onglet a son crochet (Fenetre.surOnglet) ; un clic sur une ligne du fil se répartit
 -- dans un ordre fixé (Fenetre.cliquerLigne) ; le fil montre la conversation ou une autre page
--- (Fenetre.vue), et Claude qui travaille ramène à la conversation.
+-- (Fenetre.vue), et Claude qui travaille ramène à la conversation. L'autre page est celle du
+-- Carnet de progrès (1.3, section « Carnet de progrès » : son entrée en tête de la liste des
+-- conversations, ses lignes faites par Fil.lignesCarnet), sans pièce de mise en page à elle.
 
 local LrBinding = import 'LrBinding'
 local LrColor = import 'LrColor'
@@ -35,6 +37,7 @@ local LrPathUtils = import 'LrPathUtils'
 local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
 
+local Carnet = require 'Carnet'
 local Chemins = require 'Chemins'
 local Composants = require 'Composants'
 local Consignes = require 'Consignes'
@@ -272,7 +275,12 @@ local function periode(t, maintenant)
     return "Plus ancien"
 end
 
--- Éléments de la liste : en-têtes de période et conversations trouvées (tables neuves, sans
+-- La valeur d'un en-tête de période commence par ENTETE ; celle de l'entrée de la page du carnet
+-- est Fenetre.CARNET (section « Carnet de progrès »), qui n'en est pas un.
+local ENTETE = '§'
+
+-- Éléments de la liste : l'entrée « Carnet de progrès » en tête (1.3 ; montrée aussi quand la
+-- recherche la trouve), puis en-têtes de période et conversations trouvées (tables neuves, sans
 -- métatable : Lightroom bloque sur une table relue par Json.decode).
 function Fenetre.elementsListe(recherche)
     local items = {}
@@ -286,7 +294,7 @@ function Fenetre.elementsListe(recherche)
         if not estSeance(c) and Conversation.correspond(c, recherche or '') then
             local p = periode(c.modifiee or c.creee or os.time())
             if p ~= derniere then
-                items[#items + 1] = { title = p, value = '§' .. p }
+                items[#items + 1] = { title = p, value = ENTETE .. p }
                 derniere = p
             end
             items[#items + 1] = { title = "   " .. tostring(c.titre or ''), value = c.id }
@@ -294,6 +302,9 @@ function Fenetre.elementsListe(recherche)
     end
     if courante and not dejaVue and not estSeance(courante) then
         table.insert(items, 1, { title = "   " .. tostring(courante.titre or Conversation.TITRE_PAR_DEFAUT), value = courante.id })
+    end
+    if Conversation.correspond({ titre = Fenetre.TITRE_CARNET }, recherche or '') then
+        table.insert(items, 1, { title = Fenetre.TITRE_CARNET, value = Fenetre.CARNET })
     end
     return items
 end
@@ -309,6 +320,8 @@ function Fenetre.rafraichirListe()
         morceaux[#morceaux + 1] = tostring(item.value) .. '\1' .. item.title
     end
     morceaux[#morceaux + 1] = Moteur.courante and Moteur.courante.id or ''
+    -- Sur la page du carnet, c'est son entrée qui est choisie.
+    morceaux[#morceaux + 1] = Fenetre.vue
     local signature = table.concat(morceaux, '\2')
     -- Remplacer la liste à chaque rafraîchissement la ferait sauter : seulement si elle change.
     if signature == Fenetre.signatureListe then
@@ -317,24 +330,36 @@ function Fenetre.rafraichirListe()
     Fenetre.signatureListe = signature
     Fenetre.majListe = true
     p.listeConversations = items
-    if Moteur.courante then
+    if Fenetre.vue == 'carnet' then
+        p.selectionListe = { Fenetre.CARNET }
+    elseif Moteur.courante then
         p.selectionListe = { Moteur.courante.id }
     end
     Fenetre.majListe = false
 end
 
--- Choix dans la liste : ouvre la conversation (un en-tête, ou un refus, remet le choix).
+-- Choix dans la liste : l'entrée du carnet ouvre sa page ; une conversation s'ouvre et ramène au
+-- fil (la conversation déjà ouverte aussi, choisie depuis la page) ; un en-tête, ou un refus,
+-- remet le choix (la page reste).
 function Fenetre.choisirDansListe(valeur)
     if Fenetre.majListe then
         return
     end
     local id = type(valeur) == 'table' and valeur[1] or valeur
-    if id == nil or (Moteur.courante and id == Moteur.courante.id) then
+    if id == nil then
         return
     end
-    if type(id) == 'string' and id:sub(1, 1) == '§' then
+    if id == Fenetre.CARNET then
+        Fenetre.ouvrirCarnet()
+        return
+    end
+    if type(id) == 'string' and id:sub(1, #ENTETE) == ENTETE then
         Fenetre.signatureListe = nil
         Fenetre.rafraichirListe()
+        return
+    end
+    if Moteur.courante and id == Moteur.courante.id then
+        Fenetre.quitterCarnet()
         return
     end
     local ok, raison = Moteur.ouvrir(id)
@@ -344,6 +369,7 @@ function Fenetre.choisirDansListe(valeur)
         Fenetre.rafraichirListe()
         return
     end
+    Fenetre.quitterCarnet()
     Fenetre.defilement = 0
     Fenetre.indiceImage = nil
     Fenetre.imageCliquee = nil
@@ -351,23 +377,32 @@ function Fenetre.choisirDansListe(valeur)
     Fenetre.p.message = ''
 end
 
-function Fenetre.nouvelle()
+-- Nouvelle conversation (le bouton) : elle se montre, la page du carnet se quitte. `garderPage` :
+-- une autre photo choisie dans Lightroom (Fenetre.suivreSelection) la prépare sans quitter la
+-- page du carnet, que Dany lit ; elle se montre au retour au fil. Rend vrai si elle est prête.
+function Fenetre.nouvelle(garderPage)
     local ok, raison = Moteur.nouvelle()
-    if not ok and Fenetre.p then
-        Fenetre.p.message = raison or ''
-        return
+    if not ok then
+        if Fenetre.p then
+            Fenetre.p.message = raison or ''
+        end
+        return false
     end
-    Fenetre.defilement = 0
+    if not (garderPage and Fenetre.vue == 'carnet') then
+        Fenetre.quitterCarnet()
+        Fenetre.defilement = 0
+    end
     Fenetre.indiceImage = nil
     Fenetre.imageCliquee = nil
     Fenetre.etape = nil
     Fenetre.aRafraichir = true
+    return true
 end
 
 -- Fil -----------------------------------------------------------------------------------------
 
 -- Ce que montre la grille du fil : la conversation ('conversation', par défaut et à chaque
--- ouverture) ou une autre page (la page Carnet de progrès, 'carnet', d'un lot suivant). Claude qui
+-- ouverture) ou une autre page (la page Carnet de progrès, 'carnet'). Claude qui
 -- travaille ramène à la conversation (Fenetre.rafraichir) : une demande partie d'ailleurs que le
 -- champ (Accepter, Refuser, Ajuster…, Je le fais, J'ai fini) se suit dans le fil.
 -- Rend vrai si la vue a changé ; le fil se relit alors depuis la fin. La conversation montrée
@@ -381,6 +416,11 @@ function Fenetre.revenirAuFil()
     Fenetre.defilement = 0
     Fenetre.cache = {}
     Fenetre.total = nil
+    -- Le bandeau qui disait de choisir une conversation (Renommer…, Supprimer… sur la page du
+    -- carnet) ne vaut plus sur le fil.
+    if Fenetre.p and Fenetre.p.message == Fenetre.CHOISIR_CONVERSATION then
+        Fenetre.p.message = ''
+    end
     return true
 end
 
@@ -393,25 +433,39 @@ function Fenetre.rafraichirFil()
     if not p then
         return
     end
-    local c = Moteur.courante
-    if Fenetre.conversationAffichee ~= c then
-        Fenetre.defilement = 0
-        Fenetre.cache = {}
-        Fenetre.total = nil
-        -- L'étape choisie (onglet Pourquoi ?) était de l'autre conversation.
-        Fenetre.etape = nil
+    local lignes
+    local carnet = Fenetre.vue == 'carnet'
+    if carnet then
+        -- La page du carnet : la conversation montrée (Fenetre.conversationAffichee) ne change pas,
+        -- pour que le retour au fil garde ce qui la suit (l'étape choisie de l'onglet Pourquoi ?).
+        -- La page se lit depuis son haut : sa place se compte en lignes au-dessus de la grille
+        -- (Fenetre.hautCarnet), gardée quand elle se relit.
+        lignes = Fil.lignesCarnet(Fenetre.pageCarnet, Fenetre.largeurTexte(), Fenetre.TITRE_CARNET)
+        Fenetre.defilement = math.max(0, #lignes - T.lignes - (Fenetre.hautCarnet or 0))
+    else
+        local c = Moteur.courante
+        if Fenetre.conversationAffichee ~= c then
+            Fenetre.defilement = 0
+            Fenetre.cache = {}
+            Fenetre.total = nil
+            -- L'étape choisie (onglet Pourquoi ?) était de l'autre conversation.
+            Fenetre.etape = nil
+        end
+        lignes = c and Fil.lignes(c, Fenetre.largeurTexte(), Fenetre.cache) or {}
+        -- Lecteur remonté dans le fil : ce qui arrive ne déplace pas ce qu'il lit.
+        if Fenetre.defilement > 0 and Fenetre.total and #lignes > Fenetre.total then
+            Fenetre.defilement = Fenetre.defilement + (#lignes - Fenetre.total)
+        end
+        Fenetre.conversationAffichee = c
+        Fenetre.total = #lignes
     end
-    local lignes = c and Fil.lignes(c, Fenetre.largeurTexte(), Fenetre.cache) or {}
-    -- Lecteur remonté dans le fil : ce qui arrive ne déplace pas ce qu'il lit.
-    if Fenetre.defilement > 0 and Fenetre.total and #lignes > Fenetre.total then
-        Fenetre.defilement = Fenetre.defilement + (#lignes - Fenetre.total)
-    end
-    Fenetre.conversationAffichee = c
-    Fenetre.total = #lignes
     Fenetre.lignes = lignes
     local premiere, defilement = Fil.fenetre(#lignes, T.lignes, Fenetre.defilement)
     Fenetre.defilement = defilement
     Fenetre.premiere = premiere
+    if carnet then
+        Fenetre.hautCarnet = premiere - 1
+    end
     for i = 1, T.lignes do
         local l = lignes[premiere + i - 1]
         poser(p, 't' .. i, l and l.texte or '')
@@ -436,6 +490,10 @@ function Fenetre.defiler(pas)
     else
         Fenetre.defilement = math.max(0, Fenetre.defilement + pas)
     end
+    -- Sur la page du carnet, sa place se garde depuis le haut (Fenetre.rafraichirFil).
+    if Fenetre.vue == 'carnet' and Fenetre.T then
+        Fenetre.hautCarnet = math.max(0, #(Fenetre.lignes or {}) - Fenetre.T.lignes - Fenetre.defilement)
+    end
     Fenetre.rafraichirFil()
 end
 
@@ -443,7 +501,8 @@ end
 -- prioritaire sur l'aperçu de l'onglet), une ligne de la page Carnet de progrès (la rangée d'un
 -- défaut, `defaut`, ou une action, `action`), une ligne de leçon, une étape de Claude (onglet
 -- Pourquoi ?), sinon le détail d'un outil. Fenetre.sorteDeClic dit laquelle,
--- Fenetre.clics[sorte](l, e) la traite. Le carnet est un crochet vide, rempli par un lot suivant ;
+-- Fenetre.clics[sorte](l, e) la traite. Une rangée du tableau du carnet ouvre la fenêtre de ses
+-- photos, sa ligne d'action demande à Claude ce qu'il en pense (section « Carnet de progrès ») ;
 -- une ligne de la carte d'une leçon ouvre le détail de son appel ; une étape (ligne
 -- « · Pourquoi ? », Conversation.estEtape) s'ouvre dans l'onglet Pourquoi ? (Fenetre.montrerEtape).
 function Fenetre.estEtape(e)
@@ -483,7 +542,18 @@ Fenetre.clics = {
         end
         Fenetre.rafraichirApercu()
     end,
-    carnet = function() end,
+    -- Les lignes de la page du carnet (1.3) : seulement sur la page (Fenetre.vue). Une rangée du
+    -- tableau : la fenêtre de ses photos, dans une tâche (le carnet se lit par LrTasks.pcall).
+    carnet = function(l)
+        if Fenetre.vue ~= 'carnet' then
+            return
+        end
+        if l.defaut ~= nil then
+            enTache(Fenetre.montrerDefaut, l.defaut)
+        elseif l.action == 'demander' then
+            Fenetre.demanderCarnet()
+        end
+    end,
     -- La carte d'une leçon (1.3) : le détail de son appel de photo_lesson (les points donnés, puis
     -- la réponse : faits mesurés, indices, remarques), à part, dans une tâche.
     lecon = function(_, e)
@@ -536,6 +606,282 @@ function Fenetre.montrerDetail(e)
         actionVerb = "Fermer",
         cancelVerb = '< exclude >',
     }
+end
+
+-- Carnet de progrès (1.3) ---------------------------------------------------------------------
+-- La page du carnet dans la grille du fil (Fenetre.vue = 'carnet'), atteinte par l'entrée
+-- « Carnet de progrès » en tête de la liste des conversations (valeur Fenetre.CARNET, dans une
+-- table neuve comme les autres éléments, Fenetre.elementsListe).
+-- Le résumé vient du module (Carnet.resumer, seule source des phrases), lu dans une tâche (le
+-- chemin du catalogue se lit par LrTasks.pcall), et se met en lignes par Fil.lignesCarnet ; la
+-- conversation montrée ne change pas pendant ce temps. Une rangée du tableau ouvre la fenêtre de
+-- ses photos (Fenetre.montrerDefaut : leurs constats et leurs leçons, « Retirer du carnet… »), la
+-- ligne d'action une nouvelle conversation qui demande à Claude ce qu'il en pense
+-- (Fenetre.demanderCarnet, Consignes.carnet). Une conversation choisie dans la liste (celle déjà
+-- ouverte comprise), Nouvelle conversation, une demande (Envoyer, une invite) ou Claude qui
+-- travaille (Accepter, Je le fais…) ramènent au fil ; Renommer… et Supprimer… ne font rien sur la
+-- page (ils viseraient la conversation cachée). La boucle relit la page quand le registre change
+-- (Carnet.version, abonnement 'fenetre'). Rien ici ne touche aux pièces de la fenêtre (Vues.lua,
+-- Dispositions.lua) : la page ne fait que remplir la grille du fil.
+Fenetre.CARNET = '¶carnet'
+Fenetre.TITRE_CARNET = Carnet.TITRES.carnet
+Fenetre.CHOISIR_CONVERSATION = "Le carnet de progrès est montré : choisissez d'abord une conversation dans la liste."
+Fenetre.CLAUDE_TRAVAILLE = "Claude travaille : attendez la fin, ou cliquez Arrêter."
+
+-- Montre la page du carnet (depuis la liste ; pas pendant que Claude travaille : la liste est
+-- alors inactive, et Claude ramènerait aussitôt au fil). Elle se lit depuis son haut
+-- (Fenetre.hautCarnet), son résumé relu dans une tâche. Rend vrai si la page est montrée.
+function Fenetre.ouvrirCarnet()
+    local p = Fenetre.p
+    if not p then
+        return false
+    end
+    if Moteur.travaille then
+        p.message = Fenetre.CLAUDE_TRAVAILLE
+        Fenetre.signatureListe = nil
+        Fenetre.rafraichirListe()
+        return false
+    end
+    p.message = ''
+    if Fenetre.vue ~= 'carnet' then
+        Fenetre.vue = 'carnet'
+        Fenetre.pageCarnet = nil
+        Fenetre.hautCarnet = 0
+    end
+    Fenetre.versionCarnet, Fenetre.aRafraichirCarnet = Carnet.version, false
+    enTache(Fenetre.lireCarnet)
+    Fenetre.aRafraichir = true
+    return true
+end
+
+-- Relit le résumé du carnet (depuis une tâche) et, sur la page, la redessine. Un résumé qui ne se
+-- lit pas fait une page qui le dit (Fil.lignesCarnet), jamais une page en lecture sans fin.
+function Fenetre.lireCarnet()
+    Fenetre.versionCarnet = Carnet.version
+    local ok, page = LrTasks.pcall(Carnet.resumer, os.time())
+    if not ok then
+        Journal.noter("Carnet de progrès :", tostring(page))
+        page = { erreur = tostring(page) }
+    end
+    Fenetre.pageCarnet = page
+    if Fenetre.vue == 'carnet' and Fenetre.p then
+        Fenetre.rafraichirFil()
+    end
+    return page
+end
+
+-- Revient au fil depuis la page du carnet (rien sur le fil) ; rend vrai si la vue a changé.
+function Fenetre.quitterCarnet()
+    if not Fenetre.revenirAuFil() then
+        return false
+    end
+    Fenetre.pageCarnet = nil
+    Fenetre.aRafraichir = true
+    return true
+end
+
+-- Vrai sur la page du carnet, où Renommer… et Supprimer… (✎ aussi) ne font rien : le bandeau dit
+-- de choisir une conversation.
+local function surLaPageDuCarnet()
+    if Fenetre.vue ~= 'carnet' then
+        return false
+    end
+    if Fenetre.p then
+        Fenetre.p.message = Fenetre.CHOISIR_CONVERSATION
+    end
+    return true
+end
+
+-- Le nom d'un axe de leçon rangé au carnet (Carnet.AXES : 'lumiere', 'couleur', 'composition'),
+-- celui de la carte du fil (Conversation.AXES_LECON, dans le même ordre).
+function Fenetre.nomAxeCarnet(axe)
+    for i, a in ipairs(Carnet.AXES) do
+        if a == axe and Conversation.AXES_LECON[i] then
+            return Conversation.AXES_LECON[i].nom
+        end
+    end
+    return tostring(axe or '?')
+end
+
+local function texteOuNil(valeur)
+    if type(valeur) == 'string' and Texte.nettoyer(valeur) ~= '' then
+        return Texte.nettoyer(valeur)
+    end
+    return nil
+end
+
+-- Le nom d'une photo du carnet (Carnet.photosDuDefaut) : son fichier, sinon son identifiant.
+function Fenetre.nomPhotoCarnet(x)
+    return texteOuNil(x.fichier) or ("photo " .. Conversation.clePhoto(x.original or x.photo))
+end
+
+-- Une inclinaison en degrés, au dixième, sans signe (« 1,2° »), comme le carnet la note.
+local function degres(x)
+    local d = math.floor(math.abs(x) * 10 + 0.5)
+    return string.format('%d,%d°', math.floor(d / 10), d % 10)
+end
+
+-- Une photo d'un défaut, sur une ligne : « octobre 2026 · DSCF4961.RAF · ciel brûlé : 4,2 % … ·
+-- leçon » (le constat, sinon sa mesure ; `angle` : une ligne penchée, dite en degrés).
+function Fenetre.textePhotoDuDefaut(x)
+    local morceaux = { texteOuNil(x.mois_libelle) or tostring(x.mois or '?'), Fenetre.nomPhotoCarnet(x) }
+    local mesure = type(x.mesure) == 'number' and (x.angle and ("ligne penchée de " .. degres(x.mesure))
+        or ("mesure : " .. Texte.nombre(x.mesure))) or nil
+    local constat = texteOuNil(x.texte) or mesure
+    if constat then
+        morceaux[#morceaux + 1] = constat
+    end
+    if type(x.lecons) == 'table' and #x.lecons > 0 then
+        morceaux[#morceaux + 1] = "leçon"
+    end
+    return table.concat(morceaux, " · ")
+end
+
+-- Les leçons rangées avec une photo du carnet (l'original et ses copies virtuelles), en lignes,
+-- comme la carte du fil : par axe, ce qui manquait puis la prise de vue.
+function Fenetre.texteLecons(x)
+    local lecons = x and type(x.lecons) == 'table' and x.lecons or {}
+    if #lecons == 0 then
+        return "Pas de leçon rangée pour cette photo : Claude en fait une après sa retouche."
+    end
+    local lignes = {}
+    for _, l in ipairs(lecons) do
+        if #lignes > 0 then
+            lignes[#lignes + 1] = ''
+        end
+        lignes[#lignes + 1] = "Leçon de la photo · " .. (texteOuNil(l.fichier) or Fenetre.nomPhotoCarnet(x))
+        for _, pt in ipairs(type(l.points) == 'table' and l.points or {}) do
+            lignes[#lignes + 1] = Fenetre.nomAxeCarnet(pt.axe)
+            local manque, prise = texteOuNil(pt.manque), texteOuNil(pt.prise_de_vue) or ''
+            if manque then
+                lignes[#lignes + 1] = "    Ce qui manquait : " .. manque
+                lignes[#lignes + 1] = "    À la prise de vue : " .. prise
+            else
+                lignes[#lignes + 1] = "    Rien ne manquait."
+                lignes[#lignes + 1] = "    À refaire : " .. prise
+            end
+        end
+    end
+    return table.concat(lignes, '\n')
+end
+
+-- Le défaut `code` de la page lue (libellé, conseil), sinon du vocabulaire rangé au carnet.
+local function defautDuCarnet(code)
+    local page = Fenetre.pageCarnet
+    for _, d in ipairs(type(page) == 'table' and type(page.defauts) == 'table' and page.defauts or {}) do
+        if d.code == code then
+            return d
+        end
+    end
+    for _, d in ipairs(Carnet.vocabulaire()) do
+        if d.code == code then
+            return d
+        end
+    end
+    return { code = code }
+end
+
+-- La fenêtre des photos d'un défaut (depuis une tâche) : bâtie au clic, des tables neuves
+-- (Carnet.photosDuDefaut, dans les mois de la page), la plus récente d'abord ; la leçon de la
+-- photo choisie dessous ; « Retirer du carnet… » retire la photo choisie (Fenetre.retirerDuCarnet).
+function Fenetre.montrerDefaut(code)
+    local photos = Carnet.photosDuDefaut(code, os.time())
+    -- Une ligne penchée (measure_angle, read_composition) n'a que son inclinaison, sans texte :
+    -- celle de l'angle rangé dans l'entrée de l'original sous ce code.
+    for _, x in ipairs(photos) do
+        if texteOuNil(x.texte) == nil and type(x.mesure) == 'number' then
+            local e = Carnet.entree(x.original)
+            x.angle = type(e) == 'table' and type(e.angle) == 'table' and e.angle.code == code or nil
+        end
+    end
+    local d = defautDuCarnet(code)
+    local libelle = texteOuNil(d.libelle) or tostring(code)
+    local f = LrView.osFactory()
+    local aRetirer
+    LrFunctionContext.callWithContext('Claude · carnet', function(context)
+        local q = LrBinding.makePropertyTable(context)
+        local items, parId = {}, {}
+        for _, x in ipairs(photos) do
+            items[#items + 1] = { title = Fenetre.textePhotoDuDefaut(x), value = x.original }
+            parId[x.original] = x
+        end
+        local function choisie(valeur)
+            local id = type(valeur) == 'table' and valeur[1] or valeur
+            return id ~= nil and parId[id] or nil
+        end
+        q.choix = #photos > 0 and { photos[1].original } or {}
+        q.lecon = #photos > 0 and Fenetre.texteLecons(photos[1]) or ''
+        q:addObserver('choix', function(_, _, valeur)
+            q.lecon = Fenetre.texteLecons(choisie(valeur))
+        end)
+        local entete = #photos == 0 and "Aucune photo n'a ce défaut dans les mois du carnet."
+            or #photos == 1 and "1 photo dans les mois du carnet."
+            or string.format("%d photos dans les mois du carnet, la plus récente d'abord.", #photos)
+        local contenu = {
+            bind_to_object = q,
+            spacing = f:control_spacing(),
+            f:static_text { title = entete, width = 640 },
+        }
+        if texteOuNil(d.conseil) then
+            contenu[#contenu + 1] = f:static_text { title = "À la prise de vue : " .. texteOuNil(d.conseil), width = 640, height_in_lines = 2 }
+        end
+        if #photos > 0 then
+            contenu[#contenu + 1] = f:simple_list { items = items, value = bind 'choix', allows_multiple_selection = false, width = 640, height = 160 }
+            contenu[#contenu + 1] = f:static_text { title = "Leçon de la photo choisie (sélectionnable, ⌘A puis ⌘C pour copier) :" }
+            contenu[#contenu + 1] = f:edit_field { value = bind 'lecon', width_in_chars = 90, height_in_lines = 10 }
+        end
+        local reponse = LrDialogs.presentModalDialog {
+            title = Fenetre.TITRE_CARNET .. " · " .. libelle,
+            contents = f:column(contenu),
+            actionVerb = "Fermer",
+            cancelVerb = '< exclude >',
+            otherVerb = #photos > 0 and "Retirer du carnet…" or nil,
+        }
+        if reponse == 'other' then
+            aRetirer = choisie(q.choix)
+        end
+    end)
+    if aRetirer then
+        return Fenetre.retirerDuCarnet(aRetirer)
+    end
+    return false
+end
+
+-- Retire une photo du carnet, après confirmation : par appel direct au registre du module
+-- (Carnet.commande, jamais une ligne de la liaison), avec l'identifiant de l'original (la clé de
+-- son entrée). La page se relit ensuite (Carnet.version). Rend vrai si elle est retirée.
+function Fenetre.retirerDuCarnet(x)
+    local nom = Fenetre.nomPhotoCarnet(x)
+    local reponse = LrDialogs.confirm("Retirer " .. nom .. " du carnet de progrès ?",
+        "Ses constats et ses leçons sortent du carnet et ne comptent plus dans le tableau. La photo et ses retouches ne changent pas.",
+        "Retirer", "Annuler")
+    if reponse ~= 'ok' then
+        return false
+    end
+    local ok, r = LrTasks.pcall(Carnet.commande, { action = 'retirer', photos = { x.original } })
+    local retiree = ok and type(r) == 'table' and (tonumber(r.retirees) or 0) > 0
+    if Fenetre.p then
+        Fenetre.p.message = retiree and (nom .. " est retirée du carnet de progrès.")
+            or ("Le carnet n'a pas retiré " .. nom .. (ok and " : elle n'y est plus." or (" : " .. tostring(r))))
+    end
+    return retiree
+end
+
+-- « Demander à Claude ce qu'il en pense » : une nouvelle conversation (la page se quitte), avec la
+-- demande du carnet (Consignes.carnet). Elle porte un titre à elle : Claude ne regarde aucune photo
+-- pour la nommer, et la liste montrerait sinon le début de la demande.
+Fenetre.TITRE_DEMANDE_CARNET = "Avis de Claude sur le carnet de progrès"
+
+function Fenetre.demanderCarnet()
+    -- Pendant que Claude travaille, Moteur.nouvelle refuse (le bandeau dit pourquoi).
+    if not Fenetre.nouvelle() then
+        return false
+    end
+    if Moteur.courante then
+        Moteur.renommer(Moteur.courante.id, Fenetre.TITRE_DEMANDE_CARNET)
+    end
+    Fenetre.envoyer(Consignes.carnet)
+    return true
 end
 
 -- Onglets -------------------------------------------------------------------------------------
@@ -2418,7 +2764,8 @@ function Fenetre.suivreSelection(info)
         return
     end
     Journal.noter("Autre photo choisie : nouvelle conversation")
-    Fenetre.nouvelle()
+    -- La page du carnet reste montrée : la conversation nouvelle attend le retour au fil.
+    Fenetre.nouvelle(true)
 end
 
 -- Tout ce qui dépend du moteur.
@@ -2432,7 +2779,7 @@ function Fenetre.rafraichir()
         Fenetre.revenirAuFil()
     end
     local c = Moteur.courante
-    poser(p, 'titre', c and c.titre or Conversation.TITRE_PAR_DEFAUT)
+    poser(p, 'titre', Fenetre.vue == 'carnet' and Fenetre.TITRE_CARNET or (c and c.titre or Conversation.TITRE_PAR_DEFAUT))
     poser(p, 'libre', not Moteur.travaille)
     poser(p, 'travaille', Moteur.travaille)
     poser(p, 'titreEnvoyer', Moteur.travaille and "Arrêter" or "Envoyer")
@@ -2495,6 +2842,8 @@ function Fenetre.envoyer(texte, modele)
     p.jointes = ''
     p.message = ''
     p.libre = false
+    -- Une demande se suit dans le fil : la page du carnet se quitte.
+    Fenetre.quitterCarnet()
     Fenetre.defilement = 0
     LrTasks.startAsyncTask(function()
         -- La photo active et la sélection de la demande : la conversation est la leur.
@@ -2610,7 +2959,7 @@ end
 
 function Fenetre.renommer()
     local c = Moteur.courante
-    if not c then
+    if not c or surLaPageDuCarnet() then
         return
     end
     local f = LrView.osFactory()
@@ -2634,7 +2983,7 @@ end
 
 function Fenetre.supprimer()
     local c = Moteur.courante
-    if not c or #c.elements == 0 then
+    if not c or surLaPageDuCarnet() or #c.elements == 0 then
         return
     end
     local reponse = LrDialogs.confirm("Supprimer la conversation « " .. tostring(c.titre) .. " » ?",
@@ -2679,6 +3028,7 @@ end
 function Fenetre.desabonner()
     Moteur.desabonner('fenetre')
     Notation.desabonner('fenetre')
+    Carnet.desabonner('fenetre')
 end
 
 -- Boucle d'une fenêtre (sa génération : une fenêtre rouverte a la sienne, l'ancienne boucle
@@ -2715,6 +3065,16 @@ function Fenetre.boucle(generation)
                 local ok, erreur = LrTasks.pcall(Fenetre.rafraichirNotation)
                 if not ok then
                     Journal.noter("Note :", tostring(erreur))
+                end
+            end
+            -- La page du carnet (1.3) : relue quand le registre change (un constat, une leçon, un
+            -- retrait), d'ici ou d'un autre client du connecteur.
+            if Fenetre.vue == 'carnet' and (Fenetre.aRafraichirCarnet or Carnet.version ~= Fenetre.versionCarnet) then
+                Fenetre.aRafraichirCarnet = false
+                local ok, erreur = LrTasks.pcall(Fenetre.lireCarnet)
+                if not ok then
+                    Fenetre.versionCarnet = Carnet.version
+                    Journal.noter("Carnet de progrès :", tostring(erreur))
                 end
             end
             -- Un avant/après rangé (ou manqué) par le module : la carte Pourquoi ? relit ses images.
@@ -2812,6 +3172,8 @@ function Fenetre.afficher()
         -- L'image de proposition demandée par un clic sur l'onglet (Composition lue) : à redemander.
         Fenetre.imageProposition = nil
         Fenetre.vue = 'conversation'
+        -- La page du carnet se relira à sa prochaine ouverture.
+        Fenetre.pageCarnet, Fenetre.versionCarnet, Fenetre.aRafraichirCarnet, Fenetre.hautCarnet = nil, nil, false, 0
         -- À l'ouverture, l'aperçu montre la photo active, refait (Fenetre.majPhoto).
         Fenetre.idActif, Fenetre.apercuActif, Fenetre.demandeActive, Fenetre.voirActive = nil, nil, nil, true
         Fenetre.propositionVue = nil
@@ -2901,6 +3263,7 @@ function Fenetre.afficher()
         Fenetre.rafraichirMode()
         Moteur.abonner('fenetre', function() Fenetre.aRafraichir = true end)
         Notation.abonner('fenetre', function() Fenetre.aRafraichirNotation = true end)
+        Carnet.abonner('fenetre', function() Fenetre.aRafraichirCarnet = true end)
 
         LrTasks.startAsyncTask(function() Fenetre.boucle(generation) end)
         LrTasks.startAsyncTask(function() LrTasks.pcall(Fenetre.verifier, true) end)
