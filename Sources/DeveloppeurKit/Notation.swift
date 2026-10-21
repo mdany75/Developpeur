@@ -105,7 +105,7 @@ public enum Notation {
     }
 
     /// Le plafond d'une photo triée, d'après le standard et les seuils déjà relevés (netteté 15 et
-    /// 35, bruit 1,5) : un défaut majeur, 0 et rejet proposé ; un défaut visible seulement à 100 %
+    /// 35, bruit 1,5 : `DetailMeasurements.seuilFlou`, `seuilNet` et `bruitFort`) : un défaut majeur, 0 et rejet proposé ; un défaut visible seulement à 100 %
     /// (douce, mise au point signalée manquée par l'appareil), 3 ; presque noire ou brûlée, 2, à
     /// vérifier (souvent rattrapable, surtout en RAW) ; une capture ou un document selon Vision, 1 ;
     /// une photo qui n'est pas la meilleure de sa rafale ou de sa pile (`doublon`), 3 (un 4 est la
@@ -129,8 +129,8 @@ public enum Notation {
             }
         }
         let signalee = photo.defautsMesures.contains { $0.genre == .miseAuPointSignalee }
-        if !rejet, !signalee, let nettete = photo.nettete, nettete < 35 {
-            limites.append((3, "douce (netteté \(PhotoTriee.r(nettete))\(photo.af?.nettete != nil ? " au point AF" : "") ; nette à partir de 35)"))
+        if !rejet, !signalee, let nettete = photo.nettete, nettete < DetailMeasurements.seuilNet {
+            limites.append((3, "douce (netteté \(PhotoTriee.r(nettete))\(photo.af?.nettete != nil ? " au point AF" : "") ; nette à partir de \(PhotoTriee.r(DetailMeasurements.seuilNet)))"))
         }
         if photo.vision?.utility == true {
             limites.append((1, "capture ou document selon Vision"))

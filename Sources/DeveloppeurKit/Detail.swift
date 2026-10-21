@@ -28,24 +28,29 @@ public struct DetailMeasurements: Equatable {
     public var medianSharpness: Double { zones.sorted()[zones.count / 2] }
     public var sharpestZone: String { Self.zoneNames[zones.indices.max { zones[$0] < zones[$1] } ?? 4] }
 
-    /// Seuils relevés sur des aperçus de 1024 px : une photo nette donne de 45 à 150 selon son
-    /// contenu, un léger flou (gaussien de rayon 1,5 px) de 12 à 26, un flou marqué moins de 6.
+    /// Seuils de netteté relevés sur des aperçus de 1024 px : une photo nette donne de 45 à 150
+    /// selon son contenu, un léger flou (gaussien de rayon 1,5 px) de 12 à 26, un flou marqué moins
+    /// de 6. Sous `seuilFlou`, floue probable ; à partir de `seuilNet`, nette. Repris par le tri
+    /// (`PhotoTriee.defautsMesures`), les plafonds de note (`Notation.plafond`) et le bilan.
+    static let seuilFlou = 15.0, seuilNet = 35.0
+
     public var sharpnessReading: String {
         switch sharpest {
-        case ..<15: return "floue probable : aucune zone nette"
-        case ..<35: return "douce : peu de détails nets (flou léger, ou sujet sans texture)"
+        case ..<Self.seuilFlou: return "floue probable : aucune zone nette"
+        case ..<Self.seuilNet: return "douce : peu de détails nets (flou léger, ou sujet sans texture)"
         default: return "nette \(sharpestZone)"
         }
     }
 
-    /// Au-delà, le bruit est fort (relevé à 1024 px) : la photo se débruite, et se note après.
-    static let bruitFort = 1.5
+    /// Seuils de bruit relevés à 1024 px : une image propre donne de 0,2 à 0,5, des ombres relevées
+    /// vers 1. À partir de `bruitVisible`, il se voit ; à partir de `bruitFort`, la photo se
+    /// débruite, et se note après.
+    static let bruitVisible = 0.6, bruitFort = 1.5
 
-    /// Seuils relevés à 1024 px : une image propre donne de 0,2 à 0,5, des ombres relevées vers 1.
     public var noiseReading: String {
         let level = max(noise, shadowNoise ?? 0)
         switch level {
-        case ..<0.6: return "faible"
+        case ..<Self.bruitVisible: return "faible"
         case ..<Self.bruitFort: return "visible, surtout dans les ombres : à vérifier par un zoom à 100 %"
         default: return "fort : réduction du bruit à prévoir (vérifier par un zoom à 100 %)"
         }
@@ -74,7 +79,7 @@ public struct DetailMeasurements: Equatable {
         return [
             "nettete": .object(nettete),
             "bruit": .object(noiseObject),
-            "base_detail": .string("Luminance à \(side) px de grand côté. Netteté : 95e centile du laplacien par zone (moins de 15 : flou probable ; plus de 35 : net). Bruit : écart type du résidu dans les aplats, en niveaux sur 255 (moins de 0,6 : faible)."),
+            "base_detail": .string("Luminance à \(side) px de grand côté. Netteté : 95e centile du laplacien par zone (moins de \(Bilan.nombre(Self.seuilFlou, decimales: 0)) : flou probable ; plus de \(Bilan.nombre(Self.seuilNet, decimales: 0)) : net). Bruit : écart type du résidu dans les aplats, en niveaux sur 255 (moins de \(Bilan.nombre(Self.bruitVisible)) : faible)."),
         ]
     }
 }
