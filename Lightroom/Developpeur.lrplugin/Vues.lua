@@ -1,5 +1,5 @@
--- Vues.lua : les pièces de la fenêtre Claude, assemblées par Dispositions.lua (Atelier,
--- Conversation claire, Panneau). Chaque pièce rend une vue du SDK liée aux propriétés de la
+-- Vues.lua : les pièces de la fenêtre Claude, assemblées par Dispositions.lua (la Conversation
+-- claire, seule disposition). Chaque pièce rend une vue du SDK liée aux propriétés de la
 -- fenêtre ; elle reçoit la fabrique `f`, la fenêtre `F` (Fenetre.lua : couleurs, polices, `bind`,
 -- `egal`, `bouton`, les actions) et ses largeurs. Pas de `require 'Fenetre'` ici (Fenetre requiert
 -- ce fichier par Dispositions) ni de couleur créée au chargement (la vérification des liens charge
@@ -52,12 +52,11 @@ function Vues.grille(f, F, D)
     return f:column(grille)
 end
 
--- ▲ ▼ Fin, la position dans le fil, et ce que fait Claude (sinon le forfait). Colonne étroite
--- (D.activiteDessous) : l'activité sur sa propre ligne, de toute la largeur.
+-- ▲ ▼ Fin, la position dans le fil, et ce que fait Claude (sinon le forfait).
 function Vues.defilement(f, F, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local pas = math.floor(D.lignes * 0.8)
-    local largeurActivite = D.activiteDessous and D.fil or D.activite
+    local largeurActivite = D.activite
     local activite = f:column {
         place = 'overlapping',
         f:static_text { title = bind 'activite', text_color = C.orange, alignment = 'right', width = largeurActivite, truncation = 'tail',
@@ -75,11 +74,8 @@ function Vues.defilement(f, F, D)
             action = function() F.defiler('fin') end }),
         f:static_text { title = bind 'positionFil', font = P.petit, text_color = C.gris, width = D.position, truncation = 'tail' },
         f:spacer { fill_horizontal = 1 },
-        not D.activiteDessous and activite or nil,
+        activite,
     }
-    if D.activiteDessous then
-        return f:column { spacing = 2, rangee, activite }
-    end
     return rangee
 end
 
@@ -98,9 +94,9 @@ function Vues.voyant(f, F, cleEtat, cleTexte, action, infobulle, largeur)
     }
 end
 
--- Claude Code, la liaison (un clic la démarre) et le mode (un clic le bascule), en rangée ou en
--- colonne (`sens`), chaque texte à `largeur`.
-function Vues.voyants(f, F, sens, largeur, ecart)
+-- Claude Code, la liaison (un clic la démarre) et le mode (un clic le bascule), en rangée, chaque
+-- texte à `largeur`.
+function Vues.voyants(f, F, largeur)
     local liste = {
         Vues.voyant(f, F, 'etatClaude', 'texteClaude', nil, "Claude Code, avec votre forfait claude.ai (pas de clé d'API)", largeur),
         Vues.voyant(f, F, 'etatLightroom', 'texteLightroom', function()
@@ -112,11 +108,7 @@ function Vues.voyants(f, F, sens, largeur, ecart)
             F.basculerMode()
         end, "Mode du connecteur ; un clic bascule entre « Proposer d'abord » et « Appliquer directement »", largeur),
     }
-    if sens == 'colonne' then
-        liste.spacing = 2
-        return f:column(liste)
-    end
-    liste.spacing = ecart or 12
+    liste.spacing = 12
     return f:row(liste)
 end
 
@@ -208,59 +200,22 @@ function Vues.listeConversations(f, F, largeur, hauteur)
     }
 end
 
--- Le menu des conversations (Atelier, Panneau) : les plus récentes, la conversation montrée choisie.
-function Vues.menuConversations(f, F, largeur)
-    local bind = F.bind
-    return f:popup_menu { items = bind 'menuConversations', value = bind 'conversationChoisie', width = largeur, enabled = bind 'libre',
-        tooltip = "Conversation montrée (les plus récentes)" }
-end
-
--- Nouvelle, Renommer (✎, si `renommer`) et Supprimer…, en petit.
-function Vues.boutonsConversation(f, F, renommer)
-    local bind = F.bind
-    local r = {
-        spacing = 4,
-        F.bouton(f, { title = "Nouvelle", size = 'small', tooltip = "Nouvelle conversation", enabled = bind 'libre', action = function() F.nouvelle() end }),
-    }
-    if renommer then
-        r[#r + 1] = F.bouton(f, { title = "✎", size = 'small', tooltip = "Renommer la conversation", action = function() F.enTache(F.renommer) end })
-    end
-    r[#r + 1] = F.bouton(f, { title = "Supprimer…", size = 'small', tooltip = "Supprimer la conversation (corbeille du Finder)", enabled = bind 'libre',
-        action = function() F.enTache(F.supprimer) end })
-    return f:row(r)
-end
-
 -- Demandes -------------------------------------------------------------------------------------
 
--- Les invites en raccourcis, D.invitesParRangee par rangée (toutes sur une sans elle) ; le menu
--- Style au bout de la dernière rangée, sans étiquette (demandé par Dany le 20 octobre 2026).
+-- Les invites en raccourcis, sur une rangée, et le menu Style au bout, sans étiquette (demandé par
+-- Dany le 20 octobre 2026).
 function Vues.invites(f, F, D)
-    local boutons = {}
+    local rangee = { spacing = 6 }
     for _, invite in ipairs(Consignes.invites) do
-        boutons[#boutons + 1] = F.bouton(f, {
+        rangee[#rangee + 1] = F.bouton(f, {
             title = invite.titre,
             tooltip = invite.message,
             enabled = F.bind 'libre',
             action = function() F.envoyer(invite.message, invite.modele) end,
         })
     end
-    local parRangee = D.invitesParRangee or #boutons
-    local rangees = { spacing = 4 }
-    for debut = 1, #boutons, parRangee do
-        local rangee = { spacing = 6 }
-        for k = debut, math.min(#boutons, debut + parRangee - 1) do
-            rangee[#rangee + 1] = boutons[k]
-        end
-        rangees[#rangees + 1] = rangee
-    end
-    table.insert(rangees[#rangees], Vues.style(f, F, D))
-    for i, rangee in ipairs(rangees) do
-        rangees[i] = f:row(rangee)
-    end
-    if #rangees == 1 then
-        return rangees[1]
-    end
-    return f:column(rangees)
+    rangee[#rangee + 1] = Vues.style(f, F, D)
+    return f:row(rangee)
 end
 
 -- Le menu Style seul (D.style de large) : joint à chaque demande, invites comprises.
@@ -285,14 +240,14 @@ function Vues.fleches(f, F, cle)
     }
 end
 
--- Le modèle, l'effort et la disposition se choisissent dans le Gestionnaire de modules externes
+-- Le modèle et l'effort se choisissent dans le Gestionnaire de modules externes
 -- (PluginInfoProvider.lua), pas dans la fenêtre (demandé par Dany le 20 octobre 2026 : un écran
 -- plus léger).
 function Vues.boutonEnvoyer(f, F, largeur)
     return F.bouton(f, { title = F.bind 'titreEnvoyer', width = largeur, action = function() F.boutonPrincipal() end })
 end
 
--- 📎 et 📋, puis le champ de demande (D.champ) ; Envoyer à droite si D.envoiACote. Le champ est
+-- 📎 et 📋, puis le champ de demande (D.champ), Envoyer à droite. Le champ est
 -- `immediate = false` : Retour le valide (Fenetre.saisieValidee).
 function Vues.saisie(f, F, D)
     local bind = F.bind
@@ -307,39 +262,31 @@ function Vues.saisie(f, F, D)
         f:edit_field { value = bind 'saisie', immediate = false, height_in_lines = 3, width = D.champ, enabled = bind 'libre',
             placeholder_string = "Demander à Claude… (par exemple : « Retouche la photo active, rendu naturel »)",
             tooltip = "Retour envoie la demande. Dictée : touche 🌐 deux fois." },
-        D.envoiACote and Vues.boutonEnvoyer(f, F, D.envoyer) or nil,
+        Vues.boutonEnvoyer(f, F, D.envoyer),
     }
-end
-
--- Envoyer sous le champ, à droite (Atelier, Panneau).
-function Vues.envoi(f, F, D)
-    return f:row { f:spacer { fill_horizontal = 1 }, Vues.boutonEnvoyer(f, F, D.envoyer) }
 end
 
 -- Aperçu et proposition --------------------------------------------------------------------------
 
--- Ce que Claude regarde : un cadre fixe de D.apercu × D.apercuHauteur (carré sans elle), rempli
--- par une réduction centrée sur le fond (Images.vignette) ou l'image « aucun aperçu ».
+-- Ce que Claude regarde, ou la photo active : un cadre carré fixe de D.apercu, rempli par une
+-- réduction centrée sur le fond (Images.vignette) ou l'image « aucun aperçu ».
 function Vues.apercu(f, F, D)
-    return f:picture { value = F.bind 'imageApercu', width = D.apercu, height = D.apercuHauteur or D.apercu }
+    return f:picture { value = F.bind 'imageApercu', width = D.apercu, height = D.apercu }
 end
 
--- ◀ légende ▶ (légende de `largeur`, sans légende si nil), en petit.
+-- ◀ légende ▶ (légende de `largeur`), en petit.
 function Vues.navigationApercu(f, F, largeur)
     local bind, P = F.bind, F.POLICES
-    local r = {
+    return f:row {
         spacing = 4,
         F.bouton(f, { title = "◀", size = 'small', tooltip = "Image précédente", enabled = bind 'peutPrecedente', action = function() F.changerImage(-1) end }),
+        f:static_text { title = bind 'legendeApercu', font = P.petit, alignment = 'center', width = largeur, truncation = 'middle' },
+        F.bouton(f, { title = "▶", size = 'small', tooltip = "Image suivante", enabled = bind 'peutSuivante', action = function() F.changerImage(1) end }),
     }
-    if largeur then
-        r[#r + 1] = f:static_text { title = bind 'legendeApercu', font = P.petit, alignment = 'center', width = largeur, truncation = 'middle' }
-    end
-    r[#r + 1] = F.bouton(f, { title = "▶", size = 'small', tooltip = "Image suivante", enabled = bind 'peutSuivante', action = function() F.changerImage(1) end })
-    return f:row(r)
 end
 
-function Vues.agrandir(f, F, petit)
-    return F.bouton(f, { title = "Agrandir", size = petit and 'small' or nil, enabled = F.bind 'aImage', action = function() F.agrandir() end })
+function Vues.agrandir(f, F)
+    return F.bouton(f, { title = "Agrandir", enabled = F.bind 'aImage', action = function() F.agrandir() end })
 end
 
 -- La proposition de Claude en mode « Proposer d'abord » : ce qu'il compte changer, Accepter,
@@ -410,13 +357,12 @@ end
 -- Autres fenêtres et onglets -------------------------------------------------------------------
 
 -- Publication et Consommation (le menu Fichier est réduit quand une fenêtre du module est devant).
-function Vues.autresFenetres(f, F, petit)
-    local taille = petit and 'small' or nil
+function Vues.autresFenetres(f, F)
     return f:row {
         spacing = 6,
-        F.bouton(f, { title = "Publication…", size = taille, tooltip = "Publier des photos en fichiers, sans Claude ni quota",
+        F.bouton(f, { title = "Publication…", tooltip = "Publier des photos en fichiers, sans Claude ni quota",
             action = function() F.publication() end }),
-        F.bouton(f, { title = "Consommation…", size = taille, tooltip = "Jetons de la semaine, budget, relevé du forfait",
+        F.bouton(f, { title = "Consommation…", tooltip = "Jetons de la semaine, budget, relevé du forfait",
             action = function() F.consommation() end }),
     }
 end
@@ -442,8 +388,8 @@ local SANS_CONDITION = { row = true, column = true, view = true, scrolled_view =
 -- les pièces (texte, bouton, image, menu, champ, case, liste, séparateur…), combinée à son propre
 -- `visible` (couleurs de la carte Note, pastilles, lignes du fil) en une liaison à plusieurs clés
 -- (F.et) ; une boîte de groupe, dont le cadre et le titre resteraient montrés, y devient une
--- colonne à titre gras. Les conteneurs restent sans `visible`. Une fabrique masquable s'enveloppe
--- dans une autre (Panneau : Retoucher, puis les invites ou la proposition).
+-- colonne à titre gras. Les conteneurs restent sans `visible`. Une fabrique masquable peut
+-- s'envelopper dans une autre (les conditions se combinent).
 function Vues.masquable(f, F, condition)
     local fm = {}
     return setmetatable(fm, {

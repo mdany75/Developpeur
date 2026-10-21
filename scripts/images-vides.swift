@@ -1,8 +1,7 @@
-// images-vides.swift — dessine les images « aucun aperçu » de la fenêtre Claude, une par cadre
-// d'aperçu de Dispositions.TAILLES (carrés de la Conversation claire et du Panneau, cadre 3:2 de
-// l'Atelier : vide-320.png, vide-720x480.png), au fond des vignettes (2B2B2B), en PNG à 72 ppp :
-// le SDK de Lightroom affiche une image à sa taille en points. Les essais de la fenêtre vérifient
-// qu'il y en a une pour chaque disposition.
+// images-vides.swift — dessine l'image « aucun aperçu » de la fenêtre Claude, au cadre d'aperçu de
+// Dispositions.TAILLES (un carré de 320 : vide-320.png), au fond des vignettes (2B2B2B), en PNG à
+// 72 ppp : le SDK de Lightroom affiche une image à sa taille en points. Les essais de la fenêtre
+// vérifient qu'elle existe, à ces dimensions.
 //
 // Usage : swift scripts/images-vides.swift Lightroom/Developpeur.lrplugin
 
@@ -12,9 +11,7 @@ let dossier = CommandLine.arguments.dropFirst().first ?? "."
 
 // Largeur et hauteur de chaque cadre ; un carré garde son nom d'origine (vide-320.png).
 let cadres: [(Int, Int)] = [
-    (200, 200),     // Panneau
     (320, 320),     // Conversation claire
-    (720, 480),     // Atelier
 ]
 
 for (largeur, hauteur) in cadres {

@@ -57,7 +57,7 @@ function Images.enregistrer(image, dossier)
     return ok and Fichiers.existe(destination) and nom or nil
 end
 
--- Une réduction de `cote` points de côté (ou de `cote` × `hauteur`, l'aperçu 3:2 de l'Atelier),
+-- Une réduction de `cote` points de côté (ou de `cote` × `hauteur`, un cadre qui n'est pas carré),
 -- l'image entière centrée sur le fond (le cadre des vues du SDK ne change pas de taille) ; créée à
 -- la première demande dans <dossier>/.vignettes.
 function Images.vignette(dossier, nom, cote, hauteur)

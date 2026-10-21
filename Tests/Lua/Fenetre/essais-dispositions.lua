@@ -1,9 +1,9 @@
--- essais-dispositions.lua : la fenêtre Claude dans ses trois dispositions (Atelier, Conversation
--- claire, Panneau) hors de Lightroom (LuaJIT, Lightroom simulé par Simulation.lua) : réouverture
--- dans une autre disposition (demande tapée rendue sans partir, une seule boucle), onglets, carte
--- Note, bouton Noter, nouvelle conversation par photo, anciennes conversations de séance absentes
--- de la liste, Gestionnaire de modules externes (modèle, effort, disposition), vignettes dans un
--- cadre 3:2, images « aucun aperçu ». Le registre des notes (Notation) garde ici les appels reçus :
+-- essais-dispositions.lua : la fenêtre Claude (la Conversation claire, seule disposition depuis
+-- que l'Atelier et le Panneau sont retirés) hors de Lightroom (LuaJIT, Lightroom simulé par
+-- Simulation.lua) : fenêtre déjà ouverte, boucle, onglets, carte Note et ses flèches, nouvelle
+-- conversation par photo, proposition préparée à l'ouverture, anciennes conversations de séance
+-- absentes de la liste, Gestionnaire de modules externes (modèle, effort, cases), vignettes dans un
+-- cadre 3:2, image « aucun aperçu ». Le registre des notes (Notation) garde ici les appels reçus :
 -- la simulation de la fenêtre n'écrit pas dans un catalogue. Ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
@@ -171,161 +171,59 @@ end)
 
 -- Réouverture ---------------------------------------------------------------------------------
 
-essai('Disposition changée dans le Gestionnaire : la fenêtre se rouvre, la demande tapée revient sans partir, une seule boucle', function()
-    prefs.disposition = 'conversation'
+essai('Ouvrir une fenêtre déjà ouverte : elle passe devant, et l\'aperçu remontre la photo active', function()
     photoActive(53636309, 'DSCF4961.RAF', 0, 0)
-    local ouvertures, envoiPrevu, fermetures = {}, nil, nil
-    S.pendantFenetre = function(args)
-        local p = Fenetre.p
-        ouvertures[#ouvertures + 1] = { cadre = args.save_frame, disposition = Fenetre.disposition, generation = Fenetre.generation }
-        if #ouvertures == 1 then
-            -- Dany a tapé une demande et Retour l'a validée : elle partira dans 0,3 s…
-            local avant = #S.taches
-            p.saisie = 'Assombris un peu moins le ciel'
-            egal(avant + 1, #S.taches, 'envoi automatique prévu')
-            envoiPrevu = S.taches[#S.taches]
-            -- … mais il choisit le Panneau dans le Gestionnaire de modules externes : la boucle de
-            -- la fenêtre le voit (toutes les 2 s) et la ferme, pour la rouvrir.
-            prefs.disposition = 'panneau'
-            fermetures = S.fermetures or 0
-            Fenetre.periodique()
-            egal(nil, Fenetre.envoiAuto, "la réouverture annule l'envoi automatique")
-            egal(true, Fenetre.aRouvrir)
-            egal(fermetures + 1, S.fermetures, 'fenêtre fermée')
-            Fenetre.periodique()
-            egal(fermetures + 1, S.fermetures, 'une seule fermeture')
-        else
-            egal('panneau', Fenetre.disposition)
-            egal('Assombris un peu moins le ciel', p.saisie, 'la demande tapée revient dans le champ')
-            egal(nil, Fenetre.envoiAuto, 'sans partir')
-            -- L'envoi prévu avant la réouverture ne part pas non plus.
-            envoiPrevu()
-            egal('Assombris un peu moins le ciel', p.saisie)
-            egal(true, p.libre)
-            egal(false, Moteur.travaille)
-            -- Une seule boucle : celle de la première fenêtre s'arrête aussitôt, celle-ci tourne.
-            local dormir, sommeils = S.modules.LrTasks.sleep, 0
-            S.modules.LrTasks.sleep = function()
-                sommeils = sommeils + 1
-                if sommeils >= 2 then
-                    error('boucle arrêtée par l\'essai', 0)
-                end
-            end
-            Fenetre.boucle(ouvertures[1].generation)
-            local premiere = sommeils
-            local ok, erreur = pcall(Fenetre.boucle, Fenetre.generation)
-            S.modules.LrTasks.sleep = dormir
-            egal(0, premiere, "l'ancienne boucle s'arrête sans tourner")
-            vrai(not ok and erreur == 'boucle arrêtée par l\'essai', 'la nouvelle boucle tourne : ' .. tostring(erreur))
-        end
+    local vu = false
+    S.pendantFenetre = function()
+        vu = true
+        local devant, taches = S.devant or 0, #S.taches
+        Fenetre.voirActive = false
+        Fenetre.afficher()
+        egal(devant + 1, S.devant, 'la fenêtre passe devant')
+        -- … et l'aperçu remontre la photo active, relue dans une tâche.
+        egal(taches + 1, #S.taches, 'photo active relue')
+        S.taches[#S.taches]()
+        egal(true, Fenetre.voirActive, "l'aperçu remontre la photo active")
     end
     Fenetre.afficher()
-    egal(1, #ouvertures)
-    egal(false, Fenetre.ouverte)
-    -- La réouverture attend dans une tâche que la première fenêtre soit fermée. Le champ rempli
-    -- par la fenêtre (le brouillon) n'est pas une demande validée par Dany.
-    egal(Fenetre.afficher, S.taches[#S.taches], 'réouverture prévue')
-    local saisieValidee, validees = Fenetre.saisieValidee, 0
-    Fenetre.saisieValidee = function(valeur)
-        if not Fenetre.ignorerSaisie then
-            validees = validees + 1
-        end
-        return saisieValidee(valeur)
-    end
-    S.taches[#S.taches]()
-    Fenetre.saisieValidee = saisieValidee
-    egal(0, validees, 'le brouillon rendu ne compte pas comme une demande validée')
-    egal(2, #ouvertures)
-    egal('DeveloppeurClaude-conversation-grande-1', ouvertures[1].cadre)
-    egal('DeveloppeurClaude-panneau-grande-1', ouvertures[2].cadre)
-    egal(ouvertures[1].generation + 1, ouvertures[2].generation)
-    egal(false, Fenetre.ouverte)
-    egal(nil, Fenetre.p)
-    egal(nil, Moteur.observateurs.fenetre)
-    egal(nil, Fenetre.brouillon)
+    vrai(vu, 'fenêtre ouverte')
     S.pendantFenetre = nil
 end)
 
-essai('Ouvrir une fenêtre déjà ouverte : devant, ou rouverte si la disposition a changé', function()
-    prefs.disposition = 'atelier'
-    local etapes = 0
-    S.pendantFenetre = function()
-        etapes = etapes + 1
-        if etapes == 1 then
-            local devant, taches = S.devant or 0, #S.taches
-            Fenetre.voirActive = false
-            Fenetre.afficher()
-            egal(devant + 1, S.devant, 'même disposition : la fenêtre passe devant')
-            egal(false, Fenetre.aRouvrir)
-            -- … et l'aperçu remontre la photo active, relue dans une tâche.
-            egal(taches + 1, #S.taches, 'photo active relue')
-            S.taches[#S.taches]()
-            egal(true, Fenetre.voirActive, "l'aperçu remontre la photo active")
-            -- Disposition changée dans le Gestionnaire, puis ⌃⌥C ou « Ouvrir la fenêtre Claude ».
-            prefs.disposition = 'panneau'
-            local fermetures = S.fermetures or 0
-            Fenetre.afficher()
-            egal(true, Fenetre.aRouvrir)
-            egal(fermetures + 1, S.fermetures)
-        else
-            egal('panneau', Fenetre.T.nom)
-        end
-    end
-    Fenetre.afficher()
-    S.taches[#S.taches]()
-    egal(2, etapes)
-    prefs.disposition = 'conversation'
-    S.pendantFenetre = nil
-end)
-
-essai('Disposition : une valeur inconnue ou la même ne rouvre pas', function()
-    prefs.disposition = 'conversation'
-    S.pendantFenetre = function()
-        local fermetures = S.fermetures or 0
-        prefs.disposition = 'inconnue'
-        Fenetre.periodique()
-        prefs.disposition = 'conversation'
-        Fenetre.periodique()
-        egal(fermetures, S.fermetures or 0, 'rien à rouvrir')
-        egal(false, Fenetre.aRouvrir)
-    end
-    Fenetre.afficher()
-    prefs.disposition = 'conversation'
-    S.pendantFenetre = nil
-    -- Une disposition inconnue dans les préférences retombe sur celle par défaut.
-    egal('conversation', Dispositions.dimensions('inconnue').nom)
-    egal('DeveloppeurClaude-panneau-grande-1', Fenetre.cadre('panneau'))
-    -- Une seule taille, la grande (demandé par Dany le 20 octobre 2026).
+essai('Une seule disposition : ni taille ni disposition dans les préférences, le cadre de la Conversation claire', function()
+    -- L'Atelier, le Panneau et le choix de la disposition sont retirés, comme celui de la taille
+    -- (demandés par Dany le 20 octobre 2026) ; le cadre enregistré garde son nom.
+    egal(nil, Chemins.defauts.disposition, 'plus de préférence de disposition')
     egal(nil, Chemins.defauts.taille, 'plus de préférence de taille')
+    egal(nil, Dispositions.atelier)
+    egal(nil, Dispositions.panneau)
+    egal('conversation', Dispositions.dimensions().nom)
+    egal('DeveloppeurClaude-conversation-grande-1', Fenetre.cadre())
+    egal(nil, Fenetre.rouvrir)
+    egal(nil, Fenetre.elementsMenu)
 end)
 
-essai('Boucle de la fenêtre : toutes les 2 s, une disposition changée la ferme pour la rouvrir', function()
-    prefs.disposition = 'conversation'
-    local sommeils, fermetures, ok, erreur = 0, nil, nil, nil
+essai('Boucle de la fenêtre : toutes les 2 s, les voyants et la photo active relus', function()
+    local sommeils, verifies, ok, erreur = 0, 0, nil, nil
     S.pendantFenetre = function()
-        local dormir = S.modules.LrTasks.sleep
-        fermetures = S.fermetures or 0
+        local dormir, verifier = S.modules.LrTasks.sleep, Fenetre.verifier
+        Fenetre.verifier = function(...)
+            verifies = verifies + 1
+            return verifier(...)
+        end
         S.modules.LrTasks.sleep = function()
             sommeils = sommeils + 1
-            if sommeils == 2 then
-                -- Panneau choisi dans le Gestionnaire de modules externes.
-                prefs.disposition = 'panneau'
-            elseif sommeils >= 12 then
+            if sommeils >= 12 then
                 error('boucle arrêtée par l\'essai', 0)
             end
         end
         ok, erreur = pcall(Fenetre.boucle, Fenetre.generation)
-        S.modules.LrTasks.sleep = dormir
-        egal(fermetures + 1, S.fermetures, 'fermée une fois, au huitième tour (2 s)')
-        egal(true, Fenetre.aRouvrir)
+        S.modules.LrTasks.sleep, Fenetre.verifier = dormir, verifier
+        egal(1, verifies, 'voyants relus au huitième tour (2 s)')
     end
     Fenetre.afficher()
     vrai(not ok and erreur == 'boucle arrêtée par l\'essai', tostring(erreur))
-    egal(Fenetre.afficher, S.taches[#S.taches], 'réouverture prévue')
     S.pendantFenetre = nil
-    S.taches[#S.taches]()
-    egal('panneau', Fenetre.disposition, 'rouverte en Panneau')
-    prefs.disposition = 'conversation'
 end)
 
 essai('Modèle et effort : quatre modèles, cinq efforts, maximal par défaut', function()
@@ -347,7 +245,6 @@ end)
 -- Onglets -------------------------------------------------------------------------------------
 
 essai('Onglets : une proposition ou une note qui arrive se montre, une seule fois', function()
-    prefs.disposition = 'conversation'
     -- Ici, une autre photo choisie ne doit pas commencer de nouvelle conversation (essai à part).
     prefs.nouvelleParPhoto = false
     photoActive(4961, 'DSCF4961.RAF', 0, 0)
@@ -408,31 +305,14 @@ essai('Onglets : une proposition ou une note qui arrive se montre, une seule foi
         Conversation.decider(c, Conversation.propositionEnAttente(c).id, false)
     end
     Fenetre.afficher()
-    -- Panneau : la proposition se montre dans Retoucher, à la place des invites.
-    prefs.disposition = 'panneau'
-    S.pendantFenetre = function()
-        local p = Fenetre.p
-        egal('retoucher', p.onglet)
-        egal(false, p.aProposition)
-        p.onglet = 'notation'
-        Conversation.appliquer(Moteur.courante, { genre = 'assistant', blocs = { { genre = 'outil', id = 'onglet-2',
-            nom = 'mcp__developpeur__preview_settings', entree = { settings = { Exposure2012 = 0.2 } } } } })
-        Fenetre.rafraichir()
-        egal('retoucher', p.onglet)
-        egal(true, p.aProposition)
-        Conversation.decider(Moteur.courante, Conversation.propositionEnAttente(Moteur.courante).id, false)
-        Fenetre.rafraichir()
-        egal(false, p.aProposition)
-    end
-    Fenetre.afficher()
-    prefs.disposition, prefs.nouvelleParPhoto = 'conversation', true
+    prefs.nouvelleParPhoto = true
     S.pendantFenetre = nil
 end)
 
 -- Nouvelle conversation par photo -------------------------------------------------------------
 
 essai('Autre photo choisie : une nouvelle conversation, pas pendant que Claude travaille ni pour une conversation vide', function()
-    prefs.disposition, prefs.nouvelleParPhoto = 'conversation', true
+    prefs.nouvelleParPhoto = true
     photoActive(4961, 'DSCF4961.RAF', 0, 0)
     Fenetre.cleVue, Fenetre.cleVueLe, Moteur.finTravail = nil, nil, 0
     S.pendantFenetre = function()
@@ -494,7 +374,7 @@ essai('Autre photo choisie : une nouvelle conversation, pas pendant que Claude t
 end)
 
 essai('Autre photo : la clé posée par Envoyer, une ancienne conversation continuée, une fenêtre fermée pendant le travail', function()
-    prefs.disposition, prefs.nouvelleParPhoto = 'conversation', true
+    prefs.nouvelleParPhoto = true
     photoActive(5001, 'DSCF5001.RAF', 0, 0)
     Fenetre.cleVue, Fenetre.cleVueLe, Moteur.finTravail = nil, nil, 0
     local envoyer = Moteur.envoyer
@@ -547,7 +427,7 @@ essai('Autre photo : la clé posée par Envoyer, une ancienne conversation conti
 end)
 
 essai('Ouverture : Claude prépare une proposition sur une conversation vide, sans basculer vers elle', function()
-    prefs.disposition, prefs.propositionAOuverture = 'conversation', true
+    prefs.propositionAOuverture = true
     photoActive(5101, 'DSCF5101.RAF', 0, 0)
     local envoyer, envois = Moteur.envoyer, {}
     Moteur.envoyer = function(texte)
@@ -602,7 +482,7 @@ local function simples(contenu)
 end
 
 -- Les variantes des onglets : la colonne superposée qui suit la rangée des boutons radio (clé
--- `onglet`) ; nil sans onglets (Atelier).
+-- `onglet`) ; nil sans onglets.
 -- Les variantes superposées qui suivent la rangée des onglets dans la même colonne (la Conversation
 -- claire met l'aperçu entre les deux).
 local function variantesOnglets(contenu)
@@ -646,114 +526,94 @@ end
 essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conteneur ne se masque (constaté)', function()
     local C = Fenetre.COULEURS
     photoActive(4961, 'DSCF4961.RAF', 2, 0)
-    for _, disposition in ipairs(Dispositions.LISTE) do
-        local nom = disposition.value
-        prefs.disposition = disposition.value
-        local D = Dispositions.dimensions(disposition.value)
-        local construite = false
-        S.pendantFenetre = function(args)
-            construite = true
-            local p = Fenetre.p
-            Fenetre.rafraichir()
-            -- Lightroom ignore `visible` sur un conteneur (la simulation le refuse aussi).
-            for _, v in ipairs(vues(args.contents)) do
-                vrai(not (S.CONTENEURS[v.genre] and v.args.visible ~= nil), nom .. ' : visible sur un ' .. v.genre)
-            end
-            local variantes = variantesOnglets(args.contents)
-            if not D.onglets then
-                egal(nil, variantes, nom .. ' : pas d\'onglets')
-                return
-            end
-            vrai(variantes and variantes.args.place == 'overlapping', nom .. ' : variantes superposées sous les onglets')
-            egal(#D.onglets, #variantes.args, nom .. ' : une variante par onglet')
-            -- Chaque vue simple d'un onglet est masquée quand un autre onglet est choisi ; pas de
-            -- boîte de groupe dans un onglet (son cadre et son titre resteraient montrés), ni de
-            -- vue défilante ou de tab_view (leur cadre aussi).
-            for i, onglet in ipairs(D.onglets) do
-                p.onglet = onglet.valeur
-                for j, variante in ipairs(variantes.args) do
-                    local quoi = nom .. ' : onglet ' .. D.onglets[j].valeur
-                    local montrees = 0
-                    for _, v in ipairs(vues(variante)) do
-                        vrai(v.genre ~= 'group_box' and v.genre ~= 'scrolled_view' and v.genre ~= 'tab_view',
-                            quoi .. ' : ' .. v.genre .. ' dans un onglet')
+    local nom = 'conversation'
+    local D = Dispositions.dimensions()
+    local construite = false
+    S.pendantFenetre = function(args)
+        construite = true
+        local p = Fenetre.p
+        Fenetre.rafraichir()
+        -- Lightroom ignore `visible` sur un conteneur (la simulation le refuse aussi).
+        for _, v in ipairs(vues(args.contents)) do
+            vrai(not (S.CONTENEURS[v.genre] and v.args.visible ~= nil), nom .. ' : visible sur un ' .. v.genre)
+        end
+        local variantes = variantesOnglets(args.contents)
+        if not D.onglets then
+            egal(nil, variantes, nom .. ' : pas d\'onglets')
+            return
+        end
+        vrai(variantes and variantes.args.place == 'overlapping', nom .. ' : variantes superposées sous les onglets')
+        egal(#D.onglets, #variantes.args, nom .. ' : une variante par onglet')
+        -- Chaque vue simple d'un onglet est masquée quand un autre onglet est choisi ; pas de
+        -- boîte de groupe dans un onglet (son cadre et son titre resteraient montrés), ni de
+        -- vue défilante ou de tab_view (leur cadre aussi).
+        for i, onglet in ipairs(D.onglets) do
+            p.onglet = onglet.valeur
+            for j, variante in ipairs(variantes.args) do
+                local quoi = nom .. ' : onglet ' .. D.onglets[j].valeur
+                local montrees = 0
+                for _, v in ipairs(vues(variante)) do
+                    vrai(v.genre ~= 'group_box' and v.genre ~= 'scrolled_view' and v.genre ~= 'tab_view',
+                        quoi .. ' : ' .. v.genre .. ' dans un onglet')
+                end
+                for _, v in ipairs(simples(variante)) do
+                    vrai(aCle(v, 'onglet'), quoi .. ' : ' .. v.genre .. ' sans la condition de son onglet')
+                    if S.montree(v, p) then
+                        vrai(i == j, quoi .. ' : ' .. v.genre .. ' montré dans l\'onglet ' .. onglet.valeur)
+                        montrees = montrees + 1
                     end
-                    for _, v in ipairs(simples(variante)) do
-                        vrai(aCle(v, 'onglet'), quoi .. ' : ' .. v.genre .. ' sans la condition de son onglet')
-                        if S.montree(v, p) then
-                            vrai(i == j, quoi .. ' : ' .. v.genre .. ' montré dans l\'onglet ' .. onglet.valeur)
-                            montrees = montrees + 1
-                        end
-                    end
-                    vrai(i ~= j or montrees > 0, quoi .. ' : rien de montré')
                 end
-            end
-            -- Un onglet autre que Note (Proposition, Retoucher) : l'aperçu montré (hors des
-            -- onglets), la carte Note masquée ; la proposition seulement dans Proposition.
-            local autre = D.onglets[1].valeur == D.ongletNotation and D.onglets[2].valeur or D.onglets[1].valeur
-            p.onglet, p.aProposition = autre, false
-            local apercu
-            for _, v in ipairs(vues(args.contents)) do
-                apercu = apercu or (v.genre == 'picture' and v)
-            end
-            egal(true, S.montree(apercu, p), nom .. ' : aperçu montré')
-            egal(false, S.montree(vueLiee(args.contents, 'static_text', 'notationTexte'), p), nom .. ' : texte de la note masqué')
-            egal(autre == 'proposition', S.montree(vueLiee(args.contents, 'static_text', 'propositionTexte'), p), nom .. ' : proposition')
-            egal(false, S.montree(bouton(args.contents, p, 'Accepter', 'peutAccepterNote'), p), nom .. ' : Accepter de la note masqué')
-            egal(true, S.montree(vueLiee(args.contents, 'static_text', 'infoPhoto'), p), nom .. ' : hors des onglets, toujours montré')
-            -- Une variante de couleur dans un onglet : sa couleur et l'onglet, combinés.
-            local titres = {}
-            for _, v in ipairs(vues(args.contents)) do
-                if v.genre == 'static_text' and type(v.args.title) == 'table' and v.args.title.key == 'notationProposee' then
-                    titres[#titres + 1] = v
-                end
-            end
-            egal(4, #titres, nom .. ' : quatre couleurs de la note proposée')
-            p.notationCouleur = 'vert'
-            for _, v in ipairs(titres) do
-                vrai(aCle(v, 'notationCouleur') and aCle(v, 'onglet'), nom .. ' : couleur et onglet dans la même condition')
-                egal(false, S.montree(v, p), nom .. ' : couleur masquée hors de l\'onglet Note')
-                -- `visible` ne va que de la table vers la vue.
-                egal(S.modules.LrBinding.kUnsupportedDirection, v.args.visible.operation({}, {}, false), nom .. ' : sens inverse')
-            end
-            p.onglet = D.ongletNotation
-            local montrees = {}
-            for _, v in ipairs(titres) do
-                if S.montree(v, p) then
-                    montrees[#montrees + 1] = v
-                end
-            end
-            egal(1, #montrees, nom .. ' : une seule couleur montrée')
-            egal(C.vert, montrees[1].args.text_color, nom .. ' : la couleur de l\'état')
-            egal(true, S.montree(vueLiee(args.contents, 'static_text', 'notationTexte'), p), nom .. ' : texte de la note montré')
-            egal(true, S.montree(apercu, p), nom .. " : l'aperçu reste montré avec la carte Note")
-            if disposition.value == 'panneau' then
-                -- Onglets imbriqués : dans Retoucher, la proposition prend la place des invites.
-                local invite = bouton(args.contents, p, Consignes.invites[1].titre)
-                local saisie = vueLiee(args.contents, 'edit_field', 'saisie')
-                egal(false, S.montree(saisie, p), nom .. ' : demande masquée dans Noter')
-                p.onglet = 'retoucher'
-                egal(true, S.montree(saisie, p), nom .. ' : demande montrée')
-                egal(true, S.montree(invite, p), nom .. ' : invites montrées sans proposition')
-                p.aProposition = true
-                egal(false, S.montree(invite, p), nom .. ' : invites masquées par la proposition')
-                egal(true, S.montree(vueLiee(args.contents, 'static_text', 'propositionTexte'), p), nom .. ' : proposition montrée')
-                p.onglet = 'notation'
-                egal(false, S.montree(vueLiee(args.contents, 'static_text', 'propositionTexte'), p), nom .. ' : proposition masquée dans Noter')
-                p.aProposition = false
+                vrai(i ~= j or montrees > 0, quoi .. ' : rien de montré')
             end
         end
-        Fenetre.afficher()
-        vrai(construite, nom .. ' : fenêtre construite')
+        -- Un onglet autre que Note (Proposition, Retoucher) : l'aperçu montré (hors des
+        -- onglets), la carte Note masquée ; la proposition seulement dans Proposition.
+        local autre = D.onglets[1].valeur == D.ongletNotation and D.onglets[2].valeur or D.onglets[1].valeur
+        p.onglet, p.aProposition = autre, false
+        local apercu
+        for _, v in ipairs(vues(args.contents)) do
+            apercu = apercu or (v.genre == 'picture' and v)
+        end
+        egal(true, S.montree(apercu, p), nom .. ' : aperçu montré')
+        egal(false, S.montree(vueLiee(args.contents, 'static_text', 'notationTexte'), p), nom .. ' : texte de la note masqué')
+        egal(autre == 'proposition', S.montree(vueLiee(args.contents, 'static_text', 'propositionTexte'), p), nom .. ' : proposition')
+        egal(false, S.montree(bouton(args.contents, p, 'Accepter', 'peutAccepterNote'), p), nom .. ' : Accepter de la note masqué')
+        egal(true, S.montree(vueLiee(args.contents, 'static_text', 'infoPhoto'), p), nom .. ' : hors des onglets, toujours montré')
+        -- Une variante de couleur dans un onglet : sa couleur et l'onglet, combinés.
+        local titres = {}
+        for _, v in ipairs(vues(args.contents)) do
+            if v.genre == 'static_text' and type(v.args.title) == 'table' and v.args.title.key == 'notationProposee' then
+                titres[#titres + 1] = v
+            end
+        end
+        egal(4, #titres, nom .. ' : quatre couleurs de la note proposée')
+        p.notationCouleur = 'vert'
+        for _, v in ipairs(titres) do
+            vrai(aCle(v, 'notationCouleur') and aCle(v, 'onglet'), nom .. ' : couleur et onglet dans la même condition')
+            egal(false, S.montree(v, p), nom .. ' : couleur masquée hors de l\'onglet Note')
+            -- `visible` ne va que de la table vers la vue.
+            egal(S.modules.LrBinding.kUnsupportedDirection, v.args.visible.operation({}, {}, false), nom .. ' : sens inverse')
+        end
+        p.onglet = D.ongletNotation
+        local montrees = {}
+        for _, v in ipairs(titres) do
+            if S.montree(v, p) then
+                montrees[#montrees + 1] = v
+            end
+        end
+        egal(1, #montrees, nom .. ' : une seule couleur montrée')
+        egal(C.vert, montrees[1].args.text_color, nom .. ' : la couleur de l\'état')
+        egal(true, S.montree(vueLiee(args.contents, 'static_text', 'notationTexte'), p), nom .. ' : texte de la note montré')
+        egal(true, S.montree(apercu, p), nom .. " : l'aperçu reste montré avec la carte Note")
     end
-    prefs.disposition = 'conversation'
+    Fenetre.afficher()
+    vrai(construite, nom .. ' : fenêtre construite')
     S.pendantFenetre = nil
 end)
 
 -- Carte Note ------------------------------------------------------------------------------------
 
 essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérifier, rejet', function()
-    prefs.disposition = 'conversation'
     photoActive(4961, 'DSCF4961.RAF', 2, 1)
     registre.poses, registre.decisions = {}, {}
     proposer(4961, { fichier = 'DSCF4961.RAF', note = 3, drapeau = 'aucun',
@@ -931,7 +791,7 @@ end)
 
 -- Liste des conversations -----------------------------------------------------------------------
 
-essai('Conversations : les anciennes séances de notation ne sont ni dans la liste ni dans le menu', function()
+essai('Conversations : les anciennes séances de notation ne sont pas dans la liste', function()
     Moteur.charger()
     local conversations, courante = Moteur.conversations, Moteur.courante
     local seance = Conversation.nouvelle()
@@ -959,15 +819,9 @@ essai('Conversations : les anciennes séances de notation ne sont ni dans la lis
     S.neuve(liste, 'liste')
     vrai(ids(liste)[ordinaire.id] and not ids(liste)[seance.id], 'liste sans la séance')
     vrai(not ids(Fenetre.elementsListe('lac'))[seance.id], 'recherche sans la séance')
-    local menu = Fenetre.elementsMenu()
-    S.neuve(menu, 'menu')
-    vrai(ids(menu)[ordinaire.id] and not ids(menu)[seance.id], 'menu sans la séance')
-    for _, item in ipairs(menu) do
-        vrai(item.value:sub(1, 1) ~= '§', 'pas d\'en-tête dans un menu')
-    end
     -- Une séance n'est jamais montrée comme conversation ouverte.
     Moteur.courante = seance
-    vrai(not ids(Fenetre.elementsListe(''))[seance.id] and not ids(Fenetre.elementsMenu())[seance.id])
+    vrai(not ids(Fenetre.elementsListe(''))[seance.id])
     Moteur.conversations, Moteur.courante = conversations, courante
 end)
 
@@ -983,7 +837,7 @@ for nom in ([[bind_to_object tooltip visible enabled font size title value items
     PROPRIETES[nom] = true
 end
 
-essai('Gestionnaire de modules externes : les sections se construisent, menus Modèle, Effort et Disposition, case Autre photo', function()
+essai('Gestionnaire de modules externes : les sections se construisent, menus Modèle et Effort, cases Autre photo et À l\'ouverture', function()
     local PluginInfoProvider = require 'PluginInfoProvider'
     local f = S.modules.LrView.osFactory()
     local proprietes = S.modules.LrBinding.makePropertyTable()
@@ -1009,9 +863,6 @@ essai('Gestionnaire de modules externes : les sections se construisent, menus Mo
             if v.genre == 'push_button' then
                 vrai(type(v.args.action) == 'function', 'bouton sans action : ' .. tostring(v.args.title))
             end
-            if v.genre == 'popup_menu' and type(v.args.value) == 'table' and v.args.value.key == 'disposition' then
-                menu = v
-            end
             if v.genre == 'popup_menu' and type(v.args.value) == 'table' then
                 menus[v.args.value.key] = v
             elseif v.genre == 'checkbox' and type(v.args.value) == 'table' then
@@ -1019,20 +870,12 @@ essai('Gestionnaire de modules externes : les sections se construisent, menus Mo
             end
         end
     end
-    vrai(menu, 'menu Disposition')
-    local valeurs, titres = {}, {}
-    for _, item in ipairs(menu.args.items) do
-        valeurs[#valeurs + 1] = item.value
-        titres[#titres + 1] = item.title
-    end
-    egal('atelier conversation panneau', table.concat(valeurs, ' '))
-    egal('Atelier · Conversation claire · Panneau', table.concat(titres, ' · '))
-    for _, valeur in ipairs(valeurs) do
-        vrai(Dispositions.TAILLES[valeur], 'disposition connue : ' .. valeur)
-    end
-    egal('conversation', prefsModule.disposition, 'Conversation claire par défaut')
-    vrai(PluginInfoProvider.diagnostic():find('disposition conversation ; nouvelle conversation', 1, true), 'diagnostic')
+    -- Une seule disposition, la Conversation claire, une seule taille : ni menu Disposition ni menu
+    -- Taille (demandés par Dany le 20 octobre 2026).
+    egal(nil, menus.disposition, 'plus de menu Disposition')
     egal(nil, menus.taille, 'plus de menu Taille (toujours grande)')
+    vrai(PluginInfoProvider.diagnostic():find('effort max ; nouvelle conversation par photo', 1, true), 'diagnostic')
+    vrai(cases.propositionAOuverture, 'case À l\'ouverture')
     vrai(PluginInfoProvider.diagnostic():find('modèle opus, effort max', 1, true), 'diagnostic : modèle et effort')
     -- Le modèle et l'effort se choisissent ici, plus dans la fenêtre (demandé par Dany le
     -- 20 octobre 2026), comme la nouvelle conversation à chaque autre photo.
@@ -1066,19 +909,16 @@ essai('Vignettes : un cadre 3:2 garde toute l\'image, centrée sur le fond', fun
     egal(nil, Images.vignette(dossier, 'absente.jpg', 600, 400))
 end)
 
-essai('Images « aucun aperçu » : une par cadre, à ses dimensions', function()
-    local vus = {}
-    for _, disposition in ipairs(Dispositions.LISTE) do
-        local D = Dispositions.dimensions(disposition.value)
-        local nom = Dispositions.imageVide(D)
-        if not vus[nom] then
-            vus[nom] = true
-            local l, h = Images.dimensions(Chemins.ressource(nom))
-            egal(D.apercu, l, nom)
-            egal(D.apercuHauteur or D.apercu, h, nom)
-        end
-    end
-    vrai(vus['vide-320.png'] and vus['vide-200.png'] and vus['vide-720x480.png'], 'carrés et cadre')
+essai('Image « aucun aperçu » : au cadre de l\'aperçu', function()
+    local D = Dispositions.dimensions()
+    local nom = Dispositions.imageVide(D)
+    egal('vide-320.png', nom)
+    local l, h = Images.dimensions(Chemins.ressource(nom))
+    egal(D.apercu, l, nom)
+    egal(D.apercu, h, nom)
+    -- Plus d'image pour l'Atelier ni le Panneau.
+    vrai(not Fichiers.existe(Chemins.ressource('vide-200.png')) and not Fichiers.existe(Chemins.ressource('vide-720x480.png')),
+        'images retirées')
 end)
 
 -- Fin -------------------------------------------------------------------------------------------

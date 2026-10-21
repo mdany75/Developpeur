@@ -98,9 +98,6 @@ end
 -- fenêtre : cheminClaude, cheminConnecteur, et pour la fenêtre Publication dossierPublication et
 -- profilPublication.
 Chemins.defauts = {
-    -- 'atelier', 'conversation' ou 'panneau' (Dispositions.lua) : choisie dans le Gestionnaire de
-    -- modules externes ; une fenêtre ouverte se rouvre aussitôt dans la nouvelle.
-    disposition = 'conversation',
     -- Modèle et effort de Claude Code (Consignes.modeles, Consignes.efforts), choisis dans le
     -- Gestionnaire de modules externes ; l'effort vaut pour les quatre modèles.
     modele = 'opus',

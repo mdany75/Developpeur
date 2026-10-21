@@ -3,7 +3,7 @@
 --   - la liaison avec Claude : état, boutons, mode « Proposer d'abord », réglages, garde-fous et
 --     diagnostic ;
 --   - la fenêtre Claude : chemins de Claude Code et du connecteur MCP-Développeur, modèle, effort,
---     disposition de la fenêtre, nouvelle conversation par photo, fermeture de Claude Code après
+--     nouvelle conversation par photo, proposition à l'ouverture, fermeture de Claude Code après
 --     inactivité, raccourci clavier, dossiers.
 -- Les deux sections lisent et écrivent les mêmes préférences du module (Preferences.lua,
 -- Chemins.prefs).
@@ -18,7 +18,6 @@ local LrView = import 'LrView'
 
 local Chemins = require 'Chemins'
 local Consignes = require 'Consignes'
-local Dispositions = require 'Dispositions'
 local Fichiers = require 'Fichiers'
 local Liaison = require 'Liaison'
 
@@ -35,9 +34,9 @@ local function diagnostic()
         string.format("Mode : %s ; accord dans Lightroom : %s ; copies virtuelles seulement : %s ; libellé protégé : %s ; rejetées protégées : %s ; plafond : %s photos ; retour visuel : %s",
             tostring(prefs.mode), tostring(prefs.accordDansLightroom), tostring(prefs.copiesSeulement), tostring(prefs.libelleProtege),
             tostring(prefs.rejeteesProtegees), tostring(prefs.plafondPhotos), tostring(prefs.retourVisuel)) .. " ; point de mise au point en tout temps : " .. tostring(prefs.pointMiseAuPoint),
-        string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s, effort %s ; disposition %s ; nouvelle conversation par photo : %s",
+        string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s, effort %s ; nouvelle conversation par photo : %s",
             tostring(prefs.cheminClaude), tostring(prefs.cheminConnecteur), tostring(prefs.modele), tostring(prefs.effort),
-            tostring(prefs.disposition), tostring(prefs.nouvelleParPhoto)) .. " ; proposition à l'ouverture : " .. tostring(prefs.propositionAOuverture),
+            tostring(prefs.nouvelleParPhoto)) .. " ; proposition à l'ouverture : " .. tostring(prefs.propositionAOuverture),
         "Journaux : " .. select(2, Liaison.cheminJournal()) .. " et " .. Chemins.journal(),
         "",
         "Derniers événements :",
@@ -215,9 +214,6 @@ local function sectionFenetre(f, prefs, ligne)
         ligne("Effort :",
             f:popup_menu { value = bind 'effort', items = Consignes.itemsEfforts() },
             f:static_text { title = "le même pour les quatre modèles" }),
-        ligne("Disposition :",
-            f:popup_menu { value = bind 'disposition', items = Dispositions.items() },
-            f:static_text { title = "la fenêtre ouverte se rouvre" }),
         ligne("Autre photo :",
             f:checkbox { value = bind 'nouvelleParPhoto',
                 title = "Nouvelle conversation pour une autre photo ou sélection" }),
