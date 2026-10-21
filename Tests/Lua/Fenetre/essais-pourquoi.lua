@@ -107,21 +107,36 @@ prefs.propositionAOuverture = false
 prefs.nouvelleParPhoto = false
 
 -- Les images des étapes (Etapes.images du module) : `images[id]` donne l'état d'une étape (par
--- défaut, prête : avant et après) ; les demandes reçues sont gardées. Les réductions (Images) :
--- un chemin tiré du nom, sans sips.
+-- défaut, prête : avant et après), ses fichiers rangés comme le module les range (Etapes/<photo>/) ;
+-- les demandes reçues sont gardées. Les réductions (Images) : un chemin tiré de la photo et du nom,
+-- sans sips, faites sur la copie de la fenêtre, jamais dans le dossier Etapes du module (dont le
+-- ménage ne voit pas les réductions, rangées dans .vignettes).
 local images, demandes = {}, {}
 local imagesVraies, vignetteVraie, grandeVraie = Etapes.images, Images.vignette, Images.grande
 Etapes.images = function(photo, id)
     demandes[#demandes + 1] = Conversation.clePhoto(photo) .. '/' .. tostring(id)
     local e = images[id] or { etat = 'pret', avant = true, apres = true }
-    return { dossier = '/etapes/' .. Conversation.clePhoto(photo), etat = e.etat, raison = e.raison,
-        avant = e.avant and (id .. '-avant.jpg') or nil, apres = e.apres and (id .. '-apres.jpg') or nil }
+    local dossier = Chemins.etapes() .. '/' .. Conversation.clePhoto(photo)
+    Fichiers.creerDossier(dossier)
+    local avant, apres = e.avant and (id .. '-avant.jpg') or nil, e.apres and (id .. '-apres.jpg') or nil
+    for _, nom in ipairs({ avant or false, apres or false }) do
+        if nom then
+            Fichiers.ecrire(dossier .. '/' .. nom, 'jpeg de ' .. nom)
+        end
+    end
+    return { dossier = dossier, etat = e.etat, raison = e.raison, avant = avant, apres = apres }
+end
+-- La photo de la copie (Temporaire/Pourquoi/<photo>/<lecture>/<nom>), qui doit être là.
+local function photoDeLaCopie(dossier, nom)
+    vrai(not dossier:find(Chemins.etapes(), 1, true), 'réduction dans le dossier Etapes du module : ' .. dossier)
+    vrai(Fichiers.lire(dossier .. '/' .. nom) == 'jpeg de ' .. nom, 'copie absente : ' .. dossier .. '/' .. nom)
+    return assert(dossier:match('/Pourquoi/([^/]+)/[^/]+$'), dossier)
 end
 Images.vignette = function(dossier, nom, cote)
-    return dossier .. '/.vignettes/' .. nom:gsub('%.jpg$', '') .. '-' .. cote .. '.jpg'
+    return '/etapes/' .. photoDeLaCopie(dossier, nom) .. '/.vignettes/' .. nom:gsub('%.jpg$', '') .. '-' .. cote .. '.jpg'
 end
 Images.grande = function(dossier, nom, largeur, hauteur)
-    return dossier .. '/.vignettes/' .. nom:gsub('%.jpg$', '') .. '-grande.jpg', 540, 360
+    return '/etapes/' .. photoDeLaCopie(dossier, nom) .. '/.vignettes/' .. nom:gsub('%.jpg$', '') .. '-grande.jpg', 540, 360
 end
 
 local function photoActive(id, nom)
@@ -289,7 +304,7 @@ essai('Conversation : copy_settings sur deux photos, une étape par photo avec s
     egal(true, liste[2].enCours)
 end)
 
-essai('Conversation : annulée par un undo_last suivant (par son id, sinon par son nom), défaite par revert_to_original', function()
+essai('Conversation : annulée par un undo_last suivant (par son id ; par son nom, seulement sans id), défaite par revert_to_original', function()
     local c = Conversation.nouvelle()
     balance(c, 'b1', 'E1')
     ciel(c, 'c1', 'E2')
@@ -299,9 +314,17 @@ essai('Conversation : annulée par un undo_last suivant (par son id, sinon par s
         etape = 'Claude · passe 2 : ciel', etape_id = 'E2' } } })
     egal('E1 E2:undo_last', textesDe(Conversation.etapes(c, 4961)))
     egal('E7', textesDe(Conversation.etapes(c, 4962)), "l'autre photo ne bouge pas")
-    -- Une mémoire d'avant la 1.3 (etape_id null) : par le nom, en remontant.
+    -- Une étape d'avant la 1.3 défaite (etape_id null), absente de ce fil : rien de marqué, pas
+    -- même une étape du même nom qui a un id (elle l'aurait rendu à son annulation).
     appel(c, 'u2', 'undo_last', {}, { resultats = { { photo = { id = 4961 }, annulee = true, etape = 'Claude · passe 1 : balance',
         etape_id = Json.null } } })
+    egal('E1 E2:undo_last', textesDe(Conversation.etapes(c, 4961)), "sans id : pas une étape qui en a un")
+    -- Une étape du même nom faite ailleurs (Claude Desktop) défaite : son id n'est pas dans ce fil.
+    appel(c, 'u2b', 'undo_last', {}, { resultats = { { photo = { id = 4961 }, annulee = true, etape = 'Claude · passe 1 : balance',
+        etape_id = 'D5' } } })
+    egal('E1 E2:undo_last', textesDe(Conversation.etapes(c, 4961)), "un id d'ailleurs : rien de marqué")
+    appel(c, 'u2c', 'undo_last', {}, { resultats = { { photo = { id = 4961 }, annulee = true, etape = 'Claude · passe 1 : balance',
+        etape_id = 'E1' } } })
     egal('E1:undo_last E2:undo_last', textesDe(Conversation.etapes(c, 4961)))
     -- Un undo_last qui n'a rien défait ne marque rien.
     ciel(c, 'c2', 'E3')
@@ -366,6 +389,28 @@ essai('Conversation de la 1.2 (sans etape_id) : raison et changements relus dans
         ligne = l
     end
     vrai(ligne.texte:sub(-#Fil.SUFFIXE_ETAPE) == Fil.SUFFIXE_ETAPE, ligne.texte)
+end)
+
+essai("Conversation de la 1.2 : une réponse illisible (coupée) se relit en peu d'essais, sans étape", function()
+    local lignes = {}
+    for k = 1, 400 do
+        lignes[#lignes + 1] = '        { "cle": "Exposure2012", "avant": 0, "apres": ' .. k .. ' },'
+    end
+    local e = { id = 'z', genre = 'outil', outil = 'apply_settings', etat = 'fait', texte = 'apply_settings · x', images = {},
+        changements = {}, detail = Json.encode({ step_name = 'x', reason = 'y' }) .. '\n\n— Réponse —\n{\n  "resultats": [\n'
+            .. table.concat(lignes, '\n') }
+    local decode, lectures = Json.decode, 0
+    Json.decode = function(texte)
+        lectures = lectures + 1
+        return decode(texte)
+    end
+    local ok, etape = pcall(Conversation.estEtape, e)
+    Json.decode = decode
+    vrai(ok, tostring(etape))
+    egal(false, etape, 'rien de lisible')
+    -- L'entrée, la réponse entière, LIGNES_REMARQUES têtes au plus (et non une par ligne), puis la
+    -- réponse lue pour ses étapes.
+    vrai(lectures <= Conversation.LIGNES_REMARQUES + 3, lectures .. ' lectures du JSON')
 end)
 
 -- Fil -------------------------------------------------------------------------------------------
@@ -686,6 +731,10 @@ essai("Fenêtre : images en préparation, montrées quand Etapes.version change 
         egal('Étape 2 sur 2 · avant', p.legendeApercu, "l'avant déjà gardé, en attendant l'après")
         contient(p.etapeTexte:gsub('\n', ' '), 'Avant/après en préparation…')
         egal(false, p.etapeAImages)
+        -- Les copies de la fenêtre : dans son dossier, hors du dossier Etapes du module.
+        local copies = Fenetre.imagesEtapes['4961/E2'].dossier
+        vrai(copies:find(Fenetre.dossierPourquoi() .. '/4961/', 1, true) == 1, copies)
+        vrai(Fichiers.existe(copies .. '/E2-avant.jpg'), "la copie de l'avant")
         -- La capture finit : Etapes.version change, la boucle relit les images.
         images.E2 = nil
         Etapes.version = Etapes.version + 1
@@ -696,6 +745,16 @@ essai("Fenêtre : images en préparation, montrées quand Etapes.version change 
         egal('/etapes/4961/.vignettes/E2-apres-320.jpg', p.imageApercu)
         vrai(not p.etapeTexte:find('préparation', 1, true), p.etapeTexte)
         egal(true, p.etapeAImages)
+        vrai(not Fichiers.existe(copies), 'les copies de la lecture remplacée s\'effacent')
+        vrai(Fichiers.existe(Fenetre.imagesEtapes['4961/E2'].dossier .. '/E2-apres.jpg'), "la copie de l'après")
+        -- Prête, elle ne se relit plus quand une autre capture finit.
+        local lues = #demandes
+        Etapes.version = Etapes.version + 1
+        taches = #S.taches
+        unTour()
+        lancerTaches(taches)
+        egal(lues, #demandes, 'une étape prête ne se relit pas')
+        egal('/etapes/4961/.vignettes/E2-apres-320.jpg', p.imageApercu)
         -- Une nouvelle étape de la même photo, appel en cours puis réponse : elle devient l'étape
         -- montrée (mode suivre).
         appel(c, 'b3', 'apply_settings', { step_name = 'passe 3 : peau', reason = 'Peau rougie.' })

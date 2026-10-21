@@ -584,6 +584,10 @@ function Conversation.retoursLus(textes)
     return lues
 end
 
+-- Lignes de remarques retirées au plus de la fin d'une réponse de la 1.2 pour trouver son JSON :
+-- chaque essai relit tout le JSON, et une réponse illisible (coupée) en a des milliers de lignes.
+Conversation.LIGNES_REMARQUES = 12
+
 -- L'entrée et la réponse gardées dans `detail` (« … — Réponse — … ») : l'entrée décodée, et la
 -- réponse en textes (le JSON du connecteur, sans les remarques qui le suivent).
 local function lireDetail(detail)
@@ -595,9 +599,10 @@ local function lireDetail(detail)
     local textes = { reponse }
     if not pcall(Json.decode, reponse) then
         -- Une remarque du connecteur (bloc de texte à part) suit le JSON : la plus longue tête qui
-        -- se lit.
-        local fin = #reponse
-        while fin > 0 do
+        -- se lit, en retirant au plus LIGNES_REMARQUES lignes.
+        local fin, essais = #reponse, 0
+        while fin > 0 and essais < Conversation.LIGNES_REMARQUES do
+            essais = essais + 1
             local pos = reponse:sub(1, fin):match('.*()\n')
             if not pos then
                 break
@@ -668,8 +673,9 @@ end
 -- Les étapes de la conversation pour une photo, dans l'ordre du fil : { element (indice),
 -- elementId, photo, id, nom, fichier, etape, raison, changements, outil, annulee, enCours,
 -- ancienne }. Un appel en cours compte pour toute photo (sa photo n'est connue qu'à la réponse).
--- `annulee` : 'undo_last' (défaite par un undo_last suivant, retrouvée par son id, sinon par son
--- nom en remontant) ou 'revert' (un revert_to_original suivant a remis la photo).
+-- `annulee` : 'undo_last' (défaite par un undo_last suivant, retrouvée par son id ; une étape sans
+-- id, de la 1.2, par son nom en remontant) ou 'revert' (un revert_to_original suivant a remis la
+-- photo).
 function Conversation.etapes(c, photo)
     local cle = Conversation.clePhoto(photo)
     local liste = {}
@@ -699,12 +705,16 @@ function Conversation.etapes(c, photo)
                     end
                 end
             end
+            -- Par le nom, seulement une étape sans id (conversation de la 1.2) : une étape qui a un
+            -- id l'aurait rendu à son annulation. Un undo_last qui défait une étape absente de ce
+            -- fil (faite par Claude Desktop, une série, une note posée) ne marque donc pas une
+            -- étape du même nom.
             for _, a in ipairs(info.annule) do
                 if Conversation.clePhoto(a.photo) == cle then
                     local nom = Conversation.nomEtape(a.nom)
                     local trouvee = a.id and marquer(function(x) return x.id == a.id end, 'undo_last')
                     if not trouvee and nom ~= '' then
-                        marquer(function(x) return Conversation.nomEtape(x.nom or x.etape) == nom end, 'undo_last')
+                        marquer(function(x) return x.id == nil and Conversation.nomEtape(x.nom or x.etape) == nom end, 'undo_last')
                     end
                 end
             end

@@ -488,7 +488,11 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
     Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'as-pourquoi', textes = { reponse }, images = {}, erreur = false } } })
     local element = #c.elements
     egal(id, c.elements[element].etapes[1].id)
+    -- Des copies d'une ouverture passée : effacées à l'ouverture.
+    local vieilles = Fenetre.dossierPourquoi() .. '/2004/ancienne'
+    Fichiers.ecrire(vieilles .. '/x-apres.jpg', 'x')
     ouvrirFenetre(function(p, args)
+        vrai(not Fichiers.existe(vieilles), "les copies d'une ouverture passée")
         Fenetre.rafraichir()
         local n
         for i = 1, Fenetre.T.lignes do
@@ -505,8 +509,9 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
         for i = taches + 1, #S.taches do
             S.taches[i]()
         end
-        -- L'après, réduit par sips au cadre de 320 de l'aperçu.
-        contient(p.imageApercu, '/uuid-2004/.vignettes/' .. id .. '-apres-320.jpg')
+        -- L'après, copié dans le dossier de la fenêtre et réduit par sips au cadre de 320 de l'aperçu.
+        contient(p.imageApercu, '/Temporaire/Pourquoi/2004/')
+        contient(p.imageApercu, '/.vignettes/' .. id .. '-apres-320.jpg')
         local l, h = Images.dimensions(p.imageApercu)
         egal(Fenetre.T.apercu, l, 'vignette de 320')
         egal(Fenetre.T.apercu, h)
@@ -524,7 +529,8 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
             end
         end)
         voir.args.action()
-        contient(p.imageApercu, '/uuid-2004/.vignettes/' .. id .. '-avant-320.jpg')
+        contient(p.imageApercu, '/Temporaire/Pourquoi/2004/')
+        contient(p.imageApercu, '/.vignettes/' .. id .. '-avant-320.jpg')
         l, h = Images.dimensions(p.imageApercu)
         egal(Fenetre.T.apercu, l)
         egal(Fenetre.T.apercu, h)
@@ -553,6 +559,9 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
             tailles[#tailles + 1] = colonne.args[1].args.title .. ' ' .. image.args.width .. 'x' .. image.args.height
         end
         egal('Avant 300x200 | Après 200x300', table.concat(tailles, ' | '))
+        -- Rien d'écrit par la fenêtre dans le dossier Etapes du module : ses images seulement.
+        egal(id .. '-apres.jpg ' .. id .. '-avant.jpg', table.concat(Fichiers.entrees(dossier), ' '))
+        vrai(not Fichiers.existe(dossier .. '/.vignettes'), 'aucune réduction dans le dossier du module')
         p.onglet = 'notation'
     end)
     prefs.nouvelleParPhoto = true

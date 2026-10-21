@@ -1190,10 +1190,20 @@ function Fenetre.sousTitreEtape(x)
 end
 
 -- Les images lues de chaque étape vue (Fenetre.demanderImagesEtape), par « photo/id » : { cle,
--- version (Etapes.version de la lecture), info (Etapes.images), avant, apres (réductions au cadre
--- de l'aperçu) }. Revenir à une étape la remontre tout de suite ; une lecture d'une version
--- passée reste montrée jusqu'à la suivante. Vidées à chaque ouverture.
+-- version (Etapes.version de la lecture), info (Etapes.images), dossier et noms (les copies de la
+-- fenêtre : noms.avant, noms.apres), avant, apres (réductions au cadre de l'aperçu), complete
+-- (prête : ses deux images ne changent plus, elle ne se relit pas) }. Revenir à une étape la
+-- remontre tout de suite ; une lecture d'une version passée reste montrée jusqu'à la suivante.
+-- Vidées à chaque ouverture.
 Fenetre.imagesEtapes, Fenetre.demandesEtapes = {}, {}
+
+-- Le dossier des copies des images des étapes et de leurs réductions (Temporaire/Pourquoi/<photo>/
+-- <lecture>/), propre à la fenêtre et vidé à chaque ouverture : rien ne s'écrit dans le dossier
+-- Etapes du module (Images.vignette et Images.grande rangent leurs réductions à côté de l'image,
+-- dans .vignettes, que le ménage d'Etapes.lua ne voit pas : elles y resteraient sans fin).
+function Fenetre.dossierPourquoi()
+    return LrPathUtils.child(Chemins.temporaire(), 'Pourquoi')
+end
 
 local function cleImages(x)
     return Conversation.clePhoto(x.photo) .. '/' .. tostring(x.id)
@@ -1260,9 +1270,10 @@ function Fenetre.texteEtape(x, etat)
     return table.concat(lignes, '\n')
 end
 
--- Lit dans une tâche les images de l'étape (Etapes.images) et les réduit au cadre de l'aperçu
--- (Images.vignette, sips) ; une fois lues, la carte et l'aperçu se rafraîchissent. Relues quand
--- Etapes.version change (une capture finie).
+-- Lit dans une tâche les images de l'étape (Etapes.images), les copie dans le dossier de la
+-- fenêtre (Fenetre.dossierPourquoi) et les y réduit au cadre de l'aperçu (Images.vignette, sips) ;
+-- une fois lues, la carte et l'aperçu se rafraîchissent. Relues quand Etapes.version change (une
+-- capture finie), sauf une étape prête.
 function Fenetre.demanderImagesEtape(x)
     local T = Fenetre.T
     if not (T and x and x.id) or x.enCours or Conversation.CLASSEMENTS[x.outil] then
@@ -1271,7 +1282,7 @@ function Fenetre.demanderImagesEtape(x)
     local cle = cleImages(x)
     local version = Etapes.version
     local im = Fenetre.imagesEtapes[cle]
-    if im and im.version == version then
+    if im and (im.version == version or im.complete) then
         return
     end
     -- Une lecture à la fois par étape et par version.
@@ -1284,24 +1295,44 @@ function Fenetre.demanderImagesEtape(x)
     LrTasks.startAsyncTask(function()
         local ok, lu = LrTasks.pcall(function()
             local info = Etapes.images(photo, id)
-            local r = { cle = cle, version = version, info = info }
-            for _, vue in ipairs({ 'avant', 'apres' }) do
-                if info.dossier and info[vue] then
-                    r[vue] = Images.vignette(info.dossier, info[vue], T.apercu)
+            local r = { cle = cle, version = version, info = info, noms = {} }
+            if info.dossier and (info.avant or info.apres) then
+                -- Un dossier par lecture : une réduction gardée par nom (Images.vignette) ne
+                -- montre jamais une image d'avant.
+                local dossier = LrPathUtils.child(LrPathUtils.child(Fenetre.dossierPourquoi(), Conversation.clePhoto(photo)),
+                    Conversation.identifiant())
+                Fichiers.creerDossier(dossier)
+                r.dossier = dossier
+                for _, vue in ipairs({ 'avant', 'apres' }) do
+                    local nom = info[vue]
+                    local copie = nom and LrPathUtils.child(dossier, nom)
+                    if copie then
+                        Fichiers.copier(LrPathUtils.child(info.dossier, nom), copie)
+                    end
+                    if copie and Fichiers.existe(copie) then
+                        r.noms[vue] = nom
+                        r[vue] = Images.vignette(dossier, nom, T.apercu)
+                    end
                 end
             end
+            r.complete = info.etat == 'pret' and r.avant ~= nil and r.apres ~= nil
             return r
         end)
         demandes[demande] = nil
         if not ok then
             Journal.noter("Avant/après de l'étape :", tostring(lu))
-            lu = { cle = cle, version = version, info = { etat = 'inconnu' } }
+            lu = { cle = cle, version = version, info = { etat = 'inconnu' }, noms = {} }
         end
         -- Une lecture d'une fenêtre fermée depuis, ou d'une version passée arrivée en retard, ne
-        -- remplace rien.
+        -- remplace rien (ses copies s'effacent) ; celle qu'elle remplace efface les siennes.
         local deja = lectures[cle]
         if lectures == Fenetre.imagesEtapes and not (deja and deja.version > version) then
             lectures[cle] = lu
+            if deja and deja.dossier and deja.dossier ~= lu.dossier then
+                Fichiers.supprimer(deja.dossier)
+            end
+        elseif lu.dossier then
+            Fichiers.supprimer(lu.dossier)
         end
         if Fenetre.p and Fenetre.T == T then
             Fenetre.rafraichirEtape()
@@ -1426,26 +1457,27 @@ end
 function Fenetre.agrandirEtape()
     local x, n, liste = Fenetre.etapeCourante()
     local im = x and Fenetre.imagesDe(x)
-    local info = im and im.info
-    if not (info and info.dossier and (info.avant or info.apres)) then
+    -- Les copies de la fenêtre (Fenetre.dossierPourquoi), jamais le dossier Etapes du module.
+    local dossier, noms = im and im.dossier, im and im.noms or {}
+    if not (dossier and (noms.avant or noms.apres)) then
         return
     end
     local titre = Fenetre.titreEtape(x, n, #liste)
     local legende = Fenetre.texteEtape(x)
     enTache(function()
-        if info.avant and info.apres then
-            Fenetre.agrandirDeux(titre, { dossier = info.dossier, nom = info.avant, titre = "Avant" },
-                { dossier = info.dossier, nom = info.apres, titre = "Après" }, legende)
+        if noms.avant and noms.apres then
+            Fenetre.agrandirDeux(titre, { dossier = dossier, nom = noms.avant, titre = "Avant" },
+                { dossier = dossier, nom = noms.apres, titre = "Après" }, legende)
             return
         end
-        local nom = info.apres or info.avant
-        local chemin, l, h = Images.grande(info.dossier, nom, 1100, 740)
+        local nom = noms.apres or noms.avant
+        local chemin, l, h = Images.grande(dossier, nom, 1100, 740)
         if not chemin then
             LrDialogs.message("Aperçu illisible", nom, 'warning')
             return
         end
         LrDialogs.presentModalDialog {
-            title = "Claude · " .. titre .. " · " .. (info.apres and "après" or "avant"),
+            title = "Claude · " .. titre .. " · " .. (noms.apres and "après" or "avant"),
             contents = LrView.osFactory():picture { value = chemin, width = l, height = h },
             actionVerb = "Fermer",
             cancelVerb = '< exclude >',
@@ -2269,8 +2301,10 @@ function Fenetre.afficher()
         Fenetre.info = nil
         Fenetre.noteVue, Fenetre.notePhoto = nil, nil
         Fenetre.noteEnCours = false
-        -- Aucune étape choisie (onglet Pourquoi ?) ; ses images se relisent.
+        -- Aucune étape choisie (onglet Pourquoi ?) ; ses images se relisent, les copies d'avant
+        -- s'effacent.
         Fenetre.etape, Fenetre.imagesEtapes, Fenetre.demandesEtapes, Fenetre.versionEtapes = nil, {}, {}, nil
+        Fichiers.supprimer(Fenetre.dossierPourquoi())
 
         local f = LrView.osFactory()
         local p = LrBinding.makePropertyTable(context)
