@@ -259,4 +259,25 @@ final class PeauTests: XCTestCase {
         }
         XCTAssertTrue(Peau.demandeDescription.contains("texture −35 ou clarté −15"), Peau.demandeDescription)
     }
+
+    /// Le dosage est dit partout où Claude retouche une peau : la définition d'add_mask, l'invite
+    /// portrait (étape 4, et le regard sur chaque visage à l'étape 1) et retouche_pro (étape 7).
+    /// L'intensité est linéaire (constaté le 20 octobre 2026) : amount 50 est la moitié de la dose.
+    func testLeDosageEstDitPartout() throws {
+        let definition = try XCTUnwrap(tools.definitions.first { $0["name"] == "add_mask" })
+        let masque = try XCTUnwrap(definition["inputSchema"]?["properties"]?["masks"]?["items"]?["properties"])
+        XCTAssertTrue(masque["effect"]?["description"]?.string?.contains(Peau.dosage) == true, "le dosage dans add_mask")
+        XCTAssertNotNil(masque["smoothing_requested"])
+        XCTAssertTrue(Peau.dosage.contains("amount 50 pour un homme ou une personne âgée (la moitié de la dose, exactement)"), Peau.dosage)
+
+        let portrait = Prompts.portrait.render([:])
+        XCTAssertTrue(portrait.contains("4. Retouches locales (add_mask). " + Peau.dosage + " Puis, à intensité réduite (amount) : iris renforcé"), portrait)
+        XCTAssertTrue(portrait.contains("face_skin"))
+        XCTAssertTrue(portrait.contains("Regarde chaque visage : enfant, homme, femme ou personne âgée ; la dose de la peau en dépend (étape 4), et dans le doute, la plus faible."))
+        XCTAssertFalse(portrait.contains("peau adoucie"), "plus de peau adoucie sans dose")
+
+        let retouche = Prompts.retouchePro.render([:])
+        XCTAssertTrue(retouche.contains("peau dosée comme le dit add_mask (« Peau du visage lisse » par défaut, rien pour un enfant)"))
+        XCTAssertFalse(retouche.contains("peau adoucie"))
+    }
 }

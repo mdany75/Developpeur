@@ -33,9 +33,11 @@ public enum Peau {
     /// « Adoucir la peau » : pour les textes seulement (son effet vient du fichier de Lightroom).
     static let forte = Dose(texture: 0, clarte: -100, nettete: 25)
     /// Intensité (amount) d'un masque de peau pour un homme ou une personne âgée : la moitié de la
-    /// dose. Provisoire, à relever : la linéarité de CorrectionAmount n'est pas encore constatée
-    /// (« Peau du visage lisse » à 50 contre texture −10 et clarté −5 à 100, sur une proposition) ;
-    /// si elle ne tient pas, la moitié de dose s'écrit en curseurs.
+    /// dose, exactement. Constaté le 20 octobre 2026 (Lightroom Classic 15.6, propositions de
+    /// 1 344 px sur un portrait d'essai, person_part face_skin) : l'intensité d'un masque
+    /// (CorrectionAmount) est linéaire. Texture −20 et clarté −10 à amount 50 rendent la même image,
+    /// au pixel près, que texture −10 et clarté −5 à 100 ; « Adoucir la peau (Lite) » à 50, la même
+    /// que texture −17,5 et clarté −7,5 à 100. Constat de rendu : la simulation ne peut pas l'imiter.
     public static let intensiteReduite = 50.0
     /// Marge des comparaisons : une dose se calcule en virgule flottante (curseur × 0,01, puis
     /// × intensité × 100), et une dose pile à la limite doit passer.
@@ -61,7 +63,7 @@ public enum Peau {
     static let parties: Set<String> = ["face_skin", "body_skin"]
 
     /// Le texte du dosage, tel que Claude le lit (description d'effect d'add_mask, invite portrait).
-    public static let dosage = "Peau, dosée comme Adobe, sur person_part face_skin (body_skin seulement si le corps se voit beaucoup) : par défaut effect « Peau du visage lisse » (\(chiffres(parDefaut))) ; « Soften Skin (Lite) » (Adoucir la peau (Lite) : \(chiffres(lite))) pour un gros plan dont un zoom montre des pores marqués ; amount \(nombre(intensiteReduite)) pour un homme ou une personne âgée ; rien pour un enfant. Doses différentes sur une même photo : un masque par personne (kind person, person_at sur son visage, part face_skin). « Soften Skin » (Adoucir la peau : \(chiffres(forte))) seulement si l'utilisateur demande une peau plus lisse ; au-delà de la dose Lite (intensité comprise), smoothing_requested = true, sinon refus. Puis view_photo avec region sur le visage : pores encore visibles, ni cire ni plaques."
+    public static let dosage = "Peau, dosée comme Adobe, sur person_part face_skin (body_skin seulement si le corps se voit beaucoup) : par défaut effect « Peau du visage lisse » (\(chiffres(parDefaut))) ; « Soften Skin (Lite) » (Adoucir la peau (Lite) : \(chiffres(lite))) pour un gros plan dont un zoom montre des pores marqués ; amount \(nombre(intensiteReduite)) pour un homme ou une personne âgée (la moitié de la dose, exactement) ; rien pour un enfant. Doses différentes sur une même photo : un masque par personne (kind person, person_at sur son visage, part face_skin). « Soften Skin » (Adoucir la peau : \(chiffres(forte))) seulement si l'utilisateur demande une peau plus lisse ; au-delà de la dose Lite (intensité comprise), smoothing_requested = true, sinon refus. Puis view_photo avec region sur le visage : pores encore visibles, ni cire ni plaques."
 
     /// La description de smoothing_requested, propriété d'un masque d'add_mask.
     static let demandeDescription = "true = l'utilisateur a demandé une peau plus lisse (dans sa demande ou son guide de style) : « Adoucir la peau », ou plus que la dose « Adoucir la peau (Lite) ». Jamais de toi-même. Sans lui, un masque de la peau (face_skin, body_skin) au-delà de texture \(nombre(lite.texture)) ou clarté \(nombre(lite.clarte)) (intensité comprise), ou à netteté négative, est refusé."

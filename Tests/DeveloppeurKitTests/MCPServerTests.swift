@@ -193,6 +193,125 @@ final class MCPServerTests: XCTestCase {
         XCTAssertTrue(serie.contains("Suppression des distractions › Poussière"))
     }
 
+    // MARK: Invites et consignes de la 1.2
+
+    /// 1.2 : portrait, paysage et noir_et_blanc finissent par éclaircir et assombrir comme un
+    /// tireur, doses de Prompts.Tireur, avec l'avant/après de cette seule étape avant celui de toute
+    /// la retouche ; retouche_pro y renvoie, sans empiler vignetage et radial inversé.
+    func testTireurMethodInPortraitLandscapeAndBlackAndWhite() throws {
+        for prompt in [Prompts.portrait, Prompts.paysage, Prompts.noirEtBlanc] {
+            let texte = prompt.render([:])
+            for attendu in ["step_name " + Prompts.Tireur.etape, Prompts.Tireur.zones, Prompts.Tireur.sujet, Prompts.Tireur.bords,
+                            Prompts.Tireur.forme, Prompts.Tireur.avantApres, "à la place du vignetage après recadrage, jamais les deux",
+                            "kind linear", "kind radial", "PostCropVignetteAmount", "zone_d_interet",
+                            "undo_last, puis le même add_mask à doses réduites", "comme un tireur en chambre noire"] {
+                XCTAssertTrue(texte.contains(attendu), "\(prompt.name) sans « \(attendu) »")
+            }
+            let etape = try XCTUnwrap(texte.range(of: Prompts.Tireur.avantApres)).lowerBound
+            let fin = try XCTUnwrap(texte.range(of: "compare = before_claude")).lowerBound
+            XCTAssertLessThan(etape, fin, "\(prompt.name) : l'avant/après de l'étape, puis celui de toute la retouche")
+            XCTAssertTrue(prompt.description.contains("éclaircir et assombrir"), prompt.name)
+        }
+        XCTAssertFalse(Prompts.paysage.render([:]).contains("Vignetage léger après le recadrage"))
+        XCTAssertFalse(Prompts.noirEtBlanc.render([:]).contains("(brush ou radial) pour guider l'œil"))
+        XCTAssertTrue(Prompts.noirEtBlanc.render([:]).contains("6. Grain fin et discret"), "le grain passe après")
+        let portrait = Prompts.portrait.render([:])
+        XCTAssertTrue(portrait.contains("6. " + Prompts.Tireur.methode(vers: "le visage", grandes: "Les grandes zones trop claires qui tirent l'œil hors du visage (fenêtre, mur clair, ciel)")))
+        XCTAssertTrue(portrait.contains("(sa lumière se règle à l'étape 6)"))
+        XCTAssertFalse(portrait.contains("un peu de lumière sur le visage"), "la lumière du visage passe par le tireur")
+        let retouche = Prompts.retouchePro.render([:])
+        XCTAssertTrue(retouche.contains("vignetage (ou les bords par un radial inversé à l'étape 7, jamais les deux)"))
+        XCTAssertTrue(retouche.contains("éclaircir et assombrir comme un tireur (doses dans la description d'add_mask), en une étape, suivie de " + Prompts.Tireur.avantApres))
+        // « en chambre noire », jamais ce qui se lirait comme un agrandissement.
+        XCTAssertFalse(Prompts.Tireur.resume.lowercased().contains("agrandi"))
+        // La forme des bords et le fondu du sujet sont nommés une fois, et repris tels quels.
+        XCTAssertTrue(Prompts.Tireur.forme.contains("radius_x et radius_y \(Prompts.Tireur.bordsRayon), feather \(Prompts.Tireur.bordsFondu)"))
+        XCTAssertTrue(portrait.contains("feather \(Prompts.Tireur.sujetFondu)"))
+    }
+
+    /// Ce que la méthode du tireur demande existe dans les outils, et la description d'add_mask la
+    /// résume (la fenêtre Claude ne lit pas les invites).
+    func testTireurParametersExistInAddMaskAndViewPhoto() throws {
+        let definitions = ToolHandler(lightroom: FakeLightroom()).definitions
+        let addMask = try XCTUnwrap(definitions.first { $0["name"] == "add_mask" })
+        let description = try XCTUnwrap(addMask["description"]?.string)
+        XCTAssertTrue(description.hasSuffix(" " + Prompts.Tireur.resume), "add_mask résume la méthode")
+        // L'essentiel de l'outil en tête, le résumé à la fin ; une longueur tenue, tant que celle que
+        // Claude Code garde d'une description d'outil n'est pas constatée (comme les 4 096 des consignes).
+        XCTAssertTrue(description.hasPrefix("Ajoute des masques avec leurs réglages locaux"))
+        XCTAssertLessThanOrEqual(description.utf16.count, 2048)
+        for attendu in [Prompts.Tireur.zones, Prompts.Tireur.sujet, Prompts.Tireur.bords, Prompts.Tireur.forme, Prompts.Tireur.avantApres,
+                        "step_name " + Prompts.Tireur.etape, "jamais les deux"] {
+            XCTAssertTrue(Prompts.Tireur.resume.contains(attendu), attendu)
+        }
+        let masque = try XCTUnwrap(addMask["inputSchema"]?["properties"]?["masks"]?["items"]?["properties"]?.object)
+        for cle in ["kind", "from_x", "from_y", "to_x", "to_y", "center_x", "center_y", "radius_x", "radius_y", "feather", "invert",
+                    "amount", "name", "combine", "adjustments", "strokes"] {
+            XCTAssertNotNil(masque[cle], cle)
+        }
+        let genres = Set((masque["kind"]?["enum"]?.array ?? []).compactMap(\.string))
+        XCTAssertTrue(genres.isSuperset(of: ["linear", "radial", "brush", "subject"]), "\(genres)")
+        XCTAssertNotNil(masque["adjustments"]?["properties"]?["Exposure"])
+        let exposition = try XCTUnwrap(ToolHandler.localAdjustments.first { $0.name == "Exposure" })
+        XCTAssertTrue(exposition.range.contains(-0.7) && exposition.range.contains(0.4))
+        let proprietes = try XCTUnwrap(addMask["inputSchema"]?["properties"]?.object)
+        XCTAssertNotNil(proprietes["preview"])
+        XCTAssertTrue(proprietes["compare"]?["description"]?.string?.contains("bilan chiffré") == true)
+        let viewPhoto = try XCTUnwrap(definitions.first { $0["name"] == "view_photo" })
+        XCTAssertEqual(viewPhoto["inputSchema"]?["properties"]?["compare"]?["enum"], ["before_claude", "previous_step"])
+        XCTAssertTrue(DevelopCatalogue.keys.contains("PostCropVignetteAmount"))
+    }
+
+    /// 1.2 : les invites suivent l'intention lue au boîtier (intention_boitier de view_photo).
+    func testPromptsFollowTheCameraIntention() {
+        let retouche = Prompts.retouchePro.render([:])
+        XCTAssertTrue(retouche.contains("ce que la photo cherche à montrer (intention_boitier, s'il est donné : ce que le photographe a choisi à la prise de vue)"))
+        XCTAssertTrue(retouche.contains("profil adapté au rendu voulu (RAW Fujifilm : d'abord la simulation choisie au boîtier, intention_boitier.profil, sauf autre style demandé ;"))
+        XCTAssertTrue(Prompts.portrait.render([:]).contains("RAW Fujifilm : la simulation choisie au boîtier (intention_boitier.profil) si elle flatte la peau, sinon PRO Neg. Std"))
+        XCTAssertTrue(Prompts.paysage.render([:]).contains("RAW Fujifilm : la simulation choisie au boîtier (intention_boitier.profil), sinon Velvia"))
+        XCTAssertTrue(Prompts.noirEtBlanc.render([:]).contains("ACROS (et ses filtres jaune, rouge, vert ; prise en noir et blanc au boîtier : intention_boitier.profil, avec son filtre)"))
+        let nuit = Prompts.nuitIsoEleve.render([:])
+        XCTAssertTrue(nuit.contains("intention_boitier (Fujifilm) : une compensation négative ou une scène de nuit dit une nuit voulue sombre."))
+        XCTAssertTrue(nuit.contains("noirs posés pour garder une vraie nuit, sans remonter l'exposition d'ensemble au-delà de ce que dit intention_boitier."))
+    }
+
+    /// 1.2 : un éclairage mixte mesuré (view_photo › mesures › eclairage) se traite dans les invites.
+    func testMixedLightingIsAnnounced() {
+        XCTAssertTrue(Prompts.retouchePro.render([:]).contains("Un éclairage mixte (mesures › eclairage : mixte = true) se dit : balance des blancs sur la lumière des visages ou du sujet (balance_proposee), l'autre lumière par un masque à l'étape 7"))
+        XCTAssertTrue(Prompts.portrait.render([:]).contains("(ni orangée, ni grise, ni magenta) ; sous un éclairage mixte (view_photo › mesures › eclairage), balance sur la lumière du visage (balance_proposee)"))
+        XCTAssertTrue(Prompts.nuitIsoEleve.render([:]).contains("néons verts ; mesures › eclairage)"))
+    }
+
+    /// 1.2 : le bilan chiffré de view_photo guide les passes correctives et le résumé.
+    func testBilanGuidesCorrectivePassesAndTheSummary() {
+        let retouche = Prompts.retouchePro.render([:])
+        XCTAssertTrue(retouche.contains("Lis le bilan (avant → après, chiffré) : une « regression » est un défaut que la passe a créé ou aggravé, à corriger avant la suite."))
+        XCTAssertTrue(retouche.contains("masque trop visible), ou une « regression » au bilan, fais une passe corrective ciblée"))
+        XCTAssertTrue(retouche.contains("9. view_photo avec compare = before_claude (son bilan chiffre ce qui a changé depuis l'état d'avant Claude)"))
+        XCTAssertTrue(retouche.contains("chiffres du bilan à l'appui"))
+        XCTAssertTrue(retouche.contains("Pas de passe corrective sans défaut constaté"))
+        for prompt in [Prompts.portrait, Prompts.paysage, Prompts.noirEtBlanc, Prompts.nuitIsoEleve] {
+            let texte = prompt.render([:])
+            XCTAssertTrue(texte.contains("mesuré, visible ou en « regression » au bilan"), prompt.name)
+            XCTAssertTrue(texte.contains("un résumé en quelques puces, chiffres du bilan à l'appui"), prompt.name)
+            XCTAssertTrue(texte.contains("jamais de passe sans défaut constaté"), prompt.name)
+        }
+    }
+
+    /// 1.2 : les consignes nomment le radial inversé, la régression du bilan et l'intention lue au
+    /// boîtier ; la sauvegarde avant une longue série passe à la description de get_status.
+    func testInstructionsKnowWhatTheVersionAdds() throws {
+        let consignes = ServerInfo.instructions
+        XCTAssertTrue(consignes.contains("détail, vignetage ou radial inversé, jamais les deux)"))
+        XCTAssertTrue(consignes.contains("masque trop visible, « regression » au bilan), une passe corrective ciblée sur ce seul défaut"))
+        XCTAssertTrue(consignes.contains("RAW Fujifilm : d'abord la simulation du boîtier, intention_boitier)"))
+        XCTAssertTrue(consignes.contains("diagnostic sur ces chiffres autant qu'à l'œil"))
+        XCTAssertFalse(consignes.contains("request_backup"), "dans la description de get_status")
+        let getStatus = try XCTUnwrap(ToolHandler(lightroom: FakeLightroom()).definitions.first { $0["name"] == "get_status" })
+        XCTAssertTrue(getStatus["description"]?.string?.contains("request_backup demande une sauvegarde du catalogue") == true)
+        XCTAssertTrue(getStatus["description"]?.string?.contains("la proposer avant une longue série") == true)
+    }
+
     func testUnknownMethodAndBadJSON() throws {
         let unknown = try call(#"{"jsonrpc":"2.0","id":10,"method":"sampling/createMessage"}"#)
         XCTAssertEqual(unknown["error"]?["code"]?.int, JSONRPCError.methodNotFound)
