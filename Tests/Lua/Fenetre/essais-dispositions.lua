@@ -986,6 +986,46 @@ essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; u
     S.pendantFenetre = nil
 end)
 
+essai("Aperçu de l'onglet : une image cliquée cède aussi la place à une autre conversation, d'où qu'elle vienne, et à une autre photo active", function()
+    prefs.nouvelleParPhoto = false
+    photoActive(4961, 'DSCF4961.RAF', 0, 0)
+    Moteur.nouvelle()
+    local vu = false
+    S.pendantFenetre = function()
+        vu = true
+        local p = Fenetre.p
+        Fenetre.apercuOnglet.etape = function(q)
+            q.legendeApercu = "Aperçu de l'onglet"
+            return true
+        end
+        p.onglet = 'etape'
+        egal("Aperçu de l'onglet", p.legendeApercu)
+        local ligneImage = avecApercu(Moteur.courante, 'autre-1')
+        Fenetre.cliquerLigne(ligneImage)
+        vrai(p.legendeApercu:find('1 sur 1', 1, true), p.legendeApercu)
+        -- Une autre conversation sans passer par la liste ni par Nouvelle (conversation supprimée,
+        -- demande partie d'une autre page) : l'image cliquée n'est plus de celle-ci.
+        Moteur.nouvelle()
+        Fenetre.rafraichir()
+        egal("Aperçu de l'onglet", p.legendeApercu, "une autre conversation : l'aperçu de l'onglet")
+        -- Une autre photo active (Autre photo décochée : même conversation) : l'aperçu ne montre
+        -- plus l'image cliquée.
+        ligneImage = avecApercu(Moteur.courante, 'autre-2')
+        Fenetre.cliquerLigne(ligneImage)
+        vrai(p.legendeApercu:find('1 sur 1', 1, true), p.legendeApercu)
+        photoActive(4962, 'DSCF4962.RAF', 0, 0)
+        Fenetre.majPhoto()
+        egal("Aperçu de l'onglet", p.legendeApercu, "une autre photo active : l'aperçu de l'onglet")
+        Fenetre.apercuOnglet.etape = nil
+        p.onglet = 'notation'
+    end
+    Fenetre.afficher()
+    vrai(vu, 'fenêtre ouverte')
+    Fenetre.apercuOnglet.etape = nil
+    prefs.nouvelleParPhoto = true
+    S.pendantFenetre = nil
+end)
+
 essai("Clic sur un onglet : son crochet suit un vrai clic, jamais une bascule de la fenêtre", function()
     prefs.nouvelleParPhoto = false
     photoActive(4961, 'DSCF4961.RAF', 0, 0)
@@ -1027,8 +1067,13 @@ essai("Clic sur un onglet : son crochet suit un vrai clic, jamais une bascule de
         taches.canYield = function() return false end
         taches.pcall = function() error("LrTasks.pcall hors d'une tâche", 0) end
         p.onglet = 'proposition'
-        taches.canYield, taches.pcall = peutAttendre, pcallTache
         egal('proposition etape proposition', table.concat(recus, ' '), "crochet appelé hors d'une tâche")
+        -- Sans LrTasks.canYield (s'il manquait au SDK), pcall aussi : le crochet est appelé.
+        taches.canYield = nil
+        p.onglet = 'notation'
+        p.onglet = 'proposition'
+        taches.canYield, taches.pcall = peutAttendre, pcallTache
+        egal('proposition etape proposition proposition', table.concat(recus, ' '), 'crochet appelé sans LrTasks.canYield')
         Conversation.decider(c, Conversation.propositionEnAttente(c).id, false)
     end
     Fenetre.afficher()
@@ -1108,6 +1153,18 @@ essai('Vue du fil : la conversation à l\'ouverture ; Claude qui travaille y ram
         vu = true
         egal('conversation', Fenetre.vue, "la conversation à l'ouverture")
         egal(false, Fenetre.revenirAuFil(), 'déjà la conversation')
+        -- Le retour relit le fil depuis la fin sans changer la conversation montrée : ce qui la
+        -- suit (l'étape choisie de l'onglet Pourquoi ?) n'est pas remis.
+        Fenetre.rafraichir()
+        local montree = Fenetre.conversationAffichee
+        vrai(montree, 'une conversation montrée')
+        Fenetre.vue, Fenetre.defilement, Fenetre.total = 'carnet', 3, 99
+        Fenetre.cache.marque = true
+        egal(true, Fenetre.revenirAuFil(), 'retour au fil')
+        egal(montree, Fenetre.conversationAffichee, 'la conversation montrée reste')
+        egal(0, Fenetre.defilement)
+        egal(nil, Fenetre.total)
+        egal(nil, Fenetre.cache.marque)
         -- Une autre page (le carnet, d'un lot suivant) reste montrée tant que Claude ne travaille pas.
         Fenetre.vue = 'carnet'
         Fenetre.rafraichir()

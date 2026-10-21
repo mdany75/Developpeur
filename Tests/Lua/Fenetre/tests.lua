@@ -932,6 +932,25 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         egal('Pourquoi ? etapeTitre etapeSousTitre etapeTexte', table.concat(champs, ' '), nom .. ' : textes de la carte Pourquoi ?')
         egal("◀/small/etapePrecedente ▶/small/etapeSuivante Voir l'avant/small/etapeAImages Détail…/small/etapeADetail "
             .. '▲/mini/etapeMonte ▼/mini/etapeDescend', table.concat(boutonsEtape, ' '), nom .. ' : boutons de la carte Pourquoi ?')
+        -- Les rangées de boutons de la carte Pourquoi ? et la seconde de la carte Proposition
+        -- tiennent dans leur carte, avec l'un et l'autre titre lié (Voir l'avant ou Voir l'après ;
+        -- Je le fais ou J'ai fini).
+        local rangeeEtape
+        for _, enfant in ipairs(carteEtape.args) do
+            if type(enfant) == 'table' and enfant.genre == 'row' then
+                rangeeEtape = enfant
+            end
+        end
+        vrai(rangeeEtape, nom .. ' : rangée des boutons de la carte Pourquoi ?')
+        for _, titres in ipairs({ { "Voir l'avant", 'Je le fais' }, { "Voir l'après", "J'ai fini" } }) do
+            p.titreBascule, p.titreJeLeFais = titres[1], titres[2]
+            local largeurEtape, largeurJeLeFais = largeurEstimee(rangeeEtape, p), largeurEstimee(rangeeJeLeFais.rangee, p)
+            vrai(largeurEtape <= D.largeurEtape, string.format('%s : boutons de l\'étape de %d points dans %d (%s)', nom, largeurEtape,
+                D.largeurEtape, titres[1]))
+            vrai(largeurJeLeFais <= D.largeurProposition, string.format('%s : rangée Je le fais de %d points dans %d (%s)', nom,
+                largeurJeLeFais, D.largeurProposition, titres[2]))
+        end
+        p.titreBascule, p.titreJeLeFais = "Voir l'avant", 'Je le fais'
         vrai(textes.versionNom1 and textes.versionNom2 and not textes.versionNom3, nom .. ' : deux versions')
         vrai(textes.message and textes.aide, nom .. ' : message et aide')
         -- Le fil : D.lignes lignes, une variante par style.

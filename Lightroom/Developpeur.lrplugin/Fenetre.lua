@@ -365,13 +365,17 @@ end
 -- ouverture) ou une autre page (la page Carnet de progrès, 'carnet', d'un lot suivant). Claude qui
 -- travaille ramène à la conversation (Fenetre.rafraichir) : une demande partie d'ailleurs que le
 -- champ (Accepter, Refuser, Ajuster…, Je le fais, J'ai fini) se suit dans le fil.
--- Rend vrai si la vue a changé ; le fil se relit alors depuis la fin.
+-- Rend vrai si la vue a changé ; le fil se relit alors depuis la fin. La conversation montrée
+-- (Fenetre.conversationAffichee) reste la même : ce qui la suit (l'étape choisie de l'onglet
+-- Pourquoi ?, remise quand elle change) n'est pas perdu par un aller-retour vers une autre page.
 function Fenetre.revenirAuFil()
     if Fenetre.vue == 'conversation' then
         return false
     end
     Fenetre.vue = 'conversation'
-    Fenetre.conversationAffichee = nil
+    Fenetre.defilement = 0
+    Fenetre.cache = {}
+    Fenetre.total = nil
     return true
 end
 
@@ -457,8 +461,8 @@ end
 Fenetre.clics = {
     -- Les images de la conversation relues : le clic choisit la sienne, sans bascule vers une image
     -- arrivée entre-temps (Fenetre.rafraichirApercu). Elle reste montrée quel que soit l'onglet
-    -- (Fenetre.imageCliquee), jusqu'à un autre onglet, une image nouvelle, une autre conversation
-    -- ou un clic sur une étape.
+    -- (Fenetre.imageCliquee), jusqu'à un autre onglet, une image nouvelle, une autre conversation,
+    -- une autre photo active ou un clic sur une étape.
     image = function(l)
         local c = Moteur.courante
         Fenetre.images = c and Conversation.images(c) or {}
@@ -535,7 +539,7 @@ Fenetre.surOnglet = {}
 -- tâche (observateur d'une propriété, clic), pcall : LrTasks.pcall ne sert qu'à du code qui peut
 -- attendre.
 local function crochet(fn, ...)
-    local protege = LrTasks.canYield() and LrTasks.pcall or pcall
+    local protege = LrTasks.canYield and LrTasks.canYield() and LrTasks.pcall or pcall
     local ok, r = protege(fn, ...)
     if not ok then
         Journal.noter("Crochet de la fenêtre :", tostring(r))
@@ -665,6 +669,11 @@ function Fenetre.rafraichirApercu()
     local n = #Fenetre.images
     if Fenetre.indiceImage and Fenetre.indiceImage > n then
         Fenetre.indiceImage = nil
+    end
+    -- Une autre conversation (liste, Nouvelle, conversation supprimée, nouvelle demande d'une autre
+    -- page) : l'image cliquée était d'une autre conversation, l'aperçu revient à l'onglet.
+    if Fenetre.apercuDe ~= c then
+        Fenetre.imageCliquee = nil
     end
     -- Une image de plus dans la conversation montrée (Claude regarde, une photo jointe) : elle se
     -- montre, à la place de la photo active ; une image cliquée avant rend la main à l'onglet.
@@ -1352,11 +1361,13 @@ function Fenetre.majPhoto()
     local version = Notation.version
     local info = Lightroom.photos()
     Fenetre.info = info
-    -- Une autre photo active (ou la première vue à l'ouverture) : son aperçu se montre.
+    -- Une autre photo active (ou la première vue à l'ouverture) : son aperçu se montre ; une image
+    -- cliquée avant n'est plus montrée, l'aperçu revient à l'onglet (1.3).
     local id = info.active and info.active.id
     if id ~= Fenetre.idActif then
         Fenetre.idActif = id
         Fenetre.voirActive = true
+        Fenetre.imageCliquee = nil
         Fenetre.rafraichirApercu()
     end
     if info.active then
