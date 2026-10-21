@@ -120,6 +120,21 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertEqual(JeLeFais.texte(cle: "Contrast2012", .number(ToolHandler.pendingAutoValue), raw: true), "auto")
     }
 
+    /// Les quatre courbes par points gardent leur canal (le libellé du catalogue le met entre
+    /// parenthèses) ; les listes et les clés hors catalogue ont un nom français.
+    func testLesCourbesGardentLeurCanal() {
+        let liste = lignes(JeLeFais.aFaire([
+            changement("ToneCurvePV2012Red", "linéaire", "3 points"), changement("ToneCurvePV2012", "linéaire", "4 points"),
+            changement("MaskGroupBasedCorrections", "0 masque", "2 masques"),
+        ], raw: true))
+        XCTAssertEqual(liste.compactMap { $0["reglage"]?.string }, ["Courbe par points : RVB", "Courbe par points : rouge", "Masques"])
+        XCTAssertEqual(liste.first?["texte"], "Courbe des tonalités › Courbe par points › RVB : linéaire → 4 points")
+        XCTAssertEqual(liste.dropFirst().first?["texte"], "Courbe des tonalités › Courbe par points › Rouge : linéaire → 3 points")
+        for courbe in DevelopCatalogue.curveKeys {
+            XCTAssertFalse(JeLeFais.reglage(cle: courbe.key).contains("("), courbe.key)
+        }
+    }
+
     /// Chaque groupe du catalogue a son panneau, et chaque panneau nommé existe : aucune clé connue ne
     /// tombe sous « Autres ».
     func testChaqueReglageDuCatalogueASonPanneau() {
@@ -185,11 +200,17 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertEqual(sorte("PerspectiveUpright", 0, 2, 1), "autre_choix")
         XCTAssertEqual(sorte("LensProfileEnable", false, true, true), "comme_claude")
         XCTAssertEqual(sorte("ColorGradeMidtoneHue", 0, 40, 200), "autre_choix", "une teinte est circulaire")
-        // Les tables (courbes, Look) : « changée » ou « inchangée » depuis le départ.
-        XCTAssertEqual(sorte("ToneCurvePV2012", nil, "changée", "inchangée"), "oublie")
-        XCTAssertEqual(sorte("ToneCurvePV2012", nil, "inchangée", "changée"), "ajoute")
-        XCTAssertEqual(sorte("ToneCurvePV2012", nil, "changée", "changée"), "autre_choix")
-        XCTAssertEqual(sorte("ToneCurvePV2012", nil, "inchangée", "inchangée"), "comme_claude")
+        // Les tables (courbes, couleurs ponctuelles) : « changée » ou « inchangée » depuis le départ ;
+        // côté utilisateur, « changée » comme Claude, ou « changée autrement » (Variantes.ecartsExercice).
+        XCTAssertEqual(sorte("ToneCurvePV2012", "inchangée", "changée", "inchangée"), "oublie")
+        XCTAssertEqual(sorte("ToneCurvePV2012", "inchangée", "inchangée", "changée"), "ajoute")
+        XCTAssertEqual(sorte("ToneCurvePV2012", "inchangée", "changée", "changée"), "comme_claude", "la même courbe que Claude")
+        XCTAssertEqual(sorte("ToneCurvePV2012", "inchangée", "changée", "changée autrement"), "autre_choix")
+        XCTAssertEqual(sorte("ToneCurvePV2012", "inchangée", "inchangée", "inchangée"), "comme_claude")
+        XCTAssertEqual(sorte("ToneCurvePV2012", nil, "changée", "inchangée"), "oublie", "sans départ dit")
+        // La Look, par son nom.
+        XCTAssertEqual(sorte("Look", "aucune", "Adobe Vif", "Adobe Vif"), "comme_claude")
+        XCTAssertEqual(sorte("Look", "aucune", "Adobe Vif", "aucune"), "oublie")
         // Un réglage automatique pas encore calculé ne se classe pas.
         XCTAssertEqual(sorte("Contrast2012", 0, .number(ToolHandler.pendingAutoValue), 10), "autre_choix")
         XCTAssertEqual(Set(JeLeFais.Sorte.allCases.map(\.rawValue)),
@@ -246,6 +267,37 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertTrue(sansReglage["ecart_principal"]?["texte"]?.string?.contains("Aucun réglage global") == true)
     }
 
+    /// Le réglage qui explique l'écart principal pousse la mesure dans le sens de l'écart : une
+    /// version plus claire ne s'explique pas par des Ombres plus basses, même de beaucoup ; une
+    /// version plus contrastée s'explique par des Noirs plus bas (le sens est inverse).
+    func testLeReglageEnCauseVaDansLeSensDeLEcart() throws {
+        let claire = mesures(mediane: clarte(50, plus: 0.6))
+        // Ombres : Claude +40, vous 0 (8 fois la tolérance), donc plus sombre ; Exposition : +0,8 au
+        // lieu de +0,35 (4,5 fois), donc plus clair : c'est elle qui explique.
+        let deux = JeLeFais.enrichir(["ecarts": [ecart("Shadows2012", 0, 40, 0), ecart("Exposure2012", 0, 0.35, 0.8)]],
+                                     raw: true, claude: mesures(), vous: claire)
+        XCTAssertEqual(deux["ecart_principal"]?["mesure"], "exposition")
+        XCTAssertEqual(deux["ecart_principal"]?["reglage"]?["cle"], "Exposure2012")
+        // Seules les Ombres, plus basses : rien de global n'explique une version plus claire.
+        let inverse = JeLeFais.enrichir(["ecarts": [ecart("Shadows2012", 0, 40, 0)]], raw: true, claude: mesures(), vous: claire)
+        XCTAssertNil(inverse["ecart_principal"]?["reglage"])
+        XCTAssertTrue(inverse["ecart_principal"]?["texte"]?.string?.contains("Aucun réglage global") == true)
+        // Plus contrastée : Noirs −30 (vous) au lieu de 0 l'explique ; Contraste −20 (vous) non.
+        let contrastee = JeLeFais.enrichir(["ecarts": [ecart("Contrast2012", 0, 0, -20), ecart("Blacks2012", 0, 0, -30)]],
+                                           raw: true, claude: mesures(p5: 20, p95: 80), vous: mesures(p5: 10, p95: 90))
+        XCTAssertEqual(contrastee["ecart_principal"]?["mesure"], "contraste")
+        XCTAssertEqual(contrastee["ecart_principal"]?["reglage"]?["cle"], "Blacks2012")
+        // Plus chaude : la Température plus haute l'explique.
+        let chaude = JeLeFais.enrichir(["ecarts": [ecart("Temperature", 5200, 5800, 5200), ecart("Tint", 0, 0, 10)]],
+                                       raw: true, claude: mesures(b: 3), vous: mesures(b: 0))
+        XCTAssertEqual(chaude["ecart_principal"]?["mesure"], "dominante_b")
+        XCTAssertTrue(chaude["ecart_principal"]?["texte"]?.string?.contains("plus froide") == true)
+        XCTAssertEqual(chaude["ecart_principal"]?["reglage"]?["cle"], "Temperature", "vous plus froid, Température plus basse")
+        XCTAssertEqual(JeLeFais.sens("Blacks2012", "ombres_bouchees_pct"), -1)
+        XCTAssertEqual(JeLeFais.sens("SaturationAdjustmentRed", "chroma_moyenne"), 1)
+        XCTAssertNil(JeLeFais.sens("ColorGradeMidtoneHue", "dominante_b"), "une teinte n'a pas de sens simple")
+    }
+
     /// Les écarts reçoivent panneau, réglage, sorte et texte, dans l'ordre des panneaux ; le cadre en
     /// une ligne ; ce qui est fait comme Claude, et un résumé.
     func testEnrichirLesEcarts() throws {
@@ -256,9 +308,11 @@ final class JeLeFaisTests: XCTestCase {
                 ecart("Contrast2012", 0, 10, 12),
                 ecart("CropAngle", 0, -1.2, -1.2), ecart("CropLeft", 0, 0.02, 0.02),
                 ecart("ToneCurvePV2012", "inchangée", "inchangée", "changée"),
+                // Ce qui suit d'autres réglages (recadrage actif, nom de la courbe) : ni compté ni nommé.
+                ecart("HasCrop", false, true, true), ecart("ToneCurveName2012", "Linear", "Linear", "Custom"),
             ],
             "listes": ["masques": ["depart": 0, "maintenant": 1]],
-            "restent": ["masques"],
+            "restent": ["MaskGroupBasedCorrections", "RetouchAreas"],
             "rien_change": false,
         ]
         let enrichi = JeLeFais.enrichir(exercice, raw: true, claude: mesures(), vous: mesures())
@@ -271,6 +325,9 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertEqual(try ligne(liste, "Clarity2012")["sorte"], "ajoute")
         XCTAssertEqual(try ligne(liste, "Vibrance")["sorte"], "oublie")
         XCTAssertEqual(try ligne(liste, "ToneCurvePV2012")["sorte"], "ajoute")
+        XCTAssertEqual(try ligne(liste, "ToneCurvePV2012")["texte"],
+                       "Courbe des tonalités › Courbe par points › RVB : Claude inchangée, vous changée — ajouté par vous (Claude n'y touchait pas)",
+                       "une table : changée ou non, sans « départ »")
         let cadre = try ligne(liste, "Crop")
         XCTAssertEqual(cadre["sorte"], "comme_claude")
         XCTAssertEqual(cadre["claude"]?["CropAngle"]?.double, -1.2)
@@ -279,7 +336,9 @@ final class JeLeFaisTests: XCTestCase {
         // Le reste de la réponse du module passe tel quel ; ce qui reste dans les deux images est dit.
         XCTAssertEqual(enrichi["instantane"], "Claude · ma version")
         XCTAssertEqual(enrichi["listes"]?["masques"]?["maintenant"], 1)
-        XCTAssertTrue(enrichi["a_savoir_exercice"]?.string?.contains("masques restent dans les deux images") == true)
+        let aSavoir = try XCTUnwrap(enrichi["a_savoir_exercice"]?.string)
+        XCTAssertTrue(aSavoir.contains("(masques, taches)") && aSavoir.contains("se voit dans les deux images"), aSavoir)
+        XCTAssertFalse(aSavoir.contains("MaskGroupBasedCorrections"), "les listes en français")
         XCTAssertEqual(enrichi["ecart_principal"]?["visible"], false, "deux images mesurées pareilles")
         // Sans mesures (image illisible) : pas d'écart principal, dit.
         XCTAssertTrue(JeLeFais.enrichir(exercice, raw: true, claude: nil, vous: mesures())["ecart_principal"]?["texte"]?.string?
@@ -340,6 +399,10 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertFalse(avecCompare.porteUneImage)
         let remarques = try JSONCoding.parse(avecCompare.text)["remarques_serveur"]?.array?.compactMap(\.string) ?? []
         XCTAssertTrue(remarques.contains { $0.hasPrefix("compare, size sans effet avec my_turn") }, "\(remarques)")
+        // compare = false ne demandait rien : pas de remarque.
+        let sansCompare = tools.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 0.35], "my_turn": true, "compare": false])
+        XCTAssertFalse(sansCompare.isError, sansCompare.text)
+        XCTAssertNil(try JSONCoding.parse(sansCompare.text)["remarques_serveur"])
     }
 
     /// Relecture du lot 5 : un recadrage avec my_turn n'envoie jamais entier (rien n'est rendu), et

@@ -319,7 +319,8 @@ extension ToolHandler {
         params["instantane"] = .string(JeLeFais.instantane)
         params["exercice"] = true
         params["sans_rendu"] = true
-        let ignores = ["compare", "size", "overlay"].filter(args.has)
+        // compare = false ne demandait rien : pas de remarque pour lui.
+        let ignores = ["compare", "size", "overlay"].filter { $0 == "compare" ? args.bool($0) == true : args.has($0) }
         if !ignores.isEmpty {
             notes.append(.string("\(ignores.joined(separator: ", ")) sans effet avec my_turn : rien n'est rendu (view_photo avec compare = claude_version montrera les deux versions quand l'utilisateur aura fini)."))
         }

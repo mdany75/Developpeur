@@ -145,15 +145,25 @@ enum JeLeFais {
         "Courbe des tonalités": "Courbe", "Mélangeur de couleurs": "TSL", "Noir et blanc": "Mélangeur noir et blanc",
         "Étalonnage des couleurs": "Étalonnage", "Étalonnage": "Calibrage", "Transformation": "Transformation",
     ]
-    /// Noms des clés hors du catalogue, tels que les montre le panneau.
-    private static let nomsSpeciaux: [String: String] = [
-        "Preset": "Paramètre prédéfini", "ConvertToGrayscale": "Couleur ou noir et blanc", "CameraProfile": "Profil",
-        "Look": "Profil (Look)", "WhiteBalance": "Préréglage", "AutoTone": "Auto", "AutoGrayscaleMix": "Auto",
-        "PointColors": "Couleur ponctuelle", "LensBlur": "Flou d'objectif", "DepthBasedCorrections": "Pinceau d'affinage",
-        "LensProfileName": "Profil d'objectif", "UprightFourSegments": "Upright guidé : repères",
-        "UprightTransform": "Upright : corrections", "CropConstrainToWarp": "Contraindre le recadrage",
-        "ProcessVersion": "Version de processus",
-    ]
+    /// Noms des clés hors du catalogue, tels que les montre le panneau. Les courbes par points gardent
+    /// leur canal (« Courbe par points : rouge ») : le libellé du catalogue le met entre parenthèses,
+    /// que `reglage` retire. Masques, taches et yeux rouges : une liste à faire peut les nommer (un
+    /// paramètre prédéfini qui en pose).
+    private static let nomsSpeciaux: [String: String] = {
+        var noms: [String: String] = [
+            "Preset": "Paramètre prédéfini", "ConvertToGrayscale": "Couleur ou noir et blanc", "CameraProfile": "Profil",
+            "Look": "Profil (Look)", "WhiteBalance": "Préréglage", "AutoTone": "Auto", "AutoGrayscaleMix": "Auto",
+            "PointColors": "Couleur ponctuelle", "LensBlur": "Flou d'objectif", "DepthBasedCorrections": "Pinceau d'affinage",
+            "LensProfileName": "Profil d'objectif", "UprightFourSegments": "Upright guidé : repères",
+            "UprightTransform": "Upright : corrections", "CropConstrainToWarp": "Contraindre le recadrage",
+            "ProcessVersion": "Version de processus",
+            "MaskGroupBasedCorrections": "Masques", "RetouchAreas": "Taches", "RedEyeInfo": "Yeux rouges",
+        ]
+        for courbe in DevelopCatalogue.curveKeys {
+            noms[courbe.key] = courbe.label.replacingOccurrences(of: " (", with: " : ").replacingOccurrences(of: ")", with: "")
+        }
+        return noms
+    }()
     /// La ligne du recadrage.
     static let nomCadre = "Cadre"
 
@@ -383,13 +393,31 @@ enum JeLeFais {
         return DevelopCatalogue.setting(cle)?.neutral ?? 0
     }
 
-    /// Les tables (courbes, Look, couleurs ponctuelles) arrivent du module en « changée » ou
-    /// « inchangée » depuis le départ.
-    static let tableChangee = "changée", tableInchangee = "inchangée"
+    /// Les tables (courbes, couleurs ponctuelles, flou d'objectif) arrivent du module en texte, depuis
+    /// le départ : « inchangée » ou « changée » ; côté utilisateur, « changée » veut dire changée
+    /// comme Claude quand Claude l'a changée, et « changée autrement » qu'elle diffère de la sienne
+    /// (Variantes.ecartsExercice). La Look arrive par son nom.
+    static let tableChangee = "changée", tableInchangee = "inchangée", tableAutrement = "changée autrement"
+
+    /// Une valeur de table (texte du module) : changée ou non, et autrement que Claude.
+    private static func etatTable(_ valeur: JSONValue?) -> (changee: Bool, autrement: Bool)? {
+        switch valeur?.string {
+        case tableInchangee?: return (false, false)
+        case tableChangee?: return (true, false)
+        case tableAutrement?: return (true, true)
+        default: return nil
+        }
+    }
+
+    /// Les clés que le module suit mais qui ne font que suivre d'autres réglages déjà comparés : le
+    /// recadrage actif (les bords du cadre), le nom de la courbe (ses points), le réglage du profil
+    /// d'objectif (son activation, son nom). Comptées, elles doubleraient un écart ; nommées, elles
+    /// montreraient des identifiants anglais.
+    static let derives: Set<String> = ["HasCrop", "ToneCurveName2012", "ToneCurveName", "LensProfileSetup"]
 
     /// Classe un réglage : comme Claude (à la tolérance près), plus fort, moins fort, à l'inverse,
     /// oublié (Claude l'avait changé, l'utilisateur non), ajouté (l'inverse), ou un autre choix
-    /// (profil, préréglage, mode, teinte, ou deux tables changées toutes deux).
+    /// (profil, préréglage, mode, teinte, ou une table changée autrement que Claude).
     static func classer(depart: JSONValue?, claude: JSONValue?, vous: JSONValue?, cle: String, raw: Bool) -> Sorte {
         if let c = nombre(claude), let v = nombre(vous) {
             let d = nombre(depart) ?? defaut(cle: cle)
@@ -405,14 +433,12 @@ enum JeLeFais {
             if (c - d) * (v - d) < 0 { return .aLInverse }
             return abs(v - d) > abs(c - d) ? .plusFort : .moinsFort
         }
-        let tc = claude?.string, tv = vous?.string
-        let tables: Set<String> = [tableChangee, tableInchangee]
-        if let tc, let tv, tables.contains(tc), tables.contains(tv) {
-            switch (tc == tableChangee, tv == tableChangee) {
+        if let tc = etatTable(claude), let tv = etatTable(vous) {
+            switch (tc.changee, tv.changee) {
             case (false, false): return .commeClaude
             case (true, false): return .oublie
             case (false, true): return .ajoute
-            case (true, true): return .autreChoix
+            case (true, true): return tv.autrement ? .autreChoix : .commeClaude
             }
         }
         let td = depart.map { $0.isNull ? "" : ($0.string ?? JSONCoding.line($0)) } ?? ""
@@ -435,7 +461,7 @@ enum JeLeFais {
         var lignes: [(place: Place, rang: Int, sorte: Sorte, json: [String: JSONValue])] = []
         var cadre: [[String: JSONValue]] = []
         for (i, ecart) in (exercice["ecarts"]?.array ?? []).enumerated() {
-            guard var entree = ecart.object, let cle = entree["cle"]?.string else { continue }
+            guard var entree = ecart.object, let cle = entree["cle"]?.string, !derives.contains(cle) else { continue }
             if clesCadre.contains(cle) {
                 cadre.append(entree)
                 continue
@@ -447,8 +473,13 @@ enum JeLeFais {
             entree["section"] = place.section.map(JSONValue.string) ?? .null
             entree["reglage"] = .string(nom)
             entree["sorte"] = .string(sorte.rawValue)
-            entree["texte"] = .string("\(chemin(place, reglage: nom)) : départ \(texte(cle: cle, entree["depart"], raw: raw)), "
-                + "Claude \(texte(cle: cle, entree["claude"], raw: raw)), vous \(texte(cle: cle, entree["vous"], raw: raw)) — \(sorte.texte)")
+            // Une table (courbe, couleurs ponctuelles) n'a pas de valeur à dire : changée ou non
+            // depuis le départ, de chaque côté.
+            let valeurs = etatTable(entree["claude"]) != nil && etatTable(entree["vous"]) != nil
+                ? "Claude \(entree["claude"]?.string ?? ""), vous \(entree["vous"]?.string ?? "")"
+                : "départ \(texte(cle: cle, entree["depart"], raw: raw)), Claude \(texte(cle: cle, entree["claude"], raw: raw)), "
+                    + "vous \(texte(cle: cle, entree["vous"], raw: raw))"
+            entree["texte"] = .string("\(chemin(place, reglage: nom)) : \(valeurs) — \(sorte.texte)")
             lignes.append((place, i, sorte, entree))
         }
         if !cadre.isEmpty {
@@ -479,7 +510,12 @@ enum JeLeFais {
         sortie["comme_claude"] = .array(lignes.filter { $0.sorte == .commeClaude }.compactMap { $0.json["reglage"] })
         sortie["resume"] = .string(resume(lignes.map(\.sorte)))
         if let restent = exercice["restent"]?.array?.compactMap(\.string), !restent.isEmpty {
-            sortie["a_savoir_exercice"] = .string("Ajoutés à la main sur une photo qui en avait déjà, \(restent.joined(separator: ", ")) restent dans les deux images : la version de Claude ne peut pas les retirer le temps du rendu.")
+            var noms: [String] = []
+            for liste in restent {
+                let nom = nomsListes[liste] ?? liste
+                if !noms.contains(nom) { noms.append(nom) }
+            }
+            sortie["a_savoir_exercice"] = .string("Ce que l'utilisateur a ajouté ou changé à la main (\(noms.joined(separator: ", "))) sur une photo qui en portait déjà se voit dans les deux images : la version de Claude ne peut pas le retirer le temps du rendu.")
         }
         let ecarts = lignes.map { (cle: $0.json["cle"]?.string ?? "", sorte: $0.sorte, json: $0.json) }
         if let claude, let vous, let ecart = principal(claude: claude, vous: vous, ecarts: ecarts, raw: raw) {
@@ -491,6 +527,13 @@ enum JeLeFais {
         }
         return .object(sortie)
     }
+
+    /// Les listes que la version de Claude ne retire pas le temps du rendu (`restent` du module : ses
+    /// clés de Lightroom, ou déjà un nom), en français.
+    static let nomsListes: [String: String] = [
+        "MaskGroupBasedCorrections": "masques", "RetouchAreas": "taches", "RetouchInfo": "taches", "RemoveAreas": "taches",
+        "RedEyeInfo": "yeux rouges", "DepthBasedCorrections": "pinceau d'affinage du flou", "PointColors": "couleurs ponctuelles",
+    ]
 
     /// « 7 réglages comparés : 4 comme Claude, 1 plus fort, 1 oublié, 1 ajouté. »
     static func resume(_ sortes: [Sorte]) -> String {
@@ -530,6 +573,27 @@ enum JeLeFais {
     /// Une clé appartient à la famille d'une mesure.
     static func dansLaFamille(_ cle: String, _ mesure: String) -> Bool {
         (familles[mesure] ?? []).contains { $0.hasSuffix("*") ? cle.hasPrefix(String($0.dropLast())) : cle == $0 }
+    }
+
+    /// Le sens dans lequel un réglage pousse une mesure : +1, la mesure monte quand le réglage monte
+    /// (Exposition et l'image plus claire, Température et b* plus jaune, Teinte et a* plus magenta) ;
+    /// −1, elle baisse (Noirs et le contraste, Ombres et les ombres bouchées) ; nil, sans sens
+    /// simple (teintes de l'étalonnage, limites de la courbe, calibrage, tables).
+    static func sens(_ cle: String, _ mesure: String) -> Double? {
+        let ecretage: [String: Double] = ["Highlights2012": 1, "Whites2012": 1, "Exposure2012": 1]
+        let table: [String: [String: Double]] = [
+            "exposition": ["Exposure2012": 1, "Shadows2012": 1, "Highlights2012": 1, "Whites2012": 1, "Blacks2012": 1],
+            "contraste": ["Contrast2012": 1, "Whites2012": 1, "Blacks2012": -1, "Clarity2012": 1, "Dehaze": 1,
+                          "ParametricHighlights": 1, "ParametricLights": 1, "ParametricDarks": -1, "ParametricShadows": -1],
+            "hautes_lumieres_pct": ecretage, "blanc_pur_pct": ecretage, "canal_ecrete": ecretage,
+            "ombres_bouchees_pct": ["Shadows2012": -1, "Blacks2012": -1],
+            "dominante_b": [DevelopCatalogue.temperatureKey: 1],
+            "dominante_a": [DevelopCatalogue.tintKey: 1, "ShadowTint": 1],
+        ]
+        if mesure == "chroma_moyenne" || mesure == "tres_saturee_pct" {
+            return cle == "Vibrance" || cle == "Saturation" || cle.hasPrefix("SaturationAdjustment") ? 1 : nil
+        }
+        return table[mesure]?[cle]
     }
 
     /// L'écart principal entre la version de Claude et celle de l'utilisateur.
@@ -597,9 +661,9 @@ enum JeLeFais {
     /// L'écart principal : l'écart mesuré le plus grand une fois ramené à son seuil de visibilité du
     /// bilan (exposition 0,1 IL, contraste 4, écrêtage 0,3 point, dominante 1,5, chroma 3, très
     /// saturée 1 point : ceux de Bilan, rien de nouveau), de Claude (`claude`, à gauche) à
-    /// l'utilisateur (`vous`). Dans sa famille, le réglage retenu est celui dont l'écart entre les deux
-    /// versions dépasse le plus sa tolérance (une courbe changée vient en dernier). Nil si rien ne
-    /// passe son seuil.
+    /// l'utilisateur (`vous`). Dans sa famille, le réglage retenu est celui qui pousse la mesure dans le
+    /// sens de l'écart (`sens`) et dont l'écart entre les deux versions dépasse le plus sa tolérance
+    /// (une courbe changée vient en dernier). Nil si rien ne passe son seuil.
     static func principal(claude: PhotoMeasurements, vous: PhotoMeasurements,
                           ecarts: [(cle: String, sorte: Sorte, json: [String: JSONValue])], raw: Bool) -> Principal? {
         var candidats: [(mesure: String, ecart: Double, claude: Double, vous: Double, seuil: Double, canal: String?)] = [
@@ -632,12 +696,15 @@ enum JeLeFais {
         guard let meilleur else { return nil }
         let c = candidats[meilleur.index]
         return Principal(mesure: c.mesure, ecart: c.ecart, claude: c.claude, vous: c.vous, seuil: c.seuil, fois: meilleur.fois,
-                         canal: c.canal, reglage: reglageEnCause(c.mesure, ecarts: ecarts, raw: raw))
+                         canal: c.canal, reglage: reglageEnCause(c.mesure, ecart: c.ecart, ecarts: ecarts, raw: raw))
     }
 
     /// Le réglage de la famille d'une mesure dont l'écart entre les deux versions dépasse le plus sa
-    /// tolérance ; une table changée (courbe) seulement si aucun nombre ne diffère.
-    static func reglageEnCause(_ mesure: String, ecarts: [(cle: String, sorte: Sorte, json: [String: JSONValue])], raw: Bool) -> [String: JSONValue]? {
+    /// tolérance, parmi ceux qui poussent la mesure dans le sens de l'écart mesuré (`ecart` :
+    /// l'utilisateur moins Claude ; un réglage qui pousse à l'inverse ne l'explique pas) ; une table
+    /// changée (courbe) seulement si aucun nombre ne l'explique.
+    static func reglageEnCause(_ mesure: String, ecart ecartMesure: Double, ecarts: [(cle: String, sorte: Sorte, json: [String: JSONValue])],
+                               raw: Bool) -> [String: JSONValue]? {
         var meilleur: (score: Double, json: [String: JSONValue])?
         var table: [String: JSONValue]?
         for ecart in ecarts where ecart.sorte != .commeClaude && dansLaFamille(ecart.cle, mesure) {
@@ -645,6 +712,7 @@ enum JeLeFais {
                 if table == nil { table = ecart.json }
                 continue
             }
+            if let s = sens(ecart.cle, mesure), s * (v - c) * ecartMesure < 0 { continue }
             let enK = ecart.cle == DevelopCatalogue.temperatureKey && (enKelvins(c, raw: raw) || enKelvins(v, raw: raw))
             let score = abs(v - c) / tolerance(cle: ecart.cle, raw: enK)
             if meilleur == nil || score > meilleur!.score { meilleur = (score, ecart.json) }
