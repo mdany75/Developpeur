@@ -479,6 +479,12 @@ for nom in ([[bind_to_object tooltip visible enabled font size title value items
     string_to_value value_to_string photo]]):gmatch('%S+') do
     PROPRIETES[nom] = true
 end
+-- Non documentés, constatés le 21 octobre 2026 dans Lightroom Classic 15.6 (module d'essai de la
+-- fenêtre B) : texte riche d'une static_text (B1, D4), bouton par défaut (B3, D1), icône d'un
+-- bouton (B3, D5).
+for _, nom in ipairs({ 'emphasis_font', 'emphasis_color', 'default', 'image_name' }) do
+    PROPRIETES[nom] = true
+end
 
 essai('Fenêtre : construction, liaisons et rafraîchissement', function()
     S.photoActive = { localIdentifier = 53636309, getFormattedMetadata = function() return 'DSCF4961.RAF' end }
@@ -504,7 +510,7 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
                     end
                 end
             end
-            if v.genre == 'push_button' then
+            if S.BOUTONS[v.genre] then
                 vrai(type(v.args.action) == 'function', 'bouton sans action : ' .. tostring(v.args.title))
             end
         end)
@@ -572,7 +578,7 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
         -- les retire), un message ou l'aide d'un voyant rouge.
         local retirer = false
         parcourir(args.contents, function(v)
-            if v.genre == 'push_button' and v.args.title == 'Retirer' then
+            if S.BOUTONS[v.genre] and v.args.title == 'Retirer' then
                 retirer = true
             end
         end)
@@ -609,7 +615,7 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
                 if type(t) == 'table' and t.liaison then
                     t = p[t.key]
                 end
-                if v.genre == 'push_button' and t == titre then
+                if S.BOUTONS[v.genre] and t == titre then
                     trouve = v
                 end
             end)
@@ -698,7 +704,7 @@ local function largeurEstimee(v, p)
         end
     end
     local g = v.genre
-    if g == 'push_button' then
+    if S.BOUTONS[g] then
         return texte(titre()) + (petit and 18 or 26)
     elseif g == 'radio_button' or g == 'checkbox' then
         return texte(titre()) + 22
@@ -766,7 +772,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             if type(titre) == 'table' and titre.liaison then
                 titre = p[titre.key]
             end
-            if v.genre == 'push_button' then
+            if S.BOUTONS[v.genre] then
                 vrai(type(v.args.action) == 'function', nom .. ' : bouton sans action : ' .. tostring(titre))
                 -- Le clic d'un bouton valide aussi le champ de demande : tous passent par
                 -- Fenetre.bouton, qui annule l'envoi automatique.
@@ -833,7 +839,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                     if type(enfant) == 'table' and enfant.genre == 'popup_menu' and type(enfant.args.value) == 'table'
                         and enfant.args.value.key == 'style' then
                         rangeeStyle = v
-                    elseif type(enfant) == 'table' and enfant.genre == 'push_button' and enfant.args.title == 'Sports' then
+                    elseif type(enfant) == 'table' and S.BOUTONS[enfant.genre] and enfant.args.title == 'Sports' then
                         rangeeSports = v
                     end
                 end
@@ -844,7 +850,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         -- ▲ ▼ de la carte Note, de la proposition et de la carte Pourquoi ? (1.3), en petit : six.
         local fleches = {}
         parcourir(args.contents, function(v)
-            if v.genre == 'push_button' and (v.args.title == '▲' or v.args.title == '▼') and v.args.size == 'mini' then
+            if S.BOUTONS[v.genre] and (v.args.title == '▲' or v.args.title == '▼') and v.args.size == 'mini' then
                 fleches[#fleches + 1] = v.args.enabled.key
             end
         end)
@@ -865,7 +871,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         vrai(largeurInvites <= D.fil, string.format('%s : invites de %d points dans %d', nom, largeurInvites, D.fil))
         local invites = {}
         for _, enfant in ipairs(rangeeSports.args) do
-            if type(enfant) == 'table' and enfant.genre == 'push_button' then
+            if type(enfant) == 'table' and S.BOUTONS[enfant.genre] then
                 invites[#invites + 1] = enfant.args.title
             end
         end
@@ -879,7 +885,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             for k, enfant in ipairs(v.args) do
                 if type(enfant) == 'table' and enfant.genre == 'row' then
                     for _, b in ipairs(enfant.args) do
-                        if type(b) == 'table' and b.genre == 'push_button' then
+                        if type(b) == 'table' and S.BOUTONS[b.genre] then
                             if b.args.title == 'Accepter' and type(b.args.enabled) == 'table' and b.args.enabled.key == 'enAttente' then
                                 rangeeAccepter = { parent = v, rang = k, bouton = b }
                             elseif type(b.args.title) == 'table' and b.args.title.key == 'titreJeLeFais' then
@@ -924,7 +930,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 end
             elseif v.genre == 'static_text' then
                 champs[#champs + 1] = t
-            elseif v.genre == 'push_button' then
+            elseif S.BOUTONS[v.genre] then
                 boutonsEtape[#boutonsEtape + 1] = (type(t) == 'table' and p[t.key] or t) .. '/' .. v.args.size .. '/' .. v.args.enabled.key
                 vrai(Fenetre.parBouton(v.args.action), nom .. ' : bouton de l\'étape hors de Fenetre.bouton')
                 egal(false, p[v.args.enabled.key], nom .. ' : ' .. v.args.enabled.key .. ' inactif à l\'ouverture')
@@ -977,7 +983,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         local ordre = {}
         parcourir(args.contents, function(v)
             local t = v.args.title
-            if v.genre == 'push_button' and (t == 'Publication…' or t == 'Consommation…') then
+            if S.BOUTONS[v.genre] and (t == 'Publication…' or t == 'Consommation…') then
                 ordre[#ordre + 1] = t
             elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'versionNom1' and ordre[#ordre] ~= 'versions' then
                 ordre[#ordre + 1] = 'versions'
@@ -1025,7 +1031,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             local t = v.args.title
             if v.genre == 'picture' then
                 suite[#suite + 1] = 'apercu'
-            elseif v.genre == 'push_button' and t == 'Agrandir' then
+            elseif S.BOUTONS[v.genre] and t == 'Agrandir' then
                 suite[#suite + 1] = 'agrandir'
             elseif v.genre == 'radio_button' and v.args.checked_value == 'notation' then
                 suite[#suite + 1] = 'onglets'
@@ -1035,7 +1041,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 suite[#suite + 1] = 'proposition'
             elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'etapeTexte' then
                 suite[#suite + 1] = 'etape'
-            elseif v.genre == 'push_button' and t == 'Publication…' then
+            elseif S.BOUTONS[v.genre] and t == 'Publication…' then
                 suite[#suite + 1] = 'publication'
             end
         end)
@@ -1303,12 +1309,547 @@ local function verifierVues(contenu, p)
                 end
             end
         end
-        if v.genre == 'push_button' then
+        if S.BOUTONS[v.genre] then
             vrai(type(v.args.action) == 'function', 'bouton sans action : ' .. tostring(v.args.title))
         end
     end)
     return vues
 end
+
+-- Simulation : règles tirées des constats du 21 octobre 2026 (fenêtre B) -------------------------
+-- Constats du module d'essai de la fenêtre B dans Lightroom Classic 15.6 : blocs A à C le matin,
+-- blocs D (lot B0) l'après-midi. Chaque règle de Simulation.lua a ici l'essai qui échoue sans elle.
+
+local fabriqueVues = S.modules.LrView.osFactory()
+local lier = S.modules.LrView.bind
+
+-- La fonction échoue, et son message contient `attendu`.
+local function refuse(fn, attendu, quoi)
+    local ok, erreur = pcall(fn)
+    vrai(not ok, (quoi or 'refus attendu') .. ' : accepté')
+    vrai(tostring(erreur):find(attendu, 1, true), (quoi or 'refus') .. ' : ' .. tostring(erreur))
+end
+
+-- Ouvre une fenêtre flottante de ce contenu (arguments en plus : `extra`) et appelle
+-- pendant(contenu) tant qu'elle est ouverte ; rend ok et l'erreur.
+local function ouvrirEssai(contenu, pendant, extra)
+    local args = { title = 'Essai', contents = contenu }
+    for cle, valeur in pairs(extra or {}) do
+        args[cle] = valeur
+    end
+    S.pendantFenetre = pendant and function() pendant(contenu) end
+    local ok, erreur = pcall(S.modules.LrDialogs.presentFloatingDialog, _PLUGIN, args)
+    S.pendantFenetre = nil
+    return ok, erreur
+end
+
+local function rien() end
+
+essai('Simulation : square_button accepté (B3, D5), compté parmi les boutons et trouvé par son titre', function()
+    local f = fabriqueVues
+    local p = S.modules.LrBinding.makePropertyTable()
+    p.titreCarre = 'Renommer…'
+    local carre = f:square_button { title = lier 'titreCarre', size = 'small', action = rien }
+    local contenu = f:column { bind_to_object = p, f:push_button { title = 'Envoyer', action = rien }, carre }
+    vrai(S.BOUTONS.push_button and S.BOUTONS.square_button, 'les deux genres de boutons')
+    egal(2, #S.boutons(contenu), 'push_button et square_button')
+    egal(carre, S.trouverBouton(contenu, 'Renommer…', p), 'trouvé par son titre lié')
+    local ok, erreur = ouvrirEssai(contenu, function()
+        egal(carre, S.trouverBouton(contenu, 'Renommer…'), 'titre lu dans la table de la fenêtre ouverte')
+        egal(3, verifierVues(contenu, p), 'square_button vérifié comme un bouton')
+    end)
+    assert(ok, erreur)
+    refuse(function() verifierVues(f:column { f:square_button { title = 'Sans action' } }, p) end, 'bouton sans action', 'square_button sans action')
+end)
+
+essai("Simulation : f:picture sans clic (C1), avec width et height (AgPictureView), sans image seulement en aplat (A4)", function()
+    local f = fabriqueVues
+    local fond = S.modules.LrColor(0.85, 0.85, 0.85)
+    refuse(function() f:picture { value = 'a.png', width = 24, height = 24, mouse_down = rien } end, 'C1', 'mouse_down sur une image')
+    refuse(function() f:picture { value = 'a.png', width = 24 } end, 'sans width ou sans height', 'sans height')
+    refuse(function() f:picture { value = 'a.png', height = 24 } end, 'sans width ou sans height', 'sans width')
+    refuse(function() f:picture { width = 24, height = 24 } end, 'A4', 'ni image ni fond')
+    f:picture { width = 630, height = 1, background_color = fond }
+    f:picture { value = lier 'image', width = 24, height = 24 }
+    -- Un clic simulé sur l'image est refusé ; le calque posé dessus le reçoit.
+    local recus = 0
+    local image = f:picture { value = 'a.png', width = 24, height = 24 }
+    local calque = f:static_text { title = '', width = 24, height = 24, mouse_down = function() recus = recus + 1 end }
+    local ok, erreur = ouvrirEssai(f:column { place = 'overlapping', image, calque }, function()
+        refuse(function() S.cliquer(image) end, 'C1', "clic sur l'image")
+        S.cliquer(calque)
+    end)
+    assert(ok, erreur)
+    egal(1, recus, 'le calque reçoit le clic')
+end)
+
+essai("Simulation : background_color sans effet sur row, column, view et group_box (A5) et sur la fenêtre (A1) ; "
+    .. "permis sur scrolled_view et picture", function()
+    local f = fabriqueVues
+    local rose = S.modules.LrColor(1, 0.8, 0.8)
+    for _, genre in ipairs({ 'row', 'column', 'view', 'group_box' }) do
+        refuse(function() f[genre](f, { background_color = rose, f:static_text { title = 'x' } }) end, 'A5', genre)
+    end
+    f:scrolled_view { background_color = rose, horizontal_scroller = false, f:static_text { title = 'x' } }
+    f:picture { width = 10, height = 10, background_color = rose }
+    local ouvertes = #S.fenetresOuvertes
+    local ok, erreur = ouvrirEssai(f:column { f:static_text { title = 'x' } }, rien, { background_color = rose })
+    vrai(not ok and tostring(erreur):find('A1', 1, true), 'fond de la fenêtre : ' .. tostring(erreur))
+    egal(ouvertes, #S.fenetresOuvertes, 'rien ne reste ouvert')
+    ok, erreur = ouvrirEssai(f:column { f:static_text { title = 'x' } }, rien)
+    assert(ok, erreur)
+end)
+
+essai('Simulation : primary_line_color refusé partout (A6 : séparateur resté #DBDBDB)', function()
+    local f = fabriqueVues
+    local bleu = S.modules.LrColor(0.04, 0.39, 0.85)
+    refuse(function() f:separator { fill_horizontal = 1, primary_line_color = bleu } end, 'A6', 'séparateur')
+    refuse(function() f:column { primary_line_color = bleu } end, 'A6', 'colonne')
+    f:separator { fill_horizontal = 1 }
+end)
+
+essai("Simulation : image_name sans titre (D5) ; avec un titre, refusé (B3), titre lié compris", function()
+    local f = fabriqueVues
+    refuse(function() f:push_button { title = 'Joindre', image_name = 'trombone.png', action = rien } end, 'B3', 'titre écrit')
+    f:square_button { title = '', image_name = 'trombone.png', width = 26, action = rien }
+    f:square_button { image_name = 'plus.png', width = 26, action = rien }
+    f:push_button { title = 'Joindre', action = rien }
+    -- Un titre lié se lit à l'ouverture, puis à chaque nouvelle valeur.
+    local p = S.modules.LrBinding.makePropertyTable()
+    p.titreIcone = 'Joindre'
+    local bouton = f:square_button { title = lier 'titreIcone', image_name = 'trombone.png', width = 26, action = rien }
+    local ok, erreur = ouvrirEssai(f:column { bind_to_object = p, bouton })
+    vrai(not ok and tostring(erreur):find('B3', 1, true), "titre lié non vide à l'ouverture : " .. tostring(erreur))
+    p.titreIcone = ''
+    ok, erreur = ouvrirEssai(f:column { bind_to_object = p, bouton }, function()
+        refuse(function() p.titreIcone = 'Joindre' end, 'B3', 'titre lié qui change')
+        egal(1, #S.refusDeLaFenetre(), 'le refus est gardé pour la fermeture')
+        p.titreIcone = ''
+    end)
+    assert(ok, erreur)
+    -- Un refus avalé (une tâche du module, LrTasks.pcall) fait échouer la fermeture.
+    ok, erreur = ouvrirEssai(f:column { bind_to_object = p, bouton }, function()
+        pcall(function() p.titreIcone = 'Joindre' end)
+        p.titreIcone = ''
+    end)
+    vrai(not ok and tostring(erreur):find('refusée pendant que la fenêtre était ouverte', 1, true), tostring(erreur))
+    -- Fermée, la fenêtre ne vérifie plus rien.
+    p.titreIcone = 'Joindre'
+end)
+
+essai('Simulation : un seul bouton par défaut par fenêtre (relevé dans AgUI : setDefaultButtonCell), liaison comprise', function()
+    local f = fabriqueVues
+    local function defaut(titre)
+        return f:push_button { title = titre, default = true, action = rien }
+    end
+    local ok, erreur = ouvrirEssai(f:row { defaut('Envoyer'), defaut('Accepter') })
+    vrai(not ok and tostring(erreur):find('setDefaultButtonCell', 1, true), tostring(erreur))
+    local p = S.modules.LrBinding.makePropertyTable()
+    p.parDefaut = true
+    local function contenu()
+        return f:row { bind_to_object = p, defaut('Envoyer'), f:push_button { title = 'Accepter', default = lier 'parDefaut', action = rien } }
+    end
+    ok, erreur = ouvrirEssai(contenu())
+    vrai(not ok and tostring(erreur):find('setDefaultButtonCell', 1, true), "le second par liaison : " .. tostring(erreur))
+    p.parDefaut = false
+    ok, erreur = ouvrirEssai(contenu(), function()
+        egal('Envoyer', S.titreDe(S.boutonParDefaut()), 'le bouton par défaut de la fenêtre')
+    end)
+    assert(ok, erreur)
+    refuse(function()
+        S.modules.LrDialogs.presentModalDialog { title = 'Essai', contents = f:row { defaut('Un'), defaut('Deux') } }
+    end, 'setDefaultButtonCell', 'fenêtre modale')
+end)
+
+essai('Simulation : texte riche <EM> — balises fermées, emphasis_font, ni entité, ni dernière ligne coupée (B1, D4)', function()
+    local f = fabriqueVues
+    local gras12 = { name = '<system/bold>', size = 12 }
+    local texte12 = { name = '<system>', size = 12 }
+    local texte11 = { name = '<system>', size = 11 }
+    local ambre = S.modules.LrColor(0.66, 0.38, 0)
+    local gris = S.modules.LrColor(0.42, 0.42, 0.42)
+    -- Acceptés : emphase grasse et ambre sur un texte gris (text_color n'efface pas emphasis_color,
+    -- constaté D4 : le relevé dans AgUI est démenti) ; « < » et « & » bruts ; une balise fermée sur
+    -- la ligne suivante.
+    f:static_text { title = '<EM>Plafond 3 ★</EM> : feuillage bougé.', font = texte12, emphasis_font = gras12, emphasis_color = ambre,
+        text_color = gris }
+    f:static_text { title = '<EM>Note</EM> : 2 < 3 & 4', font = texte12, emphasis_font = gras12 }
+    f:static_text { title = '<EM>Passe 1\nPasse 2</EM> : oui', font = texte12, emphasis_font = gras12, height_in_lines = 2 }
+    f:static_text { title = 'Sans balise : < et &amp; tels quels' }
+    -- Refusés.
+    refuse(function() f:static_text { title = 'Texte riche <EM>', emphasis_font = gras12 } end, 'B1', 'balise non fermée')
+    refuse(function() f:static_text { title = 'Texte riche <EM>' } end, 'B1', 'balise seule, sans police')
+    refuse(function() f:static_text { title = 'fin</EM>', emphasis_font = gras12 } end, '</EM> sans <EM>', 'fermeture seule')
+    refuse(function() f:static_text { title = '<EM>a<EM>b</EM>', emphasis_font = gras12 } end, 'ouverte deux fois', 'balises imbriquées')
+    refuse(function() f:static_text { title = '<EM>Moyen.</EM> Le ciel' } end, 'sans emphasis_font', "sans police d'emphase")
+    refuse(function() f:static_text { title = '<EM>Moyen.</EM> Le ciel', emphasis_color = ambre } end, 'emphasis_color sans emphasis_font',
+        'couleur seule')
+    refuse(function() f:static_text { title = 'Sans balise', emphasis_color = ambre } end, 'D4', 'couleur seule, sans balise')
+    refuse(function() f:static_text { title = '<EM>2 &lt; 3</EM>', emphasis_font = gras12 } end, 'D4', '&lt;')
+    refuse(function() f:static_text { title = '<EM>A</EM> &amp; B', emphasis_font = gras12 } end, 'D4', '&amp;')
+    -- Police 11, emphase grasse 12 : la dernière ligne de height_in_lines = 4 est coupée ; une ligne
+    -- de plus, ou une emphase de la même taille, passent.
+    local quatre = '<EM>Axe 1</EM> net\nb\nc\n<EM>Axe 2</EM> doux'
+    refuse(function() f:static_text { title = quatre, font = texte11, emphasis_font = gras12, height_in_lines = 4 } end, 'coupée',
+        'emphase de 12 sur 11')
+    refuse(function() f:static_text { title = quatre, font = '<system/small>', emphasis_font = gras12, height_in_lines = 4 } end, 'coupée',
+        "emphase de 12 sur '<system/small>'")
+    f:static_text { title = quatre, font = texte11, emphasis_font = gras12, height_in_lines = 5 }
+    f:static_text { title = quatre, font = texte11, emphasis_font = { name = '<system/bold>', size = 11 }, height_in_lines = 4 }
+    f:static_text { title = quatre, font = texte12, emphasis_font = gras12, height_in_lines = 4 }
+    -- Un titre lié : sa valeur à l'ouverture, puis chaque nouvelle valeur, qui garde son balisage
+    -- (constaté D4).
+    local p = S.modules.LrBinding.makePropertyTable()
+    p.critere = '<EM>Plafond 3 ★</EM>'
+    local critere = f:static_text { title = lier 'critere', font = texte12, emphasis_font = gras12, emphasis_color = ambre }
+    local ok, erreur = ouvrirEssai(f:column { bind_to_object = p, critere }, function()
+        p.critere = '<EM>Plafond 2 ★</EM> · <EM>À vérifier</EM>'
+        refuse(function() p.critere = '<EM>Plafond 2 ★' end, 'B1', 'nouvelle valeur non fermée')
+        refuse(function() p.critere = '<EM>2 &lt; 3</EM>' end, 'D4', 'nouvelle valeur avec une entité')
+        egal(2, #S.refusDeLaFenetre(), 'refus gardés')
+        p.critere = ''
+    end)
+    assert(ok, erreur)
+    p.critere = 'Sans balise <EM>'
+    ok, erreur = ouvrirEssai(f:column { bind_to_object = p, critere })
+    vrai(not ok and tostring(erreur):find('B1', 1, true), "valeur liée refusée à l'ouverture : " .. tostring(erreur))
+    -- Hauteur et police liées : lues aussi.
+    p.critere, p.lignes = quatre, 4
+    local lie = f:static_text { title = lier 'critere', font = texte11, emphasis_font = gras12, height_in_lines = lier 'lignes' }
+    ok, erreur = ouvrirEssai(f:column { bind_to_object = p, lie })
+    vrai(not ok and tostring(erreur):find('coupée', 1, true), 'hauteur liée : ' .. tostring(erreur))
+    p.lignes = 5
+    ok, erreur = ouvrirEssai(f:column { bind_to_object = p, lie }, function()
+        refuse(function() p.lignes = 4 end, 'coupée', 'hauteur liée qui change')
+        S.refusDeLaFenetre()
+        p.lignes = 5
+    end)
+    assert(ok, erreur)
+end)
+
+essai('Simulation : emphasis_font, emphasis_color, default et image_name connus du SDK et évalués, liaisons comprises', function()
+    local f = fabriqueVues
+    local p = S.modules.LrBinding.makePropertyTable()
+    p.critere, p.police, p.couleur = '<EM>Moyen.</EM> Le ciel', { name = '<system/bold>', size = 12 }, S.modules.LrColor(0.66, 0.38, 0)
+    p.parDefaut, p.icone = true, 'trombone.png'
+    local contenu = f:column {
+        bind_to_object = p,
+        f:static_text { title = lier 'critere', emphasis_font = lier 'police', emphasis_color = lier 'couleur' },
+        f:push_button { title = 'Envoyer', default = lier 'parDefaut', action = rien },
+        f:square_button { image_name = lier 'icone', width = 26, action = rien },
+    }
+    local ok, erreur = ouvrirEssai(contenu, function()
+        egal(4, verifierVues(contenu, p), 'attributs connus, liaisons avec une valeur')
+        egal('Envoyer', S.titreDe(S.boutonParDefaut()))
+        -- Une police d'emphase liée se relit quand elle change.
+        refuse(function() p.police = nil end, 'sans emphasis_font', "police d'emphase retirée")
+        S.refusDeLaFenetre()
+        p.police = { name = '<system/bold>', size = 12 }
+    end)
+    assert(ok, erreur)
+end)
+
+essai("Simulation : Retour valide le champ, puis le bouton par défaut s'il est actif et montré, même depuis « Rechercher » ; "
+    .. "jamais un autre bouton (D1, D2)", function()
+    local f = fabriqueVues
+    local p = S.modules.LrBinding.makePropertyTable()
+    p.saisie, p.recherche, p.peutEnvoyer, p.travaille = '', '', true, false
+    local journal = {}
+    local function note(texte)
+        journal[#journal + 1] = texte
+    end
+    local function lu()
+        local t = table.concat(journal, ' | ')
+        journal = {}
+        return t
+    end
+    p:addObserver('saisie', function(_, _, v) note('observateur ' .. v) end)
+    p:addObserver('recherche', function(_, _, v) note('recherche ' .. v) end)
+    local champ = f:edit_field { value = lier 'saisie', immediate = false, height_in_lines = 2 }
+    local recherche = f:edit_field { value = lier 'recherche', immediate = true }
+    local envoyer = f:push_button { title = 'Envoyer', default = true, enabled = lier 'peutEnvoyer',
+        visible = lier { key = 'travaille', transform = function(v) return not v end }, action = function() note('Envoyer lit ' .. p.saisie) end }
+    local arreter = f:push_button { title = 'Arrêter', visible = lier 'travaille', action = function() note('Arrêter') end }
+    local contenu = f:column { bind_to_object = p, champ, recherche, f:column { place = 'overlapping', envoyer, arreter } }
+    local ok, erreur = ouvrirEssai(contenu, function()
+        -- D1 : l'observateur du champ, puis l'action d'Envoyer, qui lit la valeur validée.
+        S.taper(champ, 'bonjour')
+        egal('', lu(), 'rien avant Retour')
+        egal('bonjour', S.texteChamp(champ), 'le texte tapé est dans le champ')
+        vrai(S.retour(champ), 'Envoyer prend Retour')
+        egal('observateur bonjour | Envoyer lit bonjour', lu())
+        -- D1 : « Rechercher » suit chaque frappe ; Retour y déclenche aussi Envoyer.
+        S.taper(recherche, 'abc')
+        egal('recherche a | recherche ab | recherche abc', lu())
+        vrai(S.retour(recherche), 'Retour dans « Rechercher » déclenche le bouton par défaut')
+        egal('Envoyer lit bonjour', lu())
+        -- D2 : Envoyer inactif : l'observateur seul.
+        p.peutEnvoyer = false
+        S.taper(champ, ' encore')
+        vrai(not S.retour(champ), 'Envoyer inactif ne prend pas Retour')
+        egal('observateur bonjour encore', lu())
+        -- D2 : Envoyer masqué, Arrêter montré à sa place : ni l'un ni l'autre.
+        p.peutEnvoyer, p.travaille = true, true
+        S.taper(champ, ' !')
+        vrai(not S.retour(champ), 'Envoyer masqué ne prend pas Retour')
+        egal('observateur bonjour encore !', lu())
+        -- Envoyer de retour : il reprend Retour.
+        p.travaille = false
+        vrai(S.retour(champ), 'Envoyer réactivé reprend Retour')
+        egal('Envoyer lit bonjour encore !', lu())
+        -- Le champ quitté pour un autre est validé (D1).
+        S.taper(champ, '?')
+        S.taper(recherche, 'd')
+        egal('observateur bonjour encore !? | recherche abcd', lu())
+    end)
+    assert(ok, erreur)
+    -- Sans bouton par défaut (D1) : Retour valide le champ, rien d'autre, et rien dans « Rechercher ».
+    p.saisie, p.recherche = '', ''
+    lu()
+    local sans = f:column { bind_to_object = p, f:edit_field { value = lier 'saisie' }, f:edit_field { value = lier 'recherche', immediate = true },
+        f:push_button { title = 'Envoyer', action = function() note('Envoyer') end } }
+    ok, erreur = ouvrirEssai(sans, function(c)
+        egal(nil, S.boutonParDefaut())
+        S.taper(c.args[1], 'salut')
+        vrai(not S.retour(c.args[1]))
+        egal('observateur salut', lu())
+        S.taper(c.args[2], 'x')
+        lu()
+        vrai(not S.retour(c.args[2]))
+        egal('', lu(), 'Retour dans « Rechercher » ne déclenche rien')
+    end)
+    assert(ok, erreur)
+end)
+
+essai("Simulation : un clic valide d'abord le champ tapé sans Retour, puis se fait et lit la valeur validée (D3)", function()
+    local f = fabriqueVues
+    local p = S.modules.LrBinding.makePropertyTable()
+    p.saisie, p.choix, p.coche = '', 'un', false
+    local journal = {}
+    local function note(texte)
+        journal[#journal + 1] = texte
+    end
+    p:addObserver('saisie', function(_, _, v) note('observateur ' .. v) end)
+    p:addObserver('choix', function(_, _, v) note('radio ' .. v .. ' lit ' .. p.saisie) end)
+    p:addObserver('coche', function(_, _, v) note('case ' .. tostring(v) .. ' lit ' .. p.saisie) end)
+    local champ = f:edit_field { value = lier 'saisie', immediate = false }
+    local calque = f:static_text { title = '', width = 72, height = 22, mouse_down = function() note('calque lit ' .. p.saisie) end }
+    local radio = f:radio_button { title = 'Deux', value = lier 'choix', checked_value = 'deux' }
+    local case = f:checkbox { title = 'Case', value = lier 'coche' }
+    local temoin = f:push_button { title = 'Témoin', action = function() note('bouton lit ' .. p.saisie) end }
+    local carre = f:square_button { title = '?', action = function() note('carré lit ' .. p.saisie) end }
+    local ok, erreur = ouvrirEssai(f:column { bind_to_object = p, champ, calque, radio, case, temoin, carre }, function()
+        local cas = {
+            { calque, 'a', 'calque lit a' },
+            { radio, 'b', 'radio deux lit ab' },
+            { case, 'c', 'case true lit abc' },
+            { temoin, 'd', 'bouton lit abcd' },
+            { carre, 'e', 'carré lit abcde' },
+        }
+        for _, c in ipairs(cas) do
+            journal = {}
+            S.taper(champ, c[2])
+            S.cliquer(c[1])
+            egal('observateur ' .. p.saisie .. ' | ' .. c[3], table.concat(journal, ' | '))
+            egal(p.saisie, S.texteChamp(champ), 'le texte reste dans le champ')
+        end
+        -- Sans frappe, rien à valider ; la case se décoche.
+        journal = {}
+        S.cliquer(case)
+        egal('case false lit abcde', table.concat(journal, ' | '))
+    end)
+    assert(ok, erreur)
+end)
+
+essai('Simulation : visible lié sur un f:view, qui se cache avec ses vues (D10) ; refusé sur row, column, group_box, tab_view '
+    .. 'et scrolled_view (20 octobre 2026)', function()
+    local f = fabriqueVues
+    local p = S.modules.LrBinding.makePropertyTable()
+    p.montrer = true
+    for _, genre in ipairs({ 'row', 'column', 'group_box', 'tab_view', 'scrolled_view' }) do
+        refuse(function() f[genre](f, { visible = lier 'montrer' }) end, 'visible sur un conteneur', genre)
+    end
+    local recus = 0
+    local bouton = f:push_button { title = 'Clic', size = 'mini', action = function() recus = recus + 1 end }
+    local vue = f:view { visible = lier 'montrer', f:row { f:static_text { title = 'Dans un f:view' }, bouton } }
+    local ok, erreur = ouvrirEssai(f:column { bind_to_object = p, vue, f:static_text { title = 'après la vue' } }, function()
+        S.cliquer(bouton)
+        p.montrer = false
+        vrai(not S.montreeDansFenetre(bouton), 'caché avec son f:view')
+        refuse(function() S.cliquer(bouton) end, 'masquée', 'clic dans un f:view caché')
+        p.montrer = true
+        vrai(S.montreeDansFenetre(bouton), 'montré de nouveau')
+        S.cliquer(bouton)
+    end)
+    assert(ok, erreur)
+    egal(2, recus)
+end)
+
+essai('Simulation : seule la variante montrée prend les clics, à toute place de la superposition (D11)', function()
+    local f = fabriqueVues
+    local Vues = require 'Vues'
+    local p = S.modules.LrBinding.makePropertyTable()
+    p.onglet = 'note'
+    local recus, boutons, calques = {}, {}, {}
+    local variantes = { place = 'overlapping' }
+    local noms = { 'apercu', 'proposition', 'note', 'lecon' }
+    for _, nom in ipairs(noms) do
+        local fm = Vues.masquable(f, Fenetre, Fenetre.egal('onglet', nom))
+        boutons[nom] = fm:push_button { title = 'Bouton ' .. nom, action = function() recus[#recus + 1] = 'bouton ' .. nom end }
+        calques[nom] = fm:static_text { title = '', width = 72, height = 22, mouse_down = function() recus[#recus + 1] = 'calque ' .. nom end }
+        variantes[#variantes + 1] = f:column { width = 300, boutons[nom], calques[nom] }
+    end
+    local ok, erreur = ouvrirEssai(f:column { bind_to_object = p, f:column(variantes) }, function()
+        -- Dessous (Aperçu), au milieu (Note) et au-dessus (Leçon), comme D11.
+        for _, montre in ipairs({ 'apercu', 'note', 'lecon' }) do
+            p.onglet = montre
+            for _, nom in ipairs(noms) do
+                if nom == montre then
+                    S.cliquer(boutons[nom])
+                    S.cliquer(calques[nom])
+                else
+                    refuse(function() S.cliquer(boutons[nom]) end, 'D11', 'bouton ' .. nom .. ' sous ' .. montre)
+                    refuse(function() S.cliquer(calques[nom]) end, 'D11', 'calque ' .. nom .. ' sous ' .. montre)
+                end
+            end
+        end
+    end)
+    assert(ok, erreur)
+    egal('bouton apercu calque apercu bouton note calque note bouton lecon calque lecon', table.concat(recus, ' '))
+end)
+
+essai('Simulation : mesures sans règle — cadre de la fenêtre (D7), bezel des square_button (D5), encre (D9), radio inactif (D12)', function()
+    local largeur, hauteur = S.contenuPourFenetre(1280, 800)
+    egal(1278, largeur, 'contenu d\'une fenêtre de 1 280 de large')
+    egal(766, hauteur, 'contenu d\'une fenêtre de 800 de haut')
+    largeur, hauteur = S.fenetrePourContenu(1278, 765)
+    egal(1280, largeur, 'fenêtre mesurée (D7)')
+    egal(799, hauteur, 'fenêtre mesurée (D7)')
+    local f = fabriqueVues
+    local function carre(args)
+        args.title, args.action = '☆', rien
+        return f:square_button(args)
+    end
+    egal(17, S.bezelVisible(carre({})), 'regular')
+    egal(15, S.bezelVisible(carre({ size = 'small' })), 'small')
+    egal(11, S.bezelVisible(carre({ size = 'mini' })), 'mini')
+    egal(20, S.bezelVisible(carre({ height = 22 })), 'height 22')
+    egal(22, S.bezelVisible(carre({ size = 'small', height = 24 })), 'height 24, small')
+    egal(1, S.ENCRE_SOUS_CHASSE.min)
+    egal(2, S.ENCRE_SOUS_CHASSE.max)
+    egal(true, S.RADIO_INACTIF_A_REPOSER)
+end)
+
+essai("Fenêtre : sans bouton par défaut, Retour dans « Rechercher » n'envoie rien ; Retour dans la demande part par l'envoi "
+    .. "automatique (D1, décision de repli)", function()
+    S.photoActive = S.photo(53636309, 'DSCF4961.RAF')
+    S.selection = { S.photoActive }
+    local envoyer, envoyees = Fenetre.envoyer, {}
+    local construite = false
+    S.pendantFenetre = function(args)
+        construite = true
+        local p = Fenetre.p
+        egal(nil, S.boutonParDefaut(), 'aucun bouton par défaut')
+        local champ, recherche
+        for _, v in ipairs(S.vues(args.contents)) do
+            if v.genre == 'edit_field' and type(v.args.value) == 'table' and v.args.value.key == 'saisie' then
+                champ = v
+            elseif v.genre == 'edit_field' and type(v.args.value) == 'table' and v.args.value.key == 'recherche' then
+                recherche = v
+            end
+        end
+        vrai(champ and recherche, 'champ de demande et « Rechercher »')
+        egal(false, champ.args.immediate)
+        egal(true, recherche.args.immediate)
+        Fenetre.envoyer = function(texte) envoyees[#envoyees + 1] = texte end
+        S.taper(recherche, 'zz')
+        egal('zz', p.recherche, 'la recherche suit la frappe')
+        local taches = #S.taches
+        vrai(not S.retour(recherche), 'Retour dans « Rechercher » ne déclenche rien')
+        egal(taches, #S.taches, 'aucune tâche')
+        egal(nil, Fenetre.envoiAuto, 'aucun envoi prévu')
+        S.taper(recherche, '')
+        p.recherche = ''
+        -- Retour dans la demande : le champ validé, puis l'envoi automatique, qui vide le champ.
+        S.taper(champ, 'Bonjour')
+        egal('', p.saisie, 'pas encore validée')
+        egal(taches, #S.taches, 'rien avant Retour')
+        vrai(not S.retour(champ), 'aucun bouton ne prend Retour')
+        egal('Bonjour', p.saisie, 'validée par Retour')
+        egal(taches + 1, #S.taches, 'envoi automatique prévu')
+        S.taches[#S.taches]()
+        egal('Bonjour', table.concat(envoyees, ' | '), 'envoyée une fois')
+        egal('', p.saisie, 'le champ se vide')
+        egal('', S.texteChamp(champ))
+        Fenetre.envoyer = envoyer
+    end
+    local ok, erreur = pcall(Fenetre.afficher)
+    Fenetre.envoyer = envoyer
+    S.pendantFenetre = nil
+    Fenetre.ouverte = false
+    assert(ok, erreur)
+    vrai(construite, 'fenêtre construite')
+end)
+
+essai("Fenêtre : un clic sur 📋 ou sur un onglet valide la demande tapée sans l'envoyer (D3) ; une carte cachée ne prend aucun clic (D11)", function()
+    S.photoActive = S.photo(53636309, 'DSCF4961.RAF')
+    S.selection = { S.photoActive }
+    local envoyer, envoyees = Fenetre.envoyer, {}
+    -- La tâche de 📋 lirait le vrai presse-papiers (jamais dans un essai) : elle ne colle rien ici,
+    -- et seule la tâche de l'envoi automatique tourne.
+    local coller, collages = Fenetre.coller, 0
+    local construite = false
+    S.pendantFenetre = function(args)
+        construite = true
+        local p = Fenetre.p
+        Fenetre.coller = function() collages = collages + 1 end
+        local champ, radios = nil, {}
+        for _, v in ipairs(S.vues(args.contents)) do
+            if v.genre == 'edit_field' and type(v.args.value) == 'table' and v.args.value.key == 'saisie' then
+                champ = v
+            elseif v.genre == 'radio_button' then
+                radios[v.args.checked_value] = v
+            end
+        end
+        Fenetre.envoyer = function(texte) envoyees[#envoyees + 1] = texte end
+        -- 📋 : la demande validée par le clic reste dans le champ, rien ne part.
+        local taches = #S.taches
+        S.taper(champ, 'Avec une photo')
+        S.cliquer(S.trouverBouton(args.contents, '📋'))
+        egal('Avec une photo', p.saisie, 'validée par le clic')
+        egal(nil, Fenetre.envoiAuto, "le bouton annule l'envoi automatique")
+        egal(taches + 2, #S.taches, "l'envoi automatique prévu par la validation, puis la tâche de 📋")
+        S.taches[taches + 1]()
+        egal(0, #envoyees, 'rien envoyé')
+        egal('Avec une photo', S.texteChamp(champ), 'le texte reste dans le champ')
+        -- Un onglet : de même (Fenetre.ongletChange annule l'envoi automatique).
+        S.taper(champ, ', Proposition')
+        egal('notation', p.onglet)
+        local refuser, changer = S.trouverBouton(args.contents, 'Refuser'), S.trouverBouton(args.contents, 'Changer…')
+        refuse(function() S.cliquer(refuser) end, 'D11', 'Refuser, carte Proposition cachée')
+        taches = #S.taches
+        S.cliquer(radios.proposition)
+        egal('proposition', p.onglet)
+        egal('Avec une photo, Proposition', p.saisie, "validée par le clic de l'onglet")
+        egal(nil, Fenetre.envoiAuto, "l'onglet annule l'envoi automatique")
+        vrai(#S.taches > taches, "l'envoi automatique prévu par la validation")
+        S.taches[taches + 1]()
+        egal(0, #envoyees, 'rien envoyé')
+        -- La carte Note est cachée ; Refuser est montré, inactif sans proposition.
+        refuse(function() S.cliquer(changer) end, 'D11', 'Changer…, carte Note cachée')
+        refuse(function() S.cliquer(refuser) end, 'inactive', 'Refuser sans proposition')
+        S.cliquer(radios.notation)
+        p.saisie = ''
+        Fenetre.envoyer, Fenetre.coller = envoyer, coller
+    end
+    local ok, erreur = pcall(Fenetre.afficher)
+    Fenetre.envoyer, Fenetre.coller = envoyer, coller
+    egal(0, collages, 'la tâche de 📋 ne tourne pas')
+    S.pendantFenetre = nil
+    Fenetre.ouverte = false
+    assert(ok, erreur)
+    vrai(construite, 'fenêtre construite')
+end)
 
 -- Consommation --------------------------------------------------------------------------------
 

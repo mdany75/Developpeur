@@ -5,6 +5,13 @@
 -- n'est jamais démarrée ici (sa suite est Tests/Lua/Liaison).
 -- Les tâches (LrTasks.startAsyncTask) ne tournent pas d'elles-mêmes : le test appelle ce qu'il
 -- veut éprouver (Moteur.tic…).
+--
+-- Vues : les règles tirées des constats faits dans Lightroom (« constaté le … ») ou lus dans son
+-- code (« relevé dans … ») refusent, à la création d'une vue ou à l'ouverture d'une fenêtre, ce que
+-- Lightroom ignorerait ou rendrait mal. Une fenêtre flottante ouverte (S.pendantFenetre) se
+-- manipule comme Dany le ferait : S.taper, S.retour et S.cliquer imitent la frappe, la touche Retour
+-- et les clics tels qu'ils ont été constatés le 21 octobre 2026 (blocs D1 à D3, D10 et D11 du lot
+-- B0 de la fenêtre B) ; un essai peut toujours appeler une action directement.
 
 local S = { taches = {}, dialogues = {}, messages = {}, prefs = {} }
 
@@ -230,17 +237,155 @@ end
 S.neuve = neuve
 
 -- Vues : chaque fabrique rend { genre, args } ; le test parcourt l'arbre.
+-- square_button : dans la fabrique de LrView sans être documenté (relevé dans LrView.lua), rendu et
+-- cliquable (constaté le 21 octobre 2026, B3 et D5).
 S.GENRES_VUES = {
     row = true, column = true, view = true, group_box = true, tab_view = true, tab_view_item = true, scrolled_view = true,
     spacer = true, separator = true, static_text = true, edit_field = true, password_field = true, combo_box = true,
-    checkbox = true, radio_button = true, push_button = true, popup_menu = true, simple_list = true, slider = true,
-    color_well = true, picture = true, catalog_photo = true,
+    checkbox = true, radio_button = true, push_button = true, square_button = true, popup_menu = true, simple_list = true,
+    slider = true, color_well = true, picture = true, catalog_photo = true,
 }
 
--- Lightroom ignore `visible` lié posé sur un conteneur : ses vues restent montrées (constaté le 20
--- octobre 2026 : les trois onglets de la Conversation claire s'affichaient superposés). Seules les
--- vues simples se masquent (Vues.masquable).
-S.CONTENEURS = { row = true, column = true, view = true, group_box = true, tab_view = true, scrolled_view = true }
+-- Les boutons : un essai qui rassemble les boutons d'une fenêtre (tout bouton passe par F.bouton,
+-- recherche par titre…) compte les deux genres.
+S.BOUTONS = { push_button = true, square_button = true }
+
+-- Lightroom ignore `visible` lié posé sur ces conteneurs : leurs vues restent montrées (constaté le
+-- 20 octobre 2026 : les trois onglets de la Conversation claire s'affichaient superposés). Seules
+-- les vues simples se masquent (Vues.masquable), et le f:view : il se cache, se montre et garde sa
+-- place (constaté le 21 octobre 2026, D10), ses vues avec lui.
+S.CONTENEURS = { row = true, column = true, group_box = true, tab_view = true, scrolled_view = true }
+
+-- `background_color` reste sans effet sur ces conteneurs (constaté le 21 octobre 2026, A5 : row et
+-- view ; relevé dans AgUI : aucun NSView ordinaire n'a de couleur de fond). Il agit sur un
+-- scrolled_view (constaté, A2) et sur un f:picture (aplat, constaté, A4).
+S.SANS_FOND = { row = true, column = true, view = true, group_box = true }
+
+-- Les attributs d'une static_text qui décident de son texte riche (<EM>), et celui d'un bouton qui
+-- pose une icône : vérifiés à la création s'ils sont tous donnés tels quels, sinon à l'ouverture de
+-- la fenêtre et à chaque changement de leurs clés liées.
+local ATTRIBUTS_TEXTE = { 'title', 'font', 'emphasis_font', 'emphasis_color', 'height_in_lines', 'image_name' }
+
+-- Taille en points d'une police de LrView : un nom réservé du système (« small » : 11 points,
+-- constaté le 21 octobre 2026, D9 ; sinon la taille du système de macOS, 13), ou une table
+-- { name, size }. Une static_text sans `font` est en '<system>'. Nil si la taille n'est pas connue.
+local function taillePolice(police)
+    if police == nil then
+        return 13
+    elseif type(police) == 'table' then
+        return police.size or (type(police.name) == 'string' and police.name:match('^<system') and taillePolice(police.name)) or nil
+    elseif type(police) == 'string' and police:match('^<system') then
+        return police:find('small', 1, true) and 11 or 13
+    end
+end
+S.taillePolice = taillePolice
+
+-- Texte riche d'une static_text (balise <EM>…</EM>, emphasis_font, emphasis_color), d'après ses
+-- valeurs `v` (title, font, emphasis_font, emphasis_color, height_in_lines). Rend nil si Lightroom
+-- l'affiche comme voulu, sinon la raison du refus.
+function S.refusEmphase(v)
+    if v.emphasis_color ~= nil and v.emphasis_font == nil then
+        -- Constaté le 21 octobre 2026 (D4), comme relevé dans AgUI : le style d'emphase n'est fait
+        -- qu'avec sa police.
+        return "emphasis_color sans emphasis_font : ni gras ni couleur (constaté le 21 octobre 2026, D4)"
+    end
+    local titre = v.title
+    if type(titre) ~= 'string' or not titre:find('</?EM>') then
+        return nil
+    end
+    -- Chaque <EM> se ferme par </EM> avant la suivante : seule, la balise disparaît sans rien
+    -- d'autre (constaté le 21 octobre 2026, B1). Une balise peut se fermer sur la ligne suivante
+    -- (les deux lignes passent en gras, constaté, D4).
+    local ouverte, debut = false, 1
+    while true do
+        local a, b, fin = titre:find('<(/?)EM>', debut)
+        if not a then
+            break
+        end
+        if fin == '' and ouverte then
+            return "<EM> ouverte deux fois sans </EM> : " .. titre
+        elseif fin == '/' and not ouverte then
+            return "</EM> sans <EM> : " .. titre
+        end
+        ouverte = fin == ''
+        debut = b + 1
+    end
+    if ouverte then
+        return "<EM> sans </EM> : la balise disparaît, le texte reste sans emphase (constaté le 21 octobre 2026, B1) : " .. titre
+    end
+    if v.emphasis_font == nil then
+        return "<EM> sans emphasis_font : ni gras ni couleur (constaté le 21 octobre 2026, B1 et D4) : " .. titre
+    end
+    -- « &lt; » et « &amp; » s'affichent tels quels (constaté le 21 octobre 2026, D4) ; aucune
+    -- entité n'est décodée (relevé dans AgUI : le découpage par NSScanner ne cherche que les
+    -- balises). Écrire les signes « < » et « & », affichés tels quels (constaté, D4).
+    if titre:find('&%a+;') or titre:find('&#%d+;') or titre:find('&#[xX]%x+;') then
+        return "entité dans un texte à <EM> : affichée telle quelle, écrire le signe (constaté le 21 octobre 2026, D4) : " .. titre
+    end
+    -- Une emphase plus grande que la police du texte allonge ses lignes (15 points au lieu de 14,5
+    -- pour 12 sur 11), mais la hauteur se compte sur la police du texte : avec height_in_lines égal
+    -- au nombre de lignes, la dernière est coupée (constaté le 21 octobre 2026, D4). Une ligne de plus
+    -- à height_in_lines, ou une emphase de la même taille.
+    local base, emphase = taillePolice(v.font), taillePolice(v.emphasis_font)
+    local lignes = select(2, titre:gsub('\n', '')) + 1
+    if base and emphase and emphase > base and type(v.height_in_lines) == 'number' and lignes >= v.height_in_lines then
+        return string.format("emphase de %s points sur un texte de %s : la dernière des %d lignes (height_in_lines = %d) est coupée "
+            .. "(constaté le 21 octobre 2026, D4) ; une ligne de plus, ou la même taille", tostring(emphase), tostring(base), lignes,
+            v.height_in_lines)
+    end
+    return nil
+end
+
+-- Une icône posée par image_name chevauche le titre du bouton (constaté le 21 octobre 2026, B3) :
+-- un bouton à icône n'a pas de titre (D5 : icônes seules, nettes). Rend nil, ou la raison.
+function S.refusIcone(v)
+    if v.image_name ~= nil and v.title ~= nil and v.title ~= '' then
+        return "image_name avec un titre : l'icône chevauche le titre (constaté le 21 octobre 2026, B3) : " .. tostring(v.title)
+    end
+    return nil
+end
+
+-- Les attributs de ATTRIBUTS_TEXTE, tels quels ; nil si l'un est lié (vérifié à l'ouverture).
+local function valeursSansLiaison(args)
+    local v = {}
+    for _, cle in ipairs(ATTRIBUTS_TEXTE) do
+        local valeur = args[cle]
+        if type(valeur) == 'table' and valeur.liaison then
+            return nil
+        end
+        v[cle] = valeur
+    end
+    return v
+end
+
+-- Ce que Lightroom ignorerait ou rendrait mal, refusé à la création de la vue.
+local function verifierCreation(genre, args)
+    -- Un bouton radio sans valeur cochée ne se coche jamais.
+    assert(genre ~= 'radio_button' or args.checked_value ~= nil, "radio_button sans checked_value : " .. tostring(args.title))
+    assert(not (S.CONTENEURS[genre] and args.visible ~= nil),
+        "visible sur un conteneur : sans effet dans Lightroom (constaté le 20 octobre 2026) : " .. genre)
+    assert(not (S.SANS_FOND[genre] and args.background_color ~= nil),
+        "background_color sur un " .. genre .. " : sans effet (constaté le 21 octobre 2026, A5) ; un aplat (f:picture) dessous")
+    -- Sans effet sur un séparateur, la ligne restée #DBDBDB (constaté le 21 octobre 2026, A6) :
+    -- un filet se fait par un aplat de 1 point.
+    assert(args.primary_line_color == nil, "primary_line_color : sans effet (constaté le 21 octobre 2026, A6) : " .. genre)
+    if genre == 'picture' then
+        -- Aucun clic ne parvient à un f:picture (constaté le 21 octobre 2026, C1) : un calque
+        -- (static_text vide de taille fixe) posé dessus le reçoit.
+        assert(args.mouse_down == nil, "mouse_down sur un f:picture : sans effet (constaté le 21 octobre 2026, C1) ; poser un calque")
+        -- Sans eux, l'image prend sa taille en pixels, deux fois trop grande pour une PNG en 2x
+        -- (relevé dans AgPictureView, sans avoir été vu).
+        assert(args.width ~= nil and args.height ~= nil, "f:picture sans width ou sans height (relevé dans AgPictureView)")
+        -- Un f:picture sans image ne dessine que son fond : un aplat (constaté le 21 octobre 2026,
+        -- A4) ; sans fond, il ne montre rien.
+        assert(args.value ~= nil or args.background_color ~= nil, "f:picture sans value ni background_color : rien à montrer (A4)")
+    end
+    local v = valeursSansLiaison(args)
+    if v then
+        local refus = (genre == 'static_text' and S.refusEmphase(v)) or (S.BOUTONS[genre] and S.refusIcone(v)) or nil
+        assert(not refus, refus)
+    end
+end
 
 local fabrique = setmetatable({}, {
     __index = function(_, genre)
@@ -251,10 +396,7 @@ local fabrique = setmetatable({}, {
         return function(_, args)
             args = args or {}
             neuve(args.items, genre .. '.items')
-            -- Un bouton radio sans valeur cochée ne se coche jamais.
-            assert(genre ~= 'radio_button' or args.checked_value ~= nil, "radio_button sans checked_value : " .. tostring(args.title))
-            assert(not (S.CONTENEURS[genre] and args.visible ~= nil),
-                "visible sur un conteneur : sans effet dans Lightroom (constaté) : " .. genre)
+            verifierCreation(genre, args)
             return { genre = genre, args = args }
         end
     end,
@@ -372,32 +514,485 @@ modules.LrFunctionContext = {
     postAsyncTaskWithContext = function(_, fn) fn(contexte) end,
 }
 
+-- Mesures constatées, sans règle de refus ------------------------------------------------------
+-- Ce que la simulation ne rend pas (pas de pixels), relevé le 21 octobre 2026 dans Lightroom
+-- Classic 15.6 (lot B0 de la fenêtre B) : les lots B3 à B5 en tirent leurs dimensions.
+
+-- Cadre d'une fenêtre flottante (constaté le 21 octobre 2026, D7) : barre de titre de 33 points
+-- (32 blancs et un filet), le contenu juste dessous, sans marge en haut, avec 1 point à gauche, à
+-- droite et en bas. Un contenu de 1 278 × 765 donne une fenêtre de 1 280 × 799 ; une fenêtre de
+-- 1 280 × 800 a donc un contenu de 1 278 × 766.
+S.CADRE_FENETRE = { barre = 33, haut = 0, gauche = 1, droite = 1, bas = 1 }
+
+function S.fenetrePourContenu(largeur, hauteur)
+    local c = S.CADRE_FENETRE
+    return largeur + c.gauche + c.droite, hauteur + c.barre + c.haut + c.bas
+end
+
+function S.contenuPourFenetre(largeur, hauteur)
+    local c = S.CADRE_FENETRE
+    return largeur - c.gauche - c.droite, hauteur - c.barre - c.haut - c.bas
+end
+
+-- Bezel d'un square_button, mesuré d'un bord #B4B4B4 à l'autre (constaté le 21 octobre 2026, D5) :
+-- sans height, 17 points en regular, 15 en small, 11 en mini ; avec height, toujours 2 de moins
+-- (22, 24 et 26 donnent 20, 22 et 24, en regular comme en small). Un bezel de N points demande
+-- height = N + S.MARGE_BEZEL.
+S.BEZEL_NATUREL = { regular = 17, small = 15, mini = 11 }
+S.MARGE_BEZEL = 2
+
+function S.bezelVisible(vue)
+    local a = vue.args
+    if type(a.height) == 'number' then
+        return a.height - S.MARGE_BEZEL
+    end
+    return S.BEZEL_NATUREL[a.size or 'regular']
+end
+
+-- Encre et chasse (constaté le 21 octobre 2026, D9) : la largeur d'encre d'un texte rendu par
+-- Lightroom fait 1 à 2 points de moins que sa chasse NSFont (approches des bords), pour '<system>',
+-- '<system/bold>' et '<system/small>' en 13, 12 et 11, et Helvetica Neue 13 : les chasses de
+-- Metriques.lua restent justes, sans correction.
+S.ENCRE_SOUS_CHASSE = { min = 1, max = 2 }
+
+-- Bouton radio inactif coché (constaté le 21 octobre 2026, D12) : à la première ouverture, un
+-- radio_button à enabled lié faux et coché par sa valeur liée se dessine sans point (disque gris
+-- uni) ; sa valeur reposée après l'ouverture, ou dès la création à une deuxième ouverture, le
+-- dessine grisé et coché. La fenêtre repose donc la valeur une fois après l'ouverture, dans sa
+-- première tâche (lot B3). La simulation ne dessine rien : aucune règle.
+S.RADIO_INACTIF_A_REPOSER = true
+
+-- Fenêtres ouvertes ----------------------------------------------------------------------------
+
+-- Les fenêtres flottantes ouvertes, la dernière au-dessus : chacune avec l'index de ses vues
+-- (parent et table de propriétés héritée de bind_to_object), son bouton par défaut, le champ qui a
+-- le focus et le texte tapé sans être validé.
+S.fenetresOuvertes = {}
+
+local CHAMPS = { edit_field = true, password_field = true, combo_box = true }
+
+-- Toutes les vues d'un arbre, la racine d'abord.
+function S.vues(racine)
+    local liste = {}
+    local function parcourir(v)
+        liste[#liste + 1] = v
+        for _, e in ipairs(v.args or {}) do
+            if type(e) == 'table' and e.genre then
+                parcourir(e)
+            end
+        end
+    end
+    if type(racine) == 'table' and racine.genre then
+        parcourir(racine)
+    end
+    return liste
+end
+
+-- Les boutons d'un arbre, push_button et square_button.
+function S.boutons(racine)
+    local liste = {}
+    for _, v in ipairs(S.vues(racine)) do
+        if S.BOUTONS[v.genre] then
+            liste[#liste + 1] = v
+        end
+    end
+    return liste
+end
+
+-- La fenêtre ouverte qui contient cette vue, et ce qu'elle sait de la vue ; nil sinon.
+local function chercherFenetre(vue)
+    for i = #S.fenetresOuvertes, 1, -1 do
+        local fenetre = S.fenetresOuvertes[i]
+        if fenetre.vues[vue] then
+            return fenetre, fenetre.vues[vue]
+        end
+    end
+end
+
+local function fenetreDe(vue, geste)
+    local fenetre, info = chercherFenetre(vue)
+    if not fenetre then
+        error(geste .. " : vue hors d'une fenêtre ouverte (" .. tostring(type(vue) == 'table' and vue.genre) .. ")", 3)
+    end
+    return fenetre, info
+end
+
+-- La valeur d'un attribut : tel quel, ou sa liaison évaluée dans `objet`.
+local function evaluerAttribut(valeur, objet)
+    if type(valeur) == 'table' and valeur.liaison then
+        return S.evaluer(valeur, objet)
+    end
+    return valeur
+end
+
+-- Le titre d'une vue, sa liaison évaluée (dans la table de sa fenêtre ouverte, sinon `objet`).
+function S.titreDe(vue, objet)
+    local _, info = chercherFenetre(vue)
+    return evaluerAttribut(vue.args.title, info and info.objet or objet)
+end
+
+-- Le premier bouton (push_button ou square_button) de cet arbre qui porte ce titre.
+function S.trouverBouton(racine, titre, objet)
+    for _, v in ipairs(S.boutons(racine)) do
+        if S.titreDe(v, objet) == titre then
+            return v
+        end
+    end
+end
+
+-- Les attributs de texte riche et d'icône d'une vue, évalués ; une liaison qui ne s'évalue pas
+-- (clé sans valeur : une autre règle le dit) compte pour absente.
+local function valeursTexte(vue, objet)
+    local v = {}
+    for _, cle in ipairs(ATTRIBUTS_TEXTE) do
+        local ok, valeur = pcall(evaluerAttribut, vue.args[cle], objet)
+        if ok then
+            v[cle] = valeur
+        end
+    end
+    return v
+end
+
+local function refusTexte(fenetre, vue)
+    local v = valeursTexte(vue, fenetre.vues[vue].objet)
+    if vue.genre == 'static_text' then
+        return S.refusEmphase(v)
+    elseif S.BOUTONS[vue.genre] then
+        return S.refusIcone(v)
+    end
+end
+
+-- Ouverture d'une fenêtre : l'index de ses vues, puis ce qui ne se voit qu'avec les valeurs.
+local function ouvrirFenetre(args)
+    local fenetre = { args = args, vues = {}, saisies = {}, libres = {}, refus = {}, ouverte = true }
+    local function indexer(vue, parent, objet)
+        objet = vue.args.bind_to_object or objet
+        fenetre.vues[vue] = { parent = parent, objet = objet }
+        for _, e in ipairs(vue.args) do
+            if type(e) == 'table' and e.genre then
+                indexer(e, vue, objet)
+            end
+        end
+    end
+    local liste = S.vues(args.contents)
+    if liste[1] then
+        indexer(liste[1], nil, nil)
+    end
+    -- Un seul bouton par défaut : la fenêtre n'en garde qu'un (relevé dans AgUI :
+    -- setDefaultButtonCell). Lu à l'ouverture, liaison comprise.
+    local defauts = {}
+    for _, vue in ipairs(liste) do
+        local ok, defaut = pcall(evaluerAttribut, vue.args.default, fenetre.vues[vue].objet)
+        if ok and defaut == true then
+            defauts[#defauts + 1] = vue
+        end
+    end
+    assert(#defauts <= 1, string.format("%d boutons default = true dans une fenêtre : elle n'en garde qu'un (relevé dans AgUI, "
+        .. "setDefaultButtonCell)", #defauts))
+    fenetre.defaut = defauts[1]
+    -- Texte riche et icônes liés : leurs valeurs à l'ouverture, puis chaque nouvelle valeur (un
+    -- titre lié balisé garde son balisage quand il change, constaté le 21 octobre 2026, D4).
+    local suivies = {}
+    for _, vue in ipairs(liste) do
+        if vue.genre == 'static_text' or S.BOUTONS[vue.genre] then
+            local refus = refusTexte(fenetre, vue)
+            assert(not refus, refus)
+            for _, cle in ipairs(ATTRIBUTS_TEXTE) do
+                local lien = vue.args[cle]
+                if type(lien) == 'table' and lien.liaison then
+                    local o = lien.bind_to_object or fenetre.vues[vue].objet
+                    if type(o) == 'table' and type(rawget(o, 'addObserver')) == 'function' then
+                        for _, k in ipairs(S.cles(lien)) do
+                            suivies[o] = suivies[o] or {}
+                            suivies[o][k] = suivies[o][k] or {}
+                            table.insert(suivies[o][k], vue)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    for o, cles in pairs(suivies) do
+        for k, vues in pairs(cles) do
+            o:addObserver(k, function()
+                if not fenetre.ouverte then
+                    return
+                end
+                for _, vue in ipairs(vues) do
+                    local refus = refusTexte(fenetre, vue)
+                    if refus then
+                        -- Gardé aussi pour la fermeture : une tâche du module (LrTasks.pcall)
+                        -- n'avalera pas le refus.
+                        fenetre.refus[#fenetre.refus + 1] = refus
+                        error(refus, 0)
+                    end
+                end
+            end)
+        end
+    end
+    return fenetre
+end
+
+local function fermerFenetre(fenetre)
+    fenetre.ouverte = false
+    for i = #S.fenetresOuvertes, 1, -1 do
+        if S.fenetresOuvertes[i] == fenetre then
+            table.remove(S.fenetresOuvertes, i)
+        end
+    end
+end
+
+-- Les refus de valeurs liées gardés par la fenêtre ouverte du dessus, rendus puis oubliés (pour
+-- l'essai qui les provoque exprès).
+function S.refusDeLaFenetre()
+    local fenetre = S.fenetresOuvertes[#S.fenetresOuvertes]
+    assert(fenetre, "aucune fenêtre ouverte")
+    local refus = fenetre.refus
+    fenetre.refus = {}
+    return refus
+end
+
+-- Le bouton par défaut de la fenêtre ouverte du dessus (nil s'il n'y en a pas).
+function S.boutonParDefaut()
+    local fenetre = S.fenetresOuvertes[#S.fenetresOuvertes]
+    return fenetre and fenetre.defaut
+end
+
+-- Une vue est montrée si elle l'est, et toutes les vues qui la contiennent : un f:view caché
+-- cache ses vues (constaté le 21 octobre 2026, D10).
+local function montreeDans(fenetre, vue)
+    local v = vue
+    while v do
+        local info = fenetre.vues[v]
+        if not S.montree(v, info.objet) then
+            return false
+        end
+        v = info.parent
+    end
+    return true
+end
+
+function S.montreeDansFenetre(vue)
+    local fenetre = fenetreDe(vue, 'S.montreeDansFenetre')
+    return montreeDans(fenetre, vue)
+end
+
+local function active(fenetre, vue)
+    local e = evaluerAttribut(vue.args.enabled, fenetre.vues[vue].objet)
+    return e == nil or e == true
+end
+
+-- Un geste (clic, frappe, Retour) sur une vue masquée ou inactive est refusé. Masquée : une vue
+-- d'une variante cachée, par sa condition ou celle d'un f:view qui la contient, ne prend aucun clic
+-- ; celles de la variante montrée répondent, quelle que soit sa place dans la superposition
+-- (constaté le 21 octobre 2026, D11 ; D10 pour le f:view). Inactive : la simulation ne sait pas ce
+-- qu'un tel clic validerait, elle le refuse plutôt que de l'inventer.
+local function nomDe(vue)
+    local ok, titre = pcall(S.titreDe, vue)
+    return vue.genre .. ' « ' .. (ok and tostring(titre) or '?') .. ' »'
+end
+
+local function verifierGeste(fenetre, vue, geste)
+    local nom = nomDe(vue)
+    if not montreeDans(fenetre, vue) then
+        error(geste .. " sur une vue masquée : " .. nom .. " (constaté le 21 octobre 2026, D11 : aucune réponse d'une variante cachée)", 3)
+    end
+    if not active(fenetre, vue) then
+        error(geste .. " sur une vue inactive : " .. nom, 3)
+    end
+end
+
+local function lireValeur(fenetre, vue)
+    if fenetre.libres[vue] ~= nil then
+        return fenetre.libres[vue]
+    end
+    return evaluerAttribut(vue.args.value, fenetre.vues[vue].objet)
+end
+
+-- Écrit la valeur d'une vue dans sa table de propriétés (les observateurs de la clé suivent) ; une
+-- valeur non liée reste dans la vue.
+local function ecrireValeur(fenetre, vue, valeur)
+    local lien = vue.args.value
+    if type(lien) ~= 'table' or not lien.liaison then
+        fenetre.libres[vue] = valeur
+        return
+    end
+    assert(not lien.keys, "valeur liée à plusieurs clés : non simulée")
+    local o = lien.bind_to_object or fenetre.vues[vue].objet
+    assert(type(o) == 'table', "valeur liée sans table de propriétés : " .. tostring(lien.key))
+    if lien.transform then
+        valeur = lien.transform(valeur, false)
+        if valeur == modules.LrBinding.kUnsupportedDirection then
+            return
+        end
+    end
+    o[lien.key] = valeur
+end
+
+-- Le texte affiché par un champ : le texte tapé pas encore validé, sinon sa valeur.
+local function texteChamp(fenetre, champ)
+    if fenetre.saisies[champ] ~= nil then
+        return fenetre.saisies[champ]
+    end
+    local valeur = lireValeur(fenetre, champ)
+    return valeur == nil and '' or tostring(valeur)
+end
+
+function S.texteChamp(champ)
+    local fenetre = fenetreDe(champ, 'S.texteChamp')
+    return texteChamp(fenetre, champ)
+end
+
+-- Validation d'un champ (immediate = false) : son texte tapé passe à la table, son observateur
+-- suit ; le texte reste dans le champ (constaté le 21 octobre 2026, D3).
+local function valider(fenetre, champ)
+    local texte = fenetre.saisies[champ]
+    if texte ~= nil then
+        fenetre.saisies[champ] = nil
+        ecrireValeur(fenetre, champ, texte)
+    end
+end
+
+-- Un champ qui perd le focus est validé (constaté le 21 octobre 2026, D1 : le champ de demande,
+-- tapé puis quitté pour « Rechercher », était déjà envoyé quand Retour y a déclenché le bouton par
+-- défaut).
+local function prendreFocus(fenetre, champ)
+    if fenetre.focus and fenetre.focus ~= champ then
+        valider(fenetre, fenetre.focus)
+    end
+    fenetre.focus = champ
+end
+
+-- Frappe dans un champ (le focus y va). Avec immediate = true, chaque caractère passe à la table
+-- (constaté le 21 octobre 2026, D1 : trois appels de l'observateur de « Rechercher » pour « abc ») ;
+-- sinon le texte reste dans le champ jusqu'à Retour, un clic ou le focus qui part (D1, D3).
+function S.taper(champ, texte)
+    local fenetre = fenetreDe(champ, 'S.taper')
+    assert(CHAMPS[champ.genre], "S.taper : pas un champ : " .. champ.genre)
+    verifierGeste(fenetre, champ, 'frappe')
+    prendreFocus(fenetre, champ)
+    if champ.args.immediate == true then
+        local courant = texteChamp(fenetre, champ)
+        for c in tostring(texte):gmatch('[%z\1-\127\194-\244][\128-\191]*') do
+            courant = courant .. c
+            ecrireValeur(fenetre, champ, courant)
+        end
+    else
+        fenetre.saisies[champ] = texteChamp(fenetre, champ) .. tostring(texte)
+    end
+end
+
+-- Retour dans un champ (constaté le 21 octobre 2026, D1 et D2) : un champ immediate = false est
+-- validé (son observateur), puis l'action du bouton par défaut part, s'il est actif et montré, y
+-- compris depuis un champ immediate = true (Retour dans « Rechercher » déclenche Envoyer) ; un
+-- bouton par défaut inactif ou masqué ne la prend pas, et aucun autre bouton (Arrêter montré à la
+-- place d'Envoyer) ne la prend jamais. Rend vrai si le bouton par défaut a reçu Retour.
+function S.retour(champ)
+    local fenetre = fenetreDe(champ, 'S.retour')
+    assert(CHAMPS[champ.genre], "S.retour : pas un champ : " .. champ.genre)
+    verifierGeste(fenetre, champ, 'Retour')
+    prendreFocus(fenetre, champ)
+    if champ.args.immediate ~= true then
+        valider(fenetre, champ)
+    end
+    local defaut = fenetre.defaut
+    if defaut and montreeDans(fenetre, defaut) and active(fenetre, defaut) then
+        defaut.args.action(defaut)
+        return true
+    end
+    return false
+end
+
+-- Un clic : un bouton (son action), un calque ou un texte (mouse_down), un bouton radio (sa valeur
+-- cochée), une case (cochée ou décochée), un champ (le focus). Un champ tapé sans Retour est d'abord
+-- validé (son observateur), puis le clic se fait et lit la valeur validée ; le texte reste dans le
+-- champ (constaté le 21 octobre 2026, D3, pour un calque, un bouton radio, un segment en image sous
+-- calque et un bouton). Rend ce que rend l'action.
+function S.cliquer(vue)
+    local fenetre = fenetreDe(vue, 'S.cliquer')
+    assert(vue.genre ~= 'picture', "clic sur un f:picture : sans effet (constaté le 21 octobre 2026, C1) ; cliquer son calque")
+    verifierGeste(fenetre, vue, 'clic')
+    local a = vue.args
+    local geste
+    if S.BOUTONS[vue.genre] then
+        assert(type(a.action) == 'function', "bouton sans action : " .. nomDe(vue))
+        geste = function() return a.action(vue) end
+    elseif vue.genre == 'radio_button' then
+        geste = function() ecrireValeur(fenetre, vue, a.checked_value) end
+    elseif vue.genre == 'checkbox' then
+        geste = function()
+            local coche, decoche = a.checked_value, a.unchecked_value
+            if coche == nil then
+                coche = true
+            end
+            if decoche == nil then
+                decoche = false
+            end
+            if lireValeur(fenetre, vue) == coche then
+                ecrireValeur(fenetre, vue, decoche)
+            else
+                ecrireValeur(fenetre, vue, coche)
+            end
+        end
+    elseif CHAMPS[vue.genre] then
+        geste = function() prendreFocus(fenetre, vue) end
+    elseif type(a.mouse_down) == 'function' then
+        geste = function() return a.mouse_down(vue) end
+    else
+        error("rien ne prend ce clic : " .. nomDe(vue), 2)
+    end
+    if fenetre.focus and fenetre.focus ~= vue then
+        valider(fenetre, fenetre.focus)
+    end
+    return geste()
+end
+
 modules.LrDialogs = {
     message = function(titre, detail) S.messages[#S.messages + 1] = { titre, detail } end,
     confirm = function(...)
         S.confirmation = { ... }
         return S.reponseConfirm or 'cancel'
     end,
+    -- Une fenêtre modale : ses vues passent les règles d'une fenêtre ouverte, puis elle rend
+    -- S.reponseModal sans attendre.
     presentModalDialog = function(args)
         S.dialogues[#S.dialogues + 1] = args
+        fermerFenetre(ouvrirFenetre(args))
         return S.reponseModal or 'cancel'
     end,
     -- La fenêtre flottante : le test la parcourt pendant S.pendantFenetre, puis elle se ferme.
     -- `close` (demandé par la fenêtre, pour la rouvrir) et `toFront` sont comptés ; la fermeture
-    -- (windowWillClose) vient après S.pendantFenetre.
+    -- (windowWillClose) vient après S.pendantFenetre. Pendant S.pendantFenetre, elle est ouverte :
+    -- S.taper, S.retour et S.cliquer y agissent. Une valeur liée refusée pendant ce temps fait
+    -- échouer la fermeture.
     presentFloatingDialog = function(_, args)
+        -- Sans effet : le fond reste le gris de la fenêtre, #EFEFEF à l'écran (constaté le 21
+        -- octobre 2026, A1) ; un aplat (f:picture) le remplace.
+        assert(args.background_color == nil, "background_color de presentFloatingDialog : sans effet (constaté le 21 octobre 2026, A1)")
+        local fenetre = ouvrirFenetre(args)
+        S.fenetresOuvertes[#S.fenetresOuvertes + 1] = fenetre
         S.fenetre = args
-        if args.onShow then
-            args.onShow({
-                toFront = function() S.devant = (S.devant or 0) + 1 end,
-                close = function() S.fermetures = (S.fermetures or 0) + 1 end,
-            })
-        end
-        if S.pendantFenetre then
-            S.pendantFenetre(args)
+        local ok, erreur = xpcall(function()
+            if args.onShow then
+                args.onShow({
+                    toFront = function() S.devant = (S.devant or 0) + 1 end,
+                    close = function() S.fermetures = (S.fermetures or 0) + 1 end,
+                })
+            end
+            if S.pendantFenetre then
+                S.pendantFenetre(args)
+            end
+        end, debug.traceback)
+        if not ok then
+            fermerFenetre(fenetre)
+            error(erreur, 0)
         end
         if args.windowWillClose then
             args.windowWillClose()
+        end
+        fermerFenetre(fenetre)
+        if #fenetre.refus > 0 then
+            error("valeur liée refusée pendant que la fenêtre était ouverte : " .. fenetre.refus[1], 0)
         end
     end,
     runOpenPanel = function() return S.fichiersChoisis end,
