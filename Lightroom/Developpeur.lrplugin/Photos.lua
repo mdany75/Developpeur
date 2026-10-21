@@ -6,8 +6,12 @@
 -- Ce que Claude a changé est gardé dans des métadonnées privées du module (Metadonnees.lua) :
 --   avantClaude   : valeur d'origine de chaque réglage touché (JSON objet) ; la clé Amelioration
 --                   y garde l'état du débruitage, des détails bruts et de la super résolution
---   etapesClaude  : les 20 dernières retouches, avec les valeurs qu'elles ont remplacées (JSON tableau)
---   journalClaude : les 200 dernières entrées du journal (date, étape, raison, changements)
+--   etapesClaude  : les 20 dernières retouches, avec les valeurs qu'elles ont remplacées (JSON
+--                   tableau de { id, nom, avant, le } ; id et le depuis la 1.3, par
+--                   Ecriture.nouvelleEtape : une étape plus ancienne n'a que nom et avant)
+--   journalClaude : les 200 dernières entrées du journal (date, étape, etape_id depuis la 1.3,
+--                   type, raison, changements ; une annulation porte l'etape_id de l'étape
+--                   défaite, un retour à l'origine les etape_ids de toutes)
 --   proprietaireMemoire : uuid de la photo à qui appartiennent ces champs (voir « Propriétaire
 --                   de la mémoire »)
 

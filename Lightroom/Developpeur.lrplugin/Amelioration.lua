@@ -38,7 +38,7 @@ local egal, pourLightroom = Reglages.egal, Reglages.pourLightroom
 local noter = Plans.noter
 local ajouterJournal, creerInstantane = Ecriture.ajouterJournal, Ecriture.creerInstantane
 local ecrire, ecrireMemoire = Ecriture.ecrire, Ecriture.ecrireMemoire
-local MAX_ETAPES, modeTexte = Ecriture.MAX_ETAPES, Ecriture.modeTexte
+local modeTexte, nouvelleEtape = Ecriture.modeTexte, Ecriture.nouvelleEtape
 local nomEtape, resultatsPlans = Ecriture.nomEtape, Ecriture.resultatsPlans
 local sansRetouche, verifierAccord, verifierPause = Ecriture.sansRetouche, Ecriture.verifierAccord, Ecriture.verifierPause
 local verifierProtection = Ecriture.verifierProtection
@@ -355,10 +355,9 @@ local function ameliorerAffichee(photo, dc, demandes, etape, prefs, params, plan
             original.Amelioration[cle] = valeur
         end
     end
-    etapes[#etapes + 1] = { nom = etape, avant = { Amelioration = memoire } }
-    while #etapes > MAX_ETAPES do
-        table.remove(etapes, 1)
-    end
+    -- L'étape et son id (1.3) : repris par resultatsPlans (etape_id de la réponse) et le journal.
+    local etapeId = nouvelleEtape(etapes, etape, { Amelioration = memoire })
+    plan.etapeId = etapeId
     -- L'instantané demande une écriture ordinaire ; la mémoire, une écriture privée (hors de
     -- Édition › Annuler : Lightroom écrit lui-même l'étape du traitement).
     if premiere and prefs.instantane then
@@ -404,6 +403,8 @@ local function ameliorerAffichee(photo, dc, demandes, etape, prefs, params, plan
                 photo:setPropertyForPlugin(_PLUGIN, champ, precedent[champ])
             end
         end)
+        -- Plus d'étape : la réponse n'en porte pas.
+        plan.etapeId = nil
         return
     end
     -- Ce que Lightroom a changé de lui-même avec les traitements demandés (constaté dans Lightroom
@@ -418,7 +419,7 @@ local function ameliorerAffichee(photo, dc, demandes, etape, prefs, params, plan
         original = lireJson(photo, 'avantClaude', {})
         etapes = lireJson(photo, 'etapesClaude', {})
         local derniere = etapes[#etapes]
-        if derniere and derniere.nom == etape and type(derniere.avant) == 'table' and type(derniere.avant.Amelioration) == 'table' then
+        if derniere and derniere.id == etapeId and type(derniere.avant) == 'table' and type(derniere.avant.Amelioration) == 'table' then
             for cle, valeur in pairs(ajouts) do
                 derniere.avant.Amelioration[cle] = valeur
             end
@@ -431,7 +432,7 @@ local function ameliorerAffichee(photo, dc, demandes, etape, prefs, params, plan
         end
     end
     local journal = lireJson(photo, 'journalClaude', {})
-    ajouterJournal(journal, { etape = etape, type = 'retouche', raison = params.raison, changements = plan.changements })
+    ajouterJournal(journal, { etape = etape, etape_id = etapeId, type = 'retouche', raison = params.raison, changements = plan.changements })
     ecrireMemoire(etape, function()
         garder(photo, 'journalClaude', Json.encode(Json.tableau(journal)))
         if next(ajouts) then

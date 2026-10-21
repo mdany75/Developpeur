@@ -38,7 +38,7 @@ local egal, pourLightroom = Reglages.egal, Reglages.pourLightroom
 local noter = Plans.noter
 local ajouterJournal, creerInstantane = Ecriture.ajouterJournal, Ecriture.creerInstantane
 local ecrire, ecrireMemoire = Ecriture.ecrire, Ecriture.ecrireMemoire
-local MAX_ETAPES, modeTexte = Ecriture.MAX_ETAPES, Ecriture.modeTexte
+local modeTexte, nouvelleEtape = Ecriture.modeTexte, Ecriture.nouvelleEtape
 local nomEtape, resultatsPlans = Ecriture.nomEtape, Ecriture.resultatsPlans
 local sansRetouche, verifierAccord, verifierPause = Ecriture.sansRetouche, Ecriture.verifierAccord, Ecriture.verifierPause
 local verifierProtection = Ecriture.verifierProtection
@@ -212,10 +212,9 @@ local function supprimerAffichee(photo, dc, voulu, vue, etape, prefs, params, pl
     if original.Suppression == nil then
         original.Suppression = memoire(avant)
     end
-    etapes[#etapes + 1] = { nom = etape, avant = { Suppression = memoire(avant) } }
-    while #etapes > MAX_ETAPES do
-        table.remove(etapes, 1)
-    end
+    -- L'étape et son id (1.3) : repris par resultatsPlans (etape_id de la réponse) et le journal.
+    local etapeId = nouvelleEtape(etapes, etape, { Suppression = memoire(avant) })
+    plan.etapeId = etapeId
     if premiere and prefs.instantane then
         ecrire(etape, function() creerInstantane(photo) end)
     end
@@ -245,10 +244,12 @@ local function supprimerAffichee(photo, dc, voulu, vue, etape, prefs, params, pl
                 photo:setPropertyForPlugin(_PLUGIN, champ, precedent[champ])
             end
         end)
+        -- Plus d'étape : la réponse n'en porte pas.
+        plan.etapeId = nil
         return
     end
     local journal = lireJson(photo, 'journalClaude', {})
-    ajouterJournal(journal, { etape = etape, type = 'retouche', raison = params.raison, changements = plan.changements })
+    ajouterJournal(journal, { etape = etape, etape_id = etapeId, type = 'retouche', raison = params.raison, changements = plan.changements })
     ecrireMemoire(etape, function()
         garder(photo, 'journalClaude', Json.encode(Json.tableau(journal)))
     end)

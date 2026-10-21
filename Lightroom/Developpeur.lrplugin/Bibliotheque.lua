@@ -38,7 +38,7 @@ local brut, catalogue, decrire, garder = Photos.brut, Photos.catalogue, Photos.d
 local lireJson, meta, nomFichier, photoParId = Photos.lireJson, Photos.meta, Photos.nomFichier, Photos.photoParId
 local photosVisees = Photos.photosVisees
 local minuscules, pluriel = Reglages.minuscules, Reglages.pluriel
-local ajouterJournal, ecrire, MAX_ETAPES = Ecriture.ajouterJournal, Ecriture.ecrire, Ecriture.MAX_ETAPES
+local ajouterJournal, ecrire, nouvelleEtape = Ecriture.ajouterJournal, Ecriture.ecrire, Ecriture.nouvelleEtape
 local modeTexte, nomEtape, resultatsPlans = Ecriture.modeTexte, Ecriture.nomEtape, Ecriture.resultatsPlans
 local verifierPause, verifierProtection = Ecriture.verifierPause, Ecriture.verifierProtection
 
@@ -482,15 +482,13 @@ end
 -- Garde l'étape, l'état d'avant Claude et l'entrée du journal (dans l'écriture). Avec
 -- `sansOriginal` (une note posée par l'utilisateur, Bibliotheque.noter), l'état d'avant Claude ne
 -- change pas : le retour à l'origine laisse cette note en place ; undo_last la défait toujours.
+-- L'étape a son id (1.3), au journal (etape_id) et dans la réponse (resultatsPlans).
 local function memoriser(plan, etape, params, sansOriginal)
     if next(plan.avant) == nil then
         return
     end
-    plan.etapes[#plan.etapes + 1] = { nom = etape, avant = { Bibliotheque = plan.avant } }
-    while #plan.etapes > MAX_ETAPES do
-        table.remove(plan.etapes, 1)
-    end
-    plan.entreeJournal = { etape = etape, type = 'classement', raison = params.raison, changements = plan.changements }
+    plan.etapeId = nouvelleEtape(plan.etapes, etape, { Bibliotheque = plan.avant })
+    plan.entreeJournal = { etape = etape, etape_id = plan.etapeId, type = 'classement', raison = params.raison, changements = plan.changements }
     ajouterJournal(plan.journal, plan.entreeJournal)
     if not sansOriginal then
         fusionnerOriginal(plan.original, plan.avant)

@@ -5,7 +5,9 @@ import Foundation
 /// photo de référence. Sans accord, le plan seulement ; avec confirm, des corrections relatives,
 /// puis une nouvelle mesure et une seconde correction si l'écart reste. Le lien entre a*/b* et les
 /// curseurs n'est pas linéaire (les kelvins encore moins) : la première passe part de pentes
-/// moyennes, la seconde de celles que la photo a montrées.
+/// moyennes, la seconde de celles que la photo a montrées. Chaque `appliquer` d'une série porte
+/// `sans_avant_apres` (1.3) : le module ne garde pas l'avant/après de ces étapes (Etapes.lua), même
+/// sur la photo active, pour ne pas ralentir la série ni faire attendre l'aperçu de mesure suivant.
 extension ToolHandler {
     static let maxMatchedPhotos = 60
     static let matchDimensions = ["exposure", "white_balance", "contrast"]
@@ -120,6 +122,7 @@ extension ToolHandler {
                                                defaultStep: nom)
                 ecriture["raison"] = ecriture["raison"] ?? .string("Harmonisation sur la référence.")
                 params.merge(ecriture) { _, new in new }
+                params["sans_avant_apres"] = true
                 _ = try lightroom.send("appliquer", params, timeout: 180)
                 etapes.append(.string("Claude · " + nom))
                 let avant = mesuree
@@ -204,6 +207,7 @@ extension ToolHandler {
                                                defaultStep: nom)
                 ecriture["raison"] = ecriture["raison"] ?? .string("Exposition reproduite d'après la prise de vue de la référence.")
                 params.merge(ecriture) { _, new in new }
+                params["sans_avant_apres"] = true
                 let reponse = try lightroom.send("appliquer", params, timeout: 120)
                 ligne["etape"] = .string("Claude · " + nom)
                 if let remarques = reponse["resultats"]?.array?.first?["remarques"], !(remarques.array ?? []).isEmpty {
