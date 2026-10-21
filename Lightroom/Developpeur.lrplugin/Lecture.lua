@@ -295,11 +295,46 @@ function Lecture.diagnostic(params)
     return resultat
 end
 
+-- Données de prise de vue de plus, pour la leçon de la photo (journal avec detaille, 1.3) :
+-- compensation d'exposition, flash, programme et mesure de la lumière. Lues une à une par
+-- Photos.meta (getFormattedMetadata sous LrTasks.pcall) : une clé que Lightroom refuse, ou vide,
+-- donne nil sans gêner les autres. Jamais dans une lecture groupée (CLES_FORMATEES de Photos.lua,
+-- batchGetFormattedMetadata) : une clé refusée y ferait échouer tout le lot. Ce que Lightroom
+-- Classic 15.6 rend pour chacune reste à constater (mesure 3 de la 1.3).
+local CLES_PRISE_DE_VUE_PLUS = {
+    { 'compensation', 'exposureBias' },
+    { 'flash', 'flash' },
+    { 'programme', 'exposureProgram' },
+    { 'mesure', 'meteringMode' },
+}
+
+local function priseDeVuePlus(photo)
+    local plus, lu = {}, false
+    for _, c in ipairs(CLES_PRISE_DE_VUE_PLUS) do
+        local valeur = Photos.meta(photo, c[2])
+        local sorte = type(valeur)
+        if sorte == 'string' or sorte == 'number' or sorte == 'boolean' then
+            plus[c[1]] = valeur
+            lu = true
+        end
+    end
+    return lu and plus or nil
+end
+
+-- journal {photos?|selection?, detaille?} : le journal des retouches de Claude de chaque photo.
+-- Avec detaille (la leçon de la photo), la photo est décrite en entier (appareil, objectif, ISO,
+-- vitesse, ouverture, focale, date…) avec prise_de_vue_plus ; sans, la description courte. Rien
+-- n'est écrit.
 function Lecture.journal(params)
+    local detaille = params.detaille == true
     local photos = Json.tableau()
     for _, photo in ipairs(photosVisees(params)) do
+        local description = decrire(photo, detaille)
+        if detaille then
+            description.prise_de_vue_plus = priseDeVuePlus(photo)
+        end
         photos[#photos + 1] = {
-            photo = decrire(photo, false),
+            photo = description,
             entrees = Json.tableau(lireJson(photo, 'journalClaude', {})),
         }
     end

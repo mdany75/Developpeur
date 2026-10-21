@@ -5,11 +5,19 @@ import Foundation
 /// PriseDeVue, seule liste ; la leçon est rangée par le module à part du catalogue (carnet.json),
 /// d'où sa place dans readOnlyTools : ni la photo ni le catalogue ne changent.
 ///
-/// Lot 1 : la définition seule, le corps est provisoire (une erreur d'outil, rien n'est envoyé au
-/// module). Le lot 4 le remplace : journal détaillé, corrections nettes, faits, commande lecon.
+/// L'outil valide les trois points (Lecon.points) avant toute commande ; puis il lit le journal
+/// détaillé de la photo (commande journal avec detaille : description, prise de vue, entrées), en
+/// tire les corrections nettes de Claude et les indices de défauts, avec la première vue mesurée
+/// de la session (vuesMesurees) ; enfin il range la leçon (commande lecon, action garder). Un
+/// module qui ne connaît pas encore la commande (module 1.2 resté chargé) laisse la leçon non
+/// rangée, avec une remarque : jamais une erreur d'outil. read_facts = true : les faits seuls,
+/// seule la commande journal part.
 extension ToolHandler {
     /// Chaque moitié d'un point (missing, at_capture) : une phrase simple.
-    static let longueurPointLecon = 140
+    static let longueurPointLecon = Lecon.longueurPoint
+    /// Le journal détaillé d'une photo (comme export_journal), puis le rangement de la leçon.
+    static let journalLeconTimeout: TimeInterval = 60
+    static let leconTimeout: TimeInterval = 30
 
     var lessonDefinitions: [JSONValue] {
         let parAxe = PriseDeVue.Axe.allCases.map { axe in
@@ -43,8 +51,94 @@ extension ToolHandler {
         }
     }
 
-    /// Corps provisoire : rien n'est envoyé au module (le lot 4 le remplace).
+    /// La leçon de la photo : points validés avant tout envoi ; journal détaillé ; faits (corrections
+    /// nettes, première vue mesurée, prise de vue, indices) ; leçon rangée par le module (avec
+    /// points) ; remarques.
     func photoLesson(_ args: Arguments) throws -> JSONValue {
-        throw LightroomError.invalid("photo_lesson (Leçon de la photo) n'est pas encore dans cette construction du connecteur : rien n'a été rangé.")
+        if args.has("read_facts"), args.bool("read_facts") == nil {
+            throw LightroomError.invalid("« read_facts » : true ou false. Rien n'a été rangé.")
+        }
+        let lireFaits = args.bool("read_facts") == true
+        guard args.has("points") || lireFaits else {
+            throw LightroomError.invalid("photo_lesson : donner les trois points de la leçon (points), un par axe, light, color et composition : at_capture (ce qui l'aurait évité à la prise de vue, ou ce qui a marché), missing s'il manquait quelque chose, defects (les défauts nommés) ; ou read_facts = true pour les faits seuls. Rien n'a été rangé.")
+        }
+        guard !(args.has("points") && lireFaits) else {
+            throw LightroomError.invalid("read_facts = true donne les faits seuls, sans points ; pour ranger la leçon, points sans read_facts. Rien n'a été rangé.")
+        }
+        var photoDemandee: Int?
+        if args.has("photo_id") {
+            guard let id = args.int("photo_id") else {
+                throw LightroomError.invalid("« photo_id » : l'identifiant de la photo, un entier. Rien n'a été rangé.")
+            }
+            photoDemandee = id
+        }
+        // Les points d'abord : un refus n'envoie rien.
+        var points: [Lecon.Point]?
+        if !lireFaits {
+            guard let items = args.array("points") else {
+                throw LightroomError.invalid("« points » : une liste de trois points {axis, missing, at_capture, defects}. Rien n'a été rangé.")
+            }
+            points = try Lecon.points(items)
+        }
+
+        // Le journal détaillé de la photo : sa description (prise de vue comprise) et ses entrées.
+        var params: [String: JSONValue] = ["detaille": true]
+        if let photoDemandee { params["photos"] = [.number(Double(photoDemandee))] }
+        let journal = try lightroom.send("journal", params, timeout: Self.journalLeconTimeout)
+        guard let premiere = journal["photos"]?.array?.first, let description = premiere["photo"],
+              let id = description["id"]?.int else {
+            throw LightroomError.plugin("Le module n'a pas décrit la photo (journal) : rien n'a été rangé.")
+        }
+        let fichier = description["fichier"]?.string ?? "photo \(id)"
+        let corrections = Lecon.correctionsNettes(premiere["entrees"]?.array ?? [])
+        let depart = departDeLaSession(photo: id, fichier: fichier)
+        let indices = Lecon.indices(corrections: corrections, depart: depart)
+        let faits = Lecon.faits(photo: description, corrections: corrections, depart: depart, indices: indices)
+        let photo: JSONValue = ["id": .number(Double(id)), "fichier": .string(fichier)]
+        guard let points else {
+            return ["photo": photo, "faits": faits, "rangee": false]
+        }
+
+        // La leçon rangée par le module ; une erreur de ce seul envoi laisse la leçon non rangée.
+        var remarques = Lecon.remarques(points: points, indices: indices)
+        var lecon: [String: JSONValue] = ["photo": .number(Double(id)), "fichier": .string(fichier), "rangee": false, "remplacee": false]
+        do {
+            let rangement = try lightroom.send("lecon", ["action": "garder", "photo": .number(Double(id)),
+                                                         "lecon": Lecon.pourLeModule(points: points, indices: indices)],
+                                               timeout: Self.leconTimeout)
+            lecon["rangee"] = .bool(rangement["rangee"]?.bool ?? false)
+            lecon["remplacee"] = .bool(rangement["remplacee"]?.bool ?? false)
+            for cle in ["mois", "prise_le", "sans_date"] {
+                if let valeur = rangement[cle], !valeur.isNull { lecon[cle] = valeur }
+            }
+            if let remarque = rangement["remarque"]?.string, !remarque.isEmpty { remarques.append(remarque) }
+        } catch {
+            remarques.append(Self.remarqueLeconNonRangee(error))
+        }
+        return [
+            "lecon": .object(lecon),
+            "texte": .string(Lecon.texte(points: points, fichier: fichier)),
+            "faits": faits,
+            "remarques": .array(remarques.map(JSONValue.string)),
+        ]
+    }
+
+    /// Le départ de la leçon : la plus ancienne vue mesurée de la session pour cette photo, toutes
+    /// tailles d'aperçu confondues, du même fichier (un autre fichier sous le même identifiant est
+    /// une autre photo, d'un autre catalogue). Nil sans view_photo de cette photo dans ce processus.
+    func departDeLaSession(photo: Int, fichier: String) -> Bilan.Vue? {
+        vuesMesurees.filter { $0.key.photo == photo && $0.value.depart.fichier == fichier }
+            .map(\.value.depart)
+            .min { $0.quand < $1.quand }
+    }
+
+    /// La leçon n'a pas été rangée (la réponse et ses faits restent) : un module d'avant la 1.3,
+    /// sans la commande, demande de relancer Lightroom ; sinon, la raison.
+    static func remarqueLeconNonRangee(_ erreur: Error) -> String {
+        let message = erreur.localizedDescription
+        if message.contains("Commande inconnue") {
+            return "Leçon non rangée : le module de Lightroom chargé ne connaît pas encore la commande lecon (module d'avant la 1.3). Quitter puis relancer Lightroom après l'installation ; la leçon de cette réponse reste valable."
+        }
+        return "Leçon non rangée dans le carnet (carnet.json) : \(message)"
     }
 }
