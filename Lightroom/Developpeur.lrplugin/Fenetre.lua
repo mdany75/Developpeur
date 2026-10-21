@@ -512,6 +512,24 @@ end
 -- cadre de l'aperçu, et se refait à chaque ouverture (la photo a pu être retouchée).
 Fenetre.TAILLE_PHOTO_ACTIVE = 1024
 
+-- Le carré de mise au point sur la vignette de la photo active, pour un fichier Fujifilm (demandé
+-- par Dany le 20 octobre 2026) : le connecteur le lit dans l'original et le dessine
+-- (Images.marquerMiseAuPoint) ; rien pour une autre marque (son original n'est pas ouvert).
+function Fenetre.marquerMiseAuPoint(id, source)
+    local ok, d = LrTasks.pcall(function()
+        return require('Vignettes').decrireVignette(require('Photos').photoParId(id))
+    end)
+    if not ok or type(d) ~= 'table' then
+        return nil
+    end
+    local original = type(d.chemin_original) == 'string' and d.chemin_original or ''
+    local fujifilm = tostring(d.marque or ''):upper():find('FUJIFILM', 1, true) or original:lower():match('%.raf$')
+    if not fujifilm then
+        return nil
+    end
+    return Images.marquerMiseAuPoint(Chemins.prefs().cheminConnecteur, original, d.geometrie, source)
+end
+
 local function montrerActive(p, T, active, n)
     poser(p, 'peutPrecedente', n > 0)
     poser(p, 'peutSuivante', false)
@@ -532,12 +550,14 @@ local function montrerActive(p, T, active, n)
         local ok, chemin, dossier, fichier = LrTasks.pcall(function()
             -- Un dossier par vignette (Images.vignette garde ses réductions par nom de fichier).
             local d = LrPathUtils.child(LrPathUtils.child(Chemins.temporaire(), 'PhotoActive'), Conversation.identifiant())
-            local chemins, erreurs = require('Vignettes').demander({ active.id }, Fenetre.TAILLE_PHOTO_ACTIVE, d)
+            local Vignettes = require 'Vignettes'
+            local chemins, erreurs = Vignettes.demander({ active.id }, Fenetre.TAILLE_PHOTO_ACTIVE, d)
             local source = chemins[active.id]
             if not source then
                 Journal.noter("Aperçu de la photo active :", tostring(erreurs[active.id]))
                 return nil
             end
+            source = Fenetre.marquerMiseAuPoint(active.id, source) or source
             local d, f = LrPathUtils.parent(source), LrPathUtils.leafName(source)
             return Images.vignette(d, f, T.apercu, T.apercuHauteur or T.apercu), d, f
         end)
@@ -763,7 +783,10 @@ function Fenetre.rafraichirProposition()
     -- seule fois, pour ne pas reprendre la main à chaque rafraîchissement.
     if prop and prop.id ~= Fenetre.propositionVue then
         Fenetre.propositionVue = prop.id
-        Fenetre.choisirOnglet(Fenetre.T.ongletProposition)
+        -- Celle préparée à l'ouverture attend que Dany clique Proposition.
+        if not Fenetre.propositionAuto then
+            Fenetre.choisirOnglet(Fenetre.T.ongletProposition)
+        end
     end
     if not prop then
         Fenetre.montrerPage('proposition', "Aucune proposition en attente.\n\nEn mode « Proposer d'abord », Claude montre ici ce qu'il compte changer et attend votre accord.")
@@ -1244,11 +1267,29 @@ function Fenetre.texteJointes()
     return (n == 1 and "1 photo jointe : " or (n .. " photos jointes : ")) .. table.concat(noms, ", ")
 end
 
+-- À l'ouverture de la fenêtre (et quand le menu ou ⌃⌥C la rappelle), Claude prépare une proposition
+-- de retouche de la photo active, prête dans l'onglet Proposition (préférence
+-- `propositionAOuverture`, demandé par Dany le 20 octobre 2026) : seulement sur une conversation
+-- vide (une autre photo en commence une), Claude libre ; l'onglet ne bascule pas vers elle
+-- (Fenetre.propositionAuto, effacé par la demande suivante de Dany).
+function Fenetre.proposerAOuverture()
+    local c = Moteur.courante
+    local active = Fenetre.info and Fenetre.info.active
+    if not Fenetre.p or not active or Moteur.travaille or not Chemins.prefs().propositionAOuverture
+        or (c and #(c.elements or {}) > 0) then
+        return false
+    end
+    Fenetre.envoyer(Consignes.proposerOuverture)
+    Fenetre.propositionAuto = true
+    return true
+end
+
 function Fenetre.envoyer(texte, modele)
     local p = Fenetre.p
     if Moteur.travaille then
         return
     end
+    Fenetre.propositionAuto = false
     local jointes = Fenetre.jointes
     texte = Texte.nettoyer(texte)
     if texte == '' and #jointes == 0 then
@@ -1538,7 +1579,10 @@ function Fenetre.afficher()
             Fenetre.controle.toFront()
             -- Rouverte par le menu ou ⌃⌥C : l'aperçu remontre la photo active, refait.
             Fenetre.idActif, Fenetre.apercuActif = nil, nil
-            LrTasks.startAsyncTask(function() LrTasks.pcall(Fenetre.majPhoto) end)
+            LrTasks.startAsyncTask(function()
+                LrTasks.pcall(Fenetre.majPhoto)
+                LrTasks.pcall(Fenetre.proposerAOuverture)
+            end)
         end
         return
     end
@@ -1659,6 +1703,7 @@ function Fenetre.afficher()
         end
         Fenetre.rafraichir()
         Fenetre.majPhoto()
+        Fenetre.proposerAOuverture()
         Fenetre.rafraichirMode()
         Moteur.abonner('fenetre', function() Fenetre.aRafraichir = true end)
         Notation.abonner('fenetre', function() Fenetre.aRafraichirNotation = true end)

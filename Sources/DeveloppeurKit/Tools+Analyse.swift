@@ -24,7 +24,7 @@ extension ToolHandler {
                         "height": prop("number", "Hauteur (0 à 1)."),
                     ], required: ["x", "y", "width", "height"])),
                     ("compare", enumProp(["before_claude", "previous_step"], "Avant/après côte à côte : before_claude = l'état d'avant la première retouche de Claude ; previous_step = avant la dernière retouche. L'Historique de Lightroom garde deux étapes « Claude · comparaison » (l'état d'avant, puis l'état actuel remis) : la photo revient telle qu'elle était.")),
-                    ("af_point", prop("boolean", "true = le point de mise au point de l'appareil dessiné sur l'image : carré vert, rouge si l'appareil l'a signalé manqué (fichiers Fujifilm seulement). Pour noter. Sans lui, point_af le donne en chiffres (avec la netteté autour) ; l'utilisateur peut le vouloir dessiné en tout temps.")),
+                    ("af_point", prop("boolean", "true = le point de mise au point de l'appareil dessiné sur l'image ou le zoom (region) : carré vert, rouge si l'appareil l'a signalé manqué (fichiers Fujifilm seulement). Pour noter, ou montrer la mise au point. Sans lui, point_af le donne en chiffres (avec la netteté autour ; sur un zoom, dans_la_zone) ; l'utilisateur peut le vouloir dessiné en tout temps.")),
                  ],
                  required: []),
             tool("measure_angle",
@@ -84,8 +84,8 @@ extension ToolHandler {
             guard region == nil else { throw LightroomError.invalid("« compare » et « region » ne vont pas ensemble.") }
             params["comparer"] = .string(compare == "before_claude" ? "avantClaude" : "etapePrecedente")
         }
-        // Le point de mise au point, sur l'aperçu entier seulement.
-        if region == nil, compare == nil { params["point_af"] = true }
+        // Le point de mise au point, sur l'aperçu entier ou un zoom (pas un avant/après).
+        if compare == nil { params["point_af"] = true }
 
         let result = try lightroom.send("apercu", params, timeout: region == nil ? 120 : 240)
         var image = try Self.readPreview(result["chemin"]?.string)
@@ -121,6 +121,22 @@ extension ToolHandler {
                 detail?.zoom = true
                 info["mesures_zone"] = Self.merged(measures.json, detail?.json)
             }
+            // Sur un zoom aussi (demandé par Dany le 20 octobre 2026 : un zoom pour voir la mise au
+            // point ne la montrait pas) : le point dans l'image entière, et dans la zone s'il y tombe.
+            if let af = Self.pointAF(result["photo"], lecteur: lecteurAF) {
+                let local = CGPoint(x: (af.point.x - region.minX) / region.width, y: (af.point.y - region.minY) / region.height)
+                let dedans = (0...1).contains(local.x) && (0...1).contains(local.y)
+                var point = Self.pointAFJSON(af.point, avertissement: af.avertissement)
+                point["dans_la_zone"] = .bool(dedans)
+                if dedans, let decodee = PreviewImages.image(piece.data) {
+                    if let nettete = Detail.nettete(decodee, autour: local) { point["nettete"] = .number((nettete * 10).rounded() / 10) }
+                    if args.bool("af_point") == true || afToujours, let marquee = PreviewImages.marquerPoint(decodee, local, manque: af.avertissement) {
+                        image = marquee
+                        point["carre"] = .string(af.avertissement ? "rouge, sur le zoom" : "vert, sur le zoom")
+                    }
+                }
+                info["point_af"] = .object(point)
+            }
         } else if compare != nil {
             let before = try Self.readPreview(result["chemin_avant"]?.string)
             if let measures = Measurements.analyze(before) { info["mesures_avant"] = measures.json }
@@ -138,10 +154,8 @@ extension ToolHandler {
             // sur l'image avec af_point (pour noter) ou si l'utilisateur le veut en tout temps
             // (préférence du module). Les mesures sont prises avant le carré.
             if let af = Self.pointAF(result["photo"], lecteur: lecteurAF) {
-                let x = (Double(af.point.x) * 1000).rounded() / 1000, y = (Double(af.point.y) * 1000).rounded() / 1000
-                var point: [String: JSONValue] = ["x": .number(x), "y": .number(y)]
+                var point = Self.pointAFJSON(af.point, avertissement: af.avertissement)
                 if let nettete = Detail.nettete(decodee, autour: af.point) { point["nettete"] = .number((nettete * 10).rounded() / 10) }
-                if af.avertissement { point["appareil"] = "mise au point signalée manquée" }
                 if args.bool("af_point") == true || afToujours, let marquee = PreviewImages.marquerPoint(decodee, af.point, manque: af.avertissement) {
                     image = marquee
                     point["carre"] = .string(af.avertissement ? "rouge, sur l'image" : "vert, sur l'image")
@@ -150,6 +164,15 @@ extension ToolHandler {
             }
         }
         return ToolResult(content: [Self.imageContent(image), .text(JSONCoding.pretty(.object(info)))])
+    }
+
+    /// Le point de mise au point dans l'image affichée entière (de 0 à 1), et l'avertissement de
+    /// l'appareil.
+    static func pointAFJSON(_ point: CGPoint, avertissement: Bool) -> [String: JSONValue] {
+        var json: [String: JSONValue] = ["x": .number((Double(point.x) * 1000).rounded() / 1000),
+                                         "y": .number((Double(point.y) * 1000).rounded() / 1000)]
+        if avertissement { json["appareil"] = "mise au point signalée manquée" }
+        return json
     }
 
     /// Les clés de `extra` ajoutées à l'objet `base`.

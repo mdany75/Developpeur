@@ -218,11 +218,52 @@ final class AnalyseTests: XCTestCase {
         info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: [:]).text)
         XCTAssertNotNil(info["point_af"]?["carre"])
 
-        // Un zoom ou un avant/après ne le demande pas ; une autre marque n'ouvre pas l'original.
-        _ = tools.call(name: "view_photo", arguments: ["region": ["x": 0, "y": 0, "width": 0.5, "height": 0.5]])
+        // Un zoom aussi (demandé par Dany : un zoom pour voir la mise au point ne la montrait pas) :
+        // le point dans l'image entière, et le carré dans la zone quand il y tombe.
+        fake.onSend = { [unowned fake] command, _ in
+            if command == "apercu" { fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(image)), "photo": photo] }
+        }
+        let zoom = tools.call(name: "view_photo", arguments: ["af_point": true, "region": ["x": 0, "y": 0.25, "width": 0.5, "height": 0.5]])
+        XCTAssertEqual(fake.calls.last?.params["point_af"]?.bool, true)
+        info = try JSONCoding.parse(zoom.text)
+        XCTAssertEqual(info["point_af"]?["dans_la_zone"]?.bool, true)
+        XCTAssertEqual(info["point_af"]?["carre"]?.string, "vert, sur le zoom")
+        XCTAssertEqual(info["point_af"]?["x"]?.double, 0.25, "dans l'image entière")
+        let ailleurs = tools.call(name: "view_photo", arguments: ["af_point": true, "region": ["x": 0.6, "y": 0, "width": 0.4, "height": 0.4]])
+        info = try JSONCoding.parse(ailleurs.text)
+        XCTAssertEqual(info["point_af"]?["dans_la_zone"]?.bool, false)
+        XCTAssertNil(info["point_af"]?["carre"])
+        // Un avant/après ne le demande pas ; une autre marque n'ouvre pas l'original.
+        _ = tools.call(name: "view_photo", arguments: ["compare": "before_claude"])
         XCTAssertNil(fake.calls.last?.params["point_af"])
         XCTAssertNil(ToolHandler.pointAF(["marque": "Apple", "chemin_original": "/tmp/IMG.HEIC",
                                           "geometrie": ["largeur": 300, "hauteur": 200]], lecteur: tools.lecteurAF))
+    }
+
+    /// La fenêtre Claude (aperçu de la photo active) : `mcp-developpeur --marquer-af` dessine le
+    /// point sur la vignette rendue par Lightroom.
+    func testFocusPointDrawnOnAThumbnailForTheWindow() throws {
+        let dossier = FileManager.default.temporaryDirectory.appendingPathComponent("marquer-af-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dossier, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dossier) }
+        let entree = dossier.appendingPathComponent("vignette.jpg"), sortie = dossier.appendingPathComponent("vignette-af.jpg")
+        try Self.gradient().write(to: entree)
+        let lecteur = LecteurPointsAF(delai: 1) { _ in PointAF(x: 0.25, y: 0.5, avertissement: true, visages: nil) }
+        let point = PointAF.marquer(original: URL(fileURLWithPath: "/Volumes/Photos/DSCF0001.RAF"),
+                                    geometrie: ["largeur": 300, "hauteur": 200, "orientation": "AB"],
+                                    entree: entree, sortie: sortie, lecteur: lecteur)
+        XCTAssertEqual(point?.x, 0.25)
+        XCTAssertEqual(point?.avertissement, true)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sortie.path))
+        // Hors du cadre (recadrage) ou sans point : rien d'écrit.
+        let horsCadre = PointAF.marquer(original: URL(fileURLWithPath: "/Volumes/Photos/DSCF0001.RAF"),
+                                        geometrie: ["largeur": 300, "hauteur": 200, "orientation": "AB",
+                                                    "cadre": ["CropLeft": 0.5, "CropTop": 0, "CropRight": 1, "CropBottom": 1, "CropAngle": 0]],
+                                        entree: entree, sortie: dossier.appendingPathComponent("hors.jpg"), lecteur: lecteur)
+        XCTAssertNil(horsCadre)
+        XCTAssertNil(PointAF.marquer(original: URL(fileURLWithPath: "/tmp/absent.RAF"), geometrie: ["largeur": 300, "hauteur": 200],
+                                     entree: entree, sortie: dossier.appendingPathComponent("sans.jpg"),
+                                     lecteur: LecteurPointsAF(delai: 1) { _ in nil }))
     }
 
     static func pixelVert(_ image: CGImage, x: Int, y: Int) -> Bool {

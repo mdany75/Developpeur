@@ -108,6 +108,9 @@ Chemins.defauts = {
     -- Une autre photo active ou une autre sélection commence une nouvelle conversation
     -- (Fenetre.suivreSelection).
     nouvelleParPhoto = true,
+    -- À l'ouverture de la fenêtre, sur une conversation vide, Claude prépare une proposition de
+    -- retouche de la photo active, sans rien appliquer (Fenetre.proposerAOuverture).
+    propositionAOuverture = true,
     -- Style du menu Style (valeur de Consignes.styles), joint à chaque demande ; « standard »
     -- n'ajoute rien.
     styleChoisi = 'standard',

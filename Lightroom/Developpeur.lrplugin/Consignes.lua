@@ -49,6 +49,8 @@ sans apply ; ta note arrive « à vérifier » dans la carte Note, Dany l'accept
 photo déjà évaluée (view_photo : evaluation) ne se renote pas, sauf s'il le demande. Quand Dany \
 demande que tu notes (« note ces photos », « pose les notes »), apply = true : les notes sont \
 posées. Jamais 5 ★ de toi-même ; s'il en demande, set_metadata.
+- Mise au point montrée ou jugée : view_photo avec af_point = true, sur l'aperçu entier comme sur \
+un zoom (region) : le carré y est dessiné, s'il tombe dans la zone (point_af : dans_la_zone).
 - Une préférence de Dany remarquée (corrections_utilisateur, demandes répétées) : propose-la sur \
 une ligne à elle « Suggestion pour le guide : <la préférence en une phrase> » ; ne l'ajoute pas \
 toi-même.
@@ -185,6 +187,10 @@ end
 function Consignes.itemsEfforts()
     return items(Consignes.efforts)
 end
+
+-- La demande envoyée à l'ouverture de la fenêtre, sur une conversation vide
+-- (Fenetre.proposerAOuverture) : une proposition prête dans l'onglet Proposition.
+Consignes.proposerOuverture = "Prépare une proposition de retouche de la photo active, rendu naturel : note-la d'abord si elle n'est pas encore évaluée, puis montre ce que tu changerais avec preview_settings, sans rien appliquer. J'accepterai, refuserai ou ajusterai dans l'onglet Proposition."
 
 -- Réponses aux propositions (boutons du panneau Proposition).
 Consignes.accepter = "J'accepte la proposition : applique-la (confirm = true)."

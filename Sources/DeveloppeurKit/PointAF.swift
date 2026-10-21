@@ -70,6 +70,23 @@ public final class LecteurPointsAF {
 }
 
 public struct PointAF: Equatable {
+    /// Le point de mise au point de l'original dessiné sur une vignette de la photo (aperçu de la
+    /// photo active de la fenêtre Claude, `mcp-developpeur --marquer-af`) : `geometrie` comme la
+    /// décrit le module (Vignettes.decrireVignette : dimensions affichées, orientation, cadre), la
+    /// vignette dans l'image affichée et recadrée. Écrit `sortie` et rend le point (de 0 à 1 dans
+    /// l'image affichée), ou nil : pas un fichier Fujifilm, point illisible ou hors du cadre, original
+    /// qui ne s'ouvre pas à temps.
+    public static func marquer(original: URL, geometrie: JSONValue, entree: URL, sortie: URL,
+                               lecteur: LecteurPointsAF = LecteurPointsAF()) -> (x: Double, y: Double, avertissement: Bool)? {
+        guard let g = GeometriePhoto(geometrie), let af = lecteur.lire(original) else { return nil }
+        let point = g.versApercu(x: af.x, y: af.y)
+        guard (0...1).contains(point.x), (0...1).contains(point.y),
+              let donnees = try? Data(contentsOf: entree), let image = PreviewImages.image(donnees),
+              let marquee = PreviewImages.marquerPoint(image, point, manque: af.avertissement),
+              (try? marquee.write(to: sortie)) != nil else { return nil }
+        return (Double(point.x), Double(point.y), af.avertissement)
+    }
+
     /// Position dans le fichier entier, avant l'orientation, de 0 à 1.
     public var x: Double
     public var y: Double

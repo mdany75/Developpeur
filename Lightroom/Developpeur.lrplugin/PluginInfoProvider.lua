@@ -37,7 +37,7 @@ local function diagnostic()
             tostring(prefs.rejeteesProtegees), tostring(prefs.plafondPhotos), tostring(prefs.retourVisuel)) .. " ; point de mise au point en tout temps : " .. tostring(prefs.pointMiseAuPoint),
         string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s, effort %s ; disposition %s ; nouvelle conversation par photo : %s",
             tostring(prefs.cheminClaude), tostring(prefs.cheminConnecteur), tostring(prefs.modele), tostring(prefs.effort),
-            tostring(prefs.disposition), tostring(prefs.nouvelleParPhoto)),
+            tostring(prefs.disposition), tostring(prefs.nouvelleParPhoto)) .. " ; proposition à l'ouverture : " .. tostring(prefs.propositionAOuverture),
         "Journaux : " .. select(2, Liaison.cheminJournal()) .. " et " .. Chemins.journal(),
         "",
         "Derniers événements :",
@@ -221,6 +221,9 @@ local function sectionFenetre(f, prefs, ligne)
         ligne("Autre photo :",
             f:checkbox { value = bind 'nouvelleParPhoto',
                 title = "Nouvelle conversation pour une autre photo ou sélection" }),
+        ligne("À l'ouverture :",
+            f:checkbox { value = bind 'propositionAOuverture',
+                title = "Claude prépare une proposition de retouche (rien n'est appliqué)" }),
         ligne("Fermer Claude Code après :",
             f:popup_menu { value = bind 'inactivite', items = {
                 { title = "5 minutes sans demande", value = 5 },

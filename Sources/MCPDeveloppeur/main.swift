@@ -44,6 +44,9 @@ func usage() {
                 (deux rendus) : zones fiables, écarts moyen, maximal et près des bords, en pixels du fichier
             mcp-developpeur --dump [<id photo>]   tous les réglages bruts de la photo (active par défaut),
                 à plat, une clé par ligne et triés : à comparer avec diff avant et après un essai
+            mcp-developpeur --marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>
+                dessine le point de mise au point d'un fichier Fujifilm sur sa vignette (la fenêtre Claude,
+                aperçu de la photo active) ; code 1 sans point
             mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--original] [--images <dossier>]
                 recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
                 (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
@@ -174,6 +177,13 @@ case "--call":
         log("arguments JSON illisibles ou image non enregistrée : \(error.localizedDescription)")
         exit(2)
     }
+case "--marquer-af":
+    // L'aperçu de la photo active de la fenêtre Claude (Fenetre.lua) : le point de mise au point lu
+    // dans l'original, dessiné sur la vignette que Lightroom a rendue.
+    guard arguments.count == 5, let geometrie = try? JSONCoding.parse(arguments[2]) else { usage(); exit(2) }
+    guard let point = PointAF.marquer(original: URL(fileURLWithPath: arguments[1]), geometrie: geometrie,
+                                      entree: URL(fileURLWithPath: arguments[3]), sortie: URL(fileURLWithPath: arguments[4])) else { exit(1) }
+    print(line: JSONCoding.line(["x": .number(point.x), "y": .number(point.y), "avertissement": .bool(point.avertissement)]))
 case "--recalage":
     // Écarts du recalage (Recalage.swift) sur la géométrie actuelle d'une photo, pour essayer des
     // corrections (Upright, perspective forte) : l'historique garde les deux rendus du recalage.

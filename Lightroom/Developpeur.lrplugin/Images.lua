@@ -10,6 +10,7 @@ local Chemins = require 'Chemins'
 local Conversation = require 'Conversation'
 local Fichiers = require 'Fichiers'
 local Journal = require 'Journal'
+local Json = require 'Json'
 local Texte = require 'Texte'
 
 local Images = {}
@@ -105,6 +106,25 @@ function Images.dimensions(chemin)
 end
 
 -- La version à montrer en grand, qui tient dans largeur × hauteur : chemin, largeur, hauteur.
+-- Le point de mise au point d'un fichier Fujifilm dessiné sur sa vignette (l'aperçu de la photo
+-- active) par le connecteur, qui lit l'original (`mcp-developpeur --marquer-af`, temps borné) :
+-- `geometrie` comme la décrit Vignettes.decrireVignette. Rend le chemin de la vignette marquée
+-- (`<nom>-af.jpg` à côté), ou nil : autre marque, original introuvable, point hors du cadre,
+-- connecteur absent. Un échec n'est pas journalisé : sans point, l'aperçu reste sans carré.
+function Images.marquerMiseAuPoint(connecteur, original, geometrie, source)
+    if type(connecteur) ~= 'string' or connecteur == '' or not Fichiers.existe(connecteur)
+        or type(original) ~= 'string' or type(geometrie) ~= 'table' then
+        return nil
+    end
+    local sortie = LrPathUtils.child(LrPathUtils.parent(source), LrPathUtils.removeExtension(LrPathUtils.leafName(source)) .. '-af.jpg')
+    local commande = string.format('%s --marquer-af %s %s %s %s >/dev/null 2>&1', q(connecteur), q(original), q(Json.encode(geometrie)),
+        q(source), q(sortie))
+    if LrTasks.execute(commande) == 0 and Fichiers.existe(sortie) then
+        return sortie
+    end
+    return nil
+end
+
 function Images.grande(dossier, nom, largeurMax, hauteurMax)
     local source = LrPathUtils.child(dossier, nom)
     local l, h = Images.dimensions(source)

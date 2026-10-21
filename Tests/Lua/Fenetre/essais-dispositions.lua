@@ -141,6 +141,8 @@ end
 local Fenetre = require 'Fenetre'
 local Moteur = require 'Moteur'
 local prefs = Chemins.prefs()
+-- La proposition préparée à l'ouverture a son propre essai (plus bas) : ailleurs, Claude reste libre.
+prefs.propositionAOuverture = false
 
 local function photoActive(id, nom, note, pickStatus)
     local photo = S.photo(id, nom)
@@ -541,6 +543,50 @@ essai('Autre photo : la clé posée par Envoyer, une ancienne conversation conti
     end
     Fenetre.afficher()
     Moteur.envoyer = envoyer
+    S.pendantFenetre = nil
+end)
+
+essai('Ouverture : Claude prépare une proposition sur une conversation vide, sans basculer vers elle', function()
+    prefs.disposition, prefs.propositionAOuverture = 'conversation', true
+    photoActive(5101, 'DSCF5101.RAF', 0, 0)
+    local envoyer, envois = Moteur.envoyer, {}
+    Moteur.envoyer = function(texte)
+        envois[#envois + 1] = texte
+        Conversation.ajouterDemande(Moteur.courante, texte)
+        return true
+    end
+    Moteur.nouvelle()
+    S.pendantFenetre = function()
+        local p = Fenetre.p
+        -- La demande part dans une tâche, à l'ouverture, sur la conversation vide.
+        S.taches[#S.taches - 2]()
+        egal(1, #envois, "une demande à l'ouverture")
+        egal(Consignes.proposerOuverture, envois[1])
+        egal(true, Fenetre.propositionAuto)
+        -- La proposition arrive : elle attend dans l'onglet Proposition, la carte Note reste devant.
+        local c = Moteur.courante
+        c.elements[#c.elements + 1] = { genre = 'proposition', id = 'auto-1', etat = 'enAttente', texte = 'Ciel', changements = {} }
+        Fenetre.rafraichirProposition()
+        egal('notation', p.onglet, 'pas de bascule vers la proposition préparée')
+        egal(true, p.aProposition)
+        -- Une demande de Dany ensuite : les propositions suivantes se montrent de nouveau.
+        Fenetre.envoyer('Plus chaud')
+        egal(false, Fenetre.propositionAuto)
+        c.elements[#c.elements + 1] = { genre = 'proposition', id = 'auto-2', etat = 'enAttente', texte = 'Plus chaud', changements = {} }
+        c.elements[#c.elements - 1].etat = 'refusee'
+        Fenetre.rafraichirProposition()
+        egal('proposition', p.onglet)
+        -- Une conversation qui a déjà des messages : rien de plus à l'ouverture, ni sans la case.
+        local avant = #envois
+        egal(false, Fenetre.proposerAOuverture(), 'conversation non vide')
+        Moteur.nouvelle()
+        prefs.propositionAOuverture = false
+        egal(false, Fenetre.proposerAOuverture(), 'case décochée')
+        egal(avant, #envois)
+    end
+    Fenetre.afficher()
+    Moteur.envoyer = envoyer
+    prefs.propositionAOuverture = false
     S.pendantFenetre = nil
 end)
 

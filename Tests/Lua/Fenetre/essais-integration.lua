@@ -383,14 +383,31 @@ essai('Ouverture : l\'aperçu montre la photo active ; une image de Claude la re
     Moteur.courante = Conversation.nouvelle()
     ouvrirFenetre(function(p)
         egal('Photo active · DSCF2004', p.legendeApercu)
-        -- La vignette se prépare dans une tâche (rappel de Lightroom, puis sips).
+        -- La vignette se prépare dans une tâche (rappel de Lightroom, puis sips). Fichier Fujifilm :
+        -- le connecteur (ici un faux, qui recopie la vignette) y dessine le point de mise au point.
+        local Vignettes = require 'Vignettes'
+        local decrire = Vignettes.decrireVignette
+        Vignettes.decrireVignette = function(photo)
+            return { marque = 'FUJIFILM', chemin_original = '/Volumes/Photos/' .. photo.nom, geometrie = { largeur = 300, hauteur = 200 } }
+        end
+        local faux = S.home .. '/faux-connecteur.sh'
+        local fs = assert(io.open(faux, 'w'))
+        fs:write('#!/bin/sh\n[ "$1" = "--marquer-af" ] || exit 2\ncase "$2" in *.RAF) cp "$4" "$5" ;; *) exit 1 ;; esac\n')
+        fs:close()
+        S.executer('/bin/chmod +x ' .. S.q(faux))
+        local prefs = require('Chemins').prefs()
+        local connecteur = prefs.cheminConnecteur
+        prefs.cheminConnecteur = faux
         local avant = #S.taches
         Fenetre.idActif, Fenetre.demandeActive = nil, nil
         Fenetre.majPhoto()
         egal(avant + 1, #S.taches, 'vignette demandée dans une tâche')
         egal(false, p.aImage, 'pas encore de vignette')
         S.taches[#S.taches]()
+        Vignettes.decrireVignette = decrire
+        prefs.cheminConnecteur = connecteur
         egal(true, p.aImage, 'Agrandir actif')
+        vrai(Fenetre.apercuActif.fichier:find('%-af%.jpg$'), 'la vignette marquée par le connecteur : ' .. Fenetre.apercuActif.fichier)
         local l, h = Images.dimensions(p.imageApercu)
         egal(Fenetre.T.apercu, l, 'au cadre de l\'aperçu')
         egal(Fenetre.T.apercuHauteur or Fenetre.T.apercu, h)
