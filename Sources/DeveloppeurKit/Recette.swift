@@ -44,6 +44,10 @@ public final class Recette {
     let originaux: Bool
     let rapport: (Etape) -> Void
     public private(set) var etapes: [Etape] = []
+    /// L'écran du Mac, posé dans les outils le temps de l'étape « écran nommé ». Aucun par défaut,
+    /// comme ToolHandler.lireEcran : main.swift pose `Ecran.lire` pour `--recette`, les tests un
+    /// écran fabriqué (swift test ne lit jamais le vrai écran, même avec un vrai pont).
+    public var lireEcran: () -> Ecran.Etat? = { nil }
 
     public init(lightroom: LightroomServing, images: URL? = nil, originaux: Bool = false,
                 rapport: @escaping (Etape) -> Void = { _ in }) {
@@ -55,17 +59,90 @@ public final class Recette {
 
     public var reussie: Bool { !etapes.isEmpty && etapes.allSatisfy(\.reussie) }
 
-    /// Lance les séquences demandées : un RAW (obligatoire en pratique), un JPEG, et une photo au
-    /// flash avec des yeux rouges.
-    public func lancer(raw: Int?, jpeg: Int?, flash: Int?, profondeur: Int? = nil, yeuxRouges: Int? = nil, xt20: Int? = nil) {
+    /// Lance les séquences demandées : un RAW (obligatoire en pratique), un JPEG, une photo au flash
+    /// avec des yeux rouges, un portrait (la peau dosée) et une photo à deux lumières (l'éclairage
+    /// mixte nommé). Avec le vrai pont seulement (pas le faux module des tests, qui attendent la
+    /// liste exacte des étapes, et qui ne doivent jamais lire le vrai écran), d'abord la liaison
+    /// fermée et l'écran nommé.
+    public func lancer(raw: Int?, jpeg: Int?, flash: Int?, profondeur: Int? = nil, yeuxRouges: Int? = nil, xt20: Int? = nil,
+                       portrait: Int? = nil, mixte: Int? = nil) {
+        if let pont = tools.lightroom as? LightroomBridge {
+            sequenceLiaison(pont)
+            sequenceEcran()
+        }
         if let raw { sequence("RAW \(raw)", id: raw, corps: sequenceRAW) }
         if let jpeg { sequence("JPEG \(jpeg)", id: jpeg, corps: sequenceJPEG) }
         if let flash { sequence("flash \(flash)", id: flash, corps: sequenceFlash) }
         if let profondeur { try? sequenceProfondeur(profondeur, "profondeur \(profondeur)") }
         if let yeuxRouges { sequence("yeux rouges \(yeuxRouges)", id: yeuxRouges, corps: sequenceYeuxRouges) }
         if let xt20 { sequence("X-T20 \(xt20)", id: xt20, corps: sequenceXT20) }
+        if let portrait { sequence("portrait \(portrait)", id: portrait, corps: sequencePortrait) }
+        if let mixte { sequenceEclairage(mixte, unique: raw == mixte ? nil : raw) }
         if let raw, let jpeg { try? sequenceSerie(reference: raw, autre: jpeg) }
         if let raw, let flash { try? sequenceExpositions(reference: raw, autre: flash) }
+    }
+
+    // MARK: - Liaison et écran (vrai pont seulement)
+
+    /// Liaison fermée (1.2) : le module refuse une commande sans le jeton privé de la liaison, ou
+    /// avec un autre jeton, et laisse passer celui qu'il a écrit dans liaison.jeton (le pont de la
+    /// recette le relit). Lecture seule : la commande etat, jamais une écriture. Un module d'avant
+    /// la 1.2 ne dit pas liaison_fermee : rien d'autre n'est essayé.
+    func sequenceLiaison(_ pont: LightroomBridge) {
+        try? etape("liaison", "liaison fermée (jeton privé)") {
+            let (statut, _) = try appel("get_status", [:])
+            guard statut["liaison_fermee"]?.bool == true else {
+                throw Echec(description: "module d'avant la 1.2 (get_status ne dit pas liaison_fermee) : rien d'autre essayé")
+            }
+            // Ni le jeton ni son chemin ne partent chez Claude.
+            let texte = JSONCoding.line(statut)
+            try verifier(!texte.contains(JetonLiaison.nomFichier), "le chemin du jeton est dans get_status")
+            if let jeton = pont.fichierJeton.flatMap(JetonLiaison.lire) {
+                try verifier(!texte.contains(jeton), "le jeton est dans get_status")
+            }
+            // Le refus d'un pont vers le même module, sans jeton ou avec un autre ; nil s'il passe.
+            func refus(_ fichierJeton: URL?) -> String? {
+                let autre = LightroomBridge(host: pont.host, requestPort: pont.requestPort, replyPort: pont.replyPort, fichierJeton: fichierJeton)
+                defer { autre.disconnect() }
+                do {
+                    _ = try autre.send("etat", [:], timeout: 10)
+                    return nil
+                } catch {
+                    return error.localizedDescription
+                }
+            }
+            let sans = refus(nil)
+            try verifier(sans?.contains("Liaison fermée") == true, "commande sans jeton : \(sans ?? "acceptée")")
+            // Un autre jeton bien formé (64 zéros), dans un fichier temporaire effacé ensuite.
+            let faux = FileManager.default.temporaryDirectory.appendingPathComponent("recette-jeton-\(UUID().uuidString)")
+            try Data((String(repeating: "0", count: 64) + "\n").utf8).write(to: faux)
+            defer { try? FileManager.default.removeItem(at: faux) }
+            let autre = refus(faux)
+            try verifier(autre?.contains("Liaison fermée") == true, "commande avec un autre jeton : \(autre ?? "acceptée")")
+            _ = try appel("get_status", [:])
+            return "sans jeton et avec un autre jeton : refusées ; le jeton de la liaison passe"
+        }
+    }
+
+    /// Écran nommé (1.2) : get_status dit l'écran principal du Mac, sans le chemin de son profil.
+    /// La lecture de l'écran n'est posée dans les outils que le temps de l'étape : la remarque d'un
+    /// aperçu ne doit jamais s'ajouter aux view_photo de la recette (appel recolle les blocs de texte
+    /// avant de lire le JSON), et get_status la tient pour dite.
+    func sequenceEcran() {
+        try? etape("Mac", "écran nommé (get_status)") {
+            tools.lireEcran = lireEcran
+            defer { tools.lireEcran = { nil } }
+            let (statut, _) = try appel("get_status", [:])
+            guard let ecran = statut["ecran"], let principal = ecran["principal"] else {
+                throw Echec(description: "aucun écran lu (session sans écran ?)")
+            }
+            let classes = Ecran.Etalonnage.allCases.map(\.rawValue)
+            try verifier(principal["nom"]?.string?.isEmpty == false, "écran sans nom : \(JSONCoding.line(principal))")
+            try verifier(classes.contains(principal["etalonnage"]?.string ?? ""), "classe inconnue : \(JSONCoding.line(principal))")
+            try verifier(!JSONCoding.line(ecran).contains("\"chemin\""), "le chemin du profil est allé à Claude")
+            let autres = ecran["autres"]?.array?.count ?? 0
+            return (principal["texte"]?.string ?? "?") + (autres > 0 ? " ; \(autres) autre(s) écran(s)" : "")
+        }
     }
 
     // MARK: - Séquences
@@ -100,6 +177,7 @@ public final class Recette {
             try verifierEgal(try etat(id), balance)
             return "\(apres.profil.string ?? "?") posé et relu, puis annulé"
         }
+        try etapeIntention(id, photo)
         // Constaté en 2.3 : sous Camera ACROS, le mélangeur noir et blanc ne change rien (le profil
         // rend déjà du gris) ; le plan le dit en remarque.
         try etape(photo, "mélangeur sous ACROS") {
@@ -278,6 +356,7 @@ public final class Recette {
             if info["a_savoir"] != nil { detail += " ; masques IA pas encore calculés au moment du rendu" }
             return detail
         }
+        try etapeBilan(id, photo, attendu: auto)
         try etape(photo, "mesure d'angle") {
             let (info, _) = try appel("measure_angle", ["photo_id": .number(Double(id)), "x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5])
             try verifier(info["crop_angle"]?.double != nil, "pas d'angle proposé")
@@ -808,7 +887,8 @@ public final class Recette {
     }
 
     /// Version 1.9 : tri d'une séance sur les vignettes du cache, planche contact, suppression des
-    /// reflets, objet désigné par un rectangle, plage de couleurs, couleur ponctuelle d'un masque.
+    /// reflets, objet désigné par un rectangle, plage de couleurs, couleur ponctuelle d'un masque ;
+    /// 1.1 : la note proposée ; 1.2 : éclaircir et assombrir (sequenceTireur).
     func sequenceTri(_ id: Int, _ photo: String) throws {
         let photoID = JSONValue.number(Double(id))
         let depart = try etat(id)
@@ -905,6 +985,94 @@ public final class Recette {
             try verifier(partPonctuelle > 0.005, "la couleur ponctuelle n'a rien changé")
             return "plage de couleurs : \(Self.nombre(partCouleur * 100)) % des pixels assombris ; couleur ponctuelle : \(Self.nombre(partPonctuelle * 100)) % changés"
         }
+        try sequenceTireur(id, depart, photo)
+    }
+
+    /// 1.2, éclaircir et assombrir (méthode du tireur, Prompts.Tireur) : l'inversion du radial, puis
+    /// la forme des bords que Claude pose. Des propositions à 512 px, comparées à une proposition
+    /// presque neutre (même chemin de rendu : une vue se rend un peu autrement, et peut porter le
+    /// carré du point de mise au point). Rien n'est gardé.
+    func sequenceTireur(_ id: Int, _ depart: Etat, _ photo: String) throws {
+        let photoID = JSONValue.number(Double(id))
+        func proposition(_ masque: [String: JSONValue]) throws -> Data {
+            let (_, images) = try appel("add_mask", ["photo_ids": [photoID], "preview": true, "size": 512, "step_name": "recette",
+                                                     "masks": [.object(masque)]])
+            guard let image = images.first else { throw Echec(description: "aperçu de la proposition manquant") }
+            return image
+        }
+        let neutre: [String: JSONValue] = ["kind": "radial", "center_x": 0.5, "center_y": 0.5, "radius_x": 0.35, "radius_y": 0.35,
+                                           "feather": 0, "adjustments": ["Exposure": 0.01]]
+        // Constaté le 20 octobre 2026 (propositions à −2 IL, fondu 0, sur un portrait d'essai) : le
+        // radial inversé (Flipped avec MaskInverted) assombrit l'extérieur de l'ellipse et laisse le
+        // centre ; sans invert, l'inverse ; le linéaire, le côté de from seulement. Le fondu nul isole
+        // l'inversion du contour.
+        try etape(photo, "éclaircir et assombrir : radial inversé et dégradé linéaire (propositions)") {
+            let base = try proposition(neutre)
+            var radial = neutre
+            radial["adjustments"] = ["Exposure": -2]
+            var inverse = radial
+            inverse["invert"] = true
+            let a = try proposition(inverse), b = try proposition(radial)
+            let c = try proposition(["kind": "linear", "from_x": 0.5, "from_y": 0, "to_x": 0.5, "to_y": 0.5, "adjustments": ["Exposure": -2]])
+            try verifierEgal(try etat(id), depart)
+            let coins = [CGRect(x: 0, y: 0, width: 0.1, height: 0.1), CGRect(x: 0.9, y: 0, width: 0.1, height: 0.1),
+                         CGRect(x: 0, y: 0.9, width: 0.1, height: 0.1), CGRect(x: 0.9, y: 0.9, width: 0.1, height: 0.1)]
+            let milieu = CGRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2)
+            let haut = CGRect(x: 0.3, y: 0, width: 0.4, height: 0.1), bas = CGRect(x: 0.3, y: 0.9, width: 0.4, height: 0.1)
+            guard let la = Luminances(avant: base, apres: a), let lb = Luminances(avant: base, apres: b),
+                  let lc = Luminances(avant: base, apres: c) else { throw Echec(description: "aperçus illisibles ou de tailles différentes") }
+            func pct(_ part: Double?) -> String { part.map { "\(Self.nombre($0 * 100)) %" } ?? "—" }
+            // Un coin trop sombre (12 niveaux au plus) ne se mesure pas : les autres suffisent.
+            let coinsA = coins.compactMap(la.part), coinsB = coins.compactMap(lb.part)
+            try verifier(coinsA.count >= 2 && coinsB.count >= 2, "coins trop sombres pour mesurer")
+            let milieuA = la.part(milieu) ?? 0, milieuB = lb.part(milieu) ?? 0
+            let hautC = lc.part(haut) ?? 0, basC = lc.part(bas) ?? 0
+            try verifier(coinsA.allSatisfy { $0 > 0.5 } && milieuA < 0.05,
+                         "radial inversé : coins \(coinsA.map(pct).joined(separator: ", ")), milieu \(pct(milieuA)) (attendu : coins assombris, milieu intact)")
+            try verifier(coinsB.allSatisfy { $0 < 0.05 } && milieuB > 0.5,
+                         "radial : coins \(coinsB.map(pct).joined(separator: ", ")), milieu \(pct(milieuB)) (attendu : milieu assombri, coins intacts)")
+            try verifier(hautC > 0.5 && basC < 0.05, "linéaire : haut \(pct(hautC)), bas \(pct(basC)) (attendu : le haut seul)")
+            return "radial inversé : coins \(coinsA.map(pct).joined(separator: ", ")), milieu \(pct(milieuA)) ; sans invert : milieu \(pct(milieuB)) ; "
+                + "linéaire : haut \(pct(hautC)), bas \(pct(basC))"
+        }
+        // La forme des bords que les invites et add_mask donnent (Prompts.Tireur.forme), relevée le
+        // 20 octobre 2026 sur un paysage, radial centré : le centre jamais touché, une baisse qui monte
+        // sans marche vers les coins. Vérifiée ici telle que Claude la pose : au milieu de la zone
+        // d'intérêt de Vision, aux deux bornes de Prompts.Tireur.bords (−0,3 et −0,5 IL).
+        try etape(photo, "éclaircir et assombrir : forme des bords (radial inversé, propositions)") {
+            let (vue, _) = try appel("view_photo", ["photo_id": photoID, "size": 512])
+            let zone = Self.rectangle(vue["vision"]?["zone_d_interet"])
+            let centre = zone.map { CGPoint(x: $0.midX, y: $0.midY) } ?? CGPoint(x: 0.5, y: 0.5)
+            let rayon = Double(Prompts.Tireur.bordsRayon.replacingOccurrences(of: ",", with: ".")) ?? 0.7
+            let fondu = Double(Prompts.Tireur.bordsFondu) ?? 80
+            let base = try proposition(neutre)
+            var formes: [(Double, FormeBords)] = []
+            for dose in [-0.3, -0.5] {
+                let bords = try proposition(["kind": "radial", "center_x": .number(Double(centre.x)), "center_y": .number(Double(centre.y)),
+                                             "radius_x": .number(rayon), "radius_y": .number(rayon), "feather": .number(fondu), "invert": true,
+                                             "adjustments": ["Exposure": .number(dose)]])
+                guard let forme = Self.formeDesBords(avant: base, apres: bords, centre: centre) else {
+                    throw Echec(description: "aperçus illisibles ou de tailles différentes")
+                }
+                formes.append((dose, forme))
+            }
+            try verifierEgal(try etat(id), depart)
+            // En pour cent de luminance perdue (FormeBords).
+            let n = { (valeur: Double) in Self.nombre(valeur * 100) }
+            var mesures: [String] = []
+            for (dose, forme) in formes {
+                let mesure = "à \(Self.nombre(dose)) IL : centre \(n(forme.centre)) %, milieu des bords \(n(forme.bords)) %, coins \(n(forme.coins)) % "
+                    + "(le plus loin \(n(forme.coinLoin)) %) de luminance en moins ; plus forte marche \(n(forme.marche)) % ; "
+                    + "profil vers le coin le plus loin : \(forme.profil.map { n($0) }.joined(separator: " "))"
+                try verifier(forme.centre < FormeBords.centreMax, "centre touché : \(mesure)")
+                try verifier(forme.coinLoin >= FormeBords.coinMin, "bords à peine assombris : \(mesure)")
+                try verifier(!forme.enPlaque, "vignette en plaque (une marche fait l'essentiel de la baisse) : \(mesure)")
+                try verifier(!forme.enAnneau, "anneau (la baisse retombe avant le coin) : \(mesure)")
+                mesures.append(mesure)
+            }
+            return "rayon \(Prompts.Tireur.bordsRayon), fondu \(Prompts.Tireur.bordsFondu), centré sur \(zone == nil ? "le milieu (pas de zone d'intérêt)" : "la zone d'intérêt") "
+                + "(\(Self.nombre(Double(centre.x))) ; \(Self.nombre(Double(centre.y)))) ; " + mesures.joined(separator: " ; ")
+        }
     }
 
     /// Plage de profondeur, sur une copie virtuelle qui porte une carte de profondeur (photo
@@ -927,6 +1095,16 @@ public final class Recette {
         }
     }
 
+    /// Le plus grand écart de luminance (niveaux sur 255) entre deux rendus de même taille ; nil
+    /// s'ils ne se comparent pas. Deux rendus des mêmes réglages sont identiques au pixel près
+    /// (relevé le 20 octobre 2026), d'où `ecartIdentique` : 2 niveaux, pour l'arrondi du JPEG.
+    static func ecartMax(_ a: Data, _ b: Data) -> Double? {
+        guard let l = Luminances(avant: a, apres: b) else { return nil }
+        return Double(zip(l.avant, l.apres).map { abs($0 - $1) }.max() ?? 0)
+    }
+
+    static let ecartIdentique = 2.0
+
     /// Part des pixels dont la luminance change de plus de 12 niveaux entre deux aperçus de même taille.
     static func partChangee(_ a: Data, _ b: Data) -> Double {
         guard let ia = PreviewImages.image(a), let ib = PreviewImages.image(b), ia.width == ib.width, ia.height == ib.height,
@@ -934,6 +1112,208 @@ public final class Recette {
         var changes = 0
         for i in 0..<(w * h) where abs(la[i] - lb[i]) > 12 { changes += 1 }
         return Double(changes) / Double(w * h)
+    }
+
+    /// Les luminances (0 à 255) de deux rendus de même taille, pour lire zone par zone ce qu'un
+    /// masque a assombri. Une zone se donne en fractions de l'image, depuis le haut gauche.
+    struct Luminances {
+        let largeur: Int, hauteur: Int
+        let avant: [Float], apres: [Float]
+
+        /// nil : un rendu illisible, ou deux tailles différentes.
+        init?(avant: Data, apres: Data) {
+            guard let ia = PreviewImages.image(avant), let ib = PreviewImages.image(apres), ia.width == ib.width, ia.height == ib.height,
+                  let (w, h, la) = Detail.luminance(ia), let (_, _, lb) = Detail.luminance(ib) else { return nil }
+            largeur = w
+            hauteur = h
+            self.avant = la
+            self.apres = lb
+        }
+
+        /// Chaque pixel de la zone, bornée à l'image : sa luminance avant, puis après.
+        func parcourir(_ zone: CGRect, _ corps: (Float, Float) -> Void) {
+            let x0 = max(0, min(largeur, Int((Double(zone.minX) * Double(largeur)).rounded(.down))))
+            let x1 = max(0, min(largeur, Int((Double(zone.maxX) * Double(largeur)).rounded(.up))))
+            let y0 = max(0, min(hauteur, Int((Double(zone.minY) * Double(hauteur)).rounded(.down))))
+            let y1 = max(0, min(hauteur, Int((Double(zone.maxY) * Double(hauteur)).rounded(.up))))
+            guard x1 > x0, y1 > y0 else { return }
+            for y in y0..<y1 {
+                for x in x0..<x1 { corps(avant[y * largeur + x], apres[y * largeur + x]) }
+            }
+        }
+
+        /// Part des pixels assombris (après sous 0,8 fois avant, comme `bandeAssombrie`), sans ceux
+        /// d'avant à 12 niveaux ou moins ; nil s'il n'en reste aucun.
+        func part(_ zone: CGRect) -> Double? {
+            var comptes = 0, assombris = 0
+            parcourir(zone) { a, b in
+                guard a > 12 else { return }
+                comptes += 1
+                if b < a * 0.8 { assombris += 1 }
+            }
+            return comptes == 0 ? nil : Double(assombris) / Double(comptes)
+        }
+
+        /// Baisse relative moyenne de luminance : la part perdue (1 − après / avant ; 0,15 = 15 % de
+        /// moins), sans les pixels d'avant à 12 niveaux ou moins ; nil s'il n'en reste aucun. En part
+        /// et non en niveaux : à exposition égale, une zone sombre perd moins de niveaux qu'une claire
+        /// (relevé du 20 octobre 2026 : le creux du profil venait de la scène), et un coin sombre
+        /// passerait pour un anneau ou des bords à peine assombris.
+        func baisse(_ zone: CGRect) -> Double? {
+            var total = 0.0, comptes = 0
+            parcourir(zone) { a, b in
+                guard a > 12 else { return }
+                total += Double((a - b) / a)
+                comptes += 1
+            }
+            return comptes == 0 ? nil : total / Double(comptes)
+        }
+    }
+
+    /// Part des pixels d'une zone qu'un masque a assombris entre deux rendus de même taille (après
+    /// sous 0,8 fois avant ; les pixels d'avant à 12 niveaux ou moins ne comptent pas) ; 0 pour deux
+    /// tailles différentes, un rendu illisible ou une zone trop sombre.
+    static func partAssombrie(avant: Data, apres: Data, zone: CGRect) -> Double {
+        Luminances(avant: avant, apres: apres)?.part(zone) ?? 0
+    }
+
+    /// Ce qu'un radial inversé des bords fait à l'image, en baisse relative de luminance
+    /// (`Luminances.baisse`, de 0 à 1) : au centre du radial, au milieu des quatre bords, aux quatre
+    /// coins et au coin le plus loin du centre ; et le profil de la baisse du centre à ce coin.
+    /// Relevé le 20 octobre 2026 en niveaux (rayon 0,7, fondu 80, −0,5 IL, sur un paysage) : centre
+    /// 0, milieu des bords −16, coins −21 à −27, une baisse qui monte sans marche. Les seuils sont
+    /// provisoires, à relever par la recette sur un portrait et un intérieur.
+    struct FormeBords {
+        var centre: Double
+        var bords: Double
+        var coins: Double
+        var coinLoin: Double
+        /// Les segments mesurables seulement (un segment tout noir n'a pas de baisse lisible).
+        var profil: [Double]
+
+        /// La plus forte hausse de la baisse d'un pas du profil au suivant.
+        var marche: Double { zip(profil, profil.dropFirst()).map { $1 - $0 }.max() ?? 0 }
+        /// Une plaque sombre : une seule marche fait l'essentiel de la baisse au coin.
+        var enPlaque: Bool { coinLoin > 0 && marche > Self.marcheMax * coinLoin }
+        /// Un anneau : la baisse retombe avant le coin (une scène peut creuser le profil un peu).
+        var enAnneau: Bool {
+            guard let pic = profil.max(), pic > 0, let fin = profil.last else { return false }
+            return fin < Self.finMin * pic
+        }
+        static let marcheMax = 0.5, finMin = 0.6
+        /// Le centre reste intact (moins de 2 % de luminance perdue) ; le coin le plus loin en perd
+        /// au moins 5 % (−0,3 IL entier en ôte environ 9 % dans un JPEG sRGB).
+        static let centreMax = 0.02, coinMin = 0.05
+    }
+
+    /// La forme des bords entre deux rendus de même taille (`centre` : celui du radial, en fractions
+    /// de l'image) ; nil s'ils ne se comparent pas. Le profil : `segments` carrés de 4 % du cadre,
+    /// du centre au coin le plus loin.
+    static func formeDesBords(avant: Data, apres: Data, centre: CGPoint, segments: Int = 20) -> FormeBords? {
+        guard let l = Luminances(avant: avant, apres: apres) else { return nil }
+        let cote = 0.1
+        func carre(_ x: Double, _ y: Double, _ c: Double = cote) -> CGRect {
+            CGRect(x: min(max(x - c / 2, 0), 1 - c), y: min(max(y - c / 2, 0), 1 - c), width: c, height: c)
+        }
+        func moyenne(_ zones: [CGRect]) -> Double {
+            let baisses = zones.compactMap(l.baisse)
+            return baisses.isEmpty ? 0 : baisses.reduce(0, +) / Double(baisses.count)
+        }
+        let cx = Double(centre.x), cy = Double(centre.y)
+        let coins = [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]
+        let loin = coins.max { hypot($0.0 - cx, $0.1 - cy) < hypot($1.0 - cx, $1.1 - cy) } ?? (1, 1)
+        let profil = (0..<max(segments, 2)).compactMap { k -> Double? in
+            let t = (Double(k) + 0.5) / Double(max(segments, 2))
+            return l.baisse(carre(cx + (loin.0 - cx) * t, cy + (loin.1 - cy) * t, 0.04))
+        }
+        return FormeBords(centre: l.baisse(carre(cx, cy)) ?? 0,
+                          bords: moyenne([carre(0.5, 0), carre(0.5, 1), carre(0, 0.5), carre(1, 0.5)]),
+                          coins: moyenne(coins.map { carre($0.0, $0.1) }),
+                          coinLoin: l.baisse(carre(loin.0, loin.1)) ?? 0,
+                          profil: profil)
+    }
+
+    /// Un cadre de Vision en JSON ({x, y, width, height}, fractions depuis le haut gauche).
+    static func rectangle(_ json: JSONValue?) -> CGRect? {
+        guard let x = json?["x"]?.double, let y = json?["y"]?.double, let w = json?["width"]?.double, let h = json?["height"]?.double,
+              w > 0, h > 0 else { return nil }
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    /// Les écarts d'un bilan de view_photo en une ligne : « exposition 47,8 → 71,2 (+1,95 IL) ; … ».
+    static func resumeEcarts(_ ecarts: JSONValue?) -> String {
+        if let texte = ecarts?.string { return texte }
+        guard let objet = ecarts?.object, !objet.isEmpty else { return "aucun écart visible" }
+        return objet.keys.sorted().map { cle in
+            let ecart = objet[cle] ?? .null
+            var texte = "\(cle) \(ecart["avant"]?.double.map(nombre) ?? "?") → \(ecart["apres"]?.double.map(nombre) ?? "?")"
+            if let il = ecart["IL"]?.double { texte += " (\(il > 0 ? "+" : "")\(nombre(il)) IL)" }
+            for precision in ["canal", "lecture"] {
+                if let valeur = ecart[precision]?.string { texte += " (\(valeur))" }
+            }
+            return texte
+        }.joined(separator: " ; ")
+    }
+
+    /// La durée (en millisecondes) de la mesure de l'éclairage sur un aperçu, avec les visages et la
+    /// zone d'intérêt que donne Vision (`vision` de view_photo) ; nil sur un aperçu illisible.
+    static func dureeEclairage(_ data: Data, vision: JSONValue?) -> Double? {
+        guard let image = PreviewImages.image(data) else { return nil }
+        let visages = (vision?["visages"]?.array ?? []).compactMap { rectangle($0["cadre"]) }
+        let debut = Date()
+        guard Eclairage.mesurer(image, visages: visages, sujet: rectangle(vision?["zone_d_interet"])) != nil else { return nil }
+        return Date().timeIntervalSince(debut) * 1000
+    }
+
+    // MARK: - Vérifications sans Lightroom
+
+    /// La lecture du boîtier d'un fichier Fujifilm (RAF, ou JPEG de l'appareil), sans Lightroom
+    /// (`mcp-developpeur --boitier`), pour la comparer à exiftool : le point de mise au point (dans
+    /// le fichier entier, avant l'orientation), l'intention comme view_photo la donne (RAW d'après
+    /// l'extension .raf ; profil de Lightroom du catalogue, ou d'un Look installé sans restriction
+    /// d'appareil : le modèle n'est pas lu ici), et les valeurs lues, sous les noms d'exiftool. Une
+    /// seule ouverture, bornée (LecteurBoitier : 2 s). nil si rien n'est lu (autre marque, fichier
+    /// illisible, original qui ne s'ouvre pas à temps).
+    public static func lectureBoitier(_ fichier: URL, lecteur: LecteurBoitier = LecteurBoitier(),
+                                      looks: LookProfileLibrary = LookProfileLibrary()) -> JSONValue? {
+        guard let lecture = lecteur.lire(fichier), lecture.point != nil || lecture.intention != nil else { return nil }
+        var json: [String: JSONValue] = ["fichier": .string(fichier.lastPathComponent)]
+        if let point = lecture.point {
+            var af: [String: JSONValue] = ["x": .number((point.x * 1000).rounded() / 1000), "y": .number((point.y * 1000).rounded() / 1000),
+                                           "avertissement": .bool(point.avertissement)]
+            if let visages = point.visages { af["visages"] = .number(Double(visages)) }
+            json["point_af"] = .object(af)
+        }
+        if let intention = lecture.intention {
+            let raw = fichier.pathExtension.lowercased() == "raf"
+            let profil = raw ? intention.profilLightroom(marque: "FUJIFILM", modele: nil, looks: looks) : nil
+            json["intention_boitier"] = intention.json(raw: raw, profil: profil, profilActuel: nil)
+            json["valeurs_lues"] = valeursLues(intention)
+        }
+        return .object(json)
+    }
+
+    /// Les valeurs lues dans la MakerNote et l'Exif, sous les noms et numéros d'exiftool (tons en
+    /// crans de l'appareil, compensation en IL).
+    static func valeursLues(_ i: IntentionBoitier) -> JSONValue {
+        var valeurs: [String: JSONValue] = [:]
+        let entiers: [(String, Int?)] = [
+            ("FilmMode (0x1401)", i.simulation), ("Saturation (0x1003)", i.saturation),
+            ("DynamicRangeSetting (0x1402)", i.reglagePlage), ("DevelopmentDynamicRange (0x1403)", i.plageDeveloppement),
+            ("AutoDynamicRange (0x140b)", i.plageAuto), ("DRangePriority (0x1443)", i.priorite),
+            ("DRangePriorityAuto (0x1444)", i.prioriteAuto), ("DRangePriorityFixed (0x1445)", i.prioriteFixe),
+            ("WhiteBalance (0x1002)", i.balance), ("PictureMode (0x1031)", i.modeImage), ("SceneRecognition (0x1425)", i.scene),
+            ("ExposureProgram (0x8822)", i.programme),
+        ]
+        for (nom, valeur) in entiers {
+            if let valeur { valeurs[nom] = .number(Double(valeur)) }
+        }
+        let reels: [(String, Double?)] = [("HighlightTone (0x1041, crans)", i.tonsClairs), ("ShadowTone (0x1040, crans)", i.tonsFonces),
+                                          ("ExposureCompensation (0x9204, IL)", i.compensation)]
+        for (nom, valeur) in reels {
+            if let valeur { valeurs[nom] = .number((valeur * 1000).rounded() / 1000) }
+        }
+        return .object(valeurs)
     }
 
     /// Bibliothèque : collection de recette, classement, recherche critère par critère, annulations.
@@ -1233,6 +1613,7 @@ public final class Recette {
             return String(format: "point %.2f × %.2f, carré %@ ; évaluation : %@", x, y, point["carre"]?.string ?? "?",
                           info["evaluation"]?.string ?? "?")
         }
+        try etapeIntention(id, photo)
         try etape(photo, "ETERNA refusé, profil d'avant remis") {
             let (reponse, _) = try appel("apply_settings", ["photo_ids": [photoID], "profile": "Camera ETERNA/Cinema", "step_name": "recette",
                                                             "confirm": true, "reason": "Recette automatisée du module."])
@@ -1241,6 +1622,243 @@ public final class Recette {
             try verifierEgal(try etat(id), depart)
             try verifier(remarques.contains { $0.contains("non disponible pour cet appareil") }, "remarques : \(remarques.joined(separator: " ; "))")
             return "refusé (Lightroom le rendrait comme Adobe Standard), dit en remarque"
+        }
+    }
+
+    /// 1.2 : le bilan de view_photo d'une passe à l'autre, sur une photo dans l'état `attendu`.
+    /// Relevé le 20 octobre 2026 sur les 8 copies « Essai » : deux vues de suite à la même taille
+    /// donnent les mêmes mesures (plancher nul) ; une proposition se rend un peu autrement qu'une vue
+    /// (jusqu'à 0,9 point d'écrêtage) : le bilan ne compare jamais l'une à l'autre. Une étape écrite
+    /// fait apparaître son écart, l'annulation le défait. Netteté et bruit, dits ici, relèvent leurs
+    /// seuils (encore provisoires) sur un vrai RAW ; les deux vues sont gardées (--images).
+    func etapeBilan(_ id: Int, _ photo: String, attendu: Etat) throws {
+        let photoID = JSONValue.number(Double(id))
+        try etape(photo, "bilan chiffré d'une passe à l'autre (view_photo), puis annulé") {
+            func bilan() throws -> JSONValue { try appel("view_photo", ["photo_id": photoID, "size": 1024]).0["bilan"] ?? .null }
+            let (premiere, avant) = try appel("view_photo", ["photo_id": photoID, "size": 1024])
+            if let image = avant.first { garder(image, "recette-bilan-avant.jpg") }
+            var seconde = try bilan()
+            // La photo porte des masques IA (étapes précédentes) : un calcul fini entre les deux rendus
+            // change l'image (a_savoir à la première vue). Une vue de plus, alors seulement.
+            if seconde["meme_etat"] == nil, premiere["a_savoir"] != nil { seconde = try bilan() }
+            try verifier(seconde["meme_etat"] != nil, "deux vues de suite à 1024 px diffèrent : \(JSONCoding.line(seconde))")
+            // L'empreinte des retouches à la main suppose que le module relit les mêmes valeurs dans
+            // le même ordre : sans retouche, elle ne bouge pas d'une vue à l'autre.
+            try verifier(seconde["corrections_utilisateur"] == nil, "retouche à la main vue entre deux vues identiques : \(JSONCoding.line(seconde))")
+            let (proposition, _) = try appel("preview_settings", ["photo_id": photoID, "step_name": "recette : essai",
+                                                                   "settings": ["Exposure2012": 1], "relative": true])
+            try verifier(proposition["bilan"] == nil, "bilan d'une proposition sans compare : \(JSONCoding.line(proposition["bilan"] ?? .null))")
+            let apresProposition = try bilan()
+            try verifier(apresProposition["meme_etat"] != nil && apresProposition["corrections_utilisateur"] == nil,
+                         "la vue qui suit une proposition l'a comparée : \(JSONCoding.line(apresProposition))")
+            try ecrire("apply_settings", id, ["settings": ["Exposure2012": 2, "Whites2012": 50], "relative": true])
+            let (vue, images) = try appel("view_photo", ["photo_id": photoID, "size": 1024])
+            if let image = images.first { garder(image, "recette-bilan-apres.jpg") }
+            let ecrite = vue["bilan"] ?? .null
+            _ = try appel("undo_last", ["photo_ids": [photoID]])
+            let defaite = try bilan()
+            try verifierEgal(try etat(id), attendu)
+            let il = ecrite["ecarts"]?["exposition"]?["IL"]?.double
+            try verifier((il ?? 0) >= 0.5, "exposition \(il.map(Self.nombre) ?? "absente") IL au lieu de +0,5 au moins : \(JSONCoding.line(ecrite))")
+            try verifier(ecrite["etapes_claude"]?.string?.hasPrefix("1 de plus") == true,
+                         "étapes de Claude après l'écriture : \(ecrite["etapes_claude"].map(JSONCoding.line) ?? "absentes")")
+            try verifier(defaite["etapes_claude"]?.string?.hasPrefix("1 de moins") == true,
+                         "étapes de Claude après l'annulation : \(defaite["etapes_claude"].map(JSONCoding.line) ?? "absentes")")
+            try verifier(defaite["regression"] == nil, "« regression » après l'annulation : \(JSONCoding.line(defaite["regression"] ?? .null))")
+            // Une régression de l'écrêtage dépend de la photo : dite, pas exigée.
+            let regressions = (ecrite["regression"]?.array ?? []).compactMap(\.string)
+            return "deux vues identiques (meme_etat), la proposition ignorée ; +2 IL et Whites +50 : \(Self.resumeEcarts(ecrite["ecarts"]))"
+                + (regressions.isEmpty ? " ; aucune regression" : " ; regression : " + regressions.joined(separator: " ; "))
+                + " ; annulé : 1 de moins, sans regression"
+        }
+    }
+
+    /// 1.2 : l'intention de la prise de vue, lue dans l'original Fujifilm (view_photo, aperçu
+    /// entier : intention_boitier). Recoupé le 20 octobre 2026 sur de vrais RAF (X-H2S, X-T4,
+    /// X-T20), MakerNote lue à la main : simulation, plage dynamique, tons, mode. view_photo ne fait
+    /// qu'un rendu : la photo ne change pas, et le chemin de l'original ne va pas à Claude.
+    func etapeIntention(_ id: Int, _ photo: String) throws {
+        let photoID = JSONValue.number(Double(id))
+        try etape(photo, "intention lue au boîtier (view_photo, intention_boitier)") {
+            let avant = try etat(id)
+            let (info, _) = try appel("view_photo", ["photo_id": photoID, "size": 1024])
+            try verifierEgal(try etat(id), avant)
+            try verifier(info["photo"]?["chemin_original"] == nil, "le chemin de l'original est allé à Claude")
+            let marque = info["appareil"]?["marque"]?.string
+            guard marque?.uppercased().contains("FUJIFILM") == true else {
+                return "sautée : pas un fichier Fujifilm (\(marque ?? "marque inconnue"))"
+            }
+            guard let intention = info["intention_boitier"] else {
+                return "rien de lu : original absent, ou pas ouvert dans les 2 s (autorisation de macOS ?)"
+            }
+            let simulation = intention["simulation"]?.string ?? ""
+            let lecture = (intention["lecture"]?.array ?? []).compactMap(\.string)
+            try verifier(!simulation.isEmpty, "simulation non lue : \(JSONCoding.line(intention))")
+            try verifier(!lecture.isEmpty, "aucune lecture : \(JSONCoding.line(intention))")
+            let lus = ["profil", "plage_dynamique", "priorite_plage_dynamique", "couleur", "tons_clairs", "tons_fonces", "compensation",
+                       "mode", "balance", "scene"].compactMap { cle in intention[cle].map { "\(cle) \($0.string ?? JSONCoding.line($0))" } }
+            return "simulation \(simulation)" + (lus.isEmpty ? "" : ", " + lus.joined(separator: ", "))
+                + " ; \(lecture.count) phrase(s) de lecture"
+        }
+    }
+
+    /// 1.2 : la peau dosée comme Adobe (Peau.swift), sur un portrait d'essai : trois doses en
+    /// propositions, avec le détail gardé au milieu des joues ; l'intensité d'un masque, linéaire
+    /// (constaté le 20 octobre 2026 au pixel près : amount 50 rend comme la moitié des curseurs) ;
+    /// une dose trop forte refusée sans smoothing_requested ; enfin la dose par défaut posée, relue,
+    /// puis annulée.
+    func sequencePortrait(_ id: Int, _ depart: Etat, _ photo: String) throws {
+        let photoID = JSONValue.number(Double(id))
+        var visage = CGRect.zero
+        try etape(photo, "visages vus par Vision (view_photo)") {
+            let (info, _) = try appel("view_photo", ["photo_id": photoID, "size": 1344])
+            let cadres = (info["vision"]?["visages"]?.array ?? []).compactMap { Self.rectangle($0["cadre"]) }
+            guard let plusGrand = cadres.max(by: { $0.width * $0.height < $1.width * $1.height }) else {
+                throw Echec(description: "Vision ne voit aucun visage : choisir un portrait (--portrait)")
+            }
+            visage = plusGrand
+            return "\(cadres.count) visage(s) ; le plus grand fait \(Self.nombre(Double(plusGrand.width) * 100)) % de la largeur"
+        }
+        try sequencePeau(id, depart, photo, visage: visage)
+    }
+
+    /// La peau dosée sur le visage que Vision a vu (`visage`, en fractions de l'image) : les doses
+    /// en propositions, l'intensité, le refus, puis la dose par défaut posée et annulée.
+    func sequencePeau(_ id: Int, _ depart: Etat, _ photo: String, visage: CGRect) throws {
+        let photoID = JSONValue.number(Double(id))
+        let peau: [String: JSONValue] = ["kind": "person_part", "part": "face_skin"]
+        func masque(_ reste: [String: JSONValue]) -> JSONValue { .object(peau.merging(reste) { $1 }) }
+        func proposition(_ reste: [String: JSONValue]) throws -> Data {
+            let (_, images) = try appel("add_mask", ["photo_ids": [photoID], "preview": true, "size": 1344, "step_name": "recette",
+                                                     "masks": [masque(reste)]])
+            guard let image = images.first else { throw Echec(description: "aperçu de la proposition manquant") }
+            return image
+        }
+        let forteInstallee = tools.localEffects.effect(named: "Soften Skin") != nil
+        // Le milieu des joues : le centre du visage, descendu de 15 % de sa hauteur ; une zone de la
+        // moitié de sa largeur.
+        func detailDesJoues(_ data: Data) -> Double? {
+            guard let image = PreviewImages.image(data) else { return nil }
+            let point = CGPoint(x: visage.midX, y: min(visage.midY + 0.15 * visage.height, 1))
+            let cote = Double(visage.width) * Double(image.width) * 0.5 / Double(min(image.width, image.height))
+            return Detail.nettete(image, autour: point, cote: cote)
+        }
+        // Les rendus de chaque effet à pleine dose : le témoin de l'intensité.
+        var pleines: [String: Data] = [:]
+        try etape(photo, "peau : trois doses en propositions, détail des joues mesuré") {
+            // Le point de comparaison : une proposition presque neutre sur la même peau.
+            let base = try proposition(["adjustments": ["Exposure": 0.01]])
+            var doses: [(String, [String: JSONValue])] = [("Peau du visage lisse", ["effect": "Peau du visage lisse"]),
+                                                          ("Adoucir la peau (Lite)", ["effect": "Soften Skin (Lite)"])]
+            if forteInstallee { doses.append(("Adoucir la peau, demandé", ["effect": "Soften Skin", "smoothing_requested": true])) }
+            guard let detailBase = detailDesJoues(base), detailBase > 0 else { throw Echec(description: "détail des joues illisible sur l'aperçu") }
+            var gardes: [(String, Double, Double)] = []
+            for (nom, reste) in doses {
+                let image = try proposition(reste)
+                if let effet = reste["effect"]?.string { pleines[effet] = image }
+                guard let detail = detailDesJoues(image) else { throw Echec(description: "\(nom) : détail des joues illisible") }
+                gardes.append((nom, detail / detailBase, Self.partChangee(base, image)))
+            }
+            try verifierEgal(try etat(id), depart)
+            let textes = gardes.map { "\($0.0) : \(Self.nombre($0.1 * 100)) % du détail gardé, \(Self.nombre($0.2 * 100)) % des pixels changés" }
+            // La dose la plus forte doit toucher la peau : sinon Lightroom ne l'a pas reconnue.
+            try verifier((gardes.last?.1 ?? 1) < 1, "rien de lissé (Lightroom ne reconnaît pas la peau ?) : \(textes.joined(separator: " ; "))")
+            return textes.joined(separator: " ; ") + (forteInstallee ? "" : " ; « Adoucir la peau » absent de ce Mac")
+        }
+        try etape(photo, "intensité d'un masque : amount \(Peau.nombre(Peau.intensiteReduite)) = la moitié de la dose (propositions)") {
+            // Au pixel près, et non par partChangee : un lissage fin change peu de pixels de plus de
+            // 12 niveaux (relevé le 20 octobre 2026 : dose entière contre moitié, 7 niveaux au plus),
+            // et l'étape passerait même si Lightroom ignorait l'intensité. La dose entière sert de
+            // témoin : elle doit se distinguer de la moitié, sinon il n'y a rien à juger.
+            let part = Peau.intensiteReduite / 100
+            var ecarts: [String] = []
+            for (effet, dose) in [("Peau du visage lisse", Peau.parDefaut), ("Soften Skin (Lite)", Peau.lite)] {
+                let reduit = try proposition(["effect": .string(effet), "amount": .number(Peau.intensiteReduite)])
+                let curseurs = try proposition(["adjustments": ["Texture": .number(dose.texture * part), "Clarity": .number(dose.clarte * part)]])
+                guard let plein = pleines[effet], let ecart = Self.ecartMax(reduit, curseurs), let temoin = Self.ecartMax(reduit, plein) else {
+                    throw Echec(description: "« \(effet) » : aperçus illisibles ou de tailles différentes")
+                }
+                try verifier(ecart <= Self.ecartIdentique, "« \(effet) » à amount \(Peau.nombre(Peau.intensiteReduite)) contre la moitié de ses curseurs : "
+                             + "jusqu'à \(Self.nombre(ecart)) niveaux d'écart (\(Self.nombre(Self.ecartIdentique)) au plus)")
+                try verifier(temoin > Self.ecartIdentique + 1, "« \(effet) » : la dose entière et la moitié ne se distinguent pas sur cette photo "
+                             + "(\(Self.nombre(temoin)) niveaux d'écart au plus) : rien à juger")
+                ecarts.append("« \(effet) » : \(Self.nombre(ecart)) niveau(x) d'écart au plus avec la moitié des curseurs, \(Self.nombre(temoin)) avec la dose entière")
+            }
+            try verifierEgal(try etat(id), depart)
+            return ecarts.joined(separator: " ; ")
+        }
+        try etape(photo, "peau trop lissée refusée sans smoothing_requested, rien d'écrit") {
+            // « Adoucir la peau » (clarté −100), ou des curseurs au-delà de la dose Lite.
+            let forte: [String: JSONValue] = forteInstallee ? ["effect": "Soften Skin"] : ["adjustments": ["Texture": -50, "Clarity": -30]]
+            let refus = tools.call(name: "add_mask", arguments: ["photo_ids": [photoID], "masks": [masque(forte)], "step_name": "recette",
+                                                                 "confirm": true, "reason": "Recette automatisée du module."])
+            try verifier(refus.isError && refus.text.contains("smoothing_requested"), "pas refusée : \(refus.text)")
+            try verifierEgal(try etat(id), depart)
+            return forteInstallee ? "« Adoucir la peau » refusé" : "texture −50, clarté −30 refusées"
+        }
+        try etape(photo, "dose par défaut posée à amount \(Peau.nombre(Peau.intensiteReduite)), relue, annulée") {
+            try ecrire("add_mask", id, ["masks": [masque(["effect": "Peau du visage lisse", "amount": .number(Peau.intensiteReduite)])]])
+            func derniere() throws -> JSONValue? {
+                try appel("get_settings", ["photo_id": photoID, "all_keys": true]).0["tous_les_reglages"]?["MaskGroupBasedCorrections"]?.array?.last
+            }
+            var correction = try derniere()
+            var calcul = "calculée dès la retouche"
+            if correction?["CorrectionMasks"]?.array?.first?["MaskDigest"]?.string == nil {
+                _ = try appel("view_photo", ["photo_id": photoID, "size": 512])
+                correction = try derniere()
+                calcul = "calculée avant le rendu"
+            }
+            _ = try appel("undo_last", ["photo_ids": [photoID]])
+            try verifierEgal(try etat(id), depart)
+            let zone = correction?["CorrectionMasks"]?.array?.first
+            func proche(_ cle: String, _ attendu: Double) -> Bool { correction?[cle]?.double.map { abs($0 - attendu) < 0.001 } == true }
+            try verifier(correction?["CorrectionName"]?.string?.contains("Peau du visage lisse") == true, "nom relu : \(correction?["CorrectionName"].map(JSONCoding.line) ?? "absent")")
+            try verifier(proche("CorrectionAmount", Peau.intensiteReduite / 100) && proche("LocalTexture", Peau.parDefaut.texture / 100)
+                         && proche("LocalClarity2012", Peau.parDefaut.clarte / 100),
+                         "intensité et curseurs relus : \(correction.map(JSONCoding.line) ?? "absents")")
+            try verifier(zone?["MaskSubType"]?.double == 3 && zone?["MaskSubCategoryID"]?.double == 2,
+                         "pas la peau du visage : \(zone.map(JSONCoding.line) ?? "aucun masque")")
+            try verifier(zone?["MaskDigest"]?.string != nil, "peau pas calculée par Lightroom : \(zone.map(JSONCoding.line) ?? "aucun masque")")
+            return "CorrectionAmount \(Peau.nombre(Peau.intensiteReduite / 100)), texture et clarté relues, peau du visage \(calcul) ; annulée"
+        }
+    }
+
+    /// 1.2 : l'éclairage mixte nommé par view_photo (mesures › eclairage), sur une photo que Dany
+    /// désigne comme éclairée par deux lumières (--mixte : lampe et fenêtre) ; puis, en témoin, le
+    /// RAW de la recette (`unique`, une autre photo) lu à une seule lumière. Lecture seule.
+    /// Relevé le 20 octobre 2026 sur les 8 copies « Essai » : à la balance de la photo, seul le
+    /// portrait (fenêtres et éclairage chaud) se lit mixte, ses 9 cases lues ; mesure en 85 à 110 ms.
+    func sequenceEclairage(_ id: Int, unique: Int? = nil) {
+        /// L'éclairage d'une copie d'essai par view_photo, la photo inchangée ; avec la durée de la
+        /// mesure, refaite sur l'aperçu rendu (visages et zone d'intérêt de Vision, comme view_photo).
+        /// Dans l'étape : une photo introuvable est un échec noté, pas une séquence muette.
+        func lire(_ id: Int) throws -> (eclairage: JSONValue, duree: Double?) {
+            let depart = try etat(id)
+            try verifier(depart.copieVirtuelle == true || originaux, "c'est un original : la recette n'y touche qu'avec l'option --original")
+            let (info, images) = try appel("view_photo", ["photo_id": .number(Double(id))])
+            try verifierEgal(try etat(id), depart)
+            guard let eclairage = info["mesures"]?["eclairage"] else { throw Echec(description: "pas de mesure de l'éclairage") }
+            return (eclairage, images.first.flatMap { Self.dureeEclairage($0, vision: info["vision"]) })
+        }
+        func ms(_ duree: Double?) -> String { duree.map { "\(Int($0.rounded())) ms" } ?? "?" }
+        try? etape("éclairage \(id)", "éclairage mixte nommé (view_photo)") {
+            let (eclairage, duree) = try lire(id)
+            let lecture = eclairage["lecture"]?.string ?? "?"
+            try verifier(eclairage["mixte"]?.bool == true && lecture.hasPrefix("éclairage mixte"), "pas lu comme un éclairage mixte : \(lecture)")
+            let grille = (eclairage["regions_3x3"]?.array ?? []).flatMap { $0.array ?? [] }
+            try verifier(grille.count == 9 && eclairage["conseil"]?.string != nil, "grille ou conseil absents : \(JSONCoding.line(eclairage))")
+            let lues = grille.filter { !$0.isNull }.count
+            let balance = eclairage["balance_proposee"].map { " ; balance proposée : Temperature \($0["Temperature"].map(JSONCoding.line) ?? "?"), Tint \($0["Tint"].map(JSONCoding.line) ?? "?")" } ?? ""
+            return "\(lecture) ; \(lues)/9 cases lues ; mesure en \(ms(duree))\(balance)"
+        }
+        guard let unique else { return }
+        try? etape("éclairage \(unique)", "une seule lumière, en témoin (view_photo)") {
+            let (eclairage, duree) = try lire(unique)
+            let lecture = eclairage["lecture"]?.string ?? "?"
+            try verifier(eclairage["mixte"]?.bool == false && !lecture.hasPrefix("éclairage mixte"),
+                         "lu comme un éclairage mixte (une seule lumière attendue sur le RAW de la recette) : \(lecture)")
+            let ecart = eclairage["ecart_regions"]?.double.map { " ; écart entre régions \(Self.nombre($0))" } ?? ""
+            return "\(lecture)\(ecart) ; mesure en \(ms(duree))"
         }
     }
 

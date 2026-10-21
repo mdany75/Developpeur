@@ -633,4 +633,432 @@ final class AnalyseTests: XCTestCase {
         let write = fake.calls.first { $0.command == "appliquer" }
         XCTAssertEqual(write?.params["confirme"]?.bool, true)
     }
+
+    // MARK: Recette de la 1.2
+
+    /// Éclaircir et assombrir : la part des pixels assombris par zone, entre deux rendus.
+    func testRecetteMeasuresDarkenedCornersAndCentre() throws {
+        func image(coins: UInt8?, fond: UInt8 = 150) -> Data {
+            let width = 200, height = 100
+            var pixels = [UInt8](repeating: 255, count: width * height * 4)
+            for y in 0..<height {
+                for x in 0..<width {
+                    let coin = (x < 20 || x >= 180) && (y < 10 || y >= 90)
+                    let v = coin ? (coins ?? fond) : fond
+                    for c in 0..<3 { pixels[(y * width + x) * 4 + c] = v }
+                }
+            }
+            return TriTests.encode(pixels, width: width, height: height)
+        }
+        let gris = image(coins: nil), sombres = image(coins: 60)
+        let coin = CGRect(x: 0, y: 0, width: 0.1, height: 0.1), autreCoin = CGRect(x: 0.9, y: 0.9, width: 0.1, height: 0.1)
+        let milieu = CGRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2)
+        XCTAssertEqual(Recette.partAssombrie(avant: gris, apres: sombres, zone: coin), 1, accuracy: 0.05)
+        XCTAssertEqual(Recette.partAssombrie(avant: gris, apres: sombres, zone: autreCoin), 1, accuracy: 0.05)
+        XCTAssertEqual(Recette.partAssombrie(avant: gris, apres: sombres, zone: milieu), 0)
+        XCTAssertEqual(Recette.partAssombrie(avant: gris, apres: gris, zone: coin), 0, "deux rendus identiques")
+        // Les pixels d'avant à 12 niveaux ou moins ne comptent pas : rien à mesurer.
+        XCTAssertEqual(Recette.partAssombrie(avant: image(coins: nil, fond: 8), apres: image(coins: 2, fond: 8), zone: coin), 0)
+        XCTAssertNil(Recette.Luminances(avant: image(coins: nil, fond: 8), apres: image(coins: 2, fond: 8))?.part(coin))
+        // Deux tailles différentes ne se comparent pas.
+        XCTAssertEqual(Recette.partAssombrie(avant: gris, apres: TestSupport.jpeg(red: 60, green: 60, blue: 60), zone: coin), 0)
+        // La baisse moyenne, en part de luminance perdue : 150 → 60, 60 % de moins.
+        let l = try XCTUnwrap(Recette.Luminances(avant: gris, apres: sombres))
+        XCTAssertEqual(try XCTUnwrap(l.baisse(coin)), 0.6, accuracy: 0.02)
+        XCTAssertEqual(try XCTUnwrap(l.baisse(milieu)), 0, accuracy: 0.01)
+        XCTAssertNil(l.baisse(CGRect(x: 1.2, y: 0, width: 0.1, height: 0.1)), "zone hors de l'image")
+        XCTAssertNil(Recette.Luminances(avant: image(coins: nil, fond: 8), apres: image(coins: 2, fond: 8))?.baisse(coin), "trop sombre")
+    }
+
+    /// La forme des bords d'un radial inversé : centre intact, baisse qui monte sans marche vers les
+    /// coins ; une plaque (fondu nul) ou un anneau se reconnaissent ; un coin sombre, non.
+    func testRecetteReadsTheShapeOfTheEdges() throws {
+        let width = 300, height = 200
+        // Distance au centre (0,5 ; 0,5) dans une ellipse aux proportions du cadre (0 au centre, 1 au coin).
+        func distance(_ x: Int, _ y: Int) -> Double {
+            let dx = (Double(x) + 0.5) / Double(width) - 0.5, dy = (Double(y) + 0.5) / Double(height) - 0.5
+            return hypot(dx, dy) / hypot(0.5, 0.5)
+        }
+        // Une scène (luminance selon r), puis la part qu'un masque lui ôte selon r.
+        func image(fond: (Double) -> Double = { _ in 160 }, _ baisse: (Double) -> Double) -> Data {
+            TestSupport.jpegPixels(width: width, height: height) { x, y in
+                let r = distance(x, y)
+                let v = UInt8(max(0, min(255, (fond(r) * (1 - baisse(r))).rounded())))
+                return (v, v, v)
+            }
+        }
+        let base = image { _ in 0 }
+        let centre = CGPoint(x: 0.5, y: 0.5)
+        // Fondu large : la baisse part du tiers et monte en douceur jusqu'aux coins (25 % au coin).
+        let douce = try XCTUnwrap(Recette.formeDesBords(avant: base, apres: image { r in r < 0.3 ? 0 : 0.25 * (r - 0.3) / 0.7 }, centre: centre))
+        XCTAssertLessThan(douce.centre, Recette.FormeBords.centreMax)
+        XCTAssertGreaterThan(douce.coinLoin, 0.15)
+        XCTAssertGreaterThan(douce.coins, douce.bords, "les coins plus sombres que le milieu des bords")
+        XCTAssertGreaterThan(douce.bords, douce.centre)
+        XCTAssertEqual(douce.profil.count, 20)
+        XCTAssertFalse(douce.enPlaque, "\(douce.profil)")
+        XCTAssertFalse(douce.enAnneau, "\(douce.profil)")
+        // Fondu nul : une marche fait toute la baisse.
+        let plaque = try XCTUnwrap(Recette.formeDesBords(avant: base, apres: image { r in r < 0.7 ? 0 : 0.25 }, centre: centre))
+        XCTAssertTrue(plaque.enPlaque, "\(plaque.profil)")
+        // Un anneau : la baisse retombe avant le coin.
+        let anneau = try XCTUnwrap(Recette.formeDesBords(avant: base, apres: image { r in r > 0.5 && r < 0.75 ? 0.25 : 0 }, centre: centre))
+        XCTAssertTrue(anneau.enAnneau, "\(anneau.profil)")
+        // Une scène claire au milieu, sombre aux coins (220 → 20) : la même forme douce y perd peu de
+        // niveaux aux coins, mais la même part. En niveaux, elle passerait pour un anneau aux bords
+        // à peine assombris.
+        func scene(_ r: Double) -> Double { 220 - 200 * min(r, 1) }
+        let sombre = try XCTUnwrap(Recette.formeDesBords(avant: image(fond: scene) { _ in 0 },
+                                                         apres: image(fond: scene) { r in r < 0.3 ? 0 : 0.15 * min(1, (r - 0.3) / 0.6) },
+                                                         centre: centre))
+        XCTAssertFalse(sombre.enAnneau, "\(sombre.profil)")
+        XCTAssertFalse(sombre.enPlaque, "\(sombre.profil)")
+        XCTAssertGreaterThanOrEqual(sombre.coinLoin, Recette.FormeBords.coinMin)
+        XCTAssertLessThan(sombre.centre, Recette.FormeBords.centreMax)
+        // Le coin le plus loin d'un centre décalé, et des rendus qui ne se comparent pas.
+        let decale = try XCTUnwrap(Recette.formeDesBords(avant: base, apres: base, centre: CGPoint(x: 0.2, y: 0.3)))
+        XCTAssertEqual(decale.coinLoin, 0, accuracy: 0.01)
+        XCTAssertNil(Recette.formeDesBords(avant: base, apres: TestSupport.jpeg(red: 1, green: 1, blue: 1, width: 150, height: 100), centre: centre))
+    }
+
+    /// Le détail de l'étape du bilan : les écarts d'un view_photo en une ligne.
+    func testRecetteSummarizesTheBilan() {
+        let ecarts: JSONValue = ["exposition": ["avant": 47.8, "apres": 71.2, "ecart": 23.4, "IL": 1.95],
+                                 "nettete_max": ["avant": 40, "apres": 36, "ecart": -4, "lecture": "nette → nette"],
+                                 "canal_ecrete": ["avant": 0.1, "apres": 3, "ecart": 2.9, "canal": "rouge"]]
+        // Les nombres comme dans les autres lignes de la recette (Recette.nombre).
+        XCTAssertEqual(Recette.resumeEcarts(ecarts),
+                       "canal_ecrete 0.1 → 3 (rouge) ; exposition 47.8 → 71.2 (+1.95 IL) ; nettete_max 40 → 36 (nette → nette)")
+        XCTAssertEqual(Recette.resumeEcarts(nil), "aucun écart visible")
+        XCTAssertEqual(Recette.resumeEcarts("aucun écart visible"), "aucun écart visible")
+    }
+
+    /// --mixte : l'éclairage mixte nommé par view_photo, en lecture seule, sur une copie d'essai.
+    func testRecetteNamesAMixedLighting() throws {
+        prepareRecette(virtualCopy: true)
+        var image = Self.eclairage(mixte: true), temoin = Self.eclairage(mixte: false)
+        fake.onSend = { [unowned fake] command, params in
+            if command == "apercu" {
+                let id = params["photo"]?.int ?? 5
+                fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(id == 6 ? temoin : image)),
+                                          "photo": ["id": .number(Double(id)), "fichier": "X.RAF (Copie 1)"],
+                                          "echelle_temperature": "kelvins (RAW : 2000 à 50000)", "reglages": ["Temperature": 5000, "Tint": 0]]
+            }
+        }
+        let recette = Recette(lightroom: fake)
+        recette.lancer(raw: nil, jpeg: nil, flash: nil, mixte: 5)
+        XCTAssertEqual(recette.etapes.map(\.nom), ["éclairage mixte nommé (view_photo)"])
+        XCTAssertTrue(recette.reussie, recette.etapes.first?.detail ?? "")
+        let detail = try XCTUnwrap(recette.etapes.first?.detail)
+        XCTAssertTrue(detail.hasPrefix("éclairage mixte : "), detail)
+        XCTAssertTrue(detail.contains("/9 cases lues") && detail.contains(" ms"), detail)
+        XCTAssertFalse(fake.calls.contains { ["appliquer", "masquer", "essayer", "revenir", "annuler"].contains($0.command) }, "lecture seule")
+
+        // Une seule lumière : la photo désignée ne convient pas.
+        image = Self.eclairage(mixte: false)
+        let unique = Recette(lightroom: fake)
+        unique.lancer(raw: nil, jpeg: nil, flash: nil, mixte: 5)
+        XCTAssertFalse(unique.reussie)
+        XCTAssertTrue(unique.etapes.first?.detail.contains("pas lu comme un éclairage mixte") == true, unique.etapes.first?.detail ?? "")
+
+        // Le témoin du plan : le RAW de la recette (une autre photo) lu à une seule lumière.
+        image = Self.eclairage(mixte: true)
+        let avecTemoin = Recette(lightroom: fake)
+        avecTemoin.sequenceEclairage(5, unique: 6)
+        XCTAssertEqual(avecTemoin.etapes.map(\.nom), ["éclairage mixte nommé (view_photo)", "une seule lumière, en témoin (view_photo)"])
+        XCTAssertEqual(avecTemoin.etapes.map(\.photo), ["éclairage 5", "éclairage 6"])
+        XCTAssertTrue(avecTemoin.reussie, avecTemoin.etapes.map(\.detail).joined(separator: " | "))
+        XCTAssertTrue(avecTemoin.etapes[1].detail.contains(" ms"), avecTemoin.etapes[1].detail)
+        // Un témoin lu mixte : l'étape le dit.
+        temoin = Self.eclairage(mixte: true)
+        let temoinMixte = Recette(lightroom: fake)
+        temoinMixte.sequenceEclairage(5, unique: 6)
+        XCTAssertEqual(temoinMixte.etapes.map(\.reussie), [true, false])
+        XCTAssertTrue(temoinMixte.etapes[1].detail.contains("une seule lumière attendue"), temoinMixte.etapes[1].detail)
+        XCTAssertFalse(fake.calls.contains { ["appliquer", "masquer", "essayer", "revenir", "annuler"].contains($0.command) }, "lecture seule")
+        // La même photo pour --recette et --mixte : pas de témoin.
+        let meme = Recette(lightroom: fake)
+        meme.lancer(raw: 5, jpeg: nil, flash: nil, mixte: 5)
+        XCTAssertTrue(meme.etapes.contains { $0.nom == "éclairage mixte nommé (view_photo)" })
+        XCTAssertFalse(meme.etapes.contains { $0.nom.hasPrefix("une seule lumière") })
+
+        // Un original, sans --original : refusé avant tout aperçu.
+        prepareRecette(virtualCopy: false)
+        fake.calls = []
+        let original = Recette(lightroom: fake)
+        original.lancer(raw: nil, jpeg: nil, flash: nil, mixte: 5)
+        XCTAssertFalse(original.reussie)
+        XCTAssertTrue(original.etapes.first?.detail.contains("--original") == true)
+        XCTAssertFalse(fake.commands.contains("apercu"))
+
+        // Une photo introuvable : un échec noté, pas une séquence muette.
+        fake.errors["reglages"] = LightroomError.plugin("Photo 5 introuvable.")
+        let introuvable = Recette(lightroom: fake)
+        introuvable.lancer(raw: nil, jpeg: nil, flash: nil, mixte: 5)
+        XCTAssertEqual(introuvable.etapes.map(\.nom), ["éclairage mixte nommé (view_photo)"])
+        XCTAssertTrue(introuvable.etapes.first?.detail.contains("introuvable") == true)
+    }
+
+    /// --portrait : une copie d'essai, vérifiée puis remise à l'origine ; sans visage, rien d'autre.
+    func testRecettePortraitNeedsAFaceAndReverts() {
+        prepareRecette(virtualCopy: true)
+        var lines: [String] = []
+        let recette = Recette(lightroom: fake) { lines.append("\($0.reussie ? "✔" : "✘") \($0.nom)") }
+        recette.lancer(raw: nil, jpeg: nil, flash: nil, portrait: 5)
+        XCTAssertEqual(lines, ["✔ photo d'essai", "✘ visages vus par Vision (view_photo)", "✔ remise à l'origine après l'échec"])
+        XCTAssertTrue(recette.etapes[1].detail.contains("choisir un portrait"), recette.etapes[1].detail)
+        XCTAssertFalse(fake.commands.contains("masquer") || fake.commands.contains("essayer"), "aucun masque essayé sans visage")
+        XCTAssertEqual(fake.commands.last(where: { $0 != "reglages" }), "revenir")
+    }
+
+    /// --boitier : ce que l'appareil a rangé dans un fichier Fujifilm, lu sans Lightroom.
+    func testBoitierReadWithoutLightroom() throws {
+        let dossier = TestSupport.temporaryDirectory()
+        let raf = dossier.appendingPathComponent("DSCF0001.RAF")
+        let r = BoitierTests.reglages(tons: 9)
+        try FichierFujifilm.fichier(note: r.note, exif: r.exif).write(to: raf)
+        let looks = LookProfileLibrary(folders: [])
+        let json = try XCTUnwrap(Recette.lectureBoitier(raf, looks: looks))
+        XCTAssertEqual(json["fichier"]?.string, "DSCF0001.RAF")
+        XCTAssertEqual(try XCTUnwrap(json["point_af"]?["x"]?.double), 0.563, accuracy: 0.001)
+        XCTAssertEqual(json["point_af"]?["avertissement"]?.bool, false)
+        XCTAssertEqual(json["point_af"]?["visages"]?.int, 2)
+        XCTAssertEqual(json["intention_boitier"]?["simulation"]?.string, "CLASSIC CHROME")
+        XCTAssertEqual(json["intention_boitier"]?["profil"]?.string, "Camera CLASSIC CHROME", "un RAF : le profil de la simulation")
+        XCTAssertFalse(json["intention_boitier"]?["lecture"]?.array?.isEmpty ?? true)
+        let valeurs = try XCTUnwrap(json["valeurs_lues"])
+        XCTAssertEqual(valeurs["FilmMode (0x1401)"]?.int, 0x600)
+        XCTAssertEqual(valeurs["AutoDynamicRange (0x140b)"]?.int, 200)
+        XCTAssertEqual(valeurs["HighlightTone (0x1041, crans)"]?.double, 1, "−16 en SLONG : +1 cran")
+        XCTAssertEqual(try XCTUnwrap(valeurs["ExposureCompensation (0x9204, IL)"]?.double), -0.667, accuracy: 0.001)
+        XCTAssertEqual(valeurs["ExposureProgram (0x8822)"]?.int, 3)
+        // Un JPEG de l'appareil : la simulation y est déjà appliquée, pas de profil à proposer.
+        let jpeg = dossier.appendingPathComponent("DSCF0001.JPG")
+        try FichierFujifilm.fichier(note: r.note, exif: r.exif, raf: false).write(to: jpeg)
+        XCTAssertNil(try XCTUnwrap(Recette.lectureBoitier(jpeg, looks: looks))["intention_boitier"]?["profil"])
+        // Un autre fichier : rien de lu.
+        let autre = dossier.appendingPathComponent("autre.jpg")
+        try TestSupport.jpeg(red: 10, green: 20, blue: 30).write(to: autre)
+        XCTAssertNil(Recette.lectureBoitier(autre, looks: looks))
+        XCTAssertNil(Recette.lectureBoitier(dossier.appendingPathComponent("absent.RAF"), looks: looks))
+    }
+
+    // MARK: Recette de la 1.2 face au faux module
+
+    /// Un rendu de synthèse d'une proposition (commande « essayer ») : le premier masque change
+    /// l'exposition de `fond` selon sa zone, comme Lightroom l'a montré le 20 octobre 2026 : radial
+    /// avec son fondu (dedans ; inversé, dehors), linéaire (entier du côté de from). Avec
+    /// `inversionIgnoree`, un module qui poserait le radial inversé dans l'ellipse.
+    static func rendreMasque(_ params: [String: JSONValue], inversionIgnoree: Bool = false,
+                             fond: @escaping (Double, Double) -> Double = { _, _ in 150 }) -> Data {
+        let masque = params["masques"]?.array?.first ?? .null
+        let il = (masque["locaux"]?["LocalExposure2012"]?.double ?? 0) * 4 * (masque["quantite"]?.double ?? 1)
+        func valeur(_ cle: String, _ defaut: Double) -> Double { masque[cle]?.double ?? defaut }
+        func poids(_ x: Double, _ y: Double) -> Double {
+            switch masque["type"]?.string {
+            case "radial":
+                let rx = valeur("rayon_x", 0.5), ry = valeur("rayon_y", rx), f = valeur("fondu", 50) / 100
+                let d = hypot((x - valeur("centre_x", 0.5)) / rx, (y - valeur("centre_y", 0.5)) / ry)
+                let dedans = d <= 1 - f ? 1 : (d >= 1 ? 0 : (1 - d) / f)
+                return masque["inverser"]?.bool == true && !inversionIgnoree ? 1 - dedans : dedans
+            case "lineaire":
+                let x0 = valeur("de_x", 0), y0 = valeur("de_y", 0), dx = valeur("a_x", 0) - x0, dy = valeur("a_y", 1) - y0
+                let t = ((x - x0) * dx + (y - y0) * dy) / max(dx * dx + dy * dy, 1e-9)
+                return min(max(1 - t, 0), 1)
+            default:
+                return 1
+            }
+        }
+        let width = 300, height = 200
+        return TestSupport.jpegPixels(width: width, height: height) { px, py in
+            let x = (Double(px) + 0.5) / Double(width), y = (Double(py) + 0.5) / Double(height)
+            let v = UInt8(max(0, min(255, (fond(x, y) * pow(2, il * poids(x, y) / 2.2)).rounded())))
+            return (v, v, v)
+        }
+    }
+
+    /// Éclaircir et assombrir : l'inversion du radial et la forme des bords, en propositions seulement,
+    /// avec les paramètres qu'add_mask accepte ; un radial inversé posé dans l'ellipse est signalé.
+    func testRecetteLightensAndDarkensInPreviewsOnly() throws {
+        prepareRecette(virtualCopy: true)
+        let apercu = try XCTUnwrap(fake.onSend)
+        var inversionIgnoree = false
+        fake.onSend = { [unowned fake] command, params in
+            apercu(command, params)
+            if command == "essayer" {
+                fake!.replies["essayer"] = ["chemin": .string(TestSupport.previewFile(Self.rendreMasque(params, inversionIgnoree: inversionIgnoree)))]
+            }
+        }
+        let recette = Recette(lightroom: fake)
+        let depart = try recette.etat(5)
+        try recette.sequenceTireur(5, depart, "RAW 5")
+        XCTAssertEqual(recette.etapes.map(\.nom), ["éclaircir et assombrir : radial inversé et dégradé linéaire (propositions)",
+                                                   "éclaircir et assombrir : forme des bords (radial inversé, propositions)"])
+        XCTAssertTrue(recette.reussie, recette.etapes.map(\.detail).joined(separator: " | "))
+        XCTAssertTrue(recette.etapes[1].detail.contains("à -0.3 IL") && recette.etapes[1].detail.contains("à -0.5 IL"), recette.etapes[1].detail)
+        XCTAssertFalse(fake.calls.contains { ["masquer", "appliquer", "annuler", "revenir"].contains($0.command) }, "des propositions seulement")
+        // Les bords tels que Claude les pose (Prompts.Tireur) : rayon 0,7, fondu 80, inversé, −0,3 puis −0,5 IL.
+        let masques = fake.calls.filter { $0.command == "essayer" }.compactMap { $0.params["masques"]?.array?.first }
+        XCTAssertEqual(masques.count, 7, "4 rendus pour l'inversion, 3 pour la forme")
+        let bords = masques.suffix(2)
+        XCTAssertEqual(bords.map { $0["rayon_x"]?.double }, [0.7, 0.7])
+        XCTAssertEqual(bords.map { $0["rayon_y"]?.double }, [0.7, 0.7])
+        XCTAssertEqual(bords.map { $0["fondu"]?.double }, [80, 80])
+        XCTAssertEqual(bords.map { $0["inverser"]?.bool }, [true, true])
+        XCTAssertEqual(bords.map { $0["locaux"]?["LocalExposure2012"]?.double ?? 0 }, [-0.075, -0.125])
+
+        // Un module qui poserait le radial inversé dans l'ellipse : l'étape le dit, rien d'autre n'est fait.
+        inversionIgnoree = true
+        let fautive = Recette(lightroom: fake)
+        XCTAssertThrowsError(try fautive.sequenceTireur(5, depart, "RAW 5"))
+        XCTAssertEqual(fautive.etapes.count, 1)
+        XCTAssertTrue(fautive.etapes[0].detail.contains("radial inversé : coins"), fautive.etapes[0].detail)
+    }
+
+    /// Un rendu de synthèse d'un masque de peau : un damier fin sur le visage, adouci selon la
+    /// texture et la clarté du masque et son intensité (CorrectionAmount linéaire, constaté le
+    /// 20 octobre 2026). Avec `auCarre`, un module dont l'intensité ne serait pas linéaire.
+    static func rendrePeau(_ params: [String: JSONValue], visage: CGRect, auCarre: Bool = false) -> Data {
+        let masque = params["masques"]?.array?.first ?? .null
+        let quantite = masque["quantite"]?.double ?? 1
+        let lissage = -((masque["locaux"]?["LocalTexture"]?.double ?? 0) + (masque["locaux"]?["LocalClarity2012"]?.double ?? 0))
+            * (auCarre ? quantite * quantite : quantite)
+        let amplitude = 100 * max(0, 1 - lissage)
+        let width = 600, height = 400
+        return TestSupport.jpegPixels(width: width, height: height) { px, py in
+            let x = (Double(px) + 0.5) / Double(width), y = (Double(py) + 0.5) / Double(height)
+            guard visage.contains(CGPoint(x: x, y: y)) else { return (128, 128, 128) }
+            let v = UInt8(128 + ((px / 2 + py / 2) % 2 == 0 ? 1 : -1) * amplitude / 2)
+            return (v, v, v)
+        }
+    }
+
+    /// La peau dosée : trois doses (ou deux) en propositions, l'intensité linéaire, le refus d'une dose
+    /// trop forte, puis la dose par défaut posée, relue et annulée ; une intensité non linéaire est
+    /// signalée.
+    func testRecetteDosesTheSkinThenRevertsIt() throws {
+        prepareRecette(virtualCopy: true)
+        var reglages = try XCTUnwrap(fake.replies["reglages"]?.object)
+        reglages["tous"] = ["MaskGroupBasedCorrections": [[
+            "CorrectionName": "Claude · Peau du visage lisse", "CorrectionAmount": 0.5, "LocalTexture": -0.2, "LocalClarity2012": -0.1,
+            "CorrectionMasks": [["What": "Mask/Image", "MaskSubType": 3, "MaskSubCategoryID": 2, "MaskDigest": "ABC"]],
+        ]]]
+        fake.replies["reglages"] = .object(reglages)
+        let visage = CGRect(x: 0.3, y: 0.2, width: 0.4, height: 0.5)
+        var auCarre = false
+        fake.onSend = { [unowned fake] command, params in
+            if command == "essayer" {
+                fake!.replies["essayer"] = ["chemin": .string(TestSupport.previewFile(Self.rendrePeau(params, visage: visage, auCarre: auCarre)))]
+            }
+        }
+        let recette = Recette(lightroom: fake)
+        let depart = try recette.etat(5)
+        try recette.sequencePeau(5, depart, "portrait 5", visage: visage)
+        XCTAssertEqual(recette.etapes.map(\.nom), ["peau : trois doses en propositions, détail des joues mesuré",
+                                                   "intensité d'un masque : amount 50 = la moitié de la dose (propositions)",
+                                                   "peau trop lissée refusée sans smoothing_requested, rien d'écrit",
+                                                   "dose par défaut posée à amount 50, relue, annulée"])
+        XCTAssertTrue(recette.reussie, recette.etapes.map(\.detail).joined(separator: " | "))
+        for dose in ["Peau du visage lisse : ", "Adoucir la peau (Lite) : "] {
+            XCTAssertTrue(recette.etapes[0].detail.contains(dose), recette.etapes[0].detail)
+        }
+        XCTAssertTrue(recette.etapes[0].detail.contains("% du détail gardé"), recette.etapes[0].detail)
+        // Une seule écriture, la dose par défaut à moitié, puis défaite.
+        let ecritures = fake.calls.filter { $0.command == "masquer" }
+        XCTAssertEqual(ecritures.count, 1)
+        XCTAssertEqual(ecritures.first?.params["masques"]?.array?.first?["quantite"]?.double, 0.5)
+        XCTAssertEqual(ecritures.first?.params["masques"]?.array?.first?["nom"]?.string, "Claude · Peau du visage lisse")
+        XCTAssertEqual(fake.commands.filter { $0 == "annuler" }.count, 1)
+        XCTAssertFalse(fake.commands.contains("appliquer"))
+
+        // Une intensité qui ne serait pas linéaire : l'étape le dit.
+        auCarre = true
+        let fautive = Recette(lightroom: fake)
+        XCTAssertThrowsError(try fautive.sequencePeau(5, depart, "portrait 5", visage: visage))
+        XCTAssertEqual(fautive.etapes.map(\.reussie), [true, false])
+        XCTAssertTrue(fautive.etapes[1].detail.contains("contre la moitié de ses curseurs"), fautive.etapes[1].detail)
+        // Ni l'écart, ni le témoin ne passent par partChangee : ce lissage fin ne change aucun pixel de
+        // plus de 12 niveaux, et l'étape passerait toujours.
+        let reduit = Self.rendrePeau(["masques": [["locaux": ["LocalTexture": -0.2, "LocalClarity2012": -0.1], "quantite": 0.5]]], visage: visage, auCarre: true)
+        let moitie = Self.rendrePeau(["masques": [["locaux": ["LocalTexture": -0.1, "LocalClarity2012": -0.05], "quantite": 1]]], visage: visage)
+        XCTAssertEqual(Recette.partChangee(reduit, moitie), 0)
+        XCTAssertGreaterThan(try XCTUnwrap(Recette.ecartMax(reduit, moitie)), Recette.ecartIdentique)
+        XCTAssertEqual(try XCTUnwrap(Recette.ecartMax(moitie, moitie)), 0)
+        XCTAssertNil(Recette.ecartMax(moitie, TestSupport.jpeg(red: 1, green: 1, blue: 1)), "deux tailles")
+    }
+
+    /// Le bilan d'une passe à l'autre : deux vues identiques, la proposition ignorée, l'écart d'une
+    /// étape écrite puis défaite ; un module qui ne dit pas les étapes de Claude est signalé.
+    func testRecetteReadsTheBilanFromOnePassToTheNext() throws {
+        prepareRecette(virtualCopy: true)
+        let sombre = TestSupport.jpeg(red: 90, green: 90, blue: 90), clair = TestSupport.jpeg(red: 170, green: 170, blue: 170)
+        var etapes = 3, ecrite = false, ditLesEtapes = true
+        fake.onSend = { [unowned fake] command, _ in
+            switch command {
+            case "appliquer": etapes += 1; ecrite = true
+            case "annuler": etapes -= 1; ecrite = false
+            case "essayer": fake!.replies["essayer"] = ["chemin": .string(TestSupport.previewFile(clair))]
+            case "apercu":
+                var reponse: [String: JSONValue] = ["chemin": .string(TestSupport.previewFile(ecrite ? clair : sombre)),
+                                                    "photo": ["id": 5, "fichier": "X.RAF (Copie 1)"],
+                                                    "reglages": ["Exposure2012": .number(ecrite ? 2 : 0)]]
+                if ditLesEtapes { reponse["etapes_claude"] = ["nombre": .number(Double(etapes)), "derniere": "Claude · recette"] }
+                fake!.replies["apercu"] = .object(reponse)
+            default: break
+            }
+        }
+        let recette = Recette(lightroom: fake)
+        let depart = try recette.etat(5)
+        try recette.etapeBilan(5, "RAW 5", attendu: depart)
+        XCTAssertTrue(recette.reussie, recette.etapes.first?.detail ?? "")
+        let detail = try XCTUnwrap(recette.etapes.first?.detail)
+        XCTAssertTrue(detail.contains("exposition") && detail.contains(" IL)"), detail)
+        XCTAssertTrue(detail.hasSuffix("annulé : 1 de moins, sans regression"), detail)
+        XCTAssertEqual(fake.commands.filter { ["appliquer", "annuler"].contains($0) }, ["appliquer", "annuler"], "une étape écrite, puis défaite")
+        XCTAssertEqual(etapes, 3)
+
+        // Un module d'avant la 1.2 (pas d'etapes_claude) : l'écart se voit, les étapes non.
+        ditLesEtapes = false
+        let ancien = Recette(lightroom: fake)
+        XCTAssertThrowsError(try ancien.etapeBilan(5, "RAW 5", attendu: depart))
+        XCTAssertTrue(ancien.etapes.first?.detail.contains("étapes de Claude après l'écriture : absentes") == true, ancien.etapes.first?.detail ?? "")
+        XCTAssertEqual(etapes, 3, "défaite même en échec")
+    }
+
+    /// L'intention lue au boîtier : dite pour un fichier Fujifilm, sautée pour une autre marque ; le
+    /// chemin de l'original ne part pas, la photo ne change pas.
+    func testRecetteReadsTheCameraIntention() throws {
+        prepareRecette(virtualCopy: true)
+        var marque = "FUJIFILM"
+        fake.onSend = { [unowned fake] command, _ in
+            guard command == "apercu" else { return }
+            fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 120, green: 120, blue: 120))),
+                                       "photo": ["id": 5, "fichier": "DSCF0001.RAF (Copie 1)", "marque": .string(marque),
+                                                 "chemin_original": "/Volumes/Photos/DSCF0001.RAF"],
+                                       "echelle_temperature": "kelvins (RAW : 2000 à 50000)", "profil": "Adobe Color",
+                                       "appareil": ["marque": .string(marque), "modele": "X-H2S"]]
+        }
+        func recette(_ lecture: LectureBoitier?) -> Recette {
+            let recette = Recette(lightroom: fake)
+            recette.tools.lecteurBoitier = LecteurBoitier(delai: 1) { _ in lecture }
+            return recette
+        }
+        let fuji = recette(LectureBoitier(intention: IntentionBoitier(simulation: 0x600, compensation: -1)))
+        try fuji.etapeIntention(5, "RAW 5")
+        XCTAssertEqual(fuji.etapes.map(\.nom), ["intention lue au boîtier (view_photo, intention_boitier)"])
+        let detail = try XCTUnwrap(fuji.etapes.first?.detail)
+        XCTAssertTrue(detail.hasPrefix("simulation CLASSIC CHROME"), detail)
+        XCTAssertTrue(detail.contains("phrase(s) de lecture"), detail)
+        XCTAssertFalse(detail.contains("/Volumes"), detail)
+        // Rien de lu dans l'original (absent, ou pas ouvert à temps) : dit, sans échec.
+        let rien = recette(nil)
+        try rien.etapeIntention(5, "RAW 5")
+        XCTAssertTrue(rien.etapes.first?.detail.hasPrefix("rien de lu") == true, rien.etapes.first?.detail ?? "")
+        // Une autre marque : sautée.
+        marque = "Apple"
+        let autre = recette(LectureBoitier(intention: IntentionBoitier(simulation: 0x600)))
+        try autre.etapeIntention(5, "RAW 5")
+        XCTAssertTrue(autre.etapes.first?.detail.hasPrefix("sautée") == true, autre.etapes.first?.detail ?? "")
+        XCTAssertFalse(fake.calls.contains { ["appliquer", "masquer", "essayer", "revenir", "annuler"].contains($0.command) }, "lecture seule")
+    }
 }
