@@ -103,12 +103,18 @@ final class PriseDeVueTests: XCTestCase {
         let description = try XCTUnwrap(lecon["description"]?.string)
         XCTAssertLessThanOrEqual(description.count, 1200, "photo_lesson : \(description.count) caractères")
         for attendu in ["lumière, couleur et composition", "missing", "at_capture", "carnet.json", "read_facts", "en dernier",
-                        "intention_boitier", "read_composition", "pas après une proposition seulement montrée"] {
+                        "intention_boitier", "read_composition", "pas après une proposition seule (rien d'appliqué)"] {
             XCTAssertTrue(description.contains(attendu), "photo_lesson sans « \(attendu) »")
         }
+        // Une retouche qui finit par une proposition de cadre a sa leçon : seule une proposition
+        // sans rien d'appliqué n'en a pas (synthèse de la 1.3, fin de retouche).
+        XCTAssertTrue(description.contains("en dernier, après le résumé de sa retouche et la proposition de cadre éventuelle"))
+        XCTAssertFalse(description.contains("proposition seulement montrée"), "ambigu : la proposition de cadre en est une")
         let proprietes = try XCTUnwrap(lecon["inputSchema"]?["properties"]?.object)
         XCTAssertEqual(Set(proprietes.keys), ["photo_id", "points", "read_facts"])
         XCTAssertEqual(lecon["inputSchema"]?["required"], [], "rien d'exigé : read_facts seul, ou points")
+        XCTAssertEqual(proprietes["points"]?["minItems"], 3, "exactement trois points")
+        XCTAssertEqual(proprietes["points"]?["maxItems"], 3)
         let point = try XCTUnwrap(proprietes["points"]?["items"])
         XCTAssertEqual(Set(point["properties"]?.object?.keys.map { $0 } ?? []), ["axis", "missing", "at_capture", "defects"])
         XCTAssertEqual(point["required"], ["axis", "at_capture"])

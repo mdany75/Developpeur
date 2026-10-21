@@ -4,7 +4,8 @@ import Foundation
 /// (photo_lesson : ses trois axes et l'enum de ses `defects`) et le carnet de progrès (ses domaines,
 /// et les six défauts qu'il compte d'après une mesure). Sans Vision ni SDK : des données, testées
 /// telles quelles (PriseDeVueTests). Le module reçoit `vocabulaire` (codes français, libellés,
-/// conseils) avec ses commandes et n'en garde aucune copie à lui.
+/// conseils) avec ses commandes : aucune liste n'est écrite dans son code (il peut ranger la copie
+/// reçue dans carnet.json, pour la page du carnet).
 ///
 /// Les libellés et les conseils s'adressent à un photographe amateur : une phrase simple, ce qu'il
 /// aurait pu faire au moment de déclencher. Un réglage propre à une marque n'y est cité qu'en
@@ -67,8 +68,10 @@ public enum PriseDeVue {
         public let libelle: String
         /// Ce qui l'aurait évité à la prise de vue.
         public let conseil: String
-        /// Compté par le carnet d'après une mesure prise sur l'état d'avant Claude (view_photo,
-        /// measure_angle, read_composition) ; les autres ne viennent que des leçons.
+        /// Compté par le carnet d'après une mesure : view_photo sur une photo que Claude n'a pas
+        /// encore retouchée ; pour l'horizon, une ligne mesurée (measure_angle ou read_composition)
+        /// sur une géométrie intacte (ni CropAngle, ni Upright, ni perspective), même après une
+        /// passe de tonalité. Les autres ne viennent que des leçons.
         public let mesure: Bool
     }
 

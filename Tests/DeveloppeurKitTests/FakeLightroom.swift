@@ -29,7 +29,8 @@ final class FakeLightroom: LightroomServing {
     /// Commandes notées à part, pour que les tests des outils voient les mêmes commandes qu'avant
     /// elles : la barre de progression de Lightroom (« progression »), et les registres de la 1.3
     /// rangés hors du catalogue, la leçon de la photo (« lecon ») et le carnet de progrès
-    /// (« carnet »). Une réponse ou une erreur préparée vaut pour elles aussi.
+    /// (« carnet »). Une réponse ou une erreur préparée vaut pour elles aussi ; `onSend` ne les voit
+    /// pas (préparer leur réponse dans `replies` avant l'appel).
     static let commandesAPart: Set<String> = ["progression", "lecon", "carnet"]
     private var notesAPart: [String: [[String: JSONValue]]] = [:]
     private func aPart(_ command: String) -> [[String: JSONValue]] {
