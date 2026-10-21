@@ -185,7 +185,7 @@ final class AnalyseTests: XCTestCase {
         let photo: JSONValue = ["id": 1, "fichier": "DSCF0001.RAF", "marque": "FUJIFILM",
                                 "chemin_original": "/Volumes/Photos/DSCF0001.RAF",
                                 "geometrie": ["largeur": 300, "hauteur": 200, "orientation": "AB"]]
-        tools.lecteurAF = LecteurPointsAF(delai: 1) { _ in PointAF(x: 0.25, y: 0.5, avertissement: false, visages: nil) }
+        tools.lecteurBoitier = LecteurBoitier(delai: 1) { _ in LectureBoitier(point: PointAF(x: 0.25, y: 0.5, avertissement: false, visages: nil)) }
         fake.onSend = { [unowned fake] command, _ in
             if command == "apercu" { fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(image)), "photo": photo] }
         }
@@ -237,7 +237,94 @@ final class AnalyseTests: XCTestCase {
         _ = tools.call(name: "view_photo", arguments: ["compare": "before_claude"])
         XCTAssertNil(fake.calls.last?.params["point_af"])
         XCTAssertNil(ToolHandler.pointAF(["marque": "Apple", "chemin_original": "/tmp/IMG.HEIC",
-                                          "geometrie": ["largeur": 300, "hauteur": 200]], lecteur: tools.lecteurAF))
+                                          "geometrie": ["largeur": 300, "hauteur": 200]], lecteur: tools.lecteurBoitier))
+        XCTAssertNil(ToolHandler.lectureBoitier(["marque": "Apple", "chemin_original": "/tmp/IMG.HEIC"], lecteur: tools.lecteurBoitier))
+    }
+
+    /// L'intention de la prise de vue (Fujifilm) : lue de la même ouverture que le point de mise au
+    /// point, sur l'aperçu entier seulement, avec le profil de la simulation pour un RAW.
+    func testViewPhotoGivesTheCameraIntention() throws {
+        tools = ToolHandler(lightroom: fake, lookProfiles: TestSupport.lookLibrary())
+        let image = Self.gradient()
+        var photo: JSONValue = ["id": 1, "fichier": "DSCF0001.RAF", "marque": "FUJIFILM", "chemin_original": "/Volumes/Photos/DSCF0001.RAF",
+                                "geometrie": ["largeur": 300, "hauteur": 200, "orientation": "AB"]]
+        fake.onSend = { [unowned fake] command, params in
+            guard command == "apercu" else { return }
+            var reponse: [String: JSONValue] = ["chemin": .string(TestSupport.previewFile(image)), "photo": photo,
+                                                "echelle_temperature": "kelvins (RAW : 2000 à 50000)", "profil": "Adobe Color",
+                                                "appareil": ["marque": "FUJIFILM", "modele": "X-H2S"]]
+            if params["comparer"] != nil { reponse["chemin_avant"] = .string(TestSupport.previewFile(image)) }
+            fake!.replies["apercu"] = .object(reponse)
+        }
+        let verrou = NSLock()
+        var lectures = 0
+        tools.lecteurBoitier = LecteurBoitier(delai: 1) { _ in
+            verrou.lock(); lectures += 1; verrou.unlock()
+            return LectureBoitier(point: PointAF(x: 0.25, y: 0.5, avertissement: false, visages: nil),
+                                  intention: IntentionBoitier(simulation: 0x600, compensation: -1))
+        }
+        func comptees() -> Int { verrou.lock(); defer { verrou.unlock() }; return lectures }
+
+        var info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: [:]).text)
+        XCTAssertEqual(info["intention_boitier"]?["simulation"]?.string, "CLASSIC CHROME")
+        XCTAssertEqual(info["intention_boitier"]?["profil"]?.string, "Camera CLASSIC CHROME")
+        let lecture = try XCTUnwrap(info["intention_boitier"]?["lecture"]?.array).compactMap(\.string)
+        XCTAssertTrue(lecture.contains { $0.contains("voulue plus sombre") }, "\(lecture)")
+        XCTAssertTrue(lecture.contains { $0.contains("partir du profil « Camera CLASSIC CHROME »") }, "\(lecture)")
+        XCTAssertNotNil(info["point_af"], "le point reste")
+        XCTAssertEqual(comptees(), 1, "point et intention d'une seule ouverture")
+
+        // Un zoom : le point, sans l'intention ; un avant/après : ni l'un ni l'autre, rien de lu.
+        info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: ["region": ["x": 0, "y": 0.25, "width": 0.5, "height": 0.5]]).text)
+        XCTAssertNotNil(info["point_af"])
+        XCTAssertNil(info["intention_boitier"])
+        XCTAssertEqual(comptees(), 2)
+        info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: ["compare": "before_claude"]).text)
+        XCTAssertNil(info["point_af"])
+        XCTAssertNil(info["intention_boitier"])
+        XCTAssertEqual(comptees(), 2, "pas de lecture pour un avant/après")
+
+        // Une autre marque : l'original n'est pas ouvert.
+        photo = ["id": 2, "fichier": "IMG_0001.HEIC", "marque": "Apple", "chemin_original": "/Volumes/Photos/IMG_0001.HEIC",
+                 "geometrie": ["largeur": 300, "hauteur": 200, "orientation": "AB"]]
+        info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: [:]).text)
+        XCTAssertNil(info["intention_boitier"])
+        XCTAssertEqual(comptees(), 2)
+    }
+
+    /// Un JPEG de l'appareil : pas de profil, la lecture dit que tout y est déjà ; une simulation à
+    /// base de Look : le profil de cet appareil, ou aucun.
+    func testCameraIntentionOnAJPEGAndALookSimulation() throws {
+        tools = ToolHandler(lightroom: fake, lookProfiles: TestSupport.lookLibrary())
+        let image = Self.gradient()
+        var echelle = "relative (JPEG, TIFF : −100 à +100)", modele = "X-H2S"
+        fake.onSend = { [unowned fake] command, _ in
+            if command == "apercu" {
+                fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(image)),
+                                           "photo": ["id": 1, "fichier": "DSCF0001.JPG", "marque": "FUJIFILM", "chemin_original": "/Volumes/Photos/DSCF0001.JPG"],
+                                           "echelle_temperature": .string(echelle), "profil": "Adobe Color",
+                                           "appareil": ["marque": "FUJIFILM", "modele": .string(modele)]]
+            }
+        }
+        var simulation = 0x600
+        tools.lecteurBoitier = LecteurBoitier(delai: 1) { _ in LectureBoitier(intention: IntentionBoitier(simulation: simulation)) }
+
+        var info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: [:]).text)
+        XCTAssertEqual(info["intention_boitier"]?["simulation"]?.string, "CLASSIC CHROME")
+        XCTAssertNil(info["intention_boitier"]?["profil"], "un JPEG : pas de profil")
+        var lecture = try XCTUnwrap(info["intention_boitier"]?["lecture"]?.array).compactMap(\.string)
+        XCTAssertTrue(lecture.contains { $0.hasPrefix("JPEG de l'appareil") }, "\(lecture)")
+        XCTAssertNil(info["point_af"], "pas de point lu, pas de géométrie")
+
+        echelle = "kelvins (RAW : 2000 à 50000)"
+        simulation = 0x800
+        info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: [:]).text)
+        XCTAssertEqual(info["intention_boitier"]?["profil"]?.string, "Camera CLASSIC Neg", "le Look de ce X-H2S")
+        modele = "X-T20"
+        info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: [:]).text)
+        XCTAssertNil(info["intention_boitier"]?["profil"])
+        lecture = try XCTUnwrap(info["intention_boitier"]?["lecture"]?.array).compactMap(\.string)
+        XCTAssertTrue(lecture.contains { $0.contains("sans profil Lightroom pour cet appareil") }, "\(lecture)")
     }
 
     /// La fenêtre Claude (aperçu de la photo active) : `mcp-developpeur --marquer-af` dessine le
@@ -248,7 +335,7 @@ final class AnalyseTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: dossier) }
         let entree = dossier.appendingPathComponent("vignette.jpg"), sortie = dossier.appendingPathComponent("vignette-af.jpg")
         try Self.gradient().write(to: entree)
-        let lecteur = LecteurPointsAF(delai: 1) { _ in PointAF(x: 0.25, y: 0.5, avertissement: true, visages: nil) }
+        let lecteur = LecteurBoitier(delai: 1) { _ in LectureBoitier(point: PointAF(x: 0.25, y: 0.5, avertissement: true, visages: nil)) }
         let point = PointAF.marquer(original: URL(fileURLWithPath: "/Volumes/Photos/DSCF0001.RAF"),
                                     geometrie: ["largeur": 300, "hauteur": 200, "orientation": "AB"],
                                     entree: entree, sortie: sortie, lecteur: lecteur)
@@ -263,7 +350,11 @@ final class AnalyseTests: XCTestCase {
         XCTAssertNil(horsCadre)
         XCTAssertNil(PointAF.marquer(original: URL(fileURLWithPath: "/tmp/absent.RAF"), geometrie: ["largeur": 300, "hauteur": 200],
                                      entree: entree, sortie: dossier.appendingPathComponent("sans.jpg"),
-                                     lecteur: LecteurPointsAF(delai: 1) { _ in nil }))
+                                     lecteur: LecteurBoitier(delai: 1) { _ in nil }))
+        // Une lecture sans point (intention seule) ne dessine rien.
+        XCTAssertNil(PointAF.marquer(original: URL(fileURLWithPath: "/Volumes/Photos/DSCF0001.RAF"), geometrie: ["largeur": 300, "hauteur": 200],
+                                     entree: entree, sortie: dossier.appendingPathComponent("sans-point.jpg"),
+                                     lecteur: LecteurBoitier(delai: 1) { _ in LectureBoitier(intention: IntentionBoitier(simulation: 0)) }))
     }
 
     static func pixelVert(_ image: CGImage, x: Int, y: Int) -> Bool {

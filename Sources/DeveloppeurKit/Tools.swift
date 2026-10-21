@@ -65,9 +65,10 @@ public final class ToolHandler {
     /// Plafond de note de chaque photo au dernier cull_photos de cette session, que propose_ratings
     /// fait respecter (Tools+Notation.swift).
     var dernierTri: [Int: Notation.Plafond] = [:]
-    /// Point de mise au point de view_photo : un seul lecteur, pour qu'une lecture bloquée
-    /// (autorisation de macOS) n'en lance pas d'autres ; les tests le remplacent.
-    var lecteurAF = LecteurPointsAF()
+    /// Lecture du boîtier de view_photo (point de mise au point et intention, d'une seule ouverture
+    /// de l'original) : un seul lecteur, pour qu'une lecture bloquée (autorisation de macOS) n'en
+    /// lance pas d'autres ; les tests le remplacent.
+    var lecteurBoitier = LecteurBoitier()
     /// Contexte de l'appel en cours (progression d'une série, annulation par le client) : les
     /// appels passent un à un (FileOutils), un seul contexte à la fois.
     var contexte = ContexteAppel()
