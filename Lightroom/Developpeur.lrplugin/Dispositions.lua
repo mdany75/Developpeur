@@ -28,6 +28,69 @@ Dispositions.NOM = 'conversation'
 Dispositions.TAILLES = { lignes = 42, fil = 900, liste = 250, droite = 340, apercu = 320, propLignes = 19, etapeLignes = 19,
     criteres = 12 }
 
+-- Les images de la fenêtre B (images/<nom>.png), seule source de leurs tailles, en points :
+-- { largeur = …, hauteur = … }, une table neuve par image. Chacune est un seul PNG en 2x (2 × la
+-- taille en points, 144 ppp), icônes d'image_name comprises, sans paire 1x et @2x : Lightroom
+-- l'affiche à sa taille en points (constaté le 21 octobre 2026 avec plus.png et trombone.png du
+-- module d'essai). Un f:picture reçoit toujours width et height : sans eux, il prendrait la taille
+-- en pixels (relevé dans le code de Lightroom, AgPictureView, sans avoir été vu). Tailles de la
+-- maquette « B · Conversation claire » ; les hauteurs du panneau et des
+-- cartes sont recalées au lot 18. Aucune image pour les fonds ni pour les filets : ce sont des
+-- aplats (f:picture sans value, à background_color). Après un changement :
+-- luajit scripts/gabarits.lua | swift scripts/images-fenetre.swift Lightroom/Developpeur.lrplugin
+-- (Tests/Lua/Fenetre/essais-images.lua vérifie chaque fichier).
+local function taille(largeur, hauteur)
+    return { largeur = largeur, hauteur = hauteur }
+end
+
+Dispositions.IMAGES = {
+    -- Le panneau de la colonne droite, à cheval sur les segments : une bande transparente de 12 en
+    -- haut, puis le panneau blanc (bord #C9C9C9, coins de 7), 733 pour un contenu de 765.
+    panneau = taille(435, 745),
+    -- Les fonds des cartes (#FAFAFA, bord #D9D9D9, coins de 6), à la largeur intérieure du panneau :
+    -- Note (critères, filet et plafond), Proposition, Aperçu (étape) et Leçon.
+    ['carte-note'] = taille(405, 270),
+    ['carte-proposition'] = taille(405, 350),
+    ['carte-etape'] = taille(405, 350),
+    ['carte-lecon'] = taille(405, 350),
+    -- Les onglets Aperçu | Proposition | Note | Leçon, libellés dessinés, et le segment choisi en bleu.
+    ['seg-apercu'] = taille(72, 22),
+    ['seg-apercu-actif'] = taille(72, 22),
+    ['seg-proposition'] = taille(98, 22),
+    ['seg-proposition-actif'] = taille(98, 22),
+    ['seg-note'] = taille(57, 22),
+    ['seg-note-actif'] = taille(57, 22),
+    ['seg-lecon'] = taille(65, 22),
+    ['seg-lecon-actif'] = taille(65, 22),
+    -- Le fond de la conversation choisie dans la liste (et de l'entrée Carnet de progrès montrée).
+    selection = taille(163, 40),
+    -- Les voyants Claude Code, Lightroom et Écran (plus de pastille bleue : le voyant Mode est retiré).
+    ['pastille-vert'] = taille(8, 8),
+    ['pastille-orange'] = taille(8, 8),
+    ['pastille-rouge'] = taille(8, 8),
+    ['pastille-gris'] = taille(8, 8),
+    -- « Accepter N ★ » (Note) et « Accepter » (Proposition) : normal, enfoncé et inactif ; Lightroom
+    -- pose le titre blanc par-dessus.
+    ['bouton-bleu'] = taille(120, 26),
+    ['bouton-bleu-presse'] = taille(120, 26),
+    ['bouton-bleu-inactif'] = taille(120, 26),
+    -- Les étoiles cliquables de « Votre note », puis celles de « Claude propose ».
+    ['etoile24-pleine'] = taille(24, 24),
+    ['etoile24-vide'] = taille(24, 24),
+    ['etoile12-pleine'] = taille(12, 12),
+    ['etoile12-vide'] = taille(12, 12),
+    -- La rangée des passes, la ligne du plafond et le champ Rechercher.
+    ['coche-10'] = taille(10, 10),
+    ['chevron-passe'] = taille(7, 8),
+    avertissement = taille(14, 14),
+    loupe = taille(12, 12),
+    -- Icônes de boutons sans titre, par image_name : 📎 et 📋 de la saisie, ▲ ▼ de la barre du fil.
+    trombone = taille(14, 14),
+    ['presse-papiers'] = taille(14, 14),
+    ['chevron-haut'] = taille(12, 12),
+    ['chevron-bas'] = taille(12, 12),
+}
+
 -- Les dimensions : une table neuve, avec `nom`, et les largeurs tirées des précédentes.
 function Dispositions.dimensions()
     local D = { nom = Dispositions.NOM }

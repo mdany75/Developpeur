@@ -1,7 +1,9 @@
-// images-vides.swift — dessine l'image « aucun aperçu » de la fenêtre Claude, au cadre d'aperçu de
-// Dispositions.TAILLES (un carré de 320 : vide-320.png), au fond des vignettes (2B2B2B), en PNG à
-// 72 ppp : le SDK de Lightroom affiche une image à sa taille en points. Les essais de la fenêtre
-// vérifient qu'elle existe, à ces dimensions.
+// images-vides.swift — dessine l'image « aucun aperçu » de la fenêtre Claude, au cadre d'aperçu,
+// au fond des vignettes (2B2B2B) : le carré de 320 de Dispositions.TAILLES (vide-320.png, en PNG à
+// 72 ppp), gardé jusqu'au lot B3 de la fenêtre B, et le cadre 3:2 de la fenêtre B, 330 × 220 points
+// (vide-330x220.png), en 2x : 660 × 440 pixels à 144 ppp, que le SDK de Lightroom affiche à sa
+// taille en points, comme les images de scripts/images-fenetre.swift. Les essais de la fenêtre
+// vérifient qu'elles existent, à ces dimensions.
 //
 // Usage : swift scripts/images-vides.swift Lightroom/Developpeur.lrplugin
 
@@ -9,16 +11,19 @@ import AppKit
 
 let dossier = CommandLine.arguments.dropFirst().first ?? "."
 
-// Largeur et hauteur de chaque cadre ; un carré garde son nom d'origine (vide-320.png).
-let cadres: [(Int, Int)] = [
-    (320, 320),     // Conversation claire
+// Largeur et hauteur de chaque cadre en points, et son échelle (pixels par point) ; un carré garde
+// son nom d'origine (vide-320.png).
+let cadres: [(Int, Int, Int)] = [
+    (320, 320, 1),     // Conversation claire, jusqu'au lot B3
+    (330, 220, 2),     // fenêtre B : l'aperçu commun aux quatre onglets
 ]
 
-for (largeur, hauteur) in cadres {
+for (largeur, hauteur, echelle) in cadres {
     let taille = NSSize(width: largeur, height: hauteur)
-    guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: largeur, pixelsHigh: hauteur, bitsPerSample: 8,
-                                     samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-                                     bytesPerRow: 0, bitsPerPixel: 0) else { exit(1) }
+    guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: largeur * echelle, pixelsHigh: hauteur * echelle,
+                                     bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                     colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { exit(1) }
+    // La taille en points : le dessin se fait en points, à l'échelle des pixels.
     rep.size = taille
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
