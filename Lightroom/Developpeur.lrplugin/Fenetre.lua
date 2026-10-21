@@ -1,8 +1,9 @@
 -- Fenetre.lua : la fenêtre Claude du module Développeur (« Développeur » dans sa barre de titre ;
 -- fenêtre flottante, non bloquante) :
 -- une conversation avec Claude Code (le fil avec les appels d'outils, les invites en raccourcis et
--- la demande), ce que Claude regarde, sa proposition à accepter, refuser ou ajuster, la note qu'il
--- propose pour la photo active, et les versions du module et du connecteur MCP-Développeur.
+-- la demande), ce que Claude regarde, sa proposition à accepter, refuser, ajuster ou faire soi-même
+-- (Je le fais, 1.3), la note qu'il propose pour la photo active, le pourquoi de chaque étape
+-- (onglet Pourquoi ?, 1.3), et les versions du module et du connecteur MCP-Développeur.
 --
 -- Une seule disposition, la Conversation claire (l'Atelier, le Panneau et le choix de la
 -- disposition sont retirés : demandé par Dany le 20 octobre 2026). Dispositions.lua l'assemble des
@@ -17,6 +18,12 @@
 -- boutons radio au-dessus de variantes superposées de même largeur, dont chaque vue simple porte
 -- la condition de son onglet (Vues.masquable). Une autre photo active ou une autre sélection,
 -- choisie par l'utilisateur, commence une nouvelle conversation (Fenetre.suivreSelection).
+--
+-- Structure de la 1.3, posée une fois (les lots suivants remplissent les crochets) : trois onglets
+-- (Note, Proposition, Pourquoi ?) ; l'aperçu appartient à l'onglet (Fenetre.apercuOnglet), un vrai
+-- clic sur un onglet a son crochet (Fenetre.surOnglet) ; un clic sur une ligne du fil se répartit
+-- dans un ordre fixé (Fenetre.cliquerLigne) ; le fil montre la conversation ou une autre page
+-- (Fenetre.vue), et Claude qui travaille ramène à la conversation.
 
 local LrBinding = import 'LrBinding'
 local LrColor = import 'LrColor'
@@ -43,7 +50,7 @@ local Notation = require 'Notation'
 local Stockage = require 'Stockage'
 local Texte = require 'Texte'
 
-local Fenetre = { ouverte = false, defilement = 0, jointes = {}, cache = {}, vignettes = {}, generation = 0 }
+local Fenetre = { ouverte = false, defilement = 0, jointes = {}, cache = {}, vignettes = {}, generation = 0, vue = 'conversation' }
 
 -- Couleurs, polices, icônes et variantes des lignes, pour les pièces (Vues.lua).
 local COULEURS = {
@@ -336,6 +343,7 @@ function Fenetre.choisirDansListe(valeur)
     end
     Fenetre.defilement = 0
     Fenetre.indiceImage = nil
+    Fenetre.imageCliquee = nil
     Fenetre.p.message = ''
 end
 
@@ -347,10 +355,29 @@ function Fenetre.nouvelle()
     end
     Fenetre.defilement = 0
     Fenetre.indiceImage = nil
+    Fenetre.imageCliquee = nil
     Fenetre.aRafraichir = true
 end
 
 -- Fil -----------------------------------------------------------------------------------------
+
+-- Ce que montre la grille du fil : la conversation ('conversation', par défaut et à chaque
+-- ouverture) ou une autre page (la page Carnet de progrès, 'carnet', d'un lot suivant). Claude qui
+-- travaille ramène à la conversation (Fenetre.rafraichir) : une demande partie d'ailleurs que le
+-- champ (Accepter, Refuser, Ajuster…, Je le fais, J'ai fini) se suit dans le fil.
+-- Rend vrai si la vue a changé ; le fil se relit alors depuis la fin. La conversation montrée
+-- (Fenetre.conversationAffichee) reste la même : ce qui la suit (l'étape choisie de l'onglet
+-- Pourquoi ?, remise quand elle change) n'est pas perdu par un aller-retour vers une autre page.
+function Fenetre.revenirAuFil()
+    if Fenetre.vue == 'conversation' then
+        return false
+    end
+    Fenetre.vue = 'conversation'
+    Fenetre.defilement = 0
+    Fenetre.cache = {}
+    Fenetre.total = nil
+    return true
+end
 
 function Fenetre.largeurTexte()
     return Fenetre.T.fil - 20
@@ -405,16 +432,38 @@ function Fenetre.defiler(pas)
     Fenetre.rafraichirFil()
 end
 
--- Clic sur une ligne : une image s'affiche dans l'aperçu, un outil montre son détail.
-function Fenetre.cliquerLigne(i)
-    Fenetre.annulerEnvoiAuto()
-    local l = Fenetre.lignes and Fenetre.lignes[(Fenetre.premiere or 1) + i - 1]
-    if not l then
-        return
-    end
+-- Clic sur une ligne du fil, réparti dans un ordre fixé (1.3) : une image (montrée dans l'aperçu,
+-- prioritaire sur l'aperçu de l'onglet), une ligne de la page Carnet de progrès (la rangée d'un
+-- défaut, `defaut`, ou une action, `action`), une ligne de leçon, une étape de Claude (onglet
+-- Pourquoi ?), sinon le détail d'un outil. Fenetre.sorteDeClic dit laquelle,
+-- Fenetre.clics[sorte](l, e) la traite. Le carnet, la leçon et l'étape sont des crochets vides,
+-- remplis par les lots suivants (une étape se reconnaît par Fenetre.estEtape, faux pour l'instant :
+-- ses lignes restent des outils).
+function Fenetre.estEtape(e)
+    return false
+end
+
+function Fenetre.sorteDeClic(l, e)
     if l.image then
-        -- Les images de la conversation relues : le clic choisit la sienne, sans bascule vers une
-        -- image arrivée entre-temps (Fenetre.rafraichirApercu).
+        return 'image'
+    elseif l.defaut ~= nil or l.action ~= nil then
+        return 'carnet'
+    elseif e and e.genre == 'lecon' then
+        return 'lecon'
+    elseif e and Fenetre.estEtape(e) then
+        return 'etape'
+    elseif e and e.genre == 'outil' then
+        return 'outil'
+    end
+    return nil
+end
+
+Fenetre.clics = {
+    -- Les images de la conversation relues : le clic choisit la sienne, sans bascule vers une image
+    -- arrivée entre-temps (Fenetre.rafraichirApercu). Elle reste montrée quel que soit l'onglet
+    -- (Fenetre.imageCliquee), jusqu'à un autre onglet, une image nouvelle, une autre conversation,
+    -- une autre photo active ou un clic sur une étape.
+    image = function(l)
         local c = Moteur.courante
         Fenetre.images = c and Conversation.images(c) or {}
         Fenetre.apercuDe, Fenetre.nbImages = c, #Fenetre.images
@@ -422,15 +471,36 @@ function Fenetre.cliquerLigne(i)
             if image.chemin == l.image then
                 Fenetre.indiceImage = n
                 Fenetre.voirActive = false
+                Fenetre.imageCliquee = true
             end
         end
         Fenetre.rafraichirApercu()
+    end,
+    carnet = function() end,
+    lecon = function() end,
+    etape = function() end,
+    outil = function(_, e)
+        enTache(Fenetre.montrerDetail, e)
+    end,
+}
+
+function Fenetre.cliquerLigne(i)
+    Fenetre.annulerEnvoiAuto()
+    local l = Fenetre.lignes and Fenetre.lignes[(Fenetre.premiere or 1) + i - 1]
+    if not l then
         return
     end
     local c = Moteur.courante
-    local e = c and l.element and c.elements[l.element]
-    if e and e.genre == 'outil' then
-        enTache(Fenetre.montrerDetail, e)
+    local e = c and l.element and c.elements[l.element] or nil
+    local sorte = Fenetre.sorteDeClic(l, e)
+    -- Une étape montre son avant/après dans l'aperçu, à la place d'une image cliquée avant ; le
+    -- détail d'un outil ou d'une leçon s'ouvre à part, l'aperçu reste tel quel.
+    if sorte == 'etape' then
+        Fenetre.imageCliquee = nil
+    end
+    local traiter = sorte and Fenetre.clics[sorte]
+    if traiter then
+        traiter(l, e)
     end
 end
 
@@ -452,6 +522,45 @@ function Fenetre.montrerDetail(e)
 end
 
 -- Onglets -------------------------------------------------------------------------------------
+
+-- L'aperçu appartient à l'onglet (1.3) : Note montre la photo active et les images de la
+-- conversation, comme avant ; Proposition, l'image de la proposition ou de l'exercice ;
+-- Pourquoi ?, l'avant ou l'après de l'étape choisie. Fenetre.apercuOnglet[valeur](p, T, c), s'il
+-- existe, est demandé d'abord par Fenetre.rafraichirApercu : vrai s'il a rempli l'aperçu lui-même
+-- (imageApercu, legendeApercu, aImage, peutPrecedente, peutSuivante), nil ou faux pour l'aperçu
+-- d'avant. Un clic sur une ligne d'image reste prioritaire. Fenetre.surOnglet[valeur](valeur) suit
+-- un vrai clic sur cet onglet (jamais une bascule de la fenêtre, Fenetre.choisirOnglet). Ni l'un ni
+-- l'autre n'attend : une lecture du catalogue ou un rendu passe par sa propre tâche. Crochets vides
+-- ici, remplis par les lots suivants.
+Fenetre.apercuOnglet = {}
+Fenetre.surOnglet = {}
+
+-- Appelle un crochet ; une erreur est journalisée et vaut nil (la fenêtre continue). Hors d'une
+-- tâche (observateur d'une propriété, clic), pcall : LrTasks.pcall ne sert qu'à du code qui peut
+-- attendre.
+local function crochet(fn, ...)
+    local protege = LrTasks.canYield and LrTasks.canYield() and LrTasks.pcall or pcall
+    local ok, r = protege(fn, ...)
+    if not ok then
+        Journal.noter("Crochet de la fenêtre :", tostring(r))
+        return nil
+    end
+    return r
+end
+
+-- L'onglet change (clic ou bascule) : une image cliquée dans le fil cède la place à l'aperçu de
+-- l'onglet ; un vrai clic n'envoie pas la demande validée par ce clic, et appelle son crochet.
+function Fenetre.ongletChange(valeur)
+    Fenetre.imageCliquee = nil
+    if not Fenetre.ongletAuto then
+        Fenetre.annulerEnvoiAuto()
+        local sur = Fenetre.surOnglet[valeur]
+        if sur then
+            crochet(sur, valeur)
+        end
+    end
+    Fenetre.rafraichirApercu()
+end
 
 -- Montre un onglet sans annuler l'envoi automatique : c'est la fenêtre qui change d'onglet, pas un
 -- clic.
@@ -561,13 +670,24 @@ function Fenetre.rafraichirApercu()
     if Fenetre.indiceImage and Fenetre.indiceImage > n then
         Fenetre.indiceImage = nil
     end
+    -- Une autre conversation (liste, Nouvelle, conversation supprimée, nouvelle demande d'une autre
+    -- page) : l'image cliquée était d'une autre conversation, l'aperçu revient à l'onglet.
+    if Fenetre.apercuDe ~= c then
+        Fenetre.imageCliquee = nil
+    end
     -- Une image de plus dans la conversation montrée (Claude regarde, une photo jointe) : elle se
-    -- montre, à la place de la photo active.
+    -- montre, à la place de la photo active ; une image cliquée avant rend la main à l'onglet.
     if Fenetre.apercuDe == c and Fenetre.nbImages and n > Fenetre.nbImages then
         Fenetre.voirActive = false
         Fenetre.indiceImage = nil
+        Fenetre.imageCliquee = nil
     end
     Fenetre.apercuDe, Fenetre.nbImages = c, n
+    -- L'aperçu de l'onglet (Fenetre.apercuOnglet), sauf après un clic sur une ligne d'image.
+    local deLOnglet = not Fenetre.imageCliquee and Fenetre.apercuOnglet[p.onglet]
+    if deLOnglet and crochet(deLOnglet, p, T, c) then
+        return
+    end
     local active = Fenetre.info and Fenetre.info.active
     if Fenetre.voirActive and active then
         montrerActive(p, T, active, n)
@@ -669,16 +789,69 @@ function Fenetre.agrandir()
     end)
 end
 
+-- Deux images côte à côte en grand, dans une fenêtre à part (1.3) : l'avant et l'après d'une étape
+-- (onglet Pourquoi ?), la version de Claude et celle de Dany (Je le fais). `gauche` et `droite` :
+-- { dossier, nom, titre } (le titre au-dessus de l'image, « Avant », « Après ») ; `legende`
+-- (facultative) dessous, coupée à la largeur des deux images ; le titre de la fenêtre est
+-- « Claude · <titre> ». Chaque image tient dans GRANDE_DEUX (Images.grande, sips) : depuis une
+-- tâche. Une image illisible est dite à sa place ; rend faux si aucune ne se lit.
+Fenetre.GRANDE_DEUX = { largeur = 540, hauteur = 700 }
+
+function Fenetre.agrandirDeux(titre, gauche, droite, legende)
+    local f = LrView.osFactory()
+    local G = Fenetre.GRANDE_DEUX
+    local colonnes, largeur, lues = { spacing = f:control_spacing() }, 0, 0
+    for _, image in ipairs({ gauche or false, droite or false }) do
+        local chemin, l, h
+        if type(image) == 'table' and image.dossier and image.nom then
+            chemin, l, h = Images.grande(image.dossier, image.nom, G.largeur, G.hauteur)
+        end
+        local nom = type(image) == 'table' and tostring(image.titre or '') or ''
+        if chemin then
+            lues = lues + 1
+            colonnes[#colonnes + 1] = f:column {
+                spacing = 4,
+                f:static_text { title = nom, font = POLICES.gras, width = l },
+                f:picture { value = chemin, width = l, height = h },
+            }
+            largeur = largeur + l
+        else
+            colonnes[#colonnes + 1] = f:column {
+                f:static_text { title = (nom ~= '' and (nom .. " : ") or '') .. "image illisible", font = POLICES.texte, width = 200 },
+            }
+            largeur = largeur + 200
+        end
+    end
+    if lues == 0 then
+        LrDialogs.message("Aperçu illisible", tostring(titre or ''), 'warning')
+        return false
+    end
+    local contenu = { spacing = f:control_spacing(), f:row(colonnes) }
+    if Texte.nettoyer(legende or '') ~= '' then
+        local lignes = Fenetre.lignesCarte(legende, largeur)
+        contenu[#contenu + 1] = f:static_text { title = table.concat(lignes, '\n'), font = POLICES.texte, width = largeur,
+            height_in_lines = math.max(1, #lignes) }
+    end
+    LrDialogs.presentModalDialog {
+        title = "Claude · " .. tostring(titre or ''),
+        contents = f:column(contenu),
+        actionVerb = "Fermer",
+        cancelVerb = '< exclude >',
+    }
+    return true
+end
+
 -- Textes des cartes, page par page --------------------------------------------------------------
 
--- Le texte de la carte Note (clé 'note') et celui de la proposition (clé 'proposition') : coupés
--- en lignes comme le fil (police P.texte), montrés page par page avec ▲ ▼ (Vues.fleches). Un
--- texte qui change revient à sa première page.
+-- Le texte de la carte Note (clé 'note'), celui de la proposition (clé 'proposition') et celui de
+-- la carte Pourquoi ? (clé 'etape', 1.3) : coupés en lignes comme le fil (police P.texte), montrés
+-- page par page avec ▲ ▼ (Vues.fleches). Un texte qui change revient à sa première page.
 Fenetre.pages = {}
 
 local CARTES = {
     note = { texte = 'notationTexte', largeur = 'largeurNote', lignes = function(T) return (T.criteres or 8) + 3 end },
     proposition = { texte = 'propositionTexte', largeur = 'largeurProposition', lignes = function(T) return T.propLignes or 5 end },
+    etape = { texte = 'etapeTexte', largeur = 'largeurEtape', lignes = function(T) return T.etapeLignes or 8 end },
 }
 
 -- Les lignes d'un texte dans `largeur` points (paragraphes gardés, lignes vides comprises).
@@ -769,6 +942,12 @@ function Fenetre.rafraichirProposition()
     Fenetre.montrerPage('proposition', table.concat(lignes, '\n'))
 end
 
+-- Je le fais (1.3) : l'action du bouton de la seconde rangée de la carte Proposition (depuis une
+-- tâche). Sans effet pour l'instant : un lot suivant la remplit (« Je le fais », puis « J'ai
+-- fini »).
+function Fenetre.jeLeFais()
+end
+
 function Fenetre.repondreProposition(acceptee)
     LrTasks.startAsyncTask(function() Moteur.repondre(acceptee) end)
 end
@@ -805,6 +984,20 @@ function Fenetre.ajuster()
             Moteur.ajuster(texte)
         end)
     end
+end
+
+-- Pourquoi ? (1.3) ------------------------------------------------------------------------------
+-- Les actions de la carte Pourquoi ? (Vues.etape) : ◀ ▶ (étape précédente ou suivante de la même
+-- photo), Voir l'avant / Voir l'après, Détail… (depuis une tâche). Sans effet pour l'instant : un
+-- lot suivant les remplit.
+
+function Fenetre.etapeVoisine(pas)
+end
+
+function Fenetre.basculerEtape()
+end
+
+function Fenetre.detailEtape()
 end
 
 -- Note de la photo active ----------------------------------------------------------------------
@@ -1168,11 +1361,13 @@ function Fenetre.majPhoto()
     local version = Notation.version
     local info = Lightroom.photos()
     Fenetre.info = info
-    -- Une autre photo active (ou la première vue à l'ouverture) : son aperçu se montre.
+    -- Une autre photo active (ou la première vue à l'ouverture) : son aperçu se montre ; une image
+    -- cliquée avant n'est plus montrée, l'aperçu revient à l'onglet (1.3).
     local id = info.active and info.active.id
     if id ~= Fenetre.idActif then
         Fenetre.idActif = id
         Fenetre.voirActive = true
+        Fenetre.imageCliquee = nil
         Fenetre.rafraichirApercu()
     end
     if info.active then
@@ -1233,6 +1428,10 @@ function Fenetre.rafraichir()
     local p = Fenetre.p
     if not p then
         return
+    end
+    -- Claude qui travaille ramène à la conversation (Fenetre.vue).
+    if Moteur.travaille then
+        Fenetre.revenirAuFil()
     end
     local c = Moteur.courante
     poser(p, 'titre', c and c.titre or Conversation.TITRE_PAR_DEFAUT)
@@ -1537,6 +1736,22 @@ local function initialiserNotation(p)
     p.peutChangerNote = false
 end
 
+-- Valeurs des propriétés de la 1.3 avant l'ouverture (Lightroom l'exige de toute clé liée) : la
+-- carte Pourquoi ?, vide et ses boutons inactifs, et la seconde rangée de la carte Proposition.
+local function initialiserEtapeEtExercice(p)
+    p.etapeTitre = ''
+    p.etapeSousTitre = ''
+    p.etapeTexte = ''
+    p.etapePrecedente = false
+    p.etapeSuivante = false
+    p.etapeAImages = false
+    p.etapeADetail = false
+    p.titreBascule = "Voir l'avant"
+    p.titreJeLeFais = "Je le fais"
+    p.peutJeLeFais = false
+    p.exerciceEtat = ''
+end
+
 function Fenetre.afficher()
     if Fenetre.ouverte then
         if Fenetre.controle and Fenetre.controle.toFront then
@@ -1575,6 +1790,8 @@ function Fenetre.afficher()
         Fenetre.signatureListe = nil
         Fenetre.defilement = 0
         Fenetre.indiceImage = nil
+        Fenetre.imageCliquee = nil
+        Fenetre.vue = 'conversation'
         -- À l'ouverture, l'aperçu montre la photo active, refait (Fenetre.majPhoto).
         Fenetre.idActif, Fenetre.apercuActif, Fenetre.demandeActive, Fenetre.voirActive = nil, nil, nil, true
         Fenetre.propositionVue = nil
@@ -1608,7 +1825,7 @@ function Fenetre.afficher()
         p.aProposition = false
         p.enAttente = false
         p.propositionTexte = ''
-        for _, cle in ipairs({ 'note', 'proposition' }) do
+        for cle in pairs(CARTES) do
             p[cle .. 'Monte'], p[cle .. 'Descend'] = false, false
         end
         p.aide = ''
@@ -1625,6 +1842,7 @@ function Fenetre.afficher()
             p['i' .. i] = ''
         end
         initialiserNotation(p)
+        initialiserEtapeEtExercice(p)
         Fenetre.p = p
 
         p:addObserver('selectionListe', function(_, _, valeur)
@@ -1639,12 +1857,9 @@ function Fenetre.afficher()
             Fenetre.annulerEnvoiAuto()
             Chemins.prefs().styleChoisi = valeur
         end)
-        -- Un clic sur un onglet n'envoie pas la demande validée par le clic.
-        p:addObserver('onglet', function()
-            if not Fenetre.ongletAuto then
-                Fenetre.annulerEnvoiAuto()
-            end
-        end)
+        -- Un clic sur un onglet n'envoie pas la demande validée par le clic ; l'aperçu suit
+        -- l'onglet (Fenetre.ongletChange).
+        p:addObserver('onglet', function(_, _, valeur) Fenetre.ongletChange(valeur) end)
         p:addObserver('saisie', function(_, _, valeur) Fenetre.saisieValidee(valeur) end)
         for _, cle in ipairs({ 'message', 'aide', 'jointes' }) do
             p:addObserver(cle, function(proprietes) poser(proprietes, 'bandeau', Fenetre.etatBandeau(proprietes)) end)

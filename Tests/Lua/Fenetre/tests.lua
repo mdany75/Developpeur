@@ -841,7 +841,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         end)
         vrai(style, nom .. ' : menu Style')
         vrai(rangeeStyle and rangeeStyle == rangeeSports, nom .. ' : Style à droite des invites')
-        -- ▲ ▼ de la carte Note et de la proposition, en petit.
+        -- ▲ ▼ de la carte Note, de la proposition et de la carte Pourquoi ? (1.3), en petit : six.
         local fleches = {}
         parcourir(args.contents, function(v)
             if v.genre == 'push_button' and (v.args.title == '▲' or v.args.title == '▼') and v.args.size == 'mini' then
@@ -849,7 +849,108 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end)
         table.sort(fleches)
-        egal('noteDescend noteMonte propositionDescend propositionMonte', table.concat(fleches, ' '), nom .. ' : flèches des cartes')
+        egal('etapeDescend etapeMonte noteDescend noteMonte propositionDescend propositionMonte', table.concat(fleches, ' '),
+            nom .. ' : flèches des cartes')
+        -- Chaque rangée tient dans sa colonne, sans la marge de l'estimation générale : les trois
+        -- onglets (Note, Proposition, Pourquoi ?) dans la colonne de droite, les sept invites et le
+        -- menu Style dans celle du fil (1.3 : Composition ajoutée avant Sports).
+        local rangeeOnglets
+        parcourir(args.contents, function(v)
+            if v.genre == 'row' and type(v.args[1]) == 'table' and v.args[1].genre == 'radio_button' then
+                rangeeOnglets = v
+            end
+        end)
+        local largeurOnglets, largeurInvites = largeurEstimee(rangeeOnglets, p), largeurEstimee(rangeeSports, p)
+        vrai(largeurOnglets <= D.droite, string.format('%s : onglets de %d points dans %d', nom, largeurOnglets, D.droite))
+        vrai(largeurInvites <= D.fil, string.format('%s : invites de %d points dans %d', nom, largeurInvites, D.fil))
+        local invites = {}
+        for _, enfant in ipairs(rangeeSports.args) do
+            if type(enfant) == 'table' and enfant.genre == 'push_button' then
+                invites[#invites + 1] = enfant.args.title
+            end
+        end
+        egal('Retouche pro Portrait Paysage Noir et blanc ISO élevé Composition Sports', table.concat(invites, ' '), nom .. ' : invites')
+        -- La carte Proposition (1.3) : Accepter dit que la photo ne change qu'à son clic ; une
+        -- seconde rangée, sous Accepter, Refuser et Ajuster…, porte « Je le fais » (titre lié, actif
+        -- selon peutJeLeFais, inactif à l'ouverture) et l'état de l'exercice.
+        local rangeeAccepter, rangeeJeLeFais
+        parcourir(args.contents, function(v)
+            for k, enfant in ipairs(v.args) do
+                if type(enfant) == 'table' and enfant.genre == 'row' then
+                    for _, b in ipairs(enfant.args) do
+                        if type(b) == 'table' and b.genre == 'push_button' then
+                            if b.args.title == 'Accepter' and type(b.args.enabled) == 'table' and b.args.enabled.key == 'enAttente' then
+                                rangeeAccepter = { parent = v, rang = k, bouton = b }
+                            elseif type(b.args.title) == 'table' and b.args.title.key == 'titreJeLeFais' then
+                                rangeeJeLeFais = { parent = v, rang = k, bouton = b, rangee = enfant }
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        vrai(rangeeAccepter and rangeeJeLeFais, nom .. ' : Accepter et Je le fais')
+        egal("Appliquer la proposition : la photo ne change qu'à ce clic", rangeeAccepter.bouton.args.tooltip)
+        vrai(rangeeJeLeFais.parent == rangeeAccepter.parent and rangeeJeLeFais.rang == rangeeAccepter.rang + 1,
+            nom .. ' : Je le fais sur la rangée sous Accepter')
+        egal('Je le fais', p.titreJeLeFais)
+        egal('peutJeLeFais', rangeeJeLeFais.bouton.args.enabled.key)
+        egal(false, p.peutJeLeFais, nom .. ' : Je le fais inactif à l\'ouverture')
+        vrai(boutons['Je le fais'] == rangeeJeLeFais.bouton, nom .. ' : Je le fais passe par Fenetre.bouton')
+        local etat = rangeeJeLeFais.rangee.args[2]
+        vrai(etat and etat.genre == 'static_text' and etat.args.title.key == 'exerciceEtat', nom .. " : l'état de l'exercice à droite")
+        egal('', p.exerciceEtat)
+        -- La carte Pourquoi ? (1.3) : titre, sous-titre, texte de D.etapeLignes lignes, puis ◀ ▶,
+        -- Voir l'avant (titre lié), Détail… et ▲ ▼, tous en petit, inactifs à l'ouverture.
+        local carteEtape
+        parcourir(args.contents, function(v)
+            for _, enfant in ipairs(v.args) do
+                if type(enfant) == 'table' and enfant.genre == 'static_text' and type(enfant.args.title) == 'table'
+                    and enfant.args.title.key == 'etapeTexte' then
+                    carteEtape = v
+                end
+            end
+        end)
+        vrai(carteEtape, nom .. ' : carte Pourquoi ?')
+        local champs, boutonsEtape = {}, {}
+        parcourir(carteEtape, function(v)
+            local t = v.args.title
+            if v.genre == 'static_text' and type(t) == 'table' then
+                champs[#champs + 1] = t.key
+                if t.key == 'etapeTexte' then
+                    egal(D.etapeLignes, v.args.height_in_lines, nom .. ' : lignes du texte de l\'étape')
+                    egal(D.largeurEtape, v.args.width, nom .. ' : largeur du texte de l\'étape')
+                end
+            elseif v.genre == 'static_text' then
+                champs[#champs + 1] = t
+            elseif v.genre == 'push_button' then
+                boutonsEtape[#boutonsEtape + 1] = (type(t) == 'table' and p[t.key] or t) .. '/' .. v.args.size .. '/' .. v.args.enabled.key
+                vrai(Fenetre.parBouton(v.args.action), nom .. ' : bouton de l\'étape hors de Fenetre.bouton')
+                egal(false, p[v.args.enabled.key], nom .. ' : ' .. v.args.enabled.key .. ' inactif à l\'ouverture')
+            end
+        end)
+        egal('Pourquoi ? etapeTitre etapeSousTitre etapeTexte', table.concat(champs, ' '), nom .. ' : textes de la carte Pourquoi ?')
+        egal("◀/small/etapePrecedente ▶/small/etapeSuivante Voir l'avant/small/etapeAImages Détail…/small/etapeADetail "
+            .. '▲/mini/etapeMonte ▼/mini/etapeDescend', table.concat(boutonsEtape, ' '), nom .. ' : boutons de la carte Pourquoi ?')
+        -- Les rangées de boutons de la carte Pourquoi ? et la seconde de la carte Proposition
+        -- tiennent dans leur carte, avec l'un et l'autre titre lié (Voir l'avant ou Voir l'après ;
+        -- Je le fais ou J'ai fini).
+        local rangeeEtape
+        for _, enfant in ipairs(carteEtape.args) do
+            if type(enfant) == 'table' and enfant.genre == 'row' then
+                rangeeEtape = enfant
+            end
+        end
+        vrai(rangeeEtape, nom .. ' : rangée des boutons de la carte Pourquoi ?')
+        for _, titres in ipairs({ { "Voir l'avant", 'Je le fais' }, { "Voir l'après", "J'ai fini" } }) do
+            p.titreBascule, p.titreJeLeFais = titres[1], titres[2]
+            local largeurEtape, largeurJeLeFais = largeurEstimee(rangeeEtape, p), largeurEstimee(rangeeJeLeFais.rangee, p)
+            vrai(largeurEtape <= D.largeurEtape, string.format('%s : boutons de l\'étape de %d points dans %d (%s)', nom, largeurEtape,
+                D.largeurEtape, titres[1]))
+            vrai(largeurJeLeFais <= D.largeurProposition, string.format('%s : rangée Je le fais de %d points dans %d (%s)', nom,
+                largeurJeLeFais, D.largeurProposition, titres[2]))
+        end
+        p.titreBascule, p.titreJeLeFais = "Voir l'avant", 'Je le fais'
         vrai(textes.versionNom1 and textes.versionNom2 and not textes.versionNom3, nom .. ' : deux versions')
         vrai(textes.message and textes.aide, nom .. ' : message et aide')
         -- Le fil : D.lignes lignes, une variante par style.
@@ -913,9 +1014,9 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         egal('DSCF4961', p.notationNom)
         -- Conversations : la liste, à gauche ; plus de menu des conversations (Atelier, Panneau retirés).
         vrai(textes.titre and textes.infoPhoto, nom .. ' : titre et photo active')
-        -- Les onglets Note (par défaut) et Proposition en tête, puis l'aperçu, toujours montré,
-        -- et la carte choisie sous Agrandir ; plus de « Ce que Claude voit ».
-        egal('notation proposition', table.concat(radios, ' '))
+        -- Les onglets Note (par défaut), Proposition et Pourquoi ? (1.3) en tête, puis l'aperçu,
+        -- toujours montré, et la carte choisie sous Agrandir ; plus de « Ce que Claude voit ».
+        egal('notation proposition etape', table.concat(radios, ' '))
         egal('notation', p.onglet, nom .. " : la carte Note sous l'aperçu par défaut")
         egal(nil, images[1].args.visible, nom .. ' : aperçu toujours montré')
         local suite = {}
@@ -931,11 +1032,13 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 suite[#suite + 1] = 'note'
             elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'propositionTexte' then
                 suite[#suite + 1] = 'proposition'
+            elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'etapeTexte' then
+                suite[#suite + 1] = 'etape'
             elseif v.genre == 'push_button' and t == 'Publication…' then
                 suite[#suite + 1] = 'publication'
             end
         end)
-        egal('onglets apercu agrandir note proposition publication', table.concat(suite, ' '), nom .. ' : colonne de droite')
+        egal('onglets apercu agrandir note proposition etape publication', table.concat(suite, ' '), nom .. ' : colonne de droite')
         parcourir(args.contents, function(v)
             vrai(v.args.title ~= "Ce que Claude voit", nom .. ' : plus de « Ce que Claude voit »')
         end)
