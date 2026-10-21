@@ -11,6 +11,11 @@
 -- ligne par photo) : un genre de plus ajouterait une vue à chaque ligne de la fenêtre. De même, la
 -- ligne d'une étape de Claude (1.3, Conversation.estEtape) reste une ligne d'outil, son texte
 -- suivi du repère « · Pourquoi ? » (Fil.SUFFIXE_ETAPE) : un clic l'ouvre dans l'onglet Pourquoi ?.
+-- La carte « Leçon de la photo » (1.3, élément `lecon`) se fait aussi de genres existants : le
+-- titre en `proposition` (gras orange, ⓘ), chaque axe en `titre`, ses deux moitiés en `claude`
+-- retirées de 4 espaces (deux lignes au plus chacune, sans Markdown), 16 lignes au plus (deux de
+-- plus pour la remarque d'une leçon non rangée) ; une leçon refusée ou interrompue, une ligne
+-- `note` « Leçon non rangée : … ».
 
 local Conversation = require 'Conversation'
 local Metriques = require 'Metriques'
@@ -34,6 +39,15 @@ Fil.NOTES_MONTREES = 12
 -- Le repère d'une ligne d'étape (1.3), après le texte de l'outil coupé à la place qui reste : un
 -- but (step_name) long ne le fait jamais disparaître.
 Fil.SUFFIXE_ETAPE = '  · Pourquoi ?'
+
+-- La carte d'une leçon (1.3) : le retrait des moitiés de point sous leur axe, et les lignes au plus
+-- de chaque moitié (une phrase de 140 caractères en tient deux ; au-delà, « … », et le détail de
+-- l'appel la donne entière), soit 1 + 3 × (1 + 2 + 2) = 16 lignes ; puis la remarque du rangement
+-- (« Leçon non rangée… », rare) en deux lignes au plus ; une leçon refusée, en trois au plus.
+Fil.RETRAIT_LECON = '    '
+Fil.LIGNES_MOITIE_LECON = 2
+Fil.LIGNES_REMARQUE_LECON = 2
+Fil.LIGNES_ERREUR_LECON = 3
 
 -- L'espace insécable (U+00A0) : celle de la ponctuation haute, que la coupe garde avec son mot.
 local INSECABLE = '\194\160'
@@ -116,6 +130,38 @@ local function uneLigne(texte, largeur, police)
         montre = Texte.debut(montre, math.max(1, Texte.longueur(montre) - 1)) .. '…'
     end
     return montre
+end
+
+-- Un texte coupé en `maxi` lignes au plus : la dernière finit par « … » quand il dépasse.
+local function coupeBornee(texte, largeur, police, retrait, maxi)
+    local coupe = Fil.couper(texte, largeur, police, retrait)
+    if #coupe <= maxi then
+        return coupe
+    end
+    local gardees = {}
+    for k = 1, maxi do
+        gardees[k] = coupe[k]
+    end
+    local derniere = gardees[maxi]
+    local n = Texte.longueur(derniere)
+    while n > 0 and Fil.largeur(Texte.debut(derniere, n) .. '…', police) > math.max(largeur, 80) do
+        n = n - 1
+    end
+    gardees[maxi] = Texte.debut(derniere, n):gsub('%s+$', '') .. '…'
+    return gardees
+end
+
+-- Le nom d'un axe de leçon (« Lumière »), relu au besoin d'après sa clé.
+local function nomAxe(p)
+    if type(p.nom) == 'string' and p.nom ~= '' then
+        return p.nom
+    end
+    for _, axe in ipairs(Conversation.AXES_LECON) do
+        if axe.cle == p.axe then
+            return axe.nom
+        end
+    end
+    return tostring(p.axe or '?')
 end
 
 -- « ★★★☆☆ » : une note de 0 à 5 étoiles.
@@ -297,6 +343,47 @@ function Fil.lignesElement(e, i, largeur)
             end
             lignes[#lignes + 1] = { genre = 'outil', texte = uneLigne('  ' .. Fil.texteNote(x), largeur - 16, 'mono'), element = i }
         end
+    elseif g == 'lecon' then
+        -- La carte « Leçon de la photo » (1.3) : refusée ou interrompue, une ligne « Leçon non
+        -- rangée : … » ; sinon le titre (● pendant l'appel, puis ⓘ), et pour chaque axe, dans
+        -- l'ordre Lumière, Couleur, Composition, ce qui manquait puis la prise de vue (« Rien ne
+        -- manquait. » puis « À refaire : … » pour un axe sans défaut). Le texte de Claude ne passe
+        -- pas par le Markdown du fil : il reste une phrase, jamais une puce.
+        if e.etat == 'erreur' then
+            local raison = Texte.nettoyer(e.texte or '')
+            local texte = "Leçon non rangée : " .. (raison ~= '' and raison or "l'appel n'a pas abouti.")
+            for n, t in ipairs(coupeBornee(texte, largeur, 'texte', '', Fil.LIGNES_ERREUR_LECON)) do
+                lignes[#lignes + 1] = { genre = 'note', texte = t, element = i, icone = n == 1 and 'erreur' or nil }
+            end
+        else
+            local titre = "Leçon de la photo"
+            if type(e.fichier) == 'string' and e.fichier ~= '' then
+                titre = titre .. " · " .. e.fichier
+            end
+            lignes[1] = { genre = 'proposition', texte = uneLigne(titre, largeur, 'gras'), element = i,
+                icone = e.etat == 'enCours' and 'cours' or 'note' }
+            for _, p in ipairs(e.points or {}) do
+                lignes[#lignes + 1] = { genre = 'titre', texte = uneLigne(nomAxe(p), largeur, 'gras'), element = i }
+                local manque = type(p.manque) == 'string' and Texte.nettoyer(p.manque) or ''
+                local prise = type(p.prise_de_vue) == 'string' and Texte.nettoyer(p.prise_de_vue) or ''
+                local moities = manque ~= '' and { "Ce qui manquait : " .. manque, "À la prise de vue : " .. prise }
+                    or { "Rien ne manquait.", "À refaire : " .. prise }
+                for _, m in ipairs(moities) do
+                    for _, t in ipairs(coupeBornee(Fil.RETRAIT_LECON .. m, largeur, 'texte', Fil.RETRAIT_LECON, Fil.LIGNES_MOITIE_LECON)) do
+                        lignes[#lignes + 1] = { genre = 'claude', texte = t, element = i }
+                    end
+                end
+            end
+            -- Fait, mais pas rangé (module d'avant la 1.3) ou gardé pour la session seulement : la
+            -- remarque du connecteur.
+            local remarque = type(e.remarque) == 'string' and Texte.nettoyer(e.remarque) or ''
+            if remarque ~= '' then
+                for n, t in ipairs(coupeBornee(remarque, largeur, 'texte', '', Fil.LIGNES_REMARQUE_LECON)) do
+                    lignes[#lignes + 1] = { genre = 'note', texte = t, element = i,
+                        icone = n == 1 and (e.rangee == false and 'erreur' or 'note') or nil }
+                end
+            end
+        end
     elseif g == 'note' then
         ajouterTexte(lignes, e.texte or '', 'note', largeur, i, 'note')
     end
@@ -316,6 +403,19 @@ local function signatureNotes(e)
     return table.concat(morceaux, '\3')
 end
 
+-- Ce qui change l'affichage d'une leçon (pour la signature du cache) : son fichier, sa photo, son
+-- rangement et ses points.
+local function signatureLecon(e)
+    if e.genre ~= 'lecon' then
+        return ''
+    end
+    local morceaux = { tostring(e.fichier), tostring(e.photo), tostring(e.rangee), tostring(e.remarque) }
+    for _, p in ipairs(type(e.points) == 'table' and e.points or {}) do
+        morceaux[#morceaux + 1] = table.concat({ tostring(p.axe), tostring(p.nom), tostring(p.manque), tostring(p.prise_de_vue) }, '\2')
+    end
+    return table.concat(morceaux, '\3')
+end
+
 -- Vrai si deux éléments voisins se suivent sans ligne vide (outils et aperçus d'une même série).
 local function colles(a, b)
     local serie = { outil = true, apercu = true }
@@ -331,7 +431,7 @@ function Fil.lignes(c, largeur, cache)
     for i, e in ipairs(c.elements or {}) do
         local signature = table.concat({ largeur, e.genre or '', e.etat or '', tostring(e.partiel), #(e.images or {}),
             #(e.changements or {}), e.style or '', e.texte or '', signatureNotes(e), #(e.etapes or {}),
-            tostring(Conversation.estEtape(e)) }, '\1')
+            tostring(Conversation.estEtape(e)), signatureLecon(e) }, '\1')
         local siennes
         if cache and cache[e.id] and cache[e.id].signature == signature then
             siennes = cache[e.id].lignes

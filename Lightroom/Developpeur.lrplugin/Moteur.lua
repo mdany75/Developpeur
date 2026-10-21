@@ -212,7 +212,8 @@ end
 
 -- Envoie une demande dans la conversation ouverte. options : modele, effort (sinon ceux des
 -- préférences), jointes (chemins d'images sur le disque), style (valeur d'un style de
--- Consignes.styles). Rend true, ou false et la raison.
+-- Consignes.styles). La préférence leconFinRetouche décochée joint « [Sans leçon] » (1.3). Rend
+-- true, ou false et la raison.
 function Moteur.envoyer(texte, options)
     options = options or {}
     texte = Texte.nettoyer(texte)
@@ -250,7 +251,10 @@ function Moteur.envoyer(texte, options)
         end
         local style = Consignes.style(options.style)
         local contexte = Lightroom.contexte(Lightroom.photos())
-        local message = Conversation.messagePourClaude(c, texte, contexte, Consignes.ligneStyle(options.style))
+        -- Case Leçon décochée (Gestionnaire de modules externes) : « [Sans leçon] » part avec la
+        -- demande ; les consignes de la session ne changent pas (Claude Code n'est pas relancé).
+        local ligneLecon = prefs.leconFinRetouche == false and Consignes.sansLecon or nil
+        local message = Conversation.messagePourClaude(c, texte, contexte, Consignes.ligneStyle(options.style), ligneLecon)
         Conversation.ajouterDemande(c, texte, os.time(), chemins, style and style.definition and style.title or nil)
         if not dansListe(c) then
             table.insert(Moteur.conversations, 1, c)

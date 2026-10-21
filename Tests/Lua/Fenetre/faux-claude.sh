@@ -7,7 +7,9 @@
 # (dans son dossier de travail). Un message « ARRETE-TOI » le fait quitter avec le code 3, une
 # demande d'interruption répond comme Claude Code. Un message « NOTE-LES » propose des notes
 # (propose_ratings, passe 2 : 3 étoiles, un rejet à vérifier, une photo
-# refusée par le module) et reçoit la réponse du connecteur, en JSON.
+# refusée par le module) et reçoit la réponse du connecteur, en JSON. Un message « LECON » finit
+# par la leçon de la photo (photo_lesson, trois points dans le désordre : composition d'abord) et
+# reçoit la réponse du connecteur, en JSON (leçon rangée pour DSCF4961.RAF).
 
 printf '%s\n' "$@" > arguments.txt
 session=session-essai
@@ -29,6 +31,10 @@ while IFS= read -r ligne; do
             printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"outil-notes","content":[{"type":"text","text":"{\"propositions\": [{\"photo\": 53636309, \"fichier\": \"DSCF4961.RAF\", \"note_avant\": 0, \"drapeau_avant\": \"aucun\", \"etat\": \"proposee\"}, {\"photo\": 53636310, \"fichier\": \"DSCF4962.RAF\", \"note_avant\": 2, \"drapeau_avant\": \"aucun\", \"etat\": \"proposee\"}], \"refusees\": [{\"photo\": 53636311, \"raison\": \"photo introuvable\"}]}"}]}]}}'
             printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"Deux notes proposées ; la photo 53636311 est introuvable."}]}}'
             printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"'$session'","duration_ms":900,"num_turns":2,"usage":{"input_tokens":12,"output_tokens":30},"modelUsage":{"claude-essai":{}}}' ;;
+        *LECON*)
+            printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"- Ciel retrouvé : 3 → 0,2 % écrêté.\n- Balance neutre."},{"type":"tool_use","id":"outil-lecon","name":"mcp__developpeur__photo_lesson","input":{"photo_id":53636309,"points":[{"axis":"composition","at_capture":"Le flamant au tiers gauche, regard vers le cadre : à refaire.","defects":[]},{"axis":"light","missing":"Ciel **brûlé** à 3 % : hautes lumières baissées de 40.","at_capture":"Compenser de −2/3 IL face au ciel clair.","defects":["blown_highlights"]},{"axis":"color","missing":"Dominante bleue à l’ombre : +400 K.","at_capture":"Balance des blancs Ombre plutôt qu’Auto.","defects":["color_cast"]}]}}]}}'
+            printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"outil-lecon","content":[{"type":"text","text":"{\n  \"faits\": {\"corrections\": []},\n  \"lecon\": {\"fichier\": \"DSCF4961.RAF\", \"mois\": \"2026-10\", \"photo\": 53636309, \"rangee\": true, \"remplacee\": false},\n  \"remarques\": [],\n  \"texte\": \"Leçon de la photo · DSCF4961.RAF\"\n}"}]}]}}'
+            printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"'$session'","duration_ms":800,"num_turns":2,"usage":{"input_tokens":11,"output_tokens":25},"modelUsage":{"claude-essai":{}}}' ;;
         *)
             printf '%s\n' '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"[titre : Flamant"}}}'
             printf '%s\n' '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":" rose au zoo]\nBonjour"}}}'

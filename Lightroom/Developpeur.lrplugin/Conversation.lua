@@ -1,8 +1,8 @@
 -- Conversation.lua : une conversation de la fenêtre = une session Claude Code, reprise par
--- `--resume` : des éléments `dany`, `claude`, `outil`, `apercu`, `proposition`, `notation` et
--- `note`, dans l'ordre du fil. Les dates sont en secondes Unix. Une conversation des anciennes
--- séances de notation (genre = 'notation', fenêtre retirée le 20 octobre 2026) reste sur le disque
--- mais ne s'ouvre plus.
+-- `--resume` : des éléments `dany`, `claude`, `outil`, `apercu`, `proposition`, `notation`,
+-- `lecon` (1.3) et `note`, dans l'ordre du fil. Les dates sont en secondes Unix. Une conversation
+-- des anciennes séances de notation (genre = 'notation', fenêtre retirée le 20 octobre 2026) reste
+-- sur le disque mais ne s'ouvre plus.
 --
 -- Élément : id, genre, texte, date, outil, appel, etat ('enCours', 'fait', 'erreur', 'enAttente',
 -- 'acceptee', 'refusee', 'ajustee'), detail, images (chemins relatifs au dossier de la
@@ -14,6 +14,11 @@
 -- pour undo_last : annule ({ photo, id, nom } de chaque étape défaite) ; pour
 -- revert_to_original : revenu (les photos remises). Une conversation de la 1.2 n'a ni raison, ni
 -- etape, ni etapes : elles se relisent dans `detail` (Conversation.infoEtape), sans id.
+-- Un élément `lecon` (1.3) suit un appel de photo_lesson avec ses points (jamais read_facts seul),
+-- pour le fil seulement (la leçon est rangée par le module, carnet.json) : photo, points (dans
+-- l'ordre Lumière, Couleur, Composition : { axe, nom, manque, prise_de_vue, defauts }), puis
+-- d'après la réponse : fichier, rangee, remplacee, remarque (« Leçon non rangée… ») ; en erreur, la
+-- raison dans texte.
 
 require 'Compat'
 local Consignes = require 'Consignes'
@@ -206,15 +211,19 @@ function Conversation.poserTitre(c, texte)
     end
 end
 
--- Le texte envoyé à Claude : la ligne de contexte de Lightroom, celle du style choisi, la demande,
--- et tant que la conversation n'a pas de titre tiré d'une photo ni choisi, le rappel du titre.
-function Conversation.messagePourClaude(c, demande, contexte, ligneStyle)
+-- Le texte envoyé à Claude : la ligne de contexte de Lightroom, celle du style choisi, celle de la
+-- leçon (« [Sans leçon] », case Leçon décochée), la demande, et tant que la conversation n'a pas de
+-- titre tiré d'une photo ni choisi, le rappel du titre.
+function Conversation.messagePourClaude(c, demande, contexte, ligneStyle, ligneLecon)
     local morceaux = {}
     if contexte and contexte ~= '' then
         morceaux[#morceaux + 1] = contexte
     end
     if ligneStyle and ligneStyle ~= '' then
         morceaux[#morceaux + 1] = ligneStyle
+    end
+    if ligneLecon and ligneLecon ~= '' then
+        morceaux[#morceaux + 1] = ligneLecon
     end
     morceaux[#morceaux + 1] = demande
     if c.titreAuto ~= true and c.titreChoisi ~= true then
@@ -223,8 +232,8 @@ function Conversation.messagePourClaude(c, demande, contexte, ligneStyle)
     return table.concat(morceaux, '\n\n')
 end
 
--- Recherche : chaque mot doit se trouver dans le titre, le résumé ou les messages (sans tenir
--- compte des majuscules ni des accents). Une recherche vide garde tout.
+-- Recherche : chaque mot doit se trouver dans le titre, le résumé, les messages ou les leçons (sans
+-- tenir compte des majuscules ni des accents). Une recherche vide garde tout.
 function Conversation.correspond(c, recherche)
     local mots = {}
     for mot in Texte.plier(recherche):gmatch('%S+') do
@@ -237,6 +246,12 @@ function Conversation.correspond(c, recherche)
     for _, e in ipairs(c.elements or {}) do
         if e.genre == 'dany' or e.genre == 'claude' then
             textes[#textes + 1] = e.texte or ''
+        elseif e.genre == 'lecon' then
+            for _, p in ipairs(type(e.points) == 'table' and e.points or {}) do
+                if type(p) == 'table' then
+                    textes[#textes + 1] = table.concat({ tostring(p.nom or ''), tostring(p.manque or ''), tostring(p.prise_de_vue or '') }, '\n')
+                end
+            end
         end
     end
     local botte = Texte.plier(table.concat(textes, '\n'))
@@ -462,6 +477,113 @@ function Conversation.completerNotation(e, r)
             end
         end
     end
+end
+
+-- Leçon de la photo (1.3) ---------------------------------------------------------------------
+-- Un élément `lecon` suit un appel de photo_lesson qui donne ses points : la carte « Leçon de la
+-- photo » du fil (Fil.lua) se fait de l'entrée de l'outil, visible avant la réponse, puis la
+-- réponse du connecteur dit le fichier et si la leçon est rangée. Les faits mesurés restent dans
+-- le détail de l'appel (un clic sur la carte l'ouvre). read_facts seul (les faits sans points) ne
+-- fait pas de carte.
+
+-- Les trois axes, dans l'ordre de la carte (clés de photo_lesson).
+Conversation.AXES_LECON = {
+    { cle = 'light', nom = "Lumière" },
+    { cle = 'color', nom = "Couleur" },
+    { cle = 'composition', nom = "Composition" },
+}
+
+-- Une moitié de point sur une ligne, sans gras ni code Markdown ; nil si elle est vide.
+local function textePoint(v)
+    if type(v) ~= 'string' then
+        return nil
+    end
+    local t = Texte.nettoyer((v:gsub('%*%*', ''):gsub('`', ''):gsub('%s+', ' ')))
+    return t ~= '' and t or nil
+end
+
+-- Les points demandés par Claude (entrée de photo_lesson), en tables neuves, dans l'ordre des axes
+-- (Conversation.AXES_LECON) : { axe, nom, manque (nil : rien ne manquait), prise_de_vue, defauts }.
+-- Un axe inconnu est écarté ; un axe donné deux fois garde son premier point (le connecteur refuse
+-- l'appel, la carte passe en erreur).
+function Conversation.leconDemandee(entree)
+    entree = type(entree) == 'table' and entree or {}
+    local parAxe = {}
+    for _, p in ipairs(type(entree.points) == 'table' and entree.points or {}) do
+        if type(p) == 'table' and type(p.axis) == 'string' and not parAxe[p.axis] then
+            local defauts = {}
+            for _, d in ipairs(type(p.defects) == 'table' and p.defects or {}) do
+                if type(d) == 'string' and d ~= '' then
+                    defauts[#defauts + 1] = d
+                end
+            end
+            parAxe[p.axis] = { manque = textePoint(p.missing), prise_de_vue = textePoint(p.at_capture) or '', defauts = defauts }
+        end
+    end
+    local points = {}
+    for _, axe in ipairs(Conversation.AXES_LECON) do
+        local p = parAxe[axe.cle]
+        if p then
+            points[#points + 1] = { axe = axe.cle, nom = axe.nom, manque = p.manque, prise_de_vue = p.prise_de_vue, defauts = p.defauts }
+        end
+    end
+    return points
+end
+
+-- La réponse du connecteur à photo_lesson (`lecon` : photo, fichier, rangee, remplacee, mois ;
+-- `remarques`) : { photo, fichier, rangee, remplacee, mois, remarque }, nil sans. `remarque` : la
+-- remarque du connecteur sur le rangement (« Leçon non rangée… », « Leçon gardée pour cette
+-- session… »), jamais celles des défauts mesurés, qui sont pour Claude.
+function Conversation.leconLue(textes)
+    for _, texte in ipairs(textes or {}) do
+        local ok, json = pcall(Json.decode, texte)
+        if ok and type(json) == 'table' and type(json.lecon) == 'table' then
+            local l = json.lecon
+            local lue = { photo = type(l.photo) == 'number' and l.photo or nil, fichier = chaine(l.fichier), rangee = l.rangee == true,
+                remplacee = l.remplacee == true, mois = chaine(l.mois) }
+            for _, r in ipairs(type(json.remarques) == 'table' and json.remarques or {}) do
+                local t = chaine(r)
+                if t and t:sub(1, #"Leçon ") == "Leçon " then
+                    lue.remarque = t
+                    break
+                end
+            end
+            return lue
+        end
+    end
+    return nil
+end
+
+-- Complète un élément `lecon` par le résultat de son appel : refusé (erreur du connecteur, la
+-- raison dans texte), ou fait, avec le fichier et le rangement lus dans la réponse.
+function Conversation.completerLecon(e, r)
+    if r.erreur then
+        e.etat = 'erreur'
+        e.texte = Texte.nettoyer((table.concat(r.textes or {}, ' '):gsub('%s+', ' ')))
+        return
+    end
+    e.etat = 'fait'
+    local lue = Conversation.leconLue(r.textes)
+    if lue then
+        e.photo = lue.photo or e.photo
+        e.fichier = lue.fichier or e.fichier
+        e.rangee, e.remplacee, e.mois, e.remarque = lue.rangee, lue.remplacee, lue.mois, lue.remarque
+    end
+end
+
+-- L'élément `outil` de l'appel `appel` (le dernier), nil sans appel ni élément : le détail d'une
+-- carte (leçon) est celui de son appel.
+function Conversation.outilDeLAppel(c, appel)
+    if appel == nil then
+        return nil
+    end
+    for i = #(c.elements or {}), 1, -1 do
+        local e = c.elements[i]
+        if e.genre == 'outil' and e.appel == appel then
+            return e
+        end
+    end
+    return nil
 end
 
 -- Étapes de Claude (1.3, « Pourquoi ? ») ------------------------------------------------------
@@ -834,6 +956,14 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                         c.elements[#c.elements + 1] = nouvelElement('notation', { outil = court, appel = bloc.id, etat = 'enCours',
                             passe = tonumber(bloc.entree.pass), pose = bloc.entree.apply == true or nil, notes = notes }, date)
                     end
+                elseif court == 'photo_lesson' then
+                    -- La carte de la leçon, faite de l'entrée ; les faits seuls (read_facts) n'en
+                    -- font pas.
+                    local points = Conversation.leconDemandee(entree)
+                    if #points > 0 and entree.read_facts ~= true then
+                        c.elements[#c.elements + 1] = nouvelElement('lecon', { outil = court, appel = bloc.id, etat = 'enCours',
+                            photo = type(entree.photo_id) == 'number' and entree.photo_id or nil, points = points }, date)
+                    end
                 end
             end
         end
@@ -870,6 +1000,10 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
             if n then
                 Conversation.completerNotation(c.elements[n], r)
             end
+            local l = dernierIndice(c, function(e) return e.genre == 'lecon' and e.appel == r.idOutil end)
+            if l then
+                Conversation.completerLecon(c.elements[l], r)
+            end
             if p then
                 local e = c.elements[p]
                 e.images = chemins
@@ -892,7 +1026,7 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                 e.texte = Conversation.texteAffiche(e)
                 e.partiel = false
             end
-            if (e.genre == 'outil' or e.genre == 'notation') and e.etat == 'enCours' then
+            if (e.genre == 'outil' or e.genre == 'notation' or e.genre == 'lecon') and e.etat == 'enCours' then
                 e.etat = ev.interrompue and 'erreur' or 'fait'
             end
             if not (e.genre == 'claude' and (e.texte or '') == '') then
