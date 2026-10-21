@@ -47,6 +47,10 @@ func usage() {
             mcp-developpeur --marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>
                 dessine le point de mise au point d'un fichier Fujifilm sur sa vignette (la fenêtre Claude,
                 aperçu de la photo active) ; code 1 sans point
+            mcp-developpeur --eclairage <id photo>… [<fichier.jpg>…] [--essai '{"settings": {"Temperature": 3200}}']
+                relevé de l'éclairage mixte : dominantes des tons neutres par case et par zone tonale, visages, scène,
+                à plusieurs bornes de chroma ; lecture seule (aperçus comme view_photo) ; --essai passe par
+                preview_settings (deux étapes « Claude · essai », copies virtuelles d'essai seulement)
             mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--original] [--images <dossier>]
                 recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
                 (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
@@ -228,6 +232,33 @@ case "--dump":
         log(error.localizedDescription)
         exit(1)
     }
+case "--eclairage":
+    // Relevé de l'éclairage mixte (Eclairage.releve), pour fixer ses seuils sur les copies d'essai :
+    // des identifiants (aperçus demandés au module), des fichiers JPEG (mesurés sans Lightroom), et
+    // au besoin --essai '<arguments de preview_settings>' pour mesurer sous une autre balance.
+    var ids: [Int] = [], fichiers: [URL] = [], essai: [String: JSONValue]?
+    var rest = Array(arguments.dropFirst())
+    while !rest.isEmpty {
+        let item = rest.removeFirst()
+        if item == "--essai" {
+            guard !rest.isEmpty, let objet = (try? JSONCoding.parse(rest.removeFirst()))?.object else {
+                log("--essai attend les arguments JSON de preview_settings, par exemple '{\"settings\": {\"Temperature\": 3200}}'")
+                exit(2)
+            }
+            essai = objet
+        } else if let id = Int(item) {
+            ids.append(id)
+        } else if FileManager.default.fileExists(atPath: item) {
+            fichiers.append(URL(fileURLWithPath: item))
+        } else {
+            log("argument inconnu : \(item) (ni identifiant de photo, ni fichier)")
+            usage()
+            exit(2)
+        }
+    }
+    guard !ids.isEmpty || !fichiers.isEmpty else { usage(); exit(2) }
+    let lignes = Eclairage.releve(lightroom: LightroomBridge.fromEnvironment(), ids: ids, fichiers: fichiers, essai: essai) { print(line: $0) }
+    exit(lignes.contains { $0.hasPrefix("✘") } ? 1 : 0)
 case "--module":
     // Commande brute du module (diagnostic…), pour explorer ce que le SDK de Lightroom offre.
     guard arguments.count >= 2 else { usage(); exit(2) }

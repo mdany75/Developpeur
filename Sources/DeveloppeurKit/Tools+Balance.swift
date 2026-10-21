@@ -63,6 +63,25 @@ extension ToolHandler {
                 min(max(tint + pentes.jpegTintA * a + pentes.jpegTintB * b, -100), 100).rounded())
     }
 
+    /// Balance qui neutralise la lumière des visages ou du sujet d'un éclairage mixte
+    /// (view_photo › mesures › eclairage › balance_proposee) : la dominante de cette lumière ramenée
+    /// à zéro par les mêmes pentes que white_balance_point. Nil si l'éclairage n'est pas mixte, sans
+    /// lumière du sujet, ou sans Temperature lue dans `reponse` (réponse de la commande « apercu »).
+    static func balanceProposee(_ mesure: MesureEclairage, reponse: JSONValue) -> (temperature: Double, tint: Double)? {
+        guard mesure.mixte, let lumiere = mesure.lumiereSujet else { return nil }
+        return balancePourLumiere(lumiere, reponse: reponse)
+    }
+
+    /// Balance qui neutralise une lumière mesurée, depuis la balance que donne `reponse`
+    /// (echelle_temperature, reglages) ; nil sans Temperature lue. Le relevé de l'éclairage
+    /// (`--eclairage`) la donne aussi pour une photo que le seuil provisoire ne dit pas mixte.
+    static func balancePourLumiere(_ lumiere: MesureEclairage.Dominante, reponse: JSONValue) -> (temperature: Double, tint: Double)? {
+        guard let temperature = reponse["reglages"]?["Temperature"]?.double else { return nil }
+        let raw = reponse["echelle_temperature"]?.string?.hasPrefix("kelvins") == true
+        let tint = reponse["reglages"]?["Tint"]?.double ?? 0
+        return balancePourPoint(PointNeutre(l: 50, a: lumiere.a, b: lumiere.b, ecretes: 0), raw: raw, temperature: temperature, tint: tint)
+    }
+
     /// Mesure du point sur un aperçu d'analyse de la photo, et sa balance actuelle.
     func mesurerBalance(photo: Int?, x: Double, y: Double) throws -> (point: PointNeutre, raw: Bool, temperature: Double, tint: Double) {
         var params: [String: JSONValue] = ["taille": .number(Double(Self.analysisSize)), "cles": ["Temperature", "Tint"]]
