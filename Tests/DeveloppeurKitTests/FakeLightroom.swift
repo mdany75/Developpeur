@@ -26,17 +26,24 @@ final class FakeLightroom: LightroomServing {
     /// Version que le module donnerait au ping (nil : module d'avant la 2.0).
     var moduleVersion: String?
 
-    /// La barre de progression de Lightroom (commande « progression ») : notée à part, pour que
-    /// les tests des outils voient les mêmes commandes qu'avant elle.
-    private var barres: [[String: JSONValue]] = []
-    var progressions: [[String: JSONValue]] {
-        verrou.lock(); defer { verrou.unlock() }; return barres
+    /// Commandes notées à part, pour que les tests des outils voient les mêmes commandes qu'avant
+    /// elles : la barre de progression de Lightroom (« progression »), et les registres de la 1.3
+    /// rangés hors du catalogue, la leçon de la photo (« lecon ») et le carnet de progrès
+    /// (« carnet »). Une réponse ou une erreur préparée vaut pour elles aussi ; `onSend` ne les voit
+    /// pas (préparer leur réponse dans `replies` avant l'appel).
+    static let commandesAPart: Set<String> = ["progression", "lecon", "carnet"]
+    private var notesAPart: [String: [[String: JSONValue]]] = [:]
+    private func aPart(_ command: String) -> [[String: JSONValue]] {
+        verrou.lock(); defer { verrou.unlock() }; return notesAPart[command] ?? []
     }
+    var progressions: [[String: JSONValue]] { aPart("progression") }
+    var lecons: [[String: JSONValue]] { aPart("lecon") }
+    var carnets: [[String: JSONValue]] { aPart("carnet") }
 
     func send(_ command: String, _ params: [String: JSONValue], timeout: TimeInterval) throws -> JSONValue {
         verrou.lock()
-        if command == "progression" {
-            barres.append(params)
+        if Self.commandesAPart.contains(command) {
+            notesAPart[command, default: []].append(params)
             verrou.unlock()
             if let error = errors[command] { throw error }
             return replies[command] ?? [:]
