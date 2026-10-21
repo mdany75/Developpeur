@@ -346,6 +346,14 @@ final class JeLeFaisTests: XCTestCase {
         let aSavoir = try XCTUnwrap(enrichi["a_savoir_exercice"]?.string)
         XCTAssertTrue(aSavoir.contains("(masques, taches)") && aSavoir.contains("se voit dans les deux images"), aSavoir)
         XCTAssertFalse(aSavoir.contains("MaskGroupBasedCorrections"), "les listes en français")
+        // Le module laisse une liste quand la photo en portait déjà au départ, ou des taches de
+        // l'outil Supprimer même sur une photo qui n'en avait aucune (Variantes.valeursClaude) : la
+        // phrase ne dit pas « en portait déjà » à tort.
+        XCTAssertTrue(aSavoir.hasSuffix("(la photo en portait déjà au départ, ou ce sont des taches de l'outil Supprimer)."), aSavoir)
+        var masquesSeuls = exercice.object ?? [:]
+        masquesSeuls["restent"] = ["MaskGroupBasedCorrections"]
+        let masques = try XCTUnwrap(JeLeFais.enrichir(.object(masquesSeuls), raw: true, claude: mesures(), vous: mesures())["a_savoir_exercice"]?.string)
+        XCTAssertTrue(masques.hasSuffix("(la photo en portait déjà au départ)."), masques)
         XCTAssertEqual(enrichi["ecart_principal"]?["visible"], false, "deux images mesurées pareilles")
         // Sans mesures (image illisible) : pas d'écart principal, dit.
         XCTAssertTrue(JeLeFais.enrichir(exercice, raw: true, claude: nil, vous: mesures())["ecart_principal"]?["texte"]?.string?
@@ -561,6 +569,45 @@ final class JeLeFaisTests: XCTestCase {
         fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 140, green: 140, blue: 140))),
                                   "chemin_avant": .string(TestSupport.previewFile(TestSupport.jpeg(red: 100, green: 100, blue: 100)))]
         XCTAssertFalse(ToolHandler(lightroom: fake).call(name: "view_photo", arguments: ["compare": "before_claude"]).isError)
+    }
+
+    // MARK: Corrections de l'utilisateur après l'exercice
+
+    /// Après my_turn, le module remet l'état d'après Claude au départ de l'exercice : ce que
+    /// corrections_utilisateur rapporte ensuite (étape « Claude · essai : ma version (je le fais) »)
+    /// est le travail de l'utilisateur, pas une préférence à retenir (ServerInfo dit de proposer de
+    /// retenir ses reprises) : view_photo, toute vue, et get_settings le disent ; le reste passe tel
+    /// quel, et une autre étape n'est pas touchée.
+    func testLesCorrectionsDeLExerciceNeSontPasDesGouts() throws {
+        func corrections(_ etape: String) -> JSONValue {
+            ["etape": .string(etape), "changements": [["cle": "Exposure2012", "claude": 0, "maintenant": 0.8]]]
+        }
+        XCTAssertEqual(JeLeFais.etapeEssai, "Claude · essai : ma version (je le fais)", "le nom que le module donne à l'étape (contrat)")
+        for etape in [JeLeFais.etapeEssai, "Claude · passe 1"] {
+            let exercice = etape == JeLeFais.etapeEssai
+            let fake = FakeLightroom()
+            let image = TestSupport.jpeg(red: 120, green: 120, blue: 120)
+            fake.onSend = { [unowned fake] command, _ in
+                if command == "apercu" {
+                    fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(image)), "photo": ["id": 7],
+                                              "corrections_utilisateur": corrections(etape)]
+                }
+            }
+            fake.replies["reglages"] = ["photo": ["id": 7], "reglages": ["Exposure2012": 0.8], "corrections_utilisateur": corrections(etape)]
+            let tools = ToolHandler(lightroom: fake)
+            let vue = tools.call(name: "view_photo", arguments: [:])
+            XCTAssertFalse(vue.isError, vue.text)
+            let lue = try XCTUnwrap(JSONCoding.parse(vue.text)["corrections_utilisateur"]?.object)
+            let lecture = tools.call(name: "get_settings", arguments: [:])
+            XCTAssertFalse(lecture.isError, lecture.text)
+            let lus = try XCTUnwrap(JSONCoding.parse(lecture.text)["corrections_utilisateur"]?.object)
+            for objet in [lue, lus] {
+                XCTAssertEqual(objet["etape"]?.string, etape)
+                XCTAssertEqual(objet["changements"], corrections(etape)["changements"], "passé tel quel")
+                XCTAssertEqual(objet["exercice"]?.string, exercice ? JeLeFais.correctionsDeLExercice : nil, etape)
+            }
+        }
+        XCTAssertTrue(JeLeFais.correctionsDeLExercice.contains("pas une préférence à retenir (remember_style)"))
     }
 
     // MARK: Descriptions

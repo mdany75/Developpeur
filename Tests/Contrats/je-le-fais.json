@@ -4,6 +4,7 @@
     "Chaque exemple donne les arguments de l'outil, les paramètres exacts que le serveur envoie au module (params) et la réponse exacte du module (reponse, ou erreur pour un refus), copiée de la liaison simulée.",
     "Tests/DeveloppeurKitTests/ContratJeLeFaisTests.swift vérifie que le serveur envoie ces params et qu'il lit ces réponses ; Tests/Lua/Liaison/essais-jelefais.lua (« contrat ») envoie ces params au module simulé, par la liaison, et vérifie qu'il rend ces réponses.",
     "chemin et chemin_avant : des chemins d'aperçus, remplacés par ces textes ; le serveur d'essai écrit à leur place deux aperçus (la version de Claude, puis celle de l'utilisateur).",
+    "Ce que Lightroom tient à jour et que la simulation ne suit pas est posé comme dans Lightroom le temps du contrat : la date (le, au format « %Y-%m-%d %H:%M » de LrDate.timeToUserFormat, le 21 octobre 2026 à 10 h), le recadrage relu (isCropped, croppedDimensions) et la version de processus d'un JPEG.",
     "Un changement voulu du contrat se fait des deux côtés : changer le code, puis ce fichier, et les deux suites doivent passer."
   ],
   "exemples": {
@@ -290,7 +291,7 @@
               }
             ],
             "instantane": "Claude · ma version",
-            "le": "12:00:00",
+            "le": "2026-10-21 10:00",
             "listes": {
               "masques": {
                 "depart": 1,
@@ -321,9 +322,9 @@
           "profil": "Adobe Standard",
           "recadrage": {
             "angle": 0,
-            "dimensions": "6240 x 4160",
+            "dimensions": "5616 x 4077",
             "orientation": "AB (supposée)",
-            "recadree": false
+            "recadree": true
           },
           "reglages": {
             "Clarity2012": 20,
@@ -510,7 +511,7 @@
               }
             ],
             "instantane": "Claude · ma version",
-            "le": "12:00:00",
+            "le": "2026-10-21 10:00",
             "listes": {
               "masques": {
                 "depart": 0,
@@ -561,7 +562,8 @@
             "Shadows2012": 15,
             "Temperature": 20,
             "Tint": 0
-          }
+          },
+          "version_processus": "15.4"
         }
       }
     }

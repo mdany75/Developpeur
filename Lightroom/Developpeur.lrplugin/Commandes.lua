@@ -34,12 +34,13 @@
 --                                          rendre, les deux rendus du recalage
 --   recadrer    {photos, recadrage, recalages, completer?, etape, raison?, confirme} → cadre demandé,
 --                                          sans les coins vides d'Upright et de la perspective
---   essayer     {action, photo?, taille, comparer?, instantane?, exercice?, sans_rendu?, …} → applique,
---                                          rend, puis remet comme avant ; instantane : rangée aussi
---                                          en instantané (variante) ; exercice (« Je le fais », 1.3,
---                                          exige instantane) : départ et version de Claude gardés dans
---                                          la mémoire de la variante, entrée 'exercice' au journal,
---                                          état d'après Claude noté ; refusé si rien ne change ;
+--   essayer     {action, photo?, taille, comparer?, instantane?, exercice?, raison?, sans_rendu?, …}
+--                                       → applique, rend, puis remet comme avant ; instantane : rangée
+--                                          aussi en instantané (variante) ; exercice (« Je le fais »,
+--                                          1.3, exige instantane) : départ et version de Claude gardés
+--                                          dans la mémoire de la variante, entrée 'exercice' au journal
+--                                          (raison : le step_name de preview_settings), état d'après
+--                                          Claude noté ; refusé si rien ne change ;
 --                                          réponse exercice = { instantane } et raw ; sans_rendu :
 --                                          aucun rendu (chemin absent)
 --   presets     {filtre?, limite}       → paramètres prédéfinis de développement

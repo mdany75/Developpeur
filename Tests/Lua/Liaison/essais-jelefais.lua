@@ -786,7 +786,19 @@ local function selonLeContrat(obtenu, attendu, nom)
 end
 
 -- Une commande du serveur par la liaison : la ligne JSON (avec le jeton), la réponse relue.
+-- L'heure, le temps du contrat : le 21 octobre 2026 à 10 h (secondes depuis 2001, à l'heure locale
+-- de la simulation), et LrDate.timeToUserFormat qui suit le format demandé, comme Lightroom (la
+-- simulation rend « 12:00:00 » pour « %Y-%m-%d %H:%M ») : la date d'un exercice (le, Variantes.ranger)
+-- a dans le contrat la forme qu'elle a dans Lightroom, « 2026-10-21 10:00 ».
+local HEURE_DU_CONTRAT = 814269600
+
 local function parLaLiaison(fonction)
+    local LrDate = import 'LrDate'
+    local format = LrDate.timeToUserFormat
+    LrDate.timeToUserFormat = function(t, f)
+        return os.date('!' .. f, 978307200 + math.floor(t) + S.fuseau)
+    end
+    S.horloge = HEURE_DU_CONTRAT
     Liaison.prise = { send = function(_, texte) S.envois[#S.envois + 1] = texte end }
     Liaison.reponsesConnectee = true
     local envoyer = function(commande, params)
@@ -795,6 +807,7 @@ local function parLaLiaison(fonction)
     end
     local ok, erreur = pcall(fonction, envoyer)
     Liaison.prise, Liaison.reponsesConnectee = nil, false
+    LrDate.timeToUserFormat = format
     if not ok then
         error(erreur, 0)
     end
@@ -854,6 +867,9 @@ test("contrat avec le serveur (RAW) : ses params donnent exactement les réponse
         aLaMain(photo, { Exposure2012 = 0.8, Temperature = 5650, WhiteBalance = 'Custom', Clarity2012 = 20,
             ToneCurvePV2012 = { 0, 0, 100, 90, 255, 255 }, Look = {}, CropLeft = 0.05, CropTop = 0.02, CropRight = 0.95, HasCrop = true,
             MaskGroupBasedCorrections = { masqueDeDany('Ciel'), masqueDeDany('Sol') } })
+        -- Ce que Lightroom tient à jour de lui-même après ce recadrage, et que la simulation ne suit
+        -- pas : la photo est recadrée, à 0,9 × 6240 sur 0,98 × 4160 pixels.
+        photo.brut.isCropped, photo.meta.croppedDimensions = true, '5616 x 4077'
         r = horlogeQuiAvance(function() return envoyer('apercu', contrat.apercu.params) end)
         egal(r.error, nil, "apercu refusé")
         cheminsDuContrat(r.result, contrat.apercu.reponse,
@@ -866,7 +882,8 @@ end)
 test("contrat avec le serveur (JPEG) : la balance relative sous Temperature et Tint, des deux côtés", function()
     local contrat = lireContrat().exemples.jpeg
     local photo = photoJpeg()
-    photo.reglages.Shadows2012 = 0
+    -- Un JPEG a aussi sa version de processus dans Lightroom (la photo simulée n'en a pas).
+    photo.reglages.Shadows2012, photo.reglages.ProcessVersion = 0, '15.4'
     S.active, S.selection = photo, { photo }
     parLaLiaison(function(envoyer)
         local r = envoyer('essayer', contrat.essayer.params)

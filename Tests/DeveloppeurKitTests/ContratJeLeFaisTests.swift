@@ -115,7 +115,12 @@ final class ContratJeLeFaisTests: XCTestCase {
         XCTAssertNil(lue["chemin"])
         XCTAssertNil(lue["chemin_avant"])
         XCTAssertEqual(lue["photo"], module["photo"])
-        XCTAssertEqual(lue["corrections_utilisateur"], module["corrections_utilisateur"], "passé tel quel")
+        // corrections_utilisateur : l'étape de l'essai (le départ de l'exercice est l'état d'après
+        // Claude) ; passé tel quel, avec la note qui dit que c'est le travail de l'exercice.
+        var corrections = try objet(lue["corrections_utilisateur"], "corrections_utilisateur")
+        XCTAssertEqual(module["corrections_utilisateur"]?["etape"]?.string, JeLeFais.etapeEssai, "l'étape que le serveur reconnaît")
+        XCTAssertEqual(corrections.removeValue(forKey: "exercice")?.string, JeLeFais.correctionsDeLExercice)
+        XCTAssertEqual(JSONValue.object(corrections), module["corrections_utilisateur"], "le reste passé tel quel")
 
         let exercice = try objet(lue["exercice"], "exercice enrichi")
         let duModule = try objet(module["exercice"], "apercu.reponse.exercice")
@@ -179,7 +184,10 @@ final class ContratJeLeFaisTests: XCTestCase {
         let vue = tools.call(name: "view_photo", arguments: try arguments(exemple, "view_photo"))
         XCTAssertFalse(vue.isError, vue.text)
         try memesParams(fake.lastParams, exemple["apercu"]?["params"], "apercu")
-        let exercice = try objet(try JSONCoding.parse(vue.text)["exercice"], "exercice enrichi")
+        let lue = try JSONCoding.parse(vue.text)
+        XCTAssertEqual(lue["corrections_utilisateur"]?["exercice"]?.string, JeLeFais.correctionsDeLExercice, "le travail de l'exercice, dit")
+        XCTAssertEqual(lue["version_processus"], "version 6 (15.4)")
+        let exercice = try objet(lue["exercice"], "exercice enrichi")
         let ecarts = exercice["ecarts"]?.array ?? []
         XCTAssertEqual(ecarts.compactMap { $0["cle"]?.string }, ["WhiteBalance", "Temperature", "Tint", "Shadows2012"])
         XCTAssertEqual(ecarts.compactMap { $0["sorte"]?.string }, ["comme_claude", "plus_fort", "oublie", "ajoute"])
