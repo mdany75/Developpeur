@@ -1,0 +1,276 @@
+{
+  "_lisez_moi": [
+    "Contrat de « Composition lue » (1.3) entre le serveur (read_composition, preview_settings avec crop) et le module (commande apercu avec entier, commande essayer avec entier).",
+    "Chaque exemple donne les arguments de l'outil, les paramètres exacts que le serveur envoie au module (params) et la réponse exacte du module (reponse, ou erreur pour un refus), copiée de la liaison simulée.",
+    "Tests/DeveloppeurKitTests/ContratCompositionTests.swift vérifie que le serveur envoie ces params et qu'il lit ces réponses ; Tests/Lua/Liaison/essais-composition.lua (« contrat ») envoie ces params au module simulé, par la liaison, et vérifie qu'il rend ces réponses.",
+    "chemin et chemin_entier : des chemins d'aperçus, remplacés par ces textes ; le serveur d'essai écrit à leur place des aperçus (l'image entière, ou la proposition recadrée puis l'image entière).",
+    "cadre_actuel et cadre_propose : Recadrage.lire du module (centre de 0 à 1 et largeur en pixels de l'image affichée entière, dont dimensions donne la taille) ; le serveur en tire Composition.Cadre.",
+    "Ce que Lightroom tient à jour et que la simulation ne suit pas est posé comme dans Lightroom le temps du contrat : le recadrage relu (isCropped, croppedDimensions) de la photo recadrée.",
+    "Un changement voulu du contrat se fait des deux côtés : changer le code, puis ce fichier, et les deux suites doivent passer."
+  ],
+  "exemples": {
+    "lire": {
+      "_": "RAF de X-H2S (photo 4, paysage AB, 6240 × 4160), recadré à la main en 4:5, tourné de 2°, centré en x = 0,4, à 70 % du plus grand cadre. Le module retire le cadre le temps du rendu (deux étapes « Claude · composition »), puis le remet ; il dit le cadre actuel vu dans l'image entière.",
+      "read_composition": {
+        "photo_id": 4,
+        "subject": {
+          "x": 0.3,
+          "y": 0.25,
+          "width": 0.4,
+          "height": 0.5
+        }
+      },
+      "apercu": {
+        "params": {
+          "cles": [],
+          "entier": true,
+          "photo": 4,
+          "taille": 1344
+        },
+        "reponse": {
+          "appareil": {
+            "marque": "FUJIFILM",
+            "modele": "X-H2S"
+          },
+          "balance_des_blancs": "As Shot",
+          "cadre_actuel": {
+            "angle": 2,
+            "centre_x": 0.4,
+            "centre_y": 0.5,
+            "largeur": 2267.671195,
+            "ratio": 0.8000007969
+          },
+          "chemin": "<image entière, sans cadre>",
+          "dimensions": {
+            "hauteur": 4160,
+            "largeur": 6240
+          },
+          "echelle_temperature": "kelvins (RAW : 2000 à 50000)",
+          "image_entiere": true,
+          "intensite_profil": 100,
+          "photo": {
+            "appareil": "X-H2S",
+            "copie_virtuelle": false,
+            "drapeau": "aucun",
+            "fichier": "XH2S0320.RAF (Copie 1)",
+            "format": "RAW",
+            "id": 4,
+            "libelle": "aucun",
+            "retouchee_par_claude": false
+          },
+          "profil": "Adobe Color",
+          "recadrage": {
+            "angle": 2,
+            "dimensions": "2268 x 2835",
+            "orientation": "AB",
+            "recadree": true
+          },
+          "reglages": {},
+          "version_processus": "15.4"
+        }
+      }
+    },
+    "proposer": {
+      "_": "Même RAF, sans recadrage. Claude propose un 3:2 redressé de 1,4° (taille 0,82, centre 0,48 ; 0,52) : le module rend la proposition, relit le cadre que Lightroom a gardé, puis rend l'image entière sans ce cadre (troisième étape « Claude · essai : image entière ») et remet la photo.",
+      "preview_settings": {
+        "photo_id": 4,
+        "crop": {
+          "aspect": "3:2",
+          "angle": -1.4,
+          "size": 0.82,
+          "center_x": 0.48,
+          "center_y": 0.52
+        },
+        "step_name": "cadre"
+      },
+      "essayer": {
+        "params": {
+          "action": "appliquer",
+          "comparer": false,
+          "entier": true,
+          "etape": "cadre",
+          "libelles": {
+            "CropAngle": "Recadrage : angle",
+            "CropBottom": "Recadrage : bord bas",
+            "CropConstrainToWarp": "Recadrage : contraindre à l'image (sans coins vides)",
+            "CropLeft": "Recadrage : bord gauche",
+            "CropRight": "Recadrage : bord droit",
+            "CropTop": "Recadrage : bord haut"
+          },
+          "photo": 4,
+          "plages": {},
+          "recadrage": {
+            "angle": -1.4,
+            "centre_x": 0.48,
+            "centre_y": 0.52,
+            "ratio": 1.5,
+            "taille": 0.82
+          },
+          "reglages": {},
+          "relatif": false,
+          "taille": 1344
+        },
+        "reponse": {
+          "cadre_propose": {
+            "angle": -1.4,
+            "centre_x": 0.48,
+            "centre_y": 0.52,
+            "largeur": 4937.327734,
+            "ratio": 1.500001345
+          },
+          "changements": [
+            {
+              "apres": -1.4,
+              "avant": 0,
+              "cle": "CropAngle"
+            },
+            {
+              "apres": 0.078055,
+              "avant": 0,
+              "cle": "CropLeft"
+            },
+            {
+              "apres": 0.138998,
+              "avant": 0,
+              "cle": "CropTop"
+            },
+            {
+              "apres": 0.881945,
+              "avant": 1,
+              "cle": "CropRight"
+            },
+            {
+              "apres": 0.901002,
+              "avant": 1,
+              "cle": "CropBottom"
+            }
+          ],
+          "chemin": "<proposition, recadrée>",
+          "chemin_entier": "<image entière de la proposition, sans cadre>",
+          "dimensions": {
+            "hauteur": 4160,
+            "largeur": 6240
+          },
+          "etape": "Claude · essai : cadre",
+          "mode": "appliquer directement",
+          "photo": {
+            "copie_virtuelle": false,
+            "fichier": "XH2S0320.RAF (Copie 1)",
+            "id": 4
+          },
+          "remarques": []
+        }
+      }
+    },
+    "proposer_sans_image_entiere": {
+      "_": "La même proposition, quand l'image entière ne se rend pas (disque plein dans la simulation, après son écriture) : la proposition part quand même, avec le cadre gardé et ses dimensions, sans chemin_entier, et la remarque « Image entière non rendue : … ».",
+      "preview_settings": {
+        "photo_id": 4,
+        "crop": {
+          "aspect": "3:2",
+          "angle": -1.4,
+          "size": 0.82,
+          "center_x": 0.48,
+          "center_y": 0.52
+        },
+        "step_name": "cadre"
+      },
+      "essayer": {
+        "params": {
+          "action": "appliquer",
+          "comparer": false,
+          "entier": true,
+          "etape": "cadre",
+          "libelles": {
+            "CropAngle": "Recadrage : angle",
+            "CropBottom": "Recadrage : bord bas",
+            "CropConstrainToWarp": "Recadrage : contraindre à l'image (sans coins vides)",
+            "CropLeft": "Recadrage : bord gauche",
+            "CropRight": "Recadrage : bord droit",
+            "CropTop": "Recadrage : bord haut"
+          },
+          "photo": 4,
+          "plages": {},
+          "recadrage": {
+            "angle": -1.4,
+            "centre_x": 0.48,
+            "centre_y": 0.52,
+            "ratio": 1.5,
+            "taille": 0.82
+          },
+          "reglages": {},
+          "relatif": false,
+          "taille": 1344
+        },
+        "reponse": {
+          "cadre_propose": {
+            "angle": -1.4,
+            "centre_x": 0.48,
+            "centre_y": 0.52,
+            "largeur": 4937.327734,
+            "ratio": 1.500001345
+          },
+          "changements": [
+            {
+              "apres": -1.4,
+              "avant": 0,
+              "cle": "CropAngle"
+            },
+            {
+              "apres": 0.078055,
+              "avant": 0,
+              "cle": "CropLeft"
+            },
+            {
+              "apres": 0.138998,
+              "avant": 0,
+              "cle": "CropTop"
+            },
+            {
+              "apres": 0.881945,
+              "avant": 1,
+              "cle": "CropRight"
+            },
+            {
+              "apres": 0.901002,
+              "avant": 1,
+              "cle": "CropBottom"
+            }
+          ],
+          "chemin": "<proposition, recadrée>",
+          "dimensions": {
+            "hauteur": 4160,
+            "largeur": 6240
+          },
+          "etape": "Claude · essai : cadre",
+          "mode": "appliquer directement",
+          "photo": {
+            "copie_virtuelle": false,
+            "fichier": "XH2S0320.RAF (Copie 1)",
+            "id": 4
+          },
+          "remarques": [
+            "Image entière non rendue : Lightroom n'a pas pu rendre l'aperçu : disque plein ; le cadre n'est pas dessiné."
+          ]
+        }
+      }
+    }
+  },
+  "refus": {
+    "agrandie": {
+      "_": "Le même RAF, agrandi par l'ancien connecteur (cadre hors de [0, 1]) : refusé avant toute écriture, le texte passe tel quel.",
+      "read_composition": {
+        "photo_id": 4
+      },
+      "apercu": {
+        "params": {
+          "cles": [],
+          "entier": true,
+          "photo": 4,
+          "taille": 1344
+        },
+        "erreur": "Photo agrandie (agrandissement génératif) : Claude ne la recadre pas, et ne lit pas sa composition sur l'image entière (le cadre retiré le temps du rendu pourrait lui faire perdre l'agrandissement, comme un recadrage de Claude, constaté) ; rien n'a été écrit. Recadrer à la main dans Lightroom, ou lire la composition de l'original, celle d'avant l'agrandissement (souvent juste au-dessous dans la pile)."
+      }
+    }
+  }
+}

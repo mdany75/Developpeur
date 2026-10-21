@@ -2,8 +2,13 @@
 -- (ou avec la version de Claude d'un exercice « Je le fais », 1.3), les propositions rendues puis
 -- défaites (essayer, qui range aussi les variantes et les exercices) et les deux rendus du
 -- recalage (geometrie).
+-- Composition lue (1.3) : apercu avec entier rend l'image entière, sans son cadre (retiré le
+-- temps du rendu, puis remis, comme pour le recalage), et dit le cadre actuel vu dans cette image
+-- (read_composition) ; essayer avec entier rend aussi l'image entière d'une proposition de
+-- recadrage, avec le cadre que Lightroom a gardé (preview_settings le dessine dessus).
 -- Rendu.rendre sert aussi l'avant/après des étapes (Etapes.lua, 1.3), qui garde une copie de
--- l'image de view_photo (la vue) : seulement l'image entière de l'état actuel.
+-- l'image de view_photo (la vue) : seulement l'image entière de l'état actuel, jamais l'image sans
+-- cadre d'apercu avec entier.
 
 local LrDate = import 'LrDate'
 local LrExportSession = import 'LrExportSession'
@@ -29,6 +34,7 @@ local Vignettes = require 'Vignettes'
 
 local catalogue, decrire, lireJson = Photos.catalogue, Photos.decrire, Photos.lireJson
 local meta, photosVisees, photoVisee = Photos.meta, Photos.photosVisees, Photos.photoVisee
+local dimensionsAffichees, orientationAffichage = Photos.dimensionsAffichees, Photos.orientationAffichage
 local aRemettre, DEFAUTS, estRaw = Reglages.aRemettre, Reglages.DEFAUTS, Reglages.estRaw
 local libererProfil, lireReglages = Reglages.libererProfil, Reglages.lireReglages
 local pourLightroom, valeurActuelle = Reglages.pourLightroom, Reglages.valeurActuelle
@@ -98,12 +104,16 @@ local function noterApercuSeulement(photo)
     end)
 end
 
-local function rendre(photo, taille)
-    local dejaExportee = Photos.brut(photo, 'isExported') == true
-    -- Sans original ni aperçu dynamique, Lightroom n'a rien à rendre : la raison plutôt qu'un échec.
+-- Sans original ni aperçu dynamique, Lightroom n'a rien à rendre : la raison plutôt qu'un échec.
+local function verifierRendable(photo)
     if Photos.originalAbsent(photo) and not Photos.apercuDynamique(photo) then
         echouer(Photos.raisonOriginalAbsent(photo, "Sans aperçu dynamique, Lightroom ne peut pas la rendre : aucun aperçu."))
     end
+end
+
+local function rendre(photo, taille)
+    local dejaExportee = Photos.brut(photo, 'isExported') == true
+    verifierRendable(photo)
     calculerAvantRendu(photo)
     local calcules = attendreCalculsIA(photo)
     taille = math.floor(tonumber(taille) or 1568)
@@ -171,30 +181,50 @@ local function rendre(photo, taille)
     return chemin, not reste
 end
 
--- Deux rendus non recadrés pour le recalage : tel quel, puis sans corrections géométriques ; la
--- photo revient ensuite comme avant. Comme une comparaison, l'Historique de Lightroom garde les
--- étapes « Claude · recalage ».
-local function rendreGeometrie(photo, actuels, taille)
+-- Écrit une copie neuve de ces valeurs (une étape de l'Historique, nommée).
+local function poser(photo, nom, valeurs)
+    local copie = {}
+    for cle, valeur in pairs(valeurs) do copie[cle] = valeur end
+    ecrire(nom, function() photo:applyDevelopSettings(copie, nom) end)
+end
+
+-- Ce qu'il faut poser pour rendre l'image entière d'une photo recadrée ou contrainte : le cadre
+-- retiré (tout le fichier, sans angle) et la case « Contraindre le recadrage » décochée (cochée,
+-- Lightroom resserrerait l'image entière sur l'image transformée) ; vide pour une photo ni
+-- recadrée ni contrainte. Puis les valeurs à remettre ensuite : celles de la photo, sinon leurs
+-- valeurs par défaut.
+local function sansRecadrage(actuels)
     local recadree = valeurActuelle(actuels, 'CropConstrainToWarp') ~= 0
     for cle, valeur in pairs(Recadrage.AUCUN) do
         if (valeurNumerique(actuels[cle]) or valeur) ~= valeur then
             recadree = true
         end
     end
-    -- Avec « Contraindre le recadrage », Lightroom resserrerait l'image entière sur l'image
-    -- transformée : la grille porte sur l'image entière, case décochée le temps des rendus.
-    local sansCadre = {}
+    local sansCadre, retour = {}, {}
     if recadree then
         for cle, valeur in pairs(Recadrage.AUCUN) do
             sansCadre[cle] = valeur
         end
         sansCadre.CropConstrainToWarp = 0
     end
-    local touches = {}
-    for cle in pairs(sansCadre) do touches[cle] = true end
-    for cle in pairs(NEUTRE_GEOMETRIE) do touches[cle] = true end
-    local retour = {}
-    for cle in pairs(touches) do
+    for cle in pairs(sansCadre) do
+        local actuel = actuels[cle]
+        if actuel ~= nil then
+            retour[cle] = pourLightroom(actuel)
+        else
+            retour[cle] = DEFAUTS[cle]
+        end
+    end
+    return sansCadre, retour
+end
+
+-- Deux rendus non recadrés pour le recalage : tel quel, puis sans corrections géométriques ; la
+-- photo revient ensuite comme avant. Comme une comparaison, l'Historique de Lightroom garde les
+-- étapes « Claude · recalage ».
+local function rendreGeometrie(photo, actuels, taille)
+    -- La grille porte sur l'image entière : cadre retiré et case décochée le temps des rendus.
+    local sansCadre, retour = sansRecadrage(actuels)
+    for cle in pairs(NEUTRE_GEOMETRIE) do
         local actuel = actuels[cle]
         if actuel ~= nil then
             retour[cle] = pourLightroom(actuel)
@@ -204,28 +234,124 @@ local function rendreGeometrie(photo, actuels, taille)
             retour[cle] = NEUTRE_GEOMETRIE[cle]
         end
     end
-    local function appliquerCopie(nom, valeurs)
-        local copie = {}
-        for cle, valeur in pairs(valeurs) do copie[cle] = valeur end
-        ecrire(nom, function() photo:applyDevelopSettings(copie, nom) end)
-    end
     local corrige, origine
     local ok, erreur = LrTasks.pcall(function()
         if next(sansCadre) then
-            appliquerCopie("Claude · recalage (sans recadrage)", sansCadre)
+            poser(photo, "Claude · recalage (sans recadrage)", sansCadre)
         end
         corrige = rendre(photo, taille)
         local neutre = {}
         for cle, valeur in pairs(sansCadre) do neutre[cle] = valeur end
         for cle, valeur in pairs(NEUTRE_GEOMETRIE) do neutre[cle] = valeur end
-        appliquerCopie("Claude · recalage (sans correction)", neutre)
+        poser(photo, "Claude · recalage (sans correction)", neutre)
         origine = rendre(photo, taille)
     end)
-    appliquerCopie("Claude · recalage (retour)", retour)
+    poser(photo, "Claude · recalage (retour)", retour)
     if not ok then
         error(erreur, 0)
     end
     return corrige, origine
+end
+
+-- Composition lue (1.3) ---------------------------------------------------------------------------
+
+Rendu.ETAPE_ENTIERE = "Claude · composition (image entière)"
+Rendu.ETAPE_ENTIERE_RETOUR = "Claude · composition (retour)"
+Rendu.ETAPE_ESSAI_ENTIERE = "Claude · essai : image entière"
+
+-- Photo agrandie par l'ancien connecteur (Reglages.estAgrandie : cadre hors de [0, 1]) : Claude ne
+-- la recadre pas (Plans.preparerRecadrage), et n'en retire pas le cadre le temps d'un rendu.
+local PHOTO_AGRANDIE = "Photo agrandie (agrandissement génératif) : Claude ne la recadre pas, et ne lit pas sa composition "
+    .. "sur l'image entière (le cadre retiré le temps du rendu pourrait lui faire perdre l'agrandissement, comme un recadrage "
+    .. "de Claude, constaté) ; rien n'a été écrit. Recadrer à la main dans Lightroom, ou lire la composition de l'original, "
+    .. "celle d'avant l'agrandissement (souvent juste au-dessous dans la pile)."
+
+-- Le cadre de ces réglages (Crop*) vu dans l'image affichée entière (Recadrage.lire : { ratio,
+-- angle, centre_x, centre_y, largeur en pixels }, nil sans recadrage) et les dimensions de cette
+-- image ({ largeur, hauteur }, en pixels) ; nil et nil si elles sont inconnues.
+local function cadreAffiche(photo, reglages)
+    local largeur, hauteur = dimensionsAffichees(photo)
+    if not largeur or not hauteur or largeur <= 0 or hauteur <= 0 then
+        return nil, nil
+    end
+    local orientation = orientationAffichage(photo, estRaw(photo, reglages), largeur, hauteur)
+    return Recadrage.lire(reglages, largeur, hauteur, orientation), { largeur = largeur, hauteur = hauteur }
+end
+
+-- Vrai si ces réglages ne recadrent pas : tout le fichier, sans angle.
+local function cadreNeutre(reglages)
+    for cle, valeur in pairs(Recadrage.AUCUN) do
+        if math.abs((valeurNumerique(reglages[cle]) or valeur) - valeur) > 1e-6 then
+            return false
+        end
+    end
+    return true
+end
+
+-- Avant l'image entière d'apercu (entier) : les refus, avant toute écriture, et ce que la réponse
+-- en dira, lu avant d'écrire : l'état de la photo, son cadre vu dans l'image entière et les
+-- dimensions de cette image.
+local function preparerEntier(photo, params)
+    if params.comparer or params.point_af then
+        echouer("entier (l'image entière, sans son cadre) ne va ni avec comparer ni avec point_af : rien n'a été rendu.")
+    end
+    local actuels = photo:getDevelopSettings()
+    if Reglages.estAgrandie(actuels) then
+        echouer(PHOTO_AGRANDIE)
+    end
+    local cadre, dimensions = cadreAffiche(photo, actuels)
+    if not dimensions and not cadreNeutre(actuels) then
+        echouer("Dimensions de la photo inconnues : son cadre ne peut pas se lire dans l'image entière ; rien n'a été écrit.")
+    end
+    return { actuels = actuels, cadre = cadre, dimensions = dimensions }
+end
+
+-- L'image entière, sans son cadre (apercu avec entier) : comme le premier rendu du recalage, le
+-- cadre retiré et la case « Contraindre le recadrage » décochée le temps du rendu, puis remis, même
+-- si le rendu échoue ; l'Historique de Lightroom garde les deux étapes « Claude · composition ».
+-- Une photo ni recadrée ni contrainte se rend telle quelle, sans écriture : la pause, qui n'arrête
+-- que les écritures, n'est vérifiée que s'il faut écrire. Rend le chemin, et faux si des réglages
+-- IA n'étaient pas encore calculés (comme rendre).
+local function rendreEntier(photo, actuels, taille, params)
+    local retire, retour = sansRecadrage(actuels)
+    if next(retire) == nil then
+        return rendre(photo, taille)
+    end
+    verifierPause(params)
+    verifierRendable(photo)
+    poser(photo, Rendu.ETAPE_ENTIERE, retire)
+    local ok, chemin, calcules = LrTasks.pcall(rendre, photo, taille)
+    poser(photo, Rendu.ETAPE_ENTIERE_RETOUR, retour)
+    if not ok then
+        error(chemin, 0)
+    end
+    return chemin, calcules
+end
+
+-- L'image entière d'une proposition de recadrage (essayer avec entier), après le rendu de la
+-- proposition : d'abord le cadre que Lightroom a gardé, relu (case « Contraindre le recadrage »
+-- cochée, il le resserre lui-même, un instant après l'écriture : le rendu a pris ce temps-là,
+-- comme le constate relireCadres), puis l'image entière, ce cadre retiré, dans une troisième étape
+-- « Claude · essai : image entière ». Le cadre est relu avant : un rendu entier qui échoue (ou son
+-- écriture) n'empêche ni la proposition ni le cadre, seulement le dessin, et la remarque le dit.
+-- Rend le cadre gardé (nil si Lightroom n'en garde aucun), les dimensions de l'image affichée
+-- entière, le chemin de l'image entière (nil si elle n'a pas pu se rendre) et les valeurs posées
+-- le temps de ce rendu (essayer les remet avec la proposition).
+local function rendreEntierPropose(photo, plan, taille)
+    local relus = photo:getDevelopSettings()
+    local cadre, dimensions = cadreAffiche(photo, relus)
+    local retire = sansRecadrage(relus)
+    local ok, chemin = LrTasks.pcall(function()
+        if next(retire) ~= nil then
+            poser(photo, Rendu.ETAPE_ESSAI_ENTIERE, retire)
+        end
+        return (rendre(photo, taille))
+    end)
+    if not ok then
+        noter(plan, "Image entière non rendue : " .. tostring(chemin) .. " ; le cadre n'est pas dessiné.")
+        chemin = nil
+    end
+    return cadre, dimensions, chemin, retire
 end
 
 -- Les valeurs à poser le temps du rendu d'une comparaison, selon le mode : l'état d'avant la
@@ -338,6 +464,13 @@ end
 function Rendu.apercu(params)
     local photo = photoVisee(params)
     local taille = tonumber(params.taille) or 1568
+    -- L'image entière, sans son cadre (entier, read_composition) : refusée avant toute écriture
+    -- avec comparer, point_af ou sur une photo agrandie ; le cadre actuel et les dimensions lus
+    -- avant d'écrire.
+    local entier
+    if params.entier == true then
+        entier = preparerEntier(photo, params)
+    end
     local cheminAvant, ameliore, exercice
     if params.comparer then
         cheminAvant, ameliore, exercice = rendreAvant(photo, params.comparer, taille, params)
@@ -348,17 +481,30 @@ function Rendu.apercu(params)
     -- changé pendant le rendu n'est pas gardé ; une image à qui manquent des calculs IA (a_savoir)
     -- non plus : elle ne montre pas l'état.
     local empreinteVue
-    if taille > 0 and not params.entier then
+    if taille > 0 and not entier then
         local lu, empreinte = LrTasks.pcall(Etapes.avantVue, photo, params)
         empreinteVue = lu and empreinte or nil
     end
-    local chemin, calcules = rendre(photo, taille)
+    local chemin, calcules
+    if entier then
+        chemin, calcules = rendreEntier(photo, entier.actuels, taille, params)
+    else
+        chemin, calcules = rendre(photo, taille)
+    end
     if empreinteVue and calcules ~= false then
         LrTasks.pcall(Etapes.garderVue, photo, chemin, empreinteVue)
     end
     local valeurs, infos = lireReglages(photo, params.cles, false)
     infos.chemin = chemin
     infos.chemin_avant = cheminAvant
+    -- Composition lue : l'image rendue est l'image entière (toujours dit, même sans recadrage) ;
+    -- ses dimensions (image affichée entière, en pixels) et le cadre actuel vu dans cette image
+    -- (absent sans recadrage), que le serveur emploie pour ramener les points de view_photo.
+    if entier then
+        infos.image_entiere = true
+        infos.dimensions = entier.dimensions
+        infos.cadre_actuel = entier.cadre
+    end
     if ameliore then
         infos.remarque_comparaison = "L'image d'avant garde le débruitage, les détails bruts, la super résolution ou la suppression des reflets : la comparaison ne défait pas ces traitements calculés."
     end
@@ -407,8 +553,11 @@ end
 -- 1.3 ; exige instantane), la mémoire de la variante garde l'état de départ et la version de
 -- Claude, le journal une entrée 'exercice', et l'état où la photo revient devient celui d'après
 -- Claude (noterEtatFinal : corrections_utilisateur dit ensuite ce que Dany a fait) ; une
--- proposition qui ne change rien est refusée. sans_rendu : aucun rendu (chemin nil). essayer
--- n'est pas une étape : Etapes.lua n'en garde pas d'avant/après.
+-- proposition qui ne change rien est refusée. sans_rendu : aucun rendu (chemin nil). Avec entier
+-- (Composition lue, 1.3) et un recadrage proposé (ni retiré, ni sans rendu, ni pour un exercice) :
+-- aussi l'image entière de la proposition, sans son cadre (troisième étape « Claude · essai : image
+-- entière »), et le cadre que Lightroom a gardé (cadre_propose), même si cette image ne se rend
+-- pas. essayer n'est pas une étape : Etapes.lua n'en garde pas d'avant/après.
 function Rendu.essayer(params)
     verifierPause(params)
     local prefs = Preferences.lire()
@@ -443,6 +592,12 @@ function Rendu.essayer(params)
     end
     local sansRendu = params.sans_rendu == true
     local taille = tonumber(params.taille) or 1344
+    -- L'image entière d'une proposition de recadrage (preview_settings y dessine le cadre gardé) :
+    -- seulement pour l'action appliquer avec un recadrage proposé, jamais sans rendu ni pour un
+    -- exercice (rien ne se rend), ni pour un recadrage retiré (rien à dessiner).
+    local entier = params.entier == true and params.action ~= 'masquer' and params.action ~= 'retoucher'
+        and type(params.recadrage) == 'table' and params.recadrage.retirer ~= true and not sansRendu and not exercice
+    local cadrePropose, dimensionsEntiere, cheminEntier, cadreRetire
     local cheminActuel
     if params.comparer and not sansRendu then
         cheminActuel = rendre(photo, taille)
@@ -493,9 +648,26 @@ function Rendu.essayer(params)
             if sansRendu then
                 return nil
             end
-            return rendre(photo, taille)
+            local rendu = rendre(photo, taille)
+            if entier then
+                cadrePropose, dimensionsEntiere, cheminEntier, cadreRetire = rendreEntierPropose(photo, plan, taille)
+            end
+            return rendu
         end)
         local remise = aRemettre(pourLightroom(plan.avant))
+        -- Le cadre retiré pour l'image entière : chaque valeur posée que la proposition ne touchait
+        -- pas reprend celle d'avant l'essai (CropConstrainToWarp compris, que Lightroom ne coche
+        -- pas de lui-même), sinon sa valeur par défaut.
+        for cle in pairs(cadreRetire or {}) do
+            if remise[cle] == nil then
+                local actuel = plan.actuels[cle]
+                if actuel ~= nil then
+                    remise[cle] = pourLightroom(actuel)
+                else
+                    remise[cle] = DEFAUTS[cle]
+                end
+            end
+        end
         ecrire("Claude · fin de l'essai", function()
             photo:applyDevelopSettings(libererProfil(remise), "Claude · fin de l'essai")
         end)
@@ -545,6 +717,12 @@ function Rendu.essayer(params)
         instantane = instantane,
         changements = plan.changements,
         remarques = plan.notes,
+        -- Composition lue : l'image entière (absente si elle n'a pas pu se rendre : la remarque le
+        -- dit), le cadre gardé par Lightroom vu dans cette image (Recadrage.lire : absent s'il n'en
+        -- garde aucun) et les dimensions de l'image affichée entière.
+        chemin_entier = cheminEntier,
+        cadre_propose = cadrePropose,
+        dimensions = dimensionsEntiere,
     }
     -- « Je le fais » : l'instantané de la version de Claude, et le format de la photo (le serveur
     -- dit la température en kelvins pour un RAW).
