@@ -22,6 +22,18 @@ public struct VisionReport: Equatable {
         /// seulement si les deux le sont (un clin d'œil ne compte pas). Nil si les yeux sont trop
         /// petits dans l'image pour la lire.
         public var eyeOpenness: Double?
+        /// Lacet du visage en radians (rotation autour de l'axe vertical), tel que Vision le donne ;
+        /// nil s'il ne le donne pas. Le sens du regard s'en tire par Composition.regard (signe et
+        /// seuil provisoires, à constater).
+        public var yaw: Double? = nil
+
+        /// Le sens du regard dans l'image : « vers la droite de l'image », « vers la gauche de
+        /// l'image » ou « de face » ; nil sans lacet.
+        public var regard: String? {
+            guard let yaw, yaw.isFinite else { return nil }
+            guard let sens = Composition.regard(yaw: yaw) else { return "de face" }
+            return sens > 0 ? "vers la droite de l'image" : "vers la gauche de l'image"
+        }
 
         /// Les yeux paraissent fermés (ouverture sous le seuil relevé sur de vrais portraits).
         public var eyesClosed: Bool? { eyeOpenness.map { $0 < VisionAnalysis.closedEyesThreshold } }
@@ -60,9 +72,10 @@ public struct VisionReport: Equatable {
                 if let openness = face.eyeOpenness, let closed = face.eyesClosed {
                     item["yeux"] = ["ouverture": .number((openness * 100).rounded() / 100), "lecture": .string(closed ? "fermés" : "ouverts")]
                 }
+                if let regard = face.regard { item["regard"] = .string(regard) }
                 return .object(item)
             }),
-            "base": .string("Vision d'Apple sur l'aperçu, sur ce Mac. Positions en fractions de l'image affichée (0 à 1 depuis le coin haut gauche) : pupilles et rayon_yeux_rouges vont tels quels dans retouch_spots (red_eyes, à vérifier par un zoom). Qualité d'un visage de 0 à 1 et note esthétique de −1 à 1 : pour comparer des photos entre elles. Yeux : ouverture (hauteur sur largeur de l'œil le plus ouvert ; fermés sous \(DevelopCatalogue.format(VisionAnalysis.closedEyesThreshold))), seulement pour un visage assez grand."),
+            "base": .string("Vision d'Apple sur l'aperçu, sur ce Mac. Positions en fractions de l'image affichée (0 à 1 depuis le coin haut gauche) : pupilles et rayon_yeux_rouges vont tels quels dans retouch_spots (red_eyes, à vérifier par un zoom). Qualité d'un visage de 0 à 1 et note esthétique de −1 à 1 : pour comparer des photos entre elles. Yeux : ouverture (hauteur sur largeur de l'œil le plus ouvert ; fermés sous \(DevelopCatalogue.format(VisionAnalysis.closedEyesThreshold))), seulement pour un visage assez grand. Regard : d'après la rotation du visage, à vérifier à l'œil."),
         ]
         if let aesthetics {
             var item: [String: JSONValue] = ["note": .number((aesthetics * 100).rounded() / 100)]
@@ -160,7 +173,10 @@ public enum VisionAnalysis {
                 pupils: pupils.sorted { $0.x < $1.x },
                 eyeWidth: eyeWidths.isEmpty ? nil : eyeWidths.reduce(0, +) / Double(eyeWidths.count),
                 quality: qualities[face.uuid],
-                eyeOpenness: openings.count == 2 ? openings.max() : nil)
+                eyeOpenness: openings.count == 2 ? openings.max() : nil,
+                // Constaté sur ce Mac (révision 3) : les observations des repères portent le lacet,
+                // le même que la détection des visages seule ; pas de seconde requête.
+                yaw: face.yaw.map { Double(truncating: $0) })
         }
 
         var salient: CGRect?

@@ -165,6 +165,21 @@ final class AnalyseTests: XCTestCase {
         XCTAssertEqual(VisionAnalysis.groups(prints), [[0, 1]])
     }
 
+    /// 1.3 : le sens du regard d'un visage, tiré du lacet de Vision (Composition.regard), dans le JSON
+    /// de Vision ; absent sans lacet.
+    func testVisionDitLeRegardDUnVisage() throws {
+        func regard(_ yaw: Double?) -> JSONValue? {
+            let visage = VisionReport.Face(box: CGRect(x: 0.4, y: 0.3, width: 0.2, height: 0.2), pupils: [], eyeWidth: nil,
+                                           quality: nil, eyeOpenness: nil, yaw: yaw)
+            return VisionReport(faces: [visage], aesthetics: nil, utility: nil, salientArea: nil).json["visages"]?.array?.first?["regard"]
+        }
+        XCTAssertNil(regard(nil), "sans lacet, pas de regard")
+        XCTAssertEqual(regard(0.5 * Composition.signeLacet)?.string, "vers la droite de l'image")
+        XCTAssertEqual(regard(-0.5 * Composition.signeLacet)?.string, "vers la gauche de l'image")
+        XCTAssertEqual(regard(0.1)?.string, "de face")
+        XCTAssertNil(VisionReport.Face(box: .zero, pupils: [], eyeWidth: nil, quality: nil, eyeOpenness: nil).yaw, "nil par défaut")
+    }
+
     func testViewPhotoAddsDetailAndVision() throws {
         let image = Self.checkerboard()
         fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(image)), "photo": ["id": 1]]

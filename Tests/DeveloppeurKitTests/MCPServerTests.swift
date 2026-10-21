@@ -338,18 +338,15 @@ final class MCPServerTests: XCTestCase {
         XCTAssertEqual(ToolHandler.annotations("export_journal")["title"]?.string, "Journal et carnet de progrès")
     }
 
-    /// Le corps de read_composition est provisoire dans cette construction : une erreur d'outil,
-    /// rien n'est envoyé au module, pas même aux registres notés à part ; un paramètre inconnu reste
-    /// refusé. Celui de photo_lesson est fait (LeconTests).
-    func testLesCorpsProvisoiresNEnvoientRien() throws {
+    /// Les corps de read_composition et de photo_lesson sont faits (CompositionTests,
+    /// LeconTests) : un paramètre inconnu reste refusé avant tout envoi au module, pas même aux
+    /// registres notés à part.
+    func testParametreInconnuDesOutilsDeLa13NEnvoieRien() throws {
         let tools = ToolHandler(lightroom: fake)
-        for nom in ["read_composition"] {
-            let resultat = tools.call(name: nom, arguments: [:])
-            XCTAssertTrue(resultat.isError, nom)
-            XCTAssertTrue(resultat.text.contains("n'est pas encore dans cette construction"), resultat.text)
-        }
         let inconnu = tools.call(name: "read_composition", arguments: ["photo_ids": [1]])
         XCTAssertTrue(inconnu.text.contains("Paramètres inconnus pour read_composition : photo_ids (ici : « photo_id »)"), inconnu.text)
+        let lecon = tools.call(name: "photo_lesson", arguments: ["photo_ids": [1]])
+        XCTAssertTrue(lecon.isError && lecon.text.contains("Paramètres inconnus pour photo_lesson"), lecon.text)
         XCTAssertTrue(fake.calls.isEmpty, "\(fake.commands)")
         XCTAssertTrue(fake.lecons.isEmpty)
         XCTAssertTrue(fake.carnets.isEmpty)

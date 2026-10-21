@@ -121,12 +121,13 @@ extension ToolHandler {
                  properties: developProperties + writeProperties + targetProperties,
                  required: ["step_name"]),
             tool("preview_settings",
-                 "Proposition visuelle : montre le rendu d'une retouche (mêmes paramètres qu'apply_settings) sans la garder. Le module l'applique, rend l'aperçu, puis remet la photo comme avant : rien n'est mémorisé, mais l'Historique de Lightroom garde deux étapes « Claude · essai ». Permis en mode « Proposer d'abord » : c'est la façon de montrer une proposition avant de demander l'accord. Avec compare : « bilan » de l'état actuel à la proposition (mêmes règles que view_photo : une « regression » se corrige dans la proposition avant de l'appliquer).",
+                 "Proposition visuelle : montre le rendu d'une retouche (mêmes paramètres qu'apply_settings) sans la garder. Le module l'applique, rend l'aperçu, puis remet la photo comme avant : rien n'est mémorisé, mais l'Historique de Lightroom garde deux étapes « Claude · essai » (trois avec crop). Permis en mode « Proposer d'abord » : c'est la façon de montrer une proposition avant de demander l'accord. Avec compare : « bilan » de l'état actuel à la proposition (mêmes règles que view_photo : une « regression » se corrige dans la proposition avant de l'appliquer).",
                  properties: developProperties + [
                     ("photo_id", photoIDProperty),
                     ("step_name", prop("string", "Nom court de la proposition.")),
                     ("compare", prop("boolean", "true = l'état actuel (à gauche) et la proposition (à droite) côte à côte.")),
                     ("size", prop("integer", "Grand côté de l'aperçu en pixels (défaut \(Self.defaultPreviewSize), de \(Self.previewSizes.lowerBound) à \(Self.previewSizes.upperBound)).")),
+                    ("overlay", prop("boolean", "Avec crop : l'image entière, le cadre proposé en pointillés, les tiers et le hors-cadre assombri (défaut true) ; false = l'image recadrée.")),
                  ],
                  required: []),
             tool("enhance_photo",
@@ -286,7 +287,48 @@ extension ToolHandler {
         params["action"] = "appliquer"
         params["etape"] = .string((args.string("step_name") ?? "").isEmpty ? "proposition" : String(args.string("step_name")!.prefix(60)))
         params.merge(cible) { _, new in new }
+        // Un recadrage proposé se montre sur l'image entière (1.3) : le module la rend aussi, sans
+        // cadre, et lit le cadre que Lightroom a gardé (troisième étape « Claude · essai ») ; pas pour
+        // un recadrage retiré, ni avec overlay = false, ni pour « Je le fais » (my_turn, rien rendu).
+        if let cadre = develop["recadrage"], cadre["retirer"] == nil, args.bool("overlay") != false, args.bool("my_turn") != true {
+            params["entier"] = true
+        }
         return try preview(params, args: args, notes: notes)
+    }
+
+    /// La surimpression d'une proposition de recadrage : l'image entière rendue par le module
+    /// (`chemin_entier`), le cadre que Lightroom a gardé (`cadre_propose`, relu après l'écriture) en
+    /// pointillés, les tiers et le hors-cadre assombri, et son résumé. Le fichier est toujours lu,
+    /// donc effacé. Le cadre se dit (résumé, chiffres) dès que le module l'a relu, même si l'image
+    /// entière manque (rendu échoué : le module le dit dans ses remarques) ; l'image dessinée est nil,
+    /// avec la raison, si le cadre ou l'image manquent.
+    static func surimpressionDuCadre(_ result: JSONValue) -> (image: Data?, cadre: Composition.Cadre?, aspect: Double, remarque: String?) {
+        let chemin = result["chemin_entier"]?.string
+        let entiere = chemin.flatMap { (try? readPreview($0)).flatMap(PreviewImages.image) }
+        let dimensions = result["dimensions"]
+        var aspect: Double?
+        if let largeur = dimensions?["largeur"]?.double, let hauteur = dimensions?["hauteur"]?.double, largeur > 0, hauteur > 0 {
+            aspect = largeur / hauteur
+        } else if let entiere {
+            aspect = Double(entiere.width) / Double(entiere.height)
+        }
+        let brut = result["cadre_propose"].flatMap { $0.isNull ? nil : $0 }
+        let cadre = brut.flatMap { Composition.Cadre(module: $0, dimensions: dimensions) }
+        // Sans image entière demandée ni cadre relu : une proposition sans recadrage, rien à dire.
+        guard chemin != nil || brut != nil else { return (nil, nil, 1, nil) }
+        guard brut != nil else {
+            return (nil, nil, aspect ?? 1, "Lightroom n'a gardé aucun recadrage : l'image montre la proposition.")
+        }
+        guard let cadre, let aspect else {
+            return (nil, nil, aspect ?? 1, "Cadre gardé par Lightroom illisible : l'image montre la proposition recadrée.")
+        }
+        // Le rendu de l'image entière a échoué dans le module (il le dit dans ses remarques).
+        guard chemin != nil else { return (nil, cadre, aspect, nil) }
+        guard let entiere else { return (nil, cadre, aspect, "Image entière illisible : l'image montre la proposition recadrée.") }
+        guard let dessin = PreviewImages.cadrePropose(entiere, coins: Composition.coins(cadre, aspect: aspect)) else {
+            return (nil, cadre, aspect, "Cadre non dessiné : l'image montre la proposition recadrée.")
+        }
+        return (dessin, cadre, aspect, nil)
     }
 
     /// Rend une proposition (commande « essayer » du module) : l'image, côte à côte avec l'état
@@ -299,11 +341,31 @@ extension ToolHandler {
         params["comparer"] = .bool(compare)
 
         let result = try lightroom.send("essayer", params, timeout: 240)
+        // Un recadrage proposé : l'image entière, le cadre gardé par Lightroom dessiné dessus (1.3),
+        // lue la première (son fichier est effacé même si la suite échoue). Les mesures et le bilan
+        // restent ceux de l'image recadrée (proposed).
+        let surimpression = Self.surimpressionDuCadre(result)
         let proposed = try Self.readPreview(result["chemin"]?.string)
-        var image = proposed
         var info = Self.labelChanges(Self.withLabels(result, notes: notes)).object ?? [:]
         info.removeValue(forKey: "chemin")
         info.removeValue(forKey: "chemin_actuel")
+        info.removeValue(forKey: "chemin_entier")
+        info.removeValue(forKey: "dimensions")
+        var montree = proposed
+        if let cadre = surimpression.cadre {
+            info["resume_cadre"] = .string(Composition.resume(cadre, aspectImage: surimpression.aspect))
+            func r(_ valeur: Double) -> JSONValue { .number((valeur * 1000).rounded() / 1000) }
+            info["cadre_propose"] = ["ratio": r(cadre.ratio), "angle": .number((cadre.angle * 100).rounded() / 100),
+                                     "center_x": r(cadre.centreX), "center_y": r(cadre.centreY), "largeur": r(cadre.largeur)]
+        } else {
+            info.removeValue(forKey: "cadre_propose")
+        }
+        if let dessin = surimpression.image {
+            montree = dessin
+            info["image"] = "L'image entière : le cadre proposé en pointillés (celui que Lightroom a gardé), les tiers et le hors-cadre assombri. Rien n'est appliqué."
+        }
+        if let remarque = surimpression.remarque { info["remarque_cadre"] = .string(remarque) }
+        var image = montree
         // Mesurées comme l'aperçu de view_photo (un décodage, réduction à 512 px), avec la forme
         // courte de l'éclairage : une balance ou un masque proposés se voient à l'écart entre zones.
         // Ni netteté ni bruit : une proposition ne se compare qu'à l'état actuel rendu par la même
@@ -311,8 +373,9 @@ extension ToolHandler {
         let proposition = Self.mesurerImage(proposed, detail: false)
         if compare {
             let current = try Self.readPreview(result["chemin_actuel"]?.string)
-            image = PreviewImages.sideBySide(current, proposed) ?? proposed
-            info["image"] = "À gauche l'état actuel, à droite la proposition."
+            image = PreviewImages.sideBySide(current, montree) ?? montree
+            info["image"] = surimpression.image == nil ? "À gauche l'état actuel, à droite la proposition."
+                : "À gauche l'état actuel, à droite l'image entière avec le cadre proposé en pointillés (tiers, hors-cadre assombri)."
             let actuel = Self.mesurerImage(current, detail: false)
             if let actuel { info["mesures_actuelles"] = actuel.json }
             if let actuel, let proposition {
