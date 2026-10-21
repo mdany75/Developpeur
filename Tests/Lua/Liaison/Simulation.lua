@@ -338,7 +338,11 @@ end
 -- - LocalPointColors : un texte de 19 nombres « %f, %f, … » par couleur (DevelopPointColorUtils) ;
 -- - plage de couleurs : PointModels, des textes de six nombres « c1 c2 c3 x y 0 » ;
 -- - plage de profondeur : DepthRange, quatre valeurs de 0 à 1 ; DepthMin, DepthMax ou DepthFeather
---   (forme « M2 ») font prendre l'image entière : la simulation les refuse.
+--   (forme « M2 ») font prendre l'image entière : la simulation les refuse ;
+-- - dégradé radial (constaté le 20 octobre 2026, propositions à −2 IL, fondu nul) : un
+--   Mask/CircularGradient qui porte Flipped = true agit dans l'ellipse, et avec MaskInverted, hors
+--   de l'ellipse seulement (le centre intact) ; c'est la forme que le module pose (Locaux.radial),
+--   la seule éprouvée : la simulation refuse un radial sans Flipped.
 -- Catégories d'une personne précise, de sous-type 0 (relevées dans Lightroom) : la personne entière
 -- (20036) et ses parties ; le sous-type 0 sert aussi à l'arrière-plan (22) et au paysage (5000x).
 local CATEGORIES_PERSONNE = { [20036] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true,
@@ -352,6 +356,9 @@ local function verifierMasques(reglages)
             assert(type(texte) == 'string' and n == 19 and texte:find(', ', 1, true), "LocalPointColors : un texte de 19 nombres « %f, %f, … »")
         end
         for _, m in ipairs(correction.CorrectionMasks or {}) do
+            if m.What == 'Mask/CircularGradient' then
+                assert(m.Flipped == true, "dégradé radial : Flipped = true, la forme constatée (avec MaskInverted, il agit hors de l'ellipse)")
+            end
             local geste = type(m.Gesture) == 'table' and m.Gesture[1]
             if m.What == 'Mask/Image' and type(geste) == 'table' and geste.What == 'Mask/Polygon' then
                 local valides = type(geste.Points) == 'table' and #geste.Points >= 3

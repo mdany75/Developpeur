@@ -5,8 +5,9 @@ import XCTest
 
 /// L'écran nommé (1.2) : lecture des profils ICC, classement, textes et JSON. Tests purs, sur les
 /// profils du système et des copies dans un dossier temporaire ; la lecture des vrais écrans n'est
-/// éprouvée que pour l'absence de plantage, sans aucune valeur attendue. Ni le ToolHandler ni
-/// get_status ici (lot du connecteur).
+/// éprouvée que pour l'absence de plantage, sans aucune valeur attendue. Au connecteur : get_status
+/// et la remarque du premier aperçu, sur des écrans fabriqués (ToolHandler.lireEcran), et l'étape
+/// de la recette, avec un faux module TCP.
 final class EcranTests: XCTestCase {
     static let systeme = "/System/Library/ColorSync/Profiles/"
     static let displayP3 = URL(fileURLWithPath: systeme + "Display P3.icc")
@@ -269,6 +270,147 @@ final class EcranTests: XCTestCase {
         XCTAssertEqual(sonde["mesure"]?.bool, true)
         XCTAssertEqual(sonde["logiciel"]?.string, "DisplayCAL")
         XCTAssertEqual(sonde["date_profil"]?.string, "2026-03-03")
+    }
+
+    // MARK: - Au connecteur
+
+    /// Les blocs de texte d'un résultat, dans l'ordre.
+    static func textes(_ resultat: ToolResult) -> [String] {
+        resultat.content.compactMap { if case .text(let texte) = $0 { return texte }; return nil }
+    }
+
+    func testGetStatusDitLEcran() throws {
+        let fake = FakeLightroom()
+        fake.replies["etat"] = ["module": "Développeur"]
+        let tools = ToolHandler(lightroom: fake)
+        // Par défaut, aucun écran n'est lu : les tests ne lisent jamais le vrai écran.
+        XCTAssertNil(try JSONCoding.parse(tools.call(name: "get_status", arguments: [:]).text)["ecran"])
+        tools.lireEcran = { Ecran.Etat(principal: Self.odyssey, autres: [Self.perso]) }
+        let statut = try JSONCoding.parse(tools.call(name: "get_status", arguments: [:]).text)
+        let principal = try XCTUnwrap(statut["ecran"]?["principal"])
+        XCTAssertEqual(principal["nom"]?.string, "Odyssey G85SD")
+        XCTAssertEqual(principal["etalonnage"]?.string, "usine")
+        XCTAssertEqual(principal["mesure"]?.bool, false)
+        XCTAssertEqual(principal["texte"]?.string, Ecran.texte(Self.odyssey))
+        XCTAssertEqual(statut["ecran"]?["autres"]?.array?.count, 1)
+        XCTAssertNil(statut["ecran"]?["detail"], "le texte de la boîte de la fenêtre ne part pas chez Claude")
+        XCTAssertFalse(JSONCoding.line(statut).contains("ColorSync/Profiles"), "ni le chemin d'un profil")
+        XCTAssertEqual(statut["module"]?.string, "Développeur", "l'état de la liaison reste")
+        let description = try XCTUnwrap(tools.definitions.first { $0["name"] == "get_status" }?["description"]?.string)
+        XCTAssertTrue(description.contains("(ecran : nom, profil de couleur, mesuré par une sonde ou non)"), description)
+        XCTAssertTrue(description.contains("quand son avis compte (peau, couleurs)"), description)
+        XCTAssertLessThan(try XCTUnwrap(description.range(of: "ecran :")).lowerBound,
+                          try XCTUnwrap(description.range(of: "request_backup demande")).lowerBound, "l'écran avant la sauvegarde")
+    }
+
+    func testRemarqueUneFoisAuPremierApercu() throws {
+        let fake = FakeLightroom()
+        let image = TestSupport.jpeg(red: 120, green: 120, blue: 120)
+        fake.onSend = { [unowned fake] command, _ in
+            if ["apercu", "essayer"].contains(command) {
+                fake.replies[command] = ["chemin": .string(TestSupport.previewFile(image)), "photo": ["id": 1]]
+            }
+        }
+        fake.replies["etat"] = ["module": "Développeur"]
+        let usine = Ecran.Etat(principal: Self.odyssey)
+        var lectures = 0
+        let tools = ToolHandler(lightroom: fake)
+        tools.lireEcran = { lectures += 1; return usine }
+
+        // Un aperçu en échec ne la consomme pas, ni un outil sans aperçu.
+        fake.errors["apercu"] = LightroomError.plugin("aperçu impossible")
+        XCTAssertTrue(tools.call(name: "view_photo", arguments: [:]).isError)
+        fake.errors["apercu"] = nil
+        XCTAssertEqual(Self.textes(tools.call(name: "list_selection", arguments: [:])).count, 1)
+        XCTAssertEqual(lectures, 0)
+
+        // Le premier aperçu réussi : la remarque dans un bloc à part, le JSON reste lisible.
+        let premier = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertFalse(premier.isError, premier.text)
+        let blocs = Self.textes(premier)
+        XCTAssertEqual(blocs.count, 2)
+        XCTAssertNotNil(try JSONCoding.parse(blocs[0])["mesures"])
+        XCTAssertEqual(blocs.last, Ecran.remarque(Self.odyssey))
+        XCTAssertTrue(blocs.last?.contains("non mesuré sur ce Mac") == true)
+        // Une fois par processus : ni le suivant, ni une proposition.
+        XCTAssertEqual(Self.textes(tools.call(name: "view_photo", arguments: [:])).count, 1)
+        XCTAssertEqual(Self.textes(tools.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 0.3]])).count, 1)
+        XCTAssertEqual(lectures, 1, "l'écran lu une seule fois")
+
+        // Une proposition, si elle est le premier aperçu.
+        let proposition = ToolHandler(lightroom: fake)
+        proposition.lireEcran = { usine }
+        let essai = proposition.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 0.3]])
+        XCTAssertFalse(essai.isError, essai.text)
+        XCTAssertEqual(Self.textes(essai).last, Ecran.remarque(Self.odyssey))
+
+        // Un écran mesuré par une sonde : rien à dire.
+        let sonde = ToolHandler(lightroom: fake)
+        sonde.lireEcran = { Ecran.Etat(principal: Self.mesure) }
+        XCTAssertEqual(Self.textes(sonde.call(name: "view_photo", arguments: [:])).count, 1)
+
+        // get_status l'a déjà dit : le premier aperçu ne le redit pas.
+        let statut = ToolHandler(lightroom: fake)
+        statut.lireEcran = { usine }
+        _ = statut.call(name: "get_status", arguments: [:])
+        XCTAssertEqual(Self.textes(statut.call(name: "view_photo", arguments: [:])).count, 1)
+
+        // Par défaut (aucun écran lu) : aucune remarque, le texte se lit en JSON tel quel.
+        let defaut = ToolHandler(lightroom: fake)
+        let vue = defaut.call(name: "view_photo", arguments: [:])
+        XCTAssertEqual(Self.textes(vue).count, 1)
+        XCTAssertNotNil(try JSONCoding.parse(vue.text)["mesures"])
+    }
+
+    /// La recette dit la liaison fermée et l'écran nommé avec le vrai pont seulement (ici, vers un
+    /// faux module TCP qui demande un jeton) ; l'écran vient d'un écran fabriqué, jamais du vrai.
+    func testRecetteDitLaLiaisonFermeeEtLEcranAvecLeVraiPont() throws {
+        let plugin = try FakePlugin()
+        defer { plugin.stop() }
+        let jeton = String(repeating: "ab", count: 32)
+        plugin.jetonAttendu = jeton
+        var fermee = true
+        plugin.handler = { requete in
+            let id = requete["id"] ?? .null
+            switch requete["command"]?.string {
+            case "ping": return [JSONCoding.line(["id": id, "result": ["pong": true]])]
+            case "etat":
+                var etat: [String: JSONValue] = ["module": "Développeur"]
+                if fermee { etat["liaison_fermee"] = true }
+                return [JSONCoding.line(["id": id, "result": .object(etat)])]
+            default: return [JSONCoding.line(["id": id, "error": "commande inattendue"])]
+            }
+        }
+        let fichier = dossier.appendingPathComponent("liaison.jeton")
+        try Data((jeton + "\n").utf8).write(to: fichier)
+        let pont = LightroomBridge(requestPort: plugin.requestPort, replyPort: plugin.replyPort, fichierJeton: fichier)
+        let recette = Recette(lightroom: pont)
+        var lectures = 0
+        recette.lireEcran = { lectures += 1; return Ecran.Etat(principal: Self.odyssey) }
+        recette.lancer(raw: nil, jpeg: nil, flash: nil)
+        XCTAssertEqual(recette.etapes.map(\.nom), ["liaison fermée (jeton privé)", "écran nommé (get_status)"])
+        XCTAssertTrue(recette.reussie, recette.etapes.map(\.detail).joined(separator: " | "))
+        XCTAssertEqual(recette.etapes[1].detail, Ecran.texte(Self.odyssey))
+        XCTAssertEqual(lectures, 1)
+        XCTAssertNil(recette.tools.lireEcran(), "l'écran n'est plus lu après l'étape")
+        // Une commande sans jeton, une avec un autre jeton, toutes deux refusées ; puis le jeton de la
+        // liaison. Lecture seule : etat, jamais une écriture.
+        let jetons = plugin.jetonsRecus
+        XCTAssertTrue(jetons.contains { $0 == nil })
+        XCTAssertTrue(jetons.contains { $0 == String(repeating: "0", count: 64) })
+        XCTAssertEqual(jetons.last, jeton)
+        XCTAssertEqual(Set(plugin.received), ["ping", "etat"])
+
+        // Un module d'avant la 1.2 : rien d'autre essayé, l'écran se dit quand même.
+        fermee = false
+        plugin.jetonAttendu = nil
+        let avant = plugin.jetonsRecus.count
+        let ancienne = Recette(lightroom: pont)
+        ancienne.lireEcran = { Ecran.Etat(principal: Self.odyssey) }
+        ancienne.lancer(raw: nil, jpeg: nil, flash: nil)
+        XCTAssertEqual(ancienne.etapes.map(\.reussie), [false, true])
+        XCTAssertTrue(ancienne.etapes[0].detail.contains("d'avant la 1.2"), ancienne.etapes[0].detail)
+        XCTAssertFalse(plugin.jetonsRecus.dropFirst(avant).contains { $0 != jeton }, "aucune commande sans le jeton de la liaison")
     }
 
     // MARK: - Lecture réelle

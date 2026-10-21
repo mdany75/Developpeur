@@ -33,10 +33,10 @@ func usage() {
     Usage : mcp-developpeur              lance le serveur (stdio, pour Claude)
             mcp-developpeur --install    inscrit cet exécutable dans Claude Desktop et Claude Code
             mcp-developpeur --uninstall  retire l'inscription
-            mcp-developpeur --status     inscriptions, module Lightroom, liaison et mise à jour (par gh)
+            mcp-developpeur --status     inscriptions, module Lightroom, jeton de la liaison, écran, liaison et mise à jour (par gh)
             mcp-developpeur --version
 
-    Pour le développement (parle au module Lightroom directement) :
+    Pour le développement (parlent au module Lightroom directement, sauf --marquer-af, --ecran et --boitier) :
             mcp-developpeur --call <outil> ['{"json": …}'] [--image <fichier.jpg>]
                 appelle un outil comme le ferait Claude (et enregistre les images qu'il renvoie)
             mcp-developpeur --module <commande> ['{"json": …}']   commande brute du module (diagnostic…)
@@ -47,14 +47,25 @@ func usage() {
             mcp-developpeur --marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>
                 dessine le point de mise au point d'un fichier Fujifilm sur sa vignette (la fenêtre Claude,
                 aperçu de la photo active) ; code 1 sans point
+            mcp-developpeur --ecran   l'écran principal et son profil de couleur, une ligne JSON (voyant Écran de la
+                fenêtre Claude ; {"lu": false} sans écran), lu sur le Mac sans Lightroom
             mcp-developpeur --eclairage <id photo>… [<fichier.jpg>…] [--essai '{"settings": {"Temperature": 3200}}']
                 relevé de l'éclairage mixte : dominantes des tons neutres par case et par zone tonale, visages, scène,
-                à plusieurs bornes de chroma ; lecture seule (aperçus comme view_photo) ; --essai passe par
-                preview_settings (deux étapes « Claude · essai », copies virtuelles d'essai seulement)
-            mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--original] [--images <dossier>]
+                à plusieurs bornes (écart a*b* au centre des tons neutres : le gris, ou le point neutre de l'image
+                quand une dominante l'en écarte), avec le point neutre et le centre de chaque mesure ; lecture seule
+                (aperçus comme view_photo) ; --essai passe par preview_settings (deux étapes « Claude · essai »,
+                copies virtuelles d'essai seulement)
+            mcp-developpeur --boitier <original>
+                ce que l'appareil a rangé dans un fichier Fujifilm (RAF ou JPEG), lu sans Lightroom : point de mise
+                au point, intention de la prise de vue (comme view_photo) et valeurs lues sous les noms d'exiftool,
+                une ligne JSON ; code 1 si rien n'est lu
+            mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--original] [--images <dossier>]
                 recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
                 (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
-                garde les étapes de la recette
+                garde les étapes de la recette. --portrait : la peau dosée sur un portrait ; --mixte : une photo à
+                deux lumières (lampe et fenêtre), en lecture seule. D'abord la liaison fermée et l'écran nommé
+    Les commandes portent le jeton privé de la liaison (liaison.jeton, écrit par le module à chaque démarrage
+    de la liaison) ; le serveur ne le crée jamais et ne le dit jamais.
     DEVELOPPEUR_PORT=<port> change le port des commandes (les réponses sur le port suivant ;
     défaut \(LightroomBridge.defaultRequestPort) et \(LightroomBridge.defaultReplyPort), comme dans le module).
     DEVELOPPEUR_VERBOSE=1 journalise la durée des réponses et de chaque commande du module (stderr).
@@ -65,10 +76,18 @@ func usage() {
 
 let verbose = ProcessInfo.processInfo.environment["DEVELOPPEUR_VERBOSE"] == "1"
 
+/// Les outils du serveur et de --call, qui lisent l'écran du Mac (les tests, non : ToolHandler
+/// le laisse à nil).
+func outils() -> ToolHandler {
+    let tools = ToolHandler(lightroom: LightroomBridge.fromEnvironment())
+    tools.lireEcran = Ecran.lire
+    return tools
+}
+
 func serve() {
     let server = MCPServer(name: ServerInfo.name, title: ServerInfo.title, version: ServerInfo.version,
                            instructions: ServerInfo.instructions,
-                           tools: ToolHandler(lightroom: LightroomBridge.fromEnvironment()))
+                           tools: outils())
     server.notifier = { print(line: JSONCoding.line($0)) }
     if let text = ProcessInfo.processInfo.environment["DEVELOPPEUR_LIMITE"], let seconds = Double(text), seconds > 0 {
         server.toolBudget = seconds
@@ -107,6 +126,15 @@ func status() {
     }
     let pluginInstalled = FileManager.default.fileExists(atPath: pluginPath)
     print(line: "Module Lightroom : \(pluginInstalled ? "installé (\(pluginPath))" : "absent de \(pluginPath)")")
+    // L'état du fichier du jeton, jamais sa valeur.
+    print(line: "Jeton de la liaison : \(JetonLiaison.etat(JetonLiaison.fichierParDefaut()))")
+    // L'écran se dit même Lightroom fermé : avant la liaison, qui peut finir en échec.
+    if let ecran = Ecran.lire() {
+        print(line: "Écran principal : \(Ecran.texte(ecran.principal))")
+        for autre in ecran.autres { print(line: "Autre écran : \(Ecran.texte(autre))") }
+    } else {
+        print(line: "Écran : aucun écran lu (session sans écran ?)")
+    }
     let bridge = LightroomBridge.fromEnvironment()
     do {
         let state = try bridge.send("etat", [:], timeout: 10)
@@ -159,7 +187,7 @@ case "--call":
     }
     do {
         let params = try rest.first.map { try JSONCoding.parse($0).object ?? [:] } ?? [:]
-        let result = ToolHandler(lightroom: LightroomBridge.fromEnvironment()).call(name: arguments[1], arguments: params)
+        let result = outils().call(name: arguments[1], arguments: params)
         var saved = 0
         for block in result.content {
             switch block {
@@ -188,6 +216,18 @@ case "--marquer-af":
     guard let point = PointAF.marquer(original: URL(fileURLWithPath: arguments[1]), geometrie: geometrie,
                                       entree: URL(fileURLWithPath: arguments[3]), sortie: URL(fileURLWithPath: arguments[4])) else { exit(1) }
     print(line: JSONCoding.line(["x": .number(point.x), "y": .number(point.y), "avertissement": .bool(point.avertissement)]))
+case "--ecran":
+    // Le voyant Écran de la fenêtre Claude (Lightroom.etatEcran) : une seule ligne JSON, chemins des
+    // profils et texte de la boîte compris ; sans écran lu, {"lu": false} (ECRAN_AUCUN du module).
+    print(line: JSONCoding.line(Ecran.lire().map { Ecran.json($0, detail: true) } ?? ["lu": false]))
+case "--boitier":
+    // Ce que l'appareil a rangé dans un fichier Fujifilm, sans Lightroom, à comparer à exiftool.
+    guard arguments.count == 2 else { usage(); exit(2) }
+    guard let lecture = Recette.lectureBoitier(URL(fileURLWithPath: arguments[1])) else {
+        log("rien de lu : pas un fichier Fujifilm, fichier illisible, ou ouverture trop longue (autorisation de macOS ?)")
+        exit(1)
+    }
+    print(line: JSONCoding.line(lecture))
 case "--recalage":
     // Écarts du recalage (Recalage.swift) sur la géométrie actuelle d'une photo, pour essayer des
     // corrections (Upright, perspective forte) : l'historique garde les deux rendus du recalage.
@@ -270,7 +310,8 @@ case "--module":
         exit(1)
     }
 case "--recette":
-    var raw: Int?, jpeg: Int?, flash: Int?, profondeur: Int?, yeuxRouges: Int?, xt20: Int?, images: URL?, originaux = false
+    var raw: Int?, jpeg: Int?, flash: Int?, profondeur: Int?, yeuxRouges: Int?, xt20: Int?, portrait: Int?, mixte: Int?
+    var images: URL?, originaux = false
     var rest = Array(arguments.dropFirst())
     while !rest.isEmpty {
         let item = rest.removeFirst()
@@ -281,6 +322,8 @@ case "--recette":
         case "--profondeur": profondeur = Int(next())
         case "--yeux-rouges": yeuxRouges = Int(next())
         case "--x-t20": xt20 = Int(next())
+        case "--portrait": portrait = Int(next())
+        case "--mixte": mixte = Int(next())
         case "--images": images = URL(fileURLWithPath: next())
         case "--original": originaux = true
         default:
@@ -288,7 +331,7 @@ case "--recette":
             raw = id
         }
     }
-    guard raw != nil || jpeg != nil || flash != nil || profondeur != nil || yeuxRouges != nil || xt20 != nil else { usage(); exit(2) }
+    guard [raw, jpeg, flash, profondeur, yeuxRouges, xt20, portrait, mixte].contains(where: { $0 != nil }) else { usage(); exit(2) }
     let folder = images ?? FileManager.default.temporaryDirectory.appendingPathComponent("recette-mcp-developpeur-\(Int(Date().timeIntervalSince1970))")
     print(line: originaux
         ? "Recette de MCP-Développeur \(ServerInfo.version) : originaux acceptés (--original), chaque photo remise à l'origine à la fin."
@@ -298,7 +341,8 @@ case "--recette":
         let seconds = String(format: "%.1f", etape.duree).replacingOccurrences(of: ".", with: ",")
         print(line: "\(etape.reussie ? "✔" : "✘") \(etape.photo) · \(etape.nom) — \(etape.detail) (\(seconds) s)")
     }
-    recette.lancer(raw: raw, jpeg: jpeg, flash: flash, profondeur: profondeur, yeuxRouges: yeuxRouges, xt20: xt20)
+    recette.lancer(raw: raw, jpeg: jpeg, flash: flash, profondeur: profondeur, yeuxRouges: yeuxRouges, xt20: xt20,
+                   portrait: portrait, mixte: mixte)
     let failures = recette.etapes.filter { !$0.reussie }.count
     print(line: failures == 0 ? "Recette réussie : \(recette.etapes.count) étapes." : "Recette en échec : \(failures) étape(s) sur \(recette.etapes.count).")
     exit(recette.reussie ? 0 : 1)

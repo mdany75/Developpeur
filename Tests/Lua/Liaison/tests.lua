@@ -5489,5 +5489,24 @@ test("apercu : avant/après de l'étape éclaircir et assombrir (etapePrecedente
     egal(resultat.etapes_claude, nil, "un avant/après ne donne pas les étapes : il ne touche pas au bilan des vues")
 end)
 
+-- Forme constatée du dégradé radial (20 octobre 2026) : Flipped = true, inversé ou non. Le module la
+-- pose (Locaux.radial) ; la simulation refuse un radial sans elle, que Lightroom n'a pas éprouvé.
+test("simulation : un dégradé radial sans Flipped est refusé (forme constatée)", function()
+    local Locaux = require 'Locaux'
+    for _, inverse in ipairs({ false, true }) do
+        local m = Locaux.radial(0.2, 0.2, 0.8, 0.8, 0, 80, 'Claude · Bords', inverse)
+        egal(m.Flipped, true, "le module pose la forme constatée")
+        egal(m.MaskInverted, inverse)
+        local photo = photoRaw()
+        S.ecritureEnCours = true
+        photo:applyDevelopSettings({ MaskGroupBasedCorrections = { Locaux.correction('x', 1, { LocalExposure2012 = -0.1 }, { m }) } }, 'essai')
+        m.Flipped = nil
+        echoue(function()
+            photo:applyDevelopSettings({ MaskGroupBasedCorrections = { Locaux.correction('y', 1, { LocalExposure2012 = -0.1 }, { m }) } }, 'essai')
+        end, "Flipped = true")
+        S.ecritureEnCours = false
+    end
+end)
+
 print(string.format("%d tests réussis, %d en échec", reussis, echecs))
 os.exit(echecs == 0 and 0 or 1)

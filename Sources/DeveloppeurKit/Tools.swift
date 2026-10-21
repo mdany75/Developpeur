@@ -82,6 +82,16 @@ public final class ToolHandler {
     var contexte = ContexteAppel()
     /// La version du module a déjà été comparée à celle du serveur (une remarque par session).
     var versionSignalee = false
+    /// L'écran principal du Mac et son profil de couleur (Ecran.swift). nil par défaut : les tests
+    /// ne lisent jamais le vrai écran, et la recette le pose le temps de son étape ; main.swift pose
+    /// `Ecran.lire` pour le serveur (`serve`) et `--call`.
+    public var lireEcran: () -> Ecran.Etat? = { nil }
+    /// L'écran a déjà été dit à Claude (remarque du premier aperçu, ou get_status) : une fois par
+    /// processus du serveur.
+    var ecranSignale = false
+    /// Les outils dont le résultat est un aperçu que Claude regarde : le premier réussi porte la
+    /// remarque de l'écran (un bloc de texte à part).
+    static let outilsAvecApercu: Set<String> = ["view_photo", "preview_settings", "compare_variants"]
     /// Version de ce serveur (celle du Info.plist ; « dev » en développement : pas de comparaison).
     var versionServeur = ServerInfo.version
     /// Modèles de noms de fichiers de Lightroom et ses préférences (dossiers d'exportation récents) :
@@ -158,7 +168,7 @@ public final class ToolHandler {
     var allDefinitions: [JSONValue] {
         let core: [JSONValue] = [
             tool("get_status",
-                 "État de la liaison avec Lightroom Classic : versions, photo active, mode du module (appliquer directement ou proposer d'abord), pause, limites de sécurité. request_backup demande une sauvegarde du catalogue à la prochaine fermeture de Lightroom : la proposer avant une longue série (des centaines de photos, une harmonisation), et dire de fermer puis rouvrir Lightroom pour qu'elle garde l'état d'avant.",
+                 "État de la liaison avec Lightroom Classic : versions, photo active, mode du module (appliquer directement ou proposer d'abord), pause, limites de sécurité. Dit aussi l'écran principal du Mac (ecran : nom, profil de couleur, mesuré par une sonde ou non) : les mesures de view_photo n'en dépendent pas, l'œil de l'utilisateur si ; écran non étalonné : le lui dire quand son avis compte (peau, couleurs). request_backup demande une sauvegarde du catalogue à la prochaine fermeture de Lightroom : la proposer avant une longue série (des centaines de photos, une harmonisation), et dire de fermer puis rouvrir Lightroom pour qu'elle garde l'état d'avant.",
                  properties: [("request_backup", prop("boolean", "true = demander à Lightroom une sauvegarde du catalogue à sa prochaine fermeture (sa fenêtre de sauvegarde ; l'utilisateur peut la passer)."))],
                  required: []),
             tool("list_selection",
@@ -277,7 +287,21 @@ public final class ToolHandler {
         if let remarque = remarqueVersion() {
             result.content.append(.text(remarque))
         }
+        // Un bloc de texte à part : le JSON du résultat reste lisible tel quel.
+        if !result.isError, Self.outilsAvecApercu.contains(name), let remarque = remarqueEcran() {
+            result.content.append(.text(remarque))
+        }
         return result
+    }
+
+    /// L'écran de l'utilisateur, dit une fois par processus au premier aperçu réussi, s'il n'est
+    /// pas mesuré par une sonde (Ecran.remarque) : les mesures de view_photo n'en dépendent pas, son
+    /// œil si. Rien si get_status l'a déjà dit, ou sans écran lu.
+    func remarqueEcran() -> String? {
+        guard !ecranSignale else { return nil }
+        ecranSignale = true
+        guard let etat = lireEcran() else { return nil }
+        return Ecran.remarque(etat.principal)
     }
 
     /// Une avancée d'une longue série : au client (progression MCP) et dans Lightroom, par sa barre de
@@ -383,13 +407,19 @@ public final class ToolHandler {
         }
     }
 
-    /// État de la liaison, avec la version du serveur et l'écart éventuel avec celle du module.
+    /// État de la liaison, avec la version du serveur et l'écart éventuel avec celle du module, et
+    /// l'écran principal du Mac (sans le chemin de son profil) : il est alors dit, la remarque du
+    /// premier aperçu ne le redit pas.
     private func status(_ args: Arguments) throws -> JSONValue {
         var etat = try lightroom.send("etat", args.bool("request_backup") == true ? ["sauvegarde": true] : [:], timeout: 10).object ?? [:]
         etat["version_serveur"] = .string(versionServeur)
         if let module = etat["version_module"]?.string, let ecart = Self.ecartVersions(serveur: versionServeur, module: module) {
             etat["avertissement_version"] = .string(ecart)
             versionSignalee = true
+        }
+        if let ecran = lireEcran() {
+            etat["ecran"] = Ecran.json(ecran)
+            ecranSignale = true
         }
         return .object(etat)
     }
