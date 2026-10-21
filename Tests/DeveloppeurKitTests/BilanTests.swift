@@ -26,7 +26,7 @@ final class BilanTests: XCTestCase {
 
     func vue(_ mesures: PhotoMeasurements, detail: DetailMeasurements? = nil, apres secondes: Double = 0, taille: Int = 1344,
              cadre: String = "cadre", etat: String = "état 1", etapes: Int? = 1, derniere: String? = "Claude · passe 1",
-             neutres: Measurements.NeutresSuivis? = nil, ia: Bool = false, corrections: Bool = false, grain: Double = 0) -> Bilan.Vue {
+             neutres: Measurements.NeutresSuivis? = nil, ia: Bool = false, corrections: String? = nil, grain: Double = 0) -> Bilan.Vue {
         Bilan.Vue(photo: 7, fichier: "DSCF2402.RAF", quand: t0.addingTimeInterval(secondes), taille: taille, cadre: cadre, etat: etat,
                   etapes: etapes, derniereEtape: derniere, mesures: mesures, detail: detail, neutres: neutres,
                   iaEnAttente: ia, corrections: corrections, grain: grain)
@@ -319,6 +319,13 @@ final class BilanTests: XCTestCase {
         let monte = vue(mesures(mediane: clarte(l2, plus: 0.3)), apres: 185, etapes: 3)
         XCTAssertTrue(textes(Bilan.session(precedente: deuxieme, depart: premiere, maintenant: monte, suiviPrecedente: nil,
                                            suiviDepart: nil, date: monte.quand)["a_verifier"]).isEmpty)
+        // Une annulation ramène la passe précédente en arrière : ce n'est pas un aller-retour.
+        let defaite = vue(mesures(mediane: l1), apres: 185, etapes: 1)
+        let annulee = Bilan.session(precedente: deuxieme, depart: premiere, maintenant: defaite, suiviPrecedente: nil,
+                                    suiviDepart: nil, date: defaite.quand)
+        XCTAssertEqual(annulee["etapes_claude"], "1 de moins : retouche défaite (undo_last ou revert_to_original)")
+        XCTAssertNotNil(annulee["ecarts"]?["exposition"])
+        XCTAssertFalse(textes(annulee["a_verifier"]).contains { $0.hasPrefix("aller-retour") }, "\(annulee)")
     }
 
     func testSlowDriftShowsSinceTheStart() {
@@ -427,13 +434,13 @@ final class BilanTests: XCTestCase {
         XCTAssertEqual(v.derniereEtape, "Claude · passe 1")
         XCTAssertEqual(v.grain, 25)
         XCTAssertTrue(v.iaEnAttente)
-        XCTAssertTrue(v.corrections)
+        XCTAssertNotNil(v.corrections)
         let sansEtape = try XCTUnwrap(Bilan.Vue(apercu: apercu(etapes: ["nombre": 0, "derniere": .null]), quand: t0, taille: 1344,
                                                mesures: mesures(), detail: nil, neutres: nil))
         XCTAssertEqual(sansEtape.etapes, 0)
         XCTAssertNil(sansEtape.derniereEtape)
         XCTAssertFalse(sansEtape.iaEnAttente)
-        XCTAssertFalse(sansEtape.corrections)
+        XCTAssertNil(sansEtape.corrections)
         XCTAssertNil(Bilan.Vue(apercu: ["photo": ["fichier": "a.jpg"]], quand: t0, taille: 1344, mesures: mesures(), detail: nil, neutres: nil))
         XCTAssertTrue(Bilan.premiereVue.contains("point de départ"), "le texte du premier view_photo d'une photo")
 
@@ -446,7 +453,29 @@ final class BilanTests: XCTestCase {
         let b = bilan(ancien, suivante)
         XCTAssertNil(b["etapes_claude"])
         XCTAssertNotNil(b["ecarts"]?["exposition"])
-        XCTAssertEqual(bilan(v, v)["corrections_utilisateur"], "l'utilisateur a aussi retouché à la main : un écart peut venir de lui")
+    }
+
+    /// Le module redonne les corrections à la main à chaque aperçu, jusqu'à la commande suivante
+    /// de Claude : seules des corrections nouvelles ou changées depuis la vue précédente se disent.
+    func testHandCorrectionsAreToldOnlyWhenNew() throws {
+        var avecCorrections = apercu()
+        guard case .object(var objet) = avecCorrections else { return XCTFail() }
+        objet["corrections_utilisateur"] = ["etape": "Claude · passe 1",
+                                            "changements": [["cle": "Exposure2012", "claude": 0.3, "maintenant": 0.6]]]
+        avecCorrections = .object(objet)
+        func vueDe(_ reponse: JSONValue, apres secondes: Double) throws -> Bilan.Vue {
+            try XCTUnwrap(Bilan.Vue(apercu: reponse, quand: t0.addingTimeInterval(secondes), taille: 1344, mesures: mesures(), detail: nil, neutres: nil))
+        }
+        let ligne: JSONValue = "l'utilisateur a aussi retouché à la main : un écart peut venir de lui"
+        let sans = try vueDe(apercu(), apres: 0), avec = try vueDe(avecCorrections, apres: 30), encore = try vueDe(avecCorrections, apres: 60)
+        XCTAssertEqual(bilan(sans, avec)["corrections_utilisateur"], ligne, "nouvelles depuis la vue précédente")
+        XCTAssertNil(bilan(avec, encore)["corrections_utilisateur"], "les mêmes qu'à la vue précédente : rien de neuf")
+        XCTAssertNotNil(bilan(avec, encore)["meme_etat"])
+        // D'autres corrections à la main depuis : de nouveau dites.
+        objet["corrections_utilisateur"] = ["etape": "Claude · passe 1",
+                                            "changements": [["cle": "Exposure2012", "claude": 0.3, "maintenant": 0.9]]]
+        let autres = try vueDe(.object(objet), apres: 90)
+        XCTAssertEqual(bilan(encore, autres)["corrections_utilisateur"], ligne)
     }
 
     func testNeutralsAreTrackedInTheSession() {
@@ -488,6 +517,24 @@ final class BilanTests: XCTestCase {
         XCTAssertTrue(Bilan.avantApres(avant: mesures(), apres: mesures(), detailAvant: detail(nettete: 50, bruit: 0.45),
                                        detailApres: detail(nettete: 50, bruit: 0.72), depuis: "avant", conseil: "c",
                                        grainAjoute: true)["a_verifier"] != nil)
+
+        // Avant et après de cadres différents (redressement) : coins vides à vérifier, netteté et
+        // bruit non comparés, et une remarque qui le dit.
+        let redressee = Bilan.avantApres(avant: mesures(), apres: mesures(hautes: 6.2, blanc: 6),
+                                         detailAvant: detail(nettete: 50, bruit: 0.3), detailApres: detail(nettete: 30, bruit: 0.3),
+                                         depuis: "avant", conseil: "c", cadreChange: true)
+        XCTAssertNil(redressee["regression"], "\(redressee)")
+        XCTAssertNil(redressee["conseil"])
+        XCTAssertTrue(textes(redressee["a_verifier"]).contains { $0.contains("coins vides possibles (Upright, perspective)") }, "\(redressee)")
+        XCTAssertNil(redressee["ecarts"]?["nettete_max"])
+        XCTAssertEqual(textes(redressee["remarques"]).first, "cadre différent entre l'avant et l'après (recadrage, Upright, rotation) : netteté et bruit non comparés")
+        // Le même cadre : la même hausse est une régression, avec le conseil.
+        let memeCadre = Bilan.avantApres(avant: mesures(), apres: mesures(hautes: 6.2, blanc: 6),
+                                         detailAvant: detail(nettete: 50, bruit: 0.3), detailApres: detail(nettete: 30, bruit: 0.3),
+                                         depuis: "avant", conseil: "c")
+        XCTAssertEqual(textes(memeCadre["regression"]), ["hautes lumières écrêtées : 0,0 → 6,2 % (+6,2 points)",
+                                                         "netteté passée de nette à douce : 50,0 → 30,0 (seuil 35)"])
+        XCTAssertNil(memeCadre["remarques"])
     }
 
     func testZoomBilanGivesRawDeltasWithoutAlerts() {

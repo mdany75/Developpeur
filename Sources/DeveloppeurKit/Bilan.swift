@@ -33,8 +33,11 @@ enum Bilan {
         var neutres: Measurements.NeutresSuivis?
         /// Calculs IA en attente au rendu (« a_savoir ») : l'image peut changer sans réglage.
         var iaEnAttente: Bool
-        /// L'utilisateur a retouché à la main depuis la dernière commande de Claude.
-        var corrections: Bool
+        /// Ce que l'utilisateur a retouché à la main depuis la dernière commande de Claude
+        /// (`corrections_utilisateur` du module, en empreinte) ; nil sans retouche à la main. Le
+        /// module le redonne à chaque aperçu jusqu'à la commande suivante de Claude : seul un
+        /// changement d'une vue à l'autre peut expliquer un écart.
+        var corrections: String?
         /// GrainAmount : un grain ajouté se mesure comme du bruit.
         var grain: Double
     }
@@ -343,7 +346,7 @@ enum Bilan {
                 json["etapes_claude"] = "aucune nouvelle"
             }
         }
-        if maintenant.corrections {
+        if maintenant.corrections != nil, maintenant.corrections != precedente.corrections {
             json["corrections_utilisateur"] = "l'utilisateur a aussi retouché à la main : un écart peut venir de lui"
         }
 
@@ -379,8 +382,12 @@ enum Bilan {
 
         var regressionDepuisDebut = false
         if depart.quand != precedente.quand {
-            c.aVerifier += allersRetours(depart: depart, precedente: precedente, maintenant: maintenant,
-                                         suiviPrecedente: suiviPrecedente, suiviDepart: suiviDepart)
+            // Pas d'aller-retour après une annulation : défaire la passe précédente la ramène en
+            // arrière, c'est le but, et non des réglages empilés.
+            if !annulation {
+                c.aVerifier += allersRetours(depart: depart, precedente: precedente, maintenant: maintenant,
+                                             suiviPrecedente: suiviPrecedente, suiviDepart: suiviDepart)
+            }
             // Depuis le premier view_photo : une dérive lente, faite de petites passes.
             let cadreDepuis = depart.cadre != maintenant.cadre
             let suivisDepuis = !cadreDepuis && depart.neutres != nil && suiviDepart != nil
@@ -447,11 +454,17 @@ enum Bilan {
     /// Bilan d'un avant/après (view_photo avec compare, ou une proposition avec compare) : même
     /// format que `session`, sans étapes ni aller-retour ; les tons neutres ne sont pas suivis
     /// (l'image d'avant peut avoir un autre cadre). `conseil` n'est donné qu'avec une régression.
+    /// `cadreChange` (par exemple deux images de proportions différentes : recadrage, Upright,
+    /// rotation) : netteté et bruit ne se comparent pas, et un blanc pur en hausse est « à
+    /// vérifier » (coins vides possibles), comme d'une vue à l'autre.
     static func avantApres(avant: PhotoMeasurements, apres: PhotoMeasurements,
                            detailAvant: DetailMeasurements?, detailApres: DetailMeasurements?,
-                           depuis: String, conseil: String, grainAjoute: Bool = false) -> JSONValue {
-        let c = comparer(avant: avant, apres: apres, detailAvant: detailAvant, detailApres: detailApres,
-                         neutresAvant: nil, neutresApres: nil, suivis: false, cadreChange: false, grainAjoute: grainAjoute)
+                           depuis: String, conseil: String, grainAjoute: Bool = false, cadreChange: Bool = false) -> JSONValue {
+        var c = comparer(avant: avant, apres: apres, detailAvant: detailAvant, detailApres: detailApres,
+                         neutresAvant: nil, neutresApres: nil, suivis: false, cadreChange: cadreChange, grainAjoute: grainAjoute)
+        if cadreChange {
+            c.remarques.insert("cadre différent entre l'avant et l'après (recadrage, Upright, rotation) : netteté et bruit non comparés", at: 0)
+        }
         var json: [String: JSONValue] = ["depuis": .string(depuis)]
         if !c.ecarts.isEmpty { json["ecarts"] = .object(c.ecarts) }
         if !c.sansEcart.isEmpty { json["sans_ecart_visible"] = .array(c.sansEcart.map(JSONValue.string)) }
@@ -523,12 +536,12 @@ extension Bilan.Vue {
     init?(apercu: JSONValue, quand: Date, taille: Int, mesures: PhotoMeasurements,
           detail: DetailMeasurements?, neutres: Measurements.NeutresSuivis?) {
         guard let photo = apercu["photo"]?["id"]?.int else { return nil }
-        func present(_ cle: String) -> Bool { apercu[cle].map { !$0.isNull } ?? false }
+        func present(_ cle: String) -> JSONValue? { apercu[cle].flatMap { $0.isNull ? nil : $0 } }
         self.init(photo: photo, fichier: apercu["photo"]?["fichier"]?.string ?? "", quand: quand, taille: taille,
                   cadre: Bilan.cadre(apercu), etat: Bilan.etat(apercu),
                   etapes: apercu["etapes_claude"]?["nombre"]?.int, derniereEtape: apercu["etapes_claude"]?["derniere"]?.string,
                   mesures: mesures, detail: detail, neutres: neutres,
-                  iaEnAttente: present("a_savoir"), corrections: present("corrections_utilisateur"),
+                  iaEnAttente: present("a_savoir") != nil, corrections: present("corrections_utilisateur").map(JSONCoding.line),
                   grain: apercu["reglages"]?["GrainAmount"]?.double ?? 0)
     }
 }

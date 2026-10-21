@@ -105,8 +105,9 @@ public enum Notation {
     }
 
     /// Le plafond d'une photo triée, d'après le standard et les seuils déjà relevés (netteté 15 et
-    /// 35, bruit 1,5 : `DetailMeasurements.seuilFlou`, `seuilNet` et `bruitFort`) : un défaut majeur, 0 et rejet proposé ; un défaut visible seulement à 100 %
-    /// (douce, mise au point signalée manquée par l'appareil), 3 ; presque noire ou brûlée, 2, à
+    /// 35, bruit 1,5 : `DetailMeasurements.seuilFlou`, `seuilNet` et `bruitFort`) : un défaut
+    /// majeur, 0 et rejet proposé ; un défaut visible seulement à 100 % (douce, mise au point
+    /// signalée manquée par l'appareil), 3 ; presque noire ou brûlée, 2, à
     /// vérifier (souvent rattrapable, surtout en RAW) ; une capture ou un document selon Vision, 1 ;
     /// une photo qui n'est pas la meilleure de sa rafale ou de sa pile (`doublon`), 3 (un 4 est la
     /// meilleure vue de son moment). Un bruit fort ne plafonne pas : la photo se note après le
