@@ -411,6 +411,20 @@ public enum Composition {
         public var regard: Int?
         /// Le regard vient du lacet lu par Vision (provisoire), pas de facing.
         public var regardLu = false
+        /// Angle du recadrage actuel (degrés, convention de crop.angle) ; nil sans recadrage. La
+        /// lecture se fait sur la photo prise : elle dit aussi ce que le recadrage actuel en fait.
+        public var angleActuel: Double?
+        /// Hauteur de l'horizon dans le cadre actuel (0 en haut, 1 en bas) ; nil sans recadrage.
+        public var hauteurDansCadreActuel: Double?
+    }
+
+    /// La place d'un horizon à la hauteur `y` (0 en haut, 1 en bas) : au milieu, sur un tiers, ou
+    /// en pourcentage de la hauteur.
+    static func placeHorizon(_ y: Double) -> (milieu: Bool, texte: String) {
+        if abs(y - 0.5) < seuilLecture { return (true, "au milieu") }
+        if abs(y - 2.0 / 3) < seuilLecture { return (false, "sur le tiers du bas") }
+        if abs(y - 1.0 / 3) < seuilLecture { return (false, "sur le tiers du haut") }
+        return (false, "à \(Int((y * 100).rounded())) % de la hauteur, depuis le haut")
     }
 
     /// Ce qui cloche (ou tient), en phrases simples, à dire à l'utilisateur pour qu'il cadre mieux à
@@ -424,16 +438,36 @@ public enum Composition {
             } else {
                 phrases.append("L'horizon est droit.")
             }
+            // Le recadrage actuel tourne l'image : dans la vue recadrée, l'horizon penche de t + angle.
+            if let a = lu.angleActuel {
+                let vu = t + a
+                if abs(t) >= seuilInclinaison, abs(vu) < seuilInclinaison {
+                    phrases.append("Le recadrage actuel le redresse déjà.")
+                } else if abs(vu) >= seuilInclinaison, abs(a) >= 0.05 {
+                    phrases.append("Dans le recadrage actuel, il penche de \(decimal(abs(vu), 10))° (le côté droit plus \(vu > 0 ? "haut" : "bas")).")
+                }
+            }
         }
         if let y = lu.hauteurHorizon {
-            if abs(y - 0.5) < s {
+            let place = placeHorizon(y)
+            if place.milieu {
                 phrases.append("Il coupe la photo en deux : sur un tiers, le ciel ou le premier plan prend la place.")
-            } else if abs(y - 2.0 / 3) < s {
-                phrases.append("Il est sur le tiers du bas.")
-            } else if abs(y - 1.0 / 3) < s {
-                phrases.append("Il est sur le tiers du haut.")
+            } else if place.texte.hasPrefix("sur ") {
+                phrases.append("Il est \(place.texte).")
             } else {
-                phrases.append("Il passe à \(Int((y * 100).rounded())) % de la hauteur, depuis le haut.")
+                phrases.append("Il passe \(place.texte).")
+            }
+            if let yc = lu.hauteurDansCadreActuel {
+                if !(0...1).contains(yc) {
+                    phrases.append("Le recadrage actuel ne le montre pas.")
+                } else {
+                    let actuelle = placeHorizon(yc)
+                    if actuelle.milieu {
+                        phrases.append("Dans le recadrage actuel, il coupe l'image en deux.")
+                    } else {
+                        phrases.append("Dans le recadrage actuel, il \(actuelle.texte.hasPrefix("sur ") ? "est" : "passe") \(actuelle.texte).")
+                    }
+                }
             }
         }
         if let sujet = lu.sujet {
@@ -443,14 +477,14 @@ public enum Composition {
             else if abs(x - 1.0 / 3) < s { place = "sur le tiers gauche" }
             else if abs(x - 2.0 / 3) < s { place = "sur le tiers droit" }
             else { place = x < 0.5 ? "à gauche" : "à droite" }
-            let verbe = lu.nomSujet.hasPrefix("les ") ? "sont" : "est"
-            let regarde = lu.nomSujet.hasPrefix("les ") ? "regardent" : "regarde"
-            var phrase = "\(lu.nomSujet.prefix(1).uppercased())\(lu.nomSujet.dropFirst()) \(verbe) \(place)"
+            let pluriel = lu.nomSujet.hasPrefix("les ")
+            let nom = "\(lu.nomSujet.prefix(1).uppercased())\(lu.nomSujet.dropFirst())"
+            var phrase = "\(nom) \(pluriel ? "sont" : "est") \(place)"
             if let regard = lu.regard, regard != 0 {
-                phrase += " et \(regarde) vers la \(regard > 0 ? "droite" : "gauche")"
+                phrase += " et \(pluriel ? "regardent" : "regarde") vers la \(regard > 0 ? "droite" : "gauche")"
                 if lu.regardLu { phrase += " (lu par Vision, à vérifier à l'œil)" }
                 let devant = regard > 0 ? 1 - x : x
-                phrase += devant < 0.6 ? " : peu d'espace devant lui" : " : de l'espace devant lui"
+                phrase += " : \(devant < 0.6 ? "peu d'espace" : "de l'espace") devant \(pluriel ? "eux" : "lui")"
             }
             phrases.append(phrase + ".")
             var bords: [String] = []
@@ -459,9 +493,9 @@ public enum Composition {
             if Double(sujet.minY) < s { bords.append("le haut") }
             if Double(sujet.maxY) > 1 - s { bords.append("le bas") }
             if bords.count >= 3 {
-                phrases.append("Le sujet remplit presque toute la photo.")
+                phrases.append("\(nom) \(pluriel ? "remplissent" : "remplit") presque toute la photo.")
             } else if !bords.isEmpty {
-                phrases.append("Le sujet touche presque \(bords.joined(separator: " et ")).")
+                phrases.append("\(nom) \(pluriel ? "touchent" : "touche") presque \(bords.joined(separator: " et ")).")
             }
         }
         if phrases.isEmpty {

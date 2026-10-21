@@ -261,6 +261,31 @@ final class CompositionTests: XCTestCase {
         XCTAssertTrue(Composition.lecture(.init()).first?.hasPrefix("Ni horizon donné ni sujet trouvé") == true)
         XCTAssertEqual(Composition.lecture(.init(sujet: CGRect(x: 0.01, y: 0.02, width: 0.98, height: 0.97))).last,
                        "Le sujet remplit presque toute la photo.")
+        // Plusieurs visages : les accords suivent.
+        XCTAssertEqual(Composition.lecture(.init(sujet: CGRect(x: 0.42, y: 0.3, width: 0.16, height: 0.2), nomSujet: "les visages", regard: -1)),
+                       ["Les visages sont au centre et regardent vers la gauche : peu d'espace devant eux."])
+        XCTAssertEqual(Composition.lecture(.init(sujet: CGRect(x: 0.01, y: 0.4, width: 0.3, height: 0.2), nomSujet: "les visages")).last,
+                       "Les visages touchent presque le bord gauche.")
+        XCTAssertEqual(Composition.lecture(.init(sujet: CGRect(x: 0.4, y: 0.01, width: 0.2, height: 0.98), nomSujet: "le visage")).last,
+                       "Le visage touche presque le haut et le bas.")
+    }
+
+    /// La lecture se fait sur la photo prise ; avec un recadrage, elle dit aussi ce qu'il en fait :
+    /// horizon déjà redressé, ou penché par l'angle actuel, et sa place dans le cadre actuel.
+    func testLaLectureDitCeQueFaitLeRecadrageActuel() {
+        XCTAssertEqual(Composition.lecture(.init(inclinaison: 2, hauteurHorizon: 0.5, angleActuel: -2, hauteurDansCadreActuel: 0.66)),
+                       ["L'horizon penche de 2° (le côté droit plus haut).", "Le recadrage actuel le redresse déjà.",
+                        "Il coupe la photo en deux : sur un tiers, le ciel ou le premier plan prend la place.",
+                        "Dans le recadrage actuel, il est sur le tiers du bas."])
+        XCTAssertEqual(Composition.lecture(.init(inclinaison: 0.1, hauteurHorizon: 0.4, angleActuel: 1.5, hauteurDansCadreActuel: 0.5)),
+                       ["L'horizon est droit.", "Dans le recadrage actuel, il penche de 1,6° (le côté droit plus haut).",
+                        "Il passe à 40 % de la hauteur, depuis le haut.", "Dans le recadrage actuel, il coupe l'image en deux."])
+        XCTAssertEqual(Composition.lecture(.init(inclinaison: 2, angleActuel: -1)),
+                       ["L'horizon penche de 2° (le côté droit plus haut).", "Dans le recadrage actuel, il penche de 1° (le côté droit plus haut)."])
+        // Un recadrage sans angle ne redit pas l'inclinaison ; un cadre qui ne montre pas l'horizon le dit.
+        XCTAssertEqual(Composition.lecture(.init(inclinaison: -1.5, hauteurHorizon: 0.8, angleActuel: 0, hauteurDansCadreActuel: 1.2)),
+                       ["L'horizon penche de 1,5° (le côté droit plus bas).", "Il passe à 80 % de la hauteur, depuis le haut.",
+                        "Le recadrage actuel ne le montre pas."])
     }
 
     // MARK: Le dessin
@@ -377,6 +402,11 @@ final class CompositionTests: XCTestCase {
         XCTAssertEqual(info["cadre_actuel"]?["angle"]?.double, -2)
         XCTAssertEqual(try XCTUnwrap(info["cadre_actuel"]?["size"]?.double), 0.8 / Composition.plusGrandeLargeur(ratio: 1.5, angle: -2, aspect: 1.5), accuracy: 1e-3)
         XCTAssertTrue(info["cadre_actuel"]?["resume"]?.string?.contains("redressé de 2°") == true)
+        // La lecture dit la photo prise, puis ce que le recadrage actuel en fait.
+        let lecture = info["lecture"]?.array?.compactMap(\.string) ?? []
+        XCTAssertEqual(lecture.first?.hasPrefix("L'horizon penche de 2"), true, "\(lecture)")
+        XCTAssertTrue(lecture.contains("Le recadrage actuel le redresse déjà."), "\(lecture)")
+        XCTAssertTrue(lecture.contains { $0.hasPrefix("Dans le recadrage actuel, il ") }, "\(lecture)")
     }
 
     /// Un horizon déjà droit sur l'image entière : l'angle actuel reste s'il le garde droit (moins de
@@ -407,6 +437,27 @@ final class CompositionTests: XCTestCase {
         let tourne = try lire(angleActuel: 1.5)
         XCTAssertEqual(tourne["crop"]?["angle"]?.double, 0, "l'angle actuel pencherait l'horizon : retiré")
         XCTAssertTrue(tourne["lecture"]?.array?.first?.string == "L'horizon est droit.")
+        XCTAssertEqual(tourne["lecture"]?.array?[1].string?.hasPrefix("Dans le recadrage actuel, il penche de 1,"), true,
+                       "l'angle actuel le fait pencher : \(tourne["lecture"].map(JSONCoding.line) ?? "")")
+    }
+
+    /// Un cadre proposé qui ne change presque rien au cadre actuel : read_composition le dit, pour
+    /// que Claude ne le propose pas.
+    func testUnCadrePresqueIdentiqueEstSignale() throws {
+        // L'horizon droit, déjà sur le tiers du bas d'une photo sans recadrage : rien à gagner.
+        // (Sans Vision : une zone d'intérêt trouvée dans l'image de synthèse déplacerait le cadre.)
+        repondreApercu(Self.entiere, image: AnalyseTests.tiltedHorizon(degrees: 0, y0: 896.0 / 3))
+        let y = 1 - 1.0 / 3
+        let info = try tools.readComposition(Arguments(raw: ["horizon": ["x1": 0.1, "y1": .number(y), "x2": 0.9, "y2": .number(y)]]),
+                                             vision: { _ in nil })
+        XCTAssertEqual(info["cadre_propose"]?["conseil"]?.string, "Presque le cadre actuel : rien à gagner, ne pas le proposer.",
+                       JSONCoding.line(info["cadre_propose"] ?? .null))
+
+        // L'horizon au milieu : le cadre change, pas de conseil.
+        repondreApercu(Self.entiere, image: AnalyseTests.tiltedHorizon(degrees: 0, y0: 448))
+        let milieu = try tools.readComposition(Arguments(raw: ["horizon": ["x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5]]), vision: { _ in nil })
+        XCTAssertNil(milieu["cadre_propose"]?["conseil"], JSONCoding.line(milieu["cadre_propose"] ?? .null))
+        XCTAssertEqual(milieu["cadre_propose"]?["regles_tenues"]?.array?.compactMap(\.string), ["horizon droit", "horizon sur le tiers du bas"])
     }
 
     func testReadCompositionRefuseCeQuIlNeConnaitPas() throws {
@@ -454,11 +505,13 @@ final class CompositionTests: XCTestCase {
         let visage = VisionReport.Face(box: CGRect(x: 0.45, y: 0.325, width: 0.1, height: 0.15),
                                        pupils: [CGPoint(x: 0.48, y: 0.38), CGPoint(x: 0.52, y: 0.38)],
                                        eyeWidth: nil, quality: nil, eyeOpenness: nil, yaw: 0.6 * Composition.signeLacet)
-        let rapport = VisionReport(faces: [visage], aesthetics: nil, utility: nil, salientArea: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2))
+        var rapport = VisionReport(faces: [visage], aesthetics: nil, utility: nil, salientArea: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2))
+        var appelsVision = 0
         func lire(_ arguments: [String: JSONValue]) throws -> JSONValue {
             fake.calls = []
+            appelsVision = 0
             repondreApercu(Self.entiere, image: TestSupport.jpeg(red: 120, green: 120, blue: 120, width: 1344, height: 896))
-            return try tools.readComposition(Arguments(raw: arguments), vision: { _ in rapport })
+            return try tools.readComposition(Arguments(raw: arguments), vision: { _ in appelsVision += 1; return rapport })
         }
         func place(_ info: JSONValue) throws -> CGPoint {
             let crop = try XCTUnwrap(info["crop"])
@@ -482,10 +535,23 @@ final class CompositionTests: XCTestCase {
         let centre = try lire(["subject_place": "center"])
         XCTAssertEqual(Double(try place(centre).x), 0.5, accuracy: 0.01)
 
-        // Un sujet donné passe avant les visages.
+        // Un sujet donné passe avant les visages : Vision n'est pas appelée.
         let donne = try lire(["subject": ["x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2]])
         XCTAssertEqual(donne["sujet"]?["source"]?.string, "donne")
         XCTAssertNil(donne["sujet"]?["regard"], "le lacet d'un visage ne vaut pas pour un sujet donné")
+        XCTAssertEqual(appelsVision, 0, "Vision ne sert à rien avec un sujet donné")
+        _ = try lire([:])
+        XCTAssertEqual(appelsVision, 1)
+
+        // Vision sans lacet : le regard n'est pas connu, donc pas dit (« de face » serait faux).
+        rapport.faces[0].yaw = nil
+        let sansLacet = try lire([:])
+        XCTAssertEqual(sansLacet["sujet"]?["source"]?.string, "visages")
+        XCTAssertNil(sansLacet["sujet"]?["regard"], JSONCoding.line(sansLacet["sujet"] ?? .null))
+        // Un lacet de face, lui, se dit.
+        rapport.faces[0].yaw = 0
+        XCTAssertEqual(try lire([:])["sujet"]?["regard"]?.string, "de face (lu par Vision, à vérifier)")
+        XCTAssertEqual(try lire(["facing": "none"])["sujet"]?["regard"]?.string, "de face (facing)")
     }
 
     // MARK: preview_settings, surimpression
@@ -581,5 +647,36 @@ final class CompositionTests: XCTestCase {
         let illisible = try JSONCoding.parse(tools.call(name: "preview_settings", arguments: ["crop": ["angle": 0.5]]).text)
         XCTAssertEqual(illisible["remarque_cadre"]?.string, "Cadre gardé par Lightroom illisible : l'image montre la proposition recadrée.")
         XCTAssertNil(illisible["cadre_propose"], "pas de cadre en chiffres faux")
+    }
+
+    /// Le rendu de l'image entière a échoué dans le module (il le dit dans ses remarques) : l'image
+    /// recadrée reste montrée, mais le cadre gardé par Lightroom se dit quand même (résumé et
+    /// chiffres : la fenêtre Claude en tire sa ligne « Cadre : … »).
+    func testSansImageEntiereLeCadreGardeSeDitQuandMeme() throws {
+        let fichiers = repondreEssai()
+        var reponse = try XCTUnwrap(fake.replies["essayer"]?.object)
+        reponse.removeValue(forKey: "chemin_entier")
+        reponse["remarques"] = ["Image entière non rendue : erreur de rendu ; le cadre n'est pas dessiné."]
+        fake.replies["essayer"] = .object(reponse)
+        let result = tools.call(name: "preview_settings", arguments: ["crop": ["aspect": "3:2", "size": 0.667]])
+        XCTAssertFalse(result.isError, result.text)
+        guard case .image(let base64, _) = result.content.first, let image = PreviewImages.image(Data(base64Encoded: base64)!) else {
+            return XCTFail("image attendue")
+        }
+        XCTAssertEqual(image.width, 896, "l'image recadrée")
+        let info = try JSONCoding.parse(result.text)
+        XCTAssertEqual(info["resume_cadre"]?.string, "3:2 (format d'origine), 67 % de la largeur gardée")
+        XCTAssertEqual(try XCTUnwrap(info["cadre_propose"]?["largeur"]?.double), 0.667, accuracy: 0.001)
+        XCTAssertNil(info["remarque_cadre"], "la raison est dans les remarques du module")
+        XCTAssertNil(info["image"], "pas d'image entière annoncée")
+        try? FileManager.default.removeItem(atPath: fichiers.entiere)
+    }
+
+    /// La description de preview_settings dit la troisième étape, et overlay est une propriété.
+    func testPreviewSettingsDecritLaSurimpression() throws {
+        let outils = tools.definitions.compactMap { $0.object }
+        let outil = try XCTUnwrap(outils.first { $0["name"]?.string == "preview_settings" })
+        XCTAssertTrue(outil["description"]?.string?.contains("deux étapes « Claude · essai » (trois avec crop)") == true)
+        XCTAssertEqual(outil["inputSchema"]?["properties"]?["overlay"]?["type"]?.string, "boolean")
     }
 }

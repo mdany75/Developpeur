@@ -180,7 +180,7 @@ extension ToolHandler {
                 throw LightroomError.invalid("« horizon » : segment trop court ; choisir deux points éloignés sur la ligne (au moins un cinquième de l'image).")
             }
             guard !ligne.vertical else {
-                throw LightroomError.invalid("« horizon » : une ligne presque horizontale (pour une verticale, measure_angle).")
+                throw LightroomError.invalid("« horizon » attend une ligne presque horizontale (pour une verticale, measure_angle).")
             }
             horizon = (CGPoint(x: (Double(pa.x) + Double(pb.x)) / 2, y: (Double(pa.y) + Double(pb.y)) / 2), ligne)
         }
@@ -196,10 +196,12 @@ extension ToolHandler {
         }
         angle = (min(max(angle, Self.cropAngleRange.lowerBound), Self.cropAngleRange.upperBound) * 100).rounded() / 100
 
-        // Le sujet : celui donné, sinon les visages, sinon la zone d'intérêt de Vision.
-        let rapport = vision(image)
+        // Le sujet : celui donné, sinon les visages, sinon la zone d'intérêt de Vision (appelée
+        // seulement sans sujet donné). Le regard n'est dit que s'il est connu : facing, ou le lacet
+        // que Vision donne pour le visage principal.
+        let rapport = sujetDonne == nil ? vision(image) : nil
         var sujet: CGRect?, source: String?, nomSujet = "le sujet"
-        var regard: Int?, regardLu = false, hauteurYeux: Double?
+        var regard: Int?, regardLu = false, regardConnu = false, hauteurYeux: Double?
         if let donne = sujetDonne {
             let coins = [CGPoint(x: donne.minX, y: donne.minY), CGPoint(x: donne.maxX, y: donne.minY),
                          CGPoint(x: donne.maxX, y: donne.maxY), CGPoint(x: donne.minX, y: donne.maxY)].map(versEntiere)
@@ -214,6 +216,7 @@ extension ToolHandler {
             nomSujet = retenus.count > 1 ? "les visages" : "le visage"
             regard = Composition.regard(yaw: principal.yaw)
             regardLu = regard != nil
+            regardConnu = principal.yaw?.isFinite == true
             if !principal.pupils.isEmpty { hauteurYeux = principal.pupils.map { Double($0.y) }.reduce(0, +) / Double(principal.pupils.count) }
         } else if let zone = rapport?.salientArea {
             sujet = zone
@@ -222,6 +225,7 @@ extension ToolHandler {
         if let facing {
             regard = ["right": 1, "left": -1][facing]
             regardLu = false
+            regardConnu = true
         }
 
         var regles = Composition.Regles(sujet: sujet, regard: regard, tailleMin: tailleMin, taille: taille)
@@ -249,12 +253,17 @@ extension ToolHandler {
         func r(_ valeur: Double, _ facteur: Double = 1000) -> JSONValue { .number((valeur * facteur).rounded() / facteur) }
         let largeurImage = dimensions?["largeur"] ?? .number(Double(image.width))
         let hauteurImage = dimensions?["hauteur"] ?? .number(Double(image.height))
+        // Hauteur de l'horizon dans le cadre actuel (la vue de view_photo), s'il y en a un.
+        let hauteurDansCadre = cadreActuel.flatMap { cadre in
+            horizon.map { Double(Composition.depuisImageEntiere($0.milieu, cadre: cadre, aspect: aspect).y) }
+        }
         var reponse: [String: JSONValue] = [
             "photo": result["photo"] ?? .null,
             "image_entiere": ["largeur": largeurImage, "hauteur": hauteurImage],
             "lecture": .array(Composition.lecture(Composition.Lu(
                 inclinaison: horizon?.mesure.tilt, hauteurHorizon: horizon.map { Double($0.milieu.y) }, sujet: sujet,
-                nomSujet: nomSujet, regard: regard, regardLu: regardLu)).map(JSONValue.string)),
+                nomSujet: nomSujet, regard: regard, regardLu: regardLu,
+                angleActuel: cadreActuel?.angle, hauteurDansCadreActuel: hauteurDansCadre)).map(JSONValue.string)),
             "crop": crop,
             "rien_n_est_applique": "La photo est inchangée : crop n'est qu'une proposition, à montrer par preview_settings puis à appliquer après l'accord.",
             "base": .string("Positions de 0 à 1 dans l'image entière, non recadrée, depuis le coin haut gauche. Inclinaison positive : l'horizon monte vers la droite. crop : tel quel dans preview_settings (crop), sans compare, puis apply_settings avec le même crop après l'accord. Seuils de la lecture et regard lu par Vision : provisoires."),
@@ -288,9 +297,7 @@ extension ToolHandler {
                 "angle_de_recadrage_actuel": r(angleActuel, 100),
                 "hauteur": r(Double(horizon.milieu.y)),
             ]
-            if let cadreActuel {
-                objet["hauteur_dans_le_cadre_actuel"] = r(Double(Composition.depuisImageEntiere(horizon.milieu, cadre: cadreActuel, aspect: aspect).y))
-            }
+            if let hauteurDansCadre { objet["hauteur_dans_le_cadre_actuel"] = r(hauteurDansCadre) }
             if ligne.refinedAngle != nil {
                 objet["mesure"] = .string("affinée sur \(ligne.edgePoints) points du contour (écart moyen \(Composition.decimal(ligne.residual ?? 0, 10)) px)")
             } else {
@@ -304,7 +311,7 @@ extension ToolHandler {
                 "cadre": ["x": r(Double(sujet.minX)), "y": r(Double(sujet.minY)), "width": r(Double(sujet.width)), "height": r(Double(sujet.height))],
                 "centre": ["x": r(Double(sujet.midX)), "y": r(Double(sujet.midY))],
             ]
-            if facing != nil || source == "visages" {
+            if regardConnu {
                 let sens = regard.map { $0 > 0 ? "vers la droite de l'image" : "vers la gauche de l'image" } ?? "de face"
                 objet["regard"] = .string(sens + (facing != nil ? " (facing)" : " (lu par Vision, à vérifier)"))
             }

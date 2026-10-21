@@ -299,22 +299,32 @@ extension ToolHandler {
     /// La surimpression d'une proposition de recadrage : l'image entière rendue par le module
     /// (`chemin_entier`), le cadre que Lightroom a gardé (`cadre_propose`, relu après l'écriture) en
     /// pointillés, les tiers et le hors-cadre assombri, et son résumé. Le fichier est toujours lu,
-    /// donc effacé ; nil (avec la raison) si le cadre ou l'image manquent.
+    /// donc effacé. Le cadre se dit (résumé, chiffres) dès que le module l'a relu, même si l'image
+    /// entière manque (rendu échoué : le module le dit dans ses remarques) ; l'image dessinée est nil,
+    /// avec la raison, si le cadre ou l'image manquent.
     static func surimpressionDuCadre(_ result: JSONValue) -> (image: Data?, cadre: Composition.Cadre?, aspect: Double, remarque: String?) {
-        guard let chemin = result["chemin_entier"]?.string else { return (nil, nil, 1, nil) }
-        let entiere = (try? readPreview(chemin)).flatMap(PreviewImages.image)
+        let chemin = result["chemin_entier"]?.string
+        let entiere = chemin.flatMap { (try? readPreview($0)).flatMap(PreviewImages.image) }
         let dimensions = result["dimensions"]
-        guard let entiere else { return (nil, nil, 1, "Image entière illisible : l'image montre la proposition recadrée.") }
-        var aspect = Double(entiere.width) / Double(entiere.height)
+        var aspect: Double?
         if let largeur = dimensions?["largeur"]?.double, let hauteur = dimensions?["hauteur"]?.double, largeur > 0, hauteur > 0 {
             aspect = largeur / hauteur
+        } else if let entiere {
+            aspect = Double(entiere.width) / Double(entiere.height)
         }
-        guard let brut = result["cadre_propose"], !brut.isNull else {
-            return (nil, nil, aspect, "Lightroom n'a gardé aucun recadrage : l'image montre la proposition.")
+        let brut = result["cadre_propose"].flatMap { $0.isNull ? nil : $0 }
+        let cadre = brut.flatMap { Composition.Cadre(module: $0, dimensions: dimensions) }
+        // Sans image entière demandée ni cadre relu : une proposition sans recadrage, rien à dire.
+        guard chemin != nil || brut != nil else { return (nil, nil, 1, nil) }
+        guard brut != nil else {
+            return (nil, nil, aspect ?? 1, "Lightroom n'a gardé aucun recadrage : l'image montre la proposition.")
         }
-        guard let cadre = Composition.Cadre(module: brut, dimensions: dimensions) else {
-            return (nil, nil, aspect, "Cadre gardé par Lightroom illisible : l'image montre la proposition recadrée.")
+        guard let cadre, let aspect else {
+            return (nil, nil, aspect ?? 1, "Cadre gardé par Lightroom illisible : l'image montre la proposition recadrée.")
         }
+        // Le rendu de l'image entière a échoué dans le module (il le dit dans ses remarques).
+        guard chemin != nil else { return (nil, cadre, aspect, nil) }
+        guard let entiere else { return (nil, cadre, aspect, "Image entière illisible : l'image montre la proposition recadrée.") }
         guard let dessin = PreviewImages.cadrePropose(entiere, coins: Composition.coins(cadre, aspect: aspect)) else {
             return (nil, cadre, aspect, "Cadre non dessiné : l'image montre la proposition recadrée.")
         }
