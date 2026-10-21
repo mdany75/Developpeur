@@ -21,7 +21,7 @@ public struct PhotoMeasurements: Equatable {
     /// ciel peut être brûlé dans un seul canal sans que la luminance le montre.
     public var clippedChannels: [Double]
     public var meanChroma: Double
-    /// Part des pixels très saturés (C* > 60), en %.
+    /// Part des pixels très saturés (C* > `chromaTresSaturee`), en %.
     public var saturatedShare: Double
     /// Moyenne de a* et b* sur les tons presque neutres (C* < 15), et leur part en %.
     public var neutralA: Double
@@ -32,14 +32,23 @@ public struct PhotoMeasurements: Equatable {
     public var medianL: Double { percentilesL[50] ?? meanL }
     public var contrast: Double { (percentilesL[95] ?? 0) - (percentilesL[5] ?? 0) }
 
+    /// Part des tons neutres (en %) en dessous de laquelle la dominante ne se juge pas : repris par
+    /// `Measurements.compare` et le bilan de view_photo.
+    static let partNeutreMin = 3.0
+    /// Moyenne de a* ou b* des tons neutres au-delà de laquelle la dominante est légère, puis nette.
+    static let dominanteLegere = 2.0, dominanteNette = 6.0
+    /// C* au-delà duquel un pixel compte comme très saturé (`saturatedShare`).
+    static let chromaTresSaturee = 60.0
+
     /// Lecture de la dominante, d'après les tons neutres.
     public var castReading: String {
-        guard neutralShare >= 3 else { return "trop peu de tons neutres pour juger la dominante" }
+        guard neutralShare >= Self.partNeutreMin else { return "trop peu de tons neutres pour juger la dominante" }
+        let legere = Self.dominanteLegere, nette = Self.dominanteNette
         var parts: [String] = []
-        if neutralB > 2 { parts.append(neutralB > 6 ? "nettement chaude (jaune)" : "légèrement chaude (jaune)") }
-        if neutralB < -2 { parts.append(neutralB < -6 ? "nettement froide (bleue)" : "légèrement froide (bleue)") }
-        if neutralA > 2 { parts.append(neutralA > 6 ? "nettement magenta" : "légèrement magenta") }
-        if neutralA < -2 { parts.append(neutralA < -6 ? "nettement verte" : "légèrement verte") }
+        if neutralB > legere { parts.append(neutralB > nette ? "nettement chaude (jaune)" : "légèrement chaude (jaune)") }
+        if neutralB < -legere { parts.append(neutralB < -nette ? "nettement froide (bleue)" : "légèrement froide (bleue)") }
+        if neutralA > legere { parts.append(neutralA > nette ? "nettement magenta" : "légèrement magenta") }
+        if neutralA < -legere { parts.append(neutralA < -nette ? "nettement verte" : "légèrement verte") }
         return parts.isEmpty ? "neutre" : "dominante " + parts.joined(separator: " et ")
     }
 
@@ -75,6 +84,10 @@ public struct PhotoMeasurements: Equatable {
 public enum Measurements {
     /// Grand côté de la réduction analysée.
     public static let maxSide = 512
+
+    /// Écart de chroma moyenne (C*) sous lequel un changement de saturation ne se voit pas :
+    /// `compare` (analyze_photos) et le bilan de view_photo.
+    static let seuilChroma = 3.0
 
     /// Mesure un JPEG (ou toute image lisible par ImageIO). Nil si l'image est illisible.
     public static func analyze(_ data: Data) -> PhotoMeasurements? {
@@ -115,7 +128,20 @@ public enum Measurements {
         ]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary),
               let pixels = rgba(image) else { return nil }
-        let count = image.width * image.height
+        return neutres(pixels: pixels, count: image.width * image.height, masque: masque)
+    }
+
+    /// Les mêmes tons neutres sur une image déjà décodée (view_photo), réduite comme par
+    /// `analyzeScaled` : deux vues de même cadre ont alors le même nombre de pixels, et le masque
+    /// de l'une sert à l'autre (bilan d'une passe à l'autre).
+    public static func neutres(_ image: CGImage, masque: [Bool]? = nil) -> NeutresSuivis? {
+        let reduite = PreviewImages.scaled(image, maxSide: maxSide)
+        guard let pixels = rgba(reduite) else { return nil }
+        return neutres(pixels: pixels, count: reduite.width * reduite.height, masque: masque)
+    }
+
+    private static func neutres(pixels: [UInt8], count: Int, masque: [Bool]?) -> NeutresSuivis? {
+        guard count > 0, pixels.count >= count * 4 else { return nil }
         if let masque, masque.count != count { return nil }
         var choisis = masque ?? [Bool](repeating: false, count: count)
         var sommeA = 0.0, sommeB = 0.0, nombre = 0
@@ -207,7 +233,7 @@ public enum Measurements {
             sumChroma += chroma
             fine[Int((lightness * 10).rounded())] += 1
             bins[min(Int(lightness / 10), 9)] += 1
-            if chroma > 60 { saturated += 1 }
+            if chroma > PhotoMeasurements.chromaTresSaturee { saturated += 1 }
             if chroma < 15, lightness > 15, lightness < 95 {
                 neutral += 1
                 sumA += a
@@ -249,28 +275,36 @@ public enum Measurements {
         return fy > 0.206893 ? fy * fy * fy : (fy - 16.0 / 116.0) / 7.787
     }
 
+    /// Écart d'exposition de `avant` à `apres`, en IL : log2 du rapport des luminances médianes,
+    /// borné à ±3 (non arrondi). Le même pour analyze_photos et le bilan de view_photo.
+    static func ecartIL(_ avant: PhotoMeasurements, _ apres: PhotoMeasurements) -> Double {
+        let y0 = max(luminance(avant.medianL), 0.0005), y1 = max(luminance(apres.medianL), 0.0005)
+        return min(max(log2(y1 / y0), -3), 3)
+    }
+
     /// Écarts d'une photo avec une photo de référence, et ce qu'il faudrait changer pour s'en
     /// rapprocher. Seule l'exposition se chiffre de façon fiable (en IL, par la luminance
-    /// médiane) ; le reste donne un sens et un ordre de grandeur, à vérifier à l'œil.
+    /// médiane) ; le reste donne un sens et un ordre de grandeur, à vérifier à l'œil. Seuils de
+    /// visibilité : ceux de match_series (`ToolHandler.seuilExposition`, `seuilDominante`,
+    /// `seuilContraste`), et `seuilChroma`.
     public static func compare(_ photo: PhotoMeasurements, toReference reference: PhotoMeasurements) -> JSONValue {
         func r(_ value: Double, _ step: Double = 0.1) -> JSONValue { .number((value / step).rounded() * step) }
-        let photoY = max(luminance(photo.medianL), 0.0005), referenceY = max(luminance(reference.medianL), 0.0005)
-        let exposure = min(max(log2(referenceY / photoY), -3), 3)
+        let exposure = ecartIL(photo, reference)
         let deltaA = reference.neutralA - photo.neutralA
         let deltaB = reference.neutralB - photo.neutralB
         let deltaContrast = reference.contrast - photo.contrast
         let deltaChroma = reference.meanChroma - photo.meanChroma
 
         var hints: [JSONValue] = []
-        if abs(exposure) >= 0.1 {
+        if abs(exposure) >= ToolHandler.seuilExposition {
             hints.append(.string("Exposure2012 : environ \(exposure > 0 ? "+" : "")\(DevelopCatalogue.format((exposure * 20).rounded() / 20)) IL (en relatif)"))
         }
-        if photo.neutralShare >= 3, reference.neutralShare >= 3 {
-            if abs(deltaB) >= 1.5 { hints.append(.string(deltaB > 0 ? "Temperature : réchauffer (vers le jaune)" : "Temperature : refroidir (vers le bleu)")) }
-            if abs(deltaA) >= 1.5 { hints.append(.string(deltaA > 0 ? "Tint : vers le magenta" : "Tint : vers le vert")) }
+        if photo.neutralShare >= PhotoMeasurements.partNeutreMin, reference.neutralShare >= PhotoMeasurements.partNeutreMin {
+            if abs(deltaB) >= ToolHandler.seuilDominante { hints.append(.string(deltaB > 0 ? "Temperature : réchauffer (vers le jaune)" : "Temperature : refroidir (vers le bleu)")) }
+            if abs(deltaA) >= ToolHandler.seuilDominante { hints.append(.string(deltaA > 0 ? "Tint : vers le magenta" : "Tint : vers le vert")) }
         }
-        if abs(deltaContrast) >= 4 { hints.append(.string(deltaContrast > 0 ? "Contraste : plus de contraste (ou Blancs + / Noirs −)" : "Contraste : moins de contraste")) }
-        if abs(deltaChroma) >= 3 { hints.append(.string(deltaChroma > 0 ? "Couleur : plus saturée (Vibrance +)" : "Couleur : moins saturée (Vibrance −)")) }
+        if abs(deltaContrast) >= ToolHandler.seuilContraste { hints.append(.string(deltaContrast > 0 ? "Contraste : plus de contraste (ou Blancs + / Noirs −)" : "Contraste : moins de contraste")) }
+        if abs(deltaChroma) >= seuilChroma { hints.append(.string(deltaChroma > 0 ? "Couleur : plus saturée (Vibrance +)" : "Couleur : moins saturée (Vibrance −)")) }
         if hints.isEmpty { hints.append(.string("Déjà proche de la référence.")) }
 
         return [

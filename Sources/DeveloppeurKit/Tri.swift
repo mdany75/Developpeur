@@ -67,15 +67,15 @@ public struct PhotoTriee {
 
     /// Les défauts mesurés, par genre : floue, mise au point manquée ou signalée manquée par
     /// l'appareil, yeux fermés, presque noire, brûlée. Seuils de netteté de `Detail` (relevés à
-    /// 1024 px : moins de 15 floue, plus de 35 nette).
+    /// 1024 px : moins de 15 floue, plus de 35 nette ; `DetailMeasurements.seuilFlou` et `seuilNet`).
     public var defautsMesures: [(genre: Defaut, texte: String)] {
         var liste: [(genre: Defaut, texte: String)] = []
-        if let detail, detail.sharpest < 15 {
+        if let detail, detail.sharpest < DetailMeasurements.seuilFlou {
             liste.append((.floue, "floue : aucune zone nette (netteté \(Self.r(detail.sharpest)))"))
-        } else if let af, let auPoint = af.nettete, let detail, auPoint < 15, detail.sharpest >= 35 {
+        } else if let af, let auPoint = af.nettete, let detail, auPoint < DetailMeasurements.seuilFlou, detail.sharpest >= DetailMeasurements.seuilNet {
             liste.append((.miseAuPointManquee, "mise au point manquée : floue au point AF (\(Self.r(auPoint))), nette ailleurs (\(Self.r(detail.sharpest)))"))
         }
-        if let af, af.avertissement, (nettete ?? 0) < 35, liste.isEmpty {
+        if let af, af.avertissement, (nettete ?? 0) < DetailMeasurements.seuilNet, liste.isEmpty {
             liste.append((.miseAuPointSignalee, "mise au point signalée manquée par l'appareil"))
         }
         if let yeux = yeuxFermes { liste.append((.yeuxFermes, yeux)) }
