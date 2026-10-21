@@ -72,7 +72,7 @@ local function bouton(contenu, p, titre, cleActif)
         if type(t) == 'table' and t.liaison then
             t = p[t.key]
         end
-        if v.genre == 'push_button' and t == titre
+        if S.BOUTONS[v.genre] and t == titre
             and (not cleActif or (type(v.args.enabled) == 'table' and v.args.enabled.key == cleActif)) then
             return v
         end
@@ -118,7 +118,7 @@ local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(
 prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
 prefs.cheminConnecteur = '/bin/echo'
 local imageJpeg = S.home .. '/image.jpg'
-S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/vide-320.png') .. ' --out ' .. S.q(imageJpeg) .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(imageJpeg) .. ' >/dev/null 2>&1')
 
 -- Les demandes envoyées à Claude, gardées ici (Moteur.envoyer remplacé le temps d'un essai).
 local envoyerVrai = Moteur.envoyer
@@ -581,12 +581,12 @@ essai("Aperçu : l'image de la proposition arrive ; un vrai clic sur Proposition
         egal(true, Fenetre.voirActive)
         egal('2 sur 3 · preview_settings', p.legendeApercu, "gardée quand la photo active change")
         p.onglet = 'notation'
-        egal('Photo active · XH2S0321', p.legendeApercu)
+        egal('<EM>XH2S0321.RAF</EM>', p.legendeApercu)
         p.onglet = 'proposition'
         egal('2 sur 3 · preview_settings', p.legendeApercu)
         egal(true, Fenetre.voirActive, 'Note garde la photo active')
         p.onglet = 'notation'
-        egal('Photo active · XH2S0321', p.legendeApercu, 'Note inchangée par le clic sur Proposition')
+        egal('<EM>XH2S0321.RAF</EM>', p.legendeApercu, 'Note inchangée par le clic sur Proposition')
         p.onglet = 'proposition'
         egal('2 sur 3 · preview_settings', p.legendeApercu)
         -- Agrandir : l'image de la proposition, pas la photo active (sa vignette prête, comme une
@@ -789,7 +789,7 @@ local function ajuster(args, p, choisir)
         end
         local rapides = {}
         for _, b in ipairs(rangee.args) do
-            if type(b) == 'table' and b.genre == 'push_button' then
+            if type(b) == 'table' and S.BOUTONS[b.genre] then
                 rapides[#rapides + 1] = b
             end
         end

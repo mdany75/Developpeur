@@ -1,10 +1,12 @@
 -- Lightroom.lua : ce que la fenêtre lit de Lightroom et de son entourage : photo active (avec sa
--- note posée) et sélection, état de la liaison et mode « Proposer d'abord » (lus directement : la
--- liaison est dans ce même module), connexion de Claude Code, écran principal du Mac (lu par le
+-- note posée, et sa légende quand elle change) et sélection, état de la liaison et mode « Proposer
+-- d'abord » (lus directement : la liaison est dans ce même module), connexion de Claude Code,
+-- écran principal du Mac (lu par le
 -- connecteur : `mcp-developpeur --ecran`), réglages d'une photo pendant un exercice « Je le fais »
 -- (1.3, lus sans rien écrire). À appeler depuis une tâche.
 
 local LrApplication = import 'LrApplication'
+local LrDate = import 'LrDate'
 local LrPathUtils = import 'LrPathUtils'
 local LrTasks = import 'LrTasks'
 
@@ -53,6 +55,39 @@ function Lightroom.photos()
         info.active = nil
     end
     return info
+end
+
+-- La légende d'une photo, pour l'aperçu de la photo active et l'en-tête de la fenêtre (fenêtre B,
+-- 1.3) : { nom (son nom de fichier), copie (le nom de sa copie virtuelle), appareil (le modèle du
+-- boîtier), date (de prise de vue : « 10 juil. 2020 ») }, une table neuve de textes, chacun absent
+-- s'il ne se lit pas. La date se lit à l'heure locale (timeToUserFormat : timeToW3CDate donne
+-- l'UTC, constaté), les mois par Carnet.MOIS_COURTS, leur seule copie. Lue seulement quand la photo
+-- active change (Fenetre.majPhoto) : Lightroom.photos, toutes les 2 s, n'en lit rien. À appeler
+-- depuis une tâche.
+function Lightroom.legende(id)
+    local l = {}
+    LrTasks.pcall(function()
+        local photo = LrApplication.activeCatalog():getPhotoByLocalId(tonumber(id))
+        if not photo then
+            return
+        end
+        local function texte(cle)
+            local ok, v = LrTasks.pcall(function() return photo:getFormattedMetadata(cle) end)
+            v = ok and type(v) == 'string' and Texte.nettoyer(v) or ''
+            return v ~= '' and v or nil
+        end
+        l.nom, l.copie, l.appareil = texte('fileName'), texte('copyName'), texte('cameraModel')
+        local ok, prise = LrTasks.pcall(function() return photo:getRawMetadata('dateTimeOriginal') end)
+        if ok and type(prise) == 'number' then
+            local jour = tonumber(LrDate.timeToUserFormat(prise, '%d'))
+            local mois = require('Carnet').MOIS_COURTS[tonumber(LrDate.timeToUserFormat(prise, '%m')) or 0]
+            local annee = LrDate.timeToUserFormat(prise, '%Y')
+            if jour and mois and annee then
+                l.date = string.format('%d %s %s', jour, mois, annee)
+            end
+        end
+    end)
+    return l
 end
 
 -- « DSCF4961 » pour DSCF4961.RAF.

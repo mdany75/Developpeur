@@ -127,7 +127,7 @@ local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(
 prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
 prefs.cheminConnecteur = '/bin/echo'
 local imageB64 = S.home .. '/image.b64'
-S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/vide-320.png') .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
 S.executer('/usr/bin/base64 -i ' .. S.q(S.home .. '/image.jpg') .. ' -o ' .. S.q(imageB64))
 local env = 'FAUX_IMAGE_B64=' .. S.q(imageB64) .. ' '
 local executerOriginal = S.modules.LrTasks.execute
@@ -162,6 +162,31 @@ local function ouvrirFenetre(fn)
     if erreur then
         error(erreur, 0)
     end
+end
+
+-- Un clic dans la liste des conversations, une grille de cases dans la fenêtre B (lot B3) : sur la
+-- case de cette valeur (l'id d'une conversation, Fenetre.CARNET, ou un en-tête « §… » : la case de
+-- son jour), par son calque, comme Dany (S.cliquer, puis Fenetre.cliquerListe). Rend ce que rend le
+-- clic.
+local function choisir(valeur)
+    Fenetre.rafraichirListe()
+    for k, case in ipairs(Fenetre.cases or {}) do
+        if case.value == valeur then
+            for _, v in ipairs(S.vues(S.fenetre.contents)) do
+                local t = v.args.tooltip
+                if v.genre == 'static_text' and type(t) == 'table' and t.key == 'li' .. k and Fenetre.parCalque(v.args.mouse_down) then
+                    return S.cliquer(v)
+                end
+            end
+            error('calque introuvable pour la case ' .. k, 2)
+        end
+    end
+    error('case introuvable dans la liste : ' .. tostring(valeur), 2)
+end
+
+-- La valeur de la case choisie de la liste (son fond de sélection).
+local function choix()
+    return Fenetre.choixListe()
 end
 
 -- Un tour de la boucle de la fenêtre (Fenetre.boucle), sans attendre : la pause de la fin du tour
@@ -461,7 +486,9 @@ essai('Fil.lignesCarnet : titre, note, tableau mono aligné, tendances, à trava
         vrai(l.genre == 'outil' or l.defaut == nil, 'seules les rangées portent un défaut')
         vrai(l == derniere or l.action == nil, "seule la ligne d'action en porte une")
     end
-    vrai(#lignes <= D.lignes, string.format('la page tient dans la grille (%d lignes pour %d)', #lignes, D.lignes))
+    -- Dans la grille de la fenêtre B (23 lignes, au fil de 570 points : lot B3), la page dépasse un
+    -- peu la grille : elle se lit avec ▲ ▼ (essai de la page, plus bas) ; deux grilles au plus.
+    vrai(#lignes <= 2 * D.lignes, string.format('la page tient dans deux grilles (%d lignes pour %d)', #lignes, D.lignes))
 end)
 
 essai('Fil.lignesCarnet : page vide, en lecture, en erreur ; sans tendance ; années dans l\'en-tête ; libellé trop long', function()
@@ -533,24 +560,26 @@ essai('Page : choisie dans la liste, titre « Carnet de progrès », lue dans un
         egal('Lac au matin', p.titre)
         local montree = Fenetre.conversationAffichee
         egal(lac, montree)
-        egal(lac.id, p.selectionListe[1])
+        egal(lac.id, choix())
         local taches = #S.taches
-        -- Dany choisit l'entrée (l'observateur de la liste).
-        p.selectionListe = { Fenetre.CARNET }
+        -- Dany choisit l'entrée (le calque de sa case, la première de la liste).
+        choisir(Fenetre.CARNET)
         egal('carnet', Fenetre.vue)
         egal(taches + 1, #S.taches, 'le résumé se lit dans une tâche')
         Fenetre.rafraichir()
         egal('Carnet de progrès', p.titre)
         egal('Carnet de progrès', p.t1)
         egal(Fil.LECTURE_CARNET, p.t2, 'en lecture')
-        egal(Fenetre.CARNET, p.selectionListe[1], "l'entrée reste choisie")
+        egal(Fenetre.CARNET, choix(), "l'entrée reste choisie")
         lancerTaches(taches)
         local page = Fenetre.pageCarnet
         vrai(type(page) == 'table' and #page.mois == 6, 'le résumé lu')
         egal(Carnet.version, Fenetre.versionCarnet)
         local attendues = Fil.lignesCarnet(page, Fenetre.largeurTexte(), Fenetre.TITRE_CARNET)
         egal(#attendues, #Fenetre.lignes)
-        for i, l in ipairs(attendues) do
+        -- Le haut de la page dans la grille (23 lignes, fenêtre B : la suite se lit avec ▼).
+        for i = 1, math.min(#attendues, Fenetre.T.lignes) do
+            local l = attendues[i]
             egal(l.texte, p['t' .. i], 'ligne ' .. i)
             egal(l.genre, p['g' .. i], 'genre ' .. i)
         end
@@ -576,19 +605,19 @@ essai('Page : choisie dans la liste, titre « Carnet de progrès », lue dans un
         -- la fenêtre B) : le choix de la liste suit la vue, même conversation courante.
         egal(true, Fenetre.quitterCarnet())
         Fenetre.rafraichir()
-        egal(lac.id, p.selectionListe[1], 'la conversation choisie au retour')
+        egal(lac.id, choix(), 'la conversation choisie au retour')
         local avantOuverture = #S.taches
         egal(true, Fenetre.ouvrirCarnet())
         Fenetre.rafraichir()
-        egal(Fenetre.CARNET, p.selectionListe[1], "l'entrée choisie à l'ouverture")
+        egal(Fenetre.CARNET, choix(), "l'entrée choisie à l'ouverture")
         lancerTaches(avantOuverture)
         -- La conversation déjà ouverte, choisie dans la liste : retour au fil, la même.
-        p.selectionListe = { lac.id }
+        choisir(lac.id)
         egal('conversation', Fenetre.vue)
         egal(nil, Fenetre.pageCarnet)
         Fenetre.rafraichir()
         egal('Lac au matin', p.titre)
-        egal(lac.id, p.selectionListe[1])
+        egal(lac.id, choix())
         egal(lac, Fenetre.conversationAffichee)
         egal('Lac au matin', p.t1, 'le fil de la conversation')
         oublierTaches(taches)
@@ -610,51 +639,52 @@ essai('Liste depuis la page : un en-tête ou une conversation refusée la garden
             return ouvrir(id)
         end
         -- Un en-tête choisi hors de la page : la liste se remet, aucune conversation n'est cherchée.
-        p.selectionListe = { "§Aujourd'hui" }
+        choisir("§Aujourd'hui")
         egal(0, #ouvertes, 'un en-tête n\'est pas une conversation')
-        egal(lac.id, p.selectionListe[1])
-        p.selectionListe = { Fenetre.CARNET }
+        egal(lac.id, choix())
+        choisir(Fenetre.CARNET)
         Fenetre.rafraichir()
-        p.selectionListe = { "§Aujourd'hui" }
+        choisir("§Aujourd'hui")
         egal('carnet', Fenetre.vue, 'un en-tête garde la page')
-        egal(Fenetre.CARNET, p.selectionListe[1])
+        egal(Fenetre.CARNET, choix())
         egal(0, #ouvertes)
-        -- Refusée (ancienne séance de notation) : la page reste, le bandeau dit pourquoi.
-        p.selectionListe = { seance.id }
+        -- Refusée (ancienne séance de notation) : la page reste, le bandeau dit pourquoi. Une séance
+        -- n'est pas dans la grille de la liste : le choix de sa valeur, directement.
+        egal(false, Fenetre.choisirDansListe(seance.id))
         egal('carnet', Fenetre.vue, 'un refus garde la page')
         contient(p.message, 'ancienne séance de notation')
-        egal(Fenetre.CARNET, p.selectionListe[1])
+        egal(Fenetre.CARNET, choix())
         egal(lac, Moteur.courante)
         -- Une autre conversation : elle s'ouvre, le fil revient.
-        p.selectionListe = { pont.id }
+        choisir(pont.id)
         egal(pont, Moteur.courante)
         egal('conversation', Fenetre.vue)
         egal('', p.message)
         Fenetre.rafraichir()
         egal('Pont en automne', p.titre)
-        egal(pont.id, p.selectionListe[1])
+        egal(pont.id, choix())
         -- Pendant que Claude travaille (la liste est alors inactive) : pas de page, le choix revient
         -- à la conversation.
         Moteur.travaille = true
         local avant = #S.taches
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         Moteur.travaille = false
         egal('conversation', Fenetre.vue, 'pas de page pendant le travail')
         egal(avant, #S.taches, 'rien à lire')
         contient(p.message, 'Claude travaille')
-        egal(pont.id, p.selectionListe[1])
+        egal(pont.id, choix())
         Moteur.ouvrir = ouvrir
         oublierTaches(taches)
     end)
 end)
 
-essai('Gardes : Renommer…, ✎ et Supprimer… ne font rien sur la page ; Nouvelle conversation, Envoyer et une invite ramènent au fil', function()
+essai('Gardes : Renommer… et Supprimer… ne font rien sur la page ; Nouvelle conversation, Envoyer et une invite ramènent au fil', function()
     fabriquerType()
     local lac = conversation('Lac au matin')
     Moteur.courante = lac
     ouvrirFenetre(function(p)
         local taches = #S.taches
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         local dialogues = #S.dialogues
         S.confirmation, S.reponseModal, S.reponseConfirm = nil, 'ok', 'ok'
         Fenetre.renommer()
@@ -671,10 +701,10 @@ essai('Gardes : Renommer…, ✎ et Supprimer… ne font rien sur la page ; Nouv
         -- Sur le fil, les mêmes boutons agissent (ce n'est que la page qui les arrête) ; le bandeau qui
         -- disait de choisir une conversation s'efface au retour.
         S.reponseModal, S.reponseConfirm = 'cancel', 'cancel'
-        p.selectionListe = { lac.id }
+        choisir(lac.id)
         egal('', p.message, 'le bandeau de la page effacé au retour')
         -- Claude qui travaille ramène au fil : le même bandeau s'efface aussi.
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         Fenetre.renommer()
         egal(Fenetre.CHOISIR_CONVERSATION, p.message)
         Moteur.travaille = true
@@ -685,10 +715,10 @@ essai('Gardes : Renommer…, ✎ et Supprimer… ne font rien sur la page ; Nouv
         p.libre = true
         -- Un autre message reste (seul celui de la page s'efface).
         p.message = 'Autre message.'
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         egal('', p.message, "l'ouverture de la page efface le bandeau")
         p.message = 'Autre message.'
-        p.selectionListe = { lac.id }
+        choisir(lac.id)
         egal('Autre message.', p.message)
         p.message = ''
         Fenetre.renommer()
@@ -696,13 +726,13 @@ essai('Gardes : Renommer…, ✎ et Supprimer… ne font rien sur la page ; Nouv
         Fenetre.supprimer()
         vrai(S.confirmation, 'Supprimer… sur le fil')
         -- Nouvelle conversation : elle se montre.
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         egal(true, Fenetre.nouvelle())
         egal('conversation', Fenetre.vue)
         vrai(Moteur.courante ~= lac, 'une nouvelle conversation')
         -- Refusée (Claude travaille) : faux, la page reste ; sans fenêtre (Fenetre.p) de même.
         local nouvelle = Moteur.courante
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         Moteur.travaille = true
         egal(false, Fenetre.nouvelle())
         contient(p.message, 'Claude travaille')
@@ -714,7 +744,7 @@ essai('Gardes : Renommer…, ✎ et Supprimer… ne font rien sur la page ; Nouv
         egal(nouvelle, Moteur.courante)
         p.message = ''
         -- Envoyer : vide, la page reste ; sinon la demande se suit dans le fil.
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         Fenetre.envoyer('   ')
         egal('carnet', Fenetre.vue, 'rien à envoyer')
         contient(p.message, 'Écrivez une demande')
@@ -726,10 +756,10 @@ essai('Gardes : Renommer…, ✎ et Supprimer… ne font rien sur la page ; Nouv
         p.libre = true
         -- La liste revient à la conversation (la même : seule la vue a changé).
         Fenetre.rafraichir()
-        egal(Moteur.courante.id, p.selectionListe[1], 'la conversation choisie dans la liste')
+        egal(Moteur.courante.id, choix(), 'la conversation choisie dans la liste')
         egal(Moteur.courante.titre, p.titre)
         -- Une invite passe par la même demande.
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         Fenetre.envoyer(Consignes.invites[1].message)
         egal('conversation', Fenetre.vue, 'une invite')
         oublierTaches(taches)
@@ -749,7 +779,7 @@ essai('Une autre photo choisie dans Lightroom prépare une nouvelle conversation
         Fenetre.cleVue, Fenetre.cleVueLe = 'photo-A', os.time()
         local fin = Moteur.finTravail
         Moteur.finTravail = 0
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         lancerTaches(taches)
         Fenetre.hautCarnet = 2
         Fenetre.suivreSelection({ cle = 'photo-B' })
@@ -758,10 +788,10 @@ essai('Une autre photo choisie dans Lightroom prépare une nouvelle conversation
         egal(2, Fenetre.hautCarnet, 'à la même place')
         Fenetre.rafraichir()
         egal('Carnet de progrès', p.titre)
-        egal(Fenetre.CARNET, p.selectionListe[1])
+        egal(Fenetre.CARNET, choix())
         egal(lac, Fenetre.conversationAffichee, 'pas encore montrée')
         -- Au retour, c'est elle qui se montre.
-        p.selectionListe = { Moteur.courante.id }
+        choisir(Moteur.courante.id)
         Fenetre.rafraichir()
         egal('conversation', Fenetre.vue)
         egal(Moteur.courante, Fenetre.conversationAffichee)
@@ -782,7 +812,7 @@ essai('Boucle : le registre change (abonnement, Carnet.version), la page se reli
         Carnet.signaler('constat')
         unTourDeBoucle()
         egal(nil, Fenetre.pageCarnet, 'rien lu hors de la page')
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         lancerTaches(taches)
         egal(13, Fenetre.pageCarnet.photos)
         -- Un retrait (d'un autre client du connecteur, ici le registre lui-même) : la page se relit
@@ -824,7 +854,7 @@ essai('Clic sur une rangée : la fenêtre de ses photos (dans une tâche), élé
     Moteur.courante = lac
     ouvrirFenetre(function(p)
         local taches = #S.taches
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         lancerTaches(taches)
         local i = indiceDe(Fenetre.lignes, function(l) return l.defaut == 'ciel_brule' end)
         vrai(i, 'rangée du ciel brûlé')
@@ -908,7 +938,7 @@ essai('Clic sur une rangée : la fenêtre de ses photos (dans une tâche), élé
         fabriquerType()
         egal('mars 2026 · photo 77', Fenetre.textePhotoDuDefaut({ mois_libelle = 'mars 2026', original = 77 }))
         -- Hors de la page, une ligne qui porterait un défaut ne fait rien.
-        p.selectionListe = { lac.id }
+        choisir(lac.id)
         Fenetre.rafraichir()
         local ancienne = Fenetre.lignes
         Fenetre.lignes, Fenetre.premiere = { { genre = 'outil', texte = 'x', defaut = 'flou' }, { genre = 'apercu', texte = 'y', action = 'demander' } }, 1
@@ -929,7 +959,7 @@ essai('« Retirer du carnet… » : la photo choisie, après confirmation, par a
     Moteur.courante = lac
     ouvrirFenetre(function(p)
         local taches = #S.taches
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         lancerTaches(taches)
         local commande, recues = Carnet.commande, {}
         Carnet.commande = function(params)
@@ -1012,7 +1042,7 @@ essai('« Demander à Claude ce qu\'il en pense » : nouvelle conversation avec 
     Moteur.courante = lac
     ouvrirFenetre(function(p)
         local taches = #S.taches
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         lancerTaches(taches)
         -- Claude travaille ailleurs : rien.
         Moteur.travaille = true
@@ -1064,7 +1094,7 @@ essai('Accepter et Je le fais quittent la page : Claude qui travaille ramène au
         Fenetre.rafraichir()
         local montree = Fenetre.conversationAffichee
         -- Accepter (la carte Proposition) pendant que la page est montrée.
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         lancerTaches(taches)
         local avant = #S.taches
         Fenetre.repondreProposition(true)
@@ -1078,7 +1108,7 @@ essai('Accepter et Je le fais quittent la page : Claude qui travaille ramène au
         vrai(attendre(function() return not Moteur.travaille end), 'la demande se termine')
         -- Je le fais (sans proposition : sur la photo active), depuis la page.
         avant = #S.taches
-        p.selectionListe = { Fenetre.CARNET }
+        choisir(Fenetre.CARNET)
         lancerTache(avant + 1)
         egal('carnet', Fenetre.vue)
         vrai(type(Fenetre.pageCarnet) == 'table', 'la page lue')

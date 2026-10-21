@@ -3,7 +3,7 @@
 -- Simulation.lua) : fenêtre déjà ouverte, boucle, onglets, carte Note et ses flèches, nouvelle
 -- conversation par photo, proposition préparée à l'ouverture, anciennes conversations de séance
 -- absentes de la liste, Gestionnaire de modules externes (modèle, effort, cases), vignettes dans un
--- cadre 3:2, image « aucun aperçu » ; structure de la 1.3 (carte Pourquoi ?, rangée Je le fais,
+-- cadre 3:2, image « aucun aperçu » ; structure de la 1.3 (carte de l'étape, rangée Je le fais,
 -- crochets de l'aperçu et des onglets, clics sur le fil, vue du fil, agrandissement à deux
 -- images). Le registre des notes (Notation) garde ici les appels reçus :
 -- la simulation de la fenêtre n'écrit pas dans un catalogue. Ni Claude, ni quota.
@@ -68,7 +68,7 @@ local function bouton(contenu, p, titre, cleActif)
         if type(t) == 'table' and t.liaison then
             t = p[t.key]
         end
-        if v.genre == 'push_button' and t == titre
+        if S.BOUTONS[v.genre] and t == titre
             and (not cleActif or (type(v.args.enabled) == 'table' and v.args.enabled.key == cleActif)) then
             return v
         end
@@ -200,7 +200,7 @@ essai('Une seule disposition : ni taille ni disposition dans les préférences, 
     egal(nil, Dispositions.atelier)
     egal(nil, Dispositions.panneau)
     egal('conversation', Dispositions.dimensions().nom)
-    egal('DeveloppeurClaude-conversation-grande-1', Fenetre.cadre())
+    egal('DeveloppeurClaude-conversation-grande-2', Fenetre.cadre())
     egal(nil, Fenetre.rouvrir)
     egal(nil, Fenetre.elementsMenu)
 end)
@@ -483,20 +483,21 @@ local function simples(contenu)
     return liste
 end
 
--- Les variantes des onglets : la colonne superposée qui suit la rangée des boutons radio (clé
--- `onglet`) ; nil sans onglets.
--- Les variantes superposées qui suivent la rangée des onglets dans la même colonne (la Conversation
--- claire met l'aperçu entre les deux).
+-- Les variantes des onglets : la colonne superposée de colonnes à la largeur intérieure du
+-- panneau, sous l'aperçu et sa rangée (les segments sont au-dessus, sur le bord du panneau) ; nil
+-- sans onglets.
 local function variantesOnglets(contenu)
+    local interieur = Dispositions.dimensions().interieur
     for _, v in ipairs(vues(contenu)) do
-        for i, e in ipairs(v.args) do
-            if type(e) == 'table' and e.genre == 'row' and type(e.args[1]) == 'table' and e.args[1].genre == 'radio_button'
-                and e.args[1].args.value.key == 'onglet' then
-                for k = i + 1, #v.args do
-                    if type(v.args[k]) == 'table' and v.args[k].args and v.args[k].args.place == 'overlapping' then
-                        return v.args[k]
-                    end
+        if v.args.place == 'overlapping' then
+            local colonnes = 0
+            for _, e in ipairs(v.args) do
+                if type(e) == 'table' and e.genre == 'column' and e.args.width == interieur then
+                    colonnes = colonnes + 1
                 end
+            end
+            if colonnes >= 2 then
+                return v
             end
         end
     end
@@ -546,17 +547,20 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
         end
         vrai(variantes and variantes.args.place == 'overlapping', nom .. ' : variantes superposées sous les onglets')
         egal(#D.onglets, #variantes.args, nom .. ' : une variante par onglet')
-        -- Trois onglets (1.3) : Note d'abord (montré à l'ouverture), Proposition, puis Pourquoi ?,
-        -- dont la variante est superposée en dernier.
+        -- Quatre onglets (fenêtre B) : Aperçu (l'ancien Pourquoi ?), Proposition, Note (montré à
+        -- l'ouverture) et Leçon, dans l'ordre des segments ; une variante chacun, dans cet ordre.
         local valeurs = {}
         for _, onglet in ipairs(D.onglets) do
             valeurs[#valeurs + 1] = onglet.valeur .. '=' .. onglet.titre
         end
-        egal('notation=Note proposition=Proposition etape=Pourquoi ?', table.concat(valeurs, ' '), nom .. ' : trois onglets')
-        egal(3, #variantes.args, nom .. ' : trois variantes')
-        egal('etape', D.ongletEtape)
+        egal('apercu=Aperçu proposition=Proposition notation=Note lecon=Leçon', table.concat(valeurs, ' '), nom .. ' : quatre onglets')
+        egal(4, #variantes.args, nom .. ' : quatre variantes')
+        egal('apercu', D.ongletEtape)
+        egal('lecon', D.ongletLecon)
+        egal('notation', D.ongletParDefaut)
         egal('notation', p.onglet, nom .. ' : Note par défaut')
-        vrai(vueLiee(variantes.args[3], 'static_text', 'etapeTexte'), nom .. ' : la carte Pourquoi ? en dernier')
+        vrai(vueLiee(variantes.args[1], 'static_text', 'etapeTexte'), nom .. " : la carte de l'étape dans Aperçu")
+        vrai(vueLiee(variantes.args[3], 'static_text', 'notationTexte'), nom .. ' : la carte Note')
         vrai(vueLiee(variantes.args[2], 'static_text', 'propositionTexte'), nom .. ' : la proposition au milieu')
         -- Chaque vue simple d'un onglet est masquée quand un autre onglet est choisi ; pas de
         -- boîte de groupe dans un onglet (son cadre et son titre resteraient montrés), ni de
@@ -580,14 +584,11 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
                 vrai(i ~= j or montrees > 0, quoi .. ' : rien de montré')
             end
         end
-        -- Un onglet autre que Note (Proposition, Retoucher) : l'aperçu montré (hors des
-        -- onglets), la carte Note masquée ; la proposition seulement dans Proposition.
+        -- Un onglet autre que Note (Aperçu, Proposition, Leçon) : l'aperçu montré (commun, hors
+        -- des onglets), la carte Note masquée ; la proposition seulement dans Proposition.
         local autre = D.onglets[1].valeur == D.ongletNotation and D.onglets[2].valeur or D.onglets[1].valeur
         p.onglet, p.aProposition = autre, false
-        local apercu
-        for _, v in ipairs(vues(args.contents)) do
-            apercu = apercu or (v.genre == 'picture' and v)
-        end
+        local apercu = vueLiee(args.contents, 'picture', 'imageApercu')
         egal(true, S.montree(apercu, p), nom .. ' : aperçu montré')
         egal(false, S.montree(vueLiee(args.contents, 'static_text', 'notationTexte'), p), nom .. ' : texte de la note masqué')
         egal(autre == 'proposition', S.montree(vueLiee(args.contents, 'static_text', 'propositionTexte'), p), nom .. ' : proposition')
@@ -601,7 +602,7 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
             end
         end
         egal(4, #titres, nom .. ' : quatre couleurs de la note proposée')
-        p.notationCouleur = 'vert'
+        p.notationCouleur = 'coche'
         for _, v in ipairs(titres) do
             vrai(aCle(v, 'notationCouleur') and aCle(v, 'onglet'), nom .. ' : couleur et onglet dans la même condition')
             egal(false, S.montree(v, p), nom .. ' : couleur masquée hors de l\'onglet Note')
@@ -616,7 +617,7 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
             end
         end
         egal(1, #montrees, nom .. ' : une seule couleur montrée')
-        egal(C.vert, montrees[1].args.text_color, nom .. ' : la couleur de l\'état')
+        egal(C.coche, montrees[1].args.text_color, nom .. ' : la couleur de l\'état')
         egal(true, S.montree(vueLiee(args.contents, 'static_text', 'notationTexte'), p), nom .. ' : texte de la note montré')
         egal(true, S.montree(apercu, p), nom .. " : l'aperçu reste montré avec la carte Note")
     end
@@ -675,7 +676,7 @@ essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérif
         vrai(registre.poses[1][1].note == nil and registre.poses[1][1].drapeau == nil, 'sans note ni drapeau : la proposition telle quelle')
         egal(true, Fenetre.aRafraichirNotation, 'la carte se relit')
         Fenetre.rafraichirNotation()
-        egal('vert', p.notationCouleur)
+        egal('coche', p.notationCouleur)
         egal('acceptée · passe 2', p.notationEtat)
         egal(false, p.peutAccepterNote, 'déjà acceptée')
         -- Changer… : Dany peut poser 5 ★ (fenêtre modale, depuis une tâche).
@@ -804,7 +805,7 @@ end)
 -- (ou, pour Pourquoi ?, rempli au lot 12 et éprouvé par essais-pourquoi.lua : sans étape dans le
 -- fil, sa carte montre l'aide et ses actions ne font rien) et la fenêtre se comporte comme avant.
 -- Les crochets de Pourquoi ?, que des essais remplacent : remis à la fin de chacun.
-local crochetsPourquoi = { apercu = Fenetre.apercuOnglet.etape, sur = Fenetre.surOnglet.etape }
+local crochetsPourquoi = { apercu = Fenetre.apercuOnglet.apercu, sur = Fenetre.surOnglet.apercu }
 
 -- Une conversation neuve avec un aperçu de Claude (view_photo) : sa ligne d'outil et sa ligne
 -- d'image dans le fil (indices dans la fenêtre de lecture).
@@ -841,14 +842,16 @@ essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte
             exerciceEtat = '', etapeMonte = false, etapeDescend = false }) do
             egal(valeur, p[cle], cle .. ' avant l\'ouverture')
         end
-        -- Sans étape dans le fil, la carte Pourquoi ? montre l'aide (lot 12), coupée à sa largeur.
-        egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')), "l'aide de la carte Pourquoi ?")
-        egal(19, T.propLignes, 'la proposition passe à 19 lignes (seconde rangée)')
-        egal(19, T.etapeLignes, 'texte de la carte Pourquoi ?')
-        egal(T.droite - 24, T.largeurEtape)
+        -- Sans étape dans le fil, la carte de l'étape montre l'aide (lot 12), coupée à sa largeur.
+        egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')), "l'aide de la carte de l'étape")
+        vrai(Fenetre.AIDE_ETAPE:find('« Pourquoi ? »', 1, true), "l'aide dit le bouton Pourquoi ? du fil")
+        -- Fenêtre B (provisoire jusqu'au lot 18) : 20 lignes, à la largeur intérieure du panneau.
+        egal(20, T.propLignes, 'la proposition passe à 20 lignes (fenêtre B)')
+        egal(20, T.etapeLignes, "texte de la carte de l'étape")
+        egal(T.interieur - 24, T.largeurEtape)
         -- Les actions des boutons : sans effet pour l'instant (un lot suivant les remplit), sans
         -- erreur ni demande envoyée, et l'onglet ne change pas.
-        p.onglet = 'etape'
+        p.onglet = 'apercu'
         p.saisie = 'Texte validé par le clic'
         local taches, dialogues, messages = #S.taches, #S.dialogues, #S.messages
         bouton(args.contents, p, '◀', 'etapePrecedente').args.action()
@@ -864,7 +867,7 @@ essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte
         egal(messages, #S.messages, 'aucun message')
         egal(false, Moteur.travaille, 'rien envoyé à Claude')
         egal(0, #Moteur.courante.elements, 'aucune demande')
-        egal('etape', p.onglet)
+        egal('apercu', p.onglet)
         egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')), "toujours l'aide")
         p.saisie, p.onglet, p.message = '', 'notation', ''
     end
@@ -921,13 +924,13 @@ essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; u
         local ligneImage, ligneOutil = avecApercu(c, 'crochet-1')
         local defaut = p.legendeApercu
         vrai(defaut:find('1 sur 1', 1, true), defaut)
-        -- Sans crochet, l'onglet Pourquoi ? garde l'aperçu d'avant.
-        p.onglet = 'etape'
+        -- Sans crochet, l'onglet Aperçu garde l'aperçu d'avant.
+        p.onglet = 'apercu'
         egal(defaut, p.legendeApercu, "sans crochet : l'aperçu d'avant")
         p.onglet = 'notation'
         -- Le crochet de l'onglet : demandé d'abord, au changement d'onglet et à chaque
         -- rafraîchissement, avec la table de la fenêtre, ses dimensions et la conversation.
-        Fenetre.apercuOnglet.etape = function(q, T, conversation)
+        Fenetre.apercuOnglet.apercu = function(q, T, conversation)
             appels = appels + 1
             vrai(q == p and T == Fenetre.T and conversation == c, 'arguments du crochet')
             if not rendre then
@@ -936,7 +939,7 @@ essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; u
             q.legendeApercu = 'Étape 1 sur 1 · après'
             return true
         end
-        p.onglet = 'etape'
+        p.onglet = 'apercu'
         egal(1, appels, "demandé au changement d'onglet")
         egal('Étape 1 sur 1 · après', p.legendeApercu, "l'aperçu de l'onglet")
         Fenetre.rafraichir()
@@ -953,8 +956,8 @@ essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; u
         p.onglet = 'proposition'
         egal(defaut, p.legendeApercu, "crochet en erreur : l'aperçu d'avant")
         Fenetre.apercuOnglet.proposition = nil
-        p.onglet = 'etape'
-        -- Un clic sur une ligne d'image : elle se montre, même dans l'onglet Pourquoi ?, et le
+        p.onglet = 'apercu'
+        -- Un clic sur une ligne d'image : elle se montre, même dans l'onglet Aperçu, et le
         -- reste aux rafraîchissements ; le détail d'un outil ne la remplace pas.
         Fenetre.cliquerLigne(ligneImage)
         egal(defaut, p.legendeApercu, "l'image cliquée")
@@ -966,7 +969,7 @@ essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; u
         egal(defaut, p.legendeApercu, "l'image cliquée reste")
         -- Un autre onglet rend l'aperçu à l'onglet.
         p.onglet = 'notation'
-        p.onglet = 'etape'
+        p.onglet = 'apercu'
         egal('Étape 1 sur 1 · après', p.legendeApercu, "un autre onglet : l'aperçu de l'onglet")
         -- Une image nouvelle aussi.
         Fenetre.cliquerLigne(ligneImage)
@@ -985,11 +988,11 @@ essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; u
         -- Dans l'onglet Note, sans crochet : l'aperçu d'avant.
         p.onglet = 'notation'
         vrai(p.legendeApercu:find('sur 2', 1, true), p.legendeApercu)
-        Fenetre.apercuOnglet.etape = nil
+        Fenetre.apercuOnglet.apercu = nil
     end
     Fenetre.afficher()
     vrai(vu, 'fenêtre ouverte')
-    Fenetre.apercuOnglet.etape, Fenetre.apercuOnglet.proposition = crochetsPourquoi.apercu, nil
+    Fenetre.apercuOnglet.apercu, Fenetre.apercuOnglet.proposition = crochetsPourquoi.apercu, nil
     prefs.nouvelleParPhoto = true
     S.pendantFenetre = nil
 end)
@@ -1002,11 +1005,11 @@ essai("Aperçu de l'onglet : une image cliquée cède aussi la place à une autr
     S.pendantFenetre = function()
         vu = true
         local p = Fenetre.p
-        Fenetre.apercuOnglet.etape = function(q)
+        Fenetre.apercuOnglet.apercu = function(q)
             q.legendeApercu = "Aperçu de l'onglet"
             return true
         end
-        p.onglet = 'etape'
+        p.onglet = 'apercu'
         egal("Aperçu de l'onglet", p.legendeApercu)
         local ligneImage = avecApercu(Moteur.courante, 'autre-1')
         Fenetre.cliquerLigne(ligneImage)
@@ -1024,12 +1027,12 @@ essai("Aperçu de l'onglet : une image cliquée cède aussi la place à une autr
         photoActive(4962, 'DSCF4962.RAF', 0, 0)
         Fenetre.majPhoto()
         egal("Aperçu de l'onglet", p.legendeApercu, "une autre photo active : l'aperçu de l'onglet")
-        Fenetre.apercuOnglet.etape = nil
+        Fenetre.apercuOnglet.apercu = nil
         p.onglet = 'notation'
     end
     Fenetre.afficher()
     vrai(vu, 'fenêtre ouverte')
-    Fenetre.apercuOnglet.etape = crochetsPourquoi.apercu
+    Fenetre.apercuOnglet.apercu = crochetsPourquoi.apercu
     prefs.nouvelleParPhoto = true
     S.pendantFenetre = nil
 end)
@@ -1043,7 +1046,7 @@ essai("Clic sur un onglet : son crochet suit un vrai clic, jamais une bascule de
         vu = true
         local p = Fenetre.p
         Fenetre.surOnglet.proposition = function(valeur) recus[#recus + 1] = valeur end
-        Fenetre.surOnglet.etape = function(valeur) recus[#recus + 1] = valeur end
+        Fenetre.surOnglet.apercu = function(valeur) recus[#recus + 1] = valeur end
         -- Un vrai clic : le crochet, et la demande validée par le clic ne part pas.
         p.saisie = 'Texte validé par le clic'
         vrai(Fenetre.envoiAuto, 'envoi prévu')
@@ -1051,8 +1054,8 @@ essai("Clic sur un onglet : son crochet suit un vrai clic, jamais une bascule de
         egal('proposition', table.concat(recus, ' '))
         egal(nil, Fenetre.envoiAuto, "le clic d'un onglet annule l'envoi automatique")
         p.saisie = ''
-        p.onglet = 'etape'
-        egal('proposition etape', table.concat(recus, ' '))
+        p.onglet = 'apercu'
+        egal('proposition apercu', table.concat(recus, ' '))
         -- Une bascule de la fenêtre (une proposition qui arrive) : pas de crochet.
         p.onglet = 'notation'
         local c = Moteur.courante
@@ -1060,10 +1063,10 @@ essai("Clic sur un onglet : son crochet suit un vrai clic, jamais une bascule de
             entree = { reason = 'Balance', settings = { Exposure2012 = 0.35 } } } } })
         Fenetre.rafraichir()
         egal('proposition', p.onglet, 'la proposition se montre')
-        egal('proposition etape', table.concat(recus, ' '), 'pas de crochet pour une bascule')
-        Fenetre.choisirOnglet('etape')
-        egal('etape', p.onglet)
-        egal('proposition etape', table.concat(recus, ' '), 'pas de crochet pour Fenetre.choisirOnglet')
+        egal('proposition apercu', table.concat(recus, ' '), 'pas de crochet pour une bascule')
+        Fenetre.choisirOnglet('apercu')
+        egal('apercu', p.onglet)
+        egal('proposition apercu', table.concat(recus, ' '), 'pas de crochet pour Fenetre.choisirOnglet')
         -- Un crochet en erreur n'empêche pas l'onglet de changer.
         Fenetre.surOnglet.notation = function() error('crochet cassé') end
         p.onglet = 'notation'
@@ -1075,18 +1078,18 @@ essai("Clic sur un onglet : son crochet suit un vrai clic, jamais une bascule de
         taches.canYield = function() return false end
         taches.pcall = function() error("LrTasks.pcall hors d'une tâche", 0) end
         p.onglet = 'proposition'
-        egal('proposition etape proposition', table.concat(recus, ' '), "crochet appelé hors d'une tâche")
+        egal('proposition apercu proposition', table.concat(recus, ' '), "crochet appelé hors d'une tâche")
         -- Sans LrTasks.canYield (s'il manquait au SDK), pcall aussi : le crochet est appelé.
         taches.canYield = nil
         p.onglet = 'notation'
         p.onglet = 'proposition'
         taches.canYield, taches.pcall = peutAttendre, pcallTache
-        egal('proposition etape proposition proposition', table.concat(recus, ' '), 'crochet appelé sans LrTasks.canYield')
+        egal('proposition apercu proposition proposition', table.concat(recus, ' '), 'crochet appelé sans LrTasks.canYield')
         Conversation.decider(c, Conversation.propositionEnAttente(c).id, false)
     end
     Fenetre.afficher()
     vrai(vu, 'fenêtre ouverte')
-    Fenetre.surOnglet.proposition, Fenetre.surOnglet.etape, Fenetre.surOnglet.notation = nil, crochetsPourquoi.sur, nil
+    Fenetre.surOnglet.proposition, Fenetre.surOnglet.apercu, Fenetre.surOnglet.notation = nil, crochetsPourquoi.sur, nil
     prefs.nouvelleParPhoto = true
     S.pendantFenetre = nil
 end)
@@ -1137,8 +1140,9 @@ essai('Clic sur une ligne du fil : image, ligne du carnet, leçon, étape, sinon
     for nom, fn in pairs(clics) do
         Fenetre.clics[nom] = fn
     end
-    -- Par défaut : le carnet et la leçon ne font rien, ni l'étape d'un élément qui n'en est pas une
-    -- (essais-pourquoi.lua éprouve une vraie étape) ; un outil ouvre son détail, dans une tâche.
+    -- Par défaut, hors de la page du carnet : le carnet et la leçon ne font rien, ni l'étape d'un
+    -- élément qui n'en est pas une (essais-pourquoi.lua éprouve une vraie étape) ; un outil ouvre
+    -- son détail, dans une tâche.
     local taches, dialogues = #S.taches, #S.dialogues
     Fenetre.cliquerLigne(2)
     Fenetre.cliquerLigne(3)
@@ -1162,7 +1166,7 @@ essai('Vue du fil : la conversation à l\'ouverture ; Claude qui travaille y ram
         egal('conversation', Fenetre.vue, "la conversation à l'ouverture")
         egal(false, Fenetre.revenirAuFil(), 'déjà la conversation')
         -- Le retour relit le fil depuis la fin sans changer la conversation montrée : ce qui la
-        -- suit (l'étape choisie de l'onglet Pourquoi ?) n'est pas remis.
+        -- suit (l'étape choisie de l'onglet Aperçu) n'est pas remis.
         Fenetre.rafraichir()
         local montree = Fenetre.conversationAffichee
         vrai(montree, 'une conversation montrée')
@@ -1173,7 +1177,7 @@ essai('Vue du fil : la conversation à l\'ouverture ; Claude qui travaille y ram
         egal(0, Fenetre.defilement)
         egal(nil, Fenetre.total)
         egal(nil, Fenetre.cache.marque)
-        -- Une autre page (le carnet, d'un lot suivant) reste montrée tant que Claude ne travaille pas.
+        -- Une autre page (le carnet, lot 16) reste montrée tant que Claude ne travaille pas.
         Fenetre.vue = 'carnet'
         Fenetre.rafraichir()
         egal('carnet', Fenetre.vue)
@@ -1330,7 +1334,7 @@ essai('Gestionnaire de modules externes : les sections se construisent, menus Mo
                     end
                 end
             end
-            if v.genre == 'push_button' then
+            if S.BOUTONS[v.genre] then
                 vrai(type(v.args.action) == 'function', 'bouton sans action : ' .. tostring(v.args.title))
             end
             if v.genre == 'popup_menu' and type(v.args.value) == 'table' then
@@ -1362,8 +1366,8 @@ end)
 essai('Vignettes : un cadre 3:2 garde toute l\'image, centrée sur le fond', function()
     local dossier = S.home .. '/vignettes-essai'
     Fichiers.creerDossier(dossier)
-    S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/vide-320.png') .. ' --out ' .. S.q(dossier .. '/paysage.jpg') .. ' >/dev/null 2>&1')
-    S.executer('/usr/bin/sips -s format jpeg -z 90 60 ' .. S.q(S.plugin .. '/vide-320.png') .. ' --out ' .. S.q(dossier .. '/portrait.jpg') .. ' >/dev/null 2>&1')
+    S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(dossier .. '/paysage.jpg') .. ' >/dev/null 2>&1')
+    S.executer('/usr/bin/sips -s format jpeg -z 90 60 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(dossier .. '/portrait.jpg') .. ' >/dev/null 2>&1')
     local function dimensions(chemin)
         local l, h = Images.dimensions(chemin)
         return tostring(l) .. 'x' .. tostring(h)
@@ -1379,16 +1383,29 @@ essai('Vignettes : un cadre 3:2 garde toute l\'image, centrée sur le fond', fun
     egal(nil, Images.vignette(dossier, 'absente.jpg', 600, 400))
 end)
 
-essai('Image « aucun aperçu » : au cadre de l\'aperçu', function()
+essai('Image « aucun aperçu » : au cadre 3:2 de l\'aperçu, en 2x, dans le jeu de chaque apparence', function()
     local D = Dispositions.dimensions()
-    local nom = Dispositions.imageVide(D)
-    egal('vide-320.png', nom)
-    local l, h = Images.dimensions(Chemins.ressource(nom))
-    egal(D.apercu, l, nom)
-    egal(D.apercu, h, nom)
-    -- Plus d'image pour l'Atelier ni le Panneau.
-    vrai(not Fichiers.existe(Chemins.ressource('vide-200.png')) and not Fichiers.existe(Chemins.ressource('vide-720x480.png')),
-        'images retirées')
+    egal('images/vide-330x220.png', Dispositions.imageVide('claire'))
+    egal('images/sombre/vide-330x220.png', Dispositions.imageVide('sombre'))
+    egal('images/vide-330x220.png', Dispositions.imageVide('inconnue'), 'une apparence inconnue : la claire')
+    for _, apparence in ipairs({ 'claire', 'sombre' }) do
+        local nom = Dispositions.imageVide(apparence)
+        local l, h = Images.dimensions(Chemins.ressource(nom))
+        egal(D.pixelsApercu, l, nom)
+        egal(D.pixelsApercuHauteur, h, nom)
+    end
+    egal(660, D.pixelsApercu)
+    egal(440, D.pixelsApercuHauteur)
+    -- La fenêtre prend celle de son apparence.
+    local apparence = Fenetre.apparence
+    Fenetre.preparerApparence('sombre')
+    vrai(Fenetre.imageVide():find('/images/sombre/vide%-330x220%.png$'), Fenetre.imageVide())
+    Fenetre.preparerApparence(apparence)
+    -- Plus d'image carrée (Conversation claire de la 1.2), ni pour l'Atelier et le Panneau, ni à la
+    -- racine du module.
+    for _, ancienne in ipairs({ 'vide-320.png', 'vide-200.png', 'vide-720x480.png', 'vide-330x220.png' }) do
+        vrai(not Fichiers.existe(Chemins.ressource(ancienne)), 'image retirée : ' .. ancienne)
+    end
 end)
 
 -- Fin -------------------------------------------------------------------------------------------

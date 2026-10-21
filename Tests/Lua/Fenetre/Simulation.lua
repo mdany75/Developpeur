@@ -119,8 +119,11 @@ modules.LrDate = {
 }
 
 -- Une photo simulée : nom de fichier, dimensions recadrées, nom par modèle de noms, note et
--- drapeau posés (champs `note` et `pickStatus` de la photo, à poser par l'essai), champs du module
--- (`proprietes`), qui ne s'écrivent que dans une écriture du catalogue.
+-- drapeau posés (champs `note` et `pickStatus` de la photo, à poser par l'essai), légende (champs
+-- `copie`, `appareil` et `prise`, à poser par l'essai : copyName et cameraModel par
+-- getFormattedMetadata, dateTimeOriginal par getRawMetadata, une date de LrDate, ici en secondes
+-- Unix comme le LrDate simulé), champs du module (`proprietes`), qui ne s'écrivent que dans une
+-- écriture du catalogue.
 function S.photo(id, nom, largeur, hauteur)
     local proprietes = {}
     return {
@@ -135,7 +138,16 @@ function S.photo(id, nom, largeur, hauteur)
             assert(S.enEcriture, "setPropertyForPlugin hors d'une écriture du catalogue")
             proprietes[cle] = valeur
         end,
-        getFormattedMetadata = function(_, cle) return cle == 'fileName' and nom or nil end,
+        getFormattedMetadata = function(self, cle)
+            if cle == 'fileName' then
+                return nom
+            elseif cle == 'copyName' then
+                return self.copie
+            elseif cle == 'cameraModel' then
+                return self.appareil
+            end
+            return nil
+        end,
         getRawMetadata = function(self, cle)
             if cle == 'croppedDimensions' then
                 return { width = largeur or 6240, height = hauteur or 4160 }
@@ -143,6 +155,8 @@ function S.photo(id, nom, largeur, hauteur)
                 return self.note
             elseif cle == 'pickStatus' then
                 return self.pickStatus
+            elseif cle == 'dateTimeOriginal' then
+                return self.prise
             end
         end,
         getNameViaPreset = function(_, idModele, texte, sequence)
