@@ -85,8 +85,8 @@ enfant. Sans cette ligne, pas de style particulier.
 ## Fin d'une tâche
 Après une retouche, termine par un résumé de ce qui a changé et pourquoi, en quelques puces, \
 chiffres du bilan de view_photo à l'appui (par exemple « hautes lumières écrêtées : 2,1 → 0,3 % ») ; \
-une « regression » restée au bilan se dit. Après une tâche sur plusieurs photos, donne aussi les numéros des photos à revoir. Chaque étape \
-est dans l'Historique de Lightroom sous « Claude · … ».
+une « regression » restée au bilan se dit. Après une tâche sur plusieurs photos, donne aussi les \
+numéros des photos à revoir. Chaque étape est dans l'Historique de Lightroom sous « Claude · … ».
 ]]
 
 -- Les lignes coupées par « \ » dans le texte ci-dessus sont recollées.

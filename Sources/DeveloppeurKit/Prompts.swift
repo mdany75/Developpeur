@@ -258,13 +258,19 @@ extension Prompts {
     /// Paysage et Noir et blanc, dans Consignes.lua, demandent la méthode sans chiffres).
     ///
     /// Les doses (zones, sujet, bords) viennent de la feuille de route, pas d'une mesure : ce sont
-    /// des plafonds. Constaté le 20 octobre 2026 (Lightroom Classic 15.6, propositions sur une copie
+    /// des plafonds. Constaté le 20 octobre 2026 (Lightroom Classic 15.6, propositions sur des copies
     /// « Essai ») : un radial inversé (Locaux.radial : Flipped avec MaskInverted) n'assombrit que
-    /// hors de l'ellipse, le centre reste intact. La forme des bords (`bordsRayon`, `bordsFondu`) et
-    /// le fondu du radial du sujet (`sujetFondu`) sont provisoires, à vérifier par la recette : un
-    /// premier essai, sur des propositions, gardait le centre intact pour un rayon de 0,6 à 0,75 et
-    /// un fondu de 50 à 100 ; à 80, l'assombrissement montait du centre aux coins sans marche ; à
-    /// 100, il partait presque du centre ; à 50, il montait plus raide (anneau plus visible).
+    /// hors de l'ellipse, le centre reste intact.
+    ///
+    /// La forme des bords (`bordsRayon`, `bordsFondu`) est relevée le même jour sur une seule photo,
+    /// un paysage (propositions de 1 344 px, radial inversé centré, radius_x = radius_y, Exposure
+    /// −0,5 IL) : le centre n'est jamais touché et toutes les formes descendent sans marche. Au rayon
+    /// 0,7, fondu 80 : milieu des bords −16 niveaux, coins −21 à −27, baisse commencée vers 15 % de la
+    /// diagonale (le tiers central intact) ; fondu 100 assombrit presque tout le cadre, fondu 50 fait
+    /// une vignette marquée aux seuls coins. À vérifier par la recette et l'essai réel sur un portrait
+    /// et un intérieur, et décentrée sur la zone d'intérêt (seul le radial centré est relevé). Le
+    /// fondu du radial du sujet (`sujetFondu`) n'est pas relevé : à vérifier de même (ni halo, ni
+    /// peau écrêtée).
     public enum Tireur {
         /// Le nom de l'étape (step_name), seul : « Claude · éclaircir et assombrir » dans l'Historique.
         public static let nomEtape = "éclaircir et assombrir"
@@ -275,13 +281,16 @@ extension Prompts {
         public static let sujet = "+0,2 à +0,4 IL"
         /// Les bords, assombris par un radial inversé à la place du vignetage après recadrage.
         public static let bords = "−0,3 IL, −0,5 au plus"
-        /// Forme du radial inversé des bords : une ellipse aux proportions de l'image, assez grande
-        /// pour laisser le sujet intact, au fondu large. À vérifier par la recette.
+        /// Forme du radial inversé des bords : une ellipse aux proportions de l'image (radius_x en part
+        /// de la largeur, radius_y de la hauteur), assez grande pour laisser le sujet intact, au fondu
+        /// large. Relevée centrée sur un paysage : à vérifier par la recette (voir plus haut).
         static let bordsRayon = "0,7"
         static let bordsFondu = "80"
-        /// Fondu du radial du sujet. À vérifier par la recette (ni halo, ni peau écrêtée).
+        /// Fondu du radial du sujet. Pas relevé : à vérifier par la recette (ni halo, ni peau écrêtée).
         static let sujetFondu = "80 à 100"
-        public static let forme = "invert = true, centré sur la zone_d_interet de Vision (à défaut, sur le sujet), radius_x et radius_y \(bordsRayon), feather \(bordsFondu)"
+        /// Vision rend la zone_d_interet par son coin haut gauche et sa taille : le centre se dit
+        /// « au milieu », comme pour le radial du sujet.
+        public static let forme = "invert = true, centré au milieu de la zone_d_interet de Vision (à défaut, du sujet), radius_x et radius_y \(bordsRayon), feather \(bordsFondu)"
         /// L'avant/après de cette seule étape, obligatoire.
         public static let avantApres = "view_photo avec compare = previous_step"
 

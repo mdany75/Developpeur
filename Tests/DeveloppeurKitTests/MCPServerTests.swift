@@ -226,6 +226,11 @@ final class MCPServerTests: XCTestCase {
         XCTAssertFalse(Prompts.Tireur.resume.lowercased().contains("agrandi"))
         // La forme des bords et le fondu du sujet sont nommés une fois, et repris tels quels.
         XCTAssertTrue(Prompts.Tireur.forme.contains("radius_x et radius_y \(Prompts.Tireur.bordsRayon), feather \(Prompts.Tireur.bordsFondu)"))
+        // Vision rend la zone d'intérêt par son coin haut gauche (x, y, width, height) : le radial
+        // inversé se centre en son milieu, pas sur ce coin.
+        XCTAssertTrue(Prompts.Tireur.forme.contains("centré au milieu de la zone_d_interet de Vision"), Prompts.Tireur.forme)
+        XCTAssertEqual(Prompts.Tireur.bordsRayon, "0,7", "rayon relevé (ellipse du cadre)")
+        XCTAssertEqual(Prompts.Tireur.bordsFondu, "80", "fondu relevé : 100 assombrit presque tout le cadre, 50 marque les coins")
         XCTAssertTrue(portrait.contains("feather \(Prompts.Tireur.sujetFondu)"))
     }
 
