@@ -612,6 +612,48 @@ essai("Etapes : empreinte stable après view_photo compare et preview_settings ;
     egal(Etapes.empreinte(photo) ~= tournee, true, "un débruitage")
 end)
 
+-- Constaté le 21 octobre 2026 (--dump, Lightroom Classic 15.6) : MaskGroupBasedCorrections passait
+-- d'absente à {} (l'annulation d'une étape de masques, le retour de view_photo compare) puis de {}
+-- à absente (rendus du recalage), sans rien changer à l'image : l'empreinte n'en dépend plus.
+essai("Etapes : une liste vide vaut une clé absente dans l'empreinte (masques posés puis annulés, comparaison, recalage)", function()
+    local photo = photoFuji()
+    -- Les réglages de la géométrie à leur valeur neutre, comme getDevelopSettings les rend dans
+    -- Lightroom (les rendus du recalage les remettent), et le profil d'objectif actif, comme la dune
+    -- du relevé : le recalage rend ses deux images.
+    for cle, valeur in pairs(require('Recalage').NEUTRE_GEOMETRIE) do
+        photo.reglages[cle] = valeur
+    end
+    photo.reglages.LensProfileEnable = 1
+    S.active, S.selection = photo, { photo }
+    egal(photo.reglages.MaskGroupBasedCorrections, nil)
+    local e = Etapes.empreinte(photo)
+    for _, cle in ipairs({ 'MaskGroupBasedCorrections', 'RetouchInfo', 'RetouchAreas', 'RedEyeInfo', 'DepthBasedCorrections' }) do
+        photo.reglages[cle] = {}
+        egal(Etapes.empreinte(photo), e, cle .. " = {} vaut une clé absente")
+        photo.reglages[cle] = nil
+    end
+    -- Le chemin constaté : une étape de masques, son annulation (la liste vide reste), une
+    -- comparaison, puis les rendus du recalage (la liste vide tombe, règle de la simulation).
+    Commandes.executer('masquer', { masques = Json.tableau({ { type = 'lineaire', de_x = 0.5, de_y = 0, a_x = 0.5, a_y = 0.4,
+        locaux = { LocalExposure2012 = -0.3 } } }), etape = 'ciel' })
+    egal(#photo.reglages.MaskGroupBasedCorrections, 1)
+    egal(Etapes.empreinte(photo) ~= e, true, "un masque compte")
+    Commandes.executer('annuler', {})
+    egal(type(photo.reglages.MaskGroupBasedCorrections), 'table', "l'annulation remet une liste vide")
+    egal(next(photo.reglages.MaskGroupBasedCorrections), nil)
+    egal(Etapes.empreinte(photo), e, "après l'annulation des masques")
+    appliquer({ reglages = { Exposure2012 = 0.4 }, plages = { Exposure2012 = { -5, 5 } } })
+    local e2 = Etapes.empreinte(photo)
+    Commandes.executer('apercu', { comparer = 'avantClaude', taille = 800, cles = {} })
+    egal(Etapes.empreinte(photo), e2, "après view_photo compare = before_claude")
+    Commandes.executer('geometrie', { photos = { photo.localIdentifier }, rendre = true })
+    egal(photo.reglages.MaskGroupBasedCorrections, nil, "les rendus du recalage la retirent (constaté)")
+    egal(Etapes.empreinte(photo), e2, "après les rendus du recalage")
+    -- Un élément vide d'une liste garde sa place ; une liste qui a quelque chose compte.
+    photo.reglages.MaskGroupBasedCorrections = { {} }
+    egal(Etapes.empreinte(photo) ~= e2, true, "une liste avec un élément, même vide, compte")
+end)
+
 essai("Etapes : l'avant d'une étape après view_photo compare est la vue de cette comparaison (l'état actuel, pas l'image d'avant)", function()
     local photo = enFenetre(photoRaw())
     appliquer({ reglages = { Exposure2012 = 0.4 }, plages = { Exposure2012 = { -5, 5 } } })

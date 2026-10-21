@@ -16,6 +16,25 @@ public struct PhotoTriee {
         public var point: CGPoint
         public var nettete: Double?
         public var avertissement: Bool
+        /// Texture autour du point (`Detail.autour`) ; nil si elle n'est pas mesurée.
+        public var texture: Double? = nil
+
+        /// La mise au point se juge-t-elle ici ? Pas sur une zone sans texture (ciel, nuage, sable
+        /// lisse, mur : sous `DetailMeasurements.textureMin`), où la netteté au point n'en dit rien.
+        /// Une texture non mesurée laisse juger, comme avant la 1.3.
+        public var jugeable: Bool { texture.map { $0 >= DetailMeasurements.textureMin } ?? true }
+
+        /// La netteté au point quand elle se juge ; nil sur une zone sans texture.
+        public var netteteJugee: Double? { jugeable ? nettete : nil }
+
+        /// Mesure le point dans l'image (netteté et texture, `Detail.autour`) ; `facteur` ramène la
+        /// netteté d'une vignette du cache à celle d'un aperçu exporté (la texture, à une échelle plus
+        /// grossière, n'en a pas besoin).
+        public static func mesuree(_ image: CGImage, point: CGPoint, avertissement: Bool, facteur: Double = 1) -> MiseAuPoint {
+            let mesure = Detail.autour(image, point: point)
+            return MiseAuPoint(point: point, nettete: mesure.map { $0.nettete * facteur }, avertissement: avertissement,
+                               texture: mesure?.texture)
+        }
     }
 
     public var id: Int
@@ -45,8 +64,9 @@ public struct PhotoTriee {
         self.fichier = fichier
     }
 
-    /// Netteté qui compte : au point de mise au point s'il est dans l'image, sinon la zone la plus nette.
-    var nettete: Double? { af?.nettete ?? detail?.sharpest }
+    /// Netteté qui compte : au point de mise au point s'il est dans l'image et sur une zone qui a de
+    /// la texture, sinon la zone la plus nette.
+    var nettete: Double? { af?.netteteJugee ?? detail?.sharpest }
 
     static func r(_ value: Double) -> String { DevelopCatalogue.format((value * 10).rounded() / 10).replacingOccurrences(of: ".", with: ",") }
     static func r2(_ value: Double) -> String { DevelopCatalogue.format((value * 100).rounded() / 100).replacingOccurrences(of: ".", with: ",") }
@@ -68,17 +88,22 @@ public struct PhotoTriee {
     /// Les défauts de netteté mesurés : floue, mise au point manquée, ou signalée manquée par
     /// l'appareil (sans autre défaut de netteté, et pas nette au point). Seuils de `Detail`, relevés
     /// à 1024 px : moins de 15 floue, plus de 35 nette (`DetailMeasurements.seuilFlou` et
-    /// `seuilNet`). Seule copie de ces règles : le tri (`defautsMesures`) et le carnet de progrès
+    /// `seuilNet`). La mise au point manquée ne se juge que sur une zone qui a de la texture
+    /// (`MiseAuPoint.jugeable`, `DetailMeasurements.textureMin`) : sur du sable lisse ou un ciel uni,
+    /// elle est « non jugée » et ne plafonne pas la note (faux constat du sable relevé le 21 octobre
+    /// 2026 ; celui du nuage, qui a plus de texture, reste : voir `textureMin`). Seule copie de ces
+    /// règles : le tri (`defautsMesures`) et le carnet de progrès
     /// (`Carnet.constatsVue`) les reprennent.
     static func defautsNettete(detail: DetailMeasurements?, af: MiseAuPoint?) -> [(genre: Defaut, texte: String)] {
         var liste: [(genre: Defaut, texte: String)] = []
         if let detail, detail.sharpest < DetailMeasurements.seuilFlou {
             liste.append((.floue, "floue : aucune zone nette (netteté \(r(detail.sharpest)))"))
-        } else if let af, let auPoint = af.nettete, let detail, auPoint < DetailMeasurements.seuilFlou, detail.sharpest >= DetailMeasurements.seuilNet {
+        } else if let af, let auPoint = af.netteteJugee, let detail, auPoint < DetailMeasurements.seuilFlou, detail.sharpest >= DetailMeasurements.seuilNet {
             liste.append((.miseAuPointManquee, "mise au point manquée : floue au point AF (\(r(auPoint))), nette ailleurs (\(r(detail.sharpest)))"))
         }
-        // La netteté qui compte : au point de mise au point s'il est mesuré, sinon la zone la plus nette.
-        if let af, af.avertissement, (af.nettete ?? detail?.sharpest ?? 0) < DetailMeasurements.seuilNet, liste.isEmpty {
+        // La netteté qui compte : au point de mise au point s'il est mesuré sur une zone qui a de la
+        // texture, sinon la zone la plus nette (l'avertissement de l'appareil s'y confirme alors).
+        if let af, af.avertissement, (af.netteteJugee ?? detail?.sharpest ?? 0) < DetailMeasurements.seuilNet, liste.isEmpty {
             liste.append((.miseAuPointSignalee, "mise au point signalée manquée par l'appareil"))
         }
         return liste
@@ -117,8 +142,11 @@ public struct PhotoTriee {
 
     public var pourquoi: String {
         var parties: [String] = []
-        if let auPoint = af?.nettete { parties.append("netteté au point AF \(Self.r(auPoint))") }
-        else if let detail { parties.append("netteté \(Self.r(detail.sharpest))") }
+        if let auPoint = af?.netteteJugee { parties.append("netteté au point AF \(Self.r(auPoint))") }
+        else if let detail {
+            let sansTexture = af?.nettete != nil && af?.jugeable == false
+            parties.append("netteté \(Self.r(detail.sharpest))" + (sansTexture ? " (point AF sur une zone sans texture : mise au point non jugée)" : ""))
+        }
         if let visage = vision?.faces.compactMap(\.quality).max() { parties.append("visage \(DevelopCatalogue.format((visage * 100).rounded() / 100))") }
         if let note = vision?.aesthetics { parties.append("note esthétique \(DevelopCatalogue.format((note * 100).rounded() / 100))") }
         if vision?.utility == true { parties.append("utilitaire selon Vision (capture, document)") }
@@ -135,7 +163,9 @@ public struct PhotoTriee {
         if !liste.isEmpty { item["defauts"] = .array(liste.map(JSONValue.string)) }
         if let pile { item["pile"] = .number(Double(pile)) }
         if let af {
-            item["point_af"] = ["x": .number((af.point.x * 1000).rounded() / 1000), "y": .number((af.point.y * 1000).rounded() / 1000)]
+            var point: [String: JSONValue] = ["x": .number((af.point.x * 1000).rounded() / 1000), "y": .number((af.point.y * 1000).rounded() / 1000)]
+            if !af.jugeable { point["mise_au_point"] = "non jugée : zone sans texture autour du point" }
+            item["point_af"] = .object(point)
         }
         if !motsCles.isEmpty { item["mots_cles"] = .array(motsCles.map { .string($0.mot) }) }
         let yeux = (vision?.faces ?? []).compactMap { face in face.eyeOpenness.map { (face.box.width, $0) } }

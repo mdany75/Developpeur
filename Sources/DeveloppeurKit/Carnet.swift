@@ -34,14 +34,18 @@ public enum Carnet {
     /// `Carnet.ANGLE_NUL` du module, qui refuse au-delà.
     public static let angleNul = 0.005
     /// Sous-exposition : L* médian sous `medianeSousExposee` et aucune partie claire (95e centile de
-    /// L* sous `p95SousExposee`). Provisoires : à relever par `--constats` (photos réussies, nuit,
-    /// photo voulue sombre, RAF en DR200 ou DR400).
+    /// L* sous `p95SousExposee`). Provisoires, gardés après le relevé du 21 octobre 2026 (`--constats`
+    /// sur les huit copies d'Essais, Lightroom Classic 15.6) : aucun faux constat ; les deux photos
+    /// très sombres, une nuit éclairée (L* médian 16,9, 95e centile 90,9) et une scène sur fond noir
+    /// (3,9 et 89,6), sont écartées par le 95e centile, à raison ; mais aucun vrai cas de
+    /// sous-exposition dans Essais pour les éprouver (ni photo voulue sombre à −2/3 IL, ni DR400).
     public static let medianeSousExposee = 28.0
     public static let p95SousExposee = 80.0
     /// Ciel ou haut de l'image brûlé : plus de `partBlancPurHaut` % du tiers haut en blanc pur (les
     /// trois canaux à 254 ou plus, comme `PhotoMeasurements.pureWhite`), sur la réduction à 512 px
     /// des mesures. Pas de lecture du masque Ciel de Lightroom : un mur, la neige ou un fond blanc en
-    /// haut de l'image comptent aussi, et le libellé le dit. Provisoire, comme les précédents.
+    /// haut de l'image comptent aussi, et le libellé le dit. Provisoire, comme les précédents : au
+    /// relevé du 21 octobre 2026, 1,3 % au plus sur les huit copies (aucun haut blanc) ; non éprouvé.
     public static let partBlancPurHaut = 3.0
     /// Texte d'un défaut trouvé : 200 octets au plus (`Carnet.LONGUEUR_CONSTAT` du module).
     static let longueurTexte = 200
@@ -150,8 +154,11 @@ public enum Carnet {
             cherches.insert("bruit")
             let nettete = PhotoTriee.defautsNettete(detail: detail, af: af)
             // La mise au point ne se juge qu'au point lu, et pas sur une photo floue partout : la
-            // règle ne peut alors pas la trouver manquée, et la base la compterait réussie.
-            if af != nil, !nettete.contains(where: { $0.genre == .floue }) { cherches.insert("mise_au_point") }
+            // règle ne peut alors pas la trouver manquée, et la base la compterait réussie. Ni sur une
+            // zone sans texture autour du point (sable lisse, ciel uni : non jugée, constaté le
+            // 21 octobre 2026 ; DetailMeasurements.textureMin), sauf si l'appareil l'a signalée manquée.
+            let signalee = nettete.contains { $0.genre == .miseAuPointSignalee }
+            if let af, af.jugeable || signalee, !nettete.contains(where: { $0.genre == .floue }) { cherches.insert("mise_au_point") }
             for defaut in nettete {
                 switch defaut.genre {
                 case .floue: trouve("flou", detail.sharpest, defaut.texte)
@@ -288,7 +295,8 @@ public enum Carnet {
         func n(_ valeur: Double?, _ decimales: Int = 1) -> String { valeur.map { Bilan.nombre($0, decimales: decimales) } ?? "—" }
         dire("Relevé des constats du carnet (lecture seule, rien n'est noté) : sous-exposition si L* médian < \(n(medianeSousExposee, 0)) "
             + "et 95e centile < \(n(p95SousExposee, 0)), ciel brûlé au-delà de \(n(partBlancPurHaut, 0)) % de blanc pur dans le tiers haut "
-            + "(provisoires) ; netteté \(n(DetailMeasurements.seuilFlou, 0)) et \(n(DetailMeasurements.seuilNet, 0)), bruit fort "
+            + "(provisoires) ; netteté \(n(DetailMeasurements.seuilFlou, 0)) et \(n(DetailMeasurements.seuilNet, 0)), texture au point AF "
+            + "\(n(DetailMeasurements.textureMin, 0)), bruit fort "
             + "\(n(DetailMeasurements.bruitFort)) (relevés) ; horizon de \(n(horizonMin))° ou plus, par measure_angle ou read_composition seulement")
         var resume: [String] = []
         let sources: [(nom: String, charger: () throws -> AMesurer)] =
@@ -314,8 +322,7 @@ public enum Carnet {
             let lecture = reponse.flatMap { ToolHandler.lectureBoitier($0["photo"], lecteur: lecteur) }
             var af: PhotoTriee.MiseAuPoint?
             if let point = ToolHandler.pointAF(lecture, description: reponse?["photo"]) {
-                af = PhotoTriee.MiseAuPoint(point: point.point, nettete: Detail.nettete(photo.image, autour: point.point),
-                                            avertissement: point.avertissement)
+                af = .mesuree(photo.image, point: point.point, avertissement: point.avertissement)
             }
             let intention = lecture?.intention
             let blanc = blancPurHaut(reduite)
@@ -326,7 +333,8 @@ public enum Carnet {
             if reponse != nil {
                 var point = "  Point de mise au point : "
                 if let af {
-                    point += "x \(n(Double(af.point.x), 3)) y \(n(Double(af.point.y), 3)), netteté autour \(n(af.nettete))"
+                    point += "x \(n(Double(af.point.x), 3)) y \(n(Double(af.point.y), 3)), netteté autour \(n(af.nettete)), "
+                        + "texture \(n(af.texture))" + (af.jugeable ? "" : " (sans texture : mise au point non jugée)")
                         + (af.avertissement ? ", signalé manqué par l'appareil" : "")
                 } else {
                     point += "non lu (autre marque, original absent ou lecture trop longue)"

@@ -749,8 +749,33 @@ final class Recette13Tests: XCTestCase {
         echec({ $0.ecartRestauration = 1e-5 }, 2, "recadrage pas remis exactement après read_composition : CropLeft")
         echec({ $0.angleLuIgnore = true }, 2, "cadre actuel lu sur l'image entière : angle 0° au lieu de 2°")
         echec({ $0.vueSansAngle = true }, 3, "dans le cadre au lieu de")
-        echec({ $0.horizon = nil }, 1, "aucun contour net le long de l'horizon donné")
         echec({ $0.reglages["PerspectiveUpright"] = 2; $0.garderCommeDepart() }, 1, "la copie porte PerspectiveUpright")
+    }
+
+    /// Constaté le 21 octobre 2026 : la dune d'essai n'a pas d'horizon à mi-hauteur, et la mesure
+    /// accrochée aux rides du sable faisait échouer l'étape « horizon » sur du bruit. Sans horizon net
+    /// (la ligne lue n'est pas affinée), la recette ne la fait pas échouer : les deux premières étapes,
+    /// qui n'en dépendent pas, le disent ; la troisième est sautée avec sa raison, le recadrage d'essai
+    /// annulé, la photo remise à l'origine.
+    func testHorizonSansContourNetSauteLEtapeAvecSaRaison() throws {
+        let module = moduleHorizon()
+        module.horizon = nil
+        let (recette, lignes) = lancerHorizon(module)
+        XCTAssertEqual(lignes, ["✔ photo d'essai",
+                                "✔ composition lue, cadre proposé en pointillés, photo inchangée (read_composition, preview_settings)",
+                                "✔ cadre actuel lu sur l'image entière (recadrée en 4:5, tournée de 2°)",
+                                "✔ cadre proposé appliqué : horizon droit, sur le tiers du bas (measure_angle), puis annulé",
+                                "✔ retour à l'origine"], details(recette))
+        XCTAssertTrue(recette.etapes[1].detail.hasPrefix("pas d'horizon net à 0.55 de la hauteur"), details(recette))
+        let saut = recette.etapes[3].detail
+        XCTAssertTrue(saut.hasPrefix("sautée : pas d'horizon net"), saut)
+        XCTAssertTrue(saut.contains("une copie d'Essais qui a un vrai horizon"), saut)
+        XCTAssertTrue(saut.hasSuffix("recadrage d'essai annulé"), saut)
+        // Un recadrage (celui d'essai), une annulation, puis le retour à l'origine : le cadre proposé
+        // n'est jamais appliqué.
+        XCTAssertEqual(module.commandes.map(\.nom).filter { ["appliquer", "annuler", "revenir"].contains($0) },
+                       ["appliquer", "annuler", "revenir"])
+        XCTAssertNil(module.recadrage)
     }
 
     /// Les Crop* remis au millionième près (mesure 5) suffisent ; au-delà, l'écart se dit.
@@ -867,5 +892,79 @@ final class Recette13Tests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(Recette.luminanceMoyenne(clair)), try XCTUnwrap(Recette.luminanceMoyenne(sombre)))
         XCTAssertTrue(Recette.dimensions(sombre)! == (300, 200))
         XCTAssertNil(Recette.dimensions(Data("rien".utf8)))
+    }
+
+    // MARK: Constats du 21 octobre 2026 (lot 18)
+
+    /// La photo active d'avant un passage au module Développement (débruitage, son annulation) doit
+    /// revenir : constaté trois fois qu'une autre photo restait active. L'étape le vérifie par
+    /// get_status.
+    func testLaPhotoActiveDAvantDoitRevenir() throws {
+        XCTAssertNil(Recette.ecartPhotoActive(avant: 53448416, apres: 53448416))
+        XCTAssertNil(Recette.ecartPhotoActive(avant: nil, apres: 53448372), "pas de photo active au départ : rien à remettre")
+        let ecart = try XCTUnwrap(Recette.ecartPhotoActive(avant: 53448416, apres: 53448372))
+        XCTAssertTrue(ecart.hasPrefix("photo active 53448372 au lieu de 53448416"), ecart)
+        XCTAssertTrue(try XCTUnwrap(Recette.ecartPhotoActive(avant: 53448416, apres: nil)).hasPrefix("photo active aucune"))
+        let fake = FakeLightroom()
+        fake.replies["etat"] = ["photo_active": ["id": 53448416, "fichier": "XH2S9386.RAF"]]
+        let recette = Recette(lightroom: fake)
+        XCTAssertEqual(try recette.photoActive(), 53448416)
+        XCTAssertEqual(fake.commands, ["etat"], "lue par get_status, sans rien écrire")
+        fake.replies["etat"] = ["photo_active": .null]
+        XCTAssertNil(try recette.photoActive())
+    }
+
+    /// Le registre des notes (notation.json) ne voit pas undo_last : après l'étape de notation de la
+    /// recette, la proposition de 53709912 restait « acceptee ». La recette le remet comme elle l'a
+    /// trouvé (commande notation remettre), même après un échec, et vérifie qu'il l'est.
+    func testLeRegistreDesNotesEstRemisCommeAvant() throws {
+        let fake = FakeLightroom()
+        let avant: JSONValue = ["photo": 12, "fichier": "DSCF2402.RAF (Essai)", "note": 2, "etat": "a_verifier", "le": 1792000000]
+        var registre: JSONValue? = avant
+        var remises: [JSONValue] = []
+        fake.onSend = { [unowned fake] commande, params in
+            guard commande == "notation" else { return }
+            switch params["action"]?.string {
+            case "remettre":
+                remises.append(params["proposition"] ?? .null)
+                if let proposition = params["proposition"], !proposition.isNull { registre = proposition } else { registre = nil }
+                fake.replies["notation"] = ["photo": 12, "proposition": registre ?? .null]
+            default:
+                fake.replies["notation"] = ["propositions": .array(registre.map { [$0] } ?? [])]
+            }
+        }
+        let recette = Recette(lightroom: fake)
+        // L'étape pose la note : le registre la dit acceptée.
+        let detail = try recette.garderRegistreDesNotes(12) { () -> String in
+            registre = ["photo": 12, "fichier": "DSCF2402.RAF (Essai)", "note": 2, "etat": "acceptee", "le": 1792000100, "decide_le": 1792000100]
+            return "posée, puis annulée"
+        }
+        XCTAssertEqual(detail, "posée, puis annulée")
+        XCTAssertEqual(registre, avant, "la proposition d'avant, telle quelle")
+        XCTAssertEqual(remises, [avant])
+        XCTAssertEqual(fake.calls.compactMap { $0.params["action"]?.string }, ["lire", "remettre", "lire"])
+        XCTAssertFalse(fake.commands.contains { $0 != "notation" }, "rien d'autre, rien dans le catalogue")
+
+        // Aucune proposition au départ : celle de la recette est retirée, même après un échec.
+        registre = nil
+        remises = []
+        struct Panne: Error {}
+        XCTAssertThrowsError(try recette.garderRegistreDesNotes(12) { () -> String in
+            registre = ["photo": 12, "note": 2, "etat": "acceptee"]
+            throw Panne()
+        })
+        XCTAssertNil(registre)
+        XCTAssertEqual(remises, [.null])
+
+        // Un module qui ne remet rien : l'écart se dit.
+        var lectures = 0
+        fake.onSend = { [unowned fake] commande, params in
+            guard commande == "notation", params["action"]?.string == "lire" else { return }
+            lectures += 1
+            fake.replies["notation"] = ["propositions": [["photo": 12, "etat": .string(lectures == 1 ? "a_verifier" : "acceptee")]]]
+        }
+        XCTAssertThrowsError(try recette.garderRegistreDesNotes(12) { "rien" }) { erreur in
+            XCTAssertTrue("\(erreur)".contains("registre des notes pas remis"), "\(erreur)")
+        }
     }
 }

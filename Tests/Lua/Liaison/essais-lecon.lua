@@ -28,8 +28,9 @@ LrDate.timeToUserFormat = function(t, format)
 end
 
 -- Une photo prise avec un X-H2S, décrite comme Lightroom le ferait (métadonnées formatées), avec
--- les quatre données de prise de vue de plus. Leur forme dans Lightroom Classic 15.6 reste à
--- constater (mesure 3) : la simulation les rend telles quelles.
+-- les quatre données de prise de vue de plus, sous la forme constatée le 21 octobre 2026 dans
+-- Lightroom Classic 15.6 (mesure 3, la copie DSCF1595 d'Essais) : aucune refusée, des textes
+-- traduits dans la langue de Lightroom.
 local function photoDecrite()
     local photo = photoFuji()
     photo.meta.copyName = nil
@@ -39,10 +40,10 @@ local function photoDecrite()
     photo.meta.aperture = 'ƒ/8,0'
     photo.meta.focalLength = '23 mm'
     photo.meta.dateTimeOriginal = '2026-06-30 18:42:10'
-    photo.meta.exposureBias = '-0,7 IL'
-    photo.meta.flash = "Le flash ne s'est pas déclenché"
-    photo.meta.exposureProgram = 'Priorité ouverture'
-    photo.meta.meteringMode = 'Multizone'
+    photo.meta.exposureBias = '0 EV'
+    photo.meta.flash = 'Non déclenché'
+    photo.meta.exposureProgram = "Priorité d'ouverture"
+    photo.meta.meteringMode = 'Moyenne pondérée'
     S.active = photo
     return photo
 end
@@ -73,10 +74,10 @@ test("journal detaille : la photo décrite en entier, avec prise_de_vue_plus, et
     egal(d.date, '2026-06-30 18:42:10')
     egal(d.format, 'RAW')
     egal(d.retouchee_par_claude, true)
-    egal(d.prise_de_vue_plus.compensation, '-0,7 IL')
-    egal(d.prise_de_vue_plus.flash, "Le flash ne s'est pas déclenché")
-    egal(d.prise_de_vue_plus.programme, 'Priorité ouverture')
-    egal(d.prise_de_vue_plus.mesure, 'Multizone')
+    egal(d.prise_de_vue_plus.compensation, '0 EV')
+    egal(d.prise_de_vue_plus.flash, 'Non déclenché')
+    egal(d.prise_de_vue_plus.programme, "Priorité d'ouverture")
+    egal(d.prise_de_vue_plus.mesure, 'Moyenne pondérée')
     egal(#j.entrees, 1)
     egal(j.entrees[1].raison, "Un peu sombre.")
     -- Par la prise de la liaison : detaille arrive en booléen JSON.
@@ -87,7 +88,7 @@ test("journal detaille : la photo décrite en entier, avec prise_de_vue_plus, et
     local reponse = Json.decode(S.envois[#S.envois])
     egal(reponse.error, nil)
     egal(reponse.result.photos[1].photo.appareil, 'X-H2S', "la photo active, décrite en entier")
-    egal(reponse.result.photos[1].photo.prise_de_vue_plus.mesure, 'Multizone')
+    egal(reponse.result.photos[1].photo.prise_de_vue_plus.mesure, 'Moyenne pondérée')
 end)
 
 test("journal sans detaille : la description courte d'avant, sans prise de vue", function()
@@ -116,7 +117,7 @@ test("journal detaille : une clé que Lightroom refuse, vide ou d'un autre type 
     end
     local d = journal({ detaille = true }).photo
     egal(d.appareil, 'X-H2S')
-    egal(d.prise_de_vue_plus.compensation, '-0,7 IL')
+    egal(d.prise_de_vue_plus.compensation, '0 EV')
     egal(d.prise_de_vue_plus.flash, nil, "refusée : nil")
     egal(d.prise_de_vue_plus.programme, nil, "vide : nil")
     egal(d.prise_de_vue_plus.mesure, nil, "une table n'est pas gardée")

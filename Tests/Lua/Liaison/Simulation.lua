@@ -451,6 +451,16 @@ function S.Photo(id, reglages, meta, brut)
         for cle, valeur in pairs(reglages) do
             self.reglages[cle] = valeur
         end
+        -- Constaté le 21 octobre 2026 (--dump avant et après, mesures de la 1.3) : une liste de
+        -- masques vide reste rangée {} là où la clé était absente (retour de view_photo compare,
+        -- annulation d'une étape de masques), puis n'est plus rangée après les rendus du recalage,
+        -- sans rien changer à l'image. Le déclencheur exact n'est pas relevé : supposé, une écriture
+        -- de la correction d'objectif ou de la perspective (les clés que posent ces rendus).
+        if (reglages.LensProfileEnable ~= nil or reglages.PerspectiveUpright ~= nil)
+            and type(self.reglages.MaskGroupBasedCorrections) == 'table' and next(self.reglages.MaskGroupBasedCorrections) == nil
+            and reglages.MaskGroupBasedCorrections == nil then
+            self.reglages.MaskGroupBasedCorrections = nil
+        end
         if objectifPerso and reglages.LensProfileSetup == 'LensDefaults' then
             self.reglages.LensProfileSetup = 'Custom'
         end
@@ -490,6 +500,10 @@ function S.Photo(id, reglages, meta, brut)
         S.enAttente[self] = enAttente
         enAttente[#enAttente + 1] = { cle = cle, valeur = valeur }
     end
+    -- Constaté le 21 octobre 2026 (Lightroom Classic 15.6, mesure 3 de la 1.3) : exposureBias,
+    -- flash, exposureProgram et meteringMode ne sont jamais refusées, et rendent des textes traduits
+    -- (« 0 EV », « Non déclenché », « Priorité d'ouverture », « Moyenne pondérée ») : la simulation
+    -- rend ce que l'essai a rangé dans meta, sans refus.
     function photo:getFormattedMetadata(cle)
         return self.meta[cle]
     end
@@ -1487,16 +1501,55 @@ function catalogue:getActiveSources()
 end
 
 -- Afficher un dossier rend visibles dans le film fixe les photos qu'il contient, après un moment.
+-- Constaté le 21 octobre 2026 (Lightroom Classic 15.6, mesures de la 1.3) : le film fixe est celui
+-- de la source affichée. Un dossier affiché à la place d'une source connue en fait sortir les photos
+-- qui ne sont pas dans ce dossier ; la source d'avant remise, ses photos ne se sélectionnent
+-- qu'après le même moment (S.delaiSource) : la photo active d'avant, remise aussitôt après
+-- setActiveSources (Amelioration.remettreVue d'avant ce constat), n'était pas reprise, et une autre
+-- photo restait active (trois fois : après un débruitage, son annulation, une variante retenue).
+-- La simulation garde les photos visibles dans chaque source quittée (S.visiblesSous) et les rend à
+-- son retour ; sans source connue (S.sources nil, la plupart des essais), rien ne sort du film fixe.
 function catalogue:setActiveSources(sources)
+    local avant = S.sources
+    if avant ~= nil and avant ~= sources then
+        local visibles = {}
+        for id in pairs(S.photos) do
+            if not S.invisibles[id] then
+                visibles[id] = true
+            end
+        end
+        S.visiblesSous[avant] = visibles
+    end
     S.sources = sources
     S.sourcesChangees[#S.sourcesChangees + 1] = sources
+    local connues = sources ~= nil and S.visiblesSous[sources]
+    if connues then
+        for id in pairs(S.photos) do
+            if connues[id] then
+                S.invisibles[id] = nil
+                S.visiblesDes[id] = S.horloge + S.delaiSource
+            else
+                S.invisibles[id] = true
+            end
+        end
+        return
+    end
+    local dedans = {}
     for _, source in ipairs(sources or {}) do
         if source.chemin then
             for _, photo in ipairs(source:getPhotos(false)) do
+                dedans[photo.localIdentifier] = true
                 if S.invisibles[photo.localIdentifier] then
                     S.invisibles[photo.localIdentifier] = nil
                     S.visiblesDes[photo.localIdentifier] = S.horloge + S.delaiSource
                 end
+            end
+        end
+    end
+    if avant ~= nil and next(dedans) ~= nil then
+        for id in pairs(S.photos) do
+            if not dedans[id] then
+                S.invisibles[id] = true
             end
         end
     end
@@ -2243,6 +2296,8 @@ function S.reinitialiser()
     S.recherches = {}
     S.sources = nil
     S.sourcesChangees = {}
+    -- Photos visibles dans chaque source quittée (setActiveSources), rendues à son retour.
+    S.visiblesSous = {}
     S.vue = nil
     S.miseAJourIA = true
     S.modelesIAAbsents = false

@@ -428,16 +428,59 @@ local function lire(params)
     return { propositions = propositions, perdues = perdues > 0 and perdues or nil }
 end
 
--- Commande notation du serveur : action proposer ou lire. Rien n'est écrit dans le catalogue, sauf
--- les notes de proposer avec poser (Notation.poser : pause et garde-fous des photos).
+-- Commande « remettre » (la recette seulement, jamais un outil) : la proposition d'une photo telle
+-- que la commande lire l'a rendue avant l'étape de la recette, ou aucune (proposition absente ou
+-- null). Rien n'est écrit dans le catalogue. Le registre ne voit pas une annulation : la note que la
+-- recette pose avec apply puis défait par undo_last y restait « acceptee », comme si Dany l'avait
+-- acceptée, et Notation.recaler n'y voyait rien à reprendre, la photo ayant déjà cette note
+-- (constaté le 21 octobre 2026, 53709912 à 2 ★). La proposition remise garde ses champs (état,
+-- dates, critères), avec l'uuid de la photo ; une note de plus de NOTE_MAX_PROPOSEE, un état inconnu
+-- ou une autre photo sont refusés sans rien changer.
+local function remettre(params)
+    local id = entier(params.photo)
+    if not id then
+        echouer("Photo manquante : rien n'est remis.")
+    end
+    local ok, photo = LrTasks.pcall(Photos.photoParId, id)
+    if not ok then
+        echouer(Liaison.messageErreur(photo))
+    end
+    local p = params.proposition
+    local cle = cleDe(id)
+    local r = charger()
+    if p == nil or p == Json.null then
+        r.propositions[cle] = nil
+    else
+        if type(p) ~= 'table' or entier(p.photo) ~= id or not ETATS[p.etat] then
+            echouer(string.format("Proposition à remettre invalide pour la photo %d : rien n'est remis.", id))
+        end
+        local note = p.note ~= Json.null and tonumber(p.note) or nil
+        if note and note > Notation.NOTE_MAX_PROPOSEE then
+            echouer("Claude ne propose jamais 5 étoiles : rien n'est remis.")
+        end
+        local q = copie(p)
+        q.photo = id
+        q.uuid = texte(Photos.brut(photo, 'uuid'))
+        r.propositions[cle] = q
+    end
+    changer('propositions')
+    Liaison.noter(string.format("Notation : proposition de la photo %d %s (recette)", id, r.propositions[cle] and "remise" or "retirée"))
+    return { photo = id, proposition = r.propositions[cle] and pourReponse(r.propositions[cle]) or Json.null }
+end
+
+-- Commande notation du serveur : action proposer, lire ou remettre (la recette). Rien n'est écrit
+-- dans le catalogue, sauf les notes de proposer avec poser (Notation.poser : pause et garde-fous des
+-- photos).
 function Notation.commande(params)
     local action = params.action
     if action == 'proposer' then
         return Notation.proposer(params)
     elseif action == 'lire' then
         return lire(params)
+    elseif action == 'remettre' then
+        return remettre(params)
     end
-    echouer("Action de notation inconnue : " .. tostring(action) .. " (proposer ou lire).")
+    echouer("Action de notation inconnue : " .. tostring(action) .. " (proposer, lire ou remettre).")
 end
 
 -- Poser ------------------------------------------------------------------------------

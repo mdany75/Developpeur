@@ -11,9 +11,16 @@ import Foundation
 /// fonctions sur des données, testées telles quelles (JeLeFaisTests). Les outils sont dans
 /// Tools+Retouche.swift (monTour) et Tools+Analyse.swift (viewPhoto).
 ///
-/// L'ordre des panneaux n'existe qu'ici (`panneaux`). Provisoires jusqu'à la mesure 4 de la 1.3 :
-/// les noms français des panneaux et de leurs sections, relevés dans Lightroom Classic 15.6, et les
-/// tolérances de « comme Claude » (`tolerance`), à juger sur les trois premiers exercices de Dany.
+/// L'ordre des panneaux n'existe qu'ici (`panneaux`). Mesure 4 de la 1.3 (21 octobre 2026) : my_turn
+/// a rendu Réglages de base › Tonalité › Exposition, puis › Présence › Vibrance. Constaté à l'écran
+/// le même jour (panneau de droite du module Développement, Lightroom Classic 15.6 en français) :
+/// Réglages de base, Courbe des tonalités, Mélangeur de couleurs, Color Grading (nom anglais
+/// gardé), Détail, Corrections de l'objectif, Transformation, Flou de l'objectif (après
+/// Transformation), Effets, Etalonnage (sans accent) ; ni Noir et blanc (dans le Mélangeur de
+/// couleurs) ni Recadrage (outil de la bande) ne sont des panneaux. `panneaux` n'en tient pas
+/// encore compte (« Étalonnage des couleurs », « Étalonnage », Flou de l'objectif avant les
+/// Corrections) : à reprendre ; les sections de Réglages de base restent à relever. Les tolérances
+/// de « comme Claude » (`tolerance`) restent à juger sur les trois premiers exercices de Dany.
 enum JeLeFais {
     /// Nom de l'instantané de la version de Claude (« Claude · ma version » dans Lightroom).
     static let instantane = "ma version"
@@ -372,10 +379,14 @@ enum JeLeFais {
 
     // MARK: Écarts
 
-    /// Tolérance de « comme Claude » (provisoire, mesure 4) : sous elle, deux valeurs d'un réglage
-    /// ne se distinguent pas. Exposition 0,1 IL ; température 150 K pour un RAW, 3 sinon ; teinte 3 ;
-    /// curseurs de −100 à +100 : 5 points, de 0 à 100 : 3 ; teintes : 5° ; angles : 0,3° ; bords du
-    /// cadre : 1 % de l'image ; un interrupteur ou un mode : toute différence ; autres plages : 3 %.
+    /// Tolérance de « comme Claude » : sous elle, deux valeurs d'un réglage ne se distinguent pas.
+    /// Exposition 0,1 IL ; température 150 K pour un RAW, 3 sinon ; teinte 3 ; curseurs de −100 à
+    /// +100 : 5 points, de 0 à 100 : 3 ; teintes : 5° ; angles : 0,3° ; bords du cadre : 1 % de
+    /// l'image ; un interrupteur ou un mode : toute différence ; autres plages : 3 %. Provisoire,
+    /// gardée après le relevé du 21 octobre 2026 (mesure 4, Lightroom Classic 15.6) : un seul exercice,
+    /// la retouche « à la main » remplacée par apply_settings (Exposition +0,4 contre +0,8 : plus fort ;
+    /// Ombres ajoutées ; Vibrance oubliée ; écart principal 0,55 IL, 5,4 fois le seuil de 0,1) ; à
+    /// juger sur les trois premiers exercices de Dany.
     static func tolerance(cle: String, raw: Bool) -> Double {
         switch cle {
         case "Exposure2012": return 0.1

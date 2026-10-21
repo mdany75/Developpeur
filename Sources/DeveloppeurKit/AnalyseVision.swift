@@ -26,6 +26,10 @@ public struct VisionReport: Equatable {
         /// nil s'il ne le donne pas. Le sens du regard s'en tire par Composition.regard (signe et
         /// seuil provisoires, à constater).
         public var yaw: Double? = nil
+        /// Roulis du visage en radians (rotation dans le plan de l'image), tel que Vision le donne ;
+        /// nil s'il ne le donne pas. Proche de ±π, le « visage » est à l'envers : un faux visage
+        /// (Composition.visagePlausible).
+        public var roll: Double? = nil
 
         /// Le sens du regard dans l'image : « vers la droite de l'image », « vers la gauche de
         /// l'image » ou « de face » ; nil sans lacet.
@@ -176,7 +180,8 @@ public enum VisionAnalysis {
                 eyeOpenness: openings.count == 2 ? openings.max() : nil,
                 // Constaté sur ce Mac (révision 3) : les observations des repères portent le lacet,
                 // le même que la détection des visages seule ; pas de seconde requête.
-                yaw: face.yaw.map { Double(truncating: $0) })
+                yaw: face.yaw.map { Double(truncating: $0) },
+                roll: face.roll.map { Double(truncating: $0) })
         }
 
         var salient: CGRect?

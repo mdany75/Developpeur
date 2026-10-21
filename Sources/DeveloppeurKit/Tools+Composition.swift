@@ -203,19 +203,23 @@ extension ToolHandler {
 
         // Le sujet : celui donné, sinon les visages, sinon la zone d'intérêt de Vision (appelée
         // seulement sans sujet donné). Le regard n'est dit que s'il est connu : facing, ou le lacet
-        // que Vision donne pour le visage principal.
+        // que Vision donne pour le visage principal. Un faux visage (à l'envers : le devant d'une
+        // voiture) et une zone d'intérêt qui couvre presque toute l'image ne sont pas des sujets
+        // (Composition.visagePlausible, zoneEstUnSujet ; relevés le 21 octobre 2026).
         let rapport = sujetDonne == nil ? vision(image) : nil
+        let visagesPlausibles = (rapport?.faces ?? []).filter(Composition.visagePlausible)
         var sujet: CGRect?, source: String?, nomSujet = "le sujet"
         var regard: Int?, regardLu = false, regardConnu = false, hauteurYeux: Double?
+        var sansSujet: String?
         if let donne = sujetDonne {
             let coins = [CGPoint(x: donne.minX, y: donne.minY), CGPoint(x: donne.maxX, y: donne.minY),
                          CGPoint(x: donne.maxX, y: donne.maxY), CGPoint(x: donne.minX, y: donne.maxY)].map(versEntiere)
             let xs = coins.map { Double($0.x) }, ys = coins.map { Double($0.y) }
             sujet = CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!)
             source = "donne"
-        } else if let visages = rapport?.faces, let principal = visages.max(by: { $0.box.width * $0.box.height < $1.box.width * $1.box.height }) {
+        } else if let principal = visagesPlausibles.max(by: { $0.box.width * $0.box.height < $1.box.width * $1.box.height }) {
             let aire = Double(principal.box.width * principal.box.height)
-            let retenus = visages.filter { Double($0.box.width * $0.box.height) >= Self.partVisageSujet * aire }
+            let retenus = visagesPlausibles.filter { Double($0.box.width * $0.box.height) >= Self.partVisageSujet * aire }
             sujet = retenus.dropFirst().reduce(retenus[0].box) { $0.union($1.box) }
             source = "visages"
             nomSujet = retenus.count > 1 ? "les visages" : "le visage"
@@ -224,8 +228,13 @@ extension ToolHandler {
             regardConnu = principal.yaw?.isFinite == true
             if !principal.pupils.isEmpty { hauteurYeux = principal.pupils.map { Double($0.y) }.reduce(0, +) / Double(principal.pupils.count) }
         } else if let zone = rapport?.salientArea {
-            sujet = zone
-            source = "zone_d_interet"
+            if Composition.zoneEstUnSujet(zone) {
+                sujet = zone
+                source = "zone_d_interet"
+            } else {
+                sansSujet = "La zone d'intérêt de Vision couvre \(Int((Double(zone.width * zone.height) * 100).rounded())) % de l'image : "
+                    + "pas de sujet net, le cadre proposé n'en place aucun. Pour un sujet précis, le donner (subject)."
+            }
         }
         if let facing {
             regard = ["right": 1, "left": -1][facing]
@@ -305,6 +314,8 @@ extension ToolHandler {
             if let hauteurDansCadre { objet["hauteur_dans_le_cadre_actuel"] = r(hauteurDansCadre) }
             if ligne.refinedAngle != nil {
                 objet["mesure"] = .string("affinée sur \(ligne.edgePoints) points du contour (écart moyen \(Composition.decimal(ligne.residual ?? 0, 10)) px)")
+            } else if ligne.contourIrregulier {
+                objet["mesure"] = .string("d'après les deux points seulement : contour trop irrégulier pour être une ligne (écart moyen \(Composition.decimal(ligne.residual ?? 0, 10)) px)")
             } else {
                 objet["mesure"] = "d'après les deux points seulement : aucun contour net le long du segment"
             }
@@ -327,6 +338,8 @@ extension ToolHandler {
                 objet["regard"] = .string(sens + (facing != nil ? " (facing)" : " (lu par Vision, à vérifier)"))
             }
             reponse["sujet"] = .object(objet)
+        } else if let sansSujet {
+            reponse["sujet"] = ["source": "aucun", "raison": .string(sansSujet)]
         }
         for cle in ["a_savoir", "original"] where result[cle] != nil { reponse[cle] = result[cle] }
         return .object(reponse)

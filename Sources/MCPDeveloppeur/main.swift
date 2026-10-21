@@ -72,7 +72,8 @@ func usage() {
                 notée puis retirée), « Je le fais ».
                 --portrait : la peau dosée sur un portrait ; --mixte : une photo à deux lumières (lampe et fenêtre)
                 lue mixte, puis le RAW lu à une seule lumière, en lecture seule ; --horizon : une photo qui a un
-                horizon (la dune), pour la composition lue, à --hauteur-horizon dans l'image (0,5 par défaut)
+                vrai horizon, pour la composition lue, à --hauteur-horizon dans l'image (0,5 par défaut) ; sans
+                horizon net à cette hauteur, l'étape de l'horizon est sautée, avec sa raison
     Les commandes portent le jeton privé de la liaison (liaison.jeton, écrit par le module à chaque démarrage
     de la liaison) ; le serveur ne le crée jamais et ne le dit jamais.
     DEVELOPPEUR_PORT=<port> change le port des commandes (les réponses sur le port suivant ;
@@ -380,7 +381,7 @@ case "--recette":
         : "Recette de MCP-Développeur \(ServerInfo.version) : copies virtuelles seulement, chacune remise à l'origine à la fin.")
     print(line: "Images à regarder : \(folder.path)")
     if horizon == nil {
-        print(line: "Sans --horizon : la composition lue (1.3) n'est pas vérifiée (une photo qui a un horizon, comme la dune).")
+        print(line: "Sans --horizon : la composition lue (1.3) n'est pas vérifiée (une copie d'Essais qui a un vrai horizon).")
     }
     let recette = Recette(lightroom: LightroomBridge.fromEnvironment(), images: folder, originaux: originaux) { etape in
         let seconds = String(format: "%.1f", etape.duree).replacingOccurrences(of: ".", with: ",")

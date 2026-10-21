@@ -77,12 +77,22 @@ public enum PreviewImages {
         return jpeg(marquee)
     }
 
+    /// Épaisseur du cadre proposé, en part du grand côté de l'image : gardée après le relevé du
+    /// 21 octobre 2026 (cadre pointillé lisible réduit à 320 px, comme dans l'aperçu de la fenêtre).
+    static let traitCadrePart = 0.004
+    /// Épaisseur des lignes des tiers (le trait clair ; le liseré sombre dessous en fait le double),
+    /// en part du grand côté. Relevé le 21 octobre 2026 : à 0,25 %, réduites à 320 px, les tiers
+    /// étaient pâles sur un fond clair (le sable de la dune d'essai) ; 0,35 %, le liseré sombre (le
+    /// double du trait, qui donne le contraste sur fond clair ; le trait clair, sur fond sombre)
+    /// élargi d'autant, sans autre liseré. À juger encore à l'écran (aperçu de 320 px et Agrandir).
+    static let traitTiersPart = 0.0035
+
     /// L'image entière avec un cadre proposé (preview_settings avec crop, 1.3) : le hors-cadre
     /// assombri, les lignes des tiers dans le cadre, tournées avec lui, et le cadre en pointillés
     /// blancs sur un trait sombre. `coins` : haut gauche, haut droit, bas droit, bas gauche, de 0 à 1
     /// depuis le coin haut gauche (Composition.coins). Épaisseurs proportionnelles au grand côté
-    /// (cadre 0,4 %, tiers 0,25 %), pour rester lisibles réduites à 320 px dans la fenêtre Claude
-    /// (à régler sur la capture).
+    /// (cadre `traitCadrePart`, tiers `traitTiersPart`), pour rester lisibles réduites à 320 px dans
+    /// la fenêtre Claude.
     public static func cadrePropose(_ source: CGImage, coins: [CGPoint]) -> Data? {
         guard coins.count == 4 else { return nil }
         let image = scaled(source, maxSide: maxSide)
@@ -118,7 +128,7 @@ public enum PreviewImages {
             tiers.append((entre(p[0], p[1], t), entre(p[3], p[2], t)))
             tiers.append((entre(p[0], p[3], t), entre(p[1], p[2], t)))
         }
-        let traitTiers = max(1.5, grand * 0.0025)
+        let traitTiers = max(1.5, grand * traitTiersPart)
         context.setLineCap(.butt)
         context.setStrokeColor(CGColor(red: 0, green: 0, blue: 0, alpha: 0.45))
         context.setLineWidth(traitTiers * 2)
@@ -128,7 +138,7 @@ public enum PreviewImages {
         tracer(tiers)
 
         // Le cadre : un trait sombre continu, puis les pointillés blancs (tiret ≈ côté / 40).
-        let traitCadre = max(2, grand * 0.004)
+        let traitCadre = max(2, grand * traitCadrePart)
         let cote = max(hypot(Double(p[1].x - p[0].x), Double(p[1].y - p[0].y)), hypot(Double(p[3].x - p[0].x), Double(p[3].y - p[0].y)))
         let tiret = max(4, cote / 40)
         context.setLineJoin(.miter)

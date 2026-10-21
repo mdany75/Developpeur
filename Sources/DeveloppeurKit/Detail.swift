@@ -47,6 +47,26 @@ public struct DetailMeasurements: Equatable {
     /// débruite, et se note après.
     static let bruitVisible = 0.6, bruitFort = 1.5
 
+    /// Plancher de texture autour du point de mise au point (`Detail.autour`) : en dessous, la zone
+    /// n'a pas assez de détail pour juger la mise au point (sable lisse, ciel uni, mur), et la
+    /// netteté au point n'en dit rien ; la mise au point est « non jugée ». Relevé le 21 octobre 2026
+    /// (mesures de la 1.3, Lightroom Classic 15.6) sur les vues de 1 344 px des huit copies d'Essais,
+    /// mesurées comme ici (les 81 blocs du carré), le carré vert du point AF effacé d'abord
+    /// (interpolé entre ses bords ; vérifié sur une vue de la dune sans carré : 11,6 des deux façons) :
+    /// - le point sur du sable lisse (netteté 12,6, la voiture et la dune nettes) : texture 11,2 à
+    ///   11,6, sous le plancher : la fausse « mise au point manquée » est écartée ;
+    /// - le point sur un nuage (53709534, netteté 6,6, toute la scène nette) : texture 23,6 à 24,1,
+    ///   au-dessus : sa fausse « mise au point manquée » reste. Un plancher plus haut ne l'écarte pas
+    ///   sans écarter aussi un petit visage, net (53709579 : 25,8 à 28,4) ou flouté de 1 à 3 px à
+    ///   1 024 px (21,3 à 27,2 : une vraie mise au point manquée, à garder jugée) ; le bord d'un
+    ///   nuage a autant de texture qu'un petit sujet flou. Limite connue, à reprendre par un autre
+    ///   indice que la texture ;
+    /// - les autres points (visages, sujets) : 28,4 à 64,6 nets, 21,3 au moins floutés.
+    /// (Une première mesure, sur les seuls blocs que le carré ne touchait pas, n'en gardait qu'un :
+    /// 12,9 et 14,4 ; elle ne valait pas.) À relever sur d'autres photos (ciel uni, mur, neige)
+    /// avant de le changer.
+    static let textureMin = 18.0
+
     public var noiseReading: String {
         let level = max(noise, shadowNoise ?? 0)
         switch level {
@@ -84,6 +104,15 @@ public struct DetailMeasurements: Equatable {
     }
 }
 
+/// Netteté et texture autour du point de mise au point, mesurées dans le même carré (`Detail.autour`).
+public struct MesureAutour: Equatable {
+    /// 95e centile du laplacien : la netteté au point.
+    public var nettete: Double
+    /// 75e centile de l'écart entre blocs voisins de 8 × 8 px (moyennes) : le détail à une échelle
+    /// que le flou d'une mise au point manquée efface peu.
+    public var texture: Double
+}
+
 public enum Detail {
     /// Grand côté de la mesure sur un aperçu entier : les seuils de lecture valent à cette taille.
     public static let side = 1024
@@ -104,6 +133,19 @@ public enum Detail {
     /// `side` px de grand côté (mêmes seuils de lecture). Pour juger la mise au point là où
     /// l'appareil l'a faite. Nil si le point sort de l'image.
     public static func nettete(_ image: CGImage, autour point: CGPoint, cote: Double = 0.12) -> Double? {
+        autour(image, point: point, cote: cote)?.nettete
+    }
+
+    /// Côté des blocs de la texture (`autour`), en pixels à `side` px de grand côté.
+    static let blocTexture = 8
+
+    /// Netteté et texture autour d'un point, dans le carré de `nettete` (même lecture de la
+    /// luminance). La texture : 75e centile de l'écart entre blocs voisins de `blocTexture` px
+    /// (|droite − gauche| + |bas − haut| des moyennes des blocs), en niveaux sur 255. Un contour
+    /// isolé (bord d'un nuage) ne la fait pas monter ; un sujet flou garde la sienne
+    /// (`DetailMeasurements.textureMin`). Nil si le point sort de l'image ; texture 0 si le carré
+    /// est trop petit pour deux blocs.
+    public static func autour(_ image: CGImage, point: CGPoint, cote: Double = 0.12) -> MesureAutour? {
         guard (0...1).contains(point.x), (0...1).contains(point.y),
               let (w, h, v) = luminance(PreviewImages.scaled(image, maxSide: side)), w >= 24, h >= 24 else { return nil }
         let demi = max(4, Int(Double(min(w, h)) * cote / 2))
@@ -119,7 +161,30 @@ public enum Detail {
             }
         }
         values.sort()
-        return Double(values[min(values.count - 1, Int(Double(values.count) * 0.95))])
+        let nettete = Double(values[min(values.count - 1, Int(Double(values.count) * 0.95))])
+
+        let b = blocTexture
+        func bloc(_ x: Int, _ y: Int) -> Float {
+            var somme: Float = 0
+            for yy in y..<(y + b) {
+                for xx in x..<(x + b) { somme += v[yy * w + xx] }
+            }
+            return somme / Float(b * b)
+        }
+        var ecarts: [Float] = []
+        var by = y0
+        while by + 2 * b <= y1 + 1 {
+            var bx = x0
+            while bx + 2 * b <= x1 + 1 {
+                let ici = bloc(bx, by)
+                ecarts.append(abs(bloc(bx + b, by) - ici) + abs(bloc(bx, by + b) - ici))
+                bx += b
+            }
+            by += b
+        }
+        ecarts.sort()
+        let texture = ecarts.isEmpty ? 0 : Double(ecarts[min(ecarts.count - 1, Int(Double(ecarts.count) * 0.75))])
+        return MesureAutour(nettete: nettete, texture: texture)
     }
 
     /// Luminance (0 à 255) d'une image.
