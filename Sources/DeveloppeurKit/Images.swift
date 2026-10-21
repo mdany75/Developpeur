@@ -82,8 +82,9 @@ public enum PreviewImages {
     static let traitCadrePart = 0.004
     /// Épaisseur des lignes des tiers (le trait clair ; le liseré sombre dessous en fait le double),
     /// en part du grand côté. Relevé le 21 octobre 2026 : à 0,25 %, réduites à 320 px, les tiers
-    /// étaient pâles sur un fond clair (le sable de la dune d'essai) ; 0,35 %, sans changer le
-    /// liseré sombre (il donne déjà le contraste sur fond clair, le trait clair sur fond sombre).
+    /// étaient pâles sur un fond clair (le sable de la dune d'essai) ; 0,35 %, le liseré sombre (le
+    /// double du trait, qui donne le contraste sur fond clair ; le trait clair, sur fond sombre)
+    /// élargi d'autant, sans autre liseré. À juger encore à l'écran (aperçu de 320 px et Agrandir).
     static let traitTiersPart = 0.0035
 
     /// L'image entière avec un cadre proposé (preview_settings avec crop, 1.3) : le hors-cadre

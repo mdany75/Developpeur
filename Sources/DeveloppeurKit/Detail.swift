@@ -48,15 +48,23 @@ public struct DetailMeasurements: Equatable {
     static let bruitVisible = 0.6, bruitFort = 1.5
 
     /// Plancher de texture autour du point de mise au point (`Detail.autour`) : en dessous, la zone
-    /// n'a pas assez de détail pour juger la mise au point (ciel, nuage, sable lisse, mur), et la
+    /// n'a pas assez de détail pour juger la mise au point (sable lisse, ciel uni, mur), et la
     /// netteté au point n'en dit rien ; la mise au point est « non jugée ». Relevé le 21 octobre 2026
-    /// (mesures de la 1.3, Lightroom Classic 15.6) sur les vues de 1 344 px des huit copies d'Essais :
-    /// deux « mise au point manquée » fausses, le point sur du sable lisse (texture 12,9, netteté
-    /// 12,6, la voiture et la dune nettes) et sur un nuage (texture 14,4, netteté 6,6, toute la scène
-    /// nette) ; les cinq autres points (visages, sujets) de 33,9 à 65,6, et 24,6 au moins quand on
-    /// floute leur zone (gaussien de 1 à 3 px à 1024 px : netteté de 18 à 2,6, une vraie mise au point
-    /// manquée), qui reste jugée. Sur deux cas sans texture seulement : à relever sur d'autres
-    /// photos (ciel uni, mur, neige) avant de le changer.
+    /// (mesures de la 1.3, Lightroom Classic 15.6) sur les vues de 1 344 px des huit copies d'Essais,
+    /// mesurées comme ici (les 81 blocs du carré), le carré vert du point AF effacé d'abord
+    /// (interpolé entre ses bords ; vérifié sur une vue de la dune sans carré : 11,6 des deux façons) :
+    /// - le point sur du sable lisse (netteté 12,6, la voiture et la dune nettes) : texture 11,2 à
+    ///   11,6, sous le plancher : la fausse « mise au point manquée » est écartée ;
+    /// - le point sur un nuage (53709534, netteté 6,6, toute la scène nette) : texture 23,6 à 24,1,
+    ///   au-dessus : sa fausse « mise au point manquée » reste. Un plancher plus haut ne l'écarte pas
+    ///   sans écarter aussi un petit visage, net (53709579 : 25,8 à 28,4) ou flouté de 1 à 3 px à
+    ///   1 024 px (21,3 à 27,2 : une vraie mise au point manquée, à garder jugée) ; le bord d'un
+    ///   nuage a autant de texture qu'un petit sujet flou. Limite connue, à reprendre par un autre
+    ///   indice que la texture ;
+    /// - les autres points (visages, sujets) : 28,4 à 64,6 nets, 21,3 au moins floutés.
+    /// (Une première mesure, sur les seuls blocs que le carré ne touchait pas, n'en gardait qu'un :
+    /// 12,9 et 14,4 ; elle ne valait pas.) À relever sur d'autres photos (ciel uni, mur, neige)
+    /// avant de le changer.
     static let textureMin = 18.0
 
     public var noiseReading: String {

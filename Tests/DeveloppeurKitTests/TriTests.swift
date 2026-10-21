@@ -508,9 +508,10 @@ final class TriTests: XCTestCase {
     // MARK: Mise au point sur une zone sans texture (relevé le 21 octobre 2026)
 
     /// Deux faux « mise au point manquée » relevés le 21 octobre 2026 : le point AF sur du sable
-    /// lisse (netteté 12,6, texture 12,9 ; nette ailleurs 37,4) et sur un nuage (6,6 et 14,4 ; nette
-    /// ailleurs 171,9). Sous le plancher de texture, la mise au point est non jugée et ne plafonne pas
-    /// la note ; au-dessus, une vraie mise au point manquée reste un défaut majeur.
+    /// lisse (netteté 12,6, texture 11,6 ; nette ailleurs 37,4) et sur un nuage (6,6 et 23,6 ; nette
+    /// ailleurs 171,9). Sous le plancher de texture (le sable), la mise au point est non jugée et ne
+    /// plafonne pas la note ; au-dessus, une vraie mise au point manquée reste un défaut majeur. Le
+    /// nuage est au-dessus : limite connue (`DetailMeasurements.textureMin`).
     func testUnPointAFSansTextureNEstPasUneMiseAuPointManquee() throws {
         XCTAssertEqual(DetailMeasurements.textureMin, 18)
         func photo(nettete: Double, auPoint: Double, texture: Double?, avertissement: Bool = false) -> PhotoTriee {
@@ -520,7 +521,7 @@ final class TriTests: XCTestCase {
             p.af = .init(point: CGPoint(x: 0.5, y: 0.395), nettete: auPoint, avertissement: avertissement, texture: texture)
             return p
         }
-        let sable = photo(nettete: 37.4, auPoint: 12.6, texture: 12.9)
+        let sable = photo(nettete: 37.4, auPoint: 12.6, texture: 11.6)
         XCTAssertFalse(try XCTUnwrap(sable.af).jugeable)
         XCTAssertEqual(sable.defautsMesures.count, 0, "\(sable.defauts)")
         XCTAssertEqual(sable.nettete, 37.4, "la netteté qui compte : la zone la plus nette")
@@ -531,9 +532,17 @@ final class TriTests: XCTestCase {
         XCTAssertGreaterThan(plafondSable.note, 0, plafondSable.raison)
         XCTAssertFalse(plafondSable.raison.contains("au point AF"), plafondSable.raison)
 
-        let nuage = photo(nettete: 171.9, auPoint: 6.6, texture: 14.4)
-        XCTAssertEqual(nuage.defautsMesures.count, 0)
-        XCTAssertEqual(try XCTUnwrap(Notation.plafond(nuage, doublon: false)).note, Notation.noteMaximale)
+        // Le nuage (texture 23,6 à 24,1, mesurée sur les 81 blocs) reste jugé : autant de texture qu'un
+        // petit visage flou (21,3 à 27,2), que le plancher doit garder jugé. Sa fausse mise au point
+        // manquée reste (à reprendre par un autre indice) ; la texture d'un nuage sans relief, elle,
+        // l'écarterait.
+        let nuage = photo(nettete: 171.9, auPoint: 6.6, texture: 23.6)
+        XCTAssertEqual(nuage.defautsMesures.map(\.genre), [.miseAuPointManquee], "limite connue (relevé du 21 octobre 2026)")
+        let nuageLisse = photo(nettete: 171.9, auPoint: 6.6, texture: 12)
+        XCTAssertEqual(nuageLisse.defautsMesures.count, 0)
+        XCTAssertEqual(try XCTUnwrap(Notation.plafond(nuageLisse, doublon: false)).note, Notation.noteMaximale)
+        // Le petit visage flouté de 3 px (21,3), une vraie mise au point manquée : jugé.
+        XCTAssertEqual(photo(nettete: 60, auPoint: 1.8, texture: 21.3).defautsMesures.map(\.genre), [.miseAuPointManquee])
 
         // Un vrai sujet flou au point (de la texture) : mise au point manquée, 0 et rejet proposé.
         let manquee = photo(nettete: 60, auPoint: 8, texture: 30)

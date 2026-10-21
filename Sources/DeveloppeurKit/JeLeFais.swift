@@ -11,11 +11,16 @@ import Foundation
 /// fonctions sur des données, testées telles quelles (JeLeFaisTests). Les outils sont dans
 /// Tools+Retouche.swift (monTour) et Tools+Analyse.swift (viewPhoto).
 ///
-/// L'ordre des panneaux n'existe qu'ici (`panneaux`). Provisoires après la mesure 4 de la 1.3
-/// (21 octobre 2026, sans écran) : les noms français des panneaux et de leurs sections restent à
-/// constater dans Lightroom Classic 15.6 (seul l'ordre rendu par my_turn a été lu : Réglages de base ›
-/// Tonalité › Exposition, puis › Présence › Vibrance), et les tolérances de « comme Claude »
-/// (`tolerance`), à juger sur les trois premiers exercices de Dany.
+/// L'ordre des panneaux n'existe qu'ici (`panneaux`). Mesure 4 de la 1.3 (21 octobre 2026) : my_turn
+/// a rendu Réglages de base › Tonalité › Exposition, puis › Présence › Vibrance. Constaté à l'écran
+/// le même jour (panneau de droite du module Développement, Lightroom Classic 15.6 en français) :
+/// Réglages de base, Courbe des tonalités, Mélangeur de couleurs, Color Grading (nom anglais
+/// gardé), Détail, Corrections de l'objectif, Transformation, Flou de l'objectif (après
+/// Transformation), Effets, Etalonnage (sans accent) ; ni Noir et blanc (dans le Mélangeur de
+/// couleurs) ni Recadrage (outil de la bande) ne sont des panneaux. `panneaux` n'en tient pas
+/// encore compte (« Étalonnage des couleurs », « Étalonnage », Flou de l'objectif avant les
+/// Corrections) : à reprendre ; les sections de Réglages de base restent à relever. Les tolérances
+/// de « comme Claude » (`tolerance`) restent à juger sur les trois premiers exercices de Dany.
 enum JeLeFais {
     /// Nom de l'instantané de la version de Claude (« Claude · ma version » dans Lightroom).
     static let instantane = "ma version"

@@ -155,8 +155,8 @@ public enum Carnet {
             let nettete = PhotoTriee.defautsNettete(detail: detail, af: af)
             // La mise au point ne se juge qu'au point lu, et pas sur une photo floue partout : la
             // règle ne peut alors pas la trouver manquée, et la base la compterait réussie. Ni sur une
-            // zone sans texture autour du point (ciel, sable lisse : non jugée, constaté le 21 octobre
-            // 2026), sauf si l'appareil l'a signalée manquée.
+            // zone sans texture autour du point (sable lisse, ciel uni : non jugée, constaté le
+            // 21 octobre 2026 ; DetailMeasurements.textureMin), sauf si l'appareil l'a signalée manquée.
             let signalee = nettete.contains { $0.genre == .miseAuPointSignalee }
             if let af, af.jugeable || signalee, !nettete.contains(where: { $0.genre == .floue }) { cherches.insert("mise_au_point") }
             for defaut in nettete {

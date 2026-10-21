@@ -89,9 +89,10 @@ public struct PhotoTriee {
     /// l'appareil (sans autre défaut de netteté, et pas nette au point). Seuils de `Detail`, relevés
     /// à 1024 px : moins de 15 floue, plus de 35 nette (`DetailMeasurements.seuilFlou` et
     /// `seuilNet`). La mise au point manquée ne se juge que sur une zone qui a de la texture
-    /// (`MiseAuPoint.jugeable`, `DetailMeasurements.textureMin`) : sur un ciel ou du sable lisse,
-    /// elle est « non jugée » et ne plafonne pas la note (deux faux constats relevés le 21 octobre
-    /// 2026). Seule copie de ces règles : le tri (`defautsMesures`) et le carnet de progrès
+    /// (`MiseAuPoint.jugeable`, `DetailMeasurements.textureMin`) : sur du sable lisse ou un ciel uni,
+    /// elle est « non jugée » et ne plafonne pas la note (faux constat du sable relevé le 21 octobre
+    /// 2026 ; celui du nuage, qui a plus de texture, reste : voir `textureMin`). Seule copie de ces
+    /// règles : le tri (`defautsMesures`) et le carnet de progrès
     /// (`Carnet.constatsVue`) les reprennent.
     static func defautsNettete(detail: DetailMeasurements?, af: MiseAuPoint?) -> [(genre: Defaut, texte: String)] {
         var liste: [(genre: Defaut, texte: String)] = []
