@@ -1994,8 +1994,8 @@ local modules = {
             S.datesFichiers[vers], S.datesFichiers[de] = S.datesFichiers[de], nil
             return true
         end,
-        -- Un fichier copié garde sa date. Une destination déjà là n'est pas écrasée (supposé, comme
-        -- NSFileManager : à constater) ; un dossier ne se copie pas ici.
+        -- Un fichier copié garde sa date, et une destination déjà là n'est pas écrasée (supposés,
+        -- comme NSFileManager : à constater) ; un dossier ne se copie pas ici.
         copy = function(de, vers)
             local contenu = S.fichiers[de]
             if contenu == nil or contenu == 'dossier' or S.fichiers[vers] ~= nil then
@@ -2019,10 +2019,13 @@ local modules = {
                 return liste[i]
             end
         end,
+        -- Les fichiers seuls d'un dossier (un niveau), sans ses dossiers, comme dans Lightroom
+        -- (directoryEntries les donne tous) : createAllDirectories crée aussi les dossiers parents.
         files = function(dossier)
             local liste = {}
-            for chemin in pairs(S.fichiers) do
-                if chemin:sub(1, #dossier + 1) == dossier .. '/' and not chemin:sub(#dossier + 2):find('/', 1, true) then
+            for chemin, contenu in pairs(S.fichiers) do
+                if contenu ~= 'dossier' and chemin:sub(1, #dossier + 1) == dossier .. '/'
+                    and not chemin:sub(#dossier + 2):find('/', 1, true) then
                     liste[#liste + 1] = chemin
                 end
             end

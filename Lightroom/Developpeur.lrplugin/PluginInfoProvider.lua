@@ -22,9 +22,11 @@ local Consignes = require 'Consignes'
 local Fichiers = require 'Fichiers'
 local Liaison = require 'Liaison'
 
--- Photos au carnet de progrès du catalogue ouvert, en mots (« ? » s'il ne se lit pas).
+-- Photos au carnet de progrès du catalogue ouvert, en mots (« ? » s'il ne se lit pas). pcall
+-- simple : le diagnostic s'ouvre depuis l'action d'un bouton, peut-être hors d'une tâche (à
+-- constater), et la lecture (carnet.json, chemin du catalogue) n'a pas à attendre ; au pire, « ? ».
 local function photosAuCarnet()
-    local ok, n = LrTasks.pcall(function() return require('Carnet').nombre() end)
+    local ok, n = pcall(function() return require('Carnet').nombre() end)
     if not ok or type(n) ~= 'number' then
         return "?"
     end

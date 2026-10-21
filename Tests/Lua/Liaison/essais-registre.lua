@@ -217,6 +217,30 @@ test("lecon : refus avant toute écriture (trois points, un par axe ; textes ; c
     egal(Carnet.version, version)
 end)
 
+-- La lecture de la photo passe par le catalogue : dans Lightroom, la tâche peut y rendre la main,
+-- et une autre commande passer (ici, carnet retirer, au moment où garder lit le nom du fichier).
+-- garder lit tout avant de toucher au registre : l'autre commande ne voit jamais d'entrée à moitié
+-- faite, et la leçon rangée reste au carnet.
+test("lecon garder : une autre commande pendant la lecture de la photo ne fait pas perdre la leçon", function()
+    local photo = photoRaw()
+    local lire = photo.getFormattedMetadata
+    local pendant
+    photo.getFormattedMetadata = function(self, cle)
+        if cle == 'fileName' and not pendant then
+            pendant = Commandes.executer('carnet', { action = 'retirer', photos = { 1 } })
+        end
+        return lire(self, cle)
+    end
+    local r = garder(1)
+    photo.getFormattedMetadata = lire
+    egal(pendant ~= nil, true, "l'autre commande est passée pendant la lecture")
+    egal(pendant.retirees, 0, "elle n'a vu aucune entrée à moitié faite")
+    egal(r.rangee, true)
+    egal(Carnet.nombre(), 1, "l'entrée de l'original est au carnet")
+    egal(Carnet.lecon(1) ~= nil, true, "la leçon dite rangée l'est")
+    egal(fichierRelu().catalogues[CATALOGUE].photos['1'].lecons['1'].fichier, 'DSC_0412.NEF', "et dans carnet.json")
+end)
+
 test("lecon : par la prise de la liaison, pendant la pause", function()
     photoRaw()
     Liaison.pause = true
@@ -240,7 +264,7 @@ test("carnet lire : tableaux JSON vers le serveur ; copies neuves sans métatabl
     garder(1)
     local ecritures = #S.ecritures
     local lu = Commandes.executer('carnet', { action = 'lire' })
-    egal(lu.catalogue, CATALOGUE)
+    egal(lu.catalogue, 'Catalogue.lrcat', "le nom du catalogue, jamais son chemin")
     egal(lu.nombre, 1)
     egal(getmetatable(lu.photos), getmetatable(Json.tableau()), "photos : un tableau JSON")
     local entree = lu.photos[1]
@@ -383,6 +407,33 @@ test("carnet : un fichier illisible ou d'un autre format est mis de côté avant
     egal(fichierRelu().format, 1)
 end)
 
+test("carnet : fichier non écrit, la leçon reste pour la session avec une remarque ; un illisible qui ne se met pas de côté n'est jamais écrasé", function()
+    photoRaw()
+    local ecrire = Fichiers.ecrire
+    Fichiers.ecrire = function() error("Écriture impossible : disque plein", 0) end
+    local ok, r = pcall(garder, 1)
+    Fichiers.ecrire = ecrire
+    assert(ok, r)
+    egal(r.rangee, true)
+    egal(r.remarque, "Leçon gardée pour cette session, carnet.json non écrit : Écriture impossible : disque plein")
+    egal(Carnet.lecon(1) ~= nil, true, "gardée pour la session")
+    egal(S.fichiers[Carnet.fichier()], nil)
+    egal(contient(Liaison.journal, "Carnet non enregistré : Écriture impossible : disque plein"), true)
+
+    local fichier = Carnet.fichier()
+    S.fichiers[fichier] = '{ pas du JSON'
+    Carnet.oublier()
+    local LrFileUtils = import 'LrFileUtils'
+    local deplacer = LrFileUtils.move
+    LrFileUtils.move = function() return false end
+    ok, r = pcall(garder, 1)
+    LrFileUtils.move = deplacer
+    assert(ok, r)
+    egal(r.remarque, "Leçon gardée pour cette session, carnet.json non écrit : carnet.json illisible, laissé tel quel")
+    egal(S.fichiers[fichier], '{ pas du JSON', "jamais écrasé")
+    egal(contient(Liaison.journal, "Carnet illisible non mis de côté"), true)
+end)
+
 test("carnet : Carnet se charge sans l'interface ni la Bibliothèque (la fenêtre s'en sert)", function()
     local f = assert(io.open(dossierModule .. 'Carnet.lua', 'r'))
     local source = f:read('*a')
@@ -462,6 +513,11 @@ test("aides : un crochet par module à registre, appelé avant chaque test s'il 
     A.remettre()
     egal(Carnet.nombre(), 0)
     egal(next(Carnet.observateurs), nil)
+    -- Le journal de la liaison et les photos de ses lignes repartent ensemble (même rang).
+    Liaison.noter("ligne d'un test précédent", 1)
+    A.remettre()
+    egal(#Liaison.journal, 0)
+    egal(#Liaison.journalPhotos, 0, "photos du journal vidées avec lui")
 end)
 
 -- Simulation : ce qu'elle offre aux lots suivants -----------------------------------------------
@@ -482,6 +538,13 @@ test("simulation : LrFileUtils.copy garde la date, n'écrase pas ; fileModificat
     egal(Fichiers.date(racine .. '/Etapes/u1/c.jpg'), 42, "un essai vieillit un fichier")
     egal(table.concat(Fichiers.entrees(racine .. '/Etapes'), ','), 'u1', "les dossiers d'un dossier")
     egal(table.concat(Fichiers.entrees(racine .. '/Etapes/u1'), ','), 'a-avant.jpg,b-avant.jpg,c.jpg')
+    -- LrFileUtils.files ne donne que les fichiers : pas le dossier u1, créé avec son parent.
+    Fichiers.ecrire(racine .. '/Etapes/vue.jpg', 'JPEG')
+    local fichiers = {}
+    for chemin in import('LrFileUtils').files(racine .. '/Etapes') do
+        fichiers[#fichiers + 1] = chemin:match('[^/]+$')
+    end
+    egal(table.concat(fichiers, ','), 'vue.jpg', "files : les fichiers seuls")
     Fichiers.supprimer(racine .. '/Etapes/u1/c.jpg')
     egal(S.datesFichiers[racine .. '/Etapes/u1/c.jpg'], nil)
 end)

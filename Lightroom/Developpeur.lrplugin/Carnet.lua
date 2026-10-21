@@ -217,17 +217,17 @@ function Carnet.oublier()
     registre = nil
 end
 
--- La table du catalogue ouvert (photos). `creer` : pour y écrire ; un catalogue dont le chemin ne
+-- La table (photos) du catalogue de ce chemin, déjà lu (cheminCatalogue) : rien n'y lit le
+-- catalogue, la tâche ne rend pas la main. `creer` : pour y écrire ; un catalogue dont le chemin ne
 -- se lit pas refuse alors l'écriture (un identifiant ne vaut que dans son catalogue), et se lit
 -- vide.
-local function catalogueOuvert(creer)
+local function tableDu(chemin, creer)
     local r = charger()
-    local chemin = cheminCatalogue()
     if not chemin then
         if creer then
             echouer("Chemin du catalogue ouvert illisible : rien n'est rangé au carnet.")
         end
-        return { photos = {} }, nil
+        return { photos = {} }
     end
     local c = r.catalogues[chemin]
     if not c then
@@ -236,7 +236,13 @@ local function catalogueOuvert(creer)
             r.catalogues[chemin] = c
         end
     end
-    return c, chemin
+    return c
+end
+
+-- La table du catalogue ouvert, et son chemin.
+local function catalogueOuvert(creer)
+    local chemin = cheminCatalogue()
+    return tableDu(chemin, creer), chemin
 end
 
 -- Les entrées les plus anciennes (champ le) d'un catalogue, au-delà de MAX_PHOTOS.
@@ -372,7 +378,8 @@ local function originalDe(photo)
 end
 
 -- Mois et date de la prise de vue, à l'heure locale (timeToUserFormat : timeToW3CDate donne
--- l'UTC, constaté pour le jour de Bibliotheque).
+-- l'UTC, constaté pour le jour de Bibliotheque ; l'heure et la minute de ce format sont à
+-- constater, mesure 3 de la 1.3).
 local function datesPrise(photo)
     local t = tonumber(Photos.brut(photo, 'dateTimeOriginal'))
     if not t then
@@ -386,24 +393,34 @@ local function datesPrise(photo)
     return mois, le
 end
 
--- L'entrée de l'original d'une photo dans le catalogue ouvert, créée au besoin (pour y écrire).
--- Une entrée d'un autre uuid (une autre photo sous ce numéro) est remplacée. L'uuid, le fichier
--- et la date de prise de vue sont relus à chaque fois. Rend l'entrée et l'original.
-local function entreeDe(photo)
-    local c = catalogueOuvert(true)
+-- Ce que le registre garde d'une photo et de son original, lu avant d'y toucher : ces lectures
+-- passent par le catalogue (la tâche peut rendre la main), et une autre commande (retirer, une
+-- lecture qui perd une leçon) ne doit jamais voir une entrée à moitié faite.
+local function lirePhoto(photo)
     local original = originalDe(photo)
-    local uuid = texte(Photos.brut(original, 'uuid'))
-    local cle = cleDe(original.localIdentifier)
+    local prise, priseLe = datesPrise(original)
+    return {
+        id = photo.localIdentifier, uuid = texte(Photos.brut(photo, 'uuid')), fichier = Photos.nomFichier(photo),
+        original = original.localIdentifier, uuidOriginal = texte(Photos.brut(original, 'uuid')),
+        fichierOriginal = Photos.nomFichier(original), prise = prise, prise_le = priseLe,
+    }
+end
+
+-- L'entrée de l'original (lu par lirePhoto) dans la table d'un catalogue, créée au besoin. Une
+-- entrée d'un autre uuid (une autre photo sous ce numéro) est remplacée. L'uuid, le fichier et la
+-- date de prise de vue sont repris à chaque fois. Sans lecture du catalogue.
+local function entreeDe(c, lu)
+    local cle = cleDe(lu.original)
     local e = c.photos[cle]
-    if not e or (e.uuid and uuid and e.uuid ~= uuid) then
-        e = { photo = original.localIdentifier, lecons = {}, le = os.time() }
+    if not e or (e.uuid and lu.uuidOriginal and e.uuid ~= lu.uuidOriginal) then
+        e = { photo = lu.original, lecons = {}, le = os.time() }
         c.photos[cle] = e
     end
-    e.uuid = uuid
-    e.fichier = Photos.nomFichier(original)
-    e.prise, e.prise_le = datesPrise(original)
+    e.uuid = lu.uuidOriginal
+    e.fichier = lu.fichierOriginal
+    e.prise, e.prise_le = lu.prise, lu.prise_le
     e.sans_date = not e.prise or nil
-    return e, original
+    return e
 end
 
 -- Retire l'entrée qui n'a plus rien (ni vue, ni angle, ni leçon).
@@ -553,12 +570,13 @@ local function garder(params)
     end
     local points = pointsValides(lecon.points)
     local indices = indicesValides(lecon.indices)
-    local photo = Photos.photoVisee(params)
-    local uuid = texte(Photos.brut(photo, 'uuid'))
-    local e, original = entreeDe(photo)
-    local cle = cleDe(photo.localIdentifier)
+    local lu = lirePhoto(Photos.photoVisee(params))
+    local chemin = cheminCatalogue()
+    -- Plus aucune lecture du catalogue jusqu'au fichier écrit : le registre change d'un coup.
+    local e = entreeDe(tableDu(chemin, true), lu)
+    local cle = cleDe(lu.id)
     local ancienne = e.lecons[cle]
-    local remplacee = ancienne ~= nil and (ancienne.uuid == nil or uuid == nil or ancienne.uuid == uuid)
+    local remplacee = ancienne ~= nil and (ancienne.uuid == nil or lu.uuid == nil or ancienne.uuid == lu.uuid)
     local codes, vus = {}, {}
     for _, p in ipairs(points) do
         for _, d in ipairs(p.defauts) do
@@ -569,14 +587,13 @@ local function garder(params)
         end
     end
     local maintenant = os.time()
-    local fichier = Photos.nomFichier(photo)
-    e.lecons[cle] = { photo = photo.localIdentifier, uuid = uuid, fichier = fichier, le = maintenant,
+    e.lecons[cle] = { photo = lu.id, uuid = lu.uuid, fichier = lu.fichier, le = maintenant,
         points = points, defauts = codes, indices = indices }
     e.le = maintenant
-    Liaison.noter("Leçon rangée : " .. fichier, photo.localIdentifier)
+    Liaison.noter("Leçon rangée : " .. lu.fichier, lu.id)
     local ok, raison = changer('lecon')
     return {
-        photo = photo.localIdentifier, original = original.localIdentifier, fichier = fichier,
+        photo = lu.id, original = lu.original, fichier = lu.fichier,
         rangee = true, remplacee = remplacee, mois = e.prise, prise_le = e.prise_le, sans_date = e.sans_date,
         remarque = not ok and ("Leçon gardée pour cette session, carnet.json non écrit : " .. tostring(raison)) or nil,
     }
@@ -683,8 +700,8 @@ end
 
 -- Commande carnet -------------------------------------------------------------------------------
 
--- lire {} : les entrées du catalogue ouvert, leçons comprises (en liste), sans vérifier chaque
--- photo.
+-- lire {} : { catalogue (son nom), nombre, photos } : les entrées du catalogue ouvert, leçons
+-- comprises (en liste), sans vérifier chaque photo.
 local function lireCarnet()
     local c, chemin = catalogueOuvert(false)
     local cles = {}
@@ -696,7 +713,8 @@ local function lireCarnet()
     for _, cle in ipairs(cles) do
         photos[#photos + 1] = entreePourServeur(c.photos[cle])
     end
-    return { catalogue = chemin, nombre = #photos, photos = Json.tableau(photos) }
+    -- Le nom du catalogue, comme la commande etat : jamais son chemin (la réponse va à Claude).
+    return { catalogue = chemin and LrPathUtils.leafName(chemin) or nil, nombre = #photos, photos = Json.tableau(photos) }
 end
 
 -- retirer { photos } : les entrées de ces photos (l'identifiant d'un original, ou d'une copie

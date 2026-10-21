@@ -146,6 +146,13 @@ essai('Diagnostic : réglages de la 1.3 au bout de leur ligne, débuts de ligne 
     vrai(ligneDiagnostic('Fenêtre Claude : '):find('avant/après des étapes : false', 1, true), 'case décochée')
     vrai(ligneDiagnostic('Mode : '):find('carnet de progrès : false', 1, true), 'carnet décoché')
     prefs.avantApresEtapes, prefs.carnet = nil, nil
+    -- Un carnet qui ne se lit pas ne fait pas échouer le diagnostic : « ? ».
+    local Carnet = require 'Carnet'
+    local nombre = Carnet.nombre
+    Carnet.nombre = function() error('carnet.json illisible') end
+    local ok, ligne = pcall(ligneDiagnostic, 'Mode : ')
+    Carnet.nombre = nombre
+    vrai(ok and finitPar(ligne, ' ; carnet de progrès : true (?)'), tostring(ligne))
 end)
 
 essai('Carnet : se charge dans la simulation de la fenêtre, se lit vide sans catalogue lisible', function()

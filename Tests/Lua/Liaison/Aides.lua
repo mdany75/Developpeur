@@ -59,7 +59,8 @@ A.remiseAZero('Etapes')
 function A.remettre()
     S.reinitialiser()
     Liaison.pause = false
-    Liaison.journal = {}
+    -- Le journal et les photos de ses lignes (la fenêtre de suivi les lit au même rang) ensemble.
+    Liaison.journal, Liaison.journalPhotos = {}, {}
     Liaison.jeton = A.JETON
     Liaison.derniersRefus = {}
     Liaison.refus = 0
