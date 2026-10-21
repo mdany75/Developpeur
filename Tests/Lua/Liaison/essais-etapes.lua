@@ -755,6 +755,155 @@ essai("Etapes : recadrer sans completer pour la photo écrit une étape nouvelle
     egal(etatDe(photo, id).etat, 'pret')
 end)
 
+-- appliquer avec Upright et un cadre demandé : l'étape attend recadrer pour son après.
+local function appliquerARecadrer(photo, id, mode)
+    envoyer(id, 'appliquer', { reglages = { PerspectiveUpright = mode }, plages = { PerspectiveUpright = { 0, 5 } },
+        recadrage = { ratio = 1, centre_x = 0.6 }, etape = 'géométrie ' .. id, confirme = true })
+    local r = reponse().result.resultats[1]
+    egal(r.a_recadrer, true)
+    egal(type(r.etape_id), 'string')
+    return r
+end
+
+essai("Etapes : recadrer qui n'écrit rien pour la photo (pas de recalage) ou qui échoue finit l'étape d'appliquer : son après se rend", function()
+    local photo = enFenetre(photoFuji())
+    envoyer(1, 'apercu', { taille = 1568, cles = {} })
+    -- Sans grille de recalage (image trop uniforme pour le serveur), recadrer ne place rien.
+    local r = appliquerARecadrer(photo, 2, 2)
+    egal(etatDe(photo, r.etape_id).etat, 'en_cours')
+    envoyer(3, 'recadrer', { photos = { 4 }, recadrage = { ratio = 1, centre_x = 0.6 }, completer = { 4 }, etape = r.etape, confirme = true })
+    egal(S.envois[#S.envois]:find('"etape_id":null', 1, true) ~= nil, true, "recadrer n'a rien écrit")
+    local etat = etatDe(photo, r.etape_id)
+    egal(etat.etat, 'pret', "l'étape d'appliquer a son après, tel quel")
+    egal(etat.etape, r.etape)
+    egal(fichier(photo, r.etape_id .. '-avant.jpg'), 'JPEG n°1 (Exposure2012 0)')
+    egal(fichier(photo, r.etape_id .. '-apres.jpg') ~= nil, true)
+    egal(Etapes.images(4, r.etape_id).etat, 'pret')
+
+    -- recadrer en erreur : l'après se rend une fois l'erreur répondue.
+    local r2 = appliquerARecadrer(photo, 4, 3)
+    local executer = Commandes.executer
+    Commandes.executer = function(nom, params)
+        if nom == 'recadrer' then
+            error("Lightroom est occupé.", 0)
+        end
+        return executer(nom, params)
+    end
+    local envoisAuRendu
+    pendantRendu = function() envoisAuRendu = #S.envois end
+    local ok, erreur = pcall(envoyer, 5, 'recadrer', { photos = { 4 }, recadrage = { ratio = 1, centre_x = 0.6 }, completer = { 4 },
+        etape = r2.etape, confirme = true })
+    Commandes.executer = executer
+    pendantRendu = nil
+    egal(ok, true, tostring(erreur))
+    egal(reponse().error, "Lightroom est occupé.")
+    egal(envoisAuRendu, #S.envois, "l'après est rendu une fois l'erreur répondue")
+    egal(etatDe(photo, r2.etape_id).etat, 'pret')
+    egal(next(Etapes.prepares), nil)
+end)
+
+essai("Etapes : recadrer qui complète une étape faite fenêtre fermée ne prend pas la vue d'entre les deux pour avant ; une étape à part, si", function()
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    priseDesReponses()
+    local r = appliquerARecadrer(photo, 1, 2)
+    egal(#S.rendus, 0, "fenêtre fermée : rien")
+    -- La fenêtre s'ouvre ; view_photo montre l'état d'entre appliquer et recadrer.
+    Etapes.actifPour = function() return true end
+    local rendu = Commandes.executer('geometrie', { photos = { 4 }, rendre = true }).photos[1]
+    envoyer(2, 'apercu', { taille = 1568, cles = {} })
+    egal(fichier(photo, 'vue.jpg') ~= nil, true)
+    envoyer(3, 'recadrer', { photos = { 4 }, recadrage = { ratio = 1, centre_x = 0.6 }, completer = { 4 }, etape = r.etape, confirme = true,
+        recalages = { ['4'] = grilleDe(S.deformation(photo), rendu.empreinte) } })
+    egal(reponse().result.resultats[1].etape_id, r.etape_id, "l'étape d'appliquer, complétée")
+    egal(fichier(photo, r.etape_id .. '-avant.jpg'), nil, "pas d'avant : la vue montre l'état d'après appliquer")
+    local etat = etatDe(photo, r.etape_id)
+    egal(etat.etat, 'manque')
+    egal(etat.raison, 'sans_avant')
+
+    -- La dernière étape n'a pas ce nom : recadrer écrit une étape à part, dont l'avant est la vue.
+    envoyer(4, 'apercu', { taille = 1568, cles = {} })
+    local vue = fichier(photo, 'vue.jpg')
+    rendu = Commandes.executer('geometrie', { photos = { 4 }, rendre = true }).photos[1]
+    envoyer(5, 'recadrer', { photos = { 4 }, recadrage = { ratio = 1, centre_x = 0.4 }, completer = { 4 }, etape = 'autre cadre', confirme = true,
+        recalages = { ['4'] = grilleDe(S.deformation(photo), rendu.empreinte) } })
+    local id = reponse().result.resultats[1].etape_id
+    egal(type(id), 'string')
+    egal(id ~= r.etape_id, true, "une étape à part")
+    egal(fichier(photo, id .. '-avant.jpg'), vue, "son avant : la vue, l'état d'avant recadrer")
+    egal(etatDe(photo, id).etat, 'pret')
+end)
+
+essai("Etapes : rien de rendu pour une commande qu'une photo protégée ou un accord trop vieux feront refuser", function()
+    local photo = enFenetre(photoRaw())
+    local function refusee(quoi, id, params)
+        local rendus, fichiers = #S.rendus, fichiersEtapes()
+        envoyer(id, 'appliquer', params)
+        egal(reponse().error ~= nil, true, quoi .. " : refusée")
+        egal(#S.rendus, rendus, quoi .. " : pas d'avant rendu en vain")
+        egal(fichiersEtapes(), fichiers, quoi .. " : aucun fichier sous Etapes/")
+    end
+    -- Aucune vue : sans ces refus prévus, l'avant se rendrait avant l'écriture.
+    S.prefs.copiesSeulement = true
+    refusee("pas une copie virtuelle (copies virtuelles seulement)", 1, exposer(0.3))
+    S.prefs.copiesSeulement = false
+    S.prefs.rejeteesProtegees, photo.brut.pickStatus = true, -1
+    refusee("photo rejetée, protégée", 2, exposer(0.3))
+    S.prefs.rejeteesProtegees, photo.brut.pickStatus = false, 0
+    S.prefs.mode, S.prefs.accordDansLightroom = 'proposer', true
+    Liaison.accord = { accepte = true, le = S.horloge - Ecriture.DUREE_ACCORD - 1 }
+    refusee("accord donné dans Lightroom il y a plus de 10 minutes", 3, exposer(0.4))
+    -- Un accord récent : l'avant se rend, l'écriture se fait, puis l'après.
+    Liaison.accord = { accepte = true, le = S.horloge }
+    envoyer(4, 'appliquer', exposer(0.5))
+    local id = reponse().result.resultats[1].etape_id
+    egal(type(id), 'string', "accord récent : écrite")
+    egal(etatDe(photo, id).etat, 'pret', "et son avant/après gardé")
+    egal(photo.reglages.Exposure2012, 0.5)
+end)
+
+essai("Etapes : ce que Lightroom calcule au rendu ne fait pas jeter l'image (calculs IA avant la vue, matrices d'Upright de l'après)", function()
+    local photo = enFenetre(photoFuji())
+    -- Un profil adaptatif à calculer : Lightroom le calcule juste avant le rendu de view_photo.
+    photo.reglages.AILook = { Active = true }
+    photo.lookAMettreAJour = true
+    envoyer(1, 'apercu', { taille = 1568, cles = {} })
+    egal(photo.reglages.AILook.AILookData ~= nil, true, "calculé avant le rendu")
+    egal(fichier(photo, 'vue.jpg') ~= nil, true, "la vue est gardée : son empreinte se lit après les calculs")
+    -- Upright sans cadre demandé : Lightroom calcule ses matrices au rendu de l'après.
+    envoyer(2, 'appliquer', { reglages = { PerspectiveUpright = 2 }, plages = { PerspectiveUpright = { 0, 5 } }, etape = 'upright', confirme = true })
+    local r = reponse().result.resultats[1]
+    egal(r.a_recadrer, nil, "pas de cadre à placer")
+    egal(photo.reglages.UprightTransform_0 ~= nil, true, "matrices calculées au rendu de l'après")
+    local etat = etatDe(photo, r.etape_id)
+    egal(etat.etat, 'pret', "l'après n'est pas jeté (" .. tostring(etat.raison) .. ")")
+    egal(#S.rendus, 2, "la vue, puis l'après")
+    -- L'après devient la vue : l'avant de l'étape suivante, sans autre rendu.
+    envoyer(3, 'appliquer', exposer(0.3, { etape = 'passe 2' }))
+    local id = reponse().result.resultats[1].etape_id
+    egal(fichier(photo, id .. '-avant.jpg'), fichier(photo, r.etape_id .. '-apres.jpg'))
+    egal(#S.rendus, 3)
+end)
+
+essai("Rendu.apercu : une vue rendue avant la fin des calculs IA (aperçu incomplet, a_savoir) n'est pas gardée", function()
+    local photo = photoFuji()
+    S.active, S.selection = photo, { photo }
+    S.modelesIAAbsents, S.calculDiffere, S.jamaisCalcule = true, true, true
+    Commandes.executer('masquer', { masques = Json.tableau({ { type = 'ia', soustype = 2, nom = 'Claude · Ciel', locaux = { LocalExposure2012 = -0.1 } } }),
+        etape = 'ciel', confirme = true })
+    -- Une autre photo active : son rendu n'ouvre pas la fenêtre, et le calcul reste à faire.
+    S.active = A.photoJpeg()
+    local r = Commandes.executer('apercu', { photo = 4, taille = 1568, cles = {}, avant_apres = true })
+    egal(r.a_savoir ~= nil, true, "l'aperçu se dit incomplet")
+    egal(fichier(photo, 'vue.jpg'), nil, "il n'est pas gardé comme vue")
+    egal(Etapes.vues[photo.brut.uuid], nil)
+    -- Les calculs faits, la vue se garde.
+    photo:calculerMasquesIA()
+    r = Commandes.executer('apercu', { photo = 4, taille = 1568, cles = {}, avant_apres = true })
+    egal(r.a_savoir, nil)
+    egal(fichier(photo, 'vue.jpg') ~= nil, true)
+end)
+
 essai("Liaison : une commande en erreur efface son avant préparé ; une erreur des crochets n'atteint pas la commande", function()
     local photo = enFenetre(photoRaw())
     envoyer(1, 'apercu', { taille = 1568, cles = {} })

@@ -14,11 +14,14 @@
 -- ouverte ou son Claude au travail (Etapes.actifPour, posé par la fenêtre), ou avant_apres = true
 -- (la recette seulement, jamais un outil : elle lève aussi la condition de la photo active) ; une
 -- commande qui écrit une étape sur une seule photo, la photo active ; jamais sans_avant_apres
--- (match_series), en pause, ni pour une commande que le mode « Proposer d'abord » va refuser.
+-- (match_series), en pause, ni pour une commande que le mode « Proposer d'abord » ou une photo
+-- protégée vont faire refuser.
 -- Jamais un rendu quand Lightroom a encore des calculs IA à faire : un rendu que Claude n'a pas
 -- demandé ne doit pas ouvrir la fenêtre « Mises à jour IA recommandées », qui attend l'utilisateur.
 -- Une capture à la fois : toute autre commande (sauf SANS_ATTENTE) attend sa fin, ATTENTE secondes
 -- au plus. Une photo changée pendant le rendu (empreintes E1 et E2 différentes) perd son après.
+-- Une étape d'appliquer à recadrer (a_recadrer) attend recadrer pour son après ; si recadrer
+-- n'écrit rien pour la photo ou échoue, l'après se rend tel quel.
 --
 -- Fichiers, dans Chemins.etapes()/<uuid de la photo>/ (une copie virtuelle a le sien) :
 --   <id>-avant.jpg, <id>-apres.jpg   les images de l'étape (id : Ecriture.idEtape)
@@ -30,8 +33,8 @@
 -- anciens au-delà de MAX_OCTETS. Ces images restent sur ce Mac : elles ne partent jamais vers
 -- Claude ni vers le connecteur, sauf les chemins que donne la commande etapes (recette).
 --
--- Sans LrView ni couleur : chargé par la liaison et par la fenêtre. Rendu, Ecriture et Commandes
--- sont requis à l'appel (Rendu et Liaison requièrent Etapes).
+-- Sans LrView ni couleur : chargé par la liaison et par la fenêtre. Rendu et Ecriture sont requis
+-- à l'appel (Rendu requiert Etapes ; Liaison et Commandes aussi).
 
 local LrDate = import 'LrDate'
 local LrFileUtils = import 'LrFileUtils'
@@ -67,7 +70,7 @@ local Etapes = {
     -- Dernier rendu connu de chaque photo : vues[uuid] = { chemin, empreinte }.
     vues = {},
     -- Commandes préparées par avantCommande : prepares[cle] = { photo, photoId, uuid, dossier,
-    -- empreinte, avant?, raison? }.
+    -- avant?, raison?, detail? ; pour recadrer qui complète : derniere, enAttente?, nomEnAttente? }.
     prepares = {},
 }
 
@@ -171,10 +174,16 @@ function Etapes.cible(params)
     return nil
 end
 
--- Vrai si la commande sera refusée sans rien écrire (mode « Proposer d'abord » sans accord) : pas
--- de rendu en vain.
-local function seraRefusee(params)
+-- Vrai si la commande sera refusée sans rien écrire : mode « Proposer d'abord » sans accord (accord
+-- dans Lightroom absent, refusé ou trop vieux, comme Ecriture.accordDansLightroom), ou photo
+-- protégée (Ecriture.verifierProtection : copies virtuelles seulement, libellé, rejet). Pas de
+-- rendu en vain.
+local function seraRefusee(params, photo)
     local prefs = Preferences.lire()
+    local Ecriture = require 'Ecriture'
+    if not LrTasks.pcall(Ecriture.verifierProtection, { photo }, prefs, params, 'avant/après') then
+        return true
+    end
     if prefs.mode ~= 'proposer' then
         return false
     end
@@ -183,7 +192,7 @@ local function seraRefusee(params)
     end
     if prefs.accordDansLightroom then
         local accord = Liaison.accord
-        return not (accord and accord.accepte)
+        return not (accord and accord.accepte and maintenant() - (tonumber(accord.le) or 0) < Ecriture.DUREE_ACCORD)
     end
     return false
 end
@@ -191,12 +200,16 @@ end
 -- Empreinte de l'état ---------------------------------------------------------------------------
 
 -- Clés que Lightroom calcule ou résout lui-même, sans effet visible à elles seules : retirées de
--- l'empreinte, à toute profondeur. Provisoire : à compléter d'après les relevés (mesure 1 de la
--- 1.3, --dump avant et après une écriture).
+-- l'empreinte, à toute profondeur. Les matrices UprightTransform_* (et UprightTransformCount),
+-- Lightroom les calcule au rendu d'après les autres réglages (constaté ; comme pour
+-- Recalage.empreinteGeometrie) : comptées, elles changeraient l'empreinte pendant le rendu de
+-- l'après de toute étape qui pose Upright. Provisoire : à compléter d'après les relevés (mesure 1
+-- de la 1.3, --dump avant et après une écriture).
 local VOLATILES = { LensProfileName = true, LensProfileFilename = true, LensProfileIsEmbedded = true }
 
 local function volatile(cle)
-    return type(cle) == 'string' and (VOLATILES[cle] or cle:match('Digest$') ~= nil or cle:match('DigestVersion$') ~= nil)
+    return type(cle) == 'string' and (VOLATILES[cle] or cle:match('Digest$') ~= nil or cle:match('DigestVersion$') ~= nil
+        or cle:match('^UprightTransform') ~= nil)
 end
 
 local function sansVolatils(valeur)
@@ -328,7 +341,9 @@ end
 
 -- Avant le rendu de view_photo : l'empreinte de l'état si sa vue est à garder (avant/après actif,
 -- photo active ou avant_apres), sinon nil. Rendu.apercu ne l'appelle que pour l'image entière de
--- l'état actuel (ni zoom, ni image d'avant d'une comparaison, ni image entière sans cadre).
+-- l'état actuel (ni zoom, ni image d'avant d'une comparaison, ni image entière sans cadre). Les
+-- calculs IA se font d'abord (rendre les ferait de toute façon) : l'empreinte est celle de l'état
+-- que le rendu montre, et ne change pas pendant le rendu à cause d'eux.
 function Etapes.avantVue(photo, params)
     params = params or {}
     if not Etapes.actif(params) then
@@ -337,6 +352,7 @@ function Etapes.avantVue(photo, params)
     if params.avant_apres ~= true and not estActive(photo) then
         return nil
     end
+    require('Ecriture').calculerAvantRendu(photo)
     return Etapes.empreinte(photo)
 end
 
@@ -381,6 +397,14 @@ end
 
 Etapes.attendreCapture = attendreCapture
 
+-- Id de la dernière étape de Claude dans la mémoire de la photo (nil sans étape ou sans id).
+local function derniereEtape(photo)
+    local etapes = Photos.lireJson(photo, 'etapesClaude', {})
+    local derniere = type(etapes) == 'table' and etapes[#etapes]
+    local id = type(derniere) == 'table' and derniere.id
+    return type(id) == 'string' and id ~= '' and id or nil
+end
+
 local compteurPrepares = 0
 
 -- Avant une commande : attend une capture en cours (sauf SANS_ATTENTE), puis, pour une commande
@@ -393,12 +417,12 @@ function Etapes.avantCommande(nom, params)
         attendreCapture()
     end
     local genre = genreDe(nom, params)
-    if not genre or not Etapes.actif(params) or Liaison.pause or seraRefusee(params) then
+    if not genre or not Etapes.actif(params) or Liaison.pause then
         return nil
     end
     local photo = Etapes.cible(params)
     local dossier = photo and Etapes.dossier(photo)
-    if not dossier then
+    if not dossier or seraRefusee(params, photo) then
         return nil
     end
     if genre == 'completer' then
@@ -412,6 +436,17 @@ function Etapes.avantCommande(nom, params)
     local cle = compteurPrepares
     local uuid = Photos.brut(photo, 'uuid')
     local prepare = { photo = photo, photoId = photo.localIdentifier, uuid = uuid, dossier = dossier }
+    if genre == 'completer' then
+        -- L'étape que recadrer complète : la dernière de la mémoire. Son avant est celui d'avant
+        -- appliquer, jamais une vue d'entre les deux (capturer). Laissée « en cours » par appliquer
+        -- (a_recadrer), son après se rend même si recadrer n'écrit rien pour la photo (cadre déjà
+        -- juste, pas de recalage) ou échoue (apresCommande, abandonner).
+        prepare.derniere = derniereEtape(photo)
+        local lu = prepare.derniere and lireEtat(dossier, prepare.derniere)
+        if lu and lu.etat == 'en_cours' then
+            prepare.enAttente, prepare.nomEnAttente = prepare.derniere, lu.etape
+        end
+    end
     local preparee = chemin(dossier, 'prepare-' .. cle .. '.jpg')
     local empreinte = Etapes.empreinte(photo)
     local vue = Etapes.vues[uuid]
@@ -439,9 +474,14 @@ function Etapes.avantCommande(nom, params)
     return cle
 end
 
--- Une commande en erreur : sa préparation est effacée.
+-- Une commande en erreur (appelé une fois sa réponse partie) : sa préparation est effacée ; une
+-- étape laissée en cours par appliquer (a_recadrer) que ce recadrer devait compléter reste telle
+-- quelle, et son après se rend maintenant.
 function Etapes.abandonner(cle)
     local prepare = cle and Etapes.prepares[cle]
+    if prepare and prepare.enAttente then
+        return Etapes.apresCommande(nil, nil, nil, cle)
+    end
     Etapes.prepares[cle or 0] = nil
     if prepare then
         effacer(prepare.avant)
@@ -465,8 +505,11 @@ end
 local function capturer(prepare, id, aRecadrer, nomEtape)
     local dossier = prepare.dossier
     local avant = chemin(dossier, id .. '-avant.jpg')
-    -- Une étape complétée (recadrer) garde l'avant de l'étape qu'elle complète.
-    if prepare.avant and not Fichiers.existe(avant) then
+    -- Une étape complétée (recadrer : son id existait avant la commande) garde l'avant de l'étape
+    -- qu'elle complète, ou reste sans avant : jamais l'avant préparé, qui montre l'état d'entre
+    -- appliquer et recadrer. Il ne sert qu'à une étape nouvelle.
+    local completee = prepare.derniere ~= nil and id == prepare.derniere
+    if prepare.avant and not completee and not Fichiers.existe(avant) then
         ranger(prepare.avant, avant)
     else
         effacer(prepare.avant)
@@ -516,6 +559,11 @@ function Etapes.apresCommande(nom, params, resultat, cle)
     end
     Etapes.prepares[cle] = nil
     local id, aRecadrer, nomEtape = etapeDe(resultat, prepare.photoId)
+    if not id and prepare.enAttente then
+        -- recadrer n'a rien écrit pour la photo, ou a échoué (abandonner) : l'étape laissée en
+        -- cours par appliquer est finie telle quelle ; son après se rend maintenant.
+        id, aRecadrer, nomEtape = prepare.enAttente, false, prepare.nomEnAttente
+    end
     if not id then
         -- Rien d'écrit pour cette photo : pas d'étape, pas d'avant/après.
         effacer(prepare.avant)
@@ -599,7 +647,8 @@ function Etapes.commande(params)
             ajouter(etape.id, etape.nom, true)
         end
     end
-    -- Les étapes défaites (undo_last, revert_to_original) gardent leurs images jusqu'au ménage.
+    -- Les étapes défaites (undo_last, revert_to_original) ou sorties des MAX_ETAPES dernières de la
+    -- mémoire gardent leurs images jusqu'au ménage.
     local defaites = {}
     for _, nom in ipairs(dossier and Fichiers.entrees(dossier) or {}) do
         local id = nom:match('^(.+)%.json$')

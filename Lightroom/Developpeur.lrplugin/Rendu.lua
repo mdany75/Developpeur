@@ -318,14 +318,15 @@ function Rendu.apercu(params)
     -- La vue de l'avant/après des étapes (1.3) : l'image entière de l'état actuel, rendue après le
     -- retour d'une comparaison ; ni un zoom (taille 0, pleine résolution), ni l'image entière sans
     -- cadre (entier), ni l'image d'avant (chemin_avant). Empreinte relue après le rendu : un état
-    -- changé pendant le rendu n'est pas gardé.
+    -- changé pendant le rendu n'est pas gardé ; une image à qui manquent des calculs IA (a_savoir)
+    -- non plus : elle ne montre pas l'état.
     local empreinteVue
     if taille > 0 and not params.entier then
         local lu, empreinte = LrTasks.pcall(Etapes.avantVue, photo, params)
         empreinteVue = lu and empreinte or nil
     end
     local chemin, calcules = rendre(photo, taille)
-    if empreinteVue then
+    if empreinteVue and calcules ~= false then
         LrTasks.pcall(Etapes.garderVue, photo, chemin, empreinteVue)
     end
     local valeurs, infos = lireReglages(photo, params.cles, false)

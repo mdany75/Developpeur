@@ -826,6 +826,7 @@ Ecriture.signalerARecadrer = signalerARecadrer
 Ecriture.sansRetouche = sansRetouche
 Ecriture.verifierAccord = verifierAccord
 Ecriture.accordDansLightroom = accordDansLightroom
+Ecriture.DUREE_ACCORD = DUREE_ACCORD
 Ecriture.verifierProtection = verifierProtection
 Ecriture.verifierPause = verifierPause
 

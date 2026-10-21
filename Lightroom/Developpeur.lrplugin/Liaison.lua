@@ -424,7 +424,7 @@ end
 -- n'atteint pas Commandes.executer (ni la pause, ni « Proposer d'abord ») et n'emporte pas
 -- l'événement de la photo active. Autour de la commande, l'avant/après des étapes (Etapes.lua,
 -- 1.3) : avantCommande après le jeton, apresCommande une fois la réponse partie (Claude a déjà sa
--- réponse pendant le rendu de l'après), abandonner sur une erreur.
+-- réponse pendant le rendu de l'après), abandonner une fois l'erreur répondue.
 function Liaison.recevoir(message)
     LrTasks.startAsyncTask(function()
         local lu, requete = pcall(Json.decode, message)
@@ -455,12 +455,13 @@ function Liaison.recevoir(message)
             Liaison.repondre({ id = requete.id, result = resultat })
             LrTasks.pcall(Etapes.apresCommande, requete.command, params, resultat, cle)
         else
-            LrTasks.pcall(Etapes.abandonner, cle)
             local texte = Liaison.messageErreur(resultat)
             if requete.command ~= 'ping' and texte:sub(1, #Liaison.EN_ATTENTE) ~= Liaison.EN_ATTENTE then
                 Liaison.noter("Refusé : " .. texte)
             end
             Liaison.repondre({ id = requete.id, error = texte })
+            -- Après la réponse : abandonner peut rendre l'après d'une étape laissée en cours.
+            LrTasks.pcall(Etapes.abandonner, cle)
         end
         Liaison.signaler()
     end)
