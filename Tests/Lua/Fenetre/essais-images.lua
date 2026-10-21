@@ -1,11 +1,15 @@
 -- essais-images.lua : les images de la fenêtre B, hors de Lightroom (LuaJIT) : Dispositions.IMAGES,
 -- seule source de leurs tailles en points, aux tailles de la maquette « B · Conversation claire » ;
--- chaque image dans images/, un seul PNG en 2x (2 × la taille en points, en-tête IHDR lu en Lua pur)
--- à 144 ppp (bloc pHYs : 5 669 pixels par mètre), sans image de trop ni paire @2x, et ce contrôle
--- lui-même, sur des PNG fabriqués ; l'image « aucun aperçu » du cadre 3:2 (vide-330x220.png,
--- 660 × 440) ; scripts/gabarits.lua, qui écrit Dispositions.IMAGES en JSON pour
--- scripts/images-fenetre.swift ; et ce script lui-même, lancé sur un module d'essai d'un dossier
--- temporaire (jamais sur celui du dépôt) : ce qu'il produit, et ses refus. Ni Lightroom, ni Claude.
+-- ses deux apparences, claire et sombre (Dispositions.APPARENCES, Dispositions.PALETTES : mêmes
+-- clés, la claire de la maquette, la sombre au moins aussi lisible), Dispositions.apparence (une
+-- valeur inconnue retombe sur la claire), Dispositions.image et Dispositions.couleurs ; chaque
+-- image dans les deux jeux (images/ et images/sombre/), un seul PNG en 2x (2 × la taille en points,
+-- en-tête IHDR lu en Lua pur) à 144 ppp (bloc pHYs : 5 669 pixels par mètre), aux mêmes tailles,
+-- la sombre autre que la claire, sans image de trop ni paire @2x, et ce contrôle lui-même, sur des
+-- PNG fabriqués ; l'image « aucun aperçu » du cadre 3:2 (vide-330x220.png, 660 × 440) ;
+-- scripts/gabarits.lua, qui écrit Dispositions.gabarits en JSON pour scripts/images-fenetre.swift ;
+-- et ce script lui-même, lancé sur un module d'essai d'un dossier temporaire (jamais sur celui du
+-- dépôt) : ce qu'il produit, et ses refus. Ni Lightroom, ni Claude.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
 local S = require 'Simulation'
@@ -40,6 +44,10 @@ local Json = require 'Json'
 local IMAGES = Dispositions.IMAGES
 local DOSSIER = S.plugin .. '/images'
 local RACINE = S.plugin:match('^(.*)/Lightroom/Developpeur%.lrplugin/?$')
+
+-- Les dossiers des deux jeux, depuis le dossier du module : la claire là où étaient les images de
+-- la 1.3 avant les apparences, la sombre à côté.
+local JEUX = { claire = 'images', sombre = 'images/sombre' }
 
 -- 144 ppp en pixels par mètre (144 / 0,0254, arrondi comme l'écrit ImageIO).
 local PPM_144 = 5669
@@ -195,11 +203,202 @@ essai('Dispositions.IMAGES : les images de la fenêtre B, aux tailles de la maqu
     end
 end)
 
-essai('images/ : chaque image de Dispositions.IMAGES, un PNG en 2x à 144 ppp', function()
+-- Apparences ------------------------------------------------------------------------------------
+
+-- La palette claire est celle de la maquette (et, pour l'orange, le rouge et Menlo, celle de la
+-- fenêtre de la 1.2) : les images claires n'ont pas changé en recevant une palette.
+local MAQUETTE = {
+    texte = '1D1D1F', gris = '6B6B6B', grisEntete = '5F5F5F', sousTitreChoisi = '505050', bleu = '0A64D8',
+    mono = '3D3D45', coche = '1F7A35', orange = 'E0800D', rouge = 'D12E2E', ambre = 'A86200', blanc = 'FFFFFF',
+    fondContenu = 'FFFFFF', fondVolet = 'F2F2F2', fondDroite = 'ECECEC',
+    filetVolet = 'D2D2D2', filetDroite = 'C9C9C9', filetEntete = 'E2E2E2', filetBarre = 'EBEBEB', filetPlafond = 'E3E3E3',
+    fondPanneau = 'FFFFFF', bordPanneau = 'C9C9C9', fondCarte = 'FAFAFA', bordCarte = 'D9D9D9',
+    fondSegment = 'FFFFFF', bordSegment = 'B5B5B5', filetSegment = 'D0D0D0', selection = 'DADADA',
+    pastille = '2DA44E', contour = '8A8A8A', bleuBouton = '0A64D8', bordBleu = '0A5BC4', bleuPresse = '084A9E',
+    bleuInactif = '9DBDEB', bordBleuInactif = '88AEE2',
+}
+
+local function cles(t)
+    local r = {}
+    for k in pairs(t) do
+        r[#r + 1] = k
+    end
+    table.sort(r)
+    return table.concat(r, ' ')
+end
+
+essai('Apparences : claire puis sombre, une palette chacune, aux mêmes clés, en RRGGBB', function()
+    local A = Dispositions.APPARENCES
+    egal(2, #A, 'deux apparences')
+    egal('claire', A[1].value, 'la claire en premier : celle par défaut')
+    egal('sombre', A[2].value)
+    for _, a in ipairs(A) do
+        egal(JEUX[a.value], a.dossier, a.value .. ' : dossier de ses images')
+        vrai(type(a.title) == 'string' and a.title ~= '', a.value .. ' : titre du menu')
+        vrai(type(Dispositions.PALETTES[a.value]) == 'table', a.value .. ' : sa palette')
+    end
+    egal(cles(MAQUETTE), cles(Dispositions.PALETTES.claire), 'clés de la palette claire')
+    egal(cles(MAQUETTE), cles(Dispositions.PALETTES.sombre), 'clés de la palette sombre')
+    for nom, palette in pairs(Dispositions.PALETTES) do
+        vrai(JEUX[nom], 'palette sans apparence : ' .. tostring(nom))
+        for cle, hex in pairs(palette) do
+            vrai(type(hex) == 'string' and hex:match('^%x%x%x%x%x%x$'), nom .. '.' .. cle .. ' : RRGGBB, obtenu ' .. tostring(hex))
+        end
+    end
+    for cle, hex in pairs(MAQUETTE) do
+        egal(hex, Dispositions.PALETTES.claire[cle], 'claire.' .. cle .. ' (maquette)')
+    end
+end)
+
+essai('Dispositions.apparence : la valeur connue, sinon la claire ; le menu Apparence en tables neuves', function()
+    egal('claire', Dispositions.apparence('claire'))
+    egal('sombre', Dispositions.apparence('sombre'))
+    -- Une préférence absente, d'une autre version ou abîmée retombe sur la claire.
+    for _, inconnue in ipairs({ 'bleue', 'Sombre', 'auto', '', 0, true }) do
+        egal('claire', Dispositions.apparence(inconnue), 'valeur inconnue : ' .. tostring(inconnue))
+    end
+    egal('claire', Dispositions.apparence(nil), 'sans préférence')
+    local items = Dispositions.itemsApparences()
+    egal(2, #items)
+    egal('Claire', items[1].title)
+    egal('claire', items[1].value)
+    egal('Sombre', items[2].title)
+    egal('sombre', items[2].value)
+    egal(nil, items[1].dossier, 'le menu ne porte que titre et valeur')
+    vrai(items ~= Dispositions.itemsApparences() and items[1] ~= Dispositions.itemsApparences()[1], 'tables neuves')
+    vrai(getmetatable(items) == nil and items[1] ~= Dispositions.APPARENCES[1], 'pas les tables de Dispositions')
+end)
+
+essai('Dispositions.image : le chemin du jeu de l\'apparence, la claire pour une valeur inconnue', function()
+    egal('images/loupe.png', Dispositions.image('loupe', 'claire'))
+    egal('images/sombre/loupe.png', Dispositions.image('loupe', 'sombre'))
+    egal('images/seg-note-actif.png', Dispositions.image('seg-note-actif', 'bleue'), 'valeur inconnue')
+    egal('images/panneau.png', Dispositions.image('panneau'), 'sans apparence')
+    -- Chaque chemin rendu existe dans le module, pour chaque image et chaque apparence.
+    for nom in pairs(IMAGES) do
+        for apparence in pairs(JEUX) do
+            local chemin = Dispositions.image(nom, apparence)
+            egal(JEUX[apparence] .. '/' .. nom .. '.png', chemin)
+            vrai(S.executer('test -f ' .. S.q(S.plugin .. '/' .. chemin)), 'introuvable dans le module : ' .. chemin)
+        end
+    end
+    -- Une image inconnue est une erreur, qui nomme l'image.
+    local ok, erreur = pcall(Dispositions.image, 'pastille-bleu', 'sombre')
+    vrai(not ok and tostring(erreur):find('pastille-bleu', 1, true), 'image inconnue refusée : ' .. tostring(erreur))
+end)
+
+essai('Dispositions.couleurs : des triplets neufs de 0 à 1, sans LrColor, la claire pour une valeur inconnue', function()
+    -- Hors de toute simulation (ni import ni LrColor), comme scripts/gabarits.lua : Dispositions se
+    -- charge et rend ses couleurs sans rien du SDK.
+    local code = 'package.path = ' .. string.format('%q', S.plugin .. '/?.lua;') .. ' .. package.path; '
+        .. "local D = require 'Dispositions'; local c = D.couleurs('sombre'); "
+        .. "io.write(type(import), ' ', type(LrColor), ' ', #c.texte, ' ', c.fondContenu[1] * 255)"
+    egal('nil nil 3 30', S.lireCommande('luajit -e ' .. S.q(code) .. ' 2>&1'), 'Dispositions hors du SDK')
+    for apparence, palette in pairs(Dispositions.PALETTES) do
+        local c = Dispositions.couleurs(apparence)
+        egal(cles(palette), cles(c), apparence .. ' : toutes les clés')
+        for cle, hex in pairs(palette) do
+            local t = c[cle]
+            vrai(type(t) == 'table' and #t == 3 and getmetatable(t) == nil, apparence .. '.' .. cle .. ' : un triplet')
+            for k = 1, 3 do
+                vrai(type(t[k]) == 'number' and t[k] >= 0 and t[k] <= 1, apparence .. '.' .. cle .. ' : de 0 à 1')
+                egal(tonumber(hex:sub(2 * k - 1, 2 * k), 16), math.floor(t[k] * 255 + 0.5), apparence .. '.' .. cle .. ' : composante ' .. k)
+            end
+        end
+    end
+    local claire = Dispositions.couleurs('claire')
+    egal(0, claire.blanc[1] - 1, 'blanc')
+    egal(0x1D / 255, claire.texte[1], 'texte')
+    -- Tables neuves à chaque appel : la fenêtre peut les garder sans toucher la palette.
+    vrai(claire ~= Dispositions.couleurs('claire') and claire.texte ~= Dispositions.couleurs('claire').texte, 'tables neuves')
+    local inconnue = Dispositions.couleurs('bleue')
+    for cle, t in pairs(claire) do
+        for k = 1, 3 do
+            egal(t[k], inconnue[cle][k], 'valeur inconnue : la claire (' .. cle .. ')')
+        end
+    end
+    vrai(Dispositions.couleurs('sombre').fondContenu[1] < 0.2, 'la sombre est sombre')
+end)
+
+-- Contraste de deux couleurs RRGGBB (WCAG 2 : luminance relative en sRGB).
+local function luminance(hex)
+    local function lin(c)
+        c = c / 255
+        return c <= 0.04045 and c / 12.92 or ((c + 0.055) / 1.055) ^ 2.4
+    end
+    return 0.2126 * lin(tonumber(hex:sub(1, 2), 16)) + 0.7152 * lin(tonumber(hex:sub(3, 4), 16))
+        + 0.0722 * lin(tonumber(hex:sub(5, 6), 16))
+end
+
+local function contraste(a, b)
+    local la, lb = luminance(a), luminance(b)
+    return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05)
+end
+
+-- Les textes et ce qu'ils couvrent, dans la fenêtre B : { encre, { fonds } }.
+local PAIRES = {
+    { 'texte', { 'fondContenu', 'fondVolet', 'fondDroite', 'fondPanneau', 'fondCarte', 'selection', 'fondSegment' } },
+    { 'gris', { 'fondContenu', 'fondVolet', 'fondDroite', 'fondPanneau', 'fondCarte' } },
+    { 'grisEntete', { 'fondVolet', 'fondDroite', 'fondContenu' } },
+    { 'sousTitreChoisi', { 'selection' } },
+    { 'bleu', { 'fondContenu', 'fondVolet', 'fondDroite', 'fondPanneau', 'fondCarte' } },
+    { 'mono', { 'fondContenu', 'fondPanneau', 'fondCarte' } },
+    { 'coche', { 'fondContenu', 'fondPanneau', 'fondCarte' } },
+    { 'orange', { 'fondContenu', 'fondVolet', 'fondDroite' } },
+    { 'rouge', { 'fondContenu', 'fondVolet', 'fondDroite', 'fondPanneau', 'fondCarte' } },
+    { 'ambre', { 'fondPanneau', 'fondCarte' } },
+    { 'blanc', { 'bleuBouton', 'bleuPresse' } },
+    { 'contour', { 'fondPanneau', 'fondCarte' } },
+}
+
+essai('Palette sombre : chaque texte se lit au moins aussi bien qu\'en claire, à 4,5:1 au moins là où la claire y est', function()
+    local claire, sombre = Dispositions.PALETTES.claire, Dispositions.PALETTES.sombre
+    -- Le calcul lui-même : noir sur blanc 21:1, une couleur sur elle-même 1:1.
+    egal(21, math.floor(contraste('000000', 'FFFFFF') + 0.5))
+    egal(1, contraste('3A3A3A', '3A3A3A'))
+    local nombre = 0
+    for _, paire in ipairs(PAIRES) do
+        local encre = paire[1]
+        for _, fond in ipairs(paire[2]) do
+            local c, s = contraste(claire[encre], claire[fond]), contraste(sombre[encre], sombre[fond])
+            vrai(s >= math.min(4.5, c), string.format('%s sur %s : %.2f:1 en sombre, %.2f:1 en claire', encre, fond, s, c))
+            nombre = nombre + 1
+        end
+    end
+    vrai(nombre >= 40, 'les paires vérifiées')
+    -- Les fonds suivent ceux de macOS en sombre : le contenu le plus foncé, puis le volet, puis la
+    -- colonne droite, dans l'ordre inverse de la claire (blanc, puis #F2F2F2, puis #ECECEC).
+    vrai(luminance(claire.fondContenu) > luminance(claire.fondVolet)
+        and luminance(claire.fondVolet) > luminance(claire.fondDroite), 'fonds clairs')
+    vrai(luminance(sombre.fondContenu) < luminance(sombre.fondVolet)
+        and luminance(sombre.fondVolet) < luminance(sombre.fondDroite), 'fonds sombres du plus foncé au plus clair')
+    -- Le texte courant, le gris et le bleu à 4,5:1 au moins sur chaque fond, en sombre.
+    for _, encre in ipairs({ 'texte', 'gris', 'grisEntete', 'bleu', 'mono' }) do
+        for _, fond in ipairs({ 'fondContenu', 'fondVolet', 'fondDroite', 'fondPanneau', 'fondCarte' }) do
+            vrai(contraste(sombre[encre], sombre[fond]) >= 4.5, encre .. ' sur ' .. fond .. ' en sombre')
+        end
+    end
+    -- Le contrôle refuserait une palette sombre moins lisible : le bleu de la maquette sur le
+    -- fond de la colonne droite sombre.
+    vrai(contraste(claire.bleu, sombre.fondDroite) < math.min(4.5, contraste(claire.bleu, claire.fondDroite)),
+        'un bleu illisible en sombre serait refusé')
+end)
+
+essai('images/ et images/sombre/ : chaque image de Dispositions.IMAGES dans les deux jeux, en 2x à 144 ppp, aux mêmes tailles', function()
     local nombre = 0
     for nom, t in pairs(IMAGES) do
-        local raison = controler(DOSSIER .. '/' .. nom .. '.png', t.largeur, t.hauteur)
-        vrai(raison == nil, raison)
+        local octets = {}
+        for apparence, dossier in pairs(JEUX) do
+            local chemin = S.plugin .. '/' .. dossier .. '/' .. nom .. '.png'
+            local raison = controler(chemin, t.largeur, t.hauteur)
+            vrai(raison == nil, raison)
+            local f = assert(io.open(chemin, 'rb'))
+            octets[apparence] = f:read('*a')
+            f:close()
+        end
+        -- Le jeu sombre est dessiné de sa palette, pas copié du clair : chaque image y emploie au
+        -- moins une couleur qui change avec l'apparence.
+        vrai(octets.claire ~= octets.sombre, 'images/sombre/' .. nom .. '.png : la même que la claire')
         nombre = nombre + 1
     end
     vrai(nombre >= 33, 'les 33 images au moins')
@@ -237,20 +436,42 @@ essai('Le contrôle des images refuse un fichier qui n\'est pas un PNG, un PNG e
         'une autre taille')
 end)
 
-essai('images/ : aucune image hors de Dispositions.IMAGES, ni paire @2x', function()
-    local fichiers = 0
-    for fichier in S.lireCommande('ls -1 ' .. S.q(DOSSIER)):gmatch('[^\n]+') do
-        fichiers = fichiers + 1
-        vrai(not fichier:find('@', 1, true), 'pas de paire 1x et @2x : ' .. fichier)
+-- Les fichiers d'un dossier de jeu : chaque PNG est une image de Dispositions.IMAGES, sans paire
+-- @2x ; seuls les dossiers des autres jeux s'y ajoutent (images/sombre dans images/). Rend le nombre
+-- d'images.
+local function controlerJeu(racine, dossier)
+    local images = 0
+    for fichier in S.lireCommande('ls -1 ' .. S.q(racine .. '/' .. dossier)):gmatch('[^\n]+') do
+        vrai(not fichier:find('@', 1, true), 'pas de paire 1x et @2x : ' .. dossier .. '/' .. fichier)
         local nom = fichier:match('^(.+)%.png$')
-        vrai(nom, 'seulement des PNG dans images/ : ' .. fichier)
-        vrai(IMAGES[nom], 'image absente de Dispositions.IMAGES : images/' .. fichier)
+        if nom then
+            vrai(IMAGES[nom], 'image absente de Dispositions.IMAGES : ' .. dossier .. '/' .. fichier)
+            images = images + 1
+        else
+            local sous = dossier .. '/' .. fichier
+            vrai(JEUX.sombre == sous or JEUX.claire == sous, 'seulement des PNG et les dossiers des jeux dans '
+                .. dossier .. '/ : ' .. fichier)
+        end
     end
+    return images
+end
+
+essai('images/ et images/sombre/ : aucune image hors de Dispositions.IMAGES, ni paire @2x', function()
     local nombre = 0
     for _ in pairs(IMAGES) do
         nombre = nombre + 1
     end
-    egal(nombre, fichiers, 'une image par nom de Dispositions.IMAGES')
+    for apparence, dossier in pairs(JEUX) do
+        egal(nombre, controlerJeu(S.plugin, dossier), apparence .. ' : une image par nom de Dispositions.IMAGES')
+    end
+    -- Le contrôle lui-même : un dossier en trop dans images/, une image en trop dans images/sombre/.
+    local racine = S.home .. '/module-jeux'
+    S.executer('mkdir -p ' .. S.q(racine .. '/images/sombre') .. ' ' .. S.q(racine .. '/images/autre'))
+    local ok, erreur = pcall(controlerJeu, racine, 'images')
+    vrai(not ok and tostring(erreur):find('autre', 1, true), 'dossier en trop refusé : ' .. tostring(erreur))
+    fabriquerPng(racine .. '/images/sombre/orpheline.png', 2, 2, PPM_144)
+    ok, erreur = pcall(controlerJeu, racine, 'images/sombre')
+    vrai(not ok and tostring(erreur):find('images/sombre/orpheline.png', 1, true), 'image en trop refusée : ' .. tostring(erreur))
 end)
 
 essai('vide-330x220.png : l\'image « aucun aperçu » du cadre 3:2, 660 × 440 à 144 ppp', function()
@@ -261,20 +482,33 @@ essai('vide-330x220.png : l\'image « aucun aperçu » du cadre 3:2, 660 × 440 
     egal(440, png.hauteur, 'hauteur en pixels')
 end)
 
-essai('scripts/gabarits.lua : Dispositions.IMAGES en JSON, lancé depuis un autre dossier', function()
+essai('scripts/gabarits.lua : les images et les deux apparences en JSON, lancé depuis un autre dossier', function()
     vrai(RACINE, 'racine du dépôt tirée de PLUGIN_DIR : ' .. tostring(S.plugin))
     -- Lancé ici (Tests/Lua/Fenetre), pas depuis la racine : il trouve le module par son propre chemin.
     local sortie = S.lireCommande('luajit ' .. S.q(RACINE .. '/scripts/gabarits.lua') .. ' 2>&1')
     local ok, lu = pcall(Json.decode, sortie)
     vrai(ok and type(lu) == 'table', 'JSON lisible : ' .. sortie)
+    egal('apparences images', cles(lu), 'les deux parties')
     for nom, t in pairs(IMAGES) do
-        vrai(type(lu[nom]) == 'table', 'absente du JSON : ' .. nom)
-        egal(t.largeur, lu[nom].largeur, nom .. ' : largeur')
-        egal(t.hauteur, lu[nom].hauteur, nom .. ' : hauteur')
+        vrai(type(lu.images[nom]) == 'table', 'absente du JSON : ' .. nom)
+        egal(t.largeur, lu.images[nom].largeur, nom .. ' : largeur')
+        egal(t.hauteur, lu.images[nom].hauteur, nom .. ' : hauteur')
     end
-    for nom in pairs(lu) do
+    for nom in pairs(lu.images) do
         vrai(IMAGES[nom], 'en trop dans le JSON : ' .. tostring(nom))
     end
+    egal('claire sombre', cles(lu.apparences), 'les deux apparences')
+    for apparence, dossier in pairs(JEUX) do
+        local a = lu.apparences[apparence]
+        egal(dossier, a.dossier, apparence .. ' : dossier')
+        egal(cles(Dispositions.PALETTES[apparence]), cles(a.couleurs), apparence .. ' : clés de la palette')
+        for cle, hex in pairs(Dispositions.PALETTES[apparence]) do
+            egal(hex, a.couleurs[cle], apparence .. '.' .. cle)
+        end
+    end
+    -- Dispositions.gabarits rend des tables neuves : le JSON ne touche pas les tables du module.
+    local g = Dispositions.gabarits()
+    vrai(g.images.loupe ~= IMAGES.loupe and g.apparences.sombre.couleurs ~= Dispositions.PALETTES.sombre, 'tables neuves')
 end)
 
 -- scripts/images-fenetre.swift lancé par l'usage documenté (gabarits.lua sur son entrée), mais vers
@@ -286,40 +520,89 @@ local function produire(entree, module)
     return tonumber(sortie:match('code (%d+)%s*$')), sortie
 end
 
-essai('scripts/images-fenetre.swift : chaque image en 2x à 144 ppp, une image de trop gardée', function()
+local function lireOctets(chemin)
+    local f = assert(io.open(chemin, 'rb'))
+    local octets = f:read('*a')
+    f:close()
+    return octets
+end
+
+essai('scripts/images-fenetre.swift : les deux jeux en 2x à 144 ppp, chacun de sa palette, une image de trop gardée', function()
     vrai(RACINE, 'racine du dépôt tirée de PLUGIN_DIR : ' .. tostring(S.plugin))
     local gabarits = 'luajit ' .. S.q(RACINE .. '/scripts/gabarits.lua')
     local module = S.home .. '/module-images'
     local code, sortie = produire(gabarits, module)
     egal(0, code, 'production entière : ' .. sortie)
-    -- Chaque image produite passe le contrôle des images du module : 2 × la taille en points, RGBA
-    -- 8 bits, 144 ppp.
+    vrai(sortie:find('images (claire), images/sombre (sombre)', 1, true), 'les deux jeux dits : ' .. sortie)
+    -- Chaque image produite passe le contrôle des images du module (2 × la taille en points, RGBA
+    -- 8 bits, 144 ppp), dans chaque jeu, et la sombre n'est pas la claire. (Pas de comparaison
+    -- octet à octet avec les images du dépôt : le rendu du texte et des tracés peut changer d'une
+    -- version de macOS à l'autre, celle des tests sur GitHub comprise.)
     for nom, t in pairs(IMAGES) do
-        local raison = controler(module .. '/images/' .. nom .. '.png', t.largeur, t.hauteur)
-        vrai(raison == nil, raison)
+        for _, dossier in pairs(JEUX) do
+            local raison = controler(module .. '/' .. dossier .. '/' .. nom .. '.png', t.largeur, t.hauteur)
+            vrai(raison == nil, raison)
+        end
+        vrai(lireOctets(module .. '/images/' .. nom .. '.png') ~= lireOctets(module .. '/images/sombre/' .. nom .. '.png'),
+            nom .. ' : la sombre est la claire')
     end
-    -- Une image de images/ absente de Dispositions.IMAGES est signalée, jamais effacée.
-    local orpheline = fabriquerPng(module .. '/images/orpheline.png', 2, 2, PPM_144)
+    -- Une image d'un des deux dossiers absente de Dispositions.IMAGES est signalée, jamais effacée.
+    local orphelines = { fabriquerPng(module .. '/images/orpheline.png', 2, 2, PPM_144),
+        fabriquerPng(module .. '/images/sombre/orpheline.png', 2, 2, PPM_144) }
     code, sortie = produire(gabarits, module)
     egal(0, code, 'production avec une image de trop : ' .. sortie)
-    vrai(sortie:find('à retirer : images/orpheline.png', 1, true), 'image de trop signalée : ' .. sortie)
-    vrai(lirePng(orpheline), 'image de trop gardée')
+    vrai(sortie:find('à retirer : images/orpheline.png', 1, true), 'image de trop signalée (claire) : ' .. sortie)
+    vrai(sortie:find('à retirer : images/sombre/orpheline.png', 1, true), 'image de trop signalée (sombre) : ' .. sortie)
+    for _, orpheline in ipairs(orphelines) do
+        vrai(lirePng(orpheline), 'image de trop gardée : ' .. orpheline)
+    end
 end)
 
-essai('scripts/images-fenetre.swift : refuse sans rien écrire un nom sans dessin, une taille invalide, une entrée vide', function()
+-- Des gabarits d'essai en JSON, tirés de ceux du module (Dispositions.gabarits) réduits à la seule
+-- loupe, puis changés par `changer(g)`, sur l'entrée du script.
+local function gabaritsEssai(changer)
+    local g = Dispositions.gabarits()
+    g.images = { loupe = { largeur = 12, hauteur = 12 } }
+    if changer then
+        changer(g)
+    end
+    return "printf '%s' " .. S.q(Json.encode(g))
+end
+
+essai('scripts/images-fenetre.swift : refuse sans rien écrire un nom sans dessin, une taille, une couleur ou un dossier invalides, une entrée vide', function()
     vrai(RACINE, 'racine du dépôt tirée de PLUGIN_DIR : ' .. tostring(S.plugin))
     local function json(texte)
         return "printf '%s' " .. S.q(texte)
     end
-    -- Chaque refus vient avant toute écriture : la loupe, connue et bien taillée, n'est pas écrite
-    -- non plus, et le dossier du module n'est pas créé.
+    -- Chaque refus vient avant toute écriture : la loupe, connue et bien taillée, n'est écrite dans
+    -- aucun jeu, et le dossier du module n'est pas créé.
     local cas = {
-        { json('{"loupe":{"largeur":12,"hauteur":12},"inconnue":{"largeur":12,"hauteur":12}}'),
+        { gabaritsEssai(function(g) g.images.inconnue = { largeur = 12, hauteur = 12 } end),
             'aucun dessin pour : inconnue' },
-        { json('{"loupe":{"largeur":12,"hauteur":12},"trombone":{"largeur":0,"hauteur":14}}'),
+        { gabaritsEssai(function(g) g.images.trombone = { largeur = 0, hauteur = 14 } end),
             'taille invalide pour trombone' },
+        { gabaritsEssai(function(g) g.apparences.sombre.couleurs.ambre = nil end),
+            'couleur absente de la palette sombre : ambre' },
+        { gabaritsEssai(function(g) g.apparences.sombre.couleurs.texte = '#E8E8E8' end),
+            'couleur invalide dans la palette sombre : texte' },
+        { gabaritsEssai(function(g) g.apparences.sombre.couleurs.gris = 'GGGGGG' end),
+            'couleur invalide dans la palette sombre : gris' },
+        -- Un chiffre pleine chasse (U+FF11) passe Character.isHexDigit, mais ni UInt32(_:radix:)
+        -- ni le dessin : refusé avant d'écrire le jeu clair, valide et dessiné en premier.
+        { gabaritsEssai(function(g) g.apparences.sombre.couleurs.contour = '\239\188\1458E8E8' end),
+            'couleur invalide dans la palette sombre : contour' },
+        { gabaritsEssai(function(g) g.apparences.sombre.dossier = '../ailleurs' end),
+            'dossier invalide pour l\'apparence sombre' },
+        { gabaritsEssai(function(g) g.apparences.sombre.dossier = '/tmp/ailleurs' end),
+            'dossier invalide pour l\'apparence sombre' },
+        { gabaritsEssai(function(g) g.apparences.sombre.dossier = 'images' end),
+            'dossier « images » commun aux apparences claire et sombre' },
+        { gabaritsEssai(function(g) g.apparences = { vide = true } end), 'gabarits illisibles' },
+        { json('{"images":{"loupe":{"largeur":12,"hauteur":12}},"apparences":{}}'), 'aucune apparence' },
+        -- L'ancien format (les tailles seules) n'est plus lu.
+        { json('{"loupe":{"largeur":12,"hauteur":12}}'), 'gabarits illisibles' },
         { "printf ''", "rien sur l'entrée standard" },
-        { json('pas du JSON'), 'tailles illisibles' },
+        { json('pas du JSON'), 'gabarits illisibles' },
     }
     for k, c in ipairs(cas) do
         local module = S.home .. '/module-refus-' .. k
@@ -327,6 +610,13 @@ essai('scripts/images-fenetre.swift : refuse sans rien écrire un nom sans dessi
         egal(1, code, c[2] .. ' : code de sortie (' .. sortie .. ')')
         vrai(sortie:find(c[2], 1, true), c[2] .. ' : ' .. sortie)
         vrai(not S.executer('test -e ' .. S.q(module)), c[2] .. ' : rien d\'écrit')
+    end
+    -- Les gabarits d'essai, sans changement, se dessinent : les refus viennent bien des changements.
+    local module = S.home .. '/module-loupe'
+    local code, sortie = produire(gabaritsEssai(), module)
+    egal(0, code, 'gabarits d\'essai : ' .. sortie)
+    for apparence, dossier in pairs(JEUX) do
+        vrai(controler(module .. '/' .. dossier .. '/loupe.png', 12, 12) == nil, apparence .. ' : loupe écrite')
     end
 end)
 

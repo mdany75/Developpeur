@@ -1,8 +1,9 @@
 -- essais-gestionnaire.lua : les réglages de la 1.3 dans le Gestionnaire de modules externes, hors
 -- de Lightroom (LuaJIT, Lightroom simulé par Simulation.lua) : la case Carnet dans la section de la
--- liaison, les cases Avant/après et Leçon dans celle de la fenêtre Claude, leurs valeurs par
--- défaut, et le diagnostic (réglages de la 1.3 au bout de leur ligne). Le registre du carnet
--- (Carnet.lua) se charge ici aussi, sans catalogue lisible : il se lit vide. Ni Claude, ni quota.
+-- liaison, les cases Avant/après et Leçon et le menu Apparence (claire ou sombre) dans celle de la
+-- fenêtre Claude, leurs valeurs par défaut, et le diagnostic (réglages de la 1.3 au bout de leur
+-- ligne, apparence inconnue dite). Le registre du carnet (Carnet.lua) se charge ici aussi, sans
+-- catalogue lisible : il se lit vide. Ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
 local S = require 'Simulation'
@@ -47,6 +48,7 @@ local function vues(contenu)
 end
 
 local Chemins = require 'Chemins'
+local Dispositions = require 'Dispositions'
 local Preferences = require 'Preferences'
 local PluginInfoProvider = require 'PluginInfoProvider'
 
@@ -71,6 +73,25 @@ local function cases(section, objet)
         end
     end
     return trouvees
+end
+
+-- Les menus d'une section, par clé liée, avec l'étiquette de leur ligne et leur rang parmi les
+-- menus ; chaque liaison a sa valeur avant l'ouverture.
+local function menus(section, objet)
+    local trouves, rang = {}, 0
+    for _, enfant in ipairs(section) do
+        local etiquette = enfant.genre == 'row' and enfant.args[1] and enfant.args[1].genre == 'static_text'
+            and enfant.args[1].args.title or nil
+        for _, v in ipairs(vues(enfant)) do
+            if v.genre == 'popup_menu' and type(v.args.value) == 'table' and v.args.value.liaison then
+                S.verifierLiaison(v.args.value, objet, 'popup_menu.value')
+                rang = rang + 1
+                trouves[v.args.value.key] = { vue = v, etiquette = etiquette, rang = rang, ligne = enfant,
+                    objet = v.args.value.bind_to_object or objet }
+            end
+        end
+    end
+    return trouves
 end
 
 local function sections()
@@ -132,12 +153,70 @@ essai('Gestionnaire, fenêtre Claude : cases Avant/après et Leçon, cochées pa
     prefs.leconFinRetouche = nil
 end)
 
+essai('Gestionnaire, fenêtre Claude : menu Apparence (Claire, Sombre) après Effort, claire par défaut', function()
+    local liste = sections()
+    local section = liste[2]
+    egal('Fenêtre Claude', section.title)
+    local prefs = section.bind_to_object
+    local m = menus(section, prefs)
+    local apparence = m.apparence
+    vrai(apparence, 'menu Apparence')
+    egal('Apparence :', apparence.etiquette)
+    egal(prefs, apparence.objet, 'lié aux préférences du module')
+    egal(Chemins.prefs(), apparence.objet)
+    -- Comme le modèle et l'effort (décision de Dany du 21 octobre 2026) : juste après Effort.
+    vrai(m.modele and m.effort, 'menus Modèle et Effort')
+    egal(m.modele.rang + 1, m.effort.rang, 'Effort après Modèle')
+    egal(m.effort.rang + 1, apparence.rang, 'Apparence après Effort')
+    local items = apparence.vue.args.items
+    egal(2, #items, 'deux apparences')
+    egal('Claire', items[1].title)
+    egal('claire', items[1].value)
+    egal('Sombre', items[2].title)
+    egal('sombre', items[2].value)
+    S.neuve(items, 'éléments du menu Apparence')
+    vrai(items[1] ~= Dispositions.APPARENCES[1], 'éléments neufs, pas ceux de Dispositions')
+    -- Claire par défaut, la même valeur que celle où retombe une préférence inconnue.
+    egal('claire', Chemins.defauts.apparence)
+    egal('claire', prefs.apparence)
+    egal(Dispositions.apparence(nil), Chemins.defauts.apparence, 'défaut de Chemins et de Dispositions')
+    egal(nil, Preferences.defauts.apparence, 'une clé de la fenêtre seulement')
+    -- Le texte de la ligne dit que les contrôles natifs suivent macOS.
+    local texte
+    for _, v in ipairs(vues(apparence.ligne)) do
+        if v.genre == 'static_text' and v.args.title ~= 'Apparence :' then
+            texte = v.args.title
+        end
+    end
+    vrai(texte and texte:find('suivent macOS', 1, true), 'texte de la ligne : ' .. tostring(texte))
+    -- Sombre choisie reste choisie ; la valeur par défaut ne s'impose qu'à une clé absente.
+    prefs.apparence = 'sombre'
+    egal('sombre', Chemins.prefs().apparence)
+    egal('sombre', Dispositions.apparence(Chemins.prefs().apparence))
+    -- Une préférence inconnue (autre version, abîmée) reste telle quelle dans les préférences, et
+    -- retombe sur la claire là où elle sert.
+    prefs.apparence = 'bleue'
+    egal('bleue', Chemins.prefs().apparence)
+    egal('claire', Dispositions.apparence(Chemins.prefs().apparence))
+    egal('images/loupe.png', Dispositions.image('loupe', Chemins.prefs().apparence))
+    prefs.apparence = nil
+    egal('claire', Chemins.prefs().apparence, 'clé retirée : la valeur par défaut')
+end)
+
 essai('Diagnostic : réglages de la 1.3 au bout de leur ligne, débuts de ligne intacts', function()
     local mode = ligneDiagnostic('Mode : ')
     -- Sans catalogue lisible (simulation de la fenêtre), le carnet se lit vide.
     vrai(finitPar(mode, ' ; point de mise au point en tout temps : false ; carnet de progrès : true (0 photo)'), mode)
     local fenetre = ligneDiagnostic('Fenêtre Claude : ')
-    vrai(finitPar(fenetre, "proposition à l'ouverture : true ; avant/après des étapes : true ; leçon en fin de retouche : true"), fenetre)
+    vrai(finitPar(fenetre, "proposition à l'ouverture : true ; avant/après des étapes : true ; leçon en fin de retouche : true ; apparence : claire"), fenetre)
+    -- L'apparence telle qu'elle sert ; une préférence inconnue est dite à côté.
+    local prefsApparence = Chemins.prefs()
+    prefsApparence.apparence = 'sombre'
+    vrai(finitPar(ligneDiagnostic('Fenêtre Claude : '), ' ; apparence : sombre'), 'apparence sombre')
+    prefsApparence.apparence = 'bleue'
+    local inconnue = ligneDiagnostic('Fenêtre Claude : ')
+    vrai(finitPar(inconnue, ' ; apparence : claire (préférence « bleue » inconnue)'), inconnue)
+    prefsApparence.apparence = nil
     -- Ce que lisent les essais des dispositions, inchangé.
     vrai(PluginInfoProvider.diagnostic():find('effort max ; nouvelle conversation par photo', 1, true), 'diagnostic')
     vrai(PluginInfoProvider.diagnostic():find('modèle opus, effort max', 1, true), 'diagnostic : modèle et effort')

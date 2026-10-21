@@ -106,6 +106,13 @@ Chemins.defauts = {
     -- Gestionnaire de modules externes ; l'effort vaut pour les quatre modèles.
     modele = 'opus',
     effort = 'max',
+    -- Apparence de la fenêtre Claude (fenêtre B, 1.3 ; décision de Dany du 21 octobre 2026),
+    -- choisie dans le Gestionnaire comme le modèle et l'effort : 'claire' (la maquette) ou
+    -- 'sombre' (Dispositions.APPARENCES). Elle règle les aplats, les couleurs des textes et les
+    -- images (Dispositions.couleurs, Dispositions.image) ; les contrôles natifs (boutons, champs,
+    -- menus) suivent l'apparence de macOS. Une valeur inconnue retombe sur 'claire'
+    -- (Dispositions.apparence).
+    apparence = 'claire',
     -- Une autre photo active ou une autre sélection commence une nouvelle conversation
     -- (Fenetre.suivreSelection).
     nouvelleParPhoto = true,
