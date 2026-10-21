@@ -291,12 +291,13 @@ end
 -- deux lignes en petit (F.LIGNES_BANDEAU), coupées d'après la chasse mesurée (F.texteBandeau, « … »
 -- au bout de la seconde s'il le faut), à la hauteur des boutons de la rangée. Un message (orange ;
 -- son infobulle le donne en entier), sinon l'aide d'un voyant rouge (un clic l'affiche en entier),
--- sinon les photos jointes (un clic les retire), sinon rien (état 'vide' : le rappel du style est
+-- sinon les photos jointes (un clic les retire ; « cliquer pour retirer » reste au bout, les noms
+-- coupés avant), sinon rien (état 'vide' : le rappel du style est
 -- retiré, demandé par Dany le 20 octobre 2026).
 function Vues.bandeau(f, F, largeur)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local function coupe(cle, suite)
-        return bind { key = cle, transform = function(v) return F.texteBandeau(tostring(v or '') .. (suite or ''), largeur) end }
+        return bind { key = cle, transform = function(v) return F.texteBandeau(tostring(v or ''), largeur, suite) end }
     end
     return f:column {
         place = 'overlapping',

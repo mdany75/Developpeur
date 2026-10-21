@@ -1792,6 +1792,37 @@ essai('Fil dans la fenêtre : pas de bascule vers Leçon quand une proposition a
     end)
 end)
 
+essai("Fil dans la fenêtre : une conversation vide montre son titre, puis l'aide entière, coupée dans la largeur d'une ligne de note", function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.charger()
+    Moteur.nouvelle()
+    ouvrirFenetre(function(p)
+        Fenetre.rafraichir()
+        egal(0, #Fenetre.lignes)
+        egal(Fenetre.FIL_VIDE_TITRE, p.t2)
+        egal('titre', p.g2)
+        local morceaux = {}
+        for i = 3, D.lignes do
+            if p['t' .. i] ~= '' then
+                egal('note', p['g' .. i], 'ligne ' .. i)
+                local l = { genre = 'note', texte = p['t' .. i] }
+                vrai(Fil.occupe(l) <= D.texteFil - Fil.MARGE, string.format('dans la largeur (%.0f) : %s', Fil.occupe(l), l.texte))
+                vrai(not l.texte:find('…', 1, true), 'sans « … » : ' .. l.texte)
+                morceaux[#morceaux + 1] = l.texte
+            end
+        end
+        vrai(#morceaux >= 2, 'plus d\'une ligne : ' .. #morceaux)
+        egal(Fenetre.FIL_VIDE, table.concat(morceaux, ' '), "l'aide entière")
+        -- Une demande : le fil la montre, l'aide s'en va.
+        Conversation.ajouterDemande(Moteur.courante, 'Bonjour')
+        Fenetre.rafraichir()
+        egal('Bonjour', p.t1)
+        for i = 3, D.lignes do
+            vrai(p['t' .. i] == '' or p['g' .. i] ~= 'note', "plus d'aide : ligne " .. i)
+        end
+    end)
+end)
+
 essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaque message de la fenêtre y tient en entier, les autres finissent par « … », l'infobulle les donne", function()
     egal(2, Fenetre.LIGNES_BANDEAU)
     local place = D.bandeau - Fil.MARGE
@@ -1814,6 +1845,23 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
     egal(1, select(2, montre:gsub('\n', '')), 'deux lignes')
     egal('…', montre:sub(-#'…'))
     egal('', Fenetre.texteBandeau('', D.bandeau))
+    -- Les photos jointes : « cliquer pour retirer » reste au bout, les noms se coupent avant (comme
+    -- la troncature au milieu d'avant le lot B4).
+    local suite = '  ·  cliquer pour retirer'
+    egal('1 photo jointe : a.jpg · cliquer pour retirer', (Fenetre.texteBandeau('1 photo jointe : a.jpg', D.bandeau, suite):gsub('\n', ' ')))
+    local noms = {}
+    for k = 1, 12 do
+        noms[k] = 'DSCF49' .. (60 + k) .. '.RAF'
+    end
+    local jointes = '12 photos jointes : ' .. table.concat(noms, ', ')
+    local coupe = Fenetre.texteBandeau(jointes, D.bandeau, suite)
+    egal(1, select(2, coupe:gsub('\n', '')), 'deux lignes : ' .. coupe)
+    local joint = (coupe:gsub('\n', ' '))
+    egal('… · cliquer pour retirer', joint:sub(-#'… · cliquer pour retirer'), coupe)
+    egal(1, (joint:find('12 photos jointes : DSCF49', 1, true)), coupe)
+    for ligne in (coupe .. '\n'):gmatch('([^\n]*)\n') do
+        vrai(Fil.largeur(ligne, 'petit') <= place, ligne)
+    end
     -- Dans la fenêtre : trois variantes de deux lignes, petites, à la largeur du bandeau.
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
@@ -1827,6 +1875,12 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
         egal(long, valeur(message, 'tooltip', p), "l'infobulle, en entier")
         vrai(S.montreeDansFenetre(message))
         p.message = ''
+        -- Les photos jointes, dans leur variante : la suite au bout.
+        local variante = liee(contenu, 'static_text', 'jointes')
+        egal(2, variante.args.height_in_lines)
+        p.jointes = jointes
+        egal(coupe, S.evaluer(variante.args.title, p))
+        p.jointes = ''
         -- Le bandeau dans la rangée du bas : sa hauteur tient dans la zone de saisie.
         vrai(hauteur(rangeeDe(contenu, message)) <= D.saisie - D.filet - (12 + 26 + 8 + 52 + 8), 'la rangée du bas dans la saisie')
     end)

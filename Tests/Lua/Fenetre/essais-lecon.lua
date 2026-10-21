@@ -734,6 +734,43 @@ essai("Fenêtre : une leçon qui arrive bascule une fois vers Leçon ; jamais av
     end)
 end)
 
+essai("Fenêtre : une leçon qui arrive remplace la leçon choisie avant ; d'une autre photo que l'active, elle se montre aussi", function()
+    photoActive(53636309, 'DSCF4961.RAF')
+    Moteur.charger()
+    Moteur.nouvelle()
+    local c = Moteur.courante
+    local l1 = appelLecon(c, 'l1', entreeLecon(), reponseLecon())
+    ouvrirFenetre(function(p)
+        Fenetre.rafraichir()
+        egal('notation', p.onglet, "déjà là à l'ouverture : pas de bascule")
+        -- « Leçon de la photo » de la première leçon : elle est choisie.
+        vrai(Fenetre.montrerLecon(l1))
+        egal(c.elements[l1].id, Fenetre.leconChoisie)
+        p.onglet = 'notation'
+        -- Une autre leçon de la photo active arrive : l'onglet la montre, plus la leçon choisie avant.
+        Conversation.ajouterDemande(c, 'Refais la retouche, plus contrastée.')
+        local l2 = appelLecon(c, 'l2', entreeLecon(), reponseLecon({ fichier = 'DSCF4961-2.RAF' }))
+        Fenetre.rafraichir()
+        egal('lecon', p.onglet, 'la leçon arrivée')
+        egal(c.elements[l2].id, (Fenetre.leconMontree()).id, 'la leçon arrivée, pas celle choisie avant')
+        egal('Leçon de la photo · DSCF4961-2.RAF', p.leconTitre)
+        -- La leçon d'une autre photo que l'active : la bascule la montre, elle aussi.
+        p.onglet = 'notation'
+        local autre = entreeLecon()
+        autre.photo_id = 53636310
+        local l3 = appelLecon(c, 'l3', autre, reponseLecon({ photo = 53636310, fichier = 'DSCF4962.RAF' }))
+        Fenetre.rafraichir()
+        egal('lecon', p.onglet)
+        egal(c.elements[l3].id, (Fenetre.leconMontree()).id, "la leçon de l'autre photo")
+        egal('Leçon de la photo · DSCF4962.RAF', p.leconTitre)
+        -- Vue : un rafraîchissement de plus ne change rien.
+        p.onglet = 'notation'
+        Fenetre.rafraichir()
+        egal('notation', p.onglet, 'une seule bascule')
+        egal('Leçon de la photo · DSCF4962.RAF', p.leconTitre)
+    end)
+end)
+
 essai("Fenêtre : la ligne d'une leçon refusée ouvre le détail de son appel ; la ligne d'actions n'a pas de clic de texte", function()
     photoActive(53636309, 'DSCF4961.RAF')
     Moteur.charger()

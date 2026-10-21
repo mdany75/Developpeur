@@ -695,6 +695,11 @@ function Fenetre.largeurTexte()
     return Fenetre.T.texteFil
 end
 
+-- Le fil d'une conversation vide : un titre, puis l'aide (sur plus d'une ligne : 518 points ne la
+-- tiennent pas sur une seule).
+Fenetre.FIL_VIDE_TITRE = "Demandez à Claude."
+Fenetre.FIL_VIDE = "Claude voit la photo active et la sélection de Lightroom, et retouche avec le connecteur MCP-Développeur."
+
 function Fenetre.rafraichirFil()
     local p, T = Fenetre.p, Fenetre.T
     if not p then
@@ -747,10 +752,16 @@ function Fenetre.rafraichirFil()
         poser(p, 'x' .. i, l and l.actions or '')
     end
     if #lignes == 0 then
-        poser(p, 't2', "Demandez à Claude.")
+        poser(p, 't2', Fenetre.FIL_VIDE_TITRE)
         poser(p, 'g2', 'titre')
-        poser(p, 't3', "Claude voit la photo active et la sélection de Lightroom, et retouche avec le connecteur MCP-Développeur.")
-        poser(p, 'g3', 'note')
+        -- L'aide coupée comme une ligne du fil (genre note, son retrait compris) : entière, sans « … ».
+        local aide = Fil.couper(Fenetre.FIL_VIDE, Fenetre.largeurTexte() - Fil.MARGE - Fil.retrait('note'), Fil.polices.note)
+        for k, t in ipairs(aide) do
+            if 2 + k <= T.lignes then
+                poser(p, 't' .. (2 + k), t)
+                poser(p, 'g' .. (2 + k), 'note')
+            end
+        end
     end
     local derniere = math.min(premiere + T.lignes - 1, #lignes)
     poser(p, 'positionFil', #lignes > T.lignes and string.format("Lignes %d à %d sur %d", premiere, derniere, #lignes) or '')
@@ -1781,7 +1792,8 @@ end
 -- dernière leçon de la photo active dans la conversation montrée (une leçon dont la photo n'est pas
 -- encore connue, appel sans photo_id en cours, compte pour la photo active), sinon l'aide
 -- (Fenetre.AUCUNE_LECON) ; son texte vient de Fil.texteLecon, les axes en gras. Une leçon qui arrive
--- (faite : Fenetre.leconVue garde la dernière vue) fait basculer la fenêtre une fois vers Leçon, sauf
+-- (faite : Fenetre.leconVue garde la dernière vue) devient celle que montre l'onglet, à la place
+-- d'une leçon choisie avant, et fait basculer la fenêtre une fois vers Leçon, sauf
 -- quand une proposition attend ou qu'un exercice « Je le fais » est en cours (Accepter et « J'ai
 -- fini » resteraient cachés derrière l'onglet Leçon) : elle est alors seulement marquée vue. Les
 -- leçons déjà là quand une conversation se montre (ouverture de la fenêtre, une autre conversation)
@@ -1841,6 +1853,17 @@ function Fenetre.rafraichirLecon()
         local vue = derniereLecon(c)
         Fenetre.leconVue = vue and vue.id or nil
     end
+    -- Une leçon qui arrive remplace la leçon choisie avant (« Leçon de la photo » d'une leçon plus
+    -- ancienne) : l'onglet montre celle qui arrive, même d'une autre photo que l'active.
+    local arrivee = derniereLecon(c)
+    local nouvelle = arrivee ~= nil and arrivee.id ~= Fenetre.leconVue
+    if nouvelle then
+        Fenetre.leconVue = arrivee.id
+        Fenetre.leconChoisie = nil
+        if Fenetre.leconMontree() ~= arrivee then
+            Fenetre.leconChoisie = arrivee.id
+        end
+    end
     local e = Fenetre.leconMontree()
     if e then
         poser(p, 'leconTitre', Fil.titreLecon(e) .. (e.etat == 'enCours' and " · en préparation…" or ''))
@@ -1851,12 +1874,8 @@ function Fenetre.rafraichirLecon()
         Fenetre.montrerPage('lecon', Fenetre.AUCUNE_LECON)
     end
     poser(p, 'leconADetail', e ~= nil and Conversation.outilDeLAppel(c, e.appel) ~= nil)
-    local arrivee = derniereLecon(c)
-    if arrivee and arrivee.id ~= Fenetre.leconVue then
-        Fenetre.leconVue = arrivee.id
-        if not propositionOuExercice(c) then
-            Fenetre.choisirOnglet(T.ongletLecon)
-        end
+    if nouvelle and not propositionOuExercice(c) then
+        Fenetre.choisirOnglet(T.ongletLecon)
     end
 end
 
@@ -2392,9 +2411,9 @@ function Fenetre.ajuster()
 end
 
 -- Pourquoi ? : l'onglet Aperçu (1.3) -----------------------------------------------------------
--- Un clic sur une étape du fil (ligne « · Pourquoi ? », Conversation.estEtape ; au lot B4, son
--- bouton « Pourquoi ? ») l'ouvre dans l'onglet Aperçu (l'ancien onglet Pourquoi ?, D.ongletEtape) :
--- dans l'aperçu, son après (ou son avant : Voir l'avant / Voir l'après), que
+-- Le bouton « Pourquoi ? » d'une étape du fil (la ligne de son appel, Conversation.estEtape ;
+-- Fenetre.pourquoi), ou un clic sur son texte, l'ouvre dans l'onglet Aperçu (l'ancien onglet
+-- Pourquoi ?, D.ongletEtape) : dans l'aperçu, son après (ou son avant : Voir l'avant / Voir l'après), que
 -- le module a gardé au moment de l'étape sans rien écrire au catalogue (Etapes.lua) ; dans la
 -- carte (Vues.etape), « Étape 2 sur 4 · <but> », la raison donnée par Claude et les réglages
 -- changés, page par page ; ◀ ▶ d'une étape à l'autre de la même photo ; Détail… (l'appel et sa
@@ -3309,16 +3328,41 @@ end
 -- (D.bandeau, 178 points : une seule en coupait la plupart, « Claude travaille… » en demande 269).
 -- Le texte se coupe d'après la chasse mesurée (Fil.coupeBornee, police `petit`), « … » au bout de
 -- la seconde ligne s'il dépasse (l'infobulle du message, le clic de l'aide le donnent en entier) ;
--- les messages de la fenêtre tiennent en deux lignes (essais-fenetre-b.lua).
+-- les messages de la fenêtre tiennent en deux lignes (essais-fenetre-b.lua). `suite` (facultative)
+-- reste entière au bout : un texte trop long se coupe avant elle, par « … » (les photos jointes
+-- gardent « cliquer pour retirer », comme le faisait la troncature au milieu d'avant).
 Fenetre.LIGNES_BANDEAU = 2
 
-function Fenetre.texteBandeau(texte, largeur)
+function Fenetre.texteBandeau(texte, largeur, suite)
     texte = Texte.nettoyer((sansBalises(texte):gsub('%s+', ' ')))
     if texte == '' then
         return ''
     end
-    largeur = largeur or (Fenetre.T and Fenetre.T.bandeau) or 178
-    return table.concat(Fil.coupeBornee(texte, largeur - Fil.MARGE, 'petit', '', Fenetre.LIGNES_BANDEAU), '\n')
+    largeur = (largeur or (Fenetre.T and Fenetre.T.bandeau) or 178) - Fil.MARGE
+    suite = (sansBalises(suite):gsub('%s+', ' '))
+    local maxi = Fenetre.LIGNES_BANDEAU
+    if suite ~= '' then
+        local entier = Fil.couper(texte .. suite, largeur, 'petit', '')
+        if #entier <= maxi then
+            return table.concat(entier, '\n')
+        end
+        -- Le plus long début du texte qui laisse la suite tenir (par moitiés : un transform de la
+        -- vue, à chaque changement).
+        local bas, haut, garde = 1, Texte.longueur(texte), nil
+        while bas <= haut do
+            local n = math.floor((bas + haut) / 2)
+            local essai = Fil.couper((Texte.debut(texte, n):gsub('%s+$', '')) .. '…' .. suite, largeur, 'petit', '')
+            if #essai <= maxi then
+                garde, bas = essai, n + 1
+            else
+                haut = n - 1
+            end
+        end
+        if garde then
+            return table.concat(garde, '\n')
+        end
+    end
+    return table.concat(Fil.coupeBornee(texte .. suite, largeur, 'petit', '', maxi), '\n')
 end
 
 -- Ce que montre le bandeau : un message, sinon l'aide d'un voyant rouge, sinon les photos
