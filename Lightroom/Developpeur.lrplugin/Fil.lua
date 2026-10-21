@@ -4,7 +4,8 @@
 -- module remplit. Chaque ligne a un genre (sa police, sa couleur, son icône) et un texte coupé
 -- à la largeur de la colonne d'après la chasse mesurée des polices (Metriques.lua).
 --
--- Ligne : { genre, texte, icone, element (indice dans le fil), image (chemin relatif) }
+-- Ligne : { genre, texte, icone, element (indice dans le fil), image (chemin relatif), defaut et
+--   action (page Carnet de progrès) }
 --   genres : 'dany', 'claude', 'titre', 'outil', 'apercu', 'proposition', 'note', 'vide'
 --   icones : 'dany', 'ok', 'cours', 'erreur', 'apercu', 'proposition', 'note' ou nil
 -- Un élément `notation` (notes proposées) reprend les genres `proposition` (titre) et `outil` (une
@@ -20,6 +21,9 @@
 -- Développement », puis « Je le fais · comparée : 2 écarts sur 7 »), une ligne `outil` par réglage
 -- ou par écart (Fil.REGLAGES_MONTRES au plus, puis « … et N autres »), l'écart principal en lignes
 -- `outil` aussi ; refusé, son titre dit pourquoi, icône erreur.
+-- La page Carnet de progrès (1.3, Fil.lignesCarnet) n'a que des genres existants aussi : ses
+-- lignes ne sont pas d'une conversation (pas d'`element`) ; les rangées de son tableau portent
+-- `defaut` (le code du défaut), sa ligne d'action `action = 'demander'`.
 
 local Conversation = require 'Conversation'
 local Metriques = require 'Metriques'
@@ -573,6 +577,193 @@ function Fil.lignes(c, largeur, cache)
             precedent = e
         end
     end
+    return lignes
+end
+
+-- La page Carnet de progrès (1.3) ----------------------------------------------------------------
+-- Le résumé du carnet (Carnet.resumer, du module) mis en lignes de genres existants, sans
+-- élément de conversation : le titre ; la note (sur quelles photos, par mois de prise de vue) et
+-- la remarque ; le tableau des défauts en `outil` (police mono : colonnes alignées par des
+-- espaces, « n/sur » par mois, « — » sans photo), une rangée par défaut qui porte son code
+-- (`defaut` : un clic donne ses photos) ; « Ce qui progresse » (ou « Ce qui recule ») et « À
+-- travailler à la prochaine sortie », titres et puces ; puis la ligne d'action `apercu` (bleue)
+-- « Demander à Claude ce qu'il en pense › » (`action = 'demander'`). Les phrases et les titres
+-- viennent du résumé (Carnet.resumer, seule copie) ; seuls les mots de la page sont écrits ici. Pas
+-- de barres ▁…█ : elles demanderaient de remesurer les polices (Metriques.lua).
+-- `page` : le résumé ; nil pendant sa lecture ; { erreur = texte } s'il ne s'est pas lu.
+-- `titre` : celui de la page tant que le résumé ne le donne pas (Carnet.TITRES.carnet).
+Fil.DEMANDER_CARNET = "Demander à Claude ce qu'il en pense ›"
+Fil.AIDE_TABLEAU_CARNET = "Un clic sur une ligne du tableau donne ses photos."
+Fil.LECTURE_CARNET = "Lecture du carnet de progrès…"
+Fil.ERREUR_CARNET = "Le carnet de progrès ne s'est pas lu : "
+-- Espaces entre deux colonnes du tableau ; caractères au plus de la colonne Défaut (les libellés du
+-- connecteur en font 40 au plus, PriseDeVue.swift).
+Fil.ECART_COLONNES = 3
+Fil.LIBELLE_CARNET_MAX = 40
+
+local function texteOuNil(valeur)
+    if type(valeur) == 'string' and Texte.nettoyer(valeur) ~= '' then
+        return Texte.nettoyer(valeur)
+    end
+    return nil
+end
+
+-- « n/sur » d'un mois, « — » quand le défaut n'y a été cherché sur aucune photo.
+function Fil.celluleCarnet(m)
+    local sur = type(m) == 'table' and tonumber(m.sur) or 0
+    if not sur or sur <= 0 then
+        return '—'
+    end
+    return string.format('%d/%d', tonumber(m.n) or 0, sur)
+end
+
+local function aGauche(texte, n)
+    return texte .. string.rep(' ', n - Texte.longueur(texte))
+end
+
+local function aDroite(texte, n)
+    return string.rep(' ', n - Texte.longueur(texte)) .. texte
+end
+
+-- Les rangées du tableau, en texte aligné par des espaces (un caractère par colonne de la police
+-- mono) : l'en-tête (« Défaut », puis le mois abrégé, avec l'année quand les mois en changent),
+-- puis une rangée par défaut, { texte, defaut = code }.
+function Fil.tableauCarnet(page)
+    local mois = type(page.mois) == 'table' and page.mois or {}
+    local defauts = type(page.defauts) == 'table' and page.defauts or {}
+    local plusieurs = false
+    for _, m in ipairs(mois) do
+        if m.annee ~= (mois[1] or {}).annee then
+            plusieurs = true
+        end
+    end
+    local entetes = {}
+    for i, m in ipairs(mois) do
+        local nom = tostring(m.court or m.nom or m.cle or '?')
+        entetes[i] = (plusieurs and m.annee) and (nom .. ' ' .. tostring(m.annee)) or nom
+    end
+    local premiere = texteOuNil(type(page.titres) == 'table' and page.titres.defaut) or "Défaut"
+    local large = Texte.longueur(premiere)
+    local libelles = {}
+    for k, d in ipairs(defauts) do
+        local l = texteOuNil(d.libelle) or tostring(d.code or '?')
+        if Texte.longueur(l) > Fil.LIBELLE_CARNET_MAX then
+            l = Texte.debut(l, Fil.LIBELLE_CARNET_MAX - 1) .. '…'
+        end
+        libelles[k] = l
+        large = math.max(large, Texte.longueur(l))
+    end
+    local larges = {}
+    for i, e in ipairs(entetes) do
+        local w = Texte.longueur(e)
+        for _, d in ipairs(defauts) do
+            w = math.max(w, Texte.longueur(Fil.celluleCarnet(type(d.par_mois) == 'table' and d.par_mois[i])))
+        end
+        larges[i] = w
+    end
+    local ecart = string.rep(' ', Fil.ECART_COLONNES)
+    local function rangee(tete, cellules)
+        local morceaux = { aGauche(tete, large) }
+        for i, c in ipairs(cellules) do
+            morceaux[#morceaux + 1] = aDroite(c, larges[i])
+        end
+        return table.concat(morceaux, ecart)
+    end
+    local rangees = { { texte = rangee(premiere, entetes) } }
+    for k, d in ipairs(defauts) do
+        local cellules = {}
+        for i = 1, #mois do
+            cellules[i] = Fil.celluleCarnet(type(d.par_mois) == 'table' and d.par_mois[i])
+        end
+        rangees[#rangees + 1] = { texte = rangee(libelles[k], cellules), defaut = d.code }
+    end
+    return rangees
+end
+
+function Fil.lignesCarnet(page, largeur, titre)
+    largeur = largeur - Fil.MARGE
+    local lignes = {}
+    local function paragraphe(genre, texte, icone, retrait)
+        for n, l in ipairs(Fil.couper(texte, largeur, Fil.polices[genre], retrait)) do
+            lignes[#lignes + 1] = { genre = genre, texte = l, icone = n == 1 and icone or nil }
+        end
+    end
+    local function vide()
+        lignes[#lignes + 1] = { genre = 'vide', texte = '' }
+    end
+    local function intertitre(texte)
+        lignes[#lignes + 1] = { genre = 'titre', texte = uneLigne(texte, largeur, 'gras') }
+    end
+    -- Une puce comme celles de Claude (Fil.ligneMarkdown) ; `suite` : une ligne retirée dessous.
+    local function puce(texte, suite)
+        paragraphe('claude', '•  ' .. texte, nil, '    ')
+        if suite then
+            paragraphe('claude', '    ' .. suite, nil, '    ')
+        end
+    end
+    local titres = type(page) == 'table' and type(page.titres) == 'table' and page.titres or {}
+    intertitre(texteOuNil(titres.carnet) or texteOuNil(titre) or "Carnet de progrès")
+    if type(page) ~= 'table' then
+        paragraphe('note', Fil.LECTURE_CARNET, 'cours')
+        return lignes
+    end
+    if page.erreur ~= nil then
+        paragraphe('note', Fil.ERREUR_CARNET .. (texteOuNil(tostring(page.erreur)) or '?'), 'erreur')
+        return lignes
+    end
+    if texteOuNil(page.note) then
+        paragraphe('note', texteOuNil(page.note), 'note')
+    end
+    if texteOuNil(page.remarque) then
+        paragraphe('note', texteOuNil(page.remarque))
+    end
+    local defauts = type(page.defauts) == 'table' and page.defauts or {}
+    if page.vide == true or #defauts == 0 then
+        return lignes
+    end
+
+    vide()
+    for _, r in ipairs(Fil.tableauCarnet(page)) do
+        lignes[#lignes + 1] = { genre = 'outil', texte = uneLigne(r.texte, largeur, 'mono'), defaut = r.defaut }
+    end
+    paragraphe('note', Fil.AIDE_TABLEAU_CARNET)
+
+    -- Ce qui progresse et ce qui recule (chacun s'il y en a) ; sans tendance, pourquoi.
+    local progresse = type(page.progresse) == 'table' and page.progresse or {}
+    local recule = type(page.recule) == 'table' and page.recule or {}
+    vide()
+    if #progresse > 0 or #recule == 0 then
+        intertitre(texteOuNil(titres.progresse) or "Ce qui progresse")
+        for _, x in ipairs(progresse) do
+            puce(texteOuNil(x.texte) or tostring(x.libelle or x.code or '?'))
+        end
+        if #progresse == 0 and texteOuNil(page.aucune_tendance) then
+            paragraphe('note', texteOuNil(page.aucune_tendance))
+        end
+    end
+    if #recule > 0 then
+        if #progresse > 0 then
+            vide()
+        end
+        intertitre(texteOuNil(titres.recule) or "Ce qui recule")
+        for _, x in ipairs(recule) do
+            puce(texteOuNil(x.texte) or tostring(x.libelle or x.code or '?'))
+        end
+    end
+
+    -- À travailler à la prochaine sortie : le défaut, puis ce qu'il faut faire à la prise de vue.
+    local aTravailler = type(page.a_travailler) == 'table' and page.a_travailler or {}
+    vide()
+    intertitre(texteOuNil(titres.a_travailler) or "À travailler à la prochaine sortie")
+    for _, x in ipairs(aTravailler) do
+        puce(texteOuNil(x.texte) or tostring(x.libelle or x.code or '?'), texteOuNil(x.prise_de_vue))
+    end
+    if #aTravailler == 0 and texteOuNil(page.rien_a_travailler) then
+        paragraphe('note', texteOuNil(page.rien_a_travailler))
+    end
+
+    vide()
+    lignes[#lignes + 1] = { genre = 'apercu', texte = uneLigne(Fil.DEMANDER_CARNET, largeur, 'texte'), action = 'demander' }
     return lignes
 end
 

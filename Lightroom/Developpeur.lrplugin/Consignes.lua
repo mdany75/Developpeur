@@ -63,6 +63,9 @@ un zoom (region) : le carré y est dessiné, s'il tombe dans la zone (point_af :
 - Une préférence de Dany remarquée (corrections_utilisateur, demandes répétées) : propose-la sur \
 une ligne à elle « Suggestion pour le guide : <la préférence en une phrase> » ; ne l'ajoute pas \
 toi-même.
+- Carnet de progrès : les défauts de la prise de vue s'y notent seuls (constats_prise_de_vue). Si \
+Dany demande ses progrès : export_journal avec notebook = true, puis trois puces : ce qui progresse, \
+ce qui revient, quoi essayer à sa prochaine sortie.
 
 ## Composition
 Après une retouche entière, ou si Dany parle de cadre ou d'horizon : read_composition. Si le cadre \
@@ -282,6 +285,11 @@ Consignes.ajustementsRapides = { "Moins chaud", "Peau plus naturelle", "Garder l
 -- à la place des précédents ; Claude relit la composition au besoin (read_composition) et montre
 -- le nouveau cadre, sans l'appliquer.
 Consignes.ajustementsCadre = { "Plus serré", "Plus large", "Horizon au tiers haut", "Format 4:5", "Seulement redresser" }
+
+-- « Demander à Claude ce qu'il en pense › », la ligne d'action de la page Carnet de progrès (1.3,
+-- Fenetre.demanderCarnet) : une nouvelle conversation, rien de retouché. Le résumé vient du
+-- connecteur (export_journal avec notebook), sans chiffre écrit ici.
+Consignes.carnet = "Lis mon carnet de progrès (export_journal avec notebook = true) et dis-moi en trois puces ce qui progresse, ce qui revient le plus, et quoi travailler à ma prochaine sortie, avec les réglages du boîtier quand ça aide. Ne retouche rien."
 
 -- La ligne jointe à chaque demande quand la case Leçon du Gestionnaire de modules externes est
 -- décochée (préférence leconFinRetouche, Moteur.envoyer) : pas de leçon de la photo. Elle suit la
