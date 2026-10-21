@@ -21,8 +21,9 @@ public struct LocalEffect: Equatable {
 
 /// Les effets locaux de ce Mac : ceux de l'utilisateur (premier dossier : Local Adjustment Presets
 /// de Lightroom, où Lightroom copie aussi ses six effets, sous leur nom français), puis ceux livrés
-/// dans l'application qui n'y sont pas, sous leur nom anglais. Relus à chaque demande : ce sont
-/// quelques petits fichiers.
+/// dans l'application qui n'y sont pas, sous leur nom anglais, puis les effets intégrés au serveur
+/// qui manquent encore : la dose d'Adobe pour la peau (`Peau.effetsIntegres`, « Peau du visage
+/// lisse » et « Adoucir la peau (Lite) »). Relus à chaque demande : ce sont quelques petits fichiers.
 public struct LocalEffectLibrary {
     public static var defaultFolders: [URL] {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -50,7 +51,8 @@ public struct LocalEffectLibrary {
         self.folders = folders
     }
 
-    /// Les effets, par nom ; un effet livré que l'utilisateur a déjà (même nom anglais) n'est pas répété.
+    /// Les effets, par nom ; un effet livré que l'utilisateur a déjà (même nom anglais) n'est pas
+    /// répété, ni un effet intégré qu'un fichier porte déjà (même nom, français ou anglais).
     public var effects: [LocalEffect] {
         var found: [LocalEffect] = []
         for (index, folder) in folders.enumerated() {
@@ -65,6 +67,12 @@ public struct LocalEffectLibrary {
                 }
                 found.append(effect)
             }
+        }
+        // Après les fichiers, qui l'emportent : un effet de l'utilisateur du même nom garde ses valeurs.
+        for effect in Peau.effetsIntegres where !found.contains(where: { trouve in
+            [effect.name, effect.internalName].contains { !$0.isEmpty && trouve.matches($0) }
+        }) {
+            found.append(effect)
         }
         return found
     }

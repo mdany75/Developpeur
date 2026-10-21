@@ -174,7 +174,8 @@ extension ToolHandler {
         maskProperties["adjustments"] = ["type": "object", "properties": .object(adjustments), "additionalProperties": false,
                                          "description": "Réglages locaux, sur l'échelle des curseurs du panneau Masque : {\"Exposure\": -0.4, \"Clarity\": 15}. Avec effect, ils s'ajoutent à ceux de l'effet (ou les remplacent, réglage par réglage)."]
         let effects = localEffects.effects
-        maskProperties["effect"] = prop("string", "Effet local de Lightroom (menu Effet du panneau Masque), posé sur ce masque à la place de réglages faits à la main : \(effects.isEmpty ? "aucun trouvé sur ce Mac" : effects.map { "« \($0.name) »" + ($0.internalName.isEmpty || $0.internalName == $0.name ? "" : " (\($0.internalName))") }.joined(separator: ", ")). Sur la bonne partie : dents (person_part teeth), iris (iris_pupil), peau (face_skin, body_skin) ; amount en réduit l'intensité.")
+        maskProperties["effect"] = prop("string", "Effet local de Lightroom (menu Effet du panneau Masque), posé sur ce masque à la place de réglages faits à la main : \(effects.isEmpty ? "aucun trouvé sur ce Mac" : effects.map { "« \($0.name) »" + ($0.internalName.isEmpty || $0.internalName == $0.name ? "" : " (\($0.internalName))") }.joined(separator: ", ")). Sur la bonne partie : dents (person_part teeth), iris (iris_pupil), peau (face_skin, body_skin) ; amount en réduit l'intensité. " + Peau.dosage)
+        maskProperties["smoothing_requested"] = prop("boolean", Peau.demandeDescription)
         let point: JSONValue = ["type": "array", "items": ["type": "number"], "minItems": 2, "maxItems": 2]
         let curve: JSONValue = ["type": "array", "items": point, "minItems": 2, "maxItems": .number(Double(Self.maxCurvePoints)),
                                 "description": "Points [entrée, sortie] de 0 à 255, entrée croissante."]
@@ -300,11 +301,18 @@ extension ToolHandler {
             masks = try prelever(masks, args)
         }
         var params: [String: JSONValue] = ["masques": .array(masks), "libelles": DevelopCatalogue.labels(for: ["MaskGroupBasedCorrections"])]
-        // Ce que pose chaque effet local, sur l'échelle des curseurs.
+        // Ce que pose chaque effet local, sur l'échelle des curseurs, et sa dose sous 100 % ; puis
+        // la dose d'un masque de peau au-dessus du défaut, ou au-delà à la demande (Peau.swift).
         var effectNotes: [JSONValue] = []
-        for item in list {
+        for (index, item) in list.enumerated() {
+            let quantite = masks[index]["quantite"]?.double ?? 1
             if let text = item["effect"]?.string, let effect = localEffects.effect(named: text) {
-                effectNotes.append(.string("Effet « \(effect.name) » : \(Self.describe(effect))."))
+                let reduit = quantite < 1 ? " ; à \(Peau.nombre(quantite * 100)) % : \(Self.describe(effect.locaux, facteur: quantite))" : ""
+                effectNotes.append(.string("Effet « \(effect.name) » : \(Self.describe(effect))\(reduit)."))
+            }
+            if let masque = item.object, let locaux = masks[index]["locaux"]?.object,
+               let remarque = Peau.remarque(masque, locaux: locaux, quantite: quantite, numero: index + 1) {
+                effectNotes.append(.string(remarque))
             }
         }
         var cible = try targets(args)
@@ -360,9 +368,16 @@ extension ToolHandler {
 
     /// Les réglages d'un effet local, sur l'échelle des curseurs : « exposition +0,4 IL, saturation −60 ».
     static func describe(_ effect: LocalEffect) -> String {
+        describe(effect.locaux, facteur: 1)
+    }
+
+    /// Des réglages locaux à une intensité donnée (0 à 1), sur l'échelle des curseurs : « à 50 % »,
+    /// « texture −10, clarté −5 ». La teinte d'une couleur (ToningHue) est un angle : l'intensité
+    /// ne la change pas.
+    static func describe(_ locaux: [String: Double], facteur: Double) -> String {
         let parts = localAdjustments.compactMap { item -> String? in
-            guard let value = effect.locaux[item.key] else { return nil }
-            let shown = (value / item.scale * 100).rounded() / 100
+            guard let value = locaux[item.key] else { return nil }
+            let shown = (value * (item.name == "ToningHue" ? 1 : facteur) / item.scale * 100).rounded() / 100
             let text = (shown > 0 && item.name != "ToningHue" ? "+" : "") + format(shown).replacingOccurrences(of: ".", with: ",")
             let label = item.label.replacingOccurrences(of: " en IL", with: "").replacingOccurrences(of: " en degrés", with: "")
             return "\(label) \(text)\(item.name == "Exposure" ? " IL" : "")"
@@ -543,6 +558,8 @@ extension ToolHandler {
             }
             result["composants"] = .array(try list.enumerated().map { try combinedParameter($1, path: "\(path).combine[\($0)]") })
         }
+        // Garde-fou de la peau (Peau.swift) : add_mask seul passe ici, avant tout envoi au module.
+        try Peau.verifier(mask, locaux: locals, quantite: result["quantite"]?.double ?? 1, chemin: path)
         return .object(result)
     }
 
