@@ -872,7 +872,8 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         egal('Retouche pro Portrait Paysage Noir et blanc ISO élevé Composition Sports', table.concat(invites, ' '), nom .. ' : invites')
         -- La carte Proposition (1.3) : Accepter dit que la photo ne change qu'à son clic ; une
         -- seconde rangée, sous Accepter, Refuser et Ajuster…, porte « Je le fais » (titre lié, actif
-        -- selon peutJeLeFais, inactif à l'ouverture) et l'état de l'exercice.
+        -- selon peutJeLeFais : ici une photo active et Claude libre, lot 14) et l'état de
+        -- l'exercice.
         local rangeeAccepter, rangeeJeLeFais
         parcourir(args.contents, function(v)
             for k, enfant in ipairs(v.args) do
@@ -895,7 +896,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             nom .. ' : Je le fais sur la rangée sous Accepter')
         egal('Je le fais', p.titreJeLeFais)
         egal('peutJeLeFais', rangeeJeLeFais.bouton.args.enabled.key)
-        egal(false, p.peutJeLeFais, nom .. ' : Je le fais inactif à l\'ouverture')
+        egal(true, p.peutJeLeFais, nom .. ' : Je le fais actif, une photo active et Claude libre')
         vrai(boutons['Je le fais'] == rangeeJeLeFais.bouton, nom .. ' : Je le fais passe par Fenetre.bouton')
         local etat = rangeeJeLeFais.rangee.args[2]
         vrai(etat and etat.genre == 'static_text' and etat.args.title.key == 'exerciceEtat', nom .. " : l'état de l'exercice à droite")

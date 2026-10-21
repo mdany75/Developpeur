@@ -324,6 +324,46 @@ function Moteur.ajuster(texte)
     return Moteur.envoyer(Consignes.ajuster(texte))
 end
 
+-- « Je le fais » (1.3) : Dany fait la retouche lui-même, pour apprendre. La proposition en attente
+-- devient « à faire vous-même » (Accepter n'a plus lieu d'être), puis Claude range sa version sans
+-- rien appliquer (preview_settings avec my_turn) et donne la liste des réglages ; sans proposition,
+-- Claude prépare la sienne sur la photo active. Rend true, ou false et la raison (la proposition
+-- reste alors en attente).
+function Moteur.jeLeFais()
+    if Moteur.travaille then
+        return false, "Claude travaille : attendez la fin, ou cliquez Arrêter."
+    end
+    local c = Moteur.courante
+    local p = c and Conversation.propositionEnAttente(c)
+    if not p and not Lightroom.photos().active then
+        return false, "Aucune photo active : choisissez dans Lightroom la photo à retoucher vous-même, puis cliquez « Je le fais »."
+    end
+    if p then
+        Conversation.marquer(c, p.id, 'faite')
+    end
+    local ok, raison = Moteur.envoyer(Consignes.jeLeFais(p ~= nil))
+    if not ok and p and p.etat == 'faite' then
+        p.etat = 'enAttente'
+    end
+    return ok, raison
+end
+
+-- « J'ai fini » (1.3) : Claude compare la version de Dany à la sienne (view_photo avec compare =
+-- claude_version), sans rien changer. Un Claude Code fermé après inactivité est relancé en
+-- reprenant la session (Moteur.envoyer) ; l'exercice est rangé dans le catalogue (mémoire du
+-- module), pas dans le connecteur.
+function Moteur.jaiFini()
+    if Moteur.travaille then
+        return false, "Claude travaille : attendez la fin, ou cliquez Arrêter."
+    end
+    local c = Moteur.courante
+    local exo = c and Conversation.exerciceEnCours(c)
+    if not exo then
+        return false, "Aucun exercice en cours : cliquez d'abord « Je le fais »."
+    end
+    return Moteur.envoyer(Consignes.jaiFini(exo.photo))
+end
+
 -- Lecture de la sortie de Claude Code ---------------------------------------------------------
 
 -- Applique un événement à la conversation de la session.
