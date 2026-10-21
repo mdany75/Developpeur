@@ -319,16 +319,21 @@ function Dispositions.dimensions()
     D.basVolet = cadre(22) + 6 + (6 + D.filet + 6) + 6 + cadre(22) + 6 + cadre(22) + 4 + 2 * D.ligneVersion + 6 + D.ecran
     D.hauteurListe = D.hauteurContenu - 2 * D.margeVolet - D.hautVolet - D.basVolet
     -- Centre : 590 utiles. L'en-tête : le titre (gras 16) et le Mode, puis les voyants Claude Code et
-    -- Lightroom et la photo active ; le fil ; la barre ; la saisie (Style, bandeau, Envoyer).
+    -- Lightroom et la photo active, alignée à droite sur la marge (la rangée fait les 590 : un texte
+    -- de taille fixe ne s'étire pas) ; le fil ; la barre, dont l'activité (ou le forfait) finit de
+    -- même sur la marge de droite, comme dans la maquette ; la saisie (Style, bandeau, Envoyer).
     D.fil = D.centre - 2 * D.margeCentre
     D.titre = 270
     D.voyantClaude = 125
     D.voyantLightroom = 150
-    D.info = D.fil - (8 + 6 + D.voyantClaude) - 14 - (8 + 6 + D.voyantLightroom) - 8
+    D.info = D.fil - (8 + 6 + D.voyantClaude) - 14 - (8 + 6 + D.voyantLightroom)
     D.hauteurFil = D.hauteurContenu - (D.entete + D.filet) - D.barre - D.saisie
     D.grille = D.lignes * D.hauteurLigne
+    -- ▲ ▼ de la barre et ◀ ▶ de l'aperçu (bezel de 22), puis Fin.
+    D.fleche = 26
+    D.fin = 36
     D.position = 150
-    D.activite = 300
+    D.activite = D.fil - (2 * D.fleche + 4 + 4 + D.fin + 8 + D.position)
     D.champ = D.fil
     D.joindre = 28
     D.style = 170
@@ -359,7 +364,6 @@ function Dispositions.dimensions()
     -- L'aperçu, sa vignette en pixels, et la rangée ◀ légende ▶ · ⤢ Agrandir sous lui.
     D.pixelsApercu = D.apercu * D.echelleApercu
     D.pixelsApercuHauteur = D.apercuHauteur * D.echelleApercu
-    D.fleche = 26
     D.agrandir = 90
     D.legende = D.interieur - 2 * D.fleche - 2 * 4 - 8 - D.agrandir
     -- Largeur du texte de la carte Note, de la proposition et de la carte de l'étape (Vues.notation,

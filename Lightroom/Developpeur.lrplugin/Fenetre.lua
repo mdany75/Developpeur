@@ -29,11 +29,11 @@
 -- Structure de la 1.3, posée une fois (les lots suivants remplissent les crochets) : quatre onglets
 -- (Aperçu, Proposition, Note, Leçon) ; l'aperçu est commun, mais un onglet peut le remplir
 -- (Fenetre.apercuOnglet), un vrai clic sur un onglet a son crochet (Fenetre.surOnglet) ; un clic
--- sur une ligne du fil se répartit
--- dans un ordre fixé (Fenetre.cliquerLigne) ; le fil montre la conversation ou une autre page
--- (Fenetre.vue), et Claude qui travaille ramène à la conversation. L'autre page est celle du
--- Carnet de progrès (1.3, section « Carnet de progrès » : son entrée en tête de la liste des
--- conversations, ses lignes faites par Fil.lignesCarnet), sans pièce de mise en page à elle.
+-- sur une ligne du fil se répartit dans un ordre fixé (Fenetre.cliquerLigne) ; le fil montre la
+-- conversation ou une autre page (Fenetre.vue), et Claude qui travaille ramène à la conversation.
+-- L'autre page est celle du Carnet de progrès (1.3, section « Carnet de progrès » : son entrée en
+-- tête de la liste des conversations, ses lignes faites par Fil.lignesCarnet), sans pièce de mise
+-- en page à elle.
 
 local LrBinding = import 'LrBinding'
 local LrColor = import 'LrColor'
@@ -296,6 +296,24 @@ end
 
 function Fenetre.parCalque(fn)
     return parCalque[fn] == true
+end
+
+-- La valeur liée d'un bouton radio (clé `cle`). Un clic de l'utilisateur la pousse de la vue vers
+-- la table, et ce clic a validé le champ de demande (constaté le 21 octobre 2026, D3) : l'envoi
+-- automatique s'annule ici, à chaque clic. L'observateur de la clé ne suffit pas : sur un radio
+-- déjà coché, la valeur ne change pas et la table ne prévient pas ses observateurs (supposé, comme
+-- la simulation), et la demande tapée partirait 0,3 s plus tard. La fenêtre qui pose la valeur
+-- (de la table vers la vue) n'annule rien.
+function Fenetre.lierRadio(cle)
+    return bind {
+        key = cle,
+        transform = function(valeur, depuisTable)
+            if not depuisTable then
+                Fenetre.annulerEnvoiAuto()
+            end
+            return valeur
+        end,
+    }
 end
 
 -- Une clé de la fenêtre que pose une pièce elle-même (l'enfoncement d'un bouton bleu) : sa valeur
@@ -2937,8 +2955,9 @@ function Fenetre.changerMode(valeur)
             Lightroom.basculerMode()
         end
         if exercice then
-            p.message = "Mode de la liaison : " .. Fenetre.LIBELLES_MODE[valeur]
-                .. " ; l'exercice continue (J'ai fini dans la carte Proposition)."
+            -- L'essentiel d'abord : le bandeau, étroit, coupe la fin (son infobulle la donne).
+            p.message = "L'exercice continue (J'ai fini dans la carte Proposition) ; mode de la liaison : "
+                .. Fenetre.LIBELLES_MODE[valeur] .. "."
         end
     elseif valeur == 'jelefais' and not exercice and not Moteur.travaille then
         enTache(function()

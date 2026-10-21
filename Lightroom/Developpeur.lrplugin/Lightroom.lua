@@ -1,9 +1,8 @@
 -- Lightroom.lua : ce que la fenêtre lit de Lightroom et de son entourage : photo active (avec sa
 -- note posée, et sa légende quand elle change) et sélection, état de la liaison et mode « Proposer
 -- d'abord » (lus directement : la liaison est dans ce même module), connexion de Claude Code,
--- écran principal du Mac (lu par le
--- connecteur : `mcp-developpeur --ecran`), réglages d'une photo pendant un exercice « Je le fais »
--- (1.3, lus sans rien écrire). À appeler depuis une tâche.
+-- écran principal du Mac (lu par le connecteur : `mcp-developpeur --ecran`), réglages d'une photo
+-- pendant un exercice « Je le fais » (1.3, lus sans rien écrire). À appeler depuis une tâche.
 
 local LrApplication = import 'LrApplication'
 local LrDate = import 'LrDate'

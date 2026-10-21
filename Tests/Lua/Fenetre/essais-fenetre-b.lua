@@ -230,6 +230,60 @@ local function hauteur(v)
     return contenu
 end
 
+-- Largeur d'une vue faite de largeurs données, sans estimer de texte : sa largeur, sinon une rangée
+-- additionne ses vues et leurs écarts, une superposition ou une colonne prend la plus large ; un
+-- espace extensible (fill_horizontal, sans largeur) compte 0 ; les marges ne comptent pas. Une vue
+-- sans largeur donnée, hors de ces cas, est refusée : sa largeur dépendrait de son texte.
+local function largeurDonnee(v)
+    local a = v.args
+    if type(a.width) == 'number' then
+        return a.width
+    end
+    if v.genre == 'spacer' then
+        vrai(a.fill_horizontal, 'espace sans largeur ni fill_horizontal')
+        return 0
+    end
+    local enfants = {}
+    for _, e in ipairs(a) do
+        if type(e) == 'table' and e.genre then
+            enfants[#enfants + 1] = e
+        end
+    end
+    vrai((v.genre == 'row' or v.genre == 'column') and #enfants > 0, v.genre .. ' sans largeur donnée')
+    local enLigne = v.genre == 'row' and a.place ~= 'overlapping'
+    local total = 0
+    for _, e in ipairs(enfants) do
+        local l = largeurDonnee(e)
+        total = enLigne and (total + l) or math.max(total, l)
+    end
+    if enLigne then
+        total = total + (a.spacing or 8) * (#enfants - 1)
+    end
+    return total
+end
+
+-- La rangée qui porte directement cette vue.
+local function rangeeDe(contenu, vue)
+    for _, v in ipairs(vues(contenu)) do
+        if v.genre == 'row' then
+            for _, e in ipairs(v.args) do
+                if e == vue then
+                    return v
+                end
+                -- Une vue dans une superposition ou une rangée de voyant posée dans la rangée.
+                if type(e) == 'table' and e.genre and e.genre ~= 'row' then
+                    for _, x in ipairs(e.args) do
+                        if x == vue then
+                            return v
+                        end
+                    end
+                end
+            end
+        end
+    end
+    error('rangée introuvable', 2)
+end
+
 -- Les colonnes de la racine : volet, filet, centre, filet, colonne droite.
 local function colonnes(contenu)
     local r = {}
@@ -500,6 +554,9 @@ essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, Mode en trois radi
         egal('Active : <EM>DSCF4961.RAF</EM> · Sélection : <EM>1</EM>', p.infoPhoto)
         egal(nil, S.refusEmphase({ title = p.infoPhoto, font = info.args.font, emphasis_font = info.args.emphasis_font,
             emphasis_color = info.args.emphasis_color }), 'texte riche accepté (D4)')
+        -- La rangée des voyants et de la photo active fait la largeur utile du centre : la photo
+        -- active, alignée à droite, finit sur la marge de droite, comme dans la maquette.
+        egal(D.fil, largeurDonnee(rangeeDe(contenu, info)), 'rangée des voyants et de la photo active')
     end)
 end)
 
@@ -522,7 +579,11 @@ essai('Inventaire de la barre et de la saisie : ▲ ▼ à icône, Fin, position
         end)
         local saut = math.floor(D.lignes * 0.8)
         egal(saut .. ' ' .. -saut .. ' fin', table.concat(pas, ' '), '▲ ▼ Fin')
-        vrai(liee(contenu, 'static_text', 'positionFil'), 'la position dans le fil')
+        local position = liee(contenu, 'static_text', 'positionFil')
+        -- La barre fait la largeur utile du centre : l'activité (ou le forfait), alignée à droite,
+        -- finit sur la marge de droite, comme dans la maquette.
+        egal(D.fil, largeurDonnee(rangeeDe(contenu, position)), 'la barre : ▲ ▼ Fin, position, activité')
+        egal(D.fin, parTitre(contenu, 'Fin').args.width)
         -- Les invites, dans l'ordre de Consignes.invites, envoient leur message.
         local envois = {}
         avec(Fenetre, 'envoyer', function(message) envois[#envois + 1] = message end, function()
@@ -562,8 +623,16 @@ essai('Inventaire de la barre et de la saisie : ▲ ▼ à icône, Fin, position
             local t = tostring(valeur(b, 'title', p) or '')
             vrai(not t:find('Noter', 1, true) and not t:find('Évaluer', 1, true), 'bouton « ' .. t .. ' »')
         end
-        -- Le bandeau, dans la rangée du bas.
-        egal(D.bandeau, liee(contenu, 'static_text', 'message').args.width)
+        -- Le bandeau, dans la rangée du bas, qui fait la largeur utile du centre (Envoyer sur la
+        -- marge de droite).
+        local message = liee(contenu, 'static_text', 'message')
+        egal(D.bandeau, message.args.width)
+        egal(D.fil, largeurDonnee(rangeeDe(contenu, message)), 'la rangée du bas de la saisie')
+        -- Cette place (178 points) coupe la plupart des messages (Fenetre.CLAUDE_TRAVAILLE en demande
+        -- environ 270) : son infobulle le donne en entier.
+        p.message = Fenetre.CHOISIR_CONVERSATION
+        egal(Fenetre.CHOISIR_CONVERSATION, valeur(message, 'tooltip', p), "l'infobulle du message, en entier")
+        p.message = ''
         -- Envoyer et Arrêter : superposés ; aucun bouton par défaut (repli du lot B0).
         egal(nil, S.boutonParDefaut())
         local envoyer = parInfobulle(contenu, "Envoyer la demande à Claude (Retour dans le champ aussi)")
@@ -753,6 +822,36 @@ essai('Mode : trois radios tirés de l\'état ; un clic annule l\'envoi automati
         p.saisie = ''
         S.cliquer(radios.appliquer)
         egal('appliquer', Lightroom.mode())
+        -- Le radio déjà coché : la valeur ne change pas (aucun observateur), mais le clic a validé
+        -- le champ ; la demande tapée ne part pas pour autant (F.lierRadio), et rien ne change.
+        local envoyer, envoyees = Fenetre.envoyer, 0
+        Fenetre.envoyer = function() envoyees = envoyees + 1 end
+        local taches = #S.taches
+        S.taper(champ, 'Encore')
+        S.cliquer(radios.appliquer)
+        egal(nil, Fenetre.envoiAuto, "un clic sur le radio déjà coché annule aussi l'envoi automatique")
+        egal('Encore', p.saisie, 'validée par le clic, laissée dans le champ')
+        for i = taches + 1, #S.taches do
+            S.taches[i]()
+        end
+        Fenetre.envoyer = envoyer
+        egal(0, envoyees, 'rien envoyé')
+        egal('appliquer', Lightroom.mode(), 'la liaison inchangée')
+        egal('appliquer', p.mode)
+        -- La fenêtre qui pose la valeur (de la table vers la vue : Lightroom relit la valeur de
+        -- chaque radio pour le redessiner) n'annule rien.
+        Fenetre.envoiAuto = {}
+        Fenetre.rafraichirMode()
+        Lightroom.basculerMode()
+        Fenetre.rafraichirMode()
+        for nom, r in pairs(radios) do
+            egal('proposer', valeur(r, 'value', p), nom .. ' : la valeur relue')
+        end
+        vrai(Fenetre.envoiAuto, "la fenêtre qui change le radio n'annule pas l'envoi automatique")
+        Fenetre.envoiAuto = nil
+        Lightroom.basculerMode()
+        Fenetre.rafraichirMode()
+        p.saisie = ''
         -- Un mode changé ailleurs (le menu de la liaison) : le radio suit au rafraîchissement.
         Lightroom.basculerMode()
         Fenetre.rafraichir()
@@ -816,7 +915,9 @@ essai('Mode : Je le fais lance l\'exercice (jamais J\'ai fini depuis un radio) ;
             S.cliquer(vuePar(contenu, 'checked_value', 'appliquer', 'radio_button'))
             egal('appliquer', Lightroom.mode(), 'la liaison change')
             egal('jelefais', p.mode, 'le radio revient à Je le fais')
-            vrai(p.message:find("l'exercice continue", 1, true) and p.message:find('Appliquer', 1, true), p.message)
+            -- L'essentiel en tête du message (le bandeau, étroit, coupe la fin).
+            egal(1, (p.message:find("L'exercice continue", 1, true)), p.message)
+            vrai(p.message:find('Appliquer', 1, true), p.message)
             p.message = ''
         end)
         -- Rouverte : toujours Je le fais (tiré de l'état, pas d'un drapeau).
@@ -942,7 +1043,9 @@ essai('Liste dans la fenêtre : le carnet en tête, la case choisie (fond et gra
     for i = 1, 14 do
         local c = Conversation.nouvelle()
         Conversation.ajouterDemande(c, 'Demande ' .. i)
-        Conversation.renommer(c, (i == 3 and 'Lac au matin') or ('Conversation ' .. i))
+        -- La 4e porte une balise <EM> dans son titre : Lightroom la lirait comme du texte riche
+        -- (une balise seule disparaît, constaté) ; la case et l'en-tête montrent le titre sans elle.
+        Conversation.renommer(c, (i == 3 and 'Lac au matin') or (i == 4 and 'Pont <EM>en</EM> automne') or ('Conversation ' .. i))
         c.modifiee = maintenant - (i - 1) * 60
         c.cle = '4961:' .. i .. ':4961'
         Moteur.conversations[#Moteur.conversations + 1] = c
@@ -981,6 +1084,15 @@ essai('Liste dans la fenêtre : le carnet en tête, la case choisie (fond et gra
             end
         end
         vrai(S.montree(fond, p) and S.montree(gras, p) and not S.montree(normal, p), 'choisie : fond et gras')
+        -- Un titre à balise : sans elle dans la case, son infobulle et l'en-tête, une fois ouverte.
+        local pont = Moteur.conversations[4]
+        egal(pont.id, Fenetre.cases[6].value)
+        egal('Pont en automne', p.lt6, 'la case, sans balise')
+        egal('Pont en automne', p.li6, "l'infobulle, sans balise")
+        S.cliquer(calqueCase(contenu, 6))
+        egal(pont, Moteur.courante)
+        Fenetre.rafraichir()
+        egal('Pont en automne', p.titre, "l'en-tête, sans balise")
         -- Un clic sur une autre conversation : Moteur.ouvrir, elle devient la choisie.
         local lac = Moteur.conversations[3]
         S.cliquer(calqueCase(contenu, 5))
@@ -1036,6 +1148,15 @@ essai('Liste dans la fenêtre : le carnet en tête, la case choisie (fond et gra
         Fenetre.rafraichirListe()
         egal(false, p.lc1)
         egal(lac.id, Fenetre.choixListe())
+        -- Nouvelle conversation depuis la 2e page : elle est en tête de la liste, la première page
+        -- revient, et c'est elle qui est choisie.
+        S.cliquer(calqueCase(contenu, 12))
+        egal(2, Fenetre.pageListe)
+        S.cliquer(parTitre(contenu, '＋ Nouvelle conversation'))
+        egal(1, Fenetre.pageListe, 'Nouvelle conversation : la première page')
+        vrai(Moteur.courante ~= lac, 'une nouvelle conversation')
+        Fenetre.rafraichir()
+        egal(Moteur.courante.id, Fenetre.choixListe(), 'la nouvelle, choisie')
     end)
     Moteur.ouvrir, Moteur.conversations, Moteur.courante, Moteur.travaille = ouvrir, conversations, courante, false
     Fenetre.vue = 'conversation'
@@ -1083,6 +1204,19 @@ essai('Légende : nom de la copie, appareil et date de prise de vue (heure local
         Fenetre.majPhoto()
         egal(1, lues, 'la même photo : pas relue')
         egal('fileName fileName', table.concat(cles, ' '), 'Lightroom.photos ne lit que le nom, une fois par relecture')
+        -- Agrandir la photo active : le titre de sa fenêtre est la légende sans ses balises (un
+        -- titre de fenêtre n'est pas un texte riche).
+        local dossier = S.home .. '/agrandir-legende'
+        S.executer('mkdir -p ' .. S.q(dossier) .. ' && /usr/bin/sips -s format jpeg -z 60 90 '
+            .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(dossier .. '/active.jpg') .. ' >/dev/null 2>&1')
+        Fenetre.apercuActif = { id = 4961, dossier = dossier, fichier = 'active.jpg', chemin = dossier .. '/active.jpg', T = Fenetre.T }
+        Fenetre.voirActive = true
+        local taches, dialogues = #S.taches, #S.dialogues
+        Fenetre.agrandir()
+        egal(taches + 1, #S.taches, 'dans une tâche')
+        S.taches[taches + 1]()
+        egal(dialogues + 1, #S.dialogues, 'la fenêtre de la photo en grand')
+        egal('Claude · 20200710_193347.jpg (Essai) · X-T20 · 10 juil. 2020', S.dialogues[#S.dialogues].title)
         photoActive(4962, 'DSCF4962.RAF')
         Fenetre.majPhoto()
         egal(2, lues, 'une autre photo : lue')

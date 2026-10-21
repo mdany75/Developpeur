@@ -143,7 +143,8 @@ function Vues.grille(f, F, D)
 end
 
 -- La barre sous le fil : ▲ ▼ (carrés à icône seule) et Fin, la position dans le fil, et à droite
--- ce que fait Claude (en orange), sinon le forfait.
+-- ce que fait Claude (en orange), sinon le forfait, aligné sur la marge de droite (les largeurs de
+-- la rangée font D.fil, Dispositions.dimensions).
 function Vues.defilement(f, F, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local pas = math.floor(D.lignes * 0.8)
@@ -165,7 +166,7 @@ function Vues.defilement(f, F, D)
         F.bouton(f, { carre = true, icone = 'chevron-bas', bezel = 22, width = D.fleche, place_vertical = 0.5,
             tooltip = "Redescendre", enabled = bind 'peutDescendre', action = function() F.defiler(-pas) end }),
         f:spacer { width = 4 },
-        F.bouton(f, { carre = true, title = "Fin", bezel = 22, font = P.systeme11, place_vertical = 0.5,
+        F.bouton(f, { carre = true, title = "Fin", bezel = 22, width = D.fin, font = P.systeme11, place_vertical = 0.5,
             tooltip = "Aller au dernier message", enabled = bind 'peutDescendre', action = function() F.defiler('fin') end }),
         f:spacer { width = 8 },
         f:static_text { title = bind 'positionFil', font = P.systeme11, text_color = C.gris, width = D.position, truncation = 'tail',
@@ -220,7 +221,8 @@ function Vues.voyantEcran(f, F, D)
         end })
 end
 
--- Le bandeau, une ligne en petit : un message (orange), sinon l'aide d'un voyant rouge (un clic
+-- Le bandeau, une ligne en petit : un message (orange ; son infobulle le donne en entier, la place
+-- laissée par la rangée du bas en coupe la plupart), sinon l'aide d'un voyant rouge (un clic
 -- l'affiche en entier), sinon les photos jointes (un clic les retire), sinon rien (état 'vide' :
 -- le rappel du style est retiré, demandé par Dany le 20 octobre 2026).
 function Vues.bandeau(f, F, largeur)
@@ -236,7 +238,7 @@ function Vues.bandeau(f, F, largeur)
                 F.retirerJointes()
             end },
         f:static_text { title = bind 'message', font = P.systeme11, text_color = C.orange, width = largeur, truncation = 'tail',
-            visible = F.egal('bandeau', 'message') },
+            visible = F.egal('bandeau', 'message'), tooltip = bind 'message' },
         f:static_text { title = bind 'aide', font = P.systeme11, text_color = C.rouge, width = largeur, truncation = 'tail',
             visible = F.egal('bandeau', 'aide'), tooltip = "Cliquer pour lire l'aide en entier",
             mouse_down = function()
@@ -269,18 +271,19 @@ end
 -- Le Mode, trois boutons radio liés à la clé `mode` (Fenetre.rafraichirMode la tire de l'état ;
 -- Fenetre.changerMode suit un vrai clic) : Appliquer et Proposer d'abord (le mode de la liaison),
 -- Je le fais (l'exercice, 1.3). Grisés pendant que Claude travaille ; Je le fais suit
--- `peutJeLeFais`.
+-- `peutJeLeFais`. Leur valeur passe par F.lierRadio : un clic, même sur le radio déjà coché, annule
+-- l'envoi de la demande que ce clic a validée.
 function Vues.mode(f, F)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     return f:row {
         spacing = 10,
         place_vertical = 0.5,
         f:static_text { title = "Mode :", font = P.systeme12, text_color = C.gris, place_vertical = 0.5 },
-        f:radio_button { title = "Appliquer", value = bind 'mode', checked_value = 'appliquer', size = 'small', enabled = bind 'libre',
+        f:radio_button { title = "Appliquer", value = F.lierRadio 'mode', checked_value = 'appliquer', size = 'small', enabled = bind 'libre',
             tooltip = "Claude applique ses retouches directement" },
-        f:radio_button { title = "Proposer d'abord", value = bind 'mode', checked_value = 'proposer', size = 'small', enabled = bind 'libre',
+        f:radio_button { title = "Proposer d'abord", value = F.lierRadio 'mode', checked_value = 'proposer', size = 'small', enabled = bind 'libre',
             tooltip = "Claude montre d'abord ce qu'il compte changer, et attend votre accord (carte Proposition)" },
-        f:radio_button { title = "Je le fais", value = bind 'mode', checked_value = 'jelefais', size = 'small', enabled = bind 'peutJeLeFais',
+        f:radio_button { title = "Je le fais", value = F.lierRadio 'mode', checked_value = 'jelefais', size = 'small', enabled = bind 'peutJeLeFais',
             tooltip = "Faire la retouche vous-même : Claude donne les réglages dans l'ordre du panneau Développement, "
                 .. "puis compare votre version à la sienne (J'ai fini dans la carte Proposition)" },
     }
