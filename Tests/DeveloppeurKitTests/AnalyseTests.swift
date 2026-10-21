@@ -177,6 +177,102 @@ final class AnalyseTests: XCTestCase {
         XCTAssertNotNil(info["vision"]?["visages"])
     }
 
+    // MARK: Éclairage mixte branché (1.2)
+
+    /// Aperçu de synthèse : une lampe au tiers gauche et une fenêtre ailleurs, ou un gris uni.
+    static func eclairage(mixte: Bool) -> Data {
+        TestSupport.jpegPixels(width: 600, height: 400) { x, _ in
+            mixte ? (x < 200 ? EclairageTests.lampe : EclairageTests.fenetre) : EclairageTests.gris
+        }
+    }
+
+    func testViewPhotoNommeUnEclairageMixte() throws {
+        var image = Self.eclairage(mixte: true)
+        fake.onSend = { [unowned fake] command, _ in
+            if command == "apercu" {
+                fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(image)), "photo": ["id": 1, "fichier": "A.RAF"],
+                                          "echelle_temperature": "kelvins (RAW : 2000 à 50000)", "reglages": ["Temperature": 5000, "Tint": 0]]
+            }
+        }
+        let info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: [:]).text)
+        let eclairage = try XCTUnwrap(info["mesures"]?["eclairage"], "\(info["mesures"] ?? .null)")
+        XCTAssertEqual(eclairage["mixte"], true, "\(eclairage)")
+        XCTAssertTrue(eclairage["lecture"]?.string?.hasPrefix("éclairage mixte : plus chaude tiers gauche") == true)
+        XCTAssertNotNil(eclairage["conseil"])
+        XCTAssertEqual(eclairage["regions_3x3"]?.array?.count, 3)
+        XCTAssertEqual(eclairage["groupes"]?.array?.count, 2)
+        // La balance proposée part de la Temperature brute de la réponse (en kelvins), pas des
+        // réglages regroupés de `info`, qui l'ont perdue : la même que balanceProposee sur la réponse
+        // du module, dès que Vision donne une zone d'intérêt (sur cette image, il en donne une).
+        let decodee = try XCTUnwrap(PreviewImages.image(image))
+        let vision = VisionAnalysis.analyze(decodee)
+        let mesure = try XCTUnwrap(Eclairage.mesurer(PreviewImages.scaled(decodee, maxSide: Measurements.maxSide),
+                                                     visages: vision?.faces.map(\.box) ?? [], sujet: vision?.salientArea))
+        let reponse: JSONValue = ["echelle_temperature": "kelvins (RAW : 2000 à 50000)", "reglages": ["Temperature": 5000, "Tint": 0]]
+        if let attendue = ToolHandler.balanceProposee(mesure, reponse: reponse) {
+            let balance = try XCTUnwrap(eclairage["balance_proposee"], "\(eclairage)")
+            XCTAssertEqual(try XCTUnwrap(balance["Temperature"]?.double), attendue.temperature, accuracy: 0.5)
+            XCTAssertNotEqual(attendue.temperature, 5000, "la lumière du sujet n'est pas neutre")
+        } else {
+            XCTAssertNil(eclairage["balance_proposee"], "sans zone d'intérêt ni visage : pas de lumière du sujet")
+        }
+        XCTAssertNotNil(info["vision"]?["visages"], "vision reste à sa place")
+        XCTAssertNotNil(info["mesures"]?["luminosite_L"])
+
+        image = Self.eclairage(mixte: false)
+        let simple = try XCTUnwrap(JSONCoding.parse(tools.call(name: "view_photo", arguments: [:]).text)["mesures"]?["eclairage"])
+        XCTAssertEqual(simple["mixte"], false)
+        XCTAssertNil(simple["conseil"])
+        XCTAssertNil(simple["regions_3x3"])
+        XCTAssertNil(simple["base"])
+    }
+
+    func testCompareDonneLEclairageAvantEtApres() throws {
+        fake.onSend = { [unowned fake] command, _ in
+            if command == "apercu" {
+                fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(Self.eclairage(mixte: false))),
+                                          "chemin_avant": .string(TestSupport.previewFile(Self.eclairage(mixte: true))), "photo": ["id": 1]]
+            }
+        }
+        let info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: ["compare": "before_claude"]).text)
+        XCTAssertEqual(info["mesures_avant"]?["eclairage"]?["mixte"], true, "l'écart entre zones, avant un masque")
+        XCTAssertEqual(info["mesures"]?["eclairage"]?["mixte"], false, "et après")
+        let court = try XCTUnwrap(info["mesures_avant"]?["eclairage"]?.object)
+        XCTAssertNil(court["visages"])
+        XCTAssertNil(court["conseil"])
+        XCTAssertNil(court["regions_3x3"])
+        XCTAssertNotNil(court["ecart_regions"])
+    }
+
+    func testAnalyzePhotosDitLEclairageMixte() throws {
+        fake.onSend = { [unowned fake] command, params in
+            if command == "apercu", let id = params["photo"]?.int {
+                fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(Self.eclairage(mixte: id == 1))), "photo": ["id": .number(Double(id))]]
+            }
+        }
+        let result = tools.call(name: "analyze_photos", arguments: ["photo_ids": [1, 2]])
+        XCTAssertFalse(result.isError, result.text)
+        let photos = try XCTUnwrap(JSONCoding.parse(result.text)["photos"]?.array)
+        XCTAssertEqual(photos[0]["eclairage"]?["mixte"], true)
+        XCTAssertNotNil(photos[0]["eclairage"]?["ecart_regions"])
+        XCTAssertTrue(photos[0]["eclairage"]?["lecture"]?.string?.hasPrefix("éclairage mixte") == true)
+        XCTAssertEqual(photos[1]["eclairage"]?["mixte"], false)
+    }
+
+    func testPreviewDonneLEclairageDeLaProposition() throws {
+        fake.onSend = { [unowned fake] command, _ in
+            if command == "essayer" {
+                fake!.replies["essayer"] = ["chemin": .string(TestSupport.previewFile(Self.eclairage(mixte: true))), "photo": ["id": 1]]
+            }
+        }
+        let result = tools.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 0.3]])
+        XCTAssertFalse(result.isError, result.text)
+        let proposition = try XCTUnwrap(JSONCoding.parse(result.text)["mesures_proposition"])
+        XCTAssertNotNil(proposition["eclairage"]?["ecart_regions"], "une balance ou un masque proposés se voient à l'écart entre zones")
+        XCTAssertEqual(proposition["eclairage"]?["mixte"], true)
+        XCTAssertNotNil(proposition["luminosite_L"])
+    }
+
     /// Le point de mise au point d'une photo Fujifilm : toujours en chiffres, dessiné avec
     /// af_point ou la préférence « en tout temps » du module ; le chemin et la géométrie ne vont pas
     /// à Claude.

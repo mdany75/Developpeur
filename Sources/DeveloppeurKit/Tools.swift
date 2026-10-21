@@ -65,6 +65,14 @@ public final class ToolHandler {
     /// Plafond de note de chaque photo au dernier cull_photos de cette session, que propose_ratings
     /// fait respecter (Tools+Notation.swift).
     var dernierTri: [Int: Notation.Plafond] = [:]
+    /// Mesures du premier et du dernier view_photo de chaque photo (aperçu entier), par taille
+    /// d'aperçu, pour le bilan du suivant (Bilan.swift) : gardées pour le processus du serveur,
+    /// comme dernierTri ; 30 au plus (`Bilan.photosGardees`). Les appels passent un à un
+    /// (FileOutils) : pas de verrou.
+    var vuesMesurees: [Bilan.Cle: Bilan.Suivi] = [:]
+    /// Mesures des zooms (view_photo avec region) de chaque photo, pour le bilan_zone du zoom
+    /// suivant sur la même zone : 6 par photo (`Bilan.zoomsGardes`), 30 photos au plus.
+    var zoomsMesures: [Int: [Bilan.Zoom]] = [:]
     /// Lecture du boîtier de view_photo (point de mise au point et intention, d'une seule ouverture
     /// de l'original) : un seul lecteur, pour qu'une lecture bloquée (autorisation de macOS) n'en
     /// lance pas d'autres ; les tests le remplacent.

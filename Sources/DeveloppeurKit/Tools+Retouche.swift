@@ -121,7 +121,7 @@ extension ToolHandler {
                  properties: developProperties + writeProperties + targetProperties,
                  required: ["step_name"]),
             tool("preview_settings",
-                 "Proposition visuelle : montre le rendu d'une retouche (mêmes paramètres qu'apply_settings) sans la garder. Le module l'applique, rend l'aperçu, puis remet la photo comme avant : rien n'est mémorisé, mais l'Historique de Lightroom garde deux étapes « Claude · essai ». Permis en mode « Proposer d'abord » : c'est la façon de montrer une proposition avant de demander l'accord.",
+                 "Proposition visuelle : montre le rendu d'une retouche (mêmes paramètres qu'apply_settings) sans la garder. Le module l'applique, rend l'aperçu, puis remet la photo comme avant : rien n'est mémorisé, mais l'Historique de Lightroom garde deux étapes « Claude · essai ». Permis en mode « Proposer d'abord » : c'est la façon de montrer une proposition avant de demander l'accord. Avec compare : « bilan » de l'état actuel à la proposition (mêmes règles que view_photo : une « regression » se corrige dans la proposition avant de l'appliquer).",
                  properties: developProperties + [
                     ("photo_id", photoIDProperty),
                     ("step_name", prop("string", "Nom court de la proposition.")),
@@ -304,13 +304,26 @@ extension ToolHandler {
         var info = Self.labelChanges(Self.withLabels(result, notes: notes)).object ?? [:]
         info.removeValue(forKey: "chemin")
         info.removeValue(forKey: "chemin_actuel")
+        // Mesurées comme l'aperçu de view_photo (un décodage, réduction à 512 px), avec la forme
+        // courte de l'éclairage : une balance ou un masque proposés se voient à l'écart entre zones.
+        // Ni netteté ni bruit : une proposition ne se compare qu'à l'état actuel rendu par la même
+        // commande, jamais à une vue gardée par le bilan de view_photo.
+        let proposition = Self.mesurerImage(proposed, detail: false)
         if compare {
             let current = try Self.readPreview(result["chemin_actuel"]?.string)
             image = PreviewImages.sideBySide(current, proposed) ?? proposed
             info["image"] = "À gauche l'état actuel, à droite la proposition."
-            if let measures = Measurements.analyze(current) { info["mesures_actuelles"] = measures.json }
+            let actuel = Self.mesurerImage(current, detail: false)
+            if let actuel { info["mesures_actuelles"] = actuel.json }
+            if let actuel, let proposition {
+                info["bilan"] = Bilan.avantApres(
+                    avant: actuel.mesures, apres: proposition.mesures, detailAvant: nil, detailApres: nil,
+                    depuis: "l'état actuel : la proposition n'est pas appliquée",
+                    conseil: "Une « regression » se corrige dans la proposition avant de l'appliquer.",
+                    cadreChange: actuel.largeur != proposition.largeur || actuel.hauteur != proposition.hauteur)
+            }
         }
-        if let measures = Measurements.analyze(proposed) { info["mesures_proposition"] = measures.json }
+        if let proposition { info["mesures_proposition"] = proposition.json }
         info["rien_n_est_applique"] = "La photo a été remise comme avant ; apply_settings applique la proposition."
         return ToolResult(content: [Self.imageContent(image), .text(JSONCoding.pretty(.object(info)))])
     }

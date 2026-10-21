@@ -3,8 +3,9 @@ import Foundation
 import Vision
 
 /// Voir et mesurer : `view_photo` (aperçu, zoom sur une zone, avant/après, mesures, netteté et
-/// bruit, Vision), `measure_angle` (angle d'une ligne, pour redresser), `analyze_photos` (mesures
-/// d'une série, écarts avec une référence, photos semblables) et `get_settings`.
+/// bruit, éclairage, Vision, bilan d'une passe à l'autre), `measure_angle` (angle d'une ligne,
+/// pour redresser), `analyze_photos` (mesures d'une série, écarts avec une référence, photos
+/// semblables) et `get_settings`.
 extension ToolHandler {
     /// Taille des aperçus d'analyse : celle où les seuils de netteté et de bruit ont été relevés.
     static let analysisSize = Detail.side
@@ -13,7 +14,7 @@ extension ToolHandler {
     var analysisDefinitions: [JSONValue] {
         [
             tool("view_photo",
-                 "Montre la photo telle qu'elle est développée en ce moment (aperçu JPEG rendu par Lightroom avec les réglages actuels), avec ses données de prise de vue, ses réglages non nuls et des mesures objectives : luminosité L*, centiles, écrêtage (aussi par canal), contraste, dominante des tons neutres, netteté par zone et bruit ; et ce que voit Vision (visages et pupilles, qualité des visages, note esthétique, zone d'intérêt). À appeler avant de retoucher, puis après chaque passe. Mesures sur un JPEG sRGB (une couleur hors du sRGB y paraît écrêtée) ; en HDR (HDREditMode), le rendu SDR : le HDR ne se voit pas. « a_savoir » (calculs IA en attente) : le dire. « evaluation » : la note de Claude gardée pour la photo (pas encore évaluée, à vérifier, acceptée…). « intention_boitier » (fichiers Fujifilm, lue dans l'original) : simulation de film, plage dynamique, tons clairs et foncés, compensation d'exposition et mode choisis à la prise de vue, avec sa « lecture » : la suivre sauf autre demande (une nuit voulue sombre reste sombre ; un RAW part de la simulation choisie). region = zoom à 100 % sur une zone (netteté et bruit en pleine résolution, taches) ; compare = avant/après côte à côte.",
+                 "Montre la photo telle qu'elle est développée en ce moment (aperçu JPEG rendu par Lightroom avec les réglages actuels), avec ses données de prise de vue, ses réglages non nuls et des mesures objectives : luminosité L*, centiles, écrêtage (aussi par canal), contraste, dominante des tons neutres (aussi par zone tonale et par région : « eclairage » nomme un éclairage mixte, lampe et fenêtre, et dit quoi en faire), netteté par zone et bruit ; et ce que voit Vision (visages et pupilles, qualité des visages, note esthétique, zone d'intérêt). À appeler avant de retoucher, puis après chaque passe. « bilan » : écarts chiffrés avec le view_photo précédent de la même photo à la même taille (avant → après, et depuis_le_debut) ; « regression » : un défaut apparu ou aggravé depuis (écrêtage, ombres bouchées, couleurs saturées, dominante, netteté ou bruit passés leur seuil) : le corriger par une passe ciblée, ou undo_last s'il vient de la dernière étape, et le dire ; « a_verifier » : un changement peut-être voulu. Mesures sur un JPEG sRGB (une couleur hors du sRGB y paraît écrêtée) ; en HDR (HDREditMode), le rendu SDR : le HDR ne se voit pas. « a_savoir » (calculs IA en attente) : le dire. « evaluation » : la note de Claude gardée pour la photo (pas encore évaluée, à vérifier, acceptée…). « intention_boitier » (fichiers Fujifilm, lue dans l'original) : simulation de film, plage dynamique, tons clairs et foncés, compensation d'exposition et mode choisis à la prise de vue, avec sa « lecture » : la suivre sauf autre demande (une nuit voulue sombre reste sombre ; un RAW part de la simulation choisie). region = zoom à 100 % sur une zone (netteté et bruit en pleine résolution, taches ; refait sur la même zone : bilan_zone) ; compare = avant/après côte à côte, avec son bilan.",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("size", prop("integer", "Grand côté de l'aperçu en pixels (défaut \(Self.defaultPreviewSize), de \(Self.previewSizes.lowerBound) à \(Self.previewSizes.upperBound)).")),
@@ -38,7 +39,7 @@ extension ToolHandler {
                  ],
                  required: ["x1", "y1", "x2", "y2"]),
             tool("analyze_photos",
-                 "Mesures objectives de plusieurs photos sans les afficher (luminosité L*, contraste, écrêtage, dominante, saturation, netteté, bruit, visages, note esthétique), pour juger, trier ou harmoniser une série. Repère les photos semblables (rafales, quasi-doublons) et la meilleure de chaque groupe. Avec reference_id : écarts de chaque photo avec la référence et indications pour s'en rapprocher (l'exposition en IL ; pour la couleur et le contraste, un sens à vérifier).",
+                 "Mesures objectives de plusieurs photos sans les afficher (luminosité L*, contraste, écrêtage, dominante (et éclairage mixte), saturation, netteté, bruit, visages, note esthétique), pour juger, trier ou harmoniser une série. Repère les photos semblables (rafales, quasi-doublons) et la meilleure de chaque groupe. Avec reference_id : écarts de chaque photo avec la référence et indications pour s'en rapprocher (l'exposition en IL ; pour la couleur et le contraste, un sens à vérifier).",
                  properties: targetProperties + [
                     ("reference_id", prop("integer", "Photo de référence (correspondance de couleur et d'exposition).")),
                  ],
@@ -96,6 +97,8 @@ extension ToolHandler {
         var info = result.object ?? [:]
         info.removeValue(forKey: "chemin")
         info.removeValue(forKey: "chemin_avant")
+        // Les étapes de Claude servent au bilan (il les dit), pas telles quelles à Claude.
+        info.removeValue(forKey: "etapes_claude")
         // Ce qui sert au point de mise au point, pas à Claude.
         let afToujours = info.removeValue(forKey: "point_af_toujours")?.bool == true
         if var photo = info["photo"]?.object {
@@ -123,6 +126,16 @@ extension ToolHandler {
                 var detail = Detail.analyze(piece.data, maxSide: PreviewImages.maxSide)
                 detail?.zoom = true
                 info["mesures_zone"] = Self.merged(measures.json, detail?.json)
+                // Un zoom refait sur la même zone (même cadre, mêmes pixels) : ses chiffres bruts
+                // comparés au précédent, sans alerte. Les vues entières du bilan n'y touchent pas.
+                if let id = result["photo"]?["id"]?.int {
+                    let zoom = Bilan.Zoom(zone: region, cadre: Bilan.cadre(result), pixels: "\(piece.width) × \(piece.height)",
+                                          mesures: measures, detail: detail, quand: Date())
+                    if let precedent = zoomsMesures[id]?.last(where: { $0.correspond(zoom) }) {
+                        info["bilan_zone"] = Bilan.zone(avant: precedent, apres: zoom, date: zoom.quand)
+                    }
+                    garderZoom(zoom, photo: id)
+                }
             }
             // Sur un zoom aussi (demandé par Dany le 20 octobre 2026 : un zoom pour voir la mise au
             // point ne la montrait pas) : le point dans l'image entière, et dans la zone s'il y tombe.
@@ -140,19 +153,47 @@ extension ToolHandler {
                 }
                 info["point_af"] = .object(point)
             }
-        } else if compare != nil {
+        } else if let compare {
             let before = try Self.readPreview(result["chemin_avant"]?.string)
-            if let measures = Measurements.analyze(before) { info["mesures_avant"] = measures.json }
-            if let measures = Measurements.analyze(image) { info["mesures"] = measures.json }
+            // Deux vues rendues par la même commande, mesurées comme l'aperçu entier, avec la forme
+            // courte de l'éclairage ; leur bilan, sans toucher aux vues gardées.
+            let avant = Self.mesurerImage(before, detail: true), apres = Self.mesurerImage(image, detail: true)
+            if let avant { info["mesures_avant"] = avant.json }
+            if let apres { info["mesures"] = apres.json }
+            if let avant, let apres {
+                info["bilan"] = Bilan.avantApres(
+                    avant: avant.mesures, apres: apres.mesures, detailAvant: avant.detail, detailApres: apres.detail,
+                    depuis: compare == "before_claude" ? "l'état d'avant la première retouche de Claude (à gauche)"
+                        : "l'état d'avant la dernière retouche (à gauche)",
+                    conseil: "Une « regression » restée se dit dans le résumé.",
+                    // Des images de dimensions différentes : recadrage, Upright ou rotation entre les deux.
+                    cadreChange: avant.largeur != apres.largeur || avant.hauteur != apres.hauteur)
+            }
             image = PreviewImages.sideBySide(before, image) ?? image
             info["image"] = "À gauche avant, à droite maintenant."
         } else if let decodee = PreviewImages.image(image) {
-            // Un seul décodage du JPEG pour les mesures, le détail et Vision.
-            if let measures = Measurements.analyzeScaled(decodee) {
-                info["mesures"] = Self.merged(measures.json, Detail.analyze(PreviewImages.scaled(decodee, maxSide: Detail.side))?.json)
+            // Un seul décodage du JPEG ; une seule réduction à 512 px pour les mesures, les tons
+            // neutres suivis du bilan et l'éclairage ; le détail à 1024 px ; Vision une fois.
+            let reduite = PreviewImages.scaled(decodee, maxSide: Measurements.maxSide)
+            let measures = Measurements.analyze(reduite)
+            let detail = Detail.analyze(PreviewImages.scaled(decodee, maxSide: Detail.side))
+            let vision = VisionAnalysis.analyze(decodee)
+            if let measures {
+                var mesures = Self.merged(measures.json, detail?.json)
+                // L'éclairage, visages à part (ceux de Vision) ; la balance proposée part de la
+                // balance de la réponse brute (Temperature en kelvins pour un RAW, pas regroupée).
+                if let eclairage = Eclairage.mesurer(reduite, visages: vision?.faces.map(\.box) ?? [], sujet: vision?.salientArea) {
+                    mesures = Self.merged(mesures, ["eclairage": eclairage.json(balance: Self.balanceProposee(eclairage, reponse: result))])
+                }
+                info["mesures"] = mesures
             }
-            if let vision = VisionAnalysis.analyze(decodee) { info["vision"] = vision.json }
+            if let vision { info["vision"] = vision.json }
             info["taille_apercu"] = .number(Double(size))
+            // Le bilan d'une passe à l'autre, sur la réponse brute (géométrie de la photo, réglages
+            // à plat, étapes de Claude) et avant le carré du point de mise au point.
+            if let measures, let bilan = bilanDeLaVue(apercu: result, taille: size, mesures: measures, detail: detail, reduite: reduite) {
+                info["bilan"] = bilan
+            }
             // Le point de mise au point de l'appareil (Fujifilm) : toujours en chiffres, en carré
             // sur l'image avec af_point (pour noter) ou si l'utilisateur le veut en tout temps
             // (préférence du module). Les mesures sont prises avant le carré.
@@ -172,6 +213,74 @@ extension ToolHandler {
             }
         }
         return ToolResult(content: [Self.imageContent(image), .text(JSONCoding.pretty(.object(info)))])
+    }
+
+    /// Le bilan d'un view_photo sur l'aperçu entier (Bilan.swift) : la vue de cette réponse,
+    /// comparée à la précédente de la même photo à la même taille d'aperçu (et à la première), puis
+    /// gardée à sa place. `apercu` : la réponse brute du module (géométrie de la photo, réglages à
+    /// plat, étapes de Claude), lue avant les retraits ; `reduite` : l'aperçu réduit à 512 px des
+    /// mesures. Nil sans identifiant de photo.
+    func bilanDeLaVue(apercu: JSONValue, taille: Int, mesures: PhotoMeasurements, detail: DetailMeasurements?,
+                      reduite: CGImage, quand: Date = Date()) -> JSONValue? {
+        guard let vue = Bilan.Vue(apercu: apercu, quand: quand, taille: taille, mesures: mesures, detail: detail,
+                                  neutres: Measurements.neutres(reduite)) else { return nil }
+        let cle = Bilan.Cle(photo: vue.photo, taille: taille)
+        // Un autre fichier sous le même identifiant (un autre catalogue) : un nouveau départ.
+        guard let suivi = vuesMesurees[cle], suivi.precedente.fichier == vue.fichier else {
+            for (autre, ancien) in vuesMesurees where autre.photo == vue.photo && ancien.precedente.fichier != vue.fichier {
+                vuesMesurees.removeValue(forKey: autre)
+            }
+            let autresTailles = vuesMesurees.keys.filter { $0.photo == vue.photo && $0.taille != taille }.map(\.taille)
+            vuesMesurees[cle] = Bilan.Suivi(depart: vue, precedente: vue)
+            Bilan.elaguer(&vuesMesurees)
+            return .string(Bilan.premiereVue(taille: taille, autresTailles: autresTailles))
+        }
+        // Les tons neutres de cette vue sur les pixels choisis aux vues d'avant, à cadre égal
+        // seulement (un autre cadre déplace les pixels).
+        func suivis(_ autre: Bilan.Vue) -> Measurements.NeutresSuivis? {
+            guard autre.cadre == vue.cadre, let masque = autre.neutres?.masque else { return nil }
+            return Measurements.neutres(reduite, masque: masque)
+        }
+        let json = Bilan.session(precedente: suivi.precedente, depart: suivi.depart, maintenant: vue,
+                                 suiviPrecedente: suivis(suivi.precedente), suiviDepart: suivis(suivi.depart), date: quand)
+        vuesMesurees[cle] = Bilan.Suivi(depart: suivi.depart, precedente: vue)
+        Bilan.elaguer(&vuesMesurees)
+        return json
+    }
+
+    /// Garde un zoom pour le suivant sur la même zone : `Bilan.zoomsGardes` par photo, et
+    /// `Bilan.photosGardees` photos au plus (part celle dont le dernier zoom est le plus ancien).
+    func garderZoom(_ zoom: Bilan.Zoom, photo: Int) {
+        zoomsMesures[photo] = Bilan.ajouter(zoom, a: zoomsMesures[photo] ?? [])
+        guard zoomsMesures.count > Bilan.photosGardees,
+              let ancienne = zoomsMesures.min(by: { ($0.value.last?.quand ?? .distantPast) < ($1.value.last?.quand ?? .distantPast) })?.key
+        else { return }
+        zoomsMesures.removeValue(forKey: ancienne)
+    }
+
+    /// Une image (aperçu d'avant/après, proposition) mesurée comme l'aperçu entier de view_photo :
+    /// un décodage, la réduction à 512 px, et la forme courte de l'éclairage ; le détail (netteté
+    /// et bruit) pour une vue seulement, au bilan.
+    struct ImageMesuree {
+        var largeur: Int
+        var hauteur: Int
+        var mesures: PhotoMeasurements
+        var detail: DetailMeasurements?
+        var eclairage: MesureEclairage?
+
+        /// Les mesures et l'éclairage, sans le détail (qui ne sert qu'au bilan).
+        var json: JSONValue {
+            ToolHandler.merged(mesures.json, eclairage.map { ["eclairage": $0.json(balance: nil, court: true)] })
+        }
+    }
+
+    static func mesurerImage(_ data: Data, detail: Bool) -> ImageMesuree? {
+        guard let image = PreviewImages.image(data) else { return nil }
+        let reduite = PreviewImages.scaled(image, maxSide: Measurements.maxSide)
+        guard let mesures = Measurements.analyze(reduite) else { return nil }
+        return ImageMesuree(largeur: image.width, hauteur: image.height, mesures: mesures,
+                            detail: detail ? Detail.analyze(PreviewImages.scaled(image, maxSide: Detail.side)) : nil,
+                            eclairage: Eclairage.mesurer(reduite))
     }
 
     /// Le profil de Lightroom de la simulation choisie au boîtier, pour l'appareil de la photo
@@ -281,6 +390,12 @@ extension ToolHandler {
                 item["bruit"] = ["aplats": .number((detail.noise * 100).rounded() / 100), "lecture": .string(detail.noiseReading)]
             }
             let vision = VisionAnalysis.analyze(image)
+            // L'éclairage, en trois mots : mixte ou non, l'écart entre zones et sa lecture.
+            if let eclairage = Eclairage.mesurer(image, visages: vision?.faces.map(\.box) ?? [], sujet: vision?.salientArea) {
+                var resume: [String: JSONValue] = ["mixte": .bool(eclairage.mixte), "lecture": .string(eclairage.lecture)]
+                if let ecart = eclairage.ecartRegions { resume["ecart_regions"] = .number((ecart * 10).rounded() / 10) }
+                item["eclairage"] = .object(resume)
+            }
             if let vision {
                 var summary: [String: JSONValue] = ["visages": .number(Double(vision.faces.count))]
                 if let best = vision.faces.compactMap(\.quality).max() { summary["qualite_visage_max"] = .number((best * 100).rounded() / 100) }

@@ -10,8 +10,15 @@ import Foundation
 ///
 /// Seuils d'écart visible repris de match_series (`ToolHandler.seuilExposition`, `seuilContraste`,
 /// `seuilDominante`), de `Measurements.seuilChroma` et de `Detail` (netteté 15 et 35, bruit 0,6
-/// et 1,5). Les autres sont neufs et provisoires : à relever sur de vrais aperçus (copies
-/// « Essai », étape « bilan chiffré » de la recette) avant d'être fixés.
+/// et 1,5). Seuils de régression de l'écrêtage, des ombres, des couleurs saturées et de la
+/// dominante relevés le 20 octobre 2026 ; ceux de la netteté et du bruit, provisoires, à relever
+/// (deux vues, avant et après une étape écrite puis défaite : étape « bilan chiffré » de la recette).
+///
+/// Ne se comparent que des mesures prises de même : deux vues de même taille (deux view_photo de
+/// suite à la même taille donnent les mêmes 43 mesures ; d'une taille à l'autre, la netteté
+/// varie jusqu'à 10 %), ou les deux images d'un même avant/après (view_photo avec compare, ou une
+/// proposition et l'état actuel) ; jamais une proposition à une vue gardée. Netteté et bruit
+/// seulement entre deux vues : une proposition n'en a pas.
 enum Bilan {
     /// Ce qu'un view_photo sur l'aperçu entier laisse au bilan du suivant.
     struct Vue {
@@ -61,10 +68,17 @@ enum Bilan {
 
     /// Un défaut par genre : une régression déjà signalée ne se redit pas dans depuis_le_debut.
     enum Defaut: Hashable {
-        case ecretage, canal, ombres, saturees, nettete, bruit
+        case ecretage, canal, ombres, saturees, dominante, nettete, bruit
     }
 
-    /// Photos dont les vues sont gardées (la plus ancienne part), et zooms gardés par photo.
+    /// Les vues gardées d'une photo à une taille d'aperçu : le bilan ne compare que des aperçus de
+    /// même taille.
+    struct Cle: Hashable {
+        var photo: Int
+        var taille: Int
+    }
+
+    /// Vues gardées (photo et taille ; la plus ancienne part), et zooms gardés par photo.
     static let photosGardees = 30, zoomsGardes = 6
     /// Deux zooms visent la même zone quand chaque coordonnée tombe à cette distance près.
     static let toleranceZone = 0.002
@@ -75,31 +89,41 @@ enum Bilan {
     static let seuilExposition = ToolHandler.seuilExposition, seuilContraste = ToolHandler.seuilContraste,
                seuilDominante = ToolHandler.seuilDominante, seuilChroma = Measurements.seuilChroma
 
-    /// Seuils de visibilité neufs, provisoires, à relever (au-dessus du plancher de deux
-    /// view_photo de suite sans rien changer) : écrêtage, en points de % ; part très saturée, en
-    /// points ; netteté, en % de celle d'avant ; bruit, en niveaux sur 255.
+    /// Seuils de visibilité neufs : écrêtage, en points de % ; part très saturée, en points ;
+    /// netteté, en % de celle d'avant ; bruit, en niveaux sur 255. Au-dessus du plancher de deux
+    /// vues de même taille, nul (relevé le 20 octobre 2026 sur les 8 copies « Essai ») ; leur
+    /// valeur reste provisoire.
     static let ecartEcretage = 0.3, ecartSaturee = 1.0, ecartNettetePct = 10.0, ecartBruit = 0.1
 
-    /// Un seuil de régression : la part d'après atteint `apresMin` et monte d'au moins
-    /// `hausseMin` points, ou de `hausseRelative` fois celle d'avant si c'est plus.
+    /// Un seuil de régression : la part d'après monte d'au moins `hausseMin` points et atteint au
+    /// moins `facteurMin` fois celle d'avant.
     struct Seuil {
-        var apresMin: Double
         var hausseMin: Double
-        var hausseRelative = 0.0
+        var facteurMin = 1.0
 
         func franchi(_ avant: Double, _ apres: Double) -> Bool {
-            apres >= apresMin && apres - avant >= max(hausseMin, hausseRelative * avant)
+            // Une marge d'arrondi : en binaire, 2,4 − 0,4 vaut 1,999…
+            apres - avant >= hausseMin - 1e-9 && apres >= facteurMin * avant - 1e-9
         }
     }
 
-    /// Seuils de régression, provisoires, à relever (copies « Essai » : Exposure, Whites, Blacks,
-    /// Vibrance, Saturation, Dehaze, débruitage, grain).
-    static let regressionEcretage = Seuil(apresMin: 1, hausseMin: 0.5, hausseRelative: 0.5)
-    static let regressionCanal = Seuil(apresMin: 3, hausseMin: 2)
-    static let regressionOmbres = Seuil(apresMin: 1, hausseMin: 0.5, hausseRelative: 0.5)
-    static let regressionSaturees = Seuil(apresMin: 5, hausseMin: 2)
+    /// Seuils de régression relevés le 20 octobre 2026, en propositions sur les copies « Essai »
+    /// (Exposure +0,3 à +1,5, Whites +30 et +60, Blacks −30 et −60, Contrast +40, Vibrance +40,
+    /// Saturation +30, Dehaze +30 ; écarts d'une proposition à une vue jusqu'à 0,9 point
+    /// d'écrêtage, à dépasser). Écrêtage, canal et couleurs très saturées : 2 points de plus, et au
+    /// moins 1,5 fois l'avant. Ombres bouchées : 2 points de plus ; une nuit n'alerte pas d'elle-même
+    /// (le seuil porte sur l'écart, pas sur la valeur).
+    static let regressionEcretage = Seuil(hausseMin: 2, facteurMin: 1.5)
+    static let regressionCanal = Seuil(hausseMin: 2, facteurMin: 1.5)
+    static let regressionOmbres = Seuil(hausseMin: 2)
+    static let regressionSaturees = Seuil(hausseMin: 2, facteurMin: 1.5)
+    /// Dominante des tons neutres qui s'éloigne du neutre (|a*| ou |b*|) d'au moins cette valeur.
+    /// Relevé le 20 octobre 2026 : Tint ±15 donnait a* ±3, Temperature ±600 K jusqu'à 3,1 ;
+    /// plancher de 0,2 d'une proposition à une vue.
+    static let regressionDominante = 2.0
     /// Netteté passée sous un seuil de lecture : seulement avec une baisse d'au moins
     /// `baisseNetteteMin`. Bruit passé au-dessus : avec une hausse d'au moins `hausseBruitMin`.
+    /// Provisoires, à relever.
     static let baisseNetteteMin = 3.0, hausseBruitMin = 0.1
     /// Baisse du bruit (en %) qui fait d'une baisse de netteté l'effet d'un débruitage : le grain
     /// retiré comptait comme détail.
@@ -234,17 +258,23 @@ enum Bilan {
         if suivie, let n0 = neutresAvant, let n1 = neutresApres {
             (a0, b0, a1, b1, part0, part1) = (n0.a, n0.b, n1.a, n1.b, n0.part, n1.part)
         }
+        var dominantes: [String] = []
         if part0 >= PhotoMeasurements.partNeutreMin, part1 >= PhotoMeasurements.partNeutreMin {
             for (nom, x0, x1) in [("dominante_a", a0, a1), ("dominante_b", b0, b1)] {
                 var valeur = ecart(x0, x1)
                 valeur["suivie"] = .bool(suivie)
                 noter(nom, abs(x1 - x0) >= seuilDominante, valeur)
             }
-            // Une dominante qui change de sens, nette des deux côtés : correction dépassée ?
+            let tons = suivie ? "les mêmes tons neutres" : "les tons neutres"
             let legere = PhotoMeasurements.dominanteLegere
-            for (axe, x0, x1, plus, moins) in [("b*", b0, b1, "chaude", "froide"), ("a*", a0, a1, "magenta", "verte")]
-            where x0 * x1 < 0 && abs(x0) >= legere && abs(x1) >= legere {
-                c.aVerifier.append("dominante passée de \(x0 > 0 ? plus : moins) (\(axe) \(nombre(x0, signe: true))) à \(x1 > 0 ? plus : moins) (\(axe) \(nombre(x1, signe: true))) sur \(suivie ? "les mêmes tons neutres" : "les tons neutres") : correction dépassée ?")
+            for (axe, x0, x1, plus, moins) in [("b*", b0, b1, "chaude", "froide"), ("a*", a0, a1, "magenta", "verte")] {
+                if abs(x1) - abs(x0) >= regressionDominante - 1e-9 {
+                    // Une dominante qui s'éloigne du neutre : un défaut apparu ou aggravé.
+                    dominantes.append("dominante accentuée sur \(tons) : \(axe) \(nombre(x0, signe: true)) → \(nombre(x1, signe: true)) (plus \(x1 > 0 ? plus : moins))")
+                } else if x0 * x1 < 0, abs(x0) >= legere, abs(x1) >= legere {
+                    // Une dominante qui change de sens, nette des deux côtés : correction dépassée ?
+                    c.aVerifier.append("dominante passée de \(x0 > 0 ? plus : moins) (\(axe) \(nombre(x0, signe: true))) à \(x1 > 0 ? plus : moins) (\(axe) \(nombre(x1, signe: true))) sur \(tons) : correction dépassée ?")
+                }
             }
         } else {
             c.remarques.append("dominante non comparée : moins de \(nombre(PhotoMeasurements.partNeutreMin, decimales: 0)) % de tons neutres")
@@ -278,6 +308,7 @@ enum Bilan {
         if regressionSaturees.franchi(avant.saturatedShare, apres.saturatedShare) {
             c.regressions.append((.saturees, "couleurs très saturées (C* > \(nombre(PhotoMeasurements.chromaTresSaturee, decimales: 0))) : \(nombre(avant.saturatedShare)) → \(pourcent(apres.saturatedShare)) des pixels"))
         }
+        c.regressions += dominantes.map { (.dominante, $0) }
 
         // Netteté et bruit : à taille et cadre égaux.
         if let d0 = detailAvant, let d1 = detailApres, d0.side == d1.side, !cadreChange {
@@ -316,10 +347,20 @@ enum Bilan {
 
     static let conseilSession = "Une « regression » se corrige par une passe ciblée sur ce seul défaut, ou se défait par undo_last si la dernière étape en est la cause ; la dire à l'utilisateur si elle reste."
     static let baseSession = "Après moins avant. Exposition en IL (luminance médiane) ; dominante sur les mêmes pixels neutres (suivie) si le cadre n'a pas changé ; netteté et bruit à taille d'aperçu et cadre égaux."
-    static let premiereVue = "Premier view_photo de cette photo dans cette session : point de départ du bilan des suivants."
+    /// Le texte du premier view_photo d'une photo à une taille d'aperçu ; `autresTailles` : celles
+    /// où la photo a déjà été vue dans la session (le bilan ne compare que des aperçus de même taille).
+    static func premiereVue(taille: Int, autresTailles: [Int] = []) -> String {
+        guard !autresTailles.isEmpty else {
+            return "Premier view_photo de cette photo dans cette session : point de départ du bilan des suivants."
+        }
+        let deja = autresTailles.sorted().map { "\($0) px" }.joined(separator: ", ")
+        return "Premier view_photo de cette photo à \(taille) px dans cette session : point de départ du bilan des suivants à cette taille "
+            + "(déjà vue à \(deja) : le bilan ne compare que des aperçus de même taille)."
+    }
 
     /// Le bilan d'un view_photo sur l'aperçu entier : écarts avec le précédent de la même photo
-    /// (`precedente`), et depuis le premier de la session (`depart`) s'il est plus ancien.
+    /// (`precedente`), et depuis le premier de la session (`depart`) s'il est plus ancien, tous
+    /// deux à la même taille d'aperçu.
     /// `suiviPrecedente` et `suiviDepart` : les tons neutres de `maintenant` mesurés avec le
     /// masque de `precedente` et de `depart` (nil si le cadre a changé). Une régression qui suit
     /// une annulation, ou un rendu aux calculs IA en attente, passe dans « a_verifier ».
@@ -327,7 +368,7 @@ enum Bilan {
                         suiviPrecedente: Measurements.NeutresSuivis?, suiviDepart: Measurements.NeutresSuivis?,
                         date: Date) -> JSONValue {
         func ilYA(_ quand: Date) -> String { "il y a \(FileOutils.duree(max(0, date.timeIntervalSince(quand))))" }
-        var json: [String: JSONValue] = ["depuis": .string("le view_photo précédent de cette photo, \(ilYA(precedente.quand))")]
+        var json: [String: JSONValue] = ["depuis": .string("le view_photo précédent de cette photo à \(precedente.taille) px, \(ilYA(precedente.quand))")]
 
         // Étapes de Claude depuis le view_photo précédent.
         var annulation = false, etapesIdentiques = precedente.etapes == maintenant.etapes
@@ -396,7 +437,7 @@ enum Bilan {
                              neutresAvant: depart.neutres, neutresApres: suivisDepuis ? suiviDepart : nil,
                              suivis: suivisDepuis, cadreChange: cadreDepuis, grainAjoute: maintenant.grain > depart.grain)
             var debut: [String: JSONValue] = [
-                "depuis": .string("le premier view_photo de la session, \(ilYA(depart.quand))"),
+                "depuis": .string("le premier view_photo à \(depart.taille) px de la session, \(ilYA(depart.quand))"),
                 "ecarts": d.ecarts.isEmpty ? "aucun écart visible" : .object(d.ecarts),
             ]
             let nouvelles = d.regressions.filter { !signalees.contains($0.defaut) }.map(\.texte)
@@ -474,7 +515,7 @@ enum Bilan {
         }
         if !c.aVerifier.isEmpty { json["a_verifier"] = .array(c.aVerifier.map(JSONValue.string)) }
         if !c.remarques.isEmpty { json["remarques"] = .array(c.remarques.map(JSONValue.string)) }
-        json["base"] = "Après moins avant. Exposition en IL d'après la luminance médiane ; dominante sur les tons neutres de chaque image (non suivie : l'image d'avant peut avoir un autre cadre) ; netteté et bruit si les deux images sont mesurées à la même taille."
+        json["base"] = "Après moins avant, sur deux images rendues et mesurées de même. Exposition en IL d'après la luminance médiane ; dominante sur les tons neutres de chaque image (non suivie : l'image d'avant peut avoir un autre cadre) ; netteté et bruit entre deux vues seulement (pas pour une proposition)."
         return .object(json)
     }
 
@@ -506,8 +547,8 @@ enum Bilan {
 
     // MARK: Mémoire des vues
 
-    /// Retire les photos les plus anciennes (d'après leur dernière vue) au-delà de `garder`.
-    static func elaguer(_ suivis: inout [Int: Suivi], garder: Int = photosGardees) {
+    /// Retire les vues les plus anciennes (d'après la dernière) au-delà de `garder`.
+    static func elaguer<Cle: Hashable>(_ suivis: inout [Cle: Suivi], garder: Int = photosGardees) {
         guard suivis.count > garder else { return }
         let anciennes = suivis.sorted { $0.value.precedente.quand < $1.value.precedente.quand }.prefix(suivis.count - garder)
         for (id, _) in anciennes { suivis.removeValue(forKey: id) }

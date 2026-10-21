@@ -332,6 +332,13 @@ function Rendu.apercu(params)
         -- L'évaluation de Claude gardée dans le registre (notation.json) : une photo déjà évaluée
         -- ne se renote pas à chaque retouche.
         infos.evaluation = Notation.resume(photo.localIdentifier)
+        -- Bilan de view_photo (1.2) : les étapes de Claude gardées pour la photo, pour que le
+        -- serveur dise ce qui a changé (ou a été défait) depuis l'aperçu précédent. Lecture seule.
+        local etapes = lireJson(photo, 'etapesClaude', {})
+        infos.etapes_claude = {
+            nombre = #etapes,
+            derniere = etapes[#etapes] and etapes[#etapes].nom or Json.null,
+        }
     else
         infos.photo = decrire(photo, true)
     end

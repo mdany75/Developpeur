@@ -255,7 +255,7 @@ extension ToolHandler {
     static func ecartSerie(_ photo: PhotoSerie, _ reference: PhotoSerie) -> EcartSerie {
         let p = photo.mesures, r = reference.mesures
         let photoY = max(Measurements.luminance(p.medianL), 0.0005), referenceY = max(Measurements.luminance(r.medianL), 0.0005)
-        let neutres = p.neutralShare >= 3 && r.neutralShare >= 3
+        let neutres = p.neutralShare >= PhotoMeasurements.partNeutreMin && r.neutralShare >= PhotoMeasurements.partNeutreMin
         return EcartSerie(exposition: min(max(log2(referenceY / photoY), -3), 3),
                           a: neutres ? r.neutralA - p.neutralA : nil,
                           b: neutres ? r.neutralB - p.neutralB : nil,

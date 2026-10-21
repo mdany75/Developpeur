@@ -5422,5 +5422,72 @@ test("notation : Notation se charge sans l'interface ni la Bibliothèque (la fen
     end
 end)
 
+-- Version 1.2 : bilan de view_photo (étapes de Claude dans l'aperçu) -------------------------
+
+test("apercu : point_af donne les étapes de Claude, pour le bilan de view_photo (1.2)", function()
+    local photo = photoRaw()
+    S.active = photo
+    local resultat = Commandes.executer('apercu', { taille = 1344, cles = {}, point_af = true })
+    egal(resultat.etapes_claude.nombre, 0, "aucune étape de Claude")
+    egal(resultat.etapes_claude.derniere, Json.null, "pas de dernière étape (null en JSON)")
+
+    appliquer({ reglages = { Exposure2012 = 0.3 }, plages = { Exposure2012 = { -5, 5 } }, etape = 'passe 1 : lumière' })
+    local ecritures, appliques = #S.ecritures, #photo.appliques
+    resultat = Commandes.executer('apercu', { taille = 1344, cles = {}, point_af = true })
+    egal(resultat.etapes_claude.nombre, 1)
+    egal(resultat.etapes_claude.derniere, 'Claude · passe 1 : lumière')
+    egal(#S.ecritures, ecritures, "l'aperçu lit les étapes sans écrire dans le catalogue")
+    egal(#photo.appliques, appliques)
+    local relu = Json.decode(Json.encode(resultat))
+    egal(relu.etapes_claude.nombre, 1, "passe en JSON")
+
+    appliquer({ reglages = { Vibrance = 10 }, plages = { Vibrance = { -100, 100 } }, etape = 'passe 2 : couleur' })
+    egal(Commandes.executer('apercu', { taille = 1344, cles = {}, point_af = true }).etapes_claude.derniere, 'Claude · passe 2 : couleur')
+    Commandes.executer('annuler', {})
+    resultat = Commandes.executer('apercu', { taille = 1344, cles = {}, point_af = true })
+    egal(resultat.etapes_claude.nombre, 1, "l'annulation retire l'étape : le serveur le dit « retouche défaite »")
+    egal(resultat.etapes_claude.derniere, 'Claude · passe 1 : lumière')
+
+    -- Sans point_af (aperçus d'analyse, avant/après) : rien de plus.
+    egal(Commandes.executer('apercu', { taille = 1344, cles = {} }).etapes_claude, nil)
+end)
+
+-- Garde de l'étape « éclaircir et assombrir » (1.2) : trois dégradés en une étape, dont un radial
+-- inversé (constaté le 20 octobre 2026 : il n'agit que hors de l'ellipse), puis son avant/après
+-- par view_photo avec compare = previous_step.
+test("apercu : avant/après de l'étape éclaircir et assombrir (etapePrecedente)", function()
+    local photo = photoFuji()
+    S.active = photo
+    Commandes.executer('masquer', {
+        masques = Json.tableau({
+            { type = 'lineaire', de_x = 0.5, de_y = 0, a_x = 0.5, a_y = 0.45, nom = 'Claude · Ciel', locaux = { LocalExposure2012 = -0.125 } },
+            { type = 'radial', centre_x = 0.45, centre_y = 0.4, rayon_x = 0.2, fondu = 90, nom = 'Claude · Sujet', locaux = { LocalExposure2012 = 0.075 } },
+            { type = 'radial', centre_x = 0.45, centre_y = 0.4, rayon_x = 0.7, rayon_y = 0.7, fondu = 90, inverser = true,
+              nom = 'Claude · Bords', locaux = { LocalExposure2012 = -0.1 } },
+        }),
+        etape = 'éclaircir et assombrir', raison = "Mener l'œil au sujet.",
+    })
+    local masques = photo.reglages.MaskGroupBasedCorrections
+    egal(#masques, 3, "les trois dégradés en une étape")
+    local bords = masques[3].CorrectionMasks[1]
+    egal(bords.What, 'Mask/CircularGradient')
+    egal(bords.MaskInverted, true, "radial inversé : il agit hors de l'ellipse")
+    egal(bords.Flipped, true, "forme constatée : Flipped avec MaskInverted")
+    egal(bords.Feather, 90)
+    local etapes = Json.decode(photo.proprietes.etapesClaude)
+    egal(etapes[#etapes].nom, "Claude · éclaircir et assombrir")
+
+    local nombre = #photo.appliques
+    local resultat = Commandes.executer('apercu', { comparer = 'etapePrecedente', taille = 1344, cles = {} })
+    egal(resultat.chemin_avant ~= nil, true, "l'image d'avant l'étape")
+    local avant = photo.appliques[nombre + 1]
+    egal(avant.nom, "Claude · comparaison (avant)")
+    egal(#(avant.reglages.MaskGroupBasedCorrections or {}), 0, "l'avant ne porte aucun des trois dégradés")
+    egal(photo.appliques[nombre + 2].nom, "Claude · comparaison (retour)")
+    egal(#photo.reglages.MaskGroupBasedCorrections, 3, "les trois sont remis ensuite")
+    egal(photo.reglages.MaskGroupBasedCorrections[3].CorrectionMasks[1].MaskInverted, true)
+    egal(resultat.etapes_claude, nil, "un avant/après ne donne pas les étapes : il ne touche pas au bilan des vues")
+end)
+
 print(string.format("%d tests réussis, %d en échec", reussis, echecs))
 os.exit(echecs == 0 and 0 or 1)
