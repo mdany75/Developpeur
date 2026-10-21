@@ -223,6 +223,39 @@ final class ToolsAvancesTests: XCTestCase {
         XCTAssertTrue(JSONCoding.line(description).contains("Peau douce maison"))
     }
 
+    /// La méthode du tireur (Prompts.Tireur) en un seul add_mask : grande zone claire par un dégradé
+    /// linéaire sans le sujet, sujet éclairci par un radial, bords assombris par un radial inversé.
+    /// Les doses de la méthode passent, et le module reçoit les trois masques dans une seule étape.
+    func testTireurMasksGoToTheModuleInOneStep() throws {
+        let result = call("add_mask", [
+            "masks": [
+                ["kind": "linear", "from_x": 0.5, "from_y": 0, "to_x": 0.5, "to_y": 0.45, "adjustments": ["Exposure": -0.5],
+                 "combine": [["mode": "subtract", "kind": "subject"]]],
+                ["kind": "radial", "center_x": 0.45, "center_y": 0.4, "radius_x": 0.2, "feather": 90, "adjustments": ["Exposure": 0.3]],
+                ["kind": "radial", "center_x": 0.45, "center_y": 0.4, "radius_x": 0.7, "radius_y": 0.7, "feather": 80, "invert": true,
+                 "adjustments": ["Exposure": -0.3]],
+            ],
+            "step_name": .string(Prompts.Tireur.nomEtape), "reason": "Mener l'œil au visage.", "photo_ids": [5],
+        ])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertEqual(fake.calls.filter { $0.command == "masquer" }.count, 1, "une seule étape")
+        let masks = try XCTUnwrap(fake.lastParams["masques"]?.array)
+        XCTAssertEqual(masks.count, 3)
+        XCTAssertEqual(masks[0]["type"]?.string, "lineaire")
+        XCTAssertEqual(masks[0]["composants"]?.array?.first?["mode"]?.string, "soustraire", "le sujet retiré du dégradé")
+        XCTAssertEqual(masks[0]["locaux"]?["LocalExposure2012"]?.double ?? 0, -0.125, accuracy: 1e-9)
+        XCTAssertEqual(masks[1]["locaux"]?["LocalExposure2012"]?.double ?? 0, 0.075, accuracy: 1e-9)
+        XCTAssertEqual(masks[1]["fondu"]?.double, 90)
+        XCTAssertEqual(masks[1]["inverser"]?.bool, false)
+        XCTAssertEqual(masks[2]["type"]?.string, "radial")
+        XCTAssertEqual(masks[2]["locaux"]?["LocalExposure2012"]?.double ?? 0, -0.075, accuracy: 1e-9)
+        XCTAssertEqual(masks[2]["fondu"]?.double, 80)
+        XCTAssertEqual(masks[2]["inverser"]?.bool, true, "les bords : l'extérieur de l'ellipse")
+        XCTAssertEqual(masks[2]["rayon_y"]?.double, 0.7)
+        XCTAssertEqual(fake.lastParams["etape"]?.string, "éclaircir et assombrir")
+        XCTAssertEqual(fake.lastParams["photos"], [5])
+    }
+
     func testAddMaskWithLocalCurveGrainAndHue() throws {
         let result = call("add_mask", ["masks": [["kind": "sky", "adjustments": ["Grain": 25, "Hue": 90],
                                                   "tone_curve": ["rgb": [[0, 10], [255, 245]], "blue": [[0, 0], [128, 140], [255, 255]]]]],

@@ -789,6 +789,18 @@ essai('Consignes : chaque photo traitée notée d\'abord, à vérifier, avec le 
     end
 end)
 
+essai('Consignes : le résumé d\'une retouche donne les chiffres du bilan, et dit une régression restée (1.2)', function()
+    local debut = Consignes.texte:find('\n## Fin d\'une tâche\n', 1, true)
+    vrai(debut, 'section Fin d\'une tâche')
+    local fin = Consignes.texte:find('\n## ', debut + 1, true) or (#Consignes.texte + 1)
+    local section = Consignes.texte:sub(debut, fin - 1)
+    for _, morceau in ipairs({ 'chiffres du bilan de view_photo à l\'appui', '« hautes lumières écrêtées : 2,1 → 0,3 % »',
+        'une « regression » restée au bilan se dit', 'Après une tâche sur plusieurs photos', 'sous « Claude · … »' }) do
+        vrai(section:find(morceau, 1, true), 'fin d\'une tâche : ' .. morceau)
+    end
+    vrai(not Consignes.texte:find('\\\n', 1, true), 'lignes recollées')
+end)
+
 -- Liste des conversations -----------------------------------------------------------------------
 
 essai('Conversations : les anciennes séances de notation ne sont pas dans la liste', function()

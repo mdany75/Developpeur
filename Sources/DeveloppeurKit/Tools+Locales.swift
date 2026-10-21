@@ -206,12 +206,12 @@ extension ToolHandler {
         ], required: ["x", "y", "radius"])
         let previewProperties: [(String, JSONValue)] = [
             ("preview", prop("boolean", "true = proposition visuelle seulement (comme preview_settings) : rien n'est gardé.")),
-            ("compare", prop("boolean", "Avec preview : état actuel et proposition côte à côte.")),
+            ("compare", prop("boolean", "Avec preview : état actuel et proposition côte à côte, avec leur bilan chiffré.")),
             ("size", prop("integer", "Avec preview : grand côté de l'aperçu (défaut \(Self.defaultPreviewSize)).")),
         ]
         return [
             tool("add_mask",
-                 "Ajoute des masques avec leurs réglages locaux, en une étape « Claude · <step_name> » : masques IA (sujet, ciel, arrière-plan, parties d'une personne, éléments de paysage, objet désigné par un cadre ou un trait) que Lightroom calcule pour chaque photo, dégradés linéaires et radiaux, plage de luminance, pinceau (dodge and burn, le long de traits), et masques combinés (combine : ajouter, soustraire ou intersecter d'autres zones, par exemple le ciel sans le bâtiment). Les positions se donnent dans l'image telle que la montre view_photo ; le serveur recale celles des dégradés, des traits et des objets sur la correction d'objectif, Upright et la perspective. Effets de Lightroom (effect), courbe du masque (tone_curve). Les masques déjà présents restent ; undo_last retire ceux de l'étape. Respecte le mode « Proposer d'abord » (confirm).",
+                 "Ajoute des masques avec leurs réglages locaux, en une étape « Claude · <step_name> » : masques IA (sujet, ciel, arrière-plan, parties d'une personne, éléments de paysage, objet désigné par un cadre ou un trait) que Lightroom calcule pour chaque photo, dégradés linéaires et radiaux, plage de luminance, pinceau (dodge and burn, le long de traits), et masques combinés (combine : ajouter, soustraire ou intersecter d'autres zones, par exemple le ciel sans le bâtiment). Les positions se donnent dans l'image telle que la montre view_photo ; le serveur recale celles des dégradés, des traits et des objets sur la correction d'objectif, Upright et la perspective. Effets de Lightroom (effect), courbe du masque (tone_curve). Les masques déjà présents restent ; undo_last retire ceux de l'étape. Respecte le mode « Proposer d'abord » (confirm). " + Prompts.Tireur.resume,
                  properties: [("masks", ["type": "array", "items": mask, "minItems": 1, "maxItems": .number(Double(Self.maxMasks)),
                                          "description": "Masques à ajouter."])] + writeProperties + targetProperties + previewProperties,
                  required: ["masks", "step_name"]),

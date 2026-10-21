@@ -1,5 +1,6 @@
 -- essais-moteur.lua : essais du moteur de conversation pour la notation, hors de Lightroom (LuaJIT,
--- Lightroom simulé par Simulation.lua) : consignes des notes et des passes, séance de notation
+-- Lightroom simulé par Simulation.lua) : consignes des notes et des passes, consignes de la 1.2
+-- (peau dosée, section Écran, invites Portrait, Paysage et Noir et blanc du tireur), séance de notation
 -- (sa conversation, sans changer celle de la fenêtre Claude), consignes écrites dans le dossier de
 -- la session, élément « notation » du fil (entrée de propose_ratings, réponse du connecteur),
 -- stockage des notes. Le moteur est éprouvé avec faux-claude.sh (cas NOTE-LES) : ni Claude, ni
@@ -98,6 +99,69 @@ essai('Consignes : puce Notes des garde-fous, chaque photo traitée notée d\'ab
     contient(gardeFous, "Toute photo que tu traites, note-la d'abord, avant d'y toucher", 'puce Notes')
     contient(gardeFous, "ta note arrive « à vérifier » dans la carte Note", 'puce Notes')
     egal(nil, Consignes.noterPhoto)
+end)
+
+-- Une section des consignes, de son titre (« ## … ») au titre suivant.
+local function section(titre)
+    local debut = Consignes.texte:find('\n## ' .. titre .. '\n', 1, true)
+    vrai(debut, 'section ' .. titre)
+    local fin = Consignes.texte:find('\n## ', debut + 1, true) or (#Consignes.texte + 1)
+    return Consignes.texte:sub(debut, fin - 1)
+end
+
+essai('Consignes : peau dosée comme le dit add_mask, plus lisse seulement sur demande (1.2)', function()
+    local gardeFous = section('Garde-fous')
+    contient(gardeFous, '- Peau : dosée comme le dit add_mask (effect « Peau du visage lisse » par défaut)', 'puce Peau')
+    contient(gardeFous, 'smoothing_requested = true', 'puce Peau')
+    contient(gardeFous, 'si son guide de style le dit', 'puce Peau')
+    local style = section('Style')
+    contient(style, '« Peau adoucie » : la dose « Adoucir la peau (Lite) » d\'add_mask', 'style Peau adoucie')
+    contient(style, 'rien pour un enfant', 'style Peau adoucie')
+    contient(style, 'la moitié de la dose (amount) pour un homme ou une personne âgée', 'style Peau adoucie')
+    -- Les chiffres restent au connecteur (Peau.dosage) : la fenêtre y renvoie sans les répéter.
+    vrai(not style:find('−35', 1, true) and not style:find('−15', 1, true) and not style:find('amount 50', 1, true),
+        'aucune dose chiffrée dans la fenêtre')
+    vrai(not Consignes.texte:find('texture et clarté réduites', 1, true), 'ancienne phrase retirée')
+    vrai(not Consignes.texte:find('\\\n', 1, true), 'lignes recollées')
+    -- La définition du style « Or et peau douce » ne change pas (tests.lua la vérifie mot pour mot).
+    egal('tons dorés chaleureux, peau adoucie (texture et clarté réduites sur la peau seulement), contraste doux',
+        Consignes.style('or_peau_douce').definition)
+end)
+
+essai('Consignes : invites Portrait, Paysage et Noir et blanc, éclaircir et assombrir avec leur avant/après (1.2)', function()
+    local vues = {}
+    for _, invite in ipairs(Consignes.invites) do
+        vues[invite.id] = invite
+    end
+    for _, id in ipairs({ 'portrait', 'paysage', 'noir_et_blanc' }) do
+        vrai(vues[id], 'invite ' .. id)
+        contient(vues[id].message, 'éclaircis et assombris comme un tireur', id)
+        contient(vues[id].message, "doses d'add_mask", id)
+        contient(vues[id].message, 'avant/après de cette étape', id)
+        -- Aucune dose chiffrée : elles arrivent par la description d'add_mask.
+        vrai(not vues[id].message:find('IL', 1, true) and not vues[id].message:find('%d'), id .. ' sans chiffres')
+    end
+    contient(vues.portrait.message, "mener l'œil au visage", 'portrait')
+    contient(vues.portrait.message, 'Reste naturel.', 'portrait')
+    egal('Portrait', vues.portrait.titre)
+    vrai(not vues.retouche_pro.message:find('tireur', 1, true), 'retouche pro inchangée')
+    -- La méthode reste au connecteur (en-tête de Consignes.lua) : rien dans les consignes.
+    vrai(not Consignes.texte:find('tireur', 1, true), 'consignes sans la méthode du tireur')
+    egal(6, #Consignes.invites)
+end)
+
+essai('Consignes : section Écran, dite une fois par conversation (1.2)', function()
+    local ecran = section('Écran')
+    contient(ecran, 'sans passer par l\'écran', 'section Écran')
+    contient(ecran, 'une fois par conversation', 'section Écran')
+    contient(ecran, 'get_status : ecran', 'section Écran')
+    contient(ecran, 'la peau ou les couleurs', 'section Écran')
+    -- Après le contexte, avant les garde-fous.
+    local contexte = Consignes.texte:find('\n## Contexte\n', 1, true)
+    local position = Consignes.texte:find('\n## Écran\n', 1, true)
+    local gardeFous = Consignes.texte:find('\n## Garde-fous\n', 1, true)
+    vrai(contexte < position and position < gardeFous, 'ordre des sections')
+    vrai(not Consignes.texte:find('\\\n', 1, true), 'lignes recollées')
 end)
 
 essai('Consignes : plus de Séance de notation (retirée le 20 octobre 2026)', function()

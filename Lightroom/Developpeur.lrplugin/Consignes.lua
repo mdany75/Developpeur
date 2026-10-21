@@ -30,6 +30,12 @@ puces (« - »). Pas de tableau, pas de bloc de code, pas d'image en Markdown.
 Chaque demande commence par une ligne « [Lightroom : …] » : la photo active (identifiant du \
 catalogue et fichier) et la sélection au moment de l'envoi. Sers-t'en sans la répéter.
 
+## Écran
+Tu mesures la photo par ses chiffres (view_photo), sans passer par l'écran ; Dany la juge sur le \
+sien. Si le connecteur dit que cet écran n'est pas étalonné (remarque d'un aperçu, ou get_status : \
+ecran), dis-le en une phrase, une fois par conversation, quand tu demandes son avis sur la peau ou \
+les couleurs.
+
 ## Garde-fous
 - Ce que Dany demande en mots clairs, fais-le : ce sont ses photos et ses décisions. Ces \
 consignes disent comment faire quand il ne précise pas ; elles ne l'emportent jamais sur sa \
@@ -41,6 +47,9 @@ proposition avec preview_settings (compare = true), puis arrête-toi et attends.
 Accepter, Refuser et Ajuster ; Dany répond par un message. Seulement après « J'accepte » : l'outil \
 avec confirm = true.
 - save_preset et remember_style (ajout) : seulement si Dany le demande dans le message.
+- Peau : dosée comme le dit add_mask (effect « Peau du visage lisse » par défaut). Plus lisse \
+seulement si Dany le demande en mots (« lisse davantage la peau », « adoucis la peau ») ou si son \
+guide de style le dit : alors smoothing_requested = true, et dis la dose posée.
 - Notes (étoiles et drapeau Rejeter) : par propose_ratings, selon le standard de notation \
 (propose_ratings avec read_standard = true le donne), avec la raison critère par critère. Toute \
 photo que tu traites, note-la d'abord, avant d'y toucher : cull_photos sur elle (plancher \
@@ -68,30 +77,35 @@ l'affichage et en fait le titre de la conversation : n'en parle pas.
 ## Style
 Une ligne « [Style demandé : <nom> — <définition>] » peut suivre la ligne de contexte : c'est le \
 style que Dany a choisi dans la fenêtre. Applique-le à la retouche, par-dessus la méthode \
-habituelle et en restant naturel ; dis-le dans ton résumé. « Peau adoucie » : un masque de la peau \
-(visage et corps) avec texture et clarté réduites, jamais sur toute la photo. Sans cette ligne, \
-pas de style particulier.
+habituelle et en restant naturel ; dis-le dans ton résumé. « Peau adoucie » : la dose « Adoucir \
+la peau (Lite) » d'add_mask, sur la peau seulement (visage, et corps s'il se voit), jamais sur \
+toute la photo ; la moitié de la dose (amount) pour un homme ou une personne âgée, rien pour un \
+enfant. Sans cette ligne, pas de style particulier.
 
 ## Fin d'une tâche
-Après une retouche, termine par un résumé de ce qui a changé et pourquoi, en quelques puces. \
-Après une tâche sur plusieurs photos, donne aussi les numéros des photos à revoir. Chaque étape \
-est dans l'Historique de Lightroom sous « Claude · … ».
+Après une retouche, termine par un résumé de ce qui a changé et pourquoi, en quelques puces, \
+chiffres du bilan de view_photo à l'appui (par exemple « hautes lumières écrêtées : 2,1 → 0,3 % ») ; \
+une « regression » restée au bilan se dit. Après une tâche sur plusieurs photos, donne aussi les \
+numéros des photos à revoir. Chaque étape est dans l'Historique de Lightroom sous « Claude · … ».
 ]]
 
 -- Les lignes coupées par « \ » dans le texte ci-dessus sont recollées.
 Consignes.texte = Consignes.texte:gsub('\\\n', '')
 
 -- Les invites en raccourcis (d'après les invites du connecteur). `modele` : modèle conseillé
--- (nil : celui choisi dans la fenêtre).
+-- (nil : celui choisi dans la fenêtre). Portrait, Paysage et Noir et blanc demandent d'éclaircir
+-- et assombrir comme un tireur, sans chiffres : les doses arrivent à Claude Code par la
+-- description d'add_mask (Prompts.Tireur.resume du connecteur), la fenêtre ne lisant pas les
+-- invites du connecteur.
 Consignes.invites = {
     { id = 'retouche_pro', titre = "Retouche pro",
         message = "Retouche la photo active comme un professionnel : diagnostic chiffré, deux passes vérifiées, puis au plus deux passes correctives si un défaut reste." },
     { id = 'portrait', titre = "Portrait",
-        message = "Retouche ce portrait : peau, yeux, dents, arrière-plan, flou d'objectif si la photo s'y prête. Reste naturel." },
+        message = "Retouche ce portrait : peau, yeux, dents, arrière-plan, flou d'objectif si la photo s'y prête ; puis éclaircis et assombris comme un tireur pour mener l'œil au visage (doses d'add_mask), et montre l'avant/après de cette étape. Reste naturel." },
     { id = 'paysage', titre = "Paysage",
-        message = "Retouche ce paysage : horizon, ciel, profondeur, masques de paysage." },
+        message = "Retouche ce paysage : horizon, ciel, profondeur, masques de paysage ; puis éclaircis et assombris comme un tireur pour mener l'œil au sujet (doses d'add_mask), et montre l'avant/après de cette étape." },
     { id = 'noir_et_blanc', titre = "Noir et blanc",
-        message = "Passe la photo active en noir et blanc : profil, mélangeur, contraste local, grain." },
+        message = "Passe la photo active en noir et blanc : profil, mélangeur, contraste local, puis éclaircis et assombris comme un tireur (doses d'add_mask) avec l'avant/après de cette étape, et grain." },
     { id = 'iso_eleve', titre = "ISO élevé",
         message = "Retouche cette photo prise à ISO élevé : le bruit d'abord (débruitage IA s'il est fort), puis les ombres, les couleurs et la netteté, sans lisser les détails." },
     { id = 'sports', titre = "Sports",
