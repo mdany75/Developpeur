@@ -5489,23 +5489,163 @@ test("apercu : avant/après de l'étape éclaircir et assombrir (etapePrecedente
     egal(resultat.etapes_claude, nil, "un avant/après ne donne pas les étapes : il ne touche pas au bilan des vues")
 end)
 
--- Forme constatée du dégradé radial (20 octobre 2026) : Flipped = true, inversé ou non. Le module la
--- pose (Locaux.radial) ; la simulation refuse un radial sans elle, que Lightroom n'a pas éprouvé.
-test("simulation : un dégradé radial sans Flipped est refusé (forme constatée)", function()
-    local Locaux = require 'Locaux'
-    for _, inverse in ipairs({ false, true }) do
-        local m = Locaux.radial(0.2, 0.2, 0.8, 0.8, 0, 80, 'Claude · Bords', inverse)
-        egal(m.Flipped, true, "le module pose la forme constatée")
-        egal(m.MaskInverted, inverse)
-        local photo = photoRaw()
+-- Radial inversé (1.2, constaté le 20 octobre 2026 dans Lightroom Classic 15.6) : la forme qu'écrit
+-- Locaux.radial (Mask/CircularGradient, Flipped = true, l'inversion par MaskInverted seul) agit hors
+-- de l'ellipse quand elle est inversée, dans l'ellipse sinon. Ces essais la figent clé par clé, puis
+-- vérifient que la simulation refuse toute autre forme, par les deux chemins d'écriture du module.
+local FORME_RADIAL = {
+    What = 'Mask/CircularGradient', MaskActive = true, MaskBlendMode = 0, MaskValue = 1,
+    Angle = 15, Feather = 80, Midpoint = 50, Roundness = 0, Flipped = true, Version = 2,
+}
+local CLES_RADIAL = { 'What', 'MaskActive', 'MaskBlendMode', 'MaskID', 'MaskInverted', 'MaskName', 'MaskSyncID', 'MaskValue',
+    'Left', 'Top', 'Right', 'Bottom', 'Angle', 'Feather', 'Midpoint', 'Roundness', 'Flipped', 'Version' }
+
+test("Locaux.radial : la forme constatée, Flipped avec MaskInverted, clé par clé", function()
+    local connues = {}
+    for _, cle in ipairs(CLES_RADIAL) do
+        connues[cle] = true
+    end
+    for _, inverse in ipairs({ true, false }) do
+        local m = Locaux.radial(0.1, 0.2, 0.9, 0.8, 15, 80, 'Claude · Bords', inverse)
+        for cle in pairs(m) do
+            egal(connues[cle], true, "clé de plus dans le radial (forme non constatée) : " .. tostring(cle))
+        end
+        for _, cle in ipairs(CLES_RADIAL) do
+            egal(m[cle] ~= nil, true, "clé du radial constaté : " .. cle)
+        end
+        for cle, valeur in pairs(FORME_RADIAL) do
+            egal(m[cle], valeur, "radial " .. (inverse and "inversé" or "droit") .. ", " .. cle)
+        end
+        egal(m.MaskInverted, inverse, "l'inversion passe par MaskInverted seul")
+        proche(m.Left, 0.1) proche(m.Top, 0.2) proche(m.Right, 0.9) proche(m.Bottom, 0.8)
+        egal(m.MaskName, 'Claude · Bords')
+    end
+    local defaut = Locaux.radial(0.2, 0.2, 0.8, 0.8)
+    egal(defaut.Flipped, true, "Flipped même sans inversion demandée")
+    egal(defaut.MaskInverted, false)
+    egal(defaut.Angle, 0) egal(defaut.Feather, 50)
+end)
+
+test("simulation : un radial sans la forme constatée est refusé (Flipped, MaskInverted)", function()
+    local photo = photoRaw()
+    local function radial(champ, valeur)
+        local m = Locaux.radial(0.2, 0.2, 0.8, 0.8, 0, 80, 'Claude · Bords', true)
+        m[champ] = valeur
+        return { MaskGroupBasedCorrections = { Locaux.correction('Claude · Bords', 1, { LocalExposure2012 = -0.075 }, { m }) } }
+    end
+    local refus = {
+        { 'Flipped', nil, "Flipped = true" }, { 'Flipped', false, "Flipped = true" }, { 'Flipped', 'true', "Flipped = true" },
+        { 'MaskInverted', nil, "MaskInverted vrai ou faux" }, { 'MaskInverted', 1, "MaskInverted vrai ou faux" },
+    }
+    for _, cas in ipairs(refus) do
         S.ecritureEnCours = true
-        photo:applyDevelopSettings({ MaskGroupBasedCorrections = { Locaux.correction('x', 1, { LocalExposure2012 = -0.1 }, { m }) } }, 'essai')
-        m.Flipped = nil
-        echoue(function()
-            photo:applyDevelopSettings({ MaskGroupBasedCorrections = { Locaux.correction('y', 1, { LocalExposure2012 = -0.1 }, { m }) } }, 'essai')
-        end, "Flipped = true")
+        echoue(function() photo:applyDevelopSettings(radial(cas[1], cas[2]), 'essai') end, cas[3])
+        echoue(function() photo:applyDevelopPreset({ nom = 'essai', reglages = radial(cas[1], cas[2]) }) end, cas[3])
         S.ecritureEnCours = false
     end
+    -- Un composant d'un masque combiné est vérifié de même.
+    local sujet = Locaux.masqueIA(1, nil, 'Claude · Sujet', false)
+    local bords = Locaux.combiner(Locaux.radial(0.2, 0.2, 0.8, 0.8, 0, 80, nil, false), 'intersecter', true)
+    bords.Flipped = nil
+    S.ecritureEnCours = true
+    echoue(function()
+        photo:applyDevelopSettings({ MaskGroupBasedCorrections = { Locaux.correction('x', 1, {}, { sujet, bords }) } }, 'essai')
+    end, "Flipped = true")
+    -- La forme de Locaux.radial passe, inversée ou non.
+    photo:applyDevelopSettings(radial('Flipped', true), 'essai')
+    photo:applyDevelopSettings(radial('MaskInverted', false), 'essai')
+    S.ecritureEnCours = false
+    egal(photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1].Flipped, true)
+end)
+
+test("masquer : le radial inversé garde la forme constatée, par applyDevelopSettings et par un paramètre prédéfini", function()
+    local bords = { type = 'radial', centre_x = 0.5, centre_y = 0.5, rayon_x = 0.7, rayon_y = 0.7, fondu = 80, inverser = true,
+        nom = 'Claude · Bords', locaux = { LocalExposure2012 = -0.075 } }
+    local photo = photoFuji()
+    S.active = photo
+    Commandes.executer('masquer', { masques = Json.tableau({ bords }), etape = 'bords' })
+    egal(#photo.appliques > 0, true, "le radial est écrit")
+    for _, applique in ipairs(photo.appliques) do
+        egal(applique.preset, nil, "un radial seul : par applyDevelopSettings, sans paramètre prédéfini")
+    end
+    local m = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1]
+    egal(m.What, 'Mask/CircularGradient') egal(m.Flipped, true) egal(m.MaskInverted, true)
+
+    photo = photoFuji()
+    S.active = photo
+    Commandes.executer('masquer', {
+        masques = Json.tableau({ { type = 'ia', soustype = 2, nom = 'Claude · Ciel', locaux = { LocalExposure2012 = -0.15 }, quantite = 1 }, bords }),
+        etape = 'ciel et bords',
+    })
+    egal(photo.appliques[#photo.appliques].preset ~= nil, true, "avec un masque IA : par un paramètre prédéfini")
+    m = photo.reglages.MaskGroupBasedCorrections[2].CorrectionMasks[1]
+    egal(m.What, 'Mask/CircularGradient') egal(m.Flipped, true) egal(m.MaskInverted, true)
+
+    -- Si Locaux.radial changeait de forme (ici sans Flipped), la simulation refuserait l'écriture.
+    local radial = Locaux.radial
+    Locaux.radial = function(...)
+        local r = radial(...)
+        r.Flipped = nil
+        return r
+    end
+    photo = photoFuji()
+    S.active = photo
+    local ok, erreur = pcall(Commandes.executer, 'masquer', { masques = Json.tableau({ bords }), etape = 'bords' })
+    Locaux.radial = radial
+    egal(ok, false, "un radial sans Flipped est refusé")
+    egal(tostring(erreur):find('Flipped = true', 1, true) ~= nil, true, "la raison : " .. tostring(erreur))
+end)
+
+-- Les autres chemins qui posent ou inversent un radial (plan du tireur : recopie, edit_mask
+-- dupliquer inversé, composant d'un masque combiné) gardent la forme constatée : Flipped vrai,
+-- l'inversion par MaskInverted seul. S'ils basculaient Flipped, la simulation refuserait l'écriture.
+test("radial : composant intersecté, dupliqué inversé et copié, toujours Flipped avec MaskInverted", function()
+    local photo = photoFuji()
+    S.active = photo
+    -- Le ciel limité à l'ellipse (intersection = soustraction du radial inversé, Locaux.combiner).
+    Commandes.executer('masquer', {
+        masques = Json.tableau({ {
+            type = 'ia', soustype = 2, nom = 'Claude · Ciel au centre', locaux = { LocalExposure2012 = -0.1 },
+            composants = Json.tableau({
+                { mode = 'intersecter', type = 'radial', centre_x = 0.5, centre_y = 0.4, rayon_x = 0.3, fondu = 80, nom = 'Centre' },
+            }),
+        } }),
+        etape = 'ciel au centre',
+    })
+    local composant = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[2]
+    egal(composant.What, 'Mask/CircularGradient')
+    egal(composant.Flipped, true, "composant intersecté : Flipped gardé")
+    egal(composant.MaskBlendMode, 1) egal(composant.MaskInverted, true, "l'intersection passe par MaskInverted")
+
+    -- edit_mask, dupliquer inversé : la copie d'un radial s'inverse par MaskInverted seul.
+    photo = photoFuji()
+    S.active = photo
+    Commandes.executer('masquer', {
+        masques = Json.tableau({ { type = 'radial', centre_x = 0.5, centre_y = 0.5, rayon_x = 0.3, fondu = 80,
+            nom = 'Claude · Sujet', locaux = { LocalExposure2012 = 0.075 } } }),
+        etape = 'sujet',
+    })
+    Commandes.executer('masques', { action = 'dupliquer', masque = 1, inverser = true, nom = 'Bords' })
+    local masques = photo.reglages.MaskGroupBasedCorrections
+    egal(#masques, 2)
+    egal(masques[1].CorrectionMasks[1].Flipped, true) egal(masques[1].CorrectionMasks[1].MaskInverted, false)
+    egal(masques[2].CorrectionName, 'Claude · Bords')
+    egal(masques[2].CorrectionMasks[1].Flipped, true, "la copie inversée garde Flipped")
+    egal(masques[2].CorrectionMasks[1].MaskInverted, true, "la copie s'inverse par MaskInverted")
+
+    -- Copie des masques vers une autre photo : le radial inversé arrive tel quel.
+    local cible = photoFuji()
+    cible.localIdentifier = 5
+    S.photos[5] = cible
+    local source = photoFuji()
+    source.reglages.MaskGroupBasedCorrections = {
+        Locaux.correction('Claude · Bords', 1, { LocalExposure2012 = -0.075 }, { Locaux.radial(0.1, 0.1, 0.9, 0.9, 0, 80, 'Bords', true) }),
+    }
+    S.active = cible
+    Commandes.executer('copier', { source = 4, photos = { 5 }, cles = {}, inclure = { masques = true }, etape = 'copie' })
+    local copie = cible.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1]
+    egal(copie.What, 'Mask/CircularGradient')
+    egal(copie.Flipped, true, "copié : Flipped gardé") egal(copie.MaskInverted, true, "copié : toujours inversé")
 end)
 
 print(string.format("%d tests réussis, %d en échec", reussis, echecs))
