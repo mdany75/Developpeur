@@ -121,13 +121,12 @@ function Vues.voyants(f, F, sens, largeur, ecart)
 end
 
 -- Le bandeau, une ligne en petit : un message (orange), sinon l'aide d'un voyant rouge (un clic
--- l'affiche en entier), sinon les photos jointes (un clic les retire), sinon le rappel du style.
+-- l'affiche en entier), sinon les photos jointes (un clic les retire), sinon rien (état 'vide' :
+-- le rappel du style est retiré, demandé par Dany le 20 octobre 2026).
 function Vues.bandeau(f, F, largeur)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     return f:column {
         place = 'overlapping',
-        f:static_text { title = "ajouté à chaque demande, invites comprises", font = P.petit, text_color = C.gris,
-            width = largeur, visible = F.egal('bandeau', 'rappel') },
         f:static_text { title = bind { key = 'jointes', transform = function(v) return tostring(v or '') .. "  ·  cliquer pour retirer" end },
             font = P.petit, text_color = C.gris, width = largeur, truncation = 'middle', visible = F.egal('bandeau', 'jointes'),
             tooltip = "Cliquer pour retirer les photos jointes",
@@ -233,32 +232,14 @@ end
 
 -- Demandes -------------------------------------------------------------------------------------
 
--- Noter : la photo active (une photo) ou la séance de notation (plusieurs photos sélectionnées).
-function Vues.boutonNoter(f, F, petit)
-    return F.bouton(f, { title = "Noter", size = petit and 'small' or nil, enabled = F.bind 'libre',
-        tooltip = "Claude propose une note pour la photo active ; plusieurs photos sélectionnées : la séance de notation",
-        action = function() F.enTache(F.noter) end })
-end
-
-function Vues.boutonSeance(f, F, petit)
-    return F.bouton(f, { title = "Séance…", size = petit and 'small' or nil,
-        tooltip = "Séance de notation : une sélection ou une collection, passe par passe",
-        action = function() F.seance() end })
-end
-
--- Les invites en raccourcis, D.invitesParRangee par rangée (toutes sur une sans elle) ; le bouton
--- Noter en tête si D.noterDansInvites ; en petit si D.invitesPetites.
+-- Les invites en raccourcis, D.invitesParRangee par rangée (toutes sur une sans elle) ; le menu
+-- Style au bout de la dernière rangée, sans étiquette (demandé par Dany le 20 octobre 2026).
 function Vues.invites(f, F, D)
-    local taille = D.invitesPetites and 'small' or nil
     local boutons = {}
-    if D.noterDansInvites then
-        boutons[#boutons + 1] = Vues.boutonNoter(f, F, D.invitesPetites)
-    end
     for _, invite in ipairs(Consignes.invites) do
         boutons[#boutons + 1] = F.bouton(f, {
             title = invite.titre,
             tooltip = invite.message,
-            size = taille,
             enabled = F.bind 'libre',
             action = function() F.envoyer(invite.message, invite.modele) end,
         })
@@ -270,7 +251,11 @@ function Vues.invites(f, F, D)
         for k = debut, math.min(#boutons, debut + parRangee - 1) do
             rangee[#rangee + 1] = boutons[k]
         end
-        rangees[#rangees + 1] = f:row(rangee)
+        rangees[#rangees + 1] = rangee
+    end
+    table.insert(rangees[#rangees], Vues.style(f, F, D))
+    for i, rangee in ipairs(rangees) do
+        rangees[i] = f:row(rangee)
     end
     if #rangees == 1 then
         return rangees[1]
@@ -278,35 +263,37 @@ function Vues.invites(f, F, D)
     return f:column(rangees)
 end
 
--- « Style » et son menu ; le bandeau à droite si D.bandeau (sa largeur).
+-- Le menu Style seul (D.style de large) : joint à chaque demande, invites comprises.
 function Vues.style(f, F, D)
     local styles = {}
     for _, st in ipairs(Consignes.styles) do
         styles[#styles + 1] = { title = st.title, value = st.value }
     end
+    return f:popup_menu { items = styles, value = F.bind 'style', width = D.style, enabled = F.bind 'libre',
+        tooltip = "Style de retouche joint à chaque demande, invites comprises (Standard : rien d'ajouté)" }
+end
+
+-- ▲ et ▼ en petit, pour faire défiler un texte trop long d'une carte (clés `cle .. 'Monte'` et
+-- `cle .. 'Descend'`, action F.defilerTexte(cle, sens)).
+function Vues.fleches(f, F, cle)
     return f:row {
-        spacing = 8,
-        f:static_text { title = "Style" },
-        f:popup_menu { items = styles, value = F.bind 'style', width = D.style, enabled = F.bind 'libre',
-            tooltip = "Style de retouche joint à chaque demande (Standard : rien d'ajouté)" },
-        D.bandeau and Vues.bandeau(f, F, D.bandeau) or nil,
+        spacing = 2,
+        F.bouton(f, { title = "▲", size = 'mini', tooltip = "Remonter le texte", enabled = F.bind(cle .. 'Monte'),
+            action = function() F.defilerTexte(cle, -1) end }),
+        F.bouton(f, { title = "▼", size = 'mini', tooltip = "Descendre le texte", enabled = F.bind(cle .. 'Descend'),
+            action = function() F.defilerTexte(cle, 1) end }),
     }
 end
 
-function Vues.menuModele(f, F, largeur)
-    local modeles = {}
-    for _, m in ipairs(Consignes.modeles) do
-        modeles[#modeles + 1] = { title = m.title, value = m.value }
-    end
-    return f:popup_menu { items = modeles, value = F.bind 'modele', width = largeur, enabled = F.bind 'libre' }
-end
-
+-- Le modèle, l'effort et la disposition se choisissent dans le Gestionnaire de modules externes
+-- (PluginInfoProvider.lua), pas dans la fenêtre (demandé par Dany le 20 octobre 2026 : un écran
+-- plus léger).
 function Vues.boutonEnvoyer(f, F, largeur)
     return F.bouton(f, { title = F.bind 'titreEnvoyer', width = largeur, action = function() F.boutonPrincipal() end })
 end
 
--- 📎 et 📋, puis le champ de demande (D.champ) ; le modèle et Envoyer à droite si D.envoiACote.
--- Le champ est `immediate = false` : Retour le valide (Fenetre.saisieValidee).
+-- 📎 et 📋, puis le champ de demande (D.champ) ; Envoyer à droite si D.envoiACote. Le champ est
+-- `immediate = false` : Retour le valide (Fenetre.saisieValidee).
 function Vues.saisie(f, F, D)
     local bind = F.bind
     return f:row {
@@ -320,13 +307,13 @@ function Vues.saisie(f, F, D)
         f:edit_field { value = bind 'saisie', immediate = false, height_in_lines = 3, width = D.champ, enabled = bind 'libre',
             placeholder_string = "Demander à Claude… (par exemple : « Retouche la photo active, rendu naturel »)",
             tooltip = "Retour envoie la demande. Dictée : touche 🌐 deux fois." },
-        D.envoiACote and f:column { spacing = 6, Vues.menuModele(f, F, D.modele), Vues.boutonEnvoyer(f, F, D.modele) } or nil,
+        D.envoiACote and Vues.boutonEnvoyer(f, F, D.envoyer) or nil,
     }
 end
 
--- Le modèle et Envoyer sous le champ (Atelier, Panneau).
+-- Envoyer sous le champ, à droite (Atelier, Panneau).
 function Vues.envoi(f, F, D)
-    return f:row { spacing = 6, Vues.menuModele(f, F, D.modele), f:spacer { fill_horizontal = 1 }, Vues.boutonEnvoyer(f, F, D.envoyer) }
+    return f:row { f:spacer { fill_horizontal = 1 }, Vues.boutonEnvoyer(f, F, D.envoyer) }
 end
 
 -- Aperçu et proposition --------------------------------------------------------------------------
@@ -356,19 +343,24 @@ function Vues.agrandir(f, F, petit)
 end
 
 -- La proposition de Claude en mode « Proposer d'abord » : ce qu'il compte changer, Accepter,
--- Refuser, Ajuster… (actifs quand une proposition attend et que Claude ne travaille pas).
+-- Refuser, Ajuster… (actifs quand une proposition attend et que Claude ne travaille pas), et ▲ ▼
+-- à leur droite pour faire défiler un texte plus long que la carte (F.defilerTexte, page tirée par
+-- Fenetre.rafraichirProposition, coupée comme le fil : police P.texte).
 function Vues.proposition(f, F, largeur, lignes)
-    local bind = F.bind
-    local petit = largeur - 24 < 260 and 'small' or nil
+    local bind, P = F.bind, F.POLICES
+    local petit = largeur - 24 < 300 and 'small' or nil
     return f:group_box {
         title = "Proposition de Claude",
         width = largeur,
-        f:static_text { title = bind 'propositionTexte', width = largeur - 24, height_in_lines = lignes },
+        f:static_text { title = bind 'propositionTexte', font = P.texte, width = largeur - 24, height_in_lines = lignes },
         f:row {
             spacing = 4,
+            fill_horizontal = 1,
             F.bouton(f, { title = "Accepter", size = petit, enabled = bind 'enAttente', action = function() F.repondreProposition(true) end }),
             F.bouton(f, { title = "Refuser", size = petit, enabled = bind 'enAttente', action = function() F.repondreProposition(false) end }),
             F.bouton(f, { title = "Ajuster…", size = petit, enabled = bind 'enAttente', action = function() F.enTache(F.ajuster) end }),
+            f:spacer { fill_horizontal = 1 },
+            Vues.fleches(f, F, 'proposition'),
         },
     }
 end
@@ -376,14 +368,16 @@ end
 -- Note -------------------------------------------------------------------------------------------
 
 -- La carte « Note » de la photo active : sa note posée, la note que Claude propose (couleur selon
--- l'état), ses critères du plus lourd au plus léger, le plafond mesuré et la raison. Accepter et
--- Changer… écrivent dans le catalogue sans Claude ni quota (désactivés pendant que Claude
--- travaille) ; Dany peut poser 5 ★, Claude jamais. `sansNoter` : Noter et Séance… sont ailleurs
--- (barre de l'Atelier).
-function Vues.notation(f, F, largeur, D, sansNoter)
+-- l'état), puis son texte (critères du plus lourd au plus léger, plafond mesuré, raison), page par
+-- page avec ▲ ▼ (Fenetre.rafraichirNotation, coupé comme le fil : police P.texte). Claude note
+-- d'abord chaque photo qu'il traite, et sa note arrive « à vérifier » : Dany l'accepte ou la change
+-- (demandé le 20 octobre 2026, plus de bouton Évaluer ni À vérifier). Accepter et Changer…
+-- écrivent dans le catalogue sans Claude ni quota (désactivés pendant que Claude travaille) ; Dany
+-- peut poser 5 ★, Claude jamais.
+function Vues.notation(f, F, largeur, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local interieur = largeur - 24
-    local petit = interieur < 260 and 'small' or nil
+    local petit = interieur < 300 and 'small' or nil
     local titres = { place = 'overlapping' }
     for _, couleur in ipairs({ 'gris', 'orange', 'vert', 'rouge' }) do
         titres[#titres + 1] = f:static_text { title = bind 'notationProposee', font = P.gras, text_color = C[couleur], width = interieur,
@@ -398,25 +392,22 @@ function Vues.notation(f, F, largeur, D, sansNoter)
         f:separator { fill_horizontal = 1 },
         f:column(titres),
         f:static_text { title = bind 'notationEtat', font = P.petit, text_color = C.gris, width = interieur, truncation = 'tail' },
-        f:static_text { title = bind 'notationCriteres', width = interieur, height_in_lines = D.criteres },
-        f:static_text { title = bind 'notationRaison', text_color = C.mono, width = interieur, height_in_lines = 3 },
+        f:static_text { title = bind 'notationTexte', font = P.texte, width = interieur, height_in_lines = D.criteres + 3 },
         f:row {
             spacing = 4,
+            fill_horizontal = 1,
             F.bouton(f, { title = "Accepter", size = petit, enabled = bind 'peutAccepterNote',
                 tooltip = "Poser la note proposée dans Lightroom (sans Claude ni quota)", action = function() F.enTache(F.accepterNote) end }),
             F.bouton(f, { title = "Changer…", size = petit, enabled = bind 'peutChangerNote',
                 tooltip = "Poser une autre note, de 0 à 5 ★, ou le drapeau Rejeter", action = function() F.enTache(F.changerNote) end }),
-            F.bouton(f, { title = "À vérifier", size = petit, enabled = bind 'peutVerifierNote',
-                tooltip = "Garder la proposition à revoir, sans rien poser", action = function() F.enTache(F.verifierNote) end }),
+            f:spacer { fill_horizontal = 1 },
+            Vues.fleches(f, F, 'note'),
         },
     }
-    if not sansNoter then
-        carte[#carte + 1] = f:row { spacing = 4, Vues.boutonNoter(f, F, petit ~= nil), Vues.boutonSeance(f, F, petit ~= nil) }
-    end
     return f:group_box(carte)
 end
 
--- Fenêtres et disposition ----------------------------------------------------------------------
+-- Autres fenêtres et onglets -------------------------------------------------------------------
 
 -- Publication et Consommation (le menu Fichier est réduit quand une fenêtre du module est devant).
 function Vues.autresFenetres(f, F, petit)
@@ -428,13 +419,6 @@ function Vues.autresFenetres(f, F, petit)
         F.bouton(f, { title = "Consommation…", size = taille, tooltip = "Jetons de la semaine, budget, relevé du forfait",
             action = function() F.consommation() end }),
     }
-end
-
--- Le menu Disposition : la fenêtre se ferme et se rouvre dans la disposition choisie
--- (`items` : Dispositions.items, tables neuves).
-function Vues.disposition(f, F, largeur, items)
-    return f:popup_menu { items = items, value = F.bind 'disposition', width = largeur,
-        tooltip = "Disposition de la fenêtre Claude : elle se rouvre aussitôt, la demande tapée gardée" }
 end
 
 -- Les onglets : une rangée de boutons radio (clé `onglet`) au-dessus de variantes superposées, dont

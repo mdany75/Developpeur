@@ -111,6 +111,15 @@ end
 -- ne suffit pas. Un accord vaut pour une écriture, dans les 10 minutes.
 local DUREE_ACCORD = 600
 
+-- Comment rappeler l'outil une fois l'accord donné : propose_ratings n'a pas de confirm, apply =
+-- true y vaut accord.
+local function rappel(outil)
+    if outil == 'propose_ratings' then
+        return "propose_ratings avec apply = true"
+    end
+    return outil .. " avec confirm = true"
+end
+
 local function accordDansLightroom(prefs, params, outil)
     if prefs.mode ~= 'proposer' or not prefs.accordDansLightroom or params.depuisLightroom then
         return
@@ -127,7 +136,7 @@ local function accordDansLightroom(prefs, params, outil)
     -- La raison donnée par Claude s'affiche avec la proposition, dans la fenêtre de suivi.
     Liaison.demanderAccord(outil, params.etape, type(params.raison) == 'string' and params.raison ~= '' and params.raison or nil)
     echouer(Liaison.EN_ATTENTE .. " : rien n'a été écrit. L'utilisateur accepte la proposition dans la fenêtre de suivi "
-        .. "de Lightroom (bouton Accepter, ouverte pour lui) ; ensuite, rappeler " .. outil .. " avec confirm = true.")
+        .. "de Lightroom (bouton Accepter, ouverte pour lui) ; ensuite, rappeler " .. rappel(outil) .. ".")
 end
 
 local function verifierAccord(prefs, params, outil)

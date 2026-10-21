@@ -49,16 +49,10 @@ local Fichiers = require 'Fichiers'
 
 local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(.*/)') or '.') .. ' && pwd -P'):gsub('%s+$', '')
 
--- Une séance du registre des notes (Notation.seance), telle que la fenêtre Séance la donne.
-local SEANCE = {
-    id = 'seance-essai', titre = 'Sortie aux dunes', source = { portee = 'collection', collection = 900 },
-    photos = { 53636309, 53636310, 53636311 }, passe = 2, cree = 1000,
-}
-
 -- Les notes d'un appel de propose_ratings (entrée de l'outil, comme Claude Code la rend).
 local function entreeNotes()
     return {
-        pass = 2, session = 'seance-essai',
+        pass = 2,
         ratings = {
             { photo_id = 53636309, rating = 5, reason = 'Tient seule.', to_check = false,
                 criteria = { impact = 'Fort', qualities = 'Lumière douce', technical_floor = 'Nette (44)', finish = 'Rien à reprendre' } },
@@ -70,14 +64,15 @@ local function entreeNotes()
     }
 end
 
-local REPONSE = '{"seance": "seance-essai", "propositions": [{"photo": 53636309, "fichier": "DSCF4961.RAF", "note_avant": 0, "drapeau_avant": "aucun", "etat": "proposee"}, '
+local REPONSE = '{"propositions": [{"photo": 53636309, "fichier": "DSCF4961.RAF", "note_avant": 0, "drapeau_avant": "aucun", "etat": "proposee"}, '
     .. '{"photo": 53636310, "fichier": "DSCF4962.RAF", "note_avant": 2, "drapeau_avant": "aucun", "etat": "proposee"}], '
     .. '"refusees": [{"photo": 53636311, "raison": "photo introuvable"}]}'
 
 -- Une conversation avec un appel de propose_ratings (sans sa réponse).
 local function avecNotation(entree)
-    local c = Conversation.nouvelleSeance('Sortie aux dunes', 'seance-essai', 1000)
-    Conversation.ajouterDemande(c, 'Passe 2', 1000)
+    local c = Conversation.nouvelle(1000)
+    c.titre, c.titreChoisi = 'Sortie aux dunes', true
+    Conversation.ajouterDemande(c, 'Note-les', 1000)
     Conversation.appliquer(c, { genre = 'assistant', blocs = {
         { genre = 'outil', id = 'n1', nom = 'mcp__developpeur__propose_ratings', entree = entree or entreeNotes() },
     } }, 1001)
@@ -86,81 +81,41 @@ end
 
 -- Consignes ------------------------------------------------------------------------------------
 
-essai('Consignes : puce Notes des garde-fous et message du bouton Noter', function()
+essai('Consignes : puce Notes des garde-fous, chaque photo traitée notée d\'abord', function()
     local debut = Consignes.texte:find('## Garde-fous', 1, true)
     local fin = Consignes.texte:find('## Titre de la conversation', 1, true)
     vrai(debut and fin, 'sections des garde-fous et du titre')
     local gardeFous = Consignes.texte:sub(debut, fin)
-    contient(gardeFous, '- Notes (étoiles et drapeau Rejeter) : propose-les par propose_ratings', 'puce Notes')
-    contient(gardeFous, 'jamais set_metadata pour une note', 'puce Notes')
-    contient(gardeFous, 'Jamais 5 ★', 'puce Notes')
+    contient(gardeFous, '- Notes (étoiles et drapeau Rejeter) : par propose_ratings', 'puce Notes')
+    -- « Note ces photos » : Claude pose les notes (demandé par Dany le 20 octobre 2026) ; ce que
+    -- Dany demande en mots clairs, Claude le fait.
+    contient(gardeFous, 'Quand Dany demande que tu notes (« note ces photos », « pose les notes »), apply = true', 'puce Notes')
+    contient(gardeFous, "Jamais 5 ★ de toi-même ; s'il en demande, set_metadata", 'puce Notes')
+    contient(gardeFous, "- Ce que Dany demande en mots clairs, fais-le", 'demande explicite')
     vrai(not Consignes.texte:find('\\\n', 1, true), 'lignes recollées')
-    contient(Consignes.noterPhoto, 'propose_ratings', 'bouton Noter')
-    contient(Consignes.noterPhoto, 'photo active', 'bouton Noter')
-    contient(Consignes.noterPhoto, 'jamais 5 ★', 'bouton Noter')
+    -- Plus de bouton Évaluer : Claude note d'abord chaque photo qu'il traite, à vérifier (demandé
+    -- par Dany le 20 octobre 2026).
+    contient(gardeFous, "Toute photo que tu traites, note-la d'abord, avant d'y toucher", 'puce Notes')
+    contient(gardeFous, "ta note arrive « à vérifier » dans la carte Note", 'puce Notes')
+    egal(nil, Consignes.noterPhoto)
 end)
 
-essai('Consignes : les quatre passes, une question chacune', function()
-    egal(4, #Consignes.passes)
-    local titres = { '1 · Rejets', '2 · Trois étoiles', '3 · Quatre étoiles', '4 · Cinq étoiles' }
-    for n, passe in ipairs(Consignes.passes) do
-        egal(titres[n], passe.titre)
-        vrai(type(passe.question) == 'string' and passe.question ~= '', 'question de la passe ' .. n)
-        if n < 4 then
-            local m = passe.message(SEANCE)
-            contient(m, 'Passe ' .. n .. ' de la séance de notation', 'passe ' .. n)
-            contient(m, 'Séance « Sortie aux dunes » (collection 900), 3 photos : 53636309, 53636310, 53636311.', 'passe ' .. n)
-            contient(m, 'propose_ratings avec pass = ' .. n .. ' et session = "seance-essai".', 'passe ' .. n)
-            egal(nil, passe.seul)
-        else
-            -- 5 ★ : l'utilisateur seul ; la passe ne se lance pas (aucun message pour Claude).
-            egal(nil, passe.message, 'passe 4 : rien à envoyer à Claude')
-            egal('À vous seul : revoyez vos 4 ★ après le développement.', passe.seul)
-        end
-    end
-    contient(Consignes.passes[1].message(SEANCE), 'to_check = true', 'passe 1 : les douteux')
-    -- Une sélection (sans collection), une seule photo, puis une séance sans identifiant ni photo.
-    local m = Consignes.passes[2].message({ id = 'S2', titre = 'Sélection', source = { portee = 'selection' }, photos = { 42 } })
-    contient(m, 'Séance « Sélection », 1 photo : 42.')
-    vrai(not m:find('collection', 1, true), 'pas de collection pour une sélection')
-    m = Consignes.passes[1].message({})
-    contient(m, 'Séance, 0 photos : aucune photo.')
-    contient(m, 'propose_ratings avec pass = 1.')
-end)
-
-essai("Consignes : celles d'une séance de notation, en plus de celles de la fenêtre", function()
-    egal(Consignes.texte, Consignes.pour(Conversation.nouvelle()), 'retouche : celles de la fenêtre seules')
-    egal(Consignes.texte, Consignes.pour(nil))
-    local s = Consignes.pour(Conversation.nouvelleSeance('Sortie aux dunes', 'S'))
-    egal(1, (s:find(Consignes.texte, 1, true)), 'celles de la fenêtre en tête')
-    contient(s, '# Séance de notation')
-    contient(Consignes.texteNotation, 'propose_ratings', 'consignes de séance')
-    contient(Consignes.texteNotation, 'Jamais set_metadata', 'consignes de séance')
-    contient(Consignes.texteNotation, 'Jamais 5 ★', 'consignes de séance')
-    contient(Consignes.texteNotation, 'Pas de ligne [titre : …]', 'consignes de séance')
-    vrai(not Consignes.texteNotation:find('\\\n', 1, true), 'lignes recollées')
+essai('Consignes : plus de Séance de notation (retirée le 20 octobre 2026)', function()
+    egal(nil, Consignes.passes)
+    egal(nil, Consignes.pour)
+    egal(nil, Consignes.texteNotation)
+    vrai(not Consignes.texte:find('Séance de notation', 1, true), 'consignes sans la Séance')
 end)
 
 -- Conversation ---------------------------------------------------------------------------------
 
-essai('Conversation : séance de notation, titre choisi dès sa création', function()
-    local c = Conversation.nouvelleSeance('  Sortie aux dunes ', 'seance-essai', 1000)
-    egal('notation', c.genre)
-    egal('Sortie aux dunes', c.titre)
-    egal(true, c.titreChoisi)
-    egal('seance-essai', c.seance)
+essai('Conversation : une ancienne séance de notation se reconnaît (genre notation)', function()
+    local c = Conversation.nouvelle(1000)
+    c.genre = 'notation'
     vrai(Conversation.estSeance(c))
     vrai(not Conversation.estSeance(Conversation.nouvelle()))
     vrai(not Conversation.estSeance(nil))
-    egal('Séance de notation', Conversation.nouvelleSeance(nil).titre, 'titre par défaut')
-    local m = Conversation.messagePourClaude(c, 'Passe 1', '[Lightroom : séance de notation « Sortie aux dunes », 3 photos ; passe 1]')
-    vrai(m:find('^%[Lightroom : séance de notation'), m)
-    vrai(not m:find('[titre', 1, true), 'pas de rappel du titre')
-    Conversation.ajouterDemande(c, 'Passe 1 : rejeter ou non ?', 1001)
-    egal('Sortie aux dunes', c.titre, 'la première demande ne change pas le titre')
-    Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'texte', texte = '[titre : Dunes]\nPasse faite.' } } })
-    egal('Sortie aux dunes', c.titre, 'un marqueur ne change pas le titre')
-    egal('Passe faite.', c.elements[#c.elements].texte, 'marqueur retiré')
+    egal(nil, Conversation.nouvelleSeance)
 end)
 
 essai("Conversation : notes proposées, de l'entrée de l'outil à la réponse du connecteur", function()
@@ -171,7 +126,8 @@ essai("Conversation : notes proposées, de l'entrée de l'outil à la réponse d
     egal('enCours', e.etat)
     egal('n1', e.appel)
     egal(2, e.passe)
-    egal('seance-essai', e.seance)
+    egal(nil, e.seance)
+    egal(nil, e.pose, 'sans apply : proposées')
     egal(3, #e.notes)
     local a, b, d = e.notes[1], e.notes[2], e.notes[3]
     egal(4, a.note, '5 étoiles ramenées à 4')
@@ -347,7 +303,7 @@ end)
 
 -- Stockage -------------------------------------------------------------------------------------
 
-essai('Stockage : séance et notes relues, liste vide en tableau', function()
+essai('Stockage : notes relues, liste vide en tableau', function()
     local c, e = avecNotation()
     c.elements[#c.elements + 1] = { id = 'vide', genre = 'notation', texte = '', date = 1002, etat = 'fait', images = {}, changements = {}, notes = {} }
     Stockage.enregistrer(c)
@@ -356,8 +312,7 @@ essai('Stockage : séance et notes relues, liste vide en tableau', function()
     local brut = Json.decode(texte)
     egal(nil, brut.elements[1].notes, 'pas de notes pour une demande')
     local relue = Stockage.lire(c.id)
-    egal('notation', relue.genre)
-    egal('seance-essai', relue.seance)
+    egal(nil, relue.genre)
     egal(true, relue.titreChoisi)
     egal('Sortie aux dunes', relue.titre)
     local n = relue.elements[3]
@@ -384,7 +339,7 @@ prefs.cheminConnecteur = '/bin/echo'
 
 -- Une petite image JPEG (en base64) pour le résultat d'outil du faux Claude Code (cas par défaut).
 local imageB64 = S.home .. '/image.b64'
-S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/vide-230.png') .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/vide-320.png') .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
 S.executer('/usr/bin/base64 -i ' .. S.q(S.home .. '/image.jpg') .. ' -o ' .. S.q(imageB64))
 local env = 'FAUX_IMAGE_B64=' .. S.q(imageB64) .. ' '
 local executerOriginal = S.modules.LrTasks.execute
@@ -412,45 +367,29 @@ local function arguments()
     return Fichiers.lire(Chemins.atelier() .. '/arguments.txt') or ''
 end
 
-local CONTEXTE = '[Lightroom : séance de notation « Sortie aux dunes », 3 photos ; passe 2]'
-local principale, seance
+local principale
 
-essai('Moteur : une séance de notation ne change pas la conversation ouverte', function()
+essai('Moteur : propose_ratings dans la conversation ouverte, notes dans le fil, consignes de la fenêtre', function()
     Moteur.charger()
     Moteur.nouvelle()
     vrai(Moteur.envoyer('Bonjour', { modele = 'haiku' }))
     vrai(attendre(function() return not Moteur.travaille end), 'la demande se termine')
     principale = Moteur.courante
     egal(nil, Moteur.enCours, 'plus rien en cours')
-    seance = Moteur.nouvelleSeance({ titre = 'Sortie aux dunes', seance = 'seance-essai' })
-    egal(principale, Moteur.courante, 'conversation ouverte inchangée')
-    egal('notation', seance.genre)
-    egal('Sortie aux dunes', seance.titre)
-    egal(seance, Moteur.trouver(seance.id))
-    egal(principale, Moteur.trouver(principale.id))
-    egal(nil, Moteur.trouver('inconnue'))
-    egal(seance, Moteur.nouvelleSeance({ seance = 'seance-essai' }), 'la conversation de la séance est reprise')
-    vrai(Moteur.nouvelleSeance({ seance = 'autre-seance' }) ~= seance, 'une autre séance, une autre conversation')
-    local ancienne = Moteur.session
-    local ok, raison = Moteur.envoyer(Consignes.passes[2].message(SEANCE) .. ' NOTE-LES', { conversation = seance, contexte = CONTEXTE, modele = 'haiku' })
+    local ok, raison = Moteur.envoyer('Note ces photos NOTE-LES', { modele = 'haiku' })
     vrai(ok, raison)
-    egal(seance, Moteur.enCours, 'la séance travaille')
-    egal(principale, Moteur.courante, 'toujours la même conversation ouverte')
-    vrai(ancienne ~= Moteur.session, 'Claude Code relancé pour la séance')
-    vrai(attendre(function() return not Moteur.travaille end), 'la passe se termine')
-    egal(nil, Moteur.enCours)
+    egal(principale, Moteur.enCours)
+    vrai(attendre(function() return not Moteur.travaille end), 'la notation se termine')
     egal(principale, Moteur.courante)
-    -- Le fil de la séance : la demande, le texte, l'outil, les notes, la réponse.
-    local genres = {}
-    for _, e in ipairs(seance.elements) do
-        genres[#genres + 1] = e.genre
+    local n
+    for _, e in ipairs(principale.elements) do
+        if e.genre == 'notation' then
+            n = e
+        end
     end
-    egal('dany claude outil notation claude', table.concat(genres, ' '))
-    egal('Sortie aux dunes', seance.titre, 'titre gardé')
-    local n = seance.elements[4]
+    vrai(n, 'notes dans le fil de la conversation ouverte')
     egal('fait', n.etat)
     egal(2, n.passe)
-    egal('seance-essai', n.seance)
     egal(3, #n.notes)
     egal('DSCF4961.RAF', n.notes[1].fichier)
     egal(3, n.notes[1].note)
@@ -458,134 +397,69 @@ essai('Moteur : une séance de notation ne change pas la conversation ouverte', 
     egal(true, n.notes[2].a_verifier)
     egal('refusee', n.notes[3].etat)
     egal('photo introuvable', n.notes[3].refus)
-    -- Le message envoyé : le contexte de la séance à la place de la photo active, pas de rappel du titre.
-    local entree = Fichiers.lire(Moteur.session.dossier .. '/entree.jsonl')
-    local message = Json.decode((entree:match('[^\n]+'))).message.content[1].text
-    egal(1, (message:find(CONTEXTE, 1, true)), 'contexte de la séance en tête')
-    vrai(not message:find('aucune photo active', 1, true), 'pas de ligne de la photo active')
-    vrai(not message:find('[titre', 1, true), 'pas de rappel du titre')
-    contient(message, 'pass = 2 et session = "seance-essai"', 'message de la passe')
-    -- Les consignes de la séance, dans le dossier de la session.
+    -- Les consignes de la fenêtre, dans le dossier de la session ; plus celles d'une séance.
     local consignes = Moteur.session.dossier .. '/consignes.md'
     contient(arguments(), '--append-system-prompt-file\n' .. consignes, 'consignes de la session')
-    contient(Fichiers.lire(consignes), '# Séance de notation', 'consignes de séance')
     contient(Fichiers.lire(consignes), '# Fenêtre Claude dans Lightroom', 'consignes de la fenêtre')
-    -- Rangée sur le disque avec son genre.
-    local relue = Stockage.lire(seance.id)
-    egal('notation', relue.genre)
-    egal('seance-essai', relue.seance)
-    egal('notation', relue.elements[4].genre)
+    vrai(not Fichiers.lire(consignes):find('# Séance de notation', 1, true), 'pas de consignes de séance')
 end)
 
-essai('Moteur : retour à la conversation ouverte, sans les consignes de la séance', function()
-    local dossierSeance = Moteur.session.dossier
-    local avant = #seance.elements
-    vrai(Moteur.envoyer('Encore', { modele = 'haiku' }))
+essai("Moteur : refus pendant que Claude travaille", function()
+    vrai(Moteur.envoyer('Une demande LENT'))
     egal(principale, Moteur.enCours)
-    vrai(attendre(function() return not Moteur.travaille end))
-    vrai(Moteur.session.dossier ~= dossierSeance, 'Claude Code relancé pour la conversation ouverte')
-    contient(arguments(), '--resume\nsession-essai', 'session de la conversation reprise')
-    local consignes = Fichiers.lire(Moteur.session.dossier .. '/consignes.md')
-    contient(consignes, '# Fenêtre Claude dans Lightroom')
-    vrai(not consignes:find('# Séance de notation', 1, true), 'pas les consignes de séance')
-    egal(avant, #seance.elements, 'rien dans la séance')
-    local derniere
-    for _, e in ipairs(principale.elements) do
-        if e.genre == 'dany' then
-            derniere = e
-        end
-    end
-    egal('Encore', derniere.texte, 'la demande va à la conversation ouverte')
-    vrai(Fichiers.existe(dossierSeance .. '/consignes.md'), 'chaque session garde les siennes')
-end)
-
-essai("Moteur : refus pendant que Claude travaille dans l'autre conversation", function()
-    vrai(Moteur.envoyer('Passe 2 LENT', { conversation = seance.id, contexte = CONTEXTE }), 'séance visée par son identifiant')
-    egal(seance, Moteur.enCours)
     vrai(attendre(function()
-        local d = seance.elements[#seance.elements]
+        local d = principale.elements[#principale.elements]
         return d.genre == 'claude' and d.partiel
-    end), 'Claude écrit dans la séance')
+    end), 'Claude écrit')
     local ok, raison = Moteur.envoyer('Une autre demande')
     vrai(not ok, 'refusée')
-    contient(raison, 'Claude travaille dans la séance de notation', 'refus')
-    ok, raison = Moteur.envoyer('Et dans la séance', { conversation = seance })
-    vrai(not ok)
-    contient(raison, 'Claude travaille encore', 'refus dans la même conversation')
-    vrai(not Moteur.ouvrir(principale.id), 'ouvrir refusé')
+    contient(raison, 'Claude travaille encore', 'refus')
     vrai(not Moteur.nouvelle(), 'nouvelle conversation refusée')
-    ok, raison = Moteur.supprimer(seance.id)
+    ok, raison = Moteur.supprimer(principale.id)
     vrai(not ok)
     contient(raison, 'travaille dans cette conversation')
-    ok, raison = Moteur.supprimer(principale.id)
-    vrai(not ok, 'la conversation ouverte ne se supprime pas pendant le travail de la séance')
-    contient(raison, 'séance de notation')
-    contient(Moteur.texteTravail(0), 'Claude travaille · dans la séance de notation', 'vu de la fenêtre Claude')
-    vrai(not Moteur.texteTravail(0, seance):find('dans la', 1, true), 'vu de la séance')
-    egal(principale, Moteur.courante)
+    vrai(not Moteur.texteTravail(0):find('dans une autre', 1, true), 'vu de la conversation qui travaille')
+    contient(Moteur.texteTravail(0, false), 'dans une autre conversation', 'vu sans conversation')
     Moteur.interrompre()
     vrai(attendre(function() return not Moteur.travaille end, 15), 'interruption')
-    egal('Interrompu à votre demande.', seance.elements[#seance.elements].texte)
+    egal('Interrompu à votre demande.', principale.elements[#principale.elements].texte)
     egal(nil, Moteur.enCours)
-    egal(principale, Moteur.courante)
     egal('', Moteur.texteTravail(0))
 end)
 
-essai("Moteur : vue d'une séance sans conversation, un travail de la fenêtre Claude se dit ailleurs", function()
-    local travaille, enCours = Moteur.travaille, Moteur.enCours
-    Moteur.travaille, Moteur.enCours = true, Moteur.courante
-    local ok, erreur = pcall(function()
-        contient(Moteur.texteTravail(0, false), 'Claude travaille · dans la fenêtre Claude', 'séance sans conversation')
-        vrai(not Moteur.texteTravail(0):find('dans la', 1, true), 'vu de la fenêtre Claude')
-    end)
-    Moteur.travaille, Moteur.enCours = travaille, enCours
-    vrai(ok, tostring(erreur))
-end)
-
-essai('Moteur : séance introuvable ou ouverte comme conversation', function()
-    local ok, raison = Moteur.envoyer('x', { conversation = 'inconnue' })
-    vrai(not ok)
-    contient(raison, 'introuvable')
-    ok, raison = Moteur.ouvrir(seance.id)
-    vrai(not ok, 'une séance ne devient pas la conversation ouverte')
-    contient(raison, 'séance de notation')
-    egal(principale, Moteur.courante)
-    egal(false, Moteur.travaille)
-end)
-
-essai("Moteur : au chargement, une séance n'est jamais la conversation ouverte", function()
+essai("Moteur : une ancienne séance de notation ne s'ouvre pas, ni au chargement", function()
     if Moteur.session then
         local s = Moteur.session
         Moteur.arreterSession()
         vrai(attendre(function() return Fichiers.existe(s.dossier .. '/fin.code') end, 8), 'Claude Code fermé')
     end
-    seance.modifiee = os.time() + 100
-    Stockage.enregistrer(seance)
+    -- Une conversation de séance d'avant la 1.1.1, plus récente que la conversation ouverte.
+    local ancienne = Conversation.nouvelle()
+    ancienne.genre, ancienne.titre, ancienne.titreChoisi = 'notation', 'Séance du lac', true
+    Conversation.ajouterDemande(ancienne, 'Passe 1 : rejeter ou non ?')
+    ancienne.modifiee = os.time() + 100
+    Stockage.enregistrer(ancienne)
     Moteur.charge = false
     Moteur.conversations = {}
     Moteur.courante = nil
     Moteur.charger()
-    egal('notation', Moteur.conversations[1].genre, 'la séance est la plus récente')
-    egal(principale.id, Moteur.courante.id, 'la conversation de retouche s\'ouvre')
-    local relue = Moteur.trouver(seance.id)
-    vrai(relue and relue.genre == 'notation', 'séance rechargée')
-    egal(relue, Moteur.nouvelleSeance({ seance = 'seance-essai' }), 'reprise après une relance')
-    principale, seance = Moteur.courante, relue
-end)
-
-essai('Moteur : supprimer la conversation ouverte ne rouvre pas une séance', function()
-    -- Seules restent la séance et la conversation ouverte : une nouvelle conversation s'ouvre.
+    egal('notation', Moteur.conversations[1].genre, "l'ancienne séance est la plus récente")
+    egal(principale.id, Moteur.courante.id, "la conversation de retouche s'ouvre")
+    local ok, raison = Moteur.ouvrir(ancienne.id)
+    vrai(not ok, "une ancienne séance ne s'ouvre pas")
+    contient(raison, 'ancienne séance de notation')
+    -- Supprimer la conversation ouverte n'ouvre pas l'ancienne séance.
+    principale = Moteur.courante
     for _, c in ipairs(Moteur.conversations) do
-        if c ~= principale and c ~= seance then
+        if c ~= principale and c.id ~= ancienne.id then
             Moteur.supprimer(c.id)
         end
     end
     vrai(Moteur.supprimer(principale.id))
     vrai(not Conversation.estSeance(Moteur.courante), 'pas de séance ouverte')
     egal(0, #Moteur.courante.elements, 'une nouvelle conversation')
-    vrai(Moteur.supprimer(seance.id))
-    egal(nil, Moteur.trouver(seance.id))
-    egal(false, Fichiers.existe(Stockage.dossier(seance.id)), 'à la corbeille')
+    vrai(Moteur.supprimer(ancienne.id))
+    egal(nil, Moteur.trouver(ancienne.id))
 end)
 
 -- Fin ------------------------------------------------------------------------------------------

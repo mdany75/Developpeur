@@ -207,18 +207,25 @@ extension ToolHandler {
         photo.mesures = Measurements.analyze(image)
         photo.vision = VisionAnalysis.analyze(image)
         photo.empreinte = VisionAnalysis.featurePrint(image)
-        // Le point AF n'est rangé que par Fujifilm : l'original des autres marques n'est pas ouvert.
-        let fujifilm = (description["marque"]?.string?.uppercased().contains("FUJIFILM") ?? false)
-            || (description["chemin_original"]?.string?.lowercased().hasSuffix(".raf") ?? false)
-        if fujifilm, let chemin = description["chemin_original"]?.string, let geometrie = GeometriePhoto(description["geometrie"]),
-           let af = pointsAF.lire(URL(fileURLWithPath: chemin)) {
-            let point = geometrie.versApercu(x: af.x, y: af.y)
-            if (0...1).contains(point.x), (0...1).contains(point.y) {
-                photo.af = .init(point: point, nettete: Detail.nettete(image, autour: point).map { $0 * facteur }, avertissement: af.avertissement)
-            }
+        if let af = Self.pointAF(description, lecteur: pointsAF) {
+            photo.af = .init(point: af.point, nettete: Detail.nettete(image, autour: af.point).map { $0 * facteur }, avertissement: af.avertissement)
         }
         if motsCles { photo.motsCles = MotsClesVision.proposer(image) }
         return photo
+    }
+
+    /// Point de mise au point de l'appareil dans l'image affichée (de 0 à 1 depuis le coin haut
+    /// gauche), et l'avertissement de l'appareil, d'après une description qui porte
+    /// `chemin_original` et `geometrie` (Vignettes.decrireVignette du module). Fujifilm seulement :
+    /// l'original des autres marques n'est pas ouvert. Nil si le point sort du cadre.
+    static func pointAF(_ description: JSONValue?, lecteur: LecteurPointsAF) -> (point: CGPoint, avertissement: Bool)? {
+        let fujifilm = (description?["marque"]?.string?.uppercased().contains("FUJIFILM") ?? false)
+            || (description?["chemin_original"]?.string?.lowercased().hasSuffix(".raf") ?? false)
+        guard fujifilm, let chemin = description?["chemin_original"]?.string, let geometrie = GeometriePhoto(description?["geometrie"]),
+              let af = lecteur.lire(URL(fileURLWithPath: chemin)) else { return nil }
+        let point = geometrie.versApercu(x: af.x, y: af.y)
+        guard (0...1).contains(point.x), (0...1).contains(point.y) else { return nil }
+        return (point, af.avertissement)
     }
 
     func contactSheet(_ args: Arguments) throws -> ToolResult {

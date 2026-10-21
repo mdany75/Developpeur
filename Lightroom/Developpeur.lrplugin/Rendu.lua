@@ -18,7 +18,9 @@ local Profils = require 'Profils'
 local Recadrage = require 'Recadrage'
 local Recalage = require 'Recalage'
 local Reglages = require 'Reglages'
+local Notation = require 'Notation'
 local Variantes = require 'Variantes'
+local Vignettes = require 'Vignettes'
 
 local catalogue, decrire, lireJson = Photos.catalogue, Photos.decrire, Photos.lireJson
 local meta, photosVisees, photoVisee = Photos.meta, Photos.photosVisees, Photos.photoVisee
@@ -321,7 +323,18 @@ function Rendu.apercu(params)
         infos.a_savoir = "Lightroom n'avait pas fini de calculer les réglages IA de cette photo (masques IA, profil adaptatif) : l'aperçu peut les montrer incomplets. "
             .. "Pour les calculer : afficher la photo dans le module Développement et cliquer « Mettre à jour » (panneau Masquage, ou Réglages de base pour un profil adaptatif), puis refaire l'aperçu."
     end
-    infos.photo = decrire(photo, true)
+    -- point_af (view_photo) : le chemin de l'original et la géométrie, où le serveur lit le point
+    -- de mise au point (Fujifilm), dessiné sur l'image pour noter, ou en tout temps si
+    -- l'utilisateur le veut.
+    if params.point_af then
+        infos.photo = Vignettes.decrireVignette(photo)
+        infos.point_af_toujours = Preferences.lire().pointMiseAuPoint == true
+        -- L'évaluation de Claude gardée dans le registre (notation.json) : une photo déjà évaluée
+        -- ne se renote pas à chaque retouche.
+        infos.evaluation = Notation.resume(photo.localIdentifier)
+    else
+        infos.photo = decrire(photo, true)
+    end
     if Photos.originalAbsent(photo) then
         infos.original = "Introuvable (disque débranché, ou fichier déplacé) : aperçu rendu depuis l'aperçu dynamique, "
             .. "2560 px au plus. Le débruitage, la suppression des reflets et la livraison attendent l'original."

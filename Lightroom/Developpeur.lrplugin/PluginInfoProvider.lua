@@ -2,9 +2,9 @@
 -- une section par sujet :
 --   - la liaison avec Claude : état, boutons, mode « Proposer d'abord », réglages, garde-fous et
 --     diagnostic ;
---   - la fenêtre Claude : chemins de Claude Code et du connecteur MCP-Développeur, taille et
---     disposition de la fenêtre, fermeture de Claude Code après inactivité, raccourci clavier,
---     dossiers.
+--   - la fenêtre Claude : chemins de Claude Code et du connecteur MCP-Développeur, modèle, effort,
+--     disposition de la fenêtre, nouvelle conversation par photo, fermeture de Claude Code après
+--     inactivité, raccourci clavier, dossiers.
 -- Les deux sections lisent et écrivent les mêmes préférences du module (Preferences.lua,
 -- Chemins.prefs).
 
@@ -17,6 +17,7 @@ local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
 
 local Chemins = require 'Chemins'
+local Consignes = require 'Consignes'
 local Dispositions = require 'Dispositions'
 local Fichiers = require 'Fichiers'
 local Liaison = require 'Liaison'
@@ -33,10 +34,10 @@ local function diagnostic()
         "Dernière erreur : " .. tostring(Liaison.erreur or "aucune"),
         string.format("Mode : %s ; accord dans Lightroom : %s ; copies virtuelles seulement : %s ; libellé protégé : %s ; rejetées protégées : %s ; plafond : %s photos ; retour visuel : %s",
             tostring(prefs.mode), tostring(prefs.accordDansLightroom), tostring(prefs.copiesSeulement), tostring(prefs.libelleProtege),
-            tostring(prefs.rejeteesProtegees), tostring(prefs.plafondPhotos), tostring(prefs.retourVisuel)),
-        string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s ; disposition %s, taille %s",
-            tostring(prefs.cheminClaude), tostring(prefs.cheminConnecteur), tostring(prefs.modele),
-            tostring(prefs.disposition), tostring(prefs.taille)),
+            tostring(prefs.rejeteesProtegees), tostring(prefs.plafondPhotos), tostring(prefs.retourVisuel)) .. " ; point de mise au point en tout temps : " .. tostring(prefs.pointMiseAuPoint),
+        string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s, effort %s ; disposition %s ; nouvelle conversation par photo : %s",
+            tostring(prefs.cheminClaude), tostring(prefs.cheminConnecteur), tostring(prefs.modele), tostring(prefs.effort),
+            tostring(prefs.disposition), tostring(prefs.nouvelleParPhoto)),
         "Journaux : " .. select(2, Liaison.cheminJournal()) .. " et " .. Chemins.journal(),
         "",
         "Derniers événements :",
@@ -142,6 +143,10 @@ local function sectionLiaison(f, propertyTable, prefs, ligne)
             title = "Afficher un message bref à chaque retouche de Claude",
             value = bind { key = 'retourVisuel', bind_to_object = prefs },
         }),
+        ligne("Mise au point :", f:checkbox {
+            title = "Montrer le carré de mise au point (Fujifilm) sur chaque aperçu",
+            value = bind { key = 'pointMiseAuPoint', bind_to_object = prefs },
+        }),
 
         f:separator { fill_horizontal = 1 },
 
@@ -195,8 +200,8 @@ local function sectionFenetre(f, prefs, ligne)
         bind_to_object = prefs,
 
         f:static_text {
-            title = "La fenêtre « Claude » : Fichier › Module externe - Extras › Ouvrir la fenêtre Claude. Claude Code travaille avec votre forfait claude.ai (jamais de clé d'API) et le connecteur MCP-Développeur.",
-            width_in_chars = 80, height_in_lines = 2,
+            title = "La fenêtre Claude (« Développeur » dans sa barre de titre) : Fichier › Module externe - Extras › Ouvrir la fenêtre Claude. Claude Code travaille avec votre forfait claude.ai (jamais de clé d'API) et le connecteur MCP-Développeur.",
+            width_in_chars = 66, height_in_lines = 3,
         },
         ligne("Claude Code :",
             f:edit_field { value = bind 'cheminClaude', width_in_chars = 48 },
@@ -204,16 +209,18 @@ local function sectionFenetre(f, prefs, ligne)
         ligne("Connecteur MCP :",
             f:edit_field { value = bind 'cheminConnecteur', width_in_chars = 48 },
             f:push_button { title = "Choisir…", action = function() choisirFichier(prefs, 'cheminConnecteur', "Choisir l'exécutable mcp-developpeur") end }),
-        ligne("Taille de la fenêtre :",
-            f:popup_menu { value = bind 'taille', items = {
-                { title = "Petite (portable 13 pouces)", value = 'petite' },
-                { title = "Moyenne", value = 'moyenne' },
-                { title = "Grande (grand écran)", value = 'grande' },
-            } },
-            f:static_text { title = "prise en compte à la prochaine ouverture de la fenêtre" }),
+        ligne("Modèle :",
+            f:popup_menu { value = bind 'modele', items = Consignes.itemsModeles() },
+            f:static_text { title = "pour la demande suivante" }),
+        ligne("Effort :",
+            f:popup_menu { value = bind 'effort', items = Consignes.itemsEfforts() },
+            f:static_text { title = "le même pour les quatre modèles" }),
         ligne("Disposition :",
             f:popup_menu { value = bind 'disposition', items = Dispositions.items() },
-            f:static_text { title = "aussi par le menu Disposition de la fenêtre Claude" }),
+            f:static_text { title = "la fenêtre ouverte se rouvre" }),
+        ligne("Autre photo :",
+            f:checkbox { value = bind 'nouvelleParPhoto',
+                title = "Nouvelle conversation pour une autre photo ou sélection" }),
         ligne("Fermer Claude Code après :",
             f:popup_menu { value = bind 'inactivite', items = {
                 { title = "5 minutes sans demande", value = 5 },

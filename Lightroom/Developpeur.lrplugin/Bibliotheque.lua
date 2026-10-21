@@ -1279,12 +1279,15 @@ end
 -- seulement, libellé protégé, photos rejetées), même avec depuisLightroom et confirme, qui lèvent
 -- la pause, « Proposer d'abord » et le plafond de photos par écriture. Une note de l'utilisateur
 -- n'entre pas dans l'état d'avant Claude : le retour à l'origine la laisse en place.
+-- params.outil : l'outil de Claude à rappeler après un accord (propose_ratings, quand Claude pose
+-- les notes à la demande de Dany), set_metadata sans lui.
 local MAX_NOTES = 500
 
 function Bibliotheque.noter(params)
     verifierPause(params)
     local prefs = Preferences.lire()
-    verifierAccord(prefs, params, 'set_metadata')
+    local outil = params.outil or 'set_metadata'
+    verifierAccord(prefs, params, outil)
     local demandes = {}
     for _, n in ipairs(type(params.notes) == 'table' and params.notes or {}) do
         if type(n) ~= 'table' or n.photo == nil then
@@ -1329,7 +1332,7 @@ function Bibliotheque.noter(params)
         echouer(string.format("%d photos à noter : au plus %d par écriture.", #photos, MAX_NOTES))
     end
     local etape = nomEtape(params, "notation")
-    verifierProtection(photos, prefs, params, 'set_metadata')
+    verifierProtection(photos, prefs, params, outil)
     ecrire(etape, function()
         for _, plan in ipairs(plans) do
             classer(plan, plan.demande, {}, {})

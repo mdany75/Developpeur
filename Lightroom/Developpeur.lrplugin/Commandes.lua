@@ -7,10 +7,12 @@
 --   reglages    {photo?, cles, details?, toutes?} → valeurs actuelles, profil, recadrage, appareil (et, avec
 --                                          details, courbes, masques, couleurs ponctuelles, taches,
 --                                          classement dans la Bibliothèque)
---   apercu      {photo?, taille, cles, comparer?} → JPEG rendu avec les réglages actuels (chemin
---                                          d'un fichier temporaire, que le serveur lit puis efface) ;
---                                          taille 0 = pleine résolution ; comparer = 'avantClaude' ou
---                                          'etapePrecedente' rend aussi l'état d'avant (chemin_avant)
+--   apercu      {photo?, taille, cles, comparer?, point_af?} → JPEG rendu avec les réglages actuels
+--                                          (chemin d'un fichier temporaire, que le serveur lit puis
+--                                          efface) ; taille 0 = pleine résolution ; comparer =
+--                                          'avantClaude' ou 'etapePrecedente' rend aussi l'état d'avant
+--                                          (chemin_avant) ; point_af : la photo décrite comme pour les
+--                                          vignettes (point de mise au point) et point_af_toujours
 --   appliquer   {photos?|selection?, reglages, booleens?, profil?, profil_marque?, profil_variantes?, profil_absent_sur?, profil_look?,
 --                recadrage?, recalages?, courbes?, couleurs_ponctuelles?, balance?, auto_ton?, flou_objectif?,
 --                preset?, quantite_preset?, melange_nb_auto?, profil_objectif?, reperes?, rotation?,
@@ -75,10 +77,10 @@
 --                                          affiner un masque ; retirer les masques vides
 --   progression {id, titre?, fait?, total?, message?, fin?} → barre de progression de Lightroom
 --                                          pendant une série ; annulee si l'utilisateur l'a arrêtée
---   notation    {action, seance?, passe?, propositions?, photos?} → notes proposées par Claude,
---                                          rangées pour la fenêtre sans rien écrire dans le
---                                          catalogue : proposer (jamais 5 étoiles), lire, seance
---                                          (la séance de notation ouverte dans Lightroom)
+--   notation    {action, passe?, propositions?, poser?, photos?} → notes proposées par Claude,
+--                                          rangées pour la carte Note : proposer (jamais 5
+--                                          étoiles ; posées aussi avec poser, à la demande de
+--                                          Dany), lire
 --
 -- Sans « photo » ni « photos » ni « selection », la commande vise la photo active.
 -- Les erreurs sont levées avec error(message, 0) : le message part tel quel vers Claude.

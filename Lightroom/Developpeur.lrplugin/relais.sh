@@ -7,8 +7,8 @@
 # événements dans sortie.jsonl, que la fenêtre relit. Le forfait Claude Code est employé (connexion
 # claude.ai), jamais une clé d'API.
 #
-# Usage : relais.sh <dossier> <claude> <modèle> <session à reprendre ou ""> <dossier de travail>
-#                   <config MCP> <consignes> <pid de Lightroom ou 0>
+# Usage : relais.sh <dossier> <claude> <modèle> <effort ou ""> <session à reprendre ou "">
+#                   <dossier de travail> <config MCP> <consignes> <pid de Lightroom ou 0>
 #
 # Fichiers dans <dossier> : entree.jsonl (écrit par la fenêtre), consignes.md (les consignes de
 # cette session, passées en <consignes>), sortie.jsonl, erreurs.log, relais.pid, claude.pid ;
@@ -18,11 +18,12 @@
 dossier=$1
 claude=$2
 modele=$3
-reprise=$4
-travail=$5
-config=$6
-consignes=$7
-lightroom=${8:-0}
+effort=$4
+reprise=$5
+travail=$6
+config=$7
+consignes=$8
+lightroom=${9:-0}
 
 cd "$dossier" || exit 1
 echo $$ > relais.pid
@@ -54,6 +55,11 @@ set -- -p --input-format stream-json --output-format stream-json --verbose --inc
     --tools "" --allowedTools "mcp__developpeur__*" --permission-prompts none \
     --disable-slash-commands --setting-sources local \
     --model "$modele" --append-system-prompt-file "$consignes"
+# L'effort (low, medium, high, xhigh, max), le même pour les quatre modèles ; vide : celui de
+# Claude Code.
+if [ -n "$effort" ]; then
+    set -- "$@" --effort "$effort"
+fi
 if [ -n "$reprise" ]; then
     set -- "$@" --resume "$reprise"
 fi

@@ -359,6 +359,12 @@ final class TriTests: XCTestCase {
         XCTAssertNil(lecteur.lire(URL(fileURLWithPath: "/Volumes/Photos/B.RAF")))
         verrou.lock(); XCTAssertEqual(lectures, 1, "la suite n'est pas lue"); verrou.unlock()
         attente.signal()
+        // La lecture bloquée finit (l'utilisateur a répondu à macOS) : la suite se lit de nouveau.
+        let fin = Date().addingTimeInterval(2)
+        while lecteur.bloque != nil, Date() < fin { Thread.sleep(forTimeInterval: 0.01) }
+        XCTAssertNil(lecteur.bloque, "débloqué quand la lecture finit")
+        attente.signal()
+        XCTAssertEqual(lecteur.lire(URL(fileURLWithPath: "/Volumes/Photos/B.RAF"))?.x, 0.5)
 
         let rapide = LecteurPointsAF(delai: 1) { _ in PointAF(x: 0.25, y: 0.75, avertissement: true, visages: 1) }
         XCTAssertEqual(rapide.lire(URL(fileURLWithPath: "/tmp/C.RAF"))?.x, 0.25)

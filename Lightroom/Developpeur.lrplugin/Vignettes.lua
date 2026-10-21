@@ -6,8 +6,7 @@
 -- minimum, l'aperçu rendu peut être plus grand. Le rappel reçoit le JPEG (un texte), ou nil et la
 -- raison. La requête doit rester référencée jusqu'au rappel. Le module les demande toutes à la
 -- fois, attend les rappels, puis écrit chaque JPEG dans un dossier temporaire propre à la
--- commande (le serveur lit puis efface, comme pour un aperçu). La Séance de notation de la
--- fenêtre Claude passe par Vignettes.demander, sans la description ni la commande.
+-- commande (le serveur lit puis efface, comme pour un aperçu).
 
 local LrDate = import 'LrDate'
 local LrFileUtils = import 'LrFileUtils'
@@ -51,9 +50,9 @@ local function cadre(reglages)
     return recadree and valeurs or nil
 end
 
--- Ce que le serveur doit savoir de la photo, en plus de la vignette : sa description, le chemin du
--- fichier (point de mise au point lu par le serveur), et de quoi passer du repère du fichier à la
--- vignette (dimensions affichées, orientation, cadre).
+-- Ce que le serveur doit savoir de la photo, en plus de la vignette ou de l'aperçu (Rendu.apercu) :
+-- sa description, le chemin du fichier (point de mise au point lu par le serveur), et de quoi
+-- passer du repère du fichier à l'image affichée (dimensions affichées, orientation, cadre).
 local function decrireVignette(photo, d)
     d = d or decrire(photo, true)
     local reglages = photo:getDevelopSettings()
@@ -69,6 +68,7 @@ local function decrireVignette(photo, d)
     }
     return d
 end
+Vignettes.decrireVignette = decrireVignette
 
 -- Demande la vignette de chaque photo (photo de Lightroom, ou identifiant), toutes à la fois, puis
 -- attend les rappels (Vignettes.DELAI au plus). Une photo introuvable ou une requête refusée finit
@@ -152,10 +152,11 @@ local function dossierTemporaire()
 end
 
 -- Vignettes de ces photos (photos de Lightroom, ou identifiants) écrites dans `dossier` (créé au
--- besoin ; sans dossier, un dossier temporaire), pour une planche de la fenêtre. Rend deux
--- tables par identifiant : { [id] = chemin du JPEG }, et les erreurs { [id] = raison }. À appeler
--- dans une tâche (les rappels s'attendent par LrTasks.sleep). Le JPEG peut être plus grand que la
--- taille demandée (un minimum) : le réduire avant de l'afficher dans un cadre fixe.
+-- besoin ; sans dossier, un dossier temporaire), pour l'aperçu de la photo active de la fenêtre
+-- Claude. Rend deux tables par identifiant : { [id] = chemin du JPEG }, et les erreurs
+-- { [id] = raison }. À appeler dans une tâche (les rappels s'attendent par LrTasks.sleep). Le JPEG
+-- peut être plus grand que la taille demandée (un minimum) : le réduire avant de l'afficher dans un
+-- cadre fixe.
 function Vignettes.demander(photos, taille, dossier)
     dossier = dossier or dossierTemporaire()
     LrFileUtils.createAllDirectories(dossier)

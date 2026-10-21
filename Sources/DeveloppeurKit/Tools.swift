@@ -65,6 +65,9 @@ public final class ToolHandler {
     /// Plafond de note de chaque photo au dernier cull_photos de cette session, que propose_ratings
     /// fait respecter (Tools+Notation.swift).
     var dernierTri: [Int: Notation.Plafond] = [:]
+    /// Point de mise au point de view_photo : un seul lecteur, pour qu'une lecture bloquée
+    /// (autorisation de macOS) n'en lance pas d'autres ; les tests le remplacent.
+    var lecteurAF = LecteurPointsAF()
     /// Contexte de l'appel en cours (progression d'une série, annulation par le client) : les
     /// appels passent un à un (FileOutils), un seul contexte à la fois.
     var contexte = ContexteAppel()
@@ -175,20 +178,20 @@ public final class ToolHandler {
         "undo_last": "Annuler la dernière retouche", "revert_to_original": "Revenir à l'état d'avant Claude", "export_journal": "Journal des retouches",
         "find_photos": "Chercher des photos", "set_metadata": "Classer des photos", "list_keywords": "Mots-clés",
         "manage_collections": "Collections", "create_virtual_copy": "Créer une copie virtuelle", "show_photo": "Montrer dans Lightroom",
-        "cull_photos": "Trier une séance", "contact_sheet": "Planche contact", "propose_ratings": "Proposer des notes",
+        "cull_photos": "Trier une séance", "contact_sheet": "Planche contact", "propose_ratings": "Noter des photos",
         "remove_distractions": "Supprimer les reflets",
         "remember_style": "Guide de style", "export_photos": "Exporter des photos", "compare_variants": "Comparer des variantes",
         "choose_variant": "Choisir une variante", "match_series": "Harmoniser une série",
     ]
     /// Outils qui ne changent rien aux photos ni au catalogue (`readOnlyHint`) : le client peut les
     /// laisser passer sans demander. Une proposition (preview_settings) passe par l'Historique : pas ici ;
-    /// des notes proposées (propose_ratings) vont au registre du module, hors du catalogue : ici.
+    /// propose_ratings non plus depuis la 1.1.1 : avec apply, il pose les notes dans le catalogue.
     /// get_status n'en est pas : il peut demander une sauvegarde du catalogue. view_photo en est,
     /// même avec compare : les deux étapes « Claude · comparaison » de l'Historique laissent la photo
     /// telle qu'elle était (choix de la 2.4, dit dans sa description).
     static let readOnlyTools: Set<String> = [
         "list_selection", "view_photo", "measure_angle", "analyze_photos", "get_settings", "list_profiles",
-        "list_presets", "export_journal", "find_photos", "list_keywords", "cull_photos", "contact_sheet", "propose_ratings",
+        "list_presets", "export_journal", "find_photos", "list_keywords", "cull_photos", "contact_sheet",
     ]
     /// Outils qui défont des retouches (`destructiveHint`) : le client peut demander confirmation.
     static let destructiveTools: Set<String> = ["revert_to_original", "undo_last"]
@@ -409,8 +412,9 @@ public final class ToolHandler {
             "cull_photos": schema("Bilan d'une séance : photos à défaut, rafales, ordre de lecture, plafonds de note mesurés, proposition de rejet.",
                                   ["photos_analysees": nombre, "floues_ou_ratees": liste, "rafales": liste, "classement": liste,
                                    "plafonds": objet, "propositions": liste, "vignettes": objet]),
-            "propose_ratings": schema("Propositions rangées pour la carte Note et la Séance de notation ; ou le standard de notation.",
-                                      ["seance": ["type": ["string", "null"]], "propositions": liste, "refusees": liste, "standard": texte]),
+            "propose_ratings": schema("Propositions rangées pour la carte Note, et posées avec apply ; ou le standard de notation.",
+                                      ["propositions": liste, "refusees": liste, "posees": liste, "erreur_pose": ["type": ["string", "null"]],
+                                       "standard": texte]),
             "apply_settings": ecriture,
             "add_mask": ecriture,
             "edit_mask": schema("Masques de la photo, ou résultat d'une écriture.", ["mode": texte, "resultats": liste, "masques": liste]),

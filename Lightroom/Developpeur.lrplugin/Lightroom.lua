@@ -29,7 +29,15 @@ function Lightroom.photos()
         local active = catalogue:getTargetPhoto()
         if active then
             info.active = { id = active.localIdentifier, nom = active:getFormattedMetadata('fileName') or '' }
-            info.selection = #catalogue:getTargetPhotos()
+            local photos = catalogue:getTargetPhotos()
+            info.selection = #photos
+            -- La photo active et la sélection en un texte (Fenetre.suivreSelection) : la photo
+            -- active, puis les 500 premières photos de la sélection et leur nombre.
+            local ids = { tostring(active.localIdentifier), tostring(#photos) }
+            for i = 1, math.min(#photos, 500) do
+                ids[#ids + 1] = tostring(photos[i].localIdentifier)
+            end
+            info.cle = table.concat(ids, ':')
             local okNote, note, drapeau = LrTasks.pcall(function()
                 return active:getRawMetadata('rating'), active:getRawMetadata('pickStatus')
             end)

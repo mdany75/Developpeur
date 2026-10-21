@@ -1,3 +1,0 @@
--- MenuNotation.lua : Fichier (ou Bibliothèque) › Module externe - Extras › Séance de notation…
-
-require('FenetreNotation').afficher()

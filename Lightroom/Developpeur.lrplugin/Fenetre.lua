@@ -1,10 +1,11 @@
--- Fenetre.lua : la fenêtre « Claude » du module Développeur (fenêtre flottante, non bloquante) :
+-- Fenetre.lua : la fenêtre Claude du module Développeur (« Développeur » dans sa barre de titre ;
+-- fenêtre flottante, non bloquante) :
 -- une conversation avec Claude Code (le fil avec les appels d'outils, les invites en raccourcis et
 -- la demande), ce que Claude regarde, sa proposition à accepter, refuser ou ajuster, la note qu'il
 -- propose pour la photo active, et les versions du module et du connecteur MCP-Développeur.
 --
--- Trois dispositions au choix (préférence `disposition`, dans le Gestionnaire de modules externes
--- ou le menu Disposition de la fenêtre) : Atelier, Conversation claire, Panneau. Dispositions.lua
+-- Trois dispositions au choix (préférence `disposition`, dans le Gestionnaire de modules externes,
+-- comme le modèle et l'effort de Claude) : Atelier, Conversation claire, Panneau. Dispositions.lua
 -- les assemble des pièces de Vues.lua ; ce fichier garde l'état, ce qui remplit les propriétés
 -- liées (rafraichir…), les actions, la boucle, l'ouverture et la réouverture. Les pièces ne
 -- connaissent que les propriétés : une clé sans vue dans une disposition ne gêne pas.
@@ -15,8 +16,9 @@
 -- genre (police, couleur), dont une seule est visible. Lightroom ne masque que les vues simples
 -- (`visible` sur un conteneur reste sans effet, constaté) : les onglets sont une rangée de
 -- boutons radio au-dessus de variantes superposées de même largeur, dont chaque vue simple porte
--- la condition de son onglet (Vues.masquable). Changer de disposition ferme la fenêtre et la
--- rouvre (Fenetre.rouvrir).
+-- la condition de son onglet (Vues.masquable). Changer de disposition dans le Gestionnaire de
+-- modules externes ferme la fenêtre et la rouvre (Fenetre.rouvrir, depuis la boucle). Une autre photo active ou une autre sélection, choisie par l'utilisateur, commence une
+-- nouvelle conversation (Fenetre.suivreSelection).
 
 local LrBinding = import 'LrBinding'
 local LrColor = import 'LrColor'
@@ -31,6 +33,7 @@ local Composants = require 'Composants'
 local Consignes = require 'Consignes'
 local Conversation = require 'Conversation'
 local Dispositions = require 'Dispositions'
+local Fichiers = require 'Fichiers'
 local Fil = require 'Fil'
 local Images = require 'Images'
 local Journal = require 'Journal'
@@ -242,8 +245,8 @@ end
 
 -- Liste des conversations ---------------------------------------------------------------------
 
--- Les conversations d'une séance de notation (FenetreNotation.lua) n'y figurent pas : elles ont
--- leur fenêtre.
+-- Les conversations des anciennes séances de notation (genre 'notation', fenêtre retirée le
+-- 20 octobre 2026) n'y figurent pas.
 local function estSeance(c)
     return c ~= nil and c.genre == 'notation'
 end
@@ -440,13 +443,18 @@ function Fenetre.cliquerLigne(i)
         return
     end
     if l.image then
-        for n, image in ipairs(Fenetre.images or {}) do
+        -- Les images de la conversation relues : le clic choisit la sienne, sans bascule vers une
+        -- image arrivée entre-temps (Fenetre.rafraichirApercu).
+        local c = Moteur.courante
+        Fenetre.images = c and Conversation.images(c) or {}
+        Fenetre.apercuDe, Fenetre.nbImages = c, #Fenetre.images
+        for n, image in ipairs(Fenetre.images) do
             if image.chemin == l.image then
                 Fenetre.indiceImage = n
+                Fenetre.voirActive = false
             end
         end
         Fenetre.rafraichirApercu()
-        Fenetre.choisirOnglet('apercu')
         return
     end
     local c = Moteur.courante
@@ -497,6 +505,61 @@ function Fenetre.imageVide()
     return Chemins.ressource(Dispositions.imageVide(Fenetre.T))
 end
 
+-- L'aperçu de la photo active (demandé par Dany le 20 octobre 2026) : montré à l'ouverture de la
+-- fenêtre et quand une autre photo devient active (Fenetre.majPhoto), tant que Claude ne montre pas
+-- d'image nouvelle ; ◀ revient aux images de la conversation, ▶ depuis la dernière y retourne. Sa
+-- vignette vient du cache d'aperçus de Lightroom (Vignettes.demander, dans une tâche), réduite au
+-- cadre de l'aperçu, et se refait à chaque ouverture (la photo a pu être retouchée).
+Fenetre.TAILLE_PHOTO_ACTIVE = 1024
+
+local function montrerActive(p, T, active, n)
+    poser(p, 'peutPrecedente', n > 0)
+    poser(p, 'peutSuivante', false)
+    poser(p, 'legendeApercu', "Photo active · " .. Lightroom.nomCourt(active.nom))
+    local a = Fenetre.apercuActif
+    if a and a.id == active.id and a.T == T then
+        poser(p, 'imageApercu', a.chemin)
+        poser(p, 'aImage', true)
+        return
+    end
+    poser(p, 'imageApercu', Fenetre.imageVide())
+    poser(p, 'aImage', false)
+    if Fenetre.demandeActive == active.id then
+        return
+    end
+    Fenetre.demandeActive = active.id
+    LrTasks.startAsyncTask(function()
+        local ok, chemin, dossier, fichier = LrTasks.pcall(function()
+            -- Un dossier par vignette (Images.vignette garde ses réductions par nom de fichier).
+            local d = LrPathUtils.child(LrPathUtils.child(Chemins.temporaire(), 'PhotoActive'), Conversation.identifiant())
+            local chemins, erreurs = require('Vignettes').demander({ active.id }, Fenetre.TAILLE_PHOTO_ACTIVE, d)
+            local source = chemins[active.id]
+            if not source then
+                Journal.noter("Aperçu de la photo active :", tostring(erreurs[active.id]))
+                return nil
+            end
+            local d, f = LrPathUtils.parent(source), LrPathUtils.leafName(source)
+            return Images.vignette(d, f, T.apercu, T.apercuHauteur or T.apercu), d, f
+        end)
+        if Fenetre.demandeActive == active.id then
+            Fenetre.demandeActive = nil
+        end
+        if ok and chemin then
+            -- La vignette d'avant n'est plus montrée : son dossier s'efface.
+            local avant = Fenetre.apercuActif
+            if avant and avant.dossier ~= dossier then
+                Fichiers.supprimer(avant.dossier)
+            end
+            Fenetre.apercuActif = { id = active.id, T = T, chemin = chemin, dossier = dossier, fichier = fichier }
+            if Fenetre.p and Fenetre.T == T then
+                Fenetre.rafraichirApercu()
+            end
+        elseif not ok then
+            Journal.noter("Aperçu de la photo active :", tostring(chemin))
+        end
+    end)
+end
+
 function Fenetre.rafraichirApercu()
     local p, T = Fenetre.p, Fenetre.T
     if not p then
@@ -508,10 +571,22 @@ function Fenetre.rafraichirApercu()
     if Fenetre.indiceImage and Fenetre.indiceImage > n then
         Fenetre.indiceImage = nil
     end
+    -- Une image de plus dans la conversation montrée (Claude regarde, une photo jointe) : elle se
+    -- montre, à la place de la photo active.
+    if Fenetre.apercuDe == c and Fenetre.nbImages and n > Fenetre.nbImages then
+        Fenetre.voirActive = false
+        Fenetre.indiceImage = nil
+    end
+    Fenetre.apercuDe, Fenetre.nbImages = c, n
+    local active = Fenetre.info and Fenetre.info.active
+    if Fenetre.voirActive and active then
+        montrerActive(p, T, active, n)
+        return
+    end
     local indice = Fenetre.indiceImage or n
     poser(p, 'aImage', n > 0)
     poser(p, 'peutPrecedente', indice > 1)
-    poser(p, 'peutSuivante', indice < n)
+    poser(p, 'peutSuivante', indice < n or (n > 0 and active ~= nil))
     if n == 0 then
         poser(p, 'legendeApercu', "Aucun aperçu pour l'instant")
         poser(p, 'imageApercu', Fenetre.imageVide())
@@ -540,7 +615,22 @@ end
 
 function Fenetre.changerImage(pas)
     local n = #(Fenetre.images or {})
+    local active = Fenetre.info and Fenetre.info.active
+    if Fenetre.voirActive and active then
+        -- ◀ depuis la photo active : la dernière image de la conversation.
+        if pas < 0 and n > 0 then
+            Fenetre.voirActive, Fenetre.indiceImage = false, nil
+            Fenetre.rafraichirApercu()
+        end
+        return
+    end
     if n == 0 then
+        return
+    end
+    -- ▶ depuis la dernière image : la photo active.
+    if pas > 0 and (Fenetre.indiceImage or n) >= n and active then
+        Fenetre.voirActive = true
+        Fenetre.rafraichirApercu()
         return
     end
     Fenetre.indiceImage = math.max(1, math.min(n, (Fenetre.indiceImage or n) + pas))
@@ -552,6 +642,21 @@ end
 
 -- L'aperçu en grand, dans une fenêtre à part.
 function Fenetre.agrandir()
+    local a, active = Fenetre.apercuActif, Fenetre.info and Fenetre.info.active
+    if Fenetre.voirActive and active and a and a.id == active.id then
+        LrTasks.startAsyncTask(function()
+            local chemin, l, h = Images.grande(a.dossier, a.fichier, 1100, 740)
+            if chemin then
+                LrDialogs.presentModalDialog {
+                    title = "Claude · " .. (Fenetre.p and Fenetre.p.legendeApercu or "photo active"),
+                    contents = LrView.osFactory():picture { value = chemin, width = l, height = h },
+                    actionVerb = "Fermer",
+                    cancelVerb = '< exclude >',
+                }
+            end
+        end)
+        return
+    end
     local c = Moteur.courante
     local n = #(Fenetre.images or {})
     if not c or n == 0 then
@@ -574,6 +679,75 @@ function Fenetre.agrandir()
     end)
 end
 
+-- Textes des cartes, page par page --------------------------------------------------------------
+
+-- Le texte de la carte Note (clé 'note') et celui de la proposition (clé 'proposition') : coupés
+-- en lignes comme le fil (police P.texte), montrés page par page avec ▲ ▼ (Vues.fleches). Un
+-- texte qui change revient à sa première page.
+Fenetre.pages = {}
+
+local CARTES = {
+    note = { texte = 'notationTexte', largeur = 'largeurNote', lignes = function(T) return (T.criteres or 8) + 3 end },
+    proposition = { texte = 'propositionTexte', largeur = 'largeurProposition', lignes = function(T) return T.propLignes or 5 end },
+}
+
+-- Les lignes d'un texte dans `largeur` points (paragraphes gardés, lignes vides comprises).
+function Fenetre.lignesCarte(texte, largeur)
+    local lignes = {}
+    for paragraphe in (tostring(texte or '') .. '\n'):gmatch('([^\n]*)\n') do
+        if paragraphe == '' then
+            lignes[#lignes + 1] = ''
+        else
+            for _, l in ipairs(Fil.couper(paragraphe, largeur - Fil.MARGE, 'texte')) do
+                lignes[#lignes + 1] = l
+            end
+        end
+    end
+    while #lignes > 0 and lignes[#lignes] == '' do
+        lignes[#lignes] = nil
+    end
+    return lignes
+end
+
+-- Montre la page courante du texte de la carte `cle` ; `texte` nil : le texte gardé.
+function Fenetre.montrerPage(cle, texte)
+    local p, T, carte = Fenetre.p, Fenetre.T, CARTES[cle]
+    if not (p and carte) then
+        return
+    end
+    local page = Fenetre.pages[cle]
+    if texte ~= nil and (not page or page.texte ~= texte) then
+        page = { texte = texte, debut = 1 }
+        Fenetre.pages[cle] = page
+    end
+    if not page then
+        return
+    end
+    local hauteur = T and carte.lignes(T) or 8
+    local lignes = Fenetre.lignesCarte(page.texte, T and T[carte.largeur] or 226)
+    -- La dernière page est pleine : on ne descend pas plus bas que la dernière ligne.
+    page.debut = math.max(1, math.min(page.debut, #lignes - hauteur + 1))
+    local montre = {}
+    for i = page.debut, math.min(#lignes, page.debut + hauteur - 1) do
+        montre[#montre + 1] = lignes[i]
+    end
+    poser(p, carte.texte, table.concat(montre, '\n'))
+    poser(p, cle .. 'Monte', page.debut > 1)
+    poser(p, cle .. 'Descend', page.debut + hauteur - 1 < #lignes)
+end
+
+-- ▲ (sens -1) ou ▼ (sens 1) : une page plus haut ou plus bas, la dernière ligne vue gardée.
+function Fenetre.defilerTexte(cle, sens)
+    Fenetre.annulerEnvoiAuto()
+    local page, carte = Fenetre.pages[cle], CARTES[cle]
+    if not (page and carte) then
+        return
+    end
+    local hauteur = Fenetre.T and carte.lignes(Fenetre.T) or 8
+    page.debut = math.max(1, page.debut + sens * math.max(1, hauteur - 1))
+    Fenetre.montrerPage(cle)
+end
+
 -- Proposition ---------------------------------------------------------------------------------
 
 function Fenetre.rafraichirProposition()
@@ -592,14 +766,14 @@ function Fenetre.rafraichirProposition()
         Fenetre.choisirOnglet(Fenetre.T.ongletProposition)
     end
     if not prop then
-        poser(p, 'propositionTexte', "Aucune proposition en attente.\n\nEn mode « Proposer d'abord », Claude montre ici ce qu'il compte changer et attend votre accord.")
+        Fenetre.montrerPage('proposition', "Aucune proposition en attente.\n\nEn mode « Proposer d'abord », Claude montre ici ce qu'il compte changer et attend votre accord.")
         return
     end
     local lignes = { Texte.nettoyer(prop.texte) ~= '' and prop.texte or "Claude propose :" , '' }
     for _, ch in ipairs(prop.changements or {}) do
         lignes[#lignes + 1] = string.format("%s : %s → %s", ch.libelle or '?', ch.avant or '—', ch.apres or '—')
     end
-    poser(p, 'propositionTexte', table.concat(lignes, '\n'))
+    Fenetre.montrerPage('proposition', table.concat(lignes, '\n'))
 end
 
 function Fenetre.repondreProposition(acceptee)
@@ -663,8 +837,8 @@ local CRITERES = {
     { cle = 'finition', titre = "Finition" },
 }
 
-Fenetre.AIDE_NOTATION = "Noter : Claude propose une note selon le standard, critère par critère (impact, qualités, "
-    .. "plancher technique, finition). Vous l'acceptez, la changez ou la gardez à vérifier ; 5 ★ reste à vous seul."
+Fenetre.AIDE_NOTATION = "Claude note d'abord chaque photo qu'il traite, selon le standard, critère par critère (impact, "
+    .. "qualités, plancher technique, finition) : sa note arrive à vérifier, vous l'acceptez ou la changez ; 5 ★ reste à vous seul."
 
 local function texteChamp(v)
     return type(v) == 'string' and Texte.nettoyer(v) or ''
@@ -730,6 +904,15 @@ function Fenetre.texteCriteres(prop)
     return table.concat(lignes, '\n')
 end
 
+-- Le texte de la carte Note : les critères et le plafond, puis la raison.
+function Fenetre.texteNote(prop)
+    local criteres, raison = Fenetre.texteCriteres(prop), texteChamp(prop.raison)
+    if criteres ~= '' and raison ~= '' then
+        return criteres .. '\n\n' .. raison
+    end
+    return criteres .. raison
+end
+
 function Fenetre.rafraichirNotation()
     local p = Fenetre.p
     if not p then
@@ -749,25 +932,22 @@ function Fenetre.rafraichirNotation()
         poser(p, 'notationProposee', Fenetre.texteNoteProposee(prop))
         poser(p, 'notationCouleur', COULEURS_NOTE[prop.etat] or 'gris')
         poser(p, 'notationEtat', Fenetre.texteEtatNote(prop))
-        poser(p, 'notationCriteres', Fenetre.texteCriteres(prop))
-        poser(p, 'notationRaison', texteChamp(prop.raison))
+        Fenetre.montrerPage('note', Fenetre.texteNote(prop))
     else
         poser(p, 'notationProposee', "Aucune note proposée")
         poser(p, 'notationCouleur', 'gris')
         poser(p, 'notationEtat', '')
-        poser(p, 'notationCriteres', Fenetre.AIDE_NOTATION)
-        poser(p, 'notationRaison', '')
+        Fenetre.montrerPage('note', Fenetre.AIDE_NOTATION)
     end
     -- Les écritures de la fenêtre échappent à la file du connecteur : pas pendant que Claude
     -- travaille, ni pendant une écriture déjà demandée.
     local libre = not Moteur.travaille and not Fenetre.noteEnCours
     poser(p, 'peutAccepterNote', libre and prop ~= nil and (prop.etat == 'proposee' or prop.etat == 'a_verifier'))
     poser(p, 'peutChangerNote', libre and active ~= nil)
-    poser(p, 'peutVerifierNote', prop ~= nil and prop.etat == 'proposee')
     -- Une proposition qui arrive pour la photo montrée se montre (onglet Note), une seule fois, « à
     -- vérifier » comprise (la plus fréquente, constaté) ; une autre photo choisie ne change pas
     -- d'onglet.
-    local cle = prop and (tostring(prop.photo) .. '/' .. tostring(prop.le) .. '/' .. tostring(prop.seance)) or nil
+    local cle = prop and (tostring(prop.photo) .. '/' .. tostring(prop.le)) or nil
     local photo = active and active.id
     local nouvelle = prop and (prop.etat == 'proposee' or prop.etat == 'a_verifier')
     if nouvelle and cle ~= Fenetre.noteVue and Fenetre.notePhoto == photo then
@@ -848,38 +1028,6 @@ function Fenetre.changerNote()
     end)
     if choix then
         Fenetre.poserNote(choix)
-    end
-end
-
--- À vérifier : la proposition reste à revoir ; rien n'est écrit dans le catalogue.
-function Fenetre.verifierNote()
-    local prop = Fenetre.propositionNote
-    if not prop then
-        return
-    end
-    local ok, fait, raison = LrTasks.pcall(Notation.decider, prop.photo, 'a_verifier')
-    if (not ok or not fait) and Fenetre.p then
-        Fenetre.p.message = "Pas mise à vérifier : " .. tostring(ok and raison or fait)
-    end
-    Fenetre.aRafraichirNotation = true
-end
-
--- La séance de notation (FenetreNotation.lua), dans sa fenêtre.
-function Fenetre.seance(options)
-    require('FenetreNotation').afficher(options)
-end
-
--- Noter : Claude propose une note pour la photo active ; plusieurs photos sélectionnées, c'est
--- une séance de notation (depuis une tâche : lecture du catalogue).
-function Fenetre.noter()
-    local info = Lightroom.photos()
-    Fenetre.info = info
-    if (info.selection or 0) > 1 then
-        Fenetre.seance({ portee = 'selection' })
-    elseif info.active then
-        Fenetre.envoyer(Consignes.noterPhoto)
-    elseif Fenetre.p then
-        Fenetre.p.message = "Aucune photo active : choisissez une photo dans Lightroom, puis cliquez Noter."
     end
 end
 
@@ -980,7 +1128,7 @@ function Fenetre.montrerAide()
 end
 
 -- Ce que montre le bandeau : un message, sinon l'aide d'un voyant rouge, sinon les photos
--- jointes, sinon le rappel du style.
+-- jointes, sinon rien (le rappel du style est retiré : demandé par Dany le 20 octobre 2026).
 function Fenetre.etatBandeau(p)
     if (p.message or '') ~= '' then
         return 'message'
@@ -989,7 +1137,7 @@ function Fenetre.etatBandeau(p)
     elseif (p.jointes or '') ~= '' then
         return 'jointes'
     end
-    return 'rappel'
+    return 'vide'
 end
 
 -- La photo active et la sélection (gardées pour la carte Note).
@@ -1002,6 +1150,13 @@ function Fenetre.majPhoto()
     local version = Notation.version
     local info = Lightroom.photos()
     Fenetre.info = info
+    -- Une autre photo active (ou la première vue à l'ouverture) : son aperçu se montre.
+    local id = info.active and info.active.id
+    if id ~= Fenetre.idActif then
+        Fenetre.idActif = id
+        Fenetre.voirActive = true
+        Fenetre.rafraichirApercu()
+    end
     if info.active then
         p.infoPhoto = string.format("Active : %s     Sélection : %d", Lightroom.nomCourt(info.active.nom), info.selection)
         -- Une note acceptée ou changée qui n'est plus sur la photo (undo_last, ⌘Z) : la proposition
@@ -1011,7 +1166,48 @@ function Fenetre.majPhoto()
     else
         p.infoPhoto = "Aucune photo active"
     end
+    Fenetre.suivreSelection(info)
     Fenetre.rafraichirNotation()
+end
+
+-- Une autre photo active ou une autre sélection, choisie par l'utilisateur, commence une nouvelle
+-- conversation (préférence `nouvelleParPhoto`, demandé par Dany le 20 octobre 2026), si celle
+-- montrée a déjà des messages et parlait d'autres photos (`c.cle`, posée à chaque demande). Une
+-- sélection changée pendant que Claude travaille (show_photo, tri), ou qui l'était encore
+-- DELAI_APRES_TRAVAIL secondes avant la fin de son travail, peut être la sienne : elle devient
+-- celle de la conversation. `Fenetre.cleVue` et l'heure où elle a été vue (`cleVueLe`) restent
+-- d'une ouverture de la fenêtre à l'autre : une photo choisie fenêtre fermée compte aussi, et une
+-- fenêtre fermée pendant le travail de Claude retrouve sa conversation à la réouverture.
+Fenetre.DELAI_APRES_TRAVAIL = 4
+
+function Fenetre.voirSelection(cle)
+    Fenetre.cleVue, Fenetre.cleVueLe = cle, os.time()
+end
+
+function Fenetre.suivreSelection(info)
+    local cle = info and info.cle
+    if not cle then
+        return
+    end
+    local avant, vueLe = Fenetre.cleVue, Fenetre.cleVueLe
+    Fenetre.voirSelection(cle)
+    if avant == nil or avant == cle then
+        return
+    end
+    local c = Moteur.courante
+    -- Claude a travaillé depuis que la sélection d'avant a été vue.
+    local fin = Moteur.finTravail or 0
+    if Moteur.travaille or (fin > 0 and (not vueLe or fin + Fenetre.DELAI_APRES_TRAVAIL > vueLe)) then
+        if c then
+            c.cle = cle
+        end
+        return
+    end
+    if not Chemins.prefs().nouvelleParPhoto or not c or #(c.elements or {}) == 0 or c.cle == cle then
+        return
+    end
+    Journal.noter("Autre photo choisie : nouvelle conversation")
+    Fenetre.nouvelle()
 end
 
 -- Tout ce qui dépend du moteur.
@@ -1065,7 +1261,15 @@ function Fenetre.envoyer(texte, modele)
     p.libre = false
     Fenetre.defilement = 0
     LrTasks.startAsyncTask(function()
-        local ok, raison = Moteur.envoyer(texte, { modele = modele or p.modele, jointes = jointes, style = p.style })
+        -- La photo active et la sélection de la demande : la conversation est la leur.
+        local info = Lightroom.photos()
+        -- Le modèle et l'effort des préférences (Gestionnaire de modules externes), sauf le modèle
+        -- d'une invite qui en impose un.
+        local ok, raison = Moteur.envoyer(texte, { modele = modele, jointes = jointes, style = p.style })
+        if ok and Moteur.courante and info.cle then
+            Moteur.courante.cle = info.cle
+            Fenetre.voirSelection(info.cle)
+        end
         if not ok and Fenetre.p then
             Fenetre.p.message = raison or ''
             if not Moteur.travaille then
@@ -1219,17 +1423,14 @@ end
 
 -- Disposition ---------------------------------------------------------------------------------
 
--- Menu Disposition : la préférence change, puis la fenêtre se rouvre (depuis une tâche).
-function Fenetre.changerDisposition(valeur)
-    if not Dispositions.TAILLES[valeur] or valeur == Fenetre.disposition then
-        return
-    end
-    Chemins.prefs().disposition = valeur
-    enTache(Fenetre.rouvrir)
+-- Vrai si la disposition des préférences (Gestionnaire de modules externes) n'est plus celle de
+-- la fenêtre ouverte.
+function Fenetre.dispositionChangee()
+    return Fenetre.T ~= nil and Dispositions.valider(Chemins.prefs().disposition) ~= Fenetre.T.nom
 end
 
--- Ferme la fenêtre pour la rouvrir dans la disposition et la taille des préférences (une fenêtre
--- ouverte ne change pas de structure) : la demande tapée revient dans le champ, sans partir.
+-- Ferme la fenêtre pour la rouvrir dans la disposition des préférences (une fenêtre ouverte ne
+-- change pas de structure) : la demande tapée revient dans le champ, sans partir.
 function Fenetre.rouvrir()
     if not Fenetre.ouverte then
         Fenetre.afficher()
@@ -1255,12 +1456,13 @@ end
 -- Ouverture -----------------------------------------------------------------------------------
 
 -- Le nom du cadre enregistré de la fenêtre. Lightroom rend sa taille enregistrée à la fenêtre et
--- ne la rapetisse pas quand le contenu devient plus petit (bande vide en bas, constaté) : une
--- disposition dans une taille a son propre cadre, et FORME augmente quand le contenu rapetisse.
+-- ne la rapetisse pas quand le contenu devient plus petit (bande vide en bas, constaté) : chaque
+-- disposition a son propre cadre, et FORME augmente quand le contenu rapetisse. Le nom garde
+-- « grande », la seule taille depuis la 1.1.1 : le cadre déjà enregistré en grande sert encore.
 Fenetre.FORME = 1
 
-function Fenetre.cadre(disposition, taille)
-    return 'DeveloppeurClaude-' .. tostring(disposition or Dispositions.DEFAUT) .. '-' .. tostring(taille or 'moyenne') .. '-' .. Fenetre.FORME
+function Fenetre.cadre(disposition)
+    return 'DeveloppeurClaude-' .. tostring(disposition or Dispositions.DEFAUT) .. '-grande-' .. Fenetre.FORME
 end
 
 function Fenetre.desabonner()
@@ -1270,6 +1472,17 @@ end
 
 -- Boucle d'une fenêtre (sa génération : une fenêtre rouverte a la sienne, l'ancienne boucle
 -- s'arrête) : rafraîchit ce que le moteur a changé, la note, l'activité, et les voyants.
+-- Toutes les 2 s : les voyants et la photo active (la liaison, lue dans ce module sans commande
+-- du système, peut démarrer ou s'arrêter par le menu) ; disposition changée dans le
+-- Gestionnaire de modules externes : la fenêtre se rouvre.
+function Fenetre.periodique()
+    LrTasks.pcall(Fenetre.verifier, false)
+    LrTasks.pcall(Fenetre.majPhoto)
+    if Fenetre.dispositionChangee() and not Fenetre.aRouvrir then
+        Fenetre.rouvrir()
+    end
+end
+
 function Fenetre.boucle(generation)
     local tic = 0
     while Fenetre.ouverte and Fenetre.generation == generation do
@@ -1296,11 +1509,8 @@ function Fenetre.boucle(generation)
             end
             poser(p, 'activite', Moteur.texteTravail(math.floor(tic / 2)))
             poser(p, 'travaille', Moteur.travaille)
-            -- Voyants et photo active toutes les 2 s (la liaison, lue dans ce module sans commande
-            -- du système, peut démarrer ou s'arrêter par le menu).
             if tic % 8 == 0 then
-                LrTasks.pcall(Fenetre.verifier, false)
-                LrTasks.pcall(Fenetre.majPhoto)
+                Fenetre.periodique()
             end
         end
         LrTasks.sleep(0.25)
@@ -1314,22 +1524,21 @@ local function initialiserNotation(p)
     p.notationProposee = ''
     p.notationCouleur = 'gris'
     p.notationEtat = ''
-    p.notationCriteres = ''
-    p.notationRaison = ''
+    p.notationTexte = ''
     p.peutAccepterNote = false
     p.peutChangerNote = false
-    p.peutVerifierNote = false
 end
 
 function Fenetre.afficher()
     if Fenetre.ouverte then
-        -- Disposition ou taille changée dans le Gestionnaire de modules externes : rouverte.
-        local prefs = Chemins.prefs()
-        local voulue = Dispositions.dimensions(prefs.disposition, prefs.taille)
-        if Fenetre.T and (voulue.nom ~= Fenetre.T.nom or voulue.taille ~= Fenetre.T.taille) then
+        -- Disposition changée dans le Gestionnaire de modules externes : rouverte.
+        if Fenetre.dispositionChangee() then
             Fenetre.rouvrir()
         elseif Fenetre.controle and Fenetre.controle.toFront then
             Fenetre.controle.toFront()
+            -- Rouverte par le menu ou ⌃⌥C : l'aperçu remontre la photo active, refait.
+            Fenetre.idActif, Fenetre.apercuActif = nil, nil
+            LrTasks.startAsyncTask(function() LrTasks.pcall(Fenetre.majPhoto) end)
         end
         return
     end
@@ -1351,7 +1560,7 @@ function Fenetre.afficher()
 
         Moteur.charger()
         local prefs = Chemins.prefs()
-        local D = Dispositions.dimensions(prefs.disposition, prefs.taille)
+        local D = Dispositions.dimensions(prefs.disposition)
         Fenetre.T = D
         Fenetre.disposition = D.nom
         Fenetre.aRouvrir = false
@@ -1361,6 +1570,8 @@ function Fenetre.afficher()
         Fenetre.signatureListe = nil
         Fenetre.defilement = 0
         Fenetre.indiceImage = nil
+        -- À l'ouverture, l'aperçu montre la photo active, refait (Fenetre.majPhoto).
+        Fenetre.idActif, Fenetre.apercuActif, Fenetre.demandeActive, Fenetre.voirActive = nil, nil, nil, true
         Fenetre.propositionVue = nil
         Fenetre.info = nil
         Fenetre.noteVue, Fenetre.notePhoto = nil, nil
@@ -1372,9 +1583,7 @@ function Fenetre.afficher()
         p.saisie = ''
         p.message = ''
         p.jointes = Fenetre.texteJointes()
-        p.modele = prefs.modele
         p.style = Consignes.style(prefs.styleChoisi) and prefs.styleChoisi or 'standard'
-        p.disposition = D.nom
         p.onglet = D.onglets and D.onglets[1].valeur or 'aucun'
         p.libre = not Moteur.travaille
         p.travaille = Moteur.travaille
@@ -1389,6 +1598,11 @@ function Fenetre.afficher()
         p.imageApercu = Fenetre.imageVide()
         p.legendeApercu = ''
         p.aProposition = false
+        p.enAttente = false
+        p.propositionTexte = ''
+        for _, cle in ipairs({ 'note', 'proposition' }) do
+            p[cle .. 'Monte'], p[cle .. 'Descend'] = false, false
+        end
         p.aide = ''
         p.bandeau = Fenetre.etatBandeau(p)
         for i, l in ipairs(Composants.lignes(Composants.module(), '…')) do
@@ -1419,23 +1633,15 @@ function Fenetre.afficher()
             Fenetre.annulerEnvoiAuto()
             Fenetre.rafraichirListe()
         end)
-        p:addObserver('modele', function(_, _, valeur)
-            Fenetre.annulerEnvoiAuto()
-            Moteur.changerModele(valeur)
-        end)
         p:addObserver('style', function(_, _, valeur)
             Fenetre.annulerEnvoiAuto()
             Chemins.prefs().styleChoisi = valeur
         end)
-        -- Un clic sur un onglet ou le menu Disposition n'envoie pas la demande validée par le clic.
+        -- Un clic sur un onglet n'envoie pas la demande validée par le clic.
         p:addObserver('onglet', function()
             if not Fenetre.ongletAuto then
                 Fenetre.annulerEnvoiAuto()
             end
-        end)
-        p:addObserver('disposition', function(_, _, valeur)
-            Fenetre.annulerEnvoiAuto()
-            Fenetre.changerDisposition(valeur)
         end)
         p:addObserver('saisie', function(_, _, valeur) Fenetre.saisieValidee(valeur) end)
         for _, cle in ipairs({ 'message', 'aide', 'jointes' }) do
@@ -1461,9 +1667,11 @@ function Fenetre.afficher()
         LrTasks.startAsyncTask(function() LrTasks.pcall(Fenetre.verifier, true) end)
 
         LrDialogs.presentFloatingDialog(_PLUGIN, {
-            title = "Claude",
+            -- « Développeur » (demandé par Dany le 20 octobre 2026) ; les autres fenêtres du module
+            -- gardent « Claude · … ».
+            title = "Développeur",
             contents = contenu,
-            save_frame = Fenetre.cadre(D.nom, D.taille),
+            save_frame = Fenetre.cadre(D.nom),
             blockTask = true,
             onShow = function(controle)
                 if Fenetre.generation == generation then

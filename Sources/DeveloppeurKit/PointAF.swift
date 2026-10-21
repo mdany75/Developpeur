@@ -19,8 +19,8 @@ import Foundation
 /// Claude Desktop ouvrait un original du volume externe « Photos » et open() attendait que
 /// l'utilisateur réponde à la demande d'autorisation de macOS (accès aux fichiers d'un volume) :
 /// tout le tri restait à « 0 sur 130 », et la file des outils derrière lui. Un original qui ne
-/// s'ouvre pas dans le délai est sauté, et les suivants de la série aussi (le fil bloqué reste
-/// bloqué jusqu'à la réponse ; un seul par série).
+/// s'ouvre pas dans le délai est sauté, et les suivants aussi tant que sa lecture n'a pas fini (un
+/// seul fil bloqué à la fois) ; quand elle finit (l'utilisateur a répondu), la lecture reprend.
 public final class LecteurPointsAF {
     let delai: TimeInterval
     let lecture: (URL) -> PointAF?
@@ -43,22 +43,28 @@ public final class LecteurPointsAF {
         final class Boite: @unchecked Sendable {
             let verrou = NSLock()
             var point: PointAF?
+            var finie = false
         }
         let boite = Boite()
         let fini = DispatchSemaphore(value: 0)
         let lecture = self.lecture
-        DispatchQueue.global(qos: .utility).async {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             let point = lecture(fichier)
-            boite.verrou.lock(); boite.point = point; boite.verrou.unlock()
+            boite.verrou.lock(); boite.point = point; boite.finie = true; boite.verrou.unlock()
             fini.signal()
+            // Une lecture finie après le délai débloque la suite.
+            guard let self else { return }
+            self.verrou.lock()
+            if self.bloqueSur == fichier { self.bloqueSur = nil }
+            self.verrou.unlock()
         }
-        guard fini.wait(timeout: .now() + delai) == .success else {
+        _ = fini.wait(timeout: .now() + delai)
+        boite.verrou.lock(); defer { boite.verrou.unlock() }
+        if !boite.finie {
             verrou.lock()
             if bloqueSur == nil { bloqueSur = fichier }
             verrou.unlock()
-            return nil
         }
-        boite.verrou.lock(); defer { boite.verrou.unlock() }
         return boite.point
     }
 }

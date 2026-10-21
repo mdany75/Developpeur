@@ -26,7 +26,7 @@ local LrTasks = import 'LrTasks'
 local Json = require 'Json'
 
 local Liaison = {
-    VERSION = '1.1',
+    VERSION = '1.1.1',
     PORT_COMMANDES = 54770,
     PORT_REPONSES = 54771,
 

@@ -1,6 +1,6 @@
 -- Stockage.lua : les conversations sur le disque, une par dossier
--- (Conversations/<id>/conversation.json et ses images), séances de notation comprises
--- (genre = 'notation').
+-- (Conversations/<id>/conversation.json et ses images), celles des anciennes séances de notation
+-- comprises (genre = 'notation').
 
 local LrPathUtils = import 'LrPathUtils'
 

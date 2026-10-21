@@ -29,6 +29,9 @@ Fil.MARGE = 10
 -- Photos montrées d'une notation ; les autres se résument en « … et N autres ».
 Fil.NOTES_MONTREES = 12
 
+-- L'espace insécable (U+00A0) : celle de la ponctuation haute, que la coupe garde avec son mot.
+local INSECABLE = '\194\160'
+
 -- Largeur d'un texte dans une police.
 function Fil.largeur(texte, police)
     local m = Metriques[police] or Metriques.texte
@@ -36,7 +39,7 @@ function Fil.largeur(texte, police)
     local defaut = chasse['M']
     local total = 0
     for c in Texte.caracteres(texte) do
-        total = total + (chasse[c] or defaut)
+        total = total + (chasse[c] or (c == INSECABLE and chasse[' ']) or defaut)
     end
     return total
 end
@@ -54,13 +57,16 @@ function Fil.couper(texte, largeur, police, retrait)
     local lignes = {}
     local courante = ''
     local function pousser(ligne)
-        lignes[#lignes + 1] = ligne
+        lignes[#lignes + 1] = (ligne:gsub(INSECABLE, ' '))
     end
     local function tient(t)
         return Fil.largeur(t, police) <= largeur
     end
+    -- Une ponctuation haute (; : ! ? ») reste avec le mot d'avant, « avec celui d'après : une ligne
+    -- ne commence pas par « ; » (typographie française, constaté sur la carte Note).
+    texte = texte:gsub('\t', '    '):gsub(' ([;:!?])', INSECABLE .. '%1'):gsub(' »', INSECABLE .. '»'):gsub('« ', '«' .. INSECABLE)
     -- Mots et espaces, dans l'ordre.
-    for espace, mot in (texte:gsub('\t', '    ')):gmatch('(%s*)(%S*)') do
+    for espace, mot in texte:gmatch('(%s*)(%S*)') do
         if mot == '' and espace == '' then
             break
         end
@@ -121,10 +127,12 @@ function Fil.texteNote(x)
         tete = '✕ ' .. tete
     end
     local suite = { type(x.fichier) == 'string' and x.fichier ~= '' and x.fichier or ('photo ' .. Conversation.clePhoto(x.photo)) }
-    if x.a_verifier == true then
+    if x.etat == 'posee' then
+        suite[#suite + 1] = 'posée'
+    elseif x.a_verifier == true then
         suite[#suite + 1] = 'à vérifier'
     end
-    local raison = x.etat == 'refusee' and x.refus or x.raison
+    local raison = (x.etat == 'refusee' or x.refus) and x.refus or x.raison
     if type(raison) == 'string' and Texte.nettoyer(raison) ~= '' then
         suite[#suite + 1] = Texte.nettoyer(raison)
     end
@@ -242,10 +250,26 @@ function Fil.lignesElement(e, i, largeur)
                 element = i, image = chemin, icone = 'apercu' }
         end
     elseif g == 'notation' then
-        -- « Notes proposées · passe 2 · 14 photos », puis une ligne par photo.
+        -- « Notes proposées · passe 2 · 14 photos », puis une ligne par photo. Quand Dany a demandé
+        -- à Claude de les poser : « Notes à poser » pendant l'appel, puis « Notes posées » si au
+        -- moins une l'est, sinon « Notes non posées » (pause, accord attendu : la raison est sur
+        -- chaque ligne).
         local notes = e.notes or {}
         local icone = e.etat == 'erreur' and 'erreur' or (e.etat == 'enCours' and 'cours' or 'proposition')
-        local titre = e.etat == 'erreur' and "Notes non rangées" or "Notes proposées"
+        local titre = "Notes proposées"
+        if e.etat == 'erreur' then
+            titre = "Notes non rangées"
+        elseif e.pose and e.etat == 'enCours' then
+            titre = "Notes à poser"
+        elseif e.pose then
+            titre = "Notes non posées"
+            for _, x in ipairs(notes) do
+                if x.etat == 'posee' then
+                    titre = "Notes posées"
+                    break
+                end
+            end
+        end
         if tonumber(e.passe) then
             titre = titre .. " · passe " .. Texte.nombre(tonumber(e.passe))
         end
@@ -273,7 +297,7 @@ local function signatureNotes(e)
     if type(e.notes) ~= 'table' then
         return ''
     end
-    local morceaux = { tostring(e.passe), #e.notes }
+    local morceaux = { tostring(e.passe), tostring(e.pose), #e.notes }
     for _, x in ipairs(e.notes) do
         morceaux[#morceaux + 1] = table.concat({ Conversation.clePhoto(x.photo), tostring(x.note), x.drapeau or '', x.etat or '',
             tostring(x.a_verifier), x.fichier or '', x.refus or '', x.raison or '' }, '\2')

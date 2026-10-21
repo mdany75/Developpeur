@@ -13,7 +13,7 @@ extension ToolHandler {
     var analysisDefinitions: [JSONValue] {
         [
             tool("view_photo",
-                 "Montre la photo telle qu'elle est développée en ce moment (aperçu JPEG rendu par Lightroom avec les réglages actuels), avec ses données de prise de vue, ses réglages non nuls et des mesures objectives : luminosité L*, centiles, écrêtage (aussi par canal), contraste, dominante des tons neutres, netteté par zone et bruit ; et ce que voit Vision (visages et pupilles, qualité des visages, note esthétique, zone d'intérêt). À appeler avant de retoucher, puis après chaque passe. Mesures sur un JPEG sRGB (une couleur hors du sRGB y paraît écrêtée) ; en HDR (HDREditMode), le rendu SDR : le HDR ne se voit pas. « a_savoir » (calculs IA en attente) : le dire. region = zoom à 100 % sur une zone (netteté et bruit en pleine résolution, taches) ; compare = avant/après côte à côte.",
+                 "Montre la photo telle qu'elle est développée en ce moment (aperçu JPEG rendu par Lightroom avec les réglages actuels), avec ses données de prise de vue, ses réglages non nuls et des mesures objectives : luminosité L*, centiles, écrêtage (aussi par canal), contraste, dominante des tons neutres, netteté par zone et bruit ; et ce que voit Vision (visages et pupilles, qualité des visages, note esthétique, zone d'intérêt). À appeler avant de retoucher, puis après chaque passe. Mesures sur un JPEG sRGB (une couleur hors du sRGB y paraît écrêtée) ; en HDR (HDREditMode), le rendu SDR : le HDR ne se voit pas. « a_savoir » (calculs IA en attente) : le dire. « evaluation » : la note de Claude gardée pour la photo (pas encore évaluée, à vérifier, acceptée…). region = zoom à 100 % sur une zone (netteté et bruit en pleine résolution, taches) ; compare = avant/après côte à côte.",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("size", prop("integer", "Grand côté de l'aperçu en pixels (défaut \(Self.defaultPreviewSize), de \(Self.previewSizes.lowerBound) à \(Self.previewSizes.upperBound)).")),
@@ -24,6 +24,7 @@ extension ToolHandler {
                         "height": prop("number", "Hauteur (0 à 1)."),
                     ], required: ["x", "y", "width", "height"])),
                     ("compare", enumProp(["before_claude", "previous_step"], "Avant/après côte à côte : before_claude = l'état d'avant la première retouche de Claude ; previous_step = avant la dernière retouche. L'Historique de Lightroom garde deux étapes « Claude · comparaison » (l'état d'avant, puis l'état actuel remis) : la photo revient telle qu'elle était.")),
+                    ("af_point", prop("boolean", "true = le point de mise au point de l'appareil dessiné sur l'image : carré vert, rouge si l'appareil l'a signalé manqué (fichiers Fujifilm seulement). Pour noter. Sans lui, point_af le donne en chiffres (avec la netteté autour) ; l'utilisateur peut le vouloir dessiné en tout temps.")),
                  ],
                  required: []),
             tool("measure_angle",
@@ -83,12 +84,22 @@ extension ToolHandler {
             guard region == nil else { throw LightroomError.invalid("« compare » et « region » ne vont pas ensemble.") }
             params["comparer"] = .string(compare == "before_claude" ? "avantClaude" : "etapePrecedente")
         }
+        // Le point de mise au point, sur l'aperçu entier seulement.
+        if region == nil, compare == nil { params["point_af"] = true }
 
         let result = try lightroom.send("apercu", params, timeout: region == nil ? 120 : 240)
         var image = try Self.readPreview(result["chemin"]?.string)
         var info = result.object ?? [:]
         info.removeValue(forKey: "chemin")
         info.removeValue(forKey: "chemin_avant")
+        // Ce qui sert au point de mise au point, pas à Claude.
+        let afToujours = info.removeValue(forKey: "point_af_toujours")?.bool == true
+        if var photo = info["photo"]?.object {
+            photo.removeValue(forKey: "chemin_original")
+            photo.removeValue(forKey: "geometrie")
+            photo.removeValue(forKey: "marque")
+            info["photo"] = .object(photo)
+        }
         if let settings = result["reglages"]?.object {
             let raw = result["echelle_temperature"]?.string?.hasPrefix("kelvins") == true
             info["reglages"] = Self.grouped(settings, onlyChanged: true, raw: raw)
@@ -123,6 +134,20 @@ extension ToolHandler {
             }
             if let vision = VisionAnalysis.analyze(decodee) { info["vision"] = vision.json }
             info["taille_apercu"] = .number(Double(size))
+            // Le point de mise au point de l'appareil (Fujifilm) : toujours en chiffres, en carré
+            // sur l'image avec af_point (pour noter) ou si l'utilisateur le veut en tout temps
+            // (préférence du module). Les mesures sont prises avant le carré.
+            if let af = Self.pointAF(result["photo"], lecteur: lecteurAF) {
+                var point: [String: JSONValue] = ["x": .number((af.point.x * 1000).rounded() / 1000),
+                                                  "y": .number((af.point.y * 1000).rounded() / 1000)]
+                if let nettete = Detail.nettete(decodee, autour: af.point) { point["nettete"] = .number((nettete * 10).rounded() / 10) }
+                if af.avertissement { point["appareil"] = "mise au point signalée manquée" }
+                if args.bool("af_point") == true || afToujours, let marquee = PreviewImages.marquerPoint(decodee, af.point, manque: af.avertissement) {
+                    image = marquee
+                    point["carre"] = .string(af.avertissement ? "rouge, sur l'image" : "vert, sur l'image")
+                }
+                info["point_af"] = .object(point)
+            }
         }
         return ToolResult(content: [Self.imageContent(image), .text(JSONCoding.pretty(.object(info)))])
     }

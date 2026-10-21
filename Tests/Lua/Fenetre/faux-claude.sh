@@ -6,7 +6,7 @@
 # $FAUX_IMAGE_B64), un relevé du forfait et un result. Écrit ses arguments dans arguments.txt
 # (dans son dossier de travail). Un message « ARRETE-TOI » le fait quitter avec le code 3, une
 # demande d'interruption répond comme Claude Code. Un message « NOTE-LES » propose des notes
-# (propose_ratings, passe 2 de la séance seance-essai : 3 étoiles, un rejet à vérifier, une photo
+# (propose_ratings, passe 2 : 3 étoiles, un rejet à vérifier, une photo
 # refusée par le module) et reçoit la réponse du connecteur, en JSON.
 
 printf '%s\n' "$@" > arguments.txt
@@ -25,8 +25,8 @@ while IFS= read -r ligne; do
             printf '%s\n' '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Je réfléchis"}}}'
             sleep 30 ;;
         *NOTE-LES*)
-            printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"Je propose les notes de la passe 2."},{"type":"tool_use","id":"outil-notes","name":"mcp__developpeur__propose_ratings","input":{"pass":2,"session":"seance-essai","ratings":[{"photo_id":53636309,"rating":3,"criteria":{"impact":"Moyen : le flamant se voit d’abord.","qualities":"Lumière douce, sujet clair.","technical_floor":"Nette (44)."},"reason":"Tient seule.","to_check":false},{"photo_id":53636310,"flag":"reject","criteria":{"impact":"Aucun.","qualities":"Sujet coupé.","technical_floor":"Floue (9)."},"reason":"Flou de bougé involontaire.","to_check":true},{"photo_id":53636311,"rating":2,"criteria":{"impact":"Faible.","qualities":"Fond chargé.","technical_floor":"Douce (28)."},"reason":"Correcte, sans plus."}]}}]}}'
-            printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"outil-notes","content":[{"type":"text","text":"{\"seance\": \"seance-essai\", \"propositions\": [{\"photo\": 53636309, \"fichier\": \"DSCF4961.RAF\", \"note_avant\": 0, \"drapeau_avant\": \"aucun\", \"etat\": \"proposee\"}, {\"photo\": 53636310, \"fichier\": \"DSCF4962.RAF\", \"note_avant\": 2, \"drapeau_avant\": \"aucun\", \"etat\": \"proposee\"}], \"refusees\": [{\"photo\": 53636311, \"raison\": \"photo introuvable\"}]}"}]}]}}'
+            printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"Je propose les notes de la passe 2."},{"type":"tool_use","id":"outil-notes","name":"mcp__developpeur__propose_ratings","input":{"pass":2,"ratings":[{"photo_id":53636309,"rating":3,"criteria":{"impact":"Moyen : le flamant se voit d’abord.","qualities":"Lumière douce, sujet clair.","technical_floor":"Nette (44)."},"reason":"Tient seule.","to_check":false},{"photo_id":53636310,"flag":"reject","criteria":{"impact":"Aucun.","qualities":"Sujet coupé.","technical_floor":"Floue (9)."},"reason":"Flou de bougé involontaire.","to_check":true},{"photo_id":53636311,"rating":2,"criteria":{"impact":"Faible.","qualities":"Fond chargé.","technical_floor":"Douce (28)."},"reason":"Correcte, sans plus."}]}}]}}'
+            printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"outil-notes","content":[{"type":"text","text":"{\"propositions\": [{\"photo\": 53636309, \"fichier\": \"DSCF4961.RAF\", \"note_avant\": 0, \"drapeau_avant\": \"aucun\", \"etat\": \"proposee\"}, {\"photo\": 53636310, \"fichier\": \"DSCF4962.RAF\", \"note_avant\": 2, \"drapeau_avant\": \"aucun\", \"etat\": \"proposee\"}], \"refusees\": [{\"photo\": 53636311, \"raison\": \"photo introuvable\"}]}"}]}]}}'
             printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"Deux notes proposées ; la photo 53636311 est introuvable."}]}}'
             printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"'$session'","duration_ms":900,"num_turns":2,"usage":{"input_tokens":12,"output_tokens":30},"modelUsage":{"claude-essai":{}}}' ;;
         *)

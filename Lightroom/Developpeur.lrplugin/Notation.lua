@@ -1,11 +1,13 @@
 -- Notation.lua : le registre des notes que Claude propose (outil propose_ratings, commande
--- notation), et des séances de notation de la fenêtre Claude. Rien n'y est écrit dans le
--- catalogue : Claude propose, l'utilisateur accepte, change, met à vérifier ou écarte dans la
--- fenêtre ; seule une note acceptée ou changée s'écrit, par Notation.poser (Bibliotheque.noter,
--- une écriture, une étape par photo que undo_last défait). Le registre ne voit pas l'annulation :
--- les fenêtres le recalent sur la note qu'elles relisent (Notation.recaler).
+-- notation). Rien n'y est écrit dans le catalogue : Claude propose, « à vérifier », l'utilisateur
+-- accepte ou change dans la carte Note de la fenêtre Claude ; seule une note acceptée ou changée
+-- s'écrit, par Notation.poser (Bibliotheque.noter, une écriture, une étape par photo que undo_last
+-- défait), ou une note que Dany a demandé à Claude de poser (propose_ratings avec apply). Le
+-- registre ne voit pas l'annulation : la fenêtre le recale sur la note qu'elle relit
+-- (Notation.recaler). La Séance de notation et ses séances sont retirées depuis la 1.1.1 (demandé
+-- par Dany le 20 octobre 2026) : un registre plus ancien perd ses séances à la relecture.
 --
--- La liaison (commande du serveur) et la fenêtre (cartes Note, Séance de notation) sont le même
+-- La liaison (commande du serveur) et la fenêtre (carte Note) sont le même
 -- module : elles voient la même table. Le registre est aussi rangé dans notation.json (à côté de
 -- consommation.json), propre au catalogue ouvert : un identifiant de photo ne vaut que dans son
 -- catalogue, et un autre catalogue trouve un registre vide (le fichier ne change qu'à sa première
@@ -18,11 +20,11 @@
 --
 -- Une proposition : { photo, uuid, fichier, note (0 à 4, nil pour un rejet), drapeau ('aucun' ou
 -- 'rejetee'), criteres = { impact, qualites, plancher, finition }, plafond, raison, a_verifier,
--- passe, seance, note_avant, drapeau_avant, etat, note_choisie, drapeau_choisi, le, decide_le,
--- commentaire }. etat : 'proposee', 'acceptee' (posée telle quelle), 'changee' (posée autrement :
--- note_choisie, drapeau_choisi), 'a_verifier' (Claude ou l'utilisateur doute), 'ecartee'.
--- Une séance : { id, titre, source = { portee, collection }, photos (identifiants figés à
--- l'ouverture), passe (1 à 4), cree, numero (ordre d'ouverture) }.
+-- passe, note_avant, drapeau_avant, etat, note_choisie, drapeau_choisi, le, decide_le,
+-- commentaire }. etat : 'a_verifier' (toute proposition commence ainsi depuis la 1.1.1 : Dany
+-- l'accepte ou la change ; a_verifier dit en plus que Claude doute), 'acceptee' (posée telle
+-- quelle), 'changee' (posée autrement : note_choisie, drapeau_choisi), 'ecartee' ; 'proposee' :
+-- celles d'avant la 1.1.1.
 
 local LrPathUtils = import 'LrPathUtils'
 local LrTasks = import 'LrTasks'
@@ -44,12 +46,11 @@ local Notation = {
 -- Claude ne propose jamais 5 étoiles : c'est à l'utilisateur (second garde-fou, après le serveur).
 Notation.NOTE_MAX_PROPOSEE = 4
 Notation.PASSES = 4
--- Taille du registre, réécrit à chaque décision : les séances les plus anciennes, puis les
--- propositions les plus anciennes, sortent au-delà.
-Notation.MAX_SEANCES = 50
+-- Taille du registre, réécrit à chaque décision : les propositions les plus anciennes sortent
+-- au-delà.
 Notation.MAX_PROPOSITIONS = 2000
--- Photos au plus par écriture (comme une commande du serveur) : Tout accepter sur une plus grande
--- séance se fait en plusieurs écritures.
+-- Photos au plus par écriture (comme une commande du serveur) : plus de photos à poser se posent
+-- en plusieurs écritures.
 Notation.LOT = 500
 
 local ETATS = { proposee = true, acceptee = true, changee = true, a_verifier = true, ecartee = true }
@@ -117,35 +118,19 @@ local function cheminCatalogue()
 end
 
 local function vide(catalogue)
-    return { catalogue = catalogue, seances = {}, propositions = {}, prochain = 0 }
+    return { catalogue = catalogue, propositions = {} }
 end
 
 -- Registre relu du fichier : des tables neuves, des clés de photo en texte.
 local function normaliser(r)
     r = copie(r)
     local propre = vide(texte(r.catalogue))
-    propre.prochain = entier(r.prochain) or 0
-    for id, s in pairs(type(r.seances) == 'table' and r.seances or {}) do
-        if type(s) == 'table' then
-            local photos = {}
-            for _, p in ipairs(type(s.photos) == 'table' and s.photos or {}) do
-                photos[#photos + 1] = tonumber(p)
-            end
-            propre.seances[tostring(id)] = {
-                id = tostring(id), titre = texte(s.titre) or "Séance de notation",
-                source = type(s.source) == 'table' and s.source or { portee = 'photos' },
-                photos = photos, passe = entier(s.passe) or 1, cree = tonumber(s.cree), numero = entier(s.numero) or 0,
-            }
-        end
-    end
     for cle, p in pairs(type(r.propositions) == 'table' and r.propositions or {}) do
         if type(p) == 'table' and ETATS[p.etat] then
             p.photo = tonumber(p.photo) or tonumber(cle)
+            p.seance = nil
             propre.propositions[cleDe(p.photo)] = p
         end
-    end
-    if texte(r.seanceActive) and propre.seances[r.seanceActive] then
-        propre.seanceActive = r.seanceActive
     end
     return propre
 end
@@ -179,19 +164,8 @@ function Notation.oublier()
     registre = nil
 end
 
--- Les séances les plus anciennes (sauf l'active), puis les propositions les plus anciennes.
+-- Les propositions les plus anciennes, au-delà de MAX_PROPOSITIONS.
 local function elaguer(r)
-    local seances = {}
-    for id, s in pairs(r.seances) do
-        if id ~= r.seanceActive then
-            seances[#seances + 1] = s
-        end
-    end
-    table.sort(seances, function(a, b) return a.numero < b.numero end)
-    local total = #seances + (r.seanceActive and 1 or 0)
-    for i = 1, total - Notation.MAX_SEANCES do
-        r.seances[seances[i].id] = nil
-    end
     local propositions = {}
     for cle, p in pairs(r.propositions) do
         propositions[#propositions + 1] = { cle = cle, le = p.le or 0, photo = tonumber(cle) or 0 }
@@ -212,17 +186,8 @@ end
 local function enregistrer()
     local r = charger()
     elaguer(r)
-    local seances = {}
-    for id, s in pairs(r.seances) do
-        local photos = Json.tableau()
-        for i, p in ipairs(s.photos) do
-            photos[i] = p
-        end
-        seances[id] = { id = s.id, titre = s.titre, source = s.source, photos = photos, passe = s.passe, cree = s.cree, numero = s.numero }
-    end
     local ok, erreur = pcall(Fichiers.ecrire, Notation.fichier(), Json.encode({
-        format = 1, catalogue = r.catalogue, seanceActive = r.seanceActive, prochain = r.prochain,
-        seances = seances, propositions = r.propositions,
+        format = 2, catalogue = r.catalogue, propositions = r.propositions,
     }))
     if not ok then
         Liaison.noter("Notation non enregistrée : " .. Liaison.messageErreur(erreur))
@@ -239,7 +204,7 @@ function Notation.desabonner(nom)
     Notation.observateurs[nom] = nil
 end
 
--- quoi : 'propositions', 'seance', 'decision', 'pose' ou 'recalage'.
+-- quoi : 'propositions', 'decision', 'pose' ou 'recalage'.
 function Notation.signaler(quoi)
     for _, fn in pairs(Notation.observateurs) do
         pcall(fn, quoi)
@@ -252,87 +217,6 @@ local function changer(quoi)
     Notation.signaler(quoi)
 end
 
--- Séances -------------------------------------------------------------------------------
-
-local function seanceDe(r, id)
-    if id == nil then
-        id = r.seanceActive
-    end
-    return id and r.seances[tostring(id)] or nil
-end
-
-local function membres(s)
-    local ensemble = {}
-    for _, id in ipairs(s and s.photos or {}) do
-        ensemble[cleDe(id)] = true
-    end
-    return ensemble
-end
-
--- Crée une séance sur ces photos (identifiants, ou photos de Lightroom), figées à l'ouverture : un
--- rejet accepté peut cacher une photo sous le filtre de la Bibliothèque, et la sélection change.
--- Elle devient la séance active ; les propositions encore à décider de ses photos s'y rattachent.
--- Rend son identifiant (un texte).
-function Notation.ouvrirSeance(args)
-    args = args or {}
-    local photos, vues = {}, {}
-    for _, p in ipairs(type(args.photos) == 'table' and args.photos or {}) do
-        local id = type(p) == 'table' and p.localIdentifier or tonumber(p)
-        if id and not vues[cleDe(id)] then
-            vues[cleDe(id)] = true
-            photos[#photos + 1] = id
-        end
-    end
-    if #photos == 0 then
-        echouer("Aucune photo pour la séance de notation : sélectionner des photos ou choisir une collection.")
-    end
-    local r = charger()
-    r.prochain = r.prochain + 1
-    local id = os.date('%Y%m%d-%H%M%S') .. '-' .. r.prochain
-    local source = type(args.source) == 'table' and args.source or {}
-    r.seances[id] = {
-        id = id,
-        titre = texte(args.titre) or ("Séance du " .. os.date('%Y-%m-%d %H:%M')),
-        source = { portee = texte(source.portee) or 'photos', collection = tonumber(source.collection) },
-        photos = photos, passe = 1, cree = os.time(), numero = r.prochain,
-    }
-    r.seanceActive = id
-    for cle in pairs(vues) do
-        local p = r.propositions[cle]
-        if p and (p.etat == 'proposee' or p.etat == 'a_verifier') then
-            p.seance = id
-        end
-    end
-    changer('seance')
-    return id
-end
-
-function Notation.seanceActive()
-    local r = charger()
-    return r.seanceActive and r.seances[r.seanceActive] and r.seanceActive or nil
-end
-
--- Une séance (la séance active sans identifiant), copie neuve.
-function Notation.seance(id)
-    return copie(seanceDe(charger(), id))
-end
-
--- Passe en cours de la séance (1 à 4).
-function Notation.choisirPasse(id, n)
-    local s = seanceDe(charger(), id)
-    n = entier(n)
-    if not s then
-        echouer("Séance de notation inconnue : " .. tostring(id))
-    end
-    if not n or n < 1 or n > Notation.PASSES then
-        echouer(string.format("Passe invalide : de 1 à %d.", Notation.PASSES))
-    end
-    if s.passe ~= n then
-        s.passe = n
-        changer('seance')
-    end
-end
-
 -- Propositions -------------------------------------------------------------------------
 
 function Notation.proposition(idPhoto)
@@ -342,69 +226,29 @@ function Notation.proposition(idPhoto)
     return copie(charger().propositions[cleDe(idPhoto)])
 end
 
--- Les propositions d'une séance (la séance active sans identifiant), dans l'ordre de ses photos.
-function Notation.propositions(id)
-    local r = charger()
-    local s = seanceDe(r, id)
-    local liste = {}
-    if not s then
-        return liste
+-- L'évaluation d'une photo en une phrase, pour view_photo (Rendu.apercu) : « pas encore évaluée »,
+-- « 3 ★ proposée par Claude, à vérifier », « acceptée par l'utilisateur : 3 ★ »…
+function Notation.resume(idPhoto)
+    local p = Notation.proposition(idPhoto)
+    if not p then
+        return "pas encore évaluée"
     end
-    for _, photo in ipairs(s.photos) do
-        local p = r.propositions[cleDe(photo)]
-        if p and p.seance == s.id then
-            liste[#liste + 1] = copie(p)
-        end
+    local function note(n, drapeau)
+        return drapeau == 'rejetee' and "rejet" or (tostring(entier(n) or 0) .. " ★")
     end
-    return liste
-end
-
-local function comptes()
-    return { proposees = 0, acceptees = 0, changees = 0, a_verifier = 0, ecartees = 0, total = 0 }
-end
-
-local function compterUne(c, p)
-    c.total = c.total + 1
-    if p.etat == 'proposee' then
-        c.proposees = c.proposees + 1
-    elseif p.etat == 'acceptee' or p.etat == 'changee' then
-        c.acceptees = c.acceptees + 1
-        if p.etat == 'changee' then
-            c.changees = c.changees + 1
-        end
-    elseif p.etat == 'a_verifier' then
-        c.a_verifier = c.a_verifier + 1
+    local proposee = note(p.note, p.drapeau)
+    if p.etat == 'acceptee' then
+        return "acceptée par l'utilisateur : " .. proposee
+    elseif p.etat == 'changee' then
+        return "changée par l'utilisateur : " .. note(p.note_choisie, p.drapeau_choisi) .. " (proposée : " .. proposee .. ")"
     elseif p.etat == 'ecartee' then
-        c.ecartees = c.ecartees + 1
+        return "proposition écartée par l'utilisateur (" .. proposee .. ")"
     end
+    return proposee .. " proposée par Claude, à vérifier"
 end
 
--- Comptes d'une séance : proposees (à décider), acceptees (posées, changées comprises), changees,
--- a_verifier, ecartees, total ; photos, sans_proposition ; par_passe[n] (mêmes comptes).
-function Notation.compter(id)
-    local c = comptes()
-    c.par_passe = {}
-    for n = 1, Notation.PASSES do
-        c.par_passe[n] = comptes()
-    end
-    local s = seanceDe(charger(), id)
-    if not s then
-        c.photos, c.sans_proposition = 0, 0
-        return c
-    end
-    c.photos = #s.photos
-    for _, p in ipairs(Notation.propositions(s.id)) do
-        compterUne(c, p)
-        if c.par_passe[p.passe] then
-            compterUne(c.par_passe[p.passe], p)
-        end
-    end
-    c.sans_proposition = c.photos - c.total
-    return c
-end
-
--- Décision de l'utilisateur sans rien écrire dans le catalogue : 'a_verifier', 'ecartee' (ou
--- 'proposee' pour revenir sur la décision). details.commentaire (ou raison) : son mot, gardé
+-- Décision sans rien écrire dans le catalogue : 'a_verifier', 'ecartee' (ou 'proposee' pour
+-- revenir sur la décision ; plus appelée par la fenêtre depuis le retrait du bouton À vérifier). details.commentaire (ou raison) : son mot, gardé
 -- pour apprendre de ses choix. Rend vrai, ou nil et la raison.
 function Notation.decider(idPhoto, etat, details)
     if not DECISIONS[etat] then
@@ -425,9 +269,8 @@ end
 
 -- Commande « proposer » : propositions de Claude, rangées sans rien écrire dans le catalogue. Une
 -- photo introuvable va dans refusees sans bloquer les autres ; une note de 5 ou plus refuse tout.
--- Une proposition pour une photo de la séance (donnée, sinon active) s'y rattache ; une nouvelle
--- proposition pour la même photo remplace l'ancienne. Une proposition « à vérifier » (cas
--- douteux) attend dans cet état : Tout accepter ne la pose pas.
+-- Une nouvelle proposition pour la même photo remplace l'ancienne. Une proposition « à vérifier »
+-- (cas douteux) attend dans cet état. Avec `poser`, les notes sont aussi posées (plus bas).
 function Notation.proposer(params)
     local demandes = type(params.propositions) == 'table' and params.propositions or {}
     if #demandes == 0 then
@@ -460,13 +303,6 @@ function Notation.proposer(params)
         valides[#valides + 1] = { demande = d, note = note, drapeau = drapeau }
     end
     local r = charger()
-    local s
-    if params.seance ~= nil then
-        s = r.seances[tostring(params.seance)]
-            or echouer("Séance de notation inconnue : " .. tostring(params.seance) .. ". propose_ratings avec read_session = true donne la séance ouverte.")
-    else
-        s = seanceDe(r, nil)
-    end
     local passe = entier(params.passe)
     if passe and (passe < 1 or passe > Notation.PASSES) then
         echouer(string.format("Passe invalide : de 1 à %d.", Notation.PASSES))
@@ -475,7 +311,6 @@ function Notation.proposer(params)
     if passe == Notation.PASSES then
         echouer(string.format("Passe %d : 5 étoiles, l'utilisateur seul ; rien à proposer.", Notation.PASSES))
     end
-    local dansSeance = membres(s)
 
     local refusees, trouvees, photos = Json.tableau(), {}, {}
     for _, v in ipairs(valides) do
@@ -499,26 +334,44 @@ function Notation.proposer(params)
         for _, nom in ipairs(CRITERES) do
             criteres[nom] = type(d.criteres) == 'table' and texte(d.criteres[nom]) or nil
         end
-        local rattachee = s and dansSeance[cleDe(id)] or false
         local p = {
             photo = id, uuid = texte(Photos.brut(photo, 'uuid')), fichier = description.fichier,
             note = v.note, drapeau = v.drapeau, criteres = criteres, plafond = entier(d.plafond),
             raison = texte(d.raison), a_verifier = d.a_verifier == true,
-            passe = passe or (rattachee and s.passe) or nil, seance = rattachee and s.id or nil,
+            passe = passe,
             note_avant = tonumber(description.note) or 0,
             drapeau_avant = description.drapeau == 'rejetée' and 'rejetee' or (description.drapeau or 'aucun'),
-            etat = d.a_verifier == true and 'a_verifier' or 'proposee', le = maintenant,
+            etat = 'a_verifier', le = maintenant,
         }
         r.propositions[cleDe(id)] = p
         reponses[#reponses + 1] = { photo = id, fichier = p.fichier, note_avant = p.note_avant, drapeau_avant = p.drapeau_avant,
-            etat = p.etat, hors_seance = (s and not rattachee) or nil }
+            etat = p.etat }
     end
     if #reponses > 0 then
-        Liaison.noter(string.format("Notation : %d proposition%s%s", #reponses, #reponses > 1 and "s" or "",
-            s and (" (séance « " .. s.titre .. " »)") or ""))
+        Liaison.noter(string.format("Notation : %d proposition%s", #reponses, #reponses > 1 and "s" or ""))
         changer('propositions')
     end
-    return { seance = s and s.id or Json.null, propositions = reponses, refusees = refusees }
+    local reponse = { propositions = reponses, refusees = refusees }
+    -- « Note ces photos » (propose_ratings avec apply, demandé par Dany le 20 octobre 2026) : les
+    -- notes sont aussi posées, comme Accepter, « à vérifier » comprises ; la demande explicite vaut
+    -- accord (confirme), la pause de la liaison et les garde-fous des photos restent.
+    if params.poser == true and #reponses > 0 then
+        local liste = {}
+        for _, rep in ipairs(reponses) do
+            liste[#liste + 1] = { photo = rep.photo }
+        end
+        local pose = Notation.poser(liste, { depuisLightroom = false, confirme = true })
+        local posees = Json.tableau()
+        for _, res in ipairs(pose.resultats or {}) do
+            posees[#posees + 1] = { photo = res.photo, etat = res.etat, note = res.note, drapeau = res.drapeau,
+                erreur = res.erreur, remarques = res.remarques }
+        end
+        reponse.posees = posees
+        if pose.erreur then
+            reponse.erreur_pose = pose.erreur
+        end
+    end
+    return reponse
 end
 
 -- Une proposition pour la réponse de la commande (sans l'uuid).
@@ -544,14 +397,10 @@ local function verifierPhotos(r, cles)
     return perdues
 end
 
--- Commande « lire » : la séance active, les séances, et les propositions (d'une séance, ou de
--- ces photos, ou toutes) avec leur état et les écarts de l'utilisateur.
+-- Commande « lire » : les propositions (de ces photos, ou toutes) avec leur état et les écarts
+-- de l'utilisateur.
 local function lire(params)
     local r = charger()
-    local s
-    if params.seance ~= nil then
-        s = r.seances[tostring(params.seance)] or echouer("Séance de notation inconnue : " .. tostring(params.seance))
-    end
     local voulues
     if type(params.photos) == 'table' and #params.photos > 0 then
         voulues = {}
@@ -560,8 +409,8 @@ local function lire(params)
         end
     end
     local cles = {}
-    for cle, p in pairs(r.propositions) do
-        if (not s or p.seance == s.id) and (not voulues or voulues[cle]) then
+    for cle in pairs(r.propositions) do
+        if not voulues or voulues[cle] then
             cles[#cles + 1] = cle
         end
     end
@@ -576,49 +425,19 @@ local function lire(params)
             propositions[#propositions + 1] = pourReponse(r.propositions[cle])
         end
     end
-    local seances = Json.tableau()
-    for _, x in pairs(r.seances) do
-        seances[#seances + 1] = { id = x.id, titre = x.titre, photos = #x.photos, passe = x.passe, cree = x.cree, numero = x.numero,
-            comptes = Notation.compter(x.id) }
-        seances[#seances].comptes.par_passe = nil
-    end
-    table.sort(seances, function(a, b) return a.numero > b.numero end)
-    for _, x in ipairs(seances) do
-        x.numero = nil
-    end
-    return { seance_active = r.seanceActive or Json.null, seances = seances, propositions = propositions,
-        perdues = perdues > 0 and perdues or nil }
+    return { propositions = propositions, perdues = perdues > 0 and perdues or nil }
 end
 
--- Commande « seance » (propose_ratings avec read_session) : la séance active (ou donnée), pour que
--- Claude sache quelles photos noter.
-local function seanceCommande(params)
-    local s = seanceDe(charger(), params.seance)
-    if not s then
-        return { id = Json.null, message = params.seance ~= nil and ("Séance de notation inconnue : " .. tostring(params.seance) .. ".")
-            or "Aucune séance de notation ouverte dans Lightroom (fenêtre Claude › Séance…)." }
-    end
-    local photos = Json.tableau()
-    for i, id in ipairs(s.photos) do
-        photos[i] = id
-    end
-    local c = Notation.compter(s.id)
-    c.par_passe = nil
-    return { id = s.id, titre = s.titre, source = copie(s.source), photos = photos, passe = s.passe, cree = s.cree, comptes = c }
-end
-
--- Commande notation du serveur : action proposer, lire ou seance. Rien n'est écrit dans le
--- catalogue (ni pause, ni accord, ni garde-fous, comme vignettes).
+-- Commande notation du serveur : action proposer ou lire. Rien n'est écrit dans le catalogue, sauf
+-- les notes de proposer avec poser (Notation.poser : pause et garde-fous des photos).
 function Notation.commande(params)
     local action = params.action
     if action == 'proposer' then
         return Notation.proposer(params)
     elseif action == 'lire' then
         return lire(params)
-    elseif action == 'seance' then
-        return seanceCommande(params)
     end
-    echouer("Action de notation inconnue : " .. tostring(action) .. " (proposer, lire ou seance).")
+    echouer("Action de notation inconnue : " .. tostring(action) .. " (proposer ou lire).")
 end
 
 -- Poser ------------------------------------------------------------------------------
@@ -636,8 +455,13 @@ end
 -- écriture par lot de Notation.LOT photos, une étape par photo ; garde-fous maintenus. Puis la
 -- proposition passe à 'acceptee' (la photo porte ce que Claude proposait) ou 'changee'
 -- (note_choisie, drapeau_choisi). Rend { ok, erreur, resultats = { { photo, etat, note, drapeau,
--- changements, remarques, erreur } } }.
-function Notation.poser(liste)
+-- changements, remarques, erreur } } }. `options` (depuisLightroom, confirme ; vrais par défaut :
+-- un clic dans la fenêtre) : faux pour une pose demandée à Claude (Notation.proposer avec poser),
+-- que la pause de la liaison arrête.
+function Notation.poser(liste, options)
+    options = options or {}
+    local depuisLightroom = options.depuisLightroom ~= false
+    local confirme = options.confirme ~= false
     local r = charger()
     local resultats, aPoser, change = {}, {}, false
     for _, item in ipairs(type(liste) == 'table' and liste or {}) do
@@ -682,7 +506,8 @@ function Notation.poser(liste)
                 lot[#lot + 1] = aPoser[i]
                 notes[#notes + 1] = aPoser[i].note
             end
-            local ok, reponse = LrTasks.pcall(Bibliotheque.noter, { notes = notes, etape = 'notation', depuisLightroom = true, confirme = true })
+            local ok, reponse = LrTasks.pcall(Bibliotheque.noter, { notes = notes, etape = 'notation', depuisLightroom = depuisLightroom,
+                confirme = confirme, outil = not depuisLightroom and 'propose_ratings' or nil })
             if not ok then
                 -- Rien de ce lot ni des suivants n'est écrit.
                 erreur = Liaison.messageErreur(reponse)
@@ -748,12 +573,12 @@ local function encorePosee(p, note, drapeau)
         and (p.drapeau_choisi == nil or drapeau == p.drapeau_choisi)
 end
 
--- Recale le registre sur ce que portent les photos, lu dans Lightroom par une fenêtre (carte Note,
--- planche et fiche de la Séance) : releves = { { photo = id, note = 0 à 5, drapeau = 'retenue',
+-- Recale le registre sur ce que portent les photos, lu dans Lightroom par la fenêtre (carte Note) :
+-- releves = { { photo = id, note = 0 à 5, drapeau = 'retenue',
 -- 'aucun', 'rejetee' (ou pickStatus 1, 0, −1) } }. Le registre ne voit pas une annulation
 -- (undo_last, ⌘Z) : la note quitte le catalogue, la proposition restait « acceptée » (constaté le
 -- 20 octobre 2026). Une proposition acceptée ou changée dont la note ou le drapeau posés ne sont
--- plus là repasse donc à « proposee » (note et drapeau choisis effacés). `version` :
+-- plus là repasse donc « à vérifier » ('a_verifier', note et drapeau choisis effacés). `version` :
 -- Notation.version lue avant les relevés ; si le registre a changé depuis (une note posée
 -- entre-temps par une autre tâche), ou pendant une écriture de Notation.poser, rien n'est recalé :
 -- la lecture suivante le fera. Une seule écriture du registre pour tous les relevés (une page de
@@ -771,7 +596,7 @@ function Notation.recaler(releves, version)
         local drapeau = DRAPEAUX[tonumber(x.drapeau)] or x.drapeau
         if p and (p.etat == 'acceptee' or p.etat == 'changee') and note and MOTS_DRAPEAU[drapeau]
             and not encorePosee(p, note, drapeau) then
-            p.etat, p.note_choisie, p.drapeau_choisi, p.decide_le = 'proposee', nil, nil, nil
+            p.etat, p.note_choisie, p.drapeau_choisi, p.decide_le = 'a_verifier', nil, nil, nil
             n = n + 1
         end
     end

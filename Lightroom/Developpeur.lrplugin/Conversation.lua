@@ -1,13 +1,14 @@
 -- Conversation.lua : une conversation de la fenêtre = une session Claude Code, reprise par
 -- `--resume` : des éléments `dany`, `claude`, `outil`, `apercu`, `proposition`, `notation` et
--- `note`, dans l'ordre du fil. Les dates sont en secondes Unix. Une conversation de séance de
--- notation (genre = 'notation', fenêtre « Claude · Séance de notation ») a son titre dès sa
--- création et n'est jamais la conversation ouverte de la fenêtre Claude.
+-- `note`, dans l'ordre du fil. Les dates sont en secondes Unix. Une conversation des anciennes
+-- séances de notation (genre = 'notation', fenêtre retirée le 20 octobre 2026) reste sur le disque
+-- mais ne s'ouvre plus.
 --
 -- Élément : id, genre, texte, date, outil, appel, etat ('enCours', 'fait', 'erreur', 'enAttente',
 -- 'acceptee', 'refusee', 'ajustee'), detail, images (chemins relatifs au dossier de la
 -- conversation), changements ({ libelle, avant, apres }), partiel (texte en train d'arriver) ;
--- pour une notation : passe, seance, notes (voir Conversation.notesDemandees).
+-- pour une notation : passe, pose (notes posées à la demande de Dany : propose_ratings avec
+-- apply), notes (voir Conversation.notesDemandees).
 
 require 'Compat'
 local Consignes = require 'Consignes'
@@ -18,8 +19,7 @@ local Conversation = {}
 
 Conversation.PREFIXE_OUTILS = 'mcp__developpeur__'
 Conversation.TITRE_PAR_DEFAUT = "Nouvelle conversation"
-Conversation.TITRE_SEANCE = "Séance de notation"
--- Genre d'une conversation de séance de notation (absent pour une retouche).
+-- Genre d'une conversation des anciennes séances de notation (absent pour une retouche).
 Conversation.GENRE_SEANCE = 'notation'
 -- Claude ne propose jamais 5 étoiles (standard de notation) : une note lue au-dessus est ramenée.
 Conversation.NOTE_MAXIMALE = 4
@@ -42,18 +42,6 @@ function Conversation.nouvelle(maintenant)
         modifiee = maintenant,
         elements = {},
     }
-end
-
--- Une conversation de séance de notation : son titre est choisi (pas de rappel du titre, pas de
--- titre tiré d'une photo). `seance` : l'identifiant de la séance dans le registre des notes.
-function Conversation.nouvelleSeance(titre, seance, maintenant)
-    local c = Conversation.nouvelle(maintenant)
-    c.genre = Conversation.GENRE_SEANCE
-    local propre = Texte.nettoyer(type(titre) == 'string' and titre or '')
-    c.titre = propre ~= '' and propre or Conversation.TITRE_SEANCE
-    c.titreChoisi = true
-    c.seance = seance
-    return c
 end
 
 function Conversation.estSeance(c)
@@ -401,12 +389,13 @@ function Conversation.notesDemandees(entree)
 end
 
 -- La réponse du connecteur à propose_ratings (`propositions` : photo, fichier, note_avant,
--- drapeau_avant, etat ; `refusees` : photo, raison), par clé de photo ; nil sans.
+-- drapeau_avant, etat ; `refusees` : photo, raison ; `posees` avec apply : photo, etat, erreur),
+-- par clé de photo ; nil sans.
 function Conversation.notesLues(textes)
     for _, texte in ipairs(textes or {}) do
         local ok, json = pcall(Json.decode, texte)
         if ok and type(json) == 'table' and (type(json.propositions) == 'table' or type(json.refusees) == 'table') then
-            local lues = { seance = json.seance ~= Json.null and json.seance or nil, propositions = {}, refusees = {} }
+            local lues = { propositions = {}, refusees = {}, posees = {} }
             for _, p in ipairs(type(json.propositions) == 'table' and json.propositions or {}) do
                 if type(p) == 'table' and p.photo ~= nil then
                     lues.propositions[Conversation.clePhoto(p.photo)] = { fichier = chaine(p.fichier),
@@ -416,6 +405,11 @@ function Conversation.notesLues(textes)
             for _, r in ipairs(type(json.refusees) == 'table' and json.refusees or {}) do
                 if type(r) == 'table' and r.photo ~= nil then
                     lues.refusees[Conversation.clePhoto(r.photo)] = chaine(r.raison) or "refusée"
+                end
+            end
+            for _, x in ipairs(type(json.posees) == 'table' and json.posees or {}) do
+                if type(x) == 'table' and x.photo ~= nil then
+                    lues.posees[Conversation.clePhoto(x.photo)] = { etat = chaine(x.etat), erreur = chaine(x.erreur) }
                 end
             end
             return lues
@@ -436,10 +430,7 @@ function Conversation.completerNotation(e, r)
         return
     end
     e.etat = 'fait'
-    local lues = Conversation.notesLues(r.textes) or { propositions = {}, refusees = {} }
-    if type(lues.seance) == 'string' and lues.seance ~= '' then
-        e.seance = lues.seance
-    end
+    local lues = Conversation.notesLues(r.textes) or { propositions = {}, refusees = {}, posees = {} }
     for _, x in ipairs(e.notes or {}) do
         local cle = Conversation.clePhoto(x.photo)
         local p = lues.propositions[cle]
@@ -447,8 +438,15 @@ function Conversation.completerNotation(e, r)
             x.etat = 'refusee'
             x.refus = lues.refusees[cle]
         else
-            -- Une réponse sans la photo (ou illisible) : l'outil a réussi, la note est rangée.
+            -- Une réponse sans la photo (ou illisible) : l'outil a réussi, la note est rangée ; posée
+            -- si la réponse le dit (apply), sinon la raison de l'échec.
             x.etat = 'proposee'
+            local posee = lues.posees[cle]
+            if posee and (posee.etat == 'acceptee' or posee.etat == 'changee') then
+                x.etat = 'posee'
+            elseif posee and posee.erreur then
+                x.refus = "non posée : " .. posee.erreur
+            end
             if p then
                 x.fichier = p.fichier or x.fichier
                 x.note_avant = p.note_avant
@@ -538,7 +536,7 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                     local notes = Conversation.notesDemandees(bloc.entree)
                     if #notes > 0 then
                         c.elements[#c.elements + 1] = nouvelElement('notation', { outil = court, appel = bloc.id, etat = 'enCours',
-                            passe = tonumber(bloc.entree.pass), seance = chaine(bloc.entree.session), notes = notes }, date)
+                            passe = tonumber(bloc.entree.pass), pose = bloc.entree.apply == true or nil, notes = notes }, date)
                     end
                 end
             end

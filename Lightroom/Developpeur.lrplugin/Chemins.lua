@@ -7,10 +7,10 @@
 --                                              ses consignes (consignes.md, écrites à son lancement)
 --       Atelier/                               dossier de travail de Claude Code (vide)
 --       Temporaire/                            fichiers de passage (images collées, sorties de
---                                              commandes, vignettes de la séance de notation)
+--                                              commandes)
 --       connecteur.json                        configuration MCP, écrite à chaque lancement
 --       consommation.json, publication.json    jetons comptés, profils de publication de l'utilisateur
---       notation.json                          notes proposées par Claude et séances de notation
+--       notation.json                          notes proposées par Claude
 --   ~/Library/Logs/Developpeur/conversation.log   (à côté de module.log, le journal de la liaison)
 
 local LrFileUtils = import 'LrFileUtils'
@@ -98,12 +98,16 @@ end
 -- fenêtre : cheminClaude, cheminConnecteur, et pour la fenêtre Publication dossierPublication et
 -- profilPublication.
 Chemins.defauts = {
-    -- 'petite', 'moyenne' ou 'grande' (prise en compte à la prochaine ouverture de la fenêtre).
-    taille = 'moyenne',
     -- 'atelier', 'conversation' ou 'panneau' (Dispositions.lua) : choisie dans le Gestionnaire de
-    -- modules externes ou par le menu Disposition de la fenêtre, qui se rouvre aussitôt.
+    -- modules externes ; une fenêtre ouverte se rouvre aussitôt dans la nouvelle.
     disposition = 'conversation',
+    -- Modèle et effort de Claude Code (Consignes.modeles, Consignes.efforts), choisis dans le
+    -- Gestionnaire de modules externes ; l'effort vaut pour les quatre modèles.
     modele = 'opus',
+    effort = 'max',
+    -- Une autre photo active ou une autre sélection commence une nouvelle conversation
+    -- (Fenetre.suivreSelection).
+    nouvelleParPhoto = true,
     -- Style du menu Style (valeur de Consignes.styles), joint à chaque demande ; « standard »
     -- n'ajoute rien.
     styleChoisi = 'standard',

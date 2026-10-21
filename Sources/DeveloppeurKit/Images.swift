@@ -50,6 +50,31 @@ public enum PreviewImages {
         return (jpeg, result.width, result.height, zoom)
     }
 
+    /// L'image avec un carré autour d'un point (de 0 à 1 depuis le coin haut gauche) : le point de
+    /// mise au point de l'appareil, vert, ou rouge si l'appareil l'a signalé manqué, comme le carré
+    /// AF d'un boîtier. Côté du carré : 6 % du petit côté ; un liseré sombre le garde visible sur un
+    /// fond clair.
+    public static func marquerPoint(_ source: CGImage, _ point: CGPoint, manque: Bool) -> Data? {
+        let image = scaled(source, maxSide: maxSide)
+        let width = image.width, height = image.height
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let cote = max(16, Double(min(width, height)) * 0.06)
+        let trait = max(2, cote / 14)
+        // Le repère de CoreGraphics part du bas.
+        let carre = CGRect(x: point.x * Double(width) - cote / 2, y: (1 - point.y) * Double(height) - cote / 2, width: cote, height: cote)
+        context.setStrokeColor(CGColor(red: 0, green: 0, blue: 0, alpha: 0.6))
+        context.setLineWidth(trait + 2)
+        context.stroke(carre)
+        context.setStrokeColor(manque ? CGColor(red: 1, green: 0.23, blue: 0.19, alpha: 1) : CGColor(red: 0.2, green: 0.9, blue: 0.3, alpha: 1))
+        context.setLineWidth(trait)
+        context.stroke(carre)
+        guard let marquee = context.makeImage() else { return nil }
+        return jpeg(marquee)
+    }
+
     /// Deux images côte à côte, à la même hauteur, séparées d'une bande blanche.
     public static func sideBySide(_ left: Data, _ right: Data, maxSide: Int = maxSide) -> Data? {
         guard let first = image(left), let second = image(right) else { return nil }

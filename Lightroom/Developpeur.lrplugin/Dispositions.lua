@@ -1,10 +1,10 @@
 -- Dispositions.lua : les trois dispositions de la fenêtre Claude, assemblées des pièces de
--- Vues.lua, et leurs dimensions dans chaque taille de fenêtre (préférences `disposition` et
--- `taille`, Chemins.defauts) :
+-- Vues.lua, et leurs dimensions (préférence `disposition`, Chemins.defauts ; une seule taille, la
+-- grande, depuis la 1.1.1 : demandé par Dany le 20 octobre 2026) :
 --   - « Atelier » : la photo d'abord (ce que Claude regarde, en grand, et sa proposition), la
 --     carte Note à côté, la conversation en colonne étroite à droite ;
 --   - « Conversation claire » (par défaut, la plus proche de la 1.0) : les conversations, le fil au
---     centre, à droite des onglets Aperçu, Proposition et Note ;
+--     centre, à droite les onglets Note et Proposition, l'aperçu, puis la carte choisie ;
 --   - « Panneau » : une fenêtre étroite et haute, à côté de Lightroom, onglets Retoucher et Noter.
 -- Chacune a son cadre enregistré (Fenetre.cadre) : Lightroom rend sa taille enregistrée à une
 -- fenêtre rouverte, sans la rapetisser (constaté).
@@ -21,35 +21,23 @@ local Dispositions = {}
 
 Dispositions.DEFAUT = 'conversation'
 
--- Dans l'ordre des menus (Gestionnaire de modules externes, menu Disposition de la fenêtre).
+-- Dans l'ordre du menu Disposition du Gestionnaire de modules externes.
 Dispositions.LISTE = {
     { value = 'atelier', title = "Atelier" },
     { value = 'conversation', title = "Conversation claire" },
     { value = 'panneau', title = "Panneau" },
 }
 
--- Par taille de fenêtre. Atelier : `photo` (colonne de la photo, aperçu 3:2), `note` (colonne de
--- la carte Note), `menu` (menu des conversations). Conversation claire : celles de la 1.0, la
--- colonne de droite (`droite`) à onglets. Panneau : `largeur` du contenu (fenêtre de 24 de plus) ;
--- en grande taille, 20 lignes de fil pour tenir en hauteur sur un écran de 1080 points (environ
--- 1 050 avec la barre de titre, estimé). `propLignes` : lignes de la proposition ; `criteres` :
--- lignes des critères de la carte Note.
+-- Les dimensions de chaque disposition, en grande taille. Atelier : `photo` (colonne de la
+-- photo, aperçu 3:2), `note` (colonne de la carte Note), `menu` (menu des conversations).
+-- Conversation claire : celles de la 1.0, la colonne de droite (`droite`) à onglets. Panneau :
+-- `largeur` du contenu (fenêtre de 24 de plus) ; 20 lignes de fil pour tenir en hauteur sur un
+-- écran de 1080 points (environ 1 050 avec la barre de titre, estimé). `propLignes` : lignes de
+-- la proposition ; `criteres` : lignes des critères de la carte Note.
 Dispositions.TAILLES = {
-    atelier = {
-        petite = { lignes = 20, fil = 330, photo = 470, apercu = 450, apercuHauteur = 300, note = 250, menu = 150, propLignes = 5, criteres = 9 },
-        moyenne = { lignes = 28, fil = 380, photo = 620, apercu = 600, apercuHauteur = 400, note = 270, menu = 200, propLignes = 7, criteres = 12 },
-        grande = { lignes = 38, fil = 440, photo = 740, apercu = 720, apercuHauteur = 480, note = 300, menu = 240, propLignes = 9, criteres = 15 },
-    },
-    conversation = {
-        petite = { lignes = 22, fil = 560, liste = 190, droite = 250, apercu = 230, propLignes = 14, criteres = 8, invitesPetites = true },
-        moyenne = { lignes = 30, fil = 760, liste = 220, droite = 300, apercu = 270, propLignes = 18, criteres = 11 },
-        grande = { lignes = 40, fil = 900, liste = 250, droite = 340, apercu = 320, propLignes = 22, criteres = 14 },
-    },
-    panneau = {
-        petite = { lignes = 12, largeur = 380, apercu = 120, propLignes = 5, criteres = 12 },
-        moyenne = { lignes = 18, largeur = 406, apercu = 160, propLignes = 5, criteres = 16 },
-        grande = { lignes = 20, largeur = 460, apercu = 200, propLignes = 6, criteres = 20 },
-    },
+    atelier = { lignes = 38, fil = 440, photo = 740, apercu = 720, apercuHauteur = 480, note = 300, menu = 240, propLignes = 9, criteres = 15 },
+    conversation = { lignes = 42, fil = 900, liste = 250, droite = 340, apercu = 320, propLignes = 21, criteres = 12 },
+    panneau = { lignes = 20, largeur = 460, apercu = 200, propLignes = 6, criteres = 20 },
 }
 
 -- Largeurs tirées des précédentes (une seule source par disposition).
@@ -60,35 +48,41 @@ local COMPLETER = {
         D.titre = D.fil - 40
         D.voyant = D.fil - 20
         D.position = 140
-        D.style = 140
-        D.bandeau = D.fil - D.style - 52
+        D.style = 150
+        D.bandeau = D.fil
         D.champ = D.fil - 50
-        D.modele = 170
         D.envoyer = 120
         D.legende = D.apercu - 160
+        -- Largeur du texte de la carte Note et de la proposition (Vues.notation, Vues.proposition),
+        -- pour les couper en pages (Fenetre.montrerPage).
+        D.largeurNote = D.note - 24
+        D.largeurProposition = D.photo - 24
     end,
     conversation = function(D)
+        -- L'aperçu est toujours montré ; dessous, la carte Note ou la proposition (demandé par Dany
+        -- le 20 octobre 2026 : l'aperçu et la note ensemble).
         D.onglets = {
-            { valeur = 'apercu', titre = "Aperçu" },
-            { valeur = 'proposition', titre = "Proposition" },
             { valeur = 'notation', titre = "Note" },
+            { valeur = 'proposition', titre = "Proposition" },
         }
         D.ongletProposition, D.ongletNotation = 'proposition', 'notation'
-        D.noterDansInvites = true
         D.envoiACote = true
         D.titre = D.fil - 280
         D.info = 210
         D.voyant = 150
         D.position = 150
         D.activite = 300
-        D.style = 220
-        D.bandeau = D.fil - 300
-        D.champ = D.fil - 250
-        D.modele = 170
+        D.style = 180
+        D.bandeau = D.fil
+        D.envoyer = 110
+        D.champ = D.fil - 170
         D.legende = D.apercu - 80
+        D.largeurNote = D.droite - 24
+        D.largeurProposition = D.droite - 24
         -- La liste des conversations finit au niveau du champ de demande : la grille, plus ce qui
-        -- la suit au centre (▲ ▼, séparateur, invites, Style, demande).
-        D.hauteurListe = D.lignes * 17 + 93
+        -- la suit au centre (▲ ▼, séparateur, invites et Style, bandeau, demande). Le nombre de
+        -- lignes du fil donne au centre la hauteur de la colonne de droite (aperçu, carte Note).
+        D.hauteurListe = D.lignes * 17 + 85
     end,
     panneau = function(D)
         D.onglets = {
@@ -103,10 +97,10 @@ local COMPLETER = {
         D.position = 150
         D.style = 150
         D.champ = D.largeur - 50
-        D.modele = 170
         D.envoyer = 120
         D.menu = D.largeur - D.apercu - 8
-        D.menuDisposition = D.largeur - 205
+        D.largeurNote = D.largeur - 24
+        D.largeurProposition = D.largeur - 24
     end,
 }
 
@@ -115,21 +109,19 @@ function Dispositions.valider(nom)
     return Dispositions.TAILLES[nom] and nom or Dispositions.DEFAUT
 end
 
--- Les dimensions d'une disposition dans une taille (une valeur inconnue retombe sur la
--- disposition par défaut, la taille moyenne) : une table neuve, avec `nom` et `taille`.
-function Dispositions.dimensions(nom, taille)
+-- Les dimensions d'une disposition (une valeur inconnue retombe sur la disposition par défaut) :
+-- une table neuve, avec `nom`.
+function Dispositions.dimensions(nom)
     nom = Dispositions.valider(nom)
-    local tailles = Dispositions.TAILLES[nom]
-    taille = tailles[taille] and taille or 'moyenne'
-    local D = { nom = nom, taille = taille }
-    for cle, valeur in pairs(tailles[taille]) do
+    local D = { nom = nom }
+    for cle, valeur in pairs(Dispositions.TAILLES[nom]) do
         D[cle] = valeur
     end
     COMPLETER[nom](D)
     return D
 end
 
--- Le nom de l'image « aucun aperçu » du cadre : vide-270.png, vide-600x400.png.
+-- Le nom de l'image « aucun aperçu » du cadre : vide-320.png, vide-720x480.png.
 function Dispositions.imageVide(D)
     local hauteur = D.apercuHauteur or D.apercu
     if hauteur == D.apercu then
@@ -169,9 +161,6 @@ function Dispositions.atelier(f, F, D)
             spacing = 4,
             Vues.menuConversations(f, F, D.menu),
             Vues.boutonsConversation(f, F, false),
-            f:spacer { fill_horizontal = 1 },
-            Vues.boutonNoter(f, F),
-            Vues.boutonSeance(f, F),
         },
         Vues.apercu(f, F, D),
         f:row { Vues.navigationApercu(f, F, D.legende), f:spacer { fill_horizontal = 1 }, Vues.agrandir(f, F, true) },
@@ -183,10 +172,10 @@ function Dispositions.atelier(f, F, D)
         width = D.note,
         fill_vertical = 1,
         f:static_text { title = bind 'infoPhoto', font = P.petit, text_color = C.gris, width = D.note, truncation = 'middle' },
-        Vues.notation(f, F, D.note, D, true),
-        Vues.autresFenetres(f, F, true),
-        Vues.disposition(f, F, D.note, Dispositions.items("Disposition : ")),
+        Vues.notation(f, F, D.note, D),
         f:spacer { fill_vertical = 1 },
+        -- Publication et Consommation juste au-dessus des versions, en bas.
+        Vues.autresFenetres(f, F, true),
         f:separator { fill_horizontal = 1 },
         Vues.versions(f, F, D.note),
     }
@@ -203,7 +192,7 @@ function Dispositions.atelier(f, F, D)
         f:spacer { fill_vertical = 1 },
         f:separator { fill_horizontal = 1 },
         Vues.invites(f, F, D),
-        Vues.style(f, F, D),
+        Vues.bandeau(f, F, D.bandeau),
         Vues.saisie(f, F, D),
         Vues.envoi(f, F, D),
     }
@@ -220,7 +209,6 @@ function Dispositions.atelier(f, F, D)
 end
 
 function Dispositions.conversation(f, F, D)
-    local P = F.POLICES
     local centre = f:column {
         spacing = 6,
         width = D.fil,
@@ -230,37 +218,34 @@ function Dispositions.conversation(f, F, D)
         f:separator { fill_horizontal = 1 },
         Vues.grille(f, F, D),
         Vues.defilement(f, F, D),
-        -- Ne grandit que si une autre colonne est plus haute (petite taille). La liste des
-        -- conversations (D.hauteurListe) finit au niveau du champ de demande.
+        -- Ne grandit que si une autre colonne est plus haute. La liste des conversations
+        -- (D.hauteurListe) finit au niveau du champ de demande.
         f:spacer { fill_vertical = 1 },
         f:separator { fill_horizontal = 1 },
         Vues.invites(f, F, D),
-        Vues.style(f, F, D),
+        Vues.bandeau(f, F, D.bandeau),
         Vues.saisie(f, F, D),
     }
+    -- À droite : les onglets Note et Proposition en tête, puis l'aperçu, toujours montré ;
+    -- après une ligne vide sous Agrandir, la carte Note ou la proposition ; en bas, Publication et
+    -- Consommation, puis les versions, au niveau du champ de demande (demandé par Dany le
+    -- 20 octobre 2026).
     local droite = f:column {
         spacing = 8,
         width = D.droite,
         fill_vertical = 1,
         Vues.onglets(f, F, D.onglets),
+        Vues.apercu(f, F, D),
+        Vues.navigationApercu(f, F, D.legende),
+        Vues.agrandir(f, F),
+        f:spacer { height = 8 },
         f:column {
             place = 'overlapping',
-            variante(f, F, D.droite, 'apercu', function(fm)
-                return {
-                    spacing = 8,
-                    fm:static_text { title = "Ce que Claude voit", font = P.gras },
-                    Vues.apercu(fm, F, D),
-                    Vues.navigationApercu(fm, F, D.legende),
-                    Vues.agrandir(fm, F),
-                }
-            end),
-            variante(f, F, D.droite, 'proposition', function(fm) return { Vues.proposition(fm, F, D.droite, D.propLignes) } end),
             variante(f, F, D.droite, 'notation', function(fm) return { Vues.notation(fm, F, D.droite, D) } end),
+            variante(f, F, D.droite, 'proposition', function(fm) return { Vues.proposition(fm, F, D.droite, D.propLignes) } end),
         },
-        Vues.autresFenetres(f, F),
-        Vues.disposition(f, F, D.droite, Dispositions.items("Disposition : ")),
-        -- Les versions en bas, au niveau du champ de demande.
         f:spacer { fill_vertical = 1 },
+        Vues.autresFenetres(f, F),
         f:separator { fill_horizontal = 1 },
         Vues.versions(f, F, D.droite),
     }
@@ -294,9 +279,9 @@ function Dispositions.panneau(f, F, D)
         },
     }
     local retoucher = variante(f, F, L, 'retoucher', function(fm)
-        -- La proposition, compacte, prend la place des invites et du style le temps d'y répondre :
-        -- deux fabriques masquables dans celle de l'onglet. Le bandeau suit chacune (sous le
-        -- Style, il ne flotte pas sous la place laissée à la proposition, plus haute).
+        -- La proposition, compacte, prend la place des invites (et du menu Style) le temps d'y
+        -- répondre : deux fabriques masquables dans celle de l'onglet. Le bandeau suit chacune
+        -- (sous les invites, il ne flotte pas sous la place laissée à la proposition, plus haute).
         local sansProposition = Vues.masquable(fm, F, F.non 'aProposition')
         local avecProposition = Vues.masquable(fm, F, F.si 'aProposition')
         return {
@@ -308,8 +293,7 @@ function Dispositions.panneau(f, F, D)
             fm:separator { fill_horizontal = 1 },
             f:column {
                 place = 'overlapping',
-                f:column { width = L, spacing = 6, Vues.invites(sansProposition, F, D), Vues.style(sansProposition, F, D),
-                    Vues.bandeau(sansProposition, F, L) },
+                f:column { width = L, spacing = 6, Vues.invites(sansProposition, F, D), Vues.bandeau(sansProposition, F, L) },
                 f:column { width = L, spacing = 6, Vues.proposition(avecProposition, F, L, D.propLignes),
                     Vues.bandeau(avecProposition, F, L) },
             },
@@ -326,12 +310,7 @@ function Dispositions.panneau(f, F, D)
         Vues.onglets(f, F, D.onglets),
         f:column { place = 'overlapping', retoucher, noter },
         f:separator { fill_horizontal = 1 },
-        f:row {
-            spacing = 6,
-            Vues.autresFenetres(f, F, true),
-            f:spacer { fill_horizontal = 1 },
-            Vues.disposition(f, F, D.menuDisposition, Dispositions.items("Disposition : ")),
-        },
+        Vues.autresFenetres(f, F, true),
         Vues.versions(f, F, L),
     }
 end

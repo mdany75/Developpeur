@@ -177,6 +177,69 @@ final class AnalyseTests: XCTestCase {
         XCTAssertNotNil(info["vision"]?["visages"])
     }
 
+    /// Le point de mise au point d'une photo Fujifilm : toujours en chiffres, dessiné avec
+    /// af_point ou la préférence « en tout temps » du module ; le chemin et la géométrie ne vont pas
+    /// à Claude.
+    func testViewPhotoGivesTheFocusPointAndDrawsItToRate() throws {
+        let image = Self.gradient()
+        let photo: JSONValue = ["id": 1, "fichier": "DSCF0001.RAF", "marque": "FUJIFILM",
+                                "chemin_original": "/Volumes/Photos/DSCF0001.RAF",
+                                "geometrie": ["largeur": 300, "hauteur": 200, "orientation": "AB"]]
+        tools.lecteurAF = LecteurPointsAF(delai: 1) { _ in PointAF(x: 0.25, y: 0.5, avertissement: false, visages: nil) }
+        fake.onSend = { [unowned fake] command, _ in
+            if command == "apercu" { fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(image)), "photo": photo] }
+        }
+        let simple = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertFalse(simple.isError, simple.text)
+        XCTAssertEqual(fake.calls.last?.params["point_af"]?.bool, true)
+        var info = try JSONCoding.parse(simple.text)
+        XCTAssertEqual(info["point_af"]?["x"]?.double, 0.25)
+        XCTAssertEqual(info["point_af"]?["y"]?.double, 0.5)
+        XCTAssertNil(info["point_af"]?["carre"], "sans af_point : en chiffres seulement")
+        XCTAssertNil(info["photo"]?["chemin_original"])
+        XCTAssertNil(info["photo"]?["geometrie"])
+        XCTAssertNil(info["point_af_toujours"])
+
+        let notee = tools.call(name: "view_photo", arguments: ["af_point": true])
+        info = try JSONCoding.parse(notee.text)
+        XCTAssertEqual(info["point_af"]?["carre"]?.string, "vert, sur l'image")
+        guard case .image(let base64, _) = notee.content.first, let donnees = Data(base64Encoded: base64),
+              let dessinee = PreviewImages.image(donnees) else { return XCTFail("image attendue") }
+        // Le bord gauche du carré : le point à 0,25 × 1344 = 336 px, côté 6 % de 896 ≈ 54 px.
+        XCTAssertTrue(Self.pixelVert(dessinee, x: 336 - 27, y: 448), "carré vert dessiné")
+        XCTAssertFalse(Self.pixelVert(dessinee, x: 336, y: 448), "le centre reste la photo")
+
+        // La préférence « en tout temps » du module : le carré sans af_point.
+        fake.onSend = { [unowned fake] command, _ in
+            if command == "apercu" {
+                fake!.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(image)), "photo": photo, "point_af_toujours": true]
+            }
+        }
+        info = try JSONCoding.parse(tools.call(name: "view_photo", arguments: [:]).text)
+        XCTAssertNotNil(info["point_af"]?["carre"])
+
+        // Un zoom ou un avant/après ne le demande pas ; une autre marque n'ouvre pas l'original.
+        _ = tools.call(name: "view_photo", arguments: ["region": ["x": 0, "y": 0, "width": 0.5, "height": 0.5]])
+        XCTAssertNil(fake.calls.last?.params["point_af"])
+        XCTAssertNil(ToolHandler.pointAF(["marque": "Apple", "chemin_original": "/tmp/IMG.HEIC",
+                                          "geometrie": ["largeur": 300, "hauteur": 200]], lecteur: tools.lecteurAF))
+    }
+
+    static func pixelVert(_ image: CGImage, x: Int, y: Int) -> Bool {
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                      space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
+              let data = context.data else { return false }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        for dx in -2...2 {
+            let i = (y * image.width + x + dx) * 4
+            let p = data.load(fromByteOffset: i, as: UInt32.self)
+            let r = Int(p & 0xFF), g = Int((p >> 8) & 0xFF), b = Int((p >> 16) & 0xFF)
+            if g > 180, r < 120, b < 140 { return true }
+        }
+        return false
+    }
+
     func testAnalyzePhotosFindsSimilarPhotos() throws {
         let images: [Int: Data] = [1: Self.checkerboard(), 2: Self.checkerboard(), 3: Self.gradient()]
         fake.onSend = { [unowned fake] command, params in

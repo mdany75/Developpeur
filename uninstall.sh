@@ -9,8 +9,8 @@
 # Usage : bash uninstall.sh [--tout]
 #         --tout : retire aussi ce que le module et le serveur ont gardé pour l'utilisateur, qui
 #                  reste sans cette option : guide de style, conversations de la fenêtre Claude,
-#                  profils de publication, registre de consommation, notes proposées et séances
-#                  de notation, et les journaux (~/Library/Logs/Developpeur)
+#                  profils de publication, registre de consommation, notes proposées
+#                  (notation.json), et les journaux (~/Library/Logs/Developpeur)
 #
 # Le catalogue et les photos ne sont jamais touchés : les retouches déjà faites restent (elles
 # s'annulent dans le panneau Historique).

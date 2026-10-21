@@ -127,11 +127,12 @@ final class NotationTests: XCTestCase {
         return .object(item)
     }
 
-    func testProposeRatingsIsAReadOnlyToolWithATitle() throws {
+    func testProposeRatingsHasATitleAndWritesOnlyWithApply() throws {
         XCTAssertTrue(ToolHandler.toolNames.contains("propose_ratings"))
         let definition = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "propose_ratings" })
-        XCTAssertEqual(definition["title"]?.string, "Proposer des notes")
-        XCTAssertEqual(definition["annotations"]?["readOnlyHint"]?.bool, true, "rien n'est écrit dans le catalogue")
+        XCTAssertEqual(definition["title"]?.string, "Noter des photos")
+        XCTAssertEqual(definition["annotations"]?["readOnlyHint"]?.bool, false, "avec apply, les notes sont posées dans le catalogue")
+        XCTAssertNotNil(definition["inputSchema"]?["properties"]?["apply"])
         XCTAssertNotNil(definition["outputSchema"])
         let element = try XCTUnwrap(definition["inputSchema"]?["properties"]?["ratings"]?["items"])
         XCTAssertEqual(element["additionalProperties"]?.bool, false)
@@ -139,6 +140,27 @@ final class NotationTests: XCTestCase {
         let description = definition["description"]?.string ?? ""
         XCTAssertTrue(description.contains("Jamais 5 étoiles"))
         XCTAssertTrue(description.contains("read_standard"))
+        XCTAssertTrue(description.contains("apply = true quand l'utilisateur demande que tu notes"))
+    }
+
+    /// 1.1.1 : « note ces photos » — avec apply, le module pose aussi les notes (poser = true), dans
+    /// la même commande ; sans apply, rien ne part pour le catalogue ; apply doit être un booléen.
+    func testApplyAsksTheModuleToPoseTheRatings() throws {
+        fake.replies["notation"] = ["seance": .null, "propositions": [], "refusees": [], "posees": []]
+        XCTAssertFalse(tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 3)], "apply": true]).isError)
+        XCTAssertEqual(fake.lastParams["poser"]?.bool, true)
+        XCTAssertEqual(fake.lastParams["action"]?.string, "proposer")
+        _ = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 3)], "apply": false])
+        XCTAssertNil(fake.lastParams["poser"], "apply = false : propositions seulement")
+        _ = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 3)]])
+        XCTAssertNil(fake.lastParams["poser"])
+        let refus = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 3)], "apply": "oui"])
+        XCTAssertTrue(refus.isError)
+        XCTAssertTrue(refus.text.contains("« apply »"), refus.text)
+        // Jamais 5 étoiles, même avec apply : set_metadata, à la demande de l'utilisateur.
+        let cinq = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 5)], "apply": true])
+        XCTAssertTrue(cinq.isError)
+        XCTAssertEqual(fake.calls.count, 3)
     }
 
     func testReadStandardReturnsItWithoutSendingAnything() throws {
@@ -150,7 +172,7 @@ final class NotationTests: XCTestCase {
     }
 
     func testProposalsGoToTheModuleInOneCommandAndTheAnswerIsReturnedAsIs() throws {
-        let reponse: JSONValue = ["seance": "s-12", "propositions": [["photo": 12, "fichier": "DSCF12.RAF", "note_avant": 0, "drapeau_avant": "aucun", "etat": "proposee"],
+        let reponse: JSONValue = ["propositions": [["photo": 12, "fichier": "DSCF12.RAF", "note_avant": 0, "drapeau_avant": "aucun", "etat": "proposee"],
                                                                     ["photo": 13, "fichier": "DSCF13.RAF", "note_avant": 2, "drapeau_avant": "aucun", "etat": "proposee"]],
                                   "refusees": [["photo": 99, "raison": "photo introuvable"]]]
         fake.replies["notation"] = reponse
@@ -158,13 +180,13 @@ final class NotationTests: XCTestCase {
                                              "technical_floor": "Nette au point AF (61).", "finish": "Peau naturelle."]
         let result = tools.call(name: "propose_ratings", arguments: [
             "ratings": [proposition(12, rating: 3, criteres: criteres), proposition(13, flag: "reject", aVerifier: true)],
-            "pass": 2, "session": " s-12 ",
+            "pass": 2,
         ])
         XCTAssertFalse(result.isError, result.text)
         XCTAssertEqual(fake.commands, ["notation"], "une seule commande")
         let params = fake.lastParams
         XCTAssertEqual(params["action"]?.string, "proposer")
-        XCTAssertEqual(params["seance"]?.string, "s-12")
+        XCTAssertNil(params["seance"], "plus de séance de notation (1.1.1)")
         XCTAssertEqual(params["passe"]?.int, 2)
         let propositions = try XCTUnwrap(params["propositions"]?.array)
         XCTAssertEqual(propositions.count, 2)
@@ -180,10 +202,9 @@ final class NotationTests: XCTestCase {
         XCTAssertEqual(try JSONCoding.parse(result.text), reponse, "la réponse du module, telle quelle")
         XCTAssertEqual(result.structured, reponse)
 
-        // Sans passe ni séance : le module prend la séance ouverte ; avec read_standard, le standard en plus.
+        // Sans passe ; avec read_standard, le standard en plus.
         _ = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 2)], "read_standard": true])
         XCTAssertNil(fake.lastParams["passe"])
-        XCTAssertNil(fake.lastParams["seance"])
         XCTAssertEqual(fake.calls.count, 2)
 
         // Un critère un peu plus long que demandé passe (constaté : 209 caractères pour 200).
@@ -195,33 +216,26 @@ final class NotationTests: XCTestCase {
         XCTAssertEqual(fake.calls.count, 3)
     }
 
-    /// read_session : la séance ouverte dans Lightroom (commande notation, action seance), rendue
-    /// telle quelle, sans rien ranger ; avec session, cette séance-là.
-    func testReadSessionReturnsTheOpenSessionWithoutStoringAnything() throws {
-        let reponse: JSONValue = ["id": "s-12", "titre": "Sortie aux dunes", "source": ["portee": "collection", "collection": 900],
-                                  "photos": [53636309, 53636310], "passe": 2, "cree": 1_792_000_000,
-                                  "comptes": ["proposees": 1, "acceptees": 0, "changees": 0, "a_verifier": 0, "ecartees": 0, "total": 1,
-                                              "photos": 2, "sans_proposition": 1]]
-        fake.replies["notation"] = reponse
-        let result = tools.call(name: "propose_ratings", arguments: ["read_session": true])
-        XCTAssertFalse(result.isError, result.text)
-        XCTAssertEqual(fake.commands, ["notation"], "une seule commande")
-        XCTAssertEqual(fake.lastParams, ["action": "seance"], "la séance ouverte, rien d'autre")
-        XCTAssertEqual(try JSONCoding.parse(result.text), reponse, "la réponse du module, telle quelle")
-        XCTAssertEqual(result.structured, reponse)
-
-        // Une séance donnée, et le standard en plus ; sans séance ouverte, id null et un message.
-        fake.replies["notation"] = ["id": .null, "message": "Séance de notation inconnue : s-9."]
-        let donnee = tools.call(name: "propose_ratings", arguments: ["read_session": true, "session": " s-9 ", "read_standard": true])
-        XCTAssertFalse(donnee.isError, donnee.text)
-        XCTAssertEqual(fake.lastParams, ["action": "seance", "seance": "s-9"])
-        XCTAssertEqual(donnee.structured?["id"], .null)
-        XCTAssertEqual(donnee.structured?["standard"]?.string, Notation.standard)
-        XCTAssertEqual(fake.calls.count, 2)
+    /// 1.1.1 : la Séance de notation est retirée ; propose_ratings n'a plus session ni read_session,
+    /// et l'invite noter vise la sélection.
+    func testNoMoreRatingSession() throws {
         let definition = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "propose_ratings" })
-        XCTAssertEqual(definition["inputSchema"]?["properties"]?["read_session"]?["type"]?.string, "boolean")
-        XCTAssertTrue(definition["description"]?.string?.contains("read_session = true") == true)
-        XCTAssertTrue(Prompts.noter.render([:]).contains("propose_ratings avec read_session = true donne ses photos et sa passe"))
+        XCTAssertNil(definition["inputSchema"]?["properties"]?["read_session"])
+        XCTAssertNil(definition["inputSchema"]?["properties"]?["session"])
+        XCTAssertFalse(definition["description"]?.string?.contains("Séance") == true)
+        XCTAssertFalse(definition["outputSchema"]?["description"]?.string?.contains("Séance") == true)
+        XCTAssertNil(definition["outputSchema"]?["properties"]?["seance"])
+        XCTAssertNotNil(definition["outputSchema"]?["properties"]?["posees"])
+        for arguments in [["read_session": true], ["ratings": [proposition(12, rating: 3)], "session": "s-12"]] as [[String: JSONValue]] {
+            let result = tools.call(name: "propose_ratings", arguments: arguments)
+            XCTAssertTrue(result.isError)
+            XCTAssertTrue(result.text.contains("Paramètres inconnus"), result.text)
+        }
+        XCTAssertTrue(fake.calls.isEmpty)
+        let noter = Prompts.noter.render([:])
+        XCTAssertTrue(noter.contains("Photos : la sélection de Lightroom"))
+        XCTAssertFalse(noter.contains("Séance de notation"))
+        XCTAssertFalse(noter.contains("read_session"))
     }
 
     func testFiveStarsAreRefusedWithoutSendingAnything() {
@@ -273,8 +287,6 @@ final class NotationTests: XCTestCase {
             (["ratings": [proposition(12, rating: 3), proposition(12, rating: 2)]], "photo 12 proposée deux fois"),
             (["ratings": [proposition(12, rating: 3)], "pass": 5], "« pass »"),
             (["ratings": [proposition(12, rating: 3)], "pass": 4], "Passe 4 : 5 étoiles, l'utilisateur seul ; rien à proposer."),
-            (["ratings": [proposition(12, rating: 3)], "session": ""], "« session »"),
-            (["ratings": [proposition(12, rating: 3)], "read_session": true], "« read_session » se demande seul"),
             (["ratings": .array(Array(repeating: proposition(1, rating: 2), count: 501))], "Au plus 500 propositions"),
             (["ratings": ["12:3"]], "une proposition est un objet"),
             (["ratings": [.object(proposition(12, rating: 3).object!.filter { $0.key != "photo_id" })]], "« photo_id » : l'identifiant de la photo"),

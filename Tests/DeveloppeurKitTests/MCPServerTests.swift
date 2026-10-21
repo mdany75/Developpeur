@@ -119,7 +119,9 @@ final class MCPServerTests: XCTestCase {
     /// 1.1 : noter passe par propose_ratings, selon le standard, jamais 5 étoiles ; l'invite noter
     /// porte le standard (la fenêtre Claude ne lit pas les ressources) et ne retouche rien.
     func testRatingIsAnnouncedInInstructionsAndThePrompt() throws {
-        XCTAssertTrue(ServerInfo.instructions.contains("noter : propose_ratings (standard developpeur://notation, jamais 5 ★) ;"))
+        XCTAssertTrue(ServerInfo.instructions.contains("noter : propose_ratings (standard developpeur://notation ; apply = true s'il demande de noter ; 5 ★ : set_metadata, sur sa demande) ;"))
+        // 20 octobre 2026 : ce que l'utilisateur demande clairement, Claude le fait.
+        XCTAssertTrue(ServerInfo.instructions.contains("Ce qu'il demande clairement, le faire"))
         let reponse = try call(#"{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{"name":"noter","arguments":{"photos":"la collection Été","passe":"3"}}}"#)
         let texte = try XCTUnwrap(reponse["result"]?["messages"]?.array?.first?["content"]?["text"]?.string)
         XCTAssertTrue(texte.contains("Photos : la collection Été."))

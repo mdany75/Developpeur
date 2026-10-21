@@ -1,6 +1,6 @@
 -- Preferences.lua : réglages du module, gardés par Lightroom (LrPrefs) et modifiables dans
 -- Fichier › Gestionnaire de modules externes › Développeur. Ceux de la liaison sont ici ; ceux de
--- la fenêtre Claude (taille, modèle, chemins de Claude Code et du connecteur…) sont dans
+-- la fenêtre Claude (disposition, modèle, chemins de Claude Code et du connecteur…) sont dans
 -- Chemins.defauts, dans la même table : aucune clé ne sert aux deux. Le mode « Proposer d'abord »
 -- (`mode`) est celui de la liaison, que la fenêtre montre et bascule.
 
@@ -31,6 +31,9 @@ Preferences.defauts = {
     accordDansLightroom = false,
     -- Message bref au centre de l'écran à chaque écriture de Claude.
     retourVisuel = true,
+    -- Le point de mise au point (Fujifilm) dessiné sur chaque aperçu de view_photo, pas seulement
+    -- quand Claude note.
+    pointMiseAuPoint = false,
 }
 
 -- Préférences du module, complétées par les valeurs par défaut.

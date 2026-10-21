@@ -23,9 +23,9 @@ Deux pièces :
   9 invites ;
 - le module Lightroom « Développeur » (`Lightroom/Developpeur.lrplugin`, identifiant
   `com.danymenard.developpeur`, Lightroom Classic 13.3 au moins), qui porte la liaison avec le
-  serveur (`Liaison.lua`), la fenêtre Claude (voir Fenêtre Claude), les fenêtres Publication,
-  Consommation et Séance de notation, le registre des notes proposées (`Notation.lua`, voir
-  Notation) et la fenêtre de suivi de la liaison. Journaux : `~/Library/Logs/Developpeur/`
+  serveur (`Liaison.lua`), la fenêtre Claude (voir Fenêtre Claude), les fenêtres Publication et
+  Consommation, le registre des notes proposées (`Notation.lua`, voir Notation) et la fenêtre de
+  suivi de la liaison. Journaux : `~/Library/Logs/Developpeur/`
   (`module.log` pour la liaison, `conversation.log` pour la fenêtre).
 
 ```
@@ -52,12 +52,15 @@ La fenêtre Claude lance Claude Code (`claude -p`), qui lance son propre `mcp-de
 celui-ci se connecte à la liaison du module comme celui de Claude Desktop (voir Fenêtre Claude).
 
 Menus du module (Fichier et Bibliothèque › Module externe - Extras, `Info.lua`) : Ouvrir la
-fenêtre Claude (⌃⌥C), Publication…, Consommation…, Séance de notation… (`MenuNotation.lua`,
-depuis la 1.1), Afficher la fenêtre de suivi, Revenir à
+fenêtre Claude (⌃⌥C), Publication…, Consommation…, Afficher la fenêtre de suivi, Revenir à
 « Avant Claude », Créer une copie virtuelle pour Claude, Démarrer la liaison avec Claude, Arrêter
-la liaison avec Claude. Les titres des fenêtres, les étapes de l'Historique (« Claude · … »),
-l'ensemble de collections « Claude » et les copies virtuelles « Claude » portent le nom de Claude :
-c'est ce que Claude a fait.
+la liaison avec Claude (la 1.1 avait aussi Séance de notation…, `MenuNotation.lua`, retirée en
+1.1.1). Les titres des autres fenêtres (« Claude · liaison », « Claude · Publication »,
+« Claude · Consommation »), les étapes de l'Historique (« Claude · … »), l'ensemble de collections
+« Claude » et les copies virtuelles « Claude » portent le nom de Claude : c'est ce que Claude a
+fait. Seule la barre de titre de la fenêtre Claude dit « Développeur », depuis la 1.1.1 (demandé
+par Dany le 20 octobre 2026) ; ses menus et la documentation l'appellent toujours « fenêtre
+Claude ».
 
 ## Messages entre le serveur et le module
 
@@ -93,7 +96,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `etat` | `sauvegarde?` | versions, catalogue, mode, pause, limites, photo active ; avec `sauvegarde`, la sauvegarde du catalogue demandée pour la fermeture suivante |
 | `selection` | `limite` | `total`, `renvoyees`, `photos` (id, fichier, données de prise de vue, note, drapeau, libellé, pile, `active`) |
 | `reglages` | `photo?`, `cles`, `details?`, `toutes?` | `reglages` (valeurs des clés demandées), `photo` (id, fichier, `copie_virtuelle`), `echelle_temperature`, `version_processus`, `profil`, `intensite_profil`, `appareil`, `recadrage` (angle, dimensions, orientation) ; avec `details` : `courbes_par_points`, `masques` (composants avec leur mode), `couleurs_ponctuelles`, `taches`, `yeux_rouges`, `filtres_calcules`, `amelioration` (photo affichée dans le module Développement seulement), `classement` (note, drapeau, libellé, titre, mots-clés) ; avec `toutes` : `tous`, tout ce que Lightroom range |
-| `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) |
+| `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point |
 | `appliquer` | `photos?` ou `selection?`, `reglages`, `booleens?`, `looks_traitement?`, `profil?`, `profil_marque?`, `profil_variantes?`, `profil_look?`, `recadrage?`, `recalages?`, `courbes?`, `couleurs_ponctuelles?`, `balance?`, `auto_ton?`, `preset?`, `plages`, `libelles`, `relatif`, `etape`, `raison?`, `confirme` | par photo : `changements` (`cle`, `avant`, `apres`) et `remarques` ; `a_recadrer` et `etape_ecrite` quand un cadre demandé reste à placer (voir Recadrage) |
 | `recadrer` | `photos`, `recadrage`, `recalages`, `completer?`, `etape`, `raison?`, `confirme` | comme `appliquer` (changements du cadre seulement) |
 | `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
@@ -126,7 +129,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `masques` | `photo?`, `action` (`lister`, `masquer`, `afficher`, `retirer`, `dupliquer`, `recalculer`, `affiner`, `retirer_vides`), `masque?`, `inverser?`, `nom?`, `contour?`, `decalage?`, `etape`, `raison?`, `confirme` | `lister` : `photo`, `masques` ; sinon `resultats` comme `appliquer`, et `masques` (la liste après l'écriture) ; voir Masques : pistes de la 2.1 |
 | `progression` | `id`, `titre?`, `fait?`, `total?`, `message?`, `fin?` | `annulee` (croix de la barre de Lightroom), `fermee` à la fin |
 | `variantes` | `photo?`, `action` (`lister`, `choisir`, `effacer`), `nom?`, `noms?`, `effacer_autres?`, `etape`, `raison?`, `confirme` | `lister` : `variantes` (nom, réglages touchés, date) ; `choisir` : `etape`, `instantane`, `changements`, `effaces` ; `effacer` : `effaces` ; voir Variantes |
-| `notation` | `action` (`proposer`, `lire`, `seance`) ; `proposer` : `propositions` (`photo`, `note` de 0 à 4, `drapeau` `aucun` ou `rejetee`, `criteres` `{impact, qualites, plancher, finition?}`, `plafond?`, `raison`, `a_verifier`), `seance?`, `passe?` ; `lire` : `seance?`, `photos?` ; `seance` : `seance?` | `proposer` : `seance` (ou null), `propositions` (`photo`, `fichier`, `note_avant`, `drapeau_avant`, `etat`, `hors_seance?`), `refusees` (`photo`, `raison`) ; `lire` : `seance_active`, `seances` (id, titre, photos, passe, cree, comptes), `propositions`, `perdues?` ; `seance` : `id` (ou null et `message`), `titre`, `source`, `photos`, `passe`, `cree`, `comptes`. Rien n'est écrit dans le catalogue (voir Notation) |
+| `notation` | `action` (`proposer`, `lire`) ; `proposer` : `propositions` (`photo`, `note` de 0 à 4, `drapeau` `aucun` ou `rejetee`, `criteres` `{impact, qualites, plancher, finition?}`, `plafond?`, `raison`, `a_verifier`), `passe?`, `poser?` ; `lire` : `photos?` | `proposer` : `propositions` (`photo`, `fichier`, `note_avant`, `drapeau_avant`, `etat`, toujours `a_verifier` depuis la 1.1.1), `refusees` (`photo`, `raison`) ; avec `poser`, `posees` (`photo`, `etat`, `note`, `drapeau`, `erreur`, `remarques`) et `erreur_pose?` ; `lire` : `propositions`, `perdues?`. Sans `poser`, rien n'est écrit dans le catalogue (voir Notation) |
 
 Sans `photo`, `photos` ni `selection`, la commande vise la photo active. L'aperçu est rendu dans
 un dossier temporaire propre à chaque demande ; le serveur lit le fichier, l'envoie à Claude en
@@ -205,27 +208,39 @@ ignorée.
 `Prompts.swift` (`retouche_pro`, `harmoniser_serie`, `tri_seance`, `noter`, `portrait`,
 `paysage`, `noir_et_blanc`, `nuit_iso_eleve`, `partage`) l'appliquent à un cas, `retouche_pro` et
 `harmoniser_serie` pas à pas, `noter` passe par passe selon le standard de notation (voir
-Notation). Depuis la 1.1, les consignes disent aussi « noter : propose_ratings (standard
-developpeur://notation, jamais 5 ★) ». L'ordre suit l'aide d'Adobe
+Notation). Depuis la 1.1.1, les consignes disent « noter : propose_ratings (standard
+developpeur://notation ; apply = true s'il demande de noter ; 5 ★ : set_metadata, sur sa
+demande) » (en 1.1 : « …, jamais 5 ★) »), et, au début, « Ce qu'il demande clairement, le faire ;
+ne refuser que ce que les outils ne savent pas faire, et le dire. » (demandé par Dany le
+20 octobre 2026). L'ordre suit l'aide d'Adobe
 (`docs/aide-adobe-developpement.md`, § 1 et 2), corrigé par ce que le connecteur constate (profil
 adaptatif, Upright et recadrage, ci-dessous) ; ce qu'il ne sait pas faire (§ 4) est proposé à
 l'utilisateur, à faire à la main.
 
 Claude Code ne garde que les 4096 premiers caractères des consignes d'un serveur (constaté le
 16 octobre 2026 : celles de la 1.6.1, 5365 caractères, s'arrêtaient au milieu d'un mot, suivies de
-« [truncated] »). Un test les garde sous cette limite ; le détail propre à un outil va dans sa
-description, qui n'est pas coupée.
+« [truncated] »). Un test les garde sous cette limite (`ServerInfo.instructionsLimit`, 4096), un
+autre 300 caractères en dessous (3 796), pour la consigne suivante : en 1.1.1, raccourcies pour y
+tenir, elles font 3 793 caractères. Le détail propre à un outil va dans sa description, qui n'est
+pas coupée.
 
 ## Fenêtre Claude
 
-La fenêtre « Claude » du module (Fichier › Module externe - Extras › Ouvrir la fenêtre Claude,
+La fenêtre Claude du module (Fichier › Module externe - Extras › Ouvrir la fenêtre Claude,
 ⌃⌥C) : une conversation avec Claude, qui retouche les photos du catalogue par le connecteur
-MCP-Développeur, sans quitter Lightroom. Claude passe par Claude Code et le forfait claude.ai de
-l'utilisateur, jamais par l'API. Depuis la 1.1, la fenêtre a trois dispositions (Atelier,
-Conversation claire, Panneau, voir Dispositions), une carte « Note » pour la photo active, et une
-fenêtre à part pour noter une sortie entière (Séance de notation). Captures : `docs/capture.png`
-(la fenêtre Claude), `docs/publication.png`, `docs/consommation.png`, et `docs/suivi.png` (la
-fenêtre de suivi de la liaison).
+MCP-Développeur, sans quitter Lightroom. Sa barre de titre dit « Développeur » depuis la 1.1.1
+(`Fenetre.afficher`, demandé par Dany le 20 octobre 2026 ; « Claude » avant) ; les autres fenêtres
+du module gardent « Claude · … », et les menus comme la documentation l'appellent toujours
+« fenêtre Claude ». Claude passe par Claude Code et le forfait claude.ai de l'utilisateur, jamais
+par l'API. Depuis la 1.1, la fenêtre a trois dispositions (Atelier, Conversation claire, Panneau,
+voir Dispositions) et une carte « Note » pour la photo active. La 1.1 avait aussi une fenêtre à
+part pour noter une sortie entière, la Séance de notation : elle est retirée depuis la 1.1.1
+(demandé par Dany le 20 octobre 2026), comme les boutons Noter et À vérifier. Depuis, Claude note
+d'abord toute photo qu'il traite dans la fenêtre, et sa note arrive « à vérifier » ; une demande à
+Claude (« note ces photos ») note une sélection (voir Carte Note et Notation). Captures :
+`docs/capture.png` (la fenêtre Claude en Conversation claire), `docs/atelier.png` et
+`docs/panneau.png` (ses deux autres dispositions), `docs/publication.png`, `docs/consommation.png`,
+et `docs/suivi.png` (la fenêtre de suivi de la liaison).
 
 ### Relais vers Claude Code
 
@@ -256,9 +271,9 @@ de l'eau : `LrTasks.execute` lance une commande du shell et rend son code de sor
   `LrTasks.execute`, sinon `pgrep`).
 
 Un dossier par lancement (`Sessions/<id>-<date>-<n>/`, date en secondes Unix) : un processus
-remplacé (changement de modèle) n'écrit jamais dans les fichiers du suivant. Au chargement du
-module (`Init.lua`), les dossiers d'un chargement précédent du module sont fermés (`arreter`)
-ou effacés (`Session.menage`).
+remplacé (autre modèle, autre effort, autre conversation) n'écrit jamais dans les fichiers du
+suivant. Au chargement du module (`Init.lua`), les dossiers d'un chargement précédent du module
+sont fermés (`arreter`) ou effacés (`Session.menage`).
 
 ### Claude Code
 
@@ -266,8 +281,8 @@ ou effacés (`Session.menage`).
 claude -p --input-format stream-json --output-format stream-json --verbose --include-partial-messages
        --mcp-config connecteur.json --strict-mcp-config --tools "" --allowedTools "mcp__developpeur__*"
        --permission-prompts none --disable-slash-commands --setting-sources local
-       --model <opus|sonnet|haiku> --append-system-prompt-file Sessions/<dossier>/consignes.md
-       [--resume <session>]
+       --model <fable|opus|sonnet|haiku> --append-system-prompt-file Sessions/<dossier>/consignes.md
+       [--effort <low|medium|high|xhigh|max>] [--resume <session>]
 ```
 
 Options vérifiées avec Claude Code 2.1.303 : seulement le connecteur, nommé `developpeur` dans
@@ -276,35 +291,64 @@ Options vérifiées avec Claude Code 2.1.303 : seulement le connecteur, nommé `
 rien qui demande une permission, ni compétences ni réglages de l'utilisateur. relais.sh retire
 `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` et les fournisseurs Bedrock et
 Vertex de l'environnement : le forfait est toujours employé (constaté le 19 octobre 2026 :
-`apiKeySource: none`, connecteur `connected`, 33 outils ; le 20 octobre, 34 avec la 1.1). `consignes.md` (`Consignes.texte`) ne dit
-que ce qui tient à la fenêtre (pour qui, mise en forme en texte simple, ligne de contexte, style,
-titre, garde-fous ; depuis la 1.1, une puce « Notes » : les notes se proposent par
-`propose_ratings`, selon le standard que `read_standard` donne, jamais `set_metadata` pour une
-note ou un drapeau sans demande, jamais 5 ★) : la
-méthode de retouche reste celle des consignes du connecteur. Depuis la 1.1, `consignes.md` est
-écrit dans le dossier de chaque session (`Session:lancer`, septième argument de `relais.sh`), plus
-à la racine : Claude Code le lit un peu après son lancement en arrière-plan, et les consignes
-d'une séance de notation diffèrent de celles d'une retouche ; un fichier commun pourrait être
-réécrit entre-temps. Son texte est `Consignes.pour(c)` : `Consignes.texte`, plus
-`Consignes.texteNotation` pour une conversation de séance (voir Séance de notation). Les boutons
-d'invites de la fenêtre (`Consignes.invites` : Retouche pro, Portrait, Paysage, Noir et blanc,
-ISO élevé, Sports) envoient une demande toute faite, d'après les invites du connecteur ; le bouton
-Noter envoie `Consignes.noterPhoto` (voir Carte Note).
+`apiKeySource: none`, connecteur `connected`, 33 outils ; le 20 octobre, 34 avec la 1.1).
+`--effort` (1.1.1) : Claude Code 2.1.303 l'annonce avec cinq niveaux (`low`, `medium`, `high`,
+`xhigh`, `max`), et les accepte avec chacun des quatre modèles (constaté le 20 octobre 2026, note
+de `Consignes.efforts`).
+
+Modèle et effort (1.1.1) : Fable (« Fable · le plus capable »), Opus (par défaut, « Opus ·
+retouche fine »), Sonnet, Haiku (`Consignes.modeles`) ; effort maximal (`max`, par défaut), très
+élevé (`xhigh`), élevé (`high`), moyen (`medium`), faible (`low`), le même pour les quatre modèles
+(`Consignes.efforts`). Ils se choisissent dans le Gestionnaire de modules externes (préférences
+`modele` et `effort`, voir Préférences), et non plus dans la fenêtre (la 1.1 y avait le menu
+Modèle, et pas d'effort). `Moteur.modeleEtEffort(options)` donne ceux d'une demande : ceux des
+options, sinon ceux des préférences ; une valeur inconnue (préférences d'une autre version, faute
+de frappe) retombe sur celle par défaut (`Chemins.defauts`). `Session:lancer` passe l'effort à
+`relais.sh` en quatrième argument (après le dossier, le chemin de Claude Code et le modèle ; vide :
+celui de Claude Code, sans `--effort`). `Moteur.changerModele` n'existe plus : rien ne relance
+Claude Code au moment du choix.
+
+`consignes.md` (`Consignes.texte`) ne dit que ce qui tient à la fenêtre (pour qui, mise en forme
+en texte simple, ligne de contexte, style, titre, garde-fous) : la méthode de retouche reste celle
+des consignes du connecteur. Depuis la 1.1.1, ses garde-fous commencent par « Ce que Dany demande
+en mots clairs, fais-le » (ses demandes l'emportent sur ces consignes ; ne refuser que ce que les
+outils ne savent pas faire, ou ce que bloquent les réglages du module, et le dire), et la puce
+« Notes » dit : par `propose_ratings`, selon le standard que `read_standard` donne, avec la raison
+critère par critère ; toute photo que Claude traite, il la note d'abord, avant d'y toucher
+(`cull_photos` sur elle pour le plancher technique, `view_photo` avec `af_point = true` pour le
+carré de la mise au point, puis `propose_ratings` sans `apply`), et sa note arrive « à vérifier »
+dans la carte Note, que Dany accepte ou change (demandé par Dany le 20 octobre 2026) ; une photo
+déjà évaluée (`view_photo` : `evaluation`) ne se renote pas, sauf s'il le demande ;
+`apply = true` quand Dany demande que Claude note (« note ces photos », « pose les notes ») ;
+jamais 5 ★ de lui-même, `set_metadata` si Dany en demande (en 1.1 : jamais `set_metadata` pour
+une note sans demande, jamais 5 ★). Les consignes du connecteur (`ServerInfo`, pour Claude
+Desktop) ne demandent pas de noter d'abord. Depuis la 1.1, `consignes.md` est écrit dans le
+dossier de chaque session (`Session:lancer` ; huitième argument de `relais.sh` depuis la 1.1.1,
+septième en 1.1), plus à la racine : Claude Code le lit un peu après son lancement en
+arrière-plan, et un fichier commun pourrait être réécrit entre-temps. Son texte est
+`Consignes.texte` (en 1.1, `Consignes.pour(c)` y ajoutait `Consignes.texteNotation` pour une
+conversation de séance ; retirés en 1.1.1). Les boutons d'invites de la fenêtre
+(`Consignes.invites` : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Sports)
+envoient une demande toute faite, d'après les invites du connecteur. Le bouton Noter de la 1.1
+(`Consignes.noterPhoto`, et `Consignes.noterSelection` dans un premier état de la 1.1.1) est
+retiré en 1.1.1 : la note se fait d'abord, d'elle-même (voir Carte Note).
 
 Une conversation = une session Claude Code (`session_id` du message `init` et du `result`),
-reprise par `--resume` au lancement suivant (inactivité, changement de modèle, redémarrage de
-Lightroom). Le dossier de travail est `Atelier/` (vide, sans CLAUDE.md). Si la session reprise
-n'existe plus (« No conversation found »), la conversation repart d'une nouvelle session, et une
-note le dit.
+reprise par `--resume` au lancement suivant (inactivité, autre modèle, autre effort, autre
+conversation, redémarrage de Lightroom). Le dossier de travail est `Atelier/` (vide, sans
+CLAUDE.md). Si la session reprise n'existe plus (« No conversation found »), la conversation
+repart d'une nouvelle session, et une note le dit.
 
-Un seul processus Claude Code et une seule demande à la fois, pour toutes les fenêtres : passer
-de la conversation de la fenêtre Claude à celle d'une séance de notation (ou l'inverse) relance
-Claude Code en reprenant la session visée. `Moteur.courante` est la conversation ouverte dans la
-fenêtre Claude, jamais une séance ; `Moteur.enCours`, celle de la demande en cours (la courante ou
-une séance). `Moteur.envoyer(texte, options)` accepte `options.conversation` (une autre
-conversation, ou son identifiant : la courante ne change pas) et `options.contexte` (le texte qui
-remplace la ligne « [Lightroom : …] »). Pendant une demande, un refus dit où Claude travaille
-(« dans la séance de notation », « dans la fenêtre Claude ») ; `Moteur.texteTravail` aussi.
+Un seul processus Claude Code et une seule demande à la fois. `Moteur.envoyer(texte, options)`
+(options : `modele`, `effort`, `jointes`, `style`) écrit dans la conversation ouverte : si le
+processus ouvert est celui d'une autre conversation, d'un autre modèle ou d'un autre effort, il
+est fermé, et la demande relance Claude Code en reprenant la session de la conversation. Un autre
+modèle ou un autre effort choisi dans le Gestionnaire vaut donc pour la demande suivante.
+`Moteur.courante` est la conversation ouverte dans la fenêtre Claude ; `Moteur.enCours`, celle de
+la demande en cours. Pendant une demande, un refus dit « Claude travaille encore : attendez la
+fin, ou cliquez Arrêter. » ; `Moteur.texteTravail` ajoute « dans une autre conversation » quand la
+demande en cours n'est pas celle montrée. En 1.1, `options.conversation` et `options.contexte`
+servaient à la Séance de notation : retirés en 1.1.1.
 
 Messages écrits : `{"type":"user","message":{"role":"user","content":[images…, texte]}}` ; une
 interruption : `{"type":"control_request","request_id":"interruption-N","request":{"subtype":"interrupt"}}`
@@ -317,24 +361,28 @@ Le style du menu Style (`Consignes.styles`), sauf Standard (le choix par défaut
 dessus sa méthode (« peau adoucie » : un masque de la peau, jamais toute la photo). Le nom du style
 est gardé dans l'élément de la demande (`style`) et rappelé dans le fil.
 
-Chaque demande commence par une ligne de contexte (`[Lightroom : photo active <id> (<fichier>) ;
-sélection : n photos]`) ; tant que la conversation n'a pas de titre, elle finit par le rappel du
-marqueur de titre (`[titre : …]`), que la fenêtre retire de l'affichage. Dans une séance de
-notation, la ligne est `[Lightroom : séance de notation « <titre> », N photos ; passe n]`, avec
-« ; photo choisie <id> (<fichier>) » pour une question tapée dans la séance
-(`FenetreNotation.contexte`) ; une séance a son titre dès sa création (`titreChoisi`) : pas de
-rappel du marqueur.
+Chaque demande commence par une ligne de contexte (`Lightroom.contexte` : `[Lightroom : photo
+active <id> (<fichier>) ; sélection : n photos]`) ; tant que la conversation n'a pas de titre,
+elle finit par le rappel du marqueur de titre (`[titre : …]`), que la fenêtre retire de
+l'affichage. En 1.1, une séance de notation avait sa propre ligne (`[Lightroom : séance de
+notation « <titre> », N photos ; passe n]`) : retirée avec elle.
 
 L'appel de `propose_ratings` fait un élément `notation` du fil (`Conversation.notesDemandees`,
-d'après l'entrée de l'outil, quand elle porte des `ratings`), complété par la réponse du connecteur
-(`Conversation.notesLues`, `Conversation.completerNotation` : `proposee` ou `refusee` par photo ;
-une note lue au-dessus de 4 est ramenée à 4). Ce n'est que pour le fil : le registre du module
-(`Notation.lua`) reste la source de la carte Note et de la séance. `Fil.lua` le montre en lignes
-de genres existants (un genre de plus ajouterait une vue à chaque ligne) : un titre « Notes
-proposées · passe n · N photos » (« Notes non rangées » sur un refus), puis une ligne par photo
-(« ★★★☆☆ fichier · à vérifier · raison », « ⚑ Rejeter… »), `Fil.NOTES_MONTREES` (12) au plus,
-puis « … et N autres ». `Stockage` écrit `notes` toujours en tableau, et relit un élément resté
-« enCours » comme « erreur ». ★ ☆ ⚑ ont leur chasse dans `Metriques.lua`.
+d'après l'entrée de l'outil, quand elle porte des `ratings` ; `pose` quand elle porte
+`apply = true`), complété par la réponse du connecteur (`Conversation.notesLues`,
+`Conversation.completerNotation` : `proposee`, `posee` quand `posees` donne la photo `acceptee` ou
+`changee`, ou `refusee`, par photo ; une pose en échec garde « non posée : <raison> » ; une note
+lue au-dessus de 4 est ramenée à 4). Ce n'est que pour le fil : le registre du module
+(`Notation.lua`) reste la source de la carte Note. `Fil.lua` le montre en lignes de genres
+existants (un genre de plus ajouterait une vue à chaque ligne) : un titre « Notes proposées ·
+passe n · N photos » (« Notes non rangées » sur un refus du connecteur ; depuis la 1.1.1, avec
+`apply`, « Notes à poser » pendant l'appel, puis « Notes posées » si au moins une photo l'est,
+sinon « Notes non posées » : pause de la liaison, accord attendu, la raison sur chaque ligne
+« non posée : … »), puis une ligne par photo (« ★★★☆☆ fichier · à vérifier · raison », « à
+vérifier » quand Claude a passé `to_check`, « ★★☆☆☆ fichier · posée · raison », « ⚑ Rejeter… »),
+`Fil.NOTES_MONTREES` (12) au plus, puis « … et N autres ».
+`Stockage` écrit `notes` toujours en tableau, et relit un élément resté « enCours » comme
+« erreur ». ★ ☆ ⚑ ont leur chasse dans `Metriques.lua`.
 
 ### Événements lus
 
@@ -366,11 +414,26 @@ D'où le fil en grille de lignes fixes (`Fil.lua`) : chaque ligne superpose une 
 coupées à la largeur de la colonne d'après la chasse des caractères mesurée par AppKit dans les
 polices données à Lightroom (Helvetica Neue 13, Helvetica Neue Bold 13, Menlo 11 :
 `scripts/metriques.swift` → `Metriques.lua`), moins une marge de 10 points, avec troncature en fin
-de ligne au cas où. La grille montre la fin du fil ; ▲ ▼ Fin déplacent la fenêtre de lecture, qui
+de ligne au cas où. Depuis la 1.1.1, une ponctuation haute (; : ! ? ») reste avec le mot d'avant,
+et « avec celui d'après : `Fil.couper` les lie par une espace insécable, comptée comme une espace
+et rendue ordinaire dans la ligne (une ligne de la carte Note commençait par « ; mais », vu sur la
+capture). La grille montre la fin du fil ; ▲ ▼ Fin déplacent la fenêtre de lecture, qui
 reste en place quand des lignes arrivent pendant qu'on lit plus haut. Les images ne peuvent pas
 s'insérer dans la grille : elles s'affichent dans le cadre de l'aperçu (`f:picture`, réduction
 sur fond 2B2B2B faite par `sips`, carrée, ou 3:2 dans l'Atelier, le cadre de la vue ne changeant
 pas de taille ; `Images.vignette(dossier, nom, cote, hauteur)`).
+
+De même, depuis la 1.1.1, le texte de la carte Note (`notationTexte`) et celui de la Proposition
+(`propositionTexte`) sont des `static_text` de hauteur fixe, montrés page par page : coupés en
+lignes comme le fil (`Fenetre.lignesCarte` : `Fil.couper` dans la police `P.texte`, largeurs
+`D.largeurNote` et `D.largeurProposition`, moins la marge du fil ; paragraphes et lignes vides
+gardés), une page de `D.criteres + 3` lignes pour la carte Note et de `D.propLignes` lignes pour
+la Proposition (`Fenetre.montrerPage(cle, texte)`, clés `note` et `proposition`). Deux petites
+flèches ▲ ▼ (`Vues.fleches`, boutons `size = 'mini'`) à droite des boutons de la carte, poussées
+au bord par un espace élastique (rangée à `fill_horizontal = 1`), font défiler d'une page moins
+une ligne, la dernière ligne vue gardée (`Fenetre.defilerTexte(cle, sens)` ; propriétés
+`noteMonte`, `noteDescend`, `propositionMonte`, `propositionDescend`) ; la dernière page est
+pleine. Un nouveau texte revient à la première page.
 
 Les onglets (Conversation claire, Panneau) sont une rangée de `radio_button` (clé `onglet`,
 chacun avec son `checked_value`) au-dessus de variantes superposées de même largeur
@@ -380,25 +443,31 @@ colonnes des variantes ne portent pas `visible` : leur contenu se crée par une 
 condition de l'onglet (`onglet` égal à sa valeur) sur chaque vue simple que les pièces créent, et
 la combine avec un `visible` déjà posé (couleurs de la carte Note, pastilles des voyants, lignes
 du fil, états du bandeau) ; une boîte de groupe y devient une colonne à titre gras (son cadre et
-son titre resteraient montrés). Les fabriques s'emboîtent : dans Retoucher (Panneau), les invites
-et le Style portent aussi `aProposition` faux, la proposition `aProposition` vrai. Conteneurs,
-espaces et écarts passent tels quels. Les colonnes des variantes restent donc là, vides, les unes
-sur les autres : la dernière (Note, Noter) couvre celles d'avant, et laisse passer les clics vers
-leurs boutons (constaté pour Agrandir ; le reste à l'usage, point 5 plus bas). La fenêtre ne
-change d'onglet d'elle-même qu'au passage de faux à vrai, une fois par arrivée
-(`Fenetre.choisirOnglet`, `Fenetre.ongletAuto`) : vers Proposition (ou Retoucher) quand une
-proposition arrive, vers Note quand une note est proposée, ou à vérifier, pour la photo montrée
-(pas quand une autre photo est choisie) ; un clic sur une ligne d'image revient à Aperçu.
+son titre resteraient montrés). Les fabriques s'emboîtent : dans Retoucher (Panneau), les invites,
+le Style et leur bandeau portent aussi `aProposition` faux, la proposition et le sien
+`aProposition` vrai. Conteneurs, espaces et écarts passent tels quels. Les colonnes des variantes
+restent donc là, vides, les unes sur les autres : la dernière (Proposition dans la Conversation
+claire depuis la 1.1.1, Noter dans le Panneau) couvre celles d'avant, et laisse passer les clics
+vers leurs boutons (constaté en 1.1 pour Agrandir, alors dans l'onglet Aperçu sous la colonne
+Note ; le reste à l'usage, point 3 plus bas). La fenêtre ne change d'onglet d'elle-même qu'au
+passage de faux à vrai, une fois par arrivée (`Fenetre.choisirOnglet`, `Fenetre.ongletAuto`) :
+vers Proposition (ou Retoucher) quand une proposition arrive, vers Note (ou Noter) quand une note
+arrive pour la photo montrée (« à vérifier », comme toute proposition depuis la 1.1.1, ou
+« proposée », d'avant ; pas quand une autre photo est choisie). Un clic sur une ligne d'image la
+montre dans l'aperçu, sans changer d'onglet : l'aperçu est hors des onglets dans les trois
+dispositions, dans la Conversation claire depuis la 1.1.1 (en 1.1, ce clic la ramenait à l'onglet
+Aperçu).
 
 - Champ de demande (`immediate = false`) : constaté dans Lightroom 15.6, Retour ne fait pas de saut
   de ligne ; il valide le champ (le texte passe à la table de propriétés, puis est tout sélectionné).
   Avec `immediate = true`, la frappe passe caractère par caractère mais Retour ne se voit pas du
   tout (ni `validate` ni observateur). Le clic d'un bouton valide aussi le champ, juste avant
   l'action du bouton. Un texte validé part donc après 0,3 s, sauf si un clic de bouton (tous passent
-  par `Fenetre.bouton`, appelé par les pièces de `Vues.lua` ; ceux de la séance de notation par
-  son `bouton` local), un choix dans la liste, un menu (modèle, Style, conversations, Disposition),
-  un onglet, ou la fermeture de la fenêtre l'annule ; Envoyer l'envoie lui-même, une seule fois.
-  Une fenêtre rouverte entre-temps (autre disposition) ne l'envoie pas : l'envoi automatique
+  par `Fenetre.bouton`, appelé par les pièces de `Vues.lua`), un choix dans la liste, un menu
+  (Style, conversations), un onglet, une réouverture ou la fermeture de la fenêtre l'annule ;
+  Envoyer l'envoie lui-même, une seule fois. Depuis la 1.1.1, la fenêtre n'a plus de menu Modèle
+  ni Disposition, et pas de menu Effort (tous dans le Gestionnaire de modules externes). Une
+  fenêtre rouverte entre-temps (disposition changée) ne l'envoie pas : l'envoi automatique
   compare la génération de la fenêtre (`Fenetre.generation`). Le champ est désactivé pendant que
   Claude travaille (il perd ainsi le focus et se vide).
 - Toute table passée à Lightroom est neuve (une table relue par `Json.decode` porte une métatable,
@@ -417,110 +486,172 @@ l'aide du bandeau dit quoi faire ; un clic sur le voyant la démarre, ou la rela
 (`Lightroom.demarrerLiaison`). Le mode : un clic bascule « Proposer d'abord » et « Appliquer
 directement » (`Lightroom.basculerMode`, clé `mode` des préférences, celle que lit la liaison).
 
-### Dispositions (1.1)
+### Dispositions (1.1, revues en 1.1.1)
 
-Trois façons d'assembler la même fenêtre, au choix (préférence `disposition`, voir Préférences) :
+Trois façons d'assembler la même fenêtre, au choix (préférence `disposition`, voir Préférences),
+chacune dans une seule taille depuis la 1.1.1 : toujours la grande (demandé par Dany le
+20 octobre 2026 ; la 1.1 avait trois tailles, petite, moyenne par défaut et grande, préférence
+`taille`, retirée) :
 
 - **Atelier** (`atelier`) : la photo d'abord. Colonne de la photo : une barre (menu des
-  conversations, Nouvelle, Supprimer…, Noter, Séance…), l'aperçu dans un cadre 3:2, ◀ légende ▶
-  Agrandir, puis la proposition ; colonne Note : la photo active, la carte Note (sans Noter ni
-  Séance…, déjà dans la barre), Publication et Consommation, le menu Disposition, les versions en
-  bas ; colonne de la conversation, étroite : titre, voyants en colonne, fil, ▲ ▼ Fin avec
-  l'activité dessous, invites trois par rangée, Style et bandeau, demande, modèle et Envoyer.
+  conversations, Nouvelle, Supprimer…), l'aperçu dans un cadre 3:2, ◀ légende ▶ Agrandir, puis la
+  proposition ; colonne Note : la photo active, la carte Note, un espace élastique, Publication et
+  Consommation, un séparateur et les versions en bas ; colonne de la conversation, étroite :
+  titre, voyants en colonne, fil, ▲ ▼ Fin avec l'activité dessous, invites trois par rangée (le
+  menu Style au bout de la dernière), bandeau, demande, puis Envoyer seul à droite (`Vues.envoi`).
 - **Conversation claire** (`conversation`, par défaut, `Dispositions.DEFAUT`) : la mise en page de
-  la 1.0 (liste des conversations, fil au centre, modèle et Envoyer à côté de la demande) ; la
-  colonne de droite a trois onglets, Aperçu, Proposition et Note, puis Publication, Consommation,
-  le menu Disposition et les versions ; Noter est en tête de la rangée des invites.
+  la 1.0 : à gauche la liste des conversations ; au centre le titre (la photo active à droite),
+  les voyants en rangée, le fil, ▲ ▼ Fin, les invites sur une rangée (le menu Style au bout), le
+  bandeau, puis le champ de demande (trois lignes) avec Envoyer à sa droite (`D.envoiACote`).
+  Depuis la 1.1.1 (demandé par Dany le 20 octobre 2026 : l'aperçu et la note ensemble), la colonne
+  de droite montre, de haut en bas : les boutons radio Note (par défaut) et Proposition, à la place
+  du titre « Ce que Claude voit » (retiré) ; l'aperçu ; ◀ légende ▶ ; Agrandir ; une ligne vide
+  (`f:spacer` de 8 points) ; la carte Note ou le panneau Proposition (variantes superposées) ; un
+  espace élastique ; Publication… et Consommation… ; un séparateur ; les versions. En 1.1, elle
+  avait trois onglets (Aperçu, Proposition et Note), suivis de Publication, Consommation et du menu
+  Disposition.
 - **Panneau** (`panneau`) : une fenêtre étroite et haute, à côté de Lightroom. En-tête : l'aperçu
   carré, et à côté le menu des conversations, Nouvelle, ✎, Supprimer…, la photo active, sa note
   posée, la légende, ◀ ▶ Agrandir ; deux onglets, Retoucher (voyants en rangée, fil, ▲ ▼ Fin,
-  invites trois par rangée et Style, bandeau, demande, modèle et Envoyer ; une proposition en
-  attente prend la place des invites et du Style, en variante superposée, clé `aProposition`) et
-  Noter (la carte Note entière, avec Noter et Séance…) ; en bas Publication, Consommation, le menu
-  Disposition et les versions.
+  invites trois par rangée avec le Style au bout, bandeau, demande, puis Envoyer seul à droite ;
+  une proposition en attente prend la place des invites, du Style et de leur bandeau, en variante
+  superposée avec son propre bandeau, clé `aProposition`) et Noter (la carte Note entière) ; en bas
+  un séparateur, Publication et Consommation, et les versions.
 
-Dimensions par taille (`Dispositions.TAILLES`, complétées par `Dispositions.dimensions(nom,
-taille)`, qui retombe sur Conversation claire et la taille moyenne pour une valeur inconnue) :
+Depuis la 1.1.1, ni menu Modèle (la 1.1 l'avait à côté d'Envoyer), ni menu Effort, ni menu
+Disposition dans la fenêtre (demandé par Dany le 20 octobre 2026 : un écran plus léger) : ils
+sont dans le Gestionnaire de modules externes (voir Préférences). Plus de bouton Noter non plus
+(en 1.1, dans la barre de l'Atelier, en tête des invites de la Conversation claire et dans la
+carte Note), ni de bouton Séance… : Claude note de lui-même (voir Carte Note). Le menu Style
+(`Vues.style`) n'a plus d'étiquette « Style » : `Vues.invites` le met au bout de la dernière
+rangée d'invites, dans les trois dispositions (en 1.1, « Style » et son menu sur leur propre
+ligne, le bandeau à droite). Le bandeau (`Vues.bandeau`) a sa propre ligne, sous les invites (voir
+Bas de la fenêtre).
 
-| Disposition | Petite | Moyenne | Grande |
-| --- | --- | --- | --- |
-| Atelier | photo 470, aperçu 450 × 300, Note 250, conversation 330, fil de 20 lignes | photo 620, aperçu 600 × 400, Note 270, conversation 380, 28 lignes | photo 740, aperçu 720 × 480, Note 300, conversation 440, 38 lignes |
-| Conversation claire | liste 190, fil 560, droite 250, aperçu 230, 22 lignes, invites en petit | liste 220, fil 760, droite 300, aperçu 270, 30 lignes | liste 250, fil 900, droite 340, aperçu 320, 40 lignes |
-| Panneau | contenu 380, aperçu 120, 12 lignes | contenu 406 (fenêtre d'environ 430), aperçu 160, 18 lignes | contenu 460, aperçu 200, 20 lignes |
+L'aperçu montre la photo active à l'ouverture de la fenêtre, et quand Dany choisit une autre photo
+(demandé le 20 octobre 2026) : `Fenetre.afficher` remet `Fenetre.idActif` à nil et
+`Fenetre.voirActive` à vrai, puis `Fenetre.majPhoto` voit la photo active (aussi quand la fenêtre,
+déjà ouverte, est rappelée par le menu ou ⌃⌥C, qui la remet devant). La légende dit « Photo
+active · DSCF1595 ». Sa vignette se fait dans une tâche : `Vignettes.demander` (le cache d'aperçus
+de Lightroom, `requestJpegThumbnail`, 1 024 points, `Fenetre.TAILLE_PHOTO_ACTIVE`) l'écrit dans un
+dossier à elle sous `Chemins.temporaire()/PhotoActive` (`Images.vignette` garde ses réductions par
+nom de fichier : un dossier neuf évite une vignette d'avant une retouche), puis `Images.vignette`
+la réduit au cadre de l'aperçu ; le dossier de la vignette d'avant s'efface ; Agrandir la montre
+en grand (`Images.grande`). Une image nouvelle de la conversation montrée (Claude regarde, une
+photo jointe : `Fenetre.nbImages` grandit) prend sa place ; ◀ depuis la photo active montre la
+dernière image de la conversation, ▶ depuis la dernière revient à la photo active ; un clic sur
+une ligne d'image du fil relit d'abord les images de la conversation, pour ne pas rebasculer.
 
-Largeurs de fenêtre calculées (pas encore mesurées dans Lightroom) : Atelier environ 1124, 1344 et
-1554 points, Conversation claire 1074, 1354 et 1564, Panneau 404, 430 et 484. Hauteurs estimées en
-grande taille (17 points par ligne de fil, de la moyenne) : Atelier environ 1 030 points de
-contenu, Conversation claire environ 900, Panneau environ 1 020 avec 20 lignes (environ 1 050
-avec la barre de titre, pour tenir sur un écran de 1080 points ; avec 30 lignes, environ 1 190,
-qui ne tenait ni sur un portable ni sur un écran de 1080).
+Dimensions (`Dispositions.TAILLES`, une table par disposition, complétée par
+`Dispositions.dimensions(nom)`, qui retombe sur Conversation claire pour une valeur inconnue) :
+
+| Disposition | Dimensions (points ; lignes) |
+| --- | --- |
+| Atelier | photo 740, aperçu 720 × 480, Note 300, conversation (`fil`) 440, menu 240 ; fil de 38 lignes, proposition 9, critères 15 |
+| Conversation claire | liste 250, fil 900, droite 340, aperçu 320 ; fil de 42 lignes, proposition 21, critères 12 |
+| Panneau | contenu 460, aperçu 200 ; fil de 20 lignes, proposition 6, critères 20 |
+
+Proposition = lignes du panneau Proposition (`propLignes`) ; critères = `criteres`, d'où les
+`D.criteres + 3` lignes du texte de la carte Note. Largeurs de ces textes : `D.largeurNote` et
+`D.largeurProposition` (la colonne moins 24 : Note et photo dans l'Atelier, droite dans la
+Conversation claire, contenu dans le Panneau). Ce sont les valeurs de la grande taille de la 1.1,
+sauf pour la Conversation claire (40 lignes de fil, proposition 22, critères 14 en 1.1). Dans la
+Conversation claire, le champ de demande a `D.fil - 170` de large, Envoyer 110 ; le nombre de
+lignes du fil donne au centre la hauteur de la colonne de droite (l'aperçu, puis la carte Note) ;
+pas encore mesuré dans Lightroom.
+
+Largeurs de fenêtre calculées (pas encore mesurées dans Lightroom) : Atelier environ 1554 points,
+Conversation claire 1564, Panneau 484. Hauteurs estimées (17 points par ligne de fil) : Atelier
+environ 1 030 points de contenu, Panneau environ 1 020 avec 20 lignes (environ 1 050 avec la barre
+de titre, pour tenir sur un écran de 1080 points ; avec 30 lignes, environ 1 190, qui ne tenait ni
+sur un portable ni sur un écran de 1080) ; Conversation claire environ 900 en 1.1, avec 40 lignes,
+pas encore réestimée avec 42.
 
 Le code : `Fenetre.lua` garde l'état, ce qui remplit les propriétés liées (`rafraichir…`), les
 actions, la boucle, l'ouverture et la réouverture ; `Vues.lua` les pièces (`Vues.grille`,
 `defilement`, `voyants`, `bandeau`, `versions`, `titre`, `listeConversations`,
-`menuConversations`, `boutonsConversation`, `boutonNoter`, `boutonSeance`, `invites`, `style`,
+`menuConversations`, `boutonsConversation`, `invites`, `style`, `fleches`, `boutonEnvoyer`,
 `saisie`, `envoi`, `apercu`, `navigationApercu`, `agrandir`, `proposition`, `notation`,
-`autresFenetres`, `disposition`, `onglets`, et la fabrique `masquable` des onglets), chacune liée
-aux propriétés de la fenêtre, sans `require 'Fenetre'` ni couleur créée au chargement (couleurs,
-polices, `bind`, `egal`, `bouton` et les actions arrivent par `F`) ; `Dispositions.lua` les trois
-assemblages
+`autresFenetres`, `onglets`, et la fabrique `masquable` des onglets), chacune liée aux propriétés
+de la fenêtre, sans `require 'Fenetre'` ni couleur créée au chargement (couleurs, polices, `bind`,
+`egal`, `bouton` et les actions arrivent par `F`) ; `Vues.boutonNoter`, `Vues.boutonSeance`,
+`Vues.menuModele` et `Vues.disposition` sont retirés en 1.1.1, comme `D.invitesPetites` (invites
+en petit de la petite taille). `Dispositions.lua` fait les trois assemblages
 (`Dispositions.atelier`, `conversation`, `panneau`, appelés par `Dispositions.construire`). Une
 propriété sans vue dans une disposition ne gêne pas. Chaque cadre d'aperçu a son image « aucun
 aperçu » (`Dispositions.imageVide` : `vide-<côté>.png` ou `vide-<largeur>x<hauteur>.png`) ; le
-module en porte dix (`vide-120`, `160`, `200`, `230`, `270`, `320`, `450x300`, `600x400`,
-`720x480`, et `vide-300` pour la fiche de la Séance de notation), faites par
-`scripts/images-vides.swift`. Le menu des conversations (Atelier, Panneau)
-montre les 40 plus récentes (`Fenetre.MAX_MENU`), sans en-têtes, la conversation montrée toujours
-dedans. Ni la liste ni le menu ne montrent les conversations de séance (`genre == 'notation'`),
-et `Moteur.ouvrir` les refuse.
+module en porte trois depuis la 1.1.1, faites par `scripts/images-vides.swift` : `vide-200`
+(Panneau), `vide-320` (Conversation claire) et `vide-720x480` (Atelier). Celles des petite et
+moyenne tailles et `vide-300`, faite pour la fiche de la Séance de notation, sont retirées, et le
+script ne les dessine plus. Le menu des conversations (Atelier, Panneau) montre les 40 plus
+récentes (`Fenetre.MAX_MENU`), sans en-têtes, la conversation montrée toujours dedans. Ni la liste
+ni le menu ne montrent les conversations des anciennes séances de notation
+(`genre == 'notation'`), restées sur le disque, et `Moteur.ouvrir` les refuse (« elle ne s'ouvre
+plus »).
 
 **Changer de disposition.** Une fenêtre ouverte ne change pas de structure : elle se ferme et se
-rouvre. Le menu Disposition de la fenêtre (clé `disposition`, `Dispositions.items`) écrit la
-préférence (`Fenetre.changerDisposition`), puis lance `Fenetre.rouvrir` dans une tâche : l'envoi
-automatique est annulé, le texte du champ gardé (`Fenetre.brouillon`), la fenêtre fermée
-(`controle.close()`) ; à la fin de son contexte, `Fenetre.afficher` la rouvre dans la disposition
-et la taille des préférences, et rend le brouillon au champ sans l'envoyer
-(`Fenetre.ignorerSaisie`). Chaque ouverture a sa génération (`Fenetre.generation`) :
-`Fenetre.boucle(generation)` s'arrête dès qu'une autre fenêtre est ouverte, il n'en tourne jamais
-deux. Les photos jointes restent ; le défilement, l'image choisie et l'onglet repartent du début.
-Un changement fait dans le Gestionnaire de modules externes s'applique à « Ouvrir la fenêtre
-Claude » (ou ⌃⌥C) : `Fenetre.afficher()` sur une fenêtre ouverte dans une autre disposition ou
-taille que les préférences la rouvre, sinon la met devant. Chaque disposition dans chaque taille a
-son cadre enregistré (`Fenetre.cadre(disposition, taille)` :
-`DeveloppeurClaude-<disposition>-<taille>-<Fenetre.FORME>`, `FORME` à 1).
+rouvre. Depuis la 1.1.1, la disposition ne se choisit que dans le Gestionnaire de modules externes
+(en 1.1, aussi par le menu Disposition de la fenêtre, `Fenetre.changerDisposition`, retiré, et la
+taille aussi changeait la structure). Toutes les 2 s, la boucle de la fenêtre
+(`Fenetre.periodique`) compare la disposition des préférences à celle de la fenêtre ouverte
+(`Fenetre.dispositionChangee`) ; si elle a changé, elle lance `Fenetre.rouvrir`, une seule fois
+(`Fenetre.aRouvrir`) : l'envoi automatique est annulé, le texte du champ gardé
+(`Fenetre.brouillon`), la fenêtre fermée (`controle.close()`) ; à la fin de son contexte,
+`Fenetre.afficher` la rouvre dans la disposition des préférences, et rend le brouillon au champ
+sans l'envoyer (`Fenetre.ignorerSaisie`). Chaque ouverture a sa génération
+(`Fenetre.generation`) : `Fenetre.boucle(generation)` s'arrête dès qu'une autre fenêtre est
+ouverte, il n'en tourne jamais deux. Les photos jointes restent ; le défilement, l'image choisie et
+l'onglet repartent du début. « Ouvrir la fenêtre Claude » (ou ⌃⌥C) fait de même sans attendre :
+`Fenetre.afficher()` sur une fenêtre ouverte dans une autre disposition que les préférences la
+rouvre, sinon la met devant. Chaque disposition a son cadre enregistré
+(`Fenetre.cadre(disposition)` : `DeveloppeurClaude-<disposition>-grande-<Fenetre.FORME>`,
+`FORME` à 1) : le nom garde « grande », pour reprendre le cadre déjà enregistré dans cette taille
+(en 1.1, `DeveloppeurClaude-<disposition>-<taille>-<FORME>`).
 
-### Carte Note (1.1)
+### Carte Note (1.1, revue en 1.1.1)
 
 `Vues.notation` : un `group_box` « Note » pour la photo active, dans les trois dispositions (colonne
-Note de l'Atelier, onglet Note de Conversation claire, onglet Noter du Panneau ; dans un onglet,
-une colonne à titre gras, par `Vues.masquable`). Il montre :
+Note de l'Atelier, onglet Note de la Conversation claire, sous l'aperçu, onglet Noter du
+Panneau ; dans un onglet, une colonne à titre gras, par `Vues.masquable`). Il montre :
 
-- le nom de la photo et sa note posée (`Fenetre.texteNotePosee` : « Note posée : ★★☆☆☆ ·
-  rejetée », « aucune, pas encore jugée »), lue par `Lightroom.photos()` (`rating` et
-  `pickStatus` de la photo active) ;
+- le nom de la photo (`notationNom`) et sa note posée (`notationPosee`,
+  `Fenetre.texteNotePosee` : « Note posée : ★★☆☆☆ · rejetée », « aucune, pas encore jugée »),
+  lue par `Lightroom.photos()` (`rating` et `pickStatus` de la photo active) ;
 - la note que Claude propose (`Notation.proposition(id)`, dans une tâche) : « Claude propose :
-  ★★★☆☆ » ou « rejeter », en couleur selon l'état (orange proposée, vert acceptée ou changée, rouge
-  à vérifier, gris écartée : quatre variantes superposées) ; l'état et la passe (« proposée ·
-  passe 2 », « changée : ★★★★★ ») ; les critères du plus lourd au plus léger (Impact, Qualités,
-  Plancher technique, Finition) et « Plafond mesuré : n ★ » ; la raison. Sans proposition :
-  « Aucune note proposée » et une aide (`Fenetre.AIDE_NOTATION`).
+  ★★★☆☆ » ou « rejeter », en couleur selon l'état (rouge à vérifier, vert acceptée ou changée, gris
+  écartée, orange « proposée », d'avant la 1.1.1 : quatre variantes superposées) ; l'état et la
+  passe (« à vérifier · passe 2 », « changée : ★★★★★ ») ;
+- depuis la 1.1.1, un seul texte (`notationTexte`, `Fenetre.texteNote`, à la place de
+  `notationCriteres` et `notationRaison`) : les critères du plus lourd au plus léger (Impact,
+  Qualités, Plancher technique, Finition), « Plafond mesuré : n ★ », une ligne vide, puis la
+  raison ; montré page par page, ▲ ▼ à droite des boutons (voir Contraintes du SDK). Sans
+  proposition : « Aucune note proposée » et l'aide (`Fenetre.AIDE_NOTATION`) : Claude note d'abord
+  chaque photo qu'il traite, selon le standard, critère par critère ; sa note arrive à vérifier,
+  vous l'acceptez ou la changez ; 5 ★ reste à vous seul.
 
-Boutons (Accepter, Changer…, À vérifier et Noter passent par `F.enTache` : ils lisent le registre
-et le catalogue, ou ouvrent une fenêtre modale) :
+Boutons (Accepter et Changer… passent par `F.enTache` : ils lisent le registre et le catalogue,
+ou ouvrent une fenêtre modale) :
 
 - **Accepter** (`Fenetre.accepterNote`) : la proposition telle quelle
-  (`Notation.poser{ {photo = id} }` par `Fenetre.poserNote`) ; actif pour une proposition
-  « proposée » ou « à vérifier » ;
+  (`Notation.poser{ {photo = id} }` par `Fenetre.poserNote`) ; actif pour une proposition « à
+  vérifier » (ou « proposée », d'avant la 1.1.1) ;
 - **Changer…** (`Fenetre.changerNote`) : fenêtre modale « Changer la note », de 0 à 5 ★
   (l'utilisateur peut poser 5 ★, Claude jamais) et le drapeau (inchangé, sans drapeau, Retenue,
-  Rejetée) ;
-- **À vérifier** (`Fenetre.verifierNote`) : `Notation.decider(id, 'a_verifier')`, rien dans le
-  catalogue ; actif pour une proposition « proposée » ;
-- **Noter** (`Fenetre.noter`) : une photo, la demande `Consignes.noterPhoto` (plancher technique
-  par cull_photos, view_photo, propose_ratings avec la raison critère par critère ; rien posé,
-  jamais 5 ★) ; plusieurs photos sélectionnées, la Séance de notation, source « Sélection »
-  (`FenetreNotation.afficher{portee = 'selection'}`) ; aucune photo active, un message ;
-- **Séance…** (`Fenetre.seance`) : `FenetreNotation.afficher()`.
+  Rejetée) ; actif dès qu'une photo est active.
+
+Depuis la 1.1.1 (demandé par Dany le 20 octobre 2026 : ne garder qu'Accepter et Changer…), plus
+de bouton Noter, ou Évaluer (`Fenetre.noter`, `Consignes.noterPhoto`, et
+`Consignes.noterSelection` d'un premier état de la 1.1.1), ni À vérifier (`Fenetre.verifierNote`,
+qui passait la proposition à vérifier par `Notation.decider`), ni Séance… (`Fenetre.seance`,
+1.1). À la place, toute photo que Claude traite dans la fenêtre, il la note d'abord, avant d'y
+toucher (consignes de la fenêtre, puce Notes : `cull_photos` sur elle, `view_photo` avec
+`af_point = true`, puis `propose_ratings` sans `apply`) ; toute proposition arrive « à vérifier »
+(voir Le registre), et Dany l'accepte ou la change. Une photo déjà évaluée ne se renote pas, sauf
+si Dany le demande : `view_photo` donne son évaluation (`evaluation`, gardée dans `notation.json` ;
+voir Tri d'une séance › Point de mise au point). Quand Dany écrit à Claude « note ces photos » ou
+« pose les notes », Claude appelle `propose_ratings` avec `apply = true` (consignes de la fenêtre
+et du connecteur) : les notes sont aussi posées dans le catalogue (voir Notation), et la carte
+montre la proposition acceptée. Le Panneau garde son onglet « Noter » : c'est la carte Note.
 
 Accepter et Changer… sont désactivés pendant que Claude travaille (`Moteur.travaille`) ou qu'une
 écriture de la fenêtre est en cours (`Fenetre.noteEnCours`), et `Fenetre.poserNote` le revérifie :
@@ -529,117 +660,74 @@ même moment. La fenêtre s'abonne au registre (`Notation.abonner('fenetre', …
 `Fenetre.desabonner`) et compare aussi `Notation.version` à chaque tour de sa boucle. Quand elle
 relit la photo active (`Fenetre.majPhoto`, toutes les 2 s et après une écriture), elle recale le
 registre sur sa note et son drapeau (`Notation.recaler`, avec la version lue avant) : une note
-annulée (undo_last, ⌘Z) rend la proposition de nouveau à décider.
+acceptée ou changée puis annulée (undo_last, ⌘Z) rend la proposition de nouveau « à vérifier ».
 
-### Séance de notation (1.1)
+### Séance de notation (1.1, retirée en 1.1.1)
 
-Fenêtre à part (`FenetreNotation.lua`, « Claude · Séance de notation », cadre
-`DeveloppeurNotation`), ouverte par Fichier (ou Bibliothèque) › Module externe - Extras › Séance
-de notation…, par Séance… de la carte Note, ou par Noter quand plusieurs photos sont
-sélectionnées. Une seule à la fois : déjà ouverte, elle passe devant, la source demandée appliquée
-(`options.portee`, `options.collection`). Elle ne dépend pas des pièces de la fenêtre Claude (ses
-couleurs, polices, fil et `bouton` sont à elle, sur le modèle de `FenetrePublication.lua`) ; ses
-couleurs se créent à la construction, pour que le fichier se charge sans `LrColor` (vérification
-des liens, sous la simulation de la liaison).
+La 1.1 avait une fenêtre à part pour noter une sortie entière, passe par passe (« Claude · Séance
+de notation », `FenetreNotation.lua`, cadre `DeveloppeurNotation`, ouverte par le menu Séance de
+notation…, par Séance… ou par Noter avec plusieurs photos) : une planche de 12 vignettes, une
+fiche, Tout accepter, sa propre conversation de genre `notation`, ses consignes
+(`Consignes.texteNotation`) et ses passes (`Consignes.passes`). Elle est retirée en 1.1.1 (demandé
+par Dany le 20 octobre 2026), avec `MenuNotation.lua`, les boutons Séance…, `Consignes.pour`,
+`Moteur.nouvelleSeance`, `Conversation.nouvelleSeance`, `Vignettes.demander`, les séances du
+registre, l'action `seance` de la commande `notation`, les paramètres `session` et
+`read_session` de `propose_ratings`, `essais-seance.lua` et `docs/seance.png`. Les conversations
+des anciennes séances (genre `notation`) restent sur le disque, absentes de la liste et du menu, et
+ne s'ouvrent plus (`Moteur.ouvrir` les refuse). Ce qui a été constaté sur elle reste plus bas,
+comme historique.
 
-- **En-tête.** Photos à noter : Sélection ou Collection (boutons radio, clé `portee`), le menu des
-  collections (`Publication.collections()`, lu à l'ouverture ; ↻ rouvre la fenêtre pour le relire,
-  texte du champ et source gardés), le nombre de photos (tenu à jour par
-  `selectionChangeObserver`). « Ouvrir la séance » fige la liste (`Notation.ouvrirSeance`) : un
-  rejet accepté peut cacher une photo sous le filtre de la Bibliothèque, et la sélection change.
-  Les photos sont rangées par date de prise de vue (`FenetreNotation.ordonner`,
-  `batchGetRawMetadata` de `dateTimeOriginal` : une rafale reste ensemble) ; titre « Sélection du
-  20 oct. » ou le nom de la collection. Ouvrir une séance quand une autre est active demande une
-  confirmation : l'ancienne se ferme, les notes posées ne changent pas.
-- **À gauche, les passes** (230 points). Les quatre passes du standard (`Consignes.passes[n]` :
-  `titre`, `question`), choisies par boutons radio (clé `passe`, rangée par
-  `Notation.choisirPasse`), chacune avec ses comptes (`Notation.compter(id).par_passe[n]`) ; un
-  bouton « Lancer la passe n » envoie `Consignes.passes[n].message(seance)`. La passe 4 (5 ★,
-  l'utilisateur seul) n'a pas de message : le bouton est désactivé (`peutLancer`), l'action refuse
-  aussi, et la passe affiche `Consignes.passes[4].seul` (« À vous seul : revoyez vos 4 ★ après le
-  développement. », sur deux lignes) à la place de ses comptes. Dessous, un rappel du standard.
-- **Au centre, la planche** (4 × 3 cases de 120 points, `FenetreNotation.CASES` = 12 par page,
-  ◀ ▶) : par case, la vignette (une image masquée tant qu'elle n'est pas prête, superposée à
-  « Vignette… » ou « Pas de vignette »), le nom (un clic la montre dans la fiche, « ▸ » marque la
-  photo choisie), les étoiles proposées en quatre couleurs superposées (orange proposée, rouge à
-  vérifier, vert acceptée ou changée, gris écartée ou sans proposition) et l'état en mots. Dessous,
-  « Échange avec Claude » : les 8 dernières lignes du fil de la conversation de séance
-  (`FenetreNotation.LIGNES_FIL`), ▲ ▼.
-- **À droite, la fiche** (300 points) : nom et rang (◀ ▶, la page suit), vignette de 300 (image
-  « aucun aperçu » `vide-300.png` tant qu'elle n'est pas prête, masquée ; les cases : `vide-120.png`), note
-  posée, proposition (en couleur), décision, boutons Accepter (titre « Accepter ★★★☆☆ »),
-  Changer…, À vérifier, Écarter, puis critères, plafond et raison.
-- **En bas.** « Tout accepter · passe n (N) », le filtre de la planche (Toutes, Proposées,
-  À vérifier, Acceptées ; il ramène à la page 1), un bandeau (activité de Claude, erreur ou
-  information), le champ « Demander à Claude… » (`immediate = false` : Retour l'envoie après
-  0,3 s, avec la photo choisie dans la ligne de contexte), Envoyer et Arrêter (actif seulement si
-  la demande en cours est celle de la séance : `Moteur.enCours`).
+### Nouvelle conversation par photo (1.1.1)
 
-**Écritures.** Seuls Accepter, Changer… et Tout accepter écrivent dans le catalogue, par
-`FenetreNotation.poser` → `Notation.poser`, dans une tâche, sans Claude ni quota ; jamais pendant
-que Claude travaille, qu'une demande vient de partir (`envoiEnCours`) ou qu'une écriture est en
-cours (`enEcriture`) : la vue désactive les boutons, et l'action revérifie `Moteur.travaille` et
-`enEcriture`. Tout accepter pose, après confirmation, les propositions encore « proposées » de la
-passe choisie (`FenetreNotation.aAccepter` : ni à vérifier, ni décidées), en un seul appel de
-`Notation.poser` (une écriture par lot de 500 photos, `Notation.LOT`, une étape par photo ; la
-confirmation dit « Une écriture » ou « N écritures (une par lot de 500 photos) »).
-Changer… (fenêtre modale « Changer la note · <fichier> ») propose de « 0 ★ · pas
-encore jugée » à « 5 ★ · parmi vos meilleures » et une case Drapeau Rejeter ; sans elle, seul un
-rejet déjà posé se retire (un drapeau Retenue reste). À vérifier et Écarter ne touchent que le
-registre (`Notation.decider`).
+Quand l'utilisateur choisit une autre photo active ou une autre sélection, la fenêtre commence une
+nouvelle conversation (`Fenetre.suivreSelection`, demandé par Dany le 20 octobre 2026). Elle est
+appelée par `Fenetre.majPhoto`, toutes les 2 s (`Fenetre.periodique`) et à chaque changement de
+sélection que signale `selectionChangeObserver`. La clé de la sélection (`info.cle`, faite par
+`Lightroom.photos()`) réunit l'identifiant de la photo active, le nombre de photos sélectionnées et
+les identifiants des 500 premières. Chaque demande envoyée pose la clé lue juste avant l'envoi
+sur la conversation (`c.cle`, par `Fenetre.envoyer`), et la note comme vue. La fenêtre garde la
+dernière clé vue et l'heure où elle l'a vue (`Fenetre.voirSelection` : `Fenetre.cleVue`,
+`Fenetre.cleVueLe`). Une clé différente de la précédente commence une nouvelle conversation
+(`Fenetre.nouvelle`, « Autre photo choisie : nouvelle conversation » au journal) quand :
 
-**Conversation de séance.** Une conversation de genre `notation` (`Conversation.nouvelleSeance` :
-`genre`, `titreChoisi`, `seance` = l'identifiant de la séance), créée par `Moteur.nouvelleSeance{
-titre = "Séance · <titre>", seance = id }` sans changer `Moteur.courante`, reprise si elle existe
-déjà pour cette séance (après une relance de Lightroom, par exemple). Elle est rangée avec les
-autres (`Conversations/<id>/`) mais ne s'ouvre jamais dans la fenêtre Claude (`Moteur.charger` ne
-la prend pas pour courante). « Lancer la passe n » et les questions passent par
-`Moteur.envoyer(texte, { conversation = …, contexte = … })` : la ligne de contexte nomme la séance,
-son nombre de photos et la passe. Le message d'une passe (`Consignes.passes[n].message`) donne
-les identifiants des photos (et la collection), la passe et `session = "<id>"`, écrit comme une
-valeur de paramètre pour que Claude le passe tel quel à `propose_ratings` ; la passe 4 (5 ★ :
-l'utilisateur seul) ne se lance pas. Les consignes de la session ajoutent
-`Consignes.texteNotation` : lire le standard une fois (`propose_ratings` avec `read_standard` :
-Claude Code n'a dans la fenêtre ni ressources ni invites), cull_photos pour le
-plancher, planches de 24 à 30, view_photo pour les candidates à 4 ★, `propose_ratings` avec
-`pass` et `session`, `to_check` pour un cas douteux ; rien dans le catalogue, ni `set_metadata`
-ni retouche sans demande, jamais 5 ★ ; pas de ligne `[titre : …]` ; une réponse courte.
+- Claude n'a pas travaillé depuis que la clé précédente a été vue : il ne travaille pas
+  (`Moteur.travaille`), et la fin de son dernier travail (`Moteur.finTravail`, datée par le moteur,
+  fenêtre ouverte ou fermée, à la fin d'une demande ou du processus) précède d'au moins 4 s
+  l'heure où la clé précédente a été vue (`Fenetre.DELAI_APRES_TRAVAIL`). Sinon, la nouvelle clé
+  devient celle de la conversation (`c.cle`), sans en commencer une autre : une sélection changée
+  pendant le travail de Claude, ou jusqu'à 4 s après, peut être la sienne (`show_photo`, un tri) ;
+- la préférence `nouvelleParPhoto` est cochée (case « Autre photo » du Gestionnaire de modules
+  externes, cochée par défaut) ;
+- la conversation montrée a déjà des éléments (une conversation vide n'est pas remplacée) et
+  parlait d'autres photos (sa clé n'est pas la nouvelle).
 
-**Vignettes.** `Vignettes.demander(ids, 320, dossier)` (dans une tâche), puis `Images.vignette` en
-120 et 300 points (carrées, fond 2B2B2B), dans `Temporaire/Notation/<séance>/<lot>/` ; gardées par
-photo et par `editCount` (une photo retouchée en reçoit une nouvelle), pas redemandées après un
-échec. Le dossier est vidé à l'ouverture et à la fermeture de la fenêtre (pas à ↻). Une tâche de
-vignettes écrit dans le cache de la fenêtre qui l'a lancée (`preparerVignettes` garde la table et
-la génération) : fermée puis rouverte sans ↻, ses résultats vont dans une table orpheline, et elle
-ne touche ni `vignettesEnCours` ni le rafraîchissement de la nouvelle fenêtre.
-
-**Boucle.** Toutes les 0,25 s (`FenetreNotation.tour`) : ce que le registre, le moteur ou la
-sélection ont changé ; toutes les 2 s, la planche relue (une note posée à la main dans
-Lightroom). La planche lit la note et le drapeau de ses 12 photos et de la photo de la fiche,
-puis recale le registre en un seul appel (`Notation.recaler`, une écriture pour la page, avec la
-version lue avant les photos) : une note acceptée ou changée qui n'y est plus (undo_last, ⌘Z)
-remet sa proposition à « proposee », et la fenêtre se relit alors une fois
-(`FenetreNotation.rafraichir(true)`). Abonnements `'seance'` au registre (`Notation.abonner`) et
-au moteur (`Moteur.abonner`), retirés à la fermeture et en cas d'échec de l'ouverture.
+`Fenetre.cleVue` et `Fenetre.cleVueLe` restent d'une ouverture de la fenêtre à l'autre (pas d'un
+chargement du module à l'autre) : une photo choisie fenêtre fermée compte aussi, à la réouverture,
+et une fenêtre fermée pendant que Claude travaillait retrouve sa conversation à la réouverture
+(la clé qu'elle avait vue date d'avant la fin de son travail). Un premier état de la 1.1.1 notait
+la fin du travail dans la boucle de la fenêtre (`Fenetre.finTravail`, `Fenetre.travaillait`),
+donc fenêtre ouverte seulement : retirés. Revenir aux photos d'une ancienne conversation ne la
+rouvre pas.
 
 ### Fichiers
 
 ```
 ~/Library/Application Support/Developpeur/
     mcp-developpeur                         le connecteur (installé par install.sh)
-    Conversations/<id>/conversation.json    le fil (format « developpeur/1 », dates Unix), séances
-                                            de notation comprises (genre « notation »)
+    Conversations/<id>/conversation.json    le fil (format « developpeur/1 », dates Unix), celles
+                                            des anciennes séances de notation comprises (genre
+                                            « notation », qui ne s'ouvrent plus)
     Conversations/<id>/image-*              aperçus de Claude ; jointe-*.jpg : photos jointes
     Conversations/<id>/.vignettes/          réductions pour la fenêtre
     Sessions/<id>-<date>-<n>/               échanges avec un processus Claude Code, et ses
                                             consignes (consignes.md, écrit à son lancement)
     Atelier/                                dossier de travail de Claude Code (vide)
-    Temporaire/                             fichiers de passage (Collees/, sorties de commandes,
-                                            Notation/<séance>/<lot>/ : vignettes de la séance)
+    Temporaire/                             fichiers de passage (Collees/, sorties de commandes ;
+                                            en 1.1, Notation/<séance>/ : vignettes de la séance)
     connecteur.json                         écrit à chaque lancement de Claude Code
     consommation.json, publication.json     jetons comptés, profils de publication de l'utilisateur
-    notation.json                           notes proposées par Claude et séances de notation
-                                            (registre, propre au catalogue ouvert ; voir Notation)
+    notation.json                           notes proposées par Claude (registre, format 2, propre
+                                            au catalogue ouvert ; voir Notation)
     guide-de-style.md                       guide de style (remember_style)
 ~/Library/Logs/Developpeur/module.log         journal de la liaison
 ~/Library/Logs/Developpeur/conversation.log   journal de la fenêtre
@@ -649,17 +737,32 @@ au moteur (`Moteur.abonner`), retirés à la fermeture et en cas d'échec de l'o
 
 Une seule table, les préférences du module (`LrPrefs`, lues par `Preferences.lire`) : la liaison
 y a ses réglages (`Preferences.defauts` : `demarrerAuLancement`, `mode`, `instantane`, limites,
-garde-fous, `accordDansLightroom`, `retourVisuel`), et `Chemins.prefs` y ajoute ceux de la fenêtre
-(`Chemins.defauts` : `taille` — petite, moyenne, grande —, `disposition` — `atelier`,
-`conversation` ou `panneau`, `conversation` par défaut, depuis la 1.1 —, `modele`, `styleChoisi`,
-`inactivite` en minutes), puis `cheminClaude` et `cheminConnecteur` (par défaut, le premier
-Claude Code trouvé et `~/Library/Application Support/Developpeur/mcp-developpeur`) ; la fenêtre
-Publication y garde
-`dossierPublication` et `profilPublication`. Aucune clé ne sert aux deux. Le mode « Proposer
-d'abord » est la clé `mode` de la liaison, que la fenêtre montre et bascule. Tout se règle dans
-Fichier › Gestionnaire de modules externes › Développeur (sections Liaison avec Claude et Fenêtre
-Claude) ; la disposition aussi par le menu Disposition de la fenêtre, qui écrit la même clé (voir
-Dispositions), et le diagnostic du Gestionnaire la donne avec la taille.
+garde-fous, `accordDansLightroom`, `retourVisuel`, et depuis la 1.1.1 `pointMiseAuPoint`, faux
+par défaut : le point de mise au point dessiné sur chaque aperçu de `view_photo`, pas seulement
+pour noter, voir Tri d'une séance › Point de mise au point), et `Chemins.prefs` y ajoute ceux de
+la fenêtre (`Chemins.defauts` : `disposition` — `atelier`, `conversation` ou `panneau`,
+`conversation` par défaut, depuis la 1.1 —, `modele` — `fable`, `opus` par défaut, `sonnet`,
+`haiku` —, `effort` — `max` par défaut, `xhigh`, `high`, `medium`, `low`, le même pour les quatre
+modèles, depuis la 1.1.1 —, `nouvelleParPhoto` — vrai par défaut, depuis la 1.1.1, voir Nouvelle
+conversation par photo —, `styleChoisi`, `inactivite` en minutes), puis `cheminClaude` et
+`cheminConnecteur` (par défaut, le premier Claude Code trouvé et
+`~/Library/Application Support/Developpeur/mcp-developpeur`) ; la fenêtre Publication y garde
+`dossierPublication` et `profilPublication`. Aucune clé ne sert aux deux. La clé `taille`
+(petite, moyenne par défaut, grande) est retirée en 1.1.1 : une seule taille (voir Dispositions).
+Le mode « Proposer d'abord » est la clé `mode` de la liaison, que la fenêtre montre et bascule.
+Tout se règle dans Fichier › Gestionnaire de modules externes › Développeur (sections Liaison
+avec Claude et Fenêtre Claude, `PluginInfoProvider.lua`). Depuis la 1.1.1, la section Liaison a la
+case « Mise au point » (« Montrer le carré de mise au point (Fujifilm) sur chaque aperçu »), et
+la section Fenêtre Claude les menus Modèle (« pour la demande suivante ») et Effort (« le même
+pour les quatre modèles »), à côté du menu Disposition (« la fenêtre ouverte se rouvre »), et la
+case « Autre photo » (« Nouvelle conversation pour une autre photo ou sélection ») ; le menu
+Taille de la fenêtre est retiré. Le modèle, l'effort et la disposition ne se choisissent plus que
+là (en 1.1, le modèle ne se choisissait que dans la fenêtre, et la disposition aussi par son
+menu). Un autre modèle ou un autre effort vaut pour la
+demande suivante (voir Claude Code) ; une autre disposition rouvre d'elle-même une fenêtre
+ouverte, dans les 2 s (voir Dispositions). Le diagnostic du Gestionnaire donne
+`pointMiseAuPoint` (« point de mise au point en tout temps ») avec les réglages de la liaison, et
+le modèle, l'effort, la disposition et `nouvelleParPhoto` avec ceux de la fenêtre.
 
 ### Coller une image
 
@@ -711,24 +814,30 @@ introuvable ».
 Dans la disposition Conversation claire (celle de la 1.0), les trois colonnes finissent sur la
 même ligne : Renommer et Supprimer à gauche, le champ de demande et Envoyer au centre, la ligne de
 MCP-Développeur à droite. Les colonnes ont `fill_vertical = 1` ; à droite, une `f:spacer`
-élastique pousse les versions en bas ; au centre, une autre (après ▲ ▼ Fin) ne grandit qu'en
-petite taille, où la colonne de droite est la plus haute. La liste des conversations a une hauteur
-fixe (`D.hauteurListe` = lignes du fil × 17 + 93) : `fill_vertical` sur `simple_list` reste sans
-effet (constaté). Dans l'Atelier, un espace élastique pousse de même les versions en bas de la
-colonne Note, et les invites en bas de la colonne de la conversation. Sous le champ de demande,
-plus rien : ce qui s'y affichait passe dans le bandeau de la ligne du Style, une ligne en petit à
-droite du menu (dans le Panneau, sur sa propre ligne, au-dessus de la demande) : un
-message (orange), sinon l'aide d'un voyant rouge (un clic l'affiche en entier), sinon les photos
-jointes (un clic les retire), sinon le rappel « ajouté à chaque demande, invites comprises ». La
-propriété `bandeau` suit `message`, `aide` et `jointes` par des observateurs.
+élastique, sous la carte Note ou la proposition, pousse en bas Publication et Consommation, le
+séparateur et les versions ; au centre, une autre (après ▲ ▼ Fin) ne grandit que si une autre
+colonne est plus haute. La liste des conversations a une hauteur fixe (`D.hauteurListe` = lignes
+du fil × 17 + 85 depuis la 1.1.1, + 93 en 1.1 : la grille, plus ce qui la suit au centre, ▲ ▼,
+séparateur, invites et Style, bandeau, demande) : `fill_vertical` sur `simple_list` reste sans
+effet (constaté). Dans l'Atelier, un espace élastique pousse de même Publication, Consommation et
+les versions en bas de la colonne Note, et les invites en bas de la colonne de la conversation.
+Sous le champ de demande, plus de ligne de message (dans l'Atelier et le Panneau, seulement
+Envoyer, à droite) : ce qui s'y affichait passe dans le bandeau (`Vues.bandeau`), une ligne en
+petit sur sa propre ligne, sous les invites et le menu Style, au-dessus de la demande, dans les
+trois dispositions depuis la 1.1.1 (en 1.1, à droite du menu Style, sauf dans le Panneau). Il
+montre un message (orange), sinon l'aide d'un voyant rouge (un clic l'affiche en entier), sinon
+les photos jointes (un clic les retire), sinon rien (`Fenetre.etatBandeau` : `message`, `aide`,
+`jointes` ou `vide`). Le rappel « ajouté à chaque demande, invites comprises » de la 1.1 (état
+`rappel`) est retiré en 1.1.1 (demandé par Dany le 20 octobre 2026) ; l'infobulle du menu Style
+le dit encore. La propriété `bandeau` suit `message`, `aide` et `jointes` par des observateurs.
 
 ### Raccourcis clavier
 
 Le SDK ne déclare pas de raccourci pour un module. `Raccourcis.lua` ajoute aux raccourcis d'app de
 macOS pour Lightroom (`defaults write com.adobe.LightroomClassicCC7 NSUserKeyEquivalents
 -dict-add`, sans toucher aux autres) : « Ouvrir la fenêtre Claude » ⌃⌥C, par le titre exact de
-l'entrée de menu (seulement la fenêtre de conversation ; Publication, Consommation et la Séance de
-notation s'ouvrent par ses boutons). Le bouton « Poser le raccourci » du Gestionnaire de modules externes (section
+l'entrée de menu (seulement la fenêtre de conversation ; Publication et Consommation s'ouvrent
+par ses boutons). Le bouton « Poser le raccourci » du Gestionnaire de modules externes (section
 Fenêtre Claude) l'écrit ; Lightroom les lit à son lancement. Ils ne servent que si le menu Fichier
 est complet, c'est-à-dire la fenêtre principale de Lightroom devant (voir les constats
 ci-dessous). Les essais écrivent dans un domaine à part. Lightroom met trois espaces devant chaque
@@ -756,112 +865,152 @@ suffit pas.
 - `save_frame` garde la taille de la fenêtre d'une ouverture à l'autre : elle ne rétrécit pas si
   le contenu devient plus étroit ou moins haut (bande vide en bas). Le cadre de la fenêtre Claude
   porte donc la taille choisie et un numéro de forme (`Fenetre.cadre` :
-  `DeveloppeurClaude-<taille>-1` en 1.0, `DeveloppeurClaude-<disposition>-<taille>-1` depuis la
-  1.1, où 1 est `Fenetre.FORME`, à augmenter quand le contenu rapetisse) ; la fenêtre rouvre alors
-  une fois à la position par défaut. Les autres fenêtres ont leur cadre :
-  `DeveloppeurPublication`, `DeveloppeurConsommation`, `DeveloppeurSuivi`, et depuis la 1.1
-  `DeveloppeurNotation` (Séance de notation).
+  `DeveloppeurClaude-<taille>-1` en 1.0, `DeveloppeurClaude-<disposition>-<taille>-1` en 1.1,
+  `DeveloppeurClaude-<disposition>-grande-1` depuis la 1.1.1, une seule taille, où 1 est
+  `Fenetre.FORME`, à augmenter quand le contenu rapetisse) ; la fenêtre rouvre alors une fois à la
+  position par défaut. Les autres fenêtres ont leur cadre :
+  `DeveloppeurPublication`, `DeveloppeurConsommation`, `DeveloppeurSuivi`, et en 1.1
+  `DeveloppeurNotation` (Séance de notation, retirée en 1.1.1).
 - Quand une fenêtre du module est devant (ou que Lightroom n'est pas l'application active), le
   menu Fichier de Lightroom est réduit (Nouveau catalogue, Ouvrir le catalogue, Mise en page,
   Imprimante) : les entrées du module et le Gestionnaire de modules n'y sont pas. D'où les boutons
-  Publication et Consommation dans la fenêtre Claude (et, depuis la 1.1, Séance… et le menu
-  Disposition).
+  Publication et Consommation dans la fenêtre Claude (et, en 1.1, Séance… et le menu Disposition,
+  retirés en 1.1.1 : la disposition, le modèle et l'effort se choisissent dans le Gestionnaire,
+  la fenêtre principale de Lightroom devant).
 - Publication : JPEG 5 Mpx d'un RAF de X-H2S, 2738 × 1825, sRGB, sans position GPS ; dossier créé,
   bilan et « Afficher dans le Finder ».
 - 20 octobre 2026 (1.1, premier essai réel) : `visible` lié posé sur un conteneur est sans effet.
   Dans la Conversation claire, les trois onglets (Aperçu, Proposition, Note : colonnes à
   `visible = F.egal('onglet', …)`) s'affichaient tous ensemble, superposés ; même chose pour les
   colonnes `aProposition` du Panneau, et une boîte de groupe dans un onglet ne se masque pas non
-  plus. Sur une vue simple, il marche : la Séance de notation masque bien ses cases vides
-  (`static_text` et `f:picture`), comme les variantes de la 1.0 (bandeau, voyants, lignes du fil).
-  D'où `Vues.masquable` (voir Contraintes du SDK) ; la simulation de la fenêtre refuse `visible`
-  sur un conteneur.
+  plus. Sur une vue simple, il marche : la Séance de notation (retirée en 1.1.1) masquait bien
+  ses cases vides (`static_text` et `f:picture`), comme les variantes de la 1.0 (bandeau, voyants,
+  lignes du fil). D'où `Vues.masquable` (voir Contraintes du SDK) ; la simulation de la fenêtre
+  refuse `visible` sur un conteneur.
 - 20 octobre 2026 (1.1) : après Accepter dans la Séance de notation puis `undo_last`, la note
   quitte bien le catalogue, mais la planche et la fiche montraient encore « acceptée » ★★★ : le
-  registre ne voit pas l'annulation. D'où `Notation.recaler`, appelé par la planche et la fiche de
-  la Séance et par la carte Note (voir Le registre).
+  registre ne voit pas l'annulation. D'où `Notation.recaler`, appelé alors par la planche et la
+  fiche de la Séance, et par la carte Note, seule à le faire depuis la 1.1.1 (voir Le registre).
 - 20 octobre 2026 (1.1), vus fonctionner : la Séance de notation (planche, fiche, Accepter,
-  `undo_last` qui retire la note, réouverture par ↻), le Gestionnaire de modules externes avec le
-  menu Disposition, et une passe 1 avec le vrai Claude.
+  `undo_last` qui retire la note, réouverture par ↻ ; fenêtre retirée en 1.1.1), le Gestionnaire
+  de modules externes avec le menu Disposition, et une passe 1 avec le vrai Claude.
 - 20 octobre 2026 (1.1, essai réel avant la publication), vus fonctionner : les trois
   dispositions en taille Grande, ouvertes l'une après l'autre par le menu Disposition de la
-  fenêtre (elle se ferme et se rouvre, la conversation gardée) ; les onglets par vues simples
-  (chaque onglet ne montre que ses vues ; Agrandir de l'Aperçu répond sous la colonne Note,
-  superposée) ; les glyphes ★ ☆ ◀ ▶ ; Noter avec le vrai Claude (cull_photos, view_photo,
-  propose_ratings ; la carte Note montre « Claude propose : ★★★☆☆ », « à vérifier · passe 1 »,
-  les critères et le plafond mesuré ; « Notes proposées · 1 photo » dans le fil) ; la recette,
-  étape « note proposée (propose_ratings), photo inchangée » comprise.
+  fenêtre (elle se ferme et se rouvre, la conversation gardée ; menu retiré en 1.1.1) ; les
+  onglets par vues simples (chaque onglet ne montre que ses vues ; Agrandir de l'onglet Aperçu,
+  retiré en 1.1.1, répond sous la colonne Note, superposée) ; les glyphes ★ ☆ ◀ ▶ ; Noter (bouton
+  retiré en 1.1.1) avec le vrai Claude (cull_photos, view_photo, propose_ratings ; la carte Note
+  montre « Claude propose : ★★★☆☆ », « à vérifier · passe 1 », les critères et le plafond
+  mesuré ; « Notes proposées · 1 photo » dans le fil) ; la recette, étape « note proposée
+  (propose_ratings), photo inchangée » comprise.
 - 20 octobre 2026 (1.1) : Claude propose le plus souvent « à vérifier » (deux fois sur deux), et
   la fenêtre ne passait d'elle-même à l'onglet Note que pour une note « proposée » : elle y passe
-  aussi pour « à vérifier » (`Fenetre.rafraichirNotation`).
+  aussi pour « à vérifier » (`Fenetre.rafraichirNotation`). Depuis la 1.1.1, toute proposition
+  arrive « à vérifier ».
 - 20 octobre 2026 (1.1) : Claude a écrit un critère de 209 caractères pour 200 demandés, et
   `propose_ratings` a tout refusé (il a recommencé, plus court) : la longueur demandée reste 200,
   le refus ne vient qu'au-delà de 300 (`Notation.toleranceCritere`).
 - 20 octobre 2026 (1.1) : dans le Panneau, le rappel « ajouté à chaque demande » restait sous la
   place laissée à la proposition, plus haute, loin du Style : chaque variante (invites et Style,
-  proposition) porte son bandeau.
+  proposition) porte son bandeau (le rappel est retiré en 1.1.1).
+- 20 octobre 2026 (1.1.1), vus sur les captures refaites (`docs/capture.png`, `atelier.png`,
+  `panneau.png`) : la barre de titre « Développeur » et les versions 1.1.1 ; dans la Conversation
+  claire, les boutons radio Note et Proposition en tête de la colonne de droite, puis l'aperçu,
+  ◀ légende ▶, Agrandir, la carte Note (« Claude propose : ★★☆☆☆ » en rouge, « à vérifier ·
+  passe 1 », critères, plafond mesuré et raison, coupés en page, ▼ actif ; boutons Accepter et
+  Changer… seulement), Publication… et Consommation… au-dessus des versions ; dans les trois
+  dispositions, le menu Style au bout de la dernière rangée d'invites, sans étiquette, et il y
+  tient ; ni Noter, ni À vérifier, ni menu Modèle ou Disposition ; Envoyer seul sous la demande
+  dans l'Atelier et le Panneau ; l'aperçu de l'Atelier, `f:picture` de 720 × 480, avec une
+  vignette 3:2. Deux défauts vus, corrigés depuis, à revoir sur une prochaine capture : une ligne
+  de la carte Note commençait par « ; mais » (`Fil.couper`, voir Contraintes du SDK), et dans
+  l'Atelier les ▲ ▼ de la Proposition (740 points) n'allaient pas jusqu'au bord droit de leur
+  rangée (les rangées des boutons des deux cartes portent depuis `fill_horizontal = 1`).
 
-### À constater dans Lightroom (1.1)
+### À constater dans Lightroom (1.1 et 1.1.1)
 
 La 1.1 a été construite et vérifiée le 20 octobre 2026 par les deux suites (`swift test`,
 `scripts/tester-module.sh`, essais `essais-*.lua` compris), puis essayée dans Lightroom le même
 jour, avant sa publication : ce qui y a été vu est dans la section précédente, et ses défauts
-sont corrigés. Restent à voir, à l'usage ; ce qui sera constaté passera dans sa section, avec sa
-règle dans la simulation de sa suite.
+sont corrigés. La 1.1.1 (même jour : titre « Développeur », modèle et effort dans le
+Gestionnaire, une seule taille, Conversation claire revue, nouvelle conversation par photo,
+`apply`, Séance retirée, plus de Noter ni d'À vérifier : Claude note d'abord, « à vérifier »,
+point de mise au point dans `view_photo`) est vérifiée par les deux suites (`swift test` :
+237 tests ; `scripts/tester-module.sh` : liaison 212, fenêtre 43, `essais-dispositions` 17,
+`essais-integration` 6, `essais-moteur` 13) ; dans Lightroom, seules les captures ont été
+refaites (section précédente ; `docs/seance.png` est retirée).
+Restent à voir, à l'usage ; ce qui sera constaté passera dans sa section, avec sa règle dans la
+simulation de sa suite.
 
-1. Menu : « Séance de notation… » juste après « Consommation… » dans Fichier › Module externe -
-   Extras et dans Bibliothèque › Module externe - Extras ; il ouvre la fenêtre (titre, cadre
-   `DeveloppeurNotation`, environ 1092 × 820 points sur l'écran de Dany).
-2. Claude Desktop accepte l'`outputSchema` de `propose_ratings` (`seance` de type texte ou null)
+1. Claude Desktop accepte l'`outputSchema` de `propose_ratings` (`propositions`, `refusees`,
+   `posees`, `erreur_pose` de type texte ou null, `standard` ; plus de `seance` depuis la 1.1.1)
    et lit `structuredContent` ; Claude Code 2.1.303 rend le `tool_result` de `propose_ratings` en
-   texte JSON `{seance, propositions, refusees}`, comme l'attend `Conversation.notesLues`.
-3. Planche de 30 vignettes (`contact_sheet`) : poids réel, et lisibilité de l'Impact à environ
+   texte JSON `{propositions, refusees, posees?}`, comme l'attend `Conversation.notesLues`.
+2. Planche de 30 vignettes (`contact_sheet`) : poids réel, et lisibilité de l'Impact à environ
    208 × 139 px par photo. Plafonds de `cull_photos` sur une vraie séance (rejets proposés, photos
    presque noires « à vérifier », doublons de rafale plafonnés à 3). Durée de la commande
-   `notation` pour 500 propositions.
-4. Rendu des glyphes ⚑ ▸ ↻ dans les `static_text` et les titres de boutons (Helvetica
-   Neue 13, gras, Menlo 11). Les largeurs de `Metriques.lua` viennent de NSString : vérifier
-   qu'aucune ligne n'est coupée autrement.
-5. Onglets par vues simples : les autres boutons d'un onglet couvert (Accepter, Refuser,
-   Ajuster… de Proposition sous la colonne Note ; tout Retoucher sous la colonne Noter du
-   Panneau ; Agrandir répond, constaté). S'ils ne répondaient pas : passer à un `tab_view` du SDK
-   (`tab_view_item` par onglet, `value` liée à `onglet`). Un clic sur un bouton radio ou un choix
-   dans un `popup_menu` valide-t-il le champ de demande, et avant ou après l'observateur qui
-   annule l'envoi ?
-6. Réouverture (menu Disposition, constatée) : `windowWillClose` est appelé, une seule boucle
-   tourne (journal sans doublons), le brouillon validé est rendu sans partir. Voir ce que devient
-   un texte tapé mais pas encore validé.
-7. `popup_menu` des conversations (Atelier, Panneau) dont les éléments liés changent pendant que
-   la fenêtre est ouverte, avec une valeur posée par programme. `push_button` à titre lié
-   (« Lancer la passe n », « Tout accepter · passe n (N) », « Accepter ★★★★☆ ») qui change
-   fenêtre ouverte.
-8. Hauteurs et largeurs réelles : Atelier moyenne (environ 860 points), Panneau moyenne (environ
-    930 points), Panneau grande (20 lignes : environ 1 050 avec la barre de titre, à tenir sur un
-    écran de 1080 points), Séance (environ 820 points), et les rangées de boutons. `f:picture` de
-    600 × 400, 450 × 300 et 720 × 480 avec une vignette rectangulaire ; `f:picture` masqué
-    superposé à un texte d'attente, qui garde sa taille (120 et 300). Un cadre enregistré par
-    disposition.
-9. Carte Note de bout en bout : Accepter (dans une tâche) et Changer… (fenêtre modale, 0 à 5 ★)
-    écrivent par `Bibliotheque.noter` depuis une tâche de la fenêtre (`setRawMetadata` de
-    `rating` et `pickStatus`). La note posée se relit dans la carte. Lecture de
-    `catalog:getPath()` depuis les tâches de la fenêtre.
-10. Tout accepter dans la séance : une seule opération ⌘Z « Claude · notation », une étape par
-    photo que `undo_last` défait une à une, un seul bandeau. Le message « Lightroom est occupé »
-    s'affiche si Claude Desktop écrit au même moment. Une note posée reste après « Revenir à
-    « Avant Claude » » sur une photo que Claude a aussi retouchée.
-11. Vignettes de la séance : `requestJpegThumbnail` depuis la tâche de la fenêtre, puis `sips` en
-    120 et 300 px. Durée pour une page de 12, nouvelle demande après une retouche (`editCount`).
-    `selectionChangeObserver` met à jour le nombre de photos de la source.
-12. Avec le vrai Claude dans la séance (une passe 1 a marché le 20 octobre, constaté) :
-    `consignes.md` de la session bien lu ; passage de la fenêtre Claude à la séance par
-    `--resume` (temps de démarrage, bonne session, coût du cache, grilles de recalage perdues).
-    Claude passe `session` tel quel, ne pose aucune note par `set_metadata` et n'écrit pas de
-    ligne `[titre : …]` ; « Lancer la passe 4 » reste désactivé. Les lignes « Notes proposées »
+   `notation` pour 500 propositions, et pour 500 notes posées avec `apply` (dans les 60 s de
+   `notationTimeout`).
+3. Rendu de ⚑ dans les lignes du fil (Menlo 11). Les largeurs de `Metriques.lua` viennent de
+   NSString : vérifier qu'aucune ligne n'est coupée autrement, ni dans les textes de la carte Note
+   et de la Proposition, coupés de même (1.1.1). Onglets par vues simples : les boutons d'un
+   onglet couvert (Accepter, Changer… et ▲ ▼ de la carte Note sous la colonne Proposition de la
+   Conversation claire ; tout Retoucher sous la colonne Noter du Panneau ; Agrandir répondait en
+   1.1 sous la colonne Note, constaté). S'ils ne répondaient pas : passer à un `tab_view` du SDK
+   (`tab_view_item` par onglet, `value` liée à `onglet`). Les boutons ▲ ▼ en `size = 'mini'`
+   (rendus, vu sur les captures) : leur clic, une page à la fois, et leur place au bord droit de
+   la rangée (`fill_horizontal`) ; la ponctuation haute gardée avec son mot. Un clic sur un bouton
+   radio ou un choix dans un `popup_menu` valide-t-il le champ de demande, et avant ou après
+   l'observateur qui annule l'envoi ?
+4. Réouverture (constatée en 1.1 par le menu Disposition) : depuis la 1.1.1, par la boucle
+   (`Fenetre.periodique`) après un changement dans le Gestionnaire de modules externes. La boucle
+   tourne-t-elle pendant que le Gestionnaire est ouvert, ou la fenêtre se rouvre-t-elle à sa
+   fermeture ? `windowWillClose`, une seule boucle (journal sans doublons), le brouillon validé
+   rendu sans partir ; ce que devient un texte tapé mais pas encore validé.
+5. `popup_menu` des conversations (Atelier, Panneau) dont les éléments liés changent pendant que
+   la fenêtre est ouverte, avec une valeur posée par programme.
+6. Hauteurs et largeurs réelles, dans la seule taille de la 1.1.1 : Atelier (environ 1 030 points
+   de contenu), Panneau (20 lignes : environ 1 050 avec la barre de titre, à tenir sur un écran de
+   1080 points), Conversation claire avec 42 lignes de fil (le centre à la hauteur de la colonne
+   de droite : boutons radio, aperçu, carte Note ; la liste des conversations, `D.hauteurListe`,
+   au niveau du champ de demande), et les rangées de boutons. Un cadre enregistré par disposition,
+   repris du cadre de la grande taille de la 1.1 (`-grande-`).
+7. Carte Note de bout en bout : Accepter (dans une tâche) et Changer… (fenêtre modale, 0 à 5 ★)
+   écrivent par `Bibliotheque.noter` depuis une tâche de la fenêtre (`setRawMetadata` de
+   `rating` et `pickStatus`). La note posée se relit dans la carte. Lecture de
+   `catalog:getPath()` depuis les tâches de la fenêtre. Le message « Lightroom est occupé »
+   s'affiche si Claude Desktop écrit au même moment.
+8. `propose_ratings` avec `apply` (« note ces photos ») : notes posées, une opération ⌘Z
+   « Claude · notation » par écriture, une étape par photo que `undo_last` défait une à une ; la
+   pause de la liaison l'arrête ; en « Proposer d'abord » avec « Confirmer dans Lightroom »
+   (`accordDansLightroom`), l'accord de la fenêtre de suivi (`depuisLightroom` faux), et le refus
+   qui dit de rappeler `propose_ratings` avec `apply = true` ; le fil dit « Notes à poser »
+   pendant l'appel, puis « Notes posées » et « posée » (ou « Notes non posées » et la raison), la
+   carte Note « acceptée ». Une note posée reste après « Revenir à « Avant Claude » » sur une
+   photo que Claude a aussi retouchée.
+9. Nouvelle conversation par photo : une autre photo choisie à la main commence une conversation ;
+   `show_photo` ou un tri du vrai Claude n'en commence pas, et les 4 s après la fin du travail
+   (`Moteur.finTravail`) suffisent ; une photo choisie fenêtre fermée compte à la réouverture, et
+   une fenêtre fermée pendant que Claude travaillait retrouve sa conversation.
+10. Avec le vrai Claude : `consignes.md` de la session bien lu ; `--model fable` et `--effort`
+    acceptés dans la fenêtre ; un autre modèle ou un autre effort relance Claude Code à la demande
+    suivante par `--resume` (temps de démarrage, bonne session, coût du cache, grilles de recalage
+    perdues) ; Claude note d'abord chaque photo qu'il traite (`cull_photos`, `view_photo` avec
+    `af_point`, `propose_ratings` sans `apply`), ne renote pas une photo déjà évaluée
+    (`evaluation`), passe `apply = true` quand Dany écrit « note ces photos », et n'écrit pas de
+    note par `set_metadata` sans demande ; les lignes « Notes proposées » et « Notes posées »
     s'affichent dans le fil des trois dispositions. Dans Claude Desktop, l'invite `noter` sans
-    précision lit la séance ouverte (`propose_ratings` avec `read_session`).
-13. Gestionnaire de modules externes (le menu Disposition s'y affiche, constaté) : un changement
-    s'applique à « Ouvrir la fenêtre Claude » ou à ⌃⌥C sur une fenêtre ouverte. Coût de la
-    réécriture de `notation.json` à chaque décision avec quelques centaines de propositions.
+    précision note la sélection.
+11. Gestionnaire de modules externes (le menu Disposition s'y affichait en 1.1, constaté) : les
+    menus Modèle, Effort et Disposition, la case « Autre photo » de la section Fenêtre Claude et
+    la case « Mise au point » de la section Liaison s'affichent et s'écrivent ; plus de menu
+    Taille. Coût de la réécriture de `notation.json` à chaque décision avec quelques centaines de
+    propositions.
+12. Point de mise au point dans `view_photo` (1.1.1) : sur un RAF de Fujifilm (X-T20 de la recette,
+    X-H2S), le carré à la place du collimateur, photo tournée ou recadrée comprise ; rouge pour
+    une mise au point signalée manquée ; dessiné sans `af_point` quand la case « Mise au point »
+    est cochée ; une lecture bloquée par une demande d'autorisation de macOS saute le point, puis
+    reprend quand l'utilisateur a répondu.
 
 ## Réglages
 
@@ -1833,8 +1982,33 @@ macOS demandait à l'utilisateur d'autoriser l'accès au volume pour le processu
 Desktop (fenêtre UserNotificationCenter), et `open()` attendait la réponse, avec toute la file des
 outils derrière lui. Depuis, l'original n'est ouvert que pour un fichier Fujifilm (`marque` de la
 vignette, ou `.RAF`), et la lecture est bornée à 2 s (`LecteurPointsAF`) : un original qui ne s'ouvre
-pas est sauté, la suite de la série aussi (un seul fil bloqué), et le bilan le dit (`points_af`).
-Claude ne répond pas à une demande d'autorisation de macOS : c'est à l'utilisateur.
+pas est sauté, et les suivants aussi tant que sa lecture n'a pas fini (un seul fil bloqué à la
+fois), et le bilan le dit (`points_af`). Depuis la 1.1.1, quand la lecture bloquée finit
+(l'utilisateur a répondu), elle débloque le lecteur et les lectures reprennent (avant, il restait
+bloqué jusqu'à la fin de la série). Claude ne répond pas à une demande d'autorisation de macOS :
+c'est à l'utilisateur.
+
+**Point de mise au point dans `view_photo`** (1.1.1). Le même point, lu de même dans l'original
+(Fujifilm seulement, `ToolHandler.pointAF`, commun avec `cull_photos`), sert à noter une photo
+regardée : `view_photo` envoie `point_af = true` à la commande `apercu`, pour l'aperçu entier
+seulement (pas un zoom `region`, ni un avant/après `compare`). Le module décrit alors la photo
+comme pour une vignette (`Vignettes.decrireVignette` : `chemin_original`, `marque`, `geometrie`),
+et ajoute `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`,
+lue dans `notation.json` : « pas encore évaluée », « 3 ★ proposée par Claude, à vérifier »,
+« acceptée par l'utilisateur : 3 ★ », « changée par l'utilisateur : 4 ★ (proposée : 3 ★) »,
+« proposition écartée par l'utilisateur (3 ★) » ; « rejet » à la place des étoiles pour un
+rejet). Le serveur retire `chemin_original`, `geometrie` et `marque` de la description, et
+`point_af_toujours`, avant de répondre à Claude. Un point dans l'image affichée donne `point_af` :
+`x` et `y` (de 0 à 1 depuis le coin haut gauche, au millième), `nettete` (autour du point, dans
+le carré de 12 % de `Detail.nettete`, sans le facteur des vignettes), `appareil` (« mise au point
+signalée manquée » si l'appareil l'a signalé) et `carre` s'il est dessiné. Le carré
+(`PreviewImages.marquerPoint`) : vert, rouge pour une mise au point signalée manquée, côté de 6 %
+du petit côté (16 px au moins), un liseré sombre autour pour rester visible sur un fond clair ; il
+est dessiné avec le paramètre `af_point = true` (pour noter : consignes de la fenêtre) ou quand
+la case « Mise au point » du Gestionnaire est cochée (`pointMiseAuPoint`, décochée par défaut).
+Mesures et Vision sont prises avant le carré. `view_photo` a un seul lecteur
+(`ToolHandler.lecteurAF`) : une lecture bloquée n'en lance pas d'autres. Un point hors du cadre
+(recadrage) n'est pas donné.
 
 **Tri** (`cull_photos`, `Tri.swift`). Photos visées : `photo_ids`, la sélection, une collection ou un
 dossier (par `chercher`, triées par date), 500 au plus, par lots de 25 vignettes (une commande à la
@@ -1916,11 +2090,17 @@ suivante d'une sélection, d'une collection ou d'un dossier, et les numéros con
 
 ## Notation (`propose_ratings`, `notation`)
 
-Depuis la 1.1. Claude propose des notes selon un standard, critère par critère ; l'utilisateur les
-accepte, les change ou les met à vérifier dans Lightroom (carte Note de la fenêtre Claude, Séance de
-notation), sans repasser par Claude ni dépenser de quota. Pendant une notation, Claude ne pose
-rien lui-même, et il ne propose jamais 5 ★. Ce qui reste à voir dans Lightroom : Fenêtre Claude ›
-À constater dans Lightroom (1.1).
+Depuis la 1.1. Claude propose des notes selon un standard, critère par critère ; depuis la 1.1.1,
+toute proposition arrive « à vérifier », et l'utilisateur l'accepte ou la change dans Lightroom
+(carte Note de la fenêtre Claude ; la Séance de notation de la 1.1 et les boutons Noter et
+À vérifier sont retirés), sans repasser par Claude ni dépenser de quota. Dans la fenêtre Claude, Claude note
+d'abord toute photo qu'il traite, avant d'y toucher, sans rien poser (consignes de la fenêtre,
+voir Carte Note) ; une photo déjà évaluée ne se renote pas, sauf demande (`view_photo` :
+`evaluation`). Sans demande, Claude ne pose rien lui-même. Depuis la 1.1.1 (demandé par Dany le
+20 octobre 2026), quand l'utilisateur lui demande de noter (« note ces photos », « pose les
+notes »), `propose_ratings` avec `apply` pose aussi les notes (voir plus bas). Claude ne propose
+jamais 5 ★ de lui-même ; 5 ★ que l'utilisateur demande passent par `set_metadata`. Ce qui reste à
+voir dans Lightroom : Fenêtre Claude › À constater dans Lightroom (1.1 et 1.1.1).
 
 ### Le standard
 
@@ -1928,10 +2108,10 @@ Une seule copie du texte : `Notation.standard` (`Sources/DeveloppeurKit/Notation
 La ressource `developpeur://notation` (`standard-de-notation`, `Tools+Style.swift`),
 `propose_ratings` avec `read_standard` et la fin de l'invite `noter` le reprennent de là ;
 `NotationTests` en vérifie le début, la fin, les titres et quelques phrases, et l'absence des mots
-interdits (ceux que `MCPServerTests` cherche). Le module ne le recopie pas : ses consignes et ses
-passes y renvoient (par `propose_ratings` avec `read_standard` : Claude Code n'a dans la fenêtre ni
-ressources ni invites, `--tools ""` et `--disable-slash-commands`), et le rappel de la séance
-(`FenetreNotation.RAPPEL`) n'en garde qu'une ligne par note. En résumé :
+interdits (ceux que `MCPServerTests` cherche). Le module ne le recopie pas : ses consignes y
+renvoient (par `propose_ratings` avec `read_standard` : Claude Code n'a dans la fenêtre ni
+ressources ni invites, `--tools ""` et `--disable-slash-commands`) ; en 1.1, les passes et le
+rappel de la Séance de notation, retirés en 1.1.1, y renvoyaient aussi. En résumé :
 
 - Une étoile dit un niveau de qualité, et rien d'autre, avec le même sens d'une sortie à l'autre.
   Rejeter, c'est le drapeau Rejeter ; les doublons d'une rafale, une pile sous la meilleure vue ;
@@ -1965,34 +2145,44 @@ jusqu'à 30 vignettes, pour juger l'Impact sur toute une sortie. Détails : Tri 
 
 ### L'outil `propose_ratings`
 
-Titre « Proposer des notes » (`Tools+Notation.swift`). En lecture seule (`readOnlyHint`) : rien ne
-change sur les photos ni dans le catalogue, les propositions vont au registre du module.
-`outputSchema` : `{seance (texte ou null), propositions, refusees, standard}` (propriétés en
-plus permises : la réponse de `read_session`).
+Définition dans `Tools+Notation.swift` ; titre « Noter des photos » depuis la 1.1.1
+(`ToolHandler.titles`, `Tools.swift` ; « Proposer des notes » en 1.1). Il n'est plus en lecture
+seule depuis la 1.1.1 (`readOnlyHint` faux : absent de `ToolHandler.readOnlyTools`) : avec
+`apply`, les notes sont posées dans le catalogue ; sans lui, rien ne change sur les photos ni dans
+le catalogue, les propositions vont au registre du module. Sa description le dit depuis la
+1.1.1 : sans `apply`, les notes sont rangées comme propositions « à vérifier », que l'utilisateur
+accepte ou change dans Lightroom. `outputSchema` (`ToolHandler.outputSchemas`, « Propositions
+rangées pour la carte Note, et posées avec apply ; ou le standard de notation. ») :
+`{propositions, refusees, posees, erreur_pose (texte ou null), standard}`, propriétés en plus
+permises ; plus de `seance` ni de Séance de notation depuis la 1.1.1.
 
 Arguments :
 
 - `ratings` : les propositions, une par photo, 500 au plus par appel (`maxRatings`, comme
-  `cull_photos`) ; obligatoire sauf avec `read_standard` ou `read_session`. Chacune :
+  `cull_photos`) ; obligatoire sauf avec `read_standard`. Chacune :
   `{photo_id, rating (0 à 4) ou flag: "reject", criteria: {impact, qualities, technical_floor,
   finish}, reason, to_check}`. `rating` ou `flag`, pas les deux (`flag` seul : le rejet) ;
   `impact`, `qualities` et `technical_floor` obligatoires et non vides, `finish` facultatif (une
   photo développée) ; 200 caractères demandés par critère (`longueurCritere`), 300 pour `reason`
   (`longueurRaison`), refusés seulement au-delà de 300 et 400 (`toleranceCritere`,
   `toleranceRaison` : Claude dépasse de peu en comptant mal, constaté ; la carte coupe le
-  surplus) ; `to_check` : un cas douteux, à vérifier par l'utilisateur.
-- `pass` : la passe de la séance, de 1 à 3 ; 4 (5 ★, l'utilisateur seul) est refusée avec des
+  surplus) ; `to_check` : un cas douteux (groupe, nuit, flou peut-être voulu ; défaut voulu
+  au-dessus du plafond) ; depuis la 1.1.1, sa description ajoute que toute proposition arrive de
+  toute façon « à vérifier » dans la carte Note (le registre garde `to_check` dans le champ
+  `a_verifier` de la proposition).
+- `pass` : la passe du standard, de 1 à 3 ; 4 (5 ★, l'utilisateur seul) est refusée avec des
   `ratings` (« Passe 4 : 5 étoiles, l'utilisateur seul ; rien à proposer. »), et le module la
   refuse encore.
-- `session` : l'identifiant d'une séance de notation ; sans lui, la séance ouverte dans
-  Lightroom, sinon aucune.
 - `read_standard` : seul, rend `{standard}` sans rien envoyer au module ; avec `ratings`, les
   propositions sont rangées et le standard s'ajoute à la réponse.
-- `read_session` : seul (sans `ratings`, sinon refusé), envoie `notation {action: "seance",
-  seance?: session}` et rend la réponse du module telle quelle : `{id, titre, source, photos,
-  passe, cree, comptes}`, ou `{id: null, message}` sans séance ouverte (ou pour une séance
-  inconnue) ; avec `read_standard`, le standard en plus. Rien n'est rangé. C'est ainsi que
-  l'invite `noter`, sans précision, trouve la séance ouverte dans Lightroom.
+- `apply` (1.1.1) : `true` quand l'utilisateur demande que Claude note ou pose les notes (« note
+  ces photos », « pose les notes ») : la commande reçoit `poser = true`, et les notes sont aussi
+  posées dans le catalogue, « à vérifier » comprises (réponse : `posees`). `false` ou absent :
+  propositions seulement. La description de l'outil le dit, et ajoute : jamais 5 étoiles ici ; si
+  l'utilisateur en demande, `set_metadata`.
+
+En 1.1, `session` (l'identifiant d'une séance) et `read_session` (la séance ouverte dans
+Lightroom, par l'action `seance`) servaient à la Séance de notation : retirés en 1.1.1.
 
 Tout est validé avant d'envoyer quoi que ce soit : un refus ne range rien. Les erreurs viennent
 ensemble, une ligne `ratings[i] : …` chacune (dix au plus), après « Rien n'a été rangé : ».
@@ -2002,22 +2192,23 @@ l'utilisateur. »), négative ou non entière ; `rating` avec `flag`, ou ni l'un
 bonne clé quand elle s'en rapproche (« note (ici : « rating ») ») — validée à la main
 (`ratingKeys`), car `parametresInconnus` ne voit que le premier niveau des arguments ; un
 critère obligatoire vide, un critère ou une raison trop longs, une raison vide, un `to_check` qui
-n'est pas un booléen ; une photo proposée deux fois ;
-`pass` hors de 1 à 3, `session` vide, plus de 500 propositions, `ratings` absent ou vide sans
-`read_standard` ni `read_session`, `ratings` avec `read_session`. Enfin une note au-dessus du plafond mesuré par le dernier `cull_photos` de la
-photo (`dernierTri`), sauf avec `to_check = true` : un défaut voulu et maîtrisé ne compte pas
-(standard), Claude le dit dans `technical_floor` ; le message invite aussi à relancer `cull_photos`
-pour une photo retouchée depuis le tri.
+n'est pas un booléen ; une photo proposée deux fois ; `apply` qui n'est pas un booléen, `pass`
+hors de 1 à 3, plus de 500 propositions, `ratings` absent ou vide sans `read_standard`. Enfin une
+note au-dessus du plafond mesuré par le dernier `cull_photos` de la photo (`dernierTri`), sauf avec
+`to_check = true` : un défaut voulu et maîtrisé ne compte pas (standard), Claude le dit dans
+`technical_floor` ; le message invite aussi à relancer `cull_photos` pour une photo retouchée
+depuis le tri. Ces refus valent aussi avec `apply` : rien n'est posé.
 
 `dernierTri` (`ToolHandler`) vit dans le processus du serveur : il se perd quand le serveur est
 relancé, et chaque client a le sien (Claude Desktop, chaque session de Claude Code, chaque
 processus Claude Code de la fenêtre) ; un tri fait dans Claude Desktop ne plafonne pas les notes
 proposées dans la fenêtre.
 
-Puis une seule commande, par `FileOutils`, en 60 s au plus (`notationTimeout`) :
+Puis une seule commande, par `FileOutils`, en 60 s au plus (`notationTimeout`, pose comprise avec
+`apply`) :
 
 ```
-notation {action: "proposer", seance?: texte, passe?: entier,
+notation {action: "proposer", passe?: entier, poser?: true,
           propositions: [{photo, note: 0…4 (0 pour un rejet), drapeau: "aucun" | "rejetee",
                           criteres: {impact, qualites, plancher, finition?},
                           plafond?: entier (celui de dernierTri), raison, a_verifier: booléen}]}
@@ -2025,139 +2216,158 @@ notation {action: "proposer", seance?: texte, passe?: entier,
 
 La réponse du module est rendue telle quelle (aussi en `structuredContent`), avec `standard` si
 demandé. `notation` n'est pas une lecture que `LightroomBridge` rejoue après une coupure
-(`LightroomBridge.lectures`).
+(`LightroomBridge.lectures`) : rejouée, elle remettrait les propositions acceptées ou changées à
+« à vérifier », et avec `poser`, elle écrirait de nouveau.
 
 L'invite `noter` (arguments `photos` et `passe` : 1, 2, 3, 4 ou une consigne ; sans le guide de
 style) : `cull_photos`, `contact_sheet` par planches de 24 à 30, `view_photo` sur le sujet pour les
 candidates à 4 ★ et les cas douteux, `propose_ratings` avec `pass`, puis un résumé ; jamais
-`set_metadata` pour une note sans demande, jamais 5 ★ ; à la passe 4, rien de proposé. Sans
-`photos`, la séance ouverte dans Lightroom (`propose_ratings` avec `read_session`), sinon la
-sélection. Le standard entier la termine. `tri_seance` ne propose plus de 4 ou 5 ★ ni de drapeau
-Retenue : les notes passent par `propose_ratings` (de 0 à 4 ★, 5 ★ à l'utilisateur seul ; ou
-l'invite `noter`), et `garder` désigne une collection, pas une note.
+`set_metadata` pour une note sans demande ; jamais 5 ★ de lui-même (l'utilisateur les pose, ou les
+demande : `set_metadata`) ; `apply = true` si l'utilisateur demande que Claude pose les notes ; à
+la passe 4, rien de proposé. Sans `photos`, la sélection de Lightroom (sinon, demander où elles
+sont ; en 1.1, d'abord la séance ouverte, par `read_session`). Le standard entier la termine.
+`tri_seance` ne propose plus de 4 ou 5 ★ ni de drapeau Retenue : les notes passent par
+`propose_ratings` (de 0 à 4 ★, 5 ★ à l'utilisateur seul ; acceptées dans la carte Note, ou posées
+avec `apply` à sa demande ; ou l'invite `noter`), et `garder` désigne une collection, pas une
+note.
 
 ### Le registre (`Notation.lua`, `notation.json`)
 
-Le module range les propositions et les séances en mémoire et dans
+Le module range les propositions en mémoire et dans
 `~/Library/Application Support/Developpeur/notation.json` (`Fichiers.ecrire`, réécrit à chaque
 changement), propre au catalogue ouvert : le chemin du catalogue y est gardé
 (`catalog:getPath()`), et un autre catalogue trouve un registre vide (le fichier ne change qu'à sa
-première proposition). Les clés des photos sont des textes (`Json.decode` rend des clés texte) ;
-chaque proposition garde l'uuid de sa photo : un identifiant qui désigne maintenant une autre photo
-perd sa proposition (`lire`, `poser`). Au plus 50 séances et 2000 propositions
-(`Notation.MAX_SEANCES`, `Notation.MAX_PROPOSITIONS`) : les plus anciennes sortent, jamais la
-séance active. Le fichier se charge dans les deux simulations et sans l'interface : `Bibliotheque`
-n'est requis qu'au moment d'écrire. Tout ce qui sort vers une vue est une table neuve, sans
-métatable. `Notation.version` augmente à chaque changement ; `Notation.abonner(nom, fn)`,
-`Notation.desabonner(nom)` et `Notation.signaler(quoi)` (`propositions`, `seance`, `decision`,
-`pose`, `recalage`) préviennent les fenêtres abonnées (`fenetre`, `seance`).
+première proposition). Format 2 depuis la 1.1.1 : `{format = 2, catalogue, propositions}`. Un
+registre plus ancien (format 1, avec `seances`, `seanceActive` et `prochain`) perd ses séances à la
+relecture : `normaliser` ne garde que les propositions, sans leur `seance`. Les clés des photos
+sont des textes (`Json.decode` rend des clés texte) ; chaque proposition garde l'uuid de sa photo :
+un identifiant qui désigne maintenant une autre photo perd sa proposition (`lire`, `poser`). Au
+plus 2000 propositions (`Notation.MAX_PROPOSITIONS`) : les plus anciennes sortent (en 1.1, aussi
+50 séances au plus). Le fichier se charge dans les deux simulations et sans l'interface :
+`Bibliotheque` n'est requis qu'au moment d'écrire. Tout ce qui sort vers une vue est une table
+neuve, sans métatable. `Notation.version` augmente à chaque changement ; `Notation.abonner(nom,
+fn)`, `Notation.desabonner(nom)` et `Notation.signaler(quoi)` (`propositions`, `decision`, `pose`,
+`recalage`) préviennent les fenêtres abonnées (`fenetre`, la seule depuis la 1.1.1).
 
 Une proposition : `{photo, uuid, fichier, note (0 à 4, nil pour un rejet), drapeau ('aucun' ou
 'rejetee'), criteres = {impact, qualites, plancher, finition}, plafond, raison, a_verifier, passe,
-seance, note_avant, drapeau_avant, etat, note_choisie, drapeau_choisi, le, decide_le,
-commentaire}`. `etat` : `proposee`, `acceptee` (posée telle quelle), `changee` (posée autrement :
-`note_choisie`, `drapeau_choisi`), `a_verifier` (Claude ou l'utilisateur doute), `ecartee`. Une
-nouvelle proposition pour la même photo remplace l'ancienne.
+note_avant, drapeau_avant, etat, note_choisie, drapeau_choisi, le, decide_le, commentaire}`.
+`etat` : `a_verifier` (depuis la 1.1.1, toute proposition commence ainsi, demandé par Dany le
+20 octobre 2026 : l'utilisateur l'accepte ou la change ; le champ `a_verifier`, lui, dit en plus
+que Claude doute), `acceptee` (posée telle quelle), `changee` (posée autrement : `note_choisie`,
+`drapeau_choisi`), `ecartee` (qu'aucun bouton ne pose plus depuis la 1.1.1 : Écarter était dans
+la Séance) ; `proposee` ne reste que pour les propositions d'avant la 1.1.1 (en 1.1, l'état d'une
+proposition sans doute). Une nouvelle proposition pour la même photo remplace l'ancienne.
 
-Une séance : `{id, titre, source = {portee, collection}, photos (identifiants figés à
-l'ouverture), passe (1 à 4), cree, numero}`, identifiant « AAAAMMJJ-HHMMSS-n ». API :
-`Notation.ouvrirSeance{titre, source, photos}` (la crée, la rend active, y rattache les
-propositions encore à décider de ses photos, rend son identifiant), `Notation.seanceActive()`,
-`Notation.seance(id)`, `Notation.choisirPasse(id, n)`, `Notation.propositions(id)` (dans l'ordre
-de ses photos), `Notation.compter(id)` (`proposees`, `acceptees` — changées comprises —,
-`changees`, `a_verifier`, `ecartees`, `total`, `photos`, `sans_proposition`, `par_passe[n]`),
-`Notation.proposition(idPhoto)`, `Notation.decider(idPhoto, etat, details)` (`a_verifier`,
-`ecartee`, ou `proposee` pour revenir sur la décision ; le mot de l'utilisateur gardé dans
-`commentaire` ; rien dans le catalogue ; rend vrai, ou nil et la raison),
-`Notation.recaler(releves, version)` (voir l'annulation, plus bas).
+API : `Notation.proposition(idPhoto)`, `Notation.resume(idPhoto)` (1.1.1 : l'évaluation en une
+phrase, pour `view_photo`, voir Tri d'une séance › Point de mise au point),
+`Notation.decider(idPhoto, etat, details)` (`a_verifier`, `ecartee`, ou `proposee` pour revenir
+sur la décision ; le mot de l'utilisateur gardé dans `commentaire` ; rien dans le catalogue ; rend
+vrai, ou nil et la raison ; aucun bouton ne l'appelle depuis que À vérifier est retiré, en 1.1.1),
+`Notation.poser(liste, options)` et `Notation.recaler(releves, version)` (voir plus bas). Les
+séances de la 1.1 (`Notation.ouvrirSeance`, `seanceActive`, `seance`, `choisirPasse`,
+`propositions`, `compter`) sont retirées en 1.1.1.
 
-**Commande `notation`** (`Commandes.lua` → `Notation.commande`). Rien n'est écrit dans le
-catalogue : ni la pause, ni l'accord, ni les garde-fous ne s'y appliquent, comme pour `vignettes`.
+**Commande `notation`** (`Commandes.lua` → `Notation.commande`), actions `proposer` et `lire` (en
+1.1, aussi `seance`, retirée en 1.1.1). Sans `poser`, rien n'est écrit dans le catalogue : ni la
+pause, ni l'accord, ni les garde-fous ne s'y appliquent, comme pour `vignettes`.
 
 - `proposer` : refuse tout pour une note de 5 ou plus (second garde-fou, après le serveur), un
   drapeau autre que `aucun` ou `rejetee`, une note qui n'est pas un entier de 0 à 4, une
-  proposition sans note ni rejet, une proposition sans photo, une séance inconnue (le message
-  renvoie à `propose_ratings` avec `read_session`), une passe hors de 1 à 4, ou la passe 4 (5 ★,
-  l'utilisateur seul : rien à proposer, second garde-fou) ; une photo
-  introuvable va dans `refusees` sans bloquer les autres. Un rejet est un drapeau sans note (le
-  serveur envoie 0) : l'accepter laisse les étoiles de la photo. La proposition se rattache à la
-  séance donnée (`seance`), sinon à la séance active, si la photo en fait partie (sinon
-  `hors_seance`) ; sa passe est celle donnée, sinon celle de la séance. Note et drapeau d'avant
-  (`note_avant`, `drapeau_avant`) sont lus par `Photos.decrireTout`. État : `a_verifier` si Claude
-  doute, sinon `proposee`. Réponse : `{seance, propositions: [{photo, fichier, note_avant,
-  drapeau_avant, etat, hors_seance?}], refusees: [{photo, raison}]}` ; le journal de la liaison
-  note « Notation : n propositions (séance « … ») ».
-- `lire` (`seance?`, `photos?`) : `{seance_active, seances: [{id, titre, photos (leur nombre),
-  passe, cree, comptes}], propositions (sans l'uuid), perdues?}` ; les propositions dont la photo
+  proposition sans note ni rejet, une proposition sans photo, une passe hors de 1 à 4, ou la
+  passe 4 (5 ★, l'utilisateur seul : rien à proposer, second garde-fou) ; une photo introuvable va
+  dans `refusees` sans bloquer les autres. Un rejet est un drapeau sans note (le serveur envoie
+  0) : l'accepter laisse les étoiles de la photo. La passe d'une proposition est celle donnée. Note
+  et drapeau d'avant (`note_avant`, `drapeau_avant`) sont lus par `Photos.decrireTout`. État :
+  toujours `a_verifier` depuis la 1.1.1 (en 1.1, `a_verifier` seulement si Claude doutait, sinon
+  `proposee`) ; `a_verifier = true` garde le doute de Claude. Réponse : `{propositions: [{photo,
+  fichier, note_avant, drapeau_avant, etat}], refusees: [{photo, raison}]}` ; le journal de la
+  liaison note « Notation : n propositions ». Avec `poser = true` (`propose_ratings` avec
+  `apply`, 1.1.1), les propositions rangées sont aussi posées, comme Accepter, « à vérifier »
+  comprises : `Notation.poser(liste, {depuisLightroom = false, confirme = true})` (voir plus bas).
+  La réponse ajoute `posees` (`photo`, `etat` — `acceptee` ou `changee` —, `note`, `drapeau`,
+  `erreur`, `remarques`), et `erreur_pose` quand une écriture a échoué (pause de la liaison,
+  accord en attente, garde-fou) : les propositions restent alors rangées, « à vérifier ».
+- `lire` (`photos?`) : `{propositions (sans l'uuid), perdues?}` ; les propositions dont la photo
   a disparu ou changé sont retirées et comptées dans `perdues`.
-- `seance` (`seance?`) : la séance active, ou celle donnée : `{id, titre, source, photos
-  (identifiants), passe, cree, comptes}`, pour que Claude sache quelles photos noter ; sans
-  séance, `id` vaut null, avec un message (« Séance de notation inconnue : … » pour une séance
-  donnée introuvable).
 
-`propose_ratings` envoie `proposer`, et `seance` avec `read_session` ; aucun outil n'envoie encore
-`lire` (les essais de la liaison l'emploient, et `--module`).
+`propose_ratings` envoie `proposer` ; aucun outil n'envoie `lire` (les essais de la liaison
+l'emploient, et `--module`).
 
 ### Poser une note (`Notation.poser`, `Bibliotheque.noter`) et l'annuler
 
-Seule la fenêtre écrit des notes proposées, à la demande de l'utilisateur (Accepter, Changer…,
-Tout accepter), par `Notation.poser(liste)`, dans une tâche : `liste = {{photo, note (0 à 5) ou
-nil, drapeau ('aucun', 'rejetee', 'retenue') ou nil, raison}}`.
+Une note proposée ne s'écrit qu'à la demande de l'utilisateur : Accepter et Changer… de la carte
+Note (et, en 1.1, Tout accepter de la Séance), et depuis la 1.1.1 sa demande à Claude
+(`propose_ratings` avec `apply`, commande `notation` avec `poser`). Toujours par
+`Notation.poser(liste, options)`, dans une tâche : `liste = {{photo, note (0 à 5) ou nil, drapeau
+('aucun', 'rejetee', 'retenue') ou nil, raison}}` ; `options` : `depuisLightroom` et `confirme`,
+vrais par défaut (un clic dans la fenêtre), `depuisLightroom` faux pour une pose demandée à Claude.
 
-- Sans note ni drapeau (Accepter) : la proposition telle quelle, sa note, et le drapeau Rejeter
-  pour un rejet (les étoiles restent) ; une note proposée sans rejet retire seulement un rejet
-  déjà posé (« aucun » d'une proposition veut dire « pas rejetée » : un drapeau Retenue de
+- Sans note ni drapeau (Accepter, `apply`) : la proposition telle quelle, sa note, et le drapeau
+  Rejeter pour un rejet (les étoiles restent) ; une note proposée sans rejet retire seulement un
+  rejet déjà posé (« aucun » d'une proposition veut dire « pas rejetée » : un drapeau Retenue de
   l'utilisateur reste).
 - Avec des valeurs (Changer…) : celles-là, 5 ★ compris ; nil laisse le champ tel quel.
 - Une photo dont l'uuid n'est plus celui de la proposition est refusée, sa proposition retirée.
 - Une écriture par lot de 500 photos (`Notation.LOT`) : `Bibliotheque.noter{notes, etape =
-  'notation', depuisLightroom = true, confirme = true}` ; une erreur arrête ce lot et les suivants.
-  Puis la proposition passe à `acceptee` (la photo porte ce que Claude proposait) ou `changee`
+  'notation', depuisLightroom, confirme, outil}` (`outil` = `propose_ratings` quand
+  `depuisLightroom` est faux) ; une erreur arrête ce lot et les suivants. Puis la
+  proposition passe à `acceptee` (la photo porte ce que Claude proposait) ou `changee`
   (`note_choisie`, `drapeau_choisi`), sauf si elle a été remplacée pendant l'écriture. Rend
   `{ok, erreur, resultats = {{photo, etat, note, drapeau, changements, remarques, erreur}}}`.
 
 `Bibliotheque.noter(params)` (`params.notes`, comme ci-dessus, plus `etape`, `depuisLightroom`,
-`confirme`) : une seule écriture (`Ecriture.ecrire`) pour toutes ses photos, 500 au plus ; une
-étape par photo (« Claude · notation », clé `Bibliotheque` de la mémoire), sa raison au journal
-(type `classement`) ; identifiants dédoublonnés : une photo donnée deux fois ne compte qu'une
-fois, avec sa dernière valeur, et sa remarque le dit (dans une écriture, Lightroom relit un champ
-du module avec sa valeur d'avant : la seconde étape effacerait la première). `depuisLightroom`
+`confirme`, et depuis la 1.1.1 `outil`, l'outil de Claude à rappeler après un accord,
+`set_metadata` sans lui) : une seule écriture (`Ecriture.ecrire`) pour toutes ses photos, 500 au
+plus ; une étape par photo (« Claude · notation », clé `Bibliotheque` de la mémoire), sa raison au
+journal (type `classement`) ; identifiants dédoublonnés : une photo donnée deux fois ne compte
+qu'une fois, avec sa dernière valeur, et sa remarque le dit (dans une écriture, Lightroom relit un
+champ du module avec sa valeur d'avant : la seconde étape effacerait la première). `depuisLightroom`
 lève la pause et l'accord dans Lightroom ; `confirme` passe « Proposer d'abord » et le plafond de
-photos par écriture (c'est l'utilisateur qui pose : le clic, ou la confirmation de Tout accepter,
-vaut accord explicite) ; les autres garde-fous des photos (`verifierProtection` : copies virtuelles
-seulement, libellé protégé, photos rejetées) restent.
+photos par écriture (c'est l'utilisateur qui pose : le clic, ou sa demande explicite à Claude,
+vaut accord) ; les autres garde-fous des photos (`verifierProtection` : copies virtuelles
+seulement, libellé protégé, photos rejetées) restent. Avec `apply`, `depuisLightroom` est faux :
+la pause de la liaison arrête la pose, et en mode « Proposer d'abord » avec « Confirmer dans
+Lightroom » (`accordDansLightroom`), l'accord de la fenêtre de suivi est demandé
+(`Ecriture.accordDansLightroom`) ; l'échec revient dans `erreur_pose`. Ce refus dit à Claude de
+rappeler `propose_ratings` avec `apply = true` une fois l'accord donné (`rappel` dans
+`Ecriture.lua` : `propose_ratings` n'a pas de `confirm`, `apply` y vaut accord ; pour les autres
+outils, « <outil> avec confirm = true ») ; dans un premier état de la 1.1.1, il disait
+`set_metadata`. `verifierProtection` reçoit le même outil.
 
 Annulation : comme un classement. ⌘Z défait l'écriture entière, une opération « Claude ·
-notation » comme toute écriture groupée (à constater pour Tout accepter) ; `undo_last` défait la
-dernière étape de chaque photo, une à une après Tout accepter. La note posée est celle de
-l'utilisateur : elle n'entre pas dans `avantClaude` (`memoriser` sans `fusionnerOriginal`), et
-`revert_to_original` comme « Revenir à « Avant Claude » » la laissent en place (une photo qui ne
-porte que des notes posées ainsi n'a pas de retouche de Claude à défaire). Une note que Claude
-aurait posée par `set_metadata` avant, sur la même photo, reste dans `avantClaude` : le retour à
-l'origine remet la note d'avant celle-là.
+notation » comme toute écriture groupée (à constater pour une pose de plusieurs photos avec
+`apply`) ; `undo_last` défait la dernière étape de chaque photo, une à une. La note posée est
+celle de l'utilisateur : elle n'entre pas dans `avantClaude` (`memoriser` sans
+`fusionnerOriginal`), et `revert_to_original` comme « Revenir à « Avant Claude » » la laissent en
+place (une photo qui ne porte que des notes posées ainsi n'a pas de retouche de Claude à défaire).
+Une note que Claude aurait posée par `set_metadata` avant, sur la même photo, reste dans
+`avantClaude` : le retour à l'origine remet la note d'avant celle-là.
 
 Le registre ne voit pas l'annulation : la note quitte le catalogue, la proposition restait
-`acceptee` (constaté le 20 octobre 2026, planche et fiche de la Séance). Les fenêtres le recalent
-donc sur ce qu'elles relisent : `Notation.recaler(releves, version)`, `releves = {{photo, note (0
-à 5), drapeau ('retenue', 'aucun', 'rejetee', ou pickStatus 1, 0, −1)}}`, appelé par la carte Note
-(`Fenetre.majPhoto`, la photo active) et par la planche de la Séance (ses 12 photos et celle de la
-fiche, en un seul appel). Une proposition `acceptee` dont la photo ne porte plus ce qu'elle
-proposait (sa note sans rejet ; pour un rejet, le drapeau Rejeter seul : les étoiles ne comptent
-pas, et un drapeau Retenue de l'utilisateur sur une note acceptée non plus), ou `changee` dont la
-note ou le drapeau choisis ne sont plus là (une autre note posée à la main compte aussi), repasse à
-`proposee` : `note_choisie`, `drapeau_choisi` et `decide_le` effacés ; `a_verifier` reste (une
-proposition dont Claude doutait se montre de nouveau « à vérifier »). Une note illisible, un
-drapeau inconnu, une photo sans proposition ou une proposition à décider ne changent rien.
-`version` est `Notation.version` lue avant les relevés : si le registre a changé depuis (une note
-posée entre-temps par une autre tâche, relevé périmé), rien n'est recalé, et la lecture suivante le
-fera ; de même pendant une écriture de `Notation.poser` (elle rend la main pendant l'écriture et la
-relecture des photos : une fenêtre a pu relever une photo avant que sa note y soit posée), dont la
-version ne change qu'à la fin. Ces deux conditions se vérifient après le chargement du registre,
-qui peut lui aussi rendre la main ; le reste du recalage ne la rend pas. Une seule écriture de
-`notation.json` pour tous les relevés (`changer('recalage')`, une ligne au journal de la
-liaison) ; aucune sans changement. Rend le nombre de propositions recalées. Seules les fenêtres
-recalent : sans fenêtre Claude ni Séance ouverte, la commande `notation` (`lire`) rend encore
-l'état gardé, jusqu'à la prochaine lecture d'une fenêtre.
+`acceptee` (constaté le 20 octobre 2026, planche et fiche de la Séance de la 1.1). La fenêtre le
+recale donc sur ce qu'elle relit : `Notation.recaler(releves, version)`, `releves = {{photo, note
+(0 à 5), drapeau ('retenue', 'aucun', 'rejetee', ou pickStatus 1, 0, −1)}}`, appelé par la carte
+Note (`Fenetre.majPhoto`, la photo active ; en 1.1, aussi par la planche de la Séance, en un seul
+appel pour ses 12 photos et celle de la fiche). Une proposition `acceptee` dont la photo ne porte
+plus ce qu'elle proposait (sa note sans rejet ; pour un rejet, le drapeau Rejeter seul : les
+étoiles ne comptent pas, et un drapeau Retenue de l'utilisateur sur une note acceptée non plus), ou
+`changee` dont la note ou le drapeau choisis ne sont plus là (une autre note posée à la main
+compte aussi), repasse à `a_verifier` depuis la 1.1.1 (à `proposee` en 1.1) : `note_choisie`,
+`drapeau_choisi` et `decide_le` effacés ; la carte Note la montre de nouveau « à vérifier », à
+accepter ou à changer. Une note illisible, un drapeau inconnu, une photo sans proposition ou une
+proposition à décider ne changent rien. `version` est `Notation.version` lue avant les relevés :
+si le registre a changé depuis (une note posée entre-temps par une autre tâche, relevé périmé),
+rien n'est recalé, et la lecture suivante le fera ; de même pendant une écriture de
+`Notation.poser` (elle rend la main pendant l'écriture et la relecture des photos : une fenêtre a
+pu relever une photo avant que sa note y soit posée), dont la version ne change qu'à la fin. Ces
+deux conditions se vérifient après le chargement du registre, qui peut lui aussi rendre la main ;
+le reste du recalage ne la rend pas. Une seule écriture de `notation.json` pour tous les relevés
+(`changer('recalage')`, une ligne au journal de la liaison) ; aucune sans changement. Rend le
+nombre de propositions recalées. Seule la fenêtre recale : sans fenêtre Claude ouverte, ou pour
+une photo qu'elle ne montre pas (une note posée avec `apply` puis défaite par `undo_last`, par
+exemple), la commande `notation` (`lire`) et l'évaluation de `view_photo` rendent encore l'état
+gardé, jusqu'à ce que la carte Note relise cette photo.
 
 ## Recette dans Lightroom
 
@@ -2200,11 +2410,20 @@ et position GPS relus puis défaits, photos jamais exportées, filtre posé puis
 dans sa mémoire, et le retour à l'origine de la fin l'en retirait ; elle y est maintenant remise
 (`remettreDansLaCollection`).
 Depuis la 1.1, après la planche contact, l'étape « note proposée (propose_ratings), photo
-inchangée » : 5 étoiles refusées (« jamais 5 étoiles »), puis 2 étoiles avec `to_check` rangées
-par la vraie commande `notation` (état « a_verifier », que donne `to_check`), et la séance ouverte
-lue par `read_session` ; le catalogue ne change pas. Elle laisse une
-proposition pour la photo d'essai dans `notation.json` (aucune commande ne retire une
-proposition).
+inchangée ; puis posée sur demande et annulée » (son nom depuis la 1.1.1) : 5 étoiles refusées
+(« jamais 5 étoiles »), puis 2 étoiles avec `to_check` rangées par la vraie commande `notation`
+(état « a_verifier », celui de toute proposition depuis la 1.1.1), la photo inchangée ; depuis la
+1.1.1, la même proposition avec `apply` : 2 ★ posées (`posees`, état « acceptee », note relue dans
+le classement), puis `undo_last`, après quoi la photo est de nouveau comme au départ (en 1.1,
+l'étape lisait la séance ouverte par `read_session`, retiré). Elle laisse une proposition pour la
+photo d'essai dans `notation.json` (aucune commande ne retire une proposition), « acceptee »
+jusqu'à ce que la carte Note relise cette photo, puis de nouveau « a_verifier »
+(`Notation.recaler`).
+Depuis la 1.1.1, avec `--x-t20`, l'étape « point de mise au point dessiné pour noter (view_photo,
+af_point) » : `view_photo` avec `af_point = true` à 1024 px ; une image, l'évaluation dite
+(`evaluation`), le chemin de l'original absent de la réponse ; un point lu (`point_af`) doit porter
+son carré (`carre`). Sans point lu (original absent, ou sans point AF), l'étape le dit sans
+échouer.
 Copie d'un JPEG : balance relative, tonalité automatique, masque IA. Copie au flash : pupilles
 par Vision, zooms avant et après la correction des yeux rouges, enregistrés pour l'œil. Avec un
 RAW et un JPEG : harmonisation en plan ; avec un RAW et la photo au flash : expositions d'après la
@@ -2219,7 +2438,8 @@ explorer un outil appliqué à la main (flou d'objectif, réduction du bruit…)
 `Bibliotheque.lua` ; outils `find_photos`, `set_metadata`, `list_keywords`, `manage_collections`,
 `create_virtual_copy` et `show_photo` (`Tools+Bibliotheque.swift`). Depuis la 1.1,
 `Bibliotheque.noter` pose aussi les notes que l'utilisateur accepte ou change dans la fenêtre
-Claude, sans commande du serveur (voir Notation).
+Claude, sans commande du serveur, et depuis la 1.1.1 celles qu'il demande à Claude de poser
+(`propose_ratings` avec `apply`, par la commande `notation`) ; voir Notation.
 
 Relevé dans Lightroom Classic 15.6 (commande `diagnostic`, 16 octobre 2026) : le catalogue offre
 `createVirtualCopies`, `createKeyword`, `getKeywords`, `createCollection`, `createCollectionSet`,
@@ -2434,13 +2654,18 @@ créé (si la version de Lightroom le permet et que l'option est cochée).
   protégé, photos rejetées ; plafond de photos par écriture (20 par défaut) sans `confirme`. Toutes
   les écritures sur des photos y passent, propositions comprises ; `annuler` et `revenir` non.
   Une livraison ne change pas les photos : elle n'y passe pas.
-- Notes (1.1, voir Notation) : `propose_ratings` et la commande `notation` n'écrivent rien dans
-  le catalogue (ni pause, ni accord, ni garde-fous) ; Claude ne propose jamais 5 ★ (refus du
-  serveur, puis du module). Les notes que l'utilisateur pose depuis la fenêtre
-  (`Bibliotheque.noter`, avec `depuisLightroom` et `confirme`) passent par les garde-fous des
-  photos (copies virtuelles seulement, libellé protégé, photos rejetées), sans la pause, ni
+- Notes (1.1, voir Notation) : sans `apply`, `propose_ratings` et la commande `notation`
+  n'écrivent rien dans le catalogue (ni pause, ni accord, ni garde-fous) ; Claude ne propose
+  jamais 5 ★ (refus du serveur, puis du module). Les notes que l'utilisateur pose depuis la
+  fenêtre (`Bibliotheque.noter`, avec `depuisLightroom` et `confirme`) passent par les garde-fous
+  des photos (copies virtuelles seulement, libellé protégé, photos rejetées), sans la pause, ni
   « Proposer d'abord », ni l'accord dans Lightroom, ni le plafond de photos par écriture (le clic
-  vaut accord explicite), et jamais pendant que Claude travaille dans la fenêtre.
+  vaut accord explicite), et jamais pendant que Claude travaille dans la fenêtre. Celles que
+  l'utilisateur demande à Claude de poser (1.1.1, `apply` : `confirme` sans `depuisLightroom`)
+  passent par les mêmes garde-fous des photos et s'arrêtent à la pause ; ni « Proposer d'abord »
+  ni le plafond de photos par écriture ne les retiennent (la demande explicite vaut accord), mais
+  en mode « Proposer d'abord », l'accord dans Lightroom, s'il est coché, est demandé ; le refus
+  dit alors de rappeler `propose_ratings` avec `apply = true`.
 - Version minimale de Lightroom (`DevelopSetting.since`) : le serveur lit la version une fois
   (`etat`) et refuse un réglage plus récent qu'elle (Texture 8.3 ; HDR, couleur ponctuelle, flou
   d'objectif 13.0), plutôt que d'écrire une clé que Lightroom ignorerait.

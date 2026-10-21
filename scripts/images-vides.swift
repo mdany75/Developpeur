@@ -1,9 +1,8 @@
 // images-vides.swift — dessine les images « aucun aperçu » de la fenêtre Claude, une par cadre
-// d'aperçu de Dispositions.TAILLES (carrés de la Conversation claire et du Panneau, cadres 3:2 de
-// l'Atelier : vide-270.png, vide-600x400.png), et celles de la Séance de notation (cases de 120,
-// fiche de 300), au fond des vignettes (2B2B2B), en PNG à 72 ppp :
+// d'aperçu de Dispositions.TAILLES (carrés de la Conversation claire et du Panneau, cadre 3:2 de
+// l'Atelier : vide-320.png, vide-720x480.png), au fond des vignettes (2B2B2B), en PNG à 72 ppp :
 // le SDK de Lightroom affiche une image à sa taille en points. Les essais de la fenêtre vérifient
-// qu'il y en a une pour chaque disposition dans chaque taille.
+// qu'il y en a une pour chaque disposition.
 //
 // Usage : swift scripts/images-vides.swift Lightroom/Developpeur.lrplugin
 
@@ -11,12 +10,11 @@ import AppKit
 
 let dossier = CommandLine.arguments.dropFirst().first ?? "."
 
-// Largeur et hauteur de chaque cadre ; un carré garde son nom d'origine (vide-230.png).
+// Largeur et hauteur de chaque cadre ; un carré garde son nom d'origine (vide-320.png).
 let cadres: [(Int, Int)] = [
-    (120, 120), (160, 160), (200, 200),     // Panneau
-    (230, 230), (270, 270), (320, 320),     // Conversation claire
-    (450, 300), (600, 400), (720, 480),     // Atelier
-    (300, 300),                             // fiche de la Séance de notation (ses cases : 120)
+    (200, 200),     // Panneau
+    (320, 320),     // Conversation claire
+    (720, 480),     // Atelier
 ]
 
 for (largeur, hauteur) in cadres {
@@ -31,15 +29,13 @@ for (largeur, hauteur) in cadres {
     NSRect(origin: .zero, size: taille).fill()
     let style = NSMutableParagraphStyle()
     style.alignment = .center
-    // Un petit cadre (moins de 200 points) : le texte court, en plus petit.
-    let petit = min(largeur, hauteur) < 200
     let attributs: [NSAttributedString.Key: Any] = [
-        .font: NSFont(name: "Helvetica Neue", size: petit ? 11 : 13) ?? NSFont.systemFont(ofSize: petit ? 11 : 13),
+        .font: NSFont(name: "Helvetica Neue", size: 13) ?? NSFont.systemFont(ofSize: 13),
         .foregroundColor: NSColor(white: 0.62, alpha: 1),
         .paragraphStyle: style,
     ]
-    let texte = (petit ? "Aucun aperçu\npour l'instant" : "Aucun aperçu pour l'instant\n\nLes images que Claude regarde\ns'affichent ici.") as NSString
-    let boite: CGFloat = petit ? 30 : 80
+    let texte = "Aucun aperçu pour l'instant\n\nLes images que Claude regarde\ns'affichent ici." as NSString
+    let boite: CGFloat = 80
     texte.draw(in: NSRect(x: 10, y: (CGFloat(hauteur) - boite) / 2, width: CGFloat(largeur) - 20, height: boite), withAttributes: attributs)
     NSGraphicsContext.restoreGraphicsState()
     guard let png = rep.representation(using: .png, properties: [:]) else { exit(1) }

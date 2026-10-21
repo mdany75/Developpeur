@@ -24,9 +24,8 @@ Session.SERVEUR = 'developpeur'
 
 local numero = 0
 
--- options : idConversation, claude, connecteur, modele, reprise (sessionID), travail (dossier de
--- travail de Claude Code), consignes (texte : Consignes.pour, celles d'une séance de notation en
--- plus pour une séance).
+-- options : idConversation, claude, connecteur, modele, effort, reprise (sessionID), travail
+-- (dossier de travail de Claude Code), consignes (texte : Consignes.texte).
 function Session.nouvelle(options)
     local s = setmetatable({}, Session)
     for cle, valeur in pairs(options) do
@@ -67,8 +66,7 @@ function Session:lancer(premiereLigne)
     Fichiers.creerDossier(self.travail)
     Fichiers.ecrire(Chemins.configMCP(), Session.configMCP(self.connecteur))
     -- Les consignes dans le dossier de la session : Claude Code les lit à son démarrage, un peu
-    -- après ce lancement en arrière-plan, et elles diffèrent d'une conversation de retouche à une
-    -- séance de notation ; un fichier commun pourrait être réécrit entre-temps.
+    -- après ce lancement en arrière-plan ; un fichier commun pourrait être réécrit entre-temps.
     local consignes = fichier(self, 'consignes.md')
     Fichiers.ecrire(consignes, self.consignes or '')
     Fichiers.ecrire(fichier(self, 'entree.jsonl'), premiereLigne .. '\n')
@@ -80,9 +78,10 @@ function Session:lancer(premiereLigne)
     local q = Texte.shell
     -- « $PPID » : le parent du shell lancé par LrTasks.execute, c'est-à-dire Lightroom.
     local commande = table.concat({ '/bin/sh', q(Chemins.relais()), q(self.dossier), q(self.claude), q(self.modele),
-        q(self.reprise or ''), q(self.travail), q(Chemins.configMCP()), q(consignes), '"$PPID"',
+        q(self.effort or ''), q(self.reprise or ''), q(self.travail), q(Chemins.configMCP()), q(consignes), '"$PPID"',
         '> /dev/null 2>&1 &' }, ' ')
-    Journal.noter("Lancement de Claude Code :", self.modele, self.reprise and ("reprise " .. self.reprise) or "nouvelle session", self.dossier)
+    Journal.noter("Lancement de Claude Code :", self.modele, "effort " .. tostring(self.effort or 'par défaut'),
+        self.reprise and ("reprise " .. self.reprise) or "nouvelle session", self.dossier)
     LrTasks.execute(commande)
 end
 

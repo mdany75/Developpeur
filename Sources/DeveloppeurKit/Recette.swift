@@ -837,8 +837,9 @@ public final class Recette {
         }
         // 1.1 : une note proposée se range dans le registre du module, hors du catalogue ; 5 étoiles
         // sont refusées avant d'atteindre Lightroom. À vérifier (to_check) : le plafond du tri ne gêne
-        // pas, et le module la range dans l'état « a_verifier ». read_session lit la séance ouverte.
-        try etape(photo, "note proposée (propose_ratings), photo inchangée") {
+        // pas, et le module la range dans l'état « a_verifier ». 1.1.1 : avec apply (« note ces
+        // photos »), la note est posée, une étape que undo_last défait.
+        try etape(photo, "note proposée (propose_ratings), photo inchangée ; puis posée sur demande et annulée") {
             let criteres: JSONValue = ["impact": "Recette.", "qualities": "Recette.", "technical_floor": "Recette."]
             let cinq = tools.call(name: "propose_ratings", arguments: ["ratings": [["photo_id": photoID, "rating": 5, "criteria": criteres,
                                                                                     "reason": "Recette automatisée du module."]]])
@@ -847,10 +848,15 @@ public final class Recette {
                                                                            "reason": "Recette automatisée du module."]]])
             let proposee = reponse["propositions"]?.array?.first
             try verifier(proposee?["photo"]?.int == id && proposee?["etat"]?.string == "a_verifier", "proposition non rangée : \(JSONCoding.line(reponse))")
-            let (seance, _) = try appel("propose_ratings", ["read_session": true])
-            try verifier(seance["id"] != nil, "séance ouverte illisible : \(JSONCoding.line(seance))")
             try verifierEgal(try etat(id), depart)
-            return "rangée pour \(proposee?["fichier"]?.string ?? "?") (séance \(reponse["seance"]?.string ?? "aucune")), à vérifier ; séance ouverte : \(seance["titre"]?.string ?? "aucune") ; rien n'a changé sur la photo"
+            let (pose, _) = try appel("propose_ratings", ["apply": true, "ratings": [["photo_id": photoID, "rating": 2, "to_check": true, "criteria": criteres,
+                                                                                    "reason": "Recette automatisée du module."]]])
+            let posee = pose["posees"]?.array?.first
+            let note = try etat(id).classement["note"]?.int
+            _ = try appel("undo_last", ["photo_ids": [photoID]])
+            try verifierEgal(try etat(id), depart)
+            try verifier(posee?["etat"]?.string == "acceptee" && note == 2, "note pas posée : \(JSONCoding.line(pose))")
+            return "rangée pour \(proposee?["fichier"]?.string ?? "?"), à vérifier, rien de changé ; avec apply, 2 ★ posées, puis annulées"
         }
         // Constaté le 17 octobre 2026 : filtre « Reflections » (FilterID 3), intensité dans BlendParams ;
         // changeReflectionRemovalAmount ne change pas le filtre rangé.
@@ -1212,6 +1218,20 @@ public final class Recette {
             try verifierEgal(try etat(id), depart)
             try verifier(nom.lowercased().hasPrefix("camera pro neg") && nom.contains("Hi"), "profil relu « \(nom) »")
             return "« \(nom) », puis annulé"
+        }
+        // 1.1.1 : le point de mise au point lu dans le RAF, dessiné sur l'aperçu pour noter, et
+        // l'évaluation gardée dite par view_photo.
+        try etape(photo, "point de mise au point dessiné pour noter (view_photo, af_point)") {
+            let (info, images) = try appel("view_photo", ["photo_id": photoID, "af_point": true, "size": 1024])
+            try verifier(!images.isEmpty, "pas d'image")
+            try verifier(info["evaluation"]?.string?.isEmpty == false, "évaluation non dite")
+            try verifier(info["photo"]?["chemin_original"] == nil, "le chemin de l'original est allé à Claude")
+            guard let point = info["point_af"], let x = point["x"]?.double, let y = point["y"]?.double else {
+                return "aucun point lu (original absent ou sans point AF) ; évaluation : \(info["evaluation"]?.string ?? "?")"
+            }
+            try verifier(point["carre"]?.string != nil, "carré non dessiné : \(JSONCoding.line(point))")
+            return String(format: "point %.2f × %.2f, carré %@ ; évaluation : %@", x, y, point["carre"]?.string ?? "?",
+                          info["evaluation"]?.string ?? "?")
         }
         try etape(photo, "ETERNA refusé, profil d'avant remis") {
             let (reponse, _) = try appel("apply_settings", ["photo_ids": [photoID], "profile": "Camera ETERNA/Cinema", "step_name": "recette",

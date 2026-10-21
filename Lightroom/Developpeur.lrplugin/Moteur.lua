@@ -1,10 +1,10 @@
 -- Moteur.lua : les conversations, celle qui est ouverte dans la fenêtre Claude, et le processus
 -- Claude Code qui répond. Indépendant des fenêtres : si on les ferme pendant que Claude travaille,
 -- le travail continue et se retrouve à la réouverture. Les fenêtres s'abonnent par Moteur.abonner.
--- Une séance de notation (fenêtre « Claude · Séance de notation ») a sa propre conversation
--- (genre 'notation', Moteur.nouvelleSeance), jamais ouverte comme courante. Un seul processus et
--- une seule demande à la fois : passer d'une conversation à l'autre relance Claude Code en
--- reprenant la session de la conversation visée (`--resume`).
+-- Un seul processus et une seule demande à la fois : passer d'une conversation à l'autre relance
+-- Claude Code en reprenant la session de la conversation (`--resume`). Les conversations des
+-- anciennes séances de notation (genre 'notation', fenêtre retirée le 20 octobre 2026) restent sur
+-- le disque mais ne s'ouvrent plus.
 -- Les fonctions qui attendent (envoyer, boucle, charger) s'appellent depuis une tâche.
 
 local LrTasks = import 'LrTasks'
@@ -23,12 +23,15 @@ local Texte = require 'Texte'
 
 local Moteur = {
     conversations = {},
-    -- La conversation ouverte dans la fenêtre Claude (jamais une séance de notation).
+    -- La conversation ouverte dans la fenêtre Claude (jamais une ancienne séance de notation).
     courante = nil,
-    -- La conversation de la demande en cours (la courante ou une séance), nil sans demande.
+    -- La conversation de la demande en cours, nil sans demande.
     enCours = nil,
     session = nil,
     travaille = false,
+    -- Quand Claude a fini sa dernière demande (os.time, 0 : jamais), fenêtre ouverte ou fermée : ce
+    -- qu'il a changé dans la sélection n'ouvre pas de nouvelle conversation (Fenetre.suivreSelection).
+    finTravail = 0,
     limites = nil,
     -- Fenêtres abonnées aux changements (nom → fonction).
     observateurs = {},
@@ -77,8 +80,7 @@ local function enregistrer(c)
     Moteur.enregistreLe = os.time()
 end
 
--- La plus récente des conversations de retouche (les séances de notation ne s'ouvrent pas dans
--- la fenêtre Claude).
+-- La plus récente des conversations (pas celles des anciennes séances de notation).
 local function plusRecente()
     for _, c in ipairs(Moteur.conversations) do
         if not Conversation.estSeance(c) then
@@ -99,7 +101,7 @@ function Moteur.charger()
     Moteur.courante = plusRecente() or Conversation.nouvelle()
 end
 
--- Une conversation par son identifiant (séances de notation comprises), nil sinon.
+-- Une conversation par son identifiant (anciennes séances de notation comprises), nil sinon.
 function Moteur.trouver(id)
     for _, c in ipairs(Moteur.conversations) do
         if c.id == id then
@@ -112,36 +114,6 @@ function Moteur.trouver(id)
     return nil
 end
 
--- La conversation d'une séance de notation, sans changer la conversation ouverte de la fenêtre
--- Claude. options : titre, seance (identifiant de la séance dans Notation.lua : la conversation
--- déjà faite pour elle est reprise, après une relance de Lightroom par exemple). Elle est rangée
--- avec les autres, et sur le disque à sa première demande. Rend la conversation.
-function Moteur.nouvelleSeance(options)
-    options = options or {}
-    Moteur.charger()
-    if options.seance ~= nil then
-        for _, c in ipairs(Moteur.conversations) do
-            if Conversation.estSeance(c) and tostring(c.seance) == tostring(options.seance) then
-                return c
-            end
-        end
-    end
-    local c = Conversation.nouvelleSeance(options.titre, options.seance)
-    table.insert(Moteur.conversations, 1, c)
-    return c
-end
-
--- La raison d'un refus pendant que Claude travaille, et où, si c'est ailleurs que dans la
--- conversation visée.
-local function raisonOccupe(visee)
-    local ailleurs = Moteur.enCours ~= nil and Moteur.enCours ~= visee
-    if ailleurs and Conversation.estSeance(Moteur.enCours) then
-        return "Claude travaille dans la séance de notation : attendez la fin, ou cliquez Arrêter."
-    elseif ailleurs then
-        return "Claude travaille dans la fenêtre Claude : attendez la fin, ou cliquez Arrêter."
-    end
-    return "Claude travaille encore : attendez la fin, ou cliquez Arrêter."
-end
 
 function Moteur.arreterSession()
     if Moteur.session then
@@ -150,15 +122,15 @@ function Moteur.arreterSession()
     end
 end
 
--- Ouvre une autre conversation (refusé pendant que Claude travaille, et pour une séance de
--- notation, qui se montre dans sa propre fenêtre).
+-- Ouvre une autre conversation (refusé pendant que Claude travaille, et pour une ancienne séance
+-- de notation).
 function Moteur.ouvrir(id)
     if Moteur.travaille then
         return false, "Claude travaille : attendez la fin, ou cliquez Arrêter."
     end
     local c = Moteur.trouver(id)
     if Conversation.estSeance(c) then
-        return false, "Cette conversation est celle d'une séance de notation : elle se montre dans la fenêtre Séance de notation."
+        return false, "Cette conversation est celle d'une ancienne séance de notation : elle ne s'ouvre plus."
     end
     if not c or c == Moteur.courante then
         return c ~= nil
@@ -203,10 +175,6 @@ function Moteur.supprimer(id)
     if Moteur.travaille and c == (Moteur.enCours or Moteur.courante) then
         return false, "Claude travaille dans cette conversation."
     end
-    -- Supprimer la conversation ouverte ferme Claude Code : pas pendant une demande ailleurs.
-    if Moteur.travaille and c == Moteur.courante then
-        return false, raisonOccupe(c)
-    end
     for i, x in ipairs(Moteur.conversations) do
         if x == c then
             table.remove(Moteur.conversations, i)
@@ -225,21 +193,26 @@ function Moteur.supprimer(id)
     return true
 end
 
--- Le modèle choisi vaut pour la demande suivante (Claude Code est relancé avec, en reprenant la
--- session).
-function Moteur.changerModele(modele)
+-- Le modèle et l'effort d'une demande : ceux donnés, sinon ceux des préférences (Gestionnaire de
+-- modules externes) ; une valeur inconnue (préférences d'une autre version, faute de frappe)
+-- retombe sur celle par défaut. Un autre modèle ou un autre effort que ceux du processus ouvert le
+-- relance à la demande suivante, en reprenant la session (Moteur.envoyer).
+function Moteur.modeleEtEffort(options)
     local prefs = Chemins.prefs()
-    prefs.modele = modele
-    if Moteur.session and not Moteur.travaille and Moteur.session.modele ~= modele then
-        Moteur.arreterSession()
+    local modele = options and options.modele or prefs.modele
+    local effort = options and options.effort or prefs.effort
+    if not Consignes.modele(modele) then
+        modele = Chemins.defauts.modele
     end
+    if not Consignes.effort(effort) then
+        effort = Chemins.defauts.effort
+    end
+    return modele, effort
 end
 
--- Envoie une demande dans la conversation ouverte. options : modele, jointes (chemins d'images
--- sur le disque), style (valeur d'un style de Consignes.styles), conversation (une autre
--- conversation, ou son identifiant : celle d'une séance de notation ; la conversation ouverte ne
--- change pas), contexte (texte qui remplace la ligne « [Lightroom : …] » de la photo active).
--- Rend true, ou false et la raison.
+-- Envoie une demande dans la conversation ouverte. options : modele, effort (sinon ceux des
+-- préférences), jointes (chemins d'images sur le disque), style (valeur d'un style de
+-- Consignes.styles). Rend true, ou false et la raison.
 function Moteur.envoyer(texte, options)
     options = options or {}
     texte = Texte.nettoyer(texte)
@@ -247,15 +220,8 @@ function Moteur.envoyer(texte, options)
     if texte == '' and #jointes == 0 then
         return false, "Écrivez une demande avant d'envoyer."
     end
-    local visee = options.conversation
-    if visee ~= nil and type(visee) ~= 'table' then
-        visee = Moteur.trouver(visee)
-        if not visee then
-            return false, "Cette conversation est introuvable."
-        end
-    end
     if Moteur.travaille then
-        return false, raisonOccupe(visee or Moteur.courante)
+        return false, "Claude travaille encore : attendez la fin, ou cliquez Arrêter."
     end
     local okBudget, niveau = pcall(Consommation.niveau)
     if okBudget and niveau == 'arret' then
@@ -264,11 +230,8 @@ function Moteur.envoyer(texte, options)
     end
     Moteur.travaille = true
     Moteur.interruptionLe = nil
-    local c = visee
-    if not c then
-        c = Moteur.courante or Conversation.nouvelle()
-        Moteur.courante = c
-    end
+    local c = Moteur.courante or Conversation.nouvelle()
+    Moteur.courante = c
     Moteur.enCours = c
 
     local ok, erreur = LrTasks.pcall(function()
@@ -286,10 +249,7 @@ function Moteur.envoyer(texte, options)
             texte = #jointes > 1 and "Regarde les photos jointes." or "Regarde la photo jointe."
         end
         local style = Consignes.style(options.style)
-        local contexte = options.contexte
-        if contexte == nil then
-            contexte = Lightroom.contexte(Lightroom.photos())
-        end
+        local contexte = Lightroom.contexte(Lightroom.photos())
         local message = Conversation.messagePourClaude(c, texte, contexte, Consignes.ligneStyle(options.style))
         Conversation.ajouterDemande(c, texte, os.time(), chemins, style and style.definition and style.title or nil)
         if not dansListe(c) then
@@ -297,14 +257,16 @@ function Moteur.envoyer(texte, options)
         end
         trier()
 
-        local modele = options.modele or prefs.modele
-        if Moteur.session and (Moteur.session.conversation ~= c or Moteur.session.modele ~= modele) then
+        local modele, effort = Moteur.modeleEtEffort(options)
+        if Moteur.session and (Moteur.session.conversation ~= c or Moteur.session.modele ~= modele
+            or Moteur.session.effort ~= effort) then
             Moteur.arreterSession()
         end
         if not Moteur.session then
             Moteur.session = Session.nouvelle({
                 idConversation = c.id, claude = prefs.cheminClaude, connecteur = prefs.cheminConnecteur,
-                modele = modele, reprise = c.sessionID, travail = Chemins.atelier(), consignes = Consignes.pour(c),
+                modele = modele, effort = effort, reprise = c.sessionID, travail = Chemins.atelier(),
+                consignes = Consignes.texte,
             })
             Moteur.session.conversation = c
         end
@@ -384,6 +346,7 @@ function Moteur.traiter(c, ev)
         Moteur.compter(c, ev)
         if Moteur.session and Moteur.session.conversation == c then
             Moteur.travaille = false
+            Moteur.finTravail = os.time()
             Moteur.enCours = nil
             Moteur.interruptionLe = nil
         end
@@ -413,6 +376,7 @@ function Moteur.processusFini(s, code, erreurs)
     end
     if Moteur.travaille and c then
         Moteur.travaille = false
+        Moteur.finTravail = os.time()
         Moteur.enCours = nil
         Conversation.appliquer(c, { genre = 'fin', reussie = true, interrompue = false, session = '' }, os.time())
         if Moteur.interruptionLe then
@@ -505,7 +469,7 @@ function Moteur.texteTravail(tic, vue)
         vue = Moteur.courante
     end
     if Moteur.enCours and Moteur.enCours ~= vue then
-        morceaux[#morceaux + 1] = Conversation.estSeance(Moteur.enCours) and "dans la séance de notation" or "dans la fenêtre Claude"
+        morceaux[#morceaux + 1] = "dans une autre conversation"
     end
     local c = Moteur.enCours or Moteur.courante
     local n = c and Conversation.outilsFaits(c) or 0

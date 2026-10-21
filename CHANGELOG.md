@@ -1,5 +1,119 @@
 # Changements
 
+## 1.1.1 — 2026-10-20
+
+Une fenêtre Claude plus légère : le modèle, l'effort et la disposition se choisissent dans le
+Gestionnaire de modules externes, une autre photo commence une nouvelle conversation, Claude note
+d'abord chaque photo qu'il traite (sa note arrive « à vérifier », vous l'acceptez ou la changez),
+et la Séance de notation est retirée.
+
+### Ajouté
+- Fable, le modèle le plus capable, avec Opus (par défaut), Sonnet et Haiku.
+- L'effort de Claude : maximal (par défaut), très élevé, élevé, moyen ou faible, le même pour les
+  quatre modèles. Modèle et effort se choisissent dans Fichier › Gestionnaire de modules externes ›
+  Développeur, section Fenêtre Claude ; un autre choix vaut pour la demande suivante, et la
+  conversation continue.
+- Une nouvelle conversation quand vous choisissez une autre photo active ou une autre sélection,
+  si la conversation montrée a déjà des messages et parlait d'autres photos. Une sélection qui
+  change pendant que Claude travaille, ou jusqu'à quatre secondes après (photo montrée par Claude,
+  tri), devient celle de la conversation, et une fenêtre fermée pendant qu'il travaillait retrouve
+  sa conversation à la réouverture ; une conversation vide reste ; une photo choisie fenêtre
+  fermée compte aussi, à la réouverture. Case « Autre photo » du Gestionnaire de modules externes,
+  cochée par défaut.
+- Dans la fenêtre Claude, Claude note d'abord toute photo qu'il traite, avant d'y toucher : son
+  plancher technique (`cull_photos`), la photo avec son point de mise au point (`view_photo`), puis
+  sa note selon le standard (`propose_ratings`). Sa note arrive « à vérifier » dans la carte Note :
+  vous l'acceptez ou la changez. Une photo déjà évaluée ne se renote pas, sauf si vous le
+  demandez : `view_photo` dit où en est son évaluation (« pas encore évaluée », « 3 ★ proposée par
+  Claude, à vérifier », « acceptée par l'utilisateur : 3 ★ »…).
+- Le point de mise au point dans `view_photo`, pour les fichiers Fujifilm (lu dans l'original,
+  comme au tri), sur l'aperçu entier (pas un zoom ni un avant/après) : sa place dans l'image, la
+  netteté autour, et si l'appareil a signalé la mise au point manquée. Pour noter, Claude le fait
+  dessiner sur l'image : un carré vert, rouge si l'appareil a signalé la mise au point manquée ;
+  les mesures sont prises avant le carré. Case « Mise au point » du Gestionnaire de modules
+  externes (section Liaison avec Claude, décochée par défaut, « Montrer le carré de mise au point
+  (Fujifilm) sur chaque aperçu ») : le carré sur chaque aperçu.
+- À l'ouverture de la fenêtre Claude (menu Ouvrir la fenêtre Claude ou ⌃⌥C, même déjà ouverte),
+  l'aperçu montre la photo sélectionnée dans Lightroom (« Photo active · … »), sa vignette tirée
+  du cache d'aperçus de Lightroom ; de même quand vous choisissez une autre photo. Une image que
+  Claude regarde ensuite prend sa place ; ◀ revient aux images de la conversation, ▶ depuis la
+  dernière revient à la photo active, et Agrandir la montre en grand.
+- ▲ ▼ à droite des boutons de la carte Note (Accepter, Changer…) et de la Proposition (Accepter,
+  Refuser, Ajuster…) : un texte plus long que la carte défile page par page ; un nouveau texte
+  revient à la première page.
+- Claude pose les notes quand vous le lui demandez (« note ces photos », « pose les notes ») :
+  `propose_ratings` avec `apply` les range et les pose comme Accepter, une étape « Claude ·
+  notation » par photo, que `undo_last` défait. La pause de la liaison l'arrête ; les garde-fous
+  des photos (copies virtuelles seulement, libellé protégé, photos rejetées) restent ; en mode
+  « Proposer d'abord » avec l'accord donné dans Lightroom (case Accord), la pose attend votre
+  Accepter dans la fenêtre de suivi, puis Claude la refait. Le fil dit « Notes à poser » pendant
+  l'appel, puis « Notes posées » et « posée » pour chaque photo, ou « Notes non posées » avec la
+  raison sur chaque ligne.
+
+### Changé
+- La barre de titre de la fenêtre Claude dit « Développeur ». Les autres fenêtres gardent
+  « Claude · … », et le menu reste Ouvrir la fenêtre Claude (⌃⌥C).
+- Le modèle ne se choisit plus dans la fenêtre, mais dans le Gestionnaire de modules externes,
+  avec l'effort.
+- La disposition de la fenêtre : dans le Gestionnaire de modules externes seulement. Une fenêtre
+  ouverte se rouvre d'elle-même dans les deux secondes quand elle change, la demande tapée gardée
+  (changée dans le Gestionnaire, elle attendait jusqu'ici la prochaine ouverture).
+- Conversation claire : à droite, de haut en bas, les boutons Note (par défaut) et Proposition,
+  l'aperçu, toujours montré, avec ◀ ▶ et Agrandir dessous, puis la carte Note ou la
+  Proposition ; en bas, Publication… et Consommation…, au-dessus des versions. Une proposition qui
+  arrive montre la Proposition, une note proposée pour la photo active la carte Note ; un clic sur
+  une image du fil la montre dans l'aperçu, sans changer d'onglet. Le fil a 42 lignes (au lieu de
+  30 dans la taille moyenne de la 1.1, celle par défaut, ou 40 dans la grande), et Envoyer est
+  seul à droite du champ de demande.
+- Atelier : Publication… et Consommation… en bas de la colonne Note, au-dessus des versions ;
+  Envoyer seul sous le champ, à droite.
+- Panneau : Envoyer seul sous le champ, à droite ; en bas, Publication… et Consommation…, puis les
+  versions.
+- Le menu Style, sans étiquette, est au bout de la dernière rangée d'invites, dans les trois
+  dispositions. Dessous, sur sa propre ligne dans chacune, le bandeau montre un message, l'aide
+  d'un voyant rouge ou les photos jointes, sinon rien.
+- Toute note que Claude propose arrive « à vérifier » (en rouge dans la carte Note), plus
+  seulement les cas douteux. La carte Note n'a plus que Accepter et Changer…, et montre un seul
+  texte : les critères, le plafond mesuré, puis la raison. Après une annulation (`undo_last`, ⌘Z),
+  une note acceptée ou changée qui n'est plus posée redevient « à vérifier » (elle redevenait à
+  décider).
+- 5 ★ : Claude ne les propose jamais de lui-même ; si vous lui en demandez, il les pose
+  (`set_metadata`).
+- Claude fait ce que vous lui demandez clairement : il ne refuse que ce que ses outils ne savent
+  pas faire, ou ce que bloquent les réglages du module (« Proposer d'abord », garde-fous), et il le
+  dit.
+- `propose_ratings` s'appelle « Noter des photos » et n'est plus en lecture seule (avec `apply`, il
+  écrit dans le catalogue) ; ses propositions arrivent « à vérifier ». Sans précision, l'invite
+  `noter` vise la sélection.
+
+### Retiré
+- La Séance de notation : sa fenêtre, l'entrée Séance de notation… des menus Fichier et
+  Bibliothèque (Module externe - Extras), et les boutons Séance… de la carte Note et de l'Atelier.
+  Les séances rangées dans `notation.json` disparaissent à la première lecture du fichier, les
+  notes proposées restent ; les conversations des anciennes séances restent sur le disque, mais
+  ne se montrent ni ne s'ouvrent plus.
+- Les boutons Noter (invites de la Conversation claire, carte Note, barre de l'Atelier) et
+  À vérifier (carte Note) : Claude note de lui-même chaque photo qu'il traite, et chaque note
+  arrive déjà « à vérifier ». L'onglet Noter du Panneau reste : c'est la carte Note.
+- Le choix de la taille de la fenêtre (Petite, Moyenne, Grande) dans le Gestionnaire de modules
+  externes : la fenêtre a toujours la grande taille, et un cadre déjà enregistré en grande sert
+  encore.
+- Le menu Disposition de la fenêtre Claude.
+- L'onglet Aperçu de la Conversation claire et son titre « Ce que Claude voit » : l'aperçu est
+  toujours montré.
+- L'étiquette « Style » du menu Style, et le rappel « ajouté à chaque demande, invites
+  comprises » du bandeau (l'infobulle du menu le dit).
+- Les paramètres `session` et `read_session` de `propose_ratings`, et le champ `seance` de sa
+  réponse (`pass` reste : la passe du standard).
+
+### Corrigé
+- Le texte de la carte Note et du fil ne coupe plus une ligne avant une ponctuation haute : une
+  ligne ne commence plus par « ; », « : », « ! », « ? » ou « », et « « » reste avec le mot qui le
+  suit.
+- Au tri (`cull_photos`), quand l'ouverture d'un original attend (demande d'autorisation de macOS
+  pour le volume), les points de mise au point des photos suivantes ne sont plus sautés jusqu'à
+  la fin du tri : la lecture reprend dès que cette ouverture aboutit.
+
 ## 1.1 — 2026-10-20
 
 Le nouvel écran et la notation : la fenêtre Claude en trois dispositions, et des notes que Claude
