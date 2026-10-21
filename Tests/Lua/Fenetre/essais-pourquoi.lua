@@ -639,7 +639,7 @@ essai("Fenêtre : « Pourquoi ? » d'une étape ouvre l'onglet Aperçu ; l'aprè
         Fenetre.nouvelle()
         Fenetre.rafraichir()
         egal(nil, Fenetre.etape)
-        egal('', p.etapeTitre)
+        egal(Fenetre.TITRE_ETAPE, p.etapeTitre, 'le titre de la carte sans étape')
         egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')))
         egal(false, p.etapeADetail)
         vrai(not p.legendeApercu:find('Étape', 1, true), "l'aperçu d'avant : " .. p.legendeApercu)

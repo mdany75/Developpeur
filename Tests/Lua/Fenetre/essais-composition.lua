@@ -80,6 +80,16 @@ local function bouton(contenu, p, titre, cleActif)
     error('bouton introuvable : ' .. tostring(titre), 2)
 end
 
+-- Le calque d'Accepter de la carte Proposition (un bouton bleu en image, fenêtre B, lot B5).
+local function calqueAccepter(contenu)
+    for _, v in ipairs(vues(contenu)) do
+        if v.genre == 'static_text' and v.args.tooltip == "Appliquer la proposition : la photo ne change qu'à ce clic" then
+            return v
+        end
+    end
+    error("calque d'Accepter introuvable", 2)
+end
+
 -- Lance les tâches parties depuis `depuis` (et celles qu'elles lancent), dans l'ordre.
 local function lancerTaches(depuis)
     local i = depuis + 1
@@ -525,7 +535,7 @@ essai("Fenêtre : la proposition de cadre arrive dans la carte (une bascule), co
         local lignes = 0
         for l in (p.propositionTexte .. '\n'):gmatch('([^\n]*)\n') do
             lignes = lignes + 1
-            vrai(Fil.largeur(l, 'texte') <= T.largeurProposition - Fil.MARGE, 'ligne trop large : ' .. l)
+            vrai(Fil.largeur(l, 'texte12') <= T.largeurProposition - Fil.MARGE, 'ligne trop large : ' .. l)
         end
         vrai(lignes <= T.propLignes, 'une page au plus')
         egal(false, p.propositionMonte)
@@ -846,10 +856,11 @@ essai("Ajuster… : les ajustements du cadre pour une proposition de recadrage, 
         -- Accepter applique la proposition montrée, par la réponse habituelle.
         local cadre = appelPropose(c, 'p3', entreeCadre(), { REPONSE_CADRE }, 'p3.jpg')
         Fenetre.rafraichir()
-        local accepter = bouton(args.contents, p, 'Accepter', 'enAttente')
+        -- Accepter : un bouton bleu en image (fenêtre B, lot B5), cliqué par son calque.
+        local accepter = calqueAccepter(args.contents)
         contient(accepter.args.tooltip, "la photo ne change qu'à ce clic")
         local avant = #S.taches
-        accepter.args.action()
+        S.cliquer(accepter)
         lancerTaches(avant)
         egal(2, #envoyes)
         egal(Consignes.accepter, envoyes[2].texte)

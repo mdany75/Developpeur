@@ -294,10 +294,11 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
     ouvrirFenetre(function(p, args)
         Fenetre.majPhoto()
         Fenetre.rafraichirNotation()
-        egal('Claude propose : ★★☆☆☆', p.notationProposee)
+        egal(2, p.noteClaude, 'Claude propose 2 ★')
         egal('rouge', p.notationCouleur)
-        egal('à vérifier · passe 1', p.notationEtat)
-        contient(p.notationTexte, 'Plafond mesuré : 2 ★')
+        egal('<EM>Passe 1 · à vérifier.</EM> Presque noire.', p.nt1)
+        egal('<EM>Plafond 2 ★</EM> : mesuré au tri, pas plus.', p.plafondTexte)
+        egal('Accepter 2 ★', p.titreAccepterNote)
         egal(true, p.peutAccepterNote)
         -- Claude travaille : rien ne s'écrit depuis la carte.
         Moteur.travaille = true
@@ -307,16 +308,15 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
         egal(avant, #ecritures, 'rien posé pendant que Claude travaille')
         Moteur.travaille = false
         Fenetre.rafraichirNotation()
-        -- Accepter : dans une tâche, la proposition telle quelle.
+        -- Accepter (le calque du bouton bleu de la carte Note, fenêtre B) : dans une tâche, la
+        -- proposition telle quelle.
         local accepter
         parcourir(args.contents, function(v)
-            -- Celui de la carte Note (la proposition de retouche a aussi le sien).
-            if S.BOUTONS[v.genre] and v.args.title == 'Accepter' and type(v.args.enabled) == 'table'
-                and v.args.enabled.key == 'peutAccepterNote' then
+            if v.genre == 'static_text' and v.args.tooltip == "Poser la note proposée dans Lightroom (sans Claude ni quota)" then
                 accepter = v
             end
         end)
-        accepter.args.action()
+        S.cliquer(accepter)
         S.taches[#S.taches]()
         egal(avant + 1, #ecritures)
         local params = ecritures[#ecritures]
@@ -328,7 +328,8 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
         Fenetre.majPhoto()
         Fenetre.rafraichirNotation()
         egal('coche', p.notationCouleur)
-        egal('Note posée : ★★☆☆☆', p.notationPosee)
+        egal(2, p.noteCatalogue, 'la note posée, en étoiles')
+        egal('2 ★ dans le catalogue', p.notePoseeSous)
     end)
     sansErreur()
 end)
@@ -371,9 +372,10 @@ essai('Après undo_last : la carte Note relit la note réelle (constaté), une �
         Fenetre.majPhoto()
         egal('a_verifier', Notation.proposition(2003).etat, 'la carte recale le registre')
         egal(nil, Notation.proposition(2003).note_choisie)
-        egal('Note posée : aucune, pas encore jugée', p.notationPosee)
+        egal('Pas encore jugée', p.notePoseeTitre)
+        egal(0, p.noteCatalogue)
         egal('rouge', p.notationCouleur, 'de nouveau à vérifier')
-        egal('à vérifier · passe 1', p.notationEtat)
+        egal('<EM>Passe 1 · à vérifier.</EM> Presque noire.', p.nt1)
         egal(true, p.peutAccepterNote, 'de nouveau à accepter')
         Fenetre.majPhoto()
     end)
@@ -581,6 +583,60 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
     Stockage.enregistrer(c)
     egal(id, Stockage.lire(c.id).elements[element].etapes[1].id)
     egal(0, Etapes.version, 'rien rangé par la fenêtre')
+    sansErreur()
+end)
+
+-- Les drapeaux de la carte Note (fenêtre B, lot B5), par le vrai registre : Retenir, ou retirer un
+-- drapeau, ne décide rien de la note que Claude propose (Notation.poser la dirait sinon « changée »,
+-- la note du catalogue prise pour celle de Dany) ; Rejeter la change ; sur un rejet proposé, tout
+-- drapeau décide.
+essai('Carte Note : Retenir ne décide rien de la proposition de Claude ; Rejeter la change ; un rejet proposé se décide par le drapeau', function()
+    PHOTOS[2006].note, PHOTOS[2006].drapeau = 0, 0
+    local function proposer(note, drapeau)
+        Notation.commande(Json.decode(Json.encode({ action = 'proposer', passe = 2, propositions = {
+            { photo = 2006, note = note, drapeau = drapeau, a_verifier = true, raison = "Tient seule.",
+                criteres = { impact = "Moyen.", qualites = "Bonnes.", plancher = "Nette (44)." } } } })))
+    end
+    proposer(3, 'aucun')
+    S.photoActive = PHOTOS[2006]
+    S.selection = { PHOTOS[2006] }
+    Moteur.courante = Conversation.nouvelle()
+    ouvrirFenetre(function(p)
+        local function drapeau(d)
+            Fenetre.majPhoto()
+            Fenetre.rafraichirNotation()
+            local avant = #S.taches
+            vrai(Fenetre.poserDrapeau(d), 'le drapeau part')
+            for i = avant + 1, #S.taches do
+                S.taches[i]()
+            end
+        end
+        drapeau('retenue')
+        egal(1, PHOTOS[2006].drapeau, 'retenue dans le catalogue')
+        egal(0, PHOTOS[2006].note, 'les étoiles restent')
+        egal('a_verifier', Notation.proposition(2006).etat, 'Retenir ne décide rien')
+        drapeau('retenue')
+        egal(0, PHOTOS[2006].drapeau, 'retiré')
+        egal('a_verifier', Notation.proposition(2006).etat, 'retirer un drapeau ne décide rien')
+        Fenetre.majPhoto()
+        Fenetre.rafraichirNotation()
+        egal(true, p.peutAccepterNote, 'toujours à accepter')
+        egal('Accepter 3 ★', p.titreAccepterNote)
+        drapeau('rejetee')
+        egal(-1, PHOTOS[2006].drapeau)
+        egal('changee', Notation.proposition(2006).etat, 'Rejeter décide : la proposition est changée')
+        egal('rejetee', Notation.proposition(2006).drapeau_choisi)
+        -- Un rejet proposé : Retenir le change, Rejeter l'accepte.
+        PHOTOS[2006].drapeau = 0
+        proposer(0, 'rejetee')
+        drapeau('retenue')
+        egal('changee', Notation.proposition(2006).etat, 'Retenir contre un rejet proposé : changée')
+        proposer(0, 'rejetee')
+        drapeau('rejetee')
+        egal('acceptee', Notation.proposition(2006).etat, 'Rejeter un rejet proposé : acceptée')
+        Fenetre.majPhoto()
+    end)
+    PHOTOS[2006].note, PHOTOS[2006].drapeau = 0, 0
     sansErreur()
 end)
 

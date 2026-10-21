@@ -76,6 +76,19 @@ local function bouton(contenu, p, titre, cleActif)
     error('bouton introuvable : ' .. tostring(titre), 2)
 end
 
+-- Le calque (ou le bouton) de cette infobulle : Accepter de la carte Note et de la Proposition sont
+-- des boutons bleus en image, cliqués par leur calque (fenêtre B, lot B5).
+local function parInfobulle(contenu, infobulle)
+    for _, v in ipairs(vues(contenu)) do
+        if v.args.tooltip == infobulle then
+            return v
+        end
+    end
+    error('vue introuvable par son infobulle : ' .. tostring(infobulle), 2)
+end
+
+local ACCEPTER_NOTE = "Poser la note proposée dans Lightroom (sans Claude ni quota)"
+
 local Chemins = require 'Chemins'
 local Consignes = require 'Consignes'
 local Conversation = require 'Conversation'
@@ -560,7 +573,8 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
         egal('notation', D.ongletParDefaut)
         egal('notation', p.onglet, nom .. ' : Note par défaut')
         vrai(vueLiee(variantes.args[1], 'static_text', 'etapeTexte'), nom .. " : la carte de l'étape dans Aperçu")
-        vrai(vueLiee(variantes.args[3], 'static_text', 'notationTexte'), nom .. ' : la carte Note')
+        vrai(vueLiee(variantes.args[3], 'static_text', 'notePoseeTitre'), nom .. ' : la carte Note')
+        vrai(vueLiee(variantes.args[3], 'static_text', 'nt1'), nom .. ' : la grille des critères dans la carte Note')
         vrai(vueLiee(variantes.args[2], 'static_text', 'propositionTexte'), nom .. ' : la proposition au milieu')
         -- Chaque vue simple d'un onglet est masquée quand un autre onglet est choisi ; pas de
         -- boîte de groupe dans un onglet (son cadre et son titre resteraient montrés), ni de
@@ -590,19 +604,20 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
         p.onglet, p.aProposition = autre, false
         local apercu = vueLiee(args.contents, 'picture', 'imageApercu')
         egal(true, S.montree(apercu, p), nom .. ' : aperçu montré')
-        egal(false, S.montree(vueLiee(args.contents, 'static_text', 'notationTexte'), p), nom .. ' : texte de la note masqué')
+        egal(false, S.montree(vueLiee(args.contents, 'static_text', 'notePoseeTitre'), p), nom .. ' : la note posée masquée')
         egal(autre == 'proposition', S.montree(vueLiee(args.contents, 'static_text', 'propositionTexte'), p), nom .. ' : proposition')
-        egal(false, S.montree(bouton(args.contents, p, 'Accepter', 'peutAccepterNote'), p), nom .. ' : Accepter de la note masqué')
+        egal(false, S.montree(parInfobulle(args.contents, ACCEPTER_NOTE), p), nom .. ' : Accepter de la note masqué')
         egal(true, S.montree(vueLiee(args.contents, 'static_text', 'infoPhoto'), p), nom .. ' : hors des onglets, toujours montré')
-        -- Une variante de couleur dans un onglet : sa couleur et l'onglet, combinés.
+        -- Une variante de couleur dans un onglet : sa couleur et l'onglet, combinés (la première
+        -- ligne de la grille des critères, l'état en gras de sa couleur).
         local titres = {}
         for _, v in ipairs(vues(args.contents)) do
-            if v.genre == 'static_text' and type(v.args.title) == 'table' and v.args.title.key == 'notationProposee' then
+            if v.genre == 'static_text' and type(v.args.title) == 'table' and v.args.title.key == 'nt1' and aCle(v, 'notationCouleur') then
                 titres[#titres + 1] = v
             end
         end
-        egal(4, #titres, nom .. ' : quatre couleurs de la note proposée')
-        p.notationCouleur = 'coche'
+        egal(4, #titres, nom .. ' : quatre couleurs de l\'état de la note')
+        p.notationCouleur, p.ng1 = 'coche', 'etat'
         for _, v in ipairs(titres) do
             vrai(aCle(v, 'notationCouleur') and aCle(v, 'onglet'), nom .. ' : couleur et onglet dans la même condition')
             egal(false, S.montree(v, p), nom .. ' : couleur masquée hors de l\'onglet Note')
@@ -617,8 +632,9 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
             end
         end
         egal(1, #montrees, nom .. ' : une seule couleur montrée')
-        egal(C.coche, montrees[1].args.text_color, nom .. ' : la couleur de l\'état')
-        egal(true, S.montree(vueLiee(args.contents, 'static_text', 'notationTexte'), p), nom .. ' : texte de la note montré')
+        egal(C.coche, montrees[1].args.emphasis_color, nom .. ' : la couleur de l\'état')
+        egal(C.texte, montrees[1].args.text_color, nom .. ' : le reste en couleur du texte')
+        egal(true, S.montree(vueLiee(args.contents, 'static_text', 'notePoseeTitre'), p), nom .. ' : la note posée montrée')
         egal(true, S.montree(apercu, p), nom .. " : l'aperçu reste montré avec la carte Note")
     end
     Fenetre.afficher()
@@ -632,20 +648,33 @@ essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérif
     photoActive(4961, 'DSCF4961.RAF', 2, 1)
     registre.poses, registre.decisions = {}, {}
     proposer(4961, { fichier = 'DSCF4961.RAF', note = 3, drapeau = 'aucun',
-        criteres = { impact = "Le ciel d'orage arrête l'œil.", qualites = "Sujet clair, horizon droit.", plancher = "Netteté 41 : nette." },
-        plafond = 3, raison = "Tient seule devant qui ne connaît pas le lieu.", passe = 2, le = 1000 })
+        criteres = { impact = "Moyen. Le ciel arrête l'œil.", qualites = "Sujet clair.", plancher = "Netteté 41 : nette." },
+        plafond = 3, raison = "Tient seule.", passe = 2, le = 1000 })
     S.pendantFenetre = function(args)
         local p = Fenetre.p
         local abonnes = registre.abonnes
         vrai(registre.abonne, 'la fenêtre suit le registre')
-        egal('DSCF4961', p.notationNom)
-        egal('Note posée : ★★☆☆☆ · retenue', p.notationPosee)
-        egal('Claude propose : ★★★☆☆', p.notationProposee)
+        -- La note posée (2 ★, retenue), la passe et ce que Claude propose.
+        egal(2, p.noteCatalogue)
+        egal('Correcte', p.notePoseeTitre)
+        egal('2 ★ · drapeau Retenue', p.notePoseeSous)
+        egal(2, p.notePasse)
+        egal(3, p.noteClaude)
         egal('orange', p.notationCouleur)
-        egal('proposée · passe 2', p.notationEtat)
-        -- Les critères, le plafond, puis la raison, dans un seul texte coupé en lignes.
-        egal("Impact : Le ciel d'orage arrête l'œil.\nQualités : Sujet clair, horizon droit.\nPlancher technique : Netteté 41 : nette.\nPlafond mesuré : 3 ★"
-            .. "\n\nTient seule devant qui ne connaît pas le lieu.", p.notationTexte)
+        egal('Accepter 3 ★', p.titreAccepterNote)
+        egal('Laisser à 2 ★', p.titreLaisser)
+        -- La grille : l'état et la raison, puis les critères du plus lourd au plus léger, chacun son
+        -- étiquette, le verdict en gras ; le plafond sur sa ligne.
+        local grille = {}
+        for k = 1, Fenetre.T.criteres + 1 do
+            if p['ng' .. k] ~= 'vide' then
+                grille[#grille + 1] = p['ng' .. k] .. '|' .. p['ne' .. k] .. '|' .. p['nt' .. k]
+            end
+        end
+        egal("etat||<EM>Passe 2 · proposée.</EM> Tient seule.\ncritere|Impact|<EM>Moyen.</EM> Le ciel arrête l'œil.\n"
+            .. "critere|Qualités|<EM>Sujet clair.</EM>\ncritere|Plancher technique|Netteté 41 : nette.", table.concat(grille, '\n'))
+        egal(true, p.aPlafond)
+        egal('<EM>Plafond 3 ★</EM> : mesuré au tri, pas plus.', p.plafondTexte)
         egal(false, p.noteMonte)
         egal(false, p.noteDescend, 'tout tient dans la carte')
         vrai(p.peutAccepterNote and p.peutChangerNote, 'boutons actifs')
@@ -656,18 +685,20 @@ essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérif
         vrai(not p.peutAccepterNote and not p.peutChangerNote, 'désactivés pendant que Claude travaille')
         Moteur.travaille = false
         Fenetre.rafraichir()
-        -- Accepter : la proposition telle quelle, écrite dans une tâche (le registre et le
-        -- catalogue ne se lisent pas dans le clic), une écriture à la fois.
+        -- Accepter (le calque de son bouton bleu) : la proposition telle quelle, écrite dans une
+        -- tâche (le registre et le catalogue ne se lisent pas dans le clic), une écriture à la fois.
         local avant = #S.taches
         local poserVraiment, pendant = Notation.poser, nil
         Notation.poser = function(liste)
             pendant = { accepter = p.peutAccepterNote, changer = p.peutChangerNote }
             return poserVraiment(liste)
         end
-        bouton(args.contents, p, 'Accepter', 'peutAccepterNote').args.action()
-        egal(avant + 1, #S.taches, 'écriture dans une tâche')
+        local accepter = parInfobulle(args.contents, ACCEPTER_NOTE)
+        egal('static_text', accepter.genre, 'un calque')
+        accepter.args.mouse_down()
+        egal(avant + 2, #S.taches, "l'écriture dans une tâche (et l'image enfoncée 0,15 s)")
         egal(0, #registre.poses, 'rien posé dans le clic')
-        S.taches[#S.taches]()
+        S.taches[avant + 2]()
         Notation.poser = poserVraiment
         vrai(pendant and not pendant.accepter and not pendant.changer, 'pas deux écritures à la fois')
         egal(1, #registre.poses)
@@ -677,8 +708,12 @@ essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérif
         egal(true, Fenetre.aRafraichirNotation, 'la carte se relit')
         Fenetre.rafraichirNotation()
         egal('coche', p.notationCouleur)
-        egal('acceptée · passe 2', p.notationEtat)
+        egal('<EM>Passe 2 · acceptée.</EM> Tient seule.', p.nt1)
         egal(false, p.peutAccepterNote, 'déjà acceptée')
+        -- Accepter inactif : son calque ne fait rien.
+        avant = #S.taches
+        accepter.args.mouse_down()
+        egal(avant, #S.taches, 'inactif : rien')
         -- Changer… : Dany peut poser 5 ★ (fenêtre modale, depuis une tâche).
         local presenter = S.modules.LrDialogs.presentModalDialog
         local vue
@@ -688,7 +723,7 @@ essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérif
             q.note = 5
             return 'ok'
         end
-        bouton(args.contents, p, 'Changer…').args.action()
+        bouton(args.contents, p, 'Changer…', 'peutChangerNote').args.action()
         S.taches[#S.taches]()
         S.modules.LrDialogs.presentModalDialog = presenter
         egal(3, vue.note, 'la note proposée d\'abord')
@@ -697,27 +732,41 @@ essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérif
         egal(5, registre.poses[2][1].note)
         egal(nil, registre.poses[2][1].drapeau)
         Fenetre.rafraichirNotation()
-        egal('changée : ★★★★★ · passe 2', p.notationEtat)
+        egal('<EM>Passe 2 · changée : 5 ★.</EM> Tient seule.', p.nt1)
         -- Une nouvelle proposition de Claude, comme toutes depuis la 1.1.1 : à vérifier.
         proposer(4961, { note = 4, drapeau = 'aucun', criteres = { impact = 'Fort.' }, raison = 'Peut-être 4.', le = 2000, etat = 'a_verifier' })
         Fenetre.rafraichirNotation()
         egal(2, #registre.poses, 'rien de posé')
         egal('rouge', p.notationCouleur)
-        egal('à vérifier', p.notationEtat)
+        egal('<EM>À vérifier.</EM> Peut-être 4.', p.nt1, 'sans passe connue')
+        egal(0, p.notePasse)
         egal(true, p.peutAccepterNote, 'une note à vérifier s\'accepte')
+        egal('Accepter 4 ★', p.titreAccepterNote)
+        egal(false, p.aPlafond, 'pas de plafond mesuré')
         -- Un rejet proposé.
         proposer(4961, { drapeau = 'rejetee', criteres = { plancher = 'Floue : netteté 9.' }, plafond = 0, raison = 'Mise au point manquée.', le = 3000 })
         Fenetre.rafraichirNotation()
-        egal('Claude propose : rejeter', p.notationProposee)
-        vrai(p.notationTexte:find('Plafond mesuré : 0 ★', 1, true), p.notationTexte)
+        egal('rejet', p.noteClaude)
+        egal('Accepter le rejet', p.titreAccepterNote)
+        egal('<EM>Plafond 0 ★</EM> : mesuré au tri, pas plus.', p.plafondTexte)
         -- Une autre photo, sans proposition : l'aide, Changer… seulement.
         photoActive(4970, 'DSCF4970.RAF', 0, 0)
         Fenetre.majPhoto()
-        egal('DSCF4970', p.notationNom)
-        egal('Note posée : aucune, pas encore jugée', p.notationPosee)
-        egal('Aucune note proposée', p.notationProposee)
-        egal(Fenetre.AIDE_NOTATION, (p.notationTexte:gsub('\n', ' ')), "l'aide, coupée en lignes")
+        egal('Pas encore jugée', p.notePoseeTitre)
+        egal('0 ★ dans le catalogue', p.notePoseeSous)
+        egal('aucune', p.noteClaude)
+        local aide = {}
+        for k = 1, Fenetre.T.criteres + 1 do
+            if p['ng' .. k] == 'plein' then
+                aide[#aide + 1] = p['nt' .. k]
+            else
+                egal('vide', p['ng' .. k], 'ligne ' .. k)
+            end
+        end
+        egal(Fenetre.AIDE_NOTATION, table.concat(aide, ' '), "l'aide, coupée en lignes pleine largeur")
         vrai(not p.peutAccepterNote and p.peutChangerNote)
+        egal('Accepter', p.titreAccepterNote)
+        egal('Laisser à 0 ★', p.titreLaisser)
         egal(abonnes, registre.abonnes, 'abonnée une fois')
     end
     Fenetre.afficher()
@@ -769,27 +818,39 @@ essai('Cartes : ▲ ▼ font défiler le texte de la note et de la proposition, 
         egal(avant, p.propositionTexte, 'page gardée au rafraîchissement')
         Fenetre.montrerPage('proposition', long .. '\nLigne 61')
         egal('Ligne 1', p.propositionTexte:match('^[^\n]*'), 'un autre texte : première page')
-        -- Un long paragraphe est coupé à la largeur de la carte, comme le fil.
+        -- Une balise venue de Claude ne passe pas dans la proposition (sans emphasis_font, Lightroom
+        -- ne la montrerait pas, constaté D4).
+        Fenetre.montrerPage('proposition', 'Un <EM>ciel</EM> plus dense.')
+        egal('Un ciel plus dense.', p.propositionTexte)
+        -- La carte Note est une grille : un long paragraphe s'y coupe en lignes pleine largeur, à la
+        -- largeur de l'intérieur de la carte, en 12 points.
         Fenetre.montrerPage('note', string.rep('Le ciel orageux tient la photo. ', 40))
-        for l in (p.notationTexte .. '\n'):gmatch('([^\n]*)\n') do
-            vrai(Fil.largeur(l, 'texte') <= T.largeurNote - Fil.MARGE, 'ligne trop large : ' .. l)
+        for k = 1, T.criteres + 1 do
+            egal('plein', p['ng' .. k], 'ligne ' .. k)
+            vrai(Fil.largeur(p['nt' .. k], 'texte12') <= T.largeurNote - Fil.MARGE, 'ligne trop large : ' .. p['nt' .. k])
         end
+        egal(379, T.largeurNote)
         egal(true, p.noteDescend, 'le paragraphe dépasse la carte')
         egal(false, p.noteMonte)
+        local derniere = p['nt' .. (T.criteres + 1)]
         Fenetre.defilerTexte('note', 1)
         egal(true, p.noteMonte)
+        egal(derniere, p.nt1, 'une page plus bas, la dernière ligne vue en tête')
         -- Une ligne ne commence jamais par une ponctuation haute (« ; mais » vu sur la carte Note),
         -- et les espaces restent ordinaires.
         local phrase = "Qualités : Sommet de l'action, espace devant l'auto ; mais lumière plate et terne ! « Auto » petite ?"
         for largeur = 90, 400, 7 do
-            for _, l in ipairs(Fil.couper(phrase, largeur, 'texte')) do
+            for _, l in ipairs(Fil.couper(phrase, largeur, 'texte12')) do
                 vrai(not l:find('^[;:!?]') and not l:find('^»') and not l:find('«$'), largeur .. ' : « ' .. l .. ' »')
                 vrai(not l:find('\194\160', 1, true), 'espace insécable rendue')
             end
         end
-        -- Un texte court tient : ni ▲ ni ▼.
+        -- Un texte court tient : ni ▲ ni ▼, les autres lignes vides.
         Fenetre.montrerPage('note', 'Court.')
-        egal('Court.', p.notationTexte)
+        egal('Court.', p.nt1)
+        egal('plein', p.ng1)
+        egal('vide', p.ng2)
+        egal('', p.nt2)
         egal(false, p.noteMonte)
         egal(false, p.noteDescend)
     end
@@ -837,7 +898,7 @@ essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte
     S.pendantFenetre = function(args)
         vu = true
         local p, T = Fenetre.p, Fenetre.T
-        for cle, valeur in pairs({ etapeTitre = '', etapeSousTitre = '', etapePrecedente = false, etapeSuivante = false,
+        for cle, valeur in pairs({ etapeTitre = Fenetre.TITRE_ETAPE, etapeSousTitre = '', etapePrecedente = false, etapeSuivante = false,
             etapeAImages = false, etapeADetail = false, titreBascule = "Voir l'avant", titreJeLeFais = "Je le fais", peutJeLeFais = false,
             exerciceEtat = '', etapeMonte = false, etapeDescend = false }) do
             egal(valeur, p[cle], cle .. ' avant l\'ouverture')
@@ -845,10 +906,13 @@ essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte
         -- Sans étape dans le fil, la carte de l'étape montre l'aide (lot 12), coupée à sa largeur.
         egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')), "l'aide de la carte de l'étape")
         vrai(Fenetre.AIDE_ETAPE:find('« Pourquoi ? »', 1, true), "l'aide dit le bouton Pourquoi ? du fil")
-        -- Fenêtre B (provisoire jusqu'au lot 18) : 20 lignes, à la largeur intérieure du panneau.
-        egal(20, T.propLignes, 'la proposition passe à 20 lignes (fenêtre B)')
-        egal(20, T.etapeLignes, "texte de la carte de l'étape")
-        egal(T.interieur - 24, T.largeurEtape)
+        -- Fenêtre B (lot B5, provisoire jusqu'au lot 18) : les cartes sur leurs images, à la largeur
+        -- de leur intérieur (379), 16 lignes pour la proposition, 17 pour l'étape.
+        egal('Pourquoi ?', Fenetre.TITRE_ETAPE, 'sans étape, le titre de la carte')
+        egal(16, T.propLignes, 'la proposition : 16 lignes (fenêtre B)')
+        egal(17, T.etapeLignes, "texte de la carte de l'étape")
+        egal(T.carte, T.largeurEtape)
+        egal(T.carte, T.largeurProposition)
         -- Les actions des boutons : sans effet pour l'instant (un lot suivant les remplit), sans
         -- erreur ni demande envoyée, et l'onglet ne change pas.
         p.onglet = 'apercu'
@@ -904,7 +968,7 @@ essai('Carte Pourquoi ? : ▲ ▼ font défiler son texte, page par page, comme 
         -- Un long paragraphe est coupé à la largeur de la carte.
         Fenetre.montrerPage('etape', string.rep('La balance tirait vers le bleu. ', 30))
         for l in (p.etapeTexte .. '\n'):gmatch('([^\n]*)\n') do
-            vrai(require('Fil').largeur(l, 'texte') <= T.largeurEtape - require('Fil').MARGE, 'ligne trop large : ' .. l)
+            vrai(require('Fil').largeur(l, 'texte12') <= T.largeurEtape - require('Fil').MARGE, 'ligne trop large : ' .. l)
         end
     end
     Fenetre.afficher()

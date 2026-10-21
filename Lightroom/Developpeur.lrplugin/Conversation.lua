@@ -860,8 +860,8 @@ function Conversation.infoEtape(e)
 end
 
 -- Vrai pour l'élément d'une étape de Claude : un outil qui en écrit, pas en erreur, avec les
--- étapes de sa réponse ; ou en cours, avec son but (step_name). Sa ligne du fil porte
--- « · Pourquoi ? ».
+-- étapes de sa réponse ; ou en cours, avec son but (step_name). Sa ligne du fil porte le bouton
+-- « Pourquoi ? » (le drapeau `etape` de la ligne, Vues.ligneFil).
 function Conversation.estEtape(e)
     if type(e) ~= 'table' or e.genre ~= 'outil' or e.etat == 'erreur' or not Conversation.OUTILS_ETAPES[e.outil] then
         return false
@@ -1288,8 +1288,8 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                             passe = tonumber(bloc.entree.pass), pose = bloc.entree.apply == true or nil, notes = notes }, date)
                     end
                 elseif court == 'photo_lesson' then
-                    -- La carte de la leçon, faite de l'entrée ; les faits seuls (read_facts) n'en
-                    -- font pas.
+                    -- L'élément de la leçon (son onglet et sa ligne d'actions), fait de l'entrée ;
+                    -- les faits seuls (read_facts) n'en font pas.
                     local points = Conversation.leconDemandee(entree)
                     if #points > 0 and entree.read_facts ~= true then
                         c.elements[#c.elements + 1] = nouvelElement('lecon', { outil = court, appel = bloc.id, etat = 'enCours',
@@ -1465,6 +1465,47 @@ function Conversation.images(c)
         end
     end
     return liste
+end
+
+-- Le dernier zoom d'une photo dans la conversation (1.3, « Voir à 100 % » de la carte Note : le
+-- zoom que Claude a pris pour la noter) : l'image la plus récente d'un appel réussi de view_photo
+-- avec `region`, sur cette photo (son photo_id ; sans lui, la photo que dit la réponse). Un aperçu
+-- entier (sans region), une comparaison (compare) ou une autre photo n'en sont pas. Lecture pure :
+-- rien n'est demandé à Lightroom ni à Claude. Rend { chemin (relatif au dossier de la
+-- conversation), element (indice de l'aperçu dans le fil), appel, zone (la region) }, nil sans
+-- zoom de cette photo.
+function Conversation.dernierZoom(c, photo)
+    if not c or photo == nil then
+        return nil
+    end
+    local cle = Conversation.clePhoto(photo)
+    for i = #(c.elements or {}), 1, -1 do
+        local e = c.elements[i]
+        if e.genre == 'apercu' and e.appel ~= nil and #(e.images or {}) > 0 then
+            local outil = Conversation.outilDeLAppel(c, e.appel)
+            if outil and outil.outil == 'view_photo' and outil.etat ~= 'erreur' then
+                -- L'entrée seule d'abord (petite) ; la réponse, plus longue, seulement sans photo_id.
+                local texteEntree, reponse = tostring(outil.detail or ''):match('^(.-)\n\n— Réponse —\n(.*)$')
+                local lu, entree = pcall(Json.decode, texteEntree or '')
+                entree = lu and type(entree) == 'table' and entree or nil
+                if entree and type(entree.region) == 'table' then
+                    local quelle = entree.photo_id
+                    if quelle == nil then
+                        local tete = Conversation.teteJson(reponse)
+                        quelle = type(tete) == 'table' and type(tete.photo) == 'table' and tete.photo.id or nil
+                    end
+                    if quelle ~= nil and Conversation.clePhoto(quelle) == cle then
+                        local zone = {}
+                        for _, k in ipairs({ 'x', 'y', 'width', 'height' }) do
+                            zone[k] = tonumber(entree.region[k])
+                        end
+                        return { chemin = e.images[#e.images], element = i, appel = e.appel, zone = zone }
+                    end
+                end
+            end
+        end
+    end
+    return nil
 end
 
 -- Nombre d'outils terminés depuis la dernière demande.

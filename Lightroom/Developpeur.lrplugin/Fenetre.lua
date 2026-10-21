@@ -114,22 +114,31 @@ end
 -- du système de la maquette, '<system>' et '<system/bold>' en 16, 13, 12 et 11 (constatées le
 -- 21 octobre 2026, B1 et D9 : tailles appliquées, l'encre à 1 ou 2 points sous la chasse mesurée),
 -- et Menlo 11. Le fil et les cartes les emploient par leurs clés de Metriques (texte, texte12,
--- petit, gras, gras12, titre, mono) ; les pièces de la fenêtre B, aussi par leurs noms systeme13…
+-- petit, gras, gras12, gras11, titre, mono) ; les pièces de la fenêtre B, aussi par leurs noms
+-- systeme13…
 local POLICES = {
     texte = police('texte'),
     texte12 = police('texte12'),
     petit = police('petit'),
     gras = police('gras'),
     gras12 = police('gras12'),
+    gras11 = police('gras11'),
     titre = police('titre'),
     mono = police('mono'),
     systeme13 = police('texte'),
     systeme12 = police('texte12'),
     systeme11 = police('petit'),
     systemeGras12 = police('gras12'),
-    systemeGras11 = { name = '<system/bold>', size = 11 },
+    systemeGras11 = police('gras11'),
 }
 Fenetre.POLICES = POLICES
+
+-- La largeur d'un libellé fixe (une étiquette, une passe de la carte Note) dans une police de
+-- Metriques, en points entiers : sa chasse mesurée, et 2 points de jeu (l'encre fait 1 à 2 points
+-- de moins que la chasse, constaté D9).
+function Fenetre.largeurLibelle(texte, cle)
+    return math.ceil(Fil.largeur(texte, cle)) + 2
+end
 
 -- Icônes du fil, au bord gauche de la colonne du texte (couleurs de la palette). Plus de › devant
 -- Dany : la colonne auteur dit « Vous » (fenêtre B).
@@ -1704,10 +1713,14 @@ end
 
 -- Le texte de la carte Note (clé 'note'), celui de la proposition (clé 'proposition'), celui de
 -- la carte de l'étape (onglet Aperçu, clé 'etape', 1.3) et celui de la leçon (onglet Leçon, clé
--- 'lecon', lot B4) : coupés en lignes comme le fil, dans la police de leur carte (`police` de
--- CARTES : P.texte pour les trois premières, posées telles quelles jusqu'au lot B5 ; P.texte12 pour
--- la leçon, ses axes en gras de même taille, `emphase`), montrés page par page avec ▲ ▼
--- (Vues.fleches). Un texte qui change revient à sa première page.
+-- 'lecon', lot B4) : coupés en lignes comme le fil, à la largeur de l'intérieur des cartes, dans
+-- la police de leur carte (`police` de CARTES : P.texte12 pour les quatre, lot B5), montrés page
+-- par page avec ▲ ▼ (Vues.fleches). Une carte à `emphase` (la leçon, ses axes ; la note, ses
+-- verdicts) garde ses passages balisés, en gras de même taille ; les autres textes perdent leurs
+-- balises (sans emphasis_font, Lightroom ne les montrerait pas, constaté D4). La carte Note est une
+-- grille (`grille`) : ses lignes sont des tables (Fenetre.lignesCriteres : genre, étiquette,
+-- texte), posées ligne par ligne dans `ng..k`, `ne..k` et `nt..k`. Un texte qui change revient à
+-- sa première page.
 Fenetre.pages = {}
 
 -- L'onglet Leçon sans leçon de la photo active dans la conversation montrée.
@@ -1715,9 +1728,11 @@ Fenetre.AUCUNE_LECON = "Après une retouche, Claude donne la leçon de la photo 
     .. "prise de vue. Elle s'affiche ici ; « Leçon de la photo » dans le fil la remontre."
 
 local CARTES = {
-    note = { texte = 'notationTexte', largeur = 'largeurNote', lignes = function(T) return (T.criteres or 8) + 3 end },
-    proposition = { texte = 'propositionTexte', largeur = 'largeurProposition', lignes = function(T) return T.propLignes or 5 end },
-    etape = { texte = 'etapeTexte', largeur = 'largeurEtape', lignes = function(T) return T.etapeLignes or 8 end },
+    note = { grille = { genre = 'ng', etiquette = 'ne', texte = 'nt' }, largeur = 'largeurNote',
+        lignes = function(T) return (T.criteres or 8) + 1 end, police = 'texte12', emphase = 'gras12' },
+    proposition = { texte = 'propositionTexte', largeur = 'largeurProposition', lignes = function(T) return T.propLignes or 5 end,
+        police = 'texte12' },
+    etape = { texte = 'etapeTexte', largeur = 'largeurEtape', lignes = function(T) return T.etapeLignes or 8 end, police = 'texte12' },
     lecon = { texte = 'leconTexte', largeur = 'largeurLecon', lignes = function(T) return T.leconLignes or 8 end, police = 'texte12',
         emphase = 'gras12' },
 }
@@ -1746,9 +1761,27 @@ function Fenetre.lignesCarte(texte, largeur, police, emphase)
     return lignes
 end
 
+-- Les lignes d'une page de la carte `carte` : celles données (une grille), sinon son texte coupé
+-- (sans ses balises s'il n'a pas d'emphase), en lignes pleine largeur pour une grille.
+local function lignesDeLaPage(carte, page, T)
+    if page.lignes then
+        return page.lignes
+    end
+    local source = carte.emphase and page.texte or sansBalises(page.texte)
+    local lignes = Fenetre.lignesCarte(source, T and T[carte.largeur] or 226, carte.police, carte.emphase)
+    if carte.grille then
+        for k, l in ipairs(lignes) do
+            lignes[k] = { genre = 'plein', etiquette = '', texte = l }
+        end
+    end
+    return lignes
+end
+
 -- Montre la page courante du texte de la carte `cle` ; `texte` nil : le texte gardé. `garder` : un
 -- texte qui change reste à la même page (la liste d'un exercice dont un réglage vient d'être coché).
-function Fenetre.montrerPage(cle, texte, garder)
+-- `lignes` (une carte en grille, la note) : ses lignes déjà faites ({ genre, etiquette, texte }),
+-- dont `texte` est alors la signature.
+function Fenetre.montrerPage(cle, texte, garder, lignes)
     local p, T, carte = Fenetre.p, Fenetre.T, CARTES[cle]
     if not (p and carte) then
         return
@@ -1761,17 +1794,30 @@ function Fenetre.montrerPage(cle, texte, garder)
     if not page then
         return
     end
-    local hauteur = T and carte.lignes(T) or 8
-    local lignes = Fenetre.lignesCarte(page.texte, T and T[carte.largeur] or 226, carte.police, carte.emphase)
-    -- La dernière page est pleine : on ne descend pas plus bas que la dernière ligne.
-    page.debut = math.max(1, math.min(page.debut, #lignes - hauteur + 1))
-    local montre = {}
-    for i = page.debut, math.min(#lignes, page.debut + hauteur - 1) do
-        montre[#montre + 1] = lignes[i]
+    if lignes ~= nil then
+        page.lignes = lignes
     end
-    poser(p, carte.texte, table.concat(montre, '\n'))
+    local hauteur = T and carte.lignes(T) or 8
+    local toutes = lignesDeLaPage(carte, page, T)
+    -- La dernière page est pleine : on ne descend pas plus bas que la dernière ligne.
+    page.debut = math.max(1, math.min(page.debut, #toutes - hauteur + 1))
+    if carte.grille then
+        local g = carte.grille
+        for k = 1, hauteur do
+            local l = toutes[page.debut + k - 1]
+            poser(p, g.genre .. k, l and l.genre or 'vide')
+            poser(p, g.etiquette .. k, l and l.etiquette or '')
+            poser(p, g.texte .. k, l and l.texte or '')
+        end
+    else
+        local montre = {}
+        for i = page.debut, math.min(#toutes, page.debut + hauteur - 1) do
+            montre[#montre + 1] = toutes[i]
+        end
+        poser(p, carte.texte, table.concat(montre, '\n'))
+    end
     poser(p, cle .. 'Monte', page.debut > 1)
-    poser(p, cle .. 'Descend', page.debut + hauteur - 1 < #lignes)
+    poser(p, cle .. 'Descend', page.debut + hauteur - 1 < #toutes)
 end
 
 -- ▲ (sens -1) ou ▼ (sens 1) : une page plus haut ou plus bas, la dernière ligne vue gardée.
@@ -2427,6 +2473,8 @@ end
 -- images arrivées se montrent. Les ◀ ▶ de l'aperçu sont coupés dans l'onglet (Fenetre.changerImage).
 
 Fenetre.AIDE_ETAPE = "Cliquez « Pourquoi ? » sur une étape du fil : son avant/après s'affiche au-dessus, et sa raison ici."
+-- Le titre de la carte sans étape choisie (celui de la boîte de groupe d'avant la fenêtre B).
+Fenetre.TITRE_ETAPE = "Pourquoi ?"
 
 -- Pourquoi une étape n'a pas d'avant/après, en mots (les raisons du module : Etapes.RAISONS).
 Fenetre.SANS_IMAGES = {
@@ -2761,7 +2809,7 @@ function Fenetre.rafraichirEtape(sansApercu)
     end
     local x, n, liste = Fenetre.etapeCourante()
     if not x then
-        poser(p, 'etapeTitre', '')
+        poser(p, 'etapeTitre', Fenetre.TITRE_ETAPE)
         poser(p, 'etapeSousTitre', '')
         Fenetre.montrerPage('etape', Fenetre.AIDE_ETAPE)
         poser(p, 'etapePrecedente', false)
@@ -2895,10 +2943,20 @@ function Fenetre.agrandirEtape()
 end
 
 -- Note de la photo active ----------------------------------------------------------------------
--- La carte « Note » lit le registre des notes proposées (Notation.lua, rempli par la commande
--- `notation` de la liaison quand Claude appelle propose_ratings) et la note posée de la photo
--- active. Accepter et Changer… écrivent par Notation.poser, sans Claude ni quota ; Dany peut poser
--- 5 ★, Claude ne le propose jamais.
+-- La carte Note (Vues.notation, fenêtre B, lot B5 : la maquette « B · Conversation claire ») lit
+-- le registre des notes proposées (Notation.lua, rempli par la commande `notation` de la liaison
+-- quand Claude appelle propose_ratings) et la note posée de la photo active : les passes du
+-- standard, la note et le drapeau posés (étoiles et drapeaux cliquables), la note que Claude
+-- propose, ses critères page par page (Fenetre.lignesCriteres), le plafond mesuré au tri et le zoom
+-- que Claude a pris pour noter (« Voir à 100 % », montré dans l'aperçu : Fenetre.voirZoom), puis
+-- Laisser, Changer… et Accepter. Ce qui écrit passe par une tâche et Notation.poser
+-- (Fenetre.poserNote : étoiles, drapeaux, Accepter, Changer…) ou Notation.decider (Laisser : rien
+-- dans le catalogue), sans Claude ni quota, jamais pendant que Claude travaille ni pendant une autre
+-- écriture de la carte (le bandeau dit pourquoi : un calque n'a pas d'enabled). Retenir, ou retirer
+-- un drapeau, ne décide rien de la note que Claude propose (Fenetre.poserDrapeau). Dany peut poser
+-- 5 ★ (étoiles, Changer…) ; Claude ne le propose jamais, et la carte n'offre jamais « Accepter
+-- 5 ★ ». « ? À vérifier » est posé grisé (Vues.inactif : décision de Dany du 21 octobre 2026 ; le
+-- bouton avait été retiré en 1.1.1).
 
 local ETATS_NOTE = {
     proposee = "proposée",
@@ -2908,97 +2966,268 @@ local ETATS_NOTE = {
     ecartee = "écartée",
 }
 
--- La couleur de la note proposée selon son état : des clés de la palette (Dispositions.PALETTES ;
--- l'ancien « vert » est la coche), une variante de texte chacune dans la carte (Vues.notation).
+-- En tête de phrase (l'état sans passe connue).
+local ETATS_NOTE_MAJ = {
+    proposee = "Proposée",
+    acceptee = "Acceptée",
+    changee = "Changée",
+    a_verifier = "À vérifier",
+    ecartee = "Écartée",
+}
+
+-- La couleur de l'état de la proposition : des clés de la palette (Dispositions.PALETTES ;
+-- l'ancien « vert » est la coche), une variante chacune de la première ligne de la grille des
+-- critères (Vues.ligneCritere), où l'état est en gras de cette couleur.
 local COULEURS_NOTE = { proposee = 'orange', acceptee = 'coche', changee = 'coche', a_verifier = 'rouge', ecartee = 'gris' }
 Fenetre.COULEURS_NOTE = COULEURS_NOTE
 Fenetre.TEINTES_NOTE = { 'gris', 'orange', 'coche', 'rouge' }
 
+-- Les critères du standard, du plus lourd au plus léger, et leur étiquette dans la grille.
 local CRITERES = {
     { cle = 'impact', titre = "Impact" },
     { cle = 'qualites', titre = "Qualités" },
     { cle = 'plancher', titre = "Plancher technique" },
     { cle = 'finition', titre = "Finition" },
 }
+Fenetre.CRITERES = CRITERES
+
+-- Les passes du standard (Notation.standard, « Les passes, une question à la fois »), dans
+-- l'ordre ; la dernière est à Dany seul : Claude en est au plus à l'avant-dernière.
+Fenetre.PASSES = { "Rejeter ?", "3 ★ ou non ?", "Monter à 4 ?", "5 ★ ? (vous)" }
+Fenetre.PASSE_MAX_CLAUDE = Notation.PASSES - 1
+
+-- L'état de la passe j quand Claude en est à la passe `passe` (0 : aucune) : 'faite' avant elle,
+-- 'en_cours' pour elle, sinon 'a_venir'.
+function Fenetre.etatPasse(j, passe)
+    passe = tonumber(passe) or 0
+    if passe <= 0 or j > passe then
+        return 'a_venir'
+    elseif j < passe then
+        return 'faite'
+    end
+    return 'en_cours'
+end
 
 Fenetre.AIDE_NOTATION = "Claude note d'abord chaque photo qu'il traite, selon le standard, critère par critère (impact, "
-    .. "qualités, plancher technique, finition) : sa note arrive à vérifier, vous l'acceptez ou la changez ; 5 ★ reste à vous seul."
+    .. "qualités, plancher technique, finition) : sa note arrive à vérifier, vous l'acceptez, la laissez ou la changez ; 5 ★ "
+    .. "reste à vous seul. Les étoiles et les drapeaux ci-dessus posent votre note dans Lightroom."
+
+-- Le sens de la note posée, d'après le standard (« Les notes ») : le titre à droite des étoiles.
+Fenetre.SENS_NOTES = { [0] = "Pas encore jugée", "Gardée", "Correcte", "Tient seule", "A de l'impact", "Parmi vos meilleures" }
+
+-- La raison gardée d'une note ou d'un drapeau posés depuis la carte (Notation.poser).
+Fenetre.RAISON_NOTE = "Note choisie dans la fenêtre Claude"
+Fenetre.RAISON_DRAPEAU = "Drapeau choisi dans la fenêtre Claude"
+
+-- Les messages de la carte au bandeau (chacun tient en deux lignes, essais-fenetre-b.lua) : une
+-- écriture déjà en cours, pas de photo active, une proposition de 5 ★ (impossible : refusée par le
+-- connecteur et le registre).
+Fenetre.NOTE_EN_COURS = "Une note s'écrit déjà : un instant."
+Fenetre.AUCUNE_PHOTO = "Aucune photo active : choisissez-la dans Lightroom."
+Fenetre.PAS_CINQ = "Claude ne propose jamais 5 ★ : posez-les vous-même."
+
+-- Les infobulles de « Voir à 100 % » : le zoom de Claude, montré dans l'aperçu, ou pourquoi le
+-- bouton est grisé.
+Fenetre.INFOBULLE_ZOOM = "Montrer dans l'aperçu le zoom à 100 % que Claude a pris pour noter cette photo (Agrandir : en grand)"
+Fenetre.SANS_ZOOM = "Claude n'a pas pris de zoom de cette photo"
 
 local function texteChamp(v)
-    return type(v) == 'string' and Texte.nettoyer(v) or ''
+    return type(v) == 'string' and Texte.nettoyer(sansBalises(v)) or ''
 end
 
--- « Note posée : ★★☆☆☆ · rejetée ».
-function Fenetre.texteNotePosee(active)
+local function entre(n, mini, maxi)
+    return math.max(mini, math.min(maxi, math.floor(tonumber(n) or 0)))
+end
+
+-- La note posée de la photo active, en titre (gras) et sous-titre (gris), à droite des étoiles :
+-- « Pas encore jugée » / « 0 ★ dans le catalogue », « Tient seule » / « 3 ★ · drapeau Retenue »,
+-- « Rejetée » / « 0 ★ · drapeau Rejeter ».
+function Fenetre.notePosee(active)
     if not active then
-        return "Aucune photo active"
+        return "Aucune photo active", "choisissez-la dans Lightroom"
     end
     if active.note == nil then
-        return "Note posée : —"
+        return active.drapeau == 'rejetee' and "Rejetée" or "Note inconnue", ''
     end
-    local texte = active.note > 0 and ("Note posée : " .. Lightroom.etoiles(active.note)) or "Note posée : aucune, pas encore jugée"
-    if active.drapeau == 'rejetee' then
-        texte = texte .. " · rejetée"
-    elseif active.drapeau == 'retenue' then
-        texte = texte .. " · retenue"
+    local n = entre(active.note, 0, 5)
+    local titre = active.drapeau == 'rejetee' and "Rejetée" or Fenetre.SENS_NOTES[n]
+    local sous = n .. " ★ dans le catalogue"
+    if active.drapeau == 'retenue' then
+        sous = n .. " ★ · drapeau Retenue"
+    elseif active.drapeau == 'rejetee' then
+        sous = n .. " ★ · drapeau Rejeter"
     end
-    return texte
+    return titre, sous
 end
 
--- « Claude propose : ★★★☆☆ » (ou de la rejeter).
-function Fenetre.texteNoteProposee(prop)
-    if prop.drapeau == 'rejetee' then
-        return "Claude propose : rejeter"
+-- La note que Claude propose, pour les petites étoiles de « Claude propose » (`noteClaude`) : de 0
+-- à 4 (une note de 5, refusée par le connecteur et le registre, ne s'afficherait pas plus haut que
+-- ce qu'elle est), 'rejet' pour un rejet, 'aucune' sans proposition.
+function Fenetre.noteClaude(prop)
+    if not prop then
+        return 'aucune'
+    elseif prop.drapeau == 'rejetee' then
+        return 'rejet'
     end
-    local n = tonumber(prop.note) or 0
-    return "Claude propose : " .. (n > 0 and Lightroom.etoiles(n) or "0 ★, pas encore jugée")
+    return entre(prop.note, 0, 5)
 end
 
--- « proposée · passe 2 », « changée : ★★★★★ ».
-function Fenetre.texteEtatNote(prop)
-    local texte = ETATS_NOTE[prop.etat] or tostring(prop.etat or '')
+-- Vrai pour une proposition de 5 ★ ou plus (jamais de Claude : refusée par le connecteur et le
+-- registre) : la carte ne l'offre pas à Accepter.
+function Fenetre.noteDeCinq(prop)
+    return prop ~= nil and prop.drapeau ~= 'rejetee' and (tonumber(prop.note) or 0) >= 5
+end
+
+-- « Accepter 3 ★ », « Accepter le rejet » ; « Accepter » sans proposition (grisé).
+function Fenetre.titreAccepter(prop)
+    if not prop or Fenetre.noteDeCinq(prop) then
+        return "Accepter"
+    elseif prop.drapeau == 'rejetee' then
+        return "Accepter le rejet"
+    end
+    return "Accepter " .. entre(prop.note, 0, 4) .. " ★"
+end
+
+-- « Laisser à 0 ★ » (la note du catalogue), « Laisser rejetée ».
+function Fenetre.titreLaisser(active)
+    if not active then
+        return "Laisser"
+    elseif active.drapeau == 'rejetee' then
+        return "Laisser rejetée"
+    end
+    return "Laisser à " .. entre(active.note, 0, 5) .. " ★"
+end
+
+-- « Passe 2 · à vérifier » (« À vérifier » sans passe connue), « Passe 2 · changée : 4 ★ ».
+function Fenetre.enteteNote(prop)
+    local etat = ETATS_NOTE[prop.etat] or tostring(prop.etat or '')
     if prop.etat == 'changee' then
         if prop.drapeau_choisi == 'rejetee' then
-            texte = texte .. " : rejetée"
+            etat = etat .. " : rejetée"
         elseif tonumber(prop.note_choisie) then
-            texte = texte .. " : " .. Lightroom.etoiles(prop.note_choisie)
+            etat = etat .. " : " .. entre(prop.note_choisie, 0, 5) .. " ★"
         end
     elseif prop.etat == 'proposee' and prop.a_verifier == true then
-        texte = texte .. " · à vérifier"
+        etat = etat .. " · à vérifier"
     end
     if tonumber(prop.passe) then
-        texte = texte .. " · passe " .. tostring(math.floor(tonumber(prop.passe)))
+        return "Passe " .. math.floor(tonumber(prop.passe)) .. " · " .. etat
     end
-    return texte
+    local maj = ETATS_NOTE_MAJ[prop.etat]
+    return maj and (maj .. etat:sub(#(ETATS_NOTE[prop.etat]) + 1)) or etat
 end
 
--- Les critères, du plus lourd au plus léger, puis le plafond mesuré par cull_photos.
-function Fenetre.texteCriteres(prop)
-    local criteres = type(prop.criteres) == 'table' and prop.criteres or {}
+-- Le verdict en tête du texte d'un critère (« Moyen. Le ciel arrête l'œil. », « Fort », « Nette
+-- (44). ») : ses premiers mots jusqu'au premier point, ou le texte entier sans point, s'ils font
+-- deux mots au plus, 20 caractères au plus, sans deux-points. Rend le verdict et la suite ; nil et
+-- le texte entier sans verdict.
+function Fenetre.verdict(texte)
+    texte = texteChamp(texte)
+    local debut, suite = texte:match('^([^%.]-%.)(.*)$')
+    if not debut then
+        debut, suite = texte, ''
+    end
+    local mots = 0
+    for _ in debut:gmatch('%S+') do
+        mots = mots + 1
+    end
+    if mots == 0 or mots > 2 or Texte.longueur(debut) > 20 or debut:find(':', 1, true) then
+        return nil, texte
+    end
+    return debut, suite
+end
+
+-- Les lignes de la grille de la carte Note (Vues.ligneCritere) pour une proposition (nil : l'aide,
+-- Fenetre.AIDE_NOTATION, en lignes pleine largeur), à `largeurs` { plein (379), critere (251) } :
+-- d'abord l'état et la raison (« <EM>Passe 2 · à vérifier.</EM> Tient seule… » ; sa première
+-- ligne en genre 'etat', son gras de la couleur de l'état, les suivantes 'plein'), puis chaque
+-- critère, du plus lourd au plus léger, son étiquette sur sa première ligne et son texte coupé à
+-- côté, le verdict en <EM> (gras 12). Coupées en 12 points, chaque ligne aux balises fermées
+-- (Fil.couper) ; les balises venues de Claude sont retirées. Tables neuves : { genre = 'etat',
+-- 'plein' ou 'critere', etiquette, texte }.
+function Fenetre.lignesCriteres(prop, largeurs)
     local lignes = {}
+    local function couper(texte, largeur)
+        return (Fil.couper(texte, largeur - Fil.MARGE, 'texte12', nil, 'gras12'))
+    end
+    if not prop then
+        for _, l in ipairs(Fenetre.lignesCarte(Fenetre.AIDE_NOTATION, largeurs.plein, 'texte12', 'gras12')) do
+            lignes[#lignes + 1] = { genre = 'plein', etiquette = '', texte = l }
+        end
+        return lignes
+    end
+    local raison = texteChamp(prop.raison)
+    local tete = '<EM>' .. Fenetre.enteteNote(prop) .. '.</EM>' .. (raison ~= '' and (' ' .. raison) or '')
+    for k, l in ipairs(couper(tete, largeurs.plein)) do
+        lignes[#lignes + 1] = { genre = k == 1 and 'etat' or 'plein', etiquette = '', texte = l }
+    end
+    local criteres = type(prop.criteres) == 'table' and prop.criteres or {}
     for _, critere in ipairs(CRITERES) do
         local texte = texteChamp(criteres[critere.cle])
         if texte ~= '' then
-            lignes[#lignes + 1] = critere.titre .. " : " .. texte
+            local verdict, suite = Fenetre.verdict(texte)
+            for k, l in ipairs(couper(verdict and ('<EM>' .. verdict .. '</EM>' .. suite) or suite, largeurs.critere)) do
+                lignes[#lignes + 1] = { genre = 'critere', etiquette = k == 1 and critere.titre or '', texte = l }
+            end
         end
     end
-    if tonumber(prop.plafond) then
-        lignes[#lignes + 1] = "Plafond mesuré : " .. tostring(math.floor(tonumber(prop.plafond))) .. " ★"
-    end
-    return table.concat(lignes, '\n')
+    return lignes
 end
 
--- Le texte de la carte Note : les critères et le plafond, puis la raison.
-function Fenetre.texteNote(prop)
-    local criteres, raison = Fenetre.texteCriteres(prop), texteChamp(prop.raison)
-    if criteres ~= '' and raison ~= '' then
-        return criteres .. '\n\n' .. raison
+-- La signature des lignes de la grille (le « texte » de sa page : la même revient à la même page).
+local function signature(lignes)
+    local morceaux = {}
+    for _, l in ipairs(lignes) do
+        morceaux[#morceaux + 1] = l.genre .. '\1' .. l.etiquette .. '\1' .. l.texte
     end
-    return criteres .. raison
+    return table.concat(morceaux, '\n')
+end
+
+-- « <EM>Plafond 3 ★</EM> : mesuré au tri, pas plus. » : le plafond que le plancher technique
+-- mesuré au tri (cull_photos) donne à la note ; le registre ne garde pas sa raison.
+function Fenetre.textePlafond(plafond)
+    return "<EM>Plafond " .. entre(plafond, 0, 5) .. " ★</EM> : mesuré au tri, pas plus."
+end
+
+-- Le zoom que Claude a pris pour noter la photo de la carte (Conversation.dernierZoom, dans la
+-- conversation montrée), gardé tant que la conversation, son nombre d'éléments et la photo ne
+-- changent pas (la carte se relit toutes les 2 s) ; nil sans zoom.
+function Fenetre.zoomDeLaNote()
+    local c = Moteur.courante
+    local prop = Fenetre.propositionNote
+    local active = Fenetre.info and Fenetre.info.active
+    local photo = prop and prop.photo or (active and active.id)
+    if not c or photo == nil then
+        return nil
+    end
+    local cle = tostring(c.id) .. '#' .. #(c.elements or {}) .. '#' .. Conversation.clePhoto(photo)
+    local garde = Fenetre.zoomGarde
+    if garde and garde.cle == cle and garde.conversation == c then
+        return garde.zoom
+    end
+    local zoom = Conversation.dernierZoom(c, photo)
+    Fenetre.zoomGarde = { cle = cle, conversation = c, zoom = zoom }
+    return zoom
+end
+
+-- « Voir à 100 % » : le zoom que Claude a pris pour noter la photo de la carte, montré dans
+-- l'aperçu (décision de Dany du 21 octobre 2026 : « Montre dans l'aperçu le zoom que Claude a pris
+-- pour noter, s'il y en a un dans la conversation ; grisé sinon »), comme un clic sur sa ligne
+-- d'image dans le fil (Fenetre.clics.image) : il y reste jusqu'à un autre onglet, une image
+-- nouvelle, une autre conversation ou une autre photo active, et Agrandir le montre en grand. Sans
+-- nouvel appel à Claude, sans rien demander à Lightroom. Rend faux sans zoom (le bouton est alors
+-- grisé).
+function Fenetre.voirZoom()
+    local zoom = Moteur.courante and Fenetre.zoomDeLaNote()
+    if not zoom then
+        return false
+    end
+    Fenetre.clics.image({ image = zoom.chemin })
+    return Fenetre.imageCliquee == true
 end
 
 function Fenetre.rafraichirNotation()
-    local p = Fenetre.p
+    local p, T = Fenetre.p, Fenetre.T
     if not p then
         return
     end
@@ -3010,24 +3239,31 @@ function Fenetre.rafraichirNotation()
         prop = ok and r or nil
     end
     Fenetre.propositionNote = prop
-    poser(p, 'notationNom', active and Lightroom.nomCourt(active.nom) or "Aucune photo active")
-    poser(p, 'notationPosee', Fenetre.texteNotePosee(active))
-    if prop then
-        poser(p, 'notationProposee', Fenetre.texteNoteProposee(prop))
-        poser(p, 'notationCouleur', COULEURS_NOTE[prop.etat] or 'gris')
-        poser(p, 'notationEtat', Fenetre.texteEtatNote(prop))
-        Fenetre.montrerPage('note', Fenetre.texteNote(prop))
-    else
-        poser(p, 'notationProposee', "Aucune note proposée")
-        poser(p, 'notationCouleur', 'gris')
-        poser(p, 'notationEtat', '')
-        Fenetre.montrerPage('note', Fenetre.AIDE_NOTATION)
-    end
+    -- Les passes (la passe de Claude, au plus l'avant-dernière), la note posée et ses étoiles.
+    poser(p, 'notePasse', prop and entre(prop.passe, 0, Fenetre.PASSE_MAX_CLAUDE) or 0)
+    poser(p, 'noteCatalogue', active and entre(active.note, 0, 5) or 0)
+    local titre, sous = Fenetre.notePosee(active)
+    poser(p, 'notePoseeTitre', titre)
+    poser(p, 'notePoseeSous', sous)
+    -- Ce que Claude propose, et la couleur de son état.
+    poser(p, 'noteClaude', Fenetre.noteClaude(prop))
+    poser(p, 'notationCouleur', prop and COULEURS_NOTE[prop.etat] or 'gris')
+    -- La grille des critères, page par page (la même revient à la même page).
+    local lignes = Fenetre.lignesCriteres(prop, { plein = T and T.largeurNote or 379, critere = T and T.texteCritere or 251 })
+    Fenetre.montrerPage('note', signature(lignes), nil, lignes)
+    -- Le plafond mesuré au tri, et le zoom que Claude a pris pour noter.
+    local plafond = prop and tonumber(prop.plafond)
+    poser(p, 'aPlafond', plafond ~= nil)
+    poser(p, 'plafondTexte', plafond and Fenetre.textePlafond(plafond) or '')
+    poser(p, 'peutVoirZoom', Fenetre.zoomDeLaNote() ~= nil)
     -- Les écritures de la fenêtre échappent à la file du connecteur : pas pendant que Claude
-    -- travaille, ni pendant une écriture déjà demandée.
+    -- travaille, ni pendant une écriture déjà demandée. Jamais « Accepter 5 ★ ».
     local libre = not Moteur.travaille and not Fenetre.noteEnCours
-    poser(p, 'peutAccepterNote', libre and prop ~= nil and (prop.etat == 'proposee' or prop.etat == 'a_verifier'))
+    local adecider = prop ~= nil and (prop.etat == 'proposee' or prop.etat == 'a_verifier') and not Fenetre.noteDeCinq(prop)
+    poser(p, 'peutAccepterNote', libre and adecider)
     poser(p, 'peutChangerNote', libre and active ~= nil)
+    poser(p, 'titreAccepterNote', Fenetre.titreAccepter(prop))
+    poser(p, 'titreLaisser', Fenetre.titreLaisser(active))
     -- Une proposition qui arrive pour la photo montrée se montre (onglet Note), une seule fois, « à
     -- vérifier » comprise (la plus fréquente, constaté) ; une autre photo choisie ne change pas
     -- d'onglet.
@@ -3040,15 +3276,47 @@ function Fenetre.rafraichirNotation()
     Fenetre.noteVue, Fenetre.notePhoto = cle, photo
 end
 
+-- La carte libre pour une écriture : ni Claude au travail, ni une autre écriture de la carte, et
+-- une photo active. Rend la photo active, sinon nil (le bandeau dit pourquoi).
+local function carteLibre()
+    local p = Fenetre.p
+    if not p then
+        return nil
+    end
+    local active = Fenetre.info and Fenetre.info.active
+    local message
+    if Moteur.travaille then
+        message = Fenetre.CLAUDE_TRAVAILLE
+    elseif Fenetre.noteEnCours then
+        message = Fenetre.NOTE_EN_COURS
+    elseif not active then
+        message = Fenetre.AUCUNE_PHOTO
+    end
+    if message then
+        p.message = message
+        return nil
+    end
+    return active
+end
+
 -- Écrit une note dans le catalogue (Notation.poser), depuis une tâche, puis relit la photo : une
--- écriture à la fois, jamais pendant que Claude travaille.
-function Fenetre.poserNote(choix)
+-- écriture à la fois, jamais pendant que Claude travaille (le bandeau le dit). `etatGarde` (un
+-- drapeau qui ne décide rien, Fenetre.poserDrapeau) : la proposition de Claude revient à cet état
+-- une fois le drapeau posé (Notation.poser l'aurait dite acceptée ou changée), dans la même tâche,
+-- sans rien écrire de plus dans le catalogue.
+function Fenetre.poserNote(choix, etatGarde)
     if Moteur.travaille or Fenetre.noteEnCours then
+        if Fenetre.p then
+            Fenetre.p.message = Moteur.travaille and Fenetre.CLAUDE_TRAVAILLE or Fenetre.NOTE_EN_COURS
+        end
         return
     end
     Fenetre.noteEnCours = true
     Fenetre.rafraichirNotation()
     local ok, r = LrTasks.pcall(Notation.poser, { choix })
+    if ok and r.ok and etatGarde then
+        LrTasks.pcall(Notation.decider, choix.photo, etatGarde)
+    end
     Fenetre.noteEnCours = false
     if Fenetre.p then
         if not ok then
@@ -3061,11 +3329,82 @@ function Fenetre.poserNote(choix)
     Fenetre.aRafraichirNotation = true
 end
 
+-- Un clic sur la i-e étoile de « Votre note » (son calque, Vues.notation) : i ★ posées dans
+-- Lightroom, 5 comprises (c'est Dany qui les pose), ou 0 si la photo les a déjà (un clic sur
+-- l'étoile de la note posée la retire), dans une tâche. Rend vrai si la note part.
+function Fenetre.poserEtoile(i)
+    local active = carteLibre()
+    if not active then
+        return false
+    end
+    local note = entre(i, 0, 5)
+    if tonumber(active.note) == note then
+        note = 0
+    end
+    enTache(Fenetre.poserNote, { photo = active.id, note = note, raison = Fenetre.RAISON_NOTE })
+    return true
+end
+
+-- « ⚑ Retenir » ou « ⊗ Rejeter » : ce drapeau posé dans Lightroom, ou retiré (« aucun ») si la
+-- photo l'a déjà ; les étoiles restent. Dans une tâche ; rend vrai si le drapeau part. Retenir, ou
+-- retirer un drapeau, ne décide rien de la note que Claude propose : sa proposition à décider le
+-- reste (sans quoi Notation.poser la dirait changée, la note du catalogue prise pour celle de Dany).
+-- Rejeter décide (la proposition est changée, ou acceptée si Claude proposait le rejet), comme tout
+-- drapeau sur un rejet proposé.
+function Fenetre.poserDrapeau(drapeau)
+    local active = carteLibre()
+    if not active then
+        return false
+    end
+    local nouveau = active.drapeau == drapeau and 'aucun' or drapeau
+    local prop = Fenetre.propositionNote
+    local garder
+    if prop and (prop.etat == 'a_verifier' or prop.etat == 'proposee') and prop.drapeau ~= 'rejetee' and nouveau ~= 'rejetee' then
+        garder = prop.etat
+    end
+    enTache(Fenetre.poserNote, { photo = active.id, drapeau = nouveau, raison = Fenetre.RAISON_DRAPEAU }, garder)
+    return true
+end
+
+-- « Laisser à N ★ » : la note du catalogue reste, la proposition de Claude est écartée
+-- (Notation.decider, rien n'est écrit dans Lightroom), dans une tâche. Rend vrai si elle part.
+function Fenetre.laisserNote()
+    local prop = Fenetre.propositionNote
+    if not carteLibre() or not prop then
+        return false
+    end
+    enTache(Fenetre.ecarterNote, prop.photo)
+    return true
+end
+
+-- La tâche de Laisser : refusée (et dite au bandeau, comme Fenetre.poserNote) si Claude s'est mis au
+-- travail ou qu'une note s'écrit depuis le clic.
+function Fenetre.ecarterNote(photo)
+    if Moteur.travaille or Fenetre.noteEnCours then
+        if Fenetre.p then
+            Fenetre.p.message = Moteur.travaille and Fenetre.CLAUDE_TRAVAILLE or Fenetre.NOTE_EN_COURS
+        end
+        return
+    end
+    local ok, fait, raison = LrTasks.pcall(Notation.decider, photo, 'ecartee')
+    if Fenetre.p and not (ok and fait) then
+        Fenetre.p.message = "La proposition n'a pas été écartée : " .. tostring(ok and raison or fait)
+    end
+    Fenetre.aRafraichirNotation = true
+end
+
 -- Accepter : la proposition de Claude telle quelle (Notation.poser sans note ni drapeau : sa
 -- note, ou le drapeau Rejeter pour un rejet ; un drapeau Retenue de Dany reste). Depuis une tâche.
+-- Jamais une proposition de 5 ★ (Claude ne la fait pas : 5 ★ sont à Dany).
 function Fenetre.accepterNote()
     local prop = Fenetre.propositionNote
     if not prop then
+        return
+    end
+    if Fenetre.noteDeCinq(prop) then
+        if Fenetre.p then
+            Fenetre.p.message = Fenetre.PAS_CINQ
+        end
         return
     end
     Fenetre.poserNote({ photo = prop.photo })
@@ -3106,7 +3445,7 @@ function Fenetre.changerNote()
             actionVerb = "Poser",
         }
         if reponse == 'ok' then
-            choix = { photo = active.id, note = tonumber(q.note) or 0, raison = "Note choisie dans la fenêtre Claude",
+            choix = { photo = active.id, note = tonumber(q.note) or 0, raison = Fenetre.RAISON_NOTE,
                 drapeau = q.drapeau ~= 'inchange' and q.drapeau or nil }
         end
     end)
@@ -3808,14 +4147,25 @@ function Fenetre.boucle(generation)
     end
 end
 
--- Valeurs des propriétés de la carte Note avant l'ouverture (rafraichirNotation les remplit).
-local function initialiserNotation(p)
-    p.notationNom = ''
-    p.notationPosee = ''
-    p.notationProposee = ''
+-- Valeurs des propriétés de la carte Note avant l'ouverture (rafraichirNotation les remplit) : les
+-- passes, la note posée, ce que Claude propose, la grille des critères (`ng..k`, `ne..k`, `nt..k`),
+-- le plafond et son zoom, les boutons.
+local function initialiserNotation(p, D)
+    p.notePasse = 0
+    p.noteCatalogue = 0
+    p.notePoseeTitre = ''
+    p.notePoseeSous = ''
+    p.noteClaude = 'aucune'
     p.notationCouleur = 'gris'
-    p.notationEtat = ''
-    p.notationTexte = ''
+    local g = CARTES.note.grille
+    for k = 1, CARTES.note.lignes(D) do
+        p[g.genre .. k], p[g.etiquette .. k], p[g.texte .. k] = 'vide', '', ''
+    end
+    p.aPlafond = false
+    p.plafondTexte = ''
+    p.peutVoirZoom = false
+    p.titreAccepterNote = "Accepter"
+    p.titreLaisser = "Laisser"
     p.peutAccepterNote = false
     p.peutChangerNote = false
 end
@@ -3823,7 +4173,7 @@ end
 -- Valeurs des propriétés de la 1.3 avant l'ouverture (Lightroom l'exige de toute clé liée) : la
 -- carte de l'étape, vide et ses boutons inactifs, et la seconde rangée de la carte Proposition.
 local function initialiserEtapeEtExercice(p)
-    p.etapeTitre = ''
+    p.etapeTitre = Fenetre.TITRE_ETAPE
     p.etapeSousTitre = ''
     p.etapeTexte = ''
     p.etapePrecedente = false
@@ -3962,7 +4312,7 @@ function Fenetre.afficher()
         p.leconTitre = "Leçon de la photo"
         p.leconTexte = ''
         p.leconADetail = false
-        initialiserNotation(p)
+        initialiserNotation(p, D)
         initialiserEtapeEtExercice(p)
         Fenetre.p = p
 
