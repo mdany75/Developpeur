@@ -2,7 +2,8 @@
 -- Lightroom simulé par Simulation.lua). L'image entière, non recadrée, que read_composition lit
 -- (apercu avec entier : le cadre retiré et la case « Contraindre le recadrage » décochée le temps
 -- du rendu, deux étapes « Claude · composition », photo remise ; le cadre actuel vu dans l'image
--- entière ; aucune écriture sans recadrage ; les refus) ; l'image entière d'une proposition de
+-- entière ; aucune écriture sans recadrage ; les refus, pause et photo protégée compris, seulement
+-- s'il faut écrire) ; l'image entière d'une proposition de
 -- recadrage (essayer avec entier : trois étapes, le cadre que Lightroom a gardé, Upright compris,
 -- la photo remise, CropConstrainToWarp compris ; la proposition qui part quand même si l'image
 -- entière ne se rend pas) ; en paysage (AB) et en vertical (DA) ; le contrat avec le serveur
@@ -221,6 +222,40 @@ test("apercu entier : sans recadrage ni contrainte, rendue telle quelle, sans é
     egal(r.dimensions, nil)
 end)
 
+test("apercu entier : une photo protégée se lit sans écriture si elle n'est pas recadrée ; recadrée, refusée sans rien écrire ni rendre", function()
+    local photo = photoEn('AB')
+    -- Copies virtuelles seulement, sur l'original : rendue telle quelle, rien à écrire.
+    S.prefs.copiesSeulement = true
+    local r = apercuEntier()
+    egal(#S.ecritures, 0, "aucune écriture") egal(#S.rendus, 1)
+    egal(r.image_entiere, true)
+
+    -- Recadrée : le cadre ne se retire pas, même le temps du rendu (comme une proposition).
+    cadrer(photo, { ratio = 0.8, angle = 2, taille = 0.7 })
+    local avant = copieCadre(photo.reglages)
+    echoue(function() apercuEntier() end, "pas une copie virtuelle")
+    echoue(function() apercuEntier() end, "rien n'a été écrit")
+    egal(#S.ecritures, 0, "rien d'écrit") egal(#photo.appliques, 0)
+    egal(#S.rendus, 1, "rien de rendu")
+    cadreRemis(photo, avant, "cadre intact")
+
+    -- Rejetée et protégée : refusée de même.
+    S.prefs.copiesSeulement = false
+    S.prefs.rejeteesProtegees, photo.brut.pickStatus = true, -1
+    echoue(function() apercuEntier() end, "photo rejetée, protégée")
+    egal(#S.ecritures, 0)
+
+    -- Une copie virtuelle, en copies seulement : lue, le cadre retiré puis remis.
+    S.prefs.rejeteesProtegees, photo.brut.pickStatus = false, 0
+    S.prefs.copiesSeulement = true
+    photo.brut.isVirtualCopy = true
+    r = apercuEntier()
+    egal(ecritures(), IMAGE_ENTIERE .. ' | ' .. RETOUR)
+    sansCadreNiContrainte(S.rendus[2].reglagesRendus, "rendu")
+    cadreRemis(photo, avant, "photo remise")
+    egal(type(r.cadre_actuel), 'table')
+end)
+
 test("apercu entier : refusé avec comparer ou point_af, sur une photo agrandie, ou recadrée sans dimensions connues ; rien d'écrit ni de rendu", function()
     local photo = photoEn('AB')
     cadrer(photo, { ratio = 1.5, angle = 1, taille = 0.8 })
@@ -433,7 +468,24 @@ test("essayer : l'image entière qui ne se rend pas, ou son écriture refusée, 
     egal(#S.rendus, 1)
     egal(r.chemin_entier, nil)
     egal(type(r.cadre_propose), 'table')
-    egal(contient(r.remarques, "Image entière non rendue : Lightroom est occupé"), true, Json.encode(r.remarques))
+    -- La raison sans son point final : « … dans un instant ; le cadre… », jamais « instant. ; ».
+    egal(contient(r.remarques, "Image entière non rendue : Lightroom est occupé (une autre opération écrit dans le catalogue) : "
+        .. "réessayer dans un instant ; le cadre n'est pas dessiné."), true, Json.encode(r.remarques))
+    egal(contient(r.remarques, ". ;"), false, Json.encode(r.remarques))
+    cadreRemis(photo, avant, "photo remise")
+
+    -- Une erreur Lua (avec son emplacement, « fichier.lua:12: ») juste après l'écriture de l'image
+    -- entière : la raison se lit sans l'emplacement, et le cadre écrit revient.
+    S.rendus, S.ecritures = {}, {}
+    r = surEcritures(function(nom)
+        if nom == ESSAI_ENTIERE then error("écriture interrompue") end
+    end, nil, function() return proposerCadre(demande) end)
+    egal(ecritures(), "Claude · essai : cadre | " .. ESSAI_ENTIERE .. ' | ' .. FIN)
+    egal(r.chemin_entier, nil)
+    egal(type(r.cadre_propose), 'table')
+    egal(contient(r.remarques, "Image entière non rendue : écriture interrompue ; le cadre n'est pas dessiné."), true,
+        Json.encode(r.remarques))
+    egal(contient(r.remarques, ".lua:"), false, Json.encode(r.remarques))
     cadreRemis(photo, avant, "photo remise")
 end)
 

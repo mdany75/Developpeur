@@ -20,12 +20,12 @@
 --                                          point) et point_af_toujours ; entier (Composition lue,
 --                                          1.3 : read_composition) : l'image entière, sans son
 --                                          cadre (retiré puis remis : deux étapes « Claude ·
---                                          composition », aucune sans recadrage ; la pause ne
---                                          l'arrête que s'il faut écrire), image_entiere = true,
---                                          dimensions = { largeur, hauteur } de l'image affichée
---                                          entière, cadre_actuel = Recadrage.lire du cadre (absent
---                                          sans recadrage) ; refusé avec comparer ou point_af, et sur
---                                          une photo agrandie
+--                                          composition », aucune sans recadrage ; la pause et la
+--                                          protection des photos ne l'arrêtent que s'il faut
+--                                          écrire), image_entiere = true, dimensions = { largeur,
+--                                          hauteur } de l'image affichée entière, cadre_actuel =
+--                                          Recadrage.lire du cadre (absent sans recadrage) ; refusé
+--                                          avec comparer ou point_af, et sur une photo agrandie
 --   appliquer   {photos?|selection?, reglages, booleens?, profil?, profil_marque?, profil_variantes?, profil_absent_sur?, profil_look?,
 --                recadrage?, recalages?, courbes?, couleurs_ponctuelles?, balance?, auto_ton?, flou_objectif?,
 --                preset?, quantite_preset?, melange_nb_auto?, profil_objectif?, reperes?, rotation?,

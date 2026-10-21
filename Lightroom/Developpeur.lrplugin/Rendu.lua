@@ -309,15 +309,18 @@ end
 -- L'image entière, sans son cadre (apercu avec entier) : comme le premier rendu du recalage, le
 -- cadre retiré et la case « Contraindre le recadrage » décochée le temps du rendu, puis remis, même
 -- si le rendu échoue ; l'Historique de Lightroom garde les deux étapes « Claude · composition ».
--- Une photo ni recadrée ni contrainte se rend telle quelle, sans écriture : la pause, qui n'arrête
--- que les écritures, n'est vérifiée que s'il faut écrire. Rend le chemin, et faux si des réglages
--- IA n'étaient pas encore calculés (comme rendre).
+-- Une photo ni recadrée ni contrainte se rend telle quelle, sans écriture. La pause et la
+-- protection des photos (copies virtuelles seulement, libellé protégé, photos rejetées) n'arrêtent
+-- que les écritures : elles ne sont vérifiées que s'il faut écrire. Comme pour une proposition
+-- (essayer), une photo protégée ne reçoit aucune écriture, même le temps d'un rendu. Rend le
+-- chemin, et faux si des réglages IA n'étaient pas encore calculés (comme rendre).
 local function rendreEntier(photo, actuels, taille, params)
     local retire, retour = sansRecadrage(actuels)
     if next(retire) == nil then
         return rendre(photo, taille)
     end
     verifierPause(params)
+    verifierProtection({ photo }, Preferences.lire(), { confirme = true }, 'read_composition')
     verifierRendable(photo)
     poser(photo, Rendu.ETAPE_ENTIERE, retire)
     local ok, chemin, calcules = LrTasks.pcall(rendre, photo, taille)
@@ -348,7 +351,10 @@ local function rendreEntierPropose(photo, plan, taille)
         return (rendre(photo, taille))
     end)
     if not ok then
-        noter(plan, "Image entière non rendue : " .. tostring(chemin) .. " ; le cadre n'est pas dessiné.")
+        -- La raison sans l'emplacement d'une erreur Lua ni son point final (« … occupé : réessayer
+        -- dans un instant. ; le cadre… » se lirait mal).
+        local raison = Liaison.messageErreur(chemin):gsub('%.+$', '')
+        noter(plan, "Image entière non rendue : " .. raison .. " ; le cadre n'est pas dessiné.")
         chemin = nil
     end
     return cadre, dimensions, chemin, retire
@@ -465,8 +471,8 @@ function Rendu.apercu(params)
     local photo = photoVisee(params)
     local taille = tonumber(params.taille) or 1568
     -- L'image entière, sans son cadre (entier, read_composition) : refusée avant toute écriture
-    -- avec comparer, point_af ou sur une photo agrandie ; le cadre actuel et les dimensions lus
-    -- avant d'écrire.
+    -- avec comparer, point_af, sur une photo agrandie et, s'il faut écrire, en pause ou sur une
+    -- photo protégée ; le cadre actuel et les dimensions lus avant d'écrire.
     local entier
     if params.entier == true then
         entier = preparerEntier(photo, params)
