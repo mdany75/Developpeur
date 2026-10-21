@@ -10,7 +10,9 @@ import Foundation
 /// dans l'image entière par Composition.versImageEntiere, d'après le cadre actuel que le module lit
 /// (cadre_actuel). L'horizon se mesure sur l'image entière (LineAngle : angle absolu), le sujet est
 /// celui de Vision (visages, puis zone d'intérêt) ou celui donné ; Composition.proposer calcule le
-/// cadre. Réponse sans image : preview_settings le montre, dessiné sur l'image entière.
+/// cadre. Réponse sans image : preview_settings le montre, dessiné sur l'image entière. Un horizon
+/// penché de 0,5° ou plus sur une géométrie intacte va au carnet de progrès (Carnet.constatHorizon),
+/// comme celui de measure_angle.
 extension ToolHandler {
     /// Taille du cadre (size, min_size), en part du plus grand cadre possible.
     static let tailleCadreComposition = 0.5...1.0
@@ -144,8 +146,11 @@ extension ToolHandler {
         let tailleMin = try Self.tailleComposition(args, "min_size") ?? Self.tailleMinCompositionDefaut
 
         // L'image entière, non recadrée (commande apercu avec entier : le module retire le cadre le
-        // temps du rendu, puis le remet), et le cadre actuel vu dans cette image.
-        var params: [String: JSONValue] = ["taille": .number(Double(Self.defaultPreviewSize)), "cles": [], "entier": true]
+        // temps du rendu, puis le remet), et le cadre actuel vu dans cette image. Avec un horizon
+        // qui peut aller au carnet, les réglages de la géométrie : Upright et la perspective restent
+        // dans l'image entière, et une ligne qu'ils ont redressée ne dit plus la prise de vue.
+        var params: [String: JSONValue] = ["taille": .number(Double(Self.defaultPreviewSize)),
+                                           "cles": segment == nil ? [] : clesDeLaLigne, "entier": true]
         if let id = args.int("photo_id") { params["photo"] = .number(Double(id)) }
         let result = try lightroom.send("apercu", params, timeout: 120)
         let data = try Self.readPreview(result["chemin"]?.string)
@@ -304,6 +309,12 @@ extension ToolHandler {
                 objet["mesure"] = "d'après les deux points seulement : aucun contour net le long du segment"
             }
             reponse["horizon"] = .object(objet)
+            // Le carnet de progrès (1.3) : l'inclinaison sur l'image entière, si la géométrie est
+            // intacte (ni recadrage tourné, ni Upright, ni perspective, ni distorsion manuelle).
+            if let constat = noterLAngle(apercu: result, tilt: ligne.tilt, vertical: ligne.vertical, angleActuel: angleActuel,
+                                         source: "read_composition") {
+                reponse["constats_prise_de_vue"] = [.string(constat)]
+            }
         }
         if let sujet, let source {
             var objet: [String: JSONValue] = [

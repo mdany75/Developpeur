@@ -65,19 +65,29 @@ public struct PhotoTriee {
         return "yeux fermés ou plissés : \(fermes.count) visage\(fermes.count > 1 ? "s" : "") sur \(sujets.count)"
     }
 
-    /// Les défauts mesurés, par genre : floue, mise au point manquée ou signalée manquée par
-    /// l'appareil, yeux fermés, presque noire, brûlée. Seuils de netteté de `Detail` (relevés à
-    /// 1024 px : moins de 15 floue, plus de 35 nette ; `DetailMeasurements.seuilFlou` et `seuilNet`).
-    public var defautsMesures: [(genre: Defaut, texte: String)] {
+    /// Les défauts de netteté mesurés : floue, mise au point manquée, ou signalée manquée par
+    /// l'appareil (sans autre défaut de netteté, et pas nette au point). Seuils de `Detail`, relevés
+    /// à 1024 px : moins de 15 floue, plus de 35 nette (`DetailMeasurements.seuilFlou` et
+    /// `seuilNet`). Seule copie de ces règles : le tri (`defautsMesures`) et le carnet de progrès
+    /// (`Carnet.constatsVue`) les reprennent.
+    static func defautsNettete(detail: DetailMeasurements?, af: MiseAuPoint?) -> [(genre: Defaut, texte: String)] {
         var liste: [(genre: Defaut, texte: String)] = []
         if let detail, detail.sharpest < DetailMeasurements.seuilFlou {
-            liste.append((.floue, "floue : aucune zone nette (netteté \(Self.r(detail.sharpest)))"))
+            liste.append((.floue, "floue : aucune zone nette (netteté \(r(detail.sharpest)))"))
         } else if let af, let auPoint = af.nettete, let detail, auPoint < DetailMeasurements.seuilFlou, detail.sharpest >= DetailMeasurements.seuilNet {
-            liste.append((.miseAuPointManquee, "mise au point manquée : floue au point AF (\(Self.r(auPoint))), nette ailleurs (\(Self.r(detail.sharpest)))"))
+            liste.append((.miseAuPointManquee, "mise au point manquée : floue au point AF (\(r(auPoint))), nette ailleurs (\(r(detail.sharpest)))"))
         }
-        if let af, af.avertissement, (nettete ?? 0) < DetailMeasurements.seuilNet, liste.isEmpty {
+        // La netteté qui compte : au point de mise au point s'il est mesuré, sinon la zone la plus nette.
+        if let af, af.avertissement, (af.nettete ?? detail?.sharpest ?? 0) < DetailMeasurements.seuilNet, liste.isEmpty {
             liste.append((.miseAuPointSignalee, "mise au point signalée manquée par l'appareil"))
         }
+        return liste
+    }
+
+    /// Les défauts mesurés, par genre : ceux de la netteté (`defautsNettete`), yeux fermés, presque
+    /// noire, brûlée.
+    public var defautsMesures: [(genre: Defaut, texte: String)] {
+        var liste = Self.defautsNettete(detail: detail, af: af)
         if let yeux = yeuxFermes { liste.append((.yeuxFermes, yeux)) }
         if let mesures {
             if mesures.medianL < 6 { liste.append((.presqueNoire, "presque noire (L* médian \(Self.r(mesures.medianL)))")) }

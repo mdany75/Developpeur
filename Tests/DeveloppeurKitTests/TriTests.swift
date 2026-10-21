@@ -427,6 +427,47 @@ final class TriTests: XCTestCase {
         XCTAssertLessThan(photo.score, 0)
     }
 
+    /// 1.3 : les règles de netteté (floue, mise au point manquée ou signalée) n'existent qu'à un
+    /// endroit, `PhotoTriee.defautsNettete`, que le tri et le carnet de progrès reprennent : le tri
+    /// rend les mêmes défauts, dans le même ordre, avant les autres (yeux fermés, presque noire…).
+    func testSharpnessRulesAreSharedWithTheProgressNotebook() {
+        let cas: [(nettete: Double, af: PhotoTriee.MiseAuPoint?)] = [
+            (6, nil), (60, nil), (25, nil),
+            (60, .init(point: .zero, nettete: 8, avertissement: false)),
+            (30, .init(point: .zero, nettete: 8, avertissement: false)),
+            (60, .init(point: .zero, nettete: 50, avertissement: true)),
+            (60, .init(point: .zero, nettete: 20, avertissement: true)),
+            (20, .init(point: .zero, nettete: nil, avertissement: true)),
+            (40, .init(point: .zero, nettete: nil, avertissement: true)),
+            (6, .init(point: .zero, nettete: 4, avertissement: true)),
+        ]
+        for (nettete, af) in cas {
+            var photo = PhotoTriee(id: 1, fichier: "DSCF1.RAF")
+            photo.detail = DetailMeasurements(zones: Array(repeating: nettete, count: 9), noise: 0.3, shadowNoise: nil, side: 1024)
+            photo.af = af
+            let partagees = PhotoTriee.defautsNettete(detail: photo.detail, af: af)
+            XCTAssertEqual(photo.defautsMesures.map(\.genre), partagees.map(\.genre), "netteté \(nettete), \(String(describing: af))")
+            XCTAssertEqual(photo.defauts, partagees.map(\.texte))
+        }
+        // Des valeurs attendues, pour que les deux ne dérivent pas ensemble.
+        func genres(_ nettete: Double, _ af: PhotoTriee.MiseAuPoint?) -> [PhotoTriee.Defaut] {
+            PhotoTriee.defautsNettete(detail: DetailMeasurements(zones: Array(repeating: nettete, count: 9), noise: 0.3, shadowNoise: nil, side: 1024),
+                                      af: af).map(\.genre)
+        }
+        XCTAssertEqual(genres(6, nil), [.floue])
+        XCTAssertEqual(genres(60, .init(point: .zero, nettete: 8, avertissement: false)), [.miseAuPointManquee])
+        XCTAssertEqual(genres(20, .init(point: .zero, nettete: nil, avertissement: true)), [.miseAuPointSignalee])
+        XCTAssertEqual(genres(40, .init(point: .zero, nettete: nil, avertissement: true)), [])
+        XCTAssertEqual(PhotoTriee.defautsNettete(detail: nil, af: nil).count, 0)
+        // Les autres défauts du tri viennent après ceux de la netteté.
+        var sombre = PhotoTriee(id: 2, fichier: "DSCF2.RAF")
+        sombre.detail = DetailMeasurements(zones: Array(repeating: 6, count: 9), noise: 0.3, shadowNoise: nil, side: 1024)
+        sombre.mesures = PhotoMeasurements(meanL: 3, percentilesL: [50: 3], histogramL: Array(repeating: 10, count: 10), clippedHighlights: 0,
+                                           pureWhite: 0, crushedShadows: 60, clippedChannels: [0, 0, 0], meanChroma: 1, saturatedShare: 0,
+                                           neutralA: 0, neutralB: 0, neutralShare: 0, pixelCount: 100)
+        XCTAssertEqual(sombre.defautsMesures.map(\.genre), [.floue, .presqueNoire])
+    }
+
     // MARK: Mots-clés proposés
 
     func testEveryVisionLabelHasAFrenchKeyword() throws {

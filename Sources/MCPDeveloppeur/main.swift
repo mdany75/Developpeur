@@ -59,6 +59,11 @@ func usage() {
                 ce que l'appareil a rangé dans un fichier Fujifilm (RAF ou JPEG), lu sans Lightroom : point de mise
                 au point, intention de la prise de vue (comme view_photo) et valeurs lues sous les noms d'exiftool,
                 une ligne JSON ; code 1 si rien n'est lu
+            mcp-developpeur --constats <id photo>… [<fichier.jpg>…]
+                relevé des seuils du carnet de progrès : L* médian et 95e centile, blanc pur du tiers haut, netteté
+                (au point de mise au point aussi), bruit, boîtier, géométrie, puis les défauts que view_photo
+                noterait ; lecture seule (aperçus comme view_photo, rien n'est noté au carnet) ; un fichier JPEG se
+                mesure sans Lightroom
             mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--original] [--images <dossier>]
                 recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
                 (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
@@ -86,9 +91,13 @@ func outils() -> ToolHandler {
 }
 
 func serve() {
+    let tools = outils()
+    // Le carnet de progrès (1.3) ne se remplit que par le serveur lancé par Claude (Claude Desktop,
+    // Claude Code, la fenêtre Claude) : ni --call, ni la recette, ni les tests n'y notent.
+    tools.noterAuCarnet = true
     let server = MCPServer(name: ServerInfo.name, title: ServerInfo.title, version: ServerInfo.version,
                            instructions: ServerInfo.instructions,
-                           tools: outils())
+                           tools: tools)
     server.notifier = { print(line: JSONCoding.line($0)) }
     if let text = ProcessInfo.processInfo.environment["DEVELOPPEUR_LIMITE"], let seconds = Double(text), seconds > 0 {
         server.toolBudget = seconds
@@ -299,6 +308,25 @@ case "--eclairage":
     }
     guard !ids.isEmpty || !fichiers.isEmpty else { usage(); exit(2) }
     let lignes = Eclairage.releve(lightroom: LightroomBridge.fromEnvironment(), ids: ids, fichiers: fichiers, essai: essai) { print(line: $0) }
+    exit(lignes.contains { $0.hasPrefix("✘") } ? 1 : 0)
+case "--constats":
+    // Relevé des seuils du carnet de progrès (Carnet.releve), en lecture seule : des identifiants
+    // (aperçus demandés au module, comme view_photo, sans rien noter au carnet) et des fichiers JPEG
+    // (mesurés sans Lightroom).
+    var ids: [Int] = [], fichiers: [URL] = []
+    for item in arguments.dropFirst() {
+        if let id = Int(item) {
+            ids.append(id)
+        } else if FileManager.default.fileExists(atPath: item) {
+            fichiers.append(URL(fileURLWithPath: item))
+        } else {
+            log("argument inconnu : \(item) (ni identifiant de photo, ni fichier)")
+            usage()
+            exit(2)
+        }
+    }
+    guard !ids.isEmpty || !fichiers.isEmpty else { usage(); exit(2) }
+    let lignes = Carnet.releve(lightroom: LightroomBridge.fromEnvironment(), ids: ids, fichiers: fichiers) { print(line: $0) }
     exit(lignes.contains { $0.hasPrefix("✘") } ? 1 : 0)
 case "--module":
     // Commande brute du module (diagnostic…), pour explorer ce que le SDK de Lightroom offre.
