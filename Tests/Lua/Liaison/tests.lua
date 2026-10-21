@@ -3816,6 +3816,13 @@ test("Liaison fermée : sans jeton écrit, aucune prise ne s'ouvre et la liaison
         egal(Liaison.erreur, "jeton de la liaison : aléa du système illisible (/dev/urandom)")
         egal(Liaison.texteEtat(), "Liaison en erreur : jeton de la liaison : aléa du système illisible (/dev/urandom)")
         egal(contient(Liaison.journal, "Erreur de la liaison : jeton de la liaison"), true)
+        -- En erreur, la liaison reste active : le menu Démarrer seul n'y fait rien, d'où « Arrêter,
+        -- puis Démarrer » dans la réponse à une commande refusée.
+        local generation = Liaison.generation
+        Liaison.demarrer()
+        egal(Liaison.generation, generation, "Démarrer seul ne relance pas une liaison en erreur")
+        egal(Liaison.REFUS_JETON.aucun:find("Arrêter, puis Démarrer la liaison avec Claude", 1, true) ~= nil, true,
+            Liaison.REFUS_JETON.aucun)
         priseDesReponses()
         Liaison.recevoir(ligne({ id = 1, command = 'ping', params = {} }))
         egal(reponse(1).error, Liaison.REFUS_JETON.aucun, "tout est refusé")

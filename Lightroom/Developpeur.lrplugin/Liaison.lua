@@ -96,9 +96,10 @@ Liaison.REFUS_JETON = {
         .. "ou ouvrir une nouvelle session de Claude Code, pour lancer celui qui est installé.",
     faux = "Liaison fermée : le jeton de cette commande n'est pas celui de la liaison ; rien n'a été fait. "
         .. "Il change à chaque démarrage de la liaison : réessayer ; si le refus se répète, relancer la liaison dans Lightroom.",
+    -- « Arrêter, puis Démarrer » : en erreur, la liaison reste active, et Démarrer seul n'y fait rien.
     aucun = "Liaison fermée : le module n'a pas de jeton (il n'a pas pu l'écrire au démarrage de la liaison) ; "
         .. "rien n'a été fait. Relancer la liaison dans Lightroom (Fichier › Module externe - Extras › "
-        .. "Démarrer la liaison avec Claude).",
+        .. "Arrêter, puis Démarrer la liaison avec Claude).",
 }
 
 -- Ligne du journal de chaque genre de refus.

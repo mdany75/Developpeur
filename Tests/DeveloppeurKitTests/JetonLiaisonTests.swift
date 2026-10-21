@@ -48,6 +48,38 @@ final class JetonLiaisonTests: XCTestCase {
         XCTAssertNil(JetonLiaison.lire(try fichier(nil)), "absent")
     }
 
+    /// Le module range un fichier ordinaire (mv) : un dossier, un lien ou un tube nommé à sa place
+    /// ne se lit pas. Le tube se lit à part, borné à 2 s : sa lecture ne doit jamais bloquer le
+    /// serveur.
+    func testLireRefuseCeQuiNEstPasUnFichierOrdinaire() throws {
+        let dossier = try fichier(nil)
+        try FileManager.default.createDirectory(at: dossier, withIntermediateDirectories: true)
+        XCTAssertNil(JetonLiaison.lire(dossier), "dossier")
+
+        let cible = TestSupport.temporaryDirectory().appendingPathComponent("ailleurs")
+        try Data((jeton + "\n").utf8).write(to: cible)
+        let lien = try fichier(nil)
+        try FileManager.default.createSymbolicLink(at: lien, withDestinationURL: cible)
+        XCTAssertEqual(JetonLiaison.lire(cible), jeton, "la cible elle-même se lit")
+        XCTAssertNil(JetonLiaison.lire(lien), "lien symbolique")
+
+        let tube = try fichier(nil)
+        XCTAssertEqual(mkfifo(tube.path, 0o600), 0)
+        let verrou = NSLock()
+        var lu: String? = "pas encore lu"
+        var etat = ""
+        let fini = expectation(description: "lecture du tube nommé")
+        DispatchQueue.global().async {
+            let resultat = (JetonLiaison.lire(tube), JetonLiaison.etat(tube))
+            verrou.lock(); (lu, etat) = resultat; verrou.unlock()
+            fini.fulfill()
+        }
+        wait(for: [fini], timeout: 2)
+        verrou.lock(); defer { verrou.unlock() }
+        XCTAssertNil(lu, "tube nommé")
+        XCTAssertTrue(etat.hasPrefix("illisible ou mal formé ("), etat)
+    }
+
     func testEtatSansJamaisLaValeur() throws {
         let absent = try fichier(nil)
         XCTAssertTrue(JetonLiaison.etat(absent).hasPrefix("absent ("), JetonLiaison.etat(absent))

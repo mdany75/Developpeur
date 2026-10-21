@@ -105,4 +105,10 @@ else
     fi
 fi
 
+# Le module encore chargé par un Lightroom ouvert garde le fichier de son jeton (il le réécrit
+# dans les 5 s, dossier compris) : il ne part pour de bon que Lightroom fermé.
+if pgrep -xq "Adobe Lightroom Classic"; then
+    printf "Lightroom est ouvert : tant qu'il l'est, la liaison du module réécrit %s ; après l'avoir quitté, relancer bash uninstall.sh pour le retirer.\n" "${DEST_DIR}/liaison.jeton"
+fi
+
 printf 'Terminé. Relancer Claude Desktop, ouvrir une nouvelle session Claude Code et relancer Lightroom Classic pour que le connecteur et le module disparaissent.\n'

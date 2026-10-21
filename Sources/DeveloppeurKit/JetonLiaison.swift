@@ -18,9 +18,14 @@ public enum JetonLiaison {
 
     /// Le jeton rangé dans le fichier : exactement 64 chiffres hexadécimaux en minuscules, blancs
     /// du bout retirés (le module finit par un saut de ligne). nil : fichier absent, illisible,
-    /// trop gros ou mal formé.
+    /// trop gros ou mal formé, ou autre chose qu'un fichier ordinaire (le module le range par mv :
+    /// ni lien, ni dossier, ni tube nommé) : genre et taille se vérifient avant la lecture, qui ne
+    /// charge jamais un gros fichier.
     public static func lire(_ url: URL) -> String? {
-        guard let data = try? Data(contentsOf: url), data.count <= tailleMax,
+        guard let attributs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              attributs[.type] as? FileAttributeType == .typeRegular,
+              let taille = (attributs[.size] as? NSNumber)?.intValue, taille <= tailleMax,
+              let data = try? Data(contentsOf: url), data.count <= tailleMax,
               let texte = String(data: data, encoding: .utf8) else { return nil }
         let jeton = texte.trimmingCharacters(in: .whitespacesAndNewlines)
         guard jeton.utf8.count == 64, jeton.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else {
