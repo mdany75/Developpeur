@@ -162,9 +162,10 @@ final class BilanTests: XCTestCase {
         XCTAssertTrue(comparer(mesures(hautes: 4), mesures(hautes: 5.5)).regressions.isEmpty)
         XCTAssertEqual(comparer(mesures(hautes: 4), mesures(hautes: 6.1)).regressions.count, 1)
 
-        let ombres = comparer(mesures(ombres: 0.2), mesures(ombres: 1.8))
-        XCTAssertEqual(ombres.regressions.map(\.texte), ["ombres bouchées : 0,2 → 1,8 %"])
-        XCTAssertTrue(comparer(mesures(ombres: 0.2), mesures(ombres: 0.6)).regressions.isEmpty)
+        let ombres = comparer(mesures(ombres: 0.2), mesures(ombres: 2.4))
+        XCTAssertEqual(ombres.regressions.map(\.texte), ["ombres bouchées : 0,2 → 2,4 %"])
+        XCTAssertTrue(comparer(mesures(ombres: 0.2), mesures(ombres: 1.8)).regressions.isEmpty, "moins de 2 points")
+        XCTAssertTrue(comparer(mesures(ombres: 12.5), mesures(ombres: 14)).regressions.isEmpty, "une nuit n'alerte pas d'elle-même")
 
         let canal = comparer(mesures(hautes: 3, canaux: [0.8, 0.5, 0]), mesures(hautes: 3.2, canaux: [4.1, 0.6, 0]))
         XCTAssertEqual(canal.regressions.map(\.texte), ["canal rouge écrêté : 0,8 → 4,1 % (couleur poussée hors du sRGB ou brûlée)"])
@@ -175,6 +176,7 @@ final class BilanTests: XCTestCase {
         let saturees = comparer(mesures(saturee: 3.1), mesures(saturee: 7.4))
         XCTAssertEqual(saturees.regressions.map(\.texte), ["couleurs très saturées (C* > 60) : 3,1 → 7,4 % des pixels"])
         XCTAssertTrue(comparer(mesures(saturee: 3.1), mesures(saturee: 4.5)).regressions.isEmpty)
+        XCTAssertTrue(comparer(mesures(saturee: 6), mesures(saturee: 8.5)).regressions.isEmpty, "2 points de plus, mais pas 1,5 fois l'avant")
 
         let rien = comparer(mesures(), mesures())
         XCTAssertTrue(rien.ecarts.isEmpty && rien.regressions.isEmpty && rien.aVerifier.isEmpty)
@@ -297,13 +299,13 @@ final class BilanTests: XCTestCase {
         XCTAssertEqual(b2["ecarts"]?["exposition"]?["IL"]?.double ?? 0, 0.5, accuracy: 0.001)
         XCTAssertNil(b2["depuis_le_debut"], "le départ est la vue précédente")
         XCTAssertNil(b2["a_verifier"])
-        XCTAssertEqual(b2["depuis"], "le view_photo précédent de cette photo, il y a 1 min 00 s")
+        XCTAssertEqual(b2["depuis"], "le view_photo précédent de cette photo à 1344 px, il y a 1 min 00 s")
 
         let b3 = Bilan.session(precedente: deuxieme, depart: premiere, maintenant: troisieme, suiviPrecedente: nil, suiviDepart: nil, date: troisieme.quand)
         XCTAssertTrue(textes(b3["a_verifier"]).contains("aller-retour de l'exposition : +0,50 IL à la passe précédente, −0,30 IL depuis : des réglages empilés font dériver la photo"),
                       "\(b3)")
         let debut = try XCTUnwrap(b3["depuis_le_debut"])
-        XCTAssertEqual(debut["depuis"], "le premier view_photo de la session, il y a 3 min 05 s")
+        XCTAssertEqual(debut["depuis"], "le premier view_photo à 1344 px de la session, il y a 3 min 05 s")
         XCTAssertEqual(debut["ecarts"]?["exposition"]?["IL"]?.double ?? 0, 0.2, accuracy: 0.001)
 
         // Dominante b* sur les tons neutres suivis : +1,9 à la passe précédente, −1,8 depuis.
@@ -331,14 +333,14 @@ final class BilanTests: XCTestCase {
     func testSlowDriftShowsSinceTheStart() {
         // Trois petites passes : aucune n'écrête assez, leur somme si.
         let depart = vue(mesures(hautes: 0.4), etapes: 1)
-        let precedente = vue(mesures(hautes: 0.8), apres: 60, etapes: 2)
-        let maintenant = vue(mesures(hautes: 1.2), apres: 120, etapes: 3)
+        let precedente = vue(mesures(hautes: 1.6), apres: 60, etapes: 2)
+        let maintenant = vue(mesures(hautes: 2.8), apres: 120, etapes: 3)
         let b = Bilan.session(precedente: precedente, depart: depart, maintenant: maintenant, suiviPrecedente: nil, suiviDepart: nil, date: maintenant.quand)
         XCTAssertNil(b["regression"])
-        XCTAssertEqual(textes(b["depuis_le_debut"]?["regression"]), ["hautes lumières écrêtées : 0,4 → 1,2 % (+0,8 point)"])
+        XCTAssertEqual(textes(b["depuis_le_debut"]?["regression"]), ["hautes lumières écrêtées : 0,4 → 2,8 % (+2,4 points)"])
         XCTAssertNotNil(b["conseil"])
         // Déjà signalée à la vue précédente : pas redite.
-        let forte = vue(mesures(hautes: 3), apres: 120, etapes: 3)
+        let forte = vue(mesures(hautes: 4), apres: 120, etapes: 3)
         let b2 = Bilan.session(precedente: precedente, depart: depart, maintenant: forte, suiviPrecedente: nil, suiviDepart: nil, date: forte.quand)
         XCTAssertEqual(textes(b2["regression"]).count, 1)
         XCTAssertNil(b2["depuis_le_debut"]?["regression"])
@@ -442,7 +444,7 @@ final class BilanTests: XCTestCase {
         XCTAssertFalse(sansEtape.iaEnAttente)
         XCTAssertNil(sansEtape.corrections)
         XCTAssertNil(Bilan.Vue(apercu: ["photo": ["fichier": "a.jpg"]], quand: t0, taille: 1344, mesures: mesures(), detail: nil, neutres: nil))
-        XCTAssertTrue(Bilan.premiereVue.contains("point de départ"), "le texte du premier view_photo d'une photo")
+        XCTAssertTrue(Bilan.premiereVue(taille: 1344).contains("point de départ"), "le texte du premier view_photo d'une photo")
 
         // Un module 1.1.1 ne donne pas les étapes : le bilan se fait sans elles.
         let ancien = try XCTUnwrap(Bilan.Vue(apercu: apercu(etapes: nil), quand: t0, taille: 1344, mesures: mesures(), detail: nil, neutres: nil))
@@ -487,6 +489,7 @@ final class BilanTests: XCTestCase {
         let suivi = bilan(v1, v2, suivi: .init(a: 0, b: 7.5, part: 30, masque: masque))
         XCTAssertEqual(suivi["ecarts"]?["dominante_b"]?["suivie"], true, "\(suivi)")
         XCTAssertEqual(suivi["ecarts"]?["dominante_b"]?["ecart"]?.double ?? 0, 4.5, accuracy: 0.001)
+        XCTAssertEqual(textes(suivi["regression"]), ["dominante accentuée sur les mêmes tons neutres : b* +3,0 → +7,5 (plus chaude)"])
         // Cadre changé : plus de suivi.
         var v3 = v2
         v3.cadre = "autre cadre"
@@ -616,5 +619,351 @@ final class BilanTests: XCTestCase {
         XCTAssertNotNil(b["conseil"])
         let taille = JSONCoding.line(b).count
         XCTAssertLessThan(taille, 1500, "\(taille) caractères : \(JSONCoding.pretty(b))")
+    }
+
+    // MARK: Seuils relevés le 20 octobre 2026 (mesures, section 4)
+
+    func testRegressionThresholdsFromTheMeasurements() {
+        XCTAssertEqual(Bilan.regressionEcretage.hausseMin, 2)
+        XCTAssertEqual(Bilan.regressionEcretage.facteurMin, 1.5)
+        XCTAssertEqual(Bilan.regressionCanal.hausseMin, 2)
+        XCTAssertEqual(Bilan.regressionCanal.facteurMin, 1.5)
+        XCTAssertEqual(Bilan.regressionOmbres.hausseMin, 2)
+        XCTAssertEqual(Bilan.regressionOmbres.facteurMin, 1)
+        XCTAssertEqual(Bilan.regressionSaturees.hausseMin, 2)
+        XCTAssertEqual(Bilan.regressionSaturees.facteurMin, 1.5)
+        XCTAssertEqual(Bilan.regressionDominante, 2)
+        // Le plancher d'une proposition à une vue (scène : hautes lumières 1,8 → 2,7) n'alerte pas.
+        XCTAssertTrue(comparer(mesures(hautes: 1.8), mesures(hautes: 2.7)).regressions.isEmpty)
+        // Exposure +0,3 sur la scène (1,8 → 4,3) alerte ; Whites +30 sur la dune (0 → 0,6), non.
+        XCTAssertEqual(comparer(mesures(hautes: 1.8), mesures(hautes: 4.3)).regressions.map(\.defaut), [.ecretage])
+        XCTAssertTrue(comparer(mesures(hautes: 0), mesures(hautes: 0.6)).regressions.isEmpty)
+        // Juste au seuil : 2 points de plus comptent (2,4 − 0,4 vaut 1,999… en binaire).
+        XCTAssertEqual(comparer(mesures(hautes: 0.4), mesures(hautes: 2.4)).regressions.count, 1)
+        // 2 points de plus, mais moins de 1,5 fois l'avant : non.
+        XCTAssertTrue(comparer(mesures(hautes: 5), mesures(hautes: 7.4)).regressions.isEmpty)
+        // Contraste +40 sur la nuit (ombres 0,7 → 3,9) alerte : le seuil porte sur l'écart.
+        XCTAssertEqual(comparer(mesures(ombres: 0.7), mesures(ombres: 3.9)).regressions.map(\.defaut), [.ombres])
+        // Saturation +30 (3 → 5,9) alerte ; Vibrance +40 (3 → 4,2), non.
+        XCTAssertEqual(comparer(mesures(saturee: 3), mesures(saturee: 5.9)).regressions.map(\.defaut), [.saturees])
+        XCTAssertTrue(comparer(mesures(saturee: 3), mesures(saturee: 4.2)).regressions.isEmpty)
+    }
+
+    /// Une dominante des tons neutres qui s'éloigne du neutre de 2 ou plus (relevé : Tint ±15 donnait
+    /// a* ±3 sur le portrait) : une régression ; celle qui s'en rapproche, non.
+    func testDominanceMovingAwayFromNeutralIsARegression() {
+        let teinte = comparer(mesures(a: 0.1, part: 20), mesures(a: 3.2, part: 20))
+        XCTAssertEqual(teinte.regressions.map(\.texte), ["dominante accentuée sur les tons neutres : a* +0,1 → +3,2 (plus magenta)"])
+        XCTAssertEqual(teinte.regressions.first?.defaut, .dominante)
+        XCTAssertTrue(comparer(mesures(b: 8.3, part: 20), mesures(b: 5.2, part: 20)).regressions.isEmpty, "plus près du neutre")
+        XCTAssertTrue(comparer(mesures(b: 0.4, part: 20), mesures(b: 2.2, part: 20)).regressions.isEmpty, "moins de 2")
+        // À travers le neutre, vers le froid : une régression, pas une « correction dépassée ».
+        let froide = comparer(mesures(b: 0.5, part: 20), mesures(b: -3.1, part: 20))
+        XCTAssertEqual(froide.regressions.map(\.texte), ["dominante accentuée sur les tons neutres : b* +0,5 → −3,1 (plus froide)"])
+        XCTAssertTrue(froide.aVerifier.isEmpty)
+        let depassee = comparer(mesures(b: 2.5, part: 20), mesures(b: -4.6, part: 20))
+        XCTAssertEqual(depassee.regressions.map(\.defaut), [.dominante], "accentuée de 2,1")
+        XCTAssertTrue(depassee.aVerifier.isEmpty, "pas redite en « correction dépassée »")
+        XCTAssertTrue(comparer(mesures(a: 0.1, part: 2), mesures(a: 3.2, part: 20)).regressions.isEmpty, "trop peu de tons neutres")
+        // Une régression de dominante se dédoublonne comme les autres dans depuis_le_debut.
+        let depart = vue(mesures(a: 0, part: 20)), precedente = vue(mesures(a: 2.5, part: 20), apres: 30, etapes: 2)
+        let maintenant = vue(mesures(a: 5, part: 20), apres: 60, etapes: 3)
+        let b = Bilan.session(precedente: precedente, depart: depart, maintenant: maintenant, suiviPrecedente: nil, suiviDepart: nil, date: maintenant.quand)
+        XCTAssertEqual(textes(b["regression"]).count, 1)
+        XCTAssertNil(b["depuis_le_debut"]?["regression"])
+    }
+
+    // MARK: Branché dans view_photo et les propositions
+
+    /// Le faux module : chaque « apercu » et « essayer » rend l'état présent dans un nouveau
+    /// fichier (le serveur l'efface après lecture), avec les étapes de Claude seulement pour
+    /// point_af, comme Rendu.apercu.
+    final class Module {
+        var image: Data
+        var avant: Data?
+        var proposee: Data?
+        var id = 7
+        var fichier = "DSCF2402.RAF"
+        var etapes = 0
+        var derniere: String?
+        var hauteur = 4160
+        var reglages: [String: JSONValue] = ["Exposure2012": 0, "Temperature": 5200, "Tint": 10]
+        /// Un aperçu lent : la commande « apercu » de view_photo attend `porte`.
+        var porte: DispatchSemaphore?
+        let fake = FakeLightroom()
+
+        init(_ image: Data) {
+            self.image = image
+            fake.onSend = { [unowned self] command, params in
+                switch command {
+                case "apercu":
+                    if params["point_af"]?.bool == true, let porte = self.porte { _ = porte.wait(timeout: .now() + 5) }
+                    self.fake.replies["apercu"] = self.apercu(params)
+                case "essayer":
+                    self.fake.replies["essayer"] = self.essai(params)
+                default:
+                    break
+                }
+            }
+        }
+
+        func apercu(_ params: [String: JSONValue]) -> JSONValue {
+            var objet: [String: JSONValue] = [
+                "chemin": .string(TestSupport.previewFile(image)),
+                "photo": ["id": .number(Double(id)), "fichier": .string(fichier),
+                          "geometrie": ["largeur": 6240, "hauteur": .number(Double(hauteur)), "orientation": "AB"]],
+                "recadrage": ["recadree": false, "angle": 0],
+                "reglages": .object(reglages),
+                "echelle_temperature": "kelvins (RAW : 2000 à 50000)",
+            ]
+            if params["point_af"]?.bool == true {
+                objet["etapes_claude"] = ["nombre": .number(Double(etapes)), "derniere": derniere.map(JSONValue.string) ?? .null]
+            }
+            if params["comparer"] != nil, let avant { objet["chemin_avant"] = .string(TestSupport.previewFile(avant)) }
+            return .object(objet)
+        }
+
+        func essai(_ params: [String: JSONValue]) -> JSONValue {
+            var objet: [String: JSONValue] = ["chemin": .string(TestSupport.previewFile(proposee ?? image)),
+                                              "photo": ["id": .number(Double(id)), "fichier": .string(fichier)]]
+            if params["comparer"]?.bool == true { objet["chemin_actuel"] = .string(TestSupport.previewFile(image)) }
+            return .object(objet)
+        }
+    }
+
+    func gris(_ v: UInt8) -> Data { TestSupport.jpeg(red: v, green: v, blue: v, width: 600, height: 400) }
+
+    func vue(_ tools: ToolHandler, _ arguments: [String: JSONValue] = [:]) throws -> JSONValue {
+        let result = tools.call(name: "view_photo", arguments: arguments)
+        XCTAssertFalse(result.isError, result.text)
+        return try JSONCoding.parse(result.text)
+    }
+
+    func testFirstViewIsTheStartingPointThenNumericDeltas() throws {
+        let module = Module(gris(115))
+        let tools = ToolHandler(lightroom: module.fake)
+        let premiere = try vue(tools)
+        XCTAssertTrue(premiere["bilan"]?.string?.contains("point de départ") == true, "\(premiere["bilan"] ?? .null)")
+        XCTAssertNil(premiere["etapes_claude"], "les étapes vont au bilan, pas telles quelles à Claude")
+
+        module.image = gris(140)
+        module.etapes = 1
+        module.derniere = "Claude · passe 1 : lumière"
+        module.reglages["Exposure2012"] = 0.5
+        let bilan = try XCTUnwrap(try vue(tools)["bilan"])
+        let exposition = try XCTUnwrap(bilan["ecarts"]?["exposition"], "\(bilan)")
+        XCTAssertGreaterThan(exposition["IL"]?.double ?? 0, 0)
+        XCTAssertLessThan(exposition["avant"]?.double ?? 0, exposition["apres"]?.double ?? 0)
+        XCTAssertEqual(bilan["etapes_claude"], "1 de plus (dernière : « Claude · passe 1 : lumière »)")
+        XCTAssertEqual(bilan["depuis"]?.string?.hasPrefix("le view_photo précédent de cette photo à 1344 px"), true, "\(bilan)")
+
+        // Rien de changé : le même état, en quelques mots.
+        let meme = try XCTUnwrap(try vue(tools)["bilan"])
+        XCTAssertNotNil(meme["meme_etat"], "\(meme)")
+        XCTAssertEqual(meme["etapes_claude"], "aucune nouvelle")
+    }
+
+    /// Le bilan ne compare que des aperçus de même taille (relevé du 20 octobre 2026 : d'une taille à
+    /// l'autre, la netteté varie jusqu'à 10 %) : une autre taille est un nouveau départ, et la vue
+    /// suivante à 1344 px se compare à la précédente à 1344 px.
+    func testOnlyViewsOfTheSameSizeAreCompared() throws {
+        let module = Module(gris(115))
+        let tools = ToolHandler(lightroom: module.fake)
+        _ = try vue(tools)
+        let grande = try XCTUnwrap(try vue(tools, ["size": 2048])["bilan"]?.string)
+        XCTAssertTrue(grande.contains("à 2048 px") && grande.contains("déjà vue à 1344 px"), grande)
+        module.image = gris(140)
+        module.etapes = 1
+        let retour = try XCTUnwrap(try vue(tools)["bilan"])
+        XCTAssertEqual(retour["depuis"]?.string?.hasPrefix("le view_photo précédent de cette photo à 1344 px"), true, "\(retour)")
+        XCTAssertNotNil(retour["ecarts"]?["exposition"])
+        XCTAssertFalse(textes(retour["remarques"]).contains { $0.contains("taille d'aperçu différente") }, "\(retour)")
+        XCTAssertEqual(Set(tools.vuesMesurees.keys.map(\.taille)), [1344, 2048])
+    }
+
+    func testNeutralsAreTrackedBetweenViews() throws {
+        // La moitié gauche grise, la droite d'un rouge franc ; puis la moitié grise réchauffée.
+        func image(gauche: (UInt8, UInt8, UInt8)) -> Data {
+            TestSupport.jpegPixels(width: 600, height: 400) { x, _ in x < 300 ? gauche : (200, 30, 30) }
+        }
+        let module = Module(image(gauche: (128, 128, 128)))
+        let tools = ToolHandler(lightroom: module.fake)
+        _ = try vue(tools)
+        module.image = image(gauche: (150, 128, 95))
+        module.etapes = 1
+        let info = try vue(tools)
+        let bilan = try XCTUnwrap(info["bilan"])
+        let dominante = try XCTUnwrap(bilan["ecarts"]?["dominante_b"], "\(bilan)")
+        XCTAssertEqual(dominante["suivie"], true)
+        XCTAssertGreaterThan(dominante["ecart"]?.double ?? 0, 15, "les mêmes pixels, devenus jaunes")
+        XCTAssertTrue(textes(bilan["regression"]).contains { $0.hasPrefix("dominante accentuée sur les mêmes tons neutres : b*") }, "\(bilan)")
+        // Choisis à nouveau, les tons neutres de cette vue seraient presque tous sortis de la sélection.
+        XCTAssertLessThan(info["mesures"]?["couleur"]?["tons_neutres"]?["part_pct"]?.double ?? 100, PhotoMeasurements.partNeutreMin)
+
+        // Un autre cadre (Upright) : plus de suivi, et une remarque.
+        module.hauteur = 3900
+        module.etapes = 2
+        module.image = image(gauche: (128, 128, 128))
+        let recadree = try XCTUnwrap(try vue(tools)["bilan"])
+        XCTAssertNotEqual(recadree["ecarts"]?["dominante_b"]?["suivie"], true)
+        XCTAssertTrue(textes(recadree["remarques"]).contains { $0.hasPrefix("cadre changé") }, "\(recadree)")
+    }
+
+    func testSeveralPhotosAndFilesAreKeptApart() throws {
+        let module = Module(gris(100))
+        let tools = ToolHandler(lightroom: module.fake)
+        module.id = 1
+        _ = try vue(tools)
+        module.id = 2
+        module.image = gris(200)
+        XCTAssertTrue(try vue(tools)["bilan"]?.string?.contains("point de départ") == true)
+        module.id = 1
+        module.image = gris(100)
+        XCTAssertNotNil(try vue(tools)["bilan"]?["meme_etat"], "la photo 1 se compare à sa propre vue")
+        // Le même identifiant, un autre fichier (un autre catalogue) : un nouveau départ.
+        module.fichier = "AUTRE.JPG"
+        XCTAssertTrue(try vue(tools)["bilan"]?.string?.contains("point de départ") == true)
+        XCTAssertEqual(tools.vuesMesurees.keys.filter { $0.photo == 1 }.count, 1)
+    }
+
+    func testZoomGetsItsOwnBilanAndLeavesTheMainOne() throws {
+        let module = Module(AnalyseTests.noisyGray(amount: 12))
+        let tools = ToolHandler(lightroom: module.fake)
+        _ = try vue(tools)
+        let zone: JSONValue = ["x": 0.4, "y": 0.3, "width": 0.2, "height": 0.2]
+        XCTAssertNil(try vue(tools, ["region": zone])["bilan_zone"], "premier zoom de cette zone")
+        module.image = AnalyseTests.noisyGray(amount: 4)
+        let second = try vue(tools, ["region": zone])
+        let bruit = try XCTUnwrap(second["bilan_zone"]?["ecarts"]?["bruit_aplats"], "\(second)")
+        XCTAssertLessThan(bruit["ecart_pct"]?.double ?? 0, 0, "moins de bruit, comme après un débruitage")
+        XCTAssertNil(second["bilan"], "un zoom n'a pas le bilan de l'aperçu entier")
+        XCTAssertNil(try vue(tools, ["region": ["x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2]])["bilan_zone"], "une autre zone")
+        XCTAssertEqual(tools.zoomsMesures[7]?.count, 2)
+        // La vue entière suivante se compare à la vue entière précédente, pas au zoom.
+        let entiere = try XCTUnwrap(try vue(tools)["bilan"])
+        XCTAssertEqual(entiere["depuis"]?.string?.hasPrefix("le view_photo précédent de cette photo à 1344 px"), true, "\(entiere)")
+        XCTAssertNotNil(entiere["ecarts"]?["bruit"], "\(entiere)")
+    }
+
+    func testZoomsAreKeptForThirtyPhotosAtMost() {
+        let tools = ToolHandler(lightroom: FakeLightroom())
+        for id in 1...31 {
+            tools.garderZoom(Bilan.Zoom(zone: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2), cadre: "c", pixels: "100 × 100",
+                                        mesures: mesures(), detail: nil, quand: t0.addingTimeInterval(Double(id))), photo: id)
+        }
+        XCTAssertEqual(tools.zoomsMesures.count, Bilan.photosGardees)
+        XCTAssertNil(tools.zoomsMesures[1], "part la photo dont le dernier zoom est le plus ancien")
+        XCTAssertNotNil(tools.zoomsMesures[31])
+    }
+
+    func testCompareGivesABilanWithoutTouchingTheMemory() throws {
+        let module = Module(gris(120))
+        let tools = ToolHandler(lightroom: module.fake)
+        _ = try vue(tools)
+        module.avant = gris(90)
+        let comparaison = try vue(tools, ["compare": "before_claude"])
+        let bilan = try XCTUnwrap(comparaison["bilan"])
+        XCTAssertEqual(bilan["depuis"], "l'état d'avant la première retouche de Claude (à gauche)")
+        XCTAssertGreaterThan(bilan["ecarts"]?["exposition"]?["IL"]?.double ?? 0, 0)
+        XCTAssertNotNil(comparaison["mesures_avant"]?["eclairage"]?["lecture"], "la forme courte de l'éclairage, avant et après")
+        XCTAssertNotNil(comparaison["mesures"]?["eclairage"]?["zones_tonales"])
+        XCTAssertNil(comparaison["mesures"]?["eclairage"]?["visages"], "forme courte : sans visages ni conseil")
+        XCTAssertEqual(try vue(tools, ["compare": "previous_step"])["bilan"]?["depuis"], "l'état d'avant la dernière retouche (à gauche)")
+        // Les vues gardées n'ont pas bougé : la vue suivante se compare à la première.
+        XCTAssertNotNil(try vue(tools)["bilan"]?["meme_etat"])
+        // Avant et après de dimensions différentes (un recadrage entre les deux) : netteté et bruit non comparés.
+        module.avant = TestSupport.jpeg(red: 90, green: 90, blue: 90, width: 600, height: 300)
+        let recadree = try XCTUnwrap(try vue(tools, ["compare": "before_claude"])["bilan"])
+        XCTAssertTrue(textes(recadree["remarques"]).contains { $0.hasPrefix("cadre différent entre l'avant et l'après") }, "\(recadree)")
+    }
+
+    func testPreviewCompareWarnsBeforeApplying() throws {
+        let module = Module(gris(120))
+        // La proposition brûle 5 % de l'image (une bande blanche en haut).
+        module.proposee = TestSupport.jpegPixels(width: 600, height: 400) { _, y in y < 20 ? (255, 255, 255) : (120, 120, 120) }
+        let tools = ToolHandler(lightroom: module.fake)
+        let result = tools.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 1], "compare": true])
+        XCTAssertFalse(result.isError, result.text)
+        let info = try JSONCoding.parse(result.text)
+        let bilan = try XCTUnwrap(info["bilan"], result.text)
+        XCTAssertTrue(textes(bilan["regression"]).contains { $0.hasPrefix("hautes lumières écrêtées : 0,0 →") }, "\(bilan)")
+        XCTAssertEqual(bilan["conseil"], "Une « regression » se corrige dans la proposition avant de l'appliquer.")
+        XCTAssertEqual(bilan["depuis"], "l'état actuel : la proposition n'est pas appliquée")
+        XCTAssertNil(bilan["ecarts"]?["nettete_max"], "ni netteté ni bruit pour une proposition")
+        XCTAssertFalse(textes(bilan["sans_ecart_visible"]).contains("bruit"))
+        XCTAssertNotNil(info["mesures_proposition"]?["eclairage"]?["mixte"])
+        XCTAssertNotNil(info["mesures_actuelles"]?["eclairage"]?["mixte"])
+        XCTAssertTrue(tools.vuesMesurees.isEmpty, "une proposition ne se garde pas comme une vue")
+
+        let sansComparaison = try JSONCoding.parse(tools.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 1]]).text)
+        XCTAssertNil(sansComparaison["bilan"])
+        XCTAssertNotNil(sansComparaison["mesures_proposition"]?["eclairage"])
+        // Un grain proposé : un bruit en hausse serait voulu.
+        XCTAssertTrue(ToolHandler.grainAjoute(.array([["cle": "GrainAmount", "avant": 0, "apres": 25]])))
+        XCTAssertFalse(ToolHandler.grainAjoute(.array([["cle": "GrainAmount", "avant": 25, "apres": 0]])))
+        XCTAssertFalse(ToolHandler.grainAjoute(nil))
+    }
+
+    /// Le résultat gardé par FileOutils (réponse d'attente, puis le même appel) : la vue n'est
+    /// mesurée et gardée qu'une fois.
+    func testRepeatedCallAfterTheLimitKeepsOneBilan() throws {
+        let module = Module(gris(115))
+        let server = TestSupport.makeServer(module.fake)
+        func appel(_ id: Int) throws -> (texte: String, image: Bool) {
+            let ligne = #"{"jsonrpc":"2.0","id":\#(id),"method":"tools/call","params":{"name":"view_photo","arguments":{}}}"#
+            let reponse = try JSONCoding.parse(XCTUnwrap(server.handle(line: ligne)))
+            let contenu = reponse["result"]?["content"]?.array ?? []
+            return (contenu.compactMap { $0["text"]?.string }.joined(separator: "\n"), contenu.contains { $0["type"]?.string == "image" })
+        }
+        XCTAssertTrue(try appel(1).texte.contains("point de départ"))
+
+        module.image = gris(140)
+        module.etapes = 1
+        module.derniere = "Claude · passe 1"
+        let porte = DispatchSemaphore(value: 0)
+        module.porte = porte
+        server.toolBudget = 0.3
+        let attente = try appel(2)
+        XCTAssertFalse(attente.image)
+        XCTAssertTrue(attente.texte.contains("n'est pas fini"), attente.texte)
+        // Les mesures (Vision, détail, éclairage) prennent plus que 0,3 s : le même appel attend la fin.
+        porte.signal()
+        server.toolBudget = 5
+        let repris = try appel(3)
+        XCTAssertTrue(repris.image)
+        XCTAssertTrue(repris.texte.contains("Résultat de l'appel précédent de view_photo"), repris.texte)
+        XCTAssertTrue(repris.texte.contains("1 de plus (dernière : « Claude · passe 1 »)"), repris.texte)
+        XCTAssertEqual(module.fake.commands.filter { $0 == "apercu" }.count, 2, "l'aperçu lent n'est demandé qu'une fois")
+
+        // La vue gardée est celle de l'appel lent : la suivante n'y voit rien de neuf.
+        module.porte = nil
+        server.toolBudget = 5
+        let suivante = try appel(4)
+        XCTAssertTrue(suivante.texte.contains("aucune nouvelle") && suivante.texte.contains("meme_etat"), suivante.texte)
+    }
+
+    func testDescriptionsSayTheBilanAndStayShort() throws {
+        let definitions = ToolHandler(lightroom: FakeLightroom()).definitions
+        func description(_ nom: String) throws -> String {
+            try XCTUnwrap(definitions.first { $0["name"]?.string == nom }?["description"]?.string)
+        }
+        let vue = try description("view_photo")
+        XCTAssertLessThanOrEqual(vue.count, 1850, "view_photo : \(vue.count) caractères")
+        XCTAssertTrue(vue.hasPrefix("Montre la photo telle qu'elle est développée en ce moment"))
+        // L'essentiel en tête : ce qu'il montre et quand l'appeler, avant les clés de la réponse.
+        let quand = try XCTUnwrap(vue.range(of: "À appeler avant de retoucher, puis après chaque passe."))
+        XCTAssertLessThan(vue.distance(from: vue.startIndex, to: quand.lowerBound), 700)
+        for attendu in ["« eclairage » nomme un éclairage mixte", "« bilan » : écarts chiffrés avec le view_photo précédent de la même photo à la même taille",
+                        "« regression »", "undo_last s'il vient de la dernière étape", "« a_verifier »", "bilan_zone", "avec son bilan"] {
+            XCTAssertTrue(vue.contains(attendu), "view_photo sans « \(attendu) »")
+        }
+        let proposition = try description("preview_settings")
+        XCTAssertLessThanOrEqual(proposition.count, 600, "preview_settings : \(proposition.count) caractères")
+        XCTAssertTrue(proposition.hasPrefix("Proposition visuelle : montre le rendu d'une retouche"))
+        XCTAssertTrue(proposition.contains("Avec compare : « bilan » de l'état actuel à la proposition"))
+        let serie = try description("analyze_photos")
+        XCTAssertLessThanOrEqual(serie.count, 520, "analyze_photos : \(serie.count) caractères")
+        XCTAssertTrue(serie.hasPrefix("Mesures objectives de plusieurs photos sans les afficher"))
+        XCTAssertTrue(serie.contains("dominante (et éclairage mixte)"))
     }
 }

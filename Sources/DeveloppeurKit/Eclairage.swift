@@ -28,7 +28,18 @@ public struct MesureEclairage: Equatable {
         public var teinte: Double
     }
 
+    /// Point neutre de l'image : médianes de a* et b* de ses tons peu saturés, c'est-à-dire sa
+    /// dominante globale (la balance des blancs) ; les tons presque neutres se prennent autour de lui.
+    public struct Neutre: Equatable {
+        public var a: Double
+        public var b: Double
+    }
+
     public struct Visage: Equatable {
+        /// Rang du visage dans la liste donnée à la mesure (`vision.visages` de view_photo, du plus
+        /// large au plus petit) : les visages trop petits ou au-delà de `Eclairage.maxVisages` ne
+        /// sont pas mesurés, et la liste de la mesure peut être plus courte.
+        public var index: Int = 0
         /// Cadre de Vision (fractions de l'image, depuis le haut gauche).
         public var cadre: CGRect
         public var peau: Peau?
@@ -68,8 +79,13 @@ public struct MesureEclairage: Equatable {
     public var lumiereSujet: Dominante?
     /// « visages » ou « zone d'intérêt ».
     public var sujetSource: String?
-    /// Borne de chroma des tons presque neutres de cette mesure.
+    /// Écart a*b* au centre (`centre`) des tons presque neutres de cette mesure.
     public var borne: Double
+    /// Point neutre de l'image : médianes de ses tons peu saturés (sa dominante globale).
+    public var neutre = Neutre(a: 0, b: 0)
+    /// Centre des tons presque neutres : le gris, ou le point neutre ramené vers lui de
+    /// `Eclairage.toleranceNeutre` (`Eclairage.centrer`).
+    public var centre = Neutre(a: 0, b: 0)
 
     public var mixte: Bool { (ecartRegions ?? 0) >= Eclairage.seuilMixte }
 
@@ -136,19 +152,22 @@ public struct MesureEclairage: Equatable {
     }
 
     var base: String {
-        let f = Eclairage.nombre
-        return "Tons presque neutres (C* < \(f(borne)), L* \(f(Eclairage.lumineuxMin)) à \(f(Eclairage.lumineuxMax)), sans les visages ni les pixels écrêtés) "
-            + "de l'aperçu réduit à \(Measurements.maxSide) px : médiane de a* et b* par zone tonale (L* < \(f(Eclairage.limitesTonales[0])), "
-            + "\(f(Eclairage.limitesTonales[0])) à \(f(Eclairage.limitesTonales[1])), > \(f(Eclairage.limitesTonales[1]))) et par case d'une grille 3 × 3 "
-            + "(lue à partir de \(f(Eclairage.partMinCase)) % de tons neutres). ecart_regions : distance a*b* entre les deux groupes de cases "
-            + "les plus différents (chacun au moins \(f(Eclairage.partMinGroupe)) % des tons neutres lus) ; éclairage mixte à partir de "
-            + "\(f(Eclairage.seuilMixte)). Visages : peau, et lumière autour (tons neutres autour du visage, sans la peau). "
-            + "a* : vert (−) à magenta (+) ; b* : bleu (−) à jaune (+)."
+        let f = Eclairage.nombre, e = Eclairage.texte
+        return "Tons presque neutres : à moins de \(f(borne)) en a*b* du gris, ou du point neutre de l'image (a* \(e(neutre.a, 1)), "
+            + "b* \(e(neutre.b, 1)) : médiane de ses tons peu saturés) quand une dominante globale l'en écarte de plus de "
+            + "\(f(Eclairage.toleranceNeutre)) (centre ici : a* \(e(centre.a, 1)), b* \(e(centre.b, 1))) ; L* \(f(Eclairage.lumineuxMin)) à "
+            + "\(f(Eclairage.lumineuxMax)), sans visages ni pixels écrêtés, aperçu réduit à \(Measurements.maxSide) px. Médianes par zone "
+            + "tonale (L* < \(f(Eclairage.limitesTonales[0])), \(f(Eclairage.limitesTonales[0])) à \(f(Eclairage.limitesTonales[1])), "
+            + "> \(f(Eclairage.limitesTonales[1]))) et par case 3 × 3 (lue à partir de \(f(PhotoMeasurements.partNeutreMin)) % de tons "
+            + "neutres). ecart_regions : distance a*b* entre les deux groupes de cases les plus différents (chacun au moins "
+            + "\(f(Eclairage.partMinGroupe)) % des tons neutres lus) ; mixte à partir de \(f(Eclairage.seuilMixte)) (relevé le "
+            + "20 octobre 2026). Visages : peau, et lumière autour (sans la peau)."
     }
 
     /// view_photo › mesures › eclairage. La forme courte (avant/après, proposition, série) garde la
-    /// lecture, l'écart et les zones tonales. La grille, les groupes, la balance et le conseil ne
-    /// partent que si l'éclairage est mixte.
+    /// lecture, l'écart et les zones tonales. La grille, les groupes, la balance, le conseil et la
+    /// base ne partent que si l'éclairage est mixte (view_photo s'appelle souvent : une photo à une
+    /// seule lumière n'en reçoit que la lecture, les zones tonales et ses visages).
     public func json(balance: (temperature: Double, tint: Double)?, court: Bool = false) -> JSONValue {
         func r(_ value: Double) -> JSONValue { .number((value * 10).rounded() / 10) }
         var objet: [String: JSONValue] = ["lecture": .string(lecture), "mixte": .bool(mixte)]
@@ -168,7 +187,8 @@ public struct MesureEclairage: Equatable {
         let (premiere, seconde) = nomsLumieres
         if !visages.isEmpty {
             objet["visages"] = .array(visages.map { visage in
-                var item: [String: JSONValue] = [:]
+                // Le rang dans vision.visages : la liste de la mesure peut en sauter (trop petits).
+                var item: [String: JSONValue] = ["index_vision": .number(Double(visage.index))]
                 if let peau = visage.peau {
                     item["peau"] = ["L": r(peau.l), "a": r(peau.a), "b": r(peau.b), "teinte_deg": .number(peau.teinte.rounded())]
                 }
@@ -199,30 +219,50 @@ public struct MesureEclairage: Equatable {
                 ]
             }
             objet["conseil"] = .string(conseil)
+            objet["base"] = .string(base)
         }
-        objet["base"] = .string(base)
         return .object(objet)
     }
 }
 
 public enum Eclairage {
-    /// Borne de chroma (C*) d'un ton presque neutre. Provisoire, à relever (`--eclairage`, bornes
-    /// 12, 15, 20, 25 et 30, et tenue sous deux balances) : trop étroite, elle perd les tons
-    /// neutres d'une zone franchement colorée par sa lumière ; trop large, elle laisse entrer les
-    /// ciels pâles, les murs beiges et la peau.
-    public static let chromaMax = 20.0
-    /// Écart a*b* entre les deux groupes de lumière à partir duquel l'éclairage est mixte.
-    /// Provisoire, à relever (hypothèse : une seule lumière de 2 à 6, lampe et fenêtre de 10 à 25).
+    /// Écart a*b* d'un ton presque neutre au centre (`centrer` : le gris, ou le point neutre de
+    /// l'image). Relevé le
+    /// 20 octobre 2026 (`--eclairage`, 8 copies « Essai », bornes de 12 à 30) : à 12, seul le
+    /// portrait mixte ressort (écart 9,8 ; les autres de 2,2 à 7,1) ; à 15 et au-delà, des objets
+    /// colorés pris pour des gris (ciel bleu, bouteille orange, plante, mur jaune) font de faux
+    /// mixtes. La borne était alors absolue (C* < 12) : sous une autre balance (3 200 K, ou ±30 en
+    /// relatif), plus aucune case ne se lisait (0 sur 9 pour le portrait). Prise autour du gris, ou
+    /// du point neutre de l'image quand une dominante globale l'en écarte (`centrer`), elle se lit
+    /// encore sous une autre balance.
+    public static let chromaMax = 12.0
+    /// Écart a*b* entre les deux groupes de lumière à partir duquel l'éclairage est mixte. Relevé
+    /// le 20 octobre 2026 (même relevé) : le portrait, à deux lumières (fenêtres et éclairage
+    /// chaud), à 9,8 ; les photos à une seule lumière de 2,2 à 7,1.
     public static let seuilMixte = 8.0
+    /// Borne de chroma large des tons peu saturés dont la médiane donne le point neutre de l'image :
+    /// les gris d'une photo à la balance très décalée (3 200 K sur une scène de jour) y restent.
+    static let borneNeutreGlobal = 40.0
+    /// Écart a*b* au gris jusqu'auquel le point neutre de l'image est celui d'une photo balancée
+    /// (les couleurs de la scène l'en écartent : sable, intérieur chaud) : les tons presque neutres
+    /// se prennent alors autour du gris, comme au relevé. Au-delà (une dominante globale), leur
+    /// centre suit le point neutre, à cette distance près. Mesuré le 21 octobre 2026 sur cinq
+    /// aperçus du relevé, lus en fichiers : point neutre de 3 à 11,2 du gris à la balance de la
+    /// photo ; centré sur lui sans tolérance, le portrait perdait son éclairage mixte (9,9 → 4,8) et
+    /// l'intérieur à la lampe en gagnait un (7,3 → 9,4) ; avec 10, les écarts du relevé restent à
+    /// 0,1 près, et sur ces cinq aperçus, à leur balance et sous sept dominantes simulées (gains en
+    /// lumière linéaire), 38 lectures sur 40 gardent au moins 7 cases sur 9 (30 sur 40 autour du
+    /// gris seul). Le verdict sous une forte dominante reste fragile (la mesure a*b* elle-même varie,
+    /// même sur les mêmes pixels). Provisoire : à relever dans Lightroom (`--eclairage --essai`,
+    /// 3 200 et 6 500 K, ±30 en relatif).
+    static let toleranceNeutre = 10.0
     /// Écart a*b* entre ombres et hautes lumières à partir duquel il se lit. Provisoire, à relever.
     public static let seuilTonal = 8.0
     /// Part des tons neutres lus que doit porter chaque groupe, en % : une seule case colorée (un
     /// mur beige) ne fait pas un groupe. Provisoire, à relever (15 si une vraie lumière pèse moins).
     public static let partMinGroupe = 20.0
-    /// Part de tons neutres pour lire une case, en % de ses pixels : comme les 3 % de la lecture de
-    /// la dominante (`PhotoMeasurements.castReading`).
-    public static let partMinCase = 3.0
-    /// Pixels neutres au moins pour lire une case.
+    /// Une case se lit à partir de `PhotoMeasurements.partNeutreMin` % de tons neutres, comme la
+    /// dominante de view_photo (`castReading`). Pixels neutres au moins pour lire une case.
     static let pixelsMinCase = 200
     /// Cases lues au moins pour comparer les lumières.
     static let casesMin = 3
@@ -317,8 +357,11 @@ public enum Eclairage {
             }
         }
 
-        func neutre(_ i: Int, _ chromaMax: Double) -> Bool {
-            !ecarte[i] && chroma[i] < chromaMax && l[i] >= Eclairage.lumineuxMin && l[i] <= Eclairage.lumineuxMax
+        /// Un pixel lisible (ni écrêté ni bouché, L* de 15 à 95) à moins de `borne` en a*b* du point
+        /// `centre`.
+        func neutre(_ i: Int, _ borne: Double, _ centre: MesureEclairage.Neutre) -> Bool {
+            !ecarte[i] && l[i] >= Eclairage.lumineuxMin && l[i] <= Eclairage.lumineuxMax
+                && hypot(a[i] - centre.a, b[i] - centre.b) < borne
         }
 
         /// Pixels d'un cadre (fractions de l'image, depuis le haut gauche), bornés à l'image ; nil
@@ -348,40 +391,69 @@ public enum Eclairage {
     /// histogramme quelques-unes.
     struct Histogramme {
         static let pas = 0.05
-        /// Valeurs de −borne à +borne : celles d'un ton neutre (|a*| et |b*| sous la borne de chroma).
+        /// Valeurs de centre − borne à centre + borne, sur chaque axe : celles d'un ton à moins de
+        /// la borne du centre.
         let borne: Double
+        let centre: MesureEclairage.Neutre
         var classesA: [Int]
         var classesB: [Int]
         private(set) var nombre = 0
 
-        init(borne: Double) {
+        init(borne: Double, centre: MesureEclairage.Neutre = .init(a: 0, b: 0)) {
             self.borne = borne
+            self.centre = centre
             classesA = [Int](repeating: 0, count: Int((2 * borne / Self.pas).rounded(.up)) + 1)
             classesB = classesA
         }
 
         mutating func ajouter(_ a: Double, _ b: Double) {
-            classesA[classe(a)] += 1
-            classesB[classe(b)] += 1
+            classesA[classe(a - centre.a)] += 1
+            classesB[classe(b - centre.b)] += 1
             nombre += 1
         }
 
-        func classe(_ valeur: Double) -> Int {
-            min(classesA.count - 1, max(0, Int(((valeur + borne) / Self.pas).rounded(.down))))
+        func classe(_ ecart: Double) -> Int {
+            min(classesA.count - 1, max(0, Int(((ecart + borne) / Self.pas).rounded(.down))))
         }
 
         /// La classe de l'élément de rang nombre / 2 (comme `mediane`), à son centre.
-        func mediane(_ classes: [Int]) -> Double {
+        func mediane(_ classes: [Int], autour origine: Double) -> Double {
             var cumul = 0
             for (rang, n) in classes.enumerated() {
                 cumul += n
-                if cumul > nombre / 2 { return -borne + (Double(rang) + 0.5) * Self.pas }
+                if cumul > nombre / 2 { return origine - borne + (Double(rang) + 0.5) * Self.pas }
             }
-            return 0
+            return origine
         }
 
-        var a: Double { mediane(classesA) }
-        var b: Double { mediane(classesB) }
+        var a: Double { mediane(classesA, autour: centre.a) }
+        var b: Double { mediane(classesB, autour: centre.b) }
+    }
+
+    /// Le point neutre de l'image : médianes de a* et b* de ses pixels lisibles peu saturés
+    /// (C* < `borneNeutreGlobal`), hors des visages ; puis, affinées, celles des pixels à moins de
+    /// deux fois `borne` de ce premier point (les couleurs franches entrées par la borne large n'y
+    /// tirent plus). (0, 0) sans pixel lisible.
+    static func pointNeutre(_ p: PixelsLab, exclus: [Bool], borne: Double) -> MesureEclairage.Neutre {
+        var point = MesureEclairage.Neutre(a: 0, b: 0)
+        for rayon in [borneNeutreGlobal, 2 * borne] {
+            var histogramme = Histogramme(borne: rayon, centre: point)
+            for i in 0..<(p.largeur * p.hauteur) where !exclus[i] && p.neutre(i, rayon, point) {
+                histogramme.ajouter(p.a[i], p.b[i])
+            }
+            guard histogramme.nombre > 0 else { break }
+            point = MesureEclairage.Neutre(a: histogramme.a, b: histogramme.b)
+        }
+        return point
+    }
+
+    /// Le centre des tons presque neutres : le gris tant que le point neutre de l'image en reste à
+    /// `toleranceNeutre` près ; sinon le point neutre ramené de cette distance vers le gris.
+    static func centrer(_ neutre: MesureEclairage.Neutre) -> MesureEclairage.Neutre {
+        let distance = hypot(neutre.a, neutre.b)
+        guard distance > toleranceNeutre else { return MesureEclairage.Neutre(a: 0, b: 0) }
+        let part = 1 - toleranceNeutre / distance
+        return MesureEclairage.Neutre(a: neutre.a * part, b: neutre.b * part)
     }
 
     static func agrandi(_ cadre: CGRect) -> CGRect {
@@ -396,8 +468,10 @@ public enum Eclairage {
     }
 
     static func mesurer(_ p: PixelsLab, visages: [CGRect], sujet: CGRect?, chromaMax: Double) -> MesureEclairage {
-        // Un cadre non fini ne se mesure pas (et ferait planter la conversion des positions).
-        let cadres = visages.filter(fini)
+        // Un cadre non fini ne se mesure pas (et ferait planter la conversion des positions). Chaque
+        // visage garde son rang dans la liste donnée (vision.visages).
+        let rangs = visages.indices.filter { fini(visages[$0]) }
+        let cadres = rangs.map { visages[$0] }
         let sujet = sujet.flatMap { fini($0) ? $0 : nil }
         let w = p.largeur, h = p.hauteur, total = w * h
         // Les visages (agrandis) hors des cases et des zones tonales.
@@ -406,11 +480,15 @@ public enum Eclairage {
             guard let zone = p.plage(agrandi(cadre)) else { continue }
             for y in zone.y { for x in zone.x { exclus[y * w + x] = true } }
         }
+        // Les tons presque neutres se prennent autour du gris, ou du point neutre de l'image quand
+        // une dominante globale l'en éloigne (`centrer`) : elle ne les fait pas sortir de la borne.
+        let pointNeutre = pointNeutre(p, exclus: exclus, borne: chromaMax)
+        let neutre = centrer(pointNeutre)
         // Cases de la grille : bornes zx · w / 3, comme `Detail`.
         let colonne = (0..<w).map { x in x < w / 3 ? 0 : (x < 2 * w / 3 ? 1 : 2) }
         let ligne = (0..<h).map { y in y < h / 3 ? 0 : (y < 2 * h / 3 ? 1 : 2) }
-        var cases = [Histogramme](repeating: Histogramme(borne: chromaMax), count: 9)
-        var tons = [Histogramme](repeating: Histogramme(borne: chromaMax), count: 3)
+        var cases = [Histogramme](repeating: Histogramme(borne: chromaMax, centre: neutre), count: 9)
+        var tons = [Histogramme](repeating: Histogramme(borne: chromaMax, centre: neutre), count: 3)
         var pixelsCase = [Int](repeating: 0, count: 9)
         for y in 0..<h {
             for x in 0..<w {
@@ -418,7 +496,7 @@ public enum Eclairage {
                 guard !exclus[i] else { continue }
                 let k = ligne[y] * 3 + colonne[x]
                 pixelsCase[k] += 1
-                guard p.neutre(i, chromaMax) else { continue }
+                guard p.neutre(i, chromaMax, neutre) else { continue }
                 cases[k].ajouter(p.a[i], p.b[i])
                 let t = p.l[i] < limitesTonales[0] ? 0 : (p.l[i] < limitesTonales[1] ? 1 : 2)
                 tons[t].ajouter(p.a[i], p.b[i])
@@ -428,7 +506,7 @@ public enum Eclairage {
             let n = cases[k].nombre
             guard n >= pixelsMinCase, pixelsCase[k] > 0 else { return nil }
             let part = Double(n) * 100 / Double(pixelsCase[k])
-            guard part >= partMinCase else { return nil }
+            guard part >= PhotoMeasurements.partNeutreMin else { return nil }
             return MesureEclairage.Dominante(a: cases[k].a, b: cases[k].b, part: part, pixels: n)
         }
         let tonales: [MesureEclairage.Dominante?] = (0..<3).map { t in
@@ -458,8 +536,8 @@ public enum Eclairage {
 
         // Visages : la peau au milieu du visage, la lumière autour.
         var visages: [MesureEclairage.Visage] = []
-        for cadre in cadres.filter({ Double($0.width) >= visageMin }).prefix(maxVisages) {
-            var visage = MesureEclairage.Visage(cadre: cadre)
+        for (rang, cadre) in zip(rangs, cadres).filter({ Double($0.1.width) >= visageMin }).prefix(maxVisages) {
+            var visage = MesureEclairage.Visage(index: rang, cadre: cadre)
             let interieur = CGRect(x: cadre.minX + 0.25 * cadre.width, y: cadre.minY + 0.45 * cadre.height,
                                    width: 0.5 * cadre.width, height: 0.4 * cadre.height)
             if let zone = p.plage(interieur) {
@@ -479,13 +557,13 @@ public enum Eclairage {
             let anneau = CGRect(x: cadre.minX - 0.75 * cadre.width, y: cadre.minY - 0.25 * cadre.height,
                                 width: 2.5 * cadre.width, height: 2.75 * cadre.height)
             if let zone = p.plage(anneau) {
-                var autour = Histogramme(borne: chromaMax), dedans = 0
+                var autour = Histogramme(borne: chromaMax, centre: neutre), dedans = 0
                 for y in zone.y {
                     for x in zone.x {
                         let i = y * w + x
                         guard !exclus[i] else { continue }
                         dedans += 1
-                        guard p.neutre(i, chromaMax) else { continue }
+                        guard p.neutre(i, chromaMax, neutre) else { continue }
                         if let peau = visage.peau, hypot(p.a[i] - peau.a, p.b[i] - peau.b) < distancePeau { continue }
                         autour.ajouter(p.a[i], p.b[i])
                     }
@@ -525,13 +603,13 @@ public enum Eclairage {
                 pixels: eclaires.reduce(0) { $0 + $1.lumiere.pixels })
             sujetSource = "visages"
         } else if let sujet, let zone = p.plage(sujet) {
-            var neutres = Histogramme(borne: chromaMax), dedans = 0
+            var neutres = Histogramme(borne: chromaMax, centre: neutre), dedans = 0
             for y in zone.y {
                 for x in zone.x {
                     let i = y * w + x
                     guard !exclus[i] else { continue }
                     dedans += 1
-                    if p.neutre(i, chromaMax) { neutres.ajouter(p.a[i], p.b[i]) }
+                    if p.neutre(i, chromaMax, neutre) { neutres.ajouter(p.a[i], p.b[i]) }
                 }
             }
             if neutres.nombre >= pixelsMinSujet {
@@ -542,7 +620,8 @@ public enum Eclairage {
         }
 
         return MesureEclairage(tonales: tonales, regions: regions, groupes: groupes, ecartRegions: ecartRegions, ecartTonal: ecartTonal,
-                               visages: visages, lumiereSujet: lumiereSujet, sujetSource: sujetSource, borne: chromaMax)
+                               visages: visages, lumiereSujet: lumiereSujet, sujetSource: sujetSource, borne: chromaMax,
+                               neutre: pointNeutre, centre: neutre)
     }
 
     /// Partage les cases lues en deux groupes de lumière : de toutes les partitions en deux (255 au
@@ -622,7 +701,7 @@ public enum Eclairage {
 // MARK: - Relevé (`mcp-developpeur --eclairage`)
 
 extension Eclairage {
-    /// Bornes de chroma essayées par le relevé.
+    /// Bornes essayées par le relevé (écart a*b* au centre des tons presque neutres).
     public static let bornesReleve: [Double] = [12, 15, 20, 25, 30]
     /// Étiquettes de scène de Vision relevées (`VNClassifyImageRequest`) : pour un garde-fou
     /// d'extérieur, si le relevé l'impose (soleil et ombre bleue).
@@ -670,8 +749,9 @@ extension Eclairage {
         var resume: [String] = []
         let e = texte
 
-        dire("Relevé de l'éclairage : bornes C* \(bornesReleve.map(nombre).joined(separator: ", ")) (actuelle \(nombre(chromaMax))) ; "
-            + "seuil d'éclairage mixte \(nombre(seuilMixte)), seuil tonal \(nombre(seuilTonal)), part d'un groupe \(nombre(partMinGroupe)) % (provisoires)"
+        dire("Relevé de l'éclairage : bornes (écart a*b* au centre : le gris, ou le point neutre de l'image) \(bornesReleve.map(nombre).joined(separator: ", ")) "
+            + "(actuelle \(nombre(chromaMax))) ; seuil d'éclairage mixte \(nombre(seuilMixte)) ; seuil tonal \(nombre(seuilTonal)) et part "
+            + "d'un groupe \(nombre(partMinGroupe)) % (provisoires)"
             + (essai.map { " ; essai : \(JSONCoding.line(.object($0)))" } ?? " ; lecture seule"))
         if essai != nil, ids.isEmpty { dire("(l'essai ne vaut que pour les photos de Lightroom : les fichiers sont mesurés tels quels)") }
 
@@ -725,7 +805,7 @@ extension Eclairage {
 
         if !resume.isEmpty {
             dire("")
-            dire("Résumé (photo, borne C*, cases lues, ecart_regions, ecart_tonal, mixte au seuil actuel, groupes, lumière du sujet) :")
+            dire("Résumé (photo, borne, cases lues, ecart_regions, ecart_tonal, mixte au seuil actuel, groupes, lumière du sujet) :")
             for ligne in resume { dire(ligne) }
         }
         return lignes
@@ -825,8 +905,9 @@ extension Eclairage {
         }
         let lues = mesure.regions.compactMap { $0 }.count
         var lignes: [String] = []
-        var tete = "  C* < \(nombre(mesure.borne)) : \(lues)/9 cases lues ; ecart_regions \(mesure.ecartRegions.map { e($0, 1) } ?? "—")"
+        var tete = "  borne \(nombre(mesure.borne)) : \(lues)/9 cases lues ; ecart_regions \(mesure.ecartRegions.map { e($0, 1) } ?? "—")"
             + (mesure.mixte ? " (mixte)" : "") + " ; ecart_tonal \(mesure.ecartTonal.map { e($0, 1) } ?? "—")"
+            + " ; point neutre a* \(e(mesure.neutre.a, 1)) b* \(e(mesure.neutre.b, 1)), centre a* \(e(mesure.centre.a, 1)) b* \(e(mesure.centre.b, 1))"
         if let duree { tete += " ; mesure en \(e(duree, 0)) ms" }
         lignes.append(tete)
         lignes.append("    cases : " + stride(from: 0, to: 9, by: 3).map { ligne in
