@@ -81,7 +81,17 @@
 --                                          rangées pour la carte Note : proposer (jamais 5
 --                                          étoiles ; posées aussi avec poser, à la demande de
 --                                          Dany), lire
+--   lecon       {action, photo?, photos?, lecon?} → leçons des photos (1.3), rangées dans
+--                                          carnet.json : garder (lecon = {points, indices?} :
+--                                          trois points, un par axe, lumiere, couleur,
+--                                          composition ; la nouvelle remplace l'ancienne), lire,
+--                                          retirer
+--   carnet      {action, photos?}       → carnet de progrès (1.3), carnet.json : lire (les
+--                                          originaux du catalogue ouvert, leçons comprises),
+--                                          retirer
 --
+-- lecon et carnet n'écrivent rien dans le catalogue et ne s'arrêtent pas à la pause ; ils écrivent
+-- carnet.json, à part : le serveur ne les rejoue jamais (LightroomBridge.lectures).
 -- Sans « photo » ni « photos » ni « selection », la commande vise la photo active.
 -- Les erreurs sont levées avec error(message, 0) : le message part tel quel vers Claude.
 -- Toute commande, ping compris, n'arrive ici qu'avec le jeton de la liaison (Liaison.recevoir) ;
@@ -102,6 +112,7 @@
 --   Masques.lua      masques
 --   Progression.lua  progression
 --   Notation.lua     notation
+--   Carnet.lua       lecon, carnet
 -- Elles s'appuient sur Photos.lua (photos visées, mémoire de Claude), Reglages.lua (valeurs de
 -- développement), Recalage.lua (géométrie et grille du serveur), Plans.lua (ce qu'une retouche
 -- changera), Ecriture.lua (écriture dans le catalogue, étapes, journal) et Profils.lua (profil
@@ -110,6 +121,7 @@
 local Amelioration = require 'Amelioration'
 local Annulation = require 'Annulation'
 local Bibliotheque = require 'Bibliotheque'
+local Carnet = require 'Carnet'
 local Lecture = require 'Lecture'
 local Livraison = require 'Livraison'
 local Masques = require 'Masques'
@@ -163,6 +175,8 @@ local table_commandes = {
     masques = Masques.masques,
     progression = Progression.progression,
     notation = Notation.commande,
+    lecon = Carnet.commandeLecon,
+    carnet = Carnet.commande,
 }
 
 function Commandes.executer(nom, params)

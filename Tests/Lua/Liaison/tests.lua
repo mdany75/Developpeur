@@ -14,107 +14,12 @@ local Geometrie = require 'Geometrie'
 local Locaux = require 'Locaux'
 local Notation = require 'Notation'
 
-local reussis, echecs = 0, 0
-
--- Jeton de la liaison pendant les essais (liaison fermée, 1.2) : jamais celui du vrai fichier.
-local JETON = string.rep('ab', 32)
-
-local function test(nom, fonction)
-    S.reinitialiser()
-    Liaison.pause = false
-    Liaison.journal = {}
-    Liaison.jeton = JETON
-    Liaison.derniersRefus = {}
-    Liaison.refus = 0
-    Notation.oublier()
-    Notation.observateurs = {}
-    local ok, erreur = pcall(fonction)
-    if ok then
-        reussis = reussis + 1
-    else
-        echecs = echecs + 1
-        print("ÉCHEC  " .. nom .. " : " .. tostring(erreur))
-    end
-end
-
-local function egal(obtenu, attendu, message)
-    if obtenu ~= attendu then
-        error(string.format("%s : attendu %s, obtenu %s", message or "valeur", tostring(attendu), tostring(obtenu)), 2)
-    end
-end
-
-local function proche(obtenu, attendu, message)
-    if type(obtenu) ~= 'number' or math.abs(obtenu - attendu) > 1e-9 then
-        error(string.format("%s : attendu %s, obtenu %s", message or "nombre", tostring(attendu), tostring(obtenu)), 2)
-    end
-end
-
-local function echoue(fonction, morceau)
-    local ok, erreur = pcall(fonction)
-    if ok then
-        error("une erreur était attendue", 2)
-    end
-    if morceau and not tostring(erreur):find(morceau, 1, true) then
-        error("erreur inattendue : " .. tostring(erreur), 2)
-    end
-end
-
-local function contient(liste, morceau)
-    for _, texte in ipairs(liste) do
-        if tostring(texte):find(morceau, 1, true) then
-            return true
-        end
-    end
-    return false
-end
-
--- Une ligne du serveur pour Liaison.recevoir : l'objet en JSON, avec le jeton de la liaison (JETON
--- par défaut, un autre texte, ou false pour l'omettre).
-local function ligne(objet, jeton)
-    if jeton == nil then
-        objet.jeton = JETON
-    elseif jeton then
-        objet.jeton = jeton
-    end
-    return Json.encode(objet)
-end
-
--- Photos d'essai ------------------------------------------------------------------
-
-local function photoRaw()
-    return S.Photo(1, {
-        Temperature = 5200, Tint = 5, WhiteBalance = 'As Shot',
-        Exposure2012 = 0, Highlights2012 = 0, Shadows2012 = 0, Saturation = 0, Vibrance = 0,
-        SharpenRadius = 1, ProcessVersion = '15.4',
-    }, { fileName = 'DSC_0412.NEF', fileFormat = 'RAW', cameraModel = 'NIKON Z 6' })
-end
-
-local function photoJpeg()
-    return S.Photo(2, { IncrementalTemperature = 0, IncrementalTint = 0, WhiteBalance = 'As Shot', Exposure2012 = 0 },
-        { fileName = 'IMG_0001.JPG', fileFormat = 'JPG' })
-end
-
--- RAW Fujifilm avec le profil Adobe Color (une « Look » posée sur Adobe Standard), comme à l'import.
-local ADOBE_COLOR = {
-    Name = 'Adobe Color', Amount = 1, UUID = 'B952C231111CD8E0ECCF14B86BAA7077',
-    Group = { ['x-default'] = 'Profiles' },
-    Parameters = { CameraProfile = 'Adobe Standard', ToneCurvePV2012 = { 0, 0, 22, 16, 255, 255 } },
-}
-
-local function photoFuji()
-    return S.Photo(4, {
-        Temperature = 5350, Tint = 19, WhiteBalance = 'As Shot', Exposure2012 = 0, Vibrance = 0,
-        ConvertToGrayscale = false, CameraProfile = 'Adobe Standard', Look = ADOBE_COLOR, PerspectiveScale = 100,
-        ProcessVersion = '15.4',
-    }, { fileName = 'XH2S0320.RAF', copyName = 'Copie 1', fileFormat = 'RAW', cameraMake = 'FUJIFILM',
-        cameraModel = 'X-H2S', croppedDimensions = '6240 x 4160' },
-    { dimensions = { width = 6240, height = 4160 } })
-end
-
-local function appliquer(params)
-    params.etape = params.etape or 'passe 1'
-    return Commandes.executer('appliquer', params)
-end
+-- Aides communes des essais de la liaison (Aides.lua) : avant chaque test, la simulation, la
+-- liaison et les registres (Notation, Carnet) repartent de zéro.
+local A = require 'Aides'
+local test, egal, proche, echoue, contient, ligne = A.test, A.egal, A.proche, A.echoue, A.contient, A.ligne
+local photoRaw, photoJpeg, photoFuji, appliquer = A.photoRaw, A.photoJpeg, A.photoFuji, A.appliquer
+local JETON, ADOBE_COLOR = A.JETON, A.ADOBE_COLOR
 
 -- Json ------------------------------------------------------------------------------
 
@@ -5648,5 +5553,4 @@ test("radial : composant intersecté, dupliqué inversé et copié, toujours Fli
     egal(copie.Flipped, true, "copié : Flipped gardé") egal(copie.MaskInverted, true, "copié : toujours inversé")
 end)
 
-print(string.format("%d tests réussis, %d en échec", reussis, echecs))
-os.exit(echecs == 0 and 0 or 1)
+A.bilan()

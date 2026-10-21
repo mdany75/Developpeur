@@ -1,10 +1,11 @@
 -- PluginInfoProvider.lua : le module « Développeur » dans le Gestionnaire de modules externes,
 -- une section par sujet :
---   - la liaison avec Claude : état, boutons, mode « Proposer d'abord », réglages, garde-fous et
---     diagnostic ;
+--   - la liaison avec Claude : état, boutons, mode « Proposer d'abord », réglages (dont le carnet de
+--     progrès, 1.3), garde-fous et diagnostic ;
 --   - la fenêtre Claude : chemins de Claude Code et du connecteur MCP-Développeur, modèle, effort,
---     nouvelle conversation par photo, proposition à l'ouverture, fermeture de Claude Code après
---     inactivité, raccourci clavier, dossiers.
+--     nouvelle conversation par photo, proposition à l'ouverture, avant/après de chaque étape et
+--     leçon de la photo (1.3), fermeture de Claude Code après inactivité, raccourci clavier,
+--     dossiers.
 -- Les deux sections lisent et écrivent les mêmes préférences du module (Preferences.lua,
 -- Chemins.prefs).
 
@@ -21,8 +22,20 @@ local Consignes = require 'Consignes'
 local Fichiers = require 'Fichiers'
 local Liaison = require 'Liaison'
 
+-- Photos au carnet de progrès du catalogue ouvert, en mots (« ? » s'il ne se lit pas). pcall
+-- simple : le diagnostic s'ouvre depuis l'action d'un bouton, peut-être hors d'une tâche (à
+-- constater), et la lecture (carnet.json, chemin du catalogue) n'a pas à attendre ; au pire, « ? ».
+local function photosAuCarnet()
+    local ok, n = pcall(function() return require('Carnet').nombre() end)
+    if not ok or type(n) ~= 'number' then
+        return "?"
+    end
+    return string.format("%d photo%s", n, n > 1 and "s" or "")
+end
+
 -- Le diagnostic à coller dans la conversation : versions, ports, liaison, dernier échange, dernière
--- erreur, réglages, chemins de la fenêtre Claude, journal.
+-- erreur, réglages, chemins de la fenêtre Claude, journal. Les réglages de la 1.3 sont au bout de
+-- leur ligne : les débuts de ligne lus par les essais ne changent pas.
 local function diagnostic()
     local prefs = Chemins.prefs()
     local lignes = {
@@ -36,10 +49,12 @@ local function diagnostic()
         "Dernière erreur : " .. tostring(Liaison.erreur or "aucune"),
         string.format("Mode : %s ; accord dans Lightroom : %s ; copies virtuelles seulement : %s ; libellé protégé : %s ; rejetées protégées : %s ; plafond : %s photos ; retour visuel : %s",
             tostring(prefs.mode), tostring(prefs.accordDansLightroom), tostring(prefs.copiesSeulement), tostring(prefs.libelleProtege),
-            tostring(prefs.rejeteesProtegees), tostring(prefs.plafondPhotos), tostring(prefs.retourVisuel)) .. " ; point de mise au point en tout temps : " .. tostring(prefs.pointMiseAuPoint),
+            tostring(prefs.rejeteesProtegees), tostring(prefs.plafondPhotos), tostring(prefs.retourVisuel)) .. " ; point de mise au point en tout temps : " .. tostring(prefs.pointMiseAuPoint)
+            .. " ; carnet de progrès : " .. tostring(prefs.carnet) .. " (" .. photosAuCarnet() .. ")",
         string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s, effort %s ; nouvelle conversation par photo : %s",
             tostring(prefs.cheminClaude), tostring(prefs.cheminConnecteur), tostring(prefs.modele), tostring(prefs.effort),
-            tostring(prefs.nouvelleParPhoto)) .. " ; proposition à l'ouverture : " .. tostring(prefs.propositionAOuverture),
+            tostring(prefs.nouvelleParPhoto)) .. " ; proposition à l'ouverture : " .. tostring(prefs.propositionAOuverture)
+            .. " ; avant/après des étapes : " .. tostring(prefs.avantApresEtapes) .. " ; leçon en fin de retouche : " .. tostring(prefs.leconFinRetouche),
         "Journaux : " .. select(2, Liaison.cheminJournal()) .. " et " .. Chemins.journal(),
         "",
         "Derniers événements :",
@@ -149,6 +164,10 @@ local function sectionLiaison(f, propertyTable, prefs, ligne)
             title = "Montrer le carré de mise au point (Fujifilm) sur chaque aperçu",
             value = bind { key = 'pointMiseAuPoint', bind_to_object = prefs },
         }),
+        ligne("Carnet :", f:checkbox {
+            title = "Carnet de progrès : noter les défauts vus à la prise de vue, avant la première retouche de Claude",
+            value = bind { key = 'carnet', bind_to_object = prefs },
+        }),
 
         f:separator { fill_horizontal = 1 },
 
@@ -223,6 +242,12 @@ local function sectionFenetre(f, prefs, ligne)
         ligne("À l'ouverture :",
             f:checkbox { value = bind 'propositionAOuverture',
                 title = "Claude prépare une proposition de retouche (rien n'est appliqué)" }),
+        ligne("Avant/après :",
+            f:checkbox { value = bind 'avantApresEtapes',
+                title = "Garder l'avant/après de chaque étape de Claude (un rendu de plus par étape, photo active seulement)" }),
+        ligne("Leçon :",
+            f:checkbox { value = bind 'leconFinRetouche',
+                title = "Claude finit chaque retouche par la leçon de la photo" }),
         ligne("Fermer Claude Code après :",
             f:popup_menu { value = bind 'inactivite', items = {
                 { title = "5 minutes sans demande", value = 5 },

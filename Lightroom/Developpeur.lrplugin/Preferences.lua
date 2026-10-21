@@ -34,6 +34,9 @@ Preferences.defauts = {
     -- Le point de mise au point (Fujifilm) dessiné sur chaque aperçu de view_photo, pas seulement
     -- quand Claude note.
     pointMiseAuPoint = false,
+    -- Carnet de progrès (1.3) : les défauts de la prise de vue que le connecteur constate avant la
+    -- première retouche de Claude sont notés dans carnet.json (Carnet.lua), à part du catalogue.
+    carnet = true,
 }
 
 -- Préférences du module, complétées par les valeurs par défaut.

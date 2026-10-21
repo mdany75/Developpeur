@@ -11,6 +11,9 @@
 --       connecteur.json                        configuration MCP, écrite à chaque lancement
 --       consommation.json, publication.json    jetons comptés, profils de publication de l'utilisateur
 --       notation.json                          notes proposées par Claude
+--       carnet.json                            carnet de progrès et leçons des photos (Carnet.lua,
+--                                              1.3), une table par catalogue
+--       Etapes/                                avant/après de chaque étape de Claude (1.3)
 --   ~/Library/Logs/Developpeur/conversation.log   (à côté de module.log, le journal de la liaison)
 
 local LrFileUtils = import 'LrFileUtils'
@@ -38,6 +41,7 @@ function Chemins.sessions() return LrPathUtils.child(Chemins.racine(), 'Sessions
 function Chemins.atelier() return LrPathUtils.child(Chemins.racine(), 'Atelier') end
 function Chemins.configMCP() return LrPathUtils.child(Chemins.racine(), 'connecteur.json') end
 function Chemins.temporaire() return LrPathUtils.child(Chemins.racine(), 'Temporaire') end
+function Chemins.etapes() return LrPathUtils.child(Chemins.racine(), 'Etapes') end
 function Chemins.journaux() return sous('Library', 'Logs', 'Developpeur') end
 function Chemins.journal() return LrPathUtils.child(Chemins.journaux(), 'conversation.log') end
 
@@ -113,6 +117,12 @@ Chemins.defauts = {
     styleChoisi = 'standard',
     -- Minutes sans demande avant de fermer Claude Code (il reprend la session à la demande suivante).
     inactivite = 15,
+    -- Avant/après de chaque étape de Claude (1.3, Pourquoi ?) : un rendu de plus par étape, photo
+    -- active seulement, gardé dans Etapes/.
+    avantApresEtapes = true,
+    -- Claude finit chaque retouche par la leçon de la photo (1.3, photo_lesson) ; décochée, chaque
+    -- demande porte « [Sans leçon] ».
+    leconFinRetouche = true,
 }
 
 -- Préférences du module (liaison comprise), complétées par les réglages par défaut de la fenêtre.
