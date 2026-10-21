@@ -16,10 +16,16 @@ local Notation = require 'Notation'
 
 local reussis, echecs = 0, 0
 
+-- Jeton de la liaison pendant les essais (liaison fermée, 1.2) : jamais celui du vrai fichier.
+local JETON = string.rep('ab', 32)
+
 local function test(nom, fonction)
     S.reinitialiser()
     Liaison.pause = false
     Liaison.journal = {}
+    Liaison.jeton = JETON
+    Liaison.derniersRefus = {}
+    Liaison.refus = 0
     Notation.oublier()
     Notation.observateurs = {}
     local ok, erreur = pcall(fonction)
@@ -60,6 +66,17 @@ local function contient(liste, morceau)
         end
     end
     return false
+end
+
+-- Une ligne du serveur pour Liaison.recevoir : l'objet en JSON, avec le jeton de la liaison (JETON
+-- par défaut, un autre texte, ou false pour l'omettre).
+local function ligne(objet, jeton)
+    if jeton == nil then
+        objet.jeton = JETON
+    elseif jeton then
+        objet.jeton = jeton
+    end
+    return Json.encode(objet)
 end
 
 -- Photos d'essai ------------------------------------------------------------------
@@ -3013,10 +3030,10 @@ end)
 test("Liaison : réponse sur la prise, avec l'identifiant de la commande", function()
     Liaison.prise = { send = function(self, texte) S.envois[#S.envois + 1] = texte end }
     Liaison.reponsesConnectee = true
-    Liaison.recevoir('{"id":3,"command":"ping","params":{}}')
+    Liaison.recevoir(ligne({ id = 3, command = 'ping', params = {} }))
     egal(S.envois[1], '{"id":3,"result":{"pong":true,"version":"' .. Liaison.VERSION .. '"}}\n', "le ping donne la version du module")
 
-    Liaison.recevoir('{"id":4,"command":"pivoter"}')
+    Liaison.recevoir(ligne({ id = 4, command = 'pivoter' }))
     egal(S.envois[2], '{"error":"Commande inconnue : pivoter","id":4}\n')
 
     Liaison.recevoir('pas du json')
@@ -3046,7 +3063,7 @@ end)
 test("Liaison : sans prise des réponses, la réponse est abandonnée après l'attente", function()
     Liaison.prise = nil
     Liaison.reponsesConnectee = false
-    Liaison.recevoir('{"id":5,"command":"ping","params":{}}')
+    Liaison.recevoir(ligne({ id = 5, command = 'ping', params = {} }))
     egal(#S.envois, 0)
 end)
 
@@ -3424,13 +3441,415 @@ test("liaison : une proposition en attente d'accord n'est pas notée comme un re
     Liaison.journal, Liaison.journalPhotos = {}, {}
     Liaison.prise = { send = function() end }
     Liaison.reponsesConnectee = true
-    Liaison.recevoir(Json.encode({ id = 7, command = 'appliquer', params = { reglages = { Exposure2012 = 0.2 }, plages = { Exposure2012 = { -5, 5 } },
+    Liaison.recevoir(ligne({ id = 7, command = 'appliquer', params = { reglages = { Exposure2012 = 0.2 }, plages = { Exposure2012 = { -5, 5 } },
         confirme = true, etape = 'passe 3 : bougies', raison = "Flammes encore brûlées." } }))
     local journal = table.concat(Liaison.journal, "\n")
     egal(journal:find("Proposition en attente", 1, true) ~= nil, true)
     egal(journal:find("Refusé", 1, true), nil, "pas de « Refusé » pour une proposition qui attend")
     egal(Liaison.propositionEnAttente.detail, "Flammes encore brûlées.", "la raison s'affiche avec la proposition")
     Liaison.prise, Liaison.reponsesConnectee, Liaison.propositionEnAttente = nil, false, nil
+end)
+
+-- Liaison fermée (1.2) ---------------------------------------------------------------------------
+
+-- Prise des réponses connectée : chaque réponse va dans S.envois, relue en JSON par reponse(i).
+local function priseDesReponses()
+    Liaison.prise = { send = function(_, texte) S.envois[#S.envois + 1] = texte end }
+    Liaison.reponsesConnectee = true
+end
+
+local function reponse(i)
+    return Json.decode(S.envois[i or #S.envois])
+end
+
+local function compter(liste, morceau)
+    local n = 0
+    for _, texte in ipairs(liste) do
+        if tostring(texte):find(morceau, 1, true) then
+            n = n + 1
+        end
+    end
+    return n
+end
+
+local function exposer(valeur, extra)
+    local params = { reglages = { Exposure2012 = valeur }, plages = { Exposure2012 = { -5, 5 } }, confirme = true, etape = 'passe 1' }
+    for cle, v in pairs(extra or {}) do
+        params[cle] = v
+    end
+    return params
+end
+
+-- Démarre la liaison dans la simulation : la tâche de la liaison tourne aussitôt, LrSocket.bind
+-- rend de fausses prises (notées dans la liste rendue), et pendantTour(n) est appelé à chaque
+-- tour de sa boucle (0,5 s) ; il doit finir par arrêter la liaison.
+local function demarrerLiaison(pendantTour)
+    local LrFunctionContext, LrSocket = import 'LrFunctionContext', import 'LrSocket'
+    local poster, lier = LrFunctionContext.postAsyncTaskWithContext, LrSocket.bind
+    local prises, tours = {}, 0
+    LrFunctionContext.postAsyncTaskWithContext = function(_, fonction) fonction({}) end
+    LrSocket.bind = function(args)
+        local prise = { port = args.port, fichierAuLien = S.fichiers[select(2, Liaison.cheminJeton())] }
+        function prise.close(self) self.fermee = true end
+        function prise.reconnect() end
+        prises[#prises + 1] = prise
+        return prise
+    end
+    S.pendantAttente = function()
+        tours = tours + 1
+        if tours > 100 then
+            Liaison.arreter()
+        elseif pendantTour then
+            pendantTour(tours)
+        end
+    end
+    Liaison.actif = false
+    local ok, erreur = pcall(Liaison.demarrer)
+    LrFunctionContext.postAsyncTaskWithContext, LrSocket.bind = poster, lier
+    S.pendantAttente = nil
+    if not ok then
+        Liaison.actif = false
+        error(erreur, 2)
+    end
+    return prises
+end
+
+test("Liaison fermée : une ligne sans jeton est refusée avant la commande, même avec confirme", function()
+    local photo = photoRaw()
+    S.active = photo
+    S.prefs.mode = 'proposer'
+    priseDesReponses()
+    Liaison.dernierEchange = nil
+    Liaison.recevoir(ligne({ id = 8, command = 'appliquer', params = exposer(0.5) }, false))
+    local refus = reponse(1)
+    egal(refus.id, 8)
+    egal(refus.error, Liaison.REFUS_JETON.sans)
+    egal(refus.code, 'jeton')
+    egal(refus.result, nil)
+    egal(#S.ecritures, 0, "rien d'écrit")
+    egal(photo.reglages.Exposure2012, 0, "exposition inchangée")
+    egal(Liaison.dernierEchange, nil, "une ligne refusée n'est pas un échange")
+    egal(contient(Liaison.journal, "Commande refusée sans jeton"), true)
+    egal(contient(Liaison.journal, "Refusé :"), false, "noté comme un refus du jeton, pas de la commande")
+    -- La même ligne avec le jeton passe : mode « Proposer d'abord » et confirme.
+    Liaison.recevoir(ligne({ id = 9, command = 'appliquer', params = exposer(0.5) }))
+    egal(reponse(2).error, nil)
+    egal(photo.reglages.Exposure2012, 0.5, "écrite avec le jeton")
+    Liaison.prise, Liaison.reponsesConnectee = nil, false
+end)
+
+test("Liaison fermée : mauvais jeton refusé, même presque juste", function()
+    local photo = photoRaw()
+    S.active = photo
+    S.prefs.mode = 'appliquer'
+    priseDesReponses()
+    local presque = JETON:sub(1, 63) .. 'c'
+    for i, autre in ipairs({ string.rep('cd', 32), presque, JETON:sub(1, 63), JETON .. 'a', 42, '' }) do
+        Liaison.recevoir(ligne({ id = i, command = 'appliquer', params = exposer(0.8) }, autre))
+        egal(reponse(i).error, Liaison.REFUS_JETON.faux, "jeton " .. tostring(autre))
+        egal(reponse(i).code, 'jeton')
+    end
+    egal(#S.ecritures, 0)
+    egal(photo.reglages.Exposure2012, 0, "photo inchangée")
+    egal(Liaison.refus, 6)
+    egal(contient(Liaison.journal, "Commande refusée : mauvais jeton"), true)
+    Liaison.prise, Liaison.reponsesConnectee = nil, false
+end)
+
+test("Liaison fermée : ping sans jeton refusé ; avec le bon jeton, pong et version", function()
+    priseDesReponses()
+    Liaison.recevoir(ligne({ id = 1, command = 'ping', params = {} }, false))
+    egal(reponse(1).error, Liaison.REFUS_JETON.sans)
+    egal(reponse(1).result, nil, "pas de pong sans jeton")
+    Liaison.recevoir(ligne({ id = 2, command = 'ping', params = {} }))
+    egal(S.envois[2], '{"id":2,"result":{"pong":true,"version":"' .. Liaison.VERSION .. '"}}\n', "réponse au ping inchangée")
+    Liaison.prise, Liaison.reponsesConnectee = nil, false
+end)
+
+test("Liaison fermée : liaison sans jeton, tout est refusé, même une ligne qui porte un jeton", function()
+    local photo = photoRaw()
+    S.active = photo
+    priseDesReponses()
+    Liaison.jeton = nil
+    Liaison.recevoir(ligne({ id = 1, command = 'ping', params = {} }))
+    Liaison.recevoir(ligne({ id = 2, command = 'appliquer', params = exposer(0.3) }))
+    Liaison.recevoir(ligne({ id = 3, command = 'etat', params = {} }, false))
+    for i = 1, 3 do
+        egal(reponse(i).error, Liaison.REFUS_JETON.aucun, "ligne " .. i)
+        egal(reponse(i).code, 'jeton')
+    end
+    egal(#S.ecritures, 0)
+    egal(contient(Liaison.journal, "la liaison n'a pas de jeton"), true)
+    Liaison.prise, Liaison.reponsesConnectee = nil, false
+end)
+
+test("Liaison fermée : depuisLightroom venu du réseau est retiré, la pause tient", function()
+    local photo = photoRaw()
+    S.active = photo
+    priseDesReponses()
+    Liaison.pause = true
+    Liaison.recevoir(ligne({ id = 1, command = 'appliquer', params = exposer(0.5, { depuisLightroom = true }) }))
+    egal(reponse(1).error:find("La liaison est en pause", 1, true) ~= nil, true, reponse(1).error)
+    egal(#S.ecritures, 0, "rien d'écrit pendant la pause")
+    egal(photo.reglages.Exposure2012, 0)
+    -- Le drapeau garde son effet par appel direct (menus, fenêtre de suivi, carte Note).
+    Commandes.executer('appliquer', exposer(0.5, { depuisLightroom = true }))
+    egal(photo.reglages.Exposure2012, 0.5, "appel direct depuis Lightroom")
+    Liaison.pause = false
+    Liaison.prise, Liaison.reponsesConnectee = nil, false
+end)
+
+test("Liaison fermée : depuisLightroom venu du réseau ne saute pas l'accord dans Lightroom", function()
+    local photo = photoRaw()
+    S.active = photo
+    S.prefs.mode, S.prefs.accordDansLightroom = 'proposer', true
+    priseDesReponses()
+    Liaison.propositionEnAttente = nil
+    Liaison.recevoir(ligne({ id = 1, command = 'appliquer', params = exposer(0.4, { depuisLightroom = true }) }))
+    egal(Liaison.propositionEnAttente ~= nil, true, "la proposition attend dans la fenêtre de suivi")
+    egal(reponse(1).error:sub(1, #Liaison.EN_ATTENTE), Liaison.EN_ATTENTE)
+    egal(#S.ecritures, 0)
+    egal(photo.reglages.Exposure2012, 0)
+    Liaison.prise, Liaison.reponsesConnectee, Liaison.propositionEnAttente = nil, false, nil
+end)
+
+test("Liaison fermée : refus notés une fois par 10 s et par genre, tous comptés", function()
+    priseDesReponses()
+    for i = 1, 3 do
+        Liaison.recevoir(ligne({ id = i, command = 'etat', params = {} }, false))
+    end
+    egal(compter(Liaison.journal, "Commande refusée sans jeton"), 1, "une seule ligne au journal")
+    egal(Liaison.refus, 3)
+    Liaison.recevoir(ligne({ id = 4, command = 'etat', params = {} }, string.rep('0', 64)))
+    egal(compter(Liaison.journal, "mauvais jeton"), 1, "un autre genre se note à part")
+    Liaison.recevoir('GET / HTTP/1.1')
+    Liaison.recevoir('Host: 127.0.0.1:54770')
+    egal(compter(Liaison.journal, "Message illisible ignoré"), 1, "lignes illisibles : une note")
+    egal(Liaison.refus, 6)
+    S.horloge = S.horloge + 11
+    Liaison.recevoir(ligne({ id = 5, command = 'etat', params = {} }, false))
+    egal(compter(Liaison.journal, "Commande refusée sans jeton"), 2, "notée de nouveau après 10 s")
+    egal(#S.envois, 5, "chaque ligne lisible reçoit son refus ; une illisible, rien")
+    local _, chemin = Liaison.cheminJournal()
+    egal(select(2, S.fichiers[chemin]:gsub("Commande refusée sans jeton", "")), 2, "module.log : deux lignes, pas quatre")
+    Liaison.prise, Liaison.reponsesConnectee = nil, false
+end)
+
+test("Liaison fermée : un refus n'emporte pas l'événement de la photo active", function()
+    local premiere, seconde = photoRaw(), photoFuji()
+    seconde.localIdentifier = 2
+    S.photos[2] = seconde
+    S.active = premiere
+    Liaison.derniereActive = premiere.localIdentifier
+    priseDesReponses()
+    S.active = seconde
+    Liaison.photoActiveChangee = true
+    Liaison.recevoir(ligne({ id = 1, command = 'etat', params = {} }, false))
+    egal(reponse(1).code, 'jeton')
+    egal(reponse(1).evenements, nil, "pas d'événement avec un refus")
+    Liaison.recevoir(ligne({ id = 2, command = 'ping', params = {} }))
+    egal(reponse(2).evenements.id, 2, "l'événement part avec la réponse suivante, au vrai serveur")
+    Liaison.prise, Liaison.reponsesConnectee, Liaison.derniereActive, Liaison.photoActiveChangee = nil, false, nil, false
+end)
+
+test("Liaison fermée : preparerJeton, 64 chiffres hexadécimaux, droits 600, rangé d'un coup, un autre à chaque fois", function()
+    local _, chemin = Liaison.cheminJeton()
+    egal(chemin, S.home .. '/Library/Application Support/Developpeur/liaison.jeton', "là où le serveur le lit")
+    local premier = Liaison.preparerJeton()
+    egal(type(premier), 'string')
+    egal(premier:match('^' .. string.rep('[0-9a-f]', 64) .. '$') ~= nil, true, premier)
+    egal(S.fichiers[chemin]:match('^' .. string.rep('[0-9a-f]', 64) .. '\n$') ~= nil, true)
+    egal(S.fichiers[chemin], premier .. '\n')
+    egal(S.droits[chemin], '600')
+    egal(S.fichiers[chemin .. '.nouveau'], nil, "le fichier provisoire a disparu")
+    egal(#S.commandesSysteme, 2)
+    egal(S.commandesSysteme[1]:find('umask 077', 1, true), 1, "créé vide en 600 avant d'y écrire")
+    egal(S.commandesSysteme[2]:find('/bin/mv -f', 1, true), 1, "rangé d'un coup")
+    egal(Liaison.lireFichierJeton(), premier)
+    local second = Liaison.preparerJeton()
+    egal(second ~= premier, true, "un autre jeton à chaque démarrage")
+    egal(S.fichiers[chemin], second .. '\n')
+    -- Jamais au journal ni sur une ligne de commande, même à moitié.
+    for _, jeton in ipairs({ premier, second }) do
+        for _, morceau in ipairs({ jeton, jeton:sub(1, 32), jeton:sub(33) }) do
+            egal(contient(Liaison.journal, morceau), false, "journal")
+            egal(contient(S.commandesSysteme, morceau), false, "commandes du système")
+        end
+    end
+end)
+
+test("Liaison fermée : preparerJeton, aléa illisible ou commande en échec, nil et la raison, rien d'écrit à la place du jeton", function()
+    local _, chemin = Liaison.cheminJeton()
+    local ancien = string.rep('1', 64) .. '\n'
+    S.fichiers[chemin] = ancien
+    S.aleaIllisible = true
+    local jeton, raison = Liaison.preparerJeton()
+    egal(jeton, nil)
+    egal(raison, "aléa du système illisible (/dev/urandom)")
+    egal(#S.commandesSysteme, 0, "rien tenté sans aléa")
+    S.aleaIllisible = 'court'
+    jeton, raison = Liaison.preparerJeton()
+    egal(jeton, nil, "moins de 32 octets")
+    egal(raison, "aléa du système illisible (/dev/urandom)")
+    S.aleaIllisible = false
+    S.codeCommandes = 1
+    jeton, raison = Liaison.preparerJeton()
+    egal(jeton, nil)
+    egal(raison, "fichier du jeton impossible à créer")
+    egal(S.fichiers[chemin], ancien, "l'ancien fichier reste tel quel")
+    egal(S.fichiers[chemin .. '.nouveau'], nil)
+end)
+
+test("Liaison fermée : lireFichierJeton n'accepte que 64 chiffres hexadécimaux en minuscules", function()
+    local _, chemin = Liaison.cheminJeton()
+    egal(Liaison.lireFichierJeton(), nil, "fichier absent")
+    for _, contenu in ipairs({ '', string.rep('a', 63), string.rep('a', 65), string.rep('A', 64), string.rep('a', 63) .. 'g',
+        string.rep('a', 64) .. '\n\n', ' ' .. string.rep('a', 64) }) do
+        S.fichiers[chemin] = contenu
+        egal(Liaison.lireFichierJeton(), nil, "« " .. contenu .. " »")
+    end
+    S.fichiers[chemin] = string.rep('0f', 32)
+    egal(Liaison.lireFichierJeton(), string.rep('0f', 32), "sans saut de ligne")
+    S.fichiers[chemin] = string.rep('0f', 32) .. '\n'
+    egal(Liaison.lireFichierJeton(), string.rep('0f', 32), "avec un saut de ligne")
+end)
+
+test("Liaison fermée : garderFichierJeton réécrit un fichier effacé ou remplacé ; fichier juste, aucune commande", function()
+    local _, chemin = Liaison.cheminJeton()
+    Liaison.jeton = Liaison.preparerJeton()
+    S.commandesSysteme = {}
+    egal(Liaison.garderFichierJeton(), false)
+    egal(#S.commandesSysteme, 0, "fichier juste : rien à faire")
+    S.fichiers[chemin] = nil
+    egal(Liaison.garderFichierJeton(), true, "effacé")
+    egal(S.fichiers[chemin], Liaison.jeton .. '\n')
+    egal(S.droits[chemin], '600')
+    S.fichiers[chemin] = string.rep('0', 64) .. '\n'
+    egal(Liaison.garderFichierJeton(), true, "remplacé (démarrage plus ancien)")
+    egal(S.fichiers[chemin], Liaison.jeton .. '\n')
+    egal(compter(Liaison.journal, "Fichier du jeton réécrit"), 2)
+    -- Un échec n'est noté qu'au premier tour qui échoue.
+    S.fichiers[chemin] = nil
+    S.codeCommandes = 1
+    egal(Liaison.garderFichierJeton(), false)
+    egal(Liaison.garderFichierJeton(), false)
+    egal(compter(Liaison.journal, "Fichier du jeton impossible à réécrire"), 1)
+    S.codeCommandes = 0
+    egal(Liaison.garderFichierJeton(), true, "réécrit dès que possible")
+    -- Liaison sans jeton : rien à garder.
+    Liaison.jeton = nil
+    S.fichiers[chemin] = nil
+    egal(Liaison.garderFichierJeton(), false)
+    egal(S.fichiers[chemin], nil)
+end)
+
+test("Liaison fermée : memeJeton et refusJeton", function()
+    egal(Liaison.memeJeton(JETON, JETON), true)
+    egal(Liaison.memeJeton(JETON, string.rep('ab', 32)), true, "texte égal")
+    egal(Liaison.memeJeton(JETON, JETON:sub(1, 63)), false, "longueurs différentes")
+    egal(Liaison.memeJeton(JETON, nil), false)
+    egal(Liaison.memeJeton(nil, nil), false)
+    egal(Liaison.memeJeton(42, 42), false, "nombre")
+    egal(Liaison.memeJeton(JETON, 'b' .. JETON:sub(2)), false, "premier caractère")
+    egal(Liaison.refusJeton(JETON), nil)
+    egal(Liaison.refusJeton(nil), 'sans')
+    egal(Liaison.refusJeton(string.rep('cd', 32)), 'faux')
+    egal(Liaison.refusJeton(Json.null), 'faux')
+    Liaison.jeton = nil
+    egal(Liaison.refusJeton(JETON), 'aucun')
+    egal(Liaison.refusJeton(nil), 'aucun')
+end)
+
+test("Liaison fermée : etat dit liaison_fermee, sans le jeton ; le diagnostic dit son état, jamais sa valeur", function()
+    photoRaw()
+    local etat = Commandes.executer('etat', {})
+    egal(etat.liaison_fermee, true)
+    egal(Json.encode(etat):find(JETON, 1, true), nil, "le jeton n'est pas dans l'état")
+    egal(Json.encode(etat):find('liaison.jeton', 1, true), nil, "ni son chemin")
+    local PluginInfoProvider = require 'PluginInfoProvider'
+    Liaison.refus = 4
+    local diagnostic = PluginInfoProvider.diagnostic()
+    egal(diagnostic:find("Jeton : présent (" .. select(2, Liaison.cheminJeton()) .. ") ; commandes refusées : 4", 1, true) ~= nil, true, diagnostic)
+    egal(diagnostic:find(JETON, 1, true), nil, "jamais la valeur du jeton")
+    Liaison.jeton = nil
+    egal(PluginInfoProvider.diagnostic():find("Jeton : absent", 1, true) ~= nil, true)
+end)
+
+test("Liaison fermée : la liaison tire son jeton avant ses prises, le garde, puis l'oublie à l'arrêt", function()
+    local _, chemin = Liaison.cheminJeton()
+    Liaison.jeton = nil
+    Liaison.refus, Liaison.derniersRefus = 5, { sans = 0 }
+    local pendant, refusAuDebut, reecrit
+    local prises = demarrerLiaison(function(tour)
+        if tour == 1 then
+            pendant, refusAuDebut = Liaison.jeton, Liaison.refus
+            S.fichiers[chemin] = nil -- effacé pendant que Lightroom tourne
+        elseif tour == Liaison.VERIFIER_JETON_TOUTES + 1 then
+            reecrit = S.fichiers[chemin]
+            Liaison.arreter()
+        end
+    end)
+    egal(type(pendant), 'string')
+    egal(#pendant, 64)
+    egal(refusAuDebut, 0, "compte des refus remis à zéro au démarrage")
+    egal(#prises, 2, "les deux prises")
+    egal(prises[1].fichierAuLien, pendant .. '\n', "le fichier existe avant la première prise")
+    egal(prises[1].fermee and prises[2].fermee, true, "prises fermées à l'arrêt")
+    egal(reecrit, pendant .. '\n', "fichier effacé : réécrit dans les 5 s")
+    egal(S.droits[chemin], '600')
+    egal(Liaison.jeton, nil, "jeton oublié à l'arrêt")
+    egal(contient(Liaison.journal, "Liaison démarrée (ports 54770 et 54771, jeton privé)"), true)
+    egal(contient(Liaison.journal, "Fichier du jeton réécrit"), true)
+    egal(contient(Liaison.journal, pendant), false, "le jeton n'est jamais journalisé")
+    egal(Liaison.erreur, nil)
+end)
+
+test("Liaison fermée : sans jeton écrit, aucune prise ne s'ouvre et la liaison reste en erreur", function()
+    local preparer = Liaison.preparerJeton
+    local ok, erreur = pcall(function()
+        S.aleaIllisible = true
+        Liaison.jeton = JETON
+        local prises = demarrerLiaison()
+        egal(#prises, 0, "aucune prise")
+        egal(Liaison.actif, true, "voyant rouge : un clic relance")
+        egal(Liaison.jeton, nil)
+        egal(Liaison.erreur, "jeton de la liaison : aléa du système illisible (/dev/urandom)")
+        egal(Liaison.texteEtat(), "Liaison en erreur : jeton de la liaison : aléa du système illisible (/dev/urandom)")
+        egal(contient(Liaison.journal, "Erreur de la liaison : jeton de la liaison"), true)
+        -- En erreur, la liaison reste active : le menu Démarrer seul n'y fait rien, d'où « Arrêter,
+        -- puis Démarrer » dans la réponse à une commande refusée.
+        local generation = Liaison.generation
+        Liaison.demarrer()
+        egal(Liaison.generation, generation, "Démarrer seul ne relance pas une liaison en erreur")
+        egal(Liaison.REFUS_JETON.aucun:find("Arrêter, puis Démarrer la liaison avec Claude", 1, true) ~= nil, true,
+            Liaison.REFUS_JETON.aucun)
+        priseDesReponses()
+        Liaison.recevoir(ligne({ id = 1, command = 'ping', params = {} }))
+        egal(reponse(1).error, Liaison.REFUS_JETON.aucun, "tout est refusé")
+        Liaison.prise, Liaison.reponsesConnectee = nil, false
+        Liaison.arreter()
+        -- Une erreur levée pendant la préparation : son message, sans le nom du fichier Lua.
+        S.aleaIllisible = false
+        Liaison.preparerJeton = function() error("disque plein") end
+        prises = demarrerLiaison()
+        egal(#prises, 0)
+        egal(Liaison.erreur, "jeton de la liaison : disque plein")
+        Liaison.arreter()
+        -- Un démarrage remplacé pendant la préparation ne touche ni au jeton ni aux prises.
+        Liaison.jeton = 'jeton du démarrage suivant'
+        Liaison.preparerJeton = function()
+            Liaison.generation = Liaison.generation + 1
+            return string.rep('e', 64)
+        end
+        prises = demarrerLiaison()
+        egal(#prises, 0)
+        egal(Liaison.jeton, 'jeton du démarrage suivant')
+    end)
+    Liaison.preparerJeton = preparer
+    Liaison.actif, Liaison.erreur = false, nil
+    if not ok then
+        error(erreur, 0)
+    end
 end)
 
 -- Livraison (2.0) --------------------------------------------------------------------

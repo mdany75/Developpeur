@@ -84,6 +84,8 @@
 --
 -- Sans « photo » ni « photos » ni « selection », la commande vise la photo active.
 -- Les erreurs sont levées avec error(message, 0) : le message part tel quel vers Claude.
+-- Toute commande, ping compris, n'arrive ici qu'avec le jeton de la liaison (Liaison.recevoir) ;
+-- depuisLightroom n'y vient jamais du réseau.
 --
 -- Chaque commande est dans le module de son domaine :
 --   Lecture.lua      etat, selection, reglages, presets, creerPreset, diagnostic, journal

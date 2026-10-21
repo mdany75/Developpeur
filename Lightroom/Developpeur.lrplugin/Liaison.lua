@@ -3,10 +3,21 @@
 -- LrSocket ne fonctionne que dans un sens par prise : Lightroom écoute sur 127.0.0.1, reçoit
 -- les commandes sur PORT_COMMANDES et renvoie les réponses sur PORT_REPONSES. Chaque message
 -- est une ligne JSON :
---   commande → {"id": 7, "command": "apercu", "params": {…}}
+--   commande → {"id": 7, "jeton": "<64 chiffres hexadécimaux>", "command": "apercu", "params": {…}}
 --   réponse  ← {"id": 7, "result": {…}}  ou  {"id": 7, "error": "message"}
+--   refus    ← {"id": 7, "error": "Liaison fermée : …", "code": "jeton"}
 -- Le serveur ouvre une connexion par commande puis la ferme : plusieurs sessions de Claude
 -- (Claude Desktop, Claude Code) peuvent ainsi se succéder.
+--
+-- Liaison fermée (1.2) : à chaque démarrage, le module tire un jeton privé (32 octets de
+-- /dev/urandom), le garde en mémoire et l'écrit d'un coup dans liaison.jeton (droits 600, dans
+-- ~/Library/Application Support/Developpeur/), que le serveur relit à chaque connexion. Toute
+-- ligne, ping compris, doit le porter : sinon elle est refusée avant Commandes.executer, donc
+-- avant la pause et « Proposer d'abord ». Une page web (POST vers 127.0.0.1) ou un autre compte
+-- du Mac ne peut plus rien faire faire au module ; un programme de l'utilisateur lui-même, qui
+-- peut lire le fichier, le pourrait encore. Le jeton n'est jamais journalisé ni renvoyé.
+-- `depuisLightroom` (pause et accord dans Lightroom levés) ne vient jamais du réseau : seuls les
+-- menus, la fenêtre de suivi et la carte Note le posent, par appel direct.
 --
 -- La prise des réponses ne lit jamais : elle ne voit pas le serveur partir et resterait
 -- accrochée à une connexion morte. Quand la prise des commandes se ferme, on la ferme donc et
@@ -24,6 +35,7 @@ local LrSocket = import 'LrSocket'
 local LrTasks = import 'LrTasks'
 
 local Json = require 'Json'
+local Texte = require 'Texte'
 
 local Liaison = {
     VERSION = '1.1.1',
@@ -60,6 +72,41 @@ local Liaison = {
     -- les vrais changements : un aperçu ou un débruitage qui affiche une autre photo puis remet la
     -- vue n'en est pas un.
     derniereActive = nil,
+
+    -- Liaison fermée (1.2). Le jeton de ce démarrage (nil : liaison arrêtée, ou jeton impossible
+    -- à écrire, et alors tout est refusé) ; jamais journalisé, ni dans une réponse ni dans l'état.
+    jeton = nil,
+    -- Lignes refusées depuis le démarrage (sans jeton, mauvais jeton, illisibles), pour le diagnostic.
+    refus = 0,
+    -- Genre → heure de la dernière ligne notée au journal pour ce genre de refus.
+    derniersRefus = {},
+    FICHIER_JETON = 'liaison.jeton',
+    -- Un refus du même genre n'est noté qu'une fois par DELAI_REFUS secondes.
+    DELAI_REFUS = 10,
+    -- Le fichier du jeton est vérifié tous les VERIFIER_JETON_TOUTES tours de la boucle de la
+    -- liaison (0,5 s chacun : 5 s), et réécrit s'il a été effacé ou remplacé.
+    VERIFIER_JETON_TOUTES = 10,
+}
+
+-- Réponses à une ligne refusée (code 'jeton'), selon le genre du refus. Le serveur les montre
+-- telles quelles à Claude.
+Liaison.REFUS_JETON = {
+    sans = "Liaison fermée : cette commande ne porte pas le jeton de la liaison ; rien n'a été fait. "
+        .. "Le connecteur MCP-Développeur qui l'envoie date d'avant la 1.2 : quitter puis rouvrir Claude Desktop, "
+        .. "ou ouvrir une nouvelle session de Claude Code, pour lancer celui qui est installé.",
+    faux = "Liaison fermée : le jeton de cette commande n'est pas celui de la liaison ; rien n'a été fait. "
+        .. "Il change à chaque démarrage de la liaison : réessayer ; si le refus se répète, relancer la liaison dans Lightroom.",
+    -- « Arrêter, puis Démarrer » : en erreur, la liaison reste active, et Démarrer seul n'y fait rien.
+    aucun = "Liaison fermée : le module n'a pas de jeton (il n'a pas pu l'écrire au démarrage de la liaison) ; "
+        .. "rien n'a été fait. Relancer la liaison dans Lightroom (Fichier › Module externe - Extras › "
+        .. "Arrêter, puis Démarrer la liaison avec Claude).",
+}
+
+-- Ligne du journal de chaque genre de refus.
+local NOTES_REFUS = {
+    sans = "Commande refusée sans jeton (connecteur d'avant la 1.2, ou autre programme)",
+    faux = "Commande refusée : mauvais jeton",
+    aucun = "Commande refusée : la liaison n'a pas de jeton",
 }
 
 local MAX_JOURNAL = 12
@@ -173,9 +220,165 @@ function Liaison.messageErreur(erreur)
     return (texte:gsub('^[^\n]-%.lua:%d+: ', ''))
 end
 
+-- Jeton de la liaison (1.2) -------------------------------------------------------------------
+
+-- Dossier et chemin du fichier du jeton : ~/Library/Application Support/Developpeur/liaison.jeton,
+-- là où le serveur le cherche (JetonLiaison.fichierParDefaut).
+function Liaison.cheminJeton()
+    local dossier = LrPathUtils.getStandardFilePath('home')
+    for _, nom in ipairs({ 'Library', 'Application Support', 'Developpeur' }) do
+        dossier = LrPathUtils.child(dossier, nom)
+    end
+    return dossier, LrPathUtils.child(dossier, Liaison.FICHIER_JETON)
+end
+
+-- 32 octets de l'aléa du système en 64 chiffres hexadécimaux ; nil si la lecture échoue.
+function Liaison.tirerJeton()
+    local alea = io.open('/dev/urandom', 'rb')
+    if not alea then
+        return nil
+    end
+    local octets = alea:read(32)
+    alea:close()
+    if type(octets) ~= 'string' or #octets ~= 32 then
+        return nil
+    end
+    local chiffres = {}
+    for i = 1, #octets do
+        chiffres[i] = string.format('%02x', octets:byte(i))
+    end
+    return table.concat(chiffres)
+end
+
+-- Le jeton rangé dans le fichier, ou nil (fichier absent, ou autre chose que 64 chiffres
+-- hexadécimaux en minuscules).
+function Liaison.lireFichierJeton()
+    local _, chemin = Liaison.cheminJeton()
+    local fichier = io.open(chemin, 'r')
+    if not fichier then
+        return nil
+    end
+    local contenu = fichier:read('*a')
+    fichier:close()
+    if type(contenu) ~= 'string' then
+        return nil
+    end
+    contenu = contenu:gsub('\n$', '')
+    if #contenu ~= 64 or contenu:find('[^0-9a-f]') then
+        return nil
+    end
+    return contenu
+end
+
+-- Écrit le jeton d'un seul coup : un fichier provisoire créé vide en droits 600 (umask 077), le
+-- jeton écrit dedans par io.open (jamais sur une ligne de commande), puis rangé à sa place par
+-- mv, et relu. Rend true, ou nil et la raison.
+function Liaison.ecrireJeton(jeton)
+    local dossier, chemin = Liaison.cheminJeton()
+    LrFileUtils.createAllDirectories(dossier)
+    local provisoire = chemin .. '.nouveau'
+    if LrTasks.execute('umask 077 && /bin/rm -f ' .. Texte.shell(provisoire) .. ' && /usr/bin/touch ' .. Texte.shell(provisoire)) ~= 0 then
+        return nil, "fichier du jeton impossible à créer"
+    end
+    local fichier = io.open(provisoire, 'w')
+    if not fichier then
+        return nil, "fichier du jeton impossible à créer"
+    end
+    fichier:write(jeton .. '\n')
+    fichier:close()
+    if LrTasks.execute('/bin/mv -f ' .. Texte.shell(provisoire) .. ' ' .. Texte.shell(chemin)) ~= 0 then
+        return nil, "fichier du jeton impossible à ranger"
+    end
+    if Liaison.lireFichierJeton() ~= jeton then
+        return nil, "jeton relu différent"
+    end
+    return true
+end
+
+-- Un nouveau jeton, écrit dans son fichier ; nil et la raison si l'un ou l'autre échoue.
+function Liaison.preparerJeton()
+    local jeton = Liaison.tirerJeton()
+    if not jeton then
+        return nil, "aléa du système illisible (/dev/urandom)"
+    end
+    local ecrit, raison = Liaison.ecrireJeton(jeton)
+    if not ecrit then
+        return nil, raison
+    end
+    return jeton
+end
+
+-- Le fichier du jeton, vérifié pendant que la liaison tourne : effacé, remplacé ou réécrit par
+-- un démarrage plus ancien, il reprend le jeton de la liaison. Un échec n'est noté qu'au premier
+-- tour qui échoue. Rend true si le fichier a été réécrit.
+local fichierJetonEnEchec = false
+function Liaison.garderFichierJeton()
+    local jeton = Liaison.jeton
+    if not jeton or Liaison.lireFichierJeton() == jeton then
+        fichierJetonEnEchec = false
+        return false
+    end
+    local ecrit, raison = Liaison.ecrireJeton(jeton)
+    if ecrit then
+        fichierJetonEnEchec = false
+        Liaison.noter("Fichier du jeton réécrit")
+        return true
+    end
+    if not fichierJetonEnEchec then
+        fichierJetonEnEchec = true
+        Liaison.noter("Fichier du jeton impossible à réécrire : " .. tostring(raison))
+    end
+    return false
+end
+
+-- Vrai si les deux jetons sont des textes égaux. La comparaison parcourt toute la longueur, sans
+-- s'arrêter au premier écart (le Lua de Lightroom n'a pas la bibliothèque bit).
+function Liaison.memeJeton(a, b)
+    if type(a) ~= 'string' or type(b) ~= 'string' or #a ~= #b then
+        return false
+    end
+    local ecarts = 0
+    for i = 1, #a do
+        if a:byte(i) ~= b:byte(i) then
+            ecarts = ecarts + 1
+        end
+    end
+    return ecarts == 0
+end
+
+-- nil si le jeton fourni est celui de la liaison ; sinon le genre du refus : 'aucun' (la liaison
+-- n'a pas de jeton : tout est refusé), 'sans' (la ligne n'en porte pas), 'faux'.
+function Liaison.refusJeton(fourni)
+    if not Liaison.jeton then
+        return 'aucun'
+    end
+    if fourni == nil then
+        return 'sans'
+    end
+    if Liaison.memeJeton(fourni, Liaison.jeton) then
+        return nil
+    end
+    return 'faux'
+end
+
+-- Une ligne refusée : comptée, et notée au journal au plus une fois par DELAI_REFUS secondes et
+-- par genre (une inondation de lignes ne remplit pas le journal).
+function Liaison.noterRefus(genre, texte)
+    Liaison.refus = (Liaison.refus or 0) + 1
+    Liaison.derniersRefus = Liaison.derniersRefus or {}
+    local maintenant = LrDate.currentTime()
+    local dernier = Liaison.derniersRefus[genre]
+    if dernier == nil or maintenant - dernier > Liaison.DELAI_REFUS then
+        Liaison.derniersRefus[genre] = maintenant
+        Liaison.noter(texte)
+    end
+end
+
 -- Appelée depuis une tâche asynchrone. Le serveur se connecte à la prise des réponses juste
--- avant d'envoyer sa commande : on laisse à Lightroom le temps de l'accepter.
-function Liaison.repondre(objet)
+-- avant d'envoyer sa commande : on laisse à Lightroom le temps de l'accepter. sansEvenements :
+-- réponse à une ligne refusée, qui ne doit pas emporter l'événement de la photo active destiné au
+-- vrai serveur.
+function Liaison.repondre(objet, sansEvenements)
     local attente = 0
     while not Liaison.reponsesConnectee and attente < ATTENTE_REPONSES do
         LrTasks.sleep(0.1)
@@ -183,7 +386,7 @@ function Liaison.repondre(objet)
     end
     local prise = Liaison.prise
     if prise and Liaison.reponsesConnectee then
-        if Liaison.photoActiveChangee then
+        if Liaison.photoActiveChangee and not sansEvenements then
             Liaison.photoActiveChangee = false
             local id, fichier = Liaison.photoActive()
             if id ~= Liaison.derniereActive then
@@ -216,17 +419,29 @@ function Liaison.photoActive()
 end
 
 -- Une commande reçue : traitée dans sa propre tâche (elle peut attendre un rendu ou
--- l'accès en écriture au catalogue), puis la réponse part avec le même identifiant.
+-- l'accès en écriture au catalogue), puis la réponse part avec le même identifiant. Le jeton se
+-- vérifie avant tout le reste, ping compris : une ligne refusée ne compte pas comme un échange,
+-- n'atteint pas Commandes.executer (ni la pause, ni « Proposer d'abord ») et n'emporte pas
+-- l'événement de la photo active.
 function Liaison.recevoir(message)
     LrTasks.startAsyncTask(function()
         local lu, requete = pcall(Json.decode, message)
         if not lu or type(requete) ~= 'table' or type(requete.command) ~= 'string' then
-            Liaison.noter("Message illisible ignoré")
+            Liaison.noterRefus('illisible', "Message illisible ignoré")
+            return
+        end
+        local genre = Liaison.refusJeton(requete.jeton)
+        if genre then
+            Liaison.noterRefus(genre, NOTES_REFUS[genre])
+            Liaison.repondre({ id = requete.id, error = Liaison.REFUS_JETON[genre], code = 'jeton' }, true)
             return
         end
         Liaison.dernierEchange = LrDate.currentTime()
         local Commandes = require 'Commandes'
         local params = type(requete.params) == 'table' and requete.params or {}
+        -- Seuls les menus, la fenêtre de suivi et la carte Note lèvent la pause et l'accord dans
+        -- Lightroom, par appel direct : une ligne du réseau ne le peut pas.
+        params.depuisLightroom = nil
         local ok, resultat = LrTasks.pcall(Commandes.executer, requete.command, params)
         if ok then
             Liaison.repondre({ id = requete.id, result = resultat })
@@ -254,6 +469,22 @@ function Liaison.demarrer()
         local function encore()
             return Liaison.actif and Liaison.generation == generation
         end
+
+        -- Le jeton naît avant les prises : sans lui, aucune ne s'ouvre et la liaison reste en
+        -- erreur (voyant rouge ; un clic la relance). Un démarrage remplacé pendant ce temps ne
+        -- touche pas au jeton du suivant.
+        local tire, jeton, raison = LrTasks.pcall(Liaison.preparerJeton)
+        if not encore() then
+            return
+        end
+        if not tire or not jeton then
+            Liaison.jeton = nil
+            Liaison.erreur = 'jeton de la liaison : ' .. (tire and tostring(raison) or Liaison.messageErreur(jeton))
+            Liaison.noter('Erreur de la liaison : ' .. Liaison.erreur)
+            Liaison.signaler()
+            return
+        end
+        Liaison.jeton, Liaison.refus, Liaison.derniersRefus = jeton, 0, {}
 
         local essais = 0
         local function surErreur(socket, erreur)
@@ -369,15 +600,21 @@ function Liaison.demarrer()
             Liaison.photoActiveChangee = true
         end)
 
-        Liaison.noter(string.format("Liaison démarrée (ports %d et %d)", Liaison.PORT_COMMANDES, Liaison.PORT_REPONSES))
+        Liaison.noter(string.format("Liaison démarrée (ports %d et %d, jeton privé)", Liaison.PORT_COMMANDES, Liaison.PORT_REPONSES))
 
+        local tours = 0
         while encore() do
             LrTasks.sleep(0.5)
+            tours = tours + 1
+            if tours % Liaison.VERIFIER_JETON_TOUTES == 0 and encore() then
+                LrTasks.pcall(Liaison.garderFichierJeton)
+            end
         end
 
         if Liaison.generation == generation then
             Liaison.prise = nil
             Liaison.reponsesConnectee = false
+            Liaison.jeton = nil
         end
         numeroReponses = numeroReponses + 1
         commandes:close()

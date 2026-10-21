@@ -4,7 +4,9 @@
 # Claude Desktop et Claude Code, le serveur mcp-developpeur, le module « Développeur » de
 # Lightroom Classic et ses paramètres prédéfinis invisibles (Lightroom fermé seulement), et les
 # fichiers de travail que le module refait seul (sessions de Claude Code et leurs consignes,
-# dossier de travail, configuration MCP de la fenêtre Claude).
+# dossier de travail, configuration MCP de la fenêtre Claude, jeton privé de la liaison
+# liaison.jeton et son fichier provisoire liaison.jeton.nouveau, refaits à chaque démarrage de la
+# liaison).
 #
 # Usage : bash uninstall.sh [--tout]
 #         --tout : retire aussi ce que le module et le serveur ont gardé pour l'utilisateur, qui
@@ -31,6 +33,9 @@ TRAVAIL=(
     "${DEST_DIR}/Atelier"
     "${DEST_DIR}/Temporaire"
     "${DEST_DIR}/connecteur.json"
+    # Jeton privé de la liaison (1.2) : le module en tire un nouveau à chaque démarrage.
+    "${DEST_DIR}/liaison.jeton"
+    "${DEST_DIR}/liaison.jeton.nouveau"
     # Consignes communes de la 1.0 (depuis la 1.1, chaque session a les siennes dans Sessions/).
     "${DEST_DIR}/consignes.md"
 )
@@ -98,6 +103,12 @@ else
         printf '  - %s\n' "${GARDES[@]}"
         printf 'Pour les retirer aussi : bash uninstall.sh --tout\n'
     fi
+fi
+
+# Le module encore chargé par un Lightroom ouvert garde le fichier de son jeton (il le réécrit
+# dans les 5 s, dossier compris) : il ne part pour de bon que Lightroom fermé.
+if pgrep -xq "Adobe Lightroom Classic"; then
+    printf "Lightroom est ouvert : tant qu'il l'est, la liaison du module réécrit %s ; après l'avoir quitté, relancer bash uninstall.sh pour le retirer.\n" "${DEST_DIR}/liaison.jeton"
 fi
 
 printf 'Terminé. Relancer Claude Desktop, ouvrir une nouvelle session Claude Code et relancer Lightroom Classic pour que le connecteur et le module disparaissent.\n'

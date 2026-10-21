@@ -78,6 +78,13 @@ end
 S.home = '/simulation/home'
 local ouvrir = io.open
 io.open = function(chemin, mode)
+    -- L'aléa du système (jeton de la liaison) : le vrai /dev/urandom, sauf avec S.aleaIllisible
+    -- (true : il ne s'ouvre pas ; 'court' : il rend moins d'octets que demandé).
+    if chemin == '/dev/urandom' and S.aleaIllisible == 'court' then
+        return { read = function() return string.rep('\7', 16) end, close = function() return true end }
+    elseif chemin == '/dev/urandom' and S.aleaIllisible then
+        return nil, chemin .. ': Operation not permitted'
+    end
     if type(chemin) ~= 'string' or (chemin:sub(1, #S.home + 1) ~= S.home .. '/' and chemin:sub(1, 16) ~= '/tmp/Developpeur') then
         return ouvrir(chemin, mode)
     end
@@ -1906,6 +1913,32 @@ local modules = {
                 end
             end
         end,
+        -- Commandes du système : rien n'est lancé. Chaque commande est notée dans
+        -- S.commandesSysteme ; seules les deux du fichier du jeton de la liaison (Liaison.ecrireJeton)
+        -- sont imitées, sur S.fichiers et S.droits, et toute autre lève une erreur. S.codeCommandes
+        -- non nul : chacune échoue avec ce code, sans rien faire.
+        execute = function(commande)
+            S.commandesSysteme[#S.commandesSysteme + 1] = commande
+            if S.codeCommandes ~= 0 then
+                return S.codeCommandes
+            end
+            local cree = commande:match("^umask 077 && /bin/rm %-f '([^']+)' && /usr/bin/touch '[^']+'$")
+            if cree then
+                S.fichiers[cree] = ''
+                S.droits[cree] = '600'
+                return 0
+            end
+            local de, vers = commande:match("^/bin/mv %-f '([^']+)' '([^']+)'$")
+            if de then
+                if S.fichiers[de] == nil then
+                    return 1
+                end
+                S.fichiers[vers], S.droits[vers] = S.fichiers[de], S.droits[de]
+                S.fichiers[de], S.droits[de] = nil, nil
+                return 0
+            end
+            error("commande du système non simulée : " .. commande, 2)
+        end,
     },
     LrPrefs = {
         prefsForPlugin = function() return S.prefs end,
@@ -2204,6 +2237,12 @@ function S.reinitialiser()
     S.jeuLibellesIllisible = false
     S.fuseau = 0
     S.cheminCatalogue = '/Users/test/Images/Catalogue.lrcat'
+    -- Jeton de la liaison : commandes du système demandées, leur code d'échec, droits des fichiers
+    -- (chemin → texte octal, posés par la création sous umask 077), aléa du système illisible.
+    S.commandesSysteme = {}
+    S.codeCommandes = 0
+    S.droits = {}
+    S.aleaIllisible = false
 end
 
 S.reinitialiser()
