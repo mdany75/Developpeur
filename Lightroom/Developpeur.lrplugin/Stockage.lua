@@ -136,7 +136,18 @@ function Stockage.lire(id)
             e.notes = e.notes or {}
         end
         if e.genre == 'lecon' then
-            e.points = e.points or {}
+            -- Seulement des points en table, chacun avec sa liste de défauts : le fil et
+            -- l'enregistrement les parcourent (un fichier abîmé ne doit pas bloquer la fenêtre).
+            local points = {}
+            for _, p in ipairs(type(e.points) == 'table' and e.points or {}) do
+                if type(p) == 'table' then
+                    if type(p.defauts) ~= 'table' then
+                        p.defauts = {}
+                    end
+                    points[#points + 1] = p
+                end
+            end
+            e.points = points
         end
         -- Un appel resté en cours (Lightroom fermé pendant l'appel) n'a pas abouti.
         if (e.genre == 'outil' or e.genre == 'notation' or e.genre == 'lecon') and e.etat == 'enCours' then

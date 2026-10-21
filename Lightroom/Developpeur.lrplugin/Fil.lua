@@ -375,8 +375,11 @@ function Fil.lignesElement(e, i, largeur)
                 end
             end
             -- Fait, mais pas rangé (module d'avant la 1.3) ou gardé pour la session seulement : la
-            -- remarque du connecteur.
+            -- remarque du connecteur ; non rangé sans remarque, la carte le dit quand même.
             local remarque = type(e.remarque) == 'string' and Texte.nettoyer(e.remarque) or ''
+            if remarque == '' and e.rangee == false then
+                remarque = "Leçon non rangée dans le carnet de progrès."
+            end
             if remarque ~= '' then
                 for n, t in ipairs(coupeBornee(remarque, largeur, 'texte', '', Fil.LIGNES_REMARQUE_LECON)) do
                     lignes[#lignes + 1] = { genre = 'note', texte = t, element = i,

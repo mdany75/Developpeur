@@ -17,8 +17,8 @@
 -- Un élément `lecon` (1.3) suit un appel de photo_lesson avec ses points (jamais read_facts seul),
 -- pour le fil seulement (la leçon est rangée par le module, carnet.json) : photo, points (dans
 -- l'ordre Lumière, Couleur, Composition : { axe, nom, manque, prise_de_vue, defauts }), puis
--- d'après la réponse : fichier, rangee, remplacee, remarque (« Leçon non rangée… ») ; en erreur, la
--- raison dans texte.
+-- d'après la réponse : fichier, rangee, remplacee, mois, remarque (« Leçon non rangée… ») ; en
+-- erreur, la raison dans texte.
 
 require 'Compat'
 local Consignes = require 'Consignes'

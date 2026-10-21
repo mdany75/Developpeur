@@ -449,6 +449,15 @@ essai("Fil : leçon refusée, interrompue ou non rangée ; un long refus borné"
     lignes = lignesDe(c, gardee)
     egal('note', lignes[#lignes].icone)
     contient(lignes[#lignes].texte, 'carnet.json non écrit')
+    -- Non rangée sans remarque du connecteur : la carte le dit quand même (✕) ; rangée sans
+    -- remarque, rien sous la carte.
+    local muette = appelLecon(c, 'l4', entreeLecon(), reponseLecon({ rangee = false }, { "Mesuré : x." }))
+    lignes = lignesDe(c, muette)
+    egal(11, #lignes)
+    egal("note|erreur|Leçon non rangée dans le carnet de progrès.", textes({ lignes[11] }))
+    local rangee = appelLecon(c, 'l5', entreeLecon(), reponseLecon(nil, { "Mesuré : x." }))
+    egal(10, #lignesDe(c, rangee))
+    egal('claude', lignesDe(c, rangee)[10].genre)
 end)
 
 essai('Fil : le cache suit la leçon (fichier, rangement, textes des points) et garde les lignes sinon', function()
@@ -501,6 +510,19 @@ essai('Stockage : leçon relue, points et défauts en tableaux (même vides), le
     brut.elements[faite].points = nil
     Fichiers.ecrire(Stockage.fichier(c.id), Json.encode(brut))
     egal(0, #Stockage.lire(c.id).elements[faite].points)
+    -- Un fichier abîmé (points en texte, points qui ne sont pas des tables, défauts en texte) : relu
+    -- sans bloquer le fil ni l'enregistrement suivant.
+    brut.elements[faite].points = 'abîmé'
+    brut.elements[enCours].points = { 3, 'x', { axe = 'color', nom = 'Couleur', manque = 'Dominante.', prise_de_vue = 'Ombre.', defauts = 'color_cast' } }
+    Fichiers.ecrire(Stockage.fichier(c.id), Json.encode(brut))
+    local abimee = Stockage.lire(c.id)
+    egal(0, #abimee.elements[faite].points, 'points en texte : aucun')
+    egal(1, #abimee.elements[enCours].points, 'seulement les points en table')
+    egal(0, #abimee.elements[enCours].points[1].defauts, 'défauts en texte : aucun')
+    egal("proposition|note|Leçon de la photo · DSCF4961.RAF", textes({ lignesDe(abimee, faite)[1] }))
+    egal("note|erreur|Leçon non rangée : l'appel n'a pas abouti.", textes(lignesDe(abimee, enCours)))
+    Stockage.enregistrer(abimee)
+    contient(Fichiers.lire(Stockage.fichier(c.id)), '"defauts":[]', 'réenregistrée')
     -- Le fil de la conversation relue est celui d'avant.
     egal(textes(lignesDe(c, faite)), textes(lignesDe(lue, faite)))
     egal("note|erreur|Leçon non rangée : l'appel n'a pas abouti.", textes(lignesDe(lue, enCours)))
@@ -595,6 +617,10 @@ essai('Consignes : section Leçon de la photo (600 caractères au plus), après 
         'notation', 'classement', 'série', Consignes.sansLecon }) do
         contient(section, morceau, 'section Leçon')
     end
+    -- « J'ai fini » amène la leçon (synthèse : elle vient après, une par photo et par conversation),
+    -- dans le même ordre qu'après une retouche ; ce n'est pas seulement une borne.
+    contient(section, "Après la retouche d'une photo, ou après « J'ai fini » : résumé court", 'la leçon après « J\'ai fini »')
+    vrai(not section:find('y compris après', 1, true), "« J'ai fini » ne se lit pas comme une seule restriction")
     -- Après Fin d'une tâche, qui finit par la leçon.
     local finTache = texte:find("\n## Fin d'une tâche\n", 1, true)
     vrai(finTache and finTache < debut, "après Fin d'une tâche")
