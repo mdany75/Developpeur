@@ -17,6 +17,10 @@ local Stockage = {}
 -- Format écrit dans chaque conversation.json.
 Stockage.FORMAT = 'developpeur/1'
 
+-- Les textes d'un réglage à faire ou d'un écart d'un exercice « Je le fais » (1.3) : relus
+-- seulement s'ils sont des textes (la carte et le fil les mettent bout à bout).
+local CHAMPS_TEXTE_EXERCICE = { 'panneau', 'section', 'reglage', 'cle', 'texte', 'sorte', 'de', 'a' }
+
 function Stockage.dossier(id)
     return LrPathUtils.child(Chemins.conversations(), id)
 end
@@ -183,12 +187,18 @@ function Stockage.lire(id)
             e.etat = 'erreur'
         end
         if e.genre == 'exercice' then
-            -- Seulement des réglages et des écarts en table (un fichier abîmé ne doit pas bloquer
-            -- le fil) ; une comparaison restée en cours n'aboutira plus.
+            -- Seulement des réglages et des écarts en table, et des textes en texte (un fichier
+            -- abîmé ne doit pas bloquer le fil ni la carte) ; une comparaison restée en cours
+            -- n'aboutira plus.
             for _, cle in ipairs({ 'aFaire', 'ecarts' }) do
                 local gardes = {}
                 for _, x in ipairs(type(e[cle]) == 'table' and e[cle] or {}) do
                     if type(x) == 'table' then
+                        for _, champ in ipairs(CHAMPS_TEXTE_EXERCICE) do
+                            if type(x[champ]) ~= 'string' then
+                                x[champ] = nil
+                            end
+                        end
                         gardes[#gardes + 1] = x
                     end
                 end
@@ -199,6 +209,13 @@ function Stockage.lire(id)
             end
             if type(e.principal) ~= 'table' then
                 e.principal = nil
+            elseif type(e.principal.texte) ~= 'string' then
+                e.principal.texte = nil
+            end
+            for _, champ in ipairs({ 'texte', 'resume', 'aSavoir', 'fichier', 'instantane', 'comparaisonRefusee' }) do
+                if type(e[champ]) ~= 'string' then
+                    e[champ] = nil
+                end
             end
             e.comparaisonEnCours = nil
         end

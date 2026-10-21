@@ -206,10 +206,10 @@ Lightroom.NON_SUIVIS = {
 -- lues comme le module les décrit dans ses changements, pour les comparer à `avant` : la balance
 -- d'un JPEG sous IncrementalTemperature et IncrementalTint (Reglages.cleReelle), le profil par son
 -- nom (Reglages.nomProfil : la Look s'il y en a une), un nombre absent par sa valeur par défaut
--- (Reglages.valeurActuelle), une table (courbe, couleurs ponctuelles, flou d'objectif) par son
--- résumé (Reglages.resume), avec sa signature (son JSON, clés triées) pour voir un changement que
--- le résumé ne montre pas. Rend valeurs et signatures, deux tables neuves ; un réglage de
--- Lightroom.NON_SUIVIS n'y est pas.
+-- et un booléen (ConvertToGrayscale) en 0 ou 1 (Reglages.valeurActuelle, comme `avant`), une table
+-- (courbe, couleurs ponctuelles, flou d'objectif) par son résumé (Reglages.resume), avec sa
+-- signature (son JSON, clés triées) pour voir un changement que le résumé ne montre pas. Rend
+-- valeurs et signatures, deux tables neuves ; un réglage de Lightroom.NON_SUIVIS n'y est pas.
 function Lightroom.lireValeurs(reglages, cles, raw)
     local Reglages = require 'Reglages'
     local valeurs, signatures = {}, {}
@@ -223,7 +223,7 @@ function Lightroom.lireValeurs(reglages, cles, raw)
                 valeurs[cle] = Reglages.resume(cle, brute)
                 local ok, json = pcall(Json.encode, brute)
                 signatures[cle] = ok and json or nil
-            elseif type(brute) == 'string' or type(brute) == 'boolean' then
+            elseif type(brute) == 'string' then
                 valeurs[cle] = brute
             elseif brute == nil and type(Reglages.resume(cle, nil)) == 'string' then
                 -- Une table absente (courbe linéaire, aucune couleur ponctuelle) : son résumé, sans

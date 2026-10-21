@@ -408,9 +408,9 @@ function Fil.lignesElement(e, i, largeur)
         end
         local liste = {}
         if e.etat == 'comparee' then
-            local principal = type(e.principal) == 'table' and Texte.nettoyer(e.principal.texte or '') or ''
+            local principal = Fil.textePrincipal(e)
             if principal ~= '' then
-                for _, t in ipairs(coupeBornee('  Écart principal : ' .. principal, largeur - 16, 'mono', '  ', Fil.LIGNES_PRINCIPAL)) do
+                for _, t in ipairs(coupeBornee('  ' .. principal, largeur - 16, 'mono', '  ', Fil.LIGNES_PRINCIPAL)) do
                     lignes[#lignes + 1] = { genre = 'outil', texte = t, element = i }
                 end
             end
@@ -456,6 +456,18 @@ function Fil.ecartsExercice(e)
     return n, #(e.ecarts or {})
 end
 
+-- L'écart principal d'un exercice comparé, prêt à montrer : « Écart principal : … » quand il se
+-- voit ; sinon le texte du connecteur tel quel (« Aucun écart mesuré ne dépasse… », « Écart
+-- principal non mesuré… »), sans le préfixe redoublé ; '' sans texte.
+function Fil.textePrincipal(e)
+    local p = type(e.principal) == 'table' and e.principal or nil
+    local texte = p and Texte.nettoyer(p.texte or '') or ''
+    if texte == '' then
+        return ''
+    end
+    return p.visible == true and ("Écart principal : " .. texte) or texte
+end
+
 -- Le titre d'un exercice « Je le fais » dans le fil.
 function Fil.titreExercice(e)
     if e.etat == 'erreur' then
@@ -463,13 +475,19 @@ function Fil.titreExercice(e)
         return "Je le fais · non abouti : " .. (raison ~= '' and raison or "l'appel n'a pas abouti.")
     elseif e.etat == 'enCours' then
         return "Je le fais · liste en préparation…"
-    elseif e.etat == 'comparee' then
-        local ecarts, total = Fil.ecartsExercice(e)
-        return "Je le fais · comparée : " .. compte(ecarts, "écart", "écarts", "aucun écart") .. " sur " .. total
     end
-    local titre = "Je le fais · " .. compte(#(e.aFaire or {}), "réglage", "réglages", "aucun réglage") .. ", dans l'ordre du panneau Développement"
+    local titre
+    if e.etat == 'comparee' then
+        local ecarts, total = Fil.ecartsExercice(e)
+        titre = "Je le fais · comparée : " .. compte(ecarts, "écart", "écarts", "aucun écart") .. " sur " .. total
+    else
+        titre = "Je le fais · " .. compte(#(e.aFaire or {}), "réglage", "réglages", "aucun réglage") .. ", dans l'ordre du panneau Développement"
+    end
     if e.comparaisonEnCours then
         titre = titre .. " · comparaison en cours…"
+    elseif type(e.comparaisonRefusee) == 'string' then
+        -- Un refus qui peut se refaire (Conversation.completerExercice) : l'exercice reste.
+        titre = titre .. " · comparaison non aboutie : " .. Texte.nettoyer(e.comparaisonRefusee)
     end
     return titre
 end
@@ -513,7 +531,7 @@ local function signatureExercice(e)
     for _, x in ipairs(type(e.ecarts) == 'table' and e.ecarts or {}) do
         morceaux[#morceaux + 1] = tostring(x.sorte) .. '\2' .. tostring(x.texte)
     end
-    morceaux[#morceaux + 1] = type(e.principal) == 'table' and tostring(e.principal.texte) or ''
+    morceaux[#morceaux + 1] = Fil.textePrincipal(e)
     return table.concat(morceaux, '\3')
 end
 

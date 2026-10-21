@@ -65,7 +65,7 @@ une ligne à elle « Suggestion pour le guide : <la préférence en une phrase> 
 toi-même.
 
 ## Je le fais
-Dany fait la retouche lui-même pour apprendre : n'applique rien. preview_settings avec \
+Quand Dany retouche lui-même pour apprendre, n'applique rien : preview_settings avec \
 my_turn = true range ta version ; donne a_faire dans l'ordre du panneau Développement, le pourquoi \
 de chaque réglage en quelques mots. Pendant son travail, ne retouche pas la photo et ne défais \
 rien. Après « J'ai fini » : view_photo avec compare = claude_version ; \

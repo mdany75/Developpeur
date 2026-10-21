@@ -27,8 +27,10 @@
 -- de, a, texte, avant, apres }), instantane ; puis, d'après view_photo avec compare =
 -- claude_version : appelComparaison (son appel, gardé ; comparaisonEnCours pendant l'appel),
 -- ecarts ({ cle, panneau, reglage, sorte, texte }), commeClaude, resume, principal ({ visible, texte }),
--- aSavoir ; en erreur, la raison dans texte ; signatures (les tables au départ du suivi, pour cocher
--- ce qui a bougé : Fenetre.suivreExercice).
+-- aSavoir, appelCompare (l'appel de la dernière comparaison aboutie, dont l'image est montrée) ;
+-- comparaisonRefusee (la raison d'une comparaison refusée qui peut se refaire : l'exercice reste où
+-- il en était) ; en erreur, la raison dans texte ; signatures (les tables au départ du suivi, pour
+-- cocher ce qui a bougé : Fenetre.suivreExercice).
 
 require 'Compat'
 local Consignes = require 'Consignes'
@@ -996,19 +998,31 @@ local function raisonDe(r)
     return Texte.nettoyer((table.concat(r.textes or {}, ' '):gsub('%s+', ' ')))
 end
 
+-- Le refus d'une comparaison qui ne se refera pas : le module n'a plus la version de Claude
+-- (revert_to_original l'a effacée, Rendu.lua : « Aucune version de Claude rangée… »).
+Conversation.SANS_VERSION = "Aucune version de Claude rangée"
+
 -- Complète un exercice par le résultat d'un de ses appels. La liste (my_turn) : 'aFaire' avec la
 -- liste, ou 'erreur' (refus, ou réponse sans liste : la réponse d'attente d'un appel trop long,
 -- que Claude rappelle, en fait un autre). La comparaison (claude_version) : 'comparee' avec les
--- écarts, 'erreur' sur un refus (aucune version rangée, module ancien) ; une réponse sans
--- `exercice` (attente) laisse l'exercice à faire.
+-- écarts ; 'erreur' si le module n'a plus la version de Claude (Conversation.SANS_VERSION) ; un
+-- autre refus (liaison en pause, Lightroom occupé…) laisse l'exercice où il en était, à faire ou
+-- déjà comparé, avec la raison (`comparaisonRefusee`) : « J'ai fini » se refait, et Je le fais ne
+-- recommence pas un exercice par-dessus le travail de Dany. Une réponse sans `exercice` (attente)
+-- laisse aussi l'exercice où il en était.
 function Conversation.completerExercice(e, r)
     local comparaison = e.appelComparaison ~= nil and r.idOutil == e.appelComparaison
     if comparaison then
         e.comparaisonEnCours = nil
     end
     if r.erreur then
+        local raison = raisonDe(r)
+        if comparaison and not raison:find(Conversation.SANS_VERSION, 1, true) then
+            e.comparaisonRefusee = raison ~= '' and raison or "l'appel n'a pas abouti."
+            return
+        end
         e.etat = 'erreur'
-        e.texte = (comparaison and "comparaison impossible : " or "") .. raisonDe(r)
+        e.texte = (comparaison and "comparaison impossible : " or "") .. raison
         return
     end
     local lu = Conversation.exerciceLu(r.textes)
@@ -1017,7 +1031,10 @@ function Conversation.completerExercice(e, r)
             e.etat = 'comparee'
             e.ecarts, e.commeClaude, e.resume, e.principal, e.aSavoir = lu.ecarts, lu.commeClaude, lu.resume, lu.principal, lu.aSavoir
             e.photo, e.fichier = e.photo or lu.photo, e.fichier or lu.fichier
-            e.texte = ''
+            e.texte, e.comparaisonRefusee = '', nil
+            -- L'appel dont l'image et les écarts sont montrés (une comparaison suivante refusée ne
+            -- les remplace pas).
+            e.appelCompare = r.idOutil
         end
         return
     end
@@ -1032,13 +1049,34 @@ function Conversation.completerExercice(e, r)
     end
 end
 
--- Le dernier exercice du fil, sans proposition arrivée après lui (elle prend la carte) ; nil sinon.
+-- Le dernier exercice du fil, celui que montre la carte Proposition ; nil sinon. Une proposition
+-- en attente arrivée après lui prend la carte, comme une proposition que Dany fait lui-même (un
+-- nouvel exercice suit). Une proposition décidée ensuite (acceptée, refusée, à ajuster) rend la
+-- carte à un exercice encore à faire (sa liste et « J'ai fini » reviennent), mais clôt un exercice
+-- comparé ou refusé quand elle est arrivée après sa dernière comparaison (ou après lui, sans
+-- comparaison).
 function Conversation.dernierExercice(c)
-    for i = #(c and c.elements or {}), 1, -1 do
-        local e = c.elements[i]
+    local elements = c and c.elements or {}
+    local decidee
+    for i = #elements, 1, -1 do
+        local e = elements[i]
         if e.genre == 'proposition' then
-            return nil
+            if e.etat == 'enAttente' or e.etat == 'faite' then
+                return nil
+            end
+            decidee = decidee or i
         elseif e.genre == 'exercice' then
+            if decidee and e.etat ~= 'aFaire' and e.etat ~= 'enCours' then
+                local depuis, appel = i, e.appelCompare or e.appelComparaison
+                for k = i + 1, appel and #elements or 0 do
+                    if elements[k].genre == 'outil' and elements[k].appel == appel then
+                        depuis = k
+                    end
+                end
+                if decidee > depuis then
+                    return nil
+                end
+            end
             return e
         end
     end
@@ -1046,7 +1084,7 @@ function Conversation.dernierExercice(c)
 end
 
 -- L'exercice en cours : le dernier, à faire (sa liste arrivée, pas encore comparé), sans
--- proposition arrivée après lui. Le bouton de la carte dit alors « J'ai fini ».
+-- proposition en attente arrivée après lui. Le bouton de la carte dit alors « J'ai fini ».
 function Conversation.exerciceEnCours(c)
     local e = Conversation.dernierExercice(c)
     return e and e.etat == 'aFaire' and e or nil
@@ -1065,15 +1103,17 @@ function Conversation.exercicePour(c, photo)
     return nil
 end
 
--- L'image de la comparaison d'un exercice (Claude à gauche, Dany à droite), en chemin relatif au
--- dossier de la conversation ; nil sans comparaison rendue.
+-- L'image de la comparaison d'un exercice (Claude à gauche, Dany à droite), celle de la dernière
+-- comparaison aboutie (appelCompare), en chemin relatif au dossier de la conversation ; nil sans
+-- comparaison rendue.
 function Conversation.imageComparaison(c, x)
-    if not (c and x and x.appelComparaison) then
+    local appel = x and (x.appelCompare or x.appelComparaison)
+    if not (c and appel) then
         return nil
     end
     for i = #c.elements, 1, -1 do
         local e = c.elements[i]
-        if e.genre == 'apercu' and e.appel == x.appelComparaison and #(e.images or {}) > 0 then
+        if e.genre == 'apercu' and e.appel == appel and #(e.images or {}) > 0 then
             return e.images[#e.images]
         end
     end
@@ -1164,7 +1204,7 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                 if comparaison then
                     local x = Conversation.exercicePour(c, tonumber(entree.photo_id))
                     if x then
-                        x.appelComparaison, x.comparaisonEnCours = bloc.id, true
+                        x.appelComparaison, x.comparaisonEnCours, x.comparaisonRefusee = bloc.id, true, nil
                     end
                 end
                 if court == 'preview_settings' and entree.my_turn == true then
@@ -1240,13 +1280,19 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
             if x then
                 local exo = c.elements[x]
                 Conversation.completerExercice(exo, r)
-                -- La liste arrivée (Dany l'a demandée en mots, sans le bouton) : une proposition
-                -- restée en attente avant elle est à faire lui-même, plus à accepter.
+                -- La liste arrivée (Dany l'a demandée en mots, sans le bouton) : la proposition
+                -- juste avant elle, restée en attente, est à faire lui-même, plus à accepter (pas
+                -- une plus ancienne, ni une d'avant un autre exercice qui a eu sa liste).
                 if exo.etat == 'aFaire' and exo.appel == r.idOutil then
-                    for k = 1, x - 1 do
+                    for k = x - 1, 1, -1 do
                         local avant = c.elements[k]
-                        if avant.genre == 'proposition' and avant.etat == 'enAttente' then
-                            avant.etat = 'faite'
+                        if avant.genre == 'proposition' then
+                            if avant.etat == 'enAttente' then
+                                avant.etat = 'faite'
+                            end
+                            break
+                        elseif avant.genre == 'exercice' and avant.etat ~= 'erreur' then
+                            break
                         end
                     end
                 end

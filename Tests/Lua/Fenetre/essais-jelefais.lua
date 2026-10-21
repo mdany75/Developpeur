@@ -699,6 +699,107 @@ essai("Conversation : une liste demandée en mots rend « à faire vous-même »
     egal('faite', q.etat)
     egal(false, Conversation.marquer(c, 'introuvable', 'faite'))
     egal(nil, Conversation.exerciceEnCours(c), 'une proposition arrivée après : plus d\'exercice en cours')
+    -- Une proposition en attente arrivée pendant l'exercice prend la carte ; refusée (ou acceptée),
+    -- elle la rend à l'exercice encore à faire : sa liste et « J'ai fini » reviennent.
+    local h = Conversation.nouvelle()
+    local exo = h.elements[appelTour(h, 't1', { TOUR })]
+    local pendant = proposition(h, 'p1')
+    egal(nil, Conversation.dernierExercice(h), 'la proposition en attente prend la carte')
+    egal(nil, Conversation.exerciceEnCours(h))
+    Conversation.decider(h, pendant.id, false)
+    egal(exo, Conversation.dernierExercice(h), 'refusée : la carte revient à l\'exercice')
+    egal(exo, Conversation.exerciceEnCours(h), "« J'ai fini » revient")
+    -- Comparé, il est clos par une proposition décidée ensuite (la carte dit qu'il n'y a rien).
+    appelComparaison(h, 'v1', { VUE })
+    egal(exo, Conversation.dernierExercice(h))
+    Conversation.decider(h, proposition(h, 'p2').id, true)
+    egal(nil, Conversation.dernierExercice(h), 'comparé puis une proposition acceptée : clos')
+    -- Seule la proposition juste avant la liste devient « à faire vous-même » : une plus ancienne
+    -- restée en attente garde son état.
+    local d = Conversation.nouvelle()
+    local vieille = proposition(d, 'p0')
+    local recente = proposition(d, 'p1')
+    appelTour(d, 't1', { TOUR })
+    egal('faite', recente.etat)
+    egal('enAttente', vieille.etat, 'une proposition plus ancienne')
+end)
+
+essai("Conversation : une comparaison refusée qui peut se refaire laisse l'exercice où il en était (à faire, ou comparé avec son image) ; « Aucune version » le clôt", function()
+    local c = Conversation.nouvelle()
+    local i = appelTour(c, 't1', { TOUR })
+    local e = c.elements[i]
+    -- Un refus passager (liaison en pause) : l'exercice reste à faire, « J'ai fini » se refait, et
+    -- la raison est dite (fil, état, carte).
+    local outil = appelComparaison(c, 'v1', { "Liaison en pause dans Lightroom : reprendre la liaison." }, true)
+    egal('erreur', c.elements[outil].etat, "l'appel, lui, en erreur")
+    egal('aFaire', e.etat)
+    egal(e, Conversation.exerciceEnCours(c), "toujours en cours : « J'ai fini » se refait")
+    egal(e, Conversation.exercicePour(c, 53636309), 'la comparaison suivante se note sur lui')
+    contient(e.comparaisonRefusee, 'Liaison en pause')
+    contient(Fil.titreExercice(e), 'dans l\'ordre du panneau Développement · comparaison non aboutie : Liaison en pause')
+    egal('Comparaison non aboutie : réessayez', Fenetre.etatExercice(e))
+    contient(Fenetre.texteExercice(e), "La comparaison n'a pas abouti (Liaison en pause dans Lightroom : reprendre la liaison.) : "
+        .. "cliquez de nouveau « J'ai fini ».")
+    -- La comparaison suivante efface le refus dès son appel, puis aboutit.
+    appelComparaison(c, 'v2')
+    egal(nil, e.comparaisonRefusee)
+    egal('Comparaison en cours…', Fenetre.etatExercice(e))
+    Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'v2', textes = { VUE }, images = { { donnees = 'x' } }, erreur = false } } },
+        nil, function() return 'premiere.jpg' end)
+    egal('comparee', e.etat)
+    egal('v2', e.appelCompare)
+    egal('premiere.jpg', Conversation.imageComparaison(c, e))
+    -- Une comparaison suivante refusée, ou restée sans réponse (attente) : la comparaison montrée
+    -- reste, avec son image, sans nouvelle bascule.
+    appelComparaison(c, 'v3', { "Lightroom ne répond pas." }, true)
+    egal('comparee', e.etat)
+    egal('premiere.jpg', Conversation.imageComparaison(c, e), "l'image de la comparaison aboutie")
+    egal(e.id .. '/comparee/v2', Fenetre.cleExerciceVu(e), 'la même comparaison : pas de nouvelle bascule')
+    contient(Fil.titreExercice(e), 'comparée : 7 écarts sur 9 · comparaison non aboutie : Lightroom ne répond pas.')
+    contient(Fenetre.texteExercice(e), "La comparaison suivante n'a pas abouti (Lightroom ne répond pas.) : voici la précédente.")
+    contient(Fenetre.texteExercice(e), 'Écart principal : Votre version est plus claire', 'les écarts gardés')
+    egal('Comparée : 7 écarts sur 9', Fenetre.etatExercice(e))
+    appelComparaison(c, 'v4')
+    Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'v4', textes = { "« view_photo » n'est pas fini après 50 s." },
+        images = {}, erreur = false } } })
+    egal('comparee', e.etat)
+    egal('premiere.jpg', Conversation.imageComparaison(c, e), 'une réponse d\'attente ne cache pas la comparaison')
+    -- Relu sur le disque : le refus et l'appel de la comparaison aboutie restent.
+    appelComparaison(c, 'v5', { "Lightroom ne répond pas." }, true)
+    Stockage.enregistrer(c)
+    local lue = Stockage.lire(c.id)
+    egal('Lightroom ne répond pas.', lue.elements[i].comparaisonRefusee)
+    egal('premiere.jpg', Conversation.imageComparaison(lue, lue.elements[i]))
+    Stockage.supprimer(c.id)
+    -- Le module n'a plus la version de Claude (revert_to_original) : l'exercice est clos. Le refus
+    -- est celui du contrat (Tests/Contrats/je-le-fais.json, refus.sans_version), passé tel quel par
+    -- le connecteur.
+    local contrat = Json.decode(Fichiers.lire(dossierTests .. '/../../Contrats/je-le-fais.json'))
+    local refus = contrat.refus.sans_version.apercu.erreur
+    contient(refus, Conversation.SANS_VERSION, 'le refus du contrat')
+    local d = Conversation.nouvelle()
+    local j = appelTour(d, 't1', { TOUR })
+    appelComparaison(d, 'v1', { refus }, true)
+    egal('erreur', d.elements[j].etat)
+    egal(nil, d.elements[j].comparaisonRefusee)
+    egal(nil, Conversation.exerciceEnCours(d))
+    contient(Fil.titreExercice(d.elements[j]), 'non abouti : comparaison impossible : Aucune version de Claude rangée')
+end)
+
+essai("Écart principal : « Écart principal : » seulement quand il se voit ; sinon le texte du connecteur tel quel (fil et carte)", function()
+    local e = { genre = 'exercice', etat = 'comparee', ecarts = {}, commeClaude = {},
+        principal = { visible = false, texte = "Écart principal non mesuré : une des deux images est illisible." } }
+    egal("Écart principal non mesuré : une des deux images est illisible.", Fil.textePrincipal(e))
+    local lignes = textes(Fil.lignesElement(e, 1, LARGEUR_LIGNE))
+    contient(lignes, '|  Écart principal non mesuré')
+    vrai(not lignes:find('Écart principal : Écart', 1, true), 'pas de préfixe redoublé dans le fil')
+    vrai(not Fenetre.texteExercice(e):find('Écart principal : Écart', 1, true), 'ni dans la carte')
+    e.principal = { visible = false, texte = "Aucun écart mesuré ne dépasse les seuils de visibilité du bilan." }
+    contient(Fenetre.texteExercice(e), "\nAucun écart mesuré ne dépasse les seuils de visibilité du bilan.")
+    e.principal = { visible = true, texte = "Votre version est plus claire de 1,04 IL." }
+    egal("Écart principal : Votre version est plus claire de 1,04 IL.", Fil.textePrincipal(e))
+    e.principal = nil
+    egal('', Fil.textePrincipal(e))
 end)
 
 -- Fil ----------------------------------------------------------------------------------------------
@@ -838,6 +939,25 @@ essai('Stockage : liste, écarts et réglages comme Claude en tableaux, même vi
     contient(textes(Fil.lignesElement(abimee.elements[fait], fait, LARGEUR_LIGNE)), 'comparée : 1 écart sur 1')
     Stockage.enregistrer(abimee)
     contient(Fichiers.lire(Stockage.fichier(c.id)), '"aFaire":[]', 'réenregistrée')
+    -- Des tables à la place des textes (résumé, fichier, panneau d'un écart, texte de l'écart
+    -- principal, d'un réglage à faire) : la carte et le fil se font quand même, sans eux.
+    brut = Json.decode(texte)
+    local x = brut.elements[fait]
+    x.resume, x.fichier, x.aSavoir, x.instantane = { 'abîmé' }, { 1 }, { 2 }, { 3 }
+    x.ecarts[1].panneau, x.ecarts[2].texte = { 'abîmé' }, { 'abîmé' }
+    x.principal = { visible = true, texte = { 'abîmé' } }
+    brut.elements[afaire].aFaire[1].texte, brut.elements[afaire].aFaire[2].panneau = { 'abîmé' }, { 'abîmé' }
+    Fichiers.ecrire(Stockage.fichier(c.id), Json.encode(brut))
+    abimee = Stockage.lire(c.id)
+    for _, k in ipairs({ fait, afaire }) do
+        local ok, erreur = pcall(Fenetre.texteExercice, abimee.elements[k], nil)
+        vrai(ok, 'carte : ' .. tostring(erreur))
+        ok, erreur = pcall(Fil.lignesElement, abimee.elements[k], k, LARGEUR_LIGNE)
+        vrai(ok, 'fil : ' .. tostring(erreur))
+    end
+    egal(nil, abimee.elements[fait].resume)
+    egal(nil, abimee.elements[fait].principal.texte)
+    contient(Fenetre.texteExercice(abimee.elements[fait]), '• Tonalité › Exposition : départ 0', 'les autres écarts restent')
     Stockage.supprimer(c.id)
 end)
 
@@ -879,6 +999,15 @@ essai("Lightroom.valeurs : la balance d'un JPEG en relatif, le profil par sa Loo
     egal(-4, valeurs.Tint)
     egal(0.2, valeurs.Exposure2012)
     sansMetatables(valeurs, 'valeurs')
+    -- Un booléen de Lightroom (ConvertToGrayscale) en 0 ou 1, comme `avant` dans la liste (le module
+    -- le décrit par Reglages.valeurActuelle) : le noir et blanc fait se coche.
+    local nb = photoDev(7004, 'DSCF7004.RAF', { Temperature = 5000, ConvertToGrayscale = false })
+    egal(0, Lightroom.valeurs(7004, { 'ConvertToGrayscale' }).ConvertToGrayscale)
+    local exoNb = { aFaire = { { n = 1, cle = 'ConvertToGrayscale', avant = 0, apres = 1 } } }
+    egal(0, Fenetre.reglagesFaits(exoNb, Lightroom.valeurs(7004, { 'ConvertToGrayscale' }), {}).nombre)
+    nb.reglages.ConvertToGrayscale = true
+    egal(1, Lightroom.valeurs(7004, { 'ConvertToGrayscale' }).ConvertToGrayscale)
+    egal(1, Fenetre.reglagesFaits(exoNb, Lightroom.valeurs(7004, { 'ConvertToGrayscale' }), {}).nombre, 'le noir et blanc fait')
     -- Une photo introuvable, ou qui ne se lit pas : deux tables vides.
     local parId = S.catalogue.getPhotoByLocalId
     S.catalogue.getPhotoByLocalId = function() return nil end
@@ -1290,6 +1419,40 @@ essai("Fenêtre : sans proposition, Je le fais demande une version sur la photo 
         egal('enAttente', prop.etat)
         Moteur.travaille = false
         p.message = ''
+        -- Un second clic pendant le premier (la photo active se lit) : rien de plus, le bouton
+        -- inactif dès le clic, puis rendu. (Une photo active : sans le garde, le second clic
+        -- poserait la proposition et le premier demanderait une version de la photo active.)
+        photoActive(active)
+        Fenetre.majPhoto()
+        local lirePhotos = Lightroom.photos
+        local second
+        Lightroom.photos = function(...)
+            if not second then
+                second = true
+                egal(false, p.peutJeLeFais, 'inactif dès le clic')
+                Fenetre.rafraichir()
+                egal(false, p.peutJeLeFais, 'toujours inactif pendant le premier clic')
+                Fenetre.jeLeFais()
+            end
+            return lirePhotos(...)
+        end
+        local okClic, erreurClic = pcall(Fenetre.jeLeFais)
+        Lightroom.photos = lirePhotos
+        vrai(okClic, erreurClic)
+        vrai(second, 'le second clic a eu lieu')
+        egal(1, #envoyes, 'une seule demande')
+        egal('faite', prop.etat)
+        egal(false, Fenetre.jeLeFaisEnCours)
+        -- Une erreur pendant l'action rend aussi le bouton.
+        prop.etat = 'enAttente'
+        Lightroom.photos = function() error('catalogue fermé') end
+        okClic = pcall(Fenetre.jeLeFais)
+        Lightroom.photos = lirePhotos
+        egal(false, okClic, "l'erreur remonte (journalisée par Fenetre.enTache)")
+        egal(false, Fenetre.jeLeFaisEnCours, 'le bouton est rendu')
+        Fenetre.rafraichir()
+        egal(true, p.peutJeLeFais)
+        p.message = ''
     end)
     Moteur.travaille = false
     remettreEnvoyer()
@@ -1336,6 +1499,9 @@ essai("Consignes : section Je le fais (600 caractères au plus) entre Garde-fous
     local fin = texte:find('\n## ', debut + 1, true)
     local section = texte:sub(debut + 1, fin - 1):gsub('\n$', '')
     vrai(Texte.longueur(section) <= 600, string.format('section : %d caractères pour 600', Texte.longueur(section)))
+    -- La section dit quand elle s'applique (seulement quand Dany retouche lui-même), pas « n'applique
+    -- rien » tout court.
+    contient(section, "## Je le fais\nQuand Dany retouche lui-même pour apprendre, n'applique rien :", 'section Je le fais')
     for _, morceau in ipairs({ 'my_turn', 'claude_version', "ordre du panneau Développement", 'ne retouche pas la photo et ne défais rien',
         'choose_variant « ma version »', 'Suggestion pour le guide', "n'applique rien", "« J'ai fini »", 'ecart_principal',
         "d'abord ce qu'il a bien fait", "Un écart de goût n'est pas une faute", "que s'il le demande" }) do

@@ -969,9 +969,10 @@ end
 
 -- Proposition ---------------------------------------------------------------------------------
 -- La carte Proposition montre la proposition en attente, ou l'exercice « Je le fais » (1.3) arrivé
--- après elle (Conversation.dernierExercice : une proposition arrivée après l'exercice reprend la
--- carte) : sa liste à faire, cochée au fil de ce que Dany change (Fenetre.suivreExercice), puis sa
--- comparaison, jusqu'à la proposition suivante.
+-- après elle (Conversation.dernierExercice : une proposition en attente arrivée après l'exercice
+-- reprend la carte, et la lui rend une fois décidée s'il est encore à faire) : sa liste à faire,
+-- cochée au fil de ce que Dany change (Fenetre.suivreExercice), puis sa comparaison, jusqu'à la
+-- proposition suivante.
 
 Fenetre.AUCUNE_PROPOSITION = "Aucune proposition en attente.\n\nEn mode « Proposer d'abord », Claude montre ici ce "
     .. "qu'il compte changer et attend votre accord.\n\n« Je le fais » : vous faites la retouche vous-même ; Claude donne "
@@ -1035,7 +1036,7 @@ function Fenetre.cleExerciceVu(exo)
     if exo and exo.etat == 'aFaire' then
         return exo.id .. '/aFaire'
     elseif exo and exo.etat == 'comparee' then
-        return exo.id .. '/comparee/' .. tostring(exo.appelComparaison)
+        return exo.id .. '/comparee/' .. tostring(exo.appelCompare or exo.appelComparaison)
     end
     return nil
 end
@@ -1048,11 +1049,14 @@ function Fenetre.etatExercice(exo, faits)
         return "Liste en préparation…"
     elseif exo.etat == 'erreur' then
         return "Je le fais n'a pas abouti"
+    elseif exo.comparaisonEnCours then
+        return "Comparaison en cours…"
     elseif exo.etat == 'comparee' then
         local ecarts, total = Fil.ecartsExercice(exo)
         return "Comparée : " .. (ecarts == 0 and "aucun écart" or (ecarts .. (ecarts > 1 and " écarts" or " écart"))) .. " sur " .. total
-    elseif exo.comparaisonEnCours then
-        return "Comparaison en cours…"
+    elseif type(exo.comparaisonRefusee) == 'string' then
+        -- Un refus qui peut se refaire : la raison est dans la carte, « J'ai fini » se refait.
+        return "Comparaison non aboutie : réessayez"
     end
     local total, n = #(exo.aFaire or {}), faits and faits.nombre or 0
     if n == 0 then
@@ -1073,7 +1077,7 @@ function Fenetre.rafraichirJeLeFais()
     local prop = c and Conversation.propositionEnAttente(c)
     local active = Fenetre.info and Fenetre.info.active
     poser(p, 'titreJeLeFais', enCours and "J'ai fini" or "Je le fais")
-    poser(p, 'peutJeLeFais', not Moteur.travaille and (enCours ~= nil or prop ~= nil or active ~= nil))
+    poser(p, 'peutJeLeFais', not Moteur.travaille and not Fenetre.jeLeFaisEnCours and (enCours ~= nil or prop ~= nil or active ~= nil))
     local exo = c and Conversation.dernierExercice(c)
     poser(p, 'exerciceEtat', Fenetre.etatExercice(exo, Fenetre.faitsDe(exo)))
 end
@@ -1112,15 +1116,22 @@ function Fenetre.texteExercice(exo, faits)
         local raison = Texte.nettoyer(exo.texte or '')
         return "« Je le fais » n'a pas abouti" .. (raison ~= '' and (" : " .. raison) or ".")
             .. "\n\nCliquez « Je le fais » pour recommencer, ou demandez à Claude."
-    elseif exo.etat == 'comparee' then
+    end
+    -- Une comparaison refusée qui peut se refaire (Conversation.completerExercice) : l'exercice reste
+    -- où il en était, et la carte dit pourquoi.
+    local refus = type(exo.comparaisonRefusee) == 'string' and Texte.nettoyer(exo.comparaisonRefusee) or ''
+    if exo.etat == 'comparee' then
         lignes[#lignes + 1] = "Votre version comparée à celle de Claude" .. (exo.fichier and (" (" .. exo.fichier .. ")") or "") .. "."
+        if refus ~= '' then
+            lignes[#lignes + 1] = "La comparaison suivante n'a pas abouti (" .. refus .. ") : voici la précédente."
+        end
         if Texte.nettoyer(exo.resume or '') ~= '' then
             lignes[#lignes + 1] = exo.resume
         end
-        local principal = type(exo.principal) == 'table' and Texte.nettoyer(exo.principal.texte or '') or ''
+        local principal = Fil.textePrincipal(exo)
         if principal ~= '' then
             lignes[#lignes + 1] = ''
-            lignes[#lignes + 1] = "Écart principal : " .. principal
+            lignes[#lignes + 1] = principal
         end
         lignes[#lignes + 1] = ''
         parPanneau(lignes, exo.ecarts or {}, function(_, x)
@@ -1140,6 +1151,8 @@ function Fenetre.texteExercice(exo, faits)
         .. "Rien n'est appliqué : la version de Claude est rangée en instantané « " .. (exo.instantane or "Claude · ma version") .. " »."
     if exo.comparaisonEnCours then
         lignes[#lignes + 1] = "Claude compare votre version à la sienne…"
+    elseif refus ~= '' then
+        lignes[#lignes + 1] = "La comparaison n'a pas abouti (" .. refus .. ") : cliquez de nouveau « J'ai fini »."
     end
     lignes[#lignes + 1] = ''
     parPanneau(lignes, exo.aFaire or {}, function(k, x)
@@ -1243,11 +1256,9 @@ end
 -- C'est une demande de Dany (une proposition préparée à l'ouverture ne retient plus l'onglet).
 -- « Je le fais » sans proposition porte sur la photo active : la conversation devient celle de la
 -- sélection, comme Envoyer ; avec une proposition, ou « J'ai fini » (Dany peut regarder une autre
--- photo), elle reste celle de sa photo.
-function Fenetre.jeLeFais()
-    if Moteur.travaille then
-        return
-    end
+-- photo), elle reste celle de sa photo. Un second clic avant l'envoi du premier (la lecture de la
+-- photo active attend) ne fait rien : le bouton est rendu inactif dès le clic.
+local function jeLeFais()
     local c = Moteur.courante
     local enCours = c and Conversation.exerciceEnCours(c)
     local prop = c and Conversation.propositionEnAttente(c)
@@ -1267,7 +1278,22 @@ function Fenetre.jeLeFais()
     if Fenetre.p then
         Fenetre.p.message = ok and '' or (raison or '')
     end
+end
+
+function Fenetre.jeLeFais()
+    if Moteur.travaille or Fenetre.jeLeFaisEnCours then
+        return
+    end
+    Fenetre.jeLeFaisEnCours = true
+    if Fenetre.p then
+        poser(Fenetre.p, 'peutJeLeFais', false)
+    end
+    local ok, erreur = LrTasks.pcall(jeLeFais)
+    Fenetre.jeLeFaisEnCours = false
     Fenetre.aRafraichir = true
+    if not ok then
+        error(erreur, 0)
+    end
 end
 
 -- La comparaison montrée par l'onglet Proposition : celle de l'exercice montré, comparé, s'il n'y a
