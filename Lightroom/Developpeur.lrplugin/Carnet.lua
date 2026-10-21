@@ -3,8 +3,28 @@
 -- commandes n'est arrêtée par la pause de la liaison (elle n'arrête que les écritures dans le
 -- catalogue). Commandes du serveur :
 --   lecon  : garder (la leçon d'une photo : trois points, un par axe), lire, retirer ;
---   carnet : lire, retirer (constater, les défauts mesurés à la prise de vue, vient ensuite).
+--   carnet : constater (les défauts de la prise de vue que le connecteur a mesurés : vue ou
+--            angle), lire (resume = true : avec le résumé, Carnet.resumer), retirer.
 -- Elles écrivent carnet.json : le serveur ne les rejoue jamais (LightroomBridge.lectures).
+--
+-- Constats (carnet constater { photo, vue ou angle, vocabulaire, essai_recette? }) :
+--   vue   = { cherches = { codes }, defauts = { { code, mesure?, texte? } } } : les défauts
+--           cherchés sur le premier aperçu entier de view_photo, et ceux trouvés ; refusée
+--           (note = false, avec la raison) si la photo a déjà des étapes de Claude ;
+--   angle = { inclinaison (degrés), code, source? } : une ligne penchée mesurée (measure_angle,
+--           read_composition) ; refusé seulement si la géométrie est touchée (recadrage tourné,
+--           Upright, perspective ou distorsion manuelle), pas après une passe de tonalité ;
+--   vocabulaire : la liste des défauts du connecteur (PriseDeVue.vocabulaire) ; les codes de la vue
+--           et de l'angle doivent y être. Elle est rangée (la page du carnet en tire libellés et
+--           conseils) : aucune liste de défauts n'est écrite dans ce module.
+-- Tout constat est refusé si la case Carnet est décochée (préférence carnet), et pour une photo
+-- de « Développeur › Essais » (Carnet.estPhotoDEssai), sauf avec essai_recette = true, que seule la
+-- recette envoie. Une nouvelle vue remplace l'ancienne, un nouvel angle aussi ; les leçons restent.
+--
+-- Le résumé (Carnet.resumer) compte, pour chaque défaut et par mois de prise de vue (les six
+-- derniers qui ont des photos), les photos où il a été trouvé sur celles où il a été cherché ; il
+-- dit ce qui progresse ou recule, et quoi travailler à la prochaine sortie. Ses phrases ne sont
+-- écrites qu'ici : la page du carnet (fenêtre) et export_journal (serveur) les reprennent.
 --
 -- Un seul fichier pour tous les catalogues : chacun garde sa table, sous son chemin (un
 -- identifiant de photo ne vaut que dans son catalogue) ; changer de catalogue ne fait rien perdre
@@ -15,12 +35,14 @@
 -- originaux dans un catalogue, les entrées les plus anciennes (champ le) sortent.
 --
 -- Format 1 :
---   { format = 1, catalogues = { [chemin du catalogue] = { photos = { ['<id de l'original>'] =
---     entrée } } } }
+--   { format = 1, vocabulaire = { { code, cle, axe, domaine, libelle, conseil, mesure } } (le
+--     dernier reçu, pour tous les catalogues), catalogues = { [chemin du catalogue] = { photos =
+--     { ['<id de l'original>'] = entrée } } } }
 --   entrée : { photo (id de l'original), uuid, fichier, prise ('AAAA-MM', heure locale), prise_le
---     ('AAAA-MM-JJ HH:MM'), sans_date (vrai sans date de prise de vue), le (dernier changement,
---     os.time), vue { le, cherches, defauts }, angle { le, inclinaison, source }, lecons =
---     { ['<id de la photo>'] = leçon } }
+--     ('AAAA-MM-JJ HH:MM'), sans_date (vrai sans date de prise de vue : la photo compte alors au
+--     mois du constat), le (dernier changement, os.time), vue { le, photo (id de la photo
+--     mesurée, copie virtuelle comprise), cherches = { codes }, defauts = { { code, mesure, texte }
+--     } }, angle { le, photo, inclinaison, code, source }, lecons = { ['<id de la photo>'] = leçon } }
 --   leçon : { photo, uuid, fichier, le, points = { { axe ('lumiere', 'couleur', 'composition'),
 --     manque (rien ne manquait s'il est absent), prise_de_vue, defauts = { { code, libelle } } } }
 --     (dans l'ordre des axes), defauts (les codes des trois points), indices = { { code, axe,
@@ -28,9 +50,10 @@
 -- Un fichier illisible (ou d'un autre format) est mis de côté avant la première écriture
 -- (carnet-illisible-<date>.json), jamais écrasé.
 --
--- Chargeable sans l'interface ni la Bibliothèque (la fenêtre aussi s'en sert). Tout ce qui sort
--- vers une vue est une copie neuve, sans métatable (Lightroom bloque sur une table relue par
--- Json.decode) ; vers le serveur, les listes sont des tableaux JSON, même vides.
+-- Chargeable sans l'interface ni la Bibliothèque (la fenêtre aussi s'en sert) : Preferences et
+-- Recalage ne sont requis qu'au moment de constater. Tout ce qui sort vers une vue est une copie
+-- neuve, sans métatable (Lightroom bloque sur une table relue par Json.decode) ; vers le serveur,
+-- les listes sont des tableaux JSON, même vides.
 
 local LrDate = import 'LrDate'
 local LrFileUtils = import 'LrFileUtils'
@@ -63,14 +86,54 @@ Carnet.MAX_INDICES = 20
 Carnet.LONGUEUR_TEXTE = 600
 Carnet.LONGUEUR_LIBELLE = 200
 Carnet.LONGUEUR_PREUVE = 400
+-- Constats : défauts du vocabulaire au plus, longueur du texte d'un défaut trouvé (« ciel brûlé :
+-- 4,2 % du tiers haut en blanc pur »), en octets.
+Carnet.MAX_VOCABULAIRE = 40
+Carnet.LONGUEUR_CONSTAT = 200
+-- Un recadrage tourné de moins que cela n'est pas tourné : le curseur de Lightroom va par 0,01°, et
+-- un cadre calculé peut garder un reste de l'ordre de 1e-12.
+Carnet.ANGLE_NUL = 0.005
+-- La collection des photos d'essai (Recette.collectionDeRecette du serveur) : ses photos n'entrent
+-- pas au carnet, sauf pour la recette.
+Carnet.ESSAIS = { ensemble = 'Développeur', collection = 'Essais' }
+
+-- Résumé : mois montrés (les derniers qui ont des photos) ; les deux derniers comparés aux trois
+-- d'avant ; écart en points et photos de chaque côté pour une tendance ; taux et photos pour « à
+-- travailler » (sur les deux derniers mois), et combien au plus ; photos au-dessous desquelles le
+-- carnet le dit.
+Carnet.MOIS_RESUME = 6
+Carnet.MOIS_RECENTS = 2
+Carnet.MOIS_AVANT = 3
+Carnet.ECART_TENDANCE = 15
+Carnet.BASE_TENDANCE = 5
+Carnet.TAUX_A_TRAVAILLER = 20
+Carnet.MIN_A_TRAVAILLER = 2
+Carnet.MAX_A_TRAVAILLER = 3
+Carnet.PHOTOS_SUFFISANTES = 5
+
+-- Les mois en français : nom entier et abrégé (colonnes du tableau de la page du carnet).
+Carnet.MOIS = { 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre',
+    'novembre', 'décembre' }
+Carnet.MOIS_COURTS = { 'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.' }
+
+-- Titres du résumé, repris par la page du carnet et par export_journal.
+Carnet.TITRES = {
+    carnet = "Carnet de progrès",
+    defaut = "Défaut",
+    progresse = "Ce qui progresse",
+    recule = "Ce qui recule",
+    a_travailler = "À travailler à la prochaine sortie",
+}
 
 local AXE_CONNU = {}
 for i, axe in ipairs(Carnet.AXES) do
     AXE_CONNU[axe] = i
 end
 
--- Clés des listes : des tableaux JSON, même vides, vers le serveur et dans le fichier.
-local LISTES = { points = true, defauts = true, indices = true, cherches = true }
+-- Clés des listes : des tableaux JSON, même vides, vers le serveur et dans le fichier (registre et
+-- résumé). Jamais `photos`, qui est une table par identifiant dans le registre.
+local LISTES = { points = true, defauts = true, indices = true, cherches = true, mois = true, par_mois = true,
+    progresse = true, recule = true, a_travailler = true }
 
 local function echouer(message)
     error(message, 0)
@@ -150,6 +213,49 @@ local function normaliserLecon(l, cle)
     return propre
 end
 
+-- Une vue relue : des codes en texte, des défauts avec leur code.
+local function normaliserVue(v)
+    if type(v) ~= 'table' then
+        return nil
+    end
+    local cherches, defauts = {}, {}
+    for _, c in ipairs(type(v.cherches) == 'table' and v.cherches or {}) do
+        if texte(c) then
+            cherches[#cherches + 1] = c
+        end
+    end
+    for _, d in ipairs(type(v.defauts) == 'table' and v.defauts or {}) do
+        if type(d) == 'table' and texte(d.code) then
+            defauts[#defauts + 1] = { code = d.code, mesure = tonumber(d.mesure), texte = texte(d.texte) }
+        end
+    end
+    return { le = tonumber(v.le) or 0, photo = tonumber(v.photo), cherches = cherches, defauts = defauts }
+end
+
+-- Un angle relu : sans inclinaison ni code, il ne compte pas.
+local function normaliserAngle(a)
+    if type(a) ~= 'table' or not tonumber(a.inclinaison) or not texte(a.code) then
+        return nil
+    end
+    return { le = tonumber(a.le) or 0, photo = tonumber(a.photo), inclinaison = tonumber(a.inclinaison), code = a.code,
+        source = texte(a.source) }
+end
+
+-- Le vocabulaire relu : les défauts qui ont un code.
+local function normaliserVocabulaire(v)
+    if type(v) ~= 'table' then
+        return nil
+    end
+    local propre = {}
+    for _, d in ipairs(v) do
+        if type(d) == 'table' and texte(d.code) then
+            propre[#propre + 1] = { code = d.code, cle = texte(d.cle), axe = texte(d.axe), domaine = texte(d.domaine),
+                libelle = texte(d.libelle), conseil = texte(d.conseil), mesure = d.mesure == true or nil }
+        end
+    end
+    return #propre > 0 and propre or nil
+end
+
 local function normaliserEntree(e, cle)
     if type(e) ~= 'table' then
         return nil
@@ -161,8 +267,8 @@ local function normaliserEntree(e, cle)
     local propre = {
         photo = photo, uuid = texte(e.uuid), fichier = texte(e.fichier), prise = texte(e.prise),
         prise_le = texte(e.prise_le), sans_date = e.sans_date == true or nil, le = tonumber(e.le) or 0,
-        vue = type(e.vue) == 'table' and copie(e.vue) or nil,
-        angle = type(e.angle) == 'table' and copie(e.angle) or nil,
+        vue = normaliserVue(e.vue),
+        angle = normaliserAngle(e.angle),
         lecons = {},
     }
     for cleLecon, l in pairs(type(e.lecons) == 'table' and e.lecons or {}) do
@@ -181,6 +287,7 @@ end
 -- Registre relu du fichier : des tables neuves, des clés de photo en texte.
 local function normaliser(r)
     local propre = vide()
+    propre.vocabulaire = normaliserVocabulaire(r.vocabulaire)
     for chemin, c in pairs(type(r.catalogues) == 'table' and r.catalogues or {}) do
         if texte(chemin) and type(c) == 'table' then
             local photos = {}
@@ -282,6 +389,7 @@ local function enregistrer()
         elaguer(c)
     end
     local ok, erreur = pcall(Fichiers.ecrire, fichier, Json.encode({ format = Carnet.FORMAT,
+        vocabulaire = r.vocabulaire and Json.tableau(copie(r.vocabulaire)) or nil,
         catalogues = versJson(r.catalogues) }))
     if not ok then
         local raison = Liaison.messageErreur(erreur)
@@ -301,7 +409,7 @@ function Carnet.desabonner(nom)
     Carnet.observateurs[nom] = nil
 end
 
--- quoi : 'lecon', 'retrait' (et 'constat' ensuite).
+-- quoi : 'lecon', 'constat', 'retrait'.
 function Carnet.signaler(quoi)
     for _, fn in pairs(Carnet.observateurs) do
         pcall(fn, quoi)
@@ -364,6 +472,12 @@ function Carnet.nombre()
     return n
 end
 
+-- Le dernier vocabulaire reçu du connecteur (libellés, domaines, conseils), dans son ordre ; une
+-- liste vide avant le premier constat.
+function Carnet.vocabulaire()
+    return copie(charger().vocabulaire) or {}
+end
+
 -- Entrées --------------------------------------------------------------------------------------
 
 -- L'original d'une photo (elle-même si ce n'est pas une copie virtuelle).
@@ -375,6 +489,33 @@ local function originalDe(photo)
         end
     end
     return photo
+end
+
+-- La photo est-elle dans la collection Essais de l'ensemble Développeur ? Une lecture qui échoue
+-- vaut non : la recette le verrait (son constat sur une copie d'essai doit être refusé), alors
+-- qu'un oui à tort fermerait le carnet à toutes les photos sans bruit.
+local function dansLesEssais(photo)
+    local ok, oui = LrTasks.pcall(function()
+        for _, collection in ipairs(photo:getContainedCollections() or {}) do
+            if collection:getName() == Carnet.ESSAIS.collection then
+                local parent = collection:getParent()
+                if parent and parent:getName() == Carnet.ESSAIS.ensemble then
+                    return true
+                end
+            end
+        end
+        return false
+    end)
+    return ok and oui == true
+end
+
+-- Photo d'essai : elle, ou son original, est dans « Développeur › Essais ».
+function Carnet.estPhotoDEssai(photo)
+    if dansLesEssais(photo) then
+        return true
+    end
+    local original = originalDe(photo)
+    return original ~= photo and dansLesEssais(original)
 end
 
 -- Mois et date de la prise de vue, à l'heure locale (timeToUserFormat : timeToW3CDate donne
@@ -698,11 +839,565 @@ function Carnet.commandeLecon(params)
     echouer("Action de la leçon inconnue : " .. tostring(action) .. " (garder, lire ou retirer).")
 end
 
+-- Constats : validation -------------------------------------------------------------------------
+
+local function nombreFini(valeur)
+    return type(valeur) == 'number' and valeur == valeur and valeur ~= math.huge and valeur ~= -math.huge
+end
+
+local function absent(valeur)
+    return valeur == nil or valeur == Json.null
+end
+
+-- Un identifiant facultatif (axe, domaine, clé anglaise d'un défaut du vocabulaire ; source d'un
+-- angle) : lettres minuscules et _.
+local function identifiantFacultatif(valeur, quoi)
+    if absent(valeur) then
+        return nil
+    end
+    if type(valeur) ~= 'string' or not valeur:match('^[a-z_]+$') or #valeur > 40 then
+        echouer(string.format("%s invalide « %s » (lettres minuscules et _).", quoi, tostring(valeur)))
+    end
+    return valeur
+end
+
+-- Le vocabulaire du connecteur (PriseDeVue.vocabulaire), vérifié en entier : la liste propre, et
+-- l'ensemble de ses codes.
+local function vocabulaireValide(vocabulaire)
+    if type(vocabulaire) ~= 'table' or #vocabulaire == 0 then
+        echouer("Constat : vocabulaire manquant (la liste des défauts du connecteur).")
+    end
+    if #vocabulaire > Carnet.MAX_VOCABULAIRE then
+        echouer(string.format("Constat : vocabulaire de %d défauts, %d au plus.", #vocabulaire, Carnet.MAX_VOCABULAIRE))
+    end
+    local propre, connus = {}, {}
+    for _, d in ipairs(vocabulaire) do
+        if type(d) ~= 'table' then
+            echouer("Constat : chaque défaut du vocabulaire est un objet { code, libelle, domaine, conseil }.")
+        end
+        local c = code(d.code, "Constat, vocabulaire")
+        if connus[c] then
+            echouer(string.format("Constat, vocabulaire : le code « %s » est donné deux fois.", c))
+        end
+        connus[c] = true
+        local libelle = borne(d.libelle, Carnet.LONGUEUR_LIBELLE, "Constat, vocabulaire, libellé")
+        if not libelle then
+            echouer(string.format("Constat, vocabulaire : « %s » n'a pas de libellé.", c))
+        end
+        if not absent(d.mesure) and type(d.mesure) ~= 'boolean' then
+            echouer(string.format("Constat, vocabulaire : mesure de « %s » est vrai ou faux.", c))
+        end
+        propre[#propre + 1] = {
+            code = c, libelle = libelle,
+            cle = identifiantFacultatif(d.cle, "Constat, vocabulaire : clé"),
+            axe = identifiantFacultatif(d.axe, "Constat, vocabulaire : axe"),
+            domaine = identifiantFacultatif(d.domaine, "Constat, vocabulaire : domaine"),
+            conseil = borne(d.conseil, Carnet.LONGUEUR_TEXTE, "Constat, vocabulaire, conseil"),
+            mesure = d.mesure == true or nil,
+        }
+    end
+    return propre, connus
+end
+
+-- Un code du vocabulaire.
+local function codeConnu(valeur, connus, quoi)
+    local c = code(valeur, quoi)
+    if not connus[c] then
+        echouer(string.format("%s : « %s » n'est pas dans le vocabulaire.", quoi, c))
+    end
+    return c
+end
+
+-- Une liste de codes ou de défauts, de Carnet.MAX_CODES au plus.
+local function listeDeCodes(valeur, quoi)
+    if absent(valeur) then
+        return {}
+    end
+    if type(valeur) ~= 'table' then
+        echouer(quoi .. " est une liste.")
+    end
+    if #valeur > Carnet.MAX_CODES then
+        echouer(string.format("%s : %d codes, %d au plus.", quoi, #valeur, Carnet.MAX_CODES))
+    end
+    return valeur
+end
+
+-- vue = { cherches, defauts } : les codes cherchés (un au moins), et les défauts trouvés parmi eux.
+local function vueValide(vue, connus)
+    if type(vue) ~= 'table' then
+        echouer("Constat : vue est un objet { cherches, defauts }.")
+    end
+    local cherches, cherche = {}, {}
+    for _, c in ipairs(listeDeCodes(vue.cherches, "Constat, cherches")) do
+        c = codeConnu(c, connus, "Constat, cherches")
+        if not cherche[c] then
+            cherche[c] = true
+            cherches[#cherches + 1] = c
+        end
+    end
+    if #cherches == 0 then
+        echouer("Constat : cherches est vide (les défauts cherchés sur cette vue).")
+    end
+    local defauts, vus = {}, {}
+    for _, d in ipairs(listeDeCodes(vue.defauts, "Constat, defauts")) do
+        local propre
+        if type(d) == 'table' then
+            if not absent(d.mesure) and not nombreFini(d.mesure) then
+                echouer("Constat, defauts : mesure est un nombre.")
+            end
+            propre = { code = codeConnu(d.code, connus, "Constat, defauts"),
+                mesure = not absent(d.mesure) and d.mesure or nil,
+                texte = borne(d.texte, Carnet.LONGUEUR_CONSTAT, "Constat, defauts, texte") }
+        else
+            propre = { code = codeConnu(d, connus, "Constat, defauts") }
+        end
+        if not cherche[propre.code] then
+            echouer(string.format("Constat : le défaut « %s » n'est pas dans cherches.", propre.code))
+        end
+        if not vus[propre.code] then
+            vus[propre.code] = true
+            defauts[#defauts + 1] = propre
+        end
+    end
+    return { cherches = cherches, defauts = defauts }
+end
+
+-- angle = { inclinaison, code, source? } : une ligne penchée, mesurée en degrés.
+local function angleValide(angle, connus)
+    if type(angle) ~= 'table' then
+        echouer("Constat : angle est un objet { inclinaison, code, source }.")
+    end
+    if not nombreFini(angle.inclinaison) then
+        echouer("Constat : inclinaison manquante ou non numérique (en degrés).")
+    end
+    return { inclinaison = angle.inclinaison, code = codeConnu(angle.code, connus, "Constat, angle"),
+        source = identifiantFacultatif(angle.source, "Constat, angle : source") }
+end
+
+-- Constats : commande -------------------------------------------------------------------------------
+
+-- La case Carnet du Gestionnaire de modules externes (préférence carnet, cochée par défaut).
+local function carnetCoche()
+    local Preferences = require 'Preferences'
+    return Preferences.lire().carnet ~= false
+end
+
+-- La géométrie de la photo est-elle touchée (recadrage tourné, Upright, perspective, distorsion
+-- manuelle) ? Une ligne mesurée n'y dit plus l'inclinaison de la prise de vue. Une passe de
+-- tonalité, elle, ne la change pas.
+local function geometrieTouchee(photo)
+    local Recalage = require 'Recalage'
+    local actuels = photo:getDevelopSettings()
+    return math.abs(tonumber(actuels.CropAngle) or 0) >= Carnet.ANGLE_NUL or Recalage.transformationActive(actuels)
+end
+
+local function refus(motif, raison, photo)
+    return { note = false, motif = motif, raison = raison, photo = photo }
+end
+
+-- Une inclinaison en texte, au dixième de degré, sans passer par la locale (« 1,2° »).
+local function degres(x)
+    local d = math.floor(math.abs(x) * 10 + 0.5)
+    return string.format('%d,%d°', math.floor(d / 10), d % 10)
+end
+
+-- constater { photo, vue ou angle, vocabulaire, essai_recette? } : rend { note = true, constat
+-- ('vue' ou 'angle'), photo, original, fichier, mois, prise_le, sans_date, remplacee, remarque? },
+-- ou { note = false, motif ('preference', 'essai', 'etapes', 'geometrie'), raison, photo }. Tout
+-- est vérifié et lu (photo, collections, étapes, géométrie, chemin du catalogue) avant de toucher
+-- au registre, qui change ensuite d'un coup : une autre commande passée pendant une lecture ne
+-- voit jamais d'entrée à moitié faite.
+local function constater(params)
+    local vue, angle = params.vue, params.angle
+    if absent(vue) then
+        vue = nil
+    end
+    if absent(angle) then
+        angle = nil
+    end
+    if (vue == nil) == (angle == nil) then
+        echouer("Constat : donner vue (défauts mesurés sur l'aperçu entier) ou angle (ligne mesurée), l'un ou l'autre.")
+    end
+    local vocabulaire, connus = vocabulaireValide(params.vocabulaire)
+    local constat
+    if vue then
+        constat = vueValide(vue, connus)
+    else
+        constat = angleValide(angle, connus)
+    end
+    if not carnetCoche() then
+        return refus('preference', "Carnet de progrès décoché dans le Gestionnaire de modules externes : rien n'est noté.",
+            tonumber(params.photo) or params.photo)
+    end
+    local photo = Photos.photoVisee(params)
+    local id = photo.localIdentifier
+    if params.essai_recette ~= true and Carnet.estPhotoDEssai(photo) then
+        return refus('essai', "Photo d'essai (Développeur › Essais) : le carnet ne compte que les vraies prises de vue.", id)
+    end
+    if vue then
+        -- La mémoire de la photo elle-même (une copie virtuelle reçoit celle de son original).
+        if #Photos.lireJson(photo, 'etapesClaude', {}) > 0 then
+            return refus('etapes', "Photo déjà retouchée par Claude : sa prise de vue ne se mesure qu'avant la première retouche.",
+                id)
+        end
+    elseif geometrieTouchee(photo) then
+        return refus('geometrie', "Géométrie déjà touchée (recadrage tourné, Upright, perspective ou distorsion) : "
+            .. "la ligne mesurée ne dit plus l'inclinaison de la prise de vue.", id)
+    end
+    local lu = lirePhoto(photo)
+    local chemin = cheminCatalogue()
+    -- Plus aucune lecture du catalogue jusqu'au fichier écrit : le registre change d'un coup.
+    local e = entreeDe(tableDu(chemin, true), lu)
+    local maintenant = os.time()
+    constat.le, constat.photo = maintenant, lu.id
+    local remplacee
+    if vue then
+        remplacee = e.vue ~= nil
+        e.vue = constat
+    else
+        remplacee = e.angle ~= nil
+        e.angle = constat
+    end
+    e.le = maintenant
+    charger().vocabulaire = vocabulaire
+    if vue then
+        Liaison.noter(string.format("Carnet : prise de vue notée pour %s (%d défaut%s sur %d cherché%s)", lu.fichier,
+            #constat.defauts, #constat.defauts > 1 and "s" or "", #constat.cherches, #constat.cherches > 1 and "s" or ""), lu.id)
+    else
+        Liaison.noter("Carnet : ligne penchée de " .. degres(constat.inclinaison) .. " notée pour " .. lu.fichier, lu.id)
+    end
+    local ok, raison = changer('constat')
+    return {
+        note = true, constat = vue and 'vue' or 'angle', photo = lu.id, original = lu.original, fichier = lu.fichier,
+        mois = e.prise, prise_le = e.prise_le, sans_date = e.sans_date, remplacee = remplacee,
+        remarque = not ok and ("Constat gardé pour cette session, carnet.json non écrit : " .. tostring(raison)) or nil,
+    }
+end
+
+-- Résumé -------------------------------------------------------------------------------------------
+
+-- 'AAAA-MM' d'un mois, ou nil.
+local function cleMois(valeur)
+    if type(valeur) ~= 'string' then
+        return nil
+    end
+    local annee, numero = valeur:match('^(%d%d%d%d)%-(%d%d)$')
+    numero = tonumber(numero)
+    if not annee or not numero or numero < 1 or numero > 12 then
+        return nil
+    end
+    return valeur
+end
+
+local function decrireMois(cle)
+    local annee, numero = cle:match('^(%d%d%d%d)%-(%d%d)$')
+    annee, numero = tonumber(annee), tonumber(numero)
+    return { cle = cle, annee = annee, numero = numero, nom = Carnet.MOIS[numero], court = Carnet.MOIS_COURTS[numero],
+        libelle = Carnet.MOIS[numero] .. ' ' .. annee }
+end
+
+-- Le mois où une entrée compte : celui de sa prise de vue ; sans date, celui de son constat.
+local function moisDe(e)
+    if e.prise then
+        return cleMois(e.prise)
+    end
+    local t = (e.vue and e.vue.le) or (e.angle and e.angle.le) or e.le
+    t = tonumber(t)
+    if not t or t <= 0 then
+        return nil
+    end
+    local ok, m = pcall(os.date, '%Y-%m', t)
+    return ok and cleMois(m) or nil
+end
+
+-- Les défauts cherchés et trouvés sur une entrée (code → vrai ; code → { mesure, texte, photo }).
+-- Un défaut trouvé est aussi cherché ; l'angle compte pour son code.
+local function constatsDe(e)
+    local cherches, trouves = {}, {}
+    if e.vue then
+        for _, c in ipairs(e.vue.cherches) do
+            cherches[c] = true
+        end
+        for _, d in ipairs(e.vue.defauts) do
+            cherches[d.code] = true
+            trouves[d.code] = trouves[d.code] or { mesure = d.mesure, texte = d.texte, photo = e.vue.photo }
+        end
+    end
+    if e.angle then
+        cherches[e.angle.code] = true
+        trouves[e.angle.code] = { mesure = e.angle.inclinaison, photo = e.angle.photo }
+    end
+    return cherches, trouves
+end
+
+-- Les entrées du catalogue ouvert rangées par mois (les MOIS_RESUME derniers qui en ont, jusqu'au
+-- mois de `maintenant`) : { mois = { clés, du plus ancien au plus récent }, parMois = { [clé] =
+-- { { entree, cherches, trouves } } }, apres (photos datées après ce mois, pas comptées) }.
+local function selection(maintenant)
+    local actuel = cleMois(os.date('%Y-%m', maintenant))
+    local parMois, apres = {}, 0
+    for _, e in pairs(catalogueOuvert(false).photos) do
+        local cherches, trouves = constatsDe(e)
+        local m = next(cherches) ~= nil and moisDe(e) or nil
+        if m and actuel and m > actuel then
+            apres = apres + 1
+        elseif m then
+            parMois[m] = parMois[m] or {}
+            table.insert(parMois[m], { entree = e, cherches = cherches, trouves = trouves })
+        end
+    end
+    local cles = {}
+    for m in pairs(parMois) do
+        cles[#cles + 1] = m
+    end
+    table.sort(cles)
+    local mois = {}
+    for i = math.max(1, #cles - Carnet.MOIS_RESUME + 1), #cles do
+        mois[#mois + 1] = cles[i]
+    end
+    return { mois = mois, parMois = parMois, apres = apres }
+end
+
+local function taux(n, sur)
+    return math.floor(100 * n / sur + 0.5)
+end
+
+local function photosTexte(n)
+    return string.format(n > 1 and "%d photos" or "%d photo", n)
+end
+
+-- « de » devant un mois : « d'avril », « d'août », « d'octobre ».
+local function de(mot)
+    return (mot:match('^[aeiou]') and "d'" or "de ") .. mot
+end
+
+-- La période d'une suite de mois : « en mai 2026 », « en septembre et octobre 2026 », « de mai à
+-- juillet 2026 », « de décembre 2025 à février 2026 ».
+local function periode(mois)
+    local n = #mois
+    if n == 0 then
+        return nil
+    end
+    local premier, dernier = mois[1], mois[n]
+    if n == 1 then
+        return "en " .. premier.libelle
+    end
+    local debut = premier.annee == dernier.annee and premier.nom or premier.libelle
+    if n == 2 then
+        return string.format("en %s et %s", debut, dernier.libelle)
+    end
+    return string.format("%s à %s", de(debut), dernier.libelle)
+end
+
+-- Somme de n et sur sur les mois i à j d'un défaut.
+local function somme(d, i, j)
+    local n, sur = 0, 0
+    for k = i, j do
+        n, sur = n + d.par_mois[k].n, sur + d.par_mois[k].sur
+    end
+    return { n = n, sur = sur }
+end
+
+-- « progresse » si le taux baisse d'au moins ECART_TENDANCE points des mois d'avant aux mois
+-- récents, « recule » s'il monte d'autant ; rien sans BASE_TENDANCE photos de chaque côté. En
+-- nombres entiers : 100 × (nA × sR − nR × sA) comparé à l'écart × sA × sR.
+local function tendance(avant, recent)
+    if avant.sur < Carnet.BASE_TENDANCE or recent.sur < Carnet.BASE_TENDANCE then
+        return nil
+    end
+    local difference = 100 * (avant.n * recent.sur - recent.n * avant.sur)
+    local seuil = Carnet.ECART_TENDANCE * avant.sur * recent.sur
+    if difference >= seuil then
+        return 'progresse'
+    elseif -difference >= seuil then
+        return 'recule'
+    end
+    return nil
+end
+
+-- Le résumé du carnet du catalogue ouvert, au moment `maintenant` (os.time ; par défaut,
+-- maintenant) : des tables neuves, sans métatable.
+--   { le, vide, photos (comptées), mois = { { cle, annee, numero, nom, court, libelle, photos,
+--     recent } }, periode, defauts = { { code, libelle, domaine, conseil, par_mois = { { n, sur } }
+--     (un par mois), n, sur, taux, avant = { n, sur }, recent = { n, sur }, tendance } },
+--     progresse = { { code, libelle, texte } }, recule (de même), a_travailler = { { code,
+--     libelle, n, sur, taux, texte, conseil, prise_de_vue } }, titres, note, remarque?,
+--     aucune_tendance?, rien_a_travailler? }
+-- Un défaut est montré s'il a été cherché sur une photo des mois montrés ; dans l'ordre du
+-- vocabulaire, puis des codes.
+function Carnet.resumer(maintenant)
+    maintenant = tonumber(maintenant) or os.time()
+    local sel = selection(maintenant)
+    local vocabulaire = charger().vocabulaire or {}
+    local parCode, rang = {}, {}
+    for i, d in ipairs(vocabulaire) do
+        parCode[d.code], rang[d.code] = d, i
+    end
+
+    local mois, total, codes, vus = {}, 0, {}, {}
+    for _, cle in ipairs(sel.mois) do
+        local m = decrireMois(cle)
+        m.photos = #sel.parMois[cle]
+        total = total + m.photos
+        mois[#mois + 1] = m
+        for _, x in ipairs(sel.parMois[cle]) do
+            for c in pairs(x.cherches) do
+                if not vus[c] then
+                    vus[c] = true
+                    codes[#codes + 1] = c
+                end
+            end
+        end
+    end
+    table.sort(codes, function(a, b)
+        local ra, rb = rang[a] or math.huge, rang[b] or math.huge
+        if ra ~= rb then
+            return ra < rb
+        end
+        return a < b
+    end)
+
+    local nb = #mois
+    local debutRecent = math.max(1, nb - Carnet.MOIS_RECENTS + 1)
+    local debutAvant = math.max(1, debutRecent - Carnet.MOIS_AVANT)
+    local recents, avants = {}, {}
+    for i = debutRecent, nb do
+        mois[i].recent = true
+        recents[#recents + 1] = mois[i]
+    end
+    for i = debutAvant, debutRecent - 1 do
+        avants[#avants + 1] = mois[i]
+    end
+    local periodeRecente, periodeAvant = periode(recents), periode(avants)
+
+    local defauts, progresse, recule, aTravailler = {}, {}, {}, {}
+    for _, c in ipairs(codes) do
+        local v = parCode[c] or {}
+        local d = { code = c, libelle = v.libelle or c, domaine = v.domaine, conseil = v.conseil, par_mois = {}, n = 0, sur = 0 }
+        for i, m in ipairs(mois) do
+            local n, sur = 0, 0
+            for _, x in ipairs(sel.parMois[m.cle]) do
+                if x.cherches[c] then
+                    sur = sur + 1
+                    if x.trouves[c] then
+                        n = n + 1
+                    end
+                end
+            end
+            d.par_mois[i] = { n = n, sur = sur }
+            d.n, d.sur = d.n + n, d.sur + sur
+        end
+        d.taux = d.sur > 0 and taux(d.n, d.sur) or nil
+        d.recent = somme(d, debutRecent, nb)
+        d.avant = somme(d, debutAvant, debutRecent - 1)
+        d.tendance = tendance(d.avant, d.recent)
+        defauts[#defauts + 1] = d
+        if d.tendance then
+            local item = { code = c, libelle = d.libelle, texte = string.format("%s : %d %% des photos %s, %d %% %s.", d.libelle,
+                taux(d.avant.n, d.avant.sur), periodeAvant, taux(d.recent.n, d.recent.sur), periodeRecente) }
+            table.insert(d.tendance == 'progresse' and progresse or recule, item)
+        end
+        if d.recent.n >= Carnet.MIN_A_TRAVAILLER and 100 * d.recent.n >= Carnet.TAUX_A_TRAVAILLER * d.recent.sur then
+            aTravailler[#aTravailler + 1] = { code = c, libelle = d.libelle, n = d.recent.n, sur = d.recent.sur,
+                taux = taux(d.recent.n, d.recent.sur), conseil = d.conseil, rang = #defauts,
+                texte = string.format("%s : %s sur %d (%d %%) %s.", d.libelle, photosTexte(d.recent.n), d.recent.sur,
+                    taux(d.recent.n, d.recent.sur), periodeRecente),
+                prise_de_vue = d.conseil and ("À la prise de vue : " .. d.conseil) or nil }
+        end
+    end
+    -- Le plus fréquent d'abord (taux, puis nombre de photos, puis l'ordre du vocabulaire).
+    table.sort(aTravailler, function(a, b)
+        if a.n * b.sur ~= b.n * a.sur then
+            return a.n * b.sur > b.n * a.sur
+        end
+        if a.n ~= b.n then
+            return a.n > b.n
+        end
+        return a.rang < b.rang
+    end)
+    for i = #aTravailler, 1, -1 do
+        aTravailler[i].rang = nil
+        if i > Carnet.MAX_A_TRAVAILLER then
+            table.remove(aTravailler, i)
+        end
+    end
+
+    local titres = {}
+    for cle, titre in pairs(Carnet.TITRES) do
+        titres[cle] = titre
+    end
+    local resume = {
+        le = maintenant, vide = total == 0, photos = total, mois = mois, periode = periode(mois),
+        defauts = defauts, progresse = progresse, recule = recule, a_travailler = aTravailler, titres = titres,
+    }
+    if total == 0 then
+        resume.note = "Le carnet se remplit tout seul : quand Claude regarde une photo pas encore retouchée, "
+            .. "les défauts mesurés de sa prise de vue y sont notés, par mois de prise de vue."
+    else
+        resume.note = string.format("Défauts de la prise de vue mesurés par Claude sur %s, par mois de prise de vue (%s). "
+            .. "Seules les photos montrées à Claude comptent, pas toute la sortie.", photosTexte(total), resume.periode)
+        if #progresse == 0 and #recule == 0 then
+            resume.aucune_tendance = string.format("Pas encore de tendance : il faut %d photos au moins sur les %d derniers mois, "
+                .. "et %d sur les %d d'avant.", Carnet.BASE_TENDANCE, Carnet.MOIS_RECENTS, Carnet.BASE_TENDANCE, Carnet.MOIS_AVANT)
+        end
+        if #aTravailler == 0 then
+            resume.rien_a_travailler = string.format("Aucun défaut ne revient sur %d %% des photos ou plus %s.",
+                Carnet.TAUX_A_TRAVAILLER, periodeRecente)
+        end
+    end
+    local remarques = {}
+    if total > 0 and total < Carnet.PHOTOS_SUFFISANTES then
+        remarques[#remarques + 1] = string.format("Seulement %s : le carnet dira plus après quelques sorties.", photosTexte(total))
+    end
+    if sel.apres == 1 then
+        remarques[#remarques + 1] = "1 photo datée après aujourd'hui n'est pas comptée (horloge de l'appareil ?)."
+    elseif sel.apres > 1 then
+        remarques[#remarques + 1] = string.format(
+            "%d photos datées après aujourd'hui ne sont pas comptées (horloge de l'appareil ?).", sel.apres)
+    end
+    resume.remarque = #remarques > 0 and table.concat(remarques, ' ') or nil
+    return resume
+end
+
+-- Les photos où un défaut a été trouvé, dans les mois du résumé (au même moment) : le plus récent
+-- d'abord. { { original, photo (la photo mesurée), fichier, mois, mois_libelle, mesure, texte,
+-- lecons = { leçons de l'entrée } } }, des tables neuves (la fenêtre de ce défaut).
+function Carnet.photosDuDefaut(codeDefaut, maintenant)
+    local sel = selection(tonumber(maintenant) or os.time())
+    local trouvees = {}
+    for _, cle in ipairs(sel.mois) do
+        for _, x in ipairs(sel.parMois[cle]) do
+            local t = x.trouves[codeDefaut]
+            if t then
+                local e = x.entree
+                local lecons = {}
+                for _, l in pairs(e.lecons) do
+                    lecons[#lecons + 1] = copie(l)
+                end
+                table.sort(lecons, function(a, b) return a.photo < b.photo end)
+                trouvees[#trouvees + 1] = { original = e.photo, photo = t.photo or e.photo, fichier = e.fichier, mois = cle,
+                    mois_libelle = decrireMois(cle).libelle, mesure = t.mesure, texte = t.texte, lecons = lecons }
+            end
+        end
+    end
+    table.sort(trouvees, function(a, b)
+        if a.mois ~= b.mois then
+            return a.mois > b.mois
+        end
+        if (a.fichier or '') ~= (b.fichier or '') then
+            return (a.fichier or '') < (b.fichier or '')
+        end
+        return a.original < b.original
+    end)
+    return trouvees
+end
+
 -- Commande carnet -------------------------------------------------------------------------------
 
--- lire {} : { catalogue (son nom), nombre, photos } : les entrées du catalogue ouvert, leçons
--- comprises (en liste), sans vérifier chaque photo.
-local function lireCarnet()
+-- lire { resume? } : { catalogue (son nom), nombre, photos, resume? } : les entrées du catalogue
+-- ouvert, leçons comprises (en liste), sans vérifier chaque photo ; avec resume = true, le résumé
+-- (Carnet.resumer), ses listes en tableaux JSON.
+local function lireCarnet(params)
     local c, chemin = catalogueOuvert(false)
     local cles = {}
     for cle in pairs(c.photos) do
@@ -714,7 +1409,8 @@ local function lireCarnet()
         photos[#photos + 1] = entreePourServeur(c.photos[cle])
     end
     -- Le nom du catalogue, comme la commande etat : jamais son chemin (la réponse va à Claude).
-    return { catalogue = chemin and LrPathUtils.leafName(chemin) or nil, nombre = #photos, photos = Json.tableau(photos) }
+    return { catalogue = chemin and LrPathUtils.leafName(chemin) or nil, nombre = #photos, photos = Json.tableau(photos),
+        resume = params.resume == true and versJson(Carnet.resumer(os.time())) or nil }
 end
 
 -- retirer { photos } : les entrées de ces photos (l'identifiant d'un original, ou d'une copie
@@ -754,15 +1450,17 @@ local function retirerDuCarnet(params)
     return { retirees = retirees, absentes = #absentes > 0 and absentes or nil }
 end
 
--- Commande carnet du serveur : lire ou retirer. Rien n'est écrit dans le catalogue.
+-- Commande carnet du serveur : constater, lire ou retirer. Rien n'est écrit dans le catalogue.
 function Carnet.commande(params)
     local action = params.action
-    if action == 'lire' then
-        return lireCarnet()
+    if action == 'constater' then
+        return constater(params)
+    elseif action == 'lire' then
+        return lireCarnet(params)
     elseif action == 'retirer' then
         return retirerDuCarnet(params)
     end
-    echouer("Action du carnet inconnue : " .. tostring(action) .. " (lire ou retirer).")
+    echouer("Action du carnet inconnue : " .. tostring(action) .. " (constater, lire ou retirer).")
 end
 
 return Carnet
