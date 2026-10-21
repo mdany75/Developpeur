@@ -5564,7 +5564,10 @@ test("masquer : le radial inversé garde la forme constatée, par applyDevelopSe
     local photo = photoFuji()
     S.active = photo
     Commandes.executer('masquer', { masques = Json.tableau({ bords }), etape = 'bords' })
-    egal(photo.appliques[#photo.appliques].preset, nil, "un radial seul : par applyDevelopSettings")
+    egal(#photo.appliques > 0, true, "le radial est écrit")
+    for _, applique in ipairs(photo.appliques) do
+        egal(applique.preset, nil, "un radial seul : par applyDevelopSettings, sans paramètre prédéfini")
+    end
     local m = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1]
     egal(m.What, 'Mask/CircularGradient') egal(m.Flipped, true) egal(m.MaskInverted, true)
 
@@ -5591,6 +5594,58 @@ test("masquer : le radial inversé garde la forme constatée, par applyDevelopSe
     Locaux.radial = radial
     egal(ok, false, "un radial sans Flipped est refusé")
     egal(tostring(erreur):find('Flipped = true', 1, true) ~= nil, true, "la raison : " .. tostring(erreur))
+end)
+
+-- Les autres chemins qui posent ou inversent un radial (plan du tireur : recopie, edit_mask
+-- dupliquer inversé, composant d'un masque combiné) gardent la forme constatée : Flipped vrai,
+-- l'inversion par MaskInverted seul. S'ils basculaient Flipped, la simulation refuserait l'écriture.
+test("radial : composant intersecté, dupliqué inversé et copié, toujours Flipped avec MaskInverted", function()
+    local photo = photoFuji()
+    S.active = photo
+    -- Le ciel limité à l'ellipse (intersection = soustraction du radial inversé, Locaux.combiner).
+    Commandes.executer('masquer', {
+        masques = Json.tableau({ {
+            type = 'ia', soustype = 2, nom = 'Claude · Ciel au centre', locaux = { LocalExposure2012 = -0.1 },
+            composants = Json.tableau({
+                { mode = 'intersecter', type = 'radial', centre_x = 0.5, centre_y = 0.4, rayon_x = 0.3, fondu = 80, nom = 'Centre' },
+            }),
+        } }),
+        etape = 'ciel au centre',
+    })
+    local composant = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[2]
+    egal(composant.What, 'Mask/CircularGradient')
+    egal(composant.Flipped, true, "composant intersecté : Flipped gardé")
+    egal(composant.MaskBlendMode, 1) egal(composant.MaskInverted, true, "l'intersection passe par MaskInverted")
+
+    -- edit_mask, dupliquer inversé : la copie d'un radial s'inverse par MaskInverted seul.
+    photo = photoFuji()
+    S.active = photo
+    Commandes.executer('masquer', {
+        masques = Json.tableau({ { type = 'radial', centre_x = 0.5, centre_y = 0.5, rayon_x = 0.3, fondu = 80,
+            nom = 'Claude · Sujet', locaux = { LocalExposure2012 = 0.075 } } }),
+        etape = 'sujet',
+    })
+    Commandes.executer('masques', { action = 'dupliquer', masque = 1, inverser = true, nom = 'Bords' })
+    local masques = photo.reglages.MaskGroupBasedCorrections
+    egal(#masques, 2)
+    egal(masques[1].CorrectionMasks[1].Flipped, true) egal(masques[1].CorrectionMasks[1].MaskInverted, false)
+    egal(masques[2].CorrectionName, 'Claude · Bords')
+    egal(masques[2].CorrectionMasks[1].Flipped, true, "la copie inversée garde Flipped")
+    egal(masques[2].CorrectionMasks[1].MaskInverted, true, "la copie s'inverse par MaskInverted")
+
+    -- Copie des masques vers une autre photo : le radial inversé arrive tel quel.
+    local cible = photoFuji()
+    cible.localIdentifier = 5
+    S.photos[5] = cible
+    local source = photoFuji()
+    source.reglages.MaskGroupBasedCorrections = {
+        Locaux.correction('Claude · Bords', 1, { LocalExposure2012 = -0.075 }, { Locaux.radial(0.1, 0.1, 0.9, 0.9, 0, 80, 'Bords', true) }),
+    }
+    S.active = cible
+    Commandes.executer('copier', { source = 4, photos = { 5 }, cles = {}, inclure = { masques = true }, etape = 'copie' })
+    local copie = cible.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1]
+    egal(copie.What, 'Mask/CircularGradient')
+    egal(copie.Flipped, true, "copié : Flipped gardé") egal(copie.MaskInverted, true, "copié : toujours inversé")
 end)
 
 print(string.format("%d tests réussis, %d en échec", reussis, echecs))
