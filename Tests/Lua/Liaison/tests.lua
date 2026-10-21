@@ -5489,5 +5489,109 @@ test("apercu : avant/après de l'étape éclaircir et assombrir (etapePrecedente
     egal(resultat.etapes_claude, nil, "un avant/après ne donne pas les étapes : il ne touche pas au bilan des vues")
 end)
 
+-- Radial inversé (1.2, constaté le 20 octobre 2026 dans Lightroom Classic 15.6) : la forme qu'écrit
+-- Locaux.radial (Mask/CircularGradient, Flipped = true, l'inversion par MaskInverted seul) agit hors
+-- de l'ellipse quand elle est inversée, dans l'ellipse sinon. Ces essais la figent clé par clé, puis
+-- vérifient que la simulation refuse toute autre forme, par les deux chemins d'écriture du module.
+local FORME_RADIAL = {
+    What = 'Mask/CircularGradient', MaskActive = true, MaskBlendMode = 0, MaskValue = 1,
+    Angle = 15, Feather = 80, Midpoint = 50, Roundness = 0, Flipped = true, Version = 2,
+}
+local CLES_RADIAL = { 'What', 'MaskActive', 'MaskBlendMode', 'MaskID', 'MaskInverted', 'MaskName', 'MaskSyncID', 'MaskValue',
+    'Left', 'Top', 'Right', 'Bottom', 'Angle', 'Feather', 'Midpoint', 'Roundness', 'Flipped', 'Version' }
+
+test("Locaux.radial : la forme constatée, Flipped avec MaskInverted, clé par clé", function()
+    local connues = {}
+    for _, cle in ipairs(CLES_RADIAL) do
+        connues[cle] = true
+    end
+    for _, inverse in ipairs({ true, false }) do
+        local m = Locaux.radial(0.1, 0.2, 0.9, 0.8, 15, 80, 'Claude · Bords', inverse)
+        for cle in pairs(m) do
+            egal(connues[cle], true, "clé de plus dans le radial (forme non constatée) : " .. tostring(cle))
+        end
+        for _, cle in ipairs(CLES_RADIAL) do
+            egal(m[cle] ~= nil, true, "clé du radial constaté : " .. cle)
+        end
+        for cle, valeur in pairs(FORME_RADIAL) do
+            egal(m[cle], valeur, "radial " .. (inverse and "inversé" or "droit") .. ", " .. cle)
+        end
+        egal(m.MaskInverted, inverse, "l'inversion passe par MaskInverted seul")
+        proche(m.Left, 0.1) proche(m.Top, 0.2) proche(m.Right, 0.9) proche(m.Bottom, 0.8)
+        egal(m.MaskName, 'Claude · Bords')
+    end
+    local defaut = Locaux.radial(0.2, 0.2, 0.8, 0.8)
+    egal(defaut.Flipped, true, "Flipped même sans inversion demandée")
+    egal(defaut.MaskInverted, false)
+    egal(defaut.Angle, 0) egal(defaut.Feather, 50)
+end)
+
+test("simulation : un radial sans la forme constatée est refusé (Flipped, MaskInverted)", function()
+    local photo = photoRaw()
+    local function radial(champ, valeur)
+        local m = Locaux.radial(0.2, 0.2, 0.8, 0.8, 0, 80, 'Claude · Bords', true)
+        m[champ] = valeur
+        return { MaskGroupBasedCorrections = { Locaux.correction('Claude · Bords', 1, { LocalExposure2012 = -0.075 }, { m }) } }
+    end
+    local refus = {
+        { 'Flipped', nil, "Flipped = true" }, { 'Flipped', false, "Flipped = true" }, { 'Flipped', 'true', "Flipped = true" },
+        { 'MaskInverted', nil, "MaskInverted vrai ou faux" }, { 'MaskInverted', 1, "MaskInverted vrai ou faux" },
+    }
+    for _, cas in ipairs(refus) do
+        S.ecritureEnCours = true
+        echoue(function() photo:applyDevelopSettings(radial(cas[1], cas[2]), 'essai') end, cas[3])
+        echoue(function() photo:applyDevelopPreset({ nom = 'essai', reglages = radial(cas[1], cas[2]) }) end, cas[3])
+        S.ecritureEnCours = false
+    end
+    -- Un composant d'un masque combiné est vérifié de même.
+    local sujet = Locaux.masqueIA(1, nil, 'Claude · Sujet', false)
+    local bords = Locaux.combiner(Locaux.radial(0.2, 0.2, 0.8, 0.8, 0, 80, nil, false), 'intersecter', true)
+    bords.Flipped = nil
+    S.ecritureEnCours = true
+    echoue(function()
+        photo:applyDevelopSettings({ MaskGroupBasedCorrections = { Locaux.correction('x', 1, {}, { sujet, bords }) } }, 'essai')
+    end, "Flipped = true")
+    -- La forme de Locaux.radial passe, inversée ou non.
+    photo:applyDevelopSettings(radial('Flipped', true), 'essai')
+    photo:applyDevelopSettings(radial('MaskInverted', false), 'essai')
+    S.ecritureEnCours = false
+    egal(photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1].Flipped, true)
+end)
+
+test("masquer : le radial inversé garde la forme constatée, par applyDevelopSettings et par un paramètre prédéfini", function()
+    local bords = { type = 'radial', centre_x = 0.5, centre_y = 0.5, rayon_x = 0.7, rayon_y = 0.7, fondu = 80, inverser = true,
+        nom = 'Claude · Bords', locaux = { LocalExposure2012 = -0.075 } }
+    local photo = photoFuji()
+    S.active = photo
+    Commandes.executer('masquer', { masques = Json.tableau({ bords }), etape = 'bords' })
+    egal(photo.appliques[#photo.appliques].preset, nil, "un radial seul : par applyDevelopSettings")
+    local m = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1]
+    egal(m.What, 'Mask/CircularGradient') egal(m.Flipped, true) egal(m.MaskInverted, true)
+
+    photo = photoFuji()
+    S.active = photo
+    Commandes.executer('masquer', {
+        masques = Json.tableau({ { type = 'ia', soustype = 2, nom = 'Claude · Ciel', locaux = { LocalExposure2012 = -0.15 }, quantite = 1 }, bords }),
+        etape = 'ciel et bords',
+    })
+    egal(photo.appliques[#photo.appliques].preset ~= nil, true, "avec un masque IA : par un paramètre prédéfini")
+    m = photo.reglages.MaskGroupBasedCorrections[2].CorrectionMasks[1]
+    egal(m.What, 'Mask/CircularGradient') egal(m.Flipped, true) egal(m.MaskInverted, true)
+
+    -- Si Locaux.radial changeait de forme (ici sans Flipped), la simulation refuserait l'écriture.
+    local radial = Locaux.radial
+    Locaux.radial = function(...)
+        local r = radial(...)
+        r.Flipped = nil
+        return r
+    end
+    photo = photoFuji()
+    S.active = photo
+    local ok, erreur = pcall(Commandes.executer, 'masquer', { masques = Json.tableau({ bords }), etape = 'bords' })
+    Locaux.radial = radial
+    egal(ok, false, "un radial sans Flipped est refusé")
+    egal(tostring(erreur):find('Flipped = true', 1, true) ~= nil, true, "la raison : " .. tostring(erreur))
+end)
+
 print(string.format("%d tests réussis, %d en échec", reussis, echecs))
 os.exit(echecs == 0 and 0 or 1)
