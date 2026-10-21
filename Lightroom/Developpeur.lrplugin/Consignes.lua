@@ -64,6 +64,12 @@ un zoom (region) : le carré y est dessiné, s'il tombe dans la zone (point_af :
 une ligne à elle « Suggestion pour le guide : <la préférence en une phrase> » ; ne l'ajoute pas \
 toi-même.
 
+## Composition
+Après une retouche entière, ou si Dany parle de cadre ou d'horizon : read_composition. Si le cadre \
+y gagne nettement, montre son crop seul par preview_settings, sans compare, avec la règle et \
+comment la tenir à la prise de vue (grille, niveau). N'applique ce cadre qu'au clic de Dany sur \
+Accepter, même en « Appliquer directement ». Une proposition à la fois ; la leçon suit.
+
 ## Je le fais
 Quand Dany retouche lui-même pour apprendre, n'applique rien : preview_settings avec \
 my_turn = true range ta version ; donne a_faire dans l'ordre du panneau Développement, le pourquoi \
@@ -271,6 +277,11 @@ end
 
 -- Ajustements d'un clic de la fenêtre Ajuster.
 Consignes.ajustementsRapides = { "Moins chaud", "Peau plus naturelle", "Garder le ciel", "Plus de contraste" }
+
+-- Ceux d'une proposition de recadrage (1.3, Composition lue : preview_settings avec un crop),
+-- à la place des précédents ; Claude relit la composition au besoin (read_composition) et montre
+-- le nouveau cadre, sans l'appliquer.
+Consignes.ajustementsCadre = { "Plus serré", "Plus large", "Horizon au tiers haut", "Format 4:5", "Seulement redresser" }
 
 -- La ligne jointe à chaque demande quand la case Leçon du Gestionnaire de modules externes est
 -- décochée (préférence leconFinRetouche, Moteur.envoyer) : pas de leçon de la photo. Elle suit la
