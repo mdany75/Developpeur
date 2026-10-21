@@ -177,9 +177,10 @@ local function reglagesDepart()
         CropAngle = 0 }
 end
 
--- La largeur du texte du fil (Fenetre.largeurTexte), et celle qu'une ligne ne dépasse jamais.
+-- La largeur du texte du fil (Fenetre.largeurTexte : 518 dans la fenêtre B, après la colonne
+-- auteur), et celle qu'une ligne ne dépasse jamais, son retrait compris (Fil.occupe).
 local D = Dispositions.dimensions()
-local LARGEUR = D.fil - 20
+local LARGEUR = D.texteFil
 local LARGEUR_LIGNE = LARGEUR - Fil.MARGE
 
 -- Ouvre la fenêtre Claude et appelle fn(p, args) pendant qu'elle est ouverte ; une erreur de fn
@@ -814,7 +815,7 @@ essai("Fil : lignes d'un exercice (genres proposition et outil, ordre reçu, 12 
     egal(6, #lignes)
     for n, l in ipairs(lignes) do
         vrai(l.genre == 'proposition' or l.genre == 'outil', 'genres existants : ' .. tostring(l.genre))
-        vrai(Fil.largeur(l.texte, Fil.polices[l.genre]) <= LARGEUR_LIGNE, 'largeur de la ligne ' .. n)
+        vrai(Fil.occupe(l) <= LARGEUR_LIGNE, 'largeur de la ligne ' .. n)
         egal(i, l.element)
     end
     egal('  2. Réglages de base › Tonalité › Exposition : 0 → +0,35', lignes[3].texte)
@@ -847,7 +848,7 @@ essai("Fil : lignes d'un exercice (genres proposition et outil, ordre reçu, 12 
     contient(ecarts[3], '  ✓ Réglages de base › Balance des blancs › Température')
     contient(ecarts[4], '  • Réglages de base › Tonalité › Exposition')
     for _, l in ipairs(lignes) do
-        vrai(Fil.largeur(l.texte, Fil.polices[l.genre]) <= LARGEUR_LIGNE, 'largeur : ' .. l.texte)
+        vrai(Fil.occupe(l) <= LARGEUR_LIGNE, 'largeur : ' .. l.texte)
     end
     -- Refusé : le titre dit pourquoi, icône erreur, trois lignes au plus.
     local d = Conversation.nouvelle()
@@ -870,17 +871,25 @@ essai("Fil : lignes d'un exercice (genres proposition et outil, ordre reçu, 12 
         end
     end
     contient(Fil.lignesElement(p, n, LARGEUR_LIGNE)[1].texte, 'Proposition à faire vous-même : Plus de lumière')
-    -- Le cache suit l'exercice : liste, comparaison en cours, comparaison.
+    -- Le cache suit l'exercice : liste, comparaison en cours, comparaison (le titre lu d'un trait,
+    -- ses lignes recollées : une coupe peut tomber dans la phrase cherchée).
     local g = Conversation.nouvelle()
     local k = appelTour(g, 't1')
     local cache = {}
-    contient(textes(Fil.lignes(g, LARGEUR, cache)), 'liste en préparation')
+    local function suivi()
+        local t = {}
+        for _, l in ipairs(Fil.lignes(g, LARGEUR, cache)) do
+            t[#t + 1] = l.texte
+        end
+        return table.concat(t, ' ')
+    end
+    contient(suivi(), 'liste en préparation')
     Conversation.appliquer(g, { genre = 'resultats', resultats = { { idOutil = 't1', textes = { TOUR }, images = {}, erreur = false } } })
-    contient(textes(Fil.lignes(g, LARGEUR, cache)), '5 réglages')
+    contient(suivi(), '5 réglages')
     appelComparaison(g, 'v1')
-    contient(textes(Fil.lignes(g, LARGEUR, cache)), 'comparaison en cours')
+    contient(suivi(), 'comparaison en cours')
     Conversation.appliquer(g, { genre = 'resultats', resultats = { { idOutil = 'v1', textes = { VUE }, images = {}, erreur = false } } })
-    contient(textes(Fil.lignes(g, LARGEUR, cache)), 'comparée : 7 écarts sur 9')
+    contient(suivi(), 'comparée : 7 écarts sur 9')
     egal('comparee', g.elements[k].etat)
 end)
 

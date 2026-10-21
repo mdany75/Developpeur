@@ -313,6 +313,9 @@ essai("Fil : lignes d'une notation", function()
     egal('proposition', lignes[1].genre)
     egal('cours', lignes[1].icone, 'en cours')
     egal('Notes proposées · passe 2 · 3 photos', lignes[1].texte)
+    for _, l in ipairs(Fil.lignes(c, 610)) do
+        vrai(l.genre ~= 'actions', "pas de « Voir la note » pendant l'appel")
+    end
     Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'n1', textes = { REPONSE }, images = {}, erreur = false } } })
     lignes = Fil.lignesElement(e, 3, 600)
     egal('proposition', lignes[1].icone, 'rangées')
@@ -324,6 +327,15 @@ essai("Fil : lignes d'une notation", function()
     egal('  ★★★★☆ DSCF4961.RAF · Tient seule.', lignes[2].texte)
     egal('  ⚑ Rejeter DSCF4962.RAF · à vérifier · Flou de bougé involontaire.', lignes[3].texte)
     egal('  ✕ ★★☆☆☆ photo 53636311 · photo introuvable', lignes[4].texte)
+    egal(4, #lignes)
+    -- Rangées : le tour de Claude finit par la ligne d'actions « ☆ Voir la note » (fenêtre B, lot
+    -- B4), sans texte ; pas pendant l'appel.
+    local fil = Fil.lignes(c, 610)
+    local derniere = fil[#fil]
+    egal('actions', derniere.genre)
+    egal('note', derniere.actions)
+    egal(3, derniere.notation)
+    egal('', derniere.texte)
     -- Une ligne par photo, coupée à la largeur.
     e.notes[1].raison = string.rep('Une raison bien trop longue pour la colonne. ', 10)
     lignes = Fil.lignesElement(e, 3, 300)

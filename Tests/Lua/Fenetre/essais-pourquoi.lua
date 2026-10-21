@@ -1,11 +1,12 @@
 -- essais-pourquoi.lua : « Pourquoi ? » dans la fenêtre Claude (1.3, lot 12), hors de Lightroom
 -- (LuaJIT, Lightroom simulé par Simulation.lua) : les étapes lues dans le fil (Conversation :
 -- raison, but, etape_id et photo de la réponse, annulées par undo_last, défaites par
--- revert_to_original, conversation de la 1.2 relue sans id), leur repère « · Pourquoi ? » (Fil),
--- leur stockage en tableaux (Stockage), l'onglet Pourquoi ? (clic sur une étape, avant/après dans
--- l'aperçu, carte, ◀ ▶, Détail…, Agrandir à deux images, mode suivre, images arrivées quand
--- Etapes.version change, aucune bascule automatique), Etapes.actifPour posé à l'ouverture, et les
--- consignes de la raison. Les images de l'étape (Etapes.images) et leurs réductions (Images) sont
+-- revert_to_original, conversation de la 1.2 relue sans id), leur ligne d'appel qui porte le bouton
+-- « Pourquoi ? » (Fil, drapeau `etape` ; fenêtre B, lot B4 : plus de repère dans le texte), leur
+-- stockage en tableaux (Stockage), l'onglet Aperçu, l'ancien Pourquoi ? (« Pourquoi ? » ou clic sur
+-- une étape, avant/après dans l'aperçu, carte, ◀ ▶, Détail…, Agrandir à deux images, mode suivre,
+-- images arrivées quand Etapes.version change, aucune bascule automatique), Etapes.actifPour posé à
+-- l'ouverture, et les consignes de la raison. Les images de l'étape (Etapes.images) et leurs réductions (Images) sont
 -- remplacées ici ; essais-integration.lua les éprouve pour de bon (sips). Ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
@@ -220,6 +221,27 @@ local function textesDe(liste)
     return table.concat(morceaux, ' ')
 end
 
+-- Le champ de demande de la fenêtre.
+local function champSaisie(contenu)
+    for _, v in ipairs(vues(contenu)) do
+        if v.genre == 'edit_field' and type(v.args.value) == 'table' and v.args.value.key == 'saisie' then
+            return v
+        end
+    end
+    error('champ de demande introuvable', 2)
+end
+
+-- Le bouton « Pourquoi ? » de la ligne i de la grille du fil (montré par `q..i`).
+local function boutonPourquoi(contenu, i)
+    for _, v in ipairs(vues(contenu)) do
+        if S.BOUTONS[v.genre] and v.args.title == 'Pourquoi ?' and type(v.args.visible) == 'table'
+            and table.concat(S.cles(v.args.visible), ' ') == 'q' .. i then
+            return v
+        end
+    end
+    error('« Pourquoi ? » introuvable sur la ligne ' .. i, 2)
+end
+
 -- La ligne du fil d'un élément (indice dans la fenêtre de lecture) et la ligne elle-même.
 local function ligneDe(element)
     for i = 1, Fenetre.T.lignes do
@@ -383,12 +405,13 @@ essai('Conversation de la 1.2 (sans etape_id) : raison et changements relus dans
     egal('Ombres', x.changements[1].libelle)
     egal(Texte.nombre(30), x.changements[1].apres)
     egal('undo_last', x.annulee, 'annulée par son nom')
-    -- Le fil la montre comme une étape.
+    -- Le fil la montre comme une étape : sa ligne porte « Pourquoi ? ».
     local _, ligne = nil, nil
     for _, l in ipairs(Fil.lignesElement(lue.elements[1], 1, 600)) do
         ligne = l
     end
-    vrai(ligne.texte:sub(-#Fil.SUFFIXE_ETAPE) == Fil.SUFFIXE_ETAPE, ligne.texte)
+    egal(true, ligne.etape, ligne.texte)
+    contient(ligne.texte, 'étape « Claude · passe 1 : lumière »')
 end)
 
 essai("Conversation de la 1.2 : une réponse illisible (coupée) se relit en peu d'essais, sans étape", function()
@@ -415,7 +438,7 @@ end)
 
 -- Fil -------------------------------------------------------------------------------------------
 
-essai('Fil : une étape porte « · Pourquoi ? », pas un appel en erreur, un aperçu ni une proposition (preview) ; un long but le garde', function()
+essai('Fil : une étape porte « Pourquoi ? » (drapeau etape), pas un appel en erreur, un aperçu ni une proposition (preview) ; un long but laisse sa place', function()
     local c = Conversation.nouvelle()
     local etape = balance(c, 'b1', 'E1')
     local erreur = balance(c, 'b2', 'E2')
@@ -425,40 +448,52 @@ essai('Fil : une étape porte « · Pourquoi ? », pas un appel en erreur, un ap
     local proposition = appel(c, 'p1', 'preview_settings', { reason = 'Plus chaud', settings = { Temperature = 5600 } }, '{}')
     local longue = appel(c, 'b3', 'apply_settings', { step_name = string.rep('passe très longue, ', 12), reason = 'x' },
         ecriture('longue', { { 4961, 'DSCF4961.RAF', 'E3' } }))
+    local LARGEUR = 518
     local cache = {}
-    local lignes = Fil.lignes(c, 610, cache)
-    local function texteDe(element)
+    local lignes = Fil.lignes(c, LARGEUR, cache)
+    local function ligneDeLAppel(element)
         for _, l in ipairs(lignes) do
-            if l.element == element and l.genre == 'outil' then
-                return l.texte
+            if l.element == element and l.genre == 'appel' then
+                return l
             end
         end
     end
+    local function texteDe(element)
+        return (ligneDeLAppel(element) or {}).texte
+    end
     local function marquee(element)
-        local t = texteDe(element) or ''
-        return t:sub(-#Fil.SUFFIXE_ETAPE) == Fil.SUFFIXE_ETAPE
+        local l = ligneDeLAppel(element)
+        return l ~= nil and l.etape == true
     end
     vrai(marquee(etape), "l'étape : " .. tostring(texteDe(etape)))
+    -- La description d'une étape : son but et ses réglages changés, lus dans la réponse ; plus de
+    -- repère dans le texte (le bouton « Pourquoi ? » est à sa droite).
+    egal('<EM>apply_settings</EM>  étape « Claude · passe 1 : balance » · 1 réglage', texteDe(etape))
     vrai(not marquee(erreur), 'un appel en erreur')
     vrai(not marquee(apercu), 'un aperçu')
     vrai(not marquee(preview), 'une proposition (add_mask preview)')
     vrai(not marquee(proposition), 'preview_settings')
     for _, l in ipairs(lignes) do
         vrai(l.genre ~= 'etape', 'pas de genre de ligne de plus')
+        vrai(not l.texte:find('Pourquoi ?', 1, true), 'plus de repère « · Pourquoi ? » : ' .. l.texte)
     end
-    -- Le but long est coupé avant le repère, qui reste, dans la largeur.
-    vrai(marquee(longue), 'repère gardé : ' .. tostring(texteDe(longue)))
-    contient(texteDe(longue), '…  · Pourquoi ?')
-    vrai(Fil.largeur(texteDe(longue), 'mono') <= 610 - Fil.MARGE, 'dans la largeur')
+    -- Le but long est coupé par « … », et la ligne laisse à droite la place du bouton.
+    vrai(marquee(longue), 'étape gardée : ' .. tostring(texteDe(longue)))
+    contient(texteDe(longue), '…')
+    vrai(Fil.occupe(ligneDeLAppel(longue)) <= LARGEUR - Fil.MARGE - Fil.PLACE_POURQUOI,
+        string.format('la place du bouton : %.0f', Fil.occupe(ligneDeLAppel(longue))))
+    vrai(Fil.occupe(ligneDeLAppel(apercu)) <= LARGEUR - Fil.MARGE, 'dans la largeur')
     egal('ok', lignes[1].icone or 'ok', "l'icône d'une ligne d'outil")
-    -- Signature du cache : un appel en cours marqué, puis sans étape écrite, perd son repère.
+    -- Signature du cache : un appel en cours marqué, puis sans étape écrite, perd son bouton.
     local enCours = appel(c, 'b4', 'apply_settings', { step_name = 'passe 4', reason = 'y' })
-    lignes = Fil.lignes(c, 610, cache)
+    lignes = Fil.lignes(c, LARGEUR, cache)
     vrai(marquee(enCours), 'en cours : marqué')
+    egal('<EM>apply_settings</EM>  étape « Claude · passe 4 »', texteDe(enCours), 'en cours : ses réglages pas encore connus')
     Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'b4',
         textes = { Json.encode(ecriture('passe 4', { { 4961, 'DSCF4961.RAF', nil } })) }, images = {}, erreur = false } } })
-    lignes = Fil.lignes(c, 610, cache)
-    vrai(not marquee(enCours), 'rien écrit : plus de repère')
+    lignes = Fil.lignes(c, LARGEUR, cache)
+    vrai(not marquee(enCours), 'rien écrit : plus de bouton')
+    egal('<EM>apply_settings</EM>  passe 4', texteDe(enCours), 'sans étape : le résumé de l\'appel')
 end)
 
 -- Stockage --------------------------------------------------------------------------------------
@@ -503,7 +538,7 @@ essai("Fenêtre : Etapes.actifPour posé à l'ouverture (fenêtre ouverte, puis 
     Moteur.travaille = false
 end)
 
-essai("Fenêtre : un clic sur une étape ouvre l'onglet Pourquoi ? ; l'après, puis l'avant ; Étape n sur N ; ◀ ▶ ; Détail… ; Note rend l'aperçu d'avant", function()
+essai("Fenêtre : « Pourquoi ? » d'une étape ouvre l'onglet Aperçu ; l'après, puis l'avant ; Étape n sur N ; ◀ ▶ ; Détail… ; Note rend l'aperçu d'avant", function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     local c = Moteur.courante
@@ -520,11 +555,15 @@ essai("Fenêtre : un clic sur une étape ouvre l'onglet Pourquoi ? ; l'après, p
         egal('<EM>DSCF4961.RAF</EM>', defaut)
         egal(true, p.peutPrecedente)
         local n, l = ligneDe(premiere)
-        vrai(l.texte:sub(-#Fil.SUFFIXE_ETAPE) == Fil.SUFFIXE_ETAPE, l.texte)
-        -- Le clic : l'onglet Pourquoi ?, l'après de l'étape (lu dans une tâche), sa carte.
+        egal(true, l.etape, l.texte)
+        egal(true, p['q' .. n], "« Pourquoi ? » montré sur la ligne de l'étape")
+        egal(false, p['q' .. (ligneDe(apercu))], "pas sur la ligne d'un aperçu")
+        -- « Pourquoi ? » de cette ligne, un vrai clic après une frappe sans Retour : l'onglet Aperçu,
+        -- l'après de l'étape (lu dans une tâche), sa carte ; la demande tapée ne part pas.
         local taches = #S.taches
-        p.saisie = 'Texte validé par le clic'
-        Fenetre.cliquerLigne(n)
+        S.taper(champSaisie(args.contents), 'Texte validé par le clic')
+        S.cliquer(boutonPourquoi(args.contents, n))
+        egal('Texte validé par le clic', p.saisie, 'le clic a validé le champ')
         egal(nil, Fenetre.envoiAuto, 'le clic n\'envoie pas la demande')
         p.saisie = ''
         egal('apercu', p.onglet, "l'onglet Aperçu (l'ancien Pourquoi ?)")

@@ -7,9 +7,14 @@
 -- S.cliquer), les briques (Fenetre.bouton carré ou à icône, Fenetre.calque, Vues.boutonBleu,
 -- Vues.inactif, les aplats), le Mode (radios tirés de l'état, D3, D12), la liste en cases (périodes,
 -- sous-titres, choix, pagination, recherche, carnet), la légende de la photo active
--- (Lightroom.legende) et l'apparence (couleurs et images reprises à l'ouverture). Le fil (lot B4) et
--- les cartes (lot B5) ont leurs propres essais. Ni Claude, ni quota, ni vraie photo : les actions qui
--- écriraient ou parleraient à Claude sont remplacées par des témoins le temps d'un essai.
+-- (Lightroom.legende) et l'apparence (couleurs et images reprises à l'ouverture). Puis le fil (lot
+-- B4) : les polices mesurées (Metriques), le texte riche (largeur, coupe, balises fermées), l'auteur
+-- et l'heure de chaque tour (sur des copies), la ligne d'un appel et « Pourquoi ? », la ligne
+-- d'actions (« ☆ Voir la note », « Leçon de la photo »), leurs clics, la bascule vers Leçon, le
+-- bandeau sur deux lignes et le tableau du carnet à 518 points ; essais-lecon.lua éprouve la carte
+-- de l'onglet Leçon. Les cartes (lot B5) ont leurs propres essais. Ni Claude, ni quota, ni vraie
+-- photo : les actions qui écriraient ou parleraient à Claude sont remplacées par des témoins le
+-- temps d'un essai.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
 local S = require 'Simulation'
@@ -628,8 +633,8 @@ essai('Inventaire de la barre et de la saisie : ▲ ▼ à icône, Fin, position
         local message = liee(contenu, 'static_text', 'message')
         egal(D.bandeau, message.args.width)
         egal(D.fil, largeurDonnee(rangeeDe(contenu, message)), 'la rangée du bas de la saisie')
-        -- Cette place (178 points) coupe la plupart des messages (Fenetre.CLAUDE_TRAVAILLE en demande
-        -- environ 270) : son infobulle le donne en entier.
+        -- Cette place (178 points) tient deux lignes de petit texte (lot B4, essai du bandeau plus
+        -- bas) ; son infobulle donne le message en entier.
         p.message = Fenetre.CHOISIR_CONVERSATION
         egal(Fenetre.CHOISIR_CONVERSATION, valeur(message, 'tooltip', p), "l'infobulle du message, en entier")
         p.message = ''
@@ -764,19 +769,17 @@ essai('Segments : Aperçu | Proposition | Note | Leçon en images sous calques ;
             egal(22, S.bezelVisible(b))
         end
         egal(nil, liee(contenu, 'static_text', 'legendeApercu').args.visible)
-        -- L'onglet Leçon montre son aide, en attendant sa carte (lot B4).
+        -- L'onglet Leçon montre sa carte (lot B4) : sans leçon, son aide, coupée à la largeur de la
+        -- carte.
         p.onglet = 'lecon'
-        local aide = parTitre(contenu, 'Leçon de la photo', 'static_text')
-        vrai(S.montree(aide, p), "l'onglet Leçon montré")
-        local texte
-        for _, v in ipairs(vues(contenu)) do
-            if v.genre == 'static_text' and type(v.args.title) == 'string' and v.args.title:find('Claude donne la leçon', 1, true) then
-                texte = v
-            end
-        end
-        egal(Fenetre.AIDE_LECON, (texte.args.title:gsub('\n', ' ')), "l'aide, coupée à la largeur de la carte")
+        local titre = liee(contenu, 'static_text', 'leconTitre')
+        vrai(S.montreeDansFenetre(titre), "l'onglet Leçon montré")
+        egal('Leçon de la photo', p.leconTitre)
+        egal(Fenetre.AUCUNE_LECON, (p.leconTexte:gsub('\n', ' ')), "l'aide, coupée à la largeur de la carte")
+        egal(nil, Fenetre.AIDE_LECON, "plus d'aide provisoire")
+        egal(nil, Vues.leconProvisoire, 'plus de carte provisoire')
         p.onglet = 'notation'
-        vrai(not S.montree(aide, p), 'cachée hors de son onglet')
+        vrai(not S.montreeDansFenetre(titre), 'cachée hors de son onglet')
     end)
 end)
 
@@ -915,9 +918,9 @@ essai('Mode : Je le fais lance l\'exercice (jamais J\'ai fini depuis un radio) ;
             S.cliquer(vuePar(contenu, 'checked_value', 'appliquer', 'radio_button'))
             egal('appliquer', Lightroom.mode(), 'la liaison change')
             egal('jelefais', p.mode, 'le radio revient à Je le fais')
-            -- L'essentiel en tête du message (le bandeau, étroit, coupe la fin).
+            -- Un message court, qui tient dans les deux lignes du bandeau (lot B4).
+            egal(Fenetre.EXERCICE_CONTINUE .. 'Appliquer.', p.message)
             egal(1, (p.message:find("L'exercice continue", 1, true)), p.message)
-            vrai(p.message:find('Appliquer', 1, true), p.message)
             p.message = ''
         end)
         -- Rouverte : toujours Je le fais (tiré de l'état, pas d'un drapeau).
@@ -1306,6 +1309,618 @@ essai('Ouverture : chaque clé liée a sa valeur avant l\'ouverture ; tout clic 
     end)
 end)
 
+-- Fil (lot B4) ---------------------------------------------------------------------------------------
+
+local Fil = require 'Fil'
+local Json = require 'Json'
+local Metriques = require 'Metriques'
+local Texte = require 'Texte'
+
+local function contient(texte, morceau, quoi)
+    if type(texte) ~= 'string' or not texte:find(morceau, 1, true) then
+        error(string.format('%s : %q introuvable dans %q', quoi or 'texte', morceau, tostring(texte)), 2)
+    end
+end
+
+-- 19 h 42, le 21 octobre 2026, à l'heure locale.
+local T0 = os.time({ year = 2026, month = 10, day = 21, hour = 19, min = 42, sec = 0 })
+
+local function outil(c, id, nom, entree, date)
+    Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = id, nom = 'mcp__developpeur__' .. nom,
+        entree = entree or {} } } }, date)
+end
+
+local function reponse(c, id, valeur, date)
+    Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = id,
+        textes = { type(valeur) == 'string' and valeur or Json.encode(valeur) }, images = {}, erreur = false } } }, date)
+end
+
+local function texteClaude(c, texte, date)
+    Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'texte', texte = texte } } }, date)
+end
+
+-- Une conversation comme celle de la maquette : Dany demande la retouche (19 h 42) ; Claude regarde,
+-- écrit l'étape « tons et balance » (deux réglages, son etape_id) et le dit (19 h 43) ; Dany demande la
+-- note (19 h 46) ; Claude note la photo active et une autre, puis donne la leçon, et l'explique.
+local function conversationMaquette()
+    local c = Conversation.nouvelle(T0)
+    c.titre, c.titreChoisi = 'Orage sur le camping', true
+    Conversation.ajouterDemande(c, "Retouche la photo active, rendu naturel. Garde l'orage menaçant.", T0)
+    outil(c, 'v1', 'view_photo', { size = 1568, photo_id = 4961 }, T0 + 60)
+    reponse(c, 'v1', '{}', T0 + 61)
+    outil(c, 'a1', 'apply_settings', { photo_id = 4961, step_name = 'tons et balance', reason = 'Dominante chaude : des blancs neutres.',
+        settings = { Temperature = 5600, Highlights2012 = -38 } }, T0 + 62)
+    reponse(c, 'a1', { mode = 'appliquer directement', resultats = Json.tableau({ { photo = { id = 4961, fichier = 'DSCF4961.RAF' },
+        etape = 'Claude · tons et balance', etape_id = 'E1', remarques = Json.tableau(), changements = Json.tableau({
+            { cle = 'Temperature', avant = 5200, apres = 5600, libelle = 'Température' },
+            { cle = 'Highlights2012', avant = 0, apres = -38, libelle = 'Hautes lumières' } }) } }) }, T0 + 63)
+    texteClaude(c, "La dominante était nettement chaude : Température −9 et Teinte +3 rendent le bleu de l'orage. "
+        .. "Les hautes lumières à −38 rendent leur texture aux nuages.", T0 + 64)
+    Conversation.appliquer(c, { genre = 'fin', reussie = true, interrompue = false, session = '' }, T0 + 65)
+    Conversation.ajouterDemande(c, 'Noter la photo active', T0 + 240)
+    outil(c, 'n1', 'propose_ratings', { pass = 2, ratings = {
+        { photo_id = 4961, rating = 3, reason = 'Tient seule.', criteria = { impact = 'Moyen', qualities = 'Lumière', technical_floor = 'Nette' } },
+        { photo_id = 4962, rating = 2, reason = 'Correcte.', criteria = { impact = 'Faible', qualities = 'Fond', technical_floor = 'Douce' } },
+    } }, T0 + 241)
+    reponse(c, 'n1', { propositions = Json.tableau({ { photo = 4961, fichier = 'DSCF4961.RAF', note_avant = 0, drapeau_avant = 'aucun', etat = 'proposee' },
+        { photo = 4962, fichier = 'DSCF4962.RAF', note_avant = 0, drapeau_avant = 'aucun', etat = 'proposee' } }), refusees = Json.tableau() }, T0 + 242)
+    outil(c, 'l1', 'photo_lesson', { photo_id = 4961, points = {
+        { axis = 'light', missing = 'Ciel brûlé à 3 %.', at_capture = 'Compenser de −2/3 IL.' },
+        { axis = 'color', missing = 'Dominante chaude.', at_capture = 'Balance des blancs Lumière du jour.' },
+        { axis = 'composition', at_capture = 'Les tentes au tiers bas.' },
+    } }, T0 + 243)
+    reponse(c, 'l1', { lecon = { photo = 4961, fichier = 'DSCF4961.RAF', rangee = true, remplacee = false, mois = '2026-10' },
+        remarques = Json.tableau() }, T0 + 244)
+    texteClaude(c, "Je propose 3 ★ : la photo tient seule. Pas 4 ★ : le feuillage bougé se voit à 100 %.", T0 + 245)
+    Conversation.appliquer(c, { genre = 'fin', reussie = true, interrompue = false, session = '' }, T0 + 246)
+    return c
+end
+
+-- L'indice de l'élément de ce genre (et de cet appel) dans le fil.
+local function elementDe(c, genre, appel)
+    for i, e in ipairs(c.elements) do
+        if e.genre == genre and (appel == nil or e.appel == appel) then
+            return i
+        end
+    end
+    error('élément introuvable : ' .. genre, 2)
+end
+
+-- Les balises d'un texte, fermées sur sa ligne.
+local function balisesFermees(texte)
+    local ouverte = false
+    for fin in texte:gmatch('<(/?)EM>') do
+        vrai(ouverte == (fin == '/'), 'balise mal fermée : ' .. texte)
+        ouverte = fin == ''
+    end
+    vrai(not ouverte, 'balise ouverte en fin de ligne : ' .. texte)
+end
+
+essai('Polices : Metriques mesure la police du système (13, 12, 11, gras 13 et 12, titre 16) et Menlo 11 ; Fenetre.POLICES les suit', function()
+    local attendues = {
+        texte = { '<system>', 13 }, texte12 = { '<system>', 12 }, petit = { '<system>', 11 }, gras = { '<system/bold>', 13 },
+        gras12 = { '<system/bold>', 12 }, titre = { '<system/bold>', 16 }, mono = { 'Menlo', 11 },
+    }
+    for cle, a in pairs(attendues) do
+        local m = Metriques[cle]
+        vrai(m, 'Metriques.' .. cle)
+        egal(a[1], m.nom, cle)
+        egal(a[2], m.taille, cle)
+        -- La police de la fenêtre est celle mesurée (D9 : tailles appliquées, l'encre à 1 ou 2 points sous
+        -- la chasse, S.ENCRE_SOUS_CHASSE).
+        egal(m.nom, Fenetre.POLICES[cle].name, 'POLICES.' .. cle)
+        egal(m.taille, Fenetre.POLICES[cle].size, 'POLICES.' .. cle)
+        -- Les caractères des boutons de la fenêtre B, mesurés (pas comptés comme « M »).
+        for _, c in ipairs({ '＋', '⊗', '⤢', '☆', '★', '⚑' }) do
+            vrai(type(m.chasse[c]) == 'number', cle .. ' : ' .. c .. ' non mesuré')
+        end
+    end
+    egal(Fenetre.POLICES.systeme12.name, Fenetre.POLICES.texte12.name)
+    egal(Fenetre.POLICES.systeme12.size, Fenetre.POLICES.texte12.size)
+    egal(1, S.ENCRE_SOUS_CHASSE.min)
+    -- La chasse du système en 12 est plus étroite qu'en 13, le gras plus large.
+    vrai(Fil.largeur('Leçon de la photo', 'texte12') < Fil.largeur('Leçon de la photo', 'texte'), '12 sous 13')
+    vrai(Fil.largeur('Leçon de la photo', 'gras') > Fil.largeur('Leçon de la photo', 'texte'), 'gras plus large')
+end)
+
+essai('Texte riche : Fil.largeur ignore les balises et mesure la partie balisée dans son emphase ; Fil.couper ne coupe jamais une balise, la ferme et la rouvre', function()
+    egal(Fil.largeur('apply_settings', 'mono') + Fil.largeur('  étape', 'texte12'),
+        Fil.largeur('<EM>apply_settings</EM>  étape', 'texte12', 'mono'), 'nom en Menlo, description en 12')
+    egal(Fil.largeur('Lumière', 'texte12'), Fil.largeur('<EM>Lumière</EM>', 'texte12'), 'sans emphase : la police du texte')
+    egal('Lumière', Fil.sansBalises('<EM>Lumière</EM>'))
+    -- Un passage balisé plus long qu'une ligne : chaque ligne aux balises fermées, la suite rouverte.
+    local texte = '<EM>' .. string.rep('Lumière du soir sur le lac ', 8) .. '</EM> et la suite du texte ordinaire.'
+    local lignes, ouvert = Fil.couper(texte, 200, 'texte12', nil, 'gras12')
+    vrai(#lignes >= 3, #lignes .. ' lignes')
+    egal(false, ouvert, 'fermé à la fin')
+    for k, l in ipairs(lignes) do
+        balisesFermees(l)
+        vrai(Fil.largeur(l, 'texte12', 'gras12') <= 200, 'dans la largeur : ' .. l)
+        if k < #lignes then
+            egal('<EM>', l:sub(1, 4), 'rouverte : ' .. l)
+        end
+    end
+    vrai(lignes[#lignes]:find('</EM> et', 1, true) or lignes[#lignes]:find('ordinaire', 1, true), lignes[#lignes])
+    -- Un mot balisé coupé au caractère : jamais au milieu d'une balise.
+    for _, l in ipairs((Fil.couper('<EM>' .. string.rep('W', 60) .. '</EM>', 120, 'texte12', nil, 'gras12'))) do
+        balisesFermees(l)
+        vrai(not l:find('<E[^M]') and not l:find('</?E?$'), 'balise coupée : ' .. l)
+    end
+    -- Un paragraphe laissé ouvert (fin de paragraphe d'une carte) : le suivant commence rouvert.
+    local suite = Fil.couper('suite en gras</EM> puis normal', 400, 'texte12', nil, 'gras12', true)
+    egal('<EM>suite en gras</EM> puis normal', suite[1])
+    local carte = Fenetre.lignesCarte('<EM>Axe\nsur deux lignes</EM>\nnormal', 300, 'texte12', 'gras12')
+    egal('<EM>Axe</EM>', carte[1])
+    egal('<EM>sur deux lignes</EM>', carte[2])
+    egal('normal', carte[3])
+end)
+
+essai('Fil : auteur sur la première ligne de chaque tour, heure sur la suivante (vide comprise), sur des copies ; le cache ne bouge pas', function()
+    local c = conversationMaquette()
+    local cache = {}
+    local lignes = Fil.lignes(c, D.texteFil, cache)
+    local tours = {}
+    for k, l in ipairs(lignes) do
+        if l.auteur then
+            tours[#tours + 1] = l.auteur .. '@' .. k .. ':' .. tostring(lignes[k + 1] and lignes[k + 1].heure)
+        end
+        vrai(not (l.auteur and l.heure), 'auteur et heure sur deux lignes')
+    end
+    egal(4, #tours, 'deux demandes, deux tours de Claude : ' .. table.concat(tours, ' '))
+    egal('dany', lignes[1].auteur)
+    egal('19 h 42', lignes[2].heure)
+    vrai(tours[2]:match('^claude@%d+:19 h 43$'), tours[2])
+    vrai(tours[3]:match('^dany@%d+:19 h 46$'), tours[3])
+    vrai(tours[4]:match('^claude@%d+:19 h 46$'), tours[4])
+    -- Les outils, l'aperçu et le texte de Claude sont un seul tour : un seul « Claude » entre deux demandes.
+    local claude = 0
+    for _, l in ipairs(lignes) do
+        claude = claude + (l.auteur == 'claude' and 1 or 0)
+    end
+    egal(2, claude)
+    -- Deux rafraîchissements de suite, cache compris : mêmes auteurs, mêmes heures, mêmes lignes ;
+    -- les lignes gardées n'en portent jamais.
+    local encore = Fil.lignes(c, D.texteFil, cache)
+    egal(#lignes, #encore)
+    for k, l in ipairs(lignes) do
+        egal(tostring(l.auteur) .. tostring(l.heure) .. l.texte, tostring(encore[k].auteur) .. tostring(encore[k].heure) .. encore[k].texte, 'ligne ' .. k)
+    end
+    for _, garde in pairs(cache) do
+        for _, l in ipairs(garde.lignes) do
+            vrai(l.auteur == nil and l.heure == nil, 'le cache garde une ligne sans auteur ni heure : ' .. l.texte)
+        end
+    end
+    -- Le dernier tour d'une seule ligne : une ligne vide de plus, pour son heure.
+    local d = Conversation.nouvelle(T0)
+    Conversation.ajouterDemande(d, 'Bonjour', T0)
+    local seules = Fil.lignes(d, D.texteFil)
+    egal(2, #seules)
+    egal('vide', seules[2].genre)
+    egal('19 h 42', seules[2].heure)
+    -- Deux demandes de suite (sans réponse) : deux tours.
+    Conversation.ajouterDemande(d, 'Encore', T0 + 60)
+    local deux = Fil.lignes(d, D.texteFil)
+    egal('dany', deux[1].auteur)
+    egal('dany', deux[3].auteur)
+    egal('19 h 43', deux[4].heure)
+end)
+
+essai("Fil : la ligne d'un appel (texte riche, nom en Menlo) ; une étape porte `etape` et laisse la place de « Pourquoi ? » ; aucune ligne au-delà de sa largeur, balises fermées ; outils en Menlo", function()
+    local c = conversationMaquette()
+    local lignes = Fil.lignes(c, D.texteFil)
+    local appels, etapes = {}, {}
+    for _, l in ipairs(lignes) do
+        balisesFermees(l.texte)
+        vrai(Fil.occupe(l) <= D.texteFil - Fil.MARGE, string.format('hors de la largeur (%.0f) : %s', Fil.occupe(l), l.texte))
+        if l.genre == 'appel' then
+            appels[#appels + 1] = l.texte
+            if l.etape then
+                etapes[#etapes + 1] = l.texte
+                vrai(Fil.occupe(l) <= D.texteFil - Fil.MARGE - Fil.PLACE_POURQUOI, 'la place du bouton : ' .. l.texte)
+            end
+        else
+            vrai(not l.texte:find('<EM>', 1, true), 'balise hors d\'une ligne d\'appel : ' .. l.texte)
+            vrai(not l.etape, 'Pourquoi ? hors d\'une ligne d\'appel')
+        end
+    end
+    egal('<EM>view_photo</EM>  photo ' .. Texte.nombre(4961), appels[1])
+    egal('<EM>apply_settings</EM>  étape « Claude · tons et balance » · 2 réglages', etapes[1])
+    egal(1, #etapes, 'une seule étape')
+    -- Les lignes des notes restent en Menlo, sans retrait d'icône ; le titre de la notation en a un.
+    local notes = 0
+    for _, l in ipairs(lignes) do
+        if l.genre == 'outil' then
+            notes = notes + 1
+            egal('mono', Fil.polices.outil)
+            egal(0, Fil.retrait('outil'))
+        end
+    end
+    egal(2, notes, 'une ligne Menlo par photo notée')
+    egal(Fil.RETRAIT_ICONE, Fil.retrait('appel'))
+    egal(Fil.RETRAIT_ICONE, Fil.retrait('proposition'))
+    -- Une description trop longue : coupée par « … », le nom gardé ; un nom seul trop long aussi.
+    local long = { genre = 'outil', outil = 'apply_settings', etat = 'fait', texte = 'apply_settings · ' .. string.rep('très long ', 40) }
+    local l = Fil.lignesElement(long, 1, 300)[1]
+    egal(1, (l.texte:find('<EM>apply_settings</EM>  ', 1, true)), l.texte)
+    vrai(l.texte:sub(-#'…') == '…', l.texte)
+    vrai(Fil.occupe(l) <= 300, 'dans 300 points')
+    egal('<EM>' .. string.rep('x', 3) .. '…</EM>', Fil.uneLigneOutil(string.rep('x', 200), 'description', Fil.largeur('xxx…', 'mono')))
+    -- Une balise venue de Claude ne passe pas : texte, step_name, description.
+    local balise = { genre = 'outil', outil = 'apply_settings', etat = 'fait', texte = 'apply_settings · <EM>essai' }
+    egal('<EM>apply_settings</EM>  essai', Fil.lignesElement(balise, 1, 500)[1].texte)
+    local claude = Fil.lignesElement({ genre = 'claude', texte = 'Un <EM>mot</EM> en gras ?' }, 1, 500)
+    egal('Un mot en gras ?', claude[1].texte)
+end)
+
+essai("Fil : le tour de Claude qui a noté et donné la leçon finit par une ligne d'actions, les deux boutons, après son texte (maquette) ; un tour chacun, une ligne chacun", function()
+    local c = conversationMaquette()
+    local n, l = elementDe(c, 'notation'), elementDe(c, 'lecon')
+    local lignes = Fil.lignes(c, D.texteFil)
+    local actions = {}
+    for k, x in ipairs(lignes) do
+        if x.genre == 'actions' then
+            actions[#actions + 1] = x.actions .. ':' .. tostring(x.notation) .. ':' .. tostring(x.lecon) .. '@' .. k
+        end
+    end
+    egal('les deux:' .. n .. ':' .. l .. '@' .. #lignes, table.concat(actions, ' '), 'une ligne, à la fin du tour')
+    contient(lignes[#lignes - 1].texte, 'feuillage', 'après le texte de Claude')
+    -- Une demande entre les notes et la leçon : deux tours, une ligne d'actions chacun.
+    local d = conversationMaquette()
+    local m = elementDe(d, 'notation')
+    table.insert(d.elements, m + 1, { id = 'entre', genre = 'dany', texte = 'Et la leçon ?', date = T0 + 242, images = {}, changements = {} })
+    actions = {}
+    for _, x in ipairs(Fil.lignes(d, D.texteFil)) do
+        if x.genre == 'actions' then
+            actions[#actions + 1] = x.actions
+        end
+    end
+    egal('note lecon', table.concat(actions, ' '))
+    -- Une notation refusée, ou en cours : pas de « Voir la note ».
+    d.elements[m].etat = 'erreur'
+    for _, x in ipairs(Fil.lignes(d, D.texteFil)) do
+        vrai(x.actions ~= 'note' and x.actions ~= 'les deux', 'notation refusée : ' .. tostring(x.actions))
+    end
+end)
+
+-- La ligne i de la grille qui montre ce test, et la ligne.
+local function ligneDeLaGrille(test)
+    for i = 1, Fenetre.T.lignes do
+        local l = Fenetre.lignes[Fenetre.premiere + i - 1]
+        if l and test(l) then
+            return i, l
+        end
+    end
+    error('ligne introuvable dans la grille', 2)
+end
+
+-- Le bouton de ce titre posé sur la ligne i (sa condition porte sur `cle..i`), montré.
+local function boutonDeLigne(contenu, titre, cle, i)
+    for _, v in ipairs(vues(contenu)) do
+        if S.BOUTONS[v.genre] and v.args.title == titre and type(v.args.visible) == 'table'
+            and table.concat(S.cles(v.args.visible), ' ') == cle .. i and S.montreeDansFenetre(v) then
+            return v
+        end
+    end
+    error('« ' .. titre .. ' » montré introuvable sur la ligne ' .. i, 2)
+end
+
+essai("Fil dans la fenêtre : une ligne de 21 (auteur 60, écart 12, texte 518) ; auteur et heure aux bonnes lignes ; « Pourquoi ? » et les actions aux seules bonnes lignes ; aucun refus de texte riche", function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.charger()
+    Moteur.nouvelle()
+    local c = conversationMaquette()
+    Moteur.courante = c
+    ouvrirFenetre(function(p, contenu)
+        Fenetre.rafraichir()
+        egal(518, Fenetre.largeurTexte(), 'D.fil − 60 − 12')
+        egal(D.fil - D.auteur - D.ecartAuteur, D.texteFil)
+        -- La grille : D.lignes rangées de D.hauteurLigne dans la colonne de D.grille, sous la marge.
+        local grille
+        for _, v in ipairs(vues(contenu)) do
+            if v.genre == 'column' and v.args.height == D.grille then
+                grille = v
+            end
+        end
+        vrai(grille, 'la grille')
+        local rangees = 0
+        for _, r in ipairs(grille.args) do
+            if type(r) == 'table' and r.genre == 'row' then
+                rangees = rangees + 1
+                egal(D.hauteurLigne, r.args.height, 'une ligne de 21')
+                egal(D.fil, largeurDonnee(r), 'auteur, écart et texte : la largeur du fil')
+                vrai(hauteur(r) <= D.hauteurLigne, 'son contenu y tient')
+            end
+        end
+        egal(D.lignes, rangees)
+        -- Les colonnes : « Vous », « Claude », l'heure ; chaque variante de texte à sa largeur.
+        local vous = parTitre(contenu, 'Vous', 'static_text')
+        egal(Fenetre.COULEURS.bleu, vous.args.text_color)
+        egal(Fenetre.POLICES.gras12, vous.args.font)
+        egal(D.auteur, vous.args.width)
+        -- Ce que montre la grille, ligne par ligne.
+        local montres = {}
+        for i = 1, D.lignes do
+            local l = Fenetre.lignes[Fenetre.premiere + i - 1]
+            if l then
+                local auteur = l.auteur or (l.heure and 'heure') or ''
+                egal(auteur, p['a' .. i], 'auteur de la ligne ' .. i)
+                egal(l.heure or '', p['h' .. i])
+                egal(l.etape == true, p['q' .. i], 'Pourquoi ? de la ligne ' .. i)
+                egal(l.actions or '', p['x' .. i], 'actions de la ligne ' .. i)
+                if auteur ~= '' then
+                    montres[#montres + 1] = auteur .. (auteur == 'heure' and ('=' .. p['h' .. i]) or '')
+                end
+            end
+        end
+        egal('dany heure=19 h 42 claude heure=19 h 43 dany heure=19 h 46 claude heure=19 h 46', table.concat(montres, ' '))
+        -- « Pourquoi ? » montré sur la seule ligne d'étape ; les actions sur la seule ligne d'actions.
+        local pourquoi, actions = 0, 0
+        for _, v in ipairs(vues(contenu)) do
+            if S.BOUTONS[v.genre] and v.args.title == 'Pourquoi ?' then
+                egal('square_button', v.genre)
+                egal('small', v.args.size)
+                egal(15, S.bezelVisible(v), 'bezel de 15 dans une case de 21 (D6)')
+                egal(D.pourquoi, v.args.width)
+                vrai(D.pourquoi <= Fil.PLACE_POURQUOI, 'la place gardée à droite')
+                pourquoi = pourquoi + (S.montreeDansFenetre(v) and 1 or 0)
+                local rangee = rangeeDe(contenu, v)
+                egal(D.texteFil - D.pourquoi, rangee.args.margin_left, 'poussé à droite dans sa rangée (D6)')
+            elseif S.BOUTONS[v.genre] and (v.args.title == '☆ Voir la note' or v.args.title == 'Leçon de la photo') then
+                egal('square_button', v.genre)
+                vrai(S.bezelVisible(v) + S.MARGE_BEZEL <= D.hauteurLigne, 'dans sa ligne')
+                actions = actions + (S.montreeDansFenetre(v) and 1 or 0)
+            end
+        end
+        egal(1, pourquoi, 'un seul « Pourquoi ? » montré')
+        egal(2, actions, '« ☆ Voir la note » et « Leçon de la photo » sur une ligne')
+        -- Les textes : celui d'un appel garde ses balises (Menlo en emphase) ; les autres variantes de la
+        -- même ligne le reçoivent sans balise (la simulation refuserait <EM> sans emphasis_font).
+        local i = ligneDeLaGrille(function(l) return l.etape end)
+        egal('appel', p['g' .. i])
+        local balise, sansBalise = 0, 0
+        for _, v in ipairs(vues(contenu)) do
+            local t = v.args.title
+            if v.genre == 'static_text' and type(t) == 'table' and t.key == 't' .. i then
+                local montre = S.evaluer(t, p)
+                if v.args.emphasis_font then
+                    balise = balise + 1
+                    egal(p['t' .. i], montre)
+                    egal(Fenetre.POLICES.mono, v.args.emphasis_font)
+                    egal(Fenetre.POLICES.texte12, v.args.font)
+                    egal(D.texteFil - Fil.RETRAIT_ICONE, v.args.width)
+                    vrai(S.montreeDansFenetre(v), 'la variante de l\'appel montrée')
+                else
+                    sansBalise = sansBalise + 1
+                    egal(Fil.sansBalises(p['t' .. i]), montre)
+                end
+            end
+        end
+        egal(1, balise)
+        egal(#Fenetre.STYLES - 1, sansBalise)
+        egal(0, #S.refusDeLaFenetre(), 'aucun refus de texte riche')
+        -- Deux rafraîchissements : rien ne bouge.
+        local avant = {}
+        for k = 1, D.lignes do
+            avant[k] = p['a' .. k] .. '|' .. p['h' .. k] .. '|' .. p['t' .. k]
+        end
+        Fenetre.rafraichir()
+        for k = 1, D.lignes do
+            egal(avant[k], p['a' .. k] .. '|' .. p['h' .. k] .. '|' .. p['t' .. k], 'ligne ' .. k .. ' après un rafraîchissement')
+        end
+    end)
+end)
+
+essai("Fil dans la fenêtre : « Pourquoi ? » (clic) ouvre l'onglet Aperçu sur son étape ; « ☆ Voir la note » l'onglet Note, sans changer la sélection, le bandeau dit de choisir la photo ; « Leçon de la photo » l'onglet Leçon", function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.charger()
+    Moteur.nouvelle()
+    local c = conversationMaquette()
+    Moteur.courante = c
+    ouvrirFenetre(function(p, contenu)
+        Fenetre.rafraichir()
+        local champ = liee(contenu, 'edit_field', 'saisie')
+        local montrees = {}
+        avec(Fenetre, 'montrerEtape', function(element) montrees[#montrees + 1] = element; return true end, function()
+            local i, l = ligneDeLaGrille(function(x) return x.etape end)
+            S.taper(champ, 'texte tapé')
+            S.cliquer(boutonDeLigne(contenu, 'Pourquoi ?', 'q', i))
+            egal(nil, Fenetre.envoiAuto, "« Pourquoi ? » n'envoie pas la demande")
+            egal(l.element, montrees[1], "l'élément de l'étape")
+            egal(elementDe(c, 'outil', 'a1'), montrees[1])
+            -- Sur une ligne qui n'est plus une étape (la grille a défilé) : rien.
+            egal(false, Fenetre.pourquoi(ligneDeLaGrille(function(x) return x.genre == 'dany' end)))
+            egal(1, #montrees)
+        end)
+        p.saisie = ''
+        -- « ☆ Voir la note » : l'onglet Note, comme un vrai clic (son crochet suit), la sélection
+        -- inchangée ; la photo active (4961) est parmi les notes : pas de message.
+        local selection = S.selection
+        local recus = {}
+        local i = ligneDeLaGrille(function(x) return x.genre == 'actions' end)
+        egal('les deux', p['x' .. i])
+        avec(Fenetre.surOnglet, 'notation', function(v) recus[#recus + 1] = v end, function()
+            p.onglet = 'apercu'
+            S.cliquer(boutonDeLigne(contenu, '☆ Voir la note', 'x', i))
+        end)
+        egal('notation', p.onglet)
+        egal('notation', recus[1], 'un vrai clic : son crochet')
+        egal(selection, S.selection, 'la sélection ne change pas')
+        egal('', p.message)
+        -- La photo active n'est pas notée là : le bandeau le dit, la sélection reste.
+        photoActive(4963, 'DSCF4963.RAF')
+        local avant = S.selection
+        Fenetre.majPhoto()
+        p.onglet = 'apercu'
+        S.cliquer(boutonDeLigne(contenu, '☆ Voir la note', 'x', i))
+        egal('notation', p.onglet)
+        egal(Fenetre.NOTE_AUTRE_PHOTO, p.message)
+        egal(avant, S.selection, 'jamais de sélection changée par la fenêtre')
+        p.message = ''
+        -- L'onglet Leçon suit la photo active : 4963 n'a pas de leçon ici.
+        egal(Fenetre.AUCUNE_LECON, (p.leconTexte:gsub('\n', ' ')), 'pas de leçon pour la photo active')
+        -- « Leçon de la photo » : l'onglet Leçon, sur cette leçon (même d'une autre photo).
+        S.cliquer(boutonDeLigne(contenu, 'Leçon de la photo', 'x', i))
+        egal('lecon', p.onglet)
+        egal(c.elements[elementDe(c, 'lecon')].id, Fenetre.leconChoisie)
+        egal('Leçon de la photo · DSCF4961.RAF', p.leconTitre)
+        egal(1, (p.leconTexte:find('<EM>Lumière</EM>', 1, true)), p.leconTexte)
+        p.onglet = 'notation'
+        photoActive(4961, 'DSCF4961.RAF')
+    end)
+end)
+
+essai('Fil dans la fenêtre : pas de bascule vers Leçon quand une proposition attend ; une fois sinon', function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.charger()
+    Moteur.nouvelle()
+    local c = Moteur.courante
+    ouvrirFenetre(function(p)
+        Fenetre.rafraichir()
+        outil(c, 'p1', 'preview_settings', { photo_id = 4961, settings = { Exposure2012 = 0.3 }, reason = 'Plus clair' })
+        Fenetre.rafraichir()
+        egal('proposition', p.onglet)
+        outil(c, 'l1', 'photo_lesson', { photo_id = 4961, points = { { axis = 'light', missing = 'Sombre.', at_capture = 'Exposer plus.' } } })
+        reponse(c, 'l1', { lecon = { photo = 4961, fichier = 'DSCF4961.RAF', rangee = true }, remarques = Json.tableau() })
+        Fenetre.rafraichir()
+        egal('proposition', p.onglet, 'Accepter reste devant')
+        Conversation.decider(c, Conversation.propositionEnAttente(c).id, true)
+        outil(c, 'l2', 'photo_lesson', { photo_id = 4961, points = { { axis = 'light', missing = 'Sombre.', at_capture = 'Exposer plus.' } } })
+        reponse(c, 'l2', { lecon = { photo = 4961, fichier = 'DSCF4961.RAF', rangee = true }, remarques = Json.tableau() })
+        Fenetre.rafraichir()
+        egal('lecon', p.onglet, 'sans proposition en attente : la leçon se montre')
+        p.onglet = 'notation'
+    end)
+end)
+
+essai("Fil dans la fenêtre : une conversation vide montre son titre, puis l'aide entière, coupée dans la largeur d'une ligne de note", function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.charger()
+    Moteur.nouvelle()
+    ouvrirFenetre(function(p)
+        Fenetre.rafraichir()
+        egal(0, #Fenetre.lignes)
+        egal(Fenetre.FIL_VIDE_TITRE, p.t2)
+        egal('titre', p.g2)
+        local morceaux = {}
+        for i = 3, D.lignes do
+            if p['t' .. i] ~= '' then
+                egal('note', p['g' .. i], 'ligne ' .. i)
+                local l = { genre = 'note', texte = p['t' .. i] }
+                vrai(Fil.occupe(l) <= D.texteFil - Fil.MARGE, string.format('dans la largeur (%.0f) : %s', Fil.occupe(l), l.texte))
+                vrai(not l.texte:find('…', 1, true), 'sans « … » : ' .. l.texte)
+                morceaux[#morceaux + 1] = l.texte
+            end
+        end
+        vrai(#morceaux >= 2, 'plus d\'une ligne : ' .. #morceaux)
+        egal(Fenetre.FIL_VIDE, table.concat(morceaux, ' '), "l'aide entière")
+        -- Une demande : le fil la montre, l'aide s'en va.
+        Conversation.ajouterDemande(Moteur.courante, 'Bonjour')
+        Fenetre.rafraichir()
+        egal('Bonjour', p.t1)
+        for i = 3, D.lignes do
+            vrai(p['t' .. i] == '' or p['g' .. i] ~= 'note', "plus d'aide : ligne " .. i)
+        end
+    end)
+end)
+
+essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaque message de la fenêtre y tient en entier, les autres finissent par « … », l'infobulle les donne", function()
+    egal(2, Fenetre.LIGNES_BANDEAU)
+    local place = D.bandeau - Fil.MARGE
+    -- Les messages de la fenêtre (mesurés par Metriques, en petit).
+    local messages = { Fenetre.CLAUDE_TRAVAILLE, Fenetre.CHOISIR_CONVERSATION, Fenetre.NOTE_AUTRE_PHOTO, Fenetre.PAS_D_IMAGE,
+        Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE.proposer .. '.', Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE.appliquer .. '.',
+        "Écrivez une demande avant d'envoyer." }
+    for _, m in ipairs(messages) do
+        local montre = Fenetre.texteBandeau(m, D.bandeau)
+        egal(m, (montre:gsub('\n', ' ')), 'en entier : ' .. m)
+        local lignes = select(2, montre:gsub('\n', '')) + 1
+        vrai(lignes <= 2, m .. ' : ' .. lignes .. ' lignes')
+        for ligne in (montre .. '\n'):gmatch('([^\n]*)\n') do
+            vrai(Fil.largeur(ligne, 'petit') <= place, string.format('%s : %.0f pour %d', ligne, Fil.largeur(ligne, 'petit'), place))
+        end
+    end
+    -- Plus long (un refus du moteur, une aide) : deux lignes, la seconde finie par « … ».
+    local long = "Aucune photo active : choisissez dans Lightroom la photo à retoucher vous-même, puis cliquez « Je le fais »."
+    local montre = Fenetre.texteBandeau(long, D.bandeau)
+    egal(1, select(2, montre:gsub('\n', '')), 'deux lignes')
+    egal('…', montre:sub(-#'…'))
+    egal('', Fenetre.texteBandeau('', D.bandeau))
+    -- Les photos jointes : « cliquer pour retirer » reste au bout, les noms se coupent avant (comme
+    -- la troncature au milieu d'avant le lot B4).
+    local suite = '  ·  cliquer pour retirer'
+    egal('1 photo jointe : a.jpg · cliquer pour retirer', (Fenetre.texteBandeau('1 photo jointe : a.jpg', D.bandeau, suite):gsub('\n', ' ')))
+    local noms = {}
+    for k = 1, 12 do
+        noms[k] = 'DSCF49' .. (60 + k) .. '.RAF'
+    end
+    local jointes = '12 photos jointes : ' .. table.concat(noms, ', ')
+    local coupe = Fenetre.texteBandeau(jointes, D.bandeau, suite)
+    egal(1, select(2, coupe:gsub('\n', '')), 'deux lignes : ' .. coupe)
+    local joint = (coupe:gsub('\n', ' '))
+    egal('… · cliquer pour retirer', joint:sub(-#'… · cliquer pour retirer'), coupe)
+    egal(1, (joint:find('12 photos jointes : DSCF49', 1, true)), coupe)
+    for ligne in (coupe .. '\n'):gmatch('([^\n]*)\n') do
+        vrai(Fil.largeur(ligne, 'petit') <= place, ligne)
+    end
+    -- Dans la fenêtre : trois variantes de deux lignes, petites, à la largeur du bandeau.
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.nouvelle()
+    ouvrirFenetre(function(p, contenu)
+        local message = liee(contenu, 'static_text', 'message')
+        egal(2, message.args.height_in_lines)
+        egal(Fenetre.POLICES.petit, message.args.font)
+        egal(nil, message.args.truncation, 'pas de troncature sur deux lignes : la coupe est faite')
+        p.message = long
+        egal(montre, S.evaluer(message.args.title, p))
+        egal(long, valeur(message, 'tooltip', p), "l'infobulle, en entier")
+        vrai(S.montreeDansFenetre(message))
+        p.message = ''
+        -- Les photos jointes, dans leur variante : la suite au bout.
+        local variante = liee(contenu, 'static_text', 'jointes')
+        egal(2, variante.args.height_in_lines)
+        p.jointes = jointes
+        egal(coupe, S.evaluer(variante.args.title, p))
+        p.jointes = ''
+        -- Le bandeau dans la rangée du bas : sa hauteur tient dans la zone de saisie.
+        vrai(hauteur(rangeeDe(contenu, message)) <= D.saisie - D.filet - (12 + 26 + 8 + 52 + 8), 'la rangée du bas dans la saisie')
+    end)
+end)
+
+essai('Carnet : le tableau, en Menlo, aligné et dans 518 points ; la page dépasse la grille, elle se lit par ▲ ▼', function()
+    -- Six mois (dont un changement d'année, les mois avec leur année) et des libellés de 40 caractères :
+    -- la colonne Défaut se resserre, le tableau reste aligné et tient dans le fil.
+    local mois, defauts = {}, {}
+    for k = 1, 6 do
+        mois[k] = { cle = 'm' .. k, annee = k < 4 and 2025 or 2026, court = ({ 'oct.', 'nov.', 'déc.', 'janv.', 'févr.', 'mars' })[k] }
+    end
+    for k = 1, 4 do
+        local par = {}
+        for m = 1, 6 do
+            par[m] = { n = k, sur = 12 }
+        end
+        defauts[k] = { code = 'd' .. k, libelle = string.rep('Libellé très long ', 3):sub(1, 40), par_mois = par }
+    end
+    local page = { photos = 30, mois = mois, defauts = defauts, progresse = {}, recule = {}, a_travailler = {}, titres = Carnet.TITRES }
+    local lignes = Fil.lignesCarnet(page, D.texteFil, Fenetre.TITRE_CARNET)
+    local tableau = {}
+    for _, l in ipairs(lignes) do
+        if l.genre == 'outil' then
+            tableau[#tableau + 1] = l
+        end
+    end
+    egal(5, #tableau)
+    for _, l in ipairs(tableau) do
+        egal(Texte.longueur(tableau[1].texte), Texte.longueur(l.texte), 'aligné : ' .. l.texte)
+        vrai(Fil.occupe(l) <= D.texteFil - Fil.MARGE, string.format('dans le fil : %.0f', Fil.occupe(l)))
+        contient(l.texte, '  ', 'colonnes séparées')
+    end
+    contient(tableau[1].texte, 'oct. 2025')
+    contient(tableau[1].texte, 'mars 2026')
+    vrai(tableau[2].texte:find('…', 1, true), 'libellé resserré : ' .. tableau[2].texte)
+    -- Sans resserrement possible de plus : au moins LIBELLE_CARNET_MIN caractères pour le libellé.
+    local _, coupe = tableau[2].texte:find('…', 1, true)
+    vrai(Texte.longueur(tableau[2].texte:sub(1, coupe)) >= Fil.LIBELLE_CARNET_MIN, 'libellé lisible')
+end)
 -- Fin -------------------------------------------------------------------------------------------------
 
 Notation.proposition = propositionVraie

@@ -118,9 +118,9 @@ Lightroom sous « Claude · … ». Puis la leçon (voir Leçon de la photo).
 Après la retouche d'une photo, ou après « J'ai fini » : résumé court, proposition de cadre s'il y \
 en a une, puis photo_lesson en dernier. Trois points, lumière, couleur, composition : ce qui \
 manquait, chiffres à l'appui, et ce qui l'aurait évité à la prise de vue (réglage du boîtier \
-seulement s'il est lu). La fenêtre la montre en carte : ne la redis pas, rien après. Une seule \
-leçon par photo et par conversation. Pas de leçon après une proposition seule (Proposer d'abord, \
-ouverture), une notation, un classement ou une série, ni avec la ligne « [Sans leçon] ».
+seulement s'il est lu). La fenêtre la montre dans l'onglet Leçon : ne la redis pas, rien après. \
+Une seule leçon par photo et par conversation. Pas de leçon après une proposition seule (Proposer \
+d'abord, ouverture), une notation, un classement ou une série, ni avec la ligne « [Sans leçon] ».
 ]]
 
 -- Les lignes coupées par « \ » dans le texte ci-dessus sont recollées.

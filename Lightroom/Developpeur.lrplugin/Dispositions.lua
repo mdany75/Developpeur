@@ -11,7 +11,8 @@
 -- 1 280 × 800 (demandé par Dany), et son contenu de 1 278 × 766 (constaté le 21 octobre 2026, D7 :
 -- barre de titre de 33, marge de 1 à gauche, à droite et en bas, aucune en haut) ; les colonnes
 -- (volet de 183 et son filet, centre de 630, filet et colonne droite de 463) ; `lignes` et
--- `hauteurLigne` (la grille du fil), `fil` (sa largeur utile), `cases` et `hauteurCase` (la grille
+-- `hauteurLigne` (la grille du fil), `fil` (sa largeur utile), `auteur`, `ecartAuteur` et `texteFil`
+-- (la colonne auteur, son écart et le texte d'une ligne du fil), `cases` et `hauteurCase` (la grille
 -- de la liste des conversations), `apercu` et `apercuHauteur` (le cadre 3:2 de l'aperçu, et son
 -- image « aucun aperçu », scripts/images-vides.swift), `onglets` (les segments, dans leur ordre),
 -- `ongletParDefaut` (Note, montré à l'ouverture), `ongletProposition` et `ongletNotation` (onglet
@@ -49,9 +50,12 @@ Dispositions.TAILLES = {
     entete = 68, barre = 30, saisie = 147,
     -- Le fil (à recaler) : 23 lignes de 21 points, sous une marge de 20. Le contenu de 766 (D7) a un
     -- point de plus que celui de 765 du plan : il va à la marge du bas du fil, où il ne gêne rien.
-    -- La colonne auteur et la hauteur de 21 de chaque ligne viennent au lot B4 : la grille garde ici
-    -- sa hauteur réservée.
+    -- Chaque ligne : la colonne auteur (« Vous », « Claude », l'heure) de 60, un écart de 12, puis
+    -- le texte (maquette) ; « Pourquoi ? » à droite d'une étape, un carré small de 80 (constaté le
+    -- 21 octobre 2026, D6 : bezel de 15 dans une case de 21), comme les boutons d'actions (« ☆ Voir
+    -- la note », « Leçon de la photo »), aux largeurs de leurs titres en petit.
     lignes = 23, hauteurLigne = 21, margeHautFil = 20,
+    auteur = 60, ecartAuteur = 12, pourquoi = 80, voirNote = 96, voirLecon = 116, ecartActions = 8,
     -- La liste des conversations (à recaler) : 12 cases de 40 points.
     cases = 12, hauteurCase = 40,
     -- L'aperçu commun aux quatre onglets : un cadre 3:2 de 330 × 220, sa vignette en 2x (660 × 440
@@ -60,8 +64,9 @@ Dispositions.TAILLES = {
     -- Le panneau de la colonne droite (435), son intérieur (405) et celui des cartes (379, au lot B5).
     panneau = 435, interieur = 405, carte = 379,
     -- Les lignes des cartes (provisoires jusqu'au lot 18) : les critères de la carte Note, le texte
-    -- de la proposition, de l'étape (onglet Aperçu) et de la leçon.
-    criteres = 11, propLignes = 20, etapeLignes = 20, leconLignes = 20,
+    -- de la proposition, de l'étape (onglet Aperçu) et de la leçon (en 12 points, sur carte-lecon
+    -- de 350 : 12 + titre + 6 + 18 lignes + 6 + boutons, et le bas de la carte).
+    criteres = 11, propLignes = 20, etapeLignes = 20, leconLignes = 18,
     -- Le cadre d'un square_button dépasse son bezel visible de 2 points (constaté le 21 octobre 2026,
     -- D5 : height = bezel + 2 ; Fenetre.bouton, clé `bezel`).
     margeBezel = 2,
@@ -329,6 +334,8 @@ function Dispositions.dimensions()
     D.info = D.fil - (8 + 6 + D.voyantClaude) - 14 - (8 + 6 + D.voyantLightroom)
     D.hauteurFil = D.hauteurContenu - (D.entete + D.filet) - D.barre - D.saisie
     D.grille = D.lignes * D.hauteurLigne
+    -- Le texte d'une ligne du fil (518 : Fenetre.largeurTexte), après la colonne auteur et son écart.
+    D.texteFil = D.fil - D.auteur - D.ecartAuteur
     -- ▲ ▼ de la barre et ◀ ▶ de l'aperçu (bezel de 22), puis Fin.
     D.fleche = 26
     D.fin = 36
@@ -372,6 +379,11 @@ function Dispositions.dimensions()
     D.largeurNote = D.interieur - 24
     D.largeurProposition = D.interieur - 24
     D.largeurEtape = D.interieur - 24
+    -- La carte de la leçon (Vues.lecon), sur son image : son texte à l'intérieur de la carte (379),
+    -- à 13 du bord (12 de marge et le bord de 1) ; « Détail… » en carré.
+    D.largeurLecon = D.carte
+    D.margeCarte = math.floor((D.interieur - D.carte) / 2)
+    D.detail = 70
     return D
 end
 
@@ -423,7 +435,8 @@ end
 -- La colonne droite : sur son aplat, le panneau en image, les segments à cheval sur son bord ;
 -- dedans, l'aperçu commun, la rangée ◀ légende ▶ · ⤢ Agrandir, puis les quatre variantes
 -- superposées des onglets (les cartes actuelles posées telles quelles, au lot B5 sur leurs
--- images) : la carte de l'étape dans Aperçu, la proposition, la carte Note, une aide dans Leçon.
+-- images) : la carte de l'étape dans Aperçu, la proposition, la carte Note, et la carte de la
+-- leçon dans Leçon, sur son image (lot B4).
 local function droite(f, F, D)
     local C = F.COULEURS
     local largeur = D.interieur
@@ -451,7 +464,7 @@ local function droite(f, F, D)
                         variante(f, F, largeur, 'apercu', function(fm) return { Vues.etape(fm, F, largeur, D) } end),
                         variante(f, F, largeur, 'proposition', function(fm) return { Vues.proposition(fm, F, largeur, D.propLignes) } end),
                         variante(f, F, largeur, 'notation', function(fm) return { Vues.notation(fm, F, largeur, D) } end),
-                        variante(f, F, largeur, 'lecon', function(fm) return { Vues.leconProvisoire(fm, F, largeur) } end),
+                        variante(f, F, largeur, 'lecon', function(fm) return { Vues.lecon(fm, F, largeur, D) } end),
                     },
                 },
             },
