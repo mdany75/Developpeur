@@ -7,7 +7,7 @@
 --   reglages    {photo?, cles, details?, toutes?} → valeurs actuelles, profil, recadrage, appareil (et, avec
 --                                          details, courbes, masques, couleurs ponctuelles, taches,
 --                                          classement dans la Bibliothèque)
---   apercu      {photo?, taille, cles, comparer?, point_af?} → JPEG rendu avec les réglages actuels
+--   apercu      {photo?, taille, cles, comparer?, point_af?, entier?} → JPEG rendu avec les réglages actuels
 --                                          (chemin d'un fichier temporaire, que le serveur lit puis
 --                                          efface) ; taille 0 = pleine résolution ; comparer =
 --                                          'avantClaude' ou 'etapePrecedente' rend aussi l'état d'avant
@@ -17,7 +17,15 @@
 --                                          claude, vous }], listes = { masques, taches, yeux_rouges =
 --                                          { depart, vous } }, restent, rien_change } ; point_af : la
 --                                          photo décrite comme pour les vignettes (point de mise au
---                                          point) et point_af_toujours
+--                                          point) et point_af_toujours ; entier (Composition lue,
+--                                          1.3 : read_composition) : l'image entière, sans son
+--                                          cadre (retiré puis remis : deux étapes « Claude ·
+--                                          composition », aucune sans recadrage ; la pause et la
+--                                          protection des photos ne l'arrêtent que s'il faut
+--                                          écrire), image_entiere = true, dimensions = { largeur,
+--                                          hauteur } de l'image affichée entière, cadre_actuel =
+--                                          Recadrage.lire du cadre (absent sans recadrage) ; refusé
+--                                          avec comparer ou point_af, et sur une photo agrandie
 --   appliquer   {photos?|selection?, reglages, booleens?, profil?, profil_marque?, profil_variantes?, profil_absent_sur?, profil_look?,
 --                recadrage?, recalages?, courbes?, couleurs_ponctuelles?, balance?, auto_ton?, flou_objectif?,
 --                preset?, quantite_preset?, melange_nb_auto?, profil_objectif?, reperes?, rotation?,
@@ -34,7 +42,7 @@
 --                                          rendre, les deux rendus du recalage
 --   recadrer    {photos, recadrage, recalages, completer?, etape, raison?, confirme} → cadre demandé,
 --                                          sans les coins vides d'Upright et de la perspective
---   essayer     {action, photo?, taille, comparer?, instantane?, exercice?, raison?, sans_rendu?, …}
+--   essayer     {action, photo?, taille, comparer?, instantane?, exercice?, raison?, sans_rendu?, entier?, …}
 --                                       → applique, rend, puis remet comme avant ; instantane : rangée
 --                                          aussi en instantané (variante) ; exercice (« Je le fais »,
 --                                          1.3, exige instantane) : départ et version de Claude gardés
@@ -42,7 +50,16 @@
 --                                          (raison : le step_name de preview_settings), état d'après
 --                                          Claude noté ; refusé si rien ne change ;
 --                                          réponse exercice = { instantane } et raw ; sans_rendu :
---                                          aucun rendu (chemin absent)
+--                                          aucun rendu (chemin absent) ; entier (Composition lue,
+--                                          1.3), avec un recadrage proposé (ni retiré, ni sans_rendu,
+--                                          ni exercice ; action appliquer) : le cadre gardé par
+--                                          Lightroom relu après le rendu de la proposition
+--                                          (cadre_propose, Recadrage.lire ; absent s'il n'en garde
+--                                          aucun), dimensions, et l'image entière sans ce cadre
+--                                          (chemin_entier ; troisième étape « Claude · essai : image
+--                                          entière ») ; si elle ne se rend pas, la proposition part
+--                                          quand même, sans chemin_entier, avec la remarque « Image
+--                                          entière non rendue : … »
 --   presets     {filtre?, limite}       → paramètres prédéfinis de développement
 --   creerPreset {nom, photo?, cles, inclure} → réglages d'une photo, pour un paramètre prédéfini
 --   diagnostic  {modules?}              → fonctions du SDK offertes par cette version de Lightroom
