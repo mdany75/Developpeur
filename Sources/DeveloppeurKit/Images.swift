@@ -64,7 +64,8 @@ public enum PreviewImages {
         let cote = max(16, Double(min(width, height)) * 0.06)
         let trait = max(2, cote / 14)
         // Le repère de CoreGraphics part du bas.
-        let carre = CGRect(x: point.x * Double(width) - cote / 2, y: (1 - point.y) * Double(height) - cote / 2, width: cote, height: cote)
+        let cx = Double(point.x) * Double(width), cy = (1 - Double(point.y)) * Double(height)
+        let carre = CGRect(x: cx - cote / 2, y: cy - cote / 2, width: cote, height: cote)
         context.setStrokeColor(CGColor(red: 0, green: 0, blue: 0, alpha: 0.6))
         context.setLineWidth(trait + 2)
         context.stroke(carre)

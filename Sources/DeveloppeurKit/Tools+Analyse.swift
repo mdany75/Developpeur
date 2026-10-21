@@ -138,8 +138,8 @@ extension ToolHandler {
             // sur l'image avec af_point (pour noter) ou si l'utilisateur le veut en tout temps
             // (préférence du module). Les mesures sont prises avant le carré.
             if let af = Self.pointAF(result["photo"], lecteur: lecteurAF) {
-                var point: [String: JSONValue] = ["x": .number((af.point.x * 1000).rounded() / 1000),
-                                                  "y": .number((af.point.y * 1000).rounded() / 1000)]
+                let x = (Double(af.point.x) * 1000).rounded() / 1000, y = (Double(af.point.y) * 1000).rounded() / 1000
+                var point: [String: JSONValue] = ["x": .number(x), "y": .number(y)]
                 if let nettete = Detail.nettete(decodee, autour: af.point) { point["nettete"] = .number((nettete * 10).rounded() / 10) }
                 if af.avertissement { point["appareil"] = "mise au point signalée manquée" }
                 if args.bool("af_point") == true || afToujours, let marquee = PreviewImages.marquerPoint(decodee, af.point, manque: af.avertissement) {
