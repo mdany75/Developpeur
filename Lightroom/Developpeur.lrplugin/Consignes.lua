@@ -144,7 +144,7 @@ Consignes.invites = {
         message = "Retouche cette photo prise à ISO élevé : le bruit d'abord (débruitage IA s'il est fort), puis les ombres, les couleurs et la netteté, sans lisser les détails." },
     -- Composition (1.3) : lue sur l'image entière (read_composition), le cadre proposé et montré,
     -- appliqué seulement par Accepter ; sans chiffre, comme les autres invites. Avant Sports : Sports
-    -- reste la dernière invite, le menu Style à sa droite.
+    -- reste la dernière invite (le menu Style est sous le champ, avec son étiquette).
     { id = 'composition', titre = "Composition",
         message = "Lis la composition de la photo active (horizon, tiers, espace devant le sujet) et propose un recadrage, sans l'appliquer ; dis la règle en une phrase." },
     { id = 'sports', titre = "Sports",

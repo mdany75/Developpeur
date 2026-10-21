@@ -114,7 +114,9 @@
 --   notation    {action, passe?, propositions?, poser?, photos?} → notes proposées par Claude,
 --                                          rangées pour la carte Note : proposer (jamais 5
 --                                          étoiles ; posées aussi avec poser, à la demande de
---                                          Dany), lire
+--                                          Dany), lire, remettre (la recette seule : remet la
+--                                          proposition d'avant son étape, sans rien écrire au
+--                                          catalogue)
 --   lecon       {action, photo?, photos?, lecon?} → leçons des photos (1.3), rangées dans
 --                                          carnet.json : garder (lecon = {points, indices?} :
 --                                          trois points, un par axe, lumiere, couleur,
