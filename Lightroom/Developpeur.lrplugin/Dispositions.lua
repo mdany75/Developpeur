@@ -14,6 +14,10 @@
 -- une bascule automatique), `propLignes` (lignes de la proposition), `etapeLignes` (lignes du texte
 -- de la carte Pourquoi ?), `criteres` (lignes des critères de la carte Note) ; les autres sont des
 -- largeurs de pièces et des nombres de lignes.
+--
+-- Pour la fenêtre B (1.3, lots B3 à B5) : ses images (Dispositions.IMAGES) et ses deux apparences,
+-- claire et sombre (Dispositions.APPARENCES, Dispositions.PALETTES), avec Dispositions.image et
+-- Dispositions.couleurs ; la fenêtre actuelle ne s'en sert pas encore.
 
 local Vues = require 'Vues'
 
@@ -36,9 +40,11 @@ Dispositions.TAILLES = { lignes = 42, fil = 900, liste = 250, droite = 340, aper
 -- en pixels (relevé dans le code de Lightroom, AgPictureView, sans avoir été vu). Tailles de la
 -- maquette « B · Conversation claire » ; les hauteurs du panneau et des
 -- cartes sont recalées au lot 18. Aucune image pour les fonds ni pour les filets : ce sont des
--- aplats (f:picture sans value, à background_color). Après un changement :
--- luajit scripts/gabarits.lua | swift scripts/images-fenetre.swift Lightroom/Developpeur.lrplugin
--- (Tests/Lua/Fenetre/essais-images.lua vérifie chaque fichier).
+-- aplats (f:picture sans value, à background_color). Chaque image existe en deux jeux, un par
+-- apparence (Dispositions.APPARENCES : images/ en claire, images/sombre/ en sombre), aux mêmes
+-- tailles ; Dispositions.image donne le chemin du bon jeu. Après un changement des tailles ou des
+-- palettes : luajit scripts/gabarits.lua | swift scripts/images-fenetre.swift Lightroom/Developpeur.lrplugin
+-- (Tests/Lua/Fenetre/essais-images.lua vérifie chaque fichier des deux jeux).
 local function taille(largeur, hauteur)
     return { largeur = largeur, hauteur = hauteur }
 end
@@ -90,6 +96,128 @@ Dispositions.IMAGES = {
     ['chevron-haut'] = taille(12, 12),
     ['chevron-bas'] = taille(12, 12),
 }
+
+-- Apparences ------------------------------------------------------------------------------------
+
+-- L'apparence de la fenêtre B, claire (la maquette) ou sombre, se choisit dans le Gestionnaire de
+-- modules externes, comme le modèle et l'effort (préférence `apparence` de Chemins.defauts, menu
+-- Apparence de PluginInfoProvider.lua ; décision de Dany du 21 octobre 2026). Elle ne règle que ce
+-- que le module dessine : les aplats (fonds et filets), les couleurs des textes et les images. Les
+-- contrôles natifs (boutons, champs, menus, cases, barre de titre) suivent l'apparence de macOS,
+-- quelle que soit celle choisie ici : rien à faire pour eux.
+--
+-- Les apparences, dans l'ordre du menu ; la première est celle par défaut, et toute valeur inconnue
+-- y retombe (Dispositions.apparence). `dossier` : où sont ses images, depuis le dossier du module.
+Dispositions.APPARENCES = {
+    { value = 'claire', title = "Claire", dossier = 'images' },
+    { value = 'sombre', title = "Sombre", dossier = 'images/sombre' },
+}
+
+-- Les couleurs de chaque apparence, en hexadécimal (RRGGBB), aux mêmes clés : la seule table de
+-- chaque palette. Les images (scripts/gabarits.lua puis scripts/images-fenetre.swift) et, au lot
+-- B3, Fenetre.COULEURS (Dispositions.couleurs) en viennent. La claire est la maquette « B ·
+-- Conversation claire » (l'orange et le rouge, gardés de la 1.2). La sombre est à juger à l'œil
+-- (lot 18, si Dany bascule son Mac en sombre) : chacun de ses textes se lit au moins aussi bien
+-- que dans la claire sur les mêmes fonds, et à 4,5:1 au moins là où la claire y est
+-- (essais-images.lua) ; les fonds suivent ceux de macOS en sombre, le contenu plus foncé que le
+-- reste.
+Dispositions.PALETTES = {
+    claire = {
+        -- Textes : le texte, les gris (secondaire, en-têtes, sous-titre de la conversation
+        -- choisie), le bleu (Vous, liens), Menlo (outils), la coche des passes, l'orange
+        -- (activité, alertes), le rouge (erreurs), l'ambre (plafond, étoiles pleines) et le blanc
+        -- (sur le bleu).
+        texte = '1D1D1F', gris = '6B6B6B', grisEntete = '5F5F5F', sousTitreChoisi = '505050', bleu = '0A64D8',
+        mono = '3D3D45', coche = '1F7A35', orange = 'E0800D', rouge = 'D12E2E', ambre = 'A86200', blanc = 'FFFFFF',
+        -- Aplats : le contenu (en-tête, fil, barre), le volet et la zone de saisie, la colonne droite.
+        fondContenu = 'FFFFFF', fondVolet = 'F2F2F2', fondDroite = 'ECECEC',
+        -- Filets en aplats de 1 pt : bord du volet et dessus de la saisie, bord de la colonne
+        -- droite, dessous de l'en-tête, dessus de la barre, dessus du plafond de la carte Note.
+        filetVolet = 'D2D2D2', filetDroite = 'C9C9C9', filetEntete = 'E2E2E2', filetBarre = 'EBEBEB',
+        filetPlafond = 'E3E3E3',
+        -- Images : le panneau, les cartes, les segments, la conversation choisie, la pastille
+        -- verte, le contour (étoile vide, chevron des passes, pastille grise) et le bouton bleu
+        -- (normal, enfoncé, inactif).
+        fondPanneau = 'FFFFFF', bordPanneau = 'C9C9C9', fondCarte = 'FAFAFA', bordCarte = 'D9D9D9',
+        fondSegment = 'FFFFFF', bordSegment = 'B5B5B5', filetSegment = 'D0D0D0', selection = 'DADADA',
+        pastille = '2DA44E', contour = '8A8A8A', bleuBouton = '0A64D8', bordBleu = '0A5BC4', bleuPresse = '084A9E',
+        bleuInactif = '9DBDEB', bordBleuInactif = '88AEE2',
+    },
+    sombre = {
+        texte = 'E8E8E8', gris = '9A9A9A', grisEntete = 'A6A6A6', sousTitreChoisi = 'C2C2C2', bleu = '5AA2F6',
+        mono = 'C8C8D0', coche = '3FB950', orange = 'E8963A', rouge = 'F27A72', ambre = 'E0A040', blanc = 'FFFFFF',
+        fondContenu = '1E1E1E', fondVolet = '2A2A2A', fondDroite = '323232',
+        filetVolet = '454545', filetDroite = '4A4A4A', filetEntete = '343434', filetBarre = '2E2E2E',
+        filetPlafond = '3A3A3A',
+        fondPanneau = '1E1E1E', bordPanneau = '4A4A4A', fondCarte = '262626', bordCarte = '404040',
+        fondSegment = '3C3C3C', bordSegment = '5A5A5A', filetSegment = '4E4E4E', selection = '3A3A3A',
+        pastille = '3FB950', contour = '8E8E8E', bleuBouton = '1F6FDB', bordBleu = '1A62C4', bleuPresse = '17559F',
+        bleuInactif = '2B3F5C', bordBleuInactif = '34496A',
+    },
+}
+
+local function parValeur(valeur)
+    for _, a in ipairs(Dispositions.APPARENCES) do
+        if a.value == valeur then
+            return a
+        end
+    end
+    return nil
+end
+
+-- L'apparence à employer pour une valeur de la préférence : elle-même si elle est connue, sinon
+-- la première (claire), comme Moteur.modeleEtEffort pour le modèle et l'effort.
+function Dispositions.apparence(valeur)
+    local a = parValeur(valeur) or Dispositions.APPARENCES[1]
+    return a.value
+end
+
+-- Éléments du menu Apparence du Gestionnaire de modules externes (tables neuves).
+function Dispositions.itemsApparences()
+    local r = {}
+    for _, a in ipairs(Dispositions.APPARENCES) do
+        r[#r + 1] = { title = a.title, value = a.value }
+    end
+    return r
+end
+
+-- Le chemin d'une image de Dispositions.IMAGES dans le jeu de l'apparence, depuis le dossier du
+-- module (« images/loupe.png », « images/sombre/loupe.png ») : à passer à Chemins.ressource, comme
+-- Dispositions.imageVide. Une image inconnue est une erreur.
+function Dispositions.image(nom, apparence)
+    if not Dispositions.IMAGES[nom] then
+        error("image inconnue de Dispositions.IMAGES : " .. tostring(nom), 2)
+    end
+    return parValeur(Dispositions.apparence(apparence)).dossier .. '/' .. nom .. '.png'
+end
+
+-- Les couleurs de l'apparence, en triplets { r, g, b } de 0 à 1 (une table neuve, des triplets
+-- neufs), pour LrColor(r, g, b) : Fenetre.COULEURS les reprendra au lot B3. Aucune couleur n'est
+-- créée ici (Dispositions se charge sans SDK, liens.lua et scripts/gabarits.lua compris).
+function Dispositions.couleurs(apparence)
+    local r = {}
+    for cle, hex in pairs(Dispositions.PALETTES[Dispositions.apparence(apparence)]) do
+        r[cle] = { tonumber(hex:sub(1, 2), 16) / 255, tonumber(hex:sub(3, 4), 16) / 255, tonumber(hex:sub(5, 6), 16) / 255 }
+    end
+    return r
+end
+
+-- Ce que lit scripts/images-fenetre.swift (par scripts/gabarits.lua, en JSON) : les tailles des
+-- images, puis, pour chaque apparence, le dossier de ses images et sa palette. Tables neuves.
+function Dispositions.gabarits()
+    local images, apparences = {}, {}
+    for nom, t in pairs(Dispositions.IMAGES) do
+        images[nom] = { largeur = t.largeur, hauteur = t.hauteur }
+    end
+    for _, a in ipairs(Dispositions.APPARENCES) do
+        local couleurs = {}
+        for cle, hex in pairs(Dispositions.PALETTES[a.value]) do
+            couleurs[cle] = hex
+        end
+        apparences[a.value] = { dossier = a.dossier, couleurs = couleurs }
+    end
+    return { images = images, apparences = apparences }
+end
 
 -- Les dimensions : une table neuve, avec `nom`, et les largeurs tirées des précédentes.
 function Dispositions.dimensions()

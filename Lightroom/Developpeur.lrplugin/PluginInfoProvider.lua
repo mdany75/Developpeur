@@ -3,9 +3,9 @@
 --   - la liaison avec Claude : état, boutons, mode « Proposer d'abord », réglages (dont le carnet de
 --     progrès, 1.3), garde-fous et diagnostic ;
 --   - la fenêtre Claude : chemins de Claude Code et du connecteur MCP-Développeur, modèle, effort,
---     nouvelle conversation par photo, proposition à l'ouverture, avant/après de chaque étape et
---     leçon de la photo (1.3), fermeture de Claude Code après inactivité, raccourci clavier,
---     dossiers.
+--     apparence (claire ou sombre, 1.3), nouvelle conversation par photo, proposition à
+--     l'ouverture, avant/après de chaque étape et leçon de la photo (1.3), fermeture de Claude
+--     Code après inactivité, raccourci clavier, dossiers.
 -- Les deux sections lisent et écrivent les mêmes préférences du module (Preferences.lua,
 -- Chemins.prefs).
 
@@ -19,6 +19,7 @@ local LrView = import 'LrView'
 
 local Chemins = require 'Chemins'
 local Consignes = require 'Consignes'
+local Dispositions = require 'Dispositions'
 local Fichiers = require 'Fichiers'
 local Liaison = require 'Liaison'
 
@@ -31,6 +32,16 @@ local function photosAuCarnet()
         return "?"
     end
     return string.format("%d photo%s", n, n > 1 and "s" or "")
+end
+
+-- L'apparence de la fenêtre Claude, telle qu'elle sert (Dispositions.apparence) ; une préférence
+-- inconnue est dite à côté de la valeur sur laquelle elle retombe.
+local function apparence(valeur)
+    local retenue = Dispositions.apparence(valeur)
+    if valeur == nil or valeur == retenue then
+        return retenue
+    end
+    return string.format("%s (préférence « %s » inconnue)", retenue, tostring(valeur))
 end
 
 -- Le diagnostic à coller dans la conversation : versions, ports, liaison, dernier échange, dernière
@@ -54,7 +65,8 @@ local function diagnostic()
         string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s, effort %s ; nouvelle conversation par photo : %s",
             tostring(prefs.cheminClaude), tostring(prefs.cheminConnecteur), tostring(prefs.modele), tostring(prefs.effort),
             tostring(prefs.nouvelleParPhoto)) .. " ; proposition à l'ouverture : " .. tostring(prefs.propositionAOuverture)
-            .. " ; avant/après des étapes : " .. tostring(prefs.avantApresEtapes) .. " ; leçon en fin de retouche : " .. tostring(prefs.leconFinRetouche),
+            .. " ; avant/après des étapes : " .. tostring(prefs.avantApresEtapes) .. " ; leçon en fin de retouche : " .. tostring(prefs.leconFinRetouche)
+            .. " ; apparence : " .. apparence(prefs.apparence),
         "Journaux : " .. select(2, Liaison.cheminJournal()) .. " et " .. Chemins.journal(),
         "",
         "Derniers événements :",
@@ -236,6 +248,11 @@ local function sectionFenetre(f, prefs, ligne)
         ligne("Effort :",
             f:popup_menu { value = bind 'effort', items = Consignes.itemsEfforts() },
             f:static_text { title = "le même pour les quatre modèles" }),
+        -- Les fonds, les textes et les images de la fenêtre ; les boutons, les champs et les menus
+        -- suivent l'apparence de macOS (Dispositions.APPARENCES).
+        ligne("Apparence :",
+            f:popup_menu { value = bind 'apparence', items = Dispositions.itemsApparences() },
+            f:static_text { title = "de la fenêtre Claude, à sa prochaine ouverture ; boutons et champs suivent macOS" }),
         ligne("Autre photo :",
             f:checkbox { value = bind 'nouvelleParPhoto',
                 title = "Nouvelle conversation pour une autre photo ou sélection" }),

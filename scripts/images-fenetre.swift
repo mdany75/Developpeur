@@ -1,12 +1,17 @@
 // images-fenetre.swift — dessine les images de la fenêtre Claude (fenêtre B) d'après la maquette
-// « B · Conversation claire » : couleurs, rayons des coins et tracés SVG de ses icônes, avec
-// CoreGraphics et CoreText. Les tailles en points viennent de Dispositions.IMAGES, leur seule source,
-// que scripts/gabarits.lua écrit en JSON sur l'entrée standard. Chaque image est un seul PNG en 2x
-// (2 × la taille en points, 144 ppp), icônes d'image_name comprises, sans paire 1x et @2x :
-// Lightroom l'affiche à sa taille en points (constaté le 21 octobre 2026). Écrit
-// <module>/images/<nom>.png et rien d'autre ; une image de images/ absente de Dispositions.IMAGES
-// est signalée, jamais effacée. Les essais de la fenêtre (Tests/Lua/Fenetre/essais-images.lua)
-// vérifient chaque fichier : présence, taille en pixels et 144 ppp.
+// « B · Conversation claire » : rayons des coins et tracés SVG de ses icônes, avec CoreGraphics et
+// CoreText, en un jeu par apparence (claire et sombre). Tout vient de Dispositions.lua, que
+// scripts/gabarits.lua écrit en JSON sur l'entrée standard : les tailles en points
+// (Dispositions.IMAGES), et pour chaque apparence le dossier de ses images et sa palette
+// (Dispositions.APPARENCES, Dispositions.PALETTES : la palette claire est celle de la maquette).
+// Chaque image est un seul PNG en 2x (2 × la taille en points, 144 ppp), icônes d'image_name
+// comprises, sans paire 1x et @2x : Lightroom l'affiche à sa taille en points (constaté le
+// 21 octobre 2026). Écrit <module>/<dossier>/<nom>.png (images/ en claire, images/sombre/ en
+// sombre) et rien d'autre, après avoir tout vérifié (un dessin par image, des tailles positives,
+// chaque couleur dans chaque palette, en RRGGBB, des dossiers sous le module) ; une image d'un de
+// ces dossiers absente de Dispositions.IMAGES est signalée, jamais effacée. Les essais de la
+// fenêtre (Tests/Lua/Fenetre/essais-images.lua) vérifient chaque fichier des deux jeux : présence,
+// taille en pixels et 144 ppp.
 //
 // Usage : luajit scripts/gabarits.lua | swift scripts/images-fenetre.swift Lightroom/Developpeur.lrplugin
 
@@ -27,25 +32,39 @@ guard CommandLine.arguments.count == 2 else {
     exit(2)
 }
 let module = URL(fileURLWithPath: CommandLine.arguments[1])
-let dossier = module.appendingPathComponent("images")
 
-// Les tailles en points (Dispositions.IMAGES).
+// Ce qu'écrit scripts/gabarits.lua (Dispositions.gabarits) : les tailles en points
+// (Dispositions.IMAGES), puis le dossier et la palette de chaque apparence.
 struct Taille: Decodable {
     let largeur: CGFloat
     let hauteur: CGFloat
+}
+struct Apparence: Decodable {
+    let dossier: String
+    let couleurs: [String: String]
+}
+struct Gabarits: Decodable {
+    let images: [String: Taille]
+    let apparences: [String: Apparence]
 }
 let entree = FileHandle.standardInput.readDataToEndOfFile()
 guard !entree.isEmpty else {
     echec("rien sur l'entrée standard : luajit scripts/gabarits.lua | swift scripts/images-fenetre.swift <module>")
 }
-let tailles: [String: Taille]
+let gabarits: Gabarits
 do {
-    tailles = try JSONDecoder().decode([String: Taille].self, from: entree)
+    gabarits = try JSONDecoder().decode(Gabarits.self, from: entree)
 } catch {
-    echec("tailles illisibles (JSON de scripts/gabarits.lua attendu) : \(error)")
+    echec("gabarits illisibles (JSON de scripts/gabarits.lua attendu) : \(error)")
 }
+let tailles = gabarits.images
 
 // Couleurs -----------------------------------------------------------------------------------------
+
+// Une couleur de palette : six chiffres hexadécimaux (RRGGBB), vérifiés avant tout dessin.
+func estHex(_ s: String) -> Bool {
+    s.count == 6 && s.allSatisfy { $0.isHexDigit }
+}
 
 func hex(_ s: String) -> CGColor {
     let v = UInt32(s, radix: 16)!
@@ -53,7 +72,18 @@ func hex(_ s: String) -> CGColor {
     return CGColor(srgbRed: r, green: g, blue: b, alpha: 1)
 }
 
-let TEXTE = "1D1D1F", BLEU = "0A64D8", BORD_BLEU = "0A5BC4", AMBRE = "A86200", GRIS_ETOILE = "8A8A8A"
+// La palette d'une apparence (Dispositions.PALETTES), lue par clé quand les dessins se préparent :
+// une clé absente est notée (manquantes), pour refuser avant d'écrire quoi que ce soit.
+final class Palette {
+    let valeurs: [String: String]
+    private(set) var manquantes: Set<String> = []
+    init(_ valeurs: [String: String]) { self.valeurs = valeurs }
+    subscript(_ cle: String) -> String {
+        if let v = valeurs[cle] { return v }
+        manquantes.insert(cle)
+        return "000000"
+    }
+}
 
 // Contexte et écriture ------------------------------------------------------------------------------
 
@@ -74,7 +104,7 @@ func contexte(_ l: CGFloat, _ h: CGFloat) -> CGContext {
 }
 
 // Écrit l'image à 72 × ECHELLE ppp : Lightroom l'affiche alors à sa taille en points.
-func ecrire(_ img: CGImage, _ nom: String) {
+func ecrire(_ img: CGImage, _ nom: String, dans dossier: URL) {
     let url = dossier.appendingPathComponent(nom + ".png")
     guard let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
         echec("écriture impossible : \(url.path)")
@@ -266,130 +296,190 @@ func texte(_ ctx: CGContext, _ s: String, _ police: NSFont, _ couleur: String, c
 }
 
 // Un segment des onglets Aperçu | Proposition | Note | Leçon (le contrôle de la maquette, coupé
-// segment par segment) : fond blanc et texte #1D1D1F 12, ou, choisi, fond #0A64D8 et texte blanc
-// gras (600) 12 ; bord #B5B5B5 en haut et en bas, coins de 6 au bout gauche du premier et au bout
-// droit du dernier ; un filet #D0D0D0 au bord droit de chacun sauf le dernier, gardé sous le segment
-// choisi (la maquette garde les filets de ses voisins).
-func segment(_ titre: String, premier: Bool, dernier: Bool, actif: Bool) -> Dessin {
+// segment par segment) : fond `fondSegment` et texte `texte` 12 (en claire, blanc et #1D1D1F), ou,
+// choisi, fond `bleuBouton` et texte `blanc` gras (600) 12 ; bord `bordSegment` en haut et en bas,
+// coins de 6 au bout gauche du premier et au bout droit du dernier ; un filet `filetSegment` au
+// bord droit de chacun sauf le dernier, gardé sous le segment choisi (la maquette garde les filets
+// de ses voisins). Les couleurs se lisent dans la palette ici, pas au dessin.
+func segment(_ titre: String, premier: Bool, dernier: Bool, actif: Bool, _ p: Palette) -> Dessin {
+    let fond = actif ? p["bleuBouton"] : p["fondSegment"], encre = actif ? p["blanc"] : p["texte"]
+    let filet = p["filetSegment"], bord = p["bordSegment"]
     return { ctx, l, h in
         let r: CGFloat = 6, deborde: CGFloat = 20
         // Ce qui dépasse de l'image (coins d'un bout qui n'est pas arrondi) est coupé.
         let x0 = premier ? 0 : -deborde, x1 = dernier ? l : l + deborde
-        carte(ctx, CGRect(x: x0, y: 0, width: x1 - x0, height: h), rayon: r, fond: actif ? BLEU : "FFFFFF", bord: nil)
+        carte(ctx, CGRect(x: x0, y: 0, width: x1 - x0, height: h), rayon: r, fond: fond, bord: nil)
         if !dernier {
-            ctx.setFillColor(hex("D0D0D0"))
+            ctx.setFillColor(hex(filet))
             ctx.fill(CGRect(x: l - 1, y: 1, width: 1, height: h - 2))
         }
         ctx.addPath(CGPath(roundedRect: CGRect(x: x0 + 0.5, y: 0.5, width: x1 - x0 - 1, height: h - 1),
                            cornerWidth: r - 0.5, cornerHeight: r - 0.5, transform: nil))
-        ctx.setStrokeColor(hex("B5B5B5"))
+        ctx.setStrokeColor(hex(bord))
         ctx.setLineWidth(1)
         ctx.strokePath()
         let police = actif ? NSFont.systemFont(ofSize: 12, weight: .semibold) : NSFont.systemFont(ofSize: 12)
-        texte(ctx, titre, police, actif ? "FFFFFF" : TEXTE, cx: l / 2, cy: h / 2)
+        texte(ctx, titre, police, encre, cx: l / 2, cy: h / 2)
     }
 }
-
-var dessins: [String: Dessin] = [:]
 
 // Le panneau de la colonne droite : la bande du haut (12 points, sous la moitié des segments qui
-// chevauchent son bord) reste transparente, puis le panneau blanc, bord #C9C9C9, coins de 7.
+// chevauchent son bord) reste transparente.
 let BANDE_PANNEAU: CGFloat = 12
-dessins["panneau"] = { ctx, l, h in
-    carte(ctx, CGRect(x: 0, y: BANDE_PANNEAU, width: l, height: h - BANDE_PANNEAU), rayon: 7, fond: "FFFFFF", bord: "C9C9C9")
-}
 
-// Les fonds des cartes : #FAFAFA, bord #D9D9D9, coins de 6.
-for nom in ["carte-note", "carte-proposition", "carte-etape", "carte-lecon"] {
-    dessins[nom] = pleine(fond: "FAFAFA", bord: "D9D9D9", rayon: 6)
-}
+// Les dessins d'une apparence, couleurs lues dans sa palette (clés de Dispositions.PALETTES) au
+// moment de les préparer : une couleur absente est notée par la palette avant tout dessin. Les
+// valeurs entre parenthèses sont celles de la palette claire (la maquette).
+func dessins(_ p: Palette) -> [String: Dessin] {
+    var d: [String: Dessin] = [:]
 
-// Les segments, dans l'ordre de la maquette.
-let segments = [("apercu", "Aperçu"), ("proposition", "Proposition"), ("note", "Note"), ("lecon", "Leçon")]
-for (i, (cle, titre)) in segments.enumerated() {
-    let premier = i == 0, dernier = i == segments.count - 1
-    dessins["seg-" + cle] = segment(titre, premier: premier, dernier: dernier, actif: false)
-    dessins["seg-" + cle + "-actif"] = segment(titre, premier: premier, dernier: dernier, actif: true)
-}
-
-// Le fond de la conversation choisie : #DADADA, coins de 5, sans bord.
-dessins["selection"] = pleine(fond: "DADADA", bord: nil, rayon: 5)
-
-// Les pastilles des voyants : le vert de la maquette, l'orange et le rouge des voyants de la 1.2,
-// et un gris neutre.
-for (nom, couleur) in [("vert", "2DA44E"), ("orange", "E0800D"), ("rouge", "D12E2E"), ("gris", "8A8A8A")] {
-    dessins["pastille-" + nom] = { ctx, l, h in
-        ctx.setFillColor(hex(couleur))
-        ctx.fillEllipse(in: CGRect(x: 0, y: 0, width: l, height: h))
+    // Le panneau (blanc, bord #C9C9C9, coins de 7), sous sa bande transparente.
+    let fondPanneau = p["fondPanneau"], bordPanneau = p["bordPanneau"]
+    d["panneau"] = { ctx, l, h in
+        carte(ctx, CGRect(x: 0, y: BANDE_PANNEAU, width: l, height: h - BANDE_PANNEAU), rayon: 7, fond: fondPanneau,
+              bord: bordPanneau)
     }
+
+    // Les fonds des cartes (#FAFAFA, bord #D9D9D9), coins de 6.
+    for nom in ["carte-note", "carte-proposition", "carte-etape", "carte-lecon"] {
+        d[nom] = pleine(fond: p["fondCarte"], bord: p["bordCarte"], rayon: 6)
+    }
+
+    // Les segments, dans l'ordre de la maquette.
+    let segments = [("apercu", "Aperçu"), ("proposition", "Proposition"), ("note", "Note"), ("lecon", "Leçon")]
+    for (i, (cle, titre)) in segments.enumerated() {
+        let premier = i == 0, dernier = i == segments.count - 1
+        d["seg-" + cle] = segment(titre, premier: premier, dernier: dernier, actif: false, p)
+        d["seg-" + cle + "-actif"] = segment(titre, premier: premier, dernier: dernier, actif: true, p)
+    }
+
+    // Le fond de la conversation choisie (#DADADA), coins de 5, sans bord.
+    d["selection"] = pleine(fond: p["selection"], bord: nil, rayon: 5)
+
+    // Les pastilles des voyants : le vert de la maquette (#2DA44E), l'orange et le rouge des voyants
+    // de la 1.2, et le gris du contour.
+    for (nom, couleur) in [("vert", p["pastille"]), ("orange", p["orange"]), ("rouge", p["rouge"]), ("gris", p["contour"])] {
+        d["pastille-" + nom] = { ctx, l, h in
+            ctx.setFillColor(hex(couleur))
+            ctx.fillEllipse(in: CGRect(x: 0, y: 0, width: l, height: h))
+        }
+    }
+
+    // Le bouton bleu (#0A64D8, bord #0A5BC4, coins de 6), sans texte : Lightroom pose le titre
+    // par-dessus. Enfoncé, plus foncé ; inactif, éteint.
+    d["bouton-bleu"] = pleine(fond: p["bleuBouton"], bord: p["bordBleu"], rayon: 6)
+    d["bouton-bleu-presse"] = pleine(fond: p["bleuPresse"], bord: p["bordBleu"], rayon: 6)
+    d["bouton-bleu-inactif"] = pleine(fond: p["bleuInactif"], bord: p["bordBleuInactif"], rayon: 6)
+
+    // Les étoiles : pleines en ambre (remplies et bordées), vides au trait du contour.
+    d["etoile24-pleine"] = icone(boite: B24, couleur: p["ambre"], trait: 1.5, traits: [ETOILE], pleins: [ETOILE])
+    d["etoile24-vide"] = icone(boite: B24, couleur: p["contour"], trait: 1.4, traits: [ETOILE])
+    d["etoile12-pleine"] = icone(boite: B24, couleur: p["ambre"], trait: 1.5, traits: [ETOILE], pleins: [ETOILE])
+    d["etoile12-vide"] = icone(boite: B24, couleur: p["contour"], trait: 1.8, traits: [ETOILE])
+
+    // La rangée des passes : la coche verte d'une passe faite (#1F7A35), le chevron entre deux passes.
+    d["coche-10"] = icone(boite: B16, couleur: p["coche"], trait: 2.2, traits: [trace("M3.5 8.5l3 3 6-7")])
+    d["chevron-passe"] = icone(boite: CGSize(width: 8, height: 10), couleur: p["contour"], trait: 1.4,
+                               traits: [trace("M2 1.5L6 5l-4 3.5")])
+
+    // La ligne du plafond : le triangle ambre et son point (rempli et bordé, comme le cercle de la
+    // maquette, qui hérite du trait).
+    d["avertissement"] = icone(boite: B16, couleur: p["ambre"], trait: 1.5,
+                               traits: [trace("M8 2.2l6.3 11.1H1.7z"), trace("M8 6.3v3.4"), cercle(8, 11.4, 0.5)],
+                               pleins: [cercle(8, 11.4, 0.5)])
+
+    // La loupe devant le champ Rechercher (#6B6B6B ; bouts arrondis, jointures par défaut).
+    d["loupe"] = icone(boite: B16, couleur: p["gris"], trait: 1.6, jointures: .miter,
+                       traits: [cercle(7, 7, 4.3), trace("M10.2 10.2l3.3 3.3")])
+
+    // Les icônes des boutons sans titre (#1D1D1F) : 📎 et 📋 de la saisie, ▲ ▼ de la barre du fil.
+    d["trombone"] = icone(boite: B16, couleur: p["texte"], trait: 1.4, traits: [
+        trace("M13 7.5l-5.3 5.3a3 3 0 0 1-4.2-4.2l5.6-5.6a2 2 0 0 1 2.8 2.8l-5.5 5.5a1 1 0 0 1-1.4-1.4l4.9-4.9"),
+    ])
+    d["presse-papiers"] = icone(boite: B16, couleur: p["texte"], trait: 1.4, bouts: .butt, traits: [
+        rect(3.5, 3, 9, 11, rx: 1.5), rect(6, 1.8, 4, 2.6, rx: 0.8),
+    ])
+    d["chevron-haut"] = icone(boite: B16, couleur: p["texte"], trait: 1.6, traits: [trace("M4 10l4-4 4 4")])
+    d["chevron-bas"] = icone(boite: B16, couleur: p["texte"], trait: 1.6, traits: [trace("M4 6l4 4 4-4")])
+
+    return d
 }
 
-// Le bouton bleu (#0A64D8, bord #0A5BC4, coins de 6), sans texte : Lightroom pose le titre blanc
-// par-dessus. Enfoncé, plus foncé ; inactif, pâli.
-dessins["bouton-bleu"] = pleine(fond: BLEU, bord: BORD_BLEU, rayon: 6)
-dessins["bouton-bleu-presse"] = pleine(fond: "084A9E", bord: BORD_BLEU, rayon: 6)
-dessins["bouton-bleu-inactif"] = pleine(fond: "9DBDEB", bord: "88AEE2", rayon: 6)
+// Vérifications, avant d'écrire quoi que ce soit ------------------------------------------------------
 
-// Les étoiles : pleines en ambre (remplies et bordées), vides au trait gris.
-dessins["etoile24-pleine"] = icone(boite: B24, couleur: AMBRE, trait: 1.5, traits: [ETOILE], pleins: [ETOILE])
-dessins["etoile24-vide"] = icone(boite: B24, couleur: GRIS_ETOILE, trait: 1.4, traits: [ETOILE])
-dessins["etoile12-pleine"] = icone(boite: B24, couleur: AMBRE, trait: 1.5, traits: [ETOILE], pleins: [ETOILE])
-dessins["etoile12-vide"] = icone(boite: B24, couleur: GRIS_ETOILE, trait: 1.8, traits: [ETOILE])
-
-// La rangée des passes : la coche verte d'une passe faite, le chevron entre deux passes.
-dessins["coche-10"] = icone(boite: B16, couleur: "1F7A35", trait: 2.2, traits: [trace("M3.5 8.5l3 3 6-7")])
-dessins["chevron-passe"] = icone(boite: CGSize(width: 8, height: 10), couleur: GRIS_ETOILE, trait: 1.4,
-                                 traits: [trace("M2 1.5L6 5l-4 3.5")])
-
-// La ligne du plafond : le triangle ambre et son point (rempli et bordé, comme le cercle de la
-// maquette, qui hérite du trait).
-dessins["avertissement"] = icone(boite: B16, couleur: AMBRE, trait: 1.5,
-                                 traits: [trace("M8 2.2l6.3 11.1H1.7z"), trace("M8 6.3v3.4"), cercle(8, 11.4, 0.5)],
-                                 pleins: [cercle(8, 11.4, 0.5)])
-
-// La loupe devant le champ Rechercher (bouts arrondis, jointures par défaut).
-dessins["loupe"] = icone(boite: B16, couleur: "6B6B6B", trait: 1.6, jointures: .miter,
-                         traits: [cercle(7, 7, 4.3), trace("M10.2 10.2l3.3 3.3")])
-
-// Les icônes des boutons sans titre : 📎 et 📋 de la saisie, ▲ ▼ de la barre du fil.
-dessins["trombone"] = icone(boite: B16, couleur: TEXTE, trait: 1.4, traits: [
-    trace("M13 7.5l-5.3 5.3a3 3 0 0 1-4.2-4.2l5.6-5.6a2 2 0 0 1 2.8 2.8l-5.5 5.5a1 1 0 0 1-1.4-1.4l4.9-4.9"),
-])
-dessins["presse-papiers"] = icone(boite: B16, couleur: TEXTE, trait: 1.4, bouts: .butt, traits: [
-    rect(3.5, 3, 9, 11, rx: 1.5), rect(6, 1.8, 4, 2.6, rx: 0.8),
-])
-dessins["chevron-haut"] = icone(boite: B16, couleur: TEXTE, trait: 1.6, traits: [trace("M4 10l4-4 4 4")])
-dessins["chevron-bas"] = icone(boite: B16, couleur: TEXTE, trait: 1.6, traits: [trace("M4 6l4 4 4-4")])
-
-// Écriture --------------------------------------------------------------------------------------------
-
-// Toutes les tailles doivent avoir leur dessin, avant d'écrire quoi que ce soit.
-let inconnues = tailles.keys.filter { dessins[$0] == nil }.sorted()
-if !inconnues.isEmpty {
-    echec("aucun dessin pour : \(inconnues.joined(separator: ", ")) (à ajouter dans scripts/images-fenetre.swift)")
-}
-for (nom, t) in tailles where !(t.largeur > 0 && t.hauteur > 0) {
+// Toutes les tailles doivent être positives.
+for (nom, t) in tailles.sorted(by: { $0.key < $1.key }) where !(t.largeur > 0 && t.hauteur > 0) {
     echec("taille invalide pour \(nom) : \(t.largeur) × \(t.hauteur)")
 }
 
-do {
-    try FileManager.default.createDirectory(at: dossier, withIntermediateDirectories: true)
-} catch {
-    echec("dossier impossible : \(dossier.path) (\(error))")
+// Au moins une apparence ; chacune a son dossier, sous le module (relatif, sans « .. »), à elle
+// seule, et des couleurs en RRGGBB.
+let noms = gabarits.apparences.keys.sorted()
+if noms.isEmpty {
+    echec("aucune apparence dans les gabarits (Dispositions.APPARENCES)")
 }
-for nom in tailles.keys.sorted() {
-    let t = tailles[nom]!
-    let ctx = contexte(t.largeur, t.hauteur)
-    dessins[nom]!(ctx, t.largeur, t.hauteur)
-    guard let image = ctx.makeImage() else { echec("image impossible : \(nom)") }
-    ecrire(image, nom)
+var dossiersVus: [String: String] = [:]
+for nom in noms {
+    let a = gabarits.apparences[nom]!
+    let morceaux = a.dossier.split(separator: "/", omittingEmptySubsequences: false)
+    if a.dossier.isEmpty || a.dossier.hasPrefix("/") || morceaux.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) {
+        echec("dossier invalide pour l'apparence \(nom) : « \(a.dossier) » (relatif au module, sans « .. »)")
+    }
+    if let autre = dossiersVus[a.dossier] {
+        echec("dossier « \(a.dossier) » commun aux apparences \(autre) et \(nom)")
+    }
+    dossiersVus[a.dossier] = nom
+    for (cle, valeur) in a.couleurs.sorted(by: { $0.key < $1.key }) where !estHex(valeur) {
+        echec("couleur invalide dans la palette \(nom) : \(cle) = « \(valeur) » (RRGGBB attendu)")
+    }
 }
 
-for nom in dessins.keys.sorted() where tailles[nom] == nil {
-    FileHandle.standardError.write("dessin sans taille dans Dispositions.IMAGES, non écrit : \(nom)\n".data(using: .utf8)!)
+// Les dessins de chaque apparence : toute couleur lue dans la palette, toute image avec son dessin.
+var parApparence: [String: [String: Dessin]] = [:]
+for nom in noms {
+    let palette = Palette(gabarits.apparences[nom]!.couleurs)
+    let d = dessins(palette)
+    if !palette.manquantes.isEmpty {
+        echec("couleur absente de la palette \(nom) : \(palette.manquantes.sorted().joined(separator: ", ")) (Dispositions.PALETTES)")
+    }
+    let inconnues = tailles.keys.filter { d[$0] == nil }.sorted()
+    if !inconnues.isEmpty {
+        echec("aucun dessin pour : \(inconnues.joined(separator: ", ")) (à ajouter dans scripts/images-fenetre.swift)")
+    }
+    parApparence[nom] = d
 }
-let presentes = (try? FileManager.default.contentsOfDirectory(atPath: dossier.path)) ?? []
-for fichier in presentes.sorted() where fichier.hasSuffix(".png") && tailles[String(fichier.dropLast(4))] == nil {
-    FileHandle.standardError.write("image absente de Dispositions.IMAGES, à retirer : images/\(fichier)\n".data(using: .utf8)!)
+
+// Écriture --------------------------------------------------------------------------------------------
+
+var ecrits: [String] = []
+for nom in noms {
+    let a = gabarits.apparences[nom]!
+    let dossier = module.appendingPathComponent(a.dossier)
+    do {
+        try FileManager.default.createDirectory(at: dossier, withIntermediateDirectories: true)
+    } catch {
+        echec("dossier impossible : \(dossier.path) (\(error))")
+    }
+    let d = parApparence[nom]!
+    for image in tailles.keys.sorted() {
+        let t = tailles[image]!
+        let ctx = contexte(t.largeur, t.hauteur)
+        d[image]!(ctx, t.largeur, t.hauteur)
+        guard let rendu = ctx.makeImage() else { echec("image impossible : \(nom) › \(image)") }
+        ecrire(rendu, image, dans: dossier)
+    }
+    ecrits.append("\(a.dossier) (\(nom))")
 }
-print("\(tailles.count) images écrites dans \(dossier.path)")
+
+for image in (parApparence[noms[0]] ?? [:]).keys.sorted() where tailles[image] == nil {
+    FileHandle.standardError.write("dessin sans taille dans Dispositions.IMAGES, non écrit : \(image)\n".data(using: .utf8)!)
+}
+for nom in noms {
+    let a = gabarits.apparences[nom]!
+    let dossier = module.appendingPathComponent(a.dossier)
+    let presentes = (try? FileManager.default.contentsOfDirectory(atPath: dossier.path)) ?? []
+    for fichier in presentes.sorted() where fichier.hasSuffix(".png") && tailles[String(fichier.dropLast(4))] == nil {
+        FileHandle.standardError.write("image absente de Dispositions.IMAGES, à retirer : \(a.dossier)/\(fichier)\n".data(using: .utf8)!)
+    }
+}
+print("\(tailles.count) images écrites par apparence : \(ecrits.joined(separator: ", ")), dans \(module.path)")
