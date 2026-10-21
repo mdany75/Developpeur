@@ -9,7 +9,8 @@
 // 21 octobre 2026). Écrit <module>/<dossier>/<nom>.png (images/ en claire, images/sombre/ en
 // sombre) et rien d'autre, après avoir tout vérifié (un dessin par image, des tailles positives,
 // chaque couleur dans chaque palette, en RRGGBB, des dossiers sous le module) ; une image d'un de
-// ces dossiers absente de Dispositions.IMAGES est signalée, jamais effacée. Les essais de la
+// ces dossiers absente de Dispositions.IMAGES est signalée, jamais effacée, sauf l'image « aucun
+// aperçu » (`vide` des gabarits), rangée là par scripts/images-vides.swift. Les essais de la
 // fenêtre (Tests/Lua/Fenetre/essais-images.lua) vérifient chaque fichier des deux jeux : présence,
 // taille en pixels et 144 ppp.
 //
@@ -43,9 +44,15 @@ struct Apparence: Decodable {
     let dossier: String
     let couleurs: [String: String]
 }
+// L'image « aucun aperçu » (Dispositions.nomImageVide), rangée avec les images de chaque
+// apparence mais dessinée par scripts/images-vides.swift : jamais signalée comme une image de trop.
+struct Vide: Decodable {
+    let nom: String
+}
 struct Gabarits: Decodable {
     let images: [String: Taille]
     let apparences: [String: Apparence]
+    let vide: Vide?
 }
 let entree = FileHandle.standardInput.readDataToEndOfFile()
 guard !entree.isEmpty else {
@@ -480,7 +487,8 @@ for nom in noms {
     let a = gabarits.apparences[nom]!
     let dossier = module.appendingPathComponent(a.dossier)
     let presentes = (try? FileManager.default.contentsOfDirectory(atPath: dossier.path)) ?? []
-    for fichier in presentes.sorted() where fichier.hasSuffix(".png") && tailles[String(fichier.dropLast(4))] == nil {
+    for fichier in presentes.sorted() where fichier.hasSuffix(".png") && tailles[String(fichier.dropLast(4))] == nil
+        && String(fichier.dropLast(4)) != gabarits.vide?.nom {
         FileHandle.standardError.write("image absente de Dispositions.IMAGES, à retirer : \(a.dossier)/\(fichier)\n".data(using: .utf8)!)
     }
 }

@@ -63,7 +63,7 @@ local function bouton(contenu, p, titre, cleActif)
         if type(t) == 'table' and t.liaison then
             t = p[t.key]
         end
-        if v.genre == 'push_button' and t == titre
+        if S.BOUTONS[v.genre] and t == titre
             and (not cleActif or (type(v.args.enabled) == 'table' and v.args.enabled.key == cleActif)) then
             return v
         end
@@ -517,7 +517,7 @@ essai("Fenêtre : un clic sur une étape ouvre l'onglet Pourquoi ? ; l'après, p
         egal('notation', p.onglet)
         -- L'aperçu de l'onglet Note : la photo active (une image de Claude existe, ◀ y mène).
         local defaut = p.legendeApercu
-        egal('Photo active · DSCF4961', defaut)
+        egal('<EM>DSCF4961.RAF</EM>', defaut)
         egal(true, p.peutPrecedente)
         local n, l = ligneDe(premiere)
         vrai(l.texte:sub(-#Fil.SUFFIXE_ETAPE) == Fil.SUFFIXE_ETAPE, l.texte)
@@ -527,11 +527,11 @@ essai("Fenêtre : un clic sur une étape ouvre l'onglet Pourquoi ? ; l'après, p
         Fenetre.cliquerLigne(n)
         egal(nil, Fenetre.envoiAuto, 'le clic n\'envoie pas la demande')
         p.saisie = ''
-        egal('etape', p.onglet, "l'onglet Pourquoi ?")
+        egal('apercu', p.onglet, "l'onglet Aperçu (l'ancien Pourquoi ?)")
         egal('Étape 1 sur 2 · avant/après en préparation…', p.legendeApercu, 'pendant la lecture')
         lancerTaches(taches)
         egal('4961/E1', demandes[#demandes], 'les images de cette étape')
-        egal('/etapes/4961/.vignettes/E1-apres-320.jpg', p.imageApercu, "l'après, au cadre de l'aperçu")
+        egal('/etapes/4961/.vignettes/E1-apres-660.jpg', p.imageApercu, "l'après, au cadre de l'aperçu")
         egal('Étape 1 sur 2 · après', p.legendeApercu)
         egal(true, p.aImage)
         egal(false, p.peutPrecedente, "les ◀ ▶ de l'aperçu sont coupés")
@@ -557,7 +557,7 @@ essai("Fenêtre : un clic sur une étape ouvre l'onglet Pourquoi ? ; l'après, p
         egal(nil, Fenetre.indiceImage)
         -- Voir l'avant, puis Voir l'après.
         bouton(args.contents, p, "Voir l'avant", 'etapeAImages').args.action()
-        egal('/etapes/4961/.vignettes/E1-avant-320.jpg', p.imageApercu, "l'avant")
+        egal('/etapes/4961/.vignettes/E1-avant-660.jpg', p.imageApercu, "l'avant")
         egal('Étape 1 sur 2 · avant', p.legendeApercu)
         egal("Voir l'après", p.titreBascule)
         bouton(args.contents, p, "Voir l'après", 'etapeAImages').args.action()
@@ -567,7 +567,7 @@ essai("Fenêtre : un clic sur une étape ouvre l'onglet Pourquoi ? ; l'après, p
         bouton(args.contents, p, '▶', 'etapeSuivante').args.action()
         lancerTaches(taches)
         egal('Étape 2 sur 2 · passe 2 : ciel', p.etapeTitre)
-        egal('/etapes/4961/.vignettes/E2-apres-320.jpg', p.imageApercu)
+        egal('/etapes/4961/.vignettes/E2-apres-660.jpg', p.imageApercu)
         contient(p.etapeTexte:gsub('\n', ' '), 'Hautes lumières : 0 → -40')
         egal(true, p.etapePrecedente)
         egal(false, p.etapeSuivante)
@@ -586,12 +586,12 @@ essai("Fenêtre : un clic sur une étape ouvre l'onglet Pourquoi ? ; l'après, p
         Fenetre.cliquerLigne((ligneDe(apercu)))
         lancerTaches(taches)
         egal('Claude · view_photo', S.dialogues[#S.dialogues].title)
-        egal('etape', p.onglet)
+        egal('apercu', p.onglet)
         egal('Étape 1 sur 2 · passe 1 : balance', p.etapeTitre)
         -- Note : l'aperçu d'avant ; Pourquoi ? : la même étape.
         p.onglet = 'notation'
         egal(defaut, p.legendeApercu, "Note : l'aperçu d'avant")
-        p.onglet = 'etape'
+        p.onglet = 'apercu'
         egal('Étape 1 sur 2 · après', p.legendeApercu, 'la même étape')
         -- Un clic sur l'étape de la seconde : la sienne (3e ligne, autre photo).
         Fenetre.cliquerLigne((ligneDe(seconde)))
@@ -629,7 +629,7 @@ essai("Fenêtre : l'étape d'une autre photo ; page par page ; sans images (clas
         Fenetre.cliquerLigne((ligneDe(autre)))
         lancerTaches(taches)
         egal('Étape 1 sur 1 · passe 1 : balance', p.etapeTitre)
-        egal('/etapes/4962/.vignettes/E7-apres-320.jpg', p.imageApercu)
+        egal('/etapes/4962/.vignettes/E7-apres-660.jpg', p.imageApercu)
         -- Une longue raison : page par page.
         taches = #S.taches
         Fenetre.cliquerLigne((ligneDe(longue)))
@@ -690,7 +690,7 @@ essai("Fenêtre : l'étape d'un appel sur plusieurs photos montre celle de la ph
         Fenetre.cliquerLigne((ligneDe(copie)))
         lancerTaches(taches)
         egal('DSCF4961.RAF · copy_settings', p.etapeSousTitre, 'la photo active')
-        egal('/etapes/4961/.vignettes/E1-apres-320.jpg', p.imageApercu)
+        egal('/etapes/4961/.vignettes/E1-apres-660.jpg', p.imageApercu)
         contient(p.etapeTexte, 'Exposition : 0 → ' .. Texte.nombre(0.3), 'ses changements')
         -- Une autre photo active, qui n'en fait pas partie : la première de la réponse.
         photoActive(4963, 'DSCF4963.RAF')
@@ -742,7 +742,7 @@ essai("Fenêtre : images en préparation, montrées quand Etapes.version change 
         unTour()
         lancerTaches(taches)
         egal('Étape 2 sur 2 · après', p.legendeApercu)
-        egal('/etapes/4961/.vignettes/E2-apres-320.jpg', p.imageApercu)
+        egal('/etapes/4961/.vignettes/E2-apres-660.jpg', p.imageApercu)
         vrai(not p.etapeTexte:find('préparation', 1, true), p.etapeTexte)
         egal(true, p.etapeAImages)
         vrai(not Fichiers.existe(copies), 'les copies de la lecture remplacée s\'effacent')
@@ -754,7 +754,7 @@ essai("Fenêtre : images en préparation, montrées quand Etapes.version change 
         unTour()
         lancerTaches(taches)
         egal(lues, #demandes, 'une étape prête ne se relit pas')
-        egal('/etapes/4961/.vignettes/E2-apres-320.jpg', p.imageApercu)
+        egal('/etapes/4961/.vignettes/E2-apres-660.jpg', p.imageApercu)
         -- Une nouvelle étape de la même photo, appel en cours puis réponse : elle devient l'étape
         -- montrée (mode suivre).
         appel(c, 'b3', 'apply_settings', { step_name = 'passe 3 : peau', reason = 'Peau rougie.' })
@@ -768,7 +768,7 @@ essai("Fenêtre : images en préparation, montrées quand Etapes.version change 
         Fenetre.rafraichir()
         lancerTaches(taches)
         egal('E3', Fenetre.etape.id)
-        egal('/etapes/4961/.vignettes/E3-apres-320.jpg', p.imageApercu)
+        egal('/etapes/4961/.vignettes/E3-apres-660.jpg', p.imageApercu)
         -- ◀ : l'étape 2, le mode suivre quitté ; une nouvelle étape ne la remplace pas.
         bouton(args.contents, p, '◀', 'etapePrecedente').args.action()
         egal(false, Fenetre.etape.suivre)
@@ -799,7 +799,7 @@ essai("Fenêtre : l'onglet Pourquoi ? choisi sans étape : la dernière de la ph
     ouvrirFenetre(function(p)
         Fenetre.rafraichir()
         local defaut = p.legendeApercu
-        p.onglet = 'etape'
+        p.onglet = 'apercu'
         egal(nil, Fenetre.etape, 'aucune étape')
         egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')))
         egal(defaut, p.legendeApercu, "l'aperçu d'avant")
@@ -810,7 +810,7 @@ essai("Fenêtre : l'onglet Pourquoi ? choisi sans étape : la dernière de la ph
         Fenetre.rafraichir()
         egal('notation', p.onglet, 'pas de bascule')
         -- Un vrai clic sur l'onglet : la dernière étape de la photo active (4962).
-        p.onglet = 'etape'
+        p.onglet = 'apercu'
         egal('E7', Fenetre.etape.id)
         egal(true, Fenetre.etape.suivre)
         egal('Étape 1 sur 1 · passe 1 : balance', p.etapeTitre)
@@ -819,7 +819,7 @@ essai("Fenêtre : l'onglet Pourquoi ? choisi sans étape : la dernière de la ph
         photoActive(4963, 'DSCF4963.RAF')
         Fenetre.majPhoto()
         p.onglet = 'notation'
-        p.onglet = 'etape'
+        p.onglet = 'apercu'
         egal('E2', Fenetre.etape.id)
         egal('Étape 2 sur 2 · passe 1 : balance', p.etapeTitre)
         p.onglet = 'notation'
@@ -840,7 +840,7 @@ essai("Fenêtre : Agrandir dans l'onglet Pourquoi ? : l'avant et l'après côte 
         lancerTaches(taches)
         local dialogues = #S.dialogues
         taches = #S.taches
-        bouton(args.contents, p, 'Agrandir').args.action()
+        bouton(args.contents, p, '⤢ Agrandir').args.action()
         lancerTaches(taches)
         egal(dialogues + 1, #S.dialogues)
         local d = S.dialogues[#S.dialogues]
@@ -883,7 +883,7 @@ essai('Consignes : la raison de chaque étape, une phrase simple pour Dany, 160 
     local section = texte:sub(debut + 1, fin - 1)
     vrai(Texte.longueur(section) <= 400, string.format('section : %d caractères pour 400', Texte.longueur(section)))
     for _, morceau in ipairs({ 'reason', 'une phrase simple pour Dany', '160 caractères au plus', 'défaut vu', 'view_photo',
-        'noms français des réglages', "l'avant/après de l'étape", 'onglet Pourquoi ?', 'step_name' }) do
+        'noms français des réglages', "l'avant/après de l'étape", 'onglet Aperçu, bouton Pourquoi ? du fil', 'step_name' }) do
         contient(section, morceau, 'raison de chaque étape')
     end
     -- Entre Style et Fin d'une tâche.

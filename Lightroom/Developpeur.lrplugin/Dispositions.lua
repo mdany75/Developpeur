@@ -1,23 +1,28 @@
 -- Dispositions.lua : la fenêtre Claude, assemblée des pièces de Vues.lua, et ses dimensions. Une
--- seule disposition, la « Conversation claire » (la plus proche de la 1.0) : les conversations à
--- gauche, le fil au centre, à droite les onglets Note, Proposition et Pourquoi ? (1.3), l'aperçu,
--- puis la carte choisie ; en grande taille. L'Atelier, le Panneau et le choix de la disposition sont
--- retirés, comme le choix de la taille (demandés par Dany le 20 octobre 2026). Son cadre enregistré
--- (Fenetre.cadre) : Lightroom rend sa taille enregistrée à une fenêtre rouverte, sans la rapetisser
--- (constaté).
+-- seule disposition, la « Conversation claire », à l'allure de la fenêtre B (1.3, maquette
+-- « B · Conversation claire ») : trois colonnes sur des aplats, le volet des conversations à
+-- gauche, au centre l'en-tête, le fil, sa barre et la zone de saisie, à droite les segments
+-- Aperçu | Proposition | Note | Leçon sur le panneau, l'aperçu commun et la carte de l'onglet.
+-- L'Atelier, le Panneau et le choix de la disposition sont retirés, comme le choix de la taille
+-- (demandés par Dany le 20 octobre 2026). Son cadre enregistré (Fenetre.cadre) : Lightroom rend sa
+-- taille enregistrée à une fenêtre rouverte, sans la rapetisser (constaté).
 --
--- Dimensions (D), lues aussi par Fenetre.lua : `lignes` (lignes du fil), `fil` (largeur de la
--- colonne du fil), `liste` (la liste des conversations), `droite` (la colonne de droite), `apercu`
--- (cadre carré de l'aperçu, et son image « aucun aperçu », scripts/images-vides.swift), `onglets`,
--- `ongletProposition` et `ongletNotation` (onglet montré quand une proposition ou une note
--- arrive), `ongletEtape` (l'onglet Pourquoi ?, ouvert par un clic sur une étape du fil, jamais par
--- une bascule automatique), `propLignes` (lignes de la proposition), `etapeLignes` (lignes du texte
--- de la carte Pourquoi ?), `criteres` (lignes des critères de la carte Note) ; les autres sont des
--- largeurs de pièces et des nombres de lignes.
+-- Dimensions (D, Dispositions.dimensions), lues aussi par Fenetre.lua : la fenêtre entière, de
+-- 1 280 × 800 (demandé par Dany), et son contenu de 1 278 × 766 (constaté le 21 octobre 2026, D7 :
+-- barre de titre de 33, marge de 1 à gauche, à droite et en bas, aucune en haut) ; les colonnes
+-- (volet de 183 et son filet, centre de 630, filet et colonne droite de 463) ; `lignes` et
+-- `hauteurLigne` (la grille du fil), `fil` (sa largeur utile), `cases` et `hauteurCase` (la grille
+-- de la liste des conversations), `apercu` et `apercuHauteur` (le cadre 3:2 de l'aperçu, et son
+-- image « aucun aperçu », scripts/images-vides.swift), `onglets` (les segments, dans leur ordre),
+-- `ongletParDefaut` (Note, montré à l'ouverture), `ongletProposition` et `ongletNotation` (onglet
+-- montré quand une proposition ou une note arrive), `ongletEtape` (l'onglet Aperçu, l'ancien
+-- Pourquoi ? : ouvert par un clic sur une étape du fil, jamais par une bascule automatique),
+-- `ongletLecon`, `propLignes`, `etapeLignes`, `leconLignes` et `criteres` (lignes des cartes) ;
+-- les autres sont des largeurs et des hauteurs de pièces, tirées des précédentes.
 --
--- Pour la fenêtre B (1.3, lots B3 à B5) : ses images (Dispositions.IMAGES) et ses deux apparences,
--- claire et sombre (Dispositions.APPARENCES, Dispositions.PALETTES), avec Dispositions.image et
--- Dispositions.couleurs ; la fenêtre actuelle ne s'en sert pas encore.
+-- Ses images (Dispositions.IMAGES) et ses deux apparences, claire et sombre
+-- (Dispositions.APPARENCES, Dispositions.PALETTES), avec Dispositions.image et
+-- Dispositions.couleurs : la fenêtre les reprend à chaque ouverture (Fenetre.preparerApparence).
 
 local Vues = require 'Vues'
 
@@ -26,11 +31,41 @@ local Dispositions = {}
 -- Le nom de la disposition, gardé dans celui du cadre enregistré (Fenetre.cadre).
 Dispositions.NOM = 'conversation'
 
--- `propLignes` passe de 21 à 19 (1.3) : la carte Proposition gagne une seconde rangée (Je le fais),
--- et garde la hauteur de la carte Note. `etapeLignes` (carte Pourquoi ?) : 19, provisoire, à caler
--- sur la capture de la fenêtre (Proposition à 19 lignes plus sa seconde rangée).
-Dispositions.TAILLES = { lignes = 42, fil = 900, liste = 250, droite = 340, apercu = 320, propLignes = 19, etapeLignes = 19,
-    criteres = 12 }
+-- Les tailles de base, en points, d'après la maquette (box-sizing compris) ; le lot 18 recale sur
+-- la vraie fenêtre celles dites « à recaler ».
+Dispositions.TAILLES = {
+    -- La fenêtre entière (demandée par Dany) et son cadre (constaté le 21 octobre 2026, D7 : barre
+    -- de titre de 33, 32 blancs et un filet ; 1 point de marge à gauche, à droite et en bas, aucun
+    -- en haut).
+    largeurFenetre = 1280, hauteurFenetre = 800, barreTitre = 33, margeDialogue = 1,
+    -- Les colonnes, sans leurs filets de 1 (183 + 1 + 630 + 1 + 463 = 1 278), et leurs marges : 10
+    -- dans le volet, 20 à gauche et à droite du centre, 14 sur les côtés et 10 en haut de la
+    -- colonne droite.
+    volet = 183, centre = 630, droite = 463, filet = 1,
+    margeVolet = 10, margeCentre = 20, margeDroite = 14, margeHautDroite = 10,
+    -- Le centre, de haut en bas (à recaler) : l'en-tête (12 + 22 + 6 + 18 + 10, son filet en plus), la
+    -- barre ▲ ▼ Fin (son filet compris) et la zone de saisie (son filet compris : 1 + 12 + 26 + 8 + 52
+    -- + 8 + 26 + 14, chaque rangée de boutons à la hauteur de leur cadre, D5) ; le fil prend le reste.
+    entete = 68, barre = 30, saisie = 147,
+    -- Le fil (à recaler) : 23 lignes de 21 points, sous une marge de 20. Le contenu de 766 (D7) a un
+    -- point de plus que celui de 765 du plan : il va à la marge du bas du fil, où il ne gêne rien.
+    -- La colonne auteur et la hauteur de 21 de chaque ligne viennent au lot B4 : la grille garde ici
+    -- sa hauteur réservée.
+    lignes = 23, hauteurLigne = 21, margeHautFil = 20,
+    -- La liste des conversations (à recaler) : 12 cases de 40 points.
+    cases = 12, hauteurCase = 40,
+    -- L'aperçu commun aux quatre onglets : un cadre 3:2 de 330 × 220, sa vignette en 2x (660 × 440
+    -- pixels, Images.vignette).
+    apercu = 330, apercuHauteur = 220, echelleApercu = 2,
+    -- Le panneau de la colonne droite (435), son intérieur (405) et celui des cartes (379, au lot B5).
+    panneau = 435, interieur = 405, carte = 379,
+    -- Les lignes des cartes (provisoires jusqu'au lot 18) : les critères de la carte Note, le texte
+    -- de la proposition, de l'étape (onglet Aperçu) et de la leçon.
+    criteres = 11, propLignes = 20, etapeLignes = 20, leconLignes = 20,
+    -- Le cadre d'un square_button dépasse son bezel visible de 2 points (constaté le 21 octobre 2026,
+    -- D5 : height = bezel + 2 ; Fenetre.bouton, clé `bezel`).
+    margeBezel = 2,
+}
 
 -- Les images de la fenêtre B (images/<nom>.png), seule source de leurs tailles, en points :
 -- { largeur = …, hauteur = … }, une table neuve par image. Chacune est un seul PNG en 2x (2 × la
@@ -44,14 +79,16 @@ Dispositions.TAILLES = { lignes = 42, fil = 900, liste = 250, droite = 340, aper
 -- apparence (Dispositions.APPARENCES : images/ en claire, images/sombre/ en sombre), aux mêmes
 -- tailles ; Dispositions.image donne le chemin du bon jeu. Après un changement des tailles ou des
 -- palettes : luajit scripts/gabarits.lua | swift scripts/images-fenetre.swift Lightroom/Developpeur.lrplugin
--- (Tests/Lua/Fenetre/essais-images.lua vérifie chaque fichier des deux jeux).
+-- (Tests/Lua/Fenetre/essais-images.lua vérifie chaque fichier des deux jeux). L'image « aucun
+-- aperçu » n'en est pas : elle a son cadre (Dispositions.imageVide) et son script.
 local function taille(largeur, hauteur)
     return { largeur = largeur, hauteur = hauteur }
 end
 
 Dispositions.IMAGES = {
     -- Le panneau de la colonne droite, à cheval sur les segments : une bande transparente de 12 en
-    -- haut, puis le panneau blanc (bord #C9C9C9, coins de 7), 733 pour un contenu de 765.
+    -- haut, puis le panneau blanc (bord #C9C9C9, coins de 7), 733 pour un contenu de 765 (le contenu
+    -- constaté de 766, D7, laisse 11 sous lui au lieu de 10 : hauteur recalée au lot 18).
     panneau = taille(435, 745),
     -- Les fonds des cartes (#FAFAFA, bord #D9D9D9, coins de 6), à la largeur intérieure du panneau :
     -- Note (critères, filet et plafond), Proposition, Aperçu (étape) et Leçon.
@@ -75,8 +112,8 @@ Dispositions.IMAGES = {
     ['pastille-orange'] = taille(8, 8),
     ['pastille-rouge'] = taille(8, 8),
     ['pastille-gris'] = taille(8, 8),
-    -- « Accepter N ★ » (Note) et « Accepter » (Proposition) : normal, enfoncé et inactif ; Lightroom
-    -- pose le titre blanc par-dessus.
+    -- « Accepter N ★ » (Note) et « Accepter » (Proposition), et Envoyer : normal, enfoncé et
+    -- inactif ; Lightroom pose le titre blanc par-dessus (Vues.boutonBleu).
     ['bouton-bleu'] = taille(120, 26),
     ['bouton-bleu-presse'] = taille(120, 26),
     ['bouton-bleu-inactif'] = taille(120, 26),
@@ -101,11 +138,12 @@ Dispositions.IMAGES = {
 
 -- L'apparence de la fenêtre B, claire (la maquette) ou sombre, se choisit dans le Gestionnaire de
 -- modules externes, comme le modèle et l'effort (préférence `apparence` de Chemins.defauts, menu
--- Apparence de PluginInfoProvider.lua ; décision de Dany du 21 octobre 2026). Elle ne règle que ce
--- que le module dessine : les aplats (fonds et filets), les couleurs des textes et les images. Les
--- contrôles natifs (boutons, champs, menus, cases, barre de titre) suivent l'apparence de macOS,
--- quelle que soit celle choisie ici : rien à faire pour eux. Quand les deux diffèrent, deux choses
--- restent à constater dans Lightroom (lots B3 et 18) : les icônes posées sur un bouton natif
+-- Apparence de PluginInfoProvider.lua ; décision de Dany du 21 octobre 2026), et vaut à
+-- l'ouverture suivante de la fenêtre (Fenetre.preparerApparence). Elle ne règle que ce que le
+-- module dessine : les aplats (fonds et filets), les couleurs des textes et les images, l'image
+-- « aucun aperçu » comprise. Les contrôles natifs (boutons, champs, menus, cases, barre de titre)
+-- suivent l'apparence de macOS, quelle que soit celle choisie ici. Quand les deux diffèrent, deux
+-- choses restent à constater dans Lightroom (lot 18) : les icônes posées sur un bouton natif
 -- (image_name : trombone, presse-papiers, chevron-haut, chevron-bas, à l'encre `texte` de
 -- l'apparence choisie, sur un fond de bouton qui suit macOS), et le titre d'une case ou d'un
 -- bouton radio posé sur un aplat (couleur du système, sauf si text_color y prend).
@@ -118,27 +156,31 @@ Dispositions.APPARENCES = {
 }
 
 -- Les couleurs de chaque apparence, en hexadécimal (RRGGBB), aux mêmes clés : la seule table de
--- chaque palette. Les images (scripts/gabarits.lua puis scripts/images-fenetre.swift) et, au lot
--- B3, Fenetre.COULEURS (Dispositions.couleurs) en viennent. La claire est la maquette « B ·
--- Conversation claire » (l'orange et le rouge, gardés de la 1.2). La sombre est à juger à l'œil
--- (lot 18, si Dany bascule son Mac en sombre) : chacun de ses textes se lit au moins aussi bien
--- que dans la claire sur les mêmes fonds, et à 4,5:1 au moins là où la claire y est
--- (essais-images.lua) ; les fonds suivent ceux de macOS en sombre, le contenu plus foncé que le
--- reste.
+-- chaque palette. Les images (scripts/gabarits.lua puis scripts/images-fenetre.swift et
+-- scripts/images-vides.swift) et Fenetre.COULEURS (Dispositions.couleurs, à chaque ouverture) en
+-- viennent. La claire est la maquette « B · Conversation claire » (l'orange et le rouge, gardés de
+-- la 1.2). La sombre est à juger à l'œil (lot 18, si Dany bascule son Mac en sombre) : chacun de
+-- ses textes se lit au moins aussi bien que dans la claire sur les mêmes fonds, et à 4,5:1 au
+-- moins là où la claire y est (essais-images.lua) ; les fonds suivent ceux de macOS en sombre, le
+-- contenu plus foncé que le reste.
 Dispositions.PALETTES = {
     claire = {
         -- Textes : le texte, les gris (secondaire, en-têtes, sous-titre de la conversation
         -- choisie), le bleu (Vous, liens), Menlo (outils), la coche des passes, l'orange
-        -- (activité, alertes), le rouge (erreurs), l'ambre (plafond, étoiles pleines) et le blanc
-        -- (sur le bleu).
+        -- (activité, alertes), le rouge (erreurs), l'ambre (plafond, étoiles pleines), le blanc
+        -- (sur le bleu) et le titre d'un bouton bleu inactif (Vues.boutonBleu).
         texte = '1D1D1F', gris = '6B6B6B', grisEntete = '5F5F5F', sousTitreChoisi = '505050', bleu = '0A64D8',
         mono = '3D3D45', coche = '1F7A35', orange = 'E0800D', rouge = 'D12E2E', ambre = 'A86200', blanc = 'FFFFFF',
+        titreInactif = 'FFFFFF',
         -- Aplats : le contenu (en-tête, fil, barre), le volet et la zone de saisie, la colonne droite.
         fondContenu = 'FFFFFF', fondVolet = 'F2F2F2', fondDroite = 'ECECEC',
         -- Filets en aplats de 1 pt : bord du volet et dessus de la saisie, bord de la colonne
         -- droite, dessous de l'en-tête, dessus de la barre, dessus du plafond de la carte Note.
         filetVolet = 'D2D2D2', filetDroite = 'C9C9C9', filetEntete = 'E2E2E2', filetBarre = 'EBEBEB',
         filetPlafond = 'E3E3E3',
+        -- L'aperçu : son fond (celui des vignettes, Images.FOND, sous la photo et l'image « aucun
+        -- aperçu ») et le texte de l'image « aucun aperçu ».
+        fondApercu = '2B2B2B', texteApercu = '9E9E9E',
         -- Images : le panneau, les cartes, les segments, la conversation choisie, la pastille
         -- verte, le contour (étoile vide, chevron des passes, pastille grise) et le bouton bleu
         -- (normal, enfoncé, inactif).
@@ -150,9 +192,16 @@ Dispositions.PALETTES = {
     sombre = {
         texte = 'E8E8E8', gris = '9A9A9A', grisEntete = 'A6A6A6', sousTitreChoisi = 'C2C2C2', bleu = '5AA2F6',
         mono = 'C8C8D0', coche = '3FB950', orange = 'E8963A', rouge = 'F27A72', ambre = 'E0A040', blanc = 'FFFFFF',
+        -- Sur le bleu inactif sombre (#2B3F5C), le blanc ferait 10:1 et paraîtrait allumé : un gris
+        -- bleuté à 3,2:1 le dit éteint (le blanc actif sur #1F6FDB est à 4,8:1).
+        titreInactif = '7F8EA3',
         fondContenu = '1E1E1E', fondVolet = '2A2A2A', fondDroite = '323232',
         filetVolet = '454545', filetDroite = '4A4A4A', filetEntete = '343434', filetBarre = '2E2E2E',
         filetPlafond = '3A3A3A',
+        -- Le fond de l'aperçu reste le gris des vignettes (Images.FOND, le même dans les deux
+        -- apparences : une photo se juge sur ce gris) ; seul le texte de l'image « aucun aperçu »
+        -- change.
+        fondApercu = '2B2B2B', texteApercu = 'A3A3A3',
         fondPanneau = '1E1E1E', bordPanneau = '4A4A4A', fondCarte = '262626', bordCarte = '404040',
         fondSegment = '3C3C3C', bordSegment = '5A5A5A', filetSegment = '4E4E4E', selection = '3A3A3A',
         pastille = '3FB950', contour = '8E8E8E', bleuBouton = '1F6FDB', bordBleu = '1A62C4', bleuPresse = '17559F',
@@ -186,8 +235,8 @@ function Dispositions.itemsApparences()
 end
 
 -- Le chemin d'une image de Dispositions.IMAGES dans le jeu de l'apparence, depuis le dossier du
--- module (« images/loupe.png », « images/sombre/loupe.png ») : à passer à Chemins.ressource, comme
--- Dispositions.imageVide. Une image inconnue est une erreur.
+-- module (« images/loupe.png », « images/sombre/loupe.png ») : à passer à Chemins.ressource
+-- (Fenetre.image), comme Dispositions.imageVide. Une image inconnue est une erreur.
 function Dispositions.image(nom, apparence)
     if not Dispositions.IMAGES[nom] then
         error("image inconnue de Dispositions.IMAGES : " .. tostring(nom), 2)
@@ -195,9 +244,22 @@ function Dispositions.image(nom, apparence)
     return parValeur(Dispositions.apparence(apparence)).dossier .. '/' .. nom .. '.png'
 end
 
+-- Le nom de l'image « aucun aperçu », sans extension : celui de son cadre (« vide-330x220 »).
+function Dispositions.nomImageVide()
+    local T = Dispositions.TAILLES
+    return 'vide-' .. T.apercu .. 'x' .. T.apercuHauteur
+end
+
+-- Le chemin de l'image « aucun aperçu » dans le jeu de l'apparence, depuis le dossier du module
+-- (« images/vide-330x220.png », « images/sombre/vide-330x220.png »), au cadre 3:2 de l'aperçu, en
+-- 2x : scripts/images-vides.swift la dessine, du fond et du texte de chaque palette.
+function Dispositions.imageVide(apparence)
+    return parValeur(Dispositions.apparence(apparence)).dossier .. '/' .. Dispositions.nomImageVide() .. '.png'
+end
+
 -- Les couleurs de l'apparence, en triplets { r, g, b } de 0 à 1 (une table neuve, des triplets
--- neufs), pour LrColor(r, g, b) : Fenetre.COULEURS les reprendra au lot B3. Aucune couleur n'est
--- créée ici (Dispositions se charge sans SDK, liens.lua et scripts/gabarits.lua compris).
+-- neufs), pour LrColor(r, g, b) : Fenetre.COULEURS les reprend à chaque ouverture. Aucune couleur
+-- n'est créée ici (Dispositions se charge sans SDK, liens.lua et scripts/gabarits.lua compris).
 function Dispositions.couleurs(apparence)
     local r = {}
     for cle, hex in pairs(Dispositions.PALETTES[Dispositions.apparence(apparence)]) do
@@ -206,8 +268,9 @@ function Dispositions.couleurs(apparence)
     return r
 end
 
--- Ce que lit scripts/images-fenetre.swift (par scripts/gabarits.lua, en JSON) : les tailles des
--- images, puis, pour chaque apparence, le dossier de ses images et sa palette. Tables neuves.
+-- Ce que lisent scripts/images-fenetre.swift et scripts/images-vides.swift (par
+-- scripts/gabarits.lua, en JSON) : les tailles des images, puis, pour chaque apparence, le dossier
+-- de ses images et sa palette, et le cadre de l'image « aucun aperçu ». Tables neuves.
 function Dispositions.gabarits()
     local images, apparences = {}, {}
     for nom, t in pairs(Dispositions.IMAGES) do
@@ -220,49 +283,96 @@ function Dispositions.gabarits()
         end
         apparences[a.value] = { dossier = a.dossier, couleurs = couleurs }
     end
-    return { images = images, apparences = apparences }
+    local T = Dispositions.TAILLES
+    return { images = images, apparences = apparences,
+        vide = { nom = Dispositions.nomImageVide(), largeur = T.apercu, hauteur = T.apercuHauteur } }
 end
 
--- Les dimensions : une table neuve, avec `nom`, et les largeurs tirées des précédentes.
+-- Dimensions ------------------------------------------------------------------------------------
+
+-- Le cadre d'un square_button dont le bezel visible fait `bezel` points (D5).
+function Dispositions.cadreBouton(bezel)
+    return bezel + Dispositions.TAILLES.margeBezel
+end
+
+-- Les dimensions : une table neuve, avec `nom`, et les tailles tirées des précédentes.
 function Dispositions.dimensions()
     local D = { nom = Dispositions.NOM }
     for cle, valeur in pairs(Dispositions.TAILLES) do
         D[cle] = valeur
     end
-    -- L'aperçu est toujours montré ; dessous, la carte Note, la proposition ou la carte Pourquoi ?
-    -- (demandé par Dany le 20 octobre 2026 : l'aperçu et la note ensemble). Note reste le premier
-    -- onglet, donc celui montré à l'ouverture ; Pourquoi ? vient en dernier (1.3).
-    D.onglets = {
-        { valeur = 'notation', titre = "Note" },
-        { valeur = 'proposition', titre = "Proposition" },
-        { valeur = 'etape', titre = "Pourquoi ?" },
-    }
-    D.ongletProposition, D.ongletNotation, D.ongletEtape = 'proposition', 'notation', 'etape'
-    D.titre = D.fil - 280
-    D.info = 210
-    D.voyant = 150
+    local cadre = Dispositions.cadreBouton
+    -- Le contenu de la fenêtre (D7) : 1 278 × 766 pour 1 280 × 800.
+    D.largeurContenu = D.largeurFenetre - 2 * D.margeDialogue
+    D.hauteurContenu = D.hauteurFenetre - D.barreTitre - D.margeDialogue
+    -- Volet : 163 utiles. En haut, Nouvelle conversation (bezel 26), 8, Rechercher (24), 14 ; en bas,
+    -- Renommer… et Supprimer… (bezel 22), 6, le filet entre deux marges de 6, 6, Publication… et
+    -- Consommation… (bezel 22, 6 entre eux), 4, les deux versions (14 chacune), 6, le voyant Écran
+    -- (16). Les cases de la liste remplissent le milieu, la place restante sous elles.
+    D.liste = D.volet - 2 * D.margeVolet
+    D.loupe = Dispositions.IMAGES.loupe.largeur
+    D.recherche = D.liste - D.loupe - 8
+    D.renommer = math.floor((D.liste - 6) / 2)
+    D.ligneVersion = 14
+    D.ecran = 16
+    D.hautVolet = cadre(26) + 8 + 24 + 14
+    D.basVolet = cadre(22) + 6 + (6 + D.filet + 6) + 6 + cadre(22) + 6 + cadre(22) + 4 + 2 * D.ligneVersion + 6 + D.ecran
+    D.hauteurListe = D.hauteurContenu - 2 * D.margeVolet - D.hautVolet - D.basVolet
+    -- Centre : 590 utiles. L'en-tête : le titre (gras 16) et le Mode, puis les voyants Claude Code et
+    -- Lightroom et la photo active, alignée à droite sur la marge (la rangée fait les 590 : un texte
+    -- de taille fixe ne s'étire pas) ; le fil ; la barre, dont l'activité (ou le forfait) finit de
+    -- même sur la marge de droite, comme dans la maquette ; la saisie (Style, bandeau, Envoyer).
+    D.fil = D.centre - 2 * D.margeCentre
+    D.titre = 270
+    D.voyantClaude = 125
+    D.voyantLightroom = 150
+    D.info = D.fil - (8 + 6 + D.voyantClaude) - 14 - (8 + 6 + D.voyantLightroom)
+    D.hauteurFil = D.hauteurContenu - (D.entete + D.filet) - D.barre - D.saisie
+    D.grille = D.lignes * D.hauteurLigne
+    -- ▲ ▼ de la barre et ◀ ▶ de l'aperçu (bezel de 22), puis Fin.
+    D.fleche = 26
+    D.fin = 36
     D.position = 150
-    D.activite = 300
-    D.style = 180
-    D.bandeau = D.fil
-    D.envoyer = 110
-    D.champ = D.fil - 170
-    D.legende = D.apercu - 80
-    -- Largeur du texte de la carte Note, de la proposition et de la carte Pourquoi ? (Vues.notation,
-    -- Vues.proposition, Vues.etape), pour les couper en pages (Fenetre.montrerPage).
-    D.largeurNote = D.droite - 24
-    D.largeurProposition = D.droite - 24
-    D.largeurEtape = D.droite - 24
-    -- La liste des conversations finit au niveau du champ de demande : la grille, plus ce qui la
-    -- suit au centre (▲ ▼, séparateur, invites et Style, bandeau, demande). Le nombre de lignes du
-    -- fil donne au centre la hauteur de la colonne de droite (aperçu, carte Note).
-    D.hauteurListe = D.lignes * 17 + 85
+    D.activite = D.fil - (2 * D.fleche + 4 + 4 + D.fin + 8 + D.position)
+    D.champ = D.fil
+    D.joindre = 28
+    D.style = 170
+    D.etiquetteStyle = 30
+    D.envoyer = Dispositions.IMAGES['bouton-bleu'].largeur
+    D.bandeau = D.fil - (D.joindre + 4 + D.joindre + 10 + D.etiquetteStyle + 6 + D.style + 8 + 8 + D.envoyer)
+    -- Colonne droite : le panneau de 435, à 14 du bord ; les segments centrés en tête, à cheval sur
+    -- son bord (bande transparente de 12) ; son contenu de 405 sous une marge de 13 (12 + 1 + 22 =
+    -- 35 depuis le haut des segments, comme la maquette) et à 15 du bord (14 + 1).
+    D.segments = 0
+    D.onglets = {
+        { valeur = 'apercu', titre = "Aperçu", image = 'seg-apercu' },
+        { valeur = 'proposition', titre = "Proposition", image = 'seg-proposition' },
+        { valeur = 'notation', titre = "Note", image = 'seg-note' },
+        { valeur = 'lecon', titre = "Leçon", image = 'seg-lecon' },
+    }
+    for _, onglet in ipairs(D.onglets) do
+        D.segments = D.segments + Dispositions.IMAGES[onglet.image].largeur
+    end
+    D.hauteurSegments = Dispositions.IMAGES['seg-note'].hauteur
+    D.margeSegments = math.floor((D.panneau - D.segments) / 2)
+    D.margeHautPanneau = 12 + 1 + 22 - D.hauteurSegments
+    D.margeGauchePanneau = D.panneau - D.interieur - 15
+    -- Note par défaut, donc montrée à l'ouverture ; une proposition qui arrive montre Proposition,
+    -- une note Note ; Aperçu (l'ancien Pourquoi ?) s'ouvre sur un clic, jamais tout seul.
+    D.ongletParDefaut, D.ongletProposition, D.ongletNotation, D.ongletEtape, D.ongletLecon =
+        'notation', 'proposition', 'notation', 'apercu', 'lecon'
+    -- L'aperçu, sa vignette en pixels, et la rangée ◀ légende ▶ · ⤢ Agrandir sous lui.
+    D.pixelsApercu = D.apercu * D.echelleApercu
+    D.pixelsApercuHauteur = D.apercuHauteur * D.echelleApercu
+    D.agrandir = 90
+    D.legende = D.interieur - 2 * D.fleche - 2 * 4 - 8 - D.agrandir
+    -- Largeur du texte de la carte Note, de la proposition et de la carte de l'étape (Vues.notation,
+    -- Vues.proposition, Vues.etape), pour les couper en pages (Fenetre.montrerPage) : les cartes
+    -- actuelles, posées telles quelles à la largeur intérieure du panneau (lot B5 : 379).
+    D.largeurNote = D.interieur - 24
+    D.largeurProposition = D.interieur - 24
+    D.largeurEtape = D.interieur - 24
     return D
-end
-
--- Le nom de l'image « aucun aperçu » du cadre : vide-320.png.
-function Dispositions.imageVide(D)
-    return 'vide-' .. D.apercu .. '.png'
 end
 
 -- Assemblage ------------------------------------------------------------------------------------
@@ -277,59 +387,91 @@ local function variante(f, F, largeur, valeur, pieces)
     return f:column(contenu)
 end
 
--- L'arbre de la fenêtre (sa racine liée à F.p).
-function Dispositions.construire(f, F, D)
-    local centre = f:column {
-        spacing = 6,
-        width = D.fil,
-        fill_vertical = 1,
-        Vues.titre(f, F, D.titre, D.info),
-        Vues.voyants(f, F, D.voyant),
-        f:separator { fill_horizontal = 1 },
-        Vues.grille(f, F, D),
-        Vues.defilement(f, F, D),
-        -- Ne grandit que si une autre colonne est plus haute. La liste des conversations
-        -- (D.hauteurListe) finit au niveau du champ de demande.
-        f:spacer { fill_vertical = 1 },
-        f:separator { fill_horizontal = 1 },
-        Vues.invites(f, F, D),
-        Vues.bandeau(f, F, D.bandeau),
-        Vues.saisie(f, F, D),
+-- Une colonne de taille fixe sur son aplat (un f:picture à background_color, posé dessous) : le
+-- fond de la colonne (background_color est sans effet sur un conteneur, constaté A5).
+local function surAplat(f, largeur, hauteur, couleur, contenu)
+    return f:column {
+        place = 'overlapping',
+        width = largeur,
+        height = hauteur,
+        Vues.aplat(f, largeur, hauteur, couleur),
+        contenu,
     }
-    -- À droite : les onglets Note, Proposition et Pourquoi ? en tête, puis l'aperçu, toujours
-    -- montré ; après une ligne vide sous Agrandir, la carte de l'onglet choisi ; en bas, Publication
-    -- et Consommation, puis les versions, au niveau du champ de demande (demandé par Dany le
-    -- 20 octobre 2026). La carte Pourquoi ? est superposée en dernier (1.3) : sous elle, les boutons
-    -- des cartes Note et Proposition doivent répondre (à constater ; sinon, repli sur un tab_view).
-    local droite = f:column {
-        spacing = 8,
-        width = D.droite,
-        fill_vertical = 1,
-        Vues.onglets(f, F, D.onglets),
-        Vues.apercu(f, F, D),
-        Vues.navigationApercu(f, F, D.legende),
-        Vues.agrandir(f, F),
-        f:spacer { height = 8 },
+end
+
+-- Le centre : l'en-tête et son filet, le fil, le filet et la barre, puis la zone de saisie sur son
+-- aplat, sous son filet ; le tout sur le blanc du contenu.
+local function centre(f, F, D)
+    local C = F.COULEURS
+    return surAplat(f, D.centre, D.hauteurContenu, C.fondContenu, f:column {
+        spacing = 0,
+        Vues.entete(f, F, D),
+        Vues.aplat(f, D.centre, D.filet, C.filetEntete),
+        f:column {
+            height = D.hauteurFil,
+            margin_left = D.margeCentre,
+            margin_top = D.margeHautFil,
+            Vues.grille(f, F, D),
+        },
+        Vues.aplat(f, D.centre, D.filet, C.filetBarre),
+        Vues.defilement(f, F, D),
+        Vues.aplat(f, D.centre, D.filet, C.filetVolet),
+        surAplat(f, D.centre, D.saisie - D.filet, C.fondVolet, Vues.saisie(f, F, D)),
+    })
+end
+
+-- La colonne droite : sur son aplat, le panneau en image, les segments à cheval sur son bord ;
+-- dedans, l'aperçu commun, la rangée ◀ légende ▶ · ⤢ Agrandir, puis les quatre variantes
+-- superposées des onglets (les cartes actuelles posées telles quelles, au lot B5 sur leurs
+-- images) : la carte de l'étape dans Aperçu, la proposition, la carte Note, une aide dans Leçon.
+local function droite(f, F, D)
+    local C = F.COULEURS
+    local largeur = D.interieur
+    return surAplat(f, D.droite, D.hauteurContenu, C.fondDroite, f:column {
+        margin_left = D.margeDroite,
+        margin_top = D.margeHautDroite,
         f:column {
             place = 'overlapping',
-            variante(f, F, D.droite, 'notation', function(fm) return { Vues.notation(fm, F, D.droite, D) } end),
-            variante(f, F, D.droite, 'proposition', function(fm) return { Vues.proposition(fm, F, D.droite, D.propLignes) } end),
-            variante(f, F, D.droite, 'etape', function(fm) return { Vues.etape(fm, F, D.droite, D) } end),
+            width = D.panneau,
+            height = Dispositions.IMAGES.panneau.hauteur,
+            Vues.image(f, F, 'panneau'),
+            f:column {
+                spacing = 0,
+                Vues.segments(f, F, D),
+                f:column {
+                    spacing = 0,
+                    margin_left = D.margeGauchePanneau,
+                    margin_top = D.margeHautPanneau,
+                    Vues.apercu(f, F, D),
+                    f:spacer { height = 8 },
+                    Vues.navigationApercu(f, F, D),
+                    f:spacer { height = 12 },
+                    f:column {
+                        place = 'overlapping',
+                        variante(f, F, largeur, 'apercu', function(fm) return { Vues.etape(fm, F, largeur, D) } end),
+                        variante(f, F, largeur, 'proposition', function(fm) return { Vues.proposition(fm, F, largeur, D.propLignes) } end),
+                        variante(f, F, largeur, 'notation', function(fm) return { Vues.notation(fm, F, largeur, D) } end),
+                        variante(f, F, largeur, 'lecon', function(fm) return { Vues.leconProvisoire(fm, F, largeur) } end),
+                    },
+                },
+            },
         },
-        f:spacer { fill_vertical = 1 },
-        Vues.autresFenetres(f, F),
-        f:separator { fill_horizontal = 1 },
-        Vues.versions(f, F, D.droite),
-    }
+    })
+end
+
+-- L'arbre de la fenêtre (sa racine liée à F.p) : le volet, son filet, le centre, le filet de la
+-- colonne droite, la colonne droite, côte à côte sans écart ni marge (1 278 points).
+function Dispositions.construire(f, F, D)
+    local C = F.COULEURS
     return f:row {
         bind_to_object = F.p,
-        margin = 12,
-        spacing = 12,
-        Vues.listeConversations(f, F, D.liste, D.hauteurListe),
-        f:separator { fill_vertical = 1 },
-        centre,
-        f:separator { fill_vertical = 1 },
-        droite,
+        spacing = 0,
+        margin = 0,
+        surAplat(f, D.volet, D.hauteurContenu, C.fondVolet, Vues.volet(f, F, D)),
+        Vues.aplat(f, D.filet, D.hauteurContenu, C.filetVolet),
+        centre(f, F, D),
+        Vues.aplat(f, D.filet, D.hauteurContenu, C.filetDroite),
+        droite(f, F, D),
     }
 end
 

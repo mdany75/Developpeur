@@ -283,7 +283,7 @@ prefs.cheminConnecteur = '/bin/echo'
 
 -- Une petite image JPEG (en base64) pour le résultat d'outil du faux Claude Code.
 local imageB64 = S.home .. '/image.b64'
-S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/vide-320.png') .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
 S.executer('/usr/bin/base64 -i ' .. S.q(S.home .. '/image.jpg') .. ' -o ' .. S.q(imageB64))
 -- Hérité par relais.sh puis par le faux Claude Code. Une clé d'API ne doit jamais arriver jusqu'à lui.
 local env = 'FAUX_IMAGE_B64=' .. S.q(imageB64) .. ' ANTHROPIC_API_KEY=cle-essai '
@@ -486,14 +486,40 @@ for _, nom in ipairs({ 'emphasis_font', 'emphasis_color', 'default', 'image_name
     PROPRIETES[nom] = true
 end
 
+-- La première vue de l'arbre dont l'infobulle est `infobulle` (un bouton à icône seule, un calque).
+local function parInfobulle(contenu, infobulle)
+    for _, v in ipairs(S.vues(contenu)) do
+        if v.args.tooltip == infobulle then
+            return v
+        end
+    end
+    error('vue introuvable par son infobulle : ' .. tostring(infobulle), 2)
+end
+
+-- Le calque d'Envoyer (Vues.boutonBleu) : la seule vue qui en prend le clic.
+local INFOBULLE_ENVOYER = "Envoyer la demande à Claude (Retour dans le champ aussi)"
+local INFOBULLE_COLLER = "Coller l'image du presse-papiers (capture d'écran, image copiée, photo copiée dans le Finder)"
+
+-- Les cases de la liste des conversations qui en montrent une (genre 'conversation').
+local function casesConversations()
+    local n = 0
+    for _, case in ipairs(Fenetre.cases or {}) do
+        if case.genre == 'conversation' then
+            n = n + 1
+        end
+    end
+    return n
+end
+
 essai('Fenêtre : construction, liaisons et rafraîchissement', function()
-    S.photoActive = { localIdentifier = 53636309, getFormattedMetadata = function() return 'DSCF4961.RAF' end }
+    S.photoActive = S.photo(53636309, 'DSCF4961.RAF')
+    S.photoActive.copie = 'Essai'
     S.selection = { S.photoActive }
     local vues = 0
     S.pendantFenetre = function(args)
         egal('Développeur', args.title)
-        -- La Conversation claire, seule disposition, toujours en grande taille.
-        egal('DeveloppeurClaude-conversation-grande-1', args.save_frame)
+        -- La Conversation claire, seule disposition, toujours en grande taille (fenêtre B : FORME 2).
+        egal('DeveloppeurClaude-conversation-grande-2', args.save_frame)
         local p = Fenetre.p
         vrai(p, 'table de propriétés')
         Fenetre.rafraichir()
@@ -515,8 +541,9 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
             end
         end)
         egal('Flamant rose au zoo', p.titre)
-        egal('Active : DSCF4961     Sélection : 1', p.infoPhoto)
-        egal('Envoyer', p.titreEnvoyer)
+        -- La photo active, nom de sa copie compris (Lightroom.legende), en texte riche.
+        egal('Active : <EM>DSCF4961.RAF (Essai)</EM> · Sélection : <EM>1</EM>', p.infoPhoto)
+        egal(nil, p.titreEnvoyer, "plus de titre lié d'Envoyer (Arrêter est superposé)")
         -- Deux versions en bas à droite : ce module et le connecteur.
         egal('Développeur', p.versionNom1)
         egal('MCP-Développeur', p.versionNom2)
@@ -562,15 +589,19 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
         vrai(relancee, 'le clic relance la liaison en erreur')
         egal('Lightroom', p.texteLightroom)
         Liaison.actif, Liaison.erreur = false, nil
-        -- Le mode « Proposer d'abord » est la préférence de la liaison, dans la même table.
-        egal('Appliquer directement', p.texteMode)
+        -- Le mode « Proposer d'abord » est la préférence de la liaison, dans la même table ; le
+        -- Mode de l'en-tête la montre (plus de voyant Mode).
+        egal('appliquer', p.mode)
+        egal(nil, p.texteMode, 'plus de voyant Mode')
         Lightroom.basculerMode()
         Fenetre.rafraichirMode()
-        egal("Proposer d'abord", p.texteMode)
+        egal('proposer', p.mode)
         egal('proposer', require('Preferences').lire().mode)
         egal('proposer', Chemins.prefs().mode, 'une seule table de préférences')
         Lightroom.basculerMode()
+        Fenetre.rafraichirMode()
         egal('appliquer', require('Preferences').lire().mode)
+        egal('appliquer', p.mode)
         -- Liaison active pour la suite (le bandeau ne montre pas d'aide).
         Liaison.actif = true
         Fenetre.verifier(false)
@@ -592,8 +623,12 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
         egal('message', p.bandeau)
         p.message, p.aide, p.jointes = '', '', ''
         egal('vide', p.bandeau)
-        vrai(#p.listeConversations >= 2, 'en-tête et conversation')
-        egal(Moteur.courante.id, p.selectionListe[1])
+        -- La liste en cases : l'entrée du carnet, l'en-tête du jour, la conversation, choisie.
+        egal('carnet', p.lg1)
+        egal('jour', p.lg2)
+        egal("Aujourd'hui", p.lt2)
+        vrai(casesConversations() >= 1, 'une conversation dans la liste')
+        egal(Moteur.courante.id, Fenetre.choixListe())
         local remplies = 0
         for i = 1, Fenetre.T.lignes do
             if p['t' .. i] ~= '' then
@@ -608,19 +643,6 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
         Fenetre.defiler('fin')
         egal(0, Fenetre.defilement)
         -- Retour : Lightroom reprend le texte du champ, qui part tout seul après un court délai.
-        local function bouton(titre)
-            local trouve
-            parcourir(args.contents, function(v)
-                local t = v.args.title
-                if type(t) == 'table' and t.liaison then
-                    t = p[t.key]
-                end
-                if S.BOUTONS[v.genre] and t == titre then
-                    trouve = v
-                end
-            end)
-            return trouve
-        end
         local avant = #S.taches
         p.saisie = 'Bonjour'
         egal(avant + 1, #S.taches, 'envoi automatique prévu')
@@ -631,25 +653,30 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
         vrai(Moteur.travaille, 'Claude Code reçoit la demande')
         vrai(attendre(function() return not Moteur.travaille end), 'demande envoyée par Retour')
         Fenetre.rafraichir()
-        -- Un clic sur 📋 valide aussi le champ : le texte reste, rien ne part.
+        -- Un clic sur 📋 valide aussi le champ : le texte reste, rien ne part (sa tâche ne tourne
+        -- pas : elle lirait le presse-papiers).
         avant = #S.taches
         p.saisie = 'Avec une photo'
-        bouton('📋').args.action()
+        parInfobulle(args.contents, INFOBULLE_COLLER).args.action()
         S.taches[avant + 1]()
         egal('Avec une photo', p.saisie, 'le texte reste dans le champ')
         egal(true, p.libre)
-        -- Envoyer : une seule demande, même si le clic a aussi validé le champ.
+        -- Envoyer (un bouton bleu en image, son calque) : une seule demande, même si le clic a aussi
+        -- validé le champ.
         avant = #S.taches
         p.saisie = 'Encore une'
-        bouton('Envoyer').args.action()
+        local envoyer = parInfobulle(args.contents, INFOBULLE_ENVOYER)
+        egal('static_text', envoyer.genre, 'Envoyer : un calque')
+        envoyer.args.mouse_down()
         egal('', p.saisie)
+        egal(true, p.bleuEnfonceEnvoyer, "l'image enfoncée")
         S.taches[avant + 1]()
         egal('', p.message, "pas de second envoi (« Écrivez une demande »)")
         S.taches[#S.taches]()
         vrai(attendre(function() return not Moteur.travaille end), 'demande envoyée par Envoyer')
         -- Recherche sans résultat.
         p.recherche = 'zzzz'
-        egal(0, #p.listeConversations, 'aucune conversation trouvée')
+        egal(0, casesConversations(), 'aucune conversation trouvée')
         p.recherche = ''
         -- Clic sur une ligne d'aperçu.
         for i = 1, Fenetre.T.lignes do
@@ -679,16 +706,19 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
 end)
 
 -- Largeur estimée d'une vue, en points : sa largeur donnée, sinon d'après son texte (chasse de
--- Helvetica Neue mesurée, Metriques.lua ; marges des boutons du Mac approchées) ; une rangée
--- additionne ses vues, une colonne prend la plus large.
+-- Helvetica Neue mesurée, Metriques.lua, ramenée à la taille de la police ; marges des boutons du
+-- Mac approchées) ; une rangée additionne ses vues, une colonne prend la plus large, ses marges
+-- comprises.
 local function largeurEstimee(v, p)
     local a = v.args
+    local marges = (a.margin_left or a.margin or 0) + (a.margin_right or a.margin or 0)
     if type(a.width) == 'number' then
         return a.width
     end
-    local petit = a.size == 'small' or (type(a.font) == 'table' and (a.font.size or 13) < 13)
+    local taille = (type(a.font) == 'table' and a.font.size) or ((a.size == 'small' or a.size == 'mini') and 11) or 13
+    local petit = taille < 13
     local function texte(t)
-        return Fil.largeur(tostring(t or ''), 'texte') * (petit and 11 / 13 or 1)
+        return Fil.largeur(tostring(t or ''):gsub('</?EM>', ''), 'texte') * taille / 13
     end
     local function titre()
         local t = a.title
@@ -705,11 +735,16 @@ local function largeurEstimee(v, p)
     end
     local g = v.genre
     if S.BOUTONS[g] then
+        if a.image_name then
+            return 28
+        end
         return texte(titre()) + (petit and 18 or 26)
     elseif g == 'radio_button' or g == 'checkbox' then
         return texte(titre()) + 22
     elseif g == 'static_text' then
         return texte(titre())
+    elseif g == 'spacer' then
+        return 0
     elseif g == 'popup_menu' then
         local items = a.items
         if type(items) == 'table' and items.liaison then
@@ -720,20 +755,30 @@ local function largeurEstimee(v, p)
             max = math.max(max, texte(item.title))
         end
         return max + 40
-    elseif g == 'row' then
+    elseif g == 'row' and a.place ~= 'overlapping' then
         local total = 0
         for _, e in ipairs(enfants) do
             total = total + largeurEstimee(e, p)
         end
-        return total + (a.spacing or 8) * math.max(0, #enfants - 1) + 2 * (a.margin or 0)
-    elseif g == 'column' or g == 'group_box' then
+        return total + (a.spacing or 8) * math.max(0, #enfants - 1) + marges
+    elseif g == 'row' or g == 'column' or g == 'group_box' then
         local max = 0
         for _, e in ipairs(enfants) do
             max = math.max(max, largeurEstimee(e, p))
         end
-        return max + 2 * (a.margin or 0) + (g == 'group_box' and 24 or 0)
+        return max + marges + (g == 'group_box' and 24 or 0)
     end
     return 0
+end
+
+-- Les textes cliquables de la fenêtre qui ne sont pas des calques (Fenetre.calque) : les lignes du
+-- fil, les voyants et le bandeau, chacun avec son propre mouse_down, qui annule l'envoi
+-- automatique.
+local function texteCliquable(v)
+    local t = v.args.title
+    local cle = type(t) == 'table' and t.liaison and (t.key or '') or ''
+    return cle:match('^t%d+$') or cle == 'texteLightroom' or cle == 'texteEcran' or cle == 'aide'
+        or (cle == 'jointes')
 end
 
 essai('Fenêtre : la Conversation claire, seule disposition', function()
@@ -751,10 +796,12 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         local p = Fenetre.p
         egal('Développeur', args.title)
         -- Le cadre enregistré garde son nom (Lightroom ne rapetisse pas une fenêtre rouverte,
-        -- constaté) : celui de la Conversation claire en grande taille.
+        -- constaté) : celui de la Conversation claire en grande taille, FORME 2 (fenêtre B).
         egal('DeveloppeurClaude-conversation-grande-' .. Fenetre.FORME, args.save_frame)
+        egal(2, Fenetre.FORME)
         Fenetre.rafraichir()
-        local n, boutons, textes, radios, menus, images, lignes = 0, {}, {}, {}, {}, {}, 0
+        local n, boutons, textes, radios, menus, lignes, calques = 0, {}, {}, {}, {}, 0, 0
+        local apercu
         parcourir(args.contents, function(v)
             n = n + 1
             for cle, valeur in pairs(v.args) do
@@ -777,8 +824,18 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 -- Le clic d'un bouton valide aussi le champ de demande : tous passent par
                 -- Fenetre.bouton, qui annule l'envoi automatique.
                 vrai(Fenetre.parBouton(v.args.action), nom .. ' : bouton hors de Fenetre.bouton : ' .. tostring(titre))
-                boutons[tostring(titre)] = v
-            elseif v.genre == 'static_text' and type(v.args.title) == 'table' and v.args.title.liaison then
+                boutons[tostring(titre or v.args.tooltip)] = v
+            elseif v.genre == 'static_text' and type(v.args.mouse_down) == 'function' then
+                -- Un clic sur un texte : un calque (Fenetre.calque), ou un texte cliquable connu.
+                if Fenetre.parCalque(v.args.mouse_down) then
+                    calques = calques + 1
+                    egal('', v.args.title, nom .. ' : un calque est un texte vide')
+                    vrai(type(v.args.width) == 'number' and type(v.args.height) == 'number', nom .. ' : un calque de taille fixe')
+                else
+                    vrai(texteCliquable(v), nom .. ' : clic sur un texte hors de Fenetre.calque')
+                end
+            end
+            if v.genre == 'static_text' and type(v.args.title) == 'table' and v.args.title.liaison then
                 textes[v.args.title.key] = textes[v.args.title.key] or v
                 if v.args.title.key:match('^t%d+$') then
                     lignes = lignes + 1
@@ -786,12 +843,15 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 end
             elseif v.genre == 'radio_button' then
                 radios[#radios + 1] = v.args.checked_value
-                egal('onglet', v.args.value.key)
+                egal('mode', v.args.value.key, nom .. ' : les seuls radios sont ceux du Mode')
             elseif v.genre == 'popup_menu' and type(v.args.value) == 'table' then
                 menus[v.args.value.key] = v
-            elseif v.genre == 'picture' then
-                images[#images + 1] = v
+            elseif v.genre == 'picture' and type(v.args.value) == 'table' and v.args.value.key == 'imageApercu' then
+                apercu = v
             end
+            -- Aucun bouton par défaut (repli du lot B0) ; aucun séparateur (des aplats).
+            egal(nil, v.args.default, nom .. ' : bouton par défaut')
+            vrai(v.genre ~= 'separator' or v.args.fill_horizontal, nom .. ' : séparateur hors des cartes')
             -- Les variantes superposées ont la même largeur (une vue masquée garde sa place).
             if v.args.place == 'overlapping' then
                 local largeur
@@ -814,9 +874,15 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end)
         vues[nom] = n
-        -- Envoyer et 📋, le voyant de la liaison cliquable, le bandeau, les deux versions.
-        vrai(boutons['Envoyer'] and boutons['📋'] and boutons['📎'], nom .. ' : Envoyer, 📋 et 📎')
+        egal(nil, S.boutonParDefaut(), nom .. ' : aucun bouton par défaut')
+        -- Envoyer (calque d'un bouton bleu), 📋 et 📎 (carrés à icône seule), le voyant de la liaison
+        -- cliquable, le bandeau, les deux versions.
+        vrai(parInfobulle(args.contents, INFOBULLE_ENVOYER) and boutons[INFOBULLE_COLLER]
+            and boutons["Joindre une photo du disque à la demande"], nom .. ' : Envoyer, 📋 et 📎')
+        egal('square_button', boutons[INFOBULLE_COLLER].genre)
+        vrai(boutons[INFOBULLE_COLLER].args.image_name:find('/images/presse%-papiers%.png$'), nom .. " : l'icône de 📋")
         vrai(textes.texteLightroom and textes.texteLightroom.args.mouse_down, nom .. ' : voyant de la liaison cliquable')
+        vrai(calques >= D.cases + #D.onglets + 1, nom .. ' : calques des cases, des segments et d\'Envoyer (' .. calques .. ')')
         local bandeau = 0
         parcourir(args.contents, function(v)
             if v.genre == 'static_text' and type(v.args.visible) == 'table' then
@@ -826,14 +892,12 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end)
         egal(3, bandeau, nom .. ' : les trois états du bandeau')
-        -- Le menu Style, sans étiquette ni rappel : au bout de la rangée des invites quand il y
-        -- tient (Sports en est la dernière), sinon sur une rangée à lui.
+        -- Le menu Style, sous le champ, précédé de son étiquette « Style » (maquette), et plus au
+        -- bout de la rangée des invites.
         local style, rangeeStyle, rangeeSports
         parcourir(args.contents, function(v)
             if v.genre == 'popup_menu' and type(v.args.value) == 'table' and v.args.value.key == 'style' then
                 style = v
-            elseif v.genre == 'static_text' and (v.args.title == 'Style' or v.args.title == 'Style :') then
-                vrai(false, nom .. ' : étiquette Style')
             elseif v.genre == 'row' then
                 for _, enfant in ipairs(v.args) do
                     if type(enfant) == 'table' and enfant.genre == 'popup_menu' and type(enfant.args.value) == 'table'
@@ -846,8 +910,15 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end)
         vrai(style, nom .. ' : menu Style')
-        vrai(rangeeStyle and rangeeStyle == rangeeSports, nom .. ' : Style à droite des invites')
-        -- ▲ ▼ de la carte Note, de la proposition et de la carte Pourquoi ? (1.3), en petit : six.
+        vrai(rangeeStyle and rangeeStyle ~= rangeeSports, nom .. ' : Style sous le champ, plus avec les invites')
+        local etiquette
+        for _, enfant in ipairs(rangeeStyle.args) do
+            if type(enfant) == 'table' and enfant.genre == 'static_text' and enfant.args.title == 'Style' then
+                etiquette = enfant
+            end
+        end
+        vrai(etiquette, nom .. ' : étiquette « Style » devant le menu')
+        -- ▲ ▼ de la carte Note, de la proposition et de la carte de l'étape (1.3), en petit : six.
         local fleches = {}
         parcourir(args.contents, function(v)
             if S.BOUTONS[v.genre] and (v.args.title == '▲' or v.args.title == '▼') and v.args.size == 'mini' then
@@ -857,22 +928,16 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         table.sort(fleches)
         egal('etapeDescend etapeMonte noteDescend noteMonte propositionDescend propositionMonte', table.concat(fleches, ' '),
             nom .. ' : flèches des cartes')
-        -- Chaque rangée tient dans sa colonne, sans la marge de l'estimation générale : les trois
-        -- onglets (Note, Proposition, Pourquoi ?) dans la colonne de droite, les sept invites et le
-        -- menu Style dans celle du fil (1.3 : Composition ajoutée avant Sports).
-        local rangeeOnglets
-        parcourir(args.contents, function(v)
-            if v.genre == 'row' and type(v.args[1]) == 'table' and v.args[1].genre == 'radio_button' then
-                rangeeOnglets = v
-            end
-        end)
-        local largeurOnglets, largeurInvites = largeurEstimee(rangeeOnglets, p), largeurEstimee(rangeeSports, p)
-        vrai(largeurOnglets <= D.droite, string.format('%s : onglets de %d points dans %d', nom, largeurOnglets, D.droite))
+        -- Les sept invites (1.3 : Composition ajoutée avant Sports), en carrés de 24 de bezel, tiennent
+        -- dans le centre.
+        local largeurInvites = largeurEstimee(rangeeSports, p)
         vrai(largeurInvites <= D.fil, string.format('%s : invites de %d points dans %d', nom, largeurInvites, D.fil))
         local invites = {}
         for _, enfant in ipairs(rangeeSports.args) do
             if type(enfant) == 'table' and S.BOUTONS[enfant.genre] then
                 invites[#invites + 1] = enfant.args.title
+                egal('square_button', enfant.genre, nom .. ' : invite en carré')
+                egal(24, S.bezelVisible(enfant), nom .. ' : bezel de 24 (maquette)')
             end
         end
         egal('Retouche pro Portrait Paysage Noir et blanc ISO élevé Composition Sports', table.concat(invites, ' '), nom .. ' : invites')
@@ -907,8 +972,8 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         local etat = rangeeJeLeFais.rangee.args[2]
         vrai(etat and etat.genre == 'static_text' and etat.args.title.key == 'exerciceEtat', nom .. " : l'état de l'exercice à droite")
         egal('', p.exerciceEtat)
-        -- La carte Pourquoi ? (1.3) : titre, sous-titre, texte de D.etapeLignes lignes, puis ◀ ▶,
-        -- Voir l'avant (titre lié), Détail… et ▲ ▼, tous en petit, inactifs à l'ouverture.
+        -- La carte de l'étape (1.3, onglet Aperçu) : titre, sous-titre, texte de D.etapeLignes lignes,
+        -- puis ◀ ▶, Voir l'avant (titre lié), Détail… et ▲ ▼, tous en petit, inactifs à l'ouverture.
         local carteEtape
         parcourir(args.contents, function(v)
             for _, enfant in ipairs(v.args) do
@@ -918,7 +983,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 end
             end
         end)
-        vrai(carteEtape, nom .. ' : carte Pourquoi ?')
+        vrai(carteEtape, nom .. " : carte de l'étape")
         local champs, boutonsEtape = {}, {}
         parcourir(carteEtape, function(v)
             local t = v.args.title
@@ -936,10 +1001,10 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 egal(false, p[v.args.enabled.key], nom .. ' : ' .. v.args.enabled.key .. ' inactif à l\'ouverture')
             end
         end)
-        egal('Pourquoi ? etapeTitre etapeSousTitre etapeTexte', table.concat(champs, ' '), nom .. ' : textes de la carte Pourquoi ?')
+        egal('Pourquoi ? etapeTitre etapeSousTitre etapeTexte', table.concat(champs, ' '), nom .. " : textes de la carte de l'étape")
         egal("◀/small/etapePrecedente ▶/small/etapeSuivante Voir l'avant/small/etapeAImages Détail…/small/etapeADetail "
-            .. '▲/mini/etapeMonte ▼/mini/etapeDescend', table.concat(boutonsEtape, ' '), nom .. ' : boutons de la carte Pourquoi ?')
-        -- Les rangées de boutons de la carte Pourquoi ? et la seconde de la carte Proposition
+            .. '▲/mini/etapeMonte ▼/mini/etapeDescend', table.concat(boutonsEtape, ' '), nom .. " : boutons de la carte de l'étape")
+        -- Les rangées de boutons de la carte de l'étape et la seconde de la carte Proposition
         -- tiennent dans leur carte, avec l'un et l'autre titre lié (Voir l'avant ou Voir l'après ;
         -- Je le fais ou J'ai fini).
         local rangeeEtape
@@ -948,7 +1013,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 rangeeEtape = enfant
             end
         end
-        vrai(rangeeEtape, nom .. ' : rangée des boutons de la carte Pourquoi ?')
+        vrai(rangeeEtape, nom .. " : rangée des boutons de la carte de l'étape")
         for _, titres in ipairs({ { "Voir l'avant", 'Je le fais' }, { "Voir l'après", "J'ai fini" } }) do
             p.titreBascule, p.titreJeLeFais = titres[1], titres[2]
             local largeurEtape, largeurJeLeFais = largeurEstimee(rangeeEtape, p), largeurEstimee(rangeeJeLeFais.rangee, p)
@@ -958,7 +1023,8 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 largeurJeLeFais, D.largeurProposition, titres[2]))
         end
         p.titreBascule, p.titreJeLeFais = "Voir l'avant", 'Je le fais'
-        vrai(textes.versionNom1 and textes.versionNom2 and not textes.versionNom3, nom .. ' : deux versions')
+        -- Les deux versions, une ligne chacune, en bas du volet.
+        vrai(textes.versionTexte1 and textes.versionTexte2 and not textes.versionTexte3, nom .. ' : deux versions')
         vrai(textes.message and textes.aide, nom .. ' : message et aide')
         -- Le fil : D.lignes lignes, une variante par style.
         egal(D.lignes * #Fenetre.STYLES, lignes, nom .. ' : lignes du fil')
@@ -969,45 +1035,35 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end
         vrai(remplies > 5, nom .. ' : le fil est rempli (' .. remplies .. ' lignes)')
-        -- L'aperçu : un cadre fixe, et son image « aucun aperçu » existe à ce format.
-        egal(1, #images, nom .. ' : un aperçu')
-        egal(D.apercu, images[1].args.width)
-        egal(D.apercuHauteur or D.apercu, images[1].args.height)
+        -- L'aperçu : un cadre 3:2 fixe, commun aux onglets, et son image « aucun aperçu » existe à
+        -- ce format, dans le jeu de l'apparence.
+        vrai(apercu, nom .. ' : un aperçu')
+        egal(D.apercu, apercu.args.width)
+        egal(D.apercuHauteur, apercu.args.height)
+        egal(nil, apercu.args.visible, nom .. ' : aperçu toujours montré')
         vrai(Fichiers.existe(Fenetre.imageVide()), nom .. ' : ' .. Fenetre.imageVide())
+        vrai(Fenetre.imageVide():find('/images/vide%-330x220%.png$'), Fenetre.imageVide())
         -- Ni modèle, ni effort, ni disposition dans la fenêtre : ils se choisissent dans le
         -- Gestionnaire de modules externes (demandé par Dany le 20 octobre 2026).
         vrai(not menus.modele and not menus.effort and not menus.disposition, nom .. ' : ni modèle, ni effort, ni disposition')
         egal(nil, p.modele)
         egal(nil, p.disposition)
-        -- Publication et Consommation, juste au-dessus des versions.
+        -- Dans le volet, de haut en bas : Nouvelle conversation, Renommer… et Supprimer…,
+        -- Publication… et Consommation…, les versions, le voyant Écran.
         local ordre = {}
         parcourir(args.contents, function(v)
             local t = v.args.title
-            if S.BOUTONS[v.genre] and (t == 'Publication…' or t == 'Consommation…') then
+            if S.BOUTONS[v.genre] and (t == '＋ Nouvelle conversation' or t == 'Renommer…' or t == 'Supprimer…'
+                or t == 'Publication…' or t == 'Consommation…') then
                 ordre[#ordre + 1] = t
-            elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'versionNom1' and ordre[#ordre] ~= 'versions' then
+            elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'versionTexte1' and ordre[#ordre] ~= 'versions' then
                 ordre[#ordre + 1] = 'versions'
+            elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'texteEcran' then
+                ordre[#ordre + 1] = 'écran'
             end
         end)
-        egal('Publication… Consommation… versions', table.concat(ordre, ' '), nom .. ' : Publication et Consommation au-dessus des versions')
-        -- … en bas de leur colonne : l'espace qui grandit au-dessus, puis le séparateur et les
-        -- versions au-dessous.
-        local voisins
-        parcourir(args.contents, function(v)
-            for k, enfant in ipairs(v.args) do
-                if type(enfant) == 'table' and enfant.genre == 'row' and type(enfant.args[1]) == 'table'
-                    and enfant.args[1].args.title == 'Publication…' then
-                    local function genre(e)
-                        if type(e) ~= 'table' or not e.genre then
-                            return 'rien'
-                        end
-                        return e.genre == 'spacer' and e.args.fill_vertical and 'espace' or e.genre
-                    end
-                    voisins = genre(v.args[k - 1]) .. ' ' .. genre(v.args[k + 1])
-                end
-            end
-        end)
-        egal('espace separator', voisins, nom .. ' : en bas de la colonne')
+        egal('＋ Nouvelle conversation Renommer… Supprimer… Publication… Consommation… versions écran', table.concat(ordre, ' '),
+            nom .. ' : le volet')
         -- La carte Note, avec la note posée de la photo active.
         vrai(textes.notationProposee and textes.notationTexte, nom .. ' : carte Note')
         vrai(boutons['Accepter'] and boutons['Changer…'], nom .. ' : boutons de la note')
@@ -1024,21 +1080,22 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         egal(nil, boutons['Séance…'], nom .. ' : plus de Séance de notation (1.1.1)')
         egal('Note posée : ★★☆☆☆', p.notationPosee)
         egal('DSCF4961', p.notationNom)
-        -- Conversations : la liste, à gauche ; plus de menu des conversations (Atelier, Panneau retirés).
+        -- Le titre de la conversation, sans ✎ (Renommer… est dans le volet), et la photo active.
         vrai(textes.titre and textes.infoPhoto, nom .. ' : titre et photo active')
-        -- Les onglets Note (par défaut), Proposition et Pourquoi ? (1.3) en tête, puis l'aperçu,
-        -- toujours montré, et la carte choisie sous Agrandir ; plus de « Ce que Claude voit ».
-        egal('notation proposition etape', table.concat(radios, ' '))
+        egal(nil, boutons['✎'], nom .. ' : plus de ✎')
+        -- Le Mode : trois radios ; les onglets sont des segments en images (plus de radios).
+        egal('appliquer proposer jelefais', table.concat(radios, ' '), nom .. ' : les radios du Mode')
         egal('notation', p.onglet, nom .. " : la carte Note sous l'aperçu par défaut")
-        egal(nil, images[1].args.visible, nom .. ' : aperçu toujours montré')
+        -- À droite, de haut en bas : les segments, l'aperçu, Agrandir, puis les cartes superposées
+        -- (étape, proposition, note) ; plus de « Ce que Claude voit », ni Publication… à droite.
         local suite = {}
         parcourir(args.contents, function(v)
             local t = v.args.title
-            if v.genre == 'picture' then
+            if v == apercu then
                 suite[#suite + 1] = 'apercu'
-            elseif S.BOUTONS[v.genre] and t == 'Agrandir' then
+            elseif S.BOUTONS[v.genre] and t == '⤢ Agrandir' then
                 suite[#suite + 1] = 'agrandir'
-            elseif v.genre == 'radio_button' and v.args.checked_value == 'notation' then
+            elseif v.genre == 'static_text' and v.args.tooltip == 'Aperçu' and Fenetre.parCalque(v.args.mouse_down) then
                 suite[#suite + 1] = 'onglets'
             elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'notationNom' then
                 suite[#suite + 1] = 'note'
@@ -1046,15 +1103,13 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 suite[#suite + 1] = 'proposition'
             elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'etapeTexte' then
                 suite[#suite + 1] = 'etape'
-            elseif S.BOUTONS[v.genre] and t == 'Publication…' then
-                suite[#suite + 1] = 'publication'
             end
         end)
-        egal('onglets apercu agrandir note proposition etape publication', table.concat(suite, ' '), nom .. ' : colonne de droite')
+        egal('onglets apercu agrandir etape proposition note', table.concat(suite, ' '), nom .. ' : colonne de droite')
         parcourir(args.contents, function(v)
             vrai(v.args.title ~= "Ce que Claude voit", nom .. ' : plus de « Ce que Claude voit »')
         end)
-        vrai(#p.listeConversations >= 2, nom .. ' : liste des conversations')
+        vrai(casesConversations() >= 1, nom .. ' : liste des conversations')
     end
     Fenetre.afficher()
     vrai(construite, nom .. ' : fenêtre construite')
@@ -1200,20 +1255,32 @@ essai("Fenêtre : le voyant Écran, lu à l'ouverture ; un clic le relit et donn
         local p = Fenetre.p
         egal('Écran', p.texteEcran)
         egal('neutre', p.etatEcran)
-        -- Quatre voyants, l'écran en dernier, chacun à la largeur des voyants.
+        -- Trois voyants (plus de voyant Mode : le Mode est dans l'en-tête) : l'écran en bas du volet
+        -- (de la 1.2, sous les versions), Claude Code et Lightroom dans l'en-tête ; chacun avec sa
+        -- pastille en images, une par état, à côté de son texte.
         local voyants, voyant = {}, nil
+        local largeurs = { texteClaude = Fenetre.T.voyantClaude, texteLightroom = Fenetre.T.voyantLightroom,
+            texteEcran = Fenetre.T.liste - 14 }
         parcourir(args.contents, function(v)
             local t = v.args.title
-            if v.genre == 'static_text' and type(t) == 'table' and t.liaison
-                and (t.key == 'texteClaude' or t.key == 'texteLightroom' or t.key == 'texteMode' or t.key == 'texteEcran') then
-                voyants[#voyants + 1] = t.key
-                egal(Fenetre.T.voyant, v.args.width, t.key)
-                if t.key == 'texteEcran' then
-                    voyant = v
+            if v.genre == 'row' and type(v.args[2]) == 'table' and v.args[2].genre == 'static_text'
+                and type(v.args[2].args.title) == 'table' and largeurs[v.args[2].args.title.key] then
+                local cle = v.args[2].args.title.key
+                voyants[#voyants + 1] = cle
+                egal(largeurs[cle], v.args[2].args.width, cle)
+                local pastilles = {}
+                for _, image in ipairs(v.args[1].args) do
+                    egal('picture', image.genre, cle .. ' : pastille en image')
+                    pastilles[#pastilles + 1] = image.args.value:match('([^/]+)%.png$')
+                end
+                egal('pastille-vert pastille-orange pastille-rouge pastille-gris', table.concat(pastilles, ' '), cle .. ' : pastilles')
+                if cle == 'texteEcran' then
+                    voyant = v.args[2]
                 end
             end
         end)
-        egal('texteClaude texteLightroom texteMode texteEcran', table.concat(voyants, ' '))
+        egal('texteEcran texteClaude texteLightroom', table.concat(voyants, ' '))
+        egal(nil, p.texteMode, 'plus de voyant Mode')
         vrai(voyant and voyant.args.mouse_down and voyant.args.tooltip:find('profil de couleur', 1, true), "voyant de l'écran cliquable")
         -- À l'ouverture (Fenetre.verifier(true)) : l'écran d'usine du Mac de Dany, non étalonné.
         prefs.cheminConnecteur = fauxConnecteurEcran(ECRAN_USINE)
@@ -1836,7 +1903,7 @@ essai("Fenêtre : sans bouton par défaut, Retour dans « Rechercher » n'envoie
     vrai(construite, 'fenêtre construite')
 end)
 
-essai("Fenêtre : un clic sur 📋 ou sur un onglet valide la demande tapée sans l'envoyer (D3) ; une carte cachée ne prend aucun clic (D11)", function()
+essai("Fenêtre : un clic sur 📋 ou sur un segment (calque) valide la demande tapée sans l'envoyer (D3) ; une carte cachée ne prend aucun clic (D11)", function()
     S.photoActive = S.photo(53636309, 'DSCF4961.RAF')
     S.selection = { S.photoActive }
     local envoyer, envoyees = Fenetre.envoyer, {}
@@ -1848,32 +1915,30 @@ essai("Fenêtre : un clic sur 📋 ou sur un onglet valide la demande tapée san
         construite = true
         local p = Fenetre.p
         Fenetre.coller = function() collages = collages + 1 end
-        local champ, radios = nil, {}
+        local champ
         for _, v in ipairs(S.vues(args.contents)) do
             if v.genre == 'edit_field' and type(v.args.value) == 'table' and v.args.value.key == 'saisie' then
                 champ = v
-            elseif v.genre == 'radio_button' then
-                radios[v.args.checked_value] = v
             end
         end
         Fenetre.envoyer = function(texte) envoyees[#envoyees + 1] = texte end
         -- 📋 : la demande validée par le clic reste dans le champ, rien ne part.
         local taches = #S.taches
         S.taper(champ, 'Avec une photo')
-        S.cliquer(S.trouverBouton(args.contents, '📋'))
+        S.cliquer(parInfobulle(args.contents, INFOBULLE_COLLER))
         egal('Avec une photo', p.saisie, 'validée par le clic')
         egal(nil, Fenetre.envoiAuto, "le bouton annule l'envoi automatique")
         egal(taches + 2, #S.taches, "l'envoi automatique prévu par la validation, puis la tâche de 📋")
         S.taches[taches + 1]()
         egal(0, #envoyees, 'rien envoyé')
         egal('Avec une photo', S.texteChamp(champ), 'le texte reste dans le champ')
-        -- Un onglet : de même (Fenetre.ongletChange annule l'envoi automatique).
+        -- Un segment (son calque) : de même (Fenetre.calque annule l'envoi automatique).
         S.taper(champ, ', Proposition')
         egal('notation', p.onglet)
         local refuser, changer = S.trouverBouton(args.contents, 'Refuser'), S.trouverBouton(args.contents, 'Changer…')
         refuse(function() S.cliquer(refuser) end, 'D11', 'Refuser, carte Proposition cachée')
         taches = #S.taches
-        S.cliquer(radios.proposition)
+        S.cliquer(parInfobulle(args.contents, 'Proposition'))
         egal('proposition', p.onglet)
         egal('Avec une photo, Proposition', p.saisie, "validée par le clic de l'onglet")
         egal(nil, Fenetre.envoiAuto, "l'onglet annule l'envoi automatique")
@@ -1883,7 +1948,7 @@ essai("Fenêtre : un clic sur 📋 ou sur un onglet valide la demande tapée san
         -- La carte Note est cachée ; Refuser est montré, inactif sans proposition.
         refuse(function() S.cliquer(changer) end, 'D11', 'Changer…, carte Note cachée')
         refuse(function() S.cliquer(refuser) end, 'inactive', 'Refuser sans proposition')
-        S.cliquer(radios.notation)
+        S.cliquer(parInfobulle(args.contents, 'Note'))
         p.saisie = ''
         Fenetre.envoyer, Fenetre.coller = envoyer, coller
     end
@@ -2182,7 +2247,7 @@ essai('Coller : image et fichier du presse-papiers (presse-papiers nommé, jamai
     local function osa(code)
         return S.executer("/usr/bin/osascript -l JavaScript -e " .. S.q("ObjC.import('AppKit'); var pp = $.NSPasteboard.pasteboardWithName('" .. nom .. "'); pp.clearContents; " .. code .. "; 'ok'") .. " >/dev/null")
     end
-    local png = S.plugin .. '/vide-320.png'
+    local png = S.plugin .. '/images/vide-330x220.png'
     vrai(osa("pp.setDataForType($.NSData.dataWithContentsOfFile('" .. png .. "'), 'public.png')"))
     local chemins = Images.coller(nom)
     egal(1, #chemins)

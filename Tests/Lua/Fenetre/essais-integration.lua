@@ -59,7 +59,7 @@ end
 local JPEG
 do
     local chemin = S.home .. '/source.jpg'
-    S.executer('/usr/bin/sips -s format jpeg -z 200 300 ' .. S.q(S.plugin .. '/vide-320.png') .. ' --out ' .. S.q(chemin) .. ' >/dev/null 2>&1')
+    S.executer('/usr/bin/sips -s format jpeg -z 200 300 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(chemin) .. ' >/dev/null 2>&1')
     local f = assert(io.open(chemin, 'rb'), 'JPEG source')
     JPEG = f:read('*a')
     f:close()
@@ -157,6 +157,14 @@ local function parcourir(vue, fn)
             parcourir(enfant, fn)
         end
     end
+end
+
+-- La légende de la photo active sous l'aperçu (fenêtre B, Lightroom.legende) : son nom en texte
+-- riche, puis la date de prise de vue de PHOTOS, à l'heure locale (LrDate simulé : os.date).
+local function legende(id)
+    local t = PHOTOS[id].date
+    return string.format('<EM>%s</EM> · %d %s %s', PHOTOS[id].nom, tonumber(os.date('%d', t)),
+        require('Carnet').MOIS_COURTS[tonumber(os.date('%m', t))], os.date('%Y', t))
 end
 
 -- Ouvre la fenêtre Claude et appelle fn(p, args) pendant qu'elle est ouverte.
@@ -303,7 +311,7 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
         local accepter
         parcourir(args.contents, function(v)
             -- Celui de la carte Note (la proposition de retouche a aussi le sien).
-            if v.genre == 'push_button' and v.args.title == 'Accepter' and type(v.args.enabled) == 'table'
+            if S.BOUTONS[v.genre] and v.args.title == 'Accepter' and type(v.args.enabled) == 'table'
                 and v.args.enabled.key == 'peutAccepterNote' then
                 accepter = v
             end
@@ -319,7 +327,7 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
         egal('acceptee', Notation.proposition(2003).etat)
         Fenetre.majPhoto()
         Fenetre.rafraichirNotation()
-        egal('vert', p.notationCouleur)
+        egal('coche', p.notationCouleur)
         egal('Note posée : ★★☆☆☆', p.notationPosee)
     end)
     sansErreur()
@@ -385,7 +393,7 @@ essai('Ouverture : l\'aperçu montre la photo active ; une image de Claude la re
     S.selection = { PHOTOS[2004] }
     Moteur.courante = Conversation.nouvelle()
     ouvrirFenetre(function(p)
-        egal('Photo active · DSCF2004', p.legendeApercu)
+        egal(legende(2004), p.legendeApercu)
         -- La vignette se prépare dans une tâche (rappel de Lightroom, puis sips). Fichier Fujifilm :
         -- le connecteur (ici un faux, qui recopie la vignette) y dessine le point de mise au point.
         local Vignettes = require 'Vignettes'
@@ -412,9 +420,9 @@ essai('Ouverture : l\'aperçu montre la photo active ; une image de Claude la re
         egal(true, p.aImage, 'Agrandir actif')
         vrai(Fenetre.apercuActif.fichier:find('%-af%.jpg$'), 'la vignette marquée par le connecteur : ' .. Fenetre.apercuActif.fichier)
         local l, h = Images.dimensions(p.imageApercu)
-        egal(Fenetre.T.apercu, l, 'au cadre de l\'aperçu')
-        egal(Fenetre.T.apercuHauteur or Fenetre.T.apercu, h)
-        egal('Photo active · DSCF2004', p.legendeApercu)
+        egal(Fenetre.T.pixelsApercu, l, 'au cadre de l\'aperçu, en 2x')
+        egal(Fenetre.T.pixelsApercuHauteur, h)
+        egal(legende(2004), p.legendeApercu)
         egal(false, p.peutPrecedente, 'aucune image dans la conversation')
         egal(false, p.peutSuivante)
         -- Claude regarde une photo : son image se montre à la place.
@@ -430,7 +438,7 @@ essai('Ouverture : l\'aperçu montre la photo active ; une image de Claude la re
         egal(true, p.peutSuivante, '▶ : vers la photo active')
         -- ▶ : la photo active (vignette gardée) ; ◀ : de nouveau l'image de Claude.
         Fenetre.changerImage(1)
-        egal('Photo active · DSCF2004', p.legendeApercu)
+        egal(legende(2004), p.legendeApercu)
         egal(true, p.aImage)
         egal(true, p.peutPrecedente)
         Fenetre.changerImage(-1)
@@ -445,7 +453,7 @@ essai('Ouverture : l\'aperçu montre la photo active ; une image de Claude la re
         Fenetre.majPhoto()
         prefs.nouvelleParPhoto = true
         egal(c, Moteur.courante)
-        egal('Photo active · DSCF2005', p.legendeApercu)
+        egal(legende(2005), p.legendeApercu)
         egal(avant + 1, #S.taches, 'vignette de la nouvelle photo demandée')
         S.taches[#S.taches]()
         egal(true, p.aImage)
@@ -505,16 +513,16 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
         vrai(n, "la ligne de l'étape")
         local taches = #S.taches
         Fenetre.cliquerLigne(n)
-        egal('etape', p.onglet)
+        egal('apercu', p.onglet)
         for i = taches + 1, #S.taches do
             S.taches[i]()
         end
-        -- L'après, copié dans le dossier de la fenêtre et réduit par sips au cadre de 320 de l'aperçu.
+        -- L'après, copié dans le dossier de la fenêtre et réduit par sips au cadre de l'aperçu, en 2x (660 × 440).
         contient(p.imageApercu, '/Temporaire/Pourquoi/2004/')
-        contient(p.imageApercu, '/.vignettes/' .. id .. '-apres-320.jpg')
+        contient(p.imageApercu, '/.vignettes/' .. id .. '-apres-cadre-660x440.jpg')
         local l, h = Images.dimensions(p.imageApercu)
-        egal(Fenetre.T.apercu, l, 'vignette de 320')
-        egal(Fenetre.T.apercu, h)
+        egal(Fenetre.T.pixelsApercu, l, 'vignette de 660 × 440')
+        egal(Fenetre.T.pixelsApercuHauteur, h)
         egal('Étape 1 sur 1 · après', p.legendeApercu)
         egal('Étape 1 sur 1 · passe 1 : lumière', p.etapeTitre)
         egal('DSCF2004.RAF · apply_settings', p.etapeSousTitre)
@@ -524,21 +532,21 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
         -- Voir l'avant : sa vignette, au même cadre.
         local voir
         parcourir(args.contents, function(v)
-            if v.genre == 'push_button' and type(v.args.enabled) == 'table' and v.args.enabled.key == 'etapeAImages' then
+            if S.BOUTONS[v.genre] and type(v.args.enabled) == 'table' and v.args.enabled.key == 'etapeAImages' then
                 voir = v
             end
         end)
         voir.args.action()
         contient(p.imageApercu, '/Temporaire/Pourquoi/2004/')
-        contient(p.imageApercu, '/.vignettes/' .. id .. '-avant-320.jpg')
+        contient(p.imageApercu, '/.vignettes/' .. id .. '-avant-cadre-660x440.jpg')
         l, h = Images.dimensions(p.imageApercu)
-        egal(Fenetre.T.apercu, l)
-        egal(Fenetre.T.apercu, h)
+        egal(Fenetre.T.pixelsApercu, l)
+        egal(Fenetre.T.pixelsApercuHauteur, h)
         egal('Étape 1 sur 1 · avant', p.legendeApercu)
         -- Agrandir : l'avant et l'après côte à côte, à leur taille (dans 540 × 700).
         local agrandir
         parcourir(args.contents, function(v)
-            if v.genre == 'push_button' and v.args.title == 'Agrandir' then
+            if S.BOUTONS[v.genre] and v.args.title == '⤢ Agrandir' then
                 agrandir = v
             end
         end)

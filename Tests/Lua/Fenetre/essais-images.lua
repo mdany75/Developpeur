@@ -6,10 +6,11 @@
 -- image dans les deux jeux (images/ et images/sombre/), un seul PNG en 2x (2 × la taille en points,
 -- en-tête IHDR lu en Lua pur) à 144 ppp (bloc pHYs : 5 669 pixels par mètre), aux mêmes tailles,
 -- la sombre autre que la claire, sans image de trop ni paire @2x, et ce contrôle lui-même, sur des
--- PNG fabriqués ; l'image « aucun aperçu » du cadre 3:2 (vide-330x220.png, 660 × 440) ;
--- scripts/gabarits.lua, qui écrit Dispositions.gabarits en JSON pour scripts/images-fenetre.swift ;
--- et ce script lui-même, lancé sur un module d'essai d'un dossier temporaire (jamais sur celui du
--- dépôt) : ce qu'il produit, et ses refus. Ni Lightroom, ni Claude.
+-- PNG fabriqués ; l'image « aucun aperçu » du cadre 3:2 (vide-330x220.png, 660 × 440), dans le jeu
+-- de chaque apparence ; scripts/gabarits.lua, qui écrit Dispositions.gabarits en JSON pour
+-- scripts/images-fenetre.swift et scripts/images-vides.swift ; et ces scripts eux-mêmes, lancés sur
+-- un module d'essai d'un dossier temporaire (jamais sur celui du dépôt) : ce qu'ils produisent, et
+-- leurs refus. Ni Lightroom, ni Claude.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
 local S = require 'Simulation'
@@ -216,6 +217,10 @@ local MAQUETTE = {
     fondSegment = 'FFFFFF', bordSegment = 'B5B5B5', filetSegment = 'D0D0D0', selection = 'DADADA',
     pastille = '2DA44E', contour = '8A8A8A', bleuBouton = '0A64D8', bordBleu = '0A5BC4', bleuPresse = '084A9E',
     bleuInactif = '9DBDEB', bordBleuInactif = '88AEE2',
+    -- Lot B3 : le fond de l'aperçu (#2B2B2B de la maquette, celui des vignettes), le texte de
+    -- l'image « aucun aperçu » (celui de la 1.2, blanc à 62 %) et le titre d'un bouton bleu inactif
+    -- (blanc, sur l'image pâlie).
+    fondApercu = '2B2B2B', texteApercu = '9E9E9E', titreInactif = 'FFFFFF',
 }
 
 local function cles(t)
@@ -349,6 +354,8 @@ local PAIRES = {
     { 'ambre', { 'fondPanneau', 'fondCarte' } },
     { 'blanc', { 'bleuBouton', 'bleuPresse' } },
     { 'contour', { 'fondPanneau', 'fondCarte' } },
+    { 'texteApercu', { 'fondApercu' } },
+    { 'titreInactif', { 'bleuInactif' } },
 }
 
 essai('Palette sombre : chaque texte se lit au moins aussi bien qu\'en claire, à 4,5:1 au moins là où la claire y est', function()
@@ -382,6 +389,25 @@ essai('Palette sombre : chaque texte se lit au moins aussi bien qu\'en claire, �
     -- fond de la colonne droite sombre.
     vrai(contraste(claire.bleu, sombre.fondDroite) < math.min(4.5, contraste(claire.bleu, claire.fondDroite)),
         'un bleu illisible en sombre serait refusé')
+end)
+
+essai('Bouton bleu inactif : son titre paraît éteint dans les deux apparences, et se lit encore ; l\'aperçu sur le fond des vignettes', function()
+    for nom, palette in pairs(Dispositions.PALETTES) do
+        local eteint, allume = contraste(palette.titreInactif, palette.bleuInactif), contraste(palette.blanc, palette.bleuBouton)
+        vrai(eteint < allume, string.format('%s : titre inactif à %.2f:1, actif à %.2f:1', nom, eteint, allume))
+        vrai(eteint >= 1.8, string.format('%s : titre inactif encore lisible (%.2f:1)', nom, eteint))
+    end
+    -- En sombre, le blanc sur le bleu inactif (#2B3F5C) ferait 10:1, plus que le bouton actif : le
+    -- titre inactif ne peut pas y rester blanc.
+    local sombre = Dispositions.PALETTES.sombre
+    vrai(contraste(sombre.blanc, sombre.bleuInactif) > contraste(sombre.blanc, sombre.bleuBouton), 'le blanc y paraîtrait allumé')
+    vrai(sombre.titreInactif ~= sombre.blanc, 'un autre titre en sombre')
+    -- Le fond de l'aperçu est celui des vignettes (Images.FOND, sous la photo réduite au cadre) dans
+    -- les deux apparences : l'image « aucun aperçu » et une photo tombent sur le même gris.
+    local Images = require 'Images'
+    for nom, palette in pairs(Dispositions.PALETTES) do
+        egal(Images.FOND, palette.fondApercu, nom .. ' : fond de l\'aperçu')
+    end
 end)
 
 essai('images/ et images/sombre/ : chaque image de Dispositions.IMAGES dans les deux jeux, en 2x à 144 ppp, aux mêmes tailles', function()
@@ -436,15 +462,20 @@ essai('Le contrôle des images refuse un fichier qui n\'est pas un PNG, un PNG e
         'une autre taille')
 end)
 
--- Les fichiers d'un dossier de jeu : chaque PNG est une image de Dispositions.IMAGES, sans paire
--- @2x ; seuls les dossiers des autres jeux s'y ajoutent (images/sombre dans images/). Rend le nombre
+-- Les fichiers d'un dossier de jeu : chaque PNG est une image de Dispositions.IMAGES, ou l'image
+-- « aucun aperçu » (Dispositions.nomImageVide, à part : elle n'est pas comptée), sans paire @2x ;
+-- seuls les dossiers des autres jeux s'y ajoutent (images/sombre dans images/). Rend le nombre
 -- d'images.
+local VIDE = Dispositions.nomImageVide()
+
 local function controlerJeu(racine, dossier)
     local images = 0
     for fichier in S.lireCommande('ls -1 ' .. S.q(racine .. '/' .. dossier)):gmatch('[^\n]+') do
         vrai(not fichier:find('@', 1, true), 'pas de paire 1x et @2x : ' .. dossier .. '/' .. fichier)
         local nom = fichier:match('^(.+)%.png$')
-        if nom then
+        if nom == VIDE then
+            -- scripts/images-vides.swift, contrôlée à part.
+        elseif nom then
             vrai(IMAGES[nom], 'image absente de Dispositions.IMAGES : ' .. dossier .. '/' .. fichier)
             images = images + 1
         else
@@ -474,21 +505,39 @@ essai('images/ et images/sombre/ : aucune image hors de Dispositions.IMAGES, ni 
     vrai(not ok and tostring(erreur):find('images/sombre/orpheline.png', 1, true), 'image en trop refusée : ' .. tostring(erreur))
 end)
 
-essai('vide-330x220.png : l\'image « aucun aperçu » du cadre 3:2, 660 × 440 à 144 ppp', function()
-    local raison = controler(S.plugin .. '/vide-330x220.png', 330, 220)
-    vrai(raison == nil, raison)
-    local png = lirePng(S.plugin .. '/vide-330x220.png')
-    egal(660, png.largeur, 'largeur en pixels')
-    egal(440, png.hauteur, 'hauteur en pixels')
+essai('vide-330x220.png : l\'image « aucun aperçu » du cadre 3:2, 660 × 440 à 144 ppp, dans le jeu de chaque apparence', function()
+    egal('vide-330x220', VIDE, 'son nom tiré du cadre de l\'aperçu')
+    local T = Dispositions.TAILLES
+    local octets = {}
+    for apparence, dossier in pairs(JEUX) do
+        local chemin = S.plugin .. '/' .. dossier .. '/' .. VIDE .. '.png'
+        egal(dossier .. '/' .. VIDE .. '.png', Dispositions.imageVide(apparence), apparence .. ' : Dispositions.imageVide')
+        local raison = controler(chemin, T.apercu, T.apercuHauteur)
+        vrai(raison == nil, raison)
+        local png = lirePng(chemin)
+        egal(660, png.largeur, apparence .. ' : largeur en pixels')
+        egal(440, png.hauteur, apparence .. ' : hauteur en pixels')
+        local f = assert(io.open(chemin, 'rb'))
+        octets[apparence] = f:read('*a')
+        f:close()
+    end
+    vrai(octets.claire ~= octets.sombre, 'la sombre est la claire')
+    -- Plus à la racine du module (lot B1), ni l'ancien carré de 320.
+    vrai(not S.executer('test -e ' .. S.q(S.plugin .. '/' .. VIDE .. '.png')), 'plus à la racine du module')
+    vrai(not S.executer('test -e ' .. S.q(S.plugin .. '/vide-320.png')), 'plus de vide-320.png')
 end)
 
-essai('scripts/gabarits.lua : les images et les deux apparences en JSON, lancé depuis un autre dossier', function()
+essai('scripts/gabarits.lua : les images, les deux apparences et l\'image « aucun aperçu » en JSON, lancé depuis un autre dossier', function()
     vrai(RACINE, 'racine du dépôt tirée de PLUGIN_DIR : ' .. tostring(S.plugin))
     -- Lancé ici (Tests/Lua/Fenetre), pas depuis la racine : il trouve le module par son propre chemin.
     local sortie = S.lireCommande('luajit ' .. S.q(RACINE .. '/scripts/gabarits.lua') .. ' 2>&1')
     local ok, lu = pcall(Json.decode, sortie)
     vrai(ok and type(lu) == 'table', 'JSON lisible : ' .. sortie)
-    egal('apparences images', cles(lu), 'les deux parties')
+    egal('apparences images vide', cles(lu), 'les trois parties')
+    -- Le cadre de l'image « aucun aperçu », celui de l'aperçu (Dispositions.TAILLES).
+    egal(VIDE, lu.vide.nom)
+    egal(Dispositions.TAILLES.apercu, lu.vide.largeur)
+    egal(Dispositions.TAILLES.apercuHauteur, lu.vide.hauteur)
     for nom, t in pairs(IMAGES) do
         vrai(type(lu.images[nom]) == 'table', 'absente du JSON : ' .. nom)
         egal(t.largeur, lu.images[nom].largeur, nom .. ' : largeur')
@@ -555,6 +604,58 @@ essai('scripts/images-fenetre.swift : les deux jeux en 2x à 144 ppp, chacun de 
     vrai(sortie:find('à retirer : images/sombre/orpheline.png', 1, true), 'image de trop signalée (sombre) : ' .. sortie)
     for _, orpheline in ipairs(orphelines) do
         vrai(lirePng(orpheline), 'image de trop gardée : ' .. orpheline)
+    end
+    -- L'image « aucun aperçu », rangée là par scripts/images-vides.swift, n'est pas une image de trop.
+    fabriquerPng(module .. '/images/' .. VIDE .. '.png', 660, 440, PPM_144)
+    fabriquerPng(module .. '/images/sombre/' .. VIDE .. '.png', 660, 440, PPM_144)
+    code, sortie = produire(gabarits, module)
+    egal(0, code, 'production avec l\'image « aucun aperçu » : ' .. sortie)
+    vrai(not sortie:find(VIDE, 1, true), "l'image « aucun aperçu » n'est pas signalée : " .. sortie)
+end)
+
+-- scripts/images-vides.swift, lancé de même vers un module d'essai : son code et sa sortie.
+local function produireVides(entree, module)
+    local sortie = S.lireCommande(entree .. ' | swift ' .. S.q(RACINE .. '/scripts/images-vides.swift') .. ' '
+        .. S.q(module) .. ' 2>&1; echo "code $?"')
+    return tonumber(sortie:match('code (%d+)%s*$')), sortie
+end
+
+essai('scripts/images-vides.swift : l\'image « aucun aperçu » dans chaque jeu, du fond et du texte de sa palette ; ses refus avant d\'écrire', function()
+    vrai(RACINE, 'racine du dépôt tirée de PLUGIN_DIR : ' .. tostring(S.plugin))
+    local gabarits = 'luajit ' .. S.q(RACINE .. '/scripts/gabarits.lua')
+    local module = S.home .. '/module-vides'
+    local code, sortie = produireVides(gabarits, module)
+    egal(0, code, 'production : ' .. sortie)
+    local T = Dispositions.TAILLES
+    for _, dossier in pairs(JEUX) do
+        local raison = controler(module .. '/' .. dossier .. '/' .. VIDE .. '.png', T.apercu, T.apercuHauteur)
+        vrai(raison == nil, raison)
+    end
+    vrai(lireOctets(module .. '/images/' .. VIDE .. '.png') ~= lireOctets(module .. '/images/sombre/' .. VIDE .. '.png'),
+        'la sombre est la claire')
+    -- Rien d'autre d'écrit : une image par jeu, et le dossier du jeu sombre.
+    egal('sombre ' .. VIDE .. '.png', (S.lireCommande('ls -1 ' .. S.q(module .. '/images')):gsub('\n', ' '):gsub(' $', '')))
+    -- Une couleur absente ou invalide, un dossier hors du module, un cadre nul : refusés, rien d'écrit.
+    local function vides(changer)
+        local g = Dispositions.gabarits()
+        changer(g)
+        return "printf '%s' " .. S.q(Json.encode(g))
+    end
+    local cas = {
+        { vides(function(g) g.apparences.sombre.couleurs.fondApercu = nil end), 'couleur absente de la palette sombre : fondApercu' },
+        { vides(function(g) g.apparences.claire.couleurs.texteApercu = '9E9E9' end), 'couleur invalide dans la palette claire : texteApercu' },
+        { vides(function(g) g.apparences.sombre.dossier = '../ailleurs' end), 'dossier invalide pour l\'apparence sombre' },
+        { vides(function(g) g.vide.largeur = 0 end), 'cadre invalide pour ' .. VIDE },
+        { vides(function(g) g.vide.nom = '../vide' end), 'nom invalide' },
+        { vides(function(g) g.vide = nil end), 'gabarits illisibles' },
+        { "printf ''", "rien sur l'entrée standard" },
+    }
+    for k, c in ipairs(cas) do
+        local refus = S.home .. '/module-vides-refus-' .. k
+        local codeRefus, sortieRefus = produireVides(c[1], refus)
+        egal(1, codeRefus, c[2] .. ' : code de sortie (' .. sortieRefus .. ')')
+        vrai(sortieRefus:find(c[2], 1, true), c[2] .. ' : ' .. sortieRefus)
+        vrai(not S.executer('test -e ' .. S.q(refus)), c[2] .. ' : rien d\'écrit')
     end
 end)
 

@@ -79,7 +79,7 @@ local function bouton(contenu, p, titre, cleActif)
         if type(t) == 'table' and t.liaison then
             t = p[t.key]
         end
-        if v.genre == 'push_button' and t == titre
+        if S.BOUTONS[v.genre] and t == titre
             and (not cleActif or (type(v.args.enabled) == 'table' and v.args.enabled.key == cleActif)) then
             return v
         end
@@ -128,7 +128,7 @@ prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
 prefs.cheminConnecteur = '/bin/echo'
 local imageJpeg = S.home .. '/image.jpg'
 local imageB64 = S.home .. '/image.b64'
-S.executer('/usr/bin/sips -s format jpeg -z 60 180 ' .. S.q(S.plugin .. '/vide-320.png') .. ' --out ' .. S.q(imageJpeg) .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 180 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(imageJpeg) .. ' >/dev/null 2>&1')
 S.executer('/usr/bin/base64 -i ' .. S.q(imageJpeg) .. ' -o ' .. S.q(imageB64))
 local env = 'FAUX_IMAGE_B64=' .. S.q(imageB64) .. ' '
 local executerOriginal = S.modules.LrTasks.execute
@@ -1223,7 +1223,7 @@ essai("Fenêtre : la liste arrive (une bascule), page par page, « J'ai fini » 
         -- réglage se coche.
         appelTour(c, 't2', { tourLong(40) })
         Fenetre.rafraichir()
-        egal(19, Fenetre.T.propLignes)
+        egal(20, Fenetre.T.propLignes, 'fenêtre B (lot B3, provisoire jusqu\'au lot 18)')
         local lignes = select(2, p.propositionTexte:gsub('\n', '\n')) + 1
         egal(Fenetre.T.propLignes, lignes, 'une page pleine')
         egal(false, p.propositionMonte)

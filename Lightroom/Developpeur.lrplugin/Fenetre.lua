@@ -4,30 +4,36 @@
 -- la demande), ce que Claude regarde, sa proposition à accepter, refuser, ajuster ou faire soi-même
 -- (Je le fais, 1.3), le cadre qu'il propose (Composition lue, 1.3 : la ligne « Cadre : … » de la
 -- carte, son image entière en pointillés dans l'aperçu, ses ajustements dans Ajuster…), la note
--- qu'il propose pour la photo active, le pourquoi de chaque étape (onglet Pourquoi ?, 1.3), et les
--- versions du module et du connecteur MCP-Développeur.
+-- qu'il propose pour la photo active, le pourquoi de chaque étape (onglet Aperçu, l'ancien
+-- Pourquoi ?, 1.3), et les versions du module et du connecteur MCP-Développeur.
 --
--- Une seule disposition, la Conversation claire (l'Atelier, le Panneau et le choix de la
--- disposition sont retirés : demandé par Dany le 20 octobre 2026). Dispositions.lua l'assemble des
--- pièces de Vues.lua ; ce fichier garde l'état, ce qui remplit les propriétés liées
--- (rafraichir…), les actions, la boucle et l'ouverture.
+-- Une seule disposition, la Conversation claire, à l'allure de la fenêtre B (1.3 : 1 280 × 800,
+-- volet des conversations en cases, en-tête avec le Mode, segments et panneau à droite ; l'Atelier,
+-- le Panneau et le choix de la disposition sont retirés : demandé par Dany le 20 octobre 2026).
+-- Dispositions.lua l'assemble des pièces de Vues.lua ; ce fichier garde l'état, ce qui remplit les
+-- propriétés liées (rafraichir…), les actions, la boucle et l'ouverture. Ses couleurs et ses
+-- images suivent l'apparence choisie dans le Gestionnaire, reprise à chaque ouverture
+-- (Fenetre.preparerApparence).
 --
 -- Le SDK ne sait ni ajouter de vues à une fenêtre ouverte ni la faire défiler par programme, et
 -- une vue masquée garde sa place : le fil est une grille de lignes fixes (Fil.lua), remplie à
--- chaque changement et parcourue par les boutons ▲ ▼ ; chaque ligne superpose une variante par
--- genre (police, couleur), dont une seule est visible. Lightroom ne masque que les vues simples
--- (`visible` sur un conteneur reste sans effet, constaté) : les onglets sont une rangée de
--- boutons radio au-dessus de variantes superposées de même largeur, dont chaque vue simple porte
--- la condition de son onglet (Vues.masquable). Une autre photo active ou une autre sélection,
--- choisie par l'utilisateur, commence une nouvelle conversation (Fenetre.suivreSelection).
+-- chaque changement et parcourue par les boutons ▲ ▼, comme la liste des conversations, une
+-- grille de cases (Fenetre.casesListe) ; chaque ligne superpose une variante par genre (police,
+-- couleur), dont une seule est visible. Lightroom ne masque que les vues simples (`visible` sur une
+-- rangée, une colonne ou une boîte reste sans effet, constaté) : les onglets sont des segments en
+-- images sous des calques, au-dessus de variantes superposées de même largeur, dont chaque vue
+-- simple porte la condition de son onglet (Vues.masquable). Un clic sur une image passe par un
+-- calque (Fenetre.calque) ; il n'y a aucun bouton par défaut. Une autre photo active ou une autre
+-- sélection, choisie par l'utilisateur, commence une nouvelle conversation (Fenetre.suivreSelection).
 --
--- Structure de la 1.3, posée une fois (les lots suivants remplissent les crochets) : trois onglets
--- (Note, Proposition, Pourquoi ?) ; l'aperçu appartient à l'onglet (Fenetre.apercuOnglet), un vrai
--- clic sur un onglet a son crochet (Fenetre.surOnglet) ; un clic sur une ligne du fil se répartit
--- dans un ordre fixé (Fenetre.cliquerLigne) ; le fil montre la conversation ou une autre page
--- (Fenetre.vue), et Claude qui travaille ramène à la conversation. L'autre page est celle du
--- Carnet de progrès (1.3, section « Carnet de progrès » : son entrée en tête de la liste des
--- conversations, ses lignes faites par Fil.lignesCarnet), sans pièce de mise en page à elle.
+-- Structure de la 1.3, posée une fois (les lots suivants remplissent les crochets) : quatre onglets
+-- (Aperçu, Proposition, Note, Leçon) ; l'aperçu est commun, mais un onglet peut le remplir
+-- (Fenetre.apercuOnglet), un vrai clic sur un onglet a son crochet (Fenetre.surOnglet) ; un clic
+-- sur une ligne du fil se répartit dans un ordre fixé (Fenetre.cliquerLigne) ; le fil montre la
+-- conversation ou une autre page (Fenetre.vue), et Claude qui travaille ramène à la conversation.
+-- L'autre page est celle du Carnet de progrès (1.3, section « Carnet de progrès » : son entrée en
+-- tête de la liste des conversations, ses lignes faites par Fil.lignesCarnet), sans pièce de mise
+-- en page à elle.
 
 local LrBinding = import 'LrBinding'
 local LrColor = import 'LrColor'
@@ -58,37 +64,70 @@ local Texte = require 'Texte'
 
 local Fenetre = { ouverte = false, defilement = 0, jointes = {}, cache = {}, vignettes = {}, generation = 0, vue = 'conversation' }
 
--- Couleurs, polices, icônes et variantes des lignes, pour les pièces (Vues.lua).
-local COULEURS = {
-    texte = LrColor(0.11, 0.11, 0.12),
-    dany = LrColor(0.04, 0.32, 0.72),
-    gris = LrColor(0.45, 0.45, 0.48),
-    mono = LrColor(0.24, 0.24, 0.27),
-    vert = LrColor(0.18, 0.62, 0.28),
-    orange = LrColor(0.88, 0.50, 0.05),
-    rouge = LrColor(0.82, 0.18, 0.18),
-    bleu = LrColor(0.10, 0.42, 0.85),
-}
+-- Couleurs, polices, images, icônes et variantes des lignes, pour les pièces (Vues.lua).
+
+-- Les couleurs : celles de la palette de l'apparence (Dispositions.PALETTES, aux mêmes clés : texte,
+-- gris, grisEntete, sousTitreChoisi, bleu, mono, coche, orange, rouge, ambre, blanc, titreInactif,
+-- les fonds, les filets…), en LrColor. La table est la même d'une ouverture à l'autre ; ses
+-- couleurs se refont à chaque ouverture (Fenetre.preparerApparence), pour qu'une apparence choisie
+-- dans le Gestionnaire vaille à l'ouverture suivante. Au chargement : la claire.
+local COULEURS = {}
 Fenetre.COULEURS = COULEURS
+
+-- L'apparence de la fenêtre ouverte ('claire' ou 'sombre', Dispositions.APPARENCES) : ses couleurs
+-- et le jeu de ses images (Fenetre.image).
+function Fenetre.preparerApparence(valeur)
+    Fenetre.apparence = Dispositions.apparence(valeur)
+    for cle in pairs(COULEURS) do
+        COULEURS[cle] = nil
+    end
+    for cle, t in pairs(Dispositions.couleurs(Fenetre.apparence)) do
+        COULEURS[cle] = LrColor(t[1], t[2], t[3])
+    end
+    return Fenetre.apparence
+end
+Fenetre.preparerApparence(nil)
+
+-- Le chemin d'une image de Dispositions.IMAGES dans le jeu de l'apparence (jamais
+-- 'images/<nom>.png' écrit en dur), et sa taille en points.
+function Fenetre.image(nom)
+    return Chemins.ressource(Dispositions.image(nom, Fenetre.apparence))
+end
+
+function Fenetre.tailleImage(nom)
+    local t = Dispositions.IMAGES[nom]
+    if not t then
+        error("image inconnue de Dispositions.IMAGES : " .. tostring(nom), 2)
+    end
+    return t
+end
 
 local function police(cle, taille)
     local m = Metriques[cle]
     return { name = m.nom, size = taille or m.taille }
 end
 
+-- Celles du fil et des cartes (Helvetica Neue et Menlo, mesurées dans Metriques.lua), et celles du
+-- système de la maquette (constatées le 21 octobre 2026 : '<system>' et '<system/bold>' en 16, 13,
+-- 12 et 11, B1 et D9).
 local POLICES = {
     texte = police('texte'),
     gras = police('gras'),
     mono = police('mono'),
-    titre = police('gras', 15),
     petit = police('texte', 11),
+    titre = { name = '<system/bold>', size = 16 },
+    systeme13 = { name = '<system>', size = 13 },
+    systeme12 = { name = '<system>', size = 12 },
+    systeme11 = { name = '<system>', size = 11 },
+    systemeGras12 = { name = '<system/bold>', size = 12 },
+    systemeGras11 = { name = '<system/bold>', size = 11 },
 }
 Fenetre.POLICES = POLICES
 
--- Icônes de la colonne de gauche du fil.
+-- Icônes de la colonne de gauche du fil (couleurs de la palette).
 Fenetre.ICONES = {
-    { cle = 'dany', glyphe = '›', couleur = 'dany' },
-    { cle = 'ok', glyphe = '✓', couleur = 'vert' },
+    { cle = 'dany', glyphe = '›', couleur = 'bleu' },
+    { cle = 'ok', glyphe = '✓', couleur = 'coche' },
     { cle = 'cours', glyphe = '●', couleur = 'orange' },
     { cle = 'erreur', glyphe = '✕', couleur = 'rouge' },
     { cle = 'apercu', glyphe = '▣', couleur = 'bleu' },
@@ -100,15 +139,20 @@ Fenetre.ICONES = {
 Fenetre.STYLES = {
     { genres = { claude = true, vide = true }, police = 'texte', couleur = 'texte' },
     { genres = { titre = true }, police = 'gras', couleur = 'texte' },
-    { genres = { dany = true }, police = 'texte', couleur = 'dany' },
+    { genres = { dany = true }, police = 'texte', couleur = 'bleu' },
     { genres = { outil = true }, police = 'mono', couleur = 'mono' },
     { genres = { apercu = true }, police = 'texte', couleur = 'bleu' },
     { genres = { proposition = true }, police = 'gras', couleur = 'orange' },
     { genres = { note = true }, police = 'texte', couleur = 'gris' },
 }
 
--- Pastilles des voyants (Claude Code, Lightroom, mode, écran).
-Fenetre.PASTILLES = { ok = 'vert', attention = 'orange', erreur = 'rouge', neutre = 'gris', bleu = 'bleu' }
+-- Pastilles des voyants (Claude Code, Lightroom, écran), en images par état : plus de pastille
+-- bleue, le voyant Mode est retiré (le Mode est dans l'en-tête).
+Fenetre.PASTILLES = { ok = 'pastille-vert', attention = 'pastille-orange', erreur = 'pastille-rouge', neutre = 'pastille-gris' }
+Fenetre.ETATS_VOYANT = { 'ok', 'attention', 'erreur', 'neutre' }
+
+-- L'infobulle d'un élément de la maquette sans fonction encore (Vues.inactif).
+Fenetre.A_VENIR = "À venir"
 
 local bind = LrView.bind
 Fenetre.bind = bind
@@ -201,19 +245,100 @@ local enTache = Fenetre.enTache
 local parBouton = setmetatable({}, { __mode = 'k' })
 
 -- Tout bouton de la fenêtre passe par ici : son clic valide aussi le champ de demande (constaté),
--- qui ne doit pas partir ensuite ; le bouton décide.
+-- qui ne doit pas partir ensuite ; le bouton décide. Trois clés à lui, retirées avant de créer la
+-- vue : `carre` (un f:square_button, le rectangle blanc à bord fin des boutons de la maquette,
+-- constaté le 21 octobre 2026, B3), `icone` (le nom d'une image de Dispositions.IMAGES, posée par
+-- image_name, sans titre : elle chevaucherait le titre, constaté B3) et `bezel` (la hauteur
+-- visible voulue : le cadre a 2 points de plus, constaté D5).
 function Fenetre.bouton(f, args)
+    local carre, icone, bezel = args.carre, args.icone, args.bezel
+    args.carre, args.icone, args.bezel = nil, nil, nil
+    if icone then
+        args.image_name = Fenetre.image(icone)
+        args.title = nil
+    end
+    if bezel then
+        args.height = Dispositions.cadreBouton(bezel)
+    end
     local action = args.action
     args.action = function(...)
         Fenetre.annulerEnvoiAuto()
         return action(...)
     end
     parBouton[args.action] = true
+    if carre then
+        return f:square_button(args)
+    end
     return f:push_button(args)
 end
 
 function Fenetre.parBouton(action)
     return parBouton[action] == true
+end
+
+-- Les mouse_down des calques passés par Fenetre.calque (les essais vérifient que tous y passent).
+local parCalque = setmetatable({}, { __mode = 'k' })
+
+-- Un calque : un texte vide de taille fixe posé sur une image, qui en reçoit le clic (un f:picture
+-- n'en reçoit aucun ; le calque, si : constaté le 21 octobre 2026, C1). Son clic valide aussi le
+-- champ de demande (constaté D3) : il annule l'envoi automatique, comme un bouton. Un calque n'a
+-- pas d'enabled : chaque gestionnaire vérifie lui-même l'état (Claude au travail…).
+function Fenetre.calque(f, args)
+    local fn = args.mouse_down
+    args.title = ''
+    args.mouse_down = function(...)
+        Fenetre.annulerEnvoiAuto()
+        return fn(...)
+    end
+    parCalque[args.mouse_down] = true
+    return f:static_text(args)
+end
+
+function Fenetre.parCalque(fn)
+    return parCalque[fn] == true
+end
+
+-- La valeur liée d'un bouton radio (clé `cle`). Un clic de l'utilisateur la pousse de la vue vers
+-- la table, et ce clic a validé le champ de demande (constaté le 21 octobre 2026, D3) : l'envoi
+-- automatique s'annule ici, à chaque clic. L'observateur de la clé ne suffit pas : sur un radio
+-- déjà coché, la valeur ne change pas et la table ne prévient pas ses observateurs (supposé, comme
+-- la simulation), et la demande tapée partirait 0,3 s plus tard. La fenêtre qui pose la valeur
+-- (de la table vers la vue) n'annule rien.
+function Fenetre.lierRadio(cle)
+    return bind {
+        key = cle,
+        transform = function(valeur, depuisTable)
+            if not depuisTable then
+                Fenetre.annulerEnvoiAuto()
+            end
+            return valeur
+        end,
+    }
+end
+
+-- Une clé de la fenêtre que pose une pièce elle-même (l'enfoncement d'un bouton bleu) : sa valeur
+-- avant l'ouverture, comme toute clé liée.
+function Fenetre.preparerCle(cle, valeur)
+    if Fenetre.p and Fenetre.p[cle] == nil then
+        Fenetre.p[cle] = valeur
+    end
+end
+
+-- L'image enfoncée d'un bouton bleu, 0,15 s (Vues.boutonBleu).
+Fenetre.DUREE_ENFONCE = 0.15
+
+function Fenetre.enfoncer(cle)
+    local p = Fenetre.p
+    if not p then
+        return
+    end
+    p[cle] = true
+    LrTasks.startAsyncTask(function()
+        LrTasks.sleep(Fenetre.DUREE_ENFONCE)
+        if Fenetre.p == p then
+            p[cle] = false
+        end
+    end)
 end
 
 -- Change une propriété seulement si sa valeur change (moins de travail pour Lightroom).
@@ -262,17 +387,59 @@ local function estSeance(c)
     return c ~= nil and c.genre == 'notation'
 end
 
-local function periode(t, maintenant)
+-- Un texte sans balise <EM> (le titre d'une conversation, le nom d'une photo) : posé tel quel
+-- dans un texte riche ou dans un texte simple, il ne doit jamais en ouvrir une.
+local function sansBalises(texte)
+    return (tostring(texte or ''):gsub('</?EM>', ''))
+end
+Fenetre.sansBalises = sansBalises
+
+local function memeJour(a, b)
+    return a.year == b.year and a.month == b.month and a.day == b.day
+end
+
+-- La période d'une conversation dans la liste, d'après sa date (heure locale, os.date par
+-- Compat) : « Aujourd'hui », « Hier », « Plus tôt en octobre » (le mois en cours), puis le mois et
+-- l'année (« Septembre 2026 »). Les mois viennent de Carnet.MOIS, leur seule copie.
+function Fenetre.periodeListe(t, maintenant)
     maintenant = maintenant or os.time()
-    if os.date('%Y%m%d', t) == os.date('%Y%m%d', maintenant) then
+    local d, m = os.date('*t', t), os.date('*t', maintenant)
+    if memeJour(d, m) then
         return "Aujourd'hui"
     end
-    local debut = os.date('*t', maintenant)
-    debut.hour, debut.min, debut.sec = 0, 0, 0
-    if t >= os.time(debut) - 7 * 86400 then
-        return "Cette semaine"
+    -- La veille, comptée depuis midi (un changement d'heure ne la fait pas manquer).
+    local midi = os.time({ year = m.year, month = m.month, day = m.day, hour = 12, min = 0, sec = 0 })
+    if memeJour(d, os.date('*t', midi - 86400)) then
+        return "Hier"
     end
-    return "Plus ancien"
+    local mois = Carnet.MOIS[d.month] or ''
+    if d.year == m.year and d.month == m.month then
+        return "Plus tôt en " .. mois
+    end
+    return mois:sub(1, 1):upper() .. mois:sub(2) .. ' ' .. tostring(d.year)
+end
+
+-- Le sous-titre d'une conversation dans la liste : l'heure (« 19 h 46 ») pour aujourd'hui et
+-- hier, sinon la date courte (« 12 oct. », Carnet.MOIS_COURTS) ; puis le nombre de photos de sa
+-- sélection, tiré du 2e champ de sa clé (c.cle, Lightroom.photos : « 1 photo », « 48 photos » ;
+-- rien sans clé).
+function Fenetre.sousTitreListe(c, maintenant)
+    local morceaux = {}
+    local t = c.modifiee or c.creee
+    if type(t) == 'number' then
+        local d = os.date('*t', t)
+        local p = Fenetre.periodeListe(t, maintenant)
+        if p == "Aujourd'hui" or p == "Hier" then
+            morceaux[#morceaux + 1] = string.format('%d h %02d', d.hour, d.min)
+        else
+            morceaux[#morceaux + 1] = tostring(d.day) .. ' ' .. tostring(Carnet.MOIS_COURTS[d.month] or '')
+        end
+    end
+    local n = type(c.cle) == 'string' and tonumber(c.cle:match('^[^:]*:(%d+)')) or nil
+    if n then
+        morceaux[#morceaux + 1] = n .. (n > 1 and " photos" or " photo")
+    end
+    return table.concat(morceaux, ' · ')
 end
 
 -- La valeur d'un en-tête de période commence par ENTETE ; celle de l'entrée de la page du carnet
@@ -281,8 +448,9 @@ local ENTETE = '§'
 
 -- Éléments de la liste : l'entrée « Carnet de progrès » en tête (1.3 ; montrée aussi quand la
 -- recherche la trouve), puis en-têtes de période et conversations trouvées (tables neuves, sans
--- métatable : Lightroom bloque sur une table relue par Json.decode).
-function Fenetre.elementsListe(recherche)
+-- métatable : Lightroom bloque sur une table relue par Json.decode). Chacun : genre ('carnet',
+-- 'jour', 'conversation'), title, value (Fenetre.CARNET, ENTETE .. période, ou l'id), sousTitre.
+function Fenetre.elementsListe(recherche, maintenant)
     local items = {}
     local courante = Moteur.courante
     local dejaVue = false
@@ -292,82 +460,154 @@ function Fenetre.elementsListe(recherche)
             dejaVue = true
         end
         if not estSeance(c) and Conversation.correspond(c, recherche or '') then
-            local p = periode(c.modifiee or c.creee or os.time())
+            local p = Fenetre.periodeListe(c.modifiee or c.creee or os.time(), maintenant)
             if p ~= derniere then
-                items[#items + 1] = { title = p, value = ENTETE .. p }
+                items[#items + 1] = { genre = 'jour', title = p, value = ENTETE .. p }
                 derniere = p
             end
-            items[#items + 1] = { title = "   " .. tostring(c.titre or ''), value = c.id }
+            items[#items + 1] = { genre = 'conversation', title = sansBalises(c.titre), value = c.id,
+                sousTitre = Fenetre.sousTitreListe(c, maintenant) }
         end
     end
     if courante and not dejaVue and not estSeance(courante) then
-        table.insert(items, 1, { title = "   " .. tostring(courante.titre or Conversation.TITRE_PAR_DEFAUT), value = courante.id })
+        table.insert(items, 1, { genre = 'conversation', title = sansBalises(courante.titre or Conversation.TITRE_PAR_DEFAUT),
+            value = courante.id, sousTitre = Fenetre.sousTitreListe(courante, maintenant) })
     end
     if Conversation.correspond({ titre = Fenetre.TITRE_CARNET }, recherche or '') then
-        table.insert(items, 1, { title = Fenetre.TITRE_CARNET, value = Fenetre.CARNET })
+        table.insert(items, 1, { genre = 'carnet', title = Fenetre.TITRE_CARNET, value = Fenetre.CARNET,
+            sousTitre = Fenetre.SOUS_TITRE_CARNET })
     end
     return items
 end
 
-function Fenetre.rafraichirListe()
-    local p = Fenetre.p
-    if not p then
-        return
+-- Les cases d'une page de la liste (une grille fixe : pas de défilement natif) : `n` cases, tables
+-- neuves de genre 'carnet', 'jour', 'conversation', 'plus' (« Plus récentes… » en tête d'une page
+-- qui en suit une autre, « Plus anciennes… » dans la dernière case d'une page qui en précède une,
+-- avec `vers`, la page qu'elle montre) ou 'vide'. Un en-tête de jour ne finit jamais une page : il
+-- passe à la suivante, avec ses conversations. Rend les cases et la page montrée (une page
+-- au-delà de la dernière montre la dernière). Pure.
+function Fenetre.casesListe(elements, page, n)
+    local total = #elements
+    page = math.max(1, math.floor(tonumber(page) or 1))
+    local debut, numero = 1, 1
+    while true do
+        local avant = numero > 1
+        local place = n - (avant and 1 or 0)
+        local apres = total - debut + 1 > place
+        if apres then
+            place = place - 1
+            while place > 1 and elements[debut + place - 1].genre == 'jour' do
+                place = place - 1
+            end
+        end
+        if numero >= page or not apres then
+            local cases = {}
+            if avant then
+                cases[#cases + 1] = { genre = 'plus', title = "Plus récentes…", vers = numero - 1 }
+            end
+            for i = debut, math.min(total, debut + place - 1) do
+                local e = elements[i]
+                cases[#cases + 1] = { genre = e.genre, title = e.title, value = e.value, sousTitre = e.sousTitre }
+            end
+            -- Les cases vides avant « Plus anciennes… », toujours dans la dernière case.
+            while #cases < n - (apres and 1 or 0) do
+                cases[#cases + 1] = { genre = 'vide' }
+            end
+            if apres then
+                cases[#cases + 1] = { genre = 'plus', title = "Plus anciennes…", vers = numero + 1 }
+            end
+            return cases, numero
+        end
+        debut = debut + place
+        numero = numero + 1
     end
-    local items = Fenetre.elementsListe(p.recherche)
-    local morceaux = {}
-    for _, item in ipairs(items) do
-        morceaux[#morceaux + 1] = tostring(item.value) .. '\1' .. item.title
-    end
-    morceaux[#morceaux + 1] = Moteur.courante and Moteur.courante.id or ''
-    -- Sur la page du carnet, c'est son entrée qui est choisie.
-    morceaux[#morceaux + 1] = Fenetre.vue
-    local signature = table.concat(morceaux, '\2')
-    -- Remplacer la liste à chaque rafraîchissement la ferait sauter : seulement si elle change.
-    if signature == Fenetre.signatureListe then
-        return
-    end
-    Fenetre.signatureListe = signature
-    Fenetre.majListe = true
-    p.listeConversations = items
-    if Fenetre.vue == 'carnet' then
-        p.selectionListe = { Fenetre.CARNET }
-    elseif Moteur.courante then
-        p.selectionListe = { Moteur.courante.id }
-    end
-    Fenetre.majListe = false
 end
 
--- Choix dans la liste : l'entrée du carnet ouvre sa page ; une conversation s'ouvre et ramène au
--- fil (la conversation déjà ouverte aussi, choisie depuis la page) ; un en-tête, ou un refus,
--- remet le choix (la page reste).
-function Fenetre.choisirDansListe(valeur)
-    if Fenetre.majListe then
+-- Remplit les cases de la liste (Vues.caseListe) : genre, titre, sous-titre, choix et infobulle de
+-- chacune. La case choisie suit la vue (Fenetre.vue) : l'entrée du carnet sur sa page, sinon la
+-- conversation montrée. La page de la liste (Fenetre.pageListe) se garde ; la recherche la remet à
+-- la première.
+function Fenetre.rafraichirListe()
+    local p, T = Fenetre.p, Fenetre.T
+    if not (p and T) then
         return
     end
+    local cases, page = Fenetre.casesListe(Fenetre.elementsListe(p.recherche), Fenetre.pageListe, T.cases)
+    Fenetre.pageListe, Fenetre.cases = page, cases
+    local courante = Moteur.courante
+    for k = 1, T.cases do
+        local case = cases[k]
+        local choisie = (case.genre == 'carnet' and Fenetre.vue == 'carnet')
+            or (case.genre == 'conversation' and Fenetre.vue ~= 'carnet' and courante ~= nil and case.value == courante.id)
+        poser(p, 'lg' .. k, case.genre)
+        poser(p, 'lt' .. k, case.title or '')
+        poser(p, 'ls' .. k, case.sousTitre or '')
+        poser(p, 'lc' .. k, choisie == true)
+        poser(p, 'li' .. k, case.genre == 'vide' and '' or (case.title or ''))
+    end
+end
+
+-- La case choisie (sa valeur : l'id de la conversation, ou Fenetre.CARNET), nil sans case choisie.
+function Fenetre.choixListe()
+    local p = Fenetre.p
+    for k, case in ipairs(Fenetre.cases or {}) do
+        if p and p['lc' .. k] then
+            return case.value
+        end
+    end
+    return nil
+end
+
+-- Clic sur la case k (son calque, Vues.caseListe) : l'entrée du carnet ouvre sa page, une
+-- conversation s'ouvre (Fenetre.choisirDansListe), « Plus anciennes… » ou « Plus récentes… »
+-- changent de page ; un en-tête de jour ou une case vide ne font rien. Un calque n'a pas d'enabled :
+-- pendant que Claude travaille, le clic est refusé et le bandeau le dit. Rend vrai si le clic a agi.
+function Fenetre.cliquerListe(k)
+    Fenetre.annulerEnvoiAuto()
+    local p = Fenetre.p
+    local case = Fenetre.cases and Fenetre.cases[k]
+    if not (p and case) or case.genre == 'vide' or case.genre == 'jour' then
+        return false
+    end
+    if Moteur.travaille then
+        p.message = Fenetre.CLAUDE_TRAVAILLE
+        return false
+    end
+    if case.genre == 'plus' then
+        Fenetre.pageListe = case.vers
+        Fenetre.rafraichirListe()
+        return true
+    end
+    if case.genre == 'carnet' then
+        return Fenetre.ouvrirCarnet()
+    end
+    return Fenetre.choisirDansListe(case.value)
+end
+
+-- Choix d'une valeur de la liste : l'entrée du carnet ouvre sa page ; une conversation s'ouvre et
+-- ramène au fil (la conversation déjà ouverte aussi, choisie depuis la page) ; un en-tête, ou un
+-- refus (le bandeau dit pourquoi), ne change rien (la page reste). Rend vrai si le choix a agi.
+function Fenetre.choisirDansListe(valeur)
     local id = type(valeur) == 'table' and valeur[1] or valeur
     if id == nil then
-        return
+        return false
     end
     if id == Fenetre.CARNET then
-        Fenetre.ouvrirCarnet()
-        return
+        return Fenetre.ouvrirCarnet()
     end
     if type(id) == 'string' and id:sub(1, #ENTETE) == ENTETE then
-        Fenetre.signatureListe = nil
-        Fenetre.rafraichirListe()
-        return
+        return false
     end
     if Moteur.courante and id == Moteur.courante.id then
         Fenetre.quitterCarnet()
-        return
+        Fenetre.rafraichirListe()
+        return true
     end
     local ok, raison = Moteur.ouvrir(id)
     if not ok then
         Fenetre.p.message = raison or ''
-        Fenetre.signatureListe = nil
         Fenetre.rafraichirListe()
-        return
+        return false
     end
     Fenetre.quitterCarnet()
     Fenetre.defilement = 0
@@ -375,6 +615,8 @@ function Fenetre.choisirDansListe(valeur)
     Fenetre.imageCliquee = nil
     Fenetre.etape = nil
     Fenetre.p.message = ''
+    Fenetre.rafraichirListe()
+    return true
 end
 
 -- Nouvelle conversation (le bouton) : elle se montre, la page du carnet se quitte. `garderPage` :
@@ -392,6 +634,8 @@ function Fenetre.nouvelle(garderPage)
         Fenetre.quitterCarnet()
         Fenetre.defilement = 0
     end
+    -- La nouvelle conversation est en tête de la liste : sa première page.
+    Fenetre.pageListe = 1
     Fenetre.indiceImage = nil
     Fenetre.imageCliquee = nil
     Fenetre.etape = nil
@@ -407,7 +651,7 @@ end
 -- champ (Accepter, Refuser, Ajuster…, Je le fais, J'ai fini) se suit dans le fil.
 -- Rend vrai si la vue a changé ; le fil se relit alors depuis la fin. La conversation montrée
 -- (Fenetre.conversationAffichee) reste la même : ce qui la suit (l'étape choisie de l'onglet
--- Pourquoi ?, remise quand elle change) n'est pas perdu par un aller-retour vers une autre page.
+-- Aperçu, remise quand elle change) n'est pas perdu par un aller-retour vers une autre page.
 function Fenetre.revenirAuFil()
     if Fenetre.vue == 'conversation' then
         return false
@@ -424,6 +668,8 @@ function Fenetre.revenirAuFil()
     return true
 end
 
+-- La largeur du texte d'une ligne du fil : la largeur utile du centre, sans l'icône et son écart
+-- (Vues.ligneFil).
 function Fenetre.largeurTexte()
     return Fenetre.T.fil - 20
 end
@@ -437,7 +683,7 @@ function Fenetre.rafraichirFil()
     local carnet = Fenetre.vue == 'carnet'
     if carnet then
         -- La page du carnet : la conversation montrée (Fenetre.conversationAffichee) ne change pas,
-        -- pour que le retour au fil garde ce qui la suit (l'étape choisie de l'onglet Pourquoi ?).
+        -- pour que le retour au fil garde ce qui la suit (l'étape choisie de l'onglet Aperçu).
         -- La page se lit depuis son haut : sa place se compte en lignes au-dessus de la grille
         -- (Fenetre.hautCarnet), gardée quand elle se relit.
         lignes = Fil.lignesCarnet(Fenetre.pageCarnet, Fenetre.largeurTexte(), Fenetre.TITRE_CARNET)
@@ -448,7 +694,7 @@ function Fenetre.rafraichirFil()
             Fenetre.defilement = 0
             Fenetre.cache = {}
             Fenetre.total = nil
-            -- L'étape choisie (onglet Pourquoi ?) était de l'autre conversation.
+            -- L'étape choisie (onglet Aperçu) était de l'autre conversation.
             Fenetre.etape = nil
         end
         lignes = c and Fil.lignes(c, Fenetre.largeurTexte(), Fenetre.cache) or {}
@@ -500,11 +746,11 @@ end
 -- Clic sur une ligne du fil, réparti dans un ordre fixé (1.3) : une image (montrée dans l'aperçu,
 -- prioritaire sur l'aperçu de l'onglet), une ligne de la page Carnet de progrès (la rangée d'un
 -- défaut, `defaut`, ou une action, `action`), une ligne de leçon, une étape de Claude (onglet
--- Pourquoi ?), sinon le détail d'un outil. Fenetre.sorteDeClic dit laquelle,
+-- Aperçu), sinon le détail d'un outil. Fenetre.sorteDeClic dit laquelle,
 -- Fenetre.clics[sorte](l, e) la traite. Une rangée du tableau du carnet ouvre la fenêtre de ses
 -- photos, sa ligne d'action demande à Claude ce qu'il en pense (section « Carnet de progrès ») ;
 -- une ligne de la carte d'une leçon ouvre le détail de son appel ; une étape (ligne
--- « · Pourquoi ? », Conversation.estEtape) s'ouvre dans l'onglet Pourquoi ? (Fenetre.montrerEtape).
+-- « · Pourquoi ? », Conversation.estEtape) s'ouvre dans l'onglet Aperçu (Fenetre.montrerEtape).
 function Fenetre.estEtape(e)
     return Conversation.estEtape(e)
 end
@@ -610,8 +856,10 @@ end
 
 -- Carnet de progrès (1.3) ---------------------------------------------------------------------
 -- La page du carnet dans la grille du fil (Fenetre.vue = 'carnet'), atteinte par l'entrée
--- « Carnet de progrès » en tête de la liste des conversations (valeur Fenetre.CARNET, dans une
--- table neuve comme les autres éléments, Fenetre.elementsListe).
+-- « Carnet de progrès », la première case de la liste des conversations (genre 'carnet', valeur
+-- Fenetre.CARNET, dans une table neuve comme les autres éléments, Fenetre.elementsListe ; son
+-- clic : Fenetre.cliquerListe, puis Fenetre.ouvrirCarnet), choisie (fond de sélection) tant que
+-- la page est montrée.
 -- Le résumé vient du module (Carnet.resumer, seule source des phrases), lu dans une tâche (le
 -- chemin du catalogue se lit par LrTasks.pcall), et se met en lignes par Fil.lignesCarnet ; la
 -- conversation montrée ne change pas pendant ce temps. Une rangée du tableau ouvre la fenêtre de
@@ -625,11 +873,12 @@ end
 -- Dispositions.lua) : la page ne fait que remplir la grille du fil.
 Fenetre.CARNET = '¶carnet'
 Fenetre.TITRE_CARNET = Carnet.TITRES.carnet
+Fenetre.SOUS_TITRE_CARNET = "défauts de prise de vue, mois par mois"
 Fenetre.CHOISIR_CONVERSATION = "Le carnet de progrès est montré : choisissez d'abord une conversation dans la liste."
 Fenetre.CLAUDE_TRAVAILLE = "Claude travaille : attendez la fin, ou cliquez Arrêter."
 
--- Montre la page du carnet (depuis la liste ; pas pendant que Claude travaille : la liste est
--- alors inactive, et Claude ramènerait aussitôt au fil). Elle se lit depuis son haut
+-- Montre la page du carnet (depuis la liste ; pas pendant que Claude travaille : la liste le
+-- refuse alors, et Claude ramènerait aussitôt au fil). Elle se lit depuis son haut
 -- (Fenetre.hautCarnet), son résumé relu dans une tâche. Rend vrai si la page est montrée.
 function Fenetre.ouvrirCarnet()
     local p = Fenetre.p
@@ -638,7 +887,6 @@ function Fenetre.ouvrirCarnet()
     end
     if Moteur.travaille then
         p.message = Fenetre.CLAUDE_TRAVAILLE
-        Fenetre.signatureListe = nil
         Fenetre.rafraichirListe()
         return false
     end
@@ -650,6 +898,8 @@ function Fenetre.ouvrirCarnet()
     end
     Fenetre.versionCarnet, Fenetre.aRafraichirCarnet = Carnet.version, false
     enTache(Fenetre.lireCarnet)
+    -- Son entrée choisie dans la liste, tout de suite.
+    Fenetre.rafraichirListe()
     Fenetre.aRafraichir = true
     return true
 end
@@ -680,8 +930,8 @@ function Fenetre.quitterCarnet()
     return true
 end
 
--- Vrai sur la page du carnet, où Renommer… et Supprimer… (✎ aussi) ne font rien : le bandeau dit
--- de choisir une conversation.
+-- Vrai sur la page du carnet, où Renommer… et Supprimer… ne font rien : le bandeau dit de choisir
+-- une conversation.
 local function surLaPageDuCarnet()
     if Fenetre.vue ~= 'carnet' then
         return false
@@ -886,16 +1136,18 @@ end
 
 -- Onglets -------------------------------------------------------------------------------------
 
--- L'aperçu appartient à l'onglet (1.3) : Note montre la photo active et les images de la
--- conversation, comme avant ; Proposition, l'image de la proposition ou de l'exercice ;
--- Pourquoi ?, l'avant ou l'après de l'étape choisie. Fenetre.apercuOnglet[valeur](p, T, c), s'il
--- existe, est demandé d'abord par Fenetre.rafraichirApercu : vrai s'il a rempli l'aperçu lui-même
+-- L'aperçu est commun aux quatre onglets (Aperçu, Proposition, Note, Leçon), mais un onglet peut
+-- le remplir (1.3) : Note et Leçon montrent la photo active et les images de la conversation, comme
+-- avant ; Proposition, l'image de la proposition ou de l'exercice ; Aperçu (l'ancien Pourquoi ?),
+-- l'avant ou l'après de l'étape choisie. Fenetre.apercuOnglet[valeur](p, T, c), s'il existe, est
+-- demandé d'abord par Fenetre.rafraichirApercu : vrai s'il a rempli l'aperçu lui-même
 -- (imageApercu, legendeApercu, aImage, peutPrecedente, peutSuivante), nil ou faux pour l'aperçu
 -- d'avant. Un clic sur une ligne d'image reste prioritaire. Fenetre.surOnglet[valeur](valeur) suit
--- un vrai clic sur cet onglet (jamais une bascule de la fenêtre, Fenetre.choisirOnglet). Ni l'un ni
--- l'autre n'attend : une lecture du catalogue ou un rendu passe par sa propre tâche. Ceux de
--- Pourquoi ? et de Proposition (la comparaison de Je le fais, puis l'image de la proposition
--- demandée par un clic : Composition lue) sont dans leur section ; Note n'en a pas.
+-- un vrai clic sur cet onglet (son segment, Fenetre.choisirSegment ; jamais une bascule de la
+-- fenêtre, Fenetre.choisirOnglet). Ni l'un ni l'autre n'attend : une lecture du catalogue ou un
+-- rendu passe par sa propre tâche. Ceux d'Aperçu et de Proposition (la comparaison de Je le fais,
+-- puis l'image de la proposition demandée par un clic : Composition lue) sont dans leur section ;
+-- Note et Leçon n'en ont pas.
 Fenetre.apercuOnglet = {}
 Fenetre.surOnglet = {}
 
@@ -926,6 +1178,15 @@ function Fenetre.ongletChange(valeur)
     Fenetre.rafraichirApercu()
 end
 
+-- Le clic sur un segment (son calque, Vues.segments, qui a déjà annulé l'envoi automatique) : un
+-- vrai clic, l'onglet change et son crochet suit (Fenetre.ongletChange).
+function Fenetre.choisirSegment(valeur)
+    local p = Fenetre.p
+    if p and p.onglet ~= valeur then
+        p.onglet = valeur
+    end
+end
+
 -- Montre un onglet sans annuler l'envoi automatique : c'est la fenêtre qui change d'onglet, pas un
 -- clic.
 function Fenetre.choisirOnglet(valeur)
@@ -944,8 +1205,50 @@ end
 
 -- Aperçus -------------------------------------------------------------------------------------
 
+-- L'image « aucun aperçu », dans le jeu de l'apparence de la fenêtre.
 function Fenetre.imageVide()
-    return Chemins.ressource(Dispositions.imageVide(Fenetre.T))
+    return Chemins.ressource(Dispositions.imageVide(Fenetre.apparence))
+end
+
+-- Le nom d'une photo avec celui de sa copie virtuelle (« 20200710_193347.jpg (Essai) »), d'après
+-- sa légende (Lightroom.legende) ou, sans elle, son nom de fichier seul.
+function Fenetre.nomPhoto(legende)
+    local nom = sansBalises(legende and legende.nom)
+    local copie = sansBalises(legende and legende.copie)
+    if copie ~= '' then
+        return nom .. ' (' .. copie .. ')'
+    end
+    return nom
+end
+
+-- La légende de la photo active sous l'aperçu, en texte riche : « <EM>20200710_193347.jpg
+-- (Essai)</EM> · X-T20 · 10 juil. 2020 » (l'appareil et la date s'ils sont connus).
+function Fenetre.texteLegende(legende)
+    local morceaux = { '<EM>' .. Fenetre.nomPhoto(legende) .. '</EM>' }
+    for _, cle in ipairs({ 'appareil', 'date' }) do
+        local v = sansBalises(legende and legende[cle])
+        if v ~= '' then
+            morceaux[#morceaux + 1] = v
+        end
+    end
+    return table.concat(morceaux, ' · ')
+end
+
+-- La légende lue de la photo active (Fenetre.majPhoto, quand elle change), ou son seul nom.
+local function legendeActive(active)
+    local l = Fenetre.legendeActive
+    if l and l.id == active.id then
+        if sansBalises(l.nom) == '' then
+            l.nom = active.nom
+        end
+        return l
+    end
+    return { nom = active.nom }
+end
+
+-- La vignette de l'aperçu, en pixels : 2 × le cadre (660 × 440), centrée sur le fond.
+local function vignetteApercu(T, dossier, nom)
+    return Images.vignette(dossier, nom, T.pixelsApercu, T.pixelsApercuHauteur)
 end
 
 -- L'aperçu de la photo active (demandé par Dany le 20 octobre 2026) : montré à l'ouverture de la
@@ -976,7 +1279,7 @@ end
 local function montrerActive(p, T, active, n)
     poser(p, 'peutPrecedente', n > 0)
     poser(p, 'peutSuivante', false)
-    poser(p, 'legendeApercu', "Photo active · " .. Lightroom.nomCourt(active.nom))
+    poser(p, 'legendeApercu', Fenetre.texteLegende(legendeActive(active)))
     local a = Fenetre.apercuActif
     if a and a.id == active.id and a.T == T then
         poser(p, 'imageApercu', a.chemin)
@@ -1002,7 +1305,7 @@ local function montrerActive(p, T, active, n)
             end
             source = Fenetre.marquerMiseAuPoint(active.id, source) or source
             local d, f = LrPathUtils.parent(source), LrPathUtils.leafName(source)
-            return Images.vignette(d, f, T.apercu), d, f
+            return vignetteApercu(T, d, f), d, f
         end)
         if Fenetre.demandeActive == active.id then
             Fenetre.demandeActive = nil
@@ -1090,17 +1393,17 @@ end
 Fenetre.LEGENDE_COMPARAISON = "Claude | vous"
 
 -- Montre dans l'aperçu une image de la conversation `c` (chemin relatif à son dossier), réduite au
--- cadre de l'aperçu dans une tâche (Images.vignette), gardée ensuite (Fenetre.vignettes).
+-- cadre de l'aperçu en 2x dans une tâche (Images.vignette, 660 × 440), gardée ensuite
+-- (Fenetre.vignettes, par sa taille en pixels).
 function Fenetre.montrerImage(p, T, c, chemin)
-    local hauteur = T.apercu
-    local cle = c.id .. '/' .. chemin .. '/' .. T.apercu .. 'x' .. hauteur
+    local cle = c.id .. '/' .. chemin .. '/' .. T.pixelsApercu .. 'x' .. T.pixelsApercuHauteur
     local deja = Fenetre.vignettes[cle]
     if deja then
         poser(p, 'imageApercu', deja)
         return
     end
     LrTasks.startAsyncTask(function()
-        local reduite = Images.vignette(Stockage.dossier(c.id), chemin, T.apercu, hauteur)
+        local reduite = vignetteApercu(T, Stockage.dossier(c.id), chemin)
         if reduite then
             Fenetre.vignettes[cle] = reduite
             if Fenetre.p and Fenetre.T == T and Moteur.courante == c then
@@ -1111,7 +1414,7 @@ function Fenetre.montrerImage(p, T, c, chemin)
 end
 
 function Fenetre.changerImage(pas)
-    -- L'aperçu d'une étape (onglet Pourquoi ?) : ses ◀ ▶ sont coupés, Voir l'avant / Voir l'après
+    -- L'aperçu d'une étape (onglet Aperçu) : ses ◀ ▶ sont coupés, Voir l'avant / Voir l'après
     -- et les ◀ ▶ de la carte en tiennent lieu.
     if Fenetre.modeEtape() then
         return
@@ -1150,8 +1453,14 @@ function Fenetre.changerImage(pas)
     Fenetre.rafraichirApercu()
 end
 
--- L'aperçu en grand, dans une fenêtre à part ; pour une étape (onglet Pourquoi ?), son avant et
--- son après côte à côte (Fenetre.agrandirEtape).
+-- Le titre de la fenêtre de l'aperçu en grand : la légende de l'aperçu, sans ses balises.
+local function titreAgrandi(defaut)
+    local legende = Fenetre.p and sansBalises(Fenetre.p.legendeApercu) or ''
+    return "Claude · " .. (legende ~= '' and legende or defaut)
+end
+
+-- L'aperçu en grand, dans une fenêtre à part ; pour une étape (onglet Aperçu), son avant et son
+-- après côte à côte (Fenetre.agrandirEtape).
 function Fenetre.agrandir()
     if Fenetre.modeEtape() then
         Fenetre.agrandirEtape()
@@ -1168,7 +1477,7 @@ function Fenetre.agrandir()
                 return
             end
             LrDialogs.presentModalDialog {
-                title = "Claude · " .. (Fenetre.p and Fenetre.p.legendeApercu or Fenetre.LEGENDE_COMPARAISON),
+                title = titreAgrandi(Fenetre.LEGENDE_COMPARAISON),
                 contents = LrView.osFactory():picture { value = chemin, width = l, height = h },
                 actionVerb = "Fermer",
                 cancelVerb = '< exclude >',
@@ -1185,7 +1494,7 @@ function Fenetre.agrandir()
             local chemin, l, h = Images.grande(a.dossier, a.fichier, 1100, 740)
             if chemin then
                 LrDialogs.presentModalDialog {
-                    title = "Claude · " .. (Fenetre.p and Fenetre.p.legendeApercu or "photo active"),
+                    title = titreAgrandi("photo active"),
                     contents = LrView.osFactory():picture { value = chemin, width = l, height = h },
                     actionVerb = "Fermer",
                     cancelVerb = '< exclude >',
@@ -1208,7 +1517,7 @@ function Fenetre.agrandir()
         end
         local f = LrView.osFactory()
         LrDialogs.presentModalDialog {
-            title = "Claude · " .. (Fenetre.p and Fenetre.p.legendeApercu or "aperçu"),
+            title = titreAgrandi("aperçu"),
             contents = f:picture { value = chemin, width = l, height = h },
             actionVerb = "Fermer",
             cancelVerb = '< exclude >',
@@ -1217,7 +1526,7 @@ function Fenetre.agrandir()
 end
 
 -- Deux images côte à côte en grand, dans une fenêtre à part (1.3) : l'avant et l'après d'une étape
--- (onglet Pourquoi ?), la version de Claude et celle de Dany (Je le fais). `gauche` et `droite` :
+-- (onglet Aperçu), la version de Claude et celle de Dany (Je le fais). `gauche` et `droite` :
 -- { dossier, nom, titre } (le titre au-dessus de l'image, « Avant », « Après ») ; `legende`
 -- (facultative) dessous, coupée à la largeur des deux images ; le titre de la fenêtre est
 -- « Claude · <titre> ». Chaque image tient dans GRANDE_DEUX (Images.grande, sips) : depuis une
@@ -1271,9 +1580,14 @@ end
 -- Textes des cartes, page par page --------------------------------------------------------------
 
 -- Le texte de la carte Note (clé 'note'), celui de la proposition (clé 'proposition') et celui de
--- la carte Pourquoi ? (clé 'etape', 1.3) : coupés en lignes comme le fil (police P.texte), montrés
--- page par page avec ▲ ▼ (Vues.fleches). Un texte qui change revient à sa première page.
+-- la carte de l'étape (onglet Aperçu, clé 'etape', 1.3) : coupés en lignes comme le fil (police
+-- P.texte), montrés page par page avec ▲ ▼ (Vues.fleches). Un texte qui change revient à sa
+-- première page.
 Fenetre.pages = {}
+
+-- L'aide de l'onglet Leçon, en attendant sa carte (lot B4).
+Fenetre.AIDE_LECON = "Après une retouche, Claude donne la leçon de la photo : ce qui manquait, et ce qui se fait à la "
+    .. "prise de vue. Pour l'instant, elle se lit dans le fil, sous la retouche : un clic sur sa carte en donne le détail."
 
 local CARTES = {
     note = { texte = 'notationTexte', largeur = 'largeurNote', lignes = function(T) return (T.criteres or 8) + 3 end },
@@ -1671,6 +1985,10 @@ local function jeLeFais()
         ok, raison = Moteur.jaiFini()
     else
         ok, raison = Moteur.jeLeFais()
+        -- Le Mode reste à « Je le fais » pendant que Claude prépare la liste (Fenetre.modeMontre).
+        if ok then
+            Fenetre.demandeJeLeFais = Moteur.courante
+        end
     end
     local nouvellePhoto = not enCours and not prop
     if ok and Moteur.courante and info.cle and (nouvellePhoto or Moteur.courante.cle == nil) then
@@ -1855,9 +2173,10 @@ function Fenetre.ajuster()
     end
 end
 
--- Pourquoi ? (1.3) ------------------------------------------------------------------------------
--- Un clic sur une étape du fil (ligne « · Pourquoi ? », Conversation.estEtape) l'ouvre dans
--- l'onglet Pourquoi ? : dans l'aperçu, son après (ou son avant : Voir l'avant / Voir l'après), que
+-- Pourquoi ? : l'onglet Aperçu (1.3) -----------------------------------------------------------
+-- Un clic sur une étape du fil (ligne « · Pourquoi ? », Conversation.estEtape ; au lot B4, son
+-- bouton « Pourquoi ? ») l'ouvre dans l'onglet Aperçu (l'ancien onglet Pourquoi ?, D.ongletEtape) :
+-- dans l'aperçu, son après (ou son avant : Voir l'avant / Voir l'après), que
 -- le module a gardé au moment de l'étape sans rien écrire au catalogue (Etapes.lua) ; dans la
 -- carte (Vues.etape), « Étape 2 sur 4 · <but> », la raison donnée par Claude et les réglages
 -- changés, page par page ; ◀ ▶ d'une étape à l'autre de la même photo ; Détail… (l'appel et sa
@@ -1866,11 +2185,11 @@ end
 -- l'élément du fil), vue ('apres' ou 'avant'), suivre } : l'étape montrée, remise à nil quand la
 -- conversation montrée change. En mode suivre (la dernière étape de sa photo, ou l'onglet ouvert
 -- sans étape choisie), une nouvelle étape de la même photo devient l'étape montrée ; ◀ le quitte,
--- ▶ jusqu'à la dernière le reprend. Jamais de bascule automatique vers l'onglet Pourquoi ? : un
+-- ▶ jusqu'à la dernière le reprend. Jamais de bascule automatique vers l'onglet Aperçu : un
 -- clic seulement (sur l'onglet ou sur une étape du fil). La boucle suit Etapes.version : les
 -- images arrivées se montrent. Les ◀ ▶ de l'aperçu sont coupés dans l'onglet (Fenetre.changerImage).
 
-Fenetre.AIDE_ETAPE = "Cliquez une étape du fil (· Pourquoi ?) : son avant/après s'affiche au-dessus, et sa raison ici."
+Fenetre.AIDE_ETAPE = "Cliquez « Pourquoi ? » sur une étape du fil : son avant/après s'affiche au-dessus, et sa raison ici."
 
 -- Pourquoi une étape n'a pas d'avant/après, en mots (les raisons du module : Etapes.RAISONS).
 Fenetre.SANS_IMAGES = {
@@ -1911,7 +2230,7 @@ function Fenetre.photoDeLEtape(e)
     return photos[1] or active
 end
 
--- Vrai quand l'aperçu montre une étape : onglet Pourquoi ?, une étape choisie, pas d'image
+-- Vrai quand l'aperçu montre une étape : onglet Aperçu, une étape choisie, pas d'image
 -- cliquée dans le fil (prioritaire).
 function Fenetre.modeEtape()
     local p, T = Fenetre.p, Fenetre.T
@@ -1984,7 +2303,7 @@ function Fenetre.choisirDerniereEtape()
     return true
 end
 
--- Montre l'étape de l'élément i du fil (un clic sur sa ligne) dans l'onglet Pourquoi ? : un vrai
+-- Montre l'étape de l'élément i du fil (un clic sur sa ligne) dans l'onglet Aperçu : un vrai
 -- clic, l'onglet change sans Fenetre.choisirOnglet (réservé aux bascules de la fenêtre).
 function Fenetre.montrerEtape(i)
     local p, T, c = Fenetre.p, Fenetre.T, Moteur.courante
@@ -2007,7 +2326,7 @@ function Fenetre.montrerEtape(i)
     return true
 end
 
--- Quand Dany choisit l'onglet Pourquoi ? sans étape choisie : la dernière, en mode suivre.
+-- Quand Dany choisit l'onglet Aperçu sans étape choisie : la dernière, en mode suivre.
 function Fenetre.montrerDerniereEtape()
     Fenetre.choisirDerniereEtape()
     Fenetre.rafraichirEtape()
@@ -2163,7 +2482,7 @@ function Fenetre.demanderImagesEtape(x)
                     end
                     if copie and Fichiers.existe(copie) then
                         r.noms[vue] = nom
-                        r[vue] = Images.vignette(dossier, nom, T.apercu)
+                        r[vue] = vignetteApercu(T, dossier, nom)
                     end
                 end
             end
@@ -2192,7 +2511,7 @@ function Fenetre.demanderImagesEtape(x)
     end)
 end
 
--- Remplit la carte Pourquoi ? (et l'aperçu, sauf `sansApercu`) d'après l'étape montrée ; sans
+-- Remplit la carte de l'étape (et l'aperçu, sauf `sansApercu`) d'après l'étape montrée ; sans
 -- étape, l'aide. L'onglet ouvert sans étape choisie prend la dernière (mode suivre).
 function Fenetre.rafraichirEtape(sansApercu)
     local p, T = Fenetre.p, Fenetre.T
@@ -2230,10 +2549,11 @@ function Fenetre.rafraichirEtape(sansApercu)
     end
 end
 
--- L'aperçu de l'onglet Pourquoi ? (Fenetre.apercuOnglet) : l'image de l'étape montrée (après, ou
+-- L'aperçu de l'onglet Aperçu (Fenetre.apercuOnglet) : l'image de l'étape montrée (après, ou
 -- avant), « Étape 2 sur 4 · après » ; sans image, l'image vide et pourquoi. Sans étape choisie,
--- nil : l'aperçu d'avant. Les ◀ ▶ de l'aperçu sont coupés.
-Fenetre.apercuOnglet.etape = function(p)
+-- nil : l'aperçu d'avant. Les ◀ ▶ de l'aperçu sont coupés. Sous la clé de l'onglet,
+-- D.ongletEtape ('apercu').
+Fenetre.apercuOnglet.apercu = function(p)
     local x, n, liste = Fenetre.etapeCourante()
     if not x then
         return nil
@@ -2263,8 +2583,8 @@ Fenetre.apercuOnglet.etape = function(p)
     return true
 end
 
--- Un vrai clic sur l'onglet Pourquoi ? : la carte relue ; sans étape choisie, la dernière.
-Fenetre.surOnglet.etape = function()
+-- Un vrai clic sur l'onglet Aperçu : la carte relue ; sans étape choisie, la dernière.
+Fenetre.surOnglet.apercu = function()
     Fenetre.rafraichirEtape(true)
 end
 
@@ -2304,7 +2624,7 @@ function Fenetre.detailEtape()
     end
 end
 
--- Agrandir dans l'onglet Pourquoi ? : l'avant et l'après côte à côte (Fenetre.agrandirDeux), la
+-- Agrandir dans l'onglet Aperçu : l'avant et l'après côte à côte (Fenetre.agrandirDeux), la
 -- raison et les changements dessous ; une seule image si l'autre manque.
 function Fenetre.agrandirEtape()
     local x, n, liste = Fenetre.etapeCourante()
@@ -2351,7 +2671,11 @@ local ETATS_NOTE = {
     ecartee = "écartée",
 }
 
-local COULEURS_NOTE = { proposee = 'orange', acceptee = 'vert', changee = 'vert', a_verifier = 'rouge', ecartee = 'gris' }
+-- La couleur de la note proposée selon son état : des clés de la palette (Dispositions.PALETTES ;
+-- l'ancien « vert » est la coche), une variante de texte chacune dans la carte (Vues.notation).
+local COULEURS_NOTE = { proposee = 'orange', acceptee = 'coche', changee = 'coche', a_verifier = 'rouge', ecartee = 'gris' }
+Fenetre.COULEURS_NOTE = COULEURS_NOTE
+Fenetre.TEINTES_NOTE = { 'gris', 'orange', 'coche', 'rouge' }
 
 local CRITERES = {
     { cle = 'impact', titre = "Impact" },
@@ -2554,22 +2878,98 @@ function Fenetre.changerNote()
     end
 end
 
--- Voyants -------------------------------------------------------------------------------------
+-- Mode -------------------------------------------------------------------------------------------
+-- Les trois boutons radio de l'en-tête (Vues.mode), liés à la clé `mode` : 'appliquer' et
+-- 'proposer' (le mode « Proposer d'abord » de la liaison, sa préférence `mode`), 'jelefais'
+-- (l'exercice, 1.3). La valeur montrée se tire de l'état, jamais d'un drapeau perdu à la
+-- réouverture (Fenetre.modeMontre) ; la fenêtre la pose sous la garde Fenetre.modeAuto, pour que
+-- l'observateur ne la prenne pas pour un clic. Un vrai clic (l'observateur, Fenetre.changerMode)
+-- annule d'abord l'envoi automatique : un radio est un bouton, son clic valide le champ (constaté
+-- le 21 octobre 2026, D3). « J'ai fini » ne part jamais d'un radio : seulement de la carte
+-- Proposition.
 
+Fenetre.LIBELLES_MODE = { appliquer = "Appliquer", proposer = "Proposer d'abord", jelefais = "Je le fais" }
+
+-- La valeur du Mode d'après l'état : « Je le fais » tant que la conversation montrée a un
+-- exercice à faire ou en préparation (Conversation.dernierExercice), que la demande Je le fais
+-- part (Fenetre.jeLeFaisEnCours), ou que Claude prépare la liste qu'elle a demandée
+-- (Fenetre.demandeJeLeFais) ; sinon le mode de la liaison (Lightroom.mode).
+function Fenetre.modeMontre()
+    local c = Moteur.courante
+    local exo = c and Conversation.dernierExercice(c)
+    if Fenetre.jeLeFaisEnCours or (exo and (exo.etat == 'aFaire' or exo.etat == 'enCours')) then
+        return 'jelefais'
+    end
+    if Moteur.travaille and c ~= nil and Fenetre.demandeJeLeFais == c then
+        return 'jelefais'
+    end
+    return Lightroom.mode()
+end
+
+-- Pose la valeur du Mode tirée de l'état (sans que l'observateur la prenne pour un clic).
 function Fenetre.rafraichirMode()
     local p = Fenetre.p
     if not p then
         return
     end
-    local mode = Lightroom.mode()
-    poser(p, 'texteMode', mode == 'proposer' and "Proposer d'abord" or "Appliquer directement")
-    poser(p, 'etatMode', mode == 'proposer' and 'bleu' or 'neutre')
+    if not Moteur.travaille then
+        Fenetre.demandeJeLeFais = nil
+    end
+    local valeur = Fenetre.modeMontre()
+    if p.mode ~= valeur then
+        Fenetre.modeAuto = true
+        p.mode = valeur
+        Fenetre.modeAuto = false
+    end
 end
 
-function Fenetre.basculerMode()
-    Lightroom.basculerMode()
+-- Un radio inactif et coché par sa valeur se dessine sans point à la première ouverture ; sa
+-- valeur reposée après l'ouverture le dessine grisé et coché (constaté le 21 octobre 2026, D12).
+-- Une seule fois, dans la première tâche de la fenêtre ouverte (Fenetre.boucle) : la valeur
+-- repasse par une autre, puis revient, sous la garde Fenetre.modeAuto (une valeur égale reposée
+-- pourrait ne rien redessiner : Lightroom ne prévient qu'au changement, supposé).
+function Fenetre.reposerMode()
+    local p = Fenetre.p
+    if not p then
+        return
+    end
+    local valeur = p.mode
+    Fenetre.modeAuto = true
+    p.mode = 'aucun'
+    p.mode = valeur
+    Fenetre.modeAuto = false
+end
+
+-- Un vrai clic sur un radio du Mode. Appliquer ou Proposer d'abord : le mode de la liaison change
+-- s'il diffère ; pendant un exercice, le radio revient à Je le fais, et le bandeau dit que
+-- l'exercice continue. Je le fais : la demande part (Fenetre.jeLeFais, dans une tâche), sans
+-- exercice en cours seulement ; un refus remet le radio (Fenetre.rafraichirMode).
+function Fenetre.changerMode(valeur)
+    local p = Fenetre.p
+    if not p then
+        return
+    end
+    local exercice = Fenetre.modeMontre() == 'jelefais'
+    if valeur == 'appliquer' or valeur == 'proposer' then
+        if Lightroom.mode() ~= valeur then
+            Lightroom.basculerMode()
+        end
+        if exercice then
+            -- L'essentiel d'abord : le bandeau, étroit, coupe la fin (son infobulle la donne).
+            p.message = "L'exercice continue (J'ai fini dans la carte Proposition) ; mode de la liaison : "
+                .. Fenetre.LIBELLES_MODE[valeur] .. "."
+        end
+    elseif valeur == 'jelefais' and not exercice and not Moteur.travaille then
+        enTache(function()
+            Fenetre.jeLeFais()
+            Fenetre.rafraichirMode()
+        end)
+        return
+    end
     Fenetre.rafraichirMode()
 end
+
+-- Voyants -------------------------------------------------------------------------------------
 
 -- Claude Code (commandes du système : dans une tâche) et la liaison avec le serveur, lue
 -- directement dans ce module.
@@ -2648,8 +3048,18 @@ function Fenetre.rafraichirVersions(lignes)
     for i, l in ipairs(lignes) do
         poser(p, 'versionNom' .. i, l.nom)
         poser(p, 'version' .. i, l.version)
+        poser(p, 'versionTexte' .. i, Fenetre.texteVersion(l))
         poser(p, 'versionAlerte' .. i, l.alerte == true)
     end
+end
+
+-- Une ligne de version en un texte (Vues.versions) : « Développeur 1.3 », « MCP-Développeur 1.2 ·
+-- à mettre à jour » (l'alerte après le numéro), « MCP-Développeur · introuvable ».
+function Fenetre.texteVersion(l)
+    local nom, version = tostring(l.nom or ''), tostring(l.version or '')
+    local base, suite = nom:match('^(.-)( · .*)$')
+    base, suite = base or nom, suite or ''
+    return base .. (version ~= '' and (' ' .. version) or '') .. suite
 end
 
 function Fenetre.rafraichirAide()
@@ -2703,12 +3113,19 @@ function Fenetre.majPhoto()
     local id = info.active and info.active.id
     if id ~= Fenetre.idActif then
         Fenetre.idActif = id
+        -- Sa légende (nom de la copie, appareil, date de prise de vue), lue seulement quand elle
+        -- change : Lightroom.photos, toutes les 2 s, ne lit rien de plus.
+        Fenetre.legendeActive = id ~= nil and Lightroom.legende(id) or nil
+        if Fenetre.legendeActive then
+            Fenetre.legendeActive.id = id
+        end
         Fenetre.voirActive = true
         Fenetre.imageCliquee = nil
         Fenetre.rafraichirApercu()
     end
     if info.active then
-        p.infoPhoto = string.format("Active : %s     Sélection : %d", Lightroom.nomCourt(info.active.nom), info.selection)
+        p.infoPhoto = string.format("Active : <EM>%s</EM> · Sélection : <EM>%d</EM>",
+            Fenetre.nomPhoto(legendeActive(info.active)), info.selection)
         -- Une note acceptée ou changée qui n'est plus sur la photo (undo_last, ⌘Z) : la proposition
         -- redevient à décider.
         local active = info.active
@@ -2779,19 +3196,20 @@ function Fenetre.rafraichir()
         Fenetre.revenirAuFil()
     end
     local c = Moteur.courante
-    poser(p, 'titre', Fenetre.vue == 'carnet' and Fenetre.TITRE_CARNET or (c and c.titre or Conversation.TITRE_PAR_DEFAUT))
+    poser(p, 'titre', sansBalises(Fenetre.vue == 'carnet' and Fenetre.TITRE_CARNET or (c and c.titre or Conversation.TITRE_PAR_DEFAUT)))
     poser(p, 'libre', not Moteur.travaille)
     poser(p, 'travaille', Moteur.travaille)
-    poser(p, 'titreEnvoyer', Moteur.travaille and "Arrêter" or "Envoyer")
     poser(p, 'forfait', Moteur.texteForfait())
     Fenetre.rafraichirFil()
-    -- La carte Pourquoi ? (une nouvelle étape en mode suivre, une autre conversation), avant
+    -- La carte de l'étape (une nouvelle étape en mode suivre, une autre conversation), avant
     -- l'aperçu, qui en dépend dans son onglet.
     Fenetre.rafraichirEtape(true)
     Fenetre.rafraichirApercu()
     Fenetre.rafraichirProposition()
     Fenetre.rafraichirListe()
     Fenetre.rafraichirNotation()
+    -- Le Mode suit l'exercice (Je le fais commencé, fini, refusé).
+    Fenetre.rafraichirMode()
 end
 
 -- Demandes ------------------------------------------------------------------------------------
@@ -3018,8 +3436,9 @@ end
 -- Le nom du cadre enregistré de la fenêtre. Lightroom rend sa taille enregistrée à la fenêtre et
 -- ne la rapetisse pas quand le contenu devient plus petit (bande vide en bas, constaté) : FORME
 -- augmente quand le contenu rapetisse. Le nom garde « conversation » et « grande » (la seule
--- disposition, la seule taille) : le cadre déjà enregistré sert encore.
-Fenetre.FORME = 1
+-- disposition, la seule taille). 2 : la fenêtre B (1.3), de 1 280 × 800, plus basse que la
+-- Conversation claire de la 1.2.
+Fenetre.FORME = 2
 
 function Fenetre.cadre()
     return 'DeveloppeurClaude-' .. Dispositions.NOM .. '-grande-' .. Fenetre.FORME
@@ -3043,12 +3462,19 @@ function Fenetre.periodique()
     LrTasks.pcall(Fenetre.suivreExercice)
 end
 
+-- Le tour de la boucle où la valeur du Mode se repose (Fenetre.reposerMode) : le deuxième, un
+-- quart de seconde après le premier, la fenêtre déjà montrée.
+Fenetre.TOUR_REPOSER_MODE = 2
+
 function Fenetre.boucle(generation)
     local tic = 0
     while Fenetre.ouverte and Fenetre.generation == generation do
         tic = tic + 1
         local p = Fenetre.p
         if p then
+            if tic == Fenetre.TOUR_REPOSER_MODE then
+                LrTasks.pcall(Fenetre.reposerMode)
+            end
             if Fenetre.aRafraichir then
                 Fenetre.aRafraichir = false
                 local ok, erreur = LrTasks.pcall(Fenetre.rafraichir)
@@ -3077,12 +3503,12 @@ function Fenetre.boucle(generation)
                     Journal.noter("Carnet de progrès :", tostring(erreur))
                 end
             end
-            -- Un avant/après rangé (ou manqué) par le module : la carte Pourquoi ? relit ses images.
+            -- Un avant/après rangé (ou manqué) par le module : la carte de l'étape relit ses images.
             if Etapes.version ~= Fenetre.versionEtapes then
                 local ok, erreur = LrTasks.pcall(Fenetre.rafraichirEtape)
                 if not ok then
                     Fenetre.versionEtapes = Etapes.version
-                    Journal.noter("Pourquoi ? :", tostring(erreur))
+                    Journal.noter("Étape (onglet Aperçu) :", tostring(erreur))
                 end
             end
             poser(p, 'activite', Moteur.texteTravail(math.floor(tic / 2)))
@@ -3108,7 +3534,7 @@ local function initialiserNotation(p)
 end
 
 -- Valeurs des propriétés de la 1.3 avant l'ouverture (Lightroom l'exige de toute clé liée) : la
--- carte Pourquoi ?, vide et ses boutons inactifs, et la seconde rangée de la carte Proposition.
+-- carte de l'étape, vide et ses boutons inactifs, et la seconde rangée de la carte Proposition.
 local function initialiserEtapeEtExercice(p)
     p.etapeTitre = ''
     p.etapeSousTitre = ''
@@ -3160,12 +3586,14 @@ function Fenetre.afficher()
 
         Moteur.charger()
         local prefs = Chemins.prefs()
+        -- L'apparence choisie dans le Gestionnaire : ses couleurs et ses images, à chaque ouverture.
+        Fenetre.preparerApparence(prefs.apparence)
         local D = Dispositions.dimensions()
         Fenetre.T = D
         Fenetre.cache = {}
         Fenetre.vignettes = {}
         Fenetre.conversationAffichee = nil
-        Fenetre.signatureListe = nil
+        Fenetre.pageListe, Fenetre.cases = 1, nil
         Fenetre.defilement = 0
         Fenetre.indiceImage = nil
         Fenetre.imageCliquee = nil
@@ -3185,7 +3613,7 @@ function Fenetre.afficher()
         Fenetre.info = nil
         Fenetre.noteVue, Fenetre.notePhoto = nil, nil
         Fenetre.noteEnCours = false
-        -- Aucune étape choisie (onglet Pourquoi ?) ; ses images se relisent, les copies d'avant
+        -- Aucune étape choisie (onglet Aperçu) ; ses images se relisent, les copies d'avant
         -- s'effacent.
         Fenetre.etape, Fenetre.imagesEtapes, Fenetre.demandesEtapes, Fenetre.versionEtapes = nil, {}, {}, nil
         Fichiers.supprimer(Fenetre.dossierPourquoi())
@@ -3197,7 +3625,8 @@ function Fenetre.afficher()
         p.message = ''
         p.jointes = Fenetre.texteJointes()
         p.style = Consignes.style(prefs.styleChoisi) and prefs.styleChoisi or 'standard'
-        p.onglet = D.onglets and D.onglets[1].valeur or 'aucun'
+        -- Note à l'ouverture (D.ongletParDefaut), le troisième segment.
+        p.onglet = D.ongletParDefaut
         p.libre = not Moteur.travaille
         p.travaille = Moteur.travaille
         p.forfait = Moteur.texteForfait()
@@ -3205,8 +3634,8 @@ function Fenetre.afficher()
         p.etatClaude = 'neutre'
         p.texteLightroom = "Lightroom"
         p.etatLightroom = 'neutre'
-        p.texteMode = ''
-        p.etatMode = 'neutre'
+        -- Le Mode, tiré de l'état (Fenetre.modeMontre), reposé ensuite par Fenetre.rafraichirMode.
+        p.mode = Fenetre.modeMontre()
         -- Gris tant que le connecteur ne l'a pas dit (Fenetre.verifier, à l'ouverture).
         p.texteEcran = "Écran"
         p.etatEcran = 'neutre'
@@ -3223,10 +3652,13 @@ function Fenetre.afficher()
         p.bandeau = Fenetre.etatBandeau(p)
         for i, l in ipairs(Composants.lignes(Composants.module(), '…')) do
             p['versionNom' .. i], p['version' .. i], p['versionAlerte' .. i] = l.nom, l.version, false
+            p['versionTexte' .. i] = Fenetre.texteVersion(l)
         end
         p.activite = Moteur.texteTravail(0)
-        p.listeConversations = {}
-        p.selectionListe = {}
+        -- Les cases de la liste des conversations (Fenetre.rafraichirListe les remplit).
+        for k = 1, D.cases do
+            p['lg' .. k], p['lt' .. k], p['ls' .. k], p['lc' .. k], p['li' .. k] = 'vide', '', '', false, ''
+        end
         for i = 1, D.lignes do
             p['t' .. i] = ''
             p['g' .. i] = 'vide'
@@ -3236,13 +3668,20 @@ function Fenetre.afficher()
         initialiserEtapeEtExercice(p)
         Fenetre.p = p
 
-        p:addObserver('selectionListe', function(_, _, valeur)
-            Fenetre.annulerEnvoiAuto()
-            Fenetre.choisirDansListe(valeur)
-        end)
+        -- La recherche suit chaque frappe (immediate) : la liste revient à sa première page.
         p:addObserver('recherche', function()
             Fenetre.annulerEnvoiAuto()
+            Fenetre.pageListe = 1
             Fenetre.rafraichirListe()
+        end)
+        -- Un clic sur un radio du Mode (un vrai clic : la fenêtre pose la valeur sous la garde
+        -- Fenetre.modeAuto) n'envoie pas la demande validée par ce clic.
+        p:addObserver('mode', function(_, _, valeur)
+            if Fenetre.modeAuto then
+                return
+            end
+            Fenetre.annulerEnvoiAuto()
+            Fenetre.changerMode(valeur)
         end)
         p:addObserver('style', function(_, _, valeur)
             Fenetre.annulerEnvoiAuto()
