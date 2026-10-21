@@ -117,6 +117,8 @@ extension ToolHandler {
             info["reglages"] = Self.grouped(settings, onlyChanged: true, raw: raw)
         }
         Self.describeProcessVersion(&info)
+        // Après « Je le fais » (my_turn), corrections_utilisateur est le travail de l'exercice.
+        JeLeFais.annoterCorrections(&info)
 
         if let region {
             guard let piece = PreviewImages.crop(image, region: region) else {
@@ -488,6 +490,7 @@ extension ToolHandler {
             result["tous_les_reglages"] = all
         }
         Self.describeProcessVersion(&result)
+        JeLeFais.annoterCorrections(&result)
         return .object(result)
     }
 

@@ -7,7 +7,9 @@ import XCTest
 /// Développement, le classement des écarts réglage par réglage, l'écart principal mesuré aux seuils
 /// du bilan (JeLeFais, fonctions pures), preview_settings avec my_turn et view_photo avec
 /// compare = claude_version, par FakeLightroom. Le module (essayer avec exercice et sans_rendu,
-/// apercu avec comparer = versionClaude) a ses propres essais dans la suite de la liaison.
+/// apercu avec comparer = versionClaude) a ses propres essais dans la suite de la liaison ; ce qui
+/// passe entre les deux est figé dans Tests/Contrats/je-le-fais.json (ContratJeLeFaisTests) : les
+/// fausses réponses d'ici en suivent la forme.
 final class JeLeFaisTests: XCTestCase {
     // MARK: Aides
 
@@ -118,6 +120,11 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertEqual(JeLeFais.texte(cle: "ConvertToGrayscale", true, raw: true), "noir et blanc")
         XCTAssertEqual(JeLeFais.texte(cle: "ColorGradeMidtoneHue", 45, raw: true), "45°")
         XCTAssertEqual(JeLeFais.texte(cle: "Contrast2012", .number(ToolHandler.pendingAutoValue), raw: true), "auto")
+        // La version de processus : rangée par Lightroom dans les écarts du module (« 15.4 »), nommée
+        // dans la liste à faire (« version 6 », le nom que le serveur envoie) ; dite pareil.
+        XCTAssertEqual(JeLeFais.texte(cle: "ProcessVersion", "15.4", raw: true), "version 6")
+        XCTAssertEqual(JeLeFais.texte(cle: "ProcessVersion", "11.0", raw: true), "version 5")
+        XCTAssertEqual(JeLeFais.texte(cle: "ProcessVersion", "version 6", raw: true), "version 6")
     }
 
     /// Les quatre courbes par points gardent leur canal (le libellé du catalogue le met entre
@@ -311,7 +318,7 @@ final class JeLeFaisTests: XCTestCase {
                 // Ce qui suit d'autres réglages (recadrage actif, nom de la courbe) : ni compté ni nommé.
                 ecart("HasCrop", false, true, true), ecart("ToneCurveName2012", "Linear", "Linear", "Custom"),
             ],
-            "listes": ["masques": ["depart": 0, "maintenant": 1]],
+            "listes": ["masques": ["depart": 0, "vous": 1], "taches": ["depart": 0, "vous": 0], "yeux_rouges": ["depart": 0, "vous": 0]],
             "restent": ["MaskGroupBasedCorrections", "RetouchAreas"],
             "rien_change": false,
         ]
@@ -335,10 +342,18 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertEqual(enrichi["resume"], "6 réglages comparés : 2 comme Claude, 1 plus fort, 1 oublié, 2 ajoutés.")
         // Le reste de la réponse du module passe tel quel ; ce qui reste dans les deux images est dit.
         XCTAssertEqual(enrichi["instantane"], "Claude · ma version")
-        XCTAssertEqual(enrichi["listes"]?["masques"]?["maintenant"], 1)
+        XCTAssertEqual(enrichi["listes"]?["masques"]?["vous"], 1)
         let aSavoir = try XCTUnwrap(enrichi["a_savoir_exercice"]?.string)
         XCTAssertTrue(aSavoir.contains("(masques, taches)") && aSavoir.contains("se voit dans les deux images"), aSavoir)
         XCTAssertFalse(aSavoir.contains("MaskGroupBasedCorrections"), "les listes en français")
+        // Le module laisse une liste quand la photo en portait déjà au départ, ou des taches de
+        // l'outil Supprimer même sur une photo qui n'en avait aucune (Variantes.valeursClaude) : la
+        // phrase ne dit pas « en portait déjà » à tort.
+        XCTAssertTrue(aSavoir.hasSuffix("(la photo en portait déjà au départ, ou ce sont des taches de l'outil Supprimer)."), aSavoir)
+        var masquesSeuls = exercice.object ?? [:]
+        masquesSeuls["restent"] = ["MaskGroupBasedCorrections"]
+        let masques = try XCTUnwrap(JeLeFais.enrichir(.object(masquesSeuls), raw: true, claude: mesures(), vous: mesures())["a_savoir_exercice"]?.string)
+        XCTAssertTrue(masques.hasSuffix("(la photo en portait déjà au départ)."), masques)
         XCTAssertEqual(enrichi["ecart_principal"]?["visible"], false, "deux images mesurées pareilles")
         // Sans mesures (image illisible) : pas d'écart principal, dit.
         XCTAssertTrue(JeLeFais.enrichir(exercice, raw: true, claude: nil, vous: mesures())["ecart_principal"]?["texte"]?.string?
@@ -350,7 +365,7 @@ final class JeLeFaisTests: XCTestCase {
     /// Réponse d'essayer d'un module 1.3 avec exercice et sans_rendu : aucun chemin.
     func reponseMonTour() -> JSONValue {
         [
-            "mode": "Proposer d'abord", "photo": ["id": 7, "fichier": "DSCF1595.RAF"], "etape": "Claude · essai : ma version (je le fais)",
+            "mode": "proposer d'abord", "photo": ["id": 7, "fichier": "DSCF1595.RAF", "copie_virtuelle": false], "etape": "Claude · essai : ma version (je le fais)",
             "instantane": "Claude · ma version", "exercice": ["instantane": "Claude · ma version"], "raw": true,
             "changements": [changement("Vibrance", 0, 10), changement("Temperature", 5200, 5600), changement("Exposure2012", 0, 0.35)],
             "remarques": [],
@@ -373,6 +388,7 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertEqual(params["sans_rendu"], true)
         XCTAssertEqual(params["action"], "appliquer")
         XCTAssertEqual(params["etape"], "ma version (je le fais)")
+        XCTAssertEqual(params["raison"], "lumière", "le nom de la proposition : la raison de l'entrée « Claude · je le fais » du journal")
         XCTAssertEqual(params["photo"]?.int, 7)
         XCTAssertNil(params["entier"])
         XCTAssertNil(params["comparer"])
@@ -475,7 +491,7 @@ final class JeLeFaisTests: XCTestCase {
             "instantane": "Claude · ma version", "le": "2026-10-21 10:00",
             "ecarts": [ecart("Exposure2012", 0, 0.35, 0.8), ecart("Clarity2012", 0, 0, 20), ecart("Vibrance", 0, 10, 0),
                        ecart("Temperature", 5200, 5600, 5650)],
-            "listes": ["masques": ["depart": 0, "maintenant": 1]], "restent": [], "rien_change": false,
+            "listes": ["masques": ["depart": 0, "vous": 1], "taches": ["depart": 0, "vous": 0], "yeux_rouges": ["depart": 0, "vous": 0]], "restent": [], "rien_change": false,
         ]
         fake.onSend = { [unowned fake] command, params in
             guard command == "apercu" else { return }
@@ -521,7 +537,7 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertEqual(exercice["ecart_principal"]?["visible"], true)
         XCTAssertEqual(exercice["ecart_principal"]?["mesure"], "exposition")
         XCTAssertEqual(exercice["ecart_principal"]?["reglage"]?["cle"], "Exposure2012")
-        XCTAssertEqual(exercice["listes"]?["masques"]?["maintenant"], 1)
+        XCTAssertEqual(exercice["listes"]?["masques"]?["vous"], 1)
         XCTAssertNil(info["chemin_avant"])
         XCTAssertNil(info["photo"]?["chemin_original"])
         // view_photo reste en lecture seule.
@@ -553,6 +569,45 @@ final class JeLeFaisTests: XCTestCase {
         fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 140, green: 140, blue: 140))),
                                   "chemin_avant": .string(TestSupport.previewFile(TestSupport.jpeg(red: 100, green: 100, blue: 100)))]
         XCTAssertFalse(ToolHandler(lightroom: fake).call(name: "view_photo", arguments: ["compare": "before_claude"]).isError)
+    }
+
+    // MARK: Corrections de l'utilisateur après l'exercice
+
+    /// Après my_turn, le module remet l'état d'après Claude au départ de l'exercice : ce que
+    /// corrections_utilisateur rapporte ensuite (étape « Claude · essai : ma version (je le fais) »)
+    /// est le travail de l'utilisateur, pas une préférence à retenir (ServerInfo dit de proposer de
+    /// retenir ses reprises) : view_photo, toute vue, et get_settings le disent ; le reste passe tel
+    /// quel, et une autre étape n'est pas touchée.
+    func testLesCorrectionsDeLExerciceNeSontPasDesGouts() throws {
+        func corrections(_ etape: String) -> JSONValue {
+            ["etape": .string(etape), "changements": [["cle": "Exposure2012", "claude": 0, "maintenant": 0.8]]]
+        }
+        XCTAssertEqual(JeLeFais.etapeEssai, "Claude · essai : ma version (je le fais)", "le nom que le module donne à l'étape (contrat)")
+        for etape in [JeLeFais.etapeEssai, "Claude · passe 1"] {
+            let exercice = etape == JeLeFais.etapeEssai
+            let fake = FakeLightroom()
+            let image = TestSupport.jpeg(red: 120, green: 120, blue: 120)
+            fake.onSend = { [unowned fake] command, _ in
+                if command == "apercu" {
+                    fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(image)), "photo": ["id": 7],
+                                              "corrections_utilisateur": corrections(etape)]
+                }
+            }
+            fake.replies["reglages"] = ["photo": ["id": 7], "reglages": ["Exposure2012": 0.8], "corrections_utilisateur": corrections(etape)]
+            let tools = ToolHandler(lightroom: fake)
+            let vue = tools.call(name: "view_photo", arguments: [:])
+            XCTAssertFalse(vue.isError, vue.text)
+            let lue = try XCTUnwrap(JSONCoding.parse(vue.text)["corrections_utilisateur"]?.object)
+            let lecture = tools.call(name: "get_settings", arguments: [:])
+            XCTAssertFalse(lecture.isError, lecture.text)
+            let lus = try XCTUnwrap(JSONCoding.parse(lecture.text)["corrections_utilisateur"]?.object)
+            for objet in [lue, lus] {
+                XCTAssertEqual(objet["etape"]?.string, etape)
+                XCTAssertEqual(objet["changements"], corrections(etape)["changements"], "passé tel quel")
+                XCTAssertEqual(objet["exercice"]?.string, exercice ? JeLeFais.correctionsDeLExercice : nil, etape)
+            }
+        }
+        XCTAssertTrue(JeLeFais.correctionsDeLExercice.contains("pas une préférence à retenir (remember_style)"))
     }
 
     // MARK: Descriptions

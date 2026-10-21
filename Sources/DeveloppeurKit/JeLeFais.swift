@@ -19,6 +19,25 @@ enum JeLeFais {
     static let instantane = "ma version"
     /// Nom de l'étape de l'essai (« Claude · essai : ma version (je le fais) » dans l'Historique).
     static let etape = "ma version (je le fais)"
+    /// L'étape telle que le module la nomme (Ecriture.nomEtape) : celle que corrections_utilisateur
+    /// donne tant que l'exercice est la dernière commande de Claude sur la photo.
+    static let etapeEssai = "Claude · essai : " + etape
+
+    // MARK: Corrections de l'utilisateur
+
+    /// Ce que dit corrections_utilisateur d'un exercice (`exercice`).
+    static let correctionsDeLExercice = "Le travail de l'utilisateur dans « Je le fais » (depuis que la version de Claude est rangée) : il apprend en faisant la retouche lui-même ; ce n'est pas une préférence à retenir (remember_style). Pour le comparer à la version de Claude : view_photo avec compare = claude_version."
+
+    /// Après my_turn, l'état d'après Claude est le départ de l'exercice (le module y remet la photo,
+    /// noterEtatFinal) : corrections_utilisateur rapporte alors le travail de l'utilisateur dans
+    /// l'exercice, que les consignes du connecteur (ServerInfo) diraient de proposer de retenir. Le
+    /// dit dans corrections_utilisateur (`exercice`), le reste passant tel quel : view_photo (toute
+    /// vue) et get_settings. Rien si la dernière commande de Claude est une autre étape.
+    static func annoterCorrections(_ info: inout [String: JSONValue]) {
+        guard var corrections = info["corrections_utilisateur"]?.object, corrections["etape"]?.string == etapeEssai else { return }
+        corrections["exercice"] = .string(correctionsDeLExercice)
+        info["corrections_utilisateur"] = .object(corrections)
+    }
 
     // MARK: Panneaux
 
@@ -243,10 +262,17 @@ enum JeLeFais {
     }
 
     /// La valeur d'un réglage telle que la montre le panneau : « +0,35 », « 5 600 K », « −1,2° »,
-    /// « activé », « complet », « 45° », ou le texte du module (profil, préréglage…).
+    /// « activé », « complet », « 45° », ou le texte du module (profil, préréglage…). La version de
+    /// processus arrive rangée par Lightroom dans les écarts (« 15.4 », l'état simple du module) et
+    /// nommée dans la liste à faire (« version 6 », les noms que le serveur envoie au module) : les
+    /// deux disent « version 6 ».
     static func texte(cle: String, _ valeur: JSONValue?, raw: Bool) -> String {
         guard let valeur, !valeur.isNull else { return "—" }
-        if let texte = valeur.string { return cle == "WhiteBalance" ? (nomsBalance[texte] ?? texte) : texte }
+        if let texte = valeur.string {
+            if cle == "WhiteBalance" { return nomsBalance[texte] ?? texte }
+            if cle == "ProcessVersion", let version = DevelopCatalogue.processVersion(texte) { return "version \(version)" }
+            return texte
+        }
         guard let v = nombre(valeur) else { return JSONCoding.line(valeur) }
         if v == ToolHandler.pendingAutoValue { return "auto" }
         let reglage = DevelopCatalogue.setting(cle)
@@ -515,7 +541,11 @@ enum JeLeFais {
                 let nom = nomsListes[liste] ?? liste
                 if !noms.contains(nom) { noms.append(nom) }
             }
-            sortie["a_savoir_exercice"] = .string("Ce que l'utilisateur a ajouté ou changé à la main (\(noms.joined(separator: ", "))) sur une photo qui en portait déjà se voit dans les deux images : la version de Claude ne peut pas le retirer le temps du rendu.")
+            // Le module (Variantes.valeursClaude) laisse une liste dans les deux images quand la
+            // photo en portait déjà au départ, ou, pour les taches, quand l'outil Supprimer en a posé
+            // (Lightroom en dérive RetouchAreas) : même sur une photo qui n'en avait aucune.
+            let supprimer = restent.contains { $0 == "RetouchAreas" || $0 == "RemoveAreas" }
+            sortie["a_savoir_exercice"] = .string("Ce que l'utilisateur a ajouté ou changé à la main (\(noms.joined(separator: ", "))) se voit dans les deux images : la version de Claude ne peut pas le retirer le temps du rendu (la photo en portait déjà au départ\(supprimer ? ", ou ce sont des taches de l'outil Supprimer" : "")).")
         }
         let ecarts = lignes.map { (cle: $0.json["cle"]?.string ?? "", sorte: $0.sorte, json: $0.json) }
         if let claude, let vous, let ecart = principal(claude: claude, vous: vous, ecarts: ecarts, raw: raw) {
