@@ -34,7 +34,7 @@ public enum ServerInfo {
     Couleur : une dominante verte ou magenta restée dans les seules ombres se corrige par ShadowTint, pas par Tint ; \
     le mélangeur TSL touche toutes les couleurs semblables : pour un seul objet, un masque ; dents, iris, peau : add_mask avec effect. \
     Géométrie : mesurer une inclinaison avec measure_angle (sous 0,5°, elle ne se voit pas) ; redresser par crop.angle, ou par Upright après les corrections d'objectif. \
-    Recadrer seulement sur demande ou si la composition y gagne nettement, et le dire. \
+    Recadrer (read_composition) seulement sur demande ou si la composition y gagne nettement, et le dire. \
     Bruit fort (mesure au-dessus de 1,5, ISO élevé, ombres relevées) : enhance_photo (denoise de 20 à 50), avant netteté, \
     masques IA et retouch_spots ; super résolution seulement pour un grand tirage ou un fort recadrage. \
     Série : copy_settings depuis une référence, puis match_series ; trier : \

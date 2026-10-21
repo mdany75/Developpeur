@@ -88,9 +88,12 @@ public final class LightroomBridge: LightroomServing {
     /// Journal détaillé (`DEVELOPPEUR_VERBOSE=1`) : durée de chaque commande du module.
     public var journal: ((String) -> Void)?
     /// Commandes qui ne changent rien : reprises une fois, après une seconde, si la liaison est
-    /// coupée en plein échange (une écriture ne se reprend pas : elle a peut-être été faite).
+    /// coupée en plein échange (une écriture ne se reprend pas : elle a peut-être été faite). Les
+    /// commandes de la 1.3 : etapes (images des étapes, lues) en est ; lecon et carnet n'en sont
+    /// pas, car elles écrivent carnet.json (garder, constater, retirer) : rejouées, elles le
+    /// réécriraient.
     public static let lectures: Set<String> = ["etat", "selection", "reglages", "apercu", "vignettes", "chercher", "motsCles",
-                                               "presets", "journal", "diagnostic", "livraison"]
+                                               "presets", "journal", "diagnostic", "livraison", "etapes"]
     public var delaiReprise: TimeInterval = 1
 
     /// Version que le module a donnée à la dernière poignée de main (`ping`).

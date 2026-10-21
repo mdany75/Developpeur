@@ -239,6 +239,23 @@ final class Version25Tests: XCTestCase {
         }
     }
 
+    /// 1.3 : les textes neufs (le vocabulaire des défauts de la prise de vue, envoyé au module, et
+    /// les définitions de read_composition et photo_lesson) restent ceux d'un photographe amateur.
+    func testTheNewTextsOfThe13StayForAnAmateur() throws {
+        var textes = [JSONCoding.line(PriseDeVue.vocabulaire)]
+        for nom in ["read_composition", "photo_lesson"] {
+            textes.append(JSONCoding.line(try XCTUnwrap(tools.definitions.first { $0["name"]?.string == nom }, nom)))
+        }
+        textes.append(ToolHandler.descriptionRaison)
+        textes.append(Prompts.Lecon.phrase)
+        for (index, texte) in textes.enumerated() {
+            for mot in ["photoshop", "galerie", "gallery", "publish_collection", "concours", "client", "mariage", "firefly",
+                        "agrandissement", "crédit adobe", "expand_photo"] {
+                XCTAssertFalse(texte.lowercased().contains(mot), "texte \(index) : « \(mot) »")
+            }
+        }
+    }
+
     // MARK: Livraisons types lues dans les services
 
     static let serviceWeb: JSONValue = ["id": 49283849, "nom": "Lightroom Export 5 Megapixels", "module": "com.adobe.ag.export.file",

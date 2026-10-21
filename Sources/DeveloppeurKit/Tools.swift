@@ -37,6 +37,11 @@ public struct ToolResult: Equatable {
     public var text: String {
         content.compactMap { if case .text(let text) = $0 { return text }; return nil }.joined(separator: "\n")
     }
+
+    /// Le résultat montre une image à Claude (aperçu, proposition, planche).
+    public var porteUneImage: Bool {
+        content.contains { if case .image = $0 { return true }; return false }
+    }
 }
 
 /// Les outils exposés à Claude, et leur exécution par le module Lightroom. Les outils sont
@@ -44,8 +49,9 @@ public struct ToolResult: Equatable {
 /// aperçu et mesures (Tools+Analyse), profils, paramètres prédéfinis, copie et journal
 /// (Tools+Gestion), Bibliothèque (Tools+Bibliotheque), tri d'une séance et planche contact
 /// (Tools+Tri), notes proposées selon le standard de notation (Tools+Notation), guide de style
-/// (Tools+Style), livraison en fichiers (Tools+Livraison), variantes (Tools+Variantes) et
-/// harmonisation d'une série (Tools+Serie).
+/// (Tools+Style), livraison en fichiers (Tools+Livraison), variantes (Tools+Variantes),
+/// harmonisation d'une série (Tools+Serie), composition lue (Tools+Composition) et leçon de la
+/// photo (Tools+Lecon).
 public final class ToolHandler {
     let lightroom: LightroomServing
     let lookProfiles: LookProfileLibrary
@@ -89,9 +95,14 @@ public final class ToolHandler {
     /// L'écran a déjà été dit à Claude (remarque du premier aperçu, ou get_status) : une fois par
     /// processus du serveur.
     var ecranSignale = false
-    /// Les outils dont le résultat est un aperçu que Claude regarde : le premier réussi porte la
-    /// remarque de l'écran (un bloc de texte à part).
+    /// Les outils dont le résultat est un aperçu que Claude regarde : le premier réussi qui porte
+    /// une image reçoit la remarque de l'écran (un bloc de texte à part). Un résultat sans image
+    /// (preview_settings avec my_turn, 1.3) ne la consomme pas.
     static let outilsAvecApercu: Set<String> = ["view_photo", "preview_settings", "compare_variants"]
+    /// Les constats de la prise de vue partent au carnet de progrès (commande carnet du module).
+    /// Faux par défaut : seul le serveur lancé par Claude (`serve` de main.swift) le pose ; ni
+    /// `--call`, ni la recette, ni les tests ne remplissent le carnet.
+    public var noterAuCarnet = false
     /// Version de ce serveur (celle du Info.plist ; « dev » en développement : pas de comparaison).
     var versionServeur = ServerInfo.version
     /// Modèles de noms de fichiers de Lightroom et ses préférences (dossiers d'exportation récents) :
@@ -135,12 +146,12 @@ public final class ToolHandler {
     // MARK: Définitions
 
     public static let toolNames = [
-        "get_status", "list_selection", "view_photo", "measure_angle", "analyze_photos", "get_settings",
+        "get_status", "list_selection", "view_photo", "measure_angle", "read_composition", "analyze_photos", "get_settings",
         "apply_settings", "preview_settings", "enhance_photo", "add_mask", "edit_mask", "retouch_spots", "copy_settings",
         "list_profiles", "list_presets", "save_preset", "undo_last", "revert_to_original", "export_journal",
         "find_photos", "set_metadata", "list_keywords", "manage_collections", "create_virtual_copy", "show_photo",
         "cull_photos", "contact_sheet", "propose_ratings", "remove_distractions", "remember_style",
-        "export_photos", "compare_variants", "choose_variant", "match_series",
+        "export_photos", "compare_variants", "choose_variant", "match_series", "photo_lesson",
     ]
 
     var photoIDProperty: JSONValue {
@@ -154,15 +165,21 @@ public final class ToolHandler {
         ]
     }
 
-    /// Paramètres communs aux outils qui écrivent : nom de l'étape, raison (pour le journal),
-    /// accord de l'utilisateur.
+    /// Paramètres communs aux outils qui écrivent : nom de l'étape, raison (pour le journal et
+    /// l'onglet Pourquoi ? de la fenêtre Claude), accord de l'utilisateur.
     var writeProperties: [(String, JSONValue)] {
         [
             ("step_name", prop("string", "Nom court de l'étape, par exemple « passe 1 : lumière et couleur ».")),
-            ("reason", prop("string", "Pourquoi, en une phrase : gardé dans le journal des retouches (export_journal).")),
+            ("reason", prop("string", Self.descriptionRaison)),
             ("confirm", prop("boolean", "true = l'utilisateur a approuvé ces valeurs (exigé en mode « Proposer d'abord »).")),
         ]
     }
+
+    /// La raison d'une étape (1.3) : répétée dans chaque outil qui écrit, y compris ceux qui ne
+    /// touchent pas l'image (classement, livraison) ; d'où sa brièveté (160 caractères au plus) et
+    /// rien sur un avant/après.
+    static let descriptionRaison = "Pourquoi, en une phrase simple : le défaut vu, puis ce que l'étape y fait. Gardé au journal (export_journal) ; la fenêtre Claude le montre avec l'étape cliquée."
+    static let longueurRaisonDecrite = 160
 
     /// Tous les outils définis, par thème.
     var allDefinitions: [JSONValue] {
@@ -182,35 +199,41 @@ public final class ToolHandler {
                  "Remet une photo dans l'état où elle était avant la première retouche de Claude (seulement ce que Claude a changé, classement dans la Bibliothèque compris), et oublie l'historique de Claude pour cette photo (le journal reste).",
                  properties: targetProperties, required: []),
         ]
-        return core + analysisDefinitions + developDefinitions + localDefinitions + managementDefinitions + libraryDefinitions + cullDefinitions
-            + notationDefinitions + styleDefinitions + deliveryDefinitions + variantDefinitions + seriesDefinitions
+        return core + analysisDefinitions + compositionDefinitions + developDefinitions + localDefinitions + managementDefinitions
+            + libraryDefinitions + cullDefinitions + notationDefinitions + styleDefinitions + deliveryDefinitions + variantDefinitions
+            + seriesDefinitions + lessonDefinitions
     }
 
     /// Titre lisible de chaque outil (annotations MCP, `title`), que le client montre à la place
     /// du nom technique.
     static let titles: [String: String] = [
         "get_status": "État de la liaison", "list_selection": "Photos sélectionnées", "view_photo": "Voir la photo",
-        "measure_angle": "Mesurer un angle", "analyze_photos": "Mesurer une série", "get_settings": "Lire les réglages",
+        "measure_angle": "Mesurer un angle", "read_composition": "Lire la composition", "analyze_photos": "Mesurer une série",
+        "get_settings": "Lire les réglages",
         "apply_settings": "Appliquer des réglages", "preview_settings": "Proposer des réglages", "enhance_photo": "Débruiter, détails, super résolution",
         "add_mask": "Ajouter des masques", "edit_mask": "Reprendre un masque", "retouch_spots": "Taches et yeux rouges", "copy_settings": "Copier une retouche",
         "list_profiles": "Profils", "list_presets": "Paramètres prédéfinis", "save_preset": "Créer un paramètre prédéfini",
-        "undo_last": "Annuler la dernière retouche", "revert_to_original": "Revenir à l'état d'avant Claude", "export_journal": "Journal des retouches",
+        "undo_last": "Annuler la dernière retouche", "revert_to_original": "Revenir à l'état d'avant Claude",
+        "export_journal": "Journal et carnet de progrès",
         "find_photos": "Chercher des photos", "set_metadata": "Classer des photos", "list_keywords": "Mots-clés",
         "manage_collections": "Collections", "create_virtual_copy": "Créer une copie virtuelle", "show_photo": "Montrer dans Lightroom",
         "cull_photos": "Trier une séance", "contact_sheet": "Planche contact", "propose_ratings": "Noter des photos",
         "remove_distractions": "Supprimer les reflets",
         "remember_style": "Guide de style", "export_photos": "Exporter des photos", "compare_variants": "Comparer des variantes",
-        "choose_variant": "Choisir une variante", "match_series": "Harmoniser une série",
+        "choose_variant": "Choisir une variante", "match_series": "Harmoniser une série", "photo_lesson": "Leçon de la photo",
     ]
     /// Outils qui ne changent rien aux photos ni au catalogue (`readOnlyHint`) : le client peut les
     /// laisser passer sans demander. Une proposition (preview_settings) passe par l'Historique : pas ici ;
     /// propose_ratings non plus depuis la 1.1.1 : avec apply, il pose les notes dans le catalogue.
     /// get_status n'en est pas : il peut demander une sauvegarde du catalogue. view_photo en est,
     /// même avec compare : les deux étapes « Claude · comparaison » de l'Historique laissent la photo
-    /// telle qu'elle était (choix de la 2.4, dit dans sa description).
+    /// telle qu'elle était (choix de la 2.4, dit dans sa description). De même en 1.3 :
+    /// read_composition et photo_lesson ne changent ni les photos ni le catalogue ; leurs descriptions
+    /// le disent, avec ce qu'ils laissent ailleurs (les étapes temporaires « Claude · composition »
+    /// de l'Historique, la leçon rangée dans carnet.json, à part du catalogue).
     static let readOnlyTools: Set<String> = [
-        "list_selection", "view_photo", "measure_angle", "analyze_photos", "get_settings", "list_profiles",
-        "list_presets", "export_journal", "find_photos", "list_keywords", "cull_photos", "contact_sheet",
+        "list_selection", "view_photo", "measure_angle", "read_composition", "analyze_photos", "get_settings", "list_profiles",
+        "list_presets", "export_journal", "find_photos", "list_keywords", "cull_photos", "contact_sheet", "photo_lesson",
     ]
     /// Outils qui défont des retouches (`destructiveHint`) : le client peut demander confirmation.
     static let destructiveTools: Set<String> = ["revert_to_original", "undo_last"]
@@ -287,11 +310,16 @@ public final class ToolHandler {
         if let remarque = remarqueVersion() {
             result.content.append(.text(remarque))
         }
-        // Un bloc de texte à part : le JSON du résultat reste lisible tel quel.
-        if !result.isError, Self.outilsAvecApercu.contains(name), let remarque = remarqueEcran() {
-            result.content.append(.text(remarque))
-        }
+        ajouterRemarqueEcran(&result, outil: name)
         return result
+    }
+
+    /// La remarque de l'écran, dans un bloc de texte à part (le JSON du résultat reste lisible tel
+    /// quel) : au premier aperçu réussi qui porte une image. Un résultat sans image ne la consomme
+    /// pas : elle attend l'aperçu suivant.
+    func ajouterRemarqueEcran(_ result: inout ToolResult, outil name: String) {
+        guard !result.isError, Self.outilsAvecApercu.contains(name), result.porteUneImage, let remarque = remarqueEcran() else { return }
+        result.content.append(.text(remarque))
     }
 
     /// L'écran de l'utilisateur, dit une fois par processus au premier aperçu réussi, s'il n'est
@@ -374,6 +402,7 @@ public final class ToolHandler {
             case "list_selection": return json(try listSelection(args))
             case "view_photo": return try viewPhoto(args)
             case "measure_angle": return json(try measureAngle(args))
+            case "read_composition": return json(try readComposition(args))
             case "analyze_photos": return json(try analyzePhotos(args))
             case "get_settings": return json(try getSettings(args))
             case "apply_settings": return json(try applySettings(args))
@@ -400,6 +429,7 @@ public final class ToolHandler {
                 if let result = try callLibrary(name, args) { return result }
                 if let result = try callCull(name, args) { return result }
                 if let result = try callNotation(name, args) { return result }
+                if let result = try callLesson(name, args) { return result }
                 return ToolResult(text: "Outil inconnu : \(name)", isError: true)
             }
         } catch {
