@@ -6,9 +6,14 @@
 --
 -- Élément : id, genre, texte, date, outil, appel, etat ('enCours', 'fait', 'erreur', 'enAttente',
 -- 'acceptee', 'refusee', 'ajustee'), detail, images (chemins relatifs au dossier de la
--- conversation), changements ({ libelle, avant, apres }), partiel (texte en train d'arriver) ;
--- pour une notation : passe, pose (notes posées à la demande de Dany : propose_ratings avec
--- apply), notes (voir Conversation.notesDemandees).
+-- conversation), changements ({ cle, libelle, avant, apres }), partiel (texte en train
+-- d'arriver) ; pour une notation : passe, pose (notes posées à la demande de Dany :
+-- propose_ratings avec apply), notes (voir Conversation.notesDemandees). Pour un outil qui écrit
+-- une étape (1.3, Conversation.OUTILS_ETAPES) : raison (reason de l'entrée), etape (step_name),
+-- etapes (les étapes écrites, lues dans la réponse : { photo, id, nom, fichier, changements }) ;
+-- pour undo_last : annule ({ photo, id, nom } de chaque étape défaite) ; pour
+-- revert_to_original : revenu (les photos remises). Une conversation de la 1.2 n'a ni raison, ni
+-- etape, ni etapes : elles se relisent dans `detail` (Conversation.infoEtape), sans id.
 
 require 'Compat'
 local Consignes = require 'Consignes'
@@ -310,24 +315,27 @@ function Conversation.changementsDemandes(entree)
     return liste
 end
 
+-- Ajoute à `lus` les changements d'une liste du connecteur (cle, avant, apres, libelle) : { cle,
+-- libelle, avant, apres }, la clé gardée (1.3), les valeurs en texte.
+local function lireChangements(liste, lus)
+    for _, ch in ipairs(type(liste) == 'table' and liste or {}) do
+        if type(ch) == 'table' and type(ch.cle) == 'string' then
+            lus[#lus + 1] = { cle = ch.cle, libelle = type(ch.libelle) == 'string' and ch.libelle or Conversation.libelles[ch.cle] or ch.cle,
+                avant = affichage(ch.avant), apres = affichage(ch.apres) }
+        end
+    end
+    return lus
+end
+
 -- Changements renvoyés par le connecteur (`changements` : cle, avant, apres, libelle), nil sans.
 function Conversation.changementsLus(textes)
     for _, texte in ipairs(textes or {}) do
         local ok, json = pcall(Json.decode, texte)
         if ok and type(json) == 'table' then
-            local listes = { json.changements }
+            local lus = lireChangements(json.changements, {})
             for _, r in ipairs(type(json.resultats) == 'table' and json.resultats or {}) do
                 if type(r) == 'table' then
-                    listes[#listes + 1] = r.changements
-                end
-            end
-            local lus = {}
-            for _, l in ipairs(listes) do
-                for _, ch in ipairs(type(l) == 'table' and l or {}) do
-                    if type(ch) == 'table' and type(ch.cle) == 'string' then
-                        lus[#lus + 1] = { libelle = type(ch.libelle) == 'string' and ch.libelle or Conversation.libelles[ch.cle] or ch.cle,
-                            avant = affichage(ch.avant), apres = affichage(ch.apres) }
-                    end
+                    lireChangements(r.changements, lus)
                 end
             end
             if #lus > 0 then
@@ -456,6 +464,277 @@ function Conversation.completerNotation(e, r)
     end
 end
 
+-- Étapes de Claude (1.3, « Pourquoi ? ») ------------------------------------------------------
+-- Un outil qui écrit une étape « Claude · … » (Ecriture.nouvelleEtape du module) : son élément du
+-- fil garde la raison (reason) et le but (step_name) que Claude donne, puis, d'après la réponse du
+-- connecteur, les étapes écrites, chacune avec l'identifiant que le module lui a donné
+-- (`etape_id` : celui de ses images avant/après, Etapes.lua). L'onglet Pourquoi ? de la fenêtre
+-- les montre, photo par photo, dans l'ordre du fil (Conversation.etapes). Un outil appelé en
+-- proposition seulement (preview = true) n'écrit pas d'étape.
+
+Conversation.OUTILS_ETAPES = {
+    apply_settings = true, add_mask = true, edit_mask = true, retouch_spots = true, copy_settings = true, enhance_photo = true,
+    remove_distractions = true, choose_variant = true, match_series = true, set_metadata = true, manage_collections = true,
+}
+
+-- Des classements : leur étape ne change pas l'image (pas d'avant/après).
+Conversation.CLASSEMENTS = { set_metadata = true, manage_collections = true }
+
+-- La réponse de match_series ne porte pas d'etape_id (une série ne garde pas d'avant/après) : pas
+-- de repère pendant l'appel, qui disparaîtrait à sa réponse.
+local SANS_REPERE_EN_COURS = { match_series = true }
+
+local PREFIXE_ETAPE = 'Claude · '
+
+-- Le nom d'une étape sans le préfixe « Claude · » ('' sans nom).
+function Conversation.nomEtape(nom)
+    local t = chaine(nom) or ''
+    while t:sub(1, #PREFIXE_ETAPE) == PREFIXE_ETAPE do
+        t = Texte.nettoyer(t:sub(#PREFIXE_ETAPE + 1))
+    end
+    return t
+end
+
+-- L'identifiant d'une étape (etape_id), en texte ; nil s'il manque (null : rien d'écrit).
+local function identifiantEtape(v)
+    if type(v) == 'number' then
+        return string.format('%d', v)
+    end
+    return type(v) == 'string' and v ~= '' and v or nil
+end
+
+-- La photo d'un objet de réponse (`photo` : { id, fichier } ou un identifiant) : id et fichier.
+local function photoDe(objet)
+    local photo = objet.photo
+    if type(photo) == 'table' and photo ~= Json.null then
+        return tonumber(photo.id) or chaine(photo.id), chaine(photo.fichier)
+    end
+    return tonumber(photo) or chaine(photo), nil
+end
+
+-- L'étape que porte un objet de la réponse : { photo, id, nom, fichier, changements } ; nil sans
+-- etape_id. `sansId` (conversation de la 1.2) : le nom de l'étape suffit, sans id.
+local function etapeLue(objet, sansId)
+    if type(objet) ~= 'table' or objet == Json.null then
+        return nil
+    end
+    local id = identifiantEtape(objet.etape_id)
+    if not id and not (sansId and chaine(objet.etape)) then
+        return nil
+    end
+    local photo, fichier = photoDe(objet)
+    if photo == nil then
+        return nil
+    end
+    return { photo = photo, id = id, nom = chaine(objet.etape), fichier = fichier, changements = lireChangements(objet.changements, {}) }
+end
+
+-- Les étapes écrites, lues dans la réponse du connecteur : les objets de `resultats` (ou la
+-- réponse elle-même, pour choose_variant) qui portent un etape_id.
+function Conversation.etapesLues(textes, sansId)
+    local lues = {}
+    for _, texte in ipairs(textes or {}) do
+        local ok, json = pcall(Json.decode, texte)
+        if ok and type(json) == 'table' then
+            lues[#lues + 1] = etapeLue(json, sansId)
+            for _, r in ipairs(type(json.resultats) == 'table' and json.resultats or {}) do
+                lues[#lues + 1] = etapeLue(r, sansId)
+            end
+        end
+    end
+    return lues
+end
+
+-- Les étapes défaites par undo_last (`resultats` : photo, annulee, etape, etape_id) : { photo, id,
+-- nom } ; id nil pour une mémoire d'avant la 1.3.
+function Conversation.annulationsLues(textes)
+    local lues = {}
+    for _, texte in ipairs(textes or {}) do
+        local ok, json = pcall(Json.decode, texte)
+        if ok and type(json) == 'table' then
+            for _, r in ipairs(type(json.resultats) == 'table' and json.resultats or {}) do
+                if type(r) == 'table' and r.annulee == true then
+                    local photo = photoDe(r)
+                    if photo ~= nil then
+                        lues[#lues + 1] = { photo = photo, id = identifiantEtape(r.etape_id), nom = chaine(r.etape) }
+                    end
+                end
+            end
+        end
+    end
+    return lues
+end
+
+-- Les photos remises par revert_to_original (`resultats` : photo, remise).
+function Conversation.retoursLus(textes)
+    local lues = {}
+    for _, texte in ipairs(textes or {}) do
+        local ok, json = pcall(Json.decode, texte)
+        if ok and type(json) == 'table' then
+            for _, r in ipairs(type(json.resultats) == 'table' and json.resultats or {}) do
+                if type(r) == 'table' and r.remise == true then
+                    local photo = photoDe(r)
+                    if photo ~= nil then
+                        lues[#lues + 1] = photo
+                    end
+                end
+            end
+        end
+    end
+    return lues
+end
+
+-- L'entrée et la réponse gardées dans `detail` (« … — Réponse — … ») : l'entrée décodée, et la
+-- réponse en textes (le JSON du connecteur, sans les remarques qui le suivent).
+local function lireDetail(detail)
+    local entree, reponse = tostring(detail or ''):match('^(.-)\n\n— Réponse —\n(.*)$')
+    if not entree then
+        return nil, {}
+    end
+    local ok, e = pcall(Json.decode, entree)
+    local textes = { reponse }
+    if not pcall(Json.decode, reponse) then
+        -- Une remarque du connecteur (bloc de texte à part) suit le JSON : la plus longue tête qui
+        -- se lit.
+        local fin = #reponse
+        while fin > 0 do
+            local pos = reponse:sub(1, fin):match('.*()\n')
+            if not pos then
+                break
+            end
+            if pcall(Json.decode, reponse:sub(1, pos - 1)) then
+                textes = { reponse:sub(1, pos - 1) }
+                break
+            end
+            fin = pos - 1
+        end
+    end
+    return ok and type(e) == 'table' and e or nil, textes
+end
+
+-- Ce qu'un élément d'une conversation de la 1.2 dit de ses étapes, relu une fois dans `detail`.
+local anciennes = setmetatable({}, { __mode = 'k' })
+
+local function lireAncienne(e)
+    local deja = anciennes[e]
+    if deja and deja.detail == e.detail then
+        return deja
+    end
+    local info = { detail = e.detail, etapes = {}, annule = {}, revenu = {} }
+    if e.etat ~= 'erreur' then
+        local entree, textes = lireDetail(e.detail)
+        if Conversation.OUTILS_ETAPES[e.outil] and entree and entree.preview ~= true then
+            info.raison, info.etape = chaine(entree.reason), chaine(entree.step_name)
+            info.etapes = Conversation.etapesLues(textes, true)
+        elseif e.outil == 'undo_last' then
+            info.annule = Conversation.annulationsLues(textes)
+        elseif e.outil == 'revert_to_original' then
+            info.revenu = Conversation.retoursLus(textes)
+        end
+    end
+    anciennes[e] = info
+    return info
+end
+
+-- Les étapes d'un élément outil : { etapes, raison, etape, annule, revenu, ancienne } ; celles d'une
+-- conversation de la 1.2 (sans `etapes`, `annule` ni `revenu`) relues dans son détail, sans id.
+function Conversation.infoEtape(e)
+    if type(e) ~= 'table' or e.genre ~= 'outil' then
+        return { etapes = {}, annule = {}, revenu = {} }
+    end
+    local candidat = Conversation.OUTILS_ETAPES[e.outil]
+    if (candidat and e.etapes == nil) or (e.outil == 'undo_last' and e.annule == nil)
+        or (e.outil == 'revert_to_original' and e.revenu == nil) then
+        local a = lireAncienne(e)
+        return { etapes = a.etapes, raison = a.raison, etape = a.etape, annule = a.annule, revenu = a.revenu, ancienne = true }
+    end
+    return { etapes = e.etapes or {}, raison = e.raison, etape = e.etape, annule = e.annule or {}, revenu = e.revenu or {} }
+end
+
+-- Vrai pour l'élément d'une étape de Claude : un outil qui en écrit, pas en erreur, avec les
+-- étapes de sa réponse ; ou en cours, avec son but (step_name). Sa ligne du fil porte
+-- « · Pourquoi ? ».
+function Conversation.estEtape(e)
+    if type(e) ~= 'table' or e.genre ~= 'outil' or e.etat == 'erreur' or not Conversation.OUTILS_ETAPES[e.outil] then
+        return false
+    end
+    local info = Conversation.infoEtape(e)
+    if #info.etapes > 0 then
+        return true
+    end
+    return e.etat == 'enCours' and not info.ancienne and info.etape ~= nil and not SANS_REPERE_EN_COURS[e.outil]
+end
+
+-- Les étapes de la conversation pour une photo, dans l'ordre du fil : { element (indice),
+-- elementId, photo, id, nom, fichier, etape, raison, changements, outil, annulee, enCours,
+-- ancienne }. Un appel en cours compte pour toute photo (sa photo n'est connue qu'à la réponse).
+-- `annulee` : 'undo_last' (défaite par un undo_last suivant, retrouvée par son id, sinon par son
+-- nom en remontant) ou 'revert' (un revert_to_original suivant a remis la photo).
+function Conversation.etapes(c, photo)
+    local cle = Conversation.clePhoto(photo)
+    local liste = {}
+    local function marquer(test, motif)
+        for k = #liste, 1, -1 do
+            local x = liste[k]
+            if not x.annulee and not x.enCours and test(x) then
+                x.annulee = motif
+                return true
+            end
+        end
+        return false
+    end
+    for i, e in ipairs(type(c) == 'table' and c.elements or {}) do
+        if e.genre == 'outil' and e.etat ~= 'erreur' then
+            local info = Conversation.infoEtape(e)
+            if Conversation.estEtape(e) then
+                if #info.etapes == 0 then
+                    liste[#liste + 1] = { element = i, elementId = e.id, photo = photo, outil = e.outil, etape = info.etape,
+                        raison = info.raison, changements = {}, enCours = true }
+                end
+                for _, x in ipairs(info.etapes) do
+                    if Conversation.clePhoto(x.photo) == cle then
+                        liste[#liste + 1] = { element = i, elementId = e.id, photo = x.photo, id = x.id, nom = x.nom, fichier = x.fichier,
+                            etape = info.etape, raison = info.raison, outil = e.outil, ancienne = info.ancienne,
+                            changements = (#(x.changements or {}) > 0 or #info.etapes > 1) and (x.changements or {}) or (e.changements or {}) }
+                    end
+                end
+            end
+            for _, a in ipairs(info.annule) do
+                if Conversation.clePhoto(a.photo) == cle then
+                    local nom = Conversation.nomEtape(a.nom)
+                    local trouvee = a.id and marquer(function(x) return x.id == a.id end, 'undo_last')
+                    if not trouvee and nom ~= '' then
+                        marquer(function(x) return Conversation.nomEtape(x.nom or x.etape) == nom end, 'undo_last')
+                    end
+                end
+            end
+            for _, p in ipairs(info.revenu) do
+                if Conversation.clePhoto(p) == cle then
+                    for _, x in ipairs(liste) do
+                        if not x.annulee and not x.enCours then
+                            x.annulee = 'revert'
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return liste
+end
+
+-- Les photos des étapes d'un élément, dans l'ordre de la réponse (sans doublon).
+function Conversation.photosEtape(e)
+    local photos, vues = {}, {}
+    for _, x in ipairs(Conversation.infoEtape(e).etapes) do
+        local cle = Conversation.clePhoto(x.photo)
+        if not vues[cle] then
+            vues[cle] = true
+            photos[#photos + 1] = x.photo
+        end
+    end
+    return photos
+end
+
 -- Événements de Claude Code -------------------------------------------------------------------
 
 local function dernier(c)
@@ -522,8 +801,15 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                     court = court:sub(#Conversation.PREFIXE_OUTILS + 1)
                 end
                 local ok, detail = pcall(Json.encode, bloc.entree)
-                c.elements[#c.elements + 1] = nouvelElement('outil', { texte = Conversation.resumeOutil(court, bloc.entree),
-                    outil = court, appel = bloc.id, etat = 'enCours', detail = ok and detail or '' }, date)
+                local champs = { texte = Conversation.resumeOutil(court, bloc.entree), outil = court, appel = bloc.id, etat = 'enCours',
+                    detail = ok and detail or '' }
+                -- Un outil qui écrit une étape (1.3) : sa raison et son but, et la liste de ses
+                -- étapes, remplie à la réponse ; rien pour une proposition seulement (preview).
+                local entree = type(bloc.entree) == 'table' and bloc.entree or {}
+                if Conversation.OUTILS_ETAPES[court] and entree.preview ~= true then
+                    champs.raison, champs.etape, champs.etapes = chaine(entree.reason), chaine(entree.step_name), {}
+                end
+                c.elements[#c.elements + 1] = nouvelElement('outil', champs, date)
                 if court == 'preview_settings' then
                     local raison = type(bloc.entree.reason) == 'string' and bloc.entree.reason
                         or (type(bloc.entree.step_name) == 'string' and bloc.entree.step_name) or ''
@@ -556,6 +842,18 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                 e.etat = r.erreur and 'erreur' or 'fait'
                 local reponse = table.concat(r.textes, '\n')
                 e.detail = (e.detail or '') .. '\n\n— Réponse —\n' .. (reponse == '' and '(images seulement)' or reponse)
+                -- Les étapes écrites (1.3), les étapes défaites (undo_last), les photos remises
+                -- (revert_to_original) : lues dans la réponse, toujours en tableau.
+                if not r.erreur then
+                    if e.etapes ~= nil then
+                        e.etapes = Conversation.etapesLues(r.textes)
+                        e.changements = Conversation.changementsLus(r.textes) or {}
+                    elseif e.outil == 'undo_last' then
+                        e.annule = Conversation.annulationsLues(r.textes)
+                    elseif e.outil == 'revert_to_original' then
+                        e.revenu = Conversation.retoursLus(r.textes)
+                    end
+                end
             end
             local p = dernierIndice(c, function(e) return e.genre == 'proposition' and e.appel == r.idOutil end)
             local n = dernierIndice(c, function(e) return e.genre == 'notation' and e.appel == r.idOutil end)

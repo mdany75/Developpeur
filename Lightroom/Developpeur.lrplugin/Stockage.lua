@@ -1,6 +1,7 @@
 -- Stockage.lua : les conversations sur le disque, une par dossier
 -- (Conversations/<id>/conversation.json et ses images), celles des anciennes séances de notation
--- comprises (genre = 'notation').
+-- comprises (genre = 'notation'). Les listes d'un élément (images, changements, notes, et en 1.3
+-- etapes, annule, revenu) s'écrivent toujours en tableaux JSON.
 
 local LrPathUtils = import 'LrPathUtils'
 
@@ -56,6 +57,34 @@ local function pourJson(c)
                 notes[j] = note
             end
             x.notes = notes
+        end
+        -- Les étapes écrites par un outil (1.3), chacune avec ses changements, les étapes défaites
+        -- (undo_last) et les photos remises (revert_to_original) : des tableaux, même vides (une
+        -- conversation de la 1.2 n'en a pas : ils se relisent dans le détail de l'appel).
+        if e.etapes ~= nil then
+            local etapes = Json.tableau()
+            for j, etape in ipairs(e.etapes) do
+                local y = {}
+                for cle, valeur in pairs(etape) do
+                    y[cle] = valeur
+                end
+                local siens = Json.tableau()
+                for k, ch in ipairs(etape.changements or {}) do
+                    siens[k] = ch
+                end
+                y.changements = siens
+                etapes[j] = y
+            end
+            x.etapes = etapes
+        end
+        for _, cle in ipairs({ 'annule', 'revenu' }) do
+            if e[cle] ~= nil then
+                local liste = Json.tableau()
+                for j, valeur in ipairs(e[cle]) do
+                    liste[j] = valeur
+                end
+                x[cle] = liste
+            end
         end
         elements[i] = x
     end

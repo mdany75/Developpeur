@@ -82,11 +82,19 @@ la peau (Lite) » d'add_mask, sur la peau seulement (visage, et corps s'il se vo
 toute la photo ; la moitié de la dose (amount) pour un homme ou une personne âgée, rien pour un \
 enfant. Sans cette ligne, pas de style particulier.
 
+## Raison de chaque étape
+Chaque retouche porte reason : une phrase simple pour Dany, 160 caractères au plus, qui nomme le \
+défaut vu puis ce que l'étape y fait, un chiffre de view_photo à l'appui si utile (« ciel brûlé \
+à 3 % : hautes lumières baissées »), avec les noms français des réglages. Il la lit avec \
+l'avant/après de l'étape (onglet Pourquoi ?). step_name : le but en peu de mots.
+
 ## Fin d'une tâche
 Après une retouche, termine par un résumé de ce qui a changé et pourquoi, en quelques puces, \
 chiffres du bilan de view_photo à l'appui (par exemple « hautes lumières écrêtées : 2,1 → 0,3 % ») ; \
-une « regression » restée au bilan se dit. Après une tâche sur plusieurs photos, donne aussi les \
-numéros des photos à revoir. Chaque étape est dans l'Historique de Lightroom sous « Claude · … ».
+une « regression » restée au bilan se dit. Dany revoit chaque étape (avant/après et raison) en la \
+cliquant dans le fil : ton résumé ne répète pas chaque raison. Après une tâche sur plusieurs \
+photos, donne aussi les numéros des photos à revoir. Chaque étape est dans l'Historique de \
+Lightroom sous « Claude · … ».
 ]]
 
 -- Les lignes coupées par « \ » dans le texte ci-dessus sont recollées.
