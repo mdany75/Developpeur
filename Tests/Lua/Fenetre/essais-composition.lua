@@ -490,6 +490,15 @@ essai("Carte : la raison, « Cadre : … » et ce que montre son aperçu, sans l
     -- Avant la réponse : le recadrage demandé.
     e = appelPropose(c, 'p4', entreeCadre())
     contient(Fenetre.texteProposition(e), "Recadrage : — → format 3:2, redressé de 1,4°, 82 % du plus grand cadre")
+    -- Une remarque recollée après le JSON : le cadre se lit (Conversation.teteJson), pas les
+    -- changements ; la ligne « Recadrage » demandée, restée, ne double pas « Cadre : … ».
+    e = appelPropose(c, 'p6', entreeCadre(), { REPONSE_CADRE .. "\nRemarque : l'écran principal n'est pas étalonné." }, 'p6.jpg')
+    egal(RESUME, e.cadre)
+    vrai(changement(e, 'Recadrage'), 'la demande reste dans les changements')
+    egal(RAISON .. "\n\nCadre : " .. RESUME .. "\n" .. Fenetre.CADRE_DESSINE, Fenetre.texteProposition(e))
+    -- Avec un autre réglage demandé : lui seul reste dessous.
+    table.insert(e.changements, 1, { libelle = 'Exposition', avant = '—', apres = '0,35' })
+    egal(RAISON .. "\n\nCadre : " .. RESUME .. "\n" .. Fenetre.CADRE_DESSINE .. "\n\nExposition : — → 0,35", Fenetre.texteProposition(e))
     -- Une proposition de tons : comme avant.
     e = appelPropose(c, 'p5', { photo_id = 4, settings = { Exposure2012 = 0.35 } },
         { '{"changements": [{"cle": "Exposure2012", "avant": 0, "apres": 0.35}]}' })
@@ -551,7 +560,8 @@ essai("Aperçu : l'image de la proposition arrive ; un vrai clic sur Proposition
         egal('3 sur 3 · view_photo', p.legendeApercu)
         p.onglet = 'proposition'
         egal('2 sur 3 · preview_settings', p.legendeApercu, "le clic remontre l'image de la proposition")
-        egal(2, Fenetre.indiceImage)
+        -- Ce que montre Note ne change pas : l'aperçu appartient à l'onglet.
+        egal(nil, Fenetre.indiceImage, "l'image choisie de Note ne change pas")
         egal(false, Fenetre.voirActive)
         vrai(Fenetre.imageProposition and Fenetre.imageProposition.proposition == prop.id, 'la demande du clic')
         egal(true, p.peutPrecedente)
@@ -559,13 +569,26 @@ essai("Aperçu : l'image de la proposition arrive ; un vrai clic sur Proposition
         egal(true, p.aImage)
         Fenetre.rafraichir()
         egal('2 sur 3 · preview_settings', p.legendeApercu, 'gardée aux rafraîchissements')
+        p.onglet = 'notation'
+        egal('3 sur 3 · view_photo', p.legendeApercu, 'Note montre toujours la dernière image')
+        p.onglet = 'proposition'
+        egal('2 sur 3 · preview_settings', p.legendeApercu)
         -- Une autre photo active : l'onglet Proposition garde l'image de la proposition ; Note
-        -- montre la photo active, comme avant.
+        -- montre la photo active, comme avant, et la garde après un clic sur Proposition.
         photoActive(5, 'XH2S0321.RAF')
         Fenetre.majPhoto()
         egal(c, Moteur.courante, 'Autre photo décochée : même conversation')
         egal(true, Fenetre.voirActive)
         egal('2 sur 3 · preview_settings', p.legendeApercu, "gardée quand la photo active change")
+        p.onglet = 'notation'
+        egal('Photo active · XH2S0321', p.legendeApercu)
+        p.onglet = 'proposition'
+        egal('2 sur 3 · preview_settings', p.legendeApercu)
+        egal(true, Fenetre.voirActive, 'Note garde la photo active')
+        p.onglet = 'notation'
+        egal('Photo active · XH2S0321', p.legendeApercu, 'Note inchangée par le clic sur Proposition')
+        p.onglet = 'proposition'
+        egal('2 sur 3 · preview_settings', p.legendeApercu)
         -- Agrandir : l'image de la proposition, pas la photo active (sa vignette prête, comme une
         -- fois sa tâche finie) ni la dernière image.
         Fenetre.apercuActif = { id = 5, T = Fenetre.T, chemin = imageJpeg, dossier = S.home, fichier = 'image.jpg' }
@@ -579,10 +602,11 @@ essai("Aperçu : l'image de la proposition arrive ; un vrai clic sur Proposition
         Fenetre.changerImage(-1)
         egal('1 sur 3 · view_photo', p.legendeApercu, '◀ part de la proposition')
         egal(nil, Fenetre.imageProposition)
-        -- Note montre la photo active, comme avant.
-        Fenetre.voirActive = true
+        -- ◀ ▶ partis d'elle choisissent l'image : Note la montre ensuite.
+        egal(false, Fenetre.voirActive)
+        egal(1, Fenetre.indiceImage)
         p.onglet = 'notation'
-        egal('Photo active · XH2S0321', p.legendeApercu)
+        egal('1 sur 3 · view_photo', p.legendeApercu)
         p.onglet = 'proposition'
         egal('2 sur 3 · preview_settings', p.legendeApercu)
         -- ◀ part d'elle, et la demande est oubliée : l'aperçu redevient celui d'avant.
@@ -623,10 +647,24 @@ essai("Aperçu : l'image de la proposition arrive ; un vrai clic sur Proposition
         Fenetre.rafraichir()
         egal('4 sur 4 · view_photo', p.legendeApercu, 'une image nouvelle se montre')
         egal(nil, Fenetre.imageProposition)
+        -- Une image arrivée juste avant le clic, pas encore montrée : le clic l'emporte.
+        p.onglet = 'notation'
+        vue(c, 'v4')
+        p.onglet = 'proposition'
+        egal('2 sur 5 · preview_settings', p.legendeApercu, "le clic, pas l'image arrivée")
+        Fenetre.rafraichir()
+        egal('2 sur 5 · preview_settings', p.legendeApercu)
+        -- Une autre proposition demandée, sans réponse encore : la carte parle d'elle, l'image de la
+        -- précédente n'est plus gardée.
+        local autre = appelPropose(c, 'p9', entreeCadre())
+        Fenetre.rafraichir()
+        egal(nil, Fenetre.imageProposition, 'une autre proposition attend : demande oubliée')
+        Conversation.decider(c, autre.id, false)
+        Fenetre.rafraichir()
         -- La proposition décidée : la demande ne vaut plus.
         p.onglet = 'notation'
         p.onglet = 'proposition'
-        egal('2 sur 4 · preview_settings', p.legendeApercu)
+        egal('2 sur 5 · preview_settings', p.legendeApercu)
         Conversation.decider(c, prop.id, false)
         Fenetre.rafraichir()
         egal(nil, Fenetre.imageProposition, 'proposition décidée : demande oubliée')
@@ -833,6 +871,7 @@ essai("Consignes : section Composition (400 caractères au plus) entre Garde-fou
     local section = texte:sub(debut + 1, fin - 1):gsub('\n$', '')
     vrai(Texte.longueur(section) <= 400, string.format('section : %d caractères pour 400', Texte.longueur(section)))
     for _, morceau in ipairs({ 'read_composition', 'preview_settings', 'sans compare', 'nettement', 'son crop seul', 'à la prise de vue',
+        'reason = la règle',
         'Accepter', '« Appliquer directement »', 'Une proposition à la fois', 'la leçon suit', "retouche entière", "cadre ou d'horizon" }) do
         contient(section, morceau, 'section Composition')
     end

@@ -1050,8 +1050,9 @@ Fenetre.CADRE_SANS_DESSIN = "Rien ne change avant Accepter."
 -- Le texte de la carte pour une proposition en attente (pure) : sa raison, puis, pour une
 -- proposition de recadrage dont le connecteur a dit le cadre gardé (Conversation.cadreLu), la
 -- ligne « Cadre : <résumé> » et ce que montre son aperçu, à la place des bords du recadrage (les
--- changements Crop…, illisibles pour Dany) ; puis chaque autre changement, « libellé : avant →
--- après ». Sans résumé du cadre, les changements Crop… restent : ils sont seuls à le dire.
+-- changements Crop…, illisibles pour Dany, et de la ligne « Recadrage » demandée, restée si les
+-- changements de la réponse ne se sont pas lus) ; puis chaque autre changement, « libellé : avant
+-- → après ». Sans résumé du cadre, les changements Crop… restent : ils sont seuls à le dire.
 function Fenetre.texteProposition(prop)
     local lignes = { Texte.nettoyer(prop.texte) ~= '' and prop.texte or "Claude propose :", '' }
     local cadre = type(prop.cadre) == 'string' and Texte.nettoyer(prop.cadre) or ''
@@ -1061,7 +1062,8 @@ function Fenetre.texteProposition(prop)
     end
     local autres = {}
     for _, ch in ipairs(prop.changements or {}) do
-        if not (cadre ~= '' and type(ch.cle) == 'string' and ch.cle:sub(1, 4) == 'Crop') then
+        local duCadre = (type(ch.cle) == 'string' and ch.cle:sub(1, 4) == 'Crop') or (ch.cle == nil and ch.libelle == Conversation.LIBELLE_RECADRAGE)
+        if not (cadre ~= '' and duCadre) then
             autres[#autres + 1] = string.format("%s : %s → %s", ch.libelle or '?', ch.avant or '—', ch.apres or '—')
         end
     end
@@ -1389,6 +1391,9 @@ end
 -- nouvelle, une autre conversation ou la proposition décidée. Une bascule de la fenêtre ne la
 -- demande pas : la proposition qui arrive est déjà la dernière image. Fenetre.imageProposition =
 -- { conversation, proposition (son id), chemin } : la demande du clic. Vrai si l'image est montrée.
+-- Ce que montre l'onglet Note ne change pas (l'aperçu appartient à l'onglet) : ni la photo active
+-- (Fenetre.voirActive) ni l'image choisie (Fenetre.indiceImage) ; seuls ◀ ▶ partis de l'image de
+-- la proposition les posent (Fenetre.changerImage).
 function Fenetre.montrerImageProposition()
     local p, c = Fenetre.p, Moteur.courante
     local prop = c and Conversation.propositionEnAttente(c)
@@ -1408,8 +1413,6 @@ function Fenetre.montrerImageProposition()
     end
     Fenetre.imageProposition = { conversation = c, proposition = prop.id, chemin = images[indice].chemin }
     Fenetre.images, Fenetre.apercuDe, Fenetre.nbImages = images, c, #images
-    Fenetre.indiceImage = indice < #images and indice or nil
-    Fenetre.voirActive = false
     Fenetre.imageCliquee = nil
     Fenetre.rafraichirApercu()
     return true

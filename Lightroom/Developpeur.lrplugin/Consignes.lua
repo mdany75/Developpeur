@@ -66,8 +66,8 @@ toi-même.
 
 ## Composition
 Après une retouche entière, ou si Dany parle de cadre ou d'horizon : read_composition. Si le cadre \
-y gagne nettement, montre son crop seul par preview_settings, sans compare, avec la règle et \
-comment la tenir à la prise de vue (grille, niveau). N'applique ce cadre qu'au clic de Dany sur \
+y gagne nettement, montre son crop seul par preview_settings, sans compare, reason = la règle ; \
+dis comment la tenir à la prise de vue (grille, niveau). N'applique ce cadre qu'au clic de Dany sur \
 Accepter, même en « Appliquer directement ». Une proposition à la fois ; la leçon suit.
 
 ## Je le fais

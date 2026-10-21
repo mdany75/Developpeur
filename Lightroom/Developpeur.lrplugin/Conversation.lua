@@ -360,6 +360,10 @@ function Conversation.cadreDemande(crop)
     return #parties > 0 and table.concat(parties, ", ") or "cadre demandé"
 end
 
+-- Le libellé de la ligne du recadrage demandé (sans clé) : la carte Proposition la saute quand le
+-- cadre gardé est dit (Fenetre.texteProposition).
+Conversation.LIBELLE_RECADRAGE = "Recadrage"
+
 -- Changements d'une proposition, d'après ce que Claude demande (avant inconnu) ; un recadrage
 -- demandé (crop) en une ligne « Recadrage », remplacée à la réponse par le cadre gardé.
 function Conversation.changementsDemandes(entree)
@@ -373,7 +377,7 @@ function Conversation.changementsDemandes(entree)
         liste[#liste + 1] = { libelle = Conversation.libelles[cle] or cle, avant = '—', apres = affichage(reglages[cle]) }
     end
     if type(entree.crop) == 'table' then
-        liste[#liste + 1] = { libelle = "Recadrage", avant = '—', apres = Conversation.cadreDemande(entree.crop) }
+        liste[#liste + 1] = { libelle = Conversation.LIBELLE_RECADRAGE, avant = '—', apres = Conversation.cadreDemande(entree.crop) }
     end
     return liste
 end
