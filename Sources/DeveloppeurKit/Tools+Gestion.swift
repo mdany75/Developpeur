@@ -210,7 +210,7 @@ extension ToolHandler {
             markdown = Carnet.markdown(resume)
             response = ["markdown": .string(markdown), "carnet": resume]
             if let catalogue = lu["catalogue"]?.string { response["catalogue"] = .string(catalogue) }
-            if args.has("photo_ids") || args.has("selection") {
+            if args.has("photo_ids") || args.bool("selection") == true {
                 response["remarque"] = "Le carnet compte tout le catalogue ouvert : photo_ids et selection n'y servent pas."
             }
         } else {

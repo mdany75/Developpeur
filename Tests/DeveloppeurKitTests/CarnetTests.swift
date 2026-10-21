@@ -80,12 +80,13 @@ final class CarnetTests: XCTestCase {
     /// Réponse « apercu » du module pour view_photo (entier, avec point_af) : la photo 7, ses
     /// étapes de Claude, son angle de recadrage et ses réglages de géométrie.
     func repondreApercu(_ image: Data, etapes: Int? = 0, angle: Double = 0, reglages: [String: JSONValue] = [:],
-                        photo: JSONValue = ["id": 7, "fichier": "DSCF2402.RAF"]) {
+                        photo: JSONValue = ["id": 7, "fichier": "DSCF2402.RAF"], extra: [String: JSONValue] = [:]) {
         fake.onSend = { [unowned fake] command, _ in
             guard command == "apercu" else { return }
             var objet: [String: JSONValue] = ["chemin": .string(TestSupport.previewFile(image)), "photo": photo,
                                               "recadrage": ["recadree": false, "angle": .number(angle)], "reglages": .object(reglages)]
             if let etapes { objet["etapes_claude"] = ["nombre": .number(Double(etapes)), "derniere": .null] }
+            for (cle, valeur) in extra { objet[cle] = valeur }
             fake!.replies["apercu"] = .object(objet)
         }
     }
@@ -132,7 +133,7 @@ final class CarnetTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(Carnet.blancPurHaut(presque)), 0)
     }
 
-    func testFlouMiseAuPointEtBruitReprennentLesSeuilsRelevés() {
+    func testFlouMiseAuPointEtBruitReprennentLesSeuilsRelevés() throws {
         var v = vue(detail: detail(nettete: 10))
         XCTAssertEqual(codes(v), ["flou"])
         XCTAssertEqual(v.defauts.first?.texte, "floue : aucune zone nette (netteté 10)")
@@ -148,12 +149,22 @@ final class CarnetTests: XCTestCase {
         XCTAssertEqual(codes(v), ["mise_au_point"])
         XCTAssertEqual(v.defauts.first?.texte, "mise au point signalée manquée par l'appareil")
         XCTAssertEqual(codes(vue(detail: detail(nettete: 60), af: PhotoTriee.MiseAuPoint(point: .zero, nettete: 50, avertissement: true))), [])
+        // Floue partout, point lu : la règle ne peut pas dire la mise au point manquée ; elle n'entre
+        // pas dans la base (sinon une photo floue la compterait réussie).
+        v = vue(detail: detail(nettete: 6), af: PhotoTriee.MiseAuPoint(point: .zero, nettete: 4, avertissement: true))
+        XCTAssertEqual(codes(v), ["flou"])
+        XCTAssertFalse(v.cherches.contains("mise_au_point"), "\(v.cherches)")
+        XCTAssertTrue(v.cherches.contains("flou"))
 
         v = vue(detail: detail(bruit: 1.6))
         XCTAssertEqual(codes(v), ["bruit"])
         XCTAssertEqual(v.defauts.first?.texte, "bruit fort : 1,60 (seuil 1,5)")
         XCTAssertEqual(codes(vue(detail: detail(bruit: 0.4, ombres: 1.5))), ["bruit"], "le bruit des ombres compte, comme la lecture de view_photo")
         XCTAssertEqual(codes(vue(detail: detail(bruit: 1.49))), [])
+        // La mesure part au centième (le bruit se lit à deux décimales).
+        let bruit = vue(detail: detail(bruit: 1.523)).json["defauts"]?.array?.first
+        XCTAssertEqual(bruit?["code"]?.string, "bruit")
+        XCTAssertEqual(try XCTUnwrap(bruit?["mesure"]?.double), 1.52, accuracy: 1e-9)
 
         // Sous 1 024 px (aperçu de 512), les seuils ne valent pas : ni netteté, ni bruit cherchés.
         v = vue(detail: detail(nettete: 5, bruit: 2, side: 512), af: af)
@@ -162,10 +173,11 @@ final class CarnetTests: XCTestCase {
     }
 
     func testCherchesEtTrouvesSuiventLOrdreDePriseDeVue() {
-        let v = vue(mesures: mesures(mediane: 15, p95: 40), detail: detail(nettete: 5, bruit: 2), reduite: image(blancs: 20),
+        // Nette ailleurs (40), floue au point lu (4) : mise au point manquée, les six cherchés.
+        let v = vue(mesures: mesures(mediane: 15, p95: 40), detail: detail(nettete: 40, bruit: 2), reduite: image(blancs: 20),
                     af: PhotoTriee.MiseAuPoint(point: .zero, nettete: 4, avertissement: true))
         XCTAssertEqual(v.cherches, PriseDeVue.mesures.map(\.code))
-        XCTAssertEqual(codes(v), ["sous_exposition", "ciel_brule", "bruit", "flou"])
+        XCTAssertEqual(codes(v), ["sous_exposition", "ciel_brule", "bruit", "mise_au_point"])
         // Sans géométrie intacte, l'horizon n'est pas cherché (la base compterait droite une photo redressée).
         XCTAssertFalse(vue(intacte: false).cherches.contains("horizon_penche"))
         XCTAssertEqual(vue().cherches.first, "horizon_penche")
@@ -314,6 +326,41 @@ final class CarnetTests: XCTestCase {
         }
         _ = tools.call(name: "view_photo", arguments: ["compare": "before_claude"])
         XCTAssertTrue(fake.carnets.isEmpty, "\(fake.carnets)")
+    }
+
+    /// Après « Je le fais » (ou des étapes défaites, puis des réglages faits à la main), la photo n'a
+    /// pas d'étape de Claude mais n'est plus telle que prise : corrections_utilisateur le dit, et sa
+    /// vue ne remplace pas celle d'avant. Une réponse sans corrections (null) note comme avant.
+    func testViewPhotoNeNotePasUnePhotoChangeeALaMain() throws {
+        tools.noterAuCarnet = true
+        fake.replies["carnet"] = ["note": true]
+        let corrections: JSONValue = ["etape": "Claude · je le fais",
+                                      "changements": [["cle": "Exposure2012", "claude": 0, "maintenant": 0.7]]]
+        repondreApercu(Self.sombre, extra: ["corrections_utilisateur": corrections])
+        let result = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertTrue(fake.carnets.isEmpty, "\(fake.carnets)")
+        let info = try JSONCoding.parse(result.text)
+        XCTAssertNil(info["constats_prise_de_vue"])
+        XCTAssertNotNil(info["corrections_utilisateur"], "toujours dit à Claude")
+        repondreApercu(Self.sombre, extra: ["corrections_utilisateur": .null])
+        _ = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertEqual(fake.carnets.count, 1)
+        // Calculs IA en attente au rendu : l'image ne montre pas l'état de la photo, rien n'est noté.
+        repondreApercu(Self.sombre, extra: ["a_savoir": "Lightroom n'avait pas fini de calculer les réglages IA de cette photo."])
+        let enAttente = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertFalse(enAttente.isError, enAttente.text)
+        XCTAssertEqual(fake.carnets.count, 1, "\(fake.carnets)")
+        XCTAssertNil(try JSONCoding.parse(enAttente.text)["constats_prise_de_vue"])
+        // Le relevé le dit aussi.
+        repondreApercu(Self.sombre, extra: ["corrections_utilisateur": corrections])
+        let lignes = Carnet.releve(lightroom: fake, ids: [7], fichiers: [], lecteur: LecteurBoitier(delai: 1) { _ in nil })
+        XCTAssertTrue(lignes.contains { $0.contains("changée à la main depuis Claude (view_photo ne la noterait pas)") }, "\(lignes)")
+        XCTAssertFalse(lignes.contains { $0.contains("calculs IA en attente") }, "\(lignes)")
+        repondreApercu(Self.sombre, extra: ["a_savoir": "Lightroom n'avait pas fini de calculer les réglages IA de cette photo."])
+        let releveEnAttente = Carnet.releve(lightroom: fake, ids: [7], fichiers: [], lecteur: LecteurBoitier(delai: 1) { _ in nil })
+        XCTAssertTrue(releveEnAttente.contains { $0.hasSuffix("étapes de Claude : aucune, mais calculs IA en attente au rendu (view_photo ne la noterait pas)") },
+                      "\(releveEnAttente)")
     }
 
     func testViewPhotoNeChercheLHorizonQueSurUneGeometrieIntacte() throws {
@@ -489,6 +536,11 @@ final class CarnetTests: XCTestCase {
         // photo_ids n'y sert pas : dit.
         let avecPhotos = try JSONCoding.parse(tools.call(name: "export_journal", arguments: ["notebook": true, "photo_ids": [4]]).text)
         XCTAssertNotNil(avecPhotos["remarque"]?.string)
+        let avecSelection = try JSONCoding.parse(tools.call(name: "export_journal", arguments: ["notebook": true, "selection": true]).text)
+        XCTAssertNotNil(avecSelection["remarque"]?.string)
+        // selection = false ne vise rien de plus que la photo active : rien à dire.
+        let sansSelection = try JSONCoding.parse(tools.call(name: "export_journal", arguments: ["notebook": true, "selection": false]).text)
+        XCTAssertNil(sansSelection["remarque"])
     }
 
     func testExportJournalEcritLeCarnetSansEcraser() throws {

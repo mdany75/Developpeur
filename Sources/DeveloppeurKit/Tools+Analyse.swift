@@ -301,12 +301,18 @@ extension ToolHandler {
 
     /// La vue entière de view_photo au carnet : seulement quand le serveur note au carnet
     /// (`noterAuCarnet`), pour une photo identifiée sans étape de Claude (etapes_claude.nombre == 0,
-    /// que le module donne avec point_af). L'horizon n'y est cherché que sur une géométrie intacte
+    /// que le module donne avec point_af), et que l'utilisateur n'a pas changée à la main depuis le
+    /// dernier état laissé par Claude (corrections_utilisateur : après « Je le fais », ou des étapes
+    /// défaites puis des réglages faits à la main, elle n'est plus telle que prise, et sa vue
+    /// remplacerait celle d'avant). Ni sur une image rendue avant la fin des calculs IA (a_savoir) :
+    /// elle ne montre pas l'état de la photo (le module ne la garde pas non plus pour l'avant/après,
+    /// ni le bilan pour une « regression »). L'horizon n'y est cherché que sur une géométrie intacte
     /// (réglages et angle de recadrage de la réponse). Rend les textes des défauts trouvés si le
     /// module a noté la vue, nil sinon.
     func noterLaVue(apercu: JSONValue, mesures: PhotoMeasurements?, detail: DetailMeasurements?, reduite: CGImage,
                     af: PhotoTriee.MiseAuPoint?, intention: IntentionBoitier?) -> [String]? {
-        guard noterAuCarnet, let id = apercu["photo"]?["id"]?.int, apercu["etapes_claude"]?["nombre"]?.int == 0 else { return nil }
+        guard noterAuCarnet, let id = apercu["photo"]?["id"]?.int, apercu["etapes_claude"]?["nombre"]?.int == 0,
+              apercu["corrections_utilisateur"]?.object == nil, apercu["a_savoir"]?.isNull ?? true else { return nil }
         let intacte = Carnet.geometrieIntacte(reglages: apercu["reglages"], angleRecadrage: apercu["recadrage"]?["angle"]?.double ?? 0)
         let vue = Carnet.constatsVue(mesures: mesures, detail: detail, reduite: reduite, af: af, intention: intention, geometrieIntacte: intacte)
         guard !vue.cherches.isEmpty, constaterAuCarnet(photo: id, ["vue": vue.json]) else { return nil }

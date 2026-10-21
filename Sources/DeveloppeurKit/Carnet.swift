@@ -8,7 +8,10 @@ import Foundation
 ///
 /// Deux sortes de constats, sur les six défauts mesurés de PriseDeVue :
 /// - une vue (`constatsVue`) : au premier view_photo entier d'une photo que Claude n'a pas encore
-///   retouchée (etapes_claude.nombre == 0), les défauts cherchés et ceux trouvés : sous-exposition,
+///   retouchée (etapes_claude.nombre == 0) et que l'utilisateur n'a pas changée à la main depuis le
+///   dernier état laissé par Claude (pas de corrections_utilisateur, comme après « Je le fais »),
+///   sur une image rendue avec ses calculs IA (pas d'a_savoir), les défauts cherchés et ceux
+///   trouvés : sous-exposition,
 ///   ciel brûlé, flou, mise au point, bruit ; l'horizon y est seulement cherché (une ligne ne se
 ///   trouve que mesurée), et seulement sur une géométrie intacte ;
 /// - un angle (`constatHorizon`) : une ligne horizontale penchée de `horizonMin` ou plus, mesurée
@@ -63,7 +66,8 @@ public enum Carnet {
 
         var json: JSONValue {
             var objet: [String: JSONValue] = ["code": .string(code), "texte": .string(texte)]
-            if let mesure, mesure.isFinite { objet["mesure"] = .number((mesure * 10).rounded() / 10) }
+            // Au centième, comme l'inclinaison : le bruit se lit à deux décimales (1,52 et non 1,5).
+            if let mesure, mesure.isFinite { objet["mesure"] = .number((mesure * 100).rounded() / 100) }
             return .object(objet)
         }
     }
@@ -112,7 +116,8 @@ public enum Carnet {
     /// Les défauts de la prise de vue mesurés sur l'aperçu entier de view_photo, avant le carré du
     /// point de mise au point : `mesures` et `reduite` (512 px), `detail` (1024 px ; ses seuils ne
     /// valent qu'à cette taille : sous elle, ni netteté ni bruit ne sont cherchés), `af` (point de
-    /// mise au point de l'appareil et netteté autour ; mise_au_point n'est cherché que s'il est lu),
+    /// mise au point de l'appareil et netteté autour ; mise_au_point n'est cherché que s'il est lu, et
+    /// sur une photo qui n'est pas floue partout),
     /// `intention` (Fujifilm : une compensation de −0,6 IL ou moins, ou une scène de nuit, disent une
     /// photo voulue sombre, jamais sous-exposée), `geometrieIntacte` (sinon l'horizon n'est pas
     /// cherché : la base compterait droite une photo déjà redressée).
@@ -143,8 +148,11 @@ public enum Carnet {
         if let detail, detail.side >= Detail.side {
             cherches.insert("flou")
             cherches.insert("bruit")
-            if af != nil { cherches.insert("mise_au_point") }
-            for defaut in PhotoTriee.defautsNettete(detail: detail, af: af) {
+            let nettete = PhotoTriee.defautsNettete(detail: detail, af: af)
+            // La mise au point ne se juge qu'au point lu, et pas sur une photo floue partout : la
+            // règle ne peut alors pas la trouver manquée, et la base la compterait réussie.
+            if af != nil, !nettete.contains(where: { $0.genre == .floue }) { cherches.insert("mise_au_point") }
+            for defaut in nettete {
                 switch defaut.genre {
                 case .floue: trouve("flou", detail.sharpest, defaut.texte)
                 case .miseAuPointManquee, .miseAuPointSignalee: trouve("mise_au_point", af?.nettete, defaut.texte)
@@ -337,9 +345,23 @@ public enum Carnet {
             if let reponse {
                 let angle = reponse["recadrage"]?["angle"]?.double ?? 0
                 geometrie = geometrieIntacte(reglages: reponse["reglages"], angleRecadrage: angle)
-                let etapes = reponse["etapes_claude"]?["nombre"]?.int
+                // Ce que view_photo en ferait (ToolHandler.noterLaVue) : étapes de Claude, corrections
+                // faites à la main depuis Claude, calculs IA en attente au rendu.
+                let etapes: String
+                switch reponse["etapes_claude"]?["nombre"]?.int {
+                case nil: etapes = "inconnues"
+                case let nombre? where nombre != 0: etapes = "\(nombre) (view_photo ne la noterait plus)"
+                default:
+                    if reponse["corrections_utilisateur"]?.object != nil {
+                        etapes = "aucune, mais changée à la main depuis Claude (view_photo ne la noterait pas)"
+                    } else if !(reponse["a_savoir"]?.isNull ?? true) {
+                        etapes = "aucune, mais calculs IA en attente au rendu (view_photo ne la noterait pas)"
+                    } else {
+                        etapes = "aucune (view_photo la noterait)"
+                    }
+                }
                 dire("  Géométrie : \(geometrie ? "intacte" : "touchée (recadrage tourné, Upright, perspective ou distorsion)") ; étapes de Claude : "
-                    + (etapes.map { $0 == 0 ? "aucune (view_photo la noterait)" : "\($0) (view_photo ne la noterait plus)" } ?? "inconnues"))
+                    + etapes)
             }
             let vue = constatsVue(mesures: mesures, detail: detail, reduite: reduite, af: af, intention: intention, geometrieIntacte: geometrie)
             dire("  Cherchés : \(vue.cherches.joined(separator: ", "))")
