@@ -37,6 +37,8 @@ final class ModuleRecette13: LightroomServing {
 
     /// Dans « Développeur › Essais » pour find_photos, et pour le module (Carnet.estPhotoDEssai).
     var dansLaCollection = true, dansLesEssais = true
+    /// La case Carnet du Gestionnaire décochée : tout constat est refusé (motif preference).
+    var carnetDecoche = false
     var priseLe: String? = "2025-07-14 18:32"
     /// Le jour où find_photos retrouve la photo (par défaut celui de priseLe).
     var jourTrouve: String?
@@ -51,8 +53,8 @@ final class ModuleRecette13: LightroomServing {
     var angleLuIgnore = false
     var vueSansAngle = false
     var ecartsOublies: Set<String> = []
-    /// Le cadre remis par l'image entière (apercu avec entier) à 1e-5 près, et non exactement.
-    var restaurationImparfaite = false
+    /// L'écart des Crop* remis par l'image entière (apercu avec entier) : 0, ils reviennent exactement.
+    var ecartRestauration = 0.0
     private var decalageBrut = 0.0
     /// Une erreur à lever pour une commande (selon ses paramètres et l'état).
     var erreur: ((String, [String: JSONValue]) -> Error?)?
@@ -68,7 +70,9 @@ final class ModuleRecette13: LightroomServing {
 
     var aspect: Double { Self.largeur / Self.hauteur }
     var photoJSON: JSONValue { ["id": .number(Double(id)), "fichier": .string(fichier), "retouchee_par_claude": .bool(!memoire.isEmpty)] }
-    var mois: String { priseLe.map { String($0.prefix(7)) } ?? "2026-10" }
+    /// Le mois de la prise de vue ; aucun sans date (le module rend alors mois = nil, sans_date).
+    var mois: String? { priseLe.map { String($0.prefix(7)) } }
+    var moisJSON: JSONValue { mois.map(JSONValue.string) ?? .null }
     func noms(_ commande: String) -> [String] { commandes.filter { $0.nom == commande }.compactMap { $0.params["action"]?.string } }
     func params(_ commande: String) -> [[String: JSONValue]] { commandes.filter { $0.nom == commande }.map(\.params) }
 
@@ -229,7 +233,7 @@ final class ModuleRecette13: LightroomServing {
             if entier {
                 r["image_entiere"] = true
                 r["dimensions"] = dimensions
-                if recadrage != nil, restaurationImparfaite { decalageBrut += 1e-5 }
+                if recadrage != nil { decalageBrut += ecartRestauration }
                 if let recadrage {
                     var lu = cadreModule(recadrage)
                     if angleLuIgnore { lu["angle"] = 0 }
@@ -315,9 +319,9 @@ final class ModuleRecette13: LightroomServing {
             case "garder":
                 let remplacee = lecons[id] != nil
                 lecons[id] = ["photo": .number(Double(id)), "fichier": .string(fichier), "points": params["lecon"]?["points"] ?? [],
-                              "original": 9001, "mois": .string(mois)]
+                              "original": 9001, "mois": moisJSON]
                 return ["photo": .number(Double(id)), "original": 9001, "fichier": .string(fichier), "rangee": true, "remplacee": .bool(remplacee),
-                        "mois": .string(mois), "prise_le": priseLe.map(JSONValue.string) ?? .null, "sans_date": .bool(priseLe == nil)]
+                        "mois": moisJSON, "prise_le": priseLe.map(JSONValue.string) ?? .null, "sans_date": .bool(priseLe == nil)]
             case "lire":
                 return ["lecons": .array(lecons.filter { voulues.isEmpty || voulues.contains($0.key) }.map(\.value))]
             default:
@@ -330,6 +334,9 @@ final class ModuleRecette13: LightroomServing {
                 let refus: (String, String) -> JSONValue = { motif, raison in
                     ["note": false, "motif": .string(motif), "raison": .string(raison), "photo": .number(Double(self.id))]
                 }
+                if carnetDecoche {
+                    return refus("preference", "Carnet de progrès décoché dans le Gestionnaire de modules externes : rien n'est noté.")
+                }
                 if params["essai_recette"]?.bool != true, dansLesEssais {
                     return refus("essai", "Photo d'essai (Développeur › Essais) : le carnet ne compte que les vraies prises de vue.")
                 }
@@ -339,10 +346,10 @@ final class ModuleRecette13: LightroomServing {
                 // Une photo d'essai a son entrée à elle ; une autre, celle de son original (9001).
                 let cle = dansLesEssais ? id : 9001
                 let remplacee = carnet[cle] != nil
-                carnet[cle] = ["photo": .number(Double(cle)), "prise": .string(mois), "prise_le": priseLe.map(JSONValue.string) ?? .null,
-                               "angle": params["angle"] ?? .null, "vue": params["vue"] ?? .null, "lecons": []]
+                carnet[cle] = ["photo": .number(Double(cle)), "prise": moisJSON, "prise_le": priseLe.map(JSONValue.string) ?? .null,
+                               "sans_date": priseLe == nil ? true : .null, "angle": params["angle"] ?? .null, "vue": params["vue"] ?? .null, "lecons": []]
                 return ["note": true, "constat": params["angle"] != nil ? "angle" : "vue", "photo": .number(Double(id)), "original": .number(Double(cle)),
-                        "fichier": .string(fichier), "mois": .string(mois), "prise_le": priseLe.map(JSONValue.string) ?? .null,
+                        "fichier": .string(fichier), "mois": moisJSON, "prise_le": priseLe.map(JSONValue.string) ?? .null,
                         "sans_date": .bool(priseLe == nil), "remplacee": .bool(remplacee)]
             case "lire":
                 var r: [String: JSONValue] = ["catalogue": "Essais.lrcat", "nombre": .number(Double(carnet.count)),
@@ -558,6 +565,76 @@ final class Recette13Tests: XCTestCase {
         XCTAssertTrue(export.carnet.isEmpty)
     }
 
+    /// Une copie sans date de prise de vue : le module ne dit pas de mois (sans_date), et la recette
+    /// ne cherche pas de jour à retrouver ; l'entrée est retirée.
+    func testCarnetSansDateDePriseDeVue() throws {
+        let module = ModuleRecette13()
+        module.priseLe = nil
+        let recette = recette(module)
+        try recette.sequenceCarnet(7, "RAW 7")
+        XCTAssertTrue(recette.reussie, details(recette))
+        XCTAssertTrue(recette.etapes[0].detail.contains("sans date de prise de vue (comptée au mois du constat)"), details(recette))
+        XCTAssertTrue(module.params("chercher").allSatisfy { $0["date_debut"] == nil }, "aucun jour cherché sans date")
+        XCTAssertEqual(module.noms("carnet").last, "lire")
+        XCTAssertTrue(module.carnet.isEmpty)
+    }
+
+    /// La case Carnet décochée refuse tout : l'étape le dit (la cocher), sans rien envoyer d'autre.
+    func testCarnetCaseDecocheeSeDit() throws {
+        let module = ModuleRecette13()
+        module.carnetDecoche = true
+        let recette = recette(module)
+        XCTAssertThrowsError(try recette.sequenceCarnet(7, "RAW 7"))
+        XCTAssertTrue(recette.etapes[0].detail.contains("motif preference"), details(recette))
+        XCTAssertTrue(recette.etapes[0].detail.contains("cocher la case Carnet"), details(recette))
+        XCTAssertFalse(recette.etapes[0].detail.contains("ne voit pas la copie"), details(recette))
+        XCTAssertEqual(module.noms("carnet"), ["constater"])
+    }
+
+    // MARK: Les trois étapes après le bilan
+
+    /// Après le bilan : l'avant/après d'une étape, la leçon, puis le carnet, dans cet ordre, chacun
+    /// revenu à l'état d'avant (réglages, leçons, carnet).
+    func testApprendreEnchaineLesTroisEtapes() throws {
+        let module = ModuleRecette13()
+        let recette = recette(module)
+        let (depart, attendu) = try preparerLecon(recette, module)
+        try recette.sequenceApprendre(7, "RAW 7", depart: depart, attendu: attendu)
+        XCTAssertTrue(recette.reussie, details(recette))
+        XCTAssertEqual(recette.etapes.map(\.nom), [
+            "avant/après d'une étape gardé sans autre rendu (Pourquoi ?), puis annulé",
+            "leçon de la photo (photo_lesson) : indices lus, rangée, relue, retirée ; photo inchangée",
+            "carnet de progrès : photo d'essai refusée, notée pour la recette (essai_recette), exportée, retirée",
+        ])
+        XCTAssertEqual(module.reglages, ["Exposure2012": 0.4, "Temperature": 5300, "Tint": 10, "Vibrance": 0, "Shadows2012": 0])
+        XCTAssertEqual(module.memoire.count, 2, "les deux écritures de la préparation, rien de plus")
+        XCTAssertTrue(module.lecons.isEmpty)
+        XCTAssertTrue(module.carnet.isEmpty)
+    }
+
+    /// La séquence du RAW appelle la 1.3 à sa place (le faux module de ces essais ne la mène pas
+    /// jusque-là : elle s'arrête à la balance) : après le bilan, l'avant/après, la leçon et le carnet,
+    /// avant la mesure d'angle, qui laisse la géométrie intacte jusque-là ; « Je le fais » juste après
+    /// les variantes, qui effacent toutes celles de Claude.
+    func testLaSequenceDuRAWAppelleLaRecette13() throws {
+        let racine = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: racine.appendingPathComponent("Sources/DeveloppeurKit/Recette.swift"), encoding: .utf8)
+        let debut = try XCTUnwrap(source.range(of: "func sequenceRAW("))
+        let fin = try XCTUnwrap(source.range(of: "\n    }\n", range: debut.upperBound..<source.endIndex))
+        let corps = String(source[debut.upperBound..<fin.lowerBound])
+        func position(_ texte: String) throws -> String.Index { try XCTUnwrap(corps.range(of: texte), texte).lowerBound }
+        let bilan = try position("try etapeBilan(id, photo, attendu: auto)")
+        let apprendre = try position("try sequenceApprendre(id, photo, depart: depart, attendu: auto)")
+        let angle = try position("\"mesure d'angle\"")
+        XCTAssertTrue(bilan < apprendre && apprendre < angle)
+        XCTAssertTrue(corps.contains("try sequenceVariantes(id, photo)\n"))
+        let variantes = try position("try sequenceVariantes(id, photo)\n")
+        let jeLeFais = try position("try sequenceJeLeFais(id, photo)")
+        let entre = corps[corps.index(variantes, offsetBy: "try sequenceVariantes(id, photo)\n".count)..<jeLeFais]
+        XCTAssertTrue(entre.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.allSatisfy { $0.isEmpty || $0.hasPrefix("//") },
+                      "rien entre les variantes et « Je le fais » : \(entre)")
+    }
+
     // MARK: Je le fais
 
     /// « Je le fais » : rien d'appliqué ni de rendu, a_faire dans l'ordre des panneaux, l'exercice au
@@ -669,11 +746,20 @@ final class Recette13Tests: XCTestCase {
             XCTAssertNil(module.recadrage, file: file, line: line)
         }
         echec({ $0.cadreResserre = 0.97 }, 1, "le cadre gardé par Lightroom n'est pas le crop proposé : largeur")
-        echec({ $0.restaurationImparfaite = true }, 2, "recadrage pas remis exactement après read_composition : CropLeft")
+        echec({ $0.ecartRestauration = 1e-5 }, 2, "recadrage pas remis exactement après read_composition : CropLeft")
         echec({ $0.angleLuIgnore = true }, 2, "cadre actuel lu sur l'image entière : angle 0° au lieu de 2°")
         echec({ $0.vueSansAngle = true }, 3, "dans le cadre au lieu de")
         echec({ $0.horizon = nil }, 1, "aucun contour net le long de l'horizon donné")
         echec({ $0.reglages["PerspectiveUpright"] = 2; $0.garderCommeDepart() }, 1, "la copie porte PerspectiveUpright")
+    }
+
+    /// Les Crop* remis au millionième près (mesure 5) suffisent ; au-delà, l'écart se dit.
+    func testHorizonCadreRemisAuMillionieme() {
+        let module = moduleHorizon()
+        module.ecartRestauration = 5e-7
+        let (recette, lignes) = lancerHorizon(module)
+        XCTAssertFalse(lignes.contains { $0.hasPrefix("✘") }, details(recette))
+        XCTAssertNil(module.recadrage)
     }
 
     /// Sans --horizon, aucune lecture de la composition.
@@ -735,6 +821,34 @@ final class Recette13Tests: XCTestCase {
         // Sans cadre : l'image entière ; une droite qui sort du cadre : rien.
         XCTAssertNotNil(horizon.segment(dans: nil))
         XCTAssertNil(Recette.Horizon(milieu: CGPoint(x: 0.5, y: 0.02), inclinaison: 30, aspect: 1.5).segment(dans: nil))
+    }
+
+    /// L'horizon mesuré dans le cadre appliqué : droit quand le cadre redresse, tel quel sous le
+    /// seuil ; un angle proposé du mauvais signe (l'horizon tourné du double, que la géométrie seule
+    /// accepterait) et un cadre que Lightroom tournerait à l'envers se disent.
+    func testHorizonAppliqueDroitEtGeometrie() {
+        XCTAssertEqual(Recette.ecartsHorizonApplique(vu: 0.05, inclinaison: 1.2, angleCadre: -1.2), [])
+        XCTAssertEqual(Recette.ecartsHorizonApplique(vu: 0.3, inclinaison: 0.3, angleCadre: 0), [])
+        // Près du seuil (inclinaison arrondie), redressé ou non.
+        XCTAssertEqual(Recette.ecartsHorizonApplique(vu: 0.5, inclinaison: 0.5, angleCadre: 0), [])
+        XCTAssertEqual(Recette.ecartsHorizonApplique(vu: 0, inclinaison: 0.5, angleCadre: -0.5), [])
+        // L'angle proposé du mauvais signe : t + a = 2,4, mais l'horizon n'est pas redressé.
+        let signe = Recette.ecartsHorizonApplique(vu: 2.4, inclinaison: 1.2, angleCadre: 1.2)
+        XCTAssertEqual(signe.count, 1, signe.joined(separator: " | "))
+        XCTAssertTrue(signe.first?.hasPrefix("horizon pas redressé") == true, signe.joined(separator: " | "))
+        // Lightroom qui tournerait le cadre à l'envers : les deux écarts.
+        XCTAssertEqual(Recette.ecartsHorizonApplique(vu: 2.4, inclinaison: 1.2, angleCadre: -1.2).count, 2)
+        // Sous le seuil, un cadre qui le penche davantage.
+        XCTAssertEqual(Recette.ecartsHorizonApplique(vu: 2.3, inclinaison: 0.3, angleCadre: 2).count, 1)
+    }
+
+    /// Les Crop* relus : un nombre au millionième près, toute autre valeur exactement.
+    func testChangementsBrutsAuMillionieme() {
+        XCTAssertEqual(Recette.changementsBruts(["CropLeft": 0.1, "CropAngle": 2], ["CropLeft": 0.1000005, "CropAngle": 2]), [])
+        XCTAssertEqual(Recette.changementsBruts(["CropLeft": 0.1], ["CropLeft": 0.10001]).count, 1)
+        XCTAssertEqual(Recette.changementsBruts(["CropConstrainToWarp": 0], ["CropConstrainToWarp": 1]), ["CropConstrainToWarp 0 → 1"])
+        XCTAssertEqual(Recette.changementsBruts(["CropConstrainToWarp": 0], [:]), ["CropConstrainToWarp 0 → —"])
+        XCTAssertEqual(Recette.changementsBruts(["CropUnit": "pixels"], ["CropUnit": "pouces"]).count, 1)
     }
 
     func testMoisVeilleEtDureeDeCapture() throws {

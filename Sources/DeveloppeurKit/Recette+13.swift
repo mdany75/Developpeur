@@ -272,8 +272,12 @@ extension Recette {
                     + "rien d'autre n'est envoyé (entrée à vérifier à la main)")
             }
             guard refus["motif"]?.string == "essai" else {
+                // La case Carnet décochée refuse tout avant de regarder la photo : rien n'en est vérifié.
+                let cause = refus["motif"]?.string == "preference"
+                    ? "cocher la case Carnet du Gestionnaire de modules externes le temps de la recette"
+                    : "le module ne voit pas la copie dans « Développeur › Essais »"
                 throw Echec(description: "refusée, mais pas comme photo d'essai (motif \(refus["motif"]?.string ?? "?") : \(refus["raison"]?.string ?? "")) : "
-                    + "le module ne voit pas la copie dans « Développeur › Essais » ; rien d'autre n'est envoyé")
+                    + cause + " ; rien d'autre n'est envoyé")
             }
             // L'horizon mesuré sur la géométrie de la copie (intacte jusqu'ici : ni recadrage tourné,
             // ni Upright), sans rien noter (le carnet ne note que pour le serveur de Claude).
@@ -314,7 +318,9 @@ extension Recette {
             try verifier(note["original"]?.int == id && note["photo"]?.int == id,
                          "le constat d'essai n'a pas son entrée à elle : original \(note["original"].map(JSONCoding.line) ?? "?")")
             if sansDate {
-                try verifier(mois.map(Self.estUnMois) == true, "mois du constat (photo sans date) : \(mois ?? "absent")")
+                // Sans date de prise de vue, le module ne dit pas de mois (mois = la prise de vue de
+                // l'entrée) : le résumé la compte au mois de son constat.
+                try verifier(mois.map(Self.estUnMois) ?? true, "mois du constat (photo sans date) : \(mois ?? "absent")")
             } else {
                 try verifier(mois.map(Self.estUnMois) == true && priseLe?.hasPrefix((mois ?? "?") + "-") == true,
                              "mois \(mois ?? "absent"), prise de vue \(priseLe ?? "absente")")
@@ -328,7 +334,7 @@ extension Recette {
             try verifier(retrait["retirees"]?.int == 1 && !(relu["photos"]?.array ?? []).contains { $0["photo"]?.int == id },
                          "entrée pas retirée : \(JSONCoding.line(retrait))")
             return "vue refusée (« \(refus["raison"]?.string ?? "photo d'essai") ») ; angle de \(Self.nombre(inclinaison))° noté pour la recette, "
-                + (sansDate ? "sans date de prise de vue (mois du constat \(mois ?? "?"))" : "prise de vue \(priseLe ?? "?"), retrouvée au même jour")
+                + (sansDate ? "sans date de prise de vue (comptée au mois du constat)" : "prise de vue \(priseLe ?? "?"), retrouvée au même jour")
                 + " ; exporté, puis retiré ; catalogue inchangé"
         }
     }
@@ -492,6 +498,31 @@ extension Recette {
         return ecarts
     }
 
+    /// L'horizon mesuré dans le cadre proposé, une fois appliqué (`vu`, measure_angle), contre ce que
+    /// read_composition promet : droit à `ecartInclinaison` près quand il penche de
+    /// Composition.seuilInclinaison ou plus dans l'image entière (`inclinaison`), sinon laissé tel
+    /// quel (il ne se voit pas). Un angle proposé du mauvais signe tournerait l'horizon du double :
+    /// la géométrie seule (inclinaison + angle du cadre) ne le verrait pas. Puis cette géométrie
+    /// même, qui dit si Lightroom tourne le cadre comme le serveur le suppose. Les écarts en mots ;
+    /// vide s'il n'y en a pas. Près du seuil (à 0,01° : l'inclinaison est arrondie au centième),
+    /// redressé ou non, les deux se valent.
+    static func ecartsHorizonApplique(vu: Double, inclinaison: Double, angleCadre: Double) -> [String] {
+        var ecarts: [String] = []
+        let seuil = Composition.seuilInclinaison
+        let attendus = abs(abs(inclinaison) - seuil) <= 0.01 ? [0, inclinaison] : [abs(inclinaison) >= seuil ? 0 : inclinaison]
+        if !attendus.contains(where: { abs(vu - $0) <= ecartInclinaison }) {
+            ecarts.append(abs(inclinaison) >= seuil
+                ? "horizon pas redressé : penché de \(nombre(vu))° dans le cadre (\(nombre(inclinaison))° dans l'image entière, cadre tourné de \(nombre(angleCadre))°)"
+                : "horizon penché de \(nombre(vu))° dans le cadre au lieu de \(nombre(inclinaison))° (cadre tourné de \(nombre(angleCadre))°)")
+        }
+        // Dans un cadre tourné de a, une ligne penchée de t dans l'image entière penche de t + a.
+        let geometrie = inclinaison + angleCadre
+        if abs(vu - geometrie) > ecartInclinaison {
+            ecarts.append("horizon penché de \(nombre(vu))° dans le cadre au lieu de \(nombre(geometrie))° (inclinaison + angle du cadre)")
+        }
+        return ecarts
+    }
+
     /// Les réglages Crop* bruts de la photo (get_settings, all_keys : CropLeft… et
     /// CropConstrainToWarp), tels que Lightroom les range : read_composition retire le cadre le temps
     /// du rendu de l'image entière, puis le remet, et preview_settings remet la photo comme avant ; ils
@@ -501,10 +532,15 @@ extension Recette {
         return tous.filter { $0.key.hasPrefix("Crop") }
     }
 
-    /// Les réglages Crop* qui ont changé, en mots ; vide s'ils sont revenus exactement.
+    /// Écart permis entre deux valeurs Crop* relues (mesure 5 de la 1.3 : « identiques au millionième »).
+    static let ecartBrut = 1e-6
+
+    /// Les réglages Crop* qui ont changé (un nombre au-delà du millionième, toute autre valeur dès
+    /// qu'elle diffère), en mots ; vide s'ils sont revenus.
     static func changementsBruts(_ avant: [String: JSONValue], _ apres: [String: JSONValue]) -> [String] {
         Set(avant.keys).union(apres.keys).sorted().compactMap { cle in
-            avant[cle] == apres[cle] ? nil
+            if let a = avant[cle]?.double, let b = apres[cle]?.double, abs(a - b) <= ecartBrut { return nil }
+            return avant[cle] == apres[cle] ? nil
                 : "\(cle) \(avant[cle].map(JSONCoding.line) ?? "—") → \(apres[cle].map(JSONCoding.line) ?? "—")"
         }
     }
@@ -636,11 +672,8 @@ extension Recette {
             guard droite != nil, let vu = mesure["inclinaison"]?.double else { throw Echec(description: "horizon hors du cadre appliqué") }
             try verifier(mesure["mesure"]?.string?.hasPrefix("affinée") == true,
                          "horizon non retrouvé dans le cadre appliqué : \(mesure["mesure"]?.string ?? "?")")
-            // L'inclinaison vue dans le cadre : celle de l'image entière plus l'angle du cadre ; nulle
-            // quand le cadre redresse (horizon penché de 0,5° ou plus).
-            let attendue = inclinaisonLue + lu.angle
-            try verifier(abs(vu - attendue) <= Self.ecartInclinaison,
-                         "horizon penché de \(Self.nombre(vu))° dans le cadre au lieu de \(Self.nombre(attendue))°")
+            let ecarts = Self.ecartsHorizonApplique(vu: vu, inclinaison: inclinaisonLue, angleCadre: lu.angle)
+            try verifier(ecarts.isEmpty, ecarts.joined(separator: " ; "))
             return "horizon à \(Self.nombre(Double(surLeTiers.y))) de la hauteur, penché de \(Self.nombre(vu))° (\(mesure["mesure"]?.string ?? "")) ; "
                 + "cadre \(Self.nombre(lu.angle))° ; deux recadrages annulés"
         }
