@@ -10,7 +10,8 @@
 -- Constats (carnet constater { photo, vue ou angle, vocabulaire, essai_recette? }) :
 --   vue   = { cherches = { codes }, defauts = { { code, mesure?, texte? } } } : les défauts
 --           cherchés sur le premier aperçu entier de view_photo, et ceux trouvés ; refusée
---           (note = false, avec la raison) si la photo a déjà des étapes de Claude ;
+--           (note = false, avec la raison) si la photo a déjà des étapes de Claude, ou si c'est
+--           la copie virtuelle d'un original qui en a (elle en a reçu les réglages) ;
 --   angle = { inclinaison (degrés), code, source? } : une ligne penchée mesurée (measure_angle,
 --           read_composition) ; refusé seulement si la géométrie est touchée (recadrage tourné,
 --           Upright, perspective ou distorsion manuelle), pas après une passe de tonalité ;
@@ -19,7 +20,9 @@
 --           conseils) : aucune liste de défauts n'est écrite dans ce module.
 -- Tout constat est refusé si la case Carnet est décochée (préférence carnet), et pour une photo
 -- de « Développeur › Essais » (Carnet.estPhotoDEssai), sauf avec essai_recette = true, que seule la
--- recette envoie. Une nouvelle vue remplace l'ancienne, un nouvel angle aussi ; les leçons restent.
+-- recette envoie : la photo d'essai a alors son entrée à elle, jamais celle de son original (une
+-- vraie photo), et retirer ne mène jamais d'une photo d'essai à l'entrée de son original. Une
+-- nouvelle vue remplace l'ancienne, un nouvel angle aussi ; les leçons restent.
 --
 -- Le résumé (Carnet.resumer) compte, pour chaque défaut et par mois de prise de vue (les six
 -- derniers qui ont des photos), les photos où il a été trouvé sur celles où il a été cherché ; il
@@ -38,8 +41,8 @@
 --   { format = 1, vocabulaire = { { code, cle, axe, domaine, libelle, conseil, mesure } } (le
 --     dernier reçu, pour tous les catalogues), catalogues = { [chemin du catalogue] = { photos =
 --     { ['<id de l'original>'] = entrée } } } }
---   entrée : { photo (id de l'original), uuid, fichier, prise ('AAAA-MM', heure locale), prise_le
---     ('AAAA-MM-JJ HH:MM'), sans_date (vrai sans date de prise de vue : la photo compte alors au
+--   entrée : { photo (id de l'original ; d'une photo d'essai, pour la recette), uuid, fichier,
+--     prise ('AAAA-MM', heure locale), prise_le ('AAAA-MM-JJ HH:MM'), sans_date (vrai sans date de prise de vue : la photo compte alors au
 --     mois du constat), le (dernier changement, os.time), vue { le, photo (id de la photo
 --     mesurée, copie virtuelle comprise), cherches = { codes }, defauts = { { code, mesure, texte }
 --     } }, angle { le, photo, inclinaison, code, source }, lecons = { ['<id de la photo>'] = leçon } }
@@ -536,9 +539,10 @@ end
 
 -- Ce que le registre garde d'une photo et de son original, lu avant d'y toucher : ces lectures
 -- passent par le catalogue (la tâche peut rendre la main), et une autre commande (retirer, une
--- lecture qui perd une leçon) ne doit jamais voir une entrée à moitié faite.
-local function lirePhoto(photo)
-    local original = originalDe(photo)
+-- lecture qui perd une leçon) ne doit jamais voir une entrée à moitié faite. `original` : la photo
+-- dont l'entrée reçoit (par défaut l'original ; une photo d'essai elle-même, voir constater).
+local function lirePhoto(photo, original)
+    original = original or originalDe(photo)
     local prise, priseLe = datesPrise(original)
     return {
         id = photo.localIdentifier, uuid = texte(Photos.brut(photo, 'uuid')), fichier = Photos.nomFichier(photo),
@@ -1006,8 +1010,12 @@ end
 -- ou { note = false, motif ('preference', 'essai', 'etapes', 'geometrie'), raison, photo }. Tout
 -- est vérifié et lu (photo, collections, étapes, géométrie, chemin du catalogue) avant de toucher
 -- au registre, qui change ensuite d'un coup : une autre commande passée pendant une lecture ne
--- voit jamais d'entrée à moitié faite.
+-- voit jamais d'entrée à moitié faite. La photo est obligatoire : le constat vaut pour la photo
+-- mesurée, jamais pour celle qui est active au moment où il arrive.
 local function constater(params)
+    if absent(params.photo) then
+        echouer("Constat : photo manquante (l'identifiant de la photo mesurée).")
+    end
     local vue, angle = params.vue, params.angle
     if absent(vue) then
         vue = nil
@@ -1029,22 +1037,36 @@ local function constater(params)
         return refus('preference', "Carnet de progrès décoché dans le Gestionnaire de modules externes : rien n'est noté.",
             tonumber(params.photo) or params.photo)
     end
-    local photo = Photos.photoVisee(params)
+    local photo = Photos.photoParId(params.photo)
     local id = photo.localIdentifier
-    if params.essai_recette ~= true and Carnet.estPhotoDEssai(photo) then
+    local essai = Carnet.estPhotoDEssai(photo)
+    if essai and params.essai_recette ~= true then
         return refus('essai', "Photo d'essai (Développeur › Essais) : le carnet ne compte que les vraies prises de vue.", id)
     end
+    -- L'entrée qui reçoit le constat : celle de l'original (une prise de vue ne compte qu'une
+    -- fois). Une photo d'essai (la recette) a la sienne, jamais celle de son original : c'est une
+    -- vraie photo de Dany, dont la recette ne doit ni remplacer la vue ni retirer l'entrée.
+    local original = essai and photo or originalDe(photo)
     if vue then
-        -- La mémoire de la photo elle-même (une copie virtuelle reçoit celle de son original).
+        -- La mémoire de la photo elle-même (une copie virtuelle reçoit celle de son original, qui
+        -- n'est pas la sienne : lireJson la lit vide).
         if #Photos.lireJson(photo, 'etapesClaude', {}) > 0 then
             return refus('etapes', "Photo déjà retouchée par Claude : sa prise de vue ne se mesure qu'avant la première retouche.",
                 id)
+        end
+        -- Une copie virtuelle reçoit les réglages de son original au moment où elle est faite :
+        -- celle d'une photo déjà retouchée par Claude montre ses retouches, pas la prise de vue, et
+        -- sa vue remplacerait celle de l'original, prise avant. Refusée, au risque d'écarter une
+        -- copie faite avant la retouche.
+        if original ~= photo and #Photos.lireJson(original, 'etapesClaude', {}) > 0 then
+            return refus('etapes', "Copie virtuelle d'une photo déjà retouchée par Claude : elle en a reçu les réglages ; "
+                .. "la prise de vue se mesure sur l'original, avant sa première retouche.", id)
         end
     elseif geometrieTouchee(photo) then
         return refus('geometrie', "Géométrie déjà touchée (recadrage tourné, Upright, perspective ou distorsion) : "
             .. "la ligne mesurée ne dit plus l'inclinaison de la prise de vue.", id)
     end
-    local lu = lirePhoto(photo)
+    local lu = lirePhoto(photo, original)
     local chemin = cheminCatalogue()
     -- Plus aucune lecture du catalogue jusqu'au fichier écrit : le registre change d'un coup.
     local e = entreeDe(tableDu(chemin, true), lu)
@@ -1414,7 +1436,10 @@ local function lireCarnet(params)
 end
 
 -- retirer { photos } : les entrées de ces photos (l'identifiant d'un original, ou d'une copie
--- virtuelle : l'entrée de son original), leçons comprises.
+-- virtuelle : l'entrée de son original), leçons comprises. Une photo d'essai sans entrée à elle
+-- ne mène jamais à celle de son original (une vraie photo) : la recette retire ce qu'elle a
+-- constaté, et rien d'autre, même après un constat refusé. Les photos sont lues d'abord (la tâche
+-- peut rendre la main), puis le registre change d'un coup.
 local function retirerDuCarnet(params)
     local ids = {}
     for _, id in ipairs(type(params.photos) == 'table' and params.photos or {}) do
@@ -1426,16 +1451,22 @@ local function retirerDuCarnet(params)
     if #ids == 0 then
         echouer("Photos à retirer du carnet : donner photos.")
     end
-    local c = catalogueOuvert(false)
-    local retirees, absentes = 0, Json.tableau()
-    for _, id in ipairs(ids) do
+    local chemin = cheminCatalogue()
+    local cles = {}
+    for i, id in ipairs(ids) do
         local cle = cleDe(id)
-        if not c.photos[cle] then
+        if not tableDu(chemin, false).photos[cle] then
             local ok, photo = LrTasks.pcall(Photos.photoParId, id)
-            if ok then
+            if ok and not Carnet.estPhotoDEssai(photo) then
                 cle = cleDe(originalDe(photo).localIdentifier)
             end
         end
+        cles[i] = cle
+    end
+    local c = tableDu(chemin, false)
+    local retirees, absentes = 0, Json.tableau()
+    for i, id in ipairs(ids) do
+        local cle = cles[i]
         if c.photos[cle] then
             c.photos[cle] = nil
             retirees = retirees + 1

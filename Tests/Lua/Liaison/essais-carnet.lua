@@ -318,11 +318,42 @@ test("carnet constater : vue refusée après une retouche de Claude ; angle gard
     egal(constater(4, { angle = angle(0.9) }).note, true)
     proche(Carnet.entree(4).angle.inclinaison, 0.9)
 
-    -- Une copie virtuelle de la photo retouchée : la mémoire de Claude est celle de l'original, pas
-    -- la sienne ; sa prise de vue se mesure.
+    -- Une copie virtuelle de la photo retouchée : elle en a reçu les réglages, sa vue est refusée
+    -- (essai suivant) ; sa géométrie, la sienne, est intacte : son angle se mesure.
     S.copieVirtuelle(photo, 9, 'Copie 2')
-    egal(constater(9, { vue = vueType() }).note, true)
-    egal(Carnet.entree(4).vue.photo, 9)
+    egal(constater(9, { vue = vueType() }).motif, 'etapes')
+    egal(constater(9, { angle = angle(1.1) }).note, true)
+    egal(Carnet.entree(4).angle.photo, 9)
+end)
+
+test("carnet constater : la vue d'une copie virtuelle d'une photo retouchée par Claude est refusée ; celle de l'original, prise avant, reste", function()
+    local Photos = require 'Photos'
+    local photo = photoFuji()
+    S.active = photo
+    egal(constater(4, { vue = vueType() }).note, true, "l'original, avant sa première retouche")
+    appliquer({ reglages = { Exposure2012 = 0.3 } })
+    local copie = S.copieVirtuelle(photo, 9, 'Copie 2')
+    proche(copie.reglages.Exposure2012, 0.3, "la copie a reçu les réglages de Claude")
+    egal(#Photos.lireJson(copie, 'etapesClaude', {}), 0, "sa mémoire est celle de l'original : elle se lit vide")
+    local version = Carnet.version
+    local r = constater(9, { vue = vue({ 'flou' }) })
+    egal(r.note, false)
+    egal(r.motif, 'etapes')
+    egal(r.photo, 9)
+    egal(r.raison, "Copie virtuelle d'une photo déjà retouchée par Claude : elle en a reçu les réglages ; "
+        .. "la prise de vue se mesure sur l'original, avant sa première retouche.")
+    egal(Carnet.version, version, "rien n'est rangé")
+    local e = Carnet.entree(4)
+    egal(e.vue.photo, 4, "la vue de l'original n'est pas remplacée")
+    egal(#e.vue.cherches, 6)
+    egal(e.vue.defauts[1].code, 'ciel_brule')
+
+    -- Les étapes de Claude défaites sur l'original : la copie faite ensuite se mesure.
+    Commandes.executer('annuler', {})
+    egal(#Photos.lireJson(photo, 'etapesClaude', {}), 0)
+    S.copieVirtuelle(photo, 10, 'Copie 3')
+    egal(constater(10, { vue = vue({ 'flou' }) }).note, true)
+    egal(Carnet.entree(4).vue.photo, 10)
 end)
 
 test("carnet constater : une photo de Développeur › Essais (ou dont l'original y est) est refusée, sauf pour la recette", function()
@@ -342,10 +373,29 @@ test("carnet constater : une photo de Développeur › Essais (ou dont l'origina
     egal(Carnet.estPhotoDEssai(copie), true)
     egal(Carnet.estPhotoDEssai(original), false)
 
+    -- L'original, une vraie photo, a son entrée (vue et leçon) : la recette n'y touche jamais.
+    egal(constater(1, { vue = vue({ 'flou' }, { 'flou' }) }).note, true, "l'original n'est pas une photo d'essai")
+    Commandes.executer('lecon', { action = 'garder', photo = 1, lecon = lecon() })
     r = constater(7, { vue = vueType() }, { essai_recette = true })
     egal(r.note, true, "la recette seule fait entrer une copie d'essai")
-    egal(r.original, 1)
+    egal(r.photo, 7)
+    egal(r.original, 7, "une entrée à elle, jamais celle de son original")
+    egal(r.fichier, 'DSC_0412.NEF (Essai)')
+    egal(r.remplacee, false)
+    egal(Carnet.nombre(), 2)
+    egal(Carnet.entree(7).vue.photo, 7)
+    egal(table.concat(Carnet.entree(1).vue.cherches, ','), 'flou', "la vue de l'original n'est pas remplacée")
+    egal(constater(7, { angle = angle(1) }, { essai_recette = true }).original, 7, "l'angle aussi")
+    egal(Carnet.entree(1).angle, nil)
     egal(Commandes.executer('carnet', { action = 'retirer', photos = { 7 } }).retirees, 1)
+    -- Retirée (ou jamais constatée) : retirer la photo d'essai ne mène pas à l'entrée de son original.
+    local encore = Commandes.executer('carnet', { action = 'retirer', photos = { 7 } })
+    egal(encore.retirees, 0)
+    egal(encore.absentes[1], 7)
+    local e = Carnet.entree(1)
+    egal(table.concat(e.vue.cherches, ','), 'flou', "l'entrée de l'original reste")
+    egal(e.lecons['1'] ~= nil, true, "et sa leçon")
+    egal(Carnet.nombre(), 1)
 
     -- L'original est dans les Essais : sa copie aussi est une photo d'essai.
     essais.membres[copie] = nil
@@ -385,9 +435,13 @@ test("carnet constater : case Carnet décochée, tout constat est refusé sans r
     egal(Commandes.executer('carnet', { action = 'retirer', photos = { 1 } }).retirees, 1)
 end)
 
-test("carnet constater : refus avant toute écriture (vue ou angle, vocabulaire, codes, défaut non cherché, mesure, texte, inclinaison)", function()
-    photoRaw()
+test("carnet constater : refus avant toute écriture (photo, vue ou angle, vocabulaire, codes, défaut non cherché, mesure, texte, inclinaison)", function()
+    S.active = photoRaw()
     local version = Carnet.version
+    -- Sans photo, jamais la photo active : le constat vaut pour la photo mesurée.
+    echoue(function() Commandes.executer('carnet', { action = 'constater', vue = vueType(), vocabulaire = VOCABULAIRE }) end,
+        "Constat : photo manquante (l'identifiant de la photo mesurée).")
+    echoue(function() constater(Json.null, { vue = vueType() }) end, "photo manquante")
     local function avecVocabulaire(vocabulaire)
         return function()
             Commandes.executer('carnet', { action = 'constater', photo = 1, vue = vueType(), vocabulaire = vocabulaire })
