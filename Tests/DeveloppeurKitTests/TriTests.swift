@@ -282,39 +282,12 @@ final class TriTests: XCTestCase {
 
     // MARK: Point de mise au point
 
-    /// RAF minimal : en-tête, JPEG incorporé avec son Exif (dimensions, MakerNote de Fujifilm).
+    /// RAF minimal : en-tête, JPEG incorporé avec son Exif (dimensions, MakerNote de Fujifilm avec
+    /// le point de mise au point), fabriqué par FichierFujifilm (BoitierTests).
     static func fichierFujifilm(x: Int, y: Int, avertissement: Int = 0, largeur: Int = 4416, hauteur: Int = 2944,
                                 raf: Bool = true) -> Data {
-        func le16(_ v: Int) -> [UInt8] { [UInt8(v & 0xFF), UInt8(v >> 8 & 0xFF)] }
-        func le32(_ v: Int) -> [UInt8] { le16(v & 0xFFFF) + le16(v >> 16) }
-        func be16(_ v: Int) -> [UInt8] { [UInt8(v >> 8 & 0xFF), UInt8(v & 0xFF)] }
-        func be32(_ v: Int) -> [UInt8] { be16(v >> 16) + be16(v & 0xFFFF) }
-        // MakerNote : « FUJIFILM », position de l'IFD (12), trois entrées petit-boutistes.
-        var note = Array("FUJIFILM".utf8) + le32(12)
-        note += le16(3)
-        note += le16(0x1023) + le16(3) + le32(2) + le16(x) + le16(y)
-        note += le16(0x1301) + le16(3) + le32(1) + le16(avertissement) + le16(0)
-        note += le16(0x4100) + le16(3) + le32(1) + le16(2) + le16(0)
-        note += le32(0)
-        // TIFF grand-boutiste : IFD0 → Exif IFD (dimensions, MakerNote).
-        var tiff = Array("MM".utf8) + be16(42) + be32(8)
-        let exifIFD = 8 + 2 + 12 + 4
-        let noteOffset = exifIFD + 2 + 3 * 12 + 4
-        tiff += be16(1) + be16(0x8769) + be16(4) + be32(1) + be32(exifIFD) + be32(0)
-        tiff += be16(3)
-        tiff += be16(0xA002) + be16(4) + be32(1) + be32(largeur)
-        tiff += be16(0xA003) + be16(4) + be32(1) + be32(hauteur)
-        tiff += be16(0x927C) + be16(7) + be32(note.count) + be32(noteOffset)
-        tiff += be32(0)
-        tiff += note
-        let exif = Array("Exif".utf8) + [0, 0] + tiff
-        let jpeg: [UInt8] = [0xFF, 0xD8, 0xFF, 0xE1] + be16(exif.count + 2) + exif + [0xFF, 0xD9]
-        guard raf else { return Data(jpeg) }
-        var fichier = Array("FUJIFILMCCD-RAW 0201FF169501X-H2S".utf8)
-        fichier += [UInt8](repeating: 0, count: 84 - fichier.count)
-        fichier += be32(100) + be32(jpeg.count)
-        fichier += [UInt8](repeating: 0, count: 100 - fichier.count)
-        return Data(fichier + jpeg)
+        FichierFujifilm.fichier(note: FichierFujifilm.point(x: x, y: y, avertissement: avertissement),
+                                largeur: largeur, hauteur: hauteur, raf: raf)
     }
 
     func testFocusPointIsReadFromAFujifilmRAFAndJPEG() throws {
@@ -347,10 +320,10 @@ final class TriTests: XCTestCase {
         let attente = DispatchSemaphore(value: 0)
         var lectures = 0
         let verrou = NSLock()
-        let lecteur = LecteurPointsAF(delai: 0.2) { _ in
+        let lecteur = LecteurBoitier(delai: 0.2) { _ in
             verrou.lock(); lectures += 1; verrou.unlock()
             attente.wait()
-            return PointAF(x: 0.5, y: 0.5, avertissement: false, visages: nil)
+            return LectureBoitier(point: PointAF(x: 0.5, y: 0.5, avertissement: false, visages: nil), intention: nil)
         }
         let debut = Date()
         XCTAssertNil(lecteur.lire(URL(fileURLWithPath: "/Volumes/Photos/A.RAF")))
@@ -364,10 +337,12 @@ final class TriTests: XCTestCase {
         while lecteur.bloque != nil, Date() < fin { Thread.sleep(forTimeInterval: 0.01) }
         XCTAssertNil(lecteur.bloque, "débloqué quand la lecture finit")
         attente.signal()
-        XCTAssertEqual(lecteur.lire(URL(fileURLWithPath: "/Volumes/Photos/B.RAF"))?.x, 0.5)
+        XCTAssertEqual(lecteur.lire(URL(fileURLWithPath: "/Volumes/Photos/B.RAF"))?.point?.x, 0.5)
 
-        let rapide = LecteurPointsAF(delai: 1) { _ in PointAF(x: 0.25, y: 0.75, avertissement: true, visages: 1) }
-        XCTAssertEqual(rapide.lire(URL(fileURLWithPath: "/tmp/C.RAF"))?.x, 0.25)
+        let rapide = LecteurBoitier(delai: 1) { _ in
+            LectureBoitier(point: PointAF(x: 0.25, y: 0.75, avertissement: true, visages: 1), intention: nil)
+        }
+        XCTAssertEqual(rapide.lire(URL(fileURLWithPath: "/tmp/C.RAF"))?.point?.x, 0.25)
         XCTAssertNil(rapide.bloque)
     }
 

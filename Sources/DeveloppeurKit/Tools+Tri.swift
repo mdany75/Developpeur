@@ -146,7 +146,7 @@ extension ToolHandler {
         let (ids, total) = try seriesPhotos(args, maximum: Self.maxCulledPhotos)
         guard !ids.isEmpty else { throw LightroomError.invalid("Aucune photo à trier.") }
         let motsCles = args.bool("keywords") == true
-        let pointsAF = LecteurPointsAF()
+        let pointsAF = LecteurBoitier()
         var photos: [PhotoTriee] = []
         var depuisCache = 0, rendues = 0
         try thumbnails(ids, taille: Self.cullThumbnailSize, minimum: Self.minimumCullSide, message: "tri des photos") { lot in
@@ -185,7 +185,7 @@ extension ToolHandler {
     }
 
     /// Les mesures d'une vignette : netteté, exposition, Vision, empreinte, point AF, mots-clés.
-    static func mesurer(_ vignette: Vignette, motsCles: Bool, pointsAF: LecteurPointsAF = LecteurPointsAF()) -> PhotoTriee {
+    static func mesurer(_ vignette: Vignette, motsCles: Bool, pointsAF: LecteurBoitier = LecteurBoitier()) -> PhotoTriee {
         let description = vignette.description
         var photo = PhotoTriee(id: vignette.id, fichier: description["fichier"]?.string ?? "photo \(vignette.id)")
         photo.date = Tri.date(description["date"]?.string)
@@ -218,11 +218,26 @@ extension ToolHandler {
     /// gauche), et l'avertissement de l'appareil, d'après une description qui porte
     /// `chemin_original` et `geometrie` (Vignettes.decrireVignette du module). Fujifilm seulement :
     /// l'original des autres marques n'est pas ouvert. Nil si le point sort du cadre.
-    static func pointAF(_ description: JSONValue?, lecteur: LecteurPointsAF) -> (point: CGPoint, avertissement: Bool)? {
+    static func pointAF(_ description: JSONValue?, lecteur: LecteurBoitier) -> (point: CGPoint, avertissement: Bool)? {
+        // Sans géométrie, pas de point à placer : l'original n'est pas ouvert.
+        guard GeometriePhoto(description?["geometrie"]) != nil else { return nil }
+        return pointAF(lectureBoitier(description, lecteur: lecteur), description: description)
+    }
+
+    /// Ce que dit l'original d'une photo Fujifilm (point AF et intention), d'une seule ouverture,
+    /// d'après une description qui porte `chemin_original` ; nil pour les autres marques, dont
+    /// l'original n'est pas ouvert.
+    static func lectureBoitier(_ description: JSONValue?, lecteur: LecteurBoitier) -> LectureBoitier? {
         let fujifilm = (description?["marque"]?.string?.uppercased().contains("FUJIFILM") ?? false)
             || (description?["chemin_original"]?.string?.lowercased().hasSuffix(".raf") ?? false)
-        guard fujifilm, let chemin = description?["chemin_original"]?.string, let geometrie = GeometriePhoto(description?["geometrie"]),
-              let af = lecteur.lire(URL(fileURLWithPath: chemin)) else { return nil }
+        guard fujifilm, let chemin = description?["chemin_original"]?.string else { return nil }
+        return lecteur.lire(URL(fileURLWithPath: chemin))
+    }
+
+    /// Le point de mise au point d'une lecture déjà faite, placé dans l'image affichée d'après la
+    /// `geometrie` de la description ; nil sans point ou hors du cadre.
+    static func pointAF(_ lecture: LectureBoitier?, description: JSONValue?) -> (point: CGPoint, avertissement: Bool)? {
+        guard let af = lecture?.point, let geometrie = GeometriePhoto(description?["geometrie"]) else { return nil }
         let point = geometrie.versApercu(x: af.x, y: af.y)
         guard (0...1).contains(point.x), (0...1).contains(point.y) else { return nil }
         return (point, af.avertissement)

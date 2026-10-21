@@ -13,7 +13,7 @@ extension ToolHandler {
     var analysisDefinitions: [JSONValue] {
         [
             tool("view_photo",
-                 "Montre la photo telle qu'elle est développée en ce moment (aperçu JPEG rendu par Lightroom avec les réglages actuels), avec ses données de prise de vue, ses réglages non nuls et des mesures objectives : luminosité L*, centiles, écrêtage (aussi par canal), contraste, dominante des tons neutres, netteté par zone et bruit ; et ce que voit Vision (visages et pupilles, qualité des visages, note esthétique, zone d'intérêt). À appeler avant de retoucher, puis après chaque passe. Mesures sur un JPEG sRGB (une couleur hors du sRGB y paraît écrêtée) ; en HDR (HDREditMode), le rendu SDR : le HDR ne se voit pas. « a_savoir » (calculs IA en attente) : le dire. « evaluation » : la note de Claude gardée pour la photo (pas encore évaluée, à vérifier, acceptée…). region = zoom à 100 % sur une zone (netteté et bruit en pleine résolution, taches) ; compare = avant/après côte à côte.",
+                 "Montre la photo telle qu'elle est développée en ce moment (aperçu JPEG rendu par Lightroom avec les réglages actuels), avec ses données de prise de vue, ses réglages non nuls et des mesures objectives : luminosité L*, centiles, écrêtage (aussi par canal), contraste, dominante des tons neutres, netteté par zone et bruit ; et ce que voit Vision (visages et pupilles, qualité des visages, note esthétique, zone d'intérêt). À appeler avant de retoucher, puis après chaque passe. Mesures sur un JPEG sRGB (une couleur hors du sRGB y paraît écrêtée) ; en HDR (HDREditMode), le rendu SDR : le HDR ne se voit pas. « a_savoir » (calculs IA en attente) : le dire. « evaluation » : la note de Claude gardée pour la photo (pas encore évaluée, à vérifier, acceptée…). « intention_boitier » (fichiers Fujifilm, lue dans l'original) : simulation de film, plage dynamique, tons clairs et foncés, compensation d'exposition et mode choisis à la prise de vue, avec sa « lecture » : la suivre sauf autre demande (une nuit voulue sombre reste sombre ; un RAW part de la simulation choisie). region = zoom à 100 % sur une zone (netteté et bruit en pleine résolution, taches) ; compare = avant/après côte à côte.",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("size", prop("integer", "Grand côté de l'aperçu en pixels (défaut \(Self.defaultPreviewSize), de \(Self.previewSizes.lowerBound) à \(Self.previewSizes.upperBound)).")),
@@ -89,6 +89,10 @@ extension ToolHandler {
 
         let result = try lightroom.send("apercu", params, timeout: region == nil ? 120 : 240)
         var image = try Self.readPreview(result["chemin"]?.string)
+        // Une seule ouverture de l'original (Fujifilm) pour le point de mise au point et
+        // l'intention de la prise de vue ; aucune pour un avant/après.
+        let boitier = compare == nil ? Self.lectureBoitier(result["photo"], lecteur: lecteurBoitier) : nil
+        let raw = result["echelle_temperature"]?.string?.hasPrefix("kelvins") == true
         var info = result.object ?? [:]
         info.removeValue(forKey: "chemin")
         info.removeValue(forKey: "chemin_avant")
@@ -101,7 +105,6 @@ extension ToolHandler {
             info["photo"] = .object(photo)
         }
         if let settings = result["reglages"]?.object {
-            let raw = result["echelle_temperature"]?.string?.hasPrefix("kelvins") == true
             info["reglages"] = Self.grouped(settings, onlyChanged: true, raw: raw)
         }
         Self.describeProcessVersion(&info)
@@ -123,7 +126,7 @@ extension ToolHandler {
             }
             // Sur un zoom aussi (demandé par Dany le 20 octobre 2026 : un zoom pour voir la mise au
             // point ne la montrait pas) : le point dans l'image entière, et dans la zone s'il y tombe.
-            if let af = Self.pointAF(result["photo"], lecteur: lecteurAF) {
+            if let af = Self.pointAF(boitier, description: result["photo"]) {
                 let local = CGPoint(x: (af.point.x - region.minX) / region.width, y: (af.point.y - region.minY) / region.height)
                 let dedans = (0...1).contains(local.x) && (0...1).contains(local.y)
                 var point = Self.pointAFJSON(af.point, avertissement: af.avertissement)
@@ -153,7 +156,7 @@ extension ToolHandler {
             // Le point de mise au point de l'appareil (Fujifilm) : toujours en chiffres, en carré
             // sur l'image avec af_point (pour noter) ou si l'utilisateur le veut en tout temps
             // (préférence du module). Les mesures sont prises avant le carré.
-            if let af = Self.pointAF(result["photo"], lecteur: lecteurAF) {
+            if let af = Self.pointAF(boitier, description: result["photo"]) {
                 var point = Self.pointAFJSON(af.point, avertissement: af.avertissement)
                 if let nettete = Detail.nettete(decodee, autour: af.point) { point["nettete"] = .number((nettete * 10).rounded() / 10) }
                 if args.bool("af_point") == true || afToujours, let marquee = PreviewImages.marquerPoint(decodee, af.point, manque: af.avertissement) {
@@ -162,8 +165,20 @@ extension ToolHandler {
                 }
                 info["point_af"] = .object(point)
             }
+            // L'intention de la prise de vue (Fujifilm), sur l'aperçu entier seulement.
+            if let intention = boitier?.intention {
+                info["intention_boitier"] = intention.json(raw: raw, profil: raw ? profilDuBoitier(intention, appareil: result["appareil"]) : nil,
+                                                           profilActuel: result["profil"]?.string)
+            }
         }
         return ToolResult(content: [Self.imageContent(image), .text(JSONCoding.pretty(.object(info)))])
+    }
+
+    /// Le profil de Lightroom de la simulation choisie au boîtier, pour l'appareil de la photo
+    /// (`appareil` de l'aperçu : marque, modèle) : profil DCP du catalogue ou Look installé ; nil
+    /// sinon (la lecture le dit).
+    func profilDuBoitier(_ intention: IntentionBoitier, appareil: JSONValue?) -> String? {
+        intention.profilLightroom(marque: appareil?["marque"]?.string, modele: appareil?["modele"]?.string, looks: lookProfiles)
     }
 
     /// Le point de mise au point dans l'image affichée entière (de 0 à 1), et l'avertissement de
