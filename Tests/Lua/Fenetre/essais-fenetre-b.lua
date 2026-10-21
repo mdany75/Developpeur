@@ -12,9 +12,12 @@
 -- et l'heure de chaque tour (sur des copies), la ligne d'un appel et « Pourquoi ? », la ligne
 -- d'actions (« ☆ Voir la note », « Leçon de la photo »), leurs clics, la bascule vers Leçon, le
 -- bandeau sur deux lignes et le tableau du carnet à 518 points ; essais-lecon.lua éprouve la carte
--- de l'onglet Leçon. Les cartes (lot B5) ont leurs propres essais. Ni Claude, ni quota, ni vraie
--- photo : les actions qui écriraient ou parleraient à Claude sont remplacées par des témoins le
--- temps d'un essai.
+-- de l'onglet Leçon. Enfin les cartes (lot B5) : sur leurs images, leurs hauteurs et ce qui y
+-- tient, l'inventaire de la carte Note (maquette) et des cartes Proposition et Aperçu, les passes,
+-- les étoiles, les drapeaux, Laisser, Accepter (jamais 5 ★ de Claude), « Voir à 100 % » (le zoom
+-- que Claude a pris pour noter) et la grille des critères. Ni Claude, ni quota, ni vraie photo :
+-- les actions qui écriraient ou parleraient à Claude sont remplacées par des témoins le temps d'un
+-- essai, et le registre des notes par un registre simulé.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
 local S = require 'Simulation'
@@ -377,12 +380,14 @@ essai('Cadre : la fenêtre construite fait 1 278 de large, chaque colonne au plu
             end
             vrai(v.args.background_color == nil or v.genre == 'picture', 'fond hors d\'un aplat : ' .. v.genre)
         end
-        for _, cle in ipairs({ 'fondVolet', 'fondContenu', 'fondDroite', 'filetVolet', 'filetDroite', 'filetEntete', 'filetBarre', 'fondApercu' }) do
+        for _, cle in ipairs({ 'fondVolet', 'fondContenu', 'fondDroite', 'filetVolet', 'filetDroite', 'filetEntete', 'filetBarre', 'fondApercu',
+            'filetPlafond' }) do
             vrai(aplats[C[cle]], 'aplat ' .. cle)
         end
         -- Le filet du volet, celui de la colonne droite, sous l'en-tête, au-dessus de la barre,
-        -- au-dessus de la saisie, et dans le volet sous Renommer… et Supprimer….
-        egal(6, filets, 'filets de 1 point')
+        -- au-dessus de la saisie, dans le volet sous Renommer… et Supprimer…, et au-dessus du plafond
+        -- de la carte Note (lot B5).
+        egal(7, filets, 'filets de 1 point')
         -- Le premier aplat de chaque colonne est à sa taille : volet 183, centre 630, droite 463, sur 766.
         for _, k in ipairs({ 1, 3, 5 }) do
             local aplat = cols[k].args[1]
@@ -414,7 +419,7 @@ essai('Briques : Fenetre.bouton carré (square_button), à icône (image_name, s
     egal(nil, icone.args.icone)
     egal(Chemins.ressource(Dispositions.image('trombone', Fenetre.apparence)), icone.args.image_name)
     local poussoir = Fenetre.bouton(f, { title = 'Accepter', action = function() end })
-    egal('push_button', poussoir.genre, 'sans `carre` : un push_button (les cartes, jusqu\'au lot B5)')
+    egal('push_button', poussoir.genre, 'sans `carre` : un push_button (les ▲ ▼ des cartes)')
 end)
 
 essai('Briques : Fenetre.calque, un texte vide de taille fixe qui annule l\'envoi automatique ; Vues.inactif, grisé, « À venir » ; Vues.aplat', function()
@@ -1399,7 +1404,7 @@ end
 essai('Polices : Metriques mesure la police du système (13, 12, 11, gras 13 et 12, titre 16) et Menlo 11 ; Fenetre.POLICES les suit', function()
     local attendues = {
         texte = { '<system>', 13 }, texte12 = { '<system>', 12 }, petit = { '<system>', 11 }, gras = { '<system/bold>', 13 },
-        gras12 = { '<system/bold>', 12 }, titre = { '<system/bold>', 16 }, mono = { 'Menlo', 11 },
+        gras12 = { '<system/bold>', 12 }, gras11 = { '<system/bold>', 11 }, titre = { '<system/bold>', 16 }, mono = { 'Menlo', 11 },
     }
     for cle, a in pairs(attendues) do
         local m = Metriques[cle]
@@ -1417,6 +1422,11 @@ essai('Polices : Metriques mesure la police du système (13, 12, 11, gras 13 et 
     end
     egal(Fenetre.POLICES.systeme12.name, Fenetre.POLICES.texte12.name)
     egal(Fenetre.POLICES.systeme12.size, Fenetre.POLICES.texte12.size)
+    -- Le gras 11 (en-têtes de jour, passe en cours de la carte Note) est mesuré depuis le lot B5.
+    egal(Fenetre.POLICES.gras11.name, Fenetre.POLICES.systemeGras11.name)
+    egal(11, Fenetre.POLICES.systemeGras11.size)
+    vrai(Fil.largeur('Monter à 4 ?', 'gras11') < Fil.largeur('Monter à 4 ?', 'gras12'), 'gras 11 sous gras 12')
+    vrai(Fil.largeur('Monter à 4 ?', 'gras11') > Fil.largeur('Monter à 4 ?', 'petit'), 'gras 11 plus large que le petit')
     egal(1, S.ENCRE_SOUS_CHASSE.min)
     -- La chasse du système en 12 est plus étroite qu'en 13, le gras plus large.
     vrai(Fil.largeur('Leçon de la photo', 'texte12') < Fil.largeur('Leçon de la photo', 'texte'), '12 sous 13')
@@ -1826,10 +1836,30 @@ end)
 essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaque message de la fenêtre y tient en entier, les autres finissent par « … », l'infobulle les donne", function()
     egal(2, Fenetre.LIGNES_BANDEAU)
     local place = D.bandeau - Fil.MARGE
-    -- Les messages de la fenêtre (mesurés par Metriques, en petit).
+    -- Les messages de la fenêtre (mesurés par Metriques, en petit), ceux de la carte Note (lot B5),
+    -- et les refus du moteur, provoqués ici : Claude au travail, Je le fais sans photo active, une
+    -- ancienne séance de notation (raccourcis au lot B5 : ils finissaient par « … »).
+    local refus = {}
+    local travaille, courante, conversations = Moteur.travaille, Moteur.courante, Moteur.conversations
+    local ok, erreur = pcall(function()
+        Moteur.travaille = true
+        refus[#refus + 1] = select(2, Moteur.envoyer('Bonjour'))
+        Moteur.travaille = false
+        S.photoActive, S.selection = nil, {}
+        Moteur.nouvelle()
+        refus[#refus + 1] = select(2, Moteur.jeLeFais())
+        local seance = Conversation.nouvelle()
+        seance.genre = 'notation'
+        Moteur.conversations = { seance }
+        refus[#refus + 1] = select(2, Moteur.ouvrir(seance.id))
+    end)
+    Moteur.travaille, Moteur.courante, Moteur.conversations = travaille, courante, conversations
+    assert(ok, erreur)
+    egal("Claude travaille : attendez la fin. | Aucune photo active : choisissez-la dans Lightroom. | "
+        .. "Une ancienne séance de notation ne s'ouvre plus.", table.concat(refus, ' | '), 'les refus du moteur, raccourcis')
     local messages = { Fenetre.CLAUDE_TRAVAILLE, Fenetre.CHOISIR_CONVERSATION, Fenetre.NOTE_AUTRE_PHOTO, Fenetre.PAS_D_IMAGE,
         Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE.proposer .. '.', Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE.appliquer .. '.',
-        "Écrivez une demande avant d'envoyer." }
+        "Écrivez une demande avant d'envoyer.", Fenetre.NOTE_EN_COURS, Fenetre.AUCUNE_PHOTO, Fenetre.PAS_CINQ, refus[1], refus[2], refus[3] }
     for _, m in ipairs(messages) do
         local montre = Fenetre.texteBandeau(m, D.bandeau)
         egal(m, (montre:gsub('\n', ' ')), 'en entier : ' .. m)
@@ -1839,8 +1869,8 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
             vrai(Fil.largeur(ligne, 'petit') <= place, string.format('%s : %.0f pour %d', ligne, Fil.largeur(ligne, 'petit'), place))
         end
     end
-    -- Plus long (un refus du moteur, une aide) : deux lignes, la seconde finie par « … ».
-    local long = "Aucune photo active : choisissez dans Lightroom la photo à retoucher vous-même, puis cliquez « Je le fais »."
+    -- Plus long (une erreur venue d'ailleurs, une aide) : deux lignes, la seconde finie par « … ».
+    local long = "La note n'a pas été posée : la photo DSCF4961.RAF n'est plus celle que Claude a notée, sa proposition est retirée."
     local montre = Fenetre.texteBandeau(long, D.bandeau)
     egal(1, select(2, montre:gsub('\n', '')), 'deux lignes')
     egal('…', montre:sub(-#'…'))
@@ -1921,6 +1951,849 @@ essai('Carnet : le tableau, en Menlo, aligné et dans 518 points ; la page dépa
     local _, coupe = tableau[2].texte:find('…', 1, true)
     vrai(Texte.longueur(tableau[2].texte:sub(1, coupe)) >= Fil.LIBELLE_CARNET_MIN, 'libellé lisible')
 end)
+-- Cartes (lot B5) ------------------------------------------------------------------------------------
+
+local Images = require 'Images'
+local Stockage = require 'Stockage'
+
+local INFOBULLE_ACCEPTER_NOTE = "Poser la note proposée dans Lightroom (sans Claude ni quota)"
+local INFOBULLE_ACCEPTER_PROPOSITION = "Appliquer la proposition : la photo ne change qu'à ce clic"
+
+-- La colonne superposée des variantes des onglets (Aperçu, Proposition, Note, Leçon), et chacune.
+local function variantes(contenu)
+    for _, v in ipairs(vues(contenu)) do
+        if v.args.place == 'overlapping' and #v.args == #D.onglets then
+            local toutes = true
+            for _, e in ipairs(v.args) do
+                toutes = toutes and type(e) == 'table' and e.genre == 'column' and e.args.width == D.interieur
+            end
+            if toutes then
+                local r = {}
+                for i, onglet in ipairs(D.onglets) do
+                    r[onglet.valeur] = v.args[i]
+                end
+                return r
+            end
+        end
+    end
+    error('variantes des onglets introuvables', 2)
+end
+
+-- La colonne superposée posée sur cette image de carte (Vues.lecon, Vues.proposition…).
+local function carteSur(contenu, nom)
+    for _, v in ipairs(vues(contenu)) do
+        if v.genre == 'column' and v.args.place == 'overlapping' then
+            local premier = v.args[1]
+            if type(premier) == 'table' and premier.genre == 'picture' and premier.args.value == Fenetre.image(nom) then
+                return v
+            end
+        end
+    end
+    error('carte introuvable : ' .. nom, 2)
+end
+
+-- Le registre des notes, simulé le temps de fn : une proposition (ou nil) pour la photo active, et
+-- les appels reçus par Notation.poser et Notation.decider.
+local function avecRegistre(proposition, fn)
+    local recus = { poses = {}, decisions = {} }
+    local prop = proposition
+    avec(Notation, 'proposition', function(id)
+        if prop and tostring(prop.photo) == tostring(id) then
+            local copie = {}
+            for k, v in pairs(prop) do
+                copie[k] = v
+            end
+            return copie
+        end
+        return nil
+    end, function()
+        avec(Notation, 'poser', function(liste)
+            recus.poses[#recus.poses + 1] = liste
+            return { ok = true, resultats = {} }
+        end, function()
+            avec(Notation, 'decider', function(id, etat)
+                recus.decisions[#recus.decisions + 1] = { photo = id, etat = etat }
+                if prop then
+                    prop.etat = etat
+                end
+                return true
+            end, function()
+                fn(recus, function(nouvelle) prop = nouvelle end)
+            end)
+        end)
+    end)
+end
+
+-- Lance les tâches parties depuis `depuis`, dans l'ordre (l'image enfoncée d'un bouton bleu
+-- comprise).
+local function lancerDepuis(depuis)
+    local i = depuis + 1
+    while i <= #S.taches do
+        local t = S.taches[i]
+        S.taches[i] = function() end
+        t()
+        i = i + 1
+    end
+end
+
+-- Une photo active notée dans Lightroom (note, pickStatus : 1 retenue, −1 rejetée).
+local function photoNotee(id, nom, note, pick)
+    local photo = photoActive(id, nom)
+    photo.note, photo.pickStatus = note, pick
+    return photo
+end
+
+local PROPOSITION = { photo = 4961, fichier = 'DSCF4961.RAF', note = 3, drapeau = 'aucun', etat = 'a_verifier', passe = 2, plafond = 3,
+    raison = "Tient seule devant quelqu'un qui ne connaît ni les gens ni le lieu.", le = 1000,
+    criteres = { impact = "Moyen. Le ciel d'orage arrête l'œil ; rien au premier plan ne le retient.",
+        qualites = "Bonnes. Sujet clair, lumière d'orage, horizon droit ; arbres lourds à droite.",
+        plancher = "Netteté 41 · nette ; bruit 0,4 · faible ; ombres bouchées 1,9 % ; aucun visage.",
+        finition = "Pour 5 ★ seulement, que vous seul posez." } }
+
+local function copieProposition(plus)
+    local p = {}
+    for k, v in pairs(PROPOSITION) do
+        p[k] = v
+    end
+    for k, v in pairs(plus or {}) do
+        p[k] = v
+    end
+    return p
+end
+
+essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leur contenu tient, chaque onglet sous l\'aperçu (431) ; textes à 379 en 12 points', function()
+    egal(431, D.placeCartes, 'la place sous l\'aperçu et sa rangée, jusqu\'au bas du contenu du panneau')
+    egal(379, D.carte)
+    egal(13, D.margeCarte)
+    for _, cle in ipairs({ 'largeurNote', 'largeurProposition', 'largeurEtape', 'largeurLecon' }) do
+        egal(D.carte, D[cle], cle)
+    end
+    -- Les cartes en 12 points ; la note et la leçon gardent leurs passages balisés (gras 12).
+    for cle, carte in pairs(Fenetre.CARTES) do
+        egal('texte12', carte.police, 'CARTES.' .. cle)
+    end
+    egal('gras12', Fenetre.CARTES.note.emphase)
+    egal('gras12', Fenetre.CARTES.lecon.emphase)
+    egal(nil, Fenetre.CARTES.proposition.emphase)
+    egal(D.criteres + 1, Fenetre.CARTES.note.lignes(D), 'la grille des critères : criteres + 1 lignes')
+    -- L'étiquette la plus large d'un critère tient dans sa colonne ; la grille, dans la carte.
+    for _, critere in ipairs(Fenetre.CRITERES) do
+        vrai(Fenetre.largeurLibelle(critere.titre, 'gras12') <= D.etiquetteCritere, critere.titre)
+    end
+    egal(D.carte, D.etiquetteCritere + D.ecartCritere + D.texteCritere)
+    vrai(Fenetre.largeurLibelle('Votre note :', 'texte12') <= D.etiquetteNote, 'Votre note :')
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.nouvelle()
+    ouvrirFenetre(function(p, contenu)
+        Fenetre.rafraichir()
+        local v = variantes(contenu)
+        for valeur, colonne in pairs(v) do
+            vrai(hauteur(colonne) <= D.placeCartes, string.format('onglet %s : %.1f points pour %d', valeur, hauteur(colonne), D.placeCartes))
+        end
+        -- Chaque carte : une colonne superposée de la largeur intérieure, à la hauteur de son image,
+        -- son contenu à 13 du bord et 12 du haut (comme Vues.lecon).
+        for _, nom in ipairs({ 'carte-note', 'carte-proposition', 'carte-etape', 'carte-lecon' }) do
+            local carte = carteSur(contenu, nom)
+            egal(Dispositions.IMAGES[nom].hauteur, carte.args.height, nom .. ' : la hauteur de son image')
+            egal(D.interieur, carte.args.width, nom)
+            local dedans = carte.args[2]
+            egal(D.margeCarte, dedans.args.margin_left, nom .. ' : marge de gauche')
+            egal(12, dedans.args.margin_top, nom .. ' : marge du haut')
+            vrai(hauteur(carte) <= carte.args.height, nom .. ' : son contenu y tient')
+        end
+        -- Les textes des cartes, à la largeur de leur intérieur, en 12 points.
+        for _, cle in ipairs({ 'propositionTexte', 'etapeTexte', 'leconTexte' }) do
+            local t = liee(contenu, 'static_text', cle)
+            egal(D.carte, t.args.width, cle)
+            egal(Fenetre.POLICES.texte12, t.args.font, cle)
+        end
+        egal(D.propLignes, liee(contenu, 'static_text', 'propositionTexte').args.height_in_lines)
+        egal(D.etapeLignes, liee(contenu, 'static_text', 'etapeTexte').args.height_in_lines)
+        -- La grille de la carte Note : chaque texte en 12, le verdict en gras 12 de même taille (D4).
+        local textes = 0
+        for _, x in ipairs(vues(contenu)) do
+            local t = x.args.title
+            if x.genre == 'static_text' and type(t) == 'table' and type(t.key) == 'string' and t.key:match('^nt%d+$') then
+                textes = textes + 1
+                egal(Fenetre.POLICES.texte12, x.args.font)
+                egal(Fenetre.POLICES.gras12, x.args.emphasis_font)
+                vrai(x.args.width == D.carte or x.args.width == D.texteCritere, 'largeur : ' .. tostring(x.args.width))
+            end
+        end
+        egal((D.criteres + 1) * (2 + #Fenetre.TEINTES_NOTE), textes, 'pleine largeur, une par teinte de l\'état, et à côté d\'une étiquette')
+        -- L'estimateur refuse un contenu qui dépasse la hauteur donnée.
+        local f = S.modules.LrView.osFactory()
+        refuse(function() hauteur(f:column { height = 20, f:static_text { title = 'a', height_in_lines = 3 } }) end, 'column de hauteur 20')
+    end)
+end)
+
+essai('Inventaire de la carte Note (maquette) : chaque élément, son genre, sa clé et son état ; « ? À vérifier » grisé dans tous les états ; ni Noter, ni Évaluer, ni Modèle', function()
+    local photo = photoNotee(4961, 'DSCF4961.RAF', 0, 0)
+    Moteur.nouvelle()
+    avecRegistre(copieProposition(), function()
+        ouvrirFenetre(function(p, contenu)
+            Fenetre.rafraichir()
+            local note = variantes(contenu).notation
+            local C = Fenetre.COULEURS
+            -- Les étiquettes de la grille, en gris 12, alignées à droite sur leur colonne.
+            for _, titre in ipairs({ 'Passes :', 'Votre note :', 'Drapeau :' }) do
+                local e = parTitre(note, titre, 'static_text')
+                egal('right', e.args.alignment, titre)
+                egal(D.etiquetteNote, e.args.width, titre)
+                egal(C.gris, e.args.text_color, titre)
+                egal(12, e.args.font.size, titre)
+                vrai(S.montreeDansFenetre(e), titre)
+            end
+            -- Les passes : leurs libellés, sans clic ; la coche et le chevron en images.
+            for _, libelle in ipairs(Fenetre.PASSES) do
+                local l = parTitre(note, libelle, 'static_text')
+                egal(nil, l.args.mouse_down, libelle .. ' : sans clic')
+            end
+            egal('« Rejeter ? », « 3 ★ ou non ? », « Monter à 4 ? », « 5 ★ ? (vous) »', '« ' .. table.concat(Fenetre.PASSES, ' », « ') .. ' »')
+            -- Les cinq étoiles de « Votre note » : des calques de 30 sur etoile24.
+            local calques = 0
+            for _, x in ipairs(vues(note)) do
+                if x.genre == 'static_text' and Fenetre.parCalque(x.args.mouse_down) and type(x.args.tooltip) == 'string'
+                    and x.args.tooltip:find('★ dans Lightroom', 1, true) then
+                    calques = calques + 1
+                    egal(D.etoile, x.args.width)
+                    egal(D.etoile, x.args.height)
+                end
+            end
+            egal(5, calques, 'cinq étoiles cliquables')
+            -- La note posée, à droite des étoiles.
+            egal('Pas encore jugée', p.notePoseeTitre)
+            egal('0 ★ dans le catalogue', p.notePoseeSous)
+            egal(Fenetre.POLICES.gras12, liee(note, 'static_text', 'notePoseeTitre').args.font)
+            -- Les drapeaux : deux carrés actifs, « ? À vérifier » posé grisé.
+            local retenir, rejeter, aVerifier = parTitre(note, '⚑ Retenir'), parTitre(note, '⊗ Rejeter'), parTitre(note, '? À vérifier')
+            for _, b in ipairs({ retenir, rejeter, aVerifier }) do
+                egal('square_button', b.genre, b.args.title)
+                egal(24, S.bezelVisible(b), b.args.title .. ' : bezel de 24 (maquette)')
+            end
+            egal('peutChangerNote', retenir.args.enabled.key)
+            egal('peutChangerNote', rejeter.args.enabled.key)
+            -- « Claude propose », ses étoiles en images et l'ordre des critères.
+            vrai(parTitre(note, 'Claude propose', 'static_text'), 'Claude propose')
+            vrai(parTitre(note, 'critères du plus lourd au plus léger', 'static_text'), "l'ordre des critères")
+            egal(3, p.noteClaude)
+            -- La carte des critères, le filet et la ligne du plafond.
+            vrai(carteSur(contenu, 'carte-note'), 'carte-note')
+            egal(true, p.aPlafond)
+            local plafond = liee(note, 'static_text', 'plafondTexte')
+            egal(C.ambre, plafond.args.emphasis_color, 'le plafond en ambre')
+            egal(Fenetre.POLICES.gras12, plafond.args.emphasis_font)
+            vrai(S.montreeDansFenetre(plafond))
+            -- La rangée du bas : ▲ ▼, Laisser, Changer…, Accepter (bleu).
+            local laisser = liee(note, 'square_button', 'titreLaisser')
+            egal('peutAccepterNote', laisser.args.enabled.key)
+            egal(26, S.bezelVisible(laisser))
+            egal('Laisser à 0 ★', p.titreLaisser)
+            local changer = parTitre(note, 'Changer…')
+            egal('peutChangerNote', changer.args.enabled.key)
+            local accepter = parInfobulle(note, INFOBULLE_ACCEPTER_NOTE)
+            vrai(Fenetre.parCalque(accepter.args.mouse_down), 'Accepter : un calque sur le bouton bleu')
+            egal('Accepter 3 ★', p.titreAccepterNote)
+            local titreBlanc = liee(note, 'static_text', 'titreAccepterNote')
+            egal(C.blanc, titreBlanc.args.text_color)
+            egal(false, p.bleuEnfonceAccepterNote, "sa clé d'enfoncement a une valeur avant l'ouverture")
+            for _, cle in ipairs({ 'noteMonte', 'noteDescend' }) do
+                local b
+                for _, x in ipairs(vues(note)) do
+                    if S.BOUTONS[x.genre] and type(x.args.enabled) == 'table' and x.args.enabled.key == cle then
+                        b = x
+                    end
+                end
+                vrai(b, cle)
+            end
+            -- « ? À vérifier » grisé dans tous les états : Claude libre ou au travail, une proposition
+            -- à décider, décidée, ou aucune ; son clic est refusé.
+            local etats = {
+                function() Moteur.travaille = false end,
+                function() Moteur.travaille = true end,
+                function() Moteur.travaille = false; photo.note = 3 end,
+                function() photoActive(4970, 'DSCF4970.RAF') end,
+            }
+            for k, poserEtat in ipairs(etats) do
+                poserEtat()
+                Fenetre.majPhoto()
+                Fenetre.rafraichir()
+                egal(false, valeur(aVerifier, 'enabled', p), 'état ' .. k .. ' : grisé')
+                egal(Fenetre.A_VENIR, aVerifier.args.tooltip)
+                refuse(function() S.cliquer(aVerifier) end, 'inactive', 'état ' .. k .. ' : clic refusé')
+            end
+            Moteur.travaille = false
+            -- Ni Noter, ni Évaluer, ni Modèle, sous aucun titre (décisions de Dany).
+            for _, x in ipairs(vues(contenu)) do
+                local t = tostring(valeur(x, 'title', p) or '')
+                vrai(not t:find('Noter', 1, true) and not t:find('Évaluer', 1, true) and not t:find('Modèle', 1, true), x.genre .. ' « ' .. t .. ' »')
+            end
+            egal(nil, Fenetre.noter)
+            egal(nil, Fenetre.verifierNote)
+            egal(0, #S.refusDeLaFenetre(), 'aucun refus de texte riche')
+        end)
+    end)
+end)
+
+essai('Inventaire des cartes Proposition et Aperçu (étape) : titres, textes, carrés, Accepter en bleu ; chaque bouton à sa clé', function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.nouvelle()
+    ouvrirFenetre(function(p, contenu)
+        Fenetre.rafraichir()
+        local v = variantes(contenu)
+        local proposition, apercu = v.proposition, v.apercu
+        vrai(parTitre(proposition, 'Proposition de Claude', 'static_text'), 'titre de la proposition')
+        local cles = {}
+        for _, x in ipairs(vues(proposition)) do
+            if S.BOUTONS[x.genre] then
+                local t = x.args.title
+                cles[#cles + 1] = (type(t) == 'table' and ('[' .. t.key .. ']') or t) .. '=' .. x.args.enabled.key
+            end
+        end
+        egal('▲=propositionMonte ▼=propositionDescend Refuser=enAttente Ajuster…=enAttente [titreJeLeFais]=peutJeLeFais', table.concat(cles, ' '))
+        local accepter = parInfobulle(proposition, INFOBULLE_ACCEPTER_PROPOSITION)
+        vrai(Fenetre.parCalque(accepter.args.mouse_down), 'Accepter de la proposition : un calque')
+        vrai(liee(proposition, 'static_text', 'exerciceEtat'), "l'état de l'exercice")
+        -- Accepter inactif (aucune proposition) : son calque ne fait rien.
+        egal(false, p.enAttente)
+        local reponses = {}
+        avec(Fenetre, 'repondreProposition', function(a) reponses[#reponses + 1] = a end, function()
+            p.onglet = 'proposition'
+            S.cliquer(accepter)
+            egal(0, #reponses, 'inactif : rien')
+            p.enAttente = true
+            local taches = #S.taches
+            S.cliquer(accepter)
+            S.cliquer(parTitre(proposition, 'Refuser'))
+            egal('true false', tostring(reponses[1]) .. ' ' .. tostring(reponses[2]), 'Accepter, puis Refuser')
+            lancerDepuis(taches)
+            p.enAttente = false
+        end)
+        -- La carte de l'étape : titre (« Pourquoi ? » sans étape), sous-titre, texte, ◀ ▶, Voir
+        -- l'avant, Détail… en carrés de 22, ▲ ▼.
+        egal('Pourquoi ?', p.etapeTitre)
+        cles = {}
+        for _, x in ipairs(vues(apercu)) do
+            if S.BOUTONS[x.genre] then
+                local t = x.args.title
+                cles[#cles + 1] = (type(t) == 'table' and ('[' .. t.key .. ']') or t) .. '=' .. x.args.enabled.key
+                if x.genre == 'square_button' then
+                    egal(22, S.bezelVisible(x))
+                end
+            end
+        end
+        egal('◀=etapePrecedente ▶=etapeSuivante [titreBascule]=etapeAImages Détail…=etapeADetail ▲=etapeMonte ▼=etapeDescend', table.concat(cles, ' '))
+        p.onglet = 'notation'
+    end)
+end)
+
+essai('Passes : la coche devant les passes faites, la passe en cours en gras noir, les autres en gris ; la rangée tient dans le panneau', function()
+    photoNotee(4961, 'DSCF4961.RAF', 0, 0)
+    Moteur.nouvelle()
+    egal('a_venir faite en_cours a_venir', table.concat({ Fenetre.etatPasse(1, 0), Fenetre.etatPasse(1, 2), Fenetre.etatPasse(2, 2),
+        Fenetre.etatPasse(3, 2) }, ' '))
+    egal(3, Fenetre.PASSE_MAX_CLAUDE, 'la 4e passe est à Dany')
+    local prop = copieProposition()
+    avecRegistre(prop, function(_, changer)
+        ouvrirFenetre(function(p, contenu)
+            local note = variantes(contenu).notation
+            local C = Fenetre.COULEURS
+            -- Ce que montre la rangée des passes : « ✓libellé » (faite), « *libellé* » (en cours),
+            -- « libellé » (à venir).
+            local function montre()
+                local r = {}
+                for _, libelle in ipairs(Fenetre.PASSES) do
+                    local vu
+                    for _, x in ipairs(vues(note)) do
+                        if x.genre == 'static_text' and x.args.title == libelle and S.montreeDansFenetre(x) then
+                            vrai(vu == nil, libelle .. ' : une seule variante montrée')
+                            if x.args.font.name == '<system/bold>' then
+                                egal(C.texte, x.args.text_color)
+                                vu = '*' .. libelle .. '*'
+                            else
+                                egal(C.gris, x.args.text_color)
+                                local rangee = rangeeDe(note, x)
+                                local coche = rangee.args[1]
+                                vu = (coche.genre == 'picture' and S.montreeDansFenetre(coche)) and ('✓' .. libelle) or libelle
+                            end
+                        end
+                    end
+                    r[#r + 1] = vu or '?'
+                end
+                return table.concat(r, ' | ')
+            end
+            for passe, attendu in pairs({
+                [0] = 'Rejeter ? | 3 ★ ou non ? | Monter à 4 ? | 5 ★ ? (vous)',
+                [1] = '*Rejeter ?* | 3 ★ ou non ? | Monter à 4 ? | 5 ★ ? (vous)',
+                [2] = '✓Rejeter ? | *3 ★ ou non ?* | Monter à 4 ? | 5 ★ ? (vous)',
+                [3] = '✓Rejeter ? | ✓3 ★ ou non ? | *Monter à 4 ?* | 5 ★ ? (vous)',
+                -- La 4e passe est à Dany : Claude n'y va pas (la carte montre au plus la 3e).
+                [4] = '✓Rejeter ? | ✓3 ★ ou non ? | *Monter à 4 ?* | 5 ★ ? (vous)',
+            }) do
+                local x = copieProposition()
+                x.passe = passe > 0 and passe or nil
+                changer(x)
+                Fenetre.rafraichirNotation()
+                egal(attendu, montre(), 'passe ' .. passe)
+            end
+            changer(nil)
+            Fenetre.rafraichirNotation()
+            egal('Rejeter ? | 3 ★ ou non ? | Monter à 4 ? | 5 ★ ? (vous)', montre(), 'sans proposition')
+            -- La rangée tient dans le panneau : étiquette, écart, puis les passes à leurs largeurs.
+            local passes = rangeeDe(note, parTitre(note, 'Passes :', 'static_text'))
+            vrai(largeurDonnee(passes) <= D.interieur, string.format('passes : %d points pour %d', largeurDonnee(passes), D.interieur))
+            -- La rangée « Votre note » aussi.
+            local votre = rangeeDe(note, parTitre(note, 'Votre note :', 'static_text'))
+            egal(D.interieur, largeurDonnee(votre), 'Votre note : la largeur du panneau')
+            -- Chaque libellé tient dans sa variante (mesuré en gras 11 pour la passe en cours).
+            for _, x in ipairs(vues(note)) do
+                for _, libelle in ipairs(Fenetre.PASSES) do
+                    if x.genre == 'static_text' and x.args.title == libelle then
+                        local cle = x.args.font.name == '<system/bold>' and 'gras11' or 'petit'
+                        vrai(Fil.largeur(libelle, cle) <= x.args.width, libelle .. ' en ' .. cle)
+                    end
+                end
+            end
+        end)
+    end)
+end)
+
+essai('Étoiles de « Votre note » : la k-e pose k ★ (5 comprises) par Notation.poser, sur la note posée la retire ; refusées pendant le travail, pendant une note en cours, sans photo active', function()
+    local photo = photoNotee(4961, 'DSCF4961.RAF', 3, 0)
+    Moteur.nouvelle()
+    avecRegistre(copieProposition(), function(recus)
+        ouvrirFenetre(function(p, contenu)
+            Fenetre.rafraichir()
+            egal(3, p.noteCatalogue)
+            egal('Tient seule', p.notePoseeTitre)
+            egal('3 ★ dans le catalogue', p.notePoseeSous)
+            local note = variantes(contenu).notation
+            -- Les étoiles pleines jusqu'à la note posée.
+            local pleines = 0
+            for _, x in ipairs(vues(note)) do
+                if x.genre == 'picture' and x.args.value == Fenetre.image('etoile24-pleine') and S.montreeDansFenetre(x) then
+                    pleines = pleines + 1
+                end
+            end
+            egal(3, pleines, 'trois étoiles pleines')
+            local function etoile(k)
+                for _, x in ipairs(vues(note)) do
+                    if x.genre == 'static_text' and x.args.tooltip and x.args.tooltip:find('^Poser ' .. k .. ' ★') then
+                        return x
+                    end
+                end
+                error('étoile ' .. k .. ' introuvable', 2)
+            end
+            local champ = liee(contenu, 'edit_field', 'saisie')
+            local function cliquer(k)
+                local taches = #S.taches
+                S.taper(champ, 'texte tapé')
+                S.cliquer(etoile(k))
+                egal(nil, Fenetre.envoiAuto, "le clic d'une étoile n'envoie pas la demande")
+                p.saisie = ''
+                lancerDepuis(taches)
+            end
+            cliquer(5)
+            cliquer(1)
+            cliquer(3)
+            local poses = {}
+            for _, liste in ipairs(recus.poses) do
+                egal(1, #liste)
+                egal(4961, liste[1].photo)
+                egal(nil, liste[1].drapeau, 'les étoiles ne touchent pas le drapeau')
+                egal(Fenetre.RAISON_NOTE, liste[1].raison)
+                poses[#poses + 1] = tostring(liste[1].note)
+            end
+            egal('5 1 0', table.concat(poses, ' '), '5 ★ par Dany ; 1 ★ ; la 3e sur 3 ★ posées : 0')
+            egal(0, #recus.decisions)
+            -- Refusées pendant le travail (le calque n'a pas d'enabled : le gestionnaire refuse), et
+            -- le bandeau le dit.
+            local avant = #recus.poses
+            Moteur.travaille = true
+            local taches = #S.taches
+            S.cliquer(etoile(2))
+            egal(taches, #S.taches, 'aucune tâche')
+            egal(Fenetre.CLAUDE_TRAVAILLE, p.message)
+            Moteur.travaille = false
+            p.message = ''
+            -- Pendant une note en cours.
+            Fenetre.noteEnCours = true
+            S.cliquer(etoile(2))
+            egal(Fenetre.NOTE_EN_COURS, p.message)
+            Fenetre.noteEnCours = false
+            p.message = ''
+            -- Une note demandée juste avant que Claude se mette au travail : la tâche la refuse.
+            S.cliquer(etoile(2))
+            Moteur.travaille = true
+            lancerDepuis(taches)
+            Moteur.travaille = false
+            egal(avant, #recus.poses, 'rien posé')
+            egal(Fenetre.CLAUDE_TRAVAILLE, p.message)
+            p.message = ''
+            -- Sans photo active.
+            S.photoActive, S.selection = nil, {}
+            Fenetre.majPhoto()
+            egal(false, Fenetre.poserEtoile(2))
+            egal(Fenetre.AUCUNE_PHOTO, p.message)
+            p.message = ''
+            photo = photoNotee(4961, 'DSCF4961.RAF', 3, 0)
+            Fenetre.majPhoto()
+        end)
+    end)
+end)
+
+essai('Drapeaux : Retenir et Rejeter posent leur drapeau (ou le retirent) par Notation.poser, sans toucher les étoiles ; grisés et refusés pendant le travail', function()
+    local photo = photoNotee(4961, 'DSCF4961.RAF', 2, 0)
+    Moteur.nouvelle()
+    avecRegistre(copieProposition(), function(recus)
+        ouvrirFenetre(function(p, contenu)
+            Fenetre.rafraichir()
+            local note = variantes(contenu).notation
+            local retenir, rejeter = parTitre(note, '⚑ Retenir'), parTitre(note, '⊗ Rejeter')
+            local function drapeaux()
+                local r = {}
+                for _, liste in ipairs(recus.poses) do
+                    egal(nil, liste[1].note, 'un drapeau ne touche pas les étoiles')
+                    egal(Fenetre.RAISON_DRAPEAU, liste[1].raison)
+                    r[#r + 1] = liste[1].drapeau
+                end
+                return table.concat(r, ' ')
+            end
+            local taches = #S.taches
+            S.cliquer(retenir)
+            S.cliquer(rejeter)
+            lancerDepuis(taches)
+            egal('retenue rejetee', drapeaux())
+            -- Déjà retenue : Retenir retire le drapeau ; déjà rejetée : Rejeter aussi.
+            photo.pickStatus = 1
+            Fenetre.majPhoto()
+            egal('2 ★ · drapeau Retenue', p.notePoseeSous)
+            S.cliquer(retenir)
+            photo.pickStatus = -1
+            Fenetre.majPhoto()
+            egal('Rejetée', p.notePoseeTitre)
+            egal('2 ★ · drapeau Rejeter', p.notePoseeSous)
+            egal('Laisser rejetée', p.titreLaisser)
+            S.cliquer(rejeter)
+            lancerDepuis(taches)
+            egal('retenue rejetee aucun aucun', drapeaux())
+            -- Pendant le travail : grisés, le clic refusé ; appelé quand même, refusé et dit.
+            Moteur.travaille = true
+            Fenetre.rafraichirNotation()
+            egal(false, valeur(retenir, 'enabled', p))
+            refuse(function() S.cliquer(rejeter) end, 'inactive', 'grisé pendant le travail')
+            egal(false, Fenetre.poserDrapeau('retenue'))
+            egal(Fenetre.CLAUDE_TRAVAILLE, p.message)
+            Moteur.travaille = false
+            p.message = ''
+            Fenetre.noteEnCours = true
+            egal(false, Fenetre.poserDrapeau('retenue'))
+            egal(Fenetre.NOTE_EN_COURS, p.message)
+            Fenetre.noteEnCours = false
+            p.message = ''
+            egal(4, #recus.poses)
+            Fenetre.rafraichirNotation()
+        end)
+    end)
+end)
+
+essai('Laisser à N ★ : Notation.decider(photo, « ecartee »), rien dans le catalogue ; grisé quand rien n\'est à décider ; refusé pendant le travail', function()
+    photoNotee(4961, 'DSCF4961.RAF', 2, 0)
+    Moteur.nouvelle()
+    avecRegistre(copieProposition(), function(recus)
+        ouvrirFenetre(function(p, contenu)
+            Fenetre.rafraichir()
+            local note = variantes(contenu).notation
+            local laisser = liee(note, 'square_button', 'titreLaisser')
+            egal('Laisser à 2 ★', p.titreLaisser)
+            egal(true, p.peutAccepterNote)
+            -- Refusé pendant le travail (grisé, et la fonction le dit).
+            Moteur.travaille = true
+            Fenetre.rafraichirNotation()
+            refuse(function() S.cliquer(laisser) end, 'inactive', 'grisé pendant le travail')
+            egal(false, Fenetre.laisserNote())
+            egal(Fenetre.CLAUDE_TRAVAILLE, p.message)
+            Moteur.travaille = false
+            p.message = ''
+            Fenetre.rafraichirNotation()
+            local taches = #S.taches
+            S.cliquer(laisser)
+            lancerDepuis(taches)
+            egal(1, #recus.decisions)
+            egal(4961, recus.decisions[1].photo)
+            egal('ecartee', recus.decisions[1].etat)
+            egal(0, #recus.poses, 'rien dans le catalogue')
+            -- Écartée : plus rien à décider, Laisser et Accepter grisés.
+            Fenetre.rafraichirNotation()
+            egal(false, p.peutAccepterNote)
+            egal('gris', p.notationCouleur)
+            vrai(p.nt1:find('<EM>Passe 2 · écartée.</EM>', 1, true), p.nt1)
+            refuse(function() S.cliquer(laisser) end, 'inactive', 'plus rien à laisser')
+            -- Une note en cours : la tâche ne décide rien.
+            Fenetre.noteEnCours = true
+            Fenetre.ecarterNote(4961)
+            Fenetre.noteEnCours = false
+            egal(1, #recus.decisions)
+        end)
+    end)
+end)
+
+essai('Accepter N ★ : son calque pose la proposition telle quelle ; inactif, il ne fait rien ; « Accepter le rejet » ; jamais « Accepter 5 ★ »', function()
+    photoNotee(4961, 'DSCF4961.RAF', 0, 0)
+    Moteur.nouvelle()
+    avecRegistre(copieProposition(), function(recus, changer)
+        ouvrirFenetre(function(p, contenu)
+            Fenetre.rafraichir()
+            local note = variantes(contenu).notation
+            local accepter = parInfobulle(note, INFOBULLE_ACCEPTER_NOTE)
+            egal('Accepter 3 ★', p.titreAccepterNote)
+            local taches = #S.taches
+            S.cliquer(accepter)
+            lancerDepuis(taches)
+            egal(1, #recus.poses)
+            egal(4961, recus.poses[1][1].photo)
+            vrai(recus.poses[1][1].note == nil and recus.poses[1][1].drapeau == nil, 'telle quelle : ni note ni drapeau')
+            -- Inactif (Claude au travail) : le calque ne fait rien, ni tâche ni pose.
+            Moteur.travaille = true
+            Fenetre.rafraichirNotation()
+            egal(false, p.peutAccepterNote)
+            taches = #S.taches
+            S.cliquer(accepter)
+            egal(taches, #S.taches, 'inactif : aucune tâche')
+            egal(false, p.bleuEnfonceAccepterNote, 'inactif : pas enfoncé')
+            Moteur.travaille = false
+            -- Un rejet proposé.
+            changer(copieProposition({ drapeau = 'rejetee', note = nil }))
+            Fenetre.rafraichirNotation()
+            egal('Accepter le rejet', p.titreAccepterNote)
+            egal('rejet', p.noteClaude)
+            -- Claude ne propose jamais 5 ★ (le connecteur et le registre les refusent) ; une telle
+            -- proposition, si elle venait, ne s'offre pas à Accepter.
+            changer(copieProposition({ note = 5 }))
+            Fenetre.rafraichirNotation()
+            egal('Accepter', p.titreAccepterNote)
+            egal(false, p.peutAccepterNote)
+            for _, x in ipairs(vues(contenu)) do
+                vrai(not tostring(valeur(x, 'title', p) or ''):find('Accepter 5', 1, true), 'jamais « Accepter 5 ★ »')
+            end
+            Fenetre.accepterNote()
+            egal(Fenetre.PAS_CINQ, p.message)
+            egal(1, #recus.poses, 'rien posé')
+            p.message = ''
+            for n = 0, 4 do
+                vrai(Fenetre.titreAccepter({ note = n, drapeau = 'aucun' }) == 'Accepter ' .. n .. ' ★', n .. ' ★')
+            end
+            -- Une note en cours : la pose est refusée et dite.
+            changer(copieProposition())
+            Fenetre.noteEnCours = true
+            Fenetre.poserNote({ photo = 4961 })
+            Fenetre.noteEnCours = false
+            egal(Fenetre.NOTE_EN_COURS, p.message)
+            egal(1, #recus.poses)
+            p.message = ''
+        end)
+    end)
+end)
+
+-- Une conversation où Claude regarde la photo 4961 : un aperçu entier, puis (si `zooms`) des zooms
+-- (view_photo avec region), chacun son image.
+local function avecVues(c, appels)
+    for _, a in ipairs(appels) do
+        outil(c, a.id, 'view_photo', a.entree)
+        Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = a.id, textes = { a.reponse or '{}' },
+            images = { { donnees = 'x' } }, erreur = a.erreur == true } } }, nil, function() return a.id .. '.jpg' end)
+    end
+end
+
+local ZONE = { x = 0.1, y = 0.2, width = 0.25, height = 0.25 }
+
+essai('Voir à 100 % : Conversation.dernierZoom rend le dernier zoom d\'une photo (view_photo avec region), ni un aperçu entier, ni une autre photo, ni une erreur', function()
+    local c = Conversation.nouvelle()
+    egal(nil, Conversation.dernierZoom(c, 4961), 'conversation vide')
+    -- Un aperçu entier de la photo : pas un zoom.
+    avecVues(c, { { id = 'e1', entree = { photo_id = 4961, size = 1568 } } })
+    egal(nil, Conversation.dernierZoom(c, 4961), 'un aperçu entier')
+    -- Un zoom d'une autre photo.
+    avecVues(c, { { id = 'z2', entree = { photo_id = 4962, region = ZONE } } })
+    egal(nil, Conversation.dernierZoom(c, 4961), "le zoom d'une autre photo")
+    egal('z2.jpg', Conversation.dernierZoom(c, 4962).chemin)
+    -- Deux zooms de la photo : le plus récent ; la photo en texte ou en nombre.
+    avecVues(c, { { id = 'z3', entree = { photo_id = 4961, region = ZONE } }, { id = 'z4', entree = { photo_id = 4961, region = { x = 0.5, y = 0.5, width = 0.2, height = 0.2 } } } })
+    local z = Conversation.dernierZoom(c, 4961)
+    egal('z4.jpg', z.chemin)
+    egal('z4', z.appel)
+    egal(0.5, z.zone.x)
+    egal('z4.jpg', Conversation.dernierZoom(c, '4961').chemin)
+    vrai(c.elements[z.element].genre == 'apercu', "l'élément de l'image")
+    -- Sans photo_id : la photo que dit la réponse.
+    avecVues(c, { { id = 'z5', entree = { region = ZONE }, reponse = '{"photo":{"id":4961,"fichier":"DSCF4961.RAF"},"zoom":{"pourcentage":100}}' } })
+    egal('z5.jpg', Conversation.dernierZoom(c, 4961).chemin, 'sans photo_id')
+    -- Un appel en erreur, une comparaison : rien.
+    local d = Conversation.nouvelle()
+    avecVues(d, { { id = 'x1', entree = { photo_id = 4961, region = ZONE }, erreur = true },
+        { id = 'x2', entree = { photo_id = 4961, compare = 'previous_step' } } })
+    egal(nil, Conversation.dernierZoom(d, 4961))
+    egal(nil, Conversation.dernierZoom(nil, 4961))
+    egal(nil, Conversation.dernierZoom(c, nil))
+end)
+
+essai('Voir à 100 % dans la carte : le zoom de la photo en grand (Images.grande, sans Claude ni Lightroom) ; sans zoom, d\'une autre photo ou un aperçu entier : grisé, l\'infobulle dit pourquoi', function()
+    photoNotee(4961, 'DSCF4961.RAF', 0, 0)
+    Moteur.nouvelle()
+    local c = Moteur.courante
+    avecRegistre(copieProposition(), function()
+        ouvrirFenetre(function(p, contenu)
+            Fenetre.rafraichir()
+            local note = variantes(contenu).notation
+            local actif, grise
+            for _, x in ipairs(vues(note)) do
+                if S.BOUTONS[x.genre] and x.args.title == 'Voir à 100 %' then
+                    if x.args.tooltip == Fenetre.INFOBULLE_ZOOM then
+                        actif = x
+                    elseif x.args.tooltip == Fenetre.SANS_ZOOM then
+                        grise = x
+                    end
+                end
+            end
+            vrai(actif and grise, 'les deux variantes de « Voir à 100 % »')
+            egal(false, grise.args.enabled, 'grisé')
+            egal('Claude n\'a pas pris de zoom de cette photo', Fenetre.SANS_ZOOM)
+            egal(22, S.bezelVisible(actif))
+            local function etat()
+                return (S.montreeDansFenetre(actif) and 'actif' or '') .. (S.montreeDansFenetre(grise) and 'grisé' or '')
+            end
+            -- Sans zoom : grisé, son clic refusé.
+            egal(false, p.peutVoirZoom)
+            egal('grisé', etat())
+            refuse(function() S.cliquer(grise) end, 'inactive', 'sans zoom')
+            -- Un aperçu entier, puis le zoom d'une autre photo : toujours grisé.
+            avecVues(c, { { id = 'e1', entree = { photo_id = 4961, size = 1568 } }, { id = 'z2', entree = { photo_id = 4962, region = ZONE } } })
+            Fenetre.rafraichir()
+            egal('grisé', etat(), "un aperçu entier ou le zoom d'une autre photo")
+            -- Le zoom de la photo : actif ; un clic le montre en grand, sans Claude ni Lightroom.
+            avecVues(c, { { id = 'z3', entree = { photo_id = 4961, region = ZONE } } })
+            Fenetre.rafraichir()
+            egal(true, p.peutVoirZoom)
+            egal('actif', etat())
+            local demandes, envois = {}, 0
+            avec(Images, 'grande', function(dossier, nom, l, h)
+                demandes[#demandes + 1] = { dossier = dossier, nom = nom, l = l, h = h }
+                return dossier .. '/' .. nom, 600, 400
+            end, function()
+                avec(Moteur, 'envoyer', function() envois = envois + 1 end, function()
+                    local photos, lire = 0, Lightroom.photos
+                    Lightroom.photos = function(...) photos = photos + 1; return lire(...) end
+                    local champ = liee(contenu, 'edit_field', 'saisie')
+                    local taches, dialogues = #S.taches, #S.dialogues
+                    S.taper(champ, 'texte')
+                    S.cliquer(actif)
+                    egal(nil, Fenetre.envoiAuto, "« Voir à 100 % » n'envoie pas la demande")
+                    p.saisie = ''
+                    lancerDepuis(taches)
+                    Lightroom.photos = lire
+                    egal(1, #demandes)
+                    egal(Stockage.dossier(c.id), demandes[1].dossier)
+                    egal('z3.jpg', demandes[1].nom)
+                    egal(dialogues + 1, #S.dialogues, 'la fenêtre du zoom')
+                    egal('Claude · zoom à 100 % · DSCF4961.RAF', S.dialogues[#S.dialogues].title)
+                    egal(0, envois, 'sans Claude')
+                    egal(0, photos, 'sans rien demander à Lightroom')
+                end)
+            end)
+            -- Le plafond absent : toute la ligne masquée, le bouton aussi.
+            avec(Notation, 'proposition', function()
+                local x = copieProposition()
+                x.plafond = nil
+                return x
+            end, function()
+                Fenetre.rafraichirNotation()
+                egal(false, p.aPlafond)
+                egal('', etat())
+            end)
+            Fenetre.rafraichirNotation()
+        end)
+    end)
+end)
+
+essai('Carte Note : la grille des critères (Fenetre.lignesCriteres) ; état en gras de sa couleur, verdicts en gras ; balises de Claude retirées ; page par page', function()
+    local largeurs = { plein = D.largeurNote, critere = D.texteCritere }
+    local lignes = Fenetre.lignesCriteres(copieProposition(), largeurs)
+    egal('etat', lignes[1].genre)
+    egal(1, (lignes[1].texte:find('<EM>Passe 2 · à vérifier.</EM> Tient seule', 1, true)), lignes[1].texte)
+    local etiquettes = {}
+    for _, l in ipairs(lignes) do
+        balisesFermees(l.texte)
+        local largeur = l.genre == 'critere' and D.texteCritere or D.carte
+        vrai(Fil.largeur(l.texte, 'texte12', 'gras12') <= largeur - Fil.MARGE, string.format('%.0f pour %d : %s', Fil.largeur(l.texte, 'texte12', 'gras12'), largeur, l.texte))
+        if l.etiquette ~= '' then
+            etiquettes[#etiquettes + 1] = l.etiquette .. '=' .. Texte.debut(l.texte, 10)
+        end
+    end
+    egal('Impact=<EM>Moyen. Qualités=<EM>Bonnes Plancher technique=Netteté 41 Finition=Pour 5 ★ s', table.concat(etiquettes, ' '),
+        'du plus lourd au plus léger, verdicts en gras')
+    -- Les verdicts : deux mots au plus, jusqu'au premier point ; jamais une phrase.
+    egal('Moyen.', (Fenetre.verdict('Moyen. Le ciel.')))
+    egal('Fort', (Fenetre.verdict('Fort')))
+    egal('Nette (44).', (Fenetre.verdict('Nette (44). Bien.')))
+    egal(nil, (Fenetre.verdict('Le ciel arrête l\'œil.')))
+    egal(nil, (Fenetre.verdict('Netteté 41 : nette.')))
+    -- Une balise venue de Claude ne passe pas.
+    local balisee = Fenetre.lignesCriteres(copieProposition({ raison = 'Un <EM>ciel</EM> fort.', criteres = { impact = '<EM>Fort</EM>' } }), largeurs)
+    egal('<EM>Passe 2 · à vérifier.</EM> Un ciel fort.', balisee[1].texte)
+    egal('<EM>Fort</EM>', balisee[2].texte)
+    -- Les états, au besoin sans passe connue.
+    egal('Passe 2 · changée : 4 ★', Fenetre.enteteNote(copieProposition({ etat = 'changee', note_choisie = 4 })))
+    egal('Passe 2 · changée : rejetée', Fenetre.enteteNote(copieProposition({ etat = 'changee', drapeau_choisi = 'rejetee' })))
+    local sansPasse = copieProposition({ etat = 'ecartee' })
+    sansPasse.passe = nil
+    egal('Écartée', Fenetre.enteteNote(sansPasse))
+    sansPasse.etat, sansPasse.a_verifier = 'proposee', true
+    egal('Proposée · à vérifier', Fenetre.enteteNote(sansPasse))
+    -- Sans proposition : l'aide, en lignes pleine largeur.
+    local aide = Fenetre.lignesCriteres(nil, largeurs)
+    for _, l in ipairs(aide) do
+        egal('plein', l.genre)
+    end
+    -- Dans la fenêtre : la page, ▲ ▼ ; la même proposition relue garde sa page.
+    photoNotee(4961, 'DSCF4961.RAF', 0, 0)
+    Moteur.nouvelle()
+    local longue = copieProposition()
+    for _, cle in ipairs({ 'impact', 'qualites', 'plancher' }) do
+        longue.criteres[cle] = string.rep(longue.criteres[cle] .. ' ', 6)
+    end
+    avecRegistre(longue, function()
+        ouvrirFenetre(function(p, contenu)
+            Fenetre.rafraichir()
+            egal(true, p.noteDescend, 'plus long que la grille')
+            local note = variantes(contenu).notation
+            local descendre
+            for _, x in ipairs(vues(note)) do
+                if S.BOUTONS[x.genre] and type(x.args.enabled) == 'table' and x.args.enabled.key == 'noteDescend' then
+                    descendre = x
+                end
+            end
+            local derniere = p['nt' .. (D.criteres + 1)]
+            S.cliquer(descendre)
+            egal(derniere, p.nt1, 'une page plus bas')
+            egal(true, p.noteMonte)
+            Fenetre.rafraichirNotation()
+            egal(derniere, p.nt1, 'relue : la même page')
+            egal(0, #S.refusDeLaFenetre(), 'aucun refus de texte riche')
+            -- La ligne montrée a sa variante, et une seule.
+            for k = 1, D.criteres + 1 do
+                local montrees = 0
+                for _, x in ipairs(vues(note)) do
+                    local t = x.args.title
+                    if x.genre == 'static_text' and type(t) == 'table' and t.key == 'nt' .. k and S.montreeDansFenetre(x) then
+                        montrees = montrees + 1
+                    end
+                end
+                egal(p['ng' .. k] == 'vide' and 0 or 1, montrees, 'ligne ' .. k .. ' (' .. p['ng' .. k] .. ')')
+            end
+        end)
+    end)
+end)
+
 -- Fin -------------------------------------------------------------------------------------------------
 
 Notation.proposition = propositionVraie

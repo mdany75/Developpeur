@@ -1232,7 +1232,7 @@ essai("Fenêtre : la liste arrive (une bascule), page par page, « J'ai fini » 
         -- réglage se coche.
         appelTour(c, 't2', { tourLong(40) })
         Fenetre.rafraichir()
-        egal(20, Fenetre.T.propLignes, 'fenêtre B (lot B3, provisoire jusqu\'au lot 18)')
+        egal(16, Fenetre.T.propLignes, 'fenêtre B, sur carte-proposition (lot B5, provisoire jusqu\'au lot 18)')
         local lignes = select(2, p.propositionTexte:gsub('\n', '\n')) + 1
         egal(Fenetre.T.propLignes, lignes, 'une page pleine')
         egal(false, p.propositionMonte)

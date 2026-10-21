@@ -294,10 +294,11 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
     ouvrirFenetre(function(p, args)
         Fenetre.majPhoto()
         Fenetre.rafraichirNotation()
-        egal('Claude propose : ★★☆☆☆', p.notationProposee)
+        egal(2, p.noteClaude, 'Claude propose 2 ★')
         egal('rouge', p.notationCouleur)
-        egal('à vérifier · passe 1', p.notationEtat)
-        contient(p.notationTexte, 'Plafond mesuré : 2 ★')
+        egal('<EM>Passe 1 · à vérifier.</EM> Presque noire.', p.nt1)
+        egal('<EM>Plafond 2 ★</EM> : mesuré au tri, pas plus.', p.plafondTexte)
+        egal('Accepter 2 ★', p.titreAccepterNote)
         egal(true, p.peutAccepterNote)
         -- Claude travaille : rien ne s'écrit depuis la carte.
         Moteur.travaille = true
@@ -307,16 +308,15 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
         egal(avant, #ecritures, 'rien posé pendant que Claude travaille')
         Moteur.travaille = false
         Fenetre.rafraichirNotation()
-        -- Accepter : dans une tâche, la proposition telle quelle.
+        -- Accepter (le calque du bouton bleu de la carte Note, fenêtre B) : dans une tâche, la
+        -- proposition telle quelle.
         local accepter
         parcourir(args.contents, function(v)
-            -- Celui de la carte Note (la proposition de retouche a aussi le sien).
-            if S.BOUTONS[v.genre] and v.args.title == 'Accepter' and type(v.args.enabled) == 'table'
-                and v.args.enabled.key == 'peutAccepterNote' then
+            if v.genre == 'static_text' and v.args.tooltip == "Poser la note proposée dans Lightroom (sans Claude ni quota)" then
                 accepter = v
             end
         end)
-        accepter.args.action()
+        S.cliquer(accepter)
         S.taches[#S.taches]()
         egal(avant + 1, #ecritures)
         local params = ecritures[#ecritures]
@@ -328,7 +328,8 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
         Fenetre.majPhoto()
         Fenetre.rafraichirNotation()
         egal('coche', p.notationCouleur)
-        egal('Note posée : ★★☆☆☆', p.notationPosee)
+        egal(2, p.noteCatalogue, 'la note posée, en étoiles')
+        egal('2 ★ dans le catalogue', p.notePoseeSous)
     end)
     sansErreur()
 end)
@@ -371,9 +372,10 @@ essai('Après undo_last : la carte Note relit la note réelle (constaté), une �
         Fenetre.majPhoto()
         egal('a_verifier', Notation.proposition(2003).etat, 'la carte recale le registre')
         egal(nil, Notation.proposition(2003).note_choisie)
-        egal('Note posée : aucune, pas encore jugée', p.notationPosee)
+        egal('Pas encore jugée', p.notePoseeTitre)
+        egal(0, p.noteCatalogue)
         egal('rouge', p.notationCouleur, 'de nouveau à vérifier')
-        egal('à vérifier · passe 1', p.notationEtat)
+        egal('<EM>Passe 1 · à vérifier.</EM> Presque noire.', p.nt1)
         egal(true, p.peutAccepterNote, 'de nouveau à accepter')
         Fenetre.majPhoto()
     end)

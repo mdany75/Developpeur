@@ -61,12 +61,15 @@ Dispositions.TAILLES = {
     -- L'aperçu commun aux quatre onglets : un cadre 3:2 de 330 × 220, sa vignette en 2x (660 × 440
     -- pixels, Images.vignette).
     apercu = 330, apercuHauteur = 220, echelleApercu = 2,
-    -- Le panneau de la colonne droite (435), son intérieur (405) et celui des cartes (379, au lot B5).
+    -- Le panneau de la colonne droite (435), son intérieur (405) et celui des cartes (379).
     panneau = 435, interieur = 405, carte = 379,
-    -- Les lignes des cartes (provisoires jusqu'au lot 18) : les critères de la carte Note, le texte
-    -- de la proposition, de l'étape (onglet Aperçu) et de la leçon (en 12 points, sur carte-lecon
-    -- de 350 : 12 + titre + 6 + 18 lignes + 6 + boutons, et le bas de la carte).
-    criteres = 11, propLignes = 20, etapeLignes = 20, leconLignes = 18,
+    -- Les lignes des cartes, en 12 points (provisoires jusqu'au lot 18) : la grille des critères de
+    -- la carte Note (`criteres` + 1 lignes de 16 sur carte-note de 270 : 12 + 13 × 16 + 6 + filet +
+    -- 6 + le plafond, et le bas de la carte), le texte de la proposition (sur carte-proposition de
+    -- 350 : 12 + titre + 6 + 16 lignes + 6 + l'état et ▲ ▼ + 6 + boutons), de l'étape (onglet
+    -- Aperçu, sur carte-etape de 350 : 12 + titre + 6 + sous-titre + 6 + 17 lignes + 6 + boutons) et
+    -- de la leçon (sur carte-lecon de 350 : 12 + titre + 6 + 18 lignes + 6 + boutons).
+    criteres = 12, propLignes = 16, etapeLignes = 17, leconLignes = 18,
     -- Le cadre d'un square_button dépasse son bezel visible de 2 points (constaté le 21 octobre 2026,
     -- D5 : height = bezel + 2 ; Fenetre.bouton, clé `bezel`).
     margeBezel = 2,
@@ -373,17 +376,51 @@ function Dispositions.dimensions()
     D.pixelsApercuHauteur = D.apercuHauteur * D.echelleApercu
     D.agrandir = 90
     D.legende = D.interieur - 2 * D.fleche - 2 * 4 - 8 - D.agrandir
-    -- Largeur du texte de la carte Note, de la proposition et de la carte de l'étape (Vues.notation,
-    -- Vues.proposition, Vues.etape), pour les couper en pages (Fenetre.montrerPage) : les cartes
-    -- actuelles, posées telles quelles à la largeur intérieure du panneau (lot B5 : 379).
-    D.largeurNote = D.interieur - 24
-    D.largeurProposition = D.interieur - 24
-    D.largeurEtape = D.interieur - 24
-    -- La carte de la leçon (Vues.lecon), sur son image : son texte à l'intérieur de la carte (379),
-    -- à 13 du bord (12 de marge et le bord de 1) ; « Détail… » en carré.
+    -- La place des cartes sous l'aperçu et sa rangée, jusqu'au bas du contenu du panneau (son bord
+    -- de 1 et sa marge de 14) : 431 points. Chaque carte y tient (essais-fenetre-b.lua).
+    D.placeCartes = Dispositions.IMAGES.panneau.hauteur - 1 - 14
+        - (D.hauteurSegments + D.margeHautPanneau + D.apercuHauteur + 8 + cadre(22) + 12)
+    -- Les cartes sur leurs images (Vues.lecon, Vues.proposition, Vues.etape, la grille des critères
+    -- de Vues.notation) : leur texte à l'intérieur de la carte (379), à 13 du bord (12 de marge et
+    -- le bord de 1), coupé en pages à cette largeur (Fenetre.montrerPage) ; « Détail… » en carré.
+    D.largeurNote = D.carte
+    D.largeurProposition = D.carte
+    D.largeurEtape = D.carte
     D.largeurLecon = D.carte
     D.margeCarte = math.floor((D.interieur - D.carte) / 2)
     D.detail = 70
+    -- La carte Note (Vues.notation, maquette « B · Conversation claire », onglet Note) : la grille
+    -- des étiquettes (« Passes : », « Votre note : », « Drapeau : », alignées à droite en 12 :
+    -- « Votre note : » mesure 66,6, et 2 de jeu) et de leurs valeurs, 8 entre ses rangées ; les cinq
+    -- étoiles de « Votre note » (calques de 30, 2 entre eux) et la note posée à leur droite ;
+    -- Retenir, Rejeter et « ? À vérifier » (bezel de 24) ; « Claude propose », puis la carte des
+    -- critères (une ligne de 16 par ligne de la grille : l'étiquette d'un critère en gras 12,
+    -- « Plancher technique » mesure 116,7, et 2 de jeu, puis son texte), le filet et la ligne du
+    -- plafond avec « Voir à 100 % » ; la rangée du bas (▲ ▼, Laisser, Changer…, Accepter en bleu :
+    -- bezel de 26). La rangée des passes (Vues.passes, largeurs mesurées) prend juste la place que
+    -- laisse la colonne des étiquettes (327 points).
+    D.etiquetteNote = 70
+    D.ecartEtiquette = 8
+    D.ecartGrille = 8
+    D.lignePasses = 16
+    D.etoile = 30
+    D.ecartEtoiles = 2
+    D.posee = D.interieur - D.etiquetteNote - D.ecartEtiquette - (5 * D.etoile + 4 * D.ecartEtoiles) - 12
+    D.retenir, D.rejeter, D.aVerifier = 80, 80, 92
+    D.ligneClaude = 16
+    D.ligneCritere = 16
+    D.etiquetteCritere = 120
+    D.ecartCritere = 8
+    D.texteCritere = D.carte - D.etiquetteCritere - D.ecartCritere
+    D.avertissement = Dispositions.IMAGES.avertissement.largeur
+    D.zoom = 84
+    D.plafond = D.carte - D.avertissement - 8 - 8 - D.zoom
+    D.laisser, D.changer = 104, 84
+    -- La carte Proposition (Vues.proposition) : Refuser, Ajuster… et Je le fais (ou J'ai fini) en
+    -- carrés, Accepter en bleu ; la carte de l'étape (Vues.etape) : ◀ ▶, Voir l'avant (ou l'après)
+    -- et Détail… en carrés.
+    D.refuser, D.ajuster, D.jeLeFais = 72, 78, 84
+    D.bascule = 96
     return D
 end
 
@@ -434,9 +471,9 @@ end
 
 -- La colonne droite : sur son aplat, le panneau en image, les segments à cheval sur son bord ;
 -- dedans, l'aperçu commun, la rangée ◀ légende ▶ · ⤢ Agrandir, puis les quatre variantes
--- superposées des onglets (les cartes actuelles posées telles quelles, au lot B5 sur leurs
--- images) : la carte de l'étape dans Aperçu, la proposition, la carte Note, et la carte de la
--- leçon dans Leçon, sur son image (lot B4).
+-- superposées des onglets, chacune sur sa carte en image (lots B4 et B5) : la carte de l'étape dans
+-- Aperçu, la proposition, la carte Note (sa grille, puis la carte des critères) et la carte de la
+-- leçon dans Leçon.
 local function droite(f, F, D)
     local C = F.COULEURS
     local largeur = D.interieur
@@ -462,7 +499,7 @@ local function droite(f, F, D)
                     f:column {
                         place = 'overlapping',
                         variante(f, F, largeur, 'apercu', function(fm) return { Vues.etape(fm, F, largeur, D) } end),
-                        variante(f, F, largeur, 'proposition', function(fm) return { Vues.proposition(fm, F, largeur, D.propLignes) } end),
+                        variante(f, F, largeur, 'proposition', function(fm) return { Vues.proposition(fm, F, largeur, D) } end),
                         variante(f, F, largeur, 'notation', function(fm) return { Vues.notation(fm, F, largeur, D) } end),
                         variante(f, F, largeur, 'lecon', function(fm) return { Vues.lecon(fm, F, largeur, D) } end),
                     },

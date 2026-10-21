@@ -130,7 +130,7 @@ function Moteur.ouvrir(id)
     end
     local c = Moteur.trouver(id)
     if Conversation.estSeance(c) then
-        return false, "Cette conversation est celle d'une ancienne séance de notation : elle ne s'ouvre plus."
+        return false, "Une ancienne séance de notation ne s'ouvre plus."
     end
     if not c or c == Moteur.courante then
         return c ~= nil
@@ -222,7 +222,7 @@ function Moteur.envoyer(texte, options)
         return false, "Écrivez une demande avant d'envoyer."
     end
     if Moteur.travaille then
-        return false, "Claude travaille encore : attendez la fin, ou cliquez Arrêter."
+        return false, "Claude travaille : attendez la fin."
     end
     local okBudget, niveau = pcall(Consommation.niveau)
     if okBudget and niveau == 'arret' then
@@ -336,7 +336,7 @@ function Moteur.jeLeFais()
     local c = Moteur.courante
     local p = c and Conversation.propositionEnAttente(c)
     if not p and not Lightroom.photos().active then
-        return false, "Aucune photo active : choisissez dans Lightroom la photo à retoucher vous-même, puis cliquez « Je le fais »."
+        return false, "Aucune photo active : choisissez-la dans Lightroom."
     end
     if p then
         Conversation.marquer(c, p.id, 'faite')

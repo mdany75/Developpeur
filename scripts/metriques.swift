@@ -18,6 +18,9 @@ let polices: [(cle: String, nom: String, taille: CGFloat, gras: Bool)] = [
     ("petit", "<system>", 11, false),
     ("gras", "<system/bold>", 13, true),
     ("gras12", "<system/bold>", 12, true),
+    // Le gras 11 : les en-têtes de jour de la liste et la passe en cours de la carte Note (lot B5,
+    // largeurs de ses libellés).
+    ("gras11", "<system/bold>", 11, true),
     ("titre", "<system/bold>", 16, true),
     ("mono", "Menlo", 11, false),
 ]
