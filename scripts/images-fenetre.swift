@@ -61,9 +61,11 @@ let tailles = gabarits.images
 
 // Couleurs -----------------------------------------------------------------------------------------
 
-// Une couleur de palette : six chiffres hexadécimaux (RRGGBB), vérifiés avant tout dessin.
+// Une couleur de palette : six chiffres hexadécimaux ASCII (RRGGBB), vérifiés avant tout dessin.
+// Pas Character.isHexDigit : il accepte aussi les chiffres pleine chasse (« １ »), que hex() ne lit
+// pas (UInt32(_:radix:) rend nil), et l'image tomberait en cours d'écriture, un jeu déjà écrit.
 func estHex(_ s: String) -> Bool {
-    s.count == 6 && s.allSatisfy { $0.isHexDigit }
+    s.utf8.count == 6 && s.utf8.allSatisfy { (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) }
 }
 
 func hex(_ s: String) -> CGColor {

@@ -104,7 +104,11 @@ Dispositions.IMAGES = {
 -- Apparence de PluginInfoProvider.lua ; décision de Dany du 21 octobre 2026). Elle ne règle que ce
 -- que le module dessine : les aplats (fonds et filets), les couleurs des textes et les images. Les
 -- contrôles natifs (boutons, champs, menus, cases, barre de titre) suivent l'apparence de macOS,
--- quelle que soit celle choisie ici : rien à faire pour eux.
+-- quelle que soit celle choisie ici : rien à faire pour eux. Quand les deux diffèrent, deux choses
+-- restent à constater dans Lightroom (lots B3 et 18) : les icônes posées sur un bouton natif
+-- (image_name : trombone, presse-papiers, chevron-haut, chevron-bas, à l'encre `texte` de
+-- l'apparence choisie, sur un fond de bouton qui suit macOS), et le titre d'une case ou d'un
+-- bouton radio posé sur un aplat (couleur du système, sauf si text_color y prend).
 --
 -- Les apparences, dans l'ordre du menu ; la première est celle par défaut, et toute valeur inconnue
 -- y retombe (Dispositions.apparence). `dossier` : où sont ses images, depuis le dossier du module.

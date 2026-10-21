@@ -587,6 +587,10 @@ essai('scripts/images-fenetre.swift : refuse sans rien écrire un nom sans dessi
             'couleur invalide dans la palette sombre : texte' },
         { gabaritsEssai(function(g) g.apparences.sombre.couleurs.gris = 'GGGGGG' end),
             'couleur invalide dans la palette sombre : gris' },
+        -- Un chiffre pleine chasse (U+FF11) passe Character.isHexDigit, mais ni UInt32(_:radix:)
+        -- ni le dessin : refusé avant d'écrire le jeu clair, valide et dessiné en premier.
+        { gabaritsEssai(function(g) g.apparences.sombre.couleurs.contour = '\239\188\1458E8E8' end),
+            'couleur invalide dans la palette sombre : contour' },
         { gabaritsEssai(function(g) g.apparences.sombre.dossier = '../ailleurs' end),
             'dossier invalide pour l\'apparence sombre' },
         { gabaritsEssai(function(g) g.apparences.sombre.dossier = '/tmp/ailleurs' end),
