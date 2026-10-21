@@ -6,8 +6,8 @@
 -- image dans les deux jeux (images/ et images/sombre/), un seul PNG en 2x (2 × la taille en points,
 -- en-tête IHDR lu en Lua pur) à 144 ppp (bloc pHYs : 5 669 pixels par mètre), aux mêmes tailles,
 -- la sombre autre que la claire, sans image de trop ni paire @2x, et ce contrôle lui-même, sur des
--- PNG fabriqués ; l'image « aucun aperçu » du cadre 3:2 (vide-330x220.png, 660 × 440), dans le jeu
--- de chaque apparence ; scripts/gabarits.lua, qui écrit Dispositions.gabarits en JSON pour
+-- PNG fabriqués ; l'image « aucun aperçu » du cadre 3:2 de l'aperçu (vide-405x270.png, 810 × 540),
+-- dans le jeu de chaque apparence ; scripts/gabarits.lua, qui écrit Dispositions.gabarits en JSON pour
 -- scripts/images-fenetre.swift et scripts/images-vides.swift ; et ces scripts eux-mêmes, lancés sur
 -- un module d'essai d'un dossier temporaire (jamais sur celui du dépôt) : ce qu'ils produisent, et
 -- leurs refus. Ni Lightroom, ni Claude.
@@ -43,6 +43,7 @@ local Dispositions = require 'Dispositions'
 local Json = require 'Json'
 
 local IMAGES = Dispositions.IMAGES
+local D = Dispositions.dimensions()
 local DOSSIER = S.plugin .. '/images'
 local RACINE = S.plugin:match('^(.*)/Lightroom/Developpeur%.lrplugin/?$')
 
@@ -55,7 +56,9 @@ local PPM_144 = 5669
 
 -- Les images de la fenêtre B et leurs tailles en points, d'après la maquette : { largeur, hauteur }.
 -- Les hauteurs du panneau et des cartes, recalées au lot 18, ne sont pas fixées ici : la largeur
--- seule (colonne droite de 435, intérieur du panneau de 405).
+-- seule (colonne droite de 435, intérieur du panneau de 405). Le fond de sélection suit le volet,
+-- plus large que dans la maquette (fenêtre agrandie, demandée par Dany le 21 octobre 2026) : une case
+-- de la liste, à la largeur utile du volet.
 local ATTENDUES = {
     panneau = { 435 },
     ['carte-note'] = { 405 },
@@ -70,7 +73,7 @@ local ATTENDUES = {
     ['seg-proposition-actif'] = { 98, 22 },
     ['seg-note-actif'] = { 57, 22 },
     ['seg-lecon-actif'] = { 65, 22 },
-    selection = { 163, 40 },
+    selection = { D.liste, D.hauteurCase },
     ['pastille-vert'] = { 8, 8 },
     ['pastille-orange'] = { 8, 8 },
     ['pastille-rouge'] = { 8, 8 },
@@ -505,9 +508,10 @@ essai('images/ et images/sombre/ : aucune image hors de Dispositions.IMAGES, ni 
     vrai(not ok and tostring(erreur):find('images/sombre/orpheline.png', 1, true), 'image en trop refusée : ' .. tostring(erreur))
 end)
 
-essai('vide-330x220.png : l\'image « aucun aperçu » du cadre 3:2, 660 × 440 à 144 ppp, dans le jeu de chaque apparence', function()
-    egal('vide-330x220', VIDE, 'son nom tiré du cadre de l\'aperçu')
+essai(VIDE .. '.png : l\'image « aucun aperçu » du cadre 3:2 de l\'aperçu, en 2x à 144 ppp, dans le jeu de chaque apparence', function()
     local T = Dispositions.TAILLES
+    egal('vide-' .. T.apercu .. 'x' .. T.apercuHauteur, VIDE, 'son nom tiré du cadre de l\'aperçu')
+    egal(T.apercu * 2, T.apercuHauteur * 3, 'un cadre 3:2')
     local octets = {}
     for apparence, dossier in pairs(JEUX) do
         local chemin = S.plugin .. '/' .. dossier .. '/' .. VIDE .. '.png'
@@ -515,8 +519,8 @@ essai('vide-330x220.png : l\'image « aucun aperçu » du cadre 3:2, 660 × 440 
         local raison = controler(chemin, T.apercu, T.apercuHauteur)
         vrai(raison == nil, raison)
         local png = lirePng(chemin)
-        egal(660, png.largeur, apparence .. ' : largeur en pixels')
-        egal(440, png.hauteur, apparence .. ' : hauteur en pixels')
+        egal(2 * T.apercu, png.largeur, apparence .. ' : largeur en pixels')
+        egal(2 * T.apercuHauteur, png.hauteur, apparence .. ' : hauteur en pixels')
         local f = assert(io.open(chemin, 'rb'))
         octets[apparence] = f:read('*a')
         f:close()
@@ -606,8 +610,8 @@ essai('scripts/images-fenetre.swift : les deux jeux en 2x à 144 ppp, chacun de 
         vrai(lirePng(orpheline), 'image de trop gardée : ' .. orpheline)
     end
     -- L'image « aucun aperçu », rangée là par scripts/images-vides.swift, n'est pas une image de trop.
-    fabriquerPng(module .. '/images/' .. VIDE .. '.png', 660, 440, PPM_144)
-    fabriquerPng(module .. '/images/sombre/' .. VIDE .. '.png', 660, 440, PPM_144)
+    fabriquerPng(module .. '/images/' .. VIDE .. '.png', D.pixelsApercu, D.pixelsApercuHauteur, PPM_144)
+    fabriquerPng(module .. '/images/sombre/' .. VIDE .. '.png', D.pixelsApercu, D.pixelsApercuHauteur, PPM_144)
     code, sortie = produire(gabarits, module)
     egal(0, code, 'production avec l\'image « aucun aperçu » : ' .. sortie)
     vrai(not sortie:find(VIDE, 1, true), "l'image « aucun aperçu » n'est pas signalée : " .. sortie)

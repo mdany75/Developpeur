@@ -127,7 +127,7 @@ local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(
 prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
 prefs.cheminConnecteur = '/bin/echo'
 local imageB64 = S.home .. '/image.b64'
-S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
 S.executer('/usr/bin/base64 -i ' .. S.q(S.home .. '/image.jpg') .. ' -o ' .. S.q(imageB64))
 local env = 'FAUX_IMAGE_B64=' .. S.q(imageB64) .. ' '
 local executerOriginal = S.modules.LrTasks.execute
@@ -138,7 +138,7 @@ S.modules.LrTasks.execute = function(commande)
     return executerOriginal(commande)
 end
 
--- La largeur du texte du fil (Fenetre.largeurTexte : 518 dans la fenêtre B, après la colonne
+-- La largeur du texte du fil (Fenetre.largeurTexte : D.texteFil dans la fenêtre B, après la colonne
 -- auteur), et celle qu'une ligne ne dépasse jamais, son retrait compris (Fil.occupe).
 local D = Dispositions.dimensions()
 local LARGEUR = D.texteFil
@@ -487,8 +487,8 @@ essai('Fil.lignesCarnet : titre, note, tableau mono aligné, tendances, à trava
         vrai(l.genre == 'outil' or l.defaut == nil, 'seules les rangées portent un défaut')
         vrai(l == derniere or l.action == nil, "seule la ligne d'action en porte une")
     end
-    -- Dans la grille de la fenêtre B (23 lignes, au texte de 518 points : lot B4), la page dépasse un
-    -- peu la grille : elle se lit avec ▲ ▼ (essai de la page, plus bas) ; deux grilles au plus.
+    -- Dans la grille de la fenêtre B (D.lignes lignes, au texte de D.texteFil points : lot B4), la page
+    -- tient au plus dans deux grilles (au-delà d'une, elle se lit avec ▲ ▼ : essai de la page, plus bas).
     vrai(#lignes <= 2 * D.lignes, string.format('la page tient dans deux grilles (%d lignes pour %d)', #lignes, D.lignes))
     -- Le tableau en Menlo, sans retrait d'icône : toute la largeur du texte du fil.
     egal('mono', Fil.polices.outil)
@@ -581,7 +581,7 @@ essai('Page : choisie dans la liste, titre « Carnet de progrès », lue dans un
         egal(Carnet.version, Fenetre.versionCarnet)
         local attendues = Fil.lignesCarnet(page, Fenetre.largeurTexte(), Fenetre.TITRE_CARNET)
         egal(#attendues, #Fenetre.lignes)
-        -- Le haut de la page dans la grille (23 lignes, fenêtre B : la suite se lit avec ▼).
+        -- Le haut de la page dans la grille (D.lignes lignes, fenêtre B : une suite se lit avec ▼).
         for i = 1, math.min(#attendues, Fenetre.T.lignes) do
             local l = attendues[i]
             egal(l.texte, p['t' .. i], 'ligne ' .. i)

@@ -213,7 +213,7 @@ essai('Une seule disposition : ni taille ni disposition dans les préférences, 
     egal(nil, Dispositions.atelier)
     egal(nil, Dispositions.panneau)
     egal('conversation', Dispositions.dimensions().nom)
-    egal('DeveloppeurClaude-conversation-grande-2', Fenetre.cadre())
+    egal('DeveloppeurClaude-conversation-grande-3', Fenetre.cadre(), 'FORME 3 : la fenêtre B agrandie')
     egal(nil, Fenetre.rouvrir)
     egal(nil, Fenetre.elementsMenu)
 end)
@@ -782,8 +782,9 @@ essai('Cartes : ▲ ▼ font défiler le texte de la note et de la proposition, 
     S.pendantFenetre = function(args)
         vu = true
         local p, T = Fenetre.p, Fenetre.T
-        local lignes = {}
-        for i = 1, 60 do
+        -- Trois pages de la carte (T.propLignes lignes chacune).
+        local lignes, total = {}, 3 * T.propLignes
+        for i = 1, total do
             lignes[i] = 'Ligne ' .. i
         end
         local long = table.concat(lignes, '\n')
@@ -807,7 +808,7 @@ essai('Cartes : ▲ ▼ font défiler le texte de la note et de la proposition, 
         for _ = 1, 10 do
             Fenetre.defilerTexte('proposition', 1)
         end
-        egal('Ligne 60', p.propositionTexte:match('[^\n]*$'))
+        egal('Ligne ' .. total, p.propositionTexte:match('[^\n]*$'))
         egal(false, p.propositionDescend)
         local monter = bouton(args.contents, p, '▲', 'propositionMonte')
         monter.args.action(monter)
@@ -816,7 +817,7 @@ essai('Cartes : ▲ ▼ font défiler le texte de la note et de la proposition, 
         local avant = p.propositionTexte
         Fenetre.montrerPage('proposition', long)
         egal(avant, p.propositionTexte, 'page gardée au rafraîchissement')
-        Fenetre.montrerPage('proposition', long .. '\nLigne 61')
+        Fenetre.montrerPage('proposition', long .. '\nLigne ' .. (total + 1))
         egal('Ligne 1', p.propositionTexte:match('^[^\n]*'), 'un autre texte : première page')
         -- Une balise venue de Claude ne passe pas dans la proposition (sans emphasis_font, Lightroom
         -- ne la montrerait pas, constaté D4).
@@ -824,12 +825,12 @@ essai('Cartes : ▲ ▼ font défiler le texte de la note et de la proposition, 
         egal('Un ciel plus dense.', p.propositionTexte)
         -- La carte Note est une grille : un long paragraphe s'y coupe en lignes pleine largeur, à la
         -- largeur de l'intérieur de la carte, en 12 points.
-        Fenetre.montrerPage('note', string.rep('Le ciel orageux tient la photo. ', 40))
+        Fenetre.montrerPage('note', string.rep('Le ciel orageux tient la photo. ', 4 * (T.criteres + 1)))
         for k = 1, T.criteres + 1 do
             egal('plein', p['ng' .. k], 'ligne ' .. k)
             vrai(Fil.largeur(p['nt' .. k], 'texte12') <= T.largeurNote - Fil.MARGE, 'ligne trop large : ' .. p['nt' .. k])
         end
-        egal(379, T.largeurNote)
+        egal(T.carte, T.largeurNote)
         egal(true, p.noteDescend, 'le paragraphe dépasse la carte')
         egal(false, p.noteMonte)
         local derniere = p['nt' .. (T.criteres + 1)]
@@ -907,10 +908,11 @@ essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte
         egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')), "l'aide de la carte de l'étape")
         vrai(Fenetre.AIDE_ETAPE:find('« Pourquoi ? »', 1, true), "l'aide dit le bouton Pourquoi ? du fil")
         -- Fenêtre B (lot B5, provisoire jusqu'au lot 18) : les cartes sur leurs images, à la largeur
-        -- de leur intérieur (379), 16 lignes pour la proposition, 17 pour l'étape.
+        -- de leur intérieur, aux lignes de Dispositions.TAILLES (essais-fenetre-b.lua vérifie qu'elles
+        -- remplissent leur carte).
         egal('Pourquoi ?', Fenetre.TITRE_ETAPE, 'sans étape, le titre de la carte')
-        egal(16, T.propLignes, 'la proposition : 16 lignes (fenêtre B)')
-        egal(17, T.etapeLignes, "texte de la carte de l'étape")
+        egal(Dispositions.TAILLES.propLignes, T.propLignes, 'la proposition (fenêtre B)')
+        egal(Dispositions.TAILLES.etapeLignes, T.etapeLignes, "texte de la carte de l'étape")
         egal(T.carte, T.largeurEtape)
         egal(T.carte, T.largeurProposition)
         -- Les actions des boutons : sans effet pour l'instant (un lot suivant les remplit), sans
@@ -946,8 +948,9 @@ essai('Carte Pourquoi ? : ▲ ▼ font défiler son texte, page par page, comme 
     S.pendantFenetre = function(args)
         vu = true
         local p, T = Fenetre.p, Fenetre.T
+        -- Trois pages de la carte (T.etapeLignes lignes chacune).
         local lignes = {}
-        for i = 1, 50 do
+        for i = 1, 3 * T.etapeLignes do
             lignes[i] = 'Raison ' .. i
         end
         Fenetre.montrerPage('etape', table.concat(lignes, '\n'))
@@ -1430,8 +1433,8 @@ end)
 essai('Vignettes : un cadre 3:2 garde toute l\'image, centrée sur le fond', function()
     local dossier = S.home .. '/vignettes-essai'
     Fichiers.creerDossier(dossier)
-    S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(dossier .. '/paysage.jpg') .. ' >/dev/null 2>&1')
-    S.executer('/usr/bin/sips -s format jpeg -z 90 60 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(dossier .. '/portrait.jpg') .. ' >/dev/null 2>&1')
+    S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out ' .. S.q(dossier .. '/paysage.jpg') .. ' >/dev/null 2>&1')
+    S.executer('/usr/bin/sips -s format jpeg -z 90 60 ' .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out ' .. S.q(dossier .. '/portrait.jpg') .. ' >/dev/null 2>&1')
     local function dimensions(chemin)
         local l, h = Images.dimensions(chemin)
         return tostring(l) .. 'x' .. tostring(h)
@@ -1449,25 +1452,29 @@ end)
 
 essai('Image « aucun aperçu » : au cadre 3:2 de l\'aperçu, en 2x, dans le jeu de chaque apparence', function()
     local D = Dispositions.dimensions()
-    egal('images/vide-330x220.png', Dispositions.imageVide('claire'))
-    egal('images/sombre/vide-330x220.png', Dispositions.imageVide('sombre'))
-    egal('images/vide-330x220.png', Dispositions.imageVide('inconnue'), 'une apparence inconnue : la claire')
+    -- Son nom suit le cadre de l'aperçu (« vide-405x270 ») : un autre cadre, une autre image.
+    local nom = 'vide-' .. D.apercu .. 'x' .. D.apercuHauteur .. '.png'
+    egal('images/' .. nom, Dispositions.imageVide('claire'))
+    egal('images/sombre/' .. nom, Dispositions.imageVide('sombre'))
+    egal('images/' .. nom, Dispositions.imageVide('inconnue'), 'une apparence inconnue : la claire')
     for _, apparence in ipairs({ 'claire', 'sombre' }) do
-        local nom = Dispositions.imageVide(apparence)
-        local l, h = Images.dimensions(Chemins.ressource(nom))
-        egal(D.pixelsApercu, l, nom)
-        egal(D.pixelsApercuHauteur, h, nom)
+        local chemin = Dispositions.imageVide(apparence)
+        local l, h = Images.dimensions(Chemins.ressource(chemin))
+        egal(D.pixelsApercu, l, chemin)
+        egal(D.pixelsApercuHauteur, h, chemin)
     end
-    egal(660, D.pixelsApercu)
-    egal(440, D.pixelsApercuHauteur)
+    egal(2 * D.apercu, D.pixelsApercu)
+    egal(2 * D.apercuHauteur, D.pixelsApercuHauteur)
     -- La fenêtre prend celle de son apparence.
     local apparence = Fenetre.apparence
     Fenetre.preparerApparence('sombre')
-    vrai(Fenetre.imageVide():find('/images/sombre/vide%-330x220%.png$'), Fenetre.imageVide())
+    vrai(Fenetre.imageVide():find('/images/sombre/' .. nom, 1, true), Fenetre.imageVide())
     Fenetre.preparerApparence(apparence)
     -- Plus d'image carrée (Conversation claire de la 1.2), ni pour l'Atelier et le Panneau, ni à la
-    -- racine du module.
-    for _, ancienne in ipairs({ 'vide-320.png', 'vide-200.png', 'vide-720x480.png', 'vide-330x220.png' }) do
+    -- racine du module, ni celle du cadre de 330 × 220 de la fenêtre B à 1 280 × 800 (lot B3), dans
+    -- l'un ou l'autre jeu.
+    for _, ancienne in ipairs({ 'vide-320.png', 'vide-200.png', 'vide-720x480.png', 'vide-330x220.png', 'images/vide-330x220.png',
+        'images/sombre/vide-330x220.png' }) do
         vrai(not Fichiers.existe(Chemins.ressource(ancienne)), 'image retirée : ' .. ancienne)
     end
 end)

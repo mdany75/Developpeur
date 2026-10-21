@@ -1,12 +1,12 @@
 // images-vides.swift — dessine l'image « aucun aperçu » de la fenêtre Claude (fenêtre B), au cadre
-// 3:2 de l'aperçu commun aux quatre onglets (330 × 220 points), une par apparence (claire et
+// 3:2 de l'aperçu commun aux quatre onglets (405 × 270 points), une par apparence (claire et
 // sombre), du fond et du texte de sa palette (`fondApercu`, `texteApercu`). Tout vient de
 // Dispositions.lua, que scripts/gabarits.lua écrit en JSON sur l'entrée standard : le cadre et le
 // nom de l'image (`vide`, Dispositions.nomImageVide), le dossier et la palette de chaque apparence
-// (Dispositions.APPARENCES, Dispositions.PALETTES). Chaque image est un seul PNG en 2x (660 × 440
+// (Dispositions.APPARENCES, Dispositions.PALETTES). Chaque image est un seul PNG en 2x (810 × 540
 // pixels à 144 ppp), que le SDK de Lightroom affiche à sa taille en points, comme celles de
 // scripts/images-fenetre.swift ; elle va dans le dossier des images de son apparence
-// (images/vide-330x220.png, images/sombre/vide-330x220.png : Dispositions.imageVide). Tout est
+// (images/vide-405x270.png, images/sombre/vide-405x270.png : Dispositions.imageVide). Tout est
 // vérifié avant d'écrire quoi que ce soit (un cadre positif, des dossiers sous le module, les deux
 // couleurs dans chaque palette, en RRGGBB). Les essais de la fenêtre (essais-images.lua) vérifient
 // les deux fichiers : présence, taille en pixels, 144 ppp, la sombre autre que la claire.

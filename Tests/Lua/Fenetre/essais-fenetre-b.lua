@@ -1,18 +1,19 @@
--- essais-fenetre-b.lua : la fenêtre Claude à l'allure de la fenêtre B (1.3, lot B3 : cadre de
--- 1 280 × 800, volet des conversations en cases, en-tête avec le Mode, barre du fil, zone de
--- saisie, colonne droite avec ses segments et son panneau), hors de Lightroom (LuaJIT, Lightroom
--- simulé par Simulation.lua) : les dimensions (contenu de 1 278 × 766, D7, et chaque colonne
--- estimée), l'inventaire du volet, de l'en-tête, de la barre, de la saisie et des segments (chaque
--- élément trouvé par son titre, son infobulle ou son image, son action éprouvée par un clic simulé,
--- S.cliquer), les briques (Fenetre.bouton carré ou à icône, Fenetre.calque, Vues.boutonBleu,
+-- essais-fenetre-b.lua : la fenêtre Claude à l'allure de la fenêtre B (1.3, lot B3 : volet des
+-- conversations en cases, en-tête avec le Mode, barre du fil, zone de saisie, colonne droite avec
+-- ses segments et son panneau ; agrandie à 1 497 × 1 200, demandé par Dany le 21 octobre 2026), hors
+-- de Lightroom (LuaJIT, Lightroom simulé par Simulation.lua) : les dimensions (contenu de
+-- 1 495 × 1 166, D7, chaque colonne estimée, la fenêtre dans l'écran de Dany, la longueur des
+-- lignes du fil), l'inventaire du volet, de l'en-tête, de la barre, de la saisie et des segments
+-- (chaque élément trouvé par son titre, son infobulle ou son image, son action éprouvée par un clic
+-- simulé, S.cliquer), les briques (Fenetre.bouton carré ou à icône, Fenetre.calque, Vues.boutonBleu,
 -- Vues.inactif, les aplats), le Mode (radios tirés de l'état, D3, D12), la liste en cases (périodes,
 -- sous-titres, choix, pagination, recherche, carnet), la légende de la photo active
 -- (Lightroom.legende) et l'apparence (couleurs et images reprises à l'ouverture). Puis le fil (lot
 -- B4) : les polices mesurées (Metriques), le texte riche (largeur, coupe, balises fermées), l'auteur
 -- et l'heure de chaque tour (sur des copies), la ligne d'un appel et « Pourquoi ? », la ligne
 -- d'actions (« ☆ Voir la note », « Leçon de la photo »), leurs clics, la bascule vers Leçon, le
--- bandeau sur deux lignes et le tableau du carnet à 518 points ; essais-lecon.lua éprouve la carte
--- de l'onglet Leçon. Enfin les cartes (lot B5) : sur leurs images, leurs hauteurs et ce qui y
+-- bandeau sur deux lignes et le tableau du carnet à la largeur du fil ; essais-lecon.lua éprouve la
+-- carte de l'onglet Leçon. Enfin les cartes (lot B5) : sur leurs images, leurs hauteurs et ce qui y
 -- tient, l'inventaire de la carte Note (maquette) et des cartes Proposition et Aperçu, les passes,
 -- les étoiles, les drapeaux, Laisser, Accepter (jamais 5 ★ de Claude), « Voir à 100 % » (le zoom
 -- que Claude a pris pour noter) et la grille des critères. Ni Claude, ni quota, ni vraie photo :
@@ -305,28 +306,47 @@ end
 
 -- Dimensions ---------------------------------------------------------------------------------------
 
-essai('Cadre : une fenêtre de 1 280 × 800, son contenu de 1 278 × 766 (D7) ; les colonnes et les images concordent', function()
-    local largeur, haut = S.contenuPourFenetre(1280, 800)
-    egal(1280, D.largeurFenetre)
-    egal(800, D.hauteurFenetre)
+-- La taille demandée par Dany le 21 octobre 2026, sur son écran de 3 440 × 1 440 (à 1x : un point
+-- par pixel, constaté) : la fenêtre entière, le volet, le centre et la colonne droite (celle de la
+-- maquette), et l'aperçu à la largeur de l'intérieur du panneau. La seule copie de ces chiffres dans
+-- les essais ; le reste se tire de Dispositions.
+local DEMANDE = { largeur = 1497, hauteur = 1200, volet = 270, centre = 760, droite = 463, apercu = 405, apercuHauteur = 270 }
+local ECRAN_DANY = { largeur = 3440, hauteur = 1440 }
+-- La barre des menus de macOS sur un écran sans encoche : 24 points, et son filet.
+local BARRE_MENUS = 25
+-- La place que la fenêtre laisse à Lightroom à côté d'elle, sur cet écran (environ 1 940 points).
+local PLACE_LIGHTROOM = 1940
+
+essai('Cadre : la fenêtre demandée par Dany (1 497 × 1 200), son contenu (D7) ; les colonnes, le fil, la liste et les images concordent', function()
+    local largeur, haut = S.contenuPourFenetre(DEMANDE.largeur, DEMANDE.hauteur)
+    egal(DEMANDE.largeur, D.largeurFenetre)
+    egal(DEMANDE.hauteur, D.hauteurFenetre)
     egal(largeur, D.largeurContenu, 'contenu : largeur (D7)')
     egal(haut, D.hauteurContenu, 'contenu : hauteur (D7 : barre de 33, marge de 1 en bas, aucune en haut)')
+    egal(DEMANDE.volet, D.volet)
+    egal(DEMANDE.centre, D.centre)
+    egal(DEMANDE.droite, D.droite, 'la colonne droite de la maquette, inchangée')
     egal(D.largeurContenu, D.volet + D.filet + D.centre + D.filet + D.droite, 'volet, filet, centre, filet, colonne droite')
-    egal(163, D.liste, 'volet : 163 utiles')
-    egal(590, D.fil, 'centre : 590 utiles')
+    egal(D.volet - 2 * D.margeVolet, D.liste, 'volet : sa largeur utile')
+    egal(D.centre - 2 * D.margeCentre, D.fil, 'centre : sa largeur utile')
     egal(D.panneau, D.droite - 2 * D.margeDroite, 'colonne droite : le panneau entre ses marges')
-    egal(405, D.interieur)
-    -- Le centre : en-tête et son filet, fil, barre, saisie, exactement ; le point de plus de D7 va à
-    -- la marge du bas du fil (17 au lieu de 16).
+    -- Le centre : en-tête et son filet, fil, barre, saisie, exactement ; le fil a autant de lignes
+    -- que sa hauteur en tient entre ses marges (une de plus n'y tiendrait pas), le reste va à sa
+    -- marge du bas.
     egal(D.hauteurContenu, D.entete + D.filet + D.hauteurFil + D.barre + D.saisie, 'le centre de haut en bas')
-    egal(17, D.hauteurFil - D.margeHautFil - D.grille, 'marge du bas du fil')
-    egal(23 * 21, D.grille, 'la grille du fil : 23 lignes de 21')
+    egal(D.lignes * D.hauteurLigne, D.grille, 'la grille du fil : ses lignes de ' .. D.hauteurLigne)
+    local bas = D.hauteurFil - D.margeHautFil - D.grille
+    vrai(bas >= D.margeBasFil, string.format('marge du bas du fil : %d (au moins %d)', bas, D.margeBasFil))
+    vrai(bas - D.hauteurLigne < D.margeBasFil, string.format('une ligne de plus tiendrait (%d lignes, marge du bas de %d)', D.lignes, bas))
+    -- Le titre de l'en-tête prend ce que le Mode laisse ; la photo active, ce que les voyants laissent.
+    egal(D.fil, D.titre + D.placeMode, 'le titre et la place du Mode')
+    egal(D.fil, (8 + 6 + D.voyantClaude) + 14 + (8 + 6 + D.voyantLightroom) + D.info, 'les voyants et la photo active')
     -- Les images de Dispositions.IMAGES concordent avec les tailles.
     local I = Dispositions.IMAGES
     egal(D.liste, I.selection.largeur, 'fond de sélection : la largeur du volet')
     egal(D.hauteurCase, I.selection.hauteur, 'fond de sélection : une case')
     egal(D.panneau, I.panneau.largeur, 'panneau')
-    vrai(D.margeHautDroite + I.panneau.hauteur <= D.hauteurContenu, 'le panneau tient dans la colonne')
+    egal(D.hauteurContenu, D.margeHautDroite + I.panneau.hauteur + D.margeBasDroite, 'le panneau sur toute la colonne, entre ses marges')
     for _, nom in ipairs({ 'carte-note', 'carte-proposition', 'carte-etape', 'carte-lecon' }) do
         egal(D.interieur, I[nom].largeur, nom)
     end
@@ -335,21 +355,64 @@ essai('Cadre : une fenêtre de 1 280 × 800, son contenu de 1 278 × 766 (D7) ; 
     egal(D.hauteurSegments, I['seg-apercu'].hauteur)
     egal(35, D.hauteurSegments + D.margeHautPanneau, 'contenu du panneau à 35 du haut des segments (12 + 1 + 22)')
     egal(D.interieur, D.panneau - D.margeGauchePanneau - 15, 'contenu du panneau : 15 de chaque côté')
-    -- L'aperçu : 330 × 220, sa vignette en 2x ; la rangée sous lui tient dans le panneau.
-    egal(330, D.apercu)
-    egal(220, D.apercuHauteur)
+    -- L'aperçu : 3:2, à la largeur de l'intérieur du panneau (sans élargir la colonne), sa vignette
+    -- en 2x ; la rangée sous lui tient dans le panneau.
+    egal(DEMANDE.apercu, D.apercu)
+    egal(DEMANDE.apercuHauteur, D.apercuHauteur)
+    egal(D.apercu * 2, D.apercuHauteur * 3, 'un cadre 3:2')
+    vrai(D.apercu <= D.interieur, "l'aperçu dans l'intérieur du panneau")
+    egal(2 * D.apercu, D.pixelsApercu, 'vignette en 2x')
+    egal(2 * D.apercuHauteur, D.pixelsApercuHauteur, 'vignette en 2x')
     egal(D.interieur, 2 * D.fleche + 4 + D.legende + 4 + 8 + D.agrandir, '◀ légende ▶ · Agrandir')
-    -- Le volet : son haut, ses cases et son bas dans sa hauteur.
+    -- Le volet : son haut, ses cases et son bas dans sa hauteur ; autant de cases que la place en
+    -- tient (une de plus n'y tiendrait pas).
     vrai(D.cases * D.hauteurCase <= D.hauteurListe, 'les cases dans la place de la liste')
+    vrai((D.cases + 1) * D.hauteurCase > D.hauteurListe, 'une case de plus tiendrait : ' .. D.cases)
     egal(D.hauteurContenu, 2 * D.margeVolet + D.hautVolet + D.hauteurListe + D.basVolet, 'le volet de haut en bas')
-    -- Le cadre enregistré change de nom : Lightroom ne rapetisse pas un cadre enregistré.
-    egal(2, Fenetre.FORME)
-    egal('DeveloppeurClaude-conversation-grande-2', Fenetre.cadre())
+    -- Le cadre enregistré change de nom : Lightroom ne rapetisse pas un cadre enregistré, et la
+    -- fenêtre agrandie ne doit pas reprendre celui de 1 280 × 800 (FORME 2).
+    egal(3, Fenetre.FORME)
+    egal('DeveloppeurClaude-conversation-grande-3', Fenetre.cadre())
     egal(2, Dispositions.cadreBouton(0), 'cadre d\'un carré : bezel + 2 (D5)')
     egal(S.MARGE_BEZEL, Dispositions.TAILLES.margeBezel)
 end)
 
-essai('Cadre : la fenêtre construite fait 1 278 de large, chaque colonne au plus 766 de haut (estimation), sur ses aplats', function()
+essai("Cadre : la fenêtre entière tient dans l'écran de Dany (3 440 × 1 440), sous la barre des menus, et laisse sa place à Lightroom", function()
+    local largeur, hauteur = S.fenetrePourContenu(D.largeurContenu, D.hauteurContenu)
+    egal(D.largeurFenetre, largeur, 'la fenêtre de ce contenu (D7)')
+    egal(D.hauteurFenetre, hauteur, 'la fenêtre de ce contenu (D7)')
+    vrai(hauteur <= ECRAN_DANY.hauteur - BARRE_MENUS,
+        string.format('fenêtre de %d de haut pour %d sous la barre des menus', hauteur, ECRAN_DANY.hauteur - BARRE_MENUS))
+    vrai(ECRAN_DANY.largeur - largeur >= PLACE_LIGHTROOM, string.format('il reste %d à Lightroom', ECRAN_DANY.largeur - largeur))
+end)
+
+essai('Fil : sa ligne la plus longue reste sous environ 105 caractères moyens (lisibilité) ; une phrase de la fenêtre coupée de même', function()
+    local Fil, Texte = require 'Fil', require 'Texte'
+    -- Le « caractère moyen » : la chasse moyenne d'un caractère d'une phrase de la fenêtre
+    -- (Fenetre.FIL_VIDE), espaces et ponctuation compris, dans la police des lignes de Dany et de
+    -- Claude (Metriques).
+    local police = Fil.polices.claude
+    egal(police, Fil.polices.dany, 'Vous et Claude dans la même police')
+    local moyen = Fil.largeur(Fenetre.FIL_VIDE, police) / Texte.longueur(Fenetre.FIL_VIDE)
+    -- La ligne la plus large du fil : une ligne de Dany ou de Claude, sans retrait (Fil.RETRAITS).
+    egal(0, Fil.retrait('claude'))
+    egal(0, Fil.retrait('dany'))
+    local place = D.texteFil - Fil.MARGE
+    local caracteres = place / moyen
+    vrai(caracteres <= 105, string.format('%.1f caractères moyens (%.2f points chacun) dans %d points', caracteres, moyen, place))
+    -- La même phrase, répétée et coupée comme le fil la coupe : chaque ligne dans sa place, aucune
+    -- au-delà de 105 caractères.
+    local lignes = Fil.couper(string.rep(Fenetre.FIL_VIDE .. ' ', 8), place, police)
+    vrai(#lignes > 3, 'plusieurs lignes')
+    local plusLongue = 0
+    for _, l in ipairs(lignes) do
+        plusLongue = math.max(plusLongue, Texte.longueur(l))
+        vrai(Fil.largeur(l, police) <= place, 'ligne trop large : ' .. l)
+    end
+    vrai(plusLongue <= 105, 'ligne de ' .. plusLongue .. ' caractères')
+end)
+
+essai('Cadre : la fenêtre construite fait la largeur du contenu, chaque colonne tient dans sa hauteur (estimation), sur ses aplats', function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
@@ -364,8 +427,15 @@ essai('Cadre : la fenêtre construite fait 1 278 de large, chaque colonne au plu
             total = total + c.args.width
             local h = hauteur(c)
             vrai(h <= D.hauteurContenu, string.format('colonne de %d de haut (au plus %d)', h, D.hauteurContenu))
+            -- Ce que porte la colonne sur son aplat (le volet, le centre, la colonne droite) : son
+            -- contenu estimé tient dans la hauteur du contenu de la fenêtre.
+            local dedans = c.args[2]
+            if c.genre == 'column' and type(dedans) == 'table' and dedans.genre then
+                local hd = hauteur(dedans)
+                vrai(hd <= D.hauteurContenu, string.format('contenu de colonne de %.1f de haut (au plus %d)', hd, D.hauteurContenu))
+            end
         end
-        egal(D.largeurContenu, total, 'contenu de 1 278 de large')
+        egal(D.largeurContenu, total, 'contenu de toute la largeur')
         -- Les fonds : un aplat (f:picture sans image, à background_color) sous chaque colonne, et les
         -- filets de 1 point aussi (jamais un séparateur ni primary_line_color, A6).
         local C = Fenetre.COULEURS
@@ -388,7 +458,7 @@ essai('Cadre : la fenêtre construite fait 1 278 de large, chaque colonne au plu
         -- au-dessus de la saisie, dans le volet sous Renommer… et Supprimer…, et au-dessus du plafond
         -- de la carte Note (lot B5).
         egal(7, filets, 'filets de 1 point')
-        -- Le premier aplat de chaque colonne est à sa taille : volet 183, centre 630, droite 463, sur 766.
+        -- Le premier aplat de chaque colonne est à sa taille : volet, centre, droite, sur la hauteur du contenu.
         for _, k in ipairs({ 1, 3, 5 }) do
             local aplat = cols[k].args[1]
             egal('picture', aplat.genre)
@@ -638,7 +708,7 @@ essai('Inventaire de la barre et de la saisie : ▲ ▼ à icône, Fin, position
         local message = liee(contenu, 'static_text', 'message')
         egal(D.bandeau, message.args.width)
         egal(D.fil, largeurDonnee(rangeeDe(contenu, message)), 'la rangée du bas de la saisie')
-        -- Cette place (178 points) tient deux lignes de petit texte (lot B4, essai du bandeau plus
+        -- Cette place (D.bandeau) tient deux lignes de petit texte (lot B4, essai du bandeau plus
         -- bas) ; son infobulle donne le message en entier.
         p.message = Fenetre.CHOISIR_CONVERSATION
         egal(Fenetre.CHOISIR_CONVERSATION, valeur(message, 'tooltip', p), "l'infobulle du message, en entier")
@@ -1048,7 +1118,10 @@ essai('Liste dans la fenêtre : le carnet en tête, la case choisie (fond et gra
     local conversations, courante = Moteur.conversations, Moteur.courante
     Moteur.conversations = {}
     local maintenant = os.time()
-    for i = 1, 14 do
+    -- Deux conversations de plus que la liste n'a de cases : avec l'entrée du carnet et l'en-tête du
+    -- jour, elles ne tiennent pas sur une page.
+    local nombre = D.cases + 2
+    for i = 1, nombre do
         local c = Conversation.nouvelle()
         Conversation.ajouterDemande(c, 'Demande ' .. i)
         -- La 4e porte une balise <EM> dans son titre : Lightroom la lirait comme du texte riche
@@ -1120,10 +1193,12 @@ essai('Liste dans la fenêtre : le carnet en tête, la case choisie (fond et gra
         -- Un en-tête ou une case vide : rien.
         S.cliquer(calqueCase(contenu, 2))
         egal(avant, #ouvertes)
-        -- Pages : 14 conversations, l'entrée du carnet et l'en-tête ne tiennent pas en 12 cases.
-        egal('plus', p.lg12)
-        egal('Plus anciennes…', p.lt12)
-        S.cliquer(calqueCase(contenu, 12))
+        -- Pages : les conversations, l'entrée du carnet et l'en-tête ne tiennent pas dans les cases
+        -- de la liste ; « Plus anciennes… » dans la dernière.
+        local derniere = D.cases
+        egal('plus', p['lg' .. derniere])
+        egal('Plus anciennes…', p['lt' .. derniere])
+        S.cliquer(calqueCase(contenu, derniere))
         egal(2, Fenetre.pageListe)
         egal('plus', p.lg1)
         egal('Plus récentes…', p.lt1)
@@ -1132,7 +1207,7 @@ essai('Liste dans la fenêtre : le carnet en tête, la case choisie (fond et gra
         local recherche = liee(contenu, 'edit_field', 'recherche')
         S.taper(recherche, 'Conversation')
         egal(1, Fenetre.pageListe, 'la recherche ramène à la première page')
-        egal('plus', p.lg12, 'deux pages de résultats')
+        egal('plus', p['lg' .. derniere], 'deux pages de résultats')
         p.recherche = ''
         S.taper(recherche, 'lac')
         egal(1, Fenetre.pageListe)
@@ -1158,7 +1233,7 @@ essai('Liste dans la fenêtre : le carnet en tête, la case choisie (fond et gra
         egal(lac.id, Fenetre.choixListe())
         -- Nouvelle conversation depuis la 2e page : elle est en tête de la liste, la première page
         -- revient, et c'est elle qui est choisie.
-        S.cliquer(calqueCase(contenu, 12))
+        S.cliquer(calqueCase(contenu, derniere))
         egal(2, Fenetre.pageListe)
         S.cliquer(parTitre(contenu, '＋ Nouvelle conversation'))
         egal(1, Fenetre.pageListe, 'Nouvelle conversation : la première page')
@@ -1216,7 +1291,7 @@ essai('Légende : nom de la copie, appareil et date de prise de vue (heure local
         -- titre de fenêtre n'est pas un texte riche).
         local dossier = S.home .. '/agrandir-legende'
         S.executer('mkdir -p ' .. S.q(dossier) .. ' && /usr/bin/sips -s format jpeg -z 60 90 '
-            .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(dossier .. '/active.jpg') .. ' >/dev/null 2>&1')
+            .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out ' .. S.q(dossier .. '/active.jpg') .. ' >/dev/null 2>&1')
         Fenetre.apercuActif = { id = 4961, dossier = dossier, fichier = 'active.jpg', chemin = dossier .. '/active.jpg', T = Fenetre.T }
         Fenetre.voirActive = true
         local taches, dialogues = #S.taches, #S.dialogues
@@ -1614,7 +1689,7 @@ local function boutonDeLigne(contenu, titre, cle, i)
     error('« ' .. titre .. ' » montré introuvable sur la ligne ' .. i, 2)
 end
 
-essai("Fil dans la fenêtre : une ligne de 21 (auteur 60, écart 12, texte 518) ; auteur et heure aux bonnes lignes ; « Pourquoi ? » et les actions aux seules bonnes lignes ; aucun refus de texte riche", function()
+essai("Fil dans la fenêtre : une ligne de 21 (auteur 60, écart 12, puis le texte) ; auteur et heure aux bonnes lignes ; « Pourquoi ? » et les actions aux seules bonnes lignes ; aucun refus de texte riche", function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.charger()
     Moteur.nouvelle()
@@ -1622,7 +1697,7 @@ essai("Fil dans la fenêtre : une ligne de 21 (auteur 60, écart 12, texte 518) 
     Moteur.courante = c
     ouvrirFenetre(function(p, contenu)
         Fenetre.rafraichir()
-        egal(518, Fenetre.largeurTexte(), 'D.fil − 60 − 12')
+        egal(D.texteFil, Fenetre.largeurTexte(), 'D.fil − 60 − 12')
         egal(D.fil - D.auteur - D.ecartAuteur, D.texteFil)
         -- La grille : D.lignes rangées de D.hauteurLigne dans la colonne de D.grille, sous la marge.
         local grille
@@ -1877,6 +1952,14 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
     egal(1, select(2, montre:gsub('\n', '')), 'deux lignes')
     egal('…', montre:sub(-#'…'))
     egal('', Fenetre.texteBandeau('', D.bandeau))
+    -- Sans largeur donnée, fenêtre fermée (Fenetre.T vide) : la place du bandeau de Dispositions,
+    -- celle de la fenêtre agrandie.
+    avec(Fenetre, 'T', nil, function()
+        egal(montre, Fenetre.texteBandeau(long), 'sans largeur : D.bandeau')
+        for _, m in ipairs(messages) do
+            egal(m, (Fenetre.texteBandeau(m):gsub('\n', ' ')), 'sans largeur, en entier : ' .. m)
+        end
+    end)
     -- Les photos jointes : « cliquer pour retirer » reste au bout, les noms se coupent avant (comme
     -- la troncature au milieu d'avant le lot B4).
     local suite = '  ·  cliquer pour retirer'
@@ -1918,7 +2001,7 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
     end)
 end)
 
-essai('Carnet : le tableau, en Menlo, aligné et dans 518 points ; la page dépasse la grille, elle se lit par ▲ ▼', function()
+essai('Carnet : le tableau, en Menlo, aligné et dans la largeur du fil', function()
     -- Six mois (dont un changement d'année, les mois avec leur année) et des libellés de 40 caractères :
     -- la colonne Défaut se resserre, le tableau reste aligné et tient dans le fil.
     local mois, defauts = {}, {}
@@ -2063,8 +2146,11 @@ local function copieProposition(plus)
     return p
 end
 
-essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leur contenu tient, chaque onglet sous l\'aperçu (431) ; textes à 379 en 12 points', function()
-    egal(431, D.placeCartes, 'la place sous l\'aperçu et sa rangée, jusqu\'au bas du contenu du panneau')
+essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leur contenu tient, chaque onglet sous l\'aperçu (D.placeCartes) ; textes à 379 en 12 points', function()
+    -- La place sous l\'aperçu et sa rangée, jusqu\'au bas du contenu du panneau (son bord et sa marge
+    -- de 14) : chaque carte y tient (plus bas).
+    egal(Dispositions.IMAGES.panneau.hauteur - 1 - 14, D.hauteurSegments + D.margeHautPanneau + D.apercuHauteur + 8
+        + Dispositions.cadreBouton(22) + 12 + D.placeCartes, 'la place des cartes, du haut des segments au bas du panneau')
     egal(379, D.carte)
     egal(13, D.margeCarte)
     for _, cle in ipairs({ 'largeurNote', 'largeurProposition', 'largeurEtape', 'largeurLecon' }) do
@@ -2102,7 +2188,19 @@ essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leu
             egal(D.margeCarte, dedans.args.margin_left, nom .. ' : marge de gauche')
             egal(12, dedans.args.margin_top, nom .. ' : marge du haut')
             vrai(hauteur(carte) <= carte.args.height, nom .. ' : son contenu y tient')
+            -- Ses lignes la remplissent (Dispositions.TAILLES : criteres, propLignes, etapeLignes,
+            -- leconLignes) : au moins la marge du haut sous le contenu, et une ligne de plus (16 dans
+            -- la grille de la carte Note, une ligne de texte en 12 ailleurs) ne laisserait plus cette
+            -- marge.
+            local estime = hauteur(dedans)
+            local ligne = nom == 'carte-note' and D.ligneCritere or 1.25 * 12
+            local bas = carte.args.height - dedans.args.margin_top
+            vrai(estime <= bas, string.format('%s : contenu de %.1f, %.1f sous lui (au moins %d)', nom, estime, carte.args.height - estime,
+                dedans.args.margin_top))
+            vrai(estime + ligne > bas, string.format('%s : une ligne de plus y tiendrait (contenu de %.1f pour %d)', nom, estime, carte.args.height))
         end
+        -- L'onglet Note remplit la place des cartes : une ligne de critère de plus n'y tiendrait pas.
+        vrai(hauteur(v.notation) + D.ligneCritere > D.placeCartes, string.format('onglet Note : %.1f pour %d', hauteur(v.notation), D.placeCartes))
         -- Les textes des cartes, à la largeur de leur intérieur, en 12 points.
         for _, cle in ipairs({ 'propositionTexte', 'etapeTexte', 'leconTexte' }) do
             local t = liee(contenu, 'static_text', cle)
@@ -2813,9 +2911,10 @@ essai('Carte Note : la grille des critères (Fenetre.lignesCriteres) ; état en 
     -- Dans la fenêtre : la page, ▲ ▼ ; la même proposition relue garde sa page.
     photoNotee(4961, 'DSCF4961.RAF', 0, 0)
     Moteur.nouvelle()
+    -- Chaque critère répété autant de fois que la grille a de lignes : plus de deux pages.
     local longue = copieProposition()
     for _, cle in ipairs({ 'impact', 'qualites', 'plancher' }) do
-        longue.criteres[cle] = string.rep(longue.criteres[cle] .. ' ', 6)
+        longue.criteres[cle] = string.rep(longue.criteres[cle] .. ' ', D.criteres + 1)
     end
     avecRegistre(longue, function()
         ouvrirFenetre(function(p, contenu)

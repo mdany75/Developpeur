@@ -443,7 +443,7 @@ prefs.cheminConnecteur = '/bin/echo'
 
 -- Une petite image JPEG (en base64) pour le résultat d'outil du faux Claude Code (cas par défaut).
 local imageB64 = S.home .. '/image.b64'
-S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
 S.executer('/usr/bin/base64 -i ' .. S.q(S.home .. '/image.jpg') .. ' -o ' .. S.q(imageB64))
 local env = 'FAUX_IMAGE_B64=' .. S.q(imageB64) .. ' '
 local executerOriginal = S.modules.LrTasks.execute
