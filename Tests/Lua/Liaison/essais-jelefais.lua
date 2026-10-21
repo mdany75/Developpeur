@@ -6,7 +6,9 @@
 -- (apercu, comparer = versionClaude) : la version de Claude rendue le temps d'un rendu, puis
 -- l'état de Dany remis tel quel, les écarts réglage par réglage ; les refus ; choose_variant
 -- « ma version » puis undo_last ; l'entrée du journal d'une variante choisie, avec ses
--- changements (relecture du lot 4) ; les fonctions pures d'Ecriture et de Variantes.
+-- changements (relecture du lot 4) ; les fonctions pures d'Ecriture et de Variantes ; le contrat
+-- avec le serveur (Tests/Contrats/je-le-fais.json : ses params, par la liaison, donnent exactement
+-- ses réponses ; le serveur le lit dans ContratJeLeFaisTests.swift).
 -- Lancé par scripts/tester-module.sh (essais à part de la liaison).
 
 local dossierTests = (arg and arg[0] or ''):match('(.*/)') or './'
@@ -710,6 +712,190 @@ test("Variantes.valeursClaude et ecartsExercice : fonctions pures", function()
     autreLook.Look = { Name = 'Adobe Color', Amount = 1, UUID = 'AUTRE' }
     ecarts, listes, rien = Variantes.ecartsExercice(ex, autreLook)
     egal(rien, false, "une Look changée compte")
+end)
+
+-- Contrat avec le serveur --------------------------------------------------------------------------
+
+-- Tests/Contrats/je-le-fais.json fige ce qui passe sur la liaison : les params exacts que le serveur
+-- envoie (preview_settings avec my_turn : essayer ; view_photo avec compare = claude_version :
+-- apercu) et les réponses exactes du module. Le serveur les lit dans ContratJeLeFaisTests.swift ;
+-- ici, ces params passent par la liaison (une ligne JSON, comme du serveur) et la réponse doit être
+-- celle du contrat, champ par champ : noms, formes (tableau ou objet, nombre, texte, booléen),
+-- valeurs. Les chemins d'aperçus sont remplacés par leurs textes du contrat. Un null d'objet est
+-- absent des deux côtés (Json.decode l'efface) : le serveur lit un null comme une clé absente.
+
+local CONTRAT = dossierTests .. '../../Contrats/je-le-fais.json'
+local TABLEAU = getmetatable(Json.tableau())
+
+local function lireContrat()
+    local fichier = io.open(CONTRAT, 'r')
+    if not fichier then
+        error("contrat introuvable : " .. CONTRAT, 0)
+    end
+    local texte = fichier:read('*a')
+    fichier:close()
+    return Json.decode(texte)
+end
+
+-- La première différence entre la valeur obtenue et celle du contrat, ou nil.
+local function difference(obtenu, attendu, chemin)
+    if attendu == Json.null or obtenu == Json.null then
+        if obtenu ~= attendu then
+            return string.format("%s : attendu %s, obtenu %s", chemin, Json.encode(attendu), Json.encode(obtenu))
+        end
+        return nil
+    end
+    if type(obtenu) ~= type(attendu) then
+        return string.format("%s : attendu %s, obtenu %s", chemin, Json.encode(attendu), obtenu == nil and "rien" or Json.encode(obtenu))
+    end
+    if type(attendu) ~= 'table' then
+        if obtenu ~= attendu then
+            return string.format("%s : attendu %s, obtenu %s", chemin, Json.encode(attendu), Json.encode(obtenu))
+        end
+        return nil
+    end
+    if (getmetatable(obtenu) == TABLEAU) ~= (getmetatable(attendu) == TABLEAU) then
+        return string.format("%s : attendu %s, obtenu %s", chemin, getmetatable(attendu) == TABLEAU and "un tableau" or "un objet",
+            Json.encode(obtenu))
+    end
+    if getmetatable(attendu) == TABLEAU and #obtenu ~= #attendu then
+        return string.format("%s : %d éléments attendus, %d obtenus : %s", chemin, #attendu, #obtenu, Json.encode(obtenu))
+    end
+    local cles = {}
+    for cle in pairs(attendu) do cles[#cles + 1] = cle end
+    table.sort(cles, function(a, b) return tostring(a) < tostring(b) end)
+    for _, cle in ipairs(cles) do
+        local d = difference(obtenu[cle], attendu[cle], chemin .. '.' .. tostring(cle))
+        if d then
+            return d
+        end
+    end
+    for cle, valeur in pairs(obtenu) do
+        if attendu[cle] == nil then
+            return string.format("%s.%s : en trop (%s)", chemin, tostring(cle), Json.encode(valeur))
+        end
+    end
+    return nil
+end
+
+local function selonLeContrat(obtenu, attendu, nom)
+    local d = difference(obtenu, attendu, nom)
+    if d then
+        error("écart avec Tests/Contrats/je-le-fais.json, " .. d, 2)
+    end
+end
+
+-- Une commande du serveur par la liaison : la ligne JSON (avec le jeton), la réponse relue.
+local function parLaLiaison(fonction)
+    Liaison.prise = { send = function(_, texte) S.envois[#S.envois + 1] = texte end }
+    Liaison.reponsesConnectee = true
+    local envoyer = function(commande, params)
+        Liaison.recevoir(A.ligne({ id = #S.envois + 1, command = commande, params = params }))
+        return Json.decode(S.envois[#S.envois])
+    end
+    local ok, erreur = pcall(fonction, envoyer)
+    Liaison.prise, Liaison.reponsesConnectee = nil, false
+    if not ok then
+        error(erreur, 0)
+    end
+end
+
+-- Une horloge qui avance à chaque lecture, le temps d'une commande : chaque rendu a son propre
+-- dossier (apercu-<photo>-<millisecondes>), pour savoir quel aperçu va dans chemin, lequel dans
+-- chemin_avant.
+local function horlogeQuiAvance(fonction)
+    local LrDate = import 'LrDate'
+    local lire = LrDate.currentTime
+    local pas = 0
+    LrDate.currentTime = function()
+        pas = pas + 0.001
+        return lire() + pas
+    end
+    local ok, resultat = pcall(fonction)
+    LrDate.currentTime = lire
+    if not ok then
+        error(resultat, 0)
+    end
+    return resultat
+end
+
+-- Les chemins d'aperçus de la comparaison : le premier rendu (chemin_avant) est la version de
+-- Claude, le second (chemin) celle de l'utilisateur ; remplacés ensuite par les textes du contrat.
+local function cheminsDuContrat(resultat, attendu, claude, vous)
+    egal(#S.rendus, 2, "deux rendus : la version de Claude, puis celle de l'utilisateur")
+    local function dossier(i) return S.rendus[i].exportSettings.LR_export_destinationPathPrefix end
+    egal(dossier(1) ~= dossier(2), true, "un dossier par rendu")
+    egal(tostring(resultat.chemin_avant):sub(1, #dossier(1)), dossier(1), "chemin_avant : le premier rendu")
+    egal(tostring(resultat.chemin):sub(1, #dossier(2)), dossier(2), "chemin : le second rendu")
+    claude(S.rendus[1].reglagesRendus)
+    vous(S.rendus[2].reglagesRendus)
+    resultat.chemin, resultat.chemin_avant = attendu.chemin, attendu.chemin_avant
+end
+
+test("contrat avec le serveur (RAW) : ses params donnent exactement les réponses de Tests/Contrats/je-le-fais.json", function()
+    local contrat = lireContrat().exemples.raw
+    local photo = photoFuji()
+    for cle, valeur in pairs({ Clarity2012 = 0, Contrast2012 = 0, ToneCurvePV2012 = { 0, 0, 255, 255 }, CropLeft = 0, CropTop = 0,
+        CropRight = 1, CropBottom = 1, CropAngle = 0, HasCrop = false, MaskGroupBasedCorrections = { masqueDeDany('Ciel') } }) do
+        photo.reglages[cle] = valeur
+    end
+    S.active, S.selection = photo, { photo }
+    parLaLiaison(function(envoyer)
+        local r = envoyer('essayer', contrat.essayer.params)
+        egal(r.error, nil, "essayer refusé")
+        selonLeContrat(r.result, contrat.essayer.reponse, 'essayer')
+        egal(#S.rendus, 0, "sans_rendu")
+        -- La raison envoyée par le serveur (step_name) va dans l'entrée de l'exercice.
+        local journal = memoire(photo, 'journalClaude')
+        egal(journal[1].raison, contrat.essayer.params.raison)
+
+        -- L'utilisateur, à la main : plus d'exposition, la température (balance personnalisée), de
+        -- la clarté, une autre courbe, sans Look, un recadrage et un second masque.
+        aLaMain(photo, { Exposure2012 = 0.8, Temperature = 5650, WhiteBalance = 'Custom', Clarity2012 = 20,
+            ToneCurvePV2012 = { 0, 0, 100, 90, 255, 255 }, Look = {}, CropLeft = 0.05, CropTop = 0.02, CropRight = 0.95, HasCrop = true,
+            MaskGroupBasedCorrections = { masqueDeDany('Ciel'), masqueDeDany('Sol') } })
+        r = horlogeQuiAvance(function() return envoyer('apercu', contrat.apercu.params) end)
+        egal(r.error, nil, "apercu refusé")
+        cheminsDuContrat(r.result, contrat.apercu.reponse,
+            function(claude) proche(claude.Exposure2012, 0.35, "rendu 1 : la version de Claude") end,
+            function(vous) proche(vous.Exposure2012, 0.8, "rendu 2 : celle de l'utilisateur") end)
+        selonLeContrat(r.result, contrat.apercu.reponse, 'apercu')
+    end)
+end)
+
+test("contrat avec le serveur (JPEG) : la balance relative sous Temperature et Tint, des deux côtés", function()
+    local contrat = lireContrat().exemples.jpeg
+    local photo = photoJpeg()
+    photo.reglages.Shadows2012 = 0
+    S.active, S.selection = photo, { photo }
+    parLaLiaison(function(envoyer)
+        local r = envoyer('essayer', contrat.essayer.params)
+        egal(r.error, nil, "essayer refusé")
+        selonLeContrat(r.result, contrat.essayer.reponse, 'essayer')
+        aLaMain(photo, { IncrementalTemperature = 20, WhiteBalance = 'Custom', Shadows2012 = 15 })
+        r = horlogeQuiAvance(function() return envoyer('apercu', contrat.apercu.params) end)
+        egal(r.error, nil, "apercu refusé")
+        cheminsDuContrat(r.result, contrat.apercu.reponse,
+            function(claude) egal(claude.IncrementalTemperature, 12, "rendu 1 : la version de Claude") end,
+            function(vous) egal(vous.IncrementalTemperature, 20, "rendu 2 : celle de l'utilisateur") end)
+        selonLeContrat(r.result, contrat.apercu.reponse, 'apercu')
+    end)
+end)
+
+test("contrat avec le serveur : les refus passent tels quels (rien à faire, aucune version rangée)", function()
+    local refus = lireContrat().refus
+    local photo = photoRaw()
+    S.active, S.selection = photo, { photo }
+    parLaLiaison(function(envoyer)
+        local r = envoyer('essayer', refus.rien_a_faire.essayer.params)
+        egal(r.result, nil)
+        egal(r.error, refus.rien_a_faire.essayer.erreur, "refus d'essayer")
+        r = envoyer('apercu', refus.sans_version.apercu.params)
+        egal(r.result, nil)
+        egal(r.error, refus.sans_version.apercu.erreur, "refus d'apercu")
+    end)
+    egal(#photo.appliques, 0, "rien d'écrit")
+    egal(#S.rendus, 0)
 end)
 
 A.bilan()

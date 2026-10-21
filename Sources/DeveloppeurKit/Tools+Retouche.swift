@@ -319,6 +319,12 @@ extension ToolHandler {
         params["instantane"] = .string(JeLeFais.instantane)
         params["exercice"] = true
         params["sans_rendu"] = true
+        // La raison de l'entrée « Claude · je le fais » du journal (Variantes.ranger) : le nom que
+        // Claude donne à sa proposition, seul texte de preview_settings sur elle (l'étape, elle, a
+        // son nom fixe). Sans lui, l'entrée n'a pas de raison.
+        if let nom = args.string("step_name")?.trimmingCharacters(in: .whitespacesAndNewlines), !nom.isEmpty {
+            params["raison"] = .string(String(nom.prefix(300)))
+        }
         // compare = false ne demandait rien : pas de remarque pour lui.
         let ignores = ["compare", "size", "overlay"].filter { $0 == "compare" ? args.bool($0) == true : args.has($0) }
         if !ignores.isEmpty {

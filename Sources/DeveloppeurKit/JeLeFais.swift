@@ -243,10 +243,17 @@ enum JeLeFais {
     }
 
     /// La valeur d'un réglage telle que la montre le panneau : « +0,35 », « 5 600 K », « −1,2° »,
-    /// « activé », « complet », « 45° », ou le texte du module (profil, préréglage…).
+    /// « activé », « complet », « 45° », ou le texte du module (profil, préréglage…). La version de
+    /// processus arrive rangée par Lightroom dans les écarts (« 15.4 », l'état simple du module) et
+    /// nommée dans la liste à faire (« version 6 », les noms que le serveur envoie au module) : les
+    /// deux disent « version 6 ».
     static func texte(cle: String, _ valeur: JSONValue?, raw: Bool) -> String {
         guard let valeur, !valeur.isNull else { return "—" }
-        if let texte = valeur.string { return cle == "WhiteBalance" ? (nomsBalance[texte] ?? texte) : texte }
+        if let texte = valeur.string {
+            if cle == "WhiteBalance" { return nomsBalance[texte] ?? texte }
+            if cle == "ProcessVersion", let version = DevelopCatalogue.processVersion(texte) { return "version \(version)" }
+            return texte
+        }
         guard let v = nombre(valeur) else { return JSONCoding.line(valeur) }
         if v == ToolHandler.pendingAutoValue { return "auto" }
         let reglage = DevelopCatalogue.setting(cle)
