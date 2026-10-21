@@ -36,11 +36,18 @@ public extension LightroomServing {
 /// Client TCP du module « Développeur ». Le module écoute sur 127.0.0.1 avec deux
 /// prises `LrSocket` à sens unique : l'une reçoit les commandes (`requestPort`), l'autre renvoie
 /// les réponses (`replyPort`). Chaque message est une ligne JSON :
-///   commande → `{"id": 7, "command": "apercu", "params": {…}}`
+///   commande → `{"id": 7, "jeton": "<64 chiffres hexadécimaux>", "command": "apercu", "params": {…}}`
 ///   réponse  ← `{"id": 7, "result": {…}}` ou `{"id": 7, "error": "message"}`
+///   refus    ← `{"id": 7, "error": "Liaison fermée : …", "code": "jeton"}`
 /// Une connexion par commande, fermée aussitôt après : `LrSocket` ne sert qu'un client à la fois,
 /// et Claude Desktop comme chaque session de Claude Code lancent leur propre serveur. Entre deux
 /// connexions, le module rouvre sa prise des réponses : un refus bref est donc retenté.
+///
+/// Liaison fermée (1.2) : le jeton privé que le module écrit à chaque démarrage de la liaison
+/// (`JetonLiaison`) est relu à chaque connexion et part dans chaque ligne, ping compris. Un refus
+/// du jeton (liaison redémarrée entre la lecture et le ping) fait relire le fichier une fois. Sans
+/// fichier, aucune clé `jeton` : un module d'avant la 1.2 accepte la ligne comme avant. Le jeton
+/// n'est jamais journalisé.
 public final class LightroomBridge: LightroomServing {
     public static let defaultRequestPort: UInt16 = 54770
     public static let defaultReplyPort: UInt16 = 54771
@@ -59,10 +66,20 @@ public final class LightroomBridge: LightroomServing {
     commande (débruitage, livraison, aperçu), ou Lightroom attend une réponse dans une fenêtre. Réessayer dans un instant ; \
     rien n'a été fait.
     """
+    /// Le module refuse la commande faute du bon jeton, et le fichier du jeton manque ou est mal
+    /// formé : la liaison doit le réécrire.
+    public static let jetonIntrouvableMessage = """
+    Le module de Lightroom demande le jeton de la liaison, mais le fichier « liaison.jeton » est introuvable ou \
+    illisible (~/Library/Application Support/Developpeur/) : rien n'a été fait. Relancer la liaison dans Lightroom \
+    (Fichier › Module externe - Extras › Arrêter, puis Démarrer la liaison avec Claude) : elle le réécrit.
+    """
 
     public let host: String
     public let requestPort: UInt16
     public let replyPort: UInt16
+    /// Fichier du jeton de la liaison, relu à chaque connexion ; nil (par défaut, et dans les
+    /// tests) : aucun jeton envoyé. Seul `fromEnvironment` pointe le vrai fichier.
+    public let fichierJeton: URL?
 
     /// Durée pendant laquelle un refus de connexion est retenté (le module rouvre ses prises).
     public var refusalRetryWindow: TimeInterval = 3
@@ -83,23 +100,35 @@ public final class LightroomBridge: LightroomServing {
     private var replySocket: Int32 = -1
     private var buffer = Data()
     private var nextID = 1
+    /// Jeton lu à la connexion en cours (nil : pas de fichier, ou fichier illisible).
+    private var jetonCourant: String?
+
+    /// Refus du jeton par le module (`code: "jeton"`) : traité par `connect`, qui relit le fichier
+    /// une fois, puis montré comme une erreur du module.
+    private struct RefusJeton: Error {
+        let message: String
+    }
 
     public init(host: String = "127.0.0.1",
                 requestPort: UInt16 = LightroomBridge.defaultRequestPort,
-                replyPort: UInt16 = LightroomBridge.defaultReplyPort) {
+                replyPort: UInt16 = LightroomBridge.defaultReplyPort,
+                fichierJeton: URL? = nil) {
         self.host = host
         self.requestPort = requestPort
         self.replyPort = replyPort
+        self.fichierJeton = fichierJeton
     }
 
     /// Ports donnés par `DEVELOPPEUR_PORT` (commandes ; les réponses sur le port suivant), et
-    /// journal sur stderr avec `DEVELOPPEUR_VERBOSE=1`.
+    /// journal sur stderr avec `DEVELOPPEUR_VERBOSE=1`. Le jeton vient du fichier que le module
+    /// écrit (`JetonLiaison.fichierParDefaut`) : serveur de Claude Desktop, de Claude Code, de la
+    /// fenêtre Claude, `--call` et la recette ont le même, sans réglage.
     public static func fromEnvironment(_ environment: [String: String] = ProcessInfo.processInfo.environment) -> LightroomBridge {
         let bridge: LightroomBridge
         if let text = environment["DEVELOPPEUR_PORT"], let port = UInt16(text), port < UInt16.max {
-            bridge = LightroomBridge(requestPort: port, replyPort: port + 1)
+            bridge = LightroomBridge(requestPort: port, replyPort: port + 1, fichierJeton: JetonLiaison.fichierParDefaut())
         } else {
-            bridge = LightroomBridge()
+            bridge = LightroomBridge(fichierJeton: JetonLiaison.fichierParDefaut())
         }
         if environment["DEVELOPPEUR_VERBOSE"] == "1" {
             bridge.journal = { FileHandle.standardError.write(Data("[mcp-developpeur] \($0)\n".utf8)) }
@@ -142,7 +171,12 @@ public final class LightroomBridge: LightroomServing {
     private func envoyer(_ command: String, _ params: [String: JSONValue], timeout: TimeInterval) throws -> JSONValue {
         try connect()
         defer { disconnect() }
-        return try exchange(command, params, timeout: timeout)
+        do {
+            return try exchange(command, params, timeout: timeout)
+        } catch let refus as RefusJeton {
+            // Le ping est passé avec ce jeton : la liaison a redémarré entre les deux. Rien n'a été fait.
+            throw LightroomError.plugin(refus.message)
+        }
     }
 
     public func disconnect() {
@@ -157,9 +191,12 @@ public final class LightroomBridge: LightroomServing {
 
     /// Ouvre les deux prises puis vérifie la liaison par un `ping`. Un refus est retenté pendant
     /// `refusalRetryWindow` ; une poignée de main ratée (connexion acceptée trop tard, ou coupée
-    /// pendant que le module rouvre sa prise des réponses) est retentée une fois.
+    /// pendant que le module rouvre sa prise des réponses) est retentée une fois. Le jeton est relu
+    /// ici, à chaque connexion ; refusé, il est relu une seule fois de plus, s'il a changé.
     private func connect() throws {
         disconnect()
+        jetonCourant = fichierJeton.flatMap(JetonLiaison.lire)
+        var jetonRelu = false
         let refusalDeadline = Date().addingTimeInterval(refusalRetryWindow)
         var failedHandshakes = 0
         var silences = 0
@@ -181,6 +218,20 @@ public final class LightroomBridge: LightroomServing {
                 }
                 moduleVersion = pong["version"]?.string
                 return
+            } catch let refus as RefusJeton {
+                disconnect()
+                let neuf = fichierJeton.flatMap(JetonLiaison.lire)
+                // La liaison a redémarré entre la lecture et le ping : son nouveau jeton, une fois.
+                if !jetonRelu, let neuf = neuf, neuf != jetonCourant {
+                    jetonRelu = true
+                    jetonCourant = neuf
+                    journal?("jeton de la liaison renouvelé : relu")
+                    continue
+                }
+                if fichierJeton != nil, neuf == nil {
+                    throw LightroomError.plugin(Self.jetonIntrouvableMessage)
+                }
+                throw LightroomError.plugin(refus.message)
             } catch {
                 disconnect()
                 if case LightroomError.plugin = error { throw error }
@@ -231,8 +282,11 @@ public final class LightroomBridge: LightroomServing {
     private func exchange(_ command: String, _ params: [String: JSONValue], timeout: TimeInterval) throws -> JSONValue {
         let id = nextID
         nextID += 1
-        let message: JSONValue = ["id": .number(Double(id)), "command": .string(command), "params": .object(params)]
-        try write(JSONCoding.line(message) + "\n")
+        var message: [String: JSONValue] = ["id": .number(Double(id)), "command": .string(command), "params": .object(params)]
+        if let jeton = jetonCourant {
+            message["jeton"] = .string(jeton)
+        }
+        try write(JSONCoding.line(.object(message)) + "\n")
 
         let deadline = Date().addingTimeInterval(timeout)
         while true {
@@ -244,7 +298,11 @@ public final class LightroomBridge: LightroomServing {
                 Self.signalerEvenements(evenements)
             }
             if let error = reply["error"], !error.isNull {
-                throw LightroomError.plugin(error.string ?? JSONCoding.line(error))
+                let texte = error.string ?? JSONCoding.line(error)
+                if reply["code"]?.string == "jeton" {
+                    throw RefusJeton(message: texte)
+                }
+                throw LightroomError.plugin(texte)
             }
             return reply["result"] ?? .null
         }

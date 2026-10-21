@@ -45,6 +45,9 @@ function Lecture.etat(params)
         sauvegarde = sauvegarde,
         module = "Développeur",
         version_module = Liaison.VERSION,
+        -- Liaison fermée par le jeton (1.2) : une commande qui arrive ici l'a porté. Un module plus
+        -- ancien n'a pas ce champ. Jamais le jeton ni son chemin.
+        liaison_fermee = true,
         lightroom = LrApplication.versionString(),
         catalogue = LrPathUtils.leafName(cat:getPath()),
         mode = modeTexte(prefs),

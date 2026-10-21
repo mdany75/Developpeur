@@ -19,6 +19,31 @@ final class FakePlugin {
     private var replyConnection: Int32 = -1
     private var stopped = false
     private var receivedCommands: [String] = []
+    private var receivedTokens: [String?] = []
+    private var receivedLines: [String] = []
+    private var expectedToken: String?
+
+    /// Liaison fermée (1.2) : le jeton que le module attend (nil : module d'avant la 1.2, qui
+    /// accepte tout). Une ligne qui ne le porte pas reçoit le refus du module (`code: "jeton"`),
+    /// sans passer par `handler`.
+    var jetonAttendu: String? {
+        get { lock.lock(); defer { lock.unlock() }; return expectedToken }
+        set { lock.lock(); expectedToken = newValue; lock.unlock() }
+    }
+    /// Appelé à chaque refus, avant la réponse (la liaison réécrit son fichier, par exemple).
+    var surRefus: (() -> Void)?
+
+    /// Jeton de chaque ligne reçue (nil : sans clé `jeton`).
+    var jetonsRecus: [String?] {
+        lock.lock(); defer { lock.unlock() }
+        return receivedTokens
+    }
+
+    /// Lignes reçues, telles quelles.
+    var lignesRecues: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return receivedLines
+    }
 
     /// Ports libres choisis par le système, ou ports imposés (pour reprendre ceux d'un faux module arrêté).
     init(requestPort: UInt16 = 0, replyPort: UInt16 = 0) throws {
@@ -97,8 +122,21 @@ final class FakePlugin {
                 let line = String(decoding: buffer[buffer.startIndex..<newline], as: UTF8.self)
                 buffer.removeSubrange(buffer.startIndex...newline)
                 guard let message = try? JSONCoding.parse(line) else { continue }
-                lock.lock(); receivedCommands.append(message["command"]?.string ?? "?"); lock.unlock()
-                for answer in handler(message) {
+                lock.lock()
+                receivedCommands.append(message["command"]?.string ?? "?")
+                receivedTokens.append(message.object?["jeton"].map { $0.string ?? JSONCoding.line($0) })
+                receivedLines.append(line)
+                let attendu = expectedToken
+                lock.unlock()
+                let answers: [String]
+                if let attendu = attendu, message["jeton"]?.string != attendu {
+                    surRefus?()
+                    answers = [JSONCoding.line(["id": message["id"] ?? .null, "code": "jeton",
+                                                "error": "Liaison fermée : le jeton de cette commande n'est pas celui de la liaison ; rien n'a été fait."])]
+                } else {
+                    answers = handler(message)
+                }
+                for answer in answers {
                     let bytes = Array((answer + "\n").utf8)
                     _ = bytes.withUnsafeBufferPointer { send(reply, $0.baseAddress, $0.count, 0) }
                 }
@@ -311,5 +349,145 @@ final class LightroomBridgeTests: XCTestCase {
         XCTAssertEqual(bridge.requestPort, 60000)
         XCTAssertEqual(bridge.replyPort, 60001)
         XCTAssertEqual(LightroomBridge.fromEnvironment([:]).requestPort, LightroomBridge.defaultRequestPort)
+        // Seul fromEnvironment pointe le vrai fichier du jeton (sans le lire ici : aucun envoi).
+        XCTAssertEqual(bridge.fichierJeton, JetonLiaison.fichierParDefaut())
+        XCTAssertEqual(LightroomBridge.fromEnvironment([:]).fichierJeton, JetonLiaison.fichierParDefaut())
+        XCTAssertNil(LightroomBridge(requestPort: 1, replyPort: 2).fichierJeton, "les tests ne lisent jamais le vrai jeton")
+    }
+
+    // MARK: Liaison fermée (1.2)
+
+    private let jetonA = String(repeating: "a1", count: 32)
+    private let jetonB = String(repeating: "b2", count: 32)
+
+    /// Un fichier du jeton dans un dossier temporaire, jamais le vrai.
+    private func fichierJeton(_ contenu: String?) throws -> URL {
+        let url = TestSupport.temporaryDirectory().appendingPathComponent(JetonLiaison.nomFichier)
+        if let contenu = contenu {
+            try Data(contenu.utf8).write(to: url)
+        }
+        return url
+    }
+
+    private func makeBridge(jeton url: URL) -> LightroomBridge {
+        LightroomBridge(requestPort: plugin.requestPort, replyPort: plugin.replyPort, fichierJeton: url)
+    }
+
+    private func repondreEtat() {
+        plugin.handler = { [unowned self] request in
+            [self.answer(request, request["command"]?.string == "ping" ? ["pong": true] : ["ok": true])]
+        }
+    }
+
+    func testJetonPartAvecLePingEtLaCommande() throws {
+        repondreEtat()
+        plugin.jetonAttendu = jetonA
+        let bridge = makeBridge(jeton: try fichierJeton(jetonA + "\n"))
+        XCTAssertEqual(try bridge.send("etat", [:], timeout: 5)["ok"]?.bool, true)
+        XCTAssertEqual(plugin.jetonsRecus, [jetonA, jetonA])
+        XCTAssertEqual(plugin.received, ["ping", "etat"])
+    }
+
+    func testJetonReluAChaqueConnexion() throws {
+        repondreEtat()
+        let url = try fichierJeton(jetonA)
+        plugin.jetonAttendu = jetonA
+        let bridge = makeBridge(jeton: url)
+        _ = try bridge.send("etat", [:], timeout: 5)
+        // La liaison redémarre : un nouveau jeton, que la connexion suivante relit.
+        try Data((jetonB + "\n").utf8).write(to: url)
+        plugin.jetonAttendu = jetonB
+        _ = try bridge.send("etat", [:], timeout: 5)
+        XCTAssertEqual(plugin.jetonsRecus, [jetonA, jetonA, jetonB, jetonB])
+    }
+
+    func testJetonRenouveleEntreLectureEtPing() throws {
+        repondreEtat()
+        let url = try fichierJeton(jetonA)
+        plugin.jetonAttendu = jetonB
+        plugin.surRefus = { try? Data((self.jetonB + "\n").utf8).write(to: url) }
+        let bridge = makeBridge(jeton: url)
+        var journal: [String] = []
+        bridge.journal = { journal.append($0) }
+        XCTAssertEqual(try bridge.send("etat", [:], timeout: 5)["ok"]?.bool, true)
+        XCTAssertEqual(plugin.received, ["ping", "ping", "etat"])
+        XCTAssertEqual(plugin.jetonsRecus, [jetonA, jetonB, jetonB])
+        XCTAssertTrue(journal.contains("jeton de la liaison renouvelé : relu"))
+    }
+
+    func testMauvaisJetonRefuseSansBoucle() throws {
+        repondreEtat()
+        plugin.jetonAttendu = jetonB
+        let bridge = makeBridge(jeton: try fichierJeton(jetonA))
+        XCTAssertThrowsError(try bridge.send("etat", [:], timeout: 5)) { error in
+            guard case LightroomError.plugin(let message) = error else { return XCTFail("\(error)") }
+            XCTAssertTrue(message.contains("Liaison fermée"), message)
+        }
+        XCTAssertEqual(plugin.received, ["ping"], "aucune commande envoyée, une seule tentative")
+        XCTAssertFalse(bridge.isConnected)
+    }
+
+    func testFichierAbsentFaceAuModuleFerme() throws {
+        repondreEtat()
+        plugin.jetonAttendu = jetonB
+        let bridge = makeBridge(jeton: try fichierJeton(nil))
+        XCTAssertThrowsError(try bridge.send("etat", [:], timeout: 5)) { error in
+            XCTAssertEqual(error as? LightroomError, .plugin(LightroomBridge.jetonIntrouvableMessage))
+        }
+        XCTAssertEqual(plugin.received, ["ping"])
+        // Un fichier mal formé vaut un fichier absent.
+        let bridgeMalForme = makeBridge(jeton: try fichierJeton(jetonA.uppercased()))
+        XCTAssertThrowsError(try bridgeMalForme.send("etat", [:], timeout: 5)) { error in
+            XCTAssertEqual(error as? LightroomError, .plugin(LightroomBridge.jetonIntrouvableMessage))
+        }
+    }
+
+    /// Un serveur neuf face à un module 1.1.1 : pas de fichier, aucune clé `jeton`, accepté comme avant.
+    func testSansFichierAncienModuleAccepte() throws {
+        repondreEtat()
+        let bridge = makeBridge(jeton: try fichierJeton(nil))
+        XCTAssertEqual(try bridge.send("etat", [:], timeout: 5)["ok"]?.bool, true)
+        XCTAssertEqual(plugin.jetonsRecus, [nil, nil])
+        XCTAssertFalse(plugin.lignesRecues.contains { $0.contains("jeton") }, "aucune clé jeton")
+    }
+
+    /// La liaison redémarre entre le ping et la commande : la commande refusée n'est pas reprise.
+    func testCommandeRefuseeApresLePing() throws {
+        plugin.handler = { [unowned self] request in
+            if request["command"]?.string == "ping" {
+                self.plugin.jetonAttendu = self.jetonB
+                return [self.answer(request, ["pong": true])]
+            }
+            return [self.answer(request, ["ok": true])]
+        }
+        plugin.jetonAttendu = jetonA
+        let bridge = makeBridge(jeton: try fichierJeton(jetonA))
+        XCTAssertThrowsError(try bridge.send("etat", [:], timeout: 5)) { error in
+            guard case LightroomError.plugin(let message) = error else { return XCTFail("\(error)") }
+            XCTAssertTrue(message.contains("Liaison fermée"), message)
+        }
+        XCTAssertEqual(plugin.received, ["ping", "etat"])
+    }
+
+    func testJetonJamaisDansLeJournal() throws {
+        repondreEtat()
+        let url = try fichierJeton(jetonA)
+        plugin.jetonAttendu = jetonB
+        plugin.surRefus = { try? Data(self.jetonB.utf8).write(to: url) }
+        let bridge = makeBridge(jeton: url)
+        var journal: [String] = []
+        bridge.journal = { journal.append($0) }
+        _ = try bridge.send("etat", [:], timeout: 5)
+        plugin.surRefus = nil
+        plugin.jetonAttendu = String(repeating: "c3", count: 32)
+        var messageErreur = ""
+        XCTAssertThrowsError(try bridge.send("etat", [:], timeout: 5)) { messageErreur = $0.localizedDescription }
+        XCTAssertFalse(journal.isEmpty)
+        for jeton in [jetonA, jetonB] {
+            for morceau in [jeton, String(jeton.prefix(32)), String(jeton.suffix(32))] {
+                XCTAssertFalse(journal.contains { $0.contains(morceau) }, "journal")
+                XCTAssertFalse(messageErreur.contains(morceau), "message d'erreur")
+            }
+        }
     }
 }

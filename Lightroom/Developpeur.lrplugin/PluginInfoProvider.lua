@@ -28,6 +28,9 @@ local function diagnostic()
     local lignes = {
         "Développeur " .. Liaison.VERSION .. " · Lightroom Classic " .. tostring(LrApplication.versionString()),
         string.format("Ports : %d (commandes) et %d (réponses)", Liaison.PORT_COMMANDES, Liaison.PORT_REPONSES),
+        -- L'état du jeton, jamais sa valeur.
+        string.format("Jeton : %s (%s) ; commandes refusées : %d", Liaison.jeton and "présent" or "absent",
+            select(2, Liaison.cheminJeton()), Liaison.refus or 0),
         "État : " .. Liaison.texteEtat(),
         "Dernier échange : " .. (Liaison.dernierEchange and LrDate.timeToUserFormat(Liaison.dernierEchange, '%Y-%m-%d %H:%M:%S') or "aucun"),
         "Dernière erreur : " .. tostring(Liaison.erreur or "aucune"),
