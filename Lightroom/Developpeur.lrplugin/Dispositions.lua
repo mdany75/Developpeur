@@ -32,8 +32,9 @@ Dispositions.TAILLES = { lignes = 42, fil = 900, liste = 250, droite = 340, aper
 -- { largeur = …, hauteur = … }, une table neuve par image. Chacune est un seul PNG en 2x (2 × la
 -- taille en points, 144 ppp), icônes d'image_name comprises, sans paire 1x et @2x : Lightroom
 -- l'affiche à sa taille en points (constaté le 21 octobre 2026 avec plus.png et trombone.png du
--- module d'essai), pourvu que f:picture reçoive width et height (sans eux, il prend la taille en
--- pixels). Tailles de la maquette « B · Conversation claire » ; les hauteurs du panneau et des
+-- module d'essai). Un f:picture reçoit toujours width et height : sans eux, il prendrait la taille
+-- en pixels (relevé dans le code de Lightroom, AgPictureView, sans avoir été vu). Tailles de la
+-- maquette « B · Conversation claire » ; les hauteurs du panneau et des
 -- cartes sont recalées au lot 18. Aucune image pour les fonds ni pour les filets : ce sont des
 -- aplats (f:picture sans value, à background_color). Après un changement :
 -- luajit scripts/gabarits.lua | swift scripts/images-fenetre.swift Lightroom/Developpeur.lrplugin

@@ -3,8 +3,9 @@
 -- chaque image dans images/, un seul PNG en 2x (2 × la taille en points, en-tête IHDR lu en Lua pur)
 -- à 144 ppp (bloc pHYs : 5 669 pixels par mètre), sans image de trop ni paire @2x, et ce contrôle
 -- lui-même, sur des PNG fabriqués ; l'image « aucun aperçu » du cadre 3:2 (vide-330x220.png,
--- 660 × 440) ; et scripts/gabarits.lua, qui écrit Dispositions.IMAGES en JSON pour
--- scripts/images-fenetre.swift. Ni Lightroom, ni Claude.
+-- 660 × 440) ; scripts/gabarits.lua, qui écrit Dispositions.IMAGES en JSON pour
+-- scripts/images-fenetre.swift ; et ce script lui-même, lancé sur un module d'essai d'un dossier
+-- temporaire (jamais sur celui du dépôt) : ce qu'il produit, et ses refus. Ni Lightroom, ni Claude.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
 local S = require 'Simulation'
@@ -273,6 +274,59 @@ essai('scripts/gabarits.lua : Dispositions.IMAGES en JSON, lancé depuis un autr
     end
     for nom in pairs(lu) do
         vrai(IMAGES[nom], 'en trop dans le JSON : ' .. tostring(nom))
+    end
+end)
+
+-- scripts/images-fenetre.swift lancé par l'usage documenté (gabarits.lua sur son entrée), mais vers
+-- un module d'essai du dossier temporaire, jamais vers celui du dépôt. Rend son code de sortie et ce
+-- qu'il a écrit (sortie et erreurs mêlées).
+local function produire(entree, module)
+    local sortie = S.lireCommande(entree .. ' | swift ' .. S.q(RACINE .. '/scripts/images-fenetre.swift') .. ' '
+        .. S.q(module) .. ' 2>&1; echo "code $?"')
+    return tonumber(sortie:match('code (%d+)%s*$')), sortie
+end
+
+essai('scripts/images-fenetre.swift : chaque image en 2x à 144 ppp, une image de trop gardée', function()
+    vrai(RACINE, 'racine du dépôt tirée de PLUGIN_DIR : ' .. tostring(S.plugin))
+    local gabarits = 'luajit ' .. S.q(RACINE .. '/scripts/gabarits.lua')
+    local module = S.home .. '/module-images'
+    local code, sortie = produire(gabarits, module)
+    egal(0, code, 'production entière : ' .. sortie)
+    -- Chaque image produite passe le contrôle des images du module : 2 × la taille en points, RGBA
+    -- 8 bits, 144 ppp.
+    for nom, t in pairs(IMAGES) do
+        local raison = controler(module .. '/images/' .. nom .. '.png', t.largeur, t.hauteur)
+        vrai(raison == nil, raison)
+    end
+    -- Une image de images/ absente de Dispositions.IMAGES est signalée, jamais effacée.
+    local orpheline = fabriquerPng(module .. '/images/orpheline.png', 2, 2, PPM_144)
+    code, sortie = produire(gabarits, module)
+    egal(0, code, 'production avec une image de trop : ' .. sortie)
+    vrai(sortie:find('à retirer : images/orpheline.png', 1, true), 'image de trop signalée : ' .. sortie)
+    vrai(lirePng(orpheline), 'image de trop gardée')
+end)
+
+essai('scripts/images-fenetre.swift : refuse sans rien écrire un nom sans dessin, une taille invalide, une entrée vide', function()
+    vrai(RACINE, 'racine du dépôt tirée de PLUGIN_DIR : ' .. tostring(S.plugin))
+    local function json(texte)
+        return "printf '%s' " .. S.q(texte)
+    end
+    -- Chaque refus vient avant toute écriture : la loupe, connue et bien taillée, n'est pas écrite
+    -- non plus, et le dossier du module n'est pas créé.
+    local cas = {
+        { json('{"loupe":{"largeur":12,"hauteur":12},"inconnue":{"largeur":12,"hauteur":12}}'),
+            'aucun dessin pour : inconnue' },
+        { json('{"loupe":{"largeur":12,"hauteur":12},"trombone":{"largeur":0,"hauteur":14}}'),
+            'taille invalide pour trombone' },
+        { "printf ''", "rien sur l'entrée standard" },
+        { json('pas du JSON'), 'tailles illisibles' },
+    }
+    for k, c in ipairs(cas) do
+        local module = S.home .. '/module-refus-' .. k
+        local code, sortie = produire(c[1], module)
+        egal(1, code, c[2] .. ' : code de sortie (' .. sortie .. ')')
+        vrai(sortie:find(c[2], 1, true), c[2] .. ' : ' .. sortie)
+        vrai(not S.executer('test -e ' .. S.q(module)), c[2] .. ' : rien d\'écrit')
     end
 end)
 
