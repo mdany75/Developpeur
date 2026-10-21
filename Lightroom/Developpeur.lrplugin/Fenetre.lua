@@ -5,7 +5,8 @@
 -- (Je le fais, 1.3), le cadre qu'il propose (Composition lue, 1.3 : la ligne « Cadre : … » de la
 -- carte, son image entière en pointillés dans l'aperçu, ses ajustements dans Ajuster…), la note
 -- qu'il propose pour la photo active, le pourquoi de chaque étape (onglet Aperçu, l'ancien
--- Pourquoi ?, 1.3), et les versions du module et du connecteur MCP-Développeur.
+-- Pourquoi ?, 1.3), la leçon de la photo (onglet Leçon, 1.3), et les versions du module et du
+-- connecteur MCP-Développeur.
 --
 -- Une seule disposition, la Conversation claire, à l'allure de la fenêtre B (1.3 : 1 280 × 800,
 -- volet des conversations en cases, en-tête avec le Mode, segments et panneau à droite ; l'Atelier,
@@ -18,9 +19,11 @@
 -- Le SDK ne sait ni ajouter de vues à une fenêtre ouverte ni la faire défiler par programme, et
 -- une vue masquée garde sa place : le fil est une grille de lignes fixes (Fil.lua), remplie à
 -- chaque changement et parcourue par les boutons ▲ ▼, comme la liste des conversations, une
--- grille de cases (Fenetre.casesListe) ; chaque ligne superpose une variante par genre (police,
--- couleur), dont une seule est visible. Lightroom ne masque que les vues simples (`visible` sur une
--- rangée, une colonne ou une boîte reste sans effet, constaté) : les onglets sont des segments en
+-- grille de cases (Fenetre.casesListe) ; chaque ligne a sa colonne auteur (« Vous », « Claude »,
+-- l'heure) et superpose une variante de texte par genre (police, couleur, retrait), dont une seule
+-- est visible, « Pourquoi ? » sur une étape et les boutons d'actions (Vues.ligneFil). Lightroom ne
+-- masque que les vues simples (`visible` sur une rangée, une colonne ou une boîte reste sans
+-- effet, constaté) : les onglets sont des segments en
 -- images sous des calques, au-dessus de variantes superposées de même largeur, dont chaque vue
 -- simple porte la condition de son onglet (Vues.masquable). Un clic sur une image passe par un
 -- calque (Fenetre.calque) ; il n'y a aucun bouton par défaut. Une autre photo active ou une autre
@@ -102,31 +105,35 @@ function Fenetre.tailleImage(nom)
     return t
 end
 
-local function police(cle, taille)
+local function police(cle)
     local m = Metriques[cle]
-    return { name = m.nom, size = taille or m.taille }
+    return { name = m.nom, size = m.taille }
 end
 
--- Celles du fil et des cartes (Helvetica Neue et Menlo, mesurées dans Metriques.lua), et celles du
--- système de la maquette (constatées le 21 octobre 2026 : '<system>' et '<system/bold>' en 16, 13,
--- 12 et 11, B1 et D9).
+-- Les polices de la fenêtre, toutes mesurées dans Metriques.lua (scripts/metriques.swift) : celle
+-- du système de la maquette, '<system>' et '<system/bold>' en 16, 13, 12 et 11 (constatées le
+-- 21 octobre 2026, B1 et D9 : tailles appliquées, l'encre à 1 ou 2 points sous la chasse mesurée),
+-- et Menlo 11. Le fil et les cartes les emploient par leurs clés de Metriques (texte, texte12,
+-- petit, gras, gras12, titre, mono) ; les pièces de la fenêtre B, aussi par leurs noms systeme13…
 local POLICES = {
     texte = police('texte'),
+    texte12 = police('texte12'),
+    petit = police('petit'),
     gras = police('gras'),
+    gras12 = police('gras12'),
+    titre = police('titre'),
     mono = police('mono'),
-    petit = police('texte', 11),
-    titre = { name = '<system/bold>', size = 16 },
-    systeme13 = { name = '<system>', size = 13 },
-    systeme12 = { name = '<system>', size = 12 },
-    systeme11 = { name = '<system>', size = 11 },
-    systemeGras12 = { name = '<system/bold>', size = 12 },
+    systeme13 = police('texte'),
+    systeme12 = police('texte12'),
+    systeme11 = police('petit'),
+    systemeGras12 = police('gras12'),
     systemeGras11 = { name = '<system/bold>', size = 11 },
 }
 Fenetre.POLICES = POLICES
 
--- Icônes de la colonne de gauche du fil (couleurs de la palette).
+-- Icônes du fil, au bord gauche de la colonne du texte (couleurs de la palette). Plus de › devant
+-- Dany : la colonne auteur dit « Vous » (fenêtre B).
 Fenetre.ICONES = {
-    { cle = 'dany', glyphe = '›', couleur = 'bleu' },
     { cle = 'ok', glyphe = '✓', couleur = 'coche' },
     { cle = 'cours', glyphe = '●', couleur = 'orange' },
     { cle = 'erreur', glyphe = '✕', couleur = 'rouge' },
@@ -135,15 +142,28 @@ Fenetre.ICONES = {
     { cle = 'note', glyphe = 'ⓘ', couleur = 'gris' },
 }
 
--- Variantes de texte d'une ligne, selon son genre.
+-- Variantes de texte d'une ligne, selon son genre : police et couleur, retrait (celui des genres
+-- qui portent une icône, Fil.RETRAITS), et pour la ligne d'un appel d'outil, l'emphase (le nom de
+-- l'outil en Menlo 11, sur une description en petit gris, Fil.emphases). Les genres d'une variante
+-- ont le même retrait. Le genre 'actions' n'a pas de texte : ses boutons (Vues.ligneFil).
+local function style(genres, policeDuTexte, couleur, plus)
+    local premier = next(genres)
+    local s = { genres = genres, police = policeDuTexte, couleur = couleur, retrait = Fil.retrait(premier) }
+    for cle, valeur in pairs(plus or {}) do
+        s[cle] = valeur
+    end
+    return s
+end
+
 Fenetre.STYLES = {
-    { genres = { claude = true, vide = true }, police = 'texte', couleur = 'texte' },
-    { genres = { titre = true }, police = 'gras', couleur = 'texte' },
-    { genres = { dany = true }, police = 'texte', couleur = 'bleu' },
-    { genres = { outil = true }, police = 'mono', couleur = 'mono' },
-    { genres = { apercu = true }, police = 'texte', couleur = 'bleu' },
-    { genres = { proposition = true }, police = 'gras', couleur = 'orange' },
-    { genres = { note = true }, police = 'texte', couleur = 'gris' },
+    style({ claude = true, vide = true }, 'texte', 'texte'),
+    style({ titre = true }, 'gras', 'texte'),
+    style({ dany = true }, 'texte', 'bleu'),
+    style({ outil = true }, 'mono', 'mono'),
+    style({ appel = true }, 'texte12', 'gris', { emphase = Fil.emphases.appel, couleurEmphase = 'texte' }),
+    style({ apercu = true }, 'texte', 'bleu'),
+    style({ proposition = true }, 'gras', 'orange'),
+    style({ note = true }, 'texte', 'gris'),
 }
 
 -- Pastilles des voyants (Claude Code, Lightroom, écran), en images par état : plus de pastille
@@ -430,7 +450,7 @@ function Fenetre.sousTitreListe(c, maintenant)
         local d = os.date('*t', t)
         local p = Fenetre.periodeListe(t, maintenant)
         if p == "Aujourd'hui" or p == "Hier" then
-            morceaux[#morceaux + 1] = string.format('%d h %02d', d.hour, d.min)
+            morceaux[#morceaux + 1] = Fil.heure(t)
         else
             morceaux[#morceaux + 1] = tostring(d.day) .. ' ' .. tostring(Carnet.MOIS_COURTS[d.month] or '')
         end
@@ -668,10 +688,11 @@ function Fenetre.revenirAuFil()
     return true
 end
 
--- La largeur du texte d'une ligne du fil : la largeur utile du centre, sans l'icône et son écart
--- (Vues.ligneFil).
+-- La largeur du texte d'une ligne du fil (518) : la largeur utile du centre, sans la colonne auteur
+-- et son écart (Vues.ligneFil, D.texteFil). L'icône et le retrait des genres qui en portent une
+-- sont dans cette largeur (Fil.RETRAITS).
 function Fenetre.largeurTexte()
-    return Fenetre.T.fil - 20
+    return Fenetre.T.texteFil
 end
 
 function Fenetre.rafraichirFil()
@@ -712,11 +733,18 @@ function Fenetre.rafraichirFil()
     if carnet then
         Fenetre.hautCarnet = premiere - 1
     end
+    -- Chaque ligne : son texte, son genre et son icône ; sa colonne auteur (`a..i` : 'dany',
+    -- 'claude', 'heure' ou rien ; l'heure dans `h..i`) ; « Pourquoi ? » (`q..i`, une étape) ; ses
+    -- actions (`x..i` : 'note', 'lecon', 'les deux' ou rien).
     for i = 1, T.lignes do
         local l = lignes[premiere + i - 1]
         poser(p, 't' .. i, l and l.texte or '')
         poser(p, 'g' .. i, l and l.genre or 'vide')
         poser(p, 'i' .. i, l and l.icone or '')
+        poser(p, 'a' .. i, l and (l.auteur or (l.heure and 'heure')) or '')
+        poser(p, 'h' .. i, l and l.heure or '')
+        poser(p, 'q' .. i, l ~= nil and l.etape == true)
+        poser(p, 'x' .. i, l and l.actions or '')
     end
     if #lignes == 0 then
         poser(p, 't2', "Demandez à Claude.")
@@ -749,8 +777,10 @@ end
 -- Aperçu), sinon le détail d'un outil. Fenetre.sorteDeClic dit laquelle,
 -- Fenetre.clics[sorte](l, e) la traite. Une rangée du tableau du carnet ouvre la fenêtre de ses
 -- photos, sa ligne d'action demande à Claude ce qu'il en pense (section « Carnet de progrès ») ;
--- une ligne de la carte d'une leçon ouvre le détail de son appel ; une étape (ligne
--- « · Pourquoi ? », Conversation.estEtape) s'ouvre dans l'onglet Aperçu (Fenetre.montrerEtape).
+-- une ligne d'une leçon (en préparation, ou refusée) ouvre le détail de son appel ; une étape (la
+-- ligne d'un appel qui porte « Pourquoi ? », Conversation.estEtape) s'ouvre dans l'onglet Aperçu
+-- (Fenetre.montrerEtape), comme par son bouton (Fenetre.pourquoi). La ligne d'actions d'une
+-- notation ou d'une leçon n'a pas de texte : ses boutons (Fenetre.voirNote, Fenetre.voirLecon).
 function Fenetre.estEtape(e)
     return Conversation.estEtape(e)
 end
@@ -760,6 +790,8 @@ function Fenetre.sorteDeClic(l, e)
         return 'image'
     elseif l.defaut ~= nil or l.action ~= nil then
         return 'carnet'
+    elseif l.genre == 'actions' then
+        return nil
     elseif e and e.genre == 'lecon' then
         return 'lecon'
     elseif e and Fenetre.estEtape(e) then
@@ -800,8 +832,9 @@ Fenetre.clics = {
             Fenetre.demanderCarnet()
         end
     end,
-    -- La carte d'une leçon (1.3) : le détail de son appel de photo_lesson (les points donnés, puis
-    -- la réponse : faits mesurés, indices, remarques), à part, dans une tâche.
+    -- La ligne d'une leçon (1.3 ; en préparation, ou refusée : la leçon faite a sa ligne d'actions
+    -- et son onglet) : le détail de son appel de photo_lesson (les points donnés, puis la réponse :
+    -- faits mesurés, indices, remarques), à part, dans une tâche.
     lecon = function(_, e)
         local c = Moteur.courante
         local outil = c and Conversation.outilDeLAppel(c, e.appel)
@@ -835,6 +868,84 @@ function Fenetre.cliquerLigne(i)
     if traiter then
         traiter(l, e)
     end
+end
+
+-- La ligne i de la grille du fil (celle que montre la ligne i), nil sans ligne.
+local function ligneMontree(i)
+    return Fenetre.lignes and Fenetre.lignes[(Fenetre.premiere or 1) + i - 1] or nil
+end
+
+-- « Pourquoi ? » de la ligne i (Vues.ligneFil) : l'étape de cette ligne dans l'onglet Aperçu, son
+-- avant/après dans l'aperçu (Fenetre.montrerEtape), comme un clic sur son texte.
+function Fenetre.pourquoi(i)
+    Fenetre.annulerEnvoiAuto()
+    local l = ligneMontree(i)
+    if not (l and l.etape and l.element) then
+        return false
+    end
+    return Fenetre.montrerEtape(l.element)
+end
+
+-- « ☆ Voir la note » de la ligne i : la notation de cette ligne dans l'onglet Note.
+function Fenetre.voirNote(i)
+    Fenetre.annulerEnvoiAuto()
+    local l = ligneMontree(i)
+    return l ~= nil and l.notation ~= nil and Fenetre.montrerNote(l.notation)
+end
+
+-- « Leçon de la photo » de la ligne i : la leçon de cette ligne dans l'onglet Leçon.
+function Fenetre.voirLecon(i)
+    Fenetre.annulerEnvoiAuto()
+    local l = ligneMontree(i)
+    return l ~= nil and l.lecon ~= nil and Fenetre.montrerLecon(l.lecon)
+end
+
+-- Le bandeau quand la photo active n'est pas parmi celles d'une notation (« ☆ Voir la note ») : la
+-- carte Note montre la photo active, et la fenêtre ne change jamais la sélection (une autre photo
+-- commencerait une nouvelle conversation, Fenetre.suivreSelection).
+Fenetre.NOTE_AUTRE_PHOTO = "Note d'une autre photo : choisissez-la dans Lightroom."
+
+-- Montre l'onglet Note pour la notation de l'élément i, comme un vrai clic sur son segment
+-- (Fenetre.ongletChange). Rend vrai si l'élément est une notation.
+function Fenetre.montrerNote(i)
+    local p, T, c = Fenetre.p, Fenetre.T, Moteur.courante
+    local e = c and i and c.elements[i]
+    if not (p and T and e and e.genre == 'notation') then
+        return false
+    end
+    if p.onglet ~= T.ongletNotation then
+        p.onglet = T.ongletNotation
+    end
+    local active = Fenetre.info and Fenetre.info.active
+    local cle = active and Conversation.clePhoto(active.id)
+    local parmi = false
+    for _, x in ipairs(e.notes or {}) do
+        if cle ~= nil and Conversation.clePhoto(x.photo) == cle then
+            parmi = true
+        end
+    end
+    if not parmi then
+        p.message = Fenetre.NOTE_AUTRE_PHOTO
+    elseif p.message == Fenetre.NOTE_AUTRE_PHOTO then
+        p.message = ''
+    end
+    return true
+end
+
+-- Montre l'onglet Leçon sur la leçon de l'élément i (Fenetre.leconChoisie), comme un vrai clic sur
+-- son segment. Rend vrai si l'élément est une leçon.
+function Fenetre.montrerLecon(i)
+    local p, T, c = Fenetre.p, Fenetre.T, Moteur.courante
+    local e = c and i and c.elements[i]
+    if not (p and T and e and e.genre == 'lecon') then
+        return false
+    end
+    Fenetre.leconChoisie = e.id
+    if p.onglet ~= T.ongletLecon then
+        p.onglet = T.ongletLecon
+    end
+    Fenetre.rafraichirLecon()
+    return true
 end
 
 function Fenetre.montrerDetail(e)
@@ -874,7 +985,8 @@ end
 Fenetre.CARNET = '¶carnet'
 Fenetre.TITRE_CARNET = Carnet.TITRES.carnet
 Fenetre.SOUS_TITRE_CARNET = "défauts de prise de vue, mois par mois"
-Fenetre.CHOISIR_CONVERSATION = "Le carnet de progrès est montré : choisissez d'abord une conversation dans la liste."
+-- Les messages du bandeau tiennent en deux lignes (Fenetre.texteBandeau, essais-fenetre-b.lua).
+Fenetre.CHOISIR_CONVERSATION = "Carnet montré : choisissez d'abord une conversation."
 Fenetre.CLAUDE_TRAVAILLE = "Claude travaille : attendez la fin, ou cliquez Arrêter."
 
 -- Montre la page du carnet (depuis la liste ; pas pendant que Claude travaille : la liste le
@@ -1579,30 +1691,40 @@ end
 
 -- Textes des cartes, page par page --------------------------------------------------------------
 
--- Le texte de la carte Note (clé 'note'), celui de la proposition (clé 'proposition') et celui de
--- la carte de l'étape (onglet Aperçu, clé 'etape', 1.3) : coupés en lignes comme le fil (police
--- P.texte), montrés page par page avec ▲ ▼ (Vues.fleches). Un texte qui change revient à sa
--- première page.
+-- Le texte de la carte Note (clé 'note'), celui de la proposition (clé 'proposition'), celui de
+-- la carte de l'étape (onglet Aperçu, clé 'etape', 1.3) et celui de la leçon (onglet Leçon, clé
+-- 'lecon', lot B4) : coupés en lignes comme le fil, dans la police de leur carte (`police` de
+-- CARTES : P.texte pour les trois premières, posées telles quelles jusqu'au lot B5 ; P.texte12 pour
+-- la leçon, ses axes en gras de même taille, `emphase`), montrés page par page avec ▲ ▼
+-- (Vues.fleches). Un texte qui change revient à sa première page.
 Fenetre.pages = {}
 
--- L'aide de l'onglet Leçon, en attendant sa carte (lot B4).
-Fenetre.AIDE_LECON = "Après une retouche, Claude donne la leçon de la photo : ce qui manquait, et ce qui se fait à la "
-    .. "prise de vue. Pour l'instant, elle se lit dans le fil, sous la retouche : un clic sur sa carte en donne le détail."
+-- L'onglet Leçon sans leçon de la photo active dans la conversation montrée.
+Fenetre.AUCUNE_LECON = "Après une retouche, Claude donne la leçon de la photo : ce qui manquait, et ce qui se fait à la "
+    .. "prise de vue. Elle s'affiche ici ; « Leçon de la photo » dans le fil la remontre."
 
 local CARTES = {
     note = { texte = 'notationTexte', largeur = 'largeurNote', lignes = function(T) return (T.criteres or 8) + 3 end },
     proposition = { texte = 'propositionTexte', largeur = 'largeurProposition', lignes = function(T) return T.propLignes or 5 end },
     etape = { texte = 'etapeTexte', largeur = 'largeurEtape', lignes = function(T) return T.etapeLignes or 8 end },
+    lecon = { texte = 'leconTexte', largeur = 'largeurLecon', lignes = function(T) return T.leconLignes or 8 end, police = 'texte12',
+        emphase = 'gras12' },
 }
+Fenetre.CARTES = CARTES
 
--- Les lignes d'un texte dans `largeur` points (paragraphes gardés, lignes vides comprises).
-function Fenetre.lignesCarte(texte, largeur)
+-- Les lignes d'un texte dans `largeur` points (paragraphes gardés, lignes vides comprises), dans
+-- `police` (une clé de Metriques ; P.texte sans elle) ; `emphase` : la police de ses passages
+-- balisés (<EM>), chaque ligne aux balises fermées, un passage coupé rouvert à la suivante.
+function Fenetre.lignesCarte(texte, largeur, police, emphase)
     local lignes = {}
+    local ouvert = false
     for paragraphe in (tostring(texte or '') .. '\n'):gmatch('([^\n]*)\n') do
         if paragraphe == '' then
             lignes[#lignes + 1] = ''
         else
-            for _, l in ipairs(Fil.couper(paragraphe, largeur - Fil.MARGE, 'texte')) do
+            local coupees
+            coupees, ouvert = Fil.couper(paragraphe, largeur - Fil.MARGE, police or 'texte', nil, emphase, ouvert)
+            for _, l in ipairs(coupees) do
                 lignes[#lignes + 1] = l
             end
         end
@@ -1629,7 +1751,7 @@ function Fenetre.montrerPage(cle, texte, garder)
         return
     end
     local hauteur = T and carte.lignes(T) or 8
-    local lignes = Fenetre.lignesCarte(page.texte, T and T[carte.largeur] or 226)
+    local lignes = Fenetre.lignesCarte(page.texte, T and T[carte.largeur] or 226, carte.police, carte.emphase)
     -- La dernière page est pleine : on ne descend pas plus bas que la dernière ligne.
     page.debut = math.max(1, math.min(page.debut, #lignes - hauteur + 1))
     local montre = {}
@@ -1651,6 +1773,102 @@ function Fenetre.defilerTexte(cle, sens)
     local hauteur = Fenetre.T and carte.lignes(Fenetre.T) or 8
     page.debut = math.max(1, page.debut + sens * math.max(1, hauteur - 1))
     Fenetre.montrerPage(cle)
+end
+
+-- Leçon de la photo (1.3, onglet Leçon, lot B4) --------------------------------------------------
+-- La carte de l'onglet Leçon (Vues.lecon) montre la leçon choisie par « Leçon de la photo » dans le
+-- fil (Fenetre.leconChoisie, son id, remis à nil quand la conversation montrée change), sinon la
+-- dernière leçon de la photo active dans la conversation montrée (une leçon dont la photo n'est pas
+-- encore connue, appel sans photo_id en cours, compte pour la photo active), sinon l'aide
+-- (Fenetre.AUCUNE_LECON) ; son texte vient de Fil.texteLecon, les axes en gras. Une leçon qui arrive
+-- (faite : Fenetre.leconVue garde la dernière vue) fait basculer la fenêtre une fois vers Leçon, sauf
+-- quand une proposition attend ou qu'un exercice « Je le fais » est en cours (Accepter et « J'ai
+-- fini » resteraient cachés derrière l'onglet Leçon) : elle est alors seulement marquée vue. Les
+-- leçons déjà là quand une conversation se montre (ouverture de la fenêtre, une autre conversation)
+-- sont vues, sans bascule.
+
+-- La dernière leçon faite de la conversation.
+local function derniereLecon(c)
+    for i = #(c and c.elements or {}), 1, -1 do
+        local e = c.elements[i]
+        if e.genre == 'lecon' and e.etat == 'fait' then
+            return e
+        end
+    end
+    return nil
+end
+
+-- La leçon que montre l'onglet, et son indice dans le fil ; nil sans leçon.
+function Fenetre.leconMontree()
+    local c = Moteur.courante
+    if not c then
+        return nil
+    end
+    if Fenetre.leconChoisie ~= nil then
+        for i, e in ipairs(c.elements or {}) do
+            if e.genre == 'lecon' and e.id == Fenetre.leconChoisie then
+                return e, i
+            end
+        end
+    end
+    local active = Fenetre.info and Fenetre.info.active
+    local cle = active and Conversation.clePhoto(active.id)
+    for i = #(c.elements or {}), 1, -1 do
+        local e = c.elements[i]
+        if e.genre == 'lecon' and (e.photo == nil or (cle ~= nil and Conversation.clePhoto(e.photo) == cle)) then
+            return e, i
+        end
+    end
+    return nil
+end
+
+-- Vrai quand la carte Proposition attend Dany : une proposition en attente, ou un exercice « Je le
+-- fais » à faire ou en préparation.
+local function propositionOuExercice(c)
+    local exo = Conversation.dernierExercice(c)
+    return Conversation.propositionEnAttente(c) ~= nil or (exo ~= nil and (exo.etat == 'aFaire' or exo.etat == 'enCours'))
+end
+
+function Fenetre.rafraichirLecon()
+    local p, T = Fenetre.p, Fenetre.T
+    if not (p and T) then
+        return
+    end
+    local c = Moteur.courante
+    if Fenetre.leconDe ~= c then
+        Fenetre.leconDe = c
+        Fenetre.leconChoisie = nil
+        local vue = derniereLecon(c)
+        Fenetre.leconVue = vue and vue.id or nil
+    end
+    local e = Fenetre.leconMontree()
+    if e then
+        poser(p, 'leconTitre', Fil.titreLecon(e) .. (e.etat == 'enCours' and " · en préparation…" or ''))
+        local texte = Fil.texteLecon(e)
+        Fenetre.montrerPage('lecon', texte ~= '' and texte or Fenetre.AUCUNE_LECON)
+    else
+        poser(p, 'leconTitre', "Leçon de la photo")
+        Fenetre.montrerPage('lecon', Fenetre.AUCUNE_LECON)
+    end
+    poser(p, 'leconADetail', e ~= nil and Conversation.outilDeLAppel(c, e.appel) ~= nil)
+    local arrivee = derniereLecon(c)
+    if arrivee and arrivee.id ~= Fenetre.leconVue then
+        Fenetre.leconVue = arrivee.id
+        if not propositionOuExercice(c) then
+            Fenetre.choisirOnglet(T.ongletLecon)
+        end
+    end
+end
+
+-- « Détail… » de la carte (dans une tâche) : l'appel de photo_lesson de la leçon montrée, puis sa
+-- réponse.
+function Fenetre.detailLecon()
+    local c = Moteur.courante
+    local e = Fenetre.leconMontree()
+    local outil = c and e and Conversation.outilDeLAppel(c, e.appel)
+    if outil then
+        Fenetre.montrerDetail(outil)
+    end
 end
 
 -- Proposition ---------------------------------------------------------------------------------
@@ -2890,6 +3108,9 @@ end
 
 Fenetre.LIBELLES_MODE = { appliquer = "Appliquer", proposer = "Proposer d'abord", jelefais = "Je le fais" }
 
+-- Le bandeau quand Appliquer ou Proposer d'abord est cliqué pendant un exercice (suivi du mode).
+Fenetre.EXERCICE_CONTINUE = "L'exercice continue ; liaison : "
+
 -- La valeur du Mode d'après l'état : « Je le fais » tant que la conversation montrée a un
 -- exercice à faire ou en préparation (Conversation.dernierExercice), que la demande Je le fais
 -- part (Fenetre.jeLeFaisEnCours), ou que Claude prépare la liste qu'elle a demandée
@@ -2955,9 +3176,8 @@ function Fenetre.changerMode(valeur)
             Lightroom.basculerMode()
         end
         if exercice then
-            -- L'essentiel d'abord : le bandeau, étroit, coupe la fin (son infobulle la donne).
-            p.message = "L'exercice continue (J'ai fini dans la carte Proposition) ; mode de la liaison : "
-                .. Fenetre.LIBELLES_MODE[valeur] .. "."
+            -- Deux lignes du bandeau : « J'ai fini » est dans la carte Proposition.
+            p.message = Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE[valeur] .. "."
         end
     elseif valeur == 'jelefais' and not exercice and not Moteur.travaille then
         enTache(function()
@@ -3085,6 +3305,22 @@ function Fenetre.montrerAide()
     end
 end
 
+-- Le bandeau (Vues.bandeau) : deux lignes en petit dans la place du menu Modèle de la maquette
+-- (D.bandeau, 178 points : une seule en coupait la plupart, « Claude travaille… » en demande 269).
+-- Le texte se coupe d'après la chasse mesurée (Fil.coupeBornee, police `petit`), « … » au bout de
+-- la seconde ligne s'il dépasse (l'infobulle du message, le clic de l'aide le donnent en entier) ;
+-- les messages de la fenêtre tiennent en deux lignes (essais-fenetre-b.lua).
+Fenetre.LIGNES_BANDEAU = 2
+
+function Fenetre.texteBandeau(texte, largeur)
+    texte = Texte.nettoyer((sansBalises(texte):gsub('%s+', ' ')))
+    if texte == '' then
+        return ''
+    end
+    largeur = largeur or (Fenetre.T and Fenetre.T.bandeau) or 178
+    return table.concat(Fil.coupeBornee(texte, largeur - Fil.MARGE, 'petit', '', Fenetre.LIGNES_BANDEAU), '\n')
+end
+
 -- Ce que montre le bandeau : un message, sinon l'aide d'un voyant rouge, sinon les photos
 -- jointes, sinon rien (le rappel du style est retiré : demandé par Dany le 20 octobre 2026).
 function Fenetre.etatBandeau(p)
@@ -3122,6 +3358,8 @@ function Fenetre.majPhoto()
         Fenetre.voirActive = true
         Fenetre.imageCliquee = nil
         Fenetre.rafraichirApercu()
+        -- L'onglet Leçon montre la leçon de la photo active.
+        Fenetre.rafraichirLecon()
     end
     if info.active then
         p.infoPhoto = string.format("Active : <EM>%s</EM> · Sélection : <EM>%d</EM>",
@@ -3208,6 +3446,8 @@ function Fenetre.rafraichir()
     Fenetre.rafraichirProposition()
     Fenetre.rafraichirListe()
     Fenetre.rafraichirNotation()
+    -- La leçon (onglet Leçon) après la note : la leçon vient en dernier (consignes), sa bascule aussi.
+    Fenetre.rafraichirLecon()
     -- Le Mode suit l'exercice (Je le fais commencé, fini, refusé).
     Fenetre.rafraichirMode()
 end
@@ -3317,7 +3557,7 @@ end
 function Fenetre.envoyerSaisie()
     local p = Fenetre.p
     if Moteur.travaille then
-        p.message = "Claude travaille : attendez la fin, ou cliquez Arrêter."
+        p.message = Fenetre.CLAUDE_TRAVAILLE
         return
     end
     local texte = p.saisie
@@ -3357,10 +3597,13 @@ end
 -- Bouton 📋 : l'image du presse-papiers (capture d'écran, image copiée, fichier copié dans le
 -- Finder) jointe à la demande. Le SDK ne lit pas le presse-papiers, et ⌘V dans le champ n'y colle
 -- que du texte.
+-- Le bandeau sans image à coller (l'infobulle de 📋 dit d'où elle peut venir).
+Fenetre.PAS_D_IMAGE = "Pas d'image à coller : copiez-en une (⌘C), puis cliquez 📋."
+
 function Fenetre.coller()
     local chemins = Images.coller()
     if #chemins == 0 then
-        Fenetre.p.message = "Pas d'image dans le presse-papiers : copiez une image (⌘C), une capture d'écran (⌃⇧⌘4) ou une photo dans le Finder, puis cliquez 📋."
+        Fenetre.p.message = Fenetre.PAS_D_IMAGE
         return
     end
     for _, chemin in ipairs(chemins) do
@@ -3612,6 +3855,9 @@ function Fenetre.afficher()
         Fenetre.exerciceVu = derniere and derniere.etat == 'comparee' and Fenetre.cleExerciceVu(derniere) or nil
         Fenetre.info = nil
         Fenetre.noteVue, Fenetre.notePhoto = nil, nil
+        -- L'onglet Leçon : les leçons déjà là sont vues (pas de bascule à l'ouverture), aucune
+        -- choisie (Fenetre.rafraichirLecon).
+        Fenetre.leconDe, Fenetre.leconChoisie, Fenetre.leconVue = nil, nil, nil
         Fenetre.noteEnCours = false
         -- Aucune étape choisie (onglet Aperçu) ; ses images se relisent, les copies d'avant
         -- s'effacent.
@@ -3663,7 +3909,15 @@ function Fenetre.afficher()
             p['t' .. i] = ''
             p['g' .. i] = 'vide'
             p['i' .. i] = ''
+            p['a' .. i] = ''
+            p['h' .. i] = ''
+            p['q' .. i] = false
+            p['x' .. i] = ''
         end
+        -- La carte de l'onglet Leçon (Fenetre.rafraichirLecon la remplit).
+        p.leconTitre = "Leçon de la photo"
+        p.leconTexte = ''
+        p.leconADetail = false
         initialiserNotation(p)
         initialiserEtapeEtExercice(p)
         Fenetre.p = p

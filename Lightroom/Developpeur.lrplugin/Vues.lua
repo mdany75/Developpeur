@@ -105,39 +105,105 @@ end
 
 -- Fil -----------------------------------------------------------------------------------------
 
--- Une ligne du fil : une icône et une variante de texte par genre (police, couleur), superposées ;
--- un clic est réparti par Fenetre.cliquerLigne (image dans l'aperçu, ligne du carnet, leçon,
--- étape, sinon détail d'un outil). Gardée telle quelle jusqu'au lot B4 (colonne auteur, lignes
--- de 21 points, Pourquoi ?).
-function Vues.ligneFil(f, F, i, largeur)
+-- Une ligne du fil (fenêtre B, lot B4), haute de D.hauteurLigne, à la largeur utile du centre :
+-- - la colonne auteur (D.auteur), en variantes superposées selon `a..i` : « Vous » (gras 12, bleu),
+--   « Claude » (gras 12), l'heure (`h..i`, petit gris) ou rien ; sans clic ;
+-- - un écart, puis la colonne du texte (D.texteFil, F.largeurTexte()), en superposition : l'icône
+--   (`i..i`) au bord gauche ; une variante de texte par style (F.STYLES : police, couleur, retrait,
+--   selon le genre `g..i`), celles des genres qui portent une icône à F.STYLES[…].retrait du bord ;
+--   la ligne d'un appel d'outil est un texte riche (le nom en <EM>, Menlo), et les autres variantes
+--   reçoivent le texte sans balise (une variante cachée ne voit jamais une balise qu'elle ne sait
+--   pas montrer) ;
+--   « Pourquoi ? » à droite d'une étape (`q..i`), un carré small dans une rangée poussée à droite
+--   par margin_left (constaté le 21 octobre 2026, D6 : il répond, et la rangée ne prend pas les
+--   clics du texte) ; la rangée d'actions selon `x..i` (« ☆ Voir la note », « Leçon de la photo »,
+--   ou les deux), en variantes superposées.
+-- Un clic sur le texte est réparti par Fenetre.cliquerLigne (image dans l'aperçu, ligne du carnet,
+-- leçon, étape, sinon détail d'un outil) ; les boutons appellent F.pourquoi, F.voirNote et
+-- F.voirLecon, qui relisent la ligne.
+function Vues.ligneFil(f, F, i, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    local icones = { place = 'overlapping', width = 16 }
+    local largeur = D.texteFil
+    local auteur = f:column {
+        place = 'overlapping',
+        width = D.auteur,
+        f:static_text { title = "Vous", font = P.gras12, text_color = C.bleu, width = D.auteur, visible = F.egal('a' .. i, 'dany') },
+        f:static_text { title = "Claude", font = P.gras12, text_color = C.texte, width = D.auteur, visible = F.egal('a' .. i, 'claude') },
+        f:static_text { title = bind('h' .. i), font = P.petit, text_color = C.gris, width = D.auteur, truncation = 'tail',
+            visible = F.egal('a' .. i, 'heure') },
+    }
+    local icones = { place = 'overlapping' }
     for _, ic in ipairs(F.ICONES) do
         icones[#icones + 1] = f:static_text { title = ic.glyphe, font = P.texte, text_color = C[ic.couleur],
             visible = F.egal('i' .. i, ic.cle) }
     end
-    local textes = { place = 'overlapping' }
+    local texte = { place = 'overlapping', width = largeur, f:column(icones) }
+    local enRetrait = {}
     for _, st in ipairs(F.STYLES) do
         local genres = st.genres
-        textes[#textes + 1] = f:static_text {
-            title = bind('t' .. i),
-            width = largeur,
+        local vue = f:static_text {
+            title = st.emphase and bind('t' .. i) or bind { key = 't' .. i, transform = function(v) return F.sansBalises(v) end },
+            width = largeur - st.retrait,
             font = P[st.police],
             text_color = C[st.couleur],
+            emphasis_font = st.emphase and P[st.emphase] or nil,
+            emphasis_color = st.emphase and C[st.couleurEmphase] or nil,
             truncation = 'tail',
             visible = F.condition('g' .. i, function(v) return genres[v] == true end),
             mouse_down = function() F.cliquerLigne(i) end,
         }
+        if st.retrait > 0 then
+            enRetrait[st.retrait] = enRetrait[st.retrait] or { place = 'overlapping', margin_left = st.retrait }
+            local colonne = enRetrait[st.retrait]
+            colonne[#colonne + 1] = vue
+        else
+            texte[#texte + 1] = vue
+        end
     end
-    return f:row { spacing = 4, f:column(icones), f:column(textes) }
+    for _, colonne in pairs(enRetrait) do
+        texte[#texte + 1] = f:column(colonne)
+    end
+    -- « Pourquoi ? » : l'étape de cette ligne dans l'onglet Aperçu (F.pourquoi).
+    texte[#texte + 1] = f:row {
+        margin_left = largeur - D.pourquoi,
+        F.bouton(f, { carre = true, size = 'small', title = "Pourquoi ?", font = P.petit, width = D.pourquoi,
+            tooltip = "Pourquoi cette étape : son avant/après et sa raison (onglet Aperçu)", visible = F.si('q' .. i),
+            action = function() F.pourquoi(i) end }),
+    }
+    -- Les actions d'une notation et d'une leçon : « ☆ Voir la note » (onglet Note), « Leçon de la
+    -- photo » (onglet Leçon), ou les deux, à la place des icônes de la maquette (un glyphe dans le
+    -- titre : une icône d'image_name chevaucherait le titre, constaté B3).
+    local actions = 'x' .. i
+    local function voirNote(visible)
+        return F.bouton(f, { carre = true, size = 'small', title = "☆ Voir la note", font = P.petit, width = D.voirNote,
+            tooltip = "La note proposée de la photo active, dans l'onglet Note", visible = visible, action = function() F.voirNote(i) end })
+    end
+    local function voirLecon(visible)
+        return F.bouton(f, { carre = true, size = 'small', title = "Leçon de la photo", font = P.petit, width = D.voirLecon,
+            tooltip = "La leçon de la photo : ce qui manquait, et ce qui se fait à la prise de vue (onglet Leçon)", visible = visible,
+            action = function() F.voirLecon(i) end })
+    end
+    texte[#texte + 1] = f:column {
+        place = 'overlapping',
+        f:row { spacing = D.ecartActions, voirNote(F.condition(actions, function(v) return v == 'note' or v == 'les deux' end)),
+            voirLecon(F.egal(actions, 'les deux')) },
+        f:row { voirLecon(F.egal(actions, 'lecon')) },
+    }
+    return f:row {
+        spacing = 0,
+        height = D.hauteurLigne,
+        auteur,
+        f:spacer { width = D.ecartAuteur },
+        f:column(texte),
+    }
 end
 
--- La grille du fil : D.lignes lignes, à la largeur utile du centre (D.fil : l'icône de 16, un
--- écart de 4 et le texte, F.largeurTexte()), dans la hauteur réservée aux lignes de 21 points.
+-- La grille du fil : D.lignes lignes de D.hauteurLigne, à la largeur utile du centre (D.fil : la
+-- colonne auteur, son écart et le texte, F.largeurTexte()), dans sa hauteur réservée (D.grille).
 function Vues.grille(f, F, D)
     local grille = { spacing = 0, height = D.grille }
     for i = 1, D.lignes do
-        grille[#grille + 1] = Vues.ligneFil(f, F, i, F.largeurTexte())
+        grille[#grille + 1] = Vues.ligneFil(f, F, i, D)
     end
     return f:column(grille)
 end
@@ -221,25 +287,29 @@ function Vues.voyantEcran(f, F, D)
         end })
 end
 
--- Le bandeau, une ligne en petit : un message (orange ; son infobulle le donne en entier, la place
--- laissée par la rangée du bas en coupe la plupart), sinon l'aide d'un voyant rouge (un clic
--- l'affiche en entier), sinon les photos jointes (un clic les retire), sinon rien (état 'vide' :
--- le rappel du style est retiré, demandé par Dany le 20 octobre 2026).
+-- Le bandeau, dans la place du menu Modèle de la maquette (D.bandeau, retiré : décision de Dany) :
+-- deux lignes en petit (F.LIGNES_BANDEAU), coupées d'après la chasse mesurée (F.texteBandeau, « … »
+-- au bout de la seconde s'il le faut), à la hauteur des boutons de la rangée. Un message (orange ;
+-- son infobulle le donne en entier), sinon l'aide d'un voyant rouge (un clic l'affiche en entier),
+-- sinon les photos jointes (un clic les retire), sinon rien (état 'vide' : le rappel du style est
+-- retiré, demandé par Dany le 20 octobre 2026).
 function Vues.bandeau(f, F, largeur)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
+    local function coupe(cle, suite)
+        return bind { key = cle, transform = function(v) return F.texteBandeau(tostring(v or '') .. (suite or ''), largeur) end }
+    end
     return f:column {
         place = 'overlapping',
         place_vertical = 0.5,
-        f:static_text { title = bind { key = 'jointes', transform = function(v) return tostring(v or '') .. "  ·  cliquer pour retirer" end },
-            font = P.systeme11, text_color = C.gris, width = largeur, truncation = 'middle', visible = F.egal('bandeau', 'jointes'),
-            tooltip = "Cliquer pour retirer les photos jointes",
+        f:static_text { title = coupe('jointes', "  ·  cliquer pour retirer"), font = P.petit, text_color = C.gris, width = largeur,
+            height_in_lines = F.LIGNES_BANDEAU, visible = F.egal('bandeau', 'jointes'), tooltip = "Cliquer pour retirer les photos jointes",
             mouse_down = function()
                 F.annulerEnvoiAuto()
                 F.retirerJointes()
             end },
-        f:static_text { title = bind 'message', font = P.systeme11, text_color = C.orange, width = largeur, truncation = 'tail',
+        f:static_text { title = coupe('message'), font = P.petit, text_color = C.orange, width = largeur, height_in_lines = F.LIGNES_BANDEAU,
             visible = F.egal('bandeau', 'message'), tooltip = bind 'message' },
-        f:static_text { title = bind 'aide', font = P.systeme11, text_color = C.rouge, width = largeur, truncation = 'tail',
+        f:static_text { title = coupe('aide'), font = P.petit, text_color = C.rouge, width = largeur, height_in_lines = F.LIGNES_BANDEAU,
             visible = F.egal('bandeau', 'aide'), tooltip = "Cliquer pour lire l'aide en entier",
             mouse_down = function()
                 F.annulerEnvoiAuto()
@@ -662,18 +732,37 @@ function Vues.etape(f, F, largeur, D)
     }
 end
 
--- L'onglet Leçon, en attendant sa carte (lot B4) : son titre et une aide qui dit où lire la leçon
--- pour l'instant (dans le fil), coupée à la largeur de la carte.
-function Vues.leconProvisoire(f, F, largeur)
-    local C, P = F.COULEURS, F.POLICES
-    local interieur = largeur - 24
-    local lignes = F.lignesCarte(F.AIDE_LECON, interieur)
+-- La carte de l'onglet Leçon (1.3, lot B4), sur son image (carte-lecon, à la largeur intérieure
+-- du panneau) : son titre en gras 12 (`leconTitre`, « Leçon de la photo · DSCF4961.RAF »), puis la
+-- leçon page par page (`leconTexte`, D.leconLignes lignes en 12, coupées par Fenetre.montrerPage :
+-- le nom de chaque axe en <EM>, gras de même taille, constaté le 21 octobre 2026, D4), puis
+-- « Détail… » (l'appel de photo_lesson et sa réponse) et ▲ ▼ (Fenetre.defilerTexte('lecon')). Sans
+-- leçon, l'aide (Fenetre.AUCUNE_LECON).
+function Vues.lecon(f, F, largeur, D)
+    local bind, C, P = F.bind, F.COULEURS, F.POLICES
+    local t = F.tailleImage('carte-lecon')
     return f:column {
-        spacing = 4,
+        place = 'overlapping',
         width = largeur,
-        f:static_text { title = "Leçon de la photo", font = P.gras, width = interieur, truncation = 'tail' },
-        f:static_text { title = table.concat(lignes, '\n'), font = P.texte, text_color = C.gris, width = interieur,
-            height_in_lines = math.max(1, #lignes) },
+        height = t.hauteur,
+        Vues.image(f, F, 'carte-lecon'),
+        f:column {
+            margin_left = D.margeCarte,
+            margin_top = 12,
+            spacing = 6,
+            f:static_text { title = bind 'leconTitre', font = P.gras12, text_color = C.texte, width = D.largeurLecon,
+                truncation = 'middle' },
+            f:static_text { title = bind 'leconTexte', font = P.texte12, text_color = C.texte, emphasis_font = P.gras12,
+                emphasis_color = C.texte, width = D.largeurLecon, height_in_lines = D.leconLignes },
+            f:row {
+                spacing = 0,
+                F.bouton(f, { carre = true, bezel = 22, title = "Détail…", font = P.systeme12, width = D.detail,
+                    enabled = bind 'leconADetail', tooltip = "Ce que Claude a donné au connecteur pour cette leçon, puis sa réponse",
+                    action = function() F.enTache(F.detailLecon) end }),
+                f:spacer { fill_horizontal = 1 },
+                Vues.fleches(f, F, 'lecon'),
+            },
+        },
     }
 end
 

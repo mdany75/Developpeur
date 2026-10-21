@@ -1,12 +1,15 @@
 -- essais-lecon.lua : la leçon de la photo dans la fenêtre Claude (1.3, lot 13), hors de Lightroom
 -- (LuaJIT, Lightroom simulé par Simulation.lua) : l'élément `lecon` du fil, de l'entrée de
 -- photo_lesson à la réponse du connecteur (Conversation : points dans l'ordre Lumière, Couleur,
--- Composition, fichier, rangement, refus, interruption, read_facts sans carte), la carte en lignes
--- de genres existants (Fil : 16 lignes au plus, largeur, cache), son stockage (points en tableau,
--- leçon restée en cours relue en erreur), le clic sur la carte (détail de l'appel), la recherche,
--- la section « Leçon de la photo » des consignes, la case Leçon (« [Sans leçon] » joint sans
--- relancer Claude Code), et le cas LECON de bout en bout par relais.sh avec faux-claude.sh. Ni
--- Claude, ni quota ; les fichiers vont dans un dossier personnel temporaire.
+-- Composition, fichier, rangement, refus, interruption, read_facts sans leçon), sa ligne du fil
+-- (fenêtre B, lot B4 : plus de carte, la ligne d'actions « Leçon de la photo », ● pendant l'appel, ✕
+-- refusée ; cache), son texte pour l'onglet Leçon (Fil.texteLecon : axes balisés, entier, page par
+-- page), son stockage (points en tableau, leçon restée en cours relue en erreur), l'onglet Leçon
+-- (« Leçon de la photo », Détail…, ▲ ▼, leçon choisie, bascule une fois par leçon arrivée, jamais
+-- avec une proposition en attente ni un exercice en cours), la recherche, la section « Leçon de la
+-- photo » des consignes, la case Leçon (« [Sans leçon] » joint sans relancer Claude Code), et le cas
+-- LECON de bout en bout par relais.sh avec faux-claude.sh. Ni Claude, ni quota ; les fichiers vont
+-- dans un dossier personnel temporaire.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
 local S = require 'Simulation'
@@ -106,9 +109,10 @@ S.modules.LrTasks.execute = function(commande)
     return executerOriginal(commande)
 end
 
--- La largeur du texte du fil (Fenetre.largeurTexte), et celle qu'une ligne ne dépasse jamais.
+-- La largeur du texte du fil (Fenetre.largeurTexte : 518 dans la fenêtre B, après la colonne
+-- auteur), et celle qu'une ligne ne dépasse jamais, son retrait compris (Fil.occupe).
 local D = Dispositions.dimensions()
-local LARGEUR = D.fil - 20
+local LARGEUR = D.texteFil
 local LARGEUR_LIGNE = LARGEUR - Fil.MARGE
 
 local function photoActive(id, nom)
@@ -182,6 +186,11 @@ local function appelLecon(c, id, entree, reponse, erreur)
     return carte, outil
 end
 
+-- Un texte de Claude dans le fil.
+local function texteClaude(c, texte)
+    Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'texte', texte = texte } } })
+end
+
 -- Les lignes d'un élément dans le fil entier (Fil.lignes, à la largeur de la fenêtre).
 local function lignesDe(c, element, cache)
     local siennes = {}
@@ -193,9 +202,10 @@ local function lignesDe(c, element, cache)
     return siennes
 end
 
--- Chaque ligne tient dans la largeur, avec un genre et une icône que la fenêtre connaît.
+-- Chaque ligne tient dans la largeur (son retrait compris), avec un genre et une icône que la
+-- fenêtre connaît ; une ligne d'actions n'a pas de texte.
 local function verifierLignes(lignes)
-    local genres, icones = {}, {}
+    local genres, icones = { actions = true }, {}
     for _, s in ipairs(Fenetre.STYLES) do
         for g in pairs(s.genres) do
             genres[g] = true
@@ -207,9 +217,19 @@ local function verifierLignes(lignes)
     for _, l in ipairs(lignes) do
         vrai(genres[l.genre], 'genre inconnu de la fenêtre : ' .. tostring(l.genre))
         vrai(l.icone == nil or icones[l.icone], 'icône inconnue de la fenêtre : ' .. tostring(l.icone))
-        vrai(Fil.largeur(l.texte, Fil.polices[l.genre]) <= LARGEUR_LIGNE,
-            string.format('hors de la largeur (%.0f pour %d) : %s', Fil.largeur(l.texte, Fil.polices[l.genre]), LARGEUR_LIGNE, l.texte))
+        vrai(Fil.occupe(l) <= LARGEUR_LIGNE, string.format('hors de la largeur (%.0f pour %d) : %s', Fil.occupe(l), LARGEUR_LIGNE, l.texte))
+        vrai(l.genre ~= 'actions' or l.texte == '', 'une ligne d\'actions sans texte')
     end
+end
+
+-- Les balises d'une ligne : fermées sur la ligne même (une page de carte en commence une).
+local function balisesFermees(ligne)
+    local ouverte = false
+    for fin in ligne:gmatch('<(/?)EM>') do
+        vrai(ouverte == (fin == '/'), 'balise mal fermée : ' .. ligne)
+        ouverte = fin == ''
+    end
+    vrai(not ouverte, 'balise ouverte en fin de ligne : ' .. ligne)
 end
 
 local function textes(lignes)
@@ -347,42 +367,73 @@ end)
 
 -- Fil -------------------------------------------------------------------------------------------
 
-essai("Fil : lignes d'une leçon (titre, axes, deux moitiés retirées ; Rien ne manquait ; À refaire), genres et icônes connus", function()
+essai("Fil : la leçon n'a plus de carte dans le fil : ● pendant l'appel, puis « Leçon de la photo » sur la ligne d'actions qui finit le tour ; genres connus", function()
     local c = Conversation.nouvelle()
+    Conversation.ajouterDemande(c, 'Retouche, puis la leçon')
     local carte = appelLecon(c, 'l1', entreeLecon())
-    -- Pendant l'appel : le titre sans fichier, ● (en cours).
+    -- Pendant l'appel : une ligne ● (en cours), le titre sans fichier ; pas encore d'actions.
     local lignes = lignesDe(c, carte)
-    egal('proposition', lignes[1].genre)
-    egal('Leçon de la photo', lignes[1].texte)
-    egal('cours', lignes[1].icone)
+    verifierLignes(lignes)
+    egal("note|cours|Leçon de la photo · en préparation…", textes(lignes))
+    for _, l in ipairs(Fil.lignes(c, LARGEUR)) do
+        vrai(l.genre ~= 'actions', "pas d'actions pendant l'appel")
+    end
     Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'l1', images = {}, erreur = false, textes = { reponseLecon() } } } })
+    egal(0, #Fil.lignesElement(c.elements[carte], carte, LARGEUR_LIGNE), 'faite : pas de ligne à elle')
+    texteClaude(c, 'Le résumé, après la leçon.')
     lignes = lignesDe(c, carte)
     verifierLignes(lignes)
-    egal(table.concat({
-        "proposition|note|Leçon de la photo · DSCF4961.RAF",
-        "titre||Lumière",
-        "claude||    Ce qui manquait : Ciel brûlé à 3 % : hautes lumières -40.",
-        "claude||    À la prise de vue : Compenser de −2/3 IL face au ciel clair.",
-        "titre||Couleur",
-        "claude||    Ce qui manquait : Dominante bleue à l'ombre : +400 K.",
-        "claude||    À la prise de vue : Balance des blancs Ombre plutôt qu'Auto.",
-        "titre||Composition",
-        "claude||    Rien ne manquait.",
-        "claude||    À refaire : Le flamant au tiers gauche, regard vers le cadre : à refaire.",
-    }, '\n'), textes(lignes))
-    -- Le texte de Claude reste une phrase : une moitié qui commence par « - » ou « 1. » n'en fait
-    -- pas une puce.
-    c.elements[carte].points[2].manque = '- Dominante **bleue**'
-    c.elements[carte].points[3].prise_de_vue = '1. Le flamant'
-    lignes = lignesDe(c, carte)
-    egal('    Ce qui manquait : - Dominante **bleue**', lignes[6].texte)
-    egal('    À refaire : 1. Le flamant', lignes[10].texte)
-    for _, l in ipairs(lignes) do
-        vrai(not l.texte:find('•', 1, true), 'pas de puce')
+    -- Faite : la ligne d'actions, sans texte ni axe (la leçon est dans l'onglet Leçon), à la fin du
+    -- tour de Claude, après son texte (maquette).
+    egal(1, #lignes)
+    egal('actions', lignes[1].genre)
+    egal('lecon', lignes[1].actions)
+    egal(carte, lignes[1].lecon, "l'élément de la leçon")
+    egal('', lignes[1].texte)
+    local fil = Fil.lignes(c, LARGEUR)
+    egal('actions', fil[#fil].genre, 'la dernière ligne du tour')
+    egal('Le résumé, après la leçon.', fil[#fil - 1].texte)
+    for _, l in ipairs(fil) do
+        vrai(not l.texte:find('Ce qui manquait', 1, true), 'aucun axe dans le fil : ' .. l.texte)
     end
+    -- Une demande suivante : les actions restent à la fin du tour d'avant.
+    Conversation.ajouterDemande(c, 'Merci')
+    fil = Fil.lignes(c, LARGEUR)
+    egal('dany', fil[#fil - 1].genre)
+    egal('vide', fil[#fil - 2].genre)
+    egal('actions', fil[#fil - 3].genre)
 end)
 
-essai('Fil : 16 lignes au plus pour des moitiés de 140 caractères, coupées en deux lignes, « … » au-delà', function()
+essai("Fil.texteLecon : le texte de l'onglet (axes en gras balisés, deux moitiés entières, Rien ne manquait, À refaire), sans Markdown ni balise de Claude", function()
+    local c = Conversation.nouvelle()
+    local carte = appelLecon(c, 'l1', entreeLecon(), reponseLecon())
+    local e = c.elements[carte]
+    egal('Leçon de la photo · DSCF4961.RAF', Fil.titreLecon(e))
+    egal(table.concat({
+        "<EM>Lumière</EM>",
+        "Ce qui manquait : Ciel brûlé à 3 % : hautes lumières -40.",
+        "À la prise de vue : Compenser de −2/3 IL face au ciel clair.",
+        "",
+        "<EM>Couleur</EM>",
+        "Ce qui manquait : Dominante bleue à l'ombre : +400 K.",
+        "À la prise de vue : Balance des blancs Ombre plutôt qu'Auto.",
+        "",
+        "<EM>Composition</EM>",
+        "Rien ne manquait.",
+        "À refaire : Le flamant au tiers gauche, regard vers le cadre : à refaire.",
+    }, '\n'), Fil.texteLecon(e))
+    -- Le texte de Claude reste une phrase (ni puce ni Markdown du fil), sans balise à lui.
+    e.points[2].manque = '- Dominante <EM>bleue'
+    e.points[3].prise_de_vue = '1. Le flamant'
+    local texte = Fil.texteLecon(e)
+    contient(texte, 'Ce qui manquait : - Dominante bleue')
+    contient(texte, 'À refaire : 1. Le flamant')
+    vrai(not texte:find('•', 1, true), 'pas de puce')
+    local _, balises = texte:gsub('<EM>', '')
+    egal(3, balises, 'seulement les trois axes balisés')
+end)
+
+essai("Onglet Leçon : des moitiés de 140 caractères entières, page par page ; chaque ligne dans la carte, ses balises fermées", function()
     local c = Conversation.nouvelle()
     local longue = phrase("Le ciel brûlé à 3 % au départ ; hautes lumières baissées de 40 et blancs de 20. ", 140)
     local entree = { photo_id = 53636309, points = {} }
@@ -390,40 +441,40 @@ essai('Fil : 16 lignes au plus pour des moitiés de 140 caractères, coupées en
         entree.points[#entree.points + 1] = { axis = axe, missing = longue, at_capture = longue }
     end
     local carte = appelLecon(c, 'l1', entree, reponseLecon())
-    local lignes = lignesDe(c, carte)
-    verifierLignes(lignes)
-    egal(16, #lignes, '1 + 3 × (1 + 2 + 2)')
-    -- Chaque moitié tient en deux lignes, la seconde retirée elle aussi, sans « … ».
-    egal('claude', lignes[3].genre)
-    vrai(lignes[3].texte:sub(1, #'    Ce qui manquait : ') == '    Ce qui manquait : ', lignes[3].texte)
-    vrai(lignes[4].texte:sub(1, 4) == '    ' and lignes[4].texte:sub(5, 5) ~= ' ', 'ligne de suite retirée : ' .. lignes[4].texte)
+    local texte = Fil.texteLecon(c.elements[carte])
+    vrai(not texte:find('…', 1, true), 'la leçon entière, sans « … »')
+    -- Coupée comme la carte la montre (12 points, axes en gras 12) : chaque ligne tient dans le texte
+    -- de la carte, ses balises fermées sur la ligne.
+    local lignes = Fenetre.lignesCarte(texte, D.largeurLecon, Fenetre.CARTES.lecon.police, Fenetre.CARTES.lecon.emphase)
+    vrai(#lignes > D.leconLignes, 'plus d\'une page : ' .. #lignes .. ' lignes')
     for _, l in ipairs(lignes) do
-        vrai(not l.texte:find('…', 1, true), 'rien de coupé : ' .. l.texte)
+        balisesFermees(l)
+        vrai(Fil.largeur(l, 'texte12', 'gras12') <= D.largeurLecon - Fil.MARGE, 'dans la carte : ' .. l)
     end
-    -- Des caractères larges (140 « W ») ou un mot sans espace : toujours deux lignes par moitié,
-    -- la seconde finie par « … », dans la largeur.
-    for _, motif in ipairs({ 'W', 'é' }) do
-        local large = phrase(motif, 140)
-        for _, p in ipairs(c.elements[carte].points) do
-            p.manque, p.prise_de_vue = large, large
-        end
-        lignes = lignesDe(c, carte)
-        verifierLignes(lignes)
-        egal(16, #lignes, 'motif ' .. motif)
-        vrai(lignes[4].texte:sub(-#'…') == '…', 'coupée par « … » : ' .. lignes[4].texte)
-        vrai(Fil.couper('    Ce qui manquait : ' .. large, LARGEUR_LIGNE, 'texte', '    ')[3] ~= nil, 'il fallait bien plus de deux lignes')
+    -- Des caractères larges (140 « W ») : coupés au caractère, dans la carte aussi.
+    for _, p in ipairs(c.elements[carte].points) do
+        p.manque, p.prise_de_vue = phrase('W', 140), phrase('W', 140)
     end
-    -- Un point sans défaut, à la prise de vue courte : deux lignes de moins.
-    c.elements[carte].points[3].manque = nil
-    c.elements[carte].points[3].prise_de_vue = 'Le cadre.'
-    egal(14, #lignesDe(c, carte))
+    for _, l in ipairs(Fenetre.lignesCarte(Fil.texteLecon(c.elements[carte]), D.largeurLecon, 'texte12', 'gras12')) do
+        balisesFermees(l)
+        vrai(Fil.largeur(l, 'texte12', 'gras12') <= D.largeurLecon - Fil.MARGE, 'dans la carte : ' .. l)
+    end
+    -- Un axe au nom trop long pour une ligne : coupé, chaque morceau rebalisé.
+    c.elements[carte].points[1].nom = phrase('Lumière ', 120)
+    local coupees = Fenetre.lignesCarte(Fil.texteLecon(c.elements[carte]), D.largeurLecon, 'texte12', 'gras12')
+    egal('<EM>', coupees[1]:sub(1, 4), 'le nom en gras')
+    egal('<EM>', coupees[2]:sub(1, 4), 'sa suite rouverte en gras')
+    for _, l in ipairs(coupees) do
+        balisesFermees(l)
+    end
 end)
 
-essai("Fil : leçon refusée, interrompue ou non rangée ; un long refus borné", function()
+essai("Fil : leçon refusée ou interrompue (✕, bornée) ; non rangée ou gardée pour la session : la ligne d'actions, la remarque dans l'onglet", function()
     local c = Conversation.nouvelle()
     local refusee = appelLecon(c, 'l1', entreeLecon(), "Le point « light » : at_capture vide. Rien n'a été rangé.", true)
     local lignes = lignesDe(c, refusee)
     egal("note|erreur|Leçon non rangée : Le point « light » : at_capture vide. Rien n'a été rangé.", textes(lignes))
+    egal("Leçon non rangée : Le point « light » : at_capture vide. Rien n'a été rangé.", Fil.texteLecon(c.elements[refusee]))
     -- Interrompue (ou relue en cours) : sans raison donnée.
     c.elements[refusee].texte = ''
     egal("note|erreur|Leçon non rangée : l'appel n'a pas abouti.", textes(lignesDe(c, refusee)))
@@ -433,50 +484,37 @@ essai("Fil : leçon refusée, interrompue ou non rangée ; un long refus borné"
     egal(Fil.LIGNES_ERREUR_LECON, #lignes)
     vrai(lignes[#lignes].texte:sub(-#'…') == '…', lignes[#lignes].texte)
     verifierLignes(lignes)
-    -- Faite mais non rangée : la carte, puis la remarque (✕), en deux lignes au plus.
+    -- Faite mais non rangée : la ligne d'actions dans le fil ; la remarque à la fin du texte.
     local remarque = "Leçon non rangée : le module de Lightroom chargé ne connaît pas encore la commande lecon (module d'avant la 1.3). "
         .. "Quitter puis relancer Lightroom après l'installation ; la leçon de cette réponse reste valable."
     local nonRangee = appelLecon(c, 'l2', entreeLecon(), reponseLecon({ rangee = false }, { remarque }))
-    lignes = lignesDe(c, nonRangee)
-    verifierLignes(lignes)
-    egal('Leçon de la photo · DSCF4961.RAF', lignes[1].texte)
-    vrai(#lignes <= 16 + Fil.LIGNES_REMARQUE_LECON, #lignes .. ' lignes')
-    egal('note', lignes[11].genre)
-    egal('erreur', lignes[11].icone)
-    contient(lignes[11].texte, 'Leçon non rangée : le module')
-    -- Rangée pour la session seulement (carnet.json non écrit) : ⓘ.
+    egal(0, #Fil.lignesElement(c.elements[nonRangee], nonRangee, LARGEUR_LIGNE), 'faite : pas de ligne à elle')
+    local texte = Fil.texteLecon(c.elements[nonRangee])
+    vrai(texte:sub(-#remarque) == remarque, 'la remarque en dernier : ' .. texte)
+    -- Rangée pour la session seulement (carnet.json non écrit).
     local gardee = appelLecon(c, 'l3', entreeLecon(), reponseLecon(nil, { "Leçon gardée pour cette session, carnet.json non écrit : disque plein" }))
-    lignes = lignesDe(c, gardee)
-    egal('note', lignes[#lignes].icone)
-    contient(lignes[#lignes].texte, 'carnet.json non écrit')
-    -- Non rangée sans remarque du connecteur : la carte le dit quand même (✕) ; rangée sans
-    -- remarque, rien sous la carte.
+    contient(Fil.texteLecon(c.elements[gardee]), 'carnet.json non écrit')
+    -- Non rangée sans remarque du connecteur : le texte le dit quand même ; rangée sans remarque,
+    -- rien après la composition.
     local muette = appelLecon(c, 'l4', entreeLecon(), reponseLecon({ rangee = false }, { "Mesuré : x." }))
-    lignes = lignesDe(c, muette)
-    egal(11, #lignes)
-    egal("note|erreur|Leçon non rangée dans le carnet de progrès.", textes({ lignes[11] }))
+    contient(Fil.texteLecon(c.elements[muette]), "\n\nLeçon non rangée dans le carnet de progrès.")
     local rangee = appelLecon(c, 'l5', entreeLecon(), reponseLecon(nil, { "Mesuré : x." }))
-    egal(10, #lignesDe(c, rangee))
-    egal('claude', lignesDe(c, rangee)[10].genre)
+    vrai(Fil.texteLecon(c.elements[rangee]):sub(-#'à refaire.') == 'à refaire.', 'rien après la composition')
 end)
 
-essai('Fil : le cache suit la leçon (fichier, rangement, textes des points) et garde les lignes sinon', function()
+essai('Fil : le cache suit la leçon (en cours, faite, refusée) et garde les lignes sinon', function()
     local c = Conversation.nouvelle()
-    local carte = appelLecon(c, 'l1', entreeLecon(), reponseLecon())
+    local carte = appelLecon(c, 'l1', entreeLecon())
     local cache = {}
+    egal('note', lignesDe(c, carte, cache)[1].genre, 'en cours')
+    Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'l1', images = {}, erreur = false, textes = { reponseLecon() } } } })
     local avant = lignesDe(c, carte, cache)
     local e = c.elements[carte]
-    vrai(cache[e.id] and cache[e.id].lignes[1] == avant[1], 'gardées')
-    egal(avant[1], lignesDe(c, carte, cache)[1], 'rien de changé : les mêmes lignes')
-    e.fichier = 'DSCF0002.RAF'
-    egal('Leçon de la photo · DSCF0002.RAF', lignesDe(c, carte, cache)[1].texte, 'autre fichier')
-    e.points[1].prise_de_vue = 'Une autre prise de vue.'
-    egal('    À la prise de vue : Une autre prise de vue.', lignesDe(c, carte, cache)[4].texte, 'autre texte')
-    e.points[3].manque = 'Horizon penché de 1,8°.'
-    egal('    Ce qui manquait : Horizon penché de 1,8°.', lignesDe(c, carte, cache)[9].texte, 'manque ajouté')
-    e.rangee, e.remarque = false, 'Leçon non rangée : x.'
-    local lignes = lignesDe(c, carte, cache)
-    egal('Leçon non rangée : x.', lignes[#lignes].texte, 'rangement')
+    egal('actions', avant[1].genre, 'faite : la ligne d\'actions du tour')
+    vrai(cache[e.id] and #cache[e.id].lignes == 0, 'gardée : aucune ligne à elle')
+    local garde = cache[e.id].lignes
+    lignesDe(c, carte, cache)
+    egal(garde, cache[e.id].lignes, 'rien de changé : les mêmes lignes gardées')
     e.etat, e.texte = 'erreur', 'refusée'
     egal('Leçon non rangée : refusée', lignesDe(c, carte, cache)[1].texte, 'état')
 end)
@@ -519,7 +557,8 @@ essai('Stockage : leçon relue, points et défauts en tableaux (même vides), le
     egal(0, #abimee.elements[faite].points, 'points en texte : aucun')
     egal(1, #abimee.elements[enCours].points, 'seulement les points en table')
     egal(0, #abimee.elements[enCours].points[1].defauts, 'défauts en texte : aucun')
-    egal("proposition|note|Leçon de la photo · DSCF4961.RAF", textes({ lignesDe(abimee, faite)[1] }))
+    egal(0, #Fil.lignesElement(abimee.elements[faite], faite, LARGEUR_LIGNE), 'faite : pas de ligne à elle')
+    egal('', Fil.texteLecon(abimee.elements[faite]), 'points en texte : aucun axe dans l\'onglet')
     egal("note|erreur|Leçon non rangée : l'appel n'a pas abouti.", textes(lignesDe(abimee, enCours)))
     Stockage.enregistrer(abimee)
     contient(Fichiers.lire(Stockage.fichier(c.id)), '"defauts":[]', 'réenregistrée')
@@ -531,74 +570,198 @@ end)
 
 -- Fenêtre ---------------------------------------------------------------------------------------
 
-essai("Fenêtre : un clic sur la carte montre le détail de son appel, sans envoyer la demande tapée ni changer d'onglet", function()
+-- Le bouton montré de ce titre sur la ligne i de la grille du fil (`x..i`, la rangée d'actions).
+local function boutonDeLigne(contenu, titre, i)
+    for _, v in ipairs(vues(contenu)) do
+        if S.BOUTONS[v.genre] and v.args.title == titre and type(v.args.visible) == 'table'
+            and table.concat(S.cles(v.args.visible), ' ') == 'x' .. i and S.montreeDansFenetre(v) then
+            return v
+        end
+    end
+    error('bouton « ' .. titre .. ' » introuvable sur la ligne ' .. i, 2)
+end
+
+-- La vue simple liée à cette clé (titre, valeur, ou `enabled` d'un bouton).
+local function liee(contenu, genre, cle)
+    for _, v in ipairs(vues(contenu)) do
+        local lien = v.args.title or v.args.value
+        if S.BOUTONS[v.genre] then
+            lien = v.args.enabled
+        end
+        if v.genre == genre and type(lien) == 'table' and lien.liaison and lien.key == cle then
+            return v
+        end
+    end
+    error(genre .. ' lié à ' .. cle .. ' introuvable', 2)
+end
+
+-- La ligne de la grille qui montre cette ligne du fil (test), et la ligne elle-même.
+local function ligneMontree(test)
+    for i = 1, Fenetre.T.lignes do
+        local l = Fenetre.lignes[Fenetre.premiere + i - 1]
+        if l and test(l) then
+            return i, l
+        end
+    end
+    error('ligne introuvable dans la grille', 2)
+end
+
+essai("Fenêtre : « Leçon de la photo » ouvre l'onglet Leçon sur sa leçon (vrai clic, sans envoyer la demande) ; carte, axes en gras, ▲ ▼, Détail… ; remise quand la conversation change", function()
     photoActive(53636309, 'DSCF4961.RAF')
     -- Les conversations chargées d'abord : la fenêtre ne remplace pas celle-ci en s'ouvrant.
     Moteur.charger()
     Moteur.nouvelle()
     local c = Moteur.courante
-    local carte, outil = appelLecon(c, 'l1', entreeLecon(), reponseLecon())
+    -- Une première leçon de la photo active, aux moitiés longues (plus d'une page), puis une autre
+    -- (la dernière : celle que l'onglet montre sans choix).
+    local longue = phrase("Le ciel brûlé à 3 % au départ ; hautes lumières baissées de 40 et blancs de 20. ", 140)
+    local entree = entreeLecon()
+    for _, x in ipairs(entree.points) do
+        x.missing, x.at_capture = x.missing and longue or nil, longue
+    end
+    local premiere, outil = appelLecon(c, 'l1', entree, reponseLecon())
+    Conversation.ajouterDemande(c, 'Et la leçon de la photo ?')
+    local seconde = appelLecon(c, 'l2', entreeLecon(), reponseLecon({ remplacee = true }))
+    ouvrirFenetre(function(p, args)
+        egal(c, Moteur.courante, 'la conversation des leçons')
+        Fenetre.rafraichir()
+        egal('notation', p.onglet, "des leçons déjà là ne font pas basculer à l'ouverture")
+        -- Sans choix : la dernière leçon de la photo active.
+        egal(c.elements[seconde].id, (Fenetre.leconMontree()).id)
+        contient(p.leconTexte, '<EM>Lumière</EM>')
+        -- La carte (sur son image), le texte en 12, les axes en gras 12 (emphase de même taille).
+        local texte = liee(args.contents, 'static_text', 'leconTexte')
+        egal(Fenetre.POLICES.texte12, texte.args.font)
+        egal(Fenetre.POLICES.gras12, texte.args.emphasis_font)
+        vrai(texte.args.emphasis_color, "la couleur d'emphase avec la police (D4)")
+        egal(D.leconLignes, texte.args.height_in_lines)
+        egal(D.largeurLecon, texte.args.width)
+        local image
+        for _, v in ipairs(vues(args.contents)) do
+            if v.genre == 'picture' and type(v.args.value) == 'string' and v.args.value:match('/carte%-lecon%.png$') then
+                image = v
+            end
+        end
+        vrai(image, 'la carte en image')
+        vrai(not S.montreeDansFenetre(image), 'cachée sous Note')
+        -- « Leçon de la photo » de la première leçon, après une frappe sans Retour.
+        local i = ligneMontree(function(l) return l.genre == 'actions' and l.lecon == premiere end)
+        egal('lecon', p['x' .. i])
+        local champ = liee(args.contents, 'edit_field', 'saisie')
+        S.taper(champ, 'Texte validé par le clic')
+        S.cliquer(boutonDeLigne(args.contents, 'Leçon de la photo', i))
+        egal(nil, Fenetre.envoiAuto, "le clic n'envoie pas la demande")
+        p.saisie = ''
+        egal('lecon', p.onglet, "l'onglet Leçon")
+        vrai(S.montreeDansFenetre(image) and S.montreeDansFenetre(texte), 'la carte montrée')
+        egal(c.elements[premiere].id, Fenetre.leconChoisie)
+        egal('Leçon de la photo · DSCF4961.RAF', p.leconTitre)
+        egal(1, (p.leconTexte:find('<EM>Lumière</EM>\nCe qui manquait : Le ciel brûlé', 1, true)), p.leconTexte)
+        -- Coupée dans la police de la carte (12 points, les axes en gras 12), comme elle s'affiche.
+        local attendues = Fenetre.lignesCarte(Fil.texteLecon(c.elements[premiere]), D.largeurLecon, 'texte12', 'gras12')
+        egal(table.concat(attendues, '\n', 1, D.leconLignes), p.leconTexte, 'la première page, en 12 points')
+        -- Page par page : ▼ puis ▲ (Fenetre.defilerTexte), la page suivante aux balises fermées.
+        egal(false, p.leconMonte)
+        egal(true, p.leconDescend, "plus d'une page")
+        local premierePage = p.leconTexte
+        S.cliquer(liee(args.contents, 'push_button', 'leconDescend'))
+        vrai(p.leconTexte ~= premierePage and p.leconMonte, 'page suivante')
+        for ligne in (p.leconTexte .. '\n'):gmatch('([^\n]*)\n') do
+            balisesFermees(ligne)
+        end
+        S.cliquer(liee(args.contents, 'push_button', 'leconMonte'))
+        egal(premierePage, p.leconTexte, 'retour à la première page')
+        -- Détail… : l'appel de photo_lesson et sa réponse, dans une tâche.
+        egal(true, p.leconADetail)
+        local taches, dialogues = #S.taches, #S.dialogues
+        S.cliquer(liee(args.contents, 'square_button', 'leconADetail'))
+        egal(taches + 1, #S.taches, 'le détail dans une tâche')
+        lancerTaches(taches)
+        egal(dialogues + 1, #S.dialogues)
+        egal('Claude · ' .. c.elements[outil].texte, S.dialogues[#S.dialogues].title)
+        -- Une autre conversation : plus de leçon choisie, l'aide, rien à détailler.
+        Fenetre.nouvelle()
+        Fenetre.rafraichir()
+        egal(nil, Fenetre.leconChoisie, 'remise à nil')
+        egal(Fenetre.AUCUNE_LECON, (p.leconTexte:gsub('\n', ' ')))
+        egal('Leçon de la photo', p.leconTitre)
+        egal(false, p.leconADetail)
+        p.onglet = 'notation'
+    end)
+end)
+
+essai("Fenêtre : une leçon qui arrive bascule une fois vers Leçon ; jamais avec une proposition en attente ni un exercice en cours (seulement vue)", function()
+    photoActive(53636309, 'DSCF4961.RAF')
+    Moteur.charger()
+    Moteur.nouvelle()
+    local c = Moteur.courante
     ouvrirFenetre(function(p)
-        egal(c, Moteur.courante, 'la conversation de la carte')
+        Fenetre.rafraichir()
+        egal('notation', p.onglet)
+        -- Une leçon en cours ne fait pas basculer ; faite, une fois.
+        local l1 = appelLecon(c, 'l1', entreeLecon())
+        Fenetre.rafraichir()
+        egal('notation', p.onglet, 'en cours : pas encore')
+        Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'l1', images = {}, erreur = false, textes = { reponseLecon() } } } })
+        Fenetre.rafraichir()
+        egal('lecon', p.onglet, 'la leçon arrivée')
+        egal(c.elements[l1].id, Fenetre.leconVue)
+        p.onglet = 'notation'
+        Fenetre.rafraichir()
+        egal('notation', p.onglet, 'une seule fois')
+        -- Une proposition en attente : la leçon qui arrive est vue, sans bascule (Accepter reste
+        -- devant) ; la proposition décidée, toujours pas.
+        Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = 'p1', nom = 'mcp__developpeur__preview_settings',
+            entree = { photo_id = 53636309, settings = { Exposure2012 = 0.3 }, reason = 'Plus clair' } } } })
+        Fenetre.rafraichir()
+        egal('proposition', p.onglet, 'la proposition arrivée')
+        local l2 = appelLecon(c, 'l2', entreeLecon(), reponseLecon())
+        Fenetre.rafraichir()
+        egal('proposition', p.onglet, 'pas de bascule : une proposition attend')
+        egal(c.elements[l2].id, Fenetre.leconVue, 'vue')
+        Conversation.decider(c, Conversation.propositionEnAttente(c).id, false)
+        Fenetre.rafraichir()
+        egal('proposition', p.onglet, 'déjà vue : rien de plus')
+        -- Un exercice « Je le fais » à faire : pas de bascule non plus.
+        c.elements[#c.elements + 1] = { id = 'exo', genre = 'exercice', etat = 'aFaire', photo = 53636309, texte = '', images = {},
+            changements = {}, aFaire = { { n = 1, cle = 'Exposure2012', texte = 'Exposition : 0 → +0,3' } }, ecarts = {} }
+        Fenetre.rafraichir()
+        p.onglet = 'notation'
+        local l3 = appelLecon(c, 'l3', entreeLecon(), reponseLecon())
+        Fenetre.rafraichir()
+        egal('notation', p.onglet, 'pas de bascule : un exercice en cours')
+        egal(c.elements[l3].id, Fenetre.leconVue, 'vue')
+    end)
+end)
+
+essai("Fenêtre : la ligne d'une leçon refusée ouvre le détail de son appel ; la ligne d'actions n'a pas de clic de texte", function()
+    photoActive(53636309, 'DSCF4961.RAF')
+    Moteur.charger()
+    Moteur.nouvelle()
+    local c = Moteur.courante
+    local refusee, outil = appelLecon(c, 'l1', entreeLecon(), "Le point « light » : at_capture vide.", true)
+    local faite = appelLecon(c, 'l2', entreeLecon(), reponseLecon())
+    ouvrirFenetre(function(p)
         Fenetre.rafraichir()
         local onglet = p.onglet
-        -- Une ligne de la carte (celle d'un axe) dans la fenêtre de lecture.
-        local n
-        for i = 1, Fenetre.T.lignes do
-            local l = Fenetre.lignes[Fenetre.premiere + i - 1]
-            if l and l.element == carte and l.texte == 'Couleur' then
-                n = i
-            end
-        end
-        vrai(n, "la ligne de l'axe Couleur est montrée")
-        egal('lecon', Fenetre.sorteDeClic(Fenetre.lignes[Fenetre.premiere + n - 1], c.elements[carte]))
-        -- Le texte du champ, validé par le clic (son envoi automatique attend dans une tâche).
-        local avantSaisie = #S.taches
-        p.saisie = 'Texte validé par le clic'
+        local n = ligneMontree(function(l) return l.element == refusee and l.genre == 'note' end)
+        egal('lecon', Fenetre.sorteDeClic(Fenetre.lignes[Fenetre.premiere + n - 1], c.elements[refusee]))
         local taches, dialogues = #S.taches, #S.dialogues
+        p.saisie = 'Texte validé par le clic'
         Fenetre.cliquerLigne(n)
         egal(nil, Fenetre.envoiAuto, "le clic n'envoie pas la demande")
-        egal(taches + 1, #S.taches, 'le détail dans une tâche')
         p.saisie = ''
-        local demandes = #Moteur.courante.elements
-        lancerTaches(avantSaisie)
-        egal(demandes, #Moteur.courante.elements, 'rien envoyé')
-        egal(false, Moteur.travaille)
-        egal(dialogues + 1, #S.dialogues)
-        local d = S.dialogues[#S.dialogues]
-        egal('Claude · ' .. c.elements[outil].texte, d.title)
-        egal('Claude · photo_lesson · photo 53636309', d.title)
-        local champ
-        for _, v in ipairs(vues(d.contents)) do
-            if v.genre == 'edit_field' then
-                champ = v.args.value
-            end
-        end
-        contient(champ, 'at_capture', 'ce que Claude a donné')
-        contient(champ, '— Réponse —')
-        contient(champ, 'DSCF4961.RAF', 'la réponse du connecteur')
+        lancerTaches(taches)
+        egal(dialogues + 1, #S.dialogues, 'le détail de son appel')
+        egal('Claude · ' .. c.elements[outil].texte, S.dialogues[#S.dialogues].title)
         egal(onglet, p.onglet, "l'onglet ne change pas")
-        egal(nil, Fenetre.etape, "pas d'étape choisie")
-        -- Le titre de la carte aussi.
-        for i = 1, Fenetre.T.lignes do
-            local l = Fenetre.lignes[Fenetre.premiere + i - 1]
-            if l and l.element == carte and l.genre == 'proposition' then
-                n = i
-            end
-        end
-        dialogues = #S.dialogues
-        taches = #S.taches
-        Fenetre.cliquerLigne(n)
-        lancerTaches(taches)
-        egal(dialogues + 1, #S.dialogues, 'le titre ouvre le même détail')
-        -- Sans la ligne de son appel (conversation abîmée) : rien.
-        c.elements[outil].appel = 'autre'
-        Fenetre.rafraichir()
+        -- La ligne d'actions : ses boutons seulement.
+        local m, l = ligneMontree(function(x) return x.genre == 'actions' and x.lecon == faite end)
+        egal(nil, Fenetre.sorteDeClic(l, c.elements[faite]))
         dialogues, taches = #S.dialogues, #S.taches
-        Fenetre.cliquerLigne(n)
+        Fenetre.cliquerLigne(m)
         lancerTaches(taches)
-        egal(dialogues, #S.dialogues, "rien sans l'appel")
-        c.elements[outil].appel = 'l1'
+        egal(dialogues, #S.dialogues, 'rien')
     end)
 end)
 
@@ -612,7 +775,7 @@ essai('Consignes : section Leçon de la photo (600 caractères au plus), après 
     local section = texte:sub(debut + 1, fin - 1):gsub('\n$', '')
     vrai(Texte.longueur(section) <= 600, string.format('section : %d caractères pour 600', Texte.longueur(section)))
     for _, morceau in ipairs({ 'photo_lesson en dernier', 'résumé court', 'proposition de cadre', 'lumière, couleur, composition',
-        'ce qui manquait', 'chiffres', 'à la prise de vue', "réglage du boîtier seulement s'il est lu", 'en carte', 'rien après',
+        'ce qui manquait', 'chiffres', 'à la prise de vue', "réglage du boîtier seulement s'il est lu", "dans l'onglet Leçon", 'rien après',
         'Une seule leçon par photo et par conversation', "« J'ai fini »", 'proposition seule', "Proposer d'abord", 'ouverture',
         'notation', 'classement', 'série', Consignes.sansLecon }) do
         contient(section, morceau, 'section Leçon')

@@ -138,9 +138,10 @@ S.modules.LrTasks.execute = function(commande)
     return executerOriginal(commande)
 end
 
--- La largeur du texte du fil (Fenetre.largeurTexte), et celle qu'une ligne ne dépasse jamais.
+-- La largeur du texte du fil (Fenetre.largeurTexte : 518 dans la fenêtre B, après la colonne
+-- auteur), et celle qu'une ligne ne dépasse jamais, son retrait compris (Fil.occupe).
 local D = Dispositions.dimensions()
-local LARGEUR = D.fil - 20
+local LARGEUR = D.texteFil
 local LARGEUR_LIGNE = LARGEUR - Fil.MARGE
 
 local function photoActive(id, nom)
@@ -332,9 +333,9 @@ local function verifierLignes(lignes)
     for _, l in ipairs(lignes) do
         vrai(genres[l.genre] and Fil.polices[l.genre], 'genre inconnu de la fenêtre : ' .. tostring(l.genre))
         vrai(l.icone == nil or icones[l.icone], 'icône inconnue de la fenêtre : ' .. tostring(l.icone))
-        vrai(Fil.largeur(l.texte, Fil.polices[l.genre]) <= LARGEUR_LIGNE,
-            string.format('hors de la largeur (%.0f pour %d) : %s', Fil.largeur(l.texte, Fil.polices[l.genre]), LARGEUR_LIGNE, l.texte))
+        vrai(Fil.occupe(l) <= LARGEUR_LIGNE, string.format('hors de la largeur (%.0f pour %d) : %s', Fil.occupe(l), LARGEUR_LIGNE, l.texte))
         egal(nil, l.element, "une ligne de la page n'est pas d'une conversation")
+        egal(nil, l.auteur, "pas d'auteur sur la page")
         -- Pas de barres ▁…█ (U+2581 à U+2588) : il faudrait remesurer les polices.
         for c in Texte.caracteres(l.texte) do
             vrai(not (c >= '\226\150\129' and c <= '\226\150\136' and #c == 3), 'barre dans la page : ' .. l.texte)
@@ -486,9 +487,12 @@ essai('Fil.lignesCarnet : titre, note, tableau mono aligné, tendances, à trava
         vrai(l.genre == 'outil' or l.defaut == nil, 'seules les rangées portent un défaut')
         vrai(l == derniere or l.action == nil, "seule la ligne d'action en porte une")
     end
-    -- Dans la grille de la fenêtre B (23 lignes, au fil de 570 points : lot B3), la page dépasse un
+    -- Dans la grille de la fenêtre B (23 lignes, au texte de 518 points : lot B4), la page dépasse un
     -- peu la grille : elle se lit avec ▲ ▼ (essai de la page, plus bas) ; deux grilles au plus.
     vrai(#lignes <= 2 * D.lignes, string.format('la page tient dans deux grilles (%d lignes pour %d)', #lignes, D.lignes))
+    -- Le tableau en Menlo, sans retrait d'icône : toute la largeur du texte du fil.
+    egal('mono', Fil.polices.outil)
+    egal(0, Fil.retrait('outil'))
 end)
 
 essai('Fil.lignesCarnet : page vide, en lecture, en erreur ; sans tendance ; années dans l\'en-tête ; libellé trop long', function()

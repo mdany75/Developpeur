@@ -234,20 +234,34 @@ essai('Fil : lignes d\'une conversation et fenêtre de lecture', function()
     c.elements[#c.elements + 1] = { id = 'o1', genre = 'outil', texte = 'view_photo', etat = 'fait', images = {}, changements = {} }
     c.elements[#c.elements + 1] = { id = 'a1', genre = 'apercu', texte = '', images = { 'image-1.jpg' }, changements = {} }
     c.elements[#c.elements + 1] = { id = 'c1', genre = 'claude', texte = 'Passe 1 vérifiée.\n\n## Résumé\n- un', images = {}, changements = {} }
+    c.elements[2].date, c.elements[3].date, c.elements[4].date = c.elements[1].date + 60, c.elements[1].date + 61, c.elements[1].date + 62
     local cache = {}
     local lignes = Fil.lignes(c, 500, cache)
     egal('dany', lignes[1].genre)
-    egal('dany', lignes[1].icone)
+    -- Plus de › devant Dany : la colonne auteur dit « Vous », l'heure dessous (fenêtre B).
+    egal(nil, lignes[1].icone)
+    egal('dany', lignes[1].auteur)
     egal('vide', lignes[2].genre)
-    egal('outil', lignes[3].genre)
+    egal(Fil.heure(c.elements[1].date), lignes[2].heure, "l'heure sur la ligne suivante, vide comprise")
+    -- La ligne d'un appel : le nom de l'outil en texte riche (Menlo), l'icône, le tour de Claude.
+    egal('appel', lignes[3].genre)
+    egal('<EM>view_photo</EM>', lignes[3].texte)
     egal('ok', lignes[3].icone)
+    egal('claude', lignes[3].auteur)
     egal('apercu', lignes[4].genre, 'outil et aperçu collés')
     egal('image-1.jpg', lignes[4].image)
+    egal(Fil.heure(c.elements[2].date), lignes[4].heure, "l'heure du premier élément du tour")
     egal('vide', lignes[5].genre)
     egal('Passe 1 vérifiée.', lignes[6].texte)
+    egal(nil, lignes[6].auteur, 'le même tour : pas de nouvel auteur')
     egal('titre', lignes[8].genre)
-    -- Le cache rend les mêmes lignes.
+    -- Le cache rend les mêmes lignes ; auteur et heure ne sont que sur des copies.
     egal(#lignes, #Fil.lignes(c, 500, cache))
+    for _, garde in pairs(cache) do
+        for _, l in ipairs(garde.lignes) do
+            vrai(l.auteur == nil and l.heure == nil, 'ni auteur ni heure dans le cache : ' .. tostring(l.texte))
+        end
+    end
     local premiere, defilement = Fil.fenetre(100, 30, 0)
     egal(71, premiere)
     premiere, defilement = Fil.fenetre(100, 30, 500)
@@ -839,7 +853,11 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 textes[v.args.title.key] = textes[v.args.title.key] or v
                 if v.args.title.key:match('^t%d+$') then
                     lignes = lignes + 1
-                    egal(D.fil - 20, v.args.width, nom .. ' : largeur des lignes du fil')
+                    -- Le texte de la ligne (fenêtre B : 518, après la colonne auteur et son écart),
+                    -- moins le retrait d'un genre à icône (Fil.RETRAITS).
+                    local largeurs = { [D.texteFil] = true, [D.texteFil - Fil.RETRAIT_ICONE] = true }
+                    egal(518, D.texteFil, nom .. ' : texte du fil de 518 (D.fil − 60 − 12)')
+                    vrai(largeurs[v.args.width], nom .. ' : largeur des lignes du fil : ' .. tostring(v.args.width))
                 end
             elseif v.genre == 'radio_button' then
                 radios[#radios + 1] = v.args.checked_value
@@ -918,7 +936,8 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end
         vrai(etiquette, nom .. ' : étiquette « Style » devant le menu')
-        -- ▲ ▼ de la carte Note, de la proposition et de la carte de l'étape (1.3), en petit : six.
+        -- ▲ ▼ de la carte Note, de la proposition, de la carte de l'étape (1.3) et de la carte de la
+        -- leçon (lot B4), en petit : huit.
         local fleches = {}
         parcourir(args.contents, function(v)
             if S.BOUTONS[v.genre] and (v.args.title == '▲' or v.args.title == '▼') and v.args.size == 'mini' then
@@ -926,8 +945,8 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end)
         table.sort(fleches)
-        egal('etapeDescend etapeMonte noteDescend noteMonte propositionDescend propositionMonte', table.concat(fleches, ' '),
-            nom .. ' : flèches des cartes')
+        egal('etapeDescend etapeMonte leconDescend leconMonte noteDescend noteMonte propositionDescend propositionMonte',
+            table.concat(fleches, ' '), nom .. ' : flèches des cartes')
         -- Les sept invites (1.3 : Composition ajoutée avant Sports), en carrés de 24 de bezel, tiennent
         -- dans le centre.
         local largeurInvites = largeurEstimee(rangeeSports, p)

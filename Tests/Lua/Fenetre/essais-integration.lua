@@ -507,7 +507,11 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
             local l = Fenetre.lignes[Fenetre.premiere + i - 1]
             if l and l.element == element then
                 n = i
-                contient(l.texte, 'apply_settings · passe 1 : lumière  · Pourquoi ?')
+                -- La ligne de l'appel (fenêtre B, lot B4) : le nom en texte riche, le but de l'étape,
+                -- et « Pourquoi ? » montré à sa droite.
+                contient(l.texte, '<EM>apply_settings</EM>  étape « Claude · passe 1 : lumière »')
+                egal(true, l.etape)
+                egal(true, p['q' .. i], '« Pourquoi ? » montré')
             end
         end
         vrai(n, "la ligne de l'étape")
