@@ -59,7 +59,7 @@ end
 local JPEG
 do
     local chemin = S.home .. '/source.jpg'
-    S.executer('/usr/bin/sips -s format jpeg -z 200 300 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(chemin) .. ' >/dev/null 2>&1')
+    S.executer('/usr/bin/sips -s format jpeg -z 200 300 ' .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out ' .. S.q(chemin) .. ' >/dev/null 2>&1')
     local f = assert(io.open(chemin, 'rb'), 'JPEG source')
     JPEG = f:read('*a')
     f:close()
@@ -465,7 +465,7 @@ essai('Ouverture : l\'aperçu montre la photo active ; une image de Claude la re
 end)
 
 -- 1.3, « Pourquoi ? » : une étape de Claude, de la réponse du connecteur aux images de l'onglet.
-essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par le module, vignettes de 320 de l\'après puis de l\'avant (sips)', function()
+essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par le module, vignettes au cadre de l\'aperçu de l\'après puis de l\'avant (sips)', function()
     local Chemins = require 'Chemins'
     local Etapes = require 'Etapes'
     local Fichiers = require 'Fichiers'
@@ -523,11 +523,14 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
         for i = taches + 1, #S.taches do
             S.taches[i]()
         end
-        -- L'après, copié dans le dossier de la fenêtre et réduit par sips au cadre de l'aperçu, en 2x (660 × 440).
+        -- L'après, copié dans le dossier de la fenêtre et réduit par sips au cadre de l'aperçu, en 2x
+        -- (D.pixelsApercu × D.pixelsApercuHauteur : 810 × 540).
+        local T = Fenetre.T
         contient(p.imageApercu, '/Temporaire/Pourquoi/2004/')
-        contient(p.imageApercu, '/.vignettes/' .. id .. '-apres-cadre-660x440.jpg')
+        contient(p.imageApercu, '/.vignettes/' .. id .. '-apres-cadre-' .. T.pixelsApercu .. 'x' .. T.pixelsApercuHauteur .. '.jpg')
         local l, h = Images.dimensions(p.imageApercu)
-        egal(Fenetre.T.pixelsApercu, l, 'vignette de 660 × 440')
+        egal(2 * T.apercu, l, 'vignette en 2x du cadre de l\'aperçu')
+        egal(Fenetre.T.pixelsApercu, l, 'vignette au cadre de l\'aperçu')
         egal(Fenetre.T.pixelsApercuHauteur, h)
         egal('Étape 1 sur 1 · après', p.legendeApercu)
         egal('Étape 1 sur 1 · passe 1 : lumière', p.etapeTitre)
@@ -544,7 +547,7 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
         end)
         voir.args.action()
         contient(p.imageApercu, '/Temporaire/Pourquoi/2004/')
-        contient(p.imageApercu, '/.vignettes/' .. id .. '-avant-cadre-660x440.jpg')
+        contient(p.imageApercu, '/.vignettes/' .. id .. '-avant-cadre-' .. T.pixelsApercu .. 'x' .. T.pixelsApercuHauteur .. '.jpg')
         l, h = Images.dimensions(p.imageApercu)
         egal(Fenetre.T.pixelsApercu, l)
         egal(Fenetre.T.pixelsApercuHauteur, h)

@@ -128,7 +128,7 @@ prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
 prefs.cheminConnecteur = '/bin/echo'
 local imageJpeg = S.home .. '/image.jpg'
 local imageB64 = S.home .. '/image.b64'
-S.executer('/usr/bin/sips -s format jpeg -z 60 180 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(imageJpeg) .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 180 ' .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out ' .. S.q(imageJpeg) .. ' >/dev/null 2>&1')
 S.executer('/usr/bin/base64 -i ' .. S.q(imageJpeg) .. ' -o ' .. S.q(imageB64))
 local env = 'FAUX_IMAGE_B64=' .. S.q(imageB64) .. ' '
 local executerOriginal = S.modules.LrTasks.execute
@@ -177,7 +177,7 @@ local function reglagesDepart()
         CropAngle = 0 }
 end
 
--- La largeur du texte du fil (Fenetre.largeurTexte : 518 dans la fenêtre B, après la colonne
+-- La largeur du texte du fil (Fenetre.largeurTexte : D.texteFil dans la fenêtre B, après la colonne
 -- auteur), et celle qu'une ligne ne dépasse jamais, son retrait compris (Fil.occupe).
 local D = Dispositions.dimensions()
 local LARGEUR = D.texteFil
@@ -1230,9 +1230,12 @@ essai("Fenêtre : la liste arrive (une bascule), page par page, « J'ai fini » 
         prefs.nouvelleParPhoto = false
         -- Une longue liste : page par page (T.propLignes lignes), et la page gardée quand un
         -- réglage se coche.
-        appelTour(c, 't2', { tourLong(40) })
+        -- Deux fois plus de réglages que la carte n'a de lignes (Dispositions.TAILLES.propLignes, sur
+        -- carte-proposition : provisoire jusqu'au lot 18).
+        local nombre = 2 * Fenetre.T.propLignes
+        appelTour(c, 't2', { tourLong(nombre) })
         Fenetre.rafraichir()
-        egal(16, Fenetre.T.propLignes, 'fenêtre B, sur carte-proposition (lot B5, provisoire jusqu\'au lot 18)')
+        egal(Dispositions.TAILLES.propLignes, Fenetre.T.propLignes, 'fenêtre B, sur carte-proposition')
         local lignes = select(2, p.propositionTexte:gsub('\n', '\n')) + 1
         egal(Fenetre.T.propLignes, lignes, 'une page pleine')
         egal(false, p.propositionMonte)
@@ -1243,7 +1246,7 @@ essai("Fenêtre : la liste arrive (une bascule), page par page, « J'ai fini » 
         vrai(not page2:find('○ 1. ', 1, true), 'plus la première ligne')
         photo.reglages.Exposure2012 = 1
         Fenetre.suivreExercice()
-        egal("À vous · 1 réglage fait sur 40", p.exerciceEtat)
+        egal("À vous · 1 réglage fait sur " .. nombre, p.exerciceEtat)
         egal(true, p.propositionMonte, 'la page est gardée')
         egal(page2, p.propositionTexte, 'la même page (le réglage coché est sur la première)')
         Fenetre.defilerTexte('proposition', -1)

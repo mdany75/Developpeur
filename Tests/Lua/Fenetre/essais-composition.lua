@@ -128,7 +128,7 @@ local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(
 prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
 prefs.cheminConnecteur = '/bin/echo'
 local imageJpeg = S.home .. '/image.jpg'
-S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(imageJpeg) .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out ' .. S.q(imageJpeg) .. ' >/dev/null 2>&1')
 
 -- Les demandes envoyées à Claude, gardées ici (Moteur.envoyer remplacé le temps d'un essai).
 local envoyerVrai = Moteur.envoyer

@@ -906,7 +906,7 @@ end
 -- Les rangées du tableau, en texte aligné par des espaces (un caractère par colonne de la police
 -- mono) : l'en-tête (« Défaut », puis le mois abrégé, avec l'année quand les mois en changent),
 -- puis une rangée par défaut, { texte, defaut = code }. `caracteres` (facultatif) : la largeur à
--- tenir, en caractères (les 518 points du fil, sa marge ôtée : 76).
+-- tenir, en caractères (les 648 points du fil, sa marge ôtée : 96).
 function Fil.tableauCarnet(page, caracteres)
     local mois = type(page.mois) == 'table' and page.mois or {}
     local defauts = type(page.defauts) == 'table' and page.defauts or {}

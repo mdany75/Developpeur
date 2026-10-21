@@ -465,7 +465,7 @@ function Vues.autresFenetres(f, F, D)
     }
 end
 
--- Le volet (183, marges de 10) : « ＋ Nouvelle conversation », la loupe devant « Rechercher », la
+-- Le volet (270, marges de 10) : « ＋ Nouvelle conversation », la loupe devant « Rechercher », la
 -- liste en cases ; en bas, Renommer… et Supprimer…, un filet, Publication… et Consommation…, les
 -- versions et le voyant Écran.
 function Vues.volet(f, F, D)

@@ -98,7 +98,7 @@ local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(
 prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
 prefs.cheminConnecteur = '/bin/echo'
 local imageB64 = S.home .. '/image.b64'
-S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
 S.executer('/usr/bin/base64 -i ' .. S.q(S.home .. '/image.jpg') .. ' -o ' .. S.q(imageB64))
 local env = 'FAUX_IMAGE_B64=' .. S.q(imageB64) .. ' '
 local executerOriginal = S.modules.LrTasks.execute
@@ -109,7 +109,7 @@ S.modules.LrTasks.execute = function(commande)
     return executerOriginal(commande)
 end
 
--- La largeur du texte du fil (Fenetre.largeurTexte : 518 dans la fenêtre B, après la colonne
+-- La largeur du texte du fil (Fenetre.largeurTexte : D.texteFil dans la fenêtre B, après la colonne
 -- auteur), et celle qu'une ligne ne dépasse jamais, son retrait compris (Fil.occupe).
 local D = Dispositions.dimensions()
 local LARGEUR = D.texteFil
@@ -433,7 +433,7 @@ essai("Fil.texteLecon : le texte de l'onglet (axes en gras balisés, deux moiti�
     egal(3, balises, 'seulement les trois axes balisés')
 end)
 
-essai("Onglet Leçon : des moitiés de 140 caractères entières, page par page ; chaque ligne dans la carte, ses balises fermées", function()
+essai("Onglet Leçon : des moitiés de 140 caractères entières, sur une page de la carte ; chaque ligne dans la carte, ses balises fermées", function()
     local c = Conversation.nouvelle()
     local longue = phrase("Le ciel brûlé à 3 % au départ ; hautes lumières baissées de 40 et blancs de 20. ", 140)
     local entree = { photo_id = 53636309, points = {} }
@@ -446,7 +446,10 @@ essai("Onglet Leçon : des moitiés de 140 caractères entières, page par page 
     -- Coupée comme la carte la montre (12 points, axes en gras 12) : chaque ligne tient dans le texte
     -- de la carte, ses balises fermées sur la ligne.
     local lignes = Fenetre.lignesCarte(texte, D.largeurLecon, Fenetre.CARTES.lecon.police, Fenetre.CARTES.lecon.emphase)
-    vrai(#lignes > D.leconLignes, 'plus d\'une page : ' .. #lignes .. ' lignes')
+    -- La carte de la fenêtre agrandie (D.leconLignes) tient une leçon aux moitiés les plus longues
+    -- (Lecon.longueurPoint, 140 caractères) sur une seule page ; ▲ ▼ restent pour un texte plus
+    -- long (la remarque d'une leçon non rangée), éprouvés dans la fenêtre plus bas.
+    vrai(#lignes <= D.leconLignes, 'sur une page : ' .. #lignes .. ' lignes pour ' .. D.leconLignes)
     for _, l in ipairs(lignes) do
         balisesFermees(l)
         vrai(Fil.largeur(l, 'texte12', 'gras12') <= D.largeurLecon - Fil.MARGE, 'dans la carte : ' .. l)
@@ -636,6 +639,13 @@ essai("Fenêtre : « Leçon de la photo » ouvre l'onglet Leçon sur sa leçon (
         vrai(texte.args.emphasis_color, "la couleur d'emphase avec la police (D4)")
         egal(D.leconLignes, texte.args.height_in_lines)
         egal(D.largeurLecon, texte.args.width)
+        -- La première leçon tient sur une page de la carte (D.leconLignes) : pour éprouver ▲ ▼, la
+        -- carte n'en montre ici que la moitié, le temps de l'essai (Fenetre.T.leconLignes, que
+        -- Fenetre.montrerPage lit ; Fenetre.T est refait à chaque ouverture).
+        local attendues = Fenetre.lignesCarte(Fil.texteLecon(c.elements[premiere]), D.largeurLecon, 'texte12', 'gras12')
+        vrai(#attendues <= D.leconLignes, 'la leçon sur une page de la carte : ' .. #attendues .. ' lignes')
+        local page = math.floor(#attendues / 2)
+        Fenetre.T.leconLignes = page
         local image
         for _, v in ipairs(vues(args.contents)) do
             if v.genre == 'picture' and type(v.args.value) == 'string' and v.args.value:match('/carte%-lecon%.png$') then
@@ -658,8 +668,7 @@ essai("Fenêtre : « Leçon de la photo » ouvre l'onglet Leçon sur sa leçon (
         egal('Leçon de la photo · DSCF4961.RAF', p.leconTitre)
         egal(1, (p.leconTexte:find('<EM>Lumière</EM>\nCe qui manquait : Le ciel brûlé', 1, true)), p.leconTexte)
         -- Coupée dans la police de la carte (12 points, les axes en gras 12), comme elle s'affiche.
-        local attendues = Fenetre.lignesCarte(Fil.texteLecon(c.elements[premiere]), D.largeurLecon, 'texte12', 'gras12')
-        egal(table.concat(attendues, '\n', 1, D.leconLignes), p.leconTexte, 'la première page, en 12 points')
+        egal(table.concat(attendues, '\n', 1, page), p.leconTexte, 'la première page, en 12 points')
         -- Page par page : ▼ puis ▲ (Fenetre.defilerTexte), la page suivante aux balises fermées.
         egal(false, p.leconMonte)
         egal(true, p.leconDescend, "plus d'une page")
@@ -671,6 +680,7 @@ essai("Fenêtre : « Leçon de la photo » ouvre l'onglet Leçon sur sa leçon (
         end
         S.cliquer(liee(args.contents, 'push_button', 'leconMonte'))
         egal(premierePage, p.leconTexte, 'retour à la première page')
+        Fenetre.T.leconLignes = D.leconLignes
         -- Détail… : l'appel de photo_lesson et sa réponse, dans une tâche.
         egal(true, p.leconADetail)
         local taches, dialogues = #S.taches, #S.dialogues

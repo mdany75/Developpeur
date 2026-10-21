@@ -297,7 +297,8 @@ prefs.cheminConnecteur = '/bin/echo'
 
 -- Une petite image JPEG (en base64) pour le résultat d'outil du faux Claude Code.
 local imageB64 = S.home .. '/image.b64'
-S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/images/vide-330x220.png') .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
+S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out '
+    .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
 S.executer('/usr/bin/base64 -i ' .. S.q(S.home .. '/image.jpg') .. ' -o ' .. S.q(imageB64))
 -- Hérité par relais.sh puis par le faux Claude Code. Une clé d'API ne doit jamais arriver jusqu'à lui.
 local env = 'FAUX_IMAGE_B64=' .. S.q(imageB64) .. ' ANTHROPIC_API_KEY=cle-essai '
@@ -532,8 +533,9 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
     local vues = 0
     S.pendantFenetre = function(args)
         egal('Développeur', args.title)
-        -- La Conversation claire, seule disposition, toujours en grande taille (fenêtre B : FORME 2).
-        egal('DeveloppeurClaude-conversation-grande-2', args.save_frame)
+        -- La Conversation claire, seule disposition, toujours en grande taille (fenêtre B agrandie :
+        -- FORME 3).
+        egal('DeveloppeurClaude-conversation-grande-3', args.save_frame)
         local p = Fenetre.p
         vrai(p, 'table de propriétés')
         Fenetre.rafraichir()
@@ -810,9 +812,9 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         local p = Fenetre.p
         egal('Développeur', args.title)
         -- Le cadre enregistré garde son nom (Lightroom ne rapetisse pas une fenêtre rouverte,
-        -- constaté) : celui de la Conversation claire en grande taille, FORME 2 (fenêtre B).
+        -- constaté) : celui de la Conversation claire en grande taille, FORME 3 (fenêtre B agrandie).
         egal('DeveloppeurClaude-conversation-grande-' .. Fenetre.FORME, args.save_frame)
-        egal(2, Fenetre.FORME)
+        egal(3, Fenetre.FORME)
         Fenetre.rafraichir()
         local n, boutons, textes, radios, menus, lignes, calques = 0, {}, {}, {}, {}, 0, 0
         local apercu
@@ -853,10 +855,10 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 textes[v.args.title.key] = textes[v.args.title.key] or v
                 if v.args.title.key:match('^t%d+$') then
                     lignes = lignes + 1
-                    -- Le texte de la ligne (fenêtre B : 518, après la colonne auteur et son écart),
-                    -- moins le retrait d'un genre à icône (Fil.RETRAITS).
+                    -- Le texte de la ligne (fenêtre B : la largeur utile du centre, après la colonne
+                    -- auteur et son écart), moins le retrait d'un genre à icône (Fil.RETRAITS).
                     local largeurs = { [D.texteFil] = true, [D.texteFil - Fil.RETRAIT_ICONE] = true }
-                    egal(518, D.texteFil, nom .. ' : texte du fil de 518 (D.fil − 60 − 12)')
+                    egal(D.fil - D.auteur - D.ecartAuteur, D.texteFil, nom .. ' : texte du fil (D.fil − auteur − écart)')
                     vrai(largeurs[v.args.width], nom .. ' : largeur des lignes du fil : ' .. tostring(v.args.width))
                 end
             elseif v.genre == 'radio_button' then
@@ -1072,7 +1074,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         egal(D.apercuHauteur, apercu.args.height)
         egal(nil, apercu.args.visible, nom .. ' : aperçu toujours montré')
         vrai(Fichiers.existe(Fenetre.imageVide()), nom .. ' : ' .. Fenetre.imageVide())
-        vrai(Fenetre.imageVide():find('/images/vide%-330x220%.png$'), Fenetre.imageVide())
+        vrai(Fenetre.imageVide():find('/images/vide-' .. D.apercu .. 'x' .. D.apercuHauteur .. '.png', 1, true), Fenetre.imageVide())
         -- Ni modèle, ni effort, ni disposition dans la fenêtre : ils se choisissent dans le
         -- Gestionnaire de modules externes (demandé par Dany le 20 octobre 2026).
         vrai(not menus.modele and not menus.effort and not menus.disposition, nom .. ' : ni modèle, ni effort, ni disposition')
@@ -2289,7 +2291,7 @@ essai('Coller : image et fichier du presse-papiers (presse-papiers nommé, jamai
     local function osa(code)
         return S.executer("/usr/bin/osascript -l JavaScript -e " .. S.q("ObjC.import('AppKit'); var pp = $.NSPasteboard.pasteboardWithName('" .. nom .. "'); pp.clearContents; " .. code .. "; 'ok'") .. " >/dev/null")
     end
-    local png = S.plugin .. '/images/vide-330x220.png'
+    local png = S.plugin .. '/' .. require('Dispositions').imageVide('claire')
     vrai(osa("pp.setDataForType($.NSData.dataWithContentsOfFile('" .. png .. "'), 'public.png')"))
     local chemins = Images.coller(nom)
     egal(1, #chemins)
