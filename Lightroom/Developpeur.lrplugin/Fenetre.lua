@@ -2,8 +2,10 @@
 -- fenêtre flottante, non bloquante) :
 -- une conversation avec Claude Code (le fil avec les appels d'outils, les invites en raccourcis et
 -- la demande), ce que Claude regarde, sa proposition à accepter, refuser, ajuster ou faire soi-même
--- (Je le fais, 1.3), la note qu'il propose pour la photo active, le pourquoi de chaque étape
--- (onglet Pourquoi ?, 1.3), et les versions du module et du connecteur MCP-Développeur.
+-- (Je le fais, 1.3), le cadre qu'il propose (Composition lue, 1.3 : la ligne « Cadre : … » de la
+-- carte, son image entière en pointillés dans l'aperçu, ses ajustements dans Ajuster…), la note
+-- qu'il propose pour la photo active, le pourquoi de chaque étape (onglet Pourquoi ?, 1.3), et les
+-- versions du module et du connecteur MCP-Développeur.
 --
 -- Une seule disposition, la Conversation claire (l'Atelier, le Panneau et le choix de la
 -- disposition sont retirés : demandé par Dany le 20 octobre 2026). Dispositions.lua l'assemble des
@@ -546,7 +548,8 @@ end
 -- d'avant. Un clic sur une ligne d'image reste prioritaire. Fenetre.surOnglet[valeur](valeur) suit
 -- un vrai clic sur cet onglet (jamais une bascule de la fenêtre, Fenetre.choisirOnglet). Ni l'un ni
 -- l'autre n'attend : une lecture du catalogue ou un rendu passe par sa propre tâche. Ceux de
--- Pourquoi ? sont dans sa section ; les autres, remplis par les lots suivants.
+-- Pourquoi ? et de Proposition (la comparaison de Je le fais, puis l'image de la proposition
+-- demandée par un clic : Composition lue) sont dans leur section ; Note n'en a pas.
 Fenetre.apercuOnglet = {}
 Fenetre.surOnglet = {}
 
@@ -674,41 +677,12 @@ local function montrerActive(p, T, active, n)
     end)
 end
 
-function Fenetre.rafraichirApercu()
-    local p, T = Fenetre.p, Fenetre.T
-    if not p then
-        return
-    end
-    local c = Moteur.courante
-    Fenetre.images = c and Conversation.images(c) or {}
+-- Montre l'image `indice` des images de la conversation `c` (Fenetre.images, relues) : sa légende
+-- (« 2 sur 5 · view_photo »), ◀ ▶ (▶ depuis la dernière revient à la photo active) et l'image,
+-- réduite au cadre de l'aperçu ; sans image, l'image vide.
+local function montrerNumero(p, T, c, indice)
     local n = #Fenetre.images
-    if Fenetre.indiceImage and Fenetre.indiceImage > n then
-        Fenetre.indiceImage = nil
-    end
-    -- Une autre conversation (liste, Nouvelle, conversation supprimée, nouvelle demande d'une autre
-    -- page) : l'image cliquée était d'une autre conversation, l'aperçu revient à l'onglet.
-    if Fenetre.apercuDe ~= c then
-        Fenetre.imageCliquee = nil
-    end
-    -- Une image de plus dans la conversation montrée (Claude regarde, une photo jointe) : elle se
-    -- montre, à la place de la photo active ; une image cliquée avant rend la main à l'onglet.
-    if Fenetre.apercuDe == c and Fenetre.nbImages and n > Fenetre.nbImages then
-        Fenetre.voirActive = false
-        Fenetre.indiceImage = nil
-        Fenetre.imageCliquee = nil
-    end
-    Fenetre.apercuDe, Fenetre.nbImages = c, n
-    -- L'aperçu de l'onglet (Fenetre.apercuOnglet), sauf après un clic sur une ligne d'image.
-    local deLOnglet = not Fenetre.imageCliquee and Fenetre.apercuOnglet[p.onglet]
-    if deLOnglet and crochet(deLOnglet, p, T, c) then
-        return
-    end
     local active = Fenetre.info and Fenetre.info.active
-    if Fenetre.voirActive and active then
-        montrerActive(p, T, active, n)
-        return
-    end
-    local indice = Fenetre.indiceImage or n
     poser(p, 'aImage', n > 0)
     poser(p, 'peutPrecedente', indice > 1)
     poser(p, 'peutSuivante', indice < n or (n > 0 and active ~= nil))
@@ -723,6 +697,47 @@ function Fenetre.rafraichirApercu()
         or (image.outil or "aperçu")
     poser(p, 'legendeApercu', string.format("%d sur %d · %s", indice, n, nature))
     Fenetre.montrerImage(p, T, c, image.chemin)
+end
+
+function Fenetre.rafraichirApercu()
+    local p, T = Fenetre.p, Fenetre.T
+    if not p then
+        return
+    end
+    local c = Moteur.courante
+    Fenetre.images = c and Conversation.images(c) or {}
+    local n = #Fenetre.images
+    if Fenetre.indiceImage and Fenetre.indiceImage > n then
+        Fenetre.indiceImage = nil
+    end
+    -- Une autre conversation (liste, Nouvelle, conversation supprimée, nouvelle demande d'une autre
+    -- page) : l'image cliquée était d'une autre conversation, l'aperçu revient à l'onglet ; l'image
+    -- de proposition demandée aussi (Fenetre.montrerImageProposition).
+    if Fenetre.apercuDe ~= c then
+        Fenetre.imageCliquee = nil
+        Fenetre.imageProposition = nil
+    end
+    -- Une image de plus dans la conversation montrée (Claude regarde, une photo jointe) : elle se
+    -- montre, à la place de la photo active ; une image cliquée avant rend la main à l'onglet, et
+    -- l'image de proposition demandée par un clic cède aussi la place.
+    if Fenetre.apercuDe == c and Fenetre.nbImages and n > Fenetre.nbImages then
+        Fenetre.voirActive = false
+        Fenetre.indiceImage = nil
+        Fenetre.imageCliquee = nil
+        Fenetre.imageProposition = nil
+    end
+    Fenetre.apercuDe, Fenetre.nbImages = c, n
+    -- L'aperçu de l'onglet (Fenetre.apercuOnglet), sauf après un clic sur une ligne d'image.
+    local deLOnglet = not Fenetre.imageCliquee and Fenetre.apercuOnglet[p.onglet]
+    if deLOnglet and crochet(deLOnglet, p, T, c) then
+        return
+    end
+    local active = Fenetre.info and Fenetre.info.active
+    if Fenetre.voirActive and active then
+        montrerActive(p, T, active, n)
+        return
+    end
+    montrerNumero(p, T, c, Fenetre.indiceImage or n)
 end
 
 -- La légende de la comparaison « Je le fais » (1.3) : Claude à gauche, Dany à droite.
@@ -754,6 +769,14 @@ function Fenetre.changerImage(pas)
     -- et les ◀ ▶ de la carte en tiennent lieu.
     if Fenetre.modeEtape() then
         return
+    end
+    -- L'image de la proposition montrée par l'onglet Proposition (Fenetre.apercuProposition) : ◀ ▶
+    -- partent d'elle, et l'aperçu redevient celui d'avant (la demande du clic est oubliée).
+    local _, depuis = Fenetre.imagePropositionMontree()
+    if depuis then
+        Fenetre.imageProposition = nil
+        Fenetre.voirActive = false
+        Fenetre.indiceImage = depuis
     end
     local n = #(Fenetre.images or {})
     local active = Fenetre.info and Fenetre.info.active
@@ -807,8 +830,11 @@ function Fenetre.agrandir()
         end)
         return
     end
+    -- L'image de la proposition montrée par l'onglet Proposition (le cadre proposé en pointillés,
+    -- Composition lue, 1.3) : celle-là, même si la photo active a changé entre-temps.
+    local _, indiceProposition = Fenetre.imagePropositionMontree()
     local a, active = Fenetre.apercuActif, Fenetre.info and Fenetre.info.active
-    if Fenetre.voirActive and active and a and a.id == active.id then
+    if not indiceProposition and Fenetre.voirActive and active and a and a.id == active.id then
         LrTasks.startAsyncTask(function()
             local chemin, l, h = Images.grande(a.dossier, a.fichier, 1100, 740)
             if chemin then
@@ -827,7 +853,7 @@ function Fenetre.agrandir()
     if not c or n == 0 then
         return
     end
-    local image = Fenetre.images[Fenetre.indiceImage or n]
+    local image = Fenetre.images[indiceProposition or Fenetre.indiceImage or n]
     LrTasks.startAsyncTask(function()
         local chemin, l, h = Images.grande(Stockage.dossier(c.id), image.chemin, 1100, 740)
         if not chemin then
@@ -1013,11 +1039,41 @@ function Fenetre.rafraichirProposition(garderPage)
         Fenetre.montrerPage('proposition', Fenetre.AUCUNE_PROPOSITION)
         return
     end
-    local lignes = { Texte.nettoyer(prop.texte) ~= '' and prop.texte or "Claude propose :" , '' }
-    for _, ch in ipairs(prop.changements or {}) do
-        lignes[#lignes + 1] = string.format("%s : %s → %s", ch.libelle or '?', ch.avant or '—', ch.apres or '—')
+    Fenetre.montrerPage('proposition', Fenetre.texteProposition(prop))
+end
+
+-- Ce que montre l'aperçu d'une proposition de recadrage (Composition lue, 1.3) : l'image entière
+-- que le connecteur a dessinée ; sans elle (image entière pas rendue), seulement l'accord attendu.
+Fenetre.CADRE_DESSINE = "Son aperçu : l'image entière, le cadre proposé en pointillés, les tiers et le hors-cadre assombri. Rien ne change avant Accepter."
+Fenetre.CADRE_SANS_DESSIN = "Rien ne change avant Accepter."
+
+-- Le texte de la carte pour une proposition en attente (pure) : sa raison, puis, pour une
+-- proposition de recadrage dont le connecteur a dit le cadre gardé (Conversation.cadreLu), la
+-- ligne « Cadre : <résumé> » et ce que montre son aperçu, à la place des bords du recadrage (les
+-- changements Crop…, illisibles pour Dany, et de la ligne « Recadrage » demandée, restée si les
+-- changements de la réponse ne se sont pas lus) ; puis chaque autre changement, « libellé : avant
+-- → après ». Sans résumé du cadre, les changements Crop… restent : ils sont seuls à le dire.
+function Fenetre.texteProposition(prop)
+    local lignes = { Texte.nettoyer(prop.texte) ~= '' and prop.texte or "Claude propose :", '' }
+    local cadre = type(prop.cadre) == 'string' and Texte.nettoyer(prop.cadre) or ''
+    if cadre ~= '' then
+        lignes[#lignes + 1] = "Cadre : " .. cadre
+        lignes[#lignes + 1] = prop.cadreDessine == true and Fenetre.CADRE_DESSINE or Fenetre.CADRE_SANS_DESSIN
     end
-    Fenetre.montrerPage('proposition', table.concat(lignes, '\n'))
+    local autres = {}
+    for _, ch in ipairs(prop.changements or {}) do
+        local duCadre = (type(ch.cle) == 'string' and ch.cle:sub(1, 4) == 'Crop') or (ch.cle == nil and ch.libelle == Conversation.LIBELLE_RECADRAGE)
+        if not (cadre ~= '' and duCadre) then
+            autres[#autres + 1] = string.format("%s : %s → %s", ch.libelle or '?', ch.avant or '—', ch.apres or '—')
+        end
+    end
+    if cadre ~= '' and #autres > 0 then
+        lignes[#lignes + 1] = ''
+    end
+    for _, ligne in ipairs(autres) do
+        lignes[#lignes + 1] = ligne
+    end
+    return table.concat(lignes, '\n')
 end
 
 -- Je le fais (1.3) ------------------------------------------------------------------------------
@@ -1312,8 +1368,9 @@ function Fenetre.comparaisonMontree()
 end
 
 -- L'aperçu de l'onglet Proposition (Fenetre.apercuOnglet) : la comparaison « Claude | vous » d'un
--- exercice comparé (ses ◀ ▶ coupés) ; sinon nil, l'aperçu d'avant. Un lot suivant (Composition)
--- compose ici son image du cadre : un seul crochet par onglet.
+-- exercice comparé (ses ◀ ▶ coupés) ; sinon nil, l'aperçu d'avant. L'image d'une proposition
+-- demandée par un clic (Composition lue) se compose avec elle dans le crochet de l'onglet, après
+-- elle : un seul crochet par onglet.
 function Fenetre.apercuExercice(p, T)
     local c, chemin, exo = Fenetre.comparaisonMontree()
     if not chemin then
@@ -1327,22 +1384,105 @@ function Fenetre.apercuExercice(p, T)
     return true
 end
 
+-- L'image de la proposition en attente, sur un vrai clic sur l'onglet Proposition (Composition lue,
+-- 1.3 ; Fenetre.surOnglet.proposition) : pour un recadrage, l'image entière avec le cadre proposé en
+-- pointillés. Dany a pu regarder d'autres images ou la photo active entre-temps : l'aperçu la
+-- remontre, et le crochet de l'onglet la garde (Fenetre.apercuProposition) jusqu'à ◀ ▶, une image
+-- nouvelle, une autre conversation ou la proposition décidée. Une bascule de la fenêtre ne la
+-- demande pas : la proposition qui arrive est déjà la dernière image. Fenetre.imageProposition =
+-- { conversation, proposition (son id), chemin } : la demande du clic. Vrai si l'image est montrée.
+-- Ce que montre l'onglet Note ne change pas (l'aperçu appartient à l'onglet) : ni la photo active
+-- (Fenetre.voirActive) ni l'image choisie (Fenetre.indiceImage) ; seuls ◀ ▶ partis de l'image de
+-- la proposition les posent (Fenetre.changerImage).
+function Fenetre.montrerImageProposition()
+    local p, c = Fenetre.p, Moteur.courante
+    local prop = c and Conversation.propositionEnAttente(c)
+    Fenetre.imageProposition = nil
+    if not (p and prop) then
+        return false
+    end
+    local images = Conversation.images(c)
+    local indice
+    for n, image in ipairs(images) do
+        if c.elements[image.element] == prop then
+            indice = n
+        end
+    end
+    if not indice then
+        return false
+    end
+    Fenetre.imageProposition = { conversation = c, proposition = prop.id, chemin = images[indice].chemin }
+    Fenetre.images, Fenetre.apercuDe, Fenetre.nbImages = images, c, #images
+    Fenetre.imageCliquee = nil
+    Fenetre.rafraichirApercu()
+    return true
+end
+
+-- L'image de proposition demandée par un clic, si l'onglet Proposition la montre : la conversation
+-- et son rang dans les images (Fenetre.images) tant que la demande vaut (onglet Proposition, ni
+-- image cliquée dans le fil ni comparaison montrée, même conversation, la même proposition
+-- toujours en attente, son image toujours là) ; nil sinon.
+function Fenetre.imagePropositionMontree()
+    local im, p, T, c = Fenetre.imageProposition, Fenetre.p, Fenetre.T, Moteur.courante
+    if not (im and p and T and c) or im.conversation ~= c or p.onglet ~= T.ongletProposition or Fenetre.imageCliquee
+        or Fenetre.comparaisonMontree() then
+        return nil
+    end
+    local prop = Conversation.propositionEnAttente(c)
+    if not prop or prop.id ~= im.proposition then
+        return nil
+    end
+    for n, image in ipairs(Fenetre.images or {}) do
+        if image.chemin == im.chemin then
+            return c, n
+        end
+    end
+    return nil
+end
+
+-- L'aperçu de l'onglet Proposition après la comparaison : l'image de proposition demandée par un
+-- clic, avec ses ◀ ▶ (ils partent d'elle, Fenetre.changerImage), même si la photo active a changé
+-- entre-temps ; une demande qui ne vaut plus est oubliée (nil : l'aperçu d'avant).
+function Fenetre.apercuProposition(p, T)
+    if not Fenetre.imageProposition then
+        return nil
+    end
+    local c, indice = Fenetre.imagePropositionMontree()
+    if not indice then
+        Fenetre.imageProposition = nil
+        return nil
+    end
+    montrerNumero(p, T, c, indice)
+    return true
+end
+
 Fenetre.apercuOnglet.proposition = function(p, T)
-    return Fenetre.apercuExercice(p, T)
+    return Fenetre.apercuExercice(p, T) or Fenetre.apercuProposition(p, T)
+end
+
+-- Un vrai clic sur l'onglet Proposition : l'image de la proposition en attente.
+Fenetre.surOnglet.proposition = function()
+    Fenetre.montrerImageProposition()
 end
 
 function Fenetre.repondreProposition(acceptee)
     LrTasks.startAsyncTask(function() Moteur.repondre(acceptee) end)
 end
 
+-- Ajuster… : ce qu'il faut changer, tapé ou pris parmi les ajustements d'un clic (ceux du cadre
+-- pour une proposition de recadrage, Composition lue, 1.3), envoyé à Claude (Moteur.ajuster). Une
+-- boîte modale construite à chaque ouverture, hors de la fenêtre : ses boutons varient.
 function Fenetre.ajuster()
     local f = LrView.osFactory()
     local texte = ''
+    local c = Moteur.courante
+    local prop = c and Conversation.propositionEnAttente(c)
+    local cadre = prop ~= nil and prop.recadrage == true
     LrFunctionContext.callWithContext('Claude · ajuster', function(context)
         local q = LrBinding.makePropertyTable(context)
         q.texte = ''
         local rapides = { spacing = 6 }
-        for _, a in ipairs(Consignes.ajustementsRapides) do
+        for _, a in ipairs(cadre and Consignes.ajustementsCadre or Consignes.ajustementsRapides) do
             rapides[#rapides + 1] = f:push_button { title = a, action = function()
                 q.texte = Texte.nettoyer(q.texte) == '' and a or (Texte.nettoyer(q.texte) .. ", " .. a:lower())
             end }
@@ -1352,7 +1492,7 @@ function Fenetre.ajuster()
             contents = f:column {
                 bind_to_object = q,
                 spacing = f:control_spacing(),
-                f:static_text { title = "Ce qu'il faut changer avant d'appliquer :" },
+                f:static_text { title = cadre and "Ce qu'il faut changer au cadre avant de l'appliquer :" or "Ce qu'il faut changer avant d'appliquer :" },
                 f:edit_field { value = bind 'texte', width_in_chars = 60, height_in_lines = 3, immediate = true },
                 f:row(rapides),
             },
@@ -2669,6 +2809,8 @@ function Fenetre.afficher()
         Fenetre.defilement = 0
         Fenetre.indiceImage = nil
         Fenetre.imageCliquee = nil
+        -- L'image de proposition demandée par un clic sur l'onglet (Composition lue) : à redemander.
+        Fenetre.imageProposition = nil
         Fenetre.vue = 'conversation'
         -- À l'ouverture, l'aperçu montre la photo active, refait (Fenetre.majPhoto).
         Fenetre.idActif, Fenetre.apercuActif, Fenetre.demandeActive, Fenetre.voirActive = nil, nil, nil, true

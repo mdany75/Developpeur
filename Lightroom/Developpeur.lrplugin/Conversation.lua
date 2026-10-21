@@ -15,6 +15,10 @@
 -- pour undo_last : annule ({ photo, id, nom } de chaque étape défaite) ; pour
 -- revert_to_original : revenu (les photos remises). Une conversation de la 1.2 n'a ni raison, ni
 -- etape, ni etapes : elles se relisent dans `detail` (Conversation.infoEtape), sans id.
+-- Pour une proposition de recadrage (1.3, Composition lue : preview_settings avec un crop, sauf
+-- reset) : recadrage (vrai), puis d'après la réponse cadre (resume_cadre, le cadre que Lightroom a
+-- gardé, en mots) et cadreDessine (vrai si l'image rendue est l'image entière, le cadre en
+-- pointillés).
 -- Un élément `lecon` (1.3) suit un appel de photo_lesson avec ses points (jamais read_facts seul),
 -- pour le fil seulement (la leçon est rangée par le module, carnet.json) : photo, points (dans
 -- l'ordre Lumière, Couleur, Composition : { axe, nom, manque, prise_de_vue, defauts }), puis
@@ -328,7 +332,40 @@ local function cles(t)
     return liste
 end
 
--- Changements d'une proposition, d'après ce que Claude demande (avant inconnu).
+-- Les formats que le connecteur lit comme le format d'origine (crop.aspect).
+local FORMATS_ORIGINE = { [''] = true, original = true, originale = true, origine = true, ["d'origine"] = true, ['as shot'] = true }
+
+-- Le recadrage demandé à preview_settings (crop), en mots, avant la réponse (1.3, Composition
+-- lue) : format, angle et taille demandés (« format 3:2, redressé de 1,4°, 82 % du plus grand
+-- cadre ») ; « retiré » pour un reset. La taille est une part du plus grand cadre possible, pas de
+-- la largeur de l'image (le résumé du cadre gardé, Conversation.cadreLu, dit celle-là).
+function Conversation.cadreDemande(crop)
+    crop = type(crop) == 'table' and crop or {}
+    if crop.reset == true then
+        return "retiré"
+    end
+    local parties = {}
+    if type(crop.aspect) == 'string' then
+        local format = Texte.nettoyer(crop.aspect)
+        parties[#parties + 1] = FORMATS_ORIGINE[format:lower()] and "format d'origine" or ("format " .. format)
+    end
+    local angle = tonumber(crop.angle)
+    if angle and angle ~= 0 then
+        parties[#parties + 1] = "redressé de " .. Texte.nombre(math.abs(angle)) .. "°"
+    end
+    local taille = tonumber(crop.size)
+    if taille then
+        parties[#parties + 1] = Texte.nombre(math.floor(taille * 100 + 0.5)) .. " % du plus grand cadre"
+    end
+    return #parties > 0 and table.concat(parties, ", ") or "cadre demandé"
+end
+
+-- Le libellé de la ligne du recadrage demandé (sans clé) : la carte Proposition la saute quand le
+-- cadre gardé est dit (Fenetre.texteProposition).
+Conversation.LIBELLE_RECADRAGE = "Recadrage"
+
+-- Changements d'une proposition, d'après ce que Claude demande (avant inconnu) ; un recadrage
+-- demandé (crop) en une ligne « Recadrage », remplacée à la réponse par le cadre gardé.
 function Conversation.changementsDemandes(entree)
     local liste = {}
     entree = type(entree) == 'table' and entree or {}
@@ -338,6 +375,9 @@ function Conversation.changementsDemandes(entree)
     local reglages = type(entree.settings) == 'table' and entree.settings or {}
     for _, cle in ipairs(cles(reglages)) do
         liste[#liste + 1] = { libelle = Conversation.libelles[cle] or cle, avant = '—', apres = affichage(reglages[cle]) }
+    end
+    if type(entree.crop) == 'table' then
+        liste[#liste + 1] = { libelle = Conversation.LIBELLE_RECADRAGE, avant = '—', apres = Conversation.cadreDemande(entree.crop) }
     end
     return liste
 end
@@ -367,6 +407,25 @@ function Conversation.changementsLus(textes)
             end
             if #lus > 0 then
                 return lus
+            end
+        end
+    end
+    return nil
+end
+
+-- Le cadre d'une proposition de recadrage (1.3, Composition lue), lu dans la réponse de
+-- preview_settings : son résumé (resume_cadre : le cadre que Lightroom a gardé, « 3:2 (format
+-- d'origine), redressé de 1,4°, 79 % de la largeur gardée »), nettoyé, et vrai si l'image rendue
+-- est l'image entière avec ce cadre en pointillés (le champ image de la réponse le dit ; absent
+-- quand l'image entière n'a pas pu se rendre, ou avec overlay = false). nil sans résumé. Une
+-- remarque recollée après le JSON ne gêne pas (Conversation.teteJson).
+function Conversation.cadreLu(textes)
+    for _, texte in ipairs(textes or {}) do
+        local json = Conversation.teteJson(texte)
+        if type(json) == 'table' and type(json.resume_cadre) == 'string' then
+            local resume = Texte.nettoyer(json.resume_cadre)
+            if resume ~= '' then
+                return resume, type(json.image) == 'string' and json.image:find('pointillés', 1, true) ~= nil
             end
         end
     end
@@ -1214,8 +1273,11 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                 elseif court == 'preview_settings' then
                     local raison = type(bloc.entree.reason) == 'string' and bloc.entree.reason
                         or (type(bloc.entree.step_name) == 'string' and bloc.entree.step_name) or ''
+                    -- Une proposition de recadrage (1.3, Composition lue) : Ajuster… propose les
+                    -- ajustements du cadre ; un recadrage retiré n'en est pas une.
+                    local recadrage = type(entree.crop) == 'table' and entree.crop.reset ~= true or nil
                     c.elements[#c.elements + 1] = nouvelElement('proposition', { texte = raison, outil = court, appel = bloc.id,
-                        etat = 'enAttente', changements = Conversation.changementsDemandes(bloc.entree) }, date)
+                        etat = 'enAttente', changements = Conversation.changementsDemandes(bloc.entree), recadrage = recadrage }, date)
                 elseif court == 'propose_ratings' then
                     -- Les notes sont dans l'entrée : visibles dans le fil avant la réponse. Le
                     -- standard seul (read_standard sans ratings) ne range rien ; avec des ratings,
@@ -1303,6 +1365,12 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                 local lus = Conversation.changementsLus(r.textes)
                 if lus then
                     e.changements = lus
+                end
+                -- Le cadre que Lightroom a gardé (1.3, Composition lue), en mots : la carte
+                -- Proposition le dit à la place des bords du recadrage.
+                if not r.erreur then
+                    local cadre, dessine = Conversation.cadreLu(r.textes)
+                    e.cadre, e.cadreDessine = cadre, cadre and dessine or nil
                 end
                 if r.erreur then
                     e.etat = 'refusee'
