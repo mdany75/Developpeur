@@ -1,6 +1,7 @@
 import Foundation
 
-/// Profils, paramètres prédéfinis, copie de réglages entre photos et journal des retouches.
+/// Profils, paramètres prédéfinis, copie de réglages entre photos, journal des retouches et carnet de
+/// progrès (export_journal avec notebook, 1.3).
 extension ToolHandler {
     /// Ce qu'on peut copier ou mettre dans un paramètre prédéfini, en plus des groupes de réglages.
     static let inclusions: [(name: String, module: String, label: String, copyDefault: Bool)] = [
@@ -47,10 +48,10 @@ extension ToolHandler {
                  properties: [("name", prop("string", "Nom du paramètre prédéfini.")), ("photo_id", photoIDProperty), ("groups", groupsProperty)]
                     + presetInclusions,
                  required: ["name"]),
-            tool("export_journal",
-                 "Journal des retouches de Claude, photo par photo : date, étape, raison donnée (reason) et réglages changés, annulations comprises. Renvoie le texte en Markdown et peut l'enregistrer dans un fichier.",
+            tool("export_journal", Self.descriptionJournal,
                  properties: targetProperties + [
                     ("save_to", prop("string", "Chemin du fichier Markdown à écrire (par exemple ~/Desktop/Journal.md). Sans : le texte seulement.")),
+                    ("notebook", prop("boolean", Self.descriptionCarnet)),
                  ],
                  required: []),
         ]
@@ -181,10 +182,42 @@ extension ToolHandler {
 
     // MARK: Journal
 
+    /// Description d'export_journal et de sa propriété notebook : 450 caractères au plus ensemble
+    /// (CarnetTests).
+    static let descriptionJournal = "Journal des retouches de Claude, photo par photo : date, étape, raison (reason) et réglages changés, annulations comprises ; ou le carnet de progrès (notebook). Renvoie le texte en Markdown et peut l'enregistrer dans un fichier."
+    static let descriptionCarnet = "true = le carnet de progrès de tout le catalogue : par mois de prise de vue, les défauts de la prise de vue qui reviennent (mesurés avant toute retouche de Claude), ce qui progresse, quoi travailler à la prochaine sortie."
+
     func exportJournal(_ args: Arguments) throws -> JSONValue {
-        let result = try lightroom.send("journal", try targets(args), timeout: 60)
-        let markdown = Self.journalMarkdown(result["photos"]?.array ?? [], date: Date())
-        var response: [String: JSONValue] = ["markdown": .string(markdown)]
+        var response: [String: JSONValue]
+        let markdown: String
+        if args.bool("notebook") == true {
+            // Le carnet de progrès (1.3) : le résumé que le module calcule (Carnet.resumer), ses
+            // phrases telles quelles ; ni ses entrées ni leurs leçons (jusqu'à 3 000 photos) ne
+            // vont à Claude.
+            let lu: JSONValue
+            do {
+                lu = try lightroom.send("carnet", ["action": "lire", "resume": true], timeout: Carnet.delaiLecture)
+            } catch {
+                if error.localizedDescription.contains("Commande inconnue") {
+                    let version = lightroom.moduleVersion.map { " (version \($0))" } ?? ""
+                    throw LightroomError.plugin("Le module de Lightroom\(version) ne connaît pas encore le carnet de progrès : installer Développeur 1.3, puis quitter et relancer Lightroom.")
+                }
+                throw error
+            }
+            guard let resume = lu["resume"], resume.object != nil else {
+                throw LightroomError.plugin("Le module n'a pas rendu le résumé du carnet de progrès.")
+            }
+            markdown = Carnet.markdown(resume)
+            response = ["markdown": .string(markdown), "carnet": resume]
+            if let catalogue = lu["catalogue"]?.string { response["catalogue"] = .string(catalogue) }
+            if args.has("photo_ids") || args.has("selection") {
+                response["remarque"] = "Le carnet compte tout le catalogue ouvert : photo_ids et selection n'y servent pas."
+            }
+        } else {
+            let result = try lightroom.send("journal", try targets(args), timeout: 60)
+            markdown = Self.journalMarkdown(result["photos"]?.array ?? [], date: Date())
+            response = ["markdown": .string(markdown)]
+        }
         if let path = args.string("save_to")?.trimmingCharacters(in: .whitespacesAndNewlines), !path.isEmpty {
             var url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
             // Jamais d'écrasement, comme une livraison : un fichier déjà là fait renommer le nouveau.

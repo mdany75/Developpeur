@@ -5,7 +5,8 @@ import Vision
 /// Voir et mesurer : `view_photo` (aperçu, zoom sur une zone, avant/après, mesures, netteté et
 /// bruit, éclairage, Vision, bilan d'une passe à l'autre), `measure_angle` (angle d'une ligne,
 /// pour redresser), `analyze_photos` (mesures d'une série, écarts avec une référence, photos
-/// semblables) et `get_settings`.
+/// semblables) et `get_settings`. view_photo et measure_angle envoient aussi leurs constats de la
+/// prise de vue au carnet de progrès (1.3, Carnet.swift), quand le serveur y note.
 extension ToolHandler {
     /// Taille des aperçus d'analyse : celle où les seuils de netteté et de bruit ont été relevés.
     static let analysisSize = Detail.side
@@ -216,12 +217,22 @@ extension ToolHandler {
             if let measures, let bilan = bilanDeLaVue(apercu: result, taille: size, mesures: measures, detail: detail, reduite: reduite) {
                 info["bilan"] = bilan
             }
+            let af = Self.pointAF(boitier, description: result["photo"])
+            let netteteAF = af.flatMap { Detail.nettete(decodee, autour: $0.point) }
+            // Le carnet de progrès (1.3) : sur une photo que Claude n'a pas encore retouchée, les
+            // défauts de la prise de vue, mesurés avant le carré du point de mise au point ; dits à
+            // Claude seulement si le module les a notés.
+            if let constats = noterLaVue(apercu: result, mesures: measures, detail: detail, reduite: reduite,
+                                         af: af.map { PhotoTriee.MiseAuPoint(point: $0.point, nettete: netteteAF, avertissement: $0.avertissement) },
+                                         intention: boitier?.intention), !constats.isEmpty {
+                info["constats_prise_de_vue"] = .array(constats.map(JSONValue.string))
+            }
             // Le point de mise au point de l'appareil (Fujifilm) : toujours en chiffres, en carré
             // sur l'image avec af_point (pour noter) ou si l'utilisateur le veut en tout temps
             // (préférence du module). Les mesures sont prises avant le carré.
-            if let af = Self.pointAF(boitier, description: result["photo"]) {
+            if let af {
                 var point = Self.pointAFJSON(af.point, avertissement: af.avertissement)
-                if let nettete = Detail.nettete(decodee, autour: af.point) { point["nettete"] = .number((nettete * 10).rounded() / 10) }
+                if let nettete = netteteAF { point["nettete"] = .number((nettete * 10).rounded() / 10) }
                 if args.bool("af_point") == true || afToujours, let marquee = PreviewImages.marquerPoint(decodee, af.point, manque: af.avertissement) {
                     image = marquee
                     point["carre"] = .string(af.avertissement ? "rouge, sur l'image" : "vert, sur l'image")
@@ -268,6 +279,54 @@ extension ToolHandler {
         vuesMesurees[cle] = Bilan.Suivi(depart: suivi.depart, precedente: vue)
         Bilan.elaguer(&vuesMesurees)
         return json
+    }
+
+    // MARK: Carnet de progrès
+
+    /// Envoie un constat au carnet du module (commande carnet constater, avec le vocabulaire de
+    /// PriseDeVue) : `constat` est { vue: … } ou { angle: … }. Vrai si le module l'a noté. Un refus
+    /// (note = false : case Carnet décochée, photo d'essai, déjà retouchée, géométrie touchée) est
+    /// normal, et toute erreur est tue (un module 1.2 répond « Commande inconnue ») : l'outil
+    /// réussit quand même. Rien n'est écrit dans le catalogue, seulement carnet.json.
+    func constaterAuCarnet(photo: Int, _ constat: [String: JSONValue]) -> Bool {
+        var params: [String: JSONValue] = ["action": "constater", "photo": .number(Double(photo)), "vocabulaire": PriseDeVue.vocabulaire]
+        params.merge(constat) { _, nouveau in nouveau }
+        do {
+            return try lightroom.send("carnet", params, timeout: Carnet.delaiConstat)["note"]?.bool == true
+        } catch {
+            Carnet.journaliser("carnet de progrès : constat de la photo \(photo) non noté (\(error.localizedDescription))")
+            return false
+        }
+    }
+
+    /// La vue entière de view_photo au carnet : seulement quand le serveur note au carnet
+    /// (`noterAuCarnet`), pour une photo identifiée sans étape de Claude (etapes_claude.nombre == 0,
+    /// que le module donne avec point_af). L'horizon n'y est cherché que sur une géométrie intacte
+    /// (réglages et angle de recadrage de la réponse). Rend les textes des défauts trouvés si le
+    /// module a noté la vue, nil sinon.
+    func noterLaVue(apercu: JSONValue, mesures: PhotoMeasurements?, detail: DetailMeasurements?, reduite: CGImage,
+                    af: PhotoTriee.MiseAuPoint?, intention: IntentionBoitier?) -> [String]? {
+        guard noterAuCarnet, let id = apercu["photo"]?["id"]?.int, apercu["etapes_claude"]?["nombre"]?.int == 0 else { return nil }
+        let intacte = Carnet.geometrieIntacte(reglages: apercu["reglages"], angleRecadrage: apercu["recadrage"]?["angle"]?.double ?? 0)
+        let vue = Carnet.constatsVue(mesures: mesures, detail: detail, reduite: reduite, af: af, intention: intention, geometrieIntacte: intacte)
+        guard !vue.cherches.isEmpty, constaterAuCarnet(photo: id, ["vue": vue.json]) else { return nil }
+        return vue.textes
+    }
+
+    /// Une ligne mesurée (measure_angle, read_composition) au carnet, si elle compte
+    /// (`Carnet.constatHorizon` : horizontale penchée de 0,5° ou plus, géométrie intacte). Rend le
+    /// texte du constat si le module l'a noté, nil sinon.
+    func noterLAngle(apercu: JSONValue, tilt: Double, vertical: Bool, angleActuel: Double, source: String) -> String? {
+        guard noterAuCarnet, let id = apercu["photo"]?["id"]?.int,
+              let constat = Carnet.constatHorizon(tilt: tilt, vertical: vertical, angleActuel: angleActuel, reglages: apercu["reglages"]),
+              constaterAuCarnet(photo: id, ["angle": Carnet.angleJSON(constat, source: source)]) else { return nil }
+        return constat.texte
+    }
+
+    /// Les clés de la commande apercu d'une ligne mesurée : celles de la géométrie quand le constat
+    /// peut partir au carnet (pour juger qu'elle est intacte), aucune sinon.
+    var clesDeLaLigne: JSONValue {
+        noterAuCarnet ? .array(Carnet.clesGeometrie.map(JSONValue.string)) : []
     }
 
     /// Garde un zoom pour le suivant sur la même zone : `Bilan.zoomsGardes` par photo, et
@@ -337,7 +396,7 @@ extension ToolHandler {
         }
         let from = CGPoint(x: try coordinate("x1"), y: try coordinate("y1"))
         let to = CGPoint(x: try coordinate("x2"), y: try coordinate("y2"))
-        var params: [String: JSONValue] = ["taille": .number(Double(Self.defaultPreviewSize)), "cles": []]
+        var params: [String: JSONValue] = ["taille": .number(Double(Self.defaultPreviewSize)), "cles": clesDeLaLigne]
         if let id = args.int("photo_id") { params["photo"] = .number(Double(id)) }
         let result = try lightroom.send("apercu", params, timeout: 120)
         let data = try Self.readPreview(result["chemin"]?.string)
@@ -361,6 +420,10 @@ extension ToolHandler {
             output["mesure"] = .string("affinée sur \(line.edgePoints) points du contour (écart moyen \(DevelopCatalogue.format(((line.residual ?? 0) * 10).rounded() / 10).replacingOccurrences(of: ".", with: ",")) px)")
         } else {
             output["mesure"] = .string("d'après les deux points seulement : aucun contour net le long du segment, vérifier par un zoom")
+        }
+        // Le carnet de progrès (1.3) : une horizontale penchée sur une géométrie intacte.
+        if let constat = noterLAngle(apercu: result, tilt: line.tilt, vertical: line.vertical, angleActuel: current, source: "measure_angle") {
+            output["constats_prise_de_vue"] = [.string(constat)]
         }
         return .object(output)
     }
