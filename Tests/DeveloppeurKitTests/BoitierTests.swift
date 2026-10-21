@@ -234,6 +234,10 @@ final class BoitierTests: XCTestCase {
         XCTAssertEqual(IntentionBoitier(simulation: 0x501).profilLightroom(marque: "FUJIFILM", modele: "X-H2S", looks: looks), "Camera Pro Neg Hi")
         XCTAssertNil(IntentionBoitier(simulation: 0x100).profilLightroom(marque: "FUJIFILM", modele: "X-H2S", looks: looks))
         XCTAssertNil(IntentionBoitier(compensation: -1).profilLightroom(marque: "FUJIFILM", modele: "X-H2S", looks: looks))
+        // Modèle inconnu : le profil DCP reste (rien ne le dit absent), un Look réservé ne se trouve pas.
+        XCTAssertEqual(eterna.profilLightroom(marque: "FUJIFILM", modele: nil, looks: looks), "Camera ETERNA/Cinema")
+        XCTAssertNil(classicNeg.profilLightroom(marque: "FUJIFILM", modele: nil, looks: looks))
+        XCTAssertEqual(eterna.profilLightroom(marque: "FUJIFILM", modele: "x-t20 ", looks: looks), nil, "casse et espaces")
     }
 
     func testLecture() throws {
@@ -267,6 +271,13 @@ final class BoitierTests: XCTestCase {
         XCTAssertFalse(lignes(dr400, raw: false).contains("Plage dynamique"), "un JPEG porte déjà la plage")
         XCTAssertFalse(lignes(IntentionBoitier(reglagePlage: 0, plageAuto: 100)).contains("Plage dynamique"))
         XCTAssertTrue(lignes(IntentionBoitier(reglagePlage: 0x200)).contains("1 1/3 IL plus bas"), "DR230 des anciens boîtiers")
+        XCTAssertFalse(lignes(dr400).contains("reste voulue"), "sans compensation, rien à rattraper à part")
+        // DR400 et −1 IL : la plage se rattrape, la compensation reste (les deux lectures ne se
+        // contredisent pas).
+        let sombreDR = lignes(IntentionBoitier(reglagePlage: 1, plageDeveloppement: 400, compensation: -1))
+        XCTAssertTrue(sombreDR.contains("La compensation de −1 IL, elle, reste voulue : ne rattraper que cette protection."), sombreDR)
+        XCTAssertFalse(lignes(IntentionBoitier(reglagePlage: 1, plageDeveloppement: 400, compensation: -1.0 / 3)).contains("reste voulue"),
+                       "−1/3 IL ne dit rien")
 
         XCTAssertFalse(lignes(IntentionBoitier(simulation: 0, tonsClairs: 0, tonsFonces: 0)).contains("Tons"))
         XCTAssertTrue(lignes(IntentionBoitier(tonsClairs: 1, tonsFonces: -1)).contains("tons clairs +1, tons foncés −1"))
@@ -275,6 +286,19 @@ final class BoitierTests: XCTestCase {
         XCTAssertTrue(lignes(IntentionBoitier(balance: 0x1)).contains("priorité au blanc"))
         XCTAssertTrue(lignes(IntentionBoitier(priorite: 0, prioriteAuto: 2)).contains("Priorité à la plage dynamique (forte)"))
         XCTAssertFalse(lignes(IntentionBoitier(priorite: 1, prioriteFixe: 0)).contains("Priorité"), "niveau 0 : désactivée")
+        // Priorité fixe : son niveau, sans « auto » ; le niveau auto ne compte pas quand elle est fixe.
+        let fixe = IntentionBoitier(priorite: 1, prioriteAuto: 1, prioriteFixe: 2)
+        XCTAssertEqual(fixe.prioritePlage?.niveau, "forte")
+        XCTAssertEqual(fixe.prioritePlage?.auto, false)
+        XCTAssertEqual(fixe.json(raw: true, profil: nil, profilActuel: nil)["priorite_plage_dynamique"]?.string, "forte")
+        XCTAssertNil(IntentionBoitier(priorite: 1, prioriteAuto: 2).prioritePlage, "fixe sans niveau fixe : rien")
+        // Une plage hors de DR100 à DR800 ne dit rien.
+        XCTAssertNil(IntentionBoitier(reglagePlage: 0, plageAuto: 0).plageDynamique)
+        XCTAssertNil(IntentionBoitier(reglagePlage: 1, plageDeveloppement: 65535).plageDynamique)
+        XCTAssertNil(IntentionBoitier(reglagePlage: 0x8000, plageAuto: 200).plageDynamique, "0x8000 : celle de la simulation")
+        // Le même profil sous une autre orthographe du catalogue (« Camera PRO Neg. Hi »).
+        XCTAssertTrue(lignes(IntentionBoitier(simulation: 0x501), profil: "Camera Pro Neg Hi", actuel: "Camera PRO Neg. Hi")
+            .contains("Le profil actuel est la simulation"))
         XCTAssertTrue(IntentionBoitier(programme: 3).lecture(raw: true, profil: nil, profilActuel: nil).isEmpty)
 
         XCTAssertEqual(IntentionBoitier.texteIL(-0.667), "−2/3")

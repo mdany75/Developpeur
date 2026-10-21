@@ -93,6 +93,8 @@ public struct IntentionBoitier: Equatable {
     /// (±10 accepté). Hors de là, la valeur vient d'un type inattendu et n'est pas gardée.
     static let tonsPossibles = -2.0...4.0
     static let compensationPossible = -10.0...10.0
+    /// Plage dynamique en % : DR100 à DR800 (hors de là, une valeur qui ne dit rien).
+    static let plagePossible = 100...800
 
     /// Le cran d'un ton (int32s, comme exiftool, quel que soit le type rangé).
     static func ton(_ entree: LectureBoitier.Tiff.Entree?) -> Double? {
@@ -185,7 +187,7 @@ public struct IntentionBoitier: Equatable {
         case 0x201: lue = (400, false)
         default: lue = nil
         }
-        guard let lue, (100...800).contains(lue.pourcent) else { return nil }
+        guard let lue, Self.plagePossible.contains(lue.pourcent) else { return nil }
         return lue
     }
 
@@ -277,7 +279,13 @@ public struct IntentionBoitier: Equatable {
             }
             if let plage = plageDynamique, plage.pourcent >= 200 {
                 let ecart = Self.texteIL(log2(Double(plage.pourcent) / 100), signe: false)
-                lignes.append("Plage dynamique DR\(plage.pourcent) : hautes lumières protégées à la prise de vue (RAW exposé \(ecart) IL plus bas). Les tenir ; si la photo paraît sous-exposée d'environ \(ecart) IL, c'est cette protection : remonter l'exposition en gardant les hautes lumières (Highlights2012 négatif) ; les ombres relevées seront plus bruitées.")
+                var ligne = "Plage dynamique DR\(plage.pourcent) : hautes lumières protégées à la prise de vue (RAW exposé \(ecart) IL plus bas). Les tenir ; si la photo paraît sous-exposée d'environ \(ecart) IL, c'est cette protection : remonter l'exposition en gardant les hautes lumières (Highlights2012 négatif) ; les ombres relevées seront plus bruitées."
+                // Avec une photo voulue sombre, les deux lectures se complètent : rattraper la
+                // protection, pas la compensation.
+                if let compensation, compensation <= Self.seuilSombreVoulue {
+                    ligne += " La compensation de \(Self.texteIL(compensation)) IL, elle, reste voulue : ne rattraper que cette protection."
+                }
+                lignes.append(ligne)
             }
             let tons = [tonsClairs.flatMap { $0 != 0 ? "tons clairs \(Self.cran($0))" : nil },
                         tonsFonces.flatMap { $0 != 0 ? "tons foncés \(Self.cran($0))" : nil }].compactMap { $0 }

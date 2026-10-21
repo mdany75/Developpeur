@@ -346,6 +346,24 @@ final class TriTests: XCTestCase {
         XCTAssertNil(rapide.bloque)
     }
 
+    /// Au tri, le point seul compte : sans géométrie pour le placer, l'original n'est pas ouvert
+    /// (une lecture de moins qui pourrait attendre l'autorisation de macOS) ; avec elle, une lecture.
+    func testCullOpensNoOriginalWithoutGeometry() {
+        let verrou = NSLock()
+        var lectures = 0
+        let lecteur = LecteurBoitier(delai: 1) { _ in
+            verrou.lock(); lectures += 1; verrou.unlock()
+            return LectureBoitier(point: PointAF(x: 0.5, y: 0.5, avertissement: false, visages: nil))
+        }
+        func comptees() -> Int { verrou.lock(); defer { verrou.unlock() }; return lectures }
+        XCTAssertNil(ToolHandler.pointAF(["marque": "FUJIFILM", "chemin_original": "/Volumes/Photos/DSCF0001.RAF"], lecteur: lecteur))
+        XCTAssertEqual(comptees(), 0, "pas de géométrie : rien d'ouvert")
+        let place = ToolHandler.pointAF(["marque": "FUJIFILM", "chemin_original": "/Volumes/Photos/DSCF0001.RAF",
+                                         "geometrie": ["largeur": 300, "hauteur": 200, "orientation": "AB"]], lecteur: lecteur)
+        XCTAssertEqual(place.map { Double($0.point.x) }, 0.5)
+        XCTAssertEqual(comptees(), 1)
+    }
+
     /// Le passage inverse de Geometrie.point du module (Lua), recopié ici pour l'aller-retour.
     static func versFichier(_ g: GeometriePhoto, p: Double, q: Double) -> (Double, Double) {
         let (lf, hf) = g.tournee ? (g.hauteur, g.largeur) : (g.largeur, g.hauteur)
