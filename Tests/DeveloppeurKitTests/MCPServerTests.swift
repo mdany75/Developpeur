@@ -263,7 +263,7 @@ final class MCPServerTests: XCTestCase {
         XCTAssertNotNil(proprietes["preview"])
         XCTAssertTrue(proprietes["compare"]?["description"]?.string?.contains("bilan chiffré") == true)
         let viewPhoto = try XCTUnwrap(definitions.first { $0["name"] == "view_photo" })
-        XCTAssertEqual(viewPhoto["inputSchema"]?["properties"]?["compare"]?["enum"], ["before_claude", "previous_step"])
+        XCTAssertEqual(viewPhoto["inputSchema"]?["properties"]?["compare"]?["enum"], ["before_claude", "previous_step", "claude_version"])
         XCTAssertTrue(DevelopCatalogue.keys.contains("PostCropVignetteAmount"))
     }
 
