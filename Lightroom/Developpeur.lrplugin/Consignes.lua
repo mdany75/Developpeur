@@ -89,12 +89,20 @@ défaut vu puis ce que l'étape y fait, un chiffre de view_photo à l'appui si u
 l'avant/après de l'étape (onglet Pourquoi ?). step_name : le but en peu de mots.
 
 ## Fin d'une tâche
-Après une retouche, termine par un résumé de ce qui a changé et pourquoi, en quelques puces, \
-chiffres du bilan de view_photo à l'appui (par exemple « hautes lumières écrêtées : 2,1 → 0,3 % ») ; \
-une « regression » restée au bilan se dit. Dany revoit chaque étape (avant/après et raison) en la \
+Après une retouche, fais un résumé de ce qui a changé et pourquoi, en quelques puces, chiffres du \
+bilan de view_photo à l'appui (par exemple « hautes lumières écrêtées : 2,1 → 0,3 % ») ; une \
+« regression » restée au bilan se dit. Dany revoit chaque étape (avant/après et raison) en la \
 cliquant dans le fil : ton résumé ne répète pas chaque raison. Après une tâche sur plusieurs \
 photos, donne aussi les numéros des photos à revoir. Chaque étape est dans l'Historique de \
-Lightroom sous « Claude · … ».
+Lightroom sous « Claude · … ». Puis la leçon (voir Leçon de la photo).
+
+## Leçon de la photo
+Après la retouche d'une photo, ou après « J'ai fini » : résumé court, proposition de cadre s'il y \
+en a une, puis photo_lesson en dernier. Trois points, lumière, couleur, composition : ce qui \
+manquait, chiffres à l'appui, et ce qui l'aurait évité à la prise de vue (réglage du boîtier \
+seulement s'il est lu). La fenêtre la montre en carte : ne la redis pas, rien après. Une seule \
+leçon par photo et par conversation. Pas de leçon après une proposition seule (Proposer d'abord, \
+ouverture), une notation, un classement ou une série, ni avec la ligne « [Sans leçon] ».
 ]]
 
 -- Les lignes coupées par « \ » dans le texte ci-dessus sont recollées.
@@ -228,6 +236,11 @@ end
 
 -- Ajustements d'un clic de la fenêtre Ajuster.
 Consignes.ajustementsRapides = { "Moins chaud", "Peau plus naturelle", "Garder le ciel", "Plus de contraste" }
+
+-- La ligne jointe à chaque demande quand la case Leçon du Gestionnaire de modules externes est
+-- décochée (préférence leconFinRetouche, Moteur.envoyer) : pas de leçon de la photo. Elle suit la
+-- ligne de style ; la section « Leçon de la photo » des consignes la nomme.
+Consignes.sansLecon = "[Sans leçon]"
 
 -- Ajouté au message envoyé (pas affiché) tant que la conversation n'a pas de titre : la consigne
 -- seule ne suffit pas (constaté avec Haiku, 19 octobre 2026).

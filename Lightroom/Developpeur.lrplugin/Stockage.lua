@@ -1,7 +1,8 @@
 -- Stockage.lua : les conversations sur le disque, une par dossier
 -- (Conversations/<id>/conversation.json et ses images), celles des anciennes séances de notation
 -- comprises (genre = 'notation'). Les listes d'un élément (images, changements, notes, et en 1.3
--- etapes, annule, revenu) s'écrivent toujours en tableaux JSON.
+-- etapes, annule, revenu, les points d'une leçon et leurs défauts) s'écrivent toujours en tableaux
+-- JSON.
 
 local LrPathUtils = import 'LrPathUtils'
 
@@ -86,6 +87,23 @@ local function pourJson(c)
                 x[cle] = liste
             end
         end
+        -- Les points d'une leçon (1.3), et les défauts de chaque point : des tableaux, même vides.
+        if e.genre == 'lecon' then
+            local points = Json.tableau()
+            for j, point in ipairs(e.points or {}) do
+                local y = {}
+                for cle, valeur in pairs(point) do
+                    y[cle] = valeur
+                end
+                local defauts = Json.tableau()
+                for k, d in ipairs(point.defauts or {}) do
+                    defauts[k] = d
+                end
+                y.defauts = defauts
+                points[j] = y
+            end
+            x.points = points
+        end
         elements[i] = x
     end
     copie.elements = elements
@@ -117,7 +135,22 @@ function Stockage.lire(id)
         if e.genre == 'notation' then
             e.notes = e.notes or {}
         end
-        if (e.genre == 'outil' or e.genre == 'notation') and e.etat == 'enCours' then
+        if e.genre == 'lecon' then
+            -- Seulement des points en table, chacun avec sa liste de défauts : le fil et
+            -- l'enregistrement les parcourent (un fichier abîmé ne doit pas bloquer la fenêtre).
+            local points = {}
+            for _, p in ipairs(type(e.points) == 'table' and e.points or {}) do
+                if type(p) == 'table' then
+                    if type(p.defauts) ~= 'table' then
+                        p.defauts = {}
+                    end
+                    points[#points + 1] = p
+                end
+            end
+            e.points = points
+        end
+        -- Un appel resté en cours (Lightroom fermé pendant l'appel) n'a pas abouti.
+        if (e.genre == 'outil' or e.genre == 'notation' or e.genre == 'lecon') and e.etat == 'enCours' then
             e.etat = 'erreur'
         end
     end

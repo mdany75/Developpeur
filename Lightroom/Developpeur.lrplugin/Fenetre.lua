@@ -441,9 +441,9 @@ end
 -- prioritaire sur l'aperçu de l'onglet), une ligne de la page Carnet de progrès (la rangée d'un
 -- défaut, `defaut`, ou une action, `action`), une ligne de leçon, une étape de Claude (onglet
 -- Pourquoi ?), sinon le détail d'un outil. Fenetre.sorteDeClic dit laquelle,
--- Fenetre.clics[sorte](l, e) la traite. Le carnet et la leçon sont des crochets vides, remplis par
--- les lots suivants ; une étape (ligne « · Pourquoi ? », Conversation.estEtape) s'ouvre dans
--- l'onglet Pourquoi ? (Fenetre.montrerEtape).
+-- Fenetre.clics[sorte](l, e) la traite. Le carnet est un crochet vide, rempli par un lot suivant ;
+-- une ligne de la carte d'une leçon ouvre le détail de son appel ; une étape (ligne
+-- « · Pourquoi ? », Conversation.estEtape) s'ouvre dans l'onglet Pourquoi ? (Fenetre.montrerEtape).
 function Fenetre.estEtape(e)
     return Conversation.estEtape(e)
 end
@@ -482,7 +482,15 @@ Fenetre.clics = {
         Fenetre.rafraichirApercu()
     end,
     carnet = function() end,
-    lecon = function() end,
+    -- La carte d'une leçon (1.3) : le détail de son appel de photo_lesson (les points donnés, puis
+    -- la réponse : faits mesurés, indices, remarques), à part, dans une tâche.
+    lecon = function(_, e)
+        local c = Moteur.courante
+        local outil = c and Conversation.outilDeLAppel(c, e.appel)
+        if outil then
+            enTache(Fenetre.montrerDetail, outil)
+        end
+    end,
     etape = function(l)
         Fenetre.montrerEtape(l.element)
     end,
