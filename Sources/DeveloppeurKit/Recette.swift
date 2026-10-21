@@ -48,6 +48,12 @@ public final class Recette {
     /// comme ToolHandler.lireEcran : main.swift pose `Ecran.lire` pour `--recette`, les tests un
     /// écran fabriqué (swift test ne lit jamais le vrai écran, même avec un vrai pont).
     public var lireEcran: () -> Ecran.Etat? = { nil }
+    /// Hauteur de l'horizon de la photo de `--horizon`, de 0 à 1 dans l'image que montre view_photo
+    /// (`--hauteur-horizon` ; le milieu par défaut).
+    public var hauteurHorizon = 0.5
+    /// Attente entre deux lectures d'une capture (1.3, avant/après d'une étape) : les tests ne
+    /// dorment pas.
+    var attendre: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }
 
     public init(lightroom: LightroomServing, images: URL? = nil, originaux: Bool = false,
                 rapport: @escaping (Etape) -> Void = { _ in }) {
@@ -60,12 +66,12 @@ public final class Recette {
     public var reussie: Bool { !etapes.isEmpty && etapes.allSatisfy(\.reussie) }
 
     /// Lance les séquences demandées : un RAW (obligatoire en pratique), un JPEG, une photo au flash
-    /// avec des yeux rouges, un portrait (la peau dosée) et une photo à deux lumières (l'éclairage
-    /// mixte nommé). Avec le vrai pont seulement (pas le faux module des tests, qui attendent la
-    /// liste exacte des étapes, et qui ne doivent jamais lire le vrai écran), d'abord la liaison
-    /// fermée et l'écran nommé.
+    /// avec des yeux rouges, un portrait (la peau dosée), une photo qui a un horizon (la composition
+    /// lue, 1.3) et une photo à deux lumières (l'éclairage mixte nommé). Avec le vrai pont seulement
+    /// (pas le faux module des tests, qui attendent la liste exacte des étapes, et qui ne doivent
+    /// jamais lire le vrai écran), d'abord la liaison fermée et l'écran nommé.
     public func lancer(raw: Int?, jpeg: Int?, flash: Int?, profondeur: Int? = nil, yeuxRouges: Int? = nil, xt20: Int? = nil,
-                       portrait: Int? = nil, mixte: Int? = nil) {
+                       portrait: Int? = nil, mixte: Int? = nil, horizon: Int? = nil) {
         if let pont = tools.lightroom as? LightroomBridge {
             sequenceLiaison(pont)
             sequenceEcran()
@@ -77,6 +83,8 @@ public final class Recette {
         if let yeuxRouges { sequence("yeux rouges \(yeuxRouges)", id: yeuxRouges, corps: sequenceYeuxRouges) }
         if let xt20 { sequence("X-T20 \(xt20)", id: xt20, corps: sequenceXT20) }
         if let portrait { sequence("portrait \(portrait)", id: portrait, corps: sequencePortrait) }
+        // 1.3, la composition lue (Recette+13.swift) : sans --horizon, rien n'en est vérifié.
+        if let horizon { sequence("horizon \(horizon)", id: horizon, corps: sequenceHorizon) }
         if let mixte { sequenceEclairage(mixte, unique: raw == mixte ? nil : raw) }
         if let raw, let jpeg { try? sequenceSerie(reference: raw, autre: jpeg) }
         if let raw, let flash { try? sequenceExpositions(reference: raw, autre: flash) }
@@ -357,6 +365,9 @@ public final class Recette {
             return detail
         }
         try etapeBilan(id, photo, attendu: auto)
+        // 1.3 (Recette+13.swift) : l'avant/après d'une étape, la leçon de la photo, le carnet de
+        // progrès ; chacun revient à l'état de la tonalité automatique.
+        try sequenceApprendre(id, photo, depart: depart, attendu: auto)
         try etape(photo, "mesure d'angle") {
             let (info, _) = try appel("measure_angle", ["photo_id": .number(Double(id)), "x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5])
             try verifier(info["crop_angle"]?.double != nil, "pas d'angle proposé")
@@ -547,6 +558,8 @@ public final class Recette {
         try sequenceTri(id, photo)
         try sequenceLivraison(id, photo)
         try sequenceVariantes(id, photo)
+        // 1.3 : « Je le fais » (Recette+13.swift), après les variantes, qui effacent toutes celles de Claude.
+        try sequenceJeLeFais(id, photo)
         try sequenceHDR(id, photo)
         try sequenceLivraison25(id, photo)
         try sequenceRetoucheMasques(id, photo)
