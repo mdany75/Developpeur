@@ -1,6 +1,13 @@
 -- Ecriture.lua : l'écriture dans le catalogue (toujours par withWriteAccessDo, dans ecrire),
 -- les étapes et le journal de Claude, l'application des plans et la réponse des commandes
 -- d'écriture.
+--
+-- Identité des étapes (1.3, « Pourquoi ? ») : chaque étape de Claude reçoit un identifiant
+-- (idEtape), gardé dans la mémoire (etapesClaude : { id, nom, avant, le }), dans l'entrée du
+-- journal (etape_id) et dans la réponse de la commande (etape_id de chaque résultat, null sans
+-- étape). Toute étape se crée par nouvelleEtape. La fenêtre Claude relie ainsi une ligne du fil, sa
+-- raison et l'avant/après gardé par Etapes.lua. Une étape d'avant la 1.3, sans id, reste lisible :
+-- l'annulation dépile toujours par rang.
 
 local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
@@ -32,6 +39,27 @@ end
 
 local MAX_ETAPES = 20
 local MAX_JOURNAL = 200
+
+-- Identifiant d'une étape : un texte unique (Lightroom n'a pas de générateur d'UUID), l'heure, un
+-- tirage et un compteur, comme Conversation.identifiant. Il sert aussi de nom de fichier
+-- (Etapes/<uuid>/<id>-avant.jpg) : seulement des chiffres hexadécimaux et des tirets.
+local compteurEtapes = 0
+
+local function idEtape()
+    compteurEtapes = compteurEtapes + 1
+    return string.format('%X-%04X-%d', math.floor(LrDate.currentTime()), math.random(0, 0xFFFF), compteurEtapes)
+end
+
+-- Ajoute une étape à la mémoire de la photo (liste etapesClaude lue par lireJson) : { id, nom,
+-- avant (valeurs remplacées), le (LrDate) }, les MAX_ETAPES dernières seulement. Rend son id.
+local function nouvelleEtape(etapes, nom, avant)
+    local id = idEtape()
+    etapes[#etapes + 1] = { id = id, nom = nom, avant = avant, le = LrDate.currentTime() }
+    while #etapes > MAX_ETAPES do
+        table.remove(etapes, 1)
+    end
+    return id
+end
 
 local function horodatage()
     local ok, texte = pcall(LrDate.timeToUserFormat, LrDate.currentTime(), '%Y-%m-%d %H:%M')
@@ -268,13 +296,11 @@ local function ecrirePlans(plans, etape, prefs, params)
                         plan.original[cle] = valeur
                     end
                 end
-                plan.etapes[#plan.etapes + 1] = { nom = etape, avant = plan.avant }
-                while #plan.etapes > MAX_ETAPES do
-                    table.remove(plan.etapes, 1)
-                end
+                plan.etapeId = nouvelleEtape(plan.etapes, etape, plan.avant)
                 appliquerPlan(plan, etape)
                 -- Gardée pour verifierProfils, qui peut retirer un profil que Lightroom n'a pas pris.
-                plan.entreeJournal = { etape = etape, type = 'retouche', raison = params.raison, changements = plan.changements }
+                plan.entreeJournal = { etape = etape, etape_id = plan.etapeId, type = 'retouche', raison = params.raison,
+                    changements = plan.changements }
                 ajouterJournal(plan.journal, plan.entreeJournal)
                 garder(plan.photo, 'avantClaude', Json.encode(plan.original))
                 garder(plan.photo, 'etapesClaude', Json.encode(Json.tableau(plan.etapes)))
@@ -436,6 +462,8 @@ local function resultatsPlans(plans, etape, params)
         resultats[#resultats + 1] = {
             photo = description,
             etape = etape,
+            -- L'étape écrite (ou complétée) pour cette photo ; null sans étape (rien n'a changé).
+            etape_id = plan.etapeId or Json.null,
             changements = plan.changements,
             remarques = plan.notes,
         }
@@ -575,7 +603,8 @@ end
 -- Complète la dernière étape de Claude, du même nom, par les changements des plans : valeurs
 -- d'avant des réglages qu'elle ne touchait pas, réglages, entrée du journal (ses changements du
 -- même réglage sont remplacés, depuis la valeur d'avant l'étape). Une photo dont la dernière étape
--- n'a pas ce nom reçoit une étape à part.
+-- n'a pas ce nom reçoit une étape à part. L'étape complétée garde son id (plan.etapeId) ; une
+-- étape d'avant la 1.3, sans id, en reçoit un.
 local function completerEtapes(plans, etape, prefs, params)
     local suite, seules = {}, {}
     for _, plan in ipairs(plans) do
@@ -598,6 +627,10 @@ local function completerEtapes(plans, etape, prefs, params)
     ecrire(etape, function()
         for _, plan in ipairs(suite) do
             local derniere = plan.etapes[#plan.etapes]
+            if type(derniere.id) ~= 'string' or derniere.id == '' then
+                derniere.id = idEtape()
+            end
+            plan.etapeId = derniere.id
             plan.avantEtape = derniere.avant
             for cle, valeur in pairs(plan.avant) do
                 if derniere.avant[cle] == nil then
@@ -619,6 +652,7 @@ local function completerEtapes(plans, etape, prefs, params)
             end
             local entree = plan.journal[#plan.journal]
             if type(entree) == 'table' and entree.etape == etape then
+                entree.etape_id = entree.etape_id or plan.etapeId
                 local changements = Json.tableau()
                 for _, changement in ipairs(type(entree.changements) == 'table' and entree.changements or {}) do
                     if type(changement) ~= 'table' or plan.nouveaux[changement.cle] == nil then
@@ -630,7 +664,8 @@ local function completerEtapes(plans, etape, prefs, params)
                 end
                 entree.changements = changements
             else
-                ajouterJournal(plan.journal, { etape = etape, type = 'retouche', raison = params.raison, changements = plan.changements })
+                ajouterJournal(plan.journal, { etape = etape, etape_id = plan.etapeId, type = 'retouche', raison = params.raison,
+                    changements = plan.changements })
             end
             garder(plan.photo, 'avantClaude', Json.encode(plan.original))
             garder(plan.photo, 'etapesClaude', Json.encode(Json.tableau(plan.etapes)))
@@ -780,7 +815,9 @@ Ecriture.creerInstantane = creerInstantane
 Ecriture.ecrire = ecrire
 Ecriture.ecrireMemoire = ecrireMemoire
 Ecriture.ecrirePlans = ecrirePlans
+Ecriture.idEtape = idEtape
 Ecriture.MAX_ETAPES = MAX_ETAPES
+Ecriture.nouvelleEtape = nouvelleEtape
 Ecriture.modeTexte = modeTexte
 Ecriture.nomEtape = nomEtape
 Ecriture.relireCadres = relireCadres
@@ -789,6 +826,7 @@ Ecriture.signalerARecadrer = signalerARecadrer
 Ecriture.sansRetouche = sansRetouche
 Ecriture.verifierAccord = verifierAccord
 Ecriture.accordDansLightroom = accordDansLightroom
+Ecriture.DUREE_ACCORD = DUREE_ACCORD
 Ecriture.verifierProtection = verifierProtection
 Ecriture.verifierPause = verifierPause
 

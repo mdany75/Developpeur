@@ -34,7 +34,7 @@ local decrire, garder, lireJson, photoVisee = Photos.decrire, Photos.garder, Pho
 local DEFAUTS, pourLightroom, resume = Reglages.DEFAUTS, Reglages.pourLightroom, Reglages.resume
 local ajouterJournal, creerInstantane, ecrire = Ecriture.ajouterJournal, Ecriture.creerInstantane, Ecriture.ecrire
 local ecrireMemoire = Ecriture.ecrireMemoire
-local MAX_ETAPES, modeTexte, nomEtape = Ecriture.MAX_ETAPES, Ecriture.modeTexte, Ecriture.nomEtape
+local modeTexte, nomEtape, nouvelleEtape = Ecriture.modeTexte, Ecriture.nomEtape, Ecriture.nouvelleEtape
 local sansRetouche, verifierAccord = Ecriture.sansRetouche, Ecriture.verifierAccord
 local verifierPause, verifierProtection = Ecriture.verifierPause, Ecriture.verifierProtection
 
@@ -133,15 +133,14 @@ local function choisir(photo, params, prefs)
     if sansRetouche(original) and prefs.instantane then
         ecrire(etape, function() creerInstantane(photo) end)
     end
+    -- L'étape et son id (1.3), dans la mémoire, le journal (etape_id) et la réponse.
+    local etapeId = nouvelleEtape(etapes, etape, avant)
+    entree.etape_id = etapeId
     ecrireMemoire(etape, function()
         for cle, valeur in pairs(avant) do
             if original[cle] == nil then
                 original[cle] = valeur
             end
-        end
-        etapes[#etapes + 1] = { nom = etape, avant = avant }
-        while #etapes > MAX_ETAPES do
-            table.remove(etapes, 1)
         end
         ajouterJournal(journal, entree)
         garder(photo, 'avantClaude', Json.encode(original))
@@ -193,7 +192,7 @@ local function choisir(photo, params, prefs)
             .. ". Rien n'a changé : l'utilisateur peut le poser lui-même dans le panneau Instantanés.")
     end
     Liaison.noter("Variante « " .. nom .. " » posée", photo.localIdentifier)
-    return { photo = decrire(photo, false), etape = etape, instantane = nom, changements = entree.changements }
+    return { photo = decrire(photo, false), etape = etape, etape_id = etapeId, instantane = nom, changements = entree.changements }
 end
 
 -- Efface des instantanés de variantes de Claude (tous, ou ceux nommés), et leur mémoire. Un nom

@@ -1,6 +1,9 @@
 -- Annulation.lua : défaire la dernière retouche de Claude (annuler) ou toutes (revenir),
 -- d'après la mémoire de la photo : réglages, traitements calculés (clés Amelioration et
 -- Suppression) et classement dans la Bibliothèque (clé Bibliotheque), chacun par son chemin.
+-- Depuis la 1.3, l'étape défaite est nommée par son id : etape_id dans le résultat d'annuler et
+-- dans l'entrée 'annulation' du journal ; l'entrée 'retour' garde les ids des étapes défaites
+-- (etape_ids). Une étape d'avant la 1.3, sans id, s'annule toujours (etape_id null).
 
 local LrTasks = import 'LrTasks'
 
@@ -184,6 +187,7 @@ function Annulation.annuler(params)
         if derniere then
             local reglages = aRemettre(pourLightroom(derniere.avant or {}))
             plans[#plans + 1] = { photo = photo, etapes = etapes, nom = tostring(derniere.nom or "retouche"),
+                etapeId = type(derniere.id) == 'string' and derniere.id or nil,
                 reglages = reglages, journal = lireJson(photo, 'journalClaude', {}),
                 original = lireJson(photo, 'avantClaude', {}), corrections = avertirCorrections(photo, reglages) }
         else
@@ -211,7 +215,7 @@ function Annulation.annuler(params)
                     garder(plan.photo, 'avantClaude', Json.encode(plan.original))
                 end
                 ajouterJournal(plan.journal, { etape = "Annulation de « " .. plan.nom .. " »", type = 'annulation',
-                    changements = Json.tableau(), note = "Réglages remis : " .. nomsDesCles(plan.remis) })
+                    etape_id = plan.etapeId, changements = Json.tableau(), note = "Réglages remis : " .. nomsDesCles(plan.remis) })
                 garder(plan.photo, 'etapesClaude', Json.encode(Json.tableau(plan.etapes)))
                 garder(plan.photo, 'journalClaude', Json.encode(Json.tableau(plan.journal)))
             end
@@ -223,7 +227,7 @@ function Annulation.annuler(params)
             if plan.corrections then
                 plan.notes[#plan.notes + 1] = plan.corrections
             end
-            resultats[#resultats + 1] = { photo = description, annulee = true, etape = plan.nom,
+            resultats[#resultats + 1] = { photo = description, annulee = true, etape = plan.nom, etape_id = plan.etapeId or Json.null,
                 reglages_remis = resumer(plan.remis), remarque = remarque(plan, remarques) }
             Liaison.noter("Annulé : " .. plan.nom .. " sur " .. description.fichier)
             photos[#photos + 1] = plan.photo
@@ -240,7 +244,14 @@ function Annulation.revenir(params)
     for _, photo in ipairs(photosVisees(params)) do
         local original = aRemettre(pourLightroom(lireJson(photo, 'avantClaude', {})))
         if next(original) then
-            plans[#plans + 1] = { photo = photo, reglages = original, journal = lireJson(photo, 'journalClaude', {}) }
+            -- Les ids des étapes défaites (celles d'avant la 1.3 n'en ont pas), pour le journal.
+            local ids = Json.tableau()
+            for _, etape in ipairs(lireJson(photo, 'etapesClaude', {})) do
+                if type(etape) == 'table' and type(etape.id) == 'string' then
+                    ids[#ids + 1] = etape.id
+                end
+            end
+            plans[#plans + 1] = { photo = photo, reglages = original, journal = lireJson(photo, 'journalClaude', {}), etapeIds = ids }
         else
             resultats[#resultats + 1] = { photo = decrire(photo, false), remise = false, sans_retouche = true,
                 raison = "Aucune retouche de Claude sur cette photo." }
@@ -257,7 +268,7 @@ function Annulation.revenir(params)
                 remettreObjectif(plan, "Claude · retour à l'état d'avant Claude")
                 Bibliotheque.remettre(plan.photo, plan.bibliotheque, plan.notes)
                 ajouterJournal(plan.journal, { etape = "Retour à l'état d'avant Claude", type = 'retour',
-                    changements = Json.tableau(), note = "Réglages remis : " .. nomsDesCles(plan.remis) })
+                    etape_ids = plan.etapeIds, changements = Json.tableau(), note = "Réglages remis : " .. nomsDesCles(plan.remis) })
                 garder(plan.photo, 'avantClaude', nil)
                 garder(plan.photo, 'etapesClaude', nil)
                 garder(plan.photo, 'retoucheeParClaude', nil)

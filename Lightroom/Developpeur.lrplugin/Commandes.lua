@@ -89,6 +89,17 @@
 --   carnet      {action, photos?}       → carnet de progrès (1.3), carnet.json : lire (les
 --                                          originaux du catalogue ouvert, leçons comprises),
 --                                          retirer
+--   etapes      {photo?}                → étapes de Claude gardées pour la photo et leurs images
+--                                          avant/après (1.3, Etapes.lua) : { photo, etapes = [{ id,
+--                                          nom, en_memoire, avant, apres, etat, raison }] ; lecture
+--                                          seule
+--
+-- Étapes (1.3) : chaque résultat d'une commande qui écrit une étape de Claude (appliquer,
+-- recadrer, masquer, retoucher, copier, ameliorer, supprimer, variantes choisir, masques,
+-- metadonnees, collections) porte etape_id, l'identifiant de cette étape (null sans étape) ; annuler
+-- rend celui de l'étape défaite. L'avant/après d'une étape se garde autour de la commande
+-- (Liaison.recevoir, Etapes.lua) ; avant_apres = true (la recette seulement) le force, même hors de
+-- la photo active, et sans_avant_apres = true (match_series) l'empêche.
 --
 -- lecon et carnet n'écrivent rien dans le catalogue et ne s'arrêtent pas à la pause ; ils écrivent
 -- carnet.json, à part : le serveur ne les rejoue jamais (LightroomBridge.lectures).
@@ -113,6 +124,7 @@
 --   Progression.lua  progression
 --   Notation.lua     notation
 --   Carnet.lua       lecon, carnet
+--   Etapes.lua       etapes
 -- Elles s'appuient sur Photos.lua (photos visées, mémoire de Claude), Reglages.lua (valeurs de
 -- développement), Recalage.lua (géométrie et grille du serveur), Plans.lua (ce qu'une retouche
 -- changera), Ecriture.lua (écriture dans le catalogue, étapes, journal) et Profils.lua (profil
@@ -122,6 +134,7 @@ local Amelioration = require 'Amelioration'
 local Annulation = require 'Annulation'
 local Bibliotheque = require 'Bibliotheque'
 local Carnet = require 'Carnet'
+local Etapes = require 'Etapes'
 local Lecture = require 'Lecture'
 local Livraison = require 'Livraison'
 local Masques = require 'Masques'
@@ -177,6 +190,7 @@ local table_commandes = {
     notation = Notation.commande,
     lecon = Carnet.commandeLecon,
     carnet = Carnet.commande,
+    etapes = Etapes.commande,
 }
 
 function Commandes.executer(nom, params)
