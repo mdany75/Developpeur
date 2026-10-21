@@ -801,7 +801,10 @@ end)
 -- Posée une fois (lot 11) : la carte Pourquoi ?, la seconde rangée de la carte Proposition, les
 -- crochets de l'aperçu et des onglets, la répartition des clics sur le fil, la vue du fil et
 -- l'agrandissement à deux images. Les lots suivants remplissent les crochets ; ici, ils sont vides
--- et la fenêtre se comporte comme avant.
+-- (ou, pour Pourquoi ?, rempli au lot 12 et éprouvé par essais-pourquoi.lua : sans étape dans le
+-- fil, sa carte montre l'aide et ses actions ne font rien) et la fenêtre se comporte comme avant.
+-- Les crochets de Pourquoi ?, que des essais remplacent : remis à la fin de chacun.
+local crochetsPourquoi = { apercu = Fenetre.apercuOnglet.etape, sur = Fenetre.surOnglet.etape }
 
 -- Une conversation neuve avec un aperçu de Claude (view_photo) : sa ligne d'outil et sa ligne
 -- d'image dans le fil (indices dans la fenêtre de lecture).
@@ -824,18 +827,20 @@ local function avecApercu(c, id)
     return ligneImage, ligneOutil
 end
 
-essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte vide, actions sans effet pour l\'instant', function()
+essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte sans étape (l\'aide), actions sans effet sans étape', function()
     photoActive(4961, 'DSCF4961.RAF', 0, 0)
     Moteur.nouvelle()
     local vu = false
     S.pendantFenetre = function(args)
         vu = true
         local p, T = Fenetre.p, Fenetre.T
-        for cle, valeur in pairs({ etapeTitre = '', etapeSousTitre = '', etapeTexte = '', etapePrecedente = false, etapeSuivante = false,
+        for cle, valeur in pairs({ etapeTitre = '', etapeSousTitre = '', etapePrecedente = false, etapeSuivante = false,
             etapeAImages = false, etapeADetail = false, titreBascule = "Voir l'avant", titreJeLeFais = "Je le fais", peutJeLeFais = false,
             exerciceEtat = '', etapeMonte = false, etapeDescend = false }) do
             egal(valeur, p[cle], cle .. ' avant l\'ouverture')
         end
+        -- Sans étape dans le fil, la carte Pourquoi ? montre l'aide (lot 12), coupée à sa largeur.
+        egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')), "l'aide de la carte Pourquoi ?")
         egal(19, T.propLignes, 'la proposition passe à 19 lignes (seconde rangée)')
         egal(19, T.etapeLignes, 'texte de la carte Pourquoi ?')
         egal(T.droite - 24, T.largeurEtape)
@@ -857,7 +862,7 @@ essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte
         egal(messages, #S.messages, 'aucun message')
         egal(false, Moteur.travaille, 'rien envoyé à Claude')
         egal('etape', p.onglet)
-        egal('', p.etapeTexte)
+        egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')), "toujours l'aide")
         p.saisie, p.onglet = '', 'notation'
     end
     Fenetre.afficher()
@@ -965,7 +970,7 @@ essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; u
         egal(defaut, p.legendeApercu)
         avecApercu(c, 'crochet-2')
         egal('Étape 1 sur 1 · après', p.legendeApercu, "une image nouvelle : l'aperçu de l'onglet")
-        -- Et un clic sur une étape (Fenetre.estEtape, rempli par un lot suivant).
+        -- Et un clic sur une étape (Fenetre.estEtape : Conversation.estEtape depuis le lot 12).
         Fenetre.cliquerLigne(ligneImage)
         vrai(p.legendeApercu:find('sur 2', 1, true), p.legendeApercu)
         local estEtape, etape = Fenetre.estEtape, Fenetre.clics.etape
@@ -981,7 +986,7 @@ essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; u
     end
     Fenetre.afficher()
     vrai(vu, 'fenêtre ouverte')
-    Fenetre.apercuOnglet.etape, Fenetre.apercuOnglet.proposition = nil, nil
+    Fenetre.apercuOnglet.etape, Fenetre.apercuOnglet.proposition = crochetsPourquoi.apercu, nil
     prefs.nouvelleParPhoto = true
     S.pendantFenetre = nil
 end)
@@ -1021,7 +1026,7 @@ essai("Aperçu de l'onglet : une image cliquée cède aussi la place à une autr
     end
     Fenetre.afficher()
     vrai(vu, 'fenêtre ouverte')
-    Fenetre.apercuOnglet.etape = nil
+    Fenetre.apercuOnglet.etape = crochetsPourquoi.apercu
     prefs.nouvelleParPhoto = true
     S.pendantFenetre = nil
 end)
@@ -1078,7 +1083,7 @@ essai("Clic sur un onglet : son crochet suit un vrai clic, jamais une bascule de
     end
     Fenetre.afficher()
     vrai(vu, 'fenêtre ouverte')
-    Fenetre.surOnglet.proposition, Fenetre.surOnglet.etape, Fenetre.surOnglet.notation = nil, nil, nil
+    Fenetre.surOnglet.proposition, Fenetre.surOnglet.etape, Fenetre.surOnglet.notation = nil, crochetsPourquoi.sur, nil
     prefs.nouvelleParPhoto = true
     S.pendantFenetre = nil
 end)
@@ -1086,7 +1091,7 @@ end)
 essai('Clic sur une ligne du fil : image, ligne du carnet, leçon, étape, sinon détail de l\'outil (ordre fixé)', function()
     local outil, lecon, claude = { genre = 'outil', texte = 'apply_settings · passe 1', detail = '{}' }, { genre = 'lecon' }, { genre = 'claude' }
     local sorte = Fenetre.sorteDeClic
-    -- Aujourd'hui (crochets vides) : une étape n'est pas reconnue, sa ligne reste un outil.
+    -- Un outil sans étape (ni outil d'étape ni réponse qui en porte) : sa ligne reste un outil.
     egal(false, Fenetre.estEtape(outil))
     egal('image', sorte({ image = 'a.jpg', defaut = 'horizon', action = 'demander' }, lecon))
     egal('carnet', sorte({ defaut = 'horizon' }, lecon))
@@ -1095,7 +1100,7 @@ essai('Clic sur une ligne du fil : image, ligne du carnet, leçon, étape, sinon
     egal('outil', sorte({}, outil))
     egal(nil, sorte({}, claude))
     egal(nil, sorte({}, nil))
-    -- Une étape (Fenetre.estEtape, rempli par un lot suivant) passe avant le détail de l'outil,
+    -- Une étape (Fenetre.estEtape, Conversation.estEtape) passe avant le détail de l'outil,
     -- après une image, une ligne du carnet et une leçon.
     local estEtape = Fenetre.estEtape
     Fenetre.estEtape = function() return true end
@@ -1129,13 +1134,13 @@ essai('Clic sur une ligne du fil : image, ligne du carnet, leçon, étape, sinon
     for nom, fn in pairs(clics) do
         Fenetre.clics[nom] = fn
     end
-    -- Par défaut : le carnet, la leçon et l'étape ne font rien ; un outil ouvre son détail, dans
-    -- une tâche.
+    -- Par défaut : le carnet et la leçon ne font rien, ni l'étape d'un élément qui n'en est pas une
+    -- (essais-pourquoi.lua éprouve une vraie étape) ; un outil ouvre son détail, dans une tâche.
     local taches, dialogues = #S.taches, #S.dialogues
     Fenetre.cliquerLigne(2)
     Fenetre.cliquerLigne(3)
     Fenetre.clics.etape({ n = 4, element = 1 }, outil)
-    egal(taches, #S.taches, 'crochets vides : rien')
+    egal(taches, #S.taches, 'rien sans étape')
     Fenetre.cliquerLigne(4)
     egal(taches + 1, #S.taches, "le détail de l'outil dans une tâche")
     S.taches[#S.taches]()

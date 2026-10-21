@@ -38,6 +38,7 @@ local Composants = require 'Composants'
 local Consignes = require 'Consignes'
 local Conversation = require 'Conversation'
 local Dispositions = require 'Dispositions'
+local Etapes = require 'Etapes'
 local Fichiers = require 'Fichiers'
 local Fil = require 'Fil'
 local Images = require 'Images'
@@ -344,6 +345,7 @@ function Fenetre.choisirDansListe(valeur)
     Fenetre.defilement = 0
     Fenetre.indiceImage = nil
     Fenetre.imageCliquee = nil
+    Fenetre.etape = nil
     Fenetre.p.message = ''
 end
 
@@ -356,6 +358,7 @@ function Fenetre.nouvelle()
     Fenetre.defilement = 0
     Fenetre.indiceImage = nil
     Fenetre.imageCliquee = nil
+    Fenetre.etape = nil
     Fenetre.aRafraichir = true
 end
 
@@ -393,6 +396,8 @@ function Fenetre.rafraichirFil()
         Fenetre.defilement = 0
         Fenetre.cache = {}
         Fenetre.total = nil
+        -- L'étape choisie (onglet Pourquoi ?) était de l'autre conversation.
+        Fenetre.etape = nil
     end
     local lignes = c and Fil.lignes(c, Fenetre.largeurTexte(), Fenetre.cache) or {}
     -- Lecteur remonté dans le fil : ce qui arrive ne déplace pas ce qu'il lit.
@@ -436,11 +441,11 @@ end
 -- prioritaire sur l'aperçu de l'onglet), une ligne de la page Carnet de progrès (la rangée d'un
 -- défaut, `defaut`, ou une action, `action`), une ligne de leçon, une étape de Claude (onglet
 -- Pourquoi ?), sinon le détail d'un outil. Fenetre.sorteDeClic dit laquelle,
--- Fenetre.clics[sorte](l, e) la traite. Le carnet, la leçon et l'étape sont des crochets vides,
--- remplis par les lots suivants (une étape se reconnaît par Fenetre.estEtape, faux pour l'instant :
--- ses lignes restent des outils).
+-- Fenetre.clics[sorte](l, e) la traite. Le carnet et la leçon sont des crochets vides, remplis par
+-- les lots suivants ; une étape (ligne « · Pourquoi ? », Conversation.estEtape) s'ouvre dans
+-- l'onglet Pourquoi ? (Fenetre.montrerEtape).
 function Fenetre.estEtape(e)
-    return false
+    return Conversation.estEtape(e)
 end
 
 function Fenetre.sorteDeClic(l, e)
@@ -478,7 +483,9 @@ Fenetre.clics = {
     end,
     carnet = function() end,
     lecon = function() end,
-    etape = function() end,
+    etape = function(l)
+        Fenetre.montrerEtape(l.element)
+    end,
     outil = function(_, e)
         enTache(Fenetre.montrerDetail, e)
     end,
@@ -530,8 +537,8 @@ end
 -- (imageApercu, legendeApercu, aImage, peutPrecedente, peutSuivante), nil ou faux pour l'aperçu
 -- d'avant. Un clic sur une ligne d'image reste prioritaire. Fenetre.surOnglet[valeur](valeur) suit
 -- un vrai clic sur cet onglet (jamais une bascule de la fenêtre, Fenetre.choisirOnglet). Ni l'un ni
--- l'autre n'attend : une lecture du catalogue ou un rendu passe par sa propre tâche. Crochets vides
--- ici, remplis par les lots suivants.
+-- l'autre n'attend : une lecture du catalogue ou un rendu passe par sa propre tâche. Ceux de
+-- Pourquoi ? sont dans sa section ; les autres, remplis par les lots suivants.
 Fenetre.apercuOnglet = {}
 Fenetre.surOnglet = {}
 
@@ -724,6 +731,11 @@ function Fenetre.rafraichirApercu()
 end
 
 function Fenetre.changerImage(pas)
+    -- L'aperçu d'une étape (onglet Pourquoi ?) : ses ◀ ▶ sont coupés, Voir l'avant / Voir l'après
+    -- et les ◀ ▶ de la carte en tiennent lieu.
+    if Fenetre.modeEtape() then
+        return
+    end
     local n = #(Fenetre.images or {})
     local active = Fenetre.info and Fenetre.info.active
     if Fenetre.voirActive and active then
@@ -750,8 +762,13 @@ function Fenetre.changerImage(pas)
     Fenetre.rafraichirApercu()
 end
 
--- L'aperçu en grand, dans une fenêtre à part.
+-- L'aperçu en grand, dans une fenêtre à part ; pour une étape (onglet Pourquoi ?), son avant et
+-- son après côte à côte (Fenetre.agrandirEtape).
 function Fenetre.agrandir()
+    if Fenetre.modeEtape() then
+        Fenetre.agrandirEtape()
+        return
+    end
     local a, active = Fenetre.apercuActif, Fenetre.info and Fenetre.info.active
     if Fenetre.voirActive and active and a and a.id == active.id then
         LrTasks.startAsyncTask(function()
@@ -987,17 +1004,485 @@ function Fenetre.ajuster()
 end
 
 -- Pourquoi ? (1.3) ------------------------------------------------------------------------------
--- Les actions de la carte Pourquoi ? (Vues.etape) : ◀ ▶ (étape précédente ou suivante de la même
--- photo), Voir l'avant / Voir l'après, Détail… (depuis une tâche). Sans effet pour l'instant : un
--- lot suivant les remplit.
+-- Un clic sur une étape du fil (ligne « · Pourquoi ? », Conversation.estEtape) l'ouvre dans
+-- l'onglet Pourquoi ? : dans l'aperçu, son après (ou son avant : Voir l'avant / Voir l'après), que
+-- le module a gardé au moment de l'étape sans rien écrire au catalogue (Etapes.lua) ; dans la
+-- carte (Vues.etape), « Étape 2 sur 4 · <but> », la raison donnée par Claude et les réglages
+-- changés, page par page ; ◀ ▶ d'une étape à l'autre de la même photo ; Détail… (l'appel et sa
+-- réponse) ; Agrandir, l'avant et l'après côte à côte (Fenetre.agrandirDeux).
+-- Fenetre.etape = { conversation, photo, id (etape_id du module, nil sans), element (id de
+-- l'élément du fil), vue ('apres' ou 'avant'), suivre } : l'étape montrée, remise à nil quand la
+-- conversation montrée change. En mode suivre (la dernière étape de sa photo, ou l'onglet ouvert
+-- sans étape choisie), une nouvelle étape de la même photo devient l'étape montrée ; ◀ le quitte,
+-- ▶ jusqu'à la dernière le reprend. Jamais de bascule automatique vers l'onglet Pourquoi ? : un
+-- clic seulement (sur l'onglet ou sur une étape du fil). La boucle suit Etapes.version : les
+-- images arrivées se montrent. Les ◀ ▶ de l'aperçu sont coupés dans l'onglet (Fenetre.changerImage).
 
+Fenetre.AIDE_ETAPE = "Cliquez une étape du fil (· Pourquoi ?) : son avant/après s'affiche au-dessus, et sa raison ici."
+
+-- Pourquoi une étape n'a pas d'avant/après, en mots (les raisons du module : Etapes.RAISONS).
+Fenetre.SANS_IMAGES = {
+    inconnu = "rien n'a été gardé pour cette étape (fenêtre Claude fermée, case Avant/après décochée, plusieurs photos ou une autre que la photo active)",
+    ancienne = "étape d'avant la version 1.3",
+    classement = "un classement ne change pas l'image",
+}
+
+local function elementParId(c, id)
+    for i, e in ipairs(c and c.elements or {}) do
+        if e.id == id then
+            return i, e
+        end
+    end
+    return nil
+end
+
+-- Le rang d'une étape dans la liste de sa photo : son élément du fil, et son id s'il est connu.
+local function rangEtape(liste, element, id)
+    for n, x in ipairs(liste) do
+        if x.elementId == element and (id == nil or x.id == nil or x.id == id) then
+            return n
+        end
+    end
+    return nil
+end
+
+-- La photo d'une étape du fil : la photo active si l'étape la touche, sinon la première de sa
+-- réponse ; la photo active pour un appel en cours (sa photo n'est connue qu'à la réponse).
+function Fenetre.photoDeLEtape(e)
+    local active = Fenetre.info and Fenetre.info.active and Fenetre.info.active.id
+    local photos = Conversation.photosEtape(e)
+    for _, photo in ipairs(photos) do
+        if active ~= nil and Conversation.clePhoto(photo) == Conversation.clePhoto(active) then
+            return photo
+        end
+    end
+    return photos[1] or active
+end
+
+-- Vrai quand l'aperçu montre une étape : onglet Pourquoi ?, une étape choisie, pas d'image
+-- cliquée dans le fil (prioritaire).
+function Fenetre.modeEtape()
+    local p, T = Fenetre.p, Fenetre.T
+    return p ~= nil and T ~= nil and p.onglet == T.ongletEtape and Fenetre.etape ~= nil and not Fenetre.imageCliquee
+end
+
+-- L'étape montrée, relue dans la conversation : son entrée (Conversation.etapes), son rang et la
+-- liste des étapes de sa photo ; nil sans étape. En mode suivre, la dernière de la photo ; une
+-- étape choisie qui n'est plus dans la liste de sa photo (appel en cours d'une autre photo) suit
+-- son élément.
+function Fenetre.etapeCourante()
+    local et, c = Fenetre.etape, Moteur.courante
+    if not et then
+        return nil
+    end
+    if et.conversation ~= c then
+        Fenetre.etape = nil
+        return nil
+    end
+    local liste = Conversation.etapes(c, et.photo)
+    local n = rangEtape(liste, et.element, et.id)
+    if not n and not et.suivre then
+        local _, e = elementParId(c, et.element)
+        if e and Conversation.estEtape(e) then
+            local photo = Fenetre.photoDeLEtape(e)
+            local autre = Conversation.etapes(c, photo)
+            local m = rangEtape(autre, et.element, et.id)
+            if m then
+                et.photo, liste, n = photo, autre, m
+            end
+        end
+    end
+    if et.suivre and #liste > 0 and n ~= #liste then
+        n = #liste
+        et.vue = 'apres'
+    end
+    if not n then
+        Fenetre.etape = nil
+        return nil
+    end
+    local x = liste[n]
+    et.element, et.id = x.elementId, x.id
+    return x, n, liste
+end
+
+-- Choisit la dernière étape de la conversation pour la photo active (sinon la dernière étape de la
+-- conversation), en mode suivre. Vrai si une étape est choisie.
+function Fenetre.choisirDerniereEtape()
+    local c = Moteur.courante
+    if not c then
+        return false
+    end
+    local active = Fenetre.info and Fenetre.info.active and Fenetre.info.active.id
+    local photo, liste = active, Conversation.etapes(c, active)
+    if #liste == 0 then
+        for i = #(c.elements or {}), 1, -1 do
+            local e = c.elements[i]
+            if Conversation.estEtape(e) then
+                photo = Fenetre.photoDeLEtape(e)
+                liste = Conversation.etapes(c, photo)
+                break
+            end
+        end
+    end
+    local x = liste[#liste]
+    if not x then
+        return false
+    end
+    Fenetre.etape = { conversation = c, photo = photo, id = x.id, element = x.elementId, vue = 'apres', suivre = true }
+    return true
+end
+
+-- Montre l'étape de l'élément i du fil (un clic sur sa ligne) dans l'onglet Pourquoi ? : un vrai
+-- clic, l'onglet change sans Fenetre.choisirOnglet (réservé aux bascules de la fenêtre).
+function Fenetre.montrerEtape(i)
+    local p, T, c = Fenetre.p, Fenetre.T, Moteur.courante
+    local e = c and i and c.elements[i]
+    if not (p and T and e and Conversation.estEtape(e)) then
+        return false
+    end
+    local photo = Fenetre.photoDeLEtape(e)
+    local liste = Conversation.etapes(c, photo)
+    local n = rangEtape(liste, e.id)
+    if not n then
+        return false
+    end
+    Fenetre.etape = { conversation = c, photo = photo, id = liste[n].id, element = e.id, vue = 'apres', suivre = n == #liste }
+    Fenetre.imageCliquee = nil
+    if p.onglet ~= T.ongletEtape then
+        p.onglet = T.ongletEtape
+    end
+    Fenetre.rafraichirEtape()
+    return true
+end
+
+-- Quand Dany choisit l'onglet Pourquoi ? sans étape choisie : la dernière, en mode suivre.
+function Fenetre.montrerDerniereEtape()
+    Fenetre.choisirDerniereEtape()
+    Fenetre.rafraichirEtape()
+end
+
+-- « Étape 2 sur 4 · passe 1 : balance ».
+function Fenetre.titreEtape(x, n, total)
+    local but = x.etape or Conversation.nomEtape(x.nom)
+    if not but or but == '' then
+        but = x.outil or "étape"
+    end
+    return string.format("Étape %d sur %d · %s", n, total, but)
+end
+
+-- « DSCF4961.RAF · apply_settings · annulée ensuite (undo_last) ».
+function Fenetre.sousTitreEtape(x)
+    local morceaux = {}
+    if x.fichier then
+        morceaux[#morceaux + 1] = x.fichier
+    elseif x.photo ~= nil and not x.enCours then
+        morceaux[#morceaux + 1] = "photo " .. Conversation.clePhoto(x.photo)
+    end
+    morceaux[#morceaux + 1] = x.outil
+    if x.annulee == 'undo_last' then
+        morceaux[#morceaux + 1] = "annulée ensuite (undo_last)"
+    elseif x.annulee == 'revert' then
+        morceaux[#morceaux + 1] = "défaite ensuite (revert_to_original)"
+    elseif x.enCours then
+        morceaux[#morceaux + 1] = "en cours"
+    end
+    return table.concat(morceaux, " · ")
+end
+
+-- Les images lues de chaque étape vue (Fenetre.demanderImagesEtape), par « photo/id » : { cle,
+-- version (Etapes.version de la lecture), info (Etapes.images), dossier et noms (les copies de la
+-- fenêtre : noms.avant, noms.apres), avant, apres (réductions au cadre de l'aperçu), complete
+-- (prête : ses deux images ne changent plus, elle ne se relit pas) }. Revenir à une étape la
+-- remontre tout de suite ; une lecture d'une version passée reste montrée jusqu'à la suivante.
+-- Vidées à chaque ouverture.
+Fenetre.imagesEtapes, Fenetre.demandesEtapes = {}, {}
+
+-- Le dossier des copies des images des étapes et de leurs réductions (Temporaire/Pourquoi/<photo>/
+-- <lecture>/), propre à la fenêtre et vidé à chaque ouverture : rien ne s'écrit dans le dossier
+-- Etapes du module (Images.vignette et Images.grande rangent leurs réductions à côté de l'image,
+-- dans .vignettes, que le ménage d'Etapes.lua ne voit pas : elles y resteraient sans fin).
+function Fenetre.dossierPourquoi()
+    return LrPathUtils.child(Chemins.temporaire(), 'Pourquoi')
+end
+
+local function cleImages(x)
+    return Conversation.clePhoto(x.photo) .. '/' .. tostring(x.id)
+end
+
+-- Les images lues de l'étape, nil si pas encore lues.
+function Fenetre.imagesDe(x)
+    if not (x and x.id) then
+        return nil
+    end
+    return Fenetre.imagesEtapes[cleImages(x)]
+end
+
+-- Ce qu'il en est de l'avant/après de l'étape : { etat = 'pret' | 'en_cours' | 'attente' |
+-- 'manque', texte (la ligne de la carte, nil si tout est là) }.
+function Fenetre.etatImages(x)
+    if Conversation.CLASSEMENTS[x.outil] then
+        return { etat = 'manque', texte = "Pas d'avant/après : " .. Fenetre.SANS_IMAGES.classement .. "." }
+    elseif x.enCours then
+        return { etat = 'en_cours', texte = "Avant/après en préparation…" }
+    elseif not x.id then
+        return { etat = 'manque', texte = "Pas d'avant/après : " .. Fenetre.SANS_IMAGES.ancienne .. "." }
+    end
+    local im = Fenetre.imagesDe(x)
+    local info = im and im.info or nil
+    if not info then
+        return { etat = 'attente' }
+    elseif info.etat == 'pret' and im.avant and im.apres then
+        return { etat = 'pret' }
+    elseif info.etat == 'en_cours' then
+        return { etat = 'en_cours', texte = "Avant/après en préparation…" }
+    end
+    local raison
+    if info.etat == 'inconnu' then
+        raison = Fenetre.SANS_IMAGES.inconnu
+    elseif info.etat == 'pret' then
+        raison = "image illisible"
+    else
+        raison = Etapes.RAISONS[info.raison] or (type(info.raison) == 'string' and info.raison) or "raison inconnue"
+    end
+    local une = im.avant or im.apres
+    return { etat = 'manque', texte = (une and "Avant/après incomplet : " or "Pas d'avant/après : ") .. raison .. "." }
+end
+
+-- Le texte de la carte : la raison donnée par Claude, puis ce qui a changé (comme la
+-- Proposition), puis, s'il manque, pourquoi l'avant/après n'est pas là.
+function Fenetre.texteEtape(x, etat)
+    local lignes = {}
+    local raison = Texte.nettoyer(x.raison or '')
+    lignes[#lignes + 1] = raison ~= '' and ("Pourquoi : " .. raison) or "Claude n'a pas donné de raison pour cette étape."
+    lignes[#lignes + 1] = ''
+    lignes[#lignes + 1] = "Ce qui a changé"
+    local changements = x.changements or {}
+    if #changements == 0 then
+        lignes[#lignes + 1] = x.enCours and "L'étape est en cours." or "Aucun réglage chiffré dans la réponse."
+    end
+    for _, ch in ipairs(changements) do
+        lignes[#lignes + 1] = string.format("%s : %s → %s", ch.libelle or ch.cle or '?', ch.avant or '—', ch.apres or '—')
+    end
+    if etat and etat.texte then
+        lignes[#lignes + 1] = ''
+        lignes[#lignes + 1] = etat.texte
+    end
+    return table.concat(lignes, '\n')
+end
+
+-- Lit dans une tâche les images de l'étape (Etapes.images), les copie dans le dossier de la
+-- fenêtre (Fenetre.dossierPourquoi) et les y réduit au cadre de l'aperçu (Images.vignette, sips) ;
+-- une fois lues, la carte et l'aperçu se rafraîchissent. Relues quand Etapes.version change (une
+-- capture finie), sauf une étape prête.
+function Fenetre.demanderImagesEtape(x)
+    local T = Fenetre.T
+    if not (T and x and x.id) or x.enCours or Conversation.CLASSEMENTS[x.outil] then
+        return
+    end
+    local cle = cleImages(x)
+    local version = Etapes.version
+    local im = Fenetre.imagesEtapes[cle]
+    if im and (im.version == version or im.complete) then
+        return
+    end
+    -- Une lecture à la fois par étape et par version.
+    local demande = cle .. '#' .. tostring(version)
+    if Fenetre.demandesEtapes[demande] then
+        return
+    end
+    Fenetre.demandesEtapes[demande] = true
+    local photo, id, lectures, demandes = x.photo, x.id, Fenetre.imagesEtapes, Fenetre.demandesEtapes
+    LrTasks.startAsyncTask(function()
+        local ok, lu = LrTasks.pcall(function()
+            local info = Etapes.images(photo, id)
+            local r = { cle = cle, version = version, info = info, noms = {} }
+            if info.dossier and (info.avant or info.apres) then
+                -- Un dossier par lecture : une réduction gardée par nom (Images.vignette) ne
+                -- montre jamais une image d'avant.
+                local dossier = LrPathUtils.child(LrPathUtils.child(Fenetre.dossierPourquoi(), Conversation.clePhoto(photo)),
+                    Conversation.identifiant())
+                Fichiers.creerDossier(dossier)
+                r.dossier = dossier
+                for _, vue in ipairs({ 'avant', 'apres' }) do
+                    local nom = info[vue]
+                    local copie = nom and LrPathUtils.child(dossier, nom)
+                    if copie then
+                        Fichiers.copier(LrPathUtils.child(info.dossier, nom), copie)
+                    end
+                    if copie and Fichiers.existe(copie) then
+                        r.noms[vue] = nom
+                        r[vue] = Images.vignette(dossier, nom, T.apercu)
+                    end
+                end
+            end
+            r.complete = info.etat == 'pret' and r.avant ~= nil and r.apres ~= nil
+            return r
+        end)
+        demandes[demande] = nil
+        if not ok then
+            Journal.noter("Avant/après de l'étape :", tostring(lu))
+            lu = { cle = cle, version = version, info = { etat = 'inconnu' }, noms = {} }
+        end
+        -- Une lecture d'une fenêtre fermée depuis, ou d'une version passée arrivée en retard, ne
+        -- remplace rien (ses copies s'effacent) ; celle qu'elle remplace efface les siennes.
+        local deja = lectures[cle]
+        if lectures == Fenetre.imagesEtapes and not (deja and deja.version > version) then
+            lectures[cle] = lu
+            if deja and deja.dossier and deja.dossier ~= lu.dossier then
+                Fichiers.supprimer(deja.dossier)
+            end
+        elseif lu.dossier then
+            Fichiers.supprimer(lu.dossier)
+        end
+        if Fenetre.p and Fenetre.T == T then
+            Fenetre.rafraichirEtape()
+        end
+    end)
+end
+
+-- Remplit la carte Pourquoi ? (et l'aperçu, sauf `sansApercu`) d'après l'étape montrée ; sans
+-- étape, l'aide. L'onglet ouvert sans étape choisie prend la dernière (mode suivre).
+function Fenetre.rafraichirEtape(sansApercu)
+    local p, T = Fenetre.p, Fenetre.T
+    if not p then
+        return
+    end
+    Fenetre.versionEtapes = Etapes.version
+    if not Fenetre.etape and T and p.onglet == T.ongletEtape then
+        Fenetre.choisirDerniereEtape()
+    end
+    local x, n, liste = Fenetre.etapeCourante()
+    if not x then
+        poser(p, 'etapeTitre', '')
+        poser(p, 'etapeSousTitre', '')
+        Fenetre.montrerPage('etape', Fenetre.AIDE_ETAPE)
+        poser(p, 'etapePrecedente', false)
+        poser(p, 'etapeSuivante', false)
+        poser(p, 'etapeAImages', false)
+        poser(p, 'etapeADetail', false)
+        poser(p, 'titreBascule', "Voir l'avant")
+    else
+        local im = Fenetre.imagesDe(x)
+        poser(p, 'etapeTitre', Fenetre.titreEtape(x, n, #liste))
+        poser(p, 'etapeSousTitre', Fenetre.sousTitreEtape(x))
+        Fenetre.montrerPage('etape', Fenetre.texteEtape(x, Fenetre.etatImages(x)))
+        poser(p, 'etapePrecedente', n > 1)
+        poser(p, 'etapeSuivante', n < #liste)
+        poser(p, 'etapeADetail', true)
+        poser(p, 'etapeAImages', im ~= nil and im.avant ~= nil and im.apres ~= nil)
+        poser(p, 'titreBascule', Fenetre.etape.vue == 'avant' and "Voir l'après" or "Voir l'avant")
+        Fenetre.demanderImagesEtape(x)
+    end
+    if not sansApercu then
+        Fenetre.rafraichirApercu()
+    end
+end
+
+-- L'aperçu de l'onglet Pourquoi ? (Fenetre.apercuOnglet) : l'image de l'étape montrée (après, ou
+-- avant), « Étape 2 sur 4 · après » ; sans image, l'image vide et pourquoi. Sans étape choisie,
+-- nil : l'aperçu d'avant. Les ◀ ▶ de l'aperçu sont coupés.
+Fenetre.apercuOnglet.etape = function(p)
+    local x, n, liste = Fenetre.etapeCourante()
+    if not x then
+        return nil
+    end
+    poser(p, 'peutPrecedente', false)
+    poser(p, 'peutSuivante', false)
+    local debut = string.format("Étape %d sur %d", n, #liste)
+    local im = Fenetre.imagesDe(x)
+    local vue = Fenetre.etape.vue == 'avant' and 'avant' or 'apres'
+    local chemin = im and im[vue]
+    if not chemin and im then
+        local autre = vue == 'avant' and 'apres' or 'avant'
+        if im[autre] then
+            vue, chemin = autre, im[autre]
+        end
+    end
+    if chemin then
+        poser(p, 'imageApercu', chemin)
+        poser(p, 'aImage', true)
+        poser(p, 'legendeApercu', debut .. " · " .. (vue == 'avant' and "avant" or "après"))
+        return true
+    end
+    local etat = Fenetre.etatImages(x).etat
+    poser(p, 'imageApercu', Fenetre.imageVide())
+    poser(p, 'aImage', false)
+    poser(p, 'legendeApercu', debut .. " · " .. ((etat == 'en_cours' or etat == 'attente') and "avant/après en préparation…" or "pas d'avant/après"))
+    return true
+end
+
+-- Un vrai clic sur l'onglet Pourquoi ? : la carte relue ; sans étape choisie, la dernière.
+Fenetre.surOnglet.etape = function()
+    Fenetre.rafraichirEtape(true)
+end
+
+-- ◀ (pas -1) ou ▶ (pas 1) : l'étape d'avant ou d'après de la même photo ; la dernière reprend le
+-- mode suivre.
 function Fenetre.etapeVoisine(pas)
+    local x, n, liste = Fenetre.etapeCourante()
+    if not x then
+        return
+    end
+    local m = math.max(1, math.min(#liste, n + pas))
+    if m == n then
+        return
+    end
+    local y = liste[m]
+    local et = Fenetre.etape
+    et.id, et.element, et.suivre, et.vue = y.id, y.elementId, m == #liste, 'apres'
+    Fenetre.rafraichirEtape()
 end
 
+-- Voir l'avant / Voir l'après : l'aperçu passe de l'un à l'autre.
 function Fenetre.basculerEtape()
+    local et = Fenetre.etape
+    if not et then
+        return
+    end
+    et.vue = et.vue == 'avant' and 'apres' or 'avant'
+    Fenetre.rafraichirEtape()
 end
 
+-- Détail… (depuis une tâche) : l'appel de l'outil de l'étape et sa réponse.
 function Fenetre.detailEtape()
+    local x = Fenetre.etapeCourante()
+    local _, e = elementParId(Moteur.courante, x and x.elementId)
+    if e then
+        Fenetre.montrerDetail(e)
+    end
+end
+
+-- Agrandir dans l'onglet Pourquoi ? : l'avant et l'après côte à côte (Fenetre.agrandirDeux), la
+-- raison et les changements dessous ; une seule image si l'autre manque.
+function Fenetre.agrandirEtape()
+    local x, n, liste = Fenetre.etapeCourante()
+    local im = x and Fenetre.imagesDe(x)
+    -- Les copies de la fenêtre (Fenetre.dossierPourquoi), jamais le dossier Etapes du module.
+    local dossier, noms = im and im.dossier, im and im.noms or {}
+    if not (dossier and (noms.avant or noms.apres)) then
+        return
+    end
+    local titre = Fenetre.titreEtape(x, n, #liste)
+    local legende = Fenetre.texteEtape(x)
+    enTache(function()
+        if noms.avant and noms.apres then
+            Fenetre.agrandirDeux(titre, { dossier = dossier, nom = noms.avant, titre = "Avant" },
+                { dossier = dossier, nom = noms.apres, titre = "Après" }, legende)
+            return
+        end
+        local nom = noms.apres or noms.avant
+        local chemin, l, h = Images.grande(dossier, nom, 1100, 740)
+        if not chemin then
+            LrDialogs.message("Aperçu illisible", nom, 'warning')
+            return
+        end
+        LrDialogs.presentModalDialog {
+            title = "Claude · " .. titre .. " · " .. (noms.apres and "après" or "avant"),
+            contents = LrView.osFactory():picture { value = chemin, width = l, height = h },
+            actionVerb = "Fermer",
+            cancelVerb = '< exclude >',
+        }
+    end)
 end
 
 -- Note de la photo active ----------------------------------------------------------------------
@@ -1440,6 +1925,9 @@ function Fenetre.rafraichir()
     poser(p, 'titreEnvoyer', Moteur.travaille and "Arrêter" or "Envoyer")
     poser(p, 'forfait', Moteur.texteForfait())
     Fenetre.rafraichirFil()
+    -- La carte Pourquoi ? (une nouvelle étape en mode suivre, une autre conversation), avant
+    -- l'aperçu, qui en dépend dans son onglet.
+    Fenetre.rafraichirEtape(true)
     Fenetre.rafraichirApercu()
     Fenetre.rafraichirProposition()
     Fenetre.rafraichirListe()
@@ -1714,6 +2202,14 @@ function Fenetre.boucle(generation)
                     Journal.noter("Note :", tostring(erreur))
                 end
             end
+            -- Un avant/après rangé (ou manqué) par le module : la carte Pourquoi ? relit ses images.
+            if Etapes.version ~= Fenetre.versionEtapes then
+                local ok, erreur = LrTasks.pcall(Fenetre.rafraichirEtape)
+                if not ok then
+                    Fenetre.versionEtapes = Etapes.version
+                    Journal.noter("Pourquoi ? :", tostring(erreur))
+                end
+            end
             poser(p, 'activite', Moteur.texteTravail(math.floor(tic / 2)))
             poser(p, 'travaille', Moteur.travaille)
             if tic % 8 == 0 then
@@ -1752,7 +2248,14 @@ local function initialiserEtapeEtExercice(p)
     p.exerciceEtat = ''
 end
 
+-- Le module garde l'avant/après de chaque étape de Claude (Etapes.lua) quand la fenêtre est
+-- ouverte ou que son Claude travaille, fenêtre fermée ou non ; jamais pour Claude Desktop seul.
+function Fenetre.etapesActives()
+    return Fenetre.ouverte == true or Moteur.travaille == true
+end
+
 function Fenetre.afficher()
+    Etapes.actifPour = Fenetre.etapesActives
     if Fenetre.ouverte then
         if Fenetre.controle and Fenetre.controle.toFront then
             Fenetre.controle.toFront()
@@ -1798,6 +2301,10 @@ function Fenetre.afficher()
         Fenetre.info = nil
         Fenetre.noteVue, Fenetre.notePhoto = nil, nil
         Fenetre.noteEnCours = false
+        -- Aucune étape choisie (onglet Pourquoi ?) ; ses images se relisent, les copies d'avant
+        -- s'effacent.
+        Fenetre.etape, Fenetre.imagesEtapes, Fenetre.demandesEtapes, Fenetre.versionEtapes = nil, {}, {}, nil
+        Fichiers.supprimer(Fenetre.dossierPourquoi())
 
         local f = LrView.osFactory()
         local p = LrBinding.makePropertyTable(context)

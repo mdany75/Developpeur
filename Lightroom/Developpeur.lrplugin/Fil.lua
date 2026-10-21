@@ -8,7 +8,9 @@
 --   genres : 'dany', 'claude', 'titre', 'outil', 'apercu', 'proposition', 'note', 'vide'
 --   icones : 'dany', 'ok', 'cours', 'erreur', 'apercu', 'proposition', 'note' ou nil
 -- Un élément `notation` (notes proposées) reprend les genres `proposition` (titre) et `outil` (une
--- ligne par photo) : un genre de plus ajouterait une vue à chaque ligne de la fenêtre.
+-- ligne par photo) : un genre de plus ajouterait une vue à chaque ligne de la fenêtre. De même, la
+-- ligne d'une étape de Claude (1.3, Conversation.estEtape) reste une ligne d'outil, son texte
+-- suivi du repère « · Pourquoi ? » (Fil.SUFFIXE_ETAPE) : un clic l'ouvre dans l'onglet Pourquoi ?.
 
 local Conversation = require 'Conversation'
 local Metriques = require 'Metriques'
@@ -28,6 +30,10 @@ Fil.MARGE = 10
 
 -- Photos montrées d'une notation ; les autres se résument en « … et N autres ».
 Fil.NOTES_MONTREES = 12
+
+-- Le repère d'une ligne d'étape (1.3), après le texte de l'outil coupé à la place qui reste : un
+-- but (step_name) long ne le fait jamais disparaître.
+Fil.SUFFIXE_ETAPE = '  · Pourquoi ?'
 
 -- L'espace insécable (U+00A0) : celle de la ponctuation haute, que la coupe garde avec son mot.
 local INSECABLE = '\194\160'
@@ -228,7 +234,12 @@ function Fil.lignesElement(e, i, largeur)
     elseif g == 'outil' then
         local icone = e.etat == 'erreur' and 'erreur' or (e.etat == 'enCours' and 'cours' or 'ok')
         local texte = e.texte ~= '' and e.texte or (e.outil or 'outil')
-        lignes[1] = { genre = 'outil', texte = uneLigne(texte, largeur, 'mono'), element = i, icone = icone }
+        if Conversation.estEtape(e) then
+            texte = uneLigne(texte, largeur - Fil.largeur(Fil.SUFFIXE_ETAPE, 'mono'), 'mono') .. Fil.SUFFIXE_ETAPE
+        else
+            texte = uneLigne(texte, largeur, 'mono')
+        end
+        lignes[1] = { genre = 'outil', texte = texte, element = i, icone = icone }
     elseif g == 'apercu' then
         for n, chemin in ipairs(e.images or {}) do
             lignes[#lignes + 1] = { genre = 'apercu', texte = (#e.images > 1 and ("Aperçu " .. n) or "Aperçu") .. " de Claude · cliquer pour l'agrandir",
@@ -319,7 +330,8 @@ function Fil.lignes(c, largeur, cache)
     local precedent
     for i, e in ipairs(c.elements or {}) do
         local signature = table.concat({ largeur, e.genre or '', e.etat or '', tostring(e.partiel), #(e.images or {}),
-            #(e.changements or {}), e.style or '', e.texte or '', signatureNotes(e) }, '\1')
+            #(e.changements or {}), e.style or '', e.texte or '', signatureNotes(e), #(e.etapes or {}),
+            tostring(Conversation.estEtape(e)) }, '\1')
         local siennes
         if cache and cache[e.id] and cache[e.id].signature == signature then
             siennes = cache[e.id].lignes

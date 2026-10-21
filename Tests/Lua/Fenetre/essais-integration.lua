@@ -2,9 +2,12 @@
 -- par Simulation.lua), avec les vrais modules de chaque pièce : la commande notation telle que le
 -- serveur l'envoie pour propose_ratings (relue par Json.decode), avec ou sans poser (« note ces
 -- photos »), le registre (Notation), le fil (Conversation, Fil) et la carte Note de la fenêtre
--- Claude (Fenetre). Seuls l'écriture dans le catalogue (Bibliotheque.noter, éprouvée par la suite
--- de la liaison) et l'envoi à Claude Code (Moteur.envoyer, éprouvé par essais-moteur avec
--- faux-claude) sont remplacés : ils gardent les appels reçus. Ni Claude, ni quota.
+-- Claude (Fenetre) ; et « Pourquoi ? » (1.3) : la réponse d'apply_settings telle que le connecteur
+-- la rend, les images d'une étape rangées comme le module les range (Etapes.images, le vrai) et
+-- montrées dans l'onglet Pourquoi ? (Images et sips, les vrais). Seuls l'écriture dans le catalogue
+-- (Bibliotheque.noter, éprouvée par la suite de la liaison) et l'envoi à Claude Code
+-- (Moteur.envoyer, éprouvé par essais-moteur avec faux-claude) sont remplacés : ils gardent les
+-- appels reçus. Ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
 local S = require 'Simulation'
@@ -448,6 +451,124 @@ essai('Ouverture : l\'aperçu montre la photo active ; une image de Claude la re
         egal(true, p.aImage)
         vrai(p.imageApercu:find('DSCF2005', 1, true) or p.imageApercu:find('2005', 1, true), p.imageApercu)
     end)
+    sansErreur()
+end)
+
+-- 1.3, « Pourquoi ? » : une étape de Claude, de la réponse du connecteur aux images de l'onglet.
+essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par le module, vignettes de 320 de l\'après puis de l\'avant (sips)', function()
+    local Chemins = require 'Chemins'
+    local Etapes = require 'Etapes'
+    local Fichiers = require 'Fichiers'
+    local Images = require 'Images'
+    local Stockage = require 'Stockage'
+    S.photoActive = PHOTOS[2004]
+    S.selection = { PHOTOS[2004] }
+    Moteur.courante = Conversation.nouvelle()
+    local c = Moteur.courante
+    -- La conversation reste celle-ci à l'ouverture (pas de nouvelle conversation pour une autre photo).
+    local prefs = Chemins.prefs()
+    prefs.nouvelleParPhoto = false
+    -- Les deux images de l'étape, comme Etapes.lua les range (Etapes/<uuid>/<id>-avant.jpg et
+    -- -apres.jpg) : l'avant en paysage, l'après en portrait.
+    local id = '6F2A1C3B-1B2F-1'
+    local dossier = Chemins.etapes() .. '/uuid-2004'
+    Fichiers.creerDossier(dossier)
+    local source = S.home .. '/source.jpg'
+    S.executer('/usr/bin/sips -s format jpeg -z 200 300 ' .. S.q(source) .. ' --out ' .. S.q(dossier .. '/' .. id .. '-avant.jpg') .. ' >/dev/null 2>&1')
+    S.executer('/usr/bin/sips -s format jpeg -z 300 200 ' .. S.q(source) .. ' --out ' .. S.q(dossier .. '/' .. id .. '-apres.jpg') .. ' >/dev/null 2>&1')
+    -- L'appel d'apply_settings et sa réponse telle que le connecteur la rend (JSON indenté,
+    -- libellés ajoutés, etape_id de l'étape écrite par le module).
+    Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = 'as-pourquoi', nom = 'mcp__developpeur__apply_settings',
+        entree = { step_name = 'passe 1 : lumière', reason = 'Ombres bouchées à 4 % : ombres relevées pour retrouver le pull.',
+            settings = { Shadows2012 = 35 } } } } })
+    local reponse = '{\n  "mode" : "appliquer directement",\n  "resultats" : [\n    {\n      "changements" : [\n        {\n'
+        .. '          "apres" : 35,\n          "avant" : 0,\n          "cle" : "Shadows2012",\n          "libelle" : "Ombres"\n        }\n'
+        .. '      ],\n      "etape" : "Claude · passe 1 : lumière",\n      "etape_id" : "' .. id .. '",\n'
+        .. '      "photo" : {\n        "fichier" : "DSCF2004.RAF",\n        "id" : 2004\n      },\n      "remarques" : [\n\n      ]\n    }\n  ]\n}'
+    Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'as-pourquoi', textes = { reponse }, images = {}, erreur = false } } })
+    local element = #c.elements
+    egal(id, c.elements[element].etapes[1].id)
+    -- Des copies d'une ouverture passée : effacées à l'ouverture.
+    local vieilles = Fenetre.dossierPourquoi() .. '/2004/ancienne'
+    Fichiers.ecrire(vieilles .. '/x-apres.jpg', 'x')
+    ouvrirFenetre(function(p, args)
+        vrai(not Fichiers.existe(vieilles), "les copies d'une ouverture passée")
+        Fenetre.rafraichir()
+        local n
+        for i = 1, Fenetre.T.lignes do
+            local l = Fenetre.lignes[Fenetre.premiere + i - 1]
+            if l and l.element == element then
+                n = i
+                contient(l.texte, 'apply_settings · passe 1 : lumière  · Pourquoi ?')
+            end
+        end
+        vrai(n, "la ligne de l'étape")
+        local taches = #S.taches
+        Fenetre.cliquerLigne(n)
+        egal('etape', p.onglet)
+        for i = taches + 1, #S.taches do
+            S.taches[i]()
+        end
+        -- L'après, copié dans le dossier de la fenêtre et réduit par sips au cadre de 320 de l'aperçu.
+        contient(p.imageApercu, '/Temporaire/Pourquoi/2004/')
+        contient(p.imageApercu, '/.vignettes/' .. id .. '-apres-320.jpg')
+        local l, h = Images.dimensions(p.imageApercu)
+        egal(Fenetre.T.apercu, l, 'vignette de 320')
+        egal(Fenetre.T.apercu, h)
+        egal('Étape 1 sur 1 · après', p.legendeApercu)
+        egal('Étape 1 sur 1 · passe 1 : lumière', p.etapeTitre)
+        egal('DSCF2004.RAF · apply_settings', p.etapeSousTitre)
+        contient(p.etapeTexte:gsub('\n', ' '), 'Pourquoi : Ombres bouchées à 4 % : ombres relevées pour retrouver le pull.')
+        contient(p.etapeTexte, 'Ombres : 0 → 35')
+        egal(true, p.etapeAImages)
+        -- Voir l'avant : sa vignette, au même cadre.
+        local voir
+        parcourir(args.contents, function(v)
+            if v.genre == 'push_button' and type(v.args.enabled) == 'table' and v.args.enabled.key == 'etapeAImages' then
+                voir = v
+            end
+        end)
+        voir.args.action()
+        contient(p.imageApercu, '/Temporaire/Pourquoi/2004/')
+        contient(p.imageApercu, '/.vignettes/' .. id .. '-avant-320.jpg')
+        l, h = Images.dimensions(p.imageApercu)
+        egal(Fenetre.T.apercu, l)
+        egal(Fenetre.T.apercu, h)
+        egal('Étape 1 sur 1 · avant', p.legendeApercu)
+        -- Agrandir : l'avant et l'après côte à côte, à leur taille (dans 540 × 700).
+        local agrandir
+        parcourir(args.contents, function(v)
+            if v.genre == 'push_button' and v.args.title == 'Agrandir' then
+                agrandir = v
+            end
+        end)
+        local dialogues = #S.dialogues
+        taches = #S.taches
+        agrandir.args.action()
+        for i = taches + 1, #S.taches do
+            S.taches[i]()
+        end
+        egal(dialogues + 1, #S.dialogues)
+        local d = S.dialogues[#S.dialogues]
+        egal('Claude · Étape 1 sur 1 · passe 1 : lumière', d.title)
+        local tailles = {}
+        for _, colonne in ipairs(d.contents.args[1].args) do
+            local image = colonne.args[2]
+            egal('picture', image.genre)
+            vrai(Fichiers.existe(image.args.value), image.args.value)
+            tailles[#tailles + 1] = colonne.args[1].args.title .. ' ' .. image.args.width .. 'x' .. image.args.height
+        end
+        egal('Avant 300x200 | Après 200x300', table.concat(tailles, ' | '))
+        -- Rien d'écrit par la fenêtre dans le dossier Etapes du module : ses images seulement.
+        egal(id .. '-apres.jpg ' .. id .. '-avant.jpg', table.concat(Fichiers.entrees(dossier), ' '))
+        vrai(not Fichiers.existe(dossier .. '/.vignettes'), 'aucune réduction dans le dossier du module')
+        p.onglet = 'notation'
+    end)
+    prefs.nouvelleParPhoto = true
+    -- La conversation relue du disque garde son étape.
+    Stockage.enregistrer(c)
+    egal(id, Stockage.lire(c.id).elements[element].etapes[1].id)
+    egal(0, Etapes.version, 'rien rangé par la fenêtre')
     sansErreur()
 end)
 
