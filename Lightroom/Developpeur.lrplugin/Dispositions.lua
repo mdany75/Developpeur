@@ -15,8 +15,8 @@
 -- grille du fil : autant de lignes que sa hauteur en tient), `fil` (sa largeur utile), `auteur`,
 -- `ecartAuteur` et `texteFil` (la colonne auteur, son écart et le texte d'une ligne du fil), `cases`
 -- et `hauteurCase` (la grille de la liste des conversations : autant de cases que sa place en
--- tient), `apercu` et `apercuHauteur` (le cadre 3:2 de l'aperçu, et son
--- image « aucun aperçu », scripts/images-vides.swift), `onglets` (les segments, dans leur ordre),
+-- tient), `apercu` et `apercuHauteur` (le cadre 3:2 de l'aperçu, et son image « aucun aperçu »,
+-- scripts/images-vides.swift), `onglets` (les segments, dans leur ordre),
 -- `ongletParDefaut` (Note, montré à l'ouverture), `ongletProposition` et `ongletNotation` (onglet
 -- montré quand une proposition ou une note arrive), `ongletEtape` (l'onglet Aperçu, l'ancien
 -- Pourquoi ? : ouvert par un clic sur une étape du fil, jamais par une bascule automatique),
@@ -69,6 +69,11 @@ Dispositions.TAILLES = {
     apercu = 405, apercuHauteur = 270, echelleApercu = 2,
     -- Le panneau de la colonne droite (435), son intérieur (405) et celui des cartes (379).
     panneau = 435, interieur = 405, carte = 379,
+    -- Ce que les cartes laissent de leur place sous l'aperçu (D.placeCartes), d'où leurs hauteurs
+    -- (Dispositions.IMAGES) : la carte Note, 161 (la grille de l'onglet Note au-dessus d'elle et sa
+    -- rangée du bas, et 1 de jeu : l'onglet Note remplit la place) ; les cartes Proposition, Aperçu
+    -- (étape) et Leçon, 81 sous elles (comme à 1 280 × 800 : 431 − 350).
+    autourNote = 161, sousCarte = 81,
     -- Les lignes des cartes, en 12 points (provisoires jusqu'au lot 18) : sur chaque image de carte
     -- (Dispositions.IMAGES), le plus grand nombre de lignes qui laisse au moins 12 sous le contenu,
     -- comme la marge du haut (essais-fenetre-b.lua) : la grille des critères de la carte Note
@@ -106,22 +111,35 @@ local function hauteurContenu(T)
     return T.hauteurFenetre - T.barreTitre - T.margeDialogue
 end
 
+-- Le haut du contenu du panneau, depuis le haut des segments : 12 + 1 + 22 (maquette).
+local HAUT_CONTENU_PANNEAU = 12 + 1 + 22
+
+-- La place des cartes dans un panneau de `panneau` points de haut : sous le haut de son contenu,
+-- l'aperçu, 8, la rangée ◀ légende ▶ · Agrandir (bezel de 22, son cadre de D5) et 12, jusqu'au bas
+-- du contenu du panneau (son bord de 1 et sa marge de 14).
+local function placeCartes(T, panneau)
+    return panneau - 1 - 14 - (HAUT_CONTENU_PANNEAU + T.apercuHauteur + 8 + (22 + T.margeBezel) + 12)
+end
+
 local T = Dispositions.TAILLES
+-- Le panneau, sur toute la hauteur de la colonne droite entre ses marges du haut et du bas (1 146
+-- pour un contenu de 1 166), et la place des cartes qu'il laisse (782).
+local hauteurPanneau = hauteurContenu(T) - T.margeHautDroite - T.margeBasDroite
+local placeDesCartes = placeCartes(T, hauteurPanneau)
 
 Dispositions.IMAGES = {
     -- Le panneau de la colonne droite, à cheval sur les segments : une bande transparente de 12 en
-    -- haut, puis le panneau blanc (bord #C9C9C9, coins de 7), sur toute la hauteur de la colonne
-    -- entre ses marges du haut et du bas (1 146, dont 1 134 de panneau, pour un contenu de 1 166).
-    panneau = taille(T.panneau, hauteurContenu(T) - T.margeHautDroite - T.margeBasDroite),
+    -- haut, puis le panneau blanc (bord #C9C9C9, coins de 7), dont 1 134 de panneau.
+    panneau = taille(T.panneau, hauteurPanneau),
     -- Les fonds des cartes (#FAFAFA, bord #D9D9D9, coins de 6), à la largeur intérieure du panneau :
-    -- Note (critères, filet et plafond), Proposition, Aperçu (étape) et Leçon. Sous l'aperçu de
-    -- 405 × 270, la place des cartes fait 782 (D.placeCartes) : chaque carte a 351 de plus qu'à
-    -- 1 280 × 800 (270 et 350, place de 431), l'onglet Note la remplit (781), les autres laissent
-    -- 81 sous leur carte, comme avant.
-    ['carte-note'] = taille(T.interieur, 621),
-    ['carte-proposition'] = taille(T.interieur, 701),
-    ['carte-etape'] = taille(T.interieur, 701),
-    ['carte-lecon'] = taille(T.interieur, 701),
+    -- Note (critères, filet et plafond), Proposition, Aperçu (étape) et Leçon, à la hauteur que leur
+    -- laisse la place des cartes (782 sous l'aperçu de 405 × 270 : 621 pour la carte Note, que
+    -- l'onglet Note remplit, 701 pour les autres, 81 sous elles ; 270 et 350 dans la place de 431
+    -- de la fenêtre de 1 280 × 800).
+    ['carte-note'] = taille(T.interieur, placeDesCartes - T.autourNote),
+    ['carte-proposition'] = taille(T.interieur, placeDesCartes - T.sousCarte),
+    ['carte-etape'] = taille(T.interieur, placeDesCartes - T.sousCarte),
+    ['carte-lecon'] = taille(T.interieur, placeDesCartes - T.sousCarte),
     -- Les onglets Aperçu | Proposition | Note | Leçon, libellés dessinés, et le segment choisi en bleu.
     ['seg-apercu'] = taille(72, 22),
     ['seg-apercu-actif'] = taille(72, 22),
@@ -391,7 +409,7 @@ function Dispositions.dimensions()
     end
     D.hauteurSegments = Dispositions.IMAGES['seg-note'].hauteur
     D.margeSegments = math.floor((D.panneau - D.segments) / 2)
-    D.margeHautPanneau = 12 + 1 + 22 - D.hauteurSegments
+    D.margeHautPanneau = HAUT_CONTENU_PANNEAU - D.hauteurSegments
     D.margeGauchePanneau = D.panneau - D.interieur - 15
     -- Note par défaut, donc montrée à l'ouverture ; une proposition qui arrive montre Proposition,
     -- une note Note ; Aperçu (l'ancien Pourquoi ?) s'ouvre sur un clic, jamais tout seul.
@@ -403,9 +421,9 @@ function Dispositions.dimensions()
     D.agrandir = 90
     D.legende = D.interieur - 2 * D.fleche - 2 * 4 - 8 - D.agrandir
     -- La place des cartes sous l'aperçu et sa rangée, jusqu'au bas du contenu du panneau (son bord
-    -- de 1 et sa marge de 14) : 782 points. Chaque carte y tient (essais-fenetre-b.lua).
-    D.placeCartes = Dispositions.IMAGES.panneau.hauteur - 1 - 14
-        - (D.hauteurSegments + D.margeHautPanneau + D.apercuHauteur + 8 + cadre(22) + 12)
+    -- de 1 et sa marge de 14) : 782 points, d'où les hauteurs des cartes (Dispositions.IMAGES). Chaque
+    -- carte y tient (essais-fenetre-b.lua).
+    D.placeCartes = placeCartes(D, Dispositions.IMAGES.panneau.hauteur)
     -- Les cartes sur leurs images (Vues.lecon, Vues.proposition, Vues.etape, la grille des critères
     -- de Vues.notation) : leur texte à l'intérieur de la carte (379), à 13 du bord (12 de marge et
     -- le bord de 1), coupé en pages à cette largeur (Fenetre.montrerPage) ; « Détail… » en carré.

@@ -377,6 +377,47 @@ essai('Cadre : la fenêtre demandée par Dany (1 497 × 1 200), son contenu (D7)
     egal(S.MARGE_BEZEL, Dispositions.TAILLES.margeBezel)
 end)
 
+-- Dispositions relu depuis sa source, la hauteur de la fenêtre changée (TAILLES.hauteurFenetre,
+-- une seule fois dans le fichier) : une table neuve, hors de package.loaded.
+local function dispositionsAHauteur(hauteur)
+    local f = assert(io.open(S.plugin .. '/Dispositions.lua', 'r'))
+    local source = f:read('*a')
+    f:close()
+    local autre, n = source:gsub('hauteurFenetre = %d+', 'hauteurFenetre = ' .. hauteur)
+    egal(1, n, 'la hauteur de la fenêtre, une fois dans Dispositions.TAILLES')
+    return assert(loadstring(autre, '=Dispositions.lua (hauteur ' .. hauteur .. ')'))()
+end
+
+essai("Cadre : à une autre hauteur de fenêtre, le fil, la liste, le panneau et les cartes suivent (rien n'est écrit pour une seule hauteur)", function()
+    local I = Dispositions.IMAGES
+    -- À la hauteur de la fenêtre : les cartes se tirent de la place sous l'aperçu.
+    egal(D.placeCartes - D.autourNote, I['carte-note'].hauteur, 'carte Note : la place des cartes, moins sa grille')
+    for _, nom in ipairs({ 'carte-proposition', 'carte-etape', 'carte-lecon' }) do
+        egal(D.placeCartes - D.sousCarte, I[nom].hauteur, nom .. ' : la place des cartes, moins ce qu\'elle laisse sous elle')
+    end
+    -- Deux cents points de moins, puis de plus : chaque zone suit, autant de lignes et de cases que
+    -- sa place en tient.
+    for _, ecart in ipairs({ -200, 200 }) do
+        local Autre = dispositionsAHauteur(D.hauteurFenetre + ecart)
+        local A, J = Autre.dimensions(), Autre.IMAGES
+        local quoi = string.format(' (fenêtre de %d de haut)', A.hauteurFenetre)
+        egal(D.hauteurContenu + ecart, A.hauteurContenu, 'contenu' .. quoi)
+        egal(D.hauteurFil + ecart, A.hauteurFil, 'fil' .. quoi)
+        egal(math.floor((A.hauteurFil - A.margeHautFil - A.margeBasFil) / A.hauteurLigne), A.lignes, 'lignes du fil' .. quoi)
+        vrai(ecart < 0 and A.lignes < D.lignes or A.lignes > D.lignes, 'les lignes du fil suivent' .. quoi)
+        egal(D.hauteurListe + ecart, A.hauteurListe, 'liste' .. quoi)
+        egal(math.floor(A.hauteurListe / A.hauteurCase), A.cases, 'cases de la liste' .. quoi)
+        vrai(ecart < 0 and A.cases < D.cases or A.cases > D.cases, 'les cases suivent' .. quoi)
+        egal(I.panneau.hauteur + ecart, J.panneau.hauteur, 'panneau' .. quoi)
+        egal(A.hauteurContenu, A.margeHautDroite + J.panneau.hauteur + A.margeBasDroite, 'panneau entre ses marges' .. quoi)
+        egal(D.placeCartes + ecart, A.placeCartes, 'place des cartes' .. quoi)
+        egal(A.placeCartes - A.autourNote, J['carte-note'].hauteur, 'carte Note' .. quoi)
+        for _, nom in ipairs({ 'carte-proposition', 'carte-etape', 'carte-lecon' }) do
+            egal(A.placeCartes - A.sousCarte, J[nom].hauteur, nom .. quoi)
+        end
+    end
+end)
+
 essai("Cadre : la fenêtre entière tient dans l'écran de Dany (3 440 × 1 440), sous la barre des menus, et laisse sa place à Lightroom", function()
     local largeur, hauteur = S.fenetrePourContenu(D.largeurContenu, D.hauteurContenu)
     egal(D.largeurFenetre, largeur, 'la fenêtre de ce contenu (D7)')
@@ -390,7 +431,9 @@ essai('Fil : sa ligne la plus longue reste sous environ 105 caractères moyens (
     local Fil, Texte = require 'Fil', require 'Texte'
     -- Le « caractère moyen » : la chasse moyenne d'un caractère d'une phrase de la fenêtre
     -- (Fenetre.FIL_VIDE), espaces et ponctuation compris, dans la police des lignes de Dany et de
-    -- Claude (Metriques).
+    -- Claude (Metriques). Une réponse ordinaire de Claude, aux mots plus courts et sans capitales,
+    -- est plus étroite (5,9 points par caractère au lieu de 6,2) : environ 108 caractères par ligne
+    -- (mesuré le 21 octobre 2026, hors de l'essai).
     local police = Fil.polices.claude
     egal(police, Fil.polices.dany, 'Vous et Claude dans la même police')
     local moyen = Fil.largeur(Fenetre.FIL_VIDE, police) / Texte.longueur(Fenetre.FIL_VIDE)
