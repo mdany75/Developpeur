@@ -96,7 +96,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `etat` | `sauvegarde?` | versions, catalogue, mode, pause, limites, photo active ; avec `sauvegarde`, la sauvegarde du catalogue demandée pour la fermeture suivante |
 | `selection` | `limite` | `total`, `renvoyees`, `photos` (id, fichier, données de prise de vue, note, drapeau, libellé, pile, `active`) |
 | `reglages` | `photo?`, `cles`, `details?`, `toutes?` | `reglages` (valeurs des clés demandées), `photo` (id, fichier, `copie_virtuelle`), `echelle_temperature`, `version_processus`, `profil`, `intensite_profil`, `appareil`, `recadrage` (angle, dimensions, orientation) ; avec `details` : `courbes_par_points`, `masques` (composants avec leur mode), `couleurs_ponctuelles`, `taches`, `yeux_rouges`, `filtres_calcules`, `amelioration` (photo affichée dans le module Développement seulement), `classement` (note, drapeau, libellé, titre, mots-clés) ; avec `toutes` : `tous`, tout ce que Lightroom range |
-| `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point |
+| `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier ; après la 1.1.1, sur un zoom `region` aussi, jamais sur un avant/après), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point |
 | `appliquer` | `photos?` ou `selection?`, `reglages`, `booleens?`, `looks_traitement?`, `profil?`, `profil_marque?`, `profil_variantes?`, `profil_look?`, `recadrage?`, `recalages?`, `courbes?`, `couleurs_ponctuelles?`, `balance?`, `auto_ton?`, `preset?`, `plages`, `libelles`, `relatif`, `etape`, `raison?`, `confirme` | par photo : `changements` (`cle`, `avant`, `apres`) et `remarques` ; `a_recadrer` et `etape_ecrite` quand un cadre demandé reste à placer (voir Recadrage) |
 | `recadrer` | `photos`, `recadrage`, `recalages`, `completer?`, `etape`, `raison?`, `confirme` | comme `appliquer` (changements du cadre seulement) |
 | `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
@@ -232,15 +232,20 @@ MCP-Développeur, sans quitter Lightroom. Sa barre de titre dit « Développeur 
 (`Fenetre.afficher`, demandé par Dany le 20 octobre 2026 ; « Claude » avant) ; les autres fenêtres
 du module gardent « Claude · … », et les menus comme la documentation l'appellent toujours
 « fenêtre Claude ». Claude passe par Claude Code et le forfait claude.ai de l'utilisateur, jamais
-par l'API. Depuis la 1.1, la fenêtre a trois dispositions (Atelier, Conversation claire, Panneau,
-voir Dispositions) et une carte « Note » pour la photo active. La 1.1 avait aussi une fenêtre à
-part pour noter une sortie entière, la Séance de notation : elle est retirée depuis la 1.1.1
-(demandé par Dany le 20 octobre 2026), comme les boutons Noter et À vérifier. Depuis, Claude note
-d'abord toute photo qu'il traite dans la fenêtre, et sa note arrive « à vérifier » ; une demande à
-Claude (« note ces photos ») note une sélection (voir Carte Note et Notation). Captures :
-`docs/capture.png` (la fenêtre Claude en Conversation claire), `docs/atelier.png` et
-`docs/panneau.png` (ses deux autres dispositions), `docs/publication.png`, `docs/consommation.png`,
-et `docs/suivi.png` (la fenêtre de suivi de la liaison).
+par l'API. La fenêtre a une carte « Note » pour la photo active depuis la 1.1. La 1.1 et la 1.1.1
+avaient trois dispositions au choix (Atelier, Conversation claire, Panneau) ; après la 1.1.1, il
+n'en reste qu'une, la Conversation claire (demandé par Dany le 20 octobre 2026, voir
+Disposition). La 1.1 avait aussi une fenêtre à part pour noter une sortie entière, la Séance de
+notation : elle est retirée depuis la 1.1.1 (demandé par Dany le 20 octobre 2026), comme les
+boutons Noter et À vérifier. Depuis, Claude note d'abord toute photo qu'il traite dans la fenêtre,
+et sa note arrive « à vérifier » ; une demande à Claude (« note ces photos ») note une sélection
+(voir Carte Note et Notation). Après la 1.1.1, l'aperçu de la photo active montre aussi le point
+de mise au point d'un fichier Fujifilm, et, à l'ouverture, Claude prépare une proposition de
+retouche sur une conversation vide (voir Disposition et Proposition préparée à l'ouverture). Ce
+qui suit la 1.1.1 ira dans la 1.2 (en préparation). Captures : `docs/capture.png` (la fenêtre
+Claude, en Conversation claire), `docs/publication.png`, `docs/consommation.png` et
+`docs/suivi.png` (la fenêtre de suivi de la liaison) ; `docs/atelier.png` et `docs/panneau.png`,
+les deux autres dispositions, sont retirées avec elles.
 
 ### Relais vers Claude Code
 
@@ -321,7 +326,10 @@ dans la carte Note, que Dany accepte ou change (demandé par Dany le 20 octobre 
 déjà évaluée (`view_photo` : `evaluation`) ne se renote pas, sauf s'il le demande ;
 `apply = true` quand Dany demande que Claude note (« note ces photos », « pose les notes ») ;
 jamais 5 ★ de lui-même, `set_metadata` si Dany en demande (en 1.1 : jamais `set_metadata` pour
-une note sans demande, jamais 5 ★). Les consignes du connecteur (`ServerInfo`, pour Claude
+une note sans demande, jamais 5 ★). Après la 1.1.1, une puce de plus, sous Notes : « Mise au
+point montrée ou jugée : view_photo avec af_point = true, sur l'aperçu entier comme sur un zoom
+(region) : le carré y est dessiné, s'il tombe dans la zone (point_af : dans_la_zone) » (voir Tri
+d'une séance › Point de mise au point). Les consignes du connecteur (`ServerInfo`, pour Claude
 Desktop) ne demandent pas de noter d'abord. Depuis la 1.1, `consignes.md` est écrit dans le
 dossier de chaque session (`Session:lancer` ; huitième argument de `relais.sh` depuis la 1.1.1,
 septième en 1.1), plus à la racine : Claude Code le lit un peu après son lancement en
@@ -329,7 +337,9 @@ arrière-plan, et un fichier commun pourrait être réécrit entre-temps. Son te
 `Consignes.texte` (en 1.1, `Consignes.pour(c)` y ajoutait `Consignes.texteNotation` pour une
 conversation de séance ; retirés en 1.1.1). Les boutons d'invites de la fenêtre
 (`Consignes.invites` : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Sports)
-envoient une demande toute faite, d'après les invites du connecteur. Le bouton Noter de la 1.1
+envoient une demande toute faite, d'après les invites du connecteur ; après la 1.1.1,
+`Consignes.proposerOuverture` est celle que la fenêtre envoie d'elle-même à l'ouverture (voir
+Proposition préparée à l'ouverture). Le bouton Noter de la 1.1
 (`Consignes.noterPhoto`, et `Consignes.noterSelection` dans un premier état de la 1.1.1) est
 retiré en 1.1.1 : la note se fait d'abord, d'elle-même (voir Carte Note).
 
@@ -420,8 +430,9 @@ et rendue ordinaire dans la ligne (une ligne de la carte Note commençait par «
 capture). La grille montre la fin du fil ; ▲ ▼ Fin déplacent la fenêtre de lecture, qui
 reste en place quand des lignes arrivent pendant qu'on lit plus haut. Les images ne peuvent pas
 s'insérer dans la grille : elles s'affichent dans le cadre de l'aperçu (`f:picture`, réduction
-sur fond 2B2B2B faite par `sips`, carrée, ou 3:2 dans l'Atelier, le cadre de la vue ne changeant
-pas de taille ; `Images.vignette(dossier, nom, cote, hauteur)`).
+sur fond 2B2B2B faite par `sips`, carrée, le cadre de la vue ne changeant pas de taille ;
+`Images.vignette(dossier, nom, cote, hauteur)`, où `hauteur` servait au cadre 3:2 de l'Atelier,
+retiré après la 1.1.1).
 
 De même, depuis la 1.1.1, le texte de la carte Note (`notationTexte`) et celui de la Proposition
 (`propositionTexte`) sont des `static_text` de hauteur fixe, montrés page par page : coupés en
@@ -435,45 +446,49 @@ une ligne, la dernière ligne vue gardée (`Fenetre.defilerTexte(cle, sens)` ; p
 `noteMonte`, `noteDescend`, `propositionMonte`, `propositionDescend`) ; la dernière page est
 pleine. Un nouveau texte revient à la première page.
 
-Les onglets (Conversation claire, Panneau) sont une rangée de `radio_button` (clé `onglet`,
-chacun avec son `checked_value`) au-dessus de variantes superposées de même largeur
-(`place = 'overlapping'`), et non un `tab_view`, dont le comportement n'a pas été constaté. Les
+Les onglets, Note (par défaut) et Proposition (`D.onglets`), sont une rangée de `radio_button`
+(clé `onglet`, chacun avec son `checked_value`) au-dessus de variantes superposées de même
+largeur (`place = 'overlapping'`), et non un `tab_view`, dont le comportement n'a pas été
+constaté. Le Panneau avait les siens, Retoucher et Noter : retirés avec lui après la 1.1.1. Les
 colonnes des variantes ne portent pas `visible` : leur contenu se crée par une fabrique masquable
 (`Vues.masquable(f, F, condition)`, appelée par `variante` de `Dispositions.lua`), qui pose la
 condition de l'onglet (`onglet` égal à sa valeur) sur chaque vue simple que les pièces créent, et
-la combine avec un `visible` déjà posé (couleurs de la carte Note, pastilles des voyants, lignes
-du fil, états du bandeau) ; une boîte de groupe y devient une colonne à titre gras (son cadre et
-son titre resteraient montrés). Les fabriques s'emboîtent : dans Retoucher (Panneau), les invites,
-le Style et leur bandeau portent aussi `aProposition` faux, la proposition et le sien
-`aProposition` vrai. Conteneurs, espaces et écarts passent tels quels. Les colonnes des variantes
-restent donc là, vides, les unes sur les autres : la dernière (Proposition dans la Conversation
-claire depuis la 1.1.1, Noter dans le Panneau) couvre celles d'avant, et laisse passer les clics
-vers leurs boutons (constaté en 1.1 pour Agrandir, alors dans l'onglet Aperçu sous la colonne
-Note ; le reste à l'usage, point 3 plus bas). La fenêtre ne change d'onglet d'elle-même qu'au
-passage de faux à vrai, une fois par arrivée (`Fenetre.choisirOnglet`, `Fenetre.ongletAuto`) :
-vers Proposition (ou Retoucher) quand une proposition arrive, vers Note (ou Noter) quand une note
-arrive pour la photo montrée (« à vérifier », comme toute proposition depuis la 1.1.1, ou
-« proposée », d'avant ; pas quand une autre photo est choisie). Un clic sur une ligne d'image la
-montre dans l'aperçu, sans changer d'onglet : l'aperçu est hors des onglets dans les trois
-dispositions, dans la Conversation claire depuis la 1.1.1 (en 1.1, ce clic la ramenait à l'onglet
-Aperçu).
+la combine avec un `visible` déjà posé (couleurs de la carte Note ; en 1.1.1, dans Retoucher du
+Panneau, aussi pastilles des voyants, lignes du fil, états du bandeau) ; une boîte de groupe y
+devient une colonne à titre gras (son cadre et son titre resteraient montrés). Une fabrique
+masquable peut s'envelopper dans une autre, les conditions se combinent (en 1.1.1, dans
+Retoucher du Panneau, les invites, le Style et leur bandeau portaient aussi `aProposition` faux,
+la proposition et le sien `aProposition` vrai).
+Conteneurs, espaces et écarts passent tels quels. Les colonnes des variantes restent donc là,
+vides, l'une sur l'autre : la dernière (Proposition depuis la 1.1.1) couvre celle d'avant (Note),
+et laisse passer les clics vers ses boutons (constaté en 1.1 pour Agrandir, alors dans l'onglet
+Aperçu sous la colonne Note ; le reste à l'usage, point 3 plus bas). La fenêtre ne change
+d'onglet d'elle-même qu'au passage de faux à vrai, une fois par arrivée
+(`Fenetre.choisirOnglet`, `Fenetre.ongletAuto`) : vers Proposition quand une proposition arrive
+(sauf celle préparée à l'ouverture, après la 1.1.1 : voir Proposition préparée à l'ouverture),
+vers Note quand une note arrive pour la photo montrée (« à vérifier », comme toute proposition
+depuis la 1.1.1, ou « proposée », d'avant ; pas quand une autre photo est choisie). Un clic sur
+une ligne d'image la montre dans l'aperçu, sans changer d'onglet : l'aperçu est hors des onglets
+depuis la 1.1.1 (en 1.1, ce clic la ramenait à l'onglet Aperçu).
 
 - Champ de demande (`immediate = false`) : constaté dans Lightroom 15.6, Retour ne fait pas de saut
   de ligne ; il valide le champ (le texte passe à la table de propriétés, puis est tout sélectionné).
   Avec `immediate = true`, la frappe passe caractère par caractère mais Retour ne se voit pas du
   tout (ni `validate` ni observateur). Le clic d'un bouton valide aussi le champ, juste avant
   l'action du bouton. Un texte validé part donc après 0,3 s, sauf si un clic de bouton (tous passent
-  par `Fenetre.bouton`, appelé par les pièces de `Vues.lua`), un choix dans la liste, un menu
-  (Style, conversations), un onglet, une réouverture ou la fermeture de la fenêtre l'annule ;
-  Envoyer l'envoie lui-même, une seule fois. Depuis la 1.1.1, la fenêtre n'a plus de menu Modèle
-  ni Disposition, et pas de menu Effort (tous dans le Gestionnaire de modules externes). Une
-  fenêtre rouverte entre-temps (disposition changée) ne l'envoie pas : l'envoi automatique
-  compare la génération de la fenêtre (`Fenetre.generation`). Le champ est désactivé pendant que
-  Claude travaille (il perd ainsi le focus et se vide).
+  par `Fenetre.bouton`, appelé par les pièces de `Vues.lua`), un choix dans la liste, le menu
+  Style, un onglet ou la fermeture de la fenêtre l'annule ; Envoyer l'envoie lui-même, une seule
+  fois. Depuis la 1.1.1, la fenêtre n'a plus de menu Modèle ni Disposition, et pas de menu Effort
+  (le modèle et l'effort sont dans le Gestionnaire de modules externes) ; après la 1.1.1, ni menu
+  des conversations (Atelier, Panneau), ni réouverture quand la disposition changeait. Une
+  fenêtre fermée entre-temps ne l'envoie pas : l'envoi automatique compare la génération de la
+  fenêtre (`Fenetre.generation`). Le champ est désactivé pendant que Claude travaille (il perd
+  ainsi le focus et se vide).
 - Toute table passée à Lightroom est neuve (une table relue par `Json.decode` porte une métatable,
   sur laquelle Lightroom bloque : constaté par la liaison, voir Profil).
 - `LrTasks.execute` ne bloque que la tâche : base64, sips, `osascript`, `mcp-developpeur --version`
-  et `claude auth status` passent par là, jamais par un calcul en Lua sur la tâche de l'interface.
+  et `claude auth status` passent par là, et après la 1.1.1 `mcp-developpeur --marquer-af` (voir
+  Disposition), jamais par un calcul en Lua sur la tâche de l'interface.
 
 ### Voyants et liaison
 
@@ -486,133 +501,196 @@ l'aide du bandeau dit quoi faire ; un clic sur le voyant la démarre, ou la rela
 (`Lightroom.demarrerLiaison`). Le mode : un clic bascule « Proposer d'abord » et « Appliquer
 directement » (`Lightroom.basculerMode`, clé `mode` des préférences, celle que lit la liaison).
 
-### Dispositions (1.1, revues en 1.1.1)
+### Disposition (1.1 ; une seule après la 1.1.1)
 
-Trois façons d'assembler la même fenêtre, au choix (préférence `disposition`, voir Préférences),
-chacune dans une seule taille depuis la 1.1.1 : toujours la grande (demandé par Dany le
-20 octobre 2026 ; la 1.1 avait trois tailles, petite, moyenne par défaut et grande, préférence
-`taille`, retirée) :
+Après la 1.1.1, une seule disposition : la Conversation claire (`Dispositions.NOM`,
+`conversation`), toujours en grande taille (demandé par Dany le 20 octobre 2026). La 1.1 et la
+1.1.1 en avaient trois au choix (préférence `disposition`, `conversation` par défaut), retirées
+avec ce choix : la préférence, le menu Disposition du Gestionnaire de modules externes (voir
+Préférences), l'Atelier et le Panneau (décrits plus bas, comme historique). La 1.1 avait aussi
+trois tailles (petite, moyenne par défaut et grande, préférence `taille`), retirées en 1.1.1 au
+profit de la grande.
 
-- **Atelier** (`atelier`) : la photo d'abord. Colonne de la photo : une barre (menu des
-  conversations, Nouvelle, Supprimer…), l'aperçu dans un cadre 3:2, ◀ légende ▶ Agrandir, puis la
-  proposition ; colonne Note : la photo active, la carte Note, un espace élastique, Publication et
-  Consommation, un séparateur et les versions en bas ; colonne de la conversation, étroite :
-  titre, voyants en colonne, fil, ▲ ▼ Fin avec l'activité dessous, invites trois par rangée (le
-  menu Style au bout de la dernière), bandeau, demande, puis Envoyer seul à droite (`Vues.envoi`).
-- **Conversation claire** (`conversation`, par défaut, `Dispositions.DEFAUT`) : la mise en page de
-  la 1.0 : à gauche la liste des conversations ; au centre le titre (la photo active à droite),
-  les voyants en rangée, le fil, ▲ ▼ Fin, les invites sur une rangée (le menu Style au bout), le
-  bandeau, puis le champ de demande (trois lignes) avec Envoyer à sa droite (`D.envoiACote`).
-  Depuis la 1.1.1 (demandé par Dany le 20 octobre 2026 : l'aperçu et la note ensemble), la colonne
-  de droite montre, de haut en bas : les boutons radio Note (par défaut) et Proposition, à la place
-  du titre « Ce que Claude voit » (retiré) ; l'aperçu ; ◀ légende ▶ ; Agrandir ; une ligne vide
+La Conversation claire, la mise en page de la 1.0 :
+
+- à gauche, la colonne des conversations (`Vues.listeConversations`) : Nouvelle conversation, le
+  champ Rechercher, la liste, puis Renommer… et Supprimer… ;
+- au centre : le titre de la conversation et ✎ (la photo active à droite), les voyants en rangée,
+  un séparateur, le fil, ▲ ▼ Fin (la position dans le fil, l'activité à droite), un espace
+  élastique, un séparateur, les invites sur une seule rangée avec le menu Style au bout, le
+  bandeau, puis 📎, 📋, le champ de demande (trois lignes) et Envoyer à sa droite ;
+- à droite, depuis la 1.1.1 (demandé par Dany le 20 octobre 2026 : l'aperçu et la note
+  ensemble), de haut en bas : les boutons radio Note (par défaut) et Proposition, à la place du
+  titre « Ce que Claude voit » (retiré) ; l'aperçu ; ◀ légende ▶ ; Agrandir ; une ligne vide
   (`f:spacer` de 8 points) ; la carte Note ou le panneau Proposition (variantes superposées) ; un
   espace élastique ; Publication… et Consommation… ; un séparateur ; les versions. En 1.1, elle
   avait trois onglets (Aperçu, Proposition et Note), suivis de Publication, Consommation et du menu
   Disposition.
+
+Les deux dispositions retirées après la 1.1.1, telles qu'elles étaient en 1.1.1 :
+
+- **Atelier** (`atelier`) : la photo d'abord. Colonne de la photo : une barre (menu des
+  conversations, Nouvelle, Supprimer…), l'aperçu dans un cadre 3:2 de 720 × 480, ◀ légende ▶
+  Agrandir, puis la proposition ; colonne Note : la photo active, la carte Note, un espace
+  élastique, Publication et Consommation, un séparateur et les versions en bas ; colonne de la
+  conversation, étroite : titre, voyants en colonne, fil, ▲ ▼ Fin avec l'activité dessous,
+  invites trois par rangée (le menu Style au bout de la dernière), bandeau, demande, puis Envoyer
+  seul à droite (`Vues.envoi`).
 - **Panneau** (`panneau`) : une fenêtre étroite et haute, à côté de Lightroom. En-tête : l'aperçu
-  carré, et à côté le menu des conversations, Nouvelle, ✎, Supprimer…, la photo active, sa note
-  posée, la légende, ◀ ▶ Agrandir ; deux onglets, Retoucher (voyants en rangée, fil, ▲ ▼ Fin,
+  carré de 200, et à côté le menu des conversations, Nouvelle, ✎, Supprimer…, la photo active, sa
+  note posée, la légende, ◀ ▶ Agrandir ; deux onglets, Retoucher (voyants en rangée, fil, ▲ ▼ Fin,
   invites trois par rangée avec le Style au bout, bandeau, demande, puis Envoyer seul à droite ;
-  une proposition en attente prend la place des invites, du Style et de leur bandeau, en variante
-  superposée avec son propre bandeau, clé `aProposition`) et Noter (la carte Note entière) ; en bas
-  un séparateur, Publication et Consommation, et les versions.
+  une proposition en attente prenait la place des invites, du Style et de leur bandeau, en
+  variante superposée avec son propre bandeau, clé `aProposition`) et Noter (la carte Note
+  entière) ; en bas un séparateur, Publication et Consommation, et les versions.
 
 Depuis la 1.1.1, ni menu Modèle (la 1.1 l'avait à côté d'Envoyer), ni menu Effort, ni menu
-Disposition dans la fenêtre (demandé par Dany le 20 octobre 2026 : un écran plus léger) : ils
-sont dans le Gestionnaire de modules externes (voir Préférences). Plus de bouton Noter non plus
-(en 1.1, dans la barre de l'Atelier, en tête des invites de la Conversation claire et dans la
-carte Note), ni de bouton Séance… : Claude note de lui-même (voir Carte Note). Le menu Style
-(`Vues.style`) n'a plus d'étiquette « Style » : `Vues.invites` le met au bout de la dernière
-rangée d'invites, dans les trois dispositions (en 1.1, « Style » et son menu sur leur propre
-ligne, le bandeau à droite). Le bandeau (`Vues.bandeau`) a sa propre ligne, sous les invites (voir
-Bas de la fenêtre).
+Disposition dans la fenêtre (demandé par Dany le 20 octobre 2026 : un écran plus léger) : le
+modèle et l'effort sont dans le Gestionnaire de modules externes (voir Préférences). Plus de bouton
+Noter non plus (en 1.1, dans la barre de l'Atelier, en tête des invites de la Conversation claire
+et dans la carte Note), ni de bouton Séance… : Claude note de lui-même (voir Carte Note). Le menu
+Style (`Vues.style`) n'a plus d'étiquette « Style » : `Vues.invites` le met au bout de la rangée
+d'invites (en 1.1, « Style » et son menu sur leur propre ligne, le bandeau à droite ; en 1.1.1,
+au bout de la dernière des rangées de trois de l'Atelier et du Panneau). Le bandeau
+(`Vues.bandeau`) a sa propre ligne, sous les invites (voir Bas de la fenêtre).
 
-L'aperçu montre la photo active à l'ouverture de la fenêtre, et quand Dany choisit une autre photo
-(demandé le 20 octobre 2026) : `Fenetre.afficher` remet `Fenetre.idActif` à nil et
-`Fenetre.voirActive` à vrai, puis `Fenetre.majPhoto` voit la photo active (aussi quand la fenêtre,
-déjà ouverte, est rappelée par le menu ou ⌃⌥C, qui la remet devant). La légende dit « Photo
-active · DSCF1595 ». Sa vignette se fait dans une tâche : `Vignettes.demander` (le cache d'aperçus
-de Lightroom, `requestJpegThumbnail`, 1 024 points, `Fenetre.TAILLE_PHOTO_ACTIVE`) l'écrit dans un
-dossier à elle sous `Chemins.temporaire()/PhotoActive` (`Images.vignette` garde ses réductions par
-nom de fichier : un dossier neuf évite une vignette d'avant une retouche), puis `Images.vignette`
-la réduit au cadre de l'aperçu ; le dossier de la vignette d'avant s'efface ; Agrandir la montre
-en grand (`Images.grande`). Une image nouvelle de la conversation montrée (Claude regarde, une
-photo jointe : `Fenetre.nbImages` grandit) prend sa place ; ◀ depuis la photo active montre la
-dernière image de la conversation, ▶ depuis la dernière revient à la photo active ; un clic sur
-une ligne d'image du fil relit d'abord les images de la conversation, pour ne pas rebasculer.
+**Aperçu de la photo active.** L'aperçu montre la photo active à l'ouverture de la fenêtre, et
+quand Dany choisit une autre photo (demandé le 20 octobre 2026) : `Fenetre.afficher` remet
+`Fenetre.idActif` à nil et `Fenetre.voirActive` à vrai, puis `Fenetre.majPhoto` voit la photo
+active (aussi quand la fenêtre, déjà ouverte, est rappelée par le menu ou ⌃⌥C, qui la remet
+devant). La légende dit « Photo active · DSCF1595 ». Sa vignette se fait dans une tâche :
+`Vignettes.demander` (le cache d'aperçus de Lightroom, `requestJpegThumbnail`, 1 024 points,
+`Fenetre.TAILLE_PHOTO_ACTIVE`) l'écrit dans un dossier à elle sous
+`Chemins.temporaire()/PhotoActive` (`Images.vignette` garde ses réductions par nom de fichier : un
+dossier neuf évite une vignette d'avant une retouche), puis `Images.vignette` la réduit au cadre
+de l'aperçu ; le dossier de la vignette d'avant s'efface ; Agrandir la montre en grand
+(`Images.grande`). Une image nouvelle de la conversation montrée (Claude regarde, une photo
+jointe : `Fenetre.nbImages` grandit) prend sa place ; ◀ depuis la photo active montre la dernière
+image de la conversation, ▶ depuis la dernière revient à la photo active ; un clic sur une ligne
+d'image du fil relit d'abord les images de la conversation, pour ne pas rebasculer.
 
-Dimensions (`Dispositions.TAILLES`, une table par disposition, complétée par
-`Dispositions.dimensions(nom)`, qui retombe sur Conversation claire pour une valeur inconnue) :
+Après la 1.1.1 (demandé par Dany le 20 octobre 2026), la vignette d'un fichier Fujifilm porte le
+carré de mise au point, avant sa réduction : `Fenetre.marquerMiseAuPoint(id, source)` décrit la
+photo (`Vignettes.decrireVignette` : `chemin_original`, `marque`, `geometrie`, dans une tâche) ;
+pour la marque « FUJIFILM » ou un original `.RAF`, `Images.marquerMiseAuPoint(connecteur,
+original, geometrie, source)` lance le connecteur en ligne de commande par `LrTasks.execute`
+(chemin `cheminConnecteur` des préférences, sorties jetées) :
 
-| Disposition | Dimensions (points ; lignes) |
-| --- | --- |
-| Atelier | photo 740, aperçu 720 × 480, Note 300, conversation (`fil`) 440, menu 240 ; fil de 38 lignes, proposition 9, critères 15 |
-| Conversation claire | liste 250, fil 900, droite 340, aperçu 320 ; fil de 42 lignes, proposition 21, critères 12 |
-| Panneau | contenu 460, aperçu 200 ; fil de 20 lignes, proposition 6, critères 20 |
+```
+mcp-developpeur --marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>
+```
+
+Le connecteur (`PointAF.marquer`) lit le point dans l'original, en temps borné
+(`LecteurPointsAF`, 2 s), le passe dans l'image affichée et recadrée
+(`GeometriePhoto.versApercu`), dessine le carré (`PreviewImages.marquerPoint` : vert, rouge si
+l'appareil a signalé la mise au point manquée) et écrit la vignette marquée dans `<sortie.jpg>`
+(la fenêtre la nomme `<nom>-af.jpg`, à côté de la vignette) ; il écrit alors sur sa sortie une
+ligne JSON (`x`, `y`, `avertissement`) et finit avec le code 0. Sans point (pas un fichier
+Fujifilm, point illisible ou hors du cadre, original qui ne s'ouvre pas à temps), il finit avec
+le code 1 sans rien écrire ; avec de mauvais arguments, le code 2. La fenêtre garde alors la
+vignette sans carré, sans le journaliser ; un connecteur absent n'est pas lancé. Pour une autre
+marque, pas d'appel : l'original n'est pas ouvert (voir Tri d'une séance › Point de mise au
+point). Agrandir montre la vignette marquée. Le carré se dessine en tout temps sur cet aperçu,
+sans tenir compte de la case « Mise au point » (`pointMiseAuPoint`), qui ne vaut que pour
+`view_photo`.
+
+Dimensions (`Dispositions.TAILLES`, une seule table depuis le retrait des autres dispositions,
+complétée par `Dispositions.dimensions()`, sans argument, qui rend une table neuve avec `nom`) :
+liste 250, fil 900, droite 340, aperçu 320 (points) ; fil de 42 lignes (`lignes`), proposition 21
+(`propLignes`), critères 12 (`criteres`). En 1.1.1, une table par disposition, complétée par
+`Dispositions.dimensions(nom)`, qui retombait sur la Conversation claire pour une valeur
+inconnue : Atelier, photo 740, aperçu 720 × 480, Note 300, conversation (`fil`) 440, menu 240,
+fil de 38 lignes, proposition 9, critères 15 ; Panneau, contenu 460, aperçu 200, fil de 20
+lignes, proposition 6, critères 20.
 
 Proposition = lignes du panneau Proposition (`propLignes`) ; critères = `criteres`, d'où les
 `D.criteres + 3` lignes du texte de la carte Note. Largeurs de ces textes : `D.largeurNote` et
-`D.largeurProposition` (la colonne moins 24 : Note et photo dans l'Atelier, droite dans la
-Conversation claire, contenu dans le Panneau). Ce sont les valeurs de la grande taille de la 1.1,
-sauf pour la Conversation claire (40 lignes de fil, proposition 22, critères 14 en 1.1). Dans la
-Conversation claire, le champ de demande a `D.fil - 170` de large, Envoyer 110 ; le nombre de
-lignes du fil donne au centre la hauteur de la colonne de droite (l'aperçu, puis la carte Note) ;
-pas encore mesuré dans Lightroom.
+`D.largeurProposition` (la colonne de droite moins 24). Ce sont les valeurs de la grande taille de
+la 1.1, sauf le fil (40 lignes en 1.1), la proposition (22) et les critères (14). Le champ de
+demande a `D.fil - 170` de large, Envoyer 110 ; le nombre de lignes du fil donne au centre la
+hauteur de la colonne de droite (l'aperçu, puis la carte Note) ; pas encore mesuré dans
+Lightroom.
 
-Largeurs de fenêtre calculées (pas encore mesurées dans Lightroom) : Atelier environ 1554 points,
-Conversation claire 1564, Panneau 484. Hauteurs estimées (17 points par ligne de fil) : Atelier
-environ 1 030 points de contenu, Panneau environ 1 020 avec 20 lignes (environ 1 050 avec la barre
-de titre, pour tenir sur un écran de 1080 points ; avec 30 lignes, environ 1 190, qui ne tenait ni
-sur un portable ni sur un écran de 1080) ; Conversation claire environ 900 en 1.1, avec 40 lignes,
-pas encore réestimée avec 42.
+Largeur de fenêtre calculée (pas encore mesurée dans Lightroom) : 1564 points (en 1.1.1, Atelier
+environ 1554, Panneau 484). Hauteur estimée (17 points par ligne de fil) : environ 900 en 1.1,
+avec 40 lignes, pas encore réestimée avec 42 (en 1.1.1, Atelier environ 1 030 points de contenu,
+Panneau environ 1 020 avec 20 lignes, environ 1 050 avec la barre de titre, pour tenir sur un
+écran de 1080 points ; avec 30 lignes, environ 1 190, qui ne tenait ni sur un portable ni sur un
+écran de 1080).
 
 Le code : `Fenetre.lua` garde l'état, ce qui remplit les propriétés liées (`rafraichir…`), les
-actions, la boucle, l'ouverture et la réouverture ; `Vues.lua` les pièces (`Vues.grille`,
-`defilement`, `voyants`, `bandeau`, `versions`, `titre`, `listeConversations`,
-`menuConversations`, `boutonsConversation`, `invites`, `style`, `fleches`, `boutonEnvoyer`,
-`saisie`, `envoi`, `apercu`, `navigationApercu`, `agrandir`, `proposition`, `notation`,
+actions, la boucle et l'ouverture ; `Vues.lua` les pièces (`Vues.grille`, `defilement`,
+`voyants`, `bandeau`, `versions`, `titre`, `listeConversations`, `invites`, `style`, `fleches`,
+`boutonEnvoyer`, `saisie`, `apercu`, `navigationApercu`, `agrandir`, `proposition`, `notation`,
 `autresFenetres`, `onglets`, et la fabrique `masquable` des onglets), chacune liée aux propriétés
 de la fenêtre, sans `require 'Fenetre'` ni couleur créée au chargement (couleurs, polices, `bind`,
 `egal`, `bouton` et les actions arrivent par `F`) ; `Vues.boutonNoter`, `Vues.boutonSeance`,
 `Vues.menuModele` et `Vues.disposition` sont retirés en 1.1.1, comme `D.invitesPetites` (invites
-en petit de la petite taille). `Dispositions.lua` fait les trois assemblages
-(`Dispositions.atelier`, `conversation`, `panneau`, appelés par `Dispositions.construire`). Une
-propriété sans vue dans une disposition ne gêne pas. Chaque cadre d'aperçu a son image « aucun
-aperçu » (`Dispositions.imageVide` : `vide-<côté>.png` ou `vide-<largeur>x<hauteur>.png`) ; le
-module en porte trois depuis la 1.1.1, faites par `scripts/images-vides.swift` : `vide-200`
-(Panneau), `vide-320` (Conversation claire) et `vide-720x480` (Atelier). Celles des petite et
-moyenne tailles et `vide-300`, faite pour la fiche de la Séance de notation, sont retirées, et le
-script ne les dessine plus. Le menu des conversations (Atelier, Panneau) montre les 40 plus
-récentes (`Fenetre.MAX_MENU`), sans en-têtes, la conversation montrée toujours dedans. Ni la liste
-ni le menu ne montrent les conversations des anciennes séances de notation
+en petit de la petite taille). Après la 1.1.1, `Dispositions.lua` n'a plus que `NOM`, `TAILLES`,
+`dimensions()`, `imageVide` et `construire` (l'assemblage de la Conversation claire) : `LISTE`,
+`items`, `valider`, `DEFAUT`, `atelier` et `panneau` sont retirés. Dans `Vues.lua`, partent ce qui
+ne servait qu'aux deux autres : `menuConversations`, `boutonsConversation`, `envoi`, les voyants
+en colonne, les invites par rangées de trois (`D.invitesParRangee`), l'activité sous ▲ ▼
+(`D.activiteDessous`), le cadre non carré de l'aperçu (`D.apercuHauteur`) et les boutons en petit
+d'Agrandir et des autres fenêtres ; Envoyer est toujours à côté du champ (plus de
+`D.envoiACote`). L'image « aucun aperçu » du cadre (`Dispositions.imageVide`) est `vide-320.png`,
+seule dans le module, dessinée par `scripts/images-vides.swift`, qui n'en dessine plus qu'une ;
+`vide-200.png` (Panneau) et `vide-720x480.png` (Atelier) sont retirées après la 1.1.1, comme en
+1.1.1 celles des petite et moyenne tailles et `vide-300`, faite pour la fiche de la Séance de
+notation. La liste ne montre pas les conversations des anciennes séances de notation
 (`genre == 'notation'`), restées sur le disque, et `Moteur.ouvrir` les refuse (« elle ne s'ouvre
-plus »).
+plus »). Le menu des conversations de l'Atelier et du Panneau (les 40 plus récentes,
+`Fenetre.MAX_MENU`, sans en-têtes, la conversation montrée toujours dedans ; `Fenetre.elementsMenu`,
+propriétés `menuConversations` et `conversationChoisie`) est retiré après la 1.1.1, avec eux.
 
-**Changer de disposition.** Une fenêtre ouverte ne change pas de structure : elle se ferme et se
-rouvre. Depuis la 1.1.1, la disposition ne se choisit que dans le Gestionnaire de modules externes
-(en 1.1, aussi par le menu Disposition de la fenêtre, `Fenetre.changerDisposition`, retiré, et la
-taille aussi changeait la structure). Toutes les 2 s, la boucle de la fenêtre
-(`Fenetre.periodique`) compare la disposition des préférences à celle de la fenêtre ouverte
-(`Fenetre.dispositionChangee`) ; si elle a changé, elle lance `Fenetre.rouvrir`, une seule fois
-(`Fenetre.aRouvrir`) : l'envoi automatique est annulé, le texte du champ gardé
-(`Fenetre.brouillon`), la fenêtre fermée (`controle.close()`) ; à la fin de son contexte,
-`Fenetre.afficher` la rouvre dans la disposition des préférences, et rend le brouillon au champ
-sans l'envoyer (`Fenetre.ignorerSaisie`). Chaque ouverture a sa génération
-(`Fenetre.generation`) : `Fenetre.boucle(generation)` s'arrête dès qu'une autre fenêtre est
-ouverte, il n'en tourne jamais deux. Les photos jointes restent ; le défilement, l'image choisie et
-l'onglet repartent du début. « Ouvrir la fenêtre Claude » (ou ⌃⌥C) fait de même sans attendre :
-`Fenetre.afficher()` sur une fenêtre ouverte dans une autre disposition que les préférences la
-rouvre, sinon la met devant. Chaque disposition a son cadre enregistré
-(`Fenetre.cadre(disposition)` : `DeveloppeurClaude-<disposition>-grande-<Fenetre.FORME>`,
-`FORME` à 1) : le nom garde « grande », pour reprendre le cadre déjà enregistré dans cette taille
-(en 1.1, `DeveloppeurClaude-<disposition>-<taille>-<FORME>`).
+**Réouverture, retirée après la 1.1.1.** Une fenêtre ouverte ne change pas de structure : en 1.1
+et 1.1.1, une autre disposition la fermait et la rouvrait (en 1.1, par le menu Disposition de la
+fenêtre, `Fenetre.changerDisposition` ; en 1.1.1, par le Gestionnaire de modules externes : toutes
+les 2 s, la boucle, `Fenetre.periodique`, comparait la disposition des préférences à celle de la
+fenêtre ouverte, `Fenetre.dispositionChangee`, puis lançait `Fenetre.rouvrir` une seule fois,
+`Fenetre.aRouvrir` ; le texte du champ, gardé dans `Fenetre.brouillon`, revenait sans partir). Avec
+une seule disposition, `Fenetre.rouvrir`, `dispositionChangee`, `aRouvrir`, `brouillon` et
+`Fenetre.disposition` sont retirés ; `Fenetre.periodique` ne relit plus que les voyants et la photo
+active. Chaque ouverture garde sa génération (`Fenetre.generation`) : `Fenetre.boucle(generation)`
+s'arrête dès qu'une autre fenêtre est ouverte, il n'en tourne jamais deux, et l'envoi automatique
+d'une fenêtre fermée ne part pas. « Ouvrir la fenêtre Claude » (ou ⌃⌥C) sur une fenêtre ouverte la
+met devant, remontre la photo active et, sur une conversation vide, fait préparer une proposition
+(voir Proposition préparée à l'ouverture). Le cadre enregistré (`Fenetre.cadre()`, sans argument :
+`DeveloppeurClaude-conversation-grande-<Fenetre.FORME>`, `FORME` à 1) porte le nom qu'avait celui
+de la Conversation claire en 1.1.1 : le cadre déjà enregistré sert encore (en 1.1.1,
+`Fenetre.cadre(disposition)` : `DeveloppeurClaude-<disposition>-grande-<FORME>` ; en 1.1,
+`DeveloppeurClaude-<disposition>-<taille>-<FORME>`).
+
+### Proposition préparée à l'ouverture (après la 1.1.1)
+
+À l'ouverture de la fenêtre, et quand le menu Ouvrir la fenêtre Claude ou ⌃⌥C la rappelle, Claude
+prépare une proposition de retouche de la photo active (demandé par Dany le 20 octobre 2026) :
+`Fenetre.proposerAOuverture`, appelée après `Fenetre.majPhoto` (à l'ouverture, juste avant que
+la fenêtre s'affiche ; dans une tâche quand elle est rappelée), envoie
+`Consignes.proposerOuverture` (« Prépare une proposition de retouche de la photo active, rendu
+naturel : note-la d'abord si elle n'est pas encore évaluée, puis montre ce que tu changerais avec
+preview_settings, sans rien appliquer. J'accepterai, refuserai ou ajusterai dans l'onglet
+Proposition. ») par `Fenetre.envoyer`, comme une demande de Dany (style et photos jointes,
+modèle et effort des préférences). Elle ne le fait que si la fenêtre a une photo active, que
+Claude ne travaille pas, que la préférence `propositionAOuverture` est cochée (voir Préférences),
+et que la conversation montrée est vide (ou qu'il n'y en a pas) : une conversation qui a déjà des
+éléments ne reçoit rien. Une autre photo choisie fenêtre fermée
+commence une nouvelle conversation à la réouverture (`Fenetre.majPhoto`, voir Nouvelle
+conversation par photo), qui reçoit donc la demande ; une autre photo choisie fenêtre ouverte,
+quand elle commence une conversation, la laisse vide jusqu'au rappel suivant de la fenêtre.
+
+La proposition qui arrive attend dans l'onglet Proposition, sans y basculer : tant que
+`Fenetre.propositionAuto` est vrai (posé après l'envoi), `Fenetre.rafraichirProposition` ne change
+pas d'onglet, et la carte Note reste devant. La demande suivante de Dany (`Fenetre.envoyer`)
+l'efface : les propositions suivantes se montrent de nouveau d'elles-mêmes. La note que Claude
+propose d'abord (voir Carte Note) fait encore passer à l'onglet Note, comme toute note arrivée
+pour la photo montrée (`Fenetre.rafraichirNotation`).
 
 ### Carte Note (1.1, revue en 1.1.1)
 
-`Vues.notation` : un `group_box` « Note » pour la photo active, dans les trois dispositions (colonne
-Note de l'Atelier, onglet Note de la Conversation claire, sous l'aperçu, onglet Noter du
-Panneau ; dans un onglet, une colonne à titre gras, par `Vues.masquable`). Il montre :
+`Vues.notation` : un `group_box` « Note » pour la photo active, dans l'onglet Note, sous l'aperçu
+(dans un onglet, une colonne à titre gras, par `Vues.masquable`) ; en 1.1 et 1.1.1, aussi dans la
+colonne Note de l'Atelier et l'onglet Noter du Panneau, retirés après la 1.1.1. Il montre :
 
 - le nom de la photo (`notationNom`) et sa note posée (`notationPosee`,
   `Fenetre.texteNotePosee` : « Note posée : ★★☆☆☆ · rejetée », « aucune, pas encore jugée »),
@@ -651,7 +729,8 @@ si Dany le demande : `view_photo` donne son évaluation (`evaluation`, gardée d
 voir Tri d'une séance › Point de mise au point). Quand Dany écrit à Claude « note ces photos » ou
 « pose les notes », Claude appelle `propose_ratings` avec `apply = true` (consignes de la fenêtre
 et du connecteur) : les notes sont aussi posées dans le catalogue (voir Notation), et la carte
-montre la proposition acceptée. Le Panneau garde son onglet « Noter » : c'est la carte Note.
+montre la proposition acceptée. En 1.1.1, l'onglet « Noter » du Panneau était la carte Note ;
+il est retiré avec le Panneau.
 
 Accepter et Changer… sont désactivés pendant que Claude travaille (`Moteur.travaille`) ou qu'une
 écriture de la fenêtre est en cours (`Fenetre.noteEnCours`), et `Fenetre.poserNote` le revérifie :
@@ -670,12 +749,13 @@ notation…, par Séance… ou par Noter avec plusieurs photos) : une planche de
 fiche, Tout accepter, sa propre conversation de genre `notation`, ses consignes
 (`Consignes.texteNotation`) et ses passes (`Consignes.passes`). Elle est retirée en 1.1.1 (demandé
 par Dany le 20 octobre 2026), avec `MenuNotation.lua`, les boutons Séance…, `Consignes.pour`,
-`Moteur.nouvelleSeance`, `Conversation.nouvelleSeance`, `Vignettes.demander`, les séances du
-registre, l'action `seance` de la commande `notation`, les paramètres `session` et
-`read_session` de `propose_ratings`, `essais-seance.lua` et `docs/seance.png`. Les conversations
-des anciennes séances (genre `notation`) restent sur le disque, absentes de la liste et du menu, et
-ne s'ouvrent plus (`Moteur.ouvrir` les refuse). Ce qui a été constaté sur elle reste plus bas,
-comme historique.
+`Moteur.nouvelleSeance`, `Conversation.nouvelleSeance`, les séances du registre, l'action
+`seance` de la commande `notation`, les paramètres `session` et `read_session` de
+`propose_ratings`, `essais-seance.lua` et `docs/seance.png` (`Vignettes.demander`, qui lui
+donnait ses vignettes, reste : il sert à l'aperçu de la photo active). Les conversations des
+anciennes séances (genre `notation`) restent sur le disque, absentes de la liste (et du menu des
+conversations, retiré après la 1.1.1), et ne s'ouvrent plus (`Moteur.ouvrir` les refuse). Ce qui
+a été constaté sur elle reste plus bas, comme historique.
 
 ### Nouvelle conversation par photo (1.1.1)
 
@@ -702,12 +782,13 @@ dernière clé vue et l'heure où elle l'a vue (`Fenetre.voirSelection` : `Fenet
   parlait d'autres photos (sa clé n'est pas la nouvelle).
 
 `Fenetre.cleVue` et `Fenetre.cleVueLe` restent d'une ouverture de la fenêtre à l'autre (pas d'un
-chargement du module à l'autre) : une photo choisie fenêtre fermée compte aussi, à la réouverture,
-et une fenêtre fermée pendant que Claude travaillait retrouve sa conversation à la réouverture
-(la clé qu'elle avait vue date d'avant la fin de son travail). Un premier état de la 1.1.1 notait
-la fin du travail dans la boucle de la fenêtre (`Fenetre.finTravail`, `Fenetre.travaillait`),
-donc fenêtre ouverte seulement : retirés. Revenir aux photos d'une ancienne conversation ne la
-rouvre pas.
+chargement du module à l'autre) : une photo choisie fenêtre fermée compte aussi, à la réouverture
+(après la 1.1.1, la nouvelle conversation, vide, reçoit alors la proposition préparée à
+l'ouverture), et une fenêtre fermée pendant que Claude travaillait retrouve sa conversation à la
+réouverture (la clé qu'elle avait vue date d'avant la fin de son travail). Un premier état de la
+1.1.1 notait la fin du travail dans la boucle de la fenêtre (`Fenetre.finTravail`,
+`Fenetre.travaillait`), donc fenêtre ouverte seulement : retirés. Revenir aux photos d'une
+ancienne conversation ne la rouvre pas.
 
 ### Fichiers
 
@@ -722,8 +803,10 @@ rouvre pas.
     Sessions/<id>-<date>-<n>/               échanges avec un processus Claude Code, et ses
                                             consignes (consignes.md, écrit à son lancement)
     Atelier/                                dossier de travail de Claude Code (vide)
-    Temporaire/                             fichiers de passage (Collees/, sorties de commandes ;
-                                            en 1.1, Notation/<séance>/ : vignettes de la séance)
+    Temporaire/                             fichiers de passage (Collees/, sorties de commandes,
+                                            PhotoActive/ : vignette de la photo active, et après
+                                            la 1.1.1 sa copie marquée <nom>-af.jpg ; en 1.1,
+                                            Notation/<séance>/ : vignettes de la séance)
     connecteur.json                         écrit à chaque lancement de Claude Code
     consommation.json, publication.json     jetons comptés, profils de publication de l'utilisateur
     notation.json                           notes proposées par Claude (registre, format 2, propre
@@ -740,29 +823,32 @@ y a ses réglages (`Preferences.defauts` : `demarrerAuLancement`, `mode`, `insta
 garde-fous, `accordDansLightroom`, `retourVisuel`, et depuis la 1.1.1 `pointMiseAuPoint`, faux
 par défaut : le point de mise au point dessiné sur chaque aperçu de `view_photo`, pas seulement
 pour noter, voir Tri d'une séance › Point de mise au point), et `Chemins.prefs` y ajoute ceux de
-la fenêtre (`Chemins.defauts` : `disposition` — `atelier`, `conversation` ou `panneau`,
-`conversation` par défaut, depuis la 1.1 —, `modele` — `fable`, `opus` par défaut, `sonnet`,
-`haiku` —, `effort` — `max` par défaut, `xhigh`, `high`, `medium`, `low`, le même pour les quatre
-modèles, depuis la 1.1.1 —, `nouvelleParPhoto` — vrai par défaut, depuis la 1.1.1, voir Nouvelle
-conversation par photo —, `styleChoisi`, `inactivite` en minutes), puis `cheminClaude` et
-`cheminConnecteur` (par défaut, le premier Claude Code trouvé et
+la fenêtre (`Chemins.defauts` : `modele` — `fable`, `opus` par défaut, `sonnet`, `haiku` —,
+`effort` — `max` par défaut, `xhigh`, `high`, `medium`, `low`, le même pour les quatre modèles,
+depuis la 1.1.1 —, `nouvelleParPhoto` — vrai par défaut, depuis la 1.1.1, voir Nouvelle
+conversation par photo —, `propositionAOuverture` — vrai par défaut, après la 1.1.1, voir
+Proposition préparée à l'ouverture —, `styleChoisi`, `inactivite` en minutes), puis
+`cheminClaude` et `cheminConnecteur` (par défaut, le premier Claude Code trouvé et
 `~/Library/Application Support/Developpeur/mcp-developpeur`) ; la fenêtre Publication y garde
 `dossierPublication` et `profilPublication`. Aucune clé ne sert aux deux. La clé `taille`
-(petite, moyenne par défaut, grande) est retirée en 1.1.1 : une seule taille (voir Dispositions).
-Le mode « Proposer d'abord » est la clé `mode` de la liaison, que la fenêtre montre et bascule.
-Tout se règle dans Fichier › Gestionnaire de modules externes › Développeur (sections Liaison
-avec Claude et Fenêtre Claude, `PluginInfoProvider.lua`). Depuis la 1.1.1, la section Liaison a la
-case « Mise au point » (« Montrer le carré de mise au point (Fujifilm) sur chaque aperçu »), et
-la section Fenêtre Claude les menus Modèle (« pour la demande suivante ») et Effort (« le même
-pour les quatre modèles »), à côté du menu Disposition (« la fenêtre ouverte se rouvre »), et la
-case « Autre photo » (« Nouvelle conversation pour une autre photo ou sélection ») ; le menu
-Taille de la fenêtre est retiré. Le modèle, l'effort et la disposition ne se choisissent plus que
-là (en 1.1, le modèle ne se choisissait que dans la fenêtre, et la disposition aussi par son
-menu). Un autre modèle ou un autre effort vaut pour la
-demande suivante (voir Claude Code) ; une autre disposition rouvre d'elle-même une fenêtre
-ouverte, dans les 2 s (voir Dispositions). Le diagnostic du Gestionnaire donne
-`pointMiseAuPoint` (« point de mise au point en tout temps ») avec les réglages de la liaison, et
-le modèle, l'effort, la disposition et `nouvelleParPhoto` avec ceux de la fenêtre.
+(petite, moyenne par défaut, grande) est retirée en 1.1.1 : une seule taille ; la clé
+`disposition` (`atelier`, `conversation` par défaut, `panneau`, depuis la 1.1) l'est après la
+1.1.1 : une seule disposition (voir Disposition). Le mode « Proposer d'abord » est la clé `mode`
+de la liaison, que la fenêtre montre et bascule. Tout se règle dans Fichier › Gestionnaire de
+modules externes › Développeur (sections Liaison avec Claude et Fenêtre Claude,
+`PluginInfoProvider.lua`). Depuis la 1.1.1, la section Liaison a la case « Mise au point »
+(« Montrer le carré de mise au point (Fujifilm) sur chaque aperçu »), et la section Fenêtre Claude
+les menus Modèle (« pour la demande suivante ») et Effort (« le même pour les quatre modèles »)
+et la case « Autre photo » (« Nouvelle conversation pour une autre photo ou sélection ») ; le
+menu Taille de la fenêtre est retiré. Après la 1.1.1, le menu Disposition (« la fenêtre ouverte
+se rouvre »), qui suivait le menu Effort, est retiré, et la case « À l'ouverture » (« Claude
+prépare une proposition de retouche (rien n'est appliqué) ») suit « Autre photo ». Le modèle et
+l'effort ne se choisissent plus que là (en 1.1, le modèle ne se choisissait que dans la fenêtre,
+et la disposition aussi par son menu). Un autre modèle ou un autre effort vaut pour la demande
+suivante (voir Claude Code). Le diagnostic du Gestionnaire donne `pointMiseAuPoint` (« point de
+mise au point en tout temps ») avec les réglages de la liaison, et le modèle, l'effort,
+`nouvelleParPhoto` et, après la 1.1.1, `propositionAOuverture` (« proposition à l'ouverture »)
+avec ceux de la fenêtre (la disposition, qu'il donnait en 1.1.1, n'y est plus).
 
 ### Coller une image
 
@@ -801,35 +887,36 @@ Budget (2 M par défaut) : alerte à 80 %, refus des demandes à 100 %. Les barr
 
 ### Versions
 
-En bas de la colonne de droite (Conversation claire), de la colonne Note (Atelier) ou de la
-fenêtre (Panneau), deux lignes (`Composants.lua`, `Vues.versions`), lues à l'ouverture de la
-fenêtre : « Développeur », ce module (`VERSION` de son `Info.lua`), et « MCP-Développeur », le
-connecteur (`mcp-developpeur --version`, cinq secondes au plus). Les deux viennent de la même
-installation, au même numéro : si elles diffèrent, la plus ancienne passe en orange « à mettre à
-jour » (réinstaller Développeur) ; un connecteur absent devient « MCP-Développeur ·
-introuvable ».
+En bas de la colonne de droite (en 1.1 et 1.1.1, aussi de la colonne Note de l'Atelier et de la
+fenêtre du Panneau, retirés), deux lignes (`Composants.lua`, `Vues.versions`), lues à
+l'ouverture de la fenêtre : « Développeur », ce module (`VERSION` de son `Info.lua`), et
+« MCP-Développeur », le connecteur (`mcp-developpeur --version`, cinq secondes au plus). Les deux
+viennent de la même installation, au même numéro : si elles diffèrent, la plus ancienne passe en
+orange « à mettre à jour » (réinstaller Développeur) ; un connecteur absent devient
+« MCP-Développeur · introuvable ».
 
 ### Bas de la fenêtre
 
-Dans la disposition Conversation claire (celle de la 1.0), les trois colonnes finissent sur la
-même ligne : Renommer et Supprimer à gauche, le champ de demande et Envoyer au centre, la ligne de
-MCP-Développeur à droite. Les colonnes ont `fill_vertical = 1` ; à droite, une `f:spacer`
-élastique, sous la carte Note ou la proposition, pousse en bas Publication et Consommation, le
-séparateur et les versions ; au centre, une autre (après ▲ ▼ Fin) ne grandit que si une autre
-colonne est plus haute. La liste des conversations a une hauteur fixe (`D.hauteurListe` = lignes
-du fil × 17 + 85 depuis la 1.1.1, + 93 en 1.1 : la grille, plus ce qui la suit au centre, ▲ ▼,
-séparateur, invites et Style, bandeau, demande) : `fill_vertical` sur `simple_list` reste sans
-effet (constaté). Dans l'Atelier, un espace élastique pousse de même Publication, Consommation et
-les versions en bas de la colonne Note, et les invites en bas de la colonne de la conversation.
-Sous le champ de demande, plus de ligne de message (dans l'Atelier et le Panneau, seulement
-Envoyer, à droite) : ce qui s'y affichait passe dans le bandeau (`Vues.bandeau`), une ligne en
-petit sur sa propre ligne, sous les invites et le menu Style, au-dessus de la demande, dans les
-trois dispositions depuis la 1.1.1 (en 1.1, à droite du menu Style, sauf dans le Panneau). Il
-montre un message (orange), sinon l'aide d'un voyant rouge (un clic l'affiche en entier), sinon
-les photos jointes (un clic les retire), sinon rien (`Fenetre.etatBandeau` : `message`, `aide`,
-`jointes` ou `vide`). Le rappel « ajouté à chaque demande, invites comprises » de la 1.1 (état
-`rappel`) est retiré en 1.1.1 (demandé par Dany le 20 octobre 2026) ; l'infobulle du menu Style
-le dit encore. La propriété `bandeau` suit `message`, `aide` et `jointes` par des observateurs.
+Dans la Conversation claire (la disposition de la 1.0, seule après la 1.1.1), les trois
+colonnes finissent sur la même ligne : Renommer et Supprimer à gauche, le champ de demande et
+Envoyer au centre, la ligne de MCP-Développeur à droite. Les colonnes ont `fill_vertical = 1` ; à
+droite, une `f:spacer` élastique, sous la carte Note ou la proposition, pousse en bas Publication
+et Consommation, le séparateur et les versions ; au centre, une autre (après ▲ ▼ Fin) ne grandit
+que si une autre colonne est plus haute. La liste des conversations a une hauteur fixe
+(`D.hauteurListe` = lignes du fil × 17 + 85 depuis la 1.1.1, + 93 en 1.1 : la grille, plus ce
+qui la suit au centre, ▲ ▼, séparateur, invites et Style, bandeau, demande) : `fill_vertical` sur
+`simple_list` reste sans effet (constaté). Dans l'Atelier (retiré après la 1.1.1), un espace
+élastique poussait de même Publication, Consommation et les versions en bas de la colonne Note,
+et les invites en bas de la colonne de la conversation. Sous le champ de demande, plus de ligne de
+message (dans l'Atelier et le Panneau de la 1.1.1, seulement Envoyer, à droite) : ce qui s'y
+affichait passe dans le bandeau (`Vues.bandeau`), une ligne en petit sur sa propre ligne, sous
+les invites et le menu Style, au-dessus de la demande, depuis la 1.1.1 (en 1.1, à droite du menu
+Style, sauf dans le Panneau). Il montre un message (orange), sinon l'aide d'un voyant rouge (un
+clic l'affiche en entier), sinon les photos jointes (un clic les retire), sinon rien
+(`Fenetre.etatBandeau` : `message`, `aide`, `jointes` ou `vide`). Le rappel « ajouté à chaque
+demande, invites comprises » de la 1.1 (état `rappel`) est retiré en 1.1.1 (demandé par Dany le
+20 octobre 2026) ; l'infobulle du menu Style le dit encore. La propriété `bandeau` suit
+`message`, `aide` et `jointes` par des observateurs.
 
 ### Raccourcis clavier
 
@@ -866,17 +953,18 @@ suffit pas.
   le contenu devient plus étroit ou moins haut (bande vide en bas). Le cadre de la fenêtre Claude
   porte donc la taille choisie et un numéro de forme (`Fenetre.cadre` :
   `DeveloppeurClaude-<taille>-1` en 1.0, `DeveloppeurClaude-<disposition>-<taille>-1` en 1.1,
-  `DeveloppeurClaude-<disposition>-grande-1` depuis la 1.1.1, une seule taille, où 1 est
-  `Fenetre.FORME`, à augmenter quand le contenu rapetisse) ; la fenêtre rouvre alors une fois à la
-  position par défaut. Les autres fenêtres ont leur cadre :
-  `DeveloppeurPublication`, `DeveloppeurConsommation`, `DeveloppeurSuivi`, et en 1.1
-  `DeveloppeurNotation` (Séance de notation, retirée en 1.1.1).
+  `DeveloppeurClaude-<disposition>-grande-1` en 1.1.1, une seule taille,
+  `DeveloppeurClaude-conversation-grande-1` après la 1.1.1, une seule disposition, le même nom
+  que le cadre de la Conversation claire en 1.1.1, où 1 est `Fenetre.FORME`, à augmenter quand le
+  contenu rapetisse) ; la fenêtre rouvre alors une fois à la position par défaut. Les autres
+  fenêtres ont leur cadre : `DeveloppeurPublication`, `DeveloppeurConsommation`,
+  `DeveloppeurSuivi`, et en 1.1 `DeveloppeurNotation` (Séance de notation, retirée en 1.1.1).
 - Quand une fenêtre du module est devant (ou que Lightroom n'est pas l'application active), le
   menu Fichier de Lightroom est réduit (Nouveau catalogue, Ouvrir le catalogue, Mise en page,
   Imprimante) : les entrées du module et le Gestionnaire de modules n'y sont pas. D'où les boutons
   Publication et Consommation dans la fenêtre Claude (et, en 1.1, Séance… et le menu Disposition,
-  retirés en 1.1.1 : la disposition, le modèle et l'effort se choisissent dans le Gestionnaire,
-  la fenêtre principale de Lightroom devant).
+  retirés en 1.1.1 : le modèle et l'effort se choisissent dans le Gestionnaire, la fenêtre
+  principale de Lightroom devant, comme la disposition en 1.1.1, retirée depuis).
 - Publication : JPEG 5 Mpx d'un RAF de X-H2S, 2738 × 1825, sRGB, sans position GPS ; dossier créé,
   bilan et « Afficher dans le Finder ».
 - 20 octobre 2026 (1.1, premier essai réel) : `visible` lié posé sur un conteneur est sans effet.
@@ -895,8 +983,9 @@ suffit pas.
   `undo_last` qui retire la note, réouverture par ↻ ; fenêtre retirée en 1.1.1), le Gestionnaire
   de modules externes avec le menu Disposition, et une passe 1 avec le vrai Claude.
 - 20 octobre 2026 (1.1, essai réel avant la publication), vus fonctionner : les trois
-  dispositions en taille Grande, ouvertes l'une après l'autre par le menu Disposition de la
-  fenêtre (elle se ferme et se rouvre, la conversation gardée ; menu retiré en 1.1.1) ; les
+  dispositions en taille Grande (l'Atelier et le Panneau retirés après la 1.1.1), ouvertes l'une
+  après l'autre par le menu Disposition de la fenêtre (elle se ferme et se rouvre, la
+  conversation gardée ; menu retiré en 1.1.1, réouverture retirée après la 1.1.1) ; les
   onglets par vues simples (chaque onglet ne montre que ses vues ; Agrandir de l'onglet Aperçu,
   retiré en 1.1.1, répond sous la colonne Note, superposée) ; les glyphes ★ ☆ ◀ ▶ ; Noter (bouton
   retiré en 1.1.1) avec le vrai Claude (cull_photos, view_photo, propose_ratings ; la carte Note
@@ -912,11 +1001,12 @@ suffit pas.
   le refus ne vient qu'au-delà de 300 (`Notation.toleranceCritere`).
 - 20 octobre 2026 (1.1) : dans le Panneau, le rappel « ajouté à chaque demande » restait sous la
   place laissée à la proposition, plus haute, loin du Style : chaque variante (invites et Style,
-  proposition) porte son bandeau (le rappel est retiré en 1.1.1).
+  proposition) porte son bandeau (le rappel est retiré en 1.1.1, le Panneau après la 1.1.1).
 - 20 octobre 2026 (1.1.1), vus sur les captures refaites (`docs/capture.png`, `atelier.png`,
-  `panneau.png`) : la barre de titre « Développeur » et les versions 1.1.1 ; dans la Conversation
-  claire, les boutons radio Note et Proposition en tête de la colonne de droite, puis l'aperçu,
-  ◀ légende ▶, Agrandir, la carte Note (« Claude propose : ★★☆☆☆ » en rouge, « à vérifier ·
+  `panneau.png` ; ces deux-là retirées après la 1.1.1, avec leurs dispositions) : la barre de
+  titre « Développeur » et les versions 1.1.1 ; dans la Conversation claire, les boutons radio
+  Note et Proposition en tête de la colonne de droite, puis l'aperçu, ◀ légende ▶, Agrandir, la
+  carte Note (« Claude propose : ★★☆☆☆ » en rouge, « à vérifier ·
   passe 1 », critères, plafond mesuré et raison, coupés en page, ▼ actif ; boutons Accepter et
   Changer… seulement), Publication… et Consommation… au-dessus des versions ; dans les trois
   dispositions, le menu Style au bout de la dernière rangée d'invites, sans étiquette, et il y
@@ -925,9 +1015,10 @@ suffit pas.
   vignette 3:2. Deux défauts vus, corrigés depuis, à revoir sur une prochaine capture : une ligne
   de la carte Note commençait par « ; mais » (`Fil.couper`, voir Contraintes du SDK), et dans
   l'Atelier les ▲ ▼ de la Proposition (740 points) n'allaient pas jusqu'au bord droit de leur
-  rangée (les rangées des boutons des deux cartes portent depuis `fill_horizontal = 1`).
+  rangée (les rangées des boutons des deux cartes portent depuis `fill_horizontal = 1` ; sans
+  objet pour l'Atelier, retiré après la 1.1.1).
 
-### À constater dans Lightroom (1.1 et 1.1.1)
+### À constater dans Lightroom (1.1, 1.1.1 et après)
 
 La 1.1 a été construite et vérifiée le 20 octobre 2026 par les deux suites (`swift test`,
 `scripts/tester-module.sh`, essais `essais-*.lua` compris), puis essayée dans Lightroom le même
@@ -938,7 +1029,11 @@ Gestionnaire, une seule taille, Conversation claire revue, nouvelle conversation
 point de mise au point dans `view_photo`) est vérifiée par les deux suites (`swift test` :
 237 tests ; `scripts/tester-module.sh` : liaison 212, fenêtre 43, `essais-dispositions` 17,
 `essais-integration` 6, `essais-moteur` 13) ; dans Lightroom, seules les captures ont été
-refaites (section précédente ; `docs/seance.png` est retirée).
+refaites (section précédente ; `docs/seance.png` est retirée). Après la 1.1.1 (pour la 1.2 : point
+de mise au point sur l'aperçu de la photo active et sur un zoom, proposition préparée à
+l'ouverture, Conversation claire seule), les deux suites passent (`swift test` : 238 tests ;
+`scripts/tester-module.sh` : liaison 212, fenêtre 43, `essais-dispositions` 17,
+`essais-integration` 7, `essais-moteur` 13) ; rien n'en a encore été vu dans Lightroom.
 Restent à voir, à l'usage ; ce qui sera constaté passera dans sa section, avec sa règle dans la
 simulation de sa suite.
 
@@ -954,27 +1049,25 @@ simulation de sa suite.
 3. Rendu de ⚑ dans les lignes du fil (Menlo 11). Les largeurs de `Metriques.lua` viennent de
    NSString : vérifier qu'aucune ligne n'est coupée autrement, ni dans les textes de la carte Note
    et de la Proposition, coupés de même (1.1.1). Onglets par vues simples : les boutons d'un
-   onglet couvert (Accepter, Changer… et ▲ ▼ de la carte Note sous la colonne Proposition de la
-   Conversation claire ; tout Retoucher sous la colonne Noter du Panneau ; Agrandir répondait en
-   1.1 sous la colonne Note, constaté). S'ils ne répondaient pas : passer à un `tab_view` du SDK
-   (`tab_view_item` par onglet, `value` liée à `onglet`). Les boutons ▲ ▼ en `size = 'mini'`
-   (rendus, vu sur les captures) : leur clic, une page à la fois, et leur place au bord droit de
-   la rangée (`fill_horizontal`) ; la ponctuation haute gardée avec son mot. Un clic sur un bouton
-   radio ou un choix dans un `popup_menu` valide-t-il le champ de demande, et avant ou après
-   l'observateur qui annule l'envoi ?
-4. Réouverture (constatée en 1.1 par le menu Disposition) : depuis la 1.1.1, par la boucle
-   (`Fenetre.periodique`) après un changement dans le Gestionnaire de modules externes. La boucle
-   tourne-t-elle pendant que le Gestionnaire est ouvert, ou la fenêtre se rouvre-t-elle à sa
-   fermeture ? `windowWillClose`, une seule boucle (journal sans doublons), le brouillon validé
-   rendu sans partir ; ce que devient un texte tapé mais pas encore validé.
-5. `popup_menu` des conversations (Atelier, Panneau) dont les éléments liés changent pendant que
-   la fenêtre est ouverte, avec une valeur posée par programme.
-6. Hauteurs et largeurs réelles, dans la seule taille de la 1.1.1 : Atelier (environ 1 030 points
-   de contenu), Panneau (20 lignes : environ 1 050 avec la barre de titre, à tenir sur un écran de
-   1080 points), Conversation claire avec 42 lignes de fil (le centre à la hauteur de la colonne
-   de droite : boutons radio, aperçu, carte Note ; la liste des conversations, `D.hauteurListe`,
-   au niveau du champ de demande), et les rangées de boutons. Un cadre enregistré par disposition,
-   repris du cadre de la grande taille de la 1.1 (`-grande-`).
+   onglet couvert (Accepter, Changer… et ▲ ▼ de la carte Note sous la colonne Proposition ;
+   Agrandir répondait en 1.1 sous la colonne Note, constaté ; en 1.1.1, aussi tout Retoucher
+   sous la colonne Noter du Panneau, retiré après la 1.1.1). S'ils ne répondaient pas : passer à
+   un `tab_view` du SDK (`tab_view_item` par onglet, `value` liée à `onglet`). Les boutons ▲ ▼
+   en `size = 'mini'` (rendus, vu sur les captures) : leur clic, une page à la fois, et leur place
+   au bord droit de la rangée (`fill_horizontal`) ; la ponctuation haute gardée avec son mot. Un
+   clic sur un bouton radio ou un choix dans un `popup_menu` valide-t-il le champ de demande, et
+   avant ou après l'observateur qui annule l'envoi ?
+4. Réouverture : sans objet après la 1.1.1 (une seule disposition, plus de réouverture : voir
+   Disposition). Constatée en 1.1 par le menu Disposition ; celle de la 1.1.1, par la boucle
+   (`Fenetre.periodique`) après un changement dans le Gestionnaire, n'a pas été vue.
+5. Menu des conversations (`popup_menu` de l'Atelier et du Panneau) : sans objet après la 1.1.1,
+   retiré avec eux.
+6. Hauteurs et largeurs réelles de la Conversation claire, seule disposition, dans sa seule
+   taille : 42 lignes de fil (le centre à la hauteur de la colonne de droite : boutons radio,
+   aperçu, carte Note ; la liste des conversations, `D.hauteurListe`, au niveau du champ de
+   demande), et les rangées de boutons, dont les invites et le Style sur une seule rangée. Le
+   cadre enregistré (`DeveloppeurClaude-conversation-grande-1`) repris de la 1.1.1, lui-même
+   repris de la grande taille de la 1.1 (`-grande-`).
 7. Carte Note de bout en bout : Accepter (dans une tâche) et Changer… (fenêtre modale, 0 à 5 ★)
    écrivent par `Bibliotheque.noter` depuis une tâche de la fenêtre (`setRawMetadata` de
    `rating` et `pickStatus`). La note posée se relit dans la carte. Lecture de
@@ -999,18 +1092,32 @@ simulation de sa suite.
     `af_point`, `propose_ratings` sans `apply`), ne renote pas une photo déjà évaluée
     (`evaluation`), passe `apply = true` quand Dany écrit « note ces photos », et n'écrit pas de
     note par `set_metadata` sans demande ; les lignes « Notes proposées » et « Notes posées »
-    s'affichent dans le fil des trois dispositions. Dans Claude Desktop, l'invite `noter` sans
-    précision note la sélection.
+    s'affichent dans le fil. Dans Claude Desktop, l'invite `noter` sans précision note la
+    sélection.
 11. Gestionnaire de modules externes (le menu Disposition s'y affichait en 1.1, constaté) : les
-    menus Modèle, Effort et Disposition, la case « Autre photo » de la section Fenêtre Claude et
-    la case « Mise au point » de la section Liaison s'affichent et s'écrivent ; plus de menu
-    Taille. Coût de la réécriture de `notation.json` à chaque décision avec quelques centaines de
-    propositions.
+    menus Modèle et Effort, les cases « Autre photo » et, après la 1.1.1, « À l'ouverture » de la
+    section Fenêtre Claude, et la case « Mise au point » de la section Liaison s'affichent et
+    s'écrivent ; plus de menu Taille, ni, après la 1.1.1, de menu Disposition. Coût de la
+    réécriture de `notation.json` à chaque décision avec quelques centaines de propositions.
 12. Point de mise au point dans `view_photo` (1.1.1) : sur un RAF de Fujifilm (X-T20 de la recette,
     X-H2S), le carré à la place du collimateur, photo tournée ou recadrée comprise ; rouge pour
     une mise au point signalée manquée ; dessiné sans `af_point` quand la case « Mise au point »
     est cochée ; une lecture bloquée par une demande d'autorisation de macOS saute le point, puis
-    reprend quand l'utilisateur a répondu.
+    reprend quand l'utilisateur a répondu. Après la 1.1.1, sur un zoom (`region`) : le carré dans
+    la zone quand le point y tombe (`dans_la_zone`), à sa place sur le zoom ; `dans_la_zone` faux
+    et pas de carré quand il tombe ailleurs.
+13. Aperçu de la photo active marqué (après la 1.1.1) : sur un RAF de Fujifilm (X-T20, X-H2S),
+    `mcp-developpeur --marquer-af` lancé par Lightroom (`LrTasks.execute`) dessine le carré à sa
+    place sur la vignette, photo tournée ou recadrée comprise, rouge pour une mise au point
+    signalée manquée ; Agrandir le montre ; le temps ajouté à l'ouverture (lecture bornée à 2 s).
+    Une demande d'autorisation de macOS pour le connecteur lancé par Lightroom : la vignette
+    reste-t-elle sans carré, sans bloquer la fenêtre ? Une autre marque : rien n'est lancé.
+14. Proposition préparée à l'ouverture (après la 1.1.1), avec le vrai Claude : la demande part à
+    l'ouverture et au rappel par le menu ou ⌃⌥C, sur une conversation vide seulement ; Claude
+    note d'abord la photo, puis appelle `preview_settings` sans rien appliquer ; la proposition
+    attend dans l'onglet Proposition, la carte Note devant ; rien ne part quand la case « À
+    l'ouverture » est décochée ou que la conversation a déjà des messages. Coût en jetons d'une
+    demande à chaque photo nouvelle (fenêtre Consommation).
 
 ## Réglages
 
@@ -1990,11 +2097,12 @@ c'est à l'utilisateur.
 
 **Point de mise au point dans `view_photo`** (1.1.1). Le même point, lu de même dans l'original
 (Fujifilm seulement, `ToolHandler.pointAF`, commun avec `cull_photos`), sert à noter une photo
-regardée : `view_photo` envoie `point_af = true` à la commande `apercu`, pour l'aperçu entier
-seulement (pas un zoom `region`, ni un avant/après `compare`). Le module décrit alors la photo
-comme pour une vignette (`Vignettes.decrireVignette` : `chemin_original`, `marque`, `geometrie`),
-et ajoute `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`,
-lue dans `notation.json` : « pas encore évaluée », « 3 ★ proposée par Claude, à vérifier »,
+regardée : `view_photo` envoie `point_af = true` à la commande `apercu`, pour l'aperçu entier,
+et après la 1.1.1 pour un zoom (`region`) aussi, jamais pour un avant/après (`compare` ; en
+1.1.1, l'aperçu entier seulement). Le module décrit alors la photo comme pour une vignette
+(`Vignettes.decrireVignette` : `chemin_original`, `marque`, `geometrie`), et ajoute
+`point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`, lue dans
+`notation.json` : « pas encore évaluée », « 3 ★ proposée par Claude, à vérifier »,
 « acceptée par l'utilisateur : 3 ★ », « changée par l'utilisateur : 4 ★ (proposée : 3 ★) »,
 « proposition écartée par l'utilisateur (3 ★) » ; « rejet » à la place des étoiles pour un
 rejet). Le serveur retire `chemin_original`, `geometrie` et `marque` de la description, et
@@ -2009,6 +2117,30 @@ la case « Mise au point » du Gestionnaire est cochée (`pointMiseAuPoint`, dé
 Mesures et Vision sont prises avant le carré. `view_photo` a un seul lecteur
 (`ToolHandler.lecteurAF`) : une lecture bloquée n'en lance pas d'autres. Un point hors du cadre
 (recadrage) n'est pas donné.
+
+**Sur un zoom** (après la 1.1.1, demandé par Dany le 20 octobre 2026 : un zoom pour voir la mise
+au point ne la montrait pas). Le même point, lu de même, est ramené dans la zone demandée
+(`region`, de 0 à 1 dans l'image entière). `point_af` donne `x` et `y` dans l'image entière (au
+millième, comme sur l'aperçu entier, `ToolHandler.pointAFJSON`), `appareil` s'il y a lieu, et
+`dans_la_zone` : vrai si le point tombe dans la zone. Alors seulement, `nettete` est mesurée
+autour du point dans le zoom (le carré de 12 % de `Detail.nettete`, du petit côté du zoom), et le
+carré est dessiné sur le zoom, à sa place dans la zone, avec `af_point = true` ou la case « Mise
+au point » (`carre` : « vert, sur le zoom », ou « rouge, sur le zoom ») ; les mesures de la zone
+(`mesures_zone`) sont prises avant. Un point hors de la zone donne `dans_la_zone` faux, sans
+netteté ni carré. Les consignes de la fenêtre le disent (puce « Mise au point montrée ou jugée »,
+voir Claude Code), et la description de `af_point` aussi (« sur l'image ou le zoom (region) »).
+
+**Sur l'aperçu de la photo active de la fenêtre Claude** (après la 1.1.1, demandé par Dany le
+20 octobre 2026). Le même point, lu dans l'original par `mcp-developpeur --marquer-af <original>
+'<géométrie JSON>' <vignette.jpg> <sortie.jpg>` (`PointAF.marquer`, `main.swift`), lancé par la
+fenêtre (`Images.marquerMiseAuPoint`, voir Fenêtre Claude › Disposition) pour un fichier Fujifilm
+seulement : `geometrie` est celle de `Vignettes.decrireVignette` (dimensions affichées,
+orientation, cadre) ; le connecteur lit le point en temps borné (`LecteurPointsAF`, 2 s), le passe
+dans l'image affichée et recadrée (`GeometriePhoto.versApercu`), dessine le carré sur la vignette
+(`PreviewImages.marquerPoint`, vert ou rouge) et l'écrit dans `<sortie.jpg>`, puis écrit sur sa
+sortie une ligne JSON (`x`, `y`, `avertissement`). Code 1 sans point (pas un fichier Fujifilm,
+point illisible ou hors du cadre, original qui ne s'ouvre pas à temps), 2 pour des arguments
+illisibles. Il ne passe pas par la liaison : c'est un processus à part, lancé par Lightroom.
 
 **Tri** (`cull_photos`, `Tri.swift`). Photos visées : `photo_ids`, la sélection, une collection ou un
 dossier (par `chercher`, triées par date), 500 au plus, par lots de 25 vignettes (une commande à la
@@ -2970,6 +3102,21 @@ Constaté dans Lightroom Classic 15.6, les 17 et 18 octobre 2026, sur les photos
   `sansCalculsIA` garde `InstanceBounds` (un recalcul sans eux perdait la personne, constaté).
   Copié sur une autre photo, un tel masque n'est reconnu que si les personnes y sont aux mêmes
   places : la copie le dit (`Locaux.personnesPerdues`).
+  **Personne seule** (constaté le 20 octobre 2026 sur le portrait d'essai 53709912, une seule
+  personne pour Lightroom et pour Vision) : fait à la main (Masquage › Personnes › Personne 1,
+  Toute la personne), le masque n'a ni `InstanceIDs` ni `InstanceBounds` : sous-type 0, catégorie
+  20036, `ReferencePoint` sur la personne. Envoyé ainsi par le module, il donne le même masque
+  (même `MaskDigest`, même `ReferencePoint`) ; la peau du visage de même (sous-type 0, catégorie 2).
+  Envoyé numéroté avec un seul cadre, Lightroom le calcule aussi à l'identique, puis retire
+  `InstanceIDs` et `InstanceBounds` : le module le prenait pour une personne non reconnue et le
+  retirait (« sur 1 trouvées par Vision »), d'où l'échec de la recette sur un portrait. Depuis, le
+  serveur marque `seule` quand Vision ne trouve qu'une personne ; le module envoie alors le masque
+  sans numéro ni cadres, et `Locaux.numeroPersonne` compte comme la personne 1 un masque de
+  sous-type 0 sans `InstanceIDs` dont la catégorie est celle d'une personne
+  (`Locaux.CATEGORIES_PERSONNE` : 20036 et les parties ; le sous-type 0 sert aussi à l'arrière-plan,
+  22, et au paysage, 5000x). `Locaux.personnesPerdues` signale un tel masque qui n'est plus de
+  sous-type 0 après un recalcul. La simulation de la liaison suit ce constat (une seule personne
+  trouvée : masque de personne calculé sur elle, numéro et cadres retirés).
 - **Affinage d'un masque IA** (Lightroom 15.5, `refine` : contour progressif et contour) : rangé
   dans le `Mask/Image` même : `Feather` (curseur 25 → 0,354, 50 → 1,92, 100 → 10 ; le serveur suit
   10 × (s/100)^2,381) et `EdgeShift` (le curseur divisé par 10). Constaté : posés par le module,

@@ -7,8 +7,8 @@ lancent sur stdio ; et le module Lightroom Classic « Développeur » en Lua
 (`Lightroom/Developpeur.lrplugin`, Lightroom Classic 13.3 au moins), qui exécute ses commandes
 dans le catalogue (la liaison) et porte la fenêtre Claude (« Développeur » dans sa barre de
 titre) : une conversation avec Claude Code (forfait claude.ai, jamais l'API) qui retouche et note
-par ce même connecteur, en trois dispositions (Atelier, Conversation claire, Panneau), avec les
-fenêtres Publication et Consommation.
+par ce même connecteur, en une seule disposition (la Conversation claire), avec les fenêtres
+Publication et Consommation.
 
 Trente-quatre outils : `get_status`, `list_selection`, `view_photo`, `measure_angle`,
 `analyze_photos`, `get_settings`, `apply_settings`, `preview_settings`, `enhance_photo`,
@@ -41,10 +41,11 @@ Ce projet suit le standard commun des projets de Dany (`/standard-projet` le vé
 | Recette dans Lightroom | `./.build/debug/mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--original] [--images <dossier>]` (copies virtuelles de la collection « Développeur › Essais » que Claude n'a pas encore retouchées ; `--flash` : une photo au flash, pour les expositions d'après la prise de vue ; `--profondeur` : la copie d'une photo Portrait d'iPhone ; `--yeux-rouges` : une vraie photo au flash ; `--x-t20` : un RAF de X-T20, avec l'étape « point de mise au point dessiné pour noter (view_photo, af_point) » (carré dessiné si le point est lu, évaluation dite, chemin de l'original jamais rendu à Claude) ; `--original` accepte un original désigné par Dany ; `--images` : le dossier des zooms à regarder ; chacune est remise à l'origine ; l'étape « note proposée (propose_ratings), photo inchangée ; puis posée sur demande et annulée » vérifie le refus de 5 ★, range une proposition à vérifier par la vraie commande `notation` (elle reste dans `notation.json`), puis pose 2 ★ par `propose_ratings` avec `apply` et les annule par `undo_last`) |
 | Réglages à plat | `./.build/debug/mcp-developpeur --dump [<id>]` (une clé par ligne, pour `diff` avant et après une opération faite à la main) |
 | Recalage mesuré | `./.build/debug/mcp-developpeur --recalage <id>` (écarts du modèle de recalage sur la géométrie actuelle ; deux rendus « Claude · recalage » dans l'Historique) |
+| Carré de mise au point | `./.build/debug/mcp-developpeur --marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` (ce que la fenêtre Claude lance, avec le connecteur de `cheminConnecteur`, pour l'aperçu de la photo active : `PointAF.marquer` lit le point dans un original Fujifilm en temps borné, le passe dans l'image affichée et le dessine sur la vignette, carré vert, rouge si l'appareil a signalé la mise au point manquée ; code 1 sans point) |
 | Journal détaillé | `DEVELOPPEUR_VERBOSE=1` (durée des réponses et de chaque commande du module, sur stderr) ; `DEVELOPPEUR_LIMITE=<s>` pour essayer la réponse d'attente ; `DEVELOPPEUR_PORT=<port>` pour un autre port |
 | Journaux du module | `~/Library/Logs/Developpeur/module.log` (liaison) et `conversation.log` (fenêtre Claude), gardés sous 1 Mo ; échanges avec Claude Code : `~/Library/Application Support/Developpeur/Sessions/` |
 | Recharger le module dans Lightroom | Fermer les fenêtres du module (devant, elles réduisent le menu Fichier), Lightroom au premier plan, puis Fichier › Gestionnaire de modules externes › Développeur › Outils de l'auteur du module externe › Charger de nouveau le module ext. Un fichier `.lua` ajouté depuis le lancement ne se charge pas ainsi (« Could not load toolkit script »), ni donc un fichier qui le requiert (`Commandes.lua` requiert `Notation.lua`, nouveau en 1.1), ni un raccourci clavier changé : quitter et relancer Lightroom, après toute version qui ajoute un fichier `.lua` |
-| Remesurer les polices | `swift scripts/metriques.swift > Lightroom/Developpeur.lrplugin/Metriques.lua` (si les polices du fil, ou des textes des cartes Note et Proposition coupés de même, changent dans `Fenetre.lua`, ou pour un caractère nouveau du fil, comme ★ ☆ ⚑) ; images « aucun aperçu », une par cadre d'aperçu de `Dispositions.TAILLES`, trois seulement (`vide-200.png` du Panneau, `vide-320.png` de la Conversation claire, `vide-720x480.png` de l'Atelier) : `swift scripts/images-vides.swift Lightroom/Developpeur.lrplugin` |
+| Remesurer les polices | `swift scripts/metriques.swift > Lightroom/Developpeur.lrplugin/Metriques.lua` (si les polices du fil, ou des textes des cartes Note et Proposition coupés de même, changent dans `Fenetre.lua`, ou pour un caractère nouveau du fil, comme ★ ☆ ⚑) ; image « aucun aperçu », une seule, au cadre carré de l'aperçu de `Dispositions.TAILLES` (`vide-320.png`) : `swift scripts/images-vides.swift Lightroom/Developpeur.lrplugin` |
 | Désinstaller | `bash uninstall.sh [--tout]` (inscriptions, serveur, module, paramètres prédéfinis invisibles Lightroom fermé, fichiers de travail ; `--tout` : aussi guide de style, conversations, profils de publication, consommation, notes proposées (`notation.json`) et journaux ; jamais le catalogue ni les photos) |
 | Publier une version | voir ci-dessous |
 
@@ -81,9 +82,13 @@ style appris), publiée après un essai réel ; entre deux, seulement des correc
 ce que Dany demande lui-même entre deux étapes (1.1.1 : modèle et effort dans le Gestionnaire de
 modules externes, une seule taille de fenêtre, nouvelle conversation par photo, chaque photo
 traitée notée d'abord « à vérifier » sans bouton Évaluer, notes posées sur demande, Séance de
-notation retirée). Le standard de notation (une étoile = un niveau de qualité fixe, 0 ★ = pas encore
-jugée, rejeter = drapeau, Claude ne propose jamais 5 ★), venu de la section 1.1 de la feuille de
-route, est maintenant le texte de `Notation.standard` (voir Règles).
+notation retirée). Ce qu'il a demandé depuis (une seule disposition, aperçu de la photo active
+avec son carré de mise au point, proposition préparée à l'ouverture, point de mise au point sur un
+zoom) ira dans la 1.2, en préparation : en attendant, dans `CHANGELOG.md`, sous « ## Non publié »,
+au-dessus de « ## 1.1.1 », sans section numérotée. Le standard de notation (une étoile = un niveau
+de qualité fixe, 0 ★ = pas encore jugée, rejeter = drapeau, Claude ne propose jamais 5 ★), venu de
+la section 1.1 de la feuille de route, est maintenant le texte de `Notation.standard` (voir
+Règles).
 
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 
@@ -230,7 +235,12 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   « retouchée par Claude » n'y compte que si `proprietaireMemoire` est l'uuid de la photo.
 - Une personne précise (`add_mask`, `kind: "person"`) porte `InstanceIDs` **et** `InstanceBounds`,
   les cadres de toutes les personnes (le serveur les tire de Vision, `detecterPersonnes`) : sans
-  eux, Lightroom ne la reconnaît pas (constaté). `sansCalculsIA` les garde ;
+  eux, Lightroom ne la reconnaît pas (constaté). Sauf la personne seule d'une photo (Vision n'en
+  trouve qu'une : `seule`) : faite à la main, elle n'a ni l'un ni l'autre, seulement le sous-type 0
+  et sa catégorie, et le module l'envoie ainsi (`Locaux.personne`) ; numérotée, Lightroom la calcule
+  de même puis retire le numéro (constaté le 20 octobre 2026, même `MaskDigest`).
+  `Locaux.numeroPersonne` la compte comme la personne 1 (`Locaux.CATEGORIES_PERSONNE` : le
+  sous-type 0 sert aussi à l'arrière-plan et au paysage). `sansCalculsIA` garde les cadres ;
   `Retouche.verifierPersonnes` retire un masque non reconnu après le calcul. Les masques vides se
   retirent par `deleteAllEmptyMasks`, hors de `withWriteAccessDo` (`Masques.retirerVides`).
 - Un module ne peut pas : lancer ni faire refaire la poussière (le module ne fait que la retirer ;
@@ -285,25 +295,31 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   clients abonnés (`resources/subscribe`), sinon le dit une fois au résultat d'outil suivant
   (Claude Desktop ne s'abonne pas, constaté). Rien ne part sans une commande.
 - Une photo hors du film fixe se sélectionne après l'affichage de son dossier, avec un délai
-  (`selectionnerAvecSource`, constaté) : passer par lui. Le serveur n'ouvre un original que pour le
-  point AF d'une photo Fujifilm (`cull_photos`, `view_photo`), en temps borné (`LecteurPointsAF`) :
-  macOS peut faire attendre `open()` sans fin (autorisation d'accès au volume) ; un original qui
-  ne s'ouvre pas à temps est sauté, les suivants aussi tant que sa lecture n'a pas fini, puis la
+  (`selectionnerAvecSource`, constaté) : passer par lui. Le connecteur n'ouvre un original que
+  pour le point AF d'une photo Fujifilm (`cull_photos`, `view_photo`, et `--marquer-af` pour
+  l'aperçu de la photo active de la fenêtre Claude), en temps borné (`LecteurPointsAF`) : macOS
+  peut faire attendre `open()` sans fin (autorisation d'accès au volume) ; un original qui ne
+  s'ouvre pas à temps est sauté, les suivants aussi tant que sa lecture n'a pas fini, puis la
   lecture reprend. Claude ne répond jamais à une demande d'autorisation de macOS.
 - Le point de mise au point dans `view_photo` (Fujifilm, lu par le serveur dans l'original,
-  `PointAF.swift`) : un aperçu entier (ni zoom ni avant/après) envoie `point_af = true` à la
-  commande `apercu` ; le module décrit alors la photo comme pour les vignettes
-  (`Vignettes.decrireVignette` : `chemin_original`, `marque`, `geometrie`) et ajoute
+  `PointAF.swift`) : un aperçu entier ou un zoom (`region`), jamais un avant/après (`compare`),
+  envoie `point_af = true` à la commande `apercu` ; le module décrit alors la photo comme pour les
+  vignettes (`Vignettes.decrireVignette` : `chemin_original`, `marque`, `geometrie`) et ajoute
   `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) ; le
   serveur retire `chemin_original`, `geometrie`, `marque` et `point_af_toujours` avant de répondre
-  à Claude. Réponse : `point_af` { `x`, `y` (dans l'image affichée, de 0 à 1), `nettete` (autour du
-  point), `appareil` (« mise au point signalée manquée »), `carre` (s'il est dessiné) }. Le carré
-  (vert, rouge si l'appareil a signalé la mise au point manquée ; côté 6 % du petit côté, liseré
-  sombre ; `PreviewImages.marquerPoint`) se dessine avec `af_point = true` (pour noter) ou si la
-  case « Mise au point » de la section de la liaison du Gestionnaire est cochée
-  (`pointMiseAuPoint` de `Preferences.lua`, décochée par défaut) ; mesures et Vision sont prises
+  à Claude. Réponse : `point_af` { `x`, `y` (dans l'image affichée entière, de 0 à 1, sur un zoom
+  aussi), `dans_la_zone` (zoom seulement), `nettete` (autour du point ; sur un zoom, dans le zoom,
+  si le point y tombe), `appareil` (« mise au point signalée manquée »), `carre` (s'il est
+  dessiné : « vert » ou « rouge », puis « sur l'image » ou « sur le zoom ») }. Le carré (vert,
+  rouge si l'appareil a signalé la mise au point manquée ; côté 6 % du petit côté, liseré sombre ;
+  `PreviewImages.marquerPoint`) se dessine avec `af_point = true` (pour noter, ou montrer la mise
+  au point) ou si la case « Mise au point » de la section de la liaison du Gestionnaire est cochée
+  (`pointMiseAuPoint` de `Preferences.lua`, décochée par défaut) ; sur un zoom (demandé par Dany
+  le 20 octobre 2026), seulement si le point tombe dans la zone. Mesures et Vision sont prises
   avant le carré. Un seul lecteur pour `view_photo` (`ToolHandler.lecteurAF`) : une lecture
-  bloquée n'en lance pas d'autres.
+  bloquée n'en lance pas d'autres. Les consignes de la fenêtre (`Consignes.texte`) ont leur puce :
+  « Mise au point montrée ou jugée : view_photo avec af_point = true, sur l'aperçu entier comme sur
+  un zoom (region)… ».
 - Un masque combiné range chaque composant avec `MaskBlendMode` (0 ajouter, 1 soustraire) ; une
   intersection est une soustraction du composant inversé (`Locaux.combiner`).
 - Formes constatées des masques récents (voir `docs/SPEC.md`, Retouches locales) : objet en
@@ -427,12 +443,11 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   (plancher technique), `view_photo` avec `af_point = true`, puis `propose_ratings` sans `apply` ;
   sa note arrive « à vérifier » dans la carte Note, où Dany l'accepte ou la change (Accepter,
   Changer…). Une photo déjà évaluée (`view_photo` : `evaluation`) ne se renote pas, sauf s'il le
-  demande. Plus de bouton Noter (ou Évaluer) ni À vérifier : ni dans les invites de la
-  Conversation claire, ni dans la carte Note, ni dans la barre de l'Atelier (`Fenetre.noter`,
-  `Fenetre.verifierNote`, `Consignes.noterPhoto` et `Consignes.noterSelection` retirés, les essais
-  le vérifient) ; l'aide de la carte Note (`Fenetre.AIDE_NOTATION`) le dit, et le Panneau garde
-  son onglet « Noter » (la carte Note). Les consignes du connecteur (`ServerInfo`, Claude Desktop)
-  ne demandent pas cette note d'abord.
+  demande. Plus de bouton Noter (ou Évaluer) ni À vérifier : ni dans les invites, ni dans la carte
+  Note (`Fenetre.noter`, `Fenetre.verifierNote`, `Consignes.noterPhoto` et
+  `Consignes.noterSelection` retirés, les essais le vérifient) ; l'aide de la carte Note
+  (`Fenetre.AIDE_NOTATION`) le dit. Les consignes du connecteur (`ServerInfo`, Claude Desktop) ne
+  demandent pas cette note d'abord.
 - Ports fixes 54770 (commandes) et 54771 (réponses), sur 127.0.0.1 : `Liaison.lua` et
   `LightroomBridge` doivent rester d'accord (`DEVELOPPEUR_PORT` côté serveur pour essayer un autre
   port). Le serveur ouvre une connexion par commande : Claude Desktop, Claude Code et la fenêtre
@@ -479,67 +494,92 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   image, menu, champ, case, liste, séparateur) : sur un conteneur (`row`, `column`, `view`,
   `group_box`, `tab_view`, `scrolled_view`), Lightroom l'ignore (constaté le 20 octobre 2026 : les
   trois onglets qu'avait la Conversation claire en 1.1 s'affichaient superposés), et la simulation
-  de la fenêtre le refuse. Une condition de visibilité des pièces passe toujours par `F.egal`, `F.non`, `F.si` ou
-  `F.condition`, que `F.et` sait combiner en une liaison à plusieurs clés (`keys`, `operation`). Le
-  contenu d'un onglet se crée par une fabrique masquable (`Vues.masquable(f, F, condition)`) : elle
-  pose la condition sur chaque vue simple, combinée avec son propre `visible`, et s'emboîte
-  (Retoucher, puis `aProposition`) ; pas de `group_box` dans un onglet (elle en fait une colonne à
-  titre gras), et jamais `visible` sur la colonne d'une variante. Le fil est une grille de lignes
-  (`Fil.lua`), coupées d'après la chasse mesurée des polices (`Metriques.lua`) ; ne pas y insérer
-  de vues de hauteur variable. Le texte de la carte Note (`notationTexte` : critères, plafond
-  mesuré, puis la raison) et celui de la Proposition (`propositionTexte`) se coupent de même
+  de la fenêtre le refuse. Une condition de visibilité des pièces passe toujours par `F.egal`,
+  `F.non`, `F.si` ou `F.condition`, que `F.et` sait combiner en une liaison à plusieurs clés
+  (`keys`, `operation`). Le contenu d'un onglet se crée par une fabrique masquable
+  (`Vues.masquable(f, F, condition)`, depuis `variante` de `Dispositions.lua`) : elle pose la
+  condition sur chaque vue simple, combinée avec son propre `visible`, et peut s'envelopper dans
+  une autre (les conditions se combinent) ; pas de `group_box` dans un onglet (elle en fait une
+  colonne à titre gras), et jamais `visible` sur la colonne d'une variante. Le fil est une grille
+  de lignes (`Fil.lua`), coupées d'après la chasse mesurée des polices (`Metriques.lua`) ; ne pas y
+  insérer de vues de hauteur variable. Le texte de la carte Note (`notationTexte` : critères,
+  plafond mesuré, puis la raison) et celui de la Proposition (`propositionTexte`) se coupent de même
   (`Fenetre.lignesCarte`, `Fil.couper`, police `texte`, largeurs `D.largeurNote` et
   `D.largeurProposition`) et se montrent page par page : ▲ ▼ en taille mini à droite des boutons
   de la carte (`Vues.fleches`, `Fenetre.montrerPage`, `Fenetre.defilerTexte` ; propriétés
   `noteMonte`, `noteDescend`, `propositionMonte`, `propositionDescend`) ; un nouveau texte revient
   à sa première page. Une propriété liée doit avoir une valeur avant l'ouverture (les tests le
   vérifient, pour chaque clé d'une liaison à plusieurs clés). `save_frame` garde la taille d'une
-  ouverture à l'autre, un cadre par disposition (`Fenetre.cadre(disposition)` :
-  `DeveloppeurClaude-<disposition>-grande-<FORME>` ; « grande », la seule taille depuis la 1.1.1,
-  reprend le cadre déjà enregistré) : quand le contenu de la fenêtre Claude rapetisse, augmenter
-  `Fenetre.FORME`.
+  ouverture à l'autre (`Fenetre.cadre()`, sans argument :
+  `DeveloppeurClaude-conversation-grande-<FORME>` : le nom garde « conversation » et « grande »,
+  la seule disposition et la seule taille, et le cadre déjà enregistré sert encore) : quand le
+  contenu de la fenêtre Claude rapetisse, augmenter `Fenetre.FORME`.
 - Le champ de demande est `immediate = false` (Retour le valide) ; tout bouton de la fenêtre Claude
   passe par `Fenetre.bouton` (`F.bouton` dans les pièces) : il annule l'envoi automatique (un
   clic valide aussi le champ), et les essais le vérifient pour chaque bouton. Un nouveau bouton
   créé par `f:push_button` enverrait la demande tapée.
-- La fenêtre Claude a trois dispositions : préférence `disposition` de `Chemins.defauts`
-  (`'atelier'`, `'conversation'` par défaut, `'panneau'`), choisie dans le Gestionnaire de modules
-  externes seulement (plus de menu Disposition dans la fenêtre depuis la 1.1.1). Plus de choix de
-  taille (demandé par Dany le 20 octobre 2026) : toujours la grande, ni menu « Taille de la
-  fenêtre » ni préférence `taille`. `Fenetre.lua` garde l'état, les rafraîchissements, les actions
-  et la boucle ; les pièces (carte Note comprise) sont dans `Vues.lua`, les assemblages et leurs
-  dimensions dans `Dispositions.lua` (`Dispositions.TAILLES`, une seule table par disposition ;
-  `Dispositions.dimensions(nom)`) : ni `require 'Fenetre'` ni couleur créée à leur chargement
-  (`liens.lua` les charge sans `LrColor`), couleurs, polices et actions arrivent par `F`. Le menu
-  Style, sans étiquette, finit la dernière rangée d'invites (`Vues.invites`) dans les trois
-  dispositions ; le bandeau, sur sa ligne sous les invites, montre un message, l'aide d'un voyant
-  rouge ou les photos jointes, sinon rien (`Fenetre.etatBandeau` : état `'vide'`, plus de rappel du
-  style). Une autre disposition rouvre une fenêtre ouverte dans les 2 s (`Fenetre.periodique`,
-  depuis la boucle, et `Fenetre.afficher` : `Fenetre.dispositionChangee`, puis
-  `Fenetre.rouvrir`) : la demande tapée revient dans le champ sans partir
-  (`Fenetre.brouillon`, posé sous `Fenetre.ignorerSaisie`), et chaque ouverture a sa génération
-  (`Fenetre.generation`) : une seule boucle tourne. Les conversations des anciennes séances de
-  notation (`genre == 'notation'`) restent sur le disque, absentes de la liste et du menu des
-  conversations ; `Moteur.ouvrir` les refuse.
-- Les onglets (Note, par défaut, et Proposition dans la Conversation claire ; Retoucher et Noter
-  dans le Panneau) sont une rangée de `radio_button` (clé `onglet` ; la simulation exige
+- La fenêtre Claude n'a plus qu'une disposition, la Conversation claire (demandé par Dany le
+  20 octobre 2026) : l'Atelier, le Panneau, le menu Disposition du Gestionnaire de modules externes
+  et la préférence `disposition` sont retirés, comme, depuis la 1.1.1, le choix de la taille
+  (toujours la grande, ni menu « Taille de la fenêtre » ni préférence `taille`). `Fenetre.lua`
+  garde l'état, les rafraîchissements, les actions et la boucle ; les pièces (carte Note comprise)
+  sont dans `Vues.lua`, l'assemblage et ses dimensions dans `Dispositions.lua` (`Dispositions.NOM`,
+  `'conversation'` ; `Dispositions.TAILLES`, une seule table : `lignes` 42, `fil` 900, `liste` 250,
+  `droite` 340, `apercu` 320, `propLignes` 21, `criteres` 12 ; `Dispositions.dimensions()`, sans
+  argument ; `Dispositions.imageVide` ; `Dispositions.construire`) : ni `require 'Fenetre'` ni
+  couleur créée à leur chargement (`liens.lua` les charge sans `LrColor`), couleurs, polices et
+  actions arrivent par `F`. Les invites tiennent sur une rangée, le menu Style au bout, sans
+  étiquette (`Vues.invites`) ; les voyants, en rangée (`Vues.voyants`, plus en colonne) ; le
+  bandeau, sur sa ligne sous les invites, montre un message, l'aide d'un voyant rouge ou les photos
+  jointes, sinon rien (`Fenetre.etatBandeau` : état `'vide'`, plus de rappel du style). Plus de
+  réouverture quand la disposition changeait (`Fenetre.rouvrir`, `Fenetre.dispositionChangee`,
+  `Fenetre.aRouvrir`, `Fenetre.brouillon`), ni de menu des conversations (`Fenetre.elementsMenu`,
+  `Fenetre.MAX_MENU`, propriétés `menuConversations` et `conversationChoisie` ;
+  `Vues.menuConversations` et ses boutons `Vues.boutonsConversation`) : la liste des
+  conversations, à gauche, suffit. Part aussi Envoyer sous le champ (`Vues.envoi`) : Envoyer reste
+  à droite du champ. Chaque ouverture a sa génération (`Fenetre.generation`) : une seule boucle
+  tourne. Les conversations des anciennes séances de notation (`genre == 'notation'`) restent sur
+  le disque, absentes de la liste des conversations ; `Moteur.ouvrir` les refuse.
+- Les onglets, Note (par défaut) et Proposition, les seuls depuis le retrait du Panneau (plus de
+  Retoucher ni de Noter), sont une rangée de `radio_button` (clé `onglet` ; la simulation exige
   `checked_value`) au-dessus de variantes superposées de même largeur, pas un `tab_view` (non
   constaté dans Lightroom) ; une seule bascule automatique par proposition ou note arrivée : une
-  proposition vers Proposition ou Retoucher, une nouvelle note pour la photo active (« à
-  vérifier », ou `proposee` d'avant la 1.1.1) vers Note ou Noter. Un clic sur une ligne d'image la
-  montre dans l'aperçu, sans changer d'onglet. Colonne de droite de la Conversation claire, de
-  haut en bas : les onglets, à la place du titre « Ce que Claude voit » (retiré) ; l'aperçu,
-  toujours montré ; ◀ légende ▶ ; Agrandir ; une ligne vide ; la carte Note ou la Proposition ;
-  un espace élastique ; Publication… et Consommation… ; séparateur ; versions. La liste des
-  conversations finit au niveau du champ de demande (`D.hauteurListe` = lignes × 17 + 85).
-- L'aperçu montre la photo active à l'ouverture de la fenêtre (même déjà ouverte : menu ou ⌃⌥C)
-  et quand une autre photo devient active (`Fenetre.majPhoto`, `Fenetre.idActif`,
-  `Fenetre.voirActive` ; demandé par Dany le 20 octobre 2026) : sa vignette vient du cache
-  d'aperçus de Lightroom (`Vignettes.demander`, `requestJpegThumbnail`, dans une tâche), dans un
-  dossier à elle sous `Chemins.temporaire()/PhotoActive` (l'ancien s'efface), réduite au cadre par
-  `Images.vignette`, refaite à chaque ouverture. Une image nouvelle de la conversation montrée
-  (`Fenetre.nbImages`) la remplace ; ◀ revient aux images de la conversation, ▶ depuis la dernière
-  y retourne ; un clic sur une ligne d'image relit les images d'abord (pas de bascule).
+  proposition vers Proposition (sauf celle préparée à l'ouverture, voir plus bas), une nouvelle
+  note pour la photo active (« à vérifier », ou `proposee` d'avant la 1.1.1) vers Note. Un clic sur
+  une ligne d'image la montre dans l'aperçu, sans changer d'onglet. Colonne de droite, de haut en
+  bas : les onglets, à la place du titre « Ce que Claude voit » (retiré) ; l'aperçu, toujours
+  montré ; ◀ légende ▶ ; Agrandir ; une ligne vide ; la carte Note ou la Proposition ; un espace
+  élastique ; Publication… et Consommation… ; séparateur ; versions. La liste des conversations
+  finit au niveau du champ de demande (`D.hauteurListe` = lignes × 17 + 85).
+- L'aperçu montre la photo active (légende « Photo active · <nom> ») à l'ouverture de la fenêtre
+  (même déjà ouverte : menu Ouvrir la fenêtre Claude ou ⌃⌥C) et quand une autre photo devient
+  active (`Fenetre.majPhoto`, `Fenetre.idActif`, `Fenetre.voirActive` ; demandé par Dany le
+  20 octobre 2026) : sa vignette vient du cache d'aperçus de Lightroom (`Vignettes.demander`,
+  `requestJpegThumbnail`, dans une tâche), dans un dossier à elle sous
+  `Chemins.temporaire()/PhotoActive` (l'ancien s'efface), réduite au cadre par `Images.vignette`,
+  refaite à chaque ouverture. Une image nouvelle de la conversation montrée (`Fenetre.nbImages`)
+  la remplace ; ◀ revient aux images de la conversation, ▶ depuis la dernière y retourne ; un clic
+  sur une ligne d'image relit les images d'abord (pas de bascule).
+- Sur la vignette de la photo active d'un fichier Fujifilm (marque, ou original `.RAF`), le carré
+  de mise au point est dessiné avant la réduction (`Fenetre.marquerMiseAuPoint`, demandé par Dany
+  le 20 octobre 2026) : `Images.marquerMiseAuPoint` lance par `LrTasks.execute` le connecteur de
+  `cheminConnecteur` (s'il existe), `mcp-developpeur --marquer-af <original> '<géométrie JSON>'
+  <vignette.jpg> <sortie.jpg>` (géométrie de `Vignettes.decrireVignette`) ; `PointAF.marquer` lit
+  le point dans l'original en temps borné, le passe dans l'image affichée et écrit `<nom>-af.jpg`
+  à côté de la vignette, carré vert, rouge si l'appareil a signalé la mise au point manquée ;
+  code 1 sans point (l'aperçu reste sans carré, sans rien au journal). Autre marque : pas d'appel,
+  l'original n'est pas ouvert. Agrandir montre la vignette marquée.
+- À l'ouverture de la fenêtre Claude, et quand le menu ou ⌃⌥C la rappelle, Claude prépare une
+  proposition de retouche de la photo active (`Fenetre.proposerAOuverture`, après
+  `Fenetre.majPhoto` ; demandé par Dany le 20 octobre 2026) : seulement si la préférence
+  `propositionAOuverture` est vraie (`Chemins.defauts`, vraie par défaut ; case « À l'ouverture :
+  Claude prépare une proposition de retouche (rien n'est appliqué) » de la section Fenêtre Claude
+  du Gestionnaire de modules externes, que le diagnostic dit), qu'une photo est active, que Claude
+  est libre et que la conversation montrée est vide (une autre photo en commence une). La demande
+  est `Consignes.proposerOuverture` (la noter d'abord si elle n'est pas encore évaluée, puis
+  `preview_settings`, sans rien appliquer) ; la proposition attend dans l'onglet Proposition sans
+  y basculer (`Fenetre.propositionAuto`, effacé par la demande suivante de Dany,
+  `Fenetre.envoyer`).
 - Une autre photo active ou une autre sélection, choisie par Dany, commence une nouvelle
   conversation (`Fenetre.suivreSelection`, depuis `Fenetre.majPhoto` ; préférence
   `nouvelleParPhoto`, case « Autre photo » du Gestionnaire, cochée par défaut ; demandé par Dany le
@@ -569,25 +609,25 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   puis notarise l'archive (profil `notarisation` de `notarytool`). `SKIP_NOTARIZE=1` pour un essai
   rapide ; ne jamais publier une archive non notarisée, ni construite avec `--sans-tests`.
 - Avant de pousser une fonctionnalité : README et `CHANGELOG.md` à jour, capture d'écran refaite
-  dans Lightroom si l'interface a changé (`docs/capture.png` : la fenêtre Claude en Conversation
-  claire ; `atelier.png`, `panneau.png` : ses deux autres dispositions ; `publication.png`,
-  `consommation.png`, `suivi.png` : les autres fenêtres ; `seance.png` est retirée avec la Séance),
-  et une nouvelle version si ce qu'on installe a changé.
+  dans Lightroom si l'interface a changé (`docs/capture.png` : la fenêtre Claude, en Conversation
+  claire, sa seule disposition ; `publication.png`, `consommation.png`, `suivi.png` : les autres
+  fenêtres ; `seance.png`, `atelier.png` et `panneau.png` sont retirées avec la Séance, l'Atelier
+  et le Panneau), et une nouvelle version si ce qu'on installe a changé.
 - Pousser sur `main` directement.
 
 ## Organisation
 
-- `Sources/DeveloppeurKit/` : `JSONValue` (JSON générique), `MCPServer` (JSON-RPC, initialize, tools, prompts, ressources), `FileOutils` (appels d'outils un à un, réponse d'attente avant les 60 s de Claude Desktop), `Progression` (notifications de progression), `ContexteAppel` (progression et annulation d'un appel), `Tools` (socle des outils) et ses extensions `Tools+Analyse` (aperçu, avec le point de mise au point et l'évaluation de la photo ; zoom, comparaison, mesures de série, réglages), `Tools+Retouche` (`apply_settings`, `preview_settings`, `enhance_photo`, `remove_distractions`), `Tools+Balance` (balance sur un point neutre), `Tools+Locales` (masques, taches, yeux rouges), `Tools+Recalage` (grilles demandées, gardées en mémoire), `Tools+Gestion` (copie, profils, paramètres prédéfinis, journal), `Tools+Bibliotheque` (recherche, classement, mots-clés, collections, copies virtuelles, photo montrée), `Tools+Tri` (tri d'une séance, planche contact jusqu'à 30 vignettes, vignettes par lots), `Tools+Notation` (`propose_ratings`, validé avant la commande `notation` ; notes posées avec `apply`), `Tools+Livraison` (`export_photos` : formats, HDR, poids, filigrane, réimportation, livraisons types lues dans les services Disque dur, noms exacts, dossier choisi, aperçus dynamiques, fenêtre d'exportation en dernier recours ; modèles de noms de fichiers et filigranes de l'utilisateur, relecture du fichier livré), `Tools+Variantes` (`compare_variants`, `choose_variant`), `Tools+Serie` (`match_series`, pentes de la balance, expositions d'après la prise de vue), `Tools+Style` (`remember_style`, ressources) ; `Tri` (défauts, rafales, ordre de lecture, plafonds de note, rejets proposés), `Notation` (standard de notation, seule copie ; plafonds de note), `PointAF` (point de mise au point des fichiers Fujifilm, passage dans l'image affichée ; lecture bornée `LecteurPointsAF`), `MotsClesVision` (mots-clés de Vision traduits), `ModeleCouleur` (modèle d'une couleur prélevée), `ProfilsObjectif` (profils d'objectif `.lcp` installés), `GuideStyle` (guide de style de l'utilisateur, `~/Library/Application Support/Developpeur/guide-de-style.md`), `ReglagesAPlat` (`--dump`), `Catalogue` (les 124 réglages de développement, version minimale de Lightroom des plus récents, les profils d'appareil, les libellés), `Mesures` (mesures d'un aperçu), `Detail` (netteté et bruit), `AnalyseVision` (visages, pupilles, note esthétique, saillance, photos semblables, cadres des personnes), `Lignes` (angle d'une ligne désignée), `Recalage` (correspondance entre l'image corrigée et celle d'avant la correction d'objectif, Upright et la perspective), `Recette` (recette dans le vrai Lightroom), `Images` (zoom, côte à côte, planche contact, carré du point de mise au point : `PreviewImages.marquerPoint`), `ProfilsLook` (profils à base de Look installés), `EffetsLocaux` (effets locaux de Lightroom, `.lrtemplate`), `PresetXMP` (paramètres prédéfinis XMP), `LightroomBridge` (client TCP du module), `Prompts` (invites), `ClaudeRegistration` (inscription dans les fichiers de configuration de Claude), `MiseAJour` (dernière version publiée, par `gh`, pour `--status`), `ServerInfo` (nom, titre, version, consignes données à Claude)
-- `Sources/MCPDeveloppeur/main.swift` : options de ligne de commande et boucle stdio
+- `Sources/DeveloppeurKit/` : `JSONValue` (JSON générique), `MCPServer` (JSON-RPC, initialize, tools, prompts, ressources), `FileOutils` (appels d'outils un à un, réponse d'attente avant les 60 s de Claude Desktop), `Progression` (notifications de progression), `ContexteAppel` (progression et annulation d'un appel), `Tools` (socle des outils) et ses extensions `Tools+Analyse` (aperçu, avec le point de mise au point, sur un zoom aussi, et l'évaluation de la photo ; zoom, comparaison, mesures de série, réglages), `Tools+Retouche` (`apply_settings`, `preview_settings`, `enhance_photo`, `remove_distractions`), `Tools+Balance` (balance sur un point neutre), `Tools+Locales` (masques, taches, yeux rouges), `Tools+Recalage` (grilles demandées, gardées en mémoire), `Tools+Gestion` (copie, profils, paramètres prédéfinis, journal), `Tools+Bibliotheque` (recherche, classement, mots-clés, collections, copies virtuelles, photo montrée), `Tools+Tri` (tri d'une séance, planche contact jusqu'à 30 vignettes, vignettes par lots), `Tools+Notation` (`propose_ratings`, validé avant la commande `notation` ; notes posées avec `apply`), `Tools+Livraison` (`export_photos` : formats, HDR, poids, filigrane, réimportation, livraisons types lues dans les services Disque dur, noms exacts, dossier choisi, aperçus dynamiques, fenêtre d'exportation en dernier recours ; modèles de noms de fichiers et filigranes de l'utilisateur, relecture du fichier livré), `Tools+Variantes` (`compare_variants`, `choose_variant`), `Tools+Serie` (`match_series`, pentes de la balance, expositions d'après la prise de vue), `Tools+Style` (`remember_style`, ressources) ; `Tri` (défauts, rafales, ordre de lecture, plafonds de note, rejets proposés), `Notation` (standard de notation, seule copie ; plafonds de note), `PointAF` (point de mise au point des fichiers Fujifilm, passage dans l'image affichée ; lecture bornée `LecteurPointsAF` ; `PointAF.marquer` pour `--marquer-af`), `MotsClesVision` (mots-clés de Vision traduits), `ModeleCouleur` (modèle d'une couleur prélevée), `ProfilsObjectif` (profils d'objectif `.lcp` installés), `GuideStyle` (guide de style de l'utilisateur, `~/Library/Application Support/Developpeur/guide-de-style.md`), `ReglagesAPlat` (`--dump`), `Catalogue` (les 124 réglages de développement, version minimale de Lightroom des plus récents, les profils d'appareil, les libellés), `Mesures` (mesures d'un aperçu), `Detail` (netteté et bruit), `AnalyseVision` (visages, pupilles, note esthétique, saillance, photos semblables, cadres des personnes), `Lignes` (angle d'une ligne désignée), `Recalage` (correspondance entre l'image corrigée et celle d'avant la correction d'objectif, Upright et la perspective), `Recette` (recette dans le vrai Lightroom), `Images` (zoom, côte à côte, planche contact, carré du point de mise au point : `PreviewImages.marquerPoint`), `ProfilsLook` (profils à base de Look installés), `EffetsLocaux` (effets locaux de Lightroom, `.lrtemplate`), `PresetXMP` (paramètres prédéfinis XMP), `LightroomBridge` (client TCP du module), `Prompts` (invites), `ClaudeRegistration` (inscription dans les fichiers de configuration de Claude), `MiseAJour` (dernière version publiée, par `gh`, pour `--status`), `ServerInfo` (nom, titre, version, consignes données à Claude)
+- `Sources/MCPDeveloppeur/main.swift` : options de ligne de commande (dont `--marquer-af`, pour l'aperçu de la photo active de la fenêtre Claude) et boucle stdio
 - `Lightroom/Developpeur.lrplugin/`, le module :
-  - déclaration et cycle de vie : `Info.lua` (« Développeur », `com.danymenard.developpeur`, menus, version), `Init.lua` / `Arret.lua`, `Menage.lua` (paramètres prédéfinis invisibles effacés), `PluginInfoProvider.lua` (Gestionnaire de modules externes : section liaison, avec Mise au point, et section fenêtre Claude, avec modèle, effort, disposition et Autre photo), `Preferences.lua` (réglages de la liaison, dont `pointMiseAuPoint` ; ceux de la fenêtre dans `Chemins.defauts`, même table), `Metadonnees.lua` (champs privés), `Menu*.lua` (les huit entrées de Module externe - Extras, dans Fichier et Bibliothèque)
+  - déclaration et cycle de vie : `Info.lua` (« Développeur », `com.danymenard.developpeur`, menus, version), `Init.lua` / `Arret.lua`, `Menage.lua` (paramètres prédéfinis invisibles effacés), `PluginInfoProvider.lua` (Gestionnaire de modules externes : section liaison, avec Mise au point, et section fenêtre Claude, avec modèle, effort, Autre photo et À l'ouverture), `Preferences.lua` (réglages de la liaison, dont `pointMiseAuPoint` ; ceux de la fenêtre dans `Chemins.defauts`, même table), `Metadonnees.lua` (champs privés), `Menu*.lua` (les huit entrées de Module externe - Extras, dans Fichier et Bibliothèque)
   - la liaison : `Liaison.lua` (prises LrSocket, `module.log`), `Commandes.lua` (répartition des commandes du serveur) et les modules qui les portent : `Lecture.lua` (état, sélection, réglages, paramètres prédéfinis, diagnostic, journal), `Rendu.lua` (aperçus, avec `point_af` : photo décrite par `Vignettes.decrireVignette` et évaluation ; propositions, rendus du recalage), `Retouche.lua` (appliquer, recadrer, masquer, retoucher, copier), `Amelioration.lua` (débruitage, détails bruts, super résolution), `Suppression.lua` (reflets, retrait de la poussière), `Masques.lua` (reprendre un masque : commande `masques` ; masques vides), `Conversions.lua` (rotation d'un quart de tour), `Progression.lua` (barre de progression de Lightroom pendant une série : commande `progression`), `Vignettes.lua` (vignettes du cache d'aperçus : commande `vignettes` ; `decrireVignette`, aussi pour l'aperçu de `view_photo`), `Notation.lua` (registre des notes proposées, `notation.json` : commande `notation`, `Notation.poser`), `Livraison.lua` (exporter, fenêtre d'exportation, options de livraison, dossier choisi dans une fenêtre, noms exacts, aperçus dynamiques), `Services.lua` (services de publication et réglages des services Disque dur, lus seulement), `Variantes.lua` (variantes en instantanés), `Annulation.lua` (annuler, revenir), `Bibliotheque.lua` (classement, paramètres prédéfinis de métadonnées, mots-clés, collections, recherche, copies virtuelles, photo montrée et filtre de la Bibliothèque : commandes `metadonnees`, `motsCles`, `collections`, `chercher`, `copieVirtuelle`, `montrer` ; notes acceptées ou posées sur demande : `Bibliotheque.noter`) ; leur socle : `Photos.lua` (photos visées, description, mémoire de Claude), `Reglages.lua` (valeurs de développement), `Recalage.lua` (géométrie, grille du serveur), `Plans.lua` (ce qu'une retouche changera), `Ecriture.lua` (écriture dans le catalogue, étapes, journal), `Profils.lua` (profil relu après l'écriture), `Recadrage.lua` (calcul du cadre), `Geometrie.lua` (positions de l'aperçu vers le fichier), `Locaux.lua` (tables des masques, taches et yeux rouges) — ces trois-là sans SDK —, `Json.lua`, `Suivi.lua` (fenêtre de suivi « Claude · liaison »)
-  - la fenêtre Claude : `Fenetre.lua` (la fenêtre : état, actions, boucle, réouverture, textes des cartes page par page, nouvelle conversation par photo), `Vues.lua` (ses pièces : carte Note et Proposition avec leurs flèches ▲ ▼ `Vues.fleches`, invites et menu Style, et la fabrique masquable des onglets ; plus de bouton Noter), `Dispositions.lua` (Atelier, Conversation claire, Panneau, et leurs dimensions), `Fil.lua` (le fil en lignes), `Metriques.lua` (chasse des polices, produite par `scripts/metriques.swift`), `Moteur.lua` (conversations et processus de Claude Code, indépendants de la fenêtre ; modèle et effort d'une demande), `Session.lua` (un processus Claude Code par `relais.sh`), `relais.sh`, `Evenements.lua` (lignes stream-json de Claude Code), `Conversation.lua` (éléments d'une conversation), `Stockage.lua` (conversations sur le disque), `Images.lua` (aperçus et photos jointes, base64 et `sips`), `presse-papiers.js` (lecture du presse-papiers par `osascript`), `Consignes.lua` (consignes ajoutées, dont la note d'abord de chaque photo traitée ; invites en raccourcis, réponses aux propositions, styles, modèles et efforts), `Lightroom.lua` (photo active et sa note, sélection et sa clé, état de la liaison, connexion de Claude Code), `Composants.lua` (versions du module et du connecteur en bas de la fenêtre), `Raccourcis.lua` (⌃⌥C), `Chemins.lua` (dossiers et réglages de la fenêtre), `Fichiers.lua`, `Texte.lua` (UTF-8), `Journal.lua` (`conversation.log`), `Compat.lua` (`os.time`, `os.date`), `vide-*.png` (images « aucun aperçu », une par cadre d'aperçu, trois seulement : `vide-200.png` du Panneau et `vide-320.png` de la Conversation claire, carrées, `vide-720x480.png` de l'Atelier) ; `FenetrePublication.lua` et `Publication.lua` (profils et exportation de la fenêtre Publication), `FenetreConsommation.lua` et `Consommation.lua` (jetons comptés, budget de la semaine). La Séance de notation (`FenetreNotation.lua`, `MenuNotation.lua`) est retirée depuis la 1.1.1 (demandé par Dany le 20 octobre 2026)
+  - la fenêtre Claude : `Fenetre.lua` (la fenêtre : état, actions, boucle, textes des cartes page par page, aperçu de la photo active et son carré de mise au point, proposition préparée à l'ouverture, nouvelle conversation par photo), `Vues.lua` (ses pièces : carte Note et Proposition avec leurs flèches ▲ ▼ `Vues.fleches`, invites et menu Style, et la fabrique masquable des onglets ; plus de bouton Noter), `Dispositions.lua` (la Conversation claire, seule disposition, et ses dimensions), `Fil.lua` (le fil en lignes), `Metriques.lua` (chasse des polices, produite par `scripts/metriques.swift`), `Moteur.lua` (conversations et processus de Claude Code, indépendants de la fenêtre ; modèle et effort d'une demande), `Session.lua` (un processus Claude Code par `relais.sh`), `relais.sh`, `Evenements.lua` (lignes stream-json de Claude Code), `Conversation.lua` (éléments d'une conversation), `Stockage.lua` (conversations sur le disque), `Images.lua` (aperçus et photos jointes, base64 et `sips` ; carré de mise au point par le connecteur : `Images.marquerMiseAuPoint`), `presse-papiers.js` (lecture du presse-papiers par `osascript`), `Consignes.lua` (consignes ajoutées, dont la note d'abord de chaque photo traitée et la mise au point montrée ; invites en raccourcis, demande de la proposition à l'ouverture, réponses aux propositions, styles, modèles et efforts), `Lightroom.lua` (photo active et sa note, sélection et sa clé, état de la liaison, connexion de Claude Code), `Composants.lua` (versions du module et du connecteur en bas de la fenêtre), `Raccourcis.lua` (⌃⌥C), `Chemins.lua` (dossiers et réglages de la fenêtre), `Fichiers.lua`, `Texte.lua` (UTF-8), `Journal.lua` (`conversation.log`), `Compat.lua` (`os.time`, `os.date`), `vide-320.png` (image « aucun aperçu », la seule, au cadre carré de l'aperçu) ; `FenetrePublication.lua` et `Publication.lua` (profils et exportation de la fenêtre Publication), `FenetreConsommation.lua` et `Consommation.lua` (jetons comptés, budget de la semaine). La Séance de notation (`FenetreNotation.lua`, `MenuNotation.lua`) est retirée depuis la 1.1.1 (demandé par Dany le 20 octobre 2026)
 - `Tests/DeveloppeurKitTests/` : tests XCTest avec `FakeLightroom` et `FakePlugin` (TCP)
 - `Tests/Lua/Liaison/` : `Simulation.lua` (SDK de Lightroom simulé pour les commandes du serveur), `tests.lua`, et `liens.lua` (chaque champ lu d'un module requis existe, dans tous les fichiers du module)
 - `Tests/Lua/Fenetre/` : `Simulation.lua` (SDK simulé pour la fenêtre, dossier personnel temporaire, liaison jamais démarrée ; refuse `visible` sur un conteneur, évalue les liaisons à plusieurs clés), `faux-claude.sh` (imite Claude Code en stream-json), `tests.lua`, et les essais à part `essais-*.lua` (chacun charge la simulation, la complète localement sans toucher `Simulation.lua`, a ses propres aides et sort en échec si un essai échoue ; tous lancés par `tester-module.sh`) : `essais-dispositions.lua`, `essais-moteur.lua`, `essais-integration.lua` (de bout en bout avec les vrais modules, `sips` compris)
-- `scripts/` : `tester-module.sh` (vérification du module avec LuaJIT), `metriques.swift` (chasse des polices du fil), `images-vides.swift` (images « aucun aperçu », une par cadre de `Dispositions.TAILLES` : les trois de `vide-*.png`)
+- `scripts/` : `tester-module.sh` (vérification du module avec LuaJIT), `metriques.swift` (chasse des polices du fil), `images-vides.swift` (l'image « aucun aperçu » du cadre de `Dispositions.TAILLES` : `vide-320.png`, la seule)
 - `.github/workflows/tests.yml` : syntaxe des scripts et les deux suites à chaque envoi sur `main` (macOS)
 - `build.sh` (tests, compilation, signature, archive notarisée), `install.sh`, `uninstall.sh`
 - `Resources/Info.plist` : identifiant `com.danymenard.mcp-developpeur` et version (incrusté par `-sectcreate` dans `Package.swift`)
-- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, et la fenêtre Claude (architecture, contraintes du SDK, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude en Conversation claire, capture principale du README), `atelier.png` et `panneau.png` (les deux autres dispositions), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de suivi de la liaison)
+- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, et la fenêtre Claude (architecture, contraintes du SDK, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude, en Conversation claire, sa seule disposition ; capture principale du README), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de suivi de la liaison)

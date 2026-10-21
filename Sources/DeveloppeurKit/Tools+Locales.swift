@@ -449,6 +449,12 @@ extension ToolHandler {
         }
         func r(_ v: CGFloat) -> JSONValue { .number((Double(v) * 1_000_000).rounded() / 1_000_000) }
         objet["cadres"] = .array(personnes.map { ["Left": r($0.minX), "Top": r($0.minY), "Right": r($0.maxX), "Bottom": r($0.maxY)] })
+        // Une seule personne : Lightroom range son masque sans numéro ni cadres (constaté le
+        // 20 octobre 2026 sur un portrait : fait à la main, et envoyé ainsi, même masque) ; les
+        // cadres servent encore au module à vérifier où il l'a calculé.
+        if personnes.count == 1 {
+            objet["seule"] = true
+        }
         return .object(objet)
     }
 

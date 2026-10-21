@@ -332,6 +332,11 @@ end
 -- - plage de couleurs : PointModels, des textes de six nombres « c1 c2 c3 x y 0 » ;
 -- - plage de profondeur : DepthRange, quatre valeurs de 0 à 1 ; DepthMin, DepthMax ou DepthFeather
 --   (forme « M2 ») font prendre l'image entière : la simulation les refuse.
+-- Catégories d'une personne précise, de sous-type 0 (relevées dans Lightroom) : la personne entière
+-- (20036) et ses parties ; le sous-type 0 sert aussi à l'arrière-plan (22) et au paysage (5000x).
+local CATEGORIES_PERSONNE = { [20036] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true,
+    [7] = true, [8] = true, [9] = true, [11] = true, [12] = true }
+
 local function verifierMasques(reglages)
     for _, correction in ipairs(type(reglages.MaskGroupBasedCorrections) == 'table' and reglages.MaskGroupBasedCorrections or {}) do
         for _, texte in ipairs(correction.LocalPointColors or {}) do
@@ -661,8 +666,17 @@ function S.Photo(id, reglages, meta, brut)
                     -- reconnaît que si le masque porte les cadres de toutes les personnes qu'il trouve
                     -- (photo.personnes), à peu près (le centre de chacun dans le sien) ; il range alors
                     -- ReferencePoint au centre de la personne. Sinon, il retire InstanceIDs et calcule
-                    -- un masque de sous-type 3.
-                    if m.InstanceIDs then
+                    -- un masque de sous-type 3. Une seule personne trouvée (constaté le 20 octobre 2026
+                    -- sur un portrait) : le masque de sous-type 0 d'une personne, avec ou sans numéro ni
+                    -- cadres, est le sien ; Lightroom range ReferencePoint sur elle et retire InstanceIDs
+                    -- et InstanceBounds (fait à la main, il n'en a pas).
+                    local trouvees = self.personnes or {}
+                    local personne = tonumber(m.MaskSubType) == 0 and CATEGORIES_PERSONNE[tonumber(m.MaskSubCategoryID)]
+                    if personne and #trouvees == 1 then
+                        local t = trouvees[1]
+                        m.ReferencePoint = string.format('%f %f', (t.Left + t.Right) / 2, (t.Top + t.Bottom) / 2)
+                        m.InstanceIDs, m.InstanceBounds = nil, nil
+                    elseif m.InstanceIDs then
                         local trouvees, bornes = self.personnes or {}, m.InstanceBounds
                         local reconnue = type(bornes) == 'table' and #bornes == #trouvees and #trouvees > 0
                         for j, b in ipairs(reconnue and bornes or {}) do

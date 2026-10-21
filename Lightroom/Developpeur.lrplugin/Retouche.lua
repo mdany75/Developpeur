@@ -169,8 +169,9 @@ end
 
 -- Masque d'une personne précise, une fois calculé (constaté le 18 octobre 2026) : s'il a reconnu
 -- la personne, Lightroom garde InstanceIDs et le sous-type 0, et range ReferencePoint sur elle ;
--- sinon il retire InstanceIDs et calcule autre chose (sous-type 3). Un masque non reconnu est
--- retiré, et dit ; un point de référence hors du cadre voulu est signalé.
+-- sinon il retire InstanceIDs et calcule autre chose (sous-type 3). La personne seule d'une photo
+-- n'a pas d'InstanceIDs (Locaux.numeroPersonne la compte comme la personne 1). Un masque non
+-- reconnu est retiré, et dit ; un point de référence hors du cadre voulu est signalé.
 local function verifierPersonnes(plan)
     if type(plan.personnes) ~= 'table' or #plan.personnes == 0 then
         return

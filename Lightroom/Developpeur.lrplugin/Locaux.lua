@@ -137,23 +137,42 @@ end
 -- (Personne 2 → 1 : à partir de 0, dans l'ordre de Lightroom, de gauche à droite), ReferencePoint
 -- sur la personne ; Lightroom y range aussi les cadres de toutes les personnes détectées
 -- (InstanceBounds) et son calcul. numero : à partir de 1, comme « Personne 2 » dans Lightroom.
+-- Sur une photo d'une seule personne (relevé le 20 octobre 2026, portrait d'essai) : fait à la main,
+-- le masque n'a ni InstanceIDs ni InstanceBounds, seulement le sous-type 0 et la catégorie ; envoyé
+-- ainsi, il donne le même masque (même MaskDigest). `seule` : la photo n'a qu'une personne.
 Locaux.PERSONNE_ENTIERE = 20036
 
-function Locaux.personne(numero, categorie, x, y, nom, inverse)
+-- Catégories d'une personne précise (sous-type 0) : la personne entière et ses parties, celles des
+-- parties de toutes les personnes (sous-type 3). Le sous-type 0 sert aussi à l'arrière-plan (22) et
+-- au paysage (5000x).
+Locaux.CATEGORIES_PERSONNE = { [20036] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true,
+    [7] = true, [8] = true, [9] = true, [11] = true, [12] = true }
+
+function Locaux.personne(numero, categorie, x, y, nom, inverse, seule)
     local m = Locaux.masqueIA(0, tonumber(categorie) or Locaux.PERSONNE_ENTIERE, nom, inverse)
-    m.InstanceIDs = { { InstanceID = math.max(math.floor(tonumber(numero) or 1), 1) - 1 } }
+    if not seule then
+        m.InstanceIDs = { { InstanceID = math.max(math.floor(tonumber(numero) or 1), 1) - 1 } }
+    end
     if tonumber(x) and tonumber(y) then
         m.ReferencePoint = Locaux.decimal(x) .. ' ' .. Locaux.decimal(y)
     end
     return m
 end
 
--- Personne d'un masque (InstanceID + 1), ou nil.
+-- Personne d'un masque (InstanceID + 1), ou nil ; 1 pour celui de la personne seule d'une photo
+-- (sous-type 0 et catégorie d'une personne, sans InstanceIDs).
 function Locaux.numeroPersonne(m)
     local liste = type(m) == 'table' and m.InstanceIDs
     local premier = type(liste) == 'table' and liste[1]
     local id = type(premier) == 'table' and tonumber(premier.InstanceID)
-    return id and id + 1 or nil
+    if id then
+        return id + 1
+    end
+    if type(m) == 'table' and m.What == 'Mask/Image' and liste == nil and tonumber(m.MaskSubType) == 0
+        and Locaux.CATEGORIES_PERSONNE[tonumber(m.MaskSubCategoryID)] then
+        return 1
+    end
+    return nil
 end
 
 -- Contour d'un masque IA (affinage du masque, Lightroom Classic 15.5). Relevé le 17 octobre 2026 :
@@ -435,21 +454,22 @@ local CALCULES = {
 }
 
 -- Masques de personnes précises que Lightroom n'a plus reconnues après un calcul : ceux qui avaient
--- InstanceIDs avant, et n'en ont plus une fois calculés (il les retire, voir Locaux.personne).
--- Renvoie leurs noms.
+-- InstanceIDs avant, et n'en ont plus une fois calculés (il les retire, voir Locaux.personne), ou
+-- celui d'une personne seule qui n'est plus de sous-type 0. Renvoie leurs noms.
 function Locaux.personnesPerdues(avant, apres)
     local personnes = {}
     for _, correction in ipairs(avant or {}) do
         for k, m in ipairs(correction.CorrectionMasks or {}) do
-            if type(m) == 'table' and m.InstanceIDs then
-                personnes[tostring(correction.CorrectionID) .. '/' .. k] = true
+            if type(m) == 'table' and Locaux.numeroPersonne(m) then
+                personnes[tostring(correction.CorrectionID) .. '/' .. k] = m.InstanceIDs and 'numero' or 'seule'
             end
         end
     end
     local noms = {}
     for _, correction in ipairs(apres or {}) do
         for k, m in ipairs(correction.CorrectionMasks or {}) do
-            if type(m) == 'table' and personnes[tostring(correction.CorrectionID) .. '/' .. k] and m.MaskDigest ~= nil and not m.InstanceIDs then
+            local genre = type(m) == 'table' and personnes[tostring(correction.CorrectionID) .. '/' .. k]
+            if genre and m.MaskDigest ~= nil and (tonumber(m.MaskSubType) ~= 0 or (genre == 'numero' and not m.InstanceIDs)) then
                 noms[#noms + 1] = tostring(correction.CorrectionName or m.MaskName or '?')
             end
         end

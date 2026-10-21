@@ -1,5 +1,54 @@
 # Changements
 
+## Non publié
+
+Pour la prochaine version, la 1.2 (un rendu plus juste sur chaque photo, en préparation) : à
+l'ouverture de la fenêtre Claude, l'aperçu de la photo active montre son point de mise au point
+(fichiers Fujifilm), et Claude prépare une proposition de retouche sans rien appliquer ; un zoom
+montre aussi le point de mise au point ; la fenêtre n'a plus qu'une disposition, la Conversation
+claire.
+
+### Ajouté
+- Le carré de mise au point sur l'aperçu de la photo active (« Photo active · … »), pour un
+  fichier Fujifilm : à l'ouverture de la fenêtre Claude (menu Ouvrir la fenêtre Claude ou ⌃⌥C,
+  même déjà ouverte) et quand vous choisissez une autre photo, le connecteur lit le point dans
+  l'original, en temps limité, et le dessine sur la vignette : un carré vert, rouge si l'appareil
+  a signalé la mise au point manquée. Agrandir montre la vignette avec son carré. L'original d'une
+  autre marque n'est pas ouvert ; sans point lu à temps, ou hors du cadre, l'aperçu reste sans
+  carré.
+- Une proposition de retouche prête à l'ouverture : sur une conversation vide (une autre photo en
+  commence une), quand la fenêtre Claude s'ouvre ou que le menu ou ⌃⌥C la rappelle, Claude note
+  d'abord la photo active si elle n'est pas encore évaluée, puis montre ce qu'il changerait, au
+  rendu naturel (`preview_settings`), sans rien appliquer. La proposition attend dans l'onglet
+  Proposition, sans que la fenêtre y bascule : vous l'acceptez, la refusez ou l'ajustez quand vous
+  voulez. Case « À l'ouverture » du Gestionnaire de modules externes (section Fenêtre Claude,
+  « Claude prépare une proposition de retouche (rien n'est appliqué) »), cochée par défaut.
+- Le point de mise au point sur un zoom de `view_photo` (`region`), pour les fichiers Fujifilm : sa
+  place dans l'image entière et s'il tombe dans la zone (`dans_la_zone`) ; s'il y tombe, la
+  netteté autour du point dans le zoom et, avec `af_point` (ou la case « Mise au point » du
+  Gestionnaire de modules externes), le carré dessiné sur le zoom. Toujours pas sur un avant/après
+  (`compare`). Dans la fenêtre Claude, Claude fait dessiner le carré quand il montre ou juge la
+  mise au point, sur l'aperçu entier comme sur un zoom.
+
+### Changé
+- La fenêtre Claude n'a plus qu'une disposition, la Conversation claire : à gauche les
+  conversations, au centre le fil, à droite les onglets Note et Proposition, l'aperçu, puis la
+  carte Note ou la Proposition. Si vous aviez choisi l'Atelier ou le Panneau, elle s'ouvre
+  maintenant en Conversation claire ; la taille déjà enregistrée en Conversation claire sert
+  encore.
+
+### Retiré
+- L'Atelier et le Panneau, avec ce qui ne servait qu'à eux : le menu des conversations (la liste
+  de la Conversation claire reste) et les onglets Retoucher et Noter du Panneau.
+- Le menu Disposition du Gestionnaire de modules externes, et la réouverture de la fenêtre quand
+  la disposition y changeait.
+
+### Corrigé
+- Le masque d'une personne précise (`add_mask`, `kind: "person"`) sur une photo où elle est seule,
+  un portrait par exemple : Lightroom le calculait bien, mais le module le retirait aussitôt comme
+  « personne non reconnue ». Il est maintenant fait comme à la main dans Lightroom, et gardé ; la
+  peau, les yeux ou les cheveux de cette personne aussi.
+
 ## 1.1.1 — 2026-10-20
 
 Une fenêtre Claude plus légère : le modèle, l'effort et la disposition se choisissent dans le

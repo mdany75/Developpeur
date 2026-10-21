@@ -912,6 +912,24 @@ local function presetMasques(nom, liste)
     return presetContenu(nom, { MaskGroupBasedCorrections = liste })
 end
 
+-- Cadres des personnes (de Vision, dans l'aperçu) ramenés dans le repère du fichier, ou nil.
+local function bornesPersonnes(ctx, cadres)
+    if type(cadres) ~= 'table' or #cadres == 0 then
+        return nil
+    end
+    local function borne(v)
+        return math.floor(math.min(math.max(v, 0), 1) * 1000000 + 0.5) / 1000000
+    end
+    local bornes = {}
+    for _, c in ipairs(cadres) do
+        local x1, y1 = Geometrie.point(ctx, tonumber(c.Left) or 0, tonumber(c.Top) or 0)
+        local x2, y2 = Geometrie.point(ctx, tonumber(c.Right) or 1, tonumber(c.Bottom) or 1)
+        bornes[#bornes + 1] = { Left = borne(math.min(x1, x2)), Top = borne(math.min(y1, y2)),
+            Right = borne(math.max(x1, x2)), Bottom = borne(math.max(y1, y2)) }
+    end
+    return bornes
+end
+
 -- Un composant de masque (IA, dégradé, plage de luminance), positions ramenées dans le repère du
 -- fichier. Renvoie aussi s'il est calculé par IA et s'il a une position.
 local function composant(ctx, m, nom)
@@ -921,24 +939,16 @@ local function composant(ctx, m, nom)
         -- Une personne précise (ou l'une de ses parties) : son numéro dans les cadres de toutes les
         -- personnes (InstanceBounds), sans lesquels Lightroom ne la reconnaît pas (constaté le
         -- 18 octobre 2026 ; le serveur les tire de Vision) ; cadres et point ramenés de l'aperçu
-        -- dans le fichier.
+        -- dans le fichier. La personne seule d'une photo (`seule`, Vision n'en trouve qu'une) n'a
+        -- ni numéro ni cadres, comme faite à la main (constaté le 20 octobre 2026).
         local x, y
         if tonumber(m.x) and tonumber(m.y) then
             x, y = Geometrie.point(ctx, tonumber(m.x), tonumber(m.y))
         end
-        local masque = Locaux.personne(tonumber(m.numero) or 1, tonumber(m.categorie), x, y, nom, m.inverser == true)
-        if type(m.cadres) == 'table' and #m.cadres > 0 then
-            local function borne(v)
-                return math.floor(math.min(math.max(v, 0), 1) * 1000000 + 0.5) / 1000000
-            end
-            local bornes = {}
-            for _, c in ipairs(m.cadres) do
-                local x1, y1 = Geometrie.point(ctx, tonumber(c.Left) or 0, tonumber(c.Top) or 0)
-                local x2, y2 = Geometrie.point(ctx, tonumber(c.Right) or 1, tonumber(c.Bottom) or 1)
-                bornes[#bornes + 1] = { Left = borne(math.min(x1, x2)), Top = borne(math.min(y1, y2)),
-                    Right = borne(math.max(x1, x2)), Bottom = borne(math.max(y1, y2)) }
-            end
-            masque.InstanceBounds = bornes
+        local seule = m.seule == true
+        local masque = Locaux.personne(tonumber(m.numero) or 1, tonumber(m.categorie), x, y, nom, m.inverser == true, seule)
+        if not seule then
+            masque.InstanceBounds = bornesPersonnes(ctx, m.cadres)
         end
         return masque, true, true
     elseif m.type == 'lineaire' then
@@ -1060,10 +1070,10 @@ local function preparerMasques(photo, params)
             local mk = masques[k]
             if source.type == 'personne' and mk then
                 local numero = Locaux.numeroPersonne(mk) or 1
+                local bornes = bornesPersonnes(ctx, source.cadres) or {}
                 plan.personnes = plan.personnes or {}
                 plan.personnes[#plan.personnes + 1] = { correctionID = correction.CorrectionID, composant = k, numero = numero,
-                    cadre = type(mk.InstanceBounds) == 'table' and mk.InstanceBounds[numero] or nil,
-                    trouvees = type(mk.InstanceBounds) == 'table' and #mk.InstanceBounds or 0 }
+                    cadre = bornes[numero], trouvees = #bornes }
             end
         end
         liste[#liste + 1] = correction

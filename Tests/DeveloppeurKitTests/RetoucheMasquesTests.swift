@@ -205,6 +205,7 @@ final class RetoucheMasquesTests: XCTestCase {
         XCTAssertEqual(masques[0]["nom"]?.string, "Claude · Personne 2")
         XCTAssertEqual(masques[0]["cadres"]?.array?.count, 3, "les cadres de toutes les personnes, que Lightroom exige")
         XCTAssertEqual(masques[0]["cadres"]?.array?[1]["Left"]?.double, 0.36)
+        XCTAssertNil(masques[0]["seule"], "un groupe : le numéro et les cadres")
         XCTAssertEqual(masques[1]["categorie"]?.int, 5)
         XCTAssertEqual(masques[1]["x"]?.double, 0.52)
         XCTAssertEqual(masques[1]["numero"]?.int, 3, "la personne dont le cadre contient le point")
@@ -215,6 +216,16 @@ final class RetoucheMasquesTests: XCTestCase {
         donnerApercu()
         XCTAssertTrue(call("add_mask", ["step_name": "x", "masks": [["kind": "person", "person": 4, "adjustments": ["Exposure": 0.2]]]]).text
             .contains("Vision ne trouve que 3 personnes"))
+        // Une seule personne (constaté le 20 octobre 2026) : Lightroom range son masque sans numéro
+        // ni cadres ; le module le fait de même, les cadres ne servent qu'à vérifier.
+        tools.detecterPersonnes = { _ in [CGRect(x: 0.2, y: 0.15, width: 0.35, height: 0.85)] }
+        donnerApercu()
+        XCTAssertFalse(call("add_mask", ["step_name": "portrait", "masks": [["kind": "person", "person": 1, "part": "face_skin", "adjustments": ["Texture": -20]],
+                                                                            ["kind": "person", "person": 1, "adjustments": ["Exposure": 0.1]]]]).isError)
+        let seules = try XCTUnwrap(fake.calls.last { $0.command == "masquer" }?.params["masques"]?.array)
+        XCTAssertEqual(seules.map { $0["seule"]?.bool }, [true, true])
+        XCTAssertEqual(seules[0]["categorie"]?.int, 2, "la peau du visage de la personne seule")
+        XCTAssertEqual(seules[1]["cadres"]?.array?.count, 1)
         tools.detecterPersonnes = { _ in [] }
         donnerApercu()
         XCTAssertTrue(call("add_mask", ["step_name": "x", "masks": [["kind": "person", "person": 1, "adjustments": ["Exposure": 0.2]]]]).text

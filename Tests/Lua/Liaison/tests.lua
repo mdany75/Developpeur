@@ -3821,6 +3821,39 @@ test("masquer : une personne précise, avec les cadres de toutes les personnes ;
     egal(#(photo.reglages.MaskGroupBasedCorrections or {}), 0)
 end)
 
+test("masquer : la personne seule d'un portrait, sans numéro ni cadres, gardée et recalculée", function()
+    -- Constaté le 20 octobre 2026 sur un portrait : Lightroom range le masque de la seule personne
+    -- sans InstanceIDs ni InstanceBounds ; un masque numéroté y est calculé de même, et il retire le
+    -- numéro. Le module le retirait comme « non reconnu ».
+    local photo = photoFuji()
+    photo.personnes = { { Left = 0.2, Right = 0.55, Top = 0.15, Bottom = 1 } }
+    S.active = photo
+    local cadre = Json.tableau({ { Left = 0.21, Right = 0.54, Top = 0.16, Bottom = 1 } })
+    local resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'personne', numero = 1, seule = true, cadres = cadre, nom = 'Claude · Personne 1', locaux = { LocalExposure2012 = 0.1 } },
+        { type = 'personne', numero = 1, categorie = 2, seule = true, cadres = cadre, nom = 'Claude · Peau du visage', locaux = { LocalTexture = -0.2 } },
+        -- Envoyé numéroté (comme avant le 20 octobre 2026) : Lightroom retire le numéro, gardé quand même.
+        { type = 'personne', numero = 1, cadres = cadre, nom = 'Claude · Numérotée', locaux = { LocalSaturation = -0.1 } },
+    }) })
+    egal(contient(resultat.resultats[1].remarques, "retiré"), false, "aucun masque retiré")
+    local masques = photo.reglages.MaskGroupBasedCorrections
+    egal(#masques, 3)
+    local entiere, visage = masques[1].CorrectionMasks[1], masques[2].CorrectionMasks[1]
+    egal(entiere.InstanceIDs, nil, "sans numéro, comme fait à la main")
+    egal(entiere.InstanceBounds, nil, "sans cadres")
+    egal(entiere.MaskSubType, 0) egal(entiere.MaskSubCategoryID, 20036)
+    egal(entiere.ReferencePoint, string.format('%f %f', 0.375, 0.575), "calculé sur elle")
+    egal(visage.MaskSubCategoryID, 2)
+    egal(masques[3].CorrectionMasks[1].InstanceIDs, nil, "Lightroom retire le numéro")
+    local liste = Commandes.executer('masques', { action = 'lister' })
+    egal(liste.masques[1].composants[1].personne, 1, "la personne 1")
+    egal(liste.masques[1].composants[1].ia, "personne")
+    -- Recalculée, elle reste la sienne.
+    resultat = Commandes.executer('masques', { action = 'recalculer', masque = 'Personne 1' })
+    egal(contient(resultat.resultats[1].remarques, "n'a plus reconnu"), false)
+    egal(photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1].MaskSubType, 0)
+end)
+
 test("masquer : contour d'un masque IA (affinage) et masques vides retirés après le calcul", function()
     local photo = photoFuji()
     photo.reglages.MaskGroupBasedCorrections = { MASQUE_UTILISATEUR }

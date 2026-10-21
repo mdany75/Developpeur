@@ -9,14 +9,7 @@ photographe amateur qui veut des photos d'allure professionnelle sans être un p
 connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en Swift, et le module
 « Développeur » de Lightroom Classic, qui exécute ses demandes et porte la fenêtre Claude.
 
-![La fenêtre Claude dans Lightroom Classic, disposition Conversation claire](docs/capture.png)
-
-Les deux autres dispositions de la fenêtre Claude, l'Atelier et le Panneau :
-
-<p>
-  <img src="docs/atelier.png" alt="La fenêtre Claude, disposition Atelier" width="74%">
-  <img src="docs/panneau.png" alt="La fenêtre Claude, disposition Panneau" width="24%">
-</p>
+![La fenêtre Claude dans Lightroom Classic](docs/capture.png)
 
 ## Fonctions
 
@@ -25,43 +18,32 @@ Les deux autres dispositions de la fenêtre Claude, l'Atelier et le Panneau :
 - Une fenêtre flottante, « Développeur » dans sa barre de titre : Fichier › Module externe - Extras
   › Ouvrir la fenêtre Claude (même entrée dans le menu Bibliothèque, et raccourci ⌃⌥C une fois
   posé). Elle reste ouverte pendant que vous travaillez, dans tous les modules de Lightroom.
-- Le modèle, l'effort et la disposition se choisissent dans Fichier › Gestionnaire de modules
-  externes › Développeur, section Fenêtre Claude, et non dans la fenêtre, plus légère :
+- Le modèle, l'effort et deux cases se règlent dans Fichier › Gestionnaire de modules externes ›
+  Développeur, section Fenêtre Claude, et non dans la fenêtre, plus légère :
   - Modèle : Fable (le plus capable), Opus (retouche fine, par défaut), Sonnet (courant) ou Haiku
     (rapide).
   - Effort : maximal (par défaut), très élevé, élevé, moyen ou faible, le même pour les quatre
     modèles. Plus d'effort, c'est une réponse plus soignée, mais plus lente et qui compte davantage
     dans le forfait. Un autre modèle ou un autre effort vaut pour la demande suivante, dans la même
     conversation.
-  - Disposition (Conversation claire, Atelier ou Panneau) : une fenêtre ouverte se rouvre
-    d'elle-même dans les 2 secondes, la demande tapée gardée. La taille ne se choisit plus : c'est
-    toujours la grande.
   - Autre photo, cochée par défaut : une nouvelle conversation quand vous choisissez une autre photo
     ou une autre sélection (voir plus bas).
-- Trois dispositions :
-  - **Conversation claire**, par défaut, la plus proche de la 1.0 : les conversations à gauche ; au
-    centre le fil, puis les invites et le menu Style, et le champ de demande, Envoyer à sa droite.
-    À droite, de haut en bas : deux onglets en boutons radio, Note (par défaut) et Proposition ;
-    l'aperçu de ce que Claude voit, ◀ légende ▶ et Agrandir ; après une ligne vide, la carte Note
-    ou la proposition, selon l'onglet choisi ; en bas, les boutons Publication et Consommation,
-    puis les versions. La fenêtre passe d'elle-même à l'onglet Proposition quand Claude propose
-    une retouche, et à l'onglet Note quand il propose une note pour la photo active.
-  - **Atelier**, la photo d'abord : en haut, le menu des conversations, Nouvelle et Supprimer… ;
-    dessous, ce que Claude regarde, en grand, avec sa proposition. Au milieu, la photo active et sa
-    carte Note, les boutons Publication et Consommation en bas. À droite, la conversation dans une
-    colonne étroite, Envoyer sous la demande.
-  - **Panneau**, une fenêtre étroite et haute à garder à côté de Lightroom : en haut l'aperçu, le
-    menu des conversations, la photo active et sa note ; dessous deux onglets, Retoucher (le fil,
-    les invites, la demande, Envoyer dessous) et Noter (la carte Note) ; en bas, les boutons
-    Publication et Consommation. Une proposition de retouche prend la place des invites et du style
-    le temps d'y répondre.
+  - À l'ouverture, cochée par défaut : Claude prépare une proposition de retouche de la photo
+    active, sans rien appliquer (voir plus bas).
+- Une seule disposition, la Conversation claire, la plus proche de la 1.0, toujours en grande
+  taille : les conversations à gauche ; au centre le fil, puis les invites sur une rangée, le menu
+  Style au bout, et le champ de demande, Envoyer à sa droite. À droite, de haut en bas : deux
+  onglets en boutons radio, Note (par défaut) et Proposition ; l'aperçu de ce que Claude voit,
+  ◀ légende ▶ et Agrandir ; après une ligne vide, la carte Note ou la proposition, selon l'onglet
+  choisi ; en bas, les boutons Publication et Consommation, puis les versions. La fenêtre passe
+  d'elle-même à l'onglet Proposition quand Claude propose une retouche (sauf la proposition
+  préparée à l'ouverture), et à l'onglet Note quand il propose une note pour la photo active.
 - Claude y travaille par Claude Code et votre forfait claude.ai, avec les seuls outils du
   connecteur : ni fichiers, ni terminal, ni web.
-- Les conversations : dans la Conversation claire, une colonne rangée par période (aujourd'hui,
-  cette semaine, plus ancien), avec une recherche dans leurs titres et leurs messages, sans tenir
-  compte des accents ; dans l'Atelier et le Panneau, un menu des plus récentes. Chacune est une
-  session Claude Code, reprise telle quelle à la réouverture. Renommer, supprimer (à la corbeille
-  du Finder ; les retouches faites dans Lightroom restent).
+- Les conversations : une colonne rangée par période (aujourd'hui, cette semaine, plus ancien),
+  avec une recherche dans leurs titres et leurs messages, sans tenir compte des accents. Chacune
+  est une session Claude Code, reprise telle quelle à la réouverture. Renommer, supprimer (à la
+  corbeille du Finder ; les retouches faites dans Lightroom restent).
 - Une nouvelle conversation pour une autre photo : quand vous choisissez une autre photo active ou
   une autre sélection, et que la conversation montrée a déjà des messages sur d'autres photos, la
   fenêtre en commence une nouvelle ; l'ancienne reste dans la liste. Une photo choisie pendant que
@@ -78,19 +60,32 @@ Les deux autres dispositions de la fenêtre Claude, l'Atelier et le Panneau :
   pause, accord attendu : la raison est sur chaque ligne). Un clic sur un outil montre ce que
   Claude a demandé au connecteur et sa réponse, un clic sur une image la montre dans l'aperçu,
   sans changer d'onglet. ▲, ▼ et Fin pour s'y déplacer.
-- L'aperçu : à l'ouverture de la fenêtre (et quand vous choisissez une autre photo), la photo
-  sélectionnée dans Lightroom (« Photo active · … ») ; puis les images que Claude regarde et les
-  photos jointes, avec leur légende. ◀ ▶ pour les parcourir (▶ depuis la dernière revient à la
-  photo active), Agrandir pour les voir en grand.
+- L'aperçu : à l'ouverture de la fenêtre (et quand le menu ou ⌃⌥C la rappelle, ou que vous
+  choisissez une autre photo), la photo sélectionnée dans Lightroom (« Photo active · … ») ; puis
+  les images que Claude regarde et les photos jointes, avec leur légende. ◀ ▶ pour les parcourir
+  (▶ depuis la dernière revient à la photo active), Agrandir pour les voir en grand.
+- Le carré de la mise au point sur la photo active, pour une photo Fujifilm (RAF, ou JPEG de
+  l'appareil) : vert, rouge si l'appareil a signalé la mise au point manquée. Le connecteur lit le
+  point dans l'original, sur ce Mac et en temps limité, et le dessine sur l'aperçu ; Agrandir le
+  montre aussi. Pour une autre marque, l'original n'est pas ouvert et l'aperçu reste sans carré ;
+  de même sans point lisible.
+- Une proposition préparée à l'ouverture : quand la fenêtre s'ouvre, ou que le menu ou ⌃⌥C la
+  rappelle, sur une conversation vide, Claude prépare une proposition de retouche de la photo
+  active, rendu naturel. Choisir une autre photo, fenêtre ouverte, ne la lance pas : elle vient au
+  rappel suivant, si la conversation est vide. Claude note d'abord la photo si elle n'est pas
+  encore évaluée, puis montre ce qu'il changerait, sans rien appliquer. La proposition attend dans
+  l'onglet Proposition, sans que la fenêtre y passe : Accepter, Refuser ou Ajuster… quand vous le
+  voulez. C'est une demande comme une autre, dans le fil et dans le forfait ; la case À
+  l'ouverture du Gestionnaire de modules externes la coupe.
 - Claude reçoit avec chaque demande la photo active et la sélection de Lightroom.
 - Six invites en raccourcis : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Sports.
-- Une carte Note dans chaque disposition : la note posée de la photo active et celle que Claude
+- Une carte Note, dans l'onglet Note : la note posée de la photo active et celle que Claude
   propose, à accepter ou à changer sans repasser par Claude. Dans la fenêtre, Claude note d'abord
   chaque photo qu'il traite : pas de bouton pour le lui demander (voir Noter vos photos).
-- Un style joint à chaque demande, invites comprises, par le menu au bout de la dernière rangée
-  d'invites (sans étiquette, dans les trois dispositions) : Standard (rien d'ajouté), Ambre et
-  éclat, Or et peau douce, Or rose et éclat, Éclatant et peau douce, Neutre, Rose froid et peau
-  douce. « Peau douce » passe par un masque de la peau, jamais par un réglage de toute la photo.
+- Un style joint à chaque demande, invites comprises, par le menu au bout de la rangée d'invites
+  (sans étiquette) : Standard (rien d'ajouté), Ambre et éclat, Or et peau douce, Or rose et
+  éclat, Éclatant et peau douce, Neutre, Rose froid et peau douce. « Peau douce » passe par un
+  masque de la peau, jamais par un réglage de toute la photo.
 - Joindre une photo du disque (📎 : JPEG, PNG, HEIC, TIFF, WebP) ou coller l'image du
   presse-papiers (📋 : capture d'écran, image copiée, photo copiée dans le Finder), comme exemple
   ou comme référence de style. Les photos jointes s'affichent sur la ligne sous les invites ; un
@@ -127,12 +122,16 @@ garder, passe, destination) ; celles qui retouchent suivent votre guide de style
   visage, note esthétique, zone qui attire l'œil.
 - Le point de mise au point des photos Fujifilm (RAF, ou JPEG de l'appareil), lu dans l'original
   par le connecteur, sur ce Mac : sa place dans l'image, la netteté autour, et si l'appareil a
-  signalé la mise au point manquée. Pour noter, Claude le fait dessiner sur l'aperçu entier : un
-  carré vert, rouge si la mise au point est signalée manquée. Pour le voir sur chaque aperçu :
-  case Mise au point du Gestionnaire de modules externes (décochée par défaut). Les mesures sont
-  prises avant le carré.
-- L'évaluation que Claude garde pour la photo, donnée avec l'aperçu entier : pas encore évaluée,
-  note proposée à vérifier, acceptée ou changée par vous (voir Noter vos photos).
+  signalé la mise au point manquée. Pour noter, ou pour vous montrer la mise au point, Claude le
+  fait dessiner sur l'aperçu entier ou sur un zoom : un carré vert, rouge si la mise au point est
+  signalée manquée. Sur un zoom, Claude sait aussi si le point tombe dans la zone, et la netteté
+  autour ; le carré n'y est dessiné que s'il y tombe. Jamais sur un avant/après. Pour le voir sur
+  chaque aperçu et chaque zoom : case Mise au point du Gestionnaire de modules externes (décochée
+  par défaut). Les mesures sont prises avant le carré. Dans la fenêtre Claude, l'aperçu de la
+  photo active le montre aussi (voir plus haut).
+- L'évaluation que Claude garde pour la photo, donnée avec l'aperçu entier et avec un zoom (pas
+  avec un avant/après) : pas encore évaluée, note proposée à vérifier, acceptée ou changée par vous
+  (voir Noter vos photos).
 - Zoom à 100 % sur une zone (netteté, bruit, poussières) ; avant/après côte à côte (avant la
   première retouche de Claude, ou avant la dernière).
 - Mesurer au dixième de degré l'angle d'une ligne qui devrait être droite (horizon, bâtiment,
@@ -349,9 +348,8 @@ fin de l'invite `noter`.
 
 **La carte Note**
 
-- Dans chaque disposition de la fenêtre Claude (onglet Note de la Conversation claire, sous
-  l'aperçu ; colonne du milieu de l'Atelier ; onglet Noter du Panneau) : la note posée de la photo
-  active (étoiles et drapeau), la note que Claude propose, en couleur selon son état (rouge : à
+- Dans l'onglet Note de la fenêtre Claude, sous l'aperçu : la note posée de la photo active
+  (étoiles et drapeau), la note que Claude propose, en couleur selon son état (rouge : à
   vérifier ; vert : acceptée ou changée ; orange : proposée avant la 1.1.1), sa passe, puis un
   texte : la raison critère par critère (Impact, Qualités, Plancher technique, Finition), le
   plafond mesuré au tri et une phrase.
@@ -415,9 +413,9 @@ Une fenêtre à part (Consommation…) pour suivre ce que la fenêtre Claude con
   le mode, l'instantané « Avant Claude », la variation maximale de l'exposition par retouche (2 IL
   par défaut) et la saturation maximale (30) ; photos protégées (copies virtuelles seulement,
   photos d'un libellé de couleur, photos rejetées) ; un plafond de photos par retouche sans accord
-  explicite (20 par défaut) ; le point de mise au point (Fujifilm) dessiné sur chaque aperçu, et
-  non seulement pour noter (décoché par défaut) ; un diagnostic à coller dans la conversation et le
-  journal. Une retouche refusée dit pourquoi.
+  explicite (20 par défaut) ; le point de mise au point (Fujifilm) dessiné sur chaque aperçu et
+  chaque zoom, et non seulement pour noter (décoché par défaut) ; un diagnostic à coller dans la
+  conversation et le journal. Une retouche refusée dit pourquoi.
 
 ![La fenêtre de suivi de la liaison](docs/suivi.png)
 
@@ -429,8 +427,7 @@ Une fenêtre à part (Consommation…) pour suivre ce que la fenêtre Claude con
   comme approuvée (retouche, masque, tache, classement, collection, exportation), et Claude ne le
   fait qu'après votre « oui ».
 - Dans la fenêtre Claude, la proposition s'affiche (réglages avant → après) dans l'onglet
-  Proposition de la Conversation claire, sous la photo dans l'Atelier, à la place des invites dans
-  le Panneau, avec Accepter, Refuser et Ajuster… : un texte libre, ou un ajustement d'un clic
+  Proposition, avec Accepter, Refuser et Ajuster… : un texte libre, ou un ajustement d'un clic
   (Moins chaud, Peau plus naturelle, Garder le ciel, Plus de contraste). ▲ ▼, à leur droite, font
   défiler une proposition plus longue que sa place.
 - Pour que l'accord ne vienne que de vous : la case « l'accord se donne ici » du Gestionnaire de
@@ -580,7 +577,9 @@ cette photo de nuit », « Montre-moi d'abord ce que tu proposes », « Montre-m
 interprétations : naturelle, chaude et noir et blanc », « Harmonise cette série sur la troisième
 photo », « Trie la séance et propose-moi les meilleures », « Note ces photos » (Claude pose les
 notes) ou « Prépare la sélection pour Instagram ». Dans la fenêtre Claude, une photo que Claude
-traite est d'abord notée : sa note attend « à vérifier » dans la carte Note.
+traite est d'abord notée : sa note attend « à vérifier » dans la carte Note. À l'ouverture de la
+fenêtre, sur une conversation vide, Claude prépare déjà une proposition de retouche de la photo
+active : elle attend dans l'onglet Proposition.
 
 Claude regarde la photo, pose un diagnostic chiffré, applique une première passe (profil, balance
 des blancs, tonalité), vérifie le rendu, puis fait les finitions, dans l'ordre que recommande
@@ -665,8 +664,8 @@ scripts/tester-module.sh
 Le module, avec LuaJIT : forme du module, syntaxe et globales de chaque fichier, syntaxe de
 `relais.sh`, liens entre les fichiers, puis deux suites, chacune sur son Lightroom simulé :
 `Tests/Lua/Liaison` (les commandes du connecteur, notes proposées comprises) et `Tests/Lua/Fenetre`
-(la fenêtre Claude dans ses trois dispositions avec un faux Claude Code, Publication et
-Consommation ; les essais `essais-*.lua` y tournent après `tests.lua`).
+(la fenêtre Claude avec un faux Claude Code, Publication et Consommation ; les essais
+`essais-*.lua` y tournent après `tests.lua`).
 
 Aucun test ne touche Lightroom, Claude, vos photos ni les fichiers de Claude, et aucun ne consomme
 de quota. Les deux suites tournent aussi à chaque envoi sur `main` (GitHub Actions).
@@ -681,6 +680,9 @@ Pour la mise au point, Lightroom ouvert et liaison démarrée, l'exécutable ins
 - `--dump [<id>]` : tous les réglages bruts d'une photo, une clé par ligne, à comparer avec `diff`
   avant et après une opération faite à la main ;
 - `--recalage <id>` : les écarts du recalage des positions sur la géométrie actuelle de la photo ;
+- `--marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` : le carré de mise au
+  point d'un fichier Fujifilm dessiné sur une vignette, comme dans l'aperçu de la photo active de
+  la fenêtre Claude (code 1 sans point), sans Lightroom ni liaison ;
 - `--recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>]` :
   rejoue une séquence complète dans le vrai Lightroom, sur des copies virtuelles de la collection
   « Développeur › Essais » (des originaux seulement avec `--original`), vérifie chaque étape sur
@@ -694,12 +696,12 @@ Pour la mise au point, Lightroom ouvert et liaison démarrée, l'exécutable ins
 - `Sources/MCPDeveloppeur/main.swift` : l'exécutable `mcp-developpeur` (options de ligne de
   commande, boucle stdio)
 - `Lightroom/Developpeur.lrplugin/` : le module Lightroom Classic, en Lua 5.1 (liaison avec le
-  connecteur, registre des notes proposées, fenêtre Claude en trois dispositions et `relais.sh` qui
-  lance Claude Code, Publication, Consommation, fenêtre de suivi)
+  connecteur, registre des notes proposées, fenêtre Claude et `relais.sh` qui lance Claude Code,
+  Publication, Consommation, fenêtre de suivi)
 - `Tests/DeveloppeurKitTests/` : tests du connecteur, avec un faux Lightroom et un faux module TCP
 - `Tests/Lua/Liaison/`, `Tests/Lua/Fenetre/` : tests du module, chacun sur son Lightroom simulé
 - `scripts/` : `tester-module.sh` ; `metriques.swift` et `images-vides.swift`, qui produisent des
-  fichiers de la fenêtre Claude (chasse des polices, images « aucun aperçu »)
+  fichiers de la fenêtre Claude (chasse des polices, image « aucun aperçu »)
 - `Resources/Info.plist` : identifiant et numéro de version du connecteur
 - `docs/` : captures, `SPEC.md` (cahier des charges, protocole entre le connecteur et le module,
   et la fenêtre Claude), `aide-adobe-developpement.md` (notes sur l'aide d'Adobe)
