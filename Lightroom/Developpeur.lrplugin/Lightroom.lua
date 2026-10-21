@@ -1,6 +1,7 @@
 -- Lightroom.lua : ce que la fenêtre lit de Lightroom et de son entourage : photo active (avec sa
 -- note posée) et sélection, état de la liaison et mode « Proposer d'abord » (lus directement : la
--- liaison est dans ce même module), connexion de Claude Code. À appeler depuis une tâche.
+-- liaison est dans ce même module), connexion de Claude Code, écran principal du Mac (lu par le
+-- connecteur : `mcp-developpeur --ecran`). À appeler depuis une tâche.
 
 local LrApplication = import 'LrApplication'
 local LrPathUtils = import 'LrPathUtils'
@@ -129,6 +130,60 @@ function Lightroom.etatClaude(claude)
     end
     local forfait = json.authMethod == 'claude.ai'
     return { installe = true, connecte = true, forfait = forfait, texte = forfait and "Claude Code · forfait" or "Claude Code · " .. tostring(json.authMethod) }
+end
+
+-- Détail du voyant Écran quand le connecteur ne l'a pas dit : absent, ou d'avant la 1.2 (il
+-- répond à --ecran par son aide, qui n'est pas du JSON).
+Lightroom.ECRAN_ILLISIBLE = "L'écran n'a pas pu être lu : le connecteur MCP-Développeur est introuvable ou plus ancien "
+    .. "que la 1.2 (réinstaller Développeur)."
+Lightroom.ECRAN_AUCUN = "Le connecteur MCP-Développeur n'a lu aucun écran (session sans écran ?)."
+
+-- L'écran principal du Mac et son profil de couleur, lus par le connecteur (`mcp-developpeur
+-- --ecran`, une ligne JSON, cinq secondes au plus) : macOS seul connaît l'écran. Rend
+-- { lu, texte, etat, detail } (Lightroom.decrireEcran). Un connecteur absent ou plus ancien, ou une
+-- commande en échec, laisse le voyant gris, sans erreur (la suite de Fenetre.verifier passe).
+function Lightroom.etatEcran(connecteur)
+    if not Fichiers.existe(connecteur) then
+        return Lightroom.decrireEcran(nil)
+    end
+    local lu, texte = LrTasks.pcall(function()
+        Fichiers.creerDossier(Chemins.temporaire())
+        local sortie = LrPathUtils.child(Chemins.temporaire(), 'ecran-' .. Conversation.identifiant() .. '.json')
+        LrTasks.execute("/usr/bin/perl -e 'alarm 5; exec @ARGV' " .. Texte.shell(connecteur) .. ' --ecran > ' .. Texte.shell(sortie) .. ' 2>/dev/null')
+        local reponse = Fichiers.lire(sortie) or ''
+        Fichiers.supprimer(sortie)
+        return reponse
+    end)
+    local ok, json = pcall(Json.decode, lu and texte or '')
+    return Lightroom.decrireEcran(ok and json or nil)
+end
+
+-- Le voyant Écran d'après la réponse du connecteur : { lu, texte, etat, detail }, une table neuve
+-- de textes seulement (rien de relu par Json.decode n'est posé dans Lightroom). `mesure` vrai :
+-- étalonné (vert) ; faux : non étalonné (orange) ; absente (null efface la clé) : « étalonné ? »
+-- (gris). Sans réponse lisible : « Écran », gris, et pourquoi dans le détail.
+function Lightroom.decrireEcran(json)
+    local principal = type(json) == 'table' and json.principal or nil
+    if type(principal) ~= 'table' then
+        local aucun = type(json) == 'table' and json.lu == false
+        return { lu = false, texte = "Écran", etat = 'neutre', detail = aucun and Lightroom.ECRAN_AUCUN or Lightroom.ECRAN_ILLISIBLE }
+    end
+    local ecran = { lu = true }
+    if principal.mesure == true then
+        ecran.texte, ecran.etat = "Écran · étalonné", 'ok'
+    elseif principal.mesure == false then
+        ecran.texte, ecran.etat = "Écran · non étalonné", 'attention'
+    else
+        ecran.texte, ecran.etat = "Écran · étalonné ?", 'neutre'
+    end
+    if type(json.detail) == 'string' and json.detail ~= '' then
+        ecran.detail = json.detail
+    elseif type(principal.texte) == 'string' and principal.texte ~= '' then
+        ecran.detail = principal.texte
+    else
+        ecran.detail = ecran.texte
+    end
+    return ecran
 end
 
 -- Sélectionne une photo du catalogue par son identifiant (numéros cités par Claude).
