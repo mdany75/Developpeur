@@ -382,8 +382,10 @@ end
 -- page du carnet, que Dany lit ; elle se montre au retour au fil. Rend vrai si elle est prête.
 function Fenetre.nouvelle(garderPage)
     local ok, raison = Moteur.nouvelle()
-    if not ok and Fenetre.p then
-        Fenetre.p.message = raison or ''
+    if not ok then
+        if Fenetre.p then
+            Fenetre.p.message = raison or ''
+        end
         return false
     end
     if not (garderPage and Fenetre.vue == 'carnet') then
@@ -414,6 +416,11 @@ function Fenetre.revenirAuFil()
     Fenetre.defilement = 0
     Fenetre.cache = {}
     Fenetre.total = nil
+    -- Le bandeau qui disait de choisir une conversation (Renommer…, Supprimer… sur la page du
+    -- carnet) ne vaut plus sur le fil.
+    if Fenetre.p and Fenetre.p.message == Fenetre.CHOISIR_CONVERSATION then
+        Fenetre.p.message = ''
+    end
     return true
 end
 
@@ -708,11 +715,19 @@ function Fenetre.nomPhotoCarnet(x)
     return texteOuNil(x.fichier) or ("photo " .. Conversation.clePhoto(x.original or x.photo))
 end
 
+-- Une inclinaison en degrés, au dixième, sans signe (« 1,2° »), comme le carnet la note.
+local function degres(x)
+    local d = math.floor(math.abs(x) * 10 + 0.5)
+    return string.format('%d,%d°', math.floor(d / 10), d % 10)
+end
+
 -- Une photo d'un défaut, sur une ligne : « octobre 2026 · DSCF4961.RAF · ciel brûlé : 4,2 % … ·
--- leçon » (le constat, sinon sa mesure).
+-- leçon » (le constat, sinon sa mesure ; `angle` : une ligne penchée, dite en degrés).
 function Fenetre.textePhotoDuDefaut(x)
     local morceaux = { texteOuNil(x.mois_libelle) or tostring(x.mois or '?'), Fenetre.nomPhotoCarnet(x) }
-    local constat = texteOuNil(x.texte) or (type(x.mesure) == 'number' and ("mesure : " .. Texte.nombre(x.mesure)) or nil)
+    local mesure = type(x.mesure) == 'number' and (x.angle and ("ligne penchée de " .. degres(x.mesure))
+        or ("mesure : " .. Texte.nombre(x.mesure))) or nil
+    local constat = texteOuNil(x.texte) or mesure
     if constat then
         morceaux[#morceaux + 1] = constat
     end
@@ -771,6 +786,14 @@ end
 -- photo choisie dessous ; « Retirer du carnet… » retire la photo choisie (Fenetre.retirerDuCarnet).
 function Fenetre.montrerDefaut(code)
     local photos = Carnet.photosDuDefaut(code, os.time())
+    -- Une ligne penchée (measure_angle, read_composition) n'a que son inclinaison, sans texte :
+    -- celle de l'angle rangé dans l'entrée de l'original sous ce code.
+    for _, x in ipairs(photos) do
+        if texteOuNil(x.texte) == nil and type(x.mesure) == 'number' then
+            local e = Carnet.entree(x.original)
+            x.angle = type(e) == 'table' and type(e.angle) == 'table' and e.angle.code == code or nil
+        end
+    end
     local d = defautDuCarnet(code)
     local libelle = texteOuNil(d.libelle) or tostring(code)
     local f = LrView.osFactory()
@@ -792,7 +815,8 @@ function Fenetre.montrerDefaut(code)
             q.lecon = Fenetre.texteLecons(choisie(valeur))
         end)
         local entete = #photos == 0 and "Aucune photo n'a ce défaut dans les mois du carnet."
-            or string.format("%s dans les mois du carnet, la plus récente d'abord.", #photos == 1 and "1 photo" or (#photos .. " photos"))
+            or #photos == 1 and "1 photo dans les mois du carnet."
+            or string.format("%d photos dans les mois du carnet, la plus récente d'abord.", #photos)
         local contenu = {
             bind_to_object = q,
             spacing = f:control_spacing(),

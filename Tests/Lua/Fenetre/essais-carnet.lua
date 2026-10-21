@@ -668,9 +668,29 @@ essai('Gardes : Renommer…, ✎ et Supprimer… ne font rien sur la page ; Nouv
         egal(lac, Moteur.courante)
         egal(lac, Moteur.trouver(lac.id), 'la conversation reste')
         egal('carnet', Fenetre.vue)
-        -- Sur le fil, les mêmes boutons agissent (ce n'est que la page qui les arrête).
+        -- Sur le fil, les mêmes boutons agissent (ce n'est que la page qui les arrête) ; le bandeau qui
+        -- disait de choisir une conversation s'efface au retour.
         S.reponseModal, S.reponseConfirm = 'cancel', 'cancel'
         p.selectionListe = { lac.id }
+        egal('', p.message, 'le bandeau de la page effacé au retour')
+        -- Claude qui travaille ramène au fil : le même bandeau s'efface aussi.
+        p.selectionListe = { Fenetre.CARNET }
+        Fenetre.renommer()
+        egal(Fenetre.CHOISIR_CONVERSATION, p.message)
+        Moteur.travaille = true
+        Fenetre.rafraichir()
+        Moteur.travaille = false
+        egal('conversation', Fenetre.vue)
+        egal('', p.message, 'bandeau effacé quand Claude travaille')
+        p.libre = true
+        -- Un autre message reste (seul celui de la page s'efface).
+        p.message = 'Autre message.'
+        p.selectionListe = { Fenetre.CARNET }
+        egal('', p.message, "l'ouverture de la page efface le bandeau")
+        p.message = 'Autre message.'
+        p.selectionListe = { lac.id }
+        egal('Autre message.', p.message)
+        p.message = ''
         Fenetre.renommer()
         egal(dialogues + 1, #S.dialogues, 'Renommer… sur le fil')
         Fenetre.supprimer()
@@ -680,6 +700,19 @@ essai('Gardes : Renommer…, ✎ et Supprimer… ne font rien sur la page ; Nouv
         egal(true, Fenetre.nouvelle())
         egal('conversation', Fenetre.vue)
         vrai(Moteur.courante ~= lac, 'une nouvelle conversation')
+        -- Refusée (Claude travaille) : faux, la page reste ; sans fenêtre (Fenetre.p) de même.
+        local nouvelle = Moteur.courante
+        p.selectionListe = { Fenetre.CARNET }
+        Moteur.travaille = true
+        egal(false, Fenetre.nouvelle())
+        contient(p.message, 'Claude travaille')
+        Fenetre.p = nil
+        egal(false, Fenetre.nouvelle(), 'sans fenêtre')
+        Fenetre.p = p
+        Moteur.travaille = false
+        egal('carnet', Fenetre.vue, 'la page reste')
+        egal(nouvelle, Moteur.courante)
+        p.message = ''
         -- Envoyer : vide, la page reste ; sinon la demande se suit dans le fil.
         p.selectionListe = { Fenetre.CARNET }
         Fenetre.envoyer('   ')
@@ -843,9 +876,36 @@ essai('Clic sur une rangée : la fenêtre de ses photos (dans une tâche), élé
         egal(nil, vide.otherVerb)
         egal(nil, vueDe(vide.contents, 'simple_list'))
         contient(vueDe(vide.contents, 'static_text').args.title, "Aucune photo n'a ce défaut")
-        -- Une mesure sans texte se dit telle quelle (mise au point, 8,5).
+        -- Une ligne penchée (l'angle rangé dans l'entrée, sans texte) : son inclinaison en degrés.
+        local penchee = indiceDe(Fenetre.lignes, function(l) return l.defaut == 'horizon_penche' end)
+        avant = #S.taches
+        Fenetre.cliquerLigne(penchee)
+        lancerTaches(avant)
+        local angles = vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items
+        egal(2, #angles)
+        contient(angles[1].title, 'DSCF1026.RAF · ligne penchée de 1,2°')
+        contient(angles[2].title, 'DSCF1014.RAF · ligne penchée de 0,8°')
+        egal('mars 2026 · DSCF0001.RAF · ligne penchée de 1,3°', Fenetre.textePhotoDuDefaut({ mois_libelle = 'mars 2026',
+            fichier = 'DSCF0001.RAF', mesure = -1.26, angle = true }))
+        -- Une seule photo : pas de « la plus récente d'abord ».
+        local mise = indiceDe(Fenetre.lignes, function(l) return l.defaut == 'mise_au_point' end)
+        avant = #S.taches
+        Fenetre.cliquerLigne(mise)
+        lancerTaches(avant)
+        egal('1 photo dans les mois du carnet.', vueDe(S.dialogues[#S.dialogues].contents, 'static_text').args.title)
+        -- Une autre mesure sans texte se dit telle quelle (mise au point, 8,5).
+        contient(vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title, 'DSCF1001.RAF · mesure : 8,5')
         egal('mars 2026 · DSCF1001.RAF · mesure : 8,5', Fenetre.textePhotoDuDefaut({ mois_libelle = 'mars 2026', fichier = 'DSCF1001.RAF',
             mesure = 8.5, lecons = {} }))
+        -- L'angle d'une entrée ne vaut que pour son code : la mise au point de la même photo reste
+        -- une mesure.
+        fabriquer({ entree(1101, moisIl(0), CHERCHES, { 'mise_au_point' }, { angle = { le = 1101, photo = 1101, inclinaison = 2,
+            code = 'horizon_penche', source = 'measure_angle' } }) })
+        Fenetre.montrerDefaut('mise_au_point')
+        egal('DSCF1101.RAF · mesure : 8,5', vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title:match('DSCF.*$'))
+        Fenetre.montrerDefaut('horizon_penche')
+        egal('DSCF1101.RAF · ligne penchée de 2,0°', vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title:match('DSCF.*$'))
+        fabriquerType()
         egal('mars 2026 · photo 77', Fenetre.textePhotoDuDefaut({ mois_libelle = 'mars 2026', original = 77 }))
         -- Hors de la page, une ligne qui porterait un défaut ne fait rien.
         p.selectionListe = { lac.id }
