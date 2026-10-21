@@ -828,7 +828,9 @@ local function avecApercu(c, id)
 end
 
 essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte sans étape (l\'aide), actions sans effet sans étape', function()
-    photoActive(4961, 'DSCF4961.RAF', 0, 0)
+    -- Sans photo active, ni proposition, ni exercice : Je le fais reste inactif (lot 14 : une photo
+    -- active suffit à l'activer), et son action ne demande rien à Claude.
+    S.photoActive, S.selection = nil, {}
     Moteur.nouvelle()
     local vu = false
     S.pendantFenetre = function(args)
@@ -861,9 +863,10 @@ essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte
         egal(dialogues, #S.dialogues, 'aucune fenêtre ouverte')
         egal(messages, #S.messages, 'aucun message')
         egal(false, Moteur.travaille, 'rien envoyé à Claude')
+        egal(0, #Moteur.courante.elements, 'aucune demande')
         egal('etape', p.onglet)
         egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')), "toujours l'aide")
-        p.saisie, p.onglet = '', 'notation'
+        p.saisie, p.onglet, p.message = '', 'notation', ''
     end
     Fenetre.afficher()
     vrai(vu, 'fenêtre ouverte')

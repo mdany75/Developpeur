@@ -1,7 +1,8 @@
 -- Lightroom.lua : ce que la fenêtre lit de Lightroom et de son entourage : photo active (avec sa
 -- note posée) et sélection, état de la liaison et mode « Proposer d'abord » (lus directement : la
 -- liaison est dans ce même module), connexion de Claude Code, écran principal du Mac (lu par le
--- connecteur : `mcp-developpeur --ecran`). À appeler depuis une tâche.
+-- connecteur : `mcp-developpeur --ecran`), réglages d'une photo pendant un exercice « Je le fais »
+-- (1.3, lus sans rien écrire). À appeler depuis une tâche.
 
 local LrApplication = import 'LrApplication'
 local LrPathUtils = import 'LrPathUtils'
@@ -189,6 +190,66 @@ function Lightroom.decrireEcran(json)
         ecran.detail = ecran.texte
     end
     return ecran
+end
+
+-- Je le fais (1.3) ---------------------------------------------------------------------------
+
+-- Les réglages de la liste « à faire » dont la valeur de départ (`avant` du connecteur) n'est pas
+-- une valeur relue de la photo : un nom de version, de paramètre prédéfini ou d'objectif, « non »
+-- pour un calcul automatique, des repères comptés. Ils ne se cochent pas.
+Lightroom.NON_SUIVIS = {
+    ProcessVersion = true, Preset = true, AutoTone = true, AutoGrayscaleMix = true, LensProfileName = true,
+    UprightFourSegments = true, UprightTransform = true,
+}
+
+-- Les valeurs des réglages `cles` (noms du connecteur) dans `reglages` (getDevelopSettings),
+-- lues comme le module les décrit dans ses changements, pour les comparer à `avant` : la balance
+-- d'un JPEG sous IncrementalTemperature et IncrementalTint (Reglages.cleReelle), le profil par son
+-- nom (Reglages.nomProfil : la Look s'il y en a une), un nombre absent par sa valeur par défaut
+-- (Reglages.valeurActuelle), une table (courbe, couleurs ponctuelles, flou d'objectif) par son
+-- résumé (Reglages.resume), avec sa signature (son JSON, clés triées) pour voir un changement que
+-- le résumé ne montre pas. Rend valeurs et signatures, deux tables neuves ; un réglage de
+-- Lightroom.NON_SUIVIS n'y est pas.
+function Lightroom.lireValeurs(reglages, cles, raw)
+    local Reglages = require 'Reglages'
+    local valeurs, signatures = {}, {}
+    for _, cle in ipairs(cles or {}) do
+        if not Lightroom.NON_SUIVIS[cle] then
+            local reelle = Reglages.cleReelle(cle, raw)
+            local brute = reglages[reelle]
+            if cle == 'CameraProfile' then
+                valeurs[cle] = Reglages.nomProfil(reglages)
+            elseif type(brute) == 'table' then
+                valeurs[cle] = Reglages.resume(cle, brute)
+                local ok, json = pcall(Json.encode, brute)
+                signatures[cle] = ok and json or nil
+            elseif type(brute) == 'string' or type(brute) == 'boolean' then
+                valeurs[cle] = brute
+            elseif brute == nil and type(Reglages.resume(cle, nil)) == 'string' then
+                -- Une table absente (courbe linéaire, aucune couleur ponctuelle) : son résumé, sans
+                -- signature (une courbe linéaire écrite ensuite n'a pas changé).
+                valeurs[cle] = Reglages.resume(cle, nil)
+            else
+                valeurs[cle] = Reglages.valeurActuelle(reglages, reelle)
+            end
+        end
+    end
+    return valeurs, signatures
+end
+
+-- Les valeurs actuelles des réglages `cles` de la photo `id` (Lightroom.lireValeurs, d'après
+-- getDevelopSettings) : ce que Dany a déjà fait d'un exercice « Je le fais », relu toutes les 2 s
+-- par la fenêtre. Deux tables vides si la photo ne se lit pas. À appeler depuis une tâche.
+function Lightroom.valeurs(id, cles)
+    local valeurs, signatures = {}, {}
+    LrTasks.pcall(function()
+        local photo = LrApplication.activeCatalog():getPhotoByLocalId(tonumber(id))
+        local reglages = photo and photo:getDevelopSettings()
+        if type(reglages) == 'table' then
+            valeurs, signatures = Lightroom.lireValeurs(reglages, cles, require('Reglages').estRaw(photo, reglages))
+        end
+    end)
+    return valeurs, signatures
 end
 
 -- Sélectionne une photo du catalogue par son identifiant (numéros cités par Claude).

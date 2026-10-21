@@ -1,7 +1,8 @@
 -- Stockage.lua : les conversations sur le disque, une par dossier
 -- (Conversations/<id>/conversation.json et ses images), celles des anciennes séances de notation
 -- comprises (genre = 'notation'). Les listes d'un élément (images, changements, notes, et en 1.3
--- etapes, annule, revenu, les points d'une leçon et leurs défauts) s'écrivent toujours en tableaux
+-- etapes, annule, revenu, les points d'une leçon et leurs défauts, la liste à faire d'un exercice
+-- « Je le fais », ses écarts et les réglages faits comme Claude) s'écrivent toujours en tableaux
 -- JSON.
 
 local LrPathUtils = import 'LrPathUtils'
@@ -104,6 +105,34 @@ local function pourJson(c)
             end
             x.points = points
         end
+        -- Un exercice « Je le fais » (1.3) : sa liste (avec les clés du cadre), ses écarts et les
+        -- réglages faits comme Claude, des tableaux même vides.
+        if e.genre == 'exercice' then
+            local aFaire = Json.tableau()
+            for j, item in ipairs(e.aFaire or {}) do
+                local y = {}
+                for cle, valeur in pairs(item) do
+                    y[cle] = valeur
+                end
+                if type(item.cles) == 'table' then
+                    local cles = Json.tableau()
+                    for k, nom in ipairs(item.cles) do
+                        cles[k] = nom
+                    end
+                    y.cles = cles
+                end
+                aFaire[j] = y
+            end
+            x.aFaire = aFaire
+            for _, cle in ipairs({ 'ecarts', 'commeClaude' }) do
+                local liste = Json.tableau()
+                for j, valeur in ipairs(e[cle] or {}) do
+                    liste[j] = valeur
+                end
+                x[cle] = liste
+            end
+            x.comparaisonEnCours = nil
+        end
         elements[i] = x
     end
     copie.elements = elements
@@ -150,8 +179,28 @@ function Stockage.lire(id)
             e.points = points
         end
         -- Un appel resté en cours (Lightroom fermé pendant l'appel) n'a pas abouti.
-        if (e.genre == 'outil' or e.genre == 'notation' or e.genre == 'lecon') and e.etat == 'enCours' then
+        if (e.genre == 'outil' or e.genre == 'notation' or e.genre == 'lecon' or e.genre == 'exercice') and e.etat == 'enCours' then
             e.etat = 'erreur'
+        end
+        if e.genre == 'exercice' then
+            -- Seulement des réglages et des écarts en table (un fichier abîmé ne doit pas bloquer
+            -- le fil) ; une comparaison restée en cours n'aboutira plus.
+            for _, cle in ipairs({ 'aFaire', 'ecarts' }) do
+                local gardes = {}
+                for _, x in ipairs(type(e[cle]) == 'table' and e[cle] or {}) do
+                    if type(x) == 'table' then
+                        gardes[#gardes + 1] = x
+                    end
+                end
+                e[cle] = gardes
+            end
+            if type(e.commeClaude) ~= 'table' then
+                e.commeClaude = {}
+            end
+            if type(e.principal) ~= 'table' then
+                e.principal = nil
+            end
+            e.comparaisonEnCours = nil
         end
     end
     return c

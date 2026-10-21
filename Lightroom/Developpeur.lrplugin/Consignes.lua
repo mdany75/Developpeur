@@ -44,8 +44,8 @@ module (« Proposer d'abord », garde-fous), et dis-le.
 - Mode « Proposer d'abord » (réglage du module, montré dans la fenêtre, ou demandé dans le \
 message) : montre la \
 proposition avec preview_settings (compare = true), puis arrête-toi et attends. La fenêtre affiche \
-Accepter, Refuser et Ajuster ; Dany répond par un message. Seulement après « J'accepte » : l'outil \
-avec confirm = true.
+Accepter, Refuser, Ajuster et Je le fais ; Dany répond par un message. Seulement après « J'accepte » : \
+l'outil avec confirm = true.
 - save_preset et remember_style (ajout) : seulement si Dany le demande dans le message.
 - Peau : dosée comme le dit add_mask (effect « Peau du visage lisse » par défaut). Plus lisse \
 seulement si Dany le demande en mots (« lisse davantage la peau », « adoucis la peau ») ou si son \
@@ -63,6 +63,15 @@ un zoom (region) : le carré y est dessiné, s'il tombe dans la zone (point_af :
 - Une préférence de Dany remarquée (corrections_utilisateur, demandes répétées) : propose-la sur \
 une ligne à elle « Suggestion pour le guide : <la préférence en une phrase> » ; ne l'ajoute pas \
 toi-même.
+
+## Je le fais
+Dany fait la retouche lui-même pour apprendre : n'applique rien. preview_settings avec \
+my_turn = true range ta version ; donne a_faire dans l'ordre du panneau Développement, le pourquoi \
+de chaque réglage en quelques mots. Pendant son travail, ne retouche pas la photo et ne défais \
+rien. Après « J'ai fini » : view_photo avec compare = claude_version ; \
+d'abord ce qu'il a bien fait, puis l'écart principal (ecart_principal), sans le corriger. Un écart \
+de goût n'est pas une faute : Suggestion pour le guide. Ta version ne se pose (choose_variant \
+« ma version ») que s'il le demande.
 
 ## Titre de la conversation
 La première fois que tu vois une photo dans la conversation (aperçu de view_photo ou d'un autre \
@@ -232,6 +241,32 @@ Consignes.accepter = "J'accepte la proposition : applique-la (confirm = true)."
 Consignes.refuser = "Je refuse cette proposition : ne l'applique pas. Dis-moi ce que tu proposerais d'autre, sans rien appliquer."
 function Consignes.ajuster(texte)
     return "Ajuste la proposition avant de l'appliquer : " .. texte .. ". Montre-moi la nouvelle proposition."
+end
+
+-- « Je le fais » (1.3, bouton de la carte Proposition) : Dany fait la retouche lui-même. Avec une
+-- proposition en attente, Claude range exactement celle-là ; sans, il en prépare une sur la photo
+-- active. Rien n'est appliqué : preview_settings avec my_turn range la version de Claude et rend
+-- la liste a_faire (la section « Je le fais » des consignes dit le reste).
+function Consignes.jeLeFais(avecProposition)
+    if avecProposition then
+        return "Je le fais moi-même, pour apprendre : n'applique rien. Rappelle preview_settings avec exactement les réglages "
+            .. "de ta proposition en attente et my_turn = true, puis donne-moi la liste a_faire dans son ordre, avec pour chaque "
+            .. "réglage le panneau, la valeur et pourquoi en quelques mots."
+    end
+    return "Je le fais moi-même sur la photo active, pour apprendre : n'applique rien. Regarde-la (view_photo), prépare une "
+        .. "retouche au rendu naturel et range-la avec preview_settings et my_turn = true, puis donne-moi la liste a_faire "
+        .. "dans son ordre, avec pour chaque réglage le panneau, la valeur et pourquoi en quelques mots."
+end
+
+-- « J'ai fini » (1.3, le même bouton pendant l'exercice) : la comparaison des deux versions, sans
+-- rien changer à la photo. `photo` : l'identifiant de la photo de l'exercice (nil : inconnu).
+function Consignes.jaiFini(photo)
+    local id = type(photo) == 'number' and string.format('%d', photo) or (photo ~= nil and tostring(photo) or nil)
+    local sur = id and ("la photo " .. id) or "la photo de l'exercice"
+    local vue = id and ("view_photo avec photo_id = " .. id .. " et compare = claude_version") or "view_photo avec compare = claude_version"
+    return "J'ai fini mes réglages sur " .. sur .. ". Compare ma version à la tienne : " .. vue .. ". Dis d'abord ce que j'ai "
+        .. "bien fait, puis l'écart qui compte le plus pour l'image (exercice.ecart_principal, chiffres du bilan à l'appui) et "
+        .. "comment le voir moi-même la prochaine fois ; sans rien changer à la photo."
 end
 
 -- Ajustements d'un clic de la fenêtre Ajuster.

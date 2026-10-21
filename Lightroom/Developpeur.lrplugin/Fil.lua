@@ -15,7 +15,11 @@
 -- titre en `proposition` (gras orange, ⓘ), chaque axe en `titre`, ses deux moitiés en `claude`
 -- retirées de 4 espaces (deux lignes au plus chacune, sans Markdown), 16 lignes au plus (deux de
 -- plus pour la remarque d'une leçon non rangée) ; une leçon refusée ou interrompue, une ligne
--- `note` « Leçon non rangée : … ».
+-- `note` « Leçon non rangée : … ». Un exercice « Je le fais » (1.3, élément `exercice`) se fait de
+-- même : son titre en `proposition` (« Je le fais · 7 réglages, dans l'ordre du panneau
+-- Développement », puis « Je le fais · comparée : 2 écarts sur 7 »), une ligne `outil` par réglage
+-- ou par écart (Fil.REGLAGES_MONTRES au plus, puis « … et N autres »), l'écart principal en lignes
+-- `outil` aussi ; refusé, son titre dit pourquoi, icône erreur.
 
 local Conversation = require 'Conversation'
 local Metriques = require 'Metriques'
@@ -35,6 +39,13 @@ Fil.MARGE = 10
 
 -- Photos montrées d'une notation ; les autres se résument en « … et N autres ».
 Fil.NOTES_MONTREES = 12
+
+-- Réglages (ou écarts) montrés d'un exercice « Je le fais » (1.3) ; les autres se résument en
+-- « … et N autres » (la carte Proposition les donne tous, page par page).
+Fil.REGLAGES_MONTRES = 12
+-- Lignes au plus de l'écart principal d'un exercice comparé, et du titre d'un exercice refusé.
+Fil.LIGNES_PRINCIPAL = 2
+Fil.LIGNES_ERREUR_EXERCICE = 3
 
 -- Le repère d'une ligne d'étape (1.3), après le texte de l'outil coupé à la place qui reste : un
 -- but (step_name) long ne le fait jamais disparaître.
@@ -293,7 +304,7 @@ function Fil.lignesElement(e, i, largeur)
         end
     elseif g == 'proposition' then
         local etat = ({ enAttente = "en attente de votre accord", acceptee = "acceptée", refusee = "refusée",
-            ajustee = "à ajuster" })[e.etat or ''] or ''
+            ajustee = "à ajuster", faite = "à faire vous-même" })[e.etat or ''] or ''
         ajouterTexte(lignes, "Proposition" .. (etat ~= '' and (" " .. etat) or "") .. (Texte.nettoyer(e.texte) ~= '' and (" : " .. e.texte) or ""),
             'proposition', largeur, i, 'proposition')
         for _, ch in ipairs(e.changements or {}) do
@@ -387,10 +398,80 @@ function Fil.lignesElement(e, i, largeur)
                 end
             end
         end
+    elseif g == 'exercice' then
+        -- « Je le fais » (1.3) : le titre (● pendant un appel), puis la liste dans l'ordre du
+        -- panneau Développement, ou, comparé, l'écart principal et chaque écart (✓ comme Claude).
+        local icone = e.etat == 'erreur' and 'erreur'
+            or ((e.etat == 'enCours' or e.comparaisonEnCours) and 'cours' or 'proposition')
+        for n, t in ipairs(coupeBornee(Fil.titreExercice(e), largeur, 'gras', '', Fil.LIGNES_ERREUR_EXERCICE)) do
+            lignes[#lignes + 1] = { genre = 'proposition', texte = t, element = i, icone = n == 1 and icone or nil }
+        end
+        local liste = {}
+        if e.etat == 'comparee' then
+            local principal = type(e.principal) == 'table' and Texte.nettoyer(e.principal.texte or '') or ''
+            if principal ~= '' then
+                for _, t in ipairs(coupeBornee('  Écart principal : ' .. principal, largeur - 16, 'mono', '  ', Fil.LIGNES_PRINCIPAL)) do
+                    lignes[#lignes + 1] = { genre = 'outil', texte = t, element = i }
+                end
+            end
+            for _, x in ipairs(e.ecarts or {}) do
+                liste[#liste + 1] = (x.sorte == 'comme_claude' and '✓ ' or '• ') .. tostring(x.texte or x.reglage or '?')
+            end
+        elseif e.etat == 'aFaire' then
+            for k, x in ipairs(e.aFaire or {}) do
+                liste[#liste + 1] = tostring(tonumber(x.n) or k) .. '. ' .. tostring(x.texte or x.reglage or x.cle or '?')
+            end
+        end
+        for n, t in ipairs(liste) do
+            if n > Fil.REGLAGES_MONTRES then
+                local reste = #liste - Fil.REGLAGES_MONTRES
+                lignes[#lignes + 1] = { genre = 'outil', texte = '  … et ' .. reste .. (reste == 1 and ' autre' or ' autres'), element = i }
+                break
+            end
+            lignes[#lignes + 1] = { genre = 'outil', texte = uneLigne('  ' .. t, largeur - 16, 'mono'), element = i }
+        end
     elseif g == 'note' then
         ajouterTexte(lignes, e.texte or '', 'note', largeur, i, 'note')
     end
     return lignes
+end
+
+-- « 2 écarts », « 1 réglage », « aucun écart ».
+local function compte(n, un, plusieurs, aucun)
+    if n == 0 then
+        return aucun
+    end
+    return n .. ' ' .. (n > 1 and plusieurs or un)
+end
+
+-- Les écarts d'un exercice comparé (ceux qui ne sont pas « comme Claude ») et le nombre de réglages
+-- comparés.
+function Fil.ecartsExercice(e)
+    local n = 0
+    for _, x in ipairs(e.ecarts or {}) do
+        if x.sorte ~= 'comme_claude' then
+            n = n + 1
+        end
+    end
+    return n, #(e.ecarts or {})
+end
+
+-- Le titre d'un exercice « Je le fais » dans le fil.
+function Fil.titreExercice(e)
+    if e.etat == 'erreur' then
+        local raison = Texte.nettoyer(e.texte or '')
+        return "Je le fais · non abouti : " .. (raison ~= '' and raison or "l'appel n'a pas abouti.")
+    elseif e.etat == 'enCours' then
+        return "Je le fais · liste en préparation…"
+    elseif e.etat == 'comparee' then
+        local ecarts, total = Fil.ecartsExercice(e)
+        return "Je le fais · comparée : " .. compte(ecarts, "écart", "écarts", "aucun écart") .. " sur " .. total
+    end
+    local titre = "Je le fais · " .. compte(#(e.aFaire or {}), "réglage", "réglages", "aucun réglage") .. ", dans l'ordre du panneau Développement"
+    if e.comparaisonEnCours then
+        titre = titre .. " · comparaison en cours…"
+    end
+    return titre
 end
 
 -- Ce qui change l'affichage des notes d'une notation (pour la signature du cache).
@@ -419,6 +500,23 @@ local function signatureLecon(e)
     return table.concat(morceaux, '\3')
 end
 
+-- Ce qui change l'affichage d'un exercice « Je le fais » (pour la signature du cache) : son titre,
+-- sa liste, ses écarts et l'écart principal.
+local function signatureExercice(e)
+    if e.genre ~= 'exercice' then
+        return ''
+    end
+    local morceaux = { Fil.titreExercice(e), tostring(e.comparaisonEnCours) }
+    for _, x in ipairs(type(e.aFaire) == 'table' and e.aFaire or {}) do
+        morceaux[#morceaux + 1] = tostring(x.n) .. '\2' .. tostring(x.texte)
+    end
+    for _, x in ipairs(type(e.ecarts) == 'table' and e.ecarts or {}) do
+        morceaux[#morceaux + 1] = tostring(x.sorte) .. '\2' .. tostring(x.texte)
+    end
+    morceaux[#morceaux + 1] = type(e.principal) == 'table' and tostring(e.principal.texte) or ''
+    return table.concat(morceaux, '\3')
+end
+
 -- Vrai si deux éléments voisins se suivent sans ligne vide (outils et aperçus d'une même série).
 local function colles(a, b)
     local serie = { outil = true, apercu = true }
@@ -434,7 +532,7 @@ function Fil.lignes(c, largeur, cache)
     for i, e in ipairs(c.elements or {}) do
         local signature = table.concat({ largeur, e.genre or '', e.etat or '', tostring(e.partiel), #(e.images or {}),
             #(e.changements or {}), e.style or '', e.texte or '', signatureNotes(e), #(e.etapes or {}),
-            tostring(Conversation.estEtape(e)), signatureLecon(e) }, '\1')
+            tostring(Conversation.estEtape(e)), signatureLecon(e), signatureExercice(e) }, '\1')
         local siennes
         if cache and cache[e.id] and cache[e.id].signature == signature then
             siennes = cache[e.id].lignes

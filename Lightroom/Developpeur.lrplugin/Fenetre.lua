@@ -718,21 +718,32 @@ function Fenetre.rafraichirApercu()
         return
     end
     local image = Fenetre.images[indice]
-    local nature = image.outil == 'jointe' and "photo jointe" or (image.outil or "aperçu")
+    -- La comparaison de « Je le fais » (1.3) : la version de Claude à gauche, celle de Dany à droite.
+    local nature = image.outil == 'jointe' and "photo jointe" or (image.comparaison and Fenetre.LEGENDE_COMPARAISON)
+        or (image.outil or "aperçu")
     poser(p, 'legendeApercu', string.format("%d sur %d · %s", indice, n, nature))
+    Fenetre.montrerImage(p, T, c, image.chemin)
+end
+
+-- La légende de la comparaison « Je le fais » (1.3) : Claude à gauche, Dany à droite.
+Fenetre.LEGENDE_COMPARAISON = "Claude | vous"
+
+-- Montre dans l'aperçu une image de la conversation `c` (chemin relatif à son dossier), réduite au
+-- cadre de l'aperçu dans une tâche (Images.vignette), gardée ensuite (Fenetre.vignettes).
+function Fenetre.montrerImage(p, T, c, chemin)
     local hauteur = T.apercu
-    local cle = c.id .. '/' .. image.chemin .. '/' .. T.apercu .. 'x' .. hauteur
+    local cle = c.id .. '/' .. chemin .. '/' .. T.apercu .. 'x' .. hauteur
     local deja = Fenetre.vignettes[cle]
     if deja then
         poser(p, 'imageApercu', deja)
         return
     end
     LrTasks.startAsyncTask(function()
-        local chemin = Images.vignette(Stockage.dossier(c.id), image.chemin, T.apercu, hauteur)
-        if chemin then
-            Fenetre.vignettes[cle] = chemin
+        local reduite = Images.vignette(Stockage.dossier(c.id), chemin, T.apercu, hauteur)
+        if reduite then
+            Fenetre.vignettes[cle] = reduite
             if Fenetre.p and Fenetre.T == T and Moteur.courante == c then
-                Fenetre.p.imageApercu = chemin
+                Fenetre.p.imageApercu = reduite
             end
         end
     end)
@@ -775,6 +786,25 @@ end
 function Fenetre.agrandir()
     if Fenetre.modeEtape() then
         Fenetre.agrandirEtape()
+        return
+    end
+    -- La comparaison « Je le fais » de l'onglet Proposition (1.3) : une seule image, côte à côte
+    -- (le connecteur rend les deux versions en une image).
+    local cc, comparaison = Fenetre.comparaisonMontree()
+    if comparaison then
+        LrTasks.startAsyncTask(function()
+            local chemin, l, h = Images.grande(Stockage.dossier(cc.id), comparaison, 1100, 740)
+            if not chemin then
+                LrDialogs.message("Aperçu illisible", comparaison, 'warning')
+                return
+            end
+            LrDialogs.presentModalDialog {
+                title = "Claude · " .. (Fenetre.p and Fenetre.p.legendeApercu or Fenetre.LEGENDE_COMPARAISON),
+                contents = LrView.osFactory():picture { value = chemin, width = l, height = h },
+                actionVerb = "Fermer",
+                cancelVerb = '< exclude >',
+            }
+        end)
         return
     end
     local a, active = Fenetre.apercuActif, Fenetre.info and Fenetre.info.active
@@ -897,15 +927,16 @@ function Fenetre.lignesCarte(texte, largeur)
     return lignes
 end
 
--- Montre la page courante du texte de la carte `cle` ; `texte` nil : le texte gardé.
-function Fenetre.montrerPage(cle, texte)
+-- Montre la page courante du texte de la carte `cle` ; `texte` nil : le texte gardé. `garder` : un
+-- texte qui change reste à la même page (la liste d'un exercice dont un réglage vient d'être coché).
+function Fenetre.montrerPage(cle, texte, garder)
     local p, T, carte = Fenetre.p, Fenetre.T, CARTES[cle]
     if not (p and carte) then
         return
     end
     local page = Fenetre.pages[cle]
     if texte ~= nil and (not page or page.texte ~= texte) then
-        page = { texte = texte, debut = 1 }
+        page = { texte = texte, debut = garder and page and page.debut or 1 }
         Fenetre.pages[cle] = page
     end
     if not page then
@@ -937,16 +968,27 @@ function Fenetre.defilerTexte(cle, sens)
 end
 
 -- Proposition ---------------------------------------------------------------------------------
+-- La carte Proposition montre la proposition en attente, ou l'exercice « Je le fais » (1.3) arrivé
+-- après elle (Conversation.dernierExercice : une proposition arrivée après l'exercice reprend la
+-- carte) : sa liste à faire, cochée au fil de ce que Dany change (Fenetre.suivreExercice), puis sa
+-- comparaison, jusqu'à la proposition suivante.
 
-function Fenetre.rafraichirProposition()
+Fenetre.AUCUNE_PROPOSITION = "Aucune proposition en attente.\n\nEn mode « Proposer d'abord », Claude montre ici ce "
+    .. "qu'il compte changer et attend votre accord.\n\n« Je le fais » : vous faites la retouche vous-même ; Claude donne "
+    .. "les réglages dans l'ordre du panneau Développement, puis compare votre version à la sienne."
+
+-- `garderPage` : le texte d'un exercice dont un réglage vient d'être coché reste à sa page.
+function Fenetre.rafraichirProposition(garderPage)
     local p = Fenetre.p
     if not p then
         return
     end
     local c = Moteur.courante
     local prop = c and Conversation.propositionEnAttente(c)
+    local exo = c and Conversation.dernierExercice(c)
     poser(p, 'enAttente', prop ~= nil and not Moteur.travaille)
     poser(p, 'aProposition', prop ~= nil)
+    Fenetre.rafraichirJeLeFais()
     -- Une proposition qui arrive se montre (onglet Proposition) ; une
     -- seule fois, pour ne pas reprendre la main à chaque rafraîchissement.
     if prop and prop.id ~= Fenetre.propositionVue then
@@ -956,8 +998,18 @@ function Fenetre.rafraichirProposition()
             Fenetre.choisirOnglet(Fenetre.T.ongletProposition)
         end
     end
+    -- De même la liste d'un exercice, puis chacune de ses comparaisons : une bascule chacune.
+    local vu = Fenetre.cleExerciceVu(exo)
+    if vu and vu ~= Fenetre.exerciceVu then
+        Fenetre.exerciceVu = vu
+        Fenetre.choisirOnglet(Fenetre.T.ongletProposition)
+    end
+    if exo then
+        Fenetre.montrerPage('proposition', Fenetre.texteExercice(exo, Fenetre.faitsDe(exo)), garderPage)
+        return
+    end
     if not prop then
-        Fenetre.montrerPage('proposition', "Aucune proposition en attente.\n\nEn mode « Proposer d'abord », Claude montre ici ce qu'il compte changer et attend votre accord.")
+        Fenetre.montrerPage('proposition', Fenetre.AUCUNE_PROPOSITION)
         return
     end
     local lignes = { Texte.nettoyer(prop.texte) ~= '' and prop.texte or "Claude propose :" , '' }
@@ -967,10 +1019,290 @@ function Fenetre.rafraichirProposition()
     Fenetre.montrerPage('proposition', table.concat(lignes, '\n'))
 end
 
--- Je le fais (1.3) : l'action du bouton de la seconde rangée de la carte Proposition (depuis une
--- tâche). Sans effet pour l'instant : un lot suivant la remplit (« Je le fais », puis « J'ai
--- fini »).
+-- Je le fais (1.3) ------------------------------------------------------------------------------
+-- Le bouton de la seconde rangée de la carte Proposition (titre lié : « Je le fais », puis
+-- « J'ai fini » pendant un exercice) : Dany fait la retouche lui-même, pour apprendre. Claude ne
+-- pose rien : il range sa version (preview_settings avec my_turn) et donne la liste des réglages
+-- dans l'ordre du panneau Développement ; la fenêtre les coche au fil de ce que Dany change (lu
+-- toutes les 2 s, Fenetre.suivreExercice) ; « J'ai fini » fait comparer les deux versions
+-- (view_photo avec compare = claude_version), montrées côte à côte dans l'aperçu de l'onglet
+-- Proposition. Actif quand Claude est libre et qu'il y a un exercice en cours, une proposition en
+-- attente ou une photo active.
+
+-- Ce qui fait basculer vers l'onglet Proposition, une fois chacun : la liste d'un exercice, puis
+-- chacune de ses comparaisons (nil : rien à montrer).
+function Fenetre.cleExerciceVu(exo)
+    if exo and exo.etat == 'aFaire' then
+        return exo.id .. '/aFaire'
+    elseif exo and exo.etat == 'comparee' then
+        return exo.id .. '/comparee/' .. tostring(exo.appelComparaison)
+    end
+    return nil
+end
+
+-- L'état de l'exercice montré, à droite du bouton (« À vous · 3 réglages faits sur 7 »).
+function Fenetre.etatExercice(exo, faits)
+    if not exo then
+        return ''
+    elseif exo.etat == 'enCours' then
+        return "Liste en préparation…"
+    elseif exo.etat == 'erreur' then
+        return "Je le fais n'a pas abouti"
+    elseif exo.etat == 'comparee' then
+        local ecarts, total = Fil.ecartsExercice(exo)
+        return "Comparée : " .. (ecarts == 0 and "aucun écart" or (ecarts .. (ecarts > 1 and " écarts" or " écart"))) .. " sur " .. total
+    elseif exo.comparaisonEnCours then
+        return "Comparaison en cours…"
+    end
+    local total, n = #(exo.aFaire or {}), faits and faits.nombre or 0
+    if n == 0 then
+        return "À vous · " .. total .. (total > 1 and " réglages à faire" or " réglage à faire")
+    end
+    return "À vous · " .. n .. (n > 1 and " réglages faits" or " réglage fait") .. " sur " .. total
+end
+
+-- Le bouton et l'état de l'exercice (aussi quand la photo active change : sans proposition ni
+-- exercice, il faut une photo active).
+function Fenetre.rafraichirJeLeFais()
+    local p = Fenetre.p
+    if not p then
+        return
+    end
+    local c = Moteur.courante
+    local enCours = c and Conversation.exerciceEnCours(c)
+    local prop = c and Conversation.propositionEnAttente(c)
+    local active = Fenetre.info and Fenetre.info.active
+    poser(p, 'titreJeLeFais', enCours and "J'ai fini" or "Je le fais")
+    poser(p, 'peutJeLeFais', not Moteur.travaille and (enCours ~= nil or prop ~= nil or active ~= nil))
+    local exo = c and Conversation.dernierExercice(c)
+    poser(p, 'exerciceEtat', Fenetre.etatExercice(exo, Fenetre.faitsDe(exo)))
+end
+
+-- Le texte d'un réglage ou d'un écart sans son panneau (montré en tête de son groupe).
+local function sansPanneau(texte, panneau)
+    texte = tostring(texte or '')
+    local tete = panneau and (panneau .. ' › ')
+    if tete and texte:sub(1, #tete) == tete then
+        return texte:sub(#tete + 1)
+    end
+    return texte
+end
+
+-- Des lignes groupées par panneau : le nom du panneau quand il change, puis chaque ligne.
+local function parPanneau(lignes, elements, ligne)
+    local panneau
+    for k, x in ipairs(elements) do
+        if x.panneau and x.panneau ~= panneau then
+            panneau = x.panneau
+            lignes[#lignes + 1] = panneau
+        end
+        lignes[#lignes + 1] = ligne(k, x)
+    end
+end
+
+-- Le texte de la carte Proposition pour un exercice (pure) : la liste à faire, dans l'ordre du
+-- panneau Développement et groupée par panneau, chaque réglage coché ✓ s'il a bougé (`faits`,
+-- Fenetre.reglagesFaits), ○ sinon ; comparé, le résumé, l'écart principal et chaque écart (✓ fait
+-- comme Claude) ; refusé, pourquoi.
+function Fenetre.texteExercice(exo, faits)
+    local lignes = {}
+    if exo.etat == 'enCours' then
+        return "Claude prépare la liste des réglages à faire vous-même. Rien n'est appliqué à la photo."
+    elseif exo.etat == 'erreur' then
+        local raison = Texte.nettoyer(exo.texte or '')
+        return "« Je le fais » n'a pas abouti" .. (raison ~= '' and (" : " .. raison) or ".")
+            .. "\n\nCliquez « Je le fais » pour recommencer, ou demandez à Claude."
+    elseif exo.etat == 'comparee' then
+        lignes[#lignes + 1] = "Votre version comparée à celle de Claude" .. (exo.fichier and (" (" .. exo.fichier .. ")") or "") .. "."
+        if Texte.nettoyer(exo.resume or '') ~= '' then
+            lignes[#lignes + 1] = exo.resume
+        end
+        local principal = type(exo.principal) == 'table' and Texte.nettoyer(exo.principal.texte or '') or ''
+        if principal ~= '' then
+            lignes[#lignes + 1] = ''
+            lignes[#lignes + 1] = "Écart principal : " .. principal
+        end
+        lignes[#lignes + 1] = ''
+        parPanneau(lignes, exo.ecarts or {}, function(_, x)
+            return (x.sorte == 'comme_claude' and '✓ ' or '• ') .. sansPanneau(x.texte or x.reglage, x.panneau)
+        end)
+        if Texte.nettoyer(exo.aSavoir or '') ~= '' then
+            lignes[#lignes + 1] = ''
+            lignes[#lignes + 1] = exo.aSavoir
+        end
+        lignes[#lignes + 1] = ''
+        lignes[#lignes + 1] = "La version de Claude reste en instantané « " .. (exo.instantane or "Claude · ma version")
+            .. " » : demandez-lui de la poser si vous la préférez."
+        return table.concat(lignes, '\n')
+    end
+    local fait = faits and faits.reglages or {}
+    lignes[#lignes + 1] = "À vous : faites ces réglages dans le module Développement, dans cet ordre, puis cliquez « J'ai fini ». "
+        .. "Rien n'est appliqué : la version de Claude est rangée en instantané « " .. (exo.instantane or "Claude · ma version") .. " »."
+    if exo.comparaisonEnCours then
+        lignes[#lignes + 1] = "Claude compare votre version à la sienne…"
+    end
+    lignes[#lignes + 1] = ''
+    parPanneau(lignes, exo.aFaire or {}, function(k, x)
+        return (fait[k] and '✓ ' or '○ ') .. tostring(tonumber(x.n) or k) .. '. ' .. sansPanneau(x.texte or x.reglage, x.panneau)
+    end)
+    return table.concat(lignes, '\n')
+end
+
+-- Les clés que Lightroom range pour les réglages d'un exercice (les cinq du cadre pour sa ligne).
+function Fenetre.clesExercice(exo)
+    local cles, vues = {}, {}
+    for _, x in ipairs(exo.aFaire or {}) do
+        for _, cle in ipairs(type(x.cles) == 'table' and x.cles or { x.cle }) do
+            if type(cle) == 'string' and not vues[cle] then
+                vues[cle] = true
+                cles[#cles + 1] = cle
+            end
+        end
+    end
+    return cles
+end
+
+-- Vrai si une valeur lue a bougé depuis `avant` (sa valeur au départ, dans la liste) ; faux si non,
+-- nil si on ne peut pas le dire (valeur non lue, ou d'une autre nature).
+local function abouge(avant, lue)
+    if avant == nil or lue == nil then
+        return nil
+    elseif type(avant) == 'number' and type(lue) == 'number' then
+        return math.abs(lue - avant) > 1e-6
+    elseif type(avant) == 'boolean' and type(lue) == 'boolean' then
+        return avant ~= lue
+    elseif type(avant) == 'string' and type(lue) == 'string' then
+        return avant ~= lue
+    end
+    return nil
+end
+
+-- Les réglages déjà faits d'un exercice (pure) : { reglages = { [rang dans la liste] = true },
+-- nombre }. Un réglage est fait quand sa valeur lue (Lightroom.valeurs) a bougé depuis `avant` ;
+-- une table (courbe…) aussi quand sa signature a changé depuis le début du suivi
+-- (`exo.signatures`) ; le cadre, quand l'une de ses clés a bougé.
+function Fenetre.reglagesFaits(exo, valeurs, signatures)
+    local faits = { reglages = {}, nombre = 0 }
+    local depart = type(exo.signatures) == 'table' and exo.signatures or {}
+    for k, x in ipairs(exo.aFaire or {}) do
+        local fait = false
+        if type(x.cles) == 'table' then
+            for _, cle in ipairs(x.cles) do
+                local avant = type(x.avant) == 'table' and x.avant[cle] or nil
+                fait = fait or abouge(avant, valeurs[cle]) == true
+            end
+        else
+            fait = abouge(x.avant, valeurs[x.cle]) == true
+            local sig = signatures and signatures[x.cle]
+            if not fait and sig ~= nil and depart[x.cle] ~= nil and depart[x.cle] ~= sig then
+                fait = true
+            end
+        end
+        if fait then
+            faits.reglages[k] = true
+            faits.nombre = faits.nombre + 1
+        end
+    end
+    return faits
+end
+
+-- Le suivi de l'exercice montré, s'il est celui de `exo` (nil sinon).
+function Fenetre.faitsDe(exo)
+    local s = Fenetre.suivi
+    return exo and s and s.id == exo.id and s.faits or nil
+end
+
+-- Toutes les 2 s (Fenetre.periodique) : les réglages de la photo de l'exercice en cours, relus
+-- dans le catalogue (Lightroom.valeurs, sans rien écrire) ; ce qui a bougé se coche, et l'état dit
+-- combien. Les tables lues au premier suivi servent de départ à la signature (gardées dans
+-- l'exercice). Depuis une tâche.
+function Fenetre.suivreExercice()
+    local c = Moteur.courante
+    local exo = c and Conversation.exerciceEnCours(c)
+    if not Fenetre.p or not exo or exo.photo == nil then
+        Fenetre.suivi = nil
+        return
+    end
+    local valeurs, signatures = Lightroom.valeurs(exo.photo, Fenetre.clesExercice(exo))
+    if next(valeurs) == nil then
+        return
+    end
+    if type(exo.signatures) ~= 'table' then
+        exo.signatures = {}
+        for cle, sig in pairs(signatures) do
+            exo.signatures[cle] = sig
+        end
+    end
+    Fenetre.suivi = { id = exo.id, faits = Fenetre.reglagesFaits(exo, valeurs, signatures) }
+    if Fenetre.p then
+        Fenetre.rafraichirProposition(true)
+    end
+end
+
+-- L'action du bouton (depuis une tâche) : « J'ai fini » pendant un exercice, sinon « Je le fais ».
+-- C'est une demande de Dany (une proposition préparée à l'ouverture ne retient plus l'onglet).
+-- « Je le fais » sans proposition porte sur la photo active : la conversation devient celle de la
+-- sélection, comme Envoyer ; avec une proposition, ou « J'ai fini » (Dany peut regarder une autre
+-- photo), elle reste celle de sa photo.
 function Fenetre.jeLeFais()
+    if Moteur.travaille then
+        return
+    end
+    local c = Moteur.courante
+    local enCours = c and Conversation.exerciceEnCours(c)
+    local prop = c and Conversation.propositionEnAttente(c)
+    Fenetre.propositionAuto = false
+    local info = Lightroom.photos()
+    local ok, raison
+    if enCours then
+        ok, raison = Moteur.jaiFini()
+    else
+        ok, raison = Moteur.jeLeFais()
+    end
+    local nouvellePhoto = not enCours and not prop
+    if ok and Moteur.courante and info.cle and (nouvellePhoto or Moteur.courante.cle == nil) then
+        Moteur.courante.cle = info.cle
+        Fenetre.voirSelection(info.cle)
+    end
+    if Fenetre.p then
+        Fenetre.p.message = ok and '' or (raison or '')
+    end
+    Fenetre.aRafraichir = true
+end
+
+-- La comparaison montrée par l'onglet Proposition : celle de l'exercice montré, comparé, s'il n'y a
+-- pas d'image cliquée dans le fil. Rend la conversation et le chemin de l'image, nil sinon.
+function Fenetre.comparaisonMontree()
+    local p, T, c = Fenetre.p, Fenetre.T, Moteur.courante
+    if not (p and T and c) or p.onglet ~= T.ongletProposition or Fenetre.imageCliquee then
+        return nil
+    end
+    local exo = Conversation.dernierExercice(c)
+    local chemin = exo and exo.etat == 'comparee' and Conversation.imageComparaison(c, exo) or nil
+    if not chemin then
+        return nil
+    end
+    return c, chemin, exo
+end
+
+-- L'aperçu de l'onglet Proposition (Fenetre.apercuOnglet) : la comparaison « Claude | vous » d'un
+-- exercice comparé (ses ◀ ▶ coupés) ; sinon nil, l'aperçu d'avant. Un lot suivant (Composition)
+-- compose ici son image du cadre : un seul crochet par onglet.
+function Fenetre.apercuExercice(p, T)
+    local c, chemin, exo = Fenetre.comparaisonMontree()
+    if not chemin then
+        return nil
+    end
+    poser(p, 'peutPrecedente', false)
+    poser(p, 'peutSuivante', false)
+    poser(p, 'aImage', true)
+    poser(p, 'legendeApercu', Fenetre.LEGENDE_COMPARAISON .. (exo.fichier and (" · " .. exo.fichier) or ""))
+    Fenetre.montrerImage(p, T, c, chemin)
+    return true
+end
+
+Fenetre.apercuOnglet.proposition = function(p, T)
+    return Fenetre.apercuExercice(p, T)
 end
 
 function Fenetre.repondreProposition(acceptee)
@@ -1874,6 +2206,8 @@ function Fenetre.majPhoto()
     end
     Fenetre.suivreSelection(info)
     Fenetre.rafraichirNotation()
+    -- Je le fais (1.3) : sans proposition ni exercice, il faut une photo active.
+    Fenetre.rafraichirJeLeFais()
 end
 
 -- Une autre photo active ou une autre sélection, choisie par l'utilisateur, commence une nouvelle
@@ -1883,7 +2217,9 @@ end
 -- DELAI_APRES_TRAVAIL secondes avant la fin de son travail, peut être la sienne : elle devient
 -- celle de la conversation. `Fenetre.cleVue` et l'heure où elle a été vue (`cleVueLe`) restent
 -- d'une ouverture de la fenêtre à l'autre : une photo choisie fenêtre fermée compte aussi, et une
--- fenêtre fermée pendant le travail de Claude retrouve sa conversation à la réouverture.
+-- fenêtre fermée pendant le travail de Claude retrouve sa conversation à la réouverture. Pendant un
+-- exercice « Je le fais » (1.3), Dany peut regarder d'autres photos : la conversation reste celle
+-- de l'exercice, sa liste et « J'ai fini » avec elle.
 Fenetre.DELAI_APRES_TRAVAIL = 4
 
 function Fenetre.voirSelection(cle)
@@ -1910,6 +2246,9 @@ function Fenetre.suivreSelection(info)
         return
     end
     if not Chemins.prefs().nouvelleParPhoto or not c or #(c.elements or {}) == 0 or c.cle == cle then
+        return
+    end
+    if Conversation.exerciceEnCours(c) then
         return
     end
     Journal.noter("Autre photo choisie : nouvelle conversation")
@@ -2184,6 +2523,8 @@ end
 function Fenetre.periodique()
     LrTasks.pcall(Fenetre.verifier, false)
     LrTasks.pcall(Fenetre.majPhoto)
+    -- Je le fais (1.3) : ce que Dany a déjà fait de la liste, relu dans le catalogue.
+    LrTasks.pcall(Fenetre.suivreExercice)
 end
 
 function Fenetre.boucle(generation)
@@ -2306,6 +2647,11 @@ function Fenetre.afficher()
         -- À l'ouverture, l'aperçu montre la photo active, refait (Fenetre.majPhoto).
         Fenetre.idActif, Fenetre.apercuActif, Fenetre.demandeActive, Fenetre.voirActive = nil, nil, nil, true
         Fenetre.propositionVue = nil
+        -- Je le fais (1.3) : le suivi se relit ; un exercice déjà comparé ne fait pas basculer
+        -- l'onglet à l'ouverture (un exercice en cours, si : sa liste attend Dany).
+        Fenetre.suivi = nil
+        local derniere = Conversation.dernierExercice(Moteur.courante)
+        Fenetre.exerciceVu = derniere and derniere.etat == 'comparee' and Fenetre.cleExerciceVu(derniere) or nil
         Fenetre.info = nil
         Fenetre.noteVue, Fenetre.notePhoto = nil, nil
         Fenetre.noteEnCours = false
