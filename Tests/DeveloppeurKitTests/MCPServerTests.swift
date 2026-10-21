@@ -338,11 +338,12 @@ final class MCPServerTests: XCTestCase {
         XCTAssertEqual(ToolHandler.annotations("export_journal")["title"]?.string, "Journal et carnet de progrès")
     }
 
-    /// Les corps sont provisoires dans cette construction : une erreur d'outil, rien n'est envoyé au
-    /// module, pas même aux registres notés à part ; un paramètre inconnu reste refusé.
+    /// Le corps de photo_lesson est provisoire dans cette construction : une erreur d'outil, rien
+    /// n'est envoyé au module, pas même aux registres notés à part ; un paramètre inconnu reste
+    /// refusé (read_composition a son corps depuis le lot 5 : CompositionTests).
     func testLesCorpsProvisoiresNEnvoientRien() throws {
         let tools = ToolHandler(lightroom: fake)
-        for nom in ["photo_lesson", "read_composition"] {
+        for nom in ["photo_lesson"] {
             let resultat = tools.call(name: nom, arguments: [:])
             XCTAssertTrue(resultat.isError, nom)
             XCTAssertTrue(resultat.text.contains("n'est pas encore dans cette construction"), resultat.text)

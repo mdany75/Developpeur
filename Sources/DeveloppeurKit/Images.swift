@@ -3,7 +3,8 @@ import CoreText
 import Foundation
 import ImageIO
 
-/// Découpe et assemblage des aperçus : zoom sur une zone, avant/après côte à côte.
+/// Découpe et assemblage des aperçus : zoom sur une zone, avant/après côte à côte, cadre proposé
+/// dessiné sur l'image entière.
 public enum PreviewImages {
     /// Grand côté maximal d'une image envoyée à Claude (au-delà, Claude la réduit).
     public static let maxSide = 1600
@@ -74,6 +75,76 @@ public enum PreviewImages {
         context.stroke(carre)
         guard let marquee = context.makeImage() else { return nil }
         return jpeg(marquee)
+    }
+
+    /// L'image entière avec un cadre proposé (preview_settings avec crop, 1.3) : le hors-cadre
+    /// assombri, les lignes des tiers dans le cadre, tournées avec lui, et le cadre en pointillés
+    /// blancs sur un trait sombre. `coins` : haut gauche, haut droit, bas droit, bas gauche, de 0 à 1
+    /// depuis le coin haut gauche (Composition.coins). Épaisseurs proportionnelles au grand côté
+    /// (cadre 0,4 %, tiers 0,25 %), pour rester lisibles réduites à 320 px dans la fenêtre Claude
+    /// (à régler sur la capture).
+    public static func cadrePropose(_ source: CGImage, coins: [CGPoint]) -> Data? {
+        guard coins.count == 4 else { return nil }
+        let image = scaled(source, maxSide: maxSide)
+        let width = image.width, height = image.height
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        // Le repère de CoreGraphics part du bas.
+        let p = coins.map { CGPoint(x: Double($0.x) * Double(width), y: (1 - Double($0.y)) * Double(height)) }
+        let grand = Double(max(width, height))
+
+        // Hors-cadre assombri : le rectangle de l'image moins le cadre (pair-impair).
+        context.addRect(CGRect(x: 0, y: 0, width: width, height: height))
+        context.addLines(between: p)
+        context.closePath()
+        context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 0.5))
+        context.fillPath(using: .evenOdd)
+
+        func entre(_ a: CGPoint, _ b: CGPoint, _ t: Double) -> CGPoint {
+            CGPoint(x: Double(a.x) + (Double(b.x) - Double(a.x)) * t, y: Double(a.y) + (Double(b.y) - Double(a.y)) * t)
+        }
+        func tracer(_ segments: [(CGPoint, CGPoint)]) {
+            for (a, b) in segments {
+                context.move(to: a)
+                context.addLine(to: b)
+            }
+            context.strokePath()
+        }
+        // Les tiers : deux lignes dans chaque sens, d'un côté du cadre à l'autre.
+        var tiers: [(CGPoint, CGPoint)] = []
+        for t in [1.0 / 3, 2.0 / 3] {
+            tiers.append((entre(p[0], p[1], t), entre(p[3], p[2], t)))
+            tiers.append((entre(p[0], p[3], t), entre(p[1], p[2], t)))
+        }
+        let traitTiers = max(1.5, grand * 0.0025)
+        context.setLineCap(.butt)
+        context.setStrokeColor(CGColor(red: 0, green: 0, blue: 0, alpha: 0.45))
+        context.setLineWidth(traitTiers * 2)
+        tracer(tiers)
+        context.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.7))
+        context.setLineWidth(traitTiers)
+        tracer(tiers)
+
+        // Le cadre : un trait sombre continu, puis les pointillés blancs (tiret ≈ côté / 40).
+        let traitCadre = max(2, grand * 0.004)
+        let cote = max(hypot(Double(p[1].x - p[0].x), Double(p[1].y - p[0].y)), hypot(Double(p[3].x - p[0].x), Double(p[3].y - p[0].y)))
+        let tiret = max(4, cote / 40)
+        context.setLineJoin(.miter)
+        context.addLines(between: p)
+        context.closePath()
+        context.setStrokeColor(CGColor(red: 0, green: 0, blue: 0, alpha: 0.6))
+        context.setLineWidth(traitCadre * 2)
+        context.strokePath()
+        context.addLines(between: p)
+        context.closePath()
+        context.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        context.setLineWidth(traitCadre)
+        context.setLineDash(phase: 0, lengths: [tiret, tiret])
+        context.strokePath()
+        guard let dessinee = context.makeImage() else { return nil }
+        return jpeg(dessinee)
     }
 
     /// Deux images côte à côte, à la même hauteur, séparées d'une bande blanche.
