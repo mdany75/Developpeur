@@ -683,7 +683,9 @@ end
 -- changé, la différence avec les réglages actuels dit ce que l'utilisateur a corrigé à la main.
 -- Un réglage automatique pas encore calculé (−999999, après la tonalité automatique) n'en est pas,
 -- ni ce que Lightroom résout lui-même peu après l'écriture (constaté le 18 octobre 2026 : le nom et
--- l'origine du profil d'objectif par défaut, des réglages absents qu'il ajoute).
+-- l'origine du profil d'objectif par défaut, des réglages absents qu'il ajoute). etatSimple et
+-- difference servent aussi l'exercice « Je le fais » (1.3, Variantes.lua) : son état de départ, et
+-- ce que Dany a changé depuis.
 local TEXTES_SUIVIS = { WhiteBalance = true, CameraProfile = true, ProcessVersion = true, ToneCurveName2012 = true,
     LensProfileSetup = true }
 local NON_SUIVIS = { LensProfileIsEmbedded = true }
@@ -744,6 +746,28 @@ local function noterEtatFinal(photos, etape)
     end
 end
 
+-- Ce qui diffère entre un état de référence et l'état actuel (deux états simples, etatSimple, ou
+-- deux tables de réglages ; fonction pure) : Json.tableau de {cle, avant, maintenant}, par clé. Une
+-- clé absente de la référence n'est pas une différence (Lightroom ajoute ou résout lui-même des
+-- réglages après l'écriture), ni une valeur automatique pas encore calculée (−999999) ; l'égalité
+-- est celle de Reglages.egal, tables comprises. Sert aux corrections de l'utilisateur et à
+-- l'exercice « Je le fais » (Variantes.lua : ce que Dany a changé depuis le départ).
+local function difference(reference, maintenant)
+    local cles = {}
+    for cle in pairs(reference) do
+        cles[#cles + 1] = cle
+    end
+    table.sort(cles, function(a, b) return tostring(a) < tostring(b) end)
+    local changements = Json.tableau()
+    for _, cle in ipairs(cles) do
+        local avant, actuel = reference[cle], maintenant[cle]
+        if avant ~= Json.null and avant ~= EN_ATTENTE and actuel ~= EN_ATTENTE and not egalReglage(avant, actuel) then
+            changements[#changements + 1] = { cle = cle, avant = avant, maintenant = actuel == nil and Json.null or actuel }
+        end
+    end
+    return changements
+end
+
 -- Ce que l'utilisateur a changé depuis la dernière commande de Claude sur la photo, ou nil :
 -- {etape, changements = {cle, claude, maintenant}}.
 local function correctionsUtilisateur(photo)
@@ -755,27 +779,9 @@ local function correctionsUtilisateur(photo)
         and tonumber(brut(photo, 'lastEditTime')) == tonumber(apres.lastEditTime) then
         return nil
     end
-    local maintenant = etatSimple(photo:getDevelopSettings())
-    local cles, vues = {}, {}
-    for _, source in ipairs({ apres.reglages, maintenant }) do
-        for cle in pairs(source) do
-            if not vues[cle] then
-                vues[cle] = true
-                cles[#cles + 1] = cle
-            end
-        end
-    end
-    table.sort(cles)
     local changements = Json.tableau()
-    for _, cle in ipairs(cles) do
-        local claude, actuel = apres.reglages[cle], maintenant[cle]
-        if claude == Json.null then
-            claude = nil
-        end
-        if claude ~= nil and claude ~= EN_ATTENTE and actuel ~= EN_ATTENTE and not egalReglage(claude, actuel) then
-            changements[#changements + 1] = { cle = cle, claude = claude == nil and Json.null or claude,
-                maintenant = actuel == nil and Json.null or actuel }
-        end
+    for _, c in ipairs(difference(apres.reglages, etatSimple(photo:getDevelopSettings()))) do
+        changements[#changements + 1] = { cle = c.cle, claude = c.avant, maintenant = c.maintenant }
     end
     if #changements == 0 then
         return nil
@@ -810,6 +816,9 @@ Ecriture.calculerAvantRendu = calculerAvantRendu
 Ecriture.calculerIA = calculerIA
 Ecriture.completerEtapes = completerEtapes
 Ecriture.correctionsUtilisateur = correctionsUtilisateur
+Ecriture.difference = difference
+Ecriture.EN_ATTENTE = EN_ATTENTE
+Ecriture.etatSimple = etatSimple
 Ecriture.noterEtatFinal = noterEtatFinal
 Ecriture.creerInstantane = creerInstantane
 Ecriture.ecrire = ecrire
