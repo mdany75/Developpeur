@@ -211,7 +211,7 @@ test("lecon : refus avant toute écriture (trois points, un par axe ; textes ; c
     echoue(function() garder(999) end, "Aucune photo n'a l'identifiant 999")
     echoue(function() Commandes.executer('lecon', { action = 'retirer' }) end, "donner photo ou photos")
     echoue(function() Commandes.executer('lecon', { action = 'effacer' }) end, "Action de la leçon inconnue : effacer (garder, lire ou retirer).")
-    echoue(function() Commandes.executer('carnet', { action = 'vider' }) end, "Action du carnet inconnue : vider (lire ou retirer).")
+    echoue(function() Commandes.executer('carnet', { action = 'vider' }) end, "Action du carnet inconnue : vider (constater, lire ou retirer).")
     echoue(function() Commandes.executer('carnet', { action = 'retirer' }) end, "donner photos")
     egal(S.fichiers[Carnet.fichier()], nil, "rien n'est rangé")
     egal(Carnet.version, version)
