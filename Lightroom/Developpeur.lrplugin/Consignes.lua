@@ -108,6 +108,11 @@ Consignes.invites = {
         message = "Passe la photo active en noir et blanc : profil, mélangeur, contraste local, puis éclaircis et assombris comme un tireur (doses d'add_mask) avec l'avant/après de cette étape, et grain." },
     { id = 'iso_eleve', titre = "ISO élevé",
         message = "Retouche cette photo prise à ISO élevé : le bruit d'abord (débruitage IA s'il est fort), puis les ombres, les couleurs et la netteté, sans lisser les détails." },
+    -- Composition (1.3) : lue sur l'image entière (read_composition), le cadre proposé et montré,
+    -- appliqué seulement par Accepter ; sans chiffre, comme les autres invites. Avant Sports : Sports
+    -- reste la dernière invite, le menu Style à sa droite.
+    { id = 'composition', titre = "Composition",
+        message = "Lis la composition de la photo active (horizon, tiers, espace devant le sujet) et propose un recadrage, sans l'appliquer ; dis la règle en une phrase." },
     { id = 'sports', titre = "Sports",
         message = "Retouche cette photo de sport : le sujet en action d'abord (exposition, contraste et netteté sur lui), couleurs fidèles des maillots et du terrain, arrière-plan calmé ; bruit si l'ISO est élevé ; recadrage serré sur l'action seulement s'il y gagne nettement, et dis-le." },
 }

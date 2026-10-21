@@ -1,6 +1,7 @@
 -- essais-moteur.lua : essais du moteur de conversation pour la notation, hors de Lightroom (LuaJIT,
 -- Lightroom simulé par Simulation.lua) : consignes des notes et des passes, consignes de la 1.2
--- (peau dosée, section Écran, invites Portrait, Paysage et Noir et blanc du tireur), séance de notation
+-- (peau dosée, section Écran, invites Portrait, Paysage et Noir et blanc du tireur), invite
+-- Composition et longueur des consignes de la fenêtre (1.3), séance de notation
 -- (sa conversation, sans changer celle de la fenêtre Claude), consignes écrites dans le dossier de
 -- la session, élément « notation » du fil (entrée de propose_ratings, réponse du connecteur),
 -- stockage des notes. Le moteur est éprouvé avec faux-claude.sh (cas NOTE-LES) : ni Claude, ni
@@ -147,7 +148,34 @@ essai('Consignes : invites Portrait, Paysage et Noir et blanc, éclaircir et ass
     vrai(not vues.retouche_pro.message:find('tireur', 1, true), 'retouche pro inchangée')
     -- La méthode reste au connecteur (en-tête de Consignes.lua) : rien dans les consignes.
     vrai(not Consignes.texte:find('tireur', 1, true), 'consignes sans la méthode du tireur')
-    egal(6, #Consignes.invites)
+    egal(7, #Consignes.invites)
+end)
+
+essai('Consignes : invite Composition (1.3), avant Sports, sans chiffre ; le cadre proposé, jamais appliqué', function()
+    local ids = {}
+    for _, invite in ipairs(Consignes.invites) do
+        ids[#ids + 1] = invite.id
+    end
+    egal('retouche_pro portrait paysage noir_et_blanc iso_eleve composition sports', table.concat(ids, ' '))
+    local composition = Consignes.invites[6]
+    egal('Composition', composition.titre)
+    egal(nil, composition.modele, 'le modèle des préférences')
+    for _, morceau in ipairs({ 'photo active', 'horizon', 'tiers', 'espace devant le sujet', 'propose un recadrage', "sans l'appliquer",
+        'la règle en une phrase' }) do
+        contient(composition.message, morceau, 'invite Composition')
+    end
+    vrai(not composition.message:find('%d'), 'invite Composition sans chiffre')
+end)
+
+essai('Consignes : le texte de la fenêtre, lu à chaque demande, fait 7 500 caractères au plus (1.3)', function()
+    -- 5 064 caractères à la 1.2 ; les sections de la 1.3 (Raison de chaque étape, Leçon, Je le
+    -- fais, Composition, puce Carnet) ont leur part, et ce qui dépasse va aux descriptions des
+    -- outils, que Claude lit aussi.
+    local Texte = require 'Texte'
+    local n = Texte.longueur(Consignes.texte)
+    vrai(n <= 7500, string.format('Consignes.texte : %d caractères pour 7 500', n))
+    vrai(n > 4000, 'le texte entier est compté (' .. n .. ')')
+    vrai(Texte.longueur('é → ★') == 5, 'des caractères, pas des octets')
 end)
 
 essai('Consignes : section Écran, dite une fois par conversation (1.2)', function()

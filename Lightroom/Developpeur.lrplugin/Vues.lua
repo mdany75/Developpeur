@@ -19,7 +19,8 @@ local Vues = {}
 -- Fil -----------------------------------------------------------------------------------------
 
 -- Une ligne du fil : une icône et une variante de texte par genre (police, couleur), superposées ;
--- un clic montre l'image dans l'aperçu ou le détail d'un outil.
+-- un clic est réparti par Fenetre.cliquerLigne (image dans l'aperçu, ligne du carnet, leçon,
+-- étape, sinon détail d'un outil).
 function Vues.ligneFil(f, F, i, largeur)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local icones = { place = 'overlapping', width = 16 }
@@ -296,9 +297,12 @@ end
 -- La proposition de Claude en mode « Proposer d'abord » : ce qu'il compte changer, Accepter,
 -- Refuser, Ajuster… (actifs quand une proposition attend et que Claude ne travaille pas), et ▲ ▼
 -- à leur droite pour faire défiler un texte plus long que la carte (F.defilerTexte, page tirée par
--- Fenetre.rafraichirProposition, coupée comme le fil : police P.texte).
+-- Fenetre.rafraichirProposition, coupée comme le fil : police P.texte). La première rangée, avec
+-- ▲ ▼, n'a pas la place d'un quatrième bouton : une seconde rangée porte « Je le fais » (1.3 ;
+-- titre lié `titreJeLeFais`, « J'ai fini » pendant l'exercice : jamais deux boutons superposés) et
+-- l'état de l'exercice (`exerciceEtat`, « À vous · 3 réglages faits sur 7 »).
 function Vues.proposition(f, F, largeur, lignes)
-    local bind, P = F.bind, F.POLICES
+    local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local petit = largeur - 24 < 300 and 'small' or nil
     return f:group_box {
         title = "Proposition de Claude",
@@ -307,11 +311,58 @@ function Vues.proposition(f, F, largeur, lignes)
         f:row {
             spacing = 4,
             fill_horizontal = 1,
-            F.bouton(f, { title = "Accepter", size = petit, enabled = bind 'enAttente', action = function() F.repondreProposition(true) end }),
+            F.bouton(f, { title = "Accepter", size = petit, enabled = bind 'enAttente',
+                tooltip = "Appliquer la proposition : la photo ne change qu'à ce clic", action = function() F.repondreProposition(true) end }),
             F.bouton(f, { title = "Refuser", size = petit, enabled = bind 'enAttente', action = function() F.repondreProposition(false) end }),
             F.bouton(f, { title = "Ajuster…", size = petit, enabled = bind 'enAttente', action = function() F.enTache(F.ajuster) end }),
             f:spacer { fill_horizontal = 1 },
             Vues.fleches(f, F, 'proposition'),
+        },
+        f:row {
+            spacing = 4,
+            fill_horizontal = 1,
+            F.bouton(f, { title = bind 'titreJeLeFais', size = petit, enabled = bind 'peutJeLeFais',
+                tooltip = "Faire la retouche vous-même : Claude donne les réglages dans l'ordre du panneau Développement, "
+                    .. "puis compare votre version à la sienne",
+                action = function() F.enTache(F.jeLeFais) end }),
+            -- La place à droite du bouton (« Je le fais » : environ 80 points, estimés d'après la
+            -- chasse mesurée des polices).
+            f:static_text { title = bind 'exerciceEtat', font = P.petit, text_color = C.gris, width = largeur - 24 - 100,
+                truncation = 'tail' },
+        },
+    }
+end
+
+-- La carte « Pourquoi ? » d'une étape de Claude (1.3), dans le troisième onglet : son titre
+-- (« Étape 2 sur 4 · passe 1 : balance »), son sous-titre en gris (fichier, outil, « annulée
+-- ensuite »), sa raison et ses réglages changés page par page (`etapeTexte`, D.etapeLignes lignes,
+-- coupés comme le fil : police P.texte), puis ◀ ▶ (étape précédente ou suivante de la même photo),
+-- Voir l'avant / Voir l'après (titre lié `titreBascule` : un seul bouton), Détail… (l'appel de
+-- l'outil et sa réponse) et ▲ ▼. Tous les boutons en petit, par F.bouton ; la boîte de groupe
+-- devient une colonne à titre gras dans l'onglet (Vues.masquable).
+function Vues.etape(f, F, largeur, D)
+    local bind, C, P = F.bind, F.COULEURS, F.POLICES
+    local interieur = largeur - 24
+    return f:group_box {
+        title = "Pourquoi ?",
+        width = largeur,
+        spacing = 4,
+        f:static_text { title = bind 'etapeTitre', font = P.gras, width = interieur, truncation = 'tail' },
+        f:static_text { title = bind 'etapeSousTitre', font = P.petit, text_color = C.gris, width = interieur, truncation = 'middle' },
+        f:static_text { title = bind 'etapeTexte', font = P.texte, width = interieur, height_in_lines = D.etapeLignes },
+        f:row {
+            spacing = 4,
+            fill_horizontal = 1,
+            F.bouton(f, { title = "◀", size = 'small', tooltip = "Étape précédente", enabled = bind 'etapePrecedente',
+                action = function() F.etapeVoisine(-1) end }),
+            F.bouton(f, { title = "▶", size = 'small', tooltip = "Étape suivante", enabled = bind 'etapeSuivante',
+                action = function() F.etapeVoisine(1) end }),
+            F.bouton(f, { title = bind 'titreBascule', size = 'small', tooltip = "Montrer l'avant ou l'après de cette étape dans l'aperçu",
+                enabled = bind 'etapeAImages', action = function() F.basculerEtape() end }),
+            F.bouton(f, { title = "Détail…", size = 'small', tooltip = "Ce que Claude a demandé au connecteur pour cette étape, puis sa réponse",
+                enabled = bind 'etapeADetail', action = function() F.enTache(F.detailEtape) end }),
+            f:spacer { fill_horizontal = 1 },
+            Vues.fleches(f, F, 'etape'),
         },
     }
 end

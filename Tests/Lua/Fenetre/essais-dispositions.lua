@@ -3,7 +3,9 @@
 -- Simulation.lua) : fenêtre déjà ouverte, boucle, onglets, carte Note et ses flèches, nouvelle
 -- conversation par photo, proposition préparée à l'ouverture, anciennes conversations de séance
 -- absentes de la liste, Gestionnaire de modules externes (modèle, effort, cases), vignettes dans un
--- cadre 3:2, image « aucun aperçu ». Le registre des notes (Notation) garde ici les appels reçus :
+-- cadre 3:2, image « aucun aperçu » ; structure de la 1.3 (carte Pourquoi ?, rangée Je le fais,
+-- crochets de l'aperçu et des onglets, clics sur le fil, vue du fil, agrandissement à deux
+-- images). Le registre des notes (Notation) garde ici les appels reçus :
 -- la simulation de la fenêtre n'écrit pas dans un catalogue. Ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
@@ -544,6 +546,18 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
         end
         vrai(variantes and variantes.args.place == 'overlapping', nom .. ' : variantes superposées sous les onglets')
         egal(#D.onglets, #variantes.args, nom .. ' : une variante par onglet')
+        -- Trois onglets (1.3) : Note d'abord (montré à l'ouverture), Proposition, puis Pourquoi ?,
+        -- dont la variante est superposée en dernier.
+        local valeurs = {}
+        for _, onglet in ipairs(D.onglets) do
+            valeurs[#valeurs + 1] = onglet.valeur .. '=' .. onglet.titre
+        end
+        egal('notation=Note proposition=Proposition etape=Pourquoi ?', table.concat(valeurs, ' '), nom .. ' : trois onglets')
+        egal(3, #variantes.args, nom .. ' : trois variantes')
+        egal('etape', D.ongletEtape)
+        egal('notation', p.onglet, nom .. ' : Note par défaut')
+        vrai(vueLiee(variantes.args[3], 'static_text', 'etapeTexte'), nom .. ' : la carte Pourquoi ? en dernier')
+        vrai(vueLiee(variantes.args[2], 'static_text', 'propositionTexte'), nom .. ' : la proposition au milieu')
         -- Chaque vue simple d'un onglet est masquée quand un autre onglet est choisi ; pas de
         -- boîte de groupe dans un onglet (son cadre et son titre resteraient montrés), ni de
         -- vue défilante ou de tab_view (leur cadre aussi).
@@ -781,6 +795,385 @@ essai('Cartes : ▲ ▼ font défiler le texte de la note et de la proposition, 
     Fenetre.afficher()
     vrai(vu, 'fenêtre ouverte')
     S.pendantFenetre = nil
+end)
+
+-- Structure de la 1.3 ------------------------------------------------------------------------------
+-- Posée une fois (lot 11) : la carte Pourquoi ?, la seconde rangée de la carte Proposition, les
+-- crochets de l'aperçu et des onglets, la répartition des clics sur le fil, la vue du fil et
+-- l'agrandissement à deux images. Les lots suivants remplissent les crochets ; ici, ils sont vides
+-- et la fenêtre se comporte comme avant.
+
+-- Une conversation neuve avec un aperçu de Claude (view_photo) : sa ligne d'outil et sa ligne
+-- d'image dans le fil (indices dans la fenêtre de lecture).
+local function avecApercu(c, id)
+    Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = id, nom = 'mcp__developpeur__view_photo',
+        entree = { size = 1568 } } } })
+    Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = id, textes = { '{}' }, images = { { donnees = 'x' } },
+        erreur = false } } }, nil, function() return id .. '.jpg' end)
+    Fenetre.rafraichir()
+    local ligneImage, ligneOutil
+    for i = 1, Fenetre.T.lignes do
+        local l = Fenetre.lignes[Fenetre.premiere + i - 1]
+        if l and l.image then
+            ligneImage = ligneImage or i
+        elseif l and l.element and c.elements[l.element].genre == 'outil' then
+            ligneOutil = ligneOutil or i
+        end
+    end
+    vrai(ligneImage and ligneOutil, "lignes d'outil et d'image dans le fil")
+    return ligneImage, ligneOutil
+end
+
+essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte vide, actions sans effet pour l\'instant', function()
+    photoActive(4961, 'DSCF4961.RAF', 0, 0)
+    Moteur.nouvelle()
+    local vu = false
+    S.pendantFenetre = function(args)
+        vu = true
+        local p, T = Fenetre.p, Fenetre.T
+        for cle, valeur in pairs({ etapeTitre = '', etapeSousTitre = '', etapeTexte = '', etapePrecedente = false, etapeSuivante = false,
+            etapeAImages = false, etapeADetail = false, titreBascule = "Voir l'avant", titreJeLeFais = "Je le fais", peutJeLeFais = false,
+            exerciceEtat = '', etapeMonte = false, etapeDescend = false }) do
+            egal(valeur, p[cle], cle .. ' avant l\'ouverture')
+        end
+        egal(19, T.propLignes, 'la proposition passe à 19 lignes (seconde rangée)')
+        egal(19, T.etapeLignes, 'texte de la carte Pourquoi ?')
+        egal(T.droite - 24, T.largeurEtape)
+        -- Les actions des boutons : sans effet pour l'instant (un lot suivant les remplit), sans
+        -- erreur ni demande envoyée, et l'onglet ne change pas.
+        p.onglet = 'etape'
+        p.saisie = 'Texte validé par le clic'
+        local taches, dialogues, messages = #S.taches, #S.dialogues, #S.messages
+        bouton(args.contents, p, '◀', 'etapePrecedente').args.action()
+        egal(nil, Fenetre.envoiAuto, 'un clic de la carte annule l\'envoi automatique')
+        bouton(args.contents, p, '▶', 'etapeSuivante').args.action()
+        bouton(args.contents, p, "Voir l'avant", 'etapeAImages').args.action()
+        bouton(args.contents, p, 'Détail…', 'etapeADetail').args.action()
+        bouton(args.contents, p, 'Je le fais', 'peutJeLeFais').args.action()
+        egal(taches + 2, #S.taches, 'Détail… et Je le fais passent par une tâche')
+        S.taches[#S.taches]()
+        S.taches[#S.taches - 1]()
+        egal(dialogues, #S.dialogues, 'aucune fenêtre ouverte')
+        egal(messages, #S.messages, 'aucun message')
+        egal(false, Moteur.travaille, 'rien envoyé à Claude')
+        egal('etape', p.onglet)
+        egal('', p.etapeTexte)
+        p.saisie, p.onglet = '', 'notation'
+    end
+    Fenetre.afficher()
+    vrai(vu, 'fenêtre ouverte')
+    S.pendantFenetre = nil
+end)
+
+essai('Carte Pourquoi ? : ▲ ▼ font défiler son texte, page par page, comme les deux autres cartes', function()
+    photoActive(4961, 'DSCF4961.RAF', 0, 0)
+    local vu = false
+    S.pendantFenetre = function(args)
+        vu = true
+        local p, T = Fenetre.p, Fenetre.T
+        local lignes = {}
+        for i = 1, 50 do
+            lignes[i] = 'Raison ' .. i
+        end
+        Fenetre.montrerPage('etape', table.concat(lignes, '\n'))
+        local page = {}
+        for l in (p.etapeTexte .. '\n'):gmatch('([^\n]*)\n') do
+            page[#page + 1] = l
+        end
+        egal(T.etapeLignes, #page, 'une page pleine')
+        egal(false, p.etapeMonte)
+        egal(true, p.etapeDescend)
+        local descendre = bouton(args.contents, p, '▼', 'etapeDescend')
+        egal('mini', descendre.args.size)
+        descendre.args.action()
+        egal('Raison ' .. T.etapeLignes, p.etapeTexte:match('^[^\n]*'))
+        egal(true, p.etapeMonte)
+        bouton(args.contents, p, '▲', 'etapeMonte').args.action()
+        egal('Raison 1', p.etapeTexte:match('^[^\n]*'))
+        -- Un long paragraphe est coupé à la largeur de la carte.
+        Fenetre.montrerPage('etape', string.rep('La balance tirait vers le bleu. ', 30))
+        for l in (p.etapeTexte .. '\n'):gmatch('([^\n]*)\n') do
+            vrai(require('Fil').largeur(l, 'texte') <= T.largeurEtape - require('Fil').MARGE, 'ligne trop large : ' .. l)
+        end
+    end
+    Fenetre.afficher()
+    vrai(vu, 'fenêtre ouverte')
+    S.pendantFenetre = nil
+end)
+
+essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; une image cliquée dans le fil reste prioritaire", function()
+    prefs.nouvelleParPhoto = false
+    photoActive(4961, 'DSCF4961.RAF', 0, 0)
+    Moteur.nouvelle()
+    local appels, rendre, vu = 0, true, false
+    S.pendantFenetre = function()
+        vu = true
+        local p = Fenetre.p
+        local c = Moteur.courante
+        local ligneImage, ligneOutil = avecApercu(c, 'crochet-1')
+        local defaut = p.legendeApercu
+        vrai(defaut:find('1 sur 1', 1, true), defaut)
+        -- Sans crochet, l'onglet Pourquoi ? garde l'aperçu d'avant.
+        p.onglet = 'etape'
+        egal(defaut, p.legendeApercu, "sans crochet : l'aperçu d'avant")
+        p.onglet = 'notation'
+        -- Le crochet de l'onglet : demandé d'abord, au changement d'onglet et à chaque
+        -- rafraîchissement, avec la table de la fenêtre, ses dimensions et la conversation.
+        Fenetre.apercuOnglet.etape = function(q, T, conversation)
+            appels = appels + 1
+            vrai(q == p and T == Fenetre.T and conversation == c, 'arguments du crochet')
+            if not rendre then
+                return nil
+            end
+            q.legendeApercu = 'Étape 1 sur 1 · après'
+            return true
+        end
+        p.onglet = 'etape'
+        egal(1, appels, "demandé au changement d'onglet")
+        egal('Étape 1 sur 1 · après', p.legendeApercu, "l'aperçu de l'onglet")
+        Fenetre.rafraichir()
+        egal(2, appels, 'demandé à chaque rafraîchissement')
+        egal('Étape 1 sur 1 · après', p.legendeApercu)
+        -- nil : l'aperçu d'avant.
+        rendre = false
+        Fenetre.rafraichirApercu()
+        egal(defaut, p.legendeApercu, "nil : l'aperçu d'avant")
+        rendre = true
+        Fenetre.rafraichirApercu()
+        -- Un crochet en erreur : journalisé, l'aperçu d'avant.
+        Fenetre.apercuOnglet.proposition = function() error('crochet cassé') end
+        p.onglet = 'proposition'
+        egal(defaut, p.legendeApercu, "crochet en erreur : l'aperçu d'avant")
+        Fenetre.apercuOnglet.proposition = nil
+        p.onglet = 'etape'
+        -- Un clic sur une ligne d'image : elle se montre, même dans l'onglet Pourquoi ?, et le
+        -- reste aux rafraîchissements ; le détail d'un outil ne la remplace pas.
+        Fenetre.cliquerLigne(ligneImage)
+        egal(defaut, p.legendeApercu, "l'image cliquée")
+        local avant = appels
+        Fenetre.rafraichir()
+        Fenetre.cliquerLigne(ligneOutil)
+        Fenetre.rafraichirApercu()
+        egal(avant, appels, "crochet pas demandé après un clic sur une image")
+        egal(defaut, p.legendeApercu, "l'image cliquée reste")
+        -- Un autre onglet rend l'aperçu à l'onglet.
+        p.onglet = 'notation'
+        p.onglet = 'etape'
+        egal('Étape 1 sur 1 · après', p.legendeApercu, "un autre onglet : l'aperçu de l'onglet")
+        -- Une image nouvelle aussi.
+        Fenetre.cliquerLigne(ligneImage)
+        egal(defaut, p.legendeApercu)
+        avecApercu(c, 'crochet-2')
+        egal('Étape 1 sur 1 · après', p.legendeApercu, "une image nouvelle : l'aperçu de l'onglet")
+        -- Et un clic sur une étape (Fenetre.estEtape, rempli par un lot suivant).
+        Fenetre.cliquerLigne(ligneImage)
+        vrai(p.legendeApercu:find('sur 2', 1, true), p.legendeApercu)
+        local estEtape, etape = Fenetre.estEtape, Fenetre.clics.etape
+        Fenetre.estEtape = function(e) return e.genre == 'outil' end
+        Fenetre.clics.etape = function() Fenetre.rafraichirApercu() end
+        Fenetre.cliquerLigne(ligneOutil)
+        Fenetre.estEtape, Fenetre.clics.etape = estEtape, etape
+        egal('Étape 1 sur 1 · après', p.legendeApercu, "un clic sur une étape : l'aperçu de l'onglet")
+        -- Dans l'onglet Note, sans crochet : l'aperçu d'avant.
+        p.onglet = 'notation'
+        vrai(p.legendeApercu:find('sur 2', 1, true), p.legendeApercu)
+        Fenetre.apercuOnglet.etape = nil
+    end
+    Fenetre.afficher()
+    vrai(vu, 'fenêtre ouverte')
+    Fenetre.apercuOnglet.etape, Fenetre.apercuOnglet.proposition = nil, nil
+    prefs.nouvelleParPhoto = true
+    S.pendantFenetre = nil
+end)
+
+essai("Clic sur un onglet : son crochet suit un vrai clic, jamais une bascule de la fenêtre", function()
+    prefs.nouvelleParPhoto = false
+    photoActive(4961, 'DSCF4961.RAF', 0, 0)
+    Moteur.nouvelle()
+    local recus, vu = {}, false
+    S.pendantFenetre = function()
+        vu = true
+        local p = Fenetre.p
+        Fenetre.surOnglet.proposition = function(valeur) recus[#recus + 1] = valeur end
+        Fenetre.surOnglet.etape = function(valeur) recus[#recus + 1] = valeur end
+        -- Un vrai clic : le crochet, et la demande validée par le clic ne part pas.
+        p.saisie = 'Texte validé par le clic'
+        vrai(Fenetre.envoiAuto, 'envoi prévu')
+        p.onglet = 'proposition'
+        egal('proposition', table.concat(recus, ' '))
+        egal(nil, Fenetre.envoiAuto, "le clic d'un onglet annule l'envoi automatique")
+        p.saisie = ''
+        p.onglet = 'etape'
+        egal('proposition etape', table.concat(recus, ' '))
+        -- Une bascule de la fenêtre (une proposition qui arrive) : pas de crochet.
+        p.onglet = 'notation'
+        local c = Moteur.courante
+        Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = 'bascule-1', nom = 'mcp__developpeur__preview_settings',
+            entree = { reason = 'Balance', settings = { Exposure2012 = 0.35 } } } } })
+        Fenetre.rafraichir()
+        egal('proposition', p.onglet, 'la proposition se montre')
+        egal('proposition etape', table.concat(recus, ' '), 'pas de crochet pour une bascule')
+        Fenetre.choisirOnglet('etape')
+        egal('etape', p.onglet)
+        egal('proposition etape', table.concat(recus, ' '), 'pas de crochet pour Fenetre.choisirOnglet')
+        -- Un crochet en erreur n'empêche pas l'onglet de changer.
+        Fenetre.surOnglet.notation = function() error('crochet cassé') end
+        p.onglet = 'notation'
+        egal('notation', p.onglet)
+        -- Hors d'une tâche (l'observateur d'un clic), le crochet passe par pcall, pas par
+        -- LrTasks.pcall (réservé au code qui peut attendre).
+        local taches = S.modules.LrTasks
+        local peutAttendre, pcallTache = taches.canYield, taches.pcall
+        taches.canYield = function() return false end
+        taches.pcall = function() error("LrTasks.pcall hors d'une tâche", 0) end
+        p.onglet = 'proposition'
+        taches.canYield, taches.pcall = peutAttendre, pcallTache
+        egal('proposition etape proposition', table.concat(recus, ' '), "crochet appelé hors d'une tâche")
+        Conversation.decider(c, Conversation.propositionEnAttente(c).id, false)
+    end
+    Fenetre.afficher()
+    vrai(vu, 'fenêtre ouverte')
+    Fenetre.surOnglet.proposition, Fenetre.surOnglet.etape, Fenetre.surOnglet.notation = nil, nil, nil
+    prefs.nouvelleParPhoto = true
+    S.pendantFenetre = nil
+end)
+
+essai('Clic sur une ligne du fil : image, ligne du carnet, leçon, étape, sinon détail de l\'outil (ordre fixé)', function()
+    local outil, lecon, claude = { genre = 'outil', texte = 'apply_settings · passe 1', detail = '{}' }, { genre = 'lecon' }, { genre = 'claude' }
+    local sorte = Fenetre.sorteDeClic
+    -- Aujourd'hui (crochets vides) : une étape n'est pas reconnue, sa ligne reste un outil.
+    egal(false, Fenetre.estEtape(outil))
+    egal('image', sorte({ image = 'a.jpg', defaut = 'horizon', action = 'demander' }, lecon))
+    egal('carnet', sorte({ defaut = 'horizon' }, lecon))
+    egal('carnet', sorte({ action = 'demander' }, outil))
+    egal('lecon', sorte({}, lecon))
+    egal('outil', sorte({}, outil))
+    egal(nil, sorte({}, claude))
+    egal(nil, sorte({}, nil))
+    -- Une étape (Fenetre.estEtape, rempli par un lot suivant) passe avant le détail de l'outil,
+    -- après une image, une ligne du carnet et une leçon.
+    local estEtape = Fenetre.estEtape
+    Fenetre.estEtape = function() return true end
+    egal('etape', sorte({}, outil))
+    egal('lecon', sorte({}, lecon))
+    egal('carnet', sorte({ defaut = 'bruit' }, outil))
+    egal('image', sorte({ image = 'b.jpg' }, outil))
+    Fenetre.estEtape = estEtape
+    -- Fenetre.cliquerLigne appelle Fenetre.clics[sorte](ligne, élément).
+    for _, nom in ipairs({ 'image', 'carnet', 'lecon', 'etape', 'outil' }) do
+        egal('function', type(Fenetre.clics[nom]), 'Fenetre.clics.' .. nom)
+    end
+    local courante, lignes, premiere = Moteur.courante, Fenetre.lignes, Fenetre.premiere
+    local clics, recus = {}, {}
+    for nom, fn in pairs(Fenetre.clics) do
+        clics[nom] = fn
+        Fenetre.clics[nom] = function(l, e) recus[#recus + 1] = nom .. ':' .. tostring(l.n) .. ':' .. tostring(e and e.genre) end
+    end
+    Moteur.courante = { elements = { outil, lecon, claude } }
+    Fenetre.lignes, Fenetre.premiere = {
+        { n = 1, image = 'a.jpg', element = 1 },
+        { n = 2, defaut = 'horizon' },
+        { n = 3, element = 2 },
+        { n = 4, element = 1 },
+        { n = 5, element = 3 },
+    }, 1
+    for i = 1, 6 do
+        Fenetre.cliquerLigne(i)
+    end
+    egal('image:1:outil carnet:2:nil lecon:3:lecon outil:4:outil', table.concat(recus, ' '))
+    for nom, fn in pairs(clics) do
+        Fenetre.clics[nom] = fn
+    end
+    -- Par défaut : le carnet, la leçon et l'étape ne font rien ; un outil ouvre son détail, dans
+    -- une tâche.
+    local taches, dialogues = #S.taches, #S.dialogues
+    Fenetre.cliquerLigne(2)
+    Fenetre.cliquerLigne(3)
+    Fenetre.clics.etape({ n = 4, element = 1 }, outil)
+    egal(taches, #S.taches, 'crochets vides : rien')
+    Fenetre.cliquerLigne(4)
+    egal(taches + 1, #S.taches, "le détail de l'outil dans une tâche")
+    S.taches[#S.taches]()
+    egal(dialogues + 1, #S.dialogues)
+    egal('Claude · apply_settings · passe 1', S.dialogues[#S.dialogues].title)
+    Moteur.courante, Fenetre.lignes, Fenetre.premiere = courante, lignes, premiere
+end)
+
+essai('Vue du fil : la conversation à l\'ouverture ; Claude qui travaille y ramène', function()
+    photoActive(4961, 'DSCF4961.RAF', 0, 0)
+    Moteur.nouvelle()
+    Fenetre.vue = 'carnet'
+    local vu = false
+    S.pendantFenetre = function()
+        vu = true
+        egal('conversation', Fenetre.vue, "la conversation à l'ouverture")
+        egal(false, Fenetre.revenirAuFil(), 'déjà la conversation')
+        -- Une autre page (le carnet, d'un lot suivant) reste montrée tant que Claude ne travaille pas.
+        Fenetre.vue = 'carnet'
+        Fenetre.rafraichir()
+        egal('carnet', Fenetre.vue)
+        -- Claude travaille (Accepter, Je le fais, J'ai fini… envoyés sans passer par le champ) : le
+        -- fil revient, relu depuis la fin.
+        Fenetre.defilement = 5
+        Fenetre.cache.marque = true
+        Moteur.travaille = true
+        Fenetre.rafraichir()
+        Moteur.travaille = false
+        egal('conversation', Fenetre.vue, 'Claude travaille : retour au fil')
+        egal(nil, Fenetre.cache.marque, 'le fil relu')
+        egal(0, Fenetre.defilement, 'depuis la fin')
+        egal(Moteur.courante, Fenetre.conversationAffichee)
+        Fenetre.vue = 'carnet'
+    end
+    Fenetre.afficher()
+    vrai(vu, 'fenêtre ouverte')
+    Fenetre.vue = 'conversation'
+    S.pendantFenetre = nil
+end)
+
+essai('Agrandir à deux images : avant et après côte à côte, titres au-dessus, légende dessous', function()
+    local grande, demandes = Images.grande, {}
+    Images.grande = function(dossier, nom, largeur, hauteur)
+        demandes[#demandes + 1] = string.format('%s/%s %dx%d', dossier, nom, largeur, hauteur)
+        if nom == 'illisible.jpg' then
+            return nil
+        end
+        return dossier .. '/.vignettes/' .. nom, 540, 360
+    end
+    local dialogues, messages = #S.dialogues, #S.messages
+    local raison = "Pourquoi : la photo tirait vers le bleu ; des blancs neutres.\n\nCe qui a changé\nTempérature : 5 200 → 5 600"
+    egal(true, Fenetre.agrandirDeux('Étape 2 sur 4 · passe 1 : balance', { dossier = '/etapes', nom = 'e2-avant.jpg', titre = 'Avant' },
+        { dossier = '/etapes', nom = 'e2-apres.jpg', titre = 'Après' }, raison))
+    egal('/etapes/e2-avant.jpg 540x700 /etapes/e2-apres.jpg 540x700', table.concat(demandes, ' '), 'chaque image dans 540 × 700')
+    egal(dialogues + 1, #S.dialogues)
+    local d = S.dialogues[#S.dialogues]
+    egal('Claude · Étape 2 sur 4 · passe 1 : balance', d.title)
+    egal('Fermer', d.actionVerb)
+    local rangee, legende = d.contents.args[1], d.contents.args[2]
+    egal('row', rangee.genre)
+    local cotes = {}
+    for _, colonne in ipairs(rangee.args) do
+        local titre, image = colonne.args[1], colonne.args[2]
+        cotes[#cotes + 1] = titre.args.title .. ' ' .. image.genre .. ' ' .. image.args.value .. ' ' .. image.args.width .. 'x' .. image.args.height
+    end
+    egal('Avant picture /etapes/.vignettes/e2-avant.jpg 540x360 | Après picture /etapes/.vignettes/e2-apres.jpg 540x360', table.concat(cotes, ' | '))
+    egal('static_text', legende.genre)
+    egal(raison, legende.args.title, 'la légende, ses paragraphes gardés')
+    egal(1080, legende.args.width, 'à la largeur des deux images')
+    egal(4, legende.args.height_in_lines, 'une ligne par ligne de texte')
+    -- Une image illisible est dite à sa place ; sans légende, rien dessous.
+    egal(true, Fenetre.agrandirDeux('Je le fais', { dossier = '/x', nom = 'claude.jpg', titre = 'Claude' },
+        { dossier = '/x', nom = 'illisible.jpg', titre = 'Vous' }))
+    d = S.dialogues[#S.dialogues]
+    egal(1, #d.contents.args, 'sans légende')
+    egal('Vous : image illisible', d.contents.args[1].args[2].args[1].args.title)
+    -- Aucune image lisible : un message, pas de fenêtre.
+    local avant = #S.dialogues
+    egal(false, Fenetre.agrandirDeux('Étape 3', { dossier = '/x', nom = 'illisible.jpg', titre = 'Avant' }, nil, raison))
+    egal(avant, #S.dialogues)
+    egal(messages + 1, #S.messages)
+    egal('Aperçu illisible', S.messages[#S.messages][1])
+    Images.grande = grande
 end)
 
 essai('Consignes : chaque photo traitée notée d\'abord, à vérifier, avec le carré de la mise au point', function()
