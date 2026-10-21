@@ -73,7 +73,7 @@ final class JeLeFaisTests: XCTestCase {
         ])
         XCTAssertEqual(liste.compactMap { $0["panneau"]?.string }, [
             "Paramètres prédéfinis", "Réglages de base", "Réglages de base", "Réglages de base", "Réglages de base",
-            "Courbe des tonalités", "Détail", "Corrections de l'objectif", "Transformation", "Recadrage", "Effets", "Étalonnage",
+            "Courbe des tonalités", "Détail", "Corrections de l'objectif", "Transformation", "Outil Recadrage", "Effets", "Etalonnage",
             JeLeFais.autres,
         ])
         XCTAssertEqual(liste.prefix(5).map { $0["section"]?.string }, [nil, "Profil", "Balance des blancs", "Tonalité", "Présence"])
@@ -88,7 +88,7 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertEqual(try ligne(liste, "Sharpness")["texte"], "Détail › Netteté › Gain : 40 → 60", "sans la parenthèse du catalogue")
         XCTAssertEqual(try ligne(liste, "Sharpness")["reglage"], "Netteté : gain")
         XCTAssertEqual(try ligne(liste, "RedHue")["reglage"], "Rouge primaire, teinte", "sans le préfixe qui redit le panneau")
-        XCTAssertEqual(try ligne(liste, "RedHue")["texte"], "Étalonnage › Rouge primaire, teinte : 0 → +5")
+        XCTAssertEqual(try ligne(liste, "RedHue")["texte"], "Etalonnage › Rouge primaire, teinte : 0 → +5")
         XCTAssertEqual(try ligne(liste, "PostCropVignetteAmount")["texte"], "Effets › Vignetage › Gain : 0 → −15")
         XCTAssertEqual(try ligne(liste, "PerspectiveUpright")["a"], "complet")
         XCTAssertEqual(try ligne(liste, "LensProfileEnable")["a"], "activé")
@@ -103,7 +103,7 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertEqual(cadre["a"]?.string, "angle −1,2°, rogné à gauche 2\(insecable)%, en haut 3\(insecable)%, à droite 2\(insecable)%, en bas 3\(insecable)%")
         XCTAssertEqual(cadre["de"]?.string, "angle 0°, sans rognage")
         XCTAssertEqual(cadre["apres"]?["CropAngle"]?.double, -1.2)
-        XCTAssertEqual(liste.filter { $0["panneau"] == "Recadrage" }.count, 1, "une seule ligne de recadrage")
+        XCTAssertEqual(liste.filter { $0["panneau"] == "Outil Recadrage" }.count, 1, "une seule ligne de recadrage")
 
         // Une clé inconnue va sous « Autres », avec son nom.
         XCTAssertEqual(try ligne(liste, "CleInconnue")["reglage"], "CleInconnue")
@@ -160,10 +160,21 @@ final class JeLeFaisTests: XCTestCase {
             }
         }
         XCTAssertEqual(JeLeFais.place(cle: "ConvertToGrayscale").section, "Traitement", "le traitement est dans Réglages de base")
-        XCTAssertEqual(JeLeFais.place(cle: "GrayMixerRed").panneau, "Noir et blanc")
+        // Noms et ordre constatés dans Lightroom Classic 15.6 en français (21 octobre 2026) : le mélange
+        // noir et blanc est une section du Mélangeur de couleurs ; « Color Grading » et « Etalonnage »
+        // tels que Lightroom les écrit ; le Flou de l'objectif après Transformation.
+        XCTAssertEqual(JeLeFais.place(cle: "GrayMixerRed").panneau, "Mélangeur de couleurs")
+        XCTAssertEqual(JeLeFais.place(cle: "GrayMixerRed").section, "Noir et blanc")
+        XCTAssertEqual(JeLeFais.reglage(cle: "GrayMixerRed"), "Rouge", "sans le préfixe « Mélangeur noir et blanc »")
+        XCTAssertEqual(JeLeFais.place(cle: "ColorGradeGlobalHue").panneau, "Color Grading")
+        XCTAssertEqual(JeLeFais.place(cle: "ProcessVersion").panneau, "Etalonnage")
+        XCTAssertEqual(JeLeFais.panneaux.map(\.nom).filter { $0 != JeLeFais.outilRecadrage && $0 != "Paramètres prédéfinis" }, [
+            "Réglages de base", "Courbe des tonalités", "Mélangeur de couleurs", "Color Grading", "Détail",
+            "Corrections de l'objectif", "Transformation", "Flou de l'objectif", "Effets", "Etalonnage",
+        ], "les dix panneaux de Lightroom, dans son ordre")
         XCTAssertEqual(JeLeFais.place(cle: "HueAdjustmentRed").section, "TSL")
         XCTAssertEqual(JeLeFais.place(cle: "PointColors").section, "Couleur de point")
-        // Recadrage après Transformation (Upright le remet à zéro), Étalonnage en dernier.
+        // Recadrage après Transformation (Upright le remet à zéro), Etalonnage en dernier.
         let rang = { (cle: String) in JeLeFais.place(cle: cle).rangPanneau }
         XCTAssertLessThan(rang("PerspectiveVertical"), rang("CropAngle"))
         XCTAssertLessThan(rang("CropAngle"), rang("PostCropVignetteAmount"))
@@ -437,7 +448,7 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertNotNil(fake.lastParams["recadrage"])
         XCTAssertFalse(result.porteUneImage)
         let faire = lignes(try JSONCoding.parse(result.text)["a_faire"] ?? [])
-        XCTAssertEqual(faire.first?["panneau"], "Recadrage")
+        XCTAssertEqual(faire.first?["panneau"], "Outil Recadrage")
         // Sans my_turn, le même recadrage part avec entier (lot 5).
         _ = tools.call(name: "preview_settings", arguments: ["crop": ["angle": -1.2, "aspect": "4:5"]])
         XCTAssertEqual(fake.calls.last?.params["entier"], true)

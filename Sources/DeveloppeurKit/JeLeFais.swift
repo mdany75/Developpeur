@@ -17,10 +17,10 @@ import Foundation
 /// Réglages de base, Courbe des tonalités, Mélangeur de couleurs, Color Grading (nom anglais
 /// gardé), Détail, Corrections de l'objectif, Transformation, Flou de l'objectif (après
 /// Transformation), Effets, Etalonnage (sans accent) ; ni Noir et blanc (dans le Mélangeur de
-/// couleurs) ni Recadrage (outil de la bande) ne sont des panneaux. `panneaux` n'en tient pas
-/// encore compte (« Étalonnage des couleurs », « Étalonnage », Flou de l'objectif avant les
-/// Corrections) : à reprendre ; les sections de Réglages de base restent à relever. Les tolérances
-/// de « comme Claude » (`tolerance`) restent à juger sur les trois premiers exercices de Dany.
+/// couleurs) ni Recadrage (outil de la bande) ne sont des panneaux : `panneaux` suit ce relevé. Les
+/// sections de Réglages de base restent à relever (non vues : le panneau était replié). Les
+/// tolérances de « comme Claude » (`tolerance`) restent à juger sur les trois premiers exercices de
+/// Dany.
 enum JeLeFais {
     /// Nom de l'instantané de la version de Claude (« Claude · ma version » dans Lightroom).
     static let instantane = "ma version"
@@ -54,26 +54,29 @@ enum JeLeFais {
         var sections: [String]
     }
 
-    /// Les panneaux dans l'ordre d'affichage d'Adobe (aide-adobe § 1), précédés des paramètres
-    /// prédéfinis (panneau de gauche : ils posent des réglages que la suite affine). Le Recadrage
-    /// (outil R) vient après Transformation : choisir un mode Upright le remet à zéro. Noir et blanc
-    /// remplace le Mélangeur de couleurs sur une photo en noir et blanc. Étalonnage des couleurs : le
-    /// Color Grading ; Étalonnage : le calibrage de l'appareil, et la version de processus.
+    /// Les panneaux dans l'ordre et sous les noms que montre Lightroom Classic 15.6 en français
+    /// (constaté le 21 octobre 2026, voir l'en-tête), précédés des paramètres prédéfinis (panneau de
+    /// gauche : ils posent des réglages que la suite affine). Le mélange noir et blanc est une
+    /// section du Mélangeur de couleurs (il y remplace TSL sur une photo en noir et blanc). « Color
+    /// Grading » garde son nom anglais ; « Etalonnage » (sans accent) porte le calibrage de l'appareil
+    /// et la version de processus. Le recadrage n'est pas un panneau mais un outil de la bande (R) :
+    /// sa ligne vient après Transformation, car choisir un mode Upright le remet à zéro.
     static let panneaux: [Panneau] = [
         Panneau(nom: "Paramètres prédéfinis", sections: []),
         Panneau(nom: "Réglages de base", sections: ["Traitement", "Profil", "Balance des blancs", "Tonalité", "Présence", "HDR"]),
         Panneau(nom: "Courbe des tonalités", sections: []),
-        Panneau(nom: "Mélangeur de couleurs", sections: ["TSL", "Couleur de point"]),
-        Panneau(nom: "Noir et blanc", sections: []),
-        Panneau(nom: "Étalonnage des couleurs", sections: []),
+        Panneau(nom: "Mélangeur de couleurs", sections: ["TSL", "Noir et blanc", "Couleur de point"]),
+        Panneau(nom: "Color Grading", sections: []),
         Panneau(nom: "Détail", sections: []),
-        Panneau(nom: "Flou de l'objectif", sections: []),
         Panneau(nom: "Corrections de l'objectif", sections: []),
         Panneau(nom: "Transformation", sections: []),
-        Panneau(nom: "Recadrage", sections: []),
+        Panneau(nom: outilRecadrage, sections: []),
+        Panneau(nom: "Flou de l'objectif", sections: []),
         Panneau(nom: "Effets", sections: []),
-        Panneau(nom: "Étalonnage", sections: ["Processus"]),
+        Panneau(nom: "Etalonnage", sections: ["Processus"]),
     ]
+    /// La ligne du recadrage : un outil de la bande, pas un panneau.
+    static let outilRecadrage = "Outil Recadrage"
     /// Une clé que rien ne range : en fin de liste.
     static let autres = "Autres"
 
@@ -85,13 +88,13 @@ enum JeLeFais {
         "Présence": ("Réglages de base", "Présence"),
         "Courbe des tonalités": ("Courbe des tonalités", nil),
         "TSL": ("Mélangeur de couleurs", "TSL"),
-        "Noir et blanc": ("Noir et blanc", nil),
-        "Étalonnage des couleurs": ("Étalonnage des couleurs", nil),
+        "Noir et blanc": ("Mélangeur de couleurs", "Noir et blanc"),
+        "Étalonnage des couleurs": ("Color Grading", nil),
         "Détail": ("Détail", nil),
         "Effets": ("Effets", nil),
         "Optique": ("Corrections de l'objectif", nil),
         "Transformation": ("Transformation", nil),
-        "Calibrage de l'appareil": ("Étalonnage", nil),
+        "Calibrage de l'appareil": ("Etalonnage", nil),
     ]
 
     /// Clés du recadrage, réunies en une seule ligne (angle en degrés, bords en part rognée).
@@ -117,19 +120,19 @@ enum JeLeFais {
             "WhiteBalance": ("Réglages de base", "Balance des blancs", juste(avant: DevelopCatalogue.temperatureKey)),
             "AutoTone": ("Réglages de base", "Tonalité", juste(avant: "Exposure2012")),
             "PointColors": ("Mélangeur de couleurs", "Couleur de point", 0),
-            "AutoGrayscaleMix": ("Noir et blanc", nil, juste(avant: "GrayMixerRed")),
+            "AutoGrayscaleMix": ("Mélangeur de couleurs", "Noir et blanc", juste(avant: "GrayMixerRed")),
             "LensBlur": ("Flou de l'objectif", nil, 0),
             "DepthBasedCorrections": ("Flou de l'objectif", nil, 1),
             "LensProfileName": ("Corrections de l'objectif", nil, juste(apres: "LensProfileEnable")),
             "UprightFourSegments": ("Transformation", nil, juste(apres: "PerspectiveUpright", 0.1)),
             "UprightTransform": ("Transformation", nil, juste(apres: "PerspectiveUpright", 0.2)),
             "CropConstrainToWarp": ("Transformation", nil, juste(apres: "PerspectiveUpright", 0.3)),
-            "ProcessVersion": ("Étalonnage", "Processus", 0),
+            "ProcessVersion": ("Etalonnage", "Processus", 0),
         ]
         for (i, courbe) in DevelopCatalogue.curveKeys.enumerated() {
             table[courbe.key] = ("Courbe des tonalités", nil, juste(apres: "CurveRefineSaturation", 0.1 * Double(i + 1)))
         }
-        for (i, cle) in clesCadre.enumerated() { table[cle] = ("Recadrage", nil, Double(i)) }
+        for (i, cle) in clesCadre.enumerated() { table[cle] = (outilRecadrage, nil, Double(i)) }
         return table
     }()
 
@@ -158,18 +161,18 @@ enum JeLeFais {
         }
         let rangPanneau = panneaux.firstIndex { $0.nom == panneau } ?? panneaux.count
         let sections = rangPanneau < panneaux.count ? panneaux[rangPanneau].sections : []
-        // Une clé sans section vient après les sections nommées (Étalonnage : Processus, puis les curseurs).
+        // Une clé sans section vient après les sections nommées (Etalonnage : Processus, puis les curseurs).
         let rangSection = section.flatMap { sections.firstIndex(of: $0) } ?? sections.count
         return Place(panneau: panneau, section: section, rangPanneau: rangPanneau, rangSection: rangSection, ordre: ordre)
     }
 
     // MARK: Noms
 
-    /// Préfixe du libellé du catalogue qui redit le panneau (« TSL : teinte rouge » dans le Mélangeur
-    /// de couleurs) : retiré.
-    private static let prefixesRedondants: [String: String] = [
-        "Courbe des tonalités": "Courbe", "Mélangeur de couleurs": "TSL", "Noir et blanc": "Mélangeur noir et blanc",
-        "Étalonnage des couleurs": "Étalonnage", "Étalonnage": "Calibrage", "Transformation": "Transformation",
+    /// Préfixes du libellé du catalogue qui redisent le panneau ou sa section (« TSL : teinte rouge »
+    /// dans le Mélangeur de couleurs) : retirés.
+    private static let prefixesRedondants: [String: [String]] = [
+        "Courbe des tonalités": ["Courbe"], "Mélangeur de couleurs": ["TSL", "Mélangeur noir et blanc"],
+        "Color Grading": ["Étalonnage"], "Etalonnage": ["Calibrage"], "Transformation": ["Transformation"],
     ]
     /// Noms des clés hors du catalogue, tels que les montre le panneau. Les courbes par points gardent
     /// leur canal (« Courbe par points : rouge ») : le libellé du catalogue le met entre parenthèses,
@@ -199,7 +202,7 @@ enum JeLeFais {
         if let nom = nomsSpeciaux[cle] { return nom }
         guard var texte = DevelopCatalogue.label(for: cle) else { return cle }
         if let parenthese = texte.range(of: " (") { texte = String(texte[..<parenthese.lowerBound]) }
-        if let prefixe = prefixesRedondants[place(cle: cle).panneau], texte.hasPrefix(prefixe + " : ") {
+        if let prefixe = prefixesRedondants[place(cle: cle).panneau]?.first(where: { texte.hasPrefix($0 + " : ") }) {
             let reste = texte.dropFirst(prefixe.count + 3)
             texte = reste.prefix(1).uppercased() + reste.dropFirst()
         }
@@ -254,7 +257,7 @@ enum JeLeFais {
         "Tungsten": "Tungstène", "Fluorescent": "Fluorescent", "Flash": "Flash", "Custom": "Personnalisée",
     ]
 
-    /// Une teinte en degrés (Étalonnage des couleurs : de 0 à 359).
+    /// Une teinte en degrés (Color Grading : de 0 à 359).
     static func estUneTeinte(_ cle: String) -> Bool {
         guard let reglage = DevelopCatalogue.setting(cle) else { return false }
         return reglage.min == 0 && reglage.max == 359

@@ -158,11 +158,13 @@ public enum Carnet {
             // zone sans texture autour du point (sable lisse, ciel uni : non jugée, constaté le
             // 21 octobre 2026 ; DetailMeasurements.textureMin), sauf si l'appareil l'a signalée manquée.
             let signalee = nettete.contains { $0.genre == .miseAuPointSignalee }
-            if let af, af.jugeable || signalee, !nettete.contains(where: { $0.genre == .floue }) { cherches.insert("mise_au_point") }
+            // Une texture faible autour du point (DetailMeasurements.textureDouteuse) laisse un doute :
+            // ni cherchée ni comptée, sauf signalée par l'appareil.
+            if let af, (af.jugeable && !af.douteuse) || signalee, !nettete.contains(where: { $0.genre == .floue }) { cherches.insert("mise_au_point") }
             for defaut in nettete {
                 switch defaut.genre {
                 case .floue: trouve("flou", detail.sharpest, defaut.texte)
-                case .miseAuPointManquee, .miseAuPointSignalee: trouve("mise_au_point", af?.nettete, defaut.texte)
+                case .miseAuPointManquee where af?.douteuse != true, .miseAuPointSignalee: trouve("mise_au_point", af?.nettete, defaut.texte)
                 default: break
                 }
             }

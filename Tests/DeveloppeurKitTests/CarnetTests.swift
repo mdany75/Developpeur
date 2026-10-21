@@ -159,15 +159,17 @@ final class CarnetTests: XCTestCase {
         // Relevé le 21 octobre 2026 : le point AF sur du sable lisse (12,6, texture 11,6) disait la
         // mise au point manquée sur une photo nette. Sous le plancher de texture, elle n'est ni trouvée
         // ni cherchée (non jugée) ; signalée par l'appareil, elle se cherche encore. Le nuage du même
-        // relevé (6,6, texture 23,6) est au-dessus du plancher : son faux constat reste (limite connue,
-        // DetailMeasurements.textureMin).
+        // relevé (6,6, texture 23,6) est au-dessus du plancher mais sous textureDouteuse (30) : un
+        // doute, ni cherché ni compté.
         let sable = PhotoTriee.MiseAuPoint(point: CGPoint(x: 0.5, y: 0.395), nettete: 12.6, avertissement: false, texture: 11.6)
         v = vue(detail: detail(nettete: 37.4), af: sable)
         XCTAssertEqual(codes(v), [])
         XCTAssertFalse(v.cherches.contains("mise_au_point"), "non jugée : \(v.cherches)")
         XCTAssertTrue(v.cherches.contains("flou"))
         let nuage = PhotoTriee.MiseAuPoint(point: CGPoint(x: 0.5, y: 0.5), nettete: 6.6, avertissement: false, texture: 23.6)
-        XCTAssertEqual(codes(vue(detail: detail(nettete: 171.9), af: nuage)), ["mise_au_point"], "limite connue")
+        v = vue(detail: detail(nettete: 171.9), af: nuage)
+        XCTAssertEqual(codes(v), [], "un doute ne se compte pas")
+        XCTAssertFalse(v.cherches.contains("mise_au_point"), "\(v.cherches)")
         let texture = PhotoTriee.MiseAuPoint(point: CGPoint(x: 0.5, y: 0.5), nettete: 6.6, avertissement: false, texture: 30)
         XCTAssertEqual(codes(vue(detail: detail(nettete: 171.9), af: texture)), ["mise_au_point"], "de la texture : jugée")
         let signalee = PhotoTriee.MiseAuPoint(point: CGPoint(x: 0.5, y: 0.5), nettete: 6.6, avertissement: true, texture: 10)

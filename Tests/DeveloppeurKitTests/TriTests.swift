@@ -511,7 +511,7 @@ final class TriTests: XCTestCase {
     /// lisse (netteté 12,6, texture 11,6 ; nette ailleurs 37,4) et sur un nuage (6,6 et 23,6 ; nette
     /// ailleurs 171,9). Sous le plancher de texture (le sable), la mise au point est non jugée et ne
     /// plafonne pas la note ; au-dessus, une vraie mise au point manquée reste un défaut majeur. Le
-    /// nuage est au-dessus : limite connue (`DetailMeasurements.textureMin`).
+    /// nuage est au-dessus, mais sous `DetailMeasurements.textureDouteuse` : un doute (2, à vérifier).
     func testUnPointAFSansTextureNEstPasUneMiseAuPointManquee() throws {
         XCTAssertEqual(DetailMeasurements.textureMin, 18)
         func photo(nettete: Double, auPoint: Double, texture: Double?, avertissement: Bool = false) -> PhotoTriee {
@@ -533,21 +533,34 @@ final class TriTests: XCTestCase {
         XCTAssertFalse(plafondSable.raison.contains("au point AF"), plafondSable.raison)
 
         // Le nuage (texture 23,6 à 24,1, mesurée sur les 81 blocs) reste jugé : autant de texture qu'un
-        // petit visage flou (21,3 à 27,2), que le plancher doit garder jugé. Sa fausse mise au point
-        // manquée reste (à reprendre par un autre indice) ; la texture d'un nuage sans relief, elle,
-        // l'écarterait.
+        // petit visage flou (21,3 à 27,2), que le plancher doit garder jugé. Sous textureDouteuse (30),
+        // sa mise au point manquée n'est qu'un doute : 2, à vérifier, sans rejet proposé ; la texture
+        // d'un nuage sans relief, elle, l'écarte.
+        XCTAssertEqual(DetailMeasurements.textureDouteuse, 30)
         let nuage = photo(nettete: 171.9, auPoint: 6.6, texture: 23.6)
-        XCTAssertEqual(nuage.defautsMesures.map(\.genre), [.miseAuPointManquee], "limite connue (relevé du 21 octobre 2026)")
+        XCTAssertEqual(nuage.defautsMesures.map(\.genre), [.miseAuPointManquee], "relevé du 21 octobre 2026")
+        XCTAssertTrue(try XCTUnwrap(nuage.af).douteuse)
+        let plafondNuage = try XCTUnwrap(Notation.plafond(nuage, doublon: false))
+        XCTAssertEqual(plafondNuage.note, 2, plafondNuage.raison)
+        XCTAssertFalse(plafondNuage.rejet, "un doute ne propose pas de rejet")
+        XCTAssertTrue(plafondNuage.aVerifier)
+        XCTAssertTrue(plafondNuage.raison.contains("à vérifier par un zoom à 100 %"), plafondNuage.raison)
+        XCTAssertEqual(nuage.json["point_af"]?["mise_au_point"]?.string, "à vérifier : texture faible autour du point")
         let nuageLisse = photo(nettete: 171.9, auPoint: 6.6, texture: 12)
         XCTAssertEqual(nuageLisse.defautsMesures.count, 0)
         XCTAssertEqual(try XCTUnwrap(Notation.plafond(nuageLisse, doublon: false)).note, Notation.noteMaximale)
-        // Le petit visage flouté de 3 px (21,3), une vraie mise au point manquée : jugé.
-        XCTAssertEqual(photo(nettete: 60, auPoint: 1.8, texture: 21.3).defautsMesures.map(\.genre), [.miseAuPointManquee])
+        // Le petit visage flouté de 3 px (21,3), une vraie mise au point manquée : jugé, mais à
+        // vérifier (même texture qu'un nuage) : 2 sans rejet.
+        let petitVisage = photo(nettete: 60, auPoint: 1.8, texture: 21.3)
+        XCTAssertEqual(petitVisage.defautsMesures.map(\.genre), [.miseAuPointManquee])
+        XCTAssertEqual(try XCTUnwrap(Notation.plafond(petitVisage, doublon: false)).note, 2)
 
         // Un vrai sujet flou au point (de la texture) : mise au point manquée, 0 et rejet proposé.
         let manquee = photo(nettete: 60, auPoint: 8, texture: 30)
         XCTAssertEqual(manquee.defautsMesures.map(\.genre), [.miseAuPointManquee])
         XCTAssertEqual(try XCTUnwrap(Notation.plafond(manquee, doublon: false)).note, 0)
+        XCTAssertTrue(try XCTUnwrap(Notation.plafond(manquee, doublon: false)).rejet, "à textureDouteuse : ferme")
+        XCTAssertFalse(try XCTUnwrap(manquee.af).douteuse)
         XCTAssertNil(manquee.json["point_af"]?["mise_au_point"])
         XCTAssertEqual(photo(nettete: 60, auPoint: 8, texture: DetailMeasurements.textureMin).defautsMesures.map(\.genre), [.miseAuPointManquee],
                        "au plancher : jugée")

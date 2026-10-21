@@ -24,6 +24,10 @@ public struct PhotoTriee {
         /// Une texture non mesurée laisse juger, comme avant la 1.3.
         public var jugeable: Bool { texture.map { $0 >= DetailMeasurements.textureMin } ?? true }
 
+        /// La mise au point se juge mais reste un doute : texture faible autour du point
+        /// (`DetailMeasurements.textureDouteuse`), comme le bord d'un nuage ou un petit visage.
+        public var douteuse: Bool { jugeable && (texture.map { $0 < DetailMeasurements.textureDouteuse } ?? false) }
+
         /// La netteté au point quand elle se juge ; nil sur une zone sans texture.
         public var netteteJugee: Double? { jugeable ? nettete : nil }
 
@@ -91,7 +95,8 @@ public struct PhotoTriee {
     /// `seuilNet`). La mise au point manquée ne se juge que sur une zone qui a de la texture
     /// (`MiseAuPoint.jugeable`, `DetailMeasurements.textureMin`) : sur du sable lisse ou un ciel uni,
     /// elle est « non jugée » et ne plafonne pas la note (faux constat du sable relevé le 21 octobre
-    /// 2026 ; celui du nuage, qui a plus de texture, reste : voir `textureMin`). Seule copie de ces
+    /// 2026 ; celui du nuage, qui a plus de texture, n'est plus qu'un doute : `textureDouteuse`,
+    /// 2 à vérifier dans `Notation.plafond`). Seule copie de ces
     /// règles : le tri (`defautsMesures`) et le carnet de progrès
     /// (`Carnet.constatsVue`) les reprennent.
     static func defautsNettete(detail: DetailMeasurements?, af: MiseAuPoint?) -> [(genre: Defaut, texte: String)] {
@@ -164,7 +169,11 @@ public struct PhotoTriee {
         if let pile { item["pile"] = .number(Double(pile)) }
         if let af {
             var point: [String: JSONValue] = ["x": .number((af.point.x * 1000).rounded() / 1000), "y": .number((af.point.y * 1000).rounded() / 1000)]
-            if !af.jugeable { point["mise_au_point"] = "non jugée : zone sans texture autour du point" }
+            if !af.jugeable {
+                point["mise_au_point"] = "non jugée : zone sans texture autour du point"
+            } else if af.douteuse {
+                point["mise_au_point"] = "à vérifier : texture faible autour du point"
+            }
             item["point_af"] = .object(point)
         }
         if !motsCles.isEmpty { item["mots_cles"] = .array(motsCles.map { .string($0.mot) }) }

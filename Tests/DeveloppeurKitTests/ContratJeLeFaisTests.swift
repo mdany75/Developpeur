@@ -152,7 +152,7 @@ final class ContratJeLeFaisTests: XCTestCase {
         let cadre = try ligne(ecarts, "Crop")
         XCTAssertEqual(cadre["cles"], ["CropLeft", "CropRight", "CropTop"])
         XCTAssertEqual(cadre["vous"]?["CropRight"]?.double, 0.95)
-        XCTAssertEqual(cadre["texte"], .string("Recadrage › Cadre : départ sans rognage ; Claude sans rognage ; vous rogné à gauche 5\(insecable)%, "
+        XCTAssertEqual(cadre["texte"], .string("Outil Recadrage › Cadre : départ sans rognage ; Claude sans rognage ; vous rogné à gauche 5\(insecable)%, "
             + "en haut 2\(insecable)%, à droite 5\(insecable)% — ajouté par vous (Claude n'y touchait pas)"))
         XCTAssertEqual(exercice["comme_claude"], ["Préréglage", "Température"])
         XCTAssertEqual(exercice["resume"], "9 réglages comparés : 2 comme Claude, 1 plus fort, 2 oubliés, 3 ajoutés, 1 autre choix.")

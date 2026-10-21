@@ -119,6 +119,11 @@ public enum Notation {
         let raw = ["RAW", "DNG"].contains(photo.format?.uppercased() ?? "")
         for (genre, texte) in photo.defautsMesures {
             switch genre {
+            case .miseAuPointManquee where photo.af?.douteuse == true:
+                // Texture faible autour du point (DetailMeasurements.textureDouteuse) : un doute, pas
+                // un rejet (le bord d'un nuage, relevé le 21 octobre 2026).
+                limites.append((2, texte + " ; texture faible autour du point : à vérifier par un zoom à 100 %"))
+                aVerifier = true
             case .floue, .miseAuPointManquee, .yeuxFermes:
                 limites.append((0, texte))
                 rejet = true

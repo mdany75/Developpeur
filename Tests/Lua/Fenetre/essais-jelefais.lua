@@ -412,11 +412,11 @@ local VUE = [=[{
           "CropRight": 1,
           "CropTop": 0
         },
-        "panneau": "Recadrage",
+        "panneau": "Outil Recadrage",
         "reglage": "Cadre",
         "section": null,
         "sorte": "ajoute",
-        "texte": "Recadrage › Cadre : départ sans rognage ; Claude sans rognage ; vous rogné à gauche 5 %, en haut 2 %, à droite 5 % — ajouté par vous (Claude n'y touchait pas)",
+        "texte": "Outil Recadrage › Cadre : départ sans rognage ; Claude sans rognage ; vous rogné à gauche 5 %, en haut 2 %, à droite 5 % — ajouté par vous (Claude n'y touchait pas)",
         "vous": {
           "CropLeft": 0.05,
           "CropRight": 0.95,
@@ -905,7 +905,7 @@ essai('Stockage : liste, écarts et réglages comme Claude en tableaux, même vi
     local afaire = appelTour(c, 't4', { TOUR })
     appelComparaison(c, 'v2')
     -- Le cadre a ses clés en tableau.
-    c.elements[afaire].aFaire[#c.elements[afaire].aFaire + 1] = { n = 6, cle = 'Crop', cles = { 'CropLeft', 'CropRight' }, texte = 'Recadrage › Cadre',
+    c.elements[afaire].aFaire[#c.elements[afaire].aFaire + 1] = { n = 6, cle = 'Crop', cles = { 'CropLeft', 'CropRight' }, texte = 'Outil Recadrage › Cadre',
         avant = { CropLeft = 0, CropRight = 1 }, apres = { CropLeft = 0.05, CropRight = 0.95 } }
     egal(true, c.elements[afaire].comparaisonEnCours)
     Stockage.enregistrer(c)
@@ -1085,7 +1085,7 @@ essai("Fenêtre : texte de l'exercice groupé par panneau, coché ✓ ; état ; 
     contient(texte, '\nRéglages de base\n• Profil › Profil (Look) : départ Adobe Color')
     contient(texte, '\n✓ Balance des blancs › Température : départ')
     contient(texte, '\n• Tonalité › Exposition : départ 0, Claude +0,35, vous +0,8 — plus fort que Claude')
-    contient(texte, '\nRecadrage\n• Cadre : départ sans rognage')
+    contient(texte, '\nOutil Recadrage\n• Cadre : départ sans rognage')
     contient(texte, 'masques')
     contient(texte, "« Claude · ma version » : demandez-lui de la poser si vous la préférez.")
     egal('Comparée : 7 écarts sur 9', Fenetre.etatExercice(e))

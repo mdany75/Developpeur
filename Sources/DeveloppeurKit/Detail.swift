@@ -56,16 +56,25 @@ public struct DetailMeasurements: Equatable {
     /// - le point sur du sable lisse (netteté 12,6, la voiture et la dune nettes) : texture 11,2 à
     ///   11,6, sous le plancher : la fausse « mise au point manquée » est écartée ;
     /// - le point sur un nuage (53709534, netteté 6,6, toute la scène nette) : texture 23,6 à 24,1,
-    ///   au-dessus : sa fausse « mise au point manquée » reste. Un plancher plus haut ne l'écarte pas
+    ///   au-dessus du plancher, donc jugé ; sa fausse « mise au point manquée » n'est plus qu'un
+    ///   doute (`textureDouteuse` : 2, à vérifier, sans rejet). Un plancher plus haut ne l'écarte pas
     ///   sans écarter aussi un petit visage, net (53709579 : 25,8 à 28,4) ou flouté de 1 à 3 px à
     ///   1 024 px (21,3 à 27,2 : une vraie mise au point manquée, à garder jugée) ; le bord d'un
-    ///   nuage a autant de texture qu'un petit sujet flou. Limite connue, à reprendre par un autre
-    ///   indice que la texture ;
+    ///   nuage a autant de texture qu'un petit sujet flou (un autre indice que la texture le
+    ///   départagerait) ;
     /// - les autres points (visages, sujets) : 28,4 à 64,6 nets, 21,3 au moins floutés.
     /// (Une première mesure, sur les seuls blocs que le carré ne touchait pas, n'en gardait qu'un :
     /// 12,9 et 14,4 ; elle ne valait pas.) À relever sur d'autres photos (ciel uni, mur, neige)
     /// avant de le changer.
     static let textureMin = 18.0
+    /// Texture faible autour du point AF, au-dessus du plancher : la mise au point manquée y reste
+    /// un doute (le bord d'un nuage, 23,6 à 24,1, a autant de texture qu'un petit visage flou, 21,3
+    /// à 27,2 ; les sujets nets relevés le 21 octobre 2026 vont de 28,4 à 64,6, sauf le petit visage
+    /// net de 53709579, de 25,8 à 28,4). De `textureMin` à cette valeur, une mise au point manquée
+    /// plafonne à 2, à vérifier par un zoom à 100 %, sans rejet proposé (`Notation.plafond`), et le
+    /// carnet ne la compte pas : une mesure douteuse ne propose pas de jeter une photo. Choisi par
+    /// Claude le 21 octobre 2026 sur ces seuls relevés (huit copies d'Essais) : à relever encore.
+    static let textureDouteuse = 30.0
 
     public var noiseReading: String {
         let level = max(noise, shadowNoise ?? 0)
