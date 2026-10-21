@@ -1531,7 +1531,7 @@ essai('Versions : lecture, comparaison et alerte', function()
     egal(-1, Composants.comparer('1.0', '1.1'))
     egal(0, Composants.comparer('1.0', '1.0.0'))
     egal(1, Composants.comparer('1.10', '1.9'))
-    egal('1.1.1', Composants.module(), 'la version de Info.lua')
+    egal('1.2', Composants.module(), 'la version de Info.lua')
     -- Deux lignes : ce module et le connecteur, installés ensemble au même numéro.
     local l = Composants.lignes('1.0', '1.0')
     egal(2, #l)

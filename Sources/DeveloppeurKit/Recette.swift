@@ -1182,7 +1182,8 @@ public final class Recette {
     /// coins et au coin le plus loin du centre ; et le profil de la baisse du centre à ce coin.
     /// Relevé le 20 octobre 2026 en niveaux (rayon 0,7, fondu 80, −0,5 IL, sur un paysage) : centre
     /// 0, milieu des bords −16, coins −21 à −27, une baisse qui monte sans marche. Les seuils sont
-    /// provisoires, à relever par la recette sur un portrait et un intérieur.
+    /// provisoires ; passés le 21 octobre 2026 sur un portrait pris à l'intérieur (centre 0,5 %,
+    /// plus forte marche 1,6 % à −0,3 IL), loin des bornes.
     struct FormeBords {
         var centre: Double
         var bords: Double
@@ -1827,7 +1828,7 @@ public final class Recette {
     /// désigne comme éclairée par deux lumières (--mixte : lampe et fenêtre) ; puis, en témoin, le
     /// RAW de la recette (`unique`, une autre photo) lu à une seule lumière. Lecture seule.
     /// Relevé le 20 octobre 2026 sur les 8 copies « Essai » : à la balance de la photo, seul le
-    /// portrait (fenêtres et éclairage chaud) se lit mixte, ses 9 cases lues ; mesure en 85 à 110 ms.
+    /// portrait (fenêtres et éclairage chaud) se lit mixte, ses 9 cases lues ; mesure en 85 à 200 ms.
     func sequenceEclairage(_ id: Int, unique: Int? = nil) {
         /// L'éclairage d'une copie d'essai par view_photo, la photo inchangée ; avec la durée de la
         /// mesure, refaite sur l'aperçu rendu (visages et zone d'intérêt de Vision, comme view_photo).

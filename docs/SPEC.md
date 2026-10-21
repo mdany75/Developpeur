@@ -12,6 +12,14 @@ l'Historique, annulable, et il peut exiger son accord avant toute modification.
 Les numéros de version cités (de 1.3 à 2.6, dans les constats et les titres de sections) sont
 ceux du connecteur dont Développeur 1.0 reprend le code ; leur date les situe.
 
+La 1.2 de Développeur (un rendu plus juste sur chaque photo) a sept chantiers, chacun dans sa
+section : Liaison fermée, Peau, Éclaircir et assombrir, Éclairage mixte, Bilan d'une passe à
+l'autre, Écran, Lecture du boîtier ; ce qui en reste à voir dans Lightroom est dans À constater
+dans Lightroom (1.2). Elle porte aussi ce qui a suivi la 1.1.1 : la Conversation claire seule,
+l'aperçu de la photo active avec son point de mise au point et la proposition préparée à
+l'ouverture (voir Fenêtre Claude), le point de mise au point sur un zoom de `view_photo` (voir Tri
+d'une séance) et le masque d'une personne seule gardé (voir Masques : pistes de la 2.1).
+
 ## Architecture
 
 Deux pièces :
@@ -40,7 +48,9 @@ Le module ne peut pas parler MCP lui-même (pas de stdio dans Lightroom) ; les p
 sont à sens unique, d'où deux ports. Le module écoute ; le serveur ouvre une connexion par
 commande (prise des réponses d'abord), envoie `ping`, puis la commande, et referme. `LrSocket` ne
 sert qu'un client à la fois, et Claude Desktop comme chaque session de Claude Code lancent leur
-propre serveur : des connexions courtes les laissent se succéder.
+propre serveur : des connexions courtes les laissent se succéder. Depuis la 1.2, chaque ligne,
+`ping` compris, porte le jeton privé de la liaison, sans lequel le module la refuse (voir Liaison
+fermée).
 
 La prise des réponses ne lit jamais : elle ne voit pas le client partir et resterait accrochée à
 une connexion morte (constaté sur Lightroom Classic 15.6). Quand la prise des commandes se ferme,
@@ -67,11 +77,18 @@ Claude ».
 Une ligne JSON par message, en UTF-8.
 
 ```
-→ {"id": 7, "command": "appliquer", "params": {…}}
+→ {"id": 7, "jeton": "<64 chiffres hexadécimaux>", "command": "appliquer", "params": {…}}
 ← {"id": 7, "result": {…}}
 ← {"id": 7, "error": "message en français, montré tel quel à Claude"}
+← {"id": 7, "error": "Liaison fermée : …", "code": "jeton"}
 ← {"id": 8, "result": {…}, "evenements": {"photo_active": true}}
 ```
+
+`jeton` (1.2) : le jeton privé que le module tire à chaque démarrage de la liaison et range dans
+`liaison.jeton` ; le serveur le relit à chaque connexion. Une ligne sans lui, ou avec un autre,
+reçoit une erreur `code = "jeton"` et n'atteint pas la commande ; un serveur qui ne trouve pas le
+fichier n'envoie pas la clé (un module d'avant la 1.2 accepte alors la ligne comme avant). Voir
+Liaison fermée.
 
 `evenements` accompagne une réponse quand la photo active a changé dans Lightroom depuis la
 précédente (`LrApplication.addActivePhotoChangeObserver`, dans le contexte de la liaison, qui
@@ -92,11 +109,11 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 
 | Commande | Paramètres | Résultat |
 | --- | --- | --- |
-| `ping` | — | `{pong: true, version}` |
-| `etat` | `sauvegarde?` | versions, catalogue, mode, pause, limites, photo active ; avec `sauvegarde`, la sauvegarde du catalogue demandée pour la fermeture suivante |
+| `ping` | — | `{pong: true, version}` ; depuis la 1.2, refusé lui aussi sans le bon `jeton` |
+| `etat` | `sauvegarde?` | versions, catalogue, mode, pause, limites, photo active, `liaison_fermee` (1.2 : vrai) ; avec `sauvegarde`, la sauvegarde du catalogue demandée pour la fermeture suivante |
 | `selection` | `limite` | `total`, `renvoyees`, `photos` (id, fichier, données de prise de vue, note, drapeau, libellé, pile, `active`) |
 | `reglages` | `photo?`, `cles`, `details?`, `toutes?` | `reglages` (valeurs des clés demandées), `photo` (id, fichier, `copie_virtuelle`), `echelle_temperature`, `version_processus`, `profil`, `intensite_profil`, `appareil`, `recadrage` (angle, dimensions, orientation) ; avec `details` : `courbes_par_points`, `masques` (composants avec leur mode), `couleurs_ponctuelles`, `taches`, `yeux_rouges`, `filtres_calcules`, `amelioration` (photo affichée dans le module Développement seulement), `classement` (note, drapeau, libellé, titre, mots-clés) ; avec `toutes` : `tous`, tout ce que Lightroom range |
-| `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier ; après la 1.1.1, sur un zoom `region` aussi, jamais sur un avant/après), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point |
+| `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier ; après la 1.1.1, sur un zoom `region` aussi, jamais sur un avant/après), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point ; avec `point_af` aussi (1.2), `etapes_claude` (`nombre`, `derniere` : les étapes de Claude gardées pour la photo, `etapesClaude`, lues seulement), pour le bilan de `view_photo` (voir Bilan d'une passe à l'autre) |
 | `appliquer` | `photos?` ou `selection?`, `reglages`, `booleens?`, `looks_traitement?`, `profil?`, `profil_marque?`, `profil_variantes?`, `profil_look?`, `recadrage?`, `recalages?`, `courbes?`, `couleurs_ponctuelles?`, `balance?`, `auto_ton?`, `preset?`, `plages`, `libelles`, `relatif`, `etape`, `raison?`, `confirme` | par photo : `changements` (`cle`, `avant`, `apres`) et `remarques` ; `a_recadrer` et `etape_ecrite` quand un cadre demandé reste à placer (voir Recadrage) |
 | `recadrer` | `photos`, `recadrage`, `recalages`, `completer?`, `etape`, `raison?`, `confirme` | comme `appliquer` (changements du cadre seulement) |
 | `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
@@ -202,6 +219,102 @@ dans Lightroom va jusqu'au bout, la suite ne part pas, et aucune réponse n'est 
 MCP) ; un appel pas encore commencé n'est pas lancé. Une annulation d'un appel déjà répondu est
 ignorée.
 
+## Liaison fermée (1.2)
+
+Jusqu'à la 1.1.1, tout programme du Mac, ou une page web (un POST vers 127.0.0.1:54770), pouvait
+envoyer une commande au module, qui la traitait comme celle du connecteur ; une ligne qui portait
+`depuisLightroom` sautait même la pause et l'accord dans Lightroom (lu dans `Ecriture.lua`). Depuis
+la 1.2, chaque ligne porte un jeton privé, que seul le compte de l'utilisateur peut lire.
+
+**Le jeton naît dans le module**, le côté qui écoute. À chaque démarrage de la liaison, avant
+d'ouvrir les prises (`Liaison.demarrer`, `Liaison.preparerJeton`), le module lit 32 octets de
+`/dev/urandom` (`Liaison.tirerJeton`) et en fait 64 chiffres hexadécimaux en minuscules. Il les
+garde en mémoire (`Liaison.jeton`) et les écrit d'un coup (`Liaison.ecrireJeton`) : un fichier
+provisoire `liaison.jeton.nouveau` créé vide sous `umask 077` (`LrTasks.execute` de
+`umask 077 && /bin/rm -f … && /usr/bin/touch …`), le jeton écrit dedans par `io.open` (jamais sur
+une ligne de commande), puis rangé par `/bin/mv -f` à sa place,
+`~/Library/Application Support/Developpeur/liaison.jeton`, et relu. Le jeton n'est jamais
+journalisé, ni dans une réponse, ni dans l'état ; le diagnostic du Gestionnaire de modules externes
+dit seulement « Jeton : présent (chemin) ; commandes refusées : N », et `etat` dit
+`liaison_fermee = true`. Si le jeton ne peut pas être écrit (aléa illisible ou trop court, fichier
+impossible à créer ou à ranger, jeton relu différent), aucune prise ne s'ouvre : la liaison reste
+active mais en erreur (`Liaison.erreur` commence par « jeton de la liaison : »), le voyant Lightroom
+de la fenêtre Claude passe au rouge avec sa propre aide (voir Fenêtre Claude › Voyants et liaison),
+et un clic sur ce voyant la relance (le menu Démarrer seul n'y fait rien : Arrêter, puis Démarrer).
+Pendant que la liaison tourne, le fichier est vérifié tous les 10 tours de sa boucle (0,5 s
+chacun : 5 s, `Liaison.VERIFIER_JETON_TOUTES`) : effacé, ou remplacé par un démarrage plus ancien,
+il est réécrit (« Fichier du jeton réécrit » au journal ; un échec n'est noté qu'au premier tour qui
+échoue). Le jeton change à chaque démarrage et s'oublie à l'arrêt (par sa génération) ;
+`uninstall.sh` retire `liaison.jeton` et `liaison.jeton.nouveau` avec les fichiers de travail, et
+dit de le relancer une fois Lightroom quitté, puisque la liaison réécrit le fichier dans les 5 s.
+
+**Vérification** (`Liaison.recevoir`) : juste après la lecture du JSON, avant `dernierEchange` et
+`Commandes.executer`, donc avant la pause, « Proposer d'abord » et l'accord dans Lightroom, `ping`
+compris. La comparaison (`Liaison.memeJeton`) parcourt toute la longueur. Une ligne refusée reçoit
+`{"id", "error", "code": "jeton"}` avec l'un des textes de `Liaison.REFUS_JETON` : `sans` (« cette
+commande ne porte pas le jeton de la liaison » : un connecteur d'avant la 1.2 ; quitter puis
+rouvrir Claude Desktop, ou ouvrir une nouvelle session de Claude Code), `faux` (« le jeton de cette
+commande n'est pas celui de la liaison » : réessayer, sinon relancer la liaison) ou `aucun` (le
+module n'a pas de jeton). Elle n'emporte pas l'événement de la photo active, destiné au vrai serveur
+(`Liaison.repondre(objet, true)`). Les refus sont comptés (`Liaison.refus`, lignes illisibles
+comprises) et notés au journal au plus une fois par 10 s et par genre (`DELAI_REFUS` : « Commande
+refusée sans jeton (connecteur d'avant la 1.2, ou autre programme) », « Commande refusée : mauvais
+jeton », « Message illisible ignoré ») : une inondation de lignes ne remplit pas `module.log`.
+`depuisLightroom` est retiré des paramètres reçus du réseau : seuls les menus, la fenêtre de suivi
+et la carte Note le posent, par appel direct.
+
+**Le serveur** (`JetonLiaison.swift`, `LightroomBridge`) ne crée jamais ce fichier et n'en dit
+jamais la valeur. `JetonLiaison.lire` n'accepte qu'un fichier ordinaire (ni lien, ni dossier, ni
+tube nommé : genre et taille vérifiés avant la lecture) de 1 Ko au plus, qui contient exactement
+64 chiffres hexadécimaux en minuscules. `LightroomBridge` relit le fichier à chaque connexion et met
+`jeton` dans chaque ligne ; sans fichier lisible, aucune clé. Le `ping` refusé fait relire le
+fichier une seule fois (la liaison a pu redémarrer entre la lecture et le ping, « jeton de la
+liaison renouvelé : relu » au journal détaillé) ; un fichier absent ou mal formé donne
+`LightroomBridge.jetonIntrouvableMessage` (relancer la liaison : Arrêter, puis Démarrer) ; une
+commande refusée après un ping accepté n'est pas reprise (rien n'a été fait). Le serveur de Claude
+Desktop, celui de Claude Code (fenêtre Claude comprise : Claude Code lance son propre
+`mcp-developpeur` par `connecteur.json`), `--call`, `--module`, `--dump`, `--recalage`,
+`--eclairage`, `--recette` et `--status` passent tous par `LightroomBridge.fromEnvironment`, qui
+pointe le vrai fichier : ils ont le même jeton, sans rien changer à `connecteur.json`, à
+`relais.sh` ni aux inscriptions. `mcp-developpeur --status` dit l'état du fichier
+(`JetonLiaison.etat` : absent, illisible ou mal formé, « présent, lisible par vous seul », ou lisible
+par d'autres comptes avec ses droits), jamais la valeur.
+
+| Serveur | Module | Ce qui se passe |
+| --- | --- | --- |
+| 1.2 | 1.1.1 ou plus ancien | pas de fichier `liaison.jeton` : aucune clé `jeton`, la ligne passe comme avant |
+| 1.1.1 ou plus ancien | 1.2 | ligne sans jeton : refusée (`sans`), avec le message qui dit de relancer Claude Desktop ou d'ouvrir une nouvelle session de Claude Code |
+| 1.2 | 1.2 | jeton relu à chaque connexion ; après un redémarrage de la liaison, relu une fois de plus |
+
+**Tests.** `LightroomBridge.fichierJeton` vaut nil par défaut : seul `fromEnvironment` pointe le vrai
+fichier, et aucun test n'envoie par lui ; les tests passent un fichier temporaire (`FakePlugin` a
+son jeton attendu). La simulation de la liaison (`Tests/Lua/Liaison/Simulation.lua`) imite
+`/dev/urandom` (illisible ou trop court avec `S.aleaIllisible`) et seulement les deux commandes du
+système du jeton (`LrTasks.execute`, sur `S.fichiers` et `S.droits`, droits 600 posés par la
+création ; toute autre commande lève une erreur ; `S.codeCommandes` les fait échouer) : changer la
+forme de ces commandes oblige à changer la simulation. Les essais sont dans la section « Liaison
+fermée (1.2) » de `Tests/Lua/Liaison/tests.lua`.
+
+**Limites.** Un programme lancé par l'utilisateur lui-même peut lire le fichier, donc le jeton : la
+liaison fermée arrête une page web et les autres comptes du Mac, pas ce que l'utilisateur lance. Le
+port des réponses (54771) ne lit rien et n'est pas contrôlé. Les démarrages successifs se servent du
+même fichier provisoire : arrêter puis redémarrer la liaison pendant les quelques millisecondes où
+l'ancien démarrage prépare encore son jeton peut faire échouer le `mv` du second (« fichier du jeton
+impossible à ranger », voyant rouge, un clic relance), ou laisser l'ancien jeton dans le fichier
+jusqu'à la vérification suivante (5 s ; le serveur relit le fichier une fois).
+
+**Constaté dans Lightroom Classic 15.6, le 20 octobre 2026** (module de la 1.2 chargé dans
+Lightroom) : au démarrage, `module.log` dit « Liaison démarrée (ports 54770 et 54771, jeton privé) »
+(donc `/dev/urandom` lu, les deux commandes du système passées et le jeton relu) ;
+`stat -f '%Lp %z'` du fichier donne « 600 65 » (droits 600, 64 chiffres et un saut de ligne) ; une
+ligne sans jeton est refusée, avec une seule ligne au journal (« Commande refusée sans jeton
+(connecteur d'avant la 1.2, ou autre programme) ») ; le fichier effacé est revenu à la
+vérification suivante, dans les 5 s (« Fichier du jeton réécrit » ; le journal ne date pas
+l'effacement). Le 21 octobre 2026, l'étape « liaison fermée (jeton privé) » de la
+recette : une commande `etat` sans jeton, puis une avec un autre jeton, refusées, une ligne au
+journal chacune (« Commande refusée : mauvais jeton » pour la seconde) ; le jeton de la liaison
+passe. Ce qui reste à voir est dans À constater dans Lightroom (1.2).
+
 ## Consignes et invites
 
 `ServerInfo.instructions` donne à Claude la méthode de travail ; les neuf invites de
@@ -221,8 +334,52 @@ Claude Code ne garde que les 4096 premiers caractères des consignes d'un serveu
 16 octobre 2026 : celles de la 1.6.1, 5365 caractères, s'arrêtaient au milieu d'un mot, suivies de
 « [truncated] »). Un test les garde sous cette limite (`ServerInfo.instructionsLimit`, 4096), un
 autre 300 caractères en dessous (3 796), pour la consigne suivante : en 1.1.1, raccourcies pour y
-tenir, elles font 3 793 caractères. Le détail propre à un outil va dans sa description, qui n'est
-pas coupée.
+tenir, elles faisaient 3 793 caractères ; en 1.2, 3 768 (ci-dessous). Le détail propre à un outil
+va dans sa description, qui n'est pas coupée (pour une description longue, pas constaté : voir À
+constater dans Lightroom (1.2)).
+
+**1.2.** Les consignes du connecteur perdent « Avant des centaines de photos : proposer une
+sauvegarde du catalogue (get_status, request_backup) », que la description de `get_status` porte
+déjà (`testInstructionsFollowAdobeHelp` lit les consignes et les définitions ensemble), et
+« appuyer le diagnostic sur ces chiffres autant que sur l'œil » devient « diagnostic sur ces
+chiffres autant qu'à l'œil ». Elles gagnent : « vignetage ou radial inversé, jamais les deux »
+(deuxième passe), « « regression » au bilan » parmi les défauts qui justifient une passe
+corrective, et « RAW Fujifilm : d'abord la simulation du boîtier, intention_boitier » (profil). Elles
+font 3 768 caractères (UTF-16), et toutes les phrases déjà testées y restent. Le reste des sept
+chantiers de la 1.2 passe ailleurs :
+
+- les descriptions d'outils, que Claude Desktop et la fenêtre Claude lisent : celle d'`add_mask`
+  finit par `Prompts.Tireur.resume` (méthode du tireur, 1 559 caractères au total, garde de 2 048
+  dans les tests), sa propriété `effect` par `Peau.dosage`, et chaque masque a
+  `smoothing_requested` ; celle de `view_photo` dit l'éclairage, le bilan et `intention_boitier`
+  (1 783 caractères, garde de 1 850) ; celle de `preview_settings` le bilan d'une proposition (538,
+  garde de 600) ; celle d'`analyze_photos` « dominante (et éclairage mixte) » (garde de 520) ;
+  celle de `get_status` l'écran ; la propriété `compare` d'`add_mask`, « avec leur bilan chiffré » ;
+- le texte que le serveur rend seulement quand il sert : la `lecture` d'`intention_boitier`, le
+  `conseil` d'un éclairage mixte, le `bilan` et sa `regression`, la remarque de l'écran (une fois
+  par processus, voir Écran), le refus d'une peau trop lissée et ses remarques ;
+- les invites (`Prompts.swift`) : `retouche_pro` (étape 2 : `intention_boitier`, puis l'éclairage
+  mixte, balance sur la lumière des visages ou du sujet, `balance_proposee`, l'autre lumière par
+  un masque à l'étape 7 ou gardée chaude si c'est une lampe ; 4 : RAW Fujifilm, d'abord la
+  simulation choisie au boîtier, `intention_boitier.profil` ; 5 : lire le bilan, une
+  « regression » se corrige avant la suite ; 6 : vignetage, ou les bords par un radial inversé à
+  l'étape 7, jamais les deux ; 7 : peau dosée comme le dit `add_mask`, puis éclaircir et assombrir
+  comme un tireur, suivi de `view_photo` avec `compare = previous_step` ; 8 : une « regression »
+  au bilan justifie une passe corrective ; 9 : `compare = before_claude` et le résumé, chiffres du
+  bilan à l'appui), `portrait` (1 : regarder chaque visage, enfant, homme, femme ou personne âgée,
+  la dose de la peau en dépend, dans le doute la plus faible ; 2 : la simulation du boîtier si elle
+  flatte la peau, et sous un éclairage mixte la balance sur la lumière du visage ; 4 : « Retouches
+  locales (add_mask). » puis `Peau.dosage` ; 6 : `Tireur.methode`), `paysage` (2 : la simulation du
+  boîtier ; 5 : `Tireur.methode`, à la place du vignetage léger d'avant), `noir_et_blanc` (2 : ACROS
+  et son filtre pris au boîtier ; 5 : `Tireur.methode` ; 6 : le grain), `nuit_iso_eleve` (1 :
+  `mesures › eclairage`, et `intention_boitier` : une compensation négative ou une scène de nuit
+  dit une nuit voulue sombre ; 3 : ne pas remonter l'exposition au-delà de ce que dit
+  `intention_boitier`), et `finRetouche` (« regression » au bilan, résumé chiffré) ;
+- `Consignes.lua`, pour la fenêtre (voir Fenêtre Claude › Claude Code).
+
+La méthode du tireur n'existe qu'à un endroit, `Prompts.Tireur` (voir Éclaircir et assombrir) ; le
+dosage de la peau, qu'à `Peau.dosage` (voir Peau) : les invites et les descriptions les reprennent,
+jamais une copie des chiffres.
 
 ## Fenêtre Claude
 
@@ -241,11 +398,13 @@ boutons Noter et À vérifier. Depuis, Claude note d'abord toute photo qu'il tra
 et sa note arrive « à vérifier » ; une demande à Claude (« note ces photos ») note une sélection
 (voir Carte Note et Notation). Après la 1.1.1, l'aperçu de la photo active montre aussi le point
 de mise au point d'un fichier Fujifilm, et, à l'ouverture, Claude prépare une proposition de
-retouche sur une conversation vide (voir Disposition et Proposition préparée à l'ouverture). Ce
-qui suit la 1.1.1 ira dans la 1.2 (en préparation). Captures : `docs/capture.png` (la fenêtre
-Claude, en Conversation claire), `docs/publication.png`, `docs/consommation.png` et
-`docs/suivi.png` (la fenêtre de suivi de la liaison) ; `docs/atelier.png` et `docs/panneau.png`,
-les deux autres dispositions, sont retirées avec elles.
+retouche sur une conversation vide (voir Disposition et Proposition préparée à l'ouverture). Ces
+changements font partie de la 1.2, qui ajoute à la fenêtre un quatrième voyant, Écran, l'aide
+d'une liaison qui n'a pas pu préparer son jeton privé, et des consignes pour la peau, l'écran, le
+bilan et la méthode du tireur (voir Voyants et liaison, et Claude Code). Captures :
+`docs/capture.png` (la fenêtre Claude, en Conversation claire), `docs/publication.png`,
+`docs/consommation.png` et `docs/suivi.png` (la fenêtre de suivi de la liaison) ;
+`docs/atelier.png` et `docs/panneau.png`, les deux autres dispositions, sont retirées avec elles.
 
 ### Relais vers Claude Code
 
@@ -330,9 +489,31 @@ une note sans demande, jamais 5 ★). Après la 1.1.1, une puce de plus, sous No
 point montrée ou jugée : view_photo avec af_point = true, sur l'aperçu entier comme sur un zoom
 (region) : le carré y est dessiné, s'il tombe dans la zone (point_af : dans_la_zone) » (voir Tri
 d'une séance › Point de mise au point). Les consignes du connecteur (`ServerInfo`, pour Claude
-Desktop) ne demandent pas de noter d'abord. Depuis la 1.1, `consignes.md` est écrit dans le
-dossier de chaque session (`Session:lancer` ; huitième argument de `relais.sh` depuis la 1.1.1,
-septième en 1.1), plus à la racine : Claude Code le lit un peu après son lancement en
+Desktop) ne demandent pas de noter d'abord.
+
+En 1.2, `Consignes.texte` gagne une section « ## Écran », après « ## Contexte » : Claude mesure la
+photo par ses chiffres (`view_photo`), Dany la juge sur son écran ; si le connecteur dit cet écran
+non étalonné (remarque d'un aperçu, ou `get_status` : `ecran`), le dire en une phrase, une fois par
+conversation, quand Claude demande son avis sur la peau ou les couleurs. Les garde-fous gagnent la
+puce « Peau » : dosée comme le dit `add_mask` (effect « Peau du visage lisse » par défaut), plus
+lisse seulement si Dany le demande en mots ou si son guide de style le dit, alors
+`smoothing_requested = true`, et dire la dose posée. La phrase « Peau adoucie » du Style est refaite
+sans chiffres : la dose « Adoucir la peau (Lite) » d'`add_mask`, sur la peau seulement, jamais sur
+toute la photo ; la moitié de la dose pour un homme ou une personne âgée, rien pour un enfant (les
+chiffres restent dans `Peau.swift` ; un essai vérifie qu'il n'y a ni −35, ni −15, ni « amount 50 »
+dans le Style). « ## Fin d'une tâche » demande le résumé « chiffres du bilan de view_photo à
+l'appui », et qu'une « regression » restée au bilan se dise. Les boutons Portrait, Paysage et Noir
+et blanc (`Consignes.invites`) demandent d'éclaircir et assombrir comme un tireur (« doses
+d'add_mask ») et l'avant/après de cette étape, sans chiffres : les doses arrivent à Claude Code par
+la description d'`add_mask` (`Prompts.Tireur.resume`), car la fenêtre ne lit pas les invites
+(`--disable-slash-commands`). La méthode elle-même n'entre pas dans `Consignes.texte`, dont
+l'en-tête laisse la méthode de retouche au connecteur ; l'intention du boîtier et l'éclairage mixte
+non plus : la fenêtre reçoit les mêmes descriptions et les mêmes résultats d'outils que Claude
+Desktop.
+
+Depuis la 1.1, `consignes.md` est écrit dans le dossier de chaque session (`Session:lancer` ;
+huitième argument de `relais.sh` depuis la 1.1.1, septième en 1.1), plus à la racine : Claude
+Code le lit un peu après son lancement en
 arrière-plan, et un fichier commun pourrait être réécrit entre-temps. Son texte est
 `Consignes.texte` (en 1.1, `Consignes.pour(c)` y ajoutait `Consignes.texteNotation` pour une
 conversation de séance ; retirés en 1.1.1). Les boutons d'invites de la fenêtre
@@ -368,7 +549,8 @@ interruption : `{"type":"control_request","request_id":"interruption-N","request
 Le style du menu Style (`Consignes.styles`), sauf Standard (le choix par défaut, réglage
 `styleChoisi`), ajoute après la ligne de contexte
 « [Style demandé : <nom> — <définition>] » ; la consigne « Style » dit à Claude de l'appliquer par-
-dessus sa méthode (« peau adoucie » : un masque de la peau, jamais toute la photo). Le nom du style
+dessus sa méthode (« peau adoucie » : depuis la 1.2, la dose « Adoucir la peau (Lite) » d'`add_mask`
+sur la peau seulement, jamais toute la photo ; avant, « un masque de la peau »). Le nom du style
 est gardé dans l'élément de la demande (`style`) et rappelé dans le fil.
 
 Chaque demande commence par une ligne de contexte (`Lightroom.contexte` : `[Lightroom : photo
@@ -488,18 +670,41 @@ depuis la 1.1.1 (en 1.1, ce clic la ramenait à l'onglet Aperçu).
   sur laquelle Lightroom bloque : constaté par la liaison, voir Profil).
 - `LrTasks.execute` ne bloque que la tâche : base64, sips, `osascript`, `mcp-developpeur --version`
   et `claude auth status` passent par là, et après la 1.1.1 `mcp-developpeur --marquer-af` (voir
-  Disposition), jamais par un calcul en Lua sur la tâche de l'interface.
+  Disposition), en 1.2 `mcp-developpeur --ecran` (sous `perl alarm 5`, dans un `LrTasks.pcall`,
+  voir Voyants et liaison), jamais par un calcul en Lua sur la tâche de l'interface.
 
 ### Voyants et liaison
 
-Sous le titre de la conversation, trois voyants. Claude Code : `claude auth status`, lu à
-l'ouverture de la fenêtre (forfait, autre connexion, non connecté, introuvable). Lightroom : la
-liaison, qui est dans ce même module ; la fenêtre la lit directement (`Lightroom.liaison` :
-`Liaison.actif`, `Liaison.erreur`), toutes les 2 s, sans commande du système ni connexion. Arrêtée
-ou en erreur (ports tenus par un autre Lightroom ouvert, par exemple), le voyant passe au rouge et
-l'aide du bandeau dit quoi faire ; un clic sur le voyant la démarre, ou la relance après une erreur
-(`Lightroom.demarrerLiaison`). Le mode : un clic bascule « Proposer d'abord » et « Appliquer
-directement » (`Lightroom.basculerMode`, clé `mode` des préférences, celle que lit la liaison).
+Sous le titre de la conversation, quatre voyants depuis la 1.2 (trois avant), en rangée
+(`Vues.voyants(f, F, largeur)`, `D.voyant` = 150 points chacun). Claude Code : `claude auth
+status`, lu à l'ouverture de la fenêtre (forfait, autre connexion, non connecté, introuvable).
+Lightroom : la liaison, qui est dans ce même module ; la fenêtre la lit directement
+(`Lightroom.liaison` : `Liaison.actif`, `Liaison.erreur`), toutes les 2 s, sans commande du système
+ni connexion. Arrêtée ou en erreur (ports tenus par un autre Lightroom ouvert, par exemple), le
+voyant passe au rouge et l'aide du bandeau dit quoi faire ; un clic sur le voyant la démarre, ou la
+relance après une erreur (`Lightroom.demarrerLiaison`). Depuis la 1.2, une erreur qui contient
+« jeton » (le jeton privé n'a pas pu être préparé, voir Liaison fermée) a sa propre aide, avant
+celle des ports : « La liaison avec Claude n'a pas pu préparer son jeton privé (<erreur>) : cliquez
+le voyant Lightroom pour la relancer ; le détail est dans ~/Library/Logs/Developpeur/module.log. »
+Le mode : un clic bascule « Proposer d'abord » et « Appliquer directement »
+(`Lightroom.basculerMode`, clé `mode` des préférences, celle que lit la liaison).
+
+Écran (1.2) : l'écran principal du Mac et son profil de couleur (voir Écran). Le module ne le lit
+pas lui-même : `Lightroom.etatEcran(connecteur)` lance, par `LrTasks.execute` dans un
+`LrTasks.pcall`, `/usr/bin/perl -e 'alarm 5; exec @ARGV' <connecteur> --ecran`, sortie dans
+`Chemins.temporaire()/ecran-<id>.json`, lue puis effacée ; `Lightroom.decrireEcran(json)`, pure,
+en tire une table neuve de textes : `mesure` vrai, « Écran · étalonné », vert (`ok`) ; faux,
+« Écran · non étalonné », orange (`attention`) ; absente, « Écran · étalonné ? », gris (`neutre`).
+Sans réponse lisible, « Écran », gris, et le détail dit pourquoi : `Lightroom.ECRAN_INTROUVABLE`
+(connecteur absent ou sans chemin : réinstaller, ou régler son chemin dans le Gestionnaire),
+`ECRAN_ILLISIBLE` (pas de réponse dans les 5 s, ou un connecteur d'avant la 1.2, qui répond à
+`--ecran` par son aide), `ECRAN_AUCUN` (`{"lu": false}` : aucun écran lu). L'écran se lit à
+l'ouverture, dans la tâche de `Fenetre.verifier(true)` (`Fenetre.poserEcran`), et au clic sur son
+voyant (`Fenetre.montrerEcran`, dans une tâche : il relit l'écran, puis montre la boîte « Claude ·
+écran » avec le détail du connecteur), jamais toutes les 2 s par `Fenetre.periodique`. Avant
+l'ouverture, `texteEcran` vaut « Écran » et `etatEcran` `neutre`. Une panne de la commande laisse
+le voyant gris, et la suite de `Fenetre.verifier` passe. Le clic, comme tout bouton, annule l'envoi
+automatique de la demande tapée.
 
 ### Disposition (1.1 ; une seule après la 1.1.1)
 
@@ -581,7 +786,7 @@ mcp-developpeur --marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sor
 ```
 
 Le connecteur (`PointAF.marquer`) lit le point dans l'original, en temps borné
-(`LecteurPointsAF`, 2 s), le passe dans l'image affichée et recadrée
+(`LecteurBoitier`, 2 s), le passe dans l'image affichée et recadrée
 (`GeometriePhoto.versApercu`), dessine le carré (`PreviewImages.marquerPoint` : vert, rouge si
 l'appareil a signalé la mise au point manquée) et écrit la vignette marquée dans `<sortie.jpg>`
 (la fenêtre la nomme `<nom>-af.jpg`, à côté de la vignette) ; il écrit alors sur sa sortie une
@@ -804,9 +1009,13 @@ ancienne conversation ne la rouvre pas.
                                             consignes (consignes.md, écrit à son lancement)
     Atelier/                                dossier de travail de Claude Code (vide)
     Temporaire/                             fichiers de passage (Collees/, sorties de commandes,
-                                            PhotoActive/ : vignette de la photo active, et après
-                                            la 1.1.1 sa copie marquée <nom>-af.jpg ; en 1.1,
-                                            Notation/<séance>/ : vignettes de la séance)
+                                            dont ecran-<id>.json en 1.2, PhotoActive/ : vignette
+                                            de la photo active, et après la 1.1.1 sa copie marquée
+                                            <nom>-af.jpg ; en 1.1, Notation/<séance>/ : vignettes
+                                            de la séance)
+    liaison.jeton                           jeton privé de la liaison (1.2), écrit par le module à
+                                            chaque démarrage, droits 600 ; liaison.jeton.nouveau,
+                                            son fichier provisoire (voir Liaison fermée)
     connecteur.json                         écrit à chaque lancement de Claude Code
     consommation.json, publication.json     jetons comptés, profils de publication de l'utilisateur
     notation.json                           notes proposées par Claude (registre, format 2, propre
@@ -1033,7 +1242,13 @@ refaites (section précédente ; `docs/seance.png` est retirée). Après la 1.1.
 de mise au point sur l'aperçu de la photo active et sur un zoom, proposition préparée à
 l'ouverture, Conversation claire seule), les deux suites passent (`swift test` : 238 tests ;
 `scripts/tester-module.sh` : liaison 212, fenêtre 43, `essais-dispositions` 17,
-`essais-integration` 7, `essais-moteur` 13) ; rien n'en a encore été vu dans Lightroom.
+`essais-integration` 7, `essais-moteur` 13) ; rien n'en a encore été vu dans Lightroom. La 1.2
+entière (ces trois changements et les sept chantiers, lots 1 à 9 et 12) passe les deux suites :
+`swift test` 367 tests, dont 1 sauté sans `DEVELOPPEUR_ECRAN_REEL=1` (la lecture du vrai écran,
+`EcranTests.testLectureReelleSansPlantage`) ; `scripts/tester-module.sh` : liaison 235, fenêtre
+47, `essais-dispositions` 18, `essais-integration` 7, `essais-moteur` 16. Ce qui en a été vu dans
+Lightroom est dans la section de chaque chantier ; ce qui reste à voir, dans À constater dans
+Lightroom (1.2), sauf ce qui tient à la fenêtre (points 15 et 16 ci-dessous).
 Restent à voir, à l'usage ; ce qui sera constaté passera dans sa section, avec sa règle dans la
 simulation de sa suite.
 
@@ -1118,6 +1333,21 @@ simulation de sa suite.
     attend dans l'onglet Proposition, la carte Note devant ; rien ne part quand la case « À
     l'ouverture » est décochée ou que la conversation a déjà des messages. Coût en jetons d'une
     demande à chaque photo nouvelle (fenêtre Consommation).
+15. Voyant Écran (1.2) : `mcp-developpeur --ecran`, lancé par Lightroom (`LrTasks.execute`,
+    connecteur signé au runtime durci), voit-il l'écran de la session, en moins de 5 s, sans demande
+    d'autorisation de macOS (ne jamais y répondre à la place de Dany) ? La langue que lit ce
+    processus (`Locale.preferredLanguages`) doit être fr-CA, pour que la boîte « Claude · écran »
+    dise « Réglages système › Écrans › Profil de couleur ». Capture de la rangée de quatre voyants
+    (150 points chacun, environ 690 sur les 900 du centre) : « Écran · non étalonné » non coupé ;
+    `docs/capture.png` à refaire. Un voyant orange en permanence (« non étalonné », le cas de la
+    plupart des écrans d'amateur) gêne-t-il Dany ? Le repli serait le gris (`neutre`), le texte
+    gardé (`Lightroom.decrireEcran`). L'aide « jeton privé » du voyant Lightroom quand le jeton n'a
+    pas pu être écrit.
+16. Consignes de la 1.2 avec le vrai Claude : les boutons Portrait, Paysage et Noir et blanc mènent
+    à un seul `add_mask` « éclaircir et assombrir » suivi de `view_photo` avec
+    `compare = previous_step` ; Claude dit une seule fois, quand il demande l'avis de Dany sur la
+    peau ou les couleurs, que l'écran n'est pas étalonné ; le résumé de fin donne les chiffres du
+    bilan ; Claude ne pose pas `smoothing_requested` de lui-même.
 
 ## Réglages
 
@@ -1475,10 +1705,11 @@ entier, non recadré, avant l'orientation, en suivant le modèle du cadre ci-des
   `GreenCurve`, `BlueCurve`, un tableau de textes « x,y » (linéaire : « 0,0 », « 255,255 » ;
   comme dans le paramètre prédéfini d'Adobe « Adaptive - Sky/Blue Pop ») ; et ses
   `CorrectionMasks` : `Mask/Gradient` (`ZeroX/Y`, `FullX/Y`), `Mask/CircularGradient` (`Left`,
-  `Top`, `Right`, `Bottom`, `Angle`, `Feather`), `Mask/RangeMask` de luminance (`LumRange` : quatre
-  valeurs, écrites avec un point quelle que soit la locale), `Mask/Image` pour les masques IA
-  (`MaskSubType` 1 sujet, 2 ciel, 0 avec `MaskSubCategoryID` 22 arrière-plan ou 5000x paysage,
-  3 avec une catégorie pour les parties d'une personne) ;
+  `Top`, `Right`, `Bottom`, `Angle`, `Feather`, et `Flipped = true` toujours : l'inversion passe par
+  `MaskInverted` seul, constaté le 20 octobre 2026, voir Éclaircir et assombrir), `Mask/RangeMask`
+  de luminance (`LumRange` : quatre valeurs, écrites avec un point quelle que soit la locale),
+  `Mask/Image` pour les masques IA (`MaskSubType` 1 sujet, 2 ciel, 0 avec `MaskSubCategoryID` 22
+  arrière-plan ou 5000x paysage, 3 avec une catégorie pour les parties d'une personne) ;
 - `RetouchAreas` : une entrée par tache, cercle `Mask/Ellipse` dont le rayon se rapporte au grand
   côté du fichier (constaté : un disque cloné reste un cercle) ;
 - `RedEyeInfo` : une entrée par œil (pupille, taille, assombrissement ; les valeurs de détection
@@ -1589,7 +1820,9 @@ Presets/` avec ceux de l'utilisateur. `value` porte les réglages à l'échelle 
 serveur (`EffetsLocaux.swift`) lit ces fichiers, met les réglages de l'effet dans `locaux` (ceux
 d'`adjustments` les remplacent, réglage par réglage), nomme le masque d'après l'effet, et dit ce
 qu'il pose (`remarques_serveur`) ; `amount` en règle l'intensité (`CorrectionAmount`). Le module
-n'y voit que des réglages locaux.
+n'y voit que des réglages locaux. Depuis la 1.2, deux effets intégrés pour la peau s'ajoutent après
+ceux des fichiers, un garde-fou refuse une peau trop lissée, et la remarque d'un effet dit sa dose
+sous 100 % (voir Peau).
 
 Masques combinés (`add_mask` avec `combine`) : un masque porte plusieurs composants dans ses
 `CorrectionMasks`, chacun avec son `MaskBlendMode`. Relevé dans le code de Lightroom Classic 15.6
@@ -1654,6 +1887,177 @@ Noms : le serveur nomme chaque masque « Claude · » suivi du nom donné (ou du
 nomme chaque étape « Claude · » suivi de `etape`. Un nom qui commence déjà par « Claude · » (en
 majuscules ou non, même répété) perd ce préfixe avant : il n'est jamais doublé.
 
+## Peau (1.2)
+
+Le lissage de la peau suit les doses qu'Adobe range dans ses fichiers (pas dans son aide), relevées
+le 20 octobre 2026 dans Lightroom Classic 15.6, en lecture seule :
+
+- « Peau du visage lisse » (Smooth Facial Skin) : `Settings/Premium/Adaptive - Portrait/Smooth
+  Face.xmp`, une `Correction` sur `MaskSubType` 3, `MaskSubCategoryID` 2 (la peau du visage de
+  toutes les personnes : `person_part` `face_skin`), `LocalTexture` −0,2 et `LocalClarity2012`
+  −0,1 ; Enhance Portrait a les mêmes valeurs, Polished Portrait et Glamour −0,25 et −0,1. C'est un
+  paramètre prédéfini adaptatif, pas un effet local : le serveur le fournit en effet intégré ;
+- « Adoucir la peau (Lite) » (Soften Skin (Lite)) : `SoftenSkin(Lite).lrtemplate` de
+  `localized_presets`, texture −0,35 et clarté −0,15 ;
+- « Adoucir la peau » (Soften Skin) : `SoftenSkin.lrtemplate`, clarté −1 et netteté +0,25 ; jamais
+  intégré.
+
+`Peau.swift` (`enum Peau`) est la seule copie de ces chiffres, sur l'échelle des curseurs
+(`Peau.Dose` : texture, clarté, netteté) : `parDefaut` (texture −20, clarté −10), `lite` (−35,
+−15), `forte` (clarté −100, netteté +25, pour les textes seulement). `Peau.effetsIntegres`
+(« Peau du visage lisse » et « Adoucir la peau (Lite) », valeurs tirées de ces doses ÷ 100)
+s'ajoutent à `LocalEffectLibrary` après les effets des fichiers, qui l'emportent : un effet du même
+nom, français ou anglais, n'est pas répété (sur le Mac de Dany, « Adoucir la peau (Lite) » vient de
+son `.lrtemplate`, et seule « Peau du visage lisse » s'ajoute). `Peau.dosage`, le texte que Claude
+lit, finit la description d'`effect` d'`add_mask` et fait l'étape 4 de l'invite `portrait` : par
+défaut « Peau du visage lisse » ; « Soften Skin (Lite) » pour un gros plan dont un zoom montre des
+pores marqués ; `amount` 50 pour un homme ou une personne âgée (la moitié de la dose, exactement) ;
+rien pour un enfant ; un masque par personne quand les doses diffèrent sur une même photo (`kind`
+`person`, `person_at` sur son visage, `part` `face_skin`) ; « Soften Skin » seulement si
+l'utilisateur demande une peau plus lisse ; puis `view_photo` avec `region` sur le visage (pores
+encore visibles, ni cire ni plaques). La fenêtre Claude (`Consignes.lua`) y renvoie sans chiffres.
+
+**Garde-fou** (`Peau.verifier`, à la fin de `maskParameter`, que seul `add_mask` appelle, après la
+lecture de `combine`, avant le prélèvement et tout envoi : un refus n'envoie aucune commande,
+`preview` compris). Un masque de peau qui dépasse la dose Lite, intensité comprise (réglage ×
+`amount`) : texture sous −35, clarté sous −15, ou netteté négative (Adobe ne la baisse dans aucune
+de ses doses), est refusé, sauf avec `smoothing_requested = true`, propriété d'un masque (pas d'un
+composant), à poser seulement sur demande de l'utilisateur ou de son guide de style (sa description,
+`Peau.demandeDescription`, dit « Jamais de toi-même »). La dose compte l'effet et ses `adjustments`
+ensemble. Est de la peau (`Peau.surLaPeau`) : un premier composant `person_part` ou `person` de
+`part` `face_skin` ou `body_skin`, non inversé ; ou un composant combiné qui la garde, ajouté ou
+intersecté non inversé, ou soustrait inversé (A − non B = A ∩ B, comme Lightroom range une
+intersection : `Locaux.combiner`) ; la peau soustraite, ou inversée puis ajoutée ou intersectée, la
+retire. Le refus nomme le masque, l'excès, la dose par défaut, et finit par « Rien n'a été fait. ».
+`copy_settings`, `edit_mask` (dupliquer) et `match_series` ne passent pas par lui.
+
+**Remarques** (`remarques_serveur` d'`add_mask`) : la remarque d'un effet dit sa dose sous 100 %
+(« ; à 70 % : … », `describe(_:facteur:)`, qui ne change pas la teinte d'un virage) ; « Peau
+(masque N) : … » signale une dose au-dessus de « Peau du visage lisse » (pour un gros plan aux
+pores marqués), ou une dose au-delà de la dose Lite posée à la demande (`smoothing_requested`),
+avec de quoi la vérifier (`view_photo` avec `region` sur le visage).
+
+**Constaté le 20 octobre 2026** (Lightroom Classic 15.6, propositions `add_mask` de 1 344 px sur le
+portrait d'essai 53709912, `person_part` `face_skin`) : l'intensité d'un masque
+(`CorrectionAmount`) est linéaire. Texture −20 et clarté −10 à `amount` 50 rendent la même image, au
+pixel près (écart maximal 0), que texture −10 et clarté −5 à 100 ; « Adoucir la peau (Lite) » à
+50, la même que texture −17,5 et clarté −7,5 à 100. La dose entière et la moitié ne diffèrent que de
+7 niveaux au plus (0,01 en moyenne), aucun pixel au-delà de 12 : à 1 344 px, un lissage fin change
+peu la luminance. D'où « la moitié de la dose, exactement » (`Peau.intensiteReduite` = 50). C'est
+un constat de rendu : la simulation de la liaison ne peut pas en avoir de règle. La recette
+(`--portrait`) le vérifie au pixel près, pas par la part des pixels changés, qui ne verrait pas
+7 niveaux : le 21 octobre 2026, 0 niveau d'écart avec la moitié des curseurs, pour les deux doses ;
+le détail des joues gardé à 89 % avec les doses par défaut et Lite, 76 % avec « Adoucir la peau » ;
+le refus sans `smoothing_requested` ; la dose par défaut posée et relue (voir Recette dans
+Lightroom).
+
+**Vision ne dit ni le genre ni l'âge d'un visage** : `VNClassifyImageRequest` (1 303 étiquettes)
+nomme l'image entière, dont adult, baby, child et teen, et rien ne sépare un homme, une femme ou
+une personne âgée. Claude juge à l'œil (étape 1 de `portrait`), et dans le doute prend la dose la
+plus faible. Un indice « enfant probable » par visage (`VNClassifyImageRequest` limitée au cadre du
+visage, `regionOfInterest`, dans la branche de l'aperçu entier de `view_photo`) était prévu en
+phase 2 (lot 11) ; il n'est pas fait : il fallait d'abord un relevé sur des visages d'âge connu,
+désignés par Dany, et ne le garder qu'avec au moins 90 % de précision. Ce relevé n'a pas eu lieu ;
+sans lui, l'indice ne se fait pas.
+
+**Limites.** Le garde-fou juge chaque masque seul : deux masques de peau sur la même zone, dans un
+même appel ou d'un appel à l'autre (une passe corrective qui en rajoute un), s'additionnent sans
+refus (une somme refuserait à tort « un masque par personne », et le serveur ne lit pas les masques
+déjà posés). Un masque Sujet ou Personne entière (`person` sans `part`) lissé fort n'est pas
+couvert, ni le bruit local (`LocalLuminanceNoise`).
+
+## Éclaircir et assombrir (1.2)
+
+La méthode du tireur en chambre noire, pour mener l'œil au sujet : un seul `add_mask` après le
+recadrage (`step_name` « éclaircir et assombrir », `Prompts.Tireur.nomEtape` ; « Claude ·
+éclaircir et assombrir » dans l'Historique, une étape que `undo_last` défait), une `reason` qui dit
+où va l'œil, un masque doux par geste :
+
+- les grandes zones trop claires, assombries par un dégradé linéaire (`kind` `linear` ; `from_x`,
+  `from_y` du côté le plus clair, où l'effet est entier ; `to_x`, `to_y` où il s'éteint), Exposure
+  de −0,3 à −0,7 IL selon l'écart (`Tireur.zones`) ; si le sujet traverse le dégradé, `combine`
+  `[{"mode": "subtract", "kind": "subject"}]` ;
+- le sujet (ou le visage), éclairci de +0,2 à +0,4 IL (`Tireur.sujet`) par un dégradé radial au
+  milieu du cadre du visage ou de la `zone_d_interet` de Vision (à défaut, du sujet vu au
+  diagnostic), `radius_x` d'une à deux fois sa largeur, `feather` 80 à 100 (`Tireur.sujetFondu`) ;
+- les bords, −0,3 IL, −0,5 au plus (`Tireur.bords`), par un dégradé radial inversé
+  (`Tireur.forme` : `invert = true`, centré au milieu de la `zone_d_interet` de Vision, à défaut du
+  sujet, `radius_x` et `radius_y` 0,7, `feather` 80), à la place du vignetage après recadrage,
+  jamais les deux : pas de radial inversé si la photo porte déjà un `PostCropVignetteAmount`, ou si
+  le guide de style écarte le vignetage ;
+- une zone de forme irrégulière : le pinceau (`kind` `brush`, `strokes`).
+
+Ces doses sont des plafonds, venues de la feuille de route, pas d'une mesure : rester en dessous si
+le geste se remarque. En mode « Proposer d'abord », l'étape se montre d'abord par `add_mask` avec
+`preview` et `compare`. Puis l'avant/après, obligatoire : `view_photo` avec
+`compare = previous_step` (l'état d'avant cette seule étape, à gauche) ; le sujet doit ressortir
+sans que le geste se voie : ni halo, ni bande à la limite d'un dégradé, ni anneau ou plaque sombre
+dans les coins, pas plus d'ombres bouchées qu'avant (`ecretage_pct` de `mesures` et de
+`mesures_avant`), aucune « regression » au bilan. Un défaut vu : `undo_last`, puis le même
+`add_mask` à doses réduites (`amount`), et l'avant/après de nouveau.
+
+`Prompts.Tireur` (`Prompts.swift`) est la seule copie des doses et de la forme (`zones`, `sujet`,
+`bords`, `bordsRayon`, `bordsFondu`, `sujetFondu`, `forme`, `avantApres`). `Tireur.methode` (vers
+où l'œil doit aller, et les grandes zones claires de ce genre de photo) fait l'étape des invites
+`portrait` (6, vers le visage), `paysage` (5) et `noir_et_blanc` (5, le grain passant en 6) ;
+`retouche_pro` y renvoie (étapes 6 et 7) ;
+`Tireur.resume` finit la description d'`add_mask`, car la fenêtre Claude ne lit pas les invites ;
+ses boutons Portrait, Paysage et Noir et blanc demandent la méthode sans chiffres (voir Fenêtre
+Claude › Claude Code). Les consignes du connecteur n'en disent que « vignetage ou radial inversé,
+jamais les deux ».
+
+**Constaté le 20 octobre 2026** (Lightroom Classic 15.6, propositions de 1 344 px sur le portrait
+d'essai 53709912 : `add_mask` radial centré en (0,5 ; 0,5), rayon 0,35, `feather` 0, Exposure
+−2 IL, comparé au même radial à +0,01 IL ; luminance moyenne par zone 3 × 3, écart en niveaux) :
+la forme de `Locaux.radial` (`Mask/CircularGradient` avec `Flipped = true`) agit dans l'ellipse ;
+avec `MaskInverted = true` en plus, hors de l'ellipse seulement :
+
+- inversé : coins −69, −68, −31, −58 ; bords haut −2, bas −1, gauche −20, droite −13 ; centre −0,3 ;
+- non inversé : centre −45, haut −72, bas −41 ; coins −20, −19, −12, −18 ;
+- linéaire de (0,5 ; 0) à (0,5 ; 0,4) : tiers du haut −48 à −57, le reste moins de 1 : le côté de
+  `from` seul.
+
+`Locaux.radial` n'a donc pas été changé : il pose toujours `Flipped = true`, inversé ou non, et
+l'inversion passe par `MaskInverted` seul ; `Locaux.combiner` et l'action `dupliquer` de
+`Masques.lua` ne changent que `MaskInverted` et `MaskBlendMode`. Règle de la simulation de la
+liaison (`verifierMasques`, pour `applyDevelopSettings` comme pour un paramètre prédéfini, chaque
+composant d'un masque combiné compris) : un `Mask/CircularGradient` porte `Flipped == true` et un
+`MaskInverted` booléen. Les essais de la suite de la liaison figent la forme de `Locaux.radial` clé
+par clé (18 clés, inversé ou non), vérifient le refus d'une autre forme, et suivent un radial
+inversé de bout en bout (`masquer` avec et sans masque IA ; composant intersecté, copie inversée
+par `edit_mask`, copie vers une autre photo). Un radial sans `Flipped` n'a pas été essayé dans
+Lightroom (il agirait peut-être à l'envers) : la simulation le refuse, sans que ce soit un constat.
+La règle porte sur l'état fusionné de la photo : un radial fait à la main sans `Flipped`, s'il en
+existe, serait refusé par la simulation ; la forme d'un radial fait à la main n'a pas été relevée.
+
+**Forme des bords, relevée le 20 octobre 2026** sur une seule photo, le paysage 53709786
+(propositions de 1 344 px, radial inversé centré, `radius_x` = `radius_y`, donc une ellipse aux
+proportions du cadre, Exposure −0,5 IL ; baisse de luminance en niveaux sur 255 au centre, au
+milieu des bords et aux coins, et profil de la diagonale du centre au coin en 20 segments) :
+
+| rayon | fondu | centre | milieu des bords | coins | la baisse commence (diagonale) |
+| --- | --- | --- | --- | --- | --- |
+| 0,6 | 50 | 0 | −16 | −24 à −29 | vers 35 % |
+| 0,6 | 80 | 0 | −20 | −24 à −30 | vers 10 % |
+| 0,6 | 100 | 0 | −23 | −24 à −30 | dès le centre |
+| 0,7 | 50 | 0 | −11 | −20 à −25 | vers 45 % |
+| 0,7 | 80 | 0 | −16 | −21 à −27 | vers 15 % |
+| 0,7 | 100 | 0 | −20 | −22 à −28 | dès le centre |
+| 0,75 | 50 | 0 | −8 | −18 à −22 | vers 50 % |
+| 0,75 | 80 | 0 | −14 | −20 à −25 | vers 15 % |
+| 0,75 | 100 | 0 | −19 | −21 à −26 | dès le centre |
+
+Toutes les formes descendent sans marche, aucune vignette en plaques (le petit creux vers le
+15e segment vient de la scène : à −0,5 IL, une zone claire perd plus de niveaux qu'une sombre), et
+le centre n'est jamais touché. Retenu (`bordsRayon`, `bordsFondu`) : rayon 0,7, fondu 80, le tiers
+central intact. Le fondu 100 assombrit presque tout le cadre ; le fondu 50 fait une vignette
+marquée aux seuls coins. Le 21 octobre 2026, la recette a revu l'inversion sur le portrait
+53709912 (coins assombris à 100 %, milieu 0 %), et cette forme sur ce portrait, décentrée sur la
+zone d'intérêt (0,38 ; 0,29) : centre 0,48 % de luminance en moins à −0,3 IL, 0,59 % à −0,5 IL ;
+coin le plus loin 11,93 % et 19,38 % ; ni plaque ni anneau (voir Recette dans Lightroom). Restent
+à voir (À constater dans Lightroom (1.2)) : cette forme sur un intérieur ; le fondu du radial du
+sujet ; les doses, que Dany juge sur l'avant/après.
+
 ## Proposition, comparaison et paramètres prédéfinis
 
 `essayer` applique un plan (retouche, masques ou taches), rend l'aperçu, puis réapplique les
@@ -1683,6 +2087,21 @@ de 6 (lecture : moins de 15 floue probable, plus de 35 nette) ; une image propre
 0,2 à 0,5, des ombres relevées vers 1, un bruit ajouté de ±6 niveaux de 1 à 2 (lecture : moins de
 0,6 faible, plus de 1,5 fort). `analyze_photos` rend donc ses aperçus à 1024 px.
 
+Depuis la 1.2, ces seuils sont nommés, sans changer de valeur, et repris par le tri, les plafonds de
+note, `analyze_photos` et le bilan : `DetailMeasurements.seuilFlou` (15), `seuilNet` (35),
+`bruitVisible` (0,6), `bruitFort` (1,5) ; `PhotoMeasurements.partNeutreMin` (3 % de tons neutres
+pour juger une dominante), `dominanteLegere` (2), `dominanteNette` (6), `chromaTresSaturee` (60) ;
+`Measurements.seuilChroma` (3, écart de chroma moyenne visible). Le 35 de la photo brûlée du tri
+(`pureWhite > 35`, en % de blanc pur) n'est pas un seuil de netteté : il reste un nombre. Depuis la
+1.2 aussi, l'aperçu entier de `view_photo`, les deux images d'un avant/après et une proposition se
+mesurent de même (`ToolHandler.mesurerImage`) : un seul décodage, puis la réduction à 512 px par
+CGContext (`PreviewImages.scaled`, comme `analyzeScaled`), jamais la vignette d'ImageIO. Avant,
+`view_photo` mesurait la réduction CGContext et les propositions la vignette d'ImageIO : sur un même
+aperçu de 1 344 px, L* médiane 42,5 contre 42,3, p95 79,9 contre 79,6 (relevé hors de Lightroom
+pendant la 1.2), l'ordre de l'écart proposition contre vue relevé dans Lightroom (voir Bilan). Le
+zoom (`region`) garde sa mesure de toujours. `view_photo` mesure aussi l'éclairage (voir Éclairage
+mixte) et donne son bilan (voir Bilan d'une passe à l'autre).
+
 `AnalyseVision.swift` passe l'aperçu à Vision (macOS) : visages et repères (pupilles, largeur
 des yeux), qualité de capture de chaque visage, note esthétique (macOS 15 et plus), saillance par
 attention. Les positions sont ramenées au repère de `view_photo` (Vision compte depuis le bas).
@@ -1690,7 +2109,8 @@ Le rayon d'une correction d'yeux rouges vaut 15 % de la largeur de l'œil, une e
 empreintes (`VNGenerateImageFeaturePrintRequest`) donnent la ressemblance : relevé 0,10 pour la
 même photo développée autrement, 0,44 pour la même photo recadrée, de 0,8 à 1 entre photos
 différentes ; sous 0,5, même scène (groupes de proche en proche). La meilleure d'un groupe : la
-plus nette, puis la note esthétique et le meilleur visage.
+plus nette, puis la note esthétique et le meilleur visage. Vision ne dit ni le genre ni l'âge d'un
+visage ; l'indice « enfant probable » prévu pour la peau n'est pas fait (voir Peau).
 
 Horizon : `VNDetectHorizonRequest` ne voyait pas l'horizon pourtant net d'une photo de bord de
 mer, et donnait −1,9° sur une photo mesurée à 0,4° ; un histogramme des orientations de contours
@@ -1705,6 +2125,386 @@ L'aperçu est un JPEG sRGB : une couleur que Lightroom garde dans son espace de 
 RVB dans Développement) mais qui sort du sRGB y paraît écrêtée sur un canal. Une photo en mode HDR
 (`HDREditMode`) y est mesurée dans son rendu SDR. Les coins vides laissés par Upright ou la
 perspective comptent comme blanc pur (voir Recadrage).
+
+## Éclairage mixte (1.2)
+
+`Eclairage.swift` lit l'éclairage d'un aperçu sur ses tons presque neutres (des gris dans la
+réalité, qui prennent la couleur de la lumière) : leur dominante (médianes de a* et b*) par zone
+tonale et par case d'une grille 3 × 3, les visages à part. Deux groupes de cases de couleurs
+différentes disent un éclairage mixte (une lampe et une fenêtre dans la même pièce). Serveur
+seulement : le module ne change pas.
+
+**Mesure** (`Eclairage.mesurer`, sur l'aperçu réduit à 512 px des mesures de `view_photo`, la même
+réduction, faite une fois) :
+
+- un ton presque neutre : ni écrêté ni bouché (aucune composante à 250 ou plus, ni à 5 ou moins),
+  L* de 15 à 95, hors des visages, à moins de `Eclairage.chromaMax` (12) en a*b* d'un centre
+  (`Eclairage.centrer`) : le gris, tant que le point neutre de l'image en reste à
+  `toleranceNeutre` (10) près ; au-delà (une dominante globale), le point neutre ramené de 10 vers
+  le gris. Le point neutre (`Eclairage.pointNeutre`) : les médianes de a* et b* des tons peu
+  saturés (C* < 40, `borneNeutreGlobal`), puis de ceux à moins de deux fois la borne de ce premier
+  point ;
+- les zones tonales : ombres (L* < 40), tons moyens (40 à 70), hautes lumières (au-delà), lues à
+  partir de 2 % de l'image ; `ecart_tonal` entre ombres et hautes lumières, dit à partir de
+  `seuilTonal` (8 : `lecture_tonale`, lumière d'appoint d'une autre couleur, ou dominante des
+  ombres, ShadowTint ou Color Grading des ombres) ;
+- la grille 3 × 3 (bornes comme `Detail`) : une case se lit à partir de 3 % de tons neutres
+  (`PhotoMeasurements.partNeutreMin`, comme la dominante de `view_photo`) et 200 pixels ; trois
+  cases lues au moins ;
+- deux groupes : de toutes les partitions des cases lues en deux (255 au plus pour 9 cases), celle
+  qui maximise la variance entre groupes (wG · wD · |μG − μD|²), chaque groupe portant au moins
+  `partMinGroupe` (20 %) des tons neutres lus ; `ecart_regions`, la distance a*b* entre les deux ;
+  mixte à partir de `seuilMixte` (8). Le plus chaud (ou le plus magenta, si l'écart tient surtout
+  à a*) d'abord ; chaque groupe nommé par ses cases (« tiers gauche », « bande du milieu », sinon
+  les noms de `DetailMeasurements.zoneNames`) ;
+- les visages (cadres de Vision, du plus large au plus petit ; 4 au plus, larges d'au moins 4 % de
+  l'image ; un cadre non fini est écarté) : agrandis de 10 % de chaque côté et retirés des cases et
+  des zones tonales ; la peau au milieu du visage (L* 25 à 92, C* 6 à 50, non écrêtée, 20 pixels
+  au moins, `pixelsMinPeau`) ; la lumière dans un anneau de 2,5 × 2,75 cadres autour, sans les
+  pixels à moins de 10 en a*b* de la peau (cou, mains), lue à partir de 100 pixels et 3 % de tons
+  neutres, sinon la case du visage ;
+- la lumière du sujet : celle des visages (moyenne pondérée par leur largeur), sinon celle de la
+  zone d'intérêt de Vision (100 pixels neutres au moins).
+
+Les médianes des cases et des zones se prennent par histogramme, au pas de 0,05
+(`Eclairage.Histogramme`) : trier chaque case coûtait 27 ms sur 31 par aperçu (mesuré le
+20 octobre 2026 en version optimisée, sur une image de synthèse), l'histogramme ramène la mesure
+à 6 ms ; la peau, petite, garde le tri.
+
+**Dans `view_photo`** (`mesures › eclairage`, aperçu entier) : `lecture` (« une seule lumière (écart
+entre zones 7,6, sous 8) », « éclairage mixte : plus chaude … (a* …, b* …), plus froide … ; écart
+9,7 ; visages dans … », ou pourquoi l'éclairage ne se lit pas), `mixte`, `ecart_regions`,
+`zones_tonales` (`a`, `b`, `part_pct`), `lecture_tonale` s'il y a lieu, et `visages`
+(`index_vision`, le rang dans `vision.visages` depuis 0, la liste de la mesure pouvant en sauter ;
+`peau` L, a, b, `teinte_deg` ; `lumiere` ; `lumiere_mesuree` ; `dans_la_lumiere` si mixte).
+Seulement si l'éclairage est mixte, pour rester court (une photo à une seule lumière en reçoit
+environ 240 caractères sans visage) : `regions_3x3`, `groupes` (`lumiere`, `zones`, `a`, `b`,
+`part_pct`), `balance_proposee`, `conseil` et `base` (la règle de mesure, datée). La forme courte
+(`lecture`, `mixte`, `ecart_regions`, `zones_tonales`, `lecture_tonale`) va dans `mesures` et
+`mesures_avant` d'un avant/après, et dans `mesures_actuelles` et `mesures_proposition` d'une
+proposition ; `analyze_photos` donne `eclairage` (`mixte`, `ecart_regions`, `lecture`) par photo.
+
+`balance_proposee` (`ToolHandler.balanceProposee`, `Tools+Balance.swift`) : la Temperature et la
+Tint qui neutralisent la lumière des visages (ou du sujet), par les pentes de `match_series`
+(`balancePourPoint`), depuis la balance de la réponse brute du module (Temperature en kelvins pour
+un RAW, avant le regroupement des réglages) ; « ordre de grandeur, d'après les pentes de
+match_series ; à vérifier par view_photo ». Rien sans Temperature lue, sans lumière du sujet, ou si
+l'éclairage n'est pas mixte. `conseil` : à confirmer à l'œil (un mur coloré n'est pas une lumière)
+et à dire à l'utilisateur ; balance des blancs sur la lumière des visages (`balance_proposee`, ou
+`white_balance_point` sur un gris près d'eux) ou du sujet ; puis l'autre zone par un masque
+(dégradé linéaire ou radial, ou objet, sur les cases nommées ; Temperature et Tint locaux contre
+son écart), ou gardée chaude si c'est une lampe ; vérifier par `view_photo` que `ecart_regions`
+baisse. Les invites `retouche_pro`, `portrait` et `nuit_iso_eleve` le reprennent (voir Consignes
+et invites).
+
+**Relevé** : `mcp-developpeur --eclairage <id>… [<fichier.jpg>…] [--essai '{…}']`
+(`Eclairage.releve`). Chaque photo, par la commande `apercu` à la taille de `view_photo` mais sans
+`point_af` (ni carré, ni ouverture de l'original, et la Temperature brute gardée), ou un fichier
+JPEG lu sans Lightroom, est mesurée à chaque borne de `bornesReleve` (12, 15, 20, 25, 30), avec
+Vision (visages, zone d'intérêt, scène : interior_room, outdoor, sky), le point neutre et le centre,
+la balance qui neutralise la lumière du sujet, et la durée de la mesure ; un tableau résumé finit
+la sortie. Lecture seule ; `--essai` passe par `preview_settings` (une autre balance : la
+proposition mesurée telle que Lightroom l'a rendue ; copies virtuelles seulement, refusé sur un
+original ; deux étapes « Claude · essai » dans l'Historique ; balance inconnue avec un paramètre
+prédéfini ou une balance automatique). Une ligne « ✘ » dit une photo non mesurée (code 1).
+
+**Relevé du 20 octobre 2026** (Lightroom Classic 15.6, `--eclairage` sur les 8 copies « Essai », à
+leur propre balance ; la borne était alors absolue, C* < N autour du gris ; seuil mixte 8).
+Vérité à l'œil : 53709912 (portrait dans une salle d'exposition : jour des fenêtres et éclairage
+chaud) mixte ; 53709628 (intérieur, lampe), 53709579 (statue en plein jour), 53709786 (dune) et
+53709534 (ciel) à une seule lumière ; 53709833 (groupe, intérieur, mur jaune) à une seule lumière
+probable ; 53709724 (fête foraine de nuit) et 53709677 (scène) cas limites (lumières colorées).
+Écart entre régions, « mixte » à 8 et plus :
+
+| copie | C* < 12 | 15 | 20 | 25 | 30 |
+| --- | --- | --- | --- | --- | --- |
+| 53709912 | 9,8 mixte | 11,6 mixte | 9,3 mixte | 9,4 mixte | 9,4 mixte |
+| 53709833 | 5,7 | 6,7 | 10,2 mixte | 11,0 mixte | 11,1 mixte |
+| 53709786 | 2,2 | 2,9 | 3,4 | 3,4 | 3,4 |
+| 53709724 | 5,7 | 8,0 mixte | 10,7 mixte | 11,5 mixte | 12,0 mixte |
+| 53709628 | 7,1 | 12,6 mixte | 13,5 mixte | 13,8 mixte | 13,7 mixte |
+| 53709534 | 5,5 | 5,7 | 6,5 | 9,0 mixte | 9,0 mixte |
+| 53709579 | 4,8 | 12,5 mixte | 14,5 mixte | 14,1 mixte | 12,6 mixte |
+| 53709677 | 5,5 (4 cases sur 9) | 4,9 | 9,5 mixte | 14,6 mixte | 17,7 mixte |
+
+C* < 12 est la seule borne qui suit l'œil : seul le portrait ressort ; à 15 et au-delà, des objets
+colorés pris pour des gris (ciel bleu, bouteille orange, plante, mur jaune) font de faux mixtes.
+`chromaMax` (12) et `seuilMixte` (8) sont relevés là ; la mesure prenait 85 à 107 ms (version de
+débogage). Sous une autre balance, la borne absolue ne tenait pas : à 3 200 K, le portrait n'avait
+plus aucune case lue (0 sur 9), la dune 2 et la statue 0 ; à +30 en relatif, l'intérieur HEIC 0 ;
+à 6 500 K, proche de la balance du portrait, le résultat tenait (9,7 contre 9,8). Une dominante
+globale poussait tous les gris hors de la borne : d'où le centre au point neutre de l'image.
+
+**Le centre et sa tolérance** (`toleranceNeutre`, provisoire), mesurés le 21 octobre 2026 hors de
+Lightroom, sur cinq aperçus du relevé lus comme fichiers (53709912, 53709628, 53709724, 53709833,
+53709579) : à la balance de la photo, le point neutre est à 3 à 11,2 du gris ; centré sur lui sans
+tolérance, le portrait perdait son éclairage mixte (9,9 → 4,8) et l'intérieur à la lampe en gagnait
+un (7,3 → 9,4) ; avec 10, les écarts du relevé restent à 0,1 près, et sous sept dominantes simulées
+(gains en lumière linéaire), 38 lectures sur 40 gardent au moins 7 cases sur 9 (30 sur 40 autour du
+gris seul). Aucun autre centre essayé (gris seul, point neutre sans tolérance, milieu des quartiles
+ou des déciles, avec ou sans tolérance) ne tient mieux à la fois la balance de la photo et les
+dominantes. Le critère d'un écart qui varie de moins de 25 % sous une autre balance n'est pas
+atteint, quel que soit le centre : l'écart a*b* lui-même varie sous un gain en lumière linéaire,
+même sur les mêmes pixels (portrait : 9,9 → 13,5 ou 3,2).
+
+**Relevé du 21 octobre 2026** dans Lightroom Classic 15.6 (`--eclairage`, et `--essai` à 3 200 et
+6 500 K pour les RAW, ±30 en relatif pour le JPEG et le HEIC ; borne 12 autour du centre, tolérance
+10, seuil mixte 8) :
+
+- à la balance de la photo : seul 53709912 est mixte (9,7 ; écart tonal 10,0), les 7 autres sous 8
+  (2,1 à 7,1) ; 9 cases lues sur 9 partout, sauf la scène 53709677 (6 sur 9) : la vérité à l'œil
+  est tenue ;
+- à 6 500 K : 53709912 reste mixte (10,1), les autres RAW à une seule lumière ; 53709677 n'a plus
+  qu'une case lue (forte dominante chaude sur une scène aux lumières colorées) ;
+- à 3 200 K : 6 à 9 cases lues sur 9 (0 à 4 avant le centre au point neutre), mais 53709912 n'est
+  plus mixte (4,6) ;
+- ±30 en relatif : 53709534 (JPEG) reste à une seule lumière ; 53709628 (HEIC, intérieur à la
+  lampe) aussi à −30, mais se lit mixte à +30 (11,4), sous la forte dominante chaude ajoutée.
+
+La mesure prend 85 à 110 ms par photo (version de débogage). Elle suit donc l'œil à la balance de
+la photo et sous une balance raisonnable ; sous une dominante forcée extrême, elle peut perdre une
+lumière (le portrait à 3 200 K) ou en inventer une (l'intérieur à +30). La recette du même jour
+(`--mixte 53709912`, par `view_photo`) le redit : éclairage mixte, écart 9,7, 9 cases lues sur 9,
+visages dans les deux lumières, balance proposée Temperature 5558, Tint 15, mesure en 155 ms.
+Limite connue (commentaire de `toleranceNeutre`) : une dominante qui rapproche du gris la lumière
+majoritaire laisse le point neutre près du gris, et l'autre lumière sort de la borne. Le conseil le
+dit déjà : « à confirmer à l'œil ». Seul le portrait est mixte parmi les copies d'essai : le seuil
+repose sur lui. `toleranceNeutre`, `seuilTonal`, `partMinGroupe` et `pixelsMinPeau` restent
+provisoires.
+
+## Bilan d'une passe à l'autre (1.2)
+
+`Bilan.swift` (fonctions pures) chiffre ce qui a bougé entre deux aperçus d'une même photo
+(exposition en IL, contraste, écrêtage, dominante, saturation, netteté, bruit), « avant → après »,
+puis ce qui demande l'attention : une `regression` (un défaut apparu ou aggravé depuis) ou un
+changement `a_verifier` (peut-être voulu). Il fait la clé `bilan` de `view_photo` (aperçu entier, et
+avant/après avec `compare`), `bilan_zone` d'un zoom refait sur la même zone, et le `bilan` d'une
+proposition avec `compare`.
+
+**Ce qui est gardé** (`ToolHandler`, pour la vie du processus du serveur, comme `dernierTri` ; les
+appels passent un à un par `FileOutils`, sans verrou) : `vuesMesurees`, rangé par `Bilan.Cle`
+(photo et taille d'aperçu demandée), le premier `view_photo` de la session sur l'aperçu entier
+(`depart`) et le dernier (`precedente`) : mesures, détail, tons neutres choisis
+(`Measurements.neutres`, avec leur masque), empreintes du cadre et de l'état, étapes de Claude,
+calcul IA en attente (`a_savoir`), empreinte de `corrections_utilisateur`, `GrainAmount` ; 30 au
+plus (`Bilan.photosGardees`, la plus ancienne part). `zoomsMesures` : 6 zooms par photo
+(`zoomsGardes`), 30 photos au plus. Un autre fichier sous le même identifiant (un autre catalogue)
+repart de zéro. La vue se construit sur la réponse brute du module (`Bilan.Vue(apercu:…)`), avant le
+retrait de la géométrie et le regroupement des réglages, et avant le carré du point de mise au
+point. La mémoire est celle du processus : chaque `--call` est un nouveau processus, et son
+`view_photo` est toujours le premier (« Premier view_photo de cette photo dans cette session »).
+
+**Empreintes.** `Bilan.cadre` : la géométrie de la photo (dimensions affichées, orientation, cadre),
+l'angle de recadrage, et les réglages qui déforment (`Perspective*`, `LensProfileEnable`,
+`LensProfileDistortionScale`, `LensManualDistortionAmount`). `Bilan.etat` : les réglages, le profil
+et son intensité (ni masques ni taches, que les étapes disent). Les étapes viennent du module
+(`etapes_claude` de `apercu` avec `point_af` : `nombre` et `derniere`, lus dans `etapesClaude`) :
+nil avec un module d'avant la 1.2. Le serveur les retire de la réponse à Claude : le bilan les dit.
+
+**Ne se comparent que des mesures prises de même** : deux vues de même taille d'aperçu (une autre
+taille repart de zéro et le dit : « Premier view_photo de cette photo à N px… le bilan ne compare
+que des aperçus de même taille ») ; les tons neutres suivis (la dominante sur les mêmes pixels : le
+masque de la vue d'avant appliqué à la nouvelle, comme pour `match_series`) qu'à cadre égal ;
+netteté et bruit qu'à taille et cadre égaux. Les deux images d'un avant/après (`view_photo` avec
+`compare`) se comparent entre elles, sans toucher aux vues gardées ; une proposition
+(`preview_settings`, ou `add_mask` et `retouch_spots` avec `preview`, et `compare`) à l'état actuel
+rendu par la même commande, jamais à une vue gardée, et sans netteté ni bruit (une proposition n'en
+a pas) ; une proposition sans `compare` n'a pas de bilan. Un zoom ne touche pas aux vues entières.
+
+**Écarts** (`ecarts`, chacun `avant`, `apres`, `ecart`), listés au-dessus de leur seuil de
+visibilité, sinon nommés dans `sans_ecart_visible` :
+
+- `exposition` (L* médiane, et `IL` d'après le rapport des luminances médianes,
+  `Measurements.ecartIL`) : 0,1 IL (`ToolHandler.seuilExposition`, repris de `match_series`) ;
+- `contraste` (p95 − p5, avec `p5` et `p95`) : 4 (`seuilContraste`) ;
+- `hautes_lumieres_pct`, `blanc_pur_pct`, `ombres_bouchees_pct`, `canal_ecrete` (le canal qui bouge
+  le plus) : 0,3 point (`Bilan.ecartEcretage`) ;
+- `dominante_a`, `dominante_b` (avec `suivie`) : 1,5 (`seuilDominante`) ; pas comparées sous 3 % de
+  tons neutres (une remarque le dit) ;
+- `chroma_moyenne` : 3 (`Measurements.seuilChroma`) ; `tres_saturee_pct` : 1 point
+  (`ecartSaturee`) ;
+- `nettete_max` (avec sa lecture : floue, douce, nette) : 10 % de l'avant (`ecartNettetePct`) ;
+  `bruit` (le plus fort des aplats et des ombres, avec sa lecture : faible, visible, fort) : 0,1
+  (`ecartBruit`).
+
+**Régressions** (`regression`, un texte par défaut, rangés par genre, `Bilan.Defaut`) :
+
+- hautes lumières écrêtées, canal écrêté (« couleur poussée hors du sRGB ou brûlée »), couleurs
+  très saturées (C* > 60) : au moins 2 points de plus et au moins 1,5 fois l'avant
+  (`regressionEcretage`, `regressionCanal`, `regressionSaturees`) ; le canal n'est pas redit sous
+  une régression de l'écrêtage ;
+- ombres bouchées : au moins 2 points de plus (`regressionOmbres`) ; une nuit n'alerte pas d'elle-
+  même, le seuil porte sur l'écart ;
+- « dominante accentuée sur (les mêmes) tons neutres » : |a*| ou |b*| qui s'éloigne de 0 d'au
+  moins 2 (`regressionDominante`) ; elle n'est pas redite en « correction dépassée » ;
+- netteté passée de nette à douce, ou de douce à floue (seuils 35 et 15), avec une baisse d'au
+  moins 3 (`baisseNetteteMin`) ; bruit passé de faible à visible, ou de visible à fort (0,6 et 1,5),
+  avec une hausse d'au moins 0,1 (`hausseBruitMin`).
+
+Une marge d'arrondi (1e-9) évite qu'un écart pile au seuil le rate (en binaire, 2,4 − 0,4 vaut
+1,999…).
+
+**À vérifier** (`a_verifier`), plutôt qu'une régression :
+
+- une dominante qui change de sens, nette des deux côtés (2 au moins, `dominanteLegere`) :
+  « correction dépassée ? » ;
+- cadre changé, et un blanc pur qui explique au moins 80 % de la hausse de l'écrêtage
+  (`partBlancPurCoins`) : « coins vides possibles (Upright, perspective) » ;
+- netteté en baisse avec un bruit en baisse d'au moins 30 % (`baisseBruitDebruitage`) : le
+  débruitage retire aussi du grain que la mesure comptait comme détail ; juger par un zoom ;
+- bruit en hausse avec un grain ajouté (`GrainAmount` en hausse) : voulu ?
+- toute régression qui suit une annulation (`etapes_claude` en baisse : « revenu après
+  l'annulation : … ») ou un rendu aux calculs IA en attente (« calcul IA en attente sur l'un des
+  rendus : … ») ;
+- un aller-retour d'une passe à l'autre (exposition, contraste, dominante b*, deux écarts visibles
+  de signes opposés : « des réglages empilés font dériver la photo »), sauf après une annulation,
+  qui défait la passe d'avant à dessein. La dominante b* se lit sur les tons suivis quand le cadre
+  n'a pas changé depuis le départ : l'écart de la passe précédente est alors l'écart depuis le
+  départ moins celui depuis la précédente.
+
+**Le reste du bilan d'une vue** : `depuis` (« le view_photo précédent de cette photo à N px, il y a
+… ») ; `etapes_claude` (« 1 de plus (dernière : « … ») », « 1 de moins : retouche défaite (undo_last
+ou revert_to_original) », « nouvelles » quand l'historique de 20 étapes est plein, « aucune
+nouvelle ») ; `corrections_utilisateur` (« l'utilisateur a aussi retouché à la main : un écart peut
+venir de lui »), seulement si ces corrections sont nouvelles ou ont changé depuis la vue précédente
+(le module les redonne à chaque aperçu jusqu'à la commande suivante de Claude) ; `meme_etat`, seul
+avec `depuis`, les étapes et les corrections, quand l'état, le cadre et les étapes sont identiques
+et que rien n'est listé ; `depuis_le_debut` (les écarts depuis le premier `view_photo` de la session
+à cette taille, et ses régressions qui ne sont pas déjà dites, par genre : une dérive lente, faite
+de petites passes) ; `remarques` (taille différente, cadre changé, image changée sans réglage :
+masque, tache, retouche à la main ou calcul IA fini) ; `conseil`, seulement avec une régression
+(« se corrige par une passe ciblée sur ce seul défaut, ou se défait par undo_last si la dernière
+étape en est la cause ; la dire à l'utilisateur si elle reste ») ; `base`. Le premier `view_photo`
+d'une photo ne donne que « point de départ du bilan des suivants ».
+
+**Avant/après et propositions** (`Bilan.avantApres`) : la même forme, sans étapes ni aller-retour ;
+tons neutres non suivis (l'image d'avant peut avoir un autre cadre) ; `cadreChange` quand les deux
+images n'ont pas les mêmes dimensions (recadrage, Upright, rotation) : ni netteté ni bruit, une
+remarque le dit, et un blanc pur en hausse est à vérifier. `conseil` d'un avant/après : « Une
+« regression » restée se dit dans le résumé. » ; d'une proposition : « Une « regression » se corrige
+dans la proposition avant de l'appliquer. »
+
+**Zoom refait sur la même zone** (`bilan_zone`) : la même zone à 0,002 près (`toleranceZone`), du
+même cadre, aux mêmes pixels, comparée au dernier zoom de cette zone : les chiffres bruts
+(luminosité, écrêtage, netteté et bruit avec leur écart en %, utile après un débruitage), sans
+alerte : les seuils de lecture ne valent pas à 100 %.
+
+**Résultat gardé par `FileOutils`** : une vue répondue après la limite de 50 s, puis redemandée aux
+mêmes arguments, n'est mesurée et gardée qu'une fois.
+
+**Constaté le 20 octobre 2026** (Lightroom Classic 15.6, les 8 copies « Essai », propositions et
+lectures seulement) :
+
+- plancher : deux `view_photo` de suite à 1 344 px donnent les mêmes 43 mesures (écart 0) : toute
+  différence entre deux vues de même taille est réelle. Le même état à 1 024, 1 344 et 2 048 px
+  (53709786) : L* jusqu'à 0,4 ; tons neutres, b* 0,2 et part 2,1 points ; bruit des ombres 0,27 ;
+  netteté jusqu'à 10 % (50,1, 44,9 et 45,6) : d'où la mémoire par taille d'aperçu ;
+- proposition contre vue : `preview_settings` sans changement (relatif, Exposure2012 + 0) contre
+  `view_photo`, même taille : L* médiane +0,2, p95 +0,3, hautes lumières +0,2 à +0,9 point
+  (53709677 : 1,8 → 2,7), ombres bouchées +0,3, a* +0,2, b* −0,2 : d'où « jamais une proposition à
+  une vue gardée ». Une part de cet écart venait du serveur (deux chemins de mesure, unifiés depuis :
+  voir Mesures) ; le reste est à remesurer ;
+- seuils de régression, en propositions, par rapport à une vue (le plancher ci-dessus à retrancher) :
+  hautes lumières, Exposure +0,3 : +0,3, +0,3 et +2,5 points ; +0,7 : +0,5 et +10 ; +1,5 : +1, +3,6
+  et +19,4 ; Whites +30 : +0,6 et +3,5 ; Whites +60 : +46,9, +7,5 et +11,5 ; le canal le plus écrêté
+  suit les hautes lumières. Ombres bouchées : Blacks −30 sur la nuit 53709724, 0,7 → 12,5 ; −60,
+  24,1 ; Contrast +40, 0,7 → 3,9 ; Blacks −60 sur 53709628, 0 → 1,6. Très saturées : Saturation +30,
+  3 → 5,9 et 1,2 → 2,4 ; Vibrance +40, 3 → 4,2 et 1,2 → 1,7. Dominante : Tint ±15 sur le portrait,
+  a* +3,1 et −2,9 ; Temperature ±600 K, a* +1 et −1,6, b* −0,4 et −3,1 (sur le HEIC 53709628, la
+  Temperature est relative : lignes écartées). Médiane L* : Exposure +0,3 donne +6 à +7, un
+  changement voulu, chiffré sans alerte. D'où 2 points et 1,5 fois l'avant (écrêtage, canal,
+  saturées), 2 points (ombres), 2 (dominante) : relevés en propositions, provisoires comme le dit
+  le relevé, à revoir d'une vue à l'autre.
+
+Le 21 octobre 2026, l'étape « bilan chiffré » de la recette (53709912, deux vues de 1 024 px) :
+deux vues de suite en `meme_etat`, sans `corrections_utilisateur` ; la vue qui suit une proposition
+sans `compare` ne la compare pas ; après Exposure +2 IL et Whites +50 écrits, +2,45 IL, les
+régressions « hautes lumières écrêtées : 0,0 → 6,5 % (+6,4 points) » et « bruit passé de visible à
+fort : 0,70 → 1,65 (seuil 1,5) », « 1 de plus » ; après `undo_last`, « 1 de moins », sans
+`regression` (voir Recette dans Lightroom). Les étapes de Claude lues par le module, et
+l'empreinte des retouches à la main, tiennent donc dans Lightroom.
+
+Netteté et bruit ne se mesurent pas en proposition : leurs seuils (`baisseNetteteMin`,
+`hausseBruitMin`, `baisseBruitDebruitage`, `ecartNettetePct`, `ecartBruit`), `partBlancPurCoins`
+et `toleranceZone` restent provisoires, à relever par deux vues (avant et après une étape écrite
+puis défaite : l'étape « bilan chiffré » de la recette, dont une seule passe forte, +2 IL, ne fixe
+pas encore ces seuils). `ecartEcretage` (0,3 point) et `ecartSaturee` (1 point) sont au-dessus du
+plancher nul de deux vues de même taille, mais leur valeur reste provisoire elle aussi.
+
+## Écran (1.2)
+
+Claude mesure la photo par ses chiffres, sans passer par l'écran ; l'utilisateur la juge sur le
+sien. `Ecran.swift` dit quel est cet écran et si son profil de couleur vient d'une sonde
+d'étalonnage. Serveur seulement : macOS seul connaît l'écran, et la fenêtre Claude le demande au
+connecteur (voir Fenêtre Claude › Voyants et liaison).
+
+**Lecture** (`Ecran.lire`), par CoreGraphics et ColorSync, sans AppKit et sans aucune permission
+(environ 44 ms, relevé le 20 octobre 2026) : `CGGetActiveDisplayList` (copies miroir écartées),
+`CGMainDisplayID` (l'écran de la barre des menus d'abord, `principal`, puis les `autres`), le nom
+que ColorSync donne à l'écran (`ColorSyncDeviceCopyDeviceInfo`), le profil actif
+(`ColorSyncProfileCreateWithDisplayID`, son fichier par `ColorSyncProfileGetURL`), les profils
+d'usine et personnalisés de l'écran (`FactoryProfiles`, `CustomProfiles`). L'en-tête ICC se lit
+dans les octets du profil, en gros-boutiste (CMM aux octets 4 à 7, date de 24 à 29, « acsp » de 36
+à 39, créateur de 80 à 83 ; un profil de moins de 132 octets ou sans « acsp » n'est pas lu), jamais
+par `ColorSyncProfileCopyHeader`. Origine (`Ecran.origine`) : usine si le profil est l'un des
+profils d'usine de l'écran, ou rangé sous `/Library/ColorSync/Profiles/Displays/` ; personnalisé
+s'il est l'un de ses `CustomProfiles` ; inconnue sinon.
+
+**Classes** (`Ecran.Etalonnage`, `Ecran.classer`, dans cet ordre) : `usine` (origine usine : jamais
+mesuré) ; `standard` (un profil du système, sous `/System/`) ; `sonde` (un logiciel de sonde nommé
+dans le profil, `Ecran.logicielsDeSonde` : DisplayCAL, ArgyllCMS, i1Profiler, Calibrite, X-Rite,
+ColorMunki, Datacolor Spyder, basICColor, ColorNavigator, Palette Master, Calibration Studio,
+Calman) ; pour un créateur Apple, `oeil` avec la balise `vcgt` (l'assistant d'étalonnage d'Apple),
+`standard` sans elle ; `sonde` encore pour `vcgt` d'un autre créateur ; `personnalise` pour le
+reste ; `inconnu` sans profil lisible. `mesure` vaut vrai pour `sonde` seulement, faux pour
+`usine`, `standard` et `oeil`, null pour `personnalise` et `inconnu` : dans le doute, « étalonné ? »
+plutôt qu'« étalonné ». La balise `meas` n'est pas un indice.
+
+**JSON** (`Ecran.json`) : `principal` et `autres`, chacun `nom`, `integre`, `gamut_large`, `profil`
+(son nom, ou null), `etalonnage`, `mesure` (vrai, faux ou null), `date_profil` (AAAA-MM-JJ, jamais
+pour un profil d'usine), `logiciel`, `texte` (« Odyssey G85SD · profil d'usine, non mesuré sur ce
+Mac ») ; avec `detail` (fenêtre Claude et `--ecran` seulement), le chemin de chaque profil et le
+texte de la boîte « Claude · écran » (`Ecran.detail` : l'écran, son profil, et pour juger les
+couleurs, une sonde et « coupez Night Shift (et True Tone sur un écran Apple) » ; les Réglages
+nommés comme le Mac les nomme, `Ecran.reglageProfil` : « Réglages système › Écrans › Profil de
+couleur » en fr-CA, « Réglages Système › Moniteurs › Profil de couleur » sinon). Le chemin d'un
+profil ne va jamais à Claude (il peut nommer le dossier personnel).
+
+**Au connecteur** : `get_status` ajoute `ecran` (sans chemin ni détail), et sa description dit
+quoi en faire. `ToolHandler.lireEcran` ne lit aucun écran par défaut (les tests) ; `main.swift` pose
+`Ecran.lire` pour le serveur et `--call`. La remarque de l'écran (`Ecran.remarque`, nil pour un écran
+mesuré par une sonde : « Écran principal de l'utilisateur : …, … Les mesures de view_photo n'en
+dépendent pas, son œil si : quand son avis compte (peau, couleurs), lui dire en une phrase que son
+écran n'est pas étalonné », ou « lui demander si son écran est étalonné » pour `mesure` inconnue)
+part une fois par processus du serveur, au premier `view_photo`, `preview_settings` ou
+`compare_variants` réussi, dans un bloc de texte à part (le JSON du résultat reste lisible tel
+quel) ; rien si `get_status` a déjà dit l'écran. C'est elle qui porte la consigne : les consignes
+du connecteur n'ont plus de place. `mcp-developpeur --ecran` écrit une ligne JSON
+(`Ecran.json(…, detail: true)`), ou `{"lu": false}` sans écran, avec le code 0 : la fenêtre ne lit
+que cela. `mcp-developpeur --status` dit l'écran principal et les autres (ou « aucun écran lu »)
+avant la liaison.
+
+**Constaté le 20 octobre 2026** (Mac de Dany, macOS 27, un seul écran, Odyssey G85SD en HDMI) :
+`ColorSyncProfileCopyHeader` rend les signatures de l'en-tête à l'envers (« lppa » pour
+« appl ») ; le profil d'usine de l'écran, tiré de son EDID, est rangé dans
+`/Library/ColorSync/Profiles/Displays/` (créateur « appl », sans balise `vcgt`) et refait par macOS
+à chaque branchement (la date de son en-tête est celle du branchement : elle n'est jamais dite) ;
+`FactoryProfiles` est un dictionnaire de dictionnaires portant chacun `DeviceProfileURL` (des NSURL),
+plus `DeviceDefaultProfileID`, un texte ; un mode peut viser un profil du système (« HDMI SD » :
+`/System/Library/CoreServices/Resources/Profiles/SD 170M-A.icc`) et rester usine ;
+`sRGB Profile.icc` du système porte une balise `meas`. L'écran se lit « Odyssey G85SD · profil
+d'usine, non mesuré sur ce Mac », classe `usine`. Les libellés des Réglages sont relevés dans
+`DisplaysExt.appex` et Réglages Système (le Mac de Dany est en fr-CA). Aucun vrai profil de sonde
+n'a été relevé : l'indice reste la balise `vcgt` d'un autre créateur qu'Apple, ou le nom d'un
+logiciel. Le 21 octobre 2026, l'étape « écran nommé (get_status) » de la recette (dans le processus
+de la recette, pas lancé par Lightroom) dit la même chose, sans chemin de profil ; `--ecran` lancé
+par Lightroom pour le voyant reste à voir.
+
+**Tests.** `EcranTests` fabrique ses profils (en-tête lu dans les octets, `meas`, `vcgt` avec un
+autre créateur, texte de DisplayCAL, `vcgt` d'Apple, textes UTF-16) et vérifie `get_status` et la
+remarque une fois ; `swift test` ne lit jamais le vrai écran : `testLectureReelleSansPlantage` est
+sauté sauf avec `DEVELOPPEUR_ECRAN_REEL=1`. Les essais de la fenêtre passent par un faux connecteur
+(`S.home/connecteur-ecran`) et un faux connecteur d'avant la 1.2.
 
 ## Flou d'objectif et traitements calculés : relevé du catalogue
 
@@ -2071,8 +2871,10 @@ Une vignette illisible ou de moins de 900 px est remplacée par un aperçu expor
 Une vignette peut dater d'avant la dernière retouche (le cache de Lightroom) : le tri le dit.
 
 **Point de mise au point.** ImageIO ne donne pas la MakerNote de Fujifilm (constaté sous macOS 26
-sur un RAF de X-H2S) : le serveur la lit lui-même (`PointAF.swift`), en lecture seule, comme le
-module Focus Points la lit par exiftool. RAF : « FUJIFILMCCD-RAW », position du JPEG incorporé à
+sur un RAF de X-H2S) : le serveur la lit lui-même, en lecture seule, comme le module Focus Points
+la lit par exiftool (`PointAF.swift` jusqu'à la 1.1.1 ; depuis la 1.2, `LectureBoitier` de
+`Boitier.swift`, qui lit aussi l'intention de la prise de vue d'une même ouverture : voir Lecture
+du boîtier). RAF : « FUJIFILMCCD-RAW », position du JPEG incorporé à
 l'octet 84 (grand-boutiste) ; son Exif porte les dimensions de ce JPEG (`ExifImageWidth`,
 `ExifImageHeight`) et la MakerNote (0x927C) : « FUJIFILM », position de l'IFD, entrées
 petit-boutistes repérées depuis le début de la MakerNote ; `FocusPixel` (0x1023, x y dans le repère
@@ -2088,7 +2890,7 @@ Desktop est resté à « 0 sur 130 » ; échantillonné, le serveur attendait da
 macOS demandait à l'utilisateur d'autoriser l'accès au volume pour le processus lancé par Claude
 Desktop (fenêtre UserNotificationCenter), et `open()` attendait la réponse, avec toute la file des
 outils derrière lui. Depuis, l'original n'est ouvert que pour un fichier Fujifilm (`marque` de la
-vignette, ou `.RAF`), et la lecture est bornée à 2 s (`LecteurPointsAF`) : un original qui ne s'ouvre
+vignette, ou `.RAF`), et la lecture est bornée à 2 s (`LecteurBoitier`) : un original qui ne s'ouvre
 pas est sauté, et les suivants aussi tant que sa lecture n'a pas fini (un seul fil bloqué à la
 fois), et le bilan le dit (`points_af`). Depuis la 1.1.1, quand la lecture bloquée finit
 (l'utilisateur a répondu), elle débloque le lecteur et les lectures reprennent (avant, il restait
@@ -2115,8 +2917,12 @@ du petit côté (16 px au moins), un liseré sombre autour pour rester visible s
 est dessiné avec le paramètre `af_point = true` (pour noter : consignes de la fenêtre) ou quand
 la case « Mise au point » du Gestionnaire est cochée (`pointMiseAuPoint`, décochée par défaut).
 Mesures et Vision sont prises avant le carré. `view_photo` a un seul lecteur
-(`ToolHandler.lecteurAF`) : une lecture bloquée n'en lance pas d'autres. Un point hors du cadre
-(recadrage) n'est pas donné.
+(`ToolHandler.lecteurBoitier`) : une lecture bloquée n'en lance pas d'autres. Un point hors du
+cadre (recadrage) n'est pas donné. Depuis la 1.2, une seule ouverture de l'original sert au point
+et à l'intention (`intention_boitier`, aperçu entier seulement), aucune pour un avant/après ;
+`view_photo` ouvre l'original d'un fichier Fujifilm même sans géométrie, puisque l'intention n'en a
+pas besoin (le module envoie toujours la géométrie avec `point_af = true`), alors que le tri, sans
+géométrie, ne l'ouvre pas.
 
 **Sur un zoom** (après la 1.1.1, demandé par Dany le 20 octobre 2026 : un zoom pour voir la mise
 au point ne la montrait pas). Le même point, lu de même, est ramené dans la zone demandée
@@ -2135,7 +2941,7 @@ voir Claude Code), et la description de `af_point` aussi (« sur l'image ou le z
 '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` (`PointAF.marquer`, `main.swift`), lancé par la
 fenêtre (`Images.marquerMiseAuPoint`, voir Fenêtre Claude › Disposition) pour un fichier Fujifilm
 seulement : `geometrie` est celle de `Vignettes.decrireVignette` (dimensions affichées,
-orientation, cadre) ; le connecteur lit le point en temps borné (`LecteurPointsAF`, 2 s), le passe
+orientation, cadre) ; le connecteur lit le point en temps borné (`LecteurBoitier`, 2 s), le passe
 dans l'image affichée et recadrée (`GeometriePhoto.versApercu`), dessine le carré sur la vignette
 (`PreviewImages.marquerPoint`, vert ou rouge) et l'écrit dans `<sortie.jpg>`, puis écrit sur sa
 sortie une ligne JSON (`x`, `y`, `avertissement`). Code 1 sans point (pas un fichier Fujifilm,
@@ -2220,6 +3026,114 @@ suivante d'une sélection, d'une collection ou d'un dossier, et les numéros con
 à l'autre (`offset` + 1 ; depuis 1 avec `photo_ids`) ; `suite` dit combien il en reste. Constaté
 (1.9, douze au plus) : les sept photos de la collection de recette en 1,2 s.
 
+## Lecture du boîtier (1.2)
+
+Ce que l'appareil a rangé dans un fichier Fujifilm (RAF, ou JPEG de l'appareil) se lit d'une seule
+ouverture de l'original (`Boitier.swift`) : le point de mise au point (`PointAF`, voir Tri d'une
+séance) et l'intention de la prise de vue (`IntentionBoitier.swift`), les réglages choisis sur
+l'appareil. Rien n'est posé d'office : `view_photo` les donne à Claude, avec ce qu'il en tire.
+
+**Lecture** (`LectureBoitier.lire`, en lecture seule) : un RAF (en-tête « FUJIFILMCCD-RAW », position
+du JPEG incorporé à l'octet 84, grand-boutiste) ou un JPEG (FF D8), dont 128 Ko sont lus
+(`tailleLue`) ; le segment APP1 « Exif », IFD0, l'IFD Exif (0x8769), la MakerNote (0x927C) qui
+commence par « FUJIFILM », puis l'IFD de Fujifilm (petit-boutiste, positions depuis le début de la
+MakerNote). Le point et l'intention se lisent l'un sans l'autre : un point (0, 0) n'empêche plus de
+lire l'intention, et une MakerNote coupée rend encore ce que l'Exif donne (compensation, mode). Un
+HEIF de l'appareil (ni RAF ni FF D8) n'est pas lu. La lecture TIFF (`LectureBoitier.Tiff`) connaît
+la taille des douze types ; `entiers` lit sans signe (le motif des bits), `signes` relit en signé
+selon la largeur, `signe32` lit 4 octets en int32s comme exiftool, quel que soit le type rangé
+(sans lui, ShadowTone −16 rangé en LONG se lirait 4294967280) ; `rationnel` lit un RATIONAL ou un
+SRATIONAL, signé à la demande (comme exiftool pour la compensation). Un réglage d'un type inattendu
+(texte, octets indéfinis : `IntentionBoitier.entier` ne lit que les types 1, 3, 4, 6, 8 et 9) ou
+hors de ce que l'appareil peut ranger est ignoré, sans planter.
+
+**Lecteur borné** (`LecteurBoitier`, qui remplace `LecteurPointsAF` depuis la 1.2, même délai de
+2 s) :
+un original qui ne s'ouvre pas à temps est sauté, et les suivants aussi tant que sa lecture n'a pas
+fini (une demande d'autorisation de macOS pour le volume, constaté en 2.3 : voir Tri d'une séance) ;
+quand elle finit, la lecture reprend. Fujifilm seulement (`marque`, ou un `.RAF`) : l'original
+d'une autre marque n'est pas ouvert. `view_photo` a son lecteur (`ToolHandler.lecteurBoitier`),
+`cull_photos` le sien par série, `--marquer-af` et `--boitier` le leur.
+
+**Tags lus** (noms et valeurs d'ExifTool, `Image/ExifTool/FujiFilm.pm`) :
+
+| Tag | Nom | Lu comme |
+| --- | --- | --- |
+| 0x1401 | FilmMode | la simulation en couleur : 0x000 PROVIA/Standard, 0x120 ASTIA/Soft, 0x200 et 0x400 Velvia/Vivid, 0x500 PRO Neg. Std, 0x501 PRO Neg. Hi, 0x600 CLASSIC CHROME, 0x700 ETERNA/Cinema, 0x800 CLASSIC Neg., 0x900 ETERNA Bleach Bypass, 0xa00 NOSTALGIC Neg., 0xb00 REALA ACE ; Studio Portrait des anciens compacts (0x100, 0x110, 0x130, 0x300), sans profil |
+| 0x1003 | Saturation | le réglage Couleur d'une simulation en couleur (−4 à +4 ; 0x8000 : celui de la simulation), ou la simulation noir et blanc : MONOCHROME (0x300, filtres rouge, jaune, vert 0x301 à 0x303), Sépia (0x310), ACROS (0x500, filtres 0x501 à 0x503), qui l'emporte sur FilmMode |
+| 0x1402 | DynamicRangeSetting | 0 auto (plage dans 0x140b), 1 réglée (dans 0x1403) ; 0x100, 0x200, 0x201 : DR100, 230 et 400 des anciens boîtiers ; hors de DR100 à DR800, ignorée |
+| 0x1403 | DevelopmentDynamicRange | la plage réglée (100, 200, 400) |
+| 0x140b | AutoDynamicRange | la plage choisie en auto |
+| 0x1443 à 0x1445 | DRangePriority, DRangePriorityAuto, DRangePriorityFixed | priorité à la plage dynamique : 0 auto, 1 fixe ; en auto, 1 faible, 2 forte, 3 plus ; fixe, 1 faible, 2 forte ; retenue seulement si son niveau est lu |
+| 0x1041, 0x1040 | HighlightTone, ShadowTone | tons clairs et foncés, en int32s : cran = −valeur/16, de −2 (plus doux) à +4 (plus durs), par demi-cran |
+| 0x1002 | WhiteBalance | 0x1 Auto, priorité au blanc ; 0x2 Auto, priorité à l'ambiance |
+| 0x1031 | PictureMode | 0x5, 0x17, 0x18 : modes de nuit choisis (scène de nuit, nuit sur trépied, basse lumière) |
+| 0x1425 | SceneRecognition | 0x300, 0x103 : scène de nuit, portrait de nuit, reconnus par l'appareil |
+| Exif 0x9204 | ExposureCompensation | la compensation en IL, rationnel signé même rangé en RATIONAL, ±10 IL au plus |
+| Exif 0x8822 | ExposureProgram | 1 manuel, 2 programme, 3 priorité à l'ouverture, 4 priorité à la vitesse |
+
+**Profil de Lightroom** (pour un RAW, `IntentionBoitier.profilLightroom`, appelée par
+`ToolHandler.profilDuBoitier` avec la marque et le modèle de l'aperçu) : le profil DCP du catalogue
+(`DevelopCatalogue.profiles`), sauf sur un modèle où Lightroom le rend comme Adobe Standard
+(`missingOn`, modèle comparé sans la casse) ; sinon le profil à base de Look installé pour cet
+appareil (`Camera CLASSIC Neg`, `Camera BLEACH BYPASS`, `Camera NOSTALGIC Neg`, `Camera Sepia`,
+relevés en lecture seule dans le dossier des profils de Lightroom Classic 15.6, Camera/Fujifilm/
+Fujifilm X-H2S ; le X-T4 n'y a pas NOSTALGIC Neg., le X-T20 aucun Look) ; sinon aucun.
+
+**Dans `view_photo`** (`intention_boitier`, sur l'aperçu entier seulement : ni zoom ni avant/après) :
+`simulation`, `profil` (RAW, s'il est trouvé), `couleur` (non nulle), `plage_dynamique`
+(« DR200 (auto) », « DR100 (réglée) »), `priorite_plage_dynamique` (« forte (auto) », « faible »),
+`tons_clairs` et `tons_fonces` (crans non nuls), `compensation` (IL au centième, non nulle), `mode`,
+`balance`, `scene` (« nuit »), et `lecture`, les phrases qui s'appliquent
+(`IntentionBoitier.lecture`) :
+
+- compensation de −2/3 IL et au-delà (`seuilSombreVoulue`, −0,6) : photo voulue plus sombre que
+  la mesure de l'appareil, garder sa luminosité d'ensemble, ne pas remonter Exposure2012 vers une
+  moyenne ; +2/3 et au-delà (`seuilClaireVoulue`, +0,6) : voulue plus claire ; ±1/3 ne dit rien ;
+  en mode manuel sans compensation : sa luminosité est un choix, juger l'intention d'après la
+  scène ;
+- scène de nuit (mode choisi ou reconnu par l'appareil) : une vraie nuit reste sombre ;
+- pour un RAW : le profil actuel est déjà la simulation (le garder, sauf autre style demandé), ou
+  partir du profil de la simulation en première passe, sauf autre style demandé ou guide de style
+  contraire, et le dire ; sans profil pour cet appareil, s'en approcher par les réglages seulement
+  sur demande ; à DR200 et plus, hautes lumières protégées à la prise de vue (RAW exposé de
+  log2(DR/100) IL plus bas) : les tenir, remonter l'exposition en gardant les hautes lumières, les
+  ombres relevées seront plus bruitées ; avec une compensation sombre en plus, « ne rattraper que
+  cette protection » ; tons choisis au boîtier : Lightroom ne les applique pas à un RAW, s'en
+  inspirer sans les imposer ;
+- pour un JPEG de l'appareil : la simulation, la plage dynamique et les tons y sont déjà
+  appliqués, ne pas les refaire ;
+- balance « priorité à l'ambiance » : la chaleur des lampes était voulue ; « priorité au blanc » :
+  un blanc neutre était voulu ;
+- priorité à la plage dynamique : contraste réduit au boîtier, ne pas le rendre d'office.
+
+Le module ne change pas : il donne déjà `chemin_original`, `marque` et `geometrie` avec `point_af`.
+La description de `view_photo`, la première consigne de profil du connecteur et les invites le
+reprennent (voir Consignes et invites) ; un RAW n'en reçoit que la simulation, par le profil, en
+proposition de première passe.
+
+**`mcp-developpeur --boitier <original>`** (`Recette.lectureBoitier`) : la même lecture, sans
+Lightroom (le point dans le fichier entier, `intention_boitier` comme `view_photo` la donne, RAW
+d'après l'extension `.raf`, le modèle non lu : un Look réservé à un modèle n'est pas trouvé), et
+`valeurs_lues` sous les noms et numéros d'exiftool (« FilmMode (0x1401) »…), une ligne JSON ; code 1
+si rien n'est lu. Pour comparer à exiftool, dans le Terminal de Dany (l'accès au volume lui est
+déjà donné).
+
+**Constaté le 20 octobre 2026** (Lightroom Classic 15.6, `view_photo` sur de vrais RAF des copies
+d'essai) : 53709912 (X-H2S, DSCF2402) manuel, PROVIA/Standard, DR100 réglée ; 53709724 (X-H2S)
+priorité à la vitesse, PROVIA, DR100 ; 53709579 (X-T20) programme, PROVIA, DR200 auto, couleur +2,
+tons clairs et foncés +1 ; 53709677 (X-T4) manuel, PROVIA, DR100. Recoupé hors du code du serveur
+(MakerNote lue à la main, Exif par ImageIO) : FilmMode 0 (PROVIA), DynamicRangeSetting 1 et
+DevelopmentDynamicRange 100 (DSCF2402) ; DynamicRangeSetting 0 et AutoDynamicRange 200, Saturation
+0x100 (+2), ShadowTone et HighlightTone −16 rangés en SLONG (type 9) (X-T20) ; ExposureProgram 1 et
+2. Tout concorde ; la MakerNote des trois boîtiers tient dans les 128 Ko lus. Le 21 octobre 2026,
+l'étape « intention lue au boîtier » de la recette, photo inchangée et chemin de l'original absent
+de la réponse : 53709912, PROVIA/Standard, profil Camera PROVIA/Standard, DR100 (réglée), manuel,
+2 phrases de lecture ; 53709579 (X-T20), le même profil, DR200 (auto), couleur +2, tons clairs et
+foncés +1, programme, 3 phrases. Ce qui reste à relever (noir et blanc, priorité à la plage
+dynamique, forme de la compensation, ce que Lightroom fait d'un RAF à DR200 et plus, les seuils de
+±0,6 IL) est dans À constater dans Lightroom (1.2).
+
 ## Notation (`propose_ratings`, `notation`)
 
 Depuis la 1.1. Claude propose des notes selon un standard, critère par critère ; depuis la 1.1.1,
@@ -2232,7 +3146,7 @@ voir Carte Note) ; une photo déjà évaluée ne se renote pas, sauf demande (`v
 20 octobre 2026), quand l'utilisateur lui demande de noter (« note ces photos », « pose les
 notes »), `propose_ratings` avec `apply` pose aussi les notes (voir plus bas). Claude ne propose
 jamais 5 ★ de lui-même ; 5 ★ que l'utilisateur demande passent par `set_metadata`. Ce qui reste à
-voir dans Lightroom : Fenêtre Claude › À constater dans Lightroom (1.1 et 1.1.1).
+voir dans Lightroom : Fenêtre Claude › À constater dans Lightroom (1.1, 1.1.1 et après).
 
 ### Le standard
 
@@ -2562,8 +3476,185 @@ RAW et un JPEG : harmonisation en plan ; avec un RAW et la photo au flash : expo
 prise de vue, en plan. Chaque
 séquence se termine par le retour à l'origine, même après un échec.
 
+Depuis la 1.2 (`Recette.lancer(…, portrait:, mixte:)`) :
+
+- avec le vrai pont seulement (`tools.lightroom as? LightroomBridge` : les tests passent par un faux
+  module, attendent la liste exacte des étapes et ne lisent jamais le vrai écran), d'abord deux
+  étapes en lecture seule. « liaison fermée (jeton privé) » (`sequenceLiaison`) : `get_status` dit
+  `liaison_fermee` (sinon, un module d'avant la 1.2 : rien d'autre essayé) et ne donne ni le jeton
+  ni le chemin de son fichier ; une commande `etat` sans jeton, puis avec un autre jeton bien formé
+  (64 zéros, dans un fichier temporaire effacé ensuite), sont refusées (« Liaison fermée ») ; le
+  jeton de la liaison passe. « écran nommé (get_status) » (`sequenceEcran`) : `ecran.principal` a un
+  nom et une classe connue, sans chemin de profil ; la lecture de l'écran (`Recette.lireEcran`, que
+  `main.swift` pose à `Ecran.lire`) n'est posée dans les outils que le temps de l'étape, pour
+  qu'aucune remarque d'écran ne s'ajoute aux `view_photo` de la recette ;
+- copie d'un RAW : « intention lue au boîtier (view_photo, intention_boitier) » après le profil
+  d'appareil (simulation et lecture exigées pour un fichier Fujifilm, photo inchangée, chemin de
+  l'original absent ; sautée pour une autre marque ; « rien de lu » sans original ou sans
+  ouverture dans les 2 s) ; « bilan chiffré d'une passe à l'autre (view_photo), puis annulé » après
+  l'aperçu et l'analyse (`etapeBilan` : deux vues de 1 024 px en `meme_etat`, une de plus si la
+  première signale un calcul IA en attente ; `corrections_utilisateur` absent entre deux vues
+  identiques ; une proposition sans `compare` n'a pas de bilan, et la vue suivante ne la compare
+  pas ; Exposure +2 IL et Whites +50 écrits en relatif : exposition d'au moins +0,5 IL et « 1 de
+  plus » ; puis `undo_last` : « 1 de moins », sans `regression`, et l'état revenu ; images
+  `recette-bilan-avant.jpg` et `recette-bilan-apres.jpg`) ;
+- à la fin du tri (`sequenceTireur`), deux étapes d'éclaircir et assombrir, en propositions de
+  512 px seulement : l'inversion (un radial inversé, un radial et un linéaire, à −2 IL et fondu 0,
+  comparés à une proposition presque neutre, le même radial à +0,01 IL ; part des pixels assombris,
+  sous 0,8 fois leur luminance d'avant : radial inversé, plus de la moitié dans chaque coin et
+  moins de 5 % au milieu ; sans inversion, l'inverse ; linéaire, le haut seul), puis la forme des
+  bords de `Prompts.Tireur` (rayon 0,7, fondu 80, au milieu de la zone d'intérêt de Vision, à −0,3
+  et −0,5 IL ; baisse lue en part de luminance perdue, et non en niveaux, pour qu'un coin sombre ne
+  passe pas pour un anneau : centre de moins de 2 %, coin le plus loin de 5 % au moins, ni plaque,
+  une seule marche qui fait plus de la moitié de la baisse au coin, `FormeBords.marcheMax`, ni
+  anneau, une fin de profil sous 60 % de son pic, `finMin`) ; les pixels d'avant à 12 niveaux ou
+  moins ne comptent pas ;
+- copie d'un X-T20 (`--x-t20`) : l'intention lue au boîtier, après le point de mise au point ;
+- `--portrait <id>` (`sequencePortrait`, puis `sequencePeau`, sur le visage le plus grand que voit
+  Vision) : « visages vus par Vision (view_photo) » ; « peau : trois doses en propositions, détail
+  des joues mesuré » (Peau du visage lisse, Adoucir la peau (Lite), et Adoucir la peau avec
+  `smoothing_requested` s'il est installé ; la dose la plus forte doit lisser, sinon Lightroom ne
+  reconnaît pas la peau) ; « intensité d'un masque : amount 50 = la moitié de la dose
+  (propositions) », jugée au pixel près (`Recette.ecartMax`, 2 niveaux au plus,
+  `Recette.ecartIdentique`), avec en témoin la dose entière, qui doit s'en distinguer (plus de
+  3 niveaux), sinon il n'y a rien à juger ; « peau trop lissée refusée sans smoothing_requested,
+  rien d'écrit » ; « dose par défaut posée à amount 50, relue, annulée » (`CorrectionAmount` 0,5,
+  `LocalTexture` −0,2, `LocalClarity2012` −0,1, `MaskSubType` 3, `MaskSubCategoryID` 2, calcul de
+  la peau du visage) ;
+- `--mixte <id>` (`sequenceEclairage`, lecture seule, copies d'essai) : « éclairage mixte nommé
+  (view_photo) » (lu mixte, grille et conseil, cases lues, durée de la mesure refaite sur l'aperçu
+  rendu, balance proposée), puis « une seule lumière, en témoin (view_photo) » sur le RAW de la
+  recette, sautée quand `--recette` et `--mixte` désignent la même photo (53709912, le portrait,
+  est la seule copie mixte ; la dune 53709786 convient en témoin).
+
+Les seuils de la recette 1.2 sont à elle et provisoires : `FormeBords` (`centreMax` 2 %, `coinMin`
+5 %, `marcheMax` 0,5, `finMin` 0,6), `Recette.ecartIdentique` (2 niveaux) et le témoin (plus de
+3 niveaux), ceux de l'inversion (plus de la moitié, moins de 5 %).
+
+**Recette de la 1.2, le 21 octobre 2026** (Lightroom Classic 15.6, code de la 1.2 ; RAW 53709912,
+JPEG 53709534, `--x-t20 53709579`, `--portrait 53709912`, `--mixte 53709912`) : réussie, 82 étapes,
+code 0, de 02:19 à 02:25. Pour la 1.2 :
+
+- liaison fermée : sans jeton et avec un autre jeton, refusées, une ligne au journal chacune
+  (« Commande refusée sans jeton (connecteur d'avant la 1.2, ou autre programme) », « Commande
+  refusée : mauvais jeton ») ; le jeton de la liaison passe ;
+- écran nommé (`get_status`, dans le processus de la recette) : « Odyssey G85SD · profil d'usine, non
+  mesuré sur ce Mac » ;
+- intention lue au boîtier : 53709912, PROVIA/Standard, profil Camera PROVIA/Standard, DR100
+  (réglée), manuel, 2 phrases de lecture ; 53709579 (X-T20), PROVIA/Standard, Camera
+  PROVIA/Standard, DR200 (auto), couleur +2, tons clairs et foncés +1, programme, 3 phrases ;
+- bilan chiffré : deux vues de 1 024 px identiques (`meme_etat`), la proposition ignorée ; après
+  Exposure +2 IL et Whites +50, exposition 40,9 → 84,2 (+2,45 IL), contraste 67,6 → 75, hautes
+  lumières 0 → 6,5 %, blanc pur 0 → 1 %, canal rouge écrêté 0 → 6,4 %, netteté 53,4 → 86,6 (nette
+  → nette), bruit 0,70 → 1,65 (visible → fort) ; `regression` : « hautes lumières écrêtées : 0,0 →
+  6,5 % (+6,4 points) » et « bruit passé de visible à fort : 0,70 → 1,65 (seuil 1,5) » ; puis
+  `undo_last` : « 1 de moins », sans `regression`. `etapes_claude` (`Rendu.lua`) marche donc dans
+  Lightroom ;
+- éclaircir et assombrir, sur le portrait : radial inversé, coins assombris à 100 % (les quatre),
+  milieu 0 % ; sans inversion, milieu 99,85 % ; linéaire, haut 100 %, bas 0 %. Forme des bords
+  (rayon 0,7, fondu 80, centrée sur la zone d'intérêt en (0,38 ; 0,29)) : à −0,3 IL, centre 0,48 %,
+  milieu des bords 9,1 %, coins 8,45 % (le plus loin 11,93 %) de luminance en moins, plus forte
+  marche 1,61 % ; à −0,5 IL, centre 0,59 %, bords 14,39 %, coins 13,85 % (le plus loin 19,38 %),
+  plus forte marche 2,41 % ; ni plaque ni anneau, à l'une comme à l'autre dose ;
+- peau, sur le portrait (2 visages, le plus grand à 9,2 % de la largeur) : détail des joues gardé,
+  89,27 % avec « Peau du visage lisse », 89,11 % avec « Adoucir la peau (Lite) », 75,98 % avec
+  « Adoucir la peau » demandé (0,47 % des pixels changés de plus de 12 niveaux, 0 % pour les deux
+  autres) ; `amount` 50 contre la moitié des curseurs : 0 niveau d'écart, pour 7,21 et 8 niveaux
+  avec la dose entière ; « Adoucir la peau » refusé sans `smoothing_requested` ; la dose par défaut
+  posée, `CorrectionAmount` 0,5, texture et clarté relues, peau du visage calculée dès la retouche,
+  puis annulée ;
+- éclairage mixte nommé (53709912) : écart 9,7, 9 cases lues sur 9, visages dans les deux lumières,
+  balance proposée Temperature 5558, Tint 15, mesure en 155 ms (version de débogage) ; le témoin à
+  une seule lumière n'a pas tourné (même photo que le RAW de la recette).
+
 `get_settings` avec `all_keys` ajoute tout ce que Lightroom range (`toutes` côté module) : pour
 explorer un outil appliqué à la main (flou d'objectif, réduction du bruit…).
+
+## À constater dans Lightroom (1.2)
+
+La 1.2 passe les deux suites (`swift test` : 367 tests, dont 1 sauté sans
+`DEVELOPPEUR_ECRAN_REEL=1` ; `scripts/tester-module.sh` : liaison 235, fenêtre 47,
+`essais-dispositions` 18, `essais-integration` 7, `essais-moteur` 16). Ce qui a été vu dans
+Lightroom les 20 et 21 octobre 2026 (les relevés de chaque chantier, puis la recette de la 1.2,
+réussie) est daté dans la section de chaque chantier et dans Recette dans Lightroom. Reste à voir,
+sur les copies d'essai ou une photo que Dany désigne, chaque essai défait ensuite ; ce qui sera
+constaté passera dans sa section, avec sa règle dans la simulation de sa suite quand c'en est une
+(un constat de rendu n'en a pas). Ce qui tient à la fenêtre Claude est aux points 15 et 16 de sa
+liste (Fenêtre Claude › À constater dans Lightroom).
+
+1. Liaison fermée : le jeton change entre Arrêter et Démarrer la liaison. Un POST `curl` vers
+   127.0.0.1:54770 : ses en-têtes comptés comme lignes illisibles (une note par 10 s), son corps
+   refusé faute de jeton, rien dans l'Historique ; le diagnostic du Gestionnaire de modules externes
+   dit « Jeton : présent (…) ; commandes refusées : N ». La durée de la commande `etat` ne change pas
+   (`DEVELOPPEUR_VERBOSE=1`). Un Claude Desktop resté ouvert sur un connecteur d'avant la 1.2 reçoit
+   « Liaison fermée : cette commande ne porte pas le jeton… », puis marche une fois relancé ; la
+   fenêtre Claude marche sans réglage ; `--status` dit l'état du jeton.
+2. Peau : « un masque par personne » dans un groupe (sur 53709833, Vision ne voit que 2 personnes
+   sur 4 : lesquelles Lightroom reconnaît-il pour `kind` `person` et `part` `face_skin` ?) ; sur
+   53709677, le masque de la personne a été retiré à la recette du 20 octobre 2026, peut-être par
+   le défaut de la personne seule corrigé depuis (voir Masques : pistes de la 2.1) : à réessayer ;
+   si Lightroom ne la reconnaît toujours pas, l'étape des doses de la recette y échoue (« rien de
+   lissé ») ; la largeur des visages qui fait un « gros plan » ; les doses par masque ne doivent
+   pas faire passer la netteté maximale sous 35 (une régression « nette à douce » à tort). Le panneau
+   Masque montre-t-il les curseurs d'un effet intégré, sans nom d'effet (« Peau du visage lisse »
+   n'est pas dans le menu Effet de Lightroom) ?
+3. Éclaircir et assombrir : la forme des bords sur un intérieur (53709628), décentrée sur la zone
+   d'intérêt ; le radial du sujet (fondu 80 à 100), écrit sur 53709912 puis défait : ni halo, ni
+   peau écrêtée ; les doses (−0,3 à −0,7, +0,2 à +0,4, −0,3 à −0,5 IL, venues de la feuille de
+   route), jugées par Dany sur l'avant/après d'un portrait, d'un paysage et d'un intérieur ; la
+   forme d'un radial fait à la main (`get_settings` avec `all_keys`) : `Flipped` toujours vrai ?
+   Sinon, assouplir la règle de la simulation. Les seuils de la recette (`FormeBords`,
+   `Recette.ecartIdentique`, l'inversion) restent provisoires.
+4. Lecture du boîtier : `--boitier` sur les originaux des essais (X-H2S : DSCF2402, DSCF4245,
+   DSCF1595, DSCF8755 ; X-T4 : DSCF8880 ; X-T20 : 20200718_161742.raf et 20200710_193347.jpg),
+   comparé à exiftool, dans le Terminal de Dany (jamais répondre à une demande d'autorisation de
+   macOS à sa place). En noir et blanc, FilmMode (0x1401) est-il absent et la simulation dans
+   Saturation (0x1003) ? 0x1443 à 0x1445 quand la priorité à la plage dynamique est désactivée (si
+   0x1444 vaut 1 même désactivée, la phrase de priorité sortirait à chaque photo). La forme de
+   0x9204 (−2/3 ou −67/100, SRATIONAL ou RATIONAL) et les compensations habituelles de Dany, pour
+   les seuils de ±0,6 IL (±1/3 ne doit rien déclencher). Lightroom compense-t-il la plage
+   dynamique d'un RAF à DR200 ou DR400 ? Comparer la L* médiane de `view_photo` (Exposure2012 = 0,
+   profil de la simulation) à celle du JPEG incorporé : la phrase de la plage dynamique se règle
+   là-dessus. La nuit 53709724 (ISO 12 800) : compensation, mode et scène lus ; L* médiane avant et
+   après l'essai réel : Claude ne remonte pas une nuit voulue sombre. Après un profil de simulation
+   posé à la main, `profil` de la réponse `apercu` le nomme-t-il, pour que « le profil actuel est
+   la simulation » sorte ? La durée de `view_photo` avec la lecture (moins d'une seconde visée).
+5. Éclairage mixte : `toleranceNeutre` (10), `seuilTonal` (8), `partMinGroupe` (20 %) et
+   `pixelsMinPeau` (20) sont provisoires, et seul le portrait est mixte parmi les copies d'essai :
+   un intérieur vraiment éclairé par une lampe et une fenêtre est à ajouter avec Dany (une copie
+   virtuelle rangée dans « Développeur › Essais »). La balance proposée (Temperature 5558, Tint 15
+   sur 53709912) ramène-t-elle la lumière des visages à |a*| et |b*| de 2 au plus
+   (`--eclairage 53709912 --essai` avec elle) ? Sinon les pentes de `match_series`, relevées vers
+   5 000 K, ne valent pas si loin. L'anneau autour d'un visage lit-il la lumière qui l'éclaire ?
+   `--essai` en mode « Proposer d'abord » avec l'accord dans Lightroom coché demande un accord par
+   essai. La durée de la mesure en version optimisée (moins de 50 ms visés).
+6. Bilan : les seuils de netteté et de bruit (`baisseNetteteMin` 3, `hausseBruitMin` 0,1,
+   `baisseBruitDebruitage` 30 %, `ecartNettetePct` 10 %, `ecartBruit` 0,1), par deux vues avant et
+   après une étape écrite puis défaite : débruitage 30 et 50 sur 53709724 (pas 53709833, qui porte
+   déjà la réduction du bruit de son original), Shadows +60, Exposure +1, Sharpness +60, Grain 25.
+   Les coins vides : Upright 2 et PerspectiveVertical 40, avec et sans « Contraindre le
+   recadrage » (`Bilan.cadre` change-t-il, et `partBlancPurCoins`, 80 %, envoie-t-il l'alerte dans
+   « coins vides possibles » ?). Le plancher proposition contre vue, à remesurer depuis que les
+   propositions se mesurent comme les vues (presque nul attendu ; sinon, le reste vient du rendu de
+   Lightroom). La « dominante accentuée » sur une correction voulue (balance sur la lumière des
+   visages d'un éclairage mixte, style chaud demandé) : si Claude la défait à tort, la passer dans
+   `a_verifier`. La taille de ce que lit Claude dans `view_photo` (6,9 Ko de JSON pour le portrait
+   mixte, le 21 octobre 2026 ; la lecture du boîtier, 300 à 1 300 caractères, se répète à chaque
+   vue) et sa durée en version optimisée (environ 0,9 s en débogage, sur un aperçu de 1 344 px
+   d'un portrait à quatre visages, avec Vision, le détail, l'éclairage et le bilan).
+7. Écran : des profils standard (sRGB IEC61966-2.1, puis Display P3, choisis par Dany dans les
+   Réglages système, puis le sien remis : classe `standard`) ; un profil fait à l'œil (assistant
+   d'Apple : emplacement, créateur, `vcgt`, classe `oeil`) ; un vrai profil de sonde (DisplayCAL,
+   Calibrite, i1Profiler, Spyder : créateur, `vcgt`, textes desc, cprt et meta), et un profil de
+   fabricant qui cite X-Rite dans son cprt (classé sonde à tort ?) ; où les logiciels de sonde
+   rangent leurs profils (sous `/Library/ColorSync/Profiles/Displays/`, un profil de sonde serait
+   classé usine). Un écran Apple (préréglages XDR, Studio Display) : ses préréglages restent
+   « usine ». `testEnteteLuDansLesOctets` sur le runner macos-15 de GitHub (« lppa »). La remarque
+   d'écran arrive à Claude au premier aperçu, une fois, dans Claude Desktop et dans la fenêtre ;
+   `--status` dit l'écran.
+8. Consignes et descriptions : une session de Claude Code voit les consignes du connecteur entières
+   (3 768 caractères) et les descriptions d'outils longues (`add_mask` 1 559, `view_photo` 1 783)
+   sans les couper : pour une description d'outil, jamais constaté.
 
 ## Bibliothèque
 
@@ -2801,6 +3892,12 @@ créé (si la version de Lightroom le permet et que l'option est cochée).
 - Version minimale de Lightroom (`DevelopSetting.since`) : le serveur lit la version une fois
   (`etat`) et refuse un réglage plus récent qu'elle (Texture 8.3 ; HDR, couleur ponctuelle, flou
   d'objectif 13.0), plutôt que d'écrire une clé que Lightroom ignorerait.
+- Liaison fermée (1.2) : une ligne sans le jeton privé de la liaison, ou avec un autre, est refusée
+  avant toute commande, `ping` compris, donc avant la pause et « Proposer d'abord » ;
+  `depuisLightroom` n'est jamais reçu du réseau (voir Liaison fermée).
+- Peau (1.2) : `add_mask` refuse, avant tout envoi, un masque de peau lissé au-delà de la dose
+  « Adoucir la peau (Lite) », intensité comprise, ou à netteté négative, sans
+  `smoothing_requested` (voir Peau).
 
 ## Livraison (`exporter`, `export_photos`)
 

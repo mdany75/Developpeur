@@ -259,8 +259,11 @@ public enum Eclairage {
     /// simple (portrait sous trois dominantes froides simulées : 3,4 à 4,5). Relu le 21 octobre
     /// 2026 sur les mêmes aperçus : aucun autre centre essayé (gris seul, point neutre sans
     /// tolérance, milieu des quartiles ou des déciles, avec ou sans tolérance) ne tient mieux à la
-    /// fois la balance de la photo et les dominantes. Provisoire : à relever dans Lightroom
-    /// (`--eclairage --essai`, 3 200 et 6 500 K, ±30 en relatif).
+    /// fois la balance de la photo et les dominantes. Essayée dans Lightroom le 21 octobre 2026
+    /// (`--eclairage --essai`, 3 200 et 6 500 K, ±30 en relatif) : à la balance de la photo, seul le
+    /// portrait des copies d'essai se lit mixte, comme à l'œil ; sous une dominante forcée extrême, une
+    /// lumière peut se perdre (portrait à 3 200 K : 4,6) ou s'inventer (intérieur à la lampe, +30 :
+    /// 11,4). Gardée, provisoire : le critère « écart qui varie de moins de 25 % » n'est pas tenu.
     static let toleranceNeutre = 10.0
     /// Écart a*b* entre ombres et hautes lumières à partir duquel il se lit. Provisoire, à relever.
     public static let seuilTonal = 8.0

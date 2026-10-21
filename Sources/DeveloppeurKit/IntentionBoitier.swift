@@ -9,8 +9,10 @@ import Foundation
 ///
 /// Tags d'après ExifTool (Image/ExifTool/FujiFilm.pm, TagNames/FujiFilm) ; chaque valeur est
 /// facultative, et une valeur hors de ce que l'appareil peut ranger est ignorée (type inattendu).
-/// Leur présence selon le boîtier (X-H2S, X-T4, X-T20) et le type des tons (LONG ou SLONG) restent à
-/// relever sur les vrais fichiers (`mcp-developpeur --boitier`, comparé à exiftool).
+/// Recoupés le 20 octobre 2026 sur les vrais fichiers d'un X-H2S et d'un X-T20 (MakerNote lue à la
+/// main, hors de ce code) : FilmMode, DynamicRangeSetting, DevelopmentDynamicRange,
+/// AutoDynamicRange et Saturation en SHORT, ShadowTone et HighlightTone en SLONG (type 9). Restent à
+/// relever : un X-T4, une simulation noir et blanc, la priorité à la plage dynamique.
 public struct IntentionBoitier: Equatable {
     /// FilmMode (0x1401) : la simulation de film en couleur.
     public var simulation: Int?

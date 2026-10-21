@@ -222,7 +222,8 @@ public enum DevelopCatalogue {
 
     /// Profils qu'il suffit de nommer : Adobe Standard et les simulations de film Fujifilm
     /// rangées en profils DCP. Les profils à base de « Look » (Adobe Color, CLASSIC Neg.,
-    /// NOSTALGIC Neg.…) demandent davantage et ne sont pas proposés. Les noms sont ceux que
+    /// NOSTALGIC Neg.…) demandent davantage et ne sont pas dans cette liste (la lecture du boîtier,
+    /// IntentionBoitier, les cherche parmi les profils installés). Les noms sont ceux que
     /// Lightroom Classic 15.6 range pour un X-H2S (relevés le 16 octobre 2026) : il les cherche sans
     /// tenir compte de la casse, mais la ponctuation compte (« Camera PRO Neg. Hi » n'y est pas) ;
     /// `variants` garde l'orthographe des appareils plus anciens.

@@ -267,8 +267,9 @@ extension Prompts {
     /// −0,5 IL) : le centre n'est jamais touché et toutes les formes descendent sans marche. Au rayon
     /// 0,7, fondu 80 : milieu des bords −16 niveaux, coins −21 à −27, baisse commencée vers 15 % de la
     /// diagonale (le tiers central intact) ; fondu 100 assombrit presque tout le cadre, fondu 50 fait
-    /// une vignette marquée aux seuls coins. À vérifier par la recette et l'essai réel sur un portrait
-    /// et un intérieur, et décentrée sur la zone d'intérêt (seul le radial centré est relevé). Le
+    /// une vignette marquée aux seuls coins. Vérifiée le 21 octobre 2026 par la recette sur un
+    /// portrait pris à l'intérieur, décentrée sur sa zone d'intérêt : à −0,3 IL, centre −0,5 %,
+    /// milieu des bords −9,1 %, coins −8,5 % de luminance, plus forte marche 1,6 %. Le
     /// fondu du radial du sujet (`sujetFondu`) n'est pas relevé : à vérifier de même (ni halo, ni
     /// peau écrêtée).
     public enum Tireur {

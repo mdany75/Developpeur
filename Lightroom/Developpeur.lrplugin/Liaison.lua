@@ -38,7 +38,7 @@ local Json = require 'Json'
 local Texte = require 'Texte'
 
 local Liaison = {
-    VERSION = '1.1.1',
+    VERSION = '1.2',
     PORT_COMMANDES = 54770,
     PORT_REPONSES = 54771,
 

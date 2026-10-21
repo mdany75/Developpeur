@@ -1,14 +1,103 @@
 # Changements
 
-## Non publié
+## 1.2 — 2026-10-21
 
-Pour la prochaine version, la 1.2 (un rendu plus juste sur chaque photo, en préparation) : à
-l'ouverture de la fenêtre Claude, l'aperçu de la photo active montre son point de mise au point
-(fichiers Fujifilm), et Claude prépare une proposition de retouche sans rien appliquer ; un zoom
-montre aussi le point de mise au point ; la fenêtre n'a plus qu'une disposition, la Conversation
-claire.
+Un rendu plus juste sur chaque photo. Claude lit ce que vous avez choisi au boîtier (fichiers
+Fujifilm), nomme un éclairage mixte, chiffre d'une passe à l'autre ce que sa retouche a changé et
+signale ce qu'elle a abîmé, dose la peau comme Adobe, éclaircit et assombrit comme un tireur pour
+mener l'œil au sujet, et sait sur quel écran vous jugez la photo. La liaison entre le connecteur et
+Lightroom est fermée par un jeton privé. La fenêtre Claude n'a plus qu'une disposition, la
+Conversation claire ; l'aperçu de la photo active y montre son point de mise au point (Fujifilm),
+et Claude y prépare une proposition de retouche dès l'ouverture. Après l'installation, relancer
+Lightroom et Claude Desktop, et ouvrir une nouvelle session de Claude Code : un connecteur d'avant
+la 1.2 resté ouvert est refusé par la liaison, avec un message qui le dit.
 
 ### Ajouté
+- L'intention de la prise de vue, pour les fichiers Fujifilm (RAF ou JPEG de l'appareil, pas un
+  HEIF) : `view_photo` lit dans l'original, d'une seule ouverture avec le point de mise au point et
+  en temps limité, les réglages choisis sur l'appareil (`intention_boitier`) : simulation de film
+  (ACROS, MONOCHROME et Sépia compris), réglage Couleur, plage dynamique (DR100, DR200, DR400…,
+  auto ou réglée) et sa priorité, tons clairs et foncés, compensation et mode d'exposition, balance
+  automatique et scène de nuit ; pour un RAW, aussi le profil de Lightroom qui rend cette
+  simulation sur cet appareil. Sa « lecture » guide Claude, sans rien poser d'office : un RAW part
+  de la simulation choisie (proposée en première passe, et dite, sauf autre style demandé), un JPEG
+  de l'appareil ne se voit pas refaire ce qu'il porte déjà, une photo prise avec une compensation
+  de −2/3 IL ou moins (seuil provisoire), ou en scène de nuit, reste sombre, et des hautes lumières
+  protégées au boîtier (DR200, DR400) le restent quand l'exposition remonte. Sur l'aperçu entier
+  seulement, ni sur un zoom ni sur un avant/après. Lu le 20 octobre 2026 sur de vrais RAF (X-H2S,
+  X-T4, X-T20) et recoupé avec la MakerNote lue à la main : tout concorde.
+- L'éclairage mixte nommé : `view_photo` mesure la dominante des tons presque neutres par zone
+  tonale (ombres, tons moyens, hautes lumières) et par région (grille de 3 × 3), les visages à part
+  (leur peau, et la lumière autour d'eux) : `mesures › eclairage`. Quand deux lumières de couleurs
+  différentes se mêlent (une lampe et une fenêtre dans la même pièce), la mesure nomme les deux
+  lumières et leurs zones (« plus chaude tiers gauche… »), donne leur écart, une balance des blancs
+  proposée pour la lumière des visages (ou du sujet) et le conseil : la balance sur les visages,
+  l'autre zone par un masque (Température et Teinte locales), ou gardée chaude si c'est une lampe.
+  Claude vous le dit, à confirmer à l'œil (un mur coloré n'est pas une lumière). Une forme courte
+  (lecture, écart, zones tonales) va dans l'avant/après et les propositions ; `analyze_photos` en
+  donne la lecture et l'écart. Seuil relevé le 20 octobre 2026 sur les huit photos d'essai, à la
+  balance de chacune : seul le portrait éclairé par des fenêtres et une lumière chaude ressort
+  mixte (écart 9,7 pour un seuil de 8), les sept autres restent entre 2,1 et 7,1. Sous une forte
+  dominante ajoutée exprès (balance à 3 200 K sur ce portrait, Température +30 sur un intérieur à
+  la lampe), la mesure peut perdre une lumière ou en inventer une.
+- Un bilan chiffré d'une passe à l'autre : à chaque nouveau `view_photo` d'une photo (aperçu
+  entier, à la même taille), Claude voit ce qui a bougé depuis le précédent, avant → après
+  (exposition en IL, contraste, écrêtage, ombres bouchées, dominante sur les mêmes tons neutres,
+  couleurs très saturées, netteté, bruit), et depuis le premier de la session. Une « regression »
+  signale un défaut que la passe a créé ou aggravé : hautes lumières ou un canal écrêtés, ou
+  couleurs très saturées (2 points de plus, et au moins 1,5 fois l'avant), ombres bouchées
+  (2 points de plus), dominante des tons neutres qui s'éloigne du neutre d'au moins 2 en a* ou b*,
+  netteté ou bruit passés leur seuil ; Claude la corrige par une passe ciblée ou la défait
+  (`undo_last`), et vous le dit. Ce qui peut être voulu n'est qu'« à vérifier » (dominante passée
+  de l'autre côté, coins vides après un Upright, netteté en baisse après un débruitage, calculs IA
+  en attente), et une annulation n'est jamais une régression. L'avant/après de `view_photo`
+  (`compare`) a son propre bilan, et une proposition montrée à côté de l'état actuel
+  (`preview_settings`, ou `add_mask` avec `preview`, et `compare`) le sien, sans netteté ni bruit ;
+  un zoom refait sur la même zone, le sien (`bilan_zone`, sans alerte). Le résumé de fin de
+  retouche reprend ces chiffres (« hautes lumières écrêtées : 2,1 → 0,3 % »). La mémoire dure le
+  temps de la session du connecteur. Seuils de régression de l'écrêtage, des ombres, des couleurs
+  saturées et de la dominante relevés le 20 octobre 2026 en propositions sur les photos d'essai, où
+  deux vues de suite à la même taille donnent les mêmes chiffres ; ceux de la netteté et du bruit
+  restent provisoires.
+- L'effet « Peau du visage lisse » (texture −20, clarté −10 : les valeurs d'un paramètre prédéfini
+  adaptatif du groupe Portrait de Lightroom) parmi les effets d'`add_mask`, et « Adoucir la peau
+  (Lite) » (texture −35, clarté −15) même si son fichier manque. Avec un garde-fou : `add_mask`
+  refuse, sans rien envoyer à Lightroom (proposition comprise), un masque de la peau (`face_skin`,
+  `body_skin`) qui lisse plus qu'« Adoucir la peau (Lite) », intensité comprise, ou qui baisse la
+  netteté, sauf si vous avez demandé une peau plus lisse ou que votre guide de style le dit
+  (`smoothing_requested`) : Claude ne lisse plus davantage de lui-même. Ses remarques disent la
+  dose posée sous 100 % d'intensité.
+- Éclaircir et assombrir comme un tireur en chambre noire, pour mener l'œil au sujet : les invites
+  `portrait` et `paysage` finissent par cette étape, `noir_et_blanc` la fait avant le grain, et les
+  boutons Portrait, Paysage et Noir et blanc de la fenêtre Claude la demandent. Un seul `add_mask`
+  (« Claude · éclaircir et assombrir » dans l'Historique, que `undo_last` défait) : grandes zones
+  trop claires assombries par un dégradé linéaire (−0,3 à −0,7 IL), sujet ou visage éclairci par
+  un dégradé radial (+0,2 à +0,4 IL), bords assombris par un radial inversé (−0,3 IL, −0,5 au
+  plus ; rayon 0,7 et fondu 80, au milieu de la zone d'intérêt de Vision) à la place du vignetage
+  après recadrage, jamais les deux. Ces doses sont des plafonds. Suit un avant/après de cette seule
+  étape (`view_photo` avec `compare = previous_step`) : s'il y voit un halo, une bande ou une
+  plaque sombre aux coins, Claude défait l'étape et la refait plus légère. En mode « Proposer
+  d'abord », il la montre d'abord en proposition. La méthode est aussi dans la description
+  d'`add_mask`, que Claude lit partout. Constaté le 20 octobre 2026 : le radial inversé
+  n'assombrit que hors de son ellipse (à −2 IL sur un portrait d'essai, coins −31 à −69 niveaux
+  sur 255, centre −0,3). La forme des bords, relevée le même jour sur un paysage, radial centré
+  (tiers central intact, baisse sans marche jusqu'aux coins), est constatée le 21 octobre 2026 sur
+  un portrait d'essai pris à l'intérieur, centrée sur sa zone d'intérêt : à −0,3 IL, la luminance
+  baisse de 0,5 % au centre, 9,1 % au milieu des bords et 8,5 % aux coins, sans marche de plus de
+  1,6 %. Le fondu du radial du sujet reste à vérifier.
+- L'écran nommé : un quatrième voyant dans la fenêtre Claude, lu à l'ouverture,
+  « Écran · étalonné » (vert), « Écran · non étalonné » (orange) ou « Écran · étalonné ? » (gris,
+  dans le doute), et « Écran » en gris s'il n'a pas pu être lu. Un clic le relit et donne le
+  détail : l'écran principal du Mac, son profil de couleur (d'usine, standard du système, fait à
+  l'œil avec l'assistant d'Apple, mesuré par une sonde, ou personnalisé) et, sauf pour un profil de
+  sonde, comment juger les couleurs (couper Night Shift, et True Tone sur un écran Apple ; où
+  choisir le profil dans les Réglages système). « Étalonné » veut dire mesuré par une sonde ; la
+  reconnaissance d'un vrai profil de sonde reste à constater (seul un profil d'usine a été lu
+  jusqu'ici). `get_status` et `mcp-developpeur --status` disent aussi l'écran. Claude mesure la
+  photo par ses chiffres, sans passer par l'écran ; s'il n'est pas étalonné, il vous le dit une
+  fois, quand votre avis compte (peau, couleurs). L'écran se lit sur le Mac (ColorSync), sans
+  réseau ni permission ; Claude en reçoit le nom et celui du profil, jamais le chemin du fichier
+  du profil.
 - Le carré de mise au point sur l'aperçu de la photo active (« Photo active · … »), pour un
   fichier Fujifilm : à l'ouverture de la fenêtre Claude (menu Ouvrir la fenêtre Claude ou ⌃⌥C,
   même déjà ouverte) et quand vous choisissez une autre photo, le connecteur lit le point dans
@@ -29,8 +118,41 @@ claire.
   Gestionnaire de modules externes), le carré dessiné sur le zoom. Toujours pas sur un avant/après
   (`compare`). Dans la fenêtre Claude, Claude fait dessiner le carré quand il montre ou juge la
   mise au point, sur l'aperçu entier comme sur un zoom.
+- La liaison locale fermée par un jeton privé : à chaque démarrage de la liaison, le module tire un
+  jeton au hasard et le range dans `~/Library/Application Support/Developpeur/liaison.jeton`,
+  lisible par vous seul ; le connecteur le joint à chaque commande, pour Claude Desktop, Claude
+  Code et la fenêtre Claude. Une commande sans ce jeton, ou avec un autre, venue d'un autre
+  programme du Mac ou d'une page web, est refusée avant tout (« Liaison fermée : … », constaté le
+  21 octobre 2026 dans Lightroom) et notée au journal du module, sans l'inonder : elle ne peut ni
+  regarder, ni retoucher, ni passer outre la pause ou « Proposer d'abord ». Le jeton protège de ce
+  qui ne peut pas lire vos fichiers ; un programme qui tourne sous votre compte le pourrait. Le
+  diagnostic du Gestionnaire de modules externes dit si le jeton est là et combien de commandes ont
+  été refusées, `--status` dit l'état de son fichier (jamais sa valeur), et la fenêtre Claude a sa
+  propre aide si la liaison n'a pas pu le préparer. `uninstall.sh` retire le fichier, Lightroom
+  fermé (ouvert, il le réécrit).
 
 ### Changé
+- La peau dosée comme Adobe : par défaut « Peau du visage lisse » ; « Adoucir la peau (Lite) » pour
+  un gros plan aux pores marqués ; la moitié de la dose (`amount` 50) pour un homme ou une personne
+  âgée ; rien pour un enfant ; un masque par personne quand les doses diffèrent, puis un zoom sur
+  le visage (pores encore visibles, ni cire ni plaques). Vision ne dit ni l'âge ni le genre d'un
+  visage : Claude juge à l'œil et, dans le doute, prend la dose la plus faible. Constaté le
+  20 octobre 2026 : l'intensité d'un masque est linéaire (à 50, la même image, au pixel près, que
+  les curseurs à moitié). Dans la fenêtre Claude, la peau adoucie des styles « … et peau douce »
+  (Or, Éclatant, Rose froid) est la dose « Adoucir la peau (Lite) », sur la peau seulement, la
+  moitié pour un homme ou une personne âgée, rien pour un enfant.
+- `paysage` n'a plus de « vignetage léger » : le radial inversé des bords le remplace, jamais les
+  deux, et `retouche_pro` comme les consignes du connecteur le disent. Dans `noir_et_blanc`,
+  éclaircir et assombrir devient une étape à part, et le grain vient après.
+- Les invites suivent ce qui est nouveau : `retouche_pro`, `portrait`, `paysage`, `noir_et_blanc`
+  et `nuit_iso_eleve` partent de l'intention du boîtier (Fujifilm), comme les consignes du
+  connecteur (RAW Fujifilm : d'abord la simulation du boîtier) ; `retouche_pro`, `portrait` et
+  `nuit_iso_eleve` traitent l'éclairage mixte ; une « regression » au bilan appelle une passe
+  corrective, et le résumé de fin donne les chiffres du bilan, dans les invites comme dans la
+  fenêtre Claude.
+- L'avant/après de `view_photo` et les propositions (`preview_settings`, `add_mask` avec `preview`)
+  sont mesurés comme l'aperçu entier (même réduction de l'image), avec la forme courte de
+  l'éclairage.
 - La fenêtre Claude n'a plus qu'une disposition, la Conversation claire : à gauche les
   conversations, au centre le fil, à droite les onglets Note et Proposition, l'aperçu, puis la
   carte Note ou la Proposition. Si vous aviez choisi l'Atelier ou le Panneau, elle s'ouvre
@@ -48,6 +170,9 @@ claire.
   un portrait par exemple : Lightroom le calculait bien, mais le module le retirait aussitôt comme
   « personne non reconnue ». Il est maintenant fait comme à la main dans Lightroom, et gardé ; la
   peau, les yeux ou les cheveux de cette personne aussi.
+- Une commande reçue par la liaison ne peut plus se dire venue de Lightroom même
+  (`depuisLightroom`) pour lever la pause ou l'accord demandé dans Lightroom : ce drapeau ne vient
+  plus du réseau.
 
 ## 1.1.1 — 2026-10-20
 

@@ -79,24 +79,38 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   l'ouverture du Gestionnaire de modules externes la coupe.
 - Claude reçoit avec chaque demande la photo active et la sélection de Lightroom.
 - Six invites en raccourcis : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Sports.
+  Portrait, Paysage et Noir et blanc passent en fin de retouche par éclaircir et assombrir comme
+  un tireur (voir Retouches locales), avec l'avant/après de cette étape ; en noir et blanc, le
+  grain vient après.
 - Une carte Note, dans l'onglet Note : la note posée de la photo active et celle que Claude
   propose, à accepter ou à changer sans repasser par Claude. Dans la fenêtre, Claude note d'abord
   chaque photo qu'il traite : pas de bouton pour le lui demander (voir Noter vos photos).
 - Un style joint à chaque demande, invites comprises, par le menu au bout de la rangée d'invites
   (sans étiquette) : Standard (rien d'ajouté), Ambre et éclat, Or et peau douce, Or rose et
   éclat, Éclatant et peau douce, Neutre, Rose froid et peau douce. « Peau douce » passe par un
-  masque de la peau, jamais par un réglage de toute la photo.
+  masque de la peau à la dose « Adoucir la peau (Lite) », la moitié pour un homme ou une personne
+  âgée, rien pour un enfant, jamais par un réglage de toute la photo.
 - Joindre une photo du disque (📎 : JPEG, PNG, HEIC, TIFF, WebP) ou coller l'image du
   presse-papiers (📋 : capture d'écran, image copiée, photo copiée dans le Finder), comme exemple
   ou comme référence de style. Les photos jointes s'affichent sur la ligne sous les invites ; un
   clic les retire.
 - Retour ou Envoyer envoie la demande ; Arrêter interrompt Claude proprement en pleine retouche.
-- Des voyants : Claude Code (connecté au forfait ou non), liaison avec Lightroom (arrêtée, un clic
-  la démarre), mode du connecteur (un clic bascule entre « Proposer d'abord » et « Appliquer
-  directement »), et le dernier relevé du forfait (5 heures et semaine). Une aide en rouge, sur la
-  ligne sous les invites, dit quoi faire quand quelque chose manque (un clic l'affiche en entier) ;
-  un message de la fenêtre y passe avant elle. Sans message, aide ni photo jointe, cette ligne
-  reste vide.
+- Des voyants : Claude Code (connecté au forfait ou non), liaison avec Lightroom (arrêtée ou en
+  erreur, un clic la démarre ou la relance), mode du connecteur (un clic bascule entre « Proposer
+  d'abord » et « Appliquer directement »), écran principal du Mac, et le dernier relevé du forfait
+  (5 heures et semaine). Une aide en rouge, sur la ligne sous les invites, dit quoi faire quand
+  quelque chose manque (un clic l'affiche en entier) ; un message de la fenêtre y passe avant elle.
+  Sans message, aide ni photo jointe, cette ligne reste vide.
+- Le voyant Écran, lu par le connecteur à l'ouverture de la fenêtre : « Écran · étalonné » (vert)
+  pour un profil de couleur mesuré par une sonde ; « Écran · non étalonné » (orange) pour le profil
+  d'usine de l'écran, un profil standard du système ou un profil fait à l'œil avec l'assistant
+  d'Apple ; « Écran · étalonné ? » (gris) pour un profil personnalisé sans trace d'une sonde, ou
+  illisible ; « Écran », gris, s'il n'a pas pu être lu. Un clic le relit (un autre écran a pu être
+  branché) et donne le détail : le profil de couleur, et comment juger les couleurs (couper Night
+  Shift, et True Tone sur un écran Apple ; une sonde d'étalonnage crée un profil mesuré). Claude
+  mesure la photo par ses chiffres, sans passer par l'écran ; vous la jugez sur le vôtre : s'il
+  n'est pas étalonné, Claude vous le dit une fois par conversation, quand il vous demande votre
+  avis sur la peau ou les couleurs.
 - En bas, les versions du module et du connecteur, en orange si elles ne vont plus ensemble.
 - Fermer la fenêtre n'arrête pas Claude : le travail continue et se retrouve à la réouverture.
   Claude Code reste ouvert entre deux demandes (réponses plus rapides) et se ferme après 15 minutes
@@ -110,7 +124,12 @@ invites prêtes à l'emploi s'y ajoutent, dans le menu « + » de Claude Desktop
 correctives si un défaut reste), `harmoniser_serie`, `tri_seance`, `noter` (une sortie, selon le
 standard de notation, passe par passe), `portrait`, `paysage`, `noir_et_blanc`, `nuit_iso_eleve` et
 `partage` (écran, web, Instagram, impression), chacune avec ses précisions au choix (style, photos,
-garder, passe, destination) ; celles qui retouchent suivent votre guide de style.
+garder, passe, destination) ; celles qui retouchent suivent votre guide de style. `portrait`,
+`paysage` et `noir_et_blanc` passent en fin de retouche par éclaircir et assombrir comme un tireur
+(avant le grain en noir et blanc), avec un avant/après de cette étape. Les invites qui retouchent
+(`retouche_pro`, `portrait`, `paysage`, `noir_et_blanc`, `nuit_iso_eleve`) partent de ce que
+l'appareil Fujifilm a noté de la prise de vue, lisent le bilan de chaque passe et finissent par un
+résumé chiffré ; `retouche_pro`, `portrait` et `nuit_iso_eleve` traitent aussi un éclairage mixte.
 
 **Regarder et mesurer**
 
@@ -118,6 +137,34 @@ garder, passe, destination) ; celles qui retouchent suivent votre guide de style
   données de prise de vue et des mesures : luminosité (L*, centiles), écrêtage des hautes lumières
   (aussi canal par canal) et des ombres, contraste, saturation, dominante des tons neutres,
   netteté par zone et bruit.
+- Un bilan chiffré d'une passe à l'autre : à chaque nouvel aperçu entier d'une photo, Claude voit
+  ce qui a bougé depuis le précédent à la même taille (exposition en IL, contraste, écrêtage,
+  dominante, saturation, netteté, bruit), avant → après, et depuis le premier de la session. Une
+  « régression » signale un défaut que la passe a créé ou aggravé (hautes lumières écrêtées, ombres
+  bouchées, couleurs très saturées, dominante accentuée, netteté ou bruit qui passent leur seuil) :
+  Claude la corrige par une passe ciblée ou défait la dernière étape, et vous le dit. Un changement
+  peut-être voulu (une annulation, un calcul IA en attente, une dominante corrigée au-delà du
+  neutre, des coins vides après Upright) n'est qu'« à vérifier ». L'avant/après côte à côte et les
+  propositions ont leur propre bilan, sans netteté ni bruit pour une proposition ; un zoom refait
+  sur la même zone, le sien, sans alerte (utile après un débruitage). Dans la fenêtre Claude et
+  avec les invites qui retouchent, Claude reprend ces chiffres dans son résumé (« hautes lumières
+  écrêtées : 2,1 → 0,3 % »). Le bilan ne compare que des images rendues de même (deux aperçus de
+  même taille, ou les deux côtés d'un avant/après ou d'une proposition), jamais une proposition à
+  un aperçu d'avant, et sa mémoire dure tant que le connecteur tourne (une session de Claude
+  Desktop ou de Claude Code ; dans la fenêtre Claude, tant que Claude Code reste ouvert). Les
+  seuils de l'écrêtage, des ombres, des couleurs saturées et de la dominante ont été relevés dans
+  Lightroom le 20 octobre 2026, en propositions sur les photos d'essai ; ceux de la netteté et du
+  bruit, provisoires, restent à relever.
+- L'éclairage de la photo : la couleur de la lumière, lue sur les tons presque neutres, par zone
+  tonale (ombres, tons moyens, hautes lumières) et par région (une grille de 3 × 3), les visages à
+  part (leur peau, et la lumière autour d'eux). Quand deux lumières de couleurs différentes se
+  mêlent (une lampe et une fenêtre dans la même pièce), Claude dit « éclairage mixte », à confirmer
+  à l'œil (un mur coloré n'est pas une lumière) : il règle la balance des blancs sur la lumière des
+  visages ou du sujet (une balance proposée, température et teinte), puis traite l'autre zone par
+  un masque, ou la garde chaude si c'est une lampe. Relevé les 20 et 21 octobre 2026 sur les huit
+  photos d'essai : à leur balance, seul le portrait à deux lumières (fenêtres et éclairage chaud)
+  se lit mixte, comme à l'œil ; sous une forte dominante ajoutée exprès, la mesure peut perdre une
+  lumière ou en inventer une.
 - Ce que voit Vision d'Apple, sur ce Mac et sans réseau : visages et pupilles, qualité de chaque
   visage, note esthétique, zone qui attire l'œil.
 - Le point de mise au point des photos Fujifilm (RAF, ou JPEG de l'appareil), lu dans l'original
@@ -129,6 +176,22 @@ garder, passe, destination) ; celles qui retouchent suivent votre guide de style
   chaque aperçu et chaque zoom : case Mise au point du Gestionnaire de modules externes (décochée
   par défaut). Les mesures sont prises avant le carré. Dans la fenêtre Claude, l'aperçu de la
   photo active le montre aussi (voir plus haut).
+- L'intention de la prise de vue des photos Fujifilm, lue dans l'original par le connecteur, sur ce
+  Mac et de la même ouverture que le point de mise au point : la simulation de film, la plage
+  dynamique (DR100, DR200, DR400, auto ou réglée) et sa priorité, les tons clairs et foncés, la
+  couleur, la compensation et le mode d'exposition, la balance Auto (priorité au blanc ou à
+  l'ambiance) et une scène de nuit, choisis sur l'appareil. Claude s'en sert sans rien poser
+  d'office : pour un RAW, il part en première passe du profil Lightroom de la simulation choisie, et
+  le dit (sauf autre style demandé ou guide de style contraire) ; sur un JPEG de l'appareil, il ne
+  refait pas ce que l'appareil y a déjà mis ; une photo voulue plus sombre (compensation de −2/3 IL
+  ou davantage, scène de nuit) reste sombre ; un RAW en DR200 ou DR400 qui paraît sous-exposé,
+  c'est la protection des hautes lumières à la prise de vue : il remonte l'exposition en les
+  gardant ; en « priorité à l'ambiance », la chaleur des lampes reste. Donnée avec l'aperçu entier,
+  pas avec un zoom ni un avant/après.
+- L'écran principal du Mac (`get_status`) : son nom, son profil de couleur et s'il est mesuré par
+  une sonde, lus sur ce Mac sans réseau ni permission. Les mesures n'en dépendent pas, votre œil
+  si : quand votre avis compte (peau, couleurs), Claude vous dit une fois que l'écran n'est pas
+  étalonné, ou vous demande s'il l'est quand le profil ne le dit pas.
 - L'évaluation que Claude garde pour la photo, donnée avec l'aperçu entier et avec un zoom (pas
   avec un avant/après) : pas encore évaluée, note proposée à vérifier, acceptée ou changée par vous
   (voir Noter vos photos).
@@ -180,14 +243,39 @@ garder, passe, destination) ; celles qui retouchent suivent votre guide de style
   visage et du corps, iris, lèvres, dents, cheveux, sourcils, barbe, vêtements), éléments de
   paysage (eau, végétation, montagnes, architecture, sol, neige).
 - Une personne précise d'une photo de groupe (« la personne de gauche », « les cheveux de l'enfant
-  à droite »), repérée par Vision : Lightroom calcule le même masque qu'à la main.
+  à droite »), ou la seule personne d'un portrait, repérée par Vision : Lightroom calcule le même
+  masque qu'à la main.
 - Masques combinés (« le ciel sans le bâtiment », « le sujet limité aux hautes lumières »), objet
   désigné par un cadre ou un trait, pinceau le long de traits (éclaircir et assombrir à la main),
   dégradés linéaires et radiaux, plages de luminance, de couleurs (prélevées dans l'image) et de
   profondeur (photos Portrait d'iPhone).
+- Éclaircir et assombrir comme un tireur en chambre noire, pour mener l'œil au sujet, en une seule
+  étape « Claude · éclaircir et assombrir » : les grandes zones trop claires assombries par un
+  dégradé linéaire (−0,3 à −0,7 IL), le sujet ou le visage éclairci par un dégradé radial (+0,2 à
+  +0,4 IL), les bords assombris par un radial inversé (−0,3 IL, −0,5 au plus) à la place du
+  vignetage après recadrage, jamais les deux. Ces doses sont des plafonds. Puis l'avant/après de
+  cette seule étape : s'il montre un halo autour du sujet, une bande au bout d'un dégradé ou des
+  coins en plaques, Claude défait l'étape et la reprend plus légère. Les invites `portrait`,
+  `paysage` et `noir_et_blanc` (et leurs boutons dans la fenêtre Claude) y passent en fin de
+  retouche (en noir et blanc, avant le grain) ; `retouche_pro` y passe si la photo le demande, et
+  vous pouvez le demander sur toute photo.
 - Réglages locaux, courbe du masque, couleur ponctuelle dans un seul masque, et les effets du
-  panneau Masque (Blanchiment des dents, Renforcement de l'iris, Adoucir la peau, et les vôtres),
-  posés sur la bonne partie et réglables en intensité.
+  panneau Masque (Blanchiment des dents, Renforcement de l'iris, Adoucir la peau (Lite), Adoucir la
+  peau, et les vôtres), avec « Peau du visage lisse », que le connecteur ajoute d'après les
+  paramètres prédéfinis Portrait adaptatifs d'Adobe ; posés sur la bonne partie et réglables en
+  intensité.
+- La peau dosée comme Adobe, d'après les fichiers de Lightroom Classic 15.6 : « Peau du visage
+  lisse » par défaut (texture −20, clarté −10), « Adoucir la peau (Lite) » pour un gros plan aux
+  pores marqués (texture −35, clarté −15), la moitié de la dose pour un homme ou une personne
+  âgée, rien pour un enfant ; un masque par personne quand les doses diffèrent. Vision ne dit ni
+  l'âge ni le genre d'un visage : Claude en juge à l'œil et, dans le doute, prend la dose la plus
+  faible ; puis il vérifie par un zoom sur le visage (pores encore visibles, ni cire ni plaques).
+  Plus lisse (« Adoucir la peau », ou au-delà de la dose Lite) seulement si vous le demandez, ou si
+  votre guide de style le dit : sinon le connecteur refuse ce masque de la peau (visage ou corps)
+  sans rien envoyer à Lightroom. La moitié de la dose est exacte : l'intensité d'un masque est
+  linéaire (constaté dans Lightroom le 20 octobre 2026 sur un portrait d'essai : texture −20 et
+  clarté −10, la dose « Peau du visage lisse », à l'intensité 50 rendent la même image, au pixel
+  près, que texture −10 et clarté −5 à 100).
 - Reprendre un masque après coup : masquer, afficher, dupliquer (inversé au besoin), retirer,
   recalculer, adoucir ou resserrer son contour (Lightroom 15.5). Les masques que Lightroom trouve
   vides sont retirés, et Claude le dit. Chaque masque porte un nom « Claude · … » dans le panneau
@@ -416,16 +504,20 @@ Une fenêtre à part (Consommation…) pour suivre ce que la fenêtre Claude con
   explicite (20 par défaut) ; le point de mise au point (Fujifilm) dessiné sur chaque aperçu et
   chaque zoom, et non seulement pour noter (décoché par défaut) ; un diagnostic à coller dans la
   conversation et le journal. Une retouche refusée dit pourquoi.
+- La liaison fermée par un jeton privé (voir Vos photos) : une commande qui ne porte pas le jeton
+  de la liaison est refusée sans rien faire. Le diagnostic du Gestionnaire de modules externes dit
+  si le jeton est là et combien de commandes ont été refusées, jamais sa valeur.
 
 ![La fenêtre de suivi de la liaison](docs/suivi.png)
 
 ### « Proposer d'abord »
 
 - Dans ce mode (Gestionnaire de modules externes, ou un clic sur le voyant de la fenêtre Claude),
-  Claude montre le rendu de ce qu'il propose, côte à côte avec l'état actuel, ou décrit le
-  changement, puis attend votre accord. Le module refuse toute écriture que Claude ne présente pas
-  comme approuvée (retouche, masque, tache, classement, collection, exportation), et Claude ne le
-  fait qu'après votre « oui ».
+  Claude montre le rendu de ce qu'il propose, côte à côte avec l'état actuel et avec le bilan
+  chiffré de l'un à l'autre (une régression se corrige dans la proposition avant de vous la
+  soumettre), ou décrit le changement, puis attend votre accord. Le module refuse toute écriture
+  que Claude ne présente pas comme approuvée (retouche, masque, tache, classement, collection,
+  exportation), et Claude ne le fait qu'après votre « oui ».
 - Dans la fenêtre Claude, la proposition s'affiche (réglages avant → après) dans l'onglet
   Proposition, avec Accepter, Refuser et Ajuster… : un texte libre, ou un ajustement d'un clic
   (Moins chaud, Peau plus naturelle, Garder le ciel, Plus de contraste). ▲ ▼, à leur droite, font
@@ -447,18 +539,28 @@ Ce qui part chez Anthropic quand Claude regarde ou classe :
 - les photos que vous joignez ou collez dans la fenêtre Claude (réduites à 1568 px) ;
 - la description des photos : nom du fichier, appareil, objectif, réglages de prise de vue, date,
   dimensions, note, drapeau, libellé, réglages de développement ;
+- pour une photo Fujifilm, l'intention de la prise de vue que le connecteur lit dans l'original
+  (simulation de film, plage dynamique, tons, compensation, mode, balance), sans l'original ;
+- le nom de vos écrans et de leur profil de couleur, et comment ce profil a été fait (d'usine,
+  standard, à l'œil, par une sonde, personnalisé ; le logiciel et la date du profil s'ils sont lus),
+  dans `get_status` ou dans une remarque au premier aperçu d'une session du connecteur : jamais le
+  chemin du profil ;
 - les métadonnées que Claude lit ou pose : titre, légende, mots-clés, droits d'auteur, champs IPTC,
   position GPS, noms des collections, et le chemin d'un dossier quand il en a besoin (recherche,
   livraison, original introuvable) ;
-- les chiffres des mesures et de Vision (luminosité, netteté, visages, mots-clés), la place du
-  point de mise au point, l'évaluation que Claude garde pour la photo, et bien sûr vos messages.
+- les chiffres des mesures et de Vision (luminosité, netteté, éclairage, bilan d'une passe à
+  l'autre, visages, mots-clés), la place du point de mise au point, l'évaluation que Claude garde
+  pour la photo, et bien sûr vos messages.
 
 Ce qui reste sur le Mac :
 
 - le catalogue et les originaux : Claude ne reçoit jamais un fichier original ;
-- le calcul des mesures et l'analyse de Vision, faits sur le Mac, sans réseau ; le point de mise
-  au point, que le connecteur lit dans l'original sans l'envoyer ; le tri lit les vignettes du
-  cache de Lightroom sur le Mac et n'en envoie que les résultats ;
+- le calcul des mesures et l'analyse de Vision, faits sur le Mac, sans réseau ; la lecture de
+  l'original pour le point de mise au point et l'intention de la prise de vue (seul ce qui en est
+  lu part, jamais l'original) ; la lecture de l'écran, sans réseau ni permission ; le tri lit les
+  vignettes du cache de Lightroom sur le Mac et n'en envoie que les résultats ;
+- le jeton privé de la liaison (`liaison.jeton`), qui ne part jamais chez Claude ni dans un
+  journal ;
 - les fichiers exportés, et toute la fenêtre Publication, qui ne parle jamais à Claude ;
 - les conversations de la fenêtre Claude (avec les images que Claude a regardées), le guide de
   style, les profils de publication, le registre de consommation, et les notes proposées avec
@@ -469,6 +571,16 @@ Ce qui reste sur le Mac :
 Le module et le connecteur se parlent par deux ports de cet ordinateur seulement (54770 et 54771,
 adresse 127.0.0.1). Le connecteur n'appelle jamais Anthropic lui-même ; la seule question qu'il
 pose au réseau est celle de `--status` à GitHub, par `gh`, sur la dernière version publiée.
+
+Depuis la 1.2, cette liaison est fermée par un jeton privé. À chaque démarrage de la liaison, le
+module en tire un au hasard et le range dans
+`~/Library/Application Support/Developpeur/liaison.jeton`, lisible par vous seul ; le connecteur le
+relit à chaque connexion et le joint à chaque commande. Une commande sans ce jeton, ou avec un
+autre, venue d'un autre programme du Mac ou d'une page web, est refusée sans rien faire et notée au
+journal : elle ne peut ni regarder, ni retoucher, ni passer outre la pause ou « Proposer
+d'abord ». Le jeton protège de ce qui ne peut pas lire vos fichiers ; un programme qui tourne sous
+votre compte, lui, le pourrait. Un connecteur d'avant la 1.2 resté ouvert est refusé de même (voir
+En cas de problème).
 
 Claude passe par votre forfait claude.ai, jamais par une clé d'API : Claude Desktop et Claude Code
 sont connectés à votre compte, et la fenêtre Claude lance le `claude` officiel en retirant de son
@@ -532,7 +644,8 @@ Ensuite :
 
 - quitter et relancer Lightroom Classic : le module se charge et démarre la liaison ;
 - ouvrir Claude Desktop : le connecteur `MCP-Developpeur` apparaît dans ses outils ;
-- dans Claude Code, ouvrir une nouvelle session (`/clear` ne relance pas le connecteur) ;
+- dans Claude Code, ouvrir une nouvelle session (`/clear` ne relance pas le connecteur) ; depuis la
+  1.2, la liaison refuse un connecteur plus ancien resté ouvert (voir En cas de problème) ;
 - pour le raccourci ⌃⌥C : Fichier › Gestionnaire de modules externes › Développeur › Poser le
   raccourci, puis relancer Lightroom. Un module ne peut pas déclarer de raccourci : c'est un
   raccourci d'app de macOS, qui sert quand la fenêtre principale de Lightroom est devant. Pour le
@@ -552,40 +665,49 @@ Configuration requise :
 - facultatif : [`gh`](https://cli.github.com) connecté à GitHub, pour que `--status` signale une
   version plus récente.
 
-Le connecteur ne demande pas l'Accessibilité ni aucune autre permission particulière ; seul macOS
-peut demander une fois l'accès au disque de vos photos (voir En cas de problème). Pour vérifier
-l'installation, Lightroom ouvert :
+Le connecteur ne demande pas l'Accessibilité ni aucune autre permission particulière (l'écran se
+lit sans permission) ; seul macOS peut demander une fois l'accès au disque de vos photos (voir En
+cas de problème). Pour vérifier l'installation, Lightroom ouvert :
 
 ```bash
 "$HOME/Library/Application Support/Developpeur/mcp-developpeur" --status
 ```
 
+Il dit la version (et s'il en existe une plus récente), les inscriptions, le module, l'état du
+jeton de la liaison (présent et lisible par vous seul, absent ou illisible ; jamais sa valeur),
+l'écran principal et son profil (même Lightroom fermé), puis la liaison.
+
 Pour désinstaller : `bash uninstall.sh` (dans le dossier décompressé, ou depuis le dépôt),
 Claude Desktop fermé comme pour l'installation (sinon, le script dit quoi vérifier). Il
 retire l'inscription dans Claude, le connecteur, le module, ses paramètres prédéfinis invisibles
-(Lightroom fermé) et ses fichiers de travail, et garde votre guide de style, vos conversations,
-vos profils de publication, le registre de consommation, les notes proposées et les journaux ;
-`bash uninstall.sh --tout` les retire aussi. Les retouches déjà faites restent dans le catalogue
-(elles s'annulent dans le panneau Historique).
+(Lightroom fermé) et ses fichiers de travail, dont le jeton de la liaison (un Lightroom ouvert le
+réécrit : relancer le script après l'avoir quitté), et garde votre guide de style, vos
+conversations, vos profils de publication, le registre de consommation, les notes proposées et les
+journaux ; `bash uninstall.sh --tout` les retire aussi. Les retouches déjà faites restent dans le
+catalogue (elles s'annulent dans le panneau Historique).
 
 ### Premiers pas
 
 Lightroom ouvert, une photo sélectionnée, demandez à Claude par exemple : « Retouche la photo
 active, rendu naturel et un peu chaud », « Passe-la en CLASSIC CHROME et redresse l'horizon »,
-« Assombris le ciel sans toucher au bâtiment », « Efface les poussières du capteur », « Débruite
-cette photo de nuit », « Montre-moi d'abord ce que tu proposes », « Montre-moi trois
-interprétations : naturelle, chaude et noir et blanc », « Harmonise cette série sur la troisième
-photo », « Trie la séance et propose-moi les meilleures », « Note ces photos » (Claude pose les
-notes) ou « Prépare la sélection pour Instagram ». Dans la fenêtre Claude, une photo que Claude
+« Assombris le ciel sans toucher au bâtiment », « Éclaircis et assombris pour mener l'œil au
+visage », « Efface les poussières du capteur », « Débruite cette photo de nuit », « Montre-moi
+d'abord ce que tu proposes », « Montre-moi trois interprétations : naturelle, chaude et noir et
+blanc », « Harmonise cette série sur la troisième photo », « Trie la séance et propose-moi les
+meilleures », « Note ces photos » (Claude pose les notes) ou « Prépare la sélection pour
+Instagram ». Dans la fenêtre Claude, une photo que Claude
 traite est d'abord notée : sa note attend « à vérifier » dans la carte Note. À l'ouverture de la
 fenêtre, sur une conversation vide, Claude prépare déjà une proposition de retouche de la photo
 active : elle attend dans l'onglet Proposition.
 
-Claude regarde la photo, pose un diagnostic chiffré, applique une première passe (profil, balance
+Claude regarde la photo, pose un diagnostic chiffré (avec ce que l'appareil Fujifilm a noté de la
+prise de vue, et un éclairage mixte s'il y en a un), applique une première passe (profil, balance
 des blancs, tonalité), vérifie le rendu, puis fait les finitions, dans l'ordre que recommande
 l'aide d'Adobe (corrections d'objectif avant Upright, débruitage avant les masques et les taches).
 Si la vérification montre encore un défaut précis (hautes lumières brûlées, dominante, masque trop
-visible), il fait une passe corrective ciblée, deux au plus, et dit ce qui reste. Pour comparer :
+visible, ou une régression que chiffre le bilan), il fait une passe corrective ciblée, deux au
+plus, et dit ce qui reste. Dans la fenêtre Claude et avec les invites qui retouchent, son résumé
+de fin donne les chiffres du bilan. Pour comparer :
 l'instantané « Avant Claude », ou un avant/après demandé à Claude (la touche `\` du module
 Développement montre l'état à l'importation, pas celui d'avant Claude).
 
@@ -608,14 +730,28 @@ fenêtre Claude attendent la fin.
 - **Outils absents ou anciens dans Claude** : relancer Claude Desktop, ou ouvrir une nouvelle
   session Claude Code. Un connecteur et un module de versions différentes sont signalés (en orange
   dans la fenêtre Claude, et par Claude).
+- **« Liaison fermée : cette commande ne porte pas le jeton de la liaison… »** : un connecteur
+  d'avant la 1.2 tourne encore (Claude Desktop, ou une session de Claude Code, ouverts pendant
+  l'installation). Quitter puis rouvrir Claude Desktop, ou ouvrir une nouvelle session de Claude
+  Code. Si le message revient, le connecteur installé est plus ancien que le module : réinstaller
+  Développeur.
+- **« Liaison fermée : le module n'a pas de jeton »**, jeton absent ou illisible selon `--status`,
+  ou dans la fenêtre Claude l'aide « n'a pas pu préparer son jeton privé » : relancer la liaison
+  (Fichier › Module externe - Extras › Arrêter, puis Démarrer la liaison avec Claude, ou un clic
+  sur le voyant Lightroom de la fenêtre Claude), qui réécrit le fichier ; le détail est dans
+  `~/Library/Logs/Developpeur/module.log`. « Le jeton de cette commande n'est pas celui de la
+  liaison » : la liaison vient de redémarrer, réessayer ; si le refus se répète, la relancer.
+- **Voyant Écran gris (« Écran »)** : le connecteur n'a pas répondu dans les 5 secondes, est
+  introuvable ou plus ancien que la 1.2 (un clic sur le voyant en dit la raison) : réinstaller
+  Développeur, ou régler le chemin du connecteur dans le Gestionnaire de modules externes.
 - **Connecteur absent de Claude Desktop après l'installation** (ou ancien connecteur `lightroom`
   revenu, que `--status` signale) : Claude Desktop était ouvert et a réécrit sa configuration. Le
   quitter (⌘Q), lancer `"$HOME/Library/Application Support/Developpeur/mcp-developpeur" --install`,
   puis le rouvrir.
 - **Fenêtre « … souhaite accéder aux fichiers d'un volume »** : macOS demande l'autorisation de
   lire le disque de vos photos pour le connecteur lancé par Claude ; c'est à vous d'y répondre.
-  Sans elle, le tri et l'aperçu continuent sans le point de mise au point des photos Fujifilm ; sa
-  lecture reprend une fois votre réponse donnée.
+  Sans elle, le tri et l'aperçu continuent sans le point de mise au point ni l'intention de la
+  prise de vue des photos Fujifilm ; leur lecture reprend une fois votre réponse donnée.
 - **Fenêtre « Mises à jour IA recommandées »** : Lightroom n'a pas pu calculer un masque IA (ses
   modèles IA ne sont pas encore téléchargés) ; répondre « Exporter », case « Mettre à jour les
   photos concernées » cochée.
@@ -655,7 +791,9 @@ swift test
 ```
 
 Le connecteur : protocole MCP, outils, catalogue des réglages, inscription dans Claude (sur des
-fichiers temporaires) et liaison TCP avec un faux module Lightroom.
+fichiers temporaires), liaison TCP avec un faux module Lightroom (jeton compris, dans un fichier
+temporaire), et ce que la 1.2 ajoute (bilan, éclairage, lecture des fichiers Fujifilm, écran,
+dosage de la peau), sur des images, des fichiers et des profils de couleur fabriqués.
 
 ```bash
 scripts/tester-module.sh
@@ -668,10 +806,14 @@ Le module, avec LuaJIT : forme du module, syntaxe et globales de chaque fichier,
 `essais-*.lua` y tournent après `tests.lua`).
 
 Aucun test ne touche Lightroom, Claude, vos photos ni les fichiers de Claude, et aucun ne consomme
-de quota. Les deux suites tournent aussi à chaque envoi sur `main` (GitHub Actions).
+de quota. Un test relit seulement, s'il les trouve, les doses de la peau rangées dans l'application
+Lightroom Classic ; aucun ne lit votre écran, sauf sur demande :
+`DEVELOPPEUR_ECRAN_REEL=1 swift test`. Les deux suites tournent aussi à chaque envoi sur `main`
+(GitHub Actions).
 
 Pour la mise au point, Lightroom ouvert et liaison démarrée, l'exécutable installé
-(`~/Library/Application Support/Developpeur/mcp-developpeur`) offre aussi :
+(`~/Library/Application Support/Developpeur/mcp-developpeur`) offre aussi ce qui suit ; ce qui
+parle au module y passe avec le jeton de la liaison, comme le connecteur :
 
 - `--call <outil> '{…}'` : appelle un outil comme le ferait Claude ;
 - `--module diagnostic` : les fonctions du SDK que Lightroom offre au module
@@ -683,16 +825,35 @@ Pour la mise au point, Lightroom ouvert et liaison démarrée, l'exécutable ins
 - `--marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` : le carré de mise au
   point d'un fichier Fujifilm dessiné sur une vignette, comme dans l'aperçu de la photo active de
   la fenêtre Claude (code 1 sans point), sans Lightroom ni liaison ;
-- `--recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>]` :
-  rejoue une séquence complète dans le vrai Lightroom, sur des copies virtuelles de la collection
-  « Développeur › Essais » (des originaux seulement avec `--original`), vérifie chaque étape sur
-  les réglages relus, puis remet chaque photo dans son état de départ, même après un échec ;
+- `--boitier <original>` : ce que l'appareil a rangé dans un fichier Fujifilm (RAF ou JPEG) : point
+  de mise au point, intention de la prise de vue comme dans `view_photo`, et valeurs lues sous les
+  noms d'exiftool, une ligne JSON (code 1 si rien n'est lu), sans Lightroom ni liaison ;
+- `--ecran` : l'écran principal et son profil de couleur, une ligne JSON (ce que lit le voyant Écran
+  de la fenêtre Claude ; `{"lu": false}` sans écran), sans Lightroom ni liaison ;
+- `--eclairage <id>… [<fichier.jpg>…] [--essai '{…}']` : le relevé de l'éclairage mixte (couleur des
+  tons neutres par case et par zone tonale, visages, à plusieurs bornes), en lecture seule ; un
+  fichier JPEG se mesure sans Lightroom ; `--essai` mesure sous une autre balance par
+  `preview_settings` (deux étapes « Claude · essai » dans l'Historique), sur une copie virtuelle
+  seulement ;
+- `--recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>]`
+  `[--x-t20 <id>] [--portrait <id>] [--mixte <id>]` : rejoue une séquence complète dans le vrai
+  Lightroom, sur des copies virtuelles de la collection « Développeur › Essais » (des originaux
+  seulement avec `--original`), vérifie chaque étape sur les réglages relus, puis remet chaque
+  photo dans son état de départ, même après un échec. Elle commence par la liaison fermée (une
+  commande sans jeton, ou avec un autre, refusée) et l'écran nommé, en lecture seule ; le RAW
+  passe aussi par l'intention lue au boîtier, le bilan chiffré d'une passe à l'autre (une étape
+  écrite puis annulée) et éclaircir et assombrir (en propositions), le X-T20 par l'intention ;
+  `--portrait` y ajoute la peau dosée sur un portrait (trois doses en propositions, l'intensité 50
+  qui vaut la moitié, le refus d'une peau trop lissée, la dose par défaut posée puis annulée),
+  `--mixte` une photo à deux lumières lue mixte, puis le RAW lu à une seule lumière, en lecture
+  seule ;
 - `--version`.
 
 ## Organisation
 
 - `Sources/DeveloppeurKit/` : le connecteur (protocole MCP, outils, invites, catalogue des
-  réglages, standard de notation, mesures et Vision, liaison TCP avec le module)
+  réglages, standard de notation, dosage de la peau, mesures et Vision, éclairage, bilan d'une
+  passe à l'autre, lecture des fichiers Fujifilm, écran, liaison TCP avec le module et son jeton)
 - `Sources/MCPDeveloppeur/main.swift` : l'exécutable `mcp-developpeur` (options de ligne de
   commande, boucle stdio)
 - `Lightroom/Developpeur.lrplugin/` : le module Lightroom Classic, en Lua 5.1 (liaison avec le
