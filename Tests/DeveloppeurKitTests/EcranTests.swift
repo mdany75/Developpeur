@@ -224,13 +224,20 @@ final class EcranTests: XCTestCase {
         XCTAssertTrue(doute.contains("peau, couleurs") && doute.contains("lui demander si son écran est étalonné"), doute)
 
         // Le détail de la fenêtre : l'écran, son profil, puis le conseil ; un autre écran en plus.
-        let detail = Ecran.detail(Ecran.Etat(principal: Self.odyssey, autres: [Self.perso]))
+        let detail = Ecran.detail(Ecran.Etat(principal: Self.odyssey, autres: [Self.perso]), langue: "fr-CA")
         XCTAssertTrue(detail.hasPrefix("Écran principal : Odyssey G85SD (gamut large).\n"
             + "Profil de couleur : « Odyssey G85SD », le profil d'usine de l'écran, non mesuré sur ce Mac."), detail)
         XCTAssertTrue(detail.contains("Autre écran : DELL U2723QE · profil personnalisé"), detail)
-        XCTAssertTrue(detail.contains("Réglages Système › Moniteurs › Profil de couleur"), detail)
         XCTAssertTrue(detail.contains("Night Shift"), detail)
-        let detailMesure = Ecran.detail(Ecran.Etat(principal: Self.mesure))
+        // Les Réglages nommés comme sur le Mac : « Écrans » en français du Canada (celui de Dany),
+        // « Moniteurs » en français de France (libellés relevés dans DisplaysExt.appex).
+        XCTAssertTrue(detail.contains("(Réglages système › Écrans › Profil de couleur)"), detail)
+        XCTAssertFalse(detail.contains("Moniteurs"), detail)
+        for (langue, attendu) in [("fr_CA", "Réglages système › Écrans"), ("fr-FR", "Réglages Système › Moniteurs"),
+                                  ("fr", "Réglages Système › Moniteurs"), (nil, "Réglages Système › Moniteurs")] {
+            XCTAssertTrue(Ecran.detail(Ecran.Etat(principal: Self.odyssey), langue: langue).contains(attendu), String(describing: langue))
+        }
+        let detailMesure = Ecran.detail(Ecran.Etat(principal: Self.mesure), langue: "fr-CA")
         XCTAssertTrue(detailMesure.contains("mesuré par une sonde (DisplayCAL), profil du 3 mars 2026."), detailMesure)
         XCTAssertTrue(detailMesure.contains("vous la jugez sur un écran étalonné"), detailMesure)
         XCTAssertFalse(detailMesure.contains("Night Shift"))

@@ -344,8 +344,19 @@ public enum Ecran {
         }
     }
 
-    /// Le texte de la boîte « Claude · écran » de la fenêtre Claude (un clic sur le voyant Écran).
-    public static func detail(_ e: Etat) -> String {
+    /// Où choisir le profil de couleur, avec les libellés de la langue du Mac (relevés le 20 octobre
+    /// 2026 dans DisplaysExt.appex et Réglages Système) : en français du Canada, « Réglages système ›
+    /// Écrans » (le Mac de Dany est en fr-CA) ; en français de France, « Réglages Système ›
+    /// Moniteurs ».
+    static func reglageProfil(langue: String?) -> String {
+        let code = (langue ?? "").replacingOccurrences(of: "_", with: "-").lowercased()
+        return code.hasPrefix("fr-ca") ? "Réglages système › Écrans › Profil de couleur"
+            : "Réglages Système › Moniteurs › Profil de couleur"
+    }
+
+    /// Le texte de la boîte « Claude · écran » de la fenêtre Claude (un clic sur le voyant Écran) ;
+    /// `langue` : la première langue de l'utilisateur, pour nommer les Réglages comme son Mac.
+    public static func detail(_ e: Etat, langue: String? = Locale.preferredLanguages.first) -> String {
         let a = e.principal
         var qualites: [String] = []
         if a.integre { qualites.append("intégré") }
@@ -375,7 +386,7 @@ public enum Ecran {
         }
         lignes.append("")
         let conseil = "Pour juger les couleurs, coupez Night Shift (et True Tone sur un écran Apple)."
-        let reglage = "(Réglages Système › Moniteurs › Profil de couleur)"
+        let reglage = "(\(reglageProfil(langue: langue)))"
         switch a.etalonnage.mesure {
         case .some(true):
             lignes.append("Claude mesure la photo par ses chiffres ; vous la jugez sur un écran étalonné.")

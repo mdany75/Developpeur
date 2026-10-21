@@ -1039,9 +1039,13 @@ essai('Écran : lu par le connecteur (--ecran, 5 s au plus) ; absent ou ancien, 
     egal(false, ecran.lu)
     egal(Lightroom.ECRAN_AUCUN, ecran.detail)
 
-    -- Réponse vide ou coupée (alarme de 5 s) : gris.
+    -- Réponse vide ou coupée (alarme de 5 s) : gris, « pas répondu dans les 5 s », jamais
+    -- « introuvable » (le connecteur est là).
     Fichiers.ecrire(reponseEcran, '{"principal":{"mesure":fa')
-    verifierEcran(Lightroom.etatEcran(faux), 'Écran', 'neutre', 'réponse coupée')
+    ecran = Lightroom.etatEcran(faux)
+    verifierEcran(ecran, 'Écran', 'neutre', 'réponse coupée')
+    egal(Lightroom.ECRAN_ILLISIBLE, ecran.detail, 'réponse coupée : détail')
+    vrai(not ecran.detail:find('introuvable', 1, true), ecran.detail)
     -- Une commande du système en échec : gris, sans erreur.
     local executer = S.modules.LrTasks.execute
     S.modules.LrTasks.execute = function() error('commande impossible') end
@@ -1049,17 +1053,24 @@ essai('Écran : lu par le connecteur (--ecran, 5 s au plus) ; absent ou ancien, 
     S.modules.LrTasks.execute = executer
     vrai(okPanne, tostring(enPanne))
     verifierEcran(enPanne, 'Écran', 'neutre', 'commande en échec')
+    egal(Lightroom.ECRAN_ILLISIBLE, enPanne.detail, 'commande en échec : détail')
 
-    -- Connecteur 1.1.1 (son aide sur stdout) ou introuvable : gris, « plus ancien que la 1.2 ».
+    -- Connecteur 1.1.1 (son aide sur stdout) : gris, « plus ancien que la 1.2 ».
     ecran = Lightroom.etatEcran(connecteurAncien())
     verifierEcran(ecran, 'Écran', 'neutre', 'connecteur 1.1.1')
-    vrai(ecran.detail:find('introuvable ou plus ancien que la 1.2', 1, true), ecran.detail)
+    egal(Lightroom.ECRAN_ILLISIBLE, ecran.detail, 'connecteur 1.1.1 : détail')
+    vrai(ecran.detail:find('plus ancien que la 1.2', 1, true), ecran.detail)
+    -- Connecteur introuvable : gris, « introuvable », et rien n'est lancé.
     avant = #S.dernieresCommandes
     ecran = Lightroom.etatEcran(S.home .. '/introuvable/mcp-developpeur')
     verifierEcran(ecran, 'Écran', 'neutre', 'connecteur introuvable')
-    egal(Lightroom.ECRAN_ILLISIBLE, ecran.detail)
+    egal(false, ecran.lu)
+    egal(Lightroom.ECRAN_INTROUVABLE, ecran.detail)
+    vrai(not ecran.detail:find('plus ancien', 1, true), ecran.detail)
     egal(avant, #S.dernieresCommandes, 'rien lancé sans connecteur')
-    verifierEcran(Lightroom.etatEcran(nil), 'Écran', 'neutre', 'sans chemin')
+    ecran = Lightroom.etatEcran(nil)
+    verifierEcran(ecran, 'Écran', 'neutre', 'sans chemin')
+    egal(Lightroom.ECRAN_INTROUVABLE, ecran.detail, 'sans chemin : détail')
     verifierEcran(Lightroom.decrireEcran({ principal = 'texte' }), 'Écran', 'neutre', 'principal illisible')
 end)
 

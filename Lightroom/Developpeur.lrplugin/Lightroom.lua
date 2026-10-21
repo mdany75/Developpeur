@@ -132,10 +132,13 @@ function Lightroom.etatClaude(claude)
     return { installe = true, connecte = true, forfait = forfait, texte = forfait and "Claude Code · forfait" or "Claude Code · " .. tostring(json.authMethod) }
 end
 
--- Détail du voyant Écran quand le connecteur ne l'a pas dit : absent, ou d'avant la 1.2 (il
--- répond à --ecran par son aide, qui n'est pas du JSON).
-Lightroom.ECRAN_ILLISIBLE = "L'écran n'a pas pu être lu : le connecteur MCP-Développeur est introuvable ou plus ancien "
-    .. "que la 1.2 (réinstaller Développeur)."
+-- Détail du voyant Écran quand le connecteur ne l'a pas dit : absent ; présent, mais sans réponse
+-- lisible (coupé par l'alarme de 5 s, ou d'avant la 1.2 : il répond à --ecran par son aide, qui
+-- n'est pas du JSON) ; ou sans écran lu.
+Lightroom.ECRAN_INTROUVABLE = "L'écran n'a pas pu être lu : le connecteur MCP-Développeur est introuvable "
+    .. "(réinstaller Développeur, ou régler son chemin dans le Gestionnaire de modules externes)."
+Lightroom.ECRAN_ILLISIBLE = "L'écran n'a pas pu être lu : le connecteur MCP-Développeur n'a pas répondu dans les 5 s, "
+    .. "ou il est plus ancien que la 1.2 (réinstaller Développeur)."
 Lightroom.ECRAN_AUCUN = "Le connecteur MCP-Développeur n'a lu aucun écran (session sans écran ?)."
 
 -- L'écran principal du Mac et son profil de couleur, lus par le connecteur (`mcp-developpeur
@@ -144,7 +147,9 @@ Lightroom.ECRAN_AUCUN = "Le connecteur MCP-Développeur n'a lu aucun écran (ses
 -- commande en échec, laisse le voyant gris, sans erreur (la suite de Fenetre.verifier passe).
 function Lightroom.etatEcran(connecteur)
     if not Fichiers.existe(connecteur) then
-        return Lightroom.decrireEcran(nil)
+        local ecran = Lightroom.decrireEcran(nil)
+        ecran.detail = Lightroom.ECRAN_INTROUVABLE
+        return ecran
     end
     local lu, texte = LrTasks.pcall(function()
         Fichiers.creerDossier(Chemins.temporaire())
