@@ -938,8 +938,8 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end
         vrai(etiquette, nom .. ' : étiquette « Style » devant le menu')
-        -- ▲ ▼ de la carte Note, de la proposition, de la carte de l'étape (1.3) et de la carte de la
-        -- leçon (lot B4), en petit : huit.
+        -- ▲ ▼ de la carte Note, de la proposition, de la carte de l'étape (1.3), de la carte de la
+        -- leçon (lot B4) et de la carte Focus (22 octobre 2026), en petit : dix.
         local fleches = {}
         parcourir(args.contents, function(v)
             if S.BOUTONS[v.genre] and (v.args.title == '▲' or v.args.title == '▼') and v.args.size == 'mini' then
@@ -947,7 +947,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end)
         table.sort(fleches)
-        egal('etapeDescend etapeMonte leconDescend leconMonte noteDescend noteMonte propositionDescend propositionMonte',
+        egal('etapeDescend etapeMonte focusDescend focusMonte leconDescend leconMonte noteDescend noteMonte propositionDescend propositionMonte',
             table.concat(fleches, ' '), nom .. ' : flèches des cartes')
         -- Les sept invites (1.3 : Composition ajoutée avant Sports), en carrés de 24 de bezel, tiennent
         -- dans le centre.

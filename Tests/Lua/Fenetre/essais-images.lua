@@ -65,11 +65,14 @@ local ATTENDUES = {
     ['carte-proposition'] = { 498 },
     ['carte-etape'] = { 498 },
     ['carte-lecon'] = { 498 },
+    ['carte-focus'] = { 498 },
     ['seg-apercu'] = { 72, 22 },
+    ['seg-focus'] = { 62, 22 },
     ['seg-proposition'] = { 98, 22 },
     ['seg-note'] = { 57, 22 },
     ['seg-lecon'] = { 65, 22 },
     ['seg-apercu-actif'] = { 72, 22 },
+    ['seg-focus-actif'] = { 62, 22 },
     ['seg-proposition-actif'] = { 98, 22 },
     ['seg-note-actif'] = { 57, 22 },
     ['seg-lecon-actif'] = { 65, 22 },
@@ -97,6 +100,7 @@ local ATTENDUES = {
 -- Les images qui vont par groupe (variantes d'un même contrôle) ont la même taille.
 local GROUPES = {
     { 'seg-apercu', 'seg-apercu-actif' },
+    { 'seg-focus', 'seg-focus-actif' },
     { 'seg-proposition', 'seg-proposition-actif' },
     { 'seg-note', 'seg-note-actif' },
     { 'seg-lecon', 'seg-lecon-actif' },
@@ -104,7 +108,7 @@ local GROUPES = {
     { 'etoile24-pleine', 'etoile24-vide' },
     { 'etoile12-pleine', 'etoile12-vide' },
     { 'pastille-vert', 'pastille-orange', 'pastille-rouge', 'pastille-gris' },
-    { 'carte-proposition', 'carte-etape', 'carte-lecon' },
+    { 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' },
     { 'trombone', 'presse-papiers' },
     { 'chevron-haut', 'chevron-bas' },
 }

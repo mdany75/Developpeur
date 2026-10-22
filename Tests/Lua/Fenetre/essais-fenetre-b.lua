@@ -349,7 +349,7 @@ essai('Cadre : la fenêtre demandée par Dany (1 948 × 1 200), son contenu (D7)
     egal(D.hauteurCase, I.selection.hauteur, 'fond de sélection : une case')
     egal(D.panneau, I.panneau.largeur, 'panneau')
     egal(D.hauteurContenu, D.margeHautDroite + I.panneau.hauteur + D.margeBasDroite, 'le panneau sur toute la colonne, entre ses marges')
-    for _, nom in ipairs({ 'carte-note', 'carte-proposition', 'carte-etape', 'carte-lecon' }) do
+    for _, nom in ipairs({ 'carte-note', 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' }) do
         egal(D.interieur, I[nom].largeur, nom)
     end
     egal(D.envoyer, I['bouton-bleu'].largeur, 'Envoyer : le bouton bleu')
@@ -394,7 +394,7 @@ essai("Cadre : à une autre hauteur de fenêtre, le fil, la liste, le panneau et
     local I = Dispositions.IMAGES
     -- À la hauteur de la fenêtre : les cartes se tirent de la place sous l'aperçu.
     egal(D.placeCartes - D.autourNote, I['carte-note'].hauteur, 'carte Note : la place des cartes, moins sa grille')
-    for _, nom in ipairs({ 'carte-proposition', 'carte-etape', 'carte-lecon' }) do
+    for _, nom in ipairs({ 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' }) do
         egal(D.placeCartes - D.sousCarte, I[nom].hauteur, nom .. ' : la place des cartes, moins ce qu\'elle laisse sous elle')
     end
     -- Deux cents points de moins, puis de plus : chaque zone suit, autant de lignes et de cases que
@@ -414,7 +414,7 @@ essai("Cadre : à une autre hauteur de fenêtre, le fil, la liste, le panneau et
         egal(A.hauteurContenu, A.margeHautDroite + J.panneau.hauteur + A.margeBasDroite, 'panneau entre ses marges' .. quoi)
         egal(D.placeCartes + ecart, A.placeCartes, 'place des cartes' .. quoi)
         egal(A.placeCartes - A.autourNote, J['carte-note'].hauteur, 'carte Note' .. quoi)
-        for _, nom in ipairs({ 'carte-proposition', 'carte-etape', 'carte-lecon' }) do
+        for _, nom in ipairs({ 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' }) do
             egal(A.placeCartes - A.sousCarte, J[nom].hauteur, nom .. quoi)
         end
     end
@@ -842,7 +842,7 @@ end)
 
 -- Segments -------------------------------------------------------------------------------------------
 
-essai('Segments : Aperçu | Proposition | Note | Leçon en images sous calques ; un clic choisit l\'onglet, son crochet suit, sans envoyer la demande', function()
+essai('Segments : Aperçu | Focus | Proposition | Note | Leçon en images sous calques ; un clic choisit l\'onglet, son crochet suit, sans envoyer la demande', function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
@@ -883,8 +883,8 @@ essai('Segments : Aperçu | Proposition | Note | Leçon en images sous calques ;
         end
         Fenetre.envoyer = envoyer
         p.saisie = ''
-        egal('apercu proposition notation lecon', table.concat(recus, ' '), 'un vrai clic : le crochet de chaque onglet')
-        -- La rangée ◀ légende ▶ · ⤢ Agrandir est commune aux quatre onglets.
+        egal('apercu focus proposition notation lecon', table.concat(recus, ' '), 'un vrai clic : le crochet de chaque onglet')
+        -- La rangée ◀ légende ▶ · ⤢ Agrandir est commune aux cinq onglets.
         for _, titre in ipairs({ '◀', '▶', '⤢ Agrandir' }) do
             local b = parTitre(contenu, titre)
             egal(nil, b.args.visible, titre .. ' : hors des onglets')
@@ -2231,7 +2231,7 @@ essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leu
         end
         -- Chaque carte : une colonne superposée de la largeur intérieure, à la hauteur de son image,
         -- son contenu à 13 du bord et 12 du haut (comme Vues.lecon).
-        for _, nom in ipairs({ 'carte-note', 'carte-proposition', 'carte-etape', 'carte-lecon' }) do
+        for _, nom in ipairs({ 'carte-note', 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' }) do
             local carte = carteSur(contenu, nom)
             egal(Dispositions.IMAGES[nom].hauteur, carte.args.height, nom .. ' : la hauteur de son image')
             egal(D.interieur, carte.args.width, nom)
@@ -2240,7 +2240,7 @@ essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leu
             egal(12, dedans.args.margin_top, nom .. ' : marge du haut')
             vrai(hauteur(carte) <= carte.args.height, nom .. ' : son contenu y tient')
             -- Ses lignes la remplissent (Dispositions.TAILLES : criteres, propLignes, etapeLignes,
-            -- leconLignes) : au moins la marge du haut sous le contenu, et une ligne de plus (16 dans
+            -- leconLignes, focusLignes) : au moins la marge du haut sous le contenu, et une ligne de plus (16 dans
             -- la grille de la carte Note, une ligne de texte en 12 ailleurs) ne laisserait plus cette
             -- marge.
             local estime = hauteur(dedans)
@@ -2253,7 +2253,7 @@ essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leu
         -- L'onglet Note remplit la place des cartes : une ligne de critère de plus n'y tiendrait pas.
         vrai(hauteur(v.notation) + D.ligneCritere > D.placeCartes, string.format('onglet Note : %.1f pour %d', hauteur(v.notation), D.placeCartes))
         -- Les textes des cartes, à la largeur de leur intérieur, en 12 points.
-        for _, cle in ipairs({ 'propositionTexte', 'etapeTexte', 'leconTexte' }) do
+        for _, cle in ipairs({ 'propositionTexte', 'etapeTexte', 'leconTexte', 'focusTexte' }) do
             local t = liee(contenu, 'static_text', cle)
             egal(D.carte, t.args.width, cle)
             egal(Fenetre.POLICES.texte12, t.args.font, cle)

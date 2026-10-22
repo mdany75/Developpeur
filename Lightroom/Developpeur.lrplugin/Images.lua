@@ -125,6 +125,36 @@ function Images.marquerMiseAuPoint(connecteur, original, geometrie, source)
     return nil
 end
 
+-- L'onglet Focus (demandé par Dany le 22 octobre 2026) : le connecteur lit la mise au point dans
+-- l'original d'un fichier Fujifilm (`mcp-developpeur --focus`, cinq secondes au plus par l'alarme de
+-- perl, comme --ecran ; il borne lui-même l'ouverture de l'original à 2 s), dessine ses cadres sur la
+-- vignette `source` (`<nom>-focus.jpg` à côté) et répond d'une ligne JSON. Rend cette réponse
+-- décodée (à lire seulement, jamais à donner à Lightroom : elle porte des métatables) et le chemin
+-- de la vignette marquée (nil sans dessin) ; nil : connecteur absent, original inconnu, rien de lu,
+-- pas de réponse lisible. `source` nil : les valeurs seules.
+function Images.lireFocus(connecteur, original, geometrie, source)
+    if type(connecteur) ~= 'string' or connecteur == '' or not Fichiers.existe(connecteur)
+        or type(original) ~= 'string' or original == '' then
+        return nil
+    end
+    local dossier = source and LrPathUtils.parent(source) or Chemins.temporaire()
+    local base = source and LrPathUtils.removeExtension(LrPathUtils.leafName(source)) or ('focus-' .. Conversation.identifiant())
+    local sortie = LrPathUtils.child(dossier, base .. '-focus.jpg')
+    local reponse = LrPathUtils.child(dossier, base .. '-focus.json')
+    Fichiers.creerDossier(dossier)
+    Fichiers.supprimer(sortie)
+    LrTasks.execute(string.format("/usr/bin/perl -e 'alarm 5; exec @ARGV' %s --focus %s %s %s %s > %s 2>/dev/null", q(connecteur), q(original),
+        q(Json.encode(type(geometrie) == 'table' and geometrie or {})), q(source or LrPathUtils.child(dossier, base .. '-absente.jpg')),
+        q(sortie), q(reponse)))
+    local texte = Fichiers.lire(reponse) or ''
+    Fichiers.supprimer(reponse)
+    local ok, json = pcall(Json.decode, texte)
+    if not ok or type(json) ~= 'table' or json.lue ~= true then
+        return nil
+    end
+    return json, (json.dessinee == true and Fichiers.existe(sortie)) and sortie or nil
+end
+
 function Images.grande(dossier, nom, largeurMax, hauteurMax)
     local source = LrPathUtils.child(dossier, nom)
     local l, h = Images.dimensions(source)

@@ -374,6 +374,106 @@ function Fil.texteLecon(e)
     return table.concat(morceaux, '\n\n')
 end
 
+-- L'onglet Focus (demandé par Dany le 22 octobre 2026) ----------------------------------------
+
+-- La mise au point d'une photo qui ne se lit pas, après « Mise au point : » : une autre marque que
+-- Fujifilm, un original introuvable ou trop long à ouvrir, un connecteur absent ; pendant la
+-- lecture.
+Fil.FOCUS_AUTRE_MARQUE = "non lue (seulement les fichiers Fujifilm pour l'instant)"
+Fil.FOCUS_NON_LUE = "non lue (original introuvable, ou trop long à ouvrir)"
+Fil.FOCUS_SANS_CONNECTEUR = "non lue (connecteur introuvable : réinstaller Développeur)"
+Fil.FOCUS_EN_COURS = "lecture dans l'original…"
+
+-- « Focus · DSCF2402.RAF (Essai) » : le nom du fichier et celui de la copie virtuelle.
+function Fil.titreFocus(infos)
+    local nom = Texte.nettoyer(sans(infos and infos.nom))
+    local copie = Texte.nettoyer(sans(infos and infos.copie))
+    if nom == '' then
+        return "Focus"
+    end
+    return "Focus · " .. nom .. (copie ~= '' and (" (" .. copie .. ")") or '')
+end
+
+-- Le texte de la carte Focus : les trois blocs Image, Prise de vue et Mise au point, comme les
+-- sections Image Information, Shooting Information et Focus Information de Focus-Points, en
+-- français. Le titre de chaque bloc en <EM> (l'emphase de la carte, gras 12), puis une ligne
+-- « Titre : valeur » par valeur lue (une valeur absente n'a pas de ligne). `infos` : ce que
+-- Lightroom donne (Lightroom.infosFocus) ; `boitier` : la réponse de `mcp-developpeur --focus`
+-- (Images.lireFocus ; ses blocs sont des paires titre, valeur déjà en français), ajoutée au bout de
+-- chaque bloc ; `etat` : 'lue', 'lecture' (en cours), 'autre_marque', 'non_lue' ou
+-- 'sans_connecteur', d'où « Mise au point : non lue (…) » sans lecture. Les textes reçus perdent
+-- leurs balises.
+function Fil.texteFocus(infos, boitier, etat)
+    infos = infos or {}
+    local function propre(v)
+        if type(v) ~= 'string' and type(v) ~= 'number' then
+            return ''
+        end
+        return Texte.nettoyer(sans(tostring(v)))
+    end
+    local function ajouter(lignes, titre, valeur)
+        valeur = propre(valeur)
+        if valeur ~= '' then
+            lignes[#lignes + 1] = titre .. " : " .. valeur
+        end
+    end
+    local function duBoitier(lignes, bloc)
+        for _, paire in ipairs(type(bloc) == 'table' and bloc or {}) do
+            if type(paire) == 'table' then
+                local titre = propre(paire[1])
+                if titre ~= '' then
+                    ajouter(lignes, titre, paire[2])
+                end
+            end
+        end
+    end
+    local lue = etat == 'lue' and type(boitier) == 'table'
+
+    local image = {}
+    local copie = propre(infos.copie)
+    ajouter(image, "Fichier", propre(infos.nom) ~= '' and (propre(infos.nom) .. (copie ~= '' and (" (" .. copie .. ")") or '')) or nil)
+    ajouter(image, "Prise de vue", infos.date)
+    ajouter(image, "Taille d'origine", infos.origine)
+    ajouter(image, "Taille actuelle", infos.actuelle)
+    if lue then
+        duBoitier(image, boitier.image)
+    end
+
+    local prise = {}
+    ajouter(prise, "Marque", infos.marque)
+    ajouter(prise, "Modèle", infos.modele)
+    ajouter(prise, "Objectif", infos.objectif)
+    ajouter(prise, "Focale", infos.focale)
+    local vitesse, ouverture = propre(infos.vitesse), propre(infos.ouverture)
+    ajouter(prise, "Exposition", (vitesse ~= '' and ouverture ~= '') and (vitesse .. " à " .. ouverture) or (vitesse ~= '' and vitesse or ouverture))
+    ajouter(prise, "ISO", infos.iso)
+    ajouter(prise, "Correction d'exposition", infos.correction)
+    ajouter(prise, "Programme d'exposition", infos.programme)
+    ajouter(prise, "Mesure", infos.mesure)
+    if lue then
+        duBoitier(prise, boitier.prise_de_vue)
+    end
+
+    local blocs = {}
+    for _, b in ipairs({ { "Image", image }, { "Prise de vue", prise } }) do
+        if #b[2] > 0 then
+            blocs[#blocs + 1] = '<EM>' .. b[1] .. '</EM>\n' .. table.concat(b[2], '\n')
+        end
+    end
+    local focus = {}
+    if lue then
+        duBoitier(focus, boitier.mise_au_point)
+    end
+    if #focus > 0 then
+        blocs[#blocs + 1] = "<EM>Mise au point</EM>\n" .. table.concat(focus, '\n')
+    else
+        local raison = ({ lecture = Fil.FOCUS_EN_COURS, autre_marque = Fil.FOCUS_AUTRE_MARQUE,
+            sans_connecteur = Fil.FOCUS_SANS_CONNECTEUR })[etat] or Fil.FOCUS_NON_LUE
+        blocs[#blocs + 1] = "<EM>Mise au point :</EM> " .. raison
+    end
+    return table.concat(blocs, '\n\n')
+end
+
 -- « ★★★☆☆ » : une note de 0 à 5 étoiles.
 function Fil.etoiles(note)
     local n = math.max(0, math.min(5, math.floor(tonumber(note) or 0)))

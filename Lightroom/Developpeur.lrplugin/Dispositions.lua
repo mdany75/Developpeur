@@ -2,7 +2,8 @@
 -- seule disposition, la « Conversation claire », à l'allure de la fenêtre B (1.3, maquette
 -- « B · Conversation claire ») : trois colonnes sur des aplats, le volet des conversations à
 -- gauche, au centre l'en-tête, le fil, sa barre et la zone de saisie, à droite les segments
--- Aperçu | Proposition | Note | Leçon sur le panneau, l'aperçu commun et la carte de l'onglet.
+-- Aperçu | Focus | Proposition | Note | Leçon sur le panneau, l'aperçu commun et la carte de
+-- l'onglet (Focus : demandé par Dany le 22 octobre 2026).
 -- L'Atelier, le Panneau et le choix de la disposition sont retirés, comme le choix de la taille
 -- (demandés par Dany le 20 octobre 2026). Son cadre enregistré (Fenetre.cadre) : Lightroom rend sa
 -- taille enregistrée à une fenêtre rouverte, sans la rapetisser (constaté).
@@ -20,7 +21,8 @@
 -- `ongletParDefaut` (Note, montré à l'ouverture), `ongletProposition` et `ongletNotation` (onglet
 -- montré quand une proposition ou une note arrive), `ongletEtape` (l'onglet Aperçu, l'ancien
 -- Pourquoi ? : ouvert par un clic sur une étape du fil, jamais par une bascule automatique),
--- `ongletLecon`, `propLignes`, `etapeLignes`, `leconLignes` et `criteres` (lignes des cartes) ;
+-- `ongletLecon`, `ongletFocus` (ouvert seulement par un clic sur son segment), `propLignes`,
+-- `etapeLignes`, `leconLignes`, `focusLignes` et `criteres` (lignes des cartes) ;
 -- les autres sont des largeurs et des hauteurs de pièces, tirées des précédentes.
 --
 -- Ses images (Dispositions.IMAGES) et ses deux apparences, claire et sombre
@@ -64,7 +66,7 @@ Dispositions.TAILLES = {
     -- La liste des conversations (à recaler) : des cases de 40 points, autant que sa place en tient
     -- (D.cases, 22).
     hauteurCase = 40,
-    -- L'aperçu commun aux quatre onglets : un cadre 3:2 de 498 × 332, à la largeur de l'intérieur du
+    -- L'aperçu commun aux cinq onglets : un cadre 3:2 de 498 × 332, à la largeur de l'intérieur du
     -- panneau (demandé par Dany le 21 octobre 2026), sa vignette en 2x (996 × 664 pixels,
     -- Images.vignette).
     apercu = 498, apercuHauteur = 332, echelleApercu = 2,
@@ -85,8 +87,9 @@ Dispositions.TAILLES = {
     -- plafond depuis le correctif 1.3.2, demandé par Dany le 22 octobre 2026), le texte de la
     -- proposition (sur carte-proposition de 679 : 12 + titre + 6 + 40 lignes + 6 + l'état), de
     -- l'étape (onglet Aperçu, sur carte-etape de 679 : 12 + titre + 6 + sous-titre + 6 + 40 lignes)
-    -- et de la leçon (sur carte-lecon de 679 : 12 + titre + 6 + 42 lignes).
-    criteres = 33, propLignes = 40, etapeLignes = 40, leconLignes = 42,
+    -- et de la leçon (sur carte-lecon de 679 : 12 + titre + 6 + 42 lignes), comme celui de l'onglet
+    -- Focus (sur carte-focus de 679 : 12 + titre + 6 + 42 lignes).
+    criteres = 33, propLignes = 40, etapeLignes = 40, leconLignes = 42, focusLignes = 42,
     -- Le cadre d'un square_button dépasse son bezel visible de 2 points (constaté le 21 octobre 2026,
     -- D5 : height = bezel + 2 ; Fenetre.bouton, clé `bezel`).
     margeBezel = 2,
@@ -136,16 +139,21 @@ Dispositions.IMAGES = {
     -- haut, puis le panneau blanc (bord #C9C9C9, coins de 7), dont 1 134 de panneau.
     panneau = taille(T.panneau, hauteurPanneau),
     -- Les fonds des cartes (#FAFAFA, bord #D9D9D9, coins de 6), à la largeur intérieure du panneau :
-    -- Note (la grille des critères), Proposition, Aperçu (étape) et Leçon, à la hauteur que leur
-    -- laisse la place des cartes (720 sous l'aperçu de 498 × 332 : 583 pour la carte Note, que
+    -- Note (la grille des critères), Proposition, Aperçu (étape), Leçon et Focus, à la hauteur que
+    -- leur laisse la place des cartes (720 sous l'aperçu de 498 × 332 : 583 pour la carte Note, que
     -- l'onglet Note remplit, 679 pour les autres, leur rangée de boutons sous elles).
     ['carte-note'] = taille(T.interieur, placeDesCartes - T.autourNote),
     ['carte-proposition'] = taille(T.interieur, placeDesCartes - T.sousCarte),
     ['carte-etape'] = taille(T.interieur, placeDesCartes - T.sousCarte),
     ['carte-lecon'] = taille(T.interieur, placeDesCartes - T.sousCarte),
-    -- Les onglets Aperçu | Proposition | Note | Leçon, libellés dessinés, et le segment choisi en bleu.
+    ['carte-focus'] = taille(T.interieur, placeDesCartes - T.sousCarte),
+    -- Les onglets Aperçu | Focus | Proposition | Note | Leçon, libellés dessinés, et le segment
+    -- choisi en bleu (« Focus » : 62, comme la largeur de « Leçon » à 3 points près ; les cinq font
+    -- 354 dans le panneau de 528).
     ['seg-apercu'] = taille(72, 22),
     ['seg-apercu-actif'] = taille(72, 22),
+    ['seg-focus'] = taille(62, 22),
+    ['seg-focus-actif'] = taille(62, 22),
     ['seg-proposition'] = taille(98, 22),
     ['seg-proposition-actif'] = taille(98, 22),
     ['seg-note'] = taille(57, 22),
@@ -400,6 +408,7 @@ function Dispositions.dimensions()
     D.segments = 0
     D.onglets = {
         { valeur = 'apercu', titre = "Aperçu", image = 'seg-apercu' },
+        { valeur = 'focus', titre = "Focus", image = 'seg-focus' },
         { valeur = 'proposition', titre = "Proposition", image = 'seg-proposition' },
         { valeur = 'notation', titre = "Note", image = 'seg-note' },
         { valeur = 'lecon', titre = "Leçon", image = 'seg-lecon' },
@@ -412,9 +421,10 @@ function Dispositions.dimensions()
     D.margeHautPanneau = HAUT_CONTENU_PANNEAU - D.hauteurSegments
     D.margeGauchePanneau = D.panneau - D.interieur - 15
     -- Note par défaut, donc montrée à l'ouverture ; une proposition qui arrive montre Proposition,
-    -- une note Note ; Aperçu (l'ancien Pourquoi ?) s'ouvre sur un clic, jamais tout seul.
-    D.ongletParDefaut, D.ongletProposition, D.ongletNotation, D.ongletEtape, D.ongletLecon =
-        'notation', 'proposition', 'notation', 'apercu', 'lecon'
+    -- une note Note ; Aperçu (l'ancien Pourquoi ?) s'ouvre sur un clic, jamais tout seul, comme
+    -- Focus (22 octobre 2026), qui ne s'ouvre que par un clic sur son segment.
+    D.ongletParDefaut, D.ongletProposition, D.ongletNotation, D.ongletEtape, D.ongletLecon, D.ongletFocus =
+        'notation', 'proposition', 'notation', 'apercu', 'lecon', 'focus'
     -- L'aperçu, sa vignette en pixels, et la rangée ◀ légende ▶ · ⤢ Agrandir sous lui.
     D.pixelsApercu = D.apercu * D.echelleApercu
     D.pixelsApercuHauteur = D.apercuHauteur * D.echelleApercu
@@ -431,6 +441,7 @@ function Dispositions.dimensions()
     D.largeurProposition = D.carte
     D.largeurEtape = D.carte
     D.largeurLecon = D.carte
+    D.largeurFocus = D.carte
     D.margeCarte = math.floor((D.interieur - D.carte) / 2)
     -- La carte Note (Vues.notation, maquette « B · Conversation claire », onglet Note) : la grille
     -- des étiquettes (« Votre note : », « Drapeau : », alignées à droite en 12 : « Votre note : »
@@ -513,10 +524,10 @@ local function centre(f, F, D)
 end
 
 -- La colonne droite : sur son aplat, le panneau en image, les segments à cheval sur son bord ;
--- dedans, l'aperçu commun, la rangée ◀ légende ▶ · ⤢ Agrandir, puis les quatre variantes
+-- dedans, l'aperçu commun, la rangée ◀ légende ▶ · ⤢ Agrandir, puis les cinq variantes
 -- superposées des onglets, chacune sur sa carte en image (lots B4 et B5) : la carte de l'étape dans
--- Aperçu, la proposition, la carte Note (sa grille, puis la carte des critères) et la carte de la
--- leçon dans Leçon.
+-- Aperçu, la carte Focus (Image, Prise de vue, Mise au point), la proposition, la carte Note (sa
+-- grille, puis la carte des critères) et la carte de la leçon dans Leçon.
 local function droite(f, F, D)
     local C = F.COULEURS
     local largeur = D.interieur
@@ -542,6 +553,7 @@ local function droite(f, F, D)
                     f:column {
                         place = 'overlapping',
                         variante(f, F, largeur, 'apercu', function(fm) return { Vues.etape(fm, F, largeur, D) } end),
+                        variante(f, F, largeur, 'focus', function(fm) return { Vues.focus(fm, F, largeur, D) } end),
                         variante(f, F, largeur, 'proposition', function(fm) return { Vues.proposition(fm, F, largeur, D) } end),
                         variante(f, F, largeur, 'notation', function(fm) return { Vues.notation(fm, F, largeur, D) } end),
                         variante(f, F, largeur, 'lecon', function(fm) return { Vues.lecon(fm, F, largeur, D) } end),

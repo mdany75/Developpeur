@@ -2,7 +2,8 @@
 -- note posée, et sa légende quand elle change) et sélection, état de la liaison et mode « Proposer
 -- d'abord » (lus directement : la liaison est dans ce même module), connexion de Claude Code,
 -- écran principal du Mac (lu par le connecteur : `mcp-developpeur --ecran`), réglages d'une photo
--- pendant un exercice « Je le fais » (1.3, lus sans rien écrire). À appeler depuis une tâche.
+-- pendant un exercice « Je le fais » (1.3, lus sans rien écrire), ce que l'onglet Focus montre de
+-- Lightroom (Lightroom.infosFocus). À appeler depuis une tâche.
 
 local LrApplication = import 'LrApplication'
 local LrDate = import 'LrDate'
@@ -83,6 +84,46 @@ function Lightroom.legende(id)
             local annee = LrDate.timeToUserFormat(prise, '%Y')
             if jour and mois and annee then
                 l.date = string.format('%d %s %s', jour, mois, annee)
+            end
+        end
+    end)
+    return l
+end
+
+-- Ce que l'onglet Focus montre de Lightroom (demandé par Dany le 22 octobre 2026 : les sections
+-- Image Information et Shooting Information de Focus-Points), en textes déjà traduits par
+-- Lightroom (getFormattedMetadata, clé par clé sous LrTasks.pcall comme Photos.meta : une clé
+-- refusée ne gêne pas les autres ; jamais une lecture groupée), sous les clés de
+-- Lightroom.CLES_FOCUS, plus `date` (date et heure de la prise de vue, à l'heure locale :
+-- « 13 janv. 2026 à 09:13:04 »). Une table neuve de textes, chacun absent s'il ne se lit pas. Une
+-- copie virtuelle donne le nom de son original. Le boîtier (stabilisation, mode d'entraînement,
+-- mise au point) vient du connecteur (Images.lireFocus). À appeler depuis une tâche.
+Lightroom.CLES_FOCUS = {
+    nom = 'fileName', copie = 'copyName', origine = 'dimensions', actuelle = 'croppedDimensions',
+    marque = 'cameraMake', modele = 'cameraModel', objectif = 'lens', focale = 'focalLength', vitesse = 'shutterSpeed',
+    ouverture = 'aperture', iso = 'isoSpeedRating', correction = 'exposureBias', programme = 'exposureProgram',
+    mesure = 'meteringMode',
+}
+
+function Lightroom.infosFocus(id)
+    local l = {}
+    LrTasks.pcall(function()
+        local photo = LrApplication.activeCatalog():getPhotoByLocalId(tonumber(id))
+        if not photo then
+            return
+        end
+        for cle, nom in pairs(Lightroom.CLES_FOCUS) do
+            local ok, v = LrTasks.pcall(function() return photo:getFormattedMetadata(nom) end)
+            v = ok and (type(v) == 'string' or type(v) == 'number') and Texte.nettoyer(tostring(v)) or ''
+            l[cle] = v ~= '' and v or nil
+        end
+        local ok, prise = LrTasks.pcall(function() return photo:getRawMetadata('dateTimeOriginal') end)
+        if ok and type(prise) == 'number' then
+            local jour = tonumber(LrDate.timeToUserFormat(prise, '%d'))
+            local mois = require('Carnet').MOIS_COURTS[tonumber(LrDate.timeToUserFormat(prise, '%m')) or 0]
+            if jour and mois then
+                l.date = string.format('%d %s %s à %s', jour, mois, LrDate.timeToUserFormat(prise, '%Y'),
+                    LrDate.timeToUserFormat(prise, '%H:%M:%S'))
             end
         end
     end)

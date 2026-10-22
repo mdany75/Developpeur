@@ -5,8 +5,9 @@
 -- (Je le fais, 1.3), le cadre qu'il propose (Composition lue, 1.3 : la ligne « Cadre : … » de la
 -- carte, son image entière en pointillés dans l'aperçu, ses ajustements dans Ajuster…), la note
 -- qu'il propose pour la photo active, le pourquoi de chaque étape (onglet Aperçu, l'ancien
--- Pourquoi ?, 1.3), la leçon de la photo (onglet Leçon, 1.3), et les versions du module et du
--- connecteur MCP-Développeur.
+-- Pourquoi ?, 1.3), la mise au point de la photo active comme Focus-Points la montre (onglet Focus,
+-- demandé par Dany le 22 octobre 2026), la leçon de la photo (onglet Leçon, 1.3), et les versions
+-- du module et du connecteur MCP-Développeur.
 --
 -- Une seule disposition, la Conversation claire, à l'allure de la fenêtre B (1.3 : 1 948 × 1 200,
 -- volet des conversations en cases, en-tête avec le Mode, segments et panneau à droite ; l'Atelier,
@@ -29,8 +30,9 @@
 -- calque (Fenetre.calque) ; il n'y a aucun bouton par défaut. Une autre photo active ou une autre
 -- sélection, choisie par l'utilisateur, commence une nouvelle conversation (Fenetre.suivreSelection).
 --
--- Structure de la 1.3, posée une fois (les lots suivants remplissent les crochets) : quatre onglets
--- (Aperçu, Proposition, Note, Leçon) ; l'aperçu est commun, mais un onglet peut le remplir
+-- Structure de la 1.3, posée une fois (les lots suivants remplissent les crochets) : cinq onglets
+-- (Aperçu, Focus, Proposition, Note, Leçon ; Focus depuis le 22 octobre 2026) ; l'aperçu est
+-- commun, mais un onglet peut le remplir
 -- (Fenetre.apercuOnglet), un vrai clic sur un onglet a son crochet (Fenetre.surOnglet) ; un clic
 -- sur une ligne du fil se répartit dans un ordre fixé (Fenetre.cliquerLigne) ; le fil montre la
 -- conversation ou une autre page (Fenetre.vue), et Claude qui travaille ramène à la conversation.
@@ -1268,18 +1270,19 @@ end
 
 -- Onglets -------------------------------------------------------------------------------------
 
--- L'aperçu est commun aux quatre onglets (Aperçu, Proposition, Note, Leçon), mais un onglet peut
--- le remplir (1.3) : Note et Leçon montrent la photo active et les images de la conversation, comme
--- avant ; Proposition, l'image de la proposition ou de l'exercice ; Aperçu (l'ancien Pourquoi ?),
--- l'avant ou l'après de l'étape choisie. Fenetre.apercuOnglet[valeur](p, T, c), s'il existe, est
+-- L'aperçu est commun aux cinq onglets (Aperçu, Focus, Proposition, Note, Leçon), mais un onglet
+-- peut le remplir (1.3) : Note et Leçon montrent la photo active et les images de la conversation,
+-- comme avant ; Proposition, l'image de la proposition ou de l'exercice ; Aperçu (l'ancien
+-- Pourquoi ?), l'avant ou l'après de l'étape choisie ; Focus, la photo active et ses cadres de mise
+-- au point. Fenetre.apercuOnglet[valeur](p, T, c), s'il existe, est
 -- demandé d'abord par Fenetre.rafraichirApercu : vrai s'il a rempli l'aperçu lui-même
 -- (imageApercu, legendeApercu, aImage, peutPrecedente, peutSuivante), nil ou faux pour l'aperçu
 -- d'avant. Un clic sur une ligne d'image reste prioritaire. Fenetre.surOnglet[valeur](valeur) suit
 -- un vrai clic sur cet onglet (son segment, Fenetre.choisirSegment ; jamais une bascule de la
 -- fenêtre, Fenetre.choisirOnglet). Ni l'un ni l'autre n'attend : une lecture du catalogue ou un
--- rendu passe par sa propre tâche. Ceux d'Aperçu et de Proposition (la comparaison de Je le fais,
--- puis l'image de la proposition demandée par un clic : Composition lue) sont dans leur section ;
--- Note et Leçon n'en ont pas.
+-- rendu passe par sa propre tâche. Ceux d'Aperçu, de Focus et de Proposition (la comparaison de Je
+-- le fais, puis l'image de la proposition demandée par un clic : Composition lue) sont dans leur
+-- section ; Note et Leçon n'en ont pas.
 Fenetre.apercuOnglet = {}
 Fenetre.surOnglet = {}
 
@@ -1397,15 +1400,17 @@ function Fenetre.marquerMiseAuPoint(id, source)
     local ok, d = LrTasks.pcall(function()
         return require('Vignettes').decrireVignette(require('Photos').photoParId(id))
     end)
-    if not ok or type(d) ~= 'table' then
+    if not ok or type(d) ~= 'table' or not Fenetre.estFujifilm(d) then
         return nil
     end
-    local original = type(d.chemin_original) == 'string' and d.chemin_original or ''
-    local fujifilm = tostring(d.marque or ''):upper():find('FUJIFILM', 1, true) or original:lower():match('%.raf$')
-    if not fujifilm then
-        return nil
-    end
-    return Images.marquerMiseAuPoint(Chemins.prefs().cheminConnecteur, original, d.geometrie, source)
+    return Images.marquerMiseAuPoint(Chemins.prefs().cheminConnecteur, d.chemin_original, d.geometrie, source)
+end
+
+-- Un fichier Fujifilm, d'après la description de Vignettes.decrireVignette : la marque, ou un
+-- original .RAF. Seul un tel original s'ouvre (carré de mise au point, onglet Focus).
+function Fenetre.estFujifilm(d)
+    local original = type(d) == 'table' and type(d.chemin_original) == 'string' and d.chemin_original or ''
+    return original ~= '' and (tostring(d.marque or ''):upper():find('FUJIFILM', 1, true) ~= nil or original:lower():match('%.raf$') ~= nil)
 end
 
 local function montrerActive(p, T, active, n)
@@ -1598,6 +1603,22 @@ function Fenetre.agrandir()
         Fenetre.agrandirEtape()
         return
     end
+    -- L'onglet Focus : la vignette de la photo active avec ses cadres de mise au point.
+    local r = Fenetre.focusMontre() and Fenetre.focusActif()
+    if r and r.fichier then
+        LrTasks.startAsyncTask(function()
+            local chemin, l, h = Images.grande(r.dossier, r.fichier, 1100, 740)
+            if chemin then
+                LrDialogs.presentModalDialog {
+                    title = titreAgrandi("Focus"),
+                    contents = LrView.osFactory():picture { value = chemin, width = l, height = h },
+                    actionVerb = "Fermer",
+                    cancelVerb = '< exclude >',
+                }
+            end
+        end)
+        return
+    end
     -- La comparaison « Je le fais » de l'onglet Proposition (1.3) : une seule image, côte à côte
     -- (le connecteur rend les deux versions en une image).
     local cc, comparaison = Fenetre.comparaisonMontree()
@@ -1734,6 +1755,8 @@ local CARTES = {
         police = 'texte12' },
     etape = { texte = 'etapeTexte', largeur = 'largeurEtape', lignes = function(T) return T.etapeLignes or 8 end, police = 'texte12' },
     lecon = { texte = 'leconTexte', largeur = 'largeurLecon', lignes = function(T) return T.leconLignes or 8 end, police = 'texte12',
+        emphase = 'gras12' },
+    focus = { texte = 'focusTexte', largeur = 'largeurFocus', lignes = function(T) return T.focusLignes or 8 end, police = 'texte12',
         emphase = 'gras12' },
 }
 Fenetre.CARTES = CARTES
@@ -1936,6 +1959,179 @@ function Fenetre.detailLecon()
     if outil then
         Fenetre.montrerDetail(outil)
     end
+end
+
+-- Focus (demandé par Dany le 22 octobre 2026) ------------------------------------------------
+-- L'onglet Focus, entre Aperçu et Proposition, montre la photo active comme le module Focus-Points
+-- la montre : dans l'aperçu, sa vignette avec, pour un fichier Fujifilm, le point ou la zone de
+-- mise au point à sa taille (rouge) et les visages et éléments du sujet que le boîtier a détectés
+-- (coins jaunes), dessinés par le connecteur (`mcp-developpeur --focus`, Images.lireFocus) ;
+-- dessous, la carte Image, Prise de vue et Mise au point (Fil.texteFocus), les valeurs de Lightroom
+-- (Lightroom.infosFocus) et celles du boîtier, lues dans l'original. Autre marque : la photo sans
+-- cadre, Image et Prise de vue, et « Mise au point : non lue (seulement les fichiers Fujifilm pour
+-- l'instant) ». Copie virtuelle : l'original de la copie (Vignettes.decrireVignette).
+-- Jamais de bascule d'elle-même vers Focus : seulement un vrai clic sur son segment. L'onglet suit
+-- la photo active (Fenetre.majPhoto) ; tout se lit dans une tâche (Fenetre.lireFocus : la vignette
+-- par Vignettes.demander, le boîtier par LrTasks.execute, cinq secondes au plus), une lecture à la
+-- fois, jamais de calcul en Lua ; le résultat est gardé pour la photo (Fenetre.focus) tant qu'elle
+-- ne change pas : un vrai clic sur le segment relit seulement si sa géométrie (cadre, orientation)
+-- a changé. L'aperçu des autres onglets, avec le carré de --marquer-af, ne change pas.
+
+-- La carte sans photo active.
+Fenetre.FOCUS_AUCUNE_PHOTO = "Aucune photo active : choisissez une photo dans Lightroom."
+
+-- Vrai quand l'onglet Focus est montré.
+function Fenetre.focusMontre()
+    local p, T = Fenetre.p, Fenetre.T
+    return p ~= nil and T ~= nil and p.onglet == T.ongletFocus
+end
+
+-- Le résultat gardé, s'il est celui de la photo active et de cette ouverture de la fenêtre.
+function Fenetre.focusActif()
+    local r, active = Fenetre.focus, Fenetre.info and Fenetre.info.active
+    if r and active and r.id == active.id and r.T == Fenetre.T then
+        return r
+    end
+    return nil
+end
+
+-- Ce que l'onglet montre de la photo `active`, lu dans une tâche : sa description
+-- (Vignettes.decrireVignette), les valeurs de Lightroom, sa vignette (un dossier à elle sous
+-- PhotoActive), puis, pour un fichier Fujifilm, le boîtier et les cadres par le connecteur. Rend
+-- { id, signature (la géométrie), T, chemin (la vignette réduite au cadre de l'aperçu), dossier et
+-- fichier (la vignette, marquée s'il y a des cadres : Agrandir), titre, texte } ; nil si `garde`
+-- est déjà le résultat de cette photo à cette géométrie (rien à relire).
+function Fenetre.preparerFocus(active, T, garde)
+    local Vignettes = require 'Vignettes'
+    local photo = require('Photos').photoParId(active.id)
+    local d = photo and Vignettes.decrireVignette(photo) or {}
+    local signature = Json.encode(type(d.geometrie) == 'table' and d.geometrie or {})
+    if garde and garde.id == active.id and garde.T == T and garde.signature == signature then
+        return nil
+    end
+    local infos = Lightroom.infosFocus(active.id)
+    local dossier = LrPathUtils.child(LrPathUtils.child(Chemins.temporaire(), 'PhotoActive'), 'Focus-' .. Conversation.identifiant())
+    local chemins = Vignettes.demander({ active.id }, Fenetre.TAILLE_PHOTO_ACTIVE, dossier)
+    local source = chemins[active.id]
+    local etat, boitier, marquee = 'autre_marque', nil, nil
+    if Fenetre.estFujifilm(d) then
+        local connecteur = Chemins.prefs().cheminConnecteur
+        if type(connecteur) ~= 'string' or not Fichiers.existe(connecteur) then
+            etat = 'sans_connecteur'
+        else
+            boitier, marquee = Images.lireFocus(connecteur, d.chemin_original, d.geometrie, source)
+            etat = boitier and 'lue' or 'non_lue'
+        end
+    end
+    local r = { id = active.id, signature = signature, T = T, titre = Fil.titreFocus(infos), texte = Fil.texteFocus(infos, boitier, etat),
+        dossier = dossier }
+    local image = marquee or source
+    if image then
+        r.fichier = LrPathUtils.leafName(image)
+        r.chemin = vignetteApercu(T, LrPathUtils.parent(image), r.fichier)
+    end
+    return r
+end
+
+-- Lit l'onglet de la photo `active` dans une tâche (une lecture à la fois) ; `verifier` : relit
+-- seulement si sa géométrie a changé depuis le résultat gardé. À la fin, la carte et, si l'onglet
+-- est montré, l'aperçu.
+function Fenetre.lireFocus(active, verifier)
+    if Fenetre.lectureFocus == active.id then
+        return
+    end
+    Fenetre.lectureFocus = active.id
+    local T = Fenetre.T
+    local garde = verifier and Fenetre.focus or nil
+    LrTasks.startAsyncTask(function()
+        local ok, r = LrTasks.pcall(Fenetre.preparerFocus, active, T, garde)
+        if Fenetre.lectureFocus == active.id then
+            Fenetre.lectureFocus = nil
+        end
+        if not ok then
+            Journal.noter("Onglet Focus :", tostring(r))
+            return
+        end
+        if not r then
+            return
+        end
+        -- La vignette d'avant n'est plus montrée : son dossier s'efface.
+        local avant = Fenetre.focus
+        if avant and avant.dossier and avant.dossier ~= r.dossier then
+            Fichiers.supprimer(avant.dossier)
+        end
+        Fenetre.focus = r
+        if Fenetre.p and Fenetre.T == T then
+            Fenetre.rafraichirFocus()
+            if Fenetre.focusMontre() then
+                Fenetre.rafraichirApercu()
+            end
+        end
+    end)
+end
+
+-- La carte de l'onglet : le résultat gardé de la photo active, sinon « lecture… » (la lecture part
+-- si l'onglet est montré : un onglet caché ne lit rien) ; sans photo active, l'aide. `relire` (un
+-- vrai clic sur le segment) : relit si la géométrie de la photo a changé.
+function Fenetre.rafraichirFocus(relire)
+    local p = Fenetre.p
+    if not p then
+        return
+    end
+    local active = Fenetre.info and Fenetre.info.active
+    if not active then
+        poser(p, 'focusTitre', "Focus")
+        Fenetre.montrerPage('focus', Fenetre.FOCUS_AUCUNE_PHOTO)
+        return
+    end
+    local r = Fenetre.focusActif()
+    if r then
+        poser(p, 'focusTitre', r.titre)
+        Fenetre.montrerPage('focus', r.texte)
+        if relire then
+            Fenetre.lireFocus(active, true)
+        end
+        return
+    end
+    local legende = legendeActive(active)
+    local infos = { nom = legende.nom, copie = legende.copie }
+    poser(p, 'focusTitre', Fil.titreFocus(infos))
+    Fenetre.montrerPage('focus', Fil.texteFocus(infos, nil, 'lecture'))
+    if Fenetre.focusMontre() then
+        Fenetre.lireFocus(active)
+    end
+end
+
+-- L'aperçu de l'onglet Focus (Fenetre.apercuOnglet) : la vignette de la photo active avec ses
+-- cadres (ou sans, autre marque), sa légende ; l'image vide pendant la lecture ; ◀ ▶ coupés.
+Fenetre.apercuOnglet.focus = function(p, T)
+    poser(p, 'peutPrecedente', false)
+    poser(p, 'peutSuivante', false)
+    local active = Fenetre.info and Fenetre.info.active
+    if not active then
+        poser(p, 'imageApercu', Fenetre.imageVide())
+        poser(p, 'aImage', false)
+        poser(p, 'legendeApercu', "Aucune photo active")
+        return true
+    end
+    poser(p, 'legendeApercu', Fenetre.texteLegende(legendeActive(active)))
+    local r = Fenetre.focusActif()
+    if r and r.chemin then
+        poser(p, 'imageApercu', r.chemin)
+        poser(p, 'aImage', true)
+        return true
+    end
+    poser(p, 'imageApercu', Fenetre.imageVide())
+    poser(p, 'aImage', false)
+    if not r then
+        Fenetre.rafraichirFocus()
+    end
+    return true
+end
+
+-- Un vrai clic sur l'onglet Focus : la carte de la photo active, relue si sa géométrie a changé.
+Fenetre.surOnglet.focus = function()
+    Fenetre.rafraichirFocus(true)
 end
 
 -- Proposition ---------------------------------------------------------------------------------
@@ -3732,8 +3928,9 @@ function Fenetre.majPhoto()
         Fenetre.voirActive = true
         Fenetre.imageCliquee = nil
         Fenetre.rafraichirApercu()
-        -- L'onglet Leçon montre la leçon de la photo active.
+        -- L'onglet Leçon montre la leçon de la photo active ; l'onglet Focus, sa mise au point.
         Fenetre.rafraichirLecon()
+        Fenetre.rafraichirFocus()
     end
     if info.active then
         p.infoPhoto = string.format("Active : <EM>%s</EM> · Sélection : <EM>%d</EM>",
@@ -4230,8 +4427,13 @@ function Fenetre.afficher()
         Fenetre.vue = 'conversation'
         -- La page du carnet se relira à sa prochaine ouverture.
         Fenetre.pageCarnet, Fenetre.versionCarnet, Fenetre.aRafraichirCarnet, Fenetre.hautCarnet = nil, nil, false, 0
-        -- À l'ouverture, l'aperçu montre la photo active, refait (Fenetre.majPhoto).
+        -- À l'ouverture, l'aperçu montre la photo active, refait (Fenetre.majPhoto) ; l'onglet Focus
+        -- se relira (la vignette d'une ouverture passée s'efface).
         Fenetre.idActif, Fenetre.apercuActif, Fenetre.demandeActive, Fenetre.voirActive = nil, nil, nil, true
+        if Fenetre.focus and Fenetre.focus.dossier then
+            Fichiers.supprimer(Fenetre.focus.dossier)
+        end
+        Fenetre.focus, Fenetre.lectureFocus = nil, nil
         Fenetre.propositionVue = nil
         -- Je le fais (1.3) : le suivi se relit ; un exercice déjà comparé ne fait pas basculer
         -- l'onglet à l'ouverture (un exercice en cours, si : sa liste attend Dany).
@@ -4303,6 +4505,9 @@ function Fenetre.afficher()
         p.leconTitre = "Leçon de la photo"
         p.leconTexte = ''
         p.leconADetail = false
+        -- La carte de l'onglet Focus (Fenetre.rafraichirFocus la remplit).
+        p.focusTitre = "Focus"
+        p.focusTexte = ''
         initialiserNotation(p, D)
         initialiserEtapeEtExercice(p)
         Fenetre.p = p

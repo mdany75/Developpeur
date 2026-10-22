@@ -600,7 +600,7 @@ end
 
 -- Colonne droite ---------------------------------------------------------------------------------
 
--- Les segments Aperçu | Proposition | Note | Leçon, centrés en tête du panneau : chacun son image
+-- Les segments Aperçu | Focus | Proposition | Note | Leçon, centrés en tête du panneau : chacun son image
 -- et sa variante bleue (-actif, montrée quand `onglet` vaut sa valeur), sous un calque dont le
 -- clic choisit l'onglet (F.choisirSegment : un vrai clic, son crochet suit). Ni survol, ni focus.
 function Vues.segments(f, F, D)
@@ -620,7 +620,7 @@ function Vues.segments(f, F, D)
     return f:row(r)
 end
 
--- L'aperçu commun aux quatre onglets : ce que Claude regarde, ou la photo active, dans un cadre 3:2
+-- L'aperçu commun aux cinq onglets : ce que Claude regarde, ou la photo active, dans un cadre 3:2
 -- fixe de D.apercu × D.apercuHauteur (une réduction en 2x centrée sur le fond, Images.vignette,
 -- ou l'image « aucun aperçu »), au milieu d'une bande du fond de l'aperçu à la largeur du panneau.
 function Vues.apercu(f, F, D)
@@ -636,7 +636,7 @@ function Vues.apercu(f, F, D)
     }
 end
 
--- Sous l'aperçu, dans les quatre onglets : ◀ légende ▶ (les images de la conversation et la photo
+-- Sous l'aperçu, dans les cinq onglets : ◀ légende ▶ (les images de la conversation et la photo
 -- active, Fenetre.changerImage), puis « ⤢ Agrandir » à droite. La légende est un texte riche (le
 -- nom de la photo active en <EM>), à emphase de même taille que le texte (constaté D4 : une
 -- emphase plus grande couperait la ligne).
@@ -773,6 +773,23 @@ function Vues.lecon(f, F, largeur, D)
             enabled = bind 'leconADetail', tooltip = "Ce que Claude a donné au connecteur pour cette leçon, puis sa réponse",
             action = function() F.enTache(F.detailLecon) end }),
     })
+end
+
+-- La carte de l'onglet Focus (demandé par Dany le 22 octobre 2026), sur son image (carte-focus, à la
+-- largeur intérieure du panneau) : son titre en gras 12 (`focusTitre`, « Focus · DSCF2402.RAF »),
+-- puis les trois blocs Image, Prise de vue et Mise au point page par page (`focusTexte`,
+-- D.focusLignes lignes en 12, coupées par Fenetre.montrerPage : le titre de chaque bloc en <EM>,
+-- gras de même taille, Fil.texteFocus) ; sous la carte, ▲ ▼ seulement (Fenetre.defilerTexte('focus')).
+-- L'aperçu de l'onglet (la photo active et ses cadres de mise au point) est celui du panneau,
+-- rempli par Fenetre.apercuOnglet.focus.
+function Vues.focus(f, F, largeur, D)
+    local bind, C, P = F.bind, F.COULEURS, F.POLICES
+    return carteEtRangee(f, F, largeur, D, 'carte-focus', {
+        f:static_text { title = bind 'focusTitre', font = P.gras12, text_color = C.texte, width = D.largeurFocus,
+            truncation = 'middle' },
+        f:static_text { title = bind 'focusTexte', font = P.texte12, text_color = C.texte, emphasis_font = P.gras12,
+            emphasis_color = C.texte, width = D.largeurFocus, height_in_lines = D.focusLignes },
+    }, 'focus', {})
 end
 
 -- Note -------------------------------------------------------------------------------------------

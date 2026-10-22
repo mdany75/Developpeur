@@ -560,22 +560,26 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
         end
         vrai(variantes and variantes.args.place == 'overlapping', nom .. ' : variantes superposées sous les onglets')
         egal(#D.onglets, #variantes.args, nom .. ' : une variante par onglet')
-        -- Quatre onglets (fenêtre B) : Aperçu (l'ancien Pourquoi ?), Proposition, Note (montré à
-        -- l'ouverture) et Leçon, dans l'ordre des segments ; une variante chacun, dans cet ordre.
+        -- Cinq onglets (fenêtre B) : Aperçu (l'ancien Pourquoi ?), Focus (22 octobre 2026),
+        -- Proposition, Note (montré à l'ouverture) et Leçon, dans l'ordre des segments ; une variante
+        -- chacun, dans cet ordre.
         local valeurs = {}
         for _, onglet in ipairs(D.onglets) do
             valeurs[#valeurs + 1] = onglet.valeur .. '=' .. onglet.titre
         end
-        egal('apercu=Aperçu proposition=Proposition notation=Note lecon=Leçon', table.concat(valeurs, ' '), nom .. ' : quatre onglets')
-        egal(4, #variantes.args, nom .. ' : quatre variantes')
+        egal('apercu=Aperçu focus=Focus proposition=Proposition notation=Note lecon=Leçon', table.concat(valeurs, ' '), nom .. ' : cinq onglets')
+        egal(5, #variantes.args, nom .. ' : cinq variantes')
         egal('apercu', D.ongletEtape)
+        egal('focus', D.ongletFocus)
         egal('lecon', D.ongletLecon)
         egal('notation', D.ongletParDefaut)
         egal('notation', p.onglet, nom .. ' : Note par défaut')
         vrai(vueLiee(variantes.args[1], 'static_text', 'etapeTexte'), nom .. " : la carte de l'étape dans Aperçu")
-        vrai(vueLiee(variantes.args[3], 'static_text', 'notePoseeTitre'), nom .. ' : la carte Note')
-        vrai(vueLiee(variantes.args[3], 'static_text', 'nt1'), nom .. ' : la grille des critères dans la carte Note')
-        vrai(vueLiee(variantes.args[2], 'static_text', 'propositionTexte'), nom .. ' : la proposition au milieu')
+        vrai(vueLiee(variantes.args[2], 'static_text', 'focusTexte'), nom .. ' : la carte Focus après Aperçu')
+        vrai(vueLiee(variantes.args[4], 'static_text', 'notePoseeTitre'), nom .. ' : la carte Note')
+        vrai(vueLiee(variantes.args[4], 'static_text', 'nt1'), nom .. ' : la grille des critères dans la carte Note')
+        vrai(vueLiee(variantes.args[3], 'static_text', 'propositionTexte'), nom .. ' : la proposition au milieu')
+        vrai(vueLiee(variantes.args[5], 'static_text', 'leconTexte'), nom .. ' : la leçon en dernier')
         -- Chaque vue simple d'un onglet est masquée quand un autre onglet est choisi ; pas de
         -- boîte de groupe dans un onglet (son cadre et son titre resteraient montrés), ni de
         -- vue défilante ou de tab_view (leur cadre aussi).

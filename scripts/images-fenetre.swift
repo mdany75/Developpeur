@@ -304,7 +304,7 @@ func texte(_ ctx: CGContext, _ s: String, _ police: NSFont, _ couleur: String, c
     ctx.restoreGState()
 }
 
-// Un segment des onglets Aperçu | Proposition | Note | Leçon (le contrôle de la maquette, coupé
+// Un segment des onglets Aperçu | Focus | Proposition | Note | Leçon (le contrôle de la maquette, coupé
 // segment par segment) : fond `fondSegment` et texte `texte` 12 (en claire, blanc et #1D1D1F), ou,
 // choisi, fond `bleuBouton` et texte `blanc` gras (600) 12 ; bord `bordSegment` en haut et en bas,
 // coins de 6 au bout gauche du premier et au bout droit du dernier ; un filet `filetSegment` au
@@ -350,12 +350,12 @@ func dessins(_ p: Palette) -> [String: Dessin] {
     }
 
     // Les fonds des cartes (#FAFAFA, bord #D9D9D9), coins de 6.
-    for nom in ["carte-note", "carte-proposition", "carte-etape", "carte-lecon"] {
+    for nom in ["carte-note", "carte-proposition", "carte-etape", "carte-lecon", "carte-focus"] {
         d[nom] = pleine(fond: p["fondCarte"], bord: p["bordCarte"], rayon: 6)
     }
 
-    // Les segments, dans l'ordre de la maquette.
-    let segments = [("apercu", "Aperçu"), ("proposition", "Proposition"), ("note", "Note"), ("lecon", "Leçon")]
+    // Les segments, dans l'ordre de la maquette (Focus après Aperçu : demandé par Dany le 22 octobre 2026).
+    let segments = [("apercu", "Aperçu"), ("focus", "Focus"), ("proposition", "Proposition"), ("note", "Note"), ("lecon", "Leçon")]
     for (i, (cle, titre)) in segments.enumerated() {
         let premier = i == 0, dernier = i == segments.count - 1
         d["seg-" + cle] = segment(titre, premier: premier, dernier: dernier, actif: false, p)

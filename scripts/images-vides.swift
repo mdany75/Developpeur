@@ -1,5 +1,5 @@
 // images-vides.swift — dessine l'image « aucun aperçu » de la fenêtre Claude (fenêtre B), au cadre
-// 3:2 de l'aperçu commun aux quatre onglets (498 × 332 points), une par apparence (claire et
+// 3:2 de l'aperçu commun aux cinq onglets (498 × 332 points), une par apparence (claire et
 // sombre), du fond et du texte de sa palette (`fondApercu`, `texteApercu`). Tout vient de
 // Dispositions.lua, que scripts/gabarits.lua écrit en JSON sur l'entrée standard : le cadre et le
 // nom de l'image (`vide`, Dispositions.nomImageVide), le dossier et la palette de chaque apparence
