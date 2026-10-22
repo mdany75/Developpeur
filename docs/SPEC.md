@@ -462,7 +462,9 @@ En 1.3, la Conversation claire prend l'allure de la maquette « B · Conversatio
 fenêtre B, lots B0 à B5), agrandie à 1 948 × 1 200 à la demande de Dany (voir Fenêtre B) : volet
 des conversations à gauche (le Carnet de progrès en tête de sa liste), au centre l'en-tête avec le
 Mode en boutons radio, le fil B, sa barre et la saisie, à droite quatre onglets (Aperçu,
-Proposition, Note, Leçon), l'aperçu commun et la carte de l'onglet ; apparence claire ou sombre.
+Proposition, Note, Leçon ; cinq depuis l'onglet Focus du 22 octobre 2026, entre Aperçu et
+Proposition : voir Onglet Focus), l'aperçu commun et la carte de l'onglet ; apparence claire ou
+sombre.
 Les sections Disposition, Voyants et liaison, Carte Note et Bas de la fenêtre décrivent la 1.2 :
 ce qui y a changé est dit en tête de chacune. Les cinq chantiers de la 1.3 ont chacun leur partie
 « dans la fenêtre » dans leur section (Pourquoi ?, Leçon de la photo, Je le fais, Composition lue,
@@ -723,7 +725,7 @@ Les onglets de la 1.2, Note (par défaut) et Proposition (`D.onglets`), sont une
 `radio_button` (clé `onglet`, chacun avec son `checked_value`) au-dessus de variantes superposées
 de même largeur (`place = 'overlapping'`), et non un `tab_view` (rendu correct, constaté le
 21 octobre 2026, C3, mais non retenu). En 1.3, la rangée devient quatre segments en images sous
-calques (Aperçu, Proposition, Note, Leçon : voir Fenêtre B) ; les variantes superposées et
+calques (Aperçu, Proposition, Note, Leçon : voir Fenêtre B ; cinq avec Focus, 22 octobre 2026) ; les variantes superposées et
 `Vues.masquable` restent (constaté le 21 octobre 2026, D11 : seule la variante montrée répond).
 Le Panneau avait les siens, Retoucher et Noter : retirés avec lui après la 1.1.1. Les colonnes des
 variantes ne portent pas `visible` : leur contenu se crée par une fabrique masquable
@@ -1089,22 +1091,24 @@ refus de `Moteur.lua` ; `PAS_CINQ` est retiré au correctif 1.3.2) ; l'essai « 
 d'`essais-fenetre-b.lua` les mesure.
 
 **Colonne droite** (`droite` de `Dispositions.lua`) : le panneau en image, les segments Aperçu |
-Proposition | Note | Leçon centrés à cheval sur son bord (`Vues.segments` : chacun son image et sa
+Focus | Proposition | Note | Leçon centrés à cheval sur son bord (Focus depuis le 22 octobre 2026 :
+voir Onglet Focus ; 72 + 62 + 98 + 57 + 65 = 354 dans le panneau de 528) (`Vues.segments` : chacun son image et sa
 variante bleue `-actif`, sous un calque, `Fenetre.choisirSegment`, un vrai clic ; ni survol ni
 focus), l'aperçu (`Vues.apercu`, sur un aplat du fond des vignettes, 2B2B2B dans les deux
-apparences), la rangée ◀ légende ▶ · ⤢ Agrandir commune aux quatre onglets
+apparences), la rangée ◀ légende ▶ · ⤢ Agrandir commune aux onglets
 (`Vues.navigationApercu` ; la légende de la photo active est un texte riche, « <EM>nom
 (copie)</EM> · appareil · date », lue par `Lightroom.legende` seulement quand la photo active
-change, à l'heure locale), puis quatre variantes superposées, chacune sur sa carte en image :
+change, à l'heure locale), puis les variantes superposées, chacune sur sa carte en image :
 l'étape dans Aperçu (`Vues.etape`, carte-etape), la proposition (`Vues.proposition`,
 carte-proposition), la carte Note (`Vues.notation`, sa grille au-dessus de carte-note) et la leçon
-(`Vues.lecon`, carte-lecon). Clés d'onglet : `apercu`, `proposition`, `notation` (par défaut,
-montré à l'ouverture) et `lecon` ; `Fenetre.apercuOnglet` et `Fenetre.surOnglet` passent sous la
+(`Vues.lecon`, carte-lecon), et, depuis le 22 octobre 2026, la carte Focus (`Vues.focus`,
+carte-focus, deuxième variante). Clés d'onglet : `apercu`, `focus`, `proposition`, `notation` (par
+défaut, montré à l'ouverture) et `lecon` ; `Fenetre.apercuOnglet` et `Fenetre.surOnglet` passent sous la
 clé `apercu` (l'ancien `etape`). Bascules d'elle-même, une par arrivée : vers Proposition quand une
 proposition (ou une liste « Je le fais », ou une comparaison) arrive, sauf celle préparée à
 l'ouverture ; vers Note quand une note arrive pour la photo active ; vers Leçon une fois par leçon
 arrivée (`Fenetre.leconVue`), jamais quand une proposition attend ou qu'un exercice est en cours ;
-jamais vers Aperçu. L'aperçu appartient à l'onglet (`Fenetre.apercuOnglet`, demandé d'abord par
+jamais vers Aperçu ni vers Focus. L'aperçu appartient à l'onglet (`Fenetre.apercuOnglet`, demandé d'abord par
 `rafraichirApercu` ; nil : l'aperçu commun) ; un clic sur une ligne d'image reste prioritaire
 jusqu'à un autre onglet, une image nouvelle, une autre conversation ou un clic sur une étape.
 
@@ -3720,6 +3724,132 @@ foncés +1, programme, 3 phrases. Ce qui reste à relever (noir et blanc, priori
 dynamique, forme de la compensation, ce que Lightroom fait d'un RAF à DR200 et plus, les seuils de
 ±0,6 IL) est dans À constater dans Lightroom (1.2).
 
+## Onglet Focus (demandé par Dany le 22 octobre 2026)
+
+Dany emploie le module Focus-Points (v4 PRE 4, installé ; Apache 2.0) pour voir où l'appareil a
+fait la mise au point. L'onglet Focus de la fenêtre Claude, entre Aperçu et Proposition (clé
+`focus`, `D.ongletFocus`), montre la photo active de même, avec les sections Image Information,
+Shooting Information et Focus Information de Focus-Points, en français.
+
+**Lecture du boîtier** (`Focus.swift`, `MiseAuPointBoitier`, lue par `LectureBoitier` de la même
+ouverture que le point et l'intention ; `LectureBoitier.miseAuPoint`). Les étiquettes sont celles
+qu'ExifTool nomme (`Image/ExifTool/FujiFilm.pm`, livré avec Focus-Points) et que
+`FujifilmDelegates.lua` de Focus-Points lit par exiftool ; Développeur les lit lui-même, sans
+exiftool :
+
+| Tag | Nom | Lu comme |
+| --- | --- | --- |
+| 0x1021 | FocusMode | 0 auto, 1 manuel, 65535 vidéo (sans FocusSettings) |
+| 0x1022 | AFMode | 0 aucun, 1 point unique, 256 zone, 512 large / suivi (sans FocusSettings) |
+| 0x1023 | FocusPixel | x y dans le repère du JPEG incorporé (ExifImageWidth × ExifImageHeight) |
+| 0x102b | PrioritySettings | un int16u : AF-SPriority (masque 0x000f), AF-CPriority (0x00f0) : 1 déclenchement, 2 mise au point |
+| 0x102d | FocusSettings | un int32u : FocusMode2 (0x0f : 0 AF-M, 1 AF-S, 2 AF-C), PreAF (0xf0), AFAreaMode (0x0f00 : 0 point unique, 1 zone, 2 large / suivi), AFAreaPointSize (0xf000, 0 sans objet), AFAreaZoneSize (0xff0000 : largeur dans les 4 bits bas, hauteur au-delà du 5e) |
+| 0x104d | CropMode | 1 format 35 mm sur GFX, 2 viseur sport, 4 recadrage 1,25× (obturateur électronique), 8 téléconvertisseur numérique |
+| 0x1101 | SequenceNumber | rang dans la rafale |
+| 0x1103 | DriveSettings | un int32u : DriveMode (0xff : 0 vue par vue, 1 rafale lente, 2 rafale rapide), DriveSpeed (0xff000000, images par seconde) |
+| 0x1301 | FocusWarning | 0 bonne, 1 floue |
+| 0x1422 | ImageStabilization | type (0 aucune, 1 optique, 2 capteur, 3 objectif, 258 capteur et objectif plus numérique, 512 numérique), mode (0 désactivée, 1 en continu, 2 à la prise de vue seulement), puis un nombre non nommé |
+| 0x4100 | FacesDetected | nombre de visages |
+| 0x4103 | FacePositions | gauche, haut, droite, bas de chaque visage |
+| 0x4201 | FaceElementTypes | 1 visage, 2 œil gauche, 3 œil droit, 7 corps, 8 tête, 9 les deux yeux, 11 deux-roues, 12 à 29 voitures, animaux, oiseaux, avions, trains |
+| 0x4203 | FaceElementPositions | gauche, haut, droite, bas de chaque élément |
+
+Les masques d'ExifTool se décalent de leurs bits à zéro (`(mot & masque) >> décalage`). Un réglage
+groupé se lit quel que soit le type rangé (`LectureBoitier.Tiff.Entree.mot` : les premiers octets
+de la valeur, comme ExifTool les lit en données binaires) ; une liste de positions, en SHORT,
+LONG, BYTE ou octets indéfinis, 64 nombres au plus. Comme dans Focus-Points (`getAfPoints`), les
+positions des visages et des éléments sont dans le même repère que FocusPixel (ExifTool dit « in
+full-sized image », mais Focus-Points les met à l'échelle comme le point, et DSCF2402 le
+confirme : la tête de 1283 à 1999 sur 4 416). Les textes en français (`lignesImage`,
+`lignesPriseDeVue`, `lignesMiseAuPoint`) : « AF-S (ponctuel) », « Déclenchement »,
+« Point unique », « Bonne », « Capteur, active (mode 1, en continu) », « Vue par vue »,
+« tête, visage, œil gauche, œil droit ». La priorité suit le mode (AF-S ou AF-C) ; mode AF et
+taille ne se disent pas en mise au point manuelle ; « Visages détectés : aucun » pour 0 ; un type
+d'élément inconnu se nomme par son code. `--boitier` les donne aussi (`mise_au_point`, et
+`valeurs_lues` sous les noms d'exiftool : « AFAreaPointSize (0x102d) », « FacePositions
+(0x4103) »…).
+
+**Relevé du 22 octobre 2026** (hors de Lightroom, en lecture seule) : DSCF2402.RAF (X-H2S,
+l'original de la copie d'essai 53709912), lu par `--boitier` et par l'exiftool de Focus-Points
+(`-a -G1 -s`, puis `-v3` pour les types) : tout concorde. FocusPixel 1665 845 (4 416 × 2 944),
+PrioritySettings 0x0011 (SHORT), FocusSettings 0x00006001 (LONG : AF-S, point unique de taille
+6), DriveSettings 0 (LONG), CropMode 0, FocusWarning 0, ImageStabilization 2 1 0, FacesDetected
+1, FacePositions 1283 476 1999 1124, FaceElementTypes 8 1 2 3 (rangés en SHORT : int8u chez
+ExifTool), FaceElementPositions (tête, visage, œil gauche 1435 787 1516 868, œil droit 1635 767
+1716 848) : le point tombe dans l'œil droit, comme Focus-Points le montre. Ces valeurs (pas la
+photo) sont dans `BoitierTests.dscf2402`. `--focus` sur une vignette tirée de l'original par
+`sips` : 0,02 s, un cadre AF et quatre sujets.
+
+**Cadres** (`Focus.cadres`, dans l'image affichée : chaque coin passe par
+`GeometriePhoto.versApercu`, comme le point de `--marquer-af`, orientation et cadre de Lightroom
+compris ; un cadre entièrement hors du cadre n'est pas dessiné, et la carte dit « lus, hors du
+cadre actuel » si le point y est). Le cadre AF, centré sur FocusPixel, à sa taille d'après le mode
+AF (`Focus.tailleCadreAF`), un modèle de Développeur, pas de Focus-Points (qui dessine un carré de
+taille fixe, réglable dans ses préférences) : une case de la grille AF fait 1/13 du grand côté,
+carrée (la grille de 117 points, 13 × 9, du X-H2S : 340 × 327 pixels dans le repère de
+4 416 × 2 944) ; un point unique de taille n couvre n/6 d'une case (la taille 6, la plus grande du
+X-H2S, une case entière) ; une zone de l × h, l × h cases ; sinon (large / suivi, point sans taille
+lue) le carré de 6 % du petit côté de `--marquer-af`. Provisoire : le cadre du viseur n'a pas été
+mesuré, ni la grille des boîtiers plus anciens (91 points en 13 × 7 sur un X-T20). Les visages et
+les éléments, à leurs positions ; un visage dont le cadre est déjà celui d'un élément (la tête, sur
+le X-H2S) n'est pas repris. CropMode est lu et dit (bloc Image, « Recadrage du boîtier ») ; les
+positions restent celles du repère d'ExifImageWidth et ExifImageHeight, comme dans Focus-Points :
+qu'un recadrage du boîtier (1,25×, viseur sport) les décale par rapport à l'image que Lightroom
+montre reste à constater ; la zone du téléconvertisseur numérique (CropTopLeft, CropSize), que
+Focus-Points dessine, ne l'est pas ici.
+
+**Dessin** (`PreviewImages.marquerFocus`) : le cadre AF en rouge, entier, avec un point au
+centre ; les visages et les éléments en coins jaunes (un quart de chaque côté), comme
+Focus-Points ; un liseré sombre sous chaque trait ; épaisseur de 0,3 % du grand côté (2 pixels au
+moins) ; un cadre de moins de 12 pixels grandit autour de son centre. À juger à l'écran.
+
+**`mcp-developpeur --focus <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>`**
+(`Focus.marquer`, sur le modèle de `--marquer-af`) : lecture bornée (`LecteurBoitier`, 2 s), la
+vignette marquée écrite dans `sortie`, et une ligne JSON : `lue`, `image`, `prise_de_vue` et
+`mise_au_point` (paires titre, valeur, en français), `point_af` (x, y dans l'image affichée,
+`dans_le_cadre`), `cadres` (`point_af`, `sujets` : ceux dessinés) et `dessinee`. Une géométrie ou
+une vignette illisible donne les valeurs sans dessin ; rien de lu (autre marque, original
+introuvable ou trop long à ouvrir) : code 1.
+
+**Dans la fenêtre** (`Fenetre.lua`, section Focus ; `Vues.focus`, `Fil.texteFocus`,
+`Lightroom.infosFocus`, `Images.lireFocus`) :
+
+- le segment « Focus » (62 points, images `seg-focus` et `seg-focus-actif` des deux apparences) et
+  sa variante, la carte Focus sur `carte-focus` (comme celle de la leçon : titre `focusTitre` en
+  gras 12, « Focus · DSCF2402.RAF (Essai) » ; texte `focusTexte` en 12, `D.focusLignes` lignes,
+  page par page par `Fenetre.montrerPage('focus', …)` et ▲ ▼, les titres des blocs en `<EM>`, gras
+  12) ;
+- jamais de bascule d'elle-même : `Fenetre.choisirOnglet` n'est jamais appelé pour Focus ; seul un
+  vrai clic sur le segment l'ouvre (`Fenetre.surOnglet.focus`) ;
+- l'aperçu de l'onglet (`Fenetre.apercuOnglet.focus`) : la vignette de la photo active avec ses
+  cadres (sans, pour une autre marque), sa légende, l'image vide pendant la lecture, ◀ ▶ coupés ;
+  Agrandir montre la vignette marquée en grand. L'aperçu de la photo active des autres onglets, et
+  son carré de `--marquer-af`, ne changent pas ;
+- la lecture (`Fenetre.lireFocus`, `Fenetre.preparerFocus`), dans une tâche, une à la fois :
+  `Vignettes.decrireVignette` (l'original, la marque, la géométrie ; une copie virtuelle donne
+  l'original de la copie), `Lightroom.infosFocus` (fileName, copyName, dimensions,
+  croppedDimensions, cameraMake, cameraModel, lens, focalLength, shutterSpeed, aperture,
+  isoSpeedRating, exposureBias, exposureProgram, meteringMode par getFormattedMetadata, clé par
+  clé ; la date et l'heure de dateTimeOriginal à l'heure locale), la vignette du cache de Lightroom
+  (`Vignettes.demander`, 1 024, dans `PhotoActive/Focus-…`), puis, pour un fichier Fujifilm
+  (`Fenetre.estFujifilm`, la même règle que le carré), `Images.lireFocus` :
+  `/usr/bin/perl -e 'alarm 5; exec @ARGV' <connecteur> --focus …`, cinq secondes au plus ; rien
+  n'est calculé en Lua ;
+- un onglet caché ne lit rien ; l'onglet suit la photo active (`Fenetre.majPhoto` appelle
+  `Fenetre.rafraichirFocus`) ; le résultat est gardé pour la photo (`Fenetre.focus`, refait à
+  chaque ouverture de la fenêtre), et un vrai clic ne le relit que si la géométrie de la photo
+  (cadre, orientation) a changé ;
+- autre marque : Image et Prise de vue, et « Mise au point : non lue (seulement les fichiers
+  Fujifilm pour l'instant) » (`Fil.FOCUS_AUTRE_MARQUE`) ; connecteur muet ou original trop long à
+  ouvrir : « non lue (original introuvable, ou trop long à ouvrir) » ; connecteur absent :
+  « non lue (connecteur introuvable : réinstaller Développeur) » ; sans photo active, l'aide.
+
+Essais : `BoitierTests` (`testMiseAuPointDeDSCF2402`, `testReglagesGroupesEnOctetsIndefinis`),
+`FocusTests` (cadres, tailles, dessin, `Focus.marquer`, `--boitier`),
+`Tests/Lua/Fenetre/essais-focus.lua` (un faux connecteur qui répond la ligne de DSCF2402, comme
+celui de `--marquer-af` d'`essais-integration.lua`), et les essais des segments, des cartes et des
+images (`essais-dispositions`, `essais-fenetre-b`, `essais-images`, `tests.lua`).
+
 ## Notation (`propose_ratings`, `notation`)
 
 Depuis la 1.1. Claude propose des notes selon un standard, critère par critère ; depuis la 1.1.1,
@@ -4906,7 +5036,8 @@ sans `DEVELOPPEUR_ECRAN_REEL=1` ; `scripts/tester-module.sh` : liaison 240, `ess
 `essais-integration` 9, `essais-jelefais` 18, `essais-lecon` 18, `essais-moteur` 18,
 `essais-pourquoi` 15). Les mesures du 21 octobre 2026 (ligne de commande, copies d'Essais, défaites
 ensuite) et la recette (91 étapes, une en échec : l'horizon de la dune, d'où `LineAngle.ecartMax` et
-l'étape sautée) sont dans la section de chaque chantier. Restent à voir :
+l'étape sautée) sont dans la section de chaque chantier. Restent à voir (et, pour l'onglet Focus
+du 22 octobre 2026, la liste à la fin) :
 
 1. La fenêtre B entière : la taille réelle (1 948 × 1 200, contenu 1 946 × 1 166, cadre
    `…-grande-4` ; D7 mesuré à 1 280 × 800 et à 1 497 × 1 200), sa place sur l'écran de
@@ -5009,6 +5140,24 @@ l'étape sautée) sont dans la section de chaque chantier. Restent à voir :
     Changer… et Accepter (les cinq boutons et ▲ ▼ tiennent-ils dans les 498 points ?), « Accepter
     5 ★ » quand Claude propose 5 ★ ; Claude qui propose 5 ★ à une photo qui le mérite, sans jamais
     poser ni changer un libellé de couleur.
+22. L'onglet Focus (non publié ; essais dans les simulations, et `--boitier` et `--focus` sur
+    DSCF2402.RAF hors de Lightroom ; voir Onglet Focus). Après un nouveau démarrage de Lightroom
+    (images nouvelles, aucun fichier `.lua` nouveau : un rechargement du module suffit) : le
+    segment « Focus » entre Aperçu et Proposition (largeur, libellé, les cinq segments centrés), en
+    claire et en sombre ; la carte Focus (trois blocs, titres en gras, une seule page pour une
+    photo Fujifilm) ; aucune bascule vers Focus (proposition, note, leçon qui arrivent) ; sur la
+    copie d'essai 53709912 (DSCF2402), le cadre rouge sur l'œil droit, la tête, le visage et les
+    deux yeux en coins jaunes, comme Focus-Points les montre, à comparer à sa capture ; la taille
+    du cadre AF (taille 6 = une case de 1/13 du grand côté) à comparer à l'écran du X-H2S (et une
+    zone de 5 × 5, un suivi) ; les textes de Lightroom tels qu'il les rend en français (dimensions,
+    focale, vitesse, ouverture, ISO, compensation, programme, mesure : leur forme exacte n'est pas
+    relevée ; « Exposition : <vitesse> à <ouverture> ») ; une photo d'une autre marque (iPhone) :
+    sans cadre, Image et Prise de vue, « Mise au point : non lue (seulement les fichiers Fujifilm
+    pour l'instant) » ; une copie virtuelle recadrée ou tournée (les cadres suivent le cadre de
+    Lightroom ; un vrai clic relit après un recadrage) ; la durée (la carte « lecture… », puis la
+    photo et ses cadres en moins d'une seconde attendue) et aucune demande d'autorisation de macOS
+    pour l'original ; Agrandir ; une photo prise en recadrage 1,25× ou au viseur sport (les
+    positions décalées ou non par rapport à l'image de Lightroom).
 
 ## Bibliothèque
 

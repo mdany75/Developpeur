@@ -48,8 +48,8 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
     Lightroom, la photo active et le nombre de photos sélectionnées), le fil, ▲ ▼ Fin, puis la
     saisie : les invites, le champ de demande, 📎, 📋, « Style » et son menu, le bandeau des
     messages et Envoyer ;
-  - à droite, les onglets Aperçu, Proposition, Note (par défaut) et Leçon, l'aperçu commun aux
-    quatre (◀ légende ▶ et ⤢ Agrandir dessous), puis la carte de l'onglet choisi.
+  - à droite, les onglets Aperçu, Focus, Proposition, Note (par défaut) et Leçon, l'aperçu commun
+    aux cinq (◀ légende ▶ et ⤢ Agrandir dessous), puis la carte de l'onglet choisi.
 - Claude y travaille par Claude Code et votre forfait claude.ai, avec les seuls outils du
   connecteur : ni fichiers, ni terminal, ni web.
 - Les conversations : la liste les range par jour (Aujourd'hui, Hier, puis par mois), chacune avec
@@ -80,12 +80,13 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   réponse, un clic sur une image la montre dans l'aperçu, sans changer d'onglet. ▲, ▼ et Fin pour
   s'y déplacer ; à droite, ce que fait Claude, sinon le dernier relevé du forfait (5 heures et
   semaine).
-- Les onglets de droite : Aperçu (l'étape choisie par « Pourquoi ? »), Proposition (la retouche que
-  Claude propose, ou la liste de « Je le fais »), Note (la carte Note, montrée à l'ouverture) et
-  Leçon. La fenêtre passe d'elle-même à l'onglet Proposition quand Claude propose une retouche
-  (sauf la proposition préparée à l'ouverture), à l'onglet Note quand il propose une note pour la
-  photo active, et une fois à l'onglet Leçon quand une leçon arrive (pas quand une proposition
-  attend ni pendant un exercice) ; jamais à l'onglet Aperçu.
+- Les onglets de droite : Aperçu (l'étape choisie par « Pourquoi ? »), Focus (la mise au point de
+  la photo active, comme Focus-Points la montre), Proposition (la retouche que Claude propose, ou
+  la liste de « Je le fais »), Note (la carte Note, montrée à l'ouverture) et Leçon. La fenêtre
+  passe d'elle-même à l'onglet Proposition quand Claude propose une retouche (sauf la proposition
+  préparée à l'ouverture), à l'onglet Note quand il propose une note pour la photo active, et une
+  fois à l'onglet Leçon quand une leçon arrive (pas quand une proposition attend ni pendant un
+  exercice) ; jamais aux onglets Aperçu et Focus, qui ne s'ouvrent que par un clic.
 - L'aperçu, de 498 × 332 : à l'ouverture de la fenêtre (et quand le menu ou ⌃⌥C la rappelle, ou
   que vous choisissez une autre photo), la photo active, avec sa légende (son nom, son appareil et
   sa date de prise de vue) ; puis les images que Claude regarde et les photos jointes. ◀ ▶ pour les
@@ -95,6 +96,22 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   point dans l'original, sur ce Mac et en temps limité, et le dessine sur l'aperçu ; Agrandir le
   montre aussi. Pour une autre marque, l'original n'est pas ouvert et l'aperçu reste sans carré ;
   de même sans point lisible.
+- L'onglet Focus (entre Aperçu et Proposition) : la photo active dans l'aperçu, comme dans le
+  module Focus-Points, avec ses informations dessous, en trois blocs : Image (fichier, date et heure
+  de la prise de vue, taille d'origine et taille actuelle), Prise de vue (marque, modèle, objectif,
+  focale, exposition, ISO, correction d'exposition, programme, mesure, stabilisation, mode
+  d'entraînement) et Mise au point (points lus ou non, mode de mise au point, priorité AF-S ou AF-C,
+  mode AF, taille du point ou de la zone AF, avertissement, visages et éléments du sujet détectés).
+  Pour une photo Fujifilm (RAF, ou JPEG de l'appareil), l'aperçu montre le point ou la zone de
+  mise au point à sa taille, en rouge, et les visages et les yeux que l'appareil a détectés, en
+  coins jaunes ; le connecteur les lit dans l'original, sur ce Mac et en 5 secondes au plus, et
+  les traduit en français (Point unique, Déclenchement, Bonne, œil droit…). Une copie virtuelle
+  montre l'original de la copie. Pour une autre marque : la photo sans cadre, Image et Prise de vue
+  quand même, et « Mise au point : non lue (seulement les fichiers Fujifilm pour l'instant) ».
+  L'onglet suit la photo active ; ce qu'il a lu est gardé tant que la photo ne change pas (un clic
+  le relit si vous l'avez recadrée). Agrandir montre la photo et ses cadres en grand. La taille du
+  cadre AF est une approximation, à comparer à l'écran de l'appareil (taille 6 du point unique :
+  une case de la grille AF ; une zone de 5 × 5 : 5 × 5 cases).
 - Une proposition préparée à l'ouverture : quand la fenêtre s'ouvre, ou que le menu ou ⌃⌥C la
   rappelle, sur une conversation vide, Claude prépare une proposition de retouche de la photo
   active, rendu naturel. Choisir une autre photo, fenêtre ouverte, ne la lance pas : elle vient au
@@ -994,8 +1011,9 @@ Le connecteur : protocole MCP, outils, catalogue des réglages, inscription dans
 fichiers temporaires), liaison TCP avec un faux module Lightroom (jeton compris, dans un fichier
 temporaire), ce que la 1.2 ajoute (bilan, éclairage, lecture des fichiers Fujifilm, écran,
 dosage de la peau) et la 1.3 (leçon de la photo, composition lue, « Je le fais », carnet de
-progrès, recette de la 1.3 sur un module simulé), sur des images, des fichiers et des profils de
-couleur fabriqués. Les contrats de la composition et de « Je le fais » entre le connecteur et le
+progrès, recette de la 1.3 sur un module simulé), puis l'onglet Focus (mise au point Fujifilm en
+détail, ses cadres, `--focus`), sur des images, des fichiers et des profils de couleur fabriqués
+(les valeurs d'une vraie photo, jamais la photo). Les contrats de la composition et de « Je le fais » entre le connecteur et le
 module (`Tests/Contrats/`) sont lus par les deux suites.
 
 ```bash
@@ -1006,7 +1024,8 @@ Le module, avec LuaJIT : forme du module, syntaxe et globales de chaque fichier,
 `relais.sh`, liens entre les fichiers, puis deux suites, chacune sur son Lightroom simulé :
 `Tests/Lua/Liaison` (les commandes du connecteur, notes proposées, avant/après des étapes, carnet
 et leçons comprises) et `Tests/Lua/Fenetre` (la fenêtre Claude avec un faux Claude Code, ses
-images et ses apparences, Publication et Consommation) ; dans chacune, les essais `essais-*.lua`
+images et ses apparences, l'onglet Focus avec un faux connecteur, Publication et Consommation) ;
+dans chacune, les essais `essais-*.lua`
 tournent après `tests.lua`. La simulation de la fenêtre imite ce qui a été constaté dans
 Lightroom (Retour, clics, vues masquées, texte riche…) et refuse ce qui n'y marche pas.
 
@@ -1030,9 +1049,15 @@ parle au module y passe avec le jeton de la liaison, comme le connecteur :
 - `--marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` : le carré de mise au
   point d'un fichier Fujifilm dessiné sur une vignette, comme dans l'aperçu de la photo active de
   la fenêtre Claude (code 1 sans point), sans Lightroom ni liaison ;
+- `--focus <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` : l'onglet Focus de la
+  fenêtre Claude : les cadres de la mise au point d'un fichier Fujifilm (point ou zone AF en rouge,
+  visages et éléments du sujet en coins jaunes) dessinés sur une vignette, puis ce que l'appareil
+  en dit (Image, Prise de vue, Mise au point, en français), une ligne JSON (code 1 si rien n'est
+  lu), sans Lightroom ni liaison ;
 - `--boitier <original>` : ce que l'appareil a rangé dans un fichier Fujifilm (RAF ou JPEG) : point
-  de mise au point, intention de la prise de vue comme dans `view_photo`, et valeurs lues sous les
-  noms d'exiftool, une ligne JSON (code 1 si rien n'est lu), sans Lightroom ni liaison ;
+  de mise au point, intention de la prise de vue comme dans `view_photo`, mise au point en détail
+  comme dans l'onglet Focus, et valeurs lues sous les noms d'exiftool, une ligne JSON (code 1 si
+  rien n'est lu), sans Lightroom ni liaison ;
 - `--ecran` : l'écran principal et son profil de couleur, une ligne JSON (ce que lit le voyant Écran
   de la fenêtre Claude ; `{"lu": false}` sans écran), sans Lightroom ni liaison ;
 - `--eclairage <id>… [<fichier.jpg>…] [--essai '{…}']` : le relevé de l'éclairage mixte (couleur des

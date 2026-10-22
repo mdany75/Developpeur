@@ -2,6 +2,25 @@
 
 ## Non publié
 
+### Ajouté
+- Un onglet Focus dans la fenêtre Claude, entre Aperçu et Proposition, à votre demande : la photo
+  active comme le module Focus-Points la montre. Pour une photo Fujifilm, l'aperçu dessine le point
+  ou la zone de mise au point à sa taille, en rouge, et les visages et les yeux que l'appareil a
+  détectés, en coins jaunes. Dessous, trois blocs : Image (fichier, date et heure de la prise de
+  vue, taille d'origine, taille actuelle), Prise de vue (marque, modèle, objectif, focale,
+  exposition, ISO, correction d'exposition, programme, mesure, stabilisation, mode
+  d'entraînement) et Mise au point (points lus ou non, mode, priorité AF-S, mode AF, taille du
+  point ou de la zone, avertissement, visages et éléments du sujet), en français : « Point
+  unique », « Déclenchement », « Bonne », « tête, visage, œil gauche, œil droit ». Ce que l'appareil
+  a rangé est lu dans l'original par le connecteur, sur ce Mac, en 5 secondes au plus ; une copie
+  virtuelle montre l'original de la copie. Pour une autre marque : la photo sans cadre, Image et
+  Prise de vue quand même, et « Mise au point : non lue (seulement les fichiers Fujifilm pour
+  l'instant) ». La fenêtre ne passe jamais d'elle-même à l'onglet Focus : un clic sur son segment
+  l'ouvre, et il suit ensuite la photo active. L'aperçu des autres onglets, avec son carré vert,
+  ne change pas. La taille du cadre AF est une approximation, à comparer à l'écran de l'appareil.
+- `mcp-developpeur --focus` (ce que la fenêtre lance pour l'onglet Focus) ; `--boitier` donne
+  aussi la mise au point en détail et les nouvelles valeurs sous les noms d'exiftool.
+
 ### Changé
 - Claude note maintenant vos photos de 0 à 5 ★ (à votre demande) : une 5 ★ est rare, une photo
   développée qui tient à côté de vos meilleures, vue à 100 %, finition comprise. Elle arrive « à
