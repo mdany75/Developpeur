@@ -85,9 +85,8 @@ local ATTENDUES = {
     ['etoile24-vide'] = { 24, 24 },
     ['etoile12-pleine'] = { 12, 12 },
     ['etoile12-vide'] = { 12, 12 },
-    ['coche-10'] = { 10, 10 },
-    ['chevron-passe'] = { 7, 8 },
-    avertissement = { 14, 14 },
+    -- coche-10, chevron-passe et avertissement (la rangée des passes et la ligne du plafond de la
+    -- carte Note) sont retirées au correctif 1.3.2.
     loupe = { 12, 12 },
     trombone = { 14, 14 },
     ['presse-papiers'] = { 14, 14 },
@@ -215,7 +214,7 @@ local MAQUETTE = {
     texte = '1D1D1F', gris = '6B6B6B', grisEntete = '5F5F5F', sousTitreChoisi = '505050', bleu = '0A64D8',
     mono = '3D3D45', coche = '1F7A35', orange = 'E0800D', rouge = 'D12E2E', ambre = 'A86200', blanc = 'FFFFFF',
     fondContenu = 'FFFFFF', fondVolet = 'F2F2F2', fondDroite = 'ECECEC',
-    filetVolet = 'D2D2D2', filetDroite = 'C9C9C9', filetEntete = 'E2E2E2', filetBarre = 'EBEBEB', filetPlafond = 'E3E3E3',
+    filetVolet = 'D2D2D2', filetDroite = 'C9C9C9', filetEntete = 'E2E2E2', filetBarre = 'EBEBEB',
     fondPanneau = 'FFFFFF', bordPanneau = 'C9C9C9', fondCarte = 'FAFAFA', bordCarte = 'D9D9D9',
     fondSegment = 'FFFFFF', bordSegment = 'B5B5B5', filetSegment = 'D0D0D0', selection = 'DADADA',
     pastille = '2DA44E', contour = '8A8A8A', bleuBouton = '0A64D8', bordBleu = '0A5BC4', bleuPresse = '084A9E',
@@ -430,7 +429,17 @@ essai('images/ et images/sombre/ : chaque image de Dispositions.IMAGES dans les 
         vrai(octets.claire ~= octets.sombre, 'images/sombre/' .. nom .. '.png : la même que la claire')
         nombre = nombre + 1
     end
-    vrai(nombre >= 33, 'les 33 images au moins')
+    vrai(nombre >= 30, 'les 30 images au moins (33 avant le correctif 1.3.2)')
+    -- Les images retirées avec la rangée des passes et la ligne du plafond ne restent dans aucun jeu.
+    for _, a in ipairs(Dispositions.APPARENCES) do
+        for _, nom in ipairs({ 'coche-10', 'chevron-passe', 'avertissement' }) do
+            local f = io.open(S.plugin .. '/' .. a.dossier .. '/' .. nom .. '.png', 'rb')
+            if f then
+                f:close()
+            end
+            vrai(f == nil, a.dossier .. '/' .. nom .. '.png : retirée')
+        end
+    end
 end)
 
 -- Un PNG fabriqué pour éprouver le contrôle : signature, IHDR (RGBA 8 bits), pHYs si `ppm` est

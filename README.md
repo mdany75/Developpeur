@@ -448,8 +448,8 @@ avant de proposer un cadre.
   100 %, sans rejet proposé. Douce, ou mise au point signalée manquée par l'appareil : 3 ★ au plus.
   Presque noire ou brûlée : 2 ★ au plus et « à vérifier », sans rejet proposé, car la retouche la
   rattrape souvent (surtout en RAW). Capture d'écran ou document : 1 ★. Pas la meilleure de sa
-  rafale ou de sa pile : 3 ★. Bruit fort : à noter après le débruitage. Sans défaut mesuré : 4 ★
-  au plus.
+  rafale ou de sa pile : 3 ★. Bruit fort : à noter après le débruitage. Sans défaut mesuré : pas
+  de plafond, jusqu'à 5 ★.
 - Claude propose les rejets et des mots-clés (ceux de Vision, traduits en français), et ne les pose
   qu'après votre accord ; une photo que vous avez déjà notée ou marquée d'un drapeau n'est pas
   touchée.
@@ -468,7 +468,7 @@ avant de proposer un cadre.
 
 **Noter**
 
-- Noter des photos selon le standard de notation (`propose_ratings`) : de 0 à 4 ★, ou le rejet,
+- Noter des photos selon le standard de notation (`propose_ratings`) : de 0 à 5 ★, ou le rejet,
   avec la raison critère par critère (impact, qualités, plancher technique, finition) et une
   phrase. Sans autre demande, rien ne change sur les photos : chaque proposition arrive « à
   vérifier » dans la carte Note, où vous l'acceptez ou la changez. Une nouvelle proposition pour
@@ -478,11 +478,13 @@ avant de proposer un cadre.
   s'annule comme un classement. Votre demande vaut accord, même en mode « Proposer d'abord » (avec
   « l'accord se donne ici », il attend encore le bouton Accepter de la fenêtre de suivi) ; la
   pause de la liaison l'arrête, et les photos protégées restent protégées.
-- Jamais 5 ★ de lui-même : vous les posez, ou vous les lui demandez. Une note au-dessus du plafond
-  mesuré au tri est refusée, sauf un défaut voulu et maîtrisé, que Claude nomme et vous laisse « à
-  vérifier ».
+- 5 ★ sont rares : une photo développée qui tient à côté de vos meilleures, vue à 100 % (la
+  dernière passe du standard). Vos coups de cœur ne sont pas des étoiles : c'est un libellé de
+  couleur que vous posez vous-même ; Claude n'en propose, n'en pose ni n'en change jamais sans que
+  vous le lui demandiez. Une note au-dessus du plafond mesuré au tri est refusée, sauf un défaut
+  voulu et maîtrisé, que Claude nomme et vous laisse « à vérifier ».
 - L'invite `noter` : une sortie notée passe par passe (le tri, des planches de 24 à 30 vignettes,
-  les candidates à 4 ★ regardées à 100 %, puis les propositions). Sans précision, elle note la
+  les candidates à 4 et 5 ★ regardées à 100 %, puis les propositions). Sans précision, elle note la
   sélection.
 
 **Bibliothèque**
@@ -573,8 +575,9 @@ propositions les plus récentes). Le catalogue n'en garde que les notes posées.
 
 Une étoile dit un niveau de qualité, et rien d'autre, avec le même sens d'une sortie à l'autre.
 Rejeter, c'est le drapeau Rejeter ; les doublons d'une rafale vont dans une pile sous la meilleure
-vue ; la valeur affective, dans un mot-clé ou une collection. 0 ★ veut dire « pas encore jugée »,
-jamais « mauvaise ».
+vue ; la valeur affective, dans un mot-clé ou une collection ; vos coups de cœur, dans un libellé
+de couleur que vous posez vous-même (Claude n'y touche pas sans votre demande). Claude note de 0 à
+5 ★ ; 0 ★ veut dire « pas encore jugée », jamais « mauvaise ».
 
 - Rejet (drapeau) : un défaut majeur, involontaire, confirmé à l'œil. La seule photo de sa scène
   reçoit plutôt 1 ★, à vérifier.
@@ -585,8 +588,9 @@ jamais « mauvaise ».
 - 4 ★ : une 3 ★ qui a de l'impact : vue en premier sur une planche de 20 à 30 vignettes, nette à
   100 % sur le sujet, meilleure vue de son moment. Souvent 5 à 10 % d'une sortie, sans proportion
   imposée : une sortie faible peut n'en avoir aucune.
-- 5 ★ : elle tient à côté de vos meilleures photos, toutes sorties confondues, développement fini.
-  Vous seul en décidez : Claude ne propose jamais 5 ★, et ne les pose qu'à votre demande.
+- 5 ★ : une 4 ★ qui tient à côté de vos meilleures photos, toutes sorties confondues,
+  développement fini et finition vue à 100 %. Rare : souvent aucune dans une sortie. Claude peut la
+  proposer, après le développement ; elle arrive « à vérifier », comme les autres.
 
 Les critères, du plus lourd au plus léger : l'impact (la photo arrête l'œil ; aucune mesure ne le
 voit), les qualités de l'image (lumière, sujet clair, composition, moment, couleur), le plancher
@@ -595,7 +599,7 @@ et, pour le 5 ★ seulement, la finition (halos aux bords des masques, peau plas
 Un défaut visible à la taille d'usage plafonne la note à 2 ★, un défaut visible seulement à 100 %
 à 3 ★ ; un défaut voulu et maîtrisé ne compte pas, ni l'effort de la prise de vue, ni la valeur
 affective. Une sortie se note en quatre passes, une question chacune : rejeter ou non ; 3 ★ ou
-non ; parmi les 3 ★, monter à 4 ; 5 ★, après le développement, vous seul.
+non ; parmi les 3 ★, monter à 4 ; après le développement, parmi les 4 ★, monter à 5.
 
 Le standard entier (selon le genre, ce que valent les mesures, les photos étalons d'une collection
 « Développeur › Étalons ») : la ressource `developpeur://notation` du connecteur, reprise aussi à la
@@ -604,8 +608,6 @@ fin de l'invite `noter`.
 **La carte Note**
 
 - Dans l'onglet Note de la fenêtre Claude, sous l'aperçu, pour la photo active :
-  - Passes : les quatre passes du standard (Rejeter ?, 3 ★ ou non ?, Monter à 4 ?, 5 ★ ? (vous)),
-    la passe de Claude en gras, celles d'avant cochées ;
   - Votre note : cinq étoiles cliquables, la note posée dans Lightroom et son sens (« Correcte »,
     « Tient seule »…) ; un clic pose la note, un clic sur la note posée la retire ;
   - Drapeau : « ⚑ Retenir » et « ⊗ Rejeter » posent le drapeau (un second clic le retire) ;
@@ -613,16 +615,16 @@ fin de l'invite `noter`.
   - Claude propose : sa note en petites étoiles, « rejeter », ou « rien pour l'instant » ; puis
     ses critères en grille, du plus lourd au plus léger (Impact, Qualités, Plancher technique,
     Finition), l'état de sa proposition en couleur (rouge : à vérifier ; vert : acceptée ou
-    changée ; gris : écartée), et sa raison ;
-  - le plafond mesuré au tri (« Plafond 3 ★ : mesuré au tri, pas plus »), avec « Voir à 100 % »,
-    qui montre dans l'aperçu le zoom que Claude a pris pour noter la photo (Agrandir : en grand) ;
-    grisé quand il n'en a pas pris.
-- En bas, ▲ ▼ font défiler, page par page, des critères plus longs que la carte ; puis Laisser à
-  N ★ (garder la note du catalogue et écarter la proposition : rien n'est écrit dans Lightroom),
-  Changer… (une autre note, de 0 à 5 ★, et au besoin un drapeau : sans drapeau, retenue, rejetée)
-  et Accepter N ★, en bleu (la note proposée posée dans Lightroom ; le drapeau Rejeter pour un
-  rejet, « Accepter le rejet » ; votre drapeau Retenue reste). Jamais « Accepter 5 ★ » : Claude
-  ne les propose pas, vous les posez par les étoiles ou Changer….
+    changée ; gris : écartée), sa passe (« Passe 2 · à vérifier ») et sa raison. La grille a la
+    place de la rangée des passes et de la ligne du plafond, retirées à votre demande : le plafond
+    mesuré au tri reste dans le critère Plancher technique.
+- En bas, ▲ ▼ font défiler, page par page, des critères plus longs que la carte ; « Voir à 100 % »
+  montre dans l'aperçu le zoom que Claude a pris pour noter la photo (Agrandir : en grand), grisé
+  quand il n'en a pas pris ; puis Laisser à N ★ (garder la note du catalogue et écarter la
+  proposition : rien n'est écrit dans Lightroom), Changer… (une autre note, de 0 à 5 ★, et au
+  besoin un drapeau : sans drapeau, retenue, rejetée) et Accepter N ★, en bleu, jusqu'à « Accepter
+  5 ★ » (la note proposée posée dans Lightroom ; le drapeau Rejeter pour un rejet, « Accepter le
+  rejet » ; votre drapeau Retenue reste).
 - Les étoiles, les drapeaux, Laisser, Changer… et Accepter attendent que Claude ait fini de
   travailler, sans Claude ni forfait. Le clic vaut accord, même en mode « Proposer d'abord » ; les
   photos protégées du Gestionnaire de modules externes restent protégées. Une note posée s'annule

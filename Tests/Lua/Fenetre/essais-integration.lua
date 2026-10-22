@@ -297,7 +297,7 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
         egal(2, p.noteClaude, 'Claude propose 2 ★')
         egal('rouge', p.notationCouleur)
         egal('<EM>Passe 1 · à vérifier.</EM> Presque noire.', p.nt1)
-        egal('<EM>Plafond 2 ★</EM> : mesuré au tri, pas plus.', p.plafondTexte)
+        egal(nil, p.plafondTexte, 'plus de ligne du plafond (correctif 1.3.2) : il reste dans le critère')
         egal('Accepter 2 ★', p.titreAccepterNote)
         egal(true, p.peutAccepterNote)
         -- Claude travaille : rien ne s'écrit depuis la carte.
@@ -334,7 +334,7 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
     sansErreur()
 end)
 
-essai('Registre relu du disque : décisions gardées ; jamais 5 étoiles ; consignes', function()
+essai('Registre relu du disque : décisions gardées ; de 0 à 5 étoiles, au-delà refusé ; consignes', function()
     Notation.oublier()
     egal('acceptee', Notation.proposition(2001).etat)
     egal('acceptee', Notation.proposition(2003).etat)
@@ -343,11 +343,17 @@ essai('Registre relu du disque : décisions gardées ; jamais 5 étoiles ; consi
             criteres = { impact = "Fort.", qualites = "Belle lumière.", plancher = "Nette (52)." } } } })))
     egal(nil, reponse.propositions[1].hors_seance)
     egal('a_verifier', Notation.proposition(2005).etat)
-    -- Claude ne propose jamais 5 étoiles, même si le connecteur était contourné.
+    -- Claude propose de 0 à 5 étoiles (correctif 1.3.2) ; au-delà, refusé même si le connecteur
+    -- était contourné.
     local ok, refus = pcall(Notation.commande, { action = 'proposer', propositions = {
-        { photo = 2006, note = 5, drapeau = 'aucun', raison = 'x', criteres = {} } } })
-    vrai(not ok, '5 ★ refusées')
-    contient(refus, 'jamais 5 étoiles')
+        { photo = 2006, note = 6, drapeau = 'aucun', raison = 'x', criteres = {} } } })
+    vrai(not ok, '6 ★ refusées')
+    contient(refus, 'un entier de 0 à 5')
+    local cinq = Notation.commande(Json.decode(Json.encode({ action = 'proposer', passe = 4, propositions = {
+        { photo = 2005, note = 5, drapeau = 'aucun', a_verifier = false, raison = "Parmi les meilleures.",
+            criteres = { impact = "Exceptionnel.", qualites = "Lumière rare.", plancher = "Nette (61).", finition = "Rien à reprendre." } } } })))
+    egal(5, cinq.propositions[1] and Notation.proposition(2005).note, '5 ★ rangées')
+    egal('a_verifier', Notation.proposition(2005).etat)
     -- Les consignes parlent du même outil que le connecteur.
     contient(Consignes.texte, 'propose_ratings')
     contient(Consignes.texte, 'apply = true')

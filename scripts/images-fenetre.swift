@@ -386,16 +386,8 @@ func dessins(_ p: Palette) -> [String: Dessin] {
     d["etoile12-pleine"] = icone(boite: B24, couleur: p["ambre"], trait: 1.5, traits: [ETOILE], pleins: [ETOILE])
     d["etoile12-vide"] = icone(boite: B24, couleur: p["contour"], trait: 1.8, traits: [ETOILE])
 
-    // La rangée des passes : la coche verte d'une passe faite (#1F7A35), le chevron entre deux passes.
-    d["coche-10"] = icone(boite: B16, couleur: p["coche"], trait: 2.2, traits: [trace("M3.5 8.5l3 3 6-7")])
-    d["chevron-passe"] = icone(boite: CGSize(width: 8, height: 10), couleur: p["contour"], trait: 1.4,
-                               traits: [trace("M2 1.5L6 5l-4 3.5")])
-
-    // La ligne du plafond : le triangle ambre et son point (rempli et bordé, comme le cercle de la
-    // maquette, qui hérite du trait).
-    d["avertissement"] = icone(boite: B16, couleur: p["ambre"], trait: 1.5,
-                               traits: [trace("M8 2.2l6.3 11.1H1.7z"), trace("M8 6.3v3.4"), cercle(8, 11.4, 0.5)],
-                               pleins: [cercle(8, 11.4, 0.5)])
+    // La rangée des passes (coche-10, chevron-passe) et la ligne du plafond (avertissement) de la
+    // carte Note sont retirées depuis le correctif 1.3.2 (demandé par Dany le 22 octobre 2026).
 
     // La loupe devant le champ Rechercher (#6B6B6B ; bouts arrondis, jointures par défaut).
     d["loupe"] = icone(boite: B16, couleur: p["gris"], trait: 1.6, jointures: .miter,

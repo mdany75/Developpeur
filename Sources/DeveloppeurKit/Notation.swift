@@ -12,10 +12,13 @@ public enum Notation {
     Une étoile dit un niveau de qualité, et rien d'autre. Ce niveau a le même sens d'une sortie à
     l'autre, pour que « 4 ★ et plus » garde son sens au fil des années. Les autres décisions ont
     chacune leur outil : rejeter, c'est le drapeau Rejeter ; les doublons d'une rafale, une pile sous
-    la meilleure vue ; la valeur affective, un mot-clé ou une collection. 0 ★ veut dire « pas encore
-    jugée », jamais « mauvaise ».
+    la meilleure vue ; la valeur affective, un mot-clé ou une collection ; les coups de cœur de
+    l'utilisateur, un libellé de couleur qu'il pose lui-même. 0 ★ veut dire « pas encore jugée »,
+    jamais « mauvaise ».
 
     ## Les notes
+
+    L'échelle de Claude va de 0 à 5 ★, plus le rejet.
 
     - **Rejet (drapeau)** : défaut majeur, involontaire, confirmé à l'œil. Si c'est la seule photo de
       sa scène, proposer plutôt 1 ★, à vérifier.
@@ -27,11 +30,18 @@ public enum Notation {
     - **4 ★** : une 3 ★ qui a de l'impact : vue en premier sur une planche de 20 à 30 vignettes,
       nette à 100 % sur le sujet, meilleure vue de son moment. Souvent 5 à 10 % d'une sortie, sans
       quota : une sortie faible peut n'en avoir aucune.
-    - **5 ★** : elle tient à côté des meilleures photos de l'utilisateur, toutes sorties confondues ;
-      développement fini, sans excès ; toujours forte quelques jours plus tard. Posée par
-      l'utilisateur seul : Claude ne propose jamais 5 ★.
+    - **5 ★** : une 4 ★ qui tient à côté des meilleures photos de l'utilisateur, toutes sorties
+      confondues ; développement fini, sans excès, la Finition vue à 100 % ; toujours forte quelques
+      jours plus tard. Rare : bien moins que les 4 ★, souvent aucune dans une sortie ; jamais avant le
+      développement, ni sans avoir vu toute la sortie.
 
     Une photo qui ne remplit pas les conditions d'une note reçoit la note d'en dessous.
+
+    ## Les coups de cœur
+
+    Les coups de cœur de l'utilisateur ne sont pas des étoiles : c'est un libellé de couleur qu'il
+    pose lui-même. Claude ne propose, ne pose ni ne change jamais un libellé de couleur de lui-même :
+    seulement à la demande explicite de l'utilisateur (set_metadata).
 
     ## Les critères, du plus lourd au plus léger
 
@@ -59,24 +69,25 @@ public enum Notation {
     1. Rejeter ou non ? Les cas douteux (groupe, nuit, flou peut-être voulu) vont « à vérifier ».
     2. 3 ★ ou non ? Les autres photos gardées reçoivent 2 ★ (1 ★ au passage).
     3. Parmi les 3 ★, monter à 4 ★ ? Toute la sortie vue, les candidates regardées à 100 %.
-    4. Après le développement, 5 ★ ? L'utilisateur seul.
+    4. Après le développement, parmi les 4 ★, monter à 5 ★ ? Les candidates regardées à 100 %,
+       Finition comprise ; aucune si aucune ne tient à côté des meilleures de l'utilisateur.
 
     ## Ce que valent les mesures
 
     La note esthétique de Vision ne compare que des photos d'une même sortie et d'un même genre. La
     qualité de visage ne départage que les photos d'une rafale. Les mesures fixent le plancher et
-    départagent une rafale ; elles ne justifient jamais seules un 4 ★.
+    départagent une rafale ; elles ne justifient jamais seules un 4 ★ ni un 5 ★.
 
     ## Photos étalons
 
     Si la collection « Développeur › Étalons » existe, la regarder avant de noter : une « tout juste
-    3 » et une « presque 3 », de même entre 3 et 4, par genre.
+    3 » et une « presque 3 », de même entre 3 et 4 et entre 4 et 5, par genre.
     """
 
-    /// Claude propose de 0 à 4 étoiles : 5 est posé par l'utilisateur seul.
-    public static let noteMaximale = 4
-    /// Les passes du standard ; la dernière (5 étoiles) est à l'utilisateur seul : Claude n'y
-    /// propose rien.
+    /// Claude propose de 0 à 5 étoiles (demandé par Dany le 22 octobre 2026 : ses coups de cœur
+    /// sont un libellé de couleur qu'il pose lui-même, jamais Claude).
+    public static let noteMaximale = 5
+    /// Les passes du standard ; la dernière (monter à 5 étoiles) se fait après le développement.
     public static let passes = 4
 
     /// Les critères d'une proposition, du plus lourd au plus léger : nom dans propose_ratings, nom
@@ -105,7 +116,8 @@ public enum Notation {
     }
 
     /// Le plafond d'une photo triée, d'après le standard et les seuils déjà relevés (netteté 15 et
-    /// 35, bruit 1,5 : `DetailMeasurements.seuilFlou`, `seuilNet` et `bruitFort`) : un défaut
+    /// 35, bruit 1,5 : `DetailMeasurements.seuilFlou`, `seuilNet` et `bruitFort`), pour les seuls
+    /// défauts (sans défaut, aucun plafond sous `noteMaximale`, 5 depuis le 22 octobre 2026) : un défaut
     /// majeur, 0 et rejet proposé ; un défaut visible seulement à 100 % (douce, mise au point
     /// signalée manquée par l'appareil), 3 ; presque noire ou brûlée, 2, à
     /// vérifier (souvent rattrapable, surtout en RAW) ; une capture ou un document selon Vision, 1 ;
@@ -150,7 +162,7 @@ public enum Notation {
         }
         let note = limites.map(\.note).min() ?? noteMaximale
         let raison = limites.isEmpty
-            ? "aucun défaut mesuré : \(noteMaximale) au plus (5 : l'utilisateur seul)"
+            ? "aucun défaut mesuré : pas de plafond"
             : limites.sorted { $0.note < $1.note }.map(\.raison).joined(separator: " ; ")
         return Plafond(note: min(note, noteMaximale), raison: raison, rejet: rejet, aVerifier: aVerifier)
     }

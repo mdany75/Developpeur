@@ -116,10 +116,12 @@ final class MCPServerTests: XCTestCase {
         XCTAssertTrue(ServerInfo.instructions.contains("jamais de passe sans défaut constaté"))
     }
 
-    /// 1.1 : noter passe par propose_ratings, selon le standard, jamais 5 étoiles ; l'invite noter
-    /// porte le standard (la fenêtre Claude ne lit pas les ressources) et ne retouche rien.
+    /// 1.1 : noter passe par propose_ratings, selon le standard ; l'invite noter porte le standard (la
+    /// fenêtre Claude ne lit pas les ressources) et ne retouche rien. Correctif 1.3.2 : de 0 à 5 ★,
+    /// la passe 4 comprise ; jamais de libellé de couleur sans la demande de l'utilisateur.
     func testRatingIsAnnouncedInInstructionsAndThePrompt() throws {
-        XCTAssertTrue(ServerInfo.instructions.contains("noter : propose_ratings (standard developpeur://notation ; apply = true s'il demande de noter ; 5 ★ : set_metadata, sur sa demande) ;"))
+        XCTAssertTrue(ServerInfo.instructions.contains("noter : propose_ratings (0 à 5 ★, standard developpeur://notation ; apply = true s'il demande de noter ; libellé de couleur : sur sa demande) ;"))
+        XCTAssertFalse(ServerInfo.instructions.contains("5 ★ : set_metadata"))
         // 20 octobre 2026 : ce que l'utilisateur demande clairement, Claude le fait.
         XCTAssertTrue(ServerInfo.instructions.contains("Ce qu'il demande clairement, le faire"))
         let reponse = try call(#"{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{"name":"noter","arguments":{"photos":"la collection Été","passe":"3"}}}"#)
@@ -127,12 +129,14 @@ final class MCPServerTests: XCTestCase {
         XCTAssertTrue(texte.contains("Photos : la collection Été."))
         XCTAssertTrue(texte.contains("pass = 3 dans propose_ratings"))
         XCTAssertTrue(texte.hasSuffix(Notation.standard), "le standard, en entier, à la fin")
-        for etape in ["cull_photos", "contact_sheet par planches de 24 à 30", "view_photo", "propose_ratings", "Jamais 5 étoiles",
-                      "Jamais set_metadata pour une note sans sa demande"] {
+        for etape in ["cull_photos", "contact_sheet par planches de 24 à 30", "view_photo", "propose_ratings", "5 étoiles : rares, après le développement (passe 4)",
+                      "Jamais de libellé de couleur", "Jamais set_metadata pour une note sans sa demande"] {
             XCTAssertTrue(texte.contains(etape), etape)
         }
+        XCTAssertFalse(texte.contains("Jamais 5 étoiles"))
         XCTAssertFalse(Prompts.noter.avecGuide, "noter ne retouche pas")
-        XCTAssertTrue(Prompts.noter.render(["passe": "4"]).contains("ne propose rien"))
+        XCTAssertTrue(Prompts.noter.render(["passe": "4"]).contains("Passe 4 du standard (« Les passes ») : pass = 4 dans propose_ratings."))
+        XCTAssertFalse(Prompts.noter.render(["passe": "4"]).contains("ne propose rien"))
         XCTAssertTrue(Prompts.noter.render([:]).contains("Toutes les passes"))
         XCTAssertTrue(Prompts.noter.render(["passe": "revoir les 3 étoiles"]).contains("Passe : revoir les 3 étoiles."))
         XCTAssertEqual(Prompts.noter.arguments.map(\.name), ["photos", "passe"])

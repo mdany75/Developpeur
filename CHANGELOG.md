@@ -2,6 +2,22 @@
 
 ## Non publié
 
+### Changé
+- Claude note maintenant vos photos de 0 à 5 ★ (à votre demande) : une 5 ★ est rare, une photo
+  développée qui tient à côté de vos meilleures, vue à 100 %, finition comprise. Elle arrive « à
+  vérifier » dans la carte Note comme les autres, et « Accepter 5 ★ » la pose. Vos coups de cœur ne
+  sont plus des étoiles : c'est un libellé de couleur que vous posez vous-même ; Claude n'en
+  propose, n'en pose ni n'en change jamais sans que vous le lui demandiez. Le standard de notation
+  le dit (nouvelle section « Les coups de cœur »), et la dernière passe, « parmi les 4 ★, monter à
+  5 ★ ? », se fait après le développement. Sans défaut mesuré au tri, plus de plafond sous 5 ★ ;
+  les défauts gardent leurs plafonds (floue, mise au point manquée, yeux fermés, douce, presque
+  noire ou brûlée, capture).
+- La carte Note est plus simple : plus de rangée « Passes » ni de ligne « Plafond … : mesuré au
+  tri, pas plus », retirées à votre demande. La grille des critères de Claude prend leur place
+  (trois lignes de plus par page) ; la passe de Claude reste dans l'en-tête de la grille, et le
+  plafond mesuré dans le critère Plancher technique. « Voir à 100 % » passe dans la rangée du bas,
+  à côté de ▲ ▼, et reste là même sans plafond mesuré.
+
 ### Corrigé
 - Une proposition que Claude a déjà appliquée ne vous demande plus votre accord. Quand vous
   écrivez « Applique ta proposition » et que Claude pose lui-même la retouche, la carte

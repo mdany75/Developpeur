@@ -53,7 +53,7 @@ Ce projet suit le standard commun des projets de Dany (`/standard-projet` le vé
 | Tester le serveur | `swift test` (jamais le vrai Lightroom, ni le vrai jeton, ni le vrai écran) ; `DEVELOPPEUR_ECRAN_REEL=1 swift test --filter EcranTests` lit en plus le vrai écran du Mac (`testLectureReelleSansPlantage`, sauté sans cette variable : lecture seule, aucune valeur attendue) |
 | Tester le module | `scripts/tester-module.sh` (LuaJIT : `brew install luajit`) : forme du module, syntaxe, globales, liens entre les fichiers, puis les suites `Tests/Lua/Liaison` et `Tests/Lua/Fenetre`, et chaque `essais-*.lua` des deux |
 | Essayer à la main | `swift build && ./.build/debug/mcp-developpeur --status` (inscriptions, module, état du fichier du jeton de la liaison, jamais sa valeur, écran principal, même Lightroom fermé, puis la liaison), puis `--call <outil> '{…}' [--image <fichier.jpg>]` (Lightroom ouvert, liaison démarrée ; lit l'écran comme le serveur, et chaque `--call` est un nouveau processus : le bilan de `view_photo` y repart de zéro) ; `--module diagnostic` liste les fonctions du SDK offertes, et avec `'{"valeurs": true}'` lit le jeu de libellés, le filtre de la Bibliothèque et l'original de la photo active ; `--version` |
-| Recette dans Lightroom | `./.build/debug/mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--horizon <id> [--hauteur-horizon <0 à 1>]] [--original] [--images <dossier>]` (copies virtuelles de la collection « Développeur › Essais » que Claude n'a pas encore retouchées ; avec le vrai pont seulement, d'abord deux étapes en lecture seule : « liaison fermée (jeton privé) » (commande sans jeton, puis avec un autre jeton, refusées ; ni le jeton ni son chemin dans `get_status`) et « écran nommé (get_status) » ; le RAW passe aussi par « intention lue au boîtier (view_photo, intention_boitier) », « bilan chiffré d'une passe à l'autre (view_photo), puis annulé », puis la 1.3 (`Recette+13.swift`) : « avant/après d'une étape gardé sans autre rendu (Pourquoi ?), puis annulé », « leçon de la photo (photo_lesson) : ISO et indices lus, refusée pour une photo d'essai, rangée pour la recette (essai_recette), relue, retirée ; photo inchangée », « carnet de progrès : photo d'essai refusée, notée pour la recette (essai_recette), exportée, retirée », et après les variantes « « Je le fais » : ma version rangée sans rien appliquer, réglages changés, comparée côte à côte, puis effacée » ; l'étape du débruitage vérifie aussi que la photo active revient ; `--horizon` : une copie d'Essais qui a un vrai horizon net, à `--hauteur-horizon` (0,5 par défaut), pour les trois étapes de la composition (lue et montrée, cadre actuel lu sur l'image entière recadrée en 4:5 et tournée de 2°, cadre proposé appliqué et horizon remesuré), la dernière sautée avec sa raison sans horizon net ; sans `--horizon`, la recette dit que la composition n'est pas vérifiée ; et, dans le tri, « éclaircir et assombrir : radial inversé et dégradé linéaire (propositions) » puis « … : forme des bords (radial inversé, propositions) » ; `--flash` : une photo au flash, pour les expositions d'après la prise de vue ; `--profondeur` : la copie d'une photo Portrait d'iPhone ; `--yeux-rouges` : une vraie photo au flash ; `--x-t20` : un RAF de X-T20, avec l'étape « point de mise au point dessiné pour noter (view_photo, af_point) » (carré dessiné si le point est lu, évaluation dite, chemin de l'original jamais rendu à Claude) et l'intention lue au boîtier ; `--portrait` : un portrait, la peau dosée (visages vus par Vision ; trois doses en propositions, détail des joues mesuré ; `amount` 50 = la moitié de la dose, jugé à l'écart maximal, 2 niveaux au plus ; peau trop lissée refusée sans `smoothing_requested`, rien d'écrit ; dose par défaut posée à `amount` 50, relue, annulée) ; `--mixte` : une photo à deux lumières, en lecture seule (éclairage mixte nommé, cases lues sur 9, durée de la mesure), puis le RAW de `--recette` en témoin à une seule lumière s'il est une autre photo ; `--original` accepte un original désigné par Dany ; `--images` : le dossier des zooms à regarder (et des deux vues du bilan) ; chacune est remise à l'origine ; l'étape « note proposée (propose_ratings), photo inchangée ; puis posée sur demande et annulée » vérifie le refus de 5 ★, range une proposition à vérifier par la vraie commande `notation`, puis pose 2 ★ par `propose_ratings` avec `apply` et les annule par `undo_last` ; le registre `notation.json` est remis ensuite comme avant l'étape, même après un échec (`notation` `remettre`, `Recette.garderRegistreDesNotes`)) |
+| Recette dans Lightroom | `./.build/debug/mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--horizon <id> [--hauteur-horizon <0 à 1>]] [--original] [--images <dossier>]` (copies virtuelles de la collection « Développeur › Essais » que Claude n'a pas encore retouchées ; avec le vrai pont seulement, d'abord deux étapes en lecture seule : « liaison fermée (jeton privé) » (commande sans jeton, puis avec un autre jeton, refusées ; ni le jeton ni son chemin dans `get_status`) et « écran nommé (get_status) » ; le RAW passe aussi par « intention lue au boîtier (view_photo, intention_boitier) », « bilan chiffré d'une passe à l'autre (view_photo), puis annulé », puis la 1.3 (`Recette+13.swift`) : « avant/après d'une étape gardé sans autre rendu (Pourquoi ?), puis annulé », « leçon de la photo (photo_lesson) : ISO et indices lus, refusée pour une photo d'essai, rangée pour la recette (essai_recette), relue, retirée ; photo inchangée », « carnet de progrès : photo d'essai refusée, notée pour la recette (essai_recette), exportée, retirée », et après les variantes « « Je le fais » : ma version rangée sans rien appliquer, réglages changés, comparée côte à côte, puis effacée » ; l'étape du débruitage vérifie aussi que la photo active revient ; `--horizon` : une copie d'Essais qui a un vrai horizon net, à `--hauteur-horizon` (0,5 par défaut), pour les trois étapes de la composition (lue et montrée, cadre actuel lu sur l'image entière recadrée en 4:5 et tournée de 2°, cadre proposé appliqué et horizon remesuré), la dernière sautée avec sa raison sans horizon net ; sans `--horizon`, la recette dit que la composition n'est pas vérifiée ; et, dans le tri, « éclaircir et assombrir : radial inversé et dégradé linéaire (propositions) » puis « … : forme des bords (radial inversé, propositions) » ; `--flash` : une photo au flash, pour les expositions d'après la prise de vue ; `--profondeur` : la copie d'une photo Portrait d'iPhone ; `--yeux-rouges` : une vraie photo au flash ; `--x-t20` : un RAF de X-T20, avec l'étape « point de mise au point dessiné pour noter (view_photo, af_point) » (carré dessiné si le point est lu, évaluation dite, chemin de l'original jamais rendu à Claude) et l'intention lue au boîtier ; `--portrait` : un portrait, la peau dosée (visages vus par Vision ; trois doses en propositions, détail des joues mesuré ; `amount` 50 = la moitié de la dose, jugé à l'écart maximal, 2 niveaux au plus ; peau trop lissée refusée sans `smoothing_requested`, rien d'écrit ; dose par défaut posée à `amount` 50, relue, annulée) ; `--mixte` : une photo à deux lumières, en lecture seule (éclairage mixte nommé, cases lues sur 9, durée de la mesure), puis le RAW de `--recette` en témoin à une seule lumière s'il est une autre photo ; `--original` accepte un original désigné par Dany ; `--images` : le dossier des zooms à regarder (et des deux vues du bilan) ; chacune est remise à l'origine ; l'étape « note proposée (propose_ratings), photo inchangée ; puis posée sur demande et annulée » vérifie le refus de 6 ★ (5 ★ refusées jusqu'à la 1.3.1), range une proposition à vérifier par la vraie commande `notation`, puis pose 2 ★ par `propose_ratings` avec `apply` et les annule par `undo_last` ; le registre `notation.json` est remis ensuite comme avant l'étape, même après un échec (`notation` `remettre`, `Recette.garderRegistreDesNotes`)) |
 | Recette d'une version | toutes les options dont la collection d'essai a une photo (le 21 octobre 2026 : `--jpeg`, `--x-t20`, `--portrait`, `--mixte` ; ni flash, ni yeux rouges, ni Portrait d'iPhone, ni vrai horizon : `--horizon` demande d'ajouter aux Essais une copie qui a un horizon net, mer, lac ou plaine ; la dune 53709786 ne convient pas, ses rides de sable faussent la mesure), sur des copies remises à l'origine d'abord (`revert_to_original` : une copie que Claude a déjà retouchée est refusée) ; `--mixte` sur le portrait d'essai, la seule copie à deux lumières (relevé du 20 octobre 2026) ; l'étape du témoin à une seule lumière ne vient que si le RAW de `--recette` est une autre photo ; la sortie dans un fichier, en arrière-plan, jamais tronquée (`\| head` coupe la recette au milieu d'une étape) ; puis l'essai dans la fenêtre Claude (« Publier une version », étape 3) |
 | Réglages à plat | `./.build/debug/mcp-developpeur --dump [<id>]` (une clé par ligne, pour `diff` avant et après une opération faite à la main) |
 | Recalage mesuré | `./.build/debug/mcp-developpeur --recalage <id>` (écarts du modèle de recalage sur la géométrie actuelle ; deux rendus « Claude · recalage » dans l'Historique) |
@@ -123,8 +123,11 @@ correctif 1.3.1, tiré de l'essai réel de la 1.3 (« ## Non publié », pas enc
 carnet et dans la leçon seulement à ISO élevé (`Carnet.isoEleve`), leçon d'une photo d'essai
 jamais rangée au carnet.
 Le standard de notation (une étoile = un niveau de qualité fixe, 0 ★ = pas encore jugée, rejeter =
-drapeau, Claude ne propose jamais 5 ★), venu de la section 1.1 de la feuille de route, est
-maintenant le texte de `Notation.standard` (voir Règles).
+drapeau, Claude note de 0 à 5 ★ depuis le correctif 1.3.2, les coups de cœur de Dany sont un
+libellé de couleur qu'il pose lui-même), venu de la section 1.1 de la feuille de route, est
+maintenant le texte de `Notation.standard` (voir Règles). Le correctif 1.3.2 (« ## Non publié ») :
+une proposition qu'une étape de Claude dépasse n'attend plus, Claude note de 0 à 5 ★, et la carte
+Note perd la rangée des passes et la ligne du plafond (demandés par Dany le 22 octobre 2026).
 
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 
@@ -674,19 +677,27 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   floue, une mise au point manquée ou des yeux fermés ; 3 pour une photo douce ou qui n'est pas la
   meilleure de sa rafale ; 2, à vérifier, pour une photo presque noire ou brûlée, ou une mise au
   point manquée sur une texture faible, 1.3 ; 1 pour une capture), que `dernierTri`
-  (`ToolHandler`) garde pour le processus du serveur. Une scène sur fond noir voulu (L* médian 3,9)
+  (`ToolHandler`) garde pour le processus du serveur ; sans défaut, aucun plafond sous 5 (« aucun
+  défaut mesuré : pas de plafond », correctif 1.3.2). Une scène sur fond noir voulu (L* médian 3,9)
   reste dite « presque noire » : à revoir, hors de la 1.3.
-- **Claude ne propose jamais 5 ★** : `propose_ratings` refuse une note de 5 ou plus avant tout
-  envoi (`Notation.noteMaximale = 4`), et le module la refuse encore
-  (`Notation.NOTE_MAX_PROPOSEE`) ; `set_metadata` garde 5 ★ pour l'utilisateur (à sa demande
-  seulement : 5 ★ que Dany demande à Claude passent par lui), comme Changer… et les étoiles de la
-  carte Note ; la carte n'offre jamais « Accepter 5 ★ » (`Fenetre.noteDeCinq`, `Fenetre.PAS_CINQ`).
-  Jamais `set_metadata` pour une note sans demande. `propose_ratings` (titre « Noter des photos »)
+- **Claude note de 0 à 5 ★, jamais un libellé de couleur sans demande** (correctif 1.3.2, demandé
+  par Dany le 22 octobre 2026 : « si moi je veux une photo 5 étoiles, je placerai un code de
+  couleur ») : `propose_ratings` refuse une note hors de 0 à 5 avant tout envoi
+  (`Notation.noteMaximale = 5`, 4 jusqu'à la 1.3.1), et le module la refuse encore
+  (`Notation.NOTE_MAX_PROPOSEE = 5`) ; la passe 4 (monter à 5, après le développement) se propose
+  comme les autres. Le standard (section « Les coups de cœur »), les descriptions de
+  `propose_ratings` et de `color_label` (`set_metadata`), les invites `noter` et `tri_seance`,
+  `ServerInfo.instructions` (« libellé de couleur : sur sa demande ») et `Consignes.texte` (« De 0 à
+  5 ★ ; jamais de libellé de couleur (ses coups de cœur) sans sa demande. ») disent que les coups de
+  cœur de Dany sont un libellé de couleur qu'il pose lui-même : Claude n'en propose, n'en pose ni
+  n'en change jamais sans sa demande explicite. La carte offre « Accepter 5 ★ » (`Fenetre.noteDeCinq`
+  et `Fenetre.PAS_CINQ` retirés). `set_metadata` pose toujours une note de 0 à 5 à la demande de
+  Dany, comme Changer… et les étoiles de la carte Note. Jamais `set_metadata` pour une note sans
+  demande. `propose_ratings` (titre « Noter des photos »)
   n'est plus en lecture seule depuis la 1.1.1 (hors de `readOnlyTools` : avec `apply`, il écrit
   dans le catalogue) ; il valide toutes les propositions avant d'envoyer quoi que ce soit (les clés
   de chaque élément à la main : `parametresInconnus` ne voit que le premier niveau), refuse une
-  note au-dessus du plafond du dernier `cull_photos` sans `to_check`, refuse la passe 4 (5 ★,
-  l'utilisateur seul ; le module aussi), et envoie une seule commande `notation`
+  note au-dessus du plafond du dernier `cull_photos` sans `to_check`, et envoie une seule commande `notation`
   (`action = 'proposer'`, plus `poser` avec `apply = true`), absente de `LightroomBridge.lectures`
   (rejouée, elle remettrait les propositions « à vérifier »). Plus de `session` ni de
   `read_session` (Séance de notation retirée) ; `pass` est la passe du standard.
@@ -813,13 +824,17 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   longue série (elle reste dans la description de `get_status` et l'invite `tri_seance`) ; la 1.3,
   seulement « (read_composition) » dans « Recadrer … seulement sur demande » (un repli « …puis
   photo_lesson » n'est à faire que si Claude Desktop ne l'appelle pas, en raccourcissant d'abord une
-  autre phrase) ; le reste passe par les descriptions d'outils, les résultats et les invites. La
+  autre phrase) ; le correctif 1.3.2, « 0 à 5 ★, » et « libellé de couleur : sur sa demande » à la
+  place de « 5 ★ : set_metadata, sur sa demande », payés par « rejets : set_metadata après accord »
+  (au lieu de « rejets à poser par set_metadata après accord ») : toujours 3 787 ; le reste passe
+  par les descriptions d'outils, les résultats et les invites. La
   longueur qu'une session de Claude Code garde d'une description d'outil n'est pas constatée :
   l'essentiel en tête, et un test de longueur pour les plus longues (`add_mask` 2 048 au plus,
   `view_photo` 1 850, `photo_lesson` 1 200, `read_composition` 1 000, `preview_settings` 600,
   `analyze_photos` 520, `export_journal` avec sa propriété `notebook` 450, `reason` 160). Les
-  consignes de la fenêtre (`Consignes.texte`, lues à chaque demande) font 7 466 caractères pour
-  un plafond de 7 500 (`essais-moteur.lua`) : la 1.3 y a mis ses sections Composition, Je le fais,
+  consignes de la fenêtre (`Consignes.texte`, lues à chaque demande) font 7 489 caractères pour
+  un plafond de 7 500 (`essais-moteur.lua` ; 7 466 avant la puce Notes du correctif 1.3.2, « De 0 à
+  5 ★ ; jamais de libellé de couleur (ses coups de cœur) sans sa demande. ») : la 1.3 y a mis ses sections Composition, Je le fais,
   Raison de chaque étape et Leçon de la photo, et la puce Carnet ; ce qui dépasse va aux
   descriptions d'outils.
 - Le presse-papiers ne se lit que sur un clic de l'utilisateur (bouton 📋, `presse-papiers.js`) ;
@@ -852,7 +867,7 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   fil d'environ 150 caractères (choix de Dany). `Dispositions.TAILLES` est la seule table des
   tailles, et `Dispositions.dimensions()` en tire le reste : `D.lignes` (42 lignes de 21) et
   `D.cases` (22 cases de 40) se calculent de la hauteur, comme les cartes (`D.placeCartes` 720 ;
-  carte Note de 559, les autres de 679 ; `criteres` 30, `propLignes` 40, `etapeLignes` 40,
+  carte Note de 583, les autres de 679 ; `criteres` 33, `propLignes` 40, `etapeLignes` 40,
   `leconLignes` 42 : le plus de lignes qui laisse 12 points sous le contenu, ce que vérifie
   `essais-fenetre-b.lua`). Les cartes Proposition, Aperçu (étape) et Leçon descendent comme la
   carte Note jusqu'à leur rangée de boutons, posée sous elles au bas du panneau : ▲ ▼ à gauche,
@@ -938,13 +953,20 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   `rafraichirApercu` ; nil : l'aperçu commun) ; un clic sur une ligne d'image reste prioritaire
   jusqu'à un autre onglet, une image nouvelle, une autre conversation ou un clic sur une étape.
   Claude qui travaille ramène au fil (`Fenetre.revenirAuFil`).
-- La carte Note B (`Vues.notation`) : les passes (`Vues.passes`, la passe 4 à Dany), les étoiles
-  cliquables (`Fenetre.poserEtoile`), les drapeaux (`Fenetre.poserDrapeau`), « ? À vérifier »
-  grisé, « Claude propose » en petites étoiles, la grille des critères (`Fenetre.lignesCriteres`,
-  clés `ng..k`, `ne..k`, `nt..k`), le plafond et « Voir à 100 % » (décision de Dany du 21 octobre
-  2026 : `Conversation.dernierZoom`, le dernier zoom de `view_photo` avec `region` sur la photo dans
-  la conversation, montré dans l'aperçu par `Fenetre.voirZoom`, sans Claude ni Lightroom ; grisé
-  sans zoom), puis « Laisser à N ★ », Changer… et « Accepter N ★ » en bleu (`peutAccepterNote`).
+- La carte Note B (`Vues.notation`) : les étoiles cliquables (`Fenetre.poserEtoile`), les drapeaux
+  (`Fenetre.poserDrapeau`), « ? À vérifier » grisé, « Claude propose » en petites étoiles (0 à 5),
+  la grille des critères (`Fenetre.lignesCriteres`, clés `ng..k`, `ne..k`, `nt..k` ; la passe de
+  Claude dans son en-tête), puis la rangée du bas : ▲ ▼, « Voir à 100 % » (`Vues.voirZoom` ;
+  décision de Dany du 21 octobre 2026 : `Conversation.dernierZoom`, le dernier zoom de
+  `view_photo` avec `region` sur la photo dans la conversation, montré dans l'aperçu par
+  `Fenetre.voirZoom`, sans Claude ni Lightroom ; grisé sans zoom), « Laisser à N ★ », Changer… et
+  « Accepter N ★ » en bleu (`peutAccepterNote`), jusqu'à « Accepter 5 ★ ». Plus de rangée
+  « Passes : » ni de ligne du plafond sous son filet (correctif 1.3.2, demandé par Dany le
+  22 octobre 2026 : `Vues.passes`, `Fenetre.PASSES`, `Fenetre.etatPasse`, `notePasse`,
+  `Vues.lignePlafond`, `Fenetre.textePlafond`, `aPlafond`, `plafondTexte`, `filetPlafond` et les
+  images coche-10, chevron-passe et avertissement retirés) : la grille des critères a leur place
+  (`TAILLES.autourNote` 137, carte Note de 583, `criteres` 33), le plafond reste au registre et
+  dans le critère Plancher technique.
 - L'apparence claire ou sombre (préférence `apparence` de `Chemins.defauts`, `claire` ; menu
   Apparence du Gestionnaire de modules externes, dite par le diagnostic ; une valeur inconnue
   retombe sur `claire` à l'emploi, `Dispositions.apparence`) : `Dispositions.PALETTES` est la seule

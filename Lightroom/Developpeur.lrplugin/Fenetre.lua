@@ -2973,18 +2973,20 @@ end
 -- Note de la photo active ----------------------------------------------------------------------
 -- La carte Note (Vues.notation, fenêtre B, lot B5 : la maquette « B · Conversation claire ») lit
 -- le registre des notes proposées (Notation.lua, rempli par la commande `notation` de la liaison
--- quand Claude appelle propose_ratings) et la note posée de la photo active : les passes du
--- standard, la note et le drapeau posés (étoiles et drapeaux cliquables), la note que Claude
--- propose, ses critères page par page (Fenetre.lignesCriteres), le plafond mesuré au tri et le zoom
--- que Claude a pris pour noter (« Voir à 100 % », montré dans l'aperçu : Fenetre.voirZoom), puis
--- Laisser, Changer… et Accepter. Ce qui écrit passe par une tâche et Notation.poser
+-- quand Claude appelle propose_ratings) et la note posée de la photo active : la note et le
+-- drapeau posés (étoiles et drapeaux cliquables), la note que Claude propose, ses critères page par
+-- page (Fenetre.lignesCriteres), puis le zoom que Claude a pris pour noter (« Voir à 100 % », montré
+-- dans l'aperçu : Fenetre.voirZoom), Laisser, Changer… et Accepter. Plus de passes ni de plafond
+-- dans la carte (correctif 1.3.2, demandé par Dany le 22 octobre 2026 : la passe reste dans l'en-tête
+-- de la grille, « Passe 2 · à vérifier » ; le plafond, dans le registre et les critères de Claude).
+-- Ce qui écrit passe par une tâche et Notation.poser
 -- (Fenetre.poserNote : étoiles, drapeaux, Accepter, Changer…) ou Notation.decider (Laisser : rien
 -- dans le catalogue), sans Claude ni quota, jamais pendant que Claude travaille ni pendant une autre
 -- écriture de la carte (le bandeau dit pourquoi : un calque n'a pas d'enabled). Retenir, ou retirer
--- un drapeau, ne décide rien de la note que Claude propose (Fenetre.poserDrapeau). Dany peut poser
--- 5 ★ (étoiles, Changer…) ; Claude ne le propose jamais, et la carte n'offre jamais « Accepter
--- 5 ★ ». « ? À vérifier » est posé grisé (Vues.inactif : décision de Dany du 21 octobre 2026 ; le
--- bouton avait été retiré en 1.1.1).
+-- un drapeau, ne décide rien de la note que Claude propose (Fenetre.poserDrapeau). Claude propose
+-- de 0 à 5 ★ (correctif 1.3.2), et la carte offre « Accepter 5 ★ » ; les coups de cœur de Dany sont
+-- un libellé de couleur qu'il pose lui-même. « ? À vérifier » est posé grisé (Vues.inactif :
+-- décision de Dany du 21 octobre 2026 ; le bouton avait été retiré en 1.1.1).
 
 local ETATS_NOTE = {
     proposee = "proposée",
@@ -3019,26 +3021,10 @@ local CRITERES = {
 }
 Fenetre.CRITERES = CRITERES
 
--- Les passes du standard (Notation.standard, « Les passes, une question à la fois »), dans
--- l'ordre ; la dernière est à Dany seul : Claude en est au plus à l'avant-dernière.
-Fenetre.PASSES = { "Rejeter ?", "3 ★ ou non ?", "Monter à 4 ?", "5 ★ ? (vous)" }
-Fenetre.PASSE_MAX_CLAUDE = Notation.PASSES - 1
-
--- L'état de la passe j quand Claude en est à la passe `passe` (0 : aucune) : 'faite' avant elle,
--- 'en_cours' pour elle, sinon 'a_venir'.
-function Fenetre.etatPasse(j, passe)
-    passe = tonumber(passe) or 0
-    if passe <= 0 or j > passe then
-        return 'a_venir'
-    elseif j < passe then
-        return 'faite'
-    end
-    return 'en_cours'
-end
-
-Fenetre.AIDE_NOTATION = "Claude note d'abord chaque photo qu'il traite, selon le standard, critère par critère (impact, "
-    .. "qualités, plancher technique, finition) : sa note arrive à vérifier, vous l'acceptez, la laissez ou la changez ; 5 ★ "
-    .. "reste à vous seul. Les étoiles et les drapeaux ci-dessus posent votre note dans Lightroom."
+Fenetre.AIDE_NOTATION = "Claude note d'abord chaque photo qu'il traite, de 0 à 5 ★, selon le standard, critère par critère "
+    .. "(impact, qualités, plancher technique, finition) : sa note arrive à vérifier, vous l'acceptez, la laissez ou la "
+    .. "changez. Vos coups de cœur : un libellé de couleur, que vous posez vous-même. Les étoiles et les drapeaux "
+    .. "ci-dessus posent votre note dans Lightroom."
 
 -- Le sens de la note posée, d'après le standard (« Les notes ») : le titre à droite des étoiles.
 Fenetre.SENS_NOTES = { [0] = "Pas encore jugée", "Gardée", "Correcte", "Tient seule", "A de l'impact", "Parmi vos meilleures" }
@@ -3048,11 +3034,9 @@ Fenetre.RAISON_NOTE = "Note choisie dans la fenêtre Claude"
 Fenetre.RAISON_DRAPEAU = "Drapeau choisi dans la fenêtre Claude"
 
 -- Les messages de la carte au bandeau (chacun tient en deux lignes, essais-fenetre-b.lua) : une
--- écriture déjà en cours, pas de photo active, une proposition de 5 ★ (impossible : refusée par le
--- connecteur et le registre).
+-- écriture déjà en cours, pas de photo active.
 Fenetre.NOTE_EN_COURS = "Une note s'écrit déjà : un instant."
 Fenetre.AUCUNE_PHOTO = "Aucune photo active : choisissez-la dans Lightroom."
-Fenetre.PAS_CINQ = "Claude ne propose jamais 5 ★ : posez-les vous-même."
 
 -- Les infobulles de « Voir à 100 % » : le zoom de Claude, montré dans l'aperçu, ou pourquoi le
 -- bouton est grisé.
@@ -3089,8 +3073,7 @@ function Fenetre.notePosee(active)
 end
 
 -- La note que Claude propose, pour les petites étoiles de « Claude propose » (`noteClaude`) : de 0
--- à 4 (une note de 5, refusée par le connecteur et le registre, ne s'afficherait pas plus haut que
--- ce qu'elle est), 'rejet' pour un rejet, 'aucune' sans proposition.
+-- à 5, 'rejet' pour un rejet, 'aucune' sans proposition.
 function Fenetre.noteClaude(prop)
     if not prop then
         return 'aucune'
@@ -3100,20 +3083,15 @@ function Fenetre.noteClaude(prop)
     return entre(prop.note, 0, 5)
 end
 
--- Vrai pour une proposition de 5 ★ ou plus (jamais de Claude : refusée par le connecteur et le
--- registre) : la carte ne l'offre pas à Accepter.
-function Fenetre.noteDeCinq(prop)
-    return prop ~= nil and prop.drapeau ~= 'rejetee' and (tonumber(prop.note) or 0) >= 5
-end
-
--- « Accepter 3 ★ », « Accepter le rejet » ; « Accepter » sans proposition (grisé).
+-- « Accepter 3 ★ », « Accepter 5 ★ » (correctif 1.3.2), « Accepter le rejet » ; « Accepter » sans
+-- proposition (grisé).
 function Fenetre.titreAccepter(prop)
-    if not prop or Fenetre.noteDeCinq(prop) then
+    if not prop then
         return "Accepter"
     elseif prop.drapeau == 'rejetee' then
         return "Accepter le rejet"
     end
-    return "Accepter " .. entre(prop.note, 0, 4) .. " ★"
+    return "Accepter " .. entre(prop.note, 0, 5) .. " ★"
 end
 
 -- « Laisser à 0 ★ » (la note du catalogue), « Laisser rejetée ».
@@ -3211,12 +3189,6 @@ local function signature(lignes)
     return table.concat(morceaux, '\n')
 end
 
--- « <EM>Plafond 3 ★</EM> : mesuré au tri, pas plus. » : le plafond que le plancher technique
--- mesuré au tri (cull_photos) donne à la note ; le registre ne garde pas sa raison.
-function Fenetre.textePlafond(plafond)
-    return "<EM>Plafond " .. entre(plafond, 0, 5) .. " ★</EM> : mesuré au tri, pas plus."
-end
-
 -- Le zoom que Claude a pris pour noter la photo de la carte (Conversation.dernierZoom, dans la
 -- conversation montrée), gardé tant que la conversation, son nombre d'éléments et la photo ne
 -- changent pas (la carte se relit toutes les 2 s) ; nil sans zoom.
@@ -3267,8 +3239,7 @@ function Fenetre.rafraichirNotation()
         prop = ok and r or nil
     end
     Fenetre.propositionNote = prop
-    -- Les passes (la passe de Claude, au plus l'avant-dernière), la note posée et ses étoiles.
-    poser(p, 'notePasse', prop and entre(prop.passe, 0, Fenetre.PASSE_MAX_CLAUDE) or 0)
+    -- La note posée et ses étoiles.
     poser(p, 'noteCatalogue', active and entre(active.note, 0, 5) or 0)
     local titre, sous = Fenetre.notePosee(active)
     poser(p, 'notePoseeTitre', titre)
@@ -3279,15 +3250,12 @@ function Fenetre.rafraichirNotation()
     -- La grille des critères, page par page (la même revient à la même page).
     local lignes = Fenetre.lignesCriteres(prop, { plein = T and T.largeurNote or 379, critere = T and T.texteCritere or 251 })
     Fenetre.montrerPage('note', signature(lignes), nil, lignes)
-    -- Le plafond mesuré au tri, et le zoom que Claude a pris pour noter.
-    local plafond = prop and tonumber(prop.plafond)
-    poser(p, 'aPlafond', plafond ~= nil)
-    poser(p, 'plafondTexte', plafond and Fenetre.textePlafond(plafond) or '')
+    -- Le zoom que Claude a pris pour noter.
     poser(p, 'peutVoirZoom', Fenetre.zoomDeLaNote() ~= nil)
     -- Les écritures de la fenêtre échappent à la file du connecteur : pas pendant que Claude
-    -- travaille, ni pendant une écriture déjà demandée. Jamais « Accepter 5 ★ ».
+    -- travaille, ni pendant une écriture déjà demandée.
     local libre = not Moteur.travaille and not Fenetre.noteEnCours
-    local adecider = prop ~= nil and (prop.etat == 'proposee' or prop.etat == 'a_verifier') and not Fenetre.noteDeCinq(prop)
+    local adecider = prop ~= nil and (prop.etat == 'proposee' or prop.etat == 'a_verifier')
     poser(p, 'peutAccepterNote', libre and adecider)
     poser(p, 'peutChangerNote', libre and active ~= nil)
     poser(p, 'titreAccepterNote', Fenetre.titreAccepter(prop))
@@ -3422,17 +3390,11 @@ function Fenetre.ecarterNote(photo)
 end
 
 -- Accepter : la proposition de Claude telle quelle (Notation.poser sans note ni drapeau : sa
--- note, ou le drapeau Rejeter pour un rejet ; un drapeau Retenue de Dany reste). Depuis une tâche.
--- Jamais une proposition de 5 ★ (Claude ne la fait pas : 5 ★ sont à Dany).
+-- note, 5 ★ comprises depuis le correctif 1.3.2, ou le drapeau Rejeter pour un rejet ; un drapeau
+-- Retenue de Dany reste). Depuis une tâche.
 function Fenetre.accepterNote()
     local prop = Fenetre.propositionNote
     if not prop then
-        return
-    end
-    if Fenetre.noteDeCinq(prop) then
-        if Fenetre.p then
-            Fenetre.p.message = Fenetre.PAS_CINQ
-        end
         return
     end
     Fenetre.poserNote({ photo = prop.photo })
@@ -3461,7 +3423,7 @@ function Fenetre.changerNote()
             contents = f:column {
                 bind_to_object = q,
                 spacing = f:control_spacing(),
-                f:static_text { title = "Note de " .. Lightroom.nomCourt(active.nom) .. " (5 ★ : vous seul la posez) :" },
+                f:static_text { title = "Note de " .. Lightroom.nomCourt(active.nom) .. " :" },
                 f:popup_menu { value = bind 'note', items = notes, width = 220 },
                 f:popup_menu { value = bind 'drapeau', width = 220, items = {
                     { title = "Drapeau inchangé", value = 'inchange' },
@@ -4179,11 +4141,10 @@ function Fenetre.boucle(generation)
     end
 end
 
--- Valeurs des propriétés de la carte Note avant l'ouverture (rafraichirNotation les remplit) : les
--- passes, la note posée, ce que Claude propose, la grille des critères (`ng..k`, `ne..k`, `nt..k`),
--- le plafond et son zoom, les boutons.
+-- Valeurs des propriétés de la carte Note avant l'ouverture (rafraichirNotation les remplit) : la
+-- note posée, ce que Claude propose, la grille des critères (`ng..k`, `ne..k`, `nt..k`), le zoom,
+-- les boutons.
 local function initialiserNotation(p, D)
-    p.notePasse = 0
     p.noteCatalogue = 0
     p.notePoseeTitre = ''
     p.notePoseeSous = ''
@@ -4193,8 +4154,6 @@ local function initialiserNotation(p, D)
     for k = 1, CARTES.note.lignes(D) do
         p[g.genre .. k], p[g.etiquette .. k], p[g.texte .. k] = 'vide', '', ''
     end
-    p.aPlafond = false
-    p.plafondTexte = ''
     p.peutVoirZoom = false
     p.titreAccepterNote = "Accepter"
     p.titreLaisser = "Laisser"

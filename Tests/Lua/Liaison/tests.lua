@@ -4902,7 +4902,7 @@ local function etapes(photo)
     return #Json.decode(photo.proprietes.etapesClaude or '[]')
 end
 
-test("notation : proposer range les propositions sans rien écrire ; 5 étoiles refusées ; photo absente isolée", function()
+test("notation : proposer range les propositions sans rien écrire ; au-delà de 5 étoiles refusées ; photo absente isolée", function()
     local a, b = photoRaw(), photoJpeg()
     a.brut.rating, b.brut.pickStatus = 2, 1
     local ecritures, privees = #S.ecritures, S.ecrituresPrivees
@@ -4947,8 +4947,9 @@ test("notation : proposer range les propositions sans rien écrire ; 5 étoiles 
     egal(Commandes.executer('apercu', { photo = 2, taille = 512, cles = {} }).evaluation, nil, "seulement pour view_photo")
 
     local version = Notation.version
-    echoue(function() proposer({ { photo = 2, note = 5, criteres = CRITERES } }) end, "jamais 5 étoiles")
-    echoue(function() proposer({ { photo = 1, note = 2 }, { photo = 2, note = 6 } }) end, "jamais 5 étoiles")
+    -- Correctif 1.3.2 : Claude propose de 0 à 5 étoiles ; au-delà, tout est refusé.
+    echoue(function() proposer({ { photo = 2, note = 6, criteres = CRITERES } }) end, "un entier de 0 à 5")
+    echoue(function() proposer({ { photo = 1, note = 5 }, { photo = 2, note = 6 } }) end, "un entier de 0 à 5")
     egal(Notation.proposition(1).note, 3, "rien de rangé quand une note est refusée")
     egal(Notation.version, version)
     echoue(function() proposer({ { photo = 1, note = 2.5 } }) end, "Note invalide")
@@ -4957,13 +4958,18 @@ test("notation : proposer range les propositions sans rien écrire ; 5 étoiles 
     echoue(function() proposer({ { photo = 1, note = 3, drapeau = 'retenue' } }) end, "Drapeau invalide")
     echoue(function() proposer({ { photo = 1 } }) end, "le drapeau « rejetee »")
     echoue(function() proposer({}) end, "Aucune proposition")
-    -- La passe 4 (5 étoiles) est à l'utilisateur seul : second garde-fou, après le serveur.
-    echoue(function() proposer({ { photo = 1, note = 2, criteres = CRITERES } }, { passe = 4 }) end, "rien à proposer")
+    echoue(function() proposer({ { photo = 1, note = 2, criteres = CRITERES } }, { passe = 5 }) end, "Passe invalide")
     egal(Notation.proposition(1).note, 3, "rien de rangé")
     egal(Notation.version, version, "registre inchangé par les refus")
     echoue(function() Commandes.executer('notation', { action = 'effacer' }) end, "Action de notation inconnue")
     local sansRefus = Json.encode(proposer({ { photo = 1, note = 3, criteres = CRITERES } }))
     egal(sansRefus:find('"refusees":[]', 1, true) ~= nil, true, sansRefus)
+    -- 5 étoiles, à la passe 4 (monter à 5, après le développement) : rangées « à vérifier ».
+    local cinq = proposer({ { photo = 1, note = 5, criteres = CRITERES, raison = "Parmi les meilleures." } }, { passe = 4 })
+    egal(cinq.propositions[1].etat, 'a_verifier')
+    egal(Notation.proposition(1).note, 5)
+    egal(Notation.proposition(1).passe, 4)
+    egal(#S.ecritures, ecritures, "toujours rien d'écrit dans le catalogue")
 end)
 
 test("notation : une nouvelle proposition remplace l'ancienne ; passe gardée", function()
@@ -5197,8 +5203,8 @@ test("notation : proposer avec poser pose les notes, à vérifier comprises ; la
     egal(a.brut.rating, 4, "rien posé pendant la pause")
     egal(pause.erreur_pose and pause.erreur_pose:find("pause", 1, true) ~= nil, true, tostring(pause.erreur_pose))
     egal(Notation.proposition(1).etat, 'a_verifier', "la proposition reste à décider")
-    -- Jamais 5 étoiles proposées, même avec poser.
-    echoue(function() proposer({ { photo = 1, note = 5, criteres = CRITERES } }, { poser = true }) end, "jamais 5 étoiles")
+    -- Jamais plus de 5 étoiles proposées, même avec poser.
+    echoue(function() proposer({ { photo = 1, note = 6, criteres = CRITERES } }, { poser = true }) end, "un entier de 0 à 5")
 end)
 
 test("notation : Tout accepter par lots d'écritures ; au plus 500 photos par écriture", function()
@@ -5411,8 +5417,8 @@ test("notation remettre : la recette remet la proposition qu'elle a trouvée, ou
     egal(Commandes.executer('notation', { action = 'remettre', photo = 1 }).proposition, Json.null)
     -- Refus, sans rien changer.
     local version = Notation.version
-    echoue(function() Commandes.executer('notation', { action = 'remettre', photo = 1, proposition = { photo = 1, etat = 'a_verifier', note = 5 } }) end,
-        "jamais 5 étoiles")
+    echoue(function() Commandes.executer('notation', { action = 'remettre', photo = 1, proposition = { photo = 1, etat = 'a_verifier', note = 6 } }) end,
+        "Note au-delà de 5")
     echoue(function() Commandes.executer('notation', { action = 'remettre', photo = 1, proposition = { photo = 2, etat = 'a_verifier', note = 1 } }) end,
         "invalide")
     echoue(function() Commandes.executer('notation', { action = 'remettre', photo = 1, proposition = { photo = 1, etat = 'posee', note = 1 } }) end,

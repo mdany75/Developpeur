@@ -381,8 +381,8 @@ function Fil.etoiles(note)
 end
 
 -- Une note proposée sur une ligne : « ★★★☆☆ DSCF4961.RAF · à vérifier · raison »,
--- « ⚑ Rejeter photo 53636310 · raison », « ✕ ★★☆☆☆ DSCF4962.RAF · photo introuvable ». Claude ne
--- propose jamais 5 étoiles : une note lue au-dessus de 4 se montre à 4.
+-- « ⚑ Rejeter photo 53636310 · raison », « ✕ ★★☆☆☆ DSCF4962.RAF · photo introuvable ». Claude
+-- propose de 0 à 5 étoiles : une note lue au-dessus de 5 se montre à 5.
 function Fil.texteNote(x)
     local tete = x.drapeau == 'rejetee' and '⚑ Rejeter' or Fil.etoiles(math.min(tonumber(x.note) or 0, Conversation.NOTE_MAXIMALE))
     if x.etat == 'refusee' then

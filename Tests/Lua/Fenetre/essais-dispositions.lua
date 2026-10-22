@@ -644,7 +644,7 @@ end)
 
 -- Carte Note ------------------------------------------------------------------------------------
 
-essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérifier, rejet', function()
+essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérifier, « Accepter 5 ★ », rejet ; ni passes ni plafond', function()
     photoActive(4961, 'DSCF4961.RAF', 2, 1)
     registre.poses, registre.decisions = {}, {}
     proposer(4961, { fichier = 'DSCF4961.RAF', note = 3, drapeau = 'aucun',
@@ -654,17 +654,18 @@ essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérif
         local p = Fenetre.p
         local abonnes = registre.abonnes
         vrai(registre.abonne, 'la fenêtre suit le registre')
-        -- La note posée (2 ★, retenue), la passe et ce que Claude propose.
+        -- La note posée (2 ★, retenue) et ce que Claude propose ; plus de rangée des passes
+        -- (correctif 1.3.2) : la passe reste dans l'en-tête de la grille.
         egal(2, p.noteCatalogue)
         egal('Correcte', p.notePoseeTitre)
         egal('2 ★ · drapeau Retenue', p.notePoseeSous)
-        egal(2, p.notePasse)
+        egal(nil, p.notePasse, 'plus de passes dans la carte')
         egal(3, p.noteClaude)
         egal('orange', p.notationCouleur)
         egal('Accepter 3 ★', p.titreAccepterNote)
         egal('Laisser à 2 ★', p.titreLaisser)
         -- La grille : l'état et la raison, puis les critères du plus lourd au plus léger, chacun son
-        -- étiquette, le verdict en gras ; le plafond sur sa ligne.
+        -- étiquette, le verdict en gras ; plus de ligne du plafond (correctif 1.3.2), même mesuré.
         local grille = {}
         for k = 1, Fenetre.T.criteres + 1 do
             if p['ng' .. k] ~= 'vide' then
@@ -673,8 +674,8 @@ essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérif
         end
         egal("etat||<EM>Passe 2 · proposée.</EM> Tient seule.\ncritere|Impact|<EM>Moyen.</EM> Le ciel arrête l'œil.\n"
             .. "critere|Qualités|<EM>Sujet clair.</EM>\ncritere|Plancher technique|Netteté 41 : nette.", table.concat(grille, '\n'))
-        egal(true, p.aPlafond)
-        egal('<EM>Plafond 3 ★</EM> : mesuré au tri, pas plus.', p.plafondTexte)
+        egal(nil, p.aPlafond, 'plus de ligne du plafond')
+        egal(nil, p.plafondTexte)
         egal(false, p.noteMonte)
         egal(false, p.noteDescend, 'tout tient dans la carte')
         vrai(p.peutAccepterNote and p.peutChangerNote, 'boutons actifs')
@@ -739,16 +740,29 @@ essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérif
         egal(2, #registre.poses, 'rien de posé')
         egal('rouge', p.notationCouleur)
         egal('<EM>À vérifier.</EM> Peut-être 4.', p.nt1, 'sans passe connue')
-        egal(0, p.notePasse)
         egal(true, p.peutAccepterNote, 'une note à vérifier s\'accepte')
         egal('Accepter 4 ★', p.titreAccepterNote)
-        egal(false, p.aPlafond, 'pas de plafond mesuré')
+        -- 5 ★ de Claude, à la passe 4 (correctif 1.3.2, demandé par Dany) : « Accepter 5 ★ », qui
+        -- pose la proposition telle quelle.
+        proposer(4961, { note = 5, drapeau = 'aucun', criteres = { impact = 'Exceptionnel.' }, raison = 'Parmi vos meilleures.', passe = 4,
+            le = 2500, etat = 'a_verifier' })
+        Fenetre.rafraichirNotation()
+        egal(5, p.noteClaude)
+        egal('Accepter 5 ★', p.titreAccepterNote)
+        egal(true, p.peutAccepterNote, '« Accepter 5 ★ » offert')
+        egal('<EM>Passe 4 · à vérifier.</EM> Parmi vos meilleures.', p.nt1)
+        local avantCinq = #S.taches
+        accepter.args.mouse_down()
+        S.taches[avantCinq + 2]()
+        egal(3, #registre.poses, 'la proposition de 5 ★ posée')
+        vrai(registre.poses[3][1].note == nil and registre.poses[3][1].drapeau == nil, 'telle quelle')
+        egal('', p.message or '', 'aucun refus au bandeau')
         -- Un rejet proposé.
         proposer(4961, { drapeau = 'rejetee', criteres = { plancher = 'Floue : netteté 9.' }, plafond = 0, raison = 'Mise au point manquée.', le = 3000 })
         Fenetre.rafraichirNotation()
         egal('rejet', p.noteClaude)
         egal('Accepter le rejet', p.titreAccepterNote)
-        egal('<EM>Plafond 0 ★</EM> : mesuré au tri, pas plus.', p.plafondTexte)
+        egal(nil, p.plafondTexte, 'le plafond ne se montre plus')
         -- Une autre photo, sans proposition : l'aide, Changer… seulement.
         photoActive(4970, 'DSCF4970.RAF', 0, 0)
         Fenetre.majPhoto()

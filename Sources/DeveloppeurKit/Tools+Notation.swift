@@ -5,8 +5,9 @@ import Foundation
 /// de la fenêtre Claude, où elles arrivent « à vérifier » : l'utilisateur les accepte ou les change
 /// (la Séance de notation est retirée depuis la 1.1.1). Avec apply (l'utilisateur a demandé que
 /// Claude note), le module les pose aussi dans le catalogue, comme Accepter (demandé par Dany le
-/// 20 octobre 2026). Claude ne propose jamais 5 étoiles : l'utilisateur les pose, ou les demande
-/// (set_metadata).
+/// 20 octobre 2026). Claude propose de 0 à 5 étoiles (depuis le 22 octobre 2026, demandé par
+/// Dany) ; ses coups de cœur sont un libellé de couleur qu'il pose lui-même : Claude n'en propose,
+/// n'en pose ni n'en change jamais de lui-même (set_metadata, seulement à sa demande).
 extension ToolHandler {
     /// Propositions d'un appel au plus : une séance triée d'un coup (cull_photos).
     static let maxRatings = maxCulledPhotos
@@ -29,7 +30,7 @@ extension ToolHandler {
         ]
         let proposition = objectProp("Une proposition, pour une photo.", [
             "photo_id": prop("integer", "Identifiant de la photo (champ « id » de cull_photos, contact_sheet ou list_selection)."),
-            "rating": prop("integer", "Note proposée, de 0 à \(Notation.noteMaximale) (5 : l'utilisateur seul)."),
+            "rating": prop("integer", "Note proposée, de 0 à \(Notation.noteMaximale) (5 : rare, après le développement, la Finition vue à 100 %)."),
             "flag": enumProp(["reject"], "reject = rejet (défaut majeur, involontaire, confirmé à l'œil), à la place de rating."),
             "criteria": objectProp("La raison critère par critère, \(Notation.longueurCritere) caractères au plus chacun.", criteres,
                                    required: Notation.criteres.filter(\.obligatoire).map(\.nom)),
@@ -38,11 +39,11 @@ extension ToolHandler {
         ], required: ["photo_id", "criteria", "reason"])
         return [
             tool("propose_ratings",
-                 "Note des photos selon le standard de notation (read_standard = true le donne ; le lire avant de noter), pour la carte Note de la fenêtre Claude dans Lightroom : de 0 à \(Notation.noteMaximale) étoiles, ou flag reject, avec une raison par critère (impact, qualities, technical_floor ; finish pour une photo développée) et une phrase (reason). Sans apply, les notes sont rangées comme propositions « à vérifier », sans rien changer dans le catalogue : l'utilisateur les accepte ou les change dans Lightroom. apply = true quand l'utilisateur demande que tu notes ou que tu poses les notes (« note ces photos », « pose les notes ») : chaque note est aussi posée dans Lightroom, « à vérifier » comprises (une étape « Claude · notation » par photo, que undo_last défait). Jamais 5 étoiles ici : si l'utilisateur en demande, set_metadata. Regarder les photos d'abord (contact_sheet ; view_photo à 100 % pour un 4). Une note au-dessus du plafond mesuré par le dernier cull_photos est refusée, sauf un défaut voulu et maîtrisé, dit dans technical_floor, avec to_check = true. Une proposition pour une photo remplace la précédente.",
+                 "Note des photos selon le standard de notation (read_standard = true le donne ; le lire avant de noter), pour la carte Note de la fenêtre Claude dans Lightroom : de 0 à \(Notation.noteMaximale) étoiles, ou flag reject, avec une raison par critère (impact, qualities, technical_floor ; finish pour une photo développée) et une phrase (reason). Sans apply, les notes sont rangées comme propositions « à vérifier », sans rien changer dans le catalogue : l'utilisateur les accepte ou les change dans Lightroom. apply = true quand l'utilisateur demande que tu notes ou que tu poses les notes (« note ces photos », « pose les notes ») : chaque note est aussi posée dans Lightroom, « à vérifier » comprises (une étape « Claude · notation » par photo, que undo_last défait). Jamais de libellé de couleur : ce sont les coups de cœur de l'utilisateur, qu'il pose lui-même (set_metadata, seulement à sa demande). Regarder les photos d'abord (contact_sheet ; view_photo à 100 % pour un 4 ou un 5). Une note au-dessus du plafond mesuré par le dernier cull_photos est refusée, sauf un défaut voulu et maîtrisé, dit dans technical_floor, avec to_check = true. Une proposition pour une photo remplace la précédente.",
                  properties: [
                     ("ratings", ["type": "array", "items": proposition,
                                  "description": .string("Les propositions, une par photo (\(Self.maxRatings) au plus par appel).")]),
-                    ("pass", prop("integer", "Passe du standard : 1 rejeter ou non, 2 trois étoiles ou non, 3 monter à quatre parmi les trois (la passe 4, cinq étoiles, est à l'utilisateur seul : rien à proposer).")),
+                    ("pass", prop("integer", "Passe du standard : 1 rejeter ou non, 2 trois étoiles ou non, 3 monter à quatre parmi les trois, 4 monter à cinq parmi les quatre, après le développement.")),
                     ("read_standard", prop("boolean", "true = renvoyer le standard de notation (seul : rien n'est rangé ; avec ratings, en plus des propositions).")),
                     ("apply", prop("boolean", "true = l'utilisateur a demandé que tu notes ou que tu poses les notes : elles sont aussi posées dans le catalogue (réponse : posees). false ou absent : rangées comme propositions seulement.")),
                  ],
@@ -84,10 +85,7 @@ extension ToolHandler {
         }
         if args.has("pass") {
             guard let passe = args.int("pass"), (1...Notation.passes).contains(passe) else {
-                throw LightroomError.invalid("« pass » : la passe du standard, de 1 à \(Notation.passes - 1) (la passe \(Notation.passes), 5 étoiles, est à l'utilisateur seul). Rien n'a été rangé.")
-            }
-            guard passe < Notation.passes else {
-                throw LightroomError.invalid("Passe \(Notation.passes) : 5 étoiles, l'utilisateur seul ; rien à proposer. Rien n'a été rangé.")
+                throw LightroomError.invalid("« pass » : la passe du standard, de 1 à \(Notation.passes). Rien n'a été rangé.")
             }
             params["passe"] = .number(Double(passe))
         }
@@ -127,8 +125,7 @@ extension ToolHandler {
         var note: Int?
         if p.has("rating") {
             guard let valeur = p.int("rating") else { throw LightroomError.invalid("« rating » doit être un nombre entier, de 0 à \(Notation.noteMaximale).") }
-            guard valeur <= Notation.noteMaximale else { throw LightroomError.invalid("Claude ne propose jamais 5 étoiles : c'est à l'utilisateur.") }
-            guard valeur >= 0 else { throw LightroomError.invalid("« rating » va de 0 à \(Notation.noteMaximale).") }
+            guard (0...Notation.noteMaximale).contains(valeur) else { throw LightroomError.invalid("« rating » va de 0 à \(Notation.noteMaximale).") }
             note = valeur
         }
         var rejet = false

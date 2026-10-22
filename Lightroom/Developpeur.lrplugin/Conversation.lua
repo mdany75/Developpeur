@@ -50,8 +50,9 @@ Conversation.PREFIXE_OUTILS = 'mcp__developpeur__'
 Conversation.TITRE_PAR_DEFAUT = "Nouvelle conversation"
 -- Genre d'une conversation des anciennes séances de notation (absent pour une retouche).
 Conversation.GENRE_SEANCE = 'notation'
--- Claude ne propose jamais 5 étoiles (standard de notation) : une note lue au-dessus est ramenée.
-Conversation.NOTE_MAXIMALE = 4
+-- Claude propose de 0 à 5 étoiles (standard de notation, correctif 1.3.2) : une note lue au-dessus
+-- est ramenée.
+Conversation.NOTE_MAXIMALE = 5
 
 local compteur = 0
 
@@ -456,10 +457,10 @@ function Conversation.clePhoto(photo)
 end
 
 -- Les notes demandées par Claude (entrée de propose_ratings) :
---   { photo, note (0 à 4) | nil, drapeau ('rejetee') | nil, criteres = { impact, qualites, plancher,
+--   { photo, note (0 à 5) | nil, drapeau ('rejetee') | nil, criteres = { impact, qualites, plancher,
 --     finition }, raison, a_verifier, etat = 'demandee' }
 -- puis, d'après la réponse du connecteur : fichier, note_avant, drapeau_avant, etat 'proposee' ou
--- 'refusee' (refus : la raison). Une note au-dessus de 4 est ramenée à 4 (le connecteur la refuse).
+-- 'refusee' (refus : la raison). Une note au-dessus de 5 est ramenée à 5 (le connecteur la refuse).
 function Conversation.notesDemandees(entree)
     local notes = {}
     entree = type(entree) == 'table' and entree or {}

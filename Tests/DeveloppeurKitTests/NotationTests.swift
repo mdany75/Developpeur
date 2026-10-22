@@ -3,7 +3,9 @@ import XCTest
 @testable import DeveloppeurKit
 
 /// Version 1.1 : le standard de notation, les plafonds mesurés par cull_photos, et propose_ratings
-/// (notes proposées rangées par le module, hors du catalogue ; jamais 5 étoiles).
+/// (notes proposées rangées par le module, hors du catalogue). Correctif 1.3.2 (demandé par Dany le
+/// 22 octobre 2026) : Claude note de 0 à 5 étoiles ; les coups de cœur de Dany sont un libellé de
+/// couleur qu'il pose lui-même, jamais Claude sans sa demande.
 final class NotationTests: XCTestCase {
     var fake: FakeLightroom!
     var tools: ToolHandler!
@@ -15,18 +17,24 @@ final class NotationTests: XCTestCase {
 
     // MARK: Standard
 
-    func testTheStandardIsTheSourceTextAndNeverOffersFiveStars() {
+    func testTheStandardIsTheSourceTextFromZeroToFiveStarsWithoutColorLabels() {
         let standard = Notation.standard
         XCTAssertTrue(standard.hasPrefix("# Standard de notation\n\nUne étoile dit un niveau de qualité, et rien d'autre."))
-        XCTAssertTrue(standard.hasSuffix("3 » et une « presque 3 », de même entre 3 et 4, par genre."))
-        for titre in ["## Les notes", "## Les critères, du plus lourd au plus léger", "## Selon le genre",
+        XCTAssertTrue(standard.hasSuffix("3 » et une « presque 3 », de même entre 3 et 4 et entre 4 et 5, par genre."))
+        for titre in ["## Les notes", "## Les coups de cœur", "## Les critères, du plus lourd au plus léger", "## Selon le genre",
                       "## Les passes, une question à la fois", "## Ce que valent les mesures", "## Photos étalons"] {
             XCTAssertTrue(standard.contains("\n\(titre)\n"), titre)
         }
-        XCTAssertTrue(standard.contains("l'utilisateur seul : Claude ne propose jamais 5 ★."))
+        // Correctif 1.3.2 : l'échelle de Claude va jusqu'à 5 ; les coups de cœur, un libellé de couleur.
+        XCTAssertTrue(standard.contains("L'échelle de Claude va de 0 à 5 ★, plus le rejet."))
+        XCTAssertTrue(standard.contains("- **5 ★** : une 4 ★ qui tient à côté des meilleures photos de l'utilisateur"))
+        XCTAssertTrue(standard.contains("4. Après le développement, parmi les 4 ★, monter à 5 ★ ?"))
+        XCTAssertTrue(standard.contains("Claude ne propose, ne pose ni ne change jamais un libellé de couleur de lui-même :\nseulement à la demande explicite de l'utilisateur (set_metadata)."))
+        XCTAssertFalse(standard.contains("jamais 5 ★"))
+        XCTAssertFalse(standard.contains("L'utilisateur seul"))
         XCTAssertTrue(standard.contains("Netteté (moins de 15 : floue ; 15 à 35 : douce ; plus de 35 : nette)"))
         XCTAssertFalse(standard.contains("    "), "pas d'indentation du code Swift dans le texte")
-        XCTAssertEqual(Notation.noteMaximale, 4)
+        XCTAssertEqual(Notation.noteMaximale, 5)
         for mot in ["photoshop", "expand_photo", "firefly", "agrandissement", "galerie", "gallery", "concours", "mariage", "crédit adobe"] {
             XCTAssertFalse(standard.lowercased().contains(mot), mot)
         }
@@ -41,9 +49,9 @@ final class NotationTests: XCTestCase {
     }
 
     func testCeilingsFollowTheStandard() throws {
-        // Sans défaut : 4, jamais 5.
+        // Sans défaut : pas de plafond, 5 permis (correctif 1.3.2).
         let nette = try XCTUnwrap(Notation.plafond(photo(), doublon: false))
-        XCTAssertEqual(nette, Notation.Plafond(note: 4, raison: "aucun défaut mesuré : 4 au plus (5 : l'utilisateur seul)", rejet: false, aVerifier: false))
+        XCTAssertEqual(nette, Notation.Plafond(note: 5, raison: "aucun défaut mesuré : pas de plafond", rejet: false, aVerifier: false))
         // Floue : défaut majeur, rejet proposé.
         let floue = try XCTUnwrap(Notation.plafond(photo(nettete: 8), doublon: false))
         XCTAssertEqual(floue.note, 0)
@@ -104,13 +112,15 @@ final class NotationTests: XCTestCase {
     /// Bruit fort (plus de 1,5) : la photo se note après le débruitage ; à vérifier, sans plafond.
     func testStrongNoiseAsksToRateAfterDenoising() throws {
         let bruitee = try XCTUnwrap(Notation.plafond(photo(bruit: 1.8), doublon: false))
-        XCTAssertEqual(bruitee.note, 4)
+        XCTAssertEqual(bruitee.note, 5)
         XCTAssertTrue(bruitee.aVerifier)
         XCTAssertTrue(bruitee.raison.contains("après le débruitage"))
         XCTAssertFalse(try XCTUnwrap(Notation.plafond(photo(bruit: 1.2), doublon: false)).aVerifier)
         let bilan = Tri.bilan([{ var p = photo(bruit: 1.8); p.id = 7; return p }()])
         XCTAssertEqual(bilan["plafonds"]?["7"]?["a_verifier"]?.bool, true)
-        XCTAssertEqual(bilan["plafonds"]?["7"]?["note_max"]?.int, 4)
+        XCTAssertEqual(bilan["plafonds"]?["7"]?["note_max"]?.int, 5)
+        // Sans défaut ni bruit fort : rien à dire dans les plafonds du tri.
+        XCTAssertNil(Tri.bilan([{ var p = photo(); p.id = 8; return p }()])["plafonds"]?["8"])
     }
 
     // MARK: propose_ratings
@@ -138,8 +148,12 @@ final class NotationTests: XCTestCase {
         XCTAssertEqual(element["additionalProperties"]?.bool, false)
         XCTAssertEqual(element["properties"]?["criteria"]?["required"], ["impact", "qualities", "technical_floor"])
         let description = definition["description"]?.string ?? ""
-        XCTAssertTrue(description.contains("Jamais 5 étoiles"))
+        XCTAssertTrue(description.contains("de 0 à 5 étoiles"))
+        XCTAssertFalse(description.contains("Jamais 5 étoiles"))
+        XCTAssertTrue(description.contains("Jamais de libellé de couleur : ce sont les coups de cœur de l'utilisateur, qu'il pose lui-même (set_metadata, seulement à sa demande)."))
         XCTAssertTrue(description.contains("read_standard"))
+        let passe = definition["inputSchema"]?["properties"]?["pass"]?["description"]?.string ?? ""
+        XCTAssertTrue(passe.contains("4 monter à cinq parmi les quatre, après le développement"), passe)
         XCTAssertTrue(description.contains("apply = true quand l'utilisateur demande que tu notes"))
     }
 
@@ -157,10 +171,13 @@ final class NotationTests: XCTestCase {
         let refus = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 3)], "apply": "oui"])
         XCTAssertTrue(refus.isError)
         XCTAssertTrue(refus.text.contains("« apply »"), refus.text)
-        // Jamais 5 étoiles, même avec apply : set_metadata, à la demande de l'utilisateur.
-        let cinq = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 5)], "apply": true])
-        XCTAssertTrue(cinq.isError)
-        XCTAssertEqual(fake.calls.count, 3)
+        // 5 étoiles proposées et posées avec apply (correctif 1.3.2).
+        let cinq = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 5)], "apply": true, "pass": 4])
+        XCTAssertFalse(cinq.isError, cinq.text)
+        XCTAssertEqual(fake.calls.count, 4)
+        XCTAssertEqual(fake.lastParams["poser"]?.bool, true)
+        XCTAssertEqual(fake.lastParams["passe"]?.int, 4)
+        XCTAssertEqual(fake.lastParams["propositions"]?.array?.first?["note"]?.int, 5)
     }
 
     func testReadStandardReturnsItWithoutSendingAnything() throws {
@@ -238,15 +255,23 @@ final class NotationTests: XCTestCase {
         XCTAssertFalse(noter.contains("read_session"))
     }
 
-    func testFiveStarsAreRefusedWithoutSendingAnything() {
-        for note in [5, 6] {
+    /// Correctif 1.3.2 : Claude note de 0 à 5 (demandé par Dany le 22 octobre 2026) ; au-delà, refus
+    /// sans rien envoyer.
+    func testFiveStarsAreProposedAndSixAreRefusedWithoutSendingAnything() throws {
+        for note in [6, 7] {
             let result = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 2), proposition(13, rating: note)]])
             XCTAssertTrue(result.isError)
-            XCTAssertTrue(result.text.contains("Claude ne propose jamais 5 étoiles : c'est à l'utilisateur."), result.text)
+            XCTAssertTrue(result.text.contains("« rating » va de 0 à 5."), result.text)
             XCTAssertTrue(result.text.contains("ratings[1]"), result.text)
             XCTAssertTrue(result.text.contains("Rien n'a été rangé"))
         }
         XCTAssertTrue(fake.calls.isEmpty, "aucune proposition rangée, même la bonne")
+        fake.replies["notation"] = ["propositions": [], "refusees": []]
+        let cinq = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(12, rating: 2), proposition(13, rating: 5)]])
+        XCTAssertFalse(cinq.isError, cinq.text)
+        XCTAssertEqual(fake.commands, ["notation"])
+        let notes = try XCTUnwrap(fake.lastParams["propositions"]?.array).compactMap { $0["note"]?.int }
+        XCTAssertEqual(notes, [2, 5])
     }
 
     /// parametresInconnus ne voit que le premier niveau : une clé inconnue dans une proposition (ou
@@ -271,9 +296,9 @@ final class NotationTests: XCTestCase {
             (["ratings": []], "read_standard = true donne le standard"),
             (["ratings": "12:3"], "doit être une liste"),
             (["ratings": [proposition(12, rating: 3, flag: "reject")]], "pas les deux"),
-            (["ratings": [proposition(12)]], "rating (de 0 à 4) ou flag reject"),
+            (["ratings": [proposition(12)]], "rating (de 0 à 5) ou flag reject"),
             (["ratings": [proposition(12, flag: "pick")]], "seulement reject"),
-            (["ratings": [proposition(12, rating: -1)]], "va de 0 à 4"),
+            (["ratings": [proposition(12, rating: -1)]], "va de 0 à 5"),
             (["ratings": [.object(proposition(12, rating: 3).object!.merging(["rating": 2.5]) { $1 })]], "nombre entier"),
             (["ratings": [proposition(12, rating: 3, criteres: ["impact": "a", "qualities": " ", "technical_floor": "c"])]], "« criteria.qualities » vide"),
             (["ratings": [proposition(12, rating: 3, criteres: ["impact": "a", "qualities": "b"])]], "« criteria.technical_floor » vide"),
@@ -285,8 +310,8 @@ final class NotationTests: XCTestCase {
             (["ratings": [proposition(12, rating: 3, raison: String(repeating: "a", count: 401))]], "trop longue (401 caractères, 300 demandés)"),
             (["ratings": [.object(proposition(12, rating: 3).object!.merging(["to_check": "oui"]) { $1 })]], "« to_check »"),
             (["ratings": [proposition(12, rating: 3), proposition(12, rating: 2)]], "photo 12 proposée deux fois"),
-            (["ratings": [proposition(12, rating: 3)], "pass": 5], "« pass »"),
-            (["ratings": [proposition(12, rating: 3)], "pass": 4], "Passe 4 : 5 étoiles, l'utilisateur seul ; rien à proposer."),
+            (["ratings": [proposition(12, rating: 3)], "pass": 5], "« pass » : la passe du standard, de 1 à 4."),
+            (["ratings": [proposition(12, rating: 3)], "pass": 0], "« pass » : la passe du standard, de 1 à 4."),
             (["ratings": .array(Array(repeating: proposition(1, rating: 2), count: 501))], "Au plus 500 propositions"),
             (["ratings": ["12:3"]], "une proposition est un objet"),
             (["ratings": [.object(proposition(12, rating: 3).object!.filter { $0.key != "photo_id" })]], "« photo_id » : l'identifiant de la photo"),
@@ -303,7 +328,7 @@ final class NotationTests: XCTestCase {
             XCTAssertTrue(result.text.contains(attendu), "« \(attendu) » absent de : \(result.text)")
         }
         // Toutes les erreurs d'un appel sont dites ensemble.
-        let deux = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(1, rating: 5), proposition(2, rating: 3, flag: "reject")]])
+        let deux = tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(1, rating: 6), proposition(2, rating: 3, flag: "reject")]])
         XCTAssertTrue(deux.text.contains("ratings[0]") && deux.text.contains("ratings[1]"), deux.text)
         XCTAssertTrue(fake.calls.isEmpty)
     }
@@ -341,7 +366,7 @@ final class NotationTests: XCTestCase {
         // Un nouveau tri remplace le plafond de la photo (retouchée, ou mieux vue).
         floues = []
         XCTAssertFalse(tools.call(name: "cull_photos", arguments: ["photo_ids": [3]]).isError)
-        XCTAssertEqual(tools.dernierTri[3]?.note, 4)
-        XCTAssertFalse(tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(3, rating: 4)]]).isError)
+        XCTAssertEqual(tools.dernierTri[3]?.note, 5, "sans défaut : pas de plafond sous 5")
+        XCTAssertFalse(tools.call(name: "propose_ratings", arguments: ["ratings": [proposition(3, rating: 5)]]).isError)
     }
 }

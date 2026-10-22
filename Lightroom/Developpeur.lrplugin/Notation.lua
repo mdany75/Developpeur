@@ -18,7 +18,7 @@
 -- n'est requise qu'au moment d'écrire. Tout ce qui sort vers une vue est une copie neuve, sans
 -- métatable (Lightroom bloque sur une table relue par Json.decode).
 --
--- Une proposition : { photo, uuid, fichier, note (0 à 4, nil pour un rejet), drapeau ('aucun' ou
+-- Une proposition : { photo, uuid, fichier, note (0 à 5, nil pour un rejet), drapeau ('aucun' ou
 -- 'rejetee'), criteres = { impact, qualites, plancher, finition }, plafond, raison, a_verifier,
 -- passe, note_avant, drapeau_avant, etat, note_choisie, drapeau_choisi, le, decide_le,
 -- commentaire }. etat : 'a_verifier' (toute proposition commence ainsi depuis la 1.1.1 : Dany
@@ -43,8 +43,10 @@ local Notation = {
     observateurs = {},
 }
 
--- Claude ne propose jamais 5 étoiles : c'est à l'utilisateur (second garde-fou, après le serveur).
-Notation.NOTE_MAX_PROPOSEE = 4
+-- Claude propose de 0 à 5 étoiles (correctif 1.3.2, demandé par Dany le 22 octobre 2026 : ses
+-- coups de cœur sont un libellé de couleur qu'il pose lui-même) ; au-delà, refus (second
+-- garde-fou, après le serveur). La passe 4 (monter à 5, après le développement) est à Claude aussi.
+Notation.NOTE_MAX_PROPOSEE = 5
 Notation.PASSES = 4
 -- Taille du registre, réécrit à chaque décision : les propositions les plus anciennes sortent
 -- au-delà.
@@ -268,7 +270,7 @@ function Notation.decider(idPhoto, etat, details)
 end
 
 -- Commande « proposer » : propositions de Claude, rangées sans rien écrire dans le catalogue. Une
--- photo introuvable va dans refusees sans bloquer les autres ; une note de 5 ou plus refuse tout.
+-- photo introuvable va dans refusees sans bloquer les autres ; une note de plus de 5 refuse tout.
 -- Une nouvelle proposition pour la même photo remplace l'ancienne. Une proposition « à vérifier »
 -- (cas douteux) attend dans cet état. Avec `poser`, les notes sont aussi posées (plus bas).
 function Notation.proposer(params)
@@ -286,10 +288,7 @@ function Notation.proposer(params)
             echouer("Drapeau invalide : « aucun » ou « rejetee ».")
         end
         local note = d.note ~= nil and tonumber(d.note) or nil
-        if note and note >= 5 then
-            echouer("Claude ne propose jamais 5 étoiles : c'est à l'utilisateur.")
-        end
-        if d.note ~= nil and (not note or note < 0 or note ~= math.floor(note)) then
+        if d.note ~= nil and (not note or note < 0 or note > Notation.NOTE_MAX_PROPOSEE or note ~= math.floor(note)) then
             echouer(string.format("Note invalide pour la photo %s : un entier de 0 à %d.", tostring(d.photo), Notation.NOTE_MAX_PROPOSEE))
         end
         if note == nil and drapeau ~= 'rejetee' then
@@ -306,10 +305,6 @@ function Notation.proposer(params)
     local passe = entier(params.passe)
     if passe and (passe < 1 or passe > Notation.PASSES) then
         echouer(string.format("Passe invalide : de 1 à %d.", Notation.PASSES))
-    end
-    -- La dernière passe (5 étoiles) est à l'utilisateur seul : rien à y proposer.
-    if passe == Notation.PASSES then
-        echouer(string.format("Passe %d : 5 étoiles, l'utilisateur seul ; rien à proposer.", Notation.PASSES))
     end
 
     local refusees, trouvees, photos = Json.tableau(), {}, {}
@@ -456,7 +451,7 @@ local function remettre(params)
         end
         local note = p.note ~= Json.null and tonumber(p.note) or nil
         if note and note > Notation.NOTE_MAX_PROPOSEE then
-            echouer("Claude ne propose jamais 5 étoiles : rien n'est remis.")
+            echouer(string.format("Note au-delà de %d : rien n'est remis.", Notation.NOTE_MAX_PROPOSEE))
         end
         local q = copie(p)
         q.photo = id

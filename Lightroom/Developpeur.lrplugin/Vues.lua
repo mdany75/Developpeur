@@ -780,57 +780,16 @@ end
 -- onglet Note). Claude note d'abord chaque photo qu'il traite, et sa note arrive « à vérifier » :
 -- Dany l'accepte, la laisse ou la change (pas de bouton Noter ni Évaluer : décision de Dany). Ses
 -- étoiles et ses drapeaux écrivent dans le catalogue sans Claude ni quota (Fenetre.poserEtoile,
--- Fenetre.poserDrapeau) ; Dany peut poser 5 ★, Claude jamais. Les couleurs d'état sont des clés de
--- la palette (Fenetre.COULEURS_NOTE, Fenetre.TEINTES_NOTE).
+-- Fenetre.poserDrapeau). Claude note de 0 à 5 ★ ; les coups de cœur de Dany sont un libellé de
+-- couleur qu'il pose lui-même (correctif 1.3.2). Plus de rangée « Passes : » ni de ligne du plafond
+-- (demandé par Dany le 22 octobre 2026) : la grille des critères prend leur place. Les couleurs
+-- d'état sont des clés de la palette (Fenetre.COULEURS_NOTE, Fenetre.TEINTES_NOTE).
 
--- Une étiquette de la grille de la carte (« Passes : »…), alignée à droite, en gris 12.
+-- Une étiquette de la grille de la carte (« Votre note : », « Drapeau : »), alignée à droite, en
+-- gris 12.
 local function etiquetteNote(f, F, D, titre)
     return f:static_text { title = titre, font = F.POLICES.systeme12, text_color = F.COULEURS.gris, alignment = 'right',
         width = D.etiquetteNote, place_vertical = 0.5 }
-end
-
--- « Passes : » : les quatre passes du standard (F.PASSES), d'après `notePasse` (F.etatPasse) : la
--- coche verte devant une passe faite (seules celles avant la dernière passe de Claude peuvent
--- l'être), le libellé en gras noir pour la passe en cours, en gris 11 sinon ; un chevron entre
--- deux. Chaque passe a la largeur de sa variante la plus large, mesurée (une vue masquée garde sa
--- place) ; sans clic.
-function Vues.passes(f, F, D)
-    local C, P = F.COULEURS, F.POLICES
-    local coche = F.tailleImage('coche-10').largeur
-    local rangee = { spacing = 0, height = D.lignePasses }
-    for j, libelle in ipairs(F.PASSES) do
-        if j > 1 then
-            rangee[#rangee + 1] = f:spacer { width = 3 }
-            rangee[#rangee + 1] = Vues.image(f, F, 'chevron-passe', { place_vertical = 0.5 })
-            rangee[#rangee + 1] = f:spacer { width = 3 }
-        end
-        local faisable, enCours = j < F.PASSE_MAX_CLAUDE, j <= F.PASSE_MAX_CLAUDE
-        local function etat(test)
-            return F.condition('notePasse', function(v) return test(F.etatPasse(j, v)) end)
-        end
-        local gris = F.largeurLibelle(libelle, 'petit')
-        local largeur = math.max(faisable and (coche + 3 + gris) or gris, enCours and F.largeurLibelle(libelle, 'gras11') or 0)
-        local variantes = { place = 'overlapping', place_vertical = 0.5 }
-        variantes[#variantes + 1] = f:static_text { title = libelle, font = P.systeme11, text_color = C.gris, width = largeur,
-            visible = etat(function(e) return e == 'a_venir' or (e == 'faite' and not faisable) or (e == 'en_cours' and not enCours) end) }
-        if enCours then
-            variantes[#variantes + 1] = f:static_text { title = libelle, font = P.systemeGras11, text_color = C.texte, width = largeur,
-                visible = etat(function(e) return e == 'en_cours' end) }
-        end
-        if faisable then
-            local function faite()
-                return etat(function(e) return e == 'faite' end)
-            end
-            variantes[#variantes + 1] = f:row {
-                spacing = 0,
-                Vues.image(f, F, 'coche-10', { visible = faite(), place_vertical = 0.5 }),
-                f:spacer { width = 3 },
-                f:static_text { title = libelle, font = P.systeme11, text_color = C.gris, width = largeur - coche - 3, visible = faite() },
-            }
-        end
-        rangee[#rangee + 1] = f:column(variantes)
-    end
-    return f:row(rangee)
 end
 
 -- « Votre note : » : cinq étoiles (etoile24 pleine ou vide selon `noteCatalogue`, la note posée
@@ -857,7 +816,7 @@ function Vues.etoilesNote(f, F, D)
     return f:row(rangee)
 end
 
--- « Claude propose » : cinq petites étoiles (etoile12) d'après `noteClaude` (0 à 4), « rejeter »
+-- « Claude propose » : cinq petites étoiles (etoile12) d'après `noteClaude` (0 à 5), « rejeter »
 -- pour un rejet, « rien pour l'instant » sans proposition ; à droite, l'ordre des critères.
 function Vues.noteClaude(f, F, D)
     local C, P = F.COULEURS, F.POLICES
@@ -919,39 +878,26 @@ function Vues.ligneCritere(f, F, D, k)
     return f:column(vues)
 end
 
--- La ligne du plafond, sous son filet : l'avertissement, « <EM>Plafond 3 ★</EM> : … » (gras ambre,
--- `plafondTexte`), et « Voir à 100 % » (décision de Dany du 21 octobre 2026) : le zoom que Claude
--- a pris pour noter la photo, montré dans l'aperçu (F.voirZoom, sans Claude ni Lightroom ; Agrandir
--- le montre en grand) ; sans un tel zoom, le même bouton grisé, avec une infobulle qui dit pourquoi
--- (deux boutons superposés : une infobulle liée n'est pas constatée). Toute la ligne suit
--- `aPlafond`.
-function Vues.lignePlafond(f, F, D)
-    local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    local function plafond()
-        return F.si 'aPlafond'
-    end
-    return f:row {
-        spacing = 0,
-        Vues.image(f, F, 'avertissement', { visible = plafond(), place_vertical = 0.5 }),
-        f:spacer { width = 8 },
-        f:static_text { title = bind 'plafondTexte', font = P.texte12, text_color = C.texte, emphasis_font = P.gras12, emphasis_color = C.ambre,
-            width = D.plafond, truncation = 'tail', place_vertical = 0.5, visible = plafond() },
-        f:spacer { width = 8 },
-        f:column {
-            place = 'overlapping',
-            F.bouton(f, { carre = true, bezel = 22, title = "Voir à 100 %", font = P.systeme11, width = D.zoom, tooltip = F.INFOBULLE_ZOOM,
-                visible = F.et(plafond(), F.si 'peutVoirZoom'), action = function() F.voirZoom() end }),
-            F.bouton(f, { carre = true, bezel = 22, title = "Voir à 100 %", font = P.systeme11, width = D.zoom, tooltip = F.SANS_ZOOM,
-                enabled = false, visible = F.et(plafond(), F.non 'peutVoirZoom'), action = function() end }),
-        },
+-- « Voir à 100 % » (décision de Dany du 21 octobre 2026), dans la rangée du bas de la carte Note
+-- depuis que la ligne du plafond est retirée (correctif 1.3.2) : le zoom que Claude a pris pour
+-- noter la photo, montré dans l'aperçu (F.voirZoom, sans Claude ni Lightroom ; Agrandir le montre
+-- en grand) ; sans un tel zoom, le même bouton grisé, avec une infobulle qui dit pourquoi (deux
+-- boutons superposés : une infobulle liée n'est pas constatée). Bezel de 26 et titre en 13, comme
+-- les autres boutons de la rangée.
+function Vues.voirZoom(f, F, D)
+    local P = F.POLICES
+    return f:column {
+        place = 'overlapping',
+        F.bouton(f, { carre = true, bezel = 26, title = "Voir à 100 %", font = P.systeme13, width = D.zoom, tooltip = F.INFOBULLE_ZOOM,
+            visible = F.si 'peutVoirZoom', action = function() F.voirZoom() end }),
+        F.bouton(f, { carre = true, bezel = 26, title = "Voir à 100 %", font = P.systeme13, width = D.zoom, tooltip = F.SANS_ZOOM,
+            enabled = false, visible = F.non 'peutVoirZoom', action = function() end }),
     }
 end
 
 -- La carte des critères, sur son image (carte-note, à la largeur intérieure du panneau) : la grille
--- de D.criteres + 1 lignes (Vues.ligneCritere), lue page par page (▲ ▼ de la rangée du bas), puis
--- le filet (un aplat) et la ligne du plafond.
+-- de D.criteres + 1 lignes (Vues.ligneCritere), lue page par page (▲ ▼ de la rangée du bas).
 function Vues.carteCriteres(f, F, D)
-    local C = F.COULEURS
     local t = F.tailleImage('carte-note')
     local lignes = { spacing = 0 }
     for k = 1, D.criteres + 1 do
@@ -967,33 +913,23 @@ function Vues.carteCriteres(f, F, D)
             margin_top = 12,
             spacing = 0,
             f:column(lignes),
-            f:spacer { height = 6 },
-            f:picture { width = D.carte, height = D.filet, background_color = C.filetPlafond, visible = F.si 'aPlafond' },
-            f:spacer { height = 6 },
-            Vues.lignePlafond(f, F, D),
         },
     }
 end
 
--- La carte Note : la grille des étiquettes et des valeurs (« Passes : », « Votre note : » et la
--- note posée, `notePoseeTitre` et `notePoseeSous`, « Drapeau : » avec « ⚑ Retenir », « ⊗ Rejeter »
--- et « ? À vérifier », grisé : Vues.inactif) ; « Claude propose » ; la carte des critères ; puis
--- ▲ ▼ et, à droite, « Laisser à N ★ » (`titreLaisser` : la proposition écartée, rien dans le
--- catalogue), « Changer… » (de 0 à 5 ★ et le drapeau) et « Accepter N ★ » (`titreAccepterNote`),
--- un bouton bleu en image dont le calque ne fait rien quand `peutAccepterNote` est faux.
+-- La carte Note : la grille des étiquettes et des valeurs (« Votre note : » et la note posée,
+-- `notePoseeTitre` et `notePoseeSous`, « Drapeau : » avec « ⚑ Retenir », « ⊗ Rejeter » et « ? À
+-- vérifier », grisé : Vues.inactif) ; « Claude propose » ; la carte des critères ; puis ▲ ▼ et
+-- « Voir à 100 % » (Vues.voirZoom) et, à droite, « Laisser à N ★ » (`titreLaisser` : la
+-- proposition écartée, rien dans le catalogue), « Changer… » (de 0 à 5 ★ et le drapeau) et
+-- « Accepter N ★ » (`titreAccepterNote`, jusqu'à 5 ★), un bouton bleu en image dont le calque ne
+-- fait rien quand `peutAccepterNote` est faux. Plus de rangée « Passes : » ni de ligne du plafond
+-- (correctif 1.3.2).
 function Vues.notation(f, F, largeur, D)
     local bind, P = F.bind, F.POLICES
     return f:column {
         spacing = 0,
         width = largeur,
-        f:row {
-            spacing = 0,
-            height = D.lignePasses,
-            etiquetteNote(f, F, D, "Passes :"),
-            f:spacer { width = D.ecartEtiquette },
-            Vues.passes(f, F, D),
-        },
-        f:spacer { height = D.ecartGrille },
         f:row {
             spacing = 0,
             height = D.etoile,
@@ -1033,6 +969,8 @@ function Vues.notation(f, F, largeur, D)
         f:row {
             spacing = 0,
             Vues.fleches(f, F, 'note'),
+            f:spacer { width = 8 },
+            Vues.voirZoom(f, F, D),
             f:spacer { fill_horizontal = 1 },
             F.bouton(f, { carre = true, bezel = 26, title = bind 'titreLaisser', font = P.systeme13, width = D.laisser,
                 enabled = bind 'peutAccepterNote',

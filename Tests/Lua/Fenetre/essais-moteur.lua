@@ -56,7 +56,7 @@ local function entreeNotes()
     return {
         pass = 2,
         ratings = {
-            { photo_id = 53636309, rating = 5, reason = 'Tient seule.', to_check = false,
+            { photo_id = 53636309, rating = 6, reason = 'Tient seule.', to_check = false,
                 criteria = { impact = 'Fort', qualities = 'Lumière douce', technical_floor = 'Nette (44)', finish = 'Rien à reprendre' } },
             { photo_id = 53636310, flag = 'reject', reason = 'Flou de bougé involontaire.', to_check = true,
                 criteria = { impact = 'Aucun', qualities = 'Sujet coupé', technical_floor = 'Floue (9)' } },
@@ -92,7 +92,10 @@ essai('Consignes : puce Notes des garde-fous, chaque photo traitée notée d\'ab
     -- « Note ces photos » : Claude pose les notes (demandé par Dany le 20 octobre 2026) ; ce que
     -- Dany demande en mots clairs, Claude le fait.
     contient(gardeFous, 'Quand Dany demande que tu notes (« note ces photos », « pose les notes »), apply = true', 'puce Notes')
-    contient(gardeFous, "Jamais 5 ★ de toi-même ; s'il en demande, set_metadata", 'puce Notes')
+    -- Correctif 1.3.2 (demandé par Dany le 22 octobre 2026) : de 0 à 5 ★ ; ses coups de cœur sont un
+    -- libellé de couleur qu'il pose lui-même.
+    contient(gardeFous, "De 0 à 5 ★ ; jamais de libellé de couleur (ses coups de cœur) sans sa demande.", 'puce Notes')
+    vrai(not Consignes.texte:find('Jamais 5 ★', 1, true), 'plus de « Jamais 5 ★ »')
     contient(gardeFous, "- Ce que Dany demande en mots clairs, fais-le", 'demande explicite')
     vrai(not Consignes.texte:find('\\\n', 1, true), 'lignes recollées')
     -- Plus de bouton Évaluer : Claude note d'abord chaque photo qu'il traite, à vérifier (demandé
@@ -222,7 +225,7 @@ essai("Conversation : notes proposées, de l'entrée de l'outil à la réponse d
     egal(nil, e.pose, 'sans apply : proposées')
     egal(3, #e.notes)
     local a, b, d = e.notes[1], e.notes[2], e.notes[3]
-    egal(4, a.note, '5 étoiles ramenées à 4')
+    egal(5, a.note, '6 étoiles ramenées à 5 (correctif 1.3.2 : Claude note de 0 à 5)')
     egal(nil, a.drapeau)
     egal('Fort', a.criteres.impact)
     egal('Lumière douce', a.criteres.qualites)
@@ -236,9 +239,9 @@ essai("Conversation : notes proposées, de l'entrée de l'outil à la réponse d
     egal(true, b.a_verifier)
     egal(nil, b.criteres.finition, 'finition facultative')
     egal(2, d.note)
-    -- Le fil montre 4 étoiles, jamais 5.
+    -- Le fil montre 5 étoiles, jamais plus.
     local lignes = Fil.lignesElement(e, 3, 600)
-    contient(lignes[2].texte, '★★★★☆ photo 53636309', 'note ramenée à 4 à l\'affichage')
+    contient(lignes[2].texte, '★★★★★ photo 53636309', 'note ramenée à 5 à l\'affichage')
     -- La réponse du connecteur : fichiers, notes d'avant, photo refusée.
     Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'n1', textes = { REPONSE }, images = {}, erreur = false } } })
     egal('fait', e.etat)
@@ -284,16 +287,16 @@ end)
 essai('Conversation : notes refusées par le connecteur, notes interrompues', function()
     local c, e = avecNotation()
     Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'n1', erreur = true, images = {},
-        textes = { "Claude ne propose jamais 5 étoiles : c'est à l'utilisateur." } } } })
+        textes = { "ratings[0] : « rating » va de 0 à 5." } } } })
     egal('erreur', e.etat)
-    egal("Claude ne propose jamais 5 étoiles : c'est à l'utilisateur.", e.texte)
+    egal("ratings[0] : « rating » va de 0 à 5.", e.texte)
     for _, x in ipairs(e.notes) do
         egal('refusee', x.etat)
     end
     egal('erreur', c.elements[2].etat)
     local lignes = Fil.lignesElement(e, 3, 600)
     egal('erreur', lignes[1].icone)
-    contient(lignes[1].texte, 'Notes non rangées · passe 2 · 3 photos : Claude ne propose jamais 5 étoiles', 'titre')
+    contient(lignes[1].texte, 'Notes non rangées · passe 2 · 3 photos : ratings[0] : « rating » va de 0 à 5', 'titre')
     local c2, e2 = avecNotation()
     Conversation.appliquer(c2, { genre = 'fin', reussie = false, interrompue = true, session = '' })
     egal('erreur', e2.etat, 'interrompue avant la réponse')
@@ -324,7 +327,7 @@ essai("Fil : lignes d'une notation", function()
         egal(3, lignes[k].element)
         egal(nil, lignes[k].icone)
     end
-    egal('  ★★★★☆ DSCF4961.RAF · Tient seule.', lignes[2].texte)
+    egal('  ★★★★★ DSCF4961.RAF · Tient seule.', lignes[2].texte)
     egal('  ⚑ Rejeter DSCF4962.RAF · à vérifier · Flou de bougé involontaire.', lignes[3].texte)
     egal('  ✕ ★★☆☆☆ photo 53636311 · photo introuvable', lignes[4].texte)
     egal(4, #lignes)
@@ -390,7 +393,7 @@ essai('Fil : le cache suit les notes', function()
     -- Une note seule qui change (sans changer l'état de l'élément) : recoupée aussi.
     e.notes[1].etat = 'refusee'
     e.notes[1].refus = 'déjà notée'
-    contient(texteDe(Fil.lignes(c, 610, cache)), '✕ ★★★★☆ DSCF4961.RAF · déjà notée', 'note changée')
+    contient(texteDe(Fil.lignes(c, 610, cache)), '✕ ★★★★★ DSCF4961.RAF · déjà notée', 'note changée')
     e.notes[2].a_verifier = false
     vrai(not texteDe(Fil.lignes(c, 610, cache)):find('à vérifier', 1, true), '« à vérifier » retiré')
 end)
@@ -423,7 +426,7 @@ essai('Stockage : notes relues, liste vide en tableau', function()
     egal('notation', n.genre)
     egal('erreur', n.etat, 'en cours quand Lightroom s\'est fermé')
     egal(3, #n.notes)
-    egal(4, n.notes[1].note)
+    egal(5, n.notes[1].note)
     egal('Nette (44)', n.notes[1].criteres.plancher)
     egal('rejetee', n.notes[2].drapeau)
     egal(0, #relue.elements[4].notes)

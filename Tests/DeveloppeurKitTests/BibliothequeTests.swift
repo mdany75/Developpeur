@@ -39,16 +39,21 @@ final class BibliothequeTests: XCTestCase {
         XCTAssertEqual(reply["resultats"]?.array?.first?["changements"]?.array?.first?["libelle"]?.string, "Note")
     }
 
-    /// 1.1 : Claude ne propose jamais 5 étoiles (propose_ratings), mais l'utilisateur peut les lui
-    /// demander : set_metadata les pose toujours.
-    func testSetMetadataStillSetsFiveStarsWhenAsked() {
+    /// set_metadata pose 5 étoiles à la demande de l'utilisateur ; depuis le correctif 1.3.2, Claude
+    /// propose aussi 5 étoiles (propose_ratings), et le libellé de couleur (les coups de cœur de
+    /// l'utilisateur) ne se pose que sur sa demande explicite.
+    func testSetMetadataStillSetsFiveStarsWhenAskedAndColorLabelsOnlyOnRequest() throws {
         let result = tools.call(name: "set_metadata", arguments: ["rating": 5, "photo_ids": [12], "confirm": true])
         XCTAssertFalse(result.isError, result.text)
         XCTAssertEqual(fake.lastParams["note"], 5)
-        let refus = tools.call(name: "propose_ratings", arguments: ["ratings": [["photo_id": 12, "rating": 5, "reason": "x",
-                                                                                "criteria": ["impact": "a", "qualities": "b", "technical_floor": "c"]]]])
-        XCTAssertTrue(refus.isError)
-        XCTAssertEqual(fake.commands, ["metadonnees"])
+        fake.replies["notation"] = ["propositions": [], "refusees": []]
+        let cinq = tools.call(name: "propose_ratings", arguments: ["ratings": [["photo_id": 12, "rating": 5, "reason": "x",
+                                                                               "criteria": ["impact": "a", "qualities": "b", "technical_floor": "c"]]]])
+        XCTAssertFalse(cinq.isError, cinq.text)
+        XCTAssertEqual(fake.commands, ["metadonnees", "notation"])
+        let definition = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "set_metadata" })
+        let libelle = definition["inputSchema"]?["properties"]?["color_label"]?["description"]?.string ?? ""
+        XCTAssertTrue(libelle.contains("seulement à la demande explicite de l'utilisateur, qui marque ainsi ses coups de cœur ; jamais de toi-même."), libelle)
     }
 
     func testSetMetadataRefusesInvalidOrEmptyRequests() {

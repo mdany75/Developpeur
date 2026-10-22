@@ -935,8 +935,9 @@ public final class Recette {
             try verifier(legende["photos"]?.array?.first?["vignette"] == nil, "vignette absente")
             return "une image, \(legende["photos"]?.array?.count ?? 0) vignette numérotée"
         }
-        // 1.1 : une note proposée se range dans le registre du module, hors du catalogue ; 5 étoiles
-        // sont refusées avant d'atteindre Lightroom. À vérifier (to_check) : le plafond du tri ne gêne
+        // 1.1 : une note proposée se range dans le registre du module, hors du catalogue ; une note
+        // hors de l'échelle (6 étoiles ; Claude propose de 0 à 5 depuis le correctif 1.3.2) est
+        // refusée avant d'atteindre Lightroom. À vérifier (to_check) : le plafond du tri ne gêne
         // pas, et le module la range dans l'état « a_verifier ». 1.1.1 : avec apply (« note ces
         // photos »), la note est posée, une étape que undo_last défait.
         // Le registre des notes (notation.json) est remis comme la recette l'a trouvé : il ne voit
@@ -945,9 +946,9 @@ public final class Recette {
         try etape(photo, "note proposée (propose_ratings), photo inchangée ; puis posée sur demande et annulée") {
             let detail = try garderRegistreDesNotes(id) { () throws -> String in
                 let criteres: JSONValue = ["impact": "Recette.", "qualities": "Recette.", "technical_floor": "Recette."]
-                let cinq = tools.call(name: "propose_ratings", arguments: ["ratings": [["photo_id": photoID, "rating": 5, "criteria": criteres,
-                                                                                        "reason": "Recette automatisée du module."]]])
-                try verifier(cinq.isError && cinq.text.contains("jamais 5 étoiles"), "5 étoiles acceptées : \(cinq.text)")
+                let six = tools.call(name: "propose_ratings", arguments: ["ratings": [["photo_id": photoID, "rating": 6, "criteria": criteres,
+                                                                                       "reason": "Recette automatisée du module."]]])
+                try verifier(six.isError && six.text.contains("« rating » va de 0 à 5"), "6 étoiles acceptées : \(six.text)")
                 let (reponse, _) = try appel("propose_ratings", ["ratings": [["photo_id": photoID, "rating": 2, "to_check": true, "criteria": criteres,
                                                                                "reason": "Recette automatisée du module."]]])
                 let proposee = reponse["propositions"]?.array?.first

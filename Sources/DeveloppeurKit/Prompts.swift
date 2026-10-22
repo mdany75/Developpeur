@@ -112,7 +112,7 @@ public enum Prompts {
 
             1. cull_photos sur ces photos (selection, collection ou folder) : photos floues ou à la mise au point manquée, aux yeux fermés ou plissés, presque noires ou brûlées, rafales et piles de Lightroom (la meilleure de chacune), plafonds de note mesurés, rejets proposés, mots-clés fréquents. Une longue séance (des centaines de photos) : proposer d'abord une sauvegarde du catalogue (get_status, request_backup).
             2. contact_sheet par planches de 24 à 30 (offset) pour voir la séance d'un coup d'œil, puis chaque rafale ; view_photo (avec region sur le visage ou le sujet) pour une photo douteuse, et pour confirmer des yeux fermés (un sourire qui plisse les yeux peut être voulu). Une photo volontairement floue ou sombre n'est pas un défaut : juge l'intention.
-            3. Les notes suivent le standard de notation (propose_ratings avec read_standard) : propose_ratings range des notes proposées de 0 à \(Notation.noteMaximale) étoiles, avec une raison par critère, sans dépasser les plafonds de cull_photos ; 5 étoiles restent à l'utilisateur, qui accepte les notes dans Lightroom (carte Note), ou demande que tu les poses (apply = true). Pour noter toute la séance passe par passe : l'invite noter.
+            3. Les notes suivent le standard de notation (propose_ratings avec read_standard) : propose_ratings range des notes proposées de 0 à \(Notation.noteMaximale) étoiles, avec une raison par critère, sans dépasser les plafonds de cull_photos ; l'utilisateur accepte les notes dans Lightroom (carte Note), ou demande que tu les poses (apply = true). Ses coups de cœur sont un libellé de couleur qu'il pose lui-même : n'en propose ni n'en pose aucun sans sa demande. Pour noter toute la séance passe par passe : l'invite noter.
             4. Présente le tri à l'utilisateur, chiffres à l'appui : à rejeter (et pourquoi), la meilleure de chaque rafale, les notes proposées. Rien ne change sans son accord ; une photo déjà classée par lui garde son classement, sauf s'il le demande.
             5. Avec son accord : set_metadata (flag reject) pour les rejets, avec une reason ; au besoin une collection « Claude › Sélection » (manage_collections) pour les photos à garder, et des mots-clés proposés par cull_photos (seulement ceux qu'il approuve). Puis montrer le résultat dans Lightroom : show_photo avec folder ou collection et filter (rating_min, par exemple 3) ; restore_filter remet son filtre ensuite.
             6. Résume : combien de rejetées, de notes proposées ; comment les afficher dans Lightroom (filtre d'attributs de la Bibliothèque) ; undo_last défait un classement photo par photo.
@@ -121,20 +121,19 @@ public enum Prompts {
 
     /// Une passe du standard de notation, telle que l'invite noter la donne.
     private static func passeNotation(_ arguments: [String: String]) -> String {
-        guard let passe = argument(arguments, "passe") else { return " Toutes les passes du standard, une question à la fois (pass = 1, puis 2, puis 3)." }
+        guard let passe = argument(arguments, "passe") else { return " Toutes les passes du standard, une question à la fois (pass = 1, puis 2, puis 3 ; la 4, monter à 5 étoiles, après le développement)." }
         switch passe {
-        case "1", "2", "3": return " Passe \(passe) du standard (« Les passes ») : pass = \(passe) dans propose_ratings."
-        case "4": return " Passe 4 : 5 étoiles, l'utilisateur seul ; ne propose rien, montre-lui les candidates."
+        case "1", "2", "3", "4": return " Passe \(passe) du standard (« Les passes ») : pass = \(passe) dans propose_ratings."
         default: return " Passe : \(passe)."
         }
     }
 
     public static let noter = PromptTemplate(
         name: "noter",
-        description: "Noter des photos selon le standard de notation, passe par passe, avec une raison par critère : des notes proposées, que l'utilisateur accepte dans Lightroom (jamais 5 étoiles).",
+        description: "Noter des photos selon le standard de notation, passe par passe, avec une raison par critère : des notes proposées de 0 à 5 étoiles, que l'utilisateur accepte dans Lightroom (jamais de libellé de couleur).",
         arguments: [
             .init(name: "photos", description: "Où sont les photos : « la sélection », le nom d'une collection ou le chemin d'un dossier."),
-            .init(name: "passe", description: "La passe : 1 (rejeter ou non), 2 (3 étoiles ou non), 3 (monter à 4 étoiles), ou une consigne (« revoir les 3 étoiles »)."),
+            .init(name: "passe", description: "La passe : 1 (rejeter ou non), 2 (3 étoiles ou non), 3 (monter à 4 étoiles), 4 (monter à 5 étoiles, après le développement), ou une consigne (« revoir les 3 étoiles »)."),
         ],
         render: { arguments in
             let ou = argument(arguments, "photos").map { "Photos : \($0)." }
@@ -144,8 +143,8 @@ public enum Prompts {
 
             1. cull_photos sur ces photos : le plancher technique (défauts, plafonds de note), les rafales et les piles, les rejets proposés. Une photo de nuit ou au bruit fort se note après le débruitage.
             2. contact_sheet par planches de 24 à 30 (offset ; les numéros continuent d'une planche à l'autre) : l'Impact et les Qualités se jugent sur toute la sortie vue d'un coup.
-            3. view_photo, avec region sur le sujet, pour les candidates à 4 étoiles (nette à 100 % sur le sujet, meilleure vue de son moment) et pour les cas douteux ; la Finition ne se juge que là (les vignettes peuvent dater d'avant la dernière retouche).
-            4. propose_ratings, avec pass : une note de 0 à \(Notation.noteMaximale) ou flag reject, une raison par critère (impact, qualities, technical_floor ; finish pour une photo développée), une phrase (reason), to_check pour un cas douteux ; jamais au-dessus du plafond de cull_photos, sauf un défaut voulu et maîtrisé, dit dans technical_floor, avec to_check. Jamais 5 étoiles de toi-même : l'utilisateur les pose, ou les demande (set_metadata). S'il demande que tu poses les notes, apply = true.
+            3. view_photo, avec region sur le sujet, pour les candidates à 4 et 5 étoiles (nette à 100 % sur le sujet, meilleure vue de son moment) et pour les cas douteux ; la Finition ne se juge que là (les vignettes peuvent dater d'avant la dernière retouche).
+            4. propose_ratings, avec pass : une note de 0 à \(Notation.noteMaximale) ou flag reject, une raison par critère (impact, qualities, technical_floor ; finish pour une photo développée), une phrase (reason), to_check pour un cas douteux ; jamais au-dessus du plafond de cull_photos, sauf un défaut voulu et maîtrisé, dit dans technical_floor, avec to_check. 5 étoiles : rares, après le développement (passe 4). Jamais de libellé de couleur : ses coups de cœur, qu'il pose lui-même (set_metadata, seulement à sa demande). S'il demande que tu poses les notes, apply = true.
             5. Résume : combien par note, les cas douteux, et que l'utilisateur accepte ou change chaque note, arrivée à vérifier, dans Lightroom (carte Note). Jamais set_metadata pour une note sans sa demande ; une photo déjà notée par lui garde sa note, sauf s'il le demande.
 
             Standard de notation (aussi : ressource developpeur://notation, propose_ratings avec read_standard) :

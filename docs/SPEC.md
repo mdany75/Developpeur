@@ -345,8 +345,10 @@ passe. Ce qui reste à voir est dans À constater dans Lightroom (1.2).
 `Prompts.swift` (`retouche_pro`, `harmoniser_serie`, `tri_seance`, `noter`, `portrait`,
 `paysage`, `noir_et_blanc`, `nuit_iso_eleve`, `partage`) l'appliquent à un cas, `retouche_pro` et
 `harmoniser_serie` pas à pas, `noter` passe par passe selon le standard de notation (voir
-Notation). Depuis la 1.1.1, les consignes disent « noter : propose_ratings (standard
-developpeur://notation ; apply = true s'il demande de noter ; 5 ★ : set_metadata, sur sa
+Notation). Depuis le correctif 1.3.2, les consignes disent « noter : propose_ratings (0 à 5 ★,
+standard developpeur://notation ; apply = true s'il demande de noter ; libellé de couleur : sur sa
+demande) », et « trier : cull_photos (rejets : set_metadata après accord ; … » (raccourci pour
+garder la longueur, 3 787 caractères) ; de la 1.1.1 à la 1.3.1 : « …, 5 ★ : set_metadata, sur sa
 demande) » (en 1.1 : « …, jamais 5 ★) »), et, au début, « Ce qu'il demande clairement, le faire ;
 ne refuser que ce que les outils ne savent pas faire, et le dire. » (demandé par Dany le
 20 octobre 2026). L'ordre suit l'aide d'Adobe
@@ -545,8 +547,10 @@ carré de la mise au point, puis `propose_ratings` sans `apply`), et sa note arr
 dans la carte Note, que Dany accepte ou change (demandé par Dany le 20 octobre 2026) ; une photo
 déjà évaluée (`view_photo` : `evaluation`) ne se renote pas, sauf s'il le demande ;
 `apply = true` quand Dany demande que Claude note (« note ces photos », « pose les notes ») ;
-jamais 5 ★ de lui-même, `set_metadata` si Dany en demande (en 1.1 : jamais `set_metadata` pour
-une note sans demande, jamais 5 ★). Après la 1.1.1, une puce de plus, sous Notes : « Mise au
+depuis le correctif 1.3.2 (demandé par Dany le 22 octobre 2026), « De 0 à 5 ★ ; jamais de libellé
+de couleur (ses coups de cœur) sans sa demande. » (de la 1.1.1 à la 1.3.1 : jamais 5 ★ de
+lui-même, `set_metadata` si Dany en demande ; en 1.1 : jamais `set_metadata` pour une note sans
+demande, jamais 5 ★). Les consignes font 7 489 caractères (plafond 7 500). Après la 1.1.1, une puce de plus, sous Notes : « Mise au
 point montrée ou jugée : view_photo avec af_point = true, sur l'aperçu entier comme sur un zoom
 (region) : le carré y est dessiné, s'il tombe dans la zone (point_af : dans_la_zone) » (voir Tri
 d'une séance › Point de mise au point). Les consignes du connecteur (`ServerInfo`, pour Claude
@@ -1004,11 +1008,12 @@ la maquette, qui reste la référence de l'allure.
   915) ;
 - à droite : le panneau en image (528 × 1 146), son intérieur de 498, l'aperçu commun en 3:2 de
   498 × 332 (sa vignette en 2x, 996 × 664, `Images.vignette`), la rangée ◀ légende ▶ · ⤢ Agrandir,
-  puis la place des cartes (`D.placeCartes`, 720) : carte Note de 559 (l'onglet Note la remplit),
+  puis la place des cartes (`D.placeCartes`, 720) : carte Note de 583 (559 jusqu'à la 1.3.1, avec
+  la rangée des passes et la ligne du plafond ; l'onglet Note la remplit),
   cartes Proposition, Aperçu (étape) et Leçon de 679, chacune suivie, comme la carte Note, de 12
   et de sa rangée de boutons au bas du panneau (▲ ▼ à gauche, les boutons à droite, bezel 26,
   titres en 13 : `carteEtRangee` de `Vues.lua`) ; leur intérieur de 472 (`D.carte`, textes en 12).
-  Les lignes des cartes : `criteres` 30 (une grille de 31 lignes de 16), `propLignes` 40,
+  Les lignes des cartes : `criteres` 33 (une grille de 34 lignes de 16 ; 30 jusqu'à la 1.3.1), `propLignes` 40,
   `etapeLignes` 40, `leconLignes` 42 : le plus grand nombre qui laisse au moins 12 points sous le
   contenu estimé (`essais-fenetre-b.lua` le vérifie, et échoue en disant quoi changer si la
   hauteur change) ;
@@ -1079,9 +1084,9 @@ superposé, montré pendant le travail ; aucun bouton par défaut (repli décid�
 texte (`Fenetre.LIGNES_BANDEAU`), coupées d'après la chasse mesurée (`Fenetre.texteBandeau`, « … »
 au bout de la seconde) ; l'infobulle donne le message entier, un clic l'aide entière. Les messages
 de la fenêtre sont des constantes raccourcies pour y tenir (`CHOISIR_CONVERSATION`,
-`EXERCICE_CONTINUE`, `PAS_D_IMAGE`, `NOTE_AUTRE_PHOTO`, `NOTE_EN_COURS`, `AUCUNE_PHOTO`,
-`PAS_CINQ`, et trois refus de `Moteur.lua`) ; l'essai « Bandeau » d'`essais-fenetre-b.lua` les
-mesure.
+`EXERCICE_CONTINUE`, `PAS_D_IMAGE`, `NOTE_AUTRE_PHOTO`, `NOTE_EN_COURS`, `AUCUNE_PHOTO`, et trois
+refus de `Moteur.lua` ; `PAS_CINQ` est retiré au correctif 1.3.2) ; l'essai « Bandeau »
+d'`essais-fenetre-b.lua` les mesure.
 
 **Colonne droite** (`droite` de `Dispositions.lua`) : le panneau en image, les segments Aperçu |
 Proposition | Note | Leçon centrés à cheval sur son bord (`Vues.segments` : chacun son image et sa
@@ -1252,7 +1257,8 @@ colonne Note de l'Atelier et l'onglet Noter du Panneau, retirés après la 1.1.1
   raison ; montré page par page, ▲ ▼ à droite des boutons (voir Contraintes du SDK). Sans
   proposition : « Aucune note proposée » et l'aide (`Fenetre.AIDE_NOTATION`) : Claude note d'abord
   chaque photo qu'il traite, selon le standard, critère par critère ; sa note arrive à vérifier,
-  vous l'acceptez ou la changez ; 5 ★ reste à vous seul.
+  vous l'acceptez ou la changez ; 5 ★ reste à vous seul (depuis le correctif 1.3.2 : de 0 à 5 ★ ;
+  vos coups de cœur, un libellé de couleur que vous posez vous-même).
 
 Boutons (Accepter et Changer… passent par `F.enTache` : ils lisent le registre et le catalogue,
 ou ouvrent une fenêtre modale) :
@@ -1260,9 +1266,8 @@ ou ouvrent une fenêtre modale) :
 - **Accepter** (`Fenetre.accepterNote`) : la proposition telle quelle
   (`Notation.poser{ {photo = id} }` par `Fenetre.poserNote`) ; actif pour une proposition « à
   vérifier » (ou « proposée », d'avant la 1.1.1) ;
-- **Changer…** (`Fenetre.changerNote`) : fenêtre modale « Changer la note », de 0 à 5 ★
-  (l'utilisateur peut poser 5 ★, Claude jamais) et le drapeau (inchangé, sans drapeau, Retenue,
-  Rejetée) ; actif dès qu'une photo est active.
+- **Changer…** (`Fenetre.changerNote`) : fenêtre modale « Changer la note », de 0 à 5 ★ et le
+  drapeau (inchangé, sans drapeau, Retenue, Rejetée) ; actif dès qu'une photo est active.
 
 Depuis la 1.1.1 (demandé par Dany le 20 octobre 2026 : ne garder qu'Accepter et Changer…), plus
 de bouton Noter, ou Évaluer (`Fenetre.noter`, `Consignes.noterPhoto`, et
@@ -1293,15 +1298,26 @@ acceptée ou changée puis annulée (undo_last, ⌘Z) rend la proposition de nou
 En 1.3, la carte Note suit la maquette (`Vues.notation`, lot B5) ; la section précédente reste
 vraie pour ce qu'elle fait au registre (`Notation.poser`, `Notation.recaler`, abonnement). Une
 grille d'étiquettes grises de 12 alignées à droite sur 70 points (`D.etiquetteNote` ; « Votre
-note : » mesure 66,6) :
+note : » mesure 66,6).
 
-- « Passes : » (`Vues.passes`) : les quatre passes du standard (`Fenetre.PASSES` : « Rejeter ? »,
-  « 3 ★ ou non ? », « Monter à 4 ? », « 5 ★ ? (vous) »), d'après `notePasse` (`Fenetre.etatPasse`,
-  ramenée à 3 au plus : la passe 4 est à Dany) : la coche verte devant une passe faite, la passe en
-  cours en gras 11, les autres en gris 11, un chevron entre deux ; largeurs mesurées (327 points) ;
+Correctif 1.3.2 (demandé par Dany le 22 octobre 2026 : « tu vas pouvoir enlever dans l'interface
+Passes … et Plafond 4 : mesuré au tri, pas plus ») : plus de rangée « Passes : » (`Vues.passes`,
+`Fenetre.PASSES`, `Fenetre.PASSE_MAX_CLAUDE`, `Fenetre.etatPasse`, la clé `notePasse`,
+`D.lignePasses`, les images coche-10 et chevron-passe) ni de ligne du plafond sous son filet
+(`Vues.lignePlafond`, `Fenetre.textePlafond`, les clés `aPlafond` et `plafondTexte`, l'image
+avertissement, la couleur `filetPlafond`, `D.plafond`, `D.avertissement`). La passe de Claude reste
+dans l'en-tête de la grille (« <EM>Passe 2 · à vérifier.</EM> … ») ; le plafond mesuré au tri reste
+dans le registre (`plafond` de la proposition) et dans le critère Plancher technique que Claude
+écrit. La place libérée va à la grille des critères : `TAILLES.autourNote` 137 (161 avant), carte
+Note de 583 (559), `criteres` 33 (30), soit 34 lignes de 16, le plus qui laisse 12 points sous le
+contenu (`essais-fenetre-b.lua`) ; carte-note régénérée dans les deux jeux. « Voir à 100 % » passe
+dans la rangée du bas (`Vues.voirZoom`, carré de bezel 26, titre en 13, `D.zoom` 92 : son titre
+mesure 76,3), toujours montré, grisé sans zoom (il ne suivait plus rien une fois la ligne du
+plafond retirée). La carte, de haut en bas :
+
 - « Votre note : » : cinq étoiles de 24 sous des calques de 30 (`Vues.etoilesNote`, constaté C4 :
   le clic sur la 3e pose 3 ★) qui appellent `Fenetre.poserEtoile(k)` ; un clic sur la note posée
-  la retire (0 ★) ; 5 ★ se pose (Dany seul). À droite, `notePoseeTitre` (le sens du standard,
+  la retire (0 ★) ; 5 ★ se pose. À droite, `notePoseeTitre` (le sens du standard,
   `Fenetre.SENS_NOTES` : « Pas encore jugée », « Correcte », « Tient seule »…) et `notePoseeSous`
   (« 2 ★ · drapeau Retenue ») ;
 - « Drapeau : » : « ⚑ Retenir » et « ⊗ Rejeter » (carrés de bezel 24, `Fenetre.poserDrapeau` : le
@@ -1309,7 +1325,7 @@ note : » mesure 66,6) :
   décide rien de la proposition de Claude ; Rejeter la décide : changée, ou acceptée si Claude
   proposait le rejet), et « ? À vérifier » posé grisé (`Vues.inactif`). Question encore ouverte
   à Dany : le remettre comme « remettre à vérifier » par `Notation.decider`, qui existe ;
-- « Claude propose » (gras 12) : cinq petites étoiles (etoile12) d'après `noteClaude` (0 à 4),
+- « Claude propose » (gras 12) : cinq petites étoiles (etoile12) d'après `noteClaude` (0 à 5),
   « rejeter » en rouge, ou « rien pour l'instant » ; à droite, « critères du plus lourd au plus
   léger » ;
 - la carte des critères (`Vues.carteCriteres`, sur carte-note) : une grille de `D.criteres` + 1
@@ -1319,13 +1335,13 @@ note : » mesure 66,6) :
   points, `ne..k`, puis le texte sur 251, `nt..k`, son verdict en `<EM>` : `Fenetre.verdict`, deux
   mots au plus jusqu'au premier point —), lue page par page (`Fenetre.lignesCriteres(prop,
   largeurs)` à la place de `Fenetre.texteNote`, `CARTES.note` en grille, `montrerPage` avec ses
-  lignes déjà faites) ; puis le filet et la ligne du plafond (`Vues.lignePlafond` : l'avertissement,
-  « <EM>Plafond N ★</EM> : mesuré au tri, pas plus. » en gras ambre, et « Voir à 100 % ») ;
-- en bas : ▲ ▼ (`Vues.fleches 'note'`), « Laisser à N ★ » ou « Laisser rejetée » (`titreLaisser` :
-  `Fenetre.laisserNote`, `Notation.decider` `ecartee`, rien dans le catalogue ; la proposition passe
-  en gris et Accepter se grise), « Changer… », et « Accepter N ★ » ou « Accepter le rejet », un
-  bouton bleu (`Vues.boutonBleu`, clé `peutAccepterNote`). Jamais « Accepter 5 ★ »
-  (`Fenetre.noteDeCinq` rend la carte inactive, `accepterNote` refuse : `Fenetre.PAS_CINQ`).
+  lignes déjà faites) ;
+- en bas : ▲ ▼ (`Vues.fleches 'note'`), « Voir à 100 % » (`Vues.voirZoom`), puis, à droite,
+  « Laisser à N ★ » ou « Laisser rejetée » (`titreLaisser` : `Fenetre.laisserNote`,
+  `Notation.decider` `ecartee`, rien dans le catalogue ; la proposition passe en gris et Accepter
+  se grise), « Changer… », et « Accepter N ★ » ou « Accepter le rejet », un bouton bleu
+  (`Vues.boutonBleu`, clé `peutAccepterNote`), jusqu'à « Accepter 5 ★ » depuis le correctif 1.3.2
+  (`Fenetre.noteDeCinq` et `Fenetre.PAS_CINQ` sont retirés).
 
 « Voir à 100 % » (décision de Dany du 21 octobre 2026) : le zoom que Claude a pris pour noter la
 photo, c'est-à-dire la plus récente image d'un appel réussi de `view_photo` avec `region` sur cette
@@ -1333,18 +1349,17 @@ photo dans la conversation (`Conversation.dernierZoom`, pur ; la photo vient de 
 de la réponse), gardé par `Fenetre.zoomDeLaNote` ; `Fenetre.voirZoom` le montre dans l'aperçu comme
 un clic sur sa ligne d'image (Agrandir : en grand), sans Claude ni Lightroom. Sans zoom, le même
 bouton grisé, infobulle `Fenetre.SANS_ZOOM` (deux carrés superposés : une infobulle liée n'est
-pas constatée). Toute la ligne suit `aPlafond`.
+pas constatée). Jusqu'à la 1.3.1, toute la ligne du plafond, ce bouton compris, suivait
+`aPlafond` ; depuis le correctif 1.3.2, il est dans la rangée du bas et toujours montré.
 
 Étoiles, drapeaux, Laisser, Changer… et Accepter passent par une tâche et sont refusés pendant que
 Claude travaille (`Fenetre.CLAUDE_TRAVAILLE`), pendant une note en cours
 (`Fenetre.NOTE_EN_COURS`) ou sans photo active (`Fenetre.AUCUNE_PHOTO`), et le bandeau le dit ; ils
 écrivent par `Notation.poser` (le clic vaut accord) ou `Bibliotheque.noter`, une étape
-« Claude · notation » que `undo_last` défait. `Fenetre.rafraichirNotation` pose `notePasse`,
-`noteCatalogue`, `notePoseeTitre`, `notePoseeSous`, `noteClaude`, `notationCouleur`, la grille,
-`aPlafond`, `plafondTexte`, `peutVoirZoom`, `titreAccepterNote`, `titreLaisser`,
-`peutAccepterNote` et `peutChangerNote`. Toujours ni Noter ni Évaluer (`Fenetre.verifierNote` reste
-nil). Petit écart laissé : Laisser suit `peutAccepterNote`, faux pour une proposition de 5 ★, que
-le connecteur et le registre refusent déjà.
+« Claude · notation » que `undo_last` défait. `Fenetre.rafraichirNotation` pose `noteCatalogue`,
+`notePoseeTitre`, `notePoseeSous`, `noteClaude`, `notationCouleur`, la grille, `peutVoirZoom`,
+`titreAccepterNote`, `titreLaisser`, `peutAccepterNote` et `peutChangerNote`. Toujours ni Noter ni
+Évaluer (`Fenetre.verifierNote` reste nil).
 
 ### Séance de notation (1.1, retirée en 1.1.1)
 
@@ -3551,7 +3566,8 @@ Depuis la 1.1, le bilan suit le standard de notation (voir Notation) :
   capture ou document selon Vision (`utility`), 1 ; pas la meilleure de sa rafale ou de sa pile,
   3 (un 4 est la meilleure vue de son moment) ; bruit fort (1,5 et plus,
   `DetailMeasurements.bruitFort`), pas de plafond mais à vérifier (à noter après le débruitage) ;
-  sinon 4 (5 : l'utilisateur seul). Le plus bas l'emporte, raisons jointes ; une vignette
+  sinon pas de plafond, 5 (depuis le correctif 1.3.2 ; jusqu'à la 1.3.1, 4, 5 étant à l'utilisateur
+  seul). Le plus bas l'emporte, raisons jointes ; une vignette
   illisible n'a pas de plafond. Un plafond borne la note, il ne la donne pas.
 - `propositions` : seulement `{flag: "reject", photo_ids, pourquoi}`, pour les photos au plafond 0
   (défaut majeur, à confirmer à l'œil) encore libres (ni note ni drapeau, un seul test pour toute
@@ -3714,9 +3730,14 @@ d'abord toute photo qu'il traite, avant d'y toucher, sans rien poser (consignes 
 voir Carte Note) ; une photo déjà évaluée ne se renote pas, sauf demande (`view_photo` :
 `evaluation`). Sans demande, Claude ne pose rien lui-même. Depuis la 1.1.1 (demandé par Dany le
 20 octobre 2026), quand l'utilisateur lui demande de noter (« note ces photos », « pose les
-notes »), `propose_ratings` avec `apply` pose aussi les notes (voir plus bas). Claude ne propose
-jamais 5 ★ de lui-même ; 5 ★ que l'utilisateur demande passent par `set_metadata`. Ce qui reste à
-voir dans Lightroom : Fenêtre Claude › À constater dans Lightroom (1.1, 1.1.1 et après).
+notes »), `propose_ratings` avec `apply` pose aussi les notes (voir plus bas). Depuis le
+correctif 1.3.2 (demandé par Dany le 22 octobre 2026 : « je veux que tu notes les photos de 0 à
+5 étoiles ; si moi je veux une photo 5 étoiles, je placerai un code de couleur »), Claude note de 0
+à 5 ★ ; les coups de cœur de l'utilisateur sont un libellé de couleur qu'il pose lui-même : Claude
+n'en propose, n'en pose ni n'en change jamais sans sa demande explicite (`set_metadata`). De la 1.1
+à la 1.3.1, Claude ne proposait jamais 5 ★ (l'utilisateur les posait, ou les demandait par
+`set_metadata`). Ce qui reste à voir dans Lightroom : Fenêtre Claude › À constater dans Lightroom
+(1.1, 1.1.1 et après), et À constater dans Lightroom (1.3), point 21.
 
 ### Le standard
 
@@ -3731,26 +3752,38 @@ rappel de la Séance de notation, retirés en 1.1.1, y renvoyaient aussi. En ré
 
 - Une étoile dit un niveau de qualité, et rien d'autre, avec le même sens d'une sortie à l'autre.
   Rejeter, c'est le drapeau Rejeter ; les doublons d'une rafale, une pile sous la meilleure vue ;
-  la valeur affective, un mot-clé ou une collection. 0 ★ veut dire « pas encore jugée ».
+  la valeur affective, un mot-clé ou une collection ; les coups de cœur de l'utilisateur, un
+  libellé de couleur qu'il pose lui-même (section « Les coups de cœur », 1.3.2). 0 ★ veut dire
+  « pas encore jugée ». L'échelle de Claude va de 0 à 5 ★, plus le rejet.
 - Rejet : défaut majeur, involontaire, confirmé à l'œil (la seule photo de sa scène : plutôt 1 ★,
   à vérifier). 1 ★ : gardée, sous le niveau 2. 2 ★ : correcte, aucun défaut visible à la taille
   d'usage. 3 ★ : tient seule devant quelqu'un qui ne connaît ni les gens ni le lieu. 4 ★ : une
   3 ★ qui a de l'impact (vue en premier sur une planche de 20 à 30 vignettes, nette à 100 % sur
-  le sujet, meilleure vue de son moment ; souvent 5 à 10 % d'une sortie, sans quota). 5 ★ : parmi
-  les meilleures de l'utilisateur, posée par lui seul. Une photo qui ne remplit pas les conditions
-  d'une note reçoit celle d'en dessous.
+  le sujet, meilleure vue de son moment ; souvent 5 à 10 % d'une sortie, sans quota). 5 ★ : une
+  4 ★ qui tient à côté des meilleures photos de l'utilisateur, toutes sorties confondues ;
+  développement fini, sans excès, la Finition vue à 100 % ; toujours forte quelques jours plus
+  tard ; rare (bien moins que les 4 ★, souvent aucune dans une sortie), jamais avant le
+  développement ni sans avoir vu toute la sortie (jusqu'à la 1.3.1 : posée par l'utilisateur
+  seul). Une photo qui ne remplit pas les conditions d'une note reçoit celle d'en dessous.
 - Critères, du plus lourd au plus léger : Impact (aucune mesure ne le voit), Qualités de l'image,
   Plancher technique (mesuré par `cull_photos` : il plafonne la note, il ne la donne pas),
   Finition (pour le 5 ★). Un défaut visible à la taille d'usage plafonne à 2 ★, visible seulement
   à 100 % à 3 ★ ; un défaut voulu et maîtrisé ne compte pas.
 - Selon le genre (famille, portrait, paysage, nuit notée après le débruitage, sport, rue), puis
   quatre passes, une question chacune : 1 rejeter ou non ; 2 3 ★ ou non (sinon 2 ★, 1 ★ au
-  passage) ; 3 parmi les 3 ★, monter à 4 ; 4 5 ★, l'utilisateur seul, après le développement.
+  passage) ; 3 parmi les 3 ★, monter à 4 ; 4 après le développement, parmi les 4 ★, monter à 5
+  (les candidates vues à 100 %, Finition comprise ; aucune si aucune ne tient à côté des
+  meilleures de l'utilisateur).
 - Les mesures fixent le plancher et départagent une rafale ; elles ne justifient jamais seules un
-  4 ★. Photos étalons : la collection « Développeur › Étalons », si elle existe.
+  4 ★ ni un 5 ★. Photos étalons : la collection « Développeur › Étalons », si elle existe (entre 3
+  et 4, et entre 4 et 5).
 
-`Notation.noteMaximale` = 4 : Claude propose de 0 à 4 étoiles. `set_metadata` pose toujours 5 ★
-quand l'utilisateur le demande.
+`Notation.noteMaximale` = 5 depuis le correctif 1.3.2 (4 avant) : Claude propose de 0 à 5
+étoiles. `set_metadata` pose toujours une note de 0 à 5 quand l'utilisateur le demande ; son
+`color_label` dit qu'un libellé de couleur ne se pose qu'à la demande explicite de l'utilisateur,
+qui marque ainsi ses coups de cœur. Les plafonds de `Notation.plafond` ne valent que pour les
+défauts : sans défaut mesuré, le plafond est `noteMaximale` (5), « aucun défaut mesuré : pas de
+plafond », et `cull_photos` ne le liste pas.
 
 ### `cull_photos` et `contact_sheet`
 
@@ -3777,7 +3810,7 @@ Arguments :
 
 - `ratings` : les propositions, une par photo, 500 au plus par appel (`maxRatings`, comme
   `cull_photos`) ; obligatoire sauf avec `read_standard`. Chacune :
-  `{photo_id, rating (0 à 4) ou flag: "reject", criteria: {impact, qualities, technical_floor,
+  `{photo_id, rating (0 à 5) ou flag: "reject", criteria: {impact, qualities, technical_floor,
   finish}, reason, to_check}`. `rating` ou `flag`, pas les deux (`flag` seul : le rejet) ;
   `impact`, `qualities` et `technical_floor` obligatoires et non vides, `finish` facultatif (une
   photo développée) ; 200 caractères demandés par critère (`longueurCritere`), 300 pour `reason`
@@ -3787,30 +3820,31 @@ Arguments :
   au-dessus du plafond) ; depuis la 1.1.1, sa description ajoute que toute proposition arrive de
   toute façon « à vérifier » dans la carte Note (le registre garde `to_check` dans le champ
   `a_verifier` de la proposition).
-- `pass` : la passe du standard, de 1 à 3 ; 4 (5 ★, l'utilisateur seul) est refusée avec des
-  `ratings` (« Passe 4 : 5 étoiles, l'utilisateur seul ; rien à proposer. »), et le module la
-  refuse encore.
+- `pass` : la passe du standard, de 1 à 4 (depuis le correctif 1.3.2 ; jusqu'à la 1.3.1, la
+  passe 4 était refusée, « Passe 4 : 5 étoiles, l'utilisateur seul ; rien à proposer. », par le
+  serveur et par le module).
 - `read_standard` : seul, rend `{standard}` sans rien envoyer au module ; avec `ratings`, les
   propositions sont rangées et le standard s'ajoute à la réponse.
 - `apply` (1.1.1) : `true` quand l'utilisateur demande que Claude note ou pose les notes (« note
   ces photos », « pose les notes ») : la commande reçoit `poser = true`, et les notes sont aussi
   posées dans le catalogue, « à vérifier » comprises (réponse : `posees`). `false` ou absent :
-  propositions seulement. La description de l'outil le dit, et ajoute : jamais 5 étoiles ici ; si
-  l'utilisateur en demande, `set_metadata`.
+  propositions seulement. La description de l'outil le dit, et ajoute (1.3.2) : jamais de libellé
+  de couleur, les coups de cœur de l'utilisateur, qu'il pose lui-même (`set_metadata`, seulement à
+  sa demande) ; un 5 se regarde à 100 % (jusqu'à la 1.3.1 : jamais 5 étoiles ici).
 
 En 1.1, `session` (l'identifiant d'une séance) et `read_session` (la séance ouverte dans
 Lightroom, par l'action `seance`) servaient à la Séance de notation : retirés en 1.1.1.
 
 Tout est validé avant d'envoyer quoi que ce soit : un refus ne range rien. Les erreurs viennent
 ensemble, une ligne `ratings[i] : …` chacune (dix au plus), après « Rien n'a été rangé : ».
-Refusés : une note de 5 ou plus (« Claude ne propose jamais 5 étoiles : c'est à
-l'utilisateur. »), négative ou non entière ; `rating` avec `flag`, ou ni l'un ni l'autre ; un
+Refusés : une note hors de 0 à 5 (« « rating » va de 0 à 5. » ; jusqu'à la 1.3.1, 5 ou plus :
+« Claude ne propose jamais 5 étoiles : c'est à l'utilisateur. ») ou non entière ; `rating` avec `flag`, ou ni l'un ni l'autre ; un
 `flag` autre que `reject` ; une clé inconnue dans une proposition ou dans `criteria`, avec la
 bonne clé quand elle s'en rapproche (« note (ici : « rating ») ») — validée à la main
 (`ratingKeys`), car `parametresInconnus` ne voit que le premier niveau des arguments ; un
 critère obligatoire vide, un critère ou une raison trop longs, une raison vide, un `to_check` qui
 n'est pas un booléen ; une photo proposée deux fois ; `apply` qui n'est pas un booléen, `pass`
-hors de 1 à 3, plus de 500 propositions, `ratings` absent ou vide sans `read_standard`. Enfin une
+hors de 1 à 4, plus de 500 propositions, `ratings` absent ou vide sans `read_standard`. Enfin une
 note au-dessus du plafond mesuré par le dernier `cull_photos` de la photo (`dernierTri`), sauf avec
 `to_check = true` : un défaut voulu et maîtrisé ne compte pas (standard), Claude le dit dans
 `technical_floor` ; le message invite aussi à relancer `cull_photos` pour une photo retouchée
@@ -3826,7 +3860,7 @@ Puis une seule commande, par `FileOutils`, en 60 s au plus (`notationTimeout`, p
 
 ```
 notation {action: "proposer", passe?: entier, poser?: true,
-          propositions: [{photo, note: 0…4 (0 pour un rejet), drapeau: "aucun" | "rejetee",
+          propositions: [{photo, note: 0…5 (0 pour un rejet), drapeau: "aucun" | "rejetee",
                           criteres: {impact, qualites, plancher, finition?},
                           plafond?: entier (celui de dernierTri), raison, a_verifier: booléen}]}
 ```
@@ -3838,15 +3872,17 @@ demandé. `notation` n'est pas une lecture que `LightroomBridge` rejoue après u
 
 L'invite `noter` (arguments `photos` et `passe` : 1, 2, 3, 4 ou une consigne ; sans le guide de
 style) : `cull_photos`, `contact_sheet` par planches de 24 à 30, `view_photo` sur le sujet pour les
-candidates à 4 ★ et les cas douteux, `propose_ratings` avec `pass`, puis un résumé ; jamais
-`set_metadata` pour une note sans demande ; jamais 5 ★ de lui-même (l'utilisateur les pose, ou les
-demande : `set_metadata`) ; `apply = true` si l'utilisateur demande que Claude pose les notes ; à
-la passe 4, rien de proposé. Sans `photos`, la sélection de Lightroom (sinon, demander où elles
+candidates à 4 et 5 ★ et les cas douteux, `propose_ratings` avec `pass`, puis un résumé ; jamais
+`set_metadata` pour une note sans demande ; 5 ★ rares, après le développement (passe 4) ; jamais
+de libellé de couleur (ses coups de cœur, qu'il pose lui-même : `set_metadata`, seulement à sa
+demande) ; `apply = true` si l'utilisateur demande que Claude pose les notes ; la passe 4 se
+propose comme les autres depuis le correctif 1.3.2 (jusqu'à la 1.3.1 : jamais 5 ★ de lui-même, et
+rien de proposé à la passe 4). Sans `photos`, la sélection de Lightroom (sinon, demander où elles
 sont ; en 1.1, d'abord la séance ouverte, par `read_session`). Le standard entier la termine.
-`tri_seance` ne propose plus de 4 ou 5 ★ ni de drapeau Retenue : les notes passent par
-`propose_ratings` (de 0 à 4 ★, 5 ★ à l'utilisateur seul ; acceptées dans la carte Note, ou posées
-avec `apply` à sa demande ; ou l'invite `noter`), et `garder` désigne une collection, pas une
-note.
+`tri_seance` ne propose plus de drapeau Retenue : les notes passent par `propose_ratings` (de 0 à
+5 ★ depuis le correctif 1.3.2 ; acceptées dans la carte Note, ou posées avec `apply` à sa
+demande ; ou l'invite `noter` ; ses coups de cœur, un libellé de couleur qu'il pose lui-même), et
+`garder` désigne une collection, pas une note.
 
 ### Le registre (`Notation.lua`, `notation.json`)
 
@@ -3866,7 +3902,7 @@ neuve, sans métatable. `Notation.version` augmente à chaque changement ; `Nota
 fn)`, `Notation.desabonner(nom)` et `Notation.signaler(quoi)` (`propositions`, `decision`, `pose`,
 `recalage`) préviennent les fenêtres abonnées (`fenetre`, la seule depuis la 1.1.1).
 
-Une proposition : `{photo, uuid, fichier, note (0 à 4, nil pour un rejet), drapeau ('aucun' ou
+Une proposition : `{photo, uuid, fichier, note (0 à 5, nil pour un rejet), drapeau ('aucun' ou
 'rejetee'), criteres = {impact, qualites, plancher, finition}, plafond, raison, a_verifier, passe,
 note_avant, drapeau_avant, etat, note_choisie, drapeau_choisi, le, decide_le, commentaire}`.
 `etat` : `a_verifier` (depuis la 1.1.1, toute proposition commence ainsi, demandé par Dany le
@@ -3889,10 +3925,11 @@ séances de la 1.1 (`Notation.ouvrirSeance`, `seanceActive`, `seance`, `choisirP
 1.1, aussi `seance`, retirée en 1.1.1). Sans `poser`, rien n'est écrit dans le catalogue : ni la
 pause, ni l'accord, ni les garde-fous ne s'y appliquent, comme pour `vignettes`.
 
-- `proposer` : refuse tout pour une note de 5 ou plus (second garde-fou, après le serveur), un
-  drapeau autre que `aucun` ou `rejetee`, une note qui n'est pas un entier de 0 à 4, une
-  proposition sans note ni rejet, une proposition sans photo, une passe hors de 1 à 4, ou la
-  passe 4 (5 ★, l'utilisateur seul : rien à proposer, second garde-fou) ; une photo introuvable va
+- `proposer` : refuse tout pour une note qui n'est pas un entier de 0 à 5
+  (`Notation.NOTE_MAX_PROPOSEE`, 5 depuis le correctif 1.3.2 ; second garde-fou, après le
+  serveur), un drapeau autre que `aucun` ou `rejetee`, une proposition sans note ni rejet, une
+  proposition sans photo, ou une passe hors de 1 à 4 (la passe 4 est permise depuis le correctif
+  1.3.2 ; jusqu'à la 1.3.1, 5 ★ et la passe 4 étaient refusés) ; une photo introuvable va
   dans `refusees` sans bloquer les autres. Un rejet est un drapeau sans note (le serveur envoie
   0) : l'accepter laisse les étoiles de la photo. La passe d'une proposition est celle donnée. Note
   et drapeau d'avant (`note_avant`, `drapeau_avant`) sont lus par `Photos.decrireTout`. État :
@@ -3911,7 +3948,7 @@ pause, ni l'accord, ni les garde-fous ne s'y appliquent, comme pour `vignettes`.
 - `remettre` (1.3 ; la recette seulement, jamais un outil) : `{photo, proposition}` remet la
   proposition d'une photo telle que `lire` l'a rendue avant une étape de la recette (ses champs
   gardés, l'uuid de la photo repris), ou la retire (`proposition` absente ou null) ; refuse plus
-  de 4 étoiles, un état inconnu ou une autre photo, sans rien changer ; rien n'est écrit dans le
+  de 5 étoiles (4 jusqu'à la 1.3.1), un état inconnu ou une autre photo, sans rien changer ; rien n'est écrit dans le
   catalogue. Réponse : `{photo, proposition}`. Constaté le 21 octobre 2026 : la recette posait
   avec `apply` puis défaisait par `undo_last` une note de 2 ★ sur une copie qui avait déjà 2 ★ ;
   le registre ne voit pas l'annulation et `Notation.recaler` n'y trouvait rien à reprendre (la note
@@ -4038,8 +4075,8 @@ et position GPS relus puis défaits, photos jamais exportées, filtre posé puis
 dans sa mémoire, et le retour à l'origine de la fin l'en retirait ; elle y est maintenant remise
 (`remettreDansLaCollection`).
 Depuis la 1.1, après la planche contact, l'étape « note proposée (propose_ratings), photo
-inchangée ; puis posée sur demande et annulée » (son nom depuis la 1.1.1) : 5 étoiles refusées
-(« jamais 5 étoiles »), puis 2 étoiles avec `to_check` rangées par la vraie commande `notation`
+inchangée ; puis posée sur demande et annulée » (son nom depuis la 1.1.1) : 6 étoiles refusées
+(« « rating » va de 0 à 5 » ; jusqu'à la 1.3.1, 5 étoiles refusées, « jamais 5 étoiles »), puis 2 étoiles avec `to_check` rangées par la vraie commande `notation`
 (état « a_verifier », celui de toute proposition depuis la 1.1.1), la photo inchangée ; depuis la
 1.1.1, la même proposition avec `apply` : 2 ★ posées (`posees`, état « acceptee », note relue dans
 le classement), puis `undo_last`, après quoi la photo est de nouveau comme au départ (en 1.1,
@@ -5221,8 +5258,9 @@ créé (si la version de Lightroom le permet et que l'option est cochée).
   les écritures sur des photos y passent, propositions comprises ; `annuler` et `revenir` non.
   Une livraison ne change pas les photos : elle n'y passe pas.
 - Notes (1.1, voir Notation) : sans `apply`, `propose_ratings` et la commande `notation`
-  n'écrivent rien dans le catalogue (ni pause, ni accord, ni garde-fous) ; Claude ne propose
-  jamais 5 ★ (refus du serveur, puis du module). Les notes que l'utilisateur pose depuis la
+  n'écrivent rien dans le catalogue (ni pause, ni accord, ni garde-fous) ; Claude propose de 0 à
+  5 ★ (au-delà, refus du serveur, puis du module ; jusqu'à la 1.3.1, jamais 5 ★), et ne touche à
+  aucun libellé de couleur sans la demande de l'utilisateur. Les notes que l'utilisateur pose depuis la
   fenêtre (`Bibliotheque.noter`, avec `depuisLightroom` et `confirme`) passent par les garde-fous
   des photos (copies virtuelles seulement, libellé protégé, photos rejetées), sans la pause, ni
   « Proposer d'abord », ni l'accord dans Lightroom, ni le plafond de photos par écriture (le clic

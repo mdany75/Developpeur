@@ -14,8 +14,9 @@
 -- d'actions (« ☆ Voir la note », « Leçon de la photo »), leurs clics, la bascule vers Leçon, le
 -- bandeau sur deux lignes et le tableau du carnet à la largeur du fil ; essais-lecon.lua éprouve la
 -- carte de l'onglet Leçon. Enfin les cartes (lot B5) : sur leurs images, leurs hauteurs et ce qui y
--- tient, l'inventaire de la carte Note (maquette) et des cartes Proposition et Aperçu, les passes,
--- les étoiles, les drapeaux, Laisser, Accepter (jamais 5 ★ de Claude), « Voir à 100 % » (le zoom
+-- tient, l'inventaire de la carte Note (maquette) et des cartes Proposition et Aperçu, ni passes ni
+-- plafond (correctif 1.3.2), les étoiles, les drapeaux, Laisser, Accepter (jusqu'à « Accepter 5 ★ »,
+-- correctif 1.3.2), « Voir à 100 % » (le zoom
 -- que Claude a pris pour noter) et la grille des critères. Ni Claude, ni quota, ni vraie photo :
 -- les actions qui écriraient ou parleraient à Claude sont remplacées par des témoins le temps d'un
 -- essai, et le registre des notes par un registre simulé.
@@ -496,14 +497,14 @@ essai('Cadre : la fenêtre construite fait la largeur du contenu, chaque colonne
             end
             vrai(v.args.background_color == nil or v.genre == 'picture', 'fond hors d\'un aplat : ' .. v.genre)
         end
-        for _, cle in ipairs({ 'fondVolet', 'fondContenu', 'fondDroite', 'filetVolet', 'filetDroite', 'filetEntete', 'filetBarre', 'fondApercu',
-            'filetPlafond' }) do
+        for _, cle in ipairs({ 'fondVolet', 'fondContenu', 'fondDroite', 'filetVolet', 'filetDroite', 'filetEntete', 'filetBarre', 'fondApercu' }) do
             vrai(aplats[C[cle]], 'aplat ' .. cle)
         end
+        egal(nil, C.filetPlafond, 'plus de filet du plafond (correctif 1.3.2)')
         -- Le filet du volet, celui de la colonne droite, sous l'en-tête, au-dessus de la barre,
-        -- au-dessus de la saisie, dans le volet sous Renommer… et Supprimer…, et au-dessus du plafond
-        -- de la carte Note (lot B5).
-        egal(7, filets, 'filets de 1 point')
+        -- au-dessus de la saisie, dans le volet sous Renommer… et Supprimer… (celui du plafond de la
+        -- carte Note est retiré avec sa ligne, correctif 1.3.2).
+        egal(6, filets, 'filets de 1 point')
         -- Le premier aplat de chaque colonne est à sa taille : volet, centre, droite, sur la hauteur du contenu.
         for _, k in ipairs({ 1, 3, 5 }) do
             local aplat = cols[k].args[1]
@@ -1982,7 +1983,8 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
         .. "Une ancienne séance de notation ne s'ouvre plus.", table.concat(refus, ' | '), 'les refus du moteur, raccourcis')
     local messages = { Fenetre.CLAUDE_TRAVAILLE, Fenetre.CHOISIR_CONVERSATION, Fenetre.NOTE_AUTRE_PHOTO, Fenetre.PAS_D_IMAGE,
         Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE.proposer .. '.', Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE.appliquer .. '.',
-        "Écrivez une demande avant d'envoyer.", Fenetre.NOTE_EN_COURS, Fenetre.AUCUNE_PHOTO, Fenetre.PAS_CINQ, refus[1], refus[2], refus[3] }
+        "Écrivez une demande avant d'envoyer.", Fenetre.NOTE_EN_COURS, Fenetre.AUCUNE_PHOTO, refus[1], refus[2], refus[3] }
+    egal(12, #messages, 'chaque message, aucun nil')
     for _, m in ipairs(messages) do
         local montre = Fenetre.texteBandeau(m, D.bandeau)
         egal(m, (montre:gsub('\n', ' ')), 'en entier : ' .. m)
@@ -2182,7 +2184,7 @@ local PROPOSITION = { photo = 4961, fichier = 'DSCF4961.RAF', note = 3, drapeau 
     criteres = { impact = "Moyen. Le ciel d'orage arrête l'œil ; rien au premier plan ne le retient.",
         qualites = "Bonnes. Sujet clair, lumière d'orage, horizon droit ; arbres lourds à droite.",
         plancher = "Netteté 41 · nette ; bruit 0,4 · faible ; ombres bouchées 1,9 % ; aucun visage.",
-        finition = "Pour 5 ★ seulement, que vous seul posez." } }
+        finition = "Pour 5 ★ seulement : rien à reprendre." } }
 
 local function copieProposition(plus)
     local p = {}
@@ -2284,8 +2286,9 @@ essai('Inventaire de la carte Note (maquette) : chaque élément, son genre, sa 
             Fenetre.rafraichir()
             local note = variantes(contenu).notation
             local C = Fenetre.COULEURS
-            -- Les étiquettes de la grille, en gris 12, alignées à droite sur leur colonne.
-            for _, titre in ipairs({ 'Passes :', 'Votre note :', 'Drapeau :' }) do
+            -- Les étiquettes de la grille, en gris 12, alignées à droite sur leur colonne ; plus de
+            -- « Passes : » (correctif 1.3.2, demandé par Dany le 22 octobre 2026).
+            for _, titre in ipairs({ 'Votre note :', 'Drapeau :' }) do
                 local e = parTitre(note, titre, 'static_text')
                 egal('right', e.args.alignment, titre)
                 egal(D.etiquetteNote, e.args.width, titre)
@@ -2293,12 +2296,6 @@ essai('Inventaire de la carte Note (maquette) : chaque élément, son genre, sa 
                 egal(12, e.args.font.size, titre)
                 vrai(S.montreeDansFenetre(e), titre)
             end
-            -- Les passes : leurs libellés, sans clic ; la coche et le chevron en images.
-            for _, libelle in ipairs(Fenetre.PASSES) do
-                local l = parTitre(note, libelle, 'static_text')
-                egal(nil, l.args.mouse_down, libelle .. ' : sans clic')
-            end
-            egal('« Rejeter ? », « 3 ★ ou non ? », « Monter à 4 ? », « 5 ★ ? (vous) »', '« ' .. table.concat(Fenetre.PASSES, ' », « ') .. ' »')
             -- Les cinq étoiles de « Votre note » : des calques de 30 sur etoile24.
             local calques = 0
             for _, x in ipairs(vues(note)) do
@@ -2326,14 +2323,11 @@ essai('Inventaire de la carte Note (maquette) : chaque élément, son genre, sa 
             vrai(parTitre(note, 'Claude propose', 'static_text'), 'Claude propose')
             vrai(parTitre(note, 'critères du plus lourd au plus léger', 'static_text'), "l'ordre des critères")
             egal(3, p.noteClaude)
-            -- La carte des critères, le filet et la ligne du plafond.
+            -- La carte des critères, sans filet ni ligne du plafond (correctif 1.3.2), même avec un
+            -- plafond mesuré au tri dans la proposition.
             vrai(carteSur(contenu, 'carte-note'), 'carte-note')
-            egal(true, p.aPlafond)
-            local plafond = liee(note, 'static_text', 'plafondTexte')
-            egal(C.ambre, plafond.args.emphasis_color, 'le plafond en ambre')
-            egal(Fenetre.POLICES.gras12, plafond.args.emphasis_font)
-            vrai(S.montreeDansFenetre(plafond))
-            -- La rangée du bas : ▲ ▼, Laisser, Changer…, Accepter (bleu).
+            egal(3, copieProposition().plafond, 'un plafond est dans la proposition')
+            -- La rangée du bas : ▲ ▼, « Voir à 100 % », Laisser, Changer…, Accepter (bleu).
             local laisser = liee(note, 'square_button', 'titreLaisser')
             egal('peutAccepterNote', laisser.args.enabled.key)
             egal(26, S.bezelVisible(laisser))
@@ -2436,73 +2430,74 @@ essai('Inventaire des cartes Proposition et Aperçu (étape) : titres, textes, c
     end)
 end)
 
-essai('Passes : la coche devant les passes faites, la passe en cours en gras noir, les autres en gris ; la rangée tient dans le panneau', function()
+essai('Ni passes ni plafond dans la carte Note (correctif 1.3.2, demandé par Dany) : leurs vues, leurs clés et leurs images retirées ; la grille des critères prend la place ; « Voir à 100 % » dans la rangée du bas', function()
     photoNotee(4961, 'DSCF4961.RAF', 0, 0)
     Moteur.nouvelle()
-    egal('a_venir faite en_cours a_venir', table.concat({ Fenetre.etatPasse(1, 0), Fenetre.etatPasse(1, 2), Fenetre.etatPasse(2, 2),
-        Fenetre.etatPasse(3, 2) }, ' '))
-    egal(3, Fenetre.PASSE_MAX_CLAUDE, 'la 4e passe est à Dany')
+    -- Plus rien des passes ni du plafond dans la fenêtre, ses dimensions ni ses images.
+    for _, nom in ipairs({ 'PASSES', 'PASSE_MAX_CLAUDE', 'etatPasse', 'textePlafond', 'noteDeCinq', 'PAS_CINQ' }) do
+        egal(nil, Fenetre[nom], 'Fenetre.' .. nom)
+    end
+    egal(nil, Vues.passes, 'Vues.passes')
+    egal(nil, Vues.lignePlafond, 'Vues.lignePlafond')
+    for _, image in ipairs({ 'coche-10', 'chevron-passe', 'avertissement' }) do
+        egal(nil, Dispositions.IMAGES[image], 'image ' .. image)
+    end
+    for _, cle in ipairs({ 'lignePasses', 'plafond', 'avertissement' }) do
+        egal(nil, D[cle], 'D.' .. cle)
+    end
+    -- La place libérée va à la grille des critères : 34 lignes de 16 sur une carte de 583.
+    egal(33, D.criteres)
+    egal(583, Dispositions.IMAGES['carte-note'].hauteur)
+    egal(D.placeCartes - D.autourNote, Dispositions.IMAGES['carte-note'].hauteur)
     local prop = copieProposition()
-    avecRegistre(prop, function(_, changer)
+    prop.passe, prop.plafond = 3, 2
+    avecRegistre(prop, function()
         ouvrirFenetre(function(p, contenu)
+            Fenetre.rafraichir()
             local note = variantes(contenu).notation
-            local C = Fenetre.COULEURS
-            -- Ce que montre la rangée des passes : « ✓libellé » (faite), « *libellé* » (en cours),
-            -- « libellé » (à venir).
-            local function montre()
-                local r = {}
-                for _, libelle in ipairs(Fenetre.PASSES) do
-                    local vu
-                    for _, x in ipairs(vues(note)) do
-                        if x.genre == 'static_text' and x.args.title == libelle and S.montreeDansFenetre(x) then
-                            vrai(vu == nil, libelle .. ' : une seule variante montrée')
-                            if x.args.font.name == '<system/bold>' then
-                                egal(C.texte, x.args.text_color)
-                                vu = '*' .. libelle .. '*'
-                            else
-                                egal(C.gris, x.args.text_color)
-                                local rangee = rangeeDe(note, x)
-                                local coche = rangee.args[1]
-                                vu = (coche.genre == 'picture' and S.montreeDansFenetre(coche)) and ('✓' .. libelle) or libelle
-                            end
-                        end
+            -- Aucune vue liée aux passes ou au plafond, aucun libellé des passes, aucune étiquette
+            -- « Passes : », aucun « Plafond » même mesuré.
+            for _, x in ipairs(vues(note)) do
+                for _, cle in ipairs({ 'title', 'visible', 'enabled' }) do
+                    local v = x.args[cle]
+                    local cles = type(v) == 'table' and (v.keys or { v.key }) or {}
+                    for _, k in ipairs(cles) do
+                        vrai(k ~= 'notePasse' and k ~= 'aPlafond' and k ~= 'plafondTexte', x.genre .. ' lié à ' .. tostring(k))
                     end
-                    r[#r + 1] = vu or '?'
                 end
-                return table.concat(r, ' | ')
+                local t = tostring(valeur(x, 'title', p) or '')
+                for _, mot in ipairs({ 'Passes :', 'Rejeter ?', '3 ★ ou non ?', 'Monter à 4 ?', '(vous)', 'Plafond', 'mesuré au tri' }) do
+                    vrai(not t:find(mot, 1, true), x.genre .. ' « ' .. t .. ' »')
+                end
+                egal(nil, x.args.value and tostring(x.args.value):find('avertissement', 1, true), 'image avertissement')
             end
-            for passe, attendu in pairs({
-                [0] = 'Rejeter ? | 3 ★ ou non ? | Monter à 4 ? | 5 ★ ? (vous)',
-                [1] = '*Rejeter ?* | 3 ★ ou non ? | Monter à 4 ? | 5 ★ ? (vous)',
-                [2] = '✓Rejeter ? | *3 ★ ou non ?* | Monter à 4 ? | 5 ★ ? (vous)',
-                [3] = '✓Rejeter ? | ✓3 ★ ou non ? | *Monter à 4 ?* | 5 ★ ? (vous)',
-                -- La 4e passe est à Dany : Claude n'y va pas (la carte montre au plus la 3e).
-                [4] = '✓Rejeter ? | ✓3 ★ ou non ? | *Monter à 4 ?* | 5 ★ ? (vous)',
-            }) do
-                local x = copieProposition()
-                x.passe = passe > 0 and passe or nil
-                changer(x)
-                Fenetre.rafraichirNotation()
-                egal(attendu, montre(), 'passe ' .. passe)
+            for k = 1, D.criteres + 1 do
+                vrai(not tostring(p['nt' .. k]):find('Plafond', 1, true), 'ligne ' .. k)
             end
-            changer(nil)
-            Fenetre.rafraichirNotation()
-            egal('Rejeter ? | 3 ★ ou non ? | Monter à 4 ? | 5 ★ ? (vous)', montre(), 'sans proposition')
-            -- La rangée tient dans le panneau : étiquette, écart, puis les passes à leurs largeurs.
-            local passes = rangeeDe(note, parTitre(note, 'Passes :', 'static_text'))
-            vrai(largeurDonnee(passes) <= D.interieur, string.format('passes : %d points pour %d', largeurDonnee(passes), D.interieur))
-            -- La rangée « Votre note » aussi.
+            -- La passe de Claude reste dans l'en-tête de la grille.
+            vrai(p.nt1:find('<EM>Passe 3 · à vérifier.</EM>', 1, true) == 1, p.nt1)
+            -- « Voir à 100 % » : dans la rangée du bas, avec Laisser, Changer… et Accepter, en
+            -- carrés de 26 ; sa largeur tient son titre en 13.
+            local laisser = liee(note, 'square_button', 'titreLaisser')
+            local rangee = rangeeDe(note, laisser)
+            local zooms = 0
+            for _, x in ipairs(vues(rangee)) do
+                if S.BOUTONS[x.genre] and x.args.title == 'Voir à 100 %' then
+                    zooms = zooms + 1
+                    egal(26, S.bezelVisible(x))
+                    egal(D.zoom, x.args.width)
+                    egal(Fenetre.POLICES.systeme13, x.args.font)
+                end
+            end
+            egal(2, zooms, 'les deux variantes de « Voir à 100 % », dans la rangée de Laisser')
+            vrai(Fil.largeur('Voir à 100 %', 'texte') + 12 <= D.zoom, 'son titre tient')
+            -- La rangée tient dans le panneau, en comptant 30 points par flèche mini (▲ ▼).
+            local bleu = Dispositions.IMAGES['bouton-bleu'].largeur
+            local total = 2 * 30 + 2 + 8 + D.zoom + D.laisser + 8 + D.changer + 8 + bleu
+            vrai(total <= D.interieur, string.format('rangée du bas : %d points pour %d', total, D.interieur))
+            -- La rangée « Votre note » : la largeur du panneau.
             local votre = rangeeDe(note, parTitre(note, 'Votre note :', 'static_text'))
             egal(D.interieur, largeurDonnee(votre), 'Votre note : la largeur du panneau')
-            -- Chaque libellé tient dans sa variante (mesuré en gras 11 pour la passe en cours).
-            for _, x in ipairs(vues(note)) do
-                for _, libelle in ipairs(Fenetre.PASSES) do
-                    if x.genre == 'static_text' and x.args.title == libelle then
-                        local cle = x.args.font.name == '<system/bold>' and 'gras11' or 'petit'
-                        vrai(Fil.largeur(libelle, cle) <= x.args.width, libelle .. ' en ' .. cle)
-                    end
-                end
-            end
         end)
     end)
 end)
@@ -2715,7 +2710,7 @@ essai('Laisser à N ★ : Notation.decider(photo, « ecartee »), rien dans le c
     end)
 end)
 
-essai('Accepter N ★ : son calque pose la proposition telle quelle ; inactif, il ne fait rien ; « Accepter le rejet » ; jamais « Accepter 5 ★ »', function()
+essai('Accepter N ★ : son calque pose la proposition telle quelle ; inactif, il ne fait rien ; « Accepter le rejet » ; « Accepter 5 ★ » (correctif 1.3.2)', function()
     photoNotee(4961, 'DSCF4961.RAF', 0, 0)
     Moteur.nouvelle()
     avecRegistre(copieProposition(), function(recus, changer)
@@ -2744,20 +2739,27 @@ essai('Accepter N ★ : son calque pose la proposition telle quelle ; inactif, i
             Fenetre.rafraichirNotation()
             egal('Accepter le rejet', p.titreAccepterNote)
             egal('rejet', p.noteClaude)
-            -- Claude ne propose jamais 5 ★ (le connecteur et le registre les refusent) ; une telle
-            -- proposition, si elle venait, ne s'offre pas à Accepter.
-            changer(copieProposition({ note = 5 }))
+            -- Claude propose de 0 à 5 ★ (correctif 1.3.2, demandé par Dany le 22 octobre 2026) :
+            -- « Accepter 5 ★ » s'offre et pose la proposition telle quelle.
+            changer(copieProposition({ note = 5, passe = 4 }))
             Fenetre.rafraichirNotation()
-            egal('Accepter', p.titreAccepterNote)
-            egal(false, p.peutAccepterNote)
+            egal('Accepter 5 ★', p.titreAccepterNote)
+            egal(true, p.peutAccepterNote)
+            egal(5, p.noteClaude)
+            local cinq = 0
             for _, x in ipairs(vues(contenu)) do
-                vrai(not tostring(valeur(x, 'title', p) or ''):find('Accepter 5', 1, true), 'jamais « Accepter 5 ★ »')
+                if tostring(valeur(x, 'title', p) or '') == 'Accepter 5 ★' then
+                    cinq = cinq + 1
+                end
             end
-            Fenetre.accepterNote()
-            egal(Fenetre.PAS_CINQ, p.message)
-            egal(1, #recus.poses, 'rien posé')
-            p.message = ''
-            for n = 0, 4 do
+            vrai(cinq > 0, '« Accepter 5 ★ » montré sur le bouton bleu')
+            taches = #S.taches
+            S.cliquer(accepter)
+            lancerDepuis(taches)
+            egal(2, #recus.poses, '5 ★ posées')
+            vrai(recus.poses[2][1].note == nil and recus.poses[2][1].drapeau == nil, 'telle quelle')
+            egal('', p.message or '', 'aucun refus')
+            for n = 0, 5 do
                 vrai(Fenetre.titreAccepter({ note = n, drapeau = 'aucun' }) == 'Accepter ' .. n .. ' ★', n .. ' ★')
             end
             -- Une note en cours : la pose est refusée et dite.
@@ -2766,7 +2768,7 @@ essai('Accepter N ★ : son calque pose la proposition telle quelle ; inactif, i
             Fenetre.poserNote({ photo = 4961 })
             Fenetre.noteEnCours = false
             egal(Fenetre.NOTE_EN_COURS, p.message)
-            egal(1, #recus.poses)
+            egal(2, #recus.poses)
             p.message = ''
         end)
     end)
@@ -2835,7 +2837,7 @@ essai('Voir à 100 % dans la carte : le zoom de la photo montré dans l\'aperçu
             vrai(actif and grise, 'les deux variantes de « Voir à 100 % »')
             egal(false, grise.args.enabled, 'grisé')
             egal('Claude n\'a pas pris de zoom de cette photo', Fenetre.SANS_ZOOM)
-            egal(22, S.bezelVisible(actif))
+            egal(26, S.bezelVisible(actif), 'dans la rangée du bas, comme Laisser (correctif 1.3.2)')
             local function etat()
                 return (S.montreeDansFenetre(actif) and 'actif' or '') .. (S.montreeDansFenetre(grise) and 'grisé' or '')
             end
@@ -2903,15 +2905,16 @@ essai('Voir à 100 % dans la carte : le zoom de la photo montré dans l\'aperçu
                 end)
             end)
             egal(true, Fenetre.voirZoom(), 'rend vrai avec un zoom')
-            -- Le plafond absent : toute la ligne masquée, le bouton aussi.
+            -- Sans plafond mesuré : le bouton reste là (il ne suit plus la ligne du plafond, retirée
+            -- au correctif 1.3.2).
             avec(Notation, 'proposition', function()
                 local x = copieProposition()
                 x.plafond = nil
                 return x
             end, function()
                 Fenetre.rafraichirNotation()
-                egal(false, p.aPlafond)
-                egal('', etat())
+                egal(nil, p.aPlafond)
+                egal('actif', etat())
             end)
             Fenetre.rafraichirNotation()
         end)

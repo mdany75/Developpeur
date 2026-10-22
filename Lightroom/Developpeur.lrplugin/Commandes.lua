@@ -112,7 +112,7 @@
 --   progression {id, titre?, fait?, total?, message?, fin?} → barre de progression de Lightroom
 --                                          pendant une série ; annulee si l'utilisateur l'a arrêtée
 --   notation    {action, passe?, propositions?, poser?, photos?} → notes proposées par Claude,
---                                          rangées pour la carte Note : proposer (jamais 5
+--                                          rangées pour la carte Note : proposer (de 0 à 5
 --                                          étoiles ; posées aussi avec poser, à la demande de
 --                                          Dany), lire, remettre (la recette seule : remet la
 --                                          proposition d'avant son étape, sans rien écrire au

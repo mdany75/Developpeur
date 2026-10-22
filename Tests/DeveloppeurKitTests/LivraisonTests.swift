@@ -290,7 +290,10 @@ final class LivraisonTests: XCTestCase {
         XCTAssertFalse(texte("tri_seance").contains("4 ou 5 étoiles"))
         XCTAssertFalse(texte("tri_seance").contains("pick"))
         XCTAssertTrue(texte("tri_seance").contains("propose_ratings"))
-        XCTAssertTrue(texte("tri_seance").contains("5 étoiles restent à l'utilisateur"))
+        // Correctif 1.3.2 : de 0 à 5 étoiles ; les coups de cœur, un libellé de couleur de l'utilisateur.
+        XCTAssertFalse(texte("tri_seance").contains("5 étoiles restent à l'utilisateur"))
+        XCTAssertTrue(texte("tri_seance").contains("de 0 à 5 étoiles"))
+        XCTAssertTrue(texte("tri_seance").contains("Ses coups de cœur sont un libellé de couleur qu'il pose lui-même : n'en propose ni n'en pose aucun sans sa demande."))
         XCTAssertFalse(texte("noter").contains("Guide de style"), "noter ne retouche pas")
         XCTAssertTrue(texte("harmoniser_serie").contains("(\(ToolHandler.maxContactSheet) par planche)"))
         XCTAssertTrue(texte("portrait").contains("face_skin"))

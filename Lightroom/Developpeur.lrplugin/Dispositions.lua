@@ -71,20 +71,22 @@ Dispositions.TAILLES = {
     -- Le panneau de la colonne droite (528), son intérieur (498) et celui des cartes (472).
     panneau = 528, interieur = 498, carte = 472,
     -- Ce que les cartes laissent de leur place sous l'aperçu (D.placeCartes), d'où leurs hauteurs
-    -- (Dispositions.IMAGES) : la carte Note, 161 (la grille de l'onglet Note au-dessus d'elle et sa
-    -- rangée du bas, et 1 de jeu : l'onglet Note remplit la place) ; les cartes Proposition, Aperçu
-    -- (étape) et Leçon, 41 : comme la carte Note, elles descendent jusqu'à leur rangée de boutons,
-    -- posée sous elles au bas du panneau (12, le cadre de ses boutons de bezel 26, et 1 de jeu ;
-    -- demandé par Dany le 21 octobre 2026).
-    autourNote = 161, sousCarte = 41,
+    -- (Dispositions.IMAGES) : la carte Note, 137 (la grille de l'onglet Note au-dessus d'elle, 96 :
+    -- Votre note 30, 8, Drapeau 26, 10, Claude propose 16, 6 ; sa rangée du bas, 12 et 28 ; et 1 de
+    -- jeu : l'onglet Note remplit la place ; 161 avant le correctif 1.3.2, avec la rangée des
+    -- passes) ; les cartes Proposition, Aperçu (étape) et Leçon, 41 : comme la carte Note, elles
+    -- descendent jusqu'à leur rangée de boutons, posée sous elles au bas du panneau (12, le cadre de
+    -- ses boutons de bezel 26, et 1 de jeu ; demandé par Dany le 21 octobre 2026).
+    autourNote = 137, sousCarte = 41,
     -- Les lignes des cartes, en 12 points : sur chaque image de carte (Dispositions.IMAGES), le plus
     -- grand nombre de lignes qui laisse au moins 12 sous le contenu, comme la marge du haut
     -- (essais-fenetre-b.lua) : la grille des critères de la carte Note (`criteres` + 1 lignes de 16
-    -- sur carte-note de 559 : 12 + 31 × 16 + 6 + filet + 6 + le plafond, et le bas de la carte), le
-    -- texte de la proposition (sur carte-proposition de 679 : 12 + titre + 6 + 40 lignes + 6 +
-    -- l'état), de l'étape (onglet Aperçu, sur carte-etape de 679 : 12 + titre + 6 + sous-titre + 6
-    -- + 40 lignes) et de la leçon (sur carte-lecon de 679 : 12 + titre + 6 + 42 lignes).
-    criteres = 30, propLignes = 40, etapeLignes = 40, leconLignes = 42,
+    -- sur carte-note de 583 : 12 + 34 × 16, et le bas de la carte ; sans le filet ni la ligne du
+    -- plafond depuis le correctif 1.3.2, demandé par Dany le 22 octobre 2026), le texte de la
+    -- proposition (sur carte-proposition de 679 : 12 + titre + 6 + 40 lignes + 6 + l'état), de
+    -- l'étape (onglet Aperçu, sur carte-etape de 679 : 12 + titre + 6 + sous-titre + 6 + 40 lignes)
+    -- et de la leçon (sur carte-lecon de 679 : 12 + titre + 6 + 42 lignes).
+    criteres = 33, propLignes = 40, etapeLignes = 40, leconLignes = 42,
     -- Le cadre d'un square_button dépasse son bezel visible de 2 points (constaté le 21 octobre 2026,
     -- D5 : height = bezel + 2 ; Fenetre.bouton, clé `bezel`).
     margeBezel = 2,
@@ -134,8 +136,8 @@ Dispositions.IMAGES = {
     -- haut, puis le panneau blanc (bord #C9C9C9, coins de 7), dont 1 134 de panneau.
     panneau = taille(T.panneau, hauteurPanneau),
     -- Les fonds des cartes (#FAFAFA, bord #D9D9D9, coins de 6), à la largeur intérieure du panneau :
-    -- Note (critères, filet et plafond), Proposition, Aperçu (étape) et Leçon, à la hauteur que leur
-    -- laisse la place des cartes (720 sous l'aperçu de 498 × 332 : 559 pour la carte Note, que
+    -- Note (la grille des critères), Proposition, Aperçu (étape) et Leçon, à la hauteur que leur
+    -- laisse la place des cartes (720 sous l'aperçu de 498 × 332 : 583 pour la carte Note, que
     -- l'onglet Note remplit, 679 pour les autres, leur rangée de boutons sous elles).
     ['carte-note'] = taille(T.interieur, placeDesCartes - T.autourNote),
     ['carte-proposition'] = taille(T.interieur, placeDesCartes - T.sousCarte),
@@ -168,10 +170,8 @@ Dispositions.IMAGES = {
     ['etoile24-vide'] = taille(24, 24),
     ['etoile12-pleine'] = taille(12, 12),
     ['etoile12-vide'] = taille(12, 12),
-    -- La rangée des passes, la ligne du plafond et le champ Rechercher.
-    ['coche-10'] = taille(10, 10),
-    ['chevron-passe'] = taille(7, 8),
-    avertissement = taille(14, 14),
+    -- Le champ Rechercher (la rangée des passes et la ligne du plafond, avec leurs images coche-10,
+    -- chevron-passe et avertissement, sont retirées depuis le correctif 1.3.2).
     loupe = taille(12, 12),
     -- Icônes de boutons sans titre, par image_name : 📎 et 📋 de la saisie, ▲ ▼ de la barre du fil.
     trombone = taille(14, 14),
@@ -212,23 +212,23 @@ Dispositions.APPARENCES = {
 Dispositions.PALETTES = {
     claire = {
         -- Textes : le texte, les gris (secondaire, en-têtes, sous-titre de la conversation
-        -- choisie), le bleu (Vous, liens), Menlo (outils), la coche des passes, l'orange
-        -- (activité, alertes), le rouge (erreurs), l'ambre (plafond, étoiles pleines), le blanc
-        -- (sur le bleu) et le titre d'un bouton bleu inactif (Vues.boutonBleu).
+        -- choisie), le bleu (Vous, liens), Menlo (outils), la coche (note acceptée), l'orange
+        -- (activité, alertes), le rouge (erreurs), l'ambre (étoiles pleines), le blanc (sur le
+        -- bleu) et le titre d'un bouton bleu inactif (Vues.boutonBleu).
         texte = '1D1D1F', gris = '6B6B6B', grisEntete = '5F5F5F', sousTitreChoisi = '505050', bleu = '0A64D8',
         mono = '3D3D45', coche = '1F7A35', orange = 'E0800D', rouge = 'D12E2E', ambre = 'A86200', blanc = 'FFFFFF',
         titreInactif = 'FFFFFF',
         -- Aplats : le contenu (en-tête, fil, barre), le volet et la zone de saisie, la colonne droite.
         fondContenu = 'FFFFFF', fondVolet = 'F2F2F2', fondDroite = 'ECECEC',
         -- Filets en aplats de 1 pt : bord du volet et dessus de la saisie, bord de la colonne
-        -- droite, dessous de l'en-tête, dessus de la barre, dessus du plafond de la carte Note.
+        -- droite, dessous de l'en-tête, dessus de la barre (plus de filet du plafond de la carte
+        -- Note depuis le correctif 1.3.2).
         filetVolet = 'D2D2D2', filetDroite = 'C9C9C9', filetEntete = 'E2E2E2', filetBarre = 'EBEBEB',
-        filetPlafond = 'E3E3E3',
         -- L'aperçu : son fond (celui des vignettes, Images.FOND, sous la photo et l'image « aucun
         -- aperçu ») et le texte de l'image « aucun aperçu ».
         fondApercu = '2B2B2B', texteApercu = '9E9E9E',
         -- Images : le panneau, les cartes, les segments, la conversation choisie, la pastille
-        -- verte, le contour (étoile vide, chevron des passes, pastille grise) et le bouton bleu
+        -- verte, le contour (étoile vide, pastille grise) et le bouton bleu
         -- (normal, enfoncé, inactif).
         fondPanneau = 'FFFFFF', bordPanneau = 'C9C9C9', fondCarte = 'FAFAFA', bordCarte = 'D9D9D9',
         fondSegment = 'FFFFFF', bordSegment = 'B5B5B5', filetSegment = 'D0D0D0', selection = 'DADADA',
@@ -243,7 +243,6 @@ Dispositions.PALETTES = {
         titreInactif = '7F8EA3',
         fondContenu = '1E1E1E', fondVolet = '2A2A2A', fondDroite = '323232',
         filetVolet = '454545', filetDroite = '4A4A4A', filetEntete = '343434', filetBarre = '2E2E2E',
-        filetPlafond = '3A3A3A',
         -- Le fond de l'aperçu reste le gris des vignettes (Images.FOND, le même dans les deux
         -- apparences : une photo se juge sur ce gris) ; seul le texte de l'image « aucun aperçu »
         -- change.
@@ -434,19 +433,18 @@ function Dispositions.dimensions()
     D.largeurLecon = D.carte
     D.margeCarte = math.floor((D.interieur - D.carte) / 2)
     -- La carte Note (Vues.notation, maquette « B · Conversation claire », onglet Note) : la grille
-    -- des étiquettes (« Passes : », « Votre note : », « Drapeau : », alignées à droite en 12 :
-    -- « Votre note : » mesure 66,6, et 2 de jeu) et de leurs valeurs, 8 entre ses rangées ; les cinq
-    -- étoiles de « Votre note » (calques de 30, 2 entre eux) et la note posée à leur droite ;
-    -- Retenir, Rejeter et « ? À vérifier » (bezel de 24) ; « Claude propose », puis la carte des
-    -- critères (une ligne de 16 par ligne de la grille : l'étiquette d'un critère en gras 12,
-    -- « Plancher technique » mesure 116,7, et 2 de jeu, puis son texte), le filet et la ligne du
-    -- plafond avec « Voir à 100 % » ; la rangée du bas (▲ ▼, Laisser, Changer…, Accepter en bleu :
-    -- bezel de 26). La rangée des passes (Vues.passes, largeurs mesurées) prend juste la place que
-    -- laisse la colonne des étiquettes (420 points).
+    -- des étiquettes (« Votre note : », « Drapeau : », alignées à droite en 12 : « Votre note : »
+    -- mesure 66,6, et 2 de jeu) et de leurs valeurs, 8 entre ses rangées ; les cinq étoiles de
+    -- « Votre note » (calques de 30, 2 entre eux) et la note posée à leur droite ; Retenir, Rejeter
+    -- et « ? À vérifier » (bezel de 24) ; « Claude propose », puis la carte des critères (une ligne
+    -- de 16 par ligne de la grille : l'étiquette d'un critère en gras 12, « Plancher technique »
+    -- mesure 116,7, et 2 de jeu, puis son texte) ; la rangée du bas (▲ ▼, « Voir à 100 % » de 92 :
+    -- son titre en 13 mesure 76,3 ; Laisser, Changer…, Accepter en bleu : bezel de 26). La rangée
+    -- des passes et la ligne du plafond sont retirées (correctif 1.3.2, demandé par Dany le
+    -- 22 octobre 2026).
     D.etiquetteNote = 70
     D.ecartEtiquette = 8
     D.ecartGrille = 8
-    D.lignePasses = 16
     D.etoile = 30
     D.ecartEtoiles = 2
     D.posee = D.interieur - D.etiquetteNote - D.ecartEtiquette - (5 * D.etoile + 4 * D.ecartEtoiles) - 12
@@ -456,9 +454,7 @@ function Dispositions.dimensions()
     D.etiquetteCritere = 120
     D.ecartCritere = 8
     D.texteCritere = D.carte - D.etiquetteCritere - D.ecartCritere
-    D.avertissement = Dispositions.IMAGES.avertissement.largeur
-    D.zoom = 84
-    D.plafond = D.carte - D.avertissement - 8 - 8 - D.zoom
+    D.zoom = 92
     D.laisser, D.changer = 104, 84
     -- Les rangées sous les cartes Proposition, Aperçu (étape) et Leçon, comme celle de la carte Note
     -- (bezel de 26, titres en 13, 8 entre les boutons ; demandé par Dany le 21 octobre 2026) : ▲ ▼
