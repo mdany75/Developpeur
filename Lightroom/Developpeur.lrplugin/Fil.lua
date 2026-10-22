@@ -379,10 +379,15 @@ end
 -- L'onglet Focus (demandé par Dany le 22 octobre 2026) ----------------------------------------
 
 -- La mise au point d'une photo qui ne se lit pas, après « Mise au point : » : une autre marque que
--- Fujifilm, un original introuvable ou trop long à ouvrir, un connecteur absent ; pendant la
--- lecture.
+-- Fujifilm ; un original introuvable, trop long à ouvrir, ou ouvert sans rien que la lecture sache
+-- lire (un HEIF de l'appareil, un fichier sans les données de Fujifilm), d'après la raison que le
+-- connecteur dit (Images.RAISONS_FOCUS) ; sans raison dite (connecteur muet, alarme de 5 s, erreur
+-- de la lecture), la phrase qui couvre les trois ; un connecteur absent ; pendant la lecture.
 Fil.FOCUS_AUTRE_MARQUE = "non lue (seulement les fichiers Fujifilm pour l'instant)"
-Fil.FOCUS_NON_LUE = "non lue (original introuvable, ou trop long à ouvrir)"
+Fil.FOCUS_NON_LUE = "non lue (original illisible, introuvable ou trop long à ouvrir)"
+Fil.FOCUS_INTROUVABLE = "non lue (original introuvable)"
+Fil.FOCUS_DELAI = "non lue (original trop long à ouvrir)"
+Fil.FOCUS_ILLISIBLE = "non lue (format pas encore lu, comme le HEIF, ou fichier sans les données de l'appareil)"
 Fil.FOCUS_SANS_CONNECTEUR = "non lue (connecteur introuvable : réinstaller Développeur)"
 Fil.FOCUS_EN_COURS = "lecture dans l'original…"
 
@@ -402,9 +407,9 @@ end
 -- « Titre : valeur » par valeur lue (une valeur absente n'a pas de ligne). `infos` : ce que
 -- Lightroom donne (Lightroom.infosFocus) ; `boitier` : la réponse de `mcp-developpeur --focus`
 -- (Images.lireFocus ; ses blocs sont des paires titre, valeur déjà en français), ajoutée au bout de
--- chaque bloc ; `etat` : 'lue', 'lecture' (en cours), 'autre_marque', 'non_lue' ou
--- 'sans_connecteur', d'où « Mise au point : non lue (…) » sans lecture. Les textes reçus perdent
--- leurs balises.
+-- chaque bloc ; `etat` : 'lue', 'lecture' (en cours), 'autre_marque', 'introuvable', 'delai',
+-- 'illisible', 'non_lue' ou 'sans_connecteur', d'où « Mise au point : non lue (…) » sans lecture.
+-- Les textes reçus perdent leurs balises.
 function Fil.texteFocus(infos, boitier, etat)
     infos = infos or {}
     local function propre(v)
@@ -470,7 +475,8 @@ function Fil.texteFocus(infos, boitier, etat)
         blocs[#blocs + 1] = "<EM>Mise au point</EM>\n" .. table.concat(focus, '\n')
     else
         local raison = ({ lecture = Fil.FOCUS_EN_COURS, autre_marque = Fil.FOCUS_AUTRE_MARQUE,
-            sans_connecteur = Fil.FOCUS_SANS_CONNECTEUR })[etat] or Fil.FOCUS_NON_LUE
+            sans_connecteur = Fil.FOCUS_SANS_CONNECTEUR, introuvable = Fil.FOCUS_INTROUVABLE, delai = Fil.FOCUS_DELAI,
+            illisible = Fil.FOCUS_ILLISIBLE })[etat] or Fil.FOCUS_NON_LUE
         blocs[#blocs + 1] = "<EM>Mise au point :</EM> " .. raison
     end
     return table.concat(blocs, '\n\n')

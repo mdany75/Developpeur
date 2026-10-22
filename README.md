@@ -108,6 +108,8 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   les traduit en français (Point unique, Déclenchement, Bonne, œil droit…). Une copie virtuelle
   montre l'original de la copie. Pour une autre marque : la photo sans cadre, Image et Prise de vue
   quand même, et « Mise au point : non lue (seulement les fichiers Fujifilm pour l'instant) ».
+  Quand la mise au point d'une photo Fujifilm ne se lit pas, la carte dit pourquoi : original
+  introuvable, trop long à ouvrir, ou format pas encore lu (comme un HEIF de l'appareil).
   L'onglet suit la photo active ; ce qu'il a lu est gardé tant que la photo ne change pas (un clic
   le relit si vous l'avez recadrée). Agrandir montre la photo et ses cadres en grand. La taille du
   cadre AF est une approximation, à comparer à l'écran de l'appareil (taille 6 du point unique :
@@ -732,7 +734,9 @@ Une fenêtre à part (Consommation…) pour suivre ce que la fenêtre Claude con
   Claude). ▲ ▼ font défiler une proposition plus longue que sa place. Si vous demandez à Claude
   d'appliquer sa proposition par un message (« Applique ta proposition »), ou qu'il retouche la
   photo autrement, la carte le dit (« Appliquée par Claude » ou « Remplacée par une retouche de
-  Claude ») et Accepter, Refuser et Ajuster… se grisent : rien ne se pose deux fois.
+  Claude ») et Accepter, Refuser et Ajuster… se grisent : rien ne se pose deux fois. De même quand
+  Claude harmonise une série qui comprend cette photo ; la proposition de la photo de référence,
+  qui ne change pas, attend toujours.
 - Pour que l'accord ne vienne que de vous : la case « l'accord se donne ici » du Gestionnaire de
   modules externes. Seul le bouton Accepter de la fenêtre de suivi compte alors, pour une seule
   écriture, dans les 10 minutes.
@@ -1064,8 +1068,8 @@ parle au module y passe avec le jeton de la liaison, comme le connecteur :
 - `--focus <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` : l'onglet Focus de la
   fenêtre Claude : les cadres de la mise au point d'un fichier Fujifilm (point ou zone AF en rouge,
   visages et éléments du sujet en coins jaunes) dessinés sur une vignette, puis ce que l'appareil
-  en dit (Image, Prise de vue, Mise au point, en français), une ligne JSON (code 1 si rien n'est
-  lu), sans Lightroom ni liaison ;
+  en dit (Image, Prise de vue, Mise au point, en français), une ligne JSON (rien de lu : la
+  raison, `delai`, `introuvable` ou `illisible`, et le code 1), sans Lightroom ni liaison ;
 - `--boitier <original>` : ce que l'appareil a rangé dans un fichier Fujifilm (RAF ou JPEG) : point
   de mise au point, intention de la prise de vue comme dans `view_photo`, mise au point en détail
   comme dans l'onglet Focus, et valeurs lues sous les noms d'exiftool, une ligne JSON (code 1 si

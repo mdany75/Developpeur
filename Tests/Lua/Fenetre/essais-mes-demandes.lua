@@ -705,6 +705,13 @@ essai('Nom et description proposés : ce qui précède « : », puis la suite ra
     local long = Conversation.preparerDemande(string.rep('mot ', 15) .. ': suite')
     egal('mot mot mot mot', long.nom)
     vrai(Texte.longueur(long.nom) <= Conversation.NOM_DEMANDE)
+    -- Un nom qui finit par « À » (C3 80) ou « π » (CF 80) garde ses octets : le « … » d'une
+    -- classe de Lua 5.1 ne lui retire plus le dernier (l'UTF-8 resterait coupé).
+    egal('Retouche ÉTÉ À', Conversation.preparerDemande('Retouche ÉTÉ À').nom)
+    egal('Cercle π', Conversation.preparerDemande('Cercle π : suite').nom)
+    egal('Éclairage doux', Conversation.preparerDemande('Éclairage doux… : suite').nom, '« … » retiré en entier')
+    egal('Nuit claire', Conversation.preparerDemande('Nuit claire !… : suite').nom)
+    egal('Plage à Cancún', Conversation.preparerDemande('Plage à Cancún. : suite').nom)
 end)
 
 essai('Fil : « ＋ Garder la demande » sur la ligne d\'actions d\'un tour qui a retouché et donné sa demande ; avec la note et la leçon ; jamais sans retouche ni sans la ligne', function()

@@ -410,6 +410,30 @@ public enum Focus {
         json["dessinee"] = .bool(dessinee)
         return .object(json)
     }
+
+    /// La ligne JSON de `mcp-developpeur --focus` : celle de `marquer`, sinon `{"lue": false,
+    /// "raison": …}` (code 1), pour que la carte Focus dise pourquoi rien n'est lu (`nonLue`).
+    public static func lire(original: URL, geometrie: JSONValue?, entree: URL, sortie: URL,
+                            lecteur: LecteurBoitier = LecteurBoitier()) -> JSONValue {
+        marquer(original: original, geometrie: geometrie, entree: entree, sortie: sortie, lecteur: lecteur)
+            ?? nonLue(original: original, lecteur: lecteur)
+    }
+
+    /// Pourquoi rien n'est lu, après la lecture de `lecteur` : « delai » (l'original ne s'est pas
+    /// ouvert à temps : il n'est plus touché), « introuvable » (pas de fichier à ce chemin), sinon
+    /// « illisible » (ouvert à temps, sans rien que `LectureBoitier` sache lire : un HEIF de
+    /// l'appareil, un fichier sans la MakerNote de Fujifilm).
+    public static func nonLue(original: URL, lecteur: LecteurBoitier) -> JSONValue {
+        let raison: String
+        if lecteur.bloque != nil {
+            raison = "delai"
+        } else if !FileManager.default.fileExists(atPath: original.path) {
+            raison = "introuvable"
+        } else {
+            raison = "illisible"
+        }
+        return ["lue": false, "raison": .string(raison)]
+    }
 }
 
 extension PreviewImages {

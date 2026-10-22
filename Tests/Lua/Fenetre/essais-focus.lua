@@ -77,6 +77,8 @@ Notation.proposition = function() return nil end
 
 local Fenetre = require 'Fenetre'
 local Moteur = require 'Moteur'
+local Conversation = require 'Conversation'
+local Stockage = require 'Stockage'
 -- La boucle de la fenêtre (toutes les 0,25 s tant qu'elle est ouverte) ne tourne pas ici : les
 -- essais lancent eux-mêmes les tâches (lancerTaches), et Fenetre.majPhoto quand la photo change.
 Fenetre.boucle = function() end
@@ -523,6 +525,195 @@ essai('Connecteur muet (rien de lu, code 1) ou absent : la carte le dit, l\'aper
     end)
     prefs.cheminConnecteur = connecteur
     assert(ok, erreur)
+    sansErreur()
+end)
+
+essai("Onglet Focus, une ligne d'image cliquée dans le fil : l'aperçu et Agrandir montrent cette image, pas la vignette Focus", function()
+    activer(2402)
+    repondre(REPONSE_2402)
+    Moteur.nouvelle()
+    local c = Moteur.courante
+    ouvrirFenetre(function(p, contenu)
+        lancerTaches()
+        S.cliquer(segment(contenu, 'Focus'))
+        lancerTaches()
+        local r0 = Fenetre.focus
+        egal(r0.chemin, p.imageApercu)
+        -- Claude regarde la photo : une image dans le fil (une vraie petite image JPEG).
+        Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = 'v1', nom = 'mcp__developpeur__view_photo',
+            entree = { photo_id = 2402 } } } })
+        Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'v1', textes = { '{}' },
+            images = { { donnees = 'x', type = 'image/jpeg' } }, erreur = false } } }, nil, function()
+            Fichiers.creerDossier(Stockage.dossier(c.id))
+            Fichiers.ecrire(Stockage.image(c.id, 'v1.jpg'), JPEG)
+            return 'v1.jpg'
+        end)
+        Fenetre.rafraichir()
+        lancerTaches()
+        egal(r0.chemin, p.imageApercu, "l'onglet Focus garde sa vignette")
+        -- Un clic sur la ligne de l'image : l'aperçu la montre, l'onglet reste Focus.
+        local ligne
+        for i = 1, Fenetre.T.lignes do
+            local l = Fenetre.lignes[Fenetre.premiere + i - 1]
+            if l and l.image == 'v1.jpg' then
+                ligne = ligne or i
+            end
+        end
+        vrai(ligne, "la ligne de l'image dans le fil")
+        Fenetre.cliquerLigne(ligne)
+        lancerTaches()
+        egal('1 sur 1 · view_photo', p.legendeApercu, "l'image cliquée")
+        egal('focus', p.onglet)
+        -- Agrandir : l'image cliquée, pas la vignette Focus.
+        local dialogues = #S.dialogues
+        Fenetre.agrandir()
+        lancerTaches()
+        egal(dialogues + 1, #S.dialogues, 'Agrandir')
+        local grande = S.dialogues[#S.dialogues].contents.args.value
+        contient(grande, Stockage.dossier(c.id), "l'image cliquée en grand")
+        absent(grande, r0.dossier, 'pas la vignette Focus')
+        -- Un autre onglet, puis Focus : l'aperçu et Agrandir reviennent à la vignette Focus.
+        S.cliquer(segment(contenu, 'Note'))
+        S.cliquer(segment(contenu, 'Focus'))
+        lancerTaches()
+        egal(r0.chemin, p.imageApercu)
+        Fenetre.agrandir()
+        lancerTaches()
+        contient(S.dialogues[#S.dialogues].contents.args.value, r0.dossier, 'la vignette Focus en grand')
+    end)
+    sansErreur()
+end)
+
+essai("Deux lectures croisées : celle d'une photo quittée finit après celle de la photo active ; le résultat de la photo active reste, rien n'est relu", function()
+    activer(2402)
+    repondre(REPONSE_2402)
+    Fichiers.supprimer(RECUS)
+    Moteur.nouvelle()
+    -- La tâche de chaque lecture, par photo, pour les finir dans l'ordre voulu.
+    local lire, taches = Fenetre.lireFocus, {}
+    Fenetre.lireFocus = function(active, verifier)
+        local avant = #S.taches
+        lire(active, verifier)
+        if #S.taches > avant then
+            taches[active.id] = #S.taches
+        end
+    end
+    local ok, erreur = pcall(ouvrirFenetre, function(p, contenu)
+        lancerTaches()
+        local n = commandesFocus()
+        -- La lecture de A (DSCF2402) part, lente ; Dany passe à B (DSCF2403), lu à son tour.
+        S.cliquer(segment(contenu, 'Focus'))
+        local tacheA = taches[2402]
+        vrai(tacheA, 'la lecture de A')
+        activer(2403)
+        Fenetre.majPhoto()
+        local tacheB = taches[2403]
+        vrai(tacheB and tacheB > tacheA, 'la lecture de B')
+        -- B finit d'abord : son résultat se montre.
+        local t = S.taches[tacheB]
+        S.taches[tacheB] = function() end
+        t()
+        local rB = Fenetre.focus
+        egal(2403, rB.id)
+        egal(rB.chemin, p.imageApercu)
+        egal('Focus · DSCF2403.RAF', p.focusTitre)
+        -- Puis A : son résultat ne sert plus ; B reste montré, son dossier aussi.
+        lancerTaches()
+        egal(rB, Fenetre.focus, 'le résultat de la photo active reste')
+        vrai(Fichiers.existe(rB.dossier), 'le dossier de la photo active reste')
+        egal(rB.chemin, p.imageApercu, "l'aperçu de B")
+        egal('Focus · DSCF2403.RAF', p.focusTitre)
+        egal(n + 2, commandesFocus(), 'deux lectures, aucune de plus')
+        local parOriginal = {}
+        for _, x in ipairs(recus()) do
+            parOriginal[x.original] = (parOriginal[x.original] or 0) + 1
+        end
+        egal(1, parOriginal['/Volumes/Photos/Eloise/DSCF2403.RAF'], 'B lu une seule fois')
+        egal(1, parOriginal['/Volumes/Photos/Eloise/DSCF2402.RAF'], 'A lu une fois')
+        Fenetre.rafraichirApercu()
+        Fenetre.rafraichirApercu()
+        lancerTaches()
+        egal(n + 2, commandesFocus(), 'les rafraîchissements ne relisent pas')
+    end)
+    Fenetre.lireFocus = lire
+    assert(ok, erreur)
+    sansErreur()
+end)
+
+essai("Une lecture en erreur : la carte dit « non lue », les rafraîchissements ne la relancent pas ; un vrai clic sur Focus, si", function()
+    activer(2402)
+    repondre(REPONSE_2402)
+    Moteur.nouvelle()
+    local preparer, appels = Fenetre.preparerFocus, 0
+    Fenetre.preparerFocus = function(...)
+        appels = appels + 1
+        return preparer(...)
+    end
+    local infos = Lightroom.infosFocus
+    Lightroom.infosFocus = function() error('lecture cassée') end
+    local ok, erreur = pcall(ouvrirFenetre, function(p, contenu)
+        lancerTaches()
+        S.cliquer(segment(contenu, 'Focus'))
+        lancerTaches()
+        egal(1, appels, 'une lecture')
+        egal(1, #journal, "l'erreur au journal")
+        contient(journal[1], 'lecture cassée')
+        journal = {}
+        egal('Focus · DSCF2402.RAF (Essai)', p.focusTitre, 'le nom et la copie de la légende')
+        contient((p.focusTexte:gsub('\n', ' ')), '<EM>Mise au point :</EM> ' .. Fil.FOCUS_NON_LUE, 'la carte dit « non lue »')
+        absent(p.focusTexte, Fil.FOCUS_EN_COURS)
+        egal(Fenetre.imageVide(), p.imageApercu)
+        egal(false, p.aImage)
+        -- Les rafraîchissements (fréquents pendant que Claude travaille) ne relancent rien.
+        for _ = 1, 3 do
+            Fenetre.rafraichir()
+            Fenetre.rafraichirApercu()
+            lancerTaches()
+        end
+        egal(1, appels, 'aucune lecture de plus')
+        -- Un vrai clic sur le segment relit ; la lecture réussit.
+        Lightroom.infosFocus = infos
+        S.cliquer(segment(contenu, 'Note'))
+        S.cliquer(segment(contenu, 'Focus'))
+        lancerTaches()
+        egal(2, appels, 'le clic relit')
+        contient(p.focusTexte, 'Modèle : X-H2S')
+        egal(Fenetre.focus.chemin, p.imageApercu)
+    end)
+    Lightroom.infosFocus = infos
+    Fenetre.preparerFocus = preparer
+    assert(ok, erreur)
+    sansErreur()
+end)
+
+essai("Rien de lu : la carte dit la raison du connecteur (introuvable, trop long à ouvrir, format pas lu comme un HEIF) ; sans raison, la phrase qui couvre les trois", function()
+    egal("non lue (original illisible, introuvable ou trop long à ouvrir)", Fil.FOCUS_NON_LUE)
+    contient(Fil.FOCUS_ILLISIBLE, 'HEIF')
+    for _, cas in ipairs({ { 'introuvable', Fil.FOCUS_INTROUVABLE }, { 'delai', Fil.FOCUS_DELAI }, { 'illisible', Fil.FOCUS_ILLISIBLE },
+        { 'autre', Fil.FOCUS_NON_LUE } }) do
+        activer(2402)
+        repondre('{"lue": false, "raison": "' .. cas[1] .. '"}')
+        Moteur.nouvelle()
+        ouvrirFenetre(function(p, contenu)
+            lancerTaches()
+            S.cliquer(segment(contenu, 'Focus'))
+            lancerTaches()
+            contient((p.focusTexte:gsub('\n', ' ')), '<EM>Mise au point :</EM> ' .. cas[2], cas[1])
+            contient(p.focusTexte, 'Marque : FUJIFILM', 'Lightroom quand même')
+            absent(p.focusTexte, 'Stabilisation', 'rien du boîtier')
+            egal(true, p.aImage, 'la vignette sans cadre')
+        end)
+    end
+    -- Images.lireFocus rend la raison en troisième, seulement une raison connue.
+    local source = S.home .. '/raison.jpg'
+    Fichiers.ecrire(source, JPEG)
+    repondre('{"lue": false, "raison": "illisible"}')
+    local json, marquee, raison = Images.lireFocus(FAUX, '/Volumes/Photos/DSCF0001.HIF', {}, source)
+    egal(nil, json)
+    egal(nil, marquee)
+    egal('illisible', raison)
+    repondre('{"lue": false, "raison": "autre"}')
+    egal(nil, select(3, Images.lireFocus(FAUX, '/Volumes/Photos/DSCF0001.HIF', {}, source)), 'raison inconnue')
     sansErreur()
 end)
 

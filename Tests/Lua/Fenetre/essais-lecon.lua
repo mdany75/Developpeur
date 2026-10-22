@@ -907,6 +907,75 @@ essai("Proposition dépassée : d'autres réglages la disent remplacée ; une au
     egal(Fenetre.phraseClose(p1), Fenetre.phraseClose(relue))
 end)
 
+essai("Proposition dépassée : une proposition sans photo connue (d'avant le correctif) attend encore après une étape, sur quelque photo que ce soit", function()
+    local c = Conversation.nouvelle(1000)
+    -- Une proposition enregistrée avant le correctif 1.3.2 : sans champ photo.
+    appelOutil(c, 'p0', 'preview_settings', { settings = { Exposure2012 = 0.3 } }, reponseProposition(4961, 'DSCF4961.RAF', EXPOSITION))
+    local ancienne = derniereProposition(c)
+    ancienne.photo = nil
+    ancienne = Json.decode(Json.encode(ancienne))
+    c.elements[#c.elements] = ancienne
+    egal(nil, ancienne.photo)
+    -- Claude retouche une autre photo : la proposition (sur la photo active d'alors) attend encore.
+    appelOutil(c, 'a0', 'apply_settings', { photo_id = 4962, settings = { Exposure2012 = 0.5 }, step_name = 'autre photo' },
+        reponseEcriture('autre photo', 4962, 'DSCF4962.RAF', { { cle = 'Exposure2012', avant = 0, apres = 0.5 } }, 7100))
+    egal('enAttente', ancienne.etat, 'une étape sur une autre photo ne la clôt pas')
+    egal(nil, ancienne.etapeClaude)
+    egal(ancienne, Conversation.propositionEnAttente(c), 'Accepter reste offert')
+    -- Même les mêmes réglages sur une photo : sa photo n'est pas connue, elle attend.
+    appelOutil(c, 'a1', 'apply_settings', { photo_id = 4961, settings = { Exposure2012 = 0.3 }, step_name = 'mêmes réglages' },
+        reponseEcriture('mêmes réglages', 4961, 'DSCF4961.RAF', EXPOSITION, 7101))
+    egal('enAttente', ancienne.etat, 'photo inconnue : comme avant le correctif')
+    -- Une réponse qui ne dit pas la photo de la proposition (sans photo_id dans l'entrée) : de même.
+    appelOutil(c, 'p1', 'preview_settings', { settings = { Exposure2012 = 0.3 } }, '{ "texte": "sans photo dite" }')
+    local sansPhoto = derniereProposition(c)
+    egal(nil, sansPhoto.photo)
+    appelOutil(c, 'a2', 'apply_settings', { photo_id = 4963, settings = { Exposure2012 = 0.3 }, step_name = 'troisième' },
+        reponseEcriture('troisième', 4963, 'DSCF4963.RAF', EXPOSITION, 7102))
+    egal('enAttente', sansPhoto.etat)
+end)
+
+essai("Proposition dépassée : match_series clôt la proposition d'une photo qu'il harmonise ; ni celle de la référence, ni un plan", function()
+    local c = Conversation.nouvelle(1000)
+    local REFERENCE = { id = 4961, fichier = 'DSCF4961.RAF' }
+    appelOutil(c, 'p1', 'preview_settings', { photo_id = 4962, settings = { Exposure2012 = 0.3 } },
+        reponseProposition(4962, 'DSCF4962.RAF', EXPOSITION))
+    local surSerie = derniereProposition(c)
+    appelOutil(c, 'p2', 'preview_settings', { photo_id = 4961, settings = { Exposure2012 = 0.3 } },
+        reponseProposition(4961, 'DSCF4961.RAF', EXPOSITION))
+    local surReference = derniereProposition(c)
+    -- Un plan (sans confirm) : rien d'écrit, toutes attendent.
+    appelOutil(c, 's0', 'match_series', { reference_id = 4961, photo_ids = { 4962 } }, Json.encode({ reference = REFERENCE,
+        photos = { { id = 4962, fichier = 'DSCF4962.RAF', correction_proposee = { Exposure2012 = 0.2 } } }, rien_n_est_applique = 'Plan seulement.' }))
+    egal('enAttente', surSerie.etat, 'un plan')
+    egal('enAttente', surReference.etat)
+    -- Une photo déjà proche de la référence : rien d'écrit.
+    appelOutil(c, 's1', 'match_series', { reference_id = 4961, photo_ids = { 4962 }, confirm = true }, Json.encode({ reference = REFERENCE,
+        photos = { { id = 4962, fichier = 'DSCF4962.RAF', correction = 'aucune : déjà proche de la référence' } } }))
+    egal('enAttente', surSerie.etat, 'rien à corriger')
+    -- Harmonisée par la mesure (deux passes, sans etape_id) : la proposition de la photo est
+    -- remplacée ; celle de la référence, que match_series ne touche pas, attend.
+    appelOutil(c, 's2', 'match_series', { reference_id = 4961, photo_ids = { 4962 }, confirm = true, step_name = 'harmonisation' },
+        Json.encode({ reference = REFERENCE, photos = { { id = 4962, fichier = 'DSCF4962.RAF',
+            correction_proposee = { Exposure2012 = 0.2 }, etapes = { 'Claude · harmonisation : passe 1', 'Claude · harmonisation : passe 2' } } } }))
+    egal('remplacee', surSerie.etat, "harmonisée : Accepter poserait l'ancienne proposition par-dessus")
+    egal('harmonisation : passe 1', surSerie.etapeClaude)
+    egal('enAttente', surReference.etat, 'la référence ne change pas')
+    egal(surReference, Conversation.propositionEnAttente(c))
+    -- Par la prise de vue (by = exif) : `etape`.
+    appelOutil(c, 'p3', 'preview_settings', { photo_id = 4963, settings = { Exposure2012 = 0.3 } },
+        reponseProposition(4963, 'DSCF4963.RAF', EXPOSITION))
+    local exif = derniereProposition(c)
+    appelOutil(c, 's3', 'match_series', { reference_id = 4961, photo_ids = { 4963 }, by = 'exif', confirm = true },
+        Json.encode({ reference = REFERENCE, photos = { { id = 4963, fichier = 'DSCF4963.RAF', etape = 'Claude · expositions reproduites' } } }))
+    egal('remplacee', exif.etat)
+    egal('expositions reproduites', exif.etapeClaude)
+    egal("Remplacée par une retouche de Claude (étape « expositions reproduites ») : elle n'attend plus votre accord.", Fenetre.phraseClose(exif))
+    -- Une réponse en erreur : rien.
+    appelOutil(c, 's4', 'match_series', { reference_id = 4962, photo_ids = { 4961 }, confirm = true }, 'Aucune photo à harmoniser.', true)
+    egal('enAttente', surReference.etat, 'une erreur')
+end)
+
 essai("Fenêtre : une leçon qui arrive remplace la leçon choisie avant ; d'une autre photo que l'active, elle se montre aussi", function()
     photoActive(53636309, 'DSCF4961.RAF')
     Moteur.charger()

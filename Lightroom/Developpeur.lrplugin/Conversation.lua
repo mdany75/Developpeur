@@ -973,6 +973,21 @@ Conversation.DESCRIPTION_DEMANDE = 60
 -- Les mots du nom proposé d'une demande sans « : ».
 Conversation.MOTS_NOM_DEMANDE = 4
 
+-- Le texte sans la ponctuation de sa fin (« , ; : . ! ? », espaces, « … »). « … » se retire en
+-- entier, à part : dans une classe de Lua 5.1, chacun de ses trois octets compterait seul, et un
+-- nom qui finit par « À » (C3 80) ou « π » (CF 80) perdrait son dernier octet.
+local function sansPonctuationFinale(t)
+    local avant
+    repeat
+        avant = t
+        t = t:gsub('[,;:.!?%s]+$', '')
+        while t:sub(-3) == '…' do
+            t = t:sub(1, -4)
+        end
+    until t == avant
+    return t
+end
+
 -- La fenêtre Ajouter… pré-remplie d'une demande à garder : { nom, description, texte }. Le nom est
 -- ce qui précède « : » (« Retouche ce portrait en intérieur »), sinon ses premiers mots ; la
 -- description, la suite, raccourcie (« simulation PROVIA, balance plus neutre, … »). Dany les change
@@ -995,7 +1010,7 @@ function Conversation.preparerDemande(demande)
         end
         nom, suite = table.concat(premiers, ' '), table.concat(reste, ' ')
     end
-    nom = debutEnMots(mots((nom:gsub('[,;:.!?…%s]+$', ''))), Conversation.NOM_DEMANDE)
+    nom = debutEnMots(mots(sansPonctuationFinale(nom)), Conversation.NOM_DEMANDE)
     local description = debutEnMots(mots((tostring(suite or ''):gsub('%s+', ' '))), Conversation.DESCRIPTION_DEMANDE)
     return { nom = nom, description = (description:gsub('%.$', '')), texte = texte }
 end
@@ -1448,7 +1463,7 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                         e.etapes = Conversation.etapesLues(r.textes)
                         e.changements = Conversation.changementsLus(r.textes) or {}
                         -- Une proposition encore en attente sur ces photos n'attend plus (1.3.2).
-                        Conversation.clorePropositions(c, i)
+                        Conversation.clorePropositions(c, i, r.textes)
                     elseif e.outil == 'undo_last' then
                         e.annule = Conversation.annulationsLues(r.textes)
                     elseif e.outil == 'revert_to_original' then
@@ -1638,15 +1653,43 @@ local function memesReglages(prop, changements)
     return lus > 0
 end
 
--- L'élément i (un outil dont la réponse vient d'arriver) clôt les propositions en attente arrivées
--- avant lui sur les photos de ses étapes. Rend leur nombre.
-function Conversation.clorePropositions(c, i)
+-- Les photos que match_series a harmonisées, lues dans sa réponse (`textes`) : sa réponse ne porte
+-- pas d'etape_id (SANS_REPERE_EN_COURS), mais chaque élément de `photos` écrit porte ses étapes,
+-- `etapes` (par la mesure) ou `etape` (by = exif) ; un plan (sans confirm), une photo déjà proche
+-- de la référence et la référence elle-même n'en ont pas. Rend { photo, nom, changements = {} }
+-- (les réglages relatifs de match_series ne se comparent pas à ceux d'une proposition).
+function Conversation.photosHarmonisees(textes)
+    local lues = {}
+    for _, texte in ipairs(textes or {}) do
+        local json = Conversation.teteJson(texte)
+        for _, x in ipairs(type(json) == 'table' and type(json.photos) == 'table' and json.photos or {}) do
+            if type(x) == 'table' then
+                local nom = chaine(x.etape) or (type(x.etapes) == 'table' and chaine(x.etapes[1])) or nil
+                local photo = tonumber(x.id) or chaine(x.id)
+                if nom and photo ~= nil then
+                    lues[#lues + 1] = { photo = photo, nom = nom, changements = {} }
+                end
+            end
+        end
+    end
+    return lues
+end
+
+-- L'élément i (un outil dont la réponse vient d'arriver, `textes`) clôt les propositions en attente
+-- arrivées avant lui sur les photos de ses étapes (celles que match_series a harmonisées :
+-- Conversation.photosHarmonisees). Une proposition sans photo connue (enregistrée avant le
+-- correctif 1.3.2, ou dont la réponse n'a pas dit sa photo) attend, comme avant le correctif :
+-- une étape sur une autre photo la clorait à tort. Rend leur nombre.
+function Conversation.clorePropositions(c, i, textes)
     local e = c and c.elements[i]
     if not (e and e.genre == 'outil' and e.etat ~= 'erreur' and Conversation.OUTILS_ETAPES[e.outil]
         and not Conversation.CLASSEMENTS[e.outil]) then
         return 0
     end
     local etapes = e.etapes or {}
+    if e.outil == 'match_series' then
+        etapes = Conversation.photosHarmonisees(textes)
+    end
     if #etapes == 0 then
         return 0
     end
@@ -1663,8 +1706,8 @@ function Conversation.clorePropositions(c, i)
     local closes = 0
     for k = i - 1, 1, -1 do
         local p = c.elements[k]
-        if p.genre == 'proposition' and p.etat == 'enAttente' then
-            local etape = parPhoto[Conversation.clePhoto(p.photo == nil and etapes[1].photo or p.photo)]
+        if p.genre == 'proposition' and p.etat == 'enAttente' and p.photo ~= nil then
+            local etape = parPhoto[Conversation.clePhoto(p.photo)]
             if etape then
                 p.etat = memesReglages(p, etape.changements) and 'appliquee' or 'remplacee'
                 local nom = Conversation.nomEtape(etape.nom or e.etape)

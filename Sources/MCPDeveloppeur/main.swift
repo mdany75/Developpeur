@@ -236,11 +236,13 @@ case "--marquer-af":
     print(line: JSONCoding.line(["x": .number(point.x), "y": .number(point.y), "avertissement": .bool(point.avertissement)]))
 case "--focus":
     // L'onglet Focus de la fenêtre Claude (Fenetre.lua) : les cadres de la mise au point lus dans
-    // l'original, dessinés sur la vignette que Lightroom a rendue, et ce que l'appareil en dit.
+    // l'original, dessinés sur la vignette que Lightroom a rendue, et ce que l'appareil en dit ; rien
+    // de lu, la raison (`{"lue": false, "raison": …}`) et le code 1.
     guard arguments.count == 5 else { usage(); exit(2) }
-    guard let focus = Focus.marquer(original: URL(fileURLWithPath: arguments[1]), geometrie: try? JSONCoding.parse(arguments[2]),
-                                    entree: URL(fileURLWithPath: arguments[3]), sortie: URL(fileURLWithPath: arguments[4])) else { exit(1) }
+    let focus = Focus.lire(original: URL(fileURLWithPath: arguments[1]), geometrie: try? JSONCoding.parse(arguments[2]),
+                           entree: URL(fileURLWithPath: arguments[3]), sortie: URL(fileURLWithPath: arguments[4]))
     print(line: JSONCoding.line(focus))
+    if focus["lue"]?.bool != true { exit(1) }
 case "--ecran":
     // Le voyant Écran de la fenêtre Claude (Lightroom.etatEcran) : une seule ligne JSON, chemins des
     // profils et texte de la boîte compris ; sans écran lu, {"lu": false} (ECRAN_AUCUN du module).

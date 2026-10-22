@@ -15,7 +15,9 @@
   a rangé est lu dans l'original par le connecteur, sur ce Mac, en 5 secondes au plus ; une copie
   virtuelle montre l'original de la copie. Pour une autre marque : la photo sans cadre, Image et
   Prise de vue quand même, et « Mise au point : non lue (seulement les fichiers Fujifilm pour
-  l'instant) ». La fenêtre ne passe jamais d'elle-même à l'onglet Focus : un clic sur son segment
+  l'instant) ». Quand la mise au point d'une photo Fujifilm ne se lit pas, la carte dit pourquoi :
+  original introuvable, trop long à ouvrir, ou format pas encore lu (comme un HEIF de l'appareil).
+  La fenêtre ne passe jamais d'elle-même à l'onglet Focus : un clic sur son segment
   l'ouvre, et il suit ensuite la photo active. L'aperçu des autres onglets, avec son carré vert,
   ne change pas. La taille du cadre AF est une approximation, à comparer à l'écran de l'appareil.
 - `mcp-developpeur --focus` (ce que la fenêtre lance pour l'onglet Focus) ; `--boitier` donne
@@ -57,7 +59,10 @@
   Proposition le dit (« Appliquée par Claude », ou « Remplacée par une retouche de Claude » s'il a
   posé autre chose) : Accepter, Refuser et Ajuster… sont grisés, et un clic de trop ne pose plus la
   retouche une seconde fois. La leçon de la photo qui suit s'ouvre alors d'elle-même dans l'onglet
-  Leçon, comme après toute retouche.
+  Leçon, comme après toute retouche. De même quand Claude harmonise une série sur cette photo :
+  sa proposition est remplacée ; celle de la photo de référence, qui ne change pas, attend
+  toujours. Une proposition d'une conversation enregistrée avant ce correctif, dont la photo n'est
+  pas connue, attend votre accord comme avant.
 
 ## 1.3.1 — 2026-10-22
 

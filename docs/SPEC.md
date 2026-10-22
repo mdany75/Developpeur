@@ -158,7 +158,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `masques` | `photo?`, `action` (`lister`, `masquer`, `afficher`, `retirer`, `dupliquer`, `recalculer`, `affiner`, `retirer_vides`), `masque?`, `inverser?`, `nom?`, `contour?`, `decalage?`, `etape`, `raison?`, `confirme` | `lister` : `photo`, `masques` ; sinon `resultats` comme `appliquer`, et `masques` (la liste après l'écriture) ; voir Masques : pistes de la 2.1 |
 | `progression` | `id`, `titre?`, `fait?`, `total?`, `message?`, `fin?` | `annulee` (croix de la barre de Lightroom), `fermee` à la fin |
 | `variantes` | `photo?`, `action` (`lister`, `choisir`, `effacer`), `nom?`, `noms?`, `effacer_autres?`, `etape`, `raison?`, `confirme` | `lister` : `variantes` (nom, réglages touchés, date) ; `choisir` : `etape`, `instantane`, `changements`, `effaces` ; `effacer` : `effaces` ; voir Variantes |
-| `notation` | `action` (`proposer`, `lire`) ; `proposer` : `propositions` (`photo`, `note` de 0 à 4, `drapeau` `aucun` ou `rejetee`, `criteres` `{impact, qualites, plancher, finition?}`, `plafond?`, `raison`, `a_verifier`), `passe?`, `poser?` ; `lire` : `photos?` | `proposer` : `propositions` (`photo`, `fichier`, `note_avant`, `drapeau_avant`, `etat`, toujours `a_verifier` depuis la 1.1.1), `refusees` (`photo`, `raison`) ; avec `poser`, `posees` (`photo`, `etat`, `note`, `drapeau`, `erreur`, `remarques`) et `erreur_pose?` ; `lire` : `propositions`, `perdues?`. Sans `poser`, rien n'est écrit dans le catalogue (voir Notation). 1.3 : `remettre` (`photo`, `proposition` ou null ; la recette seulement, jamais un outil) remet la proposition lue avant une étape de la recette, ou la retire, sans rien écrire au catalogue |
+| `notation` | `action` (`proposer`, `lire`, `remettre`) ; `proposer` : `propositions` (`photo`, `note` de 0 à 5 (0 à 4 jusqu'à la 1.3.1), `drapeau` `aucun` ou `rejetee`, `criteres` `{impact, qualites, plancher, finition?}`, `plafond?`, `raison`, `a_verifier`), `passe?`, `poser?` ; `lire` : `photos?` | `proposer` : `propositions` (`photo`, `fichier`, `note_avant`, `drapeau_avant`, `etat`, toujours `a_verifier` depuis la 1.1.1), `refusees` (`photo`, `raison`) ; avec `poser`, `posees` (`photo`, `etat`, `note`, `drapeau`, `erreur`, `remarques`) et `erreur_pose?` ; `lire` : `propositions`, `perdues?`. Sans `poser`, rien n'est écrit dans le catalogue (voir Notation). 1.3 : `remettre` (`photo`, `proposition` ou null ; la recette seulement, jamais un outil) remet la proposition lue avant une étape de la recette, ou la retire, sans rien écrire au catalogue |
 | `lecon` (1.3) | `action` (`garder`, `lire`, `retirer`) ; `garder` : `photo?`, `lecon` = `{points, indices?}` (trois points, un par axe : `lumiere`, `couleur`, `composition`), `essai_recette?` (1.3.1, la recette seulement) ; `lire` : `photos?` ; `retirer` : `photo` ou `photos` | `garder` : `{photo, original, fichier, rangee, remplacee, mois, prise_le, sans_date, remarque?}`, ou pour une photo de « Développeur › Essais » sans `essai_recette` (1.3.1) `{photo, fichier, rangee = false, remplacee = false, motif = essai, remarque}`, jamais une erreur ; avec `essai_recette`, sous l'entrée de la photo d'essai (`original` = elle) ; `lire` : `{lecons, perdues?}` (une photo disparue ou d'un autre uuid perd sa leçon) ; `retirer` : `{retirees}`. Rien dans le catalogue, pas d'arrêt par la pause, jamais rejouée (voir Leçon de la photo) |
 | `carnet` (1.3) | `action` (`constater`, `lire`, `retirer`) ; `constater` : `photo`, `vue` = `{cherches, defauts [{code, mesure?, texte?}]}` ou `angle` = `{inclinaison, code, source?}`, `vocabulaire`, `essai_recette?` ; `lire` : `resume?` ; `retirer` : `photos` | `constater` : `{note = true, constat, photo, original, fichier, mois, prise_le, sans_date, remplacee, remarque?}` ou `{note = false, motif (preference, essai, etapes, geometrie), raison, photo}` ; `lire` : `{catalogue, nombre, photos, resume?}` (leçons comprises) ; `retirer` : `{retirees, absentes?}` (un original ou une copie). Rien dans le catalogue, pas d'arrêt par la pause, jamais rejouée (voir Carnet de progrès) |
 | `etapes` (1.3) | `photo?` | `{photo, etapes [{id, nom, en_memoire, avant, apres, etat, raison}]}` : les étapes de la mémoire, puis celles qui ne restent que sur le disque ; lecture seule, rejouée (voir Pourquoi ? : l'avant/après des étapes) |
@@ -1221,18 +1221,27 @@ lumière et couleur »), puis `photo_lesson`. La carte offrait encore Accepter (
 Ajuster… et Je le fais : Accepter aurait fait poser la proposition une seconde fois ; et la fenêtre
 ne passait pas à l'onglet Leçon, qui ne s'ouvre pas tant qu'une proposition attend.
 
-Règle (`Conversation.clorePropositions`, appelée à la réponse de chaque outil d'étape) : dès qu'un
-outil d'étape qui change l'image (`Conversation.OUTILS_ETAPES`, sauf les classements
-`set_metadata` et `manage_collections`, qui ne la changent pas ; jamais en `preview`, jamais en
-erreur) écrit une étape (un `etape_id` dans sa réponse) sur la photo d'une proposition encore en
-attente arrivée avant lui, cette proposition n'attend plus. Sa photo : le `photo_id` de l'entrée de
-`preview_settings`, sinon celle de sa réponse (`Conversation.photoLue`) ; inconnue, n'importe quelle
-photo de l'étape la clôt (le plus sûr : un Accepter de trop poserait des réglages sur une photo
-déjà retouchée). Elle devient `appliquee` (« Appliquée par Claude ») si la première étape de sa photo
-pose chacun des réglages lus de la proposition (clé et valeur d'après, en texte, telles que les deux
-réponses du connecteur les disent ; il en faut au moins un de lu), sinon `remplacee` (« Remplacée
-par une retouche de Claude ») : une partie des réglages, d'autres valeurs, un autre outil, ou une
-proposition dont la réponse n'a pas dit ses réglages. Le nom de l'étape est gardé (`etapeClaude`).
+Règle (`Conversation.clorePropositions`, appelée à la réponse de chaque outil d'étape, avec ses
+textes) : dès qu'un outil d'étape qui change l'image (`Conversation.OUTILS_ETAPES`, sauf les
+classements `set_metadata` et `manage_collections`, qui ne la changent pas ; jamais en `preview`,
+jamais en erreur) écrit une étape (un `etape_id` dans sa réponse) sur la photo d'une proposition
+encore en attente arrivée avant lui, cette proposition n'attend plus. `match_series` ne donne pas
+d'`etape_id` (une série ne garde pas d'avant/après) : ses photos écrites se lisent dans `photos`
+de sa réponse, celles qui portent `etapes` (par la mesure) ou `etape` (`by = exif`)
+(`Conversation.photosHarmonisees`) ; un plan sans `confirm`, une photo déjà proche de la
+référence et la référence elle-même, que `match_series` ne touche pas, n'en ont pas : leurs
+propositions attendent. Sa photo : le `photo_id` de l'entrée de `preview_settings`, sinon celle de
+sa réponse (`Conversation.photoLue`) ; inconnue (une proposition enregistrée avant le correctif,
+sans champ `photo`, ou une réponse qui ne l'a pas dite), la proposition attend, comme avant le
+correctif : une étape sur une autre photo la clorait à tort (relu le 22 octobre 2026 : « Remplacée »
+sur la photo A après un `apply_settings` sur B, A inchangée). Elle devient `appliquee`
+(« Appliquée par Claude ») si la première étape de sa photo pose chacun des réglages lus de la
+proposition (clé et valeur d'après, en texte, telles que les deux réponses du connecteur les
+disent ; il en faut au moins un de lu), sinon `remplacee` (« Remplacée par une retouche de
+Claude ») : une partie des réglages, d'autres valeurs, un autre outil, `match_series` (ses
+réglages relatifs ne se comparent pas), ou une proposition dont la réponse n'a pas dit ses
+réglages. Le nom de l'étape est gardé (`etapeClaude` ; pour `match_series`, sa première étape sur
+la photo, « harmonisation : passe 1 »).
 `Conversation.propositionEnAttente` ne la rend plus : Accepter, Refuser et Ajuster… sont grisés
 (`enAttente` faux), `Moteur.repondre` et `Moteur.ajuster` ne font rien, et la leçon qui suit
 s'ouvre (`Fenetre.rafraichirLecon`). La carte montre la dernière proposition du fil si elle est
@@ -1242,8 +1251,9 @@ accord. »), puis sa raison et ses réglages, sans la phrase de l'aperçu d'un r
 change avant Accepter. »). Le fil dit « Proposition appliquée par Claude » ou « Proposition
 remplacée par une retouche de Claude ». Une proposition acceptée, refusée, ajustée ou faite par
 Dany (Je le fais) garde son chemin ; une conversation enregistrée avant le correctif garde ses
-propositions en attente (la règle ne joue qu'à l'arrivée d'une réponse). Essais :
-`Tests/Lua/Fenetre/essais-lecon.lua` (« Proposition dépassée… »).
+propositions en attente (la règle ne joue qu'à l'arrivée d'une réponse, et leur photo n'est pas
+connue). Essais : `Tests/Lua/Fenetre/essais-lecon.lua` (« Proposition dépassée… », dont une
+proposition sans photo connue et `match_series`).
 
 ### Carte Note (1.1, revue en 1.1.1)
 
@@ -1385,7 +1395,9 @@ la ligne, à droite, dans une rangée poussée par `margin_left` (D6), comme « 
 masquée garde sa place, et le poser après les deux autres boutons demanderait une variante par
 place (quatre boutons par ligne au lieu d'un). Son clic (`Fenetre.garderDemande`) ouvre Ajouter…
 pré-rempli : le nom proposé est ce qui précède « : » (40 caractères au plus), sinon les quatre
-premiers mots ; la description, la suite, coupée aux mots (60 caractères au plus,
+premiers mots, sans la ponctuation de sa fin (« … » retiré en entier, jamais dans une classe de
+Lua 5.1, qui en prendrait chaque octet à part : « Retouche ÉTÉ À » perdait l'octet 0x80 de « À »,
+relu le 22 octobre 2026) ; la description, la suite, coupée aux mots (60 caractères au plus,
 `Conversation.preparerDemande`) ; le texte entier. La ligne reste dans le fil : Dany la lit.
 
 Essais : `Tests/Lua/Fenetre/essais-mes-demandes.lua`.
@@ -3901,8 +3913,11 @@ moins) ; un cadre de moins de 12 pixels grandit autour de son centre. À juger �
 vignette marquée écrite dans `sortie`, et une ligne JSON : `lue`, `image`, `prise_de_vue` et
 `mise_au_point` (paires titre, valeur, en français), `point_af` (x, y dans l'image affichée,
 `dans_le_cadre`), `cadres` (`point_af`, `sujets` : ceux dessinés) et `dessinee`. Une géométrie ou
-une vignette illisible donne les valeurs sans dessin ; rien de lu (autre marque, original
-introuvable ou trop long à ouvrir) : code 1.
+une vignette illisible donne les valeurs sans dessin. Rien de lu (`Focus.lire`, `Focus.nonLue`) :
+la ligne `{"lue": false, "raison": …}` et le code 1, avec la raison `delai` (l'original ne s'est
+pas ouvert dans les 2 s : `LecteurBoitier.bloque`), `introuvable` (pas de fichier à ce chemin) ou
+`illisible` (ouvert à temps, sans rien que `LectureBoitier` sache lire : un HEIF de l'appareil, un
+fichier sans la MakerNote de Fujifilm, une autre marque).
 
 **Dans la fenêtre** (`Fenetre.lua`, section Focus ; `Vues.focus`, `Fil.texteFocus`,
 `Lightroom.infosFocus`, `Images.lireFocus`) :
@@ -3916,8 +3931,10 @@ introuvable ou trop long à ouvrir) : code 1.
   vrai clic sur le segment l'ouvre (`Fenetre.surOnglet.focus`) ;
 - l'aperçu de l'onglet (`Fenetre.apercuOnglet.focus`) : la vignette de la photo active avec ses
   cadres (sans, pour une autre marque), sa légende, l'image vide pendant la lecture, ◀ ▶ coupés ;
-  Agrandir montre la vignette marquée en grand. L'aperçu de la photo active des autres onglets, et
-  son carré de `--marquer-af`, ne changent pas ;
+  Agrandir montre la vignette marquée en grand. Après un clic sur une ligne d'image du fil,
+  l'aperçu montre cette image (`Fenetre.imageCliquee`), et Agrandir aussi, comme dans les onglets
+  Aperçu et Proposition, jusqu'à un autre onglet. L'aperçu de la photo active des autres onglets,
+  et son carré de `--marquer-af`, ne changent pas ;
 - la lecture (`Fenetre.lireFocus`, `Fenetre.preparerFocus`), dans une tâche, une à la fois :
   `Vignettes.decrireVignette` (l'original, la marque, la géométrie ; une copie virtuelle donne
   l'original de la copie), `Lightroom.infosFocus` (fileName, copyName, dimensions,
@@ -3932,13 +3949,25 @@ introuvable ou trop long à ouvrir) : code 1.
   `Fenetre.rafraichirFocus`) ; le résultat est gardé pour la photo (`Fenetre.focus`, refait à
   chaque ouverture de la fenêtre), et un vrai clic ne le relit que si la géométrie de la photo
   (cadre, orientation) a changé ;
+- une lecture qui finit quand sa photo n'est plus la photo active (Dany est passé à une autre
+  pendant ce temps) ne sert plus : son dossier s'efface, et le résultat de la photo active, lu
+  entre-temps, reste montré (sans cela, il était effacé, puis relu) ;
+- une lecture en erreur (`Fenetre.preparerFocus` qui lève une erreur, notée au journal) garde un
+  résultat d'échec pour la photo, sans signature : la carte dit « non lue », et les
+  rafraîchissements de l'aperçu ne relancent pas la lecture ; un vrai clic sur le segment la
+  relance ;
 - autre marque : Image et Prise de vue, et « Mise au point : non lue (seulement les fichiers
-  Fujifilm pour l'instant) » (`Fil.FOCUS_AUTRE_MARQUE`) ; connecteur muet ou original trop long à
-  ouvrir : « non lue (original introuvable, ou trop long à ouvrir) » ; connecteur absent :
-  « non lue (connecteur introuvable : réinstaller Développeur) » ; sans photo active, l'aide.
+  Fujifilm pour l'instant) » (`Fil.FOCUS_AUTRE_MARQUE`) ; rien de lu, la raison dite par le
+  connecteur (`Images.lireFocus` la rend en troisième, l'une d'`Images.RAISONS_FOCUS`) :
+  « non lue (original introuvable) » (`Fil.FOCUS_INTROUVABLE`), « non lue (original trop long à
+  ouvrir) » (`Fil.FOCUS_DELAI`), « non lue (format pas encore lu, comme le HEIF, ou fichier sans
+  les données de l'appareil) » (`Fil.FOCUS_ILLISIBLE`) ; sans raison dite (connecteur muet,
+  alarme de 5 s, erreur de la lecture) : « non lue (original illisible, introuvable ou trop long à
+  ouvrir) » (`Fil.FOCUS_NON_LUE`) ; connecteur absent : « non lue (connecteur introuvable :
+  réinstaller Développeur) » ; sans photo active, l'aide.
 
 Essais : `BoitierTests` (`testMiseAuPointDeDSCF2402`, `testReglagesGroupesEnOctetsIndefinis`),
-`FocusTests` (cadres, tailles, dessin, `Focus.marquer`, `--boitier`),
+`FocusTests` (cadres, tailles, dessin, `Focus.marquer`, la raison de `Focus.lire`, `--boitier`),
 `Tests/Lua/Fenetre/essais-focus.lua` (un faux connecteur qui répond la ligne de DSCF2402, comme
 celui de `--marquer-af` d'`essais-integration.lua`), et les essais des segments, des cartes et des
 images (`essais-dispositions`, `essais-fenetre-b`, `essais-images`, `tests.lua`).
@@ -5229,7 +5258,9 @@ du 22 octobre 2026, la liste à la fin) :
     la leçon de la photo. ») : la carte dit « Appliquée par Claude (étape « … ») », Accepter (bleu
     inactif), Refuser et Ajuster… grisés, Je le fais encore actif, l'onglet Leçon ouvert à
     l'arrivée de la leçon ; et une retouche qui change la proposition (« Remplacée par une retouche
-    de Claude »). La carte Note sans Passes ni Plafond (voir Carte Note B) : la grille des
+    de Claude ») ; une proposition sur une photo de série, puis « Harmonise la série » (`match_series`
+    avec `confirm`) : « Remplacée », la proposition de la référence en attente. La carte Note sans
+    Passes ni Plafond (voir Carte Note B) : la grille des
     critères de 34 lignes sur la carte de 583, « Voir à 100 % » dans la rangée du bas avec Laisser,
     Changer… et Accepter (les cinq boutons et ▲ ▼ tiennent-ils dans les 498 points ?), « Accepter
     5 ★ » quand Claude propose 5 ★ ; Claude qui propose 5 ★ à une photo qui le mérite, sans jamais
@@ -5250,8 +5281,10 @@ du 22 octobre 2026, la liste à la fin) :
     pour l'instant) » ; une copie virtuelle recadrée ou tournée (les cadres suivent le cadre de
     Lightroom ; un vrai clic relit après un recadrage) ; la durée (la carte « lecture… », puis la
     photo et ses cadres en moins d'une seconde attendue) et aucune demande d'autorisation de macOS
-    pour l'original ; Agrandir ; une photo prise en recadrage 1,25× ou au viseur sport (les
-    positions décalées ou non par rapport à l'image de Lightroom).
+    pour l'original ; Agrandir, et Agrandir après un clic sur une ligne d'image du fil (l'image
+    cliquée) ; un HEIF de l'appareil et un original déplacé (« non lue (format pas encore lu…) »,
+    « non lue (original introuvable) ») ; une photo prise en recadrage 1,25× ou au viseur sport
+    (les positions décalées ou non par rapport à l'image de Lightroom).
 23. Mes demandes (non publié ; essais dans les simulations seulement ; voir Mes demandes). Après un
     rechargement du module (aucun fichier `.lua` nouveau) : le menu à droite de Style, à 280, sa
     flèche et son titre « Mes demandes » ; ses séparateurs et « Aucune demande gardée » grisé

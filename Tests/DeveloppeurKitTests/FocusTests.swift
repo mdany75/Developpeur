@@ -155,6 +155,40 @@ final class FocusTests: XCTestCase {
         XCTAssertEqual(intention["cadres"]?["point_af"]?.int, 0)
     }
 
+    /// `mcp-developpeur --focus` sans rien de lu dit pourquoi (`Focus.lire`) : l'original qui ne
+    /// s'ouvre pas à temps (« delai »), absent (« introuvable »), ou ouvert sans rien que la lecture
+    /// sache lire, comme un HEIF de l'appareil (« illisible ») ; lu, la ligne de `marquer`.
+    func testCommandeFocusDitPourquoiRienNEstLu() throws {
+        let dossier = TestSupport.temporaryDirectory()
+        let entree = dossier.appendingPathComponent("vignette.jpg"), sortie = dossier.appendingPathComponent("vignette-focus.jpg")
+        try TestSupport.jpeg(red: 90, green: 120, blue: 150, width: 600, height: 400).write(to: entree)
+        let heif = dossier.appendingPathComponent("DSCF0001.HIF")
+        try Data("pas un fichier Fujifilm lisible".utf8).write(to: heif)
+        let geometrie: JSONValue = ["largeur": 6240, "hauteur": 4160, "orientation": "AB"]
+        // Ouvert à temps, rien de lisible.
+        let illisible = Focus.lire(original: heif, geometrie: geometrie, entree: entree, sortie: sortie,
+                                   lecteur: LecteurBoitier(delai: 1) { _ in nil })
+        XCTAssertEqual(illisible["lue"]?.bool, false)
+        XCTAssertEqual(illisible["raison"]?.string, "illisible")
+        // Pas de fichier à ce chemin.
+        let absent = Focus.lire(original: dossier.appendingPathComponent("absent.RAF"), geometrie: geometrie, entree: entree, sortie: sortie,
+                                lecteur: LecteurBoitier(delai: 1) { _ in nil })
+        XCTAssertEqual(absent["raison"]?.string, "introuvable")
+        // Une ouverture qui ne finit pas à temps (macOS qui fait attendre open()) : le délai, même si
+        // le fichier existe.
+        let lent = Focus.lire(original: heif, geometrie: geometrie, entree: entree, sortie: sortie,
+                              lecteur: LecteurBoitier(delai: 0.05) { _ in Thread.sleep(forTimeInterval: 1); return nil })
+        XCTAssertEqual(lent["raison"]?.string, "delai")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sortie.path), "rien de dessiné")
+        // Lu : la ligne de marquer, sans raison.
+        let m = try dscf2402()
+        let lue = Focus.lire(original: heif, geometrie: geometrie, entree: entree, sortie: sortie,
+                             lecteur: LecteurBoitier(delai: 1) { _ in LectureBoitier(point: nil, intention: nil, miseAuPoint: m) })
+        XCTAssertEqual(lue["lue"]?.bool, true)
+        XCTAssertNil(lue["raison"])
+        XCTAssertEqual(lue["dessinee"]?.bool, true)
+    }
+
     /// `--boitier` donne la mise au point en détail et les nouvelles valeurs sous les noms d'exiftool.
     func testBoitierDonneLaMiseAuPoint() throws {
         let raf = TestSupport.temporaryDirectory().appendingPathComponent("DSCF2402.RAF")

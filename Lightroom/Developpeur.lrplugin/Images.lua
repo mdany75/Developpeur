@@ -131,7 +131,15 @@ end
 -- vignette `source` (`<nom>-focus.jpg` à côté) et répond d'une ligne JSON. Rend cette réponse
 -- décodée (à lire seulement, jamais à donner à Lightroom : elle porte des métatables) et le chemin
 -- de la vignette marquée (nil sans dessin) ; nil : connecteur absent, original inconnu, rien de lu,
--- pas de réponse lisible. `source` nil : les valeurs seules.
+-- pas de réponse lisible. Rien de lu, le connecteur dit pourquoi (`{"lue": false, "raison": …}`,
+-- code 1) : nil, nil et cette raison, l'une d'Images.RAISONS_FOCUS. `source` nil : les valeurs
+-- seules.
+Images.RAISONS_FOCUS = {
+    delai = true, -- l'original ne s'est pas ouvert à temps (2 s, LecteurBoitier)
+    introuvable = true, -- pas de fichier à ce chemin
+    illisible = true, -- ouvert à temps, sans rien que la lecture sache lire (HEIF, données de l'appareil absentes)
+}
+
 function Images.lireFocus(connecteur, original, geometrie, source)
     if type(connecteur) ~= 'string' or connecteur == '' or not Fichiers.existe(connecteur)
         or type(original) ~= 'string' or original == '' then
@@ -150,7 +158,8 @@ function Images.lireFocus(connecteur, original, geometrie, source)
     Fichiers.supprimer(reponse)
     local ok, json = pcall(Json.decode, texte)
     if not ok or type(json) ~= 'table' or json.lue ~= true then
-        return nil
+        local raison = ok and type(json) == 'table' and json.lue == false and json.raison
+        return nil, nil, (type(raison) == 'string' and Images.RAISONS_FOCUS[raison]) and raison or nil
     end
     return json, (json.dessinee == true and Fichiers.existe(sortie)) and sortie or nil
 end

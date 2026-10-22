@@ -1627,8 +1627,10 @@ function Fenetre.agrandir()
         Fenetre.agrandirEtape()
         return
     end
-    -- L'onglet Focus : la vignette de la photo active avec ses cadres de mise au point.
-    local r = Fenetre.focusMontre() and Fenetre.focusActif()
+    -- L'onglet Focus : la vignette de la photo active avec ses cadres de mise au point ; sauf après
+    -- un clic sur une ligne d'image du fil, que l'aperçu montre alors (comme Fenetre.modeEtape et
+    -- Fenetre.comparaisonMontree) : c'est elle qu'Agrandir montre.
+    local r = Fenetre.focusMontre() and not Fenetre.imageCliquee and Fenetre.focusActif()
     if r and r.fichier then
         LrTasks.startAsyncTask(function()
             local chemin, l, h = Images.grande(r.dossier, r.fichier, 1100, 740)
@@ -2043,8 +2045,11 @@ function Fenetre.preparerFocus(active, T, garde)
         if type(connecteur) ~= 'string' or not Fichiers.existe(connecteur) then
             etat = 'sans_connecteur'
         else
-            boitier, marquee = Images.lireFocus(connecteur, d.chemin_original, d.geometrie, source)
-            etat = boitier and 'lue' or 'non_lue'
+            local raison
+            boitier, marquee, raison = Images.lireFocus(connecteur, d.chemin_original, d.geometrie, source)
+            -- Rien de lu : la raison que le connecteur a dite ('delai', 'introuvable', 'illisible' :
+            -- Fil.texteFocus), sinon 'non_lue'.
+            etat = boitier and 'lue' or raison or 'non_lue'
         end
     end
     local r = { id = active.id, signature = signature, T = T, titre = Fil.titreFocus(infos), texte = Fil.texteFocus(infos, boitier, etat),
@@ -2057,9 +2062,10 @@ function Fenetre.preparerFocus(active, T, garde)
     return r
 end
 
--- Lit l'onglet de la photo `active` dans une tâche (une lecture à la fois) ; `verifier` : relit
--- seulement si sa géométrie a changé depuis le résultat gardé. À la fin, la carte et, si l'onglet
--- est montré, l'aperçu.
+-- Lit l'onglet de la photo `active` dans une tâche (une lecture à la fois par photo) ; `verifier` :
+-- relit seulement si sa géométrie a changé depuis le résultat gardé. À la fin, la carte et, si
+-- l'onglet est montré, l'aperçu ; rien si la photo n'est plus active (une autre a été choisie
+-- pendant la lecture) ; une erreur garde un résultat d'échec pour la photo.
 function Fenetre.lireFocus(active, verifier)
     if Fenetre.lectureFocus == active.id then
         return
@@ -2074,9 +2080,23 @@ function Fenetre.lireFocus(active, verifier)
         end
         if not ok then
             Journal.noter("Onglet Focus :", tostring(r))
-            return
+            -- Un résultat d'échec pour la photo : la carte dit « non lue », et l'aperçu ne relance
+            -- pas la lecture à chaque rafraîchissement. Sans signature, un vrai clic sur le segment
+            -- la relance.
+            local legende = legendeActive(active)
+            local infos = { nom = legende.nom, copie = legende.copie }
+            r = { id = active.id, T = T, titre = Fil.titreFocus(infos), texte = Fil.texteFocus(infos, nil, 'non_lue') }
         end
         if not r then
+            return
+        end
+        -- Une autre photo est devenue active pendant la lecture : ce résultat ne sert plus, son
+        -- dossier s'efface ; celui de la photo active (lu entre-temps, ou à lire) n'est pas touché.
+        local actuelle = Fenetre.info and Fenetre.info.active
+        if not actuelle or actuelle.id ~= r.id then
+            if r.dossier then
+                Fichiers.supprimer(r.dossier)
+            end
             return
         end
         -- La vignette d'avant n'est plus montrée : son dossier s'efface.
