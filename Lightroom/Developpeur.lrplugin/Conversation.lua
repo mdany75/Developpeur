@@ -6,7 +6,8 @@
 --
 -- Élément : id, genre, texte, date, outil, appel, etat ('enCours', 'fait', 'erreur', 'enAttente',
 -- 'acceptee', 'refusee', 'ajustee', 'faite' : une proposition que Dany fait lui-même, Je le fais,
--- 1.3), detail, images (chemins relatifs au dossier de la
+-- 1.3 ; 'appliquee', 'remplacee' : une proposition qu'une étape de Claude sur sa photo a rendue
+-- sans objet, 1.3.2, Conversation.clorePropositions), detail, images (chemins relatifs au dossier de la
 -- conversation), changements ({ cle, libelle, avant, apres }), partiel (texte en train
 -- d'arriver) ; pour une notation : passe, pose (notes posées à la demande de Dany :
 -- propose_ratings avec apply), notes (voir Conversation.notesDemandees). Pour un outil qui écrit
@@ -18,7 +19,9 @@
 -- Pour une proposition de recadrage (1.3, Composition lue : preview_settings avec un crop, sauf
 -- reset) : recadrage (vrai), puis d'après la réponse cadre (resume_cadre, le cadre que Lightroom a
 -- gardé, en mots) et cadreDessine (vrai si l'image rendue est l'image entière, le cadre en
--- pointillés).
+-- pointillés). Pour toute proposition (1.3.2) : photo (photo_id de l'entrée, sinon la photo que
+-- dit la réponse ; nil tant qu'elle n'est pas connue) ; close par une étape de Claude, etapeClaude
+-- (le nom de cette étape, sans « Claude · »).
 -- Un élément `lecon` (1.3) suit un appel de photo_lesson avec ses points (jamais read_facts seul),
 -- pour le fil seulement (la leçon est rangée par le module, carnet.json) : photo, points (dans
 -- l'ordre Lumière, Couleur, Composition : { axe, nom, manque, prise_de_vue, defauts }), puis
@@ -1277,7 +1280,8 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                     -- ajustements du cadre ; un recadrage retiré n'en est pas une.
                     local recadrage = type(entree.crop) == 'table' and entree.crop.reset ~= true or nil
                     c.elements[#c.elements + 1] = nouvelElement('proposition', { texte = raison, outil = court, appel = bloc.id,
-                        etat = 'enAttente', changements = Conversation.changementsDemandes(bloc.entree), recadrage = recadrage }, date)
+                        etat = 'enAttente', changements = Conversation.changementsDemandes(bloc.entree), recadrage = recadrage,
+                        photo = tonumber(entree.photo_id) }, date)
                 elseif court == 'propose_ratings' then
                     -- Les notes sont dans l'entrée : visibles dans le fil avant la réponse. Le
                     -- standard seul (read_standard sans ratings) ne range rien ; avec des ratings,
@@ -1319,6 +1323,8 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                     if e.etapes ~= nil then
                         e.etapes = Conversation.etapesLues(r.textes)
                         e.changements = Conversation.changementsLus(r.textes) or {}
+                        -- Une proposition encore en attente sur ces photos n'attend plus (1.3.2).
+                        Conversation.clorePropositions(c, i)
                     elseif e.outil == 'undo_last' then
                         e.annule = Conversation.annulationsLues(r.textes)
                     elseif e.outil == 'revert_to_original' then
@@ -1371,6 +1377,8 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                 if not r.erreur then
                     local cadre, dessine = Conversation.cadreLu(r.textes)
                     e.cadre, e.cadreDessine = cadre, cadre and dessine or nil
+                    -- Sa photo, sans photo_id dans l'entrée (la photo active) : celle de la réponse.
+                    e.photo = e.photo or Conversation.photoLue(r.textes)
                 end
                 if r.erreur then
                     e.etat = 'refusee'
@@ -1447,6 +1455,109 @@ end
 function Conversation.propositionEnAttente(c)
     local i = dernierIndice(c, function(e) return e.genre == 'proposition' and e.etat == 'enAttente' end)
     return i and c.elements[i] or nil
+end
+
+-- Une proposition dépassée par Claude (1.3.2) ---------------------------------------------------
+-- Constaté le 22 octobre 2026 : la proposition préparée à l'ouverture attendait dans l'onglet
+-- Proposition ; Dany a écrit « Applique ta proposition, puis termine par la leçon de la photo »,
+-- Claude a posé les mêmes réglages par apply_settings, puis la leçon ; la carte offrait toujours
+-- Accepter (un clic les aurait posés une seconde fois), et la leçon ne s'ouvrait pas (une
+-- proposition attendait). Règle : dès qu'un outil d'étape qui change l'image
+-- (Conversation.OUTILS_ETAPES, sauf les classements, qui ne la changent pas) écrit une étape sur
+-- la photo d'une proposition en attente arrivée avant lui (sur n'importe laquelle de ses photos
+-- quand celle de la proposition n'est pas connue), elle n'attend plus : 'appliquee' si cette
+-- première étape pose chacun de ses réglages à la même valeur (clé et valeur d'après, telles que
+-- les deux réponses les disent ; il en faut au moins un de lu), sinon 'remplacee'. Accepter,
+-- Refuser et Ajuster… ne s'offrent plus (Conversation.propositionEnAttente ne la rend plus) ; la
+-- carte dit pourquoi (Conversation.propositionClose). Une proposition acceptée, refusée, ajustée
+-- ou faite par Dany garde son état.
+
+-- Les états d'une proposition close par Claude, et leur phrase (la carte Proposition, le fil).
+Conversation.ETATS_CLAUDE = {
+    appliquee = "Appliquée par Claude",
+    remplacee = "Remplacée par une retouche de Claude",
+}
+
+-- La photo que dit une réponse du connecteur (son champ photo : { id, fichier } ou un
+-- identifiant), nil sans elle.
+function Conversation.photoLue(textes)
+    for _, texte in ipairs(textes or {}) do
+        local json = Conversation.teteJson(texte)
+        if type(json) == 'table' and json.photo ~= nil and json.photo ~= Json.null then
+            local photo = photoDe(json)
+            if photo ~= nil then
+                return photo
+            end
+        end
+    end
+    return nil
+end
+
+-- Vrai si `changements` (ceux d'une étape) posent chaque réglage lu de la proposition à la même
+-- valeur ; faux sans réglage lu (rien à comparer).
+local function memesReglages(prop, changements)
+    local poses = {}
+    for _, ch in ipairs(changements or {}) do
+        if type(ch.cle) == 'string' then
+            poses[ch.cle] = ch.apres
+        end
+    end
+    local lus = 0
+    for _, ch in ipairs(prop.changements or {}) do
+        if type(ch.cle) == 'string' then
+            lus = lus + 1
+            if poses[ch.cle] ~= ch.apres then
+                return false
+            end
+        end
+    end
+    return lus > 0
+end
+
+-- L'élément i (un outil dont la réponse vient d'arriver) clôt les propositions en attente arrivées
+-- avant lui sur les photos de ses étapes. Rend leur nombre.
+function Conversation.clorePropositions(c, i)
+    local e = c and c.elements[i]
+    if not (e and e.genre == 'outil' and e.etat ~= 'erreur' and Conversation.OUTILS_ETAPES[e.outil]
+        and not Conversation.CLASSEMENTS[e.outil]) then
+        return 0
+    end
+    local etapes = e.etapes or {}
+    if #etapes == 0 then
+        return 0
+    end
+    -- La première étape de chaque photo, avec ses réglages (ceux de toute la réponse pour une
+    -- seule étape qui ne dit pas les siens, comme Conversation.etapes).
+    local parPhoto = {}
+    for _, x in ipairs(etapes) do
+        local cle = Conversation.clePhoto(x.photo)
+        if not parPhoto[cle] then
+            local propres = #(x.changements or {}) > 0 or #etapes > 1
+            parPhoto[cle] = { nom = x.nom, changements = propres and (x.changements or {}) or (e.changements or {}) }
+        end
+    end
+    local closes = 0
+    for k = i - 1, 1, -1 do
+        local p = c.elements[k]
+        if p.genre == 'proposition' and p.etat == 'enAttente' then
+            local etape = parPhoto[Conversation.clePhoto(p.photo == nil and etapes[1].photo or p.photo)]
+            if etape then
+                p.etat = memesReglages(p, etape.changements) and 'appliquee' or 'remplacee'
+                local nom = Conversation.nomEtape(etape.nom or e.etape)
+                p.etapeClaude = nom ~= '' and nom or nil
+                closes = closes + 1
+            end
+        end
+    end
+    return closes
+end
+
+-- La dernière proposition du fil si une étape de Claude l'a close ('appliquee', 'remplacee') ;
+-- nil sinon (aucune, ou la dernière en attente, décidée par Dany, faite par lui).
+function Conversation.propositionClose(c)
+    local i = dernierIndice(c, function(e) return e.genre == 'proposition' end)
+    local e = i and c.elements[i]
+    return e and Conversation.ETATS_CLAUDE[e.etat] and e or nil
 end
 
 -- Images de la conversation, dans l'ordre du fil : { chemin, element (indice), outil, comparaison

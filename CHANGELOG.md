@@ -1,5 +1,15 @@
 # Changements
 
+## Non publié
+
+### Corrigé
+- Une proposition que Claude a déjà appliquée ne vous demande plus votre accord. Quand vous
+  écrivez « Applique ta proposition » et que Claude pose lui-même la retouche, la carte
+  Proposition le dit (« Appliquée par Claude », ou « Remplacée par une retouche de Claude » s'il a
+  posé autre chose) : Accepter, Refuser et Ajuster… sont grisés, et un clic de trop ne pose plus la
+  retouche une seconde fois. La leçon de la photo qui suit s'ouvre alors d'elle-même dans l'onglet
+  Leçon, comme après toute retouche.
+
 ## 1.3.1 — 2026-10-22
 
 Le correctif 1.3.1, tiré de l'essai réel de la 1.3 du 21 octobre 2026. Après l'installation :

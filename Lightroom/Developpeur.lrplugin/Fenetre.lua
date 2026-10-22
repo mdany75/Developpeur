@@ -1841,7 +1841,9 @@ end
 -- (faite : Fenetre.leconVue garde la dernière vue) devient celle que montre l'onglet, à la place
 -- d'une leçon choisie avant, et fait basculer la fenêtre une fois vers Leçon, sauf
 -- quand une proposition attend ou qu'un exercice « Je le fais » est en cours (Accepter et « J'ai
--- fini » resteraient cachés derrière l'onglet Leçon) : elle est alors seulement marquée vue. Les
+-- fini » resteraient cachés derrière l'onglet Leçon) : elle est alors seulement marquée vue. Une
+-- proposition qu'une étape de Claude a close n'attend plus (1.3.2, Conversation.clorePropositions) :
+-- la leçon qui suit « Applique ta proposition » s'ouvre. Les
 -- leçons déjà là quand une conversation se montre (ouverture de la fenêtre, une autre conversation)
 -- sont vues, sans bascule.
 
@@ -1941,7 +1943,9 @@ end
 -- après elle (Conversation.dernierExercice : une proposition en attente arrivée après l'exercice
 -- reprend la carte, et la lui rend une fois décidée s'il est encore à faire) : sa liste à faire,
 -- cochée au fil de ce que Dany change (Fenetre.suivreExercice), puis sa comparaison, jusqu'à la
--- proposition suivante.
+-- proposition suivante. Sans l'une ni l'autre, la dernière proposition si une étape de Claude sur
+-- sa photo l'a close (1.3.2, Conversation.propositionClose) : sa phrase en tête
+-- (Fenetre.phraseClose), Accepter, Refuser et Ajuster… grisés.
 
 Fenetre.AUCUNE_PROPOSITION = "Aucune proposition en attente.\n\nEn mode « Proposer d'abord », Claude montre ici ce "
     .. "qu'il compte changer et attend votre accord.\n\n« Je le fais » : vous faites la retouche vous-même ; Claude donne "
@@ -1979,10 +1983,25 @@ function Fenetre.rafraichirProposition(garderPage)
         return
     end
     if not prop then
-        Fenetre.montrerPage('proposition', Fenetre.AUCUNE_PROPOSITION)
+        -- Une proposition qu'une étape de Claude a close (1.3.2) : la carte dit pourquoi, sans
+        -- Accepter, Refuser ni Ajuster… (enAttente est faux).
+        local close = c and Conversation.propositionClose(c)
+        Fenetre.montrerPage('proposition', close and Fenetre.texteProposition(close) or Fenetre.AUCUNE_PROPOSITION)
         return
     end
     Fenetre.montrerPage('proposition', Fenetre.texteProposition(prop))
+end
+
+-- La phrase en tête d'une proposition close par une étape de Claude (1.3.2,
+-- Conversation.clorePropositions) : « Appliquée par Claude (étape « passe 1 : lumière et
+-- couleur ») : elle n'attend plus votre accord. » ; nil pour une autre.
+function Fenetre.phraseClose(prop)
+    local debut = prop and Conversation.ETATS_CLAUDE[prop.etat]
+    if not debut then
+        return nil
+    end
+    local etape = type(prop.etapeClaude) == 'string' and Texte.nettoyer(prop.etapeClaude) or ''
+    return debut .. (etape ~= '' and (" (étape « " .. etape .. " »)") or '') .. " : elle n'attend plus votre accord."
 end
 
 -- Ce que montre l'aperçu d'une proposition de recadrage (Composition lue, 1.3) : l'image entière
@@ -1995,13 +2014,22 @@ Fenetre.CADRE_SANS_DESSIN = "Rien ne change avant Accepter."
 -- ligne « Cadre : <résumé> » et ce que montre son aperçu, à la place des bords du recadrage (les
 -- changements Crop…, illisibles pour Dany, et de la ligne « Recadrage » demandée, restée si les
 -- changements de la réponse ne se sont pas lus) ; puis chaque autre changement, « libellé : avant
--- → après ». Sans résumé du cadre, les changements Crop… restent : ils sont seuls à le dire.
+-- → après ». Sans résumé du cadre, les changements Crop… restent : ils sont seuls à le dire. Une
+-- proposition close par une étape de Claude (1.3.2) commence par sa phrase (Fenetre.phraseClose),
+-- sans ce que montrerait son aperçu avant Accepter.
 function Fenetre.texteProposition(prop)
+    local close = Fenetre.phraseClose(prop)
     local lignes = { Texte.nettoyer(prop.texte) ~= '' and prop.texte or "Claude propose :", '' }
+    if close then
+        table.insert(lignes, 1, '')
+        table.insert(lignes, 1, close)
+    end
     local cadre = type(prop.cadre) == 'string' and Texte.nettoyer(prop.cadre) or ''
     if cadre ~= '' then
         lignes[#lignes + 1] = "Cadre : " .. cadre
-        lignes[#lignes + 1] = prop.cadreDessine == true and Fenetre.CADRE_DESSINE or Fenetre.CADRE_SANS_DESSIN
+        if not close then
+            lignes[#lignes + 1] = prop.cadreDessine == true and Fenetre.CADRE_DESSINE or Fenetre.CADRE_SANS_DESSIN
+        end
     end
     local autres = {}
     for _, ch in ipairs(prop.changements or {}) do

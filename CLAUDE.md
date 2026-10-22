@@ -1019,6 +1019,16 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   `preview_settings`, sans rien appliquer) ; la proposition attend dans l'onglet Proposition sans
   y basculer (`Fenetre.propositionAuto`, effacé par la demande suivante de Dany,
   `Fenetre.envoyer`).
+- Une proposition en attente qu'une étape de Claude dépasse n'attend plus (correctif 1.3.2,
+  constaté le 22 octobre 2026 : « Applique ta proposition » laissait Accepter actif et bloquait la
+  bascule vers la leçon) : `Conversation.clorePropositions`, à la réponse d'un outil de
+  `Conversation.OUTILS_ETAPES` qui change l'image (pas `Conversation.CLASSEMENTS`, ni `preview`, ni
+  une erreur) et écrit une étape sur sa photo (`photo` : `photo_id` de l'entrée, sinon
+  `Conversation.photoLue` ; inconnue, toute photo de l'étape) ; `appliquee` si la première étape
+  pose chacun de ses réglages lus à la même valeur d'après, sinon `remplacee`
+  (`Conversation.ETATS_CLAUDE`, `etapeClaude`). La carte montre `Conversation.propositionClose`,
+  sa phrase en tête (`Fenetre.phraseClose`), Accepter, Refuser et Ajuster… grisés ; une
+  proposition décidée par Dany garde son chemin (`docs/SPEC.md`, Proposition dépassée).
 - Une autre photo active ou une autre sélection, choisie par Dany, commence une nouvelle
   conversation (`Fenetre.suivreSelection`, depuis `Fenetre.majPhoto` ; préférence
   `nouvelleParPhoto`, case « Autre photo » du Gestionnaire, cochée par défaut ; demandé par Dany le

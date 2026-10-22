@@ -753,6 +753,160 @@ essai("Fenêtre : une leçon qui arrive bascule une fois vers Leçon ; jamais av
     end)
 end)
 
+-- Une proposition dépassée par Claude (1.3.2) -----------------------------------------------------
+
+-- La réponse du connecteur à une proposition (preview_settings) : sa photo et ses changements.
+local function reponseProposition(photo, fichier, changements)
+    return Json.encode({ mode = 'proposer', photo = { id = photo, fichier = fichier }, etape = 'proposition', changements = changements })
+end
+
+-- La réponse du connecteur à une écriture (apply_settings…) : une étape par photo, avec son id.
+local function reponseEcriture(nom, photo, fichier, changements, id)
+    return Json.encode({ mode = 'appliquer', resultats = { { photo = { id = photo, fichier = fichier }, etape = 'Claude · ' .. nom,
+        etape_id = id or 7001, changements = changements } } })
+end
+
+-- Un appel d'outil dans le fil, puis sa réponse (nil : en cours) ; rend l'indice de son élément.
+local function appelOutil(c, id, nom, entree, reponse, erreur)
+    Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = id, nom = 'mcp__developpeur__' .. nom, entree = entree } } })
+    local indice = #c.elements
+    for i, e in ipairs(c.elements) do
+        if e.genre == 'outil' and e.appel == id then
+            indice = i
+        end
+    end
+    if reponse ~= nil then
+        Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = id, textes = { reponse }, images = {}, erreur = erreur == true } } })
+    end
+    return indice
+end
+
+-- La dernière proposition du fil.
+local function derniereProposition(c)
+    for i = #c.elements, 1, -1 do
+        if c.elements[i].genre == 'proposition' then
+            return c.elements[i]
+        end
+    end
+    return nil
+end
+
+local EXPOSITION = { { cle = 'Exposure2012', libelle = 'Exposition', avant = 0, apres = 0.3 } }
+
+essai("Proposition dépassée (constaté le 22 octobre 2026) : préparée à l'ouverture, puis les mêmes réglages appliqués par Claude ; la carte le dit, Accepter, Refuser et Ajuster… grisés, la leçon s'ouvre", function()
+    photoActive(53636309, 'DSCF4961.RAF')
+    Moteur.charger()
+    Moteur.nouvelle()
+    local c = Moteur.courante
+    ouvrirFenetre(function(p)
+        Fenetre.rafraichir()
+        egal('notation', p.onglet)
+        -- La proposition préparée à l'ouverture (sans photo_id : la photo active), qui attend.
+        Fenetre.propositionAuto = true
+        appelOutil(c, 'p1', 'preview_settings', { settings = { Exposure2012 = 0.3 }, reason = 'Plus lumineuse' },
+            reponseProposition(53636309, 'DSCF4961.RAF', EXPOSITION))
+        local prop = derniereProposition(c)
+        egal(53636309, prop.photo, 'sa photo lue dans la réponse')
+        Fenetre.rafraichir()
+        egal('notation', p.onglet, "préparée à l'ouverture : pas de bascule")
+        egal(true, p.enAttente)
+        -- « Applique ta proposition, puis termine par la leçon de la photo. »
+        Conversation.ajouterDemande(c, 'Applique ta proposition, puis termine par la leçon de la photo.')
+        Fenetre.propositionAuto = false
+        appelOutil(c, 'a1', 'apply_settings', { settings = { Exposure2012 = 0.3 }, step_name = 'passe 1 : lumière et couleur',
+            reason = 'Plus lumineuse' })
+        egal('enAttente', prop.etat, "l'étape pas encore écrite : la proposition attend")
+        Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'a1', images = {}, erreur = false,
+            textes = { reponseEcriture('passe 1 : lumière et couleur', 53636309, 'DSCF4961.RAF', EXPOSITION) } } } })
+        egal('appliquee', prop.etat, 'les mêmes réglages : appliquée par Claude')
+        egal('passe 1 : lumière et couleur', prop.etapeClaude)
+        egal(nil, Conversation.propositionEnAttente(c), "plus rien n'attend")
+        egal(prop, Conversation.propositionClose(c))
+        Fenetre.rafraichir()
+        egal(false, p.enAttente, 'Accepter, Refuser et Ajuster… grisés')
+        local phrase = "Appliquée par Claude (étape « passe 1 : lumière et couleur ») : elle n'attend plus votre accord."
+        egal(phrase, Fenetre.phraseClose(prop))
+        local carte = p.propositionTexte:gsub('\n', ' ')
+        contient(carte, phrase, 'la carte le dit')
+        contient(carte, 'Exposition : 0 → 0,3', 'puis ce qui était proposé')
+        egal(phrase, (Fenetre.texteProposition(prop):match('^[^\n]*')), 'en tête')
+        -- Un clic sur Accepter (le calque ne vérifie pas enabled) ne réapplique rien.
+        egal(false, Moteur.repondre(true), 'Accepter : rien à accepter')
+        egal('appliquee', prop.etat)
+        -- La leçon qui arrive ouvre l'onglet Leçon : plus de proposition qui attend.
+        appelLecon(c, 'l1', entreeLecon(), reponseLecon())
+        Fenetre.rafraichir()
+        egal('lecon', p.onglet, 'la leçon arrivée, la fenêtre bascule')
+        -- Le fil le dit aussi.
+        local texte = ''
+        for _, l in ipairs(Fil.lignes(c, LARGEUR)) do
+            if c.elements[l.element] == prop then
+                texte = texte .. l.texte .. '\n'
+            end
+        end
+        contient(texte, 'Proposition appliquée par Claude', 'la ligne du fil')
+    end)
+end)
+
+essai("Proposition dépassée : d'autres réglages la disent remplacée ; une autre photo, un classement, un aperçu, une erreur ou une décision de Dany la laissent", function()
+    local c = Conversation.nouvelle(1000)
+    -- D'autres réglages sur sa photo (photo_id dans l'entrée) : remplacée.
+    appelOutil(c, 'p1', 'preview_settings', { photo_id = 4961, settings = { Exposure2012 = 0.3 } },
+        reponseProposition(4961, 'DSCF4961.RAF', EXPOSITION))
+    local p1 = derniereProposition(c)
+    egal(4961, p1.photo)
+    -- Une étape sur une autre photo : rien.
+    appelOutil(c, 'a0', 'apply_settings', { photo_id = 4962, settings = { Exposure2012 = 0.3 }, step_name = 'autre' },
+        reponseEcriture('autre', 4962, 'DSCF4962.RAF', EXPOSITION, 7000))
+    egal('enAttente', p1.etat, 'une autre photo')
+    -- Un classement sur sa photo (ne change pas l'image) : rien.
+    appelOutil(c, 'm1', 'set_metadata', { photo_ids = { 4961 }, add_keywords = { 'Lac' }, step_name = 'mots-clés' },
+        reponseEcriture('mots-clés', 4961, 'DSCF4961.RAF', { { cle = 'motsCles', avant = '', apres = 'Lac' } }, 7002))
+    egal('enAttente', p1.etat, 'un classement')
+    -- Un masque en proposition seulement (preview) : rien d'écrit.
+    appelOutil(c, 'k1', 'add_mask', { photo_ids = { 4961 }, preview = true, masks = {} },
+        reponseProposition(4961, 'DSCF4961.RAF', {}))
+    egal('enAttente', p1.etat, 'un aperçu')
+    -- Une écriture refusée : rien.
+    appelOutil(c, 'a1', 'apply_settings', { photo_id = 4961, settings = { Exposure2012 = 0.5 } }, 'Proposer d\'abord : confirm = true.', true)
+    egal('enAttente', p1.etat, 'une erreur')
+    -- D'autres réglages : remplacée par une retouche de Claude.
+    appelOutil(c, 'a2', 'apply_settings', { photo_id = 4961, settings = { Exposure2012 = 0.5 }, step_name = 'passe 1 : lumière' },
+        reponseEcriture('passe 1 : lumière', 4961, 'DSCF4961.RAF', { { cle = 'Exposure2012', avant = 0, apres = 0.5 } }, 7003))
+    egal('remplacee', p1.etat)
+    egal('passe 1 : lumière', p1.etapeClaude)
+    egal("Remplacée par une retouche de Claude (étape « passe 1 : lumière ») : elle n'attend plus votre accord.", Fenetre.phraseClose(p1))
+    -- Une partie seulement des réglages proposés : remplacée aussi.
+    appelOutil(c, 'p2', 'preview_settings', { photo_id = 4961, settings = { Exposure2012 = 0.3, Vibrance = 10 } },
+        reponseProposition(4961, 'DSCF4961.RAF', { EXPOSITION[1], { cle = 'Vibrance', avant = 0, apres = 10 } }))
+    local p2 = derniereProposition(c)
+    appelOutil(c, 'a3', 'apply_settings', { photo_id = 4961, settings = { Exposure2012 = 0.3 }, step_name = 'lumière' },
+        reponseEcriture('lumière', 4961, 'DSCF4961.RAF', EXPOSITION, 7004))
+    egal('remplacee', p2.etat, 'la vibrance manque')
+    -- Une proposition décidée par Dany garde son état ; la suivante, sans réglage lu, est remplacée.
+    appelOutil(c, 'p3', 'preview_settings', { photo_id = 4961, settings = { Exposure2012 = 0.3 } },
+        reponseProposition(4961, 'DSCF4961.RAF', EXPOSITION))
+    local p3 = derniereProposition(c)
+    Conversation.decider(c, p3.id, true)
+    appelOutil(c, 'p4', 'preview_settings', { photo_id = 4961, settings = { Exposure2012 = 0.3 } }, '{ "texte": "sans réglages lus" }')
+    local p4 = derniereProposition(c)
+    appelOutil(c, 'a4', 'copy_settings', { from_photo_id = 4961, photo_ids = { 4961 }, step_name = 'copie' },
+        reponseEcriture('copie', 4961, 'DSCF4961.RAF', EXPOSITION, 7005))
+    egal('acceptee', p3.etat, 'acceptée par Dany : son chemin')
+    egal('remplacee', p4.etat, 'aucun réglage lu : rien ne dit les mêmes')
+    -- La carte : la dernière proposition, si Claude l'a close ; nil après une décision de Dany.
+    egal(p4, Conversation.propositionClose(c))
+    appelOutil(c, 'p5', 'preview_settings', { photo_id = 4961, settings = { Exposure2012 = 0.3 } },
+        reponseProposition(4961, 'DSCF4961.RAF', EXPOSITION))
+    Conversation.decider(c, derniereProposition(c).id, false)
+    egal(nil, Conversation.propositionClose(c), 'refusée par Dany')
+    egal(nil, Fenetre.phraseClose(derniereProposition(c)))
+    -- Relue du disque, une proposition close le reste.
+    local relue = Json.decode(Json.encode(p1))
+    egal('remplacee', relue.etat)
+    egal(Fenetre.phraseClose(p1), Fenetre.phraseClose(relue))
+end)
+
 essai("Fenêtre : une leçon qui arrive remplace la leçon choisie avant ; d'une autre photo que l'active, elle se montre aussi", function()
     photoActive(53636309, 'DSCF4961.RAF')
     Moteur.charger()

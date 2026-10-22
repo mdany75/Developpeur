@@ -699,7 +699,10 @@ Une fenêtre à part (Consommation…) pour suivre ce que la fenêtre Claude con
   libre, ou un ajustement d'un clic (Moins chaud, Peau plus naturelle, Garder le ciel, Plus de
   contraste ; pour un cadre : Plus serré, Plus large, Horizon au tiers haut, Format 4:5, Seulement
   redresser) ; Je le fais vous laisse faire vous-même ce que Claude propose (voir Apprendre avec
-  Claude). ▲ ▼ font défiler une proposition plus longue que sa place.
+  Claude). ▲ ▼ font défiler une proposition plus longue que sa place. Si vous demandez à Claude
+  d'appliquer sa proposition par un message (« Applique ta proposition »), ou qu'il retouche la
+  photo autrement, la carte le dit (« Appliquée par Claude » ou « Remplacée par une retouche de
+  Claude ») et Accepter, Refuser et Ajuster… se grisent : rien ne se pose deux fois.
 - Pour que l'accord ne vienne que de vous : la case « l'accord se donne ici » du Gestionnaire de
   modules externes. Seul le bouton Accepter de la fenêtre de suivi compte alors, pour une seule
   écriture, dans les 10 minutes.

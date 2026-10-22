@@ -1197,6 +1197,39 @@ l'efface : les propositions suivantes se montrent de nouveau d'elles-mêmes. La 
 propose d'abord (voir Carte Note) fait encore passer à l'onglet Note, comme toute note arrivée
 pour la photo montrée (`Fenetre.rafraichirNotation`).
 
+### Proposition dépassée par une étape de Claude (correctif 1.3.2)
+
+Constaté le 22 octobre 2026 sur une copie d'essai : la proposition préparée à l'ouverture attendait
+dans l'onglet Proposition ; Dany a écrit « Applique ta proposition, puis termine par la leçon de la
+photo. » ; Claude a posé les mêmes réglages par `apply_settings` (étape « Claude · passe 1 :
+lumière et couleur »), puis `photo_lesson`. La carte offrait encore Accepter (bleu), Refuser,
+Ajuster… et Je le fais : Accepter aurait fait poser la proposition une seconde fois ; et la fenêtre
+ne passait pas à l'onglet Leçon, qui ne s'ouvre pas tant qu'une proposition attend.
+
+Règle (`Conversation.clorePropositions`, appelée à la réponse de chaque outil d'étape) : dès qu'un
+outil d'étape qui change l'image (`Conversation.OUTILS_ETAPES`, sauf les classements
+`set_metadata` et `manage_collections`, qui ne la changent pas ; jamais en `preview`, jamais en
+erreur) écrit une étape (un `etape_id` dans sa réponse) sur la photo d'une proposition encore en
+attente arrivée avant lui, cette proposition n'attend plus. Sa photo : le `photo_id` de l'entrée de
+`preview_settings`, sinon celle de sa réponse (`Conversation.photoLue`) ; inconnue, n'importe quelle
+photo de l'étape la clôt (le plus sûr : un Accepter de trop poserait des réglages sur une photo
+déjà retouchée). Elle devient `appliquee` (« Appliquée par Claude ») si la première étape de sa photo
+pose chacun des réglages lus de la proposition (clé et valeur d'après, en texte, telles que les deux
+réponses du connecteur les disent ; il en faut au moins un de lu), sinon `remplacee` (« Remplacée
+par une retouche de Claude ») : une partie des réglages, d'autres valeurs, un autre outil, ou une
+proposition dont la réponse n'a pas dit ses réglages. Le nom de l'étape est gardé (`etapeClaude`).
+`Conversation.propositionEnAttente` ne la rend plus : Accepter, Refuser et Ajuster… sont grisés
+(`enAttente` faux), `Moteur.repondre` et `Moteur.ajuster` ne font rien, et la leçon qui suit
+s'ouvre (`Fenetre.rafraichirLecon`). La carte montre la dernière proposition du fil si elle est
+close ainsi (`Conversation.propositionClose`), sa phrase en tête (`Fenetre.phraseClose` :
+« Appliquée par Claude (étape « passe 1 : lumière et couleur ») : elle n'attend plus votre
+accord. »), puis sa raison et ses réglages, sans la phrase de l'aperçu d'un recadrage (« Rien ne
+change avant Accepter. »). Le fil dit « Proposition appliquée par Claude » ou « Proposition
+remplacée par une retouche de Claude ». Une proposition acceptée, refusée, ajustée ou faite par
+Dany (Je le fais) garde son chemin ; une conversation enregistrée avant le correctif garde ses
+propositions en attente (la règle ne joue qu'à l'arrivée d'une réponse). Essais :
+`Tests/Lua/Fenetre/essais-lecon.lua` (« Proposition dépassée… »).
+
 ### Carte Note (1.1, revue en 1.1.1)
 
 Jusqu'à la 1.2 ; en 1.3, son allure et ses boutons sont ceux de la carte Note B (section
@@ -4928,6 +4961,17 @@ l'étape sautée) sont dans la section de chaque chantier. Restent à voir :
     53709534 rendu sans `Brightness`, `Contrast` et `Exposure` (réglages du processus 2010, sans
     effet en 15.4) et avec `MaskGroupBasedCorrections = {}` après la recette, ce que sa
     référence n'avait pas.
+21. Correctif 1.3.2 (non publié ; essais dans les simulations seulement). La proposition dépassée
+    (voir Proposition dépassée par une étape de Claude) : refaire l'essai du 22 octobre 2026 sur une
+    copie d'essai (proposition préparée à l'ouverture, « Applique ta proposition, puis termine par
+    la leçon de la photo. ») : la carte dit « Appliquée par Claude (étape « … ») », Accepter (bleu
+    inactif), Refuser et Ajuster… grisés, Je le fais encore actif, l'onglet Leçon ouvert à
+    l'arrivée de la leçon ; et une retouche qui change la proposition (« Remplacée par une retouche
+    de Claude »). La carte Note sans Passes ni Plafond (voir Carte Note B) : la grille des
+    critères de 34 lignes sur la carte de 583, « Voir à 100 % » dans la rangée du bas avec Laisser,
+    Changer… et Accepter (les cinq boutons et ▲ ▼ tiennent-ils dans les 498 points ?), « Accepter
+    5 ★ » quand Claude propose 5 ★ ; Claude qui propose 5 ★ à une photo qui le mérite, sans jamais
+    poser ni changer un libellé de couleur.
 
 ## Bibliothèque
 

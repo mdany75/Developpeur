@@ -554,7 +554,8 @@ function Fil.lignesBrutes(e, i, largeur)
         end
     elseif g == 'proposition' then
         local etat = ({ enAttente = "en attente de votre accord", acceptee = "acceptée", refusee = "refusée",
-            ajustee = "à ajuster", faite = "à faire vous-même" })[e.etat or ''] or ''
+            ajustee = "à ajuster", faite = "à faire vous-même", appliquee = "appliquée par Claude",
+            remplacee = "remplacée par une retouche de Claude" })[e.etat or ''] or ''
         ajouterTexte(lignes, "Proposition" .. (etat ~= '' and (" " .. etat) or "") .. (Texte.nettoyer(e.texte) ~= '' and (" : " .. e.texte) or ""),
             'proposition', largeur, i, 'proposition')
         for _, ch in ipairs(e.changements or {}) do
