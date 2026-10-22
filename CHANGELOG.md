@@ -1,6 +1,11 @@
 # Changements
 
-## Non publié
+## 1.3.2 — 2026-10-22
+
+Le correctif 1.3.2, fait à votre demande le 22 octobre 2026 : l'onglet Focus, vos demandes à vous,
+la notation de 0 à 5 ★ et une carte Note plus simple, et une proposition déjà appliquée qui n'attend
+plus. Après l'installation : quitter puis relancer Lightroom (les images de la fenêtre changent),
+rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code.
 
 ### Ajouté
 - Un onglet Focus dans la fenêtre Claude, entre Aperçu et Proposition, à votre demande : la photo
