@@ -2006,6 +2006,11 @@ end
 -- « Retouche pro », l'onglet montrait encore la photo d'avant, et Dany a dû demander « reload
 -- l'image »). L'aperçu des autres onglets, avec le carré de --marquer-af, ne change pas.
 
+-- Juste après une retouche, Lightroom refait l'aperçu de la photo et répond « error loading thumb »
+-- quelques instants (constaté le 22 octobre 2026 : l'onglet relu restait sans image) : la vignette
+-- se redemande une fois par seconde, ESSAIS_VIGNETTE_FOCUS fois au plus.
+Fenetre.ESSAIS_VIGNETTE_FOCUS = 8
+
 -- La carte sans photo active.
 Fenetre.FOCUS_AUCUNE_PHOTO = "Aucune photo active : choisissez une photo dans Lightroom."
 
@@ -2049,6 +2054,17 @@ function Fenetre.preparerFocus(active, T, garde)
     local dossier = LrPathUtils.child(LrPathUtils.child(Chemins.temporaire(), 'PhotoActive'), 'Focus-' .. Conversation.identifiant())
     local chemins = Vignettes.demander({ active.id }, Fenetre.TAILLE_PHOTO_ACTIVE, dossier)
     local source = chemins[active.id]
+    local essais = 1
+    while not source and essais < Fenetre.ESSAIS_VIGNETTE_FOCUS do
+        LrTasks.sleep(1)
+        essais = essais + 1
+        source = Vignettes.demander({ active.id }, Fenetre.TAILLE_PHOTO_ACTIVE, dossier)[active.id]
+    end
+    if not source then
+        -- Toujours sans vignette : pas de signature, le prochain vrai clic (ou la fin d'un tour de
+        -- Claude) relit.
+        signature = nil
+    end
     local etat, boitier, marquee = 'autre_marque', nil, nil
     if Fenetre.estFujifilm(d) then
         local connecteur = Chemins.prefs().cheminConnecteur

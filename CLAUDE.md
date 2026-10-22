@@ -1093,7 +1093,10 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   son dossier effacé), relu par un vrai clic seulement si la géométrie ou l'édition (editCount,
   lastEditTime : une retouche) a changé, et à la fin d'un tour de Claude si l'onglet est montré
   (`Fenetre.suivreFocus`, depuis la boucle ; constaté le 22 octobre 2026 : après « Retouche pro »,
-  l'onglet montrait la photo d'avant). Une lecture finie
+  l'onglet montrait la photo d'avant) ; juste après une retouche, Lightroom répond « error loading
+  thumb » quelques instants (constaté le même jour) : la vignette se redemande une fois par seconde,
+  `Fenetre.ESSAIS_VIGNETTE_FOCUS` (8) fois au plus, et un résultat toujours sans vignette n'a pas de
+  signature (relu au clic suivant). Une lecture finie
   quand sa photo n'est plus la photo active ne touche pas `Fenetre.focus` (son dossier s'efface) ;
   une lecture en erreur garde un résultat d'échec sans signature (« non lue », pas de relecture à
   chaque rafraîchissement ; un vrai clic relit). Rien de lu : la raison du connecteur
