@@ -381,7 +381,8 @@ final class MCPServerTests: XCTestCase {
 
     /// La raison d'une étape : une phrase simple pour l'utilisateur, la même dans chaque outil qui
     /// écrit, 160 caractères au plus, sans avant/après (des outils qui écrivent ne touchent pas
-    /// l'image : classement, livraison).
+    /// l'image : classement, livraison) ; preview_settings a la sienne (1.3.1 : une proposition
+    /// n'écrit rien au journal).
     func testRaisonDUneEtapeCourteEtPartout() throws {
         let raison = ToolHandler.descriptionRaison
         XCTAssertLessThanOrEqual(raison.count, ToolHandler.longueurRaisonDecrite, "\(raison.count) caractères")
@@ -393,7 +394,8 @@ final class MCPServerTests: XCTestCase {
         var avecRaison: [String] = []
         for outil in ToolHandler(lightroom: fake).definitions {
             guard let proprietes = outil["inputSchema"]?["properties"]?.object, let reason = proprietes["reason"] else { continue }
-            XCTAssertEqual(reason["description"]?.string, raison, outil["name"]?.string ?? "")
+            let attendue = outil["name"]?.string == "preview_settings" ? ToolHandler.descriptionRaisonProposition : raison
+            XCTAssertEqual(reason["description"]?.string, attendue, outil["name"]?.string ?? "")
             avecRaison.append(outil["name"]?.string ?? "")
         }
         XCTAssertGreaterThanOrEqual(avecRaison.count, 12, "\(avecRaison)")

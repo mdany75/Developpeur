@@ -31,12 +31,14 @@ final class PourquoiTests: XCTestCase {
     }
 
     /// 1.3.1 : preview_settings accepte reason, comme apply_settings (Claude l'y joignait 3 fois sur 4,
-    /// et l'appel était refusé) : la même description ; une proposition n'écrit rien, la raison ne
-    /// part pas au module (ni étape ni journal) et revient dans la réponse, à redonner à
-    /// apply_settings.
+    /// et l'appel était refusé) : une description à elle, qui ne promet pas le journal ; une
+    /// proposition n'écrit rien, la raison ne part pas au module (ni étape ni journal) et revient dans
+    /// la réponse, à redonner à apply_settings.
     func testPreviewSettingsAcceptsTheReasonWithoutSendingIt() throws {
         let definition = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "preview_settings" })
-        XCTAssertEqual(definition["inputSchema"]?["properties"]?["reason"]?["description"]?.string, ToolHandler.descriptionRaison)
+        XCTAssertEqual(definition["inputSchema"]?["properties"]?["reason"]?["description"]?.string, ToolHandler.descriptionRaisonProposition)
+        XCTAssertLessThanOrEqual(ToolHandler.descriptionRaisonProposition.count, ToolHandler.longueurRaisonDecrite)
+        XCTAssertFalse(ToolHandler.descriptionRaisonProposition.contains("export_journal"), "une proposition ne va pas au journal")
         fake.onSend = { [unowned fake] command, _ in
             guard command == "essayer" else { return }
             fake?.replies["essayer"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 120, green: 120, blue: 120))),

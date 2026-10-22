@@ -179,6 +179,9 @@ public final class ToolHandler {
     /// touchent pas l'image (classement, livraison) ; d'où sa brièveté (160 caractères au plus) et
     /// rien sur un avant/après.
     static let descriptionRaison = "Pourquoi, en une phrase simple : le défaut vu, puis ce que l'étape y fait. Gardé au journal (export_journal) ; la fenêtre Claude le montre avec l'étape cliquée."
+    /// Celle de preview_settings (1.3.1) : une proposition n'est pas une étape, sa raison ne va pas au
+    /// journal, sauf celle d'un exercice « Je le fais » ; même borne.
+    static let descriptionRaisonProposition = "Pourquoi, en une phrase simple : le défaut vu, puis ce que la proposition y fait. Rien au journal : à redonner à apply_settings (my_turn : celle de l'exercice)."
     static let longueurRaisonDecrite = 160
 
     /// Tous les outils définis, par thème.

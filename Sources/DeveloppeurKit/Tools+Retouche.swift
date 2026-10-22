@@ -130,8 +130,9 @@ extension ToolHandler {
                     ("overlay", prop("boolean", "Avec crop : l'image entière, le cadre proposé en pointillés, les tiers et le hors-cadre assombri (défaut true) ; false = l'image recadrée.")),
                     ("my_turn", prop("boolean", Self.descriptionMonTour)),
                     // La raison, comme pour apply_settings (1.3.1 : Claude la joignait, et l'appel était
-                    // refusé) : une proposition n'écrit pas d'étape ; elle revient dans la réponse.
-                    ("reason", prop("string", Self.descriptionRaison)),
+                    // refusé) : une proposition n'écrit pas d'étape ; elle revient dans la réponse, d'où
+                    // sa description à elle.
+                    ("reason", prop("string", Self.descriptionRaisonProposition)),
                  ],
                  required: []),
             tool("enhance_photo",

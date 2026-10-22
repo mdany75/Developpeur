@@ -727,8 +727,8 @@ local function garder(params)
     if essai and params.essai_recette ~= true then
         return {
             photo = photo.localIdentifier, fichier = Photos.nomFichier(photo), rangee = false, remplacee = false, motif = 'essai',
-            remarque = "Photo d'essai (Développeur › Essais) : sa leçon n'entre pas au carnet de progrès, qui ne compte que les "
-                .. "vraies prises de vue. La leçon de cette réponse reste valable.",
+            remarque = "Leçon non rangée : photo d'essai (Développeur › Essais) ; le carnet de progrès ne compte que les vraies "
+                .. "prises de vue. La leçon de cette réponse reste valable.",
         }
     end
     local lu = lirePhoto(photo, essai and photo or nil)

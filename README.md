@@ -1036,8 +1036,9 @@ parle au module y passe avec le jeton de la liaison, comme le connecteur :
   `preview_settings` (deux étapes « Claude · essai » dans l'Historique), sur une copie virtuelle
   seulement ;
 - `--constats <id>… [<fichier.jpg>…]` : le relevé des seuils du carnet de progrès (luminosité,
-  blanc pur du tiers haut, netteté et texture au point de mise au point, bruit, boîtier,
-  géométrie, puis les défauts que `view_photo` noterait), en lecture seule : rien n'est noté au
+  blanc pur du tiers haut, netteté et texture au point de mise au point, bruit, l'ISO et si le
+  bruit fort y est cherché (l'Exif pour un fichier), boîtier, géométrie, puis les défauts que
+  `view_photo` noterait), en lecture seule : rien n'est noté au
   carnet ; un fichier JPEG se mesure sans Lightroom ;
 - `--recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>]`
   `[--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--horizon <id> [--hauteur-horizon <0 à 1>]]` :
@@ -1051,8 +1052,8 @@ parle au module y passe avec le jeton de la liaison, comme le connecteur :
   `--portrait` y ajoute la peau dosée sur un portrait (trois doses en propositions, l'intensité 50
   qui vaut la moitié, le refus d'une peau trop lissée, la dose par défaut posée puis annulée),
   `--mixte` une photo à deux lumières lue mixte, puis le RAW lu à une seule lumière, en lecture
-  seule. Le RAW passe aussi par la 1.3 : l'avant/après d'une étape, la leçon (rangée, relue,
-  retirée), le carnet (la copie d'essai notée pour la recette, puis retirée) et « Je le fais » (sa
+  seule. Le RAW passe aussi par la 1.3 : l'avant/après d'une étape, la leçon (l'ISO lu, la leçon
+  refusée par l'outil pour une photo d'essai, rangée pour la recette, relue, retirée), le carnet (la copie d'essai notée pour la recette, puis retirée) et « Je le fais » (sa
   version rangée, comparée, puis effacée) ; `--horizon` vérifie la composition lue sur une copie
   d'essai qui a un vrai horizon (sans horizon net à `--hauteur-horizon`, 0,5 par défaut, la
   dernière étape, le cadre appliqué, est sautée avec sa raison). La recette remet aussi le registre

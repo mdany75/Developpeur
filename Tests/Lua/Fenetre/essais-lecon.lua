@@ -497,6 +497,15 @@ essai("Fil : leçon refusée ou interrompue (✕, bornée) ; non rangée ou gard
     -- Rangée pour la session seulement (carnet.json non écrit).
     local gardee = appelLecon(c, 'l3', entreeLecon(), reponseLecon(nil, { "Leçon gardée pour cette session, carnet.json non écrit : disque plein" }))
     contient(Fil.texteLecon(c.elements[gardee]), 'carnet.json non écrit')
+    -- Photo d'essai (1.3.1) : le refus voulu du module (Carnet.lua, garder) est dit tel quel, jamais
+    -- le texte générique d'une leçon non rangée.
+    local essai = "Leçon non rangée : photo d'essai (Développeur › Essais) ; le carnet de progrès ne compte que les vraies "
+        .. "prises de vue. La leçon de cette réponse reste valable."
+    local dEssai = appelLecon(c, 'l6', entreeLecon(), reponseLecon({ rangee = false, motif = 'essai' }, { "Mesuré : x.", essai }))
+    egal(essai, c.elements[dEssai].remarque)
+    local texteEssai = Fil.texteLecon(c.elements[dEssai])
+    vrai(texteEssai:sub(-#essai) == essai, 'le refus de la photo d\'essai en dernier : ' .. texteEssai)
+    vrai(not texteEssai:find('dans le carnet de progrès%.'), 'pas le texte générique : ' .. texteEssai)
     -- Non rangée sans remarque du connecteur : le texte le dit quand même ; rangée sans remarque,
     -- rien après la composition.
     local muette = appelLecon(c, 'l4', entreeLecon(), reponseLecon({ rangee = false }, { "Mesuré : x." }))

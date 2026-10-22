@@ -183,10 +183,14 @@ extension Recette {
     /// rangée par la commande du module avec essai_recette (jamais par un outil), sous l'entrée de la
     /// copie elle-même, relue (lecon lire), retirée (lecon retirer, même si une vérification échoue),
     /// et l'écriture annulée. Une leçon déjà rangée pour la copie (un essai d'avant la 1.3.1) n'est pas
-    /// remplacée : l'étape s'arrête avant toute écriture.
+    /// remplacée : l'étape s'arrête avant toute écriture. Une copie hors de la collection de recette
+    /// est sautée, comme pour le carnet : photo_lesson rangerait sa leçon au carnet de son original.
     func etapeLecon(_ id: Int, _ photo: String, depart: Etat, attendu: Etat) throws {
         let photoID = JSONValue.number(Double(id))
         try etape(photo, Self.etapeLeconNom) {
+            guard try dansLaCollectionDeRecette(id) else {
+                return "sautée : la copie n'est pas dans « \(Self.collectionDeRecette) » (sa leçon irait au carnet de son original, une vraie photo)"
+            }
             let deja = try tools.lightroom.send("lecon", ["action": "lire", "photos": [photoID]], timeout: 30)["lecons"]?.array ?? []
             guard deja.isEmpty else {
                 throw Echec(description: "une leçon est déjà rangée pour cette copie (essai dans la fenêtre d'avant la 1.3.1 ?) : la recette la remplacerait ; "
@@ -203,6 +207,10 @@ extension Recette {
             defer {
                 if aRetirer { _ = try? tools.lightroom.send("lecon", ["action": "retirer", "photo": photoID], timeout: 30) }
             }
+            // 1.3.1 : la sensibilité en nombre (Photos.sensibilite, isoSpeedRating brut), que le carnet
+            // et la leçon lisent pour le bruit fort ; lue telle que le module la rend, avant photo_lesson.
+            let journal = try tools.lightroom.send("journal", ["detaille": true, "photos": [photoID]], timeout: ToolHandler.journalLeconTimeout)
+            let sensibilite = journal["photos"]?.array?.first?["photo"]?["sensibilite"]
             let (faits, _) = try appel("photo_lesson", ["photo_id": photoID, "read_facts": true])
             let indices = (faits["faits"]?["indices"]?.array ?? []).compactMap { $0["defect"]?.string }
             let apresFaits = try etat(id)
@@ -224,6 +232,8 @@ extension Recette {
             _ = try appel("undo_last", ["photo_ids": [photoID]])
             try verifierEgal(try etat(id), attendu)
 
+            try verifier((sensibilite?.double ?? 0) > 0,
+                         "sensibilité absente du journal détaillé, ou pas un nombre (isoSpeedRating brut) : \(sensibilite.map(JSONCoding.line) ?? "absente")")
             try verifier(indices.contains("underexposed") && indices.contains("color_cast"),
                          "indices lus : \(indices.isEmpty ? "aucun" : indices.joined(separator: ", ")) (attendus : underexposed et color_cast)")
             try verifierEgal(apresFaits, ecrite)
@@ -232,7 +242,7 @@ extension Recette {
             let remarques = (reponse["remarques"]?.array ?? []).compactMap(\.string)
             try verifier(lecon?["rangee"]?.bool == false && parLOutil.isEmpty,
                          "leçon d'une copie d'essai rangée par photo_lesson (elle irait au carnet de Dany) : \(lecon.map(JSONCoding.line) ?? "?")")
-            try verifier(remarques.contains { $0.contains("Photo d'essai") }, "refus de la photo d'essai non dit : \(remarques.joined(separator: " ; "))")
+            try verifier(remarques.contains { $0.contains("photo d'essai") }, "refus de la photo d'essai non dit : \(remarques.joined(separator: " ; "))")
             let fichier = faits["photo"]?["fichier"]?.string
             try verifier(rangement["rangee"]?.bool == true, "leçon non rangée avec essai_recette : \(JSONCoding.line(rangement))")
             try verifier(rangement["photo"]?.int == id && rangement["original"]?.int == id && rangement["fichier"]?.string == fichier,
@@ -246,12 +256,13 @@ extension Recette {
             try verifier((retrait["retirees"]?.int ?? 0) >= 1 && !restees.contains { $0["photo"]?.int == id },
                          "leçon pas retirée : \(JSONCoding.line(retrait))")
             return "indices \(indices.joined(separator: ", ")) ; refusée par l'outil (photo d'essai) ; rangée pour la recette sous \(fichier ?? "?")"
-                + (mois.map { " (prise de vue \($0))" } ?? " (sans date de prise de vue)") + ", relue, retirée ; écriture annulée"
+                + (mois.map { " (prise de vue \($0))" } ?? " (sans date de prise de vue)") + ", relue, retirée ; écriture annulée ; "
+                + "ISO \(Int(sensibilite?.double ?? 0)) lu en nombre"
         }
     }
 
     /// Le nom de l'étape de la leçon dans la recette.
-    static let etapeLeconNom = "leçon de la photo (photo_lesson) : indices lus, refusée pour une photo d'essai, "
+    static let etapeLeconNom = "leçon de la photo (photo_lesson) : ISO et indices lus, refusée pour une photo d'essai, "
         + "rangée pour la recette (essai_recette), relue, retirée ; photo inchangée"
 
     /// Un mois de prise de vue tel que le module le range (« AAAA-MM »).

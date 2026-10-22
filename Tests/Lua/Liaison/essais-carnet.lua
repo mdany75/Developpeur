@@ -436,8 +436,8 @@ test("lecon garder : la leçon d'une photo de Développeur › Essais n'est pas 
     egal(r.photo, 7)
     egal(r.fichier, 'DSC_0412.NEF (Essai)')
     egal(r.original, nil, "aucune entrée visée")
-    egal(r.remarque, "Photo d'essai (Développeur › Essais) : sa leçon n'entre pas au carnet de progrès, qui ne compte que les "
-        .. "vraies prises de vue. La leçon de cette réponse reste valable.")
+    egal(r.remarque, "Leçon non rangée : photo d'essai (Développeur › Essais) ; le carnet de progrès ne compte que les vraies "
+        .. "prises de vue. La leçon de cette réponse reste valable.")
     egal(Carnet.version, version, "rien n'est rangé")
     egal(S.fichiers[Carnet.fichier()], fichier, "carnet.json inchangé")
     egal(next(Carnet.entree(1).lecons), nil, "rien sous l'original")

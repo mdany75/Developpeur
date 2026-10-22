@@ -539,10 +539,11 @@ function S.Photo(id, reglages, meta, brut)
         elseif cle == 'lastEditTime' then
             return self.derniereEdition or 0
         elseif cle == 'isoSpeedRating' then
-            -- Constaté le 21 octobre 2026 (Lightroom Classic 15.6, commande reglages :
-            -- prise_de_vue.iso de 160 à 12 800) : la sensibilité brute est un nombre ; le texte
-            -- « ISO 160 » n'est que celui de getFormattedMetadata. Sans valeur brute posée par
-            -- l'essai, le nombre de ce texte.
+            -- Relevé le 21 octobre 2026 (Lightroom Classic 15.6, commande reglages :
+            -- prise_de_vue.iso, tonumber de la valeur brute, de 160 à 12 800) : tenue pour un
+            -- nombre, que l'étape de la leçon de la recette vérifie (1.3.1) ; le texte « ISO 160 »
+            -- n'est que celui de getFormattedMetadata. Sans valeur brute posée par l'essai, le
+            -- nombre de ce texte.
             local iso = self.brut.isoSpeedRating
             if iso ~= nil then
                 assert(type(iso) == 'number', "isoSpeedRating brut : un nombre, pas « " .. tostring(iso) .. " »")

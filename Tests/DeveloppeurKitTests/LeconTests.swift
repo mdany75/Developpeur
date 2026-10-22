@@ -320,12 +320,12 @@ final class LeconTests: XCTestCase {
     func testLessonOfATestPhotoIsNotStoredAndSaysWhy() throws {
         repondreJournal([], id: 53709786, fichier: "DSCF1595.RAF (Essai)")
         fake.replies["lecon"] = ["photo": 53709786, "fichier": "DSCF1595.RAF (Essai)", "rangee": false, "remplacee": false, "motif": "essai",
-                                 "remarque": "Photo d'essai (Développeur › Essais) : sa leçon n'entre pas au carnet de progrès, qui ne compte que les vraies prises de vue. La leçon de cette réponse reste valable."]
+                                 "remarque": "Leçon non rangée : photo d'essai (Développeur › Essais) ; le carnet de progrès ne compte que les vraies prises de vue. La leçon de cette réponse reste valable."]
         let result = appeler(["photo_id": 53709786, "points": points()])
         XCTAssertFalse(result.isError, result.text)
         let reponse = try JSONCoding.parse(result.text)
         XCTAssertEqual(reponse["lecon"]?["rangee"]?.bool, false)
-        XCTAssertTrue((reponse["remarques"]?.array ?? []).contains { $0.string?.hasPrefix("Photo d'essai (Développeur › Essais)") == true }, result.text)
+        XCTAssertTrue((reponse["remarques"]?.array ?? []).contains { $0.string?.hasPrefix("Leçon non rangée : photo d'essai (Développeur › Essais)") == true }, result.text)
         XCTAssertNotNil(reponse["texte"]?.string, "la leçon reste dite")
         XCTAssertEqual(fake.lecons.count, 1)
         XCTAssertNil(fake.lecons.first?["essai_recette"], "jamais par un outil")

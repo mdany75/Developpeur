@@ -2574,7 +2574,8 @@ sujet ; les doses, que Dany juge sur l'avant/après.
 `essayer` applique un plan (retouche, masques ou taches), rend l'aperçu, puis réapplique les
 valeurs d'avant ; rien n'est mémorisé ni journalisé, mais l'Historique garde les deux étapes.
 `preview_settings` accepte `reason` (1.3.1 : Claude l'y joignait 3 fois sur 4, comme à
-`apply_settings`, et l'appel était refusé ; la description est `ToolHandler.descriptionRaison`) :
+`apply_settings`, et l'appel était refusé ; sa description, `ToolHandler.descriptionRaisonProposition`,
+ne promet pas le journal) :
 une proposition n'est pas une étape, la raison ne part pas au module ; elle revient dans la réponse
 (`raison`, avec `raison_lecture` : la redonner à `apply_settings`). Avec `my_turn`, elle est la
 `raison` de l'entrée `exercice` du journal (sinon `step_name`, comme avant).
@@ -3465,11 +3466,11 @@ point illisible ou hors du cadre, original qui ne s'ouvre pas à temps), 2 pour 
 illisibles. Il ne passe pas par la liaison : c'est un processus à part, lancé par Lightroom.
 
 **Tri** (`cull_photos`, `Tri.swift`). Photos visées : `photo_ids`, la sélection, une collection ou un
-dossier (par `chercher`, triées par date), 500 au plus ; sans aucun des quatre, la photo active
-(commande `etat`, 1.3.1 : dans la fenêtre Claude, la note d'abord de la photo active l'oubliait 2
-fois sur 4 ; sans photo active, le refus « Photos à traiter ») ; `contact_sheet` garde ce refus,
-une planche d'une seule photo ne montrant pas de série, par lots de 25 vignettes (une commande à la
+dossier (par `chercher`, triées par date), 500 au plus, par lots de 25 vignettes (une commande à la
 fois vers le module) ; progression et annulation entre deux lots (voir Délai des appels d'outils).
+Sans aucun des quatre, la photo active (commande `etat`, 1.3.1 : dans la fenêtre Claude, la note
+d'abord de la photo active l'oubliait 2 fois sur 4) ; sans photo active, le refus « Photos à
+traiter ». `contact_sheet` garde ce refus : une planche d'une seule photo ne montre pas de série.
 Chaque vignette, réduite à 1024 px : `Detail`, `Measurements`, Vision (visages, qualité, note
 esthétique), empreinte, point AF, et les mots-clés de Vision si demandés. Deux photos mesurées à la
 fois au plus : constaté le 17 octobre 2026, 25 analyses Vision lancées ensemble par
@@ -4126,10 +4127,12 @@ Depuis la 1.3 (`Recette+13.swift`, appelée par `sequenceRAW` et `lancer` ; essa
   par la commande `etapes`, en lectures bornées, 30 s au plus ; état « pret », une étape de plus en
   mémoire, l'avant aux dimensions de la vue, donc sans second rendu, l'après plus clair ; la durée
   lue dans `<id>.json` ; puis `undo_last`, l'étape dite hors de la mémoire) ; « leçon de la photo
-  (photo_lesson) : indices lus, refusée pour une photo d'essai, rangée pour la recette
-  (essai_recette), relue, retirée ; photo inchangée » (`etapeLecon` : Exposure2012 = max(départ,
+  (photo_lesson) : ISO et indices lus, refusée pour une photo d'essai, rangée pour la recette
+  (essai_recette), relue, retirée ; photo inchangée » (`etapeLecon`, sautée hors de « Développeur ›
+  Essais », où la leçon irait au carnet de l'original : Exposure2012 = max(départ,
   actuel) + 0,7 et Temperature = min(départ, actuel) − 500 K, calculés depuis le départ de la
-  séquence ; `read_facts` doit donner `underexposed` et `color_cast` ; puis les trois points par
+  séquence ; le journal détaillé doit porter `sensibilite` en nombre (1.3.1) ; `read_facts` doit
+  donner `underexposed` et `color_cast` ; puis les trois points par
   `photo_lesson`, qui doit rendre `rangee = false` avec la remarque de la photo d'essai, et rien de
   rangé pour la copie (1.3.1) ; puis `lecon garder` avec `essai_recette` par la commande du module,
   jamais par un outil, sous l'entrée de la copie (`original` = la copie), `lecon lire`, `lecon
@@ -4913,6 +4916,13 @@ l'étape sautée) sont dans la section de chaque chantier. Restent à voir :
 19. Le registre des notes après la recette : la proposition de la copie RAW remise telle qu'avant
     l'étape (`notation remettre`) ; celle laissée « acceptee » le 21 octobre 2026, avant la
     correction, à remettre « à vérifier » une fois.
+20. Correctif 1.3.1 : `sensibilite` (isoSpeedRating brut) en nombre dans le journal détaillé et
+    l'aperçu avec `point_af`, pour un RAF et un JPEG (l'étape de la leçon de la recette le vérifie
+    sur le RAW ; le relevé du 21 octobre 2026 n'a lu que `tonumber` de la valeur brute) ; cette
+    étape en vrai (refus de la leçon par l'outil, rangement pour la recette) ; dans la fenêtre
+    Claude, la leçon d'une copie d'Essais qui dit « Leçon non rangée : photo d'essai… » ; le tri de
+    la photo active sans cible ; `reason` accepté par `preview_settings` ; `isoEleve` (1 600) à
+    éprouver sur de vraies photos à ISO 800, 1 600 et 3 200.
 
 ## Bibliothèque
 

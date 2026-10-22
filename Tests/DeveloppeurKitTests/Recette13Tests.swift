@@ -37,6 +37,8 @@ final class ModuleRecette13: LightroomServing {
 
     /// Dans « Développeur › Essais » pour find_photos, et pour le module (Carnet.estPhotoDEssai).
     var dansLaCollection = true, dansLesEssais = true
+    /// La sensibilité du journal détaillé (Photos.sensibilite, 1.3.1) ; nil : absente (module 1.3).
+    var sensibilite: JSONValue? = 160
     /// La case Carnet du Gestionnaire décochée : tout constat est refusé (motif preference).
     var carnetDecoche = false
     /// Écarts d'un module fautif pour la leçon (1.3.1) : la leçon d'une photo d'essai rangée par
@@ -278,8 +280,9 @@ final class ModuleRecette13: LightroomServing {
             let liste = memoire.map { entree($0.id, $0.nom, true) } + defaites.map { entree($0.id, $0.nom, false) }
             return ["photo": photoJSON, "etapes": .array(liste)]
         case "journal":
-            return ["photos": [["photo": ["id": .number(Double(id)), "fichier": .string(fichier), "appareil": "X-H2S", "format": "RAW"],
-                                "entrees": .array(journal)]]]
+            var photo: [String: JSONValue] = ["id": .number(Double(id)), "fichier": .string(fichier), "appareil": "X-H2S", "format": "RAW"]
+            if let sensibilite { photo["sensibilite"] = sensibilite }
+            return ["photos": [["photo": .object(photo), "entrees": .array(journal)]]]
         case "essayer":
             if params["exercice"]?.bool == true {
                 var claude = reglages
@@ -324,7 +327,7 @@ final class ModuleRecette13: LightroomServing {
                 // essai_recette, sous l'entrée de la photo d'essai ; une autre, sous son original (9001).
                 if dansLesEssais, params["essai_recette"]?.bool != true, !leconsDEssaiRangees {
                     return ["photo": .number(Double(id)), "fichier": .string(fichier), "rangee": false, "remplacee": false, "motif": "essai",
-                            "remarque": "Photo d'essai (Développeur › Essais) : sa leçon n'entre pas au carnet de progrès, qui ne compte que les vraies prises de vue. La leçon de cette réponse reste valable."]
+                            "remarque": "Leçon non rangée : photo d'essai (Développeur › Essais) ; le carnet de progrès ne compte que les vraies prises de vue. La leçon de cette réponse reste valable."]
                 }
                 let original = dansLesEssais && !originalPourLaRecette ? id : 9001
                 let remplacee = lecons[id] != nil
@@ -478,6 +481,7 @@ final class Recette13Tests: XCTestCase {
         XCTAssertTrue(recette.etapes[0].detail.hasPrefix("indices underexposed, color_cast ; refusée par l'outil (photo d'essai) ; rangée pour la recette"),
                       details(recette))
         XCTAssertTrue(recette.etapes[0].detail.contains("(prise de vue 2025-07)"), details(recette))
+        XCTAssertTrue(recette.etapes[0].detail.hasSuffix("ISO 160 lu en nombre"), details(recette))
         let ecriture = try XCTUnwrap(module.params("appliquer").last)
         XCTAssertEqual(try XCTUnwrap(ecriture["reglages"]?["Exposure2012"]?.double), 1.1, accuracy: 1e-9)
         XCTAssertEqual(ecriture["reglages"]?["Temperature"]?.double, 4500)
@@ -513,6 +517,34 @@ final class Recette13Tests: XCTestCase {
     }
 
     /// Une leçon déjà rangée pour la copie n'est pas remplacée : rien n'est écrit.
+    /// Une sensibilité absente du journal détaillé (module 1.3), ou en texte, fait échouer l'étape ;
+    /// la leçon est retirée et l'écriture annulée quand même.
+    func testLeconSansSensibiliteEnNombreSeDit() throws {
+        for valeur in [nil, JSONValue.string("ISO 160")] {
+            let module = ModuleRecette13()
+            module.sensibilite = valeur
+            let recette = recette(module)
+            let (depart, attendu) = try preparerLecon(recette, module)
+            XCTAssertThrowsError(try recette.etapeLecon(7, "RAW 7", depart: depart, attendu: attendu))
+            XCTAssertTrue(recette.etapes[0].detail.contains("sensibilité absente du journal détaillé"), details(recette))
+            XCTAssertTrue(module.lecons.isEmpty, "retirée malgré l'échec")
+            XCTAssertEqual(module.reglages["Exposure2012"], 0.4, "écriture annulée")
+        }
+    }
+
+    /// Hors de la collection de recette, l'étape de la leçon est sautée, comme celle du carnet : ni
+    /// leçon (photo_lesson la rangerait au carnet de l'original), ni écriture.
+    func testLeconHorsDeLaCollectionSautee() throws {
+        let module = ModuleRecette13()
+        module.dansLaCollection = false
+        let recette = recette(module)
+        try recette.etapeLecon(7, "RAW 7", depart: try recette.etat(7), attendu: try recette.etat(7))
+        XCTAssertTrue(recette.reussie, details(recette))
+        XCTAssertTrue(recette.etapes[0].detail.hasPrefix("sautée"), details(recette))
+        XCTAssertTrue(module.noms("lecon").isEmpty)
+        XCTAssertTrue(module.params("appliquer").isEmpty)
+    }
+
     func testLeconDejaRangeeArreteAvantToutEcriture() throws {
         let module = ModuleRecette13()
         module.lecons[7] = ["photo": 7, "points": []]
@@ -642,7 +674,7 @@ final class Recette13Tests: XCTestCase {
         XCTAssertTrue(recette.reussie, details(recette))
         XCTAssertEqual(recette.etapes.map(\.nom), [
             "avant/après d'une étape gardé sans autre rendu (Pourquoi ?), puis annulé",
-            "leçon de la photo (photo_lesson) : indices lus, refusée pour une photo d'essai, rangée pour la recette (essai_recette), relue, retirée ; photo inchangée",
+            "leçon de la photo (photo_lesson) : ISO et indices lus, refusée pour une photo d'essai, rangée pour la recette (essai_recette), relue, retirée ; photo inchangée",
             "carnet de progrès : photo d'essai refusée, notée pour la recette (essai_recette), exportée, retirée",
         ])
         XCTAssertEqual(module.reglages, ["Exposure2012": 0.4, "Temperature": 5300, "Tint": 10, "Vibrance": 0, "Shadows2012": 0])
