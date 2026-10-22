@@ -8,10 +8,10 @@
 -- taille enregistrée à une fenêtre rouverte, sans la rapetisser (constaté).
 --
 -- Dimensions (D, Dispositions.dimensions), lues aussi par Fenetre.lua : la fenêtre entière, de
--- 1 497 × 1 200 (demandé par Dany le 21 octobre 2026, pour son écran de 3 440 × 1 440 ; la maquette
--- est à 1 280 × 800), et son contenu de 1 495 × 1 166 (D7, constaté le 21 octobre 2026 : barre de
+-- 1 948 × 1 200 (demandé par Dany le 21 octobre 2026, pour son écran de 3 440 × 1 440 ; la maquette
+-- est à 1 280 × 800), et son contenu de 1 946 × 1 166 (D7, constaté le 21 octobre 2026 : barre de
 -- titre de 33, marge de 1 à gauche, à droite et en bas, aucune en haut) ; les colonnes (volet de
--- 270 et son filet, centre de 760, filet et colonne droite de 463) ; `lignes` et `hauteurLigne` (la
+-- 324 et son filet, centre de 1 064, filet et colonne droite de 556) ; `lignes` et `hauteurLigne` (la
 -- grille du fil : autant de lignes que sa hauteur en tient), `fil` (sa largeur utile), `auteur`,
 -- `ecartAuteur` et `texteFil` (la colonne auteur, son écart et le texte d'une ligne du fil), `cases`
 -- et `hauteurCase` (la grille de la liste des conversations : autant de cases que sa place en
@@ -38,14 +38,15 @@ Dispositions.NOM = 'conversation'
 -- la vraie fenêtre celles dites « à recaler ».
 Dispositions.TAILLES = {
     -- La fenêtre entière (demandée par Dany le 21 octobre 2026 : plus grande que la maquette de
-    -- 1 280 × 800, elle laisse environ 1 940 points à Lightroom sur son écran de 3 440 × 1 440) et
+    -- 1 280 × 800, elle laisse environ 1 490 points à Lightroom sur son écran de 3 440 × 1 440) et
     -- son cadre (constaté le 21 octobre 2026, D7 : barre de titre de 33, 32 blancs et un filet ;
     -- 1 point de marge à gauche, à droite et en bas, aucun en haut).
-    largeurFenetre = 1497, hauteurFenetre = 1200, barreTitre = 33, margeDialogue = 1,
-    -- Les colonnes, sans leurs filets de 1 (270 + 1 + 760 + 1 + 463 = 1 495 : demandées par Dany, la
-    -- colonne droite de la maquette), et leurs marges : 10 dans le volet, 20 à gauche et à droite du
-    -- centre, 14 sur les côtés, 10 en haut et en bas de la colonne droite.
-    volet = 270, centre = 760, droite = 463, filet = 1,
+    largeurFenetre = 1948, hauteurFenetre = 1200, barreTitre = 33, margeDialogue = 1,
+    -- Les colonnes, sans leurs filets de 1 (324 + 1 + 1 064 + 1 + 556 = 1 946 : demandées par Dany,
+    -- celles de 1 497 × 1 200 élargies de 20 % à gauche, 40 % au centre et 20 % à droite), et leurs
+    -- marges : 10 dans le volet, 20 à gauche et à droite du centre, 14 sur les côtés, 10 en haut et
+    -- en bas de la colonne droite.
+    volet = 324, centre = 1064, droite = 556, filet = 1,
     margeVolet = 10, margeCentre = 20, margeDroite = 14, margeHautDroite = 10, margeBasDroite = 10,
     -- Le centre, de haut en bas (à recaler) : l'en-tête (12 + 22 + 6 + 18 + 10, son filet en plus), la
     -- barre ▲ ▼ Fin (son filet compris) et la zone de saisie (son filet compris : 1 + 12 + 26 + 8 + 52
@@ -63,26 +64,27 @@ Dispositions.TAILLES = {
     -- La liste des conversations (à recaler) : des cases de 40 points, autant que sa place en tient
     -- (D.cases, 22).
     hauteurCase = 40,
-    -- L'aperçu commun aux quatre onglets : un cadre 3:2 de 405 × 270, à la largeur de l'intérieur du
-    -- panneau (demandé par Dany le 21 octobre 2026), sa vignette en 2x (810 × 540 pixels,
+    -- L'aperçu commun aux quatre onglets : un cadre 3:2 de 498 × 332, à la largeur de l'intérieur du
+    -- panneau (demandé par Dany le 21 octobre 2026), sa vignette en 2x (996 × 664 pixels,
     -- Images.vignette).
-    apercu = 405, apercuHauteur = 270, echelleApercu = 2,
-    -- Le panneau de la colonne droite (435), son intérieur (405) et celui des cartes (379).
-    panneau = 435, interieur = 405, carte = 379,
+    apercu = 498, apercuHauteur = 332, echelleApercu = 2,
+    -- Le panneau de la colonne droite (528), son intérieur (498) et celui des cartes (472).
+    panneau = 528, interieur = 498, carte = 472,
     -- Ce que les cartes laissent de leur place sous l'aperçu (D.placeCartes), d'où leurs hauteurs
     -- (Dispositions.IMAGES) : la carte Note, 161 (la grille de l'onglet Note au-dessus d'elle et sa
     -- rangée du bas, et 1 de jeu : l'onglet Note remplit la place) ; les cartes Proposition, Aperçu
-    -- (étape) et Leçon, 81 sous elles (comme à 1 280 × 800 : 431 − 350).
-    autourNote = 161, sousCarte = 81,
-    -- Les lignes des cartes, en 12 points (provisoires jusqu'au lot 18) : sur chaque image de carte
-    -- (Dispositions.IMAGES), le plus grand nombre de lignes qui laisse au moins 12 sous le contenu,
-    -- comme la marge du haut (essais-fenetre-b.lua) : la grille des critères de la carte Note
-    -- (`criteres` + 1 lignes de 16 sur carte-note de 621 : 12 + 35 × 16 + 6 + filet + 6 + le
-    -- plafond, et le bas de la carte), le texte de la proposition (sur carte-proposition de 701 :
-    -- 12 + titre + 6 + 40 lignes + 6 + l'état et ▲ ▼ + 6 + boutons), de l'étape (onglet Aperçu, sur
-    -- carte-etape de 701 : 12 + titre + 6 + sous-titre + 6 + 40 lignes + 6 + boutons) et de la leçon
-    -- (sur carte-lecon de 701 : 12 + titre + 6 + 41 lignes + 6 + boutons).
-    criteres = 34, propLignes = 40, etapeLignes = 40, leconLignes = 41,
+    -- (étape) et Leçon, 41 : comme la carte Note, elles descendent jusqu'à leur rangée de boutons,
+    -- posée sous elles au bas du panneau (12, le cadre de ses boutons de bezel 26, et 1 de jeu ;
+    -- demandé par Dany le 21 octobre 2026).
+    autourNote = 161, sousCarte = 41,
+    -- Les lignes des cartes, en 12 points : sur chaque image de carte (Dispositions.IMAGES), le plus
+    -- grand nombre de lignes qui laisse au moins 12 sous le contenu, comme la marge du haut
+    -- (essais-fenetre-b.lua) : la grille des critères de la carte Note (`criteres` + 1 lignes de 16
+    -- sur carte-note de 559 : 12 + 31 × 16 + 6 + filet + 6 + le plafond, et le bas de la carte), le
+    -- texte de la proposition (sur carte-proposition de 679 : 12 + titre + 6 + 40 lignes + 6 +
+    -- l'état), de l'étape (onglet Aperçu, sur carte-etape de 679 : 12 + titre + 6 + sous-titre + 6
+    -- + 40 lignes) et de la leçon (sur carte-lecon de 679 : 12 + titre + 6 + 42 lignes).
+    criteres = 30, propLignes = 40, etapeLignes = 40, leconLignes = 42,
     -- Le cadre d'un square_button dépasse son bezel visible de 2 points (constaté le 21 octobre 2026,
     -- D5 : height = bezel + 2 ; Fenetre.bouton, clé `bezel`).
     margeBezel = 2,
@@ -123,7 +125,7 @@ end
 
 local T = Dispositions.TAILLES
 -- Le panneau, sur toute la hauteur de la colonne droite entre ses marges du haut et du bas (1 146
--- pour un contenu de 1 166), et la place des cartes qu'il laisse (782).
+-- pour un contenu de 1 166), et la place des cartes qu'il laisse (720).
 local hauteurPanneau = hauteurContenu(T) - T.margeHautDroite - T.margeBasDroite
 local placeDesCartes = placeCartes(T, hauteurPanneau)
 
@@ -133,9 +135,8 @@ Dispositions.IMAGES = {
     panneau = taille(T.panneau, hauteurPanneau),
     -- Les fonds des cartes (#FAFAFA, bord #D9D9D9, coins de 6), à la largeur intérieure du panneau :
     -- Note (critères, filet et plafond), Proposition, Aperçu (étape) et Leçon, à la hauteur que leur
-    -- laisse la place des cartes (782 sous l'aperçu de 405 × 270 : 621 pour la carte Note, que
-    -- l'onglet Note remplit, 701 pour les autres, 81 sous elles ; 270 et 350 dans la place de 431
-    -- de la fenêtre de 1 280 × 800).
+    -- laisse la place des cartes (720 sous l'aperçu de 498 × 332 : 559 pour la carte Note, que
+    -- l'onglet Note remplit, 679 pour les autres, leur rangée de boutons sous elles).
     ['carte-note'] = taille(T.interieur, placeDesCartes - T.autourNote),
     ['carte-proposition'] = taille(T.interieur, placeDesCartes - T.sousCarte),
     ['carte-etape'] = taille(T.interieur, placeDesCartes - T.sousCarte),
@@ -289,14 +290,14 @@ function Dispositions.image(nom, apparence)
     return parValeur(Dispositions.apparence(apparence)).dossier .. '/' .. nom .. '.png'
 end
 
--- Le nom de l'image « aucun aperçu », sans extension : celui de son cadre (« vide-405x270 »).
+-- Le nom de l'image « aucun aperçu », sans extension : celui de son cadre (« vide-498x332 »).
 function Dispositions.nomImageVide()
     local T = Dispositions.TAILLES
     return 'vide-' .. T.apercu .. 'x' .. T.apercuHauteur
 end
 
 -- Le chemin de l'image « aucun aperçu » dans le jeu de l'apparence, depuis le dossier du module
--- (« images/vide-405x270.png », « images/sombre/vide-405x270.png »), au cadre 3:2 de l'aperçu, en
+-- (« images/vide-498x332.png », « images/sombre/vide-498x332.png »), au cadre 3:2 de l'aperçu, en
 -- 2x : scripts/images-vides.swift la dessine, du fond et du texte de chaque palette.
 function Dispositions.imageVide(apparence)
     return parValeur(Dispositions.apparence(apparence)).dossier .. '/' .. Dispositions.nomImageVide() .. '.png'
@@ -347,10 +348,10 @@ function Dispositions.dimensions()
         D[cle] = valeur
     end
     local cadre = Dispositions.cadreBouton
-    -- Le contenu de la fenêtre (D7) : 1 495 × 1 166 pour 1 497 × 1 200.
+    -- Le contenu de la fenêtre (D7) : 1 946 × 1 166 pour 1 948 × 1 200.
     D.largeurContenu = D.largeurFenetre - 2 * D.margeDialogue
     D.hauteurContenu = hauteurContenu(D)
-    -- Volet : 250 utiles. En haut, Nouvelle conversation (bezel 26), 8, Rechercher (24), 14 ; en bas,
+    -- Volet : 304 utiles. En haut, Nouvelle conversation (bezel 26), 8, Rechercher (24), 14 ; en bas,
     -- Renommer… et Supprimer… (bezel 22), 6, le filet entre deux marges de 6, 6, Publication… et
     -- Consommation… (bezel 22, 6 entre eux), 4, les deux versions (14 chacune), 6, le voyant Écran
     -- (16). Les cases de la liste remplissent le milieu : autant que sa place en tient (22 de 40
@@ -365,7 +366,7 @@ function Dispositions.dimensions()
     D.basVolet = cadre(22) + 6 + (6 + D.filet + 6) + 6 + cadre(22) + 6 + cadre(22) + 4 + 2 * D.ligneVersion + 6 + D.ecran
     D.hauteurListe = D.hauteurContenu - 2 * D.margeVolet - D.hautVolet - D.basVolet
     D.cases = math.floor(D.hauteurListe / D.hauteurCase)
-    -- Centre : 720 utiles. L'en-tête : le titre (gras 16) et le Mode, puis les voyants Claude Code et
+    -- Centre : 1 024 utiles. L'en-tête : le titre (gras 16) et le Mode, puis les voyants Claude Code et
     -- Lightroom et la photo active, alignée à droite sur la marge (la rangée fait les 720 : un texte
     -- de taille fixe ne s'étire pas) ; le fil ; la barre, dont l'activité (ou le forfait) finit de
     -- même sur la marge de droite, comme dans la maquette ; la saisie (Style, bandeau, Envoyer). Le
@@ -381,7 +382,7 @@ function Dispositions.dimensions()
     D.hauteurFil = D.hauteurContenu - (D.entete + D.filet) - D.barre - D.saisie
     D.lignes = math.floor((D.hauteurFil - D.margeHautFil - D.margeBasFil) / D.hauteurLigne)
     D.grille = D.lignes * D.hauteurLigne
-    -- Le texte d'une ligne du fil (648 : Fenetre.largeurTexte), après la colonne auteur et son écart.
+    -- Le texte d'une ligne du fil (952 : Fenetre.largeurTexte), après la colonne auteur et son écart.
     D.texteFil = D.fil - D.auteur - D.ecartAuteur
     -- ▲ ▼ de la barre et ◀ ▶ de l'aperçu (bezel de 22), puis Fin.
     D.fleche = 26
@@ -394,8 +395,8 @@ function Dispositions.dimensions()
     D.etiquetteStyle = 30
     D.envoyer = Dispositions.IMAGES['bouton-bleu'].largeur
     D.bandeau = D.fil - (D.joindre + 4 + D.joindre + 10 + D.etiquetteStyle + 6 + D.style + 8 + 8 + D.envoyer)
-    -- Colonne droite : le panneau de 435, à 14 du bord ; les segments centrés en tête, à cheval sur
-    -- son bord (bande transparente de 12) ; son contenu de 405 sous une marge de 13 (12 + 1 + 22 =
+    -- Colonne droite : le panneau de 528, à 14 du bord ; les segments centrés en tête, à cheval sur
+    -- son bord (bande transparente de 12) ; son contenu de 498 sous une marge de 13 (12 + 1 + 22 =
     -- 35 depuis le haut des segments, comme la maquette) et à 15 du bord (14 + 1).
     D.segments = 0
     D.onglets = {
@@ -421,18 +422,17 @@ function Dispositions.dimensions()
     D.agrandir = 90
     D.legende = D.interieur - 2 * D.fleche - 2 * 4 - 8 - D.agrandir
     -- La place des cartes sous l'aperçu et sa rangée, jusqu'au bas du contenu du panneau (son bord
-    -- de 1 et sa marge de 14) : 782 points, d'où les hauteurs des cartes (Dispositions.IMAGES). Chaque
+    -- de 1 et sa marge de 14) : 720 points, d'où les hauteurs des cartes (Dispositions.IMAGES). Chaque
     -- carte y tient (essais-fenetre-b.lua).
     D.placeCartes = placeCartes(D, Dispositions.IMAGES.panneau.hauteur)
     -- Les cartes sur leurs images (Vues.lecon, Vues.proposition, Vues.etape, la grille des critères
-    -- de Vues.notation) : leur texte à l'intérieur de la carte (379), à 13 du bord (12 de marge et
-    -- le bord de 1), coupé en pages à cette largeur (Fenetre.montrerPage) ; « Détail… » en carré.
+    -- de Vues.notation) : leur texte à l'intérieur de la carte (472), à 13 du bord (12 de marge et
+    -- le bord de 1), coupé en pages à cette largeur (Fenetre.montrerPage).
     D.largeurNote = D.carte
     D.largeurProposition = D.carte
     D.largeurEtape = D.carte
     D.largeurLecon = D.carte
     D.margeCarte = math.floor((D.interieur - D.carte) / 2)
-    D.detail = 70
     -- La carte Note (Vues.notation, maquette « B · Conversation claire », onglet Note) : la grille
     -- des étiquettes (« Passes : », « Votre note : », « Drapeau : », alignées à droite en 12 :
     -- « Votre note : » mesure 66,6, et 2 de jeu) et de leurs valeurs, 8 entre ses rangées ; les cinq
@@ -442,7 +442,7 @@ function Dispositions.dimensions()
     -- « Plancher technique » mesure 116,7, et 2 de jeu, puis son texte), le filet et la ligne du
     -- plafond avec « Voir à 100 % » ; la rangée du bas (▲ ▼, Laisser, Changer…, Accepter en bleu :
     -- bezel de 26). La rangée des passes (Vues.passes, largeurs mesurées) prend juste la place que
-    -- laisse la colonne des étiquettes (327 points).
+    -- laisse la colonne des étiquettes (420 points).
     D.etiquetteNote = 70
     D.ecartEtiquette = 8
     D.ecartGrille = 8
@@ -460,11 +460,14 @@ function Dispositions.dimensions()
     D.zoom = 84
     D.plafond = D.carte - D.avertissement - 8 - 8 - D.zoom
     D.laisser, D.changer = 104, 84
-    -- La carte Proposition (Vues.proposition) : Refuser, Ajuster… et Je le fais (ou J'ai fini) en
-    -- carrés, Accepter en bleu ; la carte de l'étape (Vues.etape) : ◀ ▶, Voir l'avant (ou l'après)
-    -- et Détail… en carrés.
-    D.refuser, D.ajuster, D.jeLeFais = 72, 78, 84
-    D.bascule = 96
+    -- Les rangées sous les cartes Proposition, Aperçu (étape) et Leçon, comme celle de la carte Note
+    -- (bezel de 26, titres en 13, 8 entre les boutons ; demandé par Dany le 21 octobre 2026) : ▲ ▼
+    -- à gauche, puis, à droite, Refuser, Ajuster… et Je le fais (ou J'ai fini) en carrés et
+    -- Accepter en bleu (Vues.proposition) ; ◀ ▶, Voir l'avant (ou l'après) et Détail… en carrés
+    -- (Vues.etape) ; Détail… (Vues.lecon).
+    D.refuser, D.ajuster, D.jeLeFais = 80, 86, 92
+    D.bascule = 104
+    D.detail = 80
     return D
 end
 

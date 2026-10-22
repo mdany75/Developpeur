@@ -8,7 +8,7 @@
 -- Pourquoi ?, 1.3), la leçon de la photo (onglet Leçon, 1.3), et les versions du module et du
 -- connecteur MCP-Développeur.
 --
--- Une seule disposition, la Conversation claire, à l'allure de la fenêtre B (1.3 : 1 497 × 1 200,
+-- Une seule disposition, la Conversation claire, à l'allure de la fenêtre B (1.3 : 1 948 × 1 200,
 -- volet des conversations en cases, en-tête avec le Mode, segments et panneau à droite ; l'Atelier,
 -- le Panneau et le choix de la disposition sont retirés : demandé par Dany le 20 octobre 2026).
 -- Dispositions.lua l'assemble des pièces de Vues.lua ; ce fichier garde l'état, ce qui remplit les
@@ -1378,7 +1378,7 @@ local function legendeActive(active)
     return { nom = active.nom }
 end
 
--- La vignette de l'aperçu, en pixels : 2 × le cadre (810 × 540), centrée sur le fond.
+-- La vignette de l'aperçu, en pixels : 2 × le cadre (996 × 664), centrée sur le fond.
 local function vignetteApercu(T, dossier, nom)
     return Images.vignette(dossier, nom, T.pixelsApercu, T.pixelsApercuHauteur)
 end
@@ -1525,7 +1525,7 @@ end
 Fenetre.LEGENDE_COMPARAISON = "Claude | vous"
 
 -- Montre dans l'aperçu une image de la conversation `c` (chemin relatif à son dossier), réduite au
--- cadre de l'aperçu en 2x dans une tâche (Images.vignette, 810 × 540), gardée ensuite
+-- cadre de l'aperçu en 2x dans une tâche (Images.vignette, 996 × 664), gardée ensuite
 -- (Fenetre.vignettes, par sa taille en pixels).
 function Fenetre.montrerImage(p, T, c, chemin)
     local cle = c.id .. '/' .. chemin .. '/' .. T.pixelsApercu .. 'x' .. T.pixelsApercuHauteur
@@ -4065,8 +4065,10 @@ end
 -- augmente quand le contenu rapetisse. Le nom garde « conversation » et « grande » (la seule
 -- disposition, la seule taille). 2 : la fenêtre B (1.3), de 1 280 × 800, plus basse que la
 -- Conversation claire de la 1.2 ; 3 : la fenêtre B agrandie, de 1 497 × 1 200 (demandée par Dany
--- le 21 octobre 2026), qui ne doit pas reprendre le cadre de 1 280 × 800 enregistré sous 2.
-Fenetre.FORME = 3
+-- le 21 octobre 2026), qui ne doit pas reprendre le cadre de 1 280 × 800 enregistré sous 2 ; 4 :
+-- élargie à 1 948 × 1 200 (demandée par Dany le même jour), sans reprendre le cadre enregistré
+-- sous 3.
+Fenetre.FORME = 4
 
 function Fenetre.cadre()
     return 'DeveloppeurClaude-' .. Dispositions.NOM .. '-grande-' .. Fenetre.FORME

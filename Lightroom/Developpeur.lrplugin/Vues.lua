@@ -465,7 +465,7 @@ function Vues.autresFenetres(f, F, D)
     }
 end
 
--- Le volet (270, marges de 10) : « ＋ Nouvelle conversation », la loupe devant « Rechercher », la
+-- Le volet (324, marges de 10) : « ＋ Nouvelle conversation », la loupe devant « Rechercher », la
 -- liste en cases ; en bas, Renommer… et Supprimer…, un filet, Publication… et Consommation…, les
 -- versions et le voyant Écran.
 function Vues.volet(f, F, D)
@@ -658,11 +658,39 @@ function Vues.navigationApercu(f, F, D)
     }
 end
 
+-- Une carte de la colonne droite telle que la carte Note (demandé par Dany le 21 octobre 2026) :
+-- l'image de la carte et son contenu à 13 du bord et 12 du haut, puis, sous elle, 12 et sa rangée
+-- de boutons, ▲ ▼ à gauche (Vues.fleches) et les boutons à droite. La carte descend ainsi jusqu'à
+-- sa rangée, au bas du panneau, comme celle de la carte Note.
+local function carteEtRangee(f, F, largeur, D, image, contenu, fleches, boutons)
+    local t = F.tailleImage(image)
+    contenu.margin_left = D.margeCarte
+    contenu.margin_top = 12
+    contenu.spacing = 6
+    local rangee = { spacing = 0, Vues.fleches(f, F, fleches), f:spacer { fill_horizontal = 1 } }
+    for _, bouton in ipairs(boutons) do
+        rangee[#rangee + 1] = bouton
+    end
+    return f:column {
+        spacing = 0,
+        width = largeur,
+        f:column {
+            place = 'overlapping',
+            width = largeur,
+            height = t.hauteur,
+            Vues.image(f, F, image),
+            f:column(contenu),
+        },
+        f:spacer { height = 12 },
+        f:row(rangee),
+    }
+end
+
 -- La proposition de Claude en mode « Proposer d'abord » (fenêtre B, lot B5), sur son image
 -- (carte-proposition, à la largeur intérieure du panneau) : « Proposition de Claude » en gras 12,
 -- ce qu'il compte changer page par page (`propositionTexte`, D.propLignes lignes en 12, coupées par
 -- Fenetre.montrerPage ; la ligne « Cadre : … » de Composition lue comprise), l'état d'un exercice
--- Je le fais (`exerciceEtat`, « À vous · 3 réglages faits sur 7 ») avec ▲ ▼ à sa droite, puis
+-- Je le fais (`exerciceEtat`, « À vous · 3 réglages faits sur 7 ») ; sous la carte, ▲ ▼, puis
 -- Refuser, Ajuster… et « Je le fais » (titre lié `titreJeLeFais` : « J'ai fini » pendant
 -- l'exercice, jamais deux boutons superposés) en carrés, et Accepter, un bouton bleu en image
 -- (Vues.boutonBleu : son calque ne fait rien quand aucune proposition n'attend, `enAttente`).
@@ -670,126 +698,81 @@ end
 -- travaille pas.
 function Vues.proposition(f, F, largeur, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    local t = F.tailleImage('carte-proposition')
-    return f:column {
-        place = 'overlapping',
-        width = largeur,
-        height = t.hauteur,
-        Vues.image(f, F, 'carte-proposition'),
-        f:column {
-            margin_left = D.margeCarte,
-            margin_top = 12,
-            spacing = 6,
-            f:static_text { title = "Proposition de Claude", font = P.gras12, text_color = C.texte, width = D.largeurProposition },
-            f:static_text { title = bind 'propositionTexte', font = P.texte12, text_color = C.texte, width = D.largeurProposition,
-                height_in_lines = D.propLignes },
-            f:row {
-                spacing = 0,
-                f:static_text { title = bind 'exerciceEtat', font = P.petit, text_color = C.gris, width = D.largeurProposition - 60,
-                    truncation = 'tail', place_vertical = 0.5 },
-                f:spacer { fill_horizontal = 1 },
-                Vues.fleches(f, F, 'proposition'),
-            },
-            f:row {
-                spacing = 0,
-                F.bouton(f, { carre = true, bezel = 24, title = "Refuser", font = P.systeme12, width = D.refuser, enabled = bind 'enAttente',
-                    tooltip = "Refuser la proposition : rien ne change", action = function() F.repondreProposition(false) end }),
-                f:spacer { width = 6 },
-                F.bouton(f, { carre = true, bezel = 24, title = "Ajuster…", font = P.systeme12, width = D.ajuster, enabled = bind 'enAttente',
-                    tooltip = "Dire à Claude ce qu'il faut changer avant d'appliquer", action = function() F.enTache(F.ajuster) end }),
-                f:spacer { width = 6 },
-                F.bouton(f, { carre = true, bezel = 24, title = bind 'titreJeLeFais', font = P.systeme12, width = D.jeLeFais,
-                    enabled = bind 'peutJeLeFais',
-                    tooltip = "Faire la retouche vous-même : Claude donne les réglages dans l'ordre du panneau Développement, "
-                        .. "puis compare votre version à la sienne",
-                    action = function() F.enTache(F.jeLeFais) end }),
-                f:spacer { fill_horizontal = 1 },
-                Vues.boutonBleu(f, F, { nom = 'AccepterProposition', titre = "Accepter", cle = 'enAttente',
-                    infobulle = "Appliquer la proposition : la photo ne change qu'à ce clic",
-                    action = function() F.repondreProposition(true) end }),
-            },
-        },
-    }
+    return carteEtRangee(f, F, largeur, D, 'carte-proposition', {
+        f:static_text { title = "Proposition de Claude", font = P.gras12, text_color = C.texte, width = D.largeurProposition },
+        f:static_text { title = bind 'propositionTexte', font = P.texte12, text_color = C.texte, width = D.largeurProposition,
+            height_in_lines = D.propLignes },
+        f:static_text { title = bind 'exerciceEtat', font = P.petit, text_color = C.gris, width = D.largeurProposition,
+            truncation = 'tail' },
+    }, 'proposition', {
+        F.bouton(f, { carre = true, bezel = 26, title = "Refuser", font = P.systeme13, width = D.refuser, enabled = bind 'enAttente',
+            tooltip = "Refuser la proposition : rien ne change", action = function() F.repondreProposition(false) end }),
+        f:spacer { width = 8 },
+        F.bouton(f, { carre = true, bezel = 26, title = "Ajuster…", font = P.systeme13, width = D.ajuster, enabled = bind 'enAttente',
+            tooltip = "Dire à Claude ce qu'il faut changer avant d'appliquer", action = function() F.enTache(F.ajuster) end }),
+        f:spacer { width = 8 },
+        F.bouton(f, { carre = true, bezel = 26, title = bind 'titreJeLeFais', font = P.systeme13, width = D.jeLeFais,
+            enabled = bind 'peutJeLeFais',
+            tooltip = "Faire la retouche vous-même : Claude donne les réglages dans l'ordre du panneau Développement, "
+                .. "puis compare votre version à la sienne",
+            action = function() F.enTache(F.jeLeFais) end }),
+        f:spacer { width = 8 },
+        Vues.boutonBleu(f, F, { nom = 'AccepterProposition', titre = "Accepter", cle = 'enAttente',
+            infobulle = "Appliquer la proposition : la photo ne change qu'à ce clic",
+            action = function() F.repondreProposition(true) end }),
+    })
 end
 
 -- La carte de l'étape (1.3, l'ancienne carte « Pourquoi ? ») dans l'onglet Aperçu, sur son image
 -- (carte-etape, fenêtre B, lot B5) : son titre en gras 12 (« Étape 2 sur 4 · passe 1 : balance » ;
 -- « Pourquoi ? » sans étape, Fenetre.TITRE_ETAPE), son sous-titre en gris (fichier, outil,
 -- « annulée ensuite »), sa raison et ses réglages changés page par page (`etapeTexte`,
--- D.etapeLignes lignes en 12, coupées par Fenetre.montrerPage), puis ◀ ▶ (étape précédente ou
--- suivante de la même photo), Voir l'avant / Voir l'après (titre lié `titreBascule` : un seul
--- bouton), Détail… (l'appel de l'outil et sa réponse) en carrés, et ▲ ▼.
+-- D.etapeLignes lignes en 12, coupées par Fenetre.montrerPage) ; sous la carte, ▲ ▼, puis ◀ ▶
+-- (étape précédente ou suivante de la même photo), Voir l'avant / Voir l'après (titre lié
+-- `titreBascule` : un seul bouton) et Détail… (l'appel de l'outil et sa réponse) en carrés.
 function Vues.etape(f, F, largeur, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    local t = F.tailleImage('carte-etape')
-    return f:column {
-        place = 'overlapping',
-        width = largeur,
-        height = t.hauteur,
-        Vues.image(f, F, 'carte-etape'),
-        f:column {
-            margin_left = D.margeCarte,
-            margin_top = 12,
-            spacing = 6,
-            f:static_text { title = bind 'etapeTitre', font = P.gras12, text_color = C.texte, width = D.largeurEtape, truncation = 'tail' },
-            f:static_text { title = bind 'etapeSousTitre', font = P.petit, text_color = C.gris, width = D.largeurEtape,
-                truncation = 'middle' },
-            f:static_text { title = bind 'etapeTexte', font = P.texte12, text_color = C.texte, width = D.largeurEtape,
-                height_in_lines = D.etapeLignes },
-            f:row {
-                spacing = 0,
-                F.bouton(f, { carre = true, bezel = 22, title = "◀", width = D.fleche, tooltip = "Étape précédente",
-                    enabled = bind 'etapePrecedente', action = function() F.etapeVoisine(-1) end }),
-                f:spacer { width = 4 },
-                F.bouton(f, { carre = true, bezel = 22, title = "▶", width = D.fleche, tooltip = "Étape suivante",
-                    enabled = bind 'etapeSuivante', action = function() F.etapeVoisine(1) end }),
-                f:spacer { width = 8 },
-                F.bouton(f, { carre = true, bezel = 22, title = bind 'titreBascule', font = P.systeme12, width = D.bascule,
-                    tooltip = "Montrer l'avant ou l'après de cette étape dans l'aperçu", enabled = bind 'etapeAImages',
-                    action = function() F.basculerEtape() end }),
-                f:spacer { width = 6 },
-                F.bouton(f, { carre = true, bezel = 22, title = "Détail…", font = P.systeme12, width = D.detail,
-                    tooltip = "Ce que Claude a demandé au connecteur pour cette étape, puis sa réponse", enabled = bind 'etapeADetail',
-                    action = function() F.enTache(F.detailEtape) end }),
-                f:spacer { fill_horizontal = 1 },
-                Vues.fleches(f, F, 'etape'),
-            },
-        },
-    }
+    return carteEtRangee(f, F, largeur, D, 'carte-etape', {
+        f:static_text { title = bind 'etapeTitre', font = P.gras12, text_color = C.texte, width = D.largeurEtape, truncation = 'tail' },
+        f:static_text { title = bind 'etapeSousTitre', font = P.petit, text_color = C.gris, width = D.largeurEtape,
+            truncation = 'middle' },
+        f:static_text { title = bind 'etapeTexte', font = P.texte12, text_color = C.texte, width = D.largeurEtape,
+            height_in_lines = D.etapeLignes },
+    }, 'etape', {
+        F.bouton(f, { carre = true, bezel = 26, title = "◀", font = P.systeme13, width = D.fleche, tooltip = "Étape précédente",
+            enabled = bind 'etapePrecedente', action = function() F.etapeVoisine(-1) end }),
+        f:spacer { width = 4 },
+        F.bouton(f, { carre = true, bezel = 26, title = "▶", font = P.systeme13, width = D.fleche, tooltip = "Étape suivante",
+            enabled = bind 'etapeSuivante', action = function() F.etapeVoisine(1) end }),
+        f:spacer { width = 8 },
+        F.bouton(f, { carre = true, bezel = 26, title = bind 'titreBascule', font = P.systeme13, width = D.bascule,
+            tooltip = "Montrer l'avant ou l'après de cette étape dans l'aperçu", enabled = bind 'etapeAImages',
+            action = function() F.basculerEtape() end }),
+        f:spacer { width = 8 },
+        F.bouton(f, { carre = true, bezel = 26, title = "Détail…", font = P.systeme13, width = D.detail,
+            tooltip = "Ce que Claude a demandé au connecteur pour cette étape, puis sa réponse", enabled = bind 'etapeADetail',
+            action = function() F.enTache(F.detailEtape) end }),
+    })
 end
 
 -- La carte de l'onglet Leçon (1.3, lot B4), sur son image (carte-lecon, à la largeur intérieure
 -- du panneau) : son titre en gras 12 (`leconTitre`, « Leçon de la photo · DSCF4961.RAF »), puis la
 -- leçon page par page (`leconTexte`, D.leconLignes lignes en 12, coupées par Fenetre.montrerPage :
--- le nom de chaque axe en <EM>, gras de même taille, constaté le 21 octobre 2026, D4), puis
--- « Détail… » (l'appel de photo_lesson et sa réponse) et ▲ ▼ (Fenetre.defilerTexte('lecon')). Sans
--- leçon, l'aide (Fenetre.AUCUNE_LECON).
+-- le nom de chaque axe en <EM>, gras de même taille, constaté le 21 octobre 2026, D4) ; sous la
+-- carte, ▲ ▼ (Fenetre.defilerTexte('lecon')) et « Détail… » (l'appel de photo_lesson et sa
+-- réponse). Sans leçon, l'aide (Fenetre.AUCUNE_LECON).
 function Vues.lecon(f, F, largeur, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    local t = F.tailleImage('carte-lecon')
-    return f:column {
-        place = 'overlapping',
-        width = largeur,
-        height = t.hauteur,
-        Vues.image(f, F, 'carte-lecon'),
-        f:column {
-            margin_left = D.margeCarte,
-            margin_top = 12,
-            spacing = 6,
-            f:static_text { title = bind 'leconTitre', font = P.gras12, text_color = C.texte, width = D.largeurLecon,
-                truncation = 'middle' },
-            f:static_text { title = bind 'leconTexte', font = P.texte12, text_color = C.texte, emphasis_font = P.gras12,
-                emphasis_color = C.texte, width = D.largeurLecon, height_in_lines = D.leconLignes },
-            f:row {
-                spacing = 0,
-                F.bouton(f, { carre = true, bezel = 22, title = "Détail…", font = P.systeme12, width = D.detail,
-                    enabled = bind 'leconADetail', tooltip = "Ce que Claude a donné au connecteur pour cette leçon, puis sa réponse",
-                    action = function() F.enTache(F.detailLecon) end }),
-                f:spacer { fill_horizontal = 1 },
-                Vues.fleches(f, F, 'lecon'),
-            },
-        },
-    }
+    return carteEtRangee(f, F, largeur, D, 'carte-lecon', {
+        f:static_text { title = bind 'leconTitre', font = P.gras12, text_color = C.texte, width = D.largeurLecon,
+            truncation = 'middle' },
+        f:static_text { title = bind 'leconTexte', font = P.texte12, text_color = C.texte, emphasis_font = P.gras12,
+            emphasis_color = C.texte, width = D.largeurLecon, height_in_lines = D.leconLignes },
+    }, 'lecon', {
+        F.bouton(f, { carre = true, bezel = 26, title = "Détail…", font = P.systeme13, width = D.detail,
+            enabled = bind 'leconADetail', tooltip = "Ce que Claude a donné au connecteur pour cette leçon, puis sa réponse",
+            action = function() F.enTache(F.detailLecon) end }),
+    })
 end
 
 -- Note -------------------------------------------------------------------------------------------

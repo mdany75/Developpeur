@@ -6,7 +6,7 @@
 -- image dans les deux jeux (images/ et images/sombre/), un seul PNG en 2x (2 × la taille en points,
 -- en-tête IHDR lu en Lua pur) à 144 ppp (bloc pHYs : 5 669 pixels par mètre), aux mêmes tailles,
 -- la sombre autre que la claire, sans image de trop ni paire @2x, et ce contrôle lui-même, sur des
--- PNG fabriqués ; l'image « aucun aperçu » du cadre 3:2 de l'aperçu (vide-405x270.png, 810 × 540),
+-- PNG fabriqués ; l'image « aucun aperçu » du cadre 3:2 de l'aperçu (vide-498x332.png, 996 × 664),
 -- dans le jeu de chaque apparence ; scripts/gabarits.lua, qui écrit Dispositions.gabarits en JSON pour
 -- scripts/images-fenetre.swift et scripts/images-vides.swift ; et ces scripts eux-mêmes, lancés sur
 -- un module d'essai d'un dossier temporaire (jamais sur celui du dépôt) : ce qu'ils produisent, et
@@ -56,15 +56,15 @@ local PPM_144 = 5669
 
 -- Les images de la fenêtre B et leurs tailles en points, d'après la maquette : { largeur, hauteur }.
 -- Les hauteurs du panneau et des cartes, recalées au lot 18, ne sont pas fixées ici : la largeur
--- seule (colonne droite de 435, intérieur du panneau de 405). Le fond de sélection suit le volet,
+-- seule (panneau de 528, intérieur de 498). Le fond de sélection suit le volet,
 -- plus large que dans la maquette (fenêtre agrandie, demandée par Dany le 21 octobre 2026) : une case
 -- de la liste, à la largeur utile du volet.
 local ATTENDUES = {
-    panneau = { 435 },
-    ['carte-note'] = { 405 },
-    ['carte-proposition'] = { 405 },
-    ['carte-etape'] = { 405 },
-    ['carte-lecon'] = { 405 },
+    panneau = { 528 },
+    ['carte-note'] = { 498 },
+    ['carte-proposition'] = { 498 },
+    ['carte-etape'] = { 498 },
+    ['carte-lecon'] = { 498 },
     ['seg-apercu'] = { 72, 22 },
     ['seg-proposition'] = { 98, 22 },
     ['seg-note'] = { 57, 22 },

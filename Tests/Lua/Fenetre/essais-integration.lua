@@ -524,7 +524,7 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
             S.taches[i]()
         end
         -- L'après, copié dans le dossier de la fenêtre et réduit par sips au cadre de l'aperçu, en 2x
-        -- (D.pixelsApercu × D.pixelsApercuHauteur : 810 × 540).
+        -- (D.pixelsApercu × D.pixelsApercuHauteur : 996 × 664).
         local T = Fenetre.T
         contient(p.imageApercu, '/Temporaire/Pourquoi/2004/')
         contient(p.imageApercu, '/.vignettes/' .. id .. '-apres-cadre-' .. T.pixelsApercu .. 'x' .. T.pixelsApercuHauteur .. '.jpg')

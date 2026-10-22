@@ -457,7 +457,7 @@ bilan et la méthode du tireur (voir Voyants et liaison, et Claude Code). Captur
 `docs/atelier.png` et `docs/panneau.png`, les deux autres dispositions, sont retirées avec elles.
 
 En 1.3, la Conversation claire prend l'allure de la maquette « B · Conversation claire » (la
-fenêtre B, lots B0 à B5), agrandie à 1 497 × 1 200 à la demande de Dany (voir Fenêtre B) : volet
+fenêtre B, lots B0 à B5), agrandie à 1 948 × 1 200 à la demande de Dany (voir Fenêtre B) : volet
 des conversations à gauche (le Carnet de progrès en tête de sa liste), au centre l'en-tête avec le
 Mode en boutons radio, le fil B, sa barre et la saisie, à droite quatre onglets (Aperçu,
 Proposition, Note, Leçon), l'aperçu commun et la carte de l'onglet ; apparence claire ou sombre.
@@ -946,7 +946,7 @@ en colonne, les invites par rangées de trois (`D.invitesParRangee`), l'activit�
 d'Agrandir et des autres fenêtres ; Envoyer est toujours à côté du champ (plus de
 `D.envoiACote`). L'image « aucun aperçu » du cadre (`Dispositions.imageVide`) était en 1.2
 `vide-320.png`, seule dans le module, dessinée par `scripts/images-vides.swift` (retirée en 1.3 :
-`images/vide-405x270.png` et `images/sombre/vide-405x270.png`, voir Fenêtre B) ;
+`images/vide-498x332.png` et `images/sombre/vide-498x332.png`, voir Fenêtre B) ;
 `vide-200.png` (Panneau) et `vide-720x480.png` (Atelier) sont retirées après la 1.1.1, comme en
 1.1.1 celles des petite et moyenne tailles et `vide-300`, faite pour la fiche de la Séance de
 notation. La liste ne montre pas les conversations des anciennes séances de notation
@@ -969,7 +969,8 @@ d'une fenêtre fermée ne part pas. « Ouvrir la fenêtre Claude » (ou ⌃⌥C)
 met devant, remontre la photo active et, sur une conversation vide, fait préparer une proposition
 (voir Proposition préparée à l'ouverture). Le cadre enregistré (`Fenetre.cadre()`, sans argument :
 `DeveloppeurClaude-conversation-grande-<Fenetre.FORME>`, `FORME` à 1 jusqu'à la 1.2, 2 pour la
-fenêtre B de 1 280 × 800, 3 pour la fenêtre agrandie de la 1.3) porte le nom qu'avait celui
+fenêtre B de 1 280 × 800, 3 pour la fenêtre agrandie de la 1.3 (1 497 × 1 200), 4 pour la fenêtre
+élargie (1 948 × 1 200)) porte le nom qu'avait celui
 de la Conversation claire en 1.1.1 : le cadre déjà enregistré sert encore (en 1.1.1,
 `Fenetre.cadre(disposition)` : `DeveloppeurClaude-<disposition>-grande-<FORME>` ; en 1.1,
 `DeveloppeurClaude-<disposition>-<taille>-<FORME>`).
@@ -982,31 +983,37 @@ son écran fait 3 440 × 1 440, et il a voulu « la partie de gauche peut-être 
 milieu 33 % plus large, celle de droite parfaite, la hauteur 33 % plus haute ». Un premier
 agrandissement à 1 671 × 1 064 a été arrêté ; retenu, sur la suggestion de Claude choisie par
 Dany : 1 497 × 1 200 (environ 1 940 points laissés à Lightroom, des lignes de fil d'environ 103
-caractères). Écart voulu avec la maquette, qui reste la référence de l'allure. Elle n'a pas encore
-été vue dans Lightroom (voir À constater dans Lightroom (1.3)).
+caractères), constatée à l'écran le 21 octobre 2026. Le même jour, Dany l'a élargie de 20 % à
+gauche, 40 % au centre et 20 % à droite : 1 948 × 1 200 (environ 1 490 points laissés à
+Lightroom, des lignes de fil d'environ 150 caractères), et a voulu les cartes Proposition, Aperçu
+et Leçon comme la carte Note : jusqu'en bas du panneau, leurs boutons sous elles. Écart voulu avec
+la maquette, qui reste la référence de l'allure.
 
 **Dimensions** (`Dispositions.TAILLES`, puis `Dispositions.dimensions()`, qui en tire le reste) :
 
-- la fenêtre de 1 497 × 1 200 et son cadre constaté (D7 : barre de titre de 33, 32 blancs et un
-  filet ; marge de 1 à gauche, à droite et en bas, aucune en haut) : contenu de 1 495 × 1 166
-  (constaté à 1 280 × 800, extrapolé ici) ;
-- trois colonnes et deux filets de 1 : volet 270 (marges de 10 : 250 utiles), centre 760 (marges
-  de 20 : 720 utiles), droite 463 (le panneau de 435, à 14 du bord) ;
+- la fenêtre de 1 948 × 1 200 et son cadre constaté (D7 : barre de titre de 33, 32 blancs et un
+  filet ; marge de 1 à gauche, à droite et en bas, aucune en haut) : contenu de 1 946 × 1 166
+  (constaté à 1 280 × 800 et à 1 497 × 1 200) ;
+- trois colonnes et deux filets de 1 : volet 324 (marges de 10 : 304 utiles), centre 1 064 (marges
+  de 20 : 1 024 utiles), droite 556 (le panneau de 528, à 14 du bord) ;
 - au centre : en-tête de 68 et son filet, fil (le reste : 920), barre de 30, saisie de 147. Le fil :
   des lignes de 21 sous une marge de 20 et au-dessus d'au moins 16 ; leur nombre se calcule
   (`D.lignes`, 42 ; la grille fait 882). Chaque ligne : la colonne auteur de 60, un écart de 12,
-  le texte de 648 (`D.texteFil`, `Fenetre.largeurTexte()`) ;
+  le texte de 952 (`D.texteFil`, `Fenetre.largeurTexte()`) ;
 - la liste des conversations : des cases de 40, autant que sa place en tient (`D.cases`, 22 dans
   915) ;
-- à droite : le panneau en image (435 × 1 146), son intérieur de 405, l'aperçu commun en 3:2 de
-  405 × 270 (sa vignette en 2x, 810 × 540, `Images.vignette`), la rangée ◀ légende ▶ · ⤢ Agrandir,
-  puis la place des cartes (`D.placeCartes`, 782) : carte Note de 621 (l'onglet Note la remplit),
-  cartes Proposition, Aperçu (étape) et Leçon de 701 ; leur intérieur de 379 (`D.carte`, textes
-  en 12). Les lignes des cartes : `criteres` 34 (une grille de 35 lignes de 16), `propLignes` 40,
-  `etapeLignes` 40, `leconLignes` 41 : le plus grand nombre qui laisse au moins 12 points sous le
+- à droite : le panneau en image (528 × 1 146), son intérieur de 498, l'aperçu commun en 3:2 de
+  498 × 332 (sa vignette en 2x, 996 × 664, `Images.vignette`), la rangée ◀ légende ▶ · ⤢ Agrandir,
+  puis la place des cartes (`D.placeCartes`, 720) : carte Note de 559 (l'onglet Note la remplit),
+  cartes Proposition, Aperçu (étape) et Leçon de 679, chacune suivie, comme la carte Note, de 12
+  et de sa rangée de boutons au bas du panneau (▲ ▼ à gauche, les boutons à droite, bezel 26,
+  titres en 13 : `carteEtRangee` de `Vues.lua`) ; leur intérieur de 472 (`D.carte`, textes en 12).
+  Les lignes des cartes : `criteres` 30 (une grille de 31 lignes de 16), `propLignes` 40,
+  `etapeLignes` 40, `leconLignes` 42 : le plus grand nombre qui laisse au moins 12 points sous le
   contenu estimé (`essais-fenetre-b.lua` le vérifie, et échoue en disant quoi changer si la
   hauteur change) ;
-- `Fenetre.FORME` 3 : le cadre enregistré `DeveloppeurClaude-conversation-grande-3`.
+- `Fenetre.FORME` 4 : le cadre enregistré `DeveloppeurClaude-conversation-grande-4` (3 pour
+  1 497 × 1 200).
 
 La fenêtre construite (simulation) compte 2 317 vues, dont 1 490 simples (1 368 et 857 à
 1 280 × 800) : son temps d'ouverture est à mesurer. Elle ne tient pas sur un écran de portable
@@ -1149,8 +1156,8 @@ macOS, quelle que soit celle choisie ici. Les images : `luajit scripts/gabarits.
 scripts/images-fenetre.swift Lightroom/Developpeur.lrplugin` (les deux jeux, d'après
 `Dispositions.IMAGES` et `Dispositions.PALETTES` ; refus, avant d'écrire, d'une couleur absente ou
 invalide, d'un dossier invalide), et l'image « aucun aperçu » par `luajit scripts/gabarits.lua |
-swift scripts/images-vides.swift Lightroom/Developpeur.lrplugin` : `images/vide-405x270.png` et
-`images/sombre/vide-405x270.png` (`Dispositions.nomImageVide`, `Dispositions.imageVide(apparence)`),
+swift scripts/images-vides.swift Lightroom/Developpeur.lrplugin` : `images/vide-498x332.png` et
+`images/sombre/vide-498x332.png` (`Dispositions.nomImageVide`, `Dispositions.imageVide(apparence)`),
 du fond et du texte de chaque palette. `vide-320.png` (1.2) et `vide-330x220.png` (fenêtre B de
 1 280 × 800) sont retirées.
 
@@ -4766,8 +4773,8 @@ sans `DEVELOPPEUR_ECRAN_REEL=1` ; `scripts/tester-module.sh` : liaison 240, `ess
 ensuite) et la recette (91 étapes, une en échec : l'horizon de la dune, d'où `LineAngle.ecartMax` et
 l'étape sautée) sont dans la section de chaque chantier. Restent à voir :
 
-1. La fenêtre B entière, jamais ouverte dans Lightroom : la taille réelle (1 497 × 1 200, contenu
-   1 495 × 1 166, cadre `…-grande-3` ; D7 n'a été mesuré qu'à 1 280 × 800), sa place sur l'écran de
+1. La fenêtre B entière : la taille réelle (1 948 × 1 200, contenu 1 946 × 1 166, cadre
+   `…-grande-4` ; D7 mesuré à 1 280 × 800 et à 1 497 × 1 200), sa place sur l'écran de
    3 440 × 1 440 (sous la barre des menus, hors du Dock), le temps d'ouverture avec 2 317 vues ;
    comparée côte à côte avec la maquette : fonds, filets, panneau, cartes, segments, polices,
    couleurs, alignements. Puis caler sur la capture `barreTitre`, `margeDialogue`, `hauteurLigne`,
@@ -4794,9 +4801,9 @@ l'étape sautée) sont dans la section de chaque chantier. Restent à voir :
    boutons de 26 ; les messages raccourcis entiers à l'écran.
 8. Les clics sur les calques (cases, segments, étoiles, Envoyer, Accepter) ; Arrêter ou Envoyer
    quand l'autre est masqué ; les deux « Voir à 100 % » superposés.
-9. La vignette JPEG de 810 × 540 dans un `f:picture` de 405 × 270 (réduite et nette) ; l'aperçu
-   bord à bord dans le panneau ; les grandes images en 2x (panneau de 870 × 2 292 px, cartes de
-   810 × 1 402 et 810 × 1 242).
+9. La vignette JPEG de 996 × 664 dans un `f:picture` de 498 × 332 (réduite et nette) ; l'aperçu
+   bord à bord dans le panneau ; les grandes images en 2x (panneau de 1 056 × 2 292 px, cartes de
+   996 × 1 358 et 996 × 1 118).
 10. La légende de la photo active (`Lightroom.legende` : copie, appareil, date à l'heure locale) et
     `infoPhoto`, en texte riche, `truncation = 'middle'` sur un nom long.
 11. L'apparence sombre, seulement si Dany bascule lui-même son Mac : panneau, cartes, sélection,

@@ -534,8 +534,8 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
     S.pendantFenetre = function(args)
         egal('Développeur', args.title)
         -- La Conversation claire, seule disposition, toujours en grande taille (fenêtre B agrandie :
-        -- FORME 3).
-        egal('DeveloppeurClaude-conversation-grande-3', args.save_frame)
+        -- FORME 4, élargie).
+        egal('DeveloppeurClaude-conversation-grande-4', args.save_frame)
         local p = Fenetre.p
         vrai(p, 'table de propriétés')
         Fenetre.rafraichir()
@@ -812,9 +812,9 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         local p = Fenetre.p
         egal('Développeur', args.title)
         -- Le cadre enregistré garde son nom (Lightroom ne rapetisse pas une fenêtre rouverte,
-        -- constaté) : celui de la Conversation claire en grande taille, FORME 3 (fenêtre B agrandie).
+        -- constaté) : celui de la Conversation claire en grande taille, FORME 4 (fenêtre B élargie).
         egal('DeveloppeurClaude-conversation-grande-' .. Fenetre.FORME, args.save_frame)
-        egal(3, Fenetre.FORME)
+        egal(4, Fenetre.FORME)
         Fenetre.rafraichir()
         local n, boutons, textes, radios, menus, lignes, calques = 0, {}, {}, {}, {}, 0, 0
         local apercu
@@ -963,25 +963,26 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         end
         egal('Retouche pro Portrait Paysage Noir et blanc ISO élevé Composition Sports', table.concat(invites, ' '), nom .. ' : invites')
         -- La carte Proposition (fenêtre B, lot B5), sur son image : Accepter, un bouton bleu en image
-        -- dont le calque dit que la photo ne change qu'à son clic ; sur sa rangée, Refuser, Ajuster… et
-        -- « Je le fais » (titre lié, actif selon peutJeLeFais : ici une photo active et Claude libre,
-        -- lot 14) en carrés ; au-dessus, l'état de l'exercice et ▲ ▼.
+        -- dont le calque dit que la photo ne change qu'à son clic ; sur sa rangée, sous la carte comme
+        -- celle de la carte Note, ▲ ▼ puis Refuser, Ajuster… et « Je le fais » (titre lié, actif selon
+        -- peutJeLeFais : ici une photo active et Claude libre, lot 14) en carrés ; dans la carte,
+        -- l'état de l'exercice.
         local calqueAccepter = parInfobulle(args.contents, "Appliquer la proposition : la photo ne change qu'à ce clic")
         egal('static_text', calqueAccepter.genre, nom .. ' : Accepter, un calque')
         vrai(Fenetre.parCalque(calqueAccepter.args.mouse_down), nom .. ' : Accepter passe par Fenetre.calque')
-        local rangeeBoutons, rangeeEtat
+        local rangeeBoutons, etat
         parcourir(args.contents, function(v)
             if v.genre == 'row' then
                 for _, b in ipairs(v.args) do
                     if type(b) == 'table' and S.BOUTONS[b.genre] and b.args.title == 'Refuser' then
                         rangeeBoutons = v
-                    elseif type(b) == 'table' and b.genre == 'static_text' and type(b.args.title) == 'table' and b.args.title.key == 'exerciceEtat' then
-                        rangeeEtat = v
                     end
                 end
+            elseif v.genre == 'static_text' and type(v.args.title) == 'table' and v.args.title.key == 'exerciceEtat' then
+                etat = v
             end
         end)
-        vrai(rangeeBoutons and rangeeEtat, nom .. ' : rangées de la carte Proposition')
+        vrai(rangeeBoutons and etat, nom .. ' : rangée et état de la carte Proposition')
         local surLaRangee = {}
         for _, b in ipairs(rangeeBoutons.args) do
             if type(b) == 'table' and S.BOUTONS[b.genre] then
@@ -1002,18 +1003,22 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         vrai(boutons['Je le fais'] and Fenetre.parBouton(boutons['Je le fais'].args.action), nom .. ' : Je le fais passe par Fenetre.bouton')
         egal('', p.exerciceEtat)
         -- La carte de l'étape (1.3, onglet Aperçu), sur son image : titre (« Pourquoi ? » sans étape),
-        -- sous-titre, texte de D.etapeLignes lignes en 12, puis ◀ ▶, Voir l'avant (titre lié) et
-        -- Détail… en carrés, et ▲ ▼, inactifs à l'ouverture.
-        local carteEtape
+        -- sous-titre, texte de D.etapeLignes lignes en 12 ; sous elle, comme sous la carte Note, ▲ ▼
+        -- puis ◀ ▶, Voir l'avant (titre lié) et Détail… en carrés, inactifs à l'ouverture.
+        local carteEtape, rangeeEtape
         parcourir(args.contents, function(v)
             for _, enfant in ipairs(v.args) do
                 if type(enfant) == 'table' and enfant.genre == 'static_text' and type(enfant.args.title) == 'table'
                     and enfant.args.title.key == 'etapeTexte' then
                     carteEtape = v
+                elseif v.genre == 'row' and type(enfant) == 'table' and S.BOUTONS[enfant.genre] and type(enfant.args.title) == 'table'
+                    and enfant.args.title.key == 'titreBascule' then
+                    rangeeEtape = v
                 end
             end
         end)
         vrai(carteEtape, nom .. " : carte de l'étape")
+        vrai(rangeeEtape, nom .. " : rangée des boutons de la carte de l'étape")
         local champs, boutonsEtape = {}, {}
         parcourir(carteEtape, function(v)
             local t = v.args.title
@@ -1026,7 +1031,11 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 end
             elseif v.genre == 'static_text' then
                 champs[#champs + 1] = t
-            elseif S.BOUTONS[v.genre] then
+            end
+        end)
+        parcourir(rangeeEtape, function(v)
+            local t = v.args.title
+            if S.BOUTONS[v.genre] then
                 boutonsEtape[#boutonsEtape + 1] = (type(t) == 'table' and p[t.key] or t) .. '/' .. (v.args.size or v.genre) .. '/' .. v.args.enabled.key
                 vrai(Fenetre.parBouton(v.args.action), nom .. ' : bouton de l\'étape hors de Fenetre.bouton')
                 egal(false, p[v.args.enabled.key], nom .. ' : ' .. v.args.enabled.key .. ' inactif à l\'ouverture')
@@ -1034,25 +1043,19 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         end)
         egal('etapeTitre etapeSousTitre etapeTexte', table.concat(champs, ' '), nom .. " : textes de la carte de l'étape")
         egal(Fenetre.TITRE_ETAPE, p.etapeTitre, nom .. " : sans étape, le titre « Pourquoi ? »")
-        egal("◀/square_button/etapePrecedente ▶/square_button/etapeSuivante Voir l'avant/square_button/etapeAImages "
-            .. 'Détail…/square_button/etapeADetail ▲/mini/etapeMonte ▼/mini/etapeDescend', table.concat(boutonsEtape, ' '),
+        egal("▲/mini/etapeMonte ▼/mini/etapeDescend ◀/square_button/etapePrecedente ▶/square_button/etapeSuivante "
+            .. "Voir l'avant/square_button/etapeAImages Détail…/square_button/etapeADetail", table.concat(boutonsEtape, ' '),
             nom .. " : boutons de la carte de l'étape")
-        -- Les rangées de boutons de la carte de l'étape et de la carte Proposition tiennent dans leur
-        -- carte, avec l'un et l'autre titre lié (Voir l'avant ou Voir l'après ; Je le fais ou J'ai fini).
-        local rangeeEtape
-        for _, enfant in ipairs(carteEtape.args) do
-            if type(enfant) == 'table' and enfant.genre == 'row' then
-                rangeeEtape = enfant
-            end
-        end
-        vrai(rangeeEtape, nom .. " : rangée des boutons de la carte de l'étape")
+        -- Les rangées de boutons sous la carte de l'étape et sous la carte Proposition tiennent dans
+        -- la largeur intérieure du panneau, avec l'un et l'autre titre lié (Voir l'avant ou Voir
+        -- l'après ; Je le fais ou J'ai fini).
         for _, titres in ipairs({ { "Voir l'avant", 'Je le fais' }, { "Voir l'après", "J'ai fini" } }) do
             p.titreBascule, p.titreJeLeFais = titres[1], titres[2]
             local largeurEtape, largeurBoutons = largeurEstimee(rangeeEtape, p), largeurEstimee(rangeeBoutons, p)
-            vrai(largeurEtape <= D.largeurEtape, string.format('%s : boutons de l\'étape de %d points dans %d (%s)', nom, largeurEtape,
-                D.largeurEtape, titres[1]))
-            vrai(largeurBoutons <= D.largeurProposition, string.format('%s : boutons de la proposition de %d points dans %d (%s)', nom,
-                largeurBoutons, D.largeurProposition, titres[2]))
+            vrai(largeurEtape <= D.interieur, string.format('%s : boutons de l\'étape de %d points dans %d (%s)', nom, largeurEtape,
+                D.interieur, titres[1]))
+            vrai(largeurBoutons <= D.interieur, string.format('%s : boutons de la proposition de %d points dans %d (%s)', nom,
+                largeurBoutons, D.interieur, titres[2]))
         end
         p.titreBascule, p.titreJeLeFais = "Voir l'avant", 'Je le fais'
         -- Les deux versions, une ligne chacune, en bas du volet.

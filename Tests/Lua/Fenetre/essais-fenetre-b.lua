@@ -1,6 +1,6 @@
 -- essais-fenetre-b.lua : la fenêtre Claude à l'allure de la fenêtre B (1.3, lot B3 : volet des
 -- conversations en cases, en-tête avec le Mode, barre du fil, zone de saisie, colonne droite avec
--- ses segments et son panneau ; agrandie à 1 497 × 1 200, demandé par Dany le 21 octobre 2026), hors
+-- ses segments et son panneau ; agrandie à 1 497 × 1 200 puis élargie à 1 948 × 1 200, demandé par Dany le 21 octobre 2026), hors
 -- de Lightroom (LuaJIT, Lightroom simulé par Simulation.lua) : les dimensions (contenu de
 -- 1 495 × 1 166, D7, chaque colonne estimée, la fenêtre dans l'écran de Dany, la longueur des
 -- lignes du fil), l'inventaire du volet, de l'en-tête, de la barre, de la saisie et des segments
@@ -310,14 +310,15 @@ end
 -- par pixel, constaté) : la fenêtre entière, le volet, le centre et la colonne droite (celle de la
 -- maquette), et l'aperçu à la largeur de l'intérieur du panneau. La seule copie de ces chiffres dans
 -- les essais ; le reste se tire de Dispositions.
-local DEMANDE = { largeur = 1497, hauteur = 1200, volet = 270, centre = 760, droite = 463, apercu = 405, apercuHauteur = 270 }
+local DEMANDE = { largeur = 1948, hauteur = 1200, volet = 324, centre = 1064, droite = 556, apercu = 498, apercuHauteur = 332 }
 local ECRAN_DANY = { largeur = 3440, hauteur = 1440 }
 -- La barre des menus de macOS sur un écran sans encoche : 24 points, et son filet.
 local BARRE_MENUS = 25
--- La place que la fenêtre laisse à Lightroom à côté d'elle, sur cet écran (environ 1 940 points).
-local PLACE_LIGHTROOM = 1940
+-- La place que la fenêtre laisse à Lightroom à côté d'elle, sur cet écran (environ 1 490 points,
+-- depuis l'élargissement demandé par Dany le 21 octobre 2026).
+local PLACE_LIGHTROOM = 1490
 
-essai('Cadre : la fenêtre demandée par Dany (1 497 × 1 200), son contenu (D7) ; les colonnes, le fil, la liste et les images concordent', function()
+essai('Cadre : la fenêtre demandée par Dany (1 948 × 1 200), son contenu (D7) ; les colonnes, le fil, la liste et les images concordent', function()
     local largeur, haut = S.contenuPourFenetre(DEMANDE.largeur, DEMANDE.hauteur)
     egal(DEMANDE.largeur, D.largeurFenetre)
     egal(DEMANDE.hauteur, D.hauteurFenetre)
@@ -370,9 +371,9 @@ essai('Cadre : la fenêtre demandée par Dany (1 497 × 1 200), son contenu (D7)
     vrai((D.cases + 1) * D.hauteurCase > D.hauteurListe, 'une case de plus tiendrait : ' .. D.cases)
     egal(D.hauteurContenu, 2 * D.margeVolet + D.hautVolet + D.hauteurListe + D.basVolet, 'le volet de haut en bas')
     -- Le cadre enregistré change de nom : Lightroom ne rapetisse pas un cadre enregistré, et la
-    -- fenêtre agrandie ne doit pas reprendre celui de 1 280 × 800 (FORME 2).
-    egal(3, Fenetre.FORME)
-    egal('DeveloppeurClaude-conversation-grande-3', Fenetre.cadre())
+    -- fenêtre élargie ne doit pas reprendre celui de 1 497 × 1 200 (FORME 3).
+    egal(4, Fenetre.FORME)
+    egal('DeveloppeurClaude-conversation-grande-4', Fenetre.cadre())
     egal(2, Dispositions.cadreBouton(0), 'cadre d\'un carré : bezel + 2 (D5)')
     egal(S.MARGE_BEZEL, Dispositions.TAILLES.margeBezel)
 end)
@@ -427,13 +428,15 @@ essai("Cadre : la fenêtre entière tient dans l'écran de Dany (3 440 × 1 440)
     vrai(ECRAN_DANY.largeur - largeur >= PLACE_LIGHTROOM, string.format('il reste %d à Lightroom', ECRAN_DANY.largeur - largeur))
 end)
 
-essai('Fil : sa ligne la plus longue reste sous environ 105 caractères moyens (lisibilité) ; une phrase de la fenêtre coupée de même', function()
+essai('Fil : sa ligne la plus longue reste sous environ 155 caractères moyens (lisibilité) ; une phrase de la fenêtre coupée de même', function()
     local Fil, Texte = require 'Fil', require 'Texte'
     -- Le « caractère moyen » : la chasse moyenne d'un caractère d'une phrase de la fenêtre
     -- (Fenetre.FIL_VIDE), espaces et ponctuation compris, dans la police des lignes de Dany et de
     -- Claude (Metriques). Une réponse ordinaire de Claude, aux mots plus courts et sans capitales,
     -- est plus étroite (5,9 points par caractère au lieu de 6,2) : environ 108 caractères par ligne
-    -- (mesuré le 21 octobre 2026, hors de l'essai).
+    -- dans la fenêtre de 1 497 (mesuré le 21 octobre 2026, hors de l'essai) ; le centre élargi de
+    -- 40 % à la demande de Dany (même jour) en tient environ 150 : un choix de Dany, que cet essai
+    -- borne.
     local police = Fil.polices.claude
     egal(police, Fil.polices.dany, 'Vous et Claude dans la même police')
     local moyen = Fil.largeur(Fenetre.FIL_VIDE, police) / Texte.longueur(Fenetre.FIL_VIDE)
@@ -442,9 +445,9 @@ essai('Fil : sa ligne la plus longue reste sous environ 105 caractères moyens (
     egal(0, Fil.retrait('dany'))
     local place = D.texteFil - Fil.MARGE
     local caracteres = place / moyen
-    vrai(caracteres <= 105, string.format('%.1f caractères moyens (%.2f points chacun) dans %d points', caracteres, moyen, place))
+    vrai(caracteres <= 155, string.format('%.1f caractères moyens (%.2f points chacun) dans %d points', caracteres, moyen, place))
     -- La même phrase, répétée et coupée comme le fil la coupe : chaque ligne dans sa place, aucune
-    -- au-delà de 105 caractères.
+    -- au-delà de 155 caractères.
     local lignes = Fil.couper(string.rep(Fenetre.FIL_VIDE .. ' ', 8), place, police)
     vrai(#lignes > 3, 'plusieurs lignes')
     local plusLongue = 0
@@ -452,7 +455,7 @@ essai('Fil : sa ligne la plus longue reste sous environ 105 caractères moyens (
         plusLongue = math.max(plusLongue, Texte.longueur(l))
         vrai(Fil.largeur(l, police) <= place, 'ligne trop large : ' .. l)
     end
-    vrai(plusLongue <= 105, 'ligne de ' .. plusLongue .. ' caractères')
+    vrai(plusLongue <= 155, 'ligne de ' .. plusLongue .. ' caractères')
 end)
 
 essai('Cadre : la fenêtre construite fait la largeur du contenu, chaque colonne tient dans sa hauteur (estimation), sur ses aplats', function()
@@ -1939,7 +1942,7 @@ essai("Fil dans la fenêtre : une conversation vide montre son titre, puis l'aid
                 morceaux[#morceaux + 1] = l.texte
             end
         end
-        vrai(#morceaux >= 2, 'plus d\'une ligne : ' .. #morceaux)
+        vrai(#morceaux >= 1, 'au moins une ligne : ' .. #morceaux)
         egal(Fenetre.FIL_VIDE, table.concat(morceaux, ' '), "l'aide entière")
         -- Une demande : le fil la montre, l'aide s'en va.
         Conversation.ajouterDemande(Moteur.courante, 'Bonjour')
@@ -1990,7 +1993,7 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
         end
     end
     -- Plus long (une erreur venue d'ailleurs, une aide) : deux lignes, la seconde finie par « … ».
-    local long = "La note n'a pas été posée : la photo DSCF4961.RAF n'est plus celle que Claude a notée, sa proposition est retirée."
+    local long = string.rep("La note n'a pas été posée : la photo DSCF4961.RAF n'est plus celle que Claude a notée, sa proposition est retirée. ", 3)
     local montre = Fenetre.texteBandeau(long, D.bandeau)
     egal(1, select(2, montre:gsub('\n', '')), 'deux lignes')
     egal('…', montre:sub(-#'…'))
@@ -2045,8 +2048,9 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
 end)
 
 essai('Carnet : le tableau, en Menlo, aligné et dans la largeur du fil', function()
-    -- Six mois (dont un changement d'année, les mois avec leur année) et des libellés de 40 caractères :
-    -- la colonne Défaut se resserre, le tableau reste aligné et tient dans le fil.
+    -- Six mois (dont un changement d'année, les mois avec leur année) et des libellés de 40 caractères,
+    -- dans un fil de 648 points (celui de la fenêtre de 1 497 × 1 200, plus étroit que celui de
+    -- D.texteFil) : la colonne Défaut se resserre, le tableau reste aligné et tient dans le fil.
     local mois, defauts = {}, {}
     for k = 1, 6 do
         mois[k] = { cle = 'm' .. k, annee = k < 4 and 2025 or 2026, court = ({ 'oct.', 'nov.', 'déc.', 'janv.', 'févr.', 'mars' })[k] }
@@ -2059,7 +2063,9 @@ essai('Carnet : le tableau, en Menlo, aligné et dans la largeur du fil', functi
         defauts[k] = { code = 'd' .. k, libelle = string.rep('Libellé très long ', 3):sub(1, 40), par_mois = par }
     end
     local page = { photos = 30, mois = mois, defauts = defauts, progresse = {}, recule = {}, a_travailler = {}, titres = Carnet.TITRES }
-    local lignes = Fil.lignesCarnet(page, D.texteFil, Fenetre.TITRE_CARNET)
+    local largeur = 648
+    vrai(largeur <= D.texteFil, 'un fil plus étroit que celui de la fenêtre')
+    local lignes = Fil.lignesCarnet(page, largeur, Fenetre.TITRE_CARNET)
     local tableau = {}
     for _, l in ipairs(lignes) do
         if l.genre == 'outil' then
@@ -2069,7 +2075,7 @@ essai('Carnet : le tableau, en Menlo, aligné et dans la largeur du fil', functi
     egal(5, #tableau)
     for _, l in ipairs(tableau) do
         egal(Texte.longueur(tableau[1].texte), Texte.longueur(l.texte), 'aligné : ' .. l.texte)
-        vrai(Fil.occupe(l) <= D.texteFil - Fil.MARGE, string.format('dans le fil : %.0f', Fil.occupe(l)))
+        vrai(Fil.occupe(l) <= largeur - Fil.MARGE, string.format('dans le fil : %.0f', Fil.occupe(l)))
         contient(l.texte, '  ', 'colonnes séparées')
     end
     contient(tableau[1].texte, 'oct. 2025')
@@ -2189,12 +2195,12 @@ local function copieProposition(plus)
     return p
 end
 
-essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leur contenu tient, chaque onglet sous l\'aperçu (D.placeCartes) ; textes à 379 en 12 points', function()
+essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leur contenu tient, chaque onglet sous l\'aperçu (D.placeCartes) ; textes à 472 en 12 points', function()
     -- La place sous l\'aperçu et sa rangée, jusqu\'au bas du contenu du panneau (son bord et sa marge
     -- de 14) : chaque carte y tient (plus bas).
     egal(Dispositions.IMAGES.panneau.hauteur - 1 - 14, D.hauteurSegments + D.margeHautPanneau + D.apercuHauteur + 8
         + Dispositions.cadreBouton(22) + 12 + D.placeCartes, 'la place des cartes, du haut des segments au bas du panneau')
-    egal(379, D.carte)
+    egal(472, D.carte)
     egal(13, D.margeCarte)
     for _, cle in ipairs({ 'largeurNote', 'largeurProposition', 'largeurEtape', 'largeurLecon' }) do
         egal(D.carte, D[cle], cle)
@@ -2412,8 +2418,8 @@ essai('Inventaire des cartes Proposition et Aperçu (étape) : titres, textes, c
             lancerDepuis(taches)
             p.enAttente = false
         end)
-        -- La carte de l'étape : titre (« Pourquoi ? » sans étape), sous-titre, texte, ◀ ▶, Voir
-        -- l'avant, Détail… en carrés de 22, ▲ ▼.
+        -- La carte de l'étape : titre (« Pourquoi ? » sans étape), sous-titre, texte ; sous elle,
+        -- comme sous la carte Note, ▲ ▼, puis ◀ ▶, Voir l'avant et Détail… en carrés de 26.
         egal('Pourquoi ?', p.etapeTitre)
         cles = {}
         for _, x in ipairs(vues(apercu)) do
@@ -2421,11 +2427,11 @@ essai('Inventaire des cartes Proposition et Aperçu (étape) : titres, textes, c
                 local t = x.args.title
                 cles[#cles + 1] = (type(t) == 'table' and ('[' .. t.key .. ']') or t) .. '=' .. x.args.enabled.key
                 if x.genre == 'square_button' then
-                    egal(22, S.bezelVisible(x))
+                    egal(26, S.bezelVisible(x))
                 end
             end
         end
-        egal('◀=etapePrecedente ▶=etapeSuivante [titreBascule]=etapeAImages Détail…=etapeADetail ▲=etapeMonte ▼=etapeDescend', table.concat(cles, ' '))
+        egal('▲=etapeMonte ▼=etapeDescend ◀=etapePrecedente ▶=etapeSuivante [titreBascule]=etapeAImages Détail…=etapeADetail', table.concat(cles, ' '))
         p.onglet = 'notation'
     end)
 end)

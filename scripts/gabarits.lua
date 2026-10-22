@@ -5,7 +5,7 @@
 -- des couleurs), et le cadre de l'image « aucun aperçu » (Dispositions.nomImageVide) :
 -- { "images": { "<nom>": { "largeur": …, "hauteur": … } },
 --   "apparences": { "<apparence>": { "dossier": "images…", "couleurs": { "<clé>": "RRGGBB" } } },
---   "vide": { "nom": "vide-405x270", "largeur": 405, "hauteur": 270 } }.
+--   "vide": { "nom": "vide-498x332", "largeur": 498, "hauteur": 332 } }.
 -- Charge Dispositions.lua sous LuaJIT, hors de Lightroom (Vues et Consignes, qu'il requiert, se
 -- chargent sans import), et écrit par Json.lua du module, comme tout le JSON du projet. Ne lit ni
 -- n'écrit aucun fichier.

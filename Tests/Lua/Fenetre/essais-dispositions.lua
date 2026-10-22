@@ -213,7 +213,7 @@ essai('Une seule disposition : ni taille ni disposition dans les préférences, 
     egal(nil, Dispositions.atelier)
     egal(nil, Dispositions.panneau)
     egal('conversation', Dispositions.dimensions().nom)
-    egal('DeveloppeurClaude-conversation-grande-3', Fenetre.cadre(), 'FORME 3 : la fenêtre B agrandie')
+    egal('DeveloppeurClaude-conversation-grande-4', Fenetre.cadre(), 'FORME 4 : la fenêtre B élargie')
     egal(nil, Fenetre.rouvrir)
     egal(nil, Fenetre.elementsMenu)
 end)
@@ -825,7 +825,9 @@ essai('Cartes : ▲ ▼ font défiler le texte de la note et de la proposition, 
         egal('Un ciel plus dense.', p.propositionTexte)
         -- La carte Note est une grille : un long paragraphe s'y coupe en lignes pleine largeur, à la
         -- largeur de l'intérieur de la carte, en 12 points.
-        Fenetre.montrerPage('note', string.rep('Le ciel orageux tient la photo. ', 4 * (T.criteres + 1)))
+        -- (Assez long pour deux pages pleines à toute largeur de carte : la dernière page finit sur la
+        -- dernière ligne.)
+        Fenetre.montrerPage('note', string.rep('Le ciel orageux tient la photo. ', 8 * (T.criteres + 1)))
         for k = 1, T.criteres + 1 do
             egal('plein', p['ng' .. k], 'ligne ' .. k)
             vrai(Fil.largeur(p['nt' .. k], 'texte12') <= T.largeurNote - Fil.MARGE, 'ligne trop large : ' .. p['nt' .. k])
@@ -1452,7 +1454,7 @@ end)
 
 essai('Image « aucun aperçu » : au cadre 3:2 de l\'aperçu, en 2x, dans le jeu de chaque apparence', function()
     local D = Dispositions.dimensions()
-    -- Son nom suit le cadre de l'aperçu (« vide-405x270 ») : un autre cadre, une autre image.
+    -- Son nom suit le cadre de l'aperçu (« vide-498x332 ») : un autre cadre, une autre image.
     local nom = 'vide-' .. D.apercu .. 'x' .. D.apercuHauteur .. '.png'
     egal('images/' .. nom, Dispositions.imageVide('claire'))
     egal('images/sombre/' .. nom, Dispositions.imageVide('sombre'))

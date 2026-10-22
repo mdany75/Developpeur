@@ -7,7 +7,7 @@ l'avant/après, finit une retouche par la leçon de la photo (ce qui manquait, e
 évité à la prise de vue), vous laisse faire la retouche vous-même avec sa liste de réglages puis
 compare vos deux versions, lit la composition et propose un cadre, et tient un carnet de progrès
 de vos prises de vue, mois par mois. La fenêtre Claude prend l'allure de la maquette « B ·
-Conversation claire », agrandie à votre demande à 1 497 × 1 200 points, en apparence claire ou
+Conversation claire », agrandie à votre demande à 1 948 × 1 200 points, en apparence claire ou
 sombre. Après l'installation : quitter et relancer Lightroom (le module a deux fichiers nouveaux,
 `Etapes.lua` et `Carnet.lua` : recharger le module ne suffit pas), rouvrir Claude Desktop (à
 quitter pendant l'installation) et ouvrir une nouvelle session de Claude Code, pour avoir les 36
@@ -91,9 +91,9 @@ constats faits le 21 octobre 2026 sur une fenêtre d'essai. La capture du README
 
 ### Changé
 - La fenêtre Claude, à l'allure de la maquette « B · Conversation claire », agrandie à
-  1 497 × 1 200 points (le volet des conversations, le centre et la hauteur plus grands que dans la
-  maquette, la colonne de droite inchangée : environ 1 940 points laissés à Lightroom sur votre
-  écran de 3 440 × 1 440) :
+  1 948 × 1 200 points (le volet des conversations, le centre, la colonne de droite et la hauteur
+  plus grands que dans la maquette : environ 1 490 points laissés à Lightroom sur votre écran de
+  3 440 × 1 440) :
   - à gauche, le volet : « ＋ Nouvelle conversation », Rechercher, la liste par jour (Aujourd'hui,
     Hier…) avec l'heure et le nombre de photos de chaque conversation, page par page (« Plus
     anciennes… » en bas, « Plus récentes… » en haut), le Carnet de progrès en tête ; en bas,
@@ -104,8 +104,9 @@ constats faits le 21 octobre 2026 sur une fenêtre d'essai. La capture du README
     avec son heure, les outils nommés en Menlo ; ▲ ▼ Fin, avec ce que fait Claude ou le relevé du
     forfait ; puis les invites, le champ de demande, 📎, 📋, « Style » et son menu, le bandeau des
     messages sur deux lignes, et Envoyer, un bouton bleu (Retour dans le champ envoie aussi) ;
-  - à droite, les onglets Aperçu, Proposition, Note et Leçon, l'aperçu de 405 × 270 commun aux
-    quatre, ◀ légende ▶ et ⤢ Agrandir, puis la carte de l'onglet, plus haute. La légende de la
+  - à droite, les onglets Aperçu, Proposition, Note et Leçon, l'aperçu de 498 × 332 commun aux
+    quatre, ◀ légende ▶ et ⤢ Agrandir, puis la carte de l'onglet, jusqu'en bas du panneau, avec
+    ses boutons sous elle (▲ ▼ à gauche) dans chacun des quatre onglets. La légende de la
     photo active dit son nom, son appareil et sa date.
 - La carte Note : les passes du standard, vos étoiles et vos drapeaux cliquables (posés dans
   Lightroom sans Claude ni forfait ; un clic sur la note posée la retire ; 5 ★ restent à vous),

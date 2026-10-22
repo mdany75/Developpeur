@@ -18,7 +18,7 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 
 ### La fenêtre Claude dans Lightroom
 
-- Une fenêtre flottante de 1 497 × 1 200 points, « Développeur » dans sa barre de titre : Fichier ›
+- Une fenêtre flottante de 1 948 × 1 200 points, « Développeur » dans sa barre de titre : Fichier ›
   Module externe - Extras › Ouvrir la fenêtre Claude (même entrée dans le menu Bibliothèque, et
   raccourci ⌃⌥C une fois posé). Elle reste ouverte pendant que vous travaillez, dans tous les
   modules de Lightroom, et laisse environ 1 940 points à Lightroom sur un écran de 3 440 × 1 440.
@@ -86,7 +86,7 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   (sauf la proposition préparée à l'ouverture), à l'onglet Note quand il propose une note pour la
   photo active, et une fois à l'onglet Leçon quand une leçon arrive (pas quand une proposition
   attend ni pendant un exercice) ; jamais à l'onglet Aperçu.
-- L'aperçu, de 405 × 270 : à l'ouverture de la fenêtre (et quand le menu ou ⌃⌥C la rappelle, ou
+- L'aperçu, de 498 × 332 : à l'ouverture de la fenêtre (et quand le menu ou ⌃⌥C la rappelle, ou
   que vous choisissez une autre photo), la photo active, avec sa légende (son nom, son appareil et
   sa date de prise de vue) ; puis les images que Claude regarde et les photos jointes. ◀ ▶ pour les
   parcourir (▶ depuis la dernière revient à la photo active), Agrandir pour les voir en grand.
