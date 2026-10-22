@@ -177,10 +177,12 @@ vous-même.
 - Elle se lit dans l'onglet Leçon (la fenêtre y passe une fois à son arrivée), ou par « Leçon de la
   photo » à la fin du tour de Claude ; Détail… montre les faits que le connecteur a donnés à
   Claude : la prise de vue, ce que Claude a corrigé, et des indices (une exposition remontée d'un
-  demi-IL ou plus dit une photo sous-exposée, par exemple).
+  demi-IL ou plus dit une photo sous-exposée, par exemple ; un débruitage ne dit un bruit de la
+  prise de vue qu'à ISO 1 600 ou plus).
 - Une leçon par photo et par conversation, rangée dans le carnet de progrès ; pas de leçon après
-  une proposition seulement montrée, une notation, un classement ou une série. La case Leçon du
-  Gestionnaire de modules externes la coupe.
+  une proposition seulement montrée, une notation, un classement ou une série. La leçon d'une
+  photo de « Développeur › Essais » se lit, mais n'est pas rangée. La case Leçon du Gestionnaire
+  de modules externes la coupe.
 
 **« Je le fais »**
 
@@ -218,7 +220,9 @@ vous-même.
 - Les défauts de vos prises de vue, notés tout seuls : quand Claude regarde une photo qu'il n'a pas
   encore retouchée (sous-exposition, ciel brûlé, flou, mise au point manquée, bruit fort), et quand
   il mesure une ligne penchée de 0,5° ou plus sur une photo dont la géométrie est intacte, ni
-  recadrage tourné, ni Upright, ni perspective (horizon penché).
+  recadrage tourné, ni Upright, ni perspective (horizon penché). Le bruit fort ne se cherche qu'à
+  ISO 1 600 ou plus (seuil provisoire) : à ISO bas, la texture d'un reflet d'eau ou d'un sous-bois
+  ressemble à du bruit, et « garder l'ISO plus bas » n'y aurait pas de sens.
   Ils sont comptés par mois de prise de vue ; une photo sans date compte au mois où Claude l'a vue.
 - En tête de la liste des conversations, le Carnet de progrès : un tableau des six derniers mois
   (« 2/9 » : le défaut sur 2 des 9 photos où il a été cherché ; « — » : pas cherché), puis ce qui
@@ -229,7 +233,7 @@ vous-même.
   en retire une, après confirmation. « Demander à Claude ce qu'il en pense › » ouvre une
   conversation où Claude le lit et répond en trois puces, sans rien retoucher.
 - Seules vos vraies prises de vue comptent : les photos de « Développeur › Essais » n'y entrent
-  pas. La case Carnet du Gestionnaire de modules externes (section Liaison avec Claude) arrête les
+  pas, ni leurs constats ni leurs leçons. La case Carnet du Gestionnaire de modules externes (section Liaison avec Claude) arrête les
   constats ; les leçons s'y rangent encore (c'est la case Leçon qui les coupe, dans la fenêtre).
   Les seuils de la sous-exposition (moitié des tons sous L* 28 et 95 % sous L* 80, sauf une photo
   voulue sombre) et du ciel brûlé (plus de 3 % du tiers haut en blanc pur) sont provisoires : aucun
@@ -430,8 +434,8 @@ avant de proposer un cadre.
 
 **Séries et tri**
 
-- Trier une séance, jusqu'à 500 photos (sélection, collection ou dossier), sur les vignettes que
-  Lightroom garde déjà en cache, sans exporter chaque photo : photos floues, mise au point manquée
+- Trier une séance, jusqu'à 500 photos (sélection, collection ou dossier ; sans rien de désigné, la
+  photo active), sur les vignettes que Lightroom garde déjà en cache, sans exporter chaque photo : photos floues, mise au point manquée
   (au point de mise au point lu dans les RAW et JPEG Fujifilm), yeux fermés ou plissés, photos
   presque noires ou brûlées, rafales et piles de Lightroom avec la meilleure de chacune, et un ordre
   de lecture (netteté et note esthétique ; la qualité des visages ne départage que les photos d'une
@@ -536,8 +540,8 @@ avant de proposer un cadre.
   Claude les faits mesurés : la prise de vue (compensation, flash, mode et mesure d'exposition),
   ses propres corrections, d'après son journal, et des indices (exposition corrigée d'un demi-IL
   ou plus, hautes lumières baissées sur une photo écrêtée, horizon redressé, cadre resserré…).
-  Avec `read_facts`, les faits seuls, sans rien ranger. Les seuils de ces indices sont
-  provisoires ; une photo remise à la main hors de Claude (Historique, ⌘Z) garde au journal des
+  Avec `read_facts`, les faits seuls, sans rien ranger. Le bruit n'y est un indice qu'à ISO 1 600
+  ou plus, comme au carnet. Les seuils de ces indices sont provisoires ; une photo remise à la main hors de Claude (Historique, ⌘Z) garde au journal des
   corrections qui n'y sont plus, et donc de faux indices.
 - Le carnet de progrès (`export_journal` avec `notebook`) : le résumé du catalogue entier en
   Markdown, mois par mois, ce qui progresse et quoi travailler à la prochaine sortie (voir Apprendre

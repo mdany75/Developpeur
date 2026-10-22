@@ -30,6 +30,35 @@ final class PourquoiTests: XCTestCase {
                        "les libellés s'ajoutent toujours")
     }
 
+    /// 1.3.1 : preview_settings accepte reason, comme apply_settings (Claude l'y joignait 3 fois sur 4,
+    /// et l'appel était refusé) : la même description ; une proposition n'écrit rien, la raison ne
+    /// part pas au module (ni étape ni journal) et revient dans la réponse, à redonner à
+    /// apply_settings.
+    func testPreviewSettingsAcceptsTheReasonWithoutSendingIt() throws {
+        let definition = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "preview_settings" })
+        XCTAssertEqual(definition["inputSchema"]?["properties"]?["reason"]?["description"]?.string, ToolHandler.descriptionRaison)
+        fake.onSend = { [unowned fake] command, _ in
+            guard command == "essayer" else { return }
+            fake?.replies["essayer"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 120, green: 120, blue: 120))),
+                                        "photo": ["id": 1, "fichier": "DSCF1595.RAF"], "etape": "Claude · essai",
+                                        "changements": [["cle": "Exposure2012", "avant": 0, "apres": 0.5]], "mode": "proposer d'abord"]
+        }
+        let resultat = tools.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 0.5], "step_name": "passe 1",
+                                                                         "reason": "  Ciel sombre : l'exposition remonte.  "])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertFalse(resultat.text.contains("Paramètres inconnus"), resultat.text)
+        XCTAssertEqual(fake.commands, ["essayer"])
+        XCTAssertNil(fake.lastParams["raison"], "une proposition n'est pas une étape : rien au module")
+        XCTAssertNil(fake.lastParams["reason"])
+        let info = try JSONCoding.parse(resultat.text)
+        XCTAssertEqual(info["raison"]?.string, "Ciel sombre : l'exposition remonte.")
+        XCTAssertTrue(info["raison_lecture"]?.string?.contains("apply_settings (reason)") == true, resultat.text)
+        // Sans reason (ou vide), rien de plus dans la réponse.
+        let sans = try JSONCoding.parse(tools.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 0.5], "reason": " "]).text)
+        XCTAssertNil(sans["raison"])
+        XCTAssertNil(sans["raison_lecture"])
+    }
+
     func testUndoLastPassesTheUndoneStepIdThrough() throws {
         fake.replies["annuler"] = ["resultats": [["photo": ["id": 1, "fichier": "DSCF1595.RAF"], "annulee": true,
                                                   "etape": "Claude · passe 1", "etape_id": "30A5C7E1-1B2F-3"]]]

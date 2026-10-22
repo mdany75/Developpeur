@@ -226,10 +226,55 @@ final class TriTests: XCTestCase {
         XCTAssertEqual(dossier.params["sous_dossiers"]?.bool, false)
 
         fake.calls = []
-        XCTAssertTrue(tools.call(name: "cull_photos", arguments: [:]).isError, "il faut dire quelles photos")
+        let sansActive = tools.call(name: "cull_photos", arguments: [:])
+        XCTAssertTrue(sansActive.isError, "sans cible ni photo active, il faut dire quelles photos")
+        XCTAssertTrue(sansActive.text.contains("Photos à traiter : photo_ids, selection = true, collection ou folder"), sansActive.text)
+        XCTAssertEqual(fake.commands, ["etat"])
         fake.replies["selection"] = ["total": 900, "photos": []]
         XCTAssertTrue(tools.call(name: "cull_photos", arguments: ["selection": true]).text.contains("au plus 500"))
         XCTAssertFalse(fake.commands.contains("vignettes"))
+    }
+
+    /// 1.3.1 : sans photo_ids, selection, collection ni folder, le tri prend la photo active de
+    /// Lightroom, comme les autres outils (dans la fenêtre Claude, la note d'abord d'une photo
+    /// oubliait photo_ids 2 fois sur 4) ; la planche contact, elle, demande toujours une série.
+    func testCullTakesTheActivePhotoWithoutTarget() throws {
+        preparerVignettes()
+        fake.replies["etat"] = ["photo_active": ["id": 42, "fichier": "DSCF42.RAF"]]
+        for arguments in [[:], ["selection": false], ["photo_ids": []], ["keywords": false, "details": true]] as [[String: JSONValue]] {
+            fake.calls = []
+            let result = tools.call(name: "cull_photos", arguments: arguments)
+            XCTAssertFalse(result.isError, result.text)
+            XCTAssertEqual(fake.commands.first, "etat", "\(arguments)")
+            XCTAssertFalse(fake.commands.contains("selection"), "pas la sélection : la photo active")
+            XCTAssertEqual(fake.calls.first { $0.command == "vignettes" }?.params["photos"]?.array?.compactMap(\.int), [42], "\(arguments)")
+            XCTAssertEqual(try JSONCoding.parse(result.text)["photos_analysees"]?.int, 1)
+        }
+        // Une cible donnée l'emporte : la photo active n'est pas lue.
+        fake.calls = []
+        XCTAssertFalse(tools.call(name: "cull_photos", arguments: ["photo_ids": [5]]).isError)
+        XCTAssertFalse(fake.commands.contains("etat"))
+        // Un photo_ids invalide se dit, sans prendre la photo active à sa place.
+        fake.calls = []
+        XCTAssertTrue(tools.call(name: "cull_photos", arguments: ["photo_ids": ["sept"]]).isError)
+        XCTAssertTrue(fake.calls.isEmpty, "\(fake.commands)")
+        // Le plafond de la photo active est gardé pour propose_ratings, comme pour une série.
+        XCTAssertNotNil(tools.dernierTri[42])
+
+        // La planche contact : une série, jamais la photo active seule.
+        fake.calls = []
+        let planche = tools.call(name: "contact_sheet", arguments: [:])
+        XCTAssertTrue(planche.isError)
+        XCTAssertTrue(planche.text.contains("Photos à traiter"), planche.text)
+        XCTAssertTrue(fake.calls.isEmpty, "\(fake.commands)")
+        // Les descriptions le disent.
+        func propriete(_ outil: String, _ nom: String) -> String? {
+            tools.definitions.first { $0["name"]?.string == outil }?["inputSchema"]?["properties"]?[nom]?["description"]?.string
+        }
+        XCTAssertTrue(propriete("cull_photos", "photo_ids")?.contains("Défaut : la photo active de Lightroom.") == true)
+        XCTAssertFalse(propriete("contact_sheet", "photo_ids")?.contains("photo active") == true)
+        let description = tools.definitions.first { $0["name"]?.string == "cull_photos" }?["description"]?.string ?? ""
+        XCTAssertTrue(description.hasSuffix("Sans photo_ids, selection, collection ni folder : la photo active de Lightroom."), description)
     }
 
     // MARK: contact_sheet

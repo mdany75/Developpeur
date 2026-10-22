@@ -278,8 +278,11 @@ enum Lecon {
 
     /// Les indices tirés des corrections nettes de Claude (un exercice compte : c'est son jugement)
     /// et de la première vue mesurée de la session (nil : pas de view_photo de cette photo dans ce
-    /// processus du serveur), dans l'ordre de PriseDeVue.
-    static func indices(corrections: [Correction], depart: Bilan.Vue?) -> [Indice] {
+    /// processus du serveur), dans l'ordre de PriseDeVue. `iso` : la sensibilité de la photo
+    /// (`Carnet.iso`) ; le bruit fort de la prise de vue ne s'y nomme qu'à un ISO connu et élevé,
+    /// comme au carnet (`Carnet.bruitCherche`, 1.3.1) : à ISO bas, un débruitage soigne autre chose
+    /// (des ombres relevées, une texture), pas un ISO trop haut.
+    static func indices(corrections: [Correction], depart: Bilan.Vue?, iso: Double?) -> [Indice] {
         var parCle: [String: Correction] = [:]
         for c in corrections where parCle[c.cle] == nil { parCle[c.cle] = c }
         // Une valeur d'avant absente vaut celle par défaut du curseur (0) ; nil quand ce défaut ne
@@ -331,13 +334,16 @@ enum Lecon {
         }
         // Voile.
         if let e = ecart("Dehaze"), e.ecart >= Seuils.voile { noter("flat_light", [change("Dehaze", e)]) }
-        // Bruit : le débruitage de Lightroom lancé, ou la réduction du bruit de luminance remontée.
+        // Bruit : le débruitage de Lightroom lancé, ou la réduction du bruit de luminance remontée, à
+        // un ISO élevé seulement (la même règle que le carnet).
         var bruit: [String] = []
         if let c = parCle["Amelioration.denoise"], !actif(c.avant), actif(c.apres) {
             bruit.append("\(libelle("Amelioration.denoise")) lancé (\(JSONCoding.line(c.avant)) → \(JSONCoding.line(c.apres)))")
         }
         if let e = ecart("LuminanceSmoothing"), e.ecart >= Seuils.lissage { bruit.append(change("LuminanceSmoothing", e)) }
-        noter("noise", bruit)
+        if Carnet.bruitCherche(iso: iso), let iso, !bruit.isEmpty {
+            noter("noise", bruit + ["à ISO \(Bilan.nombre(iso, decimales: 0))"])
+        }
         // Dominante : balance des blancs corrigée, ou vue de départ nettement colorée.
         var dominante: [String] = []
         if let e = ecart("Temperature", avantParDefaut: nil) {

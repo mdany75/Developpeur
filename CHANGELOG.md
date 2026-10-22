@@ -1,5 +1,35 @@
 # Changements
 
+## Non publié
+
+Le correctif 1.3.1, tiré de l'essai réel de la 1.3 du 21 octobre 2026. Après l'installation :
+recharger le module suffit (aucun fichier nouveau), puis rouvrir Claude Desktop et ouvrir une
+nouvelle session de Claude Code.
+
+### Corrigé
+- Une proposition (`preview_settings`) accepte la raison que Claude y joint (`reason`), comme une
+  retouche appliquée : l'appel n'est plus refusé (« Paramètres inconnus pour preview_settings :
+  reason »), ce qui forçait Claude à le refaire. Une proposition n'écrit rien : la raison n'est pas
+  une étape ; elle revient dans la réponse, pour la redonner quand la proposition est appliquée.
+  Avec « Je le fais », elle devient la raison de l'exercice au journal.
+- Le tri (`cull_photos`) sans photos désignées (ni liste, ni sélection, ni collection, ni dossier)
+  prend la photo active de Lightroom, comme les autres outils : dans la fenêtre Claude, la note
+  d'abord de la photo active ne s'arrête plus sur « Photos à traiter ». Sans photo active, le
+  refus reste. La planche contact demande toujours une série : une planche d'une seule photo ne
+  montre rien de plus.
+- Carnet de progrès : « Bruit fort (ISO élevé) » ne se compte plus qu'à un ISO connu d'au moins
+  1 600 (seuil provisoire). À ISO bas, la texture d'un reflet d'eau, d'un sous-bois ou d'un
+  feuillage passait pour du bruit, et le carnet conseillait de garder l'ISO plus bas pour des
+  photos prises à ISO 160 ou 320. Le module donne maintenant l'ISO de la photo au connecteur ;
+  les constats déjà notés restent tels quels (le carnet ne les refait pas). La leçon de la photo
+  suit la même règle : un débruitage de Claude n'y désigne le bruit de la prise de vue qu'à un ISO
+  élevé. Le relevé `--constats` dit l'ISO de chaque photo et si le bruit y est cherché.
+- La leçon d'une photo d'essai (collection « Développeur › Essais ») n'entre plus au carnet de
+  progrès : elle était rangée sous l'original de la copie, une vraie photo. Claude la donne quand
+  même, et dit qu'elle n'est pas rangée. Une leçon d'essai rangée avant ce correctif reste au
+  carnet : `mcp-developpeur --module lecon '{"action": "retirer", "photo": <id de la copie>}'` la
+  retire.
+
 ## 1.3 — 2026-10-21
 
 La 1.3 : apprendre en regardant Claude. Claude dit pourquoi il fait chaque étape et en garde

@@ -28,23 +28,28 @@ extension ToolHandler {
     static let parallelMeasures = 2
 
     var cullDefinitions: [JSONValue] {
-        let series: [(String, JSONValue)] = [
-            ("photo_ids", listProp("integer", "Photos à trier (champ « id »), dans l'ordre voulu.")),
-            ("selection", prop("boolean", "true = les photos sélectionnées dans Lightroom (toutes celles du film fixe si rien n'est sélectionné).")),
-            ("collection", prop("string", "Une collection entière, par son nom, « Ensemble > Nom » ou son identifiant (manage_collections, action list), triée par date de prise de vue.")),
-            ("folder", prop("string", "Un dossier entier, par son chemin complet (sans ses sous-dossiers), trié par date de prise de vue.")),
-        ]
+        // Les cibles d'une série. Le tri prend la photo active sans cible (1.3.1 : dans la fenêtre
+        // Claude, la note d'abord de la photo active l'oubliait) ; la planche contact non : une
+        // planche d'une seule photo ne montre pas une série, il faut dire laquelle.
+        func series(_ photos: String) -> [(String, JSONValue)] {
+            [
+                ("photo_ids", listProp("integer", photos)),
+                ("selection", prop("boolean", "true = les photos sélectionnées dans Lightroom (toutes celles du film fixe si rien n'est sélectionné).")),
+                ("collection", prop("string", "Une collection entière, par son nom, « Ensemble > Nom » ou son identifiant (manage_collections, action list), triée par date de prise de vue.")),
+                ("folder", prop("string", "Un dossier entier, par son chemin complet (sans ses sous-dossiers), trié par date de prise de vue.")),
+            ]
+        }
         return [
             tool("cull_photos",
-                 "Trie une séance (jusqu'à \(Self.maxCulledPhotos) photos) sur les vignettes du cache d'aperçus de Lightroom, sans rien changer : photos floues ou ratées (netteté, mise au point manquée au point AF lu dans les RAW et JPEG Fujifilm, yeux fermés ou plissés, presque noires, brûlées), rafales (photos consécutives semblables, prises coup sur coup) et piles de Lightroom, avec la meilleure de chacune, ordre de lecture (classement : netteté et note esthétique, pas une note), plafonds de note mesurés (plafonds : le plancher technique du standard de notation, qui borne la note sans la donner ; propose_ratings les fait respecter) et proposition de rejet (flag reject, pour un défaut majeur). Aucune étoile : elles se proposent par propose_ratings, après avoir regardé les photos. Présenter les rejets à l'utilisateur, puis, après son accord, les poser avec set_metadata ; undo_last les défait. Avec keywords, des mots-clés proposés par Vision, en français. Long sur une grande séance : la progression se suit photo par photo.",
-                 properties: series + [
+                 "Trie une séance (jusqu'à \(Self.maxCulledPhotos) photos) sur les vignettes du cache d'aperçus de Lightroom, sans rien changer : photos floues ou ratées (netteté, mise au point manquée au point AF lu dans les RAW et JPEG Fujifilm, yeux fermés ou plissés, presque noires, brûlées), rafales (photos consécutives semblables, prises coup sur coup) et piles de Lightroom, avec la meilleure de chacune, ordre de lecture (classement : netteté et note esthétique, pas une note), plafonds de note mesurés (plafonds : le plancher technique du standard de notation, qui borne la note sans la donner ; propose_ratings les fait respecter) et proposition de rejet (flag reject, pour un défaut majeur). Aucune étoile : elles se proposent par propose_ratings, après avoir regardé les photos. Présenter les rejets à l'utilisateur, puis, après son accord, les poser avec set_metadata ; undo_last les défait. Avec keywords, des mots-clés proposés par Vision, en français. Long sur une grande séance : la progression se suit photo par photo. Sans photo_ids, selection, collection ni folder : la photo active de Lightroom.",
+                 properties: series("Photos à trier (champ « id »), dans l'ordre voulu. Défaut : la photo active de Lightroom.") + [
                     ("keywords", prop("boolean", "true = proposer aussi des mots-clés par photo (Vision, traduits en français), à poser avec set_metadata après accord.")),
                     ("details", prop("boolean", "true = une ligne de mesures par photo (ordre de lecture, plafond, défauts, point AF, mots-clés).")),
                  ],
                  required: []),
             tool("contact_sheet",
                  "Planche contact : une seule image de \(Self.maxContactSheet) vignettes au plus, numérotées, avec le nom de chaque fichier, pour voir une série d'un coup d'œil (choisir, comparer, harmoniser, juger l'Impact sur 20 à 30 vignettes) en bien moins de jetons qu'une image par photo. Vignettes du cache d'aperçus de Lightroom (elles peuvent dater d'avant la dernière retouche : la netteté et la finition se jugent par view_photo) ; légende : numéro, id, fichier, note, drapeau (au-delà de 20 vignettes, les noms se lisent mal sur l'image : la légende fait foi). Pour la suite d'une sélection ou d'une collection : offset, et les numéros continuent d'une planche à l'autre.",
-                 properties: series + [
+                 properties: series("Photos de la planche (champ « id »), dans l'ordre voulu ; ou selection, collection ou folder (pas de défaut : une planche montre une série).") + [
                     ("offset", prop("integer", "Avec selection, collection ou folder : photos à sauter (planche suivante : offset + \(Self.maxContactSheet)).")),
                     ("columns", prop("integer", "Colonnes (défaut : 2 jusqu'à 4 photos, 3 jusqu'à 9, 4 jusqu'à 16, 5 jusqu'à 25, puis 6).")),
                  ],
@@ -145,9 +150,30 @@ extension ToolHandler {
         }
     }
 
+    /// Une cible de série est-elle donnée (photo_ids non vide, selection = true, collection ou
+    /// folder) ? Un photo_ids invalide compte : seriesPhotos dit pourquoi.
+    static func serieDonnee(_ args: Arguments) -> Bool {
+        do {
+            if let ids = try args.intList("photo_ids"), !ids.isEmpty { return true }
+        } catch {
+            return true
+        }
+        return args.bool("selection") == true || args.has("collection") || args.has("folder")
+    }
+
     func cullPhotos(_ args: Arguments) throws -> JSONValue {
         let debut = Date()
-        let (ids, total) = try seriesPhotos(args, maximum: Self.maxCulledPhotos)
+        let ids: [Int], total: Int
+        if Self.serieDonnee(args) {
+            (ids, total) = try seriesPhotos(args, maximum: Self.maxCulledPhotos)
+        } else {
+            // Sans cible, la photo active de Lightroom, comme les autres outils (la note d'abord d'une
+            // photo dans la fenêtre Claude) ; sans photo active, le refus de toujours.
+            guard let active = try lightroom.send("etat", [:], timeout: 10)["photo_active"]?["id"]?.int else {
+                throw LightroomError.invalid("Photos à traiter : photo_ids, selection = true, collection ou folder (aucune photo active dans Lightroom).")
+            }
+            (ids, total) = ([active], 1)
+        }
         guard !ids.isEmpty else { throw LightroomError.invalid("Aucune photo à trier.") }
         let motsCles = args.bool("keywords") == true
         let pointsAF = LecteurBoitier()

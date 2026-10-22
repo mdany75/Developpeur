@@ -417,6 +417,67 @@ test("carnet constater : une photo de Développeur › Essais (ou dont l'origina
     egal(Carnet.estPhotoDEssai(original), false)
 end)
 
+-- 1.3.1 : constaté le 21 octobre 2026 dans le carnet de Dany, la leçon de l'essai réel sur la dune
+-- d'essai (une copie de « Développeur › Essais ») rangée sous son original, une vraie photo.
+test("lecon garder : la leçon d'une photo de Développeur › Essais n'est pas rangée, sauf pour la recette, sous son entrée à elle", function()
+    local original = photoRaw()
+    original.brut.dateTimeOriginal = PRISE_JUILLET_UTC
+    S.fuseau = -4 * 3600
+    local copie = S.copieVirtuelle(original, 7, 'Essai')
+    S.Collection('Essais', S.Ensemble('Développeur')).membres[copie] = true
+    -- L'original, une vraie photo, a sa vue.
+    egal(constater(1, { vue = vue({ 'flou' }) }).note, true)
+    local version, fichier = Carnet.version, S.fichiers[Carnet.fichier()]
+    local ecritures, privees = #S.ecritures, S.ecrituresPrivees
+    local r = Commandes.executer('lecon', { action = 'garder', photo = 7, lecon = lecon() })
+    egal(r.rangee, false)
+    egal(r.remplacee, false)
+    egal(r.motif, 'essai')
+    egal(r.photo, 7)
+    egal(r.fichier, 'DSC_0412.NEF (Essai)')
+    egal(r.original, nil, "aucune entrée visée")
+    egal(r.remarque, "Photo d'essai (Développeur › Essais) : sa leçon n'entre pas au carnet de progrès, qui ne compte que les "
+        .. "vraies prises de vue. La leçon de cette réponse reste valable.")
+    egal(Carnet.version, version, "rien n'est rangé")
+    egal(S.fichiers[Carnet.fichier()], fichier, "carnet.json inchangé")
+    egal(next(Carnet.entree(1).lecons), nil, "rien sous l'original")
+    egal(Carnet.lecon(7), nil)
+    egal(Carnet.nombre(), 1)
+    egal(#S.ecritures, ecritures, "rien dans le catalogue")
+    egal(S.ecrituresPrivees, privees)
+    -- La photo active, sans photo donnée ; et par la prise de la liaison : une réponse, jamais une
+    -- erreur (photo_lesson le dit sans échouer).
+    S.active = copie
+    egal(Commandes.executer('lecon', { action = 'garder', lecon = lecon() }).rangee, false, "la photo active aussi")
+    Liaison.prise = { send = function(self, texte) S.envois[#S.envois + 1] = texte end }
+    Liaison.reponsesConnectee = true
+    Liaison.recevoir(ligne({ id = 21, command = 'lecon', params = { action = 'garder', photo = 7, lecon = lecon() } }))
+    Liaison.prise = nil
+    local reponse = Json.decode(S.envois[#S.envois])
+    egal(reponse.error, nil)
+    egal(reponse.result.rangee, false)
+    egal(reponse.result.motif, 'essai')
+    egal(Carnet.version, version)
+    -- Une leçon invalide reste refusée d'abord, photo d'essai ou pas.
+    echoue(function() Commandes.executer('lecon', { action = 'garder', photo = 7, lecon = { points = {} } }) end, "trois points")
+
+    -- Pour la recette (essai_recette) : rangée, sous l'entrée de la photo d'essai elle-même.
+    r = Commandes.executer('lecon', { action = 'garder', photo = 7, lecon = lecon(), essai_recette = true })
+    egal(r.rangee, true)
+    egal(r.photo, 7)
+    egal(r.original, 7, "une entrée à elle, jamais celle de son original")
+    egal(r.mois, '2026-06', "au mois de sa prise de vue")
+    egal(Carnet.nombre(), 2)
+    egal(Carnet.entree(7).lecons['7'] ~= nil, true)
+    egal(next(Carnet.entree(1).lecons), nil, "toujours rien sous l'original")
+    -- Retirée par la recette : l'entrée de la photo d'essai part avec elle ; celle de l'original reste.
+    egal(Commandes.executer('lecon', { action = 'retirer', photo = 7 }).retirees, 1)
+    egal(Carnet.entree(7), nil)
+    egal(table.concat(Carnet.entree(1).vue.cherches, ','), 'flou')
+    -- Une vraie photo se range comme avant, sans essai_recette.
+    egal(Commandes.executer('lecon', { action = 'garder', photo = 1, lecon = lecon() }).rangee, true)
+end)
+
 test("carnet constater : case Carnet décochée, tout constat est refusé sans rien lire ; lire et retirer marchent toujours", function()
     photoRaw()
     S.prefs.carnet = false

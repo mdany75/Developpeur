@@ -6,7 +6,9 @@ import Foundation
 /// - « Pourquoi ? » : l'avant/après d'une étape gardé par le module (avant_apres, que seule la
 ///   recette envoie : il lève aussi la condition de la photo active, d'où ni show_photo ni fenêtre
 ///   ouverte), l'avant tiré de la vue sans second rendu, puis l'étape annulée ;
-/// - la leçon de la photo : indices lus (read_facts), leçon rangée, relue, puis retirée ;
+/// - la leçon de la photo : indices lus (read_facts), leçon d'une photo d'essai refusée par l'outil
+///   (rangee = false : elle n'entre pas au carnet de Dany), puis rangée pour la recette par la
+///   commande du module (essai_recette, sous l'entrée de la copie), relue, puis retirée ;
 /// - le carnet de progrès : une photo d'essai refusée, puis notée pour la recette (essai_recette),
 ///   au mois de sa prise de vue, exportée (export_journal avec notebook), puis retirée, même si une
 ///   vérification échoue ;
@@ -176,15 +178,18 @@ extension Recette {
     /// La leçon de la photo (photo_lesson) : la photo assombrie et réchauffée par la recette (une
     /// écriture, que Claude aurait corrigée : exposition remontée de 0,7 IL, température baissée de
     /// 500 K, nettes depuis le départ de la séquence), les faits (indices underexposed et color_cast),
-    /// la leçon rangée (trois points), relue (lecon lire), puis retirée (lecon retirer, même si une
-    /// vérification échoue), et l'écriture annulée. Une leçon déjà rangée pour la copie (un essai dans
-    /// la fenêtre) n'est pas remplacée : l'étape s'arrête avant toute écriture.
+    /// la leçon donnée à l'outil (trois points) et refusée par le module comme photo d'essai
+    /// (rangee = false, motif essai : 1.3.1, une leçon d'essai n'entre pas au carnet de Dany), puis
+    /// rangée par la commande du module avec essai_recette (jamais par un outil), sous l'entrée de la
+    /// copie elle-même, relue (lecon lire), retirée (lecon retirer, même si une vérification échoue),
+    /// et l'écriture annulée. Une leçon déjà rangée pour la copie (un essai d'avant la 1.3.1) n'est pas
+    /// remplacée : l'étape s'arrête avant toute écriture.
     func etapeLecon(_ id: Int, _ photo: String, depart: Etat, attendu: Etat) throws {
         let photoID = JSONValue.number(Double(id))
-        try etape(photo, "leçon de la photo (photo_lesson) : indices lus, rangée, relue, retirée ; photo inchangée") {
+        try etape(photo, Self.etapeLeconNom) {
             let deja = try tools.lightroom.send("lecon", ["action": "lire", "photos": [photoID]], timeout: 30)["lecons"]?.array ?? []
             guard deja.isEmpty else {
-                throw Echec(description: "une leçon est déjà rangée pour cette copie (essai dans la fenêtre ?) : la recette la remplacerait ; "
+                throw Echec(description: "une leçon est déjà rangée pour cette copie (essai dans la fenêtre d'avant la 1.3.1 ?) : la recette la remplacerait ; "
                     + "la retirer d'abord (mcp-developpeur --module lecon '{\"action\": \"retirer\", \"photo\": \(id)}'), rien n'a été écrit")
             }
             guard let t0 = depart.temperature ?? attendu.temperature else { throw Echec(description: "pas de balance des blancs lisible") }
@@ -201,9 +206,17 @@ extension Recette {
             let (faits, _) = try appel("photo_lesson", ["photo_id": photoID, "read_facts": true])
             let indices = (faits["faits"]?["indices"]?.array ?? []).compactMap { $0["defect"]?.string }
             let apresFaits = try etat(id)
+            // Retirée même si une vérification échoue : celle que l'outil aurait rangée à tort, puis
+            // celle de la recette.
             aRetirer = true
             let (reponse, _) = try appel("photo_lesson", ["photo_id": photoID, "points": Self.pointsLecon])
             let apresLecon = try etat(id)
+            let parLOutil = try tools.lightroom.send("lecon", ["action": "lire", "photos": [photoID]], timeout: 30)["lecons"]?.array ?? []
+            // Rangée pour la recette : la commande du module, avec essai_recette, que seule la recette
+            // envoie (aucun outil ne le porte).
+            let points = try Lecon.points(Self.pointsLecon.array ?? [])
+            let rangement = try tools.lightroom.send("lecon", ["action": "garder", "photo": photoID, "essai_recette": true,
+                                                               "lecon": Lecon.pourLeModule(points: points, indices: [])], timeout: 30)
             let lues = try tools.lightroom.send("lecon", ["action": "lire", "photos": [photoID]], timeout: 30)["lecons"]?.array ?? []
             let retrait = try tools.lightroom.send("lecon", ["action": "retirer", "photo": photoID], timeout: 30)
             aRetirer = false
@@ -217,21 +230,29 @@ extension Recette {
             try verifierEgal(apresLecon, ecrite)
             let lecon = reponse["lecon"]
             let remarques = (reponse["remarques"]?.array ?? []).compactMap(\.string)
-            try verifier(lecon?["rangee"]?.bool == true, "leçon non rangée : \(remarques.joined(separator: " ; "))")
+            try verifier(lecon?["rangee"]?.bool == false && parLOutil.isEmpty,
+                         "leçon d'une copie d'essai rangée par photo_lesson (elle irait au carnet de Dany) : \(lecon.map(JSONCoding.line) ?? "?")")
+            try verifier(remarques.contains { $0.contains("Photo d'essai") }, "refus de la photo d'essai non dit : \(remarques.joined(separator: " ; "))")
             let fichier = faits["photo"]?["fichier"]?.string
-            try verifier(lecon?["photo"]?.int == id && lecon?["fichier"]?.string == fichier,
-                         "leçon rangée pour \(lecon?["fichier"]?.string ?? "?") au lieu de \(fichier ?? "?")")
-            let mois = lecon?["mois"]?.string
-            try verifier(mois.map(Self.estUnMois) == true || lecon?["sans_date"]?.bool == true,
-                         "mois de la prise de vue : \(lecon?["mois"].map(JSONCoding.line) ?? "absent")")
+            try verifier(rangement["rangee"]?.bool == true, "leçon non rangée avec essai_recette : \(JSONCoding.line(rangement))")
+            try verifier(rangement["photo"]?.int == id && rangement["original"]?.int == id && rangement["fichier"]?.string == fichier,
+                         "leçon de la recette rangée sous \(rangement["original"].map(JSONCoding.line) ?? "?") pour \(rangement["fichier"]?.string ?? "?") "
+                            + "au lieu de l'entrée de la copie \(id), \(fichier ?? "?")")
+            let mois = rangement["mois"]?.string
+            try verifier(mois.map(Self.estUnMois) == true || rangement["sans_date"]?.bool == true,
+                         "mois de la prise de vue : \(rangement["mois"].map(JSONCoding.line) ?? "absent")")
             let relue = lues.first { $0["photo"]?.int == id }
             try verifier(relue?["points"]?.array?.count == 3, "leçon relue : \(relue.map(JSONCoding.line) ?? "absente")")
             try verifier((retrait["retirees"]?.int ?? 0) >= 1 && !restees.contains { $0["photo"]?.int == id },
                          "leçon pas retirée : \(JSONCoding.line(retrait))")
-            return "indices \(indices.joined(separator: ", ")) ; rangée pour \(fichier ?? "?")"
+            return "indices \(indices.joined(separator: ", ")) ; refusée par l'outil (photo d'essai) ; rangée pour la recette sous \(fichier ?? "?")"
                 + (mois.map { " (prise de vue \($0))" } ?? " (sans date de prise de vue)") + ", relue, retirée ; écriture annulée"
         }
     }
+
+    /// Le nom de l'étape de la leçon dans la recette.
+    static let etapeLeconNom = "leçon de la photo (photo_lesson) : indices lus, refusée pour une photo d'essai, "
+        + "rangée pour la recette (essai_recette), relue, retirée ; photo inchangée"
 
     /// Un mois de prise de vue tel que le module le range (« AAAA-MM »).
     static func estUnMois(_ texte: String) -> Bool {

@@ -272,6 +272,19 @@ local function decrireAvec(photo, detaille, f, b, retouchee)
     return d
 end
 
+-- La sensibilité ISO de la photo, en nombre (isoSpeedRating brut ; la description détaillée n'en
+-- a que le texte formaté, « ISO 160 ») : nil si Lightroom ne la connaît pas. Constaté le
+-- 21 octobre 2026 (Lightroom Classic 15.6, commande reglages : prise_de_vue.iso de 160 à 12 800 sur
+-- des RAF de X-H2S et de X-T20 et un JPEG de X-T20) : un nombre. Le carnet de progrès et la leçon
+-- ne cherchent le bruit fort de la prise de vue qu'à un ISO élevé (Carnet.isoEleve du serveur).
+local function sensibilite(photo)
+    local iso = tonumber(brut(photo, 'isoSpeedRating'))
+    if iso and iso > 0 and iso == iso and iso ~= math.huge then
+        return iso
+    end
+    return nil
+end
+
 local function decrire(photo, detaille)
     return decrireAvec(photo, detaille,
         function(cle) return meta(photo, cle) end,
@@ -426,5 +439,6 @@ Photos.orientationAffichage = orientationAffichage
 Photos.photoParId = photoParId
 Photos.photosVisees = photosVisees
 Photos.photoVisee = photoVisee
+Photos.sensibilite = sensibilite
 
 return Photos

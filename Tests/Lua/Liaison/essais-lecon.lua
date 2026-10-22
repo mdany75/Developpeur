@@ -68,6 +68,7 @@ test("journal detaille : la photo décrite en entier, avec prise_de_vue_plus, et
     egal(d.appareil, 'X-H2S')
     egal(d.objectif, 'XF16-55mmF2.8 R LM WR')
     egal(d.iso, 'ISO 400')
+    egal(d.sensibilite, 400, "en nombre (1.3.1) : l'indice du bruit ne vaut qu'à un ISO élevé")
     egal(d.vitesse, '1/250 s')
     egal(d.ouverture, 'ƒ/8,0')
     egal(d.focale, '23 mm')

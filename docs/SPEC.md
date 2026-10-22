@@ -125,7 +125,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `etat` | `sauvegarde?` | versions, catalogue, mode, pause, limites, photo active, `liaison_fermee` (1.2 : vrai) ; avec `sauvegarde`, la sauvegarde du catalogue demandée pour la fermeture suivante |
 | `selection` | `limite` | `total`, `renvoyees`, `photos` (id, fichier, données de prise de vue, note, drapeau, libellé, pile, `active`) |
 | `reglages` | `photo?`, `cles`, `details?`, `toutes?` | `reglages` (valeurs des clés demandées), `photo` (id, fichier, `copie_virtuelle`), `echelle_temperature`, `version_processus`, `profil`, `intensite_profil`, `appareil`, `recadrage` (angle, dimensions, orientation) ; avec `details` : `courbes_par_points`, `masques` (composants avec leur mode), `couleurs_ponctuelles`, `taches`, `yeux_rouges`, `filtres_calcules`, `amelioration` (photo affichée dans le module Développement seulement), `classement` (note, drapeau, libellé, titre, mots-clés) ; avec `toutes` : `tous`, tout ce que Lightroom range |
-| `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?`, `entier?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier ; après la 1.1.1, sur un zoom `region` aussi, jamais sur un avant/après), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point ; avec `point_af` aussi (1.2), `etapes_claude` (`nombre`, `derniere` : les étapes de Claude gardées pour la photo, `etapesClaude`, lues seulement), pour le bilan de `view_photo` (voir Bilan d'une passe à l'autre) ; avec `comparer = versionClaude` (1.3), `chemin_avant` est la version de Claude de l'exercice, et `exercice` = `{instantane, le, ecarts [{cle, depart, claude, vous}], listes {masques, taches, yeux_rouges = {depart, vous}}, restent, rien_change}` (voir Je le fais) ; avec `entier` (1.3, `read_composition`), l'image entière sans son cadre, `image_entiere` = vrai, `dimensions` {`largeur`, `hauteur`}, `cadre_actuel` (absent sans recadrage), refusé avec `comparer` ou `point_af` (voir Composition lue) |
+| `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?`, `entier?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier ; après la 1.1.1, sur un zoom `region` aussi, jamais sur un avant/après), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`, et depuis la 1.3.1 `sensibilite`, l'ISO en nombre, pour le carnet de progrès), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point ; avec `point_af` aussi (1.2), `etapes_claude` (`nombre`, `derniere` : les étapes de Claude gardées pour la photo, `etapesClaude`, lues seulement), pour le bilan de `view_photo` (voir Bilan d'une passe à l'autre) ; avec `comparer = versionClaude` (1.3), `chemin_avant` est la version de Claude de l'exercice, et `exercice` = `{instantane, le, ecarts [{cle, depart, claude, vous}], listes {masques, taches, yeux_rouges = {depart, vous}}, restent, rien_change}` (voir Je le fais) ; avec `entier` (1.3, `read_composition`), l'image entière sans son cadre, `image_entiere` = vrai, `dimensions` {`largeur`, `hauteur`}, `cadre_actuel` (absent sans recadrage), refusé avec `comparer` ou `point_af` (voir Composition lue) |
 | `appliquer` | `photos?` ou `selection?`, `reglages`, `booleens?`, `looks_traitement?`, `profil?`, `profil_marque?`, `profil_variantes?`, `profil_look?`, `recadrage?`, `recalages?`, `courbes?`, `couleurs_ponctuelles?`, `balance?`, `auto_ton?`, `preset?`, `plages`, `libelles`, `relatif`, `etape`, `raison?`, `confirme` | par photo : `changements` (`cle`, `avant`, `apres`) et `remarques` ; `a_recadrer` et `etape_ecrite` quand un cadre demandé reste à placer (voir Recadrage) |
 | `recadrer` | `photos`, `recadrage`, `recalages`, `completer?`, `etape`, `raison?`, `confirme` | comme `appliquer` (changements du cadre seulement) |
 | `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
@@ -159,7 +159,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `progression` | `id`, `titre?`, `fait?`, `total?`, `message?`, `fin?` | `annulee` (croix de la barre de Lightroom), `fermee` à la fin |
 | `variantes` | `photo?`, `action` (`lister`, `choisir`, `effacer`), `nom?`, `noms?`, `effacer_autres?`, `etape`, `raison?`, `confirme` | `lister` : `variantes` (nom, réglages touchés, date) ; `choisir` : `etape`, `instantane`, `changements`, `effaces` ; `effacer` : `effaces` ; voir Variantes |
 | `notation` | `action` (`proposer`, `lire`) ; `proposer` : `propositions` (`photo`, `note` de 0 à 4, `drapeau` `aucun` ou `rejetee`, `criteres` `{impact, qualites, plancher, finition?}`, `plafond?`, `raison`, `a_verifier`), `passe?`, `poser?` ; `lire` : `photos?` | `proposer` : `propositions` (`photo`, `fichier`, `note_avant`, `drapeau_avant`, `etat`, toujours `a_verifier` depuis la 1.1.1), `refusees` (`photo`, `raison`) ; avec `poser`, `posees` (`photo`, `etat`, `note`, `drapeau`, `erreur`, `remarques`) et `erreur_pose?` ; `lire` : `propositions`, `perdues?`. Sans `poser`, rien n'est écrit dans le catalogue (voir Notation). 1.3 : `remettre` (`photo`, `proposition` ou null ; la recette seulement, jamais un outil) remet la proposition lue avant une étape de la recette, ou la retire, sans rien écrire au catalogue |
-| `lecon` (1.3) | `action` (`garder`, `lire`, `retirer`) ; `garder` : `photo?`, `lecon` = `{points, indices?}` (trois points, un par axe : `lumiere`, `couleur`, `composition`) ; `lire` : `photos?` ; `retirer` : `photo` ou `photos` | `garder` : `{photo, original, fichier, rangee, remplacee, mois, prise_le, sans_date, remarque?}` ; `lire` : `{lecons, perdues?}` (une photo disparue ou d'un autre uuid perd sa leçon) ; `retirer` : `{retirees}`. Rien dans le catalogue, pas d'arrêt par la pause, jamais rejouée (voir Leçon de la photo) |
+| `lecon` (1.3) | `action` (`garder`, `lire`, `retirer`) ; `garder` : `photo?`, `lecon` = `{points, indices?}` (trois points, un par axe : `lumiere`, `couleur`, `composition`), `essai_recette?` (1.3.1, la recette seulement) ; `lire` : `photos?` ; `retirer` : `photo` ou `photos` | `garder` : `{photo, original, fichier, rangee, remplacee, mois, prise_le, sans_date, remarque?}`, ou pour une photo de « Développeur › Essais » sans `essai_recette` (1.3.1) `{photo, fichier, rangee = false, remplacee = false, motif = essai, remarque}`, jamais une erreur ; avec `essai_recette`, sous l'entrée de la photo d'essai (`original` = elle) ; `lire` : `{lecons, perdues?}` (une photo disparue ou d'un autre uuid perd sa leçon) ; `retirer` : `{retirees}`. Rien dans le catalogue, pas d'arrêt par la pause, jamais rejouée (voir Leçon de la photo) |
 | `carnet` (1.3) | `action` (`constater`, `lire`, `retirer`) ; `constater` : `photo`, `vue` = `{cherches, defauts [{code, mesure?, texte?}]}` ou `angle` = `{inclinaison, code, source?}`, `vocabulaire`, `essai_recette?` ; `lire` : `resume?` ; `retirer` : `photos` | `constater` : `{note = true, constat, photo, original, fichier, mois, prise_le, sans_date, remplacee, remarque?}` ou `{note = false, motif (preference, essai, etapes, geometrie), raison, photo}` ; `lire` : `{catalogue, nombre, photos, resume?}` (leçons comprises) ; `retirer` : `{retirees, absentes?}` (un original ou une copie). Rien dans le catalogue, pas d'arrêt par la pause, jamais rejouée (voir Carnet de progrès) |
 | `etapes` (1.3) | `photo?` | `{photo, etapes [{id, nom, en_memoire, avant, apres, etat, raison}]}` : les étapes de la mémoire, puis celles qui ne restent que sur le disque ; lecture seule, rejouée (voir Pourquoi ? : l'avant/après des étapes) |
 
@@ -2573,6 +2573,11 @@ sujet ; les doses, que Dany juge sur l'avant/après.
 
 `essayer` applique un plan (retouche, masques ou taches), rend l'aperçu, puis réapplique les
 valeurs d'avant ; rien n'est mémorisé ni journalisé, mais l'Historique garde les deux étapes.
+`preview_settings` accepte `reason` (1.3.1 : Claude l'y joignait 3 fois sur 4, comme à
+`apply_settings`, et l'appel était refusé ; la description est `ToolHandler.descriptionRaison`) :
+une proposition n'est pas une étape, la raison ne part pas au module ; elle revient dans la réponse
+(`raison`, avec `raison_lecture` : la redonner à `apply_settings`). Avec `my_turn`, elle est la
+`raison` de l'entrée `exercice` du journal (sinon `step_name`, comme avant).
 `apercu` avec `comparer` applique de même l'état d'avant le temps d'un rendu. Les paramètres
 prédéfinis de l'utilisateur s'appliquent par `applyDevelopPreset`, avant les réglages de la même
 commande. `save_preset` écrit un fichier XMP de paramètre prédéfini (`PresetXMP.swift`) dans
@@ -3413,12 +3418,12 @@ c'est à l'utilisateur.
 regardée : `view_photo` envoie `point_af = true` à la commande `apercu`, pour l'aperçu entier,
 et après la 1.1.1 pour un zoom (`region`) aussi, jamais pour un avant/après (`compare` ; en
 1.1.1, l'aperçu entier seulement). Le module décrit alors la photo comme pour une vignette
-(`Vignettes.decrireVignette` : `chemin_original`, `marque`, `geometrie`), et ajoute
-`point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`, lue dans
+(`Vignettes.decrireVignette` : `chemin_original`, `marque`, `geometrie`, `sensibilite` depuis la
+1.3.1), et ajoute `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`, lue dans
 `notation.json` : « pas encore évaluée », « 3 ★ proposée par Claude, à vérifier »,
 « acceptée par l'utilisateur : 3 ★ », « changée par l'utilisateur : 4 ★ (proposée : 3 ★) »,
 « proposition écartée par l'utilisateur (3 ★) » ; « rejet » à la place des étoiles pour un
-rejet). Le serveur retire `chemin_original`, `geometrie` et `marque` de la description, et
+rejet). Le serveur retire `chemin_original`, `geometrie`, `marque` et `sensibilite` de la description, et
 `point_af_toujours`, avant de répondre à Claude. Un point dans l'image affichée donne `point_af` :
 `x` et `y` (de 0 à 1 depuis le coin haut gauche, au millième), `nettete` (autour du point, dans
 le carré de 12 % de `Detail.nettete`, sans le facteur des vignettes), `appareil` (« mise au point
@@ -3460,7 +3465,10 @@ point illisible ou hors du cadre, original qui ne s'ouvre pas à temps), 2 pour 
 illisibles. Il ne passe pas par la liaison : c'est un processus à part, lancé par Lightroom.
 
 **Tri** (`cull_photos`, `Tri.swift`). Photos visées : `photo_ids`, la sélection, une collection ou un
-dossier (par `chercher`, triées par date), 500 au plus, par lots de 25 vignettes (une commande à la
+dossier (par `chercher`, triées par date), 500 au plus ; sans aucun des quatre, la photo active
+(commande `etat`, 1.3.1 : dans la fenêtre Claude, la note d'abord de la photo active l'oubliait 2
+fois sur 4 ; sans photo active, le refus « Photos à traiter ») ; `contact_sheet` garde ce refus,
+une planche d'une seule photo ne montrant pas de série, par lots de 25 vignettes (une commande à la
 fois vers le module) ; progression et annulation entre deux lots (voir Délai des appels d'outils).
 Chaque vignette, réduite à 1024 px : `Detail`, `Measurements`, Vision (visages, qualité, note
 esthétique), empreinte, point AF, et les mots-clés de Vision si demandés. Deux photos mesurées à la
@@ -3714,7 +3722,8 @@ quand l'utilisateur le demande.
 
 `cull_photos` mesure le plancher technique : plafonds par photo (`plafonds`, `Notation.plafond`),
 rejets proposés seulement pour un défaut majeur, ordre de lecture (`ordre`) au lieu d'un score, plus
-de proposition de retenue ni d'étoile ; ses plafonds vont dans `dernierTri`. `contact_sheet` montre
+de proposition de retenue ni d'étoile ; ses plafonds vont dans `dernierTri`. Sans cible, la photo
+active (1.3.1). `contact_sheet` montre
 jusqu'à 30 vignettes, pour juger l'Impact sur toute une sortie. Détails : Tri d'une séance.
 
 ### L'outil `propose_ratings`
@@ -4117,11 +4126,15 @@ Depuis la 1.3 (`Recette+13.swift`, appelée par `sequenceRAW` et `lancer` ; essa
   par la commande `etapes`, en lectures bornées, 30 s au plus ; état « pret », une étape de plus en
   mémoire, l'avant aux dimensions de la vue, donc sans second rendu, l'après plus clair ; la durée
   lue dans `<id>.json` ; puis `undo_last`, l'étape dite hors de la mémoire) ; « leçon de la photo
-  (photo_lesson) : indices lus, rangée, relue, retirée ; photo inchangée » (`etapeLecon` :
-  Exposure2012 = max(départ, actuel) + 0,7 et Temperature = min(départ, actuel) − 500 K, calculés
-  depuis le départ de la séquence ; `read_facts` doit donner `underexposed` et `color_cast` ; puis
-  les trois points, `lecon lire`, `lecon retirer` et `undo_last` ; une leçon déjà rangée pour la
-  copie arrête l'étape avant toute écriture) ; « carnet de progrès : photo d'essai refusée, notée
+  (photo_lesson) : indices lus, refusée pour une photo d'essai, rangée pour la recette
+  (essai_recette), relue, retirée ; photo inchangée » (`etapeLecon` : Exposure2012 = max(départ,
+  actuel) + 0,7 et Temperature = min(départ, actuel) − 500 K, calculés depuis le départ de la
+  séquence ; `read_facts` doit donner `underexposed` et `color_cast` ; puis les trois points par
+  `photo_lesson`, qui doit rendre `rangee = false` avec la remarque de la photo d'essai, et rien de
+  rangé pour la copie (1.3.1) ; puis `lecon garder` avec `essai_recette` par la commande du module,
+  jamais par un outil, sous l'entrée de la copie (`original` = la copie), `lecon lire`, `lecon
+  retirer` et `undo_last` ; une leçon déjà rangée pour la copie, d'un essai d'avant la 1.3.1, arrête
+  l'étape avant toute écriture) ; « carnet de progrès : photo d'essai refusée, notée
   pour la recette (essai_recette), exportée, retirée » (`sequenceCarnet`, sautée hors de
   « Développeur › Essais » : une vue sans `essai_recette` doit être refusée de motif `essai`, tout
   autre motif arrête l'étape sans rien envoyer d'autre ; puis l'angle de `measure_angle` avec
@@ -4430,7 +4443,10 @@ remarques, jamais des refus, chacun avec sa preuve chiffrée en français : « E
 (0,00 → 1,10) ») et `seuils`. Seuils provisoires (`Lecon.Seuils`) : exposition ±0,5 IL ; hautes
 lumières −40 ou blancs −30 si le départ est écrêté à 0,5 % ou plus ; ombres +40 ou noirs +25 si le
 départ est bouché à 2 % ou plus ; correction du voile +10 ; débruitage lancé, ou réduction du bruit
-de luminance +20 ; température 400 K (10 en relatif, JPEG), teinte 10, ou une dominante nette au
+de luminance +20, seulement à un ISO connu d'au moins `Carnet.isoEleve` (1.3.1, la règle du carnet :
+la sensibilité en nombre, `sensibilite` de la description du journal détaillé, `Carnet.iso` ; à ISO
+bas, un débruitage soigne des ombres relevées ou une texture, pas un ISO trop haut ; la preuve dit
+« à ISO 3200 ») ; température 400 K (10 en relatif, JPEG), teinte 10, ou une dominante nette au
 départ (seulement sans retouche de Claude) ; `CropAngle` 0,5° ; Upright posé ou perspective
 verticale de 10 ; surface du cadre sous 0,85 et resserrée par Claude, seulement sans rotation ni
 Upright. Limite connue : les corrections viennent du journal de Claude, pas de l'état actuel ; une
@@ -4442,7 +4458,13 @@ actuels.
 **Le module** (`Carnet.lua`, commande `lecon`) : `garder` vérifie tout avant de toucher au registre
 (trois points, un par axe ; `prise_de_vue` obligatoire ; codes `^[a-z_]+$`, 12 au plus par point ;
 20 indices au plus ; textes bornés en octets), puis range la leçon sous l'original de la photo
-(voir Carnet de progrès : une leçon par photo, la nouvelle remplace l'ancienne) ; `lire` vérifie
+(voir Carnet de progrès : une leçon par photo, la nouvelle remplace l'ancienne). Une photo de
+« Développeur › Essais » (`Carnet.estPhotoDEssai`) n'est pas rangée (1.3.1 : constaté le 21 octobre
+2026, la leçon de l'essai réel sur la dune d'essai 53709786 était rangée sous son original
+43178545, une vraie photo de Dany) : `{photo, fichier, rangee = false, remplacee = false, motif =
+essai, remarque}`, jamais une erreur, et `photo_lesson` le dit dans ses remarques ; sauf avec
+`essai_recette`, que seule la recette envoie, sous l'entrée de la photo d'essai elle-même, comme
+pour `constater` ; `lire` vérifie
 l'uuid des photos demandées ; `retirer` retire aussi l'entrée qui n'a plus rien. Ni le catalogue
 ni la pause, jamais rejouée.
 
@@ -4675,7 +4697,15 @@ que `Carnet.ANGLE_NUL` du module) ; provisoires : `medianeSousExposee` 28 et `p9
 canaux à 254 ou plus) ; flou, mise au point et bruit fort par les seuils relevés de `Detail` (15,
 35, 1,5), seulement à 1 024 px au moins, et par la seule copie de ces règles,
 `PhotoTriee.defautsNettete` (la mise au point demande un point lu, sur une zone qui a de la
-texture : voir Tri d'une séance). `constatsVue` rend `{cherches, defauts [{code, mesure, texte}]}`
+texture : voir Tri d'une séance). Le bruit fort, un défaut de la prise de vue (« garder l'ISO plus
+bas »), ne se cherche et ne se compte qu'à un ISO connu d'au moins `isoEleve` (1 600, provisoire ;
+`bruitCherche`, 1.3.1) ; son texte dit l'ISO (« bruit fort : 1,93 (seuil 1,5) à ISO 4000 »).
+L'ISO vient de la réponse du module (`Carnet.iso`) : `sensibilite`, la sensibilité en nombre que
+`Vignettes.decrireVignette` ajoute à la description (`Photos.sensibilite`, isoSpeedRating brut),
+sinon `prise_de_vue.iso` de `lireReglages` (un module 1.3, seulement avec l'ouverture et la
+vitesse) ; jamais le texte formaté « ISO 160 ». `view_photo` retire `sensibilite` avant Claude, qui
+a ce texte. Ni le plafond de note (`Notation.plafond`, qui juge l'image : à noter après le
+débruitage) ni le tri (qui dit la mesure, sans défaut de bruit) ne changent. `constatsVue` rend `{cherches, defauts [{code, mesure, texte}]}`
 dans l'ordre de `PriseDeVue` (`horizon_penche` n'est cherché que sur une géométrie intacte) ;
 `constatHorizon` ne rend rien pour une verticale, sous 0,5°, ou sur une géométrie touchée
 (`geometrieIntacte` : recadrage tourné de moins de 0,005°, ni Upright, ni perspective, ni
@@ -4726,7 +4756,9 @@ une remarque sous 5 photos. Les phrases du résumé n'existent que dans `Carnet.
 `Carnet.vocabulaire()` servent la fenêtre.
 
 La case Carnet (préférence `carnet`) ne coupe que les constats : `lecon garder` ne la lit pas
-(question ouverte à Dany). Rejouée, une commande `lecon` ou `carnet` réécrirait `carnet.json` :
+(question ouverte à Dany). `lecon garder` refuse en revanche une photo d'essai, comme `constater`
+(1.3.1, voir Leçon de la photo) : rien de « Développeur › Essais » n'entre au carnet de Dany, sauf
+`essai_recette`. Rejouée, une commande `lecon` ou `carnet` réécrirait `carnet.json` :
 aucune n'est dans `LightroomBridge.lectures`.
 
 **Dans la fenêtre.** L'entrée « Carnet de progrès » est la première case de la liste
@@ -4760,6 +4792,36 @@ pareil. La recette a constaté `estPhotoDEssai` sur une vraie copie (refus de mo
 angle noté avec `essai_recette` au jour de la prise de vue, exporté puis retiré. Une scène sur fond
 noir (L* médian 3,9) reste dite « presque noire » au tri : à revoir dans `Notation.plafond`, hors de
 la 1.3.
+
+**Constaté le 21 octobre 2026, après l'essai réel de la 1.3** (correctif 1.3.1 ; lecture seule par la
+commande `reglages`, `--module`, pour l'ISO, et `--constats` pour le bruit, sur les quatre photos de
+Dany notées « bruit » au carnet et sept copies d'Essais ; bruit : le plus fort des aplats et des
+ombres, à 1 344 px réduits à 1 024) :
+
+| Photo | ISO | Bruit | Avant 1.3.1 | Depuis |
+| --- | --- | --- | --- | --- |
+| 53448416 XH2S9386.RAF (reflets d'eau) | 160 | 8,99 | bruit | non cherché |
+| 53448617 XH2S8387.RAF | 160 | 3,27 au carnet (0,44 après 5 étapes de Claude) | bruit | non cherché |
+| 53670499 XH2S0406.RAF (Copie 1), sous-bois | 320 | 4,71 | bruit | non cherché |
+| 53709534 JPEG de X-T20 (Essai) | 400 | 1,62 | bruit | non cherché |
+| 53709579 RAF de X-T20 (Essai) | 400 | 1,39 | — | non cherché |
+| 53709912 portrait (Essai) | 160 | 0,56 | — | non cherché |
+| 53709786 dune (Essai) | 160 | 1,02 | — | non cherché |
+| 53709833 groupe (Essai, 7 étapes de Claude) | 1 600 | 0,34 | — | cherché, pas trouvé |
+| 53709677 scène (Essai) | 3 200 | 0,67 | — | cherché, pas trouvé |
+| 53282184 XH2S7665.RAF | 4 000 | 1,93 (1,66 au carnet) | bruit | bruit |
+| 53709724 fête foraine (Essai) | 12 800 | 2,09 | bruit | bruit |
+
+La texture prise pour du bruit est toute à ISO 400 ou moins ; le vrai bruit à ISO 4 000 et plus. Le
+relevé ne tranche pas entre les deux : `isoEleve` = 1 600, provisoire, à éprouver sur de vraies
+photos à ISO 800, 1 600 et 3 200. L'ISO brut est un nombre (160 à 12 800 : `prise_de_vue.iso` de la
+commande `reglages`) ; la simulation de la liaison le rend ainsi, jamais le texte formaté. Les
+entrées déjà notées ne changent pas d'elles-mêmes : celles de 53448416, 53448617 et 53589118
+(l'original de 53670499) gardent un « bruit » faux, à nettoyer avec Dany (une nouvelle vue de
+53448416 ou de la copie 53670499, pas encore retouchées, remplacerait la vue ; 53448617 a des
+étapes de Claude, et `carnet retirer` emporterait aussi la leçon de sa copie 53726503) ; celle de
+53282184 (ISO 4 000) reste juste. La leçon de la dune d'essai 53709786, rangée sous son original
+43178545 avant ce correctif, se retire par `lecon retirer {photo = 53709786}`.
 
 ## À constater dans Lightroom (1.3)
 

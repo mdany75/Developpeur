@@ -328,8 +328,9 @@ end
 
 -- journal {photos?|selection?, detaille?} : le journal des retouches de Claude de chaque photo.
 -- Avec detaille (la leçon de la photo), la photo est décrite en entier (appareil, objectif, ISO,
--- vitesse, ouverture, focale, date…) avec prise_de_vue_plus ; sans, la description courte. Rien
--- n'est écrit.
+-- vitesse, ouverture, focale, date…) avec prise_de_vue_plus et la sensibilité ISO en nombre
+-- (sensibilite, 1.3.1 : l'indice du bruit de la leçon ne vaut qu'à un ISO élevé) ; sans, la
+-- description courte. Rien n'est écrit.
 function Lecture.journal(params)
     local detaille = params.detaille == true
     local photos = Json.tableau()
@@ -337,6 +338,7 @@ function Lecture.journal(params)
         local description = decrire(photo, detaille)
         if detaille then
             description.prise_de_vue_plus = priseDeVuePlus(photo)
+            description.sensibilite = Photos.sensibilite(photo)
         end
         photos[#photos + 1] = {
             photo = description,

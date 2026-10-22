@@ -129,6 +129,9 @@ extension ToolHandler {
                     ("size", prop("integer", "Grand côté de l'aperçu en pixels (défaut \(Self.defaultPreviewSize), de \(Self.previewSizes.lowerBound) à \(Self.previewSizes.upperBound)).")),
                     ("overlay", prop("boolean", "Avec crop : l'image entière, le cadre proposé en pointillés, les tiers et le hors-cadre assombri (défaut true) ; false = l'image recadrée.")),
                     ("my_turn", prop("boolean", Self.descriptionMonTour)),
+                    // La raison, comme pour apply_settings (1.3.1 : Claude la joignait, et l'appel était
+                    // refusé) : une proposition n'écrit pas d'étape ; elle revient dans la réponse.
+                    ("reason", prop("string", Self.descriptionRaison)),
                  ],
                  required: []),
             tool("enhance_photo",
@@ -297,7 +300,8 @@ extension ToolHandler {
         if let cadre = develop["recadrage"], cadre["retirer"] == nil, args.bool("overlay") != false, args.bool("my_turn") != true {
             params["entier"] = true
         }
-        return try preview(params, args: args, notes: notes)
+        // La raison n'est pas envoyée au module : une proposition n'est pas une étape.
+        return try preview(params, args: args, notes: notes, raison: Self.raison(args))
     }
 
     /// La propriété my_turn de preview_settings (« Je le fais », 1.3). Hors de la garde de longueur
@@ -319,10 +323,13 @@ extension ToolHandler {
         params["instantane"] = .string(JeLeFais.instantane)
         params["exercice"] = true
         params["sans_rendu"] = true
-        // La raison de l'entrée « Claude · je le fais » du journal (Variantes.ranger) : le nom que
-        // Claude donne à sa proposition, seul texte de preview_settings sur elle (l'étape, elle, a
-        // son nom fixe). Sans lui, l'entrée n'a pas de raison.
-        if let nom = args.string("step_name")?.trimmingCharacters(in: .whitespacesAndNewlines), !nom.isEmpty {
+        // La raison de l'entrée « Claude · je le fais » du journal (Variantes.ranger) : reason si
+        // Claude la donne (1.3.1), sinon le nom qu'il donne à sa proposition (l'étape, elle, a son nom
+        // fixe). Sans l'un ni l'autre, l'entrée n'a pas de raison. Ce n'est pas une étape : rien ne
+        // s'annule par elle.
+        if let raison = Self.raison(args) {
+            params["raison"] = .string(raison)
+        } else if let nom = args.string("step_name")?.trimmingCharacters(in: .whitespacesAndNewlines), !nom.isEmpty {
             params["raison"] = .string(String(nom.prefix(300)))
         }
         // compare = false ne demandait rien : pas de remarque pour lui.
@@ -349,6 +356,7 @@ extension ToolHandler {
             "base": "a_faire : dans l'ordre des panneaux du module Développement ; « de » : la valeur actuelle, « a » : celle de Claude ; texte : panneau › section › réglage. Réglages globaux seulement.",
         ]
         for cle in ["photo", "mode", "etape"] { if let valeur = resultat[cle], !valeur.isNull { info[cle] = valeur } }
+        if let raison = Self.raison(args) { info["raison"] = .string(raison) }
         if let remarques = resultat["remarques"]?.array, !remarques.isEmpty { info["remarques"] = .array(remarques) }
         if !notes.isEmpty { info["remarques_serveur"] = .array(notes) }
         return ToolResult(content: [.text(JSONCoding.pretty(.object(info)))])
@@ -390,8 +398,8 @@ extension ToolHandler {
     }
 
     /// Rend une proposition (commande « essayer » du module) : l'image, côte à côte avec l'état
-    /// actuel si demandé, et ce qui changerait.
-    func preview(_ params: [String: JSONValue], args: Arguments, notes: [JSONValue]) throws -> ToolResult {
+    /// actuel si demandé, et ce qui changerait ; `raison` (preview_settings) revient dans la réponse.
+    func preview(_ params: [String: JSONValue], args: Arguments, notes: [JSONValue], raison: String? = nil) throws -> ToolResult {
         var params = params
         let size = min(max(args.int("size") ?? Self.defaultPreviewSize, Self.previewSizes.lowerBound), Self.previewSizes.upperBound)
         let compare = args.bool("compare") ?? false
@@ -446,6 +454,12 @@ extension ToolHandler {
         }
         if let proposition { info["mesures_proposition"] = proposition.json }
         info["rien_n_est_applique"] = "La photo a été remise comme avant ; apply_settings applique la proposition."
+        // La raison donnée à preview_settings (reason) : rendue seulement ici, pour la reprendre dans
+        // apply_settings ; la proposition n'écrit ni étape ni journal, rien n'en part au module.
+        if let raison {
+            info["raison"] = .string(raison)
+            info["raison_lecture"] = "Pas d'étape ni de journal pour une proposition : la redonner à apply_settings (reason) si elle est appliquée."
+        }
         return ToolResult(content: [Self.imageContent(image), .text(JSONCoding.pretty(.object(info)))])
     }
 

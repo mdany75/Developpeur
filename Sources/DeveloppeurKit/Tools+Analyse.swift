@@ -112,6 +112,8 @@ extension ToolHandler {
             photo.removeValue(forKey: "chemin_original")
             photo.removeValue(forKey: "geometrie")
             photo.removeValue(forKey: "marque")
+            // La sensibilité en nombre sert au carnet (bruit fort à ISO élevé) ; Claude a son texte (iso).
+            photo.removeValue(forKey: "sensibilite")
             info["photo"] = .object(photo)
         }
         if let settings = result["reglages"]?.object {
@@ -313,14 +315,16 @@ extension ToolHandler {
     /// remplacerait celle d'avant). Ni sur une image rendue avant la fin des calculs IA (a_savoir) :
     /// elle ne montre pas l'état de la photo (le module ne la garde pas non plus pour l'avant/après,
     /// ni le bilan pour une « regression »). L'horizon n'y est cherché que sur une géométrie intacte
-    /// (réglages et angle de recadrage de la réponse). Rend les textes des défauts trouvés si le
-    /// module a noté la vue, nil sinon.
+    /// (réglages et angle de recadrage de la réponse), le bruit qu'à un ISO connu et élevé
+    /// (`Carnet.iso`, `Carnet.bruitCherche`). Rend les textes des défauts trouvés si le module a noté
+    /// la vue, nil sinon.
     func noterLaVue(apercu: JSONValue, mesures: PhotoMeasurements?, detail: DetailMeasurements?, reduite: CGImage,
                     af: PhotoTriee.MiseAuPoint?, intention: IntentionBoitier?) -> [String]? {
         guard noterAuCarnet, let id = apercu["photo"]?["id"]?.int, apercu["etapes_claude"]?["nombre"]?.int == 0,
               apercu["corrections_utilisateur"]?.object == nil, apercu["a_savoir"]?.isNull ?? true else { return nil }
         let intacte = Carnet.geometrieIntacte(reglages: apercu["reglages"], angleRecadrage: apercu["recadrage"]?["angle"]?.double ?? 0)
-        let vue = Carnet.constatsVue(mesures: mesures, detail: detail, reduite: reduite, af: af, intention: intention, geometrieIntacte: intacte)
+        let vue = Carnet.constatsVue(mesures: mesures, detail: detail, reduite: reduite, af: af, intention: intention,
+                                     iso: Carnet.iso(photo: apercu["photo"], priseDeVue: apercu["prise_de_vue"]), geometrieIntacte: intacte)
         guard !vue.cherches.isEmpty, constaterAuCarnet(photo: id, ["vue": vue.json]) else { return nil }
         return vue.textes
     }

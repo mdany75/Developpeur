@@ -92,7 +92,7 @@ extension ToolHandler {
         let fichier = description["fichier"]?.string ?? "photo \(id)"
         let corrections = Lecon.correctionsNettes(premiere["entrees"]?.array ?? [])
         let depart = departDeLaSession(photo: id, fichier: fichier)
-        let indices = Lecon.indices(corrections: corrections, depart: depart)
+        let indices = Lecon.indices(corrections: corrections, depart: depart, iso: Carnet.iso(photo: description))
         let faits = Lecon.faits(photo: description, corrections: corrections, depart: depart, indices: indices)
         let photo: JSONValue = ["id": .number(Double(id)), "fichier": .string(fichier)]
         guard let points else {

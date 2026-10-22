@@ -520,10 +520,16 @@ public final class ToolHandler {
             "etape": .string(stepName.isEmpty ? defaultStep : String(stepName.prefix(60))),
             "confirme": .bool(args.bool("confirm") ?? false),
         ]
-        if let reason = args.string("reason")?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty {
-            params["raison"] = .string(String(reason.prefix(300)))
+        if let reason = Self.raison(args) {
+            params["raison"] = .string(reason)
         }
         return params
+    }
+
+    /// La raison donnée (reason), nettoyée et bornée à 300 caractères ; nil si elle manque ou est vide.
+    static func raison(_ args: Arguments) -> String? {
+        guard let reason = args.string("reason")?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty else { return nil }
+        return String(reason.prefix(300))
     }
 
     /// Ajoute le libellé français à chaque changement renvoyé par le module.

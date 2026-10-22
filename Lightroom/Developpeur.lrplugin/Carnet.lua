@@ -2,7 +2,8 @@
 -- de notation.json), à part du catalogue : rien n'y est écrit dans le catalogue, et aucune de ses
 -- commandes n'est arrêtée par la pause de la liaison (elle n'arrête que les écritures dans le
 -- catalogue). Commandes du serveur :
---   lecon  : garder (la leçon d'une photo : trois points, un par axe), lire, retirer ;
+--   lecon  : garder (la leçon d'une photo : trois points, un par axe ; jamais celle d'une photo
+--            d'essai, sauf essai_recette), lire, retirer ;
 --   carnet : constater (les défauts de la prise de vue que le connecteur a mesurés : vue ou
 --            angle), lire (resume = true : avec le résumé, Carnet.resumer), retirer.
 -- Elles écrivent carnet.json : le serveur ne les rejoue jamais (LightroomBridge.lectures).
@@ -22,7 +23,9 @@
 -- de « Développeur › Essais » (Carnet.estPhotoDEssai), sauf avec essai_recette = true, que seule la
 -- recette envoie : la photo d'essai a alors son entrée à elle, jamais celle de son original (une
 -- vraie photo), et retirer ne mène jamais d'une photo d'essai à l'entrée de son original. Une
--- nouvelle vue remplace l'ancienne, un nouvel angle aussi ; les leçons restent.
+-- nouvelle vue remplace l'ancienne, un nouvel angle aussi ; les leçons restent. La leçon d'une
+-- photo d'essai n'est pas rangée non plus (lecon garder : rangee = false, 1.3.1), sauf avec
+-- essai_recette, sous l'entrée de la photo d'essai elle-même.
 --
 -- Le résumé (Carnet.resumer) compte, pour chaque défaut et par mois de prise de vue (les six
 -- derniers qui ont des photos), les photos où il a été trouvé sur celles où il a été cherché ; il
@@ -705,9 +708,13 @@ end
 
 -- Commande lecon --------------------------------------------------------------------------------
 
--- garder { photo?, lecon = { points, indices? } } : la leçon de la photo (la photo active sans
--- photo), rangée sous l'entrée de son original ; la nouvelle remplace l'ancienne. Tout est vérifié
--- avant de toucher au registre.
+-- garder { photo?, lecon = { points, indices? }, essai_recette? } : la leçon de la photo (la photo
+-- active sans photo), rangée sous l'entrée de son original ; la nouvelle remplace l'ancienne. Tout
+-- est vérifié avant de toucher au registre. Une photo de « Développeur › Essais » n'y entre pas
+-- (1.3.1 : la leçon de la dune d'essai était rangée sous son original, une vraie photo de Dany) :
+-- rangee = false, avec la raison, jamais une erreur (photo_lesson le dit sans échouer) ; sauf avec
+-- essai_recette = true, que seule la recette envoie, comme pour constater : la photo d'essai a
+-- alors son entrée à elle, jamais celle de son original.
 local function garder(params)
     local lecon = params.lecon
     if type(lecon) ~= 'table' then
@@ -715,7 +722,16 @@ local function garder(params)
     end
     local points = pointsValides(lecon.points)
     local indices = indicesValides(lecon.indices)
-    local lu = lirePhoto(Photos.photoVisee(params))
+    local photo = Photos.photoVisee(params)
+    local essai = Carnet.estPhotoDEssai(photo)
+    if essai and params.essai_recette ~= true then
+        return {
+            photo = photo.localIdentifier, fichier = Photos.nomFichier(photo), rangee = false, remplacee = false, motif = 'essai',
+            remarque = "Photo d'essai (Développeur › Essais) : sa leçon n'entre pas au carnet de progrès, qui ne compte que les "
+                .. "vraies prises de vue. La leçon de cette réponse reste valable.",
+        }
+    end
+    local lu = lirePhoto(photo, essai and photo or nil)
     local chemin = cheminCatalogue()
     -- Plus aucune lecture du catalogue jusqu'au fichier écrit : le registre change d'un coup.
     local e = entreeDe(tableDu(chemin, true), lu)

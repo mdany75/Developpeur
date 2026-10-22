@@ -169,6 +169,31 @@ test("apercu : point_af donne le chemin, la géométrie et la préférence « en
     S.prefs.pointMiseAuPoint = nil
 end)
 
+-- 1.3.1 : le carnet de progrès ne cherche le bruit fort de la prise de vue qu'à un ISO élevé ; le
+-- serveur lit la sensibilité en nombre (le texte formaté de la description ne se lit pas).
+test("apercu : point_af donne la sensibilité ISO en nombre (sensibilite), à côté du texte de la description", function()
+    S.active = photoFuji()
+    S.active.brut.isoSpeedRating = 3200
+    S.active.meta.isoSpeedRating = 'ISO 3200'
+    local resultat = Commandes.executer('apercu', { taille = 1344, cles = {}, point_af = true })
+    egal(resultat.photo.sensibilite, 3200)
+    egal(resultat.photo.iso, 'ISO 3200', "le texte de la description, pour Claude")
+    -- Rien sans sensibilité connue (un scan, une capture d'écran).
+    S.active.brut.isoSpeedRating, S.active.meta.isoSpeedRating = nil, nil
+    egal(Commandes.executer('apercu', { taille = 1344, cles = {}, point_af = true }).photo.sensibilite, nil)
+    -- Sans point_af (aperçus d'analyse, avant/après), la description de toujours.
+    S.active.brut.isoSpeedRating = 160
+    egal(Commandes.executer('apercu', { taille = 1344, cles = {} }).photo.sensibilite, nil)
+    -- Les vignettes du tri passent par la même description.
+    egal(Commandes.executer('vignettes', { photos = Json.tableau({ 4 }), taille = 1024 }).photos[1].sensibilite, 160)
+    -- La simulation : la valeur brute est un nombre (constaté), jamais le texte formaté.
+    S.active.brut.isoSpeedRating = 'ISO 160'
+    echoue(function() S.active:getRawMetadata('isoSpeedRating') end, "un nombre")
+    S.active.brut.isoSpeedRating = nil
+    S.active.meta.isoSpeedRating = 'ISO 12800'
+    egal(S.active:getRawMetadata('isoSpeedRating'), 12800, "sans valeur brute posée : le nombre du texte")
+end)
+
 -- Commandes : retouche -----------------------------------------------------------------
 
 test("appliquer : valeurs, arrondi, balance des blancs et mémoire d'origine", function()

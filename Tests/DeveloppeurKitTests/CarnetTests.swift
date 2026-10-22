@@ -1,4 +1,5 @@
 import CoreGraphics
+import ImageIO
 import XCTest
 @testable import DeveloppeurKit
 
@@ -36,10 +37,11 @@ final class CarnetTests: XCTestCase {
         }
     }
 
+    /// Une vue constatée ; à ISO 6 400 par défaut (le bruit y est cherché, `Carnet.isoEleve`).
     func vue(mesures: PhotoMeasurements? = nil, detail: DetailMeasurements? = nil, reduite: CGImage? = nil,
-             af: PhotoTriee.MiseAuPoint? = nil, intention: IntentionBoitier? = nil, intacte: Bool = true) -> Carnet.Vue {
+             af: PhotoTriee.MiseAuPoint? = nil, intention: IntentionBoitier? = nil, iso: Double? = 6400, intacte: Bool = true) -> Carnet.Vue {
         Carnet.constatsVue(mesures: mesures ?? self.mesures(), detail: detail ?? self.detail(), reduite: reduite ?? image(blancs: 0),
-                           af: af, intention: intention, geometrieIntacte: intacte)
+                           af: af, intention: intention, iso: iso, geometrieIntacte: intacte)
     }
 
     func codes(_ vue: Carnet.Vue) -> [String] { vue.defauts.map(\.code) }
@@ -179,7 +181,7 @@ final class CarnetTests: XCTestCase {
 
         v = vue(detail: detail(bruit: 1.6))
         XCTAssertEqual(codes(v), ["bruit"])
-        XCTAssertEqual(v.defauts.first?.texte, "bruit fort : 1,60 (seuil 1,5)")
+        XCTAssertEqual(v.defauts.first?.texte, "bruit fort : 1,60 (seuil 1,5) à ISO 6400")
         XCTAssertEqual(codes(vue(detail: detail(bruit: 0.4, ombres: 1.5))), ["bruit"], "le bruit des ombres compte, comme la lecture de view_photo")
         XCTAssertEqual(codes(vue(detail: detail(bruit: 1.49))), [])
         // La mesure part au centième (le bruit se lit à deux décimales).
@@ -193,6 +195,54 @@ final class CarnetTests: XCTestCase {
         XCTAssertEqual(v.cherches, ["horizon_penche", "sous_exposition", "ciel_brule"])
     }
 
+    /// 1.3.1 : le bruit fort de la prise de vue (« garder l'ISO plus bas ») ne se cherche, et ne se
+    /// compte, qu'à un ISO connu d'au moins `Carnet.isoEleve`. Relevé du 21 octobre 2026 : à ISO 160 à
+    /// 400, des reflets d'eau, un sous-bois et un feuillage mesuraient de 1,62 à 8,99 (des faux
+    /// constats, dont trois au carnet de Dany) ; à ISO 4 000 et 12 800, un vrai bruit (1,93 et 2,09).
+    func testLeBruitNeSeChercheQuAUnIsoEleve() throws {
+        XCTAssertEqual(Carnet.isoEleve, 1600)
+        // Les reflets d'eau à ISO 160 (XH2S9386.RAF : 0,37, ombres 8,99) : ni cherché ni trouvé.
+        let reflets = detail(bruit: 0.37, ombres: 8.99)
+        var v = vue(detail: reflets, iso: 160)
+        XCTAssertEqual(codes(v), [])
+        XCTAssertFalse(v.cherches.contains("bruit"), "\(v.cherches)")
+        XCTAssertTrue(v.cherches.contains("flou"), "la netteté se cherche toujours")
+        // Le sous-bois à ISO 320 (XH2S0406.RAF : 4,71), le JPEG d'un X-T20 à ISO 400 (1,62) : de même.
+        XCTAssertEqual(codes(vue(detail: detail(bruit: 0.55, ombres: 4.71), iso: 320)), [])
+        XCTAssertEqual(codes(vue(detail: detail(bruit: 0.41, ombres: 1.62), iso: 400)), [])
+        // ISO inconnu (un scan, une capture d'écran) : pas cherché non plus.
+        v = vue(detail: reflets, iso: nil)
+        XCTAssertEqual(codes(v), [])
+        XCTAssertFalse(v.cherches.contains("bruit"))
+        // Au seuil, cherché ; juste sous lui, non.
+        XCTAssertFalse(vue(detail: detail(bruit: 2), iso: 1599).cherches.contains("bruit"))
+        v = vue(detail: detail(bruit: 2), iso: 1600)
+        XCTAssertTrue(v.cherches.contains("bruit"))
+        XCTAssertEqual(codes(v), ["bruit"])
+        // Un vrai bruit à ISO 4 000 (XH2S7665.RAF : ombres 1,93) : trouvé, l'ISO dit.
+        v = vue(detail: detail(bruit: 0.5, ombres: 1.93), iso: 4000)
+        XCTAssertEqual(codes(v), ["bruit"])
+        XCTAssertEqual(v.defauts.first?.texte, "bruit fort : 1,93 (seuil 1,5) à ISO 4000")
+        // À ISO élevé sans bruit fort (la scène à ISO 3 200 : 0,67) : cherché, pas trouvé.
+        v = vue(detail: detail(bruit: 0.67, ombres: 0.67), iso: 3200)
+        XCTAssertTrue(v.cherches.contains("bruit"))
+        XCTAssertEqual(codes(v), [])
+
+        XCTAssertFalse(Carnet.bruitCherche(iso: nil))
+        XCTAssertFalse(Carnet.bruitCherche(iso: .nan))
+        XCTAssertFalse(Carnet.bruitCherche(iso: 1599.9))
+        XCTAssertTrue(Carnet.bruitCherche(iso: 1600))
+        XCTAssertTrue(Carnet.bruitCherche(iso: 12800))
+        // L'ISO d'une réponse du module : sensibilite (1.3.1), sinon prise_de_vue.iso (un module 1.3),
+        // jamais le texte de la description.
+        XCTAssertEqual(Carnet.iso(photo: ["sensibilite": 160, "iso": "ISO 160"]), 160)
+        XCTAssertEqual(Carnet.iso(photo: ["iso": "ISO 3200"], priseDeVue: ["iso": 3200, "ouverture": 2.8, "vitesse": 0.008]), 3200)
+        XCTAssertEqual(Carnet.iso(photo: ["sensibilite": 800], priseDeVue: ["iso": 3200]), 800, "la description d'abord")
+        XCTAssertNil(Carnet.iso(photo: ["iso": "ISO 160"]), "le texte formaté ne se lit pas")
+        XCTAssertNil(Carnet.iso(photo: ["sensibilite": 0]))
+        XCTAssertNil(Carnet.iso(photo: nil))
+    }
+
     func testCherchesEtTrouvesSuiventLOrdreDePriseDeVue() {
         // Nette ailleurs (40), floue au point lu (4) : mise au point manquée, les six cherchés.
         let v = vue(mesures: mesures(mediane: 15, p95: 40), detail: detail(nettete: 40, bruit: 2), reduite: image(blancs: 20),
@@ -203,7 +253,7 @@ final class CarnetTests: XCTestCase {
         XCTAssertFalse(vue(intacte: false).cherches.contains("horizon_penche"))
         XCTAssertEqual(vue().cherches.first, "horizon_penche")
         // Aucune mesure : seul l'horizon reste cherché.
-        let rien = Carnet.constatsVue(mesures: nil, detail: nil, reduite: nil, af: nil, intention: nil, geometrieIntacte: false)
+        let rien = Carnet.constatsVue(mesures: nil, detail: nil, reduite: nil, af: nil, intention: nil, iso: 6400, geometrieIntacte: false)
         XCTAssertTrue(rien.cherches.isEmpty)
         // La forme que le module attend.
         let json = v.json
@@ -277,7 +327,7 @@ final class CarnetTests: XCTestCase {
         verifierPourLeModule(params)
         XCTAssertEqual(params["photo"]?.int, 7, "la photo mesurée, celle de la réponse")
         let cherches = params["vue"]?["cherches"]?.array?.compactMap(\.string) ?? []
-        XCTAssertEqual(cherches, ["horizon_penche", "sous_exposition", "ciel_brule", "bruit", "flou"])
+        XCTAssertEqual(cherches, ["horizon_penche", "sous_exposition", "ciel_brule", "flou"], "sans ISO connu, pas de bruit cherché (1.3.1)")
         let trouves = params["vue"]?["defauts"]?.array?.compactMap { $0["code"]?.string } ?? []
         XCTAssertEqual(trouves, ["sous_exposition", "flou"])
         let info = try JSONCoding.parse(result.text)
@@ -286,6 +336,35 @@ final class CarnetTests: XCTestCase {
         XCTAssertTrue(constats[0].hasPrefix("sous-exposée : L* médian"), "\(constats)")
         XCTAssertTrue(constats[1].hasPrefix("floue"), "\(constats)")
         XCTAssertEqual(fake.commands, ["apercu"], "le carnet est noté à part, rien d'autre au module")
+    }
+
+    /// 1.3.1 : l'ISO de la réponse du module (sensibilite de la description, sinon prise_de_vue.iso
+    /// d'un module 1.3) décide si le bruit se cherche ; Claude n'a que le texte de la description.
+    func testViewPhotoNeChercheLeBruitQuAUnIsoEleve() throws {
+        tools.noterAuCarnet = true
+        fake.replies["carnet"] = ["note": true, "constat": "vue"]
+        func cherches() -> [String] { fake.carnets.last?["vue"]?["cherches"]?.array?.compactMap(\.string) ?? [] }
+        repondreApercu(Self.sombre, photo: ["id": 7, "fichier": "XH2S9386.RAF", "iso": "ISO 160", "sensibilite": 160])
+        var result = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertFalse(cherches().contains("bruit"), "\(cherches())")
+        let photo = try JSONCoding.parse(result.text)["photo"]
+        XCTAssertNil(photo?["sensibilite"], "le nombre sert au carnet, pas à Claude")
+        XCTAssertEqual(photo?["iso"]?.string, "ISO 160")
+
+        repondreApercu(Self.sombre, photo: ["id": 7, "fichier": "DSCF8755.RAF", "sensibilite": 12800])
+        result = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertTrue(cherches().contains("bruit"), "\(cherches())")
+        // Un module 1.3 : l'ISO de prise_de_vue.
+        repondreApercu(Self.sombre, extra: ["prise_de_vue": ["iso": 4000, "ouverture": 3.6, "vitesse": 0.005]])
+        _ = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertTrue(cherches().contains("bruit"), "\(cherches())")
+        repondreApercu(Self.sombre, extra: ["prise_de_vue": ["iso": 320, "ouverture": 8, "vitesse": 0.005]])
+        _ = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertFalse(cherches().contains("bruit"), "\(cherches())")
+        XCTAssertEqual(fake.carnets.count, 4)
+        fake.carnets.forEach { verifierPourLeModule($0) }
     }
 
     func testViewPhotoNeDitLesConstatsQueSiLeModuleLesANotes() throws {
@@ -675,6 +754,27 @@ final class CarnetTests: XCTestCase {
 
     // MARK: Relevé (--constats)
 
+    /// 1.3.1 : le relevé dit l'ISO de chaque photo (la réponse du module, ou l'Exif d'un fichier) et
+    /// si le bruit y est cherché ; le résumé a sa colonne.
+    func testLeReleveDitLISOEtLaDecision() throws {
+        repondreApercu(Self.sombre, photo: ["id": 7, "fichier": "XH2S9386.RAF", "sensibilite": 160])
+        let fichier = TestSupport.temporaryDirectory().appendingPathComponent("nuit.jpg")
+        let image = TestSupport.imagePixels(width: 600, height: 400) { _, _ in (60, 60, 60) }
+        let sortie = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(sortie, "public.jpeg" as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, [kCGImagePropertyExifDictionary: [kCGImagePropertyExifISOSpeedRatings: [6400]]] as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        try (sortie as Data).write(to: fichier)
+        XCTAssertEqual(Carnet.isoExif(sortie as Data), 6400)
+        let lignes = Carnet.releve(lightroom: fake, ids: [7], fichiers: [fichier], lecteur: LecteurBoitier(delai: 1) { _ in nil })
+        XCTAssertTrue(lignes.contains("  ISO 160 : bruit fort non cherché (ISO 1600 ou plus)"), "\(lignes)")
+        XCTAssertTrue(lignes.contains("  ISO 6400 : bruit fort cherché (ISO 1600 ou plus)"), "\(lignes)")
+        XCTAssertTrue(lignes.contains { $0.hasPrefix("Résumé (photo, ISO, L* médian") }, "\(lignes)")
+        XCTAssertTrue(lignes.contains { $0.hasPrefix("7\t160\t") }, "\(lignes)")
+        XCTAssertTrue(lignes.contains { $0.hasPrefix("nuit.jpg\t6400\t") }, "\(lignes)")
+        XCTAssertTrue(fake.carnets.isEmpty)
+    }
+
     func testLeReleveNeNoteRienAuCarnet() throws {
         repondreApercu(Self.sombre, reglages: ["PerspectiveUpright": 0])
         let fichier = TestSupport.temporaryDirectory().appendingPathComponent("ciel.jpg")
@@ -688,6 +788,8 @@ final class CarnetTests: XCTestCase {
         XCTAssertEqual(apercu.params["cles"]?.array?.compactMap(\.string), Carnet.clesGeometrie)
         let texte = lignes.joined(separator: "\n")
         XCTAssertTrue(texte.contains("■ DSCF2402.RAF (id 7)"), texte)
+        XCTAssertTrue(texte.contains("bruit fort 1,5 (relevés), cherché seulement à ISO 1600 ou plus (provisoire)"), texte)
+        XCTAssertTrue(texte.contains("  ISO inconnu : bruit fort non cherché (ISO 1600 ou plus)"), texte)
         XCTAssertTrue(texte.contains("étapes de Claude : aucune (view_photo la noterait)"), texte)
         XCTAssertTrue(texte.contains("Retenus : sous-exposée"), texte)
         XCTAssertTrue(texte.contains("■ ciel.jpg"), texte)

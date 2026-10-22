@@ -117,11 +117,12 @@
 --                                          Dany), lire, remettre (la recette seule : remet la
 --                                          proposition d'avant son étape, sans rien écrire au
 --                                          catalogue)
---   lecon       {action, photo?, photos?, lecon?} → leçons des photos (1.3), rangées dans
---                                          carnet.json : garder (lecon = {points, indices?} :
---                                          trois points, un par axe, lumiere, couleur,
---                                          composition ; la nouvelle remplace l'ancienne), lire,
---                                          retirer
+--   lecon       {action, photo?, photos?, lecon?, essai_recette?} → leçons des photos (1.3),
+--                                          rangées dans carnet.json : garder (lecon = {points,
+--                                          indices?} : trois points, un par axe, lumiere, couleur,
+--                                          composition ; la nouvelle remplace l'ancienne ; une
+--                                          photo d'essai : rangee = false, sauf essai_recette, la
+--                                          recette seulement), lire, retirer
 --   carnet      {action, photo?, photos?, vue?, angle?, vocabulaire?, essai_recette?, resume?}
 --                                       → carnet de progrès (1.3), carnet.json : constater (photo,
 --                                          la photo mesurée, obligatoire ; vue ou angle ;

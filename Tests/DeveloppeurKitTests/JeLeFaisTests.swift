@@ -415,12 +415,22 @@ final class JeLeFaisTests: XCTestCase {
         XCTAssertTrue(info["rien_n_est_applique"]?.string?.contains("choose_variant « ma version »") == true)
         XCTAssertNil(info["remarques_serveur"])
 
+        // 1.3.1 : reason accepté avec my_turn ; il devient la raison de l'entrée « Claude · je le
+        // fais » du journal (avant step_name), et revient dans la réponse.
+        let avecRaison = tools.call(name: "preview_settings", arguments: [
+            "settings": ["Exposure2012": 0.35], "my_turn": true, "step_name": "lumière", "reason": "Photo un peu sombre : à toi de l'éclaircir.",
+        ])
+        XCTAssertFalse(avecRaison.isError, avecRaison.text)
+        XCTAssertEqual(fake.lastParams["raison"], "Photo un peu sombre : à toi de l'éclaircir.")
+        XCTAssertEqual(try JSONCoding.parse(avecRaison.text)["raison"]?.string, "Photo un peu sombre : à toi de l'éclaircir.")
+        XCTAssertEqual(fake.lastParams["etape"], "ma version (je le fais)", "toujours le nom fixe de l'exercice")
+
         // compare, size et overlay sont sans effet : une remarque, toujours rien de rendu.
         let avecCompare = tools.call(name: "preview_settings", arguments: [
             "settings": ["Exposure2012": 0.35], "my_turn": true, "compare": true, "size": 2048,
         ])
         XCTAssertFalse(avecCompare.isError, avecCompare.text)
-        XCTAssertEqual(fake.commands, ["essayer", "essayer"])
+        XCTAssertEqual(fake.commands, ["essayer", "essayer", "essayer"])
         XCTAssertNil(fake.lastParams["comparer"])
         XCTAssertNil(fake.lastParams["taille"])
         XCTAssertFalse(avecCompare.porteUneImage)

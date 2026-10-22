@@ -39,15 +39,15 @@ final class LeconTests: XCTestCase {
         return .object(objet)
     }
 
-    /// La réponse du module à journal avec detaille : une photo décrite en entier et ses entrées.
-    func repondreJournal(_ entrees: [JSONValue], id: Int = 53636309, fichier: String = "DSCF4961.RAF") {
-        fake.replies["journal"] = ["photos": [[
-            "photo": ["id": .number(Double(id)), "fichier": .string(fichier), "copie_virtuelle": false, "appareil": "X-H2S",
-                      "objectif": "XF16-55mmF2.8 R LM WR", "iso": "ISO 400", "vitesse": "1/250 s", "ouverture": "ƒ/8,0",
-                      "focale": "23 mm", "date": "2026-06-30 18:42:10", "format": "RAW",
-                      "prise_de_vue_plus": ["compensation": "0 EV", "flash": "Non déclenché"]],
-            "entrees": .array(entrees),
-        ]]]
+    /// La réponse du module à journal avec detaille : une photo décrite en entier et ses entrées ;
+    /// `sensibilite`, l'ISO en nombre (1.3.1), absent par défaut.
+    func repondreJournal(_ entrees: [JSONValue], id: Int = 53636309, fichier: String = "DSCF4961.RAF", sensibilite: Double? = nil) {
+        var photo: [String: JSONValue] = ["id": .number(Double(id)), "fichier": .string(fichier), "copie_virtuelle": false, "appareil": "X-H2S",
+                                          "objectif": "XF16-55mmF2.8 R LM WR", "iso": "ISO 400", "vitesse": "1/250 s", "ouverture": "ƒ/8,0",
+                                          "focale": "23 mm", "date": "2026-06-30 18:42:10", "format": "RAW",
+                                          "prise_de_vue_plus": ["compensation": "0 EV", "flash": "Non déclenché"]]
+        if let sensibilite { photo["sensibilite"] = .number(sensibilite) }
+        fake.replies["journal"] = ["photos": [["photo": .object(photo), "entrees": .array(entrees)]]]
     }
 
     func mesures(hautes: Double = 0, ombres: Double = 0, a: Double = 0, b: Double = 0, part: Double = 30,
@@ -293,6 +293,45 @@ final class LeconTests: XCTestCase {
         XCTAssertTrue(parId[1].exercice)
     }
 
+    /// 1.3.1 : l'indice du bruit (débruitage lancé par Claude) ne vaut qu'à un ISO connu et élevé,
+    /// lu dans la description du journal (sensibilite) ; jamais dans son texte (« ISO 400 »).
+    func testLessonNoiseHintNeedsAHighIso() throws {
+        let debruitage = entree("retouche", "Claude · débruitage", [changement("Amelioration.denoise", 0, 35)], id: "e1")
+        repondreJournal([debruitage], sensibilite: 3200)
+        var faits = try JSONCoding.parse(appeler(["read_facts": true]).text)["faits"]
+        XCTAssertEqual(faits?["indices"]?.array?.compactMap { $0["defect"]?.string }, ["noise"])
+        XCTAssertEqual(faits?["indices"]?.array?.first?["preuve"]?.string, "Débruitage IA lancé (0 → 35) ; à ISO 3200")
+        XCTAssertNil(faits?["prise_de_vue"]?["sensibilite"], "Claude a le texte de l'ISO, pas le nombre")
+        for iso in [160.0, nil] as [Double?] {
+            repondreJournal([debruitage], sensibilite: iso)
+            faits = try JSONCoding.parse(appeler(["read_facts": true]).text)["faits"]
+            XCTAssertEqual(faits?["indices"]?.array?.count, 0, "ISO \(iso.map { "\($0)" } ?? "inconnu")")
+        }
+        // Avec des points qui ne nomment pas le bruit : pas de remarque à ISO 160.
+        repondreJournal([debruitage], sensibilite: 160)
+        fake.replies["lecon"] = ["rangee": true, "remplacee": false]
+        let rangee = try JSONCoding.parse(appeler(["points": points()]).text)
+        XCTAssertFalse((rangee["remarques"]?.array ?? []).contains { $0.string?.contains("noise") == true }, JSONCoding.line(rangee))
+        XCTAssertTrue(fake.lecons.last?["lecon"]?["indices"]?.array?.isEmpty == true)
+    }
+
+    /// 1.3.1 : la leçon d'une photo d'essai, que le module ne range pas (rangee = false, motif
+    /// essai, avec sa remarque) : photo_lesson réussit et le dit, sans jamais envoyer essai_recette.
+    func testLessonOfATestPhotoIsNotStoredAndSaysWhy() throws {
+        repondreJournal([], id: 53709786, fichier: "DSCF1595.RAF (Essai)")
+        fake.replies["lecon"] = ["photo": 53709786, "fichier": "DSCF1595.RAF (Essai)", "rangee": false, "remplacee": false, "motif": "essai",
+                                 "remarque": "Photo d'essai (Développeur › Essais) : sa leçon n'entre pas au carnet de progrès, qui ne compte que les vraies prises de vue. La leçon de cette réponse reste valable."]
+        let result = appeler(["photo_id": 53709786, "points": points()])
+        XCTAssertFalse(result.isError, result.text)
+        let reponse = try JSONCoding.parse(result.text)
+        XCTAssertEqual(reponse["lecon"]?["rangee"]?.bool, false)
+        XCTAssertTrue((reponse["remarques"]?.array ?? []).contains { $0.string?.hasPrefix("Photo d'essai (Développeur › Essais)") == true }, result.text)
+        XCTAssertNotNil(reponse["texte"]?.string, "la leçon reste dite")
+        XCTAssertEqual(fake.lecons.count, 1)
+        XCTAssertNil(fake.lecons.first?["essai_recette"], "jamais par un outil")
+        XCTAssertFalse(tools.definitions.contains { JSONCoding.line($0).contains("essai_recette") }, "aucun outil ne le déclare")
+    }
+
     // MARK: Indices
 
     /// Exposition +1,1, CropAngle −1,8, Temperature 5 600 → 5 000 et Highlights −60 avec un départ
@@ -305,7 +344,7 @@ final class LeconTests: XCTestCase {
             Lecon.Correction(cle: "Temperature", avant: 5600, apres: 5000),
             Lecon.Correction(cle: "Highlights2012", avant: 0, apres: -60),
         ]
-        let indices = Lecon.indices(corrections: corrections, depart: depart)
+        let indices = Lecon.indices(corrections: corrections, depart: depart, iso: nil)
         XCTAssertEqual(cles(indices), ["tilted_horizon", "underexposed", "blown_highlights", "color_cast"], "ordre de PriseDeVue")
         let preuves = Dictionary(uniqueKeysWithValues: indices.map { ($0.defaut.cle, $0.preuve) })
         XCTAssertEqual(preuves["underexposed"], "Exposition +1,10 IL (0,00 → 1,10)")
@@ -326,23 +365,23 @@ final class LeconTests: XCTestCase {
             Lecon.Correction(cle: "Tint", avant: 5, apres: 14),
             Lecon.Correction(cle: "PerspectiveVertical", avant: 0, apres: -9),
         ]
-        XCTAssertEqual(cles(Lecon.indices(corrections: sous, depart: vue(mesures(hautes: 3, ombres: 5)))), [])
-        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Exposure2012", avant: 0.2, apres: -0.3)], depart: nil)),
+        XCTAssertEqual(cles(Lecon.indices(corrections: sous, depart: vue(mesures(hautes: 3, ombres: 5)), iso: nil)), [])
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Exposure2012", avant: 0.2, apres: -0.3)], depart: nil, iso: nil)),
                        ["overexposed"])
     }
 
     /// Température relative d'un JPEG (sous 1 000) : 10 suffisent ; en kelvins, 400.
     func testTemperatureScaleOfAJpeg() {
-        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: 0, apres: 10)], depart: nil)), ["color_cast"])
-        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: 0, apres: -9)], depart: nil)), [])
-        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: 5000, apres: 5399)], depart: nil)), [])
-        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Tint", avant: 0, apres: -10)], depart: nil)), ["color_cast"])
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: 0, apres: 10)], depart: nil, iso: nil)), ["color_cast"])
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: 0, apres: -9)], depart: nil, iso: nil)), [])
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: 5000, apres: 5399)], depart: nil, iso: nil)), [])
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Tint", avant: 0, apres: -10)], depart: nil, iso: nil)), ["color_cast"])
         // Sans valeur d'avant, la balance de la prise de vue est inconnue : pas d'écart (0 → 5 000 K
         // n'est pas une correction de 5 000 K).
-        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: .null, apres: 5000)], depart: nil)), [])
-        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Tint", avant: .null, apres: 25)], depart: nil)), [])
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Temperature", avant: .null, apres: 5000)], depart: nil, iso: nil)), [])
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Tint", avant: .null, apres: 25)], depart: nil, iso: nil)), [])
         // Une autre clé sans valeur d'avant part de 0, la valeur par défaut du curseur.
-        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Exposure2012", avant: .null, apres: 0.7)], depart: nil)),
+        XCTAssertEqual(cles(Lecon.indices(corrections: [Lecon.Correction(cle: "Exposure2012", avant: .null, apres: 0.7)], depart: nil, iso: nil)),
                        ["underexposed"])
     }
 
@@ -350,38 +389,49 @@ final class LeconTests: XCTestCase {
     /// en a pas) ; la dominante de départ ne compte que sur une photo pas encore retouchée.
     func testDepartureGatesHighlightsShadowsAndCast() {
         let hautes = [Lecon.Correction(cle: "Whites2012", avant: 0, apres: -30)]
-        XCTAssertEqual(cles(Lecon.indices(corrections: hautes, depart: vue(mesures(hautes: 0.4)))), [])
-        XCTAssertEqual(cles(Lecon.indices(corrections: hautes, depart: vue(mesures(hautes: 0.5)))), ["blown_highlights"])
-        let sansDepart = Lecon.indices(corrections: hautes, depart: nil)
+        XCTAssertEqual(cles(Lecon.indices(corrections: hautes, depart: vue(mesures(hautes: 0.4)), iso: nil)), [])
+        XCTAssertEqual(cles(Lecon.indices(corrections: hautes, depart: vue(mesures(hautes: 0.5)), iso: nil)), ["blown_highlights"])
+        let sansDepart = Lecon.indices(corrections: hautes, depart: nil, iso: nil)
         XCTAssertEqual(cles(sansDepart), ["blown_highlights"])
         XCTAssertTrue(sansDepart[0].preuve.contains("sans vue de départ mesurée"), sansDepart[0].preuve)
 
         let ombres = [Lecon.Correction(cle: "Shadows2012", avant: 0, apres: 40), Lecon.Correction(cle: "Blacks2012", avant: 0, apres: 25)]
-        XCTAssertEqual(cles(Lecon.indices(corrections: ombres, depart: vue(mesures(ombres: 1.9)))), [])
-        let bouchees = Lecon.indices(corrections: ombres, depart: vue(mesures(ombres: 2)))
+        XCTAssertEqual(cles(Lecon.indices(corrections: ombres, depart: vue(mesures(ombres: 1.9)), iso: nil)), [])
+        let bouchees = Lecon.indices(corrections: ombres, depart: vue(mesures(ombres: 2)), iso: nil)
         XCTAssertEqual(cles(bouchees), ["crushed_shadows"])
         XCTAssertTrue(bouchees[0].preuve.hasPrefix("Ombres +40 (0 → 40) ; Noirs +25 (0 → 25) ; au départ, 2,0 %"), bouchees[0].preuve)
 
-        XCTAssertEqual(cles(Lecon.indices(corrections: [], depart: vue(mesures(b: 6.5)))), ["color_cast"])
-        XCTAssertEqual(cles(Lecon.indices(corrections: [], depart: vue(mesures(b: 5.9)))), [])
-        XCTAssertEqual(cles(Lecon.indices(corrections: [], depart: vue(mesures(a: -7), etapes: 2))), [], "déjà retouchée : pas l'état de la prise de vue")
-        XCTAssertEqual(cles(Lecon.indices(corrections: [], depart: vue(mesures(a: -7, part: 2)))), [], "trop peu de tons neutres")
+        XCTAssertEqual(cles(Lecon.indices(corrections: [], depart: vue(mesures(b: 6.5)), iso: nil)), ["color_cast"])
+        XCTAssertEqual(cles(Lecon.indices(corrections: [], depart: vue(mesures(b: 5.9)), iso: nil)), [])
+        XCTAssertEqual(cles(Lecon.indices(corrections: [], depart: vue(mesures(a: -7), etapes: 2), iso: nil)), [], "déjà retouchée : pas l'état de la prise de vue")
+        XCTAssertEqual(cles(Lecon.indices(corrections: [], depart: vue(mesures(a: -7, part: 2)), iso: nil)), [], "trop peu de tons neutres")
     }
 
     /// Voile, bruit (débruitage lancé ou lissage), verticales (Upright posé ou perspective) et
     /// cadrage (cadre resserré sans rotation ni Upright).
     func testOtherMeasuredDefects() {
-        func indices(_ corrections: [Lecon.Correction]) -> [String] { cles(Lecon.indices(corrections: corrections, depart: nil)) }
+        func indices(_ corrections: [Lecon.Correction], iso: Double? = 3200) -> [String] {
+            cles(Lecon.indices(corrections: corrections, depart: nil, iso: iso))
+        }
         XCTAssertEqual(indices([Lecon.Correction(cle: "Dehaze", avant: 0, apres: 10)]), ["flat_light"])
         XCTAssertEqual(indices([Lecon.Correction(cle: "Amelioration.denoise", avant: 0, apres: 35)]), ["noise"])
         XCTAssertEqual(indices([Lecon.Correction(cle: "Amelioration.denoise", avant: 35, apres: 50)]), [], "déjà actif")
         XCTAssertEqual(indices([Lecon.Correction(cle: "LuminanceSmoothing", avant: 0, apres: 20)]), ["noise"])
+        // 1.3.1 : le bruit fort de la prise de vue (ISO élevé) ne se nomme qu'à un ISO connu d'au
+        // moins Carnet.isoEleve, comme au carnet : à ISO 160, un débruitage soigne autre chose (des
+        // ombres relevées, une texture prise pour du bruit).
+        let debruitage = [Lecon.Correction(cle: "Amelioration.denoise", avant: 0, apres: 35)]
+        XCTAssertEqual(indices(debruitage, iso: 160), [])
+        XCTAssertEqual(indices(debruitage, iso: nil), [], "ISO inconnu")
+        XCTAssertEqual(indices(debruitage, iso: 1599), [])
+        XCTAssertEqual(indices(debruitage, iso: 1600), ["noise"])
+        XCTAssertEqual(Lecon.indices(corrections: debruitage, depart: nil, iso: 12800).first?.preuve, "Débruitage IA lancé (0 → 35) ; à ISO 12800")
         XCTAssertEqual(indices([Lecon.Correction(cle: "PerspectiveUpright", avant: 0, apres: 5)]), ["converging_verticals"])
         XCTAssertEqual(indices([Lecon.Correction(cle: "PerspectiveUpright", avant: 3, apres: 5)]), [])
         XCTAssertEqual(indices([Lecon.Correction(cle: "PerspectiveVertical", avant: 0, apres: -10)]), ["converging_verticals"])
         let cadre = [Lecon.Correction(cle: "CropLeft", avant: 0, apres: 0.1), Lecon.Correction(cle: "CropRight", avant: 1, apres: 0.9)]
         XCTAssertEqual(indices(cadre), ["loose_framing"], "80 % de l'image")
-        let preuve = Lecon.indices(corrections: cadre, depart: nil).first?.preuve
+        let preuve = Lecon.indices(corrections: cadre, depart: nil, iso: nil).first?.preuve
         XCTAssertEqual(preuve, "cadre resserré par Claude à 80 % de l'image (avant : 100 %)")
         XCTAssertEqual(indices([Lecon.Correction(cle: "CropLeft", avant: 0, apres: 0.07), Lecon.Correction(cle: "CropRight", avant: 1, apres: 0.93)]),
                        [], "86 % : sous le seuil")
@@ -571,7 +621,7 @@ final class LeconTests: XCTestCase {
 
     func testWhatGoesToTheModuleMatchesTheLiaisonEssay() throws {
         let points = try Lecon.points(points().array!)
-        let indices = Lecon.indices(corrections: [Lecon.Correction(cle: "CropAngle", avant: 0, apres: -1.8)], depart: nil)
+        let indices = Lecon.indices(corrections: [Lecon.Correction(cle: "CropAngle", avant: 0, apres: -1.8)], depart: nil, iso: nil)
         XCTAssertEqual(Lecon.pourLeModule(points: points, indices: indices), try JSONCoding.parse(Self.contratModule))
 
         // Toutes les preuves possibles tiennent dans les bornes du module.
@@ -583,7 +633,7 @@ final class LeconTests: XCTestCase {
             Lecon.Correction(cle: "Temperature", avant: 2000, apres: 50000), Lecon.Correction(cle: "Tint", avant: -150, apres: 150),
             Lecon.Correction(cle: "CropAngle", avant: -45, apres: 45), Lecon.Correction(cle: "PerspectiveUpright", avant: 0, apres: 5),
             Lecon.Correction(cle: "PerspectiveVertical", avant: -100, apres: 100),
-        ], depart: vue(mesures(hautes: 99.9, ombres: 99.9, a: -128, b: 127)))
+        ], depart: vue(mesures(hautes: 99.9, ombres: 99.9, a: -128, b: 127)), iso: 102400)
         // Tous les indices, sauf la surexposition (l'exposition est remontée) et le cadrage (la
         // rotation resserre le cadre d'elle-même).
         XCTAssertEqual(cles(toutes), ["tilted_horizon", "converging_verticals", "underexposed", "blown_highlights", "crushed_shadows",

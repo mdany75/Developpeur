@@ -51,14 +51,17 @@ local function cadre(reglages)
 end
 
 -- Ce que le serveur doit savoir de la photo, en plus de la vignette ou de l'aperçu (Rendu.apercu) :
--- sa description, le chemin du fichier (point de mise au point lu par le serveur), et de quoi
--- passer du repère du fichier à l'image affichée (dimensions affichées, orientation, cadre).
+-- sa description, le chemin du fichier (point de mise au point lu par le serveur), de quoi passer
+-- du repère du fichier à l'image affichée (dimensions affichées, orientation, cadre), et sa
+-- sensibilité ISO en nombre (1.3.1 : le carnet de progrès ne cherche le bruit fort qu'à un ISO
+-- élevé ; le texte formaté de la description, « ISO 160 », ne se lit pas).
 local function decrireVignette(photo, d)
     d = d or decrire(photo, true)
     local reglages = photo:getDevelopSettings()
     local largeur, hauteur = dimensionsAffichees(photo)
     local raw = estRaw(photo, reglages)
     d.chemin_original = brut(photo, 'path')
+    d.sensibilite = Photos.sensibilite(photo)
     -- Le serveur ne lit le point AF que dans les fichiers Fujifilm (PointAF).
     d.marque = Photos.meta(photo, 'cameraMake')
     d.geometrie = {
