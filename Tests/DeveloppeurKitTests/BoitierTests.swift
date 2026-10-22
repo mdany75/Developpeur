@@ -179,8 +179,16 @@ final class BoitierTests: XCTestCase {
         try F.fichier(note: F.point(x: 100, y: 200) + [F.court(0x1401, 0)], largeur: nil, hauteur: nil).write(to: raf)
         XCTAssertNil(LectureBoitier.lire(fichier: raf)?.point)
         XCTAssertEqual(LectureBoitier.lire(fichier: raf)?.intention?.nomSimulation, "PROVIA/Standard")
-        // Ni point ni réglage lu : rien.
+        // Ni point ni réglage : la mise au point en détail seule (onglet Focus : l'avertissement et
+        // les deux visages se disent quand même).
         try F.fichier(note: F.point(x: 0, y: 0)).write(to: raf)
+        let seule = try XCTUnwrap(LectureBoitier.lire(fichier: raf))
+        XCTAssertNil(seule.point)
+        XCTAssertNil(seule.intention)
+        XCTAssertEqual(seule.miseAuPoint?.visages, 2)
+        XCTAssertEqual(seule.miseAuPoint?.lignesMiseAuPoint().first, MiseAuPointBoitier.Ligne("Points de mise au point", "non lus"))
+        // Rien de ce que le serveur lit : rien.
+        try F.fichier(note: [F.court(0x9999, 1)]).write(to: raf)
         XCTAssertNil(LectureBoitier.lire(fichier: raf))
     }
 
@@ -378,5 +386,101 @@ final class BoitierTests: XCTestCase {
         XCTAssertTrue(description.contains("« intention_boitier » (fichiers Fujifilm, lue dans l'original)"))
         XCTAssertTrue(description.contains("une nuit voulue sombre reste sombre"))
         XCTAssertTrue(description.contains("choisie). region = zoom à 100 %"), "la phrase suivante reste entière")
+    }
+
+    // MARK: Mise au point en détail (onglet Focus, 22 octobre 2026)
+
+    /// Les étiquettes de DSCF2402.RAF (X-H2S, l'original de la copie d'essai 53709912), relevées le
+    /// 22 octobre 2026 par l'exiftool de Focus-Points (`exiftool -a -G1 -s` et `-v3`), rangées dans
+    /// les types du vrai fichier : la photo n'est pas dans le dépôt, seulement ses valeurs.
+    static let dscf2402: [F.Entree] = [
+        F.court(0x1021, 0), F.court(0x1022, 1), F.court(0x1023, 1665, 845), F.court(0x102b, 0x0011), F.long(0x102d, 0x6001),
+        F.court(0x104d, 0), F.court(0x1101, 0), F.long(0x1103, 0), F.court(0x1301, 0), F.court(0x1422, 2, 1, 0),
+        F.court(0x4100, 1), F.court(0x4103, 1283, 476, 1999, 1124), F.court(0x4200, 4), F.court(0x4201, 8, 1, 2, 3),
+        F.court(0x4203, 1283, 476, 1999, 1124, 1442, 760, 1813, 1104, 1435, 787, 1516, 868, 1635, 767, 1716, 848),
+    ]
+
+    /// Ce que Focus-Points montre pour DSCF2402 (capture de Dany), en français : Focus Mode AF-S,
+    /// AF-S Priority Release, AF Mode Single Point, AF Area Point Size 6, Focus Warning Good, Faces
+    /// Detected 1, Subject Element Types Head, Face, Left Eye, Right Eye ; Image Stabilization
+    /// Sensor-shift, On (mode 1, continuous) ; Drive Mode Single.
+    func testMiseAuPointDeDSCF2402() throws {
+        let raf = TestSupport.temporaryDirectory().appendingPathComponent("DSCF2402.RAF")
+        try F.fichier(note: Self.dscf2402).write(to: raf)
+        let m = try XCTUnwrap(LectureBoitier.lire(fichier: raf)?.miseAuPoint)
+        XCTAssertEqual(m.largeur, 4416)
+        XCTAssertEqual(m.hauteur, 2944)
+        XCTAssertEqual(m.pixel, [1665, 845])
+        XCTAssertEqual(m.modeMiseAuPoint2, 1)
+        XCTAssertEqual(m.prioriteAFS, 1)
+        XCTAssertEqual(m.zone, "point")
+        XCTAssertEqual(m.taillePoint, 6)
+        XCTAssertNil(m.tailleZone)
+        XCTAssertFalse(m.manuelle)
+        XCTAssertEqual(m.lignesMiseAuPoint(), [
+            .init("Points de mise au point", "lus"),
+            .init("Mode de mise au point", "AF-S (ponctuel)"),
+            .init("Priorité AF-S", "Déclenchement"),
+            .init("Mode AF", "Point unique"),
+            .init("Taille du point AF", "6"),
+            .init("Avertissement de mise au point", "Bonne"),
+            .init("Visages détectés", "1"),
+            .init("Éléments du sujet détectés", "tête, visage, œil gauche, œil droit"),
+        ])
+        XCTAssertEqual(m.lignesPriseDeVue, [.init("Stabilisation", "Capteur, active (mode 1, en continu)"),
+                                            .init("Mode d'entraînement", "Vue par vue")])
+        XCTAssertEqual(m.lignesImage, [], "CropMode 0 : pas de recadrage du boîtier")
+        // Le point est sur l'œil droit, comme Focus-Points le montre ; la tête des visages
+        // (FacePositions) est déjà un élément : quatre cadres de sujet, pas cinq.
+        let sujets = m.cadresSujet
+        XCTAssertEqual(sujets.map(\.nom), ["tête", "visage", "œil gauche", "œil droit"])
+        let oeil = try XCTUnwrap(sujets.last?.cadre)
+        XCTAssertTrue((oeil.gauche...oeil.droite).contains(1665) && (oeil.haut...oeil.bas).contains(845))
+        // Sous les noms d'exiftool (--boitier).
+        let v = m.valeursLues
+        XCTAssertEqual(v["AFAreaPointSize (0x102d)"]?.int, 6)
+        XCTAssertEqual(v["AF-SPriority (0x102b)"]?.int, 1)
+        XCTAssertEqual(v["FocusMode2 (0x102d)"]?.int, 1)
+        XCTAssertEqual(v["ImageStabilization (0x1422)"]?.array?.compactMap(\.int), [2, 1, 0])
+        XCTAssertEqual(v["FaceElementTypes (0x4201)"]?.array?.compactMap(\.int), [8, 1, 2, 3])
+        XCTAssertEqual(v["FacePositions (0x4103)"]?.array?.compactMap(\.int), [1283, 476, 1999, 1124])
+        XCTAssertNil(v["AFAreaZoneSize (0x102d)"], "n/a chez exiftool")
+    }
+
+    /// Les réglages groupés se lisent quel que soit le type rangé (octets indéfinis ici) : AF-C en
+    /// zone de 5 × 5, priorité à la mise au point, rafale rapide à 15 im/s, recadrage 1,25×.
+    func testReglagesGroupesEnOctetsIndefinis() throws {
+        let raf = TestSupport.temporaryDirectory().appendingPathComponent("DSCF0010.RAF")
+        try F.fichier(note: F.point(x: 2208, y: 1472) + [
+            F.Entree(tag: 0x102d, type: 7, valeurs: [0x02, 0x01, 0xA5, 0x00]), F.Entree(tag: 0x102b, type: 7, valeurs: [0x21, 0x00]),
+            F.Entree(tag: 0x1103, type: 7, valeurs: [0x02, 0x00, 0x00, 0x0F]), F.court(0x1101, 3), F.court(0x104d, 4),
+            F.court(0x1422, 1, 2, 0), F.Entree(tag: 0x4201, type: 1, valeurs: [15, 17, 30]),
+        ]).write(to: raf)
+        let m = try XCTUnwrap(LectureBoitier.lire(fichier: raf)?.miseAuPoint)
+        XCTAssertEqual(m.tailleZone?.largeur, 5)
+        XCTAssertEqual(m.tailleZone?.hauteur, 5)
+        let lignes = m.lignesMiseAuPoint()
+        XCTAssertTrue(lignes.contains(.init("Mode de mise au point", "AF-C (continu)")), "\(lignes)")
+        XCTAssertTrue(lignes.contains(.init("Priorité AF-C", "Mise au point")), "la priorité du mode de mise au point")
+        XCTAssertFalse(lignes.contains { $0.titre == "Priorité AF-S" })
+        XCTAssertTrue(lignes.contains(.init("Mode AF", "Zone")))
+        XCTAssertTrue(lignes.contains(.init("Taille de la zone AF", "5 × 5")))
+        XCTAssertTrue(lignes.contains(.init("Visages détectés", "2")))
+        XCTAssertTrue(lignes.contains(.init("Éléments du sujet détectés", "tête d'animal, œil gauche d'animal, élément 30")),
+                      "types en octets (int8u d'ExifTool), un type inconnu nommé par son code")
+        XCTAssertEqual(m.lignesPriseDeVue, [.init("Stabilisation", "Optique, active (mode 2, à la prise de vue seulement)"),
+                                            .init("Mode d'entraînement", "Rafale rapide (CH), 15 im/s, vue 3 de la rafale")])
+        XCTAssertEqual(m.lignesImage, [.init("Recadrage du boîtier", "Recadrage 1,25× (obturateur électronique)")])
+        XCTAssertEqual(m.valeursLues["AFAreaZoneSize (0x102d)"]?.string, "5 x 5", "comme exiftool")
+        XCTAssertEqual(m.valeursLues["DriveSpeed (0x1103, im/s)"]?.int, 15)
+        // Mise au point manuelle (AF-M), sans point : ni mode AF ni taille.
+        let manuelle = MiseAuPointBoitier(largeur: 4416, hauteur: 2944, reglagesAF: 0x6000)
+        XCTAssertTrue(manuelle.manuelle)
+        XCTAssertEqual(manuelle.lignesMiseAuPoint(), [.init("Points de mise au point", "non lus (mise au point manuelle)"),
+                                                      .init("Mode de mise au point", "Manuelle (MF)")])
+        // Sans FocusSettings (ancien boîtier) : FocusMode et AFMode.
+        let ancien = MiseAuPointBoitier(largeur: 4416, hauteur: 2944, pixel: [10, 10], modeMiseAuPoint: 0, modeAF: 256)
+        XCTAssertEqual(ancien.lignesMiseAuPoint().prefix(3), [.init("Points de mise au point", "lus"), .init("Mode de mise au point", "Autofocus"),
+                                                              .init("Mode AF", "Zone")])
     }
 }

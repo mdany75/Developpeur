@@ -1299,13 +1299,15 @@ public final class Recette {
     /// (`mcp-developpeur --boitier`), pour la comparer à exiftool : le point de mise au point (dans
     /// le fichier entier, avant l'orientation), l'intention comme view_photo la donne (RAW d'après
     /// l'extension .raf ; profil de Lightroom du catalogue, ou d'un Look installé sans restriction
-    /// d'appareil : le modèle n'est pas lu ici), et les valeurs lues, sous les noms d'exiftool. Une
+    /// d'appareil : le modèle n'est pas lu ici), la mise au point en détail comme l'onglet Focus de
+    /// la fenêtre Claude la montre (`mise_au_point`), et les valeurs lues, sous les noms d'exiftool. Une
     /// seule ouverture, bornée (LecteurBoitier : 2 s). nil si rien n'est lu (autre marque, fichier
     /// illisible, original qui ne s'ouvre pas à temps).
     public static func lectureBoitier(_ fichier: URL, lecteur: LecteurBoitier = LecteurBoitier(),
                                       looks: LookProfileLibrary = LookProfileLibrary()) -> JSONValue? {
-        guard let lecture = lecteur.lire(fichier), lecture.point != nil || lecture.intention != nil else { return nil }
+        guard let lecture = lecteur.lire(fichier), lecture.point != nil || lecture.intention != nil || lecture.miseAuPoint != nil else { return nil }
         var json: [String: JSONValue] = ["fichier": .string(fichier.lastPathComponent)]
+        var valeurs: [String: JSONValue] = [:]
         if let point = lecture.point {
             var af: [String: JSONValue] = ["x": .number((point.x * 1000).rounded() / 1000), "y": .number((point.y * 1000).rounded() / 1000),
                                            "avertissement": .bool(point.avertissement)]
@@ -1316,8 +1318,17 @@ public final class Recette {
             let raw = fichier.pathExtension.lowercased() == "raf"
             let profil = raw ? intention.profilLightroom(marque: "FUJIFILM", modele: nil, looks: looks) : nil
             json["intention_boitier"] = intention.json(raw: raw, profil: profil, profilActuel: nil)
-            json["valeurs_lues"] = valeursLues(intention)
+            valeurs.merge(valeursLues(intention).object ?? [:]) { a, _ in a }
         }
+        // La mise au point en détail, comme l'onglet Focus la montre (sans la géométrie de
+        // Lightroom : le point n'est pas situé dans le cadre).
+        if let m = lecture.miseAuPoint {
+            func lignes(_ liste: [MiseAuPointBoitier.Ligne]) -> JSONValue { .array(liste.map { .string("\($0.titre) : \($0.valeur)") }) }
+            json["mise_au_point"] = ["image": lignes(m.lignesImage), "prise_de_vue": lignes(m.lignesPriseDeVue),
+                                     "mise_au_point": lignes(m.lignesMiseAuPoint())]
+            valeurs.merge(m.valeursLues) { a, _ in a }
+        }
+        if !valeurs.isEmpty { json["valeurs_lues"] = .object(valeurs) }
         return .object(json)
     }
 

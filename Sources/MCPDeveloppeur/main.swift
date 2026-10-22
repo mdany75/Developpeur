@@ -36,7 +36,7 @@ func usage() {
             mcp-developpeur --status     inscriptions, module Lightroom, jeton de la liaison, écran, liaison et mise à jour (par gh)
             mcp-developpeur --version
 
-    Pour le développement (parlent au module Lightroom directement, sauf --marquer-af, --ecran et --boitier) :
+    Pour le développement (parlent au module Lightroom directement, sauf --marquer-af, --focus, --ecran et --boitier) :
             mcp-developpeur --call <outil> ['{"json": …}'] [--image <fichier.jpg>]
                 appelle un outil comme le ferait Claude (et enregistre les images qu'il renvoie)
             mcp-developpeur --module <commande> ['{"json": …}']   commande brute du module (diagnostic…)
@@ -47,6 +47,10 @@ func usage() {
             mcp-developpeur --marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>
                 dessine le point de mise au point d'un fichier Fujifilm sur sa vignette (la fenêtre Claude,
                 aperçu de la photo active) ; code 1 sans point
+            mcp-developpeur --focus <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>
+                l'onglet Focus de la fenêtre Claude : les cadres de la mise au point d'un fichier Fujifilm (point
+                ou zone AF à sa taille en rouge, visages et éléments du sujet en coins jaunes) dessinés sur sa
+                vignette, puis ce que l'appareil en dit, une ligne JSON ; code 1 si rien n'est lu
             mcp-developpeur --ecran   l'écran principal et son profil de couleur, une ligne JSON (voyant Écran de la
                 fenêtre Claude ; {"lu": false} sans écran), lu sur le Mac sans Lightroom
             mcp-developpeur --eclairage <id photo>… [<fichier.jpg>…] [--essai '{"settings": {"Temperature": 3200}}']
@@ -57,8 +61,8 @@ func usage() {
                 copies virtuelles d'essai seulement)
             mcp-developpeur --boitier <original>
                 ce que l'appareil a rangé dans un fichier Fujifilm (RAF ou JPEG), lu sans Lightroom : point de mise
-                au point, intention de la prise de vue (comme view_photo) et valeurs lues sous les noms d'exiftool,
-                une ligne JSON ; code 1 si rien n'est lu
+                au point, intention de la prise de vue (comme view_photo), mise au point en détail (comme l'onglet
+                Focus) et valeurs lues sous les noms d'exiftool, une ligne JSON ; code 1 si rien n'est lu
             mcp-developpeur --constats <id photo>… [<fichier.jpg>…]
                 relevé des seuils du carnet de progrès : L* médian et 95e centile, blanc pur du tiers haut, netteté
                 (au point de mise au point aussi), bruit, boîtier, géométrie, puis les défauts que view_photo
@@ -230,6 +234,13 @@ case "--marquer-af":
     guard let point = PointAF.marquer(original: URL(fileURLWithPath: arguments[1]), geometrie: geometrie,
                                       entree: URL(fileURLWithPath: arguments[3]), sortie: URL(fileURLWithPath: arguments[4])) else { exit(1) }
     print(line: JSONCoding.line(["x": .number(point.x), "y": .number(point.y), "avertissement": .bool(point.avertissement)]))
+case "--focus":
+    // L'onglet Focus de la fenêtre Claude (Fenetre.lua) : les cadres de la mise au point lus dans
+    // l'original, dessinés sur la vignette que Lightroom a rendue, et ce que l'appareil en dit.
+    guard arguments.count == 5 else { usage(); exit(2) }
+    guard let focus = Focus.marquer(original: URL(fileURLWithPath: arguments[1]), geometrie: try? JSONCoding.parse(arguments[2]),
+                                    entree: URL(fileURLWithPath: arguments[3]), sortie: URL(fileURLWithPath: arguments[4])) else { exit(1) }
+    print(line: JSONCoding.line(focus))
 case "--ecran":
     // Le voyant Écran de la fenêtre Claude (Lightroom.etatEcran) : une seule ligne JSON, chemins des
     // profils et texte de la boîte compris ; sans écran lu, {"lu": false} (ECRAN_AUCUN du module).

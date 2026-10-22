@@ -1,9 +1,10 @@
 import Foundation
 
 /// Ce que l'appareil a rangé dans un fichier Fujifilm (RAF, ou JPEG de l'appareil) : le point de
-/// mise au point (PointAF.swift) et l'intention de la prise de vue (IntentionBoitier.swift), lus
-/// d'une seule ouverture de l'original, dans l'Exif et la MakerNote, comme le module Focus Points
-/// de Lightroom les lit par exiftool. ImageIO ne donne pas la MakerNote de Fujifilm (constaté sous
+/// mise au point (PointAF.swift), l'intention de la prise de vue (IntentionBoitier.swift) et, pour
+/// l'onglet Focus de la fenêtre Claude, la mise au point en détail (Focus.swift), lus d'une seule
+/// ouverture de l'original, dans l'Exif et la MakerNote, comme le module Focus Points de Lightroom
+/// les lit par exiftool. ImageIO ne donne pas la MakerNote de Fujifilm (constaté sous
 /// macOS 26 sur un RAF de X-H2S) : le serveur la lit lui-même, en lecture seule.
 ///
 /// Relevé sur un RAF de X-H2S (exiftool 13.55, du module Focus Points) :
@@ -18,10 +19,14 @@ public struct LectureBoitier: Equatable {
     public var point: PointAF?
     /// Réglages choisis à la prise de vue ; nil si aucun n'est lu.
     public var intention: IntentionBoitier?
+    /// La mise au point en détail (mode, zone, visages et éléments du sujet, stabilisation, mode
+    /// d'entraînement) : l'onglet Focus de la fenêtre Claude ; nil si rien n'en est lu.
+    public var miseAuPoint: MiseAuPointBoitier?
 
-    public init(point: PointAF? = nil, intention: IntentionBoitier? = nil) {
+    public init(point: PointAF? = nil, intention: IntentionBoitier? = nil, miseAuPoint: MiseAuPointBoitier? = nil) {
         self.point = point
         self.intention = intention
+        self.miseAuPoint = miseAuPoint
     }
 
     /// Octets lus au début du JPEG incorporé (l'Exif tient dans les 64 premiers Ko).
@@ -58,8 +63,9 @@ public struct LectureBoitier: Equatable {
         let fuji = Tiff(donnees: tiff.subdata(in: debutNote..<tiff.count), petit: true)
         guard let ifd = fuji.ifd(at: Int(decalage)) else { return nil }
         let lecture = LectureBoitier(point: PointAF.depuis(note: ifd, largeur: exifIFD[0xA002]?.entier, hauteur: exifIFD[0xA003]?.entier),
-                                     intention: IntentionBoitier(note: ifd, exif: exifIFD))
-        return lecture.point == nil && lecture.intention == nil ? nil : lecture
+                                     intention: IntentionBoitier(note: ifd, exif: exifIFD),
+                                     miseAuPoint: MiseAuPointBoitier(note: ifd, exif: exifIFD))
+        return lecture.point == nil && lecture.intention == nil && lecture.miseAuPoint == nil ? nil : lecture
     }
 
     /// Le contenu TIFF du segment APP1 « Exif » d'un JPEG.
@@ -140,6 +146,17 @@ public struct LectureBoitier: Equatable {
             }
 
             var signe: Int? { signes(1).first }
+
+            /// Les `octets` premiers octets de la valeur en un entier sans signe, quel que soit le
+            /// type rangé : exiftool lit ainsi les réglages groupés de Fujifilm en données binaires
+            /// (FocusSettings et DriveSettings en int32u, PrioritySettings en int16u), rangés en
+            /// LONG, en SHORT ou en octets indéfinis selon l'appareil. Nil si la valeur est plus
+            /// courte.
+            func mot(_ octets: Int) -> Int? {
+                guard nombre * (Tiff.tailles[type] ?? 1) >= octets,
+                      let valeur = LectureBoitier.lireEntier(tiff.donnees, position, octets, petit: tiff.petit) else { return nil }
+                return Int(valeur)
+            }
 
             /// Les 4 premiers octets de la valeur en entier signé (int32s), quel que soit le type
             /// rangé, comme exiftool lit les tons de Fujifilm (Format int32s) ; une valeur de moins
