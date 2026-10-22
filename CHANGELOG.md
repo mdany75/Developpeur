@@ -1,6 +1,6 @@
 # Changements
 
-## Non publié
+## 1.3.1 — 2026-10-22
 
 Le correctif 1.3.1, tiré de l'essai réel de la 1.3 du 21 octobre 2026. Après l'installation :
 recharger le module suffit (aucun fichier nouveau), puis rouvrir Claude Desktop et ouvrir une
