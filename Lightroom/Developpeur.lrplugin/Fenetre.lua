@@ -2001,7 +2001,10 @@ end
 -- par Vignettes.demander, le boîtier par LrTasks.execute, cinq secondes au plus), une lecture à la
 -- fois, jamais de calcul en Lua ; le résultat est gardé pour la photo (Fenetre.focus) tant qu'elle
 -- ne change pas : un vrai clic sur le segment relit seulement si sa géométrie (cadre, orientation)
--- a changé. L'aperçu des autres onglets, avec le carré de --marquer-af, ne change pas.
+-- ou son édition (editCount, lastEditTime : une retouche) a changé, et la fin d'un tour de Claude
+-- aussi quand l'onglet est montré (Fenetre.suivreFocus ; constaté le 22 octobre 2026 : après
+-- « Retouche pro », l'onglet montrait encore la photo d'avant, et Dany a dû demander « reload
+-- l'image »). L'aperçu des autres onglets, avec le carré de --marquer-af, ne change pas.
 
 -- La carte sans photo active.
 Fenetre.FOCUS_AUCUNE_PHOTO = "Aucune photo active : choisissez une photo dans Lightroom."
@@ -2031,7 +2034,14 @@ function Fenetre.preparerFocus(active, T, garde)
     local Vignettes = require 'Vignettes'
     local photo = require('Photos').photoParId(active.id)
     local d = photo and Vignettes.decrireVignette(photo) or {}
-    local signature = Json.encode(type(d.geometrie) == 'table' and d.geometrie or {})
+    -- La géométrie et l'édition : une retouche change editCount et lastEditTime (Ecriture.lua les
+    -- suit de même pour apresClaude).
+    local edition = {}
+    for _, cle in ipairs({ 'editCount', 'lastEditTime' }) do
+        local ok, valeur = LrTasks.pcall(function() return photo and photo:getRawMetadata(cle) end)
+        edition[#edition + 1] = ok and tostring(valeur) or '?'
+    end
+    local signature = Json.encode(type(d.geometrie) == 'table' and d.geometrie or {}) .. '|' .. table.concat(edition, '|')
     if garde and garde.id == active.id and garde.T == T and garde.signature == signature then
         return nil
     end
@@ -2063,7 +2073,7 @@ function Fenetre.preparerFocus(active, T, garde)
 end
 
 -- Lit l'onglet de la photo `active` dans une tâche (une lecture à la fois par photo) ; `verifier` :
--- relit seulement si sa géométrie a changé depuis le résultat gardé. À la fin, la carte et, si
+-- relit seulement si sa géométrie ou son édition a changé depuis le résultat gardé. À la fin, la carte et, si
 -- l'onglet est montré, l'aperçu ; rien si la photo n'est plus active (une autre a été choisie
 -- pendant la lecture) ; une erreur garde un résultat d'échec pour la photo.
 function Fenetre.lireFocus(active, verifier)
@@ -2173,9 +2183,25 @@ Fenetre.apercuOnglet.focus = function(p, T)
     return true
 end
 
--- Un vrai clic sur l'onglet Focus : la carte de la photo active, relue si sa géométrie a changé.
+-- Un vrai clic sur l'onglet Focus : la carte de la photo active, relue si sa géométrie ou son
+-- édition a changé.
 Fenetre.surOnglet.focus = function()
     Fenetre.rafraichirFocus(true)
+end
+
+-- Depuis la boucle : à la fin d'un tour de Claude (Moteur.finTravail change), si l'onglet Focus est
+-- montré avec un résultat gardé, la photo active se relit si elle a été retouchée (même règle qu'un
+-- vrai clic) ; onglet caché, rien.
+function Fenetre.suivreFocus()
+    local fin = Moteur.finTravail
+    if fin == Fenetre.finTravailFocus then
+        return
+    end
+    Fenetre.finTravailFocus = fin
+    local active = Fenetre.info and Fenetre.info.active
+    if active and Fenetre.focusMontre() and Fenetre.focusActif() then
+        Fenetre.lireFocus(active, true)
+    end
 end
 
 -- Proposition ---------------------------------------------------------------------------------
@@ -4693,6 +4719,11 @@ function Fenetre.boucle(generation)
                     Fenetre.versionCarnet = Carnet.version
                     Journal.noter("Carnet de progrès :", tostring(erreur))
                 end
+            end
+            -- La fin d'un tour de Claude : l'onglet Focus montré relit une photo retouchée.
+            local okFocus, erreurFocus = LrTasks.pcall(Fenetre.suivreFocus)
+            if not okFocus then
+                Journal.noter("Onglet Focus :", tostring(erreurFocus))
             end
             -- Un avant/après rangé (ou manqué) par le module : la carte de l'étape relit ses images.
             if Etapes.version ~= Fenetre.versionEtapes then

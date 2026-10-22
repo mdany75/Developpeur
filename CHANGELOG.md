@@ -23,7 +23,8 @@ rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code.
   l'instant) ». Quand la mise au point d'une photo Fujifilm ne se lit pas, la carte dit pourquoi :
   original introuvable, trop long à ouvrir, ou format pas encore lu (comme un HEIF de l'appareil).
   La fenêtre ne passe jamais d'elle-même à l'onglet Focus : un clic sur son segment
-  l'ouvre, et il suit ensuite la photo active. L'aperçu des autres onglets, avec son carré vert,
+  l'ouvre, et il suit ensuite la photo active et ses retouches (relue quand Claude a fini de
+  retoucher, ou à un clic sur l'onglet). L'aperçu des autres onglets, avec son carré vert,
   ne change pas. Le point unique a la taille que Focus-Points lui donne par défaut ; une zone est
   dessinée à sa taille approchée.
 - `mcp-developpeur --focus` (ce que la fenêtre lance pour l'onglet Focus) ; `--boitier` donne

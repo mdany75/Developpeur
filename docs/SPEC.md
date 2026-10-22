@@ -3950,7 +3950,10 @@ fichier sans la MakerNote de Fujifilm, une autre marque).
 - un onglet caché ne lit rien ; l'onglet suit la photo active (`Fenetre.majPhoto` appelle
   `Fenetre.rafraichirFocus`) ; le résultat est gardé pour la photo (`Fenetre.focus`, refait à
   chaque ouverture de la fenêtre), et un vrai clic ne le relit que si la géométrie de la photo
-  (cadre, orientation) a changé ;
+  (cadre, orientation) ou son édition (`editCount`, `lastEditTime` : une retouche) a changé ; à la
+  fin d'un tour de Claude (`Moteur.finTravail` change), l'onglet montré se relit par la même règle
+  (`Fenetre.suivreFocus`, depuis la boucle ; constaté le 22 octobre 2026 : après « Retouche pro »,
+  l'onglet montrait encore la photo d'avant, et Dany a demandé à Claude « reload l'image ») ;
 - une lecture qui finit quand sa photo n'est plus la photo active (Dany est passé à une autre
   pendant ce temps) ne sert plus : son dossier s'efface, et le résultat de la photo active, lu
   entre-temps, reste montré (sans cela, il était effacé, puis relu) ;

@@ -110,8 +110,8 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   quand même, et « Mise au point : non lue (seulement les fichiers Fujifilm pour l'instant) ».
   Quand la mise au point d'une photo Fujifilm ne se lit pas, la carte dit pourquoi : original
   introuvable, trop long à ouvrir, ou format pas encore lu (comme un HEIF de l'appareil).
-  L'onglet suit la photo active ; ce qu'il a lu est gardé tant que la photo ne change pas (un clic
-  le relit si vous l'avez recadrée). Agrandir montre la photo et ses cadres en grand. Le point
+  L'onglet suit la photo active et ses retouches : quand Claude a fini de retoucher, l'onglet
+  montré relit la photo ; un clic sur l'onglet la relit aussi si elle a été recadrée ou retouchée. Agrandir montre la photo et ses cadres en grand. Le point
   unique est un carré de la taille que Focus-Points lui donne par défaut ; une zone de 5 × 5 est
   dessinée à sa taille approchée.
 - Une proposition préparée à l'ouverture : quand la fenêtre s'ouvre, ou que le menu ou ⌃⌥C la

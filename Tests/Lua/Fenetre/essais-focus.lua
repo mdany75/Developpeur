@@ -132,6 +132,8 @@ local function photo(id, valeurs, description)
     function ph:getRawMetadata(cle)
         if cle == 'dateTimeOriginal' then
             return self.prise
+        elseif cle == 'editCount' then
+            return self.editCount or 0
         elseif cle == 'uuid' then
             return self.uuid
         end
@@ -783,6 +785,48 @@ essai('Apparence sombre : le segment et la carte Focus du jeu sombre', function(
     end)
     prefs.apparence = nil
     assert(ok, erreur)
+    sansErreur()
+end)
+
+essai("Une retouche relit l'onglet : à un vrai clic, et à la fin d'un tour de Claude si l'onglet est montré ; caché, rien", function()
+    activer(2402)
+    repondre(REPONSE_2402)
+    Fichiers.supprimer(RECUS)
+    Moteur.nouvelle()
+    PHOTOS[2402].editCount = 1
+    ouvrirFenetre(function(p, contenu)
+        S.cliquer(segment(contenu, 'Focus'))
+        lancerTaches()
+        local n = commandesFocus()
+        local r0 = Fenetre.focus
+        vrai(r0 and r0.chemin, 'lu une première fois')
+        -- Retouchée (une étape de Claude ou une main dans Lightroom) : un vrai clic relit.
+        S.cliquer(segment(contenu, 'Note'))
+        PHOTOS[2402].editCount = 2
+        S.cliquer(segment(contenu, 'Focus'))
+        lancerTaches()
+        egal(n + 1, commandesFocus(), 'retouchée : relue au clic')
+        vrai(Fenetre.focus ~= r0, 'un nouveau résultat')
+        -- Fin d'un tour de Claude, onglet montré, photo retouchée : relue d'elle-même.
+        PHOTOS[2402].editCount = 3
+        Moteur.finTravail = (Moteur.finTravail or 0) + 10
+        Fenetre.suivreFocus()
+        lancerTaches()
+        egal(n + 2, commandesFocus(), 'fin du tour : relue')
+        -- Fin d'un autre tour sans retouche : rien de relu.
+        Moteur.finTravail = Moteur.finTravail + 10
+        Fenetre.suivreFocus()
+        lancerTaches()
+        egal(n + 2, commandesFocus(), 'sans retouche : rien de relu')
+        -- Onglet caché : la fin d'un tour ne lit rien.
+        S.cliquer(segment(contenu, 'Note'))
+        PHOTOS[2402].editCount = 4
+        Moteur.finTravail = Moteur.finTravail + 10
+        Fenetre.suivreFocus()
+        lancerTaches()
+        egal(n + 2, commandesFocus(), 'onglet caché : rien')
+    end)
+    PHOTOS[2402].editCount = nil
     sansErreur()
 end)
 

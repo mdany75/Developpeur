@@ -1090,7 +1090,10 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   Fujifilm (`Fenetre.estFujifilm`, la règle du carré) `Images.lireFocus` (`perl` et son alarme de
   5 s, comme `--ecran`) ; la réponse décodée ne sert qu'à faire du texte (`Fil.texteFocus`), jamais
   donnée à Lightroom ; le résultat gardé pour la photo (`Fenetre.focus`, refait à chaque ouverture,
-  son dossier effacé), relu par un vrai clic seulement si la géométrie a changé. Une lecture finie
+  son dossier effacé), relu par un vrai clic seulement si la géométrie ou l'édition (editCount,
+  lastEditTime : une retouche) a changé, et à la fin d'un tour de Claude si l'onglet est montré
+  (`Fenetre.suivreFocus`, depuis la boucle ; constaté le 22 octobre 2026 : après « Retouche pro »,
+  l'onglet montrait la photo d'avant). Une lecture finie
   quand sa photo n'est plus la photo active ne touche pas `Fenetre.focus` (son dossier s'efface) ;
   une lecture en erreur garde un résultat d'échec sans signature (« non lue », pas de relecture à
   chaque rafraîchissement ; un vrai clic relit). Rien de lu : la raison du connecteur
