@@ -4916,13 +4916,18 @@ l'étape sautée) sont dans la section de chaque chantier. Restent à voir :
 19. Le registre des notes après la recette : la proposition de la copie RAW remise telle qu'avant
     l'étape (`notation remettre`) ; celle laissée « acceptee » le 21 octobre 2026, avant la
     correction, à remettre « à vérifier » une fois.
-20. Correctif 1.3.1 : `sensibilite` (isoSpeedRating brut) en nombre dans le journal détaillé et
-    l'aperçu avec `point_af`, pour un RAF et un JPEG (l'étape de la leçon de la recette le vérifie
-    sur le RAW ; le relevé du 21 octobre 2026 n'a lu que `tonumber` de la valeur brute) ; cette
-    étape en vrai (refus de la leçon par l'outil, rangement pour la recette) ; dans la fenêtre
-    Claude, la leçon d'une copie d'Essais qui dit « Leçon non rangée : photo d'essai… » ; le tri de
-    la photo active sans cible ; `reason` accepté par `preview_settings` ; `isoEleve` (1 600) à
-    éprouver sur de vraies photos à ISO 800, 1 600 et 3 200.
+20. Correctif 1.3.1. Constaté le 22 octobre 2026 (recette de la 1.3.1, 86 étapes, et essai dans la
+    fenêtre Claude sur le portrait d'essai, défait ensuite) : `sensibilite` en nombre dans le
+    journal détaillé d'un RAF de X-H2S (ISO 160) ; la leçon de la copie d'essai refusée par
+    l'outil puis rangée pour la recette ; `cull_photos` sans cible sur la photo active et
+    `preview_settings` avec `reason`, sans refus, dans la proposition préparée à l'ouverture ; dans
+    l'onglet Leçon, « Leçon non rangée : photo d'essai… » sous la leçon. Restent : `sensibilite`
+    dans l'aperçu avec `point_af` et pour un JPEG ; `isoEleve` (1 600) à éprouver sur de vraies
+    photos à ISO 800, 1 600 et 3 200 ; la carte Proposition qui offre encore Accepter quand Claude
+    a appliqué la proposition à la demande écrite de Dany (vu le même jour) ; le JPEG d'essai
+    53709534 rendu sans `Brightness`, `Contrast` et `Exposure` (réglages du processus 2010, sans
+    effet en 15.4) et avec `MaskGroupBasedCorrections = {}` après la recette, ce que sa
+    référence n'avait pas.
 
 ## Bibliothèque
 

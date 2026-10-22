@@ -114,7 +114,10 @@ Claude : Pourquoi ?, leçon de la photo, Je le fais, composition lue, carnet de 
 fenêtre B demandée par Dany (1 948 × 1 200), faite sur la branche d'intégration `version-1.3`
 (lots 1 à 19, fenêtre B, son agrandissement et son élargissement). En restent : une copie
 d'Essais qui a un vrai horizon pour `--horizon`, et ce que `docs/SPEC.md` garde dans À constater
-dans Lightroom (1.3). Ce qui attend la 1.4 va sous « ## Non publié », au-dessus de « ## 1.3 ». Le
+dans Lightroom (1.3). Le correctif 1.3.1 (« ## 1.3.1 — 2026-10-22 », publié après sa recette, 86
+étapes, et un essai dans la fenêtre Claude) : `reason` dans `preview_settings`, `cull_photos` sur la
+photo active, bruit du carnet à ISO élevé (`Carnet.isoEleve`), leçon d'une photo d'essai hors du
+carnet. Ce qui attend la 1.4 va sous « ## Non publié », au-dessus de « ## 1.3 ». Le
 correctif 1.3.1, tiré de l'essai réel de la 1.3 (« ## Non publié », pas encore publié ni numéroté) :
 `reason` accepté par `preview_settings`, `cull_photos` sur la photo active sans cible, bruit fort au
 carnet et dans la leçon seulement à ISO élevé (`Carnet.isoEleve`), leçon d'une photo d'essai
@@ -292,7 +295,8 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   vrai bruit (1,93 et 2,09) ; à 1 600 et 3 200, rien au-dessus de `bruitFort` : le seuil reste à
   éprouver entre 400 et 4 000. L'ISO vient de la réponse du module (`Carnet.iso`) : `sensibilite`
   de la description (`Photos.sensibilite`, isoSpeedRating brut lu par `tonumber` : de 160 à 12 800
-  le même jour, la valeur brute elle-même vérifiée par l'étape de la leçon de la recette ;
+  le même jour ; un nombre dans le journal détaillé, constaté le 22 octobre 2026 par l'étape de la
+  leçon de la recette ;
   `Vignettes.decrireVignette` et le journal détaillé), sinon `prise_de_vue.iso` d'un module 1.3 ;
   `view_photo` retire `sensibilite` avant Claude. Pas le plafond de note (`Notation.plafond`), qui
   juge l'image, ni le tri, qui ne fait que dire la mesure. Les constats notés avant restent tels

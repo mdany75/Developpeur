@@ -275,9 +275,9 @@ end
 -- La sensibilité ISO de la photo, en nombre (isoSpeedRating brut ; la description détaillée n'en
 -- a que le texte formaté, « ISO 160 ») : nil si Lightroom ne la connaît pas. Relevé le 21 octobre
 -- 2026 (Lightroom Classic 15.6, commande reglages : prise_de_vue.iso, tonumber de la valeur brute,
--- de 160 à 12 800 sur des RAF de X-H2S et de X-T20 et un JPEG de X-T20) ; la valeur brute elle-même
--- (nombre ou texte) reste à constater, ce que fait l'étape de la leçon de la recette (1.3.1). La
--- simulation la tient pour un nombre. Le carnet de progrès et la leçon
+-- de 160 à 12 800 sur des RAF de X-H2S et de X-T20 et un JPEG de X-T20) ; la valeur brute elle-même,
+-- un nombre dans le journal détaillé d'un RAF (160), constatée le 22 octobre 2026 par l'étape de la
+-- leçon de la recette (1.3.1). La simulation la tient pour un nombre. Le carnet de progrès et la leçon
 -- ne cherchent le bruit fort de la prise de vue qu'à un ISO élevé (Carnet.isoEleve du serveur).
 local function sensibilite(photo)
     local iso = tonumber(brut(photo, 'isoSpeedRating'))
