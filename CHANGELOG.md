@@ -12,9 +12,9 @@ sombre. Après l'installation : quitter et relancer Lightroom (le module a deux 
 `Etapes.lua` et `Carnet.lua` : recharger le module ne suffit pas), rouvrir Claude Desktop (à
 quitter pendant l'installation) et ouvrir une nouvelle session de Claude Code, pour avoir les 36
 outils.
-La fenêtre B n'a pas encore été vue dans Lightroom : ses tailles viennent de la maquette et de
-constats faits le 21 octobre 2026 sur une fenêtre d'essai. La capture du README
-(`docs/capture.png`) montre encore la fenêtre de la 1.2 ; elle sera refaite.
+La fenêtre B a été vue dans Lightroom le 21 octobre 2026, à 1 497 × 1 200 puis à 1 948 × 1 200 :
+la capture du README (`docs/capture.png`) la montre après une retouche, avec ses étapes et la
+leçon de la photo, et `docs/carnet.png` montre la page Carnet de progrès.
 
 ### Ajouté
 - « Pourquoi ? » sur chaque étape : dans le fil de la fenêtre Claude, chaque étape de Claude a un
