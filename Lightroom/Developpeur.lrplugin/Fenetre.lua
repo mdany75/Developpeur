@@ -2006,10 +2006,14 @@ end
 -- « Retouche pro », l'onglet montrait encore la photo d'avant, et Dany a dû demander « reload
 -- l'image »). L'aperçu des autres onglets, avec le carré de --marquer-af, ne change pas.
 
--- Juste après une retouche, Lightroom refait l'aperçu de la photo et répond « error loading thumb »
--- quelques instants (constaté le 22 octobre 2026 : l'onglet relu restait sans image) : la vignette
--- se redemande une fois par seconde, ESSAIS_VIGNETTE_FOCUS fois au plus.
-Fenetre.ESSAIS_VIGNETTE_FOCUS = 8
+-- Après une retouche, tant que Lightroom n'a pas refait l'aperçu de la photo, il répond « error
+-- loading thumb » à une vignette de 512 px ou plus, mais rend encore celle de 256 (constaté le
+-- 22 octobre 2026, par la commande vignettes, plus d'une minute après une retouche faite photo
+-- affichée dans le module Développement : l'onglet relu restait sans image). La vignette se
+-- redemande une fois par seconde, ESSAIS_VIGNETTE_FOCUS fois au plus, puis à TAILLE_SECOURS_FOCUS :
+-- moins nette, mais à jour ; la grande se relit au clic suivant ou à la fin d'un tour de Claude.
+Fenetre.ESSAIS_VIGNETTE_FOCUS = 3
+Fenetre.TAILLE_SECOURS_FOCUS = 256
 
 -- La carte sans photo active.
 Fenetre.FOCUS_AUCUNE_PHOTO = "Aucune photo active : choisissez une photo dans Lightroom."
@@ -2061,8 +2065,9 @@ function Fenetre.preparerFocus(active, T, garde)
         source = Vignettes.demander({ active.id }, Fenetre.TAILLE_PHOTO_ACTIVE, dossier)[active.id]
     end
     if not source then
-        -- Toujours sans vignette : pas de signature, le prochain vrai clic (ou la fin d'un tour de
-        -- Claude) relit.
+        -- Sans la grande vignette : la petite, et pas de signature (le prochain vrai clic, ou la
+        -- fin d'un tour de Claude, relit la grande).
+        source = Vignettes.demander({ active.id }, Fenetre.TAILLE_SECOURS_FOCUS, dossier)[active.id]
         signature = nil
     end
     local etat, boitier, marquee = 'autre_marque', nil, nil

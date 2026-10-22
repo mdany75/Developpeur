@@ -142,9 +142,14 @@ local function photo(id, valeurs, description)
     function ph:getPropertyForPlugin()
         return nil
     end
-    function ph:requestJpegThumbnail(_, _, rappel)
+    function ph:requestJpegThumbnail(largeur, _, rappel)
         self.demandesVignette = (self.demandesVignette or 0) + 1
-        -- Juste après une retouche, Lightroom répond « error loading thumb » quelques instants.
+        -- Après une retouche, Lightroom répond « error loading thumb » à 512 px et plus tant que son
+        -- aperçu n'est pas refait, mais rend encore la vignette de 256 (constaté).
+        if self.grandeRefusee and largeur >= 512 then
+            rappel(nil, 'error loading thumb')
+            return {}
+        end
         if (self.echecsVignette or 0) > 0 then
             self.echecsVignette = self.echecsVignette - 1
             rappel(nil, 'error loading thumb')
@@ -852,17 +857,26 @@ essai("Après une retouche, Lightroom refait son aperçu : la vignette se redema
         local r = Fenetre.focus
         vrai(r and r.chemin, "l'image, après les refus")
         egal(r.chemin, p.imageApercu)
-        -- Toujours refusée : pas d'image ni de signature ; le prochain clic relit.
+        -- La grande toujours refusée, la petite rendue : l'image de secours, sans signature.
         S.cliquer(segment(contenu, 'Note'))
         PHOTOS[2402].editCount = 11
+        PHOTOS[2402].demandesVignette, PHOTOS[2402].grandeRefusee = 0, true
+        S.cliquer(segment(contenu, 'Focus'))
+        lancerTaches()
+        vrai(Fenetre.focus.chemin, 'la petite vignette, à jour')
+        egal(nil, Fenetre.focus.signature, 'sans signature : la grande se relira')
+        PHOTOS[2402].grandeRefusee = nil
+        -- Toutes refusées : pas d'image ni de signature ; le prochain clic relit.
+        S.cliquer(segment(contenu, 'Note'))
+        PHOTOS[2402].editCount = 12
         PHOTOS[2402].demandesVignette, PHOTOS[2402].echecsVignette = 0, 100
         S.cliquer(segment(contenu, 'Focus'))
         lancerTaches()
-        -- L'onglet la redemande ESSAIS_VIGNETTE_FOCUS fois ; l'aperçu commun des autres onglets peut
-        -- l'avoir demandée une fois de plus.
+        -- L'onglet la redemande ESSAIS_VIGNETTE_FOCUS fois, puis une fois en petit ; l'aperçu commun
+        -- des autres onglets peut l'avoir demandée une fois de plus.
         local demandes = PHOTOS[2402].demandesVignette
-        vrai(demandes >= Fenetre.ESSAIS_VIGNETTE_FOCUS and demandes <= Fenetre.ESSAIS_VIGNETTE_FOCUS + 1,
-            'redemandée, au plus ESSAIS_VIGNETTE_FOCUS fois : ' .. demandes)
+        vrai(demandes >= Fenetre.ESSAIS_VIGNETTE_FOCUS + 1 and demandes <= Fenetre.ESSAIS_VIGNETTE_FOCUS + 2,
+            'redemandée, au plus ESSAIS_VIGNETTE_FOCUS fois, puis en petit : ' .. demandes)
         egal(nil, Fenetre.focus.chemin)
         egal(nil, Fenetre.focus.signature, 'sans signature')
         local n = commandesFocus()
@@ -874,6 +888,7 @@ essai("Après une retouche, Lightroom refait son aperçu : la vignette se redema
         vrai(commandesFocus() >= n, 'le connecteur relancé au besoin')
     end)
     PHOTOS[2402].editCount, PHOTOS[2402].echecsVignette, PHOTOS[2402].demandesVignette = nil, nil, nil
+    PHOTOS[2402].grandeRefusee = nil
     -- Seul l'aperçu commun des autres onglets a pu noter les refus de Lightroom (il réessaie à son
     -- rafraîchissement suivant) ; aucune autre erreur.
     for i = #journal, 1, -1 do

@@ -3953,11 +3953,15 @@ fichier sans la MakerNote de Fujifilm, une autre marque).
   (cadre, orientation) ou son édition (`editCount`, `lastEditTime` : une retouche) a changé ; à la
   fin d'un tour de Claude (`Moteur.finTravail` change), l'onglet montré se relit par la même règle
   (`Fenetre.suivreFocus`, depuis la boucle ; constaté le 22 octobre 2026 : après « Retouche pro »,
-  l'onglet montrait encore la photo d'avant, et Dany a demandé à Claude « reload l'image ») ; juste
-  après une retouche, Lightroom répond « error loading thumb » quelques instants, le temps de refaire
-  son aperçu (constaté le même jour : l'onglet relu restait sans image) : la vignette se redemande une
-  fois par seconde, `Fenetre.ESSAIS_VIGNETTE_FOCUS` (8) fois au plus, et un résultat toujours sans
-  vignette n'a pas de signature, donc le clic suivant le relit ;
+  l'onglet montrait encore la photo d'avant, et Dany a demandé à Claude « reload l'image ») ; après
+  une retouche faite photo affichée dans le module Développement, tant que Lightroom n'a pas refait
+  son aperçu, `requestJpegThumbnail` répond « error loading thumb » à 512 px et plus, mais rend la
+  vignette de 256 (constaté le même jour par la commande `vignettes`, plus d'une minute après la
+  retouche : l'onglet relu restait sans image) : la vignette se redemande une fois par seconde,
+  `Fenetre.ESSAIS_VIGNETTE_FOCUS` (3) fois, puis à `Fenetre.TAILLE_SECOURS_FOCUS` (256, moins nette
+  mais à jour), sans signature, donc le clic suivant ou la fin d'un tour de Claude relit la grande.
+  L'aperçu commun des autres onglets rencontre le même refus (il réessaie à chaque rafraîchissement,
+  « error loading thumb » au journal) : à constater s'il reste longtemps sans image ;
 - une lecture qui finit quand sa photo n'est plus la photo active (Dany est passé à une autre
   pendant ce temps) ne sert plus : son dossier s'efface, et le résultat de la photo active, lu
   entre-temps, reste montré (sans cela, il était effacé, puis relu) ;
