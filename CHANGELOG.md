@@ -1,6 +1,6 @@
 # Changements
 
-## Non publié
+## 1.3 — 2026-10-21
 
 La 1.3 : apprendre en regardant Claude. Claude dit pourquoi il fait chaque étape et en garde
 l'avant/après, finit une retouche par la leçon de la photo (ce qui manquait, et ce qui l'aurait

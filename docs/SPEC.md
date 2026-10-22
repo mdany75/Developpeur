@@ -20,8 +20,8 @@ l'aperçu de la photo active avec son point de mise au point et la proposition p
 l'ouverture (voir Fenêtre Claude), le point de mise au point sur un zoom de `view_photo` (voir Tri
 d'une séance) et le masque d'une personne seule gardé (voir Masques : pistes de la 2.1).
 
-La 1.3 (apprendre en regardant Claude), en cours sur la branche `version-1.3` et pas encore
-publiée (`CHANGELOG.md`, « Non publié »), a cinq chantiers, chacun dans sa section : Pourquoi ? :
+La 1.3 (apprendre en regardant Claude), publiée le 21 octobre 2026 (`CHANGELOG.md`, « 1.3 »), a
+cinq chantiers, chacun dans sa section : Pourquoi ? :
 l'avant/après des étapes, Leçon de la photo, Je le fais, Composition lue, Carnet de progrès ; ce
 qui en reste à voir dans Lightroom est dans À constater dans Lightroom (1.3). Elle porte aussi la
 fenêtre B, l'allure de la maquette « B · Conversation claire », agrandie à la demande de Dany

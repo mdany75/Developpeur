@@ -26,8 +26,8 @@ rendu plus juste), `view_photo` mesure aussi l'éclairage (`mesures › eclairag
 nommé), donne l'intention lue au boîtier d'un fichier Fujifilm (`intention_boitier`) et le bilan
 chiffré d'une passe à l'autre (`bilan`, alerte « regression ») ; `add_mask` dose la peau comme
 Adobe (garde-fou `smoothing_requested`) et résume la méthode du tireur (éclaircir et assombrir) ;
-`get_status` dit l'écran principal du Mac (`ecran`). La 1.3 (apprendre en regardant Claude), en
-cours sur la branche `version-1.3` et pas encore publiée, ajoute l'avant/après et la raison de
+`get_status` dit l'écran principal du Mac (`ecran`). La 1.3 (apprendre en regardant Claude,
+publiée le 21 octobre 2026) ajoute l'avant/après et la raison de
 chaque étape (« Pourquoi ? », `Etapes.lua`), la leçon de la photo (`photo_lesson`), « Je le
 fais » (`preview_settings` avec `my_turn`, `view_photo` avec `compare = claude_version`), la
 composition lue (`read_composition`) et le carnet de progrès (constats de `view_photo` et
@@ -109,15 +109,12 @@ lue au boîtier, éclairage mixte nommé, bilan chiffré d'une passe à l'autre,
 locale fermée par un jeton privé ; avec ce que Dany avait demandé depuis la 1.1.1 (une seule
 disposition, aperçu de la photo active avec son point de mise au point, proposition préparée à
 l'ouverture, point de mise au point sur un zoom, masque d'une personne seule gardé). La 1.3
-(apprendre en regardant Claude : Pourquoi ?, leçon de la photo, Je le fais, composition lue,
-carnet de progrès, avec la fenêtre B demandée par Dany) est faite sur la branche d'intégration
-`version-1.3` (lots 1 à 19, fenêtre B et son agrandissement), pas encore publiée : elle est décrite
-dans `CHANGELOG.md` sous « ## Non publié », au-dessus de « ## 1.2 », sans section numérotée
-(`build.sh` l'accepte), que la publication renommera. Restent, avant elle : la fenêtre B vue dans
-Lightroom et calée sur sa capture, les captures `docs/capture.png` (la fenêtre B) et
-`docs/carnet.png` (la page du carnet, nouvelle), une copie d'Essais qui a un vrai horizon pour
-`--horizon`, l'essai réel et le jugement de Dany (voir `docs/SPEC.md`, À constater dans Lightroom
-(1.3)). Le
+(« ## 1.3 — 2026-10-21 » de `CHANGELOG.md`, publiée après son essai réel) apprend en regardant
+Claude : Pourquoi ?, leçon de la photo, Je le fais, composition lue, carnet de progrès, avec la
+fenêtre B demandée par Dany (1 948 × 1 200), faite sur la branche d'intégration `version-1.3`
+(lots 1 à 19, fenêtre B, son agrandissement et son élargissement). En restent : une copie
+d'Essais qui a un vrai horizon pour `--horizon`, et ce que `docs/SPEC.md` garde dans À constater
+dans Lightroom (1.3). Ce qui attend la 1.4 va sous « ## Non publié », au-dessus de « ## 1.3 ». Le
 standard de notation (une étoile = un niveau de qualité fixe, 0 ★ = pas encore jugée, rejeter =
 drapeau, Claude ne propose jamais 5 ★), venu de la section 1.1 de la feuille de route, est
 maintenant le texte de `Notation.standard` (voir Règles).
