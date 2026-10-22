@@ -822,7 +822,8 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   carte Note jusqu'à leur rangée de boutons, posée sous elles au bas du panneau : ▲ ▼ à gauche,
   les boutons à droite, en carrés de bezel 26 et titres en 13 (`carteEtRangee` de `Vues.lua` ;
   demandé par Dany le 21 octobre 2026). Elle
-  n'a pas encore été vue dans Lightroom : ses tailles sont à caler sur sa capture. `Fenetre.lua`
+  a été vue dans Lightroom le 21 octobre 2026, à 1 497 × 1 200 puis à 1 948 × 1 200 (capture
+  `docs/capture.png`, essai réel de la 1.3). `Fenetre.lua`
   garde l'état, les rafraîchissements, les actions et la boucle ; les pièces sont dans `Vues.lua` ;
   l'assemblage, les dimensions, les images (`Dispositions.IMAGES`) et les apparences dans
   `Dispositions.lua` : ni `require 'Fenetre'` ni couleur créée à leur chargement (`liens.lua` les
