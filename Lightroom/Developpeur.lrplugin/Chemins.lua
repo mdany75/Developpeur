@@ -13,6 +13,8 @@
 --       notation.json                          notes proposées par Claude
 --       carnet.json                            carnet de progrès et leçons des photos (Carnet.lua,
 --                                              1.3), une table par catalogue
+--       mes-demandes.json                      les demandes du menu Mes demandes de la fenêtre
+--                                              (Stockage.lua)
 --       Etapes/                                avant/après de chaque étape de Claude (1.3)
 --   ~/Library/Logs/Developpeur/conversation.log   (à côté de module.log, le journal de la liaison)
 

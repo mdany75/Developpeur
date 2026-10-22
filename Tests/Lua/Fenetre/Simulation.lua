@@ -377,6 +377,30 @@ function S.refusIcone(v)
     return nil
 end
 
+-- Les éléments d'un popup_menu (relevé le 22 octobre 2026 dans AgViewUtils.getPopupMenu de
+-- Lightroom 15.6, sans avoir été vu) : un élément-table est un séparateur ({ separator = true })
+-- ou porte son titre (`title`, sinon Lightroom montrerait tostring(élément)) ; `value` (sinon
+-- l'élément lui-même) et `enabled = false` (l'élément grisé) facultatifs ; un texte ou un nombre
+-- est son propre titre et sa propre valeur. Rend nil, ou la raison du refus.
+function S.refusElements(items)
+    if type(items) ~= 'table' or items.liaison then
+        return nil
+    end
+    for k, item in ipairs(items) do
+        if type(item) == 'table' then
+            if not item.separator and type(item.title) ~= 'string' then
+                return string.format("élément %d d'un menu sans title ni separator (relevé dans AgViewUtils.getPopupMenu)", k)
+            end
+            if item.enabled ~= nil and type(item.enabled) ~= 'boolean' then
+                return string.format("élément %d d'un menu : enabled doit être un booléen", k)
+            end
+        elseif type(item) ~= 'string' and type(item) ~= 'number' then
+            return string.format("élément %d d'un menu : %s", k, type(item))
+        end
+    end
+    return nil
+end
+
 -- Les attributs de ATTRIBUTS_TEXTE, tels quels ; nil si l'un est lié (vérifié à l'ouverture).
 local function valeursSansLiaison(args)
     local v = {}
@@ -416,6 +440,10 @@ local function verifierCreation(genre, args)
     local v = valeursSansLiaison(args)
     if v then
         local refus = (genre == 'static_text' and S.refusEmphase(v)) or (S.BOUTONS[genre] and S.refusIcone(v)) or nil
+        assert(not refus, refus)
+    end
+    if genre == 'popup_menu' then
+        local refus = S.refusElements(args.items)
         assert(not refus, refus)
     end
 end
@@ -776,6 +804,18 @@ local function ouvrirFenetre(args)
             end
         end
     end
+    -- Les éléments liés d'un menu : à l'ouverture, puis à chaque nouvelle valeur (S.refusElements).
+    for _, vue in ipairs(liste) do
+        local lien = vue.genre == 'popup_menu' and vue.args.items
+        if type(lien) == 'table' and lien.liaison then
+            local function verifier()
+                return S.refusElements(evaluerAttribut(lien, fenetre.vues[vue].objet))
+            end
+            refus = verifier()
+            assert(not refus, refus)
+            suivre(lien, fenetre.vues[vue].objet, verifier)
+        end
+    end
     for o, cles in pairs(suivies) do
         for k, verifications in pairs(cles) do
             o:addObserver(k, function()
@@ -1009,6 +1049,43 @@ function S.cliquer(vue)
         valider(fenetre, fenetre.focus)
     end
     return geste()
+end
+
+-- Un choix dans un popup_menu : l'élément de cette valeur (ni séparateur, ni grisé : relevé dans
+-- AgViewUtils.getPopupMenu, un élément `enabled = false` ne se choisit pas), sur un menu montré et
+-- actif. Comme un clic (S.cliquer), un champ tapé sans Retour est d'abord validé (supposé pour un
+-- menu : constaté le 21 octobre 2026, D3, pour un calque, un bouton radio, un segment et un
+-- bouton) ; puis la valeur passe de la vue à la table (son transform, puis ses observateurs, qui ne
+-- suivent que si elle change, comme pour un radio déjà coché). Rend vrai.
+function S.choisir(menu, valeur)
+    local fenetre = fenetreDe(menu, 'S.choisir')
+    assert(menu.genre == 'popup_menu', "S.choisir : pas un menu : " .. menu.genre)
+    verifierGeste(fenetre, menu, 'choix')
+    local items = evaluerAttribut(menu.args.items, fenetre.vues[menu].objet)
+    local refus = S.refusElements(items)
+    assert(not refus, refus)
+    local trouve
+    for _, item in ipairs(items or {}) do
+        local v = type(item) == 'table' and (item.value == nil and item or item.value) or item
+        if type(item) == 'table' and not item.separator and v == valeur then
+            assert(item.enabled ~= false, "S.choisir : élément grisé : " .. tostring(item.title))
+            trouve = item
+        elseif type(item) ~= 'table' and item == valeur then
+            trouve = item
+        end
+    end
+    assert(trouve ~= nil, "S.choisir : aucun élément de valeur " .. tostring(valeur))
+    if fenetre.focus and fenetre.focus ~= menu then
+        valider(fenetre, fenetre.focus)
+    end
+    ecrireValeur(fenetre, menu, valeur)
+    return true
+end
+
+-- Les éléments d'un menu, évalués dans la table de sa fenêtre ouverte (titres et valeurs).
+function S.elementsDe(menu)
+    local fenetre = fenetreDe(menu, 'S.elementsDe')
+    return evaluerAttribut(menu.args.items, fenetre.vues[menu].objet)
 end
 
 modules.LrDialogs = {

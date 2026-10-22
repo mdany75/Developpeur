@@ -117,10 +117,11 @@ end
 --   « Pourquoi ? » à droite d'une étape (`q..i`), un carré small dans une rangée poussée à droite
 --   par margin_left (constaté le 21 octobre 2026, D6 : il répond, et la rangée ne prend pas les
 --   clics du texte) ; la rangée d'actions selon `x..i` (« ☆ Voir la note », « Leçon de la photo »,
---   ou les deux), en variantes superposées.
+--   ou les deux ; « ＋ Garder la demande » à droite après une retouche : Fil.lireActions), en
+--   variantes superposées.
 -- Un clic sur le texte est réparti par Fenetre.cliquerLigne (image dans l'aperçu, ligne du carnet,
--- leçon, étape, sinon détail d'un outil) ; les boutons appellent F.pourquoi, F.voirNote et
--- F.voirLecon, qui relisent la ligne.
+-- leçon, étape, sinon détail d'un outil) ; les boutons appellent F.pourquoi, F.voirNote,
+-- F.voirLecon et F.garderDemande, qui relisent la ligne.
 function Vues.ligneFil(f, F, i, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local largeur = D.texteFil
@@ -172,8 +173,15 @@ function Vues.ligneFil(f, F, i, D)
     }
     -- Les actions d'une notation et d'une leçon : « ☆ Voir la note » (onglet Note), « Leçon de la
     -- photo » (onglet Leçon), ou les deux, à la place des icônes de la maquette (un glyphe dans le
-    -- titre : une icône d'image_name chevaucherait le titre, constaté B3).
+    -- titre : une icône d'image_name chevaucherait le titre, constaté B3). Après une retouche,
+    -- « ＋ Garder la demande » (Mes demandes) au bout de la même ligne, à droite, comme
+    -- « Pourquoi ? » au bout d'une étape : une rangée poussée par margin_left (D6). Une vue masquée
+    -- garde sa place : après les deux autres, il lui faudrait une variante par place (quatre
+    -- boutons par ligne au lieu d'un).
     local actions = 'x' .. i
+    local function base(test)
+        return F.condition(actions, function(v) return test(F.lireActions(v)) end)
+    end
     local function voirNote(visible)
         return F.bouton(f, { carre = true, size = 'small', title = "☆ Voir la note", font = P.petit, width = D.voirNote,
             tooltip = "La note proposée de la photo active, dans l'onglet Note", visible = visible, action = function() F.voirNote(i) end })
@@ -185,9 +193,16 @@ function Vues.ligneFil(f, F, i, D)
     end
     texte[#texte + 1] = f:column {
         place = 'overlapping',
-        f:row { spacing = D.ecartActions, voirNote(F.condition(actions, function(v) return v == 'note' or v == 'les deux' end)),
-            voirLecon(F.egal(actions, 'les deux')) },
-        f:row { voirLecon(F.egal(actions, 'lecon')) },
+        f:row { spacing = D.ecartActions, voirNote(base(function(b) return b == 'note' or b == 'les deux' end)),
+            voirLecon(base(function(b) return b == 'les deux' end)) },
+        f:row { voirLecon(base(function(b) return b == 'lecon' end)) },
+        f:row {
+            margin_left = largeur - D.garderDemande,
+            F.bouton(f, { carre = true, size = 'small', title = "＋ Garder la demande", font = P.petit, width = D.garderDemande,
+                tooltip = "Garder la demande de Claude dans Mes demandes (à droite de Style), pour la refaire sur une autre photo",
+                visible = F.condition(actions, function(v) return select(2, F.lireActions(v)) end),
+                action = function() F.garderDemande(i) end }),
+        },
     }
     return f:row {
         spacing = 0,
@@ -537,6 +552,19 @@ function Vues.style(f, F, D)
         tooltip = "Style de retouche joint à chaque demande, invites comprises (Standard : rien d'ajouté)" }
 end
 
+-- Le menu Mes demandes (D.mesDemandes de large, demandé par Dany le 22 octobre 2026), à droite du
+-- menu Style : les demandes personnelles de Dany (« Nom — description », `mesDemandesItems`, refaits
+-- par Fenetre.rafraichirMesDemandes), un séparateur, puis Ajouter…, Renommer… et Supprimer… ; son
+-- titre « Mes demandes » quand rien n'est choisi. Choisir une demande la met dans le champ, sans
+-- l'envoyer (Fenetre.choisirMesDemandes) ; le menu revient à son titre. Sa valeur passe par
+-- F.lierRadio, comme le Mode : un choix, même du titre, annule l'envoi de la demande que ce clic
+-- aurait validée. Grisé pendant que Claude travaille.
+function Vues.mesDemandes(f, F, D)
+    return f:popup_menu { items = F.bind 'mesDemandesItems', value = F.lierRadio 'mesDemandes', width = D.mesDemandes,
+        enabled = F.bind 'libre', place_vertical = 0.5,
+        tooltip = "Mes demandes : une demande choisie remplit le champ (Retour l'envoie) ; Ajouter…, Renommer… et Supprimer… en bas du menu" }
+end
+
 -- ▲ et ▼ en petit, pour faire défiler un texte trop long d'une carte (clés `cle .. 'Monte'` et
 -- `cle .. 'Descend'`, action F.defilerTexte(cle, sens)).
 function Vues.fleches(f, F, cle)
@@ -566,8 +594,9 @@ function Vues.envoi(f, F, D)
 end
 
 -- La zone de saisie (marges 12/20/14) : les invites, le champ de demande sur deux lignes
--- (`immediate = false` : Retour le valide, Fenetre.saisieValidee), puis 📎 et 📋 (carrés à icône
--- seule), « Style » et son menu, le bandeau, Envoyer.
+-- (`immediate = false` : Retour le valide, Fenetre.saisieValidee ; sa valeur passe par
+-- F.lierSaisie, pour une demande mise par Mes demandes), puis 📎 et 📋 (carrés à icône seule),
+-- « Style » et son menu, Mes demandes, le bandeau, Envoyer.
 function Vues.saisie(f, F, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     return f:column {
@@ -575,7 +604,7 @@ function Vues.saisie(f, F, D)
         margin_top = 12,
         spacing = 8,
         Vues.invites(f, F, D),
-        f:edit_field { value = bind 'saisie', immediate = false, height_in_lines = 2, width = D.champ, enabled = bind 'libre',
+        f:edit_field { value = F.lierSaisie(), immediate = false, height_in_lines = 2, width = D.champ, enabled = bind 'libre',
             placeholder_string = "Demander à Claude… (par exemple : « Retouche la photo active, rendu naturel »)",
             tooltip = "Retour envoie la demande. Dictée : touche 🌐 deux fois." },
         f:row {
@@ -590,6 +619,8 @@ function Vues.saisie(f, F, D)
             f:static_text { title = "Style", font = P.systeme12, text_color = C.grisEntete, width = D.etiquetteStyle, place_vertical = 0.5 },
             f:spacer { width = 6 },
             Vues.style(f, F, D),
+            f:spacer { width = 8 },
+            Vues.mesDemandes(f, F, D),
             f:spacer { width = 8 },
             Vues.bandeau(f, F, D.bandeau),
             f:spacer { width = 8 },

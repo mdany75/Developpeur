@@ -246,8 +246,9 @@ function Fil.couper(texte, largeur, police, retrait, emphase, ouvert)
 end
 
 -- Un texte tronqué à `largeur` points : tel quel s'il tient, sinon son plus long début suivi de
--- « … » ('' si même « … » ne tient pas). Sans balise.
-local function tronquer(texte, largeur, police)
+-- « … » ('' si même « … » ne tient pas). Sans balise. Aussi pour les éléments du menu Mes demandes
+-- (Fenetre.titreDemande).
+function Fil.tronquer(texte, largeur, police)
     if Fil.largeur(texte, police) <= largeur then
         return texte
     end
@@ -260,6 +261,7 @@ local function tronquer(texte, largeur, police)
     end
     return (Texte.debut(texte, n):gsub('%s+$', '')) .. '…'
 end
+local tronquer = Fil.tronquer
 
 -- Un texte sur une seule ligne : coupé par « … » s'il dépasse.
 local function uneLigne(texte, largeur, police)
@@ -881,14 +883,44 @@ end
 -- vide pour son heure. Un tour de Claude qui a rangé des notes (élément `notation`) ou donné une
 -- leçon (élément `lecon` fait) finit par sa ligne d'actions, comme dans la maquette : « ☆ Voir la
 -- note », « Leçon de la photo », ou les deux (`actions` : 'note', 'lecon', 'les deux' ; `notation`
--- et `lecon` : les indices de la dernière notation et de la dernière leçon du tour). Ces lignes
--- (auteur, heure, actions) sont faites à chaque appel, sur des copies : les lignes gardées dans le
--- cache ne changent pas.
+-- et `lecon` : les indices de la dernière notation et de la dernière leçon du tour). Un tour qui a
+-- retouché (Conversation.estRetouche) et dont le texte de Claude finit par « Demande à garder :
+-- « … » » (Conversation.demandeAGarder) y gagne « ＋ Garder la demande » (Mes demandes, demandé par
+-- Dany le 22 octobre 2026) : `actions` prend le suffixe '+demande' ('demande' seule, 'note+demande',
+-- 'lecon+demande', 'les deux+demande', Fil.valeurActions), `demande` l'indice de ce texte. Ces
+-- lignes (auteur, heure, actions) sont faites à chaque appel, sur des copies : les lignes gardées
+-- dans le cache ne changent pas.
+
+-- La valeur `actions` d'une ligne d'actions : 'note', 'lecon', 'les deux', avec '+demande' quand
+-- elle porte « ＋ Garder la demande » ('demande' seule) ; nil sans rien.
+function Fil.valeurActions(notation, lecon, demande)
+    local base = (notation and lecon) and 'les deux' or (notation and 'note') or (lecon and 'lecon') or nil
+    if demande then
+        return base and (base .. '+demande') or 'demande'
+    end
+    return base
+end
+
+-- Ce que montre une valeur `actions` : sa base ('note', 'lecon', 'les deux' ou '') et vrai si
+-- « ＋ Garder la demande » y est (Vues.ligneFil).
+function Fil.lireActions(valeur)
+    valeur = tostring(valeur or '')
+    if valeur == 'demande' then
+        return '', true
+    end
+    local base = valeur:match('^(.-)%+demande$')
+    if base then
+        return base, true
+    end
+    return valeur, false
+end
+
 function Fil.lignes(c, largeur, cache)
     largeur = largeur - Fil.MARGE
     local lignes, tours = {}, {}
     local precedent, auteurPrecedent
-    -- Les actions du tour de Claude en cours.
+    -- Les actions du tour de Claude en cours (notation, lecon, demande : des indices d'éléments ;
+    -- retouche : vrai si le tour a retouché).
     local actions = {}
     local function pousser(e, siennes, auteur, date)
         if precedent and not colles(precedent, e) then
@@ -903,12 +935,14 @@ function Fil.lignes(c, largeur, cache)
         precedent, auteurPrecedent = e, auteur
     end
     local function finirTour()
-        if not (actions.notation or actions.lecon) then
+        local demande = actions.retouche and actions.demande or nil
+        if not (actions.notation or actions.lecon or demande) then
+            actions = {}
             return
         end
-        local quoi = (actions.notation and actions.lecon) and 'les deux' or (actions.notation and 'note' or 'lecon')
-        local ligne = { genre = 'actions', texte = '', element = actions.lecon or actions.notation, actions = quoi,
-            notation = actions.notation, lecon = actions.lecon }
+        local quoi = Fil.valeurActions(actions.notation, actions.lecon, demande)
+        local ligne = { genre = 'actions', texte = '', element = actions.lecon or actions.notation or demande, actions = quoi,
+            notation = actions.notation, lecon = actions.lecon, demande = demande }
         if auteurPrecedent == 'claude' then
             lignes[#lignes + 1] = ligne
         else
@@ -940,6 +974,10 @@ function Fil.lignes(c, largeur, cache)
             actions.notation, actions.date = i, actions.date or e.date
         elseif e.genre == 'lecon' and e.etat == 'fait' then
             actions.lecon, actions.date = i, actions.date or e.date
+        elseif Conversation.estRetouche(e) then
+            actions.retouche = true
+        elseif e.genre == 'claude' and not e.partiel and Conversation.demandeAGarder(e.texte) then
+            actions.demande, actions.date = i, actions.date or e.date
         end
         if #siennes > 0 then
             pousser(e, siennes, auteur, e.date)

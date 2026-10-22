@@ -877,6 +877,129 @@ function Conversation.estEtape(e)
     return e.etat == 'enCours' and not info.ancienne and info.etape ~= nil and not SANS_REPERE_EN_COURS[e.outil]
 end
 
+-- Vrai pour une retouche faite (Mes demandes, « ＋ Garder la demande ») : l'appel d'un outil qui
+-- change l'image (Conversation.OUTILS_ETAPES, sauf les classements), abouti, avec au moins une étape
+-- écrite dans sa réponse ; match_series, dont la réponse ne porte pas d'etape_id, compte une fois
+-- abouti. Une proposition (preview_settings), une notation, un classement ou une leçon n'en sont pas.
+function Conversation.estRetouche(e)
+    if type(e) ~= 'table' or e.genre ~= 'outil' or e.etat ~= 'fait' or not Conversation.OUTILS_ETAPES[e.outil]
+        or Conversation.CLASSEMENTS[e.outil] then
+        return false
+    end
+    return e.outil == 'match_series' or #Conversation.infoEtape(e).etapes > 0
+end
+
+-- La demande à garder (Mes demandes, demandé par Dany le 22 octobre 2026) ----------------------
+-- Après une retouche, Claude finit sa réponse par une ligne « Demande à garder : « … » » (section
+-- « Demande à garder » des consignes) : une demande réutilisable qui referait son travail sur une
+-- photo semblable. La fenêtre la reconnaît dans le texte de Claude et offre « ＋ Garder la demande »
+-- sur la ligne d'actions de son tour (Fil.lignes), qui ouvre la fenêtre Ajouter… pré-remplie
+-- (Fenetre.garderDemande, Conversation.preparerDemande). La ligne reste dans le fil : Dany la lit.
+
+Conversation.LIGNE_DEMANDE = "Demande à garder"
+
+-- Les guillemets acceptés autour de la demande : « … », “…”, "…".
+local GUILLEMETS = { { '«', '»' }, { '“', '”' }, { '"', '"' } }
+
+-- La demande d'une ligne « Demande à garder : « … » » (gras ou puce Markdown tolérés autour), nil
+-- si la ligne n'en est pas une ou si sa demande est vide.
+local function demandeDeLaLigne(ligne)
+    -- Les espaces insécables de la typographie française (avant « : », dans « … ») : des espaces.
+    ligne = tostring(ligne or ''):gsub('\194\160', ' '):gsub('\226\128\175', ' ')
+    local reste = Texte.nettoyer(ligne):gsub('^[-*_%s]+', '')
+    local marque = Conversation.LIGNE_DEMANDE
+    if reste:sub(1, #marque) ~= marque then
+        return nil
+    end
+    reste = Texte.nettoyer(reste:sub(#marque + 1):gsub('^[*_%s]+', ''))
+    if reste:sub(1, 1) ~= ':' then
+        return nil
+    end
+    reste = Texte.nettoyer(reste:sub(2)):gsub('^[*_%s]+', ''):gsub('[*_%s]+$', '')
+    -- Entre guillemets, un point final après eux compris (« … ».).
+    for _, g in ipairs(GUILLEMETS) do
+        local ouvre, ferme = g[1], g[2]
+        local t = reste:sub(-#ferme) == ferme and reste or reste:gsub('%.$', '')
+        if t:sub(1, #ouvre) == ouvre and #t > #ouvre + #ferme and t:sub(-#ferme) == ferme then
+            reste = t:sub(#ouvre + 1, -#ferme - 1)
+            break
+        end
+    end
+    reste = Texte.nettoyer(reste)
+    -- Le gabarit des consignes répété tel quel (« <ta demande> ») n'est pas une demande.
+    if reste == '' or (reste:sub(1, 1) == '<' and reste:sub(-1) == '>') or reste == '…' then
+        return nil
+    end
+    return reste
+end
+
+-- La demande à garder d'un texte de Claude (la dernière, s'il en écrit plusieurs), nil sans elle.
+function Conversation.demandeAGarder(texte)
+    local trouvee
+    for _, ligne in ipairs(Texte.lignes(texte or '')) do
+        trouvee = demandeDeLaLigne(ligne) or trouvee
+    end
+    return trouvee
+end
+
+-- Les mots d'un texte, dans l'ordre.
+local function mots(texte)
+    local liste = {}
+    for mot in tostring(texte or ''):gmatch('%S+') do
+        liste[#liste + 1] = mot
+    end
+    return liste
+end
+
+-- Des mots mis bout à bout jusqu'à `n` caractères ; « … » au bout s'il en reste.
+local function debutEnMots(liste, n)
+    local texte = ''
+    for k, mot in ipairs(liste) do
+        local essai = texte == '' and mot or (texte .. ' ' .. mot)
+        if Texte.longueur(essai) > n then
+            return texte == '' and Texte.raccourcir(mot, n) or (texte:gsub('[,;:.%s]+$', '') .. '…')
+        end
+        texte = essai
+        if k == #liste then
+            return texte
+        end
+    end
+    return texte
+end
+
+-- Le nom proposé d'une demande au plus ; sa description proposée au plus (caractères).
+Conversation.NOM_DEMANDE = 40
+Conversation.DESCRIPTION_DEMANDE = 60
+-- Les mots du nom proposé d'une demande sans « : ».
+Conversation.MOTS_NOM_DEMANDE = 4
+
+-- La fenêtre Ajouter… pré-remplie d'une demande à garder : { nom, description, texte }. Le nom est
+-- ce qui précède « : » (« Retouche ce portrait en intérieur »), sinon ses premiers mots ; la
+-- description, la suite, raccourcie (« simulation PROVIA, balance plus neutre, … »). Dany les change
+-- avant de garder ; un nom déjà pris se règle à l'ouverture de la fenêtre (Stockage.nomLibre).
+function Conversation.preparerDemande(demande)
+    local texte = Texte.nettoyer(demande)
+    local avant, apres = texte:match('^([^:\n]-)%s*:%s*(.+)$')
+    local nom, suite
+    if avant and Texte.nettoyer(avant) ~= '' and Texte.longueur(avant) <= Conversation.NOM_DEMANDE then
+        nom, suite = Texte.nettoyer(avant), apres
+    else
+        local liste = mots(texte)
+        local premiers, reste = {}, {}
+        for k, mot in ipairs(liste) do
+            if k <= Conversation.MOTS_NOM_DEMANDE then
+                premiers[#premiers + 1] = mot
+            else
+                reste[#reste + 1] = mot
+            end
+        end
+        nom, suite = table.concat(premiers, ' '), table.concat(reste, ' ')
+    end
+    nom = debutEnMots(mots((nom:gsub('[,;:.!?…%s]+$', ''))), Conversation.NOM_DEMANDE)
+    local description = debutEnMots(mots((tostring(suite or ''):gsub('%s+', ' '))), Conversation.DESCRIPTION_DEMANDE)
+    return { nom = nom, description = (description:gsub('%.$', '')), texte = texte }
+end
+
 -- Les étapes de la conversation pour une photo, dans l'ordre du fil : { element (indice),
 -- elementId, photo, id, nom, fichier, etape, raison, changements, outil, annulee, enCours,
 -- ancienne }. Un appel en cours compte pour toute photo (sa photo n'est connue qu'à la réponse).

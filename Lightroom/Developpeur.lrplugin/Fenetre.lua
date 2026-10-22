@@ -329,10 +329,11 @@ function Fenetre.parCalque(fn)
     return parCalque[fn] == true
 end
 
--- La valeur liée d'un bouton radio (clé `cle`). Un clic de l'utilisateur la pousse de la vue vers
--- la table, et ce clic a validé le champ de demande (constaté le 21 octobre 2026, D3) : l'envoi
--- automatique s'annule ici, à chaque clic. L'observateur de la clé ne suffit pas : sur un radio
--- déjà coché, la valeur ne change pas et la table ne prévient pas ses observateurs (supposé, comme
+-- La valeur liée d'un bouton radio (clé `cle`), ou du menu Mes demandes. Un clic de l'utilisateur
+-- la pousse de la vue vers la table, et ce clic a validé le champ de demande (constaté le
+-- 21 octobre 2026, D3, pour un radio ; supposé pour un menu) : l'envoi automatique s'annule ici, à
+-- chaque clic. L'observateur de la clé ne suffit pas : sur un radio déjà coché (ou le titre du menu
+-- rechoisi), la valeur ne change pas et la table ne prévient pas ses observateurs (supposé, comme
 -- la simulation), et la demande tapée partirait 0,3 s plus tard. La fenêtre qui pose la valeur
 -- (de la table vers la vue) n'annule rien.
 function Fenetre.lierRadio(cle)
@@ -346,6 +347,29 @@ function Fenetre.lierRadio(cle)
         end,
     }
 end
+
+-- La valeur liée du champ de demande (Vues.saisie). Une demande que Mes demandes y a mise
+-- (Fenetre.demandeMise, Fenetre.mettreDemande) part par Retour comme une demande tapée : validé
+-- sans y rien changer, le champ ne change pas la clé, et la table ne prévient pas son observateur
+-- (supposé, comme la simulation) ; la valeur poussée du champ vers la table passe ici, et lance
+-- l'envoi automatique (Fenetre.saisieValidee). Tapée ou changée, la demande passe par
+-- l'observateur de la clé, comme avant.
+function Fenetre.lierSaisie()
+    return bind {
+        key = 'saisie',
+        transform = function(valeur, depuisTable)
+            local p = Fenetre.p
+            if not depuisTable and Fenetre.demandeMise ~= nil and valeur == Fenetre.demandeMise and p and p.saisie == valeur then
+                Fenetre.saisieValidee(valeur)
+            end
+            return valeur
+        end,
+    }
+end
+
+-- Ce que montre la ligne d'actions d'un tour de Claude (Vues.ligneFil) : sa base et « ＋ Garder la
+-- demande » (Fil.lireActions).
+Fenetre.lireActions = Fil.lireActions
 
 -- Une clé de la fenêtre que pose une pièce elle-même (l'enfoncement d'un bouton bleu) : sa valeur
 -- avant l'ouverture, comme toute clé liée.
@@ -4132,6 +4156,7 @@ function Fenetre.envoyerSaisie()
         return
     end
     local texte = p.saisie
+    Fenetre.demandeMise = nil
     Fenetre.ignorerSaisie = true
     p.saisie = ''
     Fenetre.ignorerSaisie = false
@@ -4227,6 +4252,335 @@ function Fenetre.supprimer()
         end
         Fenetre.aRafraichir = true
     end
+end
+
+-- Mes demandes ---------------------------------------------------------------------------------
+-- Le menu Mes demandes (demandé par Dany le 22 octobre 2026), à droite du menu Style sous le champ
+-- (Vues.mesDemandes) : les demandes personnelles de Dany, rangées dans mes-demandes.json
+-- (Stockage.lua, section « Mes demandes »), relues à chaque ouverture de la fenêtre. Ses éléments
+-- (Fenetre.elementsMesDemandes, tables neuves) : son titre « Mes demandes » (la valeur montrée quand
+-- rien n'est choisi), un séparateur, chaque demande « Nom — description » coupée à la largeur du
+-- menu (Fenetre.titreDemande), un séparateur, puis Ajouter…, Renommer… et Supprimer… ; sans demande,
+-- « Aucune demande gardée » grisé, puis Ajouter… seul. Séparateur et élément grisé : { separator =
+-- true } et enabled = false, relevés dans AgViewUtils.getPopupMenu de Lightroom 15.6.
+-- Choisir une demande la met dans le champ, à la place du texte tapé, sans l'envoyer
+-- (Fenetre.mettreDemande ; Retour l'envoie, Fenetre.lierSaisie) ; le menu revient à son titre, pour
+-- rechoisir la même. Ajouter…, Renommer… et Supprimer… ouvrent chacun une petite fenêtre, dans une
+-- tâche. Après une retouche, « ＋ Garder la demande » de la ligne d'actions du tour de Claude
+-- (Fenetre.garderDemande) ouvre Ajouter… pré-rempli de la demande que Claude a donnée
+-- (Conversation.demandeAGarder, Conversation.preparerDemande).
+
+Fenetre.MES_DEMANDES = "Mes demandes"
+-- La valeur du menu quand rien n'est choisi : son titre.
+Fenetre.MENU_TITRE = 'titre'
+Fenetre.AUCUNE_DEMANDE_GARDEE = "Aucune demande gardée"
+-- La place des flèches et des bords d'un menu local, ôtée de sa largeur pour le titre d'une demande.
+Fenetre.FLECHES_MENU = 32
+-- Les messages du bandeau (deux lignes de petit texte : essais-mes-demandes.lua).
+Fenetre.DEMANDE_DANS_LE_CHAMP = "Demande mise dans le champ : changez-la au besoin, Retour l'envoie."
+Fenetre.DEMANDE_GARDEE = "Demande gardée dans Mes demandes, à droite de Style."
+Fenetre.DEMANDE_CHANGEE = "Demande changée dans Mes demandes."
+Fenetre.DEMANDE_RETIREE = "Demande retirée de Mes demandes."
+Fenetre.AUCUNE_DEMANDE = "Aucune demande gardée : Ajouter… de Mes demandes en garde une."
+Fenetre.DEMANDES_ILLISIBLES = "Mes demandes illisibles : le fichier sera mis de côté à la prochaine écriture."
+-- Sous les champs de la fenêtre Ajouter… et Renommer….
+Fenetre.AIDE_DEMANDE = "Choisie dans Mes demandes, la demande remplit le champ de demande, sans partir : Retour l'envoie."
+
+-- Le titre d'une demande dans le menu : « Nom — description », coupé par « … » pour tenir dans
+-- `largeur` (celle du menu, moins ses flèches), mesuré dans la police du menu ('texte', 13) ; le nom
+-- seul s'il ne laisse pas de place à la description, ou sans description.
+function Fenetre.titreDemande(d, largeur)
+    local place = largeur - Fenetre.FLECHES_MENU
+    local nom = Fil.tronquer(d.nom or '', place, 'texte')
+    local description = Texte.nettoyer(d.description)
+    if nom ~= d.nom or description == '' then
+        return nom
+    end
+    local debut = nom .. ' — '
+    local reste = place - Fil.largeur(debut, 'texte')
+    local coupe = reste > 0 and Fil.tronquer(description, reste, 'texte') or ''
+    if coupe == '' or coupe == '…' then
+        return nom
+    end
+    return debut .. coupe
+end
+
+-- Les éléments du menu, en tables neuves (Lightroom bloque sur une table relue par Json.decode).
+function Fenetre.elementsMesDemandes(liste, largeur)
+    local items = { { title = Fenetre.MES_DEMANDES, value = Fenetre.MENU_TITRE }, { separator = true } }
+    if #liste == 0 then
+        items[#items + 1] = { title = Fenetre.AUCUNE_DEMANDE_GARDEE, value = 'aucune', enabled = false }
+    else
+        for k, d in ipairs(liste) do
+            items[#items + 1] = { title = Fenetre.titreDemande(d, largeur), value = k }
+        end
+    end
+    items[#items + 1] = { separator = true }
+    items[#items + 1] = { title = "Ajouter…", value = 'ajouter' }
+    if #liste > 0 then
+        items[#items + 1] = { title = "Renommer…", value = 'renommer' }
+        items[#items + 1] = { title = "Supprimer…", value = 'supprimer' }
+    end
+    return items
+end
+
+-- Les demandes dans le menu (la liste lue, Fenetre.mesDemandesLues).
+function Fenetre.rafraichirMesDemandes(liste)
+    Fenetre.mesDemandesLues = liste
+    local p, T = Fenetre.p, Fenetre.T
+    if p and T then
+        p.mesDemandesItems = Fenetre.elementsMesDemandes(liste, T.mesDemandes)
+    end
+end
+
+-- Relit mes-demandes.json et refait le menu ; un fichier illisible se dit au bandeau. Rend la liste.
+function Fenetre.lireMesDemandes()
+    local liste, illisible = Stockage.lireDemandes()
+    Fenetre.rafraichirMesDemandes(liste)
+    if illisible and Fenetre.p then
+        Fenetre.p.message = Fenetre.DEMANDES_ILLISIBLES
+    end
+    return liste
+end
+
+-- Un choix dans le menu (l'observateur de `mesDemandes`) : une demande (son indice), Ajouter…,
+-- Renommer… ou Supprimer… ; le titre ne fait rien. Le menu revient à son titre.
+function Fenetre.choisirMesDemandes(valeur)
+    local p = Fenetre.p
+    if not p or valeur == nil or valeur == Fenetre.MENU_TITRE then
+        return false
+    end
+    Fenetre.annulerEnvoiAuto()
+    p.mesDemandes = Fenetre.MENU_TITRE
+    if Moteur.travaille then
+        p.message = Fenetre.CLAUDE_TRAVAILLE
+        return false
+    end
+    if type(valeur) == 'number' then
+        local d = (Fenetre.mesDemandesLues or {})[valeur]
+        return d ~= nil and Fenetre.mettreDemande(d)
+    elseif valeur == 'ajouter' then
+        enTache(Fenetre.ajouterDemande, { texte = p.saisie })
+    elseif valeur == 'renommer' then
+        enTache(Fenetre.renommerDemande)
+    elseif valeur == 'supprimer' then
+        enTache(Fenetre.supprimerDemande)
+    end
+    return true
+end
+
+-- Met une demande dans le champ, à la place de ce qui y est, sans l'envoyer : ni envoi automatique
+-- (la clé posée sous Fenetre.ignorerSaisie), ni bouton ; Retour l'envoie (Fenetre.lierSaisie).
+function Fenetre.mettreDemande(d)
+    local p = Fenetre.p
+    if not p then
+        return false
+    end
+    Fenetre.annulerEnvoiAuto()
+    Fenetre.demandeMise = d.texte
+    Fenetre.ignorerSaisie = true
+    p.saisie = d.texte
+    Fenetre.ignorerSaisie = false
+    p.message = Fenetre.DEMANDE_DANS_LE_CHAMP
+    return true
+end
+
+-- La raison d'un refus d'une demande (Stockage.refusDemande) dite en direct dans sa fenêtre, et
+-- le bouton d'action grisé tant qu'elle reste (`valide`).
+local function verifierDemande(q, liste)
+    local refus = Stockage.refusDemande(liste, { nom = q.nom, texte = q.texte }, q.ancien)
+    q.erreur = refus or ''
+    q.valide = refus == nil
+end
+
+-- Le contenu de la fenêtre d'une demande : `avant` (le choix de Renommer…), puis Nom, Description
+-- et Texte, le refus et l'aide.
+local function contenuDemande(f, q, avant)
+    local function ligne(titre, vue)
+        return f:row { f:static_text { title = titre, width = 90, alignment = 'right' }, vue }
+    end
+    local colonne = { bind_to_object = q, spacing = f:control_spacing() }
+    for _, vue in ipairs(avant or {}) do
+        colonne[#colonne + 1] = vue
+    end
+    colonne[#colonne + 1] = ligne("Nom :", f:edit_field { value = bind 'nom', immediate = true, width_in_chars = 36,
+        placeholder_string = "Portrait en intérieur" })
+    colonne[#colonne + 1] = ligne("Description :", f:edit_field { value = bind 'description', immediate = true, width_in_chars = 48,
+        placeholder_string = "courte : montrée dans le menu, après le nom" })
+    colonne[#colonne + 1] = ligne("Texte :", f:edit_field { value = bind 'texte', immediate = true, width_in_chars = 60, height_in_lines = 6 })
+    colonne[#colonne + 1] = f:static_text { title = bind 'erreur', text_color = COULEURS.rouge, width_in_chars = 60 }
+    colonne[#colonne + 1] = f:static_text { title = Fenetre.AIDE_DEMANDE, width_in_chars = 60, height_in_lines = 2 }
+    return f:column(colonne)
+end
+
+-- Remplit les champs de la fenêtre d'une demande.
+local function remplirDemande(q, d)
+    q.nom, q.description, q.texte = d.nom or '', d.description or '', d.texte or ''
+end
+
+-- La fenêtre d'une demande, jusqu'à ce qu'elle se garde ou s'annule : `ecrire(q)` rend vrai et la
+-- liste écrite, ou faux et le refus, dit dans la fenêtre rouverte (les champs gardés). Rend vrai
+-- si la demande est écrite.
+local function fenetreDemande(q, titre, verbe, contenu, ecrire)
+    while true do
+        local reponse = LrDialogs.presentModalDialog {
+            title = titre,
+            contents = contenu(),
+            actionVerb = verbe,
+            actionBinding = { enabled = { bind_to_object = q, key = 'valide' } },
+        }
+        if reponse ~= 'ok' then
+            return false
+        end
+        local ok, r = ecrire(q)
+        if ok then
+            Fenetre.rafraichirMesDemandes(r)
+            return true
+        end
+        q.erreur = r
+    end
+end
+
+-- Ajouter… : une nouvelle demande, pré-remplie de `preremplie` ({ nom, description, texte } :
+-- le texte du champ depuis le menu, la demande de Claude depuis « ＋ Garder la demande »). Un nom
+-- proposé déjà pris en reçoit un libre (« … 2 »). Dans une tâche.
+function Fenetre.ajouterDemande(preremplie)
+    preremplie = preremplie or {}
+    local liste = Fenetre.lireMesDemandes()
+    local f = LrView.osFactory()
+    local gardee = false
+    LrFunctionContext.callWithContext('Claude · mes demandes', function(context)
+        local q = LrBinding.makePropertyTable(context)
+        remplirDemande(q, { nom = Stockage.nomLibre(liste, preremplie.nom or ''), description = preremplie.description,
+            texte = Texte.nettoyer(preremplie.texte) })
+        verifierDemande(q, liste)
+        for _, cle in ipairs({ 'nom', 'texte' }) do
+            q:addObserver(cle, function() verifierDemande(q, liste) end)
+        end
+        gardee = fenetreDemande(q, "Ajouter une demande", "Garder", function() return contenuDemande(f, q) end, function()
+            return Stockage.garderDemande({ nom = q.nom, description = q.description, texte = q.texte })
+        end)
+    end)
+    if gardee and Fenetre.p then
+        Fenetre.p.message = Fenetre.DEMANDE_GARDEE
+    end
+    return gardee
+end
+
+-- Le menu « Demande » d'une fenêtre de Renommer… ou Supprimer… : les noms, en tables neuves.
+local function choixDemandes(f, liste)
+    local items = {}
+    for k, d in ipairs(liste) do
+        items[k] = { title = d.nom, value = k }
+    end
+    return f:row { f:static_text { title = "Demande :", width = 90, alignment = 'right' },
+        f:popup_menu { value = bind 'choix', items = items, width = 300 } }
+end
+
+-- Renommer… : choisir une demande, puis changer son nom, sa description et son texte. Dans une
+-- tâche.
+function Fenetre.renommerDemande()
+    local liste = Fenetre.lireMesDemandes()
+    if #liste == 0 then
+        if Fenetre.p then
+            Fenetre.p.message = Fenetre.AUCUNE_DEMANDE
+        end
+        return false
+    end
+    local f = LrView.osFactory()
+    local changee = false
+    LrFunctionContext.callWithContext('Claude · mes demandes', function(context)
+        local q = LrBinding.makePropertyTable(context)
+        q.choix, q.ancien = 1, liste[1].nom
+        remplirDemande(q, liste[1])
+        verifierDemande(q, liste)
+        q:addObserver('choix', function(_, _, k)
+            local d = liste[k]
+            if d then
+                q.ancien = d.nom
+                remplirDemande(q, d)
+                verifierDemande(q, liste)
+            end
+        end)
+        for _, cle in ipairs({ 'nom', 'texte' }) do
+            q:addObserver(cle, function() verifierDemande(q, liste) end)
+        end
+        changee = fenetreDemande(q, "Renommer une demande", "Enregistrer", function() return contenuDemande(f, q, { choixDemandes(f, liste) }) end,
+            function() return Stockage.changerDemande(q.ancien, { nom = q.nom, description = q.description, texte = q.texte }) end)
+    end)
+    if changee and Fenetre.p then
+        Fenetre.p.message = Fenetre.DEMANDE_CHANGEE
+    end
+    return changee
+end
+
+-- Supprimer… : choisir une demande (son texte montré), puis confirmer. Dans une tâche.
+function Fenetre.supprimerDemande()
+    local liste = Fenetre.lireMesDemandes()
+    if #liste == 0 then
+        if Fenetre.p then
+            Fenetre.p.message = Fenetre.AUCUNE_DEMANDE
+        end
+        return false
+    end
+    local f = LrView.osFactory()
+    local choisie
+    LrFunctionContext.callWithContext('Claude · mes demandes', function(context)
+        local q = LrBinding.makePropertyTable(context)
+        q.choix, q.apercu = 1, liste[1].texte
+        q:addObserver('choix', function(_, _, k)
+            q.apercu = liste[k] and liste[k].texte or ''
+        end)
+        local reponse = LrDialogs.presentModalDialog {
+            title = "Supprimer une demande",
+            contents = f:column {
+                bind_to_object = q,
+                spacing = f:control_spacing(),
+                choixDemandes(f, liste),
+                f:static_text { title = bind 'apercu', width_in_chars = 60, height_in_lines = 4 },
+            },
+            actionVerb = "Supprimer…",
+        }
+        if reponse == 'ok' then
+            choisie = liste[q.choix]
+        end
+    end)
+    if not choisie then
+        return false
+    end
+    local confirme = LrDialogs.confirm("Supprimer la demande « " .. choisie.nom .. " » ?",
+        "Elle est retirée de Mes demandes ; les conversations et les photos ne changent pas.", "Supprimer", "Annuler")
+    if confirme ~= 'ok' then
+        return false
+    end
+    local ok, r = Stockage.retirerDemande(choisie.nom)
+    if not ok then
+        if Fenetre.p then
+            Fenetre.p.message = r
+        end
+        return false
+    end
+    Fenetre.rafraichirMesDemandes(r)
+    if Fenetre.p then
+        Fenetre.p.message = Fenetre.DEMANDE_RETIREE
+    end
+    return true
+end
+
+-- « ＋ Garder la demande » de la ligne i (la ligne d'actions d'un tour qui a retouché) : la fenêtre
+-- Ajouter… pré-remplie de la demande que Claude a donnée (nom et description proposés, texte),
+-- dans une tâche. Rend vrai si la ligne en porte une.
+function Fenetre.garderDemande(i)
+    Fenetre.annulerEnvoiAuto()
+    local l = ligneMontree(i)
+    local c = Moteur.courante
+    local e = l and l.demande and c and c.elements[l.demande]
+    local demande = e and e.genre == 'claude' and Conversation.demandeAGarder(e.texte)
+    if not demande then
+        return false
+    end
+    enTache(Fenetre.ajouterDemande, Conversation.preparerDemande(demande))
+    return true
 end
 
 -- Les autres fenêtres du module (le menu Fichier est réduit quand une fenêtre du module est devant).
@@ -4458,6 +4812,15 @@ function Fenetre.afficher()
         p.message = ''
         p.jointes = Fenetre.texteJointes()
         p.style = Consignes.style(prefs.styleChoisi) and prefs.styleChoisi or 'standard'
+        -- Mes demandes (22 octobre 2026) : relues à chaque ouverture, le menu sur son titre ; aucune
+        -- demande mise dans le champ.
+        local demandes, illisibles = Stockage.lireDemandes()
+        Fenetre.mesDemandesLues, Fenetre.demandeMise = demandes, nil
+        p.mesDemandes = Fenetre.MENU_TITRE
+        p.mesDemandesItems = Fenetre.elementsMesDemandes(demandes, D.mesDemandes)
+        if illisibles then
+            p.message = Fenetre.DEMANDES_ILLISIBLES
+        end
         -- Note à l'ouverture (D.ongletParDefaut), le troisième segment.
         p.onglet = D.ongletParDefaut
         p.libre = not Moteur.travaille
@@ -4531,10 +4894,19 @@ function Fenetre.afficher()
             Fenetre.annulerEnvoiAuto()
             Chemins.prefs().styleChoisi = valeur
         end)
+        -- Un choix dans Mes demandes : une demande dans le champ, ou une fenêtre (Ajouter…,
+        -- Renommer…, Supprimer…) ; jamais d'envoi.
+        p:addObserver('mesDemandes', function(_, _, valeur) Fenetre.choisirMesDemandes(valeur) end)
         -- Un clic sur un onglet n'envoie pas la demande validée par le clic ; l'aperçu suit
         -- l'onglet (Fenetre.ongletChange).
         p:addObserver('onglet', function(_, _, valeur) Fenetre.ongletChange(valeur) end)
-        p:addObserver('saisie', function(_, _, valeur) Fenetre.saisieValidee(valeur) end)
+        p:addObserver('saisie', function(_, _, valeur)
+            -- Une demande de Mes demandes changée dans le champ part comme une demande tapée.
+            if Fenetre.demandeMise ~= nil and valeur ~= Fenetre.demandeMise then
+                Fenetre.demandeMise = nil
+            end
+            Fenetre.saisieValidee(valeur)
+        end)
         for _, cle in ipairs({ 'message', 'aide', 'jointes' }) do
             p:addObserver(cle, function(proprietes) poser(proprietes, 'bandeau', Fenetre.etatBandeau(proprietes)) end)
         end

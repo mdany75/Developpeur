@@ -60,9 +60,14 @@ Dispositions.TAILLES = {
     -- Chaque ligne : la colonne auteur (« Vous », « Claude », l'heure) de 60, un écart de 12, puis
     -- le texte (maquette) ; « Pourquoi ? » à droite d'une étape, un carré small de 80 (constaté le
     -- 21 octobre 2026, D6 : bezel de 15 dans une case de 21), comme les boutons d'actions (« ☆ Voir
-    -- la note », « Leçon de la photo »), aux largeurs de leurs titres en petit.
+    -- la note », « Leçon de la photo », « ＋ Garder la demande » : 114 en petit, et 22 de jeu comme
+    -- les deux autres), aux largeurs de leurs titres en petit.
     hauteurLigne = 21, margeHautFil = 20, margeBasFil = 16,
-    auteur = 60, ecartAuteur = 12, pourquoi = 80, voirNote = 96, voirLecon = 116, ecartActions = 8,
+    auteur = 60, ecartAuteur = 12, pourquoi = 80, voirNote = 96, voirLecon = 116, garderDemande = 136, ecartActions = 8,
+    -- Le menu Mes demandes, à droite du menu Style sous le champ (demandé par Dany le 22 octobre
+    -- 2026) : assez large pour « Nom — petite description » (Fenetre.titreDemande coupe chaque
+    -- élément à sa largeur, moins la place de ses flèches) ; le bandeau prend ce qu'il laisse (324).
+    mesDemandes = 280,
     -- La liste des conversations (à recaler) : des cases de 40 points, autant que sa place en tient
     -- (D.cases, 22).
     hauteurCase = 40,
@@ -376,8 +381,8 @@ function Dispositions.dimensions()
     -- Centre : 1 024 utiles. L'en-tête : le titre (gras 16) et le Mode, puis les voyants Claude Code et
     -- Lightroom et la photo active, alignée à droite sur la marge (la rangée fait les 720 : un texte
     -- de taille fixe ne s'étire pas) ; le fil ; la barre, dont l'activité (ou le forfait) finit de
-    -- même sur la marge de droite, comme dans la maquette ; la saisie (Style, bandeau, Envoyer). Le
-    -- titre prend ce que le Mode laisse (D.placeMode, sa place à 1 280 × 800 : 590 − 270).
+    -- même sur la marge de droite, comme dans la maquette ; la saisie (Style, Mes demandes, bandeau,
+    -- Envoyer). Le titre prend ce que le Mode laisse (D.placeMode, sa place à 1 280 × 800 : 590 − 270).
     D.fil = D.centre - 2 * D.margeCentre
     D.placeMode = 320
     D.titre = D.fil - D.placeMode
@@ -401,7 +406,8 @@ function Dispositions.dimensions()
     D.style = 170
     D.etiquetteStyle = 30
     D.envoyer = Dispositions.IMAGES['bouton-bleu'].largeur
-    D.bandeau = D.fil - (D.joindre + 4 + D.joindre + 10 + D.etiquetteStyle + 6 + D.style + 8 + 8 + D.envoyer)
+    -- La rangée sous le champ : 📎 📋, « Style » et son menu, Mes demandes, le bandeau (324), Envoyer.
+    D.bandeau = D.fil - (D.joindre + 4 + D.joindre + 10 + D.etiquetteStyle + 6 + D.style + 8 + D.mesDemandes + 8 + 8 + D.envoyer)
     -- Colonne droite : le panneau de 528, à 14 du bord ; les segments centrés en tête, à cheval sur
     -- son bord (bande transparente de 12) ; son contenu de 498 sous une marge de 13 (12 + 1 + 22 =
     -- 35 depuis le haut des segments, comme la maquette) et à 15 du bord (14 + 1).
