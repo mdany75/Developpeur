@@ -1014,8 +1014,8 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   rapide ; ne jamais publier une archive non notarisée, ni construite avec `--sans-tests`.
 - Avant de pousser une fonctionnalité : README et `CHANGELOG.md` à jour, capture d'écran refaite
   dans Lightroom si l'interface a changé (`docs/capture.png` : la fenêtre Claude, sa seule
-  disposition, encore celle de la 1.2 : à refaire en fenêtre B, onglet Note ouvert, avant la 1.3 ;
-  `docs/carnet.png`, la page Carnet de progrès, à faire ; `publication.png`, `consommation.png`,
+  disposition, la fenêtre B de la 1.3 avec ses étapes, « Pourquoi ? » et la leçon de la photo ;
+  `docs/carnet.png`, la page Carnet de progrès ; `publication.png`, `consommation.png`,
   `suivi.png` : les autres fenêtres ; `seance.png` est retirée avec la Séance en 1.1.1,
   `atelier.png` et `panneau.png` avec l'Atelier et le Panneau en 1.2), et une nouvelle version si ce
   qu'on installe a changé.
@@ -1037,4 +1037,4 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
 - `.github/workflows/tests.yml` : syntaxe des scripts et les deux suites à chaque envoi sur `main` (macOS)
 - `build.sh` (tests, compilation, signature, archive notarisée), `install.sh`, `uninstall.sh`
 - `Resources/Info.plist` : identifiant `com.danymenard.mcp-developpeur` et version (incrusté par `-sectcreate` dans `Package.swift`)
-- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, les chantiers de la 1.3 et ce qui en reste à constater, et la fenêtre Claude (architecture, contraintes du SDK, fenêtre B et ses constats, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude, capture principale du README ; encore celle de la 1.2, à refaire en fenêtre B), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de suivi de la liaison) ; `carnet.png` (la page Carnet de progrès) est à faire
+- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, les chantiers de la 1.3 et ce qui en reste à constater, et la fenêtre Claude (architecture, contraintes du SDK, fenêtre B et ses constats, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude, fenêtre B de la 1.3, capture principale du README), `carnet.png` (la page Carnet de progrès), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de suivi de la liaison)

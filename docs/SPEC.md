@@ -464,8 +464,8 @@ Proposition, Note, Leçon), l'aperçu commun et la carte de l'onglet ; apparence
 Les sections Disposition, Voyants et liaison, Carte Note et Bas de la fenêtre décrivent la 1.2 :
 ce qui y a changé est dit en tête de chacune. Les cinq chantiers de la 1.3 ont chacun leur partie
 « dans la fenêtre » dans leur section (Pourquoi ?, Leçon de la photo, Je le fais, Composition lue,
-Carnet de progrès). `docs/capture.png` montre encore la fenêtre de la 1.2 : à refaire, comme la
-capture de la page Carnet de progrès (`docs/carnet.png`, prévue).
+Carnet de progrès). `docs/capture.png` montre la fenêtre B de la 1.3 (une retouche, ses étapes
+avec « Pourquoi ? » et la leçon de la photo), et `docs/carnet.png` la page Carnet de progrès.
 
 ### Relais vers Claude Code
 

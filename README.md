@@ -235,6 +235,8 @@ vous-même.
   voulue sombre) et du ciel brûlé (plus de 3 % du tiers haut en blanc pur) sont provisoires : aucun
   vrai cas parmi les photos d'essai.
 
+![Le Carnet de progrès dans la fenêtre Claude](docs/carnet.png)
+
 ### Ce que Claude sait faire par le connecteur
 
 Les mêmes 36 outils servent dans la fenêtre Claude, dans Claude Desktop et dans Claude Code. Neuf
