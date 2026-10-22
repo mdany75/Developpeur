@@ -1023,7 +1023,9 @@ la maquette, qui reste la référence de l'allure.
   1 497 × 1 200).
 
 La fenêtre construite (simulation) compte 2 317 vues, dont 1 490 simples (1 368 et 857 à
-1 280 × 800) : son temps d'ouverture est à mesurer. Elle ne tient pas sur un écran de portable
+1 280 × 800) ; Mes demandes (22 octobre 2026) en ajoute 86 : le menu et son espace, et par ligne du
+fil une rangée et « ＋ Garder la demande » (2 289 vues, dont 1 473 simples, avant lui ; 2 375, dont
+1 516, après, au compte de toutes les vues de l'arbre) : son temps d'ouverture est à mesurer. Elle ne tient pas sur un écran de portable
 (1 440 × 900) : son contenu est de taille fixe, sans défilement.
 
 **Volet** (`Vues.volet`) : « ＋ Nouvelle conversation » (bezel 26), la loupe devant
@@ -1070,7 +1072,9 @@ dans une `f:row` poussée par `margin_left` : constaté D6, la rangée ne prend 
 Le tour de Claude qui a noté ou donné une leçon finit par une ligne `actions` (`x..i`) : « ☆ Voir
 la note » (`Fenetre.voirNote` → `montrerNote` : l'onglet Note, comme un vrai clic ;
 `Fenetre.NOTE_AUTRE_PHOTO` au bandeau si la photo active n'est pas celle notée), « Leçon de la
-photo » (`Fenetre.voirLecon` → `montrerLecon`), ou les deux. La barre (`Vues.defilement`) : ▲ ▼ en
+photo » (`Fenetre.voirLecon` → `montrerLecon`), ou les deux ; celui qui a retouché et donné sa
+« Demande à garder » y gagne « ＋ Garder la demande », au bout de la ligne, à droite (voir Mes
+demandes). La barre (`Vues.defilement`) : ▲ ▼ en
 icônes, Fin, la position dans le fil, et à droite l'activité de Claude (orange) ou le relevé du
 forfait. Un clic sur une ligne se répartit par `Fenetre.sorteDeClic` (`Fenetre.clics`) : image,
 ligne du carnet, leçon, étape, sinon détail de l'outil.
@@ -1078,11 +1082,13 @@ ligne du carnet, leçon, étape, sinon détail de l'outil.
 **Saisie** (`Vues.saisie`) : les sept invites en carrés (bezel 24, `Vues.invites` ; ni « ★ Noter »
 ni séparateur), le champ de demande sur deux lignes (`immediate = false`), puis 📎 et 📋 (carrés à
 icône seule, `image_name`), l'étiquette « Style » et son menu (décision de Dany après le lot B3 :
-comme la maquette, à la place du « sans étiquette » du 20 octobre 2026), le bandeau, et Envoyer.
+comme la maquette, à la place du « sans étiquette » du 20 octobre 2026), le menu Mes demandes (280,
+`D.mesDemandes` ; voir Mes demandes), le bandeau, et Envoyer.
 Pas de menu Modèle (décision de Dany : Modèle et Effort sont dans le Gestionnaire de modules
 externes). Envoyer (`Vues.envoi`) est un bouton bleu en image (`Vues.boutonBleu`), Arrêter un carré
 superposé, montré pendant le travail ; aucun bouton par défaut (repli décidé après D1). Le bandeau
-(`Vues.bandeau`, à la place du menu Modèle de la maquette, `D.bandeau` 308) : deux lignes de petit
+(`Vues.bandeau`, à la place du menu Modèle de la maquette, `D.bandeau` 324 depuis Mes demandes, 612
+avant) : deux lignes de petit
 texte (`Fenetre.LIGNES_BANDEAU`), coupées d'après la chasse mesurée (`Fenetre.texteBandeau`, « … »
 au bout de la seconde) ; l'infobulle donne le message entier, un clic l'aide entière. Les messages
 de la fenêtre sont des constantes raccourcies pour y tenir (`CHOISIR_CONVERSATION`,
@@ -1296,6 +1302,93 @@ même moment. La fenêtre s'abonne au registre (`Notation.abonner('fenetre', …
 relit la photo active (`Fenetre.majPhoto`, toutes les 2 s et après une écriture), elle recale le
 registre sur sa note et son drapeau (`Notation.recaler`, avec la version lue avant) : une note
 acceptée ou changée puis annulée (undo_last, ⌘Z) rend la proposition de nouveau « à vérifier ».
+
+### Mes demandes (demandé par Dany le 22 octobre 2026)
+
+Ses mots : « un menu déroulant à droite de Style. Ce menu aurait une liste de mes prompts
+personnels, donc j'ai pas à recréer à chaque fois », avec ajouter, supprimer et renommer, et,
+« suite à une correction d'une photo », la demande de Claude à ajouter. Ses choix : choisir une
+demande remplit le champ (sans l'envoyer : Retour l'envoie) ; après une retouche, un bouton
+« Garder la demande » sur la ligne d'actions du tour de Claude ; la gestion au bas du menu.
+
+**Le menu** (`Vues.mesDemandes`) : un `popup_menu` de 280 (`Dispositions.TAILLES.mesDemandes`),
+à droite du menu Style, 8 points après lui, dans la rangée sous le champ ; le bandeau prend ce
+qu'il laisse (`D.bandeau` 324). Ses éléments (`Fenetre.elementsMesDemandes`, tables neuves, liés
+par `mesDemandesItems`) : son titre « Mes demandes » (valeur `Fenetre.MENU_TITRE`, la valeur
+montrée quand rien n'est choisi), un séparateur, chaque demande « Nom — description » (valeur :
+son indice), coupée par « … » à la largeur du menu moins ses flèches (`Fenetre.titreDemande`,
+`Fenetre.FLECHES_MENU` 32, mesurée dans la police du menu, `texte` de `Metriques`), un séparateur,
+puis Ajouter…, Renommer… et Supprimer… ; sans demande, « Aucune demande gardée » grisé et Ajouter…
+seul. Relevé dans `AgViewUtils.getPopupMenu` de Lightroom 15.6 (code compilé, lecture seule, sans
+l'avoir vu) : un élément `{ separator = true }` est un séparateur, `enabled = false` grise un
+élément (`updateStatus`), un élément-table sans `title` montrerait `tostring` de la table ;
+`value_equal` et « < no_match_found > » (une valeur sans élément) existent : d'où le titre en
+élément, toujours choisi. La simulation de la fenêtre en tient : `S.refusElements` (à la création
+et à chaque nouvelle valeur liée), `S.choisir` (ni séparateur, ni élément grisé, ni valeur
+absente ; le champ tapé validé d'abord, comme par un clic). Grisé pendant que Claude travaille
+(`enabled = libre`), comme le Mode.
+
+**Choisir une demande** (`Fenetre.choisirMesDemandes`, l'observateur de `mesDemandes`) : sa valeur
+passe par `Fenetre.lierRadio`, comme le Mode : un choix, même du titre rechoisi, annule l'envoi
+automatique de la demande que ce clic aurait validée (supposé pour un menu ; constaté D3 pour un
+calque, un radio, un segment et un bouton). Le menu revient aussitôt à son titre (pour rechoisir
+la même demande). La demande va dans le champ, à la place du texte tapé (`Fenetre.mettreDemande` :
+la clé `saisie` posée sous `Fenetre.ignorerSaisie`, `Fenetre.demandeMise` gardée,
+`Fenetre.DEMANDE_DANS_LE_CHAMP` au bandeau) : ni envoi automatique, ni bouton, ni bascule
+d'onglet. Retour l'envoie : validé sans y rien changer, le champ ne change pas la clé, et la table
+ne prévient pas son observateur (supposé, comme la simulation) ; la valeur liée du champ passe donc
+par `Fenetre.lierSaisie`, dont le `transform` (de la vue vers la table) lance l'envoi automatique
+quand la valeur poussée est la demande mise. Changée dans le champ, la demande part par
+l'observateur, comme une demande tapée ; Envoyer l'envoie aussi.
+
+**Ajouter…, Renommer…, Supprimer…** (dans une tâche, `Fenetre.enTache`) : de petites fenêtres
+modales. Ajouter… (`Fenetre.ajouterDemande`) : Nom, Description (courte, montrée dans le menu
+après le nom) et Texte (six lignes), pré-remplis du texte du champ (depuis le menu) ou de la
+demande de Claude (depuis « ＋ Garder la demande ») ; un nom proposé déjà pris en reçoit un libre
+(« … 2 », `Stockage.nomLibre`). Renommer… (`Fenetre.renommerDemande`) : un menu « Demande : »
+(les noms), puis les mêmes champs, remplis de la demande choisie. Supprimer…
+(`Fenetre.supprimerDemande`) : le même menu, le texte de la demande, puis `LrDialogs.confirm`. Le
+refus (`Stockage.refusDemande` : `NOM_VIDE`, `NOM_PRIS` — majuscules et accents ne comptent pas
+—, `TEXTE_VIDE`) se dit en direct sous les champs, et le bouton d'action est grisé tant qu'il reste
+(`actionBinding = { enabled = { bind_to_object = q, key = 'valide' } }` de
+`LrDialogs.presentModalDialog`, relevé dans `LrDialogs.lua`) ; un refus après le clic (le bouton
+resté actif, le fichier changé entre-temps, une écriture impossible) rouvre la fenêtre, champs
+gardés et raison dite. Le bandeau dit `DEMANDE_GARDEE`, `DEMANDE_CHANGEE`, `DEMANDE_RETIREE`.
+
+**Rangement** (`Stockage.lua`, section « Mes demandes ») : `mes-demandes.json` dans
+`Chemins.racine()`, `{ format = 1, demandes = [ { nom, description, texte } ] }`, trié par nom
+(`Texte.plier`), écrit d'un coup (`Fichiers.ecrire` : provisoire, puis renommé), relu à chaque
+ouverture de la fenêtre et avant chaque changement (`Stockage.garderDemande`,
+`Stockage.changerDemande`, `Stockage.retirerDemande`). Une entrée sans nom ou sans texte, ou d'un
+nom déjà lu, ne se lit pas. Un fichier illisible (ou d'un autre format) n'est jamais perdu en
+silence : dit au journal et au bandeau (`Fenetre.DEMANDES_ILLISIBLES`), il est mis de côté
+(`mes-demandes-illisible-<date>.json`) avant la première écriture, comme `carnet.json` ; s'il ne
+peut pas l'être, rien n'est écrit. Tout ce qui en sort est fait de tables neuves. `uninstall.sh
+--tout` le retire (tout le dossier) ; sans `--tout`, il reste, dit avec le reste.
+
+**La demande de Claude** : la section « Demande à garder » des consignes de la fenêtre
+(`Consignes.texte`) : après une retouche (une étape écrite ; pas une proposition, une notation, un
+classement ou une leçon seuls), Claude finit sa réponse par une ligne seule « Demande à garder :
+« … » », une ou deux phrases qui referaient son travail sur une photo semblable, sans identifiant
+ni nom de fichier ; la section Leçon dit « rien après (sauf Demande à garder) ». Le texte des
+consignes y a fait de la place (7 489 → 7 476 caractères pour un plafond de 7 500) en raccourcissant
+l'introduction, Pour qui, Mise en forme, Contexte, la puce Proposer d'abord, la puce Notes, Titre,
+Style et Leçon, sans en changer le sens. La fenêtre reconnaît la ligne
+(`Conversation.demandeAGarder` : gras ou puce Markdown, guillemets « », “ ” ou " ", point final
+après eux, espaces insécables ; la dernière du texte ; le gabarit « <ta demande> » refusé). La
+ligne d'actions du tour (`Fil.lignes`) gagne « ＋ Garder la demande » quand ce tour a retouché
+(`Conversation.estRetouche` : un outil de `OUTILS_ETAPES` hors des classements, abouti, avec une
+étape écrite ; `match_series` abouti) et que le texte de Claude, arrivé en entier, porte la ligne :
+`actions` prend le suffixe `+demande` (`Fil.valeurActions`, `Fil.lireActions`), `demande`
+l'indice du texte. Le bouton (`Vues.ligneFil` : carré small de 136, en petit) se pose au bout de
+la ligne, à droite, dans une rangée poussée par `margin_left` (D6), comme « Pourquoi ? » : une vue
+masquée garde sa place, et le poser après les deux autres boutons demanderait une variante par
+place (quatre boutons par ligne au lieu d'un). Son clic (`Fenetre.garderDemande`) ouvre Ajouter…
+pré-rempli : le nom proposé est ce qui précède « : » (40 caractères au plus), sinon les quatre
+premiers mots ; la description, la suite, coupée aux mots (60 caractères au plus,
+`Conversation.preparerDemande`) ; le texte entier. La ligne reste dans le fil : Dany la lit.
+
+Essais : `Tests/Lua/Fenetre/essais-mes-demandes.lua`.
 
 ### Carte Note B (1.3)
 
@@ -5061,8 +5154,9 @@ du 22 octobre 2026, la liste à la fin) :
    colorées ; les largeurs des carrés (« Laisser rejetée », « J'ai fini »).
 6. Le Mode : la valeur reposée au 2e tour de la boucle (D12) dessine-t-elle « Je le fais » inactif
    et coché à la première ouverture ? Le `transform` de `Fenetre.lierRadio` sur un radio déjà coché.
-   Le menu Style choisi après une demande tapée sans Retour (la simulation ne sait pas choisir dans
-   un `popup_menu`).
+   Le menu Style choisi après une demande tapée sans Retour (la simulation sait choisir dans un
+   `popup_menu` depuis Mes demandes, `S.choisir`, mais le menu Style n'annule l'envoi qu'à un
+   changement de valeur : son observateur, sans `Fenetre.lierRadio`).
 7. Les infobulles liées (cases de la liste, bandeau) ; le bandeau de deux lignes dans une rangée de
    boutons de 26 ; les messages raccourcis entiers à l'écran.
 8. Les clics sur les calques (cases, segments, étoiles, Envoyer, Accepter) ; Arrêter ou Envoyer
@@ -5158,6 +5252,23 @@ du 22 octobre 2026, la liste à la fin) :
     photo et ses cadres en moins d'une seconde attendue) et aucune demande d'autorisation de macOS
     pour l'original ; Agrandir ; une photo prise en recadrage 1,25× ou au viseur sport (les
     positions décalées ou non par rapport à l'image de Lightroom).
+23. Mes demandes (non publié ; essais dans les simulations seulement ; voir Mes demandes). Après un
+    rechargement du module (aucun fichier `.lua` nouveau) : le menu à droite de Style, à 280, sa
+    flèche et son titre « Mes demandes » ; ses séparateurs et « Aucune demande gardée » grisé
+    (relevés dans `AgViewUtils`, jamais vus) ; « Nom — description » coupé à la largeur du menu, la
+    liste ouverte aussi large ; un choix qui met la demande dans le champ et remet le menu sur son
+    titre (la valeur reposée dans l'observateur même de la clé) ; un texte tapé sans Retour, puis
+    un choix : rien ne part (le champ validé par le clic sur le menu, supposé) ; le menu ouvert
+    puis fermé sans choix (Échap, clic à côté) après une frappe : la demande tapée part-elle
+    0,3 s plus tard, comme peut-être avec le menu Style ? ; Retour dans le champ rempli, sans y
+    rien changer : la demande part-elle (`Fenetre.lierSaisie`, le transform appelé sans
+    changement de valeur, supposé) ? sinon, Envoyer ; les fenêtres Ajouter…, Renommer… et
+    Supprimer… (bouton grisé par `actionBinding` tant qu'un refus reste, refus dit en direct, Retour
+    dans le champ Texte de six lignes) ; avec le vrai Claude, une retouche finie par « Demande à
+    garder : « … » » (une ou deux phrases, sans identifiant), après la leçon, et rien de tel après
+    une proposition, une notation ou une leçon seule ; « ＋ Garder la demande » au bout de la ligne
+    d'actions, à droite, et sa fenêtre pré-remplie ; le bandeau de 324 (deux lignes) ; le temps
+    d'ouverture de la fenêtre avec 86 vues de plus.
 
 ## Bibliothèque
 

@@ -20,6 +20,20 @@
   ne change pas. La taille du cadre AF est une approximation, à comparer à l'écran de l'appareil.
 - `mcp-developpeur --focus` (ce que la fenêtre lance pour l'onglet Focus) ; `--boitier` donne
   aussi la mise au point en détail et les nouvelles valeurs sous les noms d'exiftool.
+- Mes demandes, à votre demande : un menu à droite du menu Style, sous le champ de demande, avec
+  vos demandes à vous, pour ne pas les réécrire à chaque fois. Chacune s'y montre « Nom —
+  description » ; la choisir met son texte dans le champ, à la place de ce qui y était, sans
+  l'envoyer : changez-la au besoin, puis Retour l'envoie (ou Envoyer). Au bas du menu, Ajouter…
+  (nom, courte description et texte ; le texte du champ y est déjà, s'il y en a un), Renommer…
+  (changer le nom, la description ou le texte d'une demande) et Supprimer… (après confirmation).
+  Un nom vide, ou déjà pris, est refusé avec la raison. Le menu est grisé pendant que Claude
+  travaille. Vos demandes sont rangées dans `mes-demandes.json`, sur ce Mac ; `uninstall.sh --tout`
+  le retire, `uninstall.sh` seul le garde.
+- Après une retouche dans la fenêtre Claude, Claude finit sa réponse par une ligne « Demande à
+  garder : « … » » : la demande qui referait son travail sur une photo semblable. La ligne
+  d'actions de sa réponse gagne « ＋ Garder la demande », qui ouvre Ajouter… déjà rempli (un nom et
+  une description proposés, que vous changez avant de garder). Rien après une simple
+  proposition, une notation, un classement ou une leçon seule.
 
 ### Changé
 - Claude note maintenant vos photos de 0 à 5 ★ (à votre demande) : une 5 ★ est rare, une photo

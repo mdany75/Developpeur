@@ -46,8 +46,8 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
     bas, Renommer… et Supprimer…, Publication… et Consommation…, les versions et le voyant Écran ;
   - au centre, l'en-tête (le titre de la conversation, le Mode, les voyants Claude Code et
     Lightroom, la photo active et le nombre de photos sélectionnées), le fil, ▲ ▼ Fin, puis la
-    saisie : les invites, le champ de demande, 📎, 📋, « Style » et son menu, le bandeau des
-    messages et Envoyer ;
+    saisie : les invites, le champ de demande, 📎, 📋, « Style » et son menu, Mes demandes, le
+    bandeau des messages et Envoyer ;
   - à droite, les onglets Aperçu, Focus, Proposition, Note (par défaut) et Leçon, l'aperçu commun
     aux cinq (◀ légende ▶ et ⤢ Agrandir dessous), puis la carte de l'onglet choisi.
 - Claude y travaille par Claude Code et votre forfait claude.ai, avec les seuls outils du
@@ -76,8 +76,8 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   posées » (« posée » sur chaque ligne), ou « Notes non posées » si aucune ne l'a été (liaison en
   pause, accord attendu : la raison est sur chaque ligne). Une étape de Claude porte un bouton
   « Pourquoi ? » ; le tour de Claude qui a noté ou donné une leçon finit par « ☆ Voir la note » ou
-  « Leçon de la photo ». Un clic sur un outil montre ce que Claude a demandé au connecteur et sa
-  réponse, un clic sur une image la montre dans l'aperçu, sans changer d'onglet. ▲, ▼ et Fin pour
+  « Leçon de la photo », et celui qui a retouché, par « ＋ Garder la demande » (voir Mes demandes).
+  Un clic sur un outil montre ce que Claude a demandé au connecteur et sa réponse, un clic sur une image la montre dans l'aperçu, sans changer d'onglet. ▲, ▼ et Fin pour
   s'y déplacer ; à droite, ce que fait Claude, sinon le dernier relevé du forfait (5 heures et
   semaine).
 - Les onglets de droite : Aperçu (l'étape choisie par « Pourquoi ? »), Focus (la mise au point de
@@ -138,6 +138,17 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   et peau douce, Neutre, Rose froid et peau douce. « Peau douce » passe par un masque de la peau à
   la dose « Adoucir la peau (Lite) », la moitié pour un homme ou une personne âgée, rien pour un
   enfant, jamais par un réglage de toute la photo.
+- Mes demandes, le menu à droite de Style : vos demandes à vous, gardées pour ne pas les réécrire
+  à chaque fois, chacune « Nom — description ». En choisir une met son texte dans le champ, à la
+  place de ce qui y était, sans l'envoyer : changez-la au besoin, puis Retour (ou Envoyer). Au bas
+  du menu, Ajouter… (un nom, une courte description et le texte ; celui du champ y est déjà, s'il y
+  en a un), Renommer… (le nom, la description ou le texte d'une demande) et Supprimer… (après
+  confirmation). Un nom vide ou déjà pris est refusé, avec la raison ; le menu est grisé pendant
+  que Claude travaille. Après une retouche, Claude finit sa réponse par une ligne « Demande à
+  garder : « … » », la demande qui referait son travail sur une photo semblable : « ＋ Garder la
+  demande », sur la ligne d'actions de sa réponse, ouvre Ajouter… déjà rempli (nom et description
+  proposés, à changer avant de garder). Rien de tel après une simple proposition, une notation, un
+  classement ou une leçon seule.
 - Joindre une photo du disque (📎 : JPEG, PNG, HEIC, TIFF, WebP) ou coller l'image du
   presse-papiers (📋 : capture d'écran, image copiée, photo copiée dans le Finder), comme exemple
   ou comme référence de style. Les photos jointes s'affichent dans le bandeau ; un clic les retire.
@@ -765,11 +776,12 @@ Ce qui reste sur le Mac :
 - le jeton privé de la liaison (`liaison.jeton`), qui ne part jamais chez Claude ni dans un
   journal ;
 - les fichiers exportés, et toute la fenêtre Publication, qui ne parle jamais à Claude ;
-- les conversations de la fenêtre Claude (avec les images que Claude a regardées), le guide de
-  style, les profils de publication, le registre de consommation, les notes proposées avec
-  l'évaluation de chaque photo (`notation.json`), le carnet de progrès et les leçons des photos
-  (`carnet.json` : une table par catalogue, une entrée par photo originale, 3 000 au plus par
-  catalogue, les plus anciennes sortent au-delà), et l'avant/après des étapes de Claude
+- les conversations de la fenêtre Claude (avec les images que Claude a regardées), vos demandes
+  du menu Mes demandes (`mes-demandes.json`), le guide de style, les profils de publication, le
+  registre de consommation, les notes proposées avec l'évaluation de chaque photo
+  (`notation.json`), le carnet de progrès et les leçons des photos (`carnet.json` : une table par
+  catalogue, une entrée par photo originale, 3 000 au plus par catalogue, les plus anciennes
+  sortent au-delà), et l'avant/après des étapes de Claude
   (`Etapes/`, une image avant et une après par étape, de 0,6 à 0,9 Mo ; ménage au chargement du
   module : 30 jours, 500 Mo au plus), dans `~/Library/Application Support/Developpeur/` ; les
   journaux dans `~/Library/Logs/Developpeur/`. Les images de `Etapes/` ne partent jamais chez
@@ -891,8 +903,8 @@ Claude Desktop fermé comme pour l'installation (sinon, le script dit quoi véri
 retire l'inscription dans Claude, le connecteur, le module, ses paramètres prédéfinis invisibles
 (Lightroom fermé) et ses fichiers de travail, dont le jeton de la liaison (un Lightroom ouvert le
 réécrit : relancer le script après l'avoir quitté), et garde votre guide de style, vos
-conversations, vos profils de publication, le registre de consommation, les notes proposées, le
-carnet de progrès et ses leçons (`carnet.json`), l'avant/après des étapes (`Etapes/`) et les
+conversations, vos demandes (`mes-demandes.json`), vos profils de publication, le registre de
+consommation, les notes proposées, le carnet de progrès et ses leçons (`carnet.json`), l'avant/après des étapes (`Etapes/`) et les
 journaux ; `bash uninstall.sh --tout` les retire aussi. Les retouches déjà faites restent dans le
 catalogue (elles s'annulent dans le panneau Historique).
 
