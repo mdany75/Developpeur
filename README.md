@@ -103,7 +103,7 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   d'entraînement) et Mise au point (points lus ou non, mode de mise au point, priorité AF-S ou AF-C,
   mode AF, taille du point ou de la zone AF, avertissement, visages et éléments du sujet détectés).
   Pour une photo Fujifilm (RAF, ou JPEG de l'appareil), l'aperçu montre le point ou la zone de
-  mise au point à sa taille, en rouge, et les visages et les yeux que l'appareil a détectés, en
+  mise au point en rouge, et les visages et les yeux que l'appareil a détectés, en
   coins jaunes ; le connecteur les lit dans l'original, sur ce Mac et en 5 secondes au plus, et
   les traduit en français (Point unique, Déclenchement, Bonne, œil droit…). Une copie virtuelle
   montre l'original de la copie. Pour une autre marque : la photo sans cadre, Image et Prise de vue
@@ -111,9 +111,9 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   Quand la mise au point d'une photo Fujifilm ne se lit pas, la carte dit pourquoi : original
   introuvable, trop long à ouvrir, ou format pas encore lu (comme un HEIF de l'appareil).
   L'onglet suit la photo active ; ce qu'il a lu est gardé tant que la photo ne change pas (un clic
-  le relit si vous l'avez recadrée). Agrandir montre la photo et ses cadres en grand. La taille du
-  cadre AF est une approximation, à comparer à l'écran de l'appareil (taille 6 du point unique :
-  une case de la grille AF ; une zone de 5 × 5 : 5 × 5 cases).
+  le relit si vous l'avez recadrée). Agrandir montre la photo et ses cadres en grand. Le point
+  unique est un carré de la taille que Focus-Points lui donne par défaut ; une zone de 5 × 5 est
+  dessinée à sa taille approchée.
 - Une proposition préparée à l'ouverture : quand la fenêtre s'ouvre, ou que le menu ou ⌃⌥C la
   rappelle, sur une conversation vide, Claude prépare une proposition de retouche de la photo
   active, rendu naturel. Choisir une autre photo, fenêtre ouverte, ne la lance pas : elle vient au

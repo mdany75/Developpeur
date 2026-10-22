@@ -10,7 +10,7 @@ rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code.
 ### Ajouté
 - Un onglet Focus dans la fenêtre Claude, entre Aperçu et Proposition, à votre demande : la photo
   active comme le module Focus-Points la montre. Pour une photo Fujifilm, l'aperçu dessine le point
-  ou la zone de mise au point à sa taille, en rouge, et les visages et les yeux que l'appareil a
+  ou la zone de mise au point en rouge, et les visages et les yeux que l'appareil a
   détectés, en coins jaunes. Dessous, trois blocs : Image (fichier, date et heure de la prise de
   vue, taille d'origine, taille actuelle), Prise de vue (marque, modèle, objectif, focale,
   exposition, ISO, correction d'exposition, programme, mesure, stabilisation, mode
@@ -24,7 +24,8 @@ rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code.
   original introuvable, trop long à ouvrir, ou format pas encore lu (comme un HEIF de l'appareil).
   La fenêtre ne passe jamais d'elle-même à l'onglet Focus : un clic sur son segment
   l'ouvre, et il suit ensuite la photo active. L'aperçu des autres onglets, avec son carré vert,
-  ne change pas. La taille du cadre AF est une approximation, à comparer à l'écran de l'appareil.
+  ne change pas. Le point unique a la taille que Focus-Points lui donne par défaut ; une zone est
+  dessinée à sa taille approchée.
 - `mcp-developpeur --focus` (ce que la fenêtre lance pour l'onglet Focus) ; `--boitier` donne
   aussi la mise au point en détail et les nouvelles valeurs sous les noms d'exiftool.
 - Mes demandes, à votre demande : un menu à droite du menu Style, sous le champ de demande, avec

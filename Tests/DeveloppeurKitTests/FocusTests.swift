@@ -28,12 +28,13 @@ final class FocusTests: XCTestCase {
         XCTAssertEqual(dansLeCadre, true)
         XCTAssertEqual(cadres.map(\.genre), [.pointAF, .sujet, .sujet, .sujet, .sujet], "le point AF d'abord, puis les quatre sujets")
         XCTAssertEqual(cadres.map(\.nom), ["point AF", "tête", "visage", "œil gauche", "œil droit"])
-        // Le point de taille 6 : une case de la grille (1/13 du grand côté), centrée sur FocusPixel.
+        // Le point de taille 6 : le carré de Focus-Points (4 % du petit côté), centré sur FocusPixel,
+        // plus petit que l'œil (constaté le 22 octobre 2026 : une case entière couvrait le visage).
         let (g0, h0, d0, b0) = bornes(cadres[0])
         XCTAssertEqual((g0 + d0) / 2, 1665.0 / 4416, accuracy: 1e-9)
         XCTAssertEqual((h0 + b0) / 2, 845.0 / 2944, accuracy: 1e-9)
-        XCTAssertEqual(d0 - g0, 1.0 / 13, accuracy: 1e-9)
-        XCTAssertEqual((b0 - h0) * 2944, 4416.0 / 13, accuracy: 1e-6, "carré, en pixels")
+        XCTAssertEqual((d0 - g0) * 4416, 0.04 * 2944, accuracy: 1e-6)
+        XCTAssertEqual((b0 - h0) * 2944, 0.04 * 2944, accuracy: 1e-6, "carré, en pixels")
         // L'œil droit, à ses positions.
         let (g4, h4, d4, b4) = bornes(cadres[4])
         XCTAssertEqual(g4, 1635.0 / 4416, accuracy: 1e-9)
@@ -59,8 +60,10 @@ final class FocusTests: XCTestCase {
         XCTAssertEqual(m.lignesMiseAuPoint(horsDuCadre: true).first, MiseAuPointBoitier.Ligne("Points de mise au point", "lus, hors du cadre actuel"))
     }
 
-    /// La taille du cadre AF selon le mode : zone de 5 × 5 cases ; large / suivi, le carré de 6 %
-    /// du petit côté ; un point sans taille lue aussi.
+    /// La taille du cadre AF selon le mode : zone de 5 × 5 cases ; point unique (quelle que soit sa
+    /// taille lue), large / suivi et point sans taille lue : le carré de 4 % du petit côté, comme
+    /// Focus-Points (constaté le 22 octobre 2026 : la taille 6 en case entière était trois fois trop
+    /// grande).
     func testTailleDuCadreSelonLeModeAF() {
         let zone = MiseAuPointBoitier(largeur: 4416, hauteur: 2944, pixel: [2208, 1472], reglagesAF: 0x00A50101)
         let (lz, hz) = Focus.tailleCadreAF(zone, largeur: 4416, hauteur: 2944)
@@ -68,12 +71,15 @@ final class FocusTests: XCTestCase {
         XCTAssertEqual(hz, 5 * 4416.0 / 13, accuracy: 1e-9)
         let large = MiseAuPointBoitier(largeur: 4416, hauteur: 2944, pixel: [2208, 1472], reglagesAF: 0x0201)
         let (ll, hl) = Focus.tailleCadreAF(large, largeur: 4416, hauteur: 2944)
-        XCTAssertEqual(ll, 0.06 * 2944, accuracy: 1e-9)
+        XCTAssertEqual(ll, 0.04 * 2944, accuracy: 1e-9)
         XCTAssertEqual(hl, ll)
         let petit = MiseAuPointBoitier(largeur: 4416, hauteur: 2944, pixel: [2208, 1472], reglagesAF: 0x1001)
-        XCTAssertEqual(Focus.tailleCadreAF(petit, largeur: 4416, hauteur: 2944).0, 4416.0 / 13 / 6, accuracy: 1e-9, "taille 1 : 1/6 de case")
+        XCTAssertEqual(Focus.tailleCadreAF(petit, largeur: 4416, hauteur: 2944).0, 0.04 * 2944, accuracy: 1e-9, "taille 1 : le carré de Focus-Points")
+        let grand = MiseAuPointBoitier(largeur: 4416, hauteur: 2944, pixel: [2208, 1472], reglagesAF: 0x6001)
+        XCTAssertEqual(grand.taillePoint, 6)
+        XCTAssertEqual(Focus.tailleCadreAF(grand, largeur: 4416, hauteur: 2944).0, 0.04 * 2944, accuracy: 1e-9, "taille 6 : le même carré, pas une case entière")
         let ancien = MiseAuPointBoitier(largeur: 4416, hauteur: 2944, pixel: [2208, 1472], modeAF: 1)
-        XCTAssertEqual(Focus.tailleCadreAF(ancien, largeur: 4416, hauteur: 2944).0, 0.06 * 2944, accuracy: 1e-9, "point sans taille lue")
+        XCTAssertEqual(Focus.tailleCadreAF(ancien, largeur: 4416, hauteur: 2944).0, 0.04 * 2944, accuracy: 1e-9, "point sans taille lue")
         // Sans point : pas de cadre AF, les sujets seuls.
         let sansPoint = MiseAuPointBoitier(largeur: 4416, hauteur: 2944, visages: 1, positionsVisages: [100, 100, 300, 300])
         let (cadres, dedans) = Focus.cadres(sansPoint, geometrie: GeometriePhoto(largeur: 6240, hauteur: 4160, orientation: "AB"))

@@ -1080,10 +1080,10 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   SequenceNumber, FocusWarning, ImageStabilization, visages et éléments du sujet (positions dans
   le repère de FocusPixel) ; les réglages groupés par `Tiff.Entree.mot`, quel que soit le type
   rangé ; ses textes en français n'existent que là (`lignesImage`, `lignesPriseDeVue`,
-  `lignesMiseAuPoint`). La taille du cadre AF (`Focus.tailleCadreAF`) est un modèle provisoire de
-  Développeur, pas de Focus-Points : une case de 1/13 du grand côté pour un point de taille 6 (n/6
-  pour la taille n), l × h cases pour une zone, 6 % du petit côté sinon ; à comparer à l'écran du
-  boîtier avant de le changer. Côté module (`Fenetre.lua`, section Focus) : jamais de bascule vers
+  `lignesMiseAuPoint`). La taille du cadre AF (`Focus.tailleCadreAF`) : le carré de 4 % du petit
+  côté de Focus-Points pour un point unique, un suivi ou un point sans taille lue (constaté le
+  22 octobre 2026 : le modèle d'une case de 1/13 du grand côté pour la taille 6 était trois fois
+  trop grand) ; l × h cases de 1/13 du grand côté pour une zone, provisoire. Côté module (`Fenetre.lua`, section Focus) : jamais de bascule vers
   Focus (`Fenetre.choisirOnglet` jamais pour lui), seulement un vrai clic ; un onglet caché ne lit
   rien ; la lecture dans une tâche (`Fenetre.lireFocus`), une à la fois : `Lightroom.infosFocus`
   (getFormattedMetadata clé par clé, jamais groupé), `Vignettes.demander`, puis pour un fichier

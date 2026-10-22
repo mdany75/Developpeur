@@ -322,21 +322,17 @@ public enum Focus {
     /// repère de 4 416 × 2 944). Une zone de 5 × 5 en couvre 5 × 5. Provisoire : la grille d'un
     /// boîtier plus ancien (91 points en 13 × 7) n'est pas relevée.
     static let colonnesGrille = 13.0
-    /// Un point unique de taille n couvre n/6 d'une case : la taille 6, la plus grande du X-H2S, une
-    /// case entière. Provisoire : le cadre du viseur n'a pas été mesuré (à comparer à l'écran du
-    /// boîtier).
-    static let taillesPoint = 6.0
-    /// Le carré quand la taille n'est pas lue (large / suivi, ancien boîtier) : 6 % du petit côté,
-    /// comme le carré de `--marquer-af`.
-    static let carreParDefaut = 0.06
+    /// Le carré d'un point unique, d'un mode large / suivi ou d'un point sans taille lue : 4 % du
+    /// petit côté, la taille « Medium » par défaut de Focus-Points (FocusPointPrefs.focusBoxSize,
+    /// DefaultPointRenderer.createFocusFrame), la référence de Dany. Constaté le 22 octobre 2026 sur
+    /// DSCF2402 : le modèle d'avant (taille n = n/6 d'une case de la grille) dessinait la taille 6
+    /// trois fois plus grande que Focus-Points, presque la taille du visage. La taille lue reste
+    /// dite dans la carte (« Taille du point AF »).
+    static let carreParDefaut = 0.04
 
     /// Largeur et hauteur du cadre AF, en pixels du repère.
     static func tailleCadreAF(_ m: MiseAuPointBoitier, largeur: Double, hauteur: Double) -> (Double, Double) {
         let caseAF = max(largeur, hauteur) / colonnesGrille
-        if m.zone == "point", let taille = m.taillePoint {
-            let cote = caseAF * Double(taille) / taillesPoint
-            return (cote, cote)
-        }
         if m.zone == "zone", let zone = m.tailleZone {
             return (caseAF * Double(zone.largeur), caseAF * Double(zone.hauteur))
         }

@@ -3888,14 +3888,16 @@ photo) sont dans `BoitierTests.dscf2402`. `--focus` sur une vignette tirée de l
 **Cadres** (`Focus.cadres`, dans l'image affichée : chaque coin passe par
 `GeometriePhoto.versApercu`, comme le point de `--marquer-af`, orientation et cadre de Lightroom
 compris ; un cadre entièrement hors du cadre n'est pas dessiné, et la carte dit « lus, hors du
-cadre actuel » si le point y est). Le cadre AF, centré sur FocusPixel, à sa taille d'après le mode
-AF (`Focus.tailleCadreAF`), un modèle de Développeur, pas de Focus-Points (qui dessine un carré de
-taille fixe, réglable dans ses préférences) : une case de la grille AF fait 1/13 du grand côté,
-carrée (la grille de 117 points, 13 × 9, du X-H2S : 340 × 327 pixels dans le repère de
-4 416 × 2 944) ; un point unique de taille n couvre n/6 d'une case (la taille 6, la plus grande du
-X-H2S, une case entière) ; une zone de l × h, l × h cases ; sinon (large / suivi, point sans taille
-lue) le carré de 6 % du petit côté de `--marquer-af`. Provisoire : le cadre du viseur n'a pas été
-mesuré, ni la grille des boîtiers plus anciens (91 points en 13 × 7 sur un X-T20). Les visages et
+cadre actuel » si le point y est). Le cadre AF, centré sur FocusPixel (`Focus.tailleCadreAF`) :
+un point unique, un mode large / suivi ou un point sans taille lue, le carré de 4 % du petit côté
+de Focus-Points (sa taille « Medium » par défaut : FocusPointPrefs.focusBoxSize,
+DefaultPointRenderer.createFocusFrame), la taille lue du point restant dite dans la carte ;
+constaté le 22 octobre 2026 sur DSCF2402 : le premier modèle (un point de taille n couvrait n/6
+d'une case de la grille, la taille 6 une case entière) dessinait un cadre trois fois plus grand que
+Focus-Points, presque celui du visage. Une zone de l × h : l × h cases d'une grille dont la case
+fait 1/13 du grand côté (la grille de 117 points, 13 × 9, du X-H2S : 340 × 327 pixels dans le
+repère de 4 416 × 2 944), provisoire : pas relevée à l'écran, ni la grille des boîtiers plus
+anciens (91 points en 13 × 7 sur un X-T20). Les visages et
 les éléments, à leurs positions ; un visage dont le cadre est déjà celui d'un élément (la tête, sur
 le X-H2S) n'est pas repris. CropMode est lu et dit (bloc Image, « Recadrage du boîtier ») ; les
 positions restent celles du repère d'ExifImageWidth et ExifImageHeight, comme dans Focus-Points :
@@ -5273,8 +5275,8 @@ du 22 octobre 2026, la liste à la fin) :
     photo Fujifilm) ; aucune bascule vers Focus (proposition, note, leçon qui arrivent) ; sur la
     copie d'essai 53709912 (DSCF2402), le cadre rouge sur l'œil droit, la tête, le visage et les
     deux yeux en coins jaunes, comme Focus-Points les montre, à comparer à sa capture ; la taille
-    du cadre AF (taille 6 = une case de 1/13 du grand côté) à comparer à l'écran du X-H2S (et une
-    zone de 5 × 5, un suivi) ; les textes de Lightroom tels qu'il les rend en français (dimensions,
+    du cadre AF d'un point unique calée le 22 octobre 2026 sur celle de Focus-Points (4 % du petit
+    côté) ; celle d'une zone de 5 × 5 et d'un suivi à comparer à l'écran du X-H2S ; les textes de Lightroom tels qu'il les rend en français (dimensions,
     focale, vitesse, ouverture, ISO, compensation, programme, mesure : leur forme exacte n'est pas
     relevée ; « Exposition : <vitesse> à <ouverture> ») ; une photo d'une autre marque (iPhone) :
     sans cadre, Image et Prise de vue, « Mise au point : non lue (seulement les fichiers Fujifilm
