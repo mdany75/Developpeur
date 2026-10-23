@@ -168,7 +168,8 @@ public struct PhotoTriee {
         if !liste.isEmpty { item["defauts"] = .array(liste.map(JSONValue.string)) }
         if let pile { item["pile"] = .number(Double(pile)) }
         if let af {
-            var point: [String: JSONValue] = ["x": .number((af.point.x * 1000).rounded() / 1000), "y": .number((af.point.y * 1000).rounded() / 1000)]
+            var point: [String: JSONValue] = ["x": .number((Double(af.point.x) * 1000).rounded() / 1000),
+                                              "y": .number((Double(af.point.y) * 1000).rounded() / 1000)]
             if !af.jugeable {
                 point["mise_au_point"] = "non jugée : zone sans texture autour du point"
             } else if af.douteuse {
