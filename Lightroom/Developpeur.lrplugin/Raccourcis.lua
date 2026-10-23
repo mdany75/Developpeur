@@ -20,9 +20,11 @@ Raccourcis.DOMAINE = 'com.adobe.LightroomClassicCC7'
 Raccourcis.RETRAIT = '   '
 
 -- Titre de l'entrée de menu (sans le retrait) → touches (^ Contrôle, ~ Option, @ Commande, $ Majuscule).
--- Seulement la fenêtre de conversation (Publication et Consommation s'ouvrent par ses boutons).
+-- Seulement la fenêtre de conversation et la Demande rapide (Publication et Consommation s'ouvrent
+-- par leurs entrées de menu).
 Raccourcis.LISTE = {
     { titre = "Ouvrir la fenêtre Claude", touches = '^~c', affichage = '⌃⌥C' },
+    { titre = "Demande rapide", touches = '@^~c', affichage = '⌘⌃⌥C' },
 }
 
 -- « ⌃⌥C fenêtre Claude ».

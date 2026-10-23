@@ -2317,18 +2317,23 @@ essai('Raccourcis : posés dans un fichier d\'essai, jamais dans les préférenc
     local lu = S.lireCommande('/usr/bin/defaults read ' .. domaine .. ' NSUserKeyEquivalents')
     -- Le titre tel que Lightroom l'écrit dans son menu : trois espaces devant.
     vrai(lu:find('"   Ouvrir la fen', 1, true) and lu:find('"^~c"', 1, true), lu)
-    vrai(not lu:find('"^~p"', 1, true) and not lu:find('"^~u"', 1, true), 'seulement la fenêtre Claude')
+    -- La Demande rapide (⌘⌃⌥C) : trois espaces devant aussi.
+    vrai(lu:find('"   Demande rapide"', 1, true) and lu:find('"@^~c"', 1, true), lu)
+    vrai(not lu:find('"^~p"', 1, true) and not lu:find('"^~u"', 1, true), 'seulement la fenêtre Claude et la Demande rapide')
     -- Un raccourci déjà là reste.
     S.executer('/usr/bin/defaults write ' .. domaine .. ' NSUserKeyEquivalents -dict-add Autre "@~x"')
     vrai(Raccourcis.poser(domaine))
     vrai(S.lireCommande('/usr/bin/defaults read ' .. domaine .. ' NSUserKeyEquivalents'):find('Autre', 1, true))
-    egal('⌃⌥C fenêtre Claude', Raccourcis.texte())
+    egal('⌃⌥C fenêtre Claude, ⌘⌃⌥C Demande rapide', Raccourcis.texte())
     egal('Ouvrir la fenêtre Claude', Raccourcis.LISTE[1].titre, "le titre de l'entrée de menu")
+    egal('Demande rapide', Raccourcis.LISTE[2].titre, "le titre de l'entrée de menu")
     local titres = {}
     for _, entree in ipairs(require('Info').LrExportMenuItems) do
         titres[entree.title] = true
     end
-    vrai(titres[Raccourcis.LISTE[1].titre], 'le raccourci vise une entrée du menu')
+    for _, r in ipairs(Raccourcis.LISTE) do
+        vrai(titres[r.titre], 'le raccourci vise une entrée du menu : ' .. r.titre)
+    end
 end)
 
 -- Versions ------------------------------------------------------------------------------------
@@ -2342,7 +2347,7 @@ essai('Versions : lecture, comparaison et alerte', function()
     egal(-1, Composants.comparer('1.0', '1.1'))
     egal(0, Composants.comparer('1.0', '1.0.0'))
     egal(1, Composants.comparer('1.10', '1.9'))
-    egal('1.3.2', Composants.module(), 'la version de Info.lua')
+    egal('1.3.3', Composants.module(), 'la version de Info.lua')
     -- Deux lignes : ce module et le connecteur, installés ensemble au même numéro.
     local l = Composants.lignes('1.0', '1.0')
     egal(2, #l)

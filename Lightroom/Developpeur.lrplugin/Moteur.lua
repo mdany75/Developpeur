@@ -7,6 +7,7 @@
 -- le disque mais ne s'ouvrent plus.
 -- Les fonctions qui attendent (envoyer, boucle, charger) s'appellent depuis une tâche.
 
+local LrPathUtils = import 'LrPathUtils'
 local LrTasks = import 'LrTasks'
 
 local Chemins = require 'Chemins'
@@ -14,6 +15,7 @@ local Consignes = require 'Consignes'
 local Consommation = require 'Consommation'
 local Conversation = require 'Conversation'
 local Evenements = require 'Evenements'
+local Fichiers = require 'Fichiers'
 local Images = require 'Images'
 local Journal = require 'Journal'
 local Lightroom = require 'Lightroom'
@@ -73,6 +75,10 @@ local function dansListe(c)
 end
 
 local function enregistrer(c)
+    -- Une demande rapide (Moteur.envoyerRapide) n'est jamais gardée.
+    if c.rapide then
+        return
+    end
     local ok, erreur = LrTasks.pcall(Stockage.enregistrer, c)
     if not ok then
         Journal.noter("Enregistrement impossible :", c.id, tostring(erreur))
@@ -293,6 +299,92 @@ function Moteur.envoyer(texte, options)
     return true
 end
 
+-- La fenêtre Demande rapide (FenetreRapide.lua, demandée par Dany le 22 octobre 2026) : chaque
+-- demande part dans une conversation neuve (Moteur.rapide), jamais gardée (ni sur le disque, ni
+-- dans la liste de la fenêtre Claude, `enregistrer`), avec une session neuve de Claude Code (la
+-- demande suivante de la fenêtre Claude relance la sienne, Moteur.envoyer) ; ses images vont dans
+-- un dossier temporaire, effacé à la demande rapide suivante. Rend la conversation, ou nil et la
+-- raison. À appeler depuis une tâche.
+Moteur.rapide = nil
+
+function Moteur.envoyerRapide(texte)
+    texte = Texte.nettoyer(texte)
+    if texte == '' then
+        return nil, "Écrivez une demande avant d'envoyer."
+    end
+    if Moteur.travaille then
+        return nil, "Claude travaille déjà : attendez la fin, ou arrêtez-le dans la fenêtre Claude."
+    end
+    local okBudget, niveau = pcall(Consommation.niveau)
+    if okBudget and niveau == 'arret' then
+        return nil, "Budget de la semaine atteint : augmentez-le dans la fenêtre Consommation pour continuer."
+    end
+    local avant = Moteur.rapide
+    if avant and avant.dossier then
+        LrTasks.pcall(Fichiers.supprimer, avant.dossier)
+    end
+    local c = Conversation.nouvelle()
+    c.rapide = true
+    c.titreAuto = true
+    c.dossier = LrPathUtils.child(LrPathUtils.child(Chemins.temporaire(), 'Rapide'), c.id)
+    Moteur.rapide = c
+    Moteur.travaille = true
+    Moteur.interruptionLe = nil
+    Moteur.enCours = c
+    local ok, erreur = LrTasks.pcall(function()
+        local prefs = Chemins.prefs()
+        local contexte = Lightroom.contexte(Lightroom.photos())
+        local morceaux = {}
+        if contexte and contexte ~= '' then
+            morceaux[#morceaux + 1] = contexte
+        end
+        morceaux[#morceaux + 1] = Consignes.rapide
+        morceaux[#morceaux + 1] = texte
+        Conversation.ajouterDemande(c, texte, os.time(), {})
+        local modele, effort = Moteur.modeleEtEffort()
+        Moteur.arreterSession()
+        Moteur.session = Session.nouvelle({
+            idConversation = c.id, claude = prefs.cheminClaude, connecteur = prefs.cheminConnecteur,
+            modele = modele, effort = effort, travail = Chemins.atelier(), consignes = Consignes.texte,
+        })
+        Moteur.session.conversation = c
+        Moteur.debutTravail = os.time()
+        Moteur.derniereActivite = os.time()
+        Moteur.signaler('rapide')
+        Moteur.session:envoyer(table.concat(morceaux, '\n\n'), {})
+    end)
+    if not ok then
+        Moteur.travaille = false
+        Moteur.enCours = nil
+        Moteur.session = nil
+        Journal.noter("Demande rapide impossible :", tostring(erreur))
+        return nil, tostring(erreur)
+    end
+    Moteur.demarrerBoucle()
+    return c
+end
+
+-- Oublie la dernière demande rapide (bouton ♻ de la fenêtre Demande rapide, demandé par Dany le
+-- 22 octobre 2026) : sa session de Claude Code s'arrête, son dossier temporaire s'efface. Refusé
+-- pendant que Claude y travaille. Rend vrai, ou nil et la raison. À appeler depuis une tâche.
+function Moteur.oublierRapide()
+    local c = Moteur.rapide
+    if not c then
+        return true
+    end
+    if Moteur.travaille and Moteur.enCours == c then
+        return nil, "Claude travaille sur la demande : attendez la fin."
+    end
+    if Moteur.session and Moteur.session.conversation == c then
+        Moteur.arreterSession()
+    end
+    if c.dossier then
+        LrTasks.pcall(Fichiers.supprimer, c.dossier)
+    end
+    Moteur.rapide = nil
+    return true
+end
+
 -- Demande à Claude d'arrêter ; sans réponse après quelques secondes, le processus est arrêté.
 function Moteur.interrompre()
     if Moteur.travaille and Moteur.session then
@@ -384,7 +476,7 @@ function Moteur.traiter(c, ev)
         end
     end
     Conversation.appliquer(c, ev, os.time(), function(image)
-        return Images.enregistrer(image, Stockage.dossier(c.id))
+        return Images.enregistrer(image, c.dossier or Stockage.dossier(c.id))
     end)
     if ev.genre == 'fin' then
         Moteur.compter(c, ev)

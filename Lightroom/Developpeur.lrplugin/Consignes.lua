@@ -301,6 +301,10 @@ Consignes.carnet = "Lis mon carnet de progrès (export_journal avec notebook = t
 -- ligne de style ; la section « Leçon de la photo » des consignes la nomme.
 Consignes.sansLecon = "[Sans leçon]"
 
+-- Joint à chaque demande de la fenêtre Demande rapide (Moteur.envoyerRapide) : une seule demande,
+-- sans suite ni carte.
+Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Fais ce qui est demandé sans noter la photo d'abord (sauf si on te le demande), puis dis ce qui a changé. Ni titre, ni leçon, ni « Demande à garder »."
+
 -- Ajouté au message envoyé (pas affiché) tant que la conversation n'a pas de titre : la consigne
 -- seule ne suffit pas (constaté avec Haiku, 19 octobre 2026).
 Consignes.rappelTitre = "(Pour la fenêtre, à ne pas mentionner : dès que tu vois la photo, commence ton message suivant par la ligne seule [titre : <ce que montre la photo, 3 à 6 mots>].)"

@@ -19,11 +19,16 @@ public struct PointAF: Equatable {
     /// qui ne s'ouvre pas à temps.
     public static func marquer(original: URL, geometrie: JSONValue, entree: URL, sortie: URL,
                                lecteur: LecteurBoitier = LecteurBoitier()) -> (x: Double, y: Double, avertissement: Bool)? {
-        guard let g = GeometriePhoto(geometrie), let af = lecteur.lire(original)?.point else { return nil }
+        guard let g = GeometriePhoto(geometrie), let lecture = lecteur.lire(original), let af = lecture.point else { return nil }
         let point = g.versApercu(x: af.x, y: af.y)
         guard (0...1).contains(point.x), (0...1).contains(point.y),
-              let donnees = try? Data(contentsOf: entree), let image = PreviewImages.image(donnees),
-              let marquee = PreviewImages.marquerPoint(image, point, manque: af.avertissement),
+              let donnees = try? Data(contentsOf: entree), let image = PreviewImages.image(donnees) else { return nil }
+        // Le cadre AF comme l'onglet Focus : rouge, à la taille de Focus-Points, un point au centre
+        // (demandé par Dany le 22 octobre 2026, à reprendre dans la prochaine version) ; sans cadre
+        // lu, le carré d'avant.
+        let cadresAF = lecture.miseAuPoint.map { Focus.cadres($0, geometrie: g).cadres.filter { $0.genre == .pointAF } } ?? []
+        guard let marquee = cadresAF.isEmpty ? PreviewImages.marquerPoint(image, point, manque: af.avertissement)
+                                             : PreviewImages.marquerFocus(image, cadres: cadresAF),
               (try? marquee.write(to: sortie)) != nil else { return nil }
         return (Double(point.x), Double(point.y), af.avertissement)
     }

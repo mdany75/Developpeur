@@ -57,6 +57,28 @@ function Lightroom.photos()
     return info
 end
 
+-- Une photo du catalogue par son identifiant, décrite comme la photo active de Lightroom.photos
+-- (id, nom, note, drapeau) : la photo d'une ancienne conversation choisie dans la liste
+-- (Fenetre.photoDeLaConversation). Nil si elle n'est plus au catalogue. À appeler depuis une tâche.
+function Lightroom.photo(id)
+    local decrite
+    LrTasks.pcall(function()
+        local photo = LrApplication.activeCatalog():getPhotoByLocalId(tonumber(id))
+        if not photo then
+            return
+        end
+        decrite = { id = photo.localIdentifier, nom = photo:getFormattedMetadata('fileName') or '' }
+        local okNote, note, drapeau = LrTasks.pcall(function()
+            return photo:getRawMetadata('rating'), photo:getRawMetadata('pickStatus')
+        end)
+        if okNote then
+            decrite.note = math.floor(tonumber(note) or 0)
+            decrite.drapeau = DRAPEAUX[tonumber(drapeau) or 0] or 'aucun'
+        end
+    end)
+    return decrite
+end
+
 -- La légende d'une photo, pour l'aperçu de la photo active et l'en-tête de la fenêtre (fenêtre B,
 -- 1.3) : { nom (son nom de fichier), copie (le nom de sa copie virtuelle), appareil (le modèle du
 -- boîtier), date (de prise de vue : « 10 juil. 2020 ») }, une table neuve de textes, chacun absent

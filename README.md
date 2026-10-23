@@ -91,11 +91,15 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   que vous choisissez une autre photo), la photo active, avec sa légende (son nom, son appareil et
   sa date de prise de vue) ; puis les images que Claude regarde et les photos jointes. ◀ ▶ pour les
   parcourir (▶ depuis la dernière revient à la photo active), Agrandir pour les voir en grand.
-- Le carré de la mise au point sur la photo active, pour une photo Fujifilm (RAF, ou JPEG de
-  l'appareil) : vert, rouge si l'appareil a signalé la mise au point manquée. Le connecteur lit le
-  point dans l'original, sur ce Mac et en temps limité, et le dessine sur l'aperçu ; Agrandir le
-  montre aussi. Pour une autre marque, l'original n'est pas ouvert et l'aperçu reste sans carré ;
-  de même sans point lisible.
+- Le point de mise au point sur la photo active, pour une photo Fujifilm (RAF, ou JPEG de
+  l'appareil) : un cadre rouge avec un point au centre, comme dans l'onglet Focus (le carré vert
+  d'avant reste pour un point dont la taille ne se lit pas : rouge si l'appareil a signalé la mise
+  au point manquée). Le connecteur lit le point dans l'original, sur ce Mac et en temps limité, et
+  le dessine sur l'aperçu ; Agrandir le montre aussi. Pour une autre marque, l'original n'est pas
+  ouvert et l'aperçu reste sans cadre ; de même sans point lisible.
+- Une ancienne conversation choisie dans la liste montre sa photo (la photo active de sa dernière
+  demande) dans les onglets Aperçu, Focus, Note et Leçon, comme dans Proposition, tant que la
+  sélection de Lightroom ne change pas ; la carte Note agit alors sur cette photo.
 - L'onglet Focus (entre Aperçu et Proposition) : la photo active dans l'aperçu, comme dans le
   module Focus-Points, avec ses informations dessous, en trois blocs : Image (fichier, date et heure
   de la prise de vue, taille d'origine et taille actuelle), Prise de vue (marque, modèle, objectif,
@@ -176,6 +180,22 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 - Fermer la fenêtre n'arrête pas Claude : le travail continue et se retrouve à la réouverture.
   Claude Code reste ouvert entre deux demandes (réponses plus rapides) et se ferme après 15 minutes
   sans demande (5 minutes ou 1 heure au choix) ou quand Lightroom quitte.
+
+### La Demande rapide
+
+Une petite fenêtre à part pour une question vite faite : Fichier › Module externe - Extras ›
+Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une fois le raccourci posé.
+
+- En bas, la demande sur trois lignes ; Retour l'envoie, comme Envoyer à sa droite.
+- Chaque demande part dans une conversation neuve, jamais gardée : ni dans la liste de la fenêtre
+  Claude, ni sur le disque. Claude répond sans noter la photo d'abord, sans leçon ni « Demande à
+  garder ».
+- Au-dessus, la réponse, page par page : ▲ et ▼, au-dessus d'Envoyer, la font défiler comme les
+  cartes de la fenêtre Claude, sans limite de longueur.
+- ♻, à gauche de la demande, repart de zéro : la réponse et la demande s'effacent (grisé pendant
+  que Claude travaille).
+- Échap ne la ferme pas (une fenêtre flottante de Lightroom ne reçoit pas cette touche) : le bouton
+  de fermeture rouge, en haut à gauche.
 
 ### Apprendre avec Claude
 
@@ -328,8 +348,9 @@ avant de proposer un cadre.
 - Le point de mise au point des photos Fujifilm (RAF, ou JPEG de l'appareil), lu dans l'original
   par le connecteur, sur ce Mac : sa place dans l'image, la netteté autour, et si l'appareil a
   signalé la mise au point manquée. Pour noter, ou pour vous montrer la mise au point, Claude le
-  fait dessiner sur l'aperçu entier ou sur un zoom : un carré vert, rouge si la mise au point est
-  signalée manquée. Sur un zoom, Claude sait aussi si le point tombe dans la zone, et la netteté
+  fait dessiner sur l'aperçu entier ou sur un zoom : un cadre rouge avec un point au centre, comme
+  l'onglet Focus (sans taille lue, un carré vert, rouge si la mise au point est signalée
+  manquée). Sur un zoom, Claude sait aussi si le point tombe dans la zone, et la netteté
   autour ; le carré n'y est dessiné que s'il y tombe. Jamais sur un avant/après. Pour le voir sur
   chaque aperçu et chaque zoom : case Mise au point du Gestionnaire de modules externes (décochée
   par défaut). Les mesures sont prises avant le carré. Dans la fenêtre Claude, l'aperçu de la
@@ -871,8 +892,8 @@ Ensuite :
 - ouvrir Claude Desktop : le connecteur `MCP-Developpeur` apparaît dans ses outils ;
 - dans Claude Code, ouvrir une nouvelle session (`/clear` ne relance pas le connecteur) ; depuis la
   1.2, la liaison refuse un connecteur plus ancien resté ouvert (voir En cas de problème) ;
-- pour le raccourci ⌃⌥C : Fichier › Gestionnaire de modules externes › Développeur › Poser le
-  raccourci, puis relancer Lightroom. Un module ne peut pas déclarer de raccourci : c'est un
+- pour les raccourcis ⌃⌥C (fenêtre Claude) et ⌘⌃⌥C (Demande rapide) : Fichier › Gestionnaire de
+  modules externes › Développeur › Poser le raccourci, puis relancer Lightroom. Un module ne peut pas déclarer de raccourci : c'est un
   raccourci d'app de macOS, qui sert quand la fenêtre principale de Lightroom est devant. Pour le
   poser à la main (Réglages Système › Clavier › Raccourcis clavier › Raccourcis des apps), taper
   trois espaces puis « Ouvrir la fenêtre Claude » : Lightroom met ces espaces devant chaque entrée

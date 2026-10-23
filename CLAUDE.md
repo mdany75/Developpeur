@@ -57,7 +57,7 @@ Ce projet suit le standard commun des projets de Dany (`/standard-projet` le vé
 | Recette d'une version | toutes les options dont la collection d'essai a une photo (le 21 octobre 2026 : `--jpeg`, `--x-t20`, `--portrait`, `--mixte` ; ni flash, ni yeux rouges, ni Portrait d'iPhone, ni vrai horizon : `--horizon` demande d'ajouter aux Essais une copie qui a un horizon net, mer, lac ou plaine ; la dune 53709786 ne convient pas, ses rides de sable faussent la mesure), sur des copies remises à l'origine d'abord (`revert_to_original` : une copie que Claude a déjà retouchée est refusée) ; `--mixte` sur le portrait d'essai, la seule copie à deux lumières (relevé du 20 octobre 2026) ; l'étape du témoin à une seule lumière ne vient que si le RAW de `--recette` est une autre photo ; la sortie dans un fichier, en arrière-plan, jamais tronquée (`\| head` coupe la recette au milieu d'une étape) ; puis l'essai dans la fenêtre Claude (« Publier une version », étape 3) |
 | Réglages à plat | `./.build/debug/mcp-developpeur --dump [<id>]` (une clé par ligne, pour `diff` avant et après une opération faite à la main) |
 | Recalage mesuré | `./.build/debug/mcp-developpeur --recalage <id>` (écarts du modèle de recalage sur la géométrie actuelle ; deux rendus « Claude · recalage » dans l'Historique) |
-| Carré de mise au point | `./.build/debug/mcp-developpeur --marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` (ce que la fenêtre Claude lance, avec le connecteur de `cheminConnecteur`, pour l'aperçu de la photo active : `PointAF.marquer` lit le point dans un original Fujifilm en temps borné (`LecteurBoitier`), le passe dans l'image affichée et le dessine sur la vignette, carré vert, rouge si l'appareil a signalé la mise au point manquée ; code 1 sans point) |
+| Carré de mise au point | `./.build/debug/mcp-developpeur --marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` (ce que la fenêtre Claude lance, avec le connecteur de `cheminConnecteur`, pour l'aperçu de la photo active : `PointAF.marquer` lit le point dans un original Fujifilm en temps borné (`LecteurBoitier`), le passe dans l'image affichée et le dessine sur la vignette : le cadre AF rouge à la taille de Focus-Points avec un point au centre, comme l'onglet Focus (`PreviewImages.marquerFocus`, correctif 1.3.3), sinon le carré vert, rouge si l'appareil a signalé la mise au point manquée ; code 1 sans point) |
 | Écran du Mac | `./.build/debug/mcp-developpeur --ecran` (l'écran principal et les autres, avec leur profil de couleur, une ligne JSON, chemin du profil et texte de la boîte compris ; `{"lu": false}` sans écran ; lu sans Lightroom ni permission : ce que la fenêtre Claude lance pour son voyant Écran) |
 | Cadres de mise au point (onglet Focus) | `./.build/debug/mcp-developpeur --focus <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` (ce que la fenêtre Claude lance pour l'onglet Focus, par `perl` et son alarme de 5 s : `Focus.marquer` lit la mise au point d'un original Fujifilm en temps borné (`LecteurBoitier`), dessine sur la vignette le cadre AF à sa taille en rouge et les visages et éléments du sujet en coins jaunes (`PreviewImages.marquerFocus`), puis écrit une ligne JSON : `lue`, les blocs `image`, `prise_de_vue` et `mise_au_point` en paires titre, valeur en français, `point_af`, `cadres`, `dessinee` ; rien de lu : `{"lue": false, "raison": …}` (`delai`, `introuvable`, `illisible` : `Focus.lire`) et code 1) |
 | Lecture du boîtier | `./.build/debug/mcp-developpeur --boitier <original>` (un fichier Fujifilm, RAF ou JPEG, lu sans Lightroom par `LecteurBoitier` : point de mise au point, `intention_boitier` comme `view_photo`, `mise_au_point` comme l'onglet Focus, et `valeurs_lues` sous les noms d'exiftool, pour comparer avec lui (`exiftool -a -G1 -s`, celui de Focus-Points, en lecture seule) ; une ligne JSON, code 1 si rien n'est lu) |
@@ -496,8 +496,10 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   `point_af_toujours` et `etapes_claude` avant de répondre à Claude. Réponse : `point_af` { `x`,
   `y` (dans l'image affichée entière, de 0 à 1, sur un zoom aussi), `dans_la_zone` (zoom
   seulement), `nettete` (autour du point ; sur un zoom, dans le zoom, si le point y tombe),
-  `appareil` (« mise au point signalée manquée »), `carre` (s'il est dessiné : « vert » ou
-  « rouge », puis « sur l'image » ou « sur le zoom ») }. Le carré (vert,
+  `appareil` (« mise au point signalée manquée »), `carre` (s'il est dessiné : « cadre AF rouge,
+  point au centre » depuis le correctif 1.3.3, `ToolHandler.cadresAF` et
+  `PreviewImages.marquerFocus`, sinon « vert » ou « rouge », puis « sur l'image » ou « sur le
+  zoom ») }. Le carré (vert,
   rouge si l'appareil a signalé la mise au point manquée ; côté 6 % du petit côté, liseré sombre ;
   `PreviewImages.marquerPoint`) se dessine avec `af_point = true` (pour noter, ou montrer la mise
   au point) ou si la case « Mise au point » de la section de la liaison du Gestionnaire est cochée
@@ -1061,7 +1063,11 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   `Chemins.temporaire()/PhotoActive` (l'ancien s'efface), réduite au cadre par `Images.vignette`,
   refaite à chaque ouverture. Une image nouvelle de la conversation montrée (`Fenetre.nbImages`)
   la remplace ; ◀ revient aux images de la conversation, ▶ depuis la dernière y retourne ; un clic
-  sur une ligne d'image relit les images d'abord (pas de bascule).
+  sur une ligne d'image relit les images d'abord (pas de bascule). Une ancienne conversation choisie
+  dans la liste (correctif 1.3.3) : `Fenetre.photoDeLaConversation` remplace la photo active par
+  celle de sa dernière demande (`c.cle`, `Lightroom.photo`) tant que la sélection de Lightroom ne
+  change pas (`Fenetre.conversationChoisie`) ; « Active : » garde la photo de Lightroom
+  (`info.activeLightroom`) ; la carte Note agit sur la photo de la conversation.
 - Sur la vignette de la photo active d'un fichier Fujifilm (marque, ou original `.RAF`), le carré
   de mise au point est dessiné avant la réduction (`Fenetre.marquerMiseAuPoint`, demandé par Dany
   le 20 octobre 2026) : `Images.marquerMiseAuPoint` lance par `LrTasks.execute` le connecteur de
@@ -1146,12 +1152,27 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   conversation à la réouverture. Une conversation vide n'est pas remplacée, ni une conversation
   pendant un exercice « Je le fais » ; sur la page Carnet, la nouvelle conversation se prépare sans
   quitter la page (`Fenetre.nouvelle(garderPage)`).
+- **La Demande rapide** (correctif 1.3.3, demandée par Dany le 22 octobre 2026 ; `FenetreRapide.lua`,
+  `MenuRapide.lua`) : une fenêtre flottante à part, d'environ 1 000 × 250 (`save_frame`
+  `DeveloppeurRapide-<N>`, à augmenter quand la taille change). Chaque demande part dans une
+  conversation neuve (`Moteur.envoyerRapide` : `c.rapide`, jamais gardée, `enregistrer` sauté,
+  images dans `Temporaire/Rapide/<id>`, effacé à la suivante, session neuve sans reprise ;
+  `Consignes.rapide` : sans noter d'abord, ni titre, ni leçon, ni « Demande à garder »).
+  Disposition en pièces superposées (`place = 'overlapping'`) placées par `margin_top` et
+  `margin_left` : le résultat page par page (`FenetreRapide.montrer`, `Fil.couper`, 9 lignes de
+  13 points ; ▲ ▼ en push_button « mini » comme `Vues.fleches`, une page moins une ligne par clic),
+  la demande de 3 lignes (`immediate = false`), ♻ à sa gauche (`Moteur.oublierRapide`) et ▲ ▼ puis
+  Envoyer à sa droite, de la hauteur de sa boîte (55). Constaté le 22 octobre 2026 : dans ce
+  `f:view`, la boîte du champ et une f:column commencent à leur `margin_top` ; un petit bouton
+  seul dans sa f:row est décalé de 9 ; un clic sur un bouton valide le champ (l'envoi par Retour
+  attend 0,3 s et ▲ ▼ ♻ l'annulent) ; Échap n'arrive pas à une fenêtre flottante.
 - Ne jamais nommer un fichier du module `Versions.lua` : Lightroom refuse de le charger (constaté ;
   d'où `Composants.lua`). Un seul `Info.lua`, `Init.lua`, `Arret.lua` et `PluginInfoProvider.lua`
   pour la liaison et la fenêtre, sans fichier de fusion (`InfoFenetre.lua`…) :
   `scripts/tester-module.sh` refuse l'un et l'autre.
 - Un raccourci d'app vise le titre exact de l'entrée de menu, tel que Lightroom l'écrit : trois
-  espaces devant chaque entrée de module (`Raccourcis.RETRAIT`, constaté par l'accessibilité).
+  espaces devant chaque entrée de module (`Raccourcis.RETRAIT`, constaté par l'accessibilité) ;
+  `Raccourcis.LISTE` : ⌃⌥C (Ouvrir la fenêtre Claude) et ⌘⌃⌥C (Demande rapide, correctif 1.3.3).
   Lightroom ne lit les raccourcis qu'à son lancement : un rechargement du module ne suffit pas.
 - Pas de calcul long en Lua sur la tâche de l'interface : base64, réductions d'images (`sips`) et
   commandes du système passent par `LrTasks.execute` (qui ne bloque que la tâche).

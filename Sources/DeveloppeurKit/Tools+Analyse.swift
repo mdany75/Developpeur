@@ -31,7 +31,7 @@ extension ToolHandler {
                         "height": prop("number", "Hauteur (0 à 1)."),
                     ], required: ["x", "y", "width", "height"])),
                     ("compare", enumProp(Self.comparaisons.map(\.parametre), "Avant/après côte à côte : before_claude = l'état d'avant la première retouche de Claude ; previous_step = avant la dernière retouche ; claude_version = « Je le fais » : à gauche la version de Claude rangée par preview_settings avec my_turn, à droite l'état actuel (celle de l'utilisateur), avec exercice : écarts réglage par réglage et ecart_principal. L'Historique de Lightroom garde deux étapes « Claude · comparaison » (l'état d'avant, puis l'état actuel remis) : la photo revient telle qu'elle était.")),
-                    ("af_point", prop("boolean", "true = le point de mise au point de l'appareil dessiné sur l'image ou le zoom (region) : carré vert, rouge si l'appareil l'a signalé manqué (fichiers Fujifilm seulement). Pour noter, ou montrer la mise au point. Sans lui, point_af le donne en chiffres (avec la netteté autour ; sur un zoom, dans_la_zone) ; l'utilisateur peut le vouloir dessiné en tout temps.")),
+                    ("af_point", prop("boolean", "true = le point de mise au point de l'appareil dessiné sur l'image ou le zoom (region) : cadre AF rouge, point au centre (manquée : point_af.appareil) ; fichiers Fujifilm seulement. Pour noter, ou montrer la mise au point. Sans lui, point_af le donne en chiffres (avec la netteté autour ; sur un zoom, dans_la_zone) ; l'utilisateur peut le vouloir dessiné en tout temps.")),
                  ],
                  required: []),
             tool("measure_angle",
@@ -157,9 +157,18 @@ extension ToolHandler {
                 point["dans_la_zone"] = .bool(dedans)
                 if dedans, let decodee = PreviewImages.image(piece.data) {
                     if let nettete = Detail.nettete(decodee, autour: local) { point["nettete"] = .number((nettete * 10).rounded() / 10) }
-                    if args.bool("af_point") == true || afToujours, let marquee = PreviewImages.marquerPoint(decodee, local, manque: af.avertissement) {
+                    // Le cadre AF de l'onglet Focus ramené dans le zoom ; sans cadre lu, le carré d'avant.
+                    let cadres = Self.cadresAF(boitier, description: result["photo"]).map { cadre -> Focus.Cadre in
+                        var c = cadre
+                        c.coins = cadre.coins.map { CGPoint(x: ($0.x - region.minX) / region.width, y: ($0.y - region.minY) / region.height) }
+                        return c
+                    }
+                    if args.bool("af_point") == true || afToujours,
+                       let marquee = cadres.isEmpty ? PreviewImages.marquerPoint(decodee, local, manque: af.avertissement)
+                                                    : PreviewImages.marquerFocus(decodee, cadres: cadres) {
                         image = marquee
-                        point["carre"] = .string(af.avertissement ? "rouge, sur le zoom" : "vert, sur le zoom")
+                        point["carre"] = .string(cadres.isEmpty ? (af.avertissement ? "rouge, sur le zoom" : "vert, sur le zoom")
+                                                                : "cadre AF rouge, point au centre, sur le zoom")
                     }
                 }
                 info["point_af"] = .object(point)
@@ -241,9 +250,15 @@ extension ToolHandler {
                 if miseAuPoint?.jugeable == false {
                     point["mise_au_point"] = "non jugée : zone sans texture autour du point (ciel, sable, mur) ; regarder la netteté du sujet"
                 }
-                if args.bool("af_point") == true || afToujours, let marquee = PreviewImages.marquerPoint(decodee, af.point, manque: af.avertissement) {
+                // Le cadre AF comme l'onglet Focus (rouge, à sa taille, point au centre) ; sans cadre
+                // lu, le carré d'avant (vert, rouge si manquée).
+                let cadres = Self.cadresAF(boitier, description: result["photo"])
+                if args.bool("af_point") == true || afToujours,
+                   let marquee = cadres.isEmpty ? PreviewImages.marquerPoint(decodee, af.point, manque: af.avertissement)
+                                                : PreviewImages.marquerFocus(decodee, cadres: cadres) {
                     image = marquee
-                    point["carre"] = .string(af.avertissement ? "rouge, sur l'image" : "vert, sur l'image")
+                    point["carre"] = .string(cadres.isEmpty ? (af.avertissement ? "rouge, sur l'image" : "vert, sur l'image")
+                                                            : "cadre AF rouge, point au centre, sur l'image")
                 }
                 info["point_af"] = .object(point)
             }

@@ -1,5 +1,30 @@
 # Changements
 
+## 1.3.3 — 2026-10-22
+
+Le correctif 1.3.3, fait à votre demande le 22 octobre 2026, après la 1.3.2 : la Demande rapide,
+le point de mise au point en cadre rouge dans l'aperçu, et la photo d'une ancienne conversation
+dans tous les onglets. Après l'installation : quitter puis relancer Lightroom (fichiers nouveaux
+et raccourci ⌘⌃⌥C : Gestionnaire de modules externes › Développeur › Poser le raccourci, puis
+relancer), rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code.
+
+### Ajouté
+- La Demande rapide : une petite fenêtre à part (Fichier ou Bibliothèque › Module externe - Extras
+  › Demande rapide, ⌘⌃⌥C) d'environ 1 000 × 250 points. Une demande de trois lignes, envoyée par
+  Retour ou Envoyer, part chaque fois dans une conversation neuve, jamais gardée ; la réponse
+  s'affiche au-dessus, page par page avec ▲ ▼, et ♻ repart de zéro. « Poser le raccourci » pose
+  aussi ⌘⌃⌥C.
+
+### Changé
+- Le point de mise au point de l'aperçu (onglets Aperçu, Proposition et Note) et des images que
+  Claude regarde avec `af_point` : un cadre rouge à la taille de Focus-Points avec un point au
+  centre, comme l'onglet Focus, au lieu du carré vert (gardé quand la taille du point ne se lit
+  pas). Les images déjà gardées dans vos conversations restent telles quelles.
+
+### Corrigé
+- Une ancienne conversation choisie dans la liste : les onglets Aperçu, Focus, Note et Leçon
+  montraient la photo active de Lightroom, et non celle de la conversation (Proposition, si).
+
 ## 1.3.2 — 2026-10-22
 
 Le correctif 1.3.2, fait à votre demande le 22 octobre 2026 : l'onglet Focus, vos demandes à vous,

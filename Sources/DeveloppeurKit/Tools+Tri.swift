@@ -273,6 +273,14 @@ extension ToolHandler {
         return (point, af.avertissement)
     }
 
+    /// Le cadre AF de l'onglet Focus (Focus.cadres, genre pointAF) d'une lecture déjà faite, dans
+    /// l'image affichée, pour le dessiner comme lui (PreviewImages.marquerFocus) ; vide sans cadre lu
+    /// (demandé par Dany le 22 octobre 2026 : le même cadre rouge partout dans la fenêtre Claude).
+    static func cadresAF(_ lecture: LectureBoitier?, description: JSONValue?) -> [Focus.Cadre] {
+        guard let m = lecture?.miseAuPoint, let g = GeometriePhoto(description?["geometrie"]) else { return [] }
+        return Focus.cadres(m, geometrie: g).cadres.filter { $0.genre == .pointAF }
+    }
+
     func contactSheet(_ args: Arguments) throws -> ToolResult {
         let decalage = max(0, args.int("offset") ?? 0)
         let (ids, total) = try seriesPhotos(args, maximum: Self.maxContactSheet, decalage: decalage)

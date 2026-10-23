@@ -26,9 +26,11 @@ return {
     LrMetadataProvider = 'Metadonnees.lua',
 
     -- Fichier › Module externe - Extras, et Bibliothèque › Module externe - Extras. Le titre
-    -- « Ouvrir la fenêtre Claude » ne change pas : le raccourci ⌃⌥C le vise (Raccourcis.lua).
+    -- « Ouvrir la fenêtre Claude » ne change pas : le raccourci ⌃⌥C le vise (Raccourcis.lua) ; ni
+    -- « Demande rapide », que ⌘⌃⌥C vise.
     LrExportMenuItems = {
         { title = "Ouvrir la fenêtre Claude", file = 'MenuOuvrir.lua' },
+        { title = "Demande rapide", file = 'MenuRapide.lua' },
         { title = "Publication…", file = 'MenuPublication.lua' },
         { title = "Consommation…", file = 'MenuConsommation.lua' },
         { title = "Afficher la fenêtre de suivi", file = 'MenuSuivi.lua' },
@@ -39,6 +41,7 @@ return {
     },
     LrLibraryMenuItems = {
         { title = "Ouvrir la fenêtre Claude", file = 'MenuOuvrir.lua' },
+        { title = "Demande rapide", file = 'MenuRapide.lua' },
         { title = "Publication…", file = 'MenuPublication.lua' },
         { title = "Consommation…", file = 'MenuConsommation.lua' },
         { title = "Afficher la fenêtre de suivi", file = 'MenuSuivi.lua' },
@@ -48,5 +51,5 @@ return {
         { title = "Arrêter la liaison avec Claude", file = 'MenuArreter.lua' },
     },
 
-    VERSION = { major = 1, minor = 3, revision = 2, build = 7 },
+    VERSION = { major = 1, minor = 3, revision = 3, build = 8 },
 }

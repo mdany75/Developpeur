@@ -669,6 +669,10 @@ function Fenetre.choisirDansListe(valeur)
     Fenetre.indiceImage = nil
     Fenetre.imageCliquee = nil
     Fenetre.etape = nil
+    -- Ses onglets montrent sa photo (Fenetre.photoDeLaConversation), lue au prochain tour de la boucle.
+    local info = Fenetre.info
+    Fenetre.conversationChoisie = { c = Moteur.courante, cle = info and info.cle }
+    Fenetre.photoChangee = true
     Fenetre.p.message = ''
     Fenetre.rafraichirListe()
     return true
@@ -695,6 +699,8 @@ function Fenetre.nouvelle(garderPage)
     Fenetre.imageCliquee = nil
     Fenetre.etape = nil
     Fenetre.aRafraichir = true
+    -- Les onglets reviennent à la photo active (Fenetre.photoDeLaConversation).
+    Fenetre.photoChangee = true
     return true
 end
 
@@ -3995,6 +4001,23 @@ function Fenetre.etatBandeau(p)
     return 'vide'
 end
 
+-- La photo d'une ancienne conversation choisie dans la liste (Fenetre.choisirDansListe) : la photo
+-- active de sa dernière demande (`c.cle`), tant que cette conversation est montrée, que la
+-- sélection de Lightroom n'a pas changé depuis le choix et que cette photo n'est pas la photo
+-- active ; sinon nil (constaté par Dany le 22 octobre 2026 : les onglets montraient la photo
+-- active, Proposition celle de la conversation ; correction rapide, à reprendre avec ses essais).
+function Fenetre.photoDeLaConversation(info)
+    local choix, c = Fenetre.conversationChoisie, Moteur.courante
+    if not choix or choix.c ~= c or choix.cle ~= info.cle or #(c.elements or {}) == 0 or type(c.cle) ~= 'string' then
+        return nil
+    end
+    local id = tonumber(c.cle:match('^(%d+):'))
+    if not id or (info.active and info.active.id == id) then
+        return nil
+    end
+    return Lightroom.photo(id)
+end
+
 -- La photo active et la sélection (gardées pour la carte Note).
 function Fenetre.majPhoto()
     local p = Fenetre.p
@@ -4004,6 +4027,10 @@ function Fenetre.majPhoto()
     -- La version du registre avant de lire la photo : une note posée entre-temps n'est pas défaite.
     local version = Notation.version
     local info = Lightroom.photos()
+    -- Une ancienne conversation choisie dans la liste : les onglets (aperçu, Focus, Note, Leçon)
+    -- montrent sa photo, comme Proposition ; « Active : » reste la photo active de Lightroom.
+    info.activeLightroom = info.active
+    info.active = Fenetre.photoDeLaConversation(info) or info.active
     Fenetre.info = info
     -- Une autre photo active (ou la première vue à l'ouverture) : son aperçu se montre ; une image
     -- cliquée avant n'est plus montrée, l'aperçu revient à l'onglet (1.3).
@@ -4025,7 +4052,7 @@ function Fenetre.majPhoto()
     end
     if info.active then
         p.infoPhoto = string.format("Active : <EM>%s</EM> · Sélection : <EM>%d</EM>",
-            Fenetre.nomPhoto(legendeActive(info.active)), info.selection)
+            Fenetre.nomPhoto(legendeActive(info.activeLightroom or info.active)), info.selection)
         -- Une note acceptée ou changée qui n'est plus sur la photo (undo_last, ⌘Z) : la proposition
         -- redevient à décider.
         local active = info.active
