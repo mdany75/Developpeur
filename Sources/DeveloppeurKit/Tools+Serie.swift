@@ -70,7 +70,8 @@ extension ToolHandler {
         guard !dimensions.isEmpty, dimensions.isSubset(of: Self.matchDimensions) else {
             throw LightroomError.invalid("« adjust » : \(Self.matchDimensions.joined(separator: ", ")).")
         }
-        let serie = try seriesPhotos(args, maximum: Self.maxMatchedPhotos + 1)
+        // Les vidéos d'une collection ou de la sélection sont écartées et comptées (1.3.5).
+        let serie = try seriesPhotosSansVideos(args, maximum: Self.maxMatchedPhotos + 1)
         var ids = serie.ids.filter { $0 != reference }
         // Une collection ou une sélection plus longue que la limite : les photos laissées de côté sont dites.
         let nonHarmonisees = max(0, serie.total - serie.ids.count) + max(0, ids.count - Self.maxMatchedPhotos)
@@ -78,7 +79,7 @@ extension ToolHandler {
         guard !ids.isEmpty else { throw LightroomError.invalid("Aucune photo à harmoniser (la référence est écartée).") }
         if let by = args.string("by"), by != "measure" {
             guard by == "exif" else { throw LightroomError.invalid("« by » : measure ou exif.") }
-            return try matchSeriesExif(args, reference: reference, ids: ids)
+            return Self.avecVideos(try matchSeriesExif(args, reference: reference, ids: ids), serie.videos)
         }
         let confirme = args.bool("confirm") == true
         let total = ids.count * (confirme ? 3 : 1) + 1
@@ -150,7 +151,14 @@ extension ToolHandler {
         if !confirme {
             resultat["rien_n_est_applique"] = "Plan seulement : le montrer à l'utilisateur ; avec son accord, rappeler match_series avec confirm = true (corrections relatives, mesurées puis reprises une fois)."
         }
-        return .object(resultat)
+        return Self.avecVideos(.object(resultat), serie.videos)
+    }
+
+    /// Le résultat d'une série avec ses vidéos écartées, comptées (1.3.5).
+    static func avecVideos(_ resultat: JSONValue, _ videos: Int) -> JSONValue {
+        guard videos > 0, var objet = resultat.object else { return resultat }
+        objet["videos_ecartees"] = .string("\(videos) vidéo(s) écartée(s) : seules les photos s'harmonisent.")
+        return .object(objet)
     }
 
     /// Exposition d'une photo à la prise de vue (module : `prise_de_vue`), et son Exposure2012.

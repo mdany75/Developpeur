@@ -50,6 +50,9 @@ function Lecture.etat(params)
         liaison_fermee = true,
         lightroom = LrApplication.versionString(),
         catalogue = LrPathUtils.leafName(cat:getPath()),
+        -- Le chemin complet (1.3.5) : le serveur y lit la dernière sauvegarde du catalogue et le
+        -- volume pour Time Machine, puis le retire avant Claude.
+        chemin_catalogue = cat:getPath(),
         mode = modeTexte(prefs),
         pause = Liaison.pause,
         instantane_avant_claude = prefs.instantane,

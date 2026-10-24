@@ -1,5 +1,41 @@
 # Changements
 
+## 1.3.5 — 2026-10-23
+
+Le correctif 1.3.5, fait à votre demande le 23 octobre 2026 au soir : huit chantiers tirés de la
+feuille de route (trois de la 1.4, un de la 1.5 et les quatre de la 1.6, le style). Après
+l'installation : quitter puis relancer Lightroom (le module change), rouvrir Claude Desktop et
+ouvrir une nouvelle session de Claude Code.
+
+### Ajouté
+- La sauvegarde dite avant une série : `get_status` dit la dernière sauvegarde du catalogue (le
+  dossier Backups de Lightroom, à côté du catalogue) et Time Machine (sa dernière sauvegarde, et si
+  le volume du catalogue y est). Lues seulement : Claude ne règle rien.
+- Préparer un tirage : `export_photos` avec `print` (format en centimètres, « 20x30 », « 30x45 »,
+  résolution, papier mat ou brillant) donne le grand côté à la bonne résolution et la netteté de
+  sortie du papier. Claude dit qu'un tirage sort plus sombre et plus doux que l'écran (les ombres
+  un peu remontées sur une copie « tirage », si la photo le demande) et où choisir le profil du
+  laboratoire.
+- Ton style sur une photo neuve : le style « À ma façon » dans le menu Style de la fenêtre Claude,
+  et l'invite `a_ma_facon` de Claude Desktop : ton guide de style appliqué d'abord, puis la méthode
+  habituelle seulement pour ce qu'il ne dit pas.
+- Rendu reproductible : à la fin d'une retouche, ses réglages principaux sont gardés ; la même
+  photo retouchée de nouveau depuis l'origine s'y compare, et un écart trop grand se signale.
+- Apprendre de tes corrections : `remember_style` avec `learn` lit tes reprises à la main sur une
+  série (depuis la dernière retouche de Claude) ; une règle n'est proposée que si elle revient
+  souvent et dans le même sens (« tu baisses la Correction du voile après Claude, sur 7 photos sur
+  9 »), et elle n'entre au guide qu'avec ton accord.
+
+### Changé
+- Les styles de la fenêtre (Ambre et éclat, Or et peau douce, Or rose et éclat, Éclatant et peau
+  douce, Neutre, Rose froid et peau douce) deviennent des recettes chiffrées, les mêmes à chaque
+  photo, au lieu de mots réinterprétés à chaque demande. Ce sont des recettes de départ, à ajuster
+  à votre goût.
+- Les rafales par boîtier : le numéro de série du boîtier entre dans la description ; deux boîtiers
+  sur la même scène (X-H2S et X-T4) ne forment plus une rafale.
+- Les vidéos écartées : marquées dans la description, le tri, l'harmonisation d'une série et la
+  livraison les sautent et disent combien.
+
 ## 1.3.4 — 2026-10-23
 
 Le correctif 1.3.4, fait à votre demande le 23 octobre 2026 : quatre chantiers tirés de la feuille

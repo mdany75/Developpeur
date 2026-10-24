@@ -64,6 +64,9 @@ local function decrireVignette(photo, d)
     d.sensibilite = Photos.sensibilite(photo)
     -- Le serveur ne lit le point AF que dans les fichiers Fujifilm (PointAF).
     d.marque = Photos.meta(photo, 'cameraMake')
+    -- Le numéro de série du boîtier (1.3.5) : deux boîtiers sur la même scène ne forment pas une
+    -- rafale (Tri.memeRafale). Lu seul, par Photos.meta : une clé refusée ne casse aucun lot.
+    d.serie_boitier = Photos.meta(photo, 'cameraSerialNumber')
     d.geometrie = {
         largeur = largeur, hauteur = hauteur,
         orientation = (orientationAffichage(photo, raw, largeur, hauteur)),

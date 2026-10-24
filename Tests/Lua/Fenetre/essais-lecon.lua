@@ -1080,8 +1080,10 @@ end)
 essai('Conversation.messagePourClaude : la ligne « [Sans leçon] » après le contexte et le style, avant la demande', function()
     local c = Conversation.nouvelle()
     c.titreChoisi = true
-    egal('[Lightroom : x]\n\n[Style demandé : Neutre — balance neutre, couleurs fidèles, aucune dominante]\n\n[Sans leçon]\n\nRetouche',
+    egal('[Lightroom : x]\n\n' .. Consignes.ligneStyle('neutre') .. '\n\n[Sans leçon]\n\nRetouche',
         Conversation.messagePourClaude(c, 'Retouche', '[Lightroom : x]', Consignes.ligneStyle('neutre'), Consignes.sansLecon))
+    vrai(Consignes.ligneStyle('neutre'):find('^%[Style demandé : Neutre — balance neutre, couleurs fidèles, aucune dominante%. recette fixe'),
+        'le style, puis sa recette fixe (1.3.5)')
     egal('[Lightroom : x]\n\n[Sans leçon]\n\nRetouche', Conversation.messagePourClaude(c, 'Retouche', '[Lightroom : x]', nil, Consignes.sansLecon))
     egal('[Lightroom : x]\n\nRetouche', Conversation.messagePourClaude(c, 'Retouche', '[Lightroom : x]', nil, nil))
     egal('[Lightroom : x]\n\nRetouche', Conversation.messagePourClaude(c, 'Retouche', '[Lightroom : x]', '', ''))

@@ -158,20 +158,45 @@ Consignes.invites = {
 
 -- Les styles du menu Style (sous les invites) : leur définition part avec chaque demande.
 -- « Standard » n'ajoute rien à la demande (un style « Aucun » à côté ferait la même chose).
+-- Depuis le correctif 1.3.5, une recette fixe, chiffrée, part avec la définition : le même style
+-- rend la même chose d'une photo à l'autre, au lieu de mots réinterprétés à chaque demande.
+-- `valeurs` : des réglages posés tels quels (l'étalonnage, à zéro après la retouche de base) ;
+-- `relatif` : des décalages (apply_settings avec relative = true) ; `peau` : « Adoucir la peau
+-- (Lite) » sur la peau seulement ; `note` : ce qui ne se chiffre pas. Recettes de départ, à
+-- ajuster au goût de Dany.
 Consignes.styles = {
     { value = 'standard', title = "Standard" },
     { value = 'ambre_eclat', title = "Ambre et éclat",
-        definition = "tons chauds ambrés, lumière dorée, hautes lumières lumineuses" },
+        definition = "tons chauds ambrés, lumière dorée, hautes lumières lumineuses",
+        recette = { valeurs = { { 'ColorGradeHighlightHue', 45 }, { 'ColorGradeHighlightSat', 14 },
+                                { 'ColorGradeMidtoneHue', 40 }, { 'ColorGradeMidtoneSat', 6 } },
+                    relatif = { { 'Vibrance', 8 }, { 'Highlights2012', -10 }, { 'Whites2012', 8 } } } },
     { value = 'or_peau_douce', title = "Or et peau douce",
-        definition = "tons dorés chaleureux, peau adoucie (texture et clarté réduites sur la peau seulement), contraste doux" },
+        definition = "tons dorés chaleureux, peau adoucie (texture et clarté réduites sur la peau seulement), contraste doux",
+        recette = { valeurs = { { 'ColorGradeGlobalHue', 50 }, { 'ColorGradeGlobalSat', 8 },
+                                { 'ColorGradeHighlightHue', 48 }, { 'ColorGradeHighlightSat', 10 } },
+                    relatif = { { 'Contrast2012', -10 } }, peau = true } },
     { value = 'or_rose_eclat', title = "Or rose et éclat",
-        definition = "tons rosés dorés, rendu lumineux" },
+        definition = "tons rosés dorés, rendu lumineux",
+        recette = { valeurs = { { 'ColorGradeHighlightHue', 25 }, { 'ColorGradeHighlightSat', 12 },
+                                { 'ColorGradeShadowHue', 340 }, { 'ColorGradeShadowSat', 6 } },
+                    relatif = { { 'Whites2012', 6 }, { 'Vibrance', 6 } } } },
     { value = 'eclatant_peau_douce', title = "Éclatant et peau douce",
-        definition = "couleurs vives mais naturelles (vibrance plutôt que saturation), peau adoucie" },
+        definition = "couleurs vives mais naturelles (vibrance plutôt que saturation), peau adoucie",
+        recette = { relatif = { { 'Vibrance', 18 }, { 'Contrast2012', 8 }, { 'Clarity2012', 4 } }, peau = true } },
     { value = 'neutre', title = "Neutre",
-        definition = "balance neutre, couleurs fidèles, aucune dominante" },
+        definition = "balance neutre, couleurs fidèles, aucune dominante",
+        recette = { valeurs = { { 'ColorGradeGlobalSat', 0 }, { 'ColorGradeHighlightSat', 0 },
+                                { 'ColorGradeMidtoneSat', 0 }, { 'ColorGradeShadowSat', 0 } },
+                    note = "tons neutres ramenés sous 2 en a* et b* (white_balance_point sur un gris, s'il y en a un)" } },
     { value = 'rose_froid_peau_douce', title = "Rose froid et peau douce",
-        definition = "tons froids légèrement rosés, peau adoucie" },
+        definition = "tons froids légèrement rosés, peau adoucie",
+        recette = { valeurs = { { 'ColorGradeShadowHue', 215 }, { 'ColorGradeShadowSat', 10 },
+                                { 'ColorGradeHighlightHue', 345 }, { 'ColorGradeHighlightSat', 8 } },
+                    relatif = { { 'Vibrance', 4 } }, peau = true } },
+    -- Ton style sur une photo neuve (1.3.5) : le guide de style de Dany d'abord, sans recette.
+    { value = 'ma_facon', title = "À ma façon",
+        definition = "ton guide de style d'abord : le lire (remember_style avec read) et appliquer chacune de ses préférences telle quelle, en première passe ; puis la méthode habituelle seulement pour ce qu'il ne dit pas ; sans guide, le dire et retoucher normalement" },
 }
 
 function Consignes.style(valeur)
@@ -183,13 +208,39 @@ function Consignes.style(valeur)
     return nil
 end
 
+-- « Vibrance +8, Highlights2012 -10 » : des clés exactes, des nombres sans ambiguïté.
+local function reglagesRecette(liste, signe)
+    local parties = {}
+    for _, r in ipairs(liste or {}) do
+        local valeur = r[2]
+        parties[#parties + 1] = r[1] .. " " .. ((signe and valeur > 0) and "+" or "") .. tostring(valeur)
+    end
+    return table.concat(parties, ", ")
+end
+
+-- La recette fixe d'un style, en texte ; nil sans recette.
+function Consignes.texteRecette(s)
+    local r = s and s.recette
+    if not r then
+        return nil
+    end
+    local parties = {}
+    if r.valeurs and #r.valeurs > 0 then parties[#parties + 1] = "en valeurs : " .. reglagesRecette(r.valeurs, false) end
+    if r.relatif and #r.relatif > 0 then parties[#parties + 1] = "en relatif (relative = true) : " .. reglagesRecette(r.relatif, true) end
+    if r.peau then parties[#parties + 1] = "peau : « Adoucir la peau (Lite) » d'add_mask, sur la peau seulement" end
+    if r.note then parties[#parties + 1] = r.note end
+    return "recette fixe, la même à chaque photo : l'appliquer telle quelle après la retouche de base, en une étape « style : "
+        .. s.title .. " » ; " .. table.concat(parties, " ; ")
+end
+
 -- La ligne de style jointe à une demande ; nil pour Standard (ou un style inconnu).
 function Consignes.ligneStyle(valeur)
     local s = Consignes.style(valeur)
     if not s or not s.definition then
         return nil
     end
-    return "[Style demandé : " .. s.title .. " — " .. s.definition .. "]"
+    local recette = Consignes.texteRecette(s)
+    return "[Style demandé : " .. s.title .. " — " .. s.definition .. (recette and (". " .. recette) or "") .. "]"
 end
 
 -- Les modèles proposés (valeur passée à `claude --model`).

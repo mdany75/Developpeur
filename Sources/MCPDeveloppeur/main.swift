@@ -95,6 +95,7 @@ let verbose = ProcessInfo.processInfo.environment["DEVELOPPEUR_VERBOSE"] == "1"
 func outils() -> ToolHandler {
     let tools = ToolHandler(lightroom: LightroomBridge.fromEnvironment())
     tools.lireEcran = Ecran.lire
+    tools.lireSauvegardes = Sauvegardes.lire
     return tools
 }
 
@@ -103,6 +104,7 @@ func serve() {
     // Le carnet de progrès (1.3) ne se remplit que par le serveur lancé par Claude (Claude Desktop,
     // Claude Code, la fenêtre Claude) : ni --call, ni la recette, ni les tests n'y notent.
     tools.noterAuCarnet = true
+    tools.registreRendus = RegistreRendus()
     let server = MCPServer(name: ServerInfo.name, title: ServerInfo.title, version: ServerInfo.version,
                            instructions: ServerInfo.instructions,
                            tools: tools)

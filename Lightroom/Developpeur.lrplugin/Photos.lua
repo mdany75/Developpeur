@@ -253,6 +253,8 @@ local function decrireAvec(photo, detaille, f, b, retouchee)
         d.date = f('dateTimeOriginal')
         d.dimensions = f('dimensions')
         d.format = b('fileFormat')
+        -- Une vidéo (1.3.5) : le tri, la série et la livraison la sautent et disent combien.
+        if d.format == 'VIDEO' then d.video = true end
         d.note = b('rating')
         d.drapeau = NOMS_DRAPEAU[tonumber(b('pickStatus')) or 0] or 'aucun'
         local couleur = NOMS_COULEUR[b('colorNameForLabel')]

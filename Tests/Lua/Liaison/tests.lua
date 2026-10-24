@@ -3894,6 +3894,27 @@ test("livraison : modèle de noms, texte personnalisé et numéro de départ d'u
     egal(S.dernierExport.exportSettings.LR_export_destinationPathSuffix, 'web')
 end)
 
+test("livraison : une vidéo est sautée et comptée (1.3.5)", function()
+    local a, b = deuxPhotosALivrer()
+    b.brut.fileFormat = 'VIDEO'
+    local resultat = Commandes.executer('exporter', { photos = { 1, 2 }, dossier = '/Volumes/Photos/Livraison', reglages = REGLAGES_WEB })
+    egal(#resultat.fichiers, 1, 'la photo seule')
+    egal(resultat.fichiers[1].photo.id, a.localIdentifier)
+    egal(resultat.videos_ecartees, 1)
+    a.brut.fileFormat = 'VIDEO'
+    echoue(function() Commandes.executer('exporter', { photos = { 1, 2 }, dossier = '/Volumes/Photos/Livraison', reglages = REGLAGES_WEB }) end,
+        "2 vidéo(s)")
+end)
+
+test("état : le chemin du catalogue pour les sauvegardes, la vidéo marquée dans la description (1.3.5)", function()
+    local a = deuxPhotosALivrer()
+    local etat = Commandes.executer('etat', {})
+    egal(type(etat.chemin_catalogue), 'string')
+    egal(etat.chemin_catalogue:find('%.lrcat$') ~= nil, true, tostring(etat.chemin_catalogue))
+    a.brut.fileFormat = 'VIDEO'
+    egal(require('Photos').decrire(a, true).video, true)
+end)
+
 test("livraison : « Proposer d'abord », pause, dossier impossible", function()
     deuxPhotosALivrer()
     S.prefs.mode = 'proposer'

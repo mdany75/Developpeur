@@ -68,9 +68,23 @@ extension ToolHandler {
     /// Les photos d'une série : photo_ids, la sélection de Lightroom ou une collection, dans
     /// l'ordre de Lightroom ; au plus `maximum` après `decalage`. Renvoie aussi le total.
     func seriesPhotos(_ args: Arguments, maximum: Int, decalage: Int = 0) throws -> (ids: [Int], total: Int) {
+        let serie = try seriesPhotosSansVideos(args, maximum: maximum, decalage: decalage)
+        return (serie.ids, serie.total)
+    }
+
+    /// Une vidéo, d'après la description du module (`video`, ou `format` VIDEO).
+    static func estVideo(_ description: JSONValue) -> Bool {
+        description["video"]?.bool == true || description["format"]?.string?.uppercased() == "VIDEO"
+    }
+
+    /// La même série sans ses vidéos (1.3.5) : le tri, la série et la livraison les sautent et
+    /// disent combien. Elles se lisent dans les descriptions d'une collection, d'un dossier ou de la
+    /// sélection ; des photo_ids ne sont pas décrits ici (le tri les écarte à la lecture des
+    /// vignettes, la livraison dans le module).
+    func seriesPhotosSansVideos(_ args: Arguments, maximum: Int, decalage: Int = 0) throws -> (ids: [Int], total: Int, videos: Int) {
         if let ids = try args.intList("photo_ids"), !ids.isEmpty {
             guard ids.count <= maximum else { throw LightroomError.invalid("Au plus \(maximum) photos par appel.") }
-            return (ids, ids.count)
+            return (ids, ids.count, 0)
         }
         var reponse: JSONValue
         if args.has("collection") || args.has("folder") {
@@ -82,19 +96,20 @@ extension ToolHandler {
             else if let nom = args.string("collection")?.trimmingCharacters(in: .whitespaces), !nom.isEmpty { params["collection"] = .string(nom) }
             else { throw LightroomError.invalid("« collection » : son nom, « Ensemble > Nom » ou son identifiant ; « folder » : le chemin complet du dossier.") }
             reponse = try lightroom.send("chercher", params, timeout: Self.libraryTimeout)
-            let ids = (reponse["photos"]?.array ?? []).compactMap { $0["id"]?.int }
-            return (ids, reponse["total"]?.int ?? ids.count)
+            let decrites = reponse["photos"]?.array ?? []
+            let ids = decrites.filter { !Self.estVideo($0) }.compactMap { $0["id"]?.int }
+            return (ids, reponse["total"]?.int ?? decrites.count, decrites.filter(Self.estVideo).count)
         }
         guard args.bool("selection") == true else {
             throw LightroomError.invalid("Photos à traiter : photo_ids, selection = true, collection ou folder.")
         }
         reponse = try lightroom.send("selection", ["limite": .number(Double(Self.maxSelectionLimit))], timeout: 60)
-        let toutes = (reponse["photos"]?.array ?? []).compactMap { $0["id"]?.int }
-        let total = reponse["total"]?.int ?? toutes.count
+        let decrites = Array((reponse["photos"]?.array ?? []).dropFirst(decalage).prefix(maximum))
+        let total = reponse["total"]?.int ?? (reponse["photos"]?.array ?? []).count
         guard decalage > 0 || total <= maximum else {
             throw LightroomError.invalid("\(total) photos sélectionnées : au plus \(maximum) par appel. Réduire la sélection ou donner photo_ids.")
         }
-        return (Array(toutes.dropFirst(decalage).prefix(maximum)), total)
+        return (decrites.filter { !Self.estVideo($0) }.compactMap { $0["id"]?.int }, total, decrites.filter(Self.estVideo).count)
     }
 
     /// Une photo de la série, avec sa vignette (ou nil) et ce qu'en dit le module.
@@ -164,8 +179,9 @@ extension ToolHandler {
     func cullPhotos(_ args: Arguments) throws -> JSONValue {
         let debut = Date()
         let ids: [Int], total: Int
+        var videos = 0
         if Self.serieDonnee(args) {
-            (ids, total) = try seriesPhotos(args, maximum: Self.maxCulledPhotos)
+            (ids, total, videos) = try seriesPhotosSansVideos(args, maximum: Self.maxCulledPhotos)
         } else {
             // Sans cible, la photo active de Lightroom, comme les autres outils (la note d'abord d'une
             // photo dans la fenêtre Claude) ; sans photo active, le refus de toujours.
@@ -174,12 +190,17 @@ extension ToolHandler {
             }
             (ids, total) = ([active], 1)
         }
-        guard !ids.isEmpty else { throw LightroomError.invalid("Aucune photo à trier.") }
+        guard !ids.isEmpty else {
+            throw LightroomError.invalid(videos > 0 ? "Aucune photo à trier : \(videos) vidéo(s), que le tri ne juge pas." : "Aucune photo à trier.")
+        }
         let motsCles = args.bool("keywords") == true
         let pointsAF = LecteurBoitier()
         var photos: [PhotoTriee] = []
         var depuisCache = 0, rendues = 0
-        try thumbnails(ids, taille: Self.cullThumbnailSize, minimum: Self.minimumCullSide, message: "tri des photos") { lot in
+        try thumbnails(ids, taille: Self.cullThumbnailSize, minimum: Self.minimumCullSide, message: "tri des photos") { tout in
+            // Une vidéo donnée par photo_ids se voit ici, à sa description : écartée, comptée.
+            let lot = tout.filter { !Self.estVideo($0.description) }
+            videos += tout.count - lot.count
             depuisCache += lot.filter { $0.image != nil && $0.depuisCache }.count
             rendues += lot.filter { $0.image != nil && !$0.depuisCache }.count
             // Les mesures, deux photos à la fois au plus : Vision limite ses propres tâches
@@ -205,6 +226,9 @@ extension ToolHandler {
         if total > ids.count {
             bilan["photos_non_triees"] = .string("\(total - ids.count) photo(s) de plus dans la série : au plus \(Self.maxCulledPhotos) par appel.")
         }
+        if videos > 0 {
+            bilan["videos_ecartees"] = .string("\(videos) vidéo(s) écartée(s) : le tri ne juge que les photos.")
+        }
         if let bloque = pointsAF.bloque {
             bilan["points_af"] = .string("L'original « \(bloque.lastPathComponent) » ne s'est pas ouvert en 2 s : points AF non lus pour la suite de la série (netteté mesurée dans la zone la plus nette). Volume débranché, ou macOS demande à l'utilisateur d'autoriser l'accès au volume (fenêtre à accepter, puis relancer le tri).")
         }
@@ -223,6 +247,7 @@ extension ToolHandler {
         photo.drapeau = description["drapeau"]?.string
         photo.format = description["format"]?.string
         photo.pile = description["pile"]?["dessus"]?.int
+        photo.boitier = description["serie_boitier"]?.string
         guard let source = vignette.image else {
             photo.erreur = vignette.erreur ?? "pas de vignette"
             return photo

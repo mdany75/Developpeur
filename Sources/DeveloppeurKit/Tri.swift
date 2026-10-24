@@ -54,6 +54,9 @@ public struct PhotoTriee {
     /// l'identifiant de la photo du dessus. La meilleure de la pile est nommée ; les autres ne
     /// montent pas à 4 (`Notation.plafond`).
     public var pile: Int?
+    /// Numéro de série du boîtier (1.3.5, `serie_boitier` de la description) : deux boîtiers sur la
+    /// même scène ne forment pas une rafale.
+    public var boitier: String?
     public var detail: DetailMeasurements?
     public var mesures: PhotoMeasurements?
     public var vision: VisionReport?
@@ -273,6 +276,8 @@ public enum Tri {
     }
 
     static func memeRafale(_ a: PhotoTriee, _ b: PhotoTriee) -> Bool {
+        // Deux boîtiers différents (X-H2S et X-T4 sur la même scène) : jamais la même rafale (1.3.5).
+        if let sa = a.boitier, let sb = b.boitier, !sa.isEmpty, !sb.isEmpty, sa != sb { return false }
         guard let ea = a.empreinte, let eb = b.empreinte, let distance = VisionAnalysis.distance(ea, eb) else { return false }
         if let da = a.date, let db = b.date {
             return abs(db.timeIntervalSince(da)) <= ecartRafale && distance < VisionAnalysis.sameSceneDistance

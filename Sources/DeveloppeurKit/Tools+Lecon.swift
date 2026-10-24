@@ -115,12 +115,31 @@ extension ToolHandler {
         } catch {
             remarques.append(Self.remarqueLeconNonRangee(error))
         }
-        return [
+        var resultat: [String: JSONValue] = [
             "lecon": .object(lecon),
             "texte": .string(Lecon.texte(points: points, fichier: fichier)),
             "faits": faits,
             "remarques": .array(remarques.map(JSONValue.string)),
         ]
+        // Rendu reproductible (1.3.5) : les réglages de fin de retouche gardés, comparés à ceux de la
+        // retouche précédente de la même photo si celle-ci est repartie de l'origine depuis.
+        if let registre = registreRendus {
+            let retours = (premiere["entrees"]?.array ?? []).filter { $0["type"]?.string == "retour" }.count
+            if let comparaison = try? noterLeRendu(id: id, retours: retours, registre: registre) {
+                resultat["rendu_reproductible"] = comparaison
+            }
+        }
+        return .object(resultat)
+    }
+
+    /// Le rendu de fin de retouche d'une photo (ses réglages principaux et son profil), gardé ; la
+    /// comparaison avec la retouche précédente, s'il y a lieu.
+    func noterLeRendu(id: Int, retours: Int, registre: RegistreRendus) throws -> JSONValue? {
+        let reponse = try lightroom.send("reglages", ["photo": .number(Double(id)), "cles": .array(RegistreRendus.cles.map(JSONValue.string))],
+                                         timeout: 30)
+        var reglages: [String: Double] = [:]
+        for cle in RegistreRendus.cles { if let valeur = reponse["reglages"]?[cle]?.double { reglages[cle] = valeur } }
+        return try registre.noter(RegistreRendus.Rendu(photo: id, le: Date(), reglages: reglages, profil: reponse["profil"]?.string, retours: retours))
     }
 
     /// Le départ de la leçon : la plus ancienne vue mesurée de la session pour cette photo, toutes

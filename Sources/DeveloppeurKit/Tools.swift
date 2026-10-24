@@ -92,6 +92,12 @@ public final class ToolHandler {
     /// ne lisent jamais le vrai écran, et la recette le pose le temps de son étape ; main.swift pose
     /// `Ecran.lire` pour le serveur (`serve`) et `--call`.
     public var lireEcran: () -> Ecran.Etat? = { nil }
+    /// Les sauvegardes du catalogue et Time Machine, d'après le chemin du catalogue (1.3.5,
+    /// `Sauvegardes.lire`) : rien par défaut ; seul main.swift lit les vraies (ni les tests).
+    public var lireSauvegardes: (String) -> JSONValue? = { _ in nil }
+    /// Les rendus de fin de retouche (1.3.5, rendu reproductible) : nil par défaut ; seul `serve()`
+    /// en donne un, comme `noterAuCarnet`.
+    public var registreRendus: RegistreRendus?
     /// L'écran a déjà été dit à Claude (remarque du premier aperçu, ou get_status) : une fois par
     /// processus du serveur.
     var ecranSignale = false
@@ -188,7 +194,7 @@ public final class ToolHandler {
     var allDefinitions: [JSONValue] {
         let core: [JSONValue] = [
             tool("get_status",
-                 "État de la liaison avec Lightroom Classic : versions, photo active, mode du module (appliquer directement ou proposer d'abord), pause, limites de sécurité. Dit aussi l'écran principal du Mac (ecran : nom, profil de couleur, mesuré par une sonde ou non) : les mesures de view_photo n'en dépendent pas, l'œil de l'utilisateur si ; écran non étalonné : le lui dire quand son avis compte (peau, couleurs). request_backup demande une sauvegarde du catalogue à la prochaine fermeture de Lightroom : la proposer avant une longue série (des centaines de photos, une harmonisation), et dire de fermer puis rouvrir Lightroom pour qu'elle garde l'état d'avant.",
+                 "État de la liaison avec Lightroom Classic : versions, photo active, mode du module (appliquer directement ou proposer d'abord), pause, limites de sécurité. Dit aussi l'écran principal du Mac (ecran : nom, profil de couleur, mesuré par une sonde ou non) : les mesures de view_photo n'en dépendent pas, l'œil de l'utilisateur si ; écran non étalonné : le lui dire quand son avis compte (peau, couleurs). request_backup demande une sauvegarde du catalogue à la prochaine fermeture de Lightroom : la proposer avant une longue série (des centaines de photos, une harmonisation), et dire de fermer puis rouvrir Lightroom pour qu'elle garde l'état d'avant. sauvegardes : la dernière sauvegarde du catalogue et Time Machine (le volume du catalogue y est-il ?), lues seulement : les dire avant d'écrire sur des centaines de photos.",
                  properties: [("request_backup", prop("boolean", "true = demander à Lightroom une sauvegarde du catalogue à sa prochaine fermeture (sa fenêtre de sauvegarde ; l'utilisateur peut la passer)."))],
                  required: []),
             tool("list_selection",
@@ -453,6 +459,10 @@ public final class ToolHandler {
         if let ecran = lireEcran() {
             etat["ecran"] = Ecran.json(ecran)
             ecranSignale = true
+        }
+        // Le chemin du catalogue sert aux sauvegardes, pas à Claude (1.3.5).
+        if let chemin = etat.removeValue(forKey: "chemin_catalogue")?.string, let sauvegardes = lireSauvegardes(chemin) {
+            etat["sauvegardes"] = sauvegardes
         }
         return .object(etat)
     }

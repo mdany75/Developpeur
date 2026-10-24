@@ -275,9 +275,18 @@ function Livraison.exporter(params)
     verifierPause(params)
     local prefs = Preferences.lire()
     verifierAccordLivraison(prefs, params, 'export_photos', "exporté")
-    local visees = photosVisees(params)
+    -- Les vidéos (1.3.5) : sautées et comptées ; une livraison de photos ne les prend pas.
+    local visees, videos = {}, 0
+    for _, photo in ipairs(photosVisees(params)) do
+        if Photos.brut(photo, 'fileFormat') == 'VIDEO' then
+            videos = videos + 1
+        else
+            visees[#visees + 1] = photo
+        end
+    end
     if #visees == 0 then
-        echouer("Aucune photo à exporter.")
+        echouer(videos > 0 and string.format("Aucune photo à exporter : %d vidéo(s), qu'une livraison de photos ne prend pas.", videos)
+            or "Aucune photo à exporter.")
     end
     local r = type(params.reglages) == 'table' and params.reglages or {}
     local hdrVoulu = r.hdr == true and r.format ~= 'DNG' and r.format ~= 'ORIGINAL'
@@ -378,7 +387,8 @@ function Livraison.exporter(params)
     end
     Liaison.noter(string.format("Livraison : %d fichier(s) exporté(s) vers %s", reussies, dossier))
     return { mode = modeTexte(prefs), dossier = dossier, format = format, fichiers = fichiers,
-        reimportees = reglages.LR_reimportExportedPhoto or nil, empilees = reglages.LR_reimport_stackWithOriginal or nil }
+        reimportees = reglages.LR_reimportExportedPhoto or nil, empilees = reglages.LR_reimport_stackWithOriginal or nil,
+        videos_ecartees = videos > 0 and videos or nil }
 end
 
 -- Recette seulement (pas d'outil) : retire du catalogue les fichiers que le module vient d'y

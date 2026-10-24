@@ -2347,7 +2347,7 @@ essai('Versions : lecture, comparaison et alerte', function()
     egal(-1, Composants.comparer('1.0', '1.1'))
     egal(0, Composants.comparer('1.0', '1.0.0'))
     egal(1, Composants.comparer('1.10', '1.9'))
-    egal('1.3.4', Composants.module(), 'la version de Info.lua')
+    egal('1.3.5', Composants.module(), 'la version de Info.lua')
     -- Deux lignes : ce module et le connecteur, installés ensemble au même numéro.
     local l = Composants.lignes('1.0', '1.0')
     egal(2, #l)
@@ -2406,13 +2406,24 @@ end)
 
 essai('Styles : ligne jointe à la demande et rappel dans le fil', function()
     local Consignes = require 'Consignes'
-    egal(7, #Consignes.styles)
+    egal(8, #Consignes.styles)
     egal('Standard', Consignes.styles[1].title)
     egal(nil, Consignes.ligneStyle('standard'), 'Standard n\'ajoute rien')
     egal(nil, Consignes.ligneStyle('aucun'), 'plus de style « Aucun »')
     egal(nil, Consignes.ligneStyle('inconnu'))
-    egal('[Style demandé : Or et peau douce — tons dorés chaleureux, peau adoucie (texture et clarté réduites sur la peau seulement), contraste doux]',
+    -- Une recette fixe, chiffrée, part avec la définition (1.3.5) : le même style rend la même chose.
+    egal('[Style demandé : Or et peau douce — tons dorés chaleureux, peau adoucie (texture et clarté réduites sur la peau seulement), contraste doux. '
+        .. 'recette fixe, la même à chaque photo : l\'appliquer telle quelle après la retouche de base, en une étape « style : Or et peau douce » ; '
+        .. 'en valeurs : ColorGradeGlobalHue 50, ColorGradeGlobalSat 8, ColorGradeHighlightHue 48, ColorGradeHighlightSat 10 ; '
+        .. 'en relatif (relative = true) : Contrast2012 -10 ; peau : « Adoucir la peau (Lite) » d\'add_mask, sur la peau seulement]',
         Consignes.ligneStyle('or_peau_douce'))
+    vrai(Consignes.ligneStyle('ambre_eclat'):find('Vibrance +8, Highlights2012 -10, Whites2012 +8', 1, true), 'les décalages signés')
+    -- Chaque style à définition a sa recette, sauf « À ma façon », qui suit le guide de Dany.
+    for _, st in ipairs(Consignes.styles) do
+        if st.definition and st.value ~= 'ma_facon' then vrai(Consignes.texteRecette(st), st.value .. ' : une recette') end
+    end
+    egal(nil, Consignes.texteRecette(Consignes.style('ma_facon')))
+    vrai(Consignes.ligneStyle('ma_facon'):find('remember_style avec read', 1, true), 'à ma façon : le guide d\'abord')
     local c = Conversation.nouvelle()
     local m = Conversation.messagePourClaude(c, 'Retouche', '[Lightroom : x]', Consignes.ligneStyle('neutre'))
     vrai(m:find('^%[Lightroom : x%]\n\n%[Style demandé : Neutre'), m)

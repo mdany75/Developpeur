@@ -47,7 +47,7 @@ final class MCPServerTests: XCTestCase {
         let refus = try call(#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"expand_photo","arguments":{}}}"#)
         XCTAssertEqual(refus["error"]?["code"]?.int, JSONRPCError.invalidParams, "outil inconnu")
         let invites = (try call(#"{"jsonrpc":"2.0","id":5,"method":"prompts/list"}"#)["result"]?["prompts"]?.array ?? []).compactMap { $0["name"]?.string }
-        XCTAssertEqual(invites, ["retouche_pro", "harmoniser_serie", "tri_seance", "noter", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
+        XCTAssertEqual(invites, ["retouche_pro", "a_ma_facon", "harmoniser_serie", "tri_seance", "noter", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
         let annonce = (ServerInfo.instructions + JSONCoding.line(.array(outils))
             + Prompts.all.map { Prompts.texte($0, [:], guide: nil) + $0.description }.joined()).lowercased()
         for mot in ["photoshop", "expand_photo", "firefly", "agrandissement", "galerie", "gallery", "concours", "mariage", "crédit adobe"] {
@@ -89,7 +89,7 @@ final class MCPServerTests: XCTestCase {
     func testPromptsListAndGet() throws {
         let list = try call(#"{"jsonrpc":"2.0","id":6,"method":"prompts/list"}"#)
         let names = try XCTUnwrap(list["result"]?["prompts"]?.array).compactMap { $0["name"]?.string }
-        XCTAssertEqual(names, ["retouche_pro", "harmoniser_serie", "tri_seance", "noter", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
+        XCTAssertEqual(names, ["retouche_pro", "a_ma_facon", "harmoniser_serie", "tri_seance", "noter", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
 
         let prompt = try call(#"{"jsonrpc":"2.0","id":7,"method":"prompts/get","params":{"name":"retouche_pro","arguments":{"style":"chaud et doux"}}}"#)
         let message = try XCTUnwrap(prompt["result"]?["messages"]?.array?.first)

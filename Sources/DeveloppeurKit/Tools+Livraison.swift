@@ -55,6 +55,25 @@ extension ToolHandler {
         ("all_except_camera_raw", "allExceptCameraRawInfo"), ("all_except_camera", "allExceptCameraInfo"),
     ]
     static let sharpeningMedia = ["screen", "matte", "glossy"]
+    /// Résolution d'un tirage par défaut (pixels par pouce), et ses bornes.
+    static let tiragePpp = 300, tiragePppPermis = 240...600
+
+    /// Un tirage (`print`) : le grand côté en pixels d'après le format en centimètres et la
+    /// résolution, et le papier.
+    static func tirage(_ objet: [String: JSONValue]) throws -> (grandCote: Int, ppp: Int, papier: String, cm: (Double, Double)) {
+        guard let texte = objet["size"]?.string else { throw LightroomError.invalid("« print.size » : le format en centimètres, « 20x30 ».") }
+        let nombres = texte.lowercased().replacingOccurrences(of: ",", with: ".")
+            .split(whereSeparator: { "x×* ".contains($0) }).compactMap { Double($0.replacingOccurrences(of: "cm", with: "")) }
+        guard nombres.count == 2, nombres.allSatisfy({ (5...200).contains($0) }) else {
+            throw LightroomError.invalid("« print.size » : largeur x hauteur en centimètres, de 5 à 200 (« 20x30 »).")
+        }
+        let ppp = objet["ppi"]?.int ?? tiragePpp
+        guard tiragePppPermis.contains(ppp) else { throw LightroomError.invalid("« print.ppi » : de \(tiragePppPermis.lowerBound) à \(tiragePppPermis.upperBound).") }
+        let papier = objet["paper"]?.string ?? "glossy"
+        guard ["matte", "glossy"].contains(papier) else { throw LightroomError.invalid("« print.paper » : matte ou glossy.") }
+        let grandCote = min(20000, Int((max(nombres[0], nombres[1]) / 2.54 * Double(ppp)).rounded()))
+        return (grandCote, ppp, papier, (nombres[0], nombres[1]))
+    }
     static let sharpeningAmounts = ["low", "standard", "high"]
     /// Filigrane simple des droits d'auteur de la photo (identifiant de Lightroom).
     static let simpleCopyrightWatermark = "<simpleCopyrightWatermark>"
@@ -84,6 +103,11 @@ extension ToolHandler {
                     ("long_edge", prop("integer", "Grand côté en pixels (sinon pleine résolution).")),
                     ("short_edge", prop("integer", "Petit côté en pixels.")),
                     ("megapixels", prop("number", "Taille en mégapixels (5 = environ 2740 × 1830 pour un 3:2).")),
+                    ("print", objectProp("Un tirage (1.3.5) : size, le format en cm (« 20x30 », « 30x45 », « 13x18 »…), donne le grand côté à ppi (défaut \(Self.tiragePpp), de 240 à 600) ; paper, matte ou glossy (défaut), la netteté de sortie de ce papier. long_edge et sharpening donnés à part l'emportent. Un tirage sort souvent plus sombre et plus doux que l'écran : avant, sur une copie virtuelle « tirage », remonter un peu les ombres (Shadows +5 à +10), si la photo le demande. Le profil du laboratoire se choisit dans la fenêtre d'exportation de Lightroom (open_dialog) : un module ne peut pas le poser.", [
+                        "size": prop("string", "Format en centimètres, largeur x hauteur : « 20x30 »."),
+                        "ppi": prop("integer", "Résolution en pixels par pouce (défaut \(Self.tiragePpp))."),
+                        "paper": enumProp(["matte", "glossy"], "Papier : mat ou brillant (défaut glossy)."),
+                    ])),
                     ("sharpening", objectProp("Netteté de sortie ; {\"media\": \"none\"} la retire.", [
                         "media": enumProp(Self.sharpeningMedia + ["none"], "screen (écran), matte (papier mat), glossy (papier brillant), none."),
                         "amount": enumProp(Self.sharpeningAmounts, "Intensité (défaut standard)."),
@@ -427,8 +451,17 @@ extension ToolHandler {
                 r["nettete"] = ["support": .string(support), "niveau": .number(Double(niveau + 1))]
             }
         }
+        // Un tirage (1.3.5) : le format en centimètres donne le grand côté à la résolution voulue,
+        // et la netteté de sortie suit le papier ; une taille ou une netteté données à part
+        // l'emportent.
+        if let tirage = args.object("print") {
+            let t = try Self.tirage(tirage)
+            if tailles.isEmpty { r["taille"] = ["type": "longEdge", "valeur": .number(Double(t.grandCote))] }
+            r["resolution"] = .number(Double(t.ppp))
+            if args.object("sharpening") == nil { r["nettete"] = ["support": .string(t.papier), "niveau": 2] }
+        }
         if !rendu {
-            for cle in ["qualite", "taille", "nettete", "espace", "profondeur", "hdr", "compatibilite", "filigrane", "poids_max_ko", "sans_perte"] {
+            for cle in ["qualite", "taille", "nettete", "espace", "profondeur", "hdr", "compatibilite", "filigrane", "poids_max_ko", "sans_perte", "resolution"] {
                 r.removeValue(forKey: cle)
             }
         }
@@ -463,6 +496,7 @@ extension ToolHandler {
             case "shortEdge": parties.append("petit côté \(Int(valeur)) px")
             default: parties.append("grand côté \(Int(valeur)) px")
             }
+            if let ppp = r["resolution"]?.int { parties.append("\(ppp) ppp") }
         } else if format != "ORIGINAL", format != "DNG" {
             parties.append("pleine résolution")
         }

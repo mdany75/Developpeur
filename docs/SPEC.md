@@ -38,7 +38,7 @@ Deux pièces :
   `com.danymenard.mcp-developpeur`), installé dans `~/Library/Application Support/Developpeur/`
   et inscrit sous la clé `MCP-Developpeur` dans Claude Desktop et Claude Code ; 36 outils (34
   jusqu'à la 1.2 ; la 1.3 ajoute `read_composition` après `measure_angle` et `photo_lesson` à la
-  fin, tous deux en lecture seule) et 9 invites ;
+  fin, tous deux en lecture seule) et 10 invites (a_ma_facon depuis la 1.3.5) ;
 - le module Lightroom « Développeur » (`Lightroom/Developpeur.lrplugin`, identifiant
   `com.danymenard.developpeur`, Lightroom Classic 13.3 au moins), qui porte la liaison avec le
   serveur (`Liaison.lua`), la fenêtre Claude (voir Fenêtre Claude), les fenêtres Publication et
@@ -341,8 +341,8 @@ passe. Ce qui reste à voir est dans À constater dans Lightroom (1.2).
 
 ## Consignes et invites
 
-`ServerInfo.instructions` donne à Claude la méthode de travail ; les neuf invites de
-`Prompts.swift` (`retouche_pro`, `harmoniser_serie`, `tri_seance`, `noter`, `portrait`,
+`ServerInfo.instructions` donne à Claude la méthode de travail ; les dix invites de
+`Prompts.swift` (`retouche_pro`, `a_ma_facon`, `harmoniser_serie`, `tri_seance`, `noter`, `portrait`,
 `paysage`, `noir_et_blanc`, `nuit_iso_eleve`, `partage`) l'appliquent à un cas, `retouche_pro` et
 `harmoniser_serie` pas à pas, `noter` passe par passe selon le standard de notation (voir
 Notation). Depuis le correctif 1.3.2, les consignes disent « noter : propose_ratings (0 à 5 ★,
@@ -5315,6 +5315,21 @@ du 22 octobre 2026, la liste à la fin) :
     une proposition, une notation ou une leçon seule ; « ＋ Garder la demande » au bout de la ligne
     d'actions, à droite, et sa fenêtre pré-remplie ; le bandeau de 324 (deux lignes) ; le temps
     d'ouverture de la fenêtre avec 86 vues de plus.
+
+## Correctif 1.3.5 : huit chantiers de la feuille de route
+
+Demandé par Dany le 23 octobre 2026 au soir, juste après la 1.3.4, au-delà de la limite d'usage à
+sa demande : trois chantiers de la 1.4 (« Sauvegarde dite avant une série », « Rafales par
+boîtier », « Vidéos écartées »), un de la 1.5 (« Préparer un tirage ») et les quatre de la 1.6
+(« Ton style sur une photo neuve », « Rendu reproductible », « Styles en recettes fixes »,
+« Apprendre de tes corrections »). Les règles et les seuils sont dans CLAUDE.md (puce « Correctif
+1.3.5 »). Ce qui reste à constater dans Lightroom : `cameraSerialNumber` lu par
+`getFormattedMetadata` (supposé ; refusé, la clé manque et les rafales restent celles d'avant) ;
+le nom des dossiers de sauvegarde « AAAA-MM-JJ HHMM » dans Backups (celui de Lightroom Classic,
+supposé) ; `tmutil isexcluded` sur un volume externe, sans demande d'autorisation de macOS ;
+`LR_size_resolution` dans le fichier livré (300 ppp) ; une vidéo dans une collection, sautée par le
+tri et la livraison. Les recettes des styles sont des recettes de départ, choisies par Claude
+hors de Lightroom : à juger à l'œil sur de vraies photos et à ajuster avec Dany.
 
 ## Correctif 1.3.4 : quatre chantiers de la feuille de route
 

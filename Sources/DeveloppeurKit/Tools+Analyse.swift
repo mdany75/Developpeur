@@ -112,6 +112,8 @@ extension ToolHandler {
             photo.removeValue(forKey: "chemin_original")
             photo.removeValue(forKey: "geometrie")
             photo.removeValue(forKey: "marque")
+            // Le numéro de série du boîtier sert aux rafales du tri (1.3.5), pas à Claude.
+            photo.removeValue(forKey: "serie_boitier")
             // La sensibilité en nombre sert au carnet (bruit fort à ISO élevé) ; Claude a son texte (iso).
             photo.removeValue(forKey: "sensibilite")
             info["photo"] = .object(photo)

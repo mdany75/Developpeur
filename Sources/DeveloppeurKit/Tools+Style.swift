@@ -13,12 +13,16 @@ extension ToolHandler {
                     ("preference", prop("string", "La préférence à ajouter, en une phrase, telle que l'utilisateur l'a approuvée.")),
                     ("category", enumProp(GuideStyle.rubriques.map(\.nom), "Rubrique : \(GuideStyle.rubriques.map { "\($0.nom) (\($0.titre.lowercased()))" }.joined(separator: ", ")).")),
                     ("confirm", prop("boolean", "true = l'utilisateur a approuvé cette phrase (exigé pour ajouter).")),
-                 ],
+                    ("learn", prop("boolean", "true = apprendre de ses corrections (1.3.5) : ses reprises à la main depuis la dernière retouche de Claude, lues sur une série (photo_ids, selection, collection ou folder ; \(Apprentissage.maxPhotos) photos au plus) ; une règle n'est proposée que si elle revient souvent et dans le même sens, et rien n'est ajouté sans son accord.")),
+                    ("collection", prop("string", "Avec learn : une collection, par son nom ou son identifiant.")),
+                    ("folder", prop("string", "Avec learn : un dossier, par son chemin complet.")),
+                 ] + targetProperties,
                  required: []),
         ]
     }
 
     func rememberStyle(_ args: Arguments) throws -> JSONValue {
+        if args.bool("learn") == true { return try apprendreDesCorrections(args) }
         if let preference = args.string("preference") {
             guard args.bool("confirm") == true else {
                 throw LightroomError.invalid("Rien n'a été ajouté : proposer la phrase à l'utilisateur, attendre son accord, puis rappeler remember_style avec confirm = true.")
@@ -31,6 +35,26 @@ extension ToolHandler {
                     "a_savoir": "Pas encore de guide de style : il se remplit avec remember_style, après l'accord de l'utilisateur, ou à la main dans ce fichier."]
         }
         return ["guide": .string(guide), "fichier": .string(guideStyle.fichier.path)]
+    }
+
+    /// Les reprises à la main d'une série (commande `reglages` par photo, `corrections_utilisateur`),
+    /// puis les règles d'`Apprentissage`. Rien n'est écrit.
+    func apprendreDesCorrections(_ args: Arguments) throws -> JSONValue {
+        guard Self.serieDonnee(args) else {
+            throw LightroomError.invalid("« learn » : la série à lire, photo_ids, selection = true, collection ou folder.")
+        }
+        let serie = try seriesPhotosSansVideos(args, maximum: Apprentissage.maxPhotos)
+        guard !serie.ids.isEmpty else { throw LightroomError.invalid("Aucune photo à lire.") }
+        var parPhoto: [[Apprentissage.Reprise]] = []
+        avancer(0, sur: serie.ids.count, "Lecture des reprises", titre: serie.ids.count > 20 ? "reprises à la main" : nil)
+        for (index, id) in serie.ids.enumerated() {
+            try contexte.verifier()
+            let reponse = try lightroom.send("reglages", ["photo": .number(Double(id)), "cles": ["Exposure2012"]], timeout: 30)
+            let reprises = Apprentissage.reprises(reponse["corrections_utilisateur"])
+            if !reprises.isEmpty { parPhoto.append(reprises) }
+            avancer(index + 1, sur: serie.ids.count, "Lecture des reprises", titre: serie.ids.count > 20 ? "reprises à la main" : nil)
+        }
+        return Apprentissage.json(Apprentissage.regles(parPhoto), lues: serie.ids.count, reprises: parPhoto.count, videos: serie.videos)
     }
 
     // MARK: Ressources

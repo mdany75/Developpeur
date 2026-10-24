@@ -141,9 +141,14 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   demander (voir Noter vos photos).
 - Un style joint à chaque demande, invites comprises, par le menu « Style » sous le champ de
   demande : Standard (rien d'ajouté), Ambre et éclat, Or et peau douce, Or rose et éclat, Éclatant
-  et peau douce, Neutre, Rose froid et peau douce. « Peau douce » passe par un masque de la peau à
-  la dose « Adoucir la peau (Lite) », la moitié pour un homme ou une personne âgée, rien pour un
-  enfant, jamais par un réglage de toute la photo.
+  et peau douce, Neutre, Rose froid et peau douce, et À ma façon (1.3.5 : votre guide de style
+  appliqué d'abord, puis la méthode habituelle seulement pour ce qu'il ne dit pas). Depuis la
+  1.3.5, chaque style est une recette chiffrée, la même à chaque photo (l'étalonnage des couleurs en
+  valeurs, la vibrance, le contraste ou les blancs en décalages), posée telle quelle après la
+  retouche de base dans une étape « style : … » : le même style rend la même chose d'une photo à
+  l'autre. Ce sont des recettes de départ, à ajuster à votre goût. « Peau douce » passe par un
+  masque de la peau à la dose « Adoucir la peau (Lite) », la moitié pour un homme ou une personne
+  âgée, rien pour un enfant, jamais par un réglage de toute la photo.
 - Mes demandes, le menu à droite de Style : vos demandes à vous, gardées pour ne pas les réécrire
   à chaque fois, chacune « Nom — description ». En choisir une met son texte dans le champ, à la
   place de ce qui y était, sans l'envoyer : changez-la au besoin, puis Retour (ou Envoyer). Au bas
@@ -293,10 +298,11 @@ vous-même.
 
 ### Ce que Claude sait faire par le connecteur
 
-Les mêmes 36 outils servent dans la fenêtre Claude, dans Claude Desktop et dans Claude Code. Neuf
+Les mêmes 36 outils servent dans la fenêtre Claude, dans Claude Desktop et dans Claude Code. Dix
 invites prêtes à l'emploi s'y ajoutent, dans le menu « + » de Claude Desktop et parmi les commandes
 « / » de Claude Code : `retouche_pro` (une photo, en deux passes vérifiées, puis au plus deux passes
-correctives si un défaut reste), `harmoniser_serie`, `tri_seance`, `noter` (une sortie, selon le
+correctives si un défaut reste), `a_ma_facon` (1.3.5 : votre guide de style appliqué d'abord, puis
+la méthode habituelle pour le reste), `harmoniser_serie`, `tri_seance`, `noter` (une sortie, selon le
 standard de notation, passe par passe), `portrait`, `paysage`, `noir_et_blanc`, `nuit_iso_eleve` et
 `partage` (écran, web, Instagram, impression), chacune avec ses précisions au choix (style, photos,
 garder, passe, destination) ; celles qui retouchent suivent votre guide de style. `portrait`,
@@ -538,6 +544,15 @@ avant de proposer un cadre.
   progression de Lightroom, et s'arrête proprement si vous l'interrompez (Échap dans Claude Code,
   croix de la barre dans Lightroom). Avant des centaines de photos, Claude propose une sauvegarde du
   catalogue, que Lightroom fait à sa prochaine fermeture.
+- La sauvegarde dite avant une série (1.3.5) : `get_status` dit la dernière sauvegarde du catalogue
+  (les dossiers datés de Backups, à côté du catalogue) et Time Machine (sa dernière sauvegarde, et si
+  le volume du catalogue y est : un disque externe n'y entre que s'il est ajouté dans les options de
+  Time Machine). Lues seulement : Claude ne règle rien, il vous le dit avant d'écrire sur des
+  centaines de photos.
+- Les rafales par boîtier (1.3.5) : le numéro de série du boîtier entre dans la description ; deux
+  boîtiers sur la même scène (X-H2S et X-T4) ne forment plus une rafale.
+- Les vidéos écartées (1.3.5) : marquées dans la description, le tri, l'harmonisation d'une série et
+  la livraison les sautent et disent combien.
 
 **Noter**
 
@@ -588,6 +603,11 @@ avant de proposer un cadre.
 - Sortie HDR pour une photo réglée en mode HDR (Claude relit le fichier livré et dit s'il est bien
   HDR) ; poids maximal d'un JPEG ; filigrane (le vôtre, ou vos droits d'auteur) ; vos modèles de
   noms de fichiers, et les noms exacts que Lightroom donnera.
+- Préparer un tirage (1.3.5, `print`) : le format en centimètres (« 20x30 », « 30x45 »), la
+  résolution (300 ppp par défaut) et le papier, mat ou brillant, donnent le grand côté et la netteté
+  de sortie de ce papier. Un tirage sort souvent plus sombre et plus doux que l'écran : Claude
+  propose au besoin une copie virtuelle « tirage » aux ombres un peu remontées. Le profil du
+  laboratoire se choisit dans la fenêtre d'exportation de Lightroom : un module ne peut pas le poser.
 - Les réglages de vos services de publication « Disque dur » comme livraisons types, et vos
   dossiers d'exportation récents ; remettre un fichier livré dans le catalogue, par exemple un
   TIFF d'impression empilé avec l'original.
@@ -604,6 +624,16 @@ avant de proposer un cadre.
   ajoute une préférence (« jamais de vignetage ») qu'après votre accord sur la phrase exacte.
 - Claude voit ce que vous avez corrigé à la main depuis sa dernière retouche (« Vibrance remise à
   0, Ombres +54 »), en tient compte, et vous propose de le retenir dans le guide.
+- Apprendre de vos corrections (1.3.5, `remember_style` avec `learn`) : vos reprises à la main sur
+  une série, depuis la dernière retouche de Claude, lues d'un coup ; une règle n'est proposée que si
+  elle revient souvent (au moins 3 photos et 60 % des photos reprises) et dans le même sens (80 %),
+  « tu baisses la Correction du voile après Claude, sur 7 photos sur 9 », et elle n'entre au guide
+  qu'avec votre accord sur la phrase exacte. Seuils provisoires.
+- Rendu reproductible (1.3.5) : à la fin d'une retouche (la leçon de la photo), ses réglages
+  principaux sont gardés, dans `rendus.json` ; la même photo retouchée de nouveau depuis l'origine
+  s'y compare, et un écart au-delà des seuils (0,3 IL d'exposition, 400 K de température, un autre
+  profil…) se signale : un style qui change d'un jour à l'autre n'est pas un style. Seuils
+  provisoires.
 - Chaque retouche est une étape nommée du panneau Historique (« Claude · passe 1 : lumière et
   couleur »), précédée la première fois d'un instantané « Avant Claude ». Claude donne à chacune
   sa raison, en une phrase simple (le défaut vu, puis ce que l'étape y fait). Le journal des

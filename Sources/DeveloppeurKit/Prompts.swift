@@ -35,7 +35,7 @@ public enum Prompts {
         return texte
     }
 
-    public static let all: [PromptTemplate] = [retouchePro, harmoniserSerie, triSeance, noter, portrait, paysage, noirEtBlanc, nuitIsoEleve, partage]
+    public static let all: [PromptTemplate] = [retouchePro, aMaFacon, harmoniserSerie, triSeance, noter, portrait, paysage, noirEtBlanc, nuitIsoEleve, partage]
 
     private static let styleArgument = PromptTemplate.Argument(
         name: "style",
@@ -66,6 +66,25 @@ public enum Prompts {
             7. Si la photo le demande, retouches locales avec add_mask (ciel, sujet, arrière-plan, visage, dégradés, combinés au besoin), légères ; pour un portrait, les effets de Lightroom (effect : blanchiment des dents sur person_part teeth, renforcement de l'iris sur iris_pupil, peau dosée comme le dit add_mask (« Peau du visage lisse » par défaut, rien pour un enfant)), souvent à intensité réduite (amount) ; yeux rouges avec retouch_spots, seulement si un zoom montre des pupilles rouges, au centre de la pupille vu dans ce zoom. Pour mener l'œil au sujet : éclaircir et assombrir comme un tireur (doses dans la description d'add_mask), en une étape, suivie de \(Tireur.avantApres).
             8. view_photo de nouveau. Si un défaut précis reste, mesuré ou visible (hautes lumières brûlées, ombres bouchées, dominante, peau, masque trop visible), ou une « regression » au bilan, fais une passe corrective ciblée sur ce seul défaut (step_name « passe 3 : … », avec une reason qui le nomme), puis vérifie de même. Deux passes correctives au plus : s'il reste un défaut, dis-le dans le résumé plutôt que d'empiler les réglages. Pas de passe corrective sans défaut constaté.
             9. view_photo avec compare = before_claude (son bilan chiffre ce qui a changé depuis l'état d'avant Claude), puis résume en quelques puces ce que tu as changé et pourquoi, chiffres du bilan à l'appui, et ce qui reste à faire à la main dans Lightroom s'il y a lieu. \(Lecon.phrase)
+            """
+        })
+
+    /// Ton style sur une photo neuve (1.3.5) : le guide de style appliqué d'abord, puis la méthode
+    /// habituelle pour ce qui reste.
+    public static let aMaFacon = PromptTemplate(
+        name: "a_ma_facon",
+        description: "Retoucher la photo active à la façon de l'utilisateur : son guide de style appliqué d'abord, puis la méthode habituelle seulement pour ce qu'il ne dit pas.",
+        arguments: [],
+        avecGuide: true,
+        render: { _ in
+            """
+            Retouche la photo active de Lightroom Classic à ma façon : mon guide de style d'abord, puis ta méthode habituelle seulement pour ce qu'il ne dit pas.
+
+            1. remember_style avec read (le guide est aussi plus bas) : relève chacune de mes préférences qui touche cette photo (profil, contraste, couleurs, peau, noir et blanc, grain, recadrage). Sans guide, dis-le, et retouche comme retouche_pro.
+            2. view_photo : diagnostic bref, chiffres à l'appui, et ce que la photo cherche à montrer (intention_boitier, s'il est donné).
+            3. Première passe (apply_settings, step_name « passe 1 : mon guide », avec reason) : mes préférences, telles que le guide les dit, sans les réinterpréter ; une préférence qui contredit la photo (un noir dense sur une scène de brume) se dit, et ne se pose pas.
+            4. view_photo, puis la méthode de retouche_pro pour le reste seulement (balance, exposition, finitions, retouches locales légères), chaque étape avec sa reason ; ne défais pas une préférence du guide sans le dire.
+            \(finRetouche) Dis enfin quelles préférences du guide ont servi.
             """
         })
 
