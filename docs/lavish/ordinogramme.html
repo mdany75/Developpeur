@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordinogramme d'une retouche</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Mise en page : une colonne de lecture, chaque étape = en-tête, texte, ordinogramme pleine largeur, puis ce qui joue dans l'exemple */
+:root {
+  --bg: #f2f3f0;
+  --surface: #ffffff;
+  --ink: #1b1f22;
+  --muted: #59625f;
+  --line: #d3d8d3;
+  --accent: #0c6870;
+  --decision: #95570a;
+  --tool: #3a4d9c;
+  --soft: #e6ece9;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111416; --surface: #191d20; --ink: #e6e9e7; --muted: #9ba5a2; --line: #2d3437;
+    --accent: #5ec3c9; --decision: #e2a54c; --tool: #9fadee; --soft: #1f2629; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111416; --surface: #191d20; --ink: #e6e9e7; --muted: #9ba5a2; --line: #2d3437;
+  --accent: #5ec3c9; --decision: #e2a54c; --tool: #9fadee; --soft: #1f2629; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 15px/1.6 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+.page { max-width: 1120px; margin: 0 auto; display: grid; gap: 40px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(30px, 5vw, 44px); letter-spacing: -0.01em; }
+h2 { font-size: clamp(22px, 3.2vw, 28px); }
+h3 { font-size: 17px; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+header.intro { display: grid; gap: 14px; }
+header.intro p { color: var(--muted); font-size: 16px; }
+
+.fiche { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: grid; gap: 16px; }
+.fiche .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; align-items: baseline; }
+.fiche .tag { font: 500 12px/1 var(--mono); color: var(--decision); border: 1px solid currentColor; border-radius: 4px; padding: 4px 7px; }
+.exif { font: 13px/1.5 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); background: var(--soft); border-radius: 6px; padding: 10px 12px; overflow-x: auto; white-space: nowrap; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px 28px; }
+.cols > div { min-width: 0; display: grid; gap: 8px; align-content: start; }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+ul.plain li::marker { color: var(--muted); }
+
+.legende { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 13px; color: var(--muted); }
+.legende span { display: inline-flex; align-items: center; gap: 8px; }
+.sh { width: 22px; height: 14px; display: inline-block; border: 1.5px solid var(--ink); background: var(--surface); flex: none; }
+.sh.stade { border-radius: 999px; }
+.sh.losange { width: 12px; height: 12px; transform: rotate(45deg); border-color: var(--decision); margin: 0 5px; }
+.sh.hexa { border: none; background: var(--tool); clip-path: polygon(22% 0, 78% 0, 100% 50%, 78% 100%, 22% 100%, 0 50%); }
+.sh.para { transform: skewX(-18deg); }
+.sh.cyl { border-radius: 50% / 28%; }
+
+nav.rail ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; counter-reset: etape; }
+nav.rail li { counter-increment: etape; }
+nav.rail a { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: baseline; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; height: 100%; }
+nav.rail a::before { content: counter(etape, decimal-leading-zero); font: 500 12px/1 var(--mono); color: var(--accent); }
+nav.rail a:hover { border-color: var(--accent); }
+nav.rail small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+
+section.etape { display: grid; gap: 14px; scroll-margin-top: 16px; }
+section.etape > .titre { display: grid; gap: 6px; }
+.diagramme { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; overflow-x: auto; }
+.diagramme pre.mermaid { margin: 0; font-size: 13px; background: transparent; }
+.exemple { border-left: 3px solid var(--accent); padding: 2px 0 2px 14px; display: grid; gap: 6px; }
+.exemple strong { font-family: var(--display); font-weight: 600; }
+.regles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.regles p { background: var(--soft); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; line-height: 1.5; max-width: none; }
+.regles b { font-weight: 600; }
+
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; display: grid; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="intro">
+  <span class="eyebrow">Développeur 1.3.3 · fenêtre Claude · Mode Appliquer</span>
+  <h1>Ordinogramme d'une retouche</h1>
+  <p>Le parcours complet d'une seule photo, de ton clic dans la Bibliothèque jusqu'à la note posée : ce que fait Lightroom, la fenêtre Claude, Claude Code, le connecteur MCP et le module, avec chaque décision prise en route. La photo est inventée pour réunir le plus de cas possibles.</p>
+</header>
+
+<div class="fiche">
+  <div class="head">
+    <h3>La photo imaginée : <span class="mono">DSCF7731.RAF</span></h3>
+    <span class="tag">exemple inventé, aucune de tes photos</span>
+  </div>
+  <div class="exif">X-H2S · XF16mmF1.4 · 1/60 s · f/2 · ISO 6400 · compensation −0,7 IL · priorité ouverture · CLASSIC CHROME · DR400 · flash d'appoint déclenché</div>
+  <div class="cols">
+    <div>
+      <h3>Ce qu'elle contient</h3>
+      <ul class="plain">
+        <li>Un portrait près d'une fenêtre, au crépuscule, pris à travers une vitre : des reflets.</li>
+        <li>Deux lumières : une lampe au tungstène dedans, le ciel bleu à la fenêtre.</li>
+        <li>Le cadre de la fenêtre penché de 1,8° et la distorsion du 16 mm.</li>
+        <li>Un bruit fort (mesuré à 2,0) à ISO 6400, la fenêtre brûlée.</li>
+        <li>Des yeux rouges (le flash), une tache de capteur dans le ciel.</li>
+        <li>Un passant flou au fond : celui-là reste à faire à la main.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Les réglages de départ</h3>
+      <ul class="plain">
+        <li>Mode : <b>Appliquer</b> (ni Proposer d'abord, ni Je le fais).</li>
+        <li>Gestionnaire : Autre photo, À l'ouverture, Avant/après, Leçon et Carnet cochées ; Mise au point décochée.</li>
+        <li>Modèle Opus, effort max ; un guide de style sans règle contraire.</li>
+        <li>La photo n'a jamais été notée ni retouchée par Claude.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="legende" aria-label="Légende des formes">
+  <span><i class="sh stade"></i>départ ou arrivée</span>
+  <span><i class="sh"></i>action</span>
+  <span><i class="sh losange"></i>décision</span>
+  <span><i class="sh hexa"></i>outil du connecteur MCP</span>
+  <span><i class="sh para"></i>ce que tu fais</span>
+  <span><i class="sh cyl"></i>fichier ou registre</span>
+</div>
+
+<nav class="rail" aria-label="Les étapes">
+  <ol>
+    <li><a href="#selection">Sélection<small>la photo active dans Lightroom</small></a></li>
+    <li><a href="#ouverture">Ouverture<small>⌃⌥C et la proposition préparée</small></a></li>
+    <li><a href="#noter">Noter d'abord<small>plancher technique et plafond</small></a></li>
+    <li><a href="#demande">La demande<small>Retouche pro vers Claude Code</small></a></li>
+    <li><a href="#appel">Un appel d'outil<small>du MCP au catalogue</small></a></li>
+    <li><a href="#diagnostic">Diagnostic<small>mesures, boîtier, lumières</small></a></li>
+    <li><a href="#globale">Retouche globale<small>reflets, profil, passes 1 et 2</small></a></li>
+    <li><a href="#locales">Retouches locales<small>tireur, peau, yeux, taches</small></a></li>
+    <li><a href="#verifier">Vérifier et cadrer<small>passe 3, composition</small></a></li>
+    <li><a href="#fin">Fin du tour<small>résumé, leçon, carnet</small></a></li>
+    <li><a href="#note">La note<small>ta décision dans la carte Note</small></a></li>
+  </ol>
+</nav>
+
+<section class="etape" id="selection">
+  <div class="titre"><span class="eyebrow">Étape 1 · Lightroom et la fenêtre</span><h2>Sélection de la photo</h2></div>
+  <p>Tu cliques la photo dans la Bibliothèque. La fenêtre Claude relit la photo active toutes les 2 secondes ; elle décide s'il faut une nouvelle conversation, puis refait l'aperçu, avec le cadre de mise au point pour un fichier Fujifilm.</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A[/"Tu cliques la photo dans la Bibliothèque"/] --> B{"Fenêtre Claude ouverte ?"}
+  B -->|non| B1["Rien ne part : la sélection vue et son heure&lt;br/&gt;sont gardées pour la prochaine ouverture"]
+  B -->|oui| C["Fenetre.majPhoto : photo active relue,&lt;br/&gt;toutes les 2 s"]
+  C --> D{"Autre photo que celle&lt;br/&gt;de la conversation montrée ?"}
+  D -->|non| G
+  D -->|oui| E{"Case « Autre photo » cochée,&lt;br/&gt;conversation avec des messages,&lt;br/&gt;pas d'exercice Je le fais ?"}
+  E -->|non| G
+  E -->|oui| F{"Claude a fini de travailler&lt;br/&gt;il y a moins de 4 s ?"}
+  F -->|"oui : la sélection peut venir de lui"| F1["Elle devient celle de la conversation"]
+  F -->|non| F2["Nouvelle conversation pour cette photo"]
+  F1 --> G
+  F2 --> G
+  G["Vignette demandée au cache de Lightroom&lt;br/&gt;(requestJpegThumbnail, dans une tâche)"] --> H{"Fichier Fujifilm ?&lt;br/&gt;(marque, ou original .RAF)"}
+  H -->|non| K
+  H -->|oui| I["mcp-developpeur --marquer-af&lt;br/&gt;lancé par perl, alarme de 5 s"]
+  I --> J{"Original ouvert à temps ?&lt;br/&gt;(LecteurBoitier, 2 s)"}
+  J -->|"non : volume pas autorisé, disque absent"| K
+  J -->|oui| J1["Point AF lu dans la MakerNote,&lt;br/&gt;passé dans l'image affichée"]
+  J1 --> J2["Cadre AF rouge à la taille de Focus-Points,&lt;br/&gt;point au centre"]
+  J2 --> K
+  K["Réduite au cadre de 498 × 332 (sips),&lt;br/&gt;légende : nom, appareil, date locale"] --> L(["Aperçu de la photo active à jour"])
+</pre></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>La fenêtre est ouverte sur une conversation d'une autre photo : une nouvelle conversation commence. Le RAF est lu à temps, le cadre AF rouge tombe sur l'œil gauche.</p></div>
+  <div class="regles">
+    <p><b>Jamais de réponse à macOS.</b> Si macOS demande l'accès au volume Photos, <code>open()</code> attend : la lecture est sautée, Claude ne répond jamais à la demande à ta place.</p>
+    <p><b>L'onglet Focus</b> ne lit rien tant qu'il est caché : seulement sur un vrai clic de ta part.</p>
+  </div>
+</section>
+
+<section class="etape" id="ouverture">
+  <div class="titre"><span class="eyebrow">Étape 2 · Fenêtre Claude</span><h2>Ouverture et proposition préparée</h2></div>
+  <p>À l'ouverture (ou quand ⌃⌥C la rappelle), la fenêtre vérifie la liaison et ses voyants. Si la conversation est vide, Claude prépare tout seul une proposition de retouche, sans rien appliquer.</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A[/"Tu tapes ⌃⌥C, ou Fichier › Module externe - Extras"/] --> B["Fenetre.afficher : apparence et palette,&lt;br/&gt;nouvelle génération de la fenêtre"]
+  B --> C["Voyants : Claude Code, Lightroom,&lt;br/&gt;Écran (mcp-developpeur --ecran, 5 s au plus)"]
+  C --> D{"Liaison démarrée avec&lt;br/&gt;son jeton privé ?"}
+  D -->|non| D1["Voyant rouge et son aide :&lt;br/&gt;aucune prise ouverte"]
+  D -->|oui| E["Fenetre.majPhoto, puis l'aperçu (étape 1)"]
+  E --> F{"Case « À l'ouverture » cochée,&lt;br/&gt;photo active, Claude libre,&lt;br/&gt;conversation vide ?"}
+  F -->|non| F1(["La fenêtre attend ta demande"])
+  F -->|oui| G["Consignes.proposerOuverture envoyée à Claude&lt;br/&gt;(trajet de l'étape 4)"]
+  G --> H{"Photo déjà évaluée ?"}
+  H -->|non| I["Noter d'abord (étape 3)"]
+  H -->|oui| J
+  I --> J{{"preview_settings : rien n'est écrit"}}
+  J --> K["Proposition rendue : image, bilan,&lt;br/&gt;raison, réglages lus"]
+  K --> L["Onglet Proposition : elle attend,&lt;br/&gt;sans bascule (propositionAuto)"]
+</pre></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>Conversation neuve, photo jamais évaluée : Claude la note d'abord, puis prépare sa proposition (Classic Chrome, balance sur le visage). Elle attend dans l'onglet Proposition.</p></div>
+</section>
+
+<section class="etape" id="noter">
+  <div class="titre"><span class="eyebrow">Étape 3 · Notation</span><h2>Noter d'abord : le plancher technique</h2></div>
+  <p>Toute photo que Claude traite dans la fenêtre, il la note avant d'y toucher : le tri mesure les défauts et fixe un plafond, la vue avec le point de mise au point remplit le carnet, puis la note arrive « à vérifier ».</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A{{"cull_photos, sans cible"}} --> B["Photo active prise par la commande etat"]
+  B --> C["Vignette du cache, sa netteté ramenée&lt;br/&gt;à celle d'un aperçu"]
+  C --> D["Netteté, bruit, yeux (Vision, deux photos à la fois),&lt;br/&gt;rafale ou pile, point AF lu au boîtier"]
+  D --> E{"Texture autour du point AF"}
+  E -->|"moins de 18"| E1["Mise au point « non jugée »"]
+  E -->|"18 à 30"| E2["Manquée = un doute seulement"]
+  E -->|"30 et plus"| E3["Mise au point jugée"]
+  E1 --> F
+  E2 --> F
+  E3 --> F
+  F{"Défaut mesuré ?"}
+  F -->|"floue, MAP manquée, yeux fermés"| F1["Plafond 0 ★, rejet proposé"]
+  F -->|"douce, pas la meilleure de sa rafale"| F2["Plafond 3 ★"]
+  F -->|"presque noire ou brûlée, doute de MAP"| F3["Plafond 2 ★, à vérifier"]
+  F -->|"capture d'écran"| F4["Plafond 1 ★"]
+  F -->|"aucun"| F5["Pas de plafond"]
+  F1 --> G
+  F2 --> G
+  F3 --> G
+  F4 --> G
+  F5 --> G
+  G[("dernierTri : le plafond gardé&lt;br/&gt;pour le processus du serveur")] --> H{{"view_photo avec af_point = true"}}
+  H --> I{"Déjà évaluée ?&lt;br/&gt;(evaluation)"}
+  I -->|oui| I1(["Ne pas renoter, sauf ta demande"])
+  I -->|non| J{"Première vue sans étape de Claude,&lt;br/&gt;hors Essais, case Carnet cochée ?"}
+  J -->|oui| K["Constats au carnet de progrès"]
+  J -->|non| L
+  K --> L{{"propose_ratings avec read_standard"}}
+  L --> M{{"propose_ratings : une note, sans apply"}}
+  M --> N{"De 0 à 5 ★, et sous le plafond&lt;br/&gt;ou avec to_check ?"}
+  N -->|non| N1["Refus avant tout envoi"]
+  N -->|oui| O[("notation.json : la note « à vérifier »")]
+  O --> P(["Carte Note : Accepter, Laisser,&lt;br/&gt;Changer…, les étoiles"])
+</pre></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>Œil net, yeux ouverts, pas de rafale : aucun plafond. Au carnet, le bruit fort est constaté (2,0, cherché dès ISO 1 600) ; la sous-exposition est écartée, car −0,7 IL dit une photo voulue sombre. Claude propose 3 ★, à vérifier.</p></div>
+  <div class="regles">
+    <p><b>Une note, un niveau fixe.</b> 0 ★ = pas encore jugée ; rejeter = un drapeau ; Claude note de 0 à 5 ★, jamais un libellé de couleur.</p>
+    <p><b>Les photos d'Essais</b> n'entrent jamais au carnet, ni leurs constats ni leurs leçons.</p>
+  </div>
+</section>
+
+<section class="etape" id="demande">
+  <div class="titre"><span class="eyebrow">Étape 4 · Fenêtre, moteur, Claude Code</span><h2>La demande : Retouche pro</h2></div>
+  <p>Tu cliques l'invite Retouche pro. Le moteur joint les consignes et la ligne de style, relance Claude Code au besoin (jamais l'API : ta connexion claude.ai), et lit ses réponses pour remplir le fil.</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A[/"Tu cliques Retouche pro, Mode Appliquer"/] --> B{"Claude travaille déjà ?"}
+  B -->|oui| B1["Refus dit au bandeau"]
+  B -->|non| C["Fenetre.envoyer : la proposition préparée&lt;br/&gt;n'est plus « automatique », la photo est notée&lt;br/&gt;comme celle de la conversation"]
+  C --> D["Moteur.envoyer : la demande et la ligne de style"]
+  D --> E{"Case Leçon cochée ?"}
+  E -->|non| E1["« [Sans leçon] » joint à la demande"]
+  E -->|oui| F
+  E1 --> F{"Claude Code ouvert pour cette conversation,&lt;br/&gt;même modèle, même effort ?"}
+  F -->|oui| H
+  F -->|non| G["Session:lancer → relais.sh :&lt;br/&gt;clés d'API retirées de l'environnement"]
+  G --> G1["claude --resume, --model opus, --effort max,&lt;br/&gt;--strict-mcp-config, aucun outil intégré,&lt;br/&gt;consignes.md, dossier vide Atelier/"]
+  G1 --> G2["Claude Code lance son propre connecteur&lt;br/&gt;mcp-developpeur sur stdio"]
+  G2 --> H
+  H["entree.jsonl, suivi par tail -f → Claude Code"] --> I["Claude lit les consignes de la fenêtre,&lt;br/&gt;ta demande et le guide de style"]
+  I --> J["sortie.jsonl relu par le moteur&lt;br/&gt;→ lignes du fil, heure, outils"]
+  J --> K(["Chaque outil appelé suit le trajet de l'étape 5"])
+</pre></div>
+  <div class="regles">
+    <p><b>Un seul processus Claude Code</b> à la fois : une autre conversation, un autre modèle ou un autre effort le relance à la demande suivante, en reprenant la session.</p>
+    <p><b>Ce que tu demandes en mots clairs</b>, Claude le fait ; il ne refuse que ce que les outils ne savent pas faire, ou ce que bloquent les réglages du module.</p>
+  </div>
+</section>
+
+<section class="etape" id="appel">
+  <div class="titre"><span class="eyebrow">Étape 5 · Connecteur MCP et liaison</span><h2>Le trajet de chaque appel d'outil</h2></div>
+  <p>Chaque outil (view_photo, apply_settings, add_mask…) fait ce chemin : le connecteur le vérifie, l'envoie au module par la liaison locale fermée par un jeton, le module l'exécute dans le catalogue et garde l'avant/après de l'étape.</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A["Claude Code : tools/call mcp__developpeur__…"] --> B["mcp-developpeur (Swift) sur stdio"]
+  B --> C{"Même appel déjà répondu ?"}
+  C -->|oui| C1["Résultat gardé, renvoyé tel quel"]
+  C -->|non| D["FileOutils : un seul appel à la fois vers le module"]
+  D --> E{"Paramètres valides ?&lt;br/&gt;clés connues, garde-fous"}
+  E -->|non| E1["Refus avant tout envoi : rien d'écrit"]
+  E -->|oui| F["LightroomBridge relit liaison.jeton"]
+  F --> G["TCP 127.0.0.1:54770 : une ligne JSON,&lt;br/&gt;avec le jeton"]
+  G --> H{"Liaison.recevoir : bon jeton ?"}
+  H -->|non| H1["Refus « jeton », noté au journal&lt;br/&gt;une fois par 10 s"]
+  H -->|oui| I{"Avant/après à garder ?&lt;br/&gt;case cochée, fenêtre ouverte,&lt;br/&gt;photo active seule"}
+  I -->|oui| I1["Etapes.avantCommande : la vue reconnue&lt;br/&gt;par l'empreinte, sinon un rendu avant"]
+  I -->|non| J
+  I1 --> J{"Liaison en pause ?"}
+  J -->|oui| J1["Refus : en pause"]
+  J -->|non| K{"Mode Proposer d'abord&lt;br/&gt;et pas de confirm ?"}
+  K -->|oui| K1["Refus : montrer d'abord"]
+  K -->|"non : Appliquer"| L["Commandes.executer"]
+  L --> M{"La commande écrit ?"}
+  M -->|"non : une lecture"| P
+  M -->|oui| N["withWriteAccessDo : réglages et mémoire,&lt;br/&gt;Ecriture.nouvelleEtape « Claude · … » avec la raison"]
+  N --> N1{"Première retouche de la photo ?"}
+  N1 -->|oui| N2["Instantané « Avant Claude »"]
+  N1 -->|non| O
+  N2 --> O{"Calculs IA à faire ?&lt;br/&gt;masques, profil adaptatif, flou"}
+  O -->|oui| O1["updateAISettings hors de l'écriture,&lt;br/&gt;deux passages au plus"]
+  O -->|non| P
+  O1 --> P["Réponse sur le port 54771,&lt;br/&gt;avec la photo active si elle a changé"]
+  P --> Q["Etapes.apresCommande : rendu de l'après"]
+  P --> R{"Plus de 50 s ?"}
+  R -->|oui| R1["Réponse d'attente « pas fini » :&lt;br/&gt;Claude rappelle avec les mêmes arguments"]
+  R -->|non| S
+  R1 --> S["Résultat à Claude Code"]
+  S --> T(["Ligne d'étape dans le fil, avec « Pourquoi ? »"])
+</pre></div>
+  <div class="regles">
+    <p><b>Mode Appliquer.</b> L'écriture passe sans <code>confirm</code> ; en Proposer d'abord, apply_settings serait refusé tant que tu n'as pas dit oui.</p>
+    <p><b>Tout se défait.</b> Chaque étape a son id : undo_last la défait, revert_to_original revient à « Avant Claude ».</p>
+  </div>
+</section>
+
+<section class="etape" id="diagnostic">
+  <div class="titre"><span class="eyebrow">Étape 6 · view_photo</span><h2>Diagnostic</h2></div>
+  <p>Claude regarde la photo développée et ses chiffres avant de toucher à quoi que ce soit : l'intention lue au boîtier, les mesures, Vision et l'éclairage.</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A{{"view_photo : aperçu entier de 1 344 px"}} --> B["Le module rend la photo développée,&lt;br/&gt;calculs IA attendus d'abord"]
+  B --> C["Le serveur ouvre l'original une seule fois&lt;br/&gt;(LecteurBoitier, 2 s)"]
+  C --> D["intention_boitier : CLASSIC CHROME, DR400,&lt;br/&gt;−0,7 IL, priorité ouverture, flash"]
+  D --> E{"Compensation de −0,6 IL ou moins ?"}
+  E -->|oui| E1["Photo voulue sombre : ne pas la remonter"]
+  E -->|non| F
+  E1 --> F["Mesures : histogramme, écrêtage,&lt;br/&gt;tons neutres, netteté, bruit"]
+  F --> G["Vision : un visage (lacet, roulis, yeux ouverts),&lt;br/&gt;une personne seule, zone d'intérêt"]
+  G --> H["Éclairage : cases 3 × 3, zones tonales,&lt;br/&gt;visages à part"]
+  H --> I{"Deux groupes de cases écartés&lt;br/&gt;de 8 ou plus ?"}
+  I -->|oui| I1["Éclairage mixte nommé,&lt;br/&gt;balance_proposee sur le visage"]
+  I -->|non| J
+  I1 --> J{"Écran mesuré par une sonde ?"}
+  J -->|non| J1["Remarque d'écran, une fois par processus"]
+  J -->|oui| K
+  J1 --> K["Bilan : première vue gardée à cette taille"]
+  K --> L(["Diagnostic bref : exposition, balance, contraste,&lt;br/&gt;couleurs, sujet, intention"])
+</pre></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>Écart de 9,8 entre les deux lumières : tungstène dedans, ciel bleu à la fenêtre. La balance proposée vise la peau. L'écran n'est pas sondé : la remarque part une fois.</p></div>
+</section>
+
+<section class="etape" id="globale">
+  <div class="titre"><span class="eyebrow">Étape 7 · Module Développement</span><h2>Retouche globale : passes 1 et 2</h2></div>
+  <p>Dans l'ordre d'un retoucheur : les reflets d'abord, puis le profil, la géométrie, la balance et la tonalité ; une vérification, le débruitage, puis les finitions.</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A{"Reflets d'une vitre ?"} -->|oui| B{{"remove_distractions, avant toute autre retouche"}}
+  A -->|non| C
+  B --> B1{"Original disponible ?"}
+  B1 -->|non| B2["Refus, avec sa raison dite"]
+  B1 -->|oui| B3["Photo affichée dans Développement,&lt;br/&gt;un traitement à la fois, hors écriture,&lt;br/&gt;état d'avant gardé (Suppression)"]
+  B3 --> B4["Source, photo active et sélection remises"]
+  B4 --> C
+  B2 --> C
+  C{{"measure_angle sur le montant de la fenêtre"}} --> D{"Inclinaison de 0,5° ou plus ?"}
+  D -->|non| D1["Rien : elle ne se voit pas"]
+  D -->|oui| D2["Carnet : horizon penché,&lt;br/&gt;si la géométrie est intacte"]
+  D1 --> E
+  D2 --> E{"Guide de style contre&lt;br/&gt;la simulation du boîtier ?"}
+  E -->|non| F["Profil : la simulation lue, Classic Chrome"]
+  E -->|oui| F1{{"list_profiles : un autre profil"}}
+  F --> G
+  F1 --> G{{"apply_settings · passe 1"}}
+  G --> G1["libererProfil : MissingCameraProfile vidé,&lt;br/&gt;profil relu après coup"]
+  G1 --> G2["Corrections de l'objectif, puis Upright"]
+  G2 --> G3{"Photo redressée ?"}
+  G3 -->|oui| G4["« Contraindre le recadrage » coché,&lt;br/&gt;cadre mémorisé puis relu"]
+  G3 -->|non| G5
+  G4 --> G5["Balance des blancs sur le visage"]
+  G5 --> G6{"Dominante restée dans les seules ombres ?"}
+  G6 -->|oui| G7["ShadowTint, pas Tint"]
+  G6 -->|non| G8
+  G7 --> G8["Tonalité : hautes lumières, ombres,&lt;br/&gt;sans remonter l'exposition voulue"]
+  G8 --> G9{"Un réglage que Lightroom ne calcule pas&lt;br/&gt;par applyDevelopSettings ?"}
+  G9 -->|oui| G10["Paramètre prédéfini du module,&lt;br/&gt;puis la balance personnalisée reposée"]
+  G9 -->|non| H
+  G10 --> H{{"view_photo : vérifier, bilan"}}
+  H --> I{"Bruit de 1,5 ou plus, ISO élevé ?"}
+  I -->|oui| J{{"enhance_photo : débruitage de 20 à 50"}}
+  I -->|non| K
+  J --> J1["Avant netteté, masques IA et taches :&lt;br/&gt;LrDevelopController, état d'avant gardé"]
+  J1 --> K{{"apply_settings · passe 2 : finitions"}}
+  K --> K1["Présence (Vibrance plutôt que Saturation),&lt;br/&gt;TSL, étalonnage, courbe, détail"]
+  K1 --> K2{"Vignetage déjà posé,&lt;br/&gt;ou guide de style contre ?"}
+  K2 -->|oui| K3(["Rien de plus aux bords"])
+  K2 -->|non| K4(["Radial inversé aux bords à l'étape 8,&lt;br/&gt;jamais avec un vignetage"])
+</pre></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>Reflets retirés en premier. Penché de 1,8° : Upright après les corrections de l'objectif, cadre resserré par Lightroom. Débruitage à 35, car le bruit mesure 2,0 à ISO 6400.</p></div>
+  <div class="regles">
+    <p><b>Chaque passe a sa raison.</b> step_name « passe 1 : … » et reason, gardés au journal (export_journal).</p>
+    <p><b>Rester naturel.</b> Modéré sur Clarté, Correction du voile, Texture et les réglages locaux.</p>
+  </div>
+</section>
+
+<section class="etape" id="locales">
+  <div class="titre"><span class="eyebrow">Étape 8 · add_mask, retouch_spots</span><h2>Retouches locales</h2></div>
+  <p>Éclaircir et assombrir comme un tireur en un seul appel, puis la peau dosée comme Adobe, les yeux et les dents, les yeux rouges et la tache de capteur.</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A{{"add_mask · éclaircir et assombrir, un seul appel"}} --> B["Positions données dans l'image de view_photo"]
+  B --> C{"Géométrie changée&lt;br/&gt;(objectif, Upright) ?"}
+  C -->|oui| C1["Grille de recalage : deux rendus&lt;br/&gt;« Claude · recalage », gardée en mémoire"]
+  C -->|non| D
+  C1 --> D["Geometrie.lua : positions vers le repère du fichier"]
+  D --> E["Fenêtre brûlée : dégradé linéaire, −0,3 à −0,7 IL"]
+  E --> F["Sujet : radial, +0,2 à +0,4 IL"]
+  F --> G["Bords : radial inversé −0,3 IL, rayon 0,7,&lt;br/&gt;fondu 80, au milieu de la zone d'intérêt"]
+  G --> H{{"view_photo, compare = previous_step"}}
+  H --> I{{"add_mask · peau du visage, avec effect"}}
+  I --> J{"Qui est-ce ? Jugé à l'œil :&lt;br/&gt;Vision ne dit ni l'âge ni le genre"}
+  J -->|"un enfant"| J1["Pas de lissage"]
+  J -->|"un homme ou une personne âgée"| J2["Peau du visage lisse à amount 50"]
+  J -->|"sinon"| J3["Peau du visage lisse :&lt;br/&gt;texture −20, clarté −10"]
+  J2 --> K
+  J3 --> K{"Au-delà de la dose Lite,&lt;br/&gt;ou netteté négative ?"}
+  K -->|"oui, sans smoothing_requested"| K1["Refus avant envoi"]
+  K -->|non| L{"Vision ne voit qu'une personne ?"}
+  L -->|oui| L1["Personne seule : sous-type 0,&lt;br/&gt;sans InstanceIDs"]
+  L -->|non| L2["InstanceIDs et InstanceBounds&lt;br/&gt;de toutes les personnes"]
+  L1 --> M
+  L2 --> M["Paramètre prédéfini avec la liste entière&lt;br/&gt;des masques, anciens compris"]
+  M --> N["updateAISettings hors de l'écriture"]
+  N --> O{"Modèles IA absents ?"}
+  O -->|oui| O1["Fenêtre « Mises à jour IA recommandées » :&lt;br/&gt;elle t'attend, rien n'y répond"]
+  O -->|non| P{"Masque reconnu par Lightroom ?"}
+  P -->|non| P1["Masque retiré"]
+  P -->|oui| Q{{"add_mask · iris et dents, au besoin"}}
+  Q --> R{"Yeux rouges du flash ?"}
+  R -->|oui| R1{{"retouch_spots · yeux rouges"}}
+  R -->|non| S
+  R1 --> S{"Tache de capteur ?"}
+  S -->|oui| S1{{"retouch_spots · patchmatch,&lt;br/&gt;jamais génératif"}}
+  S -->|non| T
+  S1 --> T(["Masques vides retirés"])
+</pre></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>Fenêtre à −0,5 IL, visage à +0,3 IL, bords à −0,3 IL. Une seule personne : masque de personne seule. Peau à la dose par défaut. Yeux rouges et tache corrigés.</p></div>
+  <div class="regles">
+    <p><b>Le passant flou au fond</b> reste pour toi : Suppression des distractions › Personnes, à la main dans Lightroom. Claude te le dit.</p>
+    <p><b>Mélangeur TSL ou masque ?</b> Le TSL touche toutes les couleurs semblables : pour un seul objet, un masque.</p>
+  </div>
+</section>
+
+<section class="etape" id="verifier">
+  <div class="titre"><span class="eyebrow">Étape 9 · Bilan et composition</span><h2>Vérifier, corriger, cadrer</h2></div>
+  <p>Une passe corrective ne vient que pour un défaut constaté, deux au plus. Le recadrage seulement si la composition y gagne nettement, et proposé avant d'être fait.</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A{{"view_photo : aperçu entier"}} --> B["Bilan : écarts depuis la passe d'avant&lt;br/&gt;et depuis le début"]
+  B --> C{"« regression » ou défaut précis ?&lt;br/&gt;brûlé, bouché, dominante, peau, masque visible"}
+  C -->|non| F
+  C -->|oui| D{"Déjà deux passes correctives ?"}
+  D -->|oui| D1["Dire ce qui reste"]
+  D -->|non| E{{"apply_settings · « passe 3 : … »,&lt;br/&gt;une raison qui nomme le défaut"}}
+  E --> A
+  D1 --> F{"La composition y gagne nettement ?"}
+  F -->|non| F1["Pas de recadrage"]
+  F -->|oui| G{{"read_composition"}}
+  G --> G1{"Photo agrandie par l'ancien connecteur ?"}
+  G1 -->|oui| G2["Refus avant toute écriture"]
+  G1 -->|non| H["Image entière : cadre retiré puis remis,&lt;br/&gt;deux étapes « Claude · composition »"]
+  H --> I["Horizon, tiers, sujet, regard,&lt;br/&gt;espace devant le sujet"]
+  I --> J{{"preview_settings avec crop : la proposition de cadre"}}
+  J --> K[/"Tu choisis : Accepter, Ajuster… ou Refuser"/]
+  K --> L{"Une étape de Claude a dépassé&lt;br/&gt;la proposition de l'ouverture ?"}
+  F1 --> L
+  L -->|oui| L1["Elle est close : appliquée ou remplacée,&lt;br/&gt;ses boutons grisés"]
+  L -->|non| M
+  L1 --> M(["Retouche finie"])
+</pre></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>Le bilan signale la fenêtre encore brûlée : une passe 3 sur les seules hautes lumières, vérifiée. Upright a déjà redressé le cadre : pas de recadrage proposé. La proposition de l'ouverture est close, « remplacée ».</p></div>
+</section>
+
+<section class="etape" id="fin">
+  <div class="titre"><span class="eyebrow">Étape 10 · Fin du tour de Claude</span><h2>Résumé, demande à garder, leçon</h2></div>
+  <p>Claude résume ce qui a changé et pourquoi, te propose de garder la demande, puis donne la leçon de la photo et la range au carnet.</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A["Le résumé de Claude : ce qui a changé, et pourquoi"] --> B{"Le tour a retouché ?"}
+  B -->|oui| C["« Demande à garder : « … » » en fin de réponse,&lt;br/&gt;« ＋ Garder la demande » au bout de la ligne"]
+  C --> C1[/"Tu cliques : Ajouter… s'ouvre prérempli"/]
+  C1 --> C2{"Nom vide, nom déjà pris, texte vide ?"}
+  C2 -->|oui| C3["Refus en direct, bouton grisé"]
+  C2 -->|non| C4[("mes-demandes.json")]
+  B -->|non| D
+  C4 --> D{"Case Leçon cochée ?"}
+  D -->|non| H
+  D -->|oui| E{{"photo_lesson avec read_facts"}}
+  E --> E1["Journal détaillé : la prise de vue, l'ISO,&lt;br/&gt;les corrections nettes de Claude"]
+  E1 --> E2["Indices : un débruitage à ISO 1 600 ou plus&lt;br/&gt;dit un bruit de la prise de vue"]
+  E2 --> F{{"photo_lesson : Lumière, Couleur, Composition"}}
+  F --> F1{"Photo de « Développeur › Essais » ?"}
+  F1 -->|oui| F2["Leçon lue, pas rangée"]
+  F1 -->|non| F3[("carnet.json : leçon rangée sous l'original")]
+  F2 --> G
+  F3 --> G{"Proposition en attente,&lt;br/&gt;ou exercice en cours ?"}
+  G -->|non| G1["Bascule vers l'onglet Leçon, une fois"]
+  G -->|oui| H
+  G1 --> H["État laissé par Claude noté,&lt;br/&gt;en écriture privée"]
+  H --> I(["Claude libre : fil, cartes et voyants à jour"])
+</pre></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>Lumière : bruit fort à ISO 6400, ouvrir davantage ou accepter le grain. Couleur : deux lumières, choisir celle du visage. Composition : tenir le boîtier droit sur les montants verticaux.</p></div>
+</section>
+
+<section class="etape" id="note">
+  <div class="titre"><span class="eyebrow">Étape 11 · Carte Note</span><h2>La note : ta décision</h2></div>
+  <p>La proposition de Claude attend dans la carte Note. Rien n'est posé au catalogue tant que tu ne l'as pas acceptée, changée, ou que tu ne lui as pas demandé de la poser.</p>
+  <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
+flowchart TD
+  A(["Carte Note : 3 ★ proposée, à vérifier"]) --> B{"Tu décides"}
+  B -->|"Accepter 3 ★"| C
+  B -->|"Changer…, ou une étoile"| C
+  B -->|"Rejeter"| C
+  B -->|"Laisser à N ★"| B1[("Proposition écartée,&lt;br/&gt;rien d'écrit au catalogue")]
+  B -->|"tu dis à Claude « pose la note »"| B2{{"propose_ratings avec apply = true"}}
+  B2 --> C
+  C{"Claude travaille,&lt;br/&gt;ou une note en cours ?"}
+  C -->|oui| C1["Refus dit au bandeau"]
+  C -->|non| D["Notation.poser"]
+  D --> E{"Garde-fous : libellé protégé,&lt;br/&gt;photo déjà rejetée,&lt;br/&gt;réglage « copies virtuelles seulement » ?"}
+  E -->|"bloquée"| E1["« non posée : » et sa raison"]
+  E -->|"libre"| F["Bibliotheque.noter : une écriture,&lt;br/&gt;étape « Claude · notation »"]
+  F --> G[("notation.json : acceptée,&lt;br/&gt;ou changée par l'utilisateur")]
+  G --> H{"Annulée ensuite par ⌘Z ou undo_last ?"}
+  H -->|oui| H1["La proposition redevient à vérifier"]
+  H -->|non| I{"Un coup de cœur ?"}
+  I -->|oui| I1[/"Tu poses toi-même ton libellé de couleur"/]
+  I -->|non| J
+  I1 --> J(["Photo notée : fin du parcours"])
+</pre></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>Tu acceptes 3 ★ : une écriture, une étape « Claude · notation » que undo_last défait. Claude ne renote pas après la retouche, sauf si tu le lui demandes.</p></div>
+  <div class="regles">
+    <p><b>Rejeter</b> pose le drapeau sans toucher les étoiles ; une note ne retire qu'un rejet déjà posé, un drapeau Retenue reste.</p>
+    <p><b>Revenir à « Avant Claude »</b> laisse la note en place : seule undo_last la défait, étape par étape.</p>
+  </div>
+</section>
+
+<footer>
+  <p>D'après le code et les règles de Développeur 1.3.3 (CLAUDE.md, README, docs/SPEC.md), le 23 octobre 2026. Les seuils dits provisoires y restent à relever.</p>
+  <p>La photo DSCF7731.RAF et ses chiffres sont inventés pour l'exemple.</p>
+</footer>
+
+</div>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const requete = matchMedia("(prefers-color-scheme: dark)");
+  const sombre = () => { const t = document.documentElement.dataset.theme; return t ? t === "dark" : requete.matches; };
+  const diagrammes = [...document.querySelectorAll(".mermaid")].map(el => ({ el, src: el.innerHTML }));
+  let applique;
+  async function rendre() {
+    const theme = sombre() ? "dark" : "default";
+    if (theme === applique) return;
+    applique = theme;
+    mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+    for (const d of diagrammes) { d.el.removeAttribute("data-processed"); d.el.innerHTML = d.src; }
+    try { await mermaid.run({ nodes: diagrammes.map(d => d.el) }); } catch (e) { console.error("Mermaid :", e); }
+  }
+  if (document.readyState === "complete") rendre(); else addEventListener("load", rendre, { once: true });
+  requete.addEventListener("change", rendre);
+  new MutationObserver(rendre).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+</body>
+</html>

@@ -98,14 +98,15 @@ Dans cet ordre :
    fait supprimer l'ancien document Claude Docs le même jour) : la relire (Artifact, `read`), retirer
    ce que la version vient de livrer et corriger ce qui est devenu faux (frise des versions,
    bilan et décisions compris), l'ouvrir dans Lavish (`npx -y lavish-axi <fichier>`, source dans
-   `build/lavish/`) pour la relecture de Dany, puis la republier à la même adresse. De même pour
+   `docs/lavish/`, commitée et poussée depuis le 24 octobre 2026 : le dépôt est public) pour la
+   relecture de Dany, puis la republier à la même adresse. De même pour
    les pages que la version rend fausses : Les 36 outils
    (https://claude.ai/artifact/KniGdYp5yt4DPsLcbsLoCL), Guide des demandes
    (https://claude.ai/artifact/F7uUKLaAnzo3BX6kWxBGPP), Apprendre avec Claude
    (https://claude.ai/artifact/CZR9wrRWk73gGGBb46HxXU), Ordinogramme d'une retouche
    (https://claude.ai/artifact/RzGhic1X61H3crEBFYjTLd). Tout document nouveau pour Dany (guide,
-   compte rendu, plan) se fait de même : une page Lavish publiée en artefact, jamais un document
-   Claude Docs.
+   compte rendu, plan) se fait de même : une page Lavish publiée en artefact, sa source dans
+   `docs/lavish/`, jamais un document Claude Docs.
 
 Une version par étape de la feuille de route (1.1 le nouvel écran et la notation, 1.2 rendu plus
 juste, 1.3 apprendre en regardant Claude, 1.4 une sortie entière, 1.5 finitions et impression, 1.6
@@ -1311,4 +1312,4 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
 - `.github/workflows/tests.yml` : syntaxe des scripts et les deux suites à chaque envoi sur `main` (macOS)
 - `build.sh` (tests, compilation, signature, archive notarisée), `install.sh`, `uninstall.sh`
 - `Resources/Info.plist` : identifiant `com.danymenard.mcp-developpeur` et version (incrusté par `-sectcreate` dans `Package.swift`)
-- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, les chantiers de la 1.3 et ce qui en reste à constater, et la fenêtre Claude (architecture, contraintes du SDK, fenêtre B et ses constats, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude, fenêtre B de la 1.3.2 avec l'onglet Focus, capture principale du README), `carnet.png` (la page Carnet de progrès), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de suivi de la liaison)
+- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, les chantiers de la 1.3 et ce qui en reste à constater, et la fenêtre Claude (architecture, contraintes du SDK, fenêtre B et ses constats, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude, fenêtre B de la 1.3.2 avec l'onglet Focus, capture principale du README), `carnet.png` (la page Carnet de progrès), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de suivi de la liaison) ; `docs/lavish/` : les sources des pages Lavish publiées en artefacts (feuille de route, Les 36 outils, Guide des demandes, Apprendre avec Claude, Ordinogramme d'une retouche), une par page, à garder identiques à leur artefact

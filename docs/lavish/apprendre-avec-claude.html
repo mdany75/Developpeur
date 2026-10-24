@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apprendre avec Claude</title>
+<style>
+  :root {
+    --texte: #1D1D1F; --gris: #6B6B6B; --entete: #5F5F5F; --bleu: #0A64D8; --mono: #3D3D45;
+    --vert: #1F7A35; --orange: #A85A00; --ambre: #A86200;
+    --fond: #FFFFFF; --volet: #F2F2F2; --carte: #FAFAFA; --filet: #E2E2E2; --bord: #D9D9D9;
+    --vert-doux: #E6F2E9; --orange-doux: #FCEFDF; --bleu-doux: #E3EEFC; --gris-doux: #EBEBEB;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --texte: #E8E8E8; --gris: #9A9A9A; --entete: #A6A6A6; --bleu: #5AA2F6; --mono: #C8C8D0;
+      --vert: #3FB950; --orange: #E8963A; --ambre: #E0A040;
+      --fond: #1E1E1E; --volet: #2A2A2A; --carte: #262626; --filet: #343434; --bord: #404040;
+      --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --gris-doux: #333333;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --texte: #E8E8E8; --gris: #9A9A9A; --entete: #A6A6A6; --bleu: #5AA2F6; --mono: #C8C8D0;
+    --vert: #3FB950; --orange: #E8963A; --ambre: #E0A040;
+    --fond: #1E1E1E; --volet: #2A2A2A; --carte: #262626; --filet: #343434; --bord: #404040;
+    --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --gris-doux: #333333;
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { background: var(--volet); scroll-behavior: smooth; }
+  body { margin: 0; background: var(--volet); color: var(--texte); font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  code { font-family: Menlo, ui-monospace, "SF Mono", monospace; font-size: 0.86em; color: var(--mono); background: var(--gris-doux); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  a { color: var(--bleu); }
+  .page { max-width: 1240px; margin: 0 auto; padding: 32px 16px 64px; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 32px; }
+  header.tete { grid-column: 1 / -1; }
+  header.tete h1 { margin: 0 0 4px; font-size: 30px; line-height: 1.2; letter-spacing: -0.01em; }
+  header.tete .sous { color: var(--gris); margin: 0 0 10px; }
+  header.tete .source { font-size: 13px; color: var(--gris); }
+  .outils { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 18px; }
+  .outils input { flex: 1 1 280px; min-width: 0; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--bord); background: var(--fond); color: var(--texte); font: inherit; }
+  .outils input:focus { outline: 2px solid var(--bleu); border-color: transparent; }
+  .outils .compte { color: var(--gris); font-size: 13px; }
+  .outils button, .bascule { font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; cursor: pointer; background: var(--fond); color: var(--texte); border: 1px solid var(--bord); }
+  .bascule[aria-pressed="true"] { border-color: var(--bleu); color: var(--bleu); box-shadow: inset 0 0 0 1px var(--bleu); }
+  nav.sommaire { position: sticky; top: 16px; align-self: start; max-height: calc(100vh - 32px); overflow-y: auto; font-size: 13.5px; }
+  nav.sommaire b { display: block; font-size: 12px; color: var(--entete); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+  nav.sommaire a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--texte); text-decoration: none; border-left: 2px solid transparent; }
+  nav.sommaire a:hover { background: var(--fond); }
+  nav.sommaire a.ici { border-left-color: var(--bleu); background: var(--fond); color: var(--bleu); }
+  nav.sommaire a.cache { display: none; }
+  main { min-width: 0; }
+  section.partie { background: var(--fond); border: 1px solid var(--bord); border-radius: 12px; padding: 20px 22px; margin-bottom: 18px; scroll-margin-top: 16px; }
+  section.partie[hidden] { display: none; }
+  section.partie > h2 { margin: 0 0 10px; font-size: 21px; line-height: 1.3; }
+  section.intro { background: none; border: 0; padding: 0 2px; }
+  h3 { margin: 22px 0 8px; font-size: 16.5px; }
+  p { margin: 0 0 12px; max-width: 860px; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; max-width: 880px; }
+  li { margin: 4px 0; }
+  li[hidden], tr[hidden], p[hidden] { display: none; }
+  ol.etapes { list-style: none; padding: 0; counter-reset: etape; display: grid; gap: 8px; }
+  ol.etapes li { counter-increment: etape; position: relative; padding: 10px 14px 10px 50px; background: var(--carte); border: 1px solid var(--filet); border-radius: 10px; margin: 0; }
+  ol.etapes li::before { content: counter(etape); position: absolute; left: 12px; top: 9px; width: 26px; height: 26px; border-radius: 50%; background: var(--bleu); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+  .tableau { border: 1px solid var(--filet); border-radius: 10px; overflow: hidden; margin: 6px 0 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 12px; font-weight: 600; color: var(--entete); text-transform: uppercase; letter-spacing: 0.04em; padding: 9px 12px; background: var(--carte); border-bottom: 1px solid var(--filet); }
+  td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid var(--filet); overflow-wrap: anywhere; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--carte); }
+  button.demande { all: unset; cursor: copy; display: inline; color: var(--texte); background: var(--bleu-doux); border-radius: 6px; padding: 1px 5px; box-decoration-break: clone; -webkit-box-decoration-break: clone; line-height: 1.7; }
+  button.demande:hover { outline: 1px solid var(--bleu); }
+  button.demande:focus-visible { outline: 2px solid var(--bleu); }
+  button.demande.copiee { background: var(--vert-doux); color: var(--vert); }
+  .points { color: var(--bleu); letter-spacing: 2px; white-space: nowrap; }
+  .points span { color: var(--bord); }
+  .effort { display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 13px; font-weight: 600; }
+  .effort.petit { background: var(--vert-doux); color: var(--vert); }
+  .effort.moyen { background: var(--bleu-doux); color: var(--bleu); }
+  .effort.gros { background: var(--orange-doux); color: var(--orange); }
+  ul.taches { list-style: none; padding: 0; display: grid; gap: 6px; }
+  li.tache { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--orange-doux); }
+  li.tache.faite { background: var(--carte); color: var(--gris); }
+  li.tache .case { flex: none; width: 18px; height: 18px; margin-top: 2px; border-radius: 4px; border: 2px solid var(--orange); display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+  li.tache.faite .case { border-color: var(--vert); background: var(--vert); color: #fff; }
+  .note-croquis { font-size: 13.5px; color: var(--gris); border-left: 3px solid var(--bord); padding-left: 12px; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--texte); color: var(--fond); padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.vue { opacity: 1; }
+  .rien { display: none; color: var(--gris); padding: 24px 0; text-align: center; }
+  .rien.visible { display: block; }
+  footer { grid-column: 1 / -1; color: var(--gris); font-size: 13px; }
+  @media (max-width: 900px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    nav.sommaire { position: sticky; top: 0; z-index: 2; max-height: none; display: flex; gap: 6px; overflow-x: auto; padding: 10px 0; background: var(--volet); border-bottom: 1px solid var(--filet); }
+    nav.sommaire b { display: none; }
+    nav.sommaire a { flex: none; border: 1px solid var(--bord); border-radius: 14px; background: var(--fond); padding: 4px 11px; white-space: nowrap; }
+    nav.sommaire a.ici { border-color: var(--bleu); }
+    section.partie { padding: 16px; scroll-margin-top: 60px; }
+  }
+  @media (max-width: 680px) {
+    table, tbody, tr, td { display: block; width: 100%; }
+    thead { display: none; }
+    tr { padding: 10px 12px; border-bottom: 1px solid var(--filet); }
+    tbody tr:last-child { border-bottom: 0; }
+    td { border: 0; padding: 2px 0; }
+    td::before { content: attr(data-label); display: block; font-size: 11.5px; font-weight: 600; color: var(--entete); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; }
+    tbody tr:hover td { background: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="tete">
+    <h1>Guide — Apprendre avec Claude</h1>
+    <p class="sous">23 octobre 2026 · Développeur 1.3.3</p>
+
+    <div class="outils">
+      <input id="cherche" type="search" placeholder="Chercher : leçon, carnet, Je le fais…" aria-label="Chercher dans la page">
+
+      <button id="effacer" type="button">Tout voir</button>
+      <span class="compte" id="compte"></span>
+    </div>
+  </header>
+  <nav class="sommaire" aria-label="Sommaire"><b>Sommaire</b><a href="#en-un-coup-d-il">En un coup d'œil</a><a href="#une-seance-type">Une séance type</a><a href="#pourquoi-comprendre-chaque-etape">« Pourquoi ? » : comprendre chaque étape</a><a href="#la-lecon-de-la-photo">La leçon de la photo</a><a href="#je-le-fais-retoucher-toi-meme">« Je le fais » : retoucher toi-même</a><a href="#la-composition">La composition</a><a href="#le-carnet-de-progres">Le carnet de progrès</a><a href="#les-reglages">Les réglages</a><a href="#bon-a-savoir">Bon à savoir</a><a href="#ou-sont-les-tests">Où sont les tests</a></nav>
+  <main>
+<section class="partie intro" id="intro"><p>Ce guide résume les cinq fonctions de la 1.3 pour progresser en photo : regarder Claude travailler, puis faire toi-même. Tout se passe dans la fenêtre Claude de Lightroom (Fichier › Module externe - Extras › Ouvrir la fenêtre Claude, ou ⌃⌥C).</p></section>
+<section class="partie" id="en-un-coup-d-il"><h2>En un coup d'œil</h2><div class="tableau"><table><thead><tr><th>Fonction</th><th>Où la trouver</th><th>Ce qu'elle t'apprend</th></tr></thead><tbody><tr><td data-label="Fonction">Pourquoi ?</td><td data-label="Où la trouver">Bouton au bout de chaque ligne d'étape du fil</td><td data-label="Ce qu'elle t'apprend">Ce que chaque réglage corrige, avec l'avant et l'après</td></tr><tr><td data-label="Fonction">Leçon de la photo</td><td data-label="Où la trouver">Onglet Leçon, ou « Leçon de la photo » à la fin du tour de Claude</td><td data-label="Ce qu'elle t'apprend">Ce qui manquait à la prise de vue, et comment l'éviter</td></tr><tr><td data-label="Fonction">Je le fais</td><td data-label="Où la trouver">Troisième choix du Mode, ou bouton Je le fais de la carte Proposition</td><td data-label="Ce qu'elle t'apprend">Refaire la retouche toi-même, puis comparer avec Claude</td></tr><tr><td data-label="Fonction">Composition</td><td data-label="Où la trouver">Invite Composition, ou « lis la composition »</td><td data-label="Ce qu'elle t'apprend">Horizon, tiers, sujet, regard, et un cadre proposé</td></tr><tr><td data-label="Fonction">Carnet de progrès</td><td data-label="Où la trouver">Première case de la liste des conversations</td><td data-label="Ce qu'elle t'apprend">Tes défauts de prise de vue, mois après mois</td></tr></tbody></table></div></section>
+<section class="partie" id="une-seance-type"><h2>Une séance type</h2><ol class="etapes"><li>Choisis une de tes photos dans Lightroom et ouvre la fenêtre Claude (⌃⌥C).</li><li>Clique Retouche pro, ou écris ta demande. Claude note d'abord la photo, puis la retouche étape par étape.</li><li>Sur chaque ligne d'étape, clique « Pourquoi ? » : lis la raison, puis passe de Voir l'avant à Voir l'après.</li><li>À la fin, lis l'onglet Leçon : les trois points Lumière, Couleur et Composition.</li><li>Sur une photo semblable, passe le Mode à Je le fais : fais toi-même les réglages de la liste, puis clique J'ai fini.</li><li>Une fois par mois, ouvre le Carnet de progrès : ce qui progresse, et ce qu'il faut travailler à la prochaine sortie.</li></ol></section>
+<section class="partie" id="pourquoi-comprendre-chaque-etape"><h2>« Pourquoi ? » : comprendre chaque étape</h2><ul><li>Chaque étape de Claude dans le fil porte un bouton « Pourquoi ? ». Il ouvre l'onglet Aperçu sur cette étape : « Étape 2 sur 4 », son but, la raison donnée par Claude (le défaut vu, puis ce que l'étape y fait) et les réglages changés.</li><li>Voir l'avant et Voir l'après passent de l'un à l'autre ; Agrandir les montre côte à côte en grand ; ◀ ▶ passent d'une étape à l'autre de la même photo ; Détail… montre l'appel de l'outil et sa réponse.</li><li>Si l'étape a été annulée ensuite, ou défaite par un retour à « Avant Claude », la carte le dit.</li><li>L'avant/après ne se garde que pour la photo active, pendant que la fenêtre est ouverte (ou fermée pendant que le Claude de la fenêtre travaille). Rien pour une étape faite par Claude Desktop fenêtre fermée, sur plusieurs photos à la fois, ni pour un classement : la carte le dit.</li></ul></section>
+<section class="partie" id="la-lecon-de-la-photo"><h2>La leçon de la photo</h2><ul><li>À la fin d'une retouche, Claude donne trois points : Lumière, Couleur et Composition. Pour chacun : ce qui manquait, chiffres à l'appui, et ce qui l'aurait évité à la prise de vue (ou, si rien ne manquait, ce qu'il faut refaire).</li><li>Un réglage du boîtier n'y est cité que s'il a été lu dans le fichier.</li><li>La fenêtre passe une fois à l'onglet Leçon quand elle arrive. Détail… montre les faits donnés à Claude : la prise de vue, ce qu'il a corrigé, et des indices (une exposition remontée d'un demi-IL ou plus dit une photo sous-exposée ; un débruitage ne dit un bruit de prise de vue qu'à ISO 1 600 ou plus).</li><li>Une leçon par photo et par conversation, rangée au carnet de progrès. Pas de leçon après une proposition seulement montrée, une notation, un classement ou une série.</li><li>Tu peux aussi la demander en mots : « donne-moi la leçon de cette photo ».</li></ul></section>
+<section class="partie" id="je-le-fais-retoucher-toi-meme"><h2>« Je le fais » : retoucher toi-même</h2><ol class="etapes"><li>Choisis la photo, puis passe le Mode à Je le fais (ou clique Je le fais sur la carte Proposition, quand une proposition attend). Le Mode est grisé pendant que Claude travaille.</li><li>Claude prépare sa retouche sous forme de liste, sans rien appliquer : sa version est rangée dans l'instantané « Claude · ma version ».</li><li>La liste, dans l'onglet Proposition, suit l'ordre et les noms des panneaux du module Développement en français, par exemple « Réglages de base › Tonalité › Exposition : 0 → +0,35 ».</li><li>Fais les réglages dans Lightroom. Chaque ligne se coche toute seule (○ devient ✓), toutes les 2 secondes, et la carte dit « À vous · 3 réglages faits sur 7 ». Tu peux regarder d'autres photos pendant l'exercice.</li><li>Clique J'ai fini (le même bouton). Claude compare ta version à la sienne, côte à côte dans l'aperçu (« Claude | vous » ; Agrandir pour les voir en grand) : ce qui est pareil, puis l'écart qui se voit le plus et le réglage qui l'explique, puis les autres écarts.</li><li>Ta version reste sur la photo. La sienne ne s'y pose que si tu le lui demandes ; dans ce cas, Annuler la dernière retouche te rend la tienne.</li></ol></section>
+<section class="partie" id="la-composition"><h2>La composition</h2><ul><li>Clique l'invite Composition, ou demande « lis la composition » ou « propose un cadre ».</li><li>Claude lit la composition sur l'image entière, même recadrée : horizon, tiers, sujet, vers où regardent les visages, espace devant le sujet. Il propose un cadre (horizon droit et sur un tiers, sujet sur un tiers avec de l'espace devant lui) et dit la règle en une phrase.</li><li>L'onglet Proposition montre l'image entière, le cadre en pointillés, les tiers et le hors-cadre assombri. La carte dit par exemple « Cadre : 3:2 (format d'origine), redressé de 1,4°, 82 % de la largeur gardée ».</li><li>Rien ne change avant Accepter. Ajuster… offre Plus serré, Plus large, Horizon au tiers haut, Format 4:5 et Seulement redresser.</li><li>Sans demande, Claude ne recadre que si la composition y gagne nettement, et il le dit.</li></ul></section>
+<section class="partie" id="le-carnet-de-progres"><h2>Le carnet de progrès</h2><ul><li>Il note tout seul les défauts de tes prises de vue, quand Claude regarde une photo qu'il n'a pas encore retouchée : sous-exposition, ciel brûlé, flou, mise au point manquée, et bruit fort (cherché seulement à ISO 1 600 ou plus). L'horizon penché s'y ajoute quand Claude mesure une ligne penchée de 0,5° ou plus sur une photo à la géométrie intacte (ni recadrage tourné, ni Upright, ni perspective).</li><li>Les défauts se comptent par mois de prise de vue ; une photo sans date compte au mois où Claude l'a vue.</li><li>Ouvre-le par la première case de la liste des conversations. Tu y trouves un tableau des six derniers mois (« 2/9 » : le défaut sur 2 des 9 photos où il a été cherché ; « — » : pas cherché), puis ce qui progresse ou recule (les deux derniers mois contre les trois d'avant), et ce qu'il faut travailler à la prochaine sortie (trois défauts au plus), avec ce qui aide à la prise de vue.</li><li>Un clic sur une ligne ouvre ses photos, leurs constats et leurs leçons. « Retirer du carnet… » en retire une, après confirmation.</li><li>« Demander à Claude ce qu'il en pense › » ouvre une conversation où Claude lit le carnet et répond en trois puces, sans rien retoucher.</li><li>Seules tes vraies photos comptent : celles de « Développeur › Essais » n'y entrent pas, ni leurs constats ni leurs leçons.</li></ul></section>
+<section class="partie" id="les-reglages"><h2>Les réglages</h2><p>Dans Fichier › Gestionnaire de modules externes › Développeur :</p>
+<div class="tableau"><table><thead><tr><th>Case</th><th>Section</th><th>Ce qu'elle fait</th></tr></thead><tbody><tr><td data-label="Case">Garder l'avant/après de chaque étape de Claude</td><td data-label="Section">Fenêtre Claude</td><td data-label="Ce qu'elle fait">Les images de « Pourquoi ? » : un rendu de plus par étape, environ une seconde</td></tr><tr><td data-label="Case">Claude finit chaque retouche par la leçon de la photo</td><td data-label="Section">Fenêtre Claude</td><td data-label="Ce qu'elle fait">La leçon ; décochée, Claude n'en donne plus d'office</td></tr><tr><td data-label="Case">Carnet de progrès : noter les défauts vus à la prise de vue</td><td data-label="Section">Liaison avec Claude</td><td data-label="Ce qu'elle fait">Les constats du carnet ; décochée, les leçons s'y rangent encore</td></tr></tbody></table></div></section>
+<section class="partie" id="bon-a-savoir"><h2>Bon à savoir</h2><ul><li>Ces fonctions n'écrivent rien de plus dans le catalogue que la retouche elle-même : l'avant/après est un rendu, la leçon et le carnet sont dans un fichier à part.</li><li>La leçon d'une photo de « Développeur › Essais » se lit, mais n'est pas rangée au carnet.</li><li>Les seuils du carnet (sous-exposition, ciel brûlé, bruit fort à ISO 1 600) sont provisoires : aucun vrai cas relevé pour l'instant.</li><li>La Demande rapide (⌘⌃⌥C) ne donne pas de leçon.</li></ul></section>
+<section class="partie" id="ou-sont-les-tests"><h2>Où sont les tests</h2><p>Ces fonctions sont vérifiées par trois séries de tests, dans le dépôt <code>~/Developer/Developpeur</code> :</p>
+<ul><li>Le connecteur (<code>swift test</code>), dans <code>Tests/DeveloppeurKitTests</code> : <code>PourquoiTests</code>, <code>LeconTests</code>, <code>JeLeFaisTests</code> et <code>ContratJeLeFaisTests</code>, <code>CompositionTests</code> et <code>ContratCompositionTests</code>, <code>CarnetTests</code>, <code>PriseDeVueTests</code>, <code>Recette13Tests</code>.</li><li>Le module (<code>scripts/tester-module.sh</code>) : <code>essais-etapes</code>, <code>essais-lecon</code>, <code>essais-jelefais</code>, <code>essais-composition</code> et <code>essais-carnet</code> dans <code>Tests/Lua/Liaison</code> ; <code>essais-pourquoi</code>, <code>essais-lecon</code>, <code>essais-jelefais</code>, <code>essais-composition</code> et <code>essais-carnet</code> dans <code>Tests/Lua/Fenetre</code>.</li><li>La recette dans le vrai Lightroom, sur les copies d'Essais : <code>Sources/DeveloppeurKit/Recette+13.swift</code>.</li></ul></section>
+    <p class="rien" id="rien">Rien ne répond à cette recherche.</p>
+  </main>
+  <footer>Page Lavish faite le 24 octobre 2026 à partir de l'ancien document de claude.ai, supprimé depuis.</footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+  const cherche = document.getElementById('cherche');
+  const sections = [...document.querySelectorAll('section.partie')];
+  const liens = [...document.querySelectorAll('nav.sommaire a')];
+  const sansAccents = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const items = s => s.querySelectorAll('tbody tr, li, p');
+  let seulementAFaire = false;
+  function appliquer() {
+    const mots = sansAccents(cherche.value.trim()).split(/\s+/).filter(Boolean);
+    let vus = 0, total = 0;
+    for (const s of sections) {
+      const titre = sansAccents(s.querySelector('h2')?.textContent || '');
+      const titreOk = mots.length > 0 && mots.every(m => titre.includes(m));
+      let dans = 0;
+      for (const it of items(s)) {
+        if (it.closest('li') && it.tagName === 'P') continue;
+        total++;
+        const texte = sansAccents(it.textContent);
+        let ok = titreOk || mots.every(m => texte.includes(m));
+        if (seulementAFaire && it.classList.contains('faite')) ok = false;
+        it.hidden = !ok;
+        if (ok) { dans++; vus++; }
+      }
+      s.hidden = mots.length > 0 && dans === 0 && !titreOk;
+      const lien = liens.find(a => a.hash === '#' + s.id);
+      if (lien) lien.classList.toggle('cache', s.hidden);
+    }
+    document.getElementById('compte').textContent = mots.length ? vus + ' élément' + (vus > 1 ? 's' : '') + ' trouvé' + (vus > 1 ? 's' : '') : '';
+    document.getElementById('rien').classList.toggle('visible', sections.every(s => s.hidden));
+  }
+  cherche.addEventListener('input', appliquer);
+  document.getElementById('effacer').addEventListener('click', () => { cherche.value = ''; appliquer(); cherche.focus(); });
+  const bascule = document.getElementById('afaire');
+  if (bascule) bascule.addEventListener('click', () => {
+    seulementAFaire = !seulementAFaire;
+    bascule.setAttribute('aria-pressed', String(seulementAFaire));
+    appliquer();
+  });
+  const toast = document.getElementById('toast');
+  let minuterie;
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('button.demande');
+    if (!b) return;
+    try { await navigator.clipboard.writeText(b.dataset.texte); toast.textContent = 'Demande copiée : colle-la dans la fenêtre Claude'; }
+    catch { toast.textContent = 'Copie impossible ici : sélectionne le texte à la main'; }
+    b.classList.add('copiee'); setTimeout(() => b.classList.remove('copiee'), 1200);
+    toast.classList.add('vue'); clearTimeout(minuterie); minuterie = setTimeout(() => toast.classList.remove('vue'), 1800);
+  });
+  const observateur = new IntersectionObserver(entrees => {
+    for (const en of entrees) if (en.isIntersecting) liens.forEach(a => a.classList.toggle('ici', a.hash === '#' + en.target.id));
+  }, { rootMargin: '-10% 0px -80% 0px' });
+  sections.forEach(s => observateur.observe(s));
+  appliquer();
+</script>
+</body>
+</html>

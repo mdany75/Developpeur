@@ -1202,6 +1202,11 @@ parle au module y passe avec le jeton de la liaison, comme le connecteur :
 - `Resources/Info.plist` : identifiant et numéro de version du connecteur
 - `docs/` : captures, `SPEC.md` (cahier des charges, protocole entre le connecteur et le module,
   et la fenêtre Claude), `aide-adobe-developpement.md` (notes sur l'aide d'Adobe)
+- `docs/lavish/` : les pages de la feuille de route (`feuille-de-route.html`) et des guides
+  (`les-36-outils.html`, `guide-des-demandes.html`, `apprendre-avec-claude.html`,
+  `ordinogramme.html`, une retouche pas à pas), à ouvrir dans un navigateur ; faites avec
+  [Lavish](https://www.npmjs.com/package/lavish-axi) (`npx -y lavish-axi <fichier>` pour les
+  annoter)
 - `build.sh`, `install.sh`, `uninstall.sh` : construire, installer, désinstaller
 
 ## Licence

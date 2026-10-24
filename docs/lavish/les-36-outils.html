@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Les 36 outils</title>
+<style>
+  /* Couleurs de la fenêtre Claude (Dispositions.PALETTES, claire et sombre). */
+  :root {
+    --texte: #1D1D1F; --gris: #6B6B6B; --entete: #5F5F5F; --bleu: #0A64D8; --mono: #3D3D45;
+    --vert: #1F7A35; --orange: #A85A00; --ambre: #A86200; --rouge: #D12E2E;
+    --fond: #FFFFFF; --volet: #F2F2F2; --droite: #ECECEC; --carte: #FAFAFA;
+    --filet: #E2E2E2; --bord: #D9D9D9; --selection: #DADADA;
+    --vert-doux: #E6F2E9; --orange-doux: #FCEFDF; --bleu-doux: #E3EEFC; --gris-doux: #EFEFEF;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --texte: #E8E8E8; --gris: #9A9A9A; --entete: #A6A6A6; --bleu: #5AA2F6; --mono: #C8C8D0;
+      --vert: #3FB950; --orange: #E8963A; --ambre: #E0A040; --rouge: #F27A72;
+      --fond: #1E1E1E; --volet: #2A2A2A; --droite: #323232; --carte: #262626;
+      --filet: #343434; --bord: #404040; --selection: #3A3A3A;
+      --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --gris-doux: #2E2E2E;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --texte: #E8E8E8; --gris: #9A9A9A; --entete: #A6A6A6; --bleu: #5AA2F6; --mono: #C8C8D0;
+    --vert: #3FB950; --orange: #E8963A; --ambre: #E0A040; --rouge: #F27A72;
+    --fond: #1E1E1E; --volet: #2A2A2A; --droite: #323232; --carte: #262626;
+    --filet: #343434; --bord: #404040; --selection: #3A3A3A;
+    --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --gris-doux: #2E2E2E;
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { background: var(--volet); }
+  body {
+    margin: 0; background: var(--volet); color: var(--texte);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  }
+  code, .mono { font-family: Menlo, ui-monospace, "SF Mono", monospace; font-size: 13px; color: var(--mono); }
+  .page { max-width: 1120px; margin: 0 auto; padding: 32px 16px 64px; }
+  header h1 { margin: 0 0 6px; font-size: 30px; line-height: 1.2; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--gris); max-width: 760px; }
+  .version { display: inline-block; padding: 1px 8px; border-radius: 10px; background: var(--bleu-doux); color: var(--bleu); font-weight: 600; font-size: 13px; }
+
+  /* Le bilan : chaque case filtre les tableaux. */
+  .bilan { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 26px 0 18px; }
+  .case {
+    all: unset; cursor: pointer; display: block; padding: 12px 14px; border-radius: 10px;
+    background: var(--fond); border: 1px solid var(--bord); min-width: 0;
+  }
+  .case:hover { border-color: var(--gris); }
+  .case:focus-visible { outline: 2px solid var(--bleu); outline-offset: 2px; }
+  .case[aria-pressed="true"] { border-color: var(--bleu); box-shadow: inset 0 0 0 1px var(--bleu); }
+  .case b { display: block; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .case span { display: block; font-size: 13px; color: var(--gris); }
+  .case.oui b { color: var(--orange); }
+  .case.defait b { color: var(--ambre); }
+  .case.classement b { color: var(--bleu); }
+  .case.non b { color: var(--vert); }
+
+  .outils { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .outils input {
+    flex: 1 1 280px; min-width: 0; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--bord);
+    background: var(--fond); color: var(--texte); font: inherit;
+  }
+  .outils input:focus { outline: 2px solid var(--bleu); outline-offset: 0; border-color: transparent; }
+  .outils .compte { color: var(--gris); font-size: 13px; }
+  .outils button {
+    font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+    background: var(--fond); color: var(--texte); border: 1px solid var(--bord);
+  }
+
+  nav.familles {
+    position: sticky; top: 0; z-index: 2; display: flex; gap: 6px; overflow-x: auto; padding: 10px 0;
+    background: var(--volet); border-bottom: 1px solid var(--filet); margin-bottom: 8px;
+  }
+  nav.familles a {
+    flex: none; text-decoration: none; color: var(--texte); font-size: 13px; padding: 5px 11px;
+    border-radius: 14px; background: var(--fond); border: 1px solid var(--bord);
+  }
+  nav.familles a:hover { border-color: var(--gris); }
+  nav.familles a small { color: var(--gris); font-variant-numeric: tabular-nums; }
+
+  section.famille { margin-top: 30px; scroll-margin-top: 60px; }
+  section.famille h2 { margin: 0 0 4px; font-size: 20px; display: flex; gap: 10px; align-items: baseline; }
+  section.famille h2 small { font-size: 14px; font-weight: 500; color: var(--gris); }
+  section.famille > p { margin: 0 0 12px; color: var(--gris); max-width: 820px; }
+  section.famille[hidden] { display: none; }
+
+  .tableau { background: var(--fond); border: 1px solid var(--bord); border-radius: 10px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th {
+    text-align: left; font-size: 12px; font-weight: 600; color: var(--entete); text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 10px 14px; background: var(--carte); border-bottom: 1px solid var(--filet);
+  }
+  td { padding: 11px 14px; vertical-align: top; border-bottom: 1px solid var(--filet); overflow-wrap: anywhere; }
+  tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--carte); }
+  col.c-outil { width: 22%; } col.c-titre { width: 19%; } col.c-fait { width: 41%; } col.c-change { width: 18%; }
+  td.titre { color: var(--gris); }
+  .nouveau {
+    display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    background: var(--bleu-doux); color: var(--bleu); white-space: nowrap; vertical-align: 1px;
+  }
+  .ajout { display: block; margin-top: 4px; font-size: 13.5px; color: var(--gris); }
+
+  .etat { display: inline-flex; gap: 6px; align-items: center; padding: 2px 9px; border-radius: 10px; font-size: 13px; font-weight: 600; }
+  .etat::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+  .etat.oui { background: var(--orange-doux); color: var(--orange); }
+  .etat.defait { background: var(--orange-doux); color: var(--ambre); }
+  .etat.classement { background: var(--bleu-doux); color: var(--bleu); }
+  .etat.non { background: var(--vert-doux); color: var(--vert); }
+  .precision { display: block; margin-top: 4px; font-size: 12.5px; color: var(--gris); }
+
+  .rien { display: none; padding: 30px 0; text-align: center; color: var(--gris); }
+  .rien.visible { display: block; }
+  footer { margin-top: 40px; color: var(--gris); font-size: 13px; }
+
+  @media (max-width: 760px) {
+    .bilan { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .bilan .case:first-child { grid-column: 1 / -1; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    colgroup, thead { display: none; }
+    tr { padding: 12px 14px; border-bottom: 1px solid var(--filet); }
+    tr:last-child { border-bottom: 0; }
+    td { padding: 2px 0; border: 0; }
+    tbody tr:hover td { background: none; }
+    td.outil code { font-size: 14px; font-weight: 600; }
+    td.change { margin-top: 6px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>Les 36 outils</h1>
+    <p>Le connecteur MCP-Développeur <span class="version">1.3.5</span> donne 36 outils à Claude : les mêmes dans Claude Desktop, dans Claude Code et dans la fenêtre Claude de Lightroom.</p>
+  </header>
+
+  <div class="bilan" role="group" aria-label="Filtrer par effet sur la photo">
+    <button class="case tous" data-filtre="tous" aria-pressed="true"><b id="n-tous">36</b><span>outils en tout</span></button>
+    <button class="case oui" data-filtre="oui" aria-pressed="false"><b id="n-oui"></b><span>changent la photo</span></button>
+    <button class="case defait" data-filtre="defait" aria-pressed="false"><b id="n-defait"></b><span>défont une retouche</span></button>
+    <button class="case classement" data-filtre="classement" aria-pressed="false"><b id="n-classement"></b><span>classent seulement</span></button>
+    <button class="case non" data-filtre="non" aria-pressed="false"><b id="n-non"></b><span>ne changent rien</span></button>
+  </div>
+
+  <div class="outils">
+    <input id="cherche" type="search" placeholder="Chercher : masque, note, tirage…" aria-label="Chercher un outil">
+    <span class="compte" id="compte"></span>
+    <button id="toutvoir" type="button">Tout voir</button>
+  </div>
+
+  <nav class="familles" id="familles" aria-label="Familles d'outils"></nav>
+
+  <main id="contenu"></main>
+  <p class="rien" id="rien">Aucun outil ne répond à cette recherche.</p>
+
+  <footer>
+    Mis à jour pour la 1.3.5 (23 octobre 2026) : les ajouts des correctifs 1.3.4 et 1.3.5 sont marqués. Les seuils de ces ajouts sont encore provisoires.
+  </footer>
+</div>
+
+<script>
+  // « change » : oui, defait, classement ou non ; « precision » : la nuance de la doc d'origine.
+  const FAMILLES = [
+    { id: "voir", nom: "Voir et mesurer",
+      intro: "Sept outils regardent la photo sans jamais la retoucher : Claude s'en sert pour son diagnostic, avant et après chaque passe.",
+      outils: [
+        { nom: "get_status", titre: "État de la liaison", fait: "Dit si Lightroom répond, la version du module, la photo active et l'écran du Mac.", ajout: ["1.3.5", "Dit aussi la dernière sauvegarde du catalogue et l'état de Time Machine, avant une longue série, sans rien régler."], change: "non" },
+        { nom: "list_selection", titre: "Photos sélectionnées", fait: "Liste les photos sélectionnées dans Lightroom, avec leurs identifiants.", change: "non" },
+        { nom: "view_photo", titre: "Voir la photo", fait: "Montre la photo développée et ses mesures : exposition, couleurs, netteté, bruit, visages, éclairage, intention du boîtier Fujifilm, point de mise au point, bilan d'une passe à l'autre ; aussi un zoom ou un avant/après.", ajout: ["1.3.4", "Dit si l'écrêtage vient de la lumière ou d'une couleur trop vive, et signale les points chauds hors du sujet."], change: "non" },
+        { nom: "measure_angle", titre: "Mesurer un angle", fait: "Mesure l'inclinaison d'une ligne (horizon, bâtiment) avant de redresser.", change: "non" },
+        { nom: "read_composition", titre: "Lire la composition", fait: "Lit l'horizon, les tiers, le sujet et le regard sur l'image entière, et propose un cadre.", change: "non", precision: "deux étapes temporaires dans l'Historique" },
+        { nom: "analyze_photos", titre: "Mesurer une série", fait: "Mesure plusieurs photos d'un coup pour les comparer.", change: "non" },
+        { nom: "get_settings", titre: "Lire les réglages", fait: "Lit les réglages de développement actuels d'une photo.", change: "non" },
+      ] },
+    { id: "retoucher", nom: "Retoucher",
+      intro: "Onze outils travaillent la photo. Chaque changement est une étape « Claude · … » de l'Historique, avec sa raison, et se défait ; en mode « Proposer d'abord », rien ne s'applique sans ton accord.",
+      outils: [
+        { nom: "apply_settings", titre: "Appliquer des réglages", fait: "Pose des réglages de développement : profil, balance des blancs, tonalité, présence, TSL, courbe, détail, recadrage, géométrie.", change: "oui" },
+        { nom: "preview_settings", titre: "Proposer des réglages", fait: "Montre le rendu d'une proposition sans l'appliquer, avec la raison de Claude (gardée pour quand tu l'acceptes) ; sert aussi au mode « Je le fais » (les réglages à faire toi-même) et au cadre proposé.", change: "non" },
+        { nom: "enhance_photo", titre: "Débruiter, détails, super résolution", fait: "Réduction du bruit par IA, détails bruts, super résolution.", change: "oui" },
+        { nom: "add_mask", titre: "Ajouter des masques", fait: "Retouches locales : sujet, ciel, arrière-plan, personnes, peau dosée, dégradés et radiaux pour éclaircir et assombrir.", ajout: ["1.3.4", "La carte du masque (mask_map) montre la zone de chaque masque avant de l'écrire, et prévient d'un masque vide, total, inversé ou qui déborde sur un visage."], change: "oui" },
+        { nom: "edit_mask", titre: "Reprendre un masque", fait: "Change, inverse ou retire un masque déjà posé.", change: "oui" },
+        { nom: "retouch_spots", titre: "Taches et yeux rouges", fait: "Retire des taches, corrige les yeux rouges.", change: "oui" },
+        { nom: "remove_distractions", titre: "Supprimer les reflets", fait: "Supprime les reflets d'une vitre.", change: "oui" },
+        { nom: "copy_settings", titre: "Copier une retouche", fait: "Copie la retouche d'une photo vers d'autres.", change: "oui" },
+        { nom: "match_series", titre: "Harmoniser une série", fait: "Accorde l'exposition et la balance d'une série sur une photo de référence.", ajout: ["1.3.5", "Écarte les vidéos de la série et dit combien."], change: "oui" },
+        { nom: "compare_variants", titre: "Comparer des variantes", fait: "Prépare plusieurs interprétations en instantanés, à comparer côte à côte.", change: "oui", precision: "en instantanés" },
+        { nom: "choose_variant", titre: "Choisir une variante", fait: "Pose la variante choisie.", change: "oui" },
+      ] },
+    { id: "autour", nom: "Profils, annulation, journal et style",
+      intro: "Sept outils servent autour de la retouche : choisir un profil, défaire, garder la trace de ce qui a été fait et de tes goûts.",
+      outils: [
+        { nom: "list_profiles", titre: "Profils", fait: "Liste les profils de l'appareil (simulations Fujifilm comprises) et les profils créatifs installés.", change: "non" },
+        { nom: "list_presets", titre: "Paramètres prédéfinis", fait: "Liste tes paramètres prédéfinis de développement.", change: "non" },
+        { nom: "save_preset", titre: "Créer un paramètre prédéfini", fait: "Range une retouche en paramètre prédéfini, réutilisable dans Lightroom.", change: "non", precision: "crée un paramètre prédéfini" },
+        { nom: "undo_last", titre: "Annuler la dernière retouche", fait: "Défait la dernière étape de Claude : réglages, masque, note ou classement.", change: "defait" },
+        { nom: "revert_to_original", titre: "Revenir à l'état d'avant Claude", fait: "Remet la photo telle qu'elle était avant les retouches de Claude.", change: "defait" },
+        { nom: "export_journal", titre: "Journal et carnet de progrès", fait: "Le journal des retouches (quoi et pourquoi) et le carnet de progrès, mois par mois.", change: "non" },
+        { nom: "remember_style", titre: "Guide de style", fait: "Lit ton guide de style ; y ajoute une préférence après ton accord.", ajout: ["1.3.5", "Avec learn, tire des règles de tes corrections à la main sur une série ; rien n'entre au guide sans ton accord."], change: "non", precision: "ton guide, à part" },
+      ] },
+    { id: "classer", nom: "Classer dans la Bibliothèque",
+      intro: "Six outils rangent et retrouvent tes photos sans toucher à leur rendu ; le classement se défait aussi par undo_last.",
+      outils: [
+        { nom: "find_photos", titre: "Chercher des photos", fait: "Cherche par date, note, drapeau, libellé, mot-clé, appareil, dossier ou collection.", change: "non" },
+        { nom: "set_metadata", titre: "Classer des photos", fait: "Pose note, drapeau, libellé, titre, légende, mots-clés ou position GPS ; un libellé de couleur (tes coups de cœur) seulement sur ta demande.", change: "classement" },
+        { nom: "list_keywords", titre: "Mots-clés", fait: "Liste tes mots-clés.", change: "non" },
+        { nom: "manage_collections", titre: "Collections", fait: "Crée des collections, y ajoute ou en retire des photos ; ne supprime jamais rien.", change: "classement" },
+        { nom: "create_virtual_copy", titre: "Créer une copie virtuelle", fait: "Crée une copie virtuelle, pour essayer sans toucher à l'original.", change: "non", precision: "une copie de plus" },
+        { nom: "show_photo", titre: "Montrer dans Lightroom", fait: "Sélectionne et affiche des photos dans la Bibliothèque ou le module Développement, avec un filtre au besoin.", change: "non" },
+      ] },
+    { id: "trier", nom: "Trier, noter et apprendre",
+      intro: "Quatre outils jugent une séance et t'aident à progresser. Claude note de 0 à 5 ★ ; tes coups de cœur sont un libellé de couleur que tu poses toi-même, et une note proposée attend ton accord dans la carte Note.",
+      outils: [
+        { nom: "cull_photos", titre: "Trier une séance", fait: "Mesure netteté, exposition, yeux fermés et rafales ; propose les rejets et le plafond de note de chaque photo ; sans photos désignées, juge la photo active.", ajout: ["1.3.4 · 1.3.5", "Des yeux fermés ne font proposer un rejet que si une autre vue de la rafale les a ouverts ; deux boîtiers ne font plus une rafale ; les vidéos sont écartées."], change: "non" },
+        { nom: "contact_sheet", titre: "Planche contact", fait: "Une planche de 30 vignettes numérotées au plus, pour voir une sortie d'un coup.", change: "non" },
+        { nom: "propose_ratings", titre: "Noter des photos", fait: "Propose une note de 0 à 5 ★, « à vérifier », selon le standard de notation ; la pose si tu le demandes.", change: "classement", precision: "seulement sur ta demande" },
+        { nom: "photo_lesson", titre: "Leçon de la photo", fait: "Range la leçon de la photo : ce qui manquait, et ce qui l'aurait évité à la prise de vue ; la leçon d'une photo d'essai est donnée, mais n'entre pas au carnet de progrès.", ajout: ["1.3.5", "Compare une nouvelle retouche de la même photo, repartie de l'origine, à la précédente : le rendu se reproduit-il ?"], change: "non" },
+      ] },
+    { id: "livrer", nom: "Livrer",
+      intro: "Un outil sort les photos de Lightroom, dans un dossier choisi avec toi.",
+      outils: [
+        { nom: "export_photos", titre: "Exporter des photos", fait: "Exporte en JPEG, TIFF, AVIF ou HDR, avec la taille, le poids, le filigrane et le dossier choisis.", ajout: ["1.3.5", "Prépare un tirage (print) : format en cm, 300 ppp par défaut, netteté du papier mat ou brillant ; saute les vidéos."], change: "non", precision: "de nouveaux fichiers" },
+      ] },
+  ];
+
+  const ETATS = { oui: "Oui", defait: "Défait", classement: "Classement", non: "Non" };
+  const tous = FAMILLES.flatMap(f => f.outils);
+  for (const etat of Object.keys(ETATS)) {
+    document.getElementById("n-" + etat).textContent = tous.filter(o => o.change === etat).length;
+  }
+  document.getElementById("n-tous").textContent = tous.length;
+
+  const echapper = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  // Les noms d'outils cités dans un texte passent en Menlo.
+  const noms = new Set(tous.map(o => o.nom).concat(["mask_map", "learn", "print"]));
+  const enCode = t => echapper(t).replace(/\b[a-z_]+\b/g, m => noms.has(m) ? `<code>${m}</code>` : m);
+
+  const contenu = document.getElementById("contenu");
+  const nav = document.getElementById("familles");
+  for (const f of FAMILLES) {
+    const lignes = f.outils.map(o => `
+      <tr id="outil-${o.nom}" data-change="${o.change}" data-texte="${echapper((o.nom + " " + o.titre + " " + o.fait + " " + (o.ajout ? o.ajout[1] : "") + " " + (o.precision || "")).toLowerCase())}">
+        <td class="outil"><code>${o.nom}</code>${o.ajout ? `<span class="nouveau">${o.ajout[0]}</span>` : ""}</td>
+        <td class="titre">${echapper(o.titre)}</td>
+        <td class="fait">${enCode(o.fait)}${o.ajout ? `<span class="ajout">${enCode(o.ajout[1])}</span>` : ""}</td>
+        <td class="change"><span class="etat ${o.change}">${ETATS[o.change]}</span>${o.precision ? `<span class="precision">${echapper(o.precision)}</span>` : ""}</td>
+      </tr>`).join("");
+    contenu.insertAdjacentHTML("beforeend", `
+      <section class="famille" id="${f.id}">
+        <h2>${echapper(f.nom)} <small>${f.outils.length} outil${f.outils.length > 1 ? "s" : ""}</small></h2>
+        <p>${enCode(f.intro)}</p>
+        <div class="tableau">
+          <table>
+            <colgroup><col class="c-outil"><col class="c-titre"><col class="c-fait"><col class="c-change"></colgroup>
+            <thead><tr><th>Outil</th><th>Titre dans Claude Desktop</th><th>Ce qu'il fait</th><th>Change la photo ?</th></tr></thead>
+            <tbody>${lignes}</tbody>
+          </table>
+        </div>
+      </section>`);
+    nav.insertAdjacentHTML("beforeend", `<a href="#${f.id}">${echapper(f.nom)} <small>${f.outils.length}</small></a>`);
+  }
+
+  const cherche = document.getElementById("cherche");
+  const cases = [...document.querySelectorAll(".case")];
+  let filtre = "tous";
+  const sansAccents = t => t.normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+  function appliquer() {
+    const mots = sansAccents(cherche.value.trim().toLowerCase()).split(/\s+/).filter(Boolean);
+    let vus = 0;
+    for (const section of contenu.querySelectorAll("section.famille")) {
+      let dansSection = 0;
+      for (const tr of section.querySelectorAll("tbody tr")) {
+        const texte = sansAccents(tr.dataset.texte);
+        const ok = (filtre === "tous" || tr.dataset.change === filtre) && mots.every(m => texte.includes(m));
+        tr.hidden = !ok;
+        if (ok) dansSection++;
+      }
+      section.hidden = dansSection === 0;
+      vus += dansSection;
+    }
+    document.getElementById("compte").textContent = vus === tous.length ? "" : `${vus} sur ${tous.length}`;
+    document.getElementById("rien").classList.toggle("visible", vus === 0);
+  }
+
+  for (const c of cases) {
+    c.addEventListener("click", () => {
+      filtre = c.dataset.filtre === filtre ? "tous" : c.dataset.filtre;
+      cases.forEach(x => x.setAttribute("aria-pressed", String(x.dataset.filtre === filtre)));
+      appliquer();
+    });
+  }
+  cherche.addEventListener("input", appliquer);
+  document.getElementById("toutvoir").addEventListener("click", () => {
+    cherche.value = ""; filtre = "tous";
+    cases.forEach(x => x.setAttribute("aria-pressed", String(x.dataset.filtre === "tous")));
+    appliquer();
+  });
+  appliquer();
+</script>
+</body>
+</html>
