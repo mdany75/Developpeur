@@ -73,23 +73,39 @@ public enum Sauvegardes {
     }
 
     /// Time Machine, d'après ses préférences (`plist`, nil : illisibles) ; `exclu` dit si un chemin en
-    /// est exclu (nil : pas lu).
-    static func timeMachine(plist: [String: Any]?, cheminCatalogue: String, maintenant: Date, exclu: (String) -> Bool?) -> JSONValue {
-        guard let plist else { return ["lue": false, "remarque": "Préférences de Time Machine illisibles."] }
-        let destinations = plist["Destinations"] as? [[String: Any]] ?? []
-        var item: [String: JSONValue] = ["configuree": .bool(!destinations.isEmpty)]
-        guard !destinations.isEmpty else {
-            item["remarque"] = "Time Machine n'a aucune destination : ni le Mac ni les photos n'y sont sauvegardés."
-            return .object(item)
+    /// est exclu (nil : pas lu). Lancé depuis Lightroom (la fenêtre Claude), le connecteur ne lit pas
+    /// ces préférences (constaté le 23 octobre 2026 : elles demandent l'accès complet au disque) :
+    /// `destinations` (de `tmutil destinationinfo`) dit alors la destination, et `exclu` le volume.
+    static func timeMachine(plist: [String: Any]?, cheminCatalogue: String, maintenant: Date, exclu: (String) -> Bool?,
+                            destinations repli: () -> [String]? = { nil }) -> JSONValue {
+        var item: [String: JSONValue] = [:]
+        if let plist {
+            let destinations = plist["Destinations"] as? [[String: Any]] ?? []
+            item["configuree"] = .bool(!destinations.isEmpty)
+            guard !destinations.isEmpty else {
+                item["remarque"] = "Time Machine n'a aucune destination : ni le Mac ni les photos n'y sont sauvegardés."
+                return .object(item)
+            }
+            let auto = (plist["AutoBackup"] as? Bool) ?? ((plist["AutoBackup"] as? Int).map { $0 != 0 } ?? false)
+            item["automatique"] = .bool(auto)
+            if let derniere = destinations.flatMap({ $0["SnapshotDates"] as? [Date] ?? [] }).max() {
+                item["derniere"] = .string(texte(derniere))
+                item["il_y_a"] = .string(ilYA(derniere, maintenant: maintenant))
+            }
+            let noms = destinations.compactMap { $0["LastKnownVolumeName"] as? String }
+            if !noms.isEmpty { item["destination"] = .string(noms.joined(separator: ", ")) }
+        } else {
+            item["preferences_lues"] = false
+            if let noms = repli() {
+                item["configuree"] = .bool(!noms.isEmpty)
+                guard !noms.isEmpty else {
+                    item["remarque"] = "Time Machine n'a aucune destination : ni le Mac ni les photos n'y sont sauvegardés."
+                    return .object(item)
+                }
+                item["destination"] = .string(noms.joined(separator: ", "))
+            }
+            item["a_savoir"] = "Date de la dernière sauvegarde non lue d'ici (préférences du système protégées) : l'utilisateur la voit dans Réglages Système › Time Machine."
         }
-        let auto = (plist["AutoBackup"] as? Bool) ?? ((plist["AutoBackup"] as? Int).map { $0 != 0 } ?? false)
-        item["automatique"] = .bool(auto)
-        if let derniere = destinations.flatMap({ $0["SnapshotDates"] as? [Date] ?? [] }).max() {
-            item["derniere"] = .string(texte(derniere))
-            item["il_y_a"] = .string(ilYA(derniere, maintenant: maintenant))
-        }
-        let noms = destinations.compactMap { $0["LastKnownVolumeName"] as? String }
-        if !noms.isEmpty { item["destination"] = .string(noms.joined(separator: ", ")) }
         let racine = volume(cheminCatalogue) ?? "/"
         item["volume_du_catalogue"] = .string(racine == "/" ? "disque du Mac" : String(racine.dropFirst("/Volumes/".count)))
         if let estExclu = exclu(racine) {
@@ -123,6 +139,32 @@ public enum Sauvegardes {
         } ?? nil
     }
 
+    /// Les noms des destinations de Time Machine (`tmutil destinationinfo`) ; nil si l'outil ne
+    /// répond pas à temps.
+    static func destinations() -> [String]? {
+        borne {
+            let processus = Process()
+            processus.executableURL = URL(fileURLWithPath: "/usr/bin/tmutil")
+            processus.arguments = ["destinationinfo"]
+            let sortie = Pipe()
+            processus.standardOutput = sortie
+            processus.standardError = Pipe()
+            do { try processus.run() } catch { return nil }
+            let data = sortie.fileHandleForReading.readDataToEndOfFile()
+            processus.waitUntilExit()
+            return nomsDestinations(String(decoding: data, as: UTF8.self))
+        } ?? nil
+    }
+
+    /// Les lignes « Name : … » de `tmutil destinationinfo`.
+    static func nomsDestinations(_ texte: String) -> [String] {
+        texte.split(separator: "\n").compactMap { ligne in
+            let parties = ligne.split(separator: ":", maxSplits: 1)
+            guard parties.count == 2, parties[0].trimmingCharacters(in: .whitespaces) == "Name" else { return nil }
+            return parties[1].trimmingCharacters(in: .whitespaces)
+        }
+    }
+
     /// Ce que get_status en dit, sur ce Mac.
     public static func lire(cheminCatalogue: String) -> JSONValue? {
         let maintenant = Date()
@@ -132,7 +174,8 @@ public enum Sauvegardes {
         return json(catalogue: catalogue(chemin: cheminCatalogue, maintenant: maintenant) { dossier in
                         borne { try? FileManager.default.contentsOfDirectory(atPath: dossier.path) } ?? nil
                     },
-                    timeMachine: timeMachine(plist: plist, cheminCatalogue: cheminCatalogue, maintenant: maintenant, exclu: exclu))
+                    timeMachine: timeMachine(plist: plist, cheminCatalogue: cheminCatalogue, maintenant: maintenant, exclu: exclu,
+                                             destinations: destinations))
     }
 
     static func json(catalogue: JSONValue, timeMachine: JSONValue) -> JSONValue {

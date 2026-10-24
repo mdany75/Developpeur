@@ -1219,7 +1219,11 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
     `Backups` à côté du catalogue et `/Library/Preferences/com.apple.TimeMachine.plist`
     (`Destinations`, `SnapshotDates`, `AutoBackup`), puis `tmutil isexcluded` sur le volume du
     catalogue ; toute lecture du volume des photos ou d'un outil est bornée (`Sauvegardes.borne`,
-    3 s) : macOS peut y faire attendre, Claude ne répond jamais à sa place. Rien n'est réglé.
+    3 s) : macOS peut y faire attendre, Claude ne répond jamais à sa place. Rien n'est réglé. Lancé
+    depuis Lightroom (la fenêtre Claude), le connecteur ne lit pas ces préférences (accès complet
+    au disque ; constaté le 23 octobre 2026 à l'essai de la 1.3.5 : « préférences non lisibles ») :
+    repli par `tmutil destinationinfo` (la destination) et `tmutil isexcluded` (le volume), sans la
+    date de la dernière sauvegarde (`preferences_lues` faux, `a_savoir`).
   - **Rafales par boîtier** : `Vignettes.decrireVignette` lit `serie_boitier`
     (`cameraSerialNumber`, par `Photos.meta`, une à la fois : une clé refusée ne casse aucun lot) ;
     `PhotoTriee.boitier`, et `Tri.memeRafale` refuse deux boîtiers différents ; `view_photo` retire

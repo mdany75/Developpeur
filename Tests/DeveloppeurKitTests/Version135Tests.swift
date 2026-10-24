@@ -56,7 +56,18 @@ final class Version135Tests: XCTestCase {
         XCTAssertEqual(interne["volume_du_catalogue"]?.string, "disque du Mac")
         XCTAssertEqual(interne["volume_dans_time_machine"], true)
         XCTAssertEqual(Sauvegardes.timeMachine(plist: [:], cheminCatalogue: "/x.lrcat", maintenant: maintenant) { _ in nil }["configuree"], false)
-        XCTAssertEqual(Sauvegardes.timeMachine(plist: nil, cheminCatalogue: "/x.lrcat", maintenant: maintenant) { _ in nil }["lue"], false)
+        // Préférences illisibles (le connecteur lancé depuis Lightroom, constaté le 23 octobre 2026) :
+        // tmutil dit la destination et le volume.
+        let repli = Sauvegardes.timeMachine(plist: nil, cheminCatalogue: "/Volumes/Photos/c.lrcat", maintenant: maintenant,
+                                            exclu: { _ in true }, destinations: { ["Backup"] })
+        XCTAssertEqual(repli["preferences_lues"], false)
+        XCTAssertEqual(repli["configuree"], true)
+        XCTAssertEqual(repli["destination"]?.string, "Backup")
+        XCTAssertEqual(repli["volume_dans_time_machine"], false)
+        XCTAssertNotNil(repli["a_savoir"])
+        XCTAssertEqual(Sauvegardes.timeMachine(plist: nil, cheminCatalogue: "/x.lrcat", maintenant: maintenant,
+                                               exclu: { _ in nil }, destinations: { [] })["configuree"], false)
+        XCTAssertEqual(Sauvegardes.nomsDestinations("=====\nName          : Backup\nKind          : Network\nID            : AF\n"), ["Backup"])
         let pasLu = Sauvegardes.timeMachine(plist: plist, cheminCatalogue: "/Volumes/Photos/c.lrcat", maintenant: maintenant) { _ in nil }
         XCTAssertEqual(pasLu["volume_dans_time_machine"], .null)
     }

@@ -5323,7 +5323,11 @@ sa demande : trois chantiers de la 1.4 (« Sauvegarde dite avant une série », 
 boîtier », « Vidéos écartées »), un de la 1.5 (« Préparer un tirage ») et les quatre de la 1.6
 (« Ton style sur une photo neuve », « Rendu reproductible », « Styles en recettes fixes »,
 « Apprendre de tes corrections »). Les règles et les seuils sont dans CLAUDE.md (puce « Correctif
-1.3.5 »). Ce qui reste à constater dans Lightroom : `cameraSerialNumber` lu par
+1.3.5 »). Constaté à l'essai dans la fenêtre Claude, le 23 octobre 2026 : le connecteur lancé depuis
+Lightroom ne lit pas `/Library/Preferences/com.apple.TimeMachine.plist` (il faut l'accès complet au
+disque, que ni Lightroom ni Claude ne demandent) ; d'où le repli par `tmutil destinationinfo` et
+`tmutil isexcluded`. La sauvegarde du catalogue, elle, s'y est lue (6 sauvegardes, la dernière le
+19 octobre). Ce qui reste à constater dans Lightroom : `cameraSerialNumber` lu par
 `getFormattedMetadata` (supposé ; refusé, la clé manque et les rafales restent celles d'avant) ;
 le nom des dossiers de sauvegarde « AAAA-MM-JJ HHMM » dans Backups (celui de Lightroom Classic,
 supposé) ; `tmutil isexcluded` sur un volume externe, sans demande d'autorisation de macOS ;
