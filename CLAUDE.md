@@ -135,7 +135,7 @@ Dany le 23 octobre 2026, quatre chantiers tirés de la 1.4 et de la 1.5 de la fe
 côté connecteur) : la règle de la rafale pour les yeux fermés, la nature de l'écrêtage (luminance ou
 gamme), la carte du masque (`mask_map`) et les points chauds ; « Harmoniser par lumière » reste dans
 la 1.4, et la partie « « À vérifier » devient un libellé de couleur, filtrable » de la ligne Yeux est
-écartée (décision de Dany du 23 octobre 2026 : rien de filtrable).
+écartée (décision de Dany du 23 octobre 2026 : rien de filtrable). Publié le 23 octobre 2026 sur la demande de Dany (« publie »), après les deux suites et sa recette (87 étapes), sans l'essai dans la fenêtre Claude : le contrôle en arrière-plan refuse « Ouvrir la fenêtre Claude » et ⌃⌥C (pris pour une commande du presse-papiers) et l'accord plein écran n'est pas venu ; l'essai reste à faire.
 
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 
