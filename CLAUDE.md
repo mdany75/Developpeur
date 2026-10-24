@@ -96,7 +96,9 @@ Dans cet ordre :
 6. Mettre à jour la feuille de route « Développeur — Feuille de route » (document claude.ai
    privé, https://claude.ai/code/artifact/9b2efe2d-d295-4655-9653-3a324d84472e, par le
    connecteur Claude Docs) : retirer ce que la version vient de livrer et corriger ce qui est
-   devenu faux.
+   devenu faux. Puis reporter les mêmes changements dans sa page (artefact privé
+   https://claude.ai/artifact/1nTRUJhgpvrkYybt7pNVns, frise des versions et décisions comprises) :
+   la relire (Artifact, `read`), la corriger et la republier à la même adresse.
 
 Une version par étape de la feuille de route (1.1 le nouvel écran et la notation, 1.2 rendu plus
 juste, 1.3 apprendre en regardant Claude, 1.4 une sortie entière, 1.5 finitions et impression, 1.6
