@@ -140,7 +140,9 @@ la 1.4, et la partie « « À vérifier » devient un libellé de couleur, filtr
 chantiers de la feuille de route, trois de la 1.4 (sauvegarde dite, rafales par boîtier, vidéos
 écartées), un de la 1.5 (préparer un tirage) et les quatre de la 1.6 (ton style sur une photo neuve,
 rendu reproductible, styles en recettes fixes, apprendre de tes corrections) ; il change le module
-(relancer Lightroom). Publié le 23 octobre 2026 sur la demande de Dany (« publie »), après les deux suites et sa recette (87 étapes), sans l'essai dans la fenêtre Claude : le contrôle en arrière-plan refuse « Ouvrir la fenêtre Claude » et ⌃⌥C (pris pour une commande du presse-papiers) et l'accord plein écran n'est pas venu ; l'essai reste à faire.
+(relancer Lightroom). Publié le 23 octobre 2026 (tag v1.3.5 sur fedabf3) après les deux suites, sa recette (87
+étapes) et un essai dans la fenêtre Claude (sauvegardes dites, +0,2 IL sur le portrait d'essai,
+défait). Publié le 23 octobre 2026 sur la demande de Dany (« publie »), après les deux suites et sa recette (87 étapes), sans l'essai dans la fenêtre Claude : le contrôle en arrière-plan refuse « Ouvrir la fenêtre Claude » et ⌃⌥C (pris pour une commande du presse-papiers) et l'accord plein écran n'est pas venu ; l'essai reste à faire.
 
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 
