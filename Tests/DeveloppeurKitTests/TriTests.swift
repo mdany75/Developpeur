@@ -206,6 +206,36 @@ final class TriTests: XCTestCase {
         XCTAssertNil(bilan["plafonds"]?["1"], "la meilleure, sans défaut : rien ne la borne sous 4")
     }
 
+    /// La règle de la rafale (1.3.4) : des yeux fermés ne font proposer le rejet que si une autre vue
+    /// de la rafale ou de la pile les a ouverts ; la seule vue de son moment reste à vérifier, à 2 ★.
+    func testClosedEyesAreOnlyRejectedWhenAnotherViewOfTheBurstHasThemOpen() {
+        func photo(_ id: Int, ouverture: Double, pile: Int?) -> PhotoTriee {
+            var p = PhotoTriee(id: id, fichier: "DSCF\(id).RAF")
+            p.detail = DetailMeasurements(zones: Array(repeating: 50, count: 9), noise: 0.3, shadowNoise: nil, side: 1024)
+            p.vision = VisionReport(faces: [VisionReport.Face(box: CGRect(x: 0.4, y: 0.3, width: 0.2, height: 0.2), pupils: [], eyeWidth: nil,
+                                                              quality: 0.6, eyeOpenness: ouverture)], aesthetics: 0.2, utility: false, salientArea: nil)
+            p.pile = pile
+            return p
+        }
+        let fermesDansLaPile = photo(1, ouverture: 0.05, pile: 1)
+        let ouvertsDansLaPile = photo(2, ouverture: 0.4, pile: 1)
+        let fermesSeule = photo(3, ouverture: 0.05, pile: nil)
+        XCTAssertTrue(ouvertsDansLaPile.yeuxOuverts)
+        XCTAssertFalse(fermesDansLaPile.yeuxOuverts)
+        let bilan = Tri.bilan([fermesDansLaPile, ouvertsDansLaPile, fermesSeule])
+        let rejets = (bilan["propositions"]?.array ?? []).filter { $0["flag"]?.string == "reject" }
+            .flatMap { $0["photo_ids"]?.array?.compactMap(\.int) ?? [] }
+        XCTAssertEqual(rejets, [1], "seule la vue aux yeux fermés d'une pile qui a une autre vue aux yeux ouverts")
+        XCTAssertEqual(bilan["plafonds"]?["1"]?["note_max"]?.int, 0)
+        XCTAssertEqual(bilan["plafonds"]?["3"]?["note_max"]?.int, 2, "la seule vue de son moment : 2 au plus")
+        XCTAssertEqual(bilan["plafonds"]?["3"]?["a_verifier"]?.bool, true)
+        XCTAssertEqual(bilan["yeux_fermes"]?.array?.compactMap(\.int), [1, 3], "les yeux fermés restent dits")
+        // Toute la pile aux yeux fermés : aucune autre vue ne les a ouverts, aucun rejet.
+        let bilanFermes = Tri.bilan([photo(4, ouverture: 0.05, pile: 4), photo(5, ouverture: 0.08, pile: 4)])
+        XCTAssertTrue((bilanFermes["propositions"]?.array ?? []).isEmpty)
+        XCTAssertEqual(bilanFermes["plafonds"]?["4"]?["a_verifier"]?.bool, true)
+    }
+
     func testCullTargetsSelectionCollectionAndFolder() throws {
         preparerVignettes()
         fake.replies["selection"] = ["total": 2, "photos": [["id": 7], ["id": 8]]]

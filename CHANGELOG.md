@@ -1,5 +1,32 @@
 # Changements
 
+## 1.3.4 — 2026-10-23
+
+Le correctif 1.3.4, fait à votre demande le 23 octobre 2026 : quatre chantiers tirés de la feuille
+de route (deux de la 1.4, deux de la 1.5), tous du côté du connecteur. Après l'installation :
+rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code ; le module Lightroom ne
+change que de numéro.
+
+### Ajouté
+- La carte du masque : `add_mask` avec `mask_map` fait rendre chaque masque (quatre au plus) avec
+  un effet témoin, sans rien garder, et dit où il porte : la part de l'image, sa zone, la part de
+  chaque visage qu'il couvre, et une image où chaque masque a sa couleur. Des alertes signalent un
+  masque presque vide, presque total, qui déborde sur un visage, ou qui semble inversé (un ciel en
+  bas de l'image, un sujet qui évite les visages).
+- Les points chauds : `view_photo` donne, sur l'aperçu entier, jusqu'à cinq zones claires hors du
+  sujet (hors des visages et de la zone d'intérêt) qui peuvent voler l'œil, une fenêtre, une nappe,
+  un panneau, avec leur place. Rien n'est corrigé d'office.
+- La nature de l'écrêtage : `view_photo` dit si des hautes lumières brûlent par la luminance (une
+  zone presque blanche, qui se corrige par les Hautes lumières ou les Blancs) ou par la gamme (une
+  couleur trop saturée pour l'espace de l'aperçu, qui se corrige par la TSL de sa couleur ou le
+  profil), avec la bande de la TSL la plus touchée.
+
+### Changé
+- Les yeux fermés et la règle de la rafale : le tri ne propose plus le rejet d'une photo aux yeux
+  fermés que si une autre vue de sa rafale ou de sa pile les a ouverts. La seule vue de son moment
+  (la seule photo d'un groupe) ne se jette pas pour un clignement : 2 ★ au plus, à vérifier. Le
+  standard de notation le dit.
+
 ## 1.3.3 — 2026-10-22
 
 Le correctif 1.3.3, fait à votre demande le 22 octobre 2026, après la 1.3.2 : la Demande rapide,

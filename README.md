@@ -314,6 +314,17 @@ avant de proposer un cadre.
   données de prise de vue et des mesures : luminosité (L*, centiles), écrêtage des hautes lumières
   (aussi canal par canal) et des ombres, contraste, saturation, dominante des tons neutres,
   netteté par zone et bruit.
+- La nature de l'écrêtage (1.3.4) : des hautes lumières brûlées par la luminance (une zone presque
+  blanche : les Hautes lumières ou les Blancs la corrigent) ou par la gamme (une couleur trop
+  saturée pour l'espace de l'aperçu, un rouge de fleur, un coucher de soleil, un vêtement vif : la
+  TSL de sa couleur ou le profil la corrigent ; baisser les Hautes lumières éteindrait toute la
+  photo sans la ramener), avec la bande de la TSL la plus touchée. Mesuré dans l'aperçu sRGB :
+  exportée en Adobe RVB ou P3, une partie rentre dans la gamme. Seuils provisoires.
+- Les points chauds (1.3.4), sur l'aperçu entier : jusqu'à cinq zones claires hors du sujet (hors
+  des visages et de la zone d'intérêt), une fenêtre, une nappe blanche, un panneau, qui peuvent
+  voler l'œil, avec leur place (« en haut à droite »). Claude vous les montre ; il ne les assombrit
+  que si elles distraient vraiment, et le dit. Ni un grand ciel clair ni un petit reflet n'en sont.
+  Seuils provisoires.
 - Un bilan chiffré d'une passe à l'autre : à chaque nouvel aperçu entier d'une photo, Claude voit
   ce qui a bougé depuis le précédent à la même taille (exposition en IL, contraste, écrêtage,
   dominante, saturation, netteté, bruit), avant → après, et depuis le premier de la session. Une
@@ -474,6 +485,15 @@ avant de proposer un cadre.
   linéaire (constaté dans Lightroom le 20 octobre 2026 sur un portrait d'essai : texture −20 et
   clarté −10, la dose « Peau du visage lisse », à l'intensité 50 rendent la même image, au pixel
   près, que texture −10 et clarté −5 à 100).
+- La carte du masque (1.3.4, `add_mask` avec `mask_map`, une seule photo) : chaque masque (quatre au
+  plus) est rendu avec un effet témoin (+1,5 IL et plus froid, à pleine intensité), comparé à
+  l'état actuel, sans rien garder : sa part de l'image, sa zone, la part de chaque visage qu'il
+  couvre, et une image où chaque masque a sa couleur (rouge, bleu, vert, jaune). Des alertes : un
+  masque presque vide (Lightroom n'a rien trouvé), presque total, qui déborde sur un visage (un ciel,
+  un arrière-plan, les bords), ou qui semble inversé (un ciel en bas de l'image, un sujet qui évite
+  les visages). Claude s'en sert pour un masque IA près d'un visage, un ciel découpé, une personne,
+  un masque combiné. Un rendu de plus par masque, et deux étapes « Claude · essai » chacun dans
+  l'Historique. Seuils provisoires.
 - Reprendre un masque après coup : masquer, afficher, dupliquer (inversé au besoin), retirer,
   recalculer, adoucir ou resserrer son contour (Lightroom 15.5). Les masques que Lightroom trouve
   vides sont retirés, et Claude le dit. Chaque masque porte un nom « Claude · … » dans le panneau
@@ -492,8 +512,10 @@ avant de proposer un cadre.
   de lecture (netteté et note esthétique ; la qualité des visages ne départage que les photos d'une
   même rafale ou pile).
 - Le tri ne propose pas d'étoiles : il donne à chaque photo un plafond de note mesuré, le plancher
-  technique du standard de notation (voir Noter vos photos). Floue, mise au point manquée ou yeux
-  fermés : rejet proposé. La mise au point ne se juge que sur une zone qui a du détail : posée sur
+  technique du standard de notation (voir Noter vos photos). Floue ou mise au point manquée : rejet
+  proposé. Yeux fermés : rejet proposé seulement si une autre vue de sa rafale ou de sa pile les a
+  ouverts (la règle de la rafale, 1.3.4) ; la seule vue de son moment, la seule photo d'un groupe,
+  ne se jette pas pour un clignement : 2 ★ au plus, à vérifier. La mise au point ne se juge que sur une zone qui a du détail : posée sur
   du sable lisse ou un ciel uni, elle est « non jugée » ; sur une texture faible (le bord d'un
   nuage), une mise au point manquée n'est qu'un doute, 2 ★ au plus, à vérifier par un zoom à
   100 %, sans rejet proposé. Douce, ou mise au point signalée manquée par l'appareil : 3 ★ au plus.

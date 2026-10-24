@@ -28,6 +28,12 @@ public struct PhotoMeasurements: Equatable {
     public var neutralB: Double
     public var neutralShare: Double
     public var pixelCount: Int
+    /// Part des pixels écrêtés par la gamme (1.3.4) : un canal saturé sur une couleur vive, pas une
+    /// zone presque blanche (`basGamme`, `chromaGamme`), en %. Le reste de `clippedHighlights` est
+    /// écrêté par la luminance.
+    public var clippedGamut: Double = 0
+    /// La bande de la TSL (rouge, orange… magenta) la plus touchée par l'écrêtage par la gamme.
+    public var gamutBand: String?
 
     public var medianL: Double { percentilesL[50] ?? meanL }
     public var contrast: Double { (percentilesL[95] ?? 0) - (percentilesL[5] ?? 0) }
@@ -39,6 +45,54 @@ public struct PhotoMeasurements: Equatable {
     static let dominanteLegere = 2.0, dominanteNette = 6.0
     /// C* au-delà duquel un pixel compte comme très saturé (`saturatedShare`).
     static let chromaTresSaturee = 60.0
+
+    /// Écrêtage par la gamme (1.3.4) : le canal le plus bas sous `basGamme` (une couleur, pas un
+    /// presque blanc) et C* d'au moins `chromaGamme`. `ecretageMin` : part écrêtée (%) sous laquelle
+    /// la nature ne se dit pas ; `natureNette` : rapport d'une nature à l'autre au-delà duquel elle
+    /// l'emporte. Provisoires, choisis hors de Lightroom : à relever sur des fleurs, un coucher de
+    /// soleil, un vêtement vif.
+    static let basGamme: UInt8 = 220, chromaGamme = 30.0, ecretageMin = 0.1, natureNette = 2.0
+    /// Les bandes de la TSL de Lightroom, par leur teinte (TSV, en degrés).
+    static let bandes: [(nom: String, teinte: Double)] = [("rouge", 0), ("orange", 30), ("jaune", 60), ("vert", 120),
+                                                         ("aqua", 180), ("bleu", 240), ("violet", 270), ("magenta", 300)]
+
+    /// La bande de la TSL d'un pixel, d'après sa teinte TSV.
+    static func bande(_ red: UInt8, _ green: UInt8, _ blue: UInt8) -> Int {
+        let r = Double(red), g = Double(green), b = Double(blue)
+        let haut = max(r, g, b), ecart = haut - min(r, g, b)
+        guard ecart > 0 else { return 0 }
+        var teinte: Double
+        if haut == r { teinte = 60 * ((g - b) / ecart) }
+        else if haut == g { teinte = 60 * ((b - r) / ecart + 2) }
+        else { teinte = 60 * ((r - g) / ecart + 4) }
+        if teinte < 0 { teinte += 360 }
+        return bandes.indices.min { a, c in
+            let da = min(abs(teinte - bandes[a].teinte), 360 - abs(teinte - bandes[a].teinte))
+            let dc = min(abs(teinte - bandes[c].teinte), 360 - abs(teinte - bandes[c].teinte))
+            return da < dc
+        } ?? 0
+    }
+
+    /// La nature de l'écrêtage (1.3.4) : par la luminance (une zone trop claire : Hautes lumières,
+    /// Blancs) ou par la gamme (une couleur trop saturée pour l'espace de l'aperçu : TSL, profil),
+    /// et la correction qui va. Nil sous `ecretageMin`.
+    public var natureEcretage: JSONValue? {
+        guard clippedHighlights >= Self.ecretageMin else { return nil }
+        func r(_ value: Double) -> JSONValue { .number((value * 10).rounded() / 10) }
+        let gamme = clippedGamut, luminance = max(clippedHighlights - clippedGamut, 0)
+        let bande = gamutBand ?? "couleur vive"
+        let lecture: String
+        if gamme >= Self.natureNette * luminance {
+            lecture = "par la gamme (\(bande)) : une couleur trop saturée pour l'espace de l'aperçu (sRGB), pas une zone trop claire. À corriger par la TSL (saturation ou luminance du \(bande)), la saturation du profil ou un masque de cette couleur ; baisser les Hautes lumières éteindrait toute la photo sans la ramener. Exportée en Adobe RVB ou P3, une partie rentre dans la gamme."
+        } else if luminance >= Self.natureNette * gamme {
+            lecture = "par la luminance : des zones presque blanches, trop claires. À corriger par les Hautes lumières ou les Blancs (ou un masque sur la zone) ; la TSL n'y peut rien."
+        } else {
+            lecture = "mixte : une part par la luminance (Hautes lumières, Blancs), une part par la gamme (\(bande) : TSL ou profil)."
+        }
+        var item: [String: JSONValue] = ["luminance_pct": r(luminance), "gamme_pct": r(gamme), "lecture": .string(lecture)]
+        if gamme > 0, let gamutBand { item["bande_tsl"] = .string(gamutBand) }
+        return .object(item)
+    }
 
     /// Lecture de la dominante, d'après les tons neutres.
     public var castReading: String {
@@ -56,7 +110,7 @@ public struct PhotoMeasurements: Equatable {
         func r(_ value: Double) -> JSONValue { .number((value * 10).rounded() / 10) }
         var luminosity: [String: JSONValue] = ["moyenne": r(meanL)]
         for (centile, value) in percentilesL { luminosity[centile == 50 ? "mediane" : "p\(centile)"] = r(value) }
-        return [
+        var resultat: JSONValue = [
             "luminosite_L": .object(luminosity),
             "histogramme_L_pct": .array(histogramL.map(r)),
             "contraste_p95_moins_p5": r(contrast),
@@ -78,6 +132,11 @@ public struct PhotoMeasurements: Equatable {
             ],
             "base": .string("Aperçu sRGB rendu par Lightroom, réduit à \(Measurements.maxSide) px. L* : 0 noir, 100 blanc ; histogramme par tranches de 10. a* : vert (−) à magenta (+) ; b* : bleu (−) à jaune (+)."),
         ]
+        if let nature = natureEcretage, var objet = resultat.object {
+            objet["ecretage_nature"] = nature
+            resultat = .object(objet)
+        }
+        return resultat
     }
 }
 
@@ -215,8 +274,9 @@ public enum Measurements {
         var fine = [Int](repeating: 0, count: 1001)
         var bins = [Int](repeating: 0, count: 10)
         var sumL = 0.0, sumChroma = 0.0, sumA = 0.0, sumB = 0.0
-        var clipped = 0, white = 0, crushed = 0, saturated = 0, neutral = 0
+        var clipped = 0, white = 0, crushed = 0, saturated = 0, neutral = 0, gamut = 0
         var channels = [0, 0, 0]
+        var parBande = [Int](repeating: 0, count: PhotoMeasurements.bandes.count)
         for i in 0..<count {
             let red = pixels[i * 4], green = pixels[i * 4 + 1], blue = pixels[i * 4 + 2]
             let high = max(red, green, blue), low = min(red, green, blue)
@@ -234,6 +294,10 @@ public enum Measurements {
             fine[Int((lightness * 10).rounded())] += 1
             bins[min(Int(lightness / 10), 9)] += 1
             if chroma > PhotoMeasurements.chromaTresSaturee { saturated += 1 }
+            if high >= 254, low < PhotoMeasurements.basGamme, chroma >= PhotoMeasurements.chromaGamme {
+                gamut += 1
+                parBande[PhotoMeasurements.bande(red, green, blue)] += 1
+            }
             if chroma < 15, lightness > 15, lightness < 95 {
                 neutral += 1
                 sumA += a
@@ -266,7 +330,9 @@ public enum Measurements {
             neutralA: neutral > 0 ? sumA / Double(neutral) : 0,
             neutralB: neutral > 0 ? sumB / Double(neutral) : 0,
             neutralShare: Double(neutral) / total * 100,
-            pixelCount: count)
+            pixelCount: count,
+            clippedGamut: Double(gamut) / total * 100,
+            gamutBand: gamut > 0 ? parBande.indices.max { parBande[$0] < parBande[$1] }.map { PhotoMeasurements.bandes[$0].nom } : nil)
     }
 
     /// Luminance relative (0 à 1) d'une valeur de L*.

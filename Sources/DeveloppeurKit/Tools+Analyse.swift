@@ -219,6 +219,12 @@ extension ToolHandler {
                 if let eclairage = Eclairage.mesurer(reduite, visages: vision?.faces.map(\.box) ?? [], sujet: vision?.salientArea) {
                     mesures = Self.merged(mesures, ["eclairage": eclairage.json(balance: Self.balanceProposee(eclairage, reponse: result))])
                 }
+                // Les points chauds (1.3.4) : sur l'aperçu entier seulement, hors des visages et de la
+                // zone d'intérêt ; dits, jamais corrigés d'office.
+                let sujet = (vision?.faces.map(\.box) ?? []) + [vision?.salientArea].compactMap { $0 }
+                if let points = PointsChauds.json(PointsChauds.trouver(reduite, sujet: sujet)) {
+                    mesures = Self.merged(mesures, ["points_chauds": points])
+                }
                 info["mesures"] = mesures
             }
             if let vision { info["vision"] = vision.json }

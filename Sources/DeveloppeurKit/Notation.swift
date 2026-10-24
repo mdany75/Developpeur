@@ -50,8 +50,9 @@ public enum Notation {
     2. **Qualités de l'image** : lumière, sujet clair, composition, moment ou expression, couleur.
     3. **Plancher technique**, mesuré par cull_photos : il plafonne la note, il ne la donne pas.
        Netteté (moins de 15 : floue ; 15 à 35 : douce ; plus de 35 : nette), exposition (presque noire,
-       brûlée), yeux fermés, bruit (plus de 1,5 : fort ; une photo de nuit se note après le
-       débruitage).
+       brûlée), yeux fermés (rejet seulement si une autre vue de la rafale les a ouverts : la seule
+       vue de son moment ne se jette pas pour un clignement), bruit (plus de 1,5 : fort ; une photo de
+       nuit se note après le débruitage).
     4. **Finition**, pour le 5 ★ seulement : halos aux bords des masques, peau plastique, saturation.
 
     Plafonds : un défaut visible à la taille d'usage plafonne à 2 ★ ; un défaut visible seulement à
@@ -109,7 +110,8 @@ public enum Notation {
         public var note: Int
         /// Pourquoi, mesures à l'appui.
         public var raison: String
-        /// Défaut majeur (floue, mise au point manquée, yeux fermés) : rejet proposé, à confirmer à l'œil.
+        /// Défaut majeur (floue, mise au point manquée, yeux fermés quand une autre vue de la rafale
+        /// les a ouverts) : rejet proposé, à confirmer à l'œil.
         public var rejet: Bool
         /// Rattrapable par la retouche ou douteux : à vérifier par l'utilisateur.
         public var aVerifier: Bool
@@ -122,9 +124,11 @@ public enum Notation {
     /// signalée manquée par l'appareil), 3 ; presque noire ou brûlée, 2, à
     /// vérifier (souvent rattrapable, surtout en RAW) ; une capture ou un document selon Vision, 1 ;
     /// une photo qui n'est pas la meilleure de sa rafale ou de sa pile (`doublon`), 3 (un 4 est la
-    /// meilleure vue de son moment). Un bruit fort ne plafonne pas : la photo se note après le
-    /// débruitage, à vérifier. Nil si rien n'a pu être mesuré (vignette illisible).
-    public static func plafond(_ photo: PhotoTriee, doublon: Bool) -> Plafond? {
+    /// meilleure vue de son moment). Des yeux fermés ne sont un défaut majeur que si une autre vue de
+    /// la rafale ou de la pile les a ouverts (`autreVueYeuxOuverts`, la règle de la rafale, 1.3.4) ;
+    /// sinon, 2, à vérifier. Un bruit fort ne plafonne pas : la photo se note après le débruitage, à
+    /// vérifier. Nil si rien n'a pu être mesuré (vignette illisible).
+    public static func plafond(_ photo: PhotoTriee, doublon: Bool, autreVueYeuxOuverts: Bool = false) -> Plafond? {
         guard photo.erreur == nil else { return nil }
         var limites: [(note: Int, raison: String)] = []
         var rejet = false, aVerifier = false
@@ -136,9 +140,17 @@ public enum Notation {
                 // un rejet (le bord d'un nuage, relevé le 21 octobre 2026).
                 limites.append((2, texte + " ; texture faible autour du point : à vérifier par un zoom à 100 %"))
                 aVerifier = true
-            case .floue, .miseAuPointManquee, .yeuxFermes:
+            case .floue, .miseAuPointManquee:
                 limites.append((0, texte))
                 rejet = true
+            case .yeuxFermes where autreVueYeuxOuverts:
+                limites.append((0, texte + " ; une autre vue de sa rafale les a ouverts"))
+                rejet = true
+            case .yeuxFermes:
+                // La règle de la rafale (1.3.4) : la seule vue de son moment (la seule photo d'un
+                // groupe) ne se jette pas pour un clignement.
+                limites.append((2, texte + " ; aucune autre vue de sa rafale ne les a ouverts : la seule de son moment ne se jette pas pour un clignement, à vérifier"))
+                aVerifier = true
             case .miseAuPointSignalee:
                 limites.append((3, texte))
             case .presqueNoire, .brulee:

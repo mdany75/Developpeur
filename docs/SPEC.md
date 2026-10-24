@@ -5316,6 +5316,53 @@ du 22 octobre 2026, la liste à la fin) :
     d'actions, à droite, et sa fenêtre pré-remplie ; le bandeau de 324 (deux lignes) ; le temps
     d'ouverture de la fenêtre avec 86 vues de plus.
 
+## Correctif 1.3.4 : quatre chantiers de la feuille de route
+
+Demandé par Dany le 23 octobre 2026 : quatre chantiers tirés de la feuille de route (« Yeux : la
+règle de la rafale » de la 1.4 ; « Écrêtage : luminance ou gamme », « Carte du masque » et
+« Points chauds » de la 1.5), tous du côté du connecteur. « Harmoniser par lumière » (effort gros)
+reste dans la 1.4. De la ligne Yeux, la partie « « À vérifier » devient un libellé de couleur,
+filtrable » est écartée : Dany a choisi « rien de filtrable » (elle allait contre la règle du
+correctif 1.3.2, les libellés de couleur sont ses coups de cœur).
+
+**Yeux : la règle de la rafale** (`Notation.plafond`, `autreVueYeuxOuverts` ;
+`PhotoTriee.yeuxOuverts` ; `Tri.analyser`). Des yeux fermés ne font proposer le rejet (plafond 0)
+que si une autre vue du même groupe (rafale ou pile, `Tri.groupes`) a les yeux ouverts sur tous
+ses sujets lus (les mêmes sujets que `yeuxFermes` : un visage d'au moins la moitié de la largeur du
+plus grand, aux yeux lisibles). Sinon : 2, à vérifier, sans rejet. Le tri d'une seule photo (la
+note d'abord de la fenêtre) n'a pas de groupe : il ne rejette jamais pour des yeux fermés. Le
+standard de notation le dit (plancher technique).
+
+**Écrêtage : luminance ou gamme** (`PhotoMeasurements.natureEcretage`, `clippedGamut`,
+`gamutBand`, clé `ecretage_nature` des mesures). Mesuré sur l'aperçu sRGB réduit à 512 px, dès
+0,1 % d'écrêtage : un pixel à un canal saturé (254 ou plus) l'est par la gamme si son canal le
+plus bas est sous 220 et son C* d'au moins 30, sinon par la luminance. La lecture dit la
+correction qui va : Hautes lumières ou Blancs pour la luminance ; TSL de la bande la plus touchée
+(teinte TSV la plus proche des huit bandes de Lightroom) ou profil pour la gamme, en disant que
+baisser les Hautes lumières éteindrait la photo. Seuils provisoires, choisis hors de Lightroom.
+
+**Carte du masque** (`CarteMasque.swift`, `ToolHandler.cartesDesMasques`, `add_mask` avec
+`mask_map`). Lightroom ne dit pas où porte un masque : le serveur fait rendre la photo avec chaque
+masque seul (commande `essayer`, action `masquer`, 512 px), sa zone gardée et son effet remplacé
+par un témoin fort (+1,5 IL, température −40, à pleine intensité), et compare au rendu de l'état
+actuel donné par le premier appel (`comparer`). Hors du masque, les deux rendus sont les mêmes
+pixels (même commande, même rendu) : un écart de 6 sur 255 dans un canal marque le masque, les
+blocs JPEG du bord ne bougeant que de 1 à 3 (supposé, à constater). Puis Vision sur l'état actuel
+(les visages), la lecture (part, zone, centre, part de chaque visage couverte) et les alertes
+(seuils de CLAUDE.md, provisoires). Les cartes passent avant l'écriture ; elles ne la bloquent pas.
+Chaque rendu témoin laisse ses deux étapes « Claude · essai » dans l'Historique, comme toute
+proposition. À constater dans Lightroom : l'écart hors du masque (zéro attendu), un masque IA
+calculé pour le témoin comme pour la vraie écriture, la durée par masque ; l'étape « carte du
+masque » de `--portrait` en est le premier relevé.
+
+**Points chauds** (`PointsChauds.swift`, clé `points_chauds` des mesures de `view_photo`, aperçu
+entier seulement). Grille de 24 cases sur le grand côté ; une case chaude dépasse la médiane de L*
+de 20 et atteint 70 ; les cases voisines forment une zone, gardée entre 0,3 % et 20 % de l'image,
+écartée si 30 % de son cadre tombe dans un visage ou la zone d'intérêt de Vision (une zone
+d'intérêt de plus de la moitié de l'image ne compte pas). Cinq zones au plus, de la plus forte.
+Rien n'est corrigé d'office : la lecture le dit. Seuils provisoires : à relever sur une fenêtre
+dans un intérieur, une nappe, un ciel blanc derrière un portrait.
+
 ## Bibliothèque
 
 `Bibliotheque.lua` ; outils `find_photos`, `set_metadata`, `list_keywords`, `manage_collections`,

@@ -1758,7 +1758,34 @@ public final class Recette {
             visage = plusGrand
             return "\(cadres.count) visage(s) ; le plus grand fait \(Self.nombre(Double(plusGrand.width) * 100)) % de la largeur"
         }
+        try etapeCarteDuMasque(id, depart, photo)
         try sequencePeau(id, depart, photo, visage: visage)
+    }
+
+    /// 1.3.4 : la carte du masque (CarteMasque.swift), en proposition : la peau du visage et
+    /// l'arrière-plan, un rendu témoin chacun. La peau doit couvrir le plus grand visage, l'arrière-plan
+    /// ne pas déborder sur lui ; rien n'est gardé.
+    func etapeCarteDuMasque(_ id: Int, _ depart: Etat, _ photo: String) throws {
+        try etape(photo, "carte du masque : un rendu témoin par masque, visages et alertes (add_mask, mask_map, en proposition)") {
+            let (info, images) = try appel("add_mask", ["photo_ids": [.number(Double(id))], "preview": true, "size": 1024, "step_name": "recette",
+                                                        "mask_map": true,
+                                                        "masks": [["kind": "person_part", "part": "face_skin", "adjustments": ["Exposure": 0.1]],
+                                                                  ["kind": "background", "adjustments": ["Exposure": -0.1]]]])
+            try verifierEgal(try etat(id), depart)
+            let carte = info["carte_des_masques"] ?? .null
+            let cartes = carte["masques"]?.array ?? []
+            try verifier(cartes.count == 2, "deux cartes attendues : \(JSONCoding.line(carte))")
+            try verifier(images.count >= 2, "l'image de la carte et celle de la proposition attendues")
+            let peau = cartes[0], fond = cartes[1]
+            let partPeau = peau["part_de_l_image_pct"]?.double ?? 0, partFond = fond["part_de_l_image_pct"]?.double ?? 0
+            let visagePeau = peau["visages_couverts_pct"]?.array?.first?.double ?? 0
+            let visageFond = fond["visages_couverts_pct"]?.array?.first?.double ?? 100
+            let alertes = (fond["alertes"]?.array ?? []).compactMap(\.string)
+            try verifier(visagePeau >= 30, "la peau couvre \(Self.nombre(visagePeau)) % du visage : \(JSONCoding.line(peau))")
+            try verifier(visageFond < CarteMasque.debordVisage * 100 && alertes.isEmpty,
+                         "l'arrière-plan couvre \(Self.nombre(visageFond)) % du visage : \(alertes.joined(separator: " ; "))")
+            return "peau : \(Self.nombre(partPeau)) % de l'image, \(Self.nombre(visagePeau)) % du visage ; arrière-plan : \(Self.nombre(partFond)) % de l'image, \(Self.nombre(visageFond)) % du visage ; aucune alerte"
+        }
     }
 
     /// La peau dosée sur le visage que Vision a vu (`visage`, en fractions de l'image) : les doses

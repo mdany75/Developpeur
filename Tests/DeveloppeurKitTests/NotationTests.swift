@@ -72,11 +72,19 @@ final class NotationTests: XCTestCase {
         let parAppareil = try XCTUnwrap(Notation.plafond(signalee, doublon: false))
         XCTAssertEqual(parAppareil.note, 3)
         XCTAssertFalse(parAppareil.raison.contains("douce"), "un seul motif pour la même netteté")
-        // Yeux fermés du sujet : rejet.
+        // Yeux fermés du sujet (la règle de la rafale, 1.3.4) : rejet seulement si une autre vue de la
+        // rafale les a ouverts ; la seule vue de son moment, 2 à vérifier, sans rejet.
         var yeux = photo()
         yeux.vision = VisionReport(faces: [VisionReport.Face(box: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.3), pupils: [], eyeWidth: nil,
                                                              quality: 0.5, eyeOpenness: 0.05)], aesthetics: nil, utility: false, salientArea: nil)
-        XCTAssertEqual(Notation.plafond(yeux, doublon: false)?.note, 0)
+        let seule = try XCTUnwrap(Notation.plafond(yeux, doublon: false))
+        XCTAssertEqual(seule.note, 2)
+        XCTAssertFalse(seule.rejet, "la seule vue de son moment ne se jette pas pour un clignement")
+        XCTAssertTrue(seule.aVerifier)
+        XCTAssertTrue(seule.raison.contains("clignement"))
+        let autreVue = try XCTUnwrap(Notation.plafond(yeux, doublon: false, autreVueYeuxOuverts: true))
+        XCTAssertEqual(autreVue.note, 0)
+        XCTAssertTrue(autreVue.rejet)
         // Capture ou document selon Vision : 1.
         var document = photo()
         document.vision = VisionReport(faces: [], aesthetics: nil, utility: true, salientArea: nil)

@@ -89,6 +89,15 @@ public struct PhotoTriee {
         return "yeux fermés ou plissés : \(fermes.count) visage\(fermes.count > 1 ? "s" : "") sur \(sujets.count)"
     }
 
+    /// Yeux ouverts sur tous les sujets dont les yeux se lisent (les mêmes sujets que `yeuxFermes`) :
+    /// la vue d'une rafale ou d'une pile qui fait proposer au rejet celles aux yeux fermés (1.3.4).
+    var yeuxOuverts: Bool {
+        let visages = vision?.faces ?? []
+        guard let grand = visages.map({ Double($0.box.width) }).max(), grand > 0 else { return false }
+        let lus = visages.filter { Double($0.box.width) >= 0.5 * grand }.compactMap(\.eyesClosed)
+        return !lus.isEmpty && !lus.contains(true)
+    }
+
     /// Les défauts de netteté mesurés : floue, mise au point manquée, ou signalée manquée par
     /// l'appareil (sans autre défaut de netteté, et pas nette au point). Seuils de `Detail`, relevés
     /// à 1024 px : moins de 15 floue, plus de 35 nette (`DetailMeasurements.seuilFlou` et
@@ -303,9 +312,17 @@ public enum Tri {
             meilleures[g] = meilleure
             autres.formUnion(groupe.membres.filter { $0 != meilleure })
         }
+        // La règle de la rafale (1.3.4) : des yeux fermés ne font proposer le rejet que si une autre
+        // vue du même groupe les a ouverts.
+        var avecAutreVue: Set<Int> = []
+        for groupe in groupes {
+            for i in groupe.membres where groupe.membres.contains(where: { $0 != i && photos[$0].yeuxOuverts }) {
+                avecAutreVue.insert(i)
+            }
+        }
         var plafonds: [Int: Notation.Plafond] = [:]
         for i in photos.indices {
-            plafonds[i] = Notation.plafond(photos[i], doublon: autres.contains(i))
+            plafonds[i] = Notation.plafond(photos[i], doublon: autres.contains(i), autreVueYeuxOuverts: avecAutreVue.contains(i))
         }
         return Analyse(groupes: groupes, meilleures: meilleures, plafonds: plafonds)
     }
@@ -372,7 +389,7 @@ public enum Tri {
         let aRejeter = photos.indices.filter { analyse.plafonds[$0]?.rejet == true && libre($0) }
         if !aRejeter.isEmpty {
             propositions.append(["flag": "reject", "photo_ids": ids(aRejeter),
-                                 "pourquoi": "défaut majeur (floue, mise au point manquée, yeux fermés : floues_ou_ratees), à confirmer à l'œil ; la seule photo de sa scène : plutôt 1 étoile à vérifier (propose_ratings, to_check)"])
+                                 "pourquoi": "défaut majeur (floue, mise au point manquée, ou yeux fermés quand une autre vue de sa rafale les a ouverts : floues_ou_ratees), à confirmer à l'œil ; la seule photo de sa scène : plutôt 1 étoile à vérifier (propose_ratings, to_check)"])
         }
         let doublons = groupes.enumerated().flatMap { g, membres in
             membres.filter { $0 != meilleures[g] && photos[$0].defauts.isEmpty }

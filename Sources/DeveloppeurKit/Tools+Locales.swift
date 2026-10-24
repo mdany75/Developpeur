@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Retouches locales : masques (`add_mask`), taches et yeux rouges (`retouch_spots`). Les
@@ -213,7 +214,9 @@ extension ToolHandler {
             tool("add_mask",
                  "Ajoute des masques avec leurs réglages locaux, en une étape « Claude · <step_name> » : masques IA (sujet, ciel, arrière-plan, parties d'une personne, éléments de paysage, objet désigné par un cadre ou un trait) que Lightroom calcule pour chaque photo, dégradés linéaires et radiaux, plage de luminance, pinceau (dodge and burn, le long de traits), et masques combinés (combine : ajouter, soustraire ou intersecter d'autres zones, par exemple le ciel sans le bâtiment). Les positions se donnent dans l'image telle que la montre view_photo ; le serveur recale celles des dégradés, des traits et des objets sur la correction d'objectif, Upright et la perspective. Effets de Lightroom (effect), courbe du masque (tone_curve). Les masques déjà présents restent ; undo_last retire ceux de l'étape. Respecte le mode « Proposer d'abord » (confirm). " + Prompts.Tireur.resume,
                  properties: [("masks", ["type": "array", "items": mask, "minItems": 1, "maxItems": .number(Double(Self.maxMasks)),
-                                         "description": "Masques à ajouter."])] + writeProperties + targetProperties + previewProperties,
+                                         "description": "Masques à ajouter."])]
+                    + [("mask_map", prop("boolean", "true = carte du masque, une seule photo : un rendu témoin par masque (\(CarteMasque.maxMasques) au plus, rien n'est gardé) dit où il porte, en image et en chiffres, avec des alertes : presque vide, presque total, déborde sur un visage, semble inversé. Pour un masque IA près d'un visage, un ciel découpé, une personne, un masque combiné ; les alertes se corrigent avant d'aller plus loin."))]
+                    + writeProperties + targetProperties + previewProperties,
                  required: ["masks", "step_name"]),
             tool("edit_mask",
                  "Reprend un masque de la photo sans défaire toute l'étape qui l'a posé : list (ses masques, numérotés, avec leurs composants : IA calculé ou non, personne, contour), hide et show (l'œil du panneau Masques), remove, duplicate (une copie avec les mêmes réglages locaux ; invert = le reste de l'image), refine (contour d'un masque IA : feather, edge), recompute (Lightroom recalcule un masque IA mal posé, comme « Tout mettre à jour »), remove_empty (les masques IA qui n'ont rien trouvé). Chaque écriture est une étape « Claude · <step_name> » que undo_last défait. Respecte le mode « Proposer d'abord » (confirm).",
@@ -316,9 +319,10 @@ extension ToolHandler {
             }
         }
         var cible = try targets(args)
-        if args.bool("preview") == true {
+        let carte = args.bool("mask_map") == true
+        if args.bool("preview") == true || carte {
             guard args.bool("selection") != true, (try args.intList("photo_ids") ?? []).count <= 1 else {
-                throw LightroomError.invalid("« preview » montre une seule photo : donner un seul photo_ids (ou la photo active), pas selection.")
+                throw LightroomError.invalid("« \(carte ? "mask_map" : "preview") » ne vaut que pour une seule photo : donner un seul photo_ids (ou la photo active), pas selection.")
             }
             cible = [:]
             if let id = try args.intList("photo_ids")?.first { cible["photo"] = .number(Double(id)) }
@@ -331,13 +335,88 @@ extension ToolHandler {
             notes += remarques
         }
         params.merge(cible) { _, new in new }
+        // La carte du masque (1.3.4) : les rendus témoins d'abord, avant toute écriture.
+        let cartes = carte ? cartesDesMasques(params, kinds: list.map { $0["kind"]?.string }) : nil
+        let resultat: ToolResult
         if args.bool("preview") == true {
             params["action"] = "masquer"
             params["etape"] = .string(args.string("step_name") ?? "masques")
-            return try preview(params, args: args, notes: notes)
+            resultat = try preview(params, args: args, notes: notes)
+        } else {
+            params.merge(writeParameters(args, defaultStep: "masques")) { _, new in new }
+            resultat = json(Self.withLabels(try lightroom.send("masquer", params, timeout: 180), notes: notes))
         }
-        params.merge(writeParameters(args, defaultStep: "masques")) { _, new in new }
-        return json(Self.withLabels(try lightroom.send("masquer", params, timeout: 180), notes: notes))
+        return cartes.map { Self.avecCarte(resultat, $0) } ?? resultat
+    }
+
+    /// Les cartes des masques d'un appel : pour chacun (`CarteMasque.maxMasques` au plus), un rendu
+    /// témoin (commande « essayer », rien n'est gardé), comparé à l'état actuel rendu par la même
+    /// commande ; puis les visages de Vision sur l'état actuel, et les alertes. Une carte qui ne se
+    /// fait pas ne bloque pas les masques : sa raison est dite.
+    func cartesDesMasques(_ params: [String: JSONValue], kinds: [String?]) -> (image: Data?, info: JSONValue) {
+        let masques = params["masques"]?.array ?? []
+        var actuel: CGImage?
+        var lues: [(carte: (masque: [Bool], largeur: Int, hauteur: Int), numero: Int)] = []
+        var items: [JSONValue] = []
+        var remarques: [JSONValue] = []
+        for (index, masque) in masques.prefix(CarteMasque.maxMasques).enumerated() {
+            var essai = params
+            essai["masques"] = .array([CarteMasque.masqueTemoin(masque)])
+            essai["action"] = "masquer"
+            essai["etape"] = "carte du masque"
+            essai["taille"] = .number(Double(Self.previewSizes.lowerBound))
+            essai["comparer"] = .bool(actuel == nil)
+            do {
+                let reponse = try lightroom.send("essayer", essai, timeout: 240)
+                if actuel == nil {
+                    actuel = PreviewImages.image(try Self.readPreview(reponse["chemin_actuel"]?.string))
+                }
+                guard let base = actuel, let temoin = PreviewImages.image(try Self.readPreview(reponse["chemin"]?.string)),
+                      let lue = CarteMasque.pixels(actuel: base, temoin: temoin) else {
+                    remarques.append(.string("Masque \(index + 1) : carte non faite (rendus illisibles ou de tailles différentes)."))
+                    continue
+                }
+                lues.append((lue, index))
+            } catch {
+                remarques.append(.string("Masque \(index + 1) : carte non faite (\(error.localizedDescription))."))
+            }
+        }
+        if masques.count > CarteMasque.maxMasques {
+            remarques.append(.string("Seuls les \(CarteMasque.maxMasques) premiers masques ont leur carte."))
+        }
+        let visages = actuel.flatMap { VisionAnalysis.analyze($0) }?.faces.map(\.box) ?? []
+        for (lue, index) in lues {
+            let lecture = CarteMasque.lire(lue.masque, largeur: lue.largeur, hauteur: lue.hauteur, visages: visages)
+            let alertes = CarteMasque.alertes(lecture, masque: masques[index], genre: kinds.indices.contains(index) ? kinds[index] : nil)
+            items.append(CarteMasque.json(lecture, numero: index + 1, nom: masques[index]["nom"]?.string, alertes: alertes))
+        }
+        var info: [String: JSONValue] = [
+            "masques": .array(items),
+            "lecture": "Rendus témoins (+1,5 IL et plus froid, à pleine intensité), comparés à l'état actuel : rien n'est gardé. Zones de 0 à 1 depuis le coin haut gauche ; visages dans l'ordre de Vision, du plus grand au plus petit.",
+        ]
+        if !remarques.isEmpty { info["remarques"] = .array(remarques) }
+        var image: Data?
+        if let base = actuel, let premiere = lues.first {
+            image = CarteMasque.dessiner(actuel: base, cartes: lues.map(\.carte.masque), largeur: premiere.carte.largeur, hauteur: premiere.carte.hauteur)
+            let noms = ["rouge", "bleu", "vert", "jaune"]
+            info["image"] = .string("La carte : " + lues.map { "masque \($0.numero + 1) en \(noms[$0.numero % noms.count])" }.joined(separator: ", ") + " ; le reste assombri.")
+        }
+        return (image, .object(info))
+    }
+
+    /// Le résultat d'add_mask avec la carte des masques : son image en premier, puis le texte, où
+    /// s'ajoute `carte_des_masques`.
+    static func avecCarte(_ resultat: ToolResult, _ carte: (image: Data?, info: JSONValue)) -> ToolResult {
+        var contenu = resultat.content
+        if let index = contenu.lastIndex(where: { if case .text = $0 { return true }; return false }),
+           case let .text(texte) = contenu[index], var objet = (try? JSONCoding.parse(texte))?.object {
+            objet["carte_des_masques"] = carte.info
+            contenu[index] = .text(JSONCoding.pretty(.object(objet)))
+        } else {
+            contenu.append(.text(JSONCoding.pretty(["carte_des_masques": carte.info])))
+        }
+        if let image = carte.image { contenu.insert(imageContent(image), at: 0) }
+        return ToolResult(content: contenu, isError: resultat.isError, structured: resultat.structured)
     }
 
     func retouchSpots(_ args: Arguments) throws -> ToolResult {
