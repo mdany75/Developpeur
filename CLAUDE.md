@@ -93,12 +93,19 @@ Dans cet ordre :
    l'une de ces photos, défaite ensuite. L'essai doit réussir avant le tag.
 4. `git tag -a vX.Y -m "Version X.Y" && git push origin vX.Y`
 5. `gh release create vX.Y "build/Developpeur.zip" --title "Développeur X.Y" --notes "$(~/.claude/skills/standard-projet/scripts/notes-version.sh X.Y)"`
-6. Mettre à jour la feuille de route « Développeur — Feuille de route » (document claude.ai
-   privé, https://claude.ai/code/artifact/9b2efe2d-d295-4655-9653-3a324d84472e, par le
-   connecteur Claude Docs) : retirer ce que la version vient de livrer et corriger ce qui est
-   devenu faux. Puis reporter les mêmes changements dans sa page (artefact privé
-   https://claude.ai/artifact/1nTRUJhgpvrkYybt7pNVns, frise des versions et décisions comprises) :
-   la relire (Artifact, `read`), la corriger et la republier à la même adresse.
+6. Mettre à jour la feuille de route, dans sa page Lavish seulement (artefact privé
+   https://claude.ai/artifact/1nTRUJhgpvrkYybt7pNVns ; demandé par Dany le 24 octobre 2026 : le
+   document Claude Docs 9b2efe2d n'est plus tenu à jour) : la relire (Artifact, `read`), retirer
+   ce que la version vient de livrer et corriger ce qui est devenu faux (frise des versions,
+   bilan et décisions compris), l'ouvrir dans Lavish (`npx -y lavish-axi <fichier>`, source dans
+   `build/lavish/`) pour la relecture de Dany, puis la republier à la même adresse. De même pour
+   les pages que la version rend fausses : Les 36 outils
+   (https://claude.ai/artifact/KniGdYp5yt4DPsLcbsLoCL), Guide des demandes
+   (https://claude.ai/artifact/F7uUKLaAnzo3BX6kWxBGPP), Apprendre avec Claude
+   (https://claude.ai/artifact/CZR9wrRWk73gGGBb46HxXU), Ordinogramme d'une retouche
+   (https://claude.ai/artifact/RzGhic1X61H3crEBFYjTLd). Tout document nouveau pour Dany (guide,
+   compte rendu, plan) se fait de même : une page Lavish publiée en artefact, jamais un document
+   Claude Docs.
 
 Une version par étape de la feuille de route (1.1 le nouvel écran et la notation, 1.2 rendu plus
 juste, 1.3 apprendre en regardant Claude, 1.4 une sortie entière, 1.5 finitions et impression, 1.6
