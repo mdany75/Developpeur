@@ -94,8 +94,8 @@ Dans cet ordre :
 4. `git tag -a vX.Y -m "Version X.Y" && git push origin vX.Y`
 5. `gh release create vX.Y "build/Developpeur.zip" --title "Développeur X.Y" --notes "$(~/.claude/skills/standard-projet/scripts/notes-version.sh X.Y)"`
 6. Mettre à jour la feuille de route, dans sa page Lavish seulement (artefact privé
-   https://claude.ai/artifact/1nTRUJhgpvrkYybt7pNVns ; demandé par Dany le 24 octobre 2026 : le
-   document Claude Docs 9b2efe2d n'est plus tenu à jour) : la relire (Artifact, `read`), retirer
+   https://claude.ai/artifact/1nTRUJhgpvrkYybt7pNVns ; demandé par Dany le 24 octobre 2026, qui a
+   fait supprimer l'ancien document Claude Docs le même jour) : la relire (Artifact, `read`), retirer
    ce que la version vient de livrer et corriger ce qui est devenu faux (frise des versions,
    bilan et décisions compris), l'ouvrir dans Lavish (`npx -y lavish-axi <fichier>`, source dans
    `build/lavish/`) pour la relecture de Dany, puis la republier à la même adresse. De même pour
