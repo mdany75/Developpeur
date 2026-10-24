@@ -236,6 +236,15 @@ func rect(_ x: CGFloat, _ y: CGFloat, _ l: CGFloat, _ h: CGFloat, rx: CGFloat) -
 // L'étoile des notes (polygone de la maquette, boîte de 24).
 let ETOILE = trace("M12 2.6L14.76 8.8L21.51 9.51L16.47 14.05L17.88 20.69L12 17.3L6.12 20.69L7.53 14.05L2.49 9.51L9.24 8.8Z")
 
+// L'étoile des notes réduite à `echelle`, son centre (12, 12) posé en (cx, cy).
+func etoile(_ cx: CGFloat, _ cy: CGFloat, _ echelle: CGFloat) -> CGPath {
+    var t = CGAffineTransform(translationX: cx - 12 * echelle, y: cy - 12 * echelle).scaledBy(x: echelle, y: echelle)
+    return ETOILE.copy(using: &t) ?? ETOILE
+}
+
+// L'étincelle de l'IA (quatre branches courbes), en haut à droite d'une boîte de 24.
+let ETINCELLE = trace("M20.5 0.6C20.9 3.2 21.4 3.7 24 4.1C21.4 4.5 20.9 5 20.5 7.6C20.1 5 19.6 4.5 17 4.1C19.6 3.7 20.1 3.2 20.5 0.6Z")
+
 // Dessins -------------------------------------------------------------------------------------------
 
 // Un dessin reçoit le contexte en points et la taille de l'image en points (Dispositions.IMAGES) :
@@ -268,6 +277,18 @@ func icone(boite: CGSize, couleur: String, trait: CGFloat, bouts: CGLineCap = .r
 }
 
 let B16 = CGSize(width: 16, height: 16), B24 = CGSize(width: 24, height: 24)
+
+// Plusieurs dessins l'un sur l'autre, chacun dans son propre état du contexte (une icône à deux
+// couleurs : l'image, puis l'étincelle).
+func ensemble(_ morceaux: [Dessin]) -> Dessin {
+    return { ctx, l, h in
+        for m in morceaux {
+            ctx.saveGState()
+            m(ctx, l, h)
+            ctx.restoreGState()
+        }
+    }
+}
 
 // Remplit et borde un rectangle arrondi (bord de 1 point, à l'intérieur).
 func carte(_ ctx: CGContext, _ cadre: CGRect, rayon r: CGFloat, fond: String, bord: String?) {
@@ -402,6 +423,26 @@ func dessins(_ p: Palette) -> [String: Dessin] {
     ])
     d["chevron-haut"] = icone(boite: B16, couleur: p["texte"], trait: 1.6, traits: [trace("M4 10l4-4 4 4")])
     d["chevron-bas"] = icone(boite: B16, couleur: p["texte"], trait: 1.6, traits: [trace("M4 6l4 4 4-4")])
+
+    // Les boutons de la Demande rapide, à côté de ♻ (demandés par Dany le 24 octobre 2026) : trois
+    // étoiles ambre (noter) ; une photo et un portrait à l'encre du texte, chacun avec l'étincelle
+    // orange de l'IA en haut à droite (Retouche pro, Portrait).
+    let etoiles = [etoile(5.2, 14.2, 0.32), etoile(12, 10.6, 0.4), etoile(18.8, 14.2, 0.32)]
+    d["rapide-noter"] = icone(boite: B24, couleur: p["ambre"], trait: 1.2, traits: etoiles, pleins: etoiles)
+    let cadrePhoto = rect(2, 7, 15, 12.5, rx: 2)
+    let etincelle = icone(boite: B24, couleur: p["orange"], trait: 0.8, traits: [ETINCELLE], pleins: [ETINCELLE])
+    d["rapide-retouche"] = ensemble([
+        icone(boite: B24, couleur: p["texte"], trait: 1.4, traits: [
+            cadrePhoto, trace("M4 17.5l3.8-4.5 3 3.2 2-2 3.2 3.3"), cercle(13, 10.6, 1.3),
+        ]),
+        etincelle,
+    ])
+    d["rapide-portrait"] = ensemble([
+        icone(boite: B24, couleur: p["texte"], trait: 1.4, traits: [
+            cadrePhoto, cercle(9.5, 11.6, 2.4), trace("M5.2 19.5C5.2 16.6 7.1 15 9.5 15C11.9 15 13.8 16.6 13.8 19.5"),
+        ]),
+        etincelle,
+    ])
 
     return d
 }

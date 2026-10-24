@@ -1,5 +1,12 @@
 # Changements
 
+## Non publié
+
+### Ajouté
+- Trois boutons dans la Demande rapide, à droite de ♻, chacun une demande toute faite pour la
+  photo active : noter (Claude pose sa note, de 0 à 5 ★ ou un rejet), Retouche pro et Portrait,
+  comme les invites de la fenêtre Claude. Après l'installation : quitter puis relancer Lightroom.
+
 ## 1.3.5 — 2026-10-23
 
 Le correctif 1.3.5, fait à votre demande le 23 octobre 2026 au soir : huit chantiers tirés de la

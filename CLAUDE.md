@@ -1194,7 +1194,13 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   `margin_left` : le résultat page par page (`FenetreRapide.montrer`, `Fil.couper`, 9 lignes de
   13 points ; ▲ ▼ en push_button « mini » comme `Vues.fleches`, une page moins une ligne par clic),
   la demande de 3 lignes (`immediate = false`), ♻ à sa gauche (`Moteur.oublierRapide`) et ▲ ▼ puis
-  Envoyer à sa droite, de la hauteur de sa boîte (55). Constaté le 22 octobre 2026 : dans ce
+  Envoyer à sa droite, de la hauteur de sa boîte (55). Entre ♻ et le champ, trois carrés à icône
+  (`FenetreRapide.ACTIONS`, demandés par Dany le 24 octobre 2026 ; images `rapide-noter`,
+  `rapide-retouche`, `rapide-portrait` de `Dispositions.IMAGES`, jeu de l'apparence choisie) :
+  chacun envoie sa demande toute faite par `FenetreRapide.demander`, le champ laissé tel quel ;
+  noter (`Consignes.noterRapide` : `propose_ratings` avec `apply`, le clic vaut la demande), puis
+  Retouche pro et Portrait (messages des invites, `Consignes.invite`). Pas encore vus dans
+  Lightroom. Constaté le 22 octobre 2026 : dans ce
   `f:view`, la boîte du champ et une f:column commencent à leur `margin_top` ; un petit bouton
   seul dans sa f:row est décalé de 9 ; un clic sur un bouton valide le champ (l'envoi par Retour
   attend 0,3 s et ▲ ▼ ♻ l'annulent) ; Échap n'arrive pas à une fenêtre flottante.

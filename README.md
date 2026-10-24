@@ -199,6 +199,12 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
   cartes de la fenêtre Claude, sans limite de longueur.
 - ♻, à gauche de la demande, repart de zéro : la réponse et la demande s'effacent (grisé pendant
   que Claude travaille).
+- À droite de ♻, trois boutons font une demande toute faite pour la photo active, sans toucher à
+  ce que vous avez tapé : les étoiles la notent (Claude pose sa note, de 0 à 5 ★ ou un rejet,
+  annulable par ⌘Z) ; la photo à l'étincelle fait une retouche pro, le portrait à l'étincelle une
+  retouche de portrait, comme les invites du même nom de la fenêtre Claude. En mode « Proposer
+  d'abord », Claude ne fait que proposer ces retouches, et la Demande rapide n'a rien pour les
+  accepter : prenez le mode Appliquer, ou la fenêtre Claude.
 - Échap ne la ferme pas (une fenêtre flottante de Lightroom ne reçoit pas cette touche) : le bouton
   de fermeture rouge, en haut à gauche.
 

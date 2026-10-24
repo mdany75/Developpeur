@@ -95,6 +95,10 @@ local ATTENDUES = {
     ['presse-papiers'] = { 14, 14 },
     ['chevron-haut'] = { 12, 12 },
     ['chevron-bas'] = { 12, 12 },
+    -- Les boutons à icône de la Demande rapide (24 octobre 2026).
+    ['rapide-noter'] = { 30, 30 },
+    ['rapide-retouche'] = { 30, 30 },
+    ['rapide-portrait'] = { 30, 30 },
 }
 
 -- Les images qui vont par groupe (variantes d'un même contrôle) ont la même taille.
@@ -111,6 +115,7 @@ local GROUPES = {
     { 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' },
     { 'trombone', 'presse-papiers' },
     { 'chevron-haut', 'chevron-bas' },
+    { 'rapide-noter', 'rapide-retouche', 'rapide-portrait' },
 }
 
 -- Lecture d'un PNG en Lua pur : sa signature, puis ses blocs. Rend { blocs, largeur, hauteur,

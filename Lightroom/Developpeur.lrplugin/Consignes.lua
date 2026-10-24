@@ -356,6 +356,21 @@ Consignes.sansLecon = "[Sans leçon]"
 -- sans suite ni carte.
 Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Fais ce qui est demandé sans noter la photo d'abord (sauf si on te le demande), puis dis ce qui a changé. Ni titre, ni leçon, ni « Demande à garder »."
 
+-- Les boutons de la Demande rapide, à côté de ♻ (FenetreRapide.ACTIONS, demandés par Dany le
+-- 24 octobre 2026) : le premier note la photo active et pose la note de Claude (le clic vaut la
+-- demande, comme « note ces photos ») ; les deux autres reprennent les invites Retouche pro et
+-- Portrait (Consignes.invite : une seule copie de leurs messages).
+Consignes.noterRapide = "Note la photo active selon le standard de notation, même si elle est déjà évaluée : cull_photos sur elle, view_photo avec af_point = true, puis propose_ratings avec apply = true pour poser ta note. Dis la note posée et sa raison en une phrase."
+
+function Consignes.invite(id)
+    for _, invite in ipairs(Consignes.invites) do
+        if invite.id == id then
+            return invite
+        end
+    end
+    error("invite inconnue : " .. tostring(id), 2)
+end
+
 -- Ajouté au message envoyé (pas affiché) tant que la conversation n'a pas de titre : la consigne
 -- seule ne suffit pas (constaté avec Haiku, 19 octobre 2026).
 Consignes.rappelTitre = "(Pour la fenêtre, à ne pas mentionner : dès que tu vois la photo, commence ton message suivant par la ligne seule [titre : <ce que montre la photo, 3 à 6 mots>].)"

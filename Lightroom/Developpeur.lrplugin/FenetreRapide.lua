@@ -1,6 +1,7 @@
 -- FenetreRapide.lua : la fenêtre Demande rapide (Fichier ou Bibliothèque › Module externe - Extras
 -- › Demande rapide, ⌘⌃⌥C ; demandée par Dany le 22 octobre 2026) : le résultat page par page, une
--- demande de 3 lignes, à sa gauche ♻ (repartir de zéro) et à sa droite ▲, ▼ et Envoyer, dans une
+-- demande de 3 lignes, à sa gauche ♻ (repartir de zéro) et trois boutons à icône (noter, Retouche
+-- pro, Portrait ; 24 octobre 2026), à sa droite ▲, ▼ et Envoyer, dans une
 -- fenêtre d'environ 1 000 × 250 points ; Retour envoie, comme dans la fenêtre Claude (champ à `immediate = false` : Retour le
 -- valide). Chaque demande part dans une nouvelle conversation, jamais gardée
 -- (Moteur.envoyerRapide) ; la fenêtre Claude n'en voit rien dans sa liste.
@@ -11,6 +12,9 @@ local LrFunctionContext = import 'LrFunctionContext'
 local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
 
+local Chemins = require 'Chemins'
+local Consignes = require 'Consignes'
+local Dispositions = require 'Dispositions'
 local Fil = require 'Fil'
 local Journal = require 'Journal'
 local Moteur = require 'Moteur'
@@ -39,6 +43,20 @@ FenetreRapide.FLECHE = 14
 -- Le bouton ♻ à gauche de la demande, carré, de la hauteur de sa boîte (demandé par Dany le
 -- 22 octobre 2026).
 FenetreRapide.RESET = FenetreRapide.HAUTEUR_DEMANDE
+-- Les boutons à droite de ♻, carrés comme lui, chacun une demande toute faite pour la photo active
+-- (demandés par Dany le 24 octobre 2026) : noter et poser la note de Claude, Retouche pro et
+-- Portrait (les messages des invites de la fenêtre Claude). Icônes de Dispositions.IMAGES ; ESPACE :
+-- l'écart entre deux carrés (un carré de 55 a un cadre de 57).
+FenetreRapide.ESPACE = 6
+local retouchePro, portrait = Consignes.invite('retouche_pro'), Consignes.invite('portrait')
+FenetreRapide.ACTIONS = {
+    { icone = 'rapide-noter', message = Consignes.noterRapide,
+        tooltip = "Noter la photo active : Claude pose sa note (0 à 5 ★, ou rejet)" },
+    { icone = 'rapide-retouche', message = retouchePro.message,
+        tooltip = retouchePro.titre .. " : " .. retouchePro.message },
+    { icone = 'rapide-portrait', message = portrait.message,
+        tooltip = portrait.titre .. " : " .. portrait.message },
+}
 -- La zone du résultat : toute la hauteur au-dessus de la demande (relevé le 22 octobre 2026 : 988 ×
 -- 248 pour 984 × 214, d'où 996 × 216 pour 1 000 × 250), sans barre de défilement : ▲ et ▼ y
 -- changent de page. Le texte se coupe à la largeur du texte, moins la marge de Fil.couper.
@@ -154,13 +172,14 @@ end
 
 -- Envoie la demande du champ : par Retour (l'observateur du champ validé) ou par Envoyer (un clic
 -- valide d'abord le champ, constaté dans la fenêtre Claude : l'observateur part avant l'action du
--- bouton) ; `FenetreRapide.envoi` empêche le double envoi.
-function FenetreRapide.envoyer()
+-- bouton) ; `FenetreRapide.envoi` empêche le double envoi. `message` : la demande toute faite d'un
+-- bouton à icône, qui laisse le champ tel quel.
+function FenetreRapide.envoyer(message)
     local p = FenetreRapide.p
     if not p or Moteur.travaille or FenetreRapide.envoi then
         return
     end
-    local texte = p.demande or ''
+    local texte = message or p.demande or ''
     if Texte.nettoyer(texte) == '' then
         return
     end
@@ -169,7 +188,7 @@ function FenetreRapide.envoyer()
     LrTasks.startAsyncTask(function()
         local ok, c, raison = LrTasks.pcall(Moteur.envoyerRapide, texte)
         if ok and c then
-            if FenetreRapide.p then
+            if FenetreRapide.p and not message then
                 -- Le champ vidé par la fenêtre n'est pas une demande (observateur).
                 FenetreRapide.vidage = true
                 FenetreRapide.p.demande = ''
@@ -180,6 +199,13 @@ function FenetreRapide.envoyer()
         end
         FenetreRapide.envoi = false
     end)
+end
+
+-- Un bouton à icône : sa demande toute faite part comme une demande tapée. Comme ▲ ▼ ♻, le clic
+-- valide le champ et annule l'envoi par Retour.
+function FenetreRapide.demander(message)
+    FenetreRapide.attente = nil
+    FenetreRapide.envoyer(message)
 end
 
 -- ♻ : repartir de zéro. La dernière demande rapide est oubliée (Moteur.oublierRapide : session
@@ -272,10 +298,14 @@ function FenetreRapide.afficher()
         -- hauteur).
         local boite = FenetreRapide.HAUTEUR_RESULTAT + FenetreRapide.ECART
         local gauche = FenetreRapide.LARGEUR - FenetreRapide.BOUTON
-        local champ = FenetreRapide.RESET + FenetreRapide.ECART
+        -- ♻ puis les boutons à icône, carrés de la hauteur de la boîte, chacun dans sa colonne à
+        -- sa marge (comme ♻) ; le champ commence après eux.
+        local pas = FenetreRapide.RESET + FenetreRapide.ESPACE
+        local champ = (#FenetreRapide.ACTIONS + 1) * pas - FenetreRapide.ESPACE + FenetreRapide.ECART
         local fleche = FenetreRapide.FLECHE
         local moitie = (FenetreRapide.BOUTON - 2) / 2
-        local contenu = f:view {
+        local apparence = Chemins.prefs().apparence
+        local pieces = {
             bind_to_object = p,
             place = 'overlapping',
             width = FenetreRapide.LARGEUR,
@@ -341,6 +371,23 @@ function FenetreRapide.afficher()
                 },
             },
         }
+        -- Les boutons à icône : image_name sans titre, comme les icônes de la fenêtre Claude (B3),
+        -- dans le jeu d'images de l'apparence choisie au Gestionnaire de modules externes.
+        for i, a in ipairs(FenetreRapide.ACTIONS) do
+            pieces[#pieces + 1] = f:column {
+                margin_top = boite,
+                margin_left = i * pas,
+                f:square_button {
+                    image_name = Chemins.ressource(Dispositions.image(a.icone, apparence)),
+                    width = FenetreRapide.RESET,
+                    height = FenetreRapide.HAUTEUR_DEMANDE,
+                    enabled = bind 'libre',
+                    tooltip = a.tooltip,
+                    action = function() FenetreRapide.demander(a.message) end,
+                },
+            }
+        end
+        local contenu = f:view(pieces)
         LrTasks.startAsyncTask(boucle)
         LrDialogs.presentFloatingDialog(_PLUGIN, {
             title = "Claude · Demande rapide",
