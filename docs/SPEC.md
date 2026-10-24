@@ -1610,8 +1610,9 @@ les essais : « ; carnet de progrès : true (N photos) » sur la ligne Mode (`Ca
 s'il ne se lit pas), et « ; avant/après des étapes : … ; leçon en fin de retouche : … ;
 apparence : claire » sur la ligne Fenêtre Claude (une apparence inconnue est dite à côté de celle
 sur laquelle elle retombe). La case Carnet ne vise que les constats : `lecon garder` ne la lit
-pas, et une leçon se range encore dans `carnet.json` quand elle est décochée (question ouverte à
-Dany : doit-elle couper aussi les leçons ?).
+pas, et une leçon se range encore dans `carnet.json` quand elle est décochée (décidé par Dany le
+24 octobre 2026 : elle coupera aussi les leçons, montrées encore dans la fenêtre ; au prochain
+correctif).
 
 ### Coller une image
 
@@ -5093,8 +5094,8 @@ une remarque sous 5 photos. Les phrases du résumé n'existent que dans `Carnet.
 `Carnet.MOIS`, `Carnet.MOIS_COURTS`). `Carnet.photosDuDefaut(code, maintenant)` et
 `Carnet.vocabulaire()` servent la fenêtre.
 
-La case Carnet (préférence `carnet`) ne coupe que les constats : `lecon garder` ne la lit pas
-(question ouverte à Dany). `lecon garder` refuse en revanche une photo d'essai, comme `constater`
+La case Carnet (préférence `carnet`) ne coupe encore que les constats : `lecon garder` ne la lit
+pas (Dany a décidé le 24 octobre 2026 qu'elle coupera aussi les leçons, au prochain correctif). `lecon garder` refuse en revanche une photo d'essai, comme `constater`
 (1.3.1, voir Leçon de la photo) : rien de « Développeur › Essais » n'entre au carnet de Dany, sauf
 `essai_recette`. Rejouée, une commande `lecon` ou `carnet` réécrirait `carnet.json` :
 aucune n'est dans `LightroomBridge.lectures`.

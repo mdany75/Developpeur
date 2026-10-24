@@ -154,6 +154,11 @@ rendu reproductible, styles en recettes fixes, apprendre de tes corrections) ; i
 étapes) et un essai dans la fenêtre Claude (sauvegardes dites, +0,2 IL sur le portrait d'essai,
 défait). Publié le 23 octobre 2026 sur la demande de Dany (« publie »), après les deux suites et sa recette (87 étapes), sans l'essai dans la fenêtre Claude : le contrôle en arrière-plan refuse « Ouvrir la fenêtre Claude » et ⌃⌥C (pris pour une commande du presse-papiers) et l'accord plein écran n'est pas venu ; l'essai reste à faire.
 
+Le 24 octobre 2026, Dany a retiré l'épreuvage (ni sonde pour l'écran, ni profil ICC du labo) :
+la 1.5 est livrée par les correctifs 1.3.4 et 1.3.5, comme la 1.6 par le 1.3.5 ; reste la 1.4,
+dont l'essai sur une sortie de 500 photos servira aussi à éprouver la notation (notée, puis
+renotée en partie quelques jours plus tard ; pas de photos étalons).
+
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 
 ## Règles
@@ -333,8 +338,9 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   `serve()` (ni `--call`, ni la recette, ni les tests), et seul lui fait demander les clés de la
   géométrie ; `view_photo`, `measure_angle` et `read_composition` restent `readOnlyHint`. Seuils
   `medianeSousExposee` 28, `p95SousExposee` 80 et `partBlancPurHaut` 3 % provisoires (aucun vrai
-  cas). La case Carnet ne coupe que les constats : une leçon se range encore (question ouverte à
-  Dany).
+  cas). La case Carnet ne coupe encore que les constats : une leçon se range encore (décidé par
+  Dany le 24 octobre 2026 : décochée, elle coupera aussi les leçons, la leçon restant montrée dans
+  la fenêtre ; à faire au prochain correctif).
 - **Mise au point jugée sur de la texture** (`Detail.autour`, relevé le 21 octobre 2026 sur les
   copies d'Essais) : sous `DetailMeasurements.textureMin` (18 : sable lisse, ciel uni), la mise au
   point est « non jugée » (pas de plafond, pas de constat au carnet sauf si l'appareil l'a
