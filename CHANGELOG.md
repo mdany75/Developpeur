@@ -3,9 +3,14 @@
 ## Non publié
 
 ### Ajouté
-- Trois boutons dans la Demande rapide, à droite de ♻, chacun une demande toute faite pour la
-  photo active : noter (Claude pose sa note, de 0 à 5 ★ ou un rejet), Retouche pro et Portrait,
-  comme les invites de la fenêtre Claude. Après l'installation : quitter puis relancer Lightroom.
+- Trois boutons dans la Demande rapide, à droite de ♻, chacun une demande toute faite pour toutes
+  les photos sélectionnées : noter (Claude pose ses notes, de 0 à 5 ★ ou un rejet), Retouche pro
+  et Portrait, comme les invites de la fenêtre Claude. Après l'installation : quitter puis
+  relancer Lightroom.
+
+### Changé
+- Une demande tapée dans la Demande rapide vise toutes les photos sélectionnées, et non plus la
+  seule photo active (sauf si elle en nomme une).
 
 ## 1.3.5 — 2026-10-23
 

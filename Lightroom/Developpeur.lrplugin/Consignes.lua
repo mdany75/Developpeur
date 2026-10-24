@@ -354,13 +354,14 @@ Consignes.sansLecon = "[Sans leçon]"
 
 -- Joint à chaque demande de la fenêtre Demande rapide (Moteur.envoyerRapide) : une seule demande,
 -- sans suite ni carte.
-Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Fais ce qui est demandé sans noter la photo d'abord (sauf si on te le demande), puis dis ce qui a changé. Ni titre, ni leçon, ni « Demande à garder »."
+Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Elle vise toutes les photos sélectionnées dans Lightroom (list_selection, puis chacune, ou selection = true), pas seulement la photo active, sauf si elle en nomme une. Fais ce qui est demandé sans noter les photos d'abord (sauf si on te le demande), puis dis ce qui a changé, photo par photo si elles sont plusieurs. Ni titre, ni leçon, ni « Demande à garder »."
 
 -- Les boutons de la Demande rapide, à côté de ♻ (FenetreRapide.ACTIONS, demandés par Dany le
--- 24 octobre 2026) : le premier note la photo active et pose la note de Claude (le clic vaut la
--- demande, comme « note ces photos ») ; les deux autres reprennent les invites Retouche pro et
--- Portrait (Consignes.invite : une seule copie de leurs messages).
-Consignes.noterRapide = "Note la photo active selon le standard de notation, même si elle est déjà évaluée : cull_photos sur elle, view_photo avec af_point = true, puis propose_ratings avec apply = true pour poser ta note. Dis la note posée et sa raison en une phrase."
+-- 24 octobre 2026), visent toutes les photos sélectionnées, comme une demande tapée : le premier
+-- les note et pose les notes de Claude (le clic vaut la demande, comme « note ces photos ») ; les
+-- deux autres reprennent les invites Retouche pro et Portrait (Consignes.invite : une seule copie
+-- de leurs messages), pour chaque photo sélectionnée (Consignes.surLaSelection).
+Consignes.noterRapide = "Note chaque photo sélectionnée selon le standard de notation, même déjà évaluée : cull_photos avec selection = true, view_photo avec af_point = true sur chacune, puis propose_ratings avec apply = true pour poser les notes. Dis chaque note posée et sa raison en une phrase."
 
 function Consignes.invite(id)
     for _, invite in ipairs(Consignes.invites) do
@@ -369,6 +370,12 @@ function Consignes.invite(id)
         end
     end
     error("invite inconnue : " .. tostring(id), 2)
+end
+
+-- Le message d'une invite pour toutes les photos sélectionnées, une à une (« la photo active » de
+-- l'invite y devient « chaque photo »).
+function Consignes.surLaSelection(message)
+    return "Pour toutes les photos sélectionnées dans Lightroom, une à une : " .. (message:gsub('la photo active', 'chaque photo'))
 end
 
 -- Ajouté au message envoyé (pas affiché) tant que la conversation n'a pas de titre : la consigne

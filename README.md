@@ -193,16 +193,18 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
 
 - En bas, la demande sur trois lignes ; Retour l'envoie, comme Envoyer à sa droite.
 - Chaque demande part dans une conversation neuve, jamais gardée : ni dans la liste de la fenêtre
-  Claude, ni sur le disque. Claude répond sans noter la photo d'abord, sans leçon ni « Demande à
-  garder ».
+  Claude, ni sur le disque. Elle vise toutes les photos sélectionnées dans Lightroom, pas
+  seulement la photo active (sauf si elle en nomme une). Claude répond sans noter les photos
+  d'abord, sans leçon ni « Demande à garder ».
 - Au-dessus, la réponse, page par page : ▲ et ▼, au-dessus d'Envoyer, la font défiler comme les
   cartes de la fenêtre Claude, sans limite de longueur.
 - ♻, à gauche de la demande, repart de zéro : la réponse et la demande s'effacent (grisé pendant
   que Claude travaille).
-- À droite de ♻, trois boutons font une demande toute faite pour la photo active, sans toucher à
-  ce que vous avez tapé : les étoiles la notent (Claude pose sa note, de 0 à 5 ★ ou un rejet,
-  annulable par ⌘Z) ; la photo à l'étincelle fait une retouche pro, le portrait à l'étincelle une
-  retouche de portrait, comme les invites du même nom de la fenêtre Claude. En mode « Proposer
+- À droite de ♻, trois boutons font une demande toute faite pour toutes les photos sélectionnées,
+  sans toucher à ce que vous avez tapé : les étoiles les notent (Claude pose ses notes, de 0 à 5 ★
+  ou un rejet, annulables par ⌘Z) ; la photo à l'étincelle fait une retouche pro de chacune, le
+  portrait à l'étincelle une retouche de portrait, comme les invites du même nom de la fenêtre
+  Claude. En mode « Proposer
   d'abord », Claude ne fait que proposer ces retouches, et la Demande rapide n'a rien pour les
   accepter : prenez le mode Appliquer, ou la fenêtre Claude.
 - Échap ne la ferme pas (une fenêtre flottante de Lightroom ne reçoit pas cette touche) : le bouton

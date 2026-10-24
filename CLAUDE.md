@@ -1189,7 +1189,8 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   `DeveloppeurRapide-<N>`, à augmenter quand la taille change). Chaque demande part dans une
   conversation neuve (`Moteur.envoyerRapide` : `c.rapide`, jamais gardée, `enregistrer` sauté,
   images dans `Temporaire/Rapide/<id>`, effacé à la suivante, session neuve sans reprise ;
-  `Consignes.rapide` : sans noter d'abord, ni titre, ni leçon, ni « Demande à garder »).
+  `Consignes.rapide` : toute la sélection, sans noter d'abord, ni titre, ni leçon, ni « Demande à
+  garder »).
   Disposition en pièces superposées (`place = 'overlapping'`) placées par `margin_top` et
   `margin_left` : le résultat page par page (`FenetreRapide.montrer`, `Fil.couper`, 9 lignes de
   13 points ; ▲ ▼ en push_button « mini » comme `Vues.fleches`, une page moins une ligne par clic),
@@ -1199,8 +1200,10 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   `rapide-retouche`, `rapide-portrait` de `Dispositions.IMAGES`, jeu de l'apparence choisie) :
   chacun envoie sa demande toute faite par `FenetreRapide.demander`, le champ laissé tel quel ;
   noter (`Consignes.noterRapide` : `propose_ratings` avec `apply`, le clic vaut la demande), puis
-  Retouche pro et Portrait (messages des invites, `Consignes.invite`). Pas encore vus dans
-  Lightroom. Constaté le 22 octobre 2026 : dans ce
+  Retouche pro et Portrait (messages des invites, `Consignes.invite`, pour chaque photo par
+  `Consignes.surLaSelection`). Pas encore vus dans Lightroom. Toute demande rapide, tapée ou par
+  un bouton, vise toutes les photos sélectionnées, pas seulement la photo active
+  (`Consignes.rapide` ; demandé par Dany le 24 octobre 2026). Constaté le 22 octobre 2026 : dans ce
   `f:view`, la boîte du champ et une f:column commencent à leur `margin_top` ; un petit bouton
   seul dans sa f:row est décalé de 9 ; un clic sur un bouton valide le champ (l'envoi par Retour
   attend 0,3 s et ▲ ▼ ♻ l'annulent) ; Échap n'arrive pas à une fenêtre flottante.

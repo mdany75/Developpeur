@@ -43,19 +43,20 @@ FenetreRapide.FLECHE = 14
 -- Le bouton ♻ à gauche de la demande, carré, de la hauteur de sa boîte (demandé par Dany le
 -- 22 octobre 2026).
 FenetreRapide.RESET = FenetreRapide.HAUTEUR_DEMANDE
--- Les boutons à droite de ♻, carrés comme lui, chacun une demande toute faite pour la photo active
--- (demandés par Dany le 24 octobre 2026) : noter et poser la note de Claude, Retouche pro et
--- Portrait (les messages des invites de la fenêtre Claude). Icônes de Dispositions.IMAGES ; ESPACE :
--- l'écart entre deux carrés (un carré de 55 a un cadre de 57).
+-- Les boutons à droite de ♻, carrés comme lui, chacun une demande toute faite pour toutes les
+-- photos sélectionnées (demandés par Dany le 24 octobre 2026) : noter et poser les notes de
+-- Claude, Retouche pro et Portrait (les messages des invites de la fenêtre Claude, pour chaque
+-- photo). Icônes de Dispositions.IMAGES ; ESPACE : l'écart entre deux carrés (un carré de 55 a un
+-- cadre de 57).
 FenetreRapide.ESPACE = 6
 local retouchePro, portrait = Consignes.invite('retouche_pro'), Consignes.invite('portrait')
 FenetreRapide.ACTIONS = {
     { icone = 'rapide-noter', message = Consignes.noterRapide,
-        tooltip = "Noter la photo active : Claude pose sa note (0 à 5 ★, ou rejet)" },
-    { icone = 'rapide-retouche', message = retouchePro.message,
-        tooltip = retouchePro.titre .. " : " .. retouchePro.message },
-    { icone = 'rapide-portrait', message = portrait.message,
-        tooltip = portrait.titre .. " : " .. portrait.message },
+        tooltip = "Noter les photos sélectionnées : Claude pose ses notes (0 à 5 ★, ou rejet)" },
+    { icone = 'rapide-retouche', message = Consignes.surLaSelection(retouchePro.message),
+        tooltip = retouchePro.titre .. ", pour chaque photo sélectionnée : " .. retouchePro.message },
+    { icone = 'rapide-portrait', message = Consignes.surLaSelection(portrait.message),
+        tooltip = portrait.titre .. ", pour chaque photo sélectionnée : " .. portrait.message },
 }
 -- La zone du résultat : toute la hauteur au-dessus de la demande (relevé le 22 octobre 2026 : 988 ×
 -- 248 pour 984 × 214, d'où 996 × 216 pour 1 000 × 250), sans barre de défilement : ▲ et ▼ y
