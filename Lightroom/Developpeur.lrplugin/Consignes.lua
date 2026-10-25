@@ -356,7 +356,7 @@ Consignes.sansLecon = "[Sans leçon]"
 -- sans suite ni carte.
 Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Elle vise toutes les photos sélectionnées dans Lightroom (list_selection, puis chacune, ou selection = true), pas seulement la photo active, sauf si elle en nomme une. Fais ce qui est demandé sans noter les photos d'abord (sauf si on te le demande), puis dis ce qui a changé, photo par photo si elles sont plusieurs. Ni titre, ni leçon, ni « Demande à garder »."
 
--- Les boutons de la Demande rapide, à côté de ♻ (FenetreRapide.ACTIONS, demandés par Dany le
+-- Les boutons de la Demande rapide, à gauche du champ (FenetreRapide.ACTIONS, demandés par Dany le
 -- 24 octobre 2026), visent toutes les photos sélectionnées, comme une demande tapée : le premier
 -- les note et pose les notes de Claude (le clic vaut la demande, comme « note ces photos ») ; les
 -- deux autres reprennent les invites Retouche pro et Portrait (Consignes.invite : une seule copie

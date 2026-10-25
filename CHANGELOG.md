@@ -3,7 +3,7 @@
 ## Non publié
 
 ### Ajouté
-- Trois boutons dans la Demande rapide, à droite de ♻, chacun une demande toute faite pour toutes
+- Trois boutons dans la Demande rapide, à gauche de la demande, chacun une demande toute faite pour toutes
   les photos sélectionnées : noter (Claude pose ses notes, de 0 à 5 ★ ou un rejet), Retouche pro
   et Portrait, comme les invites de la fenêtre Claude. Après l'installation : quitter puis
   relancer Lightroom.
@@ -11,6 +11,9 @@
 ### Changé
 - Une demande tapée dans la Demande rapide vise toutes les photos sélectionnées, et non plus la
   seule photo active (sauf si elle en nomme une).
+- Dans la Demande rapide, une autre photo ou une autre sélection efface la réponse, qui parlait
+  d'autres photos ; ce que vous avez tapé reste. Le bouton ♻ est retiré : chaque demande partait
+  déjà dans une conversation neuve. Après l'installation : quitter puis relancer Lightroom.
 
 ### Corrigé
 - La balance des blancs d'une photo à forte dominante (signalé le 24 octobre 2026 : un portrait à

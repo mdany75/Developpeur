@@ -364,8 +364,9 @@ function Moteur.envoyerRapide(texte)
     return c
 end
 
--- Oublie la dernière demande rapide (bouton ♻ de la fenêtre Demande rapide, demandé par Dany le
--- 22 octobre 2026) : sa session de Claude Code s'arrête, son dossier temporaire s'efface. Refusé
+-- Oublie la dernière demande rapide (une autre photo ou une autre sélection dans Lightroom,
+-- FenetreRapide.suivreSelection ; d'abord le bouton ♻, du 22 au 24 octobre 2026) : sa session de
+-- Claude Code s'arrête, son dossier temporaire s'efface. Refusé
 -- pendant que Claude y travaille. Rend vrai, ou nil et la raison. À appeler depuis une tâche.
 function Moteur.oublierRapide()
     local c = Moteur.rapide

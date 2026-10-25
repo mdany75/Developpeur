@@ -1,10 +1,11 @@
 -- FenetreRapide.lua : la fenêtre Demande rapide (Fichier ou Bibliothèque › Module externe - Extras
 -- › Demande rapide, ⌘⌃⌥C ; demandée par Dany le 22 octobre 2026) : le résultat page par page, une
--- demande de 3 lignes, à sa gauche ♻ (repartir de zéro) et trois boutons à icône (noter, Retouche
--- pro, Portrait ; 24 octobre 2026), à sa droite ▲, ▼ et Envoyer, dans une
--- fenêtre d'environ 1 000 × 250 points ; Retour envoie, comme dans la fenêtre Claude (champ à `immediate = false` : Retour le
--- valide). Chaque demande part dans une nouvelle conversation, jamais gardée
--- (Moteur.envoyerRapide) ; la fenêtre Claude n'en voit rien dans sa liste.
+-- demande de 3 lignes, à sa gauche trois boutons à icône (noter, Retouche pro, Portrait ; 24 octobre
+-- 2026), à sa droite ▲, ▼ et Envoyer, dans une fenêtre d'environ 1 000 × 250 points ; Retour envoie,
+-- comme dans la fenêtre Claude (champ à `immediate = false` : Retour le valide). Chaque demande part
+-- dans une nouvelle conversation, jamais gardée (Moteur.envoyerRapide) ; la fenêtre Claude n'en voit
+-- rien dans sa liste. Une autre photo ou une autre sélection efface la réponse
+-- (FenetreRapide.suivreSelection) : plus de bouton ♻ (24 octobre 2026).
 
 local LrBinding = import 'LrBinding'
 local LrDialogs = import 'LrDialogs'
@@ -17,6 +18,7 @@ local Consignes = require 'Consignes'
 local Dispositions = require 'Dispositions'
 local Fil = require 'Fil'
 local Journal = require 'Journal'
+local Lightroom = require 'Lightroom'
 local Moteur = require 'Moteur'
 local Texte = require 'Texte'
 
@@ -40,14 +42,12 @@ FenetreRapide.ECART = 8
 -- colonne (14 points, relevé le 22 octobre 2026 ; son cadre en a 17).
 FenetreRapide.BOUTON = 90
 FenetreRapide.FLECHE = 14
--- Le bouton ♻ à gauche de la demande, carré, de la hauteur de sa boîte (demandé par Dany le
--- 22 octobre 2026).
-FenetreRapide.RESET = FenetreRapide.HAUTEUR_DEMANDE
--- Les boutons à droite de ♻, carrés comme lui, chacun une demande toute faite pour toutes les
--- photos sélectionnées (demandés par Dany le 24 octobre 2026) : noter et poser les notes de
--- Claude, Retouche pro et Portrait (les messages des invites de la fenêtre Claude, pour chaque
--- photo). Icônes de Dispositions.IMAGES ; ESPACE : l'écart entre deux carrés (un carré de 55 a un
--- cadre de 57).
+-- Les boutons à gauche de la demande, carrés de la hauteur de sa boîte, chacun une demande toute
+-- faite pour toutes les photos sélectionnées (demandés par Dany le 24 octobre 2026, à droite de ♻,
+-- puis à sa place quand il est retiré le même soir) : noter et poser les notes de Claude, Retouche
+-- pro et Portrait (les messages des invites de la fenêtre Claude, pour chaque photo). Icônes de
+-- Dispositions.IMAGES ; ESPACE : l'écart entre deux carrés (un carré de 55 a un cadre de 57).
+FenetreRapide.CARRE = FenetreRapide.HAUTEUR_DEMANDE
 FenetreRapide.ESPACE = 6
 local retouchePro, portrait = Consignes.invite('retouche_pro'), Consignes.invite('portrait')
 FenetreRapide.ACTIONS = {
@@ -68,7 +68,8 @@ FenetreRapide.POLICE = { name = '<system>', size = 13 }
 -- Claude, D3 : l'observateur part avant l'action du bouton) et annule cet envoi.
 FenetreRapide.DELAI_ENVOI = 0.3
 
-FenetreRapide.VIDE = "Écrivez une demande, puis Envoyer : elle part dans une nouvelle conversation, qui n'est pas gardée."
+FenetreRapide.VIDE = "Écrivez une demande, puis Envoyer : elle part dans une nouvelle conversation, qui n'est pas gardée. "
+    .. "Une autre photo ou une autre sélection efface la réponse."
 
 -- Le texte de Claude sans la mise en forme Markdown, en une suite de lignes.
 local function sansMarkdown(texte)
@@ -202,34 +203,45 @@ function FenetreRapide.envoyer(message)
     end)
 end
 
--- Un bouton à icône : sa demande toute faite part comme une demande tapée. Comme ▲ ▼ ♻, le clic
+-- Un bouton à icône : sa demande toute faite part comme une demande tapée. Comme ▲ ▼, le clic
 -- valide le champ et annule l'envoi par Retour.
 function FenetreRapide.demander(message)
     FenetreRapide.attente = nil
     FenetreRapide.envoyer(message)
 end
 
--- ♻ : repartir de zéro. La dernière demande rapide est oubliée (Moteur.oublierRapide : session
--- arrêtée, dossier effacé), la réponse et la demande s'effacent. Comme ▲ ▼, le clic valide le champ
--- et annule l'envoi par Retour.
-function FenetreRapide.reinitialiser()
-    FenetreRapide.attente = nil
-    if FenetreRapide.envoi then
+-- Une autre photo active ou une autre sélection, choisie par Dany, efface la réponse et oublie la
+-- demande d'avant (Moteur.oublierRapide : session arrêtée, dossier effacé) : la réponse parlait
+-- d'autres photos (demandé par Dany le 24 octobre 2026, à la place du bouton ♻). Ce qu'il a tapé
+-- reste, pour le renvoyer sur les nouvelles. Comme Fenetre.suivreSelection : une sélection changée
+-- pendant que Claude travaille, ou vue moins de DELAI_APRES_TRAVAIL secondes après la fin de son
+-- travail, peut être la sienne (show_photo, une copie virtuelle montrée) : elle devient celle de la
+-- réponse. La sélection vue reste d'une ouverture à l'autre : une photo choisie fenêtre fermée
+-- compte aussi. `info` : Lightroom.photos(). À appeler depuis une tâche.
+FenetreRapide.DELAI_APRES_TRAVAIL = 4
+
+function FenetreRapide.suivreSelection(info)
+    local cle = info and info.cle
+    if not cle then
         return
     end
-    LrTasks.startAsyncTask(function()
-        local ok, fait, raison = LrTasks.pcall(Moteur.oublierRapide)
-        if ok and fait then
-            FenetreRapide.message = nil
-            if FenetreRapide.p then
-                FenetreRapide.vidage = true
-                FenetreRapide.p.demande = ''
-                FenetreRapide.vidage = false
-            end
-        else
-            FenetreRapide.message = ok and raison or tostring(fait)
-        end
-    end)
+    local avant, vueLe = FenetreRapide.cleVue, FenetreRapide.cleVueLe
+    FenetreRapide.cleVue, FenetreRapide.cleVueLe = cle, os.time()
+    if avant == nil or avant == cle then
+        return
+    end
+    local fin = Moteur.finTravail or 0
+    if Moteur.travaille or (fin > 0 and (not vueLe or fin + FenetreRapide.DELAI_APRES_TRAVAIL > vueLe)) then
+        return
+    end
+    if not Moteur.rapide and not FenetreRapide.message then
+        return
+    end
+    local ok, fait = LrTasks.pcall(Moteur.oublierRapide)
+    if ok and fait then
+        FenetreRapide.message = nil
+        Journal.noter("Demande rapide : autre photo choisie, réponse effacée")
+    end
 end
 
 local function boucle()
@@ -238,6 +250,10 @@ local function boucle()
         local p = FenetreRapide.p
         if p then
             local ok, erreur = LrTasks.pcall(function()
+                -- La sélection de Lightroom toutes les 2 s, comme la fenêtre Claude.
+                if tic % 8 == 0 then
+                    FenetreRapide.suivreSelection(Lightroom.photos())
+                end
                 FenetreRapide.montrer(FenetreRapide.texte(tic))
                 poser(p, 'libre', not Moteur.travaille)
             end)
@@ -291,7 +307,7 @@ function FenetreRapide.afficher()
             end)
         end)
         -- Pièces superposées, placées par leurs marges (place = 'overlapping') : le résultat en
-        -- haut ; la demande en bas ; à sa gauche ♻, à sa droite ▲, ▼ et Envoyer, de la hauteur de sa
+        -- haut ; la demande en bas ; à sa gauche les boutons à icône, à sa droite ▲, ▼ et Envoyer, de la hauteur de sa
         -- boîte, à la même marge du haut (relevé le 22 octobre 2026 : la boîte du champ et la colonne commencent
         -- à leur margin_top). Dans une f:row, Lightroom alignait les lignes de texte (champ 15 points
         -- plus bas que le bouton), et une f:column ajoutait une zone grise sous le résultat (demandé
@@ -299,10 +315,10 @@ function FenetreRapide.afficher()
         -- hauteur).
         local boite = FenetreRapide.HAUTEUR_RESULTAT + FenetreRapide.ECART
         local gauche = FenetreRapide.LARGEUR - FenetreRapide.BOUTON
-        -- ♻ puis les boutons à icône, carrés de la hauteur de la boîte, chacun dans sa colonne à
-        -- sa marge (comme ♻) ; le champ commence après eux.
-        local pas = FenetreRapide.RESET + FenetreRapide.ESPACE
-        local champ = (#FenetreRapide.ACTIONS + 1) * pas - FenetreRapide.ESPACE + FenetreRapide.ECART
+        -- Les boutons à icône, carrés de la hauteur de la boîte, chacun dans sa colonne à sa marge ;
+        -- le champ commence après eux.
+        local pas = FenetreRapide.CARRE + FenetreRapide.ESPACE
+        local champ = #FenetreRapide.ACTIONS * pas - FenetreRapide.ESPACE + FenetreRapide.ECART
         local fleche = FenetreRapide.FLECHE
         local moitie = (FenetreRapide.BOUTON - 2) / 2
         local apparence = Chemins.prefs().apparence
@@ -323,18 +339,6 @@ function FenetreRapide.afficher()
                     font = FenetreRapide.POLICE,
                     width = FenetreRapide.LARGEUR_TEXTE,
                     height_in_lines = FenetreRapide.LIGNES_RESULTAT,
-                },
-            },
-            f:column {
-                margin_top = boite,
-                f:square_button {
-                    title = "♻",
-                    font = { name = '<system>', size = 26 },
-                    width = FenetreRapide.RESET,
-                    height = FenetreRapide.HAUTEUR_DEMANDE,
-                    enabled = bind 'libre',
-                    tooltip = "Repartir de zéro : effacer la réponse et la demande",
-                    action = function() FenetreRapide.reinitialiser() end,
                 },
             },
             f:row {
@@ -377,10 +381,10 @@ function FenetreRapide.afficher()
         for i, a in ipairs(FenetreRapide.ACTIONS) do
             pieces[#pieces + 1] = f:column {
                 margin_top = boite,
-                margin_left = i * pas,
+                margin_left = (i - 1) * pas,
                 f:square_button {
                     image_name = Chemins.ressource(Dispositions.image(a.icone, apparence)),
-                    width = FenetreRapide.RESET,
+                    width = FenetreRapide.CARRE,
                     height = FenetreRapide.HAUTEUR_DEMANDE,
                     enabled = bind 'libre',
                     tooltip = a.tooltip,

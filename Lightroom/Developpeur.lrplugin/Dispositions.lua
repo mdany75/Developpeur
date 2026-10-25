@@ -191,7 +191,7 @@ Dispositions.IMAGES = {
     ['presse-papiers'] = taille(14, 14),
     ['chevron-haut'] = taille(12, 12),
     ['chevron-bas'] = taille(12, 12),
-    -- Les icônes des boutons de la Demande rapide, à côté de ♻ (FenetreRapide.ACTIONS ; demandés
+    -- Les icônes des boutons de la Demande rapide, à gauche du champ (FenetreRapide.ACTIONS ; demandés
     -- par Dany le 24 octobre 2026) : noter, Retouche pro, Portrait, dans des carrés de 55.
     ['rapide-noter'] = taille(30, 30),
     ['rapide-retouche'] = taille(30, 30),

@@ -198,9 +198,10 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
   d'abord, sans leçon ni « Demande à garder ».
 - Au-dessus, la réponse, page par page : ▲ et ▼, au-dessus d'Envoyer, la font défiler comme les
   cartes de la fenêtre Claude, sans limite de longueur.
-- ♻, à gauche de la demande, repart de zéro : la réponse et la demande s'effacent (grisé pendant
-  que Claude travaille).
-- À droite de ♻, trois boutons font une demande toute faite pour toutes les photos sélectionnées,
+- Une autre photo ou une autre sélection dans Lightroom efface la réponse, qui parlait d'autres
+  photos ; ce que vous avez tapé reste, pour le renvoyer sur les nouvelles. Une sélection que
+  Claude change lui-même (pendant son travail ou juste après) garde la réponse.
+- À gauche de la demande, trois boutons font une demande toute faite pour toutes les photos sélectionnées,
   sans toucher à ce que vous avez tapé : les étoiles les notent (Claude pose ses notes, de 0 à 5 ★
   ou un rejet, annulables par ⌘Z) ; la photo à l'étincelle fait une retouche pro de chacune, le
   portrait à l'étincelle une retouche de portrait, comme les invites du même nom de la fenêtre

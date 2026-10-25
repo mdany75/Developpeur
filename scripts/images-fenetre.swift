@@ -424,7 +424,7 @@ func dessins(_ p: Palette) -> [String: Dessin] {
     d["chevron-haut"] = icone(boite: B16, couleur: p["texte"], trait: 1.6, traits: [trace("M4 10l4-4 4 4")])
     d["chevron-bas"] = icone(boite: B16, couleur: p["texte"], trait: 1.6, traits: [trace("M4 6l4 4 4-4")])
 
-    // Les boutons de la Demande rapide, à côté de ♻ (demandés par Dany le 24 octobre 2026) : trois
+    // Les boutons de la Demande rapide, à gauche du champ (demandés par Dany le 24 octobre 2026) : trois
     // étoiles ambre (noter) ; une photo et un portrait à l'encre du texte, chacun avec l'étincelle
     // orange de l'IA en haut à droite (Retouche pro, Portrait).
     let etoiles = [etoile(5.2, 14.2, 0.32), etoile(12, 10.6, 0.4), etoile(18.8, 14.2, 0.32)]
