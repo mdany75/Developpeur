@@ -65,7 +65,7 @@ public enum Prompts {
             6. Deuxième passe (step_name « passe 2 : finitions ») : présence, TSL (il touche toutes les couleurs semblables : pour un seul objet, plutôt un masque à l'étape 7), étalonnage (une dominante verte ou magenta restée dans les seules ombres : ShadowTint, pas Tint), courbe (relis d'abord ToneCurvePV2012 avec get_settings : des curseurs Parametric… à 0 ne prouvent pas une courbe droite), netteté (view_photo avec region pour juger à 100 %), vignetage (ou les bords par un radial inversé à l'étape 7, jamais les deux), avec retenue. Bruit fort (mesure au-dessus de 1,5) : le débruitage IA de Lightroom (enhance_photo) d'abord, avant la netteté, les masques et les taches de l'étape 7, et pas de LuminanceSmoothing par-dessus ; bruit léger : réduction manuelle modérée.
             7. Si la photo le demande, retouches locales avec add_mask (ciel, sujet, arrière-plan, visage, dégradés, combinés au besoin), légères ; pour un portrait, les effets de Lightroom (effect : blanchiment des dents sur person_part teeth, renforcement de l'iris sur iris_pupil, peau dosée comme le dit add_mask (« Peau du visage lisse » par défaut, rien pour un enfant)), souvent à intensité réduite (amount) ; yeux rouges avec retouch_spots, seulement si un zoom montre des pupilles rouges, au centre de la pupille vu dans ce zoom. Pour mener l'œil au sujet : éclaircir et assombrir comme un tireur (doses dans la description d'add_mask), en une étape, suivie de \(Tireur.avantApres).
             8. view_photo de nouveau. Si un défaut précis reste, mesuré ou visible (hautes lumières brûlées, ombres bouchées, dominante, peau, masque trop visible), ou une « regression » au bilan, fais une passe corrective ciblée sur ce seul défaut (step_name « passe 3 : … », avec une reason qui le nomme), puis vérifie de même. Deux passes correctives au plus : s'il reste un défaut, dis-le dans le résumé plutôt que d'empiler les réglages. Pas de passe corrective sans défaut constaté.
-            9. view_photo avec compare = before_claude (son bilan chiffre ce qui a changé depuis l'état d'avant Claude), puis résume en quelques puces ce que tu as changé et pourquoi, chiffres du bilan à l'appui, et ce qui reste à faire à la main dans Lightroom s'il y a lieu. \(Lecon.phrase)
+            9. view_photo avec compare = before_claude (son bilan chiffre ce qui a changé depuis l'état d'avant Claude), puis résume en quelques puces ce que tu as changé et pourquoi, chiffres du bilan à l'appui, et ce qui reste à faire à la main dans Lightroom s'il y a lieu.
             """
         })
 
@@ -111,9 +111,9 @@ public enum Prompts {
         return valeur
     }
 
-    /// Vérification, résumé et leçon, communs aux invites de retouche.
+    /// Vérification et résumé, communs aux invites de retouche.
     private static let finRetouche = """
-        Puis view_photo de nouveau : si un défaut précis reste, mesuré, visible ou en « regression » au bilan, une passe corrective ciblée sur ce seul défaut (step_name « passe 3 : … », reason qui le nomme), deux au plus ; jamais de passe sans défaut constaté. Enfin view_photo avec compare = before_claude, et un résumé en quelques puces, chiffres du bilan à l'appui : ce qui a changé, pourquoi, et ce qui reste à faire à la main dans Lightroom. \(Lecon.phrase)
+        Puis view_photo de nouveau : si un défaut précis reste, mesuré, visible ou en « regression » au bilan, une passe corrective ciblée sur ce seul défaut (step_name « passe 3 : … », reason qui le nomme), deux au plus ; jamais de passe sans défaut constaté. Enfin view_photo avec compare = before_claude, et un résumé en quelques puces, chiffres du bilan à l'appui : ce qui a changé, pourquoi, et ce qui reste à faire à la main dans Lightroom.
         """
 
     public static let triSeance = PromptTemplate(
@@ -271,15 +271,6 @@ public enum Prompts {
 }
 
 extension Prompts {
-    /// La leçon de la photo (1.3) : la phrase n'existe qu'ici. Elle finit l'étape 9 de retouche_pro
-    /// et la fin commune des invites portrait, paysage, noir_et_blanc et nuit_iso_eleve (finRetouche),
-    /// après le résumé ; jamais harmoniser_serie, tri_seance, noter ni partage (une série, un tri, une
-    /// notation ou une livraison n'ont pas de leçon). La fenêtre Claude ne lit pas les invites : ses
-    /// consignes (Consignes.lua) la demandent à leur façon.
-    public enum Lecon {
-        public static let phrase = "Enfin photo_lesson : la leçon de la photo, lumière, couleur et composition : ce qui manquait, chiffres à l'appui, et ce qui l'aurait évité à la prise de vue."
-    }
-
     /// Éclaircir et assombrir comme un tireur en chambre noire (1.2). Les doses n'existent qu'ici :
     /// les invites portrait, paysage et noir_et_blanc les reprennent par `methode`, la description
     /// d'add_mask par `resume` (la fenêtre Claude ne lit pas les invites ; ses boutons Portrait,

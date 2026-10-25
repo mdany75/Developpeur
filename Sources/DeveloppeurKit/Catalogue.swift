@@ -418,7 +418,7 @@ public enum DevelopCatalogue {
         return .object(object)
     }
 
-    /// Libellés français envoyés au module Lightroom, pour sa fenêtre de suivi.
+    /// Libellés français envoyés au module Lightroom, pour sa fenêtre de la liaison.
     public static func labels(for keys: [String]) -> JSONValue {
         var object: [String: JSONValue] = [:]
         for key in keys {

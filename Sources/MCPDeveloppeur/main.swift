@@ -72,8 +72,8 @@ func usage() {
                 recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
                 (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
                 garde les étapes de la recette ; d'abord la liaison fermée et l'écran nommé, en lecture seule.
-                Le RAW passe aussi par la 1.3 : avant/après d'une étape, leçon, carnet de progrès (copie d'essai
-                notée puis retirée), « Je le fais ».
+                Le RAW passe aussi par la 1.3 : avant/après d'une étape, carnet de progrès (copie d'essai notée
+                puis retirée).
                 --portrait : la peau dosée sur un portrait ; --mixte : une photo à deux lumières (lampe et fenêtre)
                 lue mixte, puis le RAW lu à une seule lumière, en lecture seule ; --horizon : une photo qui a un
                 vrai horizon, pour la composition lue, à --hauteur-horizon dans l'image (0,5 par défaut) ; sans
@@ -104,6 +104,7 @@ func serve() {
     // Le carnet de progrès (1.3) ne se remplit que par le serveur lancé par Claude (Claude Desktop,
     // Claude Code, la fenêtre Claude) : ni --call, ni la recette, ni les tests n'y notent.
     tools.noterAuCarnet = true
+    // Le rendu reproductible (1.3.5), gardé au view_photo avec compare = before_claude : de même.
     tools.registreRendus = RegistreRendus()
     let server = MCPServer(name: ServerInfo.name, title: ServerInfo.title, version: ServerInfo.version,
                            instructions: ServerInfo.instructions,

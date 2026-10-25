@@ -27,17 +27,16 @@ final class FakeLightroom: LightroomServing {
     var moduleVersion: String?
 
     /// Commandes notées à part, pour que les tests des outils voient les mêmes commandes qu'avant
-    /// elles : la barre de progression de Lightroom (« progression »), et les registres de la 1.3
-    /// rangés hors du catalogue, la leçon de la photo (« lecon ») et le carnet de progrès
-    /// (« carnet »). Une réponse ou une erreur préparée vaut pour elles aussi ; `onSend` ne les voit
-    /// pas (préparer leur réponse dans `replies` avant l'appel).
-    static let commandesAPart: Set<String> = ["progression", "lecon", "carnet"]
+    /// elles : la barre de progression de Lightroom (« progression »), et le registre de la 1.3
+    /// rangé hors du catalogue, le carnet de progrès (« carnet » ; la leçon de la photo, « lecon »,
+    /// est retirée en 1.3.6). Une réponse ou une erreur préparée vaut pour elles aussi ; `onSend` ne
+    /// les voit pas (préparer leur réponse dans `replies` avant l'appel).
+    static let commandesAPart: Set<String> = ["progression", "carnet"]
     private var notesAPart: [String: [[String: JSONValue]]] = [:]
     private func aPart(_ command: String) -> [[String: JSONValue]] {
         verrou.lock(); defer { verrou.unlock() }; return notesAPart[command] ?? []
     }
     var progressions: [[String: JSONValue]] { aPart("progression") }
-    var lecons: [[String: JSONValue]] { aPart("lecon") }
     var carnets: [[String: JSONValue]] { aPart("carnet") }
 
     func send(_ command: String, _ params: [String: JSONValue], timeout: TimeInterval) throws -> JSONValue {

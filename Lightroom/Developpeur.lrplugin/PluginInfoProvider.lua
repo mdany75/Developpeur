@@ -3,9 +3,11 @@
 --   - la liaison avec Claude : état, boutons, mode « Proposer d'abord », réglages (dont le carnet de
 --     progrès, 1.3), garde-fous et diagnostic ;
 --   - la fenêtre Claude : chemins de Claude Code et du connecteur MCP-Développeur, modèle, effort,
---     apparence (claire ou sombre, 1.3), nouvelle conversation par photo, proposition à
---     l'ouverture, avant/après de chaque étape et leçon de la photo (1.3), fermeture de Claude
---     Code après inactivité, raccourci clavier, dossiers.
+--     apparence (claire ou sombre, 1.3), la conversation de chaque photo (Autre photo : reprendre
+--     sa conversation, sinon une nouvelle, correctif 1.3.6), avant/après de chaque étape (1.3),
+--     fermeture de Claude Code après inactivité, raccourci clavier, dossiers. (Les cases Leçon et
+--     « À l'ouverture » sont retirées au correctif 1.3.6, avec la leçon et la proposition préparée à
+--     l'ouverture de la fenêtre.)
 -- Les deux sections lisent et écrivent les mêmes préférences du module (Preferences.lua,
 -- Chemins.prefs).
 
@@ -62,10 +64,9 @@ local function diagnostic()
             tostring(prefs.mode), tostring(prefs.accordDansLightroom), tostring(prefs.copiesSeulement), tostring(prefs.libelleProtege),
             tostring(prefs.rejeteesProtegees), tostring(prefs.plafondPhotos), tostring(prefs.retourVisuel)) .. " ; point de mise au point en tout temps : " .. tostring(prefs.pointMiseAuPoint)
             .. " ; carnet de progrès : " .. tostring(prefs.carnet) .. " (" .. photosAuCarnet() .. ")",
-        string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s, effort %s ; nouvelle conversation par photo : %s",
+        string.format("Fenêtre Claude : Claude Code %s ; connecteur %s ; modèle %s, effort %s ; autre photo, reprendre sa conversation, sinon une nouvelle : %s",
             tostring(prefs.cheminClaude), tostring(prefs.cheminConnecteur), tostring(prefs.modele), tostring(prefs.effort),
-            tostring(prefs.nouvelleParPhoto)) .. " ; proposition à l'ouverture : " .. tostring(prefs.propositionAOuverture)
-            .. " ; avant/après des étapes : " .. tostring(prefs.avantApresEtapes) .. " ; leçon en fin de retouche : " .. tostring(prefs.leconFinRetouche)
+            tostring(prefs.nouvelleParPhoto)) .. " ; avant/après des étapes : " .. tostring(prefs.avantApresEtapes)
             .. " ; apparence : " .. apparence(prefs.apparence),
         "Journaux : " .. select(2, Liaison.cheminJournal()) .. " et " .. Chemins.journal(),
         "",
@@ -130,7 +131,7 @@ local function sectionLiaison(f, propertyTable, prefs, ligne)
         ligne("", f:row {
             f:push_button { title = "Démarrer la liaison", action = function() Liaison.demarrer(); rafraichir() end },
             f:push_button { title = "Arrêter la liaison", action = function() Liaison.arreter(); rafraichir() end },
-            f:push_button { title = "Fenêtre de suivi", action = function() require('Suivi').afficher() end },
+            f:push_button { title = "Fenêtre de la liaison", action = function() require('Suivi').afficher() end },
         }),
 
         f:separator { fill_horizontal = 1 },
@@ -165,7 +166,7 @@ local function sectionLiaison(f, propertyTable, prefs, ligne)
             f:static_text { title = "au plus, en plus ou en moins" },
         }),
         ligne("Accord :", f:checkbox {
-            title = "En mode « Proposer d'abord », l'accord se donne ici (fenêtre de suivi, bouton Accepter)",
+            title = "En mode « Proposer d'abord », l'accord se donne ici (fenêtre de la liaison, bouton Accepter)",
             value = bind { key = 'accordDansLightroom', bind_to_object = prefs },
         }),
         ligne("Retour visuel :", f:checkbox {
@@ -253,18 +254,17 @@ local function sectionFenetre(f, prefs, ligne)
         ligne("Apparence :",
             f:popup_menu { value = bind 'apparence', items = Dispositions.itemsApparences() },
             f:static_text { title = "de la fenêtre Claude, à sa prochaine ouverture ; boutons et champs suivent macOS" }),
+        -- Une photo, une conversation (correctif 1.3.6) : la photo choisie montre la sienne, ou une
+        -- neuve, et la Demande rapide sur une photo seule écrit dans la sienne ; décochée, la
+        -- conversation montrée reste, quelle que soit la sélection, et chaque demande rapide part
+        -- dans une conversation jamais gardée.
         ligne("Autre photo :",
             f:checkbox { value = bind 'nouvelleParPhoto',
-                title = "Nouvelle conversation pour une autre photo ou sélection" }),
-        ligne("À l'ouverture :",
-            f:checkbox { value = bind 'propositionAOuverture',
-                title = "Claude prépare une proposition de retouche (rien n'est appliqué)" }),
+                title = "Reprendre sa conversation, sinon une nouvelle" }),
         ligne("Avant/après :",
             f:checkbox { value = bind 'avantApresEtapes',
                 title = "Garder l'avant/après de chaque étape de Claude (un rendu de plus par étape, photo active seulement)" }),
-        ligne("Leçon :",
-            f:checkbox { value = bind 'leconFinRetouche',
-                title = "Claude finit chaque retouche par la leçon de la photo" }),
+
         ligne("Fermer Claude Code après :",
             f:popup_menu { value = bind 'inactivite', items = {
                 { title = "5 minutes sans demande", value = 5 },

@@ -26,7 +26,10 @@ code, ni image en Markdown.
 
 ## Contexte
 Chaque demande commence par « [Lightroom : …] » : la photo active (identifiant et fichier) et la \
-sélection à l'envoi. Sers-t'en sans la répéter.
+sélection à l'envoi. Sers-t'en sans la répéter. Chaque photo a sa conversation : une ligne \
+« [Historique de la photo : …] », « [Depuis la dernière fois : …] » ou le résumé d'un groupe peut \
+suivre, faite par la fenêtre (le journal de tes étapes, les reprises à la main de Dany) : repars \
+de là, sans la répéter.
 
 ## Écran
 Tu mesures la photo par ses chiffres (view_photo), sans passer par l'écran ; Dany la juge sur le \
@@ -41,8 +44,8 @@ demande. Ne refuse que ce que les outils ne savent pas faire, ou ce que bloquent
 module (« Proposer d'abord », garde-fous), et dis-le.
 - Mode « Proposer d'abord » (réglage du module, ou demandé) : montre la proposition avec \
 preview_settings (compare = true), puis arrête-toi et attends. La fenêtre affiche Accepter, \
-Refuser, Ajuster et Je le fais ; Dany répond par un message. Seulement après « J'accepte » : \
-l'outil avec confirm = true.
+Refuser et Ajuster ; Dany répond par un message. Seulement après « J'accepte » : l'outil avec \
+confirm = true.
 - save_preset et remember_style (ajout) : seulement à la demande de Dany.
 - Peau : dosée comme le dit add_mask (effect « Peau du visage lisse » par défaut). Plus lisse \
 seulement si Dany le demande en mots (« lisse davantage la peau », « adoucis la peau ») ou si son \
@@ -68,16 +71,7 @@ ce qui revient, quoi essayer à sa prochaine sortie.
 Après une retouche entière, ou si Dany parle de cadre ou d'horizon : read_composition. Si le cadre \
 y gagne nettement, montre son crop seul par preview_settings, sans compare, reason = la règle ; \
 dis comment la tenir à la prise de vue (grille, niveau). N'applique ce cadre qu'au clic de Dany sur \
-Accepter, même en « Appliquer directement ». Une proposition à la fois ; la leçon suit.
-
-## Je le fais
-Quand Dany retouche lui-même pour apprendre, n'applique rien : preview_settings avec \
-my_turn = true range ta version ; donne a_faire dans l'ordre du panneau Développement, le pourquoi \
-de chaque réglage en quelques mots. Pendant son travail, ne retouche pas la photo et ne défais \
-rien. Après « J'ai fini » : view_photo avec compare = claude_version ; \
-d'abord ce qu'il a bien fait, puis l'écart principal (ecart_principal), sans le corriger. Un écart \
-de goût n'est pas une faute : Suggestion pour le guide. Ta version ne se pose (choose_variant \
-« ma version ») que s'il le demande.
+Accepter, même en « Appliquer directement ». Une proposition à la fois.
 
 ## Titre de la conversation
 La première fois que tu vois une photo dans la conversation (aperçu d'un outil, photo jointe), si \
@@ -103,25 +97,18 @@ hautes lumières baissées »), avec les noms français des réglages. Il la lit
 l'étape (onglet Aperçu, bouton Pourquoi ? du fil). step_name : le but, en bref.
 
 ## Fin d'une tâche
+Après la retouche d'une photo (pas dans une [Demande rapide]), finis par view_photo avec compare = \
+before_claude, avant le résumé ; s'il rend rendu_reproductible, dis l'écart.
 Après une retouche, fais un résumé de ce qui a changé et pourquoi, en quelques puces, chiffres du \
 bilan de view_photo à l'appui (par exemple « hautes lumières écrêtées : 2,1 → 0,3 % ») ; une \
 « regression » restée au bilan se dit. Dany revoit chaque étape (avant/après et raison) en la \
 cliquant dans le fil : ton résumé ne répète pas chaque raison. Après une tâche sur plusieurs \
 photos, donne aussi les numéros des photos à revoir. Chaque étape est dans l'Historique de \
-Lightroom sous « Claude · … ». Puis la leçon (voir Leçon de la photo).
-
-## Leçon de la photo
-Après la retouche d'une photo, ou après « J'ai fini » : résumé court, proposition de cadre s'il y \
-en a, puis photo_lesson en dernier. Trois points, lumière, couleur, composition : ce qui \
-manquait, chiffres à l'appui, et ce qui l'aurait évité à la prise de vue (réglage du boîtier \
-seulement s'il est lu). La fenêtre la montre dans l'onglet Leçon : ne la redis pas, rien après \
-(sauf Demande à garder). Une seule leçon par photo et par conversation. Pas de leçon après une \
-proposition seule (Proposer d'abord, ouverture), notation, classement ou série, ni avec \
-« [Sans leçon] ».
+Lightroom sous « Claude · … ».
 
 ## Demande à garder
-Après une retouche (une étape écrite ; pas une proposition, notation, classement ou leçon \
-seuls), finis ta réponse par une ligne seule :
+Après une retouche (une étape écrite ; pas une proposition, notation ou classement seuls), finis \
+ta réponse par une ligne seule :
 Demande à garder : « <ta demande> »
 Une ou deux phrases qui referaient ton travail sur une photo semblable, sans identifiant ni nom de \
 fichier, par exemple « Retouche ce portrait en intérieur : PROVIA, balance plus neutre, ombres \
@@ -297,9 +284,13 @@ function Consignes.itemsEfforts()
     return items(Consignes.efforts)
 end
 
--- La demande envoyée à l'ouverture de la fenêtre, sur une conversation vide
--- (Fenetre.proposerAOuverture) : une proposition prête dans l'onglet Proposition.
-Consignes.proposerOuverture = "Prépare une proposition de retouche de la photo active, rendu naturel : note-la d'abord si elle n'est pas encore évaluée, puis montre ce que tu changerais avec preview_settings, sans rien appliquer. J'accepterai, refuserai ou ajusterai dans l'onglet Proposition."
+-- « Obtenir », sous la carte de l'onglet Proposition (Fenetre.obtenir ; décision de Dany du
+-- 25 octobre 2026, à la place de la proposition préparée à l'ouverture de la fenêtre) : `demande`
+-- part à Claude, `fil` est ce que le fil montre de la demande de Dany, court comme une invite.
+Consignes.obtenir = {
+    fil = "Propose-moi une retouche de cette photo, sans rien appliquer.",
+    demande = "Prépare une proposition de retouche de la photo active, rendu naturel : note-la d'abord si elle n'est pas encore évaluée, puis montre ce que tu changerais avec preview_settings, sans rien appliquer. J'accepterai, refuserai ou ajusterai dans l'onglet Proposition.",
+}
 
 -- Réponses aux propositions (boutons du panneau Proposition).
 Consignes.accepter = "J'accepte la proposition : applique-la (confirm = true)."
@@ -308,31 +299,6 @@ function Consignes.ajuster(texte)
     return "Ajuste la proposition avant de l'appliquer : " .. texte .. ". Montre-moi la nouvelle proposition."
 end
 
--- « Je le fais » (1.3, bouton de la carte Proposition) : Dany fait la retouche lui-même. Avec une
--- proposition en attente, Claude range exactement celle-là ; sans, il en prépare une sur la photo
--- active. Rien n'est appliqué : preview_settings avec my_turn range la version de Claude et rend
--- la liste a_faire (la section « Je le fais » des consignes dit le reste).
-function Consignes.jeLeFais(avecProposition)
-    if avecProposition then
-        return "Je le fais moi-même, pour apprendre : n'applique rien. Rappelle preview_settings avec exactement les réglages "
-            .. "de ta proposition en attente et my_turn = true, puis donne-moi la liste a_faire dans son ordre, avec pour chaque "
-            .. "réglage le panneau, la valeur et pourquoi en quelques mots."
-    end
-    return "Je le fais moi-même sur la photo active, pour apprendre : n'applique rien. Regarde-la (view_photo), prépare une "
-        .. "retouche au rendu naturel et range-la avec preview_settings et my_turn = true, puis donne-moi la liste a_faire "
-        .. "dans son ordre, avec pour chaque réglage le panneau, la valeur et pourquoi en quelques mots."
-end
-
--- « J'ai fini » (1.3, le même bouton pendant l'exercice) : la comparaison des deux versions, sans
--- rien changer à la photo. `photo` : l'identifiant de la photo de l'exercice (nil : inconnu).
-function Consignes.jaiFini(photo)
-    local id = type(photo) == 'number' and string.format('%d', photo) or (photo ~= nil and tostring(photo) or nil)
-    local sur = id and ("la photo " .. id) or "la photo de l'exercice"
-    local vue = id and ("view_photo avec photo_id = " .. id .. " et compare = claude_version") or "view_photo avec compare = claude_version"
-    return "J'ai fini mes réglages sur " .. sur .. ". Compare ma version à la tienne : " .. vue .. ". Dis d'abord ce que j'ai "
-        .. "bien fait, puis l'écart qui compte le plus pour l'image (exercice.ecart_principal, chiffres du bilan à l'appui) et "
-        .. "comment le voir moi-même la prochaine fois ; sans rien changer à la photo."
-end
 
 -- Ajustements d'un clic de la fenêtre Ajuster.
 Consignes.ajustementsRapides = { "Moins chaud", "Peau plus naturelle", "Garder le ciel", "Plus de contraste" }
@@ -342,19 +308,17 @@ Consignes.ajustementsRapides = { "Moins chaud", "Peau plus naturelle", "Garder l
 -- le nouveau cadre, sans l'appliquer.
 Consignes.ajustementsCadre = { "Plus serré", "Plus large", "Horizon au tiers haut", "Format 4:5", "Seulement redresser" }
 
--- « Demander à Claude ce qu'il en pense › », la ligne d'action de la page Carnet de progrès (1.3,
--- Fenetre.demanderCarnet) : une nouvelle conversation, rien de retouché. Le résumé vient du
--- connecteur (export_journal avec notebook), sans chiffre écrit ici.
-Consignes.carnet = "Lis mon carnet de progrès (export_journal avec notebook = true) et dis-moi en trois puces ce qui progresse, ce qui revient le plus, et quoi travailler à ma prochaine sortie, avec les réglages du boîtier quand ça aide. Ne retouche rien."
+-- (« Demander à Claude ce qu'il en pense › », la ligne d'action de la page Carnet de progrès, et sa
+-- demande Consignes.carnet sont retirées avec la page au correctif 1.3.6 : l'onglet Suivi montre le
+-- carnet sans Claude.)
 
--- La ligne jointe à chaque demande quand la case Leçon du Gestionnaire de modules externes est
--- décochée (préférence leconFinRetouche, Moteur.envoyer) : pas de leçon de la photo. Elle suit la
--- ligne de style ; la section « Leçon de la photo » des consignes la nomme.
-Consignes.sansLecon = "[Sans leçon]"
 
 -- Joint à chaque demande de la fenêtre Demande rapide (Moteur.envoyerRapide) : une seule demande,
--- sans suite ni carte.
-Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Elle vise toutes les photos sélectionnées dans Lightroom (list_selection, puis chacune, ou selection = true), pas seulement la photo active, sauf si elle en nomme une. Fais ce qui est demandé sans noter les photos d'abord (sauf si on te le demande), puis dis ce qui a changé, photo par photo si elles sont plusieurs. Ni titre, ni leçon, ni « Demande à garder »."
+-- sans suite ni carte. `rapide` : plusieurs photos (ou la case Autre photo décochée), dans une
+-- conversation jamais gardée ; `rapidePhoto` : une photo seule, dans sa conversation, que la fenêtre
+-- Claude reprendra (correctif 1.3.6, « une photo, une conversation »).
+Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Elle vise toutes les photos sélectionnées dans Lightroom (list_selection, puis chacune, ou selection = true), pas seulement la photo active, sauf si elle en nomme une. Fais ce qui est demandé sans noter les photos d'abord (sauf si on te le demande), puis dis ce qui a changé, photo par photo si elles sont plusieurs. Ni titre, ni « Demande à garder »."
+Consignes.rapidePhoto = "[Demande rapide] Une seule demande, faite depuis la fenêtre Demande rapide dans la conversation de cette photo, que la fenêtre Claude reprendra : la Demande rapide ne montre que ta réponse, et rien n'y pourra être accepté. Elle vise la photo active, seule sélectionnée. Fais ce qui est demandé sans noter la photo d'abord (sauf si on te le demande), puis dis ce qui a changé. Ni titre, ni « Demande à garder »."
 
 -- Les boutons de la Demande rapide, à gauche du champ (FenetreRapide.ACTIONS, demandés par Dany le
 -- 24 octobre 2026), visent toutes les photos sélectionnées, comme une demande tapée : le premier

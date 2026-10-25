@@ -1,11 +1,13 @@
 import Foundation
 
-/// Rendu reproductible (1.3.5) : à la fin de chaque retouche (photo_lesson), les réglages
-/// principaux de la photo sont gardés, et une seconde retouche de la même photo, faite après un
-/// retour à l'origine (revert_to_original, une entrée « retour » de plus au journal), s'y compare :
-/// un écart au-delà des seuils se signale. Un style qui change d'un jour à l'autre n'est pas un
-/// style. Gardés dans `rendus.json` ; seul `serve()` en donne un (ni `--call`, ni la recette, ni
-/// les tests, qui passent un fichier temporaire).
+/// Rendu reproductible (1.3.5) : à la fin de chaque retouche, les réglages principaux de la photo
+/// sont gardés, et une seconde retouche de la même photo, faite après un retour à l'origine
+/// (revert_to_original, une entrée « retour » de plus au journal), s'y compare : un écart au-delà
+/// des seuils se signale. Un style qui change d'un jour à l'autre n'est pas un style. La fin d'une
+/// retouche était photo_lesson ; depuis la 1.3.6 (la leçon retirée), c'est le view_photo avec
+/// compare = before_claude que les invites et les consignes demandent en dernier
+/// (`ToolHandler.noterLeRendu`). Gardés dans `rendus.json` ; seul `serve()` en donne un (ni
+/// `--call`, ni la recette, ni les tests, qui passent un fichier temporaire).
 public struct RegistreRendus {
     public let fichier: URL
 
@@ -52,17 +54,23 @@ public struct RegistreRendus {
         try ecrivain.encode(registre).write(to: fichier, options: .atomic)
     }
 
-    /// Garde le rendu de fin de retouche ; le compare au précédent de la même photo si une
-    /// nouvelle retouche est partie de l'origine depuis (plus de retours au journal). Le même
-    /// nombre de retours : la même retouche, qui a continué, remplace son rendu sans comparaison.
+    /// Garde le rendu d'une retouche et le compare à la fin de la retouche précédente de la même
+    /// photo. Une photo garde un rendu par série (une retouche, de son retour à l'origine au
+    /// suivant), le dernier de chacune, dans l'ordre : plus de retours au journal que le dernier
+    /// gardé, une nouvelle série commence ; autant (ou moins : le journal ne garde que ses
+    /// 200 dernières entrées), la même série a continué et son nouveau rendu remplace le dernier.
+    /// Dans les deux cas, le rendu se compare au dernier de la série d'avant, gardé tant qu'une
+    /// nouvelle série n'a pas commencé : un before_claude demandé en cours de retouche ne prend pas
+    /// la place de la fin de la précédente, et chaque before_claude de la série, le dernier
+    /// compris, dit l'écart du rendu courant. Rien à comparer pour la première série d'une photo.
+    /// Un fichier d'avant la 1.3.6 se relit tel quel : il gardait déjà le dernier rendu de chaque
+    /// série.
     func noter(_ rendu: Rendu) throws -> JSONValue? {
         var registre = lire()
         let cle = String(rendu.photo)
         var liste = registre[cle] ?? []
-        var comparaison: JSONValue?
-        if let precedent = liste.last {
-            if rendu.retours > precedent.retours { comparaison = Self.comparer(precedent, rendu) } else { liste.removeLast() }
-        }
+        if let dernier = liste.last, rendu.retours <= dernier.retours { liste.removeLast() }
+        let comparaison = liste.last.map { Self.comparer($0, rendu) }
         liste.append(rendu)
         registre[cle] = Array(liste.suffix(Self.parPhoto))
         if registre.count > Self.maxPhotos {
@@ -91,10 +99,36 @@ public struct RegistreRendus {
         let date = Sauvegardes.texte(avant.le)
         let lecture = tropGrands.isEmpty
             ? "Proche de la retouche précédente de cette photo (\(date)) : écarts sous les seuils, le rendu se reproduit."
-            : "Loin de la retouche précédente de cette photo (\(date)) : \(tropGrands.joined(separator: ", ")). Le dire à l'utilisateur : un style qui change d'un jour à l'autre n'est pas un style ; lui demander laquelle des deux suit son goût (et son guide de style)."
+            : "Loin de la retouche précédente de cette photo (\(date)) : \(tropGrands.joined(separator: ", ")). Si la retouche n'est pas finie, rejuger à sa fin ; sinon, le dire à l'utilisateur (un style qui change d'un jour à l'autre n'est pas un style) et lui demander laquelle des deux suit son goût (et son guide de style)."
         var resultat: [String: JSONValue] = ["precedente": .string(date), "ecarts": .array(ecarts), "lecture": .string(lecture),
                                              "reproductible": .bool(tropGrands.isEmpty)]
         if !tropGrands.isEmpty { resultat["trop_grands"] = .array(tropGrands.map(JSONValue.string)) }
         return .object(resultat)
+    }
+}
+
+extension ToolHandler {
+    /// Le journal d'une photo, pour compter ses retours à l'origine : quelques entrées à lire.
+    static let journalRenduTimeout: TimeInterval = 30
+
+    /// Le rendu de fin de retouche d'une photo (view_photo avec compare = before_claude), d'après la
+    /// réponse brute de la commande apercu : ses réglages à plat (l'état actuel, relu après le
+    /// retour de la comparaison) et son profil. Gardé à la place du rendu d'avant de la même
+    /// retouche, puis comparé à la fin de la retouche précédente de la même photo, celle d'avant
+    /// son dernier retour à l'origine (`RegistreRendus.noter`) : les retours (entrées « retour »)
+    /// se comptent au journal de la photo (commande journal, lecture seule). Nil sans photo
+    /// identifiée ni réglage lu, si le journal ou le registre échoue (l'outil réussit quand même),
+    /// ou quand il n'y a rien à comparer (la première retouche de la photo).
+    func noterLeRendu(apercu: JSONValue, registre: RegistreRendus, quand: Date = Date()) -> JSONValue? {
+        guard let id = apercu["photo"]?["id"]?.int else { return nil }
+        var reglages: [String: Double] = [:]
+        for cle in RegistreRendus.cles { if let valeur = apercu["reglages"]?[cle]?.double { reglages[cle] = valeur } }
+        guard !reglages.isEmpty,
+              let journal = try? lightroom.send("journal", ["photos": [.number(Double(id))]], timeout: Self.journalRenduTimeout) else { return nil }
+        let photos = journal["photos"]?.array ?? []
+        let entrees = (photos.first { $0["photo"]?["id"]?.int == id } ?? photos.first)?["entrees"]?.array ?? []
+        let retours = entrees.filter { $0["type"]?.string == "retour" }.count
+        let rendu = RegistreRendus.Rendu(photo: id, le: quand, reglages: reglages, profil: apercu["profil"]?.string, retours: retours)
+        return (try? registre.noter(rendu)) ?? nil
     }
 }

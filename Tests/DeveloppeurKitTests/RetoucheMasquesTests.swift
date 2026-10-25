@@ -371,6 +371,6 @@ final class RetoucheMasquesTests: XCTestCase {
         let names = tools.definitions.compactMap { $0["name"]?.string }
         XCTAssertTrue(names.contains("edit_mask"))
         XCTAssertEqual(names.count, ToolHandler.toolNames.count)
-        XCTAssertEqual(names.count, 36)
+        XCTAssertEqual(names.count, 35, "photo_lesson retiré en 1.3.6")
     }
 }

@@ -11,13 +11,14 @@ package.path = dossierTests .. '../../../Lightroom/Developpeur.lrplugin/?.lua;'
 require 'Simulation'
 
 -- Modules dont les champs changent pendant que Lightroom tourne (état de la liaison, préférences,
--- fenêtre de suivi) : un champ encore vide au chargement n'y est pas une erreur.
+-- fenêtre de la liaison) : un champ encore vide au chargement n'y est pas une erreur.
 local AVEC_ETAT = { Liaison = true, Preferences = true, Suivi = true }
 
 -- Champs d'état d'un module par ailleurs vérifié : posés pendant que Lightroom tourne (la
--- conversation ouverte de la fenêtre Claude, celle où Claude travaille, la dernière demande rapide),
+-- conversation ouverte de la fenêtre Claude, celle où Claude travaille, la dernière demande rapide,
+-- la conversation de la demande rapide en cours et la sélection de la dernière, correctif 1.3.6),
 -- vides au chargement.
-local CHAMPS_ETAT = { Moteur = { courante = true, enCours = true, rapide = true } }
+local CHAMPS_ETAT = { Moteur = { courante = true, enCours = true, rapide = true, tourRapide = true, selectionRapide = true } }
 
 -- Le code seul : commentaires et contenu des chaînes remplacés par des espaces (« Geometrie.lua »
 -- dans un commentaire n'est pas un champ lu). Les chaînes gardent leurs guillemets, pour require.

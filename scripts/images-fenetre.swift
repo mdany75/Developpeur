@@ -325,7 +325,7 @@ func texte(_ ctx: CGContext, _ s: String, _ police: NSFont, _ couleur: String, c
     ctx.restoreGState()
 }
 
-// Un segment des onglets Aperçu | Focus | Proposition | Note | Leçon (le contrôle de la maquette, coupé
+// Un segment des onglets Aperçu | Focus | Proposition | Note | Suivi (le contrôle de la maquette, coupé
 // segment par segment) : fond `fondSegment` et texte `texte` 12 (en claire, blanc et #1D1D1F), ou,
 // choisi, fond `bleuBouton` et texte `blanc` gras (600) 12 ; bord `bordSegment` en haut et en bas,
 // coins de 6 au bout gauche du premier et au bout droit du dernier ; un filet `filetSegment` au
@@ -371,20 +371,22 @@ func dessins(_ p: Palette) -> [String: Dessin] {
     }
 
     // Les fonds des cartes (#FAFAFA, bord #D9D9D9), coins de 6.
-    for nom in ["carte-note", "carte-proposition", "carte-etape", "carte-lecon", "carte-focus"] {
+    for nom in ["carte-note", "carte-proposition", "carte-etape", "carte-focus", "carte-suivi"] {
         d[nom] = pleine(fond: p["fondCarte"], bord: p["bordCarte"], rayon: 6)
     }
 
-    // Les segments, dans l'ordre de la maquette (Focus après Aperçu : demandé par Dany le 22 octobre 2026).
-    let segments = [("apercu", "Aperçu"), ("focus", "Focus"), ("proposition", "Proposition"), ("note", "Note"), ("lecon", "Leçon")]
+    // Les segments, dans l'ordre de la maquette (Focus après Aperçu : demandé par Dany le 22 octobre 2026 ;
+    // Suivi, le carnet de progrès, le dernier, à la place de Leçon au correctif 1.3.6).
+    let segments = [("apercu", "Aperçu"), ("focus", "Focus"), ("proposition", "Proposition"), ("note", "Note"),
+                    ("suivi", "Suivi")]
     for (i, (cle, titre)) in segments.enumerated() {
         let premier = i == 0, dernier = i == segments.count - 1
         d["seg-" + cle] = segment(titre, premier: premier, dernier: dernier, actif: false, p)
         d["seg-" + cle + "-actif"] = segment(titre, premier: premier, dernier: dernier, actif: true, p)
     }
 
-    // Le fond de la conversation choisie (#DADADA), coins de 5, sans bord.
-    d["selection"] = pleine(fond: p["selection"], bord: nil, rayon: 5)
+    // (Le fond de la conversation choisie et la loupe du champ Rechercher sont retirés avec le volet
+    // au correctif 1.3.6.)
 
     // Les pastilles des voyants : le vert de la maquette (#2DA44E), l'orange et le rouge des voyants
     // de la 1.2, et le gris du contour.
@@ -409,10 +411,6 @@ func dessins(_ p: Palette) -> [String: Dessin] {
 
     // La rangée des passes (coche-10, chevron-passe) et la ligne du plafond (avertissement) de la
     // carte Note sont retirées depuis le correctif 1.3.2 (demandé par Dany le 22 octobre 2026).
-
-    // La loupe devant le champ Rechercher (#6B6B6B ; bouts arrondis, jointures par défaut).
-    d["loupe"] = icone(boite: B16, couleur: p["gris"], trait: 1.6, jointures: .miter,
-                       traits: [cercle(7, 7, 4.3), trace("M10.2 10.2l3.3 3.3")])
 
     // Les icônes des boutons sans titre (#1D1D1F) : 📎 et 📋 de la saisie, ▲ ▼ de la barre du fil.
     d["trombone"] = icone(boite: B16, couleur: p["texte"], trait: 1.4, traits: [

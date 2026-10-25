@@ -42,8 +42,9 @@ final class MCPServerTests: XCTestCase {
         XCTAssertNil(try call(#"{"jsonrpc":"2.0","id":2,"method":"initialize","params":{}}"#)["result"]?["serverInfo"]?["title"], "sans titre donné, pas de title")
 
         let outils = try call(#"{"jsonrpc":"2.0","id":3,"method":"tools/list"}"#)["result"]?["tools"]?.array ?? []
-        XCTAssertEqual(outils.count, 36)
+        XCTAssertEqual(outils.count, 35)
         XCTAssertFalse(ToolHandler.toolNames.contains("expand_photo"))
+        XCTAssertFalse(ToolHandler.toolNames.contains("photo_lesson"), "la leçon de la photo est retirée (1.3.6)")
         let refus = try call(#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"expand_photo","arguments":{}}}"#)
         XCTAssertEqual(refus["error"]?["code"]?.int, JSONRPCError.invalidParams, "outil inconnu")
         let invites = (try call(#"{"jsonrpc":"2.0","id":5,"method":"prompts/list"}"#)["result"]?["prompts"]?.array ?? []).compactMap { $0["name"]?.string }
@@ -267,7 +268,8 @@ final class MCPServerTests: XCTestCase {
         XCTAssertNotNil(proprietes["preview"])
         XCTAssertTrue(proprietes["compare"]?["description"]?.string?.contains("bilan chiffré") == true)
         let viewPhoto = try XCTUnwrap(definitions.first { $0["name"] == "view_photo" })
-        XCTAssertEqual(viewPhoto["inputSchema"]?["properties"]?["compare"]?["enum"], ["before_claude", "previous_step", "claude_version"])
+        // claude_version (« Je le fais ») est retiré en 1.3.6.
+        XCTAssertEqual(viewPhoto["inputSchema"]?["properties"]?["compare"]?["enum"], ["before_claude", "previous_step"])
         XCTAssertTrue(DevelopCatalogue.keys.contains("PostCropVignetteAmount"))
     }
 
@@ -323,16 +325,20 @@ final class MCPServerTests: XCTestCase {
 
     // MARK: Socle de la 1.3
 
-    /// 1.3 : deux outils de plus, 36 en tout ; read_composition après measure_angle, photo_lesson à
-    /// la fin ; tous deux en lecture seule (ni les photos ni le catalogue ne changent), avec leur titre.
-    func testLesDeuxOutilsDeLa13() throws {
-        XCTAssertEqual(ToolHandler.toolNames.count, 36)
-        XCTAssertEqual(Set(ToolHandler.toolNames).count, 36, "pas de doublon")
+    /// 1.3 : deux outils de plus, read_composition et photo_lesson ; 1.3.6 : photo_lesson retiré,
+    /// 35 en tout. read_composition après measure_angle, en lecture seule (ni les photos ni le
+    /// catalogue ne changent), avec son titre ; match_series en dernier.
+    func testLOutilDeLa13() throws {
+        XCTAssertEqual(ToolHandler.toolNames.count, 35)
+        XCTAssertEqual(Set(ToolHandler.toolNames).count, 35, "pas de doublon")
         let mesure = try XCTUnwrap(ToolHandler.toolNames.firstIndex(of: "measure_angle"))
         XCTAssertEqual(ToolHandler.toolNames[mesure + 1], "read_composition")
-        XCTAssertEqual(ToolHandler.toolNames.last, "photo_lesson")
+        XCTAssertEqual(ToolHandler.toolNames.last, "match_series")
+        XCTAssertNil(ToolHandler.titles["photo_lesson"])
+        XCTAssertFalse(ToolHandler.readOnlyTools.contains("photo_lesson"))
         let outils = try call(#"{"jsonrpc":"2.0","id":3,"method":"tools/list"}"#)["result"]?["tools"]?.array ?? []
-        for (nom, titre) in [("read_composition", "Lire la composition"), ("photo_lesson", "Leçon de la photo")] {
+        XCTAssertNil(outils.first { $0["name"]?.string == "photo_lesson" })
+        for (nom, titre) in [("read_composition", "Lire la composition")] {
             let outil = try XCTUnwrap(outils.first { $0["name"]?.string == nom }, nom)
             XCTAssertEqual(outil["title"]?.string, titre)
             XCTAssertEqual(outil["annotations"]?["readOnlyHint"]?.bool, true, nom)
@@ -342,35 +348,47 @@ final class MCPServerTests: XCTestCase {
         XCTAssertEqual(ToolHandler.annotations("export_journal")["title"]?.string, "Journal et carnet de progrès")
     }
 
-    /// Les corps de read_composition et de photo_lesson sont faits (CompositionTests,
-    /// LeconTests) : un paramètre inconnu reste refusé avant tout envoi au module, pas même aux
-    /// registres notés à part.
+    /// Le corps de read_composition est fait (CompositionTests) : un paramètre inconnu reste refusé
+    /// avant tout envoi au module, pas même au registre noté à part. photo_lesson, retiré en 1.3.6,
+    /// est un outil inconnu : rien n'est envoyé.
     func testParametreInconnuDesOutilsDeLa13NEnvoieRien() throws {
         let tools = ToolHandler(lightroom: fake)
         let inconnu = tools.call(name: "read_composition", arguments: ["photo_ids": [1]])
         XCTAssertTrue(inconnu.text.contains("Paramètres inconnus pour read_composition : photo_ids (ici : « photo_id »)"), inconnu.text)
-        let lecon = tools.call(name: "photo_lesson", arguments: ["photo_ids": [1]])
-        XCTAssertTrue(lecon.isError && lecon.text.contains("Paramètres inconnus pour photo_lesson"), lecon.text)
+        let lecon = tools.call(name: "photo_lesson", arguments: ["read_facts": true])
+        XCTAssertTrue(lecon.isError && lecon.text.contains("Outil inconnu : photo_lesson"), lecon.text)
         XCTAssertTrue(fake.calls.isEmpty, "\(fake.commands)")
-        XCTAssertTrue(fake.lecons.isEmpty)
         XCTAssertTrue(fake.carnets.isEmpty)
     }
 
-    /// Le faux module note lecon et carnet à part, comme progression : les tests des outils voient
-    /// les mêmes commandes qu'avant ; une réponse ou une erreur préparée vaut pour elles.
-    func testLeFauxModuleNoteLeconEtCarnetAPart() throws {
-        fake.replies["lecon"] = ["rangee": true]
-        XCTAssertEqual(try fake.send("lecon", ["action": "garder"], timeout: 1)["rangee"]?.bool, true)
+    /// « Je le fais » est retiré en 1.3.6 : preview_settings n'a plus my_turn (refusé comme un
+    /// paramètre inconnu), view_photo refuse compare = claude_version ; rien n'est envoyé.
+    func testJeLeFaisRetire() throws {
+        let tools = ToolHandler(lightroom: fake)
+        let proposition = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "preview_settings" })
+        XCTAssertNil(proposition["inputSchema"]?["properties"]?["my_turn"])
+        XCTAssertFalse(JSONCoding.line(proposition).contains("Je le fais"))
+        let tour = tools.call(name: "preview_settings", arguments: ["my_turn": true, "settings": ["Exposure2012": 0.3]])
+        XCTAssertTrue(tour.isError && tour.text.contains("Paramètres inconnus pour preview_settings : my_turn"), tour.text)
+        let version = tools.call(name: "view_photo", arguments: ["compare": "claude_version"])
+        XCTAssertTrue(version.isError && version.text.contains("before_claude ou previous_step"), version.text)
+        XCTAssertTrue(fake.calls.isEmpty, "\(fake.commands)")
+        XCTAssertFalse(ToolHandler.descriptionRaisonProposition.contains("my_turn"))
+    }
+
+    /// Le faux module note carnet à part, comme progression : les tests des outils voient les mêmes
+    /// commandes qu'avant ; une réponse ou une erreur préparée vaut pour elles.
+    func testLeFauxModuleNoteLeCarnetAPart() throws {
         fake.errors["carnet"] = LightroomError.plugin("Commande inconnue : carnet")
         XCTAssertThrowsError(try fake.send("carnet", ["action": "lire"], timeout: 1))
         _ = try fake.send("etat", [:], timeout: 1)
         XCTAssertEqual(fake.commands, ["etat"])
-        XCTAssertEqual(fake.lecons.map { $0["action"]?.string }, ["garder"])
         XCTAssertEqual(fake.carnets.map { $0["action"]?.string }, ["lire"])
+        XCTAssertFalse(FakeLightroom.commandesAPart.contains("lecon"), "plus de commande lecon (1.3.6)")
     }
 
-    /// Seules les lectures pures se rejouent après une coupure : etapes oui ; lecon et carnet
-    /// écrivent carnet.json, non.
+    /// Seules les lectures pures se rejouent après une coupure : etapes oui ; carnet écrit
+    /// carnet.json, non (lecon, retirée en 1.3.6, ne s'y trouve pas).
     func testLecturesRejoueesDeLa13() {
         XCTAssertTrue(LightroomBridge.lectures.contains("etapes"))
         XCTAssertFalse(LightroomBridge.lectures.contains("lecon"))
@@ -435,24 +453,23 @@ final class MCPServerTests: XCTestCase {
         let consignes = ServerInfo.instructions
         XCTAssertTrue(consignes.contains("Recadrer (read_composition) seulement sur demande ou si la composition y gagne nettement, et le dire."))
         XCTAssertFalse(consignes.contains("Recadrer seulement sur demande"))
-        XCTAssertFalse(consignes.contains("photo_lesson"), "la leçon passe par sa description et les invites")
+        XCTAssertFalse(consignes.contains("photo_lesson"), "la leçon est retirée (1.3.6)")
         XCTAssertLessThanOrEqual(consignes.utf16.count, 3787, "\(consignes.utf16.count) caractères")
     }
 
-    /// La leçon finit chaque invite de retouche d'une photo, après le résumé ; ni une série, ni un
-    /// tri, ni une notation, ni une livraison n'en ont.
-    func testLesInvitesDeRetoucheFinissentParLaLecon() {
-        let phrase = Prompts.Lecon.phrase
-        XCTAssertLessThanOrEqual(phrase.count, 170, "\(phrase.count) caractères")
-        XCTAssertTrue(phrase.contains("photo_lesson"))
-        for prompt in [Prompts.retouchePro, Prompts.portrait, Prompts.paysage, Prompts.noirEtBlanc, Prompts.nuitIsoEleve] {
+    /// Les invites de retouche d'une photo finissent par le résumé (view_photo avec compare =
+    /// before_claude, où le rendu reproductible se garde) : plus de leçon depuis la 1.3.6. Ni une
+    /// série, ni un tri, ni une notation, ni une livraison ne lisent la composition.
+    func testLesInvitesDeRetoucheFinissentParLeResume() {
+        for prompt in [Prompts.retouchePro, Prompts.portrait, Prompts.paysage, Prompts.noirEtBlanc, Prompts.nuitIsoEleve, Prompts.aMaFacon] {
             let texte = prompt.render([:])
-            XCTAssertTrue(texte.hasSuffix(" " + phrase), "\(prompt.name) ne finit pas par la leçon")
-            XCTAssertEqual(texte.components(separatedBy: "photo_lesson").count, 2, "\(prompt.name) : une seule leçon")
-            let resume = texte.range(of: "compare = before_claude")?.lowerBound
-            let lecon = texte.range(of: phrase)?.lowerBound
-            XCTAssertNotNil(resume, prompt.name)
-            if let resume, let lecon { XCTAssertLessThan(resume, lecon, "\(prompt.name) : le résumé, puis la leçon") }
+            XCTAssertFalse(texte.contains("photo_lesson"), "\(prompt.name) : plus de leçon")
+            XCTAssertFalse(texte.lowercased().contains("leçon"), prompt.name)
+            XCTAssertTrue(texte.contains("compare = before_claude"), prompt.name)
+        }
+        for prompt in [Prompts.retouchePro, Prompts.portrait, Prompts.paysage, Prompts.noirEtBlanc, Prompts.nuitIsoEleve] {
+            XCTAssertTrue(prompt.render([:]).hasSuffix("ce qui reste à faire à la main dans Lightroom s'il y a lieu.")
+                          || prompt.render([:]).hasSuffix("ce qui reste à faire à la main dans Lightroom."), prompt.name)
         }
         for prompt in [Prompts.harmoniserSerie, Prompts.triSeance, Prompts.noter, Prompts.partage] {
             let texte = prompt.render([:])

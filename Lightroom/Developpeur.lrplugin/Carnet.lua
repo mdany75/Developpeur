@@ -1,12 +1,15 @@
--- Carnet.lua : le carnet de progrès et les leçons des photos (1.3), rangés dans carnet.json (à côté
--- de notation.json), à part du catalogue : rien n'y est écrit dans le catalogue, et aucune de ses
--- commandes n'est arrêtée par la pause de la liaison (elle n'arrête que les écritures dans le
--- catalogue). Commandes du serveur :
---   lecon  : garder (la leçon d'une photo : trois points, un par axe ; jamais celle d'une photo
---            d'essai, sauf essai_recette), lire, retirer ;
+-- Carnet.lua : le carnet de progrès (1.3), rangé dans carnet.json (à côté de notation.json), à part
+-- du catalogue : rien n'y est écrit dans le catalogue, et sa commande n'est pas arrêtée par la pause
+-- de la liaison (elle n'arrête que les écritures dans le catalogue). Commande du serveur :
 --   carnet : constater (les défauts de la prise de vue que le connecteur a mesurés : vue ou
 --            angle), lire (resume = true : avec le résumé, Carnet.resumer), retirer.
--- Elles écrivent carnet.json : le serveur ne les rejoue jamais (LightroomBridge.lectures).
+-- Elle écrit carnet.json : le serveur ne la rejoue jamais (LightroomBridge.lectures).
+--
+-- Les leçons des photos (1.3 à 1.3.5, retirées au correctif 1.3.6 avec photo_lesson) restent dans
+-- les entrées qui en ont : le registre les garde telles qu'il les a lues (table relue par
+-- Json.decode, jamais normalisée ni copiée), les réécrit telles quelles à chaque écriture du
+-- fichier, et ne les montre plus nulle part (ni la fenêtre, ni le serveur) : jamais perdues,
+-- même par retirer ou l'élagage (une entrée qui n'a plus qu'elles reste, sans compter au carnet).
 --
 -- Constats (carnet constater { photo, vue ou angle, vocabulaire, essai_recette? }) :
 --   vue   = { cherches = { codes }, defauts = { { code, mesure?, texte? } } } : les défauts
@@ -17,28 +20,26 @@
 --           read_composition) ; refusé seulement si la géométrie est touchée (recadrage tourné,
 --           Upright, perspective ou distorsion manuelle), pas après une passe de tonalité ;
 --   vocabulaire : la liste des défauts du connecteur (PriseDeVue.vocabulaire) ; les codes de la vue
---           et de l'angle doivent y être. Elle est rangée (la page du carnet en tire libellés et
---           conseils) : aucune liste de défauts n'est écrite dans ce module.
+--           et de l'angle doivent y être. Elle est rangée (la carte Suivi de la fenêtre en tire
+--           libellés et conseils) : aucune liste de défauts n'est écrite dans ce module.
 -- Tout constat est refusé si la case Carnet est décochée (préférence carnet), et pour une photo
 -- de « Développeur › Essais » (Carnet.estPhotoDEssai), sauf avec essai_recette = true, que seule la
 -- recette envoie : la photo d'essai a alors son entrée à elle, jamais celle de son original (une
 -- vraie photo), et retirer ne mène jamais d'une photo d'essai à l'entrée de son original. Une
--- nouvelle vue remplace l'ancienne, un nouvel angle aussi ; les leçons restent. La leçon d'une
--- photo d'essai n'est pas rangée non plus (lecon garder : rangee = false, 1.3.1), sauf avec
--- essai_recette, sous l'entrée de la photo d'essai elle-même.
+-- nouvelle vue remplace l'ancienne, un nouvel angle aussi ; les leçons d'avant restent.
 --
 -- Le résumé (Carnet.resumer) compte, pour chaque défaut et par mois de prise de vue (les six
 -- derniers qui ont des photos), les photos où il a été trouvé sur celles où il a été cherché ; il
 -- dit ce qui progresse ou recule, et quoi travailler à la prochaine sortie. Ses phrases ne sont
--- écrites qu'ici : la page du carnet (fenêtre) et export_journal (serveur) les reprennent.
+-- écrites qu'ici : la carte de l'onglet Suivi (fenêtre ; la page du carnet jusqu'au correctif
+-- 1.3.6) et export_journal (serveur) les reprennent.
 --
 -- Un seul fichier pour tous les catalogues : chacun garde sa table, sous son chemin (un
 -- identifiant de photo ne vaut que dans son catalogue) ; changer de catalogue ne fait rien perdre
 -- au premier (contrairement à notation.json). Dans un catalogue, une entrée par original
--- (masterPhoto) : une prise de vue ne compte qu'une fois, ses copies virtuelles comprises ; les
--- leçons de l'original et de ses copies y sont rangées, chacune sous l'identifiant de sa photo,
--- avec son uuid (une photo qui n'a plus cet uuid perd sa leçon). Au-delà de Carnet.MAX_PHOTOS
--- originaux dans un catalogue, les entrées les plus anciennes (champ le) sortent.
+-- (masterPhoto) : une prise de vue ne compte qu'une fois, ses copies virtuelles comprises. Au-delà
+-- de Carnet.MAX_PHOTOS originaux qui ont des constats dans un catalogue, les plus anciens (champ
+-- le) perdent les leurs (et sortent, sauf leurs leçons d'avant).
 --
 -- Format 1 :
 --   { format = 1, vocabulaire = { { code, cle, axe, domaine, libelle, conseil, mesure } } (le
@@ -48,11 +49,8 @@
 --     prise ('AAAA-MM', heure locale), prise_le ('AAAA-MM-JJ HH:MM'), sans_date (vrai sans date de prise de vue : la photo compte alors au
 --     mois du constat), le (dernier changement, os.time), vue { le, photo (id de la photo
 --     mesurée, copie virtuelle comprise), cherches = { codes }, defauts = { { code, mesure, texte }
---     } }, angle { le, photo, inclinaison, code, source }, lecons = { ['<id de la photo>'] = leçon } }
---   leçon : { photo, uuid, fichier, le, points = { { axe ('lumiere', 'couleur', 'composition'),
---     manque (rien ne manquait s'il est absent), prise_de_vue, defauts = { { code, libelle } } } }
---     (dans l'ordre des axes), defauts (les codes des trois points), indices = { { code, axe,
---     libelle, preuve } } }
+--     } }, angle { le, photo, inclinaison, code, source }, lecons? (les leçons d'avant le
+--     correctif 1.3.6, { ['<id de la photo>'] = leçon }, gardées telles quelles) }
 -- Un fichier illisible (ou d'un autre format) est mis de côté avant la première écriture
 -- (carnet-illisible-<date>.json), jamais écrasé.
 --
@@ -81,17 +79,14 @@ local Carnet = {
 }
 
 Carnet.FORMAT = 1
--- Originaux au plus par catalogue ; les plus anciens (champ le) sortent au-delà.
+-- Originaux qui ont des constats, au plus, par catalogue ; les plus anciens (champ le) sortent
+-- au-delà.
 Carnet.MAX_PHOTOS = 3000
--- Les trois axes d'une leçon, dans leur ordre (codes de PriseDeVue.swift, côté serveur).
-Carnet.AXES = { 'lumiere', 'couleur', 'composition' }
--- Bornes de ce que le serveur envoie (il en vérifie de plus strictes) : codes de défauts par
--- point, indices par leçon, longueurs en octets (UTF-8).
+-- Bornes de ce que le serveur envoie (il en vérifie de plus strictes) : codes de défauts d'une
+-- vue, longueurs en octets (UTF-8).
 Carnet.MAX_CODES = 12
-Carnet.MAX_INDICES = 20
 Carnet.LONGUEUR_TEXTE = 600
 Carnet.LONGUEUR_LIBELLE = 200
-Carnet.LONGUEUR_PREUVE = 400
 -- Constats : défauts du vocabulaire au plus, longueur du texte d'un défaut trouvé (« ciel brûlé :
 -- 4,2 % du tiers haut en blanc pur »), en octets.
 Carnet.MAX_VOCABULAIRE = 40
@@ -117,12 +112,12 @@ Carnet.MIN_A_TRAVAILLER = 2
 Carnet.MAX_A_TRAVAILLER = 3
 Carnet.PHOTOS_SUFFISANTES = 5
 
--- Les mois en français : nom entier et abrégé (colonnes du tableau de la page du carnet).
+-- Les mois en français : nom entier et abrégé (les mois de la carte Suivi, la légende de l'aperçu).
 Carnet.MOIS = { 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre',
     'novembre', 'décembre' }
 Carnet.MOIS_COURTS = { 'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.' }
 
--- Titres du résumé, repris par la page du carnet et par export_journal.
+-- Titres du résumé, repris par la carte Suivi de la fenêtre et par export_journal.
 Carnet.TITRES = {
     carnet = "Carnet de progrès",
     defaut = "Défaut",
@@ -131,15 +126,14 @@ Carnet.TITRES = {
     a_travailler = "À travailler à la prochaine sortie",
 }
 
-local AXE_CONNU = {}
-for i, axe in ipairs(Carnet.AXES) do
-    AXE_CONNU[axe] = i
-end
-
 -- Clés des listes : des tableaux JSON, même vides, vers le serveur et dans le fichier (registre et
--- résumé). Jamais `photos`, qui est une table par identifiant dans le registre.
-local LISTES = { points = true, defauts = true, indices = true, cherches = true, mois = true, par_mois = true,
-    progresse = true, recule = true, a_travailler = true }
+-- résumé). Jamais `photos`, qui est une table par identifiant dans le registre. Les leçons d'avant
+-- gardent, elles, les tableaux que Json.decode y a marqués (versJson).
+local LISTES = { defauts = true, cherches = true, mois = true, par_mois = true, progresse = true, recule = true,
+    a_travailler = true }
+
+-- La marque des tableaux JSON (Json.tableau), qu'une table relue par Json.decode porte aussi.
+local MARQUE_TABLEAU = getmetatable(Json.tableau())
 
 local function echouer(message)
     error(message, 0)
@@ -166,7 +160,8 @@ local function copie(valeur)
     return t
 end
 
--- Copie pour Json.encode : les listes (LISTES) marquées tableaux, même vides.
+-- Copie pour Json.encode : les listes (LISTES), et les tables déjà marquées tableaux (les leçons
+-- d'avant, relues par Json.decode), marquées tableaux, même vides.
 local function versJson(valeur, cle)
     if type(valeur) ~= 'table' or valeur == Json.null then
         return valeur
@@ -175,10 +170,23 @@ local function versJson(valeur, cle)
     for k, element in pairs(valeur) do
         t[k] = versJson(element, k)
     end
-    if LISTES[cle] then
+    if LISTES[cle] or getmetatable(valeur) == MARQUE_TABLEAU then
         return Json.tableau(t)
     end
     return t
+end
+
+-- L'entrée a-t-elle des constats (une vue ou un angle) ? Une entrée qui n'a plus que ses leçons
+-- d'avant n'est plus au carnet : ni montrée, ni comptée, ni envoyée au serveur.
+local function aDesConstats(e)
+    return e ~= nil and (e.vue ~= nil or e.angle ~= nil)
+end
+
+-- Copie neuve d'une entrée pour une vue, sans ses leçons d'avant (plus montrées).
+local function copieEntree(e)
+    local r = copie(e)
+    r.lecons = nil
+    return r
 end
 
 -- Clé d'une photo : un texte (Json.decode rend des clés texte).
@@ -202,22 +210,6 @@ local function cheminCatalogue()
 end
 
 -- Relecture ----------------------------------------------------------------------------
-
-local function normaliserLecon(l, cle)
-    if type(l) ~= 'table' then
-        return nil
-    end
-    local photo = tonumber(l.photo) or tonumber(cle)
-    if not photo or type(l.points) ~= 'table' then
-        return nil
-    end
-    local propre = copie(l)
-    propre.photo = photo
-    propre.le = tonumber(l.le) or 0
-    propre.defauts = type(propre.defauts) == 'table' and propre.defauts or {}
-    propre.indices = type(propre.indices) == 'table' and propre.indices or {}
-    return propre
-end
 
 -- Une vue relue : des codes en texte, des défauts avec leur code.
 local function normaliserVue(v)
@@ -275,13 +267,12 @@ local function normaliserEntree(e, cle)
         prise_le = texte(e.prise_le), sans_date = e.sans_date == true or nil, le = tonumber(e.le) or 0,
         vue = normaliserVue(e.vue),
         angle = normaliserAngle(e.angle),
-        lecons = {},
+        -- Les leçons d'avant, telles que Json.decode les a rendues (tableaux marqués compris) :
+        -- rien ne les lit plus, enregistrer les réécrit à l'identique.
+        lecons = type(e.lecons) == 'table' and e.lecons ~= Json.null and next(e.lecons) ~= nil and e.lecons or nil,
     }
-    for cleLecon, l in pairs(type(e.lecons) == 'table' and e.lecons or {}) do
-        local lecon = normaliserLecon(l, cleLecon)
-        if lecon then
-            propre.lecons[cleDe(lecon.photo)] = lecon
-        end
+    if not aDesConstats(propre) and not propre.lecons then
+        return nil
     end
     return propre
 end
@@ -358,11 +349,14 @@ local function catalogueOuvert(creer)
     return tableDu(chemin, creer), chemin
 end
 
--- Les entrées les plus anciennes (champ le) d'un catalogue, au-delà de MAX_PHOTOS.
+-- Les entrées les plus anciennes (champ le) d'un catalogue qui ont des constats, au-delà de
+-- MAX_PHOTOS : leurs constats sortent, et l'entrée avec eux, sauf ses leçons d'avant.
 local function elaguer(c)
     local entrees = {}
     for cle, e in pairs(c.photos) do
-        entrees[#entrees + 1] = { cle = cle, le = tonumber(e.le) or 0, photo = tonumber(cle) or 0 }
+        if aDesConstats(e) then
+            entrees[#entrees + 1] = { cle = cle, le = tonumber(e.le) or 0, photo = tonumber(cle) or 0 }
+        end
     end
     if #entrees > Carnet.MAX_PHOTOS then
         table.sort(entrees, function(a, b)
@@ -372,7 +366,11 @@ local function elaguer(c)
             return a.photo < b.photo
         end)
         for i = 1, #entrees - Carnet.MAX_PHOTOS do
-            c.photos[entrees[i].cle] = nil
+            local e = c.photos[entrees[i].cle]
+            e.vue, e.angle = nil, nil
+            if not e.lecons then
+                c.photos[entrees[i].cle] = nil
+            end
         end
     end
 end
@@ -415,7 +413,7 @@ function Carnet.desabonner(nom)
     Carnet.observateurs[nom] = nil
 end
 
--- quoi : 'lecon', 'constat', 'retrait'.
+-- quoi : 'constat', 'retrait'.
 function Carnet.signaler(quoi)
     for _, fn in pairs(Carnet.observateurs) do
         pcall(fn, quoi)
@@ -432,50 +430,42 @@ end
 
 -- Lectures pour la fenêtre (copies neuves) ----------------------------------------------------
 
--- Les entrées du catalogue ouvert, triées par identifiant de l'original.
-function Carnet.entrees()
-    local c = catalogueOuvert(false)
+-- Les clés des entrées du catalogue ouvert qui ont des constats, triées par identifiant de
+-- l'original.
+local function clesAvecConstats(c)
     local cles = {}
-    for cle in pairs(c.photos) do
-        cles[#cles + 1] = cle
+    for cle, e in pairs(c.photos) do
+        if aDesConstats(e) then
+            cles[#cles + 1] = cle
+        end
     end
     table.sort(cles, function(a, b) return (tonumber(a) or 0) < (tonumber(b) or 0) end)
+    return cles
+end
+
+-- Les entrées du catalogue ouvert (celles qui ont des constats), triées par identifiant de
+-- l'original, sans leurs leçons d'avant.
+function Carnet.entrees()
+    local c = catalogueOuvert(false)
     local liste = {}
-    for _, cle in ipairs(cles) do
-        liste[#liste + 1] = copie(c.photos[cle])
+    for _, cle in ipairs(clesAvecConstats(c)) do
+        liste[#liste + 1] = copieEntree(c.photos[cle])
     end
     return liste
 end
 
--- L'entrée d'un original (identifiant de l'original), ou nil.
+-- L'entrée d'un original (identifiant de l'original), sans ses leçons d'avant ; nil sans constat.
 function Carnet.entree(idOriginal)
     if idOriginal == nil then
         return nil
     end
-    return copie(catalogueOuvert(false).photos[cleDe(idOriginal)])
+    local e = catalogueOuvert(false).photos[cleDe(idOriginal)]
+    return aDesConstats(e) and copieEntree(e) or nil
 end
 
--- La leçon d'une photo (original ou copie virtuelle), ou nil.
-function Carnet.lecon(idPhoto)
-    if idPhoto == nil then
-        return nil
-    end
-    local cle = cleDe(idPhoto)
-    for _, e in pairs(catalogueOuvert(false).photos) do
-        if e.lecons[cle] then
-            return copie(e.lecons[cle])
-        end
-    end
-    return nil
-end
-
--- Nombre d'originaux au carnet du catalogue ouvert (diagnostic).
+-- Nombre d'originaux au carnet du catalogue ouvert (ceux qui ont des constats ; diagnostic).
 function Carnet.nombre()
-    local n = 0
-    for _ in pairs(catalogueOuvert(false).photos) do
-        n = n + 1
-    end
-    return n
+    return #clesAvecConstats(catalogueOuvert(false))
 end
 
 -- Le dernier vocabulaire reçu du connecteur (libellés, domaines, conseils), dans son ordre ; une
@@ -541,9 +531,9 @@ local function datesPrise(photo)
 end
 
 -- Ce que le registre garde d'une photo et de son original, lu avant d'y toucher : ces lectures
--- passent par le catalogue (la tâche peut rendre la main), et une autre commande (retirer, une
--- lecture qui perd une leçon) ne doit jamais voir une entrée à moitié faite. `original` : la photo
--- dont l'entrée reçoit (par défaut l'original ; une photo d'essai elle-même, voir constater).
+-- passent par le catalogue (la tâche peut rendre la main), et une autre commande (retirer) ne doit
+-- jamais voir une entrée à moitié faite. `original` : la photo dont l'entrée reçoit (par défaut
+-- l'original ; une photo d'essai elle-même, voir constater).
 local function lirePhoto(photo, original)
     original = original or originalDe(photo)
     local prise, priseLe = datesPrise(original)
@@ -555,13 +545,14 @@ local function lirePhoto(photo, original)
 end
 
 -- L'entrée de l'original (lu par lirePhoto) dans la table d'un catalogue, créée au besoin. Une
--- entrée d'un autre uuid (une autre photo sous ce numéro) est remplacée. L'uuid, le fichier et la
--- date de prise de vue sont repris à chaque fois. Sans lecture du catalogue.
+-- entrée d'un autre uuid (une autre photo sous ce numéro) est remplacée, ses constats oubliés,
+-- jamais ses leçons d'avant, qui restent (elles ne se lisent plus). L'uuid, le fichier et la date de
+-- prise de vue sont repris à chaque fois. Sans lecture du catalogue.
 local function entreeDe(c, lu)
     local cle = cleDe(lu.original)
     local e = c.photos[cle]
     if not e or (e.uuid and lu.uuidOriginal and e.uuid ~= lu.uuidOriginal) then
-        e = { photo = lu.original, lecons = {}, le = os.time() }
+        e = { photo = lu.original, le = os.time(), lecons = e and e.lecons or nil }
         c.photos[cle] = e
     end
     e.uuid = lu.uuidOriginal
@@ -571,41 +562,16 @@ local function entreeDe(c, lu)
     return e
 end
 
--- Retire l'entrée qui n'a plus rien (ni vue, ni angle, ni leçon).
-local function retirerSiVide(c, cle)
-    local e = c.photos[cle]
-    if e and not e.vue and not e.angle and next(e.lecons) == nil then
-        c.photos[cle] = nil
-    end
-end
-
--- Une entrée pour le serveur : les leçons en liste (par photo), les listes en tableaux JSON, sans
--- les uuid.
+-- Une entrée pour le serveur : ses constats, les listes en tableaux JSON, sans l'uuid ni les
+-- leçons d'avant.
 local function entreePourServeur(e)
     local r = versJson(e)
     r.uuid = nil
-    local lecons = {}
-    for _, l in pairs(e.lecons) do
-        local lecon = versJson(l)
-        lecon.uuid = nil
-        lecons[#lecons + 1] = lecon
-    end
-    table.sort(lecons, function(a, b) return a.photo < b.photo end)
-    r.lecons = Json.tableau(lecons)
+    r.lecons = nil
     return r
 end
 
--- Une leçon pour le serveur, avec l'original et la prise de vue de son entrée.
-local function leconPourServeur(l, e)
-    local r = versJson(l)
-    r.uuid = nil
-    r.original = e.photo
-    r.mois = e.prise
-    r.prise_le = e.prise_le
-    return r
-end
-
--- Leçons : validation ---------------------------------------------------------------------------
+-- Validation ------------------------------------------------------------------------------------
 
 local function borne(valeur, max, quoi)
     if valeur == nil or valeur == Json.null then
@@ -625,238 +591,6 @@ local function code(valeur, quoi)
         echouer(string.format("%s : code de défaut invalide « %s » (lettres minuscules et _).", quoi, tostring(valeur)))
     end
     return valeur
-end
-
-local function axe(valeur, quoi)
-    if not AXE_CONNU[valeur] then
-        echouer(string.format("%s : axe inconnu « %s » (lumiere, couleur ou composition).", quoi, tostring(valeur)))
-    end
-    return valeur
-end
-
--- Les trois points d'une leçon, vérifiés et rangés dans l'ordre des axes.
-local function pointsValides(points)
-    if type(points) ~= 'table' or #points ~= #Carnet.AXES then
-        echouer("Leçon : trois points, un par axe (lumiere, couleur, composition).")
-    end
-    local parAxe = {}
-    for _, p in ipairs(points) do
-        if type(p) ~= 'table' then
-            echouer("Leçon : chaque point est un objet { axe, manque, prise_de_vue, defauts }.")
-        end
-        local a = axe(p.axe, "Leçon")
-        if parAxe[a] then
-            echouer(string.format("Leçon : l'axe « %s » est donné deux fois (un point par axe).", a))
-        end
-        local quoi = "Leçon, axe " .. a
-        local priseDeVue = borne(p.prise_de_vue, Carnet.LONGUEUR_TEXTE, quoi .. ", prise_de_vue")
-        if not priseDeVue then
-            echouer(quoi .. " : prise_de_vue manque (ce qui l'aurait évité, ou ce qui a marché, à la prise de vue).")
-        end
-        local defauts = p.defauts
-        if defauts == nil or defauts == Json.null then
-            defauts = {}
-        elseif type(defauts) ~= 'table' then
-            echouer(quoi .. " : defauts est une liste.")
-        end
-        if #defauts > Carnet.MAX_CODES then
-            echouer(string.format("%s : %d défauts, %d au plus.", quoi, #defauts, Carnet.MAX_CODES))
-        end
-        local propres = {}
-        for _, d in ipairs(defauts) do
-            if type(d) == 'table' then
-                propres[#propres + 1] = { code = code(d.code, quoi),
-                    libelle = borne(d.libelle, Carnet.LONGUEUR_LIBELLE, quoi .. ", libellé") }
-            else
-                propres[#propres + 1] = { code = code(d, quoi) }
-            end
-        end
-        parAxe[a] = { axe = a, manque = borne(p.manque, Carnet.LONGUEUR_TEXTE, quoi .. ", manque"),
-            prise_de_vue = priseDeVue, defauts = propres }
-    end
-    local ranges = {}
-    for i, a in ipairs(Carnet.AXES) do
-        ranges[i] = parAxe[a]
-    end
-    return ranges
-end
-
-local function indicesValides(indices)
-    if indices == nil or indices == Json.null then
-        return {}
-    end
-    if type(indices) ~= 'table' then
-        echouer("Leçon : indices est une liste.")
-    end
-    if #indices > Carnet.MAX_INDICES then
-        echouer(string.format("Leçon : %d indices, %d au plus.", #indices, Carnet.MAX_INDICES))
-    end
-    local propres = {}
-    for _, d in ipairs(indices) do
-        if type(d) ~= 'table' then
-            echouer("Leçon : chaque indice est un objet { code, axe, libelle, preuve }.")
-        end
-        propres[#propres + 1] = {
-            code = code(d.code, "Leçon, indice"),
-            axe = (d.axe ~= nil and d.axe ~= Json.null) and axe(d.axe, "Leçon, indice") or nil,
-            libelle = borne(d.libelle, Carnet.LONGUEUR_LIBELLE, "Leçon, indice, libellé"),
-            preuve = borne(d.preuve, Carnet.LONGUEUR_PREUVE, "Leçon, indice, preuve"),
-        }
-    end
-    return propres
-end
-
--- Commande lecon --------------------------------------------------------------------------------
-
--- garder { photo?, lecon = { points, indices? }, essai_recette? } : la leçon de la photo (la photo
--- active sans photo), rangée sous l'entrée de son original ; la nouvelle remplace l'ancienne. Tout
--- est vérifié avant de toucher au registre. Une photo de « Développeur › Essais » n'y entre pas
--- (1.3.1 : la leçon de la dune d'essai était rangée sous son original, une vraie photo de Dany) :
--- rangee = false, avec la raison, jamais une erreur (photo_lesson le dit sans échouer) ; sauf avec
--- essai_recette = true, que seule la recette envoie, comme pour constater : la photo d'essai a
--- alors son entrée à elle, jamais celle de son original.
-local function garder(params)
-    local lecon = params.lecon
-    if type(lecon) ~= 'table' then
-        echouer("Leçon manquante : donner lecon = { points, indices? }.")
-    end
-    local points = pointsValides(lecon.points)
-    local indices = indicesValides(lecon.indices)
-    local photo = Photos.photoVisee(params)
-    local essai = Carnet.estPhotoDEssai(photo)
-    if essai and params.essai_recette ~= true then
-        return {
-            photo = photo.localIdentifier, fichier = Photos.nomFichier(photo), rangee = false, remplacee = false, motif = 'essai',
-            remarque = "Leçon non rangée : photo d'essai (Développeur › Essais) ; le carnet de progrès ne compte que les vraies "
-                .. "prises de vue. La leçon de cette réponse reste valable.",
-        }
-    end
-    local lu = lirePhoto(photo, essai and photo or nil)
-    local chemin = cheminCatalogue()
-    -- Plus aucune lecture du catalogue jusqu'au fichier écrit : le registre change d'un coup.
-    local e = entreeDe(tableDu(chemin, true), lu)
-    local cle = cleDe(lu.id)
-    local ancienne = e.lecons[cle]
-    local remplacee = ancienne ~= nil and (ancienne.uuid == nil or lu.uuid == nil or ancienne.uuid == lu.uuid)
-    local codes, vus = {}, {}
-    for _, p in ipairs(points) do
-        for _, d in ipairs(p.defauts) do
-            if not vus[d.code] then
-                vus[d.code] = true
-                codes[#codes + 1] = d.code
-            end
-        end
-    end
-    local maintenant = os.time()
-    e.lecons[cle] = { photo = lu.id, uuid = lu.uuid, fichier = lu.fichier, le = maintenant,
-        points = points, defauts = codes, indices = indices }
-    e.le = maintenant
-    Liaison.noter("Leçon rangée : " .. lu.fichier, lu.id)
-    local ok, raison = changer('lecon')
-    return {
-        photo = lu.id, original = lu.original, fichier = lu.fichier,
-        rangee = true, remplacee = remplacee, mois = e.prise, prise_le = e.prise_le, sans_date = e.sans_date,
-        remarque = not ok and ("Leçon gardée pour cette session, carnet.json non écrit : " .. tostring(raison)) or nil,
-    }
-end
-
--- Identifiants donnés (photo ou photos), en clés.
-local function clesDonnees(params)
-    local cles = {}
-    if type(params.photos) == 'table' then
-        for _, id in ipairs(params.photos) do
-            cles[#cles + 1] = cleDe(id)
-        end
-    end
-    if params.photo ~= nil then
-        cles[#cles + 1] = cleDe(params.photo)
-    end
-    return cles
-end
-
--- La photo d'une leçon est-elle encore celle-là (même uuid) ?
-local function encoreLaPhoto(l)
-    local ok, photo = LrTasks.pcall(Photos.photoParId, l.photo)
-    return ok and (l.uuid == nil or Photos.brut(photo, 'uuid') == l.uuid)
-end
-
--- lire { photos? } : les leçons de ces photos (vérifiées : une photo disparue, ou d'un autre uuid,
--- perd la sienne), ou toutes celles du catalogue ouvert, sans vérifier chaque photo.
-local function lireLecons(params)
-    local c = catalogueOuvert(false)
-    local voulues
-    local cles = clesDonnees(params)
-    if #cles > 0 then
-        voulues = {}
-        for _, cle in ipairs(cles) do
-            voulues[cle] = true
-        end
-    end
-    -- Relevées d'abord : la vérification lit le catalogue (la tâche peut rendre la main), jamais
-    -- pendant un parcours du registre.
-    local candidates = {}
-    for cleEntree, e in pairs(c.photos) do
-        for cle, l in pairs(e.lecons) do
-            if not voulues or voulues[cle] then
-                candidates[#candidates + 1] = { cleEntree = cleEntree, cle = cle, entree = e, lecon = l }
-            end
-        end
-    end
-    local trouvees, perdues = {}, 0
-    for _, x in ipairs(candidates) do
-        if voulues and not encoreLaPhoto(x.lecon) then
-            if x.entree.lecons[x.cle] == x.lecon then
-                x.entree.lecons[x.cle] = nil
-                retirerSiVide(c, x.cleEntree)
-            end
-            perdues = perdues + 1
-        else
-            trouvees[#trouvees + 1] = leconPourServeur(x.lecon, x.entree)
-        end
-    end
-    if perdues > 0 then
-        changer('retrait')
-    end
-    table.sort(trouvees, function(a, b) return a.photo < b.photo end)
-    return { lecons = Json.tableau(trouvees), perdues = perdues > 0 and perdues or nil }
-end
-
--- retirer { photo? | photos } : les leçons de ces photos (l'entrée de l'original part avec la
--- dernière, si elle n'a ni vue ni angle). Pour la recette, qui ne laisse rien au carnet.
-local function retirerLecons(params)
-    local cles = clesDonnees(params)
-    if #cles == 0 then
-        echouer("Leçon à retirer : donner photo ou photos.")
-    end
-    local c = catalogueOuvert(false)
-    local retirees = 0
-    for _, cle in ipairs(cles) do
-        for cleEntree, e in pairs(c.photos) do
-            if e.lecons[cle] then
-                e.lecons[cle] = nil
-                retirerSiVide(c, cleEntree)
-                retirees = retirees + 1
-            end
-        end
-    end
-    if retirees > 0 then
-        Liaison.noter(string.format("Leçon%s retirée%s du carnet : %d", retirees > 1 and "s" or "", retirees > 1 and "s" or "", retirees))
-        changer('retrait')
-    end
-    return { retirees = retirees }
-end
-
--- Commande lecon du serveur : garder, lire ou retirer. Rien n'est écrit dans le catalogue.
-function Carnet.commandeLecon(params)
-    local action = params.action
-    if action == 'garder' then
-        return garder(params)
-    elseif action == 'lire' then
-        return lireLecons(params)
-    elseif action == 'retirer' then
-        return retirerLecons(params)
-    end
-    echouer("Action de la leçon inconnue : " .. tostring(action) .. " (garder, lire ou retirer).")
 end
 
 -- Constats : validation -------------------------------------------------------------------------
@@ -1398,8 +1132,8 @@ function Carnet.resumer(maintenant)
 end
 
 -- Les photos où un défaut a été trouvé, dans les mois du résumé (au même moment) : le plus récent
--- d'abord. { { original, photo (la photo mesurée), fichier, mois, mois_libelle, mesure, texte,
--- lecons = { leçons de l'entrée } } }, des tables neuves (la fenêtre de ce défaut).
+-- d'abord. { { original, photo (la photo mesurée), fichier, mois, mois_libelle, mesure, texte } },
+-- des tables neuves (la fenêtre de ce défaut).
 function Carnet.photosDuDefaut(codeDefaut, maintenant)
     local sel = selection(tonumber(maintenant) or os.time())
     local trouvees = {}
@@ -1408,13 +1142,8 @@ function Carnet.photosDuDefaut(codeDefaut, maintenant)
             local t = x.trouves[codeDefaut]
             if t then
                 local e = x.entree
-                local lecons = {}
-                for _, l in pairs(e.lecons) do
-                    lecons[#lecons + 1] = copie(l)
-                end
-                table.sort(lecons, function(a, b) return a.photo < b.photo end)
                 trouvees[#trouvees + 1] = { original = e.photo, photo = t.photo or e.photo, fichier = e.fichier, mois = cle,
-                    mois_libelle = decrireMois(cle).libelle, mesure = t.mesure, texte = t.texte, lecons = lecons }
+                    mois_libelle = decrireMois(cle).libelle, mesure = t.mesure, texte = t.texte }
             end
         end
     end
@@ -1433,17 +1162,12 @@ end
 -- Commande carnet -------------------------------------------------------------------------------
 
 -- lire { resume? } : { catalogue (son nom), nombre, photos, resume? } : les entrées du catalogue
--- ouvert, leçons comprises (en liste), sans vérifier chaque photo ; avec resume = true, le résumé
--- (Carnet.resumer), ses listes en tableaux JSON.
+-- ouvert qui ont des constats (sans les leçons d'avant), sans vérifier chaque photo ; avec
+-- resume = true, le résumé (Carnet.resumer), ses listes en tableaux JSON.
 local function lireCarnet(params)
     local c, chemin = catalogueOuvert(false)
-    local cles = {}
-    for cle in pairs(c.photos) do
-        cles[#cles + 1] = cle
-    end
-    table.sort(cles, function(a, b) return (tonumber(a) or 0) < (tonumber(b) or 0) end)
     local photos = {}
-    for _, cle in ipairs(cles) do
+    for _, cle in ipairs(clesAvecConstats(c)) do
         photos[#photos + 1] = entreePourServeur(c.photos[cle])
     end
     -- Le nom du catalogue, comme la commande etat : jamais son chemin (la réponse va à Claude).
@@ -1451,11 +1175,12 @@ local function lireCarnet(params)
         resume = params.resume == true and versJson(Carnet.resumer(os.time())) or nil }
 end
 
--- retirer { photos } : les entrées de ces photos (l'identifiant d'un original, ou d'une copie
--- virtuelle : l'entrée de son original), leçons comprises. Une photo d'essai sans entrée à elle
--- ne mène jamais à celle de son original (une vraie photo) : la recette retire ce qu'elle a
--- constaté, et rien d'autre, même après un constat refusé. Les photos sont lues d'abord (la tâche
--- peut rendre la main), puis le registre change d'un coup.
+-- retirer { photos } : les constats de ces photos (l'identifiant d'un original, ou d'une copie
+-- virtuelle : l'entrée de son original) ; l'entrée part avec eux, sauf ses leçons d'avant, qui
+-- restent (jamais perdues). Une photo d'essai sans entrée à elle ne mène jamais à celle de son
+-- original (une vraie photo) : la recette retire ce qu'elle a constaté, et rien d'autre, même après
+-- un constat refusé. Les photos sont lues d'abord (la tâche peut rendre la main), puis le registre
+-- change d'un coup.
 local function retirerDuCarnet(params)
     local ids = {}
     for _, id in ipairs(type(params.photos) == 'table' and params.photos or {}) do
@@ -1471,7 +1196,7 @@ local function retirerDuCarnet(params)
     local cles = {}
     for i, id in ipairs(ids) do
         local cle = cleDe(id)
-        if not tableDu(chemin, false).photos[cle] then
+        if not aDesConstats(tableDu(chemin, false).photos[cle]) then
             local ok, photo = LrTasks.pcall(Photos.photoParId, id)
             if ok and not Carnet.estPhotoDEssai(photo) then
                 cle = cleDe(originalDe(photo).localIdentifier)
@@ -1483,8 +1208,12 @@ local function retirerDuCarnet(params)
     local retirees, absentes = 0, Json.tableau()
     for i, id in ipairs(ids) do
         local cle = cles[i]
-        if c.photos[cle] then
-            c.photos[cle] = nil
+        local e = c.photos[cle]
+        if aDesConstats(e) then
+            e.vue, e.angle = nil, nil
+            if not e.lecons then
+                c.photos[cle] = nil
+            end
             retirees = retirees + 1
         else
             absentes[#absentes + 1] = tonumber(id) or id

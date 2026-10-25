@@ -17,7 +17,7 @@
 -- du Mac ne peut plus rien faire faire au module ; un programme de l'utilisateur lui-même, qui
 -- peut lire le fichier, le pourrait encore. Le jeton n'est jamais journalisé ni renvoyé.
 -- `depuisLightroom` (pause et accord dans Lightroom levés) ne vient jamais du réseau : seuls les
--- menus, la fenêtre de suivi et la carte Note le posent, par appel direct.
+-- menus, la fenêtre de la liaison et la carte Note le posent, par appel direct.
 --
 -- La prise des réponses ne lit jamais : elle ne voit pas le serveur partir et resterait
 -- accrochée à une connexion morte. Quand la prise des commandes se ferme, on la ferme donc et
@@ -38,7 +38,7 @@ local Json = require 'Json'
 local Texte = require 'Texte'
 
 local Liaison = {
-    VERSION = '1.3.5',
+    VERSION = '1.3.6',
     PORT_COMMANDES = 54770,
     PORT_REPONSES = 54771,
 
@@ -50,21 +50,21 @@ local Liaison = {
     dernierEchange = nil,
 
     journal = {},
-    -- Photo de chaque ligne du journal (ou false), pour la sélectionner d'un clic dans la fenêtre de suivi.
+    -- Photo de chaque ligne du journal (ou false), pour la sélectionner d'un clic dans la fenêtre de la liaison.
     journalPhotos = {},
-    -- Dernière retouche, affichée dans la fenêtre de suivi.
+    -- Dernière retouche, affichée dans la fenêtre de la liaison.
     dernierePhotoId = nil,
     dernierePhoto = nil,
     derniersReglages = nil,
 
-    -- Fonction appelée à chaque changement d'état (fenêtre de suivi ouverte).
+    -- Fonction appelée à chaque changement d'état (fenêtre de la liaison ouverte).
     observateur = nil,
 
     -- Accord véritable (préférence « Confirmer dans Lightroom ») : la proposition qui attend la
     -- réponse de l'utilisateur ({outil, etape, detail, le}), et sa réponse ({accepte, le}).
     propositionEnAttente = nil,
     accord = nil,
-    -- Début du refus d'une écriture qui attend l'accord dans la fenêtre de suivi : la proposition
+    -- Début du refus d'une écriture qui attend l'accord dans la fenêtre de la liaison : la proposition
     -- y est déjà notée, le journal ne la redit pas comme un refus.
     EN_ATTENTE = "« Confirmer dans Lightroom » est actif",
 
@@ -142,7 +142,7 @@ end
 
 -- Journal du module sur disque : ~/Library/Logs/Developpeur/
 -- module.log, gardé sous 1 Mo (l'ancien devient module.log.1). Pour comprendre après coup un échec
--- (fenêtre de suivi fermée, Lightroom relancé). Un journal qui ne s'écrit pas ne bloque rien.
+-- (fenêtre de la liaison fermée, Lightroom relancé). Un journal qui ne s'écrit pas ne bloque rien.
 Liaison.TAILLE_JOURNAL = 1048576
 
 function Liaison.cheminJournal()
@@ -173,7 +173,7 @@ local function ecrireJournal(ligne)
     end)
 end
 
--- Une ligne du journal (fenêtre de suivi et fichier) ; photo : l'identifiant de la photo qu'elle
+-- Une ligne du journal (fenêtre de la liaison et fichier) ; photo : l'identifiant de la photo qu'elle
 -- concerne, pour la sélectionner d'un clic.
 function Liaison.noter(texte, photo)
     table.insert(Liaison.journal, heure(LrDate.currentTime()) .. "  " .. texte)
@@ -186,7 +186,7 @@ function Liaison.noter(texte, photo)
     Liaison.signaler()
 end
 
--- Une proposition attend l'accord de l'utilisateur dans la fenêtre de suivi (ouverte pour lui).
+-- Une proposition attend l'accord de l'utilisateur dans la fenêtre de la liaison (ouverte pour lui).
 function Liaison.demanderAccord(outil, etape, detail)
     Liaison.propositionEnAttente = { outil = outil, etape = etape, detail = detail, le = LrDate.currentTime() }
     Liaison.accord = nil
@@ -197,7 +197,7 @@ function Liaison.demanderAccord(outil, etape, detail)
     end
 end
 
--- Réponse de l'utilisateur à la proposition en attente (boutons de la fenêtre de suivi).
+-- Réponse de l'utilisateur à la proposition en attente (boutons de la fenêtre de la liaison).
 function Liaison.repondreProposition(accepte)
     Liaison.accord = { accepte = accepte == true, le = LrDate.currentTime() }
     local etape = Liaison.propositionEnAttente and Liaison.propositionEnAttente.etape
@@ -206,7 +206,7 @@ function Liaison.repondreProposition(accepte)
 end
 
 -- Retour visuel d'une écriture de Claude (préférence retourVisuel) : un message bref au centre de
--- l'écran, même fenêtre de suivi fermée.
+-- l'écran, même fenêtre de la liaison fermée.
 function Liaison.retourVisuel(texte)
     local ok, Preferences = pcall(require, 'Preferences')
     if ok and Preferences.lire().retourVisuel then
@@ -442,7 +442,7 @@ function Liaison.recevoir(message)
         local Commandes = require 'Commandes'
         local Etapes = require 'Etapes'
         local params = type(requete.params) == 'table' and requete.params or {}
-        -- Seuls les menus, la fenêtre de suivi et la carte Note lèvent la pause et l'accord dans
+        -- Seuls les menus, la fenêtre de la liaison et la carte Note lèvent la pause et l'accord dans
         -- Lightroom, par appel direct : une ligne du réseau ne le peut pas.
         params.depuisLightroom = nil
         -- Avant/après des étapes (1.3) : la commande attend une capture en cours, et l'avant d'une

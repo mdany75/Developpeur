@@ -1,19 +1,19 @@
--- essais-fenetre-b.lua : la fenêtre Claude à l'allure de la fenêtre B (1.3, lot B3 : volet des
--- conversations en cases, en-tête avec le Mode, barre du fil, zone de saisie, colonne droite avec
--- ses segments et son panneau ; agrandie à 1 497 × 1 200 puis élargie à 1 948 × 1 200, demandé par Dany le 21 octobre 2026), hors
--- de Lightroom (LuaJIT, Lightroom simulé par Simulation.lua) : les dimensions (contenu de
--- 1 495 × 1 166, D7, chaque colonne estimée, la fenêtre dans l'écran de Dany, la longueur des
--- lignes du fil), l'inventaire du volet, de l'en-tête, de la barre, de la saisie et des segments
--- (chaque élément trouvé par son titre, son infobulle ou son image, son action éprouvée par un clic
--- simulé, S.cliquer), les briques (Fenetre.bouton carré ou à icône, Fenetre.calque, Vues.boutonBleu,
--- Vues.inactif, les aplats), le Mode (radios tirés de l'état, D3, D12), la liste en cases (périodes,
--- sous-titres, choix, pagination, recherche, carnet), la légende de la photo active
--- (Lightroom.legende) et l'apparence (couleurs et images reprises à l'ouverture). Puis le fil (lot
--- B4) : les polices mesurées (Metriques), le texte riche (largeur, coupe, balises fermées), l'auteur
--- et l'heure de chaque tour (sur des copies), la ligne d'un appel et « Pourquoi ? », la ligne
--- d'actions (« ☆ Voir la note », « Leçon de la photo »), leurs clics, la bascule vers Leçon, le
--- bandeau sur deux lignes et le tableau du carnet à la largeur du fil ; essais-lecon.lua éprouve la
--- carte de l'onglet Leçon. Enfin les cartes (lot B5) : sur leurs images, leurs hauteurs et ce qui y
+-- essais-fenetre-b.lua : la fenêtre Claude à l'allure de la fenêtre B (1.3, lot B3 : en-tête et ses
+-- voyants, barre du fil, zone de saisie, colonne droite avec ses segments et son panneau ; agrandie
+-- à 1 497 × 1 200 puis élargie à 1 948 × 1 200, demandé par Dany le 21 octobre 2026 ; sans le volet
+-- des conversations de gauche, 1 623 × 1 200, au correctif 1.3.6), hors de Lightroom (LuaJIT,
+-- Lightroom simulé par Simulation.lua) : les dimensions (contenu de 1 621 × 1 166, D7, chaque
+-- colonne estimée, la fenêtre dans l'écran de Dany, la longueur des lignes du fil), plus de volet
+-- (ses boutons, Rechercher, la liste, les versions : au menu, dans l'infobulle du voyant Lightroom),
+-- l'inventaire de l'en-tête (ses trois voyants), de la barre, de la saisie et des segments (chaque
+-- élément trouvé par son titre, son infobulle ou son image, son action éprouvée par un clic simulé,
+-- S.cliquer), les briques (Fenetre.bouton carré ou à icône, Fenetre.calque, Vues.boutonBleu,
+-- Vues.inactif, les aplats), le Mode (plus de radios, correctif 1.3.6), la légende de la photo
+-- active (Lightroom.legende) et l'apparence (couleurs et images reprises à l'ouverture). Puis le fil
+-- (lot B4) : les polices mesurées (Metriques), le texte riche (largeur, coupe, balises fermées),
+-- l'auteur et l'heure de chaque tour (sur des copies), la ligne d'un appel et « Pourquoi ? », la
+-- ligne d'actions (« ☆ Voir la note »), leurs clics et le bandeau sur deux lignes ; essais-carnet.lua
+-- éprouve la carte de l'onglet Suivi. Enfin les cartes (lot B5) : sur leurs images, leurs hauteurs et ce qui y
 -- tient, l'inventaire de la carte Note (maquette) et des cartes Proposition et Aperçu, ni passes ni
 -- plafond (correctif 1.3.2), les étoiles, les drapeaux, Laisser, Accepter (jusqu'à « Accepter 5 ★ »,
 -- correctif 1.3.2), « Voir à 100 % » (le zoom
@@ -54,6 +54,12 @@ local function refuse(fn, attendu, quoi)
     vrai(tostring(erreur):find(attendu, 1, true), (quoi or 'refus') .. ' : ' .. tostring(erreur))
 end
 
+local function contient(texte, morceau, quoi)
+    if type(texte) ~= 'string' or not texte:find(morceau, 1, true) then
+        error(string.format('%s : %q introuvable dans %q', quoi or 'texte', morceau, tostring(texte)), 2)
+    end
+end
+
 local Carnet = require 'Carnet'
 local Chemins = require 'Chemins'
 local Consignes = require 'Consignes'
@@ -70,7 +76,6 @@ local Fenetre = require 'Fenetre'
 local Moteur = require 'Moteur'
 local Vues = require 'Vues'
 local prefs = Chemins.prefs()
-prefs.propositionAOuverture = false
 prefs.nouvelleParPhoto = false
 -- Le faux Claude Code (une demande partie par erreur ne lance jamais le vrai).
 local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(.*/)') or '.') .. ' && pwd -P'):gsub('%s+$', '')
@@ -294,7 +299,8 @@ local function rangeeDe(contenu, vue)
     error('rangée introuvable', 2)
 end
 
--- Les colonnes de la racine : volet, filet, centre, filet, colonne droite.
+-- Les colonnes de la racine : centre, filet, colonne droite (le volet et son filet sont retirés au
+-- correctif 1.3.6).
 local function colonnes(contenu)
     local r = {}
     for _, e in ipairs(contenu.args) do
@@ -308,29 +314,33 @@ end
 -- Dimensions ---------------------------------------------------------------------------------------
 
 -- La taille demandée par Dany le 21 octobre 2026, sur son écran de 3 440 × 1 440 (à 1x : un point
--- par pixel, constaté) : la fenêtre entière, le volet, le centre et la colonne droite (celle de la
+-- par pixel, constaté), sans le volet de gauche ni son filet (325 : correctif 1.3.6, décision de
+-- Dany du 25 octobre 2026) : la fenêtre entière, le centre et la colonne droite (celle de la
 -- maquette), et l'aperçu à la largeur de l'intérieur du panneau. La seule copie de ces chiffres dans
 -- les essais ; le reste se tire de Dispositions.
-local DEMANDE = { largeur = 1948, hauteur = 1200, volet = 324, centre = 1064, droite = 556, apercu = 498, apercuHauteur = 332 }
+local DEMANDE = { largeur = 1623, hauteur = 1200, centre = 1064, droite = 556, apercu = 498, apercuHauteur = 332 }
 local ECRAN_DANY = { largeur = 3440, hauteur = 1440 }
 -- La barre des menus de macOS sur un écran sans encoche : 24 points, et son filet.
 local BARRE_MENUS = 25
--- La place que la fenêtre laisse à Lightroom à côté d'elle, sur cet écran (environ 1 490 points,
--- depuis l'élargissement demandé par Dany le 21 octobre 2026).
-local PLACE_LIGHTROOM = 1490
+-- La place que la fenêtre laisse à Lightroom à côté d'elle, sur cet écran (environ 1 815 points
+-- depuis le retrait du volet, correctif 1.3.6 ; 1 490 avant).
+local PLACE_LIGHTROOM = 1815
 
-essai('Cadre : la fenêtre demandée par Dany (1 948 × 1 200), son contenu (D7) ; les colonnes, le fil, la liste et les images concordent', function()
+essai('Cadre : la fenêtre demandée par Dany, sans son volet (1 623 × 1 200), son contenu (D7) ; les colonnes, le fil et les images concordent', function()
     local largeur, haut = S.contenuPourFenetre(DEMANDE.largeur, DEMANDE.hauteur)
     egal(DEMANDE.largeur, D.largeurFenetre)
     egal(DEMANDE.hauteur, D.hauteurFenetre)
     egal(largeur, D.largeurContenu, 'contenu : largeur (D7)')
     egal(haut, D.hauteurContenu, 'contenu : hauteur (D7 : barre de 33, marge de 1 en bas, aucune en haut)')
-    egal(DEMANDE.volet, D.volet)
+    egal(nil, D.volet, 'plus de volet (correctif 1.3.6)')
+    egal(nil, D.liste)
+    egal(nil, D.cases)
     egal(DEMANDE.centre, D.centre)
     egal(DEMANDE.droite, D.droite, 'la colonne droite de la maquette, inchangée')
-    egal(D.largeurContenu, D.volet + D.filet + D.centre + D.filet + D.droite, 'volet, filet, centre, filet, colonne droite')
-    egal(D.volet - 2 * D.margeVolet, D.liste, 'volet : sa largeur utile')
+    egal(D.largeurContenu, D.centre + D.filet + D.droite, 'centre, filet, colonne droite')
     egal(D.centre - 2 * D.margeCentre, D.fil, 'centre : sa largeur utile')
+    -- Le fil garde sa largeur (des lignes d'environ 150 caractères : choix de Dany).
+    egal(952, D.texteFil, 'le texte du fil, inchangé')
     egal(D.panneau, D.droite - 2 * D.margeDroite, 'colonne droite : le panneau entre ses marges')
     -- Le centre : en-tête et son filet, fil, barre, saisie, exactement ; le fil a autant de lignes
     -- que sa hauteur en tient entre ses marges (une de plus n'y tiendrait pas), le reste va à sa
@@ -340,16 +350,23 @@ essai('Cadre : la fenêtre demandée par Dany (1 948 × 1 200), son contenu (D7)
     local bas = D.hauteurFil - D.margeHautFil - D.grille
     vrai(bas >= D.margeBasFil, string.format('marge du bas du fil : %d (au moins %d)', bas, D.margeBasFil))
     vrai(bas - D.hauteurLigne < D.margeBasFil, string.format('une ligne de plus tiendrait (%d lignes, marge du bas de %d)', D.lignes, bas))
-    -- Le titre de l'en-tête prend ce que le Mode laisse ; la photo active, ce que les voyants laissent.
-    egal(D.fil, D.titre + D.placeMode, 'le titre et la place du Mode')
-    egal(D.fil, (8 + 6 + D.voyantClaude) + 14 + (8 + 6 + D.voyantLightroom) + D.info, 'les voyants et la photo active')
-    -- Les images de Dispositions.IMAGES concordent avec les tailles.
+    -- Le titre de l'en-tête prend ce que le Mode laisse ; la photo active, ce que les trois voyants
+    -- laissent.
+    egal(D.fil, D.titre + D.placeRepartir, 'le titre et la place de « Repartir à neuf » (celle du Mode)')
+    egal(nil, D.placeMode)
+    vrai(D.repartir <= D.placeRepartir, 'Repartir à neuf tient dans sa place')
+    vrai(require('Fil').largeur('Repartir à neuf', 'texte12') + 2 * 12 <= D.repartir, 'son titre tient dans le bouton')
+    egal(D.fil, (8 + 6 + D.voyantClaude) + D.ecartVoyants + (8 + 6 + D.voyantLightroom) + D.ecartVoyants + (8 + 6 + D.voyantEcran) + D.info,
+        'les voyants et la photo active')
+    vrai(D.info >= 400, 'la photo active garde sa place : ' .. D.info)
+    -- Les images de Dispositions.IMAGES concordent avec les tailles (plus de fond de sélection ni de
+    -- loupe : le volet est retiré).
     local I = Dispositions.IMAGES
-    egal(D.liste, I.selection.largeur, 'fond de sélection : la largeur du volet')
-    egal(D.hauteurCase, I.selection.hauteur, 'fond de sélection : une case')
+    egal(nil, I.selection)
+    egal(nil, I.loupe)
     egal(D.panneau, I.panneau.largeur, 'panneau')
     egal(D.hauteurContenu, D.margeHautDroite + I.panneau.hauteur + D.margeBasDroite, 'le panneau sur toute la colonne, entre ses marges')
-    for _, nom in ipairs({ 'carte-note', 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' }) do
+    for _, nom in ipairs({ 'carte-note', 'carte-proposition', 'carte-etape', 'carte-focus', 'carte-suivi' }) do
         egal(D.interieur, I[nom].largeur, nom)
     end
     egal(D.envoyer, I['bouton-bleu'].largeur, 'Envoyer : le bouton bleu')
@@ -366,15 +383,10 @@ essai('Cadre : la fenêtre demandée par Dany (1 948 × 1 200), son contenu (D7)
     egal(2 * D.apercu, D.pixelsApercu, 'vignette en 2x')
     egal(2 * D.apercuHauteur, D.pixelsApercuHauteur, 'vignette en 2x')
     egal(D.interieur, 2 * D.fleche + 4 + D.legende + 4 + 8 + D.agrandir, '◀ légende ▶ · Agrandir')
-    -- Le volet : son haut, ses cases et son bas dans sa hauteur ; autant de cases que la place en
-    -- tient (une de plus n'y tiendrait pas).
-    vrai(D.cases * D.hauteurCase <= D.hauteurListe, 'les cases dans la place de la liste')
-    vrai((D.cases + 1) * D.hauteurCase > D.hauteurListe, 'une case de plus tiendrait : ' .. D.cases)
-    egal(D.hauteurContenu, 2 * D.margeVolet + D.hautVolet + D.hauteurListe + D.basVolet, 'le volet de haut en bas')
-    -- Le cadre enregistré change de nom : Lightroom ne rapetisse pas un cadre enregistré, et la
-    -- fenêtre élargie ne doit pas reprendre celui de 1 497 × 1 200 (FORME 3).
-    egal(4, Fenetre.FORME)
-    egal('DeveloppeurClaude-conversation-grande-4', Fenetre.cadre())
+    -- Le cadre enregistré change de nom : Lightroom rend à une fenêtre rouverte sa taille
+    -- enregistrée, et la fenêtre sans volet ne doit pas reprendre la largeur de 1 948 (FORME 4).
+    egal(5, Fenetre.FORME)
+    egal('DeveloppeurClaude-conversation-grande-5', Fenetre.cadre())
     egal(2, Dispositions.cadreBouton(0), 'cadre d\'un carré : bezel + 2 (D5)')
     egal(S.MARGE_BEZEL, Dispositions.TAILLES.margeBezel)
 end)
@@ -390,15 +402,15 @@ local function dispositionsAHauteur(hauteur)
     return assert(loadstring(autre, '=Dispositions.lua (hauteur ' .. hauteur .. ')'))()
 end
 
-essai("Cadre : à une autre hauteur de fenêtre, le fil, la liste, le panneau et les cartes suivent (rien n'est écrit pour une seule hauteur)", function()
+essai("Cadre : à une autre hauteur de fenêtre, le fil, le panneau et les cartes suivent (rien n'est écrit pour une seule hauteur)", function()
     local I = Dispositions.IMAGES
     -- À la hauteur de la fenêtre : les cartes se tirent de la place sous l'aperçu.
     egal(D.placeCartes - D.autourNote, I['carte-note'].hauteur, 'carte Note : la place des cartes, moins sa grille')
-    for _, nom in ipairs({ 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' }) do
+    for _, nom in ipairs({ 'carte-proposition', 'carte-etape', 'carte-focus', 'carte-suivi' }) do
         egal(D.placeCartes - D.sousCarte, I[nom].hauteur, nom .. ' : la place des cartes, moins ce qu\'elle laisse sous elle')
     end
-    -- Deux cents points de moins, puis de plus : chaque zone suit, autant de lignes et de cases que
-    -- sa place en tient.
+    -- Deux cents points de moins, puis de plus : chaque zone suit, autant de lignes que sa place en
+    -- tient.
     for _, ecart in ipairs({ -200, 200 }) do
         local Autre = dispositionsAHauteur(D.hauteurFenetre + ecart)
         local A, J = Autre.dimensions(), Autre.IMAGES
@@ -407,14 +419,11 @@ essai("Cadre : à une autre hauteur de fenêtre, le fil, la liste, le panneau et
         egal(D.hauteurFil + ecart, A.hauteurFil, 'fil' .. quoi)
         egal(math.floor((A.hauteurFil - A.margeHautFil - A.margeBasFil) / A.hauteurLigne), A.lignes, 'lignes du fil' .. quoi)
         vrai(ecart < 0 and A.lignes < D.lignes or A.lignes > D.lignes, 'les lignes du fil suivent' .. quoi)
-        egal(D.hauteurListe + ecart, A.hauteurListe, 'liste' .. quoi)
-        egal(math.floor(A.hauteurListe / A.hauteurCase), A.cases, 'cases de la liste' .. quoi)
-        vrai(ecart < 0 and A.cases < D.cases or A.cases > D.cases, 'les cases suivent' .. quoi)
         egal(I.panneau.hauteur + ecart, J.panneau.hauteur, 'panneau' .. quoi)
         egal(A.hauteurContenu, A.margeHautDroite + J.panneau.hauteur + A.margeBasDroite, 'panneau entre ses marges' .. quoi)
         egal(D.placeCartes + ecart, A.placeCartes, 'place des cartes' .. quoi)
         egal(A.placeCartes - A.autourNote, J['carte-note'].hauteur, 'carte Note' .. quoi)
-        for _, nom in ipairs({ 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' }) do
+        for _, nom in ipairs({ 'carte-proposition', 'carte-etape', 'carte-focus', 'carte-suivi' }) do
             egal(A.placeCartes - A.sousCarte, J[nom].hauteur, nom .. quoi)
         end
     end
@@ -465,7 +474,7 @@ essai('Cadre : la fenêtre construite fait la largeur du contenu, chaque colonne
     ouvrirFenetre(function(p, contenu)
         Fenetre.rafraichir()
         local cols = colonnes(contenu)
-        egal(5, #cols, 'volet, filet, centre, filet, colonne droite')
+        egal(3, #cols, 'centre, filet, colonne droite (plus de volet)')
         egal(0, contenu.args.spacing, 'sans écart')
         egal(0, contenu.args.margin, 'sans marge')
         local total = 0
@@ -474,7 +483,7 @@ essai('Cadre : la fenêtre construite fait la largeur du contenu, chaque colonne
             total = total + c.args.width
             local h = hauteur(c)
             vrai(h <= D.hauteurContenu, string.format('colonne de %d de haut (au plus %d)', h, D.hauteurContenu))
-            -- Ce que porte la colonne sur son aplat (le volet, le centre, la colonne droite) : son
+            -- Ce que porte la colonne sur son aplat (le centre, la colonne droite) : son
             -- contenu estimé tient dans la hauteur du contenu de la fenêtre.
             local dedans = c.args[2]
             if c.genre == 'column' and type(dedans) == 'table' and dedans.genre then
@@ -501,12 +510,12 @@ essai('Cadre : la fenêtre construite fait la largeur du contenu, chaque colonne
             vrai(aplats[C[cle]], 'aplat ' .. cle)
         end
         egal(nil, C.filetPlafond, 'plus de filet du plafond (correctif 1.3.2)')
-        -- Le filet du volet, celui de la colonne droite, sous l'en-tête, au-dessus de la barre,
-        -- au-dessus de la saisie, dans le volet sous Renommer… et Supprimer… (celui du plafond de la
-        -- carte Note est retiré avec sa ligne, correctif 1.3.2).
-        egal(6, filets, 'filets de 1 point')
-        -- Le premier aplat de chaque colonne est à sa taille : volet, centre, droite, sur la hauteur du contenu.
-        for _, k in ipairs({ 1, 3, 5 }) do
+        -- Le filet de la colonne droite, sous l'en-tête, au-dessus de la barre, au-dessus de la saisie
+        -- (ceux du volet sont retirés avec lui au correctif 1.3.6 ; celui du plafond de la carte Note
+        -- avec sa ligne, correctif 1.3.2).
+        egal(4, filets, 'filets de 1 point')
+        -- Le premier aplat de chaque colonne est à sa taille : centre, droite, sur la hauteur du contenu.
+        for _, k in ipairs({ 1, 3 }) do
             local aplat = cols[k].args[1]
             egal('picture', aplat.genre)
             egal(cols[k].args.width, aplat.args.width)
@@ -570,108 +579,115 @@ end)
 
 -- Inventaire ---------------------------------------------------------------------------------------
 
-essai('Inventaire du volet : Nouvelle conversation, Rechercher et sa loupe, les cases, Renommer…, Supprimer…, Publication…, Consommation…, versions, Écran', function()
+essai("Plus de volet (correctif 1.3.6) : ni Nouvelle conversation, Rechercher, cases, Renommer…, Supprimer…, ni versions ; Publication… et Consommation… au menu", function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
-        local appels = {}
-        local function temoin(nom)
-            return function(...) appels[#appels + 1] = nom .. (select('#', ...) > 0 and (':' .. tostring((...))) or '') end
+        for _, titre in ipairs({ '＋ Nouvelle conversation', 'Renommer…', 'Supprimer…', 'Publication…', 'Consommation…' }) do
+            refuse(function() parTitre(contenu, titre) end, 'introuvable', 'plus de « ' .. titre .. ' »')
         end
-        local nouvelle = parTitre(contenu, '＋ Nouvelle conversation')
-        egal('square_button', nouvelle.genre)
-        egal(26, S.bezelVisible(nouvelle), 'bezel de 26 (maquette)')
-        egal(D.liste, nouvelle.args.width)
-        egal('libre', nouvelle.args.enabled.key)
-        avec(Fenetre, 'nouvelle', temoin('nouvelle'), function() S.cliquer(nouvelle) end)
-        -- Rechercher : champ immédiat de 143, la loupe devant (une image, sans clic).
-        local recherche = liee(contenu, 'edit_field', 'recherche')
-        egal(true, recherche.args.immediate)
-        egal('Rechercher', recherche.args.placeholder_string)
-        egal(D.recherche, recherche.args.width)
-        local rangee
+        refuse(function() liee(contenu, 'edit_field', 'recherche') end, 'introuvable', 'plus de Rechercher')
+        refuse(function() calqueCase(contenu, 1) end, 'introuvable', 'plus de cases')
+        for _, cle in ipairs({ 'versionTexte1', 'versionTexte2' }) do
+            refuse(function() liee(contenu, 'static_text', cle) end, 'introuvable', 'plus de ligne de version')
+        end
         for _, v in ipairs(vues(contenu)) do
-            if v.genre == 'row' and v.args[3] == recherche then
-                rangee = v
+            vrai(not (v.genre == 'picture' and type(v.args.value) == 'string'
+                and (v.args.value:match('/loupe%.png$') or v.args.value:match('/selection%.png$'))), 'image du volet : ' .. tostring(v.args.value))
+        end
+        egal(nil, p.recherche)
+        egal(nil, p.lg1)
+        for _, nom in ipairs({ 'publication', 'consommation', 'nouvelle', 'renommer', 'supprimer', 'cliquerListe', 'rafraichirVersions',
+            'photoDeLaConversation' }) do
+            vrai(nom == 'nouvelle' or Fenetre[nom] == nil, 'Fenetre.' .. nom .. ' retiré')
+        end
+        -- Fenetre.nouvelle reste (une conversation vide, sans photo) ; une photo choisie dans Lightroom
+        -- montre la sienne (Fenetre.suivreSelection, essais-une-photo.lua).
+        egal('function', type(Fenetre.nouvelle))
+        -- Publication… et Consommation… restent au menu Module externe - Extras, dans les deux.
+        local info = dofile(S.plugin .. '/Info.lua')
+        for _, menu in ipairs({ info.LrExportMenuItems, info.LrLibraryMenuItems }) do
+            local titres = {}
+            for _, item in ipairs(menu) do
+                titres[item.title] = item.file
             end
+            egal('MenuPublication.lua', titres['Publication…'])
+            egal('MenuConsommation.lua', titres['Consommation…'])
         end
-        vrai(rangee and rangee.args[1].genre == 'picture' and rangee.args[1].args.value:match('/loupe%.png$'), 'la loupe devant le champ')
-        egal(nil, rangee.args[1].args.mouse_down)
-        -- Les cases : un calque chacune, qui appelle Fenetre.cliquerListe(k).
-        avec(Fenetre, 'cliquerListe', temoin('case'), function()
-            for k = 1, D.cases do
-                S.cliquer(calqueCase(contenu, k))
-            end
-        end)
-        -- Renommer… et Supprimer… : dans une tâche.
-        local renommer, supprimer = parTitre(contenu, 'Renommer…'), parTitre(contenu, 'Supprimer…')
-        egal(22, S.bezelVisible(renommer))
-        egal(D.renommer, renommer.args.width)
-        egal('libre', supprimer.args.enabled.key)
-        avec(Fenetre, 'renommer', temoin('renommer'), function()
-            avec(Fenetre, 'supprimer', temoin('supprimer'), function()
-                local taches = #S.taches
-                S.cliquer(renommer)
-                S.cliquer(supprimer)
-                egal(taches + 2, #S.taches, 'dans des tâches')
-                S.taches[taches + 1]()
-                S.taches[taches + 2]()
-            end)
-        end)
-        avec(Fenetre, 'publication', temoin('publication'), function()
-            avec(Fenetre, 'consommation', temoin('consommation'), function()
-                S.cliquer(parTitre(contenu, 'Publication…'))
-                S.cliquer(parTitre(contenu, 'Consommation…'))
-            end)
-        end)
-        local attendus = { 'nouvelle' }
-        for k = 1, D.cases do
-            attendus[#attendus + 1] = 'case:' .. k
-        end
-        for _, nom in ipairs({ 'renommer', 'supprimer', 'publication', 'consommation' }) do
-            attendus[#attendus + 1] = nom
-        end
-        egal(table.concat(attendus, ' '), table.concat(appels, ' '), 'les actions du volet')
-        -- Les versions, une ligne chacune ; le voyant Écran en dessous, cliquable.
-        egal('Développeur ' .. require('Composants').module(), p.versionTexte1)
-        vrai(liee(contenu, 'static_text', 'versionTexte2'), 'MCP-Développeur')
-        egal('MCP-Développeur 1.2 · à mettre à jour', Fenetre.texteVersion({ nom = 'MCP-Développeur · à mettre à jour', version = '1.2' }))
-        egal('MCP-Développeur · introuvable', Fenetre.texteVersion({ nom = 'MCP-Développeur · introuvable', version = '' }))
+        -- Le voyant Écran (en bas du volet jusque-là) est dans l'en-tête ; un clic le relit dans une
+        -- tâche (essai de l'en-tête, et tests.lua).
         local ecran = liee(contenu, 'static_text', 'texteEcran')
-        avec(Fenetre, 'montrerEcran', temoin('ecran'), function()
+        local appels = 0
+        avec(Fenetre, 'montrerEcran', function() appels = appels + 1 end, function()
             local taches = #S.taches
             S.cliquer(ecran)
             S.taches[taches + 1]()
         end)
-        egal('ecran', appels[#appels])
+        egal(1, appels, 'le voyant Écran se relit au clic')
     end)
 end)
 
-essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, Mode en trois radios, voyants Claude Code et Lightroom, photo active en texte riche', function()
+essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, « Repartir à neuf » à la place du Mode, voyants Claude Code, Lightroom (versions et mode dans son infobulle) et Écran, photo active en texte riche', function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
         local titre = liee(contenu, 'static_text', 'titre')
         egal('<system/bold>', titre.args.font.name)
         egal(16, titre.args.font.size)
+        egal(D.titre, titre.args.width, 'le titre garde sa largeur : « Repartir à neuf » à sa droite')
         refuse(function() parTitre(contenu, '✎') end, 'introuvable', 'plus de ✎')
-        local mode = parTitre(contenu, 'Mode :', 'static_text')
-        egal(Fenetre.COULEURS.gris, mode.args.text_color)
-        local radios = {}
+        -- Le Mode est retiré (correctif 1.3.6) : ni « Mode : », ni radios ; « Repartir à neuf » prend
+        -- sa place, à droite du titre (essais-une-photo.lua : ce qu'il fait).
+        refuse(function() parTitre(contenu, 'Mode :', 'static_text') end, 'introuvable', 'plus de « Mode : »')
         for _, v in ipairs(vues(contenu)) do
-            if v.genre == 'radio_button' then
-                radios[#radios + 1] = v.args.title .. '=' .. v.args.checked_value .. '/' .. v.args.enabled.key
-                egal('mode', v.args.value.key)
-                egal('small', v.args.size)
-            end
+            vrai(v.genre ~= 'radio_button', 'plus de radio')
         end
-        egal("Appliquer=appliquer/libre Proposer d'abord=proposer/libre Je le fais=jelefais/peutJeLeFais", table.concat(radios, ' '))
-        -- Deux voyants : Claude Code sans clic, Lightroom qui démarre la liaison.
+        local rangeeTitre = rangeeDe(contenu, titre)
+        egal(3, #rangeeTitre.args, 'le titre, un espace, puis « Repartir à neuf »')
+        local repartir = rangeeTitre.args[3]
+        egal('square_button', repartir.genre)
+        egal('Repartir à neuf', repartir.args.title)
+        egal(D.repartir, repartir.args.width)
+        egal('peutRepartir', repartir.args.enabled.key, 'grisé selon peutRepartir')
+        vrai(Fenetre.parBouton(repartir.args.action), 'par Fenetre.bouton (annule l\'envoi automatique)')
+        -- Trois voyants, dans la rangée de la photo active : Claude Code sans clic, Lightroom qui
+        -- démarre la liaison (son infobulle, liée : les versions et le mode de la liaison), Écran qui
+        -- se relit (venu du bas du volet, correctif 1.3.6).
         local claude, liaison = liee(contenu, 'static_text', 'texteClaude'), liee(contenu, 'static_text', 'texteLightroom')
+        local ecran = liee(contenu, 'static_text', 'texteEcran')
         egal(nil, claude.args.mouse_down, 'Claude Code : sans clic')
         local demarree = false
         avec(Fenetre, 'demarrerLiaison', function() demarree = true end, function() S.cliquer(liaison) end)
         vrai(demarree, 'le voyant Lightroom démarre la liaison')
+        egal('infobulleLightroom', liaison.args.tooltip.key, "l'infobulle du voyant Lightroom, liée")
+        local Composants = require 'Composants'
+        egal(Fenetre.infobulleLightroom(require('Lightroom').liaison(), Composants.lignes(Composants.module(), '…'), 'appliquer'),
+            valeur(liaison, 'tooltip', p), "l'infobulle avant la lecture du connecteur")
+        contient(valeur(liaison, 'tooltip', p), 'Versions : Développeur ' .. Composants.module() .. ' ; MCP-Développeur …')
+        contient(valeur(liaison, 'tooltip', p), 'Mode de la liaison : Appliquer')
+        vrai(ecran.args.mouse_down, 'le voyant Écran se relit au clic')
+        egal(D.voyantEcran, ecran.args.width)
+        -- Les trois voyants (chacun sa rangée : sa pastille et son texte) dans la rangée de la photo
+        -- active, dans cet ordre.
+        local rangee, ordre = rangeeDe(contenu, liee(contenu, 'static_text', 'infoPhoto')), {}
+        for _, e in ipairs(rangee.args) do
+            if type(e) == 'table' and e.genre == 'row' then
+                for _, v in ipairs({ claude, liaison, ecran }) do
+                    if e.args[2] == v then
+                        ordre[#ordre + 1] = v.args.title.key
+                    end
+                end
+            end
+        end
+        egal('texteClaude texteLightroom texteEcran', table.concat(ordre, ' '), 'les trois voyants dans la rangée de la photo active')
+        -- Les versions et le mode, dans les mots de l'infobulle.
+        egal("Liaison avec le connecteur MCP-Développeur : active. Versions : Développeur 1.3.6 ; MCP-Développeur 1.3.5 · à mettre à jour. "
+            .. "Mode de la liaison : Proposer d'abord (Gestionnaire de modules externes).",
+            Fenetre.infobulleLightroom('active', Composants.lignes('1.3.6', '1.3.5'), 'proposer'))
+        egal(true, Fenetre.alerteVersions(Composants.lignes('1.3.6', '1.3.5')))
+        egal(false, Fenetre.alerteVersions(Composants.lignes('1.3.6', '1.3.6')))
+        egal(false, Fenetre.alerteVersions(Composants.lignes('1.3.6', '…')), "« … » pas encore lu : pas d'alerte")
+        contient(Fenetre.infobulleLightroom('erreur', {}, nil), 'en erreur, un clic la relance. Versions : ?. Mode de la liaison : Appliquer')
         -- La photo active : texte riche, emphase de même taille, en couleur du texte.
         local info = liee(contenu, 'static_text', 'infoPhoto')
         egal(Fenetre.COULEURS.gris, info.args.text_color)
@@ -757,8 +773,8 @@ essai('Inventaire de la barre et de la saisie : ▲ ▼ à icône, Fin, position
         egal(D.fil, largeurDonnee(rangeeDe(contenu, message)), 'la rangée du bas de la saisie')
         -- Cette place (D.bandeau) tient deux lignes de petit texte (lot B4, essai du bandeau plus
         -- bas) ; son infobulle donne le message en entier.
-        p.message = Fenetre.CHOISIR_CONVERSATION
-        egal(Fenetre.CHOISIR_CONVERSATION, valeur(message, 'tooltip', p), "l'infobulle du message, en entier")
+        p.message = Fenetre.NOTE_AUTRE_PHOTO
+        egal(Fenetre.NOTE_AUTRE_PHOTO, valeur(message, 'tooltip', p), "l'infobulle du message, en entier")
         p.message = ''
         -- Envoyer et Arrêter : superposés ; aucun bouton par défaut (repli du lot B0).
         egal(nil, S.boutonParDefaut())
@@ -842,7 +858,7 @@ end)
 
 -- Segments -------------------------------------------------------------------------------------------
 
-essai('Segments : Aperçu | Focus | Proposition | Note | Leçon en images sous calques ; un clic choisit l\'onglet, son crochet suit, sans envoyer la demande', function()
+essai('Segments : Aperçu | Focus | Proposition | Note | Suivi en images sous calques ; un clic choisit l\'onglet, son crochet suit, sans envoyer la demande', function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
@@ -883,7 +899,7 @@ essai('Segments : Aperçu | Focus | Proposition | Note | Leçon en images sous c
         end
         Fenetre.envoyer = envoyer
         p.saisie = ''
-        egal('apercu focus proposition notation lecon', table.concat(recus, ' '), 'un vrai clic : le crochet de chaque onglet')
+        egal('apercu focus proposition notation suivi', table.concat(recus, ' '), 'un vrai clic : le crochet de chaque onglet')
         -- La rangée ◀ légende ▶ · ⤢ Agrandir est commune aux cinq onglets.
         for _, titre in ipairs({ '◀', '▶', '⤢ Agrandir' }) do
             local b = parTitre(contenu, titre)
@@ -891,407 +907,59 @@ essai('Segments : Aperçu | Focus | Proposition | Note | Leçon en images sous c
             egal(22, S.bezelVisible(b))
         end
         egal(nil, liee(contenu, 'static_text', 'legendeApercu').args.visible)
-        -- L'onglet Leçon montre sa carte (lot B4) : sans leçon, son aide, coupée à la largeur de la
-        -- carte.
-        p.onglet = 'lecon'
-        local titre = liee(contenu, 'static_text', 'leconTitre')
-        vrai(S.montreeDansFenetre(titre), "l'onglet Leçon montré")
-        egal('Leçon de la photo', p.leconTitre)
-        egal(Fenetre.AUCUNE_LECON, (p.leconTexte:gsub('\n', ' ')), "l'aide, coupée à la largeur de la carte")
-        egal(nil, Fenetre.AIDE_LECON, "plus d'aide provisoire")
-        egal(nil, Vues.leconProvisoire, 'plus de carte provisoire')
-        p.onglet = 'notation'
-        vrai(not S.montreeDansFenetre(titre), 'cachée hors de son onglet')
+        -- Plus de segment ni de carte Leçon (correctif 1.3.6) : Suivi, le dernier, à sa place.
+        egal(0, #segment('lecon'), 'plus de segment Leçon')
+        egal(2, #segment('suivi'), 'le segment Suivi et sa variante bleue')
+        egal('suivi', D.onglets[#D.onglets].valeur, 'Suivi, le dernier')
+        egal(nil, Fenetre.AUCUNE_LECON)
+        egal(nil, Vues.lecon)
     end)
 end)
 
 -- Mode -----------------------------------------------------------------------------------------------
 
--- Une réponse de preview_settings avec my_turn (Je le fais), réduite à un réglage.
-local TOUR = [=[{"a_faire":[{"a":"+0,35","apres":0.35,"avant":0,"cle":"Exposure2012","de":"0","n":1,"panneau":"Réglages de base",
-"reglage":"Exposition","section":"Tonalité","texte":"Réglages de base › Tonalité › Exposition : 0 → +0,35"}],
-"etape":"Claude · essai : ma version (je le fais)","instantane":"Claude · ma version","mode":"appliquer directement",
-"photo":{"copie_virtuelle":true,"fichier":"DSCF4961.RAF","id":4961}}]=]
-
--- Ajoute à la conversation un exercice « Je le fais » à faire (sa liste arrivée).
-local function exerciceAFaire(c, appel)
-    Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = appel, nom = 'mcp__developpeur__preview_settings',
-        entree = { photo_id = 4961, settings = { Exposure2012 = 0.35 }, my_turn = true, step_name = 'lumière' } } } })
-    Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = appel, textes = { TOUR }, images = {}, erreur = false } } })
-    local exo = Conversation.exerciceEnCours(c)
-    vrai(exo, 'exercice à faire')
-    return exo
-end
-
-essai('Mode : trois radios tirés de l\'état ; un clic annule l\'envoi automatique ; Appliquer et Proposer d\'abord changent la liaison ; grisés pendant le travail', function()
+-- Correctif 1.3.6 : la rangée Mode de l'en-tête (Appliquer, Proposer d'abord, Je le fais) est
+-- retirée, avec ce qui la tirait de l'état et la reposait (D12) ; la fenêtre suit la préférence
+-- `mode`, que le Gestionnaire de modules externes règle. Fenetre.lierRadio reste : Mes demandes s'en
+-- sert.
+essai("Mode : plus de radios ni de valeur reposée ; la préférence du Gestionnaire reste telle quelle, la fenêtre n'y touche pas", function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
-    require('Preferences').lire().mode = 'appliquer'
+    local prefs = require('Preferences').lire()
+    prefs.mode = 'proposer'
     ouvrirFenetre(function(p, contenu)
-        local champ = liee(contenu, 'edit_field', 'saisie')
-        local radios = {}
         for _, v in ipairs(vues(contenu)) do
-            if v.genre == 'radio_button' then
-                radios[v.args.checked_value] = v
-            end
+            vrai(v.genre ~= 'radio_button', 'plus de radio')
         end
-        egal('appliquer', p.mode, 'le mode de la liaison à l\'ouverture')
-        egal(nil, p.texteMode, 'plus de voyant Mode')
-        -- Proposer d'abord : la préférence de la liaison change ; la demande tapée n'est pas envoyée.
-        S.taper(champ, 'Bonjour')
-        S.cliquer(radios.proposer)
-        egal('proposer', Lightroom.mode())
-        egal('proposer', p.mode)
-        egal(nil, Fenetre.envoiAuto, "le clic d'un radio annule l'envoi automatique (D3)")
-        egal('Bonjour', p.saisie, 'validée par le clic, laissée dans le champ')
-        p.saisie = ''
-        S.cliquer(radios.appliquer)
-        egal('appliquer', Lightroom.mode())
-        -- Le radio déjà coché : la valeur ne change pas (aucun observateur), mais le clic a validé
-        -- le champ ; la demande tapée ne part pas pour autant (F.lierRadio), et rien ne change.
-        local envoyer, envoyees = Fenetre.envoyer, 0
-        Fenetre.envoyer = function() envoyees = envoyees + 1 end
-        local taches = #S.taches
-        S.taper(champ, 'Encore')
-        S.cliquer(radios.appliquer)
-        egal(nil, Fenetre.envoiAuto, "un clic sur le radio déjà coché annule aussi l'envoi automatique")
-        egal('Encore', p.saisie, 'validée par le clic, laissée dans le champ')
-        for i = taches + 1, #S.taches do
-            S.taches[i]()
+        egal(nil, p.mode, 'plus de clé mode dans la fenêtre')
+        for _, nom in ipairs({ 'modeMontre', 'rafraichirMode', 'reposerMode', 'changerMode', 'TOUR_REPOSER_MODE', 'LIBELLES_MODE',
+            'EXERCICE_CONTINUE', 'jeLeFais', 'suivreExercice' }) do
+            egal(nil, Fenetre[nom], 'Fenetre.' .. nom .. ' retiré')
         end
-        Fenetre.envoyer = envoyer
-        egal(0, envoyees, 'rien envoyé')
-        egal('appliquer', Lightroom.mode(), 'la liaison inchangée')
-        egal('appliquer', p.mode)
-        -- La fenêtre qui pose la valeur (de la table vers la vue : Lightroom relit la valeur de
-        -- chaque radio pour le redessiner) n'annule rien.
-        Fenetre.envoiAuto = {}
-        Fenetre.rafraichirMode()
-        Lightroom.basculerMode()
-        Fenetre.rafraichirMode()
-        for nom, r in pairs(radios) do
-            egal('proposer', valeur(r, 'value', p), nom .. ' : la valeur relue')
-        end
-        vrai(Fenetre.envoiAuto, "la fenêtre qui change le radio n'annule pas l'envoi automatique")
-        Fenetre.envoiAuto = nil
-        Lightroom.basculerMode()
-        Fenetre.rafraichirMode()
-        p.saisie = ''
-        -- Un mode changé ailleurs (le menu de la liaison) : le radio suit au rafraîchissement.
-        Lightroom.basculerMode()
+        egal('function', type(Fenetre.lierRadio), 'gardé pour Mes demandes')
         Fenetre.rafraichir()
-        egal('proposer', p.mode)
-        Lightroom.basculerMode()
-        Fenetre.rafraichir()
-        -- Pendant que Claude travaille : les trois grisés.
-        Moteur.travaille = true
-        Fenetre.rafraichir()
-        for nom, r in pairs(radios) do
-            egal(false, valeur(r, 'enabled', p), nom .. ' grisé pendant le travail')
-        end
-        refuse(function() S.cliquer(radios.proposer) end, 'inactive', 'un radio grisé ne se clique pas')
-        Moteur.travaille = false
-        Fenetre.rafraichir()
-        egal(true, valeur(radios.appliquer, 'enabled', p))
-        egal(true, valeur(radios.jelefais, 'enabled', p), 'Je le fais : une photo active, Claude libre')
-    end)
-end)
-
-essai('Mode : Je le fais lance l\'exercice (jamais J\'ai fini depuis un radio) ; coché pendant l\'exercice, réouverture comprise ; revenu au mode après la comparaison ou un refus', function()
-    photoActive(4961, 'DSCF4961.RAF')
-    Moteur.nouvelle()
-    require('Preferences').lire().mode = 'proposer'
-    local c = Moteur.courante
-    local jeLeFais, jaiFini = Moteur.jeLeFais, Moteur.jaiFini
-    local demandes, finis = 0, 0
-    Moteur.jeLeFais = function()
-        demandes = demandes + 1
-        Moteur.travaille = true
-        return true
-    end
-    Moteur.jaiFini = function() finis = finis + 1; return true end
-    local ok, erreur = pcall(function()
-        ouvrirFenetre(function(p, contenu)
-            local radio = vuePar(contenu, 'checked_value', 'jelefais', 'radio_button')
-            egal('proposer', p.mode)
-            local taches = #S.taches
-            S.cliquer(radio)
-            egal('jelefais', p.mode, 'coché au clic')
-            egal(taches + 1, #S.taches, 'la demande part dans une tâche')
-            S.taches[taches + 1]()
-            egal(1, demandes, 'Moteur.jeLeFais')
-            egal('jelefais', p.mode, 'Claude prépare la liste : toujours Je le fais')
-            -- La liste arrive : l'exercice est à faire.
-            Moteur.travaille = false
-            exerciceAFaire(c, 'tour-1')
-            Fenetre.rafraichir()
-            egal('jelefais', p.mode, 'exercice à faire')
-            -- Je le fais pendant l'exercice : rien (ni nouvelle demande, ni J'ai fini), pas même une
-            -- tâche.
-            local avant = #S.taches
-            Fenetre.changerMode('jelefais')
-            egal(avant, #S.taches, 'aucune tâche')
-            for i = avant + 1, #S.taches do
-                S.taches[i]()
-            end
-            egal(1, demandes)
-            egal(0, finis, "jamais J'ai fini depuis un radio")
-            -- Appliquer pendant l'exercice : la liaison change, le radio revient, le bandeau le dit.
-            S.cliquer(vuePar(contenu, 'checked_value', 'appliquer', 'radio_button'))
-            egal('appliquer', Lightroom.mode(), 'la liaison change')
-            egal('jelefais', p.mode, 'le radio revient à Je le fais')
-            -- Un message court, qui tient dans les deux lignes du bandeau (lot B4).
-            egal(Fenetre.EXERCICE_CONTINUE .. 'Appliquer.', p.message)
-            egal(1, (p.message:find("L'exercice continue", 1, true)), p.message)
-            p.message = ''
-        end)
-        -- Rouverte : toujours Je le fais (tiré de l'état, pas d'un drapeau).
-        ouvrirFenetre(function(p)
-            egal('jelefais', p.mode, "réouverte pendant l'exercice")
-            -- Comparée : le mode de la liaison.
-            Conversation.exerciceEnCours(c).etat = 'comparee'
-            Fenetre.rafraichir()
-            egal('appliquer', p.mode, 'après la comparaison')
-            -- Un refus (aucune photo active ni proposition) : le radio revient aussi.
-            Moteur.jeLeFais = function() return false, 'Aucune photo active' end
-            local taches = #S.taches
-            Fenetre.changerMode('jelefais')
-            S.taches[taches + 1]()
-            egal('appliquer', p.mode, 'après un refus')
-            egal('Aucune photo active', p.message)
-            p.message = ''
-        end)
-    end)
-    Moteur.jeLeFais, Moteur.jaiFini, Moteur.travaille = jeLeFais, jaiFini, false
-    require('Preferences').lire().mode = 'appliquer'
-    assert(ok, erreur)
-end)
-
-essai('Mode (D12) : la valeur se repose une fois dans la première tâche de la fenêtre, par une autre, sans que l\'observateur la prenne pour un clic', function()
-    photoActive(4961, 'DSCF4961.RAF')
-    Moteur.nouvelle()
-    ouvrirFenetre(function(p)
-        local vus, changes = {}, 0
-        p:addObserver('mode', function(_, _, v) vus[#vus + 1] = tostring(v) end)
+        -- La boucle tourne quelques tours sans rien reposer.
         local LrTasks = S.modules.LrTasks
         local dormir, tours = LrTasks.sleep, 0
         LrTasks.sleep = function()
             tours = tours + 1
-            if tours >= Fenetre.TOUR_REPOSER_MODE + 1 then
+            if tours >= 3 then
                 error('arrêt de la boucle', 0)
             end
         end
-        avec(Fenetre, 'changerMode', function() changes = changes + 1 end, function()
-            local ok, e = pcall(Fenetre.boucle, Fenetre.generation)
-            vrai(not ok and e == 'arrêt de la boucle', tostring(e))
-        end)
+        local ok, e = pcall(Fenetre.boucle, Fenetre.generation)
         LrTasks.sleep = dormir
-        egal(2, Fenetre.TOUR_REPOSER_MODE, 'au deuxième tour')
-        egal('aucun ' .. p.mode, table.concat(vus, ' '), 'une autre valeur, puis la même')
-        egal(0, changes, "l'observateur ne la prend pas pour un clic")
-        egal(false, Fenetre.modeAuto)
+        vrai(not ok and e == 'arrêt de la boucle', tostring(e))
+        egal(nil, p.mode)
+        egal('proposer', prefs.mode, 'la fenêtre ne change pas le mode de la liaison')
+        egal('proposer', require('Lightroom').mode())
     end)
+    prefs.mode = 'appliquer'
 end)
 
 -- Liste des conversations -----------------------------------------------------------------------------
-
-local function date(annee, mois, jour, heure, minute)
-    return os.time({ year = annee, month = mois, day = jour, hour = heure or 12, min = minute or 0, sec = 0 })
-end
-
-essai('Liste : périodes Aujourd\'hui, Hier, Plus tôt en <mois>, <Mois année> ; sous-titres à l\'heure ou à la date courte, avec les photos', function()
-    local maintenant = date(2026, 10, 21, 20, 0)
-    egal("Aujourd'hui", Fenetre.periodeListe(date(2026, 10, 21, 0, 5), maintenant))
-    egal('Hier', Fenetre.periodeListe(date(2026, 10, 20, 21, 5), maintenant))
-    egal('Plus tôt en octobre', Fenetre.periodeListe(date(2026, 10, 12), maintenant))
-    egal('Septembre 2026', Fenetre.periodeListe(date(2026, 9, 30), maintenant))
-    egal('Octobre 2025', Fenetre.periodeListe(date(2025, 10, 8), maintenant))
-    egal('Décembre 2025', Fenetre.periodeListe(date(2025, 12, 31), maintenant))
-    -- Hier par-dessus un changement de mois.
-    egal('Hier', Fenetre.periodeListe(date(2026, 10, 31, 23, 0), date(2026, 11, 1, 9, 0)))
-    egal('Octobre 2026', Fenetre.periodeListe(date(2026, 10, 30), date(2026, 11, 1, 9, 0)))
-    -- Sous-titres.
-    egal('19 h 46 · 1 photo', Fenetre.sousTitreListe({ modifiee = date(2026, 10, 21, 19, 46), cle = '53:1:53' }, maintenant))
-    egal('21 h 05 · 3 photos', Fenetre.sousTitreListe({ modifiee = date(2026, 10, 20, 21, 5), cle = '7:3:7:8:9' }, maintenant))
-    egal('12 oct. · 48 photos', Fenetre.sousTitreListe({ modifiee = date(2026, 10, 12), cle = '1:48:1' }, maintenant))
-    egal('8 oct.', Fenetre.sousTitreListe({ modifiee = date(2025, 10, 8) }, maintenant), 'sans clé : la date seule')
-    egal('9 h 00', Fenetre.sousTitreListe({ creee = date(2026, 10, 21, 9, 0) }, maintenant), 'sans modifiee : creee')
-end)
-
-essai('Liste : cases d\'une page (Fenetre.casesListe) ; Plus anciennes… et Plus récentes… ; un en-tête de jour ne finit jamais une page', function()
-    local elements = {}
-    for i = 1, 30 do
-        if i % 6 == 1 then
-            elements[#elements + 1] = { genre = 'jour', title = 'Jour ' .. i, value = '§' .. i }
-        else
-            elements[#elements + 1] = { genre = 'conversation', title = 'C' .. i, value = 'c' .. i, sousTitre = 's' }
-        end
-    end
-    local function decrire(cases)
-        local r = {}
-        for _, c in ipairs(cases) do
-            r[#r + 1] = c.genre == 'plus' and (c.title .. '>' .. c.vers) or (c.value or c.genre)
-        end
-        return table.concat(r, ' ')
-    end
-    local cases, page = Fenetre.casesListe(elements, 1, 12)
-    egal(1, page)
-    egal(12, #cases)
-    egal('§1 c2 c3 c4 c5 c6 §7 c8 c9 c10 c11 Plus anciennes…>2', decrire(cases))
-    cases, page = Fenetre.casesListe(elements, 2, 12)
-    egal('Plus récentes…>1 c12 §13 c14 c15 c16 c17 c18 §19 c20 c21 Plus anciennes…>3', decrire(cases))
-    cases, page = Fenetre.casesListe(elements, 99, 12)
-    egal(3, page, 'au-delà : la dernière page')
-    egal('Plus récentes…>2 c22 c23 c24 §25 c26 c27 c28 c29 c30 vide vide', decrire(cases), 'cases vides au bout')
-    -- Un en-tête de jour ne finit jamais une page : il passe à la suivante, une case vide à sa place,
-    -- et « Plus anciennes… » reste dans la dernière case.
-    local jours = {}
-    for i = 1, 20 do
-        jours[i] = (i == 1 or i == 11) and { genre = 'jour', title = 'J' .. i, value = '§' .. i }
-            or { genre = 'conversation', title = 'C' .. i, value = 'c' .. i }
-    end
-    egal('§1 c2 c3 c4 c5 c6 c7 c8 c9 c10 vide Plus anciennes…>2', decrire(Fenetre.casesListe(jours, 1, 12)))
-    egal('Plus récentes…>1 §11 c12 c13 c14 c15 c16 c17 c18 c19 c20 vide', decrire(Fenetre.casesListe(jours, 2, 12)))
-    -- Une liste courte : une page, sans pagination, des cases vides.
-    cases = Fenetre.casesListe({ elements[1], elements[2] }, 1, 12)
-    egal('§1 c2 vide vide vide vide vide vide vide vide vide vide', decrire(cases))
-    egal('§1 c2 vide', decrire(Fenetre.casesListe({ elements[1], elements[2] }, 0, 3)), 'une page 0 : la première')
-    -- Des tables neuves.
-    vrai(cases[2] ~= elements[2], 'tables neuves')
-end)
-
-essai('Liste dans la fenêtre : le carnet en tête, la case choisie (fond et gras) suit la vue ; un clic ouvre, refusé pendant le travail ; pages, recherche', function()
-    photoActive(4961, 'DSCF4961.RAF')
-    local conversations, courante = Moteur.conversations, Moteur.courante
-    Moteur.conversations = {}
-    local maintenant = os.time()
-    -- Deux conversations de plus que la liste n'a de cases : avec l'entrée du carnet et l'en-tête du
-    -- jour, elles ne tiennent pas sur une page.
-    local nombre = D.cases + 2
-    for i = 1, nombre do
-        local c = Conversation.nouvelle()
-        Conversation.ajouterDemande(c, 'Demande ' .. i)
-        -- La 4e porte une balise <EM> dans son titre : Lightroom la lirait comme du texte riche
-        -- (une balise seule disparaît, constaté) ; la case et l'en-tête montrent le titre sans elle.
-        Conversation.renommer(c, (i == 3 and 'Lac au matin') or (i == 4 and 'Pont <EM>en</EM> automne') or ('Conversation ' .. i))
-        c.modifiee = maintenant - (i - 1) * 60
-        c.cle = '4961:' .. i .. ':4961'
-        Moteur.conversations[#Moteur.conversations + 1] = c
-    end
-    Moteur.courante = Moteur.conversations[1]
-    local ouvrir, ouvertes = Moteur.ouvrir, {}
-    Moteur.ouvrir = function(id)
-        ouvertes[#ouvertes + 1] = id
-        return ouvrir(id)
-    end
-    local ok, erreur = pcall(ouvrirFenetre, function(p, contenu)
-        Fenetre.rafraichir()
-        egal('carnet', p.lg1, 'le carnet en première case')
-        egal(Carnet.TITRES.carnet, p.lt1)
-        egal(Fenetre.SOUS_TITRE_CARNET, p.ls1)
-        egal('jour', p.lg2)
-        egal("Aujourd'hui", p.lt2)
-        egal('conversation', p.lg3)
-        egal('Conversation 1', p.lt3)
-        vrai(p.ls3:match('^%d+ h %d%d · 1 photo$'), p.ls3)
-        egal('Conversation 1', p.li3, "l'infobulle : le titre entier")
-        -- La case choisie : la conversation montrée ; son fond, son titre en gras.
-        egal(true, p.lc3)
-        egal(Moteur.courante.id, Fenetre.choixListe())
-        local fond, gras, normal
-        for _, v in ipairs(vues(contenu)) do
-            local vis = v.args.visible
-            if v.genre == 'picture' and type(v.args.value) == 'string' and v.args.value:match('/selection%.png$') and S.cles(vis)[1] == 'lc3' then
-                fond = v
-            elseif v.genre == 'static_text' and type(v.args.title) == 'table' and v.args.title.key == 'lt3' and type(vis) == 'table' then
-                if v.args.font.name == '<system/bold>' and v.args.font.size == 12 then
-                    gras = v
-                elseif v.args.font.name == '<system>' and v.args.font.size == 12 then
-                    normal = normal or v
-                end
-            end
-        end
-        vrai(S.montree(fond, p) and S.montree(gras, p) and not S.montree(normal, p), 'choisie : fond et gras')
-        -- Un titre à balise : sans elle dans la case, son infobulle et l'en-tête, une fois ouverte.
-        local pont = Moteur.conversations[4]
-        egal(pont.id, Fenetre.cases[6].value)
-        egal('Pont en automne', p.lt6, 'la case, sans balise')
-        egal('Pont en automne', p.li6, "l'infobulle, sans balise")
-        S.cliquer(calqueCase(contenu, 6))
-        egal(pont, Moteur.courante)
-        Fenetre.rafraichir()
-        egal('Pont en automne', p.titre, "l'en-tête, sans balise")
-        -- Un clic sur une autre conversation : Moteur.ouvrir, elle devient la choisie.
-        local lac = Moteur.conversations[3]
-        S.cliquer(calqueCase(contenu, 5))
-        egal(lac.id, ouvertes[#ouvertes], 'Moteur.ouvrir')
-        egal(lac, Moteur.courante)
-        egal(lac.id, Fenetre.choixListe())
-        vrai(not S.montree(fond, p), 'l\'ancienne case n\'est plus choisie')
-        -- Pendant que Claude travaille : refusé, le bandeau le dit.
-        Moteur.travaille = true
-        local avant = #ouvertes
-        S.cliquer(calqueCase(contenu, 3))
-        Moteur.travaille = false
-        egal(avant, #ouvertes, 'refusé pendant le travail')
-        egal(lac, Moteur.courante)
-        egal(Fenetre.CLAUDE_TRAVAILLE, p.message)
-        p.message = ''
-        -- Un en-tête ou une case vide : rien.
-        S.cliquer(calqueCase(contenu, 2))
-        egal(avant, #ouvertes)
-        -- Pages : les conversations, l'entrée du carnet et l'en-tête ne tiennent pas dans les cases
-        -- de la liste ; « Plus anciennes… » dans la dernière.
-        local derniere = D.cases
-        egal('plus', p['lg' .. derniere])
-        egal('Plus anciennes…', p['lt' .. derniere])
-        S.cliquer(calqueCase(contenu, derniere))
-        egal(2, Fenetre.pageListe)
-        egal('plus', p.lg1)
-        egal('Plus récentes…', p.lt1)
-        egal(avant, #ouvertes, 'changer de page n\'ouvre rien')
-        -- La recherche ramène à la première page (ici, encore deux pages de résultats), et filtre.
-        local recherche = liee(contenu, 'edit_field', 'recherche')
-        S.taper(recherche, 'Conversation')
-        egal(1, Fenetre.pageListe, 'la recherche ramène à la première page')
-        egal('plus', p['lg' .. derniere], 'deux pages de résultats')
-        p.recherche = ''
-        S.taper(recherche, 'lac')
-        egal(1, Fenetre.pageListe)
-        local trouvees = {}
-        for k = 1, D.cases do
-            if p['lg' .. k] == 'conversation' then
-                trouvees[#trouvees + 1] = p['lt' .. k]
-            end
-        end
-        egal('Lac au matin', table.concat(trouvees, ' '))
-        p.recherche = ''
-        -- Sur la page du carnet, c'est son entrée qui est choisie (Fenetre.vue).
-        avec(Fenetre, 'lireCarnet', function() end, function()
-            S.cliquer(calqueCase(contenu, 1))
-            S.taches[#S.taches]()
-        end)
-        egal('carnet', Fenetre.vue)
-        egal(true, p.lc1)
-        egal(Fenetre.CARNET, Fenetre.choixListe())
-        Fenetre.quitterCarnet()
-        Fenetre.rafraichirListe()
-        egal(false, p.lc1)
-        egal(lac.id, Fenetre.choixListe())
-        -- Nouvelle conversation depuis la 2e page : elle est en tête de la liste, la première page
-        -- revient, et c'est elle qui est choisie.
-        S.cliquer(calqueCase(contenu, derniere))
-        egal(2, Fenetre.pageListe)
-        S.cliquer(parTitre(contenu, '＋ Nouvelle conversation'))
-        egal(1, Fenetre.pageListe, 'Nouvelle conversation : la première page')
-        vrai(Moteur.courante ~= lac, 'une nouvelle conversation')
-        Fenetre.rafraichir()
-        egal(Moteur.courante.id, Fenetre.choixListe(), 'la nouvelle, choisie')
-    end)
-    Moteur.ouvrir, Moteur.conversations, Moteur.courante, Moteur.travaille = ouvrir, conversations, courante, false
-    Fenetre.vue = 'conversation'
-    assert(ok, erreur)
-end)
+-- (Retirée avec le volet au correctif 1.3.6 : ses périodes, ses cases et ses pages ; essai « Plus de
+-- volet », plus haut.)
 
 -- Légende de la photo active ---------------------------------------------------------------------------
 
@@ -1443,11 +1111,6 @@ local Json = require 'Json'
 local Metriques = require 'Metriques'
 local Texte = require 'Texte'
 
-local function contient(texte, morceau, quoi)
-    if type(texte) ~= 'string' or not texte:find(morceau, 1, true) then
-        error(string.format('%s : %q introuvable dans %q', quoi or 'texte', morceau, tostring(texte)), 2)
-    end
-end
 
 -- 19 h 42, le 21 octobre 2026, à l'heure locale.
 local T0 = os.time({ year = 2026, month = 10, day = 21, hour = 19, min = 42, sec = 0 })
@@ -1468,7 +1131,8 @@ end
 
 -- Une conversation comme celle de la maquette : Dany demande la retouche (19 h 42) ; Claude regarde,
 -- écrit l'étape « tons et balance » (deux réglages, son etape_id) et le dit (19 h 43) ; Dany demande la
--- note (19 h 46) ; Claude note la photo active et une autre, puis donne la leçon, et l'explique.
+-- note (19 h 46) ; Claude note la photo active et une autre, et l'explique (plus de leçon de la
+-- photo depuis le correctif 1.3.6).
 local function conversationMaquette()
     local c = Conversation.nouvelle(T0)
     c.titre, c.titreChoisi = 'Orage sur le camping', true
@@ -1491,13 +1155,6 @@ local function conversationMaquette()
     } }, T0 + 241)
     reponse(c, 'n1', { propositions = Json.tableau({ { photo = 4961, fichier = 'DSCF4961.RAF', note_avant = 0, drapeau_avant = 'aucun', etat = 'proposee' },
         { photo = 4962, fichier = 'DSCF4962.RAF', note_avant = 0, drapeau_avant = 'aucun', etat = 'proposee' } }), refusees = Json.tableau() }, T0 + 242)
-    outil(c, 'l1', 'photo_lesson', { photo_id = 4961, points = {
-        { axis = 'light', missing = 'Ciel brûlé à 3 %.', at_capture = 'Compenser de −2/3 IL.' },
-        { axis = 'color', missing = 'Dominante chaude.', at_capture = 'Balance des blancs Lumière du jour.' },
-        { axis = 'composition', at_capture = 'Les tentes au tiers bas.' },
-    } }, T0 + 243)
-    reponse(c, 'l1', { lecon = { photo = 4961, fichier = 'DSCF4961.RAF', rangee = true, remplacee = false, mois = '2026-10' },
-        remarques = Json.tableau() }, T0 + 244)
     texteClaude(c, "Je propose 3 ★ : la photo tient seule. Pas 4 ★ : le feuillage bougé se voit à 100 %.", T0 + 245)
     Conversation.appliquer(c, { genre = 'fin', reussie = true, interrompue = false, session = '' }, T0 + 246)
     return c
@@ -1684,9 +1341,9 @@ essai("Fil : la ligne d'un appel (texte riche, nom en Menlo) ; une étape porte 
     egal('Un mot en gras ?', claude[1].texte)
 end)
 
-essai("Fil : le tour de Claude qui a noté et donné la leçon finit par une ligne d'actions, les deux boutons, après son texte (maquette) ; un tour chacun, une ligne chacun", function()
+essai("Fil : le tour de Claude qui a noté finit par une ligne d'actions, après son texte (maquette) ; un tour chacun, une ligne chacun", function()
     local c = conversationMaquette()
-    local n, l = elementDe(c, 'notation'), elementDe(c, 'lecon')
+    local n = elementDe(c, 'notation')
     local lignes = Fil.lignes(c, D.texteFil)
     local actions = {}
     for k, x in ipairs(lignes) do
@@ -1694,23 +1351,29 @@ essai("Fil : le tour de Claude qui a noté et donné la leçon finit par une lig
             actions[#actions + 1] = x.actions .. ':' .. tostring(x.notation) .. ':' .. tostring(x.lecon) .. '@' .. k
         end
     end
-    egal('les deux:' .. n .. ':' .. l .. '@' .. #lignes, table.concat(actions, ' '), 'une ligne, à la fin du tour')
+    egal('note:' .. n .. ':nil@' .. #lignes, table.concat(actions, ' '), 'une ligne, à la fin du tour ; plus de leçon (correctif 1.3.6)')
     contient(lignes[#lignes - 1].texte, 'feuillage', 'après le texte de Claude')
-    -- Une demande entre les notes et la leçon : deux tours, une ligne d'actions chacun.
+    egal(nil, Fil.valeurActions(nil, nil))
+    egal('note', Fil.valeurActions(n, nil))
+    egal('note+demande', Fil.valeurActions(n, 9))
+    egal('demande', Fil.valeurActions(nil, 9))
+    -- Une demande entre les notes et le texte de Claude : la ligne d'actions finit le tour des notes.
     local d = conversationMaquette()
     local m = elementDe(d, 'notation')
-    table.insert(d.elements, m + 1, { id = 'entre', genre = 'dany', texte = 'Et la leçon ?', date = T0 + 242, images = {}, changements = {} })
+    table.insert(d.elements, m + 1, { id = 'entre', genre = 'dany', texte = 'Et pourquoi 3 ?', date = T0 + 242, images = {}, changements = {} })
     actions = {}
-    for _, x in ipairs(Fil.lignes(d, D.texteFil)) do
+    local dLignes = Fil.lignes(d, D.texteFil)
+    for k, x in ipairs(dLignes) do
         if x.genre == 'actions' then
             actions[#actions + 1] = x.actions
+            egal('dany', dLignes[k + 2] and dLignes[k + 2].genre, 'avant la demande suivante')
         end
     end
-    egal('note lecon', table.concat(actions, ' '))
+    egal('note', table.concat(actions, ' '))
     -- Une notation refusée, ou en cours : pas de « Voir la note ».
     d.elements[m].etat = 'erreur'
     for _, x in ipairs(Fil.lignes(d, D.texteFil)) do
-        vrai(x.actions ~= 'note' and x.actions ~= 'les deux', 'notation refusée : ' .. tostring(x.actions))
+        vrai(x.actions ~= 'note', 'notation refusée : ' .. tostring(x.actions))
     end
 end)
 
@@ -1797,14 +1460,15 @@ essai("Fil dans la fenêtre : une ligne de 21 (auteur 60, écart 12, puis le tex
                 pourquoi = pourquoi + (S.montreeDansFenetre(v) and 1 or 0)
                 local rangee = rangeeDe(contenu, v)
                 egal(D.texteFil - D.pourquoi, rangee.args.margin_left, 'poussé à droite dans sa rangée (D6)')
-            elseif S.BOUTONS[v.genre] and (v.args.title == '☆ Voir la note' or v.args.title == 'Leçon de la photo') then
+            elseif S.BOUTONS[v.genre] and v.args.title == '☆ Voir la note' then
                 egal('square_button', v.genre)
                 vrai(S.bezelVisible(v) + S.MARGE_BEZEL <= D.hauteurLigne, 'dans sa ligne')
                 actions = actions + (S.montreeDansFenetre(v) and 1 or 0)
             end
         end
         egal(1, pourquoi, 'un seul « Pourquoi ? » montré')
-        egal(2, actions, '« ☆ Voir la note » et « Leçon de la photo » sur une ligne')
+        egal(1, actions, '« ☆ Voir la note » sur une ligne')
+        refuse(function() parTitre(contenu, 'Leçon de la photo') end, 'introuvable', 'plus de « Leçon de la photo »')
         -- Les textes : celui d'un appel garde ses balises (Menlo en emphase) ; les autres variantes de la
         -- même ligne le reçoivent sans balise (la simulation refuserait <EM> sans emphasis_font).
         local i = ligneDeLaGrille(function(l) return l.etape end)
@@ -1842,7 +1506,7 @@ essai("Fil dans la fenêtre : une ligne de 21 (auteur 60, écart 12, puis le tex
     end)
 end)
 
-essai("Fil dans la fenêtre : « Pourquoi ? » (clic) ouvre l'onglet Aperçu sur son étape ; « ☆ Voir la note » l'onglet Note, sans changer la sélection, le bandeau dit de choisir la photo ; « Leçon de la photo » l'onglet Leçon", function()
+essai("Fil dans la fenêtre : « Pourquoi ? » (clic) ouvre l'onglet Aperçu sur son étape ; « ☆ Voir la note » l'onglet Note, sans changer la sélection, le bandeau dit de choisir la photo", function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.charger()
     Moteur.nouvelle()
@@ -1869,7 +1533,7 @@ essai("Fil dans la fenêtre : « Pourquoi ? » (clic) ouvre l'onglet Aperçu sur
         local selection = S.selection
         local recus = {}
         local i = ligneDeLaGrille(function(x) return x.genre == 'actions' end)
-        egal('les deux', p['x' .. i])
+        egal('note', p['x' .. i])
         avec(Fenetre.surOnglet, 'notation', function(v) recus[#recus + 1] = v end, function()
             p.onglet = 'apercu'
             S.cliquer(boutonDeLigne(contenu, '☆ Voir la note', 'x', i))
@@ -1888,39 +1552,8 @@ essai("Fil dans la fenêtre : « Pourquoi ? » (clic) ouvre l'onglet Aperçu sur
         egal(Fenetre.NOTE_AUTRE_PHOTO, p.message)
         egal(avant, S.selection, 'jamais de sélection changée par la fenêtre')
         p.message = ''
-        -- L'onglet Leçon suit la photo active : 4963 n'a pas de leçon ici.
-        egal(Fenetre.AUCUNE_LECON, (p.leconTexte:gsub('\n', ' ')), 'pas de leçon pour la photo active')
-        -- « Leçon de la photo » : l'onglet Leçon, sur cette leçon (même d'une autre photo).
-        S.cliquer(boutonDeLigne(contenu, 'Leçon de la photo', 'x', i))
-        egal('lecon', p.onglet)
-        egal(c.elements[elementDe(c, 'lecon')].id, Fenetre.leconChoisie)
-        egal('Leçon de la photo · DSCF4961.RAF', p.leconTitre)
-        egal(1, (p.leconTexte:find('<EM>Lumière</EM>', 1, true)), p.leconTexte)
         p.onglet = 'notation'
         photoActive(4961, 'DSCF4961.RAF')
-    end)
-end)
-
-essai('Fil dans la fenêtre : pas de bascule vers Leçon quand une proposition attend ; une fois sinon', function()
-    photoActive(4961, 'DSCF4961.RAF')
-    Moteur.charger()
-    Moteur.nouvelle()
-    local c = Moteur.courante
-    ouvrirFenetre(function(p)
-        Fenetre.rafraichir()
-        outil(c, 'p1', 'preview_settings', { photo_id = 4961, settings = { Exposure2012 = 0.3 }, reason = 'Plus clair' })
-        Fenetre.rafraichir()
-        egal('proposition', p.onglet)
-        outil(c, 'l1', 'photo_lesson', { photo_id = 4961, points = { { axis = 'light', missing = 'Sombre.', at_capture = 'Exposer plus.' } } })
-        reponse(c, 'l1', { lecon = { photo = 4961, fichier = 'DSCF4961.RAF', rangee = true }, remarques = Json.tableau() })
-        Fenetre.rafraichir()
-        egal('proposition', p.onglet, 'Accepter reste devant')
-        Conversation.decider(c, Conversation.propositionEnAttente(c).id, true)
-        outil(c, 'l2', 'photo_lesson', { photo_id = 4961, points = { { axis = 'light', missing = 'Sombre.', at_capture = 'Exposer plus.' } } })
-        reponse(c, 'l2', { lecon = { photo = 4961, fichier = 'DSCF4961.RAF', rangee = true }, remarques = Json.tableau() })
-        Fenetre.rafraichir()
-        egal('lecon', p.onglet, 'sans proposition en attente : la leçon se montre')
-        p.onglet = 'notation'
     end)
 end)
 
@@ -1959,17 +1592,15 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
     egal(2, Fenetre.LIGNES_BANDEAU)
     local place = D.bandeau - Fil.MARGE
     -- Les messages de la fenêtre (mesurés par Metriques, en petit), ceux de la carte Note (lot B5),
-    -- et les refus du moteur, provoqués ici : Claude au travail, Je le fais sans photo active, une
-    -- ancienne séance de notation (raccourcis au lot B5 : ils finissaient par « … »).
+    -- et les refus du moteur, provoqués ici : Claude au travail, une ancienne séance de notation
+    -- (raccourcis au lot B5 : ils finissaient par « … » ; Je le fais sans photo active est retiré au
+    -- correctif 1.3.6).
     local refus = {}
     local travaille, courante, conversations = Moteur.travaille, Moteur.courante, Moteur.conversations
     local ok, erreur = pcall(function()
         Moteur.travaille = true
         refus[#refus + 1] = select(2, Moteur.envoyer('Bonjour'))
         Moteur.travaille = false
-        S.photoActive, S.selection = nil, {}
-        Moteur.nouvelle()
-        refus[#refus + 1] = select(2, Moteur.jeLeFais())
         local seance = Conversation.nouvelle()
         seance.genre = 'notation'
         Moteur.conversations = { seance }
@@ -1979,12 +1610,17 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
     assert(ok, erreur)
     -- Le refus d'un envoi pendant le travail est celui des autres refus du moteur (Arrêter compris).
     egal(Fenetre.CLAUDE_TRAVAILLE, refus[1], "le refus d'un envoi, comme les autres")
-    egal("Claude travaille : attendez la fin, ou cliquez Arrêter. | Aucune photo active : choisissez-la dans Lightroom. | "
-        .. "Une ancienne séance de notation ne s'ouvre plus.", table.concat(refus, ' | '), 'les refus du moteur, raccourcis')
-    local messages = { Fenetre.CLAUDE_TRAVAILLE, Fenetre.CHOISIR_CONVERSATION, Fenetre.NOTE_AUTRE_PHOTO, Fenetre.PAS_D_IMAGE,
-        Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE.proposer .. '.', Fenetre.EXERCICE_CONTINUE .. Fenetre.LIBELLES_MODE.appliquer .. '.',
-        "Écrivez une demande avant d'envoyer.", Fenetre.NOTE_EN_COURS, Fenetre.AUCUNE_PHOTO, refus[1], refus[2], refus[3] }
-    egal(12, #messages, 'chaque message, aucun nil')
+    egal("Claude travaille : attendez la fin, ou cliquez Arrêter. | Une ancienne séance de notation ne s'ouvre plus.",
+        table.concat(refus, ' | '), 'les refus du moteur, raccourcis')
+    egal(nil, Fenetre.CHOISIR_CONVERSATION, 'retiré avec la page du carnet (correctif 1.3.6)')
+    -- « Repartir à neuf » (correctif 1.3.6) : sans photo seule, une conversation montrée qui n'est pas
+    -- celle de la photo active, et ce qui est fait ; « Obtenir » (onglet Proposition) : sans photo
+    -- seule, une proposition qui attend déjà.
+    local messages = { Fenetre.CLAUDE_TRAVAILLE, Fenetre.NOTE_AUTRE_PHOTO, Fenetre.PAS_D_IMAGE,
+        "Écrivez une demande avant d'envoyer.", Fenetre.NOTE_EN_COURS, Fenetre.AUCUNE_PHOTO, refus[1], refus[2],
+        Fenetre.REPARTIR_SANS_PHOTO, Fenetre.REPARTIR_AUTRE, Fenetre.REPARTIE, Fenetre.OBTENIR_SANS_PHOTO,
+        Fenetre.OBTENIR_EN_ATTENTE }
+    egal(13, #messages, 'chaque message, aucun nil')
     for _, m in ipairs(messages) do
         local montre = Fenetre.texteBandeau(m, D.bandeau)
         egal(m, (montre:gsub('\n', ' ')), 'en entier : ' .. m)
@@ -2049,44 +1685,8 @@ essai("Bandeau : deux lignes de petit texte dans la place du menu Modèle ; chaq
     end)
 end)
 
-essai('Carnet : le tableau, en Menlo, aligné et dans la largeur du fil', function()
-    -- Six mois (dont un changement d'année, les mois avec leur année) et des libellés de 40 caractères,
-    -- dans un fil de 648 points (celui de la fenêtre de 1 497 × 1 200, plus étroit que celui de
-    -- D.texteFil) : la colonne Défaut se resserre, le tableau reste aligné et tient dans le fil.
-    local mois, defauts = {}, {}
-    for k = 1, 6 do
-        mois[k] = { cle = 'm' .. k, annee = k < 4 and 2025 or 2026, court = ({ 'oct.', 'nov.', 'déc.', 'janv.', 'févr.', 'mars' })[k] }
-    end
-    for k = 1, 4 do
-        local par = {}
-        for m = 1, 6 do
-            par[m] = { n = k, sur = 12 }
-        end
-        defauts[k] = { code = 'd' .. k, libelle = string.rep('Libellé très long ', 3):sub(1, 40), par_mois = par }
-    end
-    local page = { photos = 30, mois = mois, defauts = defauts, progresse = {}, recule = {}, a_travailler = {}, titres = Carnet.TITRES }
-    local largeur = 648
-    vrai(largeur <= D.texteFil, 'un fil plus étroit que celui de la fenêtre')
-    local lignes = Fil.lignesCarnet(page, largeur, Fenetre.TITRE_CARNET)
-    local tableau = {}
-    for _, l in ipairs(lignes) do
-        if l.genre == 'outil' then
-            tableau[#tableau + 1] = l
-        end
-    end
-    egal(5, #tableau)
-    for _, l in ipairs(tableau) do
-        egal(Texte.longueur(tableau[1].texte), Texte.longueur(l.texte), 'aligné : ' .. l.texte)
-        vrai(Fil.occupe(l) <= largeur - Fil.MARGE, string.format('dans le fil : %.0f', Fil.occupe(l)))
-        contient(l.texte, '  ', 'colonnes séparées')
-    end
-    contient(tableau[1].texte, 'oct. 2025')
-    contient(tableau[1].texte, 'mars 2026')
-    vrai(tableau[2].texte:find('…', 1, true), 'libellé resserré : ' .. tableau[2].texte)
-    -- Sans resserrement possible de plus : au moins LIBELLE_CARNET_MIN caractères pour le libellé.
-    local _, coupe = tableau[2].texte:find('…', 1, true)
-    vrai(Texte.longueur(tableau[2].texte:sub(1, coupe)) >= Fil.LIBELLE_CARNET_MIN, 'libellé lisible')
-end)
+-- (Le tableau du carnet en Menlo, à la largeur du fil, est retiré avec la page du carnet au
+-- correctif 1.3.6 : essais-carnet.lua éprouve la carte de l'onglet Suivi.)
 -- Cartes (lot B5) ------------------------------------------------------------------------------------
 
 local Images = require 'Images'
@@ -2095,7 +1695,7 @@ local Stockage = require 'Stockage'
 local INFOBULLE_ACCEPTER_NOTE = "Poser la note proposée dans Lightroom (sans Claude ni quota)"
 local INFOBULLE_ACCEPTER_PROPOSITION = "Appliquer la proposition : la photo ne change qu'à ce clic"
 
--- La colonne superposée des variantes des onglets (Aperçu, Proposition, Note, Leçon), et chacune.
+-- La colonne superposée des variantes des onglets (Aperçu, Focus, Proposition, Note, Suivi), et chacune.
 local function variantes(contenu)
     for _, v in ipairs(vues(contenu)) do
         if v.args.place == 'overlapping' and #v.args == #D.onglets then
@@ -2115,7 +1715,7 @@ local function variantes(contenu)
     error('variantes des onglets introuvables', 2)
 end
 
--- La colonne superposée posée sur cette image de carte (Vues.lecon, Vues.proposition…).
+-- La colonne superposée posée sur cette image de carte (Vues.focus, Vues.proposition…).
 local function carteSur(contenu, nom)
     for _, v in ipairs(vues(contenu)) do
         if v.genre == 'column' and v.args.place == 'overlapping' then
@@ -2204,15 +1804,18 @@ essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leu
         + Dispositions.cadreBouton(22) + 12 + D.placeCartes, 'la place des cartes, du haut des segments au bas du panneau')
     egal(472, D.carte)
     egal(13, D.margeCarte)
-    for _, cle in ipairs({ 'largeurNote', 'largeurProposition', 'largeurEtape', 'largeurLecon' }) do
+    for _, cle in ipairs({ 'largeurNote', 'largeurProposition', 'largeurEtape', 'largeurFocus', 'largeurSuivi' }) do
         egal(D.carte, D[cle], cle)
     end
-    -- Les cartes en 12 points ; la note et la leçon gardent leurs passages balisés (gras 12).
+    egal(nil, D.largeurLecon, "plus de carte de la leçon (correctif 1.3.6)")
+    -- Les cartes en 12 points ; la note, Focus et Suivi gardent leurs passages balisés (gras 12).
     for cle, carte in pairs(Fenetre.CARTES) do
         egal('texte12', carte.police, 'CARTES.' .. cle)
     end
     egal('gras12', Fenetre.CARTES.note.emphase)
-    egal('gras12', Fenetre.CARTES.lecon.emphase)
+    egal('gras12', Fenetre.CARTES.focus.emphase)
+    egal('gras12', Fenetre.CARTES.suivi.emphase)
+    egal(nil, Fenetre.CARTES.lecon)
     egal(nil, Fenetre.CARTES.proposition.emphase)
     egal(D.criteres + 1, Fenetre.CARTES.note.lignes(D), 'la grille des critères : criteres + 1 lignes')
     -- L'étiquette la plus large d'un critère tient dans sa colonne ; la grille, dans la carte.
@@ -2230,8 +1833,8 @@ essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leu
             vrai(hauteur(colonne) <= D.placeCartes, string.format('onglet %s : %.1f points pour %d', valeur, hauteur(colonne), D.placeCartes))
         end
         -- Chaque carte : une colonne superposée de la largeur intérieure, à la hauteur de son image,
-        -- son contenu à 13 du bord et 12 du haut (comme Vues.lecon).
-        for _, nom in ipairs({ 'carte-note', 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' }) do
+        -- son contenu à 13 du bord et 12 du haut (comme Vues.focus).
+        for _, nom in ipairs({ 'carte-note', 'carte-proposition', 'carte-etape', 'carte-focus', 'carte-suivi' }) do
             local carte = carteSur(contenu, nom)
             egal(Dispositions.IMAGES[nom].hauteur, carte.args.height, nom .. ' : la hauteur de son image')
             egal(D.interieur, carte.args.width, nom)
@@ -2240,7 +1843,7 @@ essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leu
             egal(12, dedans.args.margin_top, nom .. ' : marge du haut')
             vrai(hauteur(carte) <= carte.args.height, nom .. ' : son contenu y tient')
             -- Ses lignes la remplissent (Dispositions.TAILLES : criteres, propLignes, etapeLignes,
-            -- leconLignes, focusLignes) : au moins la marge du haut sous le contenu, et une ligne de plus (16 dans
+            -- focusLignes, suiviLignes) : au moins la marge du haut sous le contenu, et une ligne de plus (16 dans
             -- la grille de la carte Note, une ligne de texte en 12 ailleurs) ne laisserait plus cette
             -- marge.
             local estime = hauteur(dedans)
@@ -2253,13 +1856,14 @@ essai('Cartes (lot B5) : chacune sur son image, à la hauteur de son image ; leu
         -- L'onglet Note remplit la place des cartes : une ligne de critère de plus n'y tiendrait pas.
         vrai(hauteur(v.notation) + D.ligneCritere > D.placeCartes, string.format('onglet Note : %.1f pour %d', hauteur(v.notation), D.placeCartes))
         -- Les textes des cartes, à la largeur de leur intérieur, en 12 points.
-        for _, cle in ipairs({ 'propositionTexte', 'etapeTexte', 'leconTexte', 'focusTexte' }) do
+        for _, cle in ipairs({ 'propositionTexte', 'etapeTexte', 'focusTexte', 'suiviTexte' }) do
             local t = liee(contenu, 'static_text', cle)
             egal(D.carte, t.args.width, cle)
             egal(Fenetre.POLICES.texte12, t.args.font, cle)
         end
         egal(D.propLignes, liee(contenu, 'static_text', 'propositionTexte').args.height_in_lines)
         egal(D.etapeLignes, liee(contenu, 'static_text', 'etapeTexte').args.height_in_lines)
+        egal(D.suiviLignes, liee(contenu, 'static_text', 'suiviTexte').args.height_in_lines)
         -- La grille de la carte Note : chaque texte en 12, le verdict en gras 12 de même taille (D4).
         local textes = 0
         for _, x in ipairs(vues(contenu)) do
@@ -2378,7 +1982,7 @@ essai('Inventaire de la carte Note (maquette) : chaque élément, son genre, sa 
     end)
 end)
 
-essai('Inventaire des cartes Proposition et Aperçu (étape) : titres, textes, carrés, Accepter en bleu ; chaque bouton à sa clé', function()
+essai('Inventaire des cartes Proposition et Aperçu (étape) : titres, textes, carrés (Obtenir compris), Accepter en bleu ; chaque bouton à sa clé ; la rangée tient dans le panneau', function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
@@ -2393,10 +1997,39 @@ essai('Inventaire des cartes Proposition et Aperçu (étape) : titres, textes, c
                 cles[#cles + 1] = (type(t) == 'table' and ('[' .. t.key .. ']') or t) .. '=' .. x.args.enabled.key
             end
         end
-        egal('▲=propositionMonte ▼=propositionDescend Refuser=enAttente Ajuster…=enAttente [titreJeLeFais]=peutJeLeFais', table.concat(cles, ' '))
+        egal('▲=propositionMonte ▼=propositionDescend Obtenir=peutObtenir Refuser=enAttente Ajuster…=enAttente', table.concat(cles, ' '),
+            'Obtenir, puis Refuser et Ajuster… ; plus de Je le fais (correctif 1.3.6)')
+        -- Obtenir, Refuser et Ajuster… : des carrés de bezel 26, titres en 13, comme sous la carte
+        -- Note ; la largeur d'Obtenir vient de Dispositions.TAILLES et tient son titre.
+        local obtenir = parTitre(proposition, 'Obtenir')
+        for _, titre in ipairs({ 'Obtenir', 'Refuser', 'Ajuster…' }) do
+            local b = parTitre(proposition, titre)
+            egal('square_button', b.genre, titre .. ' : un carré')
+            egal(26, S.bezelVisible(b), titre .. ' : bezel de 26')
+            egal(Fenetre.POLICES.systeme13, b.args.font, titre .. ' : titre en 13')
+        end
+        egal(Dispositions.TAILLES.obtenir, obtenir.args.width, 'Obtenir : sa largeur de TAILLES')
+        egal(D.obtenir, obtenir.args.width)
+        vrai(Fil.largeur('Obtenir', 'texte') + 12 <= D.obtenir, 'son titre tient')
+        -- La rangée (▲ ▼, l'espace, Obtenir, Refuser, Ajuster…, Accepter en bleu) tient dans
+        -- l'intérieur du panneau, en comptant 30 points par flèche mini (▲ ▼).
+        local rangee = rangeeDe(proposition, obtenir)
+        egal(rangee, rangeeDe(proposition, parTitre(proposition, 'Refuser')), 'Obtenir et Refuser, dans la même rangée')
+        local bleu = Dispositions.IMAGES['bouton-bleu'].largeur
+        local total = 2 * 30 + 2 + D.obtenir + 8 + D.refuser + 8 + D.ajuster + 8 + bleu
+        vrai(total <= D.interieur, string.format('rangée de la carte Proposition : %d points pour %d', total, D.interieur))
+        local ordre = {}
+        for _, x in ipairs(rangee.args) do
+            if type(x) == 'table' and S.BOUTONS[x.genre] and x.args.title ~= nil then
+                ordre[#ordre + 1] = x.args.title
+            elseif type(x) == 'table' and x.genre == 'spacer' then
+                vrai(x.args.fill_horizontal or x.args.width == 8, 'entre les boutons : 8')
+            end
+        end
+        egal('Obtenir Refuser Ajuster…', table.concat(ordre, ' '), "l'ordre de la rangée, Accepter en bleu au bout")
         local accepter = parInfobulle(proposition, INFOBULLE_ACCEPTER_PROPOSITION)
         vrai(Fenetre.parCalque(accepter.args.mouse_down), 'Accepter de la proposition : un calque')
-        vrai(liee(proposition, 'static_text', 'exerciceEtat'), "l'état de l'exercice")
+        refuse(function() liee(proposition, 'static_text', 'exerciceEtat') end, 'introuvable', "plus d'état de l'exercice")
         -- Accepter inactif (aucune proposition) : son calque ne fait rien.
         egal(false, p.enAttente)
         local reponses = {}

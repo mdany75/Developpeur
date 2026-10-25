@@ -33,7 +33,7 @@ return {
         { title = "Demande rapide", file = 'MenuRapide.lua' },
         { title = "Publication…", file = 'MenuPublication.lua' },
         { title = "Consommation…", file = 'MenuConsommation.lua' },
-        { title = "Afficher la fenêtre de suivi", file = 'MenuSuivi.lua' },
+        { title = "Afficher la fenêtre de la liaison", file = 'MenuSuivi.lua' },
         { title = "Revenir à « Avant Claude »", file = 'MenuRevenir.lua', enabledWhen = 'photosSelected' },
         { title = "Créer une copie virtuelle pour Claude", file = 'MenuCopie.lua', enabledWhen = 'photosSelected' },
         { title = "Démarrer la liaison avec Claude", file = 'MenuDemarrer.lua' },
@@ -44,12 +44,12 @@ return {
         { title = "Demande rapide", file = 'MenuRapide.lua' },
         { title = "Publication…", file = 'MenuPublication.lua' },
         { title = "Consommation…", file = 'MenuConsommation.lua' },
-        { title = "Afficher la fenêtre de suivi", file = 'MenuSuivi.lua' },
+        { title = "Afficher la fenêtre de la liaison", file = 'MenuSuivi.lua' },
         { title = "Revenir à « Avant Claude »", file = 'MenuRevenir.lua', enabledWhen = 'photosSelected' },
         { title = "Créer une copie virtuelle pour Claude", file = 'MenuCopie.lua', enabledWhen = 'photosSelected' },
         { title = "Démarrer la liaison avec Claude", file = 'MenuDemarrer.lua' },
         { title = "Arrêter la liaison avec Claude", file = 'MenuArreter.lua' },
     },
 
-    VERSION = { major = 1, minor = 3, revision = 5, build = 10 },
+    VERSION = { major = 1, minor = 3, revision = 6, build = 11 },
 }

@@ -661,6 +661,34 @@ final class CarnetTests: XCTestCase {
         XCTAssertNil(sansSelection["remarque"])
     }
 
+    /// Le carnet ne montre plus que les constats (1.3.6, la leçon de la photo retirée) : une clé
+    /// lecons du résumé (à la racine, dans un défaut ou une tendance) ne va ni à Claude ni au
+    /// Markdown ; le reste passe tel quel.
+    func testExportJournalNeMontrePlusLesLecons() throws {
+        var resume = try XCTUnwrap(Self.resume.object)
+        resume["lecons"] = [["photo": 1, "points": []]]
+        resume["defauts"] = .array((resume["defauts"]?.array ?? []).map { defaut in
+            var d = defaut.object ?? [:]
+            d["lecons"] = [["photo": 1, "points": [["axe": "lumiere", "manque": "Leçon d'avant la 1.3.6."]]]]
+            return .object(d)
+        })
+        resume["a_travailler"] = .array((resume["a_travailler"]?.array ?? []).map { item in
+            var i = item.object ?? [:]
+            i["lecons"] = [["photo": 2]]
+            return .object(i)
+        })
+        fake.replies["carnet"] = ["catalogue": "Photos.lrcat", "nombre": 12, "photos": [], "resume": .object(resume)]
+        let result = tools.call(name: "export_journal", arguments: ["notebook": true])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertFalse(result.text.contains("lecons"), result.text)
+        XCTAssertFalse(result.text.contains("Leçon d'avant la 1.3.6."), result.text)
+        let info = try JSONCoding.parse(result.text)
+        XCTAssertEqual(info["carnet"], Carnet.sansLecons(.object(resume)))
+        XCTAssertEqual(Carnet.sansLecons(.object(resume)), Self.resume, "sans ses leçons, le résumé d'origine")
+        XCTAssertEqual(info["markdown"]?.string, Carnet.markdown(Self.resume))
+        XCTAssertEqual(Carnet.sansLecons("texte"), "texte", "ce qui n'est pas un objet passe tel quel")
+    }
+
     func testExportJournalEcritLeCarnetSansEcraser() throws {
         fake.replies["carnet"] = ["catalogue": "Photos.lrcat", "nombre": 12, "photos": [], "resume": Self.resume]
         let dossier = TestSupport.temporaryDirectory()

@@ -4,9 +4,8 @@
 -- cadre gardé lu dans la réponse : Conversation.cadreLu), son stockage, la carte Proposition (la
 -- ligne « Cadre : … » et ce que montre son aperçu, à la place des bords Crop…), l'image de la
 -- proposition remontrée par un vrai clic sur l'onglet Proposition et gardée par son crochet
--- (Fenetre.montrerImageProposition, Fenetre.apercuProposition, composé après la comparaison de
--- « Je le fais »), ◀ ▶ et Agrandir depuis elle, les ajustements du cadre dans Ajuster…, et la
--- section « Composition » des consignes. Les réponses du connecteur sont les vraies, produites par
+-- (Fenetre.montrerImageProposition, Fenetre.apercuProposition), ◀ ▶ et Agrandir depuis elle, les
+-- ajustements du cadre dans Ajuster…, et la section « Composition » des consignes. Les réponses du connecteur sont les vraies, produites par
 -- le serveur sur l'exemple « proposer » de Tests/Contrats/composition.json (preview_settings avec
 -- crop : un 3:2 redressé de 1,4°). Ni Claude, ni quota, ni photo : les fichiers vont dans un
 -- dossier personnel temporaire.
@@ -119,7 +118,6 @@ Notation.proposition = function() return nil end
 local Fenetre = require 'Fenetre'
 local Moteur = require 'Moteur'
 local prefs = Chemins.prefs()
-prefs.propositionAOuverture = false
 prefs.nouvelleParPhoto = false
 
 -- Le faux Claude Code dès le départ (une demande partie par erreur ne lance jamais le vrai), aucun
@@ -418,10 +416,12 @@ essai("Conversation : un recadrage retiré n'est pas une proposition de cadre ; 
     egal(nil, e.recadrage, 'sans crop')
     egal(nil, changement(e, 'Recadrage'))
     egal('Exposition', e.changements[1].libelle)
-    -- « Je le fais » (my_turn) : un exercice, pas une proposition, même avec un crop.
+    -- « Je le fais » (my_turn) est retiré au correctif 1.3.6 : plus d'exercice, une proposition de
+    -- cadre comme une autre.
     local avant = #c.elements
     appelPropose(c, 'r3', entreeCadre({ my_turn = true }))
-    egal('exercice', c.elements[#c.elements].genre)
+    egal('proposition', c.elements[#c.elements].genre)
+    egal(true, c.elements[#c.elements].recadrage)
     egal(avant + 2, #c.elements)
     -- Le recadrage demandé, en mots.
     egal("format d'origine, redressé de 2°", Conversation.cadreDemande({ aspect = 'original', angle = 2 }))
@@ -749,13 +749,13 @@ essai("Aperçu : une bascule de la fenêtre ne demande pas l'image ; une autre c
     end)
 end)
 
-essai("Aperçu : un seul crochet pour l'onglet Proposition ; la comparaison de « Je le fais » passe d'abord, l'image de la proposition ensuite", function()
+essai("Aperçu : un seul crochet pour l'onglet Proposition, l'image de la proposition (plus de comparaison de « Je le fais »)", function()
     photoActive(4, 'XH2S0320.RAF')
     Moteur.nouvelle()
     local c = Moteur.courante
     vrai(type(Fenetre.apercuOnglet.proposition) == 'function', 'crochet de l\'aperçu')
     vrai(type(Fenetre.surOnglet.proposition) == 'function', 'crochet du clic')
-    local exercice = Fenetre.apercuExercice
+    egal(nil, Fenetre.apercuExercice, 'plus de comparaison (correctif 1.3.6)')
     local ok, erreur = pcall(ouvrirFenetre, function(p)
         Fenetre.majPhoto()
         appelPropose(c, 'p1', entreeCadre(), { REPONSE_CADRE }, 'p1.jpg')
@@ -763,19 +763,10 @@ essai("Aperçu : un seul crochet pour l'onglet Proposition ; la comparaison de �
         p.onglet = 'notation'
         p.onglet = 'proposition'
         egal('1 sur 1 · preview_settings', p.legendeApercu)
-        -- Une comparaison montrée (Fenetre.apercuExercice) l'emporte.
-        Fenetre.apercuExercice = function(q)
-            q.legendeApercu = 'Claude | vous · XH2S0320.RAF'
-            return true
-        end
         Fenetre.rafraichirApercu()
-        egal('Claude | vous · XH2S0320.RAF', p.legendeApercu, "la comparaison d'abord")
-        Fenetre.apercuExercice = exercice
-        Fenetre.rafraichirApercu()
-        egal('1 sur 1 · preview_settings', p.legendeApercu, "puis l'image de la proposition")
+        egal('1 sur 1 · preview_settings', p.legendeApercu, "l'image de la proposition, gardée")
         Conversation.decider(c, Conversation.propositionEnAttente(c).id, false)
     end)
-    Fenetre.apercuExercice = exercice
     vrai(ok, erreur)
 end)
 
@@ -874,7 +865,7 @@ end)
 
 -- Consignes ----------------------------------------------------------------------------------------
 
-essai("Consignes : section Composition (400 caractères au plus) entre Garde-fous et Je le fais ; ajustements du cadre", function()
+essai("Consignes : section Composition (400 caractères au plus) entre Garde-fous et Titre ; ajustements du cadre", function()
     local texte = Consignes.texte
     local debut = texte:find('\n## Composition\n', 1, true)
     vrai(debut, 'section Composition')
@@ -883,17 +874,18 @@ essai("Consignes : section Composition (400 caractères au plus) entre Garde-fou
     vrai(Texte.longueur(section) <= 400, string.format('section : %d caractères pour 400', Texte.longueur(section)))
     for _, morceau in ipairs({ 'read_composition', 'preview_settings', 'sans compare', 'nettement', 'son crop seul', 'à la prise de vue',
         'reason = la règle',
-        'Accepter', '« Appliquer directement »', 'Une proposition à la fois', 'la leçon suit', "retouche entière", "cadre ou d'horizon" }) do
+        'Accepter', '« Appliquer directement »', 'Une proposition à la fois', "retouche entière", "cadre ou d'horizon" }) do
         contient(section, morceau, 'section Composition')
     end
-    -- « N'applique ce cadre qu'au clic » : la seule application du cadre attend ; la leçon suit.
+    vrai(not section:find('leçon', 1, true), 'plus de leçon (correctif 1.3.6)')
+    -- « N'applique ce cadre qu'au clic » : la seule application du cadre attend.
     contient(section, "N'applique ce cadre qu'au clic de Dany sur Accepter", 'section Composition')
-    -- Entre Garde-fous et Je le fais, qui reste juste avant Titre.
+    -- Entre Garde-fous et Titre (la section Je le fais, entre elles, est retirée au correctif 1.3.6).
     local gardeFous = texte:find('\n## Garde-fous\n', 1, true)
-    local jeLeFais = texte:find('\n## Je le fais\n', 1, true)
-    vrai(gardeFous < debut and debut < jeLeFais, 'entre Garde-fous et Je le fais')
-    egal(fin, jeLeFais, 'juste avant Je le fais')
-    egal(texte:find('\n## ', jeLeFais + 1, true), texte:find('\n## Titre de la conversation\n', 1, true), 'Je le fais juste avant Titre')
+    local titre = texte:find('\n## Titre de la conversation\n', 1, true)
+    vrai(gardeFous < debut and debut < titre, 'entre Garde-fous et Titre')
+    egal(fin, titre, 'juste avant Titre')
+    egal(nil, texte:find('\n## Je le fais\n', 1, true), 'plus de section Je le fais')
     vrai(Texte.longueur(texte) <= 7500, string.format('plafond des consignes : %d', Texte.longueur(texte)))
     vrai(not texte:find('\\\n', 1, true), 'lignes recollées')
     -- Les ajustements du cadre, à la place des autres pour une proposition de recadrage.

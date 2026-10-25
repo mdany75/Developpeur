@@ -86,7 +86,6 @@ Fenetre.boucle = function() end
 -- faux Claude Code écrirait ses arguments dans le dossier courant.
 Fenetre.verifier = function() end
 local prefs = Chemins.prefs()
-prefs.propositionAOuverture = false
 prefs.nouvelleParPhoto = false
 local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(.*/)') or '.') .. ' && pwd -P'):gsub('%s+$', '')
 prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
@@ -292,13 +291,13 @@ essai('Segment Focus : entre Aperçu et Proposition, une variante à lui, sa car
     for _, o in ipairs(D.onglets) do
         ordre[#ordre + 1] = o.valeur
     end
-    egal('apercu focus proposition notation lecon', table.concat(ordre, ' '))
+    egal('apercu focus proposition notation suivi', table.concat(ordre, ' '), 'cinq onglets (Suivi à la place de Leçon au correctif 1.3.6)')
     egal('focus', D.ongletFocus)
     egal('Focus', D.onglets[2].titre)
     egal('seg-focus', D.onglets[2].image)
     vrai(D.segments <= D.panneau, string.format('les cinq segments (%d) dans le panneau (%d)', D.segments, D.panneau))
     -- Aucun onglet où la fenêtre bascule d'elle-même n'est Focus.
-    for _, cle in ipairs({ 'ongletParDefaut', 'ongletProposition', 'ongletNotation', 'ongletEtape', 'ongletLecon' }) do
+    for _, cle in ipairs({ 'ongletParDefaut', 'ongletProposition', 'ongletNotation', 'ongletEtape', 'ongletSuivi' }) do
         vrai(D[cle] ~= 'focus', cle .. ' : jamais Focus')
     end
     -- Ni Fenetre.lua ni aucun autre fichier du module ne le choisissent d'eux-mêmes.

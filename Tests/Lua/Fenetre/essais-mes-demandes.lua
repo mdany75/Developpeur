@@ -84,7 +84,6 @@ local Moteur = require 'Moteur'
 Fenetre.boucle = function() end
 Fenetre.verifier = function() end
 local prefs = Chemins.prefs()
-prefs.propositionAOuverture = false
 prefs.nouvelleParPhoto = false
 local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(.*/)') or '.') .. ' && pwd -P'):gsub('%s+$', '')
 prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
@@ -714,7 +713,7 @@ essai('Nom et description proposés : ce qui précède « : », puis la suite ra
     egal('Plage à Cancún', Conversation.preparerDemande('Plage à Cancún. : suite').nom)
 end)
 
-essai('Fil : « ＋ Garder la demande » sur la ligne d\'actions d\'un tour qui a retouché et donné sa demande ; avec la note et la leçon ; jamais sans retouche ni sans la ligne', function()
+essai('Fil : « ＋ Garder la demande » sur la ligne d\'actions d\'un tour qui a retouché et donné sa demande ; avec la note ; jamais sans retouche ni sans la ligne', function()
     local texte = element('claude', { texte = "C'est fait.\n" .. LIGNE })
     -- Une retouche et sa demande : la ligne d'actions, seule.
     local c = conversation(retouche(), texte)
@@ -723,21 +722,22 @@ essai('Fil : « ＋ Garder la demande » sur la ligne d\'actions d\'un tour qui 
     egal('demande', l.actions)
     egal(3, l.demande, "l'indice du texte de Claude")
     egal('actions', Fil.lignes(c, D.texteFil)[#Fil.lignes(c, D.texteFil)].genre, 'à la fin du tour')
-    -- Avec une notation et une leçon dans le même tour.
+    -- Avec une notation dans le même tour ; une leçon d'une conversation d'avant le correctif 1.3.6
+    -- (élément `lecon`) n'ajoute plus rien.
     local notation = element('notation', { etat = 'fait', notes = { { photo = 4961, note = 3 } } })
     local lecon = element('lecon', { etat = 'fait', photo = 4961, points = {} })
     egal('note+demande', ligneActions(conversation(notation, retouche(), texte)).actions)
-    egal('lecon+demande', ligneActions(conversation(retouche(), lecon, texte)).actions)
-    egal('les deux+demande', ligneActions(conversation(notation, retouche(), lecon, texte)).actions)
-    egal('les deux', ligneActions(conversation(notation, retouche(), lecon, element('claude', { texte = 'Sans ligne.' }))).actions,
+    egal('demande', ligneActions(conversation(retouche(), lecon, texte)).actions)
+    egal('note+demande', ligneActions(conversation(notation, retouche(), lecon, texte)).actions)
+    egal('note', ligneActions(conversation(notation, retouche(), lecon, element('claude', { texte = 'Sans ligne.' }))).actions,
         'sans la ligne : pas de bouton')
     -- Pas de retouche dans le tour : ni une proposition, ni une notation, ni un classement, ni une
-    -- leçon seuls, ni une retouche en erreur ou en cours, ni une étape sans rien d'écrit.
+    -- leçon d'avant seuls, ni une retouche en erreur ou en cours, ni une étape sans rien d'écrit.
     local proposition = element('outil', { outil = 'preview_settings', etat = 'fait', texte = 'proposition' })
     egal(nil, ligneActions(conversation(proposition, element('proposition', { etat = 'enAttente' }), texte)), 'une proposition')
     egal('note', ligneActions(conversation(notation, texte)).actions, 'une notation')
     egal(nil, ligneActions(conversation(retouche('set_metadata'), texte)), 'un classement')
-    egal('lecon', ligneActions(conversation(lecon, texte)).actions, 'une leçon')
+    egal(nil, ligneActions(conversation(lecon, texte)), "une leçon d'avant : rien")
     local enErreur = retouche()
     enErreur.etat = 'erreur'
     egal(nil, ligneActions(conversation(enErreur, texte)), 'une retouche en erreur')
@@ -758,8 +758,7 @@ essai('Fil : « ＋ Garder la demande » sur la ligne d\'actions d\'un tour qui 
     local deux = conversation(retouche(), element('claude', { texte = 'Fait.' }), element('dany', { texte = 'Et la demande ?' }), texte)
     egal(nil, ligneActions(deux), 'la retouche était dans le tour d\'avant')
     -- Valeurs lues par la fenêtre (Fil.lireActions).
-    for valeur, attendu in pairs({ demande = '|true', ['note+demande'] = 'note|true', ['les deux+demande'] = 'les deux|true',
-        note = 'note|false', ['les deux'] = 'les deux|false', [''] = '|false' }) do
+    for valeur, attendu in pairs({ demande = '|true', ['note+demande'] = 'note|true', note = 'note|false', [''] = '|false' }) do
         local b, d = Fil.lireActions(valeur)
         egal(attendu, b .. '|' .. tostring(d), valeur)
     end
@@ -809,13 +808,9 @@ essai('Fenêtre : « ＋ Garder la demande » au bout de la ligne d\'actions, à
         egal('＋ Garder la demande@' .. droite, boutonsMontres(contenu, i), 'au bout de la ligne')
         p['x' .. i] = 'note+demande'
         egal('☆ Voir la note@0 ＋ Garder la demande@' .. droite, boutonsMontres(contenu, i))
-        p['x' .. i] = 'lecon+demande'
-        egal('Leçon de la photo@0 ＋ Garder la demande@' .. droite, boutonsMontres(contenu, i))
-        p['x' .. i] = 'les deux+demande'
-        egal('Leçon de la photo@0 ☆ Voir la note@0 ＋ Garder la demande@' .. droite, boutonsMontres(contenu, i))
-        vrai(D.voirNote + D.ecartActions + D.voirLecon + D.ecartActions <= droite, 'sans chevaucher les deux autres')
-        p['x' .. i] = 'les deux'
-        egal('Leçon de la photo@0 ☆ Voir la note@0', boutonsMontres(contenu, i), 'sans demande : comme avant')
+        vrai(D.voirNote + D.ecartActions <= droite, "sans chevaucher l'autre")
+        p['x' .. i] = 'note'
+        egal('☆ Voir la note@0', boutonsMontres(contenu, i), 'sans demande : comme avant')
         p['x' .. i] = 'demande'
         -- Le bouton : carré small, en petit, à sa largeur mesurée ; dans sa ligne.
         local bouton
@@ -851,13 +846,13 @@ essai('Fenêtre : « ＋ Garder la demande » au bout de la ligne d\'actions, à
     Moteur.courante = nil
 end)
 
-essai('Consignes : la section « Demande à garder » (la ligne exacte, après une retouche seulement, une ou deux phrases, ni identifiant ni fichier, l\'exemple reconnu) ; la leçon y renvoie ; le texte sous 7 500', function()
+essai('Consignes : la section « Demande à garder » (la ligne exacte, après une retouche seulement, une ou deux phrases, ni identifiant ni fichier, l\'exemple reconnu), la dernière ; le texte sous 7 500', function()
     local texte = Consignes.texte
     local debut = texte:find('\n## Demande à garder\n', 1, true)
     vrai(debut, 'section Demande à garder')
     local fin = texte:find('\n## ', debut + 1, true) or (#texte + 1)
     local section = texte:sub(debut + 1, fin - 1)
-    for _, morceau in ipairs({ 'Après une retouche', 'une étape écrite', 'pas une proposition, notation, classement ou leçon seuls',
+    for _, morceau in ipairs({ 'Après une retouche', 'une étape écrite', 'pas une proposition, notation ou classement seuls',
         'finis ta réponse par une ligne seule', '\nDemande à garder : « <ta demande> »\n', 'Une ou deux phrases',
         'sur une photo semblable', 'sans identifiant ni nom de fichier' }) do
         contient(section, morceau, 'section Demande à garder')
@@ -867,8 +862,8 @@ essai('Consignes : la section « Demande à garder » (la ligne exacte, après u
     vrai(exemple, "l'exemple")
     egal(exemple, Conversation.demandeAGarder('Demande à garder : « ' .. exemple .. ' »'))
     vrai(not exemple:find('%d'), "l'exemple sans identifiant")
-    -- La leçon reste la dernière chose dite, sauf cette ligne.
-    contient(texte, "ne la redis pas, rien après (sauf Demande à garder)", 'section Leçon')
+    -- Plus de section Leçon (correctif 1.3.6) : cette ligne est la dernière chose dite.
+    egal(nil, texte:find('\n## Leçon de la photo\n', 1, true), 'plus de section Leçon')
     egal(nil, texte:find('\n## ', debut + 1, true), 'la dernière section')
     vrai(Texte.longueur(texte) <= 7500, string.format('plafond des consignes : %d', Texte.longueur(texte)))
     vrai(not texte:find('\\\n', 1, true), 'lignes recollées')

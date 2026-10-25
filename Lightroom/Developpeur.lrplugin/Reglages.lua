@@ -391,7 +391,7 @@ local function arrondir(cle, valeur)
     return math.floor(valeur * facteur + 0.5) / facteur
 end
 
--- Affichage dans la fenêtre de suivi : virgule décimale, sans décimale inutile.
+-- Affichage dans la fenêtre de la liaison : virgule décimale, sans décimale inutile.
 local function afficher(valeur)
     if type(valeur) ~= 'number' then
         return tostring(valeur)

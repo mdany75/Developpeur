@@ -4,10 +4,10 @@
 -- module remplit. Chaque ligne a un genre (sa police, sa couleur, son icône) et un texte coupé
 -- à la largeur de la colonne d'après la chasse mesurée des polices (Metriques.lua).
 --
--- Ligne : { genre, texte, icone, element (indice dans le fil), image (chemin relatif), defaut et
---   action (page Carnet de progrès), etape (vrai : la ligne d'une étape de Claude, qui porte
---   « Pourquoi ? »), actions ('note', 'lecon' ou 'les deux' : la ligne des boutons « ☆ Voir la
---   note » et « Leçon de la photo », avec notation et lecon, les indices de leurs éléments) ;
+-- Ligne : { genre, texte, icone, element (indice dans le fil), image (chemin relatif), etape (vrai :
+--   la ligne d'une étape de Claude, qui porte
+--   « Pourquoi ? »), actions ('note', 'demande' ou 'note+demande' : la ligne des boutons « ☆ Voir
+--   la note » et « ＋ Garder la demande », avec notation et demande, les indices de leurs éléments) ;
 --   auteur ('dany' ou 'claude', sur la première ligne d'un tour de parole) et heure (« 19 h 42 »,
 --   sur la ligne suivante), posés par Fil.lignes sur des copies }
 --   genres : 'dany', 'claude', 'titre', 'outil', 'appel', 'apercu', 'proposition', 'note',
@@ -23,19 +23,19 @@
 -- « Pourquoi ? » (Fil.PLACE_POURQUOI), qui l'ouvre dans l'onglet Aperçu. Les autres textes viennent
 -- sans balise (Fil.sansBalises) : seules celles que pose ce module restent.
 -- Un élément `notation` (notes proposées) reprend les genres `proposition` (titre) et `outil` (une
--- ligne par photo, en Menlo). Un élément `lecon` (1.3) n'a plus de carte dans le fil : la leçon se
--- lit dans l'onglet Leçon (Fil.texteLecon) ; une ligne `note` ● pendant l'appel, ✕ « Leçon non
--- rangée : … » refusée ou interrompue. Le tour de Claude qui a rangé des notes ou donné une leçon
--- finit par sa ligne d'actions (« ☆ Voir la note », « Leçon de la photo », ou les deux, comme dans
--- la maquette : Fil.lignes). Un exercice « Je le fais » (1.3, élément `exercice`) : son titre en
--- `proposition` (« Je le fais · 7 réglages, dans l'ordre du panneau Développement », puis « Je le
--- fais · comparée : 2 écarts sur 7 »), une ligne `outil` par réglage ou par écart
--- (Fil.REGLAGES_MONTRES au plus, puis « … et N autres »), l'écart principal en lignes `outil`
--- aussi ; refusé, son titre dit pourquoi, icône erreur.
--- La page Carnet de progrès (1.3, Fil.lignesCarnet) n'a que des genres existants aussi : ses
--- lignes ne sont pas d'une conversation (pas d'`element`, pas d'auteur) ; les rangées de son tableau
--- (en Menlo, alignées par des espaces) portent `defaut` (le code du défaut), sa ligne d'action
--- `action = 'demander'`.
+-- ligne par photo, en Menlo). Le tour de Claude qui a rangé des notes finit par sa ligne d'actions
+-- (« ☆ Voir la note », comme dans la maquette : Fil.lignes). Les éléments `lecon` et `exercice`
+-- d'une conversation d'avant le correctif 1.3.6 (leçon de la photo, « Je le fais », retirés) n'ont
+-- aucune ligne : seul l'appel de leur outil (genre `appel`) reste dans le fil.
+-- La page Carnet de progrès (1.3, Fil.lignesCarnet), que le fil montrait aussi, est devenue la
+-- carte de l'onglet Suivi au correctif 1.3.6 (Fil.texteSuivi : un texte riche, pas des lignes).
+-- Un élément `historique` (correctif 1.3.6 : ce que la fenêtre dit de la photo ou du groupe,
+-- Historique.lua) reprend le genre `note` (en gris, l'icône ⓘ sur sa première ligne), ses puces
+-- en retrait sur leurs lignes de suite ; il n'est d'aucun tour de parole (ni « Vous » ni « Claude »,
+-- ni heure : Fil.lignes).
+-- Une demande faite par la Demande rapide dans la conversation d'une photo (correctif 1.3.6,
+-- Moteur.envoyerRapide : elle et ce qui y répond portent `rapide`) se dit d'une ligne « Demande
+-- rapide » sous son texte (Fil.MENTION_RAPIDE, en note, comme le style choisi).
 
 local Conversation = require 'Conversation'
 local Metriques = require 'Metriques'
@@ -60,6 +60,9 @@ Fil.emphases = { appel = 'mono' }
 Fil.RETRAIT_ICONE = 20
 Fil.RETRAITS = { appel = Fil.RETRAIT_ICONE, apercu = Fil.RETRAIT_ICONE, proposition = Fil.RETRAIT_ICONE, note = Fil.RETRAIT_ICONE }
 
+-- La mention d'une demande faite par la Demande rapide (Fil.lignesBrutes).
+Fil.MENTION_RAPIDE = "Demande rapide"
+
 function Fil.retrait(genre)
     return Fil.RETRAITS[genre] or 0
 end
@@ -76,16 +79,6 @@ Fil.MARGE = 10
 
 -- Photos montrées d'une notation ; les autres se résument en « … et N autres ».
 Fil.NOTES_MONTREES = 12
-
--- Réglages (ou écarts) montrés d'un exercice « Je le fais » (1.3) ; les autres se résument en
--- « … et N autres » (la carte Proposition les donne tous, page par page).
-Fil.REGLAGES_MONTRES = 12
--- Lignes au plus de l'écart principal d'un exercice comparé, et du titre d'un exercice refusé.
-Fil.LIGNES_PRINCIPAL = 2
-Fil.LIGNES_ERREUR_EXERCICE = 3
-
--- Une leçon refusée (1.3) : sa ligne « Leçon non rangée : … », en trois lignes au plus.
-Fil.LIGNES_ERREUR_LECON = 3
 
 -- L'espace insécable (U+00A0) : celle de la ponctuation haute, que la coupe garde avec son mot.
 local INSECABLE = '\194\160'
@@ -292,7 +285,6 @@ function Fil.coupeBornee(texte, largeur, police, retrait, maxi)
     gardees[maxi] = Texte.debut(derniere, n):gsub('%s+$', '') .. '…'
     return gardees
 end
-local coupeBornee = Fil.coupeBornee
 
 -- La ligne d'un appel d'outil, en texte riche : « <EM>apply_settings</EM>  étape « Claude · tons et
 -- balance » · 6 réglages » ; le nom (sans balise) se mesure en Menlo, la description en petit, et
@@ -321,59 +313,6 @@ function Fil.heure(t)
     end
     local d = os.date('*t', t)
     return string.format('%d h %02d', d.hour, d.min)
-end
-
--- Le nom d'un axe de leçon (« Lumière »), relu au besoin d'après sa clé.
-local function nomAxe(p)
-    if type(p.nom) == 'string' and p.nom ~= '' then
-        return p.nom
-    end
-    for _, axe in ipairs(Conversation.AXES_LECON) do
-        if axe.cle == p.axe then
-            return axe.nom
-        end
-    end
-    return tostring(p.axe or '?')
-end
-
--- La leçon de la photo (1.3, élément `lecon`), pour l'onglet Leçon -----------------------------
-
--- « Leçon de la photo · DSCF4961.RAF » (le fichier vient de la réponse du connecteur).
-function Fil.titreLecon(e)
-    local fichier = Texte.nettoyer(sans(type(e.fichier) == 'string' and e.fichier or ''))
-    return "Leçon de la photo" .. (fichier ~= '' and (" · " .. fichier) or '')
-end
-
--- Le texte de la leçon : pour chaque axe, dans l'ordre Lumière, Couleur, Composition, son nom en
--- gras (<EM>, l'emphase de la carte), puis ce qui manquait et la prise de vue (« Rien ne
--- manquait. » puis « À refaire : … » pour un axe sans défaut), entiers (la carte se lit page par
--- page) ; puis la remarque du rangement (« Leçon non rangée… », « … gardée pour cette session »),
--- ou « Leçon non rangée dans le carnet de progrès. » sans remarque. Refusée ou interrompue :
--- « Leçon non rangée : <raison> ». Le texte de Claude ne passe pas par le Markdown du fil : il
--- reste une phrase, jamais une puce ; ses balises sont retirées.
-function Fil.texteLecon(e)
-    if e.etat == 'erreur' then
-        local raison = Texte.nettoyer(sans(e.texte))
-        return "Leçon non rangée : " .. (raison ~= '' and raison or "l'appel n'a pas abouti.")
-    end
-    local morceaux = {}
-    for _, p in ipairs(type(e.points) == 'table' and e.points or {}) do
-        if type(p) == 'table' then
-            local manque = type(p.manque) == 'string' and Texte.nettoyer(sans(p.manque)) or ''
-            local prise = type(p.prise_de_vue) == 'string' and Texte.nettoyer(sans(p.prise_de_vue)) or ''
-            local moities = manque ~= '' and { "Ce qui manquait : " .. manque, "À la prise de vue : " .. prise }
-                or { "Rien ne manquait.", "À refaire : " .. prise }
-            morceaux[#morceaux + 1] = '<EM>' .. Texte.nettoyer(sans(nomAxe(p))) .. '</EM>\n' .. moities[1] .. '\n' .. moities[2]
-        end
-    end
-    local remarque = type(e.remarque) == 'string' and Texte.nettoyer(sans(e.remarque)) or ''
-    if remarque == '' and e.rangee == false then
-        remarque = "Leçon non rangée dans le carnet de progrès."
-    end
-    if remarque ~= '' then
-        morceaux[#morceaux + 1] = remarque
-    end
-    return table.concat(morceaux, '\n\n')
 end
 
 -- L'onglet Focus (demandé par Dany le 22 octobre 2026) ----------------------------------------
@@ -631,6 +570,9 @@ function Fil.lignesBrutes(e, i, largeur)
     local g = e.genre
     if g == 'dany' then
         ajouterTexte(lignes, e.texte or '', 'dany', largeur, i)
+        if e.rapide == true then
+            lignes[#lignes + 1] = { genre = 'note', texte = Fil.MENTION_RAPIDE, element = i }
+        end
         if type(e.style) == 'string' and e.style ~= '' then
             lignes[#lignes + 1] = { genre = 'note', texte = uneLigne("Style : " .. e.style, place('note', largeur), 'texte'), element = i }
         end
@@ -713,111 +655,23 @@ function Fil.lignesBrutes(e, i, largeur)
             end
             lignes[#lignes + 1] = { genre = 'outil', texte = uneLigne('  ' .. Fil.texteNote(x), largeur - 16, 'mono'), element = i }
         end
-    elseif g == 'lecon' then
-        -- La leçon de la photo (1.3) se lit dans l'onglet Leçon (Fil.texteLecon) : faite, elle n'a pas
-        -- de ligne à elle (son bouton « Leçon de la photo » est sur la ligne d'actions de son tour,
-        -- Fil.lignes) ; pendant l'appel, une ligne ● ; refusée ou interrompue, une ligne ✕ « Leçon
-        -- non rangée : … ».
-        if e.etat == 'erreur' then
-            for n, t in ipairs(coupeBornee(Fil.texteLecon(e), place('note', largeur), 'texte', '', Fil.LIGNES_ERREUR_LECON)) do
-                lignes[#lignes + 1] = { genre = 'note', texte = t, element = i, icone = n == 1 and 'erreur' or nil }
-            end
-        elseif e.etat == 'enCours' then
-            lignes[1] = { genre = 'note', texte = uneLigne(Fil.titreLecon(e) .. " · en préparation…", place('note', largeur), 'texte'),
-                element = i, icone = 'cours' }
-        end
-    elseif g == 'exercice' then
-        -- « Je le fais » (1.3) : le titre (● pendant un appel), puis la liste dans l'ordre du
-        -- panneau Développement, ou, comparé, l'écart principal et chaque écart (✓ comme Claude).
-        local icone = e.etat == 'erreur' and 'erreur'
-            or ((e.etat == 'enCours' or e.comparaisonEnCours) and 'cours' or 'proposition')
-        for n, t in ipairs(coupeBornee(Fil.titreExercice(e), place('proposition', largeur), 'gras', '', Fil.LIGNES_ERREUR_EXERCICE)) do
-            lignes[#lignes + 1] = { genre = 'proposition', texte = t, element = i, icone = n == 1 and icone or nil }
-        end
-        local liste = {}
-        if e.etat == 'comparee' then
-            local principal = Fil.textePrincipal(e)
-            if principal ~= '' then
-                for _, t in ipairs(coupeBornee('  ' .. principal, largeur - 16, 'mono', '  ', Fil.LIGNES_PRINCIPAL)) do
-                    lignes[#lignes + 1] = { genre = 'outil', texte = t, element = i }
-                end
-            end
-            for _, x in ipairs(e.ecarts or {}) do
-                liste[#liste + 1] = (x.sorte == 'comme_claude' and '✓ ' or '• ') .. tostring(x.texte or x.reglage or '?')
-            end
-        elseif e.etat == 'aFaire' then
-            for k, x in ipairs(e.aFaire or {}) do
-                liste[#liste + 1] = tostring(tonumber(x.n) or k) .. '. ' .. tostring(x.texte or x.reglage or x.cle or '?')
-            end
-        end
-        for n, t in ipairs(liste) do
-            if n > Fil.REGLAGES_MONTRES then
-                local reste = #liste - Fil.REGLAGES_MONTRES
-                lignes[#lignes + 1] = { genre = 'outil', texte = '  … et ' .. reste .. (reste == 1 and ' autre' or ' autres'), element = i }
-                break
-            end
-            lignes[#lignes + 1] = { genre = 'outil', texte = uneLigne('  ' .. t, largeur - 16, 'mono'), element = i }
-        end
     elseif g == 'note' then
         ajouterTexte(lignes, e.texte or '', 'note', largeur, i, 'note')
-    end
-    return lignes
-end
-
--- « 2 écarts », « 1 réglage », « aucun écart ».
-local function compte(n, un, plusieurs, aucun)
-    if n == 0 then
-        return aucun
-    end
-    return n .. ' ' .. (n > 1 and plusieurs or un)
-end
-
--- Les écarts d'un exercice comparé (ceux qui ne sont pas « comme Claude ») et le nombre de réglages
--- comparés.
-function Fil.ecartsExercice(e)
-    local n = 0
-    for _, x in ipairs(e.ecarts or {}) do
-        if x.sorte ~= 'comme_claude' then
-            n = n + 1
+    elseif g == 'historique' then
+        -- L'en-tête, puis ses puces (« •  », Historique.PUCE), dont les lignes de suite s'alignent
+        -- sur le texte de la puce.
+        local premiere = true
+        for _, brute in ipairs(Texte.lignes(e.texte or '')) do
+            if Texte.nettoyer(brute) ~= '' then
+                local retrait = brute:sub(1, #'•  ') == '•  ' and '    ' or ''
+                for _, l in ipairs(Fil.couper(brute, place('note', largeur), Fil.polices.note, retrait)) do
+                    lignes[#lignes + 1] = { genre = 'note', texte = l, element = i, icone = premiere and 'note' or nil }
+                    premiere = false
+                end
+            end
         end
     end
-    return n, #(e.ecarts or {})
-end
-
--- L'écart principal d'un exercice comparé, prêt à montrer : « Écart principal : … » quand il se
--- voit ; sinon le texte du connecteur tel quel (« Aucun écart mesuré ne dépasse… », « Écart
--- principal non mesuré… »), sans le préfixe redoublé ; '' sans texte.
-function Fil.textePrincipal(e)
-    local p = type(e.principal) == 'table' and e.principal or nil
-    local texte = p and Texte.nettoyer(p.texte or '') or ''
-    if texte == '' then
-        return ''
-    end
-    return p.visible == true and ("Écart principal : " .. texte) or texte
-end
-
--- Le titre d'un exercice « Je le fais » dans le fil.
-function Fil.titreExercice(e)
-    if e.etat == 'erreur' then
-        local raison = Texte.nettoyer(e.texte or '')
-        return "Je le fais · non abouti : " .. (raison ~= '' and raison or "l'appel n'a pas abouti.")
-    elseif e.etat == 'enCours' then
-        return "Je le fais · liste en préparation…"
-    end
-    local titre
-    if e.etat == 'comparee' then
-        local ecarts, total = Fil.ecartsExercice(e)
-        titre = "Je le fais · comparée : " .. compte(ecarts, "écart", "écarts", "aucun écart") .. " sur " .. total
-    else
-        titre = "Je le fais · " .. compte(#(e.aFaire or {}), "réglage", "réglages", "aucun réglage") .. ", dans l'ordre du panneau Développement"
-    end
-    if e.comparaisonEnCours then
-        titre = titre .. " · comparaison en cours…"
-    elseif type(e.comparaisonRefusee) == 'string' then
-        -- Un refus qui peut se refaire (Conversation.completerExercice) : l'exercice reste.
-        titre = titre .. " · comparaison non aboutie : " .. Texte.nettoyer(e.comparaisonRefusee)
-    end
-    return titre
+    return lignes
 end
 
 -- Ce qui change l'affichage des notes d'une notation (pour la signature du cache).
@@ -830,36 +684,6 @@ local function signatureNotes(e)
         morceaux[#morceaux + 1] = table.concat({ Conversation.clePhoto(x.photo), tostring(x.note), x.drapeau or '', x.etat or '',
             tostring(x.a_verifier), x.fichier or '', x.refus or '', x.raison or '' }, '\2')
     end
-    return table.concat(morceaux, '\3')
-end
-
--- Ce qui change l'affichage d'une leçon (pour la signature du cache) : son fichier, sa photo, son
--- rangement et ses points.
-local function signatureLecon(e)
-    if e.genre ~= 'lecon' then
-        return ''
-    end
-    local morceaux = { tostring(e.fichier), tostring(e.photo), tostring(e.rangee), tostring(e.remarque) }
-    for _, p in ipairs(type(e.points) == 'table' and e.points or {}) do
-        morceaux[#morceaux + 1] = table.concat({ tostring(p.axe), tostring(p.nom), tostring(p.manque), tostring(p.prise_de_vue) }, '\2')
-    end
-    return table.concat(morceaux, '\3')
-end
-
--- Ce qui change l'affichage d'un exercice « Je le fais » (pour la signature du cache) : son titre,
--- sa liste, ses écarts et l'écart principal.
-local function signatureExercice(e)
-    if e.genre ~= 'exercice' then
-        return ''
-    end
-    local morceaux = { Fil.titreExercice(e), tostring(e.comparaisonEnCours) }
-    for _, x in ipairs(type(e.aFaire) == 'table' and e.aFaire or {}) do
-        morceaux[#morceaux + 1] = tostring(x.n) .. '\2' .. tostring(x.texte)
-    end
-    for _, x in ipairs(type(e.ecarts) == 'table' and e.ecarts or {}) do
-        morceaux[#morceaux + 1] = tostring(x.sorte) .. '\2' .. tostring(x.texte)
-    end
-    morceaux[#morceaux + 1] = Fil.textePrincipal(e)
     return table.concat(morceaux, '\3')
 end
 
@@ -886,29 +710,28 @@ end
 -- Chaque tour de parole (une demande de Dany ; la suite de Claude : ses outils, ses aperçus, ses
 -- notes et son texte) porte son auteur sur sa première ligne et son heure (celle de son premier
 -- élément) sur la suivante, ligne vide comprise ; le dernier tour, d'une seule ligne, en reçoit une
--- vide pour son heure. Un tour de Claude qui a rangé des notes (élément `notation`) ou donné une
--- leçon (élément `lecon` fait) finit par sa ligne d'actions, comme dans la maquette : « ☆ Voir la
--- note », « Leçon de la photo », ou les deux (`actions` : 'note', 'lecon', 'les deux' ; `notation`
--- et `lecon` : les indices de la dernière notation et de la dernière leçon du tour). Un tour qui a
--- retouché (Conversation.estRetouche) et dont le texte de Claude finit par « Demande à garder :
--- « … » » (Conversation.demandeAGarder) y gagne « ＋ Garder la demande » (Mes demandes, demandé par
--- Dany le 22 octobre 2026) : `actions` prend le suffixe '+demande' ('demande' seule, 'note+demande',
--- 'lecon+demande', 'les deux+demande', Fil.valeurActions), `demande` l'indice de ce texte. Ces
--- lignes (auteur, heure, actions) sont faites à chaque appel, sur des copies : les lignes gardées
--- dans le cache ne changent pas.
+-- vide pour son heure. Un tour de Claude qui a rangé des notes (élément `notation`) finit par sa
+-- ligne d'actions, comme dans la maquette : « ☆ Voir la note » (`actions` : 'note' ; `notation` :
+-- l'indice de la dernière notation du tour). Un tour qui a retouché (Conversation.estRetouche) et
+-- dont le texte de Claude finit par « Demande à garder : « … » » (Conversation.demandeAGarder) y
+-- gagne « ＋ Garder la demande » (Mes demandes, demandé par Dany le 22 octobre 2026) : `actions`
+-- prend le suffixe '+demande' ('demande' seule, 'note+demande', Fil.valeurActions), `demande`
+-- l'indice de ce texte. Ces lignes (auteur, heure, actions) sont faites à chaque appel, sur des
+-- copies : les lignes gardées dans le cache ne changent pas. (« Leçon de la photo », 'lecon' et
+-- 'les deux' : retirés avec la leçon au correctif 1.3.6.)
 
--- La valeur `actions` d'une ligne d'actions : 'note', 'lecon', 'les deux', avec '+demande' quand
--- elle porte « ＋ Garder la demande » ('demande' seule) ; nil sans rien.
-function Fil.valeurActions(notation, lecon, demande)
-    local base = (notation and lecon) and 'les deux' or (notation and 'note') or (lecon and 'lecon') or nil
+-- La valeur `actions` d'une ligne d'actions : 'note', avec '+demande' quand elle porte « ＋ Garder
+-- la demande » ('demande' seule) ; nil sans rien.
+function Fil.valeurActions(notation, demande)
+    local base = notation and 'note' or nil
     if demande then
         return base and (base .. '+demande') or 'demande'
     end
     return base
 end
 
--- Ce que montre une valeur `actions` : sa base ('note', 'lecon', 'les deux' ou '') et vrai si
--- « ＋ Garder la demande » y est (Vues.ligneFil).
+-- Ce que montre une valeur `actions` : sa base ('note' ou '') et vrai si « ＋ Garder la demande » y
+-- est (Vues.ligneFil).
 function Fil.lireActions(valeur)
     valeur = tostring(valeur or '')
     if valeur == 'demande' then
@@ -925,14 +748,14 @@ function Fil.lignes(c, largeur, cache)
     largeur = largeur - Fil.MARGE
     local lignes, tours = {}, {}
     local precedent, auteurPrecedent
-    -- Les actions du tour de Claude en cours (notation, lecon, demande : des indices d'éléments ;
+    -- Les actions du tour de Claude en cours (notation, demande : des indices d'éléments ;
     -- retouche : vrai si le tour a retouché).
     local actions = {}
     local function pousser(e, siennes, auteur, date)
         if precedent and not colles(precedent, e) then
             lignes[#lignes + 1] = { genre = 'vide', texte = '' }
         end
-        if auteur == 'dany' or auteurPrecedent ~= 'claude' then
+        if auteur ~= 'fenetre' and (auteur == 'dany' or auteurPrecedent ~= 'claude') then
             tours[#tours + 1] = { ligne = #lignes + 1, auteur = auteur, heure = Fil.heure(date) }
         end
         for _, l in ipairs(siennes) do
@@ -942,13 +765,13 @@ function Fil.lignes(c, largeur, cache)
     end
     local function finirTour()
         local demande = actions.retouche and actions.demande or nil
-        if not (actions.notation or actions.lecon or demande) then
+        if not (actions.notation or demande) then
             actions = {}
             return
         end
-        local quoi = Fil.valeurActions(actions.notation, actions.lecon, demande)
-        local ligne = { genre = 'actions', texte = '', element = actions.lecon or actions.notation or demande, actions = quoi,
-            notation = actions.notation, lecon = actions.lecon, demande = demande }
+        local quoi = Fil.valeurActions(actions.notation, demande)
+        local ligne = { genre = 'actions', texte = '', element = actions.notation or demande, actions = quoi,
+            notation = actions.notation, demande = demande }
         if auteurPrecedent == 'claude' then
             lignes[#lignes + 1] = ligne
         else
@@ -957,13 +780,15 @@ function Fil.lignes(c, largeur, cache)
         actions = {}
     end
     for i, e in ipairs(c.elements or {}) do
-        local auteur = e.genre == 'dany' and 'dany' or 'claude'
-        if auteur == 'dany' then
+        -- Un élément de la fenêtre (l'historique de la photo, correctif 1.3.6) clôt le tour de
+        -- Claude d'avant, sans en commencer un.
+        local auteur = e.genre == 'dany' and 'dany' or (e.genre == 'historique' and 'fenetre' or 'claude')
+        if auteur ~= 'claude' then
             finirTour()
         end
         local signature = table.concat({ largeur, e.genre or '', e.etat or '', tostring(e.partiel), #(e.images or {}),
             #(e.changements or {}), e.style or '', e.texte or '', signatureNotes(e), #(e.etapes or {}),
-            tostring(Conversation.estEtape(e)), signatureLecon(e), signatureExercice(e) }, '\1')
+            tostring(Conversation.estEtape(e)), tostring(e.rapide) }, '\1')
         local siennes
         if cache and cache[e.id] and cache[e.id].signature == signature then
             siennes = cache[e.id].lignes
@@ -978,8 +803,6 @@ function Fil.lignes(c, largeur, cache)
         end
         if e.genre == 'notation' and e.etat ~= 'erreur' and e.etat ~= 'enCours' and #(e.notes or {}) > 0 then
             actions.notation, actions.date = i, actions.date or e.date
-        elseif e.genre == 'lecon' and e.etat == 'fait' then
-            actions.lecon, actions.date = i, actions.date or e.date
         elseif Conversation.estRetouche(e) then
             actions.retouche = true
         elseif e.genre == 'claude' and not e.partiel and Conversation.demandeAGarder(e.texte) then
@@ -1000,33 +823,27 @@ function Fil.lignes(c, largeur, cache)
     return lignes
 end
 
--- La page Carnet de progrès (1.3) ----------------------------------------------------------------
--- Le résumé du carnet (Carnet.resumer, du module) mis en lignes de genres existants, sans
--- élément de conversation : le titre ; la note (sur quelles photos, par mois de prise de vue) et
--- la remarque ; le tableau des défauts en `outil` (police mono : colonnes alignées par des
--- espaces, « n/sur » par mois, « — » sans photo), une rangée par défaut qui porte son code
--- (`defaut` : un clic donne ses photos) ; « Ce qui progresse » (ou « Ce qui recule ») et « À
--- travailler à la prochaine sortie », titres et puces ; puis la ligne d'action `apercu` (bleue)
--- « Demander à Claude ce qu'il en pense › » (`action = 'demander'`). Les phrases et les titres
--- viennent du résumé (Carnet.resumer, seule copie) ; seuls les mots de la page sont écrits ici. Pas
--- de barres ▁…█ : elles demanderaient de remesurer les polices (Metriques.lua).
+-- La carte Suivi : le carnet de progrès (correctif 1.3.6) -------------------------------------------
+-- Le résumé du carnet (Carnet.resumer, du module), ses constats seulement, en un texte riche pour la
+-- carte de l'onglet Suivi (Vues.suivi), coupé page par page à sa largeur en 12 (Fenetre.montrerPage,
+-- clé 'suivi') : la note (sur quelles photos, par mois de prise de vue) et la remarque ; les défauts
+-- mois par mois, un par ligne (le libellé en <EM>, gras 12, puis « n/sur » par mois, « — » sans
+-- photo où il a été cherché, le mois abrégé avec son année quand les mois en changent) ; « Ce qui
+-- progresse » (ou « Ce qui recule ») et « À travailler à la prochaine sortie », intertitres en <EM>
+-- et puces. Il remplace la page Carnet de progrès du fil (Fil.lignesCarnet, son tableau en Menlo
+-- aligné par des espaces : la carte est en police proportionnelle, et le défaut porte ses mois sur
+-- sa ligne). Les phrases et les titres viennent du résumé (Carnet.resumer, seule copie) ; seuls les
+-- mots de la carte sont écrits ici. Les textes venus du registre perdent leurs balises (sans) : seules
+-- celles posées ici restent.
 -- `page` : le résumé ; nil pendant sa lecture ; { erreur = texte } s'il ne s'est pas lu.
--- `titre` : celui de la page tant que le résumé ne le donne pas (Carnet.TITRES.carnet).
-Fil.DEMANDER_CARNET = "Demander à Claude ce qu'il en pense ›"
-Fil.AIDE_TABLEAU_CARNET = "Un clic sur une ligne du tableau donne ses photos."
 Fil.LECTURE_CARNET = "Lecture du carnet de progrès…"
 Fil.ERREUR_CARNET = "Le carnet de progrès ne s'est pas lu : "
--- Espaces entre deux colonnes du tableau ; caractères au plus de la colonne Défaut (les libellés du
--- connecteur en font 40 au plus, PriseDeVue.swift).
--- Une colonne Défaut resserrée pour tenir dans le fil (Fil.tableauCarnet) en garde au moins
--- LIBELLE_CARNET_MIN.
-Fil.ECART_COLONNES = 3
-Fil.LIBELLE_CARNET_MAX = 40
-Fil.LIBELLE_CARNET_MIN = 14
+Fil.MOIS_PAR_MOIS = "Mois par mois"
+Fil.AIDE_DEFAUTS_SUIVI = "« Photos d'un défaut… », sous la carte : ses photos, et les retirer du carnet."
 
 local function texteOuNil(valeur)
-    if type(valeur) == 'string' and Texte.nettoyer(valeur) ~= '' then
-        return Texte.nettoyer(valeur)
+    if type(valeur) == 'string' and Texte.nettoyer(sans(valeur)) ~= '' then
+        return Texte.nettoyer(sans(valeur))
     end
     return nil
 end
@@ -1040,170 +857,85 @@ function Fil.celluleCarnet(m)
     return string.format('%d/%d', tonumber(m.n) or 0, sur)
 end
 
-local function aGauche(texte, n)
-    return texte .. string.rep(' ', n - Texte.longueur(texte))
-end
-
-local function aDroite(texte, n)
-    return string.rep(' ', n - Texte.longueur(texte)) .. texte
-end
-
--- Les rangées du tableau, en texte aligné par des espaces (un caractère par colonne de la police
--- mono) : l'en-tête (« Défaut », puis le mois abrégé, avec l'année quand les mois en changent),
--- puis une rangée par défaut, { texte, defaut = code }. `caracteres` (facultatif) : la largeur à
--- tenir, en caractères (les 648 points du fil, sa marge ôtée : 96).
-function Fil.tableauCarnet(page, caracteres)
-    local mois = type(page.mois) == 'table' and page.mois or {}
-    local defauts = type(page.defauts) == 'table' and page.defauts or {}
+-- Les mois du résumé, abrégés (« oct. »), avec leur année quand ils en changent (« oct. 2025 »).
+local function nomsDesMois(mois)
     local plusieurs = false
     for _, m in ipairs(mois) do
         if m.annee ~= (mois[1] or {}).annee then
             plusieurs = true
         end
     end
-    local entetes = {}
+    local noms = {}
     for i, m in ipairs(mois) do
         local nom = tostring(m.court or m.nom or m.cle or '?')
-        entetes[i] = (plusieurs and m.annee) and (nom .. ' ' .. tostring(m.annee)) or nom
+        noms[i] = (plusieurs and m.annee) and (nom .. ' ' .. tostring(m.annee)) or nom
     end
-    local premiere = texteOuNil(type(page.titres) == 'table' and page.titres.defaut) or "Défaut"
-    local large = Texte.longueur(premiere)
-    local libelles = {}
-    for k, d in ipairs(defauts) do
-        local l = texteOuNil(d.libelle) or tostring(d.code or '?')
-        if Texte.longueur(l) > Fil.LIBELLE_CARNET_MAX then
-            l = Texte.debut(l, Fil.LIBELLE_CARNET_MAX - 1) .. '…'
-        end
-        libelles[k] = l
-        large = math.max(large, Texte.longueur(l))
-    end
-    local larges = {}
-    for i, e in ipairs(entetes) do
-        local w = Texte.longueur(e)
-        for _, d in ipairs(defauts) do
-            w = math.max(w, Texte.longueur(Fil.celluleCarnet(type(d.par_mois) == 'table' and d.par_mois[i])))
-        end
-        larges[i] = w
-    end
-    -- Dans `caracteres` (la largeur du fil en caractères de la police mono) : la colonne Défaut se
-    -- resserre d'abord, ses libellés coupés par « … » (LIBELLE_CARNET_MIN caractères au moins),
-    -- puis les écarts entre colonnes ; le tableau reste aligné.
-    local n = Fil.ECART_COLONNES
-    if caracteres then
-        local function cellules(e)
-            local total = 0
-            for _, w in ipairs(larges) do
-                total = total + e + w
-            end
-            return total
-        end
-        while n > 1 and caracteres - cellules(n) < Fil.LIBELLE_CARNET_MIN do
-            n = n - 1
-        end
-        local place = math.max(Fil.LIBELLE_CARNET_MIN, caracteres - cellules(n))
-        if large > place then
-            large = math.max(Texte.longueur(premiere), place)
-            for k, l in ipairs(libelles) do
-                if Texte.longueur(l) > large then
-                    libelles[k] = Texte.debut(l, large - 1) .. '…'
-                end
-            end
-        end
-    end
-    local ecart = string.rep(' ', n)
-    local function rangee(tete, cellules)
-        local morceaux = { aGauche(tete, large) }
-        for i, c in ipairs(cellules) do
-            morceaux[#morceaux + 1] = aDroite(c, larges[i])
-        end
-        return table.concat(morceaux, ecart)
-    end
-    local rangees = { { texte = rangee(premiere, entetes) } }
-    for k, d in ipairs(defauts) do
-        local cellules = {}
-        for i = 1, #mois do
-            cellules[i] = Fil.celluleCarnet(type(d.par_mois) == 'table' and d.par_mois[i])
-        end
-        rangees[#rangees + 1] = { texte = rangee(libelles[k], cellules), defaut = d.code }
-    end
-    return rangees
+    return noms
 end
 
-function Fil.lignesCarnet(page, largeur, titre)
-    local lignes = Fil.lignesCarnetBrutes(page, largeur, titre)
-    for _, l in ipairs(lignes) do
-        l.texte = sans(l.texte)
+-- La ligne d'un défaut : « <EM>Ciel brûlé</EM> · sept. 1/4 · oct. 2/5 ».
+function Fil.ligneDefautSuivi(d, noms)
+    local morceaux = { '<EM>' .. (texteOuNil(d.libelle) or tostring(d.code or '?')) .. '</EM>' }
+    for i, nom in ipairs(noms) do
+        morceaux[#morceaux + 1] = nom .. ' ' .. Fil.celluleCarnet(type(d.par_mois) == 'table' and d.par_mois[i])
     end
-    return lignes
+    return table.concat(morceaux, ' · ')
 end
 
--- Les lignes de la page, avant le retrait des balises (Fil.lignesCarnet).
-function Fil.lignesCarnetBrutes(page, largeur, titre)
-    largeur = largeur - Fil.MARGE
-    local lignes = {}
-    local function paragraphe(genre, texte, icone, retrait)
-        for n, l in ipairs(Fil.couper(texte, place(genre, largeur), Fil.polices[genre], retrait)) do
-            lignes[#lignes + 1] = { genre = genre, texte = l, icone = n == 1 and icone or nil }
-        end
+function Fil.texteSuivi(page)
+    if type(page) ~= 'table' then
+        return Fil.LECTURE_CARNET
     end
-    local function vide()
-        lignes[#lignes + 1] = { genre = 'vide', texte = '' }
+    if page.erreur ~= nil then
+        return Fil.ERREUR_CARNET .. (texteOuNil(tostring(page.erreur)) or '?')
+    end
+    local titres = type(page.titres) == 'table' and page.titres or {}
+    local parties = {}
+    local function ajouter(texte)
+        parties[#parties + 1] = texte
     end
     local function intertitre(texte)
-        lignes[#lignes + 1] = { genre = 'titre', texte = uneLigne(texte, largeur, 'gras') }
+        ajouter('')
+        ajouter('<EM>' .. texte .. '</EM>')
     end
     -- Une puce comme celles de Claude (Fil.ligneMarkdown) ; `suite` : une ligne retirée dessous.
     local function puce(texte, suite)
-        paragraphe('claude', '•  ' .. texte, nil, '    ')
+        ajouter('•  ' .. texte)
         if suite then
-            paragraphe('claude', '    ' .. suite, nil, '    ')
+            ajouter('    ' .. suite)
         end
     end
-    local titres = type(page) == 'table' and type(page.titres) == 'table' and page.titres or {}
-    intertitre(texteOuNil(titres.carnet) or texteOuNil(titre) or "Carnet de progrès")
-    if type(page) ~= 'table' then
-        paragraphe('note', Fil.LECTURE_CARNET, 'cours')
-        return lignes
-    end
-    if page.erreur ~= nil then
-        paragraphe('note', Fil.ERREUR_CARNET .. (texteOuNil(tostring(page.erreur)) or '?'), 'erreur')
-        return lignes
-    end
     if texteOuNil(page.note) then
-        paragraphe('note', texteOuNil(page.note), 'note')
+        ajouter(texteOuNil(page.note))
     end
     if texteOuNil(page.remarque) then
-        paragraphe('note', texteOuNil(page.remarque))
+        ajouter(texteOuNil(page.remarque))
     end
     local defauts = type(page.defauts) == 'table' and page.defauts or {}
     if page.vide == true or #defauts == 0 then
-        return lignes
+        return table.concat(parties, '\n')
     end
 
-    vide()
-    local caracteres = math.floor(place('outil', largeur) / Metriques.mono.chasse[' '])
-    for _, r in ipairs(Fil.tableauCarnet(page, caracteres)) do
-        lignes[#lignes + 1] = { genre = 'outil', texte = uneLigne(r.texte, place('outil', largeur), 'mono'), defaut = r.defaut }
+    intertitre(Fil.MOIS_PAR_MOIS)
+    local noms = nomsDesMois(type(page.mois) == 'table' and page.mois or {})
+    for _, d in ipairs(defauts) do
+        ajouter(Fil.ligneDefautSuivi(d, noms))
     end
-    paragraphe('note', Fil.AIDE_TABLEAU_CARNET)
+    ajouter(Fil.AIDE_DEFAUTS_SUIVI)
 
     -- Ce qui progresse et ce qui recule (chacun s'il y en a) ; sans tendance, pourquoi.
     local progresse = type(page.progresse) == 'table' and page.progresse or {}
     local recule = type(page.recule) == 'table' and page.recule or {}
-    vide()
     if #progresse > 0 or #recule == 0 then
         intertitre(texteOuNil(titres.progresse) or "Ce qui progresse")
         for _, x in ipairs(progresse) do
             puce(texteOuNil(x.texte) or tostring(x.libelle or x.code or '?'))
         end
         if #progresse == 0 and texteOuNil(page.aucune_tendance) then
-            paragraphe('note', texteOuNil(page.aucune_tendance))
+            ajouter(texteOuNil(page.aucune_tendance))
         end
     end
     if #recule > 0 then
-        if #progresse > 0 then
-            vide()
-        end
         intertitre(texteOuNil(titres.recule) or "Ce qui recule")
         for _, x in ipairs(recule) do
             puce(texteOuNil(x.texte) or tostring(x.libelle or x.code or '?'))
@@ -1212,18 +944,14 @@ function Fil.lignesCarnetBrutes(page, largeur, titre)
 
     -- À travailler à la prochaine sortie : le défaut, puis ce qu'il faut faire à la prise de vue.
     local aTravailler = type(page.a_travailler) == 'table' and page.a_travailler or {}
-    vide()
     intertitre(texteOuNil(titres.a_travailler) or "À travailler à la prochaine sortie")
     for _, x in ipairs(aTravailler) do
         puce(texteOuNil(x.texte) or tostring(x.libelle or x.code or '?'), texteOuNil(x.prise_de_vue))
     end
     if #aTravailler == 0 and texteOuNil(page.rien_a_travailler) then
-        paragraphe('note', texteOuNil(page.rien_a_travailler))
+        ajouter(texteOuNil(page.rien_a_travailler))
     end
-
-    vide()
-    lignes[#lignes + 1] = { genre = 'apercu', texte = uneLigne(Fil.DEMANDER_CARNET, place('apercu', largeur), 'texte'), action = 'demander' }
-    return lignes
+    return table.concat(parties, '\n')
 end
 
 -- La fenêtre de lignes à montrer : `nombre` lignes, `defilement` lignes au-dessus de la fin.

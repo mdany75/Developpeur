@@ -1921,6 +1921,102 @@ test("journal : retouche avec raison, annulation, retour à l'avant-Claude", fun
     egal(photo.proprietes.journalClaude ~= nil, true, "…mais pas le journal")
 end)
 
+-- Venu d'essais-lecon.lua (1.3, retiré avec la leçon au correctif 1.3.6) : la forme des entrées que
+-- lisent export_journal et les corrections, qui reste.
+test("journal : la forme des entrées (retouche, annulation de son nom entre « », retour)", function()
+    S.active = photoFuji()
+    appliquer({ reglages = { Exposure2012 = 0.4 }, plages = { Exposure2012 = { -5, 5 } }, etape = 'passe 1' })
+    appliquer({ reglages = { Exposure2012 = 0.9, Vibrance = 12 }, plages = { Exposure2012 = { -5, 5 }, Vibrance = { -100, 100 } },
+        etape = 'passe 2' })
+    Commandes.executer('annuler', {})
+    Commandes.executer('revenir', {})
+    local e = Commandes.executer('journal', {}).photos[1].entrees
+    egal(#e, 4)
+    egal(e[1].type, 'retouche')
+    egal(e[1].etape, 'Claude · passe 1')
+    egal(e[1].changements[1].cle, 'Exposure2012')
+    egal(e[1].changements[1].avant, 0)
+    egal(e[1].changements[1].apres, 0.4)
+    egal(e[2].etape, 'Claude · passe 2')
+    egal(e[3].type, 'annulation')
+    egal(e[3].etape, 'Annulation de « ' .. e[2].etape .. ' »', "le nom de l'étape défaite, entre « »")
+    egal(#e[3].changements, 0)
+    egal(e[4].type, 'retour')
+    egal(#e[4].changements, 0)
+    -- detaille (le journal détaillé de la leçon) est retiré : la description reste la courte.
+    egal(Commandes.executer('journal', { detaille = true }).photos[1].photo.appareil, nil)
+end)
+
+-- Venus d'essais-jelefais.lua (1.3, retiré avec « Je le fais » au correctif 1.3.6).
+test("choose_variant : l'entrée du journal d'une variante porte ses changements ; une pose qui ne prend pas n'en laisse aucune", function()
+    local function changement(changements, cle)
+        for _, c in ipairs(changements or {}) do
+            if c.cle == cle then
+                return c
+            end
+        end
+        return nil
+    end
+    local function memoire(photo, champ)
+        local texte = photo:getPropertyForPlugin(nil, champ)
+        return texte and Json.decode(texte) or nil
+    end
+    local photo = photoRaw()
+    photo.reglages.Clarity2012 = 0
+    photo.reglages.ToneCurvePV2012 = { 0, 0, 255, 255 }
+    S.active, S.selection = photo, { photo }
+    Commandes.executer('essayer', { action = 'appliquer', reglages = { Temperature = 6200, Vibrance = 15 }, libelles = {},
+        etape = 'variante chaude', instantane = 'chaude', taille = 800 })
+    Commandes.executer('variantes', { action = 'choisir', nom = 'chaude', etape = 'variante chaude' })
+    local entrees = Commandes.executer('journal', {}).photos[1].entrees
+    local entree = entrees[#entrees]
+    egal(entree.etape, 'Claude · variante chaude')
+    local c = changement(entree.changements, 'Temperature')
+    egal(c ~= nil, true, "Temperature au journal (il restait vide : la mémoire est écrite avant la pose)")
+    egal(c.avant, 5200)
+    egal(c.apres, 6200)
+    egal(changement(entree.changements, 'Vibrance').apres, 15)
+
+    -- L'instantané ne prend pas : ni étape, ni entrée au journal.
+    local autre = photoJpeg()
+    S.active, S.selection = autre, { autre }
+    Commandes.executer('essayer', { action = 'appliquer', reglages = { Exposure2012 = 0.4 }, libelles = {},
+        etape = 'variante claire', instantane = 'claire', taille = 800 })
+    S.instantaneBloque = true
+    echoue(function() Commandes.executer('variantes', { action = 'choisir', nom = 'claire', etape = 'claire' }) end, "n'a pas posé")
+    egal(#(memoire(autre, 'etapesClaude') or {}), 0)
+    egal(#(memoire(autre, 'journalClaude') or {}), 0, "pas d'entrée pour une étape retirée")
+end)
+
+test("Ecriture.difference : clé absente de la référence, valeur en attente et null ignorées ; tables comparées", function()
+    local Ecriture = require 'Ecriture'
+    local d = Ecriture.difference(
+        { Exposure2012 = 0, Vibrance = 10, Shadows2012 = Ecriture.EN_ATTENTE, Texture = Json.null, Look = { Name = 'A' },
+            Clarity2012 = 5, Dehaze = 1 },
+        { Exposure2012 = 0.5, Vibrance = 10, Shadows2012 = 20, Texture = 3, Look = { Name = 'B' }, Clarity2012 = Ecriture.EN_ATTENTE,
+            Contrast2012 = 9 })
+    egal(#d, 3)
+    egal(d[1].cle, 'Dehaze')
+    egal(d[1].avant, 1)
+    egal(d[1].maintenant, Json.null, "une clé disparue : null")
+    egal(d[2].cle, 'Exposure2012')
+    egal(d[2].avant, 0)
+    egal(d[2].maintenant, 0.5)
+    egal(d[3].cle, 'Look')
+    egal(d[3].maintenant.Name, 'B')
+    egal(Json.encode(Ecriture.difference({ A = 1 }, { A = 1 })), '[]', "un tableau JSON, même vide")
+    -- etatSimple exporté : nombres, booléens, textes suivis, nom de la Look, nombre des listes.
+    local etat = Ecriture.etatSimple({ Exposure2012 = 0.2, CameraProfile = 'Adobe Standard', LensProfileName = 'X',
+        Look = { Name = 'Adobe Color' }, MaskGroupBasedCorrections = { {}, {} }, UprightTransform_0 = 1 })
+    egal(etat.Exposure2012, 0.2)
+    egal(etat.CameraProfile, 'Adobe Standard')
+    egal(etat.LensProfileName, nil)
+    egal(etat['Look.Name'], 'Adobe Color')
+    egal(etat['#MaskGroupBasedCorrections'], 2)
+    egal(etat['#RetouchAreas'], 0)
+    egal(etat.UprightTransform_0, nil)
+end)
+
 -- Analyse et recette ---------------------------------------------------------------------
 
 test("apercu : attend le calcul des masques IA avant d'exporter", function()
@@ -3253,14 +3349,14 @@ test("garde-fous : plafond de photos par écriture, levé par un accord explicit
     egal(S.photos[521].reglages.Exposure2012, 0.2, "sans plafond")
 end)
 
-test("accord dans Lightroom : confirm ne suffit pas, l'utilisateur accepte dans la fenêtre de suivi", function()
+test("accord dans Lightroom : confirm ne suffit pas, l'utilisateur accepte dans la fenêtre de la liaison", function()
     local photo = photoRaw()
     S.active = photo
     S.prefs.mode, S.prefs.accordDansLightroom = 'proposer', true
     local essai = Commandes.executer('essayer', { action = 'appliquer', reglages = { Exposure2012 = 0.3 }, plages = { Exposure2012 = { -5, 5 } },
         taille = 512, etape = 'passe 1' })
     egal(essai.etape ~= nil, true)
-    egal(Liaison.propositionEnAttente.etape, 'Claude · essai : passe 1', "la proposition attend dans la fenêtre de suivi")
+    egal(Liaison.propositionEnAttente.etape, 'Claude · essai : passe 1', "la proposition attend dans la fenêtre de la liaison")
     echoue(function() appliquer({ reglages = { Exposure2012 = 0.3 }, confirme = true }) end, "bouton Accepter")
     egal(photo.reglages.Exposure2012, 0)
     Liaison.repondreProposition(true)
@@ -3587,7 +3683,7 @@ test("Liaison fermée : depuisLightroom venu du réseau est retiré, la pause ti
     egal(reponse(1).error:find("La liaison est en pause", 1, true) ~= nil, true, reponse(1).error)
     egal(#S.ecritures, 0, "rien d'écrit pendant la pause")
     egal(photo.reglages.Exposure2012, 0)
-    -- Le drapeau garde son effet par appel direct (menus, fenêtre de suivi, carte Note).
+    -- Le drapeau garde son effet par appel direct (menus, fenêtre de la liaison, carte Note).
     Commandes.executer('appliquer', exposer(0.5, { depuisLightroom = true }))
     egal(photo.reglages.Exposure2012, 0.5, "appel direct depuis Lightroom")
     Liaison.pause = false
@@ -3601,7 +3697,7 @@ test("Liaison fermée : depuisLightroom venu du réseau ne saute pas l'accord da
     priseDesReponses()
     Liaison.propositionEnAttente = nil
     Liaison.recevoir(ligne({ id = 1, command = 'appliquer', params = exposer(0.4, { depuisLightroom = true }) }))
-    egal(Liaison.propositionEnAttente ~= nil, true, "la proposition attend dans la fenêtre de suivi")
+    egal(Liaison.propositionEnAttente ~= nil, true, "la proposition attend dans la fenêtre de la liaison")
     egal(reponse(1).error:sub(1, #Liaison.EN_ATTENTE), Liaison.EN_ATTENTE)
     egal(#S.ecritures, 0)
     egal(photo.reglages.Exposure2012, 0)
@@ -5125,7 +5221,7 @@ test("notation : poser lève la pause et « Proposer d'abord », jamais les gard
     local r = Notation.poser({ { photo = 1 } })
     egal(r.ok, true, tostring(r.erreur))
     egal(a.brut.rating, 3)
-    egal(Liaison.propositionEnAttente, nil, "aucun accord demandé dans la fenêtre de suivi")
+    egal(Liaison.propositionEnAttente, nil, "aucun accord demandé dans la fenêtre de la liaison")
     local Bibliotheque = require 'Bibliotheque'
     echoue(function() Bibliotheque.noter({ notes = { { photo = 1, note = 2 } } }) end, "pause")
     Liaison.pause = false
@@ -5205,7 +5301,7 @@ test("notation : proposer avec poser pose les notes, à vérifier comprises ; la
     S.prefs.mode = 'proposer'
     proposer({ { photo = 1, note = 4, criteres = CRITERES } }, { poser = true })
     egal(a.brut.rating, 4)
-    -- Avec « Confirmer dans Lightroom » : l'accord se donne dans la fenêtre de suivi, puis Claude
+    -- Avec « Confirmer dans Lightroom » : l'accord se donne dans la fenêtre de la liaison, puis Claude
     -- rappelle propose_ratings avec apply (pas set_metadata, qui laisserait le registre en arrière).
     S.prefs.accordDansLightroom = true
     local attente = proposer({ { photo = 1, note = 3, criteres = CRITERES } }, { poser = true })

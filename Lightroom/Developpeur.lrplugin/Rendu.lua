@@ -1,7 +1,6 @@
--- Rendu.lua : les aperçus que voit Claude (commande apercu), la comparaison avec l'état d'avant
--- (ou avec la version de Claude d'un exercice « Je le fais », 1.3), les propositions rendues puis
--- défaites (essayer, qui range aussi les variantes et les exercices) et les deux rendus du
--- recalage (geometrie).
+-- Rendu.lua : les aperçus que voit Claude (commande apercu), la comparaison avec l'état d'avant,
+-- les propositions rendues puis défaites (essayer, qui range aussi les variantes) et les deux
+-- rendus du recalage (geometrie).
 -- Composition lue (1.3) : apercu avec entier rend l'image entière, sans son cadre (retiré le
 -- temps du rendu, puis remis, comme pour le recalage), et dit le cadre actuel vu dans cette image
 -- (read_composition) ; essayer avec entier rend aussi l'image entière d'une proposition de
@@ -46,7 +45,7 @@ local aDesChangements, noter, preparer = Plans.aDesChangements, Plans.noter, Pla
 local preparerMasques, preparerTaches = Plans.preparerMasques, Plans.preparerTaches
 local appliquerPlan, ecrire, modeTexte = Ecriture.appliquerPlan, Ecriture.ecrire, Ecriture.modeTexte
 local calculerAvantRendu, calculerIA = Ecriture.calculerAvantRendu, Ecriture.calculerIA
-local nomEtape, noterEtatFinal, verifierPause = Ecriture.nomEtape, Ecriture.noterEtatFinal, Ecriture.verifierPause
+local nomEtape, verifierPause = Ecriture.nomEtape, Ecriture.verifierPause
 local verifierProtection = Ecriture.verifierProtection
 local attendreProfils, essayerVariantes = Profils.attendreProfils, Profils.essayerVariantes
 local texteProfilRefuse = Profils.texteProfilRefuse
@@ -361,26 +360,11 @@ local function rendreEntierPropose(photo, plan, taille)
 end
 
 -- Les valeurs à poser le temps du rendu d'une comparaison, selon le mode : l'état d'avant la
--- première retouche de Claude (avantClaude), d'avant sa dernière étape (etapePrecedente, et toute
--- autre valeur), ou sa version d'un exercice « Je le fais » (versionClaude, 1.3 : la version rangée,
--- et le départ sur ce que Dany a changé hors d'elle ; voir Variantes.lua). Pour versionClaude, le
--- second résultat décrit l'exercice pour la réponse : { instantane, le, ecarts, listes, restent,
--- rien_change }, lu sur l'état de Dany, avant le rendu.
+-- première retouche de Claude (avantClaude), ou d'avant sa dernière étape (etapePrecedente, et
+-- toute autre valeur ; versionClaude, la version de Claude d'un exercice « Je le fais », est
+-- retiré au correctif 1.3.6).
 local function valeursAComparer(photo, comparer)
-    if comparer == 'versionClaude' then
-        local ex = Variantes.exercice(photo)
-        if not ex then
-            echouer("Aucune version de Claude rangée pour « Je le fais » sur cette photo : preview_settings avec my_turn = true la prépare.")
-        end
-        local actuels = photo:getDevelopSettings()
-        local valeurs, restent = Variantes.valeursClaude(ex, actuels)
-        local ecarts, listes, rienChange = Variantes.ecartsExercice(ex, actuels)
-        if next(valeurs) == nil then
-            echouer("La version de Claude rangée pour « Je le fais » ne change aucun réglage : rien à comparer.")
-        end
-        return valeurs, { instantane = ex.instantane, le = ex.le or Json.null, ecarts = ecarts, listes = listes,
-            restent = restent, rien_change = rienChange }
-    elseif comparer == 'avantClaude' then
+    if comparer == 'avantClaude' then
         return lireJson(photo, 'avantClaude', {})
     end
     local etapes = lireJson(photo, 'etapesClaude', {})
@@ -388,12 +372,11 @@ local function valeursAComparer(photo, comparer)
 end
 
 -- Comparaison : rend l'état d'avant (avant la première retouche de Claude, ou avant la dernière),
--- ou la version de Claude d'un exercice, en l'appliquant le temps du rendu, puis remet les valeurs
--- actuelles. Rend le chemin, vrai si un traitement calculé n'a pas pu être défait, et la
--- description de l'exercice (versionClaude).
+-- en l'appliquant le temps du rendu, puis remet les valeurs actuelles. Rend le chemin, et vrai si
+-- un traitement calculé n'a pas pu être défait.
 local function rendreAvant(photo, comparer, taille, params)
     verifierPause(params)
-    local valeurs, exercice = valeursAComparer(photo, comparer)
+    local valeurs = valeursAComparer(photo, comparer)
     valeurs = pourLightroom(valeurs)
     -- Un traitement calculé (Amelioration, Suppression) ne se défait pas le temps d'un rendu.
     local ameliore = valeurs.Amelioration ~= nil or valeurs.Suppression ~= nil
@@ -442,7 +425,7 @@ local function rendreAvant(photo, comparer, taille, params)
     if not ok then
         error(chemin, 0)
     end
-    return chemin, ameliore, exercice
+    return chemin, ameliore
 end
 
 -- Géométrie des photos visées (commande « geometrie ») : correction active et son empreinte ; avec
@@ -477,9 +460,9 @@ function Rendu.apercu(params)
     if params.entier == true then
         entier = preparerEntier(photo, params)
     end
-    local cheminAvant, ameliore, exercice
+    local cheminAvant, ameliore
     if params.comparer then
-        cheminAvant, ameliore, exercice = rendreAvant(photo, params.comparer, taille, params)
+        cheminAvant, ameliore = rendreAvant(photo, params.comparer, taille, params)
     end
     -- La vue de l'avant/après des étapes (1.3) : l'image entière de l'état actuel, rendue après le
     -- retour d'une comparaison ; ni un zoom (taille 0, pleine résolution), ni l'image entière sans
@@ -513,11 +496,6 @@ function Rendu.apercu(params)
     end
     if ameliore then
         infos.remarque_comparaison = "L'image d'avant garde le débruitage, les détails bruts, la super résolution ou la suppression des reflets : la comparaison ne défait pas ces traitements calculés."
-    end
-    -- « Je le fais » (comparer = versionClaude) : chemin_avant est la version de Claude, chemin
-    -- l'état de Dany ; les écarts réglage par réglage. Rien d'autre n'est écrit (lecture seule).
-    if exercice then
-        infos.exercice = exercice
     end
     if calcules == false then
         infos.a_savoir = "Lightroom n'avait pas fini de calculer les réglages IA de cette photo (masques IA, profil adaptatif) : l'aperçu peut les montrer incomplets. "
@@ -555,15 +533,12 @@ end
 
 -- Proposition visuelle : applique, rend, puis remet la photo comme avant. Rien n'est mémorisé ni
 -- journalisé ; l'Historique de Lightroom garde les deux étapes. Avec instantane (compare_variants),
--- la proposition est aussi rangée en instantané (Variantes.ranger). Avec exercice (« Je le fais »,
--- 1.3 ; exige instantane), la mémoire de la variante garde l'état de départ et la version de
--- Claude, le journal une entrée 'exercice', et l'état où la photo revient devient celui d'après
--- Claude (noterEtatFinal : corrections_utilisateur dit ensuite ce que Dany a fait) ; une
--- proposition qui ne change rien est refusée. sans_rendu : aucun rendu (chemin nil). Avec entier
--- (Composition lue, 1.3) et un recadrage proposé (ni retiré, ni sans rendu, ni pour un exercice) :
--- aussi l'image entière de la proposition, sans son cadre (troisième étape « Claude · essai : image
--- entière »), et le cadre que Lightroom a gardé (cadre_propose), même si cette image ne se rend
--- pas. essayer n'est pas une étape : Etapes.lua n'en garde pas d'avant/après.
+-- la proposition est aussi rangée en instantané (Variantes.ranger). Avec entier (Composition lue,
+-- 1.3) et un recadrage proposé (pas retiré) : aussi l'image entière de la proposition, sans son
+-- cadre (troisième étape « Claude · essai : image entière »), et le cadre que Lightroom a gardé
+-- (cadre_propose), même si cette image ne se rend pas. essayer n'est pas une étape : Etapes.lua
+-- n'en garde pas d'avant/après. (L'exercice « Je le fais », exercice et sans_rendu, est retiré au
+-- correctif 1.3.6.)
 function Rendu.essayer(params)
     verifierPause(params)
     local prefs = Preferences.lire()
@@ -571,10 +546,6 @@ function Rendu.essayer(params)
     -- Une proposition écrit le temps d'un rendu : une photo protégée n'en reçoit pas non plus. Le
     -- plafond ne compte pas (une photo, rien de gardé).
     verifierProtection({ photo }, prefs, { confirme = true }, 'preview_settings')
-    local exercice = params.exercice == true
-    if exercice and (params.instantane == nil or tostring(params.instantane) == '') then
-        echouer("« Je le fais » : la version de Claude se range en instantané, et le nom de l'instantané manque. Rien n'a été écrit.")
-    end
     local plan
     if params.action == 'masquer' then
         plan = preparerMasques(photo, params)
@@ -586,26 +557,15 @@ function Rendu.essayer(params)
     if params.rotation then
         noter(plan, "La rotation de 90° n'est pas montrée dans une proposition : apply_settings la fait.")
     end
-    -- L'état de départ d'un exercice, lu avant toute écriture.
-    local depart, raw
-    if exercice then
-        if not aDesChangements(plan) then
-            echouer("Rien à faire : la proposition est l'état actuel. Rien n'a été écrit.")
-        end
-        local reglages = photo:getDevelopSettings()
-        depart = Variantes.departExercice(reglages)
-        raw = estRaw(photo, reglages)
-    end
-    local sansRendu = params.sans_rendu == true
     local taille = tonumber(params.taille) or 1344
     -- L'image entière d'une proposition de recadrage (preview_settings y dessine le cadre gardé) :
-    -- seulement pour l'action appliquer avec un recadrage proposé, jamais sans rendu ni pour un
-    -- exercice (rien ne se rend), ni pour un recadrage retiré (rien à dessiner).
+    -- seulement pour l'action appliquer avec un recadrage proposé, jamais pour un recadrage retiré
+    -- (rien à dessiner).
     local entier = params.entier == true and params.action ~= 'masquer' and params.action ~= 'retoucher'
-        and type(params.recadrage) == 'table' and params.recadrage.retirer ~= true and not sansRendu and not exercice
+        and type(params.recadrage) == 'table' and params.recadrage.retirer ~= true
     local cadrePropose, dimensionsEntiere, cheminEntier, cadreRetire
     local cheminActuel
-    if params.comparer and not sansRendu then
+    if params.comparer then
         cheminActuel = rendre(photo, taille)
     end
     local etape = nomEtape(params, "proposition", "Claude · essai : ")
@@ -640,19 +600,12 @@ function Rendu.essayer(params)
                     end
                 end
             end
-            -- Une variante (compare_variants) : rangée en instantané avant le rendu et le retour ;
-            -- l'exercice « Je le fais » aussi, avec son départ et la version de Claude.
+            -- Une variante (compare_variants) : rangée en instantané avant le rendu et le retour.
             if params.instantane then
                 local cles = {}
                 for cle in pairs(plan.avant) do cles[cle] = true end
                 for cle in pairs(plan.nouveaux) do cles[cle] = true end
-                instantane = Variantes.ranger(photo, params.instantane, cles, exercice and {
-                    depart = depart, avant = plan.avant, nouveaux = plan.nouveaux, raison = params.raison,
-                    changements = plan.changements,
-                } or nil)
-            end
-            if sansRendu then
-                return nil
+                instantane = Variantes.ranger(photo, params.instantane, cles)
             end
             local rendu = rendre(photo, taille)
             if entier then
@@ -685,25 +638,15 @@ function Rendu.essayer(params)
             error(resultat, 0)
         end
         chemin = resultat
-        -- L'exercice : la photo revenue au départ est l'état d'après Claude (écriture privée).
-        if exercice then
-            noterEtatFinal({ photo }, etape)
-        end
     else
         noter(plan, "Rien ne changerait : la proposition est l'état actuel.")
         if params.instantane then
             instantane = Variantes.ranger(photo, params.instantane, {})
         end
-        if not sansRendu then
-            chemin = rendre(photo, taille)
-        end
+        chemin = rendre(photo, taille)
     end
-    if exercice then
-        Liaison.noter("« Je le fais » : version de Claude rangée (" .. tostring(instantane) .. "), rien d'appliqué", photo.localIdentifier)
-    else
-        Liaison.noter("Proposition montrée à Claude : " .. etape, photo.localIdentifier)
-    end
-    -- Accord véritable : l'utilisateur répond dans la fenêtre de suivi (Accepter ou Refuser).
+    Liaison.noter("Proposition montrée à Claude : " .. etape, photo.localIdentifier)
+    -- Accord véritable : l'utilisateur répond dans la fenêtre de la liaison (Accepter ou Refuser).
     if prefs.mode == 'proposer' and prefs.accordDansLightroom and not params.instantane then
         local lignes = {}
         for i, changement in ipairs(plan.changements) do
@@ -730,12 +673,6 @@ function Rendu.essayer(params)
         cadre_propose = cadrePropose,
         dimensions = dimensionsEntiere,
     }
-    -- « Je le fais » : l'instantané de la version de Claude, et le format de la photo (le serveur
-    -- dit la température en kelvins pour un RAW).
-    if exercice then
-        reponse.exercice = { instantane = instantane }
-        reponse.raw = raw == true
-    end
     return reponse
 end
 

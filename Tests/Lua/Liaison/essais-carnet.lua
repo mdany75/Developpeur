@@ -89,17 +89,25 @@ local function constater(photo, constat, plus)
     return Commandes.executer('carnet', params)
 end
 
--- Une leçon valide (trois points, un par axe), pour vérifier qu'un constat la garde.
-local function lecon()
-    return { points = {
-        { axe = 'lumiere', prise_de_vue = "Exposer pour le ciel." },
-        { axe = 'couleur', prise_de_vue = "Balance des blancs juste : à refaire." },
-        { axe = 'composition', prise_de_vue = "Niveau électronique du viseur.", defauts = { 'horizon_penche' } },
-    } }
-end
-
 local function fichierRelu()
     return Json.decode(S.fichiers[Carnet.fichier()])
+end
+
+-- Une leçon d'avant le correctif 1.3.6 (la commande lecon est retirée), rangée sous l'entrée de
+-- l'original `id` d'un carnet.json écrit puis relu, pour vérifier qu'un constat la garde.
+local function leconDAvant(id)
+    local cle = tostring(id)
+    S.fichiers[Carnet.fichier()] = Json.encode({ format = 1, catalogues = { [CATALOGUE] = { photos = { [cle] = {
+        photo = id, uuid = 'uuid-' .. cle, fichier = 'DSC_0412.NEF', le = 1, lecons = { [cle] = { photo = id, le = 1,
+            points = Json.tableau({ { axe = 'lumiere', prise_de_vue = "Exposer pour le ciel.", defauts = Json.tableau() } }),
+            defauts = Json.tableau(), indices = Json.tableau() } } } } } } })
+    Carnet.oublier()
+end
+
+-- La leçon d'avant de la photo `id`, sous l'entrée de l'original `original`, relue du fichier.
+local function leconRelue(original, id)
+    local e = fichierRelu().catalogues[CATALOGUE].photos[tostring(original)]
+    return e and e.lecons and e.lecons[tostring(id)]
 end
 
 -- Aucune table de cette valeur ne porte de métatable (tableau relu par Json.decode, ou marqué par
@@ -127,7 +135,6 @@ local function fabriquer(entrees, vocabulaire)
         e.uuid = e.uuid or ('uuid-' .. e.photo)
         e.fichier = e.fichier or string.format('IMG_%04d.JPG', e.photo)
         e.le = e.le or 1
-        e.lecons = e.lecons or {}
         photos[tostring(e.photo)] = e
     end
     S.fichiers[Carnet.fichier()] = Json.encode({ format = 1, vocabulaire = vocabulaire or VOCABULAIRE,
@@ -237,9 +244,9 @@ test("carnet constater : une copie virtuelle va sous son original (une prise de 
     egal(#Carnet.entree(1).vue.defauts, 0)
 end)
 
-test("carnet constater : une vue remplace la vue, un angle l'angle ; l'autre et les leçons restent", function()
+test("carnet constater : une vue remplace la vue, un angle l'angle ; l'autre et les leçons d'avant restent", function()
     photoRaw()
-    Commandes.executer('lecon', { action = 'garder', photo = 1, lecon = lecon() })
+    leconDAvant(1)
     local r = constater(1, { angle = angle(1.8, 'measure_angle') })
     egal(r.note, true)
     egal(r.constat, 'angle')
@@ -253,7 +260,8 @@ test("carnet constater : une vue remplace la vue, un angle l'angle ; l'autre et 
     egal(e.angle.photo, 1)
     egal(e.vue.defauts[1].code, 'flou', "un code seul devient { code }")
     egal(e.vue.defauts[1].mesure, nil)
-    egal(e.lecons['1'] ~= nil, true, "la leçon reste")
+    egal(e.lecons, nil, "la leçon d'avant n'est plus montrée…")
+    egal(leconRelue(1, 1).points[1].prise_de_vue, "Exposer pour le ciel.", "…mais elle reste dans carnet.json")
 
     r = constater(1, { vue = vue({ 'bruit' }) })
     egal(r.remplacee, true)
@@ -268,7 +276,7 @@ test("carnet constater : une vue remplace la vue, un angle l'angle ; l'autre et 
     proche(e.angle.inclinaison, -0.7, "le nouvel angle remplace l'ancien")
     egal(e.angle.source, nil)
     egal(table.concat(e.vue.cherches, ','), 'bruit', "la vue reste")
-    egal(e.lecons['1'] ~= nil, true, "la leçon reste")
+    egal(leconRelue(1, 1) ~= nil, true, "la leçon d'avant reste")
     egal(contient(Liaison.journal, "Carnet : ligne penchée de 0,7° notée pour DSC_0412.NEF"), true)
     local texte = S.fichiers[Carnet.fichier()]
     egal(texte:find('"defauts":[]', 1, true) ~= nil, true, "une liste vide reste un tableau JSON dans le fichier")
@@ -373,9 +381,9 @@ test("carnet constater : une photo de Développeur › Essais (ou dont l'origina
     egal(Carnet.estPhotoDEssai(copie), true)
     egal(Carnet.estPhotoDEssai(original), false)
 
-    -- L'original, une vraie photo, a son entrée (vue et leçon) : la recette n'y touche jamais.
+    -- L'original, une vraie photo, a son entrée (vue et leçon d'avant) : la recette n'y touche jamais.
+    leconDAvant(1)
     egal(constater(1, { vue = vue({ 'flou' }, { 'flou' }) }).note, true, "l'original n'est pas une photo d'essai")
-    Commandes.executer('lecon', { action = 'garder', photo = 1, lecon = lecon() })
     r = constater(7, { vue = vueType() }, { essai_recette = true })
     egal(r.note, true, "la recette seule fait entrer une copie d'essai")
     egal(r.photo, 7)
@@ -394,7 +402,7 @@ test("carnet constater : une photo de Développeur › Essais (ou dont l'origina
     egal(encore.absentes[1], 7)
     local e = Carnet.entree(1)
     egal(table.concat(e.vue.cherches, ','), 'flou', "l'entrée de l'original reste")
-    egal(e.lecons['1'] ~= nil, true, "et sa leçon")
+    egal(leconRelue(1, 1) ~= nil, true, "et sa leçon d'avant")
     egal(Carnet.nombre(), 1)
 
     -- L'original est dans les Essais : sa copie aussi est une photo d'essai.
@@ -415,67 +423,6 @@ test("carnet constater : une photo de Développeur › Essais (ou dont l'origina
     -- Des collections illisibles : pas une photo d'essai (la recette le verrait).
     original.getContainedCollections = function() error("illisible") end
     egal(Carnet.estPhotoDEssai(original), false)
-end)
-
--- 1.3.1 : constaté le 21 octobre 2026 dans le carnet de Dany, la leçon de l'essai réel sur la dune
--- d'essai (une copie de « Développeur › Essais ») rangée sous son original, une vraie photo.
-test("lecon garder : la leçon d'une photo de Développeur › Essais n'est pas rangée, sauf pour la recette, sous son entrée à elle", function()
-    local original = photoRaw()
-    original.brut.dateTimeOriginal = PRISE_JUILLET_UTC
-    S.fuseau = -4 * 3600
-    local copie = S.copieVirtuelle(original, 7, 'Essai')
-    S.Collection('Essais', S.Ensemble('Développeur')).membres[copie] = true
-    -- L'original, une vraie photo, a sa vue.
-    egal(constater(1, { vue = vue({ 'flou' }) }).note, true)
-    local version, fichier = Carnet.version, S.fichiers[Carnet.fichier()]
-    local ecritures, privees = #S.ecritures, S.ecrituresPrivees
-    local r = Commandes.executer('lecon', { action = 'garder', photo = 7, lecon = lecon() })
-    egal(r.rangee, false)
-    egal(r.remplacee, false)
-    egal(r.motif, 'essai')
-    egal(r.photo, 7)
-    egal(r.fichier, 'DSC_0412.NEF (Essai)')
-    egal(r.original, nil, "aucune entrée visée")
-    egal(r.remarque, "Leçon non rangée : photo d'essai (Développeur › Essais) ; le carnet de progrès ne compte que les vraies "
-        .. "prises de vue. La leçon de cette réponse reste valable.")
-    egal(Carnet.version, version, "rien n'est rangé")
-    egal(S.fichiers[Carnet.fichier()], fichier, "carnet.json inchangé")
-    egal(next(Carnet.entree(1).lecons), nil, "rien sous l'original")
-    egal(Carnet.lecon(7), nil)
-    egal(Carnet.nombre(), 1)
-    egal(#S.ecritures, ecritures, "rien dans le catalogue")
-    egal(S.ecrituresPrivees, privees)
-    -- La photo active, sans photo donnée ; et par la prise de la liaison : une réponse, jamais une
-    -- erreur (photo_lesson le dit sans échouer).
-    S.active = copie
-    egal(Commandes.executer('lecon', { action = 'garder', lecon = lecon() }).rangee, false, "la photo active aussi")
-    Liaison.prise = { send = function(self, texte) S.envois[#S.envois + 1] = texte end }
-    Liaison.reponsesConnectee = true
-    Liaison.recevoir(ligne({ id = 21, command = 'lecon', params = { action = 'garder', photo = 7, lecon = lecon() } }))
-    Liaison.prise = nil
-    local reponse = Json.decode(S.envois[#S.envois])
-    egal(reponse.error, nil)
-    egal(reponse.result.rangee, false)
-    egal(reponse.result.motif, 'essai')
-    egal(Carnet.version, version)
-    -- Une leçon invalide reste refusée d'abord, photo d'essai ou pas.
-    echoue(function() Commandes.executer('lecon', { action = 'garder', photo = 7, lecon = { points = {} } }) end, "trois points")
-
-    -- Pour la recette (essai_recette) : rangée, sous l'entrée de la photo d'essai elle-même.
-    r = Commandes.executer('lecon', { action = 'garder', photo = 7, lecon = lecon(), essai_recette = true })
-    egal(r.rangee, true)
-    egal(r.photo, 7)
-    egal(r.original, 7, "une entrée à elle, jamais celle de son original")
-    egal(r.mois, '2026-06', "au mois de sa prise de vue")
-    egal(Carnet.nombre(), 2)
-    egal(Carnet.entree(7).lecons['7'] ~= nil, true)
-    egal(next(Carnet.entree(1).lecons), nil, "toujours rien sous l'original")
-    -- Retirée par la recette : l'entrée de la photo d'essai part avec elle ; celle de l'original reste.
-    egal(Commandes.executer('lecon', { action = 'retirer', photo = 7 }).retirees, 1)
-    egal(Carnet.entree(7), nil)
-    egal(table.concat(Carnet.entree(1).vue.cherches, ','), 'flou')
-    -- Une vraie photo se range comme avant, sans essai_recette.
-    egal(Commandes.executer('lecon', { action = 'garder', photo = 1, lecon = lecon() }).rangee, true)
 end)
 
 test("carnet constater : case Carnet décochée, tout constat est refusé sans rien lire ; lire et retirer marchent toujours", function()
@@ -620,12 +567,12 @@ end)
 
 -- Lire, retirer, registre ------------------------------------------------------------------------
 
-test("carnet lire : constats et leçons de chaque photo vers le serveur ; copies neuves sans métatable pour la fenêtre", function()
+test("carnet lire : les constats de chaque photo vers le serveur, sans les leçons d'avant ; copies neuves sans métatable pour la fenêtre", function()
     local original = photoRaw()
     S.copieVirtuelle(original, 7, 'Copie 1')
+    leconDAvant(1)
     constater(7, { vue = vueType() })
     constater(1, { angle = angle(1.4, 'read_composition') })
-    Commandes.executer('lecon', { action = 'garder', photo = 7, lecon = lecon() })
     local ecritures = #S.ecritures
     local lu = Commandes.executer('carnet', { action = 'lire' })
     egal(lu.nombre, 1)
@@ -634,8 +581,8 @@ test("carnet lire : constats et leçons de chaque photo vers le serveur ; copies
     egal(entree.vue.photo, 7)
     egal(entree.vue.defauts[1].code, 'ciel_brule')
     egal(entree.angle.source, 'read_composition')
-    egal(#entree.lecons, 1, "les leçons de chaque photo")
-    egal(entree.lecons[1].photo, 7)
+    egal(entree.lecons, nil, "ni les leçons d'avant")
+    egal(leconRelue(1, 1) ~= nil, true, "qui restent dans carnet.json")
     egal(entree.uuid, nil)
     egal(#S.ecritures, ecritures, "lire n'écrit rien")
 
@@ -768,7 +715,7 @@ test("résumé : les six derniers mois de prise de vue qui ont des photos, en fr
     entrees[#entrees + 1] = { sans_date = true, vue = { le = le(2026, 5, 10), cherches = { 'flou' }, defauts = { { code = 'flou' } } } }
     -- Datée après aujourd'hui (juin 2026) : pas comptée.
     serie(entrees, '2026-07', 1, { 'flou' }, function() return { 'flou' } end)
-    -- Une leçon seule, sans constat : pas comptée, et avril n'est pas un mois du carnet.
+    -- Une leçon d'avant seule, sans constat : pas comptée, et avril n'est pas un mois du carnet.
     entrees[#entrees + 1] = { prise = '2026-04', lecons = { ['77'] = { photo = 77, points = {}, defauts = { 'flou' } } } }
     fabriquer(entrees)
 

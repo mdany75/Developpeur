@@ -1,9 +1,15 @@
 -- Stockage.lua : les conversations sur le disque, une par dossier
 -- (Conversations/<id>/conversation.json et ses images), celles des anciennes séances de notation
 -- comprises (genre = 'notation'). Les listes d'un élément (images, changements, notes, et en 1.3
--- etapes, annule, revenu, les points d'une leçon et leurs défauts, la liste à faire d'un exercice
--- « Je le fais », ses écarts et les réglages faits comme Claude) s'écrivent toujours en tableaux
--- JSON.
+-- etapes, annule, revenu) s'écrivent toujours en tableaux JSON. Les éléments `lecon` et
+-- `exercice` d'une conversation d'avant le correctif 1.3.6 (leçon de la photo, « Je le fais »,
+-- retirés) se relisent et se réécrivent tels quels (les tableaux relus par Json.decode le
+-- restent), sans que rien ne les lise.
+-- Une photo, une conversation (correctif 1.3.6) : la photo d'une conversation (`photo`), ce qu'elle
+-- en a vu (`vu`) et sa mise de côté par « Repartir à neuf » (`ecartee`) s'écrivent avec elle, comme
+-- ses éléments `historique` ; une conversation écartée reste sur le disque, jamais effacée (plus de
+-- Supprimer… depuis le correctif 1.3.6). Une conversation neuve n'est écrite qu'à sa première
+-- demande, celle d'un groupe jamais (Moteur.lua).
 -- Aussi les demandes personnelles de Dany, le menu Mes demandes de la fenêtre (mes-demandes.json,
 -- section « Mes demandes » en bas de ce fichier).
 
@@ -21,9 +27,6 @@ local Stockage = {}
 -- Format écrit dans chaque conversation.json.
 Stockage.FORMAT = 'developpeur/1'
 
--- Les textes d'un réglage à faire ou d'un écart d'un exercice « Je le fais » (1.3) : relus
--- seulement s'ils sont des textes (la carte et le fil les mettent bout à bout).
-local CHAMPS_TEXTE_EXERCICE = { 'panneau', 'section', 'reglage', 'cle', 'texte', 'sorte', 'de', 'a' }
 
 function Stockage.dossier(id)
     return LrPathUtils.child(Chemins.conversations(), id)
@@ -96,51 +99,6 @@ local function pourJson(c)
                 x[cle] = liste
             end
         end
-        -- Les points d'une leçon (1.3), et les défauts de chaque point : des tableaux, même vides.
-        if e.genre == 'lecon' then
-            local points = Json.tableau()
-            for j, point in ipairs(e.points or {}) do
-                local y = {}
-                for cle, valeur in pairs(point) do
-                    y[cle] = valeur
-                end
-                local defauts = Json.tableau()
-                for k, d in ipairs(point.defauts or {}) do
-                    defauts[k] = d
-                end
-                y.defauts = defauts
-                points[j] = y
-            end
-            x.points = points
-        end
-        -- Un exercice « Je le fais » (1.3) : sa liste (avec les clés du cadre), ses écarts et les
-        -- réglages faits comme Claude, des tableaux même vides.
-        if e.genre == 'exercice' then
-            local aFaire = Json.tableau()
-            for j, item in ipairs(e.aFaire or {}) do
-                local y = {}
-                for cle, valeur in pairs(item) do
-                    y[cle] = valeur
-                end
-                if type(item.cles) == 'table' then
-                    local cles = Json.tableau()
-                    for k, nom in ipairs(item.cles) do
-                        cles[k] = nom
-                    end
-                    y.cles = cles
-                end
-                aFaire[j] = y
-            end
-            x.aFaire = aFaire
-            for _, cle in ipairs({ 'ecarts', 'commeClaude' }) do
-                local liste = Json.tableau()
-                for j, valeur in ipairs(e[cle] or {}) do
-                    liste[j] = valeur
-                end
-                x[cle] = liste
-            end
-            x.comparaisonEnCours = nil
-        end
         elements[i] = x
     end
     copie.elements = elements
@@ -172,56 +130,9 @@ function Stockage.lire(id)
         if e.genre == 'notation' then
             e.notes = e.notes or {}
         end
-        if e.genre == 'lecon' then
-            -- Seulement des points en table, chacun avec sa liste de défauts : le fil et
-            -- l'enregistrement les parcourent (un fichier abîmé ne doit pas bloquer la fenêtre).
-            local points = {}
-            for _, p in ipairs(type(e.points) == 'table' and e.points or {}) do
-                if type(p) == 'table' then
-                    if type(p.defauts) ~= 'table' then
-                        p.defauts = {}
-                    end
-                    points[#points + 1] = p
-                end
-            end
-            e.points = points
-        end
         -- Un appel resté en cours (Lightroom fermé pendant l'appel) n'a pas abouti.
-        if (e.genre == 'outil' or e.genre == 'notation' or e.genre == 'lecon' or e.genre == 'exercice') and e.etat == 'enCours' then
+        if (e.genre == 'outil' or e.genre == 'notation') and e.etat == 'enCours' then
             e.etat = 'erreur'
-        end
-        if e.genre == 'exercice' then
-            -- Seulement des réglages et des écarts en table, et des textes en texte (un fichier
-            -- abîmé ne doit pas bloquer le fil ni la carte) ; une comparaison restée en cours
-            -- n'aboutira plus.
-            for _, cle in ipairs({ 'aFaire', 'ecarts' }) do
-                local gardes = {}
-                for _, x in ipairs(type(e[cle]) == 'table' and e[cle] or {}) do
-                    if type(x) == 'table' then
-                        for _, champ in ipairs(CHAMPS_TEXTE_EXERCICE) do
-                            if type(x[champ]) ~= 'string' then
-                                x[champ] = nil
-                            end
-                        end
-                        gardes[#gardes + 1] = x
-                    end
-                end
-                e[cle] = gardes
-            end
-            if type(e.commeClaude) ~= 'table' then
-                e.commeClaude = {}
-            end
-            if type(e.principal) ~= 'table' then
-                e.principal = nil
-            elseif type(e.principal.texte) ~= 'string' then
-                e.principal.texte = nil
-            end
-            for _, champ in ipairs({ 'texte', 'resume', 'aSavoir', 'fichier', 'instantane', 'comparaisonRefusee' }) do
-                if type(e[champ]) ~= 'string' then
-                    e[champ] = nil
-                end
-            end
-            e.comparaisonEnCours = nil
         end
     end
     return c
@@ -240,10 +151,8 @@ function Stockage.charger()
     return liste
 end
 
--- À la corbeille du Finder, avec ses images.
-function Stockage.supprimer(id)
-    return Fichiers.corbeille(Stockage.dossier(id))
-end
+-- (Stockage.supprimer, qui mettait une conversation à la corbeille du Finder pour Supprimer… du
+-- volet, est retiré au correctif 1.3.6 : une conversation n'est plus jamais effacée.)
 
 -- Mes demandes -----------------------------------------------------------------------------------
 -- Les demandes personnelles de Dany (demandé par Dany le 22 octobre 2026) : le menu Mes demandes de

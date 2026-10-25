@@ -26,7 +26,7 @@ Preferences.defauts = {
     libelleProtege = 'aucun',
     rejeteesProtegees = false,
     plafondPhotos = 20,
-    -- En mode « Proposer d'abord », l'accord se donne dans la fenêtre de suivi (bouton Accepter),
+    -- En mode « Proposer d'abord », l'accord se donne dans la fenêtre de la liaison (bouton Accepter),
     -- pas par confirm = true seul.
     accordDansLightroom = false,
     -- Message bref au centre de l'écran à chaque écriture de Claude.

@@ -1,10 +1,10 @@
 -- essais-dispositions.lua : la fenêtre Claude (la Conversation claire, seule disposition depuis
 -- que l'Atelier et le Panneau sont retirés) hors de Lightroom (LuaJIT, Lightroom simulé par
--- Simulation.lua) : fenêtre déjà ouverte, boucle, onglets, carte Note et ses flèches, nouvelle
--- conversation par photo, proposition préparée à l'ouverture, anciennes conversations de séance
--- absentes de la liste, Gestionnaire de modules externes (modèle, effort, cases), vignettes dans un
--- cadre 3:2, image « aucun aperçu » ; structure de la 1.3 (carte de l'étape, rangée Je le fais,
--- crochets de l'aperçu et des onglets, clics sur le fil, vue du fil, agrandissement à deux
+-- Simulation.lua) : fenêtre déjà ouverte, boucle, onglets, carte Note et ses flèches, anciennes
+-- conversations de séance (une photo, une conversation et Obtenir, qui remplace la proposition
+-- préparée à l'ouverture : essais-une-photo.lua), Gestionnaire de modules externes (modèle, effort, cases), vignettes dans un
+-- cadre 3:2, image « aucun aperçu » ; structure de la 1.3 (carte de l'étape, crochets de l'aperçu
+-- et des onglets, clics sur le fil, vue du fil, agrandissement à deux
 -- images). Le registre des notes (Notation) garde ici les appels reçus :
 -- la simulation de la fenêtre n'écrit pas dans un catalogue. Ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
@@ -156,8 +156,6 @@ end
 local Fenetre = require 'Fenetre'
 local Moteur = require 'Moteur'
 local prefs = Chemins.prefs()
--- La proposition préparée à l'ouverture a son propre essai (plus bas) : ailleurs, Claude reste libre.
-prefs.propositionAOuverture = false
 
 local function photoActive(id, nom, note, pickStatus)
     local photo = S.photo(id, nom)
@@ -213,7 +211,7 @@ essai('Une seule disposition : ni taille ni disposition dans les préférences, 
     egal(nil, Dispositions.atelier)
     egal(nil, Dispositions.panneau)
     egal('conversation', Dispositions.dimensions().nom)
-    egal('DeveloppeurClaude-conversation-grande-4', Fenetre.cadre(), 'FORME 4 : la fenêtre B élargie')
+    egal('DeveloppeurClaude-conversation-grande-5', Fenetre.cadre(), 'FORME 5 : la fenêtre B sans son volet (correctif 1.3.6)')
     egal(nil, Fenetre.rouvrir)
     egal(nil, Fenetre.elementsMenu)
 end)
@@ -324,166 +322,10 @@ essai('Onglets : une proposition ou une note qui arrive se montre, une seule foi
     S.pendantFenetre = nil
 end)
 
--- Nouvelle conversation par photo -------------------------------------------------------------
-
-essai('Autre photo choisie : une nouvelle conversation, pas pendant que Claude travaille ni pour une conversation vide', function()
-    prefs.nouvelleParPhoto = true
-    photoActive(4961, 'DSCF4961.RAF', 0, 0)
-    Fenetre.cleVue, Fenetre.cleVueLe, Moteur.finTravail = nil, nil, 0
-    S.pendantFenetre = function()
-        Fenetre.majPhoto()
-        -- Une conversation neuve, puis un premier message, sur la photo 4961.
-        Moteur.nouvelle()
-        local premiere = Moteur.courante
-        -- Une conversation avec un message, sur la photo 4961.
-        Conversation.ajouterDemande(premiere, 'Retouche-la')
-        premiere.cle = Fenetre.cleVue
-        vrai(premiere.cle and premiere.cle:find('4961', 1, true), 'clé de la sélection : ' .. tostring(premiere.cle))
-        -- La même photo relue : rien.
-        Fenetre.majPhoto()
-        egal(premiere, Moteur.courante, 'même photo : même conversation')
-        -- Dany choisit une autre photo : une nouvelle conversation, vide.
-        photoActive(4962, 'DSCF4962.RAF', 0, 0)
-        Fenetre.majPhoto()
-        local deuxieme = Moteur.courante
-        vrai(deuxieme ~= premiere, 'nouvelle conversation')
-        egal(0, #deuxieme.elements)
-        -- Une conversation vide ne se remplace pas par une autre vide.
-        photoActive(4963, 'DSCF4963.RAF', 0, 0)
-        Fenetre.majPhoto()
-        egal(deuxieme, Moteur.courante, 'conversation vide gardée')
-        -- Pendant que Claude travaille (show_photo, tri), la sélection qu'il change devient celle de
-        -- la conversation, et aussi juste après la fin de son travail.
-        Conversation.ajouterDemande(deuxieme, 'Montre-moi la 4964')
-        deuxieme.cle = Fenetre.cleVue
-        Moteur.travaille = true
-        photoActive(4964, 'DSCF4964.RAF', 0, 0)
-        Fenetre.majPhoto()
-        egal(deuxieme, Moteur.courante, 'Claude travaille : même conversation')
-        vrai(deuxieme.cle:find('4964', 1, true), 'la sélection de Claude devient celle de la conversation')
-        Moteur.travaille = false
-        Moteur.finTravail = os.time()
-        photoActive(4965, 'DSCF4965.RAF', 0, 0)
-        Fenetre.majPhoto()
-        egal(deuxieme, Moteur.courante, 'juste après le travail : même conversation')
-        -- Plus tard, une autre photo de Dany : nouvelle conversation, sauf si la préférence est
-        -- décochée.
-        Moteur.finTravail = os.time() - Fenetre.DELAI_APRES_TRAVAIL - 1
-        prefs.nouvelleParPhoto = false
-        photoActive(4966, 'DSCF4966.RAF', 0, 0)
-        Fenetre.majPhoto()
-        egal(deuxieme, Moteur.courante, 'préférence décochée : même conversation')
-        prefs.nouvelleParPhoto = true
-        photoActive(4967, 'DSCF4967.RAF', 0, 0)
-        Fenetre.majPhoto()
-        vrai(Moteur.courante ~= deuxieme, 'autre photo : nouvelle conversation')
-        -- Revenir à une photo déjà vue d'une ancienne conversation ne la rouvre pas : la
-        -- conversation montrée, vide, reste.
-        local troisieme = Moteur.courante
-        photoActive(4961, 'DSCF4961.RAF', 0, 0)
-        Fenetre.majPhoto()
-        egal(troisieme, Moteur.courante)
-    end
-    Fenetre.afficher()
-    S.pendantFenetre = nil
-end)
-
-essai('Autre photo : la clé posée par Envoyer, une ancienne conversation continuée, une fenêtre fermée pendant le travail', function()
-    prefs.nouvelleParPhoto = true
-    photoActive(5001, 'DSCF5001.RAF', 0, 0)
-    Fenetre.cleVue, Fenetre.cleVueLe, Moteur.finTravail = nil, nil, 0
-    local envoyer = Moteur.envoyer
-    -- Le moteur remplacé : la demande s'ajoute à la conversation, Claude « travaille ».
-    Moteur.envoyer = function(texte)
-        Conversation.ajouterDemande(Moteur.courante, texte)
-        Moteur.travaille = true
-        return true
-    end
-    local conversation
-    S.pendantFenetre = function()
-        Fenetre.majPhoto()
-        Moteur.nouvelle()
-        conversation = Moteur.courante
-        -- Envoyer pose la sélection de la demande sur la conversation.
-        Fenetre.envoyer('Retouche la 5001')
-        S.taches[#S.taches]()
-        vrai(conversation.cle and conversation.cle:find('5001', 1, true), 'clé posée par Envoyer : ' .. tostring(conversation.cle))
-        egal(conversation.cle, Fenetre.cleVue)
-        -- Dany ferme la fenêtre pendant que Claude travaille.
-    end
-    Fenetre.afficher()
-    -- Fenêtre fermée : Claude montre la 5002 (show_photo), puis finit son travail.
-    photoActive(5002, 'DSCF5002.RAF', 0, 0)
-    Moteur.travaille = false
-    Moteur.finTravail = os.time()
-    -- Réouverture : la sélection changée est celle de Claude, la conversation reste.
-    Fenetre.cleVueLe = os.time() - 60
-    S.pendantFenetre = function()
-        egal(conversation, Moteur.courante, 'même conversation à la réouverture')
-        vrai(#conversation.elements > 0, 'avec sa demande')
-        vrai(conversation.cle:find('5002', 1, true), 'la sélection de Claude devient la sienne')
-        -- Une ancienne conversation rouverte depuis la liste, dont la sélection est la 5003 : la
-        -- choisir dans Lightroom la continue, sans en ouvrir une autre.
-        Moteur.finTravail = os.time() - 60
-        Moteur.nouvelle()
-        local ancienne = Moteur.courante
-        Conversation.ajouterDemande(ancienne, 'Recadre la 5003')
-        photoActive(5003, 'DSCF5003.RAF', 0, 0)
-        local cle = require('Lightroom').photos().cle
-        photoActive(5002, 'DSCF5002.RAF', 0, 0)
-        ancienne.cle = cle
-        photoActive(5003, 'DSCF5003.RAF', 0, 0)
-        Fenetre.majPhoto()
-        egal(ancienne, Moteur.courante, 'la sélection de la conversation : elle continue')
-    end
-    Fenetre.afficher()
-    Moteur.envoyer = envoyer
-    S.pendantFenetre = nil
-end)
-
-essai('Ouverture : Claude prépare une proposition sur une conversation vide, sans basculer vers elle', function()
-    prefs.propositionAOuverture = true
-    photoActive(5101, 'DSCF5101.RAF', 0, 0)
-    local envoyer, envois = Moteur.envoyer, {}
-    Moteur.envoyer = function(texte)
-        envois[#envois + 1] = texte
-        Conversation.ajouterDemande(Moteur.courante, texte)
-        return true
-    end
-    Moteur.nouvelle()
-    S.pendantFenetre = function()
-        local p = Fenetre.p
-        -- La demande part dans une tâche, à l'ouverture, sur la conversation vide.
-        S.taches[#S.taches - 2]()
-        egal(1, #envois, "une demande à l'ouverture")
-        egal(Consignes.proposerOuverture, envois[1])
-        egal(true, Fenetre.propositionAuto)
-        -- La proposition arrive : elle attend dans l'onglet Proposition, la carte Note reste devant.
-        local c = Moteur.courante
-        c.elements[#c.elements + 1] = { genre = 'proposition', id = 'auto-1', etat = 'enAttente', texte = 'Ciel', changements = {} }
-        Fenetre.rafraichirProposition()
-        egal('notation', p.onglet, 'pas de bascule vers la proposition préparée')
-        egal(true, p.aProposition)
-        -- Une demande de Dany ensuite : les propositions suivantes se montrent de nouveau.
-        Fenetre.envoyer('Plus chaud')
-        egal(false, Fenetre.propositionAuto)
-        c.elements[#c.elements + 1] = { genre = 'proposition', id = 'auto-2', etat = 'enAttente', texte = 'Plus chaud', changements = {} }
-        c.elements[#c.elements - 1].etat = 'refusee'
-        Fenetre.rafraichirProposition()
-        egal('proposition', p.onglet)
-        -- Une conversation qui a déjà des messages : rien de plus à l'ouverture, ni sans la case.
-        local avant = #envois
-        egal(false, Fenetre.proposerAOuverture(), 'conversation non vide')
-        Moteur.nouvelle()
-        prefs.propositionAOuverture = false
-        egal(false, Fenetre.proposerAOuverture(), 'case décochée')
-        egal(avant, #envois)
-    end
-    Fenetre.afficher()
-    Moteur.envoyer = envoyer
-    prefs.propositionAOuverture = false
-    S.pendantFenetre = nil
-end)
+-- Une photo, une conversation ---------------------------------------------------------------------
+-- (La nouvelle conversation à chaque autre photo, la clé posée par Envoyer, la fenêtre fermée pendant
+-- le travail de Claude, et Obtenir, qui remplace la proposition préparée à l'ouverture, ont leurs
+-- essais, adaptés au correctif 1.3.6, dans essais-une-photo.lua.)
 
 -- Les vues simples d'un arbre (ni conteneur ni espace) : celles que Lightroom sait masquer.
 local function simples(contenu)
@@ -561,25 +403,28 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
         vrai(variantes and variantes.args.place == 'overlapping', nom .. ' : variantes superposées sous les onglets')
         egal(#D.onglets, #variantes.args, nom .. ' : une variante par onglet')
         -- Cinq onglets (fenêtre B) : Aperçu (l'ancien Pourquoi ?), Focus (22 octobre 2026),
-        -- Proposition, Note (montré à l'ouverture) et Leçon, dans l'ordre des segments ; une variante
-        -- chacun, dans cet ordre.
+        -- Proposition, Note (montré à l'ouverture) et Suivi (le carnet de progrès, à la place de
+        -- Leçon au correctif 1.3.6), dans l'ordre des segments ; une variante chacun, dans cet ordre.
         local valeurs = {}
         for _, onglet in ipairs(D.onglets) do
             valeurs[#valeurs + 1] = onglet.valeur .. '=' .. onglet.titre
         end
-        egal('apercu=Aperçu focus=Focus proposition=Proposition notation=Note lecon=Leçon', table.concat(valeurs, ' '), nom .. ' : cinq onglets')
+        egal('apercu=Aperçu focus=Focus proposition=Proposition notation=Note suivi=Suivi', table.concat(valeurs, ' '),
+            nom .. ' : cinq onglets')
         egal(5, #variantes.args, nom .. ' : cinq variantes')
         egal('apercu', D.ongletEtape)
         egal('focus', D.ongletFocus)
-        egal('lecon', D.ongletLecon)
+        egal('suivi', D.ongletSuivi)
+        egal(nil, D.ongletLecon, "plus d'onglet Leçon")
         egal('notation', D.ongletParDefaut)
         egal('notation', p.onglet, nom .. ' : Note par défaut')
         vrai(vueLiee(variantes.args[1], 'static_text', 'etapeTexte'), nom .. " : la carte de l'étape dans Aperçu")
         vrai(vueLiee(variantes.args[2], 'static_text', 'focusTexte'), nom .. ' : la carte Focus après Aperçu')
         vrai(vueLiee(variantes.args[4], 'static_text', 'notePoseeTitre'), nom .. ' : la carte Note')
         vrai(vueLiee(variantes.args[4], 'static_text', 'nt1'), nom .. ' : la grille des critères dans la carte Note')
+        vrai(vueLiee(variantes.args[5], 'static_text', 'suiviTexte'), nom .. ' : la carte Suivi, en dernier')
         vrai(vueLiee(variantes.args[3], 'static_text', 'propositionTexte'), nom .. ' : la proposition au milieu')
-        vrai(vueLiee(variantes.args[5], 'static_text', 'leconTexte'), nom .. ' : la leçon en dernier')
+        vrai(not pcall(vueLiee, args.contents, 'static_text', 'leconTexte'), nom .. ' : plus de carte de la leçon')
         -- Chaque vue simple d'un onglet est masquée quand un autre onglet est choisi ; pas de
         -- boîte de groupe dans un onglet (son cadre et son titre resteraient montrés), ni de
         -- vue défilante ou de tab_view (leur cadre aussi).
@@ -602,7 +447,7 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
                 vrai(i ~= j or montrees > 0, quoi .. ' : rien de montré')
             end
         end
-        -- Un onglet autre que Note (Aperçu, Proposition, Leçon) : l'aperçu montré (commun, hors
+        -- Un onglet autre que Note (Aperçu, Focus, Proposition) : l'aperçu montré (commun, hors
         -- des onglets), la carte Note masquée ; la proposition seulement dans Proposition.
         local autre = D.onglets[1].valeur == D.ongletNotation and D.onglets[2].valeur or D.onglets[1].valeur
         p.onglet, p.aProposition = autre, false
@@ -910,9 +755,8 @@ local function avecApercu(c, id)
     return ligneImage, ligneOutil
 end
 
-essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte sans étape (l\'aide), actions sans effet sans étape', function()
-    -- Sans photo active, ni proposition, ni exercice : Je le fais reste inactif (lot 14 : une photo
-    -- active suffit à l'activer), et son action ne demande rien à Claude.
+essai('Pourquoi ? : propriétés posées avant l\'ouverture, carte sans étape (l\'aide), actions sans effet sans étape', function()
+    -- Sans photo active ni proposition (« Je le fais » est retiré au correctif 1.3.6).
     S.photoActive, S.selection = nil, {}
     Moteur.nouvelle()
     local vu = false
@@ -920,9 +764,11 @@ essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte
         vu = true
         local p, T = Fenetre.p, Fenetre.T
         for cle, valeur in pairs({ etapeTitre = Fenetre.TITRE_ETAPE, etapeSousTitre = '', etapePrecedente = false, etapeSuivante = false,
-            etapeAImages = false, etapeADetail = false, titreBascule = "Voir l'avant", titreJeLeFais = "Je le fais", peutJeLeFais = false,
-            exerciceEtat = '', etapeMonte = false, etapeDescend = false }) do
+            etapeAImages = false, etapeADetail = false, titreBascule = "Voir l'avant", etapeMonte = false, etapeDescend = false }) do
             egal(valeur, p[cle], cle .. ' avant l\'ouverture')
+        end
+        for _, cle in ipairs({ 'titreJeLeFais', 'peutJeLeFais', 'exerciceEtat', 'leconTitre', 'leconTexte', 'mode' }) do
+            egal(nil, p[cle], cle .. ' : retiré (correctif 1.3.6)')
         end
         -- Sans étape dans le fil, la carte de l'étape montre l'aide (lot 12), coupée à sa largeur.
         egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')), "l'aide de la carte de l'étape")
@@ -945,10 +791,8 @@ essai('Pourquoi ? et Je le fais : propriétés posées avant l\'ouverture, carte
         bouton(args.contents, p, '▶', 'etapeSuivante').args.action()
         bouton(args.contents, p, "Voir l'avant", 'etapeAImages').args.action()
         bouton(args.contents, p, 'Détail…', 'etapeADetail').args.action()
-        bouton(args.contents, p, 'Je le fais', 'peutJeLeFais').args.action()
-        egal(taches + 2, #S.taches, 'Détail… et Je le fais passent par une tâche')
+        egal(taches + 1, #S.taches, 'Détail… passe par une tâche')
         S.taches[#S.taches]()
-        S.taches[#S.taches - 1]()
         egal(dialogues, #S.dialogues, 'aucune fenêtre ouverte')
         egal(messages, #S.messages, 'aucun message')
         egal(false, Moteur.travaille, 'rien envoyé à Claude')
@@ -1181,31 +1025,36 @@ essai("Clic sur un onglet : son crochet suit un vrai clic, jamais une bascule de
     S.pendantFenetre = nil
 end)
 
-essai('Clic sur une ligne du fil : image, ligne du carnet, leçon, étape, sinon détail de l\'outil (ordre fixé)', function()
+essai('Clic sur une ligne du fil : image, étape, sinon détail de l\'outil (ordre fixé ; plus de ligne du carnet)', function()
+    -- Une leçon d'une conversation d'avant le correctif 1.3.6 (élément `lecon`) n'a plus de ligne ni
+    -- de clic.
     local outil, lecon, claude = { genre = 'outil', texte = 'apply_settings · passe 1', detail = '{}' }, { genre = 'lecon' }, { genre = 'claude' }
     local sorte = Fenetre.sorteDeClic
     -- Un outil sans étape (ni outil d'étape ni réponse qui en porte) : sa ligne reste un outil.
     egal(false, Fenetre.estEtape(outil))
     egal('image', sorte({ image = 'a.jpg', defaut = 'horizon', action = 'demander' }, lecon))
-    egal('carnet', sorte({ defaut = 'horizon' }, lecon))
-    egal('carnet', sorte({ action = 'demander' }, outil))
-    egal('lecon', sorte({}, lecon))
+    -- La page Carnet de progrès est retirée du fil (correctif 1.3.6) : une ligne qui porterait un
+    -- défaut ou une action n'a plus de clic à elle.
+    egal(nil, sorte({ defaut = 'horizon' }, lecon))
+    egal('outil', sorte({ action = 'demander' }, outil))
+    egal(nil, sorte({}, lecon), 'plus de clic pour une leçon')
     egal('outil', sorte({}, outil))
     egal(nil, sorte({}, claude))
     egal(nil, sorte({}, nil))
-    -- Une étape (Fenetre.estEtape, Conversation.estEtape) passe avant le détail de l'outil,
-    -- après une image, une ligne du carnet et une leçon.
+    -- Une étape (Fenetre.estEtape, Conversation.estEtape) passe avant le détail de l'outil, après
+    -- une image.
     local estEtape = Fenetre.estEtape
     Fenetre.estEtape = function() return true end
     egal('etape', sorte({}, outil))
-    egal('lecon', sorte({}, lecon))
-    egal('carnet', sorte({ defaut = 'bruit' }, outil))
+    egal('etape', sorte({ defaut = 'bruit' }, outil))
     egal('image', sorte({ image = 'b.jpg' }, outil))
     Fenetre.estEtape = estEtape
     -- Fenetre.cliquerLigne appelle Fenetre.clics[sorte](ligne, élément).
-    for _, nom in ipairs({ 'image', 'carnet', 'lecon', 'etape', 'outil' }) do
+    for _, nom in ipairs({ 'image', 'etape', 'outil' }) do
         egal('function', type(Fenetre.clics[nom]), 'Fenetre.clics.' .. nom)
     end
+    egal(nil, Fenetre.clics.lecon, 'plus de clic de la leçon')
+    egal(nil, Fenetre.clics.carnet, 'plus de clic du carnet')
     local courante, lignes, premiere = Moteur.courante, Fenetre.lignes, Fenetre.premiere
     local clics, recus = {}, {}
     for nom, fn in pairs(Fenetre.clics) do
@@ -1223,13 +1072,13 @@ essai('Clic sur une ligne du fil : image, ligne du carnet, leçon, étape, sinon
     for i = 1, 6 do
         Fenetre.cliquerLigne(i)
     end
-    egal('image:1:outil carnet:2:nil lecon:3:lecon outil:4:outil', table.concat(recus, ' '))
+    egal('image:1:outil outil:4:outil', table.concat(recus, ' '))
     for nom, fn in pairs(clics) do
         Fenetre.clics[nom] = fn
     end
-    -- Par défaut, hors de la page du carnet : le carnet et la leçon ne font rien, ni l'étape d'un
-    -- élément qui n'en est pas une (essais-pourquoi.lua éprouve une vraie étape) ; un outil ouvre
-    -- son détail, dans une tâche.
+    -- Par défaut : une ligne du carnet et la leçon ne font rien, ni l'étape d'un élément qui n'en
+    -- est pas une (essais-pourquoi.lua éprouve une vraie étape) ; un outil ouvre son détail, dans
+    -- une tâche.
     local taches, dialogues = #S.taches, #S.dialogues
     Fenetre.cliquerLigne(2)
     Fenetre.cliquerLigne(3)
@@ -1243,47 +1092,27 @@ essai('Clic sur une ligne du fil : image, ligne du carnet, leçon, étape, sinon
     Moteur.courante, Fenetre.lignes, Fenetre.premiere = courante, lignes, premiere
 end)
 
-essai('Vue du fil : la conversation à l\'ouverture ; Claude qui travaille y ramène', function()
+essai("Fil : toujours la conversation (plus de page Carnet de progrès, ni de vue, au correctif 1.3.6) ; Claude qui travaille le relit sans changer de place", function()
     photoActive(4961, 'DSCF4961.RAF', 0, 0)
     Moteur.nouvelle()
-    Fenetre.vue = 'carnet'
     local vu = false
     S.pendantFenetre = function()
         vu = true
-        egal('conversation', Fenetre.vue, "la conversation à l'ouverture")
-        egal(false, Fenetre.revenirAuFil(), 'déjà la conversation')
-        -- Le retour relit le fil depuis la fin sans changer la conversation montrée : ce qui la
-        -- suit (l'étape choisie de l'onglet Aperçu) n'est pas remis.
+        egal(nil, Fenetre.vue, 'plus de vue du fil')
+        egal(nil, Fenetre.revenirAuFil, 'ni de retour au fil')
         Fenetre.rafraichir()
         local montree = Fenetre.conversationAffichee
         vrai(montree, 'une conversation montrée')
-        Fenetre.vue, Fenetre.defilement, Fenetre.total = 'carnet', 3, 99
-        Fenetre.cache.marque = true
-        egal(true, Fenetre.revenirAuFil(), 'retour au fil')
-        egal(montree, Fenetre.conversationAffichee, 'la conversation montrée reste')
-        egal(0, Fenetre.defilement)
-        egal(nil, Fenetre.total)
-        egal(nil, Fenetre.cache.marque)
-        -- Une autre page (le carnet, lot 16) reste montrée tant que Claude ne travaille pas.
-        Fenetre.vue = 'carnet'
-        Fenetre.rafraichir()
-        egal('carnet', Fenetre.vue)
-        -- Claude travaille (Accepter, Je le fais, J'ai fini… envoyés sans passer par le champ) : le
-        -- fil revient, relu depuis la fin.
-        Fenetre.defilement = 5
-        Fenetre.cache.marque = true
+        egal(Moteur.courante, montree)
+        -- Claude travaille : la conversation reste montrée, rien ne la quitte.
         Moteur.travaille = true
         Fenetre.rafraichir()
         Moteur.travaille = false
-        egal('conversation', Fenetre.vue, 'Claude travaille : retour au fil')
-        egal(nil, Fenetre.cache.marque, 'le fil relu')
-        egal(0, Fenetre.defilement, 'depuis la fin')
-        egal(Moteur.courante, Fenetre.conversationAffichee)
-        Fenetre.vue = 'carnet'
+        egal(montree, Fenetre.conversationAffichee)
+        egal('function', type(Fenetre.rafraichirFil))
     end
     Fenetre.afficher()
     vrai(vu, 'fenêtre ouverte')
-    Fenetre.vue = 'conversation'
     S.pendantFenetre = nil
 end)
 
@@ -1318,11 +1147,11 @@ essai('Agrandir à deux images : avant et après côte à côte, titres au-dessu
     egal(1080, legende.args.width, 'à la largeur des deux images')
     egal(4, legende.args.height_in_lines, 'une ligne par ligne de texte')
     -- Une image illisible est dite à sa place ; sans légende, rien dessous.
-    egal(true, Fenetre.agrandirDeux('Je le fais', { dossier = '/x', nom = 'claude.jpg', titre = 'Claude' },
-        { dossier = '/x', nom = 'illisible.jpg', titre = 'Vous' }))
+    egal(true, Fenetre.agrandirDeux('Étape 1', { dossier = '/x', nom = 'avant.jpg', titre = 'Avant' },
+        { dossier = '/x', nom = 'illisible.jpg', titre = 'Après' }))
     d = S.dialogues[#S.dialogues]
     egal(1, #d.contents.args, 'sans légende')
-    egal('Vous : image illisible', d.contents.args[1].args[2].args[1].args.title)
+    egal('Après : image illisible', d.contents.args[1].args[2].args[1].args.title)
     -- Aucune image lisible : un message, pas de fenêtre.
     local avant = #S.dialogues
     egal(false, Fenetre.agrandirDeux('Étape 3', { dossier = '/x', nom = 'illisible.jpg', titre = 'Avant' }, nil, raison))
@@ -1352,7 +1181,7 @@ end)
 
 -- Liste des conversations -----------------------------------------------------------------------
 
-essai('Conversations : les anciennes séances de notation ne sont pas dans la liste', function()
+essai("Conversations : les anciennes séances de notation restent refusées (Moteur.ouvrir) ; plus de liste où les montrer (correctif 1.3.6)", function()
     Moteur.charger()
     local conversations, courante = Moteur.conversations, Moteur.courante
     local seance = Conversation.nouvelle()
@@ -1362,27 +1191,14 @@ essai('Conversations : les anciennes séances de notation ne sont pas dans la li
     Conversation.ajouterDemande(ordinaire, 'Retouche le lac au matin')
     Stockage.enregistrer(seance)
     Stockage.enregistrer(ordinaire)
-    -- Relues du disque (Json.decode) : les éléments donnés à Lightroom sont des tables neuves.
     Moteur.conversations = Stockage.charger()
-    for _, c in ipairs(Moteur.conversations) do
-        if c.id == ordinaire.id then
-            Moteur.courante = c
-        end
-    end
-    local function ids(items)
-        local t = {}
-        for _, item in ipairs(items) do
-            t[item.value] = true
-        end
-        return t
-    end
-    local liste = Fenetre.elementsListe('')
-    S.neuve(liste, 'liste')
-    vrai(ids(liste)[ordinaire.id] and not ids(liste)[seance.id], 'liste sans la séance')
-    vrai(not ids(Fenetre.elementsListe('lac'))[seance.id], 'recherche sans la séance')
-    -- Une séance n'est jamais montrée comme conversation ouverte.
-    Moteur.courante = seance
-    vrai(not ids(Fenetre.elementsListe(''))[seance.id])
+    -- La liste des conversations est retirée avec le volet ; Moteur.ouvrir reste (l'étape suivante du
+    -- correctif s'en sert), et refuse toujours une séance.
+    egal(nil, Fenetre.elementsListe)
+    local ok, raison = Moteur.ouvrir(seance.id)
+    egal(false, ok, 'une séance ne se rouvre pas')
+    vrai(tostring(raison):find('séance de notation', 1, true), tostring(raison))
+    vrai(Moteur.ouvrir(ordinaire.id), 'une conversation ordinaire se rouvre')
     Moteur.conversations, Moteur.courante = conversations, courante
 end)
 
@@ -1398,7 +1214,7 @@ for nom in ([[bind_to_object tooltip visible enabled font size title value items
     PROPRIETES[nom] = true
 end
 
-essai('Gestionnaire de modules externes : les sections se construisent, menus Modèle et Effort, cases Autre photo et À l\'ouverture', function()
+essai('Gestionnaire de modules externes : les sections se construisent, menus Modèle et Effort, case Autre photo ; plus de case À l\'ouverture', function()
     local PluginInfoProvider = require 'PluginInfoProvider'
     local f = S.modules.LrView.osFactory()
     local proprietes = S.modules.LrBinding.makePropertyTable()
@@ -1435,8 +1251,8 @@ essai('Gestionnaire de modules externes : les sections se construisent, menus Mo
     -- Taille (demandés par Dany le 20 octobre 2026).
     egal(nil, menus.disposition, 'plus de menu Disposition')
     egal(nil, menus.taille, 'plus de menu Taille (toujours grande)')
-    vrai(PluginInfoProvider.diagnostic():find('effort max ; nouvelle conversation par photo', 1, true), 'diagnostic')
-    vrai(cases.propositionAOuverture, 'case À l\'ouverture')
+    vrai(PluginInfoProvider.diagnostic():find('effort max ; autre photo, reprendre sa conversation, sinon une nouvelle', 1, true), 'diagnostic')
+    egal(nil, cases.propositionAOuverture, 'plus de case À l\'ouverture (correctif 1.3.6)')
     vrai(PluginInfoProvider.diagnostic():find('modèle opus, effort max', 1, true), 'diagnostic : modèle et effort')
     -- Le modèle et l'effort se choisissent ici, plus dans la fenêtre (demandé par Dany le
     -- 20 octobre 2026), comme la nouvelle conversation à chaque autre photo.

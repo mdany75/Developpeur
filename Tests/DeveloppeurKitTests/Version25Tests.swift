@@ -239,15 +239,15 @@ final class Version25Tests: XCTestCase {
         }
     }
 
-    /// 1.3 : les textes neufs (le vocabulaire des défauts de la prise de vue, envoyé au module, et
-    /// les définitions de read_composition et photo_lesson) restent ceux d'un photographe amateur.
+    /// 1.3 : les textes neufs (le vocabulaire des défauts de la prise de vue, envoyé au module, et la
+    /// définition de read_composition ; photo_lesson est retiré en 1.3.6) restent ceux d'un
+    /// photographe amateur.
     func testTheNewTextsOfThe13StayForAnAmateur() throws {
         var textes = [JSONCoding.line(PriseDeVue.vocabulaire)]
-        for nom in ["read_composition", "photo_lesson"] {
+        for nom in ["read_composition"] {
             textes.append(JSONCoding.line(try XCTUnwrap(tools.definitions.first { $0["name"]?.string == nom }, nom)))
         }
         textes.append(ToolHandler.descriptionRaison)
-        textes.append(Prompts.Lecon.phrase)
         for (index, texte) in textes.enumerated() {
             for mot in ["photoshop", "galerie", "gallery", "publish_collection", "concours", "client", "mariage", "firefly",
                         "agrandissement", "crédit adobe", "expand_photo"] {

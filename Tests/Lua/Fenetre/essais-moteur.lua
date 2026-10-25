@@ -173,12 +173,28 @@ end)
 essai('Consignes : le texte de la fenêtre, lu à chaque demande, fait 7 500 caractères au plus (1.3)', function()
     -- 5 064 caractères à la 1.2 ; les sections de la 1.3 (Raison de chaque étape, Leçon, Je le
     -- fais, Composition, puce Carnet) ont leur part, et ce qui dépasse va aux descriptions des
-    -- outils, que Claude lit aussi.
+    -- outils, que Claude lit aussi. 7 476 au correctif 1.3.5, 6 208 au correctif 1.3.6 (sections
+    -- Leçon de la photo et Je le fais retirées), 6 470 avec le contexte d'une photo, une
+    -- conversation, 6 646 avec la fin d'une retouche par view_photo avec compare = before_claude.
     local Texte = require 'Texte'
     local n = Texte.longueur(Consignes.texte)
     vrai(n <= 7500, string.format('Consignes.texte : %d caractères pour 7 500', n))
     vrai(n > 4000, 'le texte entier est compté (' .. n .. ')')
     vrai(Texte.longueur('é → ★') == 5, 'des caractères, pas des octets')
+end)
+
+essai('Consignes : la retouche d\'une photo finit par view_photo avec compare = before_claude, qui garde le rendu (correctif 1.3.6) ; pas la Demande rapide', function()
+    -- Le rendu reproductible se garde à ce view_photo (Rendus.swift) depuis que la leçon de fin de
+    -- retouche (photo_lesson) est retirée : rien d'autre ne le demande dans la fenêtre.
+    local fin = section('Fin d\'une tâche')
+    contient(fin, 'finis par view_photo avec compare = before_claude, avant le résumé', 'fin d\'une retouche')
+    contient(fin, 'rendu_reproductible', 'l\'écart dit')
+    contient(fin, '(pas dans une [Demande rapide])', 'pas la Demande rapide')
+    vrai(fin:find('before_claude', 1, true) < fin:find('fais un résumé', 1, true), 'avant le résumé')
+    for _, regle in ipairs({ Consignes.rapide, Consignes.rapidePhoto }) do
+        vrai(regle:find('[Demande rapide]', 1, true) == 1, 'la Demande rapide se nomme en tête')
+        vrai(not regle:find('before_claude', 1, true), 'rien à faire de plus pour elle')
+    end
 end)
 
 essai('Consignes : section Écran, dite une fois par conversation (1.2)', function()
@@ -434,7 +450,7 @@ essai('Stockage : notes relues, liste vide en tableau', function()
     -- Relue, elle se montre encore dans le fil.
     local lignes = Fil.lignesElement(n, 3, 600)
     egal('Notes non rangées · passe 2 · 3 photos', lignes[1].texte)
-    Stockage.supprimer(c.id)
+    Fichiers.corbeille(Stockage.dossier(c.id))
 end)
 
 -- Moteur, avec le faux Claude Code --------------------------------------------------------------
@@ -522,9 +538,12 @@ essai("Moteur : refus pendant que Claude travaille", function()
     vrai(not ok, 'refusée')
     contient(raison, 'Claude travaille : attendez la fin, ou cliquez Arrêter.', 'refus')
     vrai(not Moteur.nouvelle(), 'nouvelle conversation refusée')
-    ok, raison = Moteur.supprimer(principale.id)
-    vrai(not ok)
-    contient(raison, 'travaille dans cette conversation')
+    -- Plus de Supprimer… ni de Renommer… (correctif 1.3.6) : une conversation n'est jamais effacée.
+    egal(nil, Moteur.supprimer)
+    egal(nil, Moteur.renommer)
+    ok, raison = Moteur.montrer(Conversation.nouvelle())
+    vrai(not ok, 'aucune autre conversation montrée pendant le travail')
+    contient(raison, 'Claude travaille : attendez la fin, ou cliquez Arrêter.', 'refus')
     vrai(not Moteur.texteTravail(0):find('dans une autre', 1, true), 'vu de la conversation qui travaille')
     contient(Moteur.texteTravail(0, false), 'dans une autre conversation', 'vu sans conversation')
     Moteur.interrompre()
@@ -534,7 +553,7 @@ essai("Moteur : refus pendant que Claude travaille", function()
     egal('', Moteur.texteTravail(0))
 end)
 
-essai("Moteur : une ancienne séance de notation ne s'ouvre pas, ni au chargement", function()
+essai("Moteur : une ancienne séance de notation ne s'ouvre pas, ni au chargement ; une conversation sans photo ni clé d'une photo seule non plus (correctif 1.3.6)", function()
     if Moteur.session then
         local s = Moteur.session
         Moteur.arreterSession()
@@ -546,27 +565,32 @@ essai("Moteur : une ancienne séance de notation ne s'ouvre pas, ni au chargemen
     Conversation.ajouterDemande(ancienne, 'Passe 1 : rejeter ou non ?')
     ancienne.modifiee = os.time() + 100
     Stockage.enregistrer(ancienne)
+    -- La conversation de retouche, d'une photo seule (sa dernière demande : « id:1:id ») ; une
+    -- autre, d'un groupe (correctif 1.3.6 : gardée sur le disque, plus montrée).
+    principale.cle = '4961:1:4961'
+    Stockage.enregistrer(principale)
+    local groupe = Conversation.nouvelle()
+    Conversation.ajouterDemande(groupe, 'Trie ces photos')
+    groupe.cle, groupe.modifiee = '4961:2:4961:4962', os.time() + 50
+    Stockage.enregistrer(groupe)
     Moteur.charge = false
     Moteur.conversations = {}
     Moteur.courante = nil
     Moteur.charger()
     egal('notation', Moteur.conversations[1].genre, "l'ancienne séance est la plus récente")
     egal(principale.id, Moteur.courante.id, "la conversation de retouche s'ouvre")
+    egal(4961, Moteur.courante.photo, 'la photo de sa dernière demande')
+    vrai(Moteur.trouver(groupe.id), 'celle du groupe reste chargée')
+    egal(nil, Moteur.trouver(groupe.id).photo)
+    egal(false, Moteur.montrable(Moteur.trouver(groupe.id)), "celle d'un groupe ne se montre plus")
     local ok, raison = Moteur.ouvrir(ancienne.id)
     vrai(not ok, "une ancienne séance ne s'ouvre pas")
     contient(raison, 'ancienne séance de notation')
-    -- Supprimer la conversation ouverte n'ouvre pas l'ancienne séance.
-    principale = Moteur.courante
-    for _, c in ipairs(Moteur.conversations) do
-        if c ~= principale and c.id ~= ancienne.id then
-            Moteur.supprimer(c.id)
-        end
-    end
-    vrai(Moteur.supprimer(principale.id))
     vrai(not Conversation.estSeance(Moteur.courante), 'pas de séance ouverte')
-    egal(0, #Moteur.courante.elements, 'une nouvelle conversation')
-    vrai(Moteur.supprimer(ancienne.id))
-    egal(nil, Moteur.trouver(ancienne.id))
+    -- Rien n'est effacé : les trois restent sur le disque.
+    for _, c in ipairs({ principale, groupe, ancienne }) do
+        vrai(Fichiers.existe(Stockage.fichier(c.id)), 'gardée : ' .. c.id)
+    end
 end)
 
 -- Fin ------------------------------------------------------------------------------------------

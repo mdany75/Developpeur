@@ -403,7 +403,7 @@ for _, orientation in ipairs({ 'AB', 'DA' }) do
     end)
 end
 
-test("essayer : sans recadrage, recadrage retiré, sans rendu ou exercice, entier ne rend ni n'écrit rien de plus", function()
+test("essayer : sans recadrage ou recadrage retiré, entier ne rend ni n'écrit rien de plus", function()
     local photo = photoEn('AB')
     local r = proposerCadre(nil, { reglages = { Exposure2012 = 0.3 }, plages = { Exposure2012 = { -5, 5 } } })
     egal(#S.rendus, 1) egal(#S.ecritures, 2, "l'essai et sa fin")
@@ -413,19 +413,6 @@ test("essayer : sans recadrage, recadrage retiré, sans rendu ou exercice, entie
     S.rendus, S.ecritures = {}, {}
     r = proposerCadre({ retirer = true })
     egal(#S.rendus, 1) egal(#S.ecritures, 2)
-    egal(r.chemin_entier, nil) egal(r.cadre_propose, nil)
-
-    S.rendus, S.ecritures = {}, {}
-    r = proposerCadre({ ratio = 1.5, taille = 0.8 }, { sans_rendu = true })
-    egal(#S.rendus, 0, "sans rendu : rien, pas même l'image entière")
-    egal(#S.ecritures, 2)
-    egal(r.chemin, nil) egal(r.chemin_entier, nil) egal(r.cadre_propose, nil)
-
-    -- « Je le fais » (my_turn n'envoie jamais entier) : ignoré quand même, même avec un rendu.
-    S.rendus, S.ecritures = {}, {}
-    r = proposerCadre({ ratio = 1.5, taille = 0.8 }, { exercice = true, instantane = 'ma version' })
-    egal(#S.rendus, 1, "la proposition seule")
-    egal(contient(S.ecritures, ESSAI_ENTIERE), false)
     egal(r.chemin_entier, nil) egal(r.cadre_propose, nil)
 
     -- Une proposition de masque (add_mask n'envoie jamais entier) : ignoré, même avec un recadrage.

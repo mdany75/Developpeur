@@ -10,7 +10,7 @@ import ImageIO
 /// Deux sortes de constats, sur les six défauts mesurés de PriseDeVue :
 /// - une vue (`constatsVue`) : au premier view_photo entier d'une photo que Claude n'a pas encore
 ///   retouchée (etapes_claude.nombre == 0) et que l'utilisateur n'a pas changée à la main depuis le
-///   dernier état laissé par Claude (pas de corrections_utilisateur, comme après « Je le fais »),
+///   dernier état laissé par Claude (pas de corrections_utilisateur),
 ///   sur une image rendue avec ses calculs IA (pas d'a_savoir), les défauts cherchés et ceux
 ///   trouvés : sous-exposition,
 ///   ciel brûlé, flou, mise au point, bruit (seulement à un ISO connu et élevé, `isoEleve`) ;
@@ -73,10 +73,10 @@ public enum Carnet {
     // MARK: Constats
 
     /// La sensibilité ISO d'une photo d'après une réponse du module, en nombre : `sensibilite` de la
-    /// description de la photo (1.3.1 : Vignettes.decrireVignette pour l'aperçu avec point_af,
-    /// journal détaillé pour la leçon), sinon `prise_de_vue.iso` de la commande apercu (lireReglages,
-    /// seulement avec l'ouverture et la vitesse : ce que rend un module 1.3). Jamais le texte formaté
-    /// de la description (« ISO 160 »). Nil si elle n'est pas lue.
+    /// description de la photo (1.3.1 : Vignettes.decrireVignette pour l'aperçu avec point_af), sinon
+    /// `prise_de_vue.iso` de la commande apercu (lireReglages, seulement avec l'ouverture et la
+    /// vitesse : ce que rend un module 1.3). Jamais le texte formaté de la description (« ISO 160 »).
+    /// Nil si elle n'est pas lue.
     public static func iso(photo: JSONValue?, priseDeVue: JSONValue? = nil) -> Double? {
         for valeur in [photo?["sensibilite"], priseDeVue?["iso"]] {
             if let iso = valeur?.double, iso.isFinite, iso > 0 { return iso }
@@ -86,8 +86,7 @@ public enum Carnet {
 
     /// Le bruit fort de la prise de vue se cherche-t-il à cet ISO ? Seulement connu, et d'au moins
     /// `isoEleve` : à ISO bas, une mesure forte vient de la texture, et « garder l'ISO plus bas »
-    /// n'aurait pas de sens. La leçon (`Lecon.indices`) reprend la même règle ; pas le plafond de
-    /// note (`Notation.plafond`), qui juge l'image.
+    /// n'aurait pas de sens. Pas le plafond de note (`Notation.plafond`), qui juge l'image.
     public static func bruitCherche(iso: Double?) -> Bool {
         guard let iso, iso.isFinite else { return false }
         return iso >= isoEleve
@@ -244,6 +243,24 @@ public enum Carnet {
     }
 
     // MARK: export_journal
+
+    /// Le résumé du carnet sans les leçons (retirées en 1.3.6) : seulement les constats. Le résumé du
+    /// module (Carnet.resumer) ne compte déjà que les vues et les angles ; une clé `lecons` (à la
+    /// racine, ou dans un défaut ou une tendance), d'un module d'avant ou d'un registre ancien, est
+    /// retirée avant d'aller à Claude ou au Markdown. Le reste passe tel quel.
+    public static func sansLecons(_ resume: JSONValue) -> JSONValue {
+        guard var objet = resume.object else { return resume }
+        objet.removeValue(forKey: "lecons")
+        for (cle, valeur) in objet {
+            guard let liste = valeur.array else { continue }
+            objet[cle] = .array(liste.map { element in
+                guard var item = element.object, item["lecons"] != nil else { return element }
+                item.removeValue(forKey: "lecons")
+                return .object(item)
+            })
+        }
+        return .object(objet)
+    }
 
     /// Le carnet en Markdown (export_journal avec notebook), d'après le résumé que rend la commande
     /// carnet lire (Carnet.resumer du module) : ses titres et ses phrases tels quels, et le tableau

@@ -11,14 +11,10 @@
 --                                          (chemin d'un fichier temporaire, que le serveur lit puis
 --                                          efface) ; taille 0 = pleine résolution ; comparer =
 --                                          'avantClaude' ou 'etapePrecedente' rend aussi l'état d'avant
---                                          (chemin_avant) ; comparer = 'versionClaude' (« Je le fais »,
---                                          1.3) : chemin_avant est la version de Claude de l'exercice,
---                                          et exercice = { instantane, le, ecarts = [{ cle, depart,
---                                          claude, vous }], listes = { masques, taches, yeux_rouges =
---                                          { depart, vous } }, restent, rien_change } ; point_af : la
---                                          photo décrite comme pour les vignettes (point de mise au
---                                          point) et point_af_toujours ; entier (Composition lue,
---                                          1.3 : read_composition) : l'image entière, sans son
+--                                          (chemin_avant) ; point_af : la photo décrite comme pour
+--                                          les vignettes (point de mise au point) et
+--                                          point_af_toujours ; entier (Composition lue, 1.3 :
+--                                          read_composition) : l'image entière, sans son
 --                                          cadre (retiré puis remis : deux étapes « Claude ·
 --                                          composition », aucune sans recadrage ; la pause et la
 --                                          protection des photos ne l'arrêtent que s'il faut
@@ -42,17 +38,11 @@
 --                                          rendre, les deux rendus du recalage
 --   recadrer    {photos, recadrage, recalages, completer?, etape, raison?, confirme} → cadre demandé,
 --                                          sans les coins vides d'Upright et de la perspective
---   essayer     {action, photo?, taille, comparer?, instantane?, exercice?, raison?, sans_rendu?, entier?, …}
+--   essayer     {action, photo?, taille, comparer?, instantane?, raison?, entier?, …}
 --                                       → applique, rend, puis remet comme avant ; instantane : rangée
---                                          aussi en instantané (variante) ; exercice (« Je le fais »,
---                                          1.3, exige instantane) : départ et version de Claude gardés
---                                          dans la mémoire de la variante, entrée 'exercice' au journal
---                                          (raison : le step_name de preview_settings), état d'après
---                                          Claude noté ; refusé si rien ne change ;
---                                          réponse exercice = { instantane } et raw ; sans_rendu :
---                                          aucun rendu (chemin absent) ; entier (Composition lue,
---                                          1.3), avec un recadrage proposé (ni retiré, ni sans_rendu,
---                                          ni exercice ; action appliquer) : le cadre gardé par
+--                                          aussi en instantané (variante) ; entier (Composition lue,
+--                                          1.3), avec un recadrage proposé (pas retiré ; action
+--                                          appliquer) : le cadre gardé par
 --                                          Lightroom relu après le rendu de la proposition
 --                                          (cadre_propose, Recadrage.lire ; absent s'il n'en garde
 --                                          aucun), dimensions, et l'image entière sans ce cadre
@@ -63,9 +53,7 @@
 --   presets     {filtre?, limite}       → paramètres prédéfinis de développement
 --   creerPreset {nom, photo?, cles, inclure} → réglages d'une photo, pour un paramètre prédéfini
 --   diagnostic  {modules?}              → fonctions du SDK offertes par cette version de Lightroom
---   journal     {photos?|selection?, detaille?} → journal des retouches de Claude ; detaille (la
---                                          leçon, 1.3) : la photo décrite en entier, avec
---                                          prise_de_vue_plus
+--   journal     {photos?|selection?}    → journal des retouches de Claude
 --   annuler     {photos?|selection?}    → défait la dernière retouche de Claude
 --   revenir     {photos?|selection?}    → remet l'état d'avant la première retouche de Claude
 --   metadonnees {photos?|selection?, note?, drapeau?, libelle?, titre?, legende?, droits?, iptc?, gps?,
@@ -103,9 +91,7 @@
 --                                          vient d'y réimporter (même session, 30 min)
 --   variantes   {photo?, action, nom?, noms?, effacer_autres?, etape, raison?, confirme} → variantes
 --                                          rangées en instantanés : lister, choisir, effacer
---                                          (essayer avec `instantane` les prépare) ; choisir « ma
---                                          version » d'un exercice touche aussi les réglages que Dany
---                                          a changés (undo_last les lui rend)
+--                                          (essayer avec `instantane` les prépare)
 --   masques     {photo?, action, masque?, inverser?, nom?, contour?, decalage?, etape, raison?, confirme}
 --                                       → lister, masquer, afficher, retirer, dupliquer, recalculer,
 --                                          affiner un masque ; retirer les masques vides
@@ -117,18 +103,14 @@
 --                                          Dany), lire, remettre (la recette seule : remet la
 --                                          proposition d'avant son étape, sans rien écrire au
 --                                          catalogue)
---   lecon       {action, photo?, photos?, lecon?, essai_recette?} → leçons des photos (1.3),
---                                          rangées dans carnet.json : garder (lecon = {points,
---                                          indices?} : trois points, un par axe, lumiere, couleur,
---                                          composition ; la nouvelle remplace l'ancienne ; une
---                                          photo d'essai : rangee = false, sauf essai_recette, la
---                                          recette seulement), lire, retirer
 --   carnet      {action, photo?, photos?, vue?, angle?, vocabulaire?, essai_recette?, resume?}
 --                                       → carnet de progrès (1.3), carnet.json : constater (photo,
 --                                          la photo mesurée, obligatoire ; vue ou angle ;
 --                                          vocabulaire ; essai_recette, la recette seulement), lire
---                                          (les originaux du catalogue ouvert, leçons comprises ;
---                                          resume : avec le résumé), retirer (photos)
+--                                          (les originaux du catalogue ouvert qui ont des constats ;
+--                                          resume : avec le résumé), retirer (photos) ; la commande
+--                                          lecon (leçons des photos) est retirée au correctif 1.3.6,
+--                                          les leçons déjà rangées restent dans le fichier
 --   etapes      {photo?}                → étapes de Claude gardées pour la photo et leurs images
 --                                          avant/après (1.3, Etapes.lua) : { photo, etapes = [{ id,
 --                                          nom, en_memoire, avant, apres, etat, raison }] ; lecture
@@ -141,8 +123,8 @@
 -- (Liaison.recevoir, Etapes.lua) ; avant_apres = true (la recette seulement) le force, même hors de
 -- la photo active, et sans_avant_apres = true (match_series) l'empêche.
 --
--- lecon et carnet n'écrivent rien dans le catalogue et ne s'arrêtent pas à la pause ; ils écrivent
--- carnet.json, à part : le serveur ne les rejoue jamais (LightroomBridge.lectures).
+-- carnet n'écrit rien dans le catalogue et ne s'arrête pas à la pause ; il écrit carnet.json, à
+-- part : le serveur ne le rejoue jamais (LightroomBridge.lectures).
 -- Sans « photo » ni « photos » ni « selection », la commande vise la photo active.
 -- Les erreurs sont levées avec error(message, 0) : le message part tel quel vers Claude.
 -- Toute commande, ping compris, n'arrive ici qu'avec le jeton de la liaison (Liaison.recevoir) ;
@@ -163,7 +145,7 @@
 --   Masques.lua      masques
 --   Progression.lua  progression
 --   Notation.lua     notation
---   Carnet.lua       lecon, carnet
+--   Carnet.lua       carnet
 --   Etapes.lua       etapes
 -- Elles s'appuient sur Photos.lua (photos visées, mémoire de Claude), Reglages.lua (valeurs de
 -- développement), Recalage.lua (géométrie et grille du serveur), Plans.lua (ce qu'une retouche
@@ -228,7 +210,6 @@ local table_commandes = {
     masques = Masques.masques,
     progression = Progression.progression,
     notation = Notation.commande,
-    lecon = Carnet.commandeLecon,
     carnet = Carnet.commande,
     etapes = Etapes.commande,
 }

@@ -18,18 +18,6 @@
 -- l'instantané par son snapshotID (un uuid). L'effacement se fait de même, photo affichée, par son
 -- id_global.
 -- createDevelopSnapshot, lui, s'appelle dans une écriture (référence du SDK), sans affichage.
---
--- « Je le fais » (1.3) : Dany fait lui-même la retouche que Claude propose, pour apprendre. La
--- proposition est appliquée le temps d'être rangée en instantané « Claude · ma version »
--- (Rendu.essayer avec exercice et sans_rendu), puis la photo revient comme avant : rien n'est
--- appliqué. La mémoire de cette variante (variantesClaude, sans champ nouveau) garde exercice =
--- { depart, claude, le } : l'état de départ (departExercice) et la version de Claude (chaque
--- réglage de la proposition tel que Lightroom l'a gardé). Le journal reçoit une entrée de type
--- 'exercice' (etape « Claude · je le fais », changements de la proposition {cle, avant, apres}),
--- que la leçon et le carnet lisent comme jamais appliquée. La comparaison (Rendu.apercu, comparer
--- = 'versionClaude') pose la version de Claude le temps d'un rendu (valeursClaude) et dit les
--- écarts réglage par réglage (ecartsExercice). Choisir « ma version » (choose_variant) rend aussi à
--- undo_last les réglages que Dany avait changés hors de la proposition.
 
 local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
@@ -44,10 +32,8 @@ local Reglages = require 'Reglages'
 
 local decrire, garder, lireJson, photoVisee = Photos.decrire, Photos.garder, Photos.lireJson, Photos.photoVisee
 local DEFAUTS, pourLightroom, resume = Reglages.DEFAUTS, Reglages.pourLightroom, Reglages.resume
-local COURBE_LINEAIRE, egal, lookVide = Reglages.COURBE_LINEAIRE, Reglages.egal, Reglages.lookVide
 local ajouterJournal, creerInstantane, ecrire = Ecriture.ajouterJournal, Ecriture.creerInstantane, Ecriture.ecrire
-local difference, ecrireMemoire, etatSimple = Ecriture.difference, Ecriture.ecrireMemoire, Ecriture.etatSimple
-local EN_ATTENTE = Ecriture.EN_ATTENTE
+local ecrireMemoire = Ecriture.ecrireMemoire
 local modeTexte, nomEtape, nouvelleEtape = Ecriture.modeTexte, Ecriture.nomEtape, Ecriture.nouvelleEtape
 local sansRetouche, verifierAccord = Ecriture.sansRetouche, Ecriture.verifierAccord
 local verifierPause, verifierProtection = Ecriture.verifierPause, Ecriture.verifierProtection
@@ -82,82 +68,9 @@ local function trouver(photo, nom)
     return nil
 end
 
--- « Je le fais » (1.3) ----------------------------------------------------------------------------
-
--- Le nom de la variante d'un exercice : l'instantané « Claude · ma version ».
-Variantes.EXERCICE = 'ma version'
--- L'étape de l'entrée du journal d'un exercice (la forme que lit la leçon, Lecon.correctionsNettes).
-Variantes.ETAPE_EXERCICE = 'Claude · je le fais'
-
--- Tables gardées entières dans l'état de départ, en plus des réglages simples (etatSimple) : le
--- profil à Look, les courbes et les couleurs ponctuelles, que la comparaison remet si Dany les a
--- changées.
-local TABLES_EXERCICE = { 'Look', 'ToneCurvePV2012', 'ToneCurvePV2012Red', 'ToneCurvePV2012Green', 'ToneCurvePV2012Blue',
-    'PointColors' }
--- Listes dont le départ ne garde que le nombre (etatSimple) : une liste vide les retire le temps
--- de la comparaison si le départ n'en avait aucune (comme undo_last) ; sinon, une liste que Dany a
--- changée reste dans les deux images (restent).
-local LISTES_EXERCICE = { 'MaskGroupBasedCorrections', 'RetouchAreas', 'RedEyeInfo', 'DepthBasedCorrections' }
--- Les nombres que la comparaison rend (listes) : masques, taches, yeux rouges.
-local LISTES_MONTREES = { { nom = 'masques', cle = 'MaskGroupBasedCorrections' }, { nom = 'taches', cle = 'RetouchAreas' },
-    { nom = 'yeux_rouges', cle = 'RedEyeInfo' } }
-
-local function dansListe(liste, cle)
-    for _, element in ipairs(liste) do
-        if element == cle then
-            return true
-        end
-    end
-    return false
-end
-
-local function nombre(etat, cle)
-    return tonumber(etat['#' .. cle]) or 0
-end
-
--- État de départ d'un exercice (fonction pure, à lire avant toute écriture) : les réglages simples
--- (etatSimple : nombres, booléens, textes suivis, nom de la Look, nombre d'éléments des listes),
--- les tables de TABLES_EXERCICE en copies neuves (pourLightroom), et le nombre de taches de l'outil
--- Supprimer (#RemoveAreas : Lightroom en dérive RetouchAreas).
-function Variantes.departExercice(reglages)
-    local etat = etatSimple(reglages)
-    for _, cle in ipairs(TABLES_EXERCICE) do
-        if type(reglages[cle]) == 'table' then
-            etat[cle] = pourLightroom(reglages[cle])
-        end
-    end
-    etat['#RemoveAreas'] = type(reglages.RemoveAreas) == 'table' and #reglages.RemoveAreas or 0
-    return etat
-end
-
--- La version de Claude : chaque réglage de la proposition (cles) tel que Lightroom l'a gardé, la
--- proposition appliquée (paramètres prédéfinis du module, tonalité automatique, profil relu
--- compris), sinon la valeur de la proposition, sinon celle par défaut ; jamais une valeur
--- automatique pas encore calculée. Des tables neuves.
-local function versionDuPlan(cles, apres, nouveaux)
-    local claude = {}
-    for cle in pairs(cles) do
-        local valeur = apres[cle]
-        if valeur == nil then
-            valeur = nouveaux[cle]
-        end
-        if valeur == nil then
-            valeur = DEFAUTS[cle]
-        end
-        if valeur ~= nil and valeur ~= EN_ATTENTE and valeur ~= Json.null then
-            claude[cle] = pourLightroom(valeur)
-        end
-    end
-    return claude
-end
-
 -- Range l'état actuel de la photo (une proposition appliquée) en instantané, avec les réglages que
--- la variante touche (dans sa propre écriture). Avec exercice ({ depart, avant, nouveaux, raison,
--- changements } : « Je le fais »), la mémoire de la variante garde aussi exercice = { depart,
--- claude, le } (la valeur de départ d'une table de Claude que le départ ne garde pas vient de la
--- proposition : avant), et le journal reçoit l'entrée de l'exercice, dans la même écriture que
--- l'instantané.
-function Variantes.ranger(photo, nom, cles, exercice)
+-- la variante touche (dans sa propre écriture).
+function Variantes.ranger(photo, nom, cles)
     local complet = Variantes.nomInstantane(nom)
     local memoire = lireJson(photo, 'variantesClaude', {})
     local liste = Json.tableau()
@@ -167,249 +80,11 @@ function Variantes.ranger(photo, nom, cles, exercice)
     table.sort(liste)
     local ok, date = pcall(LrDate.timeToUserFormat, LrDate.currentTime(), '%Y-%m-%d %H:%M')
     memoire[complet] = { cles = liste, le = ok and date or '' }
-    local journal
-    if exercice then
-        local depart = exercice.depart or {}
-        local claude = versionDuPlan(cles, photo:getDevelopSettings(), exercice.nouveaux or {})
-        local avant = exercice.avant or {}
-        for cle, valeur in pairs(claude) do
-            if type(valeur) == 'table' and depart[cle] == nil and type(avant[cle]) == 'table'
-                and not dansListe(TABLES_EXERCICE, cle) then
-                depart[cle] = pourLightroom(avant[cle])
-            end
-        end
-        memoire[complet].exercice = { depart = depart, claude = claude, le = memoire[complet].le }
-        journal = lireJson(photo, 'journalClaude', {})
-        -- La note le dit dans export_journal, qui liste les changements comme ceux d'une retouche.
-        ajouterJournal(journal, { etape = Variantes.ETAPE_EXERCICE, type = 'exercice', raison = exercice.raison,
-            changements = exercice.changements or Json.tableau(),
-            note = "Version de Claude rangée en instantané « " .. complet
-                .. " », non appliquée : l'utilisateur fait la retouche lui-même." })
-    end
     ecrire(complet, function()
         photo:createDevelopSnapshot(complet, true)
         garder(photo, 'variantesClaude', Json.encode(memoire))
-        if journal then
-            garder(photo, 'journalClaude', Json.encode(Json.tableau(journal)))
-        end
     end)
     return complet
-end
-
--- L'exercice « Je le fais » rangé pour la photo ({ instantane, depart, claude, le }, des tables
--- neuves, sans métatable), ou nil : aucun, ou sa variante effacée. nom : celui de la variante
--- (Variantes.EXERCICE par défaut).
-function Variantes.exercice(photo, nom)
-    nom = Variantes.nomInstantane(nom or Variantes.EXERCICE)
-    local info = lireJson(photo, 'variantesClaude', {})[nom]
-    if type(info) ~= 'table' or type(info.exercice) ~= 'table' then
-        return nil
-    end
-    local ex = pourLightroom(info.exercice)
-    if type(ex.depart) ~= 'table' or type(ex.claude) ~= 'table' then
-        return nil
-    end
-    ex.instantane = nom
-    return ex
-end
-
--- Ce que Dany a changé depuis le départ de l'exercice (fonction pure) : les réglages simples (cle →
--- valeur de départ), les tables de TABLES_EXERCICE, les listes dont le nombre a changé, et l'état
--- actuel au format du départ.
-local function changementsDeDany(ex, actuels)
-    local depart = ex.depart or {}
-    local maintenant = Variantes.departExercice(actuels)
-    local simples, tables, listes = {}, {}, {}
-    for _, c in ipairs(difference(depart, maintenant)) do
-        local cle = c.cle
-        if type(cle) == 'string' and type(c.avant) ~= 'table' and not cle:match('^#') and cle ~= 'Look.Name' then
-            simples[cle] = c.avant
-        end
-    end
-    for _, cle in ipairs(TABLES_EXERCICE) do
-        if not egal(depart[cle], maintenant[cle]) then
-            tables[cle] = true
-        end
-    end
-    for _, cle in ipairs(LISTES_EXERCICE) do
-        if nombre(depart, cle) ~= nombre(maintenant, cle) then
-            listes[cle] = true
-        end
-    end
-    if nombre(depart, 'RemoveAreas') ~= nombre(maintenant, 'RemoveAreas') then
-        listes.RetouchAreas = true
-    end
-    return simples, tables, listes, maintenant
-end
-
--- La valeur de départ d'une table de TABLES_EXERCICE, à remettre : sans valeur au départ, une
--- courbe linéaire, une Look vide (profil sans Look) ou aucune couleur ponctuelle.
-local function tableDeDepart(depart, cle)
-    if depart[cle] ~= nil then
-        return pourLightroom(depart[cle])
-    end
-    if cle:match('^ToneCurvePV2012') then
-        return pourLightroom(COURBE_LINEAIRE)
-    end
-    return {}
-end
-
--- Les valeurs à poser le temps du rendu de la version de Claude (fonction pure, des tables neuves) :
--- sa version, plus, sur chaque réglage que Dany a changé et que Claude ne touche pas, la valeur de
--- départ (profil et Look, courbes, couleurs ponctuelles compris), et une liste vide pour les
--- masques, taches, yeux rouges et traits d'affinage que Dany a ajoutés à une photo qui n'en avait
--- pas. Second résultat, restent (Json.tableau) : les listes changées par Dany qui restent dans les
--- deux images (le départ en avait déjà, ou des taches de l'outil Supprimer, dont Lightroom dérive
--- RetouchAreas).
-function Variantes.valeursClaude(ex, actuels)
-    local valeurs = pourLightroom(ex.claude or {})
-    local depart = ex.depart or {}
-    local simples, tables, listes, maintenant = changementsDeDany(ex, actuels)
-    for cle, valeur in pairs(simples) do
-        if valeurs[cle] == nil then
-            valeurs[cle] = valeur
-        end
-    end
-    for cle in pairs(tables) do
-        if valeurs[cle] == nil then
-            valeurs[cle] = tableDeDepart(depart, cle)
-        end
-    end
-    local restent = Json.tableau()
-    for _, cle in ipairs(LISTES_EXERCICE) do
-        if listes[cle] and valeurs[cle] == nil then
-            local supprimer = cle == 'RetouchAreas'
-                and (nombre(depart, 'RemoveAreas') > 0 or nombre(maintenant, 'RemoveAreas') > 0)
-            if nombre(depart, cle) == 0 and not supprimer then
-                valeurs[cle] = {}
-            else
-                restent[#restent + 1] = cle
-            end
-        end
-    end
-    return valeurs, restent
-end
-
--- Le nom d'une Look, avec son intensité quand elle n'est pas de 100 % (comme les changements d'un
--- plan, Plans.lua : « Adobe Color (60 %) ») : une intensité changée, par Claude ou par Dany, est un
--- écart même si le profil reste le même.
-local function nomLook(look)
-    if lookVide(look) then
-        return "aucune"
-    end
-    local nom = tostring(look.Name)
-    local quantite = tonumber(look.Amount)
-    if quantite and math.abs(quantite - 1) > 1e-6 then
-        nom = string.format('%s (%d %%)', nom, math.floor(quantite * 100 + 0.5))
-    end
-    return nom
-end
-
-local function nul(valeur)
-    if valeur == nil then
-        return Json.null
-    end
-    return valeur
-end
-
--- Le nom sous lequel Claude voit un réglage : la balance des blancs d'un JPEG, d'un TIFF ou d'un
--- HEIC (IncrementalTemperature, IncrementalTint) sous Temperature et Tint, comme dans les
--- changements d'une proposition (la liste a_faire) et dans view_photo (Reglages.cleReelle).
-local NOMS_CLAUDE = { IncrementalTemperature = 'Temperature', IncrementalTint = 'Tint' }
-
-local function nomClaude(cle)
-    return NOMS_CLAUDE[cle] or cle
-end
-
--- Les écarts de l'exercice (fonction pure) : Json.tableau de {cle, depart, claude, vous}, par clé
--- (le nom que voit Claude, nomClaude : Temperature pour la balance d'un JPEG), sur les réglages
--- que Claude ou Dany ont changés depuis le départ. Look : le nom de la Look, avec son intensité si
--- elle n'est pas de 100 % (nomLook). Une autre table (courbe, couleurs ponctuelles, flou
--- d'objectif…) : « inchangée » ou « changée » (vous : « changée » comme Claude, « changée
--- autrement » sinon). Les listes vont à part (listes : masques, taches, yeux_rouges = { depart,
--- vous }, leurs nombres). Troisième résultat : vrai si Dany n'a rien changé (ni réglage, ni table,
--- ni liste).
-function Variantes.ecartsExercice(ex, actuels)
-    local depart, claude = ex.depart or {}, ex.claude or {}
-    local simples, tables, listesChangees, maintenant = changementsDeDany(ex, actuels)
-    local cles, vues = {}, {}
-    local function ajouter(cle)
-        if not vues[cle] and not dansListe(LISTES_EXERCICE, cle) and cle ~= 'RemoveAreas' and cle ~= 'RetouchInfo' then
-            vues[cle] = true
-            cles[#cles + 1] = cle
-        end
-    end
-    -- Les réglages simples de Claude que l'état de départ suit (etatSimple) : un nom que Lightroom
-    -- résout lui-même (profil d'objectif), une empreinte, n'en sont pas.
-    for cle, valeur in pairs(claude) do
-        if type(valeur) == 'table' or etatSimple({ [cle] = valeur })[cle] ~= nil then
-            ajouter(cle)
-        end
-    end
-    for cle in pairs(simples) do ajouter(cle) end
-    for cle in pairs(tables) do ajouter(cle) end
-    table.sort(cles, function(a, b) return nomClaude(a) < nomClaude(b) end)
-    local ecarts = Json.tableau()
-    local rienChange = true
-    for _, cle in ipairs(cles) do
-        local d, c, v
-        if cle == 'Look' then
-            d = nomLook(depart.Look)
-            c = claude.Look ~= nil and nomLook(claude.Look) or d
-            v = nomLook(maintenant.Look)
-        elseif type(depart[cle]) == 'table' or type(claude[cle]) == 'table' or dansListe(TABLES_EXERCICE, cle) then
-            local dt, ct, vt = depart[cle], claude[cle], actuels[cle]
-            if ct == nil then
-                ct = dt
-            end
-            d = "inchangée"
-            c = egal(ct, dt) and "inchangée" or "changée"
-            if egal(vt, dt) then
-                v = "inchangée"
-            elseif egal(vt, ct) or c == "inchangée" then
-                v = "changée"
-            else
-                v = "changée autrement"
-            end
-        else
-            d, v = depart[cle], maintenant[cle]
-            c = claude[cle]
-            if c == nil then
-                c = d
-            end
-        end
-        if not egal(v, d) then
-            rienChange = false
-        end
-        if not egal(c, d) or not egal(v, d) then
-            ecarts[#ecarts + 1] = { cle = nomClaude(cle), depart = nul(d), claude = nul(c), vous = nul(v) }
-        end
-    end
-    local listes = {}
-    for _, l in ipairs(LISTES_MONTREES) do
-        listes[l.nom] = { depart = nombre(depart, l.cle), vous = nombre(maintenant, l.cle) }
-    end
-    -- Une liste, ou une table (la Look : un autre détail que son nom et son intensité), changée par
-    -- Dany sans écart visible dans ecarts : il a quand même changé quelque chose.
-    if next(listesChangees) or next(tables) then
-        rienChange = false
-    end
-    return ecarts, listes, rienChange
-end
-
--- Les réglages que Dany a changés depuis le départ de l'exercice, en clés de Lightroom (ensemble) :
--- poser « ma version » (son instantané : le départ et la version de Claude) les remet au départ ;
--- undo_last doit les lui rendre.
-local function clesDeDany(ex, actuels)
-    local simples, tables, listes = changementsDeDany(ex, actuels)
-    local cles = {}
-    for cle in pairs(simples) do cles[cle] = true end
-    for cle in pairs(tables) do cles[cle] = true end
-    for cle in pairs(listes) do cles[cle] = true end
-    if cles.RetouchAreas and type(actuels.RemoveAreas) == 'table' then
-        cles.RemoveAreas = true
-    end
-    return cles
 end
 
 local function lister(photo)
@@ -425,9 +100,9 @@ local function lister(photo)
 end
 
 -- Pose l'instantané d'une variante comme une étape de Claude. Les réglages de l'étape sont ceux de
--- la variante ; pour « ma version » d'un exercice, aussi ceux que Dany a changés depuis le départ
--- (l'instantané les remet au départ : undo_last les lui rend). L'entrée du journal, écrite avec la
--- mémoire avant la pose, est réécrite après avec ses changements (export_journal, la leçon).
+-- la variante (« ma version » d'un ancien exercice « Je le fais », retiré au correctif 1.3.6, comme
+-- les autres). L'entrée du journal, écrite avec la mémoire avant la pose, est réécrite après avec
+-- ses changements (export_journal).
 local function choisir(photo, params, prefs)
     local nom = Variantes.nomInstantane(params.nom)
     local instantane = trouver(photo, nom)
@@ -444,23 +119,9 @@ local function choisir(photo, params, prefs)
     end
     local etape = nomEtape(params, "variante " .. nom:gsub('^Claude · ', ''))
     local actuels = photo:getDevelopSettings()
-    local cles, vues = {}, {}
+    local cles = {}
     for _, cle in ipairs(info.cles or {}) do
         cles[#cles + 1] = cle
-        vues[cle] = true
-    end
-    local exercice = type(info.exercice) == 'table' and Variantes.exercice(photo, nom) or nil
-    if exercice then
-        local deDany = {}
-        for cle in pairs(clesDeDany(exercice, actuels)) do
-            if not vues[cle] then
-                deDany[#deDany + 1] = cle
-            end
-        end
-        table.sort(deDany)
-        for _, cle in ipairs(deDany) do
-            cles[#cles + 1] = cle
-        end
     end
     local avant = {}
     for _, cle in ipairs(cles) do
@@ -545,7 +206,7 @@ local function choisir(photo, params, prefs)
             .. ". Rien n'a changé : l'utilisateur peut le poser lui-même dans le panneau Instantanés.")
     end
     -- L'entrée du journal a été écrite avant la pose, sans ses changements (inconnus alors) :
-    -- réécrite avec eux, sinon ni export_journal ni la leçon ne voient les réglages de la variante.
+    -- réécrite avec eux, sinon export_journal ne voit pas les réglages de la variante.
     if #entree.changements > 0 then
         ecrireMemoire(etape .. " (journal)", function()
             garder(photo, 'journalClaude', Json.encode(Json.tableau(journal)))

@@ -1,9 +1,8 @@
 -- Lightroom.lua : ce que la fenêtre lit de Lightroom et de son entourage : photo active (avec sa
 -- note posée, et sa légende quand elle change) et sélection, état de la liaison et mode « Proposer
 -- d'abord » (lus directement : la liaison est dans ce même module), connexion de Claude Code,
--- écran principal du Mac (lu par le connecteur : `mcp-developpeur --ecran`), réglages d'une photo
--- pendant un exercice « Je le fais » (1.3, lus sans rien écrire), ce que l'onglet Focus montre de
--- Lightroom (Lightroom.infosFocus). À appeler depuis une tâche.
+-- écran principal du Mac (lu par le connecteur : `mcp-developpeur --ecran`), ce que l'onglet Focus
+-- montre de Lightroom (Lightroom.infosFocus). À appeler depuis une tâche.
 
 local LrApplication = import 'LrApplication'
 local LrDate = import 'LrDate'
@@ -23,9 +22,14 @@ local Lightroom = {}
 -- Drapeau (pickStatus : 1, 0 ou −1), en mots.
 local DRAPEAUX = { [1] = 'retenue', [0] = 'aucun', [-1] = 'rejetee' }
 
+-- Photos d'une sélection comptées dans la clé de son groupe (au-delà, les premières seulement).
+Lightroom.MAX_GROUPE = 2000
+
 -- Photo active ({ id, nom, note, drapeau }) et nombre de photos sélectionnées. La note (0 à 5) et
 -- le drapeau ('retenue', 'aucun', 'rejetee') posés, pour la carte Note de la fenêtre ; nil si la
--- photo ne les donne pas.
+-- photo ne les donne pas. `cle` : la photo active et la sélection en un texte ; `groupe` (plusieurs
+-- photos sélectionnées) : la clé de la conversation de ce groupe (correctif 1.3.6), l'ensemble de
+-- ses photos sans l'ordre ni la photo active (« nombre:ids rangés »).
 function Lightroom.photos()
     local info = { selection = 0 }
     local ok = LrTasks.pcall(function()
@@ -42,6 +46,17 @@ function Lightroom.photos()
                 ids[#ids + 1] = tostring(photos[i].localIdentifier)
             end
             info.cle = table.concat(ids, ':')
+            if #photos > 1 then
+                local groupe = {}
+                for i = 1, math.min(#photos, Lightroom.MAX_GROUPE) do
+                    groupe[i] = tonumber(photos[i].localIdentifier) or 0
+                end
+                table.sort(groupe)
+                for i, id in ipairs(groupe) do
+                    groupe[i] = string.format('%d', id)
+                end
+                info.groupe = tostring(#photos) .. ':' .. table.concat(groupe, ':')
+            end
             local okNote, note, drapeau = LrTasks.pcall(function()
                 return active:getRawMetadata('rating'), active:getRawMetadata('pickStatus')
             end)
@@ -57,27 +72,9 @@ function Lightroom.photos()
     return info
 end
 
--- Une photo du catalogue par son identifiant, décrite comme la photo active de Lightroom.photos
--- (id, nom, note, drapeau) : la photo d'une ancienne conversation choisie dans la liste
--- (Fenetre.photoDeLaConversation). Nil si elle n'est plus au catalogue. À appeler depuis une tâche.
-function Lightroom.photo(id)
-    local decrite
-    LrTasks.pcall(function()
-        local photo = LrApplication.activeCatalog():getPhotoByLocalId(tonumber(id))
-        if not photo then
-            return
-        end
-        decrite = { id = photo.localIdentifier, nom = photo:getFormattedMetadata('fileName') or '' }
-        local okNote, note, drapeau = LrTasks.pcall(function()
-            return photo:getRawMetadata('rating'), photo:getRawMetadata('pickStatus')
-        end)
-        if okNote then
-            decrite.note = math.floor(tonumber(note) or 0)
-            decrite.drapeau = DRAPEAUX[tonumber(drapeau) or 0] or 'aucun'
-        end
-    end)
-    return decrite
-end
+-- (Lightroom.photo, la photo d'une ancienne conversation choisie dans la liste du volet, est retirée
+-- au correctif 1.3.6 : la fenêtre montre toujours la conversation de la photo choisie dans
+-- Lightroom.)
 
 -- La légende d'une photo, pour l'aperçu de la photo active et l'en-tête de la fenêtre (fenêtre B,
 -- 1.3) : { nom (son nom de fichier), copie (le nom de sa copie virtuelle), appareil (le modèle du
@@ -194,18 +191,15 @@ function Lightroom.demarrerLiaison()
     end
 end
 
--- Mode de la liaison : 'proposer' (Proposer d'abord) ou 'appliquer'.
+-- Mode de la liaison : 'proposer' (Proposer d'abord) ou 'appliquer', celui de la préférence `mode`
+-- que le Gestionnaire de modules externes règle (la fenêtre n'a plus de radios pour le changer,
+-- correctif 1.3.6).
 function Lightroom.mode()
     local ok, prefs = pcall(Preferences.lire)
     if ok and prefs and prefs.mode == 'proposer' then
         return 'proposer'
     end
     return 'appliquer'
-end
-
-function Lightroom.basculerMode()
-    Preferences.lire().mode = Lightroom.mode() == 'proposer' and 'appliquer' or 'proposer'
-    return Lightroom.mode()
 end
 
 -- Connexion de Claude Code (`claude auth status`) : { installe, connecte, forfait, texte }.
@@ -287,66 +281,6 @@ function Lightroom.decrireEcran(json)
         ecran.detail = ecran.texte
     end
     return ecran
-end
-
--- Je le fais (1.3) ---------------------------------------------------------------------------
-
--- Les réglages de la liste « à faire » dont la valeur de départ (`avant` du connecteur) n'est pas
--- une valeur relue de la photo : un nom de version, de paramètre prédéfini ou d'objectif, « non »
--- pour un calcul automatique, des repères comptés. Ils ne se cochent pas.
-Lightroom.NON_SUIVIS = {
-    ProcessVersion = true, Preset = true, AutoTone = true, AutoGrayscaleMix = true, LensProfileName = true,
-    UprightFourSegments = true, UprightTransform = true,
-}
-
--- Les valeurs des réglages `cles` (noms du connecteur) dans `reglages` (getDevelopSettings),
--- lues comme le module les décrit dans ses changements, pour les comparer à `avant` : la balance
--- d'un JPEG sous IncrementalTemperature et IncrementalTint (Reglages.cleReelle), le profil par son
--- nom (Reglages.nomProfil : la Look s'il y en a une), un nombre absent par sa valeur par défaut
--- et un booléen (ConvertToGrayscale) en 0 ou 1 (Reglages.valeurActuelle, comme `avant`), une table
--- (courbe, couleurs ponctuelles, flou d'objectif) par son résumé (Reglages.resume), avec sa
--- signature (son JSON, clés triées) pour voir un changement que le résumé ne montre pas. Rend
--- valeurs et signatures, deux tables neuves ; un réglage de Lightroom.NON_SUIVIS n'y est pas.
-function Lightroom.lireValeurs(reglages, cles, raw)
-    local Reglages = require 'Reglages'
-    local valeurs, signatures = {}, {}
-    for _, cle in ipairs(cles or {}) do
-        if not Lightroom.NON_SUIVIS[cle] then
-            local reelle = Reglages.cleReelle(cle, raw)
-            local brute = reglages[reelle]
-            if cle == 'CameraProfile' then
-                valeurs[cle] = Reglages.nomProfil(reglages)
-            elseif type(brute) == 'table' then
-                valeurs[cle] = Reglages.resume(cle, brute)
-                local ok, json = pcall(Json.encode, brute)
-                signatures[cle] = ok and json or nil
-            elseif type(brute) == 'string' then
-                valeurs[cle] = brute
-            elseif brute == nil and type(Reglages.resume(cle, nil)) == 'string' then
-                -- Une table absente (courbe linéaire, aucune couleur ponctuelle) : son résumé, sans
-                -- signature (une courbe linéaire écrite ensuite n'a pas changé).
-                valeurs[cle] = Reglages.resume(cle, nil)
-            else
-                valeurs[cle] = Reglages.valeurActuelle(reglages, reelle)
-            end
-        end
-    end
-    return valeurs, signatures
-end
-
--- Les valeurs actuelles des réglages `cles` de la photo `id` (Lightroom.lireValeurs, d'après
--- getDevelopSettings) : ce que Dany a déjà fait d'un exercice « Je le fais », relu toutes les 2 s
--- par la fenêtre. Deux tables vides si la photo ne se lit pas. À appeler depuis une tâche.
-function Lightroom.valeurs(id, cles)
-    local valeurs, signatures = {}, {}
-    LrTasks.pcall(function()
-        local photo = LrApplication.activeCatalog():getPhotoByLocalId(tonumber(id))
-        local reglages = photo and photo:getDevelopSettings()
-        if type(reglages) == 'table' then
-            valeurs, signatures = Lightroom.lireValeurs(reglages, cles, require('Reglages').estRaw(photo, reglages))
-        end
-    end)
-    return valeurs, signatures
 end
 
 -- Sélectionne une photo du catalogue par son identifiant (numéros cités par Claude).

@@ -11,8 +11,8 @@
 --       connecteur.json                        configuration MCP, écrite à chaque lancement
 --       consommation.json, publication.json    jetons comptés, profils de publication de l'utilisateur
 --       notation.json                          notes proposées par Claude
---       carnet.json                            carnet de progrès et leçons des photos (Carnet.lua,
---                                              1.3), une table par catalogue
+--       carnet.json                            carnet de progrès (Carnet.lua, 1.3), une table par
+--                                              catalogue ; les leçons d'avant la 1.3.6 y restent
 --       mes-demandes.json                      les demandes du menu Mes demandes de la fenêtre
 --                                              (Stockage.lua)
 --       Etapes/                                avant/après de chaque étape de Claude (1.3)
@@ -115,12 +115,16 @@ Chemins.defauts = {
     -- menus) suivent l'apparence de macOS. Une valeur inconnue retombe sur 'claire'
     -- (Dispositions.apparence).
     apparence = 'claire',
-    -- Une autre photo active ou une autre sélection commence une nouvelle conversation
-    -- (Fenetre.suivreSelection).
+    -- Une autre photo active ou une autre sélection reprend sa conversation, sinon en commence une
+    -- (case « Autre photo : reprendre sa conversation, sinon une nouvelle », Fenetre.suivreSelection ;
+    -- une photo, une conversation depuis le correctif 1.3.6) ; la Demande rapide sur une photo seule
+    -- écrit dans sa conversation (Moteur.envoyerRapide). Décochée : la conversation montrée reste,
+    -- quelle que soit la sélection, et chaque demande rapide part dans une conversation jamais
+    -- gardée. La clé garde son nom.
     nouvelleParPhoto = true,
-    -- À l'ouverture de la fenêtre, sur une conversation vide, Claude prépare une proposition de
-    -- retouche de la photo active, sans rien appliquer (Fenetre.proposerAOuverture).
-    propositionAOuverture = true,
+    -- (La proposition préparée à l'ouverture de la fenêtre, `propositionAOuverture`, est retirée au
+    -- correctif 1.3.6, décision de Dany du 25 octobre 2026 : « Obtenir » de l'onglet Proposition la
+    -- demande. Une valeur restée dans les réglages de Lightroom n'est plus lue.)
     -- Style du menu Style (valeur de Consignes.styles), joint à chaque demande ; « standard »
     -- n'ajoute rien.
     styleChoisi = 'standard',
@@ -129,9 +133,6 @@ Chemins.defauts = {
     -- Avant/après de chaque étape de Claude (1.3, Pourquoi ?) : un rendu de plus par étape, photo
     -- active seulement, gardé dans Etapes/.
     avantApresEtapes = true,
-    -- Claude finit chaque retouche par la leçon de la photo (1.3, photo_lesson) ; décochée, chaque
-    -- demande porte « [Sans leçon] ».
-    leconFinRetouche = true,
 }
 
 -- Préférences du module (liaison comprise), complétées par les réglages par défaut de la fenêtre.

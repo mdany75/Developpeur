@@ -2,10 +2,14 @@
 -- › Demande rapide, ⌘⌃⌥C ; demandée par Dany le 22 octobre 2026) : le résultat page par page, une
 -- demande de 3 lignes, à sa gauche trois boutons à icône (noter, Retouche pro, Portrait ; 24 octobre
 -- 2026), à sa droite ▲, ▼ et Envoyer, dans une fenêtre d'environ 1 000 × 250 points ; Retour envoie,
--- comme dans la fenêtre Claude (champ à `immediate = false` : Retour le valide). Chaque demande part
--- dans une nouvelle conversation, jamais gardée (Moteur.envoyerRapide) ; la fenêtre Claude n'en voit
--- rien dans sa liste. Une autre photo ou une autre sélection efface la réponse
--- (FenetreRapide.suivreSelection) : plus de bouton ♻ (24 octobre 2026).
+-- comme dans la fenêtre Claude (champ à `immediate = false` : Retour le valide). Depuis le correctif
+-- 1.3.6 (« une photo, une conversation », décidé avec Dany le 25 octobre 2026), une demande sur une
+-- photo seule part dans la conversation de la photo, la même que la fenêtre Claude, gardée, où elle
+-- porte la mention « Demande rapide » ; sur plusieurs photos (ou la case Autre photo décochée), dans
+-- une nouvelle conversation, jamais gardée, avec le résumé court du groupe (Moteur.envoyerRapide).
+-- La fenêtre ne montre que la réponse à sa demande (Moteur.reponseRapide). Une autre photo ou une
+-- autre sélection efface la réponse (FenetreRapide.suivreSelection) : plus de bouton ♻ (24 octobre
+-- 2026).
 
 local LrBinding = import 'LrBinding'
 local LrDialogs = import 'LrDialogs'
@@ -68,7 +72,8 @@ FenetreRapide.POLICE = { name = '<system>', size = 13 }
 -- Claude, D3 : l'observateur part avant l'action du bouton) et annule cet envoi.
 FenetreRapide.DELAI_ENVOI = 0.3
 
-FenetreRapide.VIDE = "Écrivez une demande, puis Envoyer : elle part dans une nouvelle conversation, qui n'est pas gardée. "
+FenetreRapide.VIDE = "Écrivez une demande, puis Envoyer. Pour une photo seule (case Autre photo cochée), elle part dans sa conversation, que la fenêtre "
+    .. "Claude reprend ; pour plusieurs photos, dans une conversation qui n'est pas gardée. "
     .. "Une autre photo ou une autre sélection efface la réponse."
 
 -- Le texte de Claude sans la mise en forme Markdown, en une suite de lignes.
@@ -79,7 +84,9 @@ local function sansMarkdown(texte)
 end
 
 -- Le résultat de la dernière demande rapide : l'état du travail pendant qu'elle se fait, puis ce
--- que Claude a écrit en dernier, avec les notes qui le suivent (un arrêt, une erreur).
+-- que Claude a écrit en dernier, avec les notes qui le suivent (un arrêt, une erreur). Seulement la
+-- réponse à sa demande (Moteur.reponseRapide) : dans la conversation d'une photo, ni ce qui la
+-- précède, ni une demande faite ensuite dans la fenêtre Claude.
 function FenetreRapide.texte(tic)
     if FenetreRapide.message then
         return FenetreRapide.message
@@ -88,19 +95,18 @@ function FenetreRapide.texte(tic)
     if not c then
         return FenetreRapide.VIDE
     end
-    if Moteur.travaille and Moteur.enCours == c then
+    local reponse, enCours = Moteur.reponseRapide(c)
+    if enCours then
         return Moteur.texteTravail(tic, c)
     end
     local morceaux = {}
-    for i = #c.elements, 1, -1 do
-        local e = c.elements[i]
+    for i = #reponse, 1, -1 do
+        local e = reponse[i]
         if e.genre == 'claude' and (e.texte or '') ~= '' then
             table.insert(morceaux, 1, sansMarkdown(e.texte))
             break
         elseif e.genre == 'note' and (e.texte or '') ~= '' then
             table.insert(morceaux, 1, e.texte)
-        elseif e.genre == 'dany' then
-            break
         end
     end
     if #morceaux == 0 then
@@ -211,7 +217,8 @@ function FenetreRapide.demander(message)
 end
 
 -- Une autre photo active ou une autre sélection, choisie par Dany, efface la réponse et oublie la
--- demande d'avant (Moteur.oublierRapide : session arrêtée, dossier effacé) : la réponse parlait
+-- demande d'avant (Moteur.oublierRapide : session arrêtée et dossier effacé pour plusieurs photos ;
+-- la conversation d'une photo reste gardée, la fenêtre Claude la reprend) : la réponse parlait
 -- d'autres photos (demandé par Dany le 24 octobre 2026, à la place du bouton ♻). Ce qu'il a tapé
 -- reste, pour le renvoyer sur les nouvelles. Comme Fenetre.suivreSelection : une sélection changée
 -- pendant que Claude travaille, ou vue moins de DELAI_APRES_TRAVAIL secondes après la fin de son

@@ -1,21 +1,114 @@
 # Changements
 
-## Non publié
+## 1.3.6 — 2026-10-25
+
+Le correctif 1.3.6, « une photo, une conversation », décidé avec vous le 25 octobre 2026 : chaque
+photo a sa conversation, qui s'ouvre sur son historique ; la fenêtre Claude s'allège (plus de volet
+à gauche, plus de rangée Mode) ; la leçon de la photo et « Je le fais » sont retirés. Avec lui, la
+balance des blancs de toute l'image et la Demande rapide revue. Après l'installation : quitter puis
+relancer Lightroom (le module gagne un fichier : un rechargement ne suffit pas), rouvrir Claude
+Desktop et ouvrir une nouvelle session de Claude Code (le connecteur passe à 35 outils).
 
 ### Ajouté
+- Une photo, une conversation, dans la fenêtre Claude : choisir une seule photo dans Lightroom
+  montre sa conversation, telle que vous l'avez laissée, et Claude reprend où il en était. Chaque
+  copie virtuelle a la sienne. Une photo choisie fenêtre fermée compte aussi, à la réouverture.
+- L'historique de la photo : une photo qui n'a pas encore de conversation en commence une, qui
+  s'ouvre sur ses étapes de Claude (avec leur raison et leur date, qu'elles viennent de la fenêtre,
+  de la Demande rapide ou de Claude Desktop) et sur ce que vous avez repris à la main depuis la
+  dernière. Elle n'est gardée sur le disque qu'à votre première demande : parcourir des centaines
+  de photos ne crée aucun fichier.
+- « Depuis la dernière fois » : quand vous revenez à une photo qui a changé depuis que sa
+  conversation l'a vue (une étape de Claude faite ailleurs, une reprise à la main), une ligne du fil
+  dit ce qui a changé ; rien de changé, rien d'ajouté. L'historique et ce complément sont faits par
+  la fenêtre, sans Claude ni forfait, et partent une seule fois avec votre demande suivante : Claude
+  sait d'où il repart. (Lightroom ne laisse pas lire son panneau Historique : l'historique, c'est le
+  journal de Claude et vos reprises à la main.)
+- Plusieurs photos sélectionnées : une conversation de groupe, le temps du travail, jamais gardée,
+  qui commence par un résumé court (« 3 de ces 12 photos ont déjà des étapes de Claude : … »).
+  Changer de photo active dans la même sélection ne change pas de conversation ; ce que Claude y
+  fait arrive dans le journal de chaque photo, que sa conversation lira ensuite.
+- « Repartir à neuf », à droite du titre de la conversation : une conversation neuve pour la photo,
+  avec son historique. L'ancienne reste sur le disque, mise de côté, jamais effacée. Grisé pendant
+  que Claude travaille, sans photo seule, ou quand la conversation montrée n'est pas celle de la
+  photo active.
+- L'onglet Suivi, à la place de l'onglet Leçon : le carnet de progrès (ses constats), page par
+  page avec ▲ ▼ ; « Photos d'un défaut… », sous la carte, montre les photos d'un défaut et permet de
+  les retirer du carnet. Il ne s'ouvre que par un clic.
 - Trois boutons dans la Demande rapide, à gauche de la demande, chacun une demande toute faite pour toutes
   les photos sélectionnées : noter (Claude pose ses notes, de 0 à 5 ★ ou un rejet), Retouche pro
-  et Portrait, comme les invites de la fenêtre Claude. Après l'installation : quitter puis
-  relancer Lightroom.
+  et Portrait, comme les invites de la fenêtre Claude.
 
 ### Changé
+- La fenêtre Claude passe à 1 623 × 1 200 points (1 948 de large avant), sans le volet de gauche ;
+  le fil garde sa largeur. Les trois voyants (Claude Code, Lightroom, Écran) sont dans l'en-tête.
+  Les versions du module et du connecteur, et le mode de la liaison, sont dans l'infobulle du
+  voyant Lightroom, qui passe à l'orange quand l'une des deux versions est à mettre à jour ou que
+  le connecteur est introuvable. Publication… et Consommation… s'ouvrent par Fichier › Module
+  externe - Extras.
+- Le mode (Appliquer directement, ou Proposer d'abord) se règle seulement dans le Gestionnaire de
+  modules externes (section Liaison avec Claude, « Avant d'appliquer ») ; la fenêtre suit ce
+  réglage.
+- Le titre d'une conversation : le nom de la photo (ou « 12 photos » pour un groupe) jusqu'à celui
+  que Claude donne ; il ne se renomme plus. Une conversation commencée par la Demande rapide reçoit
+  son titre à la première demande faite dans la fenêtre Claude.
+- La case Autre photo du Gestionnaire de modules externes devient « Reprendre sa conversation,
+  sinon une nouvelle », et vaut aussi pour la Demande rapide. Décochée : la conversation montrée
+  reste, quelle que soit la sélection, et chaque demande rapide part dans une conversation jamais
+  gardée.
+- Plus de proposition préparée à l'ouverture de la fenêtre Claude (votre décision du 25 octobre
+  2026) : pour en avoir une, cliquez Obtenir, sous la carte de l'onglet Proposition. Claude propose
+  alors une retouche de la photo active, dans sa conversation, sans rien appliquer (il la note
+  d'abord si elle n'est pas encore évaluée), et la fenêtre passe à l'onglet Proposition, où vous
+  l'acceptez, la refusez ou l'ajustez. Obtenir est grisé pendant que Claude travaille (fenêtre
+  Claude ou Demande rapide), quand plusieurs photos ou aucune sont sélectionnées, et quand une
+  proposition attend déjà. Sous la carte : Obtenir, Refuser, Ajuster… et Accepter.
+- Les conversations d'avant le correctif : celle dont la dernière demande portait sur une seule
+  photo devient la conversation de cette photo (la plus récente, s'il y en a plusieurs) ; celles de
+  plusieurs photos restent sur le disque, sans plus se montrer. Rien n'est effacé.
+- La Demande rapide sur une seule photo écrit dans la conversation de cette photo, la même que la
+  fenêtre Claude, gardée sur le disque, et Claude y reprend sa session ; la fenêtre Claude y montre
+  « Demande rapide » sous la demande. Sur plusieurs photos, elle part comme avant dans une
+  conversation jamais gardée, avec le résumé court du groupe.
 - Une demande tapée dans la Demande rapide vise toutes les photos sélectionnées, et non plus la
   seule photo active (sauf si elle en nomme une).
 - Dans la Demande rapide, une autre photo ou une autre sélection efface la réponse, qui parlait
-  d'autres photos ; ce que vous avez tapé reste. Le bouton ♻ est retiré : chaque demande partait
-  déjà dans une conversation neuve. Après l'installation : quitter puis relancer Lightroom.
+  d'autres photos ; ce que vous avez tapé reste. La conversation d'une photo, elle, reste gardée.
+- À la fin d'une retouche dans la fenêtre Claude, Claude montre l'avant/après depuis l'état d'avant
+  lui (`view_photo` avec `compare = before_claude`), puis fait son résumé chiffré, comme les invites
+  de Claude Desktop ; pas dans une demande rapide.
+- Le rendu reproductible se garde à cet avant/après de fin de retouche, au lieu de la leçon. Chaque
+  photo garde la fin de chacune de ses retouches ; une retouche repartie de l'origine s'y compare à
+  chaque avant/après de ce genre, même avant d'être finie, et un écart trop grand vous est dit à la
+  fin de la retouche.
+- Le menu « Afficher la fenêtre de suivi » devient « Afficher la fenêtre de la liaison » (le bouton
+  du Gestionnaire de modules externes aussi) : le mot « Suivi » est maintenant celui de l'onglet du
+  carnet.
+- Le carnet de progrès (`export_journal` avec `notebook`, onglet Suivi) ne montre plus que les
+  constats ; les leçons déjà rangées restent dans `carnet.json`, telles quelles, sans être montrées.
+
+### Retiré
+- Le volet de gauche de la fenêtre Claude : « ＋ Nouvelle conversation », Rechercher, la liste des
+  conversations, Renommer… et Supprimer… (une conversation n'est plus jamais effacée), et la page
+  Carnet de progrès du fil, avec « Demander à Claude ce qu'il en pense › » : pour son avis,
+  demandez-le-lui (« Comment progressent mes prises de vue ? »).
+- La rangée Mode de l'en-tête (Appliquer, Proposer d'abord, Je le fais).
+- La case « À l'ouverture » du Gestionnaire de modules externes (section Fenêtre Claude), avec la
+  proposition qu'elle faisait préparer à l'ouverture de la fenêtre : Obtenir la remplace. Si vous
+  l'aviez décochée, ce réglage est simplement ignoré.
+- La leçon de la photo : l'outil `photo_lesson` (le connecteur passe de 36 à 35 outils), l'onglet
+  Leçon, « Leçon de la photo » au bout d'un tour de Claude, la case Leçon du Gestionnaire de
+  modules externes, et la leçon à la fin des invites qui retouchent.
+- « Je le fais » : son bouton (« J'ai fini »), l'exercice et sa liste cochée, `my_turn` de
+  `preview_settings` et `compare = claude_version` de `view_photo`. Un instantané « Claude · ma
+  version » déjà rangé reste dans le panneau Instantanés de sa photo : effacez-le là si vous n'en
+  voulez plus.
+- Le bouton ♻ de la Demande rapide : une autre sélection fait place nette d'elle-même.
 
 ### Corrigé
+- Les dossiers temporaires des demandes rapides sur plusieurs photos (et ceux des nouvelles
+  conversations de groupe) s'effacent au chargement du module : quand Lightroom quittait sur une
+  demande rapide, ses images restaient sur le disque.
 - La balance des blancs d'une photo à forte dominante (signalé le 24 octobre 2026 : un portrait à
   l'ombre des feuillus restait bleu après Retouche pro, réchauffé de 600 K seulement). `view_photo`
   dit maintenant la dominante de toute l'image (`dominante_globale`) et quoi en faire ; les tons
@@ -26,7 +119,6 @@
   telle dominante (6 400 K et +14 laissaient encore le gravier bleu, quand l'Auto le rendait
   neutre). Le bilan ne prend plus cette correction pour une dominante accentuée : c'est un point
   « à vérifier ».
-  Après l'installation : rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code.
 
 ## 1.3.5 — 2026-10-23
 

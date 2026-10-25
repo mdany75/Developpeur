@@ -119,7 +119,7 @@ end
 
 local function verifierPause(params)
     if Liaison.pause and not params.depuisLightroom then
-        echouer("La liaison est en pause dans Lightroom : Claude peut regarder les photos mais pas les retoucher. Reprendre dans la fenêtre de suivi.")
+        echouer("La liaison est en pause dans Lightroom : Claude peut regarder les photos mais pas les retoucher. Reprendre dans la fenêtre de la liaison.")
     end
 end
 
@@ -135,7 +135,7 @@ local function sansRetouche(original)
 end
 
 -- Accord véritable (préférence « Confirmer dans Lightroom ») : en mode « Proposer d'abord »,
--- l'accord se donne dans la fenêtre de suivi (bouton Accepter), hors de Claude ; confirm = true
+-- l'accord se donne dans la fenêtre de la liaison (bouton Accepter), hors de Claude ; confirm = true
 -- ne suffit pas. Un accord vaut pour une écriture, dans les 10 minutes.
 local DUREE_ACCORD = 600
 
@@ -159,11 +159,11 @@ local function accordDansLightroom(prefs, params, outil)
     end
     if accord and accord.accepte == false then
         Liaison.accord = nil
-        echouer("L'utilisateur a refusé la proposition dans la fenêtre de suivi de Lightroom : rien n'a été écrit. Lui demander ce qu'il veut changer.")
+        echouer("L'utilisateur a refusé la proposition dans la fenêtre de la liaison de Lightroom : rien n'a été écrit. Lui demander ce qu'il veut changer.")
     end
-    -- La raison donnée par Claude s'affiche avec la proposition, dans la fenêtre de suivi.
+    -- La raison donnée par Claude s'affiche avec la proposition, dans la fenêtre de la liaison.
     Liaison.demanderAccord(outil, params.etape, type(params.raison) == 'string' and params.raison ~= '' and params.raison or nil)
-    echouer(Liaison.EN_ATTENTE .. " : rien n'a été écrit. L'utilisateur accepte la proposition dans la fenêtre de suivi "
+    echouer(Liaison.EN_ATTENTE .. " : rien n'a été écrit. L'utilisateur accepte la proposition dans la fenêtre de la liaison "
         .. "de Lightroom (bouton Accepter, ouverte pour lui) ; ensuite, rappeler " .. rappel(outil) .. ".")
 end
 
@@ -453,7 +453,7 @@ local function calculerAvantRendu(photo)
     end
 end
 
--- Réponse d'une commande d'écriture, et fenêtre de suivi.
+-- Réponse d'une commande d'écriture, et fenêtre de la liaison.
 local function resultatsPlans(plans, etape, params)
     local libelles = type(params.libelles) == 'table' and params.libelles or {}
     local resultats = Json.tableau()
@@ -683,9 +683,7 @@ end
 -- changé, la différence avec les réglages actuels dit ce que l'utilisateur a corrigé à la main.
 -- Un réglage automatique pas encore calculé (−999999, après la tonalité automatique) n'en est pas,
 -- ni ce que Lightroom résout lui-même peu après l'écriture (constaté le 18 octobre 2026 : le nom et
--- l'origine du profil d'objectif par défaut, des réglages absents qu'il ajoute). etatSimple et
--- difference servent aussi l'exercice « Je le fais » (1.3, Variantes.lua) : son état de départ, et
--- ce que Dany a changé depuis.
+-- l'origine du profil d'objectif par défaut, des réglages absents qu'il ajoute).
 local TEXTES_SUIVIS = { WhiteBalance = true, CameraProfile = true, ProcessVersion = true, ToneCurveName2012 = true,
     LensProfileSetup = true }
 local NON_SUIVIS = { LensProfileIsEmbedded = true }
@@ -750,8 +748,7 @@ end
 -- deux tables de réglages ; fonction pure) : Json.tableau de {cle, avant, maintenant}, par clé. Une
 -- clé absente de la référence n'est pas une différence (Lightroom ajoute ou résout lui-même des
 -- réglages après l'écriture), ni une valeur automatique pas encore calculée (−999999) ; l'égalité
--- est celle de Reglages.egal, tables comprises. Sert aux corrections de l'utilisateur et à
--- l'exercice « Je le fais » (Variantes.lua : ce que Dany a changé depuis le départ).
+-- est celle de Reglages.egal, tables comprises. Sert aux corrections de l'utilisateur.
 local function difference(reference, maintenant)
     local cles = {}
     for cle in pairs(reference) do

@@ -56,27 +56,27 @@ local PPM_144 = 5669
 
 -- Les images de la fenêtre B et leurs tailles en points, d'après la maquette : { largeur, hauteur }.
 -- Les hauteurs du panneau et des cartes, recalées au lot 18, ne sont pas fixées ici : la largeur
--- seule (panneau de 528, intérieur de 498). Le fond de sélection suit le volet,
--- plus large que dans la maquette (fenêtre agrandie, demandée par Dany le 21 octobre 2026) : une case
--- de la liste, à la largeur utile du volet.
+-- seule (panneau de 528, intérieur de 498). (Le fond de sélection et la loupe sont retirés avec le
+-- volet au correctif 1.3.6.)
 local ATTENDUES = {
     panneau = { 528 },
     ['carte-note'] = { 498 },
     ['carte-proposition'] = { 498 },
     ['carte-etape'] = { 498 },
-    ['carte-lecon'] = { 498 },
     ['carte-focus'] = { 498 },
+    ['carte-suivi'] = { 498 },
     ['seg-apercu'] = { 72, 22 },
     ['seg-focus'] = { 62, 22 },
     ['seg-proposition'] = { 98, 22 },
     ['seg-note'] = { 57, 22 },
-    ['seg-lecon'] = { 65, 22 },
     ['seg-apercu-actif'] = { 72, 22 },
     ['seg-focus-actif'] = { 62, 22 },
     ['seg-proposition-actif'] = { 98, 22 },
     ['seg-note-actif'] = { 57, 22 },
-    ['seg-lecon-actif'] = { 65, 22 },
-    selection = { D.liste, D.hauteurCase },
+    -- Suivi, le carnet de progrès, à la place de Leçon (seg-lecon, seg-lecon-actif et carte-lecon,
+    -- retirées au correctif 1.3.6), de la largeur de Note.
+    ['seg-suivi'] = { 57, 22 },
+    ['seg-suivi-actif'] = { 57, 22 },
     ['pastille-vert'] = { 8, 8 },
     ['pastille-orange'] = { 8, 8 },
     ['pastille-rouge'] = { 8, 8 },
@@ -90,7 +90,6 @@ local ATTENDUES = {
     ['etoile12-vide'] = { 12, 12 },
     -- coche-10, chevron-passe et avertissement (la rangée des passes et la ligne du plafond de la
     -- carte Note) sont retirées au correctif 1.3.2.
-    loupe = { 12, 12 },
     trombone = { 14, 14 },
     ['presse-papiers'] = { 14, 14 },
     ['chevron-haut'] = { 12, 12 },
@@ -107,12 +106,12 @@ local GROUPES = {
     { 'seg-focus', 'seg-focus-actif' },
     { 'seg-proposition', 'seg-proposition-actif' },
     { 'seg-note', 'seg-note-actif' },
-    { 'seg-lecon', 'seg-lecon-actif' },
+    { 'seg-suivi', 'seg-suivi-actif', 'seg-note' },
     { 'bouton-bleu', 'bouton-bleu-presse', 'bouton-bleu-inactif' },
     { 'etoile24-pleine', 'etoile24-vide' },
     { 'etoile12-pleine', 'etoile12-vide' },
     { 'pastille-vert', 'pastille-orange', 'pastille-rouge', 'pastille-gris' },
-    { 'carte-proposition', 'carte-etape', 'carte-lecon', 'carte-focus' },
+    { 'carte-proposition', 'carte-etape', 'carte-focus', 'carte-suivi' },
     { 'trombone', 'presse-papiers' },
     { 'chevron-haut', 'chevron-bas' },
     { 'rapide-noter', 'rapide-retouche', 'rapide-portrait' },
@@ -220,18 +219,21 @@ end)
 -- La palette claire est celle de la maquette (et, pour l'orange, le rouge et Menlo, celle de la
 -- fenêtre de la 1.2) : les images claires n'ont pas changé en recevant une palette.
 local MAQUETTE = {
-    texte = '1D1D1F', gris = '6B6B6B', grisEntete = '5F5F5F', sousTitreChoisi = '505050', bleu = '0A64D8',
+    texte = '1D1D1F', gris = '6B6B6B', grisEntete = '5F5F5F', bleu = '0A64D8',
     mono = '3D3D45', coche = '1F7A35', orange = 'E0800D', rouge = 'D12E2E', ambre = 'A86200', blanc = 'FFFFFF',
     fondContenu = 'FFFFFF', fondVolet = 'F2F2F2', fondDroite = 'ECECEC',
     filetVolet = 'D2D2D2', filetDroite = 'C9C9C9', filetEntete = 'E2E2E2', filetBarre = 'EBEBEB',
     fondPanneau = 'FFFFFF', bordPanneau = 'C9C9C9', fondCarte = 'FAFAFA', bordCarte = 'D9D9D9',
-    fondSegment = 'FFFFFF', bordSegment = 'B5B5B5', filetSegment = 'D0D0D0', selection = 'DADADA',
+    fondSegment = 'FFFFFF', bordSegment = 'B5B5B5', filetSegment = 'D0D0D0',
     pastille = '2DA44E', contour = '8A8A8A', bleuBouton = '0A64D8', bordBleu = '0A5BC4', bleuPresse = '084A9E',
     bleuInactif = '9DBDEB', bordBleuInactif = '88AEE2',
     -- Lot B3 : le fond de l'aperçu (#2B2B2B de la maquette, celui des vignettes), le texte de
     -- l'image « aucun aperçu » (celui de la 1.2, blanc à 62 %) et le titre d'un bouton bleu inactif
     -- (blanc, sur l'image pâlie).
     fondApercu = '2B2B2B', texteApercu = '9E9E9E', titreInactif = 'FFFFFF',
+    -- (Le fond de la conversation choisie, `selection`, et le gris de son sous-titre,
+    -- `sousTitreChoisi`, sont retirés avec le volet au correctif 1.3.6 ; `fondVolet` et `filetVolet`
+    -- restent : la zone de saisie et son filet.)
 }
 
 local function cles(t)
@@ -286,8 +288,12 @@ essai('Dispositions.apparence : la valeur connue, sinon la claire ; le menu Appa
 end)
 
 essai('Dispositions.image : le chemin du jeu de l\'apparence, la claire pour une valeur inconnue', function()
-    egal('images/loupe.png', Dispositions.image('loupe', 'claire'))
-    egal('images/sombre/loupe.png', Dispositions.image('loupe', 'sombre'))
+    egal('images/trombone.png', Dispositions.image('trombone', 'claire'))
+    egal('images/sombre/trombone.png', Dispositions.image('trombone', 'sombre'))
+    -- Les images du volet, retirées avec lui (correctif 1.3.6), sont inconnues.
+    for _, nom in ipairs({ 'loupe', 'selection' }) do
+        vrai(not pcall(Dispositions.image, nom, 'claire'), nom .. ' : retirée')
+    end
     egal('images/seg-note-actif.png', Dispositions.image('seg-note-actif', 'bleue'), 'valeur inconnue')
     egal('images/panneau.png', Dispositions.image('panneau'), 'sans apparence')
     -- Chaque chemin rendu existe dans le module, pour chaque image et chaque apparence.
@@ -353,10 +359,9 @@ end
 
 -- Les textes et ce qu'ils couvrent, dans la fenêtre B : { encre, { fonds } }.
 local PAIRES = {
-    { 'texte', { 'fondContenu', 'fondVolet', 'fondDroite', 'fondPanneau', 'fondCarte', 'selection', 'fondSegment' } },
+    { 'texte', { 'fondContenu', 'fondVolet', 'fondDroite', 'fondPanneau', 'fondCarte', 'fondSegment' } },
     { 'gris', { 'fondContenu', 'fondVolet', 'fondDroite', 'fondPanneau', 'fondCarte' } },
     { 'grisEntete', { 'fondVolet', 'fondDroite', 'fondContenu' } },
-    { 'sousTitreChoisi', { 'selection' } },
     { 'bleu', { 'fondContenu', 'fondVolet', 'fondDroite', 'fondPanneau', 'fondCarte' } },
     { 'mono', { 'fondContenu', 'fondPanneau', 'fondCarte' } },
     { 'coche', { 'fondContenu', 'fondPanneau', 'fondCarte' } },
@@ -383,9 +388,10 @@ essai('Palette sombre : chaque texte se lit au moins aussi bien qu\'en claire, �
             nombre = nombre + 1
         end
     end
-    vrai(nombre >= 40, 'les paires vérifiées')
-    -- Les fonds suivent ceux de macOS en sombre : le contenu le plus foncé, puis le volet, puis la
-    -- colonne droite, dans l'ordre inverse de la claire (blanc, puis #F2F2F2, puis #ECECEC).
+    vrai(nombre >= 38, 'les paires vérifiées')
+    -- Les fonds suivent ceux de macOS en sombre : le contenu le plus foncé, puis la saisie (le fond de
+    -- l'ancien volet), puis la colonne droite, dans l'ordre inverse de la claire (blanc, puis
+    -- #F2F2F2, puis #ECECEC).
     vrai(luminance(claire.fondContenu) > luminance(claire.fondVolet)
         and luminance(claire.fondVolet) > luminance(claire.fondDroite), 'fonds clairs')
     vrai(luminance(sombre.fondContenu) < luminance(sombre.fondVolet)
@@ -439,9 +445,11 @@ essai('images/ et images/sombre/ : chaque image de Dispositions.IMAGES dans les 
         nombre = nombre + 1
     end
     vrai(nombre >= 30, 'les 30 images au moins (33 avant le correctif 1.3.2)')
-    -- Les images retirées avec la rangée des passes et la ligne du plafond ne restent dans aucun jeu.
+    -- Les images retirées avec la rangée des passes et la ligne du plafond (correctif 1.3.2), avec
+    -- l'onglet Leçon et avec le volet (correctif 1.3.6) ne restent dans aucun jeu.
     for _, a in ipairs(Dispositions.APPARENCES) do
-        for _, nom in ipairs({ 'coche-10', 'chevron-passe', 'avertissement' }) do
+        for _, nom in ipairs({ 'coche-10', 'chevron-passe', 'avertissement', 'seg-lecon', 'seg-lecon-actif', 'carte-lecon', 'loupe',
+            'selection' }) do
             local f = io.open(S.plugin .. '/' .. a.dossier .. '/' .. nom .. '.png', 'rb')
             if f then
                 f:close()
@@ -479,8 +487,8 @@ essai('Le contrôle des images refuse un fichier qui n\'est pas un PNG, un PNG e
     vrai(controler(fabriquerPng(S.home .. '/sans-phys.png', 20, 20), 10, 10):find('pHYs', 1, true), 'un PNG sans pHYs')
     -- Une image en 1x de 20 × 20 points : la moitié des pixels attendus.
     vrai(controler(S.home .. '/2x.png', 20, 20):find('attendu 40', 1, true), 'un PNG en 1x de cette taille')
-    vrai(controler(DOSSIER .. '/loupe.png', IMAGES.loupe.largeur * 2, IMAGES.loupe.hauteur * 2):find('attendu', 1, true),
-        'une autre taille')
+    vrai(controler(DOSSIER .. '/chevron-haut.png', IMAGES['chevron-haut'].largeur * 2, IMAGES['chevron-haut'].hauteur * 2)
+        :find('attendu', 1, true), 'une autre taille')
 end)
 
 -- Les fichiers d'un dossier de jeu : chaque PNG est une image de Dispositions.IMAGES, ou l'image
@@ -579,7 +587,7 @@ essai('scripts/gabarits.lua : les images, les deux apparences et l\'image « auc
     end
     -- Dispositions.gabarits rend des tables neuves : le JSON ne touche pas les tables du module.
     local g = Dispositions.gabarits()
-    vrai(g.images.loupe ~= IMAGES.loupe and g.apparences.sombre.couleurs ~= Dispositions.PALETTES.sombre, 'tables neuves')
+    vrai(g.images.trombone ~= IMAGES.trombone and g.apparences.sombre.couleurs ~= Dispositions.PALETTES.sombre, 'tables neuves')
 end)
 
 -- scripts/images-fenetre.swift lancé par l'usage documenté (gabarits.lua sur son entrée), mais vers
@@ -681,11 +689,12 @@ essai('scripts/images-vides.swift : l\'image « aucun aperçu » dans chaque jeu
     end
 end)
 
--- Des gabarits d'essai en JSON, tirés de ceux du module (Dispositions.gabarits) réduits à la seule
--- loupe, puis changés par `changer(g)`, sur l'entrée du script.
+-- Des gabarits d'essai en JSON, tirés de ceux du module (Dispositions.gabarits) réduits au seul
+-- chevron du haut (la loupe jusqu'au correctif 1.3.6), puis changés par `changer(g)`, sur l'entrée
+-- du script.
 local function gabaritsEssai(changer)
     local g = Dispositions.gabarits()
-    g.images = { loupe = { largeur = 12, hauteur = 12 } }
+    g.images = { ['chevron-haut'] = { largeur = 12, hauteur = 12 } }
     if changer then
         changer(g)
     end
@@ -697,7 +706,7 @@ essai('scripts/images-fenetre.swift : refuse sans rien écrire un nom sans dessi
     local function json(texte)
         return "printf '%s' " .. S.q(texte)
     end
-    -- Chaque refus vient avant toute écriture : la loupe, connue et bien taillée, n'est écrite dans
+    -- Chaque refus vient avant toute écriture : le chevron, connu et bien taillé, n'est écrit dans
     -- aucun jeu, et le dossier du module n'est pas créé.
     local cas = {
         { gabaritsEssai(function(g) g.images.inconnue = { largeur = 12, hauteur = 12 } end),
@@ -721,9 +730,9 @@ essai('scripts/images-fenetre.swift : refuse sans rien écrire un nom sans dessi
         { gabaritsEssai(function(g) g.apparences.sombre.dossier = 'images' end),
             'dossier « images » commun aux apparences claire et sombre' },
         { gabaritsEssai(function(g) g.apparences = { vide = true } end), 'gabarits illisibles' },
-        { json('{"images":{"loupe":{"largeur":12,"hauteur":12}},"apparences":{}}'), 'aucune apparence' },
+        { json('{"images":{"chevron-haut":{"largeur":12,"hauteur":12}},"apparences":{}}'), 'aucune apparence' },
         -- L'ancien format (les tailles seules) n'est plus lu.
-        { json('{"loupe":{"largeur":12,"hauteur":12}}'), 'gabarits illisibles' },
+        { json('{"chevron-haut":{"largeur":12,"hauteur":12}}'), 'gabarits illisibles' },
         { "printf ''", "rien sur l'entrée standard" },
         { json('pas du JSON'), 'gabarits illisibles' },
     }
@@ -735,11 +744,11 @@ essai('scripts/images-fenetre.swift : refuse sans rien écrire un nom sans dessi
         vrai(not S.executer('test -e ' .. S.q(module)), c[2] .. ' : rien d\'écrit')
     end
     -- Les gabarits d'essai, sans changement, se dessinent : les refus viennent bien des changements.
-    local module = S.home .. '/module-loupe'
+    local module = S.home .. '/module-chevron'
     local code, sortie = produire(gabaritsEssai(), module)
     egal(0, code, 'gabarits d\'essai : ' .. sortie)
     for apparence, dossier in pairs(JEUX) do
-        vrai(controler(module .. '/' .. dossier .. '/loupe.png', 12, 12) == nil, apparence .. ' : loupe écrite')
+        vrai(controler(module .. '/' .. dossier .. '/chevron-haut.png', 12, 12) == nil, apparence .. ' : chevron écrit')
     end
 end)
 

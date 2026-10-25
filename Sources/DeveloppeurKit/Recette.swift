@@ -365,9 +365,9 @@ public final class Recette {
             return detail
         }
         try etapeBilan(id, photo, attendu: auto)
-        // 1.3 (Recette+13.swift) : l'avant/après d'une étape, la leçon de la photo, le carnet de
-        // progrès ; chacun revient à l'état de la tonalité automatique.
-        try sequenceApprendre(id, photo, depart: depart, attendu: auto)
+        // 1.3 (Recette+13.swift) : l'avant/après d'une étape, le carnet de progrès ; chacun revient à
+        // l'état de la tonalité automatique.
+        try sequenceApprendre(id, photo, attendu: auto)
         try etape(photo, "mesure d'angle") {
             let (info, _) = try appel("measure_angle", ["photo_id": .number(Double(id)), "x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5])
             try verifier(info["crop_angle"]?.double != nil, "pas d'angle proposé")
@@ -565,8 +565,6 @@ public final class Recette {
         try sequenceTri(id, photo)
         try sequenceLivraison(id, photo)
         try sequenceVariantes(id, photo)
-        // 1.3 : « Je le fais » (Recette+13.swift), après les variantes, qui effacent toutes celles de Claude.
-        try sequenceJeLeFais(id, photo)
         try sequenceHDR(id, photo)
         try sequenceLivraison25(id, photo)
         try sequenceRetoucheMasques(id, photo)

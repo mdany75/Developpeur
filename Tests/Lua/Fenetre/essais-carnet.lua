@@ -1,12 +1,14 @@
--- essais-carnet.lua : la page Carnet de progrès de la fenêtre Claude (1.3, lot 16), hors de
--- Lightroom (LuaJIT, Lightroom simulé par Simulation.lua) : l'entrée en tête de la liste des
--- conversations, la page dans la grille du fil (Fil.lignesCarnet : genres existants, tableau mono
--- aligné par des espaces, tendances, à travailler, ligne d'action), son ouverture et son retour au
--- fil, les gardes (Renommer…, Supprimer…), la boucle qui suit Carnet.version, la fenêtre des
--- photos d'un défaut (leçons, « Retirer du carnet… » par appel direct), « Demander à Claude ce
--- qu'il en pense » de bout en bout par relais.sh et faux-claude.sh, Accepter et Je le fais qui
--- quittent la page, et la puce Carnet des consignes. Le registre est le vrai (Carnet.lua), rangé
--- dans un dossier personnel temporaire ; ni Claude, ni quota.
+-- essais-carnet.lua : le carnet de progrès dans la fenêtre Claude, hors de Lightroom (LuaJIT,
+-- Lightroom simulé par Simulation.lua) : l'onglet Suivi (correctif 1.3.6, à la place de Leçon ; la
+-- page Carnet de progrès du fil, son entrée dans la liste des conversations et sa ligne « Demander
+-- à Claude ce qu'il en pense › » sont retirées avec le volet) : le texte de sa carte
+-- (Fil.texteSuivi : note, défauts mois par mois, tendances, à travailler ; coupé à la largeur de la
+-- carte en 12, chaque caractère mesuré), l'onglet ouvert seulement par un clic (jamais une bascule,
+-- source comprise), le résumé lu dans une tâche, la boucle qui suit Carnet.version tant que
+-- l'onglet est montré, « Photos d'un défaut… » et la fenêtre des photos d'un défaut (leurs
+-- constats seulement, plus les leçons d'avant le correctif 1.3.6 ; « Retirer du carnet… » par appel
+-- direct), et la puce Carnet des consignes. Le registre est le vrai (Carnet.lua), rangé dans un
+-- dossier personnel temporaire ; ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
 local S = require 'Simulation'
@@ -113,7 +115,6 @@ Notation.proposition = function() return nil end
 local Fenetre = require 'Fenetre'
 local Moteur = require 'Moteur'
 local prefs = Chemins.prefs()
-prefs.propositionAOuverture = false
 prefs.nouvelleParPhoto = false
 
 -- Complément de la simulation, pour cet essai : le chemin du catalogue ouvert (le carnet range
@@ -121,27 +122,15 @@ prefs.nouvelleParPhoto = false
 local CATALOGUE = '/Users/test/Images/Catalogue.lrcat'
 S.catalogue.getPath = function() return CATALOGUE end
 
--- Le faux Claude Code dès le départ (une demande partie par erreur ne lance jamais le vrai), et
--- une petite image JPEG (en base64) pour son résultat d'outil (cas par défaut).
+-- Le faux Claude Code dès le départ (une demande partie par erreur ne lance jamais le vrai).
 local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(.*/)') or '.') .. ' && pwd -P'):gsub('%s+$', '')
 prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
 prefs.cheminConnecteur = '/bin/echo'
-local imageB64 = S.home .. '/image.b64'
-S.executer('/usr/bin/sips -s format jpeg -z 60 90 ' .. S.q(S.plugin .. '/' .. require('Dispositions').imageVide('claire')) .. ' --out ' .. S.q(S.home .. '/image.jpg') .. ' >/dev/null 2>&1')
-S.executer('/usr/bin/base64 -i ' .. S.q(S.home .. '/image.jpg') .. ' -o ' .. S.q(imageB64))
-local env = 'FAUX_IMAGE_B64=' .. S.q(imageB64) .. ' '
-local executerOriginal = S.modules.LrTasks.execute
-S.modules.LrTasks.execute = function(commande)
-    if commande:find('relais.sh', 1, true) then
-        commande = env .. commande
-    end
-    return executerOriginal(commande)
-end
 
--- La largeur du texte du fil (Fenetre.largeurTexte : D.texteFil dans la fenêtre B, après la colonne
--- auteur), et celle qu'une ligne ne dépasse jamais, son retrait compris (Fil.occupe).
+-- La largeur du texte de la carte Suivi (D.largeurSuivi, à l'intérieur de la carte), et celle
+-- qu'une ligne ne dépasse jamais (Fenetre.lignesCarte la coupe à sa marge près).
 local D = Dispositions.dimensions()
-local LARGEUR = D.texteFil
+local LARGEUR = D.largeurSuivi
 local LARGEUR_LIGNE = LARGEUR - Fil.MARGE
 
 local function photoActive(id, nom)
@@ -165,29 +154,15 @@ local function ouvrirFenetre(fn)
     end
 end
 
--- Un clic dans la liste des conversations, une grille de cases dans la fenêtre B (lot B3) : sur la
--- case de cette valeur (l'id d'une conversation, Fenetre.CARNET, ou un en-tête « §… » : la case de
--- son jour), par son calque, comme Dany (S.cliquer, puis Fenetre.cliquerListe). Rend ce que rend le
--- clic.
-local function choisir(valeur)
-    Fenetre.rafraichirListe()
-    for k, case in ipairs(Fenetre.cases or {}) do
-        if case.value == valeur then
-            for _, v in ipairs(S.vues(S.fenetre.contents)) do
-                local t = v.args.tooltip
-                if v.genre == 'static_text' and type(t) == 'table' and t.key == 'li' .. k and Fenetre.parCalque(v.args.mouse_down) then
-                    return S.cliquer(v)
-                end
-            end
-            error('calque introuvable pour la case ' .. k, 2)
+-- Un clic sur un segment des onglets (son calque, dont l'infobulle est le titre de l'onglet), comme
+-- Dany (S.cliquer, puis Fenetre.choisirSegment).
+local function segment(titre)
+    for _, v in ipairs(S.vues(S.fenetre.contents)) do
+        if v.genre == 'static_text' and v.args.tooltip == titre and Fenetre.parCalque(v.args.mouse_down) then
+            return S.cliquer(v)
         end
     end
-    error('case introuvable dans la liste : ' .. tostring(valeur), 2)
-end
-
--- La valeur de la case choisie de la liste (son fond de sélection).
-local function choix()
-    return Fenetre.choixListe()
+    error('segment introuvable : ' .. titre, 2)
 end
 
 -- Un tour de la boucle de la fenêtre (Fenetre.boucle), sans attendre : la pause de la fin du tour
@@ -202,11 +177,12 @@ local function unTourDeBoucle()
     vrai(ok, erreur)
 end
 
--- Une conversation qui a des messages, en tête de la liste.
+-- Une conversation qui a des messages, en tête de la liste (son titre posé comme un titre choisi
+-- d'avant le correctif 1.3.6 : plus de Renommer…).
 local function conversation(titre)
     local c = Conversation.nouvelle()
     Conversation.ajouterDemande(c, titre)
-    Conversation.renommer(c, titre)
+    c.titre, c.titreChoisi = titre, true
     table.insert(Moteur.conversations, 1, c)
     return c
 end
@@ -266,7 +242,7 @@ local function entree(id, prise, cherches, trouves, plus)
         defauts[#defauts + 1] = { code = code, mesure = c.mesure, texte = c.texte }
     end
     local e = { photo = id, uuid = 'uuid-' .. id, fichier = string.format('DSCF%04d.RAF', id), prise = prise, le = id,
-        vue = { le = id, photo = id, cherches = cherches, defauts = defauts }, lecons = {} }
+        vue = { le = id, photo = id, cherches = cherches, defauts = defauts } }
     for cle, valeur in pairs(plus or {}) do
         e[cle] = valeur
     end
@@ -284,7 +260,8 @@ local function fabriquer(entrees)
     Carnet.oublier()
 end
 
--- La leçon rangée avec la photo 1024 (axes du module : lumiere, couleur, composition).
+-- La leçon rangée avec la photo 1024 avant le correctif 1.3.6 (axes du module : lumiere, couleur,
+-- composition), qui reste dans carnet.json sans plus être montrée.
 local LECON_1024 = { photo = 1024, uuid = 'uuid-1024', fichier = 'DSCF1024.RAF', le = 5, defauts = {}, indices = {}, points = {
     { axe = 'lumiere', manque = "Ciel brûlé à 4 %.", prise_de_vue = "Exposer pour le ciel." },
     { axe = 'couleur', prise_de_vue = "Balance des blancs juste : à refaire." },
@@ -295,7 +272,7 @@ local LECON_1024 = { photo = 1024, uuid = 'uuid-1024', fichier = 'DSCF1024.RAF',
 -- progresse), le ciel brûlé revient (3 sur 6 récentes, aucune avant : il recule, et il est à
 -- travailler) ; une mise au point manquée seule, cinq mois plus tôt ; une ligne penchée (angle)
 -- avant et une ce mois-ci (sans tendance) ; la photo 1025 mesurée sur sa copie virtuelle (5025) ;
--- une leçon pour 1024.
+-- une leçon d'avant pour 1024.
 local function fabriquerType()
     local entrees = {
         entree(1001, moisIl(5), { 'horizon_penche', 'sous_exposition', 'ciel_brule', 'flou', 'bruit', 'mise_au_point' }, { 'mise_au_point' }),
@@ -318,73 +295,47 @@ local function fabriquerType()
     fabriquer(entrees)
 end
 
--- Chaque ligne tient dans la largeur, avec un genre et une icône que la fenêtre connaît, et sans
--- élément de conversation.
-local function verifierLignes(lignes)
-    local genres, icones = {}, {}
-    for _, s in ipairs(Fenetre.STYLES) do
-        for g in pairs(s.genres) do
-            genres[g] = true
-        end
-    end
-    for _, ic in ipairs(Fenetre.ICONES) do
-        icones[ic.cle] = true
-    end
+-- Les lignes de la carte Suivi pour ce texte, coupées comme la fenêtre les coupe (Fenetre.lignesCarte,
+-- en 12, l'emphase en gras 12) : chacune dans la largeur de la carte, ses balises fermées, chaque
+-- caractère mesuré dans les deux polices (Metriques ; pas de barres ▁…█, U+2581 à U+2588 : il
+-- faudrait remesurer les polices).
+local function lignesDeLaCarte(texte)
+    local lignes = Fenetre.lignesCarte(texte, LARGEUR, 'texte12', 'gras12')
     for _, l in ipairs(lignes) do
-        vrai(genres[l.genre] and Fil.polices[l.genre], 'genre inconnu de la fenêtre : ' .. tostring(l.genre))
-        vrai(l.icone == nil or icones[l.icone], 'icône inconnue de la fenêtre : ' .. tostring(l.icone))
-        vrai(Fil.occupe(l) <= LARGEUR_LIGNE, string.format('hors de la largeur (%.0f pour %d) : %s', Fil.occupe(l), LARGEUR_LIGNE, l.texte))
-        egal(nil, l.element, "une ligne de la page n'est pas d'une conversation")
-        egal(nil, l.auteur, "pas d'auteur sur la page")
-        -- Pas de barres ▁…█ (U+2581 à U+2588) : il faudrait remesurer les polices.
-        for c in Texte.caracteres(l.texte) do
-            vrai(not (c >= '\226\150\129' and c <= '\226\150\136' and #c == 3), 'barre dans la page : ' .. l.texte)
+        local largeur = Fil.largeur(l, 'texte12', 'gras12')
+        vrai(largeur <= LARGEUR_LIGNE, string.format('hors de la carte (%.0f pour %d) : %s', largeur, LARGEUR_LIGNE, l))
+        local ouverte = false
+        for fin in l:gmatch('<(/?)EM>') do
+            vrai(ouverte == (fin == '/'), 'balise mal fermée : ' .. l)
+            ouverte = fin == ''
+        end
+        vrai(not ouverte, 'balise ouverte en fin de ligne : ' .. l)
+        for c in Texte.caracteres(Fil.sansBalises(l)) do
+            vrai(Metriques.texte12.chasse[c] and Metriques.gras12.chasse[c], 'caractère non mesuré : ' .. c)
+            vrai(not (c >= '\226\150\129' and c <= '\226\150\136' and #c == 3), 'barre dans la carte : ' .. l)
         end
     end
+    return lignes
 end
 
--- Les rangées du tableau (lignes `outil`) : même largeur mesurée dans la police mono, chaque
--- caractère mesuré (Metriques.mono), l'en-tête sans défaut, les autres avec le leur.
-local function rangees(lignes)
+-- La ligne d'un défaut dans le texte de la carte (« <EM>libellé</EM> · mois n/sur · … »), et ses
+-- cellules, sans les mois (« 0/1 2/2 … », « — » sans photo où il a été cherché).
+local function ligneDefaut(texte, libelle)
+    for ligne in (texte .. '\n'):gmatch('([^\n]*)\n') do
+        if ligne:sub(1, #('<EM>' .. libelle .. '</EM>')) == '<EM>' .. libelle .. '</EM>' then
+            return ligne
+        end
+    end
+    error('ligne du défaut introuvable : ' .. libelle, 2)
+end
+
+local function cellules(ligne)
+    ligne = ligne:match('</EM>(.*)$') or ligne
     local liste = {}
-    for _, l in ipairs(lignes) do
-        if l.genre == 'outil' then
-            liste[#liste + 1] = l
-        end
-    end
-    vrai(#liste >= 2, 'un en-tête et des rangées')
-    local largeur = Fil.largeur(liste[1].texte, 'mono')
-    for i, l in ipairs(liste) do
-        egal(largeur, Fil.largeur(l.texte, 'mono'), 'rangée alignée : ' .. l.texte)
-        egal(Texte.longueur(liste[1].texte), Texte.longueur(l.texte), 'même nombre de caractères : ' .. l.texte)
-        for c in Texte.caracteres(l.texte) do
-            vrai(Metriques.mono.chasse[c], 'caractère non mesuré dans la police mono : ' .. c)
-        end
-        if i == 1 then
-            egal(nil, l.defaut, "l'en-tête ne s'ouvre pas")
-        else
-            vrai(type(l.defaut) == 'string', 'rangée sans défaut : ' .. l.texte)
-        end
-    end
-    return liste
-end
-
-local function rangeeDe(liste, code)
-    for _, l in ipairs(liste) do
-        if l.defaut == code then
-            return l
-        end
-    end
-    error('rangée introuvable : ' .. code, 2)
-end
-
--- Les cellules d'une rangée, sans le libellé (colonnes séparées par Fil.ECART_COLONNES espaces).
-local function cellules(texte)
-    local reste = texte:match('^.-%s%s%s+(.*)$') or ''
-    local liste = {}
-    for c in reste:gmatch('%S+') do
+    for c in ligne:gmatch(' (%S+) ·') do
         liste[#liste + 1] = c
     end
+    liste[#liste + 1] = ligne:match(' (%S+)$')
     return table.concat(liste, ' ')
 end
 
@@ -397,477 +348,388 @@ local function indiceDe(lignes, test)
     return nil
 end
 
+-- Les lignes d'un texte.
+local function lignesDe(texte)
+    local r = {}
+    for ligne in (texte .. '\n'):gmatch('([^\n]*)\n') do
+        r[#r + 1] = ligne
+    end
+    return r
+end
+
 Moteur.charger()
 
--- Liste des conversations --------------------------------------------------------------------------
+-- Plus de page du carnet dans le fil ------------------------------------------------------------
 
-essai("Liste : l'entrée « Carnet de progrès » en tête (table neuve) ; la recherche la trouve ou l'écarte", function()
-    local lac = conversation('Lac au matin')
-    Moteur.courante = lac
-    local items = Fenetre.elementsListe('')
-    S.neuve(items, 'liste')
-    egal(Fenetre.CARNET, items[1].value)
-    egal('Carnet de progrès', items[1].title)
+essai("Plus de page Carnet de progrès dans le fil, ni d'entrée dans une liste, ni « Demander à Claude ce qu'il en pense › » (correctif 1.3.6)", function()
+    for _, nom in ipairs({ 'vue', 'CARNET', 'SOUS_TITRE_CARNET', 'CHOISIR_CONVERSATION', 'ouvrirCarnet', 'quitterCarnet', 'lireCarnet',
+        'revenirAuFil', 'demanderCarnet', 'TITRE_DEMANDE_CARNET', 'elementsListe', 'casesListe', 'rafraichirListe', 'choixListe',
+        'cliquerListe', 'choisirDansListe', 'renommer', 'supprimer', 'pageCarnet' }) do
+        egal(nil, Fenetre[nom], 'Fenetre.' .. nom .. ' retiré')
+    end
+    for _, nom in ipairs({ 'lignesCarnet', 'lignesCarnetBrutes', 'tableauCarnet', 'DEMANDER_CARNET', 'AIDE_TABLEAU_CARNET' }) do
+        egal(nil, Fil[nom], 'Fil.' .. nom .. ' retiré')
+    end
+    egal(nil, Consignes.carnet, 'la demande de sa ligne d\'action, retirée avec elle')
+    egal(nil, Fenetre.clics.carnet, 'plus de clic du carnet dans le fil')
+    -- Une ligne qui porterait un défaut ou une action (comme celles de la page) n'est qu'une ligne.
+    egal(nil, Fenetre.sorteDeClic({ genre = 'outil', texte = 'x', defaut = 'flou' }, nil))
+    egal(nil, Fenetre.sorteDeClic({ genre = 'apercu', texte = 'y', action = 'demander' }, nil))
     egal(Carnet.TITRES.carnet, Fenetre.TITRE_CARNET, 'le titre du registre, seule copie')
-    vrai(Fenetre.CARNET:sub(1, #'§') ~= '§', "pas la marque d'un en-tête")
-    egal(lac.id, items[3].value, 'puis les en-têtes et les conversations')
-    egal(1, #(function()
-        local n = {}
-        for _, x in ipairs(items) do
-            if x.value == Fenetre.CARNET then
-                n[#n + 1] = x
-            end
-        end
-        return n
-    end)(), 'une seule fois')
-    egal(Fenetre.CARNET, Fenetre.elementsListe('carnet')[1].value)
-    egal(Fenetre.CARNET, Fenetre.elementsListe('PROGRES')[1].value, 'sans casse ni accent')
-    local surLac = Fenetre.elementsListe('lac')
-    vrai(surLac[1].value ~= Fenetre.CARNET, 'une recherche sans rapport l\'écarte')
-    egal(0, #Fenetre.elementsListe('zzzz'))
 end)
 
--- Fil.lignesCarnet --------------------------------------------------------------------------------
+-- Fil.texteSuivi ---------------------------------------------------------------------------------
 
-essai('Fil.lignesCarnet : titre, note, tableau mono aligné, tendances, à travailler, ligne d\'action ; genres existants', function()
+essai('Fil.texteSuivi : note, défauts mois par mois (libellés en gras), tendances, à travailler ; chaque ligne dans la carte en 12', function()
     fabriquerType()
     local page = Carnet.resumer(os.time())
     egal(6, #page.mois)
-    local lignes = Fil.lignesCarnet(page, LARGEUR, Fenetre.TITRE_CARNET)
-    verifierLignes(lignes)
-    egal('titre', lignes[1].genre)
-    egal('Carnet de progrès', lignes[1].texte)
-    egal('note', lignes[2].genre)
-    egal('note', lignes[2].icone)
-    contient(lignes[2].texte, 'Défauts de la prise de vue mesurés par Claude sur 13 photos')
-    -- Le tableau : l'en-tête, puis une rangée par défaut cherché, dans l'ordre du vocabulaire.
-    local tableau = rangees(lignes)
-    egal(1 + #page.defauts, #tableau)
-    local codes = {}
-    for i = 2, #tableau do
-        codes[#codes + 1] = tableau[i].defaut
+    egal(13, page.photos)
+    local texte = Fil.texteSuivi(page)
+    local lignes = lignesDe(texte)
+    contient(lignes[1], 'Défauts de la prise de vue mesurés par Claude sur 13 photos')
+    egal('', lignes[2])
+    egal('<EM>' .. Fil.MOIS_PAR_MOIS .. '</EM>', lignes[3])
+    -- Un défaut par ligne, dans l'ordre du vocabulaire, son libellé en gras, puis ses mois.
+    local ordre = {}
+    for i = 4, 3 + #page.defauts do
+        ordre[#ordre + 1] = lignes[i]:match('^<EM>(.-)</EM>')
     end
-    egal('horizon_penche sous_exposition ciel_brule bruit flou mise_au_point', table.concat(codes, ' '))
-    vrai(tableau[1].texte:sub(1, #'Défaut') == 'Défaut', tableau[1].texte)
+    egal("Horizon ou ligne penchée|Photo sous-exposée|Ciel ou haut de l'image brûlé|Bruit fort (ISO élevé)|Photo floue ou bougée|"
+        .. "Mise au point à côté", table.concat(ordre, '|'))
     for _, m in ipairs(page.mois) do
-        contient(tableau[1].texte, m.court, 'en-tête des mois')
+        contient(lignes[4], ' · ' .. m.court .. ' ', 'les mois abrégés')
     end
     -- « n/sur » par mois, « — » quand le défaut n'y a pas été cherché.
-    egal('0/1 2/2 1/2 1/2 0/3 0/3', cellules(rangeeDe(tableau, 'flou').texte), 'flou')
-    egal('1/1 — — — — —', cellules(rangeeDe(tableau, 'mise_au_point').texte), 'mise au point')
-    egal('0/1 0/2 1/2 0/2 0/3 1/3', cellules(rangeeDe(tableau, 'horizon_penche').texte), 'ligne penchée (angle)')
+    egal('0/1 2/2 1/2 1/2 0/3 0/3', cellules(ligneDefaut(texte, 'Photo floue ou bougée')), 'flou')
+    egal('1/1 — — — — —', cellules(ligneDefaut(texte, 'Mise au point à côté')), 'mise au point')
+    egal('0/1 0/2 1/2 0/2 0/3 1/3', cellules(ligneDefaut(texte, 'Horizon ou ligne penchée')), 'ligne penchée (angle)')
+    egal('0/1 0/2 0/2 0/2 1/3 2/3', cellules(ligneDefaut(texte, "Ciel ou haut de l'image brûlé")), 'ciel brûlé')
+    egal(Fil.AIDE_DEFAUTS_SUIVI, lignes[4 + #page.defauts], 'l\'aide de « Photos d\'un défaut… », sous les défauts')
+    -- Ce qui progresse, ce qui recule, à travailler : intertitres en gras et puces, phrases du résumé.
     egal(1, #page.progresse)
     egal(1, #page.recule)
-    egal('0/1 0/2 0/2 0/2 1/3 2/3', cellules(rangeeDe(tableau, 'ciel_brule').texte), 'ciel brûlé')
-    contient(rangeeDe(tableau, 'ciel_brule').texte, "Ciel ou haut de l'image brûlé")
-    local aide = indiceDe(lignes, function(l) return l.texte == Fil.AIDE_TABLEAU_CARNET end)
-    vrai(aide and lignes[aide - 1].genre == 'outil', "l'aide du tableau juste dessous")
-    -- Ce qui progresse, ce qui recule, à travailler : titres et puces du résumé, phrases reprises.
-    local progresse = indiceDe(lignes, function(l) return l.genre == 'titre' and l.texte == 'Ce qui progresse' end)
+    local progresse = indiceDe(lignes, function(l) return l == '<EM>Ce qui progresse</EM>' end)
     vrai(progresse, 'Ce qui progresse')
-    egal('claude', lignes[progresse + 1].genre)
-    egal('•  ' .. page.progresse[1].texte:sub(1, 12), lignes[progresse + 1].texte:sub(1, #'•  ' + 12))
-    local recule = indiceDe(lignes, function(l) return l.genre == 'titre' and l.texte == 'Ce qui recule' end)
+    egal('', lignes[progresse - 1], 'une ligne vide avant chaque intertitre')
+    egal('•  ' .. page.progresse[1].texte, lignes[progresse + 1])
+    local recule = indiceDe(lignes, function(l) return l == '<EM>Ce qui recule</EM>' end)
     vrai(recule and recule > progresse, 'Ce qui recule, après')
-    contient(lignes[recule + 1].texte, "Ciel ou haut de l'image brûlé")
-    local travailler = indiceDe(lignes, function(l) return l.genre == 'titre' and l.texte == 'À travailler à la prochaine sortie' end)
+    contient(lignes[recule + 1], "•  Ciel ou haut de l'image brûlé")
+    local travailler = indiceDe(lignes, function(l) return l == '<EM>À travailler à la prochaine sortie</EM>' end)
     vrai(travailler and travailler > recule, 'À travailler, ensuite')
-    contient(lignes[travailler + 1].texte, '•  ' .. "Ciel ou haut de l'image brûlé : 3 photos sur 6 (50 %)")
-    local conseil = indiceDe(lignes, function(l) return l.texte:find('À la prise de vue : Exposer pour le ciel', 1, true) ~= nil end)
-    vrai(conseil and conseil > travailler, 'le conseil sous le défaut')
-    egal('    À la prise', lignes[conseil].texte:sub(1, #'    À la prise'), 'retiré sous sa puce')
-    -- La ligne d'action, en dernier : bleue (aperçu), cliquable.
-    local derniere = lignes[#lignes]
-    egal('apercu', derniere.genre)
-    egal('demander', derniere.action)
-    egal("Demander à Claude ce qu'il en pense ›", derniere.texte)
-    egal('vide', lignes[#lignes - 1].genre)
-    -- Aucune autre ligne ne s'ouvre.
-    for _, l in ipairs(lignes) do
-        vrai(l.genre == 'outil' or l.defaut == nil, 'seules les rangées portent un défaut')
-        vrai(l == derniere or l.action == nil, "seule la ligne d'action en porte une")
-    end
-    -- Dans la grille de la fenêtre B (D.lignes lignes, au texte de D.texteFil points : lot B4), la page
-    -- tient au plus dans deux grilles (au-delà d'une, elle se lit avec ▲ ▼ : essai de la page, plus bas).
-    vrai(#lignes <= 2 * D.lignes, string.format('la page tient dans deux grilles (%d lignes pour %d)', #lignes, D.lignes))
-    -- Le tableau en Menlo, sans retrait d'icône : toute la largeur du texte du fil.
-    egal('mono', Fil.polices.outil)
-    egal(0, Fil.retrait('outil'))
+    contient(lignes[travailler + 1], '•  ' .. "Ciel ou haut de l'image brûlé : 3 photos sur 6 (50 %)")
+    egal('    À la prise de vue : Exposer pour le ciel', lignes[travailler + 2]:sub(1, #'    À la prise de vue : Exposer pour le ciel'),
+        'le conseil retiré sous sa puce')
+    -- Plus de ligne d'action, ni la leçon d'avant de 1024.
+    vrai(not texte:find('Demander à Claude', 1, true), "plus de « Demander à Claude ce qu'il en pense › »")
+    vrai(not texte:find('Horizon un peu bas', 1, true) and not texte:find('Leçon', 1, true), "rien de la leçon d'avant")
+    -- Dans la carte : chaque ligne tient, ses balises fermées, chaque caractère mesuré ; le résumé se
+    -- lit en deux pages au plus.
+    local carte = lignesDeLaCarte(texte)
+    vrai(#carte >= #lignes, 'les lignes de la carte')
+    vrai(#carte <= 2 * D.suiviLignes, string.format('deux pages au plus (%d lignes pour %d)', #carte, D.suiviLignes))
 end)
 
-essai('Fil.lignesCarnet : page vide, en lecture, en erreur ; sans tendance ; années dans l\'en-tête ; libellé trop long', function()
-    -- Vide : la note qui explique, ni tableau ni action.
+essai('Fil.texteSuivi : vide, en lecture, en erreur ; sans tendance ; années ; libellé long coupé dans la carte ; balises du registre retirées', function()
+    -- Vide : la note qui explique, ni défauts ni tendances.
     fabriquer({})
-    local vide = Fil.lignesCarnet(Carnet.resumer(os.time()), LARGEUR, Fenetre.TITRE_CARNET)
-    verifierLignes(vide)
-    egal('Carnet de progrès', vide[1].texte)
-    contient(vide[2].texte, 'Le carnet se remplit tout seul')
-    for _, l in ipairs(vide) do
-        vrai(l.genre ~= 'outil' and l.action == nil, 'ni tableau ni action : ' .. l.texte)
-    end
+    local vide = Fil.texteSuivi(Carnet.resumer(os.time()))
+    contient(vide, 'Le carnet se remplit tout seul')
+    vrai(not vide:find('<EM>', 1, true), 'ni mois par mois ni intertitres : ' .. vide)
+    lignesDeLaCarte(vide)
     -- En lecture (nil), puis en erreur.
-    local lecture = Fil.lignesCarnet(nil, LARGEUR, Fenetre.TITRE_CARNET)
-    egal(2, #lecture)
-    egal('Carnet de progrès', lecture[1].texte)
-    egal(Fil.LECTURE_CARNET, lecture[2].texte)
-    egal('cours', lecture[2].icone)
-    local erreur = Fil.lignesCarnet({ erreur = 'carnet.json illisible' }, LARGEUR, Fenetre.TITRE_CARNET)
-    egal("Le carnet de progrès ne s'est pas lu : carnet.json illisible", erreur[2].texte)
-    egal('erreur', erreur[2].icone)
-    verifierLignes(erreur)
-    -- Fait main : deux années (l'en-tête les dit), un libellé trop long, ni tendance ni défaut à
+    egal(Fil.LECTURE_CARNET, Fil.texteSuivi(nil))
+    egal("Le carnet de progrès ne s'est pas lu : carnet.json illisible", Fil.texteSuivi({ erreur = 'carnet.json illisible' }))
+    -- Fait main : deux années (les mois les disent), un libellé trop long, un libellé et une note qui
+    -- portent une balise (retirée : seules celles de la carte restent), ni tendance ni défaut à
     -- travailler (leurs phrases du résumé), une remarque.
     local long = string.rep('Défaut au libellé très long ', 3)
     local page = {
-        vide = false, photos = 3, note = 'Note du résumé.', remarque = 'Seulement 3 photos.',
+        vide = false, photos = 3, note = 'Note du <EM>résumé</EM>.', remarque = 'Seulement 3 photos.',
         titres = Carnet.TITRES,
         mois = { { cle = '2025-12', annee = 2025, numero = 12, court = 'déc.' }, { cle = '2026-01', annee = 2026, numero = 1, court = 'janv.' } },
         defauts = {
-            { code = 'flou', libelle = 'Photo floue ou bougée', par_mois = { { n = 1, sur = 2 }, { n = 0, sur = 1 } } },
+            { code = 'flou', libelle = 'Photo <EM>floue</EM> ou bougée', par_mois = { { n = 1, sur = 2 }, { n = 0, sur = 1 } } },
             { code = 'long', libelle = long, par_mois = { { n = 0, sur = 0 }, { n = 12, sur = 13 } } },
         },
         progresse = {}, recule = {}, a_travailler = {},
         aucune_tendance = 'Pas encore de tendance.', rien_a_travailler = 'Rien ne revient.',
     }
-    local lignes = Fil.lignesCarnet(page, LARGEUR, Fenetre.TITRE_CARNET)
-    verifierLignes(lignes)
-    egal('Seulement 3 photos.', lignes[3].texte)
-    local tableau = rangees(lignes)
-    contient(tableau[1].texte, 'déc. 2025')
-    contient(tableau[1].texte, 'janv. 2026')
-    local rangeeLongue = rangeeDe(tableau, 'long')
-    egal(Fil.LIBELLE_CARNET_MAX, Texte.longueur(rangeeLongue.texte:match('^(.-…)')), 'libellé coupé à la colonne')
-    egal('— 12/13', cellules(rangeeLongue.texte))
-    local progresse = indiceDe(lignes, function(l) return l.texte == 'Ce qui progresse' end)
-    egal('Pas encore de tendance.', lignes[progresse + 1].texte)
-    egal('note', lignes[progresse + 1].genre)
-    vrai(not indiceDe(lignes, function(l) return l.texte == 'Ce qui recule' end), 'pas de « Ce qui recule » vide')
-    local travailler = indiceDe(lignes, function(l) return l.texte == 'À travailler à la prochaine sortie' end)
-    egal('Rien ne revient.', lignes[travailler + 1].texte)
+    local texte = Fil.texteSuivi(page)
+    local lignes = lignesDe(texte)
+    egal('Note du résumé.', lignes[1])
+    egal('Seulement 3 photos.', lignes[2])
+    egal('<EM>Photo floue ou bougée</EM> · déc. 2025 1/2 · janv. 2026 0/1', lignes[5])
+    local libelle = Texte.nettoyer(long)
+    egal('<EM>' .. libelle .. '</EM> · déc. 2025 — · janv. 2026 12/13', lignes[6])
+    -- Le libellé long se coupe dans la carte, sa balise fermée et rouverte d'une ligne à l'autre.
+    local carte = lignesDeLaCarte(texte)
+    local debut = indiceDe(carte, function(l) return l:find('Défaut au libellé', 1, true) ~= nil end)
+    vrai(debut and carte[debut + 1]:sub(1, 4) == '<EM>', 'coupé sur deux lignes, en gras : ' .. tostring(carte[debut + 1]))
+    local progresse = indiceDe(lignes, function(l) return l == '<EM>Ce qui progresse</EM>' end)
+    egal('Pas encore de tendance.', lignes[progresse + 1])
+    vrai(not indiceDe(lignes, function(l) return l == '<EM>Ce qui recule</EM>' end), 'pas de « Ce qui recule » vide')
+    local travailler = indiceDe(lignes, function(l) return l == '<EM>À travailler à la prochaine sortie</EM>' end)
+    egal('Rien ne revient.', lignes[travailler + 1])
     -- Ce qui recule seul : sans « Ce qui progresse » vide au-dessus.
     page.recule = { { code = 'flou', texte = 'Photo floue ou bougée : 0 % puis 40 %.' } }
-    local seul = Fil.lignesCarnet(page, LARGEUR, Fenetre.TITRE_CARNET)
-    vrai(not indiceDe(seul, function(l) return l.texte == 'Ce qui progresse' end), 'pas de « Ce qui progresse » vide')
-    local recule = indiceDe(seul, function(l) return l.texte == 'Ce qui recule' end)
-    egal('•  Photo floue ou bougée : 0 % puis 40 %.', seul[recule + 1].texte)
+    local seul = lignesDe(Fil.texteSuivi(page))
+    vrai(not indiceDe(seul, function(l) return l == '<EM>Ce qui progresse</EM>' end), 'pas de « Ce qui progresse » vide')
+    local recule = indiceDe(seul, function(l) return l == '<EM>Ce qui recule</EM>' end)
+    egal('•  Photo floue ou bougée : 0 % puis 40 %.', seul[recule + 1])
 end)
 
--- La page dans la fenêtre --------------------------------------------------------------------------
+-- L'onglet Suivi dans la fenêtre -----------------------------------------------------------------
 
-essai('Page : choisie dans la liste, titre « Carnet de progrès », lue dans une tâche, lignes du résumé ; ▲ ▼ ; la conversation courante ramène au fil', function()
+essai("Onglet Suivi : le dernier segment, ouvert seulement par un clic (jamais une bascule, source comprise) ; le résumé lu dans une tâche, la carte page par page", function()
+    local ordre = {}
+    for _, o in ipairs(D.onglets) do
+        ordre[#ordre + 1] = o.valeur
+    end
+    egal('apercu focus proposition notation suivi', table.concat(ordre, ' '), 'Suivi à la place de Leçon, en dernier')
+    egal('suivi', D.ongletSuivi)
+    egal('Suivi', D.onglets[5].titre)
+    egal('seg-suivi', D.onglets[5].image)
+    -- Aucun onglet où la fenêtre bascule d'elle-même n'est Suivi.
+    for _, cle in ipairs({ 'ongletParDefaut', 'ongletProposition', 'ongletNotation', 'ongletEtape', 'ongletFocus' }) do
+        vrai(D[cle] ~= 'suivi', cle .. ' : jamais Suivi')
+    end
+    -- Ni Fenetre.lua ni aucun autre fichier du module ne le choisissent d'eux-mêmes.
+    for _, nom in ipairs({ 'Fenetre.lua', 'Vues.lua', 'Dispositions.lua', 'Moteur.lua', 'Conversation.lua', 'Carnet.lua' }) do
+        local source = assert(Fichiers.lire(S.plugin .. '/' .. nom), nom)
+        for _, morceau in ipairs({ 'choisirOnglet(T.ongletSuivi', 'choisirOnglet(Fenetre.T.ongletSuivi', "choisirOnglet('suivi'",
+            'p.onglet = T.ongletSuivi', "p.onglet = 'suivi'" }) do
+            vrai(not source:find(morceau, 1, true), nom .. ' : ' .. morceau)
+        end
+    end
     fabriquerType()
     photoActive(53636309, 'DSCF4961.RAF')
-    local lac = conversation('Lac au matin')
-    Moteur.courante = lac
-    ouvrirFenetre(function(p)
-        Fenetre.rafraichir()
-        egal('Lac au matin', p.titre)
-        local montree = Fenetre.conversationAffichee
-        egal(lac, montree)
-        egal(lac.id, choix())
+    Moteur.courante = conversation('Lac au matin')
+    local choisis = {}
+    local choisir = Fenetre.choisirOnglet
+    Fenetre.choisirOnglet = function(valeur)
+        choisis[#choisis + 1] = tostring(valeur)
+        return choisir(valeur)
+    end
+    local ok, erreur = pcall(ouvrirFenetre, function(p, args)
+        -- La carte : son titre en gras 12, son texte en 12 (l'emphase en gras 12), D.suiviLignes lignes.
+        local texte, titre
+        for _, v in ipairs(vues(args.contents)) do
+            local t = v.args.title
+            if v.genre == 'static_text' and type(t) == 'table' and t.key == 'suiviTexte' then
+                texte = v
+            elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'suiviTitre' then
+                titre = v
+            end
+        end
+        vrai(texte and titre, 'la carte Suivi')
+        egal(Fenetre.POLICES.texte12, texte.args.font)
+        egal(Fenetre.POLICES.gras12, texte.args.emphasis_font)
+        egal(Fenetre.COULEURS.texte, texte.args.emphasis_color)
+        egal(D.carte, texte.args.width)
+        egal(D.suiviLignes, texte.args.height_in_lines)
+        egal(Fenetre.POLICES.gras12, titre.args.font)
+        egal('gras12', Fenetre.CARTES.suivi.emphase)
+        -- À l'ouverture : Note ; rien de lu, la carte vide.
+        egal('notation', p.onglet)
+        egal(nil, Fenetre.pageSuivi)
+        egal('', p.suiviTexte)
+        egal(false, p.suiviADefauts)
+        egal('Carnet de progrès', p.suiviTitre)
+        -- Un clic sur le segment : l'onglet, « Lecture… », puis le résumé lu dans une tâche.
         local taches = #S.taches
-        -- Dany choisit l'entrée (le calque de sa case, la première de la liste).
-        choisir(Fenetre.CARNET)
-        egal('carnet', Fenetre.vue)
+        segment('Suivi')
+        egal('suivi', p.onglet)
         egal(taches + 1, #S.taches, 'le résumé se lit dans une tâche')
-        Fenetre.rafraichir()
-        egal('Carnet de progrès', p.titre)
-        egal('Carnet de progrès', p.t1)
-        egal(Fil.LECTURE_CARNET, p.t2, 'en lecture')
-        egal(Fenetre.CARNET, choix(), "l'entrée reste choisie")
+        egal(Fil.LECTURE_CARNET, p.suiviTexte)
         lancerTaches(taches)
-        local page = Fenetre.pageCarnet
-        vrai(type(page) == 'table' and #page.mois == 6, 'le résumé lu')
-        egal(Carnet.version, Fenetre.versionCarnet)
-        local attendues = Fil.lignesCarnet(page, Fenetre.largeurTexte(), Fenetre.TITRE_CARNET)
-        egal(#attendues, #Fenetre.lignes)
-        -- Le haut de la page dans la grille (D.lignes lignes, fenêtre B : une suite se lit avec ▼).
-        for i = 1, math.min(#attendues, Fenetre.T.lignes) do
-            local l = attendues[i]
-            egal(l.texte, p['t' .. i], 'ligne ' .. i)
-            egal(l.genre, p['g' .. i], 'genre ' .. i)
+        local page = Fenetre.pageSuivi
+        vrai(type(page) == 'table' and page.photos == 13, 'le résumé lu')
+        egal(Carnet.version, Fenetre.versionSuivi)
+        local attendues = Fenetre.lignesCarte(Fil.texteSuivi(page), D.largeurSuivi, 'texte12', 'gras12')
+        local premiere = {}
+        for i = 1, math.min(#attendues, D.suiviLignes) do
+            premiere[i] = attendues[i]
         end
-        egal(montree, Fenetre.conversationAffichee, 'la conversation montrée ne change pas')
-        egal(1, Fenetre.premiere, 'la page se lit depuis son début')
-        -- ▲ ▼ : une grille plus courte que la page.
+        egal(table.concat(premiere, '\n'), p.suiviTexte, 'la première page de la carte')
+        egal(true, p.suiviADefauts)
+        egal(#attendues > D.suiviLignes, p.suiviDescend)
+        egal(false, p.suiviMonte)
+        -- Page par page (une carte plus courte) : ▼ descend d'une page moins une ligne, la place se
+        -- garde quand le résumé se relit pareil, ▲ remonte.
         local T = Fenetre.T
-        local lignesGrille = T.lignes
-        T.lignes = 10
-        Fenetre.rafraichirFil()
-        egal(1, Fenetre.premiere)
-        egal(false, p.peutMonter)
-        egal(true, p.peutDescendre)
-        egal(string.format('Lignes 1 à 10 sur %d', #attendues), p.positionFil)
-        Fenetre.defiler(-5)
-        egal(6, Fenetre.premiere, '▼')
-        egal(attendues[6].texte, p.t1)
-        Fenetre.defiler(5)
-        egal(1, Fenetre.premiere, '▲')
-        T.lignes = lignesGrille
-        Fenetre.rafraichirFil()
-        -- Quittée ou ouverte sans clic dans la liste (une demande, Claude qui travaille, la grille de
-        -- la fenêtre B) : le choix de la liste suit la vue, même conversation courante.
-        egal(true, Fenetre.quitterCarnet())
-        Fenetre.rafraichir()
-        egal(lac.id, choix(), 'la conversation choisie au retour')
-        local avantOuverture = #S.taches
-        egal(true, Fenetre.ouvrirCarnet())
-        Fenetre.rafraichir()
-        egal(Fenetre.CARNET, choix(), "l'entrée choisie à l'ouverture")
-        lancerTaches(avantOuverture)
-        -- La conversation déjà ouverte, choisie dans la liste : retour au fil, la même.
-        choisir(lac.id)
-        egal('conversation', Fenetre.vue)
-        egal(nil, Fenetre.pageCarnet)
-        Fenetre.rafraichir()
-        egal('Lac au matin', p.titre)
-        egal(lac.id, choix())
-        egal(lac, Fenetre.conversationAffichee)
-        egal('Lac au matin', p.t1, 'le fil de la conversation')
-        oublierTaches(taches)
-    end)
-end)
-
-essai('Liste depuis la page : un en-tête ou une conversation refusée la gardent ; une autre conversation ramène au fil', function()
-    fabriquerType()
-    local lac = conversation('Lac au matin')
-    local pont = conversation('Pont en automne')
-    local seance = conversation('Ancienne séance')
-    seance.genre = 'notation'
-    Moteur.courante = lac
-    ouvrirFenetre(function(p)
-        local taches = #S.taches
-        local ouvrir, ouvertes = Moteur.ouvrir, {}
-        Moteur.ouvrir = function(id)
-            ouvertes[#ouvertes + 1] = id
-            return ouvrir(id)
-        end
-        -- Un en-tête choisi hors de la page : la liste se remet, aucune conversation n'est cherchée.
-        choisir("§Aujourd'hui")
-        egal(0, #ouvertes, 'un en-tête n\'est pas une conversation')
-        egal(lac.id, choix())
-        choisir(Fenetre.CARNET)
-        Fenetre.rafraichir()
-        choisir("§Aujourd'hui")
-        egal('carnet', Fenetre.vue, 'un en-tête garde la page')
-        egal(Fenetre.CARNET, choix())
-        egal(0, #ouvertes)
-        -- Refusée (ancienne séance de notation) : la page reste, le bandeau dit pourquoi. Une séance
-        -- n'est pas dans la grille de la liste : le choix de sa valeur, directement.
-        egal(false, Fenetre.choisirDansListe(seance.id))
-        egal('carnet', Fenetre.vue, 'un refus garde la page')
-        contient(p.message, 'ancienne séance de notation')
-        egal(Fenetre.CARNET, choix())
-        egal(lac, Moteur.courante)
-        -- Une autre conversation : elle s'ouvre, le fil revient.
-        choisir(pont.id)
-        egal(pont, Moteur.courante)
-        egal('conversation', Fenetre.vue)
-        egal('', p.message)
-        Fenetre.rafraichir()
-        egal('Pont en automne', p.titre)
-        egal(pont.id, choix())
-        -- Pendant que Claude travaille (la liste est alors inactive) : pas de page, le choix revient
-        -- à la conversation.
-        Moteur.travaille = true
+        local hauteur = T.suiviLignes
+        T.suiviLignes = 10
+        Fenetre.rafraichirSuivi()
+        egal(true, p.suiviDescend)
+        Fenetre.defilerTexte('suivi', 1)
+        egal(attendues[10], lignesDe(p.suiviTexte)[1], '▼')
+        egal(true, p.suiviMonte)
+        Fenetre.rafraichirSuivi()
+        egal(attendues[10], lignesDe(p.suiviTexte)[1], 'la place gardée')
+        Fenetre.defilerTexte('suivi', -1)
+        egal(attendues[1], lignesDe(p.suiviTexte)[1], '▲')
+        T.suiviLignes = hauteur
+        Fenetre.rafraichirSuivi()
+        -- L'aperçu de l'onglet est celui de la photo active (pas d'aperçu à lui).
+        egal(nil, Fenetre.apercuOnglet.suivi)
+        -- Un autre onglet, puis Suivi de nouveau : un vrai clic relit.
+        segment('Note')
         local avant = #S.taches
-        choisir(Fenetre.CARNET)
-        Moteur.travaille = false
-        egal('conversation', Fenetre.vue, 'pas de page pendant le travail')
-        egal(avant, #S.taches, 'rien à lire')
-        contient(p.message, 'Claude travaille')
-        egal(pont.id, choix())
-        Moteur.ouvrir = ouvrir
-        oublierTaches(taches)
+        segment('Suivi')
+        egal(avant + 1, #S.taches, 'un vrai clic relit')
+        lancerTaches(avant)
+        -- Ce qui arrive de Claude (une note, une proposition) bascule vers son onglet, jamais vers Suivi.
+        segment('Note')
+        Fenetre.choisirOnglet(D.ongletProposition)
+        Fenetre.choisirOnglet(D.ongletNotation)
+        egal('notation', p.onglet)
     end)
+    Fenetre.choisirOnglet = choisir
+    assert(ok, erreur)
+    for _, v in ipairs(choisis) do
+        vrai(v ~= 'suivi', 'une bascule vers Suivi : ' .. table.concat(choisis, ', '))
+    end
 end)
 
-essai('Gardes : Renommer… et Supprimer… ne font rien sur la page ; Nouvelle conversation, Envoyer et une invite ramènent au fil', function()
+essai("Boucle : le registre change (abonnement, Carnet.version), la carte se relit si l'onglet Suivi est montré ; caché, rien ; désabonnée à la fermeture", function()
     fabriquerType()
-    local lac = conversation('Lac au matin')
-    Moteur.courante = lac
-    ouvrirFenetre(function(p)
-        local taches = #S.taches
-        choisir(Fenetre.CARNET)
-        local dialogues = #S.dialogues
-        S.confirmation, S.reponseModal, S.reponseConfirm = nil, 'ok', 'ok'
-        Fenetre.renommer()
-        egal(dialogues, #S.dialogues, 'Renommer… : aucune fenêtre')
-        egal(Fenetre.CHOISIR_CONVERSATION, p.message)
-        egal('Lac au matin', lac.titre)
-        p.message = ''
-        Fenetre.supprimer()
-        egal(nil, S.confirmation, 'Supprimer… : rien à confirmer')
-        egal(Fenetre.CHOISIR_CONVERSATION, p.message)
-        egal(lac, Moteur.courante)
-        egal(lac, Moteur.trouver(lac.id), 'la conversation reste')
-        egal('carnet', Fenetre.vue)
-        -- Sur le fil, les mêmes boutons agissent (ce n'est que la page qui les arrête) ; le bandeau qui
-        -- disait de choisir une conversation s'efface au retour.
-        S.reponseModal, S.reponseConfirm = 'cancel', 'cancel'
-        choisir(lac.id)
-        egal('', p.message, 'le bandeau de la page effacé au retour')
-        -- Claude qui travaille ramène au fil : le même bandeau s'efface aussi.
-        choisir(Fenetre.CARNET)
-        Fenetre.renommer()
-        egal(Fenetre.CHOISIR_CONVERSATION, p.message)
-        Moteur.travaille = true
-        Fenetre.rafraichir()
-        Moteur.travaille = false
-        egal('conversation', Fenetre.vue)
-        egal('', p.message, 'bandeau effacé quand Claude travaille')
-        p.libre = true
-        -- Un autre message reste (seul celui de la page s'efface).
-        p.message = 'Autre message.'
-        choisir(Fenetre.CARNET)
-        egal('', p.message, "l'ouverture de la page efface le bandeau")
-        p.message = 'Autre message.'
-        choisir(lac.id)
-        egal('Autre message.', p.message)
-        p.message = ''
-        Fenetre.renommer()
-        egal(dialogues + 1, #S.dialogues, 'Renommer… sur le fil')
-        Fenetre.supprimer()
-        vrai(S.confirmation, 'Supprimer… sur le fil')
-        -- Nouvelle conversation : elle se montre.
-        choisir(Fenetre.CARNET)
-        egal(true, Fenetre.nouvelle())
-        egal('conversation', Fenetre.vue)
-        vrai(Moteur.courante ~= lac, 'une nouvelle conversation')
-        -- Refusée (Claude travaille) : faux, la page reste ; sans fenêtre (Fenetre.p) de même.
-        local nouvelle = Moteur.courante
-        choisir(Fenetre.CARNET)
-        Moteur.travaille = true
-        egal(false, Fenetre.nouvelle())
-        contient(p.message, 'Claude travaille')
-        Fenetre.p = nil
-        egal(false, Fenetre.nouvelle(), 'sans fenêtre')
-        Fenetre.p = p
-        Moteur.travaille = false
-        egal('carnet', Fenetre.vue, 'la page reste')
-        egal(nouvelle, Moteur.courante)
-        p.message = ''
-        -- Envoyer : vide, la page reste ; sinon la demande se suit dans le fil.
-        choisir(Fenetre.CARNET)
-        Fenetre.envoyer('   ')
-        egal('carnet', Fenetre.vue, 'rien à envoyer')
-        contient(p.message, 'Écrivez une demande')
-        local avant = #S.taches
-        Fenetre.envoyer('Bonjour')
-        egal('conversation', Fenetre.vue, 'Envoyer')
-        egal(avant + 1, #S.taches, 'la demande part')
-        oublierTaches(avant)
-        p.libre = true
-        -- La liste revient à la conversation (la même : seule la vue a changé).
-        Fenetre.rafraichir()
-        egal(Moteur.courante.id, choix(), 'la conversation choisie dans la liste')
-        egal(Moteur.courante.titre, p.titre)
-        -- Une invite passe par la même demande.
-        choisir(Fenetre.CARNET)
-        Fenetre.envoyer(Consignes.invites[1].message)
-        egal('conversation', Fenetre.vue, 'une invite')
-        oublierTaches(taches)
-        p.libre = true
-        S.confirmation, S.reponseModal, S.reponseConfirm = nil, nil, nil
-    end)
-end)
-
-essai('Une autre photo choisie dans Lightroom prépare une nouvelle conversation sans quitter la page', function()
-    fabriquerType()
-    local lac = conversation('Lac au matin')
-    Moteur.courante = lac
-    prefs.nouvelleParPhoto = true
-    ouvrirFenetre(function(p)
-        local taches = #S.taches
-        lac.cle = 'photo-A'
-        Fenetre.cleVue, Fenetre.cleVueLe = 'photo-A', os.time()
-        local fin = Moteur.finTravail
-        Moteur.finTravail = 0
-        choisir(Fenetre.CARNET)
-        lancerTaches(taches)
-        Fenetre.hautCarnet = 2
-        Fenetre.suivreSelection({ cle = 'photo-B' })
-        vrai(Moteur.courante ~= lac, 'la nouvelle conversation est prête')
-        egal('carnet', Fenetre.vue, 'la page reste')
-        egal(2, Fenetre.hautCarnet, 'à la même place')
-        Fenetre.rafraichir()
-        egal('Carnet de progrès', p.titre)
-        egal(Fenetre.CARNET, choix())
-        egal(lac, Fenetre.conversationAffichee, 'pas encore montrée')
-        -- Au retour, c'est elle qui se montre.
-        choisir(Moteur.courante.id)
-        Fenetre.rafraichir()
-        egal('conversation', Fenetre.vue)
-        egal(Moteur.courante, Fenetre.conversationAffichee)
-        Moteur.finTravail = fin
-        oublierTaches(taches)
-    end)
-    prefs.nouvelleParPhoto = false
-end)
-
-essai('Boucle : le registre change (abonnement, Carnet.version), la page se relit ; hors de la page, rien ; désabonné à la fermeture', function()
-    fabriquerType()
-    local lac = conversation('Lac au matin')
-    Moteur.courante = lac
+    Moteur.courante = conversation('Lac au matin')
     ouvrirFenetre(function(p)
         local taches = #S.taches
         egal('function', type(Carnet.observateurs.fenetre), 'abonnée')
-        -- Hors de la page : un changement du registre ne fait rien lire.
+        -- Onglet caché : un changement du registre ne fait rien lire.
         Carnet.signaler('constat')
+        egal(true, Fenetre.aRafraichirSuivi, "l'abonnement l'a dit")
         unTourDeBoucle()
-        egal(nil, Fenetre.pageCarnet, 'rien lu hors de la page')
-        choisir(Fenetre.CARNET)
+        egal(nil, Fenetre.pageSuivi, 'rien lu, onglet caché')
+        segment('Suivi')
         lancerTaches(taches)
-        egal(13, Fenetre.pageCarnet.photos)
-        -- Un retrait (d'un autre client du connecteur, ici le registre lui-même) : la page se relit
-        -- au tour suivant.
+        egal(13, Fenetre.pageSuivi.photos)
+        egal(false, Fenetre.aRafraichirSuivi)
+        -- Un retrait (d'un autre client du connecteur, ici le registre lui-même) : la carte se relit au
+        -- tour suivant.
         local version = Carnet.version
         Carnet.commande({ action = 'retirer', photos = { 1001 } })
         vrai(Carnet.version > version, 'nouvelle version')
-        egal(true, Fenetre.aRafraichirCarnet, "l'abonnement l'a dit")
+        egal(true, Fenetre.aRafraichirSuivi)
         unTourDeBoucle()
-        egal(12, Fenetre.pageCarnet.photos, 'page relue')
-        egal(false, Fenetre.aRafraichirCarnet)
-        egal(Carnet.version, Fenetre.versionCarnet)
-        contient(p.t2, 'sur 12 photos')
+        egal(12, Fenetre.pageSuivi.photos, 'carte relue')
+        egal(false, Fenetre.aRafraichirSuivi)
+        egal(Carnet.version, Fenetre.versionSuivi)
+        contient(p.suiviTexte, 'sur 12 photos')
         -- La version seule suffit aussi (un changement sans abonnement).
         Carnet.oublier()
-        Fenetre.versionCarnet = Carnet.version - 1
-        local lue = Fenetre.pageCarnet
+        Fenetre.versionSuivi = Carnet.version - 1
+        local lue = Fenetre.pageSuivi
         unTourDeBoucle()
-        vrai(Fenetre.pageCarnet ~= lue, 'relue par la version')
-        -- Un résumé qui ne se lit pas : la page le dit, la boucle ne la relit pas sans fin.
+        vrai(Fenetre.pageSuivi ~= lue, 'relue par la version')
+        -- Caché de nouveau : une version nouvelle ne fait rien lire.
+        segment('Note')
+        Fenetre.versionSuivi = -1
+        lue = Fenetre.pageSuivi
+        unTourDeBoucle()
+        egal(lue, Fenetre.pageSuivi, 'caché : rien')
+        -- Un résumé qui ne se lit pas : la carte le dit, la boucle ne le relit pas sans fin.
+        local avant = #S.taches
+        segment('Suivi')
+        lancerTaches(avant)
         local resumer = Carnet.resumer
         Carnet.resumer = function() error('carnet.json illisible', 0) end
-        Fenetre.versionCarnet = -1
+        Fenetre.versionSuivi = -1
         unTourDeBoucle()
         Carnet.resumer = resumer
-        egal('carnet.json illisible', Fenetre.pageCarnet.erreur)
-        egal(Carnet.version, Fenetre.versionCarnet)
-        egal("Le carnet de progrès ne s'est pas lu : carnet.json illisible", p.t2)
+        egal('carnet.json illisible', Fenetre.pageSuivi.erreur)
+        egal(Carnet.version, Fenetre.versionSuivi)
+        egal("Le carnet de progrès ne s'est pas lu : carnet.json illisible", p.suiviTexte)
+        egal(false, p.suiviADefauts)
         oublierTaches(taches)
     end)
     egal(nil, Carnet.observateurs.fenetre, 'désabonnée à la fermeture')
 end)
 
--- Fenêtre des photos d'un défaut -----------------------------------------------------------------
+-- Photos d'un défaut -------------------------------------------------------------------------------
 
-essai('Clic sur une rangée : la fenêtre de ses photos (dans une tâche), éléments neufs, leçon de la photo choisie ; rien hors de la page', function()
+essai("« Photos d'un défaut… » : la liste des défauts du résumé (tables neuves), puis la fenêtre des photos du défaut choisi ; sans défaut, grisé et rien", function()
     fabriquerType()
-    local lac = conversation('Lac au matin')
-    Moteur.courante = lac
-    ouvrirFenetre(function(p)
+    Moteur.courante = conversation('Lac au matin')
+    ouvrirFenetre(function(p, args)
         local taches = #S.taches
-        choisir(Fenetre.CARNET)
-        lancerTaches(taches)
-        local i = indiceDe(Fenetre.lignes, function(l) return l.defaut == 'ciel_brule' end)
-        vrai(i, 'rangée du ciel brûlé')
+        local bouton
+        for _, v in ipairs(vues(args.contents)) do
+            if S.BOUTONS[v.genre] and v.args.title == "Photos d'un défaut…" then
+                bouton = v
+            end
+        end
+        vrai(bouton, "« Photos d'un défaut… » sous la carte Suivi")
+        egal('square_button', bouton.genre)
+        egal(26, S.bezelVisible(bouton))
+        egal('suiviADefauts', bouton.args.enabled.key)
+        egal(D.photosDefaut, bouton.args.width)
+        vrai(Fenetre.parBouton(bouton.args.action), 'passe par Fenetre.bouton')
+        -- Avant la lecture : grisé, et rien sans résumé.
+        egal(false, p.suiviADefauts)
         local dialogues = #S.dialogues
-        local avant = #S.taches
-        Fenetre.cliquerLigne(i)
-        egal(avant + 1, #S.taches, 'la fenêtre des photos part d\'une tâche')
+        egal(false, Fenetre.choisirDefaut())
         egal(dialogues, #S.dialogues)
-        lancerTaches(avant)
+        segment('Suivi')
+        lancerTaches(taches)
+        egal(true, p.suiviADefauts)
+        -- Dany choisit le ciel brûlé, puis ferme la fenêtre de ses photos.
+        local presenter = S.modules.LrDialogs.presentModalDialog
+        local recus = {}
+        S.modules.LrDialogs.presentModalDialog = function(d)
+            S.dialogues[#S.dialogues + 1] = d
+            recus[#recus + 1] = d
+            if #recus == 1 then
+                d.contents.args.bind_to_object.choix = { 'ciel_brule' }
+            end
+            return 'ok'
+        end
+        local avant = #S.taches
+        S.cliquer(bouton)
+        egal(avant + 1, #S.taches, 'dans une tâche')
+        local ok, erreur = pcall(lancerTaches, avant)
+        S.modules.LrDialogs.presentModalDialog = presenter
+        assert(ok, erreur)
+        egal(2, #recus, 'la liste des défauts, puis la fenêtre des photos')
+        egal("Carnet de progrès · Photos d'un défaut", recus[1].title)
+        egal('Voir ses photos', recus[1].actionVerb)
+        local liste = vueDe(recus[1].contents, 'simple_list')
+        S.neuve(liste.args.items, 'défauts du carnet')
+        egal(#Fenetre.pageSuivi.defauts, #liste.args.items)
+        egal('horizon_penche', liste.args.items[1].value, "dans l'ordre du résumé")
+        egal("Ciel ou haut de l'image brûlé · 3 photos sur 13", liste.args.items[3].title)
+        egal('Mise au point à côté · 1 photo sur 1', liste.args.items[6].title)
+        egal("Carnet de progrès · Ciel ou haut de l'image brûlé", recus[2].title)
+        -- Annulé : la liste seule.
+        S.reponseModal = 'cancel'
+        dialogues = #S.dialogues
+        egal(false, Fenetre.choisirDefaut())
+        egal(dialogues + 1, #S.dialogues, 'la liste seule')
+        S.reponseModal = nil
+        -- Sans défaut (un carnet vide) : grisé, rien.
+        fabriquer({})
+        Fenetre.versionSuivi = -1
+        unTourDeBoucle()
+        egal(false, p.suiviADefauts)
+        dialogues = #S.dialogues
+        egal(false, Fenetre.choisirDefaut())
+        egal(dialogues, #S.dialogues)
+        oublierTaches(taches)
+    end)
+end)
+
+essai("La fenêtre des photos d'un défaut : éléments neufs, la plus récente d'abord, leurs constats sans la leçon d'avant ; une ligne penchée en degrés ; une mesure seule", function()
+    fabriquerType()
+    Moteur.courante = conversation('Lac au matin')
+    ouvrirFenetre(function()
+        local taches = #S.taches
+        segment('Suivi')
+        lancerTaches(taches)
+        local dialogues = #S.dialogues
+        egal(false, Fenetre.montrerDefaut('ciel_brule'), 'Fermer')
         egal(dialogues + 1, #S.dialogues)
         local d = S.dialogues[#S.dialogues]
         egal("Carnet de progrès · Ciel ou haut de l'image brûlé", d.title)
@@ -880,7 +742,8 @@ essai('Clic sur une rangée : la fenêtre de ses photos (dans une tâche), élé
         egal(1024, liste.args.items[1].value)
         egal(1025, liste.args.items[2].value, "l'original, même mesuré sur sa copie virtuelle")
         egal(1021, liste.args.items[3].value)
-        contient(liste.args.items[1].title, 'DSCF1024.RAF · ciel brûlé : 4,2 % du tiers haut en blanc pur · leçon')
+        egal('DSCF1024.RAF · ciel brûlé : 4,2 % du tiers haut en blanc pur', liste.args.items[1].title:match('DSCF.*$'),
+            "le constat seul, plus « leçon » (correctif 1.3.6)")
         contient(liste.args.items[3].title, Carnet.MOIS[tonumber(moisIl(1):sub(6, 7))])
         local textes = {}
         for _, v in ipairs(vues(d.contents)) do
@@ -890,31 +753,20 @@ essai('Clic sur une rangée : la fenêtre de ses photos (dans une tâche), élé
         end
         contient(table.concat(textes, '\n'), "3 photos dans les mois du carnet, la plus récente d'abord.")
         contient(table.concat(textes, '\n'), 'À la prise de vue : Exposer pour le ciel')
-        -- La leçon de la photo choisie : 1024 d'abord, puis une autre choisie.
+        -- La photo choisie, 1024 d'abord ; sa leçon d'avant ne se montre plus (correctif 1.3.6).
         local q = d.contents.args.bind_to_object
         egal(1024, q.choix[1])
-        local lecon = q.lecon
-        contient(lecon, 'Leçon de la photo · DSCF1024.RAF')
-        contient(lecon, 'Lumière\n    Ce qui manquait : Ciel brûlé à 4 %.\n    À la prise de vue : Exposer pour le ciel.')
-        contient(lecon, 'Couleur\n    Rien ne manquait.\n    À refaire : Balance des blancs juste : à refaire.')
-        contient(lecon, 'Composition\n    Ce qui manquait : Horizon un peu bas.')
-        q.choix = { 1021 }
-        contient(q.lecon, 'Pas de leçon rangée pour cette photo')
-        egal('lecon', vueDe(d.contents, 'edit_field').args.value.key)
+        egal(nil, q.lecon)
+        egal(nil, vueDe(d.contents, 'edit_field'), 'plus de champ de la leçon')
+        vrai(not table.concat(textes, '\n'):find('Leçon', 1, true), 'rien de la leçon')
         -- Un défaut cherché mais jamais trouvé : la fenêtre le dit, sans liste ni retrait.
-        local bruit = indiceDe(Fenetre.lignes, function(l) return l.defaut == 'bruit' end)
-        avant = #S.taches
-        Fenetre.cliquerLigne(bruit)
-        lancerTaches(avant)
+        Fenetre.montrerDefaut('bruit')
         local vide = S.dialogues[#S.dialogues]
         egal(nil, vide.otherVerb)
         egal(nil, vueDe(vide.contents, 'simple_list'))
         contient(vueDe(vide.contents, 'static_text').args.title, "Aucune photo n'a ce défaut")
         -- Une ligne penchée (l'angle rangé dans l'entrée, sans texte) : son inclinaison en degrés.
-        local penchee = indiceDe(Fenetre.lignes, function(l) return l.defaut == 'horizon_penche' end)
-        avant = #S.taches
-        Fenetre.cliquerLigne(penchee)
-        lancerTaches(avant)
+        Fenetre.montrerDefaut('horizon_penche')
         local angles = vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items
         egal(2, #angles)
         contient(angles[1].title, 'DSCF1026.RAF · ligne penchée de 1,2°')
@@ -922,15 +774,12 @@ essai('Clic sur une rangée : la fenêtre de ses photos (dans une tâche), élé
         egal('mars 2026 · DSCF0001.RAF · ligne penchée de 1,3°', Fenetre.textePhotoDuDefaut({ mois_libelle = 'mars 2026',
             fichier = 'DSCF0001.RAF', mesure = -1.26, angle = true }))
         -- Une seule photo : pas de « la plus récente d'abord ».
-        local mise = indiceDe(Fenetre.lignes, function(l) return l.defaut == 'mise_au_point' end)
-        avant = #S.taches
-        Fenetre.cliquerLigne(mise)
-        lancerTaches(avant)
+        Fenetre.montrerDefaut('mise_au_point')
         egal('1 photo dans les mois du carnet.', vueDe(S.dialogues[#S.dialogues].contents, 'static_text').args.title)
         -- Une autre mesure sans texte se dit telle quelle (mise au point, 8,5).
         contient(vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title, 'DSCF1001.RAF · mesure : 8,5')
         egal('mars 2026 · DSCF1001.RAF · mesure : 8,5', Fenetre.textePhotoDuDefaut({ mois_libelle = 'mars 2026', fichier = 'DSCF1001.RAF',
-            mesure = 8.5, lecons = {} }))
+            mesure = 8.5 }))
         -- L'angle d'une entrée ne vaut que pour son code : la mise au point de la même photo reste
         -- une mesure.
         fabriquer({ entree(1101, moisIl(0), CHERCHES, { 'mise_au_point' }, { angle = { le = 1101, photo = 1101, inclinaison = 2,
@@ -941,30 +790,18 @@ essai('Clic sur une rangée : la fenêtre de ses photos (dans une tâche), élé
         egal('DSCF1101.RAF · ligne penchée de 2,0°', vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title:match('DSCF.*$'))
         fabriquerType()
         egal('mars 2026 · photo 77', Fenetre.textePhotoDuDefaut({ mois_libelle = 'mars 2026', original = 77 }))
-        -- Hors de la page, une ligne qui porterait un défaut ne fait rien.
-        choisir(lac.id)
-        Fenetre.rafraichir()
-        local ancienne = Fenetre.lignes
-        Fenetre.lignes, Fenetre.premiere = { { genre = 'outil', texte = 'x', defaut = 'flou' }, { genre = 'apercu', texte = 'y', action = 'demander' } }, 1
-        avant = #S.taches
-        local courante = Moteur.courante
-        Fenetre.cliquerLigne(1)
-        Fenetre.cliquerLigne(2)
-        egal(avant, #S.taches, 'rien hors de la page')
-        egal(courante, Moteur.courante)
-        Fenetre.lignes = ancienne
         oublierTaches(taches)
     end)
 end)
 
-essai('« Retirer du carnet… » : la photo choisie, après confirmation, par appel direct au registre avec l\'id de l\'original', function()
+essai('« Retirer du carnet… » : la photo choisie, après confirmation, par appel direct au registre avec l\'id de l\'original ; la carte se relit', function()
     fabriquerType()
-    local lac = conversation('Lac au matin')
-    Moteur.courante = lac
+    Moteur.courante = conversation('Lac au matin')
     ouvrirFenetre(function(p)
         local taches = #S.taches
-        choisir(Fenetre.CARNET)
+        segment('Suivi')
         lancerTaches(taches)
+        egal(13, Fenetre.pageSuivi.photos)
         local commande, recues = Carnet.commande, {}
         Carnet.commande = function(params)
             recues[#recues + 1] = params
@@ -994,7 +831,7 @@ essai('« Retirer du carnet… » : la photo choisie, après confirmation, par a
         egal(1, #recues[1].photos)
         egal(nil, Carnet.entree(1025), 'retirée')
         vrai(Carnet.entree(1024), 'les autres restent')
-        vrai(Carnet.version > version, 'la page se relira')
+        vrai(Carnet.version > version, 'la carte se relira')
         egal('DSCF1025.RAF est retirée du carnet de progrès.', p.message)
         -- Fermer : rien.
         S.modules.LrDialogs.presentModalDialog = function(args)
@@ -1006,129 +843,16 @@ essai('« Retirer du carnet… » : la photo choisie, après confirmation, par a
         S.modules.LrDialogs.presentModalDialog = presenter
         Carnet.commande = commande
         S.reponseConfirm = nil
-        -- Les noms des axes du carnet sont ceux de la carte du fil.
-        egal('Lumière', Fenetre.nomAxeCarnet('lumiere'))
-        egal('Couleur', Fenetre.nomAxeCarnet('couleur'))
-        egal('Composition', Fenetre.nomAxeCarnet('composition'))
-        oublierTaches(taches)
-    end)
-end)
-
--- Avec le faux Claude Code -------------------------------------------------------------------------
-
-local function attendre(condition, secondes)
-    for _ = 1, (secondes or 10) * 10 do
-        Moteur.tic()
-        if condition() then
-            return true
-        end
-        S.executer('sleep 0.1')
-    end
-    return false
-end
-
--- Le texte du dernier message écrit pour Claude Code (entree.jsonl de la session).
-local function dernierMessage()
-    local entree = Fichiers.lire(Moteur.session.dossier .. '/entree.jsonl') or ''
-    local derniere
-    for ligne in entree:gmatch('[^\n]+') do
-        derniere = ligne
-    end
-    local json = Json.decode(derniere)
-    local contenu = json.message.content
-    return contenu[#contenu].text
-end
-
-essai('« Demander à Claude ce qu\'il en pense » : nouvelle conversation avec Consignes.carnet (relais.sh, faux-claude.sh) ; la page se quitte', function()
-    fabriquerType()
-    photoActive(53636309, 'DSCF4961.RAF')
-    local lac = conversation('Lac au matin')
-    Moteur.courante = lac
-    ouvrirFenetre(function(p)
-        local taches = #S.taches
-        choisir(Fenetre.CARNET)
-        lancerTaches(taches)
-        -- Claude travaille ailleurs : rien.
-        Moteur.travaille = true
-        egal(false, Fenetre.demanderCarnet())
-        contient(p.message, 'Claude travaille')
-        egal('carnet', Fenetre.vue)
-        egal(lac, Moteur.courante)
-        Moteur.travaille = false
-        p.message = ''
-        local i = indiceDe(Fenetre.lignes, function(l) return l.action == 'demander' end)
-        vrai(i, "la ligne d'action")
-        local avant = #S.taches
-        Fenetre.cliquerLigne(i)
-        egal('conversation', Fenetre.vue, 'la page se quitte')
-        local c = Moteur.courante
-        vrai(c ~= lac, 'une nouvelle conversation')
-        egal(avant + 1, #S.taches, 'la demande part dans une tâche')
-        lancerTache(avant + 1)
-        vrai(Moteur.travaille, 'Claude Code reçoit la demande')
-        egal(c, Moteur.courante)
-        egal('dany', c.elements[1].genre)
-        egal(Consignes.carnet, c.elements[1].texte)
-        contient(dernierMessage(), Consignes.carnet)
-        -- Son titre à elle (Claude ne regarde aucune photo pour la nommer), sans le rappel du titre.
-        egal(Fenetre.TITRE_DEMANDE_CARNET, c.titre)
-        egal(true, c.titreChoisi)
-        vrai(not dernierMessage():find(Consignes.rappelTitre, 1, true), 'pas de rappel du titre')
-        vrai(attendre(function() return not Moteur.travaille end), 'la demande se termine')
-        Fenetre.rafraichir()
-        egal(c, Fenetre.conversationAffichee)
-        vrai(#lac.elements == 1, "l'ancienne conversation n'a rien reçu")
-        oublierTaches(taches)
-    end)
-end)
-
-essai('Accepter et Je le fais quittent la page : Claude qui travaille ramène au fil', function()
-    fabriquerType()
-    photoActive(53636309, 'DSCF4961.RAF')
-    local c = conversation('Flamant au zoo')
-    Moteur.courante = c
-    -- Une proposition ordinaire en attente.
-    Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = 'carnet-prop', nom = 'mcp__developpeur__preview_settings',
-        entree = { reason = 'Plus de lumière', settings = { Exposure2012 = 0.35 }, compare = true } } } })
-    Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'carnet-prop',
-        textes = { '{"changements": [{"cle": "Exposure2012", "avant": 0, "apres": 0.35}]}' }, images = {}, erreur = false } } })
-    vrai(Conversation.propositionEnAttente(c), 'proposition en attente')
-    ouvrirFenetre(function(p)
-        local taches = #S.taches
-        Fenetre.rafraichir()
-        local montree = Fenetre.conversationAffichee
-        -- Accepter (la carte Proposition) pendant que la page est montrée.
-        choisir(Fenetre.CARNET)
-        lancerTaches(taches)
-        local avant = #S.taches
-        Fenetre.repondreProposition(true)
-        lancerTache(avant + 1)
-        vrai(Moteur.travaille, 'Claude applique la proposition')
-        Fenetre.rafraichir()
-        egal('conversation', Fenetre.vue, 'Accepter ramène au fil')
-        egal(montree, Fenetre.conversationAffichee)
-        egal(c.titre, p.titre)
-        contient(dernierMessage(), Consignes.accepter)
-        vrai(attendre(function() return not Moteur.travaille end), 'la demande se termine')
-        -- Je le fais (sans proposition : sur la photo active), depuis la page.
-        avant = #S.taches
-        choisir(Fenetre.CARNET)
-        lancerTache(avant + 1)
-        egal('carnet', Fenetre.vue)
-        vrai(type(Fenetre.pageCarnet) == 'table', 'la page lue')
-        Fenetre.jeLeFais()
-        vrai(Moteur.travaille, 'Claude range sa version')
-        Fenetre.rafraichir()
-        egal('conversation', Fenetre.vue, 'Je le fais ramène au fil')
-        contient(dernierMessage(), 'Je le fais moi-même')
-        vrai(attendre(function() return not Moteur.travaille end), 'la demande se termine')
+        -- La carte, montrée, se relit au tour suivant de la boucle.
+        unTourDeBoucle()
+        egal(12, Fenetre.pageSuivi.photos, 'la carte relue')
         oublierTaches(taches)
     end)
 end)
 
 -- Consignes ----------------------------------------------------------------------------------------
 
-essai('Consignes : puce Carnet des garde-fous (250 caractères au plus) ; Consignes.carnet ; le texte reste sous 7 500', function()
+essai('Consignes : puce Carnet des garde-fous (250 caractères au plus) ; le texte reste sous 7 500', function()
     local texte = Consignes.texte
     local debut = texte:find('\n## Garde-fous\n', 1, true)
     local fin = texte:find('\n## ', debut + 1, true)
@@ -1142,13 +866,6 @@ essai('Consignes : puce Carnet des garde-fous (250 caractères au plus) ; Consig
     end
     vrai(not texte:find('\\\n', 1, true), 'lignes recollées')
     vrai(Texte.longueur(texte) <= 7500, string.format('plafond des consignes : %d', Texte.longueur(texte)))
-    -- La demande de la ligne d'action : le résumé du connecteur, trois puces, rien de retouché, sans
-    -- chiffre écrit dans la fenêtre.
-    for _, morceau in ipairs({ 'carnet de progrès', 'export_journal avec notebook = true', 'trois puces', 'ce qui progresse',
-        'ce qui revient le plus', 'prochaine sortie', 'réglages du boîtier', 'Ne retouche rien.' }) do
-        contient(Consignes.carnet, morceau, 'Consignes.carnet')
-    end
-    vrai(not Consignes.carnet:find('%d'), 'Consignes.carnet sans chiffre')
 end)
 
 -- Fin ----------------------------------------------------------------------------------------------

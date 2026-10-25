@@ -279,8 +279,9 @@ end
 -- 2026 (Lightroom Classic 15.6, commande reglages : prise_de_vue.iso, tonumber de la valeur brute,
 -- de 160 à 12 800 sur des RAF de X-H2S et de X-T20 et un JPEG de X-T20) ; la valeur brute elle-même,
 -- un nombre dans le journal détaillé d'un RAF (160), constatée le 22 octobre 2026 par l'étape de la
--- leçon de la recette (1.3.1). La simulation la tient pour un nombre. Le carnet de progrès et la leçon
--- ne cherchent le bruit fort de la prise de vue qu'à un ISO élevé (Carnet.isoEleve du serveur).
+-- leçon de la recette (1.3.1, retirée avec la leçon au correctif 1.3.6). La simulation la tient pour
+-- un nombre. Le carnet de progrès ne cherche le bruit fort de la prise de vue qu'à un ISO élevé
+-- (Carnet.isoEleve du serveur), d'après la description des vignettes (Vignettes.decrireVignette).
 local function sensibilite(photo)
     local iso = tonumber(brut(photo, 'isoSpeedRating'))
     if iso and iso > 0 and iso == iso and iso ~= math.huge then

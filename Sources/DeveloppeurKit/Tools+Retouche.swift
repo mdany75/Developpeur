@@ -129,7 +129,6 @@ extension ToolHandler {
                     ("compare", prop("boolean", "true = l'état actuel (à gauche) et la proposition (à droite) côte à côte.")),
                     ("size", prop("integer", "Grand côté de l'aperçu en pixels (défaut \(Self.defaultPreviewSize), de \(Self.previewSizes.lowerBound) à \(Self.previewSizes.upperBound)).")),
                     ("overlay", prop("boolean", "Avec crop : l'image entière, le cadre proposé en pointillés, les tiers et le hors-cadre assombri (défaut true) ; false = l'image recadrée.")),
-                    ("my_turn", prop("boolean", Self.descriptionMonTour)),
                     // La raison, comme pour apply_settings (1.3.1 : Claude la joignait, et l'appel était
                     // refusé) : une proposition n'écrit pas d'étape ; elle revient dans la réponse, d'où
                     // sa description à elle.
@@ -289,79 +288,18 @@ extension ToolHandler {
         let cible: [String: JSONValue] = args.int("photo_id").map { ["photo": .number(Double($0))] } ?? [:]
         notes += recalagesDuRecadrage(&develop, cible: cible)
         notes += recalagesDesPositions(&develop, cible: cible)
-        if args.bool("my_turn") == true {
-            return try monTour(develop, cible: cible, notes: notes, args: args)
-        }
         var params = develop
         params["action"] = "appliquer"
         params["etape"] = .string((args.string("step_name") ?? "").isEmpty ? "proposition" : String(args.string("step_name")!.prefix(60)))
         params.merge(cible) { _, new in new }
         // Un recadrage proposé se montre sur l'image entière (1.3) : le module la rend aussi, sans
         // cadre, et lit le cadre que Lightroom a gardé (troisième étape « Claude · essai ») ; pas pour
-        // un recadrage retiré, ni avec overlay = false, ni pour « Je le fais » (my_turn, rien rendu).
-        if let cadre = develop["recadrage"], cadre["retirer"] == nil, args.bool("overlay") != false, args.bool("my_turn") != true {
+        // un recadrage retiré, ni avec overlay = false.
+        if let cadre = develop["recadrage"], cadre["retirer"] == nil, args.bool("overlay") != false {
             params["entier"] = true
         }
         // La raison n'est pas envoyée au module : une proposition n'est pas une étape.
         return try preview(params, args: args, notes: notes, raison: Self.raison(args))
-    }
-
-    /// La propriété my_turn de preview_settings (« Je le fais », 1.3). Hors de la garde de longueur
-    /// des descriptions d'outils (BilanTests) : la description de preview_settings ne change pas.
-    static let descriptionMonTour = "true = « Je le fais » : l'utilisateur fera lui-même cette retouche, pour apprendre. Rien n'est appliqué ni rendu : la proposition est rangée en instantané « Claude · ma version » avec l'état de départ de la photo ; la réponse donne a_faire, les réglages dans l'ordre du panneau Développement (panneau, réglage, de, à). Réglages globaux seulement. Quand il a fini : view_photo avec compare = claude_version."
-
-    /// « Je le fais » (preview_settings avec my_turn, 1.3) : le module applique la proposition le
-    /// temps de la ranger en instantané « Claude · ma version », avec l'état de départ dans la mémoire
-    /// variantesClaude et une entrée « exercice » du journal, remet la photo comme avant et ne rend
-    /// rien (sans_rendu ; jamais entier). La réponse, en texte seul, donne a_faire : les réglages dans
-    /// l'ordre des panneaux du module Développement (JeLeFais.aFaire), en kelvins pour un RAW (raw de
-    /// la réponse). Un module qui ne connaît pas l'exercice (avant la 1.3) est dit, ses fichiers effacés.
-    func monTour(_ develop: [String: JSONValue], cible: [String: JSONValue], notes: [JSONValue], args: Arguments) throws -> ToolResult {
-        var notes = notes
-        var params = develop
-        params.merge(cible) { _, new in new }
-        params["action"] = "appliquer"
-        params["etape"] = .string(JeLeFais.etape)
-        params["instantane"] = .string(JeLeFais.instantane)
-        params["exercice"] = true
-        params["sans_rendu"] = true
-        // La raison de l'entrée « Claude · je le fais » du journal (Variantes.ranger) : reason si
-        // Claude la donne (1.3.1), sinon le nom qu'il donne à sa proposition (l'étape, elle, a son nom
-        // fixe). Sans l'un ni l'autre, l'entrée n'a pas de raison. Ce n'est pas une étape : rien ne
-        // s'annule par elle.
-        if let raison = Self.raison(args) {
-            params["raison"] = .string(raison)
-        } else if let nom = args.string("step_name")?.trimmingCharacters(in: .whitespacesAndNewlines), !nom.isEmpty {
-            params["raison"] = .string(String(nom.prefix(300)))
-        }
-        // compare = false ne demandait rien : pas de remarque pour lui.
-        let ignores = ["compare", "size", "overlay"].filter { $0 == "compare" ? args.bool($0) == true : args.has($0) }
-        if !ignores.isEmpty {
-            notes.append(.string("\(ignores.joined(separator: ", ")) sans effet avec my_turn : rien n'est rendu (view_photo avec compare = claude_version montrera les deux versions quand l'utilisateur aura fini)."))
-        }
-        let resultat = try lightroom.send("essayer", params, timeout: 240)
-        // Un module qui aurait rendu quand même : ses aperçus sont lus, donc effacés.
-        for cle in ["chemin", "chemin_actuel", "chemin_entier"] {
-            if let chemin = resultat[cle]?.string, !chemin.isEmpty { _ = try? Self.readPreview(chemin) }
-        }
-        guard let exercice = resultat["exercice"]?.object else {
-            let version = lightroom.moduleVersion.map { " (version \($0))" } ?? ""
-            throw LightroomError.plugin("Le module de Lightroom\(version) ne connaît pas encore « Je le fais » : installer Développeur 1.3, puis quitter et relancer Lightroom. La photo n'a pas changé ; l'instantané « Claude · \(JeLeFais.instantane) » qu'il a pu ranger s'efface par choose_variant (delete).")
-        }
-        let raw = resultat["raw"]?.bool ?? false
-        let faire = JeLeFais.aFaire(resultat["changements"]?.array ?? [], raw: raw)
-        var info: [String: JSONValue] = [
-            "a_faire": faire,
-            "instantane": exercice["instantane"] ?? resultat["instantane"] ?? .string("Claude · \(JeLeFais.instantane)"),
-            "rien_n_est_applique": .string("La photo est restée comme avant : la version de Claude est rangée en instantané « Claude · \(JeLeFais.instantane) » (choose_variant « \(JeLeFais.instantane) » la pose, seulement si l'utilisateur le demande)."),
-            "ensuite": "Quand l'utilisateur a fini : view_photo avec compare = claude_version.",
-            "base": "a_faire : dans l'ordre des panneaux du module Développement ; « de » : la valeur actuelle, « a » : celle de Claude ; texte : panneau › section › réglage. Réglages globaux seulement.",
-        ]
-        for cle in ["photo", "mode", "etape"] { if let valeur = resultat[cle], !valeur.isNull { info[cle] = valeur } }
-        if let raison = Self.raison(args) { info["raison"] = .string(raison) }
-        if let remarques = resultat["remarques"]?.array, !remarques.isEmpty { info["remarques"] = .array(remarques) }
-        if !notes.isEmpty { info["remarques_serveur"] = .array(notes) }
-        return ToolResult(content: [.text(JSONCoding.pretty(.object(info)))])
     }
 
     /// La surimpression d'une proposition de recadrage : l'image entière rendue par le module

@@ -192,8 +192,9 @@ extension ToolHandler {
         let markdown: String
         if args.bool("notebook") == true {
             // Le carnet de progrès (1.3) : le résumé que le module calcule (Carnet.resumer), ses
-            // phrases telles quelles ; ni ses entrées ni leurs leçons (jusqu'à 3 000 photos) ne
-            // vont à Claude.
+            // phrases telles quelles ; ni ses entrées (jusqu'à 3 000 photos) ne vont à Claude, ni les
+            // leçons (retirées en 1.3.6 : celles déjà rangées restent dans carnet.json, jamais
+            // montrées) : le carnet ne montre que les constats (Carnet.sansLecons).
             let lu: JSONValue
             do {
                 lu = try lightroom.send("carnet", ["action": "lire", "resume": true], timeout: Carnet.delaiLecture)
@@ -204,9 +205,10 @@ extension ToolHandler {
                 }
                 throw error
             }
-            guard let resume = lu["resume"], resume.object != nil else {
+            guard let brut = lu["resume"], brut.object != nil else {
                 throw LightroomError.plugin("Le module n'a pas rendu le résumé du carnet de progrès.")
             }
+            let resume = Carnet.sansLecons(brut)
             markdown = Carnet.markdown(resume)
             response = ["markdown": .string(markdown), "carnet": resume]
             if let catalogue = lu["catalogue"]?.string { response["catalogue"] = .string(catalogue) }

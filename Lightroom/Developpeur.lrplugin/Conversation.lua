@@ -1,15 +1,33 @@
 -- Conversation.lua : une conversation de la fenêtre = une session Claude Code, reprise par
--- `--resume` : des éléments `dany`, `claude`, `outil`, `apercu`, `proposition`, `notation`,
--- `lecon` (1.3), `exercice` (1.3) et `note`, dans l'ordre du fil. Les dates sont en secondes Unix.
+-- `--resume` : des éléments `dany`, `claude`, `outil`, `apercu`, `proposition`, `notation` et
+-- `note`, dans l'ordre du fil. Les dates sont en secondes Unix. Une conversation d'avant le
+-- correctif 1.3.6 peut porter aussi des éléments `lecon` (la leçon de la photo) et `exercice`
+-- (« Je le fais »), retirés avec eux : gardés tels quels sur le disque, ils ne se montrent plus
+-- (le fil n'en fait aucune ligne ; l'appel de leur outil garde la sienne).
 -- Une conversation des anciennes séances de notation (genre = 'notation', fenêtre retirée le
 -- 20 octobre 2026) reste sur le disque mais ne s'ouvre plus.
 --
+-- Une photo, une conversation (correctif 1.3.6, décidé avec Dany le 25 octobre 2026) : `photo`, le
+-- localIdentifier de la photo seule dont c'est la conversation (une copie virtuelle a la sienne ;
+-- une conversation d'avant le correctif dont la dernière demande portait sur une photo seule la
+-- tire de sa clé « id:1:id », Conversation.photoDeLaCle) ; `vu`, ce qu'elle a vu de sa photo
+-- (Historique.vu : la dernière entrée du journal de Claude, editCount et lastEditTime), d'où le
+-- complément « Depuis la dernière fois » ; `ecartee`, vrai quand « Repartir à neuf » l'a mise de
+-- côté (gardée sur le disque, plus jamais reprise ni montrée) ; `groupe`, la clé de la sélection
+-- d'une conversation de plusieurs photos (l'ensemble des photos, sans l'ordre ni la photo active),
+-- jamais gardée, comme une demande rapide sur plusieurs photos. Leurs éléments `historique` (sorte 'historique',
+-- 'depuis' ou 'groupe' : ce que la fenêtre dit de la photo ou du groupe, sans Claude, Historique.lua)
+-- se montrent dans le fil et partent une seule fois avec la demande suivante de Dany (`pourClaude`,
+-- `envoye`) ; ils ne commencent pas la conversation (Conversation.commencee). Une demande faite par
+-- la Demande rapide dans la conversation d'une photo, et ce qui y répond, portent `rapide` = true
+-- (Moteur.envoyerRapide ; le fil le dit, Fil.MENTION_RAPIDE).
+--
 -- Élément : id, genre, texte, date, outil, appel, etat ('enCours', 'fait', 'erreur', 'enAttente',
--- 'acceptee', 'refusee', 'ajustee', 'faite' : une proposition que Dany fait lui-même, Je le fais,
--- 1.3 ; 'appliquee', 'remplacee' : une proposition qu'une étape de Claude sur sa photo a rendue
--- sans objet, 1.3.2, Conversation.clorePropositions), detail, images (chemins relatifs au dossier de la
--- conversation), changements ({ cle, libelle, avant, apres }), partiel (texte en train
--- d'arriver) ; pour une notation : passe, pose (notes posées à la demande de Dany :
+-- 'acceptee', 'refusee', 'ajustee', 'faite' : une proposition que Dany faisait lui-même, Je le
+-- fais, 1.3, retiré au correctif 1.3.6 ; 'appliquee', 'remplacee' : une proposition qu'une étape
+-- de Claude sur sa photo a rendue sans objet, 1.3.2, Conversation.clorePropositions), detail,
+-- images (chemins relatifs au dossier de la conversation), changements ({ cle, libelle, avant,
+-- apres }), partiel (texte en train d'arriver) ; pour une notation : passe, pose (notes posées à la demande de Dany :
 -- propose_ratings avec apply), notes (voir Conversation.notesDemandees). Pour un outil qui écrit
 -- une étape (1.3, Conversation.OUTILS_ETAPES) : raison (reason de l'entrée), etape (step_name),
 -- etapes (les étapes écrites, lues dans la réponse : { photo, id, nom, fichier, changements }) ;
@@ -22,22 +40,6 @@
 -- pointillés). Pour toute proposition (1.3.2) : photo (photo_id de l'entrée, sinon la photo que
 -- dit la réponse ; nil tant qu'elle n'est pas connue) ; close par une étape de Claude, etapeClaude
 -- (le nom de cette étape, sans « Claude · »).
--- Un élément `lecon` (1.3) suit un appel de photo_lesson avec ses points (jamais read_facts seul),
--- pour le fil seulement (la leçon est rangée par le module, carnet.json) : photo, points (dans
--- l'ordre Lumière, Couleur, Composition : { axe, nom, manque, prise_de_vue, defauts }), puis
--- d'après la réponse : fichier, rangee, remplacee, mois, remarque (« Leçon non rangée… ») ; en
--- erreur, la raison dans texte.
--- Un élément `exercice` (1.3, « Je le fais ») suit un appel de preview_settings avec my_turn, à la
--- place d'une proposition (rien n'est appliqué : Dany fait la retouche lui-même) : photo, fichier,
--- appel, etat ('enCours' jusqu'à la liste, 'aFaire', 'comparee', 'erreur'), aFaire (la liste du
--- connecteur, dans l'ordre du panneau Développement : { n, panneau, section, reglage, cle, cles,
--- de, a, texte, avant, apres }), instantane ; puis, d'après view_photo avec compare =
--- claude_version : appelComparaison (son appel, gardé ; comparaisonEnCours pendant l'appel),
--- ecarts ({ cle, panneau, reglage, sorte, texte }), commeClaude, resume, principal ({ visible, texte }),
--- aSavoir, appelCompare (l'appel de la dernière comparaison aboutie, dont l'image est montrée) ;
--- comparaisonRefusee (la raison d'une comparaison refusée qui peut se refaire : l'exercice reste où
--- il en était) ; en erreur, la raison dans texte ; signatures (les tables au départ du suivi, pour
--- cocher ce qui a bougé : Fenetre.suivreExercice).
 
 require 'Compat'
 local Consignes = require 'Consignes'
@@ -201,22 +203,16 @@ function Conversation.ajouterDemande(c, texte, date, images, style)
             demandes = demandes + 1
         end
     end
-    if c.titreChoisi ~= true and c.titreAuto ~= true and demandes == 1 then
+    -- Une conversation de photo ou de groupe garde son titre provisoire (le nom de la photo, le
+    -- nombre de photos) jusqu'à celui que Claude donne (Conversation.poserTitre).
+    if c.titreChoisi ~= true and c.titreAuto ~= true and demandes == 1 and c.photo == nil and c.groupe == nil then
         c.titre = Conversation.titreDepuis(texte)
     end
     c.modifiee = date
 end
 
--- Renomme ; un titre vide ne change rien (rend false).
-function Conversation.renommer(c, nouveau)
-    local propre = Texte.nettoyer(nouveau)
-    if propre == '' then
-        return false
-    end
-    c.titre = propre
-    c.titreChoisi = true
-    return true
-end
+-- (Renommer une conversation, Conversation.renommer, est retiré au correctif 1.3.6 : le titre est
+-- celui que Claude donne ; un titre choisi avant, `titreChoisi`, reste.)
 
 -- Le titre que Claude tire de la photo : seulement à la place du titre par défaut (jamais d'un
 -- titre choisi par Dany), et une seule fois.
@@ -231,10 +227,11 @@ function Conversation.poserTitre(c, texte)
     end
 end
 
--- Le texte envoyé à Claude : la ligne de contexte de Lightroom, celle du style choisi, celle de la
--- leçon (« [Sans leçon] », case Leçon décochée), la demande, et tant que la conversation n'a pas de
+-- Le texte envoyé à Claude : la ligne de contexte de Lightroom, celle du style choisi, les lignes
+-- de l'historique pas encore envoyées (`historiques`, Conversation.historiquesAEnvoyer : comme
+-- « [Sans leçon] » jusqu'au correctif 1.3.6), la demande, et tant que la conversation n'a pas de
 -- titre tiré d'une photo ni choisi, le rappel du titre.
-function Conversation.messagePourClaude(c, demande, contexte, ligneStyle, ligneLecon)
+function Conversation.messagePourClaude(c, demande, contexte, ligneStyle, historiques)
     local morceaux = {}
     if contexte and contexte ~= '' then
         morceaux[#morceaux + 1] = contexte
@@ -242,8 +239,10 @@ function Conversation.messagePourClaude(c, demande, contexte, ligneStyle, ligneL
     if ligneStyle and ligneStyle ~= '' then
         morceaux[#morceaux + 1] = ligneStyle
     end
-    if ligneLecon and ligneLecon ~= '' then
-        morceaux[#morceaux + 1] = ligneLecon
+    for _, e in ipairs(historiques or {}) do
+        if type(e.pourClaude) == 'string' and e.pourClaude ~= '' then
+            morceaux[#morceaux + 1] = e.pourClaude
+        end
     end
     morceaux[#morceaux + 1] = demande
     if c.titreAuto ~= true and c.titreChoisi ~= true then
@@ -252,35 +251,59 @@ function Conversation.messagePourClaude(c, demande, contexte, ligneStyle, ligneL
     return table.concat(morceaux, '\n\n')
 end
 
--- Recherche : chaque mot doit se trouver dans le titre, le résumé, les messages ou les leçons (sans
--- tenir compte des majuscules ni des accents). Une recherche vide garde tout.
-function Conversation.correspond(c, recherche)
-    local mots = {}
-    for mot in Texte.plier(recherche):gmatch('%S+') do
-        mots[#mots + 1] = mot
-    end
-    if #mots == 0 then
-        return true
-    end
-    local textes = { c.titre or '', c.resume or '' }
+-- (La recherche dans les conversations, Conversation.correspond, est retirée avec le champ
+-- Rechercher du volet au correctif 1.3.6.)
+
+-- Une photo, une conversation (correctif 1.3.6) ------------------------------------------------
+
+-- Ajoute un élément de la fenêtre (Historique.lua) : `sorte` 'historique' (l'historique de la photo,
+-- en tête d'une conversation neuve), 'depuis' (ce qui a changé depuis que la conversation a vu la
+-- photo) ou 'groupe' (le résumé court d'un groupe) ; `texte`, ses lignes pour le fil ; `pourClaude`,
+-- la ligne jointe à la demande suivante de Dany, une seule fois (`envoye`). Ne change pas la date de
+-- la conversation (son rang parmi les autres).
+function Conversation.ajouterHistorique(c, sorte, texte, pourClaude, date)
+    local e = nouvelElement('historique', { sorte = sorte, texte = texte, pourClaude = pourClaude, envoye = false }, date)
+    c.elements[#c.elements + 1] = e
+    return e
+end
+
+-- Les éléments de la fenêtre pas encore envoyés à Claude, dans l'ordre du fil (Moteur.envoyer les
+-- marque envoyés une fois la demande partie).
+function Conversation.historiquesAEnvoyer(c)
+    local liste = {}
     for _, e in ipairs(c.elements or {}) do
-        if e.genre == 'dany' or e.genre == 'claude' then
-            textes[#textes + 1] = e.texte or ''
-        elseif e.genre == 'lecon' then
-            for _, p in ipairs(type(e.points) == 'table' and e.points or {}) do
-                if type(p) == 'table' then
-                    textes[#textes + 1] = table.concat({ tostring(p.nom or ''), tostring(p.manque or ''), tostring(p.prise_de_vue or '') }, '\n')
-                end
-            end
+        if e.genre == 'historique' and e.envoye ~= true then
+            liste[#liste + 1] = e
         end
     end
-    local botte = Texte.plier(table.concat(textes, '\n'))
-    for _, mot in ipairs(mots) do
-        if not botte:find(mot, 1, true) then
-            return false
+    return liste
+end
+
+-- Vrai quand la conversation a commencé : un élément autre que ceux de la fenêtre (l'historique ne
+-- compte pas : une photo dont la conversation n'a que lui est une photo sans conversation).
+function Conversation.commencee(c)
+    for _, e in ipairs(type(c) == 'table' and c.elements or {}) do
+        if e.genre ~= 'historique' then
+            return true
         end
     end
-    return true
+    return false
+end
+
+-- La photo seule d'une clé de sélection (Lightroom.photos : « active:nombre:ids… ») : « 4961:1:4961 »
+-- donne 4961 ; nil pour un groupe ou une clé d'une autre forme.
+function Conversation.photoDeLaCle(cle)
+    local active, seule = tostring(cle or ''):match('^(%d+):1:(%d+)$')
+    if active and active == seule then
+        return tonumber(active)
+    end
+    return nil
+end
+
+-- Vrai si `c` est la conversation de la photo `id` (jamais celle d'un groupe).
+function Conversation.dePhoto(c, id)
+    return type(c) == 'table' and c.groupe == nil and c.photo ~= nil and id ~= nil
+        and Conversation.clePhoto(c.photo) == Conversation.clePhoto(id)
 end
 
 -- Outils et propositions ----------------------------------------------------------------------
@@ -554,100 +577,8 @@ function Conversation.completerNotation(e, r)
     end
 end
 
--- Leçon de la photo (1.3) ---------------------------------------------------------------------
--- Un élément `lecon` suit un appel de photo_lesson qui donne ses points : la carte « Leçon de la
--- photo » du fil (Fil.lua) se fait de l'entrée de l'outil, visible avant la réponse, puis la
--- réponse du connecteur dit le fichier et si la leçon est rangée. Les faits mesurés restent dans
--- le détail de l'appel (un clic sur la carte l'ouvre). read_facts seul (les faits sans points) ne
--- fait pas de carte.
-
--- Les trois axes, dans l'ordre de la carte (clés de photo_lesson).
-Conversation.AXES_LECON = {
-    { cle = 'light', nom = "Lumière" },
-    { cle = 'color', nom = "Couleur" },
-    { cle = 'composition', nom = "Composition" },
-}
-
--- Une moitié de point sur une ligne, sans gras ni code Markdown ; nil si elle est vide.
-local function textePoint(v)
-    if type(v) ~= 'string' then
-        return nil
-    end
-    local t = Texte.nettoyer((v:gsub('%*%*', ''):gsub('`', ''):gsub('%s+', ' ')))
-    return t ~= '' and t or nil
-end
-
--- Les points demandés par Claude (entrée de photo_lesson), en tables neuves, dans l'ordre des axes
--- (Conversation.AXES_LECON) : { axe, nom, manque (nil : rien ne manquait), prise_de_vue, defauts }.
--- Un axe inconnu est écarté ; un axe donné deux fois garde son premier point (le connecteur refuse
--- l'appel, la carte passe en erreur).
-function Conversation.leconDemandee(entree)
-    entree = type(entree) == 'table' and entree or {}
-    local parAxe = {}
-    for _, p in ipairs(type(entree.points) == 'table' and entree.points or {}) do
-        if type(p) == 'table' and type(p.axis) == 'string' and not parAxe[p.axis] then
-            local defauts = {}
-            for _, d in ipairs(type(p.defects) == 'table' and p.defects or {}) do
-                if type(d) == 'string' and d ~= '' then
-                    defauts[#defauts + 1] = d
-                end
-            end
-            parAxe[p.axis] = { manque = textePoint(p.missing), prise_de_vue = textePoint(p.at_capture) or '', defauts = defauts }
-        end
-    end
-    local points = {}
-    for _, axe in ipairs(Conversation.AXES_LECON) do
-        local p = parAxe[axe.cle]
-        if p then
-            points[#points + 1] = { axe = axe.cle, nom = axe.nom, manque = p.manque, prise_de_vue = p.prise_de_vue, defauts = p.defauts }
-        end
-    end
-    return points
-end
-
--- La réponse du connecteur à photo_lesson (`lecon` : photo, fichier, rangee, remplacee, mois ;
--- `remarques`) : { photo, fichier, rangee, remplacee, mois, remarque }, nil sans. `remarque` : la
--- remarque du connecteur sur le rangement (« Leçon non rangée… », « Leçon gardée pour cette
--- session… »), jamais celles des défauts mesurés, qui sont pour Claude.
-function Conversation.leconLue(textes)
-    for _, texte in ipairs(textes or {}) do
-        local ok, json = pcall(Json.decode, texte)
-        if ok and type(json) == 'table' and type(json.lecon) == 'table' then
-            local l = json.lecon
-            local lue = { photo = type(l.photo) == 'number' and l.photo or nil, fichier = chaine(l.fichier), rangee = l.rangee == true,
-                remplacee = l.remplacee == true, mois = chaine(l.mois) }
-            for _, r in ipairs(type(json.remarques) == 'table' and json.remarques or {}) do
-                local t = chaine(r)
-                if t and t:sub(1, #"Leçon ") == "Leçon " then
-                    lue.remarque = t
-                    break
-                end
-            end
-            return lue
-        end
-    end
-    return nil
-end
-
--- Complète un élément `lecon` par le résultat de son appel : refusé (erreur du connecteur, la
--- raison dans texte), ou fait, avec le fichier et le rangement lus dans la réponse.
-function Conversation.completerLecon(e, r)
-    if r.erreur then
-        e.etat = 'erreur'
-        e.texte = Texte.nettoyer((table.concat(r.textes or {}, ' '):gsub('%s+', ' ')))
-        return
-    end
-    e.etat = 'fait'
-    local lue = Conversation.leconLue(r.textes)
-    if lue then
-        e.photo = lue.photo or e.photo
-        e.fichier = lue.fichier or e.fichier
-        e.rangee, e.remplacee, e.mois, e.remarque = lue.rangee, lue.remplacee, lue.mois, lue.remarque
-    end
-end
-
--- L'élément `outil` de l'appel `appel` (le dernier), nil sans appel ni élément : le détail d'une
--- carte (leçon) est celui de son appel.
+-- L'élément `outil` de l'appel `appel` (le dernier), nil sans appel ni élément (l'appel d'un
+-- aperçu : Conversation.dernierZoom).
 function Conversation.outilDeLAppel(c, appel)
     if appel == nil then
         return nil
@@ -880,7 +811,7 @@ end
 -- Vrai pour une retouche faite (Mes demandes, « ＋ Garder la demande ») : l'appel d'un outil qui
 -- change l'image (Conversation.OUTILS_ETAPES, sauf les classements), abouti, avec au moins une étape
 -- écrite dans sa réponse ; match_series, dont la réponse ne porte pas d'etape_id, compte une fois
--- abouti. Une proposition (preview_settings), une notation, un classement ou une leçon n'en sont pas.
+-- abouti. Une proposition (preview_settings), une notation ou un classement n'en sont pas.
 function Conversation.estRetouche(e)
     if type(e) ~= 'table' or e.genre ~= 'outil' or e.etat ~= 'fait' or not Conversation.OUTILS_ETAPES[e.outil]
         or Conversation.CLASSEMENTS[e.outil] then
@@ -1090,237 +1021,6 @@ function Conversation.photosEtape(e)
     return photos
 end
 
--- Je le fais (1.3) ----------------------------------------------------------------------------
--- Dany fait la retouche lui-même, pour apprendre. preview_settings avec my_turn range la version de
--- Claude sans rien appliquer et rend a_faire, la liste des réglages dans l'ordre du panneau
--- Développement : un élément `exercice` à la place d'une proposition (rien à accepter). Quand Dany
--- a fini, view_photo avec compare = claude_version rend les deux versions côte à côte et
--- `exercice` : les écarts réglage par réglage et l'écart principal, notés sur l'exercice de la
--- photo. Le registre reste le module (mémoire variantesClaude) : l'élément ne sert qu'à la fenêtre.
-
--- Une valeur de la liste : nombre, texte ou booléen ; les autres (null, table) ne se gardent pas.
-local function valeurSimple(v)
-    local t = type(v)
-    if t == 'number' or t == 'string' or t == 'boolean' then
-        return v
-    end
-    return nil
-end
-
--- Une valeur d'avant ou d'après : simple, ou (le cadre) une table neuve de valeurs simples par clé.
-local function valeurListe(v)
-    if type(v) ~= 'table' or v == Json.null then
-        return valeurSimple(v)
-    end
-    local t = {}
-    for cle, x in pairs(v) do
-        if type(cle) == 'string' then
-            t[cle] = valeurSimple(x)
-        end
-    end
-    return t
-end
-
--- Une liste de textes en table neuve (sans les autres valeurs).
-local function textes(liste)
-    local t = {}
-    for _, x in ipairs(type(liste) == 'table' and liste or {}) do
-        local s = chaine(x)
-        if s then
-            t[#t + 1] = s
-        end
-    end
-    return t
-end
-
--- La liste « à faire » du connecteur, en tables neuves, dans l'ordre reçu.
-local function lireAFaire(liste)
-    local lus = {}
-    for _, x in ipairs(liste) do
-        if type(x) == 'table' and chaine(x.cle) then
-            local cles = type(x.cles) == 'table' and textes(x.cles) or nil
-            lus[#lus + 1] = { n = tonumber(x.n) or (#lus + 1), panneau = chaine(x.panneau), section = chaine(x.section),
-                reglage = chaine(x.reglage) or chaine(x.cle), cle = chaine(x.cle), cles = cles and #cles > 0 and cles or nil,
-                de = chaine(x.de) or '', a = chaine(x.a) or '', texte = chaine(x.texte) or chaine(x.cle),
-                avant = valeurListe(x.avant), apres = valeurListe(x.apres) }
-        end
-    end
-    return lus
-end
-
--- Les écarts de la comparaison, en tables neuves : { cle, panneau, reglage, sorte, texte }.
-local function lireEcarts(liste)
-    local lus = {}
-    for _, x in ipairs(type(liste) == 'table' and liste or {}) do
-        if type(x) == 'table' and (chaine(x.texte) or chaine(x.reglage)) then
-            lus[#lus + 1] = { cle = chaine(x.cle), panneau = chaine(x.panneau), reglage = chaine(x.reglage) or chaine(x.cle) or '?',
-                sorte = chaine(x.sorte), texte = chaine(x.texte) or chaine(x.reglage) }
-        end
-    end
-    return lus
-end
-
--- La photo d'une réponse (`photo` : { id, fichier }) : id et fichier.
-local function photoDeLaReponse(json)
-    if type(json.photo) == 'table' and json.photo ~= Json.null then
-        return tonumber(json.photo.id), chaine(json.photo.fichier)
-    end
-    return tonumber(json.photo), nil
-end
-
--- Ce que dit une réponse du connecteur sur un exercice : la liste (preview_settings avec my_turn :
--- { liste = true, aFaire, instantane, photo, fichier }) ou la comparaison (view_photo avec
--- compare = claude_version : { comparaison = true, ecarts, commeClaude, resume, principal,
--- aSavoir, instantane, photo, fichier }) ; nil sans l'une ni l'autre. Un texte qui n'est pas du
--- JSON (réponse d'attente, remarque de l'écran à part) est passé ; une remarque recollée après le
--- JSON est retirée (Conversation.teteJson).
-function Conversation.exerciceLu(textesReponse)
-    for _, texte in ipairs(textesReponse or {}) do
-        local json = Conversation.teteJson(texte)
-        if type(json) == 'table' and json ~= Json.null then
-            local photo, fichier = photoDeLaReponse(json)
-            if type(json.a_faire) == 'table' then
-                return { liste = true, aFaire = lireAFaire(json.a_faire), instantane = chaine(json.instantane), photo = photo, fichier = fichier }
-            end
-            local x = json.exercice
-            if type(x) == 'table' and x ~= Json.null then
-                local p = type(x.ecart_principal) == 'table' and x.ecart_principal or {}
-                return { comparaison = true, ecarts = lireEcarts(x.ecarts), commeClaude = textes(x.comme_claude), resume = chaine(x.resume),
-                    principal = { visible = p.visible == true, texte = chaine(p.texte) }, aSavoir = chaine(x.a_savoir_exercice),
-                    instantane = chaine(x.instantane), photo = photo, fichier = fichier }
-            end
-        end
-    end
-    return nil
-end
-
--- Une raison sur une ligne, d'après les textes d'une réponse.
-local function raisonDe(r)
-    return Texte.nettoyer((table.concat(r.textes or {}, ' '):gsub('%s+', ' ')))
-end
-
--- Le refus d'une comparaison qui ne se refera pas : le module n'a plus la version de Claude
--- (revert_to_original l'a effacée, Rendu.lua : « Aucune version de Claude rangée… »).
-Conversation.SANS_VERSION = "Aucune version de Claude rangée"
-
--- Complète un exercice par le résultat d'un de ses appels. La liste (my_turn) : 'aFaire' avec la
--- liste, ou 'erreur' (refus, ou réponse sans liste : la réponse d'attente d'un appel trop long,
--- que Claude rappelle, en fait un autre). La comparaison (claude_version) : 'comparee' avec les
--- écarts ; 'erreur' si le module n'a plus la version de Claude (Conversation.SANS_VERSION) ; un
--- autre refus (liaison en pause, Lightroom occupé…) laisse l'exercice où il en était, à faire ou
--- déjà comparé, avec la raison (`comparaisonRefusee`) : « J'ai fini » se refait, et Je le fais ne
--- recommence pas un exercice par-dessus le travail de Dany. Une réponse sans `exercice` (attente)
--- laisse aussi l'exercice où il en était.
-function Conversation.completerExercice(e, r)
-    local comparaison = e.appelComparaison ~= nil and r.idOutil == e.appelComparaison
-    if comparaison then
-        e.comparaisonEnCours = nil
-    end
-    if r.erreur then
-        local raison = raisonDe(r)
-        if comparaison and not raison:find(Conversation.SANS_VERSION, 1, true) then
-            e.comparaisonRefusee = raison ~= '' and raison or "l'appel n'a pas abouti."
-            return
-        end
-        e.etat = 'erreur'
-        e.texte = (comparaison and "comparaison impossible : " or "") .. raison
-        return
-    end
-    local lu = Conversation.exerciceLu(r.textes)
-    if comparaison then
-        if lu and lu.comparaison then
-            e.etat = 'comparee'
-            e.ecarts, e.commeClaude, e.resume, e.principal, e.aSavoir = lu.ecarts, lu.commeClaude, lu.resume, lu.principal, lu.aSavoir
-            e.photo, e.fichier = e.photo or lu.photo, e.fichier or lu.fichier
-            e.texte, e.comparaisonRefusee = '', nil
-            -- L'appel dont l'image et les écarts sont montrés (une comparaison suivante refusée ne
-            -- les remplace pas).
-            e.appelCompare = r.idOutil
-        end
-        return
-    end
-    if lu and lu.liste then
-        e.etat = 'aFaire'
-        e.aFaire, e.instantane = lu.aFaire, lu.instantane
-        e.photo, e.fichier = lu.photo or e.photo, lu.fichier or e.fichier
-        e.texte = ''
-    else
-        e.etat = 'erreur'
-        e.texte = "liste non reçue : " .. raisonDe(r)
-    end
-end
-
--- Le dernier exercice du fil, celui que montre la carte Proposition ; nil sinon. Une proposition
--- en attente arrivée après lui prend la carte, comme une proposition que Dany fait lui-même (un
--- nouvel exercice suit). Une proposition décidée ensuite (acceptée, refusée, à ajuster) rend la
--- carte à un exercice encore à faire (sa liste et « J'ai fini » reviennent), mais clôt un exercice
--- comparé ou refusé quand elle est arrivée après sa dernière comparaison (ou après lui, sans
--- comparaison).
-function Conversation.dernierExercice(c)
-    local elements = c and c.elements or {}
-    local decidee
-    for i = #elements, 1, -1 do
-        local e = elements[i]
-        if e.genre == 'proposition' then
-            if e.etat == 'enAttente' or e.etat == 'faite' then
-                return nil
-            end
-            decidee = decidee or i
-        elseif e.genre == 'exercice' then
-            if decidee and e.etat ~= 'aFaire' and e.etat ~= 'enCours' then
-                local depuis, appel = i, e.appelCompare or e.appelComparaison
-                for k = i + 1, appel and #elements or 0 do
-                    if elements[k].genre == 'outil' and elements[k].appel == appel then
-                        depuis = k
-                    end
-                end
-                if decidee > depuis then
-                    return nil
-                end
-            end
-            return e
-        end
-    end
-    return nil
-end
-
--- L'exercice en cours : le dernier, à faire (sa liste arrivée, pas encore comparé), sans
--- proposition en attente arrivée après lui. Le bouton de la carte dit alors « J'ai fini ».
-function Conversation.exerciceEnCours(c)
-    local e = Conversation.dernierExercice(c)
-    return e and e.etat == 'aFaire' and e or nil
-end
-
--- L'exercice d'une photo (le dernier, hors erreur) ; `photo` nil : le dernier. Une comparaison s'y
--- note ; nil sans exercice de cette photo dans la conversation.
-function Conversation.exercicePour(c, photo)
-    local cle = photo ~= nil and Conversation.clePhoto(photo) or nil
-    for i = #(c and c.elements or {}), 1, -1 do
-        local e = c.elements[i]
-        if e.genre == 'exercice' and e.etat ~= 'erreur' and (cle == nil or e.photo == nil or Conversation.clePhoto(e.photo) == cle) then
-            return e
-        end
-    end
-    return nil
-end
-
--- L'image de la comparaison d'un exercice (Claude à gauche, Dany à droite), celle de la dernière
--- comparaison aboutie (appelCompare), en chemin relatif au dossier de la conversation ; nil sans
--- comparaison rendue.
-function Conversation.imageComparaison(c, x)
-    local appel = x and (x.appelCompare or x.appelComparaison)
-    if not (c and appel) then
-        return nil
-    end
-    for i = #c.elements, 1, -1 do
-        local e = c.elements[i]
-        if e.genre == 'apercu' and e.appel == appel and #(e.images or {}) > 0 then
-            return e.images[#e.images]
-        end
-    end
-    return nil
-end
-
 -- Événements de Claude Code -------------------------------------------------------------------
 
 local function dernier(c)
@@ -1395,24 +1095,8 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                 if Conversation.OUTILS_ETAPES[court] and entree.preview ~= true then
                     champs.raison, champs.etape, champs.etapes = chaine(entree.reason), chaine(entree.step_name), {}
                 end
-                -- La comparaison de « Je le fais » (1.3) : ses images se légendent « Claude | vous »
-                -- (Conversation.images), et elle se note sur l'exercice de la photo.
-                local comparaison = court == 'view_photo' and entree.compare == 'claude_version'
-                if comparaison then
-                    champs.comparaison = true
-                end
                 c.elements[#c.elements + 1] = nouvelElement('outil', champs, date)
-                if comparaison then
-                    local x = Conversation.exercicePour(c, tonumber(entree.photo_id))
-                    if x then
-                        x.appelComparaison, x.comparaisonEnCours, x.comparaisonRefusee = bloc.id, true, nil
-                    end
-                end
-                if court == 'preview_settings' and entree.my_turn == true then
-                    -- « Je le fais » (1.3) : rien à accepter ; la liste arrive avec la réponse.
-                    c.elements[#c.elements + 1] = nouvelElement('exercice', { outil = court, appel = bloc.id, etat = 'enCours',
-                        photo = tonumber(entree.photo_id), aFaire = {}, ecarts = {} }, date)
-                elseif court == 'preview_settings' then
+                if court == 'preview_settings' then
                     local raison = type(bloc.entree.reason) == 'string' and bloc.entree.reason
                         or (type(bloc.entree.step_name) == 'string' and bloc.entree.step_name) or ''
                     -- Une proposition de recadrage (1.3, Composition lue) : Ajuster… propose les
@@ -1429,14 +1113,6 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                     if #notes > 0 then
                         c.elements[#c.elements + 1] = nouvelElement('notation', { outil = court, appel = bloc.id, etat = 'enCours',
                             passe = tonumber(bloc.entree.pass), pose = bloc.entree.apply == true or nil, notes = notes }, date)
-                    end
-                elseif court == 'photo_lesson' then
-                    -- L'élément de la leçon (son onglet et sa ligne d'actions), fait de l'entrée ;
-                    -- les faits seuls (read_facts) n'en font pas.
-                    local points = Conversation.leconDemandee(entree)
-                    if #points > 0 and entree.read_facts ~= true then
-                        c.elements[#c.elements + 1] = nouvelElement('lecon', { outil = court, appel = bloc.id, etat = 'enCours',
-                            photo = type(entree.photo_id) == 'number' and entree.photo_id or nil, points = points }, date)
                     end
                 end
             end
@@ -1476,34 +1152,6 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
             if n then
                 Conversation.completerNotation(c.elements[n], r)
             end
-            local l = dernierIndice(c, function(e) return e.genre == 'lecon' and e.appel == r.idOutil end)
-            if l then
-                Conversation.completerLecon(c.elements[l], r)
-            end
-            -- « Je le fais » (1.3) : la liste (my_turn) ou la comparaison (claude_version).
-            local x = dernierIndice(c, function(e)
-                return e.genre == 'exercice' and (e.appel == r.idOutil or (e.appelComparaison ~= nil and e.appelComparaison == r.idOutil))
-            end)
-            if x then
-                local exo = c.elements[x]
-                Conversation.completerExercice(exo, r)
-                -- La liste arrivée (Dany l'a demandée en mots, sans le bouton) : la proposition
-                -- juste avant elle, restée en attente, est à faire lui-même, plus à accepter (pas
-                -- une plus ancienne, ni une d'avant un autre exercice qui a eu sa liste).
-                if exo.etat == 'aFaire' and exo.appel == r.idOutil then
-                    for k = x - 1, 1, -1 do
-                        local avant = c.elements[k]
-                        if avant.genre == 'proposition' then
-                            if avant.etat == 'enAttente' then
-                                avant.etat = 'faite'
-                            end
-                            break
-                        elseif avant.genre == 'exercice' and avant.etat ~= 'erreur' then
-                            break
-                        end
-                    end
-                end
-            end
             if p then
                 local e = c.elements[p]
                 e.images = chemins
@@ -1534,15 +1182,8 @@ function Conversation.appliquer(c, ev, date, enregistrerImage)
                 e.texte = Conversation.texteAffiche(e)
                 e.partiel = false
             end
-            if (e.genre == 'outil' or e.genre == 'notation' or e.genre == 'lecon') and e.etat == 'enCours' then
+            if (e.genre == 'outil' or e.genre == 'notation') and e.etat == 'enCours' then
                 e.etat = ev.interrompue and 'erreur' or 'fait'
-            end
-            -- Un exercice sans sa liste n'a pas abouti ; une comparaison sans réponse le laisse à faire.
-            if e.genre == 'exercice' then
-                if e.etat == 'enCours' then
-                    e.etat = 'erreur'
-                end
-                e.comparaisonEnCours = nil
             end
             if not (e.genre == 'claude' and (e.texte or '') == '') then
                 gardes[#gardes + 1] = e
@@ -1579,7 +1220,7 @@ function Conversation.decider(c, id, acceptee)
     end
 end
 
--- Marque un élément (une proposition que Dany fait lui-même : 'faite', Je le fais) ; vrai s'il
+-- Marque un élément (une proposition) ; vrai s'il
 -- existe.
 function Conversation.marquer(c, id, etat)
     for _, e in ipairs(c.elements) do
@@ -1598,13 +1239,13 @@ end
 
 -- Une proposition dépassée par Claude (1.3.2) ---------------------------------------------------
 -- Constaté le 22 octobre 2026 : la proposition préparée à l'ouverture attendait dans l'onglet
--- Proposition ; Dany a écrit « Applique ta proposition, puis termine par la leçon de la photo »,
--- Claude a posé les mêmes réglages par apply_settings, puis la leçon ; la carte offrait toujours
--- Accepter (un clic les aurait posés une seconde fois), et la leçon ne s'ouvrait pas (une
--- proposition attendait). Règle : dès qu'un outil d'étape qui change l'image
--- (Conversation.OUTILS_ETAPES, sauf les classements, qui ne la changent pas) écrit une étape sur
--- la photo d'une proposition en attente arrivée avant lui (sur n'importe laquelle de ses photos
--- quand celle de la proposition n'est pas connue), elle n'attend plus : 'appliquee' si cette
+-- Proposition ; Dany a écrit « Applique ta proposition, puis termine par la leçon de la photo »
+-- (la leçon, retirée au correctif 1.3.6), Claude a posé les mêmes réglages par apply_settings,
+-- puis la leçon ; la carte offrait toujours Accepter (un clic les aurait posés une seconde fois),
+-- et la leçon ne s'ouvrait pas (une proposition attendait). Règle : dès qu'un outil d'étape qui
+-- change l'image (Conversation.OUTILS_ETAPES, sauf les classements, qui ne la changent pas) écrit
+-- une étape sur la photo d'une proposition en attente arrivée avant lui (sur n'importe laquelle de
+-- ses photos quand celle de la proposition n'est pas connue), elle n'attend plus : 'appliquee' si cette
 -- première étape pose chacun de ses réglages à la même valeur (clé et valeur d'après, telles que
 -- les deux réponses les disent ; il en faut au moins un de lu), sinon 'remplacee'. Accepter,
 -- Refuser et Ajuster… ne s'offrent plus (Conversation.propositionEnAttente ne la rend plus) ; la
@@ -1727,19 +1368,17 @@ function Conversation.propositionClose(c)
     return e and Conversation.ETATS_CLAUDE[e.etat] and e or nil
 end
 
--- Images de la conversation, dans l'ordre du fil : { chemin, element (indice), outil, comparaison
--- (vrai pour celle de « Je le fais », la version de Claude à gauche, celle de Dany à droite) }.
+-- Images de la conversation, dans l'ordre du fil : { chemin, element (indice), outil }.
 function Conversation.images(c)
     local liste = {}
     for i, e in ipairs(c.elements) do
         for _, chemin in ipairs(e.images or {}) do
-            local outil, comparaison
+            local outil
             if e.appel then
                 local j = dernierIndice(c, function(x) return x.genre == 'outil' and x.appel == e.appel end)
                 outil = j and c.elements[j].outil
-                comparaison = j and c.elements[j].comparaison == true or nil
             end
-            liste[#liste + 1] = { chemin = chemin, element = i, outil = outil or (e.genre == 'dany' and 'jointe'), comparaison = comparaison }
+            liste[#liste + 1] = { chemin = chemin, element = i, outil = outil or (e.genre == 'dany' and 'jointe') }
         end
     end
     return liste

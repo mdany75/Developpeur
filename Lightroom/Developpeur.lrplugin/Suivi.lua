@@ -1,4 +1,6 @@
--- Suivi.lua : fenêtre flottante « Claude · liaison », non bloquante. Elle montre l'état de la
+-- Suivi.lua : fenêtre flottante « Claude · liaison », non bloquante (la fenêtre de la liaison :
+-- « Afficher la fenêtre de la liaison » du menu, « fenêtre de suivi » jusqu'au correctif 1.3.6,
+-- quand l'onglet Suivi de la fenêtre Claude a pris ce mot). Elle montre l'état de la
 -- liaison (version, mode, pause), la proposition qui attend l'accord de l'utilisateur
 -- (préférence « Confirmer dans Lightroom » : boutons Accepter et Refuser), la dernière retouche
 -- et le journal (un clic sur une ligne sélectionne sa photo), et permet d'annuler la dernière

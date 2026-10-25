@@ -11,10 +11,9 @@ extension ToolHandler {
     /// Taille des aperçus d'analyse : celle où les seuils de netteté et de bruit ont été relevés.
     static let analysisSize = Detail.side
     static let maxAnalyzedPhotos = 30
-    /// Les avant/après de view_photo (compare) et le mode de la commande apercu (comparer) :
-    /// claude_version (« Je le fais », 1.3) rend la version de Claude rangée par my_turn.
+    /// Les avant/après de view_photo (compare) et le mode de la commande apercu (comparer).
     static let comparaisons: [(parametre: String, module: String)] = [
-        ("before_claude", "avantClaude"), ("previous_step", "etapePrecedente"), ("claude_version", "versionClaude"),
+        ("before_claude", "avantClaude"), ("previous_step", "etapePrecedente"),
     ]
 
     var analysisDefinitions: [JSONValue] {
@@ -30,7 +29,7 @@ extension ToolHandler {
                         "width": prop("number", "Largeur (0 à 1)."),
                         "height": prop("number", "Hauteur (0 à 1)."),
                     ], required: ["x", "y", "width", "height"])),
-                    ("compare", enumProp(Self.comparaisons.map(\.parametre), "Avant/après côte à côte : before_claude = l'état d'avant la première retouche de Claude ; previous_step = avant la dernière retouche ; claude_version = « Je le fais » : à gauche la version de Claude rangée par preview_settings avec my_turn, à droite l'état actuel (celle de l'utilisateur), avec exercice : écarts réglage par réglage et ecart_principal. L'Historique de Lightroom garde deux étapes « Claude · comparaison » (l'état d'avant, puis l'état actuel remis) : la photo revient telle qu'elle était.")),
+                    ("compare", enumProp(Self.comparaisons.map(\.parametre), "Avant/après côte à côte : before_claude = l'état d'avant la première retouche de Claude ; previous_step = avant la dernière retouche. L'Historique de Lightroom garde deux étapes « Claude · comparaison » (l'état d'avant, puis l'état actuel remis) : la photo revient telle qu'elle était. En fin de retouche, before_claude garde aussi le rendu ; rendu_reproductible (une retouche repartie de l'origine) : l'écart avec la précédente, à dire.")),
                     ("af_point", prop("boolean", "true = le point de mise au point de l'appareil dessiné sur l'image ou le zoom (region) : cadre AF rouge, point au centre (manquée : point_af.appareil) ; fichiers Fujifilm seulement. Pour noter, ou montrer la mise au point. Sans lui, point_af le donne en chiffres (avec la netteté autour ; sur un zoom, dans_la_zone) ; l'utilisateur peut le vouloir dessiné en tout temps.")),
                  ],
                  required: []),
@@ -86,12 +85,11 @@ extension ToolHandler {
         let compare = args.string("compare")
         if let compare {
             guard let mode = Self.comparaisons.first(where: { $0.parametre == compare })?.module else {
-                throw LightroomError.invalid("« compare » vaut before_claude, previous_step ou claude_version (« Je le fais » : la version de Claude rangée par preview_settings avec my_turn).")
+                throw LightroomError.invalid("« compare » vaut before_claude ou previous_step.")
             }
             guard region == nil else { throw LightroomError.invalid("« compare » et « region » ne vont pas ensemble.") }
             params["comparer"] = .string(mode)
         }
-        let exercice = compare == "claude_version"
         // Le point de mise au point, sur l'aperçu entier ou un zoom (pas un avant/après).
         if compare == nil { params["point_af"] = true }
 
@@ -122,8 +120,6 @@ extension ToolHandler {
             info["reglages"] = Self.grouped(settings, onlyChanged: true, raw: raw)
         }
         Self.describeProcessVersion(&info)
-        // Après « Je le fais » (my_turn), corrections_utilisateur est le travail de l'exercice.
-        JeLeFais.annoterCorrections(&info)
 
         if let region {
             guard let piece = PreviewImages.crop(image, region: region) else {
@@ -177,13 +173,6 @@ extension ToolHandler {
             }
         } else if let compare {
             let before = try Self.readPreview(result["chemin_avant"]?.string)
-            // « Je le fais » : un module d'avant la 1.3 prendrait versionClaude pour l'étape
-            // précédente, sans le dire ; sa comparaison n'est pas montrée (ses deux aperçus sont lus,
-            // donc effacés).
-            if exercice, result["exercice"]?.object == nil {
-                let version = lightroom.moduleVersion.map { " (version \($0))" } ?? ""
-                throw LightroomError.plugin("Le module de Lightroom\(version) ne connaît pas encore « Je le fais » : installer Développeur 1.3, puis quitter et relancer Lightroom, et refaire l'exercice (preview_settings avec my_turn).")
-            }
             // Deux vues rendues par la même commande, mesurées comme l'aperçu entier, avec la forme
             // courte de l'éclairage ; leur bilan, sans toucher aux vues gardées.
             let avant = Self.mesurerImage(before, detail: true), apres = Self.mesurerImage(image, detail: true)
@@ -192,20 +181,20 @@ extension ToolHandler {
             if let avant, let apres {
                 info["bilan"] = Bilan.avantApres(
                     avant: avant.mesures, apres: apres.mesures, detailAvant: avant.detail, detailApres: apres.detail,
-                    depuis: exercice ? "ma version (Claude, à gauche)"
-                        : compare == "before_claude" ? "l'état d'avant la première retouche de Claude (à gauche)"
+                    depuis: compare == "before_claude" ? "l'état d'avant la première retouche de Claude (à gauche)"
                         : "l'état d'avant la dernière retouche (à gauche)",
-                    conseil: exercice ? "Une « regression » est un défaut de la version de l'utilisateur que celle de Claude n'a pas : le lui dire simplement, sans toucher à la photo."
-                        : "Une « regression » restée se dit dans le résumé.",
+                    conseil: "Une « regression » restée se dit dans le résumé.",
                     // Des images de dimensions différentes : recadrage, Upright ou rotation entre les deux.
                     cadreChange: avant.largeur != apres.largeur || avant.hauteur != apres.hauteur)
             }
             image = PreviewImages.sideBySide(before, image) ?? image
-            info["image"] = exercice ? "À gauche ma version (Claude), à droite la vôtre." : "À gauche avant, à droite maintenant."
-            // Les écarts de l'exercice, réglage par réglage (classés), et l'écart principal mesuré sur
-            // les deux images : d'abord ce qui est réussi, puis l'écart qui compte.
-            if exercice, let module = result["exercice"] {
-                info["exercice"] = JeLeFais.enrichir(module, raw: raw, claude: avant?.mesures, vous: apres?.mesures)
+            info["image"] = "À gauche avant, à droite maintenant."
+            // Rendu reproductible (1.3.5 ; depuis la 1.3.6, à la fin d'une retouche) : le rendu de la
+            // photo gardé, comparé à la fin de la retouche précédente, celle d'avant son dernier
+            // retour à l'origine (chaque before_claude de la retouche en cours, le dernier compris).
+            if compare == "before_claude", let registre = registreRendus,
+               let comparaison = noterLeRendu(apercu: result, registre: registre) {
+                info["rendu_reproductible"] = comparaison
             }
         } else if let decodee = PreviewImages.image(image) {
             // Un seul décodage du JPEG ; une seule réduction à 512 px pour les mesures, les tons
@@ -339,8 +328,8 @@ extension ToolHandler {
     /// La vue entière de view_photo au carnet : seulement quand le serveur note au carnet
     /// (`noterAuCarnet`), pour une photo identifiée sans étape de Claude (etapes_claude.nombre == 0,
     /// que le module donne avec point_af), et que l'utilisateur n'a pas changée à la main depuis le
-    /// dernier état laissé par Claude (corrections_utilisateur : après « Je le fais », ou des étapes
-    /// défaites puis des réglages faits à la main, elle n'est plus telle que prise, et sa vue
+    /// dernier état laissé par Claude (corrections_utilisateur : après des étapes défaites puis des
+    /// réglages faits à la main, elle n'est plus telle que prise, et sa vue
     /// remplacerait celle d'avant). Ni sur une image rendue avant la fin des calculs IA (a_savoir) :
     /// elle ne montre pas l'état de la photo (le module ne la garde pas non plus pour l'avant/après,
     /// ni le bilan pour une « regression »). L'horizon n'y est cherché que sur une géométrie intacte
@@ -621,7 +610,6 @@ extension ToolHandler {
             result["tous_les_reglages"] = all
         }
         Self.describeProcessVersion(&result)
-        JeLeFais.annoterCorrections(&result)
         return .object(result)
     }
 

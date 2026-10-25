@@ -81,7 +81,7 @@ local function compatibiliteMaximale(format, voulue)
 end
 
 -- Mode « Proposer d'abord » : rien ne part sans l'accord de l'utilisateur (confirm = true, et la
--- fenêtre de suivi si « Confirmer dans Lightroom » est actif). Une fois pour toute la série.
+-- fenêtre de la liaison si « Confirmer dans Lightroom » est actif). Une fois pour toute la série.
 local function verifierAccordLivraison(prefs, params, outil, quoi)
     if params.suite then
         return

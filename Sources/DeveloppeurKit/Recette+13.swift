@@ -1,24 +1,20 @@
 import CoreGraphics
 import Foundation
 
-/// Recette de la 1.3 (« Apprendre en regardant Claude travailler ») : les cinq chantiers vérifiés
-/// dans le vrai Lightroom, sur les copies d'essai de « Développeur › Essais », chaque étape défaite.
+/// Recette de la 1.3 (« Apprendre en regardant Claude travailler ») : ses chantiers vérifiés dans
+/// le vrai Lightroom, sur les copies d'essai de « Développeur › Essais », chaque étape défaite (la
+/// leçon de la photo et « Je le fais » sont retirés depuis la 1.3.6, avec leurs étapes).
 /// - « Pourquoi ? » : l'avant/après d'une étape gardé par le module (avant_apres, que seule la
 ///   recette envoie : il lève aussi la condition de la photo active, d'où ni show_photo ni fenêtre
 ///   ouverte), l'avant tiré de la vue sans second rendu, puis l'étape annulée ;
-/// - la leçon de la photo : indices lus (read_facts), leçon d'une photo d'essai refusée par l'outil
-///   (rangee = false : elle n'entre pas au carnet de Dany), puis rangée pour la recette par la
-///   commande du module (essai_recette, sous l'entrée de la copie), relue, puis retirée ;
 /// - le carnet de progrès : une photo d'essai refusée, puis notée pour la recette (essai_recette),
 ///   au mois de sa prise de vue, exportée (export_journal avec notebook), puis retirée, même si une
 ///   vérification échoue ;
-/// - « Je le fais » : la version de Claude rangée sans rien appliquer, des réglages faits « à la
-///   main », la comparaison côte à côte et ses écarts, puis la version effacée ;
 /// - la composition lue (`--horizon`, une photo qui a un vrai horizon) : le cadre proposé
 ///   montré tel quel, le cadre actuel lu sur l'image entière, puis le cadre proposé appliqué et
 ///   l'horizon mesuré, droit et sur le tiers du bas.
-/// Les quatre premiers vont dans la séquence du RAW (sequenceApprendre, après le bilan ;
-/// sequenceJeLeFais, après les variantes), la composition dans sa propre séquence (lancer).
+/// Les deux premiers vont dans la séquence du RAW (sequenceApprendre, après le bilan), la
+/// composition dans sa propre séquence (lancer).
 extension Recette {
     // MARK: - Réglages de la recette
 
@@ -43,23 +39,12 @@ extension Recette {
     /// grand (la valeur par défaut) ; plus haut, avec un plus petit. La recette vérifie la
     /// géométrie, pas le goût du cadre.
     static let tailleMinComposition = 0.5
-    /// Un point de la leçon, par axe : de quoi la ranger (photo_lesson), pour une photo assombrie et
-    /// réchauffée par la recette.
-    static let pointsLecon: JSONValue = [
-        ["axis": "light", "missing": "Recette : photo sous-exposée, remontée d'au moins 0,7 IL.",
-         "at_capture": "Recette : exposer plus clair à la prise de vue.", "defects": ["underexposed"]],
-        ["axis": "color", "missing": "Recette : dominante corrigée de 500 K.",
-         "at_capture": "Recette : régler la balance des blancs selon la lumière.", "defects": ["color_cast"]],
-        ["axis": "composition", "at_capture": "Recette : rien à reprendre au cadrage."],
-    ]
-
     // MARK: - Séquence du RAW
 
-    /// Après le bilan, sur la photo dans l'état `attendu` : l'avant/après d'une étape, la leçon de
-    /// la photo, puis le carnet de progrès. Chacun revient à `attendu`.
-    func sequenceApprendre(_ id: Int, _ photo: String, depart: Etat, attendu: Etat) throws {
+    /// Après le bilan, sur la photo dans l'état `attendu` : l'avant/après d'une étape, puis le
+    /// carnet de progrès. Chacun revient à `attendu`.
+    func sequenceApprendre(_ id: Int, _ photo: String, attendu: Etat) throws {
         try etapePourquoi(id, photo, attendu: attendu)
-        try etapeLecon(id, photo, depart: depart, attendu: attendu)
         try sequenceCarnet(id, photo)
     }
 
@@ -172,98 +157,6 @@ extension Recette {
     static func luminanceMoyenne(_ data: Data) -> Double? {
         Measurements.analyze(data)?.meanL
     }
-
-    // MARK: - La leçon de la photo
-
-    /// La leçon de la photo (photo_lesson) : la photo assombrie et réchauffée par la recette (une
-    /// écriture, que Claude aurait corrigée : exposition remontée de 0,7 IL, température baissée de
-    /// 500 K, nettes depuis le départ de la séquence), les faits (indices underexposed et color_cast),
-    /// la leçon donnée à l'outil (trois points) et refusée par le module comme photo d'essai
-    /// (rangee = false, motif essai : 1.3.1, une leçon d'essai n'entre pas au carnet de Dany), puis
-    /// rangée par la commande du module avec essai_recette (jamais par un outil), sous l'entrée de la
-    /// copie elle-même, relue (lecon lire), retirée (lecon retirer, même si une vérification échoue),
-    /// et l'écriture annulée. Une leçon déjà rangée pour la copie (un essai d'avant la 1.3.1) n'est pas
-    /// remplacée : l'étape s'arrête avant toute écriture. Une copie hors de la collection de recette
-    /// est sautée, comme pour le carnet : photo_lesson rangerait sa leçon au carnet de son original.
-    func etapeLecon(_ id: Int, _ photo: String, depart: Etat, attendu: Etat) throws {
-        let photoID = JSONValue.number(Double(id))
-        try etape(photo, Self.etapeLeconNom) {
-            guard try dansLaCollectionDeRecette(id) else {
-                return "sautée : la copie n'est pas dans « \(Self.collectionDeRecette) » (sa leçon irait au carnet de son original, une vraie photo)"
-            }
-            let deja = try tools.lightroom.send("lecon", ["action": "lire", "photos": [photoID]], timeout: 30)["lecons"]?.array ?? []
-            guard deja.isEmpty else {
-                throw Echec(description: "une leçon est déjà rangée pour cette copie (essai dans la fenêtre d'avant la 1.3.1 ?) : la recette la remplacerait ; "
-                    + "la retirer d'abord (mcp-developpeur --module lecon '{\"action\": \"retirer\", \"photo\": \(id)}'), rien n'a été écrit")
-            }
-            guard let t0 = depart.temperature ?? attendu.temperature else { throw Echec(description: "pas de balance des blancs lisible") }
-            // Nettes depuis le départ de la séquence, comme depuis l'état actuel : le journal compte
-            // la première valeur d'avant de chaque réglage (Lecon.correctionsNettes).
-            let exposition = min(max(Self.valeur(depart, "Exposure2012") ?? 0, Self.valeur(attendu, "Exposure2012") ?? 0) + 0.7, 5)
-            let temperature = max(min(t0, attendu.temperature ?? t0) - 500, 2000)
-            try ecrire("apply_settings", id, ["settings": ["Exposure2012": .number(exposition), "Temperature": .number(temperature)]])
-            let ecrite = try etat(id)
-            var aRetirer = false
-            defer {
-                if aRetirer { _ = try? tools.lightroom.send("lecon", ["action": "retirer", "photo": photoID], timeout: 30) }
-            }
-            // 1.3.1 : la sensibilité en nombre (Photos.sensibilite, isoSpeedRating brut), que le carnet
-            // et la leçon lisent pour le bruit fort ; lue telle que le module la rend, avant photo_lesson.
-            let journal = try tools.lightroom.send("journal", ["detaille": true, "photos": [photoID]], timeout: ToolHandler.journalLeconTimeout)
-            let sensibilite = journal["photos"]?.array?.first?["photo"]?["sensibilite"]
-            let (faits, _) = try appel("photo_lesson", ["photo_id": photoID, "read_facts": true])
-            let indices = (faits["faits"]?["indices"]?.array ?? []).compactMap { $0["defect"]?.string }
-            let apresFaits = try etat(id)
-            // Retirée même si une vérification échoue : celle que l'outil aurait rangée à tort, puis
-            // celle de la recette.
-            aRetirer = true
-            let (reponse, _) = try appel("photo_lesson", ["photo_id": photoID, "points": Self.pointsLecon])
-            let apresLecon = try etat(id)
-            let parLOutil = try tools.lightroom.send("lecon", ["action": "lire", "photos": [photoID]], timeout: 30)["lecons"]?.array ?? []
-            // Rangée pour la recette : la commande du module, avec essai_recette, que seule la recette
-            // envoie (aucun outil ne le porte).
-            let points = try Lecon.points(Self.pointsLecon.array ?? [])
-            let rangement = try tools.lightroom.send("lecon", ["action": "garder", "photo": photoID, "essai_recette": true,
-                                                               "lecon": Lecon.pourLeModule(points: points, indices: [])], timeout: 30)
-            let lues = try tools.lightroom.send("lecon", ["action": "lire", "photos": [photoID]], timeout: 30)["lecons"]?.array ?? []
-            let retrait = try tools.lightroom.send("lecon", ["action": "retirer", "photo": photoID], timeout: 30)
-            aRetirer = false
-            let restees = try tools.lightroom.send("lecon", ["action": "lire", "photos": [photoID]], timeout: 30)["lecons"]?.array ?? []
-            _ = try appel("undo_last", ["photo_ids": [photoID]])
-            try verifierEgal(try etat(id), attendu)
-
-            try verifier((sensibilite?.double ?? 0) > 0,
-                         "sensibilité absente du journal détaillé, ou pas un nombre (isoSpeedRating brut) : \(sensibilite.map(JSONCoding.line) ?? "absente")")
-            try verifier(indices.contains("underexposed") && indices.contains("color_cast"),
-                         "indices lus : \(indices.isEmpty ? "aucun" : indices.joined(separator: ", ")) (attendus : underexposed et color_cast)")
-            try verifierEgal(apresFaits, ecrite)
-            try verifierEgal(apresLecon, ecrite)
-            let lecon = reponse["lecon"]
-            let remarques = (reponse["remarques"]?.array ?? []).compactMap(\.string)
-            try verifier(lecon?["rangee"]?.bool == false && parLOutil.isEmpty,
-                         "leçon d'une copie d'essai rangée par photo_lesson (elle irait au carnet de Dany) : \(lecon.map(JSONCoding.line) ?? "?")")
-            try verifier(remarques.contains { $0.contains("photo d'essai") }, "refus de la photo d'essai non dit : \(remarques.joined(separator: " ; "))")
-            let fichier = faits["photo"]?["fichier"]?.string
-            try verifier(rangement["rangee"]?.bool == true, "leçon non rangée avec essai_recette : \(JSONCoding.line(rangement))")
-            try verifier(rangement["photo"]?.int == id && rangement["original"]?.int == id && rangement["fichier"]?.string == fichier,
-                         "leçon de la recette rangée sous \(rangement["original"].map(JSONCoding.line) ?? "?") pour \(rangement["fichier"]?.string ?? "?") "
-                            + "au lieu de l'entrée de la copie \(id), \(fichier ?? "?")")
-            let mois = rangement["mois"]?.string
-            try verifier(mois.map(Self.estUnMois) == true || rangement["sans_date"]?.bool == true,
-                         "mois de la prise de vue : \(rangement["mois"].map(JSONCoding.line) ?? "absent")")
-            let relue = lues.first { $0["photo"]?.int == id }
-            try verifier(relue?["points"]?.array?.count == 3, "leçon relue : \(relue.map(JSONCoding.line) ?? "absente")")
-            try verifier((retrait["retirees"]?.int ?? 0) >= 1 && !restees.contains { $0["photo"]?.int == id },
-                         "leçon pas retirée : \(JSONCoding.line(retrait))")
-            return "indices \(indices.joined(separator: ", ")) ; refusée par l'outil (photo d'essai) ; rangée pour la recette sous \(fichier ?? "?")"
-                + (mois.map { " (prise de vue \($0))" } ?? " (sans date de prise de vue)") + ", relue, retirée ; écriture annulée ; "
-                + "ISO \(Int(sensibilite?.double ?? 0)) lu en nombre"
-        }
-    }
-
-    /// Le nom de l'étape de la leçon dans la recette.
-    static let etapeLeconNom = "leçon de la photo (photo_lesson) : ISO et indices lus, refusée pour une photo d'essai, "
-        + "rangée pour la recette (essai_recette), relue, retirée ; photo inchangée"
 
     /// Un mois de prise de vue tel que le module le range (« AAAA-MM »).
     static func estUnMois(_ texte: String) -> Bool {
@@ -387,75 +280,6 @@ extension Recette {
         format.dateFormat = "yyyy-MM-dd"
         guard let date = format.date(from: jour) else { return nil }
         return format.string(from: date.addingTimeInterval(-86_400))
-    }
-
-    // MARK: - « Je le fais »
-
-    /// « Je le fais » : la version de Claude rangée par preview_settings avec my_turn (rien
-    /// d'appliqué ni de rendu, a_faire dans l'ordre des panneaux, entrée « exercice » au journal),
-    /// puis des réglages faits « à la main » (apply_settings, en guise de Dany), la comparaison
-    /// view_photo avec compare = claude_version (une image, les écarts classés), enfin ces réglages
-    /// annulés et « ma version » effacée (même si une vérification échoue : ni undo_last ni
-    /// revert_to_original ne l'effacent). Une « ma version » déjà rangée arrête l'étape avant toute
-    /// écriture.
-    func sequenceJeLeFais(_ id: Int, _ photo: String) throws {
-        let photoID = JSONValue.number(Double(id))
-        let depart = try etat(id)
-        let maVersion = "Claude · " + JeLeFais.instantane
-        func variantes() throws -> [String] {
-            (try appel("choose_variant", ["photo_id": photoID, "action": "list"]).0["variantes"]?.array ?? []).compactMap { $0["nom"]?.string }
-        }
-        try etape(photo, "« Je le fais » : ma version rangée sans rien appliquer, réglages changés, comparée côte à côte, puis effacée") {
-            guard try !variantes().contains(maVersion) else {
-                throw Echec(description: "« \(maVersion) » est déjà rangée (essai précédent ?) : l'effacer (choose_variant, action = delete, "
-                    + "names = [\"\(JeLeFais.instantane)\"]) ; rien n'a été écrit")
-            }
-            var aEffacer = true
-            defer {
-                if aEffacer { _ = try? appel("choose_variant", ["photo_id": photoID, "action": "delete", "names": [.string(JeLeFais.instantane)]]) }
-            }
-            let (tour, imagesTour) = try appel("preview_settings", ["photo_id": photoID, "my_turn": true, "relative": true,
-                                                                    "settings": ["Exposure2012": 0.3, "Vibrance": 10],
-                                                                    "step_name": "recette : je le fais"])
-            let apresTour = try etat(id)
-            let rangees = try variantes()
-            let entrees = try tools.lightroom.send("journal", ["photos": [photoID]], timeout: 60)["photos"]?.array?.first?["entrees"]?.array ?? []
-            // Les réglages de Dany, comme s'il les avait faits à la main.
-            try ecrire("apply_settings", id, ["settings": ["Exposure2012": 0.8, "Shadows2012": 20], "relative": true])
-            let dany = try etat(id)
-            let (comparaison, images) = try appel("view_photo", ["photo_id": photoID, "compare": "claude_version"])
-            if let image = images.first { garder(image, "recette-je-le-fais.jpg") }
-            let apresComparaison = try etat(id)
-            _ = try appel("undo_last", ["photo_ids": [photoID]])
-            let annulee = try etat(id)
-            let (effacement, _) = try appel("choose_variant", ["photo_id": photoID, "action": "delete", "names": [.string(JeLeFais.instantane)]])
-            aEffacer = false
-            let restees = try variantes()
-            try verifierEgal(try etat(id), depart)
-
-            try verifier(imagesTour.isEmpty, "my_turn a rendu \(imagesTour.count) image(s)")
-            try verifierEgal(apresTour, depart)
-            let faire = (tour["a_faire"]?.array ?? []).compactMap { $0["cle"]?.string }
-            try verifier(faire == ["Exposure2012", "Vibrance"], "a_faire : \(faire.joined(separator: ", ")) (attendu : Exposure2012 puis Vibrance)")
-            try verifier(rangees.contains(maVersion), "« \(maVersion) » pas rangée : \(rangees.joined(separator: ", "))")
-            try verifier(entrees.last?["type"]?.string == "exercice", "dernière entrée du journal : \(entrees.last.map(JSONCoding.line) ?? "aucune")")
-            try verifier(images.count == 1, "\(images.count) image(s) pour la comparaison")
-            try verifierEgal(apresComparaison, dany)
-            var sortes: [String: String] = [:]
-            for ecart in comparaison["exercice"]?["ecarts"]?.array ?? [] {
-                if let cle = ecart["cle"]?.string, let sorte = ecart["sorte"]?.string { sortes[cle] = sorte }
-            }
-            let attendues = ["Exposure2012": JeLeFais.Sorte.plusFort.rawValue, "Shadows2012": JeLeFais.Sorte.ajoute.rawValue,
-                             "Vibrance": JeLeFais.Sorte.oublie.rawValue]
-            try verifier(attendues.allSatisfy { sortes[$0.key] == $0.value },
-                         "écarts : \(sortes.keys.sorted().map { "\($0) \(sortes[$0] ?? "?")" }.joined(separator: ", ")) "
-                         + "(attendus : Exposure2012 plus_fort, Shadows2012 ajoute, Vibrance oublie)")
-            try verifierEgal(annulee, depart)
-            let effaces = (effacement["effaces"]?.array ?? []).compactMap(\.string)
-            try verifier(effaces.contains(maVersion) && !restees.contains(maVersion), "« \(maVersion) » pas effacée : \(effaces.joined(separator: ", "))")
-            return "a_faire : Exposition puis Vibrance, rien d'appliqué ni rendu ; écarts : Exposition plus fort, Ombres ajoutées, Vibrance oubliée"
-                + (comparaison["exercice"]?["resume"]?.string.map { " (« \($0) »)" } ?? "") + " ; réglages annulés, « ma version » effacée"
-        }
     }
 
     // MARK: - La composition lue (--horizon)

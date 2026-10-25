@@ -4,7 +4,8 @@
 -- besoin. Appelé au chargement du module (Init.lua) et à son arrêt (Arret.lua). Constaté le
 -- 17 octobre 2026 : à la fermeture de Lightroom, Arret.lua (LrShutdownPlugin) ne s'exécute pas ;
 -- le chargement suivant fait donc le ménage. Effacer des fichiers déjà chargés ne change rien à
--- la session en cours (Lightroom les garde en mémoire).
+-- la session en cours (Lightroom les garde en mémoire). Depuis le correctif 1.3.6, aussi les
+-- dossiers temporaires des conversations jamais gardées (Menage.temporaires, au chargement seul).
 
 local LrFileUtils = import 'LrFileUtils'
 local LrPathUtils = import 'LrPathUtils'
@@ -17,6 +18,29 @@ function Menage.dossierPresets()
         dossier = LrPathUtils.child(dossier, nom)
     end
     return dossier
+end
+
+-- Les dossiers temporaires des conversations jamais gardées (correctif 1.3.6) : celles des groupes
+-- de photos de la fenêtre Claude (Temporaire/Groupes/<id>, Fenetre.conversationDeGroupe) et des
+-- demandes rapides sur plusieurs photos (Temporaire/Rapide/<id>, Moteur.envoyerRapide). Ils ne
+-- s'effacent que quand leur conversation est quittée ou oubliée (Moteur.montrer,
+-- Moteur.oublierRapide) : une séance qui finit sur l'une d'elles (Lightroom quitté, module
+-- rechargé) les laisserait pour toujours. Au chargement, aucune n'est en mémoire : ils s'effacent en
+-- entier. Rien d'autre de Temporaire, ni les conversations gardées. Rend le nombre de dossiers
+-- effacés. Dans une tâche (Init.lua).
+Menage.TEMPORAIRES = { 'Groupes', 'Rapide' }
+
+function Menage.temporaires()
+    local Chemins = require 'Chemins'
+    local effaces = 0
+    for _, nom in ipairs(Menage.TEMPORAIRES) do
+        local dossier = LrPathUtils.child(Chemins.temporaire(), nom)
+        if LrFileUtils.exists(dossier) then
+            LrFileUtils.delete(dossier)
+            effaces = effaces + 1
+        end
+    end
+    return effaces
 end
 
 -- Nombre de fichiers effacés.

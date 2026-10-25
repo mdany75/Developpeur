@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Les 36 outils</title>
+<title>Les 35 outils</title>
 <style>
   /* Couleurs de la fenêtre Claude (Dispositions.PALETTES, claire et sombre). */
   :root {
@@ -135,12 +135,12 @@
 <body>
 <div class="page">
   <header>
-    <h1>Les 36 outils</h1>
-    <p>Le connecteur MCP-Développeur <span class="version">1.3.5</span> donne 36 outils à Claude : les mêmes dans Claude Desktop, dans Claude Code et dans la fenêtre Claude de Lightroom.</p>
+    <h1>Les 35 outils</h1>
+    <p>Le connecteur MCP-Développeur <span class="version">correctif 1.3.6</span> donne 35 outils à Claude : les mêmes dans Claude Desktop, dans Claude Code et dans la fenêtre Claude de Lightroom. Le correctif 1.3.6 retire la leçon de la photo (<code>photo_lesson</code>) et « Je le fais » (<code>my_turn</code> de <code>preview_settings</code>, <code>compare = claude_version</code> de <code>view_photo</code>).</p>
   </header>
 
   <div class="bilan" role="group" aria-label="Filtrer par effet sur la photo">
-    <button class="case tous" data-filtre="tous" aria-pressed="true"><b id="n-tous">36</b><span>outils en tout</span></button>
+    <button class="case tous" data-filtre="tous" aria-pressed="true"><b id="n-tous">35</b><span>outils en tout</span></button>
     <button class="case oui" data-filtre="oui" aria-pressed="false"><b id="n-oui"></b><span>changent la photo</span></button>
     <button class="case defait" data-filtre="defait" aria-pressed="false"><b id="n-defait"></b><span>défont une retouche</span></button>
     <button class="case classement" data-filtre="classement" aria-pressed="false"><b id="n-classement"></b><span>classent seulement</span></button>
@@ -159,7 +159,7 @@
   <p class="rien" id="rien">Aucun outil ne répond à cette recherche.</p>
 
   <footer>
-    Mis à jour pour la 1.3.5 (23 octobre 2026) : les ajouts des correctifs 1.3.4 et 1.3.5 sont marqués. Les seuils de ces ajouts sont encore provisoires.
+    Mis à jour pour le correctif 1.3.6 (25 octobre 2026, en cours de publication) : <code>photo_lesson</code> est retiré (36 outils de la 1.3 au correctif 1.3.5) ; les ajouts des correctifs 1.3.4, 1.3.5 et 1.3.6 sont marqués. Les seuils de ces ajouts sont encore provisoires.
   </footer>
 </div>
 
@@ -171,7 +171,7 @@
       outils: [
         { nom: "get_status", titre: "État de la liaison", fait: "Dit si Lightroom répond, la version du module, la photo active et l'écran du Mac.", ajout: ["1.3.5", "Dit aussi la dernière sauvegarde du catalogue et l'état de Time Machine, avant une longue série, sans rien régler."], change: "non" },
         { nom: "list_selection", titre: "Photos sélectionnées", fait: "Liste les photos sélectionnées dans Lightroom, avec leurs identifiants.", change: "non" },
-        { nom: "view_photo", titre: "Voir la photo", fait: "Montre la photo développée et ses mesures : exposition, couleurs, netteté, bruit, visages, éclairage, intention du boîtier Fujifilm, point de mise au point, bilan d'une passe à l'autre ; aussi un zoom ou un avant/après.", ajout: ["1.3.4", "Dit si l'écrêtage vient de la lumière ou d'une couleur trop vive, et signale les points chauds hors du sujet."], change: "non" },
+        { nom: "view_photo", titre: "Voir la photo", fait: "Montre la photo développée et ses mesures : exposition, couleurs, netteté, bruit, visages, éclairage, intention du boîtier Fujifilm, point de mise au point, bilan d'une passe à l'autre ; aussi un zoom ou un avant/après.", ajout: ["1.3.4 · 1.3.6", "Dit si l'écrêtage vient de la lumière ou d'une couleur trop vive, et signale les points chauds hors du sujet ; dit la dominante de toute l'image et quoi en faire. En fin de retouche, avec before_claude, dit si le rendu se reproduit : l'écart avec la retouche précédente de la même photo, repartie de l'origine."], change: "non" },
         { nom: "measure_angle", titre: "Mesurer un angle", fait: "Mesure l'inclinaison d'une ligne (horizon, bâtiment) avant de redresser.", change: "non" },
         { nom: "read_composition", titre: "Lire la composition", fait: "Lit l'horizon, les tiers, le sujet et le regard sur l'image entière, et propose un cadre.", change: "non", precision: "deux étapes temporaires dans l'Historique" },
         { nom: "analyze_photos", titre: "Mesurer une série", fait: "Mesure plusieurs photos d'un coup pour les comparer.", change: "non" },
@@ -180,8 +180,8 @@
     { id: "retoucher", nom: "Retoucher",
       intro: "Onze outils travaillent la photo. Chaque changement est une étape « Claude · … » de l'Historique, avec sa raison, et se défait ; en mode « Proposer d'abord », rien ne s'applique sans ton accord.",
       outils: [
-        { nom: "apply_settings", titre: "Appliquer des réglages", fait: "Pose des réglages de développement : profil, balance des blancs, tonalité, présence, TSL, courbe, détail, recadrage, géométrie.", change: "oui" },
-        { nom: "preview_settings", titre: "Proposer des réglages", fait: "Montre le rendu d'une proposition sans l'appliquer, avec la raison de Claude (gardée pour quand tu l'acceptes) ; sert aussi au mode « Je le fais » (les réglages à faire toi-même) et au cadre proposé.", change: "non" },
+        { nom: "apply_settings", titre: "Appliquer des réglages", fait: "Pose des réglages de développement : profil, balance des blancs, tonalité, présence, TSL, courbe, détail, recadrage, géométrie.", ajout: ["1.3.6", "La balance sur toute l'image (white_balance_point avec scene) : deux passes mesurées, puis l'Auto de Lightroom, gardé s'il laisse l'image plus neutre."], change: "oui" },
+        { nom: "preview_settings", titre: "Proposer des réglages", fait: "Montre le rendu d'une proposition sans l'appliquer, avec la raison de Claude (gardée pour quand tu l'acceptes) ; sert aussi au cadre proposé.", ajout: ["1.3.6", "Plus de my_turn : « Je le fais » est retiré."], change: "non" },
         { nom: "enhance_photo", titre: "Débruiter, détails, super résolution", fait: "Réduction du bruit par IA, détails bruts, super résolution.", change: "oui" },
         { nom: "add_mask", titre: "Ajouter des masques", fait: "Retouches locales : sujet, ciel, arrière-plan, personnes, peau dosée, dégradés et radiaux pour éclaircir et assombrir.", ajout: ["1.3.4", "La carte du masque (mask_map) montre la zone de chaque masque avant de l'écrire, et prévient d'un masque vide, total, inversé ou qui déborde sur un visage."], change: "oui" },
         { nom: "edit_mask", titre: "Reprendre un masque", fait: "Change, inverse ou retire un masque déjà posé.", change: "oui" },
@@ -200,7 +200,7 @@
         { nom: "save_preset", titre: "Créer un paramètre prédéfini", fait: "Range une retouche en paramètre prédéfini, réutilisable dans Lightroom.", change: "non", precision: "crée un paramètre prédéfini" },
         { nom: "undo_last", titre: "Annuler la dernière retouche", fait: "Défait la dernière étape de Claude : réglages, masque, note ou classement.", change: "defait" },
         { nom: "revert_to_original", titre: "Revenir à l'état d'avant Claude", fait: "Remet la photo telle qu'elle était avant les retouches de Claude.", change: "defait" },
-        { nom: "export_journal", titre: "Journal et carnet de progrès", fait: "Le journal des retouches (quoi et pourquoi) et le carnet de progrès, mois par mois.", change: "non" },
+        { nom: "export_journal", titre: "Journal et carnet de progrès", fait: "Le journal des retouches (quoi et pourquoi) et le carnet de progrès, mois par mois.", ajout: ["1.3.6", "Le carnet ne donne plus que les constats : les leçons déjà rangées restent dans son fichier, sans être montrées."], change: "non" },
         { nom: "remember_style", titre: "Guide de style", fait: "Lit ton guide de style ; y ajoute une préférence après ton accord.", ajout: ["1.3.5", "Avec learn, tire des règles de tes corrections à la main sur une série ; rien n'entre au guide sans ton accord."], change: "non", precision: "ton guide, à part" },
       ] },
     { id: "classer", nom: "Classer dans la Bibliothèque",
@@ -213,13 +213,12 @@
         { nom: "create_virtual_copy", titre: "Créer une copie virtuelle", fait: "Crée une copie virtuelle, pour essayer sans toucher à l'original.", change: "non", precision: "une copie de plus" },
         { nom: "show_photo", titre: "Montrer dans Lightroom", fait: "Sélectionne et affiche des photos dans la Bibliothèque ou le module Développement, avec un filtre au besoin.", change: "non" },
       ] },
-    { id: "trier", nom: "Trier, noter et apprendre",
-      intro: "Quatre outils jugent une séance et t'aident à progresser. Claude note de 0 à 5 ★ ; tes coups de cœur sont un libellé de couleur que tu poses toi-même, et une note proposée attend ton accord dans la carte Note.",
+    { id: "trier", nom: "Trier et noter",
+      intro: "Trois outils jugent une séance. Claude note de 0 à 5 ★ ; tes coups de cœur sont un libellé de couleur que tu poses toi-même, et une note proposée attend ton accord dans la carte Note.",
       outils: [
         { nom: "cull_photos", titre: "Trier une séance", fait: "Mesure netteté, exposition, yeux fermés et rafales ; propose les rejets et le plafond de note de chaque photo ; sans photos désignées, juge la photo active.", ajout: ["1.3.4 · 1.3.5", "Des yeux fermés ne font proposer un rejet que si une autre vue de la rafale les a ouverts ; deux boîtiers ne font plus une rafale ; les vidéos sont écartées."], change: "non" },
         { nom: "contact_sheet", titre: "Planche contact", fait: "Une planche de 30 vignettes numérotées au plus, pour voir une sortie d'un coup.", change: "non" },
         { nom: "propose_ratings", titre: "Noter des photos", fait: "Propose une note de 0 à 5 ★, « à vérifier », selon le standard de notation ; la pose si tu le demandes.", change: "classement", precision: "seulement sur ta demande" },
-        { nom: "photo_lesson", titre: "Leçon de la photo", fait: "Range la leçon de la photo : ce qui manquait, et ce qui l'aurait évité à la prise de vue ; la leçon d'une photo d'essai est donnée, mais n'entre pas au carnet de progrès.", ajout: ["1.3.5", "Compare une nouvelle retouche de la même photo, repartie de l'origine, à la précédente : le rendu se reproduit-il ?"], change: "non" },
       ] },
     { id: "livrer", nom: "Livrer",
       intro: "Un outil sort les photos de Lightroom, dans un dossier choisi avec toi.",
@@ -237,7 +236,7 @@
 
   const echapper = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   // Les noms d'outils cités dans un texte passent en Menlo.
-  const noms = new Set(tous.map(o => o.nom).concat(["mask_map", "learn", "print"]));
+  const noms = new Set(tous.map(o => o.nom).concat(["mask_map", "learn", "print", "before_claude", "white_balance_point", "my_turn"]));
   const enCode = t => echapper(t).replace(/\b[a-z_]+\b/g, m => noms.has(m) ? `<code>${m}</code>` : m);
 
   const contenu = document.getElementById("contenu");

@@ -116,12 +116,11 @@ end
 --   pas montrer) ;
 --   « Pourquoi ? » à droite d'une étape (`q..i`), un carré small dans une rangée poussée à droite
 --   par margin_left (constaté le 21 octobre 2026, D6 : il répond, et la rangée ne prend pas les
---   clics du texte) ; la rangée d'actions selon `x..i` (« ☆ Voir la note », « Leçon de la photo »,
---   ou les deux ; « ＋ Garder la demande » à droite après une retouche : Fil.lireActions), en
---   variantes superposées.
--- Un clic sur le texte est réparti par Fenetre.cliquerLigne (image dans l'aperçu, ligne du carnet,
--- leçon, étape, sinon détail d'un outil) ; les boutons appellent F.pourquoi, F.voirNote,
--- F.voirLecon et F.garderDemande, qui relisent la ligne.
+--   clics du texte) ; la rangée d'actions selon `x..i` (« ☆ Voir la note » ; « ＋ Garder la
+--   demande » à droite après une retouche : Fil.lireActions), en variantes superposées.
+-- Un clic sur le texte est réparti par Fenetre.cliquerLigne (image dans l'aperçu, étape, sinon
+-- détail d'un outil) ; les boutons appellent F.pourquoi, F.voirNote et F.garderDemande, qui
+-- relisent la ligne.
 function Vues.ligneFil(f, F, i, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local largeur = D.texteFil
@@ -171,31 +170,20 @@ function Vues.ligneFil(f, F, i, D)
             tooltip = "Pourquoi cette étape : son avant/après et sa raison (onglet Aperçu)", visible = F.si('q' .. i),
             action = function() F.pourquoi(i) end }),
     }
-    -- Les actions d'une notation et d'une leçon : « ☆ Voir la note » (onglet Note), « Leçon de la
-    -- photo » (onglet Leçon), ou les deux, à la place des icônes de la maquette (un glyphe dans le
-    -- titre : une icône d'image_name chevaucherait le titre, constaté B3). Après une retouche,
-    -- « ＋ Garder la demande » (Mes demandes) au bout de la même ligne, à droite, comme
-    -- « Pourquoi ? » au bout d'une étape : une rangée poussée par margin_left (D6). Une vue masquée
-    -- garde sa place : après les deux autres, il lui faudrait une variante par place (quatre
-    -- boutons par ligne au lieu d'un).
+    -- Les actions d'une notation : « ☆ Voir la note » (onglet Note), à la place des icônes de la
+    -- maquette (un glyphe dans le titre : une icône d'image_name chevaucherait le titre, constaté
+    -- B3). Après une retouche, « ＋ Garder la demande » (Mes demandes) au bout de la même ligne, à
+    -- droite, comme « Pourquoi ? » au bout d'une étape : une rangée poussée par margin_left (D6).
+    -- (« Leçon de la photo » est retiré avec la leçon au correctif 1.3.6.)
     local actions = 'x' .. i
-    local function base(test)
-        return F.condition(actions, function(v) return test(F.lireActions(v)) end)
-    end
-    local function voirNote(visible)
-        return F.bouton(f, { carre = true, size = 'small', title = "☆ Voir la note", font = P.petit, width = D.voirNote,
-            tooltip = "La note proposée de la photo active, dans l'onglet Note", visible = visible, action = function() F.voirNote(i) end })
-    end
-    local function voirLecon(visible)
-        return F.bouton(f, { carre = true, size = 'small', title = "Leçon de la photo", font = P.petit, width = D.voirLecon,
-            tooltip = "La leçon de la photo : ce qui manquait, et ce qui se fait à la prise de vue (onglet Leçon)", visible = visible,
-            action = function() F.voirLecon(i) end })
-    end
     texte[#texte + 1] = f:column {
         place = 'overlapping',
-        f:row { spacing = D.ecartActions, voirNote(base(function(b) return b == 'note' or b == 'les deux' end)),
-            voirLecon(base(function(b) return b == 'les deux' end)) },
-        f:row { voirLecon(base(function(b) return b == 'lecon' end)) },
+        f:row {
+            F.bouton(f, { carre = true, size = 'small', title = "☆ Voir la note", font = P.petit, width = D.voirNote,
+                tooltip = "La note proposée de la photo active, dans l'onglet Note",
+                visible = F.condition(actions, function(v) return F.lireActions(v) == 'note' end),
+                action = function() F.voirNote(i) end }),
+        },
         f:row {
             margin_left = largeur - D.garderDemande,
             F.bouton(f, { carre = true, size = 'small', title = "＋ Garder la demande", font = P.petit, width = D.garderDemande,
@@ -275,27 +263,30 @@ function Vues.voyant(f, F, v)
     }
 end
 
--- Le voyant de Claude Code (sans clic) et celui de la liaison (un clic la démarre), en tête du
--- centre.
+-- Les trois voyants de l'en-tête : Claude Code (sans clic), la liaison (un clic la démarre) et
+-- l'écran principal du Mac (un clic le relit), en tête du centre.
 function Vues.voyantClaude(f, F, D)
     return Vues.voyant(f, F, { etat = 'etatClaude', texte = 'texteClaude', largeur = D.voyantClaude, police = F.POLICES.systeme12,
         couleur = F.COULEURS.texte, infobulle = "Claude Code, avec votre forfait claude.ai (pas de clé d'API)" })
 end
 
+-- Son infobulle, liée (`infobulleLightroom`, Fenetre.infobulleLightroom) : la liaison, les versions
+-- du module et du connecteur (en bas du volet jusqu'au correctif 1.3.6) et le mode de la liaison
+-- (« Appliquer » ou « Proposer d'abord », la rangée Mode étant retirée).
 function Vues.voyantLightroom(f, F, D)
     return Vues.voyant(f, F, { etat = 'etatLightroom', texte = 'texteLightroom', largeur = D.voyantLightroom,
-        police = F.POLICES.systeme12, couleur = F.COULEURS.texte,
-        infobulle = "Liaison de ce module avec le connecteur MCP-Développeur ; arrêtée, un clic la démarre",
+        police = F.POLICES.systeme12, couleur = F.COULEURS.texte, infobulle = F.bind 'infobulleLightroom',
         action = function()
             F.annulerEnvoiAuto()
             F.demarrerLiaison()
         end })
 end
 
--- L'écran principal du Mac (de la 1.2, en bas du volet) : un clic le relit et donne son détail.
+-- L'écran principal du Mac (de la 1.2 ; en bas du volet jusqu'au correctif 1.3.6) : un clic le
+-- relit et donne son détail.
 function Vues.voyantEcran(f, F, D)
-    return Vues.voyant(f, F, { etat = 'etatEcran', texte = 'texteEcran', largeur = D.liste - 14, police = F.POLICES.systeme11,
-        couleur = F.COULEURS.gris, infobulle = "Écran principal du Mac et son profil de couleur ; un clic donne le détail",
+    return Vues.voyant(f, F, { etat = 'etatEcran', texte = 'texteEcran', largeur = D.voyantEcran, police = F.POLICES.systeme12,
+        couleur = F.COULEURS.texte, infobulle = "Écran principal du Mac et son profil de couleur ; un clic donne le détail",
         action = function()
             F.annulerEnvoiAuto()
             F.enTache(F.montrerEcran)
@@ -334,50 +325,15 @@ function Vues.bandeau(f, F, largeur)
     }
 end
 
--- Versions -------------------------------------------------------------------------------------
-
--- Ce module et le connecteur MCP-Développeur, une ligne chacun (« Développeur 1.3 »), en gris des
--- en-têtes, en orange en cas d'alerte (Composants.lignes).
-function Vues.versions(f, F, D)
-    local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    local function ligne(i)
-        return f:column {
-            place = 'overlapping',
-            f:static_text { title = bind('versionTexte' .. i), font = P.systeme11, text_color = C.grisEntete, width = D.liste,
-                height = D.ligneVersion, truncation = 'middle', visible = F.non('versionAlerte' .. i) },
-            f:static_text { title = bind('versionTexte' .. i), font = P.systeme11, text_color = C.orange, width = D.liste,
-                height = D.ligneVersion, truncation = 'middle', visible = F.si('versionAlerte' .. i) },
-        }
-    end
-    return f:column { spacing = 0, ligne(1), ligne(2) }
-end
-
 -- En-tête --------------------------------------------------------------------------------------
 
--- Le Mode, trois boutons radio liés à la clé `mode` (Fenetre.rafraichirMode la tire de l'état ;
--- Fenetre.changerMode suit un vrai clic) : Appliquer et Proposer d'abord (le mode de la liaison),
--- Je le fais (l'exercice, 1.3). Grisés pendant que Claude travaille ; Je le fais suit
--- `peutJeLeFais`. Leur valeur passe par F.lierRadio : un clic, même sur le radio déjà coché, annule
--- l'envoi de la demande que ce clic a validée.
-function Vues.mode(f, F)
-    local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    return f:row {
-        spacing = 10,
-        place_vertical = 0.5,
-        f:static_text { title = "Mode :", font = P.systeme12, text_color = C.gris, place_vertical = 0.5 },
-        f:radio_button { title = "Appliquer", value = F.lierRadio 'mode', checked_value = 'appliquer', size = 'small', enabled = bind 'libre',
-            tooltip = "Claude applique ses retouches directement" },
-        f:radio_button { title = "Proposer d'abord", value = F.lierRadio 'mode', checked_value = 'proposer', size = 'small', enabled = bind 'libre',
-            tooltip = "Claude montre d'abord ce qu'il compte changer, et attend votre accord (carte Proposition)" },
-        f:radio_button { title = "Je le fais", value = F.lierRadio 'mode', checked_value = 'jelefais', size = 'small', enabled = bind 'peutJeLeFais',
-            tooltip = "Faire la retouche vous-même : Claude donne les réglages dans l'ordre du panneau Développement, "
-                .. "puis compare votre version à la sienne (J'ai fini dans la carte Proposition)" },
-    }
-end
-
--- L'en-tête du centre : le titre de la conversation (gras 16, sans ✎ : Renommer… est dans le
--- volet) et le Mode ; dessous, les voyants Claude Code et Lightroom, et la photo active
--- (`infoPhoto`, texte riche : nom et sélection en <EM>).
+-- L'en-tête du centre : le titre de la conversation (gras 16, sans ✎ : celui que Claude donne ;
+-- Renommer… est retiré avec le volet au correctif 1.3.6), et à sa droite, dans la place du Mode (ses
+-- trois radios sont retirés au correctif 1.3.6 : la fenêtre suit la préférence `mode` du
+-- Gestionnaire), « Repartir à neuf » (F.repartir : une conversation neuve pour la photo seule,
+-- l'ancienne mise de côté ; grisé pendant que Claude travaille et sans photo seule) ; dessous, les
+-- voyants Claude Code, Lightroom et Écran, et la photo active (`infoPhoto`, texte riche : nom et
+-- sélection en <EM>).
 function Vues.entete(f, F, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     return f:column {
@@ -390,132 +346,22 @@ function Vues.entete(f, F, D)
             f:static_text { title = bind 'titre', font = P.titre, text_color = C.texte, width = D.titre, truncation = 'tail',
                 place_vertical = 0.5 },
             f:spacer { fill_horizontal = 1 },
-            Vues.mode(f, F),
+            F.bouton(f, { carre = true, bezel = 22, title = "Repartir à neuf", font = P.systeme12, width = D.repartir,
+                place_vertical = 0.5, enabled = bind 'peutRepartir',
+                tooltip = "Une conversation neuve pour la photo choisie, avec son historique ; l'ancienne reste sur le disque, mise de côté",
+                action = function() F.enTache(F.repartir) end }),
         },
         f:row {
             spacing = 0,
             Vues.voyantClaude(f, F, D),
-            f:spacer { width = 14 },
+            f:spacer { width = D.ecartVoyants },
             Vues.voyantLightroom(f, F, D),
+            f:spacer { width = D.ecartVoyants },
+            Vues.voyantEcran(f, F, D),
             f:spacer { fill_horizontal = 1 },
             f:static_text { title = bind 'infoPhoto', font = P.systeme12, text_color = C.gris, emphasis_font = P.systeme12,
                 emphasis_color = C.texte, alignment = 'right', width = D.info, truncation = 'middle' },
         },
-    }
-end
-
--- Volet des conversations ------------------------------------------------------------------------
-
--- Une case de la liste (k, de D.hauteurCase) : ses variantes superposées, selon son genre (`lg..k` :
--- 'jour', 'conversation', 'carnet', 'plus', 'vide', Fenetre.casesListe) et son choix (`lc..k`) — le
--- fond de sélection, l'en-tête de jour, le titre en gras ou non, le sous-titre (`ls..k`),
--- « Plus anciennes… » ou « Plus récentes… » —, puis le calque qui reçoit le clic
--- (Fenetre.cliquerListe : il refuse lui-même pendant que Claude travaille). L'infobulle (`li..k`)
--- donne le titre entier.
-function Vues.caseListe(f, F, k, D)
-    local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    local genre, choisie = 'lg' .. k, 'lc' .. k
-    local largeur = D.liste - 16
-    local entree = function() return F.condition(genre, function(v) return v == 'conversation' or v == 'carnet' end) end
-    return f:column {
-        place = 'overlapping',
-        width = D.liste,
-        height = D.hauteurCase,
-        Vues.image(f, F, 'selection', { visible = F.si(choisie) }),
-        f:column {
-            margin_left = 8,
-            margin_top = 22,
-            f:static_text { title = bind('lt' .. k), font = P.systemeGras11, text_color = C.grisEntete, width = largeur, truncation = 'tail',
-                visible = F.egal(genre, 'jour') },
-        },
-        f:column {
-            margin_left = 8,
-            margin_top = 5,
-            spacing = 0,
-            f:column {
-                place = 'overlapping',
-                f:static_text { title = bind('lt' .. k), font = P.systemeGras12, text_color = C.texte, width = largeur, truncation = 'tail',
-                    visible = F.et(entree(), F.si(choisie)) },
-                f:static_text { title = bind('lt' .. k), font = P.systeme12, text_color = C.texte, width = largeur, truncation = 'tail',
-                    visible = F.et(entree(), F.non(choisie)) },
-            },
-            f:column {
-                place = 'overlapping',
-                f:static_text { title = bind('ls' .. k), font = P.systeme11, text_color = C.sousTitreChoisi, width = largeur,
-                    truncation = 'tail', visible = F.et(entree(), F.si(choisie)) },
-                f:static_text { title = bind('ls' .. k), font = P.systeme11, text_color = C.grisEntete, width = largeur,
-                    truncation = 'tail', visible = F.et(entree(), F.non(choisie)) },
-            },
-        },
-        f:column {
-            margin_left = 8,
-            margin_top = 12,
-            f:static_text { title = bind('lt' .. k), font = P.systeme12, text_color = C.bleu, width = largeur, truncation = 'tail',
-                visible = F.egal(genre, 'plus') },
-        },
-        F.calque(f, { width = D.liste, height = D.hauteurCase, tooltip = bind('li' .. k), mouse_down = function() F.cliquerListe(k) end }),
-    }
-end
-
--- La liste des conversations : D.cases cases (Fenetre.rafraichirListe les remplit), dans la place
--- que le haut et le bas du volet laissent (D.hauteurListe).
-function Vues.listeConversations(f, F, D)
-    local cases = { spacing = 0, height = D.hauteurListe }
-    for k = 1, D.cases do
-        cases[#cases + 1] = Vues.caseListe(f, F, k, D)
-    end
-    return f:column(cases)
-end
-
--- Publication et Consommation (venus de la colonne droite ; le menu Fichier est réduit quand une
--- fenêtre du module est devant).
-function Vues.autresFenetres(f, F, D)
-    local P = F.POLICES
-    return f:column {
-        spacing = 6,
-        F.bouton(f, { carre = true, bezel = 22, title = "Publication…", font = P.systeme12, width = D.liste,
-            tooltip = "Publier des photos en fichiers, sans Claude ni quota", action = function() F.publication() end }),
-        F.bouton(f, { carre = true, bezel = 22, title = "Consommation…", font = P.systeme12, width = D.liste,
-            tooltip = "Jetons de la semaine, budget, relevé du forfait", action = function() F.consommation() end }),
-    }
-end
-
--- Le volet (324, marges de 10) : « ＋ Nouvelle conversation », la loupe devant « Rechercher », la
--- liste en cases ; en bas, Renommer… et Supprimer…, un filet, Publication… et Consommation…, les
--- versions et le voyant Écran.
-function Vues.volet(f, F, D)
-    local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    return f:column {
-        margin_left = D.margeVolet,
-        margin_top = D.margeVolet,
-        spacing = 0,
-        F.bouton(f, { carre = true, bezel = 26, title = "＋ Nouvelle conversation", font = P.systeme12, width = D.liste,
-            tooltip = "Commencer une nouvelle conversation", enabled = bind 'libre', action = function() F.nouvelle() end }),
-        f:spacer { height = 8 },
-        f:row {
-            spacing = 0,
-            Vues.image(f, F, 'loupe', { place_vertical = 0.5 }),
-            f:spacer { width = 8 },
-            f:edit_field { value = bind 'recherche', immediate = true, width = D.recherche, height = 24, font = P.systeme12,
-                placeholder_string = "Rechercher", tooltip = "Rechercher dans les titres et les messages des conversations" },
-        },
-        f:spacer { height = 14 },
-        Vues.listeConversations(f, F, D),
-        f:row {
-            spacing = 6,
-            F.bouton(f, { carre = true, bezel = 22, title = "Renommer…", font = P.systeme12, width = D.renommer,
-                tooltip = "Renommer la conversation", action = function() F.enTache(F.renommer) end }),
-            F.bouton(f, { carre = true, bezel = 22, title = "Supprimer…", font = P.systeme12, width = D.renommer, enabled = bind 'libre',
-                tooltip = "Mettre la conversation à la corbeille", action = function() F.enTache(F.supprimer) end }),
-        },
-        f:spacer { height = 12 },
-        Vues.aplat(f, D.liste, D.filet, C.filetVolet),
-        f:spacer { height = 12 },
-        Vues.autresFenetres(f, F, D),
-        f:spacer { height = 4 },
-        Vues.versions(f, F, D),
-        f:spacer { height = 6 },
-        Vues.voyantEcran(f, F, D),
     }
 end
 
@@ -557,8 +403,9 @@ end
 -- par Fenetre.rafraichirMesDemandes), un séparateur, puis Ajouter…, Renommer… et Supprimer… ; son
 -- titre « Mes demandes » quand rien n'est choisi. Choisir une demande la met dans le champ, sans
 -- l'envoyer (Fenetre.choisirMesDemandes) ; le menu revient à son titre. Sa valeur passe par
--- F.lierRadio, comme le Mode : un choix, même du titre, annule l'envoi de la demande que ce clic
--- aurait validée. Grisé pendant que Claude travaille.
+-- F.lierRadio (faite pour les radios du Mode, retirés au correctif 1.3.6) : un choix, même du
+-- titre, annule l'envoi de la demande que ce clic aurait validée. Grisé pendant que Claude
+-- travaille.
 function Vues.mesDemandes(f, F, D)
     return f:popup_menu { items = F.bind 'mesDemandesItems', value = F.lierRadio 'mesDemandes', width = D.mesDemandes,
         enabled = F.bind 'libre', place_vertical = 0.5,
@@ -579,8 +426,9 @@ end
 
 -- Envoyer, un bouton bleu en image, et Arrêter superposé (montré pendant que Claude travaille) ;
 -- les deux appellent F.boutonPrincipal. Aucun bouton par défaut dans la fenêtre (décision de
--- repli du lot B0 : Retour dans « Rechercher » déclencherait Envoyer, constaté D1) : Retour dans
--- le champ de demande passe par son observateur et l'envoi automatique (Fenetre.saisieValidee).
+-- repli du lot B0 : Retour dans « Rechercher », le champ du volet d'alors, déclencherait Envoyer,
+-- constaté D1) : Retour dans le champ de demande passe par son observateur et l'envoi automatique
+-- (Fenetre.saisieValidee).
 function Vues.envoi(f, F, D)
     return f:column {
         place = 'overlapping',
@@ -631,8 +479,8 @@ end
 
 -- Colonne droite ---------------------------------------------------------------------------------
 
--- Les segments Aperçu | Focus | Proposition | Note | Leçon, centrés en tête du panneau : chacun son image
--- et sa variante bleue (-actif, montrée quand `onglet` vaut sa valeur), sous un calque dont le
+-- Les segments Aperçu | Focus | Proposition | Note | Suivi, centrés en tête du panneau : chacun son image et
+-- sa variante bleue (-actif, montrée quand `onglet` vaut sa valeur), sous un calque dont le
 -- clic choisit l'onglet (F.choisirSegment : un vrai clic, son crochet suit). Ni survol, ni focus.
 function Vues.segments(f, F, D)
     local r = { spacing = 0, margin_left = D.margeSegments, height = D.hauteurSegments }
@@ -717,36 +565,33 @@ local function carteEtRangee(f, F, largeur, D, image, contenu, fleches, boutons)
     }
 end
 
--- La proposition de Claude en mode « Proposer d'abord » (fenêtre B, lot B5), sur son image
--- (carte-proposition, à la largeur intérieure du panneau) : « Proposition de Claude » en gras 12,
--- ce qu'il compte changer page par page (`propositionTexte`, D.propLignes lignes en 12, coupées par
--- Fenetre.montrerPage ; la ligne « Cadre : … » de Composition lue comprise), l'état d'un exercice
--- Je le fais (`exerciceEtat`, « À vous · 3 réglages faits sur 7 ») ; sous la carte, ▲ ▼, puis
--- Refuser, Ajuster… et « Je le fais » (titre lié `titreJeLeFais` : « J'ai fini » pendant
--- l'exercice, jamais deux boutons superposés) en carrés, et Accepter, un bouton bleu en image
--- (Vues.boutonBleu : son calque ne fait rien quand aucune proposition n'attend, `enAttente`).
--- Refuser, Ajuster… et Accepter sont actifs quand une proposition attend et que Claude ne
--- travaille pas.
+-- La proposition de Claude (fenêtre B, lot B5), sur son image (carte-proposition, à la largeur
+-- intérieure du panneau) : « Proposition de Claude » en gras 12, ce qu'il compte changer page par
+-- page (`propositionTexte`, D.propLignes lignes en 12, coupées par Fenetre.montrerPage ; la ligne
+-- « Cadre : … » de Composition lue comprise) ; sous la carte, ▲ ▼, puis Obtenir, Refuser et
+-- Ajuster… en carrés, et Accepter, un bouton bleu en image (Vues.boutonBleu : son calque ne fait
+-- rien quand aucune proposition n'attend, `enAttente`). Obtenir (décision de Dany du 25 octobre
+-- 2026, à la place de la proposition préparée à l'ouverture) demande une proposition pour la photo
+-- seule active (Fenetre.obtenir) : actif quand Claude est libre, une seule photo choisie et aucune
+-- proposition en attente (`peutObtenir`). Refuser, Ajuster… et Accepter sont actifs quand une
+-- proposition attend et que Claude ne travaille pas. (« Je le fais » et l'état de son exercice
+-- sont retirés au correctif 1.3.6.)
 function Vues.proposition(f, F, largeur, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     return carteEtRangee(f, F, largeur, D, 'carte-proposition', {
         f:static_text { title = "Proposition de Claude", font = P.gras12, text_color = C.texte, width = D.largeurProposition },
         f:static_text { title = bind 'propositionTexte', font = P.texte12, text_color = C.texte, width = D.largeurProposition,
             height_in_lines = D.propLignes },
-        f:static_text { title = bind 'exerciceEtat', font = P.petit, text_color = C.gris, width = D.largeurProposition,
-            truncation = 'tail' },
     }, 'proposition', {
+        F.bouton(f, { carre = true, bezel = 26, title = "Obtenir", font = P.systeme13, width = D.obtenir, enabled = bind 'peutObtenir',
+            tooltip = "Demander à Claude une proposition de retouche de la photo active, sans rien appliquer",
+            action = function() F.enTache(F.obtenir) end }),
+        f:spacer { width = 8 },
         F.bouton(f, { carre = true, bezel = 26, title = "Refuser", font = P.systeme13, width = D.refuser, enabled = bind 'enAttente',
             tooltip = "Refuser la proposition : rien ne change", action = function() F.repondreProposition(false) end }),
         f:spacer { width = 8 },
         F.bouton(f, { carre = true, bezel = 26, title = "Ajuster…", font = P.systeme13, width = D.ajuster, enabled = bind 'enAttente',
             tooltip = "Dire à Claude ce qu'il faut changer avant d'appliquer", action = function() F.enTache(F.ajuster) end }),
-        f:spacer { width = 8 },
-        F.bouton(f, { carre = true, bezel = 26, title = bind 'titreJeLeFais', font = P.systeme13, width = D.jeLeFais,
-            enabled = bind 'peutJeLeFais',
-            tooltip = "Faire la retouche vous-même : Claude donne les réglages dans l'ordre du panneau Développement, "
-                .. "puis compare votre version à la sienne",
-            action = function() F.enTache(F.jeLeFais) end }),
         f:spacer { width = 8 },
         Vues.boutonBleu(f, F, { nom = 'AccepterProposition', titre = "Accepter", cle = 'enAttente',
             infobulle = "Appliquer la proposition : la photo ne change qu'à ce clic",
@@ -786,26 +631,6 @@ function Vues.etape(f, F, largeur, D)
     })
 end
 
--- La carte de l'onglet Leçon (1.3, lot B4), sur son image (carte-lecon, à la largeur intérieure
--- du panneau) : son titre en gras 12 (`leconTitre`, « Leçon de la photo · DSCF4961.RAF »), puis la
--- leçon page par page (`leconTexte`, D.leconLignes lignes en 12, coupées par Fenetre.montrerPage :
--- le nom de chaque axe en <EM>, gras de même taille, constaté le 21 octobre 2026, D4) ; sous la
--- carte, ▲ ▼ (Fenetre.defilerTexte('lecon')) et « Détail… » (l'appel de photo_lesson et sa
--- réponse). Sans leçon, l'aide (Fenetre.AUCUNE_LECON).
-function Vues.lecon(f, F, largeur, D)
-    local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    return carteEtRangee(f, F, largeur, D, 'carte-lecon', {
-        f:static_text { title = bind 'leconTitre', font = P.gras12, text_color = C.texte, width = D.largeurLecon,
-            truncation = 'middle' },
-        f:static_text { title = bind 'leconTexte', font = P.texte12, text_color = C.texte, emphasis_font = P.gras12,
-            emphasis_color = C.texte, width = D.largeurLecon, height_in_lines = D.leconLignes },
-    }, 'lecon', {
-        F.bouton(f, { carre = true, bezel = 26, title = "Détail…", font = P.systeme13, width = D.detail,
-            enabled = bind 'leconADetail', tooltip = "Ce que Claude a donné au connecteur pour cette leçon, puis sa réponse",
-            action = function() F.enTache(F.detailLecon) end }),
-    })
-end
-
 -- La carte de l'onglet Focus (demandé par Dany le 22 octobre 2026), sur son image (carte-focus, à la
 -- largeur intérieure du panneau) : son titre en gras 12 (`focusTitre`, « Focus · DSCF2402.RAF »),
 -- puis les trois blocs Image, Prise de vue et Mise au point page par page (`focusTexte`,
@@ -821,6 +646,28 @@ function Vues.focus(f, F, largeur, D)
         f:static_text { title = bind 'focusTexte', font = P.texte12, text_color = C.texte, emphasis_font = P.gras12,
             emphasis_color = C.texte, width = D.largeurFocus, height_in_lines = D.focusLignes },
     }, 'focus', {})
+end
+
+-- La carte de l'onglet Suivi (le carnet de progrès, à la place de Leçon au correctif 1.3.6 ; la
+-- page Carnet de progrès du fil est retirée avec le volet), sur son image (carte-suivi, à la largeur
+-- intérieure du panneau) : son titre en gras 12 (`suiviTitre`, « Carnet de progrès »), puis le
+-- résumé du carnet, ses constats seulement, page par page (`suiviTexte`, D.suiviLignes lignes en 12,
+-- coupées par Fenetre.montrerPage : ses intertitres et les défauts en <EM>, gras de même taille,
+-- Fil.texteSuivi) ; sous la carte, ▲ ▼, puis « Photos d'un défaut… » (la fenêtre des photos d'un
+-- défaut, et son « Retirer du carnet… » : Fenetre.choisirDefaut), actif quand le résumé montre des
+-- défauts (`suiviADefauts`).
+function Vues.suivi(f, F, largeur, D)
+    local bind, C, P = F.bind, F.COULEURS, F.POLICES
+    return carteEtRangee(f, F, largeur, D, 'carte-suivi', {
+        f:static_text { title = bind 'suiviTitre', font = P.gras12, text_color = C.texte, width = D.largeurSuivi,
+            truncation = 'tail' },
+        f:static_text { title = bind 'suiviTexte', font = P.texte12, text_color = C.texte, emphasis_font = P.gras12,
+            emphasis_color = C.texte, width = D.largeurSuivi, height_in_lines = D.suiviLignes },
+    }, 'suivi', {
+        F.bouton(f, { carre = true, bezel = 26, title = "Photos d'un défaut…", font = P.systeme13, width = D.photosDefaut,
+            tooltip = "Les photos où un défaut du carnet a été vu, et « Retirer du carnet… »", enabled = bind 'suiviADefauts',
+            action = function() F.enTache(F.choisirDefaut) end }),
+    })
 end
 
 -- Note -------------------------------------------------------------------------------------------

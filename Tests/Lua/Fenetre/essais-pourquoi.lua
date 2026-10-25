@@ -104,7 +104,6 @@ Notation.proposition = function() return nil end
 local Fenetre = require 'Fenetre'
 local Moteur = require 'Moteur'
 local prefs = Chemins.prefs()
-prefs.propositionAOuverture = false
 prefs.nouvelleParPhoto = false
 
 -- Les images des étapes (Etapes.images du module) : `images[id]` donne l'état d'une étape (par

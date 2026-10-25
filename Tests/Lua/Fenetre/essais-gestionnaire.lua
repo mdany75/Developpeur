@@ -1,7 +1,7 @@
 -- essais-gestionnaire.lua : les réglages de la 1.3 dans le Gestionnaire de modules externes, hors
 -- de Lightroom (LuaJIT, Lightroom simulé par Simulation.lua) : la case Carnet dans la section de la
--- liaison, les cases Avant/après et Leçon et le menu Apparence (claire ou sombre) dans celle de la
--- fenêtre Claude, leurs valeurs par défaut, et le diagnostic (réglages de la 1.3 au bout de leur
+-- liaison, la case Avant/après et le menu Apparence (claire ou sombre) dans celle de la fenêtre
+-- Claude (la case Leçon est retirée avec la leçon au correctif 1.3.6), leurs valeurs par défaut, et le diagnostic (réglages de la 1.3 au bout de leur
 -- ligne, apparence inconnue dite). Le registre du carnet (Carnet.lua) se charge ici aussi, sans
 -- catalogue lisible : il se lit vide. Ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
@@ -128,29 +128,78 @@ essai('Gestionnaire, liaison : case Carnet, cochée par défaut, liée aux préf
     vrai(c.pointMiseAuPoint and carnet.rang == c.pointMiseAuPoint.rang + 1, 'après la case Mise au point')
 end)
 
-essai('Gestionnaire, fenêtre Claude : cases Avant/après et Leçon, cochées par défaut, après À l\'ouverture', function()
+essai("Gestionnaire et menus : « Fenêtre de la liaison » et « Afficher la fenêtre de la liaison » (la fenêtre de suivi, renommée au correctif 1.3.6)", function()
+    local liste = sections()
+    local titres = {}
+    for _, enfant in ipairs(liste[1]) do
+        if type(enfant) == 'table' and enfant.genre then
+            for _, v in ipairs(vues(enfant)) do
+                if v.genre == 'push_button' or v.genre == 'checkbox' then
+                    titres[#titres + 1] = tostring(v.args.title)
+                end
+            end
+        end
+    end
+    local tous = table.concat(titres, '\n')
+    vrai(tous:find('Fenêtre de la liaison', 1, true), 'le bouton de la section de la liaison : ' .. tous)
+    vrai(tous:find("(fenêtre de la liaison, bouton Accepter)", 1, true), 'la case Accord')
+    vrai(not tous:lower():find('fenêtre de suivi', 1, true), "plus de « fenêtre de suivi » : " .. tous)
+    -- Les deux menus (Fichier et Bibliothèque › Module externe - Extras) : le même fichier,
+    -- MenuSuivi.lua, sous le nouveau titre.
+    local info = dofile(S.plugin .. '/Info.lua')
+    for _, menu in ipairs({ info.LrExportMenuItems, info.LrLibraryMenuItems }) do
+        local fichier
+        for _, item in ipairs(menu) do
+            vrai(item.title ~= 'Afficher la fenêtre de suivi', 'ancien titre du menu')
+            if item.title == 'Afficher la fenêtre de la liaison' then
+                fichier = item.file
+            end
+        end
+        egal('MenuSuivi.lua', fichier)
+    end
+    -- Aucun texte du module ne nomme plus « la fenêtre de suivi » (le refus d'une écriture en
+    -- pause ou d'une proposition refusée, dit à Claude, compris).
+    for _, nom in ipairs({ 'Ecriture.lua', 'PluginInfoProvider.lua', 'Info.lua', 'Liaison.lua', 'Consignes.lua', 'Suivi.lua', 'Fenetre.lua' }) do
+        local source = assert(io.open(S.plugin .. '/' .. nom, 'r'))
+        local texte = source:read('*a')
+        source:close()
+        for ligne in texte:gmatch('[^\n]+') do
+            -- Seule l'histoire du nom (« fenêtre de suivi » jusqu'au correctif 1.3.6) en reste.
+            vrai(not ligne:find('fenêtre de suivi', 1, true) or ligne:find('1.3.6', 1, true) or ligne:find('jusqu', 1, true),
+                nom .. ' : ' .. ligne)
+        end
+    end
+end)
+
+essai('Gestionnaire, fenêtre Claude : case Avant/après, cochée par défaut, après Autre photo ; plus de case Leçon ni À l\'ouverture', function()
     local liste = sections()
     local section = liste[2]
     egal('Fenêtre Claude', section.title)
     local prefs = section.bind_to_object
     egal(Chemins.prefs(), prefs)
     local c = cases(section, prefs)
-    local avantApres, lecon = c.avantApresEtapes, c.leconFinRetouche
-    vrai(avantApres and lecon, 'cases Avant/après et Leçon')
+    local avantApres = c.avantApresEtapes
+    vrai(avantApres, 'case Avant/après')
+    egal(nil, c.leconFinRetouche, 'plus de case Leçon (correctif 1.3.6)')
     egal('Avant/après :', avantApres.etiquette)
-    egal('Leçon :', lecon.etiquette)
     vrai(avantApres.vue.args.title:find("avant/après de chaque étape de Claude", 1, true), 'titre Avant/après')
-    vrai(lecon.vue.args.title:find('leçon de la photo', 1, true), 'titre Leçon')
-    egal(c.propositionAOuverture.rang + 1, avantApres.rang, 'Avant/après après À l\'ouverture')
-    egal(avantApres.rang + 1, lecon.rang, 'puis Leçon')
+    -- Plus de case « À l'ouverture » (correctif 1.3.6, décision de Dany du 25 octobre 2026 : Obtenir
+    -- de l'onglet Proposition la remplace) : Avant/après suit Autre photo.
+    egal(nil, c.propositionAOuverture, 'plus de case À l\'ouverture')
+    egal(nil, Chemins.defauts.propositionAOuverture)
+    egal(c.nouvelleParPhoto.rang + 1, avantApres.rang, 'Avant/après après Autre photo')
+    for _, x in pairs(c) do
+        vrai(not tostring(x.vue.args.title or ''):find('proposition de retouche', 1, true), 'aucune case de la proposition à l\'ouverture')
+        vrai(x.etiquette ~= "À l'ouverture :", 'plus d\'étiquette « À l\'ouverture »')
+    end
     egal(true, prefs.avantApresEtapes)
-    egal(true, prefs.leconFinRetouche)
     egal(true, Chemins.defauts.avantApresEtapes)
-    egal(true, Chemins.defauts.leconFinRetouche)
+    egal(nil, Chemins.defauts.leconFinRetouche)
     -- Une case décochée reste décochée : la valeur par défaut ne s'impose qu'à une clé absente.
-    prefs.leconFinRetouche = false
-    egal(false, Chemins.prefs().leconFinRetouche)
-    prefs.leconFinRetouche = nil
+    prefs.avantApresEtapes = false
+    egal(false, Chemins.prefs().avantApresEtapes)
+    prefs.avantApresEtapes = nil
+    egal(true, Chemins.prefs().avantApresEtapes, 'clé retirée : la valeur par défaut')
 end)
 
 essai('Gestionnaire, fenêtre Claude : menu Apparence (Claire, Sombre) après Effort, claire par défaut', function()
@@ -198,7 +247,7 @@ essai('Gestionnaire, fenêtre Claude : menu Apparence (Claire, Sombre) après Ef
     prefs.apparence = 'bleue'
     egal('bleue', Chemins.prefs().apparence)
     egal('claire', Dispositions.apparence(Chemins.prefs().apparence))
-    egal('images/loupe.png', Dispositions.image('loupe', Chemins.prefs().apparence))
+    egal('images/trombone.png', Dispositions.image('trombone', Chemins.prefs().apparence))
     prefs.apparence = nil
     egal('claire', Chemins.prefs().apparence, 'clé retirée : la valeur par défaut')
 end)
@@ -208,7 +257,9 @@ essai('Diagnostic : réglages de la 1.3 au bout de leur ligne, débuts de ligne 
     -- Sans catalogue lisible (simulation de la fenêtre), le carnet se lit vide.
     vrai(finitPar(mode, ' ; point de mise au point en tout temps : false ; carnet de progrès : true (0 photo)'), mode)
     local fenetre = ligneDiagnostic('Fenêtre Claude : ')
-    vrai(finitPar(fenetre, "proposition à l'ouverture : true ; avant/après des étapes : true ; leçon en fin de retouche : true ; apparence : claire"), fenetre)
+    vrai(finitPar(fenetre, "autre photo, reprendre sa conversation, sinon une nouvelle : true ; avant/après des étapes : true ; apparence : claire"), fenetre)
+    vrai(not fenetre:find("proposition à l'ouverture", 1, true), "plus de proposition à l'ouverture au diagnostic")
+    vrai(not fenetre:find('leçon', 1, true), 'plus de leçon au diagnostic')
     -- L'apparence telle qu'elle sert ; une préférence inconnue est dite à côté.
     local prefsApparence = Chemins.prefs()
     prefsApparence.apparence = 'sombre'
@@ -218,7 +269,7 @@ essai('Diagnostic : réglages de la 1.3 au bout de leur ligne, débuts de ligne 
     vrai(finitPar(inconnue, ' ; apparence : claire (préférence « bleue » inconnue)'), inconnue)
     prefsApparence.apparence = nil
     -- Ce que lisent les essais des dispositions, inchangé.
-    vrai(PluginInfoProvider.diagnostic():find('effort max ; nouvelle conversation par photo', 1, true), 'diagnostic')
+    vrai(PluginInfoProvider.diagnostic():find('effort max ; autre photo, reprendre sa conversation, sinon une nouvelle', 1, true), 'diagnostic')
     vrai(PluginInfoProvider.diagnostic():find('modèle opus, effort max', 1, true), 'diagnostic : modèle et effort')
     local prefs = Chemins.prefs()
     prefs.avantApresEtapes, prefs.carnet = false, false
@@ -239,7 +290,7 @@ essai('Carnet : se charge dans la simulation de la fenêtre, se lit vide sans ca
     egal(0, Carnet.nombre())
     egal(0, #Carnet.entrees())
     S.neuve(Carnet.entrees(), 'entrées du carnet')
-    egal(nil, Carnet.lecon(1))
+    egal(nil, Carnet.lecon, 'plus de leçon à lire (correctif 1.3.6)')
     egal(nil, Carnet.entree(1))
     egal(nil, package.loaded.Bibliotheque, 'sans la Bibliothèque')
 end)

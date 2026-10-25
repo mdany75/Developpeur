@@ -1881,7 +1881,7 @@ local function copiesDe(photo)
     return ids, original
 end
 
--- Renvoie aussi si elles ont été créées hors d'une écriture (dit dans la fenêtre de suivi).
+-- Renvoie aussi si elles ont été créées hors d'une écriture (dit dans la fenêtre de la liaison).
 -- Constaté en 2.3 (Lightroom Classic 15.6) : createVirtualCopies se fait dans une écriture ; le
 -- second chemin reste pour une autre version.
 local function creerCopies(nom)

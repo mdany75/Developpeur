@@ -50,8 +50,7 @@ public struct ToolResult: Equatable {
 /// (Tools+Gestion), Bibliothèque (Tools+Bibliotheque), tri d'une séance et planche contact
 /// (Tools+Tri), notes proposées selon le standard de notation (Tools+Notation), guide de style
 /// (Tools+Style), livraison en fichiers (Tools+Livraison), variantes (Tools+Variantes),
-/// harmonisation d'une série (Tools+Serie), composition lue (Tools+Composition) et leçon de la
-/// photo (Tools+Lecon).
+/// harmonisation d'une série (Tools+Serie) et composition lue (Tools+Composition).
 public final class ToolHandler {
     let lightroom: LightroomServing
     let lookProfiles: LookProfileLibrary
@@ -95,15 +94,16 @@ public final class ToolHandler {
     /// Les sauvegardes du catalogue et Time Machine, d'après le chemin du catalogue (1.3.5,
     /// `Sauvegardes.lire`) : rien par défaut ; seul main.swift lit les vraies (ni les tests).
     public var lireSauvegardes: (String) -> JSONValue? = { _ in nil }
-    /// Les rendus de fin de retouche (1.3.5, rendu reproductible) : nil par défaut ; seul `serve()`
-    /// en donne un, comme `noterAuCarnet`.
+    /// Les rendus de fin de retouche (1.3.5, rendu reproductible ; gardés depuis la 1.3.6 au
+    /// view_photo avec compare = before_claude) : nil par défaut ; seul `serve()` en donne un, comme
+    /// `noterAuCarnet`.
     public var registreRendus: RegistreRendus?
     /// L'écran a déjà été dit à Claude (remarque du premier aperçu, ou get_status) : une fois par
     /// processus du serveur.
     var ecranSignale = false
     /// Les outils dont le résultat est un aperçu que Claude regarde : le premier réussi qui porte
-    /// une image reçoit la remarque de l'écran (un bloc de texte à part). Un résultat sans image
-    /// (preview_settings avec my_turn, 1.3) ne la consomme pas.
+    /// une image reçoit la remarque de l'écran (un bloc de texte à part). Un résultat sans image ne
+    /// la consomme pas.
     static let outilsAvecApercu: Set<String> = ["view_photo", "preview_settings", "compare_variants"]
     /// Les constats de la prise de vue partent au carnet de progrès (commande carnet du module).
     /// Faux par défaut : seul le serveur lancé par Claude (`serve` de main.swift) le pose ; ni
@@ -157,7 +157,7 @@ public final class ToolHandler {
         "list_profiles", "list_presets", "save_preset", "undo_last", "revert_to_original", "export_journal",
         "find_photos", "set_metadata", "list_keywords", "manage_collections", "create_virtual_copy", "show_photo",
         "cull_photos", "contact_sheet", "propose_ratings", "remove_distractions", "remember_style",
-        "export_photos", "compare_variants", "choose_variant", "match_series", "photo_lesson",
+        "export_photos", "compare_variants", "choose_variant", "match_series",
     ]
 
     var photoIDProperty: JSONValue {
@@ -186,8 +186,8 @@ public final class ToolHandler {
     /// rien sur un avant/après.
     static let descriptionRaison = "Pourquoi, en une phrase simple : le défaut vu, puis ce que l'étape y fait. Gardé au journal (export_journal) ; la fenêtre Claude le montre avec l'étape cliquée."
     /// Celle de preview_settings (1.3.1) : une proposition n'est pas une étape, sa raison ne va pas au
-    /// journal, sauf celle d'un exercice « Je le fais » ; même borne.
-    static let descriptionRaisonProposition = "Pourquoi, en une phrase simple : le défaut vu, puis ce que la proposition y fait. Rien au journal : à redonner à apply_settings (my_turn : celle de l'exercice)."
+    /// journal ; même borne.
+    static let descriptionRaisonProposition = "Pourquoi, en une phrase simple : le défaut vu, puis ce que la proposition y fait. Rien au journal : à redonner à apply_settings."
     static let longueurRaisonDecrite = 160
 
     /// Tous les outils définis, par thème.
@@ -210,7 +210,7 @@ public final class ToolHandler {
         ]
         return core + analysisDefinitions + compositionDefinitions + developDefinitions + localDefinitions + managementDefinitions
             + libraryDefinitions + cullDefinitions + notationDefinitions + styleDefinitions + deliveryDefinitions + variantDefinitions
-            + seriesDefinitions + lessonDefinitions
+            + seriesDefinitions
     }
 
     /// Titre lisible de chaque outil (annotations MCP, `title`), que le client montre à la place
@@ -229,20 +229,21 @@ public final class ToolHandler {
         "cull_photos": "Trier une séance", "contact_sheet": "Planche contact", "propose_ratings": "Noter des photos",
         "remove_distractions": "Supprimer les reflets",
         "remember_style": "Guide de style", "export_photos": "Exporter des photos", "compare_variants": "Comparer des variantes",
-        "choose_variant": "Choisir une variante", "match_series": "Harmoniser une série", "photo_lesson": "Leçon de la photo",
+        "choose_variant": "Choisir une variante", "match_series": "Harmoniser une série",
     ]
     /// Outils qui ne changent rien aux photos ni au catalogue (`readOnlyHint`) : le client peut les
     /// laisser passer sans demander. Une proposition (preview_settings) passe par l'Historique : pas ici ;
     /// propose_ratings non plus depuis la 1.1.1 : avec apply, il pose les notes dans le catalogue.
     /// get_status n'en est pas : il peut demander une sauvegarde du catalogue. view_photo en est,
     /// même avec compare : les deux étapes « Claude · comparaison » de l'Historique laissent la photo
-    /// telle qu'elle était (choix de la 2.4, dit dans sa description). De même en 1.3 :
-    /// read_composition et photo_lesson ne changent ni les photos ni le catalogue ; leurs descriptions
-    /// le disent, avec ce qu'ils laissent ailleurs (les étapes temporaires « Claude · composition »
-    /// de l'Historique, la leçon rangée dans carnet.json, à part du catalogue).
+    /// telle qu'elle était (choix de la 2.4, dit dans sa description) ; ce qu'il garde à part du
+    /// catalogue (les constats du carnet, carnet.json ; le rendu de fin de retouche, rendus.json,
+    /// 1.3.6) ne change ni les photos ni le catalogue. De même en 1.3 :
+    /// read_composition ne change ni les photos ni le catalogue ; sa description le dit, avec ce
+    /// qu'il laisse dans l'Historique (les étapes temporaires « Claude · composition »).
     static let readOnlyTools: Set<String> = [
         "list_selection", "view_photo", "measure_angle", "read_composition", "analyze_photos", "get_settings", "list_profiles",
-        "list_presets", "export_journal", "find_photos", "list_keywords", "cull_photos", "contact_sheet", "photo_lesson",
+        "list_presets", "export_journal", "find_photos", "list_keywords", "cull_photos", "contact_sheet",
     ]
     /// Outils qui défont des retouches (`destructiveHint`) : le client peut demander confirmation.
     static let destructiveTools: Set<String> = ["revert_to_original", "undo_last"]
@@ -438,7 +439,6 @@ public final class ToolHandler {
                 if let result = try callLibrary(name, args) { return result }
                 if let result = try callCull(name, args) { return result }
                 if let result = try callNotation(name, args) { return result }
-                if let result = try callLesson(name, args) { return result }
                 return ToolResult(text: "Outil inconnu : \(name)", isError: true)
             }
         } catch {

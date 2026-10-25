@@ -298,53 +298,14 @@ function Lecture.diagnostic(params)
     return resultat
 end
 
--- Données de prise de vue de plus, pour la leçon de la photo (journal avec detaille, 1.3) :
--- compensation d'exposition, flash, programme et mesure de la lumière. Lues une à une par
--- Photos.meta (getFormattedMetadata sous LrTasks.pcall) : une clé que Lightroom refuse, ou vide,
--- donne nil sans gêner les autres. Jamais dans une lecture groupée (CLES_FORMATEES de Photos.lua,
--- batchGetFormattedMetadata) : une clé refusée y ferait échouer tout le lot. Constaté le
--- 21 octobre 2026 (Lightroom Classic 15.6, mesure 3 de la 1.3, cinq copies d'Essais : RAF de X-H2S
--- et de X-T20, JPEG de X-T20, HEIC d'iPhone) : aucune des quatre n'est refusée, et chacune rend un
--- texte traduit dans la langue de Lightroom, pas un code : « 0 EV », « Non déclenché »,
--- « Priorité d'ouverture », « Priorité d'obturation », « Normal », « Moyenne pondérée », « Motif ».
--- Rien ne les analyse : le texte va tel quel à Claude. Le format d'une compensation non nulle n'est
--- pas relevé (aucune copie d'Essais n'en a).
-local CLES_PRISE_DE_VUE_PLUS = {
-    { 'compensation', 'exposureBias' },
-    { 'flash', 'flash' },
-    { 'programme', 'exposureProgram' },
-    { 'mesure', 'meteringMode' },
-}
-
-local function priseDeVuePlus(photo)
-    local plus, lu = {}, false
-    for _, c in ipairs(CLES_PRISE_DE_VUE_PLUS) do
-        local valeur = Photos.meta(photo, c[2])
-        local sorte = type(valeur)
-        if sorte == 'string' or sorte == 'number' or sorte == 'boolean' then
-            plus[c[1]] = valeur
-            lu = true
-        end
-    end
-    return lu and plus or nil
-end
-
--- journal {photos?|selection?, detaille?} : le journal des retouches de Claude de chaque photo.
--- Avec detaille (la leçon de la photo), la photo est décrite en entier (appareil, objectif, ISO,
--- vitesse, ouverture, focale, date…) avec prise_de_vue_plus et la sensibilité ISO en nombre
--- (sensibilite, 1.3.1 : l'indice du bruit de la leçon ne vaut qu'à un ISO élevé) ; sans, la
--- description courte. Rien n'est écrit.
+-- journal {photos?|selection?} : le journal des retouches de Claude de chaque photo, avec la
+-- description courte de la photo. Rien n'est écrit. (Le journal détaillé, detaille, ne servait
+-- qu'à la leçon de la photo : retiré avec elle au correctif 1.3.6.)
 function Lecture.journal(params)
-    local detaille = params.detaille == true
     local photos = Json.tableau()
     for _, photo in ipairs(photosVisees(params)) do
-        local description = decrire(photo, detaille)
-        if detaille then
-            description.prise_de_vue_plus = priseDeVuePlus(photo)
-            description.sensibilite = Photos.sensibilite(photo)
-        end
         photos[#photos + 1] = {
-            photo = description,
+            photo = decrire(photo, false),
             entrees = Json.tableau(lireJson(photo, 'journalClaude', {})),
         }
     end

@@ -100,7 +100,7 @@ Etapes.COMMANDES = {
 -- capture regarde (lectures, barre de progression, registres hors du catalogue).
 Etapes.SANS_ATTENTE = {
     ping = true, etat = true, selection = true, progression = true, notation = true, etapes = true,
-    lecon = true, carnet = true, journal = true, reglages = true, diagnostic = true,
+    carnet = true, journal = true, reglages = true, diagnostic = true,
 }
 
 -- Raisons d'un avant/après manquant, en mots (journal de la liaison ; la fenêtre les reprend).
