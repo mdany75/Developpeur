@@ -34,6 +34,10 @@ public struct PhotoMeasurements: Equatable {
     public var clippedGamut: Double = 0
     /// La bande de la TSL (rouge, orange… magenta) la plus touchée par l'écrêtage par la gamme.
     public var gamutBand: String?
+    /// Point neutre de toute l'image (`MesureEclairage.neutre` : médianes de a* et b* de ses tons
+    /// peu saturés), posé après la mesure de l'éclairage ; nil sans elle. Gardé avec la vue : le bilan
+    /// en tire la dominante de toute l'image d'une passe à l'autre.
+    public var pointNeutre: MesureEclairage.Neutre?
 
     public var medianL: Double { percentilesL[50] ?? meanL }
     public var contrast: Double { (percentilesL[95] ?? 0) - (percentilesL[5] ?? 0) }
@@ -106,6 +110,30 @@ public struct PhotoMeasurements: Equatable {
         return parts.isEmpty ? "neutre" : "dominante " + parts.joined(separator: " et ")
     }
 
+    /// La dominante de toute l'image : son point neutre, quand il s'écarte du gris de plus de
+    /// `Eclairage.toleranceNeutre` (au-delà, ce n'est plus celui d'une photo balancée) ; nil en deçà
+    /// ou sans lui. Les tons presque neutres (C* < 15) n'en gardent que les pixels déjà gris, et la
+    /// sous-estiment : constaté le 24 octobre 2026 sur un portrait à l'ombre des feuillus (balance
+    /// automatique du boîtier, 5 150 K) : tons neutres b* −3, « légèrement froide », mais point neutre
+    /// a* 3,4, b* −17,7, chandail blanc à b* −30 et gravier à −23 ; Retouche pro n'avait réchauffé que
+    /// de 600 K.
+    public var dominanteGlobale: MesureEclairage.Neutre? {
+        guard let pointNeutre, hypot(pointNeutre.a, pointNeutre.b) > Eclairage.toleranceNeutre else { return nil }
+        return pointNeutre
+    }
+
+    /// Lecture de la dominante de toute l'image ; nil sans elle.
+    public var lectureDominanteGlobale: String? {
+        guard let globale = dominanteGlobale else { return nil }
+        var sens: [String] = []
+        for (valeur, moins, plus) in [(globale.b, "au bleu", "au jaune"), (globale.a, "au vert", "au magenta")]
+        where abs(valeur) >= Self.dominanteLegere {
+            sens.append((abs(valeur) >= Self.dominanteNette ? "" : "un peu ") + (valeur < 0 ? moins : plus))
+        }
+        return "toute l'image tire " + sens.joined(separator: " et ")
+            + " (point neutre : médiane de ses tons peu saturés) ; tons_neutres, qui ne garde que les pixels déjà presque gris, la sous-estime"
+    }
+
     public var json: JSONValue {
         func r(_ value: Double) -> JSONValue { .number((value * 10).rounded() / 10) }
         var luminosity: [String: JSONValue] = ["moyenne": r(meanL)]
@@ -134,6 +162,14 @@ public struct PhotoMeasurements: Equatable {
         ]
         if let nature = natureEcretage, var objet = resultat.object {
             objet["ecretage_nature"] = nature
+            resultat = .object(objet)
+        }
+        if let globale = dominanteGlobale, let lecture = lectureDominanteGlobale, var objet = resultat.object,
+           var couleur = objet["couleur"]?.object, var neutres = couleur["tons_neutres"]?.object {
+            neutres["lecture"] = .string(castReading + " ; sous-estimée : voir dominante_globale")
+            couleur["tons_neutres"] = .object(neutres)
+            couleur["dominante_globale"] = ["a": r(globale.a), "b": r(globale.b), "lecture": .string(lecture)]
+            objet["couleur"] = .object(couleur)
             resultat = .object(objet)
         }
         return resultat

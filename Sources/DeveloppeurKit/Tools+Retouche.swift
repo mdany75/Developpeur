@@ -91,9 +91,10 @@ extension ToolHandler {
                                 "description": "Upright avec repères (mode Guidé) : 2 à 4 lignes vraiment verticales ou horizontales dans la réalité (arêtes de bâtiment, poteaux, horizon), à redresser, positions mesurées dans view_photo. Le module les pose, mais Lightroom ne calcule la transformation qu'au clic de l'utilisateur sur « Mettre à jour » (panneau Transformation, section Upright) : le lui demander (show_photo en Développement), puis view_photo. Lightroom resserre ensuite le cadre (« Contraindre le recadrage »)."]),
             ("rotate", enumProp(["left", "right", "180"], "Rotation d'un quart de tour (photo couchée) : left = vers la gauche, right = vers la droite, 180 = demi-tour. undo_last la défait. Pas montrée par preview_settings.")),
             ("snapshot", prop("string", "Nom d'un instantané pris avant cette retouche (panneau Instantanés, « Claude · <nom> »), comme Adobe le conseille avant un gros changement ; un aussi, de lui-même, avant process_version.")),
-            ("white_balance_point", objectProp("Balance des blancs sur un point neutre (comme la pipette de Lightroom) : un gris ou un blanc qui doit être neutre, dans l'image telle que la montre view_photo. Le serveur mesure sa dominante sur l'aperçu et en tire Temperature et Tint ; avec apply_settings, une seconde passe mesurée corrige l'écart qui reste. Une seule photo.", [
+            ("white_balance_point", objectProp("Balance des blancs sur un point neutre (comme la pipette de Lightroom) : un gris ou un blanc qui doit être neutre, dans l'image telle que la montre view_photo ; ou {scene: true} : le point neutre de toute l'image (dominante_globale de view_photo). Le serveur mesure sa dominante sur l'aperçu et en tire Temperature et Tint ; avec apply_settings, une seconde passe mesurée corrige l'écart qui reste. Une seule photo.", [
                 "x": prop("number", "Depuis la gauche (0 à 1)."), "y": prop("number", "Depuis le haut (0 à 1)."),
-            ], required: ["x", "y"])),
+                "scene": prop("boolean", "true = toute l'image au lieu d'un point (sans x ni y)."),
+            ])),
             ("process_version", prop("integer", "Version de processus : \(DevelopCatalogue.currentProcessVersion.version) (l'actuelle) met à jour une photo d'une version ancienne (3 à 5 ; get_settings et view_photo la signalent). Le rendu peut changer nettement : toujours le montrer d'abord (preview_settings), et apply_settings exige confirm = true. Un instantané « Claude · avant version de processus » est pris avant. Une photo en version 1 ou 2 (2003, 2010) se met à jour à la main dans Lightroom : un module ne peut pas convertir ses curseurs.")),
             ("relative", prop("boolean", "true = les valeurs de settings s'ajoutent aux valeurs actuelles (sans effet sur le reste).")),
         ]
@@ -283,7 +284,7 @@ extension ToolHandler {
         }
         var (develop, notes) = try developParameters(args)
         if let balance {
-            notes.append(.string("Balance du point neutre : a* \(Self.format((balance.avant.a * 10).rounded() / 10)), b* \(Self.format((balance.avant.b * 10).rounded() / 10)) mesurés ; Temperature et Tint proposés d'après les pentes relevées (apply_settings remesure et corrige l'écart qui reste)."))
+            notes.append(.string("Balance \(balance.point == nil ? "de toute l'image" : "du point neutre") : a* \(Self.format((balance.avant.a * 10).rounded() / 10)), b* \(Self.format((balance.avant.b * 10).rounded() / 10)) mesurés ; Temperature et Tint proposés d'après les pentes relevées (apply_settings remesure et corrige l'écart qui reste)."))
         }
         let cible: [String: JSONValue] = args.int("photo_id").map { ["photo": .number(Double($0))] } ?? [:]
         notes += recalagesDuRecadrage(&develop, cible: cible)

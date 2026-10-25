@@ -328,6 +328,11 @@ avant de proposer un cadre.
   données de prise de vue et des mesures : luminosité (L*, centiles), écrêtage des hautes lumières
   (aussi canal par canal) et des ombres, contraste, saturation, dominante des tons neutres,
   netteté par zone et bruit.
+- La dominante de toute l'image : quand la photo entière tire nettement vers une couleur (un
+  portrait à l'ombre des arbres, bleu sous la lumière du ciel ; une lampe), Claude le voit, avec la
+  balance qui la ramène au neutre. Les tons presque neutres seuls la sous-estimaient : sous une
+  forte dominante, un chandail blanc ou un chemin n'en font plus partie. Claude la corrige en
+  première passe, en deux passes mesurées, sauf si la lumière est voulue (coucher de soleil, lampe).
 - La nature de l'écrêtage (1.3.4) : des hautes lumières brûlées par la luminance (une zone presque
   blanche : les Hautes lumières ou les Blancs la corrigent) ou par la gamme (une couleur trop
   saturée pour l'espace de l'aperçu, un rouge de fleur, un coucher de soleil, un vêtement vif : la
@@ -346,7 +351,8 @@ avant de proposer un cadre.
   bouchées, couleurs très saturées, dominante accentuée, netteté ou bruit qui passent leur seuil) :
   Claude la corrige par une passe ciblée ou défait la dernière étape, et vous le dit. Un changement
   peut-être voulu (une annulation, un calcul IA en attente, une dominante corrigée au-delà du
-  neutre, des coins vides après Upright) n'est qu'« à vérifier ». L'avant/après côte à côte et les
+  neutre, des tons qui prennent leur vraie couleur quand une forte dominante de toute l'image est
+  corrigée, des coins vides après Upright) n'est qu'« à vérifier ». L'avant/après côte à côte et les
   propositions ont leur propre bilan, sans netteté ni bruit pour une proposition ; un zoom refait
   sur la même zone, le sien, sans alerte (utile après un débruitage). Dans la fenêtre Claude et
   avec les invites qui retouchent, Claude reprend ces chiffres dans son résumé (« hautes lumières
@@ -432,8 +438,9 @@ avant de proposer un cadre.
   200 %, profils adaptatifs (RAW), et les vôtres. Le profil est relu après coup : si Lightroom ne
   le garde pas pour votre appareil, Claude le dit.
 - Balance des blancs et tonalité automatiques de Lightroom, préréglages de balance (lumière du
-  jour, nuageux, tungstène…), et balance sur un point neutre de l'image, comme la pipette : Claude
-  mesure le point, le ramène au neutre et vérifie.
+  jour, nuageux, tungstène…), et balance sur un point neutre de l'image, comme la pipette, ou sur
+  toute l'image (son point neutre) : Claude mesure, ramène au neutre, puis remesure et corrige
+  l'écart qui reste.
 - Flou d'objectif : arrière-plan flou d'après la profondeur que Lightroom estime, intensité, forme
   du bokeh, et le pinceau d'affinage pour un contour mal détouré (des cheveux, par exemple).
 - Débruitage IA, détails bruts et super résolution, que Lightroom calcule lui-même : la photo

@@ -279,6 +279,24 @@ enum Bilan {
         } else {
             c.remarques.append("dominante non comparée : moins de \(nombre(PhotoMeasurements.partNeutreMin, decimales: 0)) % de tons neutres")
         }
+        // La dominante de toute l'image (point neutre). Quand elle se rapproche nettement du gris, la
+        // balance a été corrigée : les tons suivis, gris sous l'ancienne dominante, reprennent la
+        // couleur de leur objet. Ce n'est pas une dominante accentuée, mais un point à vérifier à
+        // l'œil (24 octobre 2026 : sans cela, la vraie correction d'une forte dominante passait pour
+        // une « regression »).
+        if let g0 = avant.pointNeutre, let g1 = apres.pointNeutre {
+            let d0 = hypot(g0.a, g0.b), d1 = hypot(g1.a, g1.b)
+            func point(_ g: MesureEclairage.Neutre) -> JSONValue { ["a": arrondi(g.a), "b": arrondi(g.b)] }
+            noter("dominante_globale", abs(d1 - d0) >= seuilDominante,
+                  ["avant": point(g0), "apres": point(g1), "ecart_au_gris": .string("\(nombre(d0)) → \(nombre(d1))")])
+            if d0 - d1 >= regressionDominante, !dominantes.isEmpty {
+                c.aVerifier += dominantes.map {
+                    "\($0), mais toute l'image se rapproche du neutre (point neutre à \(nombre(d0)) → \(nombre(d1)) du gris) : "
+                        + "ces tons paraissaient gris sous l'ancienne dominante ; juger un blanc ou la peau à l'œil"
+                }
+                dominantes = []
+            }
+        }
 
         // Saturation.
         noter("chroma_moyenne", abs(apres.meanChroma - avant.meanChroma) >= seuilChroma, ecart(avant.meanChroma, apres.meanChroma))

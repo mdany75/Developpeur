@@ -148,6 +148,40 @@ final class RetoucheMasquesTests: XCTestCase {
         XCTAssertTrue(call("apply_settings", ["white_balance_point": ["x": 0.5, "y": 0.5], "settings": ["Temperature": 5000], "step_name": "x"]).isError)
     }
 
+    func testWhiteBalanceOnTheWholeSceneCorrectsAStrongCastInTwoMeasuredPasses() throws {
+        // Une forte dominante bleue de toute l'image (b* vers −27, plus de 25 de chroma : refusée
+        // comme point) ; la première passe dépasse vers le jaune, la seconde, mesurée, ramène au gris.
+        var couleur: (UInt8, UInt8, UInt8) = (110, 125, 170)
+        var temperature = 5150.0, teinte = 34.0
+        fake.onSend = { [unowned fake] command, params in
+            if command == "apercu" {
+                fake?.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: couleur.0, green: couleur.1, blue: couleur.2))),
+                                           "echelle_temperature": "kelvins (RAW : 2000 à 50000)",
+                                           "reglages": ["Temperature": .number(temperature), "Tint": .number(teinte)]]
+            }
+            if command == "appliquer" {
+                temperature = params["reglages"]?["Temperature"]?.double ?? temperature
+                teinte = params["reglages"]?["Tint"]?.double ?? teinte
+                let passe = fake?.calls.filter { $0.command == "appliquer" }.count ?? 0
+                couleur = passe == 1 ? (140, 132, 112) : (128, 128, 128)
+            }
+        }
+        XCTAssertTrue(call("apply_settings", ["white_balance_point": ["x": 0.5, "y": 0.5], "photo_ids": [4], "step_name": "x"])
+            .text.contains("n'est pas un gris"))
+        let result = call("apply_settings", ["white_balance_point": ["scene": true], "photo_ids": [4], "step_name": "balance"])
+        XCTAssertFalse(result.isError, result.text)
+        let ecritures = fake.calls.filter { $0.command == "appliquer" }
+        XCTAssertEqual(ecritures.count, 2, "une seconde passe mesurée sur toute l'image")
+        XCTAssertGreaterThan(ecritures[0].params["reglages"]?["Temperature"]?.double ?? 0, 5150, "bleue : réchauffer")
+        XCTAssertEqual(ecritures[1].params["etape"]?.string, "balance : balance, passe 2")
+        let rapport = try XCTUnwrap(try JSONCoding.parse(result.text)["balance_point"])
+        XCTAssertLessThan(rapport["mesure_avant"]?["b"]?.double ?? 0, -15)
+        XCTAssertGreaterThan(rapport["apres_passe_1"]?["b"]?.double ?? 0, 5)
+        XCTAssertEqual(rapport["apres"]?["b"]?.double ?? 99, 0, accuracy: 1)
+        // Ni point ni scene : refusé, et le refus dit les deux formes.
+        XCTAssertTrue(call("apply_settings", ["white_balance_point": ["scene": false], "step_name": "x"]).text.contains("{scene: true}"))
+    }
+
     func testWhiteBalanceForAPointOnAJpegIsRelative() {
         let point = ToolHandler.PointNeutre(l: 50, a: 0, b: 11.6, ecretes: 0)
         let (temperature, tint) = ToolHandler.balancePourPoint(point, raw: false, temperature: 10, tint: 0)

@@ -9,7 +9,11 @@ import Foundation
 /// apply_settings, une seconde passe mesurée corrige l'écart qui reste.
 extension ToolHandler {
     /// La zone mesurée autour du point : en L*a*b* D65, comme les tons neutres de match_series (les
-    /// pentes ont été relevées ainsi), sans les pixels écrêtés.
+    /// pentes ont été relevées ainsi), sans les pixels écrêtés. Avec `scene`, le point neutre de toute
+/// l'image (`MesureEclairage.neutre`, la dominante_globale de view_photo) tient lieu de point : pour
+/// une forte dominante, les pentes dépassent la cible et la seconde passe mesurée la rattrape (constaté
+/// le 24 octobre 2026 sur un portrait à l'ombre des feuillus, 5 150 K et +34 : la balance proposée
+/// d'un coup, 6 968 K et +2, virait au vert ; 7 000 K et +28 laissaient le gravier neutre).
     struct PointNeutre: Equatable {
         var l: Double
         var a: Double
@@ -72,6 +76,14 @@ extension ToolHandler {
         return balancePourLumiere(lumiere, reponse: reponse)
     }
 
+    /// Balance qui ramène au gris le point neutre de toute l'image (view_photo › mesures › couleur ›
+    /// dominante_globale › balance_proposee), par les mêmes pentes. Nil sans dominante globale ou
+    /// sans Temperature lue dans `reponse`.
+    static func balanceGlobale(_ mesures: PhotoMeasurements, reponse: JSONValue) -> (temperature: Double, tint: Double)? {
+        guard let globale = mesures.dominanteGlobale else { return nil }
+        return balancePourLumiere(MesureEclairage.Dominante(a: globale.a, b: globale.b, part: 0, pixels: 0), reponse: reponse)
+    }
+
     /// Balance qui neutralise une lumière mesurée, depuis la balance que donne `reponse`
     /// (echelle_temperature, reglages) ; nil sans Temperature lue. Le relevé de l'éclairage
     /// (`--eclairage`) la donne aussi pour une photo que le seuil provisoire ne dit pas mixte.
@@ -82,13 +94,21 @@ extension ToolHandler {
         return balancePourPoint(PointNeutre(l: 50, a: lumiere.a, b: lumiere.b, ecretes: 0), raw: raw, temperature: temperature, tint: tint)
     }
 
-    /// Mesure du point sur un aperçu d'analyse de la photo, et sa balance actuelle.
-    func mesurerBalance(photo: Int?, x: Double, y: Double) throws -> (point: PointNeutre, raw: Bool, temperature: Double, tint: Double) {
+    /// Le point neutre de toute l'image d'un aperçu, mesuré comme celui de view_photo (réduit à
+    /// `Measurements.maxSide`, sans visages) ; nil si l'aperçu est illisible.
+    static func mesurerScene(_ data: Data) -> PointNeutre? {
+        guard let image = PreviewImages.image(data), let mesure = Eclairage.mesurer(image) else { return nil }
+        return PointNeutre(l: 50, a: mesure.neutre.a, b: mesure.neutre.b, ecretes: 0)
+    }
+
+    /// Mesure du point (ou, sans point, de toute l'image) sur un aperçu d'analyse de la photo, et sa
+    /// balance actuelle.
+    func mesurerBalance(photo: Int?, point cible: (x: Double, y: Double)?) throws -> (point: PointNeutre, raw: Bool, temperature: Double, tint: Double) {
         var params: [String: JSONValue] = ["taille": .number(Double(Self.analysisSize)), "cles": ["Temperature", "Tint"]]
         if let photo { params["photo"] = .number(Double(photo)) }
         let reponse = try lightroom.send("apercu", params, timeout: 120)
         let data = try Self.readPreview(reponse["chemin"]?.string)
-        guard let point = Self.mesurerPoint(data, x: x, y: y) else {
+        guard let point = cible.map({ Self.mesurerPoint(data, x: $0.x, y: $0.y) }) ?? Self.mesurerScene(data) else {
             throw LightroomError.plugin("Aperçu illisible : le point neutre ne se mesure pas.")
         }
         let raw = reponse["echelle_temperature"]?.string?.contains("kelvins") == true
@@ -97,17 +117,22 @@ extension ToolHandler {
 
     struct BalancePoint {
         var photo: Int?
-        var x: Double
-        var y: Double
+        /// Le point désigné ; nil pour toute l'image (`scene`).
+        var point: (x: Double, y: Double)?
         var avant: PointNeutre
     }
 
     /// Mesure le point et met la balance qui le neutralise dans les réglages de la retouche
     /// (absolue, ou l'écart si la retouche est relative).
     func balanceSurPoint(_ args: Arguments) throws -> (Arguments, BalancePoint) {
-        guard let point = args.object("white_balance_point"), let x = point["x"]?.double, let y = point["y"]?.double,
-              (0...1).contains(x), (0...1).contains(y) else {
-            throw LightroomError.invalid("« white_balance_point » : {x, y}, de 0 à 1 dans l'image telle que la montre view_photo.")
+        let objet = args.object("white_balance_point")
+        let scene = objet?["scene"]?.bool == true
+        var designe: (x: Double, y: Double)?
+        if !scene {
+            guard let x = objet?["x"]?.double, let y = objet?["y"]?.double, (0...1).contains(x), (0...1).contains(y) else {
+                throw LightroomError.invalid("« white_balance_point » : {x, y}, de 0 à 1 dans l'image telle que la montre view_photo, ou {scene: true} pour toute l'image.")
+            }
+            designe = (x, y)
         }
         let ids = try args.intList("photo_ids") ?? (args.int("photo_id").map { [$0] } ?? [])
         guard ids.count <= 1, args.bool("selection") != true else {
@@ -117,14 +142,14 @@ extension ToolHandler {
         guard settings["Temperature"] == nil, settings["Tint"] == nil, !args.has("white_balance") else {
             throw LightroomError.invalid("« white_balance_point » donne lui-même Temperature et Tint : ne pas les donner aussi (ni white_balance).")
         }
-        let mesure = try mesurerBalance(photo: ids.first, x: x, y: y)
-        if mesure.point.ecretes > 50 {
+        let mesure = try mesurerBalance(photo: ids.first, point: designe)
+        if designe != nil, mesure.point.ecretes > 50 {
             throw LightroomError.invalid("Le point désigné est brûlé (\(Int(mesure.point.ecretes.rounded())) % de pixels écrêtés) : la dominante ne s'y lit pas. Prendre un gris moins clair.")
         }
-        if mesure.point.l < 8 {
+        if designe != nil, mesure.point.l < 8 {
             throw LightroomError.invalid("Le point désigné est presque noir (L* \(DevelopCatalogue.format(mesure.point.l.rounded()))) : la dominante ne s'y lit pas. Prendre un gris plus clair.")
         }
-        if mesure.point.chroma > Self.chromaMaxPointNeutre {
+        if designe != nil, mesure.point.chroma > Self.chromaMaxPointNeutre {
             throw LightroomError.invalid("Le point désigné n'est pas un gris (a* \(Self.format((mesure.point.a * 10).rounded() / 10)), b* \(Self.format((mesure.point.b * 10).rounded() / 10)) : une couleur franche). Désigner un gris, un blanc cassé ou un noir sans couleur dans la réalité.")
         }
         let cible = Self.balancePourPoint(mesure.point, raw: mesure.raw, temperature: mesure.temperature, tint: mesure.tint)
@@ -138,7 +163,7 @@ extension ToolHandler {
         var raw = args.raw
         raw["settings"] = .object(settings)
         raw.removeValue(forKey: "white_balance_point")
-        return (Arguments(raw: raw), BalancePoint(photo: ids.first, x: x, y: y, avant: mesure.point))
+        return (Arguments(raw: raw), BalancePoint(photo: ids.first, point: designe, avant: mesure.point))
     }
 
     static func pointJSON(_ point: PointNeutre) -> JSONValue {
@@ -149,7 +174,7 @@ extension ToolHandler {
     /// correction de l'écart, en une étape à part (« … : balance, passe 2 »).
     func secondePasseBalance(_ balance: BalancePoint, args: Arguments) -> JSONValue {
         var rapport: [String: JSONValue] = ["mesure_avant": Self.pointJSON(balance.avant)]
-        guard let mesure = try? mesurerBalance(photo: balance.photo, x: balance.x, y: balance.y) else {
+        guard let mesure = try? mesurerBalance(photo: balance.photo, point: balance.point) else {
             rapport["remarque"] = "Point non remesuré après la retouche."
             return .object(rapport)
         }
@@ -169,7 +194,7 @@ extension ToolHandler {
             params.merge(ecriture) { _, new in new }
             _ = try lightroom.send("appliquer", params, timeout: 120)
             rapport["passe_2"] = .string("Claude · " + nom)
-            if let final = try? mesurerBalance(photo: balance.photo, x: balance.x, y: balance.y) {
+            if let final = try? mesurerBalance(photo: balance.photo, point: balance.point) {
                 rapport["apres"] = Self.pointJSON(final.point)
             }
         } catch {

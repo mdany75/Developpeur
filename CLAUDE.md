@@ -637,6 +637,24 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   hors de Lightroom sur cinq aperçus, est la seule valeur essayée à ce relevé (son commentaire la
   dit encore à relever) ; `seuilTonal`, `partMinGroupe` et `pixelsMinPeau` restent provisoires.
   Mesure en 123 à 199 ms par photo à ce relevé.
+- **La dominante de toute l'image** (24 octobre 2026, signalée par Dany : XH2S0312.RAF, un portrait à
+  l'ombre des feuillus, balance auto du boîtier 5 150 K et +29, que Retouche pro n'avait réchauffé
+  que jusqu'à 5 750 K et +16) : les tons presque neutres (`Measurements`, C* < 15) n'en gardent que
+  les pixels déjà gris (b* −3, « légèrement froide », quand le chandail blanc était à −30 et le
+  gravier à −23). `PhotoMeasurements.pointNeutre` reçoit le point neutre de l'éclairage
+  (`MesureEclairage.neutre`, posé par `view_photo` et `mesurerImage`, gardé avec la vue) ; au-delà
+  de `Eclairage.toleranceNeutre` du gris, `couleur › dominante_globale` le dit (`dominanteGlobale`,
+  `lectureDominanteGlobale`) et la lecture des tons neutres y renvoie ; l'aperçu entier y ajoute
+  `balance_proposee` (`ToolHandler.balanceGlobale`, mêmes pentes) et `conseilDominante`. Pour un
+  grand écart, les pentes de `PentesSerie` dépassent la cible (ce portrait : 6 968 K et +2 viraient
+  au vert, la pipette sur le gravier à 7 881 K et −2 au jaune-vert ; 7 000 K et +28 le laissaient
+  neutre) : `white_balance_point` avec `{scene: true}` (`mesurerScene`) prend le point neutre de
+  toute l'image, sans les refus du point (chroma, brûlé, noir), et apply_settings le remesure en
+  seconde passe (essai sur « XH2S0312 (Essai ombre) » des Essais : 6 890 K et +1, puis 7 054 K et
+  +31, gravier a* 3,7, b* −1,2, défait ensuite). Le bilan compare aussi `dominante_globale` ; quand
+  elle se rapproche du gris d'au moins `regressionDominante`, une dominante accentuée sur les tons
+  suivis passe dans `a_verifier` (ils reprennent la couleur de leur objet). Seuil et conseil
+  provisoires, à éprouver sur d'autres scènes (sable, intérieur à la lampe, coucher de soleil).
 - Le bilan de `view_photo` (`Bilan.swift`) compare l'aperçu entier au précédent de la même photo à
   la même taille d'aperçu, et au premier de la session (`depuis_le_debut`) : `vuesMesurees` de
   `ToolHandler`, rangé par `Bilan.Cle` (photo et taille), gardé pour le processus du serveur comme

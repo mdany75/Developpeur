@@ -20,7 +20,7 @@ extension ToolHandler {
     var analysisDefinitions: [JSONValue] {
         [
             tool("view_photo",
-                 "Montre la photo telle qu'elle est développée en ce moment (aperçu JPEG rendu par Lightroom avec les réglages actuels), avec ses données de prise de vue, ses réglages non nuls et des mesures objectives : luminosité L*, centiles, écrêtage (aussi par canal), contraste, dominante des tons neutres (aussi par zone tonale et par région : « eclairage » nomme un éclairage mixte, lampe et fenêtre, et dit quoi en faire), netteté par zone et bruit ; et ce que voit Vision (visages et pupilles, qualité des visages, note esthétique, zone d'intérêt). À appeler avant de retoucher, puis après chaque passe. « bilan » : écarts chiffrés avec le view_photo précédent de la même photo à la même taille (avant → après, et depuis_le_debut) ; « regression » : un défaut apparu ou aggravé depuis (écrêtage, ombres bouchées, couleurs saturées, dominante, netteté ou bruit passés leur seuil) : le corriger par une passe ciblée, ou undo_last s'il vient de la dernière étape, et le dire ; « a_verifier » : un changement peut-être voulu. Mesures sur un JPEG sRGB (une couleur hors du sRGB y paraît écrêtée) ; en HDR (HDREditMode), le rendu SDR : le HDR ne se voit pas. « a_savoir » (calculs IA en attente) : le dire. « evaluation » : la note de Claude gardée pour la photo (pas encore évaluée, à vérifier, acceptée…). « intention_boitier » (fichiers Fujifilm, lue dans l'original) : simulation de film, plage dynamique, tons clairs et foncés, compensation d'exposition et mode choisis à la prise de vue, avec sa « lecture » : la suivre sauf autre demande (une nuit voulue sombre reste sombre ; un RAW part de la simulation choisie). region = zoom à 100 % sur une zone (netteté et bruit en pleine résolution, taches ; refait sur la même zone : bilan_zone) ; compare = avant/après côte à côte, avec son bilan.",
+                 "Montre la photo telle qu'elle est développée en ce moment (aperçu JPEG rendu par Lightroom avec les réglages actuels), avec ses données de prise de vue, ses réglages non nuls et des mesures objectives : luminosité L*, centiles, écrêtage (aussi par canal), contraste, dominante des tons neutres (aussi par zone tonale et par région : « eclairage » nomme un éclairage mixte, lampe et fenêtre, et dit quoi en faire) et de toute l'image (dominante_globale), netteté par zone et bruit ; et ce que voit Vision (visages et pupilles, qualité des visages, note esthétique, zone d'intérêt). À appeler avant de retoucher, puis après chaque passe. « bilan » : écarts chiffrés avec le view_photo précédent de la même photo à la même taille (avant → après, et depuis_le_debut) ; « regression » : un défaut apparu ou aggravé depuis (écrêtage, ombres bouchées, couleurs saturées, dominante, netteté ou bruit passés leur seuil) : le corriger par une passe ciblée, ou undo_last s'il vient de la dernière étape, et le dire ; « a_verifier » : un changement peut-être voulu. Mesures sur un JPEG sRGB (une couleur hors du sRGB y paraît écrêtée) ; en HDR (HDREditMode), le rendu SDR : le HDR ne se voit pas. « a_savoir » (calculs IA en attente) : le dire. « evaluation » : la note de Claude gardée pour la photo (pas encore évaluée, à vérifier, acceptée…). « intention_boitier » (fichiers Fujifilm, lue dans l'original) : simulation de film, plage dynamique, tons clairs et foncés, compensation d'exposition et mode choisis à la prise de vue, avec sa « lecture » : la suivre sauf autre demande (une nuit voulue sombre reste sombre ; un RAW part de la simulation choisie). region = zoom à 100 % sur une zone (netteté et bruit en pleine résolution, taches ; refait sur la même zone : bilan_zone) ; compare = avant/après côte à côte, avec son bilan.",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("size", prop("integer", "Grand côté de l'aperçu en pixels (défaut \(Self.defaultPreviewSize), de \(Self.previewSizes.lowerBound) à \(Self.previewSizes.upperBound)).")),
@@ -211,16 +211,22 @@ extension ToolHandler {
             // Un seul décodage du JPEG ; une seule réduction à 512 px pour les mesures, les tons
             // neutres suivis du bilan et l'éclairage ; le détail à 1024 px ; Vision une fois.
             let reduite = PreviewImages.scaled(decodee, maxSide: Measurements.maxSide)
-            let measures = Measurements.analyze(reduite)
+            var measures = Measurements.analyze(reduite)
             let detail = Detail.analyze(PreviewImages.scaled(decodee, maxSide: Detail.side))
             let vision = VisionAnalysis.analyze(decodee)
+            // L'éclairage, visages à part (ceux de Vision) ; son point neutre va aux mesures (la
+            // dominante de toute l'image, gardée avec la vue pour le bilan).
+            let eclairage = measures == nil ? nil
+                : Eclairage.mesurer(reduite, visages: vision?.faces.map(\.box) ?? [], sujet: vision?.salientArea)
+            measures?.pointNeutre = eclairage?.neutre
             if let measures {
                 var mesures = Self.merged(measures.json, detail?.json)
-                // L'éclairage, visages à part (ceux de Vision) ; la balance proposée part de la
-                // balance de la réponse brute (Temperature en kelvins pour un RAW, pas regroupée).
-                if let eclairage = Eclairage.mesurer(reduite, visages: vision?.faces.map(\.box) ?? [], sujet: vision?.salientArea) {
+                // Les balances proposées partent de la balance de la réponse brute (Temperature en
+                // kelvins pour un RAW, pas regroupée).
+                if let eclairage {
                     mesures = Self.merged(mesures, ["eclairage": eclairage.json(balance: Self.balanceProposee(eclairage, reponse: result))])
                 }
+                mesures = Self.conseilDominanteGlobale(mesures, balance: Self.balanceGlobale(measures, reponse: result))
                 // Les points chauds (1.3.4) : sur l'aperçu entier seulement, hors des visages et de la
                 // zone d'intérêt ; dits, jamais corrigés d'office.
                 let sujet = (vision?.faces.map(\.box) ?? []) + [vision?.salientArea].compactMap { $0 }
@@ -397,11 +403,38 @@ extension ToolHandler {
     static func mesurerImage(_ data: Data, detail: Bool) -> ImageMesuree? {
         guard let image = PreviewImages.image(data) else { return nil }
         let reduite = PreviewImages.scaled(image, maxSide: Measurements.maxSide)
-        guard let mesures = Measurements.analyze(reduite) else { return nil }
+        guard var mesures = Measurements.analyze(reduite) else { return nil }
+        let eclairage = Eclairage.mesurer(reduite)
+        mesures.pointNeutre = eclairage?.neutre
         return ImageMesuree(largeur: image.width, hauteur: image.height, mesures: mesures,
                             detail: detail ? Detail.analyze(PreviewImages.scaled(image, maxSide: Detail.side)) : nil,
-                            eclairage: Eclairage.mesurer(reduite))
+                            eclairage: eclairage)
     }
+
+    /// Ce que l'aperçu entier de view_photo ajoute à couleur › dominante_globale : la balance qui la
+    /// ramène au gris et quoi en faire. Rien sans dominante globale.
+    static func conseilDominanteGlobale(_ mesures: JSONValue, balance: (temperature: Double, tint: Double)?) -> JSONValue {
+        guard var objet = mesures.object, var couleur = objet["couleur"]?.object,
+              var globale = couleur["dominante_globale"]?.object else { return mesures }
+        if let balance {
+            globale["balance_proposee"] = [
+                "Temperature": .number(balance.temperature),
+                "Tint": .number(balance.tint),
+                "remarque": "un seul calcul, d'après les pentes de match_series : pour un grand écart, il dépasse souvent la cible ; white_balance_point avec scene la remesure",
+            ]
+        }
+        globale["conseil"] = .string(conseilDominante)
+        couleur["dominante_globale"] = .object(globale)
+        objet["couleur"] = .object(couleur)
+        return .object(objet)
+    }
+
+    static let conseilDominante = "À confirmer à l'œil : une lumière voulue (coucher de soleil, lampe) ou une scène aux couleurs franches "
+        + "(sable, bois) décale aussi le point neutre. Si un blanc ou un gris de la scène la montre (vêtement blanc, chemin, mur, "
+        + "nuages) : la corriger en première passe, avant le reste, par apply_settings avec white_balance_point (deux passes "
+        + "mesurées) : {scene: true} pour toute l'image, ou {x, y} sur un gris terne (un blanc vif peut dépasser la chroma "
+        + "admise) ; un écart de 1 000 K ou plus est normal (ombre, ciel couvert, lampe). Puis view_photo : dominante_globale "
+        + "disparaît, la peau est naturelle."
 
     /// Le profil de Lightroom de la simulation choisie au boîtier, pour l'appareil de la photo
     /// (`appareil` de l'aperçu : marque, modèle) : profil DCP du catalogue ou Look installé ; nil

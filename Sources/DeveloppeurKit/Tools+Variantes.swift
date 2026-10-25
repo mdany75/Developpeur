@@ -78,7 +78,7 @@ extension ToolHandler {
             if vargs.has("white_balance_point") { (vargs, balance) = try balanceSurPoint(vargs) }
             var (develop, notes) = try developParameters(vargs)
             if let balance {
-                notes.append(.string("Balance du point neutre : a* \(Self.format((balance.avant.a * 10).rounded() / 10)), b* \(Self.format((balance.avant.b * 10).rounded() / 10)) mesurés ; Temperature et Tint d'après les pentes relevées."))
+                notes.append(.string("Balance \(balance.point == nil ? "de toute l'image" : "du point neutre") : a* \(Self.format((balance.avant.a * 10).rounded() / 10)), b* \(Self.format((balance.avant.b * 10).rounded() / 10)) mesurés ; Temperature et Tint d'après les pentes relevées."))
             }
             notes += recalagesDuRecadrage(&develop, cible: cible)
             notes += recalagesDesPositions(&develop, cible: cible)

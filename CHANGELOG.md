@@ -12,6 +12,16 @@
 - Une demande tapée dans la Demande rapide vise toutes les photos sélectionnées, et non plus la
   seule photo active (sauf si elle en nomme une).
 
+### Corrigé
+- La balance des blancs d'une photo à forte dominante (signalé le 24 octobre 2026 : un portrait à
+  l'ombre des feuillus restait bleu après Retouche pro, réchauffé de 600 K seulement). `view_photo`
+  dit maintenant la dominante de toute l'image (`dominante_globale`), avec la balance qui la ramène
+  au neutre et quoi en faire ; les tons presque neutres, qui ne gardent que les pixels déjà gris,
+  la sous-estimaient. `white_balance_point` accepte `{scene: true}` : toute l'image, en deux passes
+  mesurées (sur ce portrait : 7 054 K et +31, gravier neutre, au lieu de 5 750 K et +16). Le bilan
+  ne prend plus cette correction pour une dominante accentuée : c'est un point « à vérifier ».
+  Après l'installation : rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code.
+
 ## 1.3.5 — 2026-10-23
 
 Le correctif 1.3.5, fait à votre demande le 23 octobre 2026 au soir : huit chantiers tirés de la
