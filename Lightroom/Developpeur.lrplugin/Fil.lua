@@ -5,8 +5,8 @@
 -- à la largeur de la colonne d'après la chasse mesurée des polices (Metriques.lua).
 --
 -- Ligne : { genre, texte, icone, element (indice dans le fil), image (chemin relatif), etape (vrai :
---   la ligne d'une étape de Claude, qui porte
---   « Pourquoi ? »), actions ('note', 'demande' ou 'note+demande' : la ligne des boutons « ☆ Voir
+--   la ligne d'une étape de Claude, qu'un clic ouvre dans l'onglet Aperçu), actions ('note',
+--   'demande' ou 'note+demande' : la ligne des boutons « ☆ Voir
 --   la note » et « ＋ Garder la demande », avec notation et demande, les indices de leurs éléments) ;
 --   auteur ('dany' ou 'claude', sur la première ligne d'un tour de parole) et heure (« 19 h 42 »,
 --   sur la ligne suivante), posés par Fil.lignes sur des copies }
@@ -19,16 +19,18 @@
 -- portent une (Fil.RETRAITS) se pose à RETRAIT_ICONE de son bord. La ligne d'un appel d'outil (genre
 -- 'appel') est un texte riche : le nom de l'outil en <EM> (Menlo 11, Fil.emphases), puis sa
 -- description en petit gris (Fil.uneLigneOutil) ; celle d'une étape de Claude (1.3,
--- Conversation.estEtape) porte le drapeau `etape` et laisse à droite la place du bouton
--- « Pourquoi ? » (Fil.PLACE_POURQUOI), qui l'ouvre dans l'onglet Aperçu. Les autres textes viennent
--- sans balise (Fil.sansBalises) : seules celles que pose ce module restent.
+-- Conversation.estEtape) porte le drapeau `etape`, et un clic sur elle l'ouvre dans l'onglet Aperçu
+-- (le bouton « Pourquoi ? » à sa droite, et la place qu'elle lui laissait, sont retirés au
+-- correctif 1.3.6, décision de Dany du 25 octobre 2026). Les autres textes viennent sans balise
+-- (Fil.sansBalises) : seules celles que pose ce module restent.
 -- Un élément `notation` (notes proposées) reprend les genres `proposition` (titre) et `outil` (une
 -- ligne par photo, en Menlo). Le tour de Claude qui a rangé des notes finit par sa ligne d'actions
 -- (« ☆ Voir la note », comme dans la maquette : Fil.lignes). Les éléments `lecon` et `exercice`
 -- d'une conversation d'avant le correctif 1.3.6 (leçon de la photo, « Je le fais », retirés) n'ont
 -- aucune ligne : seul l'appel de leur outil (genre `appel`) reste dans le fil.
 -- La page Carnet de progrès (1.3, Fil.lignesCarnet), que le fil montrait aussi, est devenue la
--- carte de l'onglet Suivi au correctif 1.3.6 (Fil.texteSuivi : un texte riche, pas des lignes).
+-- fenêtre Suivi au correctif 1.3.6 (Fil.texteSuivi : un texte riche, pas des lignes ; d'abord la
+-- carte d'un onglet Suivi, devenu une fenêtre à part le 25 octobre 2026, FenetreSuivi.lua).
 -- Un élément `historique` (correctif 1.3.6 : ce que la fenêtre dit de la photo ou du groupe,
 -- Historique.lua) reprend le genre `note` (en gris, l'icône ⓘ sur sa première ligne), ses puces
 -- en retrait sur leurs lignes de suite ; il n'est d'aucun tour de parole (ni « Vous » ni « Claude »,
@@ -66,11 +68,6 @@ Fil.MENTION_RAPIDE = "Demande rapide"
 function Fil.retrait(genre)
     return Fil.RETRAITS[genre] or 0
 end
-
--- La place laissée à droite de la ligne d'une étape, pour le bouton « Pourquoi ? » (Vues.ligneFil,
--- D.pourquoi : 80, la largeur constatée le 21 octobre 2026, D6) ; la marge de la ligne (Fil.MARGE)
--- fait l'écart entre le texte et le bouton.
-Fil.PLACE_POURQUOI = 80
 
 -- Marge gardée à droite de chaque ligne : la chasse mesurée ne tient pas compte de tous les
 -- réglages de rendu de Lightroom (l'encre fait 1 à 2 points de moins que la chasse, constaté le
@@ -236,6 +233,31 @@ function Fil.couper(texte, largeur, police, retrait, emphase, ouvert)
         lignes[k] = (t:gsub('<EM></EM>', ''))
     end
     return lignes, debut
+end
+
+-- Les lignes d'un texte de carte dans `largeur` points (paragraphes gardés, lignes vides comprises,
+-- sans ligne vide au bout), la marge de la ligne (Fil.MARGE) gardée, dans `police` (une clé de
+-- Metriques ; 'texte' sans elle) ; `emphase` : la police de ses passages balisés (<EM>), chaque
+-- ligne aux balises fermées, un passage coupé rouvert à la suivante. Pour les cartes de la fenêtre
+-- Claude (Fenetre.lignesCarte), la fenêtre Suivi et les légendes en grand.
+function Fil.lignesCarte(texte, largeur, police, emphase)
+    local lignes = {}
+    local ouvert = false
+    for paragraphe in (tostring(texte or '') .. '\n'):gmatch('([^\n]*)\n') do
+        if paragraphe == '' then
+            lignes[#lignes + 1] = ''
+        else
+            local coupees
+            coupees, ouvert = Fil.couper(paragraphe, largeur - Fil.MARGE, police or 'texte', nil, emphase, ouvert)
+            for _, l in ipairs(coupees) do
+                lignes[#lignes + 1] = l
+            end
+        end
+    end
+    while #lignes > 0 and lignes[#lignes] == '' do
+        lignes[#lignes] = nil
+    end
+    return lignes
 end
 
 -- Un texte tronqué à `largeur` points : tel quel s'il tient, sinon son plus long début suivi de
@@ -577,7 +599,7 @@ function Fil.lignesBrutes(e, i, largeur)
             lignes[#lignes + 1] = { genre = 'note', texte = uneLigne("Style : " .. e.style, place('note', largeur), 'texte'), element = i }
         end
         for n, chemin in ipairs(e.images or {}) do
-            lignes[#lignes + 1] = { genre = 'apercu', texte = "Photo jointe " .. n .. " · cliquer pour l'agrandir", element = i, image = chemin, icone = 'apercu' }
+            lignes[#lignes + 1] = { genre = 'apercu', texte = "Photo jointe " .. n .. " · cliquer pour la voir", element = i, image = chemin, icone = 'apercu' }
         end
     elseif g == 'claude' then
         ajouterTexte(lignes, Conversation.texteAffiche(e), 'claude', largeur, i)
@@ -590,16 +612,18 @@ function Fil.lignesBrutes(e, i, largeur)
         end
     elseif g == 'outil' then
         -- « <EM>apply_settings</EM>  étape « Claude · tons et balance » · 6 réglages » ; une étape
-        -- laisse la place du bouton « Pourquoi ? » à sa droite.
+        -- porte `etape` (un clic l'ouvre dans l'onglet Aperçu), sur toute la largeur.
         local icone = e.etat == 'erreur' and 'erreur' or (e.etat == 'enCours' and 'cours' or 'ok')
         local etape = Conversation.estEtape(e)
         local nom, description = Fil.descriptionOutil(e)
-        local largeurAppel = place('appel', largeur) - (etape and Fil.PLACE_POURQUOI or 0)
-        lignes[1] = { genre = 'appel', texte = Fil.uneLigneOutil(nom, description, largeurAppel), element = i, icone = icone,
+        lignes[1] = { genre = 'appel', texte = Fil.uneLigneOutil(nom, description, place('appel', largeur)), element = i, icone = icone,
             etape = etape or nil }
     elseif g == 'apercu' then
+        -- Une ligne d'image dit ce que fait son clic (correctif 1.3.6) : l'image dans l'onglet Aperçu,
+        -- et pour une image de Claude, le pourquoi de l'étape qui la précède (Fenetre.voirImageDuFil) ;
+        -- Agrandir est sous l'aperçu.
         for n, chemin in ipairs(e.images or {}) do
-            lignes[#lignes + 1] = { genre = 'apercu', texte = (#e.images > 1 and ("Aperçu " .. n) or "Aperçu") .. " de Claude · cliquer pour l'agrandir",
+            lignes[#lignes + 1] = { genre = 'apercu', texte = (#e.images > 1 and ("Aperçu " .. n) or "Aperçu") .. " de Claude · cliquer pour le voir, avec son pourquoi",
                 element = i, image = chemin, icone = 'apercu' }
         end
     elseif g == 'proposition' then
@@ -615,7 +639,7 @@ function Fil.lignesBrutes(e, i, largeur)
             end
         end
         for n, chemin in ipairs(e.images or {}) do
-            lignes[#lignes + 1] = { genre = 'apercu', texte = (n == 1 and "Avant / après" or ("Rendu " .. n)) .. " · cliquer pour l'agrandir",
+            lignes[#lignes + 1] = { genre = 'apercu', texte = (n == 1 and "Avant / après" or ("Rendu " .. n)) .. " · cliquer pour le voir",
                 element = i, image = chemin, icone = 'apercu' }
         end
     elseif g == 'notation' then
@@ -823,10 +847,12 @@ function Fil.lignes(c, largeur, cache)
     return lignes
 end
 
--- La carte Suivi : le carnet de progrès (correctif 1.3.6) -------------------------------------------
+-- Suivi : le carnet de progrès (correctif 1.3.6) --------------------------------------------------
 -- Le résumé du carnet (Carnet.resumer, du module), ses constats seulement, en un texte riche pour la
--- carte de l'onglet Suivi (Vues.suivi), coupé page par page à sa largeur en 12 (Fenetre.montrerPage,
--- clé 'suivi') : la note (sur quelles photos, par mois de prise de vue) et la remarque ; les défauts
+-- fenêtre Suivi (FenetreSuivi.lua, ouverte par le bouton Suivi de l'en-tête de la fenêtre Claude ;
+-- d'abord la carte d'un onglet Suivi, devenu cette fenêtre le 25 octobre 2026), coupé page par page
+-- à sa largeur en 12 (Fil.lignesCarte) : la note (sur quelles photos, par mois de prise de vue) et
+-- la remarque ; les défauts
 -- mois par mois, un par ligne (le libellé en <EM>, gras 12, puis « n/sur » par mois, « — » sans
 -- photo où il a été cherché, le mois abrégé avec son année quand les mois en changent) ; « Ce qui
 -- progresse » (ou « Ce qui recule ») et « À travailler à la prochaine sortie », intertitres en <EM>
@@ -839,7 +865,7 @@ end
 Fil.LECTURE_CARNET = "Lecture du carnet de progrès…"
 Fil.ERREUR_CARNET = "Le carnet de progrès ne s'est pas lu : "
 Fil.MOIS_PAR_MOIS = "Mois par mois"
-Fil.AIDE_DEFAUTS_SUIVI = "« Photos d'un défaut… », sous la carte : ses photos, et les retirer du carnet."
+Fil.AIDE_DEFAUTS_SUIVI = "« Photos d'un défaut… », en bas de la fenêtre : ses photos, et les retirer du carnet."
 
 local function texteOuNil(valeur)
     if type(valeur) == 'string' and Texte.nettoyer(sans(valeur)) ~= '' then

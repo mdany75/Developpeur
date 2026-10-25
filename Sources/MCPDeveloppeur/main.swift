@@ -51,8 +51,8 @@ func usage() {
                 l'onglet Focus de la fenêtre Claude : les cadres de la mise au point d'un fichier Fujifilm (point
                 ou zone AF à sa taille en rouge, visages et éléments du sujet en coins jaunes) dessinés sur sa
                 vignette, puis ce que l'appareil en dit, une ligne JSON ; code 1 si rien n'est lu
-            mcp-developpeur --ecran   l'écran principal et son profil de couleur, une ligne JSON (voyant Écran de la
-                fenêtre Claude ; {"lu": false} sans écran), lu sur le Mac sans Lightroom
+            mcp-developpeur --ecran   l'écran principal et son profil de couleur, classé (d'usine, standard, à
+                l'œil, sonde…), une ligne JSON ; {"lu": false} sans écran ; lu sur le Mac sans Lightroom
             mcp-developpeur --eclairage <id photo>… [<fichier.jpg>…] [--essai '{"settings": {"Temperature": 3200}}']
                 relevé de l'éclairage mixte : dominantes des tons neutres par case et par zone tonale, visages, scène,
                 à plusieurs bornes (écart a*b* au centre des tons neutres : le gris, ou le point neutre de l'image
@@ -90,8 +90,8 @@ func usage() {
 
 let verbose = ProcessInfo.processInfo.environment["DEVELOPPEUR_VERBOSE"] == "1"
 
-/// Les outils du serveur et de --call, qui lisent l'écran du Mac (les tests, non : ToolHandler
-/// le laisse à nil).
+/// Les outils du serveur et de --call, qui lisent le nom de l'écran du Mac pour get_status (les
+/// tests, non : ToolHandler le laisse à nil).
 func outils() -> ToolHandler {
     let tools = ToolHandler(lightroom: LightroomBridge.fromEnvironment())
     tools.lireEcran = Ecran.lire
@@ -149,10 +149,12 @@ func status() {
     print(line: "Module Lightroom : \(pluginInstalled ? "installé (\(pluginPath))" : "absent de \(pluginPath)")")
     // L'état du fichier du jeton, jamais sa valeur.
     print(line: "Jeton de la liaison : \(JetonLiaison.etat(JetonLiaison.fichierParDefaut()))")
-    // L'écran se dit même Lightroom fermé : avant la liaison, qui peut finir en échec.
+    // L'écran se dit même Lightroom fermé : avant la liaison, qui peut finir en échec. Son nom
+    // seulement, comme get_status (correctif 1.3.6 : plus rien sur l'étalonnage) ; son profil, par
+    // --ecran.
     if let ecran = Ecran.lire() {
-        print(line: "Écran principal : \(Ecran.texte(ecran.principal))")
-        for autre in ecran.autres { print(line: "Autre écran : \(Ecran.texte(autre))") }
+        print(line: "Écran principal : \(ecran.principal.nom)")
+        for autre in ecran.autres { print(line: "Autre écran : \(autre.nom)") }
     } else {
         print(line: "Écran : aucun écran lu (session sans écran ?)")
     }
@@ -247,9 +249,10 @@ case "--focus":
     print(line: JSONCoding.line(focus))
     if focus["lue"]?.bool != true { exit(1) }
 case "--ecran":
-    // Le voyant Écran de la fenêtre Claude (Lightroom.etatEcran) : une seule ligne JSON, chemins des
-    // profils et texte de la boîte compris ; sans écran lu, {"lu": false} (ECRAN_AUCUN du module).
-    print(line: JSONCoding.line(Ecran.lire().map { Ecran.json($0, detail: true) } ?? ["lu": false]))
+    // Pour le développement seulement depuis le correctif 1.3.6 (la fenêtre Claude n'a plus de voyant
+    // Écran) : une seule ligne JSON, le profil classé et son chemin compris ; sans écran lu,
+    // {"lu": false}.
+    print(line: JSONCoding.line(Ecran.lire().map { Ecran.json($0) } ?? ["lu": false]))
 case "--boitier":
     // Ce que l'appareil a rangé dans un fichier Fujifilm, sans Lightroom, à comparer à exiftool.
     guard arguments.count == 2 else { usage(); exit(2) }

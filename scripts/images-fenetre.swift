@@ -35,7 +35,8 @@ guard CommandLine.arguments.count == 2 else {
 let module = URL(fileURLWithPath: CommandLine.arguments[1])
 
 // Ce qu'écrit scripts/gabarits.lua (Dispositions.gabarits) : les tailles en points
-// (Dispositions.IMAGES), puis le dossier et la palette de chaque apparence.
+// (Dispositions.IMAGES), puis le dossier et la palette de chaque apparence, et les segments des
+// onglets dans leur ordre (Dispositions.ONGLETS).
 struct Taille: Decodable {
     let largeur: CGFloat
     let hauteur: CGFloat
@@ -49,9 +50,16 @@ struct Apparence: Decodable {
 struct Vide: Decodable {
     let nom: String
 }
+// Un segment des onglets : `cle` (son image est seg-<cle>, et seg-<cle>-actif choisi) et `titre`,
+// le libellé dessiné.
+struct Segment: Decodable {
+    let cle: String
+    let titre: String
+}
 struct Gabarits: Decodable {
     let images: [String: Taille]
     let apparences: [String: Apparence]
+    let segments: [Segment]
     let vide: Vide?
 }
 let entree = FileHandle.standardInput.readDataToEndOfFile()
@@ -325,8 +333,8 @@ func texte(_ ctx: CGContext, _ s: String, _ police: NSFont, _ couleur: String, c
     ctx.restoreGState()
 }
 
-// Un segment des onglets Aperçu | Focus | Proposition | Note | Suivi (le contrôle de la maquette, coupé
-// segment par segment) : fond `fondSegment` et texte `texte` 12 (en claire, blanc et #1D1D1F), ou,
+// Un segment des onglets Focus | Note | Aperçu | Proposition (le contrôle de la maquette, coupé
+// segment par segment, dans l'ordre de Dispositions.ONGLETS) : fond `fondSegment` et texte `texte` 12 (en claire, blanc et #1D1D1F), ou,
 // choisi, fond `bleuBouton` et texte `blanc` gras (600) 12 ; bord `bordSegment` en haut et en bas,
 // coins de 6 au bout gauche du premier et au bout droit du dernier ; un filet `filetSegment` au
 // bord droit de chacun sauf le dernier, gardé sous le segment choisi (la maquette garde les filets
@@ -371,14 +379,13 @@ func dessins(_ p: Palette) -> [String: Dessin] {
     }
 
     // Les fonds des cartes (#FAFAFA, bord #D9D9D9), coins de 6.
-    for nom in ["carte-note", "carte-proposition", "carte-etape", "carte-focus", "carte-suivi"] {
+    for nom in ["carte-note", "carte-proposition", "carte-etape", "carte-focus"] {
         d[nom] = pleine(fond: p["fondCarte"], bord: p["bordCarte"], rayon: 6)
     }
 
-    // Les segments, dans l'ordre de la maquette (Focus après Aperçu : demandé par Dany le 22 octobre 2026 ;
-    // Suivi, le carnet de progrès, le dernier, à la place de Leçon au correctif 1.3.6).
-    let segments = [("apercu", "Aperçu"), ("focus", "Focus"), ("proposition", "Proposition"), ("note", "Note"),
-                    ("suivi", "Suivi")]
+    // Les segments, dans l'ordre de Dispositions.ONGLETS (Focus, Note, Aperçu, Proposition : décision
+    // de Dany du 25 octobre 2026, correctif 1.3.6) : les bouts arrondis au premier et au dernier.
+    let segments = gabarits.segments.map { ($0.cle, $0.titre) }
     for (i, (cle, titre)) in segments.enumerated() {
         let premier = i == 0, dernier = i == segments.count - 1
         d["seg-" + cle] = segment(titre, premier: premier, dernier: dernier, actif: false, p)
@@ -450,6 +457,15 @@ func dessins(_ p: Palette) -> [String: Dessin] {
 // Toutes les tailles doivent être positives.
 for (nom, t) in tailles.sorted(by: { $0.key < $1.key }) where !(t.largeur > 0 && t.hauteur > 0) {
     echec("taille invalide pour \(nom) : \(t.largeur) × \(t.hauteur)")
+}
+
+// Au moins un segment, chacun une seule fois (ses deux images sont dans Dispositions.IMAGES : sinon
+// « dessin sans taille », signalé à la fin).
+if gabarits.segments.isEmpty {
+    echec("aucun segment dans les gabarits (Dispositions.ONGLETS)")
+}
+if Set(gabarits.segments.map { $0.cle }).count != gabarits.segments.count {
+    echec("segment en double dans les gabarits (Dispositions.ONGLETS)")
 }
 
 // Au moins une apparence ; chacune a son dossier, sous le module (relatif, sans « .. »), à elle

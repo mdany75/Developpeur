@@ -206,12 +206,14 @@ local function elements(c, genre)
     return liste
 end
 
-essai("Les boutons à icône à gauche du champ, sans ♻", function()
-    local contenu
-    S.pendantFenetre = function(args) contenu = args.contents end
+essai("Les boutons à icône à gauche du champ, sans ♻ ; le titre de la fenêtre, sans version", function()
+    local contenu, titre
+    S.pendantFenetre = function(args) contenu, titre = args.contents, args.title end
     FenetreRapide.afficher()
     S.pendantFenetre = nil
     vrai(contenu, 'fenêtre ouverte')
+    -- La Demande rapide garde son titre (seule la fenêtre Claude dit sa version, correctif 1.3.6).
+    egal('Claude · Demande rapide', titre)
     local icones, champ = {}, nil
     for _, v in ipairs(vues(contenu)) do
         local a = v.vue.args or {}

@@ -293,6 +293,8 @@ essai('Carte Note de la fenêtre Claude : la proposition, Accepter par le regist
     local avant = #ecritures
     ouvrirFenetre(function(p, args)
         Fenetre.majPhoto()
+        -- L'onglet Note (la fenêtre s'ouvre sur Focus depuis le correctif 1.3.6).
+        p.onglet = 'notation'
         Fenetre.rafraichirNotation()
         egal(2, p.noteClaude, 'Claude propose 2 ★')
         egal('rouge', p.notationCouleur)
@@ -393,7 +395,7 @@ end)
 
 -- 1.1.1 : à l'ouverture, l'aperçu montre la photo sélectionnée (demandé par Dany le 20 octobre
 -- 2026), sa vignette du cache de Lightroom réduite au cadre par sips.
-essai('Ouverture : l\'aperçu montre la photo active ; une image de Claude la remplace ; ◀ ▶ entre elles', function()
+essai('Ouverture, onglet Note : l\'aperçu montre la photo active ; une image de Claude la remplace (onglet Aperçu) ; ◀ ▶ entre elles', function()
     local Fichiers = require 'Fichiers'
     local Images = require 'Images'
     local Stockage = require 'Stockage'
@@ -401,6 +403,9 @@ essai('Ouverture : l\'aperçu montre la photo active ; une image de Claude la re
     S.selection = { PHOTOS[2004] }
     Moteur.courante = Conversation.nouvelle()
     ouvrirFenetre(function(p)
+        egal(legende(2004), p.legendeApercu)
+        -- L'onglet Note (la fenêtre s'ouvre sur Focus depuis le correctif 1.3.6) : la photo active.
+        p.onglet = 'notation'
         egal(legende(2004), p.legendeApercu)
         -- La vignette se prépare dans une tâche (rappel de Lightroom, puis sips). Fichier Fujifilm :
         -- le connecteur (ici un faux, qui recopie la vignette) y dessine le point de mise au point.
@@ -441,6 +446,7 @@ essai('Ouverture : l\'aperçu montre la photo active ; une image de Claude la re
         f:close()
         c.elements[#c.elements + 1] = { genre = 'resultat', images = { 'apercu-1.jpg' } }
         Fenetre.rafraichirApercu()
+        egal('apercu', p.onglet, "l'image de Claude dans l'onglet Aperçu (correctif 1.3.6)")
         egal(false, Fenetre.voirActive)
         vrai(p.legendeApercu:find('1 sur 1', 1, true), p.legendeApercu)
         egal(true, p.peutSuivante, '▶ : vers la photo active')
@@ -515,11 +521,11 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
             local l = Fenetre.lignes[Fenetre.premiere + i - 1]
             if l and l.element == element then
                 n = i
-                -- La ligne de l'appel (fenêtre B, lot B4) : le nom en texte riche, le but de l'étape,
-                -- et « Pourquoi ? » montré à sa droite.
+                -- La ligne de l'appel (fenêtre B, lot B4) : le nom en texte riche, le but de l'étape ;
+                -- un clic sur elle l'ouvre (plus de « Pourquoi ? » à sa droite, correctif 1.3.6).
                 contient(l.texte, '<EM>apply_settings</EM>  étape « Claude · passe 1 : lumière »')
                 egal(true, l.etape)
-                egal(true, p['q' .. i], '« Pourquoi ? » montré')
+                egal(nil, p['q' .. i], 'plus de « Pourquoi ? »')
             end
         end
         vrai(n, "la ligne de l'étape")
@@ -558,7 +564,8 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
         egal(Fenetre.T.pixelsApercu, l)
         egal(Fenetre.T.pixelsApercuHauteur, h)
         egal('Étape 1 sur 1 · avant', p.legendeApercu)
-        -- Agrandir : l'avant et l'après côte à côte, à leur taille (dans 540 × 700).
+        -- Agrandir : l'avant et l'après côte à côte, à leur vraie taille (les deux ensemble dans
+        -- 2 000 × 1 250 : correctif 1.3.6).
         local agrandir
         parcourir(args.contents, function(v)
             if S.BOUTONS[v.genre] and v.args.title == '⤢ Agrandir' then
@@ -592,6 +599,82 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
     Stockage.enregistrer(c)
     egal(id, Stockage.lire(c.id).elements[element].etapes[1].id)
     egal(0, Etapes.version, 'rien rangé par la fenêtre')
+    sansErreur()
+end)
+
+-- Agrandir (décision de Dany du 25 octobre 2026, correctif 1.3.6), par Images et sips, les vrais :
+-- jusqu'à 2 000 × 1 250 ; une image plus petite à sa vraie taille, jamais étirée ; avant et après
+-- côte à côte, les deux ensemble, titres et légende compris.
+essai('Agrandir (sips) : dans 2 000 × 1 250 ; une image plus petite à sa vraie taille, son propre fichier ; une plus grande réduite, en paysage comme en portrait ; avant et après côte à côte, ensemble', function()
+    local Fichiers = require 'Fichiers'
+    local Images = require 'Images'
+    local Metriques = require 'Metriques'
+    egal(2000, Fenetre.GRANDE.largeur)
+    egal(1250, Fenetre.GRANDE.hauteur)
+    local dossier = S.home .. '/agrandir'
+    S.executer('mkdir -p ' .. S.q(dossier))
+    local function image(nom, l, h)
+        S.executer(string.format('/usr/bin/sips -s format jpeg -z %d %d %s --out %s >/dev/null 2>&1', h, l, S.q(S.home .. '/source.jpg'),
+            S.q(dossier .. '/' .. nom)))
+        local lu, hu = Images.dimensions(dossier .. '/' .. nom)
+        egal(l .. 'x' .. h, tostring(lu) .. 'x' .. tostring(hu), 'image fabriquée : ' .. nom)
+    end
+    image('petite.jpg', 300, 200)
+    image('juste.jpg', 2000, 1250)
+    image('large.jpg', 3000, 1500)
+    image('haute.jpg', 1000, 2500)
+    -- Plus petite, ou juste à la taille : son propre fichier, à sa taille, sans rien réduire.
+    for _, cas in ipairs({ { 'petite.jpg', 300, 200 }, { 'juste.jpg', 2000, 1250 } }) do
+        local chemin, l, h = Images.grande(dossier, cas[1], 2000, 1250)
+        egal(dossier .. '/' .. cas[1], chemin, cas[1] .. ' : son propre fichier')
+        egal(cas[2] .. 'x' .. cas[3], l .. 'x' .. h, cas[1] .. ' : sa vraie taille')
+    end
+    vrai(not Fichiers.existe(dossier .. '/.vignettes'), 'rien de réduit')
+    -- Plus grande : réduite, à ses proportions, dans les deux sens.
+    local chemin, l, h = Images.grande(dossier, 'large.jpg', 2000, 1250)
+    egal('2000x1000', l .. 'x' .. h, 'paysage : la largeur fait la limite')
+    contient(chemin, '/.vignettes/large-2000x1000.jpg')
+    local lu, hu = Images.dimensions(chemin)
+    egal('2000x1000', lu .. 'x' .. hu, 'le fichier réduit a la taille dite')
+    chemin, l, h = Images.grande(dossier, 'haute.jpg', 2000, 1250)
+    egal('500x1250', l .. 'x' .. h, 'portrait : la hauteur fait la limite')
+    -- La fenêtre d'une image : sa vraie taille ; illisible, elle est dite.
+    local dialogues, messages = #S.dialogues, #S.messages
+    egal(true, Fenetre.agrandirUne('Claude · essai', dossier, 'petite.jpg'))
+    egal(dialogues + 1, #S.dialogues)
+    local d = S.dialogues[#S.dialogues]
+    egal('Claude · essai', d.title)
+    egal('picture', d.contents.genre)
+    egal(dossier .. '/petite.jpg', d.contents.args.value)
+    egal('300x200', d.contents.args.width .. 'x' .. d.contents.args.height, 'jamais étirée')
+    egal(false, Fenetre.agrandirUne('Claude · essai', dossier, 'absente.jpg'))
+    egal(dialogues + 1, #S.dialogues, 'pas de fenêtre pour une image illisible')
+    egal(messages + 1, #S.messages)
+    egal('Aperçu illisible', S.messages[#S.messages][1])
+    -- Avant et après côte à côte : chacune réduite (le fichier a la taille dite), les deux ensemble,
+    -- avec leurs titres et la légende, dans 2 000 × 1 250.
+    local legende = string.rep("Pourquoi : un ciel brûlé, des hautes lumières baissées pour retrouver les nuages. ", 6)
+        .. "\n\nCe qui a changé\nHautes lumières : 0 → −60\nBlancs : 0 → −20"
+    egal(true, Fenetre.agrandirDeux('Étape 1 sur 1', { dossier = dossier, nom = 'large.jpg', titre = 'Avant' },
+        { dossier = dossier, nom = 'haute.jpg', titre = 'Après' }, legende))
+    d = S.dialogues[#S.dialogues]
+    local rangee, texte = d.contents.args[1], d.contents.args[2]
+    egal(Fenetre.ECART_DEUX, rangee.args.spacing)
+    local largeur, hauteur = Fenetre.ECART_DEUX, 0
+    for _, colonne in ipairs(rangee.args) do
+        local vue = colonne.args[2]
+        egal('picture', vue.genre)
+        local lv, hv = Images.dimensions(vue.args.value)
+        egal(vue.args.width .. 'x' .. vue.args.height, lv .. 'x' .. hv, colonne.args[1].args.title .. ' : le fichier a la taille dite')
+        largeur, hauteur = largeur + vue.args.width, math.max(hauteur, vue.args.height)
+    end
+    vrai(largeur <= 2000, 'les deux images en largeur : ' .. largeur)
+    egal(largeur, texte.args.width, 'la légende à la largeur des deux')
+    vrai(texte.args.height_in_lines >= 2, 'la légende sur plusieurs lignes')
+    local total = math.ceil(Metriques.gras.hauteur) + Fenetre.ECART_TITRE + hauteur + Fenetre.ECART_LEGENDE
+        + texte.args.height_in_lines * math.ceil(Metriques.texte.hauteur)
+    vrai(total <= 1250, 'titres, images et légende en hauteur : ' .. total)
+    vrai(total >= 1250 - math.ceil(Metriques.texte.hauteur), 'le portrait prend la hauteur qui reste : ' .. total)
     sansErreur()
 end)
 

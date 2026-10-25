@@ -263,8 +263,9 @@ essai('Onglets : une proposition ou une note qui arrive se montre, une seule foi
     photoActive(4961, 'DSCF4961.RAF', 0, 0)
     S.pendantFenetre = function(args)
         local p = Fenetre.p
-        -- Conversation claire : l'aperçu toujours montré, la carte Note dessous par défaut.
-        egal('notation', p.onglet)
+        -- Conversation claire : l'aperçu toujours montré, la carte Focus dessous à l'ouverture
+        -- (correctif 1.3.6, décision de Dany du 25 octobre 2026).
+        egal('focus', p.onglet)
         local c = Moteur.courante
         Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = 'onglet-1', nom = 'mcp__developpeur__preview_settings',
             entree = { reason = 'Balance', settings = { Exposure2012 = 0.35 } } } } })
@@ -301,21 +302,31 @@ essai('Onglets : une proposition ou une note qui arrive se montre, une seule foi
         vrai(Fenetre.envoiAuto, 'envoi prévu')
         p.onglet = 'notation'
         egal(nil, Fenetre.envoiAuto, "le clic d'un onglet annule l'envoi automatique")
-        -- Un clic sur une ligne d'image la montre dans l'aperçu, toujours visible : l'onglet ne
-        -- change pas.
+        -- L'image de la proposition qui arrive : pas de bascule vers Aperçu (la proposition, déjà
+        -- montrée, ne reprend pas la main) ; un clic sur sa ligne, tant qu'elle attend, la montre
+        -- dans l'onglet Proposition, avec sa raison et Accepter ; décidée, dans l'onglet Aperçu
+        -- (correctif 1.3.6 ; essais-pourquoi.lua : ce que dit la carte).
         Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'onglet-1', textes = { '{}' }, images = { { donnees = 'x' } }, erreur = false } } },
             nil, function() return 'image-essai.jpg' end)
         Fenetre.rafraichir()
-        for i = 1, Fenetre.T.lignes do
-            local l = Fenetre.lignes[Fenetre.premiere + i - 1]
-            if l and l.image then
-                Fenetre.cliquerLigne(i)
-                break
+        egal('notation', p.onglet, "l'image d'une proposition ne bascule pas vers Aperçu")
+        local function cliquerImage()
+            for i = 1, Fenetre.T.lignes do
+                local l = Fenetre.lignes[Fenetre.premiere + i - 1]
+                if l and l.image then
+                    Fenetre.cliquerLigne(i)
+                    return
+                end
             end
+            error("pas de ligne d'image")
         end
-        egal('notation', p.onglet, "un clic sur une image ne change pas d'onglet")
-        vrai(Fenetre.indiceImage, "l'image choisie dans l'aperçu")
+        cliquerImage()
+        egal('proposition', p.onglet, "un clic sur l'image de la proposition qui attend : l'onglet Proposition")
+        egal('image-essai.jpg', Fenetre.imageProposition and Fenetre.imageProposition.chemin, 'son image dans l\'aperçu')
         Conversation.decider(c, Conversation.propositionEnAttente(c).id, false)
+        cliquerImage()
+        egal('apercu', p.onglet, "décidée, un clic sur son image : l'onglet Aperçu")
+        vrai(Fenetre.indiceImage, "l'image choisie dans l'aperçu")
     end
     Fenetre.afficher()
     prefs.nouvelleParPhoto = true
@@ -402,28 +413,29 @@ essai('Onglets : chaque vue simple porte la condition de son onglet, aucun conte
         end
         vrai(variantes and variantes.args.place == 'overlapping', nom .. ' : variantes superposées sous les onglets')
         egal(#D.onglets, #variantes.args, nom .. ' : une variante par onglet')
-        -- Cinq onglets (fenêtre B) : Aperçu (l'ancien Pourquoi ?), Focus (22 octobre 2026),
-        -- Proposition, Note (montré à l'ouverture) et Suivi (le carnet de progrès, à la place de
-        -- Leçon au correctif 1.3.6), dans l'ordre des segments ; une variante chacun, dans cet ordre.
+        -- Quatre onglets (fenêtre B, dans l'ordre décidé par Dany le 25 octobre 2026, correctif
+        -- 1.3.6) : Focus (22 octobre 2026, montré à l'ouverture), Note, Aperçu (l'ancien Pourquoi ?)
+        -- et Proposition ; Suivi, le carnet de progrès, est une fenêtre à part. Une variante chacun,
+        -- dans l'ordre des segments.
         local valeurs = {}
         for _, onglet in ipairs(D.onglets) do
             valeurs[#valeurs + 1] = onglet.valeur .. '=' .. onglet.titre
         end
-        egal('apercu=Aperçu focus=Focus proposition=Proposition notation=Note suivi=Suivi', table.concat(valeurs, ' '),
-            nom .. ' : cinq onglets')
-        egal(5, #variantes.args, nom .. ' : cinq variantes')
+        egal('focus=Focus notation=Note apercu=Aperçu proposition=Proposition', table.concat(valeurs, ' '),
+            nom .. ' : quatre onglets')
+        egal(4, #variantes.args, nom .. ' : quatre variantes')
         egal('apercu', D.ongletEtape)
         egal('focus', D.ongletFocus)
-        egal('suivi', D.ongletSuivi)
+        egal(nil, D.ongletSuivi, "plus d'onglet Suivi")
         egal(nil, D.ongletLecon, "plus d'onglet Leçon")
-        egal('notation', D.ongletParDefaut)
-        egal('notation', p.onglet, nom .. ' : Note par défaut')
-        vrai(vueLiee(variantes.args[1], 'static_text', 'etapeTexte'), nom .. " : la carte de l'étape dans Aperçu")
-        vrai(vueLiee(variantes.args[2], 'static_text', 'focusTexte'), nom .. ' : la carte Focus après Aperçu')
-        vrai(vueLiee(variantes.args[4], 'static_text', 'notePoseeTitre'), nom .. ' : la carte Note')
-        vrai(vueLiee(variantes.args[4], 'static_text', 'nt1'), nom .. ' : la grille des critères dans la carte Note')
-        vrai(vueLiee(variantes.args[5], 'static_text', 'suiviTexte'), nom .. ' : la carte Suivi, en dernier')
-        vrai(vueLiee(variantes.args[3], 'static_text', 'propositionTexte'), nom .. ' : la proposition au milieu')
+        egal('focus', D.ongletParDefaut)
+        egal('focus', p.onglet, nom .. ' : Focus par défaut')
+        vrai(vueLiee(variantes.args[1], 'static_text', 'focusTexte'), nom .. ' : la carte Focus, en premier')
+        vrai(vueLiee(variantes.args[2], 'static_text', 'notePoseeTitre'), nom .. ' : la carte Note')
+        vrai(vueLiee(variantes.args[2], 'static_text', 'nt1'), nom .. ' : la grille des critères dans la carte Note')
+        vrai(vueLiee(variantes.args[3], 'static_text', 'etapeTexte'), nom .. " : la carte de l'étape dans Aperçu")
+        vrai(vueLiee(variantes.args[4], 'static_text', 'propositionTexte'), nom .. ' : la proposition, en dernier')
+        vrai(not pcall(vueLiee, args.contents, 'static_text', 'suiviTexte'), nom .. ' : plus de carte Suivi')
         vrai(not pcall(vueLiee, args.contents, 'static_text', 'leconTexte'), nom .. ' : plus de carte de la leçon')
         -- Chaque vue simple d'un onglet est masquée quand un autre onglet est choisi ; pas de
         -- boîte de groupe dans un onglet (son cadre et son titre resteraient montrés), ni de
@@ -772,7 +784,9 @@ essai('Pourquoi ? : propriétés posées avant l\'ouverture, carte sans étape (
         end
         -- Sans étape dans le fil, la carte de l'étape montre l'aide (lot 12), coupée à sa largeur.
         egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')), "l'aide de la carte de l'étape")
-        vrai(Fenetre.AIDE_ETAPE:find('« Pourquoi ? »', 1, true), "l'aide dit le bouton Pourquoi ? du fil")
+        -- Plus de bouton « Pourquoi ? » au bout d'une étape (correctif 1.3.6) : l'aide dit le clic.
+        vrai(Fenetre.AIDE_ETAPE:find('Cliquez une étape de Claude dans le fil', 1, true), "l'aide dit le clic sur une étape du fil")
+        vrai(not Fenetre.AIDE_ETAPE:find('« Pourquoi ? »', 1, true), "l'aide ne dit plus le bouton « Pourquoi ? »")
         -- Fenêtre B (lot B5, provisoire jusqu'au lot 18) : les cartes sur leurs images, à la largeur
         -- de leur intérieur, aux lignes de Dispositions.TAILLES (essais-fenetre-b.lua vérifie qu'elles
         -- remplissent leur carte).
@@ -853,9 +867,14 @@ essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; u
         local p = Fenetre.p
         local c = Moteur.courante
         local ligneImage, ligneOutil = avecApercu(c, 'crochet-1')
+        -- L'image de Claude qui arrive montre l'onglet Aperçu, elle dans l'aperçu (correctif 1.3.6) ;
+        -- l'onglet Note, l'aperçu d'avant (la même image, la dernière de la conversation).
+        egal('apercu', p.onglet, "l'image de Claude : l'onglet Aperçu")
         local defaut = p.legendeApercu
         vrai(defaut:find('1 sur 1', 1, true), defaut)
-        -- Sans crochet, l'onglet Aperçu garde l'aperçu d'avant.
+        p.onglet = 'notation'
+        egal(defaut, p.legendeApercu, "Note : l'aperçu d'avant")
+        -- Sans crochet qui le remplisse (aucune étape), l'onglet Aperçu garde l'aperçu d'avant.
         p.onglet = 'apercu'
         egal(defaut, p.legendeApercu, "sans crochet : l'aperçu d'avant")
         p.onglet = 'notation'
@@ -902,11 +921,15 @@ essai("Aperçu de l'onglet : son crochet d'abord, nil pour l'aperçu d'avant ; u
         p.onglet = 'notation'
         p.onglet = 'apercu'
         egal('Étape 1 sur 1 · après', p.legendeApercu, "un autre onglet : l'aperçu de l'onglet")
-        -- Une image nouvelle aussi.
+        -- Une image nouvelle de Claude : elle se montre à son tour, devant l'aperçu de l'onglet
+        -- (correctif 1.3.6), et y reste aux rafraîchissements.
         Fenetre.cliquerLigne(ligneImage)
         egal(defaut, p.legendeApercu)
         avecApercu(c, 'crochet-2')
-        egal('Étape 1 sur 1 · après', p.legendeApercu, "une image nouvelle : l'aperçu de l'onglet")
+        vrai(p.legendeApercu:find('2 sur 2', 1, true), "une image nouvelle de Claude : elle se montre (" .. p.legendeApercu .. ')')
+        avant = appels
+        Fenetre.rafraichir()
+        egal(avant, appels, "crochet pas demandé devant l'image nouvelle")
         -- Et un clic sur une étape (Fenetre.estEtape : Conversation.estEtape depuis le lot 12).
         Fenetre.cliquerLigne(ligneImage)
         vrai(p.legendeApercu:find('sur 2', 1, true), p.legendeApercu)
@@ -1116,49 +1139,123 @@ essai("Fil : toujours la conversation (plus de page Carnet de progrès, ni de vu
     S.pendantFenetre = nil
 end)
 
-essai('Agrandir à deux images : avant et après côte à côte, titres au-dessus, légende dessous', function()
-    local grande, demandes = Images.grande, {}
+essai('Agrandir à deux images : avant et après côte à côte, titres au-dessus, légende dessous ; les deux ensemble dans 2 000 × 1 250 (correctif 1.3.6)', function()
+    local grande, dimensions, demandes = Images.grande, Images.dimensions, {}
+    -- Les pixels de chaque image ; Images.grande réduit comme le vrai (jamais au-delà de 1).
+    local tailles = { ['/etapes/e2-avant.jpg'] = { 3000, 2000 }, ['/etapes/e2-apres.jpg'] = { 3000, 2000 }, ['/x/avant.jpg'] = { 540, 360 } }
+    Images.dimensions = function(chemin)
+        local d = tailles[chemin]
+        if d then
+            return d[1], d[2]
+        end
+        return nil
+    end
     Images.grande = function(dossier, nom, largeur, hauteur)
         demandes[#demandes + 1] = string.format('%s/%s %dx%d', dossier, nom, largeur, hauteur)
-        if nom == 'illisible.jpg' then
+        local d = tailles[dossier .. '/' .. nom]
+        if not d then
             return nil
         end
-        return dossier .. '/.vignettes/' .. nom, 540, 360
+        local e = math.min(largeur / d[1], hauteur / d[2], 1)
+        return dossier .. '/.vignettes/' .. nom, math.floor(d[1] * e), math.floor(d[2] * e)
     end
     local dialogues, messages = #S.dialogues, #S.messages
     local raison = "Pourquoi : la photo tirait vers le bleu ; des blancs neutres.\n\nCe qui a changé\nTempérature : 5 200 → 5 600"
     egal(true, Fenetre.agrandirDeux('Étape 2 sur 4 · passe 1 : balance', { dossier = '/etapes', nom = 'e2-avant.jpg', titre = 'Avant' },
         { dossier = '/etapes', nom = 'e2-apres.jpg', titre = 'Après' }, raison))
-    egal('/etapes/e2-avant.jpg 540x700 /etapes/e2-apres.jpg 540x700', table.concat(demandes, ' '), 'chaque image dans 540 × 700')
+    -- La moitié de 2 000 moins l'écart (994), et la hauteur que laissent les titres (16 + 4) et la
+    -- légende de 4 lignes (8 + 4 × 16) : 1 158.
+    egal('/etapes/e2-avant.jpg 994x1158 /etapes/e2-apres.jpg 994x1158', table.concat(demandes, ' '), 'chaque image dans sa moitié')
     egal(dialogues + 1, #S.dialogues)
     local d = S.dialogues[#S.dialogues]
     egal('Claude · Étape 2 sur 4 · passe 1 : balance', d.title)
     egal('Fermer', d.actionVerb)
     local rangee, legende = d.contents.args[1], d.contents.args[2]
     egal('row', rangee.genre)
-    local cotes = {}
+    egal(Fenetre.ECART_DEUX, rangee.args.spacing)
+    local cotes, largeur = {}, Fenetre.ECART_DEUX
     for _, colonne in ipairs(rangee.args) do
         local titre, image = colonne.args[1], colonne.args[2]
-        cotes[#cotes + 1] = titre.args.title .. ' ' .. image.genre .. ' ' .. image.args.value .. ' ' .. image.args.width .. 'x' .. image.args.height
+        egal(Fenetre.ECART_TITRE, colonne.args.spacing)
+        cotes[#cotes + 1] = titre.args.title .. ' ' .. image.genre .. ' ' .. image.args.value
+        vrai(image.args.width <= 994 and image.args.width >= 993, 'la moitié de la largeur : ' .. image.args.width)
+        egal(math.floor(image.args.width * 2 / 3), image.args.height, 'à ses proportions')
+        egal(image.args.width, titre.args.width)
+        largeur = largeur + image.args.width
     end
-    egal('Avant picture /etapes/.vignettes/e2-avant.jpg 540x360 | Après picture /etapes/.vignettes/e2-apres.jpg 540x360', table.concat(cotes, ' | '))
+    egal('Avant picture /etapes/.vignettes/e2-avant.jpg | Après picture /etapes/.vignettes/e2-apres.jpg', table.concat(cotes, ' | '))
+    vrai(largeur <= Fenetre.GRANDE.largeur, 'les deux dans 2 000 : ' .. largeur)
     egal('static_text', legende.genre)
     egal(raison, legende.args.title, 'la légende, ses paragraphes gardés')
-    egal(1080, legende.args.width, 'à la largeur des deux images')
+    egal(largeur, legende.args.width, 'à la largeur des deux images')
     egal(4, legende.args.height_in_lines, 'une ligne par ligne de texte')
-    -- Une image illisible est dite à sa place ; sans légende, rien dessous.
+    -- Une image illisible est dite à sa place ; sans légende, rien dessous, et la pleine hauteur.
+    demandes = {}
     egal(true, Fenetre.agrandirDeux('Étape 1', { dossier = '/x', nom = 'avant.jpg', titre = 'Avant' },
         { dossier = '/x', nom = 'illisible.jpg', titre = 'Après' }))
+    egal('/x/avant.jpg 994x1230 /x/illisible.jpg 994x1230', table.concat(demandes, ' '))
     d = S.dialogues[#S.dialogues]
     egal(1, #d.contents.args, 'sans légende')
+    egal('540x360', d.contents.args[1].args[1].args[2].args.width .. 'x' .. d.contents.args[1].args[1].args[2].args.height,
+        'plus petite : à sa vraie taille')
     egal('Après : image illisible', d.contents.args[1].args[2].args[1].args.title)
+    egal(Fenetre.LARGEUR_ILLISIBLE, d.contents.args[1].args[2].args[1].args.width)
     -- Aucune image lisible : un message, pas de fenêtre.
     local avant = #S.dialogues
     egal(false, Fenetre.agrandirDeux('Étape 3', { dossier = '/x', nom = 'illisible.jpg', titre = 'Avant' }, nil, raison))
     egal(avant, #S.dialogues)
     egal(messages + 1, #S.messages)
     egal('Aperçu illisible', S.messages[#S.messages][1])
-    Images.grande = grande
+    Images.grande, Images.dimensions = grande, dimensions
+end)
+
+essai("Agrandir à deux images (pur) : la place de chacune pour que les deux, leurs titres et la légende tiennent dans 2 000 × 1 250, en paysage, en portrait, petites, avec une longue légende", function()
+    local Metriques = require 'Metriques'
+    local G, ligne = Fenetre.GRANDE, math.ceil(Metriques.texte.hauteur)
+    local titre = math.ceil(Metriques.gras.hauteur) + Fenetre.ECART_TITRE
+    -- La place prise par deux images de ces pixels à la place rendue, la légende dessous.
+    local function occupe(dims, legende)
+        local l, h, lignes = Fenetre.cadreDeux(dims, legende)
+        local largeur, hauteur = Fenetre.ECART_DEUX, 0
+        for _, d in ipairs(dims) do
+            local e = math.min(l / d[1], h / d[2], 1)
+            largeur, hauteur = largeur + math.floor(d[1] * e), math.max(hauteur, math.floor(d[2] * e))
+        end
+        local total = titre + hauteur + (#lignes > 0 and (Fenetre.ECART_LEGENDE + #lignes * ligne) or 0)
+        return largeur, total, l, h, lignes
+    end
+    local longue = string.rep("Pourquoi : des ombres bouchées, relevées pour retrouver le pull ; le contraste remonté d'autant. ", 12)
+    for _, cas in ipairs({
+        { nom = 'paysages', dims = { { 6000, 4000 }, { 6000, 4000 } } },
+        { nom = 'portraits', dims = { { 2000, 3000 }, { 2000, 3000 } } },
+        { nom = 'paysage et portrait', dims = { { 3000, 2000 }, { 2000, 3000 } } },
+        { nom = 'carrés', dims = { { 2400, 2400 }, { 2400, 2400 } } },
+    }) do
+        for _, legende in ipairs({ false, "Pourquoi : un essai.", longue }) do
+            local largeur, total, l, h, lignes = occupe(cas.dims, legende or nil)
+            local quoi = cas.nom .. (legende and (' (légende de ' .. #lignes .. ' lignes)') or ' (sans légende)')
+            egal(994, l, quoi .. ' : la moitié de 2 000 moins l\'écart')
+            vrai(largeur <= G.largeur, quoi .. ' : largeur ' .. largeur)
+            vrai(total <= G.hauteur, quoi .. ' : hauteur ' .. total)
+            vrai(h <= G.hauteur - titre, quoi .. ' : hauteur des images ' .. h)
+            egal(legende and true or false, #lignes > 0, quoi .. ' : lignes de la légende')
+        end
+    end
+    -- Sans légende : la pleine hauteur sous les titres ; des petites images à leur vraie taille.
+    local l, h = Fenetre.cadreDeux({ { 300, 200 }, { 200, 300 } })
+    egal('994x' .. (G.hauteur - titre), l .. 'x' .. h)
+    local largeur, total = occupe({ { 300, 200 }, { 200, 300 } })
+    egal(Fenetre.ECART_DEUX + 300 + 200, largeur, 'petites : à leur vraie taille')
+    egal(titre + 300, total)
+    -- Une longue légende prend sa hauteur aux portraits, qui la laissent tenir.
+    local _, totalPortraits, _, hPortraits, lignes = occupe({ { 2000, 3000 }, { 2000, 3000 } }, longue)
+    vrai(#lignes >= 4, 'longue légende : ' .. #lignes .. ' lignes')
+    egal(G.hauteur - titre - Fenetre.ECART_LEGENDE - #lignes * ligne, hPortraits, 'les portraits prennent ce qui reste')
+    vrai(totalPortraits >= G.hauteur - 1, 'la hauteur remplie : ' .. totalPortraits)
+    -- Une image illisible garde la place de son texte.
+    local l2, h2 = Fenetre.cadreDeux({ { 3000, 2000 }, false }, "Pourquoi : un essai.")
+    egal(994, l2)
+    egal(G.hauteur - titre - Fenetre.ECART_LEGENDE - ligne, h2)
 end)
 
 essai('Consignes : chaque photo traitée notée d\'abord, à vérifier, avec le carré de la mise au point', function()

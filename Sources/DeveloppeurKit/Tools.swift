@@ -87,9 +87,10 @@ public final class ToolHandler {
     var contexte = ContexteAppel()
     /// La version du module a déjà été comparée à celle du serveur (une remarque par session).
     var versionSignalee = false
-    /// L'écran principal du Mac et son profil de couleur (Ecran.swift). nil par défaut : les tests
-    /// ne lisent jamais le vrai écran, et la recette le pose le temps de son étape ; main.swift pose
-    /// `Ecran.lire` pour le serveur (`serve`) et `--call`.
+    /// L'écran principal du Mac (Ecran.swift), dont get_status dit le nom, sans rien de son
+    /// étalonnage (correctif 1.3.6). nil par défaut : les tests ne lisent jamais le vrai écran, et la
+    /// recette le pose le temps de son étape ; main.swift pose `Ecran.lire` pour le serveur (`serve`)
+    /// et `--call`.
     public var lireEcran: () -> Ecran.Etat? = { nil }
     /// Les sauvegardes du catalogue et Time Machine, d'après le chemin du catalogue (1.3.5,
     /// `Sauvegardes.lire`) : rien par défaut ; seul main.swift lit les vraies (ni les tests).
@@ -98,13 +99,6 @@ public final class ToolHandler {
     /// view_photo avec compare = before_claude) : nil par défaut ; seul `serve()` en donne un, comme
     /// `noterAuCarnet`.
     public var registreRendus: RegistreRendus?
-    /// L'écran a déjà été dit à Claude (remarque du premier aperçu, ou get_status) : une fois par
-    /// processus du serveur.
-    var ecranSignale = false
-    /// Les outils dont le résultat est un aperçu que Claude regarde : le premier réussi qui porte
-    /// une image reçoit la remarque de l'écran (un bloc de texte à part). Un résultat sans image ne
-    /// la consomme pas.
-    static let outilsAvecApercu: Set<String> = ["view_photo", "preview_settings", "compare_variants"]
     /// Les constats de la prise de vue partent au carnet de progrès (commande carnet du module).
     /// Faux par défaut : seul le serveur lancé par Claude (`serve` de main.swift) le pose ; ni
     /// `--call`, ni la recette, ni les tests ne remplissent le carnet.
@@ -194,7 +188,7 @@ public final class ToolHandler {
     var allDefinitions: [JSONValue] {
         let core: [JSONValue] = [
             tool("get_status",
-                 "État de la liaison avec Lightroom Classic : versions, photo active, mode du module (appliquer directement ou proposer d'abord), pause, limites de sécurité. Dit aussi l'écran principal du Mac (ecran : nom, profil de couleur, mesuré par une sonde ou non) : les mesures de view_photo n'en dépendent pas, l'œil de l'utilisateur si ; écran non étalonné : le lui dire quand son avis compte (peau, couleurs). request_backup demande une sauvegarde du catalogue à la prochaine fermeture de Lightroom : la proposer avant une longue série (des centaines de photos, une harmonisation), et dire de fermer puis rouvrir Lightroom pour qu'elle garde l'état d'avant. sauvegardes : la dernière sauvegarde du catalogue et Time Machine (le volume du catalogue y est-il ?), lues seulement : les dire avant d'écrire sur des centaines de photos.",
+                 "État de la liaison avec Lightroom Classic : versions, photo active, mode du module (appliquer directement ou proposer d'abord), pause, limites de sécurité. ecran : le nom de l'écran principal du Mac. request_backup demande une sauvegarde du catalogue à la prochaine fermeture de Lightroom : la proposer avant une longue série (des centaines de photos, une harmonisation), et dire de fermer puis rouvrir Lightroom pour qu'elle garde l'état d'avant. sauvegardes : la dernière sauvegarde du catalogue et Time Machine (le volume du catalogue y est-il ?), lues seulement : les dire avant d'écrire sur des centaines de photos.",
                  properties: [("request_backup", prop("boolean", "true = demander à Lightroom une sauvegarde du catalogue à sa prochaine fermeture (sa fenêtre de sauvegarde ; l'utilisateur peut la passer)."))],
                  required: []),
             tool("list_selection",
@@ -320,26 +314,7 @@ public final class ToolHandler {
         if let remarque = remarqueVersion() {
             result.content.append(.text(remarque))
         }
-        ajouterRemarqueEcran(&result, outil: name)
         return result
-    }
-
-    /// La remarque de l'écran, dans un bloc de texte à part (le JSON du résultat reste lisible tel
-    /// quel) : au premier aperçu réussi qui porte une image. Un résultat sans image ne la consomme
-    /// pas : elle attend l'aperçu suivant.
-    func ajouterRemarqueEcran(_ result: inout ToolResult, outil name: String) {
-        guard !result.isError, Self.outilsAvecApercu.contains(name), result.porteUneImage, let remarque = remarqueEcran() else { return }
-        result.content.append(.text(remarque))
-    }
-
-    /// L'écran de l'utilisateur, dit une fois par processus au premier aperçu réussi, s'il n'est
-    /// pas mesuré par une sonde (Ecran.remarque) : les mesures de view_photo n'en dépendent pas, son
-    /// œil si. Rien si get_status l'a déjà dit, ou sans écran lu.
-    func remarqueEcran() -> String? {
-        guard !ecranSignale else { return nil }
-        ecranSignale = true
-        guard let etat = lireEcran() else { return nil }
-        return Ecran.remarque(etat.principal)
     }
 
     /// Une avancée d'une longue série : au client (progression MCP) et dans Lightroom, par sa barre de
@@ -446,9 +421,8 @@ public final class ToolHandler {
         }
     }
 
-    /// État de la liaison, avec la version du serveur et l'écart éventuel avec celle du module, et
-    /// l'écran principal du Mac (sans le chemin de son profil) : il est alors dit, la remarque du
-    /// premier aperçu ne le redit pas.
+    /// État de la liaison, avec la version du serveur et l'écart éventuel avec celle du module, et le
+    /// nom de l'écran principal du Mac (rien de son profil ni de son étalonnage, correctif 1.3.6).
     private func status(_ args: Arguments) throws -> JSONValue {
         var etat = try lightroom.send("etat", args.bool("request_backup") == true ? ["sauvegarde": true] : [:], timeout: 10).object ?? [:]
         etat["version_serveur"] = .string(versionServeur)
@@ -457,8 +431,7 @@ public final class ToolHandler {
             versionSignalee = true
         }
         if let ecran = lireEcran() {
-            etat["ecran"] = Ecran.json(ecran)
-            ecranSignale = true
+            etat["ecran"] = Ecran.nommer(ecran)
         }
         // Le chemin du catalogue sert aux sauvegardes, pas à Claude (1.3.5).
         if let chemin = etat.removeValue(forKey: "chemin_catalogue")?.string, let sauvegardes = lireSauvegardes(chemin) {

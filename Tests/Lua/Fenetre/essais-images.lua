@@ -64,7 +64,6 @@ local ATTENDUES = {
     ['carte-proposition'] = { 498 },
     ['carte-etape'] = { 498 },
     ['carte-focus'] = { 498 },
-    ['carte-suivi'] = { 498 },
     ['seg-apercu'] = { 72, 22 },
     ['seg-focus'] = { 62, 22 },
     ['seg-proposition'] = { 98, 22 },
@@ -73,10 +72,8 @@ local ATTENDUES = {
     ['seg-focus-actif'] = { 62, 22 },
     ['seg-proposition-actif'] = { 98, 22 },
     ['seg-note-actif'] = { 57, 22 },
-    -- Suivi, le carnet de progrès, à la place de Leçon (seg-lecon, seg-lecon-actif et carte-lecon,
-    -- retirées au correctif 1.3.6), de la largeur de Note.
-    ['seg-suivi'] = { 57, 22 },
-    ['seg-suivi-actif'] = { 57, 22 },
+    -- (seg-lecon, seg-lecon-actif et carte-lecon sont retirées au correctif 1.3.6, comme seg-suivi,
+    -- seg-suivi-actif et carte-suivi, de l'onglet Suivi qui les avait remplacées : la fenêtre Suivi.)
     ['pastille-vert'] = { 8, 8 },
     ['pastille-orange'] = { 8, 8 },
     ['pastille-rouge'] = { 8, 8 },
@@ -106,12 +103,11 @@ local GROUPES = {
     { 'seg-focus', 'seg-focus-actif' },
     { 'seg-proposition', 'seg-proposition-actif' },
     { 'seg-note', 'seg-note-actif' },
-    { 'seg-suivi', 'seg-suivi-actif', 'seg-note' },
     { 'bouton-bleu', 'bouton-bleu-presse', 'bouton-bleu-inactif' },
     { 'etoile24-pleine', 'etoile24-vide' },
     { 'etoile12-pleine', 'etoile12-vide' },
     { 'pastille-vert', 'pastille-orange', 'pastille-rouge', 'pastille-gris' },
-    { 'carte-proposition', 'carte-etape', 'carte-focus', 'carte-suivi' },
+    { 'carte-proposition', 'carte-etape', 'carte-focus' },
     { 'trombone', 'presse-papiers' },
     { 'chevron-haut', 'chevron-bas' },
     { 'rapide-noter', 'rapide-retouche', 'rapide-portrait' },
@@ -446,10 +442,10 @@ essai('images/ et images/sombre/ : chaque image de Dispositions.IMAGES dans les 
     end
     vrai(nombre >= 30, 'les 30 images au moins (33 avant le correctif 1.3.2)')
     -- Les images retirées avec la rangée des passes et la ligne du plafond (correctif 1.3.2), avec
-    -- l'onglet Leçon et avec le volet (correctif 1.3.6) ne restent dans aucun jeu.
+    -- l'onglet Leçon, avec le volet et avec l'onglet Suivi (correctif 1.3.6) ne restent dans aucun jeu.
     for _, a in ipairs(Dispositions.APPARENCES) do
         for _, nom in ipairs({ 'coche-10', 'chevron-passe', 'avertissement', 'seg-lecon', 'seg-lecon-actif', 'carte-lecon', 'loupe',
-            'selection' }) do
+            'selection', 'seg-suivi', 'seg-suivi-actif', 'carte-suivi' }) do
             local f = io.open(S.plugin .. '/' .. a.dossier .. '/' .. nom .. '.png', 'rb')
             if f then
                 f:close()
@@ -563,7 +559,16 @@ essai('scripts/gabarits.lua : les images, les deux apparences et l\'image « auc
     local sortie = S.lireCommande('luajit ' .. S.q(RACINE .. '/scripts/gabarits.lua') .. ' 2>&1')
     local ok, lu = pcall(Json.decode, sortie)
     vrai(ok and type(lu) == 'table', 'JSON lisible : ' .. sortie)
-    egal('apparences images vide', cles(lu), 'les trois parties')
+    egal('apparences images segments vide', cles(lu), 'les quatre parties')
+    -- Les segments des onglets, dans l'ordre de Dispositions.ONGLETS (Focus, Note, Aperçu,
+    -- Proposition : correctif 1.3.6) : le script les dessine dans cet ordre, les bouts arrondis au
+    -- premier et au dernier ; chacun a ses deux images.
+    local segments = {}
+    for _, seg in ipairs(lu.segments) do
+        segments[#segments + 1] = seg.cle .. '=' .. seg.titre
+        vrai(IMAGES['seg-' .. seg.cle] and IMAGES['seg-' .. seg.cle .. '-actif'], 'images du segment ' .. seg.cle)
+    end
+    egal('focus=Focus note=Note apercu=Aperçu proposition=Proposition', table.concat(segments, ' '), 'segments dans leur ordre')
     -- Le cadre de l'image « aucun aperçu », celui de l'aperçu (Dispositions.TAILLES).
     egal(VIDE, lu.vide.nom)
     egal(Dispositions.TAILLES.apercu, lu.vide.largeur)
@@ -730,7 +735,14 @@ essai('scripts/images-fenetre.swift : refuse sans rien écrire un nom sans dessi
         { gabaritsEssai(function(g) g.apparences.sombre.dossier = 'images' end),
             'dossier « images » commun aux apparences claire et sombre' },
         { gabaritsEssai(function(g) g.apparences = { vide = true } end), 'gabarits illisibles' },
-        { json('{"images":{"chevron-haut":{"largeur":12,"hauteur":12}},"apparences":{}}'), 'aucune apparence' },
+        { json('{"images":{"chevron-haut":{"largeur":12,"hauteur":12}},"apparences":{},"segments":[{"cle":"focus","titre":"Focus"}]}'),
+            'aucune apparence' },
+        -- Les segments des onglets (Dispositions.ONGLETS, correctif 1.3.6) : au moins un, chacun une
+        -- seule fois ; sans eux, les gabarits ne se lisent pas.
+        { json('{"images":{"chevron-haut":{"largeur":12,"hauteur":12}},"apparences":{},"segments":[]}'), 'aucun segment' },
+        { json('{"images":{"chevron-haut":{"largeur":12,"hauteur":12}},"apparences":{},"segments":[{"cle":"focus","titre":"Focus"},'
+            .. '{"cle":"focus","titre":"Focus"}]}'), 'segment en double' },
+        { json('{"images":{"chevron-haut":{"largeur":12,"hauteur":12}},"apparences":{}}'), 'gabarits illisibles' },
         -- L'ancien format (les tailles seules) n'est plus lu.
         { json('{"chevron-haut":{"largeur":12,"hauteur":12}}'), 'gabarits illisibles' },
         { "printf ''", "rien sur l'entrée standard" },

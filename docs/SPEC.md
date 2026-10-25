@@ -29,14 +29,19 @@ fenêtre B, l'allure de la maquette « B · Conversation claire », agrandie à 
 Lightroom (photo active remise, texture au point de mise au point, faux visages, ligne affinée,
 empreinte des étapes, registre des notes remis par la recette).
 
-Le correctif 1.3.6 (« une photo, une conversation », décidé avec Dany le 25 octobre 2026, pas
-encore publié : « ## Non publié » de `CHANGELOG.md`) donne à chaque photo sa conversation dans la
-fenêtre Claude, ouverte sur l'historique de la photo, et la Demande rapide sur une photo seule
-écrit dans la même (voir Fenêtre Claude › Une photo, une conversation, et Demande rapide) ; la
-fenêtre perd son volet de gauche et sa rangée Mode, l'onglet Leçon devient l'onglet Suivi (le
-carnet de progrès) ; la leçon de la photo et « Je le fais » sont retirés partout (leurs sections
-restent plus bas, comme historique), et le rendu reproductible se garde au `view_photo` avec
-`compare = before_claude`. Le tout est résumé dans Correctif 1.3.6.
+Le correctif 1.3.6 (« une photo, une conversation », décidé avec Dany le 25 octobre 2026, numéroté
+« ## 1.3.6 — 2026-10-25 » dans `CHANGELOG.md`, installé pour ses essais, pas encore publié) donne
+à chaque photo sa conversation dans la fenêtre Claude, ouverte sur l'historique de la photo, et la
+Demande rapide sur une photo seule écrit dans la même (voir Fenêtre Claude › Une photo, une
+conversation, et Demande rapide) ; la fenêtre perd son volet de gauche et sa rangée Mode ; la
+leçon de la photo et « Je le fais » sont retirés partout (leurs sections restent plus bas, comme
+historique), et le rendu reproductible se garde au `view_photo` avec `compare = before_claude`.
+Après l'essai de Dany, le même jour : un clic sur une étape ou une image du fil à la place de
+« Pourquoi ? », les onglets Focus, Note, Aperçu et Proposition (ouverture sur Focus, bascules vers
+Aperçu), Agrandir jusqu'à 2 000 × 1 250, le carnet de progrès dans la fenêtre Suivi (d'abord un
+onglet Suivi, à la place de Leçon), plus rien sur l'étalonnage de l'écran, les réglages hors des
+valeurs par défaut dans l'historique, « Développeur v1.3.6 » dans la barre de titre. Le tout est
+résumé dans Correctif 1.3.6.
 
 ## Architecture
 
@@ -56,8 +61,9 @@ Deux pièces :
   l'avant/après des étapes (`Etapes.lua`) et le carnet de progrès (`Carnet.lua`, `carnet.json` ;
   les leçons des photos, de la 1.3 à la 1.3.5, y restent telles quelles), depuis le correctif 1.3.3
   la Demande rapide (`FenetreRapide.lua`), depuis le correctif 1.3.6 l'historique d'une photo
-  (`Historique.lua`), et la fenêtre de la liaison (« Claude · liaison », `Suivi.lua` ; « fenêtre de
-  suivi » jusqu'au correctif 1.3.6, quand l'onglet Suivi de la fenêtre Claude a pris ce mot).
+  (`Historique.lua`) et la fenêtre Suivi du carnet de progrès (« Claude · Suivi »,
+  `FenetreSuivi.lua`), et la fenêtre de la liaison (« Claude · liaison », `Suivi.lua` ; « fenêtre de
+  suivi » jusqu'au correctif 1.3.6, quand le carnet de progrès a pris ce mot).
   Journaux :
   `~/Library/Logs/Developpeur/`
   (`module.log` pour la liaison, `conversation.log` pour la fenêtre).
@@ -510,15 +516,18 @@ conversation) ; la Demande rapide sur une photo seule écrit dans la même conve
 Demande rapide). La fenêtre s'allège : plus de volet de gauche (la liste des conversations, sa
 recherche, Renommer…, Supprimer…, Publication… et Consommation…, les versions et le voyant Écran),
 plus de rangée Mode ni de page Carnet de progrès dans le fil ; deux colonnes, 1 623 × 1 200
-(voir Fenêtre B) ; « Repartir à neuf » à droite du titre ; trois voyants dans l'en-tête ; cinq
-onglets, Aperçu, Focus, Proposition, Note et Suivi (le carnet de progrès, à la place de Leçon).
-Plus de proposition préparée à l'ouverture : « Obtenir », sous la carte de l'onglet Proposition, la
-demande (voir Obtenir une proposition). La leçon de la photo et « Je le fais » sont retirés de la
-fenêtre comme du connecteur (leurs sections restent, comme historique) ; Pourquoi ? ne change pas.
-Les captures `docs/capture.png` et `docs/carnet.png` montrent encore la fenêtre d'avant le
-correctif (1 948 × 1 200, le volet et la rangée Mode ; la page Carnet de progrès du fil) : à
-refaire au correctif 1.3.6, dans Lightroom ; elles montreront la fenêtre de 1 623 × 1 200, en deux
-colonnes, et l'onglet Suivi.
+(voir Fenêtre B) ; « Repartir à neuf » à droite du titre ; deux voyants dans l'en-tête (Claude
+Code, Lightroom) et le bouton Suivi ; quatre onglets, Focus, Note, Aperçu et Proposition (après
+l'essai de Dany : d'abord cinq, avec Suivi à la place de Leçon). Plus de proposition préparée à
+l'ouverture : « Obtenir », sous la carte de l'onglet Proposition, la demande (voir Obtenir une
+proposition). La leçon de la photo et « Je le fais » sont retirés de la fenêtre comme du
+connecteur (leurs sections restent, comme historique) ; Pourquoi ? devient un clic sur l'étape ou
+l'image du fil (voir Fenêtre B, Retours de Dany après son essai). La barre de titre dit
+« Développeur v1.3.6 » (`Fenetre.titreFenetre`, d'après `Composants.module()`). Les captures
+`docs/capture.png` et `docs/carnet.png` montrent encore la fenêtre d'avant le correctif
+(1 948 × 1 200, le volet et la rangée Mode ; la page Carnet de progrès du fil) : à refaire au
+correctif 1.3.6, dans Lightroom ; elles montreront la fenêtre de 1 623 × 1 200, en deux colonnes,
+ses quatre onglets et le bouton Suivi, et la fenêtre Suivi.
 
 ### Relais vers Claude Code
 
@@ -658,8 +667,11 @@ suivre la ligne de contexte, faite par la fenêtre (le journal des étapes de Cl
 la main de Dany) : repartir de là, sans la répéter. « ## Fin d'une tâche » commence par : après la
 retouche d'une photo (pas dans une [Demande rapide]), finir par `view_photo` avec
 `compare = before_claude`, avant le résumé, et dire l'écart s'il rend `rendu_reproductible`
-(voir Correctif 1.3.6) ; il ne renvoie plus à la leçon. `Consignes.texte` fait 6 646 caractères
-(7 476 avant), sous le plafond de 7 500. Hors du plafond, `Consignes.jeLeFais`,
+(voir Correctif 1.3.6) ; il ne renvoie plus à la leçon. Après l'essai de Dany, le même jour, la
+section « ## Écran » (de la 1.2) est retirée, avec tout ce qui parlait d'étalonnage (voir Écran), et
+« ## Raison de chaque étape » dit « (onglet Aperçu, d'un clic sur l'étape du fil) » au lieu du
+bouton Pourquoi ? du fil. `Consignes.texte` fait 6 331 caractères (6 646 avant ces retours, 7 476
+au correctif 1.3.5), sous le plafond de 7 500. Hors du plafond, `Consignes.jeLeFais`,
 `Consignes.jaiFini`, `Consignes.carnet` (la ligne d'action de la page du carnet) et
 `Consignes.sansLecon` sont retirés ; `Consignes.rapide` perd « ni leçon », et
 `Consignes.rapidePhoto` s'y ajoute, pour une demande rapide dans la conversation d'une photo (voir
@@ -860,7 +872,18 @@ depuis la 1.1.1 (en 1.1, ce clic la ramenait à l'onglet Aperçu).
 
 ### Voyants et liaison
 
-Au correctif 1.3.6, les trois voyants sont dans l'en-tête, sous le titre, en rangée : Claude Code
+Depuis les retours de Dany du 25 octobre 2026 (correctif 1.3.6), deux voyants seulement, Claude
+Code (125) et Lightroom (150), 14 points entre eux, puis la photo active (`D.info`, le reste de la
+rangée) et, au bout de la rangée, en haut à droite sous « Repartir à neuf », le bouton Suivi
+(`Vues.boutonSuivi` : un carré small comme les boutons d'actions du fil, titre « Suivi » en petit,
+`TAILLES.boutonSuivi` 56 ; il ouvre la fenêtre Suivi, voir Carnet de progrès). Le voyant Écran est
+retiré avec tout ce qui parlait d'étalonnage (Dany n'achètera jamais de sonde ; voir Écran) :
+`Vues.voyantEcran`, `TAILLES.voyantEcran`, `Fenetre.poserEcran`, `Fenetre.montrerEcran`, les
+propriétés `texteEcran` et `etatEcran`, `Lightroom.etatEcran`, `Lightroom.decrireEcran` et les
+textes `ECRAN_*` ; la fenêtre ne lance plus `mcp-developpeur --ecran`, ni à l'ouverture ni au clic.
+Ce qui suit sur l'Écran décrit la fenêtre jusque-là.
+
+Au correctif 1.3.6, d'abord, les trois voyants sont dans l'en-tête, sous le titre, en rangée : Claude Code
 (125 points), Lightroom (150) et Écran (150, venu du bas du volet, retiré), 14 points entre eux
 (`TAILLES.voyantClaude`, `voyantLightroom`, `voyantEcran`, `ecartVoyants`), la photo active prenant
 le reste (`D.info`). L'infobulle du voyant Lightroom est liée (`infobulleLightroom`,
@@ -1144,6 +1167,79 @@ la fenêtre B de la 1.3 ; le correctif la change ainsi :
   Ajuster… et Accepter en bleu, 452 points pour 498 (voir Obtenir une proposition) ; Suivi, comme Aperçu et Focus, ne s'ouvre que par un vrai clic, et plus
   aucune bascule vers Leçon (`Fenetre.leconVue`).
 
+**Retours de Dany après son essai** (25 octobre 2026, la 1.3.6 installée ; tous acceptés tels quels,
+le numéro gardé). Ils changent encore le correctif :
+
+- **Un clic à la place de « Pourquoi ? »** : le carré « Pourquoi ? » au bout d'une ligne d'étape
+  est retiré (clé `q..i`, `Fenetre.pourquoi`, `D.pourquoi`, `Fil.PLACE_POURQUOI` : la ligne prend
+  toute la largeur du texte). Un clic sur une ligne d'étape ouvre l'onglet Aperçu, son avant/après
+  et sa raison (`Fenetre.clics.etape`, `Fenetre.montrerEtape`, comme avant le bouton). Un clic sur
+  une ligne d'image ouvre aussi l'onglet Aperçu (`Fenetre.voirImageDuFil` : l'onglet change d'abord,
+  puis l'aperçu montre l'image et la carte le pourquoi de l'étape qui la précède dans le fil,
+  `Fenetre.etapeAvant`, `Fenetre.choisirEtapeDeLImage`, sans la suivre ; `set_metadata` et
+  `manage_collections`, qui ne changent pas l'image, sont sautés ; sans étape avant elle,
+  `Fenetre.SANS_ETAPE_IMAGE`). L'image d'une proposition et une photo jointe par Dany ne sont faites
+  par aucune étape (`Fenetre.imageDeClaude` faux) : la carte dit ce qu'elles sont
+  (`Fenetre.texteSansEtape` : `SANS_ETAPE_PROPOSITION`, `SANS_ETAPE_JOINTE`), jamais le pourquoi
+  d'un tour d'avant ; l'image de la proposition qui attend ouvre l'onglet Proposition, où sont sa
+  raison et Accepter (`Fenetre.voirPropositionDuFil`), décidée ou close l'onglet Aperçu. Devant une
+  image du fil, ◀ ▶ vont d'une image à l'autre et la carte suit ; Voir l'avant, ou ◀ ▶ de la carte,
+  repassent à l'avant/après de l'étape. « Voir à 100 % » reste dans l'onglet Note
+  (`Fenetre.montrerImageDuFil`). Les lignes d'image disent l'effet du clic : « Aperçu de Claude ·
+  cliquer pour le voir, avec son pourquoi », « Avant / après · cliquer pour le voir », « Photo
+  jointe 1 · cliquer pour la voir ». L'aide de la carte (`Fenetre.AIDE_ETAPE`) et la consigne de la
+  raison disent « d'un clic sur l'étape du fil ». Le changement d'onglet puis l'image posée
+  supposent des observateurs de propriétés synchrones, comme `Fenetre.choisirOnglet` : à constater.
+- **Les onglets** : Focus, Note, Aperçu, Proposition, dans cet ordre (`Dispositions.ONGLETS`, seule
+  liste : valeur, titre, image ; segments de 62, 57, 72 et 98, soit 289 dans le panneau de 528 ;
+  `Dispositions.gabarits` donne `segments` à `scripts/images-fenetre.swift`, qui en tire l'ordre et
+  les bouts arrondis, et refuse aucun segment ou un segment en double ; les segments des deux jeux
+  sont refaits, `seg-suivi`, `seg-suivi-actif` et `carte-suivi` retirés). La fenêtre s'ouvre sur
+  Focus (`D.ongletParDefaut` `'focus'`, même avec une proposition en attente ; les images comptées
+  sont remises à zéro à l'ouverture : une image arrivée fenêtre fermée n'est pas une arrivée) et y
+  revient chaque fois que la conversation montrée change pour une autre photo choisie, ou un groupe
+  (`Fenetre.revenirAFocus`, depuis `Fenetre.suivreSelection` : une bascule, qui lit la photo
+  active ; ni pour Obtenir, ni pour « Repartir à neuf », ni case Autre photo décochée ; une
+  proposition qui attend déjà n'y reprend pas la main, `Fenetre.propositionVue`).
+- **Les bascules** : une image de Claude qui arrive (`view_photo`, une comparaison) ouvre l'onglet
+  Aperçu (`Fenetre.rafraichirApercu`, puis `Fenetre.voirImageDuFil(chemin, true)` : l'aperçu suit
+  les images suivantes, la carte le pourquoi de l'étape qui la précède) ; l'image d'une proposition
+  va dans Proposition (`Fenetre.rafraichirProposition`), une note dans Note, comme avant ; une photo
+  jointe par Dany ne change pas d'onglet. Les règles « jamais vers Aperçu » et « jamais vers
+  Focus » tombent.
+- **Agrandir** jusqu'à 2 000 × 1 250 (1 100 × 740 avant), voir Agrandir plus bas.
+- **Suivi devient une fenêtre** : l'onglet Suivi, sa carte (`Vues.suivi`, `CARTES.suivi`,
+  `D.ongletSuivi`, `D.suiviLignes`, `D.photosDefaut`), son abonnement `fenetre` au carnet et sa
+  lecture dans la boucle sont retirés ; le bouton Suivi de l'en-tête ouvre la fenêtre « Claude ·
+  Suivi » (voir Voyants et liaison, et Carnet de progrès). `Fenetre.lignesCarte` devient
+  `Fil.lignesCarte`, avec un alias.
+- **Plus rien sur l'étalonnage** : le voyant Écran est retiré (voir Voyants et liaison et Écran).
+- **Le titre** : « Développeur v1.3.6 » dans la barre de titre (`Fenetre.titreFenetre` : la version
+  de `Composants.module()`, « Développeur » seul si elle ne se lit pas) ; la Demande rapide garde
+  « Claude · Demande rapide ».
+- `Fenetre.FORME` reste 5 : la taille de la fenêtre ne change pas.
+
+**Agrandir** (retours de Dany du 25 octobre 2026) : l'image en grand tient dans `Fenetre.GRANDE`,
+2 000 × 1 250, qui laisse à la fenêtre modale sa barre de titre et Fermer sur l'écran de Dany
+(3 440 × 1 440 ; environ 1 330 de haut en tout, pas encore vu), sous chacune de ses formes : la
+photo active, la vignette de l'onglet Focus, une image du fil ou de la proposition, une image
+d'étape seule (`Fenetre.agrandirUne`, une seule fonction pour les quatre, dans une tâche), et
+l'avant et l'après d'une étape côte à côte, les deux ensemble avec leurs titres et la légende
+(`Fenetre.agrandirDeux` ; la place de chaque image par `Fenetre.cadreDeux`, pure : 994 de large au
+plus par image, `ECART_DEUX` 12 entre elles, `ECART_TITRE` 4 sous chaque titre, `ECART_LEGENDE` 8
+avant la légende, une ligne de 16 d'après `Metriques`, une image illisible sur `LARGEUR_ILLISIBLE`
+200 ; la légende coupée à leur largeur ensemble, et une légende longue réduit la hauteur des
+images, la place refaite tant que ses lignes changent, quatre fois au plus). `Images.grande`
+n'agrandit jamais : une image qui tient dans la limite est montrée à sa vraie taille, son propre
+fichier, sans `sips` ni recompression ; une plus grande est réduite en gardant ses proportions, en
+paysage comme en portrait (3 000 × 1 500 : 2 000 × 1 000 ; 1 000 × 2 500 : 500 × 1 250) ; une
+image illisible dit « Aperçu illisible », Focus et la photo active compris (rien ne s'ouvrait
+avant). La taille demandée pour la vignette de la photo active ne change pas
+(`Fenetre.TAILLE_PHOTO_ACTIVE` 1 024) : Lightroom rend son aperçu standard en cache, plus grand
+(1 720 pixels pour un RAW, constaté le 17 octobre 2026) ; les images d'étape font 1 024
+(`Etapes.COTE`) et sont ramenées à 994 de large côte à côte. Essais : `essais-integration.lua`
+(avec le vrai `sips`), `essais-dispositions.lua` (`cadreDeux`, pur), `essais-fenetre-b.lua`.
+
 **Dimensions** (`Dispositions.TAILLES`, puis `Dispositions.dimensions()`, qui en tire le reste) :
 
 - la fenêtre de 1 948 × 1 200 et son cadre constaté (D7 : barre de titre de 33, 32 blancs et un
@@ -1247,8 +1343,10 @@ de la fenêtre sont des constantes raccourcies pour y tenir (`CHOISIR_CONVERSATI
 refus de `Moteur.lua` ; `PAS_CINQ` est retiré au correctif 1.3.2) ; l'essai « Bandeau »
 d'`essais-fenetre-b.lua` les mesure.
 
-**Colonne droite** (`droite` de `Dispositions.lua` ; au correctif 1.3.6, Suivi à la place de Leçon :
-voir plus haut) : le panneau en image, les segments Aperçu | Focus | Proposition | Note | Leçon
+**Colonne droite** (`droite` de `Dispositions.lua` ; au correctif 1.3.6, Suivi à la place de Leçon,
+puis, après l'essai de Dany, les segments Focus | Note | Aperçu | Proposition, l'ouverture sur
+Focus et les bascules vers Aperçu : voir plus haut, Retours de Dany après son essai ; ce paragraphe
+décrit la 1.3) : le panneau en image, les segments Aperçu | Focus | Proposition | Note | Leçon
 centrés à cheval sur son bord (Focus depuis le 22 octobre 2026 :
 voir Onglet Focus ; 72 + 62 + 98 + 57 + 65 = 354 dans le panneau de 528) (`Vues.segments` : chacun son image et sa
 variante bleue `-actif`, sous un calque, `Fenetre.choisirSegment`, un vrai clic ; ni survol ni
@@ -1808,7 +1906,10 @@ conversation :
   finitions » : Exposition 0,45 → 0,6 ; … », `REPRISES_MONTREES` 8 réglages, libellés de
   `Conversation.libelles`, sinon `Historique.LIBELLES`) ; sans étape de Claude, « … : retouchée à
   la main, sans étape de Claude. » quand `editCount` est au-dessus de 0 (non constaté sur une
-  photo jamais développée), sinon rien ;
+  photo jamais développée), sinon rien ; depuis les retours de Dany du 25 octobre 2026, une photo
+  sans étape de Claude a en plus la puce de ses réglages hors des valeurs par défaut (voir Le résumé
+  des réglages), et « … : sans étape de Claude. » quand elle en a avec `editCount` à 0 (un paramètre
+  prédéfini posé à l'importation) ;
 - `depuis` (`Historique.depuis`), à une conversation reprise : les étapes plus récentes que la
   dernière qu'elle a vue (`Historique.nouvelles` : après la dernière vue, même date, étape,
   identifiant et genre ; si elle n'est plus au journal, qui garde ses 200 dernières entrées, celles
@@ -1825,6 +1926,37 @@ conversation :
   passe par `Photos.lireJson` ; si les lectures groupées échouent, seules les `MAX_GROUPE` (500)
   premières photos sont lues une à une, et le texte le dit (« 3 des 500 premières de ces 600
   photos… »).
+
+**Le résumé des réglages** (`Historique.ecarts(reglages, raw)`, pure ; demandé par Dany le
+25 octobre 2026). Pour une photo sans étape de Claude, `Historique.etat` lit ses réglages
+(`photo:getDevelopSettings()`, sous `LrTasks.pcall`, seulement quand le journal est vide ;
+`Reglages.estRaw`) et l'élément « Historique de la photo » ajoute la puce « Réglages hors des
+valeurs par défaut : Profil Camera CLASSIC CHROME · Balance 5 600 K / +8 · Exposition +0,45 ·
+Ombres +30 · Recadrée · 2 masques » (`Historique.REGLAGES`, `Historique.texteReglages`), dans le
+fil et pour Claude, joint une seule fois à la demande suivante comme le reste de l'historique, en
+mots français, pas avec les clés de Lightroom (à la différence des reprises à la main). Dans l'ordre
+des panneaux du module Développement : le profil (Adobe Color pour un RAW, Embedded, le profil
+incorporé, pour un autre fichier, à son intensité de 100 : `Historique.PROFILS_PAR_DEFAUT`, à la
+casse près ; le nom tel que Lightroom le range, « Camera CLASSIC CHROME » ; Embedded pour un JPEG
+est supposé) ; la balance (Telle quelle par défaut ; « 5 600 K / +8 » pour un RAW, relative pour un
+JPEG, les balances nommées en français, `Historique.BALANCES`) ; le noir et blanc ; la tonalité et
+la présence à 0, avec leur signe (`Historique.TONALITE`, libellés de `Conversation.libelles`) ; la
+courbe (paramétrique ou par points, linéaire par défaut) ; la TSL (pas en noir et blanc : le mélange
+des gris la remplace) ; l'étalonnage ; la netteté (40 pour un RAW, 0 sinon), la réduction du bruit,
+le bruit de couleur (25 pour un RAW, 0 sinon) ; les corrections d'objectif, la transformation, le
+vignetage, le grain, le calibrage ; « Recadrée » (un cadre plus petit que l'image) et « Redressée
+de N° » (au dixième) ; puis les masques, les taches et les yeux rouges comptés, et le flou de
+l'objectif. Seulement des valeurs par défaut sûres, celles d'Adobe (`Catalogue.swift`), arrondies
+comme Lightroom les montre (`Reglages.arrondir`). Ce qui n'est pas sûr se tait plutôt que
+d'inventer : un réglage absent de ceux que Lightroom rend, des réglages illisibles ; un quart de
+tour (l'orientation, que l'appareil pose aussi) ; le débruitage et les détails bruts (un même
+filtre) ; la teinte d'étalonnage sans saturation, le fondu et l'équilibre. Un profil ou des
+corrections d'objectif posés par les réglages par défaut de Dany se disent comme les autres. Les
+nombres sont à la française : virgule, signe « − » (U+2212), espace fine insécable (U+202F) des
+milliers et devant « K », tous déjà mesurés dans `Metriques.lua`. Rien pour une photo qui a des
+étapes de Claude. Essais : `essais-une-photo.lua` (l'exemple de Dany dans le fil et joint une fois ;
+« sans étape de Claude » ; rien aux valeurs d'Adobe ; pas de résumé avec des étapes ; réglages
+illisibles ; chaque panneau, les défauts d'un RAW et d'un JPEG, les nombres, l'ordre).
 
 Chaque élément a deux formes : `texte` (l'en-tête, puis ses puces « •  », pour le fil) et
 `pourClaude` (la même chose entre crochets, sur une ligne ; les reprises par leurs clés de
@@ -2011,9 +2143,11 @@ autre sélection, la conversation d'une photo, le groupe, la réservation de Cla
 ```
 
 Dans le module (1.3) : `images/` et `images/sombre/`, les images de la fenêtre B, un jeu par
-apparence (voir Fenêtre B ; au correctif 1.3.6, `carte-suivi`, `seg-suivi` et `seg-suivi-actif`
-arrivent, `carte-lecon`, `seg-lecon`, `seg-lecon-actif`, `loupe` et `selection` partent), et
-`Historique.lua` (nouveau au correctif 1.3.6 : relancer Lightroom). `uninstall.sh` garde
+apparence (voir Fenêtre B ; au correctif 1.3.6, `carte-lecon`, `seg-lecon`, `seg-lecon-actif`,
+`loupe` et `selection` partent, `carte-suivi`, `seg-suivi` et `seg-suivi-actif` arrivent, puis
+repartent avec l'onglet Suivi après l'essai de Dany, et les segments Focus, Aperçu et Proposition
+sont refaits pour leur nouvel ordre), et `Historique.lua` et `FenetreSuivi.lua` (nouveaux au
+correctif 1.3.6 : relancer Lightroom). `uninstall.sh` garde
 `carnet.json` et `Etapes/` ; `--tout` retire tout le dossier, eux compris.
 
 ### Préférences
@@ -2126,6 +2260,10 @@ Budget (2 M par défaut) : alerte à 80 %, refus des demandes à 100 %. Les barr
 Au correctif 1.3.6, dans l'infobulle du voyant Lightroom (voir Voyants et liaison), lues de même à
 l'ouverture (`Composants.lire`, dans `Fenetre.verifier(true)`) ; une version à mettre à jour ou un
 connecteur introuvable passent le voyant à l'orange. `Vues.versions` est retiré avec le volet.
+Après l'essai de Dany, la version du module est aussi dans la barre de titre de la fenêtre Claude :
+« Développeur v1.3.6 » (`Fenetre.titreFenetre`, d'après `Composants.module()`, lu de `VERSION`
+d'`Info.lua` ; « Développeur » seul si elle ne se lit pas) ; la Demande rapide garde « Claude ·
+Demande rapide ».
 En 1.3, en bas du volet, au-dessus du voyant Écran, en gris des en-têtes (`Vues.versions`). Jusqu'à
 la 1.2, en bas de la colonne de droite (en 1.1 et 1.1.1, aussi de la colonne Note de l'Atelier et de la
 fenêtre du Panneau, retirés), deux lignes (`Composants.lua`, `Vues.versions`), lues à
@@ -2203,7 +2341,8 @@ un simple rechargement du module ne suffit pas.
   que le cadre de la Conversation claire en 1.1.1, où 1 est `Fenetre.FORME`, à augmenter quand le
   contenu rapetisse) ; la fenêtre rouvre alors une fois à la position par défaut. Les autres
   fenêtres ont leur cadre : `DeveloppeurPublication`, `DeveloppeurConsommation`,
-  `DeveloppeurSuivi`, et en 1.1 `DeveloppeurNotation` (Séance de notation, retirée en 1.1.1).
+  `DeveloppeurSuivi` (la fenêtre de la liaison), `DeveloppeurCarnet` (la fenêtre Suivi du carnet,
+  correctif 1.3.6), et en 1.1 `DeveloppeurNotation` (Séance de notation, retirée en 1.1.1).
 - Quand une fenêtre du module est devant (ou que Lightroom n'est pas l'application active), le
   menu Fichier de Lightroom est réduit (Nouveau catalogue, Ouvrir le catalogue, Mise en page,
   Imprimante) : les entrées du module et le Gestionnaire de modules n'y sont pas. D'où les boutons
@@ -3590,6 +3729,29 @@ plancher nul de deux vues de même taille, mais leur valeur reste provisoire ell
 
 ## Écran (1.2)
 
+**Depuis le correctif 1.3.6 : plus rien sur l'étalonnage** (décision de Dany du 25 octobre 2026,
+après son essai : il n'achètera jamais de sonde). Ni Dany ni Claude n'en entendent plus parler :
+`get_status` ne dit que les noms (`Ecran.nommer` : `ecran: {"nom": "Odyssey G85SD"}`, avec
+`"autres": [noms]` seulement s'il y a d'autres écrans ; ni profil, ni `etalonnage`, `mesure`,
+`texte`, date ou logiciel), et sa description seulement « ecran : le nom de l'écran principal du
+Mac. » ; la remarque du premier aperçu est retirée (`Ecran.remarque`, `ToolHandler.ecranSignale`,
+`outilsAvecApercu`, `ajouterRemarqueEcran`, `remarqueEcran` : les aperçus ne lisent même plus
+l'écran) ; le texte de la boîte du voyant (`Ecran.detail`, `Ecran.reglageProfil`, le seul conseil
+d'une sonde) part avec le voyant Écran de la fenêtre Claude (voir Fenêtre Claude › Voyants et
+liaison), et la section « ## Écran » des consignes de la fenêtre avec lui. `--status` dit « Écran
+principal : <nom> » et « Autre écran : <nom> », sans jugement. `mcp-developpeur --ecran` reste,
+pour le développement seulement : une ligne JSON `{"principal": {…}, "autres": [{…}]}` (ou
+`{"lu": false}`), chaque écran avec `nom`, `integre`, `gamut_large`, `profil`, `etalonnage`,
+`mesure`, `texte`, `chemin` du profil, et `date_profil` et `logiciel` s'ils sont lus, sans la clé
+`detail`. Le classement (`Ecran.Etalonnage`) et ses tests restent pour lui. La recette, étape
+« écran nommé (get_status) », vérifie un nom non vide et que rien d'autre que `nom` et `autres` ne
+part chez Claude ; son détail est le nom seul. `EcranTests` : `testNommer`,
+`testGetStatusNeDitQueLeNomDeLEcran` (ni « mesur », ni « étalonn », ni « sonde » ; aucune
+description d'outil ni `ServerInfo.instructions` ne parlent de sonde ou d'écran non étalonné),
+`testAucuneRemarqueDEcranAuxApercus` (`view_photo`, `preview_settings` et `compare_variants` rendent
+un seul bloc de texte et ne lisent pas l'écran) ; `MCPServerTests.testRemarqueDeLEcranSeulementAvecUneImage`
+est retiré. Ce qui suit décrit la 1.2 à la 1.3.5.
+
 Claude mesure la photo par ses chiffres, sans passer par l'écran ; l'utilisateur la juge sur le
 sien. `Ecran.swift` dit quel est cet écran et si son profil de couleur vient d'une sonde
 d'étalonnage. Serveur seulement : macOS seul connaît l'écran, et la fenêtre Claude le demande au
@@ -4315,8 +4477,9 @@ dynamique, forme de la compensation, ce que Lightroom fait d'un RAF à DR200 et 
 ## Onglet Focus (demandé par Dany le 22 octobre 2026)
 
 Dany emploie le module Focus-Points (v4 PRE 4, installé ; Apache 2.0) pour voir où l'appareil a
-fait la mise au point. L'onglet Focus de la fenêtre Claude, entre Aperçu et Proposition (clé
-`focus`, `D.ongletFocus`), montre la photo active de même, avec les sections Image Information,
+fait la mise au point. L'onglet Focus de la fenêtre Claude, le premier des quatre depuis les
+retours de Dany du 25 octobre 2026 (entre Aperçu et Proposition avant ; clé `focus`,
+`D.ongletFocus`), montre la photo active de même, avec les sections Image Information,
 Shooting Information et Focus Information de Focus-Points, en français.
 
 **Lecture du boîtier** (`Focus.swift`, `MiseAuPointBoitier`, lue par `LectureBoitier` de la même
@@ -4413,13 +4576,18 @@ fichier sans la MakerNote de Fujifilm, une autre marque).
   gras 12, « Focus · DSCF2402.RAF (Essai) » ; texte `focusTexte` en 12, `D.focusLignes` lignes,
   page par page par `Fenetre.montrerPage('focus', …)` et ▲ ▼, les titres des blocs en `<EM>`, gras
   12) ;
-- jamais de bascule d'elle-même : `Fenetre.choisirOnglet` n'est jamais appelé pour Focus ; seul un
-  vrai clic sur le segment l'ouvre (`Fenetre.surOnglet.focus`) ;
+- depuis les retours de Dany du 25 octobre 2026, la fenêtre s'ouvre sur Focus (`D.ongletParDefaut`)
+  et y revient chaque fois que la conversation montrée change pour une autre photo choisie, ou un
+  groupe (`Fenetre.revenirAFocus`, une bascule par `Fenetre.choisirOnglet`, sans le crochet d'un
+  vrai clic : l'aperçu de l'onglet lit la photo active) ; un vrai clic sur le segment l'ouvre aussi
+  (`Fenetre.surOnglet.focus`, qui relit si la photo a changé). Jusque-là, jamais de bascule
+  d'elle-même : seul un vrai clic l'ouvrait ;
 - l'aperçu de l'onglet (`Fenetre.apercuOnglet.focus`) : la vignette de la photo active avec ses
   cadres (sans, pour une autre marque), sa légende, l'image vide pendant la lecture, ◀ ▶ coupés ;
-  Agrandir montre la vignette marquée en grand. Après un clic sur une ligne d'image du fil,
-  l'aperçu montre cette image (`Fenetre.imageCliquee`), et Agrandir aussi, comme dans les onglets
-  Aperçu et Proposition, jusqu'à un autre onglet. L'aperçu de la photo active des autres onglets,
+  Agrandir montre la vignette marquée en grand (jusqu'à 2 000 × 1 250 depuis le correctif 1.3.6).
+  Un clic sur une ligne d'image du fil ouvre l'onglet Aperçu depuis les retours de Dany ; avant,
+  l'aperçu de Focus montrait cette image (`Fenetre.imageCliquee`), et Agrandir aussi, jusqu'à un
+  autre onglet. L'aperçu de la photo active des autres onglets,
   et son carré de `--marquer-af`, ne changent pas ;
 - la lecture (`Fenetre.lireFocus`, `Fenetre.preparerFocus`), dans une tâche, une à la fois :
   `Vignettes.decrireVignette` (l'original, la marque, la géométrie ; une copie virtuelle donne
@@ -5181,10 +5349,13 @@ porte un `etape_id`), `e.annule` pour `undo_last`, `e.revenu` pour `revert_to_or
 les écrit en tableaux, même vides. `Conversation.estEtape(e)`, `Conversation.etapes(c, photo)` (une
 étape est « annulée » par un `undo_last` suivant, par son id, sinon par son nom ; « défaite » par un
 `revert_to_original` suivant) ; une conversation de la 1.2 se relit dans `detail`
-(`Conversation.infoEtape`, sans id). Sa ligne du fil porte le bouton « Pourquoi ? » (voir Fenêtre
-B) : `Fenetre.pourquoi(i)` relit la ligne, puis `Fenetre.montrerEtape` ouvre l'onglet Aperçu, jamais
-par une bascule automatique. `Fenetre.etape` = `{ conversation, photo, id, element, vue, suivre }`
-(l'id de l'élément, pas son indice), remis à nil quand la conversation change. La carte
+(`Conversation.infoEtape`, sans id). Un clic sur sa ligne du fil ouvre l'onglet Aperçu
+(`Fenetre.clics.etape`, puis `Fenetre.montrerEtape`) ; un clic sur une ligne d'image aussi, avec le
+pourquoi de l'étape qui la précède, et une image de Claude qui arrive y bascule d'elle-même (retours
+de Dany du 25 octobre 2026, correctif 1.3.6 : voir Fenêtre B ; de la 1.3 jusque-là, le bouton
+« Pourquoi ? » au bout de la ligne, `Fenetre.pourquoi(i)`, jamais par une bascule automatique).
+`Fenetre.etape` = `{ conversation, photo, id, element, vue, suivre }` (l'id de l'élément, pas son
+indice), remis à nil quand la conversation change. La carte
 (`Vues.etape`) : « Étape n sur N · but » (sans étape : « Pourquoi ? », `Fenetre.TITRE_ETAPE`, et
 l'aide `Fenetre.AIDE_ETAPE`), le sous-titre (fichier · outil · « annulée ensuite (undo_last) »,
 « défaite ensuite (revert_to_original) » ou « en cours »), la raison, ce qui a changé, et « Pas
@@ -5194,8 +5365,9 @@ ou avant, « avant/après en préparation… », « pas d'avant/après ») ; ses
 carte passent d'une étape à l'autre de la même photo (la dernière reprend le mode suivre, qui suit
 la dernière étape à mesure que Claude travaille) ; Voir l'avant / Voir l'après (`titreBascule`) ;
 Détail… (l'appel et sa réponse) ; Agrandir montre l'avant et l'après côte à côte
-(`Fenetre.agrandirDeux`, chaque image dans 540 × 700, `Fenetre.GRANDE_DEUX`, titre « Claude ·
-<titre> »), ou la seule image qui existe. Les images se lisent par `Etapes.images` dans une tâche,
+(`Fenetre.agrandirDeux`, titre « Claude · <titre> » ; chaque image dans 540 × 700,
+`Fenetre.GRANDE_DEUX`, jusqu'au correctif 1.3.6, puis les deux ensemble dans 2 000 × 1 250 :
+voir Fenêtre B › Agrandir), ou la seule image qui existe. Les images se lisent par `Etapes.images` dans une tâche,
 réduites par `Images.vignette`, gardées par étape (`Fenetre.imagesEtapes`) et relues quand
 `Etapes.version` change. Un vrai clic sur le segment Aperçu sans étape choisie montre la dernière
 étape de la photo active, sinon de la conversation.
@@ -5230,7 +5402,7 @@ déclencheur exact est supposé, et dit comme tel.
 la case Leçon et « [Sans leçon] », les essais (`essais-lecon.lua` des deux suites) et l'étape de la
 recette. Les leçons déjà rangées restent dans `carnet.json` : le registre les garde telles qu'il
 les a lues et les réécrit telles quelles (jamais perdues, même par `retirer` ou l'élagage), sans
-plus les montrer (ni l'onglet Suivi, ni `export_journal`, qui retire une clé `lecons` d'un module
+plus les montrer (ni l'onglet puis la fenêtre Suivi, ni `export_journal`, qui retire une clé `lecons` d'un module
 ancien : `Carnet.sansLecons`) ; les éléments `lecon` d'une conversation d'avant se relisent sans
 ligne dans le fil. Le rendu reproductible, qui se gardait à la fin de `photo_lesson`, se garde
 au `view_photo` avec `compare = before_claude` (voir Correctif 1.3.6). Ce qui suit est
@@ -5624,8 +5796,33 @@ une entrée qui n'a plus que des leçons reste, sans compter au carnet ; `retire
 `lecons` d'un module ancien ou d'un registre ancien (`Carnet.sansLecons`, à la racine du résumé
 ou dans un défaut, une tendance). La case Carnet coupe donc tout ce qui entre au carnet.
 
-**Dans la fenêtre, depuis le correctif 1.3.6 : l'onglet Suivi** (à la place de Leçon ; seul
-l'onglet est renommé : la case Carnet, `carnet.json`, `Carnet.lua` et le carnet
+**La fenêtre Suivi** (retours de Dany du 25 octobre 2026, correctif 1.3.6 ; `FenetreSuivi.lua`,
+nouveau : relancer Lightroom). Le carnet quitte l'onglet Suivi pour une fenêtre à part,
+« Claude · Suivi » (`FenetreSuivi.TITRE`, cadre `DeveloppeurCarnet`), comme Publication et
+Consommation : ses contrôles sont ceux du système (ni aplat ni image : l'apparence de macOS), toute
+table donnée à Lightroom est neuve. Seul le bouton Suivi de l'en-tête de la fenêtre Claude l'ouvre
+(`Fenetre.ouvrirSuivi`, `FenetreSuivi.afficher` ; déjà ouverte, elle passe devant ; pas d'entrée
+au menu Module externe - Extras). Elle montre le titre du résumé (`Carnet.TITRES.carnet`, en gras
+13), puis le résumé du catalogue ouvert, ses constats seulement, page par page avec ▲ ▼ (mini,
+une page moins une ligne par clic) : le même texte riche que la carte d'avant (`Fil.texteSuivi`,
+d'après `Carnet.resumer`, seule source des phrases), coupé à `FenetreSuivi.LARGEUR` 600 en 12, ses
+passages balisés en gras 12 (`Fil.lignesCarte`), `FenetreSuivi.LIGNES` 36 lignes par page, la
+place gardée quand il se relit. Le résumé se lit dans une tâche (`FenetreSuivi.lire`, le chemin du
+catalogue par `LrTasks.pcall`) à l'ouverture, puis chaque fois que le registre change
+(`Carnet.version`, abonnement `suivi`, d'ici ou d'un autre client du connecteur), par la boucle de
+la fenêtre (`FenetreSuivi.suivre`) ; il se désabonne à la fermeture. Un résumé qui ne se lit pas
+fait un texte qui le dit. « Photos d'un défaut… » (actif s'il y a des défauts) ouvre la liste des
+défauts du résumé (`FenetreSuivi.choisirDefaut`), puis la fenêtre des photos du défaut choisi
+(`FenetreSuivi.montrerDefaut`, `textePhotoDuDefaut`, `nomPhotoCarnet`) et « Retirer du carnet… »
+(`FenetreSuivi.retirerDuCarnet`, appel direct à `Carnet.commande`, jamais une ligne TCP), son
+message en bas de la fenêtre Suivi : ce qui servait aux défauts quitte `Fenetre.lua`. Rien n'est
+écrit dans le catalogue ni demandé à Claude. La fenêtre Claude n'a plus ni l'onglet, ni sa carte,
+ni son abonnement au carnet, ni sa lecture dans la boucle. Les graphiques du carnet et l'ajout de
+chaque photo au carnet viendront au correctif 1.3.7. Essais : `Tests/Lua/Fenetre/essais-carnet.lua`
+(ouverture, lecture, pages, boucle, désabonnement, Photos d'un défaut…, Retirer du carnet…).
+
+**D'abord, au correctif 1.3.6 : l'onglet Suivi** (à la place de Leçon, jusqu'aux retours de Dany ;
+seul l'onglet était renommé : la case Carnet, `carnet.json`, `Carnet.lua` et le carnet
 d'`export_journal` gardent leur nom). La carte Suivi (`Vues.suivi`, sur `carte-suivi` de 679, à la
 largeur intérieure du panneau) : son titre en gras 12 (`suiviTitre`, `Carnet.TITRES.carnet`,
 « Carnet de progrès »), puis le résumé du catalogue ouvert, ses constats seulement, page par page
@@ -5882,9 +6079,11 @@ Correctif 1.3.6 :
 
 ## Correctif 1.3.6 : une photo, une conversation
 
-Décidé avec Dany le 25 octobre 2026 (séance de questions, toutes ses réponses données), pas
-encore publié (« ## Non publié » de `CHANGELOG.md`, avec la balance des blancs de toute l'image et
-la Demande rapide sans ♻). Le module gagne un fichier (`Historique.lua`) : relancer Lightroom.
+Décidé avec Dany le 25 octobre 2026 (séance de questions, toutes ses réponses données), numéroté
+(« ## 1.3.6 — 2026-10-25 » de `CHANGELOG.md`, avec la balance des blancs de toute l'image et la
+Demande rapide sans ♻, qui attendaient sous « ## Non publié »), installé pour les essais de Dany,
+pas encore publié ; complété le même jour par ses retours après cet essai (numéro gardé). Le module
+gagne deux fichiers (`Historique.lua`, `FenetreSuivi.lua`) : relancer Lightroom.
 
 - **Une photo, une conversation** dans la fenêtre Claude, avec l'historique de la photo,
   « Depuis la dernière fois », la conversation d'un groupe jamais gardée et « Repartir à neuf » :
@@ -5892,10 +6091,22 @@ la Demande rapide sans ♻). Le module gagne un fichier (`Historique.lua`) : rel
 - **La Demande rapide** sur une photo seule écrit dans la conversation de cette photo, gardée ; sur
   plusieurs photos, comme avant, avec le résumé court du groupe ; un seul Claude Code, réservé dès
   avant les lectures du catalogue : voir Fenêtre Claude › Demande rapide.
-- **La fenêtre allégée** : plus de volet ni de rangée Mode, 1 623 × 1 200, trois voyants dans
+- **La fenêtre allégée** : plus de volet ni de rangée Mode, 1 623 × 1 200, les voyants dans
   l'en-tête, les versions et le mode dans l'infobulle du voyant Lightroom, l'onglet Suivi à la
-  place de Leçon, « Afficher la fenêtre de la liaison » à la place de « Afficher la fenêtre de
-  suivi » : voir Fenêtre B, Voyants et liaison, Préférences et Carnet de progrès.
+  place de Leçon (devenu ensuite la fenêtre Suivi), « Afficher la fenêtre de la liaison » à la place
+  de « Afficher la fenêtre de suivi » : voir Fenêtre B, Voyants et liaison, Préférences et Carnet de
+  progrès.
+- **Les retours de Dany après son essai** (25 octobre 2026, tous acceptés tels quels) : un clic sur
+  une étape ou une image du fil à la place du bouton « Pourquoi ? » ; les onglets Focus, Note,
+  Aperçu et Proposition, la fenêtre ouverte sur Focus et ramenée à Focus à chaque autre photo ; une
+  image de Claude qui arrive ouvre Aperçu, une proposition Proposition, une note Note ; Agrandir
+  jusqu'à 2 000 × 1 250, une image plus petite à sa vraie taille ; le bouton Suivi et la fenêtre
+  Suivi à la place de l'onglet (les graphiques et l'ajout de chaque photo au carnet attendent le
+  correctif 1.3.7) ; plus rien sur l'étalonnage de l'écran (ni voyant Écran, ni section Écran des
+  consignes, ni remarque au premier aperçu, `get_status` ne dit que le nom) ; le résumé des
+  réglages d'une photo sans étape de Claude dans son historique ; la barre de titre « Développeur
+  v1.3.6 ». Voir Fenêtre B (Retours de Dany après son essai, Agrandir), Voyants et liaison, Écran,
+  Carnet de progrès et Une photo, une conversation (le résumé des réglages).
 - **Retirés** : la leçon de la photo et « Je le fais », partout (voir leurs sections, gardées comme
   historique) ; dans le protocole, la commande `lecon`, `journal` avec `detaille`, `exercice` et
   `sans_rendu` d'`essayer`, `comparer = versionClaude` d'`apercu`.
@@ -5923,15 +6134,21 @@ la Demande rapide sans ♻). Le module gagne un fichier (`Historique.lua`) : rel
 - **Corrigé** : les dossiers temporaires des conversations jamais gardées (`Temporaire/Groupes`,
   `Temporaire/Rapide`) s'effacent au chargement du module (`Menage.temporaires`).
 
-Les deux suites passent (rapports des étapes du 25 octobre 2026 : `swift test` 522 tests, dont 1
-sauté sans `DEVELOPPEUR_ECRAN_REEL=1` ; `scripts/tester-module.sh` 604 tests et essais, dont
-`essais-une-photo` 18, `essais-rapide` 12, `essais-moteur` 19, `essais-fenetre-b` 36). Rien n'en a
-encore été vu dans Lightroom. Reste à constater :
+Les deux suites passent (25 octobre 2026, après les retours de Dany : `swift test` 522 tests, dont
+1 sauté sans `DEVELOPPEUR_ECRAN_REEL=1`, 0 échec ; `scripts/tester-module.sh` 614 tests et essais,
+0 échec : la liaison 331, dont `tests.lua` 246, la fenêtre 283, dont `tests.lua` 64,
+`essais-une-photo` 20, `essais-pourquoi` 20, `essais-rapide` 12, `essais-moteur` 19,
+`essais-fenetre-b` 36, `essais-dispositions` 24, `essais-carnet` 10, `essais-integration` 10).
+Dany a vu la fenêtre de 1 623 × 1 200 à son essai, d'où ses retours ; rien d'eux n'a encore été vu
+dans Lightroom. Reste à constater :
 
-1. La fenêtre de 1 623 × 1 200 (contenu 1 621 × 1 166, cadre `…-grande-5`) : sa place sur l'écran
-   de Dany, l'en-tête avec « Repartir à neuf » (carré de bezel 22) et les trois voyants, et
-   l'infobulle du voyant Lightroom sur une seule ligne (versions et mode), orange avec une version
-   à mettre à jour ; le segment Suivi et sa carte, en claire et en sombre.
+1. La fenêtre de 1 623 × 1 200 (contenu 1 621 × 1 166, cadre `…-grande-5`) : vue par Dany à son
+   essai du 25 octobre 2026, d'où ses retours ; après eux, l'en-tête avec « Repartir à neuf » (carré
+   de bezel 22), les deux voyants, la photo active et le bouton Suivi au bout de la rangée (carré
+   small de 56 : sa place sous « Repartir à neuf » est à faire confirmer à Dany), l'infobulle du
+   voyant Lightroom sur une seule ligne (versions et mode), orange avec une version à mettre à
+   jour ; les quatre segments refaits (Focus, Note, Aperçu, Proposition), en claire et en sombre ;
+   « Développeur v1.3.6 » dans la barre de titre.
 2. Une photo, une conversation dans le vrai Lightroom : la conversation d'une photo qui revient à
    chaque choix ; une photo neuve et son historique (le journal de Claude, les reprises à la main
    lues par `Ecriture.correctionsUtilisateur`), « Depuis la dernière fois » après une étape faite
@@ -5959,11 +6176,26 @@ encore été vu dans Lightroom. Reste à constater :
 8. Avec le vrai Claude, une retouche finie dans la fenêtre par `view_photo` avec
    `compare = before_claude` avant le résumé ; `rendu_reproductible` après un retour à l'origine et
    une seconde retouche, et l'écart dit à la fin seulement.
-9. L'onglet Suivi : la carte en texte riche (les défauts et leurs mois sur une ligne, sans coupure
-   d'un défaut au milieu), « Photos d'un défaut… » et sa fenêtre, « Retirer du carnet… » sur une
-   vraie photo désignée par Dany ; les leçons d'avant restées dans `carnet.json` après une écriture.
+9. La fenêtre Suivi (à la place de l'onglet) : son texte riche sur 600 points en 12 (les défauts
+   et leurs mois sur une ligne, sans coupure d'un défaut au milieu), ▲ ▼, sa relecture quand un
+   constat arrive, « Photos d'un défaut… » et sa fenêtre, « Retirer du carnet… » sur une vraie photo
+   désignée par Dany ; les leçons d'avant restées dans `carnet.json` après une écriture.
 10. Publication… et Consommation… par le menu seulement : le menu Fichier réduit quand une fenêtre du
     module est devant (constaté le 19 octobre 2026) gêne-t-il Dany ?
+11. Les retours de Dany dans le vrai Lightroom : un clic sur une ligne d'étape ou d'image qui change
+    d'onglet puis pose l'image (des observateurs de propriétés synchrones, supposés) ; la fenêtre
+    ouverte sur Focus, et ramenée à Focus à chaque autre photo choisie (et pas pour Obtenir ni
+    « Repartir à neuf ») ; une image de Claude qui ouvre Aperçu pendant une retouche, sans gêner la
+    proposition ni la note ; le pourquoi de l'étape qui précède une image, et la carte qui suit
+    ◀ ▶.
+12. Agrandir à 2 000 × 1 250 : la fenêtre modale entière sur l'écran de Dany (environ 1 330 de haut
+    avec la barre de titre et Fermer, pour 1 440), l'avant/après côte à côte et sa légende, une image
+    plus petite à sa vraie taille ; la photo active et Focus à la taille du cache de Lightroom.
+13. Le résumé des réglages sur de vraies photos de Dany retouchées à la main, et sur un JPEG : le
+    profil par défaut d'un JPEG (Embedded, supposé), une photo importée avec un paramètre prédéfini
+    (`editCount` à 0), et Claude qui en tient compte sans le répéter.
+14. Plus rien sur l'étalonnage : `get_status` dans Claude Desktop ne dit que le nom de l'écran, et
+    aucune remarque d'écran au premier aperçu d'une session.
 
 ## Correctif 1.3.5 : huit chantiers de la feuille de route
 

@@ -1,12 +1,17 @@
 -- essais-pourquoi.lua : « Pourquoi ? » dans la fenêtre Claude (1.3, lot 12), hors de Lightroom
 -- (LuaJIT, Lightroom simulé par Simulation.lua) : les étapes lues dans le fil (Conversation :
 -- raison, but, etape_id et photo de la réponse, annulées par undo_last, défaites par
--- revert_to_original, conversation de la 1.2 relue sans id), leur ligne d'appel qui porte le bouton
--- « Pourquoi ? » (Fil, drapeau `etape` ; fenêtre B, lot B4 : plus de repère dans le texte), leur
--- stockage en tableaux (Stockage), l'onglet Aperçu, l'ancien Pourquoi ? (« Pourquoi ? » ou clic sur
--- une étape, avant/après dans l'aperçu, carte, ◀ ▶, Détail…, Agrandir à deux images, mode suivre,
--- images arrivées quand Etapes.version change, aucune bascule automatique), Etapes.actifPour posé à
--- l'ouverture, et les consignes de la raison. Les images de l'étape (Etapes.images) et leurs réductions (Images) sont
+-- revert_to_original, conversation de la 1.2 relue sans id), leur ligne d'appel (Fil, drapeau
+-- `etape` ; fenêtre B, lot B4 : plus de repère dans le texte ; plus de bouton « Pourquoi ? » à son
+-- bout depuis le correctif 1.3.6), leur stockage en tableaux (Stockage), l'onglet Aperçu, l'ancien
+-- Pourquoi ? (un clic sur une étape, avant/après dans l'aperçu, carte, ◀ ▶, Détail…, Agrandir à
+-- deux images, mode suivre, images arrivées quand Etapes.version change, pas de bascule pour une
+-- étape), un clic sur une image du fil et une image de Claude qui arrive (correctif 1.3.6 :
+-- l'onglet Aperçu, l'image et le pourquoi de l'étape qui la précède, les classements sautés ; une
+-- proposition va dans Proposition, une photo jointe ne change pas d'onglet ; l'image d'une
+-- proposition ou une photo jointe n'a pas de pourquoi, et un clic sur celle de la proposition qui
+-- attend ouvre l'onglet Proposition ; chaque ligne d'image dit ce que fait son clic),
+-- Etapes.actifPour posé à l'ouverture, et les consignes de la raison. Les images de l'étape (Etapes.images) et leurs réductions (Images) sont
 -- remplacées ici ; essais-integration.lua les éprouve pour de bon (sips). Ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
@@ -236,15 +241,18 @@ local function champSaisie(contenu)
     error('champ de demande introuvable', 2)
 end
 
--- Le bouton « Pourquoi ? » de la ligne i de la grille du fil (montré par `q..i`).
-local function boutonPourquoi(contenu, i)
+-- Le texte montré de la ligne i de la grille du fil (sa variante visible, celle qui prend le clic :
+-- Fenetre.cliquerLigne), pour un vrai clic (S.cliquer). (Le bouton « Pourquoi ? » de la ligne,
+-- montré par `q..i`, est retiré au correctif 1.3.6 : ce clic en tient lieu.)
+local function texteDeLigne(contenu, i)
     for _, v in ipairs(vues(contenu)) do
-        if S.BOUTONS[v.genre] and v.args.title == 'Pourquoi ?' and type(v.args.visible) == 'table'
-            and table.concat(S.cles(v.args.visible), ' ') == 'q' .. i then
+        local t = v.args.title
+        local cle = type(t) == 'table' and (t.key or (t.keys and t.keys[1]))
+        if v.genre == 'static_text' and cle == 't' .. i and v.args.mouse_down and S.montreeDansFenetre(v) then
             return v
         end
     end
-    error('« Pourquoi ? » introuvable sur la ligne ' .. i, 2)
+    error('texte montré introuvable sur la ligne ' .. i, 2)
 end
 
 -- La ligne du fil d'un élément (indice dans la fenêtre de lecture) et la ligne elle-même.
@@ -443,7 +451,7 @@ end)
 
 -- Fil -------------------------------------------------------------------------------------------
 
-essai('Fil : une étape porte « Pourquoi ? » (drapeau etape), pas un appel en erreur, un aperçu ni une proposition (preview) ; un long but laisse sa place', function()
+essai("Fil : une étape porte le drapeau etape (un clic l'ouvre), pas un appel en erreur, un aperçu ni une proposition (preview) ; un long but tient dans la ligne, sans place pour « Pourquoi ? »", function()
     local c = Conversation.nouvelle()
     local etape = balance(c, 'b1', 'E1')
     local erreur = balance(c, 'b2', 'E2')
@@ -472,7 +480,7 @@ essai('Fil : une étape porte « Pourquoi ? » (drapeau etape), pas un appel en 
     end
     vrai(marquee(etape), "l'étape : " .. tostring(texteDe(etape)))
     -- La description d'une étape : son but et ses réglages changés, lus dans la réponse ; plus de
-    -- repère dans le texte (le bouton « Pourquoi ? » est à sa droite).
+    -- repère dans le texte (un clic sur la ligne ouvre l'étape).
     egal('<EM>apply_settings</EM>  étape « Claude · passe 1 : balance » · 1 réglage', texteDe(etape))
     vrai(not marquee(erreur), 'un appel en erreur')
     vrai(not marquee(apercu), 'un aperçu')
@@ -482,11 +490,15 @@ essai('Fil : une étape porte « Pourquoi ? » (drapeau etape), pas un appel en 
         vrai(l.genre ~= 'etape', 'pas de genre de ligne de plus')
         vrai(not l.texte:find('Pourquoi ?', 1, true), 'plus de repère « · Pourquoi ? » : ' .. l.texte)
     end
-    -- Le but long est coupé par « … », et la ligne laisse à droite la place du bouton.
+    -- Le but long est coupé par « … », sur toute la largeur de la ligne : plus de place gardée à
+    -- droite pour le bouton « Pourquoi ? », retiré au correctif 1.3.6.
     vrai(marquee(longue), 'étape gardée : ' .. tostring(texteDe(longue)))
     contient(texteDe(longue), '…')
-    vrai(Fil.occupe(ligneDeLAppel(longue)) <= LARGEUR - Fil.MARGE - Fil.PLACE_POURQUOI,
-        string.format('la place du bouton : %.0f', Fil.occupe(ligneDeLAppel(longue))))
+    egal(nil, Fil.PLACE_POURQUOI, 'plus de place pour « Pourquoi ? »')
+    vrai(Fil.occupe(ligneDeLAppel(longue)) <= LARGEUR - Fil.MARGE,
+        string.format('dans la ligne : %.0f', Fil.occupe(ligneDeLAppel(longue))))
+    vrai(Fil.occupe(ligneDeLAppel(longue)) > LARGEUR - Fil.MARGE - 80,
+        string.format("la ligne prend la place de l'ancien bouton : %.0f", Fil.occupe(ligneDeLAppel(longue))))
     vrai(Fil.occupe(ligneDeLAppel(apercu)) <= LARGEUR - Fil.MARGE, 'dans la largeur')
     egal('ok', lignes[1].icone or 'ok', "l'icône d'une ligne d'outil")
     -- Signature du cache : un appel en cours marqué, puis sans étape écrite, perd son bouton.
@@ -543,7 +555,7 @@ essai("Fenêtre : Etapes.actifPour posé à l'ouverture (fenêtre ouverte, puis 
     Moteur.travaille = false
 end)
 
-essai("Fenêtre : « Pourquoi ? » d'une étape ouvre l'onglet Aperçu ; l'après, puis l'avant ; Étape n sur N ; ◀ ▶ ; Détail… ; Note rend l'aperçu d'avant", function()
+essai("Fenêtre : un clic sur une étape ouvre l'onglet Aperçu ; l'après, puis l'avant ; Étape n sur N ; ◀ ▶ ; Détail… ; Note rend l'aperçu d'avant", function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     local c = Moteur.courante
@@ -554,20 +566,21 @@ essai("Fenêtre : « Pourquoi ? » d'une étape ouvre l'onglet Aperçu ; l'aprè
     demandes = {}
     ouvrirFenetre(function(p, args)
         Fenetre.rafraichir()
-        egal('notation', p.onglet)
-        -- L'aperçu de l'onglet Note : la photo active (une image de Claude existe, ◀ y mène).
+        -- Focus à l'ouverture (correctif 1.3.6), puis l'onglet Note : son aperçu, la photo active (une
+        -- image de Claude existe, ◀ y mène).
+        egal('focus', p.onglet)
+        p.onglet = 'notation'
         local defaut = p.legendeApercu
         egal('<EM>DSCF4961.RAF</EM>', defaut)
         egal(true, p.peutPrecedente)
         local n, l = ligneDe(premiere)
         egal(true, l.etape, l.texte)
-        egal(true, p['q' .. n], "« Pourquoi ? » montré sur la ligne de l'étape")
-        egal(false, p['q' .. (ligneDe(apercu))], "pas sur la ligne d'un aperçu")
-        -- « Pourquoi ? » de cette ligne, un vrai clic après une frappe sans Retour : l'onglet Aperçu,
-        -- l'après de l'étape (lu dans une tâche), sa carte ; la demande tapée ne part pas.
+        egal(nil, p['q' .. n], "plus de « Pourquoi ? » sur la ligne de l'étape (correctif 1.3.6)")
+        -- Un vrai clic sur cette ligne, après une frappe sans Retour : l'onglet Aperçu, l'après de
+        -- l'étape (lu dans une tâche), sa carte ; la demande tapée ne part pas.
         local taches = #S.taches
         S.taper(champSaisie(args.contents), 'Texte validé par le clic')
-        S.cliquer(boutonPourquoi(args.contents, n))
+        S.cliquer(texteDeLigne(args.contents, n))
         egal('Texte validé par le clic', p.saisie, 'le clic a validé le champ')
         egal(nil, Fenetre.envoiAuto, 'le clic n\'envoie pas la demande')
         p.saisie = ''
@@ -759,7 +772,7 @@ local function unTour()
     taches.sleep = dormir
 end
 
-essai("Fenêtre : images en préparation, montrées quand Etapes.version change ; mode suivre, pas après un ◀ ; aucune bascule vers Pourquoi ?", function()
+essai("Fenêtre : images en préparation, montrées quand Etapes.version change ; mode suivre, pas après un ◀ ; une étape qui arrive ne bascule pas vers Aperçu", function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     local c = Moteur.courante
@@ -828,7 +841,8 @@ essai("Fenêtre : images en préparation, montrées quand Etapes.version change 
         balance(c, 'b5', 'E5')
         Fenetre.rafraichir()
         egal('Étape 5 sur 5 · passe 1 : balance', p.etapeTitre)
-        -- Aucune bascule automatique vers Pourquoi ? : une étape qui arrive laisse l'onglet Note.
+        -- Une étape qui arrive laisse l'onglet Note (seule une image de Claude bascule vers Aperçu,
+        -- correctif 1.3.6 : essai suivant).
         p.onglet = 'notation'
         balance(c, 'b6', 'E6')
         Fenetre.rafraichir()
@@ -836,6 +850,334 @@ essai("Fenêtre : images en préparation, montrées quand Etapes.version change 
         unTour()
         egal('notation', p.onglet, 'pas de bascule')
     end)
+end)
+
+
+-- La ligne d'image du fil dont l'image est `chemin` (indice dans la fenêtre de lecture), et la ligne.
+local function ligneImage(chemin)
+    for i = 1, Fenetre.T.lignes do
+        local l = Fenetre.lignes[Fenetre.premiere + i - 1]
+        if l and l.image == chemin then
+            return i, l
+        end
+    end
+    error("ligne d'image introuvable : " .. tostring(chemin), 2)
+end
+
+-- Oublie les tâches parties depuis `depuis` sans les lancer (la réduction d'une image du fil, que
+-- le remplaçant d'Images.vignette de ces essais ne sait pas faire : seules les images des étapes).
+local function oublierTaches(depuis)
+    for i = depuis + 1, #S.taches do
+        S.taches[i] = function() end
+    end
+end
+
+essai("Fenêtre : un clic sur une ligne d'image ouvre l'onglet Aperçu : l'image, et le pourquoi de l'étape qui la précède ; sans étape avant elle, la carte le dit ; ◀ ▶ et la carte suivent ; Voir l'avant montre l'étape", function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.nouvelle()
+    local c = Moteur.courante
+    vuePhoto(c, 'w0')
+    local premiere = balance(c, 'b1', 'E1')
+    vuePhoto(c, 'w1')
+    ciel(c, 'c1', 'E2')
+    vuePhoto(c, 'w2')
+    ouvrirFenetre(function(p, args)
+        Fenetre.rafraichir()
+        egal('focus', p.onglet, "Focus à l'ouverture")
+        egal(nil, Fenetre.imageCliquee, 'les images de la conversation ne sont pas des arrivées')
+        -- Un vrai clic sur la ligne de l'image w1 (après une frappe sans Retour : la demande tapée ne
+        -- part pas) : l'onglet Aperçu, son crochet comme pour un clic sur le segment.
+        local recus = {}
+        local sur = Fenetre.surOnglet.apercu
+        Fenetre.surOnglet.apercu = function(v) recus[#recus + 1] = v; return sur(v) end
+        local taches = #S.taches
+        S.taper(champSaisie(args.contents), 'Texte validé par le clic')
+        S.cliquer(texteDeLigne(args.contents, (ligneImage('w1.jpg'))))
+        Fenetre.surOnglet.apercu = sur
+        egal(nil, Fenetre.envoiAuto, "le clic n'envoie pas la demande")
+        p.saisie = ''
+        egal('apercu', p.onglet, "l'onglet Aperçu")
+        egal('apercu', recus[1], 'un vrai clic : son crochet')
+        egal(true, Fenetre.imageCliquee, "l'image du fil montrée")
+        egal(false, Fenetre.modeEtape(), "l'aperçu montre l'image, pas l'avant/après de l'étape")
+        egal('2 sur 3 · view_photo', p.legendeApercu, "l'image cliquée")
+        egal(true, p.peutPrecedente)
+        egal(true, p.peutSuivante)
+        -- La carte : le pourquoi de l'étape qui la précède dans le fil, sans la suivre.
+        egal('E1', Fenetre.etape.id)
+        egal(false, Fenetre.etape.suivre)
+        egal('Étape 1 sur 2 · passe 1 : balance', p.etapeTitre)
+        contient(p.etapeTexte:gsub('\n', ' '), 'Pourquoi : La photo tirait vers le bleu')
+        oublierTaches(taches)
+        -- ▶ : l'image suivante, et la carte suit (l'étape qui précède w2).
+        Fenetre.changerImage(1)
+        egal('3 sur 3 · view_photo', p.legendeApercu)
+        egal('Étape 2 sur 2 · passe 2 : ciel', p.etapeTitre, 'la carte suit l\'image')
+        -- ◀ ◀ : la première image, qu'aucune étape ne précède : la carte le dit (jamais la dernière
+        -- étape à la place).
+        Fenetre.changerImage(-1)
+        Fenetre.changerImage(-1)
+        egal('1 sur 3 · view_photo', p.legendeApercu)
+        egal(nil, Fenetre.etape)
+        egal(Fenetre.TITRE_ETAPE, p.etapeTitre)
+        egal(Fenetre.SANS_ETAPE_IMAGE, (p.etapeTexte:gsub('\n', ' ')))
+        egal(false, p.etapeADetail)
+        Fenetre.rafraichir()
+        egal(nil, Fenetre.etape, 'un rafraîchissement ne choisit pas la dernière étape')
+        egal('1 sur 3 · view_photo', p.legendeApercu)
+        oublierTaches(taches)
+        -- Depuis l'onglet Note, un clic sur la ligne de w0 : de même.
+        p.onglet = 'notation'
+        egal(nil, Fenetre.imageCliquee, "un autre onglet rend l'aperçu à l'onglet")
+        Fenetre.cliquerLigne((ligneImage('w0.jpg')))
+        egal('apercu', p.onglet)
+        egal('1 sur 3 · view_photo', p.legendeApercu)
+        egal(Fenetre.SANS_ETAPE_IMAGE, (p.etapeTexte:gsub('\n', ' ')))
+        -- Un clic sur w2, puis Voir l'avant : l'aperçu montre l'avant de l'étape de la carte.
+        taches = #S.taches
+        Fenetre.cliquerLigne((ligneImage('w2.jpg')))
+        oublierTaches(taches)
+        egal('Étape 2 sur 2 · passe 2 : ciel', p.etapeTitre)
+        egal("Voir l'avant", p.titreBascule)
+        Fenetre.etape.vue = 'apres'
+        -- (La lecture de ses images, partie avec le clic, a été oubliée ci-dessus : une capture finie
+        -- la relance.)
+        Etapes.version = Etapes.version + 1
+        taches = #S.taches
+        Fenetre.basculerEtape()
+        lancerTaches(taches)
+        egal(nil, Fenetre.imageCliquee, "l'aperçu passe à l'étape")
+        egal(true, Fenetre.modeEtape())
+        egal('Étape 2 sur 2 · avant', p.legendeApercu)
+        egal(reduite('4961', 'E2-avant'), p.imageApercu)
+        -- Un clic sur une étape du fil : son avant/après, plus l'image.
+        taches = #S.taches
+        Fenetre.cliquerLigne((ligneImage('w1.jpg')))
+        oublierTaches(taches)
+        Etapes.version = Etapes.version + 1
+        taches = #S.taches
+        Fenetre.cliquerLigne((ligneDe(premiere)))
+        lancerTaches(taches)
+        egal(nil, Fenetre.imageCliquee)
+        egal('Étape 1 sur 2 · après', p.legendeApercu)
+        p.onglet = 'notation'
+    end)
+end)
+
+essai("Fenêtre : une image de Claude qui arrive ouvre l'onglet Aperçu (une bascule, sans crochet), avec le pourquoi de l'étape qui la précède ; une proposition va dans Proposition ; une photo jointe ne change pas d'onglet ; fenêtre fermée, rien", function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.nouvelle()
+    local c = Moteur.courante
+    balance(c, 'b1', 'E1')
+    ouvrirFenetre(function(p)
+        Fenetre.rafraichir()
+        egal('focus', p.onglet)
+        local recus = {}
+        local sur = Fenetre.surOnglet.apercu
+        Fenetre.surOnglet.apercu = function(v) recus[#recus + 1] = v; return sur(v) end
+        -- Claude regarde (view_photo) : son image arrive.
+        local taches = #S.taches
+        vuePhoto(c, 'w1')
+        Fenetre.rafraichir()
+        Fenetre.surOnglet.apercu = sur
+        egal('apercu', p.onglet, "l'image de Claude montre l'onglet Aperçu")
+        egal(0, #recus, 'une bascule de la fenêtre : pas de crochet')
+        egal(true, Fenetre.imageCliquee)
+        egal('1 sur 1 · view_photo', p.legendeApercu, "l'image arrivée")
+        egal('E1', Fenetre.etape.id, "le pourquoi de l'étape qui la précède")
+        egal('Étape 1 sur 1 · passe 1 : balance', p.etapeTitre)
+        oublierTaches(taches)
+        -- Une étape qui arrive ensuite ne change ni l'aperçu ni la carte (la carte suit les images).
+        ciel(c, 'c1', 'E2')
+        Fenetre.rafraichir()
+        egal('1 sur 1 · view_photo', p.legendeApercu)
+        egal('Étape 1 sur 2 · passe 1 : balance', p.etapeTitre)
+        -- Une deuxième image, l'onglet Note montré : de nouveau Aperçu, la carte devant elle.
+        p.onglet = 'notation'
+        taches = #S.taches
+        vuePhoto(c, 'w2')
+        Fenetre.rafraichir()
+        egal('apercu', p.onglet)
+        egal('2 sur 2 · view_photo', p.legendeApercu)
+        egal('Étape 2 sur 2 · passe 2 : ciel', p.etapeTitre)
+        oublierTaches(taches)
+        -- Une proposition (preview_settings, Obtenir) et son image : l'onglet Proposition, pas Aperçu.
+        p.onglet = 'notation'
+        Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = 'p1', nom = 'mcp__developpeur__preview_settings',
+            entree = { reason = 'Plus chaud', settings = { Temperature = 5800 } } } } })
+        Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = 'p1', textes = { '{}' }, images = { { donnees = 'x' } },
+            erreur = false } } }, nil, function() return 'p1.jpg' end)
+        taches = #S.taches
+        Fenetre.rafraichir()
+        oublierTaches(taches)
+        egal('proposition', p.onglet, "la proposition dans l'onglet Proposition")
+        egal(nil, Fenetre.imageCliquee)
+        -- Une photo jointe par Dany : l'onglet montré reste.
+        p.onglet = 'notation'
+        Conversation.ajouterDemande(c, 'Compare avec celle-ci', nil, { 'j1.jpg' })
+        taches = #S.taches
+        Fenetre.rafraichir()
+        oublierTaches(taches)
+        egal('notation', p.onglet, 'une photo jointe ne bascule pas')
+        egal(nil, Fenetre.imageCliquee)
+    end)
+    -- Une image arrivée fenêtre fermée (la Demande rapide, un tour fini après la fermeture) : la
+    -- fenêtre rouverte montre Focus.
+    vuePhoto(c, 'w3')
+    ouvrirFenetre(function(p)
+        Fenetre.rafraichir()
+        egal('focus', p.onglet, 'rouverte sur Focus')
+        egal(nil, Fenetre.imageCliquee)
+        Fenetre.rafraichir()
+        egal('focus', p.onglet, 'toujours Focus')
+        p.onglet = 'notation'
+    end)
+end)
+
+-- Une proposition (preview_settings, Obtenir) et son image dans le fil de `c`, rangée sous « <id>.jpg ».
+local function propositionAvecImage(c, id)
+    Conversation.appliquer(c, { genre = 'assistant', blocs = { { genre = 'outil', id = id, nom = 'mcp__developpeur__preview_settings',
+        entree = { reason = 'Plus chaud', settings = { Temperature = 5800 } } } } })
+    Conversation.appliquer(c, { genre = 'resultats', resultats = { { idOutil = id, textes = { '{}' }, images = { { donnees = 'x' } },
+        erreur = false } } }, nil, function() return id .. '.jpg' end)
+    return Conversation.propositionEnAttente(c)
+end
+
+essai("Fenêtre : l'image d'une proposition ou une photo jointe n'a pas le pourquoi d'une étape (jamais celle du tour d'avant) : un clic sur celle de la proposition qui attend ouvre l'onglet Proposition ; décidée, ou une photo jointe, l'onglet Aperçu le dit ; ◀ ▶ de même", function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.nouvelle()
+    local c = Moteur.courante
+    balance(c, 'b1', 'E1')
+    local prop = propositionAvecImage(c, 'p1')
+    vrai(prop, 'la proposition attend')
+    Conversation.ajouterDemande(c, 'Compare avec celle-ci', nil, { 'j1.jpg' })
+    ouvrirFenetre(function(p, args)
+        Fenetre.rafraichir()
+        egal('focus', p.onglet, "la proposition d'avant l'ouverture ne bascule pas")
+        -- Un vrai clic sur l'image de la proposition qui attend : l'onglet Proposition (son crochet),
+        -- qui montre son image, sa raison et Accepter ; pas l'onglet Aperçu, ni l'étape d'avant.
+        local recus = {}
+        local sur = Fenetre.surOnglet.proposition
+        Fenetre.surOnglet.proposition = function(v) recus[#recus + 1] = v; return sur(v) end
+        local taches = #S.taches
+        S.taper(champSaisie(args.contents), 'Texte validé par le clic')
+        S.cliquer(texteDeLigne(args.contents, (ligneImage('p1.jpg'))))
+        Fenetre.surOnglet.proposition = sur
+        oublierTaches(taches)
+        egal(nil, Fenetre.envoiAuto, "le clic n'envoie pas la demande")
+        p.saisie = ''
+        egal('proposition', p.onglet, "l'onglet Proposition")
+        egal('proposition', recus[1], 'un vrai clic : son crochet')
+        egal('p1.jpg', Fenetre.imageProposition and Fenetre.imageProposition.chemin, "l'image de la proposition montrée")
+        egal(nil, Fenetre.imageCliquee)
+        contient(p.legendeApercu, '1 sur 2 · ', "l'image de la proposition dans l'aperçu")
+        contient(p.propositionTexte:gsub('\n', ' '), 'Plus chaud', 'sa raison dans la carte')
+        egal(nil, Fenetre.etape, "pas l'étape du tour d'avant")
+        -- Déjà dans l'onglet Proposition, un autre clic la remontre.
+        Fenetre.imageProposition = nil
+        taches = #S.taches
+        Fenetre.cliquerLigne((ligneImage('p1.jpg')))
+        oublierTaches(taches)
+        egal('proposition', p.onglet)
+        egal('p1.jpg', Fenetre.imageProposition and Fenetre.imageProposition.chemin)
+        -- La photo jointe par Dany : l'onglet Aperçu, la carte le dit, sans l'étape du tour d'avant.
+        taches = #S.taches
+        Fenetre.cliquerLigne((ligneImage('j1.jpg')))
+        oublierTaches(taches)
+        egal('apercu', p.onglet)
+        egal(true, Fenetre.imageCliquee)
+        egal('2 sur 2 · photo jointe', p.legendeApercu)
+        egal(nil, Fenetre.etape, "pas l'étape du tour d'avant")
+        egal(Fenetre.TITRE_ETAPE, p.etapeTitre)
+        egal(Fenetre.SANS_ETAPE_JOINTE, (p.etapeTexte:gsub('\n', ' ')))
+        egal(false, p.etapeADetail)
+        -- ◀ : l'image de la proposition, dans l'onglet Aperçu ; la carte suit et le dit.
+        taches = #S.taches
+        Fenetre.changerImage(-1)
+        oublierTaches(taches)
+        egal('apercu', p.onglet)
+        contient(p.legendeApercu, '1 sur 2 · ')
+        egal(nil, Fenetre.etape)
+        egal(Fenetre.SANS_ETAPE_PROPOSITION, (p.etapeTexte:gsub('\n', ' ')))
+        -- ▶ : de nouveau la photo jointe.
+        taches = #S.taches
+        Fenetre.changerImage(1)
+        oublierTaches(taches)
+        egal(Fenetre.SANS_ETAPE_JOINTE, (p.etapeTexte:gsub('\n', ' ')))
+        -- La proposition décidée (refusée) : un clic sur son image, l'onglet Aperçu, la carte le dit.
+        prop.etat = 'refusee'
+        p.onglet = 'notation'
+        taches = #S.taches
+        Fenetre.cliquerLigne((ligneImage('p1.jpg')))
+        oublierTaches(taches)
+        egal('apercu', p.onglet)
+        egal(true, Fenetre.imageCliquee)
+        contient(p.legendeApercu, '1 sur 2 · ')
+        egal(nil, Fenetre.etape)
+        egal(Fenetre.SANS_ETAPE_PROPOSITION, (p.etapeTexte:gsub('\n', ' ')))
+        -- Une image de Claude après elles : le pourquoi de l'étape qui la précède (la proposition et
+        -- la photo jointe ne sont pas des étapes).
+        taches = #S.taches
+        vuePhoto(c, 'w1')
+        Fenetre.rafraichir()
+        oublierTaches(taches)
+        egal('apercu', p.onglet)
+        egal('E1', Fenetre.etape and Fenetre.etape.id)
+        egal('Étape 1 sur 1 · passe 1 : balance', p.etapeTitre)
+        p.onglet = 'notation'
+    end)
+end)
+
+essai("Fenêtre : le pourquoi d'une image saute les classements (set_metadata, manage_collections), qui ne changent pas l'image : la retouche qui l'a faite", function()
+    photoActive(4961, 'DSCF4961.RAF')
+    Moteur.nouvelle()
+    local c = Moteur.courante
+    local finitions = appel(c, 'a2', 'apply_settings', { step_name = 'passe 2 : finitions', reason = 'Un peu plus de présence.',
+        settings = { Vibrance = 10 } }, ecriture('passe 2 : finitions', { { 4961, 'DSCF4961.RAF', 'E1',
+        { changement('Vibrance', 0, 10, 'Vibrance') } } }))
+    local motCle = appel(c, 'm1', 'set_metadata', { step_name = 'mots-clés', reason = 'Pour retrouver la photo.' },
+        ecriture('mots-clés', { { 4961, 'DSCF4961.RAF', 'E2' } }))
+    local collection = appel(c, 'm2', 'manage_collections', { step_name = 'collection', reason = 'Rangée avec les autres.' },
+        ecriture('collection', { { 4961, 'DSCF4961.RAF', 'E3' } }))
+    vrai(Conversation.estEtape(c.elements[motCle]) and Conversation.estEtape(c.elements[collection]), 'deux étapes de classement')
+    egal(finitions, Fenetre.etapeAvant(c, #c.elements + 1), 'la retouche, pas le dernier classement')
+    ouvrirFenetre(function(p)
+        Fenetre.rafraichir()
+        -- Claude finit par l'avant/après (view_photo, compare = before_claude) : la carte montre la
+        -- retouche, pas « un classement ne change pas l'image ».
+        local taches = #S.taches
+        vuePhoto(c, 'w1')
+        Fenetre.rafraichir()
+        oublierTaches(taches)
+        egal('apercu', p.onglet)
+        egal('E1', Fenetre.etape and Fenetre.etape.id, 'la retouche')
+        contient(p.etapeTitre, 'passe 2 : finitions')
+        contient(p.etapeTexte:gsub('\n', ' '), 'Pourquoi : Un peu plus de présence.')
+        p.onglet = 'notation'
+    end)
+    -- Sans retouche avant eux, aucun pourquoi (jamais un classement).
+    Moteur.nouvelle()
+    local d = Moteur.courante
+    appel(d, 'm3', 'set_metadata', { step_name = 'mots-clés', reason = 'Pour retrouver la photo.' },
+        ecriture('mots-clés', { { 4961, 'DSCF4961.RAF', 'E4' } }))
+    egal(nil, Fenetre.etapeAvant(d, #d.elements + 1))
+end)
+
+essai("Fil : chaque ligne d'image dit ce que fait son clic (la voir, et pour une image de Claude son pourquoi), plus « cliquer pour l'agrandir »", function()
+    local c = Conversation.nouvelle()
+    vuePhoto(c, 'w1')
+    propositionAvecImage(c, 'p1')
+    Conversation.ajouterDemande(c, 'Compare avec celle-ci', nil, { 'j1.jpg' })
+    local textes = {}
+    for _, l in ipairs(Fil.lignes(c, 900)) do
+        if l.image then
+            textes[#textes + 1] = l.texte
+            vrai(not l.texte:find('agrandir', 1, true), "plus « cliquer pour l'agrandir » : " .. l.texte)
+            vrai(Fil.largeur(l.texte, 'texte') <= 900, 'la ligne tient : ' .. l.texte)
+        end
+    end
+    egal("Aperçu de Claude · cliquer pour le voir, avec son pourquoi | Avant / après · cliquer pour le voir | Photo jointe 1 · cliquer pour la voir",
+        table.concat(textes, ' | '))
 end)
 
 essai("Fenêtre : l'onglet Pourquoi ? choisi sans étape : la dernière de la photo active ; sans aucune, l'aide et l'aperçu d'avant", function()
@@ -929,9 +1271,11 @@ essai('Consignes : la raison de chaque étape, une phrase simple pour Dany, 160 
     local section = texte:sub(debut + 1, fin - 1)
     vrai(Texte.longueur(section) <= 400, string.format('section : %d caractères pour 400', Texte.longueur(section)))
     for _, morceau in ipairs({ 'reason', 'une phrase simple pour Dany', '160 caractères au plus', 'défaut vu', 'view_photo',
-        'noms français des réglages', "l'avant/après de l'étape", 'onglet Aperçu, bouton Pourquoi ? du fil', 'step_name' }) do
+        'noms français des réglages', "l'avant/après de l'étape", "onglet Aperçu, d'un clic sur l'étape du fil", 'step_name' }) do
         contient(section, morceau, 'raison de chaque étape')
     end
+    -- Plus de bouton « Pourquoi ? » dans le fil (correctif 1.3.6) : les consignes ne le nomment plus.
+    vrai(not texte:find('Pourquoi ?', 1, true), 'le bouton « Pourquoi ? » nommé dans les consignes')
     -- Entre Style et Fin d'une tâche.
     vrai(texte:find('\n## Style\n', 1, true) < debut, 'après Style')
     egal(fin, texte:find("\n## Fin d'une tâche\n", 1, true), "avant Fin d'une tâche")

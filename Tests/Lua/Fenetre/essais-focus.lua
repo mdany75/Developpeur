@@ -1,13 +1,15 @@
 -- essais-focus.lua : l'onglet Focus de la fenêtre Claude (demandé par Dany le 22 octobre 2026), hors
--- de Lightroom (LuaJIT, Lightroom simulé par Simulation.lua) : son segment entre Aperçu et
--- Proposition, sa carte (Image, Prise de vue, Mise au point : Fil.texteFocus, en 12 avec les titres
+-- de Lightroom (LuaJIT, Lightroom simulé par Simulation.lua) : son segment, le premier (correctif
+-- 1.3.6), sa carte (Image, Prise de vue, Mise au point : Fil.texteFocus, en 12 avec les titres
 -- en gras 12, page par page), les valeurs de Lightroom lues clé par clé (Lightroom.infosFocus), le
 -- connecteur imité comme pour --marquer-af (un faux `mcp-developpeur --focus`, qui recopie la
 -- vignette et répond la ligne JSON de DSCF2402 telle que le vrai la rend), la lecture dans une tâche
 -- par perl et son alarme de 5 s, le résultat gardé pour la photo (relu seulement si sa géométrie
 -- change), une autre marque (sans connecteur, « non lue (seulement les fichiers Fujifilm pour
--- l'instant) »), un connecteur muet ou absent, aucune bascule automatique vers Focus, l'aperçu des
--- autres onglets inchangé, et l'apparence sombre. Ni Claude, ni quota ; les fichiers vont dans un
+-- l'instant) »), un connecteur muet ou absent, la fenêtre ouverte sur Focus et ramenée à Focus quand
+-- une autre photo choisie montre sa conversation (correctif 1.3.6, décision de Dany du 25 octobre
+-- 2026), une image de Claude qui arrive montrée dans l'onglet Aperçu, l'aperçu des autres onglets
+-- inchangé, et l'apparence sombre. Ni Claude, ni quota ; les fichiers vont dans un
 -- dossier personnel temporaire.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
@@ -286,28 +288,29 @@ end
 
 -- Les essais ---------------------------------------------------------------------------------------
 
-essai('Segment Focus : entre Aperçu et Proposition, une variante à lui, sa carte en 12 (titres en gras 12), ▲ ▼ ; jamais un onglet d\'arrivée', function()
+essai("Segment Focus : le premier (Focus, Note, Aperçu, Proposition), une variante à lui, sa carte en 12 (titres en gras 12), ▲ ▼ ; l'onglet de l'ouverture", function()
     local ordre = {}
     for _, o in ipairs(D.onglets) do
         ordre[#ordre + 1] = o.valeur
     end
-    egal('apercu focus proposition notation suivi', table.concat(ordre, ' '), 'cinq onglets (Suivi à la place de Leçon au correctif 1.3.6)')
+    egal('focus notation apercu proposition', table.concat(ordre, ' '), 'quatre onglets dans cet ordre (correctif 1.3.6), plus de Suivi')
     egal('focus', D.ongletFocus)
-    egal('Focus', D.onglets[2].titre)
-    egal('seg-focus', D.onglets[2].image)
-    vrai(D.segments <= D.panneau, string.format('les cinq segments (%d) dans le panneau (%d)', D.segments, D.panneau))
-    -- Aucun onglet où la fenêtre bascule d'elle-même n'est Focus.
-    for _, cle in ipairs({ 'ongletParDefaut', 'ongletProposition', 'ongletNotation', 'ongletEtape', 'ongletSuivi' }) do
-        vrai(D[cle] ~= 'focus', cle .. ' : jamais Focus')
-    end
-    -- Ni Fenetre.lua ni aucun autre fichier du module ne le choisissent d'eux-mêmes.
+    egal('Focus', D.onglets[1].titre)
+    egal('seg-focus', D.onglets[1].image)
+    egal('focus', D.ongletParDefaut, "Focus à l'ouverture (décision de Dany du 25 octobre 2026)")
+    egal(nil, D.ongletSuivi, "plus d'onglet Suivi : la fenêtre Suivi")
+    vrai(D.segments <= D.panneau, string.format('les quatre segments (%d) dans le panneau (%d)', D.segments, D.panneau))
+    -- La fenêtre ne bascule d'elle-même vers Focus que par Fenetre.revenirAFocus (une autre photo
+    -- choisie qui montre sa conversation), jamais en posant l'onglet à la main.
+    local source = assert(Fichiers.lire(S.plugin .. '/Fenetre.lua'))
+    local _, bascules = source:gsub('choisirOnglet%(T%.ongletFocus%)', '')
+    egal(1, bascules, 'une seule bascule vers Focus (Fenetre.revenirAFocus)')
     for _, nom in ipairs({ 'Fenetre.lua', 'Vues.lua', 'Dispositions.lua', 'Moteur.lua', 'Conversation.lua' }) do
-        local source = assert(Fichiers.lire(S.plugin .. '/' .. nom), nom)
-        absent(source, 'choisirOnglet(T.ongletFocus', nom)
-        absent(source, 'choisirOnglet(Fenetre.T.ongletFocus', nom)
-        absent(source, "choisirOnglet('focus'", nom)
-        absent(source, 'p.onglet = T.ongletFocus', nom)
-        absent(source, "p.onglet = 'focus'", nom)
+        local texte = assert(Fichiers.lire(S.plugin .. '/' .. nom), nom)
+        absent(texte, 'choisirOnglet(Fenetre.T.ongletFocus', nom)
+        absent(texte, "choisirOnglet('focus'", nom)
+        absent(texte, 'p.onglet = T.ongletFocus', nom)
+        absent(texte, "p.onglet = 'focus'", nom)
     end
     activer(2402)
     Moteur.nouvelle()
@@ -326,33 +329,32 @@ essai('Segment Focus : entre Aperçu et Proposition, une variante à lui, sa car
             end
         end
         egal(2, fleches, '▲ ▼ de la carte Focus')
-        egal('notation', p.onglet, 'Note à l\'ouverture')
+        egal('focus', p.onglet, "Focus à l'ouverture")
+        egal(true, S.montreeDansFenetre(carte), 'sa carte montrée')
+        S.cliquer(segment(contenu, 'Note'))
         egal(false, S.montreeDansFenetre(carte), 'carte cachée hors de son onglet')
     end)
     sansErreur()
 end)
 
-essai('Fujifilm : un vrai clic sur Focus lit dans une tâche (perl, alarme de 5 s) ; la carte Image, Prise de vue, Mise au point ; l\'aperçu avec ses cadres', function()
+essai("Fujifilm : à l'ouverture, Focus montré lit dans une tâche (perl, alarme de 5 s) ; la carte Image, Prise de vue, Mise au point ; l'aperçu avec ses cadres", function()
     activer(2402)
     repondre(REPONSE_2402)
     Fichiers.supprimer(RECUS)
     Moteur.nouvelle()
+    local avant = commandesFocus()
     ouvrirFenetre(function(p, contenu)
-        lancerTaches()
-        -- Onglet caché : rien n'est lu.
-        egal(0, commandesFocus(), 'onglet caché : pas de --focus')
-        local avantApercu = p.imageApercu
-        S.cliquer(segment(contenu, 'Focus'))
+        -- Focus à l'ouverture (correctif 1.3.6) : la lecture part dans une tâche, la carte dit
+        -- qu'elle lit, l'aperçu attend.
         egal('focus', p.onglet)
-        -- La lecture part dans une tâche : la carte dit qu'elle lit, l'aperçu attend.
-        egal(0, commandesFocus(), 'rien de lu hors de la tâche')
+        egal(avant, commandesFocus(), 'rien de lu hors de la tâche')
         egal('Focus · DSCF2402.RAF (Essai)', p.focusTitre, 'le nom et la copie, avant la lecture')
         contient((p.focusTexte:gsub('\n', ' ')), "<EM>Mise au point :</EM> " .. Fil.FOCUS_EN_COURS)
         egal(Fenetre.imageVide(), p.imageApercu, 'image vide pendant la lecture')
         egal(false, p.peutPrecedente)
         egal(false, p.peutSuivante)
         lancerTaches()
-        egal(1, commandesFocus(), 'une seule lecture')
+        egal(avant + 1, commandesFocus(), 'une seule lecture')
         local commande
         for _, c in ipairs(S.dernieresCommandes) do
             if c:find(' --focus ', 1, true) then
@@ -401,16 +403,16 @@ essai('Fujifilm : un vrai clic sur Focus lit dans une tâche (perl, alarme de 5 
         lancerTaches()
         egal(dialogues + 1, #S.dialogues, 'Agrandir')
         contient(S.dialogues[#S.dialogues].title, 'DSCF2402.RAF')
-        -- Un autre onglet : l'aperçu de la photo active d'avant (avec le carré de --marquer-af),
-        -- pas la vignette de Focus.
+        -- Un autre onglet : l'aperçu de la photo active (avec le carré de --marquer-af), pas la
+        -- vignette de Focus.
         S.cliquer(segment(contenu, 'Note'))
         lancerTaches()
         vrai(p.imageApercu ~= r0.chemin, "l'aperçu de Note n'est pas celui de Focus")
-        egal(avantApercu, p.imageApercu, "l'aperçu de la photo active, inchangé")
+        egal(Fenetre.apercuActif.chemin, p.imageApercu, "l'aperçu de la photo active")
         -- Le résultat est gardé : un vrai clic de nouveau, même géométrie, rien n'est relu.
         S.cliquer(segment(contenu, 'Focus'))
         lancerTaches()
-        egal(1, commandesFocus(), 'même photo, même géométrie : rien de relu')
+        egal(avant + 1, commandesFocus(), 'même photo, même géométrie : rien de relu')
         egal(r0, Fenetre.focus, 'le résultat gardé')
         egal(r0.chemin, p.imageApercu)
         -- La photo recadrée dans Lightroom : un vrai clic relit, avec la nouvelle géométrie.
@@ -419,7 +421,7 @@ essai('Fujifilm : un vrai clic sur Focus lit dans une tâche (perl, alarme de 5 
             cadre = { CropLeft = 0.1, CropTop = 0, CropRight = 0.9, CropBottom = 1, CropAngle = 0 } }
         S.cliquer(segment(contenu, 'Focus'))
         lancerTaches()
-        egal(2, commandesFocus(), 'géométrie changée : relue')
+        egal(avant + 2, commandesFocus(), 'géométrie changée : relue')
         egal(0.1, Json.decode(recus()[2].geometrie).cadre.CropLeft)
         vrai(Fenetre.focus ~= r0, 'un nouveau résultat')
         vrai(not Fichiers.existe(r0.dossier), "la vignette d'avant s'efface")
@@ -428,7 +430,7 @@ essai('Fujifilm : un vrai clic sur Focus lit dans une tâche (perl, alarme de 5 
     sansErreur()
 end)
 
-essai('L\'onglet suit la photo active ; caché, il ne lit rien ; jamais de bascule vers Focus', function()
+essai("L'onglet suit la photo active ; caché, il ne lit rien ; case Autre photo décochée, pas de bascule ; cochée, une autre photo qui montre sa conversation ramène Focus", function()
     activer(2402)
     repondre(REPONSE_2402)
     Fichiers.supprimer(RECUS)
@@ -439,10 +441,10 @@ essai('L\'onglet suit la photo active ; caché, il ne lit rien ; jamais de bascu
         choisis[#choisis + 1] = tostring(valeur)
         return choisir(valeur)
     end
+    local surFocus, crochets = Fenetre.surOnglet.focus, 0
     local ok, erreur = pcall(ouvrirFenetre, function(p, contenu)
         lancerTaches()
-        S.cliquer(segment(contenu, 'Focus'))
-        lancerTaches()
+        egal('focus', p.onglet)
         local n = commandesFocus()
         -- Une autre photo Fujifilm devient active, l'onglet montré : sa lecture, dans une tâche.
         activer(2403)
@@ -453,13 +455,14 @@ essai('L\'onglet suit la photo active ; caché, il ne lit rien ; jamais de bascu
         egal(n + 1, commandesFocus(), 'la nouvelle photo lue')
         egal('/Volumes/Photos/Eloise/DSCF2403.RAF', recus()[#recus()].original)
         egal('focus', p.onglet)
-        -- Sur Note, une autre photo : rien n'est lu, aucune bascule.
+        -- Sur Note, une autre photo, la case Autre photo décochée (la conversation montrée reste) :
+        -- rien n'est lu, aucune bascule.
         S.cliquer(segment(contenu, 'Note'))
         activer(2402)
         Fenetre.majPhoto()
         lancerTaches()
         egal(n + 1, commandesFocus(), 'onglet caché : rien de lu')
-        egal('notation', p.onglet, 'aucune bascule vers Focus')
+        egal('notation', p.onglet, 'la conversation reste : pas de bascule vers Focus')
         -- Une lecture qui finit pendant que Note est montré ne bascule pas non plus.
         Fenetre.lireFocus(Fenetre.info.active)
         lancerTaches()
@@ -477,12 +480,36 @@ essai('L\'onglet suit la photo active ; caché, il ne lit rien ; jamais de bascu
         egal(Fenetre.FOCUS_AUCUNE_PHOTO, (p.focusTexte:gsub('\n', ' ')))
         egal('Aucune photo active', p.legendeApercu)
         egal(false, p.aImage)
+        for _, v in ipairs(choisis) do
+            vrai(v ~= 'focus', 'une bascule vers Focus sans conversation changée : ' .. table.concat(choisis, ', '))
+        end
+        -- La case cochée : Dany choisit une autre photo, sa conversation se montre, et Focus revient
+        -- d'elle-même (une bascule : sans le crochet d'un vrai clic), qui lit la photo.
+        prefs.nouvelleParPhoto = true
+        Fenetre.surOnglet.focus = function(...) crochets = crochets + 1; return surFocus(...) end
+        activer(2403)
+        Fenetre.majPhoto()
+        S.cliquer(segment(contenu, 'Note'))
+        crochets = 0
+        local lues = commandesFocus()
+        activer(2402)
+        Fenetre.majPhoto()
+        egal('focus', p.onglet, 'une autre photo : Focus revient')
+        egal('focus', choisis[#choisis], 'par une bascule de la fenêtre')
+        egal(0, crochets, 'sans le crochet d\'un vrai clic')
+        vrai(Conversation.dePhoto(Moteur.courante, 2402), 'la conversation de la photo montrée')
+        lancerTaches()
+        vrai(Fenetre.focusActif() and Fenetre.focusActif().id == 2402, 'la photo active, dans Focus')
+        vrai(commandesFocus() <= lues + 1, 'une lecture au plus (le résultat gardé de la photo)')
+        -- La même photo (sa conversation déjà montrée) : rien ne bascule.
+        S.cliquer(segment(contenu, 'Note'))
+        Fenetre.majPhoto()
+        egal('notation', p.onglet, 'la même conversation : pas de bascule')
     end)
     Fenetre.choisirOnglet = choisir
+    Fenetre.surOnglet.focus = surFocus
+    prefs.nouvelleParPhoto = false
     assert(ok, erreur)
-    for _, v in ipairs(choisis) do
-        vrai(v ~= 'focus', 'une bascule vers Focus : ' .. table.concat(choisis, ', '))
-    end
     sansErreur()
 end)
 
@@ -515,10 +542,9 @@ essai('Connecteur muet (rien de lu, code 1) ou absent : la carte le dit, l\'aper
     activer(2402)
     repondre(nil)
     Moteur.nouvelle()
-    ouvrirFenetre(function(p, contenu)
-        lancerTaches()
-        local n = commandesFocus()
-        S.cliquer(segment(contenu, 'Focus'))
+    local n = commandesFocus()
+    ouvrirFenetre(function(p)
+        -- Focus à l'ouverture : la lecture de la photo active.
         lancerTaches()
         egal(n + 1, commandesFocus(), 'le connecteur lancé')
         contient((p.focusTexte:gsub('\n', ' ')), '<EM>Mise au point :</EM> ' .. Fil.FOCUS_NON_LUE)
@@ -530,9 +556,7 @@ essai('Connecteur muet (rien de lu, code 1) ou absent : la carte le dit, l\'aper
     -- Connecteur absent (pas installé) : réinstaller.
     local connecteur = prefs.cheminConnecteur
     prefs.cheminConnecteur = S.home .. '/introuvable/mcp-developpeur'
-    local ok, erreur = pcall(ouvrirFenetre, function(p, contenu)
-        lancerTaches()
-        S.cliquer(segment(contenu, 'Focus'))
+    local ok, erreur = pcall(ouvrirFenetre, function(p)
         lancerTaches()
         contient((p.focusTexte:gsub('\n', ' ')), '<EM>Mise au point :</EM> ' .. Fil.FOCUS_SANS_CONNECTEUR)
     end)
@@ -541,15 +565,14 @@ essai('Connecteur muet (rien de lu, code 1) ou absent : la carte le dit, l\'aper
     sansErreur()
 end)
 
-essai("Onglet Focus, une ligne d'image cliquée dans le fil : l'aperçu et Agrandir montrent cette image, pas la vignette Focus", function()
+essai("Focus montré, une image de Claude arrive : l'onglet Aperçu la montre, Agrandir aussi ; de retour sur Focus, sa vignette ; un clic sur la ligne de l'image, l'onglet Aperçu", function()
     activer(2402)
     repondre(REPONSE_2402)
     Moteur.nouvelle()
     local c = Moteur.courante
     ouvrirFenetre(function(p, contenu)
         lancerTaches()
-        S.cliquer(segment(contenu, 'Focus'))
-        lancerTaches()
+        egal('focus', p.onglet)
         local r0 = Fenetre.focus
         egal(r0.chemin, p.imageApercu)
         -- Claude regarde la photo : une image dans le fil (une vraie petite image JPEG).
@@ -563,8 +586,26 @@ essai("Onglet Focus, une ligne d'image cliquée dans le fil : l'aperçu et Agran
         end)
         Fenetre.rafraichir()
         lancerTaches()
-        egal(r0.chemin, p.imageApercu, "l'onglet Focus garde sa vignette")
-        -- Un clic sur la ligne de l'image : l'aperçu la montre, l'onglet reste Focus.
+        -- L'image de Claude montre l'onglet Aperçu (correctif 1.3.6), elle dans l'aperçu.
+        egal('apercu', p.onglet, "l'image de Claude dans l'onglet Aperçu")
+        egal('1 sur 1 · view_photo', p.legendeApercu, "l'image arrivée")
+        vrai(p.imageApercu ~= r0.chemin, "plus la vignette Focus")
+        -- Agrandir : l'image, pas la vignette Focus.
+        local dialogues = #S.dialogues
+        Fenetre.agrandir()
+        lancerTaches()
+        egal(dialogues + 1, #S.dialogues, 'Agrandir')
+        local grande = S.dialogues[#S.dialogues].contents.args.value
+        contient(grande, Stockage.dossier(c.id), "l'image en grand")
+        absent(grande, r0.dossier, 'pas la vignette Focus')
+        -- Focus de nouveau : l'aperçu et Agrandir reviennent à la vignette Focus.
+        S.cliquer(segment(contenu, 'Focus'))
+        lancerTaches()
+        egal(r0.chemin, p.imageApercu)
+        Fenetre.agrandir()
+        lancerTaches()
+        contient(S.dialogues[#S.dialogues].contents.args.value, r0.dossier, 'la vignette Focus en grand')
+        -- Un clic sur la ligne de l'image, Focus montré : l'onglet Aperçu, l'image.
         local ligne
         for i = 1, Fenetre.T.lignes do
             local l = Fenetre.lignes[Fenetre.premiere + i - 1]
@@ -575,24 +616,9 @@ essai("Onglet Focus, une ligne d'image cliquée dans le fil : l'aperçu et Agran
         vrai(ligne, "la ligne de l'image dans le fil")
         Fenetre.cliquerLigne(ligne)
         lancerTaches()
+        egal('apercu', p.onglet, "un clic sur l'image : l'onglet Aperçu")
         egal('1 sur 1 · view_photo', p.legendeApercu, "l'image cliquée")
-        egal('focus', p.onglet)
-        -- Agrandir : l'image cliquée, pas la vignette Focus.
-        local dialogues = #S.dialogues
-        Fenetre.agrandir()
-        lancerTaches()
-        egal(dialogues + 1, #S.dialogues, 'Agrandir')
-        local grande = S.dialogues[#S.dialogues].contents.args.value
-        contient(grande, Stockage.dossier(c.id), "l'image cliquée en grand")
-        absent(grande, r0.dossier, 'pas la vignette Focus')
-        -- Un autre onglet, puis Focus : l'aperçu et Agrandir reviennent à la vignette Focus.
-        S.cliquer(segment(contenu, 'Note'))
-        S.cliquer(segment(contenu, 'Focus'))
-        lancerTaches()
-        egal(r0.chemin, p.imageApercu)
-        Fenetre.agrandir()
-        lancerTaches()
-        contient(S.dialogues[#S.dialogues].contents.args.value, r0.dossier, 'la vignette Focus en grand')
+        p.onglet = 'notation'
     end)
     sansErreur()
 end)
@@ -611,11 +637,10 @@ essai("Deux lectures croisées : celle d'une photo quittée finit après celle d
             taches[active.id] = #S.taches
         end
     end
-    local ok, erreur = pcall(ouvrirFenetre, function(p, contenu)
-        lancerTaches()
-        local n = commandesFocus()
-        -- La lecture de A (DSCF2402) part, lente ; Dany passe à B (DSCF2403), lu à son tour.
-        S.cliquer(segment(contenu, 'Focus'))
+    local n = commandesFocus()
+    local ok, erreur = pcall(ouvrirFenetre, function(p)
+        -- La lecture de A (DSCF2402), partie à l'ouverture (Focus montré), est lente ; Dany passe à
+        -- B (DSCF2403), lu à son tour.
         local tacheA = taches[2402]
         vrai(tacheA, 'la lecture de A')
         activer(2403)

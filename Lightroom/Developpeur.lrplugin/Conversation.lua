@@ -596,8 +596,8 @@ end
 -- Un outil qui écrit une étape « Claude · … » (Ecriture.nouvelleEtape du module) : son élément du
 -- fil garde la raison (reason) et le but (step_name) que Claude donne, puis, d'après la réponse du
 -- connecteur, les étapes écrites, chacune avec l'identifiant que le module lui a donné
--- (`etape_id` : celui de ses images avant/après, Etapes.lua). L'onglet Pourquoi ? de la fenêtre
--- les montre, photo par photo, dans l'ordre du fil (Conversation.etapes). Un outil appelé en
+-- (`etape_id` : celui de ses images avant/après, Etapes.lua). L'onglet Aperçu de la fenêtre
+-- (l'ancien onglet Pourquoi ?) les montre, photo par photo, dans l'ordre du fil (Conversation.etapes). Un outil appelé en
 -- proposition seulement (preview = true) n'écrit pas d'étape.
 
 Conversation.OUTILS_ETAPES = {
@@ -795,8 +795,9 @@ function Conversation.infoEtape(e)
 end
 
 -- Vrai pour l'élément d'une étape de Claude : un outil qui en écrit, pas en erreur, avec les
--- étapes de sa réponse ; ou en cours, avec son but (step_name). Sa ligne du fil porte le bouton
--- « Pourquoi ? » (le drapeau `etape` de la ligne, Vues.ligneFil).
+-- étapes de sa réponse ; ou en cours, avec son but (step_name). Sa ligne du fil porte le drapeau
+-- `etape` : un clic sur elle l'ouvre dans l'onglet Aperçu (le bouton « Pourquoi ? » à son bout est
+-- retiré au correctif 1.3.6).
 function Conversation.estEtape(e)
     if type(e) ~= 'table' or e.genre ~= 'outil' or e.etat == 'erreur' or not Conversation.OUTILS_ETAPES[e.outil] then
         return false

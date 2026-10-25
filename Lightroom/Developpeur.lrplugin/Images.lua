@@ -105,7 +105,6 @@ function Images.dimensions(chemin)
     return l, h
 end
 
--- La version à montrer en grand, qui tient dans largeur × hauteur : chemin, largeur, hauteur.
 -- Le point de mise au point d'un fichier Fujifilm dessiné sur sa vignette (l'aperçu de la photo
 -- active) par le connecteur, qui lit l'original (`mcp-developpeur --marquer-af`, temps borné) :
 -- `geometrie` comme la décrit Vignettes.decrireVignette. Rend le chemin de la vignette marquée
@@ -127,7 +126,7 @@ end
 
 -- L'onglet Focus (demandé par Dany le 22 octobre 2026) : le connecteur lit la mise au point dans
 -- l'original d'un fichier Fujifilm (`mcp-developpeur --focus`, cinq secondes au plus par l'alarme de
--- perl, comme --ecran ; il borne lui-même l'ouverture de l'original à 2 s), dessine ses cadres sur la
+-- perl ; il borne lui-même l'ouverture de l'original à 2 s), dessine ses cadres sur la
 -- vignette `source` (`<nom>-focus.jpg` à côté) et répond d'une ligne JSON. Rend cette réponse
 -- décodée (à lire seulement, jamais à donner à Lightroom : elle porte des métatables) et le chemin
 -- de la vignette marquée (nil sans dessin) ; nil : connecteur absent, original inconnu, rien de lu,
@@ -164,14 +163,21 @@ function Images.lireFocus(connecteur, original, geometrie, source)
     return json, (json.dessinee == true and Fichiers.existe(sortie)) and sortie or nil
 end
 
+-- La version à montrer en grand (Agrandir), qui tient dans largeurMax × hauteurMax : chemin,
+-- largeur, hauteur. Une image plus grande est réduite (sips, rangée dans .vignettes à côté) ; une
+-- image qui y tient est montrée à sa vraie taille, jamais étirée ni recompressée : son propre
+-- chemin et ses dimensions (correctif 1.3.6, décision de Dany du 25 octobre 2026). nil : illisible.
 function Images.grande(dossier, nom, largeurMax, hauteurMax)
     local source = LrPathUtils.child(dossier, nom)
     local l, h = Images.dimensions(source)
     if not l or not h then
         return nil
     end
-    local echelle = math.min(largeurMax / l, hauteurMax / h, 1)
-    local lf, hf = math.floor(l * echelle), math.floor(h * echelle)
+    if l <= largeurMax and h <= hauteurMax then
+        return source, l, h
+    end
+    local echelle = math.min(largeurMax / l, hauteurMax / h)
+    local lf, hf = math.max(1, math.floor(l * echelle)), math.max(1, math.floor(h * echelle))
     local base = LrPathUtils.removeExtension(LrPathUtils.leafName(nom))
     local destination = LrPathUtils.child(LrPathUtils.child(dossier, '.vignettes'), string.format('%s-%dx%d.jpg', base, lf, hf))
     if not Fichiers.existe(destination) then

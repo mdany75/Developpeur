@@ -424,30 +424,6 @@ final class MCPServerTests: XCTestCase {
         XCTAssertTrue(avecRaison.contains("export_photos") && avecRaison.contains("set_metadata"), "\(avecRaison)")
     }
 
-    /// La remarque de l'écran ne vient qu'avec une image : un aperçu réussi sans image ne la
-    /// consomme pas, elle attend l'aperçu suivant.
-    func testRemarqueDeLEcranSeulementAvecUneImage() {
-        let tools = ToolHandler(lightroom: fake)
-        var lectures = 0
-        tools.lireEcran = { lectures += 1; return Ecran.Etat(principal: EcranTests.odyssey) }
-        var sansImage = ToolResult(text: "{}")
-        XCTAssertFalse(sansImage.porteUneImage)
-        tools.ajouterRemarqueEcran(&sansImage, outil: "preview_settings")
-        XCTAssertEqual(sansImage.content.count, 1, "pas de remarque sans image")
-        XCTAssertEqual(lectures, 0, "l'écran n'est pas encore lu")
-        var avecImage = ToolResult(content: [.image(base64: "AA==", mimeType: "image/jpeg"), .text("{}")])
-        XCTAssertTrue(avecImage.porteUneImage)
-        tools.ajouterRemarqueEcran(&avecImage, outil: "preview_settings")
-        XCTAssertEqual(avecImage.content.last, .text(Ecran.remarque(EcranTests.odyssey) ?? ""))
-        XCTAssertEqual(avecImage.content.count, 3)
-        // Une image d'un outil qui n'est pas un aperçu (planche contact) ne la porte pas.
-        let autre = ToolHandler(lightroom: fake)
-        autre.lireEcran = { Ecran.Etat(principal: EcranTests.odyssey) }
-        var planche = ToolResult(content: [.image(base64: "AA==", mimeType: "image/jpeg")])
-        autre.ajouterRemarqueEcran(&planche, outil: "contact_sheet")
-        XCTAssertEqual(planche.content.count, 1)
-    }
-
     /// Les consignes nomment read_composition pour recadrer, une seule fois, sous la limite.
     func testConsignesNommentReadComposition() {
         let consignes = ServerInfo.instructions

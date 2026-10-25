@@ -132,24 +132,23 @@ public final class Recette {
         }
     }
 
-    /// Écran nommé (1.2) : get_status dit l'écran principal du Mac, sans le chemin de son profil.
-    /// La lecture de l'écran n'est posée dans les outils que le temps de l'étape : la remarque d'un
-    /// aperçu ne doit jamais s'ajouter aux view_photo de la recette (appel recolle les blocs de texte
-    /// avant de lire le JSON), et get_status la tient pour dite.
+    /// Écran nommé (1.2) : get_status dit le nom de l'écran principal du Mac, et rien de son profil
+    /// ni de son étalonnage (correctif 1.3.6). La lecture de l'écran n'est posée dans les outils que
+    /// le temps de l'étape, comme avant : les autres étapes ne lisent jamais l'écran.
     func sequenceEcran() {
         try? etape("Mac", "écran nommé (get_status)") {
             tools.lireEcran = lireEcran
             defer { tools.lireEcran = { nil } }
             let (statut, _) = try appel("get_status", [:])
-            guard let ecran = statut["ecran"], let principal = ecran["principal"] else {
+            guard let ecran = statut["ecran"] else {
                 throw Echec(description: "aucun écran lu (session sans écran ?)")
             }
-            let classes = Ecran.Etalonnage.allCases.map(\.rawValue)
-            try verifier(principal["nom"]?.string?.isEmpty == false, "écran sans nom : \(JSONCoding.line(principal))")
-            try verifier(classes.contains(principal["etalonnage"]?.string ?? ""), "classe inconnue : \(JSONCoding.line(principal))")
-            try verifier(!JSONCoding.line(ecran).contains("\"chemin\""), "le chemin du profil est allé à Claude")
+            let nom = ecran["nom"]?.string ?? ""
+            try verifier(!nom.isEmpty, "écran sans nom : \(JSONCoding.line(ecran))")
+            try verifier(Set(ecran.object.map { Array($0.keys) } ?? []).isSubset(of: ["nom", "autres"]),
+                         "plus que le nom de l'écran est allé à Claude : \(JSONCoding.line(ecran))")
             let autres = ecran["autres"]?.array?.count ?? 0
-            return (principal["texte"]?.string ?? "?") + (autres > 0 ? " ; \(autres) autre(s) écran(s)" : "")
+            return nom + (autres > 0 ? " ; \(autres) autre(s) écran(s)" : "")
         }
     }
 

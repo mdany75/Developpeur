@@ -114,13 +114,14 @@ end
 --   la ligne d'un appel d'outil est un texte riche (le nom en <EM>, Menlo), et les autres variantes
 --   reçoivent le texte sans balise (une variante cachée ne voit jamais une balise qu'elle ne sait
 --   pas montrer) ;
---   « Pourquoi ? » à droite d'une étape (`q..i`), un carré small dans une rangée poussée à droite
---   par margin_left (constaté le 21 octobre 2026, D6 : il répond, et la rangée ne prend pas les
---   clics du texte) ; la rangée d'actions selon `x..i` (« ☆ Voir la note » ; « ＋ Garder la
---   demande » à droite après une retouche : Fil.lireActions), en variantes superposées.
--- Un clic sur le texte est réparti par Fenetre.cliquerLigne (image dans l'aperçu, étape, sinon
--- détail d'un outil) ; les boutons appellent F.pourquoi, F.voirNote et F.garderDemande, qui
--- relisent la ligne.
+--   la rangée d'actions selon `x..i` (« ☆ Voir la note » ; « ＋ Garder la demande » à droite après
+--   une retouche : Fil.lireActions), en variantes superposées, des carrés small dans des rangées
+--   poussées à droite par margin_left (constaté le 21 octobre 2026, D6 : ils répondent, et la
+--   rangée ne prend pas les clics du texte).
+-- Un clic sur le texte est réparti par Fenetre.cliquerLigne (une image ou une étape dans l'onglet
+-- Aperçu, sinon le détail d'un outil : « Pourquoi ? », au bout d'une étape, est retiré au
+-- correctif 1.3.6, décision de Dany du 25 octobre 2026) ; les boutons appellent F.voirNote et
+-- F.garderDemande, qui relisent la ligne.
 function Vues.ligneFil(f, F, i, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local largeur = D.texteFil
@@ -163,18 +164,11 @@ function Vues.ligneFil(f, F, i, D)
     for _, colonne in pairs(enRetrait) do
         texte[#texte + 1] = f:column(colonne)
     end
-    -- « Pourquoi ? » : l'étape de cette ligne dans l'onglet Aperçu (F.pourquoi).
-    texte[#texte + 1] = f:row {
-        margin_left = largeur - D.pourquoi,
-        F.bouton(f, { carre = true, size = 'small', title = "Pourquoi ?", font = P.petit, width = D.pourquoi,
-            tooltip = "Pourquoi cette étape : son avant/après et sa raison (onglet Aperçu)", visible = F.si('q' .. i),
-            action = function() F.pourquoi(i) end }),
-    }
     -- Les actions d'une notation : « ☆ Voir la note » (onglet Note), à la place des icônes de la
     -- maquette (un glyphe dans le titre : une icône d'image_name chevaucherait le titre, constaté
     -- B3). Après une retouche, « ＋ Garder la demande » (Mes demandes) au bout de la même ligne, à
-    -- droite, comme « Pourquoi ? » au bout d'une étape : une rangée poussée par margin_left (D6).
-    -- (« Leçon de la photo » est retiré avec la leçon au correctif 1.3.6.)
+    -- droite : une rangée poussée par margin_left (D6). (« Leçon de la photo » est retiré avec la
+    -- leçon au correctif 1.3.6, comme « Pourquoi ? » au bout d'une étape.)
     local actions = 'x' .. i
     texte[#texte + 1] = f:column {
         place = 'overlapping',
@@ -263,8 +257,10 @@ function Vues.voyant(f, F, v)
     }
 end
 
--- Les trois voyants de l'en-tête : Claude Code (sans clic), la liaison (un clic la démarre) et
--- l'écran principal du Mac (un clic le relit), en tête du centre.
+-- Les deux voyants de l'en-tête : Claude Code (sans clic) et la liaison (un clic la démarre), en
+-- tête du centre ; dans leur rangée, au bout à droite, le bouton Suivi (Vues.boutonSuivi). Le
+-- voyant Écran (de la 1.2) est retiré au correctif 1.3.6 (décision de Dany du 25 octobre 2026 :
+-- plus rien sur l'étalonnage de l'écran).
 function Vues.voyantClaude(f, F, D)
     return Vues.voyant(f, F, { etat = 'etatClaude', texte = 'texteClaude', largeur = D.voyantClaude, police = F.POLICES.systeme12,
         couleur = F.COULEURS.texte, infobulle = "Claude Code, avec votre forfait claude.ai (pas de clé d'API)" })
@@ -282,15 +278,15 @@ function Vues.voyantLightroom(f, F, D)
         end })
 end
 
--- L'écran principal du Mac (de la 1.2 ; en bas du volet jusqu'au correctif 1.3.6) : un clic le
--- relit et donne son détail.
-function Vues.voyantEcran(f, F, D)
-    return Vues.voyant(f, F, { etat = 'etatEcran', texte = 'texteEcran', largeur = D.voyantEcran, police = F.POLICES.systeme12,
-        couleur = F.COULEURS.texte, infobulle = "Écran principal du Mac et son profil de couleur ; un clic donne le détail",
-        action = function()
-            F.annulerEnvoiAuto()
-            F.enTache(F.montrerEcran)
-        end })
+-- Le bouton Suivi, en haut à droite (décision de Dany du 25 octobre 2026, correctif 1.3.6 : au bout
+-- de la rangée des voyants, après la photo active, sous « Repartir à neuf ») : le carnet de
+-- progrès dans sa fenêtre à part (F.ouvrirSuivi, FenetreSuivi.lua), comme Publication et
+-- Consommation, à la place de l'onglet Suivi. Un carré small comme les boutons d'actions du fil
+-- (bezel de 15, D6), son titre en petit ; toujours actif : le carnet se lit sans Claude.
+function Vues.boutonSuivi(f, F, D)
+    return F.bouton(f, { carre = true, size = 'small', title = "Suivi", font = F.POLICES.petit, width = D.boutonSuivi,
+        place_vertical = 0.5, tooltip = "Le carnet de progrès (ce que Claude a constaté de vos prises de vue), dans une fenêtre à part",
+        action = function() F.ouvrirSuivi() end })
 end
 
 -- Le bandeau, dans la place du menu Modèle de la maquette (D.bandeau, retiré : décision de Dany) :
@@ -332,8 +328,9 @@ end
 -- trois radios sont retirés au correctif 1.3.6 : la fenêtre suit la préférence `mode` du
 -- Gestionnaire), « Repartir à neuf » (F.repartir : une conversation neuve pour la photo seule,
 -- l'ancienne mise de côté ; grisé pendant que Claude travaille et sans photo seule) ; dessous, les
--- voyants Claude Code, Lightroom et Écran, et la photo active (`infoPhoto`, texte riche : nom et
--- sélection en <EM>).
+-- voyants Claude Code et Lightroom, la photo active (`infoPhoto`, texte riche : nom et sélection en
+-- <EM>), puis le bouton Suivi (Vues.boutonSuivi) au bout de la rangée, en haut à droite, sous
+-- « Repartir à neuf ».
 function Vues.entete(f, F, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     return f:column {
@@ -357,10 +354,10 @@ function Vues.entete(f, F, D)
             f:spacer { width = D.ecartVoyants },
             Vues.voyantLightroom(f, F, D),
             f:spacer { width = D.ecartVoyants },
-            Vues.voyantEcran(f, F, D),
-            f:spacer { fill_horizontal = 1 },
             f:static_text { title = bind 'infoPhoto', font = P.systeme12, text_color = C.gris, emphasis_font = P.systeme12,
                 emphasis_color = C.texte, alignment = 'right', width = D.info, truncation = 'middle' },
+            f:spacer { width = D.ecartVoyants },
+            Vues.boutonSuivi(f, F, D),
         },
     }
 end
@@ -479,9 +476,10 @@ end
 
 -- Colonne droite ---------------------------------------------------------------------------------
 
--- Les segments Aperçu | Focus | Proposition | Note | Suivi, centrés en tête du panneau : chacun son image et
--- sa variante bleue (-actif, montrée quand `onglet` vaut sa valeur), sous un calque dont le
--- clic choisit l'onglet (F.choisirSegment : un vrai clic, son crochet suit). Ni survol, ni focus.
+-- Les segments Focus | Note | Aperçu | Proposition (D.onglets, Dispositions.ONGLETS), centrés en
+-- tête du panneau : chacun son image et sa variante bleue (-actif, montrée quand `onglet` vaut sa
+-- valeur), sous un calque dont le clic choisit l'onglet (F.choisirSegment : un vrai clic, son
+-- crochet suit). Ni survol, ni focus.
 function Vues.segments(f, F, D)
     local r = { spacing = 0, margin_left = D.margeSegments, height = D.hauteurSegments }
     for _, onglet in ipairs(D.onglets) do
@@ -499,7 +497,7 @@ function Vues.segments(f, F, D)
     return f:row(r)
 end
 
--- L'aperçu commun aux cinq onglets : ce que Claude regarde, ou la photo active, dans un cadre 3:2
+-- L'aperçu commun aux quatre onglets : ce que Claude regarde, ou la photo active, dans un cadre 3:2
 -- fixe de D.apercu × D.apercuHauteur (une réduction en 2x centrée sur le fond, Images.vignette,
 -- ou l'image « aucun aperçu »), au milieu d'une bande du fond de l'aperçu à la largeur du panneau.
 function Vues.apercu(f, F, D)
@@ -515,7 +513,7 @@ function Vues.apercu(f, F, D)
     }
 end
 
--- Sous l'aperçu, dans les cinq onglets : ◀ légende ▶ (les images de la conversation et la photo
+-- Sous l'aperçu, dans les quatre onglets : ◀ légende ▶ (les images de la conversation et la photo
 -- active, Fenetre.changerImage), puis « ⤢ Agrandir » à droite. La légende est un texte riche (le
 -- nom de la photo active en <EM>), à emphase de même taille que le texte (constaté D4 : une
 -- emphase plus grande couperait la ligne).
@@ -648,27 +646,8 @@ function Vues.focus(f, F, largeur, D)
     }, 'focus', {})
 end
 
--- La carte de l'onglet Suivi (le carnet de progrès, à la place de Leçon au correctif 1.3.6 ; la
--- page Carnet de progrès du fil est retirée avec le volet), sur son image (carte-suivi, à la largeur
--- intérieure du panneau) : son titre en gras 12 (`suiviTitre`, « Carnet de progrès »), puis le
--- résumé du carnet, ses constats seulement, page par page (`suiviTexte`, D.suiviLignes lignes en 12,
--- coupées par Fenetre.montrerPage : ses intertitres et les défauts en <EM>, gras de même taille,
--- Fil.texteSuivi) ; sous la carte, ▲ ▼, puis « Photos d'un défaut… » (la fenêtre des photos d'un
--- défaut, et son « Retirer du carnet… » : Fenetre.choisirDefaut), actif quand le résumé montre des
--- défauts (`suiviADefauts`).
-function Vues.suivi(f, F, largeur, D)
-    local bind, C, P = F.bind, F.COULEURS, F.POLICES
-    return carteEtRangee(f, F, largeur, D, 'carte-suivi', {
-        f:static_text { title = bind 'suiviTitre', font = P.gras12, text_color = C.texte, width = D.largeurSuivi,
-            truncation = 'tail' },
-        f:static_text { title = bind 'suiviTexte', font = P.texte12, text_color = C.texte, emphasis_font = P.gras12,
-            emphasis_color = C.texte, width = D.largeurSuivi, height_in_lines = D.suiviLignes },
-    }, 'suivi', {
-        F.bouton(f, { carre = true, bezel = 26, title = "Photos d'un défaut…", font = P.systeme13, width = D.photosDefaut,
-            tooltip = "Les photos où un défaut du carnet a été vu, et « Retirer du carnet… »", enabled = bind 'suiviADefauts',
-            action = function() F.enTache(F.choisirDefaut) end }),
-    })
-end
+-- (La carte de l'onglet Suivi, Vues.suivi, est retirée au correctif 1.3.6 : le carnet de progrès a
+-- sa fenêtre à part, FenetreSuivi.lua, ouverte par le bouton Suivi de l'en-tête.)
 
 -- Note -------------------------------------------------------------------------------------------
 -- La carte Note de la photo active (fenêtre B, lot B5 : la maquette « B · Conversation claire »,

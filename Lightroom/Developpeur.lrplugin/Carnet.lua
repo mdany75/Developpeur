@@ -20,8 +20,8 @@
 --           read_composition) ; refusé seulement si la géométrie est touchée (recadrage tourné,
 --           Upright, perspective ou distorsion manuelle), pas après une passe de tonalité ;
 --   vocabulaire : la liste des défauts du connecteur (PriseDeVue.vocabulaire) ; les codes de la vue
---           et de l'angle doivent y être. Elle est rangée (la carte Suivi de la fenêtre en tire
---           libellés et conseils) : aucune liste de défauts n'est écrite dans ce module.
+--           et de l'angle doivent y être. Elle est rangée (la fenêtre Suivi en tire libellés et
+--           conseils) : aucune liste de défauts n'est écrite dans ce module.
 -- Tout constat est refusé si la case Carnet est décochée (préférence carnet), et pour une photo
 -- de « Développeur › Essais » (Carnet.estPhotoDEssai), sauf avec essai_recette = true, que seule la
 -- recette envoie : la photo d'essai a alors son entrée à elle, jamais celle de son original (une
@@ -31,8 +31,8 @@
 -- Le résumé (Carnet.resumer) compte, pour chaque défaut et par mois de prise de vue (les six
 -- derniers qui ont des photos), les photos où il a été trouvé sur celles où il a été cherché ; il
 -- dit ce qui progresse ou recule, et quoi travailler à la prochaine sortie. Ses phrases ne sont
--- écrites qu'ici : la carte de l'onglet Suivi (fenêtre ; la page du carnet jusqu'au correctif
--- 1.3.6) et export_journal (serveur) les reprennent.
+-- écrites qu'ici : la fenêtre Suivi (FenetreSuivi.lua ; la page du carnet jusqu'au correctif
+-- 1.3.6, puis un onglet Suivi de la fenêtre Claude) et export_journal (serveur) les reprennent.
 --
 -- Un seul fichier pour tous les catalogues : chacun garde sa table, sous son chemin (un
 -- identifiant de photo ne vaut que dans son catalogue) ; changer de catalogue ne fait rien perdre
@@ -112,12 +112,12 @@ Carnet.MIN_A_TRAVAILLER = 2
 Carnet.MAX_A_TRAVAILLER = 3
 Carnet.PHOTOS_SUFFISANTES = 5
 
--- Les mois en français : nom entier et abrégé (les mois de la carte Suivi, la légende de l'aperçu).
+-- Les mois en français : nom entier et abrégé (les mois de la fenêtre Suivi, la légende de l'aperçu).
 Carnet.MOIS = { 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre',
     'novembre', 'décembre' }
 Carnet.MOIS_COURTS = { 'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.' }
 
--- Titres du résumé, repris par la carte Suivi de la fenêtre et par export_journal.
+-- Titres du résumé, repris par la fenêtre Suivi et par export_journal.
 Carnet.TITRES = {
     carnet = "Carnet de progrès",
     defaut = "Défaut",

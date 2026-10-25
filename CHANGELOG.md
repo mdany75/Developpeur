@@ -5,9 +5,13 @@
 Le correctif 1.3.6, « une photo, une conversation », décidé avec vous le 25 octobre 2026 : chaque
 photo a sa conversation, qui s'ouvre sur son historique ; la fenêtre Claude s'allège (plus de volet
 à gauche, plus de rangée Mode) ; la leçon de la photo et « Je le fais » sont retirés. Avec lui, la
-balance des blancs de toute l'image et la Demande rapide revue. Après l'installation : quitter puis
-relancer Lightroom (le module gagne un fichier : un rechargement ne suffit pas), rouvrir Claude
-Desktop et ouvrir une nouvelle session de Claude Code (le connecteur passe à 35 outils).
+balance des blancs de toute l'image et la Demande rapide revue, puis vos retours après l'essai du
+même jour : un clic sur une étape à la place de « Pourquoi ? », les onglets Focus, Note, Aperçu et
+Proposition, Agrandir plus grand, le carnet de progrès dans la fenêtre Suivi, plus rien sur
+l'étalonnage de l'écran, les réglages d'une photo sans étape de Claude et la version dans la barre
+de titre. Après l'installation : quitter puis relancer Lightroom (le module gagne deux fichiers : un
+rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code
+(le connecteur passe à 35 outils).
 
 ### Ajouté
 - Une photo, une conversation, dans la fenêtre Claude : choisir une seule photo dans Lightroom
@@ -16,8 +20,11 @@ Desktop et ouvrir une nouvelle session de Claude Code (le connecteur passe à 35
 - L'historique de la photo : une photo qui n'a pas encore de conversation en commence une, qui
   s'ouvre sur ses étapes de Claude (avec leur raison et leur date, qu'elles viennent de la fenêtre,
   de la Demande rapide ou de Claude Desktop) et sur ce que vous avez repris à la main depuis la
-  dernière. Elle n'est gardée sur le disque qu'à votre première demande : parcourir des centaines
-  de photos ne crée aucun fichier.
+  dernière. Une photo sans étape de Claude y montre ses réglages qui s'écartent de leur valeur par
+  défaut (par exemple « Profil Camera CLASSIC CHROME · Balance 5 600 K / +8 · Exposition +0,45 ·
+  Ombres +30 · Recadrée · 2 masques », le profil sous le nom que Lightroom lui donne), que Claude
+  reçoit aussi. Elle n'est gardée sur le disque qu'à
+  votre première demande : parcourir des centaines de photos ne crée aucun fichier.
 - « Depuis la dernière fois » : quand vous revenez à une photo qui a changé depuis que sa
   conversation l'a vue (une étape de Claude faite ailleurs, une reprise à la main), une ligne du fil
   dit ce qui a changé ; rien de changé, rien d'ajouté. L'historique et ce complément sont faits par
@@ -32,20 +39,32 @@ Desktop et ouvrir une nouvelle session de Claude Code (le connecteur passe à 35
   avec son historique. L'ancienne reste sur le disque, mise de côté, jamais effacée. Grisé pendant
   que Claude travaille, sans photo seule, ou quand la conversation montrée n'est pas celle de la
   photo active.
-- L'onglet Suivi, à la place de l'onglet Leçon : le carnet de progrès (ses constats), page par
-  page avec ▲ ▼ ; « Photos d'un défaut… », sous la carte, montre les photos d'un défaut et permet de
-  les retirer du carnet. Il ne s'ouvre que par un clic.
+- Le bouton Suivi, en haut à droite de l'en-tête de la fenêtre Claude : le carnet de progrès (ses
+  constats) dans une fenêtre à part, comme Publication et Consommation, page par page avec ▲ ▼ ;
+  « Photos d'un défaut… » montre les photos d'un défaut et permet de les retirer du carnet.
 - Trois boutons dans la Demande rapide, à gauche de la demande, chacun une demande toute faite pour toutes
   les photos sélectionnées : noter (Claude pose ses notes, de 0 à 5 ★ ou un rejet), Retouche pro
   et Portrait, comme les invites de la fenêtre Claude.
 
 ### Changé
 - La fenêtre Claude passe à 1 623 × 1 200 points (1 948 de large avant), sans le volet de gauche ;
-  le fil garde sa largeur. Les trois voyants (Claude Code, Lightroom, Écran) sont dans l'en-tête.
+  le fil garde sa largeur. Les deux voyants (Claude Code, Lightroom) sont dans l'en-tête. Sa barre
+  de titre dit la version du module : « Développeur v1.3.6 » (la Demande rapide garde son titre).
   Les versions du module et du connecteur, et le mode de la liaison, sont dans l'infobulle du
   voyant Lightroom, qui passe à l'orange quand l'une des deux versions est à mettre à jour ou que
   le connecteur est introuvable. Publication… et Consommation… s'ouvrent par Fichier › Module
   externe - Extras.
+- Les onglets de droite sont, dans l'ordre, Focus, Note, Aperçu et Proposition. La fenêtre s'ouvre
+  sur Focus et y revient chaque fois que vous choisissez une autre photo ; une proposition qui
+  attend déjà garde son onglet sans reprendre la main.
+- Un clic sur une étape de Claude dans le fil ouvre l'onglet Aperçu : son avant/après au-dessus, sa
+  raison dans la carte (ce que faisait « Pourquoi ? »). Un clic sur une image du fil l'y montre
+  aussi, avec le pourquoi de l'étape qui la précède ; l'image de la proposition qui attend votre
+  accord s'ouvre dans l'onglet Proposition, et une photo jointe n'a pas de pourquoi.
+- Les onglets suivent Claude d'eux-mêmes : chaque nouvelle image de Claude (un aperçu, une
+  comparaison) ouvre l'onglet Aperçu, une proposition l'onglet Proposition, une note l'onglet Note.
+- Agrandir montre l'image jusqu'à 2 000 × 1 250 points (1 100 × 740 avant), l'avant et l'après
+  côte à côte ensemble dans ce cadre ; une image plus petite garde sa vraie taille, jamais étirée.
 - Le mode (Appliquer directement, ou Proposer d'abord) se règle seulement dans le Gestionnaire de
   modules externes (section Liaison avec Claude, « Avant d'appliquer ») ; la fenêtre suit ce
   réglage.
@@ -82,9 +101,9 @@ Desktop et ouvrir une nouvelle session de Claude Code (le connecteur passe à 35
   chaque avant/après de ce genre, même avant d'être finie, et un écart trop grand vous est dit à la
   fin de la retouche.
 - Le menu « Afficher la fenêtre de suivi » devient « Afficher la fenêtre de la liaison » (le bouton
-  du Gestionnaire de modules externes aussi) : le mot « Suivi » est maintenant celui de l'onglet du
-  carnet.
-- Le carnet de progrès (`export_journal` avec `notebook`, onglet Suivi) ne montre plus que les
+  du Gestionnaire de modules externes aussi) : le mot « Suivi » est maintenant celui du carnet de
+  progrès.
+- Le carnet de progrès (`export_journal` avec `notebook`, fenêtre Suivi) ne montre plus que les
   constats ; les leçons déjà rangées restent dans `carnet.json`, telles quelles, sans être montrées.
 
 ### Retiré
@@ -93,6 +112,10 @@ Desktop et ouvrir une nouvelle session de Claude Code (le connecteur passe à 35
   Carnet de progrès du fil, avec « Demander à Claude ce qu'il en pense › » : pour son avis,
   demandez-le-lui (« Comment progressent mes prises de vue ? »).
 - La rangée Mode de l'en-tête (Appliquer, Proposer d'abord, Je le fais).
+- Le bouton « Pourquoi ? » au bout des étapes du fil : un clic sur la ligne de l'étape en tient
+  lieu.
+- Plus rien sur l'étalonnage de l'écran : ni voyant Écran, ni remarque de Claude sur un écran non
+  étalonné ; `get_status` ne dit plus que le nom de l'écran.
 - La case « À l'ouverture » du Gestionnaire de modules externes (section Fenêtre Claude), avec la
   proposition qu'elle faisait préparer à l'ouverture de la fenêtre : Obtenir la remplace. Si vous
   l'aviez décochée, ce réglage est simplement ignoré.

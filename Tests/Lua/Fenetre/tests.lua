@@ -523,7 +523,9 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
     S.selection = { S.photoActive }
     local vues = 0
     S.pendantFenetre = function(args)
-        egal('Développeur', args.title)
+        -- « Développeur v1.3.6 » : la version du module (correctif 1.3.6, décision de Dany).
+        egal('Développeur v' .. require('Composants').module(), args.title)
+        vrai(args.title:match('^Développeur v%d+%.%d+'), args.title)
         -- La Conversation claire, seule disposition, toujours en grande taille (fenêtre B sans son
         -- volet : FORME 5, correctif 1.3.6).
         egal('DeveloppeurClaude-conversation-grande-5', args.save_frame)
@@ -575,10 +577,9 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
         end)
         vrai(voyantLiaison and voyantLiaison.args.mouse_down, 'voyant de la liaison cliquable')
         egal('infobulleLightroom', voyantLiaison.args.tooltip.key, "l'infobulle du voyant, liée")
-        -- Le voyant Écran : gris tant que le connecteur ne l'a pas dit (Fenetre.verifier(true), dans
-        -- la tâche de l'ouverture, pas encore lancée ici).
-        egal('Écran', p.texteEcran)
-        egal('neutre', p.etatEcran)
+        -- Plus de voyant Écran (correctif 1.3.6) : ni sa propriété, ni son état.
+        egal(nil, p.texteEcran, 'plus de voyant Écran')
+        egal(nil, p.etatEcran)
         local demarrer, demarree = Liaison.demarrer, false
         Liaison.demarrer = function() demarree = true; Liaison.actif = true end
         voyantLiaison.args.mouse_down()
@@ -804,7 +805,7 @@ end
 local function texteCliquable(v)
     local t = v.args.title
     local cle = type(t) == 'table' and t.liaison and (t.key or '') or ''
-    return cle:match('^t%d+$') or cle == 'texteLightroom' or cle == 'texteEcran' or cle == 'aide'
+    return cle:match('^t%d+$') or cle == 'texteLightroom' or cle == 'aide'
         or (cle == 'jointes')
 end
 
@@ -821,7 +822,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
     S.pendantFenetre = function(args)
         construite = true
         local p = Fenetre.p
-        egal('Développeur', args.title)
+        egal(Fenetre.titreFenetre(), args.title)
         -- Le cadre enregistré garde son nom (Lightroom ne rapetisse pas une fenêtre rouverte,
         -- constaté) : celui de la Conversation claire en grande taille, FORME 5 (fenêtre B sans son
         -- volet, correctif 1.3.6).
@@ -949,9 +950,9 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end
         vrai(etiquette, nom .. ' : étiquette « Style » devant le menu')
-        -- ▲ ▼ de la carte Note, de la proposition, de la carte de l'étape (1.3), de la carte Focus
-        -- (22 octobre 2026) et de la carte Suivi, en petit : dix (la carte Suivi à la place de celle
-        -- de la leçon depuis le correctif 1.3.6).
+        -- ▲ ▼ de la carte Note, de la proposition, de la carte de l'étape (1.3) et de la carte Focus
+        -- (22 octobre 2026), en petit : huit (la carte Suivi, à la place de celle de la leçon au
+        -- correctif 1.3.6, est devenue la fenêtre Suivi, qui a les siennes).
         local fleches = {}
         parcourir(args.contents, function(v)
             if S.BOUTONS[v.genre] and (v.args.title == '▲' or v.args.title == '▼') and v.args.size == 'mini' then
@@ -959,8 +960,8 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end)
         table.sort(fleches)
-        egal('etapeDescend etapeMonte focusDescend focusMonte noteDescend noteMonte propositionDescend propositionMonte '
-            .. 'suiviDescend suiviMonte', table.concat(fleches, ' '), nom .. ' : flèches des cartes')
+        egal('etapeDescend etapeMonte focusDescend focusMonte noteDescend noteMonte propositionDescend propositionMonte',
+            table.concat(fleches, ' '), nom .. ' : flèches des cartes')
         -- Les sept invites (1.3 : Composition ajoutée avant Sports), en carrés de 24 de bezel, tiennent
         -- dans le centre.
         local largeurInvites = largeurEstimee(rangeeSports, p)
@@ -1094,8 +1095,8 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         egal(nil, p.modele)
         egal(nil, p.disposition)
         -- Plus de volet (correctif 1.3.6) : ni Nouvelle conversation, Renommer…, Supprimer…,
-        -- Publication… et Consommation… (au menu), ni Rechercher ; les trois voyants dans l'en-tête,
-        -- dans cet ordre : Claude Code, Lightroom, Écran.
+        -- Publication… et Consommation… (au menu), ni Rechercher ; les deux voyants dans l'en-tête,
+        -- dans cet ordre : Claude Code, Lightroom (plus de voyant Écran : correctif 1.3.6).
         local ordre = {}
         parcourir(args.contents, function(v)
             local t = v.args.title
@@ -1108,7 +1109,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 ordre[#ordre + 1] = t.key
             end
         end)
-        egal('texteClaude texteLightroom texteEcran', table.concat(ordre, ' '), nom .. ' : les voyants de l\'en-tête')
+        egal('texteClaude texteLightroom', table.concat(ordre, ' '), nom .. ' : les voyants de l\'en-tête')
         -- La carte Note (fenêtre B, lot B5), avec la note posée de la photo active : Laisser,
         -- Changer… et Accepter (un bouton bleu en image, cliqué par son calque).
         vrai(textes.notePoseeTitre and textes.nt1, nom .. ' : carte Note')
@@ -1143,9 +1144,10 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         -- Plus de radios : ni le Mode (retiré au correctif 1.3.6), ni les onglets (des segments en
         -- images).
         egal('', table.concat(radios, ' '), nom .. ' : aucun radio')
-        egal('notation', p.onglet, nom .. " : la carte Note sous l'aperçu par défaut")
-        -- À droite, de haut en bas : les segments, l'aperçu, Agrandir, puis les cartes superposées
-        -- (étape, proposition, note, suivi) ; plus de « Ce que Claude voit », ni Publication… à droite.
+        egal('focus', p.onglet, nom .. " : la carte Focus sous l'aperçu par défaut (correctif 1.3.6)")
+        -- À droite, de haut en bas : les segments, l'aperçu, Agrandir, puis les cartes superposées,
+        -- dans l'ordre des segments (Focus, note, étape, proposition ; plus de carte Suivi : la
+        -- fenêtre Suivi, correctif 1.3.6) ; plus de « Ce que Claude voit », ni Publication… à droite.
         local suite = {}
         parcourir(args.contents, function(v)
             local t = v.args.title
@@ -1161,11 +1163,13 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
                 suite[#suite + 1] = 'proposition'
             elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'etapeTexte' then
                 suite[#suite + 1] = 'etape'
+            elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'focusTexte' then
+                suite[#suite + 1] = 'focus'
             elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'suiviTexte' then
                 suite[#suite + 1] = 'suivi'
             end
         end)
-        egal('onglets apercu agrandir etape proposition note suivi', table.concat(suite, ' '), nom .. ' : colonne de droite')
+        egal('onglets apercu agrandir focus note etape proposition', table.concat(suite, ' '), nom .. ' : colonne de droite')
         parcourir(args.contents, function(v)
             vrai(v.args.title ~= "Ce que Claude voit", nom .. ' : plus de « Ce que Claude voit »')
         end)
@@ -1185,13 +1189,24 @@ essai('Fenêtre : texte JSON rendu lisible', function()
     egal('pas du json', Fenetre.lisible('pas du json'))
 end)
 
--- Écran (1.2) ----------------------------------------------------------------------------------
+essai("Titre de la fenêtre Claude : « Développeur v » et la version du module (son Info.lua) ; sans version lue, « Développeur » seul", function()
+    local Composants = require 'Composants'
+    local v = require('Info').VERSION
+    egal(Composants.formater(v.major, v.minor, v.revision), Composants.module(), 'la version de Info.lua')
+    egal('Développeur v' .. Composants.module(), Fenetre.titreFenetre())
+    local module = Composants.module
+    Composants.module = function() return '1.3.6' end
+    egal('Développeur v1.3.6', Fenetre.titreFenetre())
+    Composants.module = function() return '?' end
+    egal('Développeur', Fenetre.titreFenetre(), 'version illisible')
+    Composants.module = function() return nil end
+    egal('Développeur', Fenetre.titreFenetre(), 'sans version')
+    Composants.module = module
+end)
 
--- Un faux connecteur qui ne répond qu'à --ecran, par la ligne JSON rangée dans S.home/ecran.json
--- (celle de `mcp-developpeur --ecran`) ; tout autre argument est refusé. Un connecteur d'avant la
--- 1.2 répond à une option inconnue par son aide, sur stdout, et le code 2.
-local reponseEcran = S.home .. '/ecran.json'
+-- Plus rien sur l'écran (correctif 1.3.6) -------------------------------------------------------
 
+-- Un script exécutable dans S.home.
 local function script(nom, contenu)
     local chemin = S.home .. '/' .. nom
     Fichiers.ecrire(chemin, contenu)
@@ -1199,188 +1214,58 @@ local function script(nom, contenu)
     return chemin
 end
 
-local function fauxConnecteurEcran(reponse)
-    Fichiers.ecrire(reponseEcran, reponse)
-    return script('connecteur-ecran', '#!/bin/sh\n[ "$#" -eq 1 ] && [ "$1" = "--ecran" ] || { echo "option refusée : $*" >&2; exit 2; }\n'
-        .. 'cat ' .. S.q(reponseEcran) .. '\n')
+-- Un faux connecteur qui note chacun de ses lancements (ses arguments, dans S.home/lancements.txt)
+-- et répond à --version, et un faux Claude Code connecté (`claude auth status`), qui ne lit rien sur
+-- son entrée.
+local lancements = S.home .. '/lancements.txt'
+local function connecteurQuiNote()
+    return script('connecteur-note', '#!/bin/sh\necho "$*" >> ' .. S.q(lancements) .. '\n[ "$1" = "--version" ] && echo "1.3.6"\nexit 0\n')
 end
 
-local function connecteurAncien()
-    return script('connecteur-1.1.1', '#!/bin/sh\necho "option inconnue : $1" >&2\n'
-        .. "printf 'mcp-developpeur 1.1.1 — MCP-Développeur\\n\\nUsage : mcp-developpeur --status\\n'\nexit 2\n")
-end
-
--- Les réponses de --ecran : un écran d'usine (relevé sur le Mac de Dany), un écran mesuré par une
--- sonde, un profil personnalisé (mesure null), aucun écran.
-local ECRAN_USINE = [[{"autres":[],"detail":"Écran principal : Odyssey G85SD (gamut large).\nProfil de couleur : « Odyssey G85SD », le profil d'usine de l'écran, non mesuré sur ce Mac.","principal":{"chemin":"/Library/ColorSync/Profiles/Displays/Odyssey G85SD-60EC80AD.icc","etalonnage":"usine","gamut_large":true,"integre":false,"mesure":false,"nom":"Odyssey G85SD","profil":"Odyssey G85SD","texte":"Odyssey G85SD · profil d'usine, non mesuré sur ce Mac"}}
-]]
-local ECRAN_SONDE = [[{"autres":[],"detail":"Écran principal : ColorEdge CS2400S.\nProfil de couleur : « CS2400S D65 », mesuré par une sonde (DisplayCAL), profil du 3 mars 2026.","principal":{"etalonnage":"sonde","mesure":true,"logiciel":"DisplayCAL","nom":"ColorEdge CS2400S","texte":"ColorEdge CS2400S · profil mesuré par une sonde (DisplayCAL), du 3 mars 2026"}}
-]]
-local ECRAN_DOUTE = [[{"autres":[],"principal":{"etalonnage":"personnalise","mesure":null,"nom":"DELL U2723QE","texte":"DELL U2723QE · profil personnalisé « Mon profil », sans trace d'une sonde"}}
-]]
-
--- Un faux Claude Code connecté (`claude auth status`), qui ne lit rien sur son entrée.
 local function claudeConnecte()
     return script('claude-connecte', '#!/bin/sh\n[ "$1" = auth ] && [ "$2" = status ] && echo \'{"loggedIn":true,"authMethod":"claude.ai"}\'\n')
 end
 
--- Ce que rend Lightroom.etatEcran : une table neuve de textes, sans le chemin du profil.
-local function verifierEcran(ecran, texte, etat, quoi)
-    S.neuve(ecran, quoi)
-    egal(texte, ecran.texte, quoi .. ' : texte')
-    egal(etat, ecran.etat, quoi .. ' : état')
-    vrai(type(ecran.detail) == 'string' and ecran.detail ~= '', quoi .. ' : détail')
-    for cle, valeur in pairs(ecran) do
-        vrai(type(valeur) == 'string' or type(valeur) == 'boolean', quoi .. ' : ' .. cle .. ' de type ' .. type(valeur))
-    end
-end
-
-essai('Écran : lu par le connecteur (--ecran, 5 s au plus) ; absent ou ancien, voyant gris sans erreur', function()
-    local Lightroom = require 'Lightroom'
-    local faux = fauxConnecteurEcran(ECRAN_USINE)
-    local avant = #(S.dernieresCommandes or {})
-    local ecran = Lightroom.etatEcran(faux)
-    verifierEcran(ecran, 'Écran · non étalonné', 'attention', 'usine')
-    egal(true, ecran.lu)
-    vrai(ecran.detail:find("le profil d'usine de l'écran, non mesuré sur ce Mac", 1, true), ecran.detail)
-    egal(avant + 1, #S.dernieresCommandes, 'une commande du système')
-    local commande = S.dernieresCommandes[#S.dernieresCommandes]
-    vrai(commande:find("alarm 5", 1, true) and commande:find(S.q(faux) .. ' --ecran >', 1, true), commande)
-    -- Le fichier de sortie est retiré.
-    local restes = S.lireCommande('ls ' .. S.q(Chemins.temporaire()) .. ' 2>/dev/null')
-    vrai(not restes:find('ecran%-'), 'sortie de --ecran laissée : ' .. restes)
-
-    Fichiers.ecrire(reponseEcran, ECRAN_SONDE)
-    ecran = Lightroom.etatEcran(faux)
-    verifierEcran(ecran, 'Écran · étalonné', 'ok', 'sonde')
-    vrai(ecran.detail:find('mesuré par une sonde (DisplayCAL)', 1, true), ecran.detail)
-
-    -- mesure null (Json.decode efface la clé) : « étalonné ? », et le texte de l'écran pour détail.
-    Fichiers.ecrire(reponseEcran, ECRAN_DOUTE)
-    ecran = Lightroom.etatEcran(faux)
-    verifierEcran(ecran, 'Écran · étalonné ?', 'neutre', 'personnalisé')
-    vrai(ecran.detail:find('sans trace d\'une sonde', 1, true), ecran.detail)
-
-    -- Aucun écran lu (session sans écran) : gris, et dit tel quel.
-    Fichiers.ecrire(reponseEcran, '{"lu":false}\n')
-    ecran = Lightroom.etatEcran(faux)
-    verifierEcran(ecran, 'Écran', 'neutre', 'aucun écran')
-    egal(false, ecran.lu)
-    egal(Lightroom.ECRAN_AUCUN, ecran.detail)
-
-    -- Réponse vide ou coupée (alarme de 5 s) : gris, « pas répondu dans les 5 s », jamais
-    -- « introuvable » (le connecteur est là).
-    Fichiers.ecrire(reponseEcran, '{"principal":{"mesure":fa')
-    ecran = Lightroom.etatEcran(faux)
-    verifierEcran(ecran, 'Écran', 'neutre', 'réponse coupée')
-    egal(Lightroom.ECRAN_ILLISIBLE, ecran.detail, 'réponse coupée : détail')
-    vrai(not ecran.detail:find('introuvable', 1, true), ecran.detail)
-    -- Une commande du système en échec : gris, sans erreur.
-    local executer = S.modules.LrTasks.execute
-    S.modules.LrTasks.execute = function() error('commande impossible') end
-    local okPanne, enPanne = pcall(Lightroom.etatEcran, faux)
-    S.modules.LrTasks.execute = executer
-    vrai(okPanne, tostring(enPanne))
-    verifierEcran(enPanne, 'Écran', 'neutre', 'commande en échec')
-    egal(Lightroom.ECRAN_ILLISIBLE, enPanne.detail, 'commande en échec : détail')
-
-    -- Connecteur 1.1.1 (son aide sur stdout) : gris, « plus ancien que la 1.2 ».
-    ecran = Lightroom.etatEcran(connecteurAncien())
-    verifierEcran(ecran, 'Écran', 'neutre', 'connecteur 1.1.1')
-    egal(Lightroom.ECRAN_ILLISIBLE, ecran.detail, 'connecteur 1.1.1 : détail')
-    vrai(ecran.detail:find('plus ancien que la 1.2', 1, true), ecran.detail)
-    -- Connecteur introuvable : gris, « introuvable », et rien n'est lancé.
-    avant = #S.dernieresCommandes
-    ecran = Lightroom.etatEcran(S.home .. '/introuvable/mcp-developpeur')
-    verifierEcran(ecran, 'Écran', 'neutre', 'connecteur introuvable')
-    egal(false, ecran.lu)
-    egal(Lightroom.ECRAN_INTROUVABLE, ecran.detail)
-    vrai(not ecran.detail:find('plus ancien', 1, true), ecran.detail)
-    egal(avant, #S.dernieresCommandes, 'rien lancé sans connecteur')
-    ecran = Lightroom.etatEcran(nil)
-    verifierEcran(ecran, 'Écran', 'neutre', 'sans chemin')
-    egal(Lightroom.ECRAN_INTROUVABLE, ecran.detail, 'sans chemin : détail')
-    verifierEcran(Lightroom.decrireEcran({ principal = 'texte' }), 'Écran', 'neutre', 'principal illisible')
-end)
-
-essai("Fenêtre : le voyant Écran, lu à l'ouverture ; un clic le relit et donne son détail, sans envoyer la demande", function()
+essai("Fenêtre : plus rien sur l'étalonnage de l'écran (correctif 1.3.6) : ni voyant Écran, ni --ecran lancé à l'ouverture ni toutes les 2 s, ni section Écran des consignes", function()
     S.photoActive = S.photo(53636309, 'DSCF4961.RAF')
     S.selection = { S.photoActive }
     local prefs = Chemins.prefs()
     local connecteur, claude = prefs.cheminConnecteur, prefs.cheminClaude
+    Fichiers.supprimer(lancements)
     local construite = false
     S.pendantFenetre = function(args)
         construite = true
         local p = Fenetre.p
-        egal('Écran', p.texteEcran)
-        egal('neutre', p.etatEcran)
-        -- Trois voyants (plus de voyant Mode), dans l'en-tête dans cet ordre : Claude Code, Lightroom
-        -- et l'écran (de la 1.2 ; en bas du volet jusqu'au correctif 1.3.6, à la même police que les
-        -- deux autres depuis) ; chacun avec sa pastille en images, une par état, à côté de son texte.
-        local voyants, voyant = {}, nil
-        local largeurs = { texteClaude = Fenetre.T.voyantClaude, texteLightroom = Fenetre.T.voyantLightroom,
-            texteEcran = Fenetre.T.voyantEcran }
+        -- Aucune vue liée à l'écran, aucun texte ni infobulle qui en parle.
         parcourir(args.contents, function(v)
-            local t = v.args.title
-            if v.genre == 'row' and type(v.args[2]) == 'table' and v.args[2].genre == 'static_text'
-                and type(v.args[2].args.title) == 'table' and largeurs[v.args[2].args.title.key] then
-                local cle = v.args[2].args.title.key
-                voyants[#voyants + 1] = cle
-                egal(largeurs[cle], v.args[2].args.width, cle)
-                local pastilles = {}
-                for _, image in ipairs(v.args[1].args) do
-                    egal('picture', image.genre, cle .. ' : pastille en image')
-                    pastilles[#pastilles + 1] = image.args.value:match('([^/]+)%.png$')
-                end
-                egal('pastille-vert pastille-orange pastille-rouge pastille-gris', table.concat(pastilles, ' '), cle .. ' : pastilles')
-                egal(Fenetre.POLICES.systeme12, v.args[2].args.font, cle .. ' : en 12')
-                egal(Fenetre.COULEURS.texte, v.args[2].args.text_color, cle .. ' : couleur du texte')
-                if cle == 'texteEcran' then
-                    voyant = v.args[2]
+            for _, cle in ipairs({ 'title', 'tooltip', 'value', 'visible' }) do
+                local x = v.args[cle]
+                if type(x) == 'table' and type(x.key) == 'string' then
+                    vrai(not x.key:find('Ecran', 1, true), 'propriété liée à l\'écran : ' .. x.key)
+                elseif type(x) == 'string' then
+                    vrai(not x:find('talonn', 1, true) and not x:find('Écran', 1, true), cle .. ' : ' .. x)
                 end
             end
         end)
-        egal('texteClaude texteLightroom texteEcran', table.concat(voyants, ' '))
-        egal(nil, p.texteMode, 'plus de voyant Mode')
-        vrai(voyant and voyant.args.mouse_down and voyant.args.tooltip:find('profil de couleur', 1, true), "voyant de l'écran cliquable")
-        -- À l'ouverture (Fenetre.verifier(true)) : l'écran d'usine du Mac de Dany, non étalonné.
-        prefs.cheminConnecteur = fauxConnecteurEcran(ECRAN_USINE)
+        egal(nil, p.texteEcran, 'plus de voyant Écran')
+        egal(nil, p.etatEcran)
+        -- À l'ouverture (Fenetre.verifier(true)) : Claude Code et la version du connecteur, jamais
+        -- l'écran ; toutes les 2 s non plus.
+        prefs.cheminConnecteur = connecteurQuiNote()
         prefs.cheminClaude = claudeConnecte()
+        local commandes = #(S.dernieresCommandes or {})
         Fenetre.verifier(true)
         egal('ok', p.etatClaude, 'faux Claude Code connecté')
-        egal('Écran · non étalonné', p.texteEcran)
-        egal('attention', p.etatEcran)
-        vrai(not p.aide:find('cran', 1, true), "l'écran n'est pas une aide du bandeau : " .. p.aide)
-        -- Toutes les 2 s, l'écran ne se relit pas.
-        local commandes = #S.dernieresCommandes
         Fenetre.periodique()
-        for i = commandes + 1, #S.dernieresCommandes do
-            vrai(not S.dernieresCommandes[i]:find('--ecran', 1, true), "l'écran relu toutes les 2 s")
-        end
-        -- Un clic : la demande validée par ce clic ne part pas ; l'écran se relit dans une tâche (un
-        -- autre a pu être branché), puis la boîte « Claude · écran » donne son détail.
-        Fichiers.ecrire(reponseEcran, ECRAN_SONDE)
-        p.saisie = 'Texte validé par le clic'
-        vrai(Fenetre.envoiAuto, 'envoi prévu')
-        local taches, messages = #S.taches, #S.messages
-        voyant.args.mouse_down()
-        egal(nil, Fenetre.envoiAuto, "le clic du voyant annule l'envoi automatique")
-        egal(taches + 1, #S.taches, 'relu dans une tâche')
-        S.taches[#S.taches]()
-        egal(messages + 1, #S.messages, 'une boîte')
-        egal('Claude · écran', S.messages[#S.messages][1])
-        vrai(S.messages[#S.messages][2]:find('mesuré par une sonde (DisplayCAL)', 1, true), S.messages[#S.messages][2])
-        egal('Écran · étalonné', p.texteEcran)
-        egal('ok', p.etatEcran)
-        -- Un connecteur d'avant la 1.2 : gris, sans erreur ; le clic dit pourquoi.
-        prefs.cheminConnecteur = connecteurAncien()
         Fenetre.verifier(true)
-        egal('Écran', p.texteEcran)
-        egal('neutre', p.etatEcran)
-        voyant.args.mouse_down()
-        S.taches[#S.taches]()
-        vrai(S.messages[#S.messages][2]:find('plus ancien que la 1.2', 1, true), S.messages[#S.messages][2])
-        p.saisie = ''
+        for i = commandes + 1, #S.dernieresCommandes do
+            vrai(not S.dernieresCommandes[i]:find('--ecran', 1, true), "l'écran lu : " .. S.dernieresCommandes[i])
+        end
+        local lus = Fichiers.lire(lancements) or ''
+        vrai(lus:find('--version', 1, true), 'le connecteur lancé pour sa version : ' .. lus)
+        vrai(not lus:find('--ecran', 1, true), "le connecteur lancé pour l'écran : " .. lus)
+        egal(nil, p.texteEcran)
+        vrai(not tostring(p.aide or ''):find('cran', 1, true), "l'écran dans l'aide du bandeau : " .. tostring(p.aide))
     end
     local ok, erreur = pcall(Fenetre.afficher)
     prefs.cheminConnecteur, prefs.cheminClaude = connecteur, claude
@@ -1388,6 +1273,21 @@ essai("Fenêtre : le voyant Écran, lu à l'ouverture ; un clic le relit et donn
     Fenetre.ouverte = false
     assert(ok, erreur)
     vrai(construite, 'fenêtre construite')
+    -- Ni la lecture de l'écran pour la fenêtre, ni le voyant, ni sa boîte.
+    local Lightroom = require 'Lightroom'
+    for _, nom in ipairs({ 'etatEcran', 'decrireEcran', 'ECRAN_INTROUVABLE', 'ECRAN_ILLISIBLE', 'ECRAN_AUCUN' }) do
+        egal(nil, Lightroom[nom], 'Lightroom.' .. nom)
+    end
+    for _, nom in ipairs({ 'poserEcran', 'montrerEcran', 'detailEcran' }) do
+        egal(nil, Fenetre[nom], 'Fenetre.' .. nom)
+    end
+    egal(nil, require('Vues').voyantEcran, 'Vues.voyantEcran')
+    egal(nil, require('Dispositions').TAILLES.voyantEcran, 'la largeur du voyant Écran')
+    -- Les consignes de la fenêtre : plus de section Écran, rien sur l'étalonnage.
+    local Consignes = require 'Consignes'
+    vrai(not Consignes.texte:find('## Écran', 1, true), 'section Écran des consignes')
+    vrai(not Consignes.texte:find('talonn', 1, true), "l'étalonnage dans les consignes")
+    vrai(not Consignes.texte:find('get_status : ecran', 1, true), 'get_status : ecran dans les consignes')
 end)
 
 -- Jeton de la liaison (1.2) --------------------------------------------------------------------
@@ -1991,7 +1891,8 @@ essai("Fenêtre : un clic sur 📋 ou sur un segment (calque) valide la demande 
         egal('Avec une photo', S.texteChamp(champ), 'le texte reste dans le champ')
         -- Un segment (son calque) : de même (Fenetre.calque annule l'envoi automatique).
         S.taper(champ, ', Proposition')
-        egal('notation', p.onglet)
+        -- Focus à l'ouverture (correctif 1.3.6, décision de Dany du 25 octobre 2026).
+        egal('focus', p.onglet)
         local refuser, changer = S.trouverBouton(args.contents, 'Refuser'), S.trouverBouton(args.contents, 'Changer…')
         refuse(function() S.cliquer(refuser) end, 'D11', 'Refuser, carte Proposition cachée')
         taches = #S.taches

@@ -1,6 +1,7 @@
 -- essais-moteur.lua : essais du moteur de conversation pour la notation, hors de Lightroom (LuaJIT,
 -- Lightroom simulé par Simulation.lua) : consignes des notes et des passes, consignes de la 1.2
--- (peau dosée, section Écran, invites Portrait, Paysage et Noir et blanc du tireur), invite
+-- (peau dosée, plus de section Écran depuis le correctif 1.3.6, invites Portrait, Paysage et Noir
+-- et blanc du tireur), invite
 -- Composition et longueur des consignes de la fenêtre (1.3), séance de notation
 -- (sa conversation, sans changer celle de la fenêtre Claude), consignes écrites dans le dossier de
 -- la session, élément « notation » du fil (entrée de propose_ratings, réponse du connecteur),
@@ -197,17 +198,14 @@ essai('Consignes : la retouche d\'une photo finit par view_photo avec compare = 
     end
 end)
 
-essai('Consignes : section Écran, dite une fois par conversation (1.2)', function()
-    local ecran = section('Écran')
-    contient(ecran, 'sans passer par l\'écran', 'section Écran')
-    contient(ecran, 'une fois par conversation', 'section Écran')
-    contient(ecran, 'get_status : ecran', 'section Écran')
-    contient(ecran, 'la peau ou les couleurs', 'section Écran')
-    -- Après le contexte, avant les garde-fous.
-    local contexte = Consignes.texte:find('\n## Contexte\n', 1, true)
-    local position = Consignes.texte:find('\n## Écran\n', 1, true)
-    local gardeFous = Consignes.texte:find('\n## Garde-fous\n', 1, true)
-    vrai(contexte < position and position < gardeFous, 'ordre des sections')
+essai("Consignes : plus de section Écran (de la 1.2), ni rien sur l'étalonnage de l'écran (correctif 1.3.6, décision de Dany) ; le Contexte, puis les garde-fous", function()
+    vrai(not Consignes.texte:find('\n## Écran\n', 1, true), 'plus de section Écran')
+    for _, morceau in ipairs({ 'talonn', "sans passer par l'écran", 'get_status : ecran', 'remarque d\'un aperçu' }) do
+        vrai(not Consignes.texte:find(morceau, 1, true), 'consignes : ' .. morceau)
+    end
+    -- Le Contexte est suivi des garde-fous.
+    local contexte = section('Contexte')
+    egal(Consignes.texte:find('\n## Contexte\n', 1, true) + #contexte, Consignes.texte:find('\n## Garde-fous\n', 1, true))
     vrai(not Consignes.texte:find('\\\n', 1, true), 'lignes recollées')
 end)
 

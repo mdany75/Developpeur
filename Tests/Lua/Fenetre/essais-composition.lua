@@ -381,18 +381,18 @@ essai("Conversation : preview_settings avec un crop fait une proposition de reca
     vrai(type(e.cadre) == 'string' and type(e.cadreDessine) == 'boolean', 'textes et booléens')
 end)
 
-essai("Conversation : image entière non rendue, remarque d'écran à part, refus, réponse sans résumé du cadre", function()
+essai("Conversation : image entière non rendue, remarque à part, refus, réponse sans résumé du cadre", function()
     local c = Conversation.nouvelle(1000)
     -- L'image entière n'a pas pu se rendre : le cadre se dit quand même, sans dessin.
     local e = appelPropose(c, 'p1', entreeCadre(), { REPONSE_SANS_IMAGE }, 'p1.jpg')
     egal(RESUME, e.cadre)
     egal(nil, e.cadreDessine, "pas d'image entière : pas de dessin")
-    -- Une remarque d'écran (bloc de texte à part) ne gêne pas.
-    e = appelPropose(c, 'p2', entreeCadre(), { REPONSE_CADRE, "Remarque : l'écran principal n'est pas étalonné." }, 'p2.jpg')
+    -- Une remarque du connecteur (bloc de texte à part : la photo active changée) ne gêne pas.
+    e = appelPropose(c, 'p2', entreeCadre(), { REPONSE_CADRE, "Remarque : la photo active a changé depuis le dernier appel." }, 'p2.jpg')
     egal(RESUME, e.cadre)
     egal(true, e.cadreDessine)
     -- Ni l'une recollée après le JSON (Conversation.teteJson).
-    e = appelPropose(c, 'p3', entreeCadre(), { REPONSE_CADRE .. "\nRemarque : l'écran principal n'est pas étalonné." }, 'p3.jpg')
+    e = appelPropose(c, 'p3', entreeCadre(), { REPONSE_CADRE .. "\nRemarque : la photo active a changé depuis le dernier appel." }, 'p3.jpg')
     egal(RESUME, e.cadre)
     -- Un refus : la proposition est refusée, sans cadre.
     e = appelPropose(c, 'p4', entreeCadre(), { 'Photo agrandie : Claude ne la recadre pas.' }, nil, true)
@@ -502,7 +502,7 @@ essai("Carte : la raison, « Cadre : … » et ce que montre son aperçu, sans l
     contient(Fenetre.texteProposition(e), "Recadrage : — → format 3:2, redressé de 1,4°, 82 % du plus grand cadre")
     -- Une remarque recollée après le JSON : le cadre se lit (Conversation.teteJson), pas les
     -- changements ; la ligne « Recadrage » demandée, restée, ne double pas « Cadre : … ».
-    e = appelPropose(c, 'p6', entreeCadre(), { REPONSE_CADRE .. "\nRemarque : l'écran principal n'est pas étalonné." }, 'p6.jpg')
+    e = appelPropose(c, 'p6', entreeCadre(), { REPONSE_CADRE .. "\nRemarque : la photo active a changé depuis le dernier appel." }, 'p6.jpg')
     egal(RESUME, e.cadre)
     vrai(changement(e, 'Recadrage'), 'la demande reste dans les changements')
     egal(RAISON .. "\n\nCadre : " .. RESUME .. "\n" .. Fenetre.CADRE_DESSINE, Fenetre.texteProposition(e))
@@ -522,7 +522,7 @@ essai("Fenêtre : la proposition de cadre arrive dans la carte (une bascule), co
     ouvrirFenetre(function(p)
         local T = Fenetre.T
         Fenetre.majPhoto()
-        egal('notation', p.onglet)
+        egal('focus', p.onglet, "Focus à l'ouverture (correctif 1.3.6)")
         appelPropose(c, 'p1', entreeCadre(), { REPONSE_CADRE }, 'p1.jpg')
         Fenetre.rafraichir()
         egal('proposition', p.onglet, 'la proposition se montre')
@@ -552,7 +552,7 @@ essai("Aperçu : l'image de la proposition arrive ; un vrai clic sur Proposition
     local c = Moteur.courante
     ouvrirFenetre(function(p)
         Fenetre.majPhoto()
-        egal('notation', p.onglet)
+        egal('focus', p.onglet, "Focus à l'ouverture (correctif 1.3.6)")
         vue(c, 'v1')
         Fenetre.rafraichir()
         egal('1 sur 1 · view_photo', p.legendeApercu)
@@ -561,9 +561,10 @@ essai("Aperçu : l'image de la proposition arrive ; un vrai clic sur Proposition
         egal('proposition', p.onglet, 'la proposition se montre (bascule de la fenêtre)')
         egal('2 sur 2 · preview_settings', p.legendeApercu, 'son image, la dernière arrivée')
         egal(nil, Fenetre.imageProposition, 'une bascule ne la demande pas')
-        -- Une image arrivée ensuite se montre, même dans l'onglet Proposition.
+        -- Une image de Claude arrivée ensuite se montre dans l'onglet Aperçu (correctif 1.3.6).
         vue(c, 'v2')
         Fenetre.rafraichir()
+        egal('apercu', p.onglet, "l'image de Claude dans l'onglet Aperçu")
         egal('3 sur 3 · view_photo', p.legendeApercu)
         -- Dany va sur Note, puis clique Proposition : l'image de la proposition revient.
         p.onglet = 'notation'
@@ -607,7 +608,8 @@ essai("Aperçu : l'image de la proposition arrive ; un vrai clic sur Proposition
         lancerTaches(avant)
         egal(dialogues + 1, #S.dialogues)
         egal('Claude · 2 sur 3 · preview_settings', S.dialogues[#S.dialogues].title)
-        contient(S.dialogues[#S.dialogues].contents.args.value, '/p1-', "l'image de la proposition en grand")
+        -- Plus petite que 2 000 × 1 250 : son propre fichier, à sa vraie taille (correctif 1.3.6).
+        contient(S.dialogues[#S.dialogues].contents.args.value, '/p1.jpg', "l'image de la proposition en grand")
         -- ◀ depuis elle, la photo active ayant changé : l'image d'avant la proposition.
         Fenetre.changerImage(-1)
         egal('1 sur 3 · view_photo', p.legendeApercu, '◀ part de la proposition')

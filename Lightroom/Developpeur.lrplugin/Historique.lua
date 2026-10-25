@@ -15,6 +15,10 @@
 -- conversation l'écrit sur le disque, la fenêtre en tire ses lignes). Chaque texte a deux formes :
 -- celle du fil (des lignes : l'en-tête, puis des puces « •  ») et celle jointe à la demande suivante
 -- de Dany, entre crochets sur une ligne (Conversation.historiquesAEnvoyer), une seule fois.
+--
+-- Une photo sans étape de Claude a dans son historique le résumé de ses réglages : ceux de
+-- Lightroom qui s'écartent de leur valeur par défaut (Historique.ecarts ; demandé par Dany le
+-- 25 octobre 2026).
 
 local LrApplication = import 'LrApplication'
 local LrTasks = import 'LrTasks'
@@ -23,6 +27,7 @@ local Conversation = require 'Conversation'
 local Ecriture = require 'Ecriture'
 local Json = require 'Json'
 local Photos = require 'Photos'
+local Reglages = require 'Reglages'
 local Texte = require 'Texte'
 
 local Historique = {}
@@ -38,9 +43,11 @@ Historique.MAX_GROUPE = 500
 -- Le début des puces (celui des listes de Claude dans le fil, Fil.ligneMarkdown).
 Historique.PUCE = '•  '
 
--- Les en-têtes des trois éléments.
+-- Les en-têtes des trois éléments, et le début de la puce des réglages d'une photo sans étape de
+-- Claude (Historique.texteReglages).
 Historique.TITRE = "Historique de la photo"
 Historique.TITRE_DEPUIS = "Depuis la dernière fois"
+Historique.REGLAGES = "Réglages hors des valeurs par défaut"
 
 -- Les réglages suivis par apresClaude qui n'ont pas de libellé dans Conversation.libelles (les
 -- listes y sont comptées : « #MaskGroupBasedCorrections », Ecriture.etatSimple).
@@ -101,8 +108,9 @@ end
 -- L'état d'une photo (un LrPhoto) : { id, nom, journal (ses entrées, des plus anciennes aux plus
 -- récentes), editCount, lastEditTime (métadonnées brutes, des nombres), reprises (nil, ou
 -- { etape, changements = { { cle, claude, maintenant } } } : ce que Dany a changé à la main depuis
--- la dernière commande de Claude, valeurs en mots) }. `sansReprises` : sans lire les réglages (ce
--- qu'une conversation a vu n'en a pas besoin).
+-- la dernière commande de Claude, valeurs en mots), reglages (nil, ou pour une photo sans étape de
+-- Claude, ses réglages hors de leur valeur par défaut, en mots : Historique.ecarts) }.
+-- `sansReprises` : sans lire les réglages (ce qu'une conversation a vu n'en a pas besoin).
 function Historique.etat(photo, sansReprises)
     local journal = {}
     for _, e in ipairs(Photos.lireJson(photo, 'journalClaude', {})) do
@@ -122,6 +130,13 @@ function Historique.etat(photo, sansReprises)
                 end
             end
             etat.reprises = #reprises.changements > 0 and reprises or nil
+        end
+        if #journal == 0 then
+            local okR, ecarts = LrTasks.pcall(function()
+                local reglages = photo:getDevelopSettings()
+                return type(reglages) == 'table' and Historique.ecarts(reglages, Reglages.estRaw(photo, reglages)) or nil
+            end)
+            etat.reglages = okR and type(ecarts) == 'table' and #ecarts > 0 and ecarts or nil
         end
     end
     return etat
@@ -259,6 +274,253 @@ function Historique.retouchee(etat, vu)
     return etat.editCount ~= vu.editCount or etat.lastEditTime ~= vu.lastEditTime
 end
 
+-- Les réglages hors de leur valeur par défaut (pur) ---------------------------------------------
+
+-- Les réglages d'une photo sans étape de Claude, ceux de Lightroom qui s'écartent de leur valeur
+-- par défaut, en mots et dans l'ordre des panneaux du module Développement : « Profil Camera
+-- CLASSIC CHROME · Balance 5 600 K / +8 · Exposition +0,45 · Ombres +30 · Recadrée · 2 masques »
+-- (demandé par Dany le 25 octobre 2026). Seulement des réglages dont la valeur par défaut est sûre,
+-- celle d'Adobe : le profil Adobe Color d'un RAW (Embedded, le profil incorporé, pour un autre
+-- fichier) à son intensité de 100 ; la balance Telle quelle ; la tonalité, la présence, la TSL,
+-- l'étalonnage, le calibrage, la transformation, les corrections d'objectif et les effets à 0 ; les
+-- courbes linéaires ; la netteté à 40 et le bruit de couleur à 25 pour un RAW, à 0 sinon
+-- (Catalogue.swift) ; ni recadrage, ni masque, ni tache. Ce qui n'est pas sûr se tait plutôt que d'inventer : un
+-- réglage absent de ceux que Lightroom rend ; la TSL d'une photo en noir et blanc (le mélange des
+-- gris la remplace) ; un quart de tour (l'orientation de la photo, que l'appareil pose aussi) et
+-- les traitements calculés (débruitage, détails bruts : un même filtre) ; un profil par défaut
+-- choisi par Dany dans ses préférences se dit comme un autre. Rend une liste neuve de textes.
+
+-- Les profils par défaut d'Adobe (Reglages.nomProfil, à la casse près).
+Historique.PROFILS_PAR_DEFAUT = { ['adobe color'] = true, embedded = true }
+
+-- La balance des blancs nommée par Lightroom (WhiteBalance), en français ; Telle quelle (As Shot)
+-- est celle par défaut.
+Historique.BALANCES = {
+    Auto = "auto", Custom = "personnalisée", Daylight = "Lumière du jour", Cloudy = "Nuageux", Shade = "Ombre",
+    Tungsten = "Tungstène", Fluorescent = "Fluorescent", Flash = "Flash",
+}
+
+-- Tonalité et présence (Réglages de base), à 0 par défaut, avec leur libellé de Conversation.libelles.
+Historique.TONALITE = { 'Exposure2012', 'Contrast2012', 'Highlights2012', 'Shadows2012', 'Whites2012', 'Blacks2012',
+    'Texture', 'Clarity2012', 'Dehaze', 'Vibrance', 'Saturation' }
+
+local COULEURS_TSL = { 'Red', 'Orange', 'Yellow', 'Green', 'Aqua', 'Blue', 'Purple', 'Magenta' }
+local ETALONNAGE = { 'SplitToningShadowSaturation', 'SplitToningHighlightSaturation', 'ColorGradeMidtoneSat', 'ColorGradeGlobalSat',
+    'ColorGradeShadowLum', 'ColorGradeMidtoneLum', 'ColorGradeHighlightLum', 'ColorGradeGlobalLum' }
+local CALIBRAGE = { 'ShadowTint', 'RedHue', 'RedSaturation', 'GreenHue', 'GreenSaturation', 'BlueHue', 'BlueSaturation' }
+local COURBE_PARAMETRIQUE = { 'ParametricShadows', 'ParametricDarks', 'ParametricLights', 'ParametricHighlights' }
+local OBJECTIF_MANUEL = { 'LensManualDistortionAmount', 'VignetteAmount', 'DefringePurpleAmount', 'DefringeGreenAmount' }
+local TRANSFORMATION = { PerspectiveVertical = 0, PerspectiveHorizontal = 0, PerspectiveRotate = 0, PerspectiveAspect = 0,
+    PerspectiveScale = 100, PerspectiveX = 0, PerspectiveY = 0 }
+
+-- Le signe moins et l'espace fine insécable des milliers et des unités (U+2212, U+202F : mesurés
+-- dans Metriques.lua).
+local MOINS, FINE = '\226\136\146', '\226\128\175'
+
+-- « 5 600 », « 0,45 », « 30 » : un nombre à la française, ses milliers séparés.
+local function chiffres(n)
+    local t = Texte.nombre(n)
+    local entier, reste = t:match('^(%d+)(.*)$')
+    if not entier then
+        return t
+    end
+    local groupes = {}
+    while #entier > 3 do
+        table.insert(groupes, 1, entier:sub(-3))
+        entier = entier:sub(1, -4)
+    end
+    table.insert(groupes, 1, entier)
+    return table.concat(groupes, FINE) .. reste
+end
+
+-- « +0,45 », « −12 », « 0 ».
+local function signe(n)
+    if n == 0 then
+        return '0'
+    end
+    return (n > 0 and '+' or MOINS) .. chiffres(math.abs(n))
+end
+
+-- La valeur d'un réglage arrondie comme Lightroom l'affiche (Reglages.arrondir), si elle s'écarte
+-- de `defaut` ; nil si elle ne s'en écarte pas ou si Lightroom ne l'a pas rendue.
+local function ecart(r, cle, defaut)
+    local v = Reglages.valeurNumerique(r[cle])
+    if v == nil then
+        return nil
+    end
+    local a = Reglages.arrondir(cle, v)
+    if math.abs(a - Reglages.arrondir(cle, defaut or 0)) < 1e-9 then
+        return nil
+    end
+    return a
+end
+
+-- Vrai si l'un de ces réglages s'écarte de 0.
+local function touche(r, cles)
+    for _, cle in ipairs(cles) do
+        if ecart(r, cle, 0) then
+            return true
+        end
+    end
+    return false
+end
+
+local function compter(liste)
+    return type(liste) == 'table' and #liste or 0
+end
+
+-- Le profil, s'il n'est pas celui d'Adobe par défaut ou que son intensité a changé.
+local function profil(r)
+    local nom = Reglages.nomProfil(r)
+    if type(nom) ~= 'string' or Texte.nettoyer(nom) == '' then
+        return nil
+    end
+    local look = not Reglages.lookVide(r.Look) and r.Look or nil
+    local intensite = look and tonumber(look.Amount) and math.floor(tonumber(look.Amount) * 100 + 0.5)
+    local autreIntensite = intensite ~= nil and intensite ~= 100
+    if Historique.PROFILS_PAR_DEFAUT[nom:lower()] and not autreIntensite then
+        return nil
+    end
+    return "Profil " .. Texte.nettoyer(nom) .. (autreIntensite and (" (intensité " .. chiffres(intensite) .. ")") or '')
+end
+
+-- La balance des blancs, si elle n'est pas Telle quelle : « Balance 5 600 K / +8 » (RAW, en
+-- kelvins), « Balance +10 / −3 » (un autre fichier, relative), « Balance auto : 5 600 K / +8 ».
+local function balance(r, raw)
+    local nom = r.WhiteBalance
+    if type(nom) ~= 'string' or nom == '' or nom == 'As Shot' then
+        return nil
+    end
+    local t, teinte
+    if raw then
+        t, teinte = Reglages.valeurNumerique(r.Temperature), Reglages.valeurNumerique(r.Tint)
+    else
+        t, teinte = Reglages.valeurNumerique(r.IncrementalTemperature), Reglages.valeurNumerique(r.IncrementalTint)
+    end
+    local valeurs
+    if t and teinte then
+        t, teinte = math.floor(t + 0.5), math.floor(teinte + 0.5)
+        valeurs = (raw and (chiffres(t) .. FINE .. 'K') or signe(t)) .. ' / ' .. signe(teinte)
+    end
+    if nom == 'Custom' then
+        return valeurs and ("Balance " .. valeurs) or ("Balance " .. Historique.BALANCES.Custom)
+    end
+    local mots = Historique.BALANCES[nom] or Texte.nettoyer(nom)
+    return "Balance " .. mots .. (valeurs and (" : " .. valeurs) or '')
+end
+
+-- Une courbe des tonalités qui n'est pas linéaire (par points, d'un canal, ou paramétrique).
+local function courbe(r)
+    for _, cle in ipairs(Reglages.CLES_COURBES) do
+        local c = r[cle]
+        if type(c) == 'table' and #c > 0 and not Reglages.egal(c, Reglages.COURBE_LINEAIRE) then
+            return true
+        end
+    end
+    return touche(r, COURBE_PARAMETRIQUE)
+end
+
+-- Les corrections d'objectif posées : « Objectif : profil, aberrations chromatiques ».
+local function objectif(r)
+    local parties = {}
+    if ecart(r, 'LensProfileEnable', 0) then
+        parties[#parties + 1] = "profil"
+    end
+    if ecart(r, 'AutoLateralCA', 0) then
+        parties[#parties + 1] = "aberrations chromatiques"
+    end
+    if touche(r, OBJECTIF_MANUEL) then
+        parties[#parties + 1] = "réglages manuels"
+    end
+    return #parties > 0 and ("Objectif : " .. table.concat(parties, ", ")) or nil
+end
+
+-- La transformation : Upright, ou des réglages manuels.
+local function transformation(r)
+    local upright = ecart(r, 'PerspectiveUpright', 0) ~= nil
+    local manuelle = false
+    for cle, defaut in pairs(TRANSFORMATION) do
+        if ecart(r, cle, defaut) then
+            manuelle = true
+        end
+    end
+    if upright then
+        return manuelle and "Transformation (Upright et réglages manuels)" or "Transformation (Upright)"
+    end
+    return manuelle and "Transformation" or nil
+end
+
+-- Recadrée (un cadre plus petit que l'image), puis redressée (l'angle du cadre, au dixième).
+local function recadrage(r, parties)
+    local g, h, d, b = Reglages.valeurNumerique(r.CropLeft), Reglages.valeurNumerique(r.CropTop),
+        Reglages.valeurNumerique(r.CropRight), Reglages.valeurNumerique(r.CropBottom)
+    if (g and g > 0.0005) or (h and h > 0.0005) or (d and d < 0.9995) or (b and b < 0.9995) then
+        parties[#parties + 1] = "Recadrée"
+    end
+    local angle = Reglages.valeurNumerique(r.CropAngle)
+    angle = angle and math.floor(math.abs(angle) * 10 + 0.5) / 10
+    if angle and angle > 0 then
+        parties[#parties + 1] = "Redressée de " .. chiffres(angle) .. "°"
+    end
+end
+
+function Historique.ecarts(r, raw)
+    local parties = {}
+    local function ajouter(texte)
+        if texte then
+            parties[#parties + 1] = texte
+        end
+    end
+    if type(r) ~= 'table' then
+        return parties
+    end
+    ajouter(profil(r))
+    ajouter(balance(r, raw))
+    local noirEtBlanc = r.ConvertToGrayscale == true
+    ajouter(noirEtBlanc and "Noir et blanc" or nil)
+    for _, cle in ipairs(Historique.TONALITE) do
+        local v = ecart(r, cle, 0)
+        ajouter(v and ((Conversation.libelles[cle] or cle) .. ' ' .. signe(v)) or nil)
+    end
+    ajouter(courbe(r) and "Courbe des tonalités" or nil)
+    if not noirEtBlanc then
+        for _, couleur in ipairs(COULEURS_TSL) do
+            if touche(r, { 'HueAdjustment' .. couleur, 'SaturationAdjustment' .. couleur, 'LuminanceAdjustment' .. couleur }) then
+                ajouter("TSL touchée")
+                break
+            end
+        end
+    end
+    ajouter(touche(r, ETALONNAGE) and "Étalonnage touché" or nil)
+    local nettete = ecart(r, 'Sharpness', raw and 40 or 0)
+    ajouter(nettete and ("Netteté " .. chiffres(nettete)) or nil)
+    local bruit = ecart(r, 'LuminanceSmoothing', 0)
+    ajouter(bruit and ("Réduction du bruit " .. chiffres(bruit)) or nil)
+    local couleur = ecart(r, 'ColorNoiseReduction', raw and 25 or 0)
+    ajouter(couleur and ("Bruit de couleur " .. chiffres(couleur)) or nil)
+    ajouter(objectif(r))
+    ajouter(transformation(r))
+    local vignetage = ecart(r, 'PostCropVignetteAmount', 0)
+    ajouter(vignetage and ("Vignetage " .. signe(vignetage)) or nil)
+    local grain = ecart(r, 'GrainAmount', 0)
+    ajouter(grain and ("Grain " .. chiffres(grain)) or nil)
+    ajouter(touche(r, CALIBRAGE) and "Calibrage touché" or nil)
+    recadrage(r, parties)
+    local masques = compter(r.MaskGroupBasedCorrections)
+    ajouter(masques > 0 and Reglages.pluriel(masques, "masque", "masques") or nil)
+    local taches = math.max(compter(r.RetouchAreas), compter(r.RetouchInfo))
+    ajouter(taches > 0 and Reglages.pluriel(taches, "tache", "taches") or nil)
+    local yeux = compter(r.RedEyeInfo)
+    ajouter(yeux > 0 and Reglages.pluriel(yeux, "œil rouge corrigé", "yeux rouges corrigés") or nil)
+    ajouter(type(r.LensBlur) == 'table' and r.LensBlur.Active == true and "Flou de l'objectif" or nil)
+    return parties
+end
+
+-- La puce des réglages : « Réglages hors des valeurs par défaut : Profil … · Exposition +0,45 · … ».
+function Historique.texteReglages(ecarts)
+    return Historique.REGLAGES .. " : " .. table.concat(ecarts, " · ")
+end
+
 -- Textes ---------------------------------------------------------------------------------------
 
 -- « 25 oct. 2026, 14 h 30 » pour « 2026-10-25 14:30 » (les mois par Carnet.MOIS_COURTS, leur seule
@@ -343,14 +605,18 @@ local function combien(liste)
 end
 
 -- L'élément « Historique de la photo » d'une conversation neuve : ses étapes de Claude (avec leur
--- raison et leur date) et ses reprises à la main depuis la dernière ; sans étape de Claude, au plus
+-- raison et leur date) et ses reprises à la main depuis la dernière ; sans étape de Claude,
 -- « retouchée à la main » (editCount au-dessus de 0 : pas constaté sur une photo jamais
--- développée) ; nil sans rien à dire.
+-- développée) et la puce de ses réglages hors de leur valeur par défaut (Historique.ecarts : un
+-- paramètre prédéfini posé à l'importation en fait aussi, sans retouche) ; nil sans rien à dire.
 function Historique.historique(etat)
     local journal = etat.journal
     if #journal == 0 then
+        local reglages = type(etat.reglages) == 'table' and #etat.reglages > 0 and { Historique.texteReglages(etat.reglages) } or {}
         if (etat.editCount or 0) > 0 then
-            return element(Historique.TITRE .. " : retouchée à la main, sans étape de Claude.", {})
+            return element(Historique.TITRE .. " : retouchée à la main, sans étape de Claude.", reglages)
+        elseif #reglages > 0 then
+            return element(Historique.TITRE .. " : sans étape de Claude.", reglages)
         end
         return nil
     end

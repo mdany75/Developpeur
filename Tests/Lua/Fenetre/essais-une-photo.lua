@@ -362,6 +362,93 @@ essai("Historique de la photo : ses étapes (raison, date), ses reprises à la m
     end)
 end)
 
+-- Les réglages d'un RAW tels que Lightroom les rend, à leurs valeurs par défaut d'Adobe (Adobe Color,
+-- Telle quelle, netteté 40 et bruit de couleur 25, le reste à 0, sans cadre ni masque), puis ceux-là.
+local function reglagesRaw(changes)
+    local r = { CameraProfile = 'Adobe Standard', Look = { Name = 'Adobe Color', Amount = 1 }, WhiteBalance = 'As Shot',
+        Temperature = 5150, Tint = 12, Exposure2012 = 0, Contrast2012 = 0, Highlights2012 = 0, Shadows2012 = 0, Whites2012 = 0,
+        Blacks2012 = 0, Texture = 0, Clarity2012 = 0, Dehaze = 0, Vibrance = 0, Saturation = 0, ConvertToGrayscale = false,
+        ToneCurvePV2012 = { 0, 0, 255, 255 }, ToneCurvePV2012Red = { 0, 0, 255, 255 }, ParametricShadows = 0, ParametricDarks = 0,
+        ParametricLights = 0, ParametricHighlights = 0, ParametricShadowSplit = 25, ParametricMidtoneSplit = 50,
+        ParametricHighlightSplit = 75, HueAdjustmentRed = 0, SaturationAdjustmentBlue = 0, LuminanceAdjustmentAqua = 0,
+        SplitToningShadowHue = 0, SplitToningShadowSaturation = 0, ColorGradeMidtoneSat = 0, ColorGradeBlending = 50,
+        SplitToningBalance = 0, Sharpness = 40, SharpenRadius = 1, SharpenDetail = 25, LuminanceSmoothing = 0, ColorNoiseReduction = 25,
+        LensProfileEnable = 0, AutoLateralCA = 0, LensManualDistortionAmount = 0, VignetteAmount = 0, DefringePurpleAmount = 0,
+        PerspectiveUpright = 0, PerspectiveVertical = 0, PerspectiveScale = 100, PostCropVignetteAmount = 0, GrainAmount = 0,
+        ShadowTint = 0, RedHue = 0, CropLeft = 0, CropTop = 0, CropRight = 1, CropBottom = 1, CropAngle = 0,
+        MaskGroupBasedCorrections = {}, RetouchAreas = {}, RedEyeInfo = {}, LensBlur = { Active = false } }
+    for k, v in pairs(changes or {}) do
+        r[k] = v
+    end
+    return r
+end
+
+essai("Historique d'une photo sans étape de Claude : ses réglages hors de leur valeur par défaut, dans le fil et joints à la première demande ; aux valeurs d'Adobe, rien ; avec des étapes, pas de résumé", function()
+    -- Retouchée à la main : profil de l'appareil, balance, exposition, ombres, recadrée, deux masques.
+    local p205 = photo(205, { editCount = 3 })
+    p205.reglages = reglagesRaw({ CameraProfile = 'Camera CLASSIC CHROME', Look = {}, WhiteBalance = 'Custom', Temperature = 5600, Tint = 8,
+        Exposure2012 = 0.45, Shadows2012 = 30, CropLeft = 0.05, CropRight = 0.95, MaskGroupBasedCorrections = { {}, {} } })
+    -- Un paramètre prédéfini posé à l'importation (rien de retouché à la main, editCount 0).
+    local p206 = photo(206)
+    p206.reglages = reglagesRaw({ Vibrance = 15 })
+    -- Aux valeurs d'Adobe : pas d'historique ; avec des étapes de Claude : ses étapes, pas de résumé.
+    local p207 = photo(207, { editCount = 0 })
+    p207.reglages = reglagesRaw()
+    local p208 = photo(208, { editCount = 2 })
+    p208.reglages = reglagesRaw({ Exposure2012 = 0.3 })
+    journal(p208, { etape('2026-10-24 10:02', 'passe 1 : lumière', 'Sous-exposée.') })
+    depart({})
+    choisir(205)
+    ouvrir(function()
+        local c = Moteur.courante
+        local h = historiques(c, 'historique')
+        egal(1, #h, "l'historique en tête de la conversation neuve")
+        local fine = '\226\128\175'
+        local reglages = "Réglages hors des valeurs par défaut : Profil Camera CLASSIC CHROME · Balance 5" .. fine .. "600" .. fine
+            .. "K / +8 · Exposition +0,45 · Ombres +30 · Recadrée · 2 masques"
+        egal("Historique de la photo : retouchée à la main, sans étape de Claude.\n•  " .. reglages, h[1].texte)
+        egal("[Historique de la photo : retouchée à la main, sans étape de Claude ; " .. reglages .. "]", h[1].pourClaude)
+        egal(false, Conversation.commencee(c), "l'historique ne commence pas la conversation")
+        -- Chaque caractère est mesuré (Metriques) : aucun nouveau ; dans le fil, coupé à sa largeur.
+        for car in Texte.caracteres(h[1].texte .. h[1].pourClaude) do
+            vrai(car == '\n' or Metriques.texte.chasse[car], 'caractère non mesuré : ' .. car)
+        end
+        Fenetre.rafraichir()
+        for _, l in ipairs(Fil.lignes(c, Fenetre.largeurTexte())) do
+            vrai(Fil.occupe(l) <= Fenetre.largeurTexte(), 'coupée à la largeur : ' .. tostring(l.texte))
+        end
+        -- Claude le reçoit avec la première demande, comme le reste de l'historique, une seule fois.
+        local message = demander('Retouche-la')
+        contient(message, h[1].pourClaude, "les réglages joints à la demande")
+        absent(demander('Et le ciel ?'), 'Réglages hors des valeurs par défaut', 'une seule fois')
+        -- Sans retouche à la main : « sans étape de Claude », avec ses réglages.
+        choisir(206)
+        voir()
+        egal("Historique de la photo : sans étape de Claude.\n•  Réglages hors des valeurs par défaut : Vibrance +15",
+            historiques(Moteur.courante, 'historique')[1].texte)
+        -- Aux valeurs d'Adobe, sans retouche : rien.
+        choisir(207)
+        voir()
+        egal(207, Moteur.courante.photo)
+        egal(0, #historiques(Moteur.courante), 'aux valeurs par défaut : pas d\'historique')
+        -- Des étapes de Claude : son journal, sans résumé des réglages.
+        choisir(208)
+        voir()
+        local h208 = historiques(Moteur.courante, 'historique')
+        egal(1, #h208)
+        contient(h208[1].texte, '1 étape de Claude')
+        absent(h208[1].texte, 'Réglages hors des valeurs par défaut', 'pas de résumé avec des étapes de Claude')
+    end)
+    -- Des réglages illisibles (getDevelopSettings en échec) : rien d'inventé, l'historique reste.
+    local p209 = photo(209, { editCount = 1 })
+    p209.getDevelopSettings = function() error('illisible') end
+    local etat = Historique.lire(209)
+    egal(nil, etat.reglages)
+    egal("Historique de la photo : retouchée à la main, sans étape de Claude.", Historique.historique(etat).texte)
+    -- Ce qu'une conversation a vu ne lit pas les réglages.
+    egal(nil, Historique.lire(205, true).reglages, 'sans les réglages')
+end)
+
 essai("Depuis la dernière fois : une étape de Claude faite ailleurs, une reprise à la main ; rien de changé, rien d'ajouté ; ses propres étapes non", function()
     local p301 = photo(301)
     photo(302)
@@ -999,7 +1086,7 @@ essai("Plus de proposition à l'ouverture : ni fenêtre ouverte, ni rappelée pa
         choisir(801, 803)
         voir()
         egal(0, #envois, 'rien quand la photo change')
-        egal('notation', p.onglet, "l'onglet Note, sans bascule")
+        egal('focus', p.onglet, "l'onglet Focus, que chaque autre photo ramène (correctif 1.3.6) ; pas de bascule vers Proposition")
     end)
     Fenetre.envoyer = envoyer
     prefs.propositionAOuverture = nil
@@ -1132,6 +1219,9 @@ essai("Obtenir : la demande part dans la conversation de la photo (neuve gardée
         choisir(822)
         voir()
         egal(c822, Moteur.courante)
+        -- Une autre photo ramène Focus (correctif 1.3.6) : Dany revient à l'onglet Proposition.
+        egal('focus', p.onglet, 'une autre photo : Focus')
+        p.onglet = 'proposition'
         Fenetre.rafraichir()
         egal(true, p.peutObtenir)
         recu = cliquerObtenir(bouton)
@@ -1180,6 +1270,78 @@ essai("Historique (pur) : nouvelles entrées après la dernière vue, par date q
     egal(nil, Conversation.photoDeLaCle(nil))
     egal('25 oct. 2026, 14 h 30', Historique.date('2026-10-25 14:30'))
     vrai(getmetatable(Historique.vu(etat)) == nil, 'table neuve')
+end)
+
+essai("Réglages hors de leur valeur par défaut (pur) : chaque panneau, les défauts d'Adobe d'un RAW et d'un autre fichier, rien d'inventé, nombres à la française, dans l'ordre des panneaux", function()
+    local fine, moins = '\226\128\175', '\226\136\146'
+    local function texte(r, raw)
+        local liste = Historique.ecarts(r, raw)
+        vrai(getmetatable(liste) == nil, 'table neuve')
+        return table.concat(liste, ' · ')
+    end
+    -- Aux valeurs d'Adobe : rien. Un RAW (netteté 40, bruit de couleur 25) ; un JPEG (Incorporé, 0).
+    egal('', texte(reglagesRaw(), true), 'RAW aux valeurs d\'Adobe')
+    local jpeg = { CameraProfile = 'Embedded', WhiteBalance = 'As Shot', IncrementalTemperature = 0, IncrementalTint = 0, Sharpness = 0,
+        ColorNoiseReduction = 0, LuminanceSmoothing = 0, Exposure2012 = 0 }
+    egal('', texte(jpeg, false), 'JPEG aux valeurs d\'Adobe')
+    egal('Netteté 40 · Bruit de couleur 25', texte({ Sharpness = 40, ColorNoiseReduction = 25 }, false), 'les défauts d\'un RAW, pour un JPEG')
+    egal('Netteté 0', texte(reglagesRaw({ Sharpness = 0 }), true))
+    -- Rien d'inventé : ce que Lightroom n'a pas rendu se tait.
+    egal('', texte({}, true), 'aucun réglage lu')
+    egal('', texte(nil, true))
+    -- Le profil : un autre, ou Adobe Color à une autre intensité.
+    egal('Profil Camera PROVIA/Standard', texte(reglagesRaw({ CameraProfile = 'Camera PROVIA/Standard', Look = {} }), true))
+    egal('Profil Adobe Color (intensité 80)', texte(reglagesRaw({ Look = { Name = 'Adobe Color', Amount = 0.8 } }), true))
+    egal('Profil Adobe Standard', texte(reglagesRaw({ Look = {} }), true))
+    egal('', texte({ CameraProfile = 'embedded' }, false), 'à la casse près')
+    -- La balance : en kelvins pour un RAW, relative pour un autre fichier ; ses noms en français.
+    egal('Balance 12' .. fine .. '000' .. fine .. 'K / ' .. moins .. '3', texte(reglagesRaw({ WhiteBalance = 'Custom', Temperature = 12000, Tint = -3 }), true))
+    egal('Balance auto : 5' .. fine .. '600' .. fine .. 'K / +8', texte(reglagesRaw({ WhiteBalance = 'Auto', Temperature = 5600, Tint = 8 }), true))
+    egal('Balance Lumière du jour : 5' .. fine .. '500' .. fine .. 'K / +10',
+        texte(reglagesRaw({ WhiteBalance = 'Daylight', Temperature = 5500, Tint = 10 }), true))
+    egal('Balance +12 / ' .. moins .. '4', texte({ WhiteBalance = 'Custom', IncrementalTemperature = 12, IncrementalTint = -4 }, false))
+    egal('Balance personnalisée', texte({ WhiteBalance = 'Custom' }, true), 'sans ses valeurs')
+    egal('Balance Ma lampe', texte({ WhiteBalance = 'Ma lampe' }, true), 'un nom inconnu, tel quel')
+    -- Tonalité et présence : signées, l'exposition au centième ; sous le centième, rien.
+    egal('Exposition ' .. moins .. '1,23 · Noirs ' .. moins .. '12 · Texture +5 · Correction du voile +8',
+        texte(reglagesRaw({ Exposure2012 = -1.234, Blacks2012 = -12, Texture = 5, Dehaze = 8 }), true))
+    egal('', texte(reglagesRaw({ Exposure2012 = 0.004 }), true), 'arrondie à 0')
+    egal('Exposition +4', texte(reglagesRaw({ Exposure2012 = 4 }), true))
+    -- Courbe, TSL (pas en noir et blanc), étalonnage (sa saturation ou sa luminance), calibrage.
+    egal('Courbe des tonalités', texte(reglagesRaw({ ToneCurvePV2012 = { 0, 0, 64, 50, 255, 255 } }), true))
+    egal('Courbe des tonalités', texte(reglagesRaw({ ParametricDarks = 10 }), true))
+    egal('', texte(reglagesRaw({ ToneCurvePV2012 = {} }), true), 'une courbe vide')
+    egal('TSL touchée', texte(reglagesRaw({ HueAdjustmentOrange = 5, LuminanceAdjustmentBlue = -10 }), true))
+    egal('Noir et blanc', texte(reglagesRaw({ ConvertToGrayscale = true, HueAdjustmentOrange = 5 }), true), 'la TSL ne compte pas en noir et blanc')
+    egal('Étalonnage touché', texte(reglagesRaw({ ColorGradeMidtoneSat = 10 }), true))
+    egal('', texte(reglagesRaw({ SplitToningShadowHue = 200, ColorGradeBlending = 60, SplitToningBalance = 10 }), true),
+        'une teinte sans saturation, le fondu, l\'équilibre : sans effet')
+    egal('Calibrage touché', texte(reglagesRaw({ ShadowTint = 5 }), true))
+    -- Détail, objectif, transformation, effets.
+    egal('Netteté 60 · Réduction du bruit 20 · Bruit de couleur 30',
+        texte(reglagesRaw({ Sharpness = 60, LuminanceSmoothing = 20, ColorNoiseReduction = 30 }), true))
+    egal('Objectif : profil, aberrations chromatiques, réglages manuels',
+        texte(reglagesRaw({ LensProfileEnable = 1, AutoLateralCA = 1, LensManualDistortionAmount = 5 }), true))
+    egal('Transformation (Upright)', texte(reglagesRaw({ PerspectiveUpright = 1 }), true))
+    egal('Transformation', texte(reglagesRaw({ PerspectiveVertical = -10 }), true))
+    egal('Transformation (Upright et réglages manuels)', texte(reglagesRaw({ PerspectiveUpright = 2, PerspectiveScale = 90 }), true))
+    egal('Vignetage ' .. moins .. '15 · Grain 25', texte(reglagesRaw({ PostCropVignetteAmount = -15, GrainAmount = 25 }), true))
+    -- Recadrage, redressement (au dixième), masques, taches, yeux rouges, flou de l'objectif.
+    egal('Recadrée · Redressée de 1,4°', texte(reglagesRaw({ CropTop = 0.1, CropAngle = -1.43 }), true))
+    egal('', texte(reglagesRaw({ CropAngle = 0.02, CropRight = 0.9999 }), true), 'sous le dixième et la marge : rien')
+    egal('1 masque · 5 taches · 2 yeux rouges corrigés · Flou de l\'objectif', texte(reglagesRaw({ MaskGroupBasedCorrections = { {} },
+        RetouchAreas = { {}, {}, {}, {}, {} }, RedEyeInfo = { {}, {} }, LensBlur = { Active = true } }), true))
+    egal('2 taches', texte({ RetouchInfo = { {}, {} } }, true), "l'ancienne forme des taches")
+    -- Tout ensemble, dans l'ordre des panneaux.
+    egal('Profil Camera CLASSIC CHROME · Balance 5' .. fine .. '600' .. fine .. 'K / +8 · Noir et blanc · Exposition +0,45 · Ombres +30'
+        .. ' · Courbe des tonalités · Étalonnage touché · Netteté 50 · Objectif : profil · Transformation (Upright) · Vignetage '
+        .. moins .. '10 · Calibrage touché · Recadrée · Redressée de 2° · 2 masques · 1 tache',
+        texte(reglagesRaw({ CameraProfile = 'Camera CLASSIC CHROME', Look = {}, WhiteBalance = 'Custom', Temperature = 5600, Tint = 8,
+            ConvertToGrayscale = true, Exposure2012 = 0.45, Shadows2012 = 30, ParametricLights = 5, ColorGradeGlobalSat = 4,
+            Sharpness = 50, LensProfileEnable = 1, PerspectiveUpright = 1, PostCropVignetteAmount = -10, RedHue = 3, CropLeft = 0.1,
+            CropAngle = 2, MaskGroupBasedCorrections = { {}, {} }, RetouchAreas = { {} } }), true))
+    -- La puce.
+    egal('Réglages hors des valeurs par défaut : Ombres +30 · Recadrée', Historique.texteReglages({ 'Ombres +30', 'Recadrée' }))
 end)
 
 essai("Gestionnaire : la case « Autre photo : reprendre sa conversation, sinon une nouvelle » (même clé), dite par le diagnostic ; consignes", function()

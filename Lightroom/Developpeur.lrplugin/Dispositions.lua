@@ -1,14 +1,17 @@
 -- Dispositions.lua : la fenêtre Claude, assemblée des pièces de Vues.lua, et ses dimensions. Une
 -- seule disposition, la « Conversation claire », à l'allure de la fenêtre B (1.3, maquette
--- « B · Conversation claire ») : deux colonnes sur des aplats, au centre l'en-tête (ses trois
--- voyants), le fil, sa barre et la zone de saisie, à droite les segments
--- Aperçu | Focus | Proposition | Note | Suivi sur le panneau, l'aperçu commun et la carte de
--- l'onglet (Focus : demandé par Dany le 22 octobre 2026 ; Suivi, le carnet de progrès, à la place
--- de Leçon au correctif 1.3.6). Le volet des conversations de gauche (Nouvelle conversation,
--- Rechercher, la liste, Renommer…, Supprimer…, Publication… et Consommation…, les versions et le
--- voyant Écran) est retiré au correctif 1.3.6 (décision de Dany du 25 octobre 2026) : Publication…
--- et Consommation… restent au menu Module externe - Extras. L'Atelier, le Panneau et le choix de
--- la disposition sont retirés, comme le choix de la taille (demandés par Dany le 20 octobre 2026).
+-- « B · Conversation claire ») : deux colonnes sur des aplats, au centre l'en-tête (ses deux
+-- voyants et, en haut à droite, le bouton Suivi), le fil, sa barre et la zone de saisie, à droite les segments
+-- Focus | Note | Aperçu | Proposition sur le panneau, l'aperçu commun et la carte de l'onglet
+-- (Focus : demandé par Dany le 22 octobre 2026 ; cet ordre, décidé par Dany le 25 octobre 2026,
+-- correctif 1.3.6). Suivi, le carnet de progrès (l'onglet qui avait pris la place de Leçon), est
+-- une fenêtre à part depuis la même décision (FenetreSuivi.lua), que le bouton Suivi de l'en-tête
+-- ouvre. Le volet des conversations de gauche (Nouvelle conversation, Rechercher, la liste,
+-- Renommer…, Supprimer…, Publication… et Consommation…, les versions et le voyant Écran) est retiré
+-- au correctif 1.3.6 (décision de Dany du 25 octobre 2026) : Publication… et Consommation… restent
+-- au menu Module externe - Extras, et le voyant Écran, passé d'abord dans l'en-tête, est retiré au
+-- même correctif (plus rien sur l'étalonnage de l'écran). L'Atelier, le Panneau et le choix de la
+-- disposition sont retirés, comme le choix de la taille (demandés par Dany le 20 octobre 2026).
 -- Son cadre enregistré (Fenetre.cadre) : Lightroom rend sa taille enregistrée à une fenêtre
 -- rouverte, sans la rapetisser (constaté).
 --
@@ -20,13 +23,13 @@
 -- 556) ; `lignes` et `hauteurLigne` (la grille du fil : autant de lignes que sa hauteur en tient),
 -- `fil` (sa largeur utile), `auteur`, `ecartAuteur` et `texteFil` (la colonne auteur, son écart et
 -- le texte d'une ligne du fil), `apercu` et `apercuHauteur` (le cadre 3:2 de l'aperçu, et son
--- image « aucun aperçu », scripts/images-vides.swift), `onglets` (les segments, dans leur ordre),
--- `ongletParDefaut` (Note, montré à l'ouverture), `ongletProposition` et `ongletNotation` (onglet
--- montré quand une proposition ou une note arrive), `ongletEtape` (l'onglet Aperçu, l'ancien
--- Pourquoi ? : ouvert par un clic sur une étape du fil, jamais par une bascule automatique),
--- `ongletFocus` et `ongletSuivi` (ouverts seulement par un clic sur leur segment), `propLignes`,
--- `etapeLignes`, `focusLignes`, `suiviLignes` et `criteres` (lignes des cartes) ;
--- les autres sont des largeurs et des hauteurs de pièces, tirées des précédentes.
+-- image « aucun aperçu », scripts/images-vides.swift), `onglets` (les segments, dans leur ordre,
+-- Dispositions.ONGLETS), `ongletParDefaut` et `ongletFocus` (Focus : montré à l'ouverture, et chaque
+-- fois qu'une autre photo choisie montre sa conversation), `ongletProposition` et `ongletNotation`
+-- (onglet montré quand une proposition ou une note arrive), `ongletEtape` (l'onglet Aperçu, l'ancien
+-- Pourquoi ? : ouvert par un clic sur une étape ou une image du fil, et quand une image de Claude
+-- arrive), `propLignes`, `etapeLignes`, `focusLignes` et `criteres` (lignes des cartes) ; les autres
+-- sont des largeurs et des hauteurs de pièces, tirées des précédentes.
 --
 -- Ses images (Dispositions.IMAGES) et ses deux apparences, claire et sombre
 -- (Dispositions.APPARENCES, Dispositions.PALETTES), avec Dispositions.image et
@@ -62,20 +65,23 @@ Dispositions.TAILLES = {
     -- d'au moins 16 ; leur nombre (D.lignes, 42) est celui que la hauteur du fil tient, le reste va à
     -- la marge du bas, où il ne gêne rien.
     -- Chaque ligne : la colonne auteur (« Vous », « Claude », l'heure) de 60, un écart de 12, puis
-    -- le texte (maquette) ; « Pourquoi ? » à droite d'une étape, un carré small de 80 (constaté le
-    -- 21 octobre 2026, D6 : bezel de 15 dans une case de 21), comme les boutons d'actions (« ☆ Voir
-    -- la note », « ＋ Garder la demande » : 114 en petit, et 22 de jeu comme l'autre), aux largeurs de
-    -- leurs titres en petit.
+    -- le texte (maquette) ; les boutons d'actions en carrés small (« ☆ Voir la note », « ＋ Garder la
+    -- demande » : bezel de 15 dans une case de 21, constaté le 21 octobre 2026, D6, pour « Pourquoi ? »,
+    -- retiré au correctif 1.3.6 : un clic sur la ligne de l'étape en tient lieu), aux largeurs de
+    -- leurs titres en petit et 22 de jeu.
     hauteurLigne = 21, margeHautFil = 20, margeBasFil = 16,
-    auteur = 60, ecartAuteur = 12, pourquoi = 80, voirNote = 96, garderDemande = 136, ecartActions = 8,
+    auteur = 60, ecartAuteur = 12, voirNote = 96, garderDemande = 136, ecartActions = 8,
     -- Le menu Mes demandes, à droite du menu Style sous le champ (demandé par Dany le 22 octobre
     -- 2026) : assez large pour « Nom — petite description » (Fenetre.titreDemande coupe chaque
     -- élément à sa largeur, moins la place de ses flèches) ; le bandeau prend ce qu'il laisse (324).
     mesDemandes = 280,
-    -- Les trois voyants de l'en-tête (Claude Code, Lightroom, Écran : le voyant Écran y vient du bas
-    -- du volet, retiré au correctif 1.3.6), chacun avec sa pastille de 8 et 6 d'écart, 14 entre
-    -- eux : la photo active prend le reste de la rangée.
-    voyantClaude = 125, voyantLightroom = 150, voyantEcran = 150, ecartVoyants = 14,
+    -- Les deux voyants de l'en-tête (Claude Code, Lightroom ; le voyant Écran, de 150, est retiré
+    -- au correctif 1.3.6), chacun avec sa pastille de 8 et 6 d'écart, 14 entre eux, et au bout de
+    -- leur rangée, en haut à droite, le bouton Suivi (le carnet de progrès dans sa fenêtre, décision
+    -- de Dany du 25 octobre 2026) : un carré small, comme les boutons d'actions du fil (bezel de 15,
+    -- D6, dans la rangée des voyants), son titre en petit (« Suivi » : environ 24) et 22 de jeu ; la
+    -- photo active prend le reste de la rangée, entre eux.
+    voyantClaude = 125, voyantLightroom = 150, ecartVoyants = 14, boutonSuivi = 56,
     -- « Repartir à neuf », à droite du titre (correctif 1.3.6) : un carré de bezel 22, son titre en
     -- 12 (environ 87 points) et du jeu.
     repartir = 120,
@@ -84,7 +90,7 @@ Dispositions.TAILLES = {
     -- Refuser, Ajuster… et Accepter en bleu, la rangée tient dans l'intérieur du panneau
     -- (essais-fenetre-b.lua).
     obtenir = 80,
-    -- L'aperçu commun aux cinq onglets : un cadre 3:2 de 498 × 332, à la largeur de l'intérieur du
+    -- L'aperçu commun aux quatre onglets : un cadre 3:2 de 498 × 332, à la largeur de l'intérieur du
     -- panneau (demandé par Dany le 21 octobre 2026), sa vignette en 2x (996 × 664 pixels,
     -- Images.vignette).
     apercu = 498, apercuHauteur = 332, echelleApercu = 2,
@@ -94,7 +100,7 @@ Dispositions.TAILLES = {
     -- (Dispositions.IMAGES) : la carte Note, 137 (la grille de l'onglet Note au-dessus d'elle, 96 :
     -- Votre note 30, 8, Drapeau 26, 10, Claude propose 16, 6 ; sa rangée du bas, 12 et 28 ; et 1 de
     -- jeu : l'onglet Note remplit la place ; 161 avant le correctif 1.3.2, avec la rangée des
-    -- passes) ; les cartes Proposition, Aperçu (étape), Focus et Suivi, 41 : comme la carte Note, elles
+    -- passes) ; les cartes Proposition, Aperçu (étape) et Focus, 41 : comme la carte Note, elles
     -- descendent jusqu'à leur rangée de boutons, posée sous elles au bas du panneau (12, le cadre de
     -- ses boutons de bezel 26, et 1 de jeu ; demandé par Dany le 21 octobre 2026).
     autourNote = 137, sousCarte = 41,
@@ -105,9 +111,10 @@ Dispositions.TAILLES = {
     -- plafond depuis le correctif 1.3.2, demandé par Dany le 22 octobre 2026), le texte de la
     -- proposition (sur carte-proposition de 679 : 12 + titre + 6 + 42 lignes, sans la ligne de l'état
     -- d'un exercice « Je le fais » depuis le correctif 1.3.6, 40 lignes avant), de l'étape (onglet
-    -- Aperçu, sur carte-etape de 679 : 12 + titre + 6 + sous-titre + 6 + 40 lignes) et des onglets
-    -- Focus et Suivi (sur carte-focus et carte-suivi de 679 : 12 + titre + 6 + 42 lignes).
-    criteres = 33, propLignes = 42, etapeLignes = 40, focusLignes = 42, suiviLignes = 42,
+    -- Aperçu, sur carte-etape de 679 : 12 + titre + 6 + sous-titre + 6 + 40 lignes) et de l'onglet
+    -- Focus (sur carte-focus de 679 : 12 + titre + 6 + 42 lignes ; carte-suivi, de même, est retirée
+    -- avec l'onglet Suivi au correctif 1.3.6).
+    criteres = 33, propLignes = 42, etapeLignes = 40, focusLignes = 42,
     -- Le cadre d'un square_button dépasse son bezel visible de 2 points (constaté le 21 octobre 2026,
     -- D5 : height = bezel + 2 ; Fenetre.bouton, clé `bezel`).
     margeBezel = 2,
@@ -152,34 +159,46 @@ local T = Dispositions.TAILLES
 local hauteurPanneau = hauteurContenu(T) - T.margeHautDroite - T.margeBasDroite
 local placeDesCartes = placeCartes(T, hauteurPanneau)
 
+-- Les onglets de la colonne droite, dans l'ordre de leurs segments (décision de Dany du 25 octobre
+-- 2026, correctif 1.3.6 : Focus, Note, Aperçu, Proposition ; Suivi, le carnet de progrès, est
+-- devenu une fenêtre à part, ouverte par le bouton Suivi de l'en-tête) : la valeur de la clé
+-- `onglet`, le titre (l'infobulle du segment, et le libellé que scripts/images-fenetre.swift
+-- dessine) et l'image du segment (et `-actif`, le segment choisi). La seule liste :
+-- Dispositions.dimensions (D.onglets) et Dispositions.gabarits (l'ordre des segments dessinés et
+-- leurs bouts arrondis) en viennent.
+Dispositions.ONGLETS = {
+    { valeur = 'focus', titre = "Focus", image = 'seg-focus' },
+    { valeur = 'notation', titre = "Note", image = 'seg-note' },
+    { valeur = 'apercu', titre = "Aperçu", image = 'seg-apercu' },
+    { valeur = 'proposition', titre = "Proposition", image = 'seg-proposition' },
+}
+
 Dispositions.IMAGES = {
     -- Le panneau de la colonne droite, à cheval sur les segments : une bande transparente de 12 en
     -- haut, puis le panneau blanc (bord #C9C9C9, coins de 7), dont 1 134 de panneau.
     panneau = taille(T.panneau, hauteurPanneau),
     -- Les fonds des cartes (#FAFAFA, bord #D9D9D9, coins de 6), à la largeur intérieure du panneau :
-    -- Note (la grille des critères), Proposition, Aperçu (étape), Focus et Suivi, à la hauteur que
-    -- leur laisse la place des cartes (720 sous l'aperçu de 498 × 332 : 583 pour la carte Note, que
-    -- l'onglet Note remplit, 679 pour les autres, leur rangée de boutons sous elles).
+    -- Note (la grille des critères), Proposition, Aperçu (étape) et Focus, à la hauteur que leur
+    -- laisse la place des cartes (720 sous l'aperçu de 498 × 332 : 583 pour la carte Note, que
+    -- l'onglet Note remplit, 679 pour les autres, leur rangée de boutons sous elles). (carte-suivi
+    -- est retirée avec l'onglet Suivi au correctif 1.3.6.)
     ['carte-note'] = taille(T.interieur, placeDesCartes - T.autourNote),
     ['carte-proposition'] = taille(T.interieur, placeDesCartes - T.sousCarte),
     ['carte-etape'] = taille(T.interieur, placeDesCartes - T.sousCarte),
     ['carte-focus'] = taille(T.interieur, placeDesCartes - T.sousCarte),
-    ['carte-suivi'] = taille(T.interieur, placeDesCartes - T.sousCarte),
-    -- Les onglets Aperçu | Focus | Proposition | Note | Suivi, libellés dessinés, et le segment
-    -- choisi en bleu (« Focus » : 62, comme la largeur de « Leçon », retiré au correctif 1.3.6, à 3
-    -- points près ; « Suivi », de la chasse de « Note » à 1 point près, 57 comme lui ; les cinq font
-    -- 346 dans le panneau de 528).
-    ['seg-apercu'] = taille(72, 22),
-    ['seg-apercu-actif'] = taille(72, 22),
+    -- Les onglets Focus | Note | Aperçu | Proposition (Dispositions.ONGLETS), libellés dessinés, et
+    -- le segment choisi en bleu, les bouts arrondis au premier et au dernier (« Focus » : 62, comme
+    -- la largeur de « Leçon », retiré au correctif 1.3.6, à 3 points près ; les quatre font 289 dans
+    -- le panneau de 528 ; seg-suivi et seg-suivi-actif sont retirées avec l'onglet Suivi).
     ['seg-focus'] = taille(62, 22),
     ['seg-focus-actif'] = taille(62, 22),
-    ['seg-proposition'] = taille(98, 22),
-    ['seg-proposition-actif'] = taille(98, 22),
     ['seg-note'] = taille(57, 22),
     ['seg-note-actif'] = taille(57, 22),
-    ['seg-suivi'] = taille(57, 22),
-    ['seg-suivi-actif'] = taille(57, 22),
-    -- Les voyants Claude Code, Lightroom et Écran (plus de pastille bleue : le voyant Mode est retiré).
+    ['seg-apercu'] = taille(72, 22),
+    ['seg-apercu-actif'] = taille(72, 22),
+    ['seg-proposition'] = taille(98, 22),
+    ['seg-proposition-actif'] = taille(98, 22),
+    -- Les voyants Claude Code et Lightroom (plus de pastille bleue : le voyant Mode est retiré).
     ['pastille-vert'] = taille(8, 8),
     ['pastille-orange'] = taille(8, 8),
     ['pastille-rouge'] = taille(8, 8),
@@ -346,9 +365,11 @@ end
 
 -- Ce que lisent scripts/images-fenetre.swift et scripts/images-vides.swift (par
 -- scripts/gabarits.lua, en JSON) : les tailles des images, puis, pour chaque apparence, le dossier
--- de ses images et sa palette, et le cadre de l'image « aucun aperçu ». Tables neuves.
+-- de ses images et sa palette, le cadre de l'image « aucun aperçu », et les segments des onglets
+-- dans leur ordre (Dispositions.ONGLETS : `cle`, le nom de l'image sans « seg- », et `titre`, le
+-- libellé dessiné). Tables neuves.
 function Dispositions.gabarits()
-    local images, apparences = {}, {}
+    local images, apparences, segments = {}, {}, {}
     for nom, t in pairs(Dispositions.IMAGES) do
         images[nom] = { largeur = t.largeur, hauteur = t.hauteur }
     end
@@ -359,8 +380,11 @@ function Dispositions.gabarits()
         end
         apparences[a.value] = { dossier = a.dossier, couleurs = couleurs }
     end
+    for _, onglet in ipairs(Dispositions.ONGLETS) do
+        segments[#segments + 1] = { cle = (onglet.image:gsub('^seg%-', '')), titre = onglet.titre }
+    end
     local T = Dispositions.TAILLES
-    return { images = images, apparences = apparences,
+    return { images = images, apparences = apparences, segments = segments,
         vide = { nom = Dispositions.nomImageVide(), largeur = T.apercu, hauteur = T.apercuHauteur } }
 end
 
@@ -381,17 +405,17 @@ function Dispositions.dimensions()
     D.largeurContenu = D.largeurFenetre - 2 * D.margeDialogue
     D.hauteurContenu = hauteurContenu(D)
     -- Centre : 1 024 utiles. L'en-tête : le titre (gras 16) et « Repartir à neuf », puis les voyants
-    -- Claude Code, Lightroom et Écran et la photo active, alignée à droite sur la marge (la rangée
-    -- fait les 1 024 : un texte de taille fixe ne s'étire pas) ; le fil ; la barre, dont l'activité
-    -- (ou le forfait) finit de même sur la marge de droite, comme dans la maquette ; la saisie
-    -- (Style, Mes demandes, bandeau, Envoyer). Le titre prend ce que le Mode laissait (sa place à
-    -- 1 280 × 800 : 590 − 270), où « Repartir à neuf » (D.repartir) se pose à droite depuis que les
-    -- radios du Mode sont retirés (correctif 1.3.6) : D.placeRepartir.
+    -- Claude Code et Lightroom, la photo active, alignée à droite, et le bouton Suivi sur la marge,
+    -- sous « Repartir à neuf » (la rangée fait les 1 024 : un texte de taille fixe ne s'étire pas) ;
+    -- le fil ; la barre, dont l'activité (ou le forfait) finit de même sur la marge de droite, comme
+    -- dans la maquette ; la saisie (Style, Mes demandes, bandeau, Envoyer). Le titre prend ce que le
+    -- Mode laissait (sa place à 1 280 × 800 : 590 − 270), où « Repartir à neuf » (D.repartir) se
+    -- pose à droite depuis que les radios du Mode sont retirés (correctif 1.3.6) : D.placeRepartir.
     D.fil = D.centre - 2 * D.margeCentre
     D.placeRepartir = 320
     D.titre = D.fil - D.placeRepartir
     D.info = D.fil - (8 + 6 + D.voyantClaude) - D.ecartVoyants - (8 + 6 + D.voyantLightroom) - D.ecartVoyants
-        - (8 + 6 + D.voyantEcran)
+        - D.boutonSuivi - D.ecartVoyants
     -- Le fil : autant de lignes que sa hauteur en tient entre ses marges (42 dans 920), le reste à
     -- la marge du bas.
     D.hauteurFil = D.hauteurContenu - (D.entete + D.filet) - D.barre - D.saisie
@@ -415,26 +439,21 @@ function Dispositions.dimensions()
     -- son bord (bande transparente de 12) ; son contenu de 498 sous une marge de 13 (12 + 1 + 22 =
     -- 35 depuis le haut des segments, comme la maquette) et à 15 du bord (14 + 1).
     D.segments = 0
-    D.onglets = {
-        { valeur = 'apercu', titre = "Aperçu", image = 'seg-apercu' },
-        { valeur = 'focus', titre = "Focus", image = 'seg-focus' },
-        { valeur = 'proposition', titre = "Proposition", image = 'seg-proposition' },
-        { valeur = 'notation', titre = "Note", image = 'seg-note' },
-        { valeur = 'suivi', titre = "Suivi", image = 'seg-suivi' },
-    }
-    for _, onglet in ipairs(D.onglets) do
+    D.onglets = {}
+    for _, onglet in ipairs(Dispositions.ONGLETS) do
+        D.onglets[#D.onglets + 1] = { valeur = onglet.valeur, titre = onglet.titre, image = onglet.image }
         D.segments = D.segments + Dispositions.IMAGES[onglet.image].largeur
     end
     D.hauteurSegments = Dispositions.IMAGES['seg-note'].hauteur
     D.margeSegments = math.floor((D.panneau - D.segments) / 2)
     D.margeHautPanneau = HAUT_CONTENU_PANNEAU - D.hauteurSegments
     D.margeGauchePanneau = D.panneau - D.interieur - 15
-    -- Note par défaut, donc montrée à l'ouverture ; une proposition qui arrive montre Proposition,
-    -- une note Note ; Aperçu (l'ancien Pourquoi ?) s'ouvre sur un clic, jamais tout seul, comme
-    -- Focus (22 octobre 2026) et Suivi (le carnet de progrès, correctif 1.3.6), qui ne s'ouvrent que
-    -- par un clic sur leur segment.
-    D.ongletParDefaut, D.ongletProposition, D.ongletNotation, D.ongletEtape, D.ongletFocus, D.ongletSuivi =
-        'notation', 'proposition', 'notation', 'apercu', 'focus', 'suivi'
+    -- Focus par défaut, montré à l'ouverture et chaque fois qu'une autre photo choisie montre sa
+    -- conversation ; une image de Claude qui arrive montre Aperçu (l'ancien Pourquoi ?, ouvert aussi
+    -- par un clic sur une étape ou une image du fil), sauf celle d'une proposition, qui montre
+    -- Proposition ; une note montre Note (décisions de Dany du 25 octobre 2026, correctif 1.3.6).
+    D.ongletParDefaut, D.ongletProposition, D.ongletNotation, D.ongletEtape, D.ongletFocus =
+        'focus', 'proposition', 'notation', 'apercu', 'focus'
     -- L'aperçu, sa vignette en pixels, et la rangée ◀ légende ▶ · ⤢ Agrandir sous lui.
     D.pixelsApercu = D.apercu * D.echelleApercu
     D.pixelsApercuHauteur = D.apercuHauteur * D.echelleApercu
@@ -444,14 +463,13 @@ function Dispositions.dimensions()
     -- de 1 et sa marge de 14) : 720 points, d'où les hauteurs des cartes (Dispositions.IMAGES). Chaque
     -- carte y tient (essais-fenetre-b.lua).
     D.placeCartes = placeCartes(D, Dispositions.IMAGES.panneau.hauteur)
-    -- Les cartes sur leurs images (Vues.focus, Vues.suivi, Vues.proposition, Vues.etape, la grille
-    -- des critères de Vues.notation) : leur texte à l'intérieur de la carte (472), à 13 du bord (12
-    -- de marge et le bord de 1), coupé en pages à cette largeur (Fenetre.montrerPage).
+    -- Les cartes sur leurs images (Vues.focus, Vues.proposition, Vues.etape, la grille des critères
+    -- de Vues.notation) : leur texte à l'intérieur de la carte (472), à 13 du bord (12 de marge et le
+    -- bord de 1), coupé en pages à cette largeur (Fenetre.montrerPage).
     D.largeurNote = D.carte
     D.largeurProposition = D.carte
     D.largeurEtape = D.carte
     D.largeurFocus = D.carte
-    D.largeurSuivi = D.carte
     D.margeCarte = math.floor((D.interieur - D.carte) / 2)
     -- La carte Note (Vues.notation, maquette « B · Conversation claire », onglet Note) : la grille
     -- des étiquettes (« Votre note : », « Drapeau : », alignées à droite en 12 : « Votre note : »
@@ -477,16 +495,15 @@ function Dispositions.dimensions()
     D.texteCritere = D.carte - D.etiquetteCritere - D.ecartCritere
     D.zoom = 92
     D.laisser, D.changer = 104, 84
-    -- Les rangées sous les cartes Proposition, Aperçu (étape), Focus et Suivi, comme celle de la
-    -- carte Note (bezel de 26, titres en 13, 8 entre les boutons ; demandé par Dany le 21 octobre
-    -- 2026) : ▲ ▼ à gauche, puis, à droite, Obtenir (D.obtenir, de TAILLES), Refuser et Ajuster… en
-    -- carrés et Accepter en bleu (Vues.proposition) ; ◀ ▶, Voir l'avant (ou l'après) et Détail… en
-    -- carrés (Vues.etape) ; ▲ ▼ seulement (Vues.focus) ; « Photos d'un défaut… » en carré
-    -- (Vues.suivi : son titre en 13 mesure 125,7, et le jeu du carré, comme Détail… à 80 pour 45,2).
+    -- Les rangées sous les cartes Proposition, Aperçu (étape) et Focus, comme celle de la carte Note
+    -- (bezel de 26, titres en 13, 8 entre les boutons ; demandé par Dany le 21 octobre 2026) : ▲ ▼ à
+    -- gauche, puis, à droite, Obtenir (D.obtenir, de TAILLES), Refuser et Ajuster… en carrés et
+    -- Accepter en bleu (Vues.proposition) ; ◀ ▶, Voir l'avant (ou l'après) et Détail… en carrés
+    -- (Vues.etape) ; ▲ ▼ seulement (Vues.focus). (« Photos d'un défaut… » est passé de la carte Suivi
+    -- à la fenêtre Suivi, FenetreSuivi.lua.)
     D.refuser, D.ajuster = 80, 86
     D.bascule = 104
     D.detail = 80
-    D.photosDefaut = 150
     return D
 end
 
@@ -536,10 +553,10 @@ local function centre(f, F, D)
 end
 
 -- La colonne droite : sur son aplat, le panneau en image, les segments à cheval sur son bord ;
--- dedans, l'aperçu commun, la rangée ◀ légende ▶ · ⤢ Agrandir, puis les cinq variantes
--- superposées des onglets, chacune sur sa carte en image (lots B4 et B5) : la carte de l'étape dans
--- Aperçu, la carte Focus (Image, Prise de vue, Mise au point), la proposition, la carte Note (sa
--- grille, puis la carte des critères) et la carte Suivi (le résumé du carnet de progrès).
+-- dedans, l'aperçu commun, la rangée ◀ légende ▶ · ⤢ Agrandir, puis les quatre variantes
+-- superposées des onglets, dans l'ordre de leurs segments, chacune sur sa carte en image (lots B4
+-- et B5) : la carte Focus (Image, Prise de vue, Mise au point), la carte Note (sa grille, puis la
+-- carte des critères), la carte de l'étape dans Aperçu et la proposition.
 local function droite(f, F, D)
     local C = F.COULEURS
     local largeur = D.interieur
@@ -564,11 +581,10 @@ local function droite(f, F, D)
                     f:spacer { height = 12 },
                     f:column {
                         place = 'overlapping',
-                        variante(f, F, largeur, 'apercu', function(fm) return { Vues.etape(fm, F, largeur, D) } end),
                         variante(f, F, largeur, 'focus', function(fm) return { Vues.focus(fm, F, largeur, D) } end),
-                        variante(f, F, largeur, 'proposition', function(fm) return { Vues.proposition(fm, F, largeur, D) } end),
                         variante(f, F, largeur, 'notation', function(fm) return { Vues.notation(fm, F, largeur, D) } end),
-                        variante(f, F, largeur, 'suivi', function(fm) return { Vues.suivi(fm, F, largeur, D) } end),
+                        variante(f, F, largeur, 'apercu', function(fm) return { Vues.etape(fm, F, largeur, D) } end),
+                        variante(f, F, largeur, 'proposition', function(fm) return { Vues.proposition(fm, F, largeur, D) } end),
                     },
                 },
             },

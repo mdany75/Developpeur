@@ -3,11 +3,15 @@ import CoreGraphics
 import Foundation
 
 /// L'écran principal du Mac et son profil de couleur (« écran nommé », 1.2). Claude mesure la photo
-/// par ses chiffres (view_photo), sans passer par l'écran ; l'utilisateur la juge sur le sien : le
-/// connecteur dit quel est cet écran et si son profil vient d'une sonde d'étalonnage. Lu par
-/// CoreGraphics et ColorSync, sans AppKit et sans aucune permission (environ 44 ms, relevé le
-/// 20 octobre 2026). Le module ne le lit pas : macOS seul connaît l'écran, et la fenêtre Claude le
-/// demande au connecteur (`mcp-developpeur --ecran`, une ligne JSON).
+/// par ses chiffres (view_photo), sans passer par l'écran. Lu par CoreGraphics et ColorSync, sans
+/// AppKit et sans aucune permission (environ 44 ms, relevé le 20 octobre 2026). Le module ne le lit
+/// pas : macOS seul connaît l'écran.
+///
+/// Depuis le correctif 1.3.6 (Dany n'achètera jamais de sonde : « plus rien sur l'étalonnage de
+/// l'écran », 25 octobre 2026), ni Claude ni Dany n'entendent plus parler d'étalonnage : get_status
+/// ne dit que le nom des écrans (`nommer`), sans remarque au premier aperçu, et la fenêtre Claude n'a
+/// plus de voyant Écran. Le classement du profil reste pour le développement seulement
+/// (`mcp-developpeur --ecran`, une ligne JSON).
 ///
 /// Constaté le 20 octobre 2026 (Odyssey G85SD en HDMI, seul écran) :
 /// - ColorSyncProfileCopyHeader rend les signatures de l'en-tête à l'envers (« lppa » pour
@@ -20,11 +24,10 @@ import Foundation
 ///   du système (« HDMI SD » : /System/Library/CoreServices/Resources/Profiles/SD 170M-A.icc) ;
 /// - sRGB Profile.icc du système porte une balise meas : elle n'est pas l'indice d'une sonde.
 ///
-/// Six classes (Etalonnage). `mesure` ne vaut vrai que pour une sonde, faux pour un profil d'usine,
-/// standard ou fait à l'œil, et reste inconnu (nil) pour un profil personnalisé sans trace d'une
-/// sonde : dans le doute, « étalonné ? » plutôt qu'« étalonné ». Aucun vrai profil de sonde n'a
-/// encore été relevé (à constater) : l'indice est la balise vcgt avec un créateur autre qu'Apple,
-/// ou le nom d'un logiciel de sonde dans le profil.
+/// Six classes (Etalonnage), pour `--ecran` seulement. `mesure` ne vaut vrai que pour une sonde, faux
+/// pour un profil d'usine, standard ou fait à l'œil, et reste inconnu (nil) pour un profil
+/// personnalisé sans trace d'une sonde. Aucun vrai profil de sonde n'a été relevé : l'indice est la
+/// balise vcgt avec un créateur autre qu'Apple, ou le nom d'un logiciel de sonde dans le profil.
 public enum Ecran {
     /// La classe du profil actif d'un écran.
     public enum Etalonnage: String, CaseIterable {
@@ -327,86 +330,15 @@ public enum Ecran {
         }
     }
 
-    /// Une ligne : « Odyssey G85SD · profil d'usine, non mesuré sur ce Mac ».
+    /// Une ligne, pour `--ecran` : « Odyssey G85SD · profil d'usine, non mesuré sur ce Mac ».
     public static func texte(_ a: Affichage) -> String {
         "\(a.nom) · \(profilEnMots(a))"
     }
 
-    /// La remarque dite une fois à Claude, au premier aperçu, si l'écran n'est pas mesuré ; nil s'il
-    /// l'est. Elle porte la consigne : les consignes du connecteur n'ont plus de place.
-    public static func remarque(_ a: Affichage) -> String? {
-        let debut = "Écran principal de l'utilisateur : \(a.nom), \(profilEnMots(a)). Les mesures de view_photo "
-            + "n'en dépendent pas, son œil si : quand son avis compte (peau, couleurs), "
-        switch a.etalonnage.mesure {
-        case .some(true): return nil
-        case .some(false): return debut + "lui dire en une phrase que son écran n'est pas étalonné."
-        case .none: return debut + "lui demander si son écran est étalonné."
-        }
-    }
-
-    /// Où choisir le profil de couleur, avec les libellés de la langue du Mac (relevés le 20 octobre
-    /// 2026 dans DisplaysExt.appex et Réglages Système) : en français du Canada, « Réglages système ›
-    /// Écrans » (le Mac de Dany est en fr-CA) ; en français de France, « Réglages Système ›
-    /// Moniteurs ».
-    static func reglageProfil(langue: String?) -> String {
-        let code = (langue ?? "").replacingOccurrences(of: "_", with: "-").lowercased()
-        return code.hasPrefix("fr-ca") ? "Réglages système › Écrans › Profil de couleur"
-            : "Réglages Système › Moniteurs › Profil de couleur"
-    }
-
-    /// Le texte de la boîte « Claude · écran » de la fenêtre Claude (un clic sur le voyant Écran) ;
-    /// `langue` : la première langue de l'utilisateur, pour nommer les Réglages comme son Mac.
-    public static func detail(_ e: Etat, langue: String? = Locale.preferredLanguages.first) -> String {
-        let a = e.principal
-        var qualites: [String] = []
-        if a.integre { qualites.append("intégré") }
-        if a.gamutLarge { qualites.append("gamut large") }
-        var lignes = ["Écran principal : \(a.nom)\(qualites.isEmpty ? "" : " (\(qualites.joined(separator: ", ")))")."]
-        let nom = "« \(nomProfil(a)) »"
-        switch a.etalonnage {
-        case .usine:
-            lignes.append("Profil de couleur : \(nom), le profil d'usine de l'écran, non mesuré sur ce Mac.")
-        case .standard:
-            lignes.append("Profil de couleur : \(nom), un profil standard du système, non mesuré sur cet écran.")
-        case .oeil:
-            lignes.append("Profil de couleur : \(nom), fait à l'œil avec l'assistant d'étalonnage d'Apple, non mesuré.")
-        case .sonde:
-            var texte = "Profil de couleur : \(nom), mesuré par une sonde"
-            if let logiciel = a.profil?.logiciel { texte += " (\(logiciel))" }
-            if let date = a.profil?.date { texte += ", profil du \(dateEnMots(date))" }
-            lignes.append(texte + ".")
-        case .personnalise:
-            lignes.append("Profil de couleur : \(nom), un profil personnalisé, sans trace d'une sonde (ni logiciel "
-                + "d'étalonnage nommé, ni courbes de la carte graphique).")
-        case .inconnu:
-            lignes.append("Profil de couleur : illisible.")
-        }
-        for autre in e.autres {
-            lignes.append("Autre écran : \(texte(autre)).")
-        }
-        lignes.append("")
-        let conseil = "Pour juger les couleurs, coupez Night Shift (et True Tone sur un écran Apple)."
-        let reglage = "(\(reglageProfil(langue: langue)))"
-        switch a.etalonnage.mesure {
-        case .some(true):
-            lignes.append("Claude mesure la photo par ses chiffres ; vous la jugez sur un écran étalonné.")
-        case .some(false):
-            lignes.append("Claude mesure la photo par ses chiffres, sans passer par l'écran ; vous la jugez sur le vôtre. "
-                + "Sans étalonnage, la peau et les couleurs peuvent y paraître autrement qu'en tirage ou sur un autre "
-                + "écran : une sonde d'étalonnage crée un profil mesuré \(reglage). \(conseil)")
-        case .none:
-            lignes.append("Claude mesure la photo par ses chiffres, sans passer par l'écran ; vous la jugez sur le vôtre. "
-                + "Si ce profil ne vient pas d'une sonde d'étalonnage, la peau et les couleurs peuvent y paraître "
-                + "autrement qu'en tirage ou sur un autre écran : une sonde crée un profil mesuré \(reglage). \(conseil)")
-        }
-        return lignes.joined(separator: "\n")
-    }
-
-    /// Un écran en JSON : nom, integre, gamut_large, profil (son nom), etalonnage, mesure (vrai, faux
-    /// ou null), date_profil (AAAA-MM-JJ, jamais pour un profil d'usine), logiciel, texte ; avec
-    /// `detail`, aussi le chemin du profil, qui ne part jamais chez Claude (get_status) : il peut
-    /// nommer le dossier personnel et ne lui sert à rien.
-    static func json(_ a: Affichage, detail: Bool) -> JSONValue {
+    /// Un écran en JSON, pour `--ecran` : nom, integre, gamut_large, profil (son nom), etalonnage,
+    /// mesure (vrai, faux ou null), date_profil (AAAA-MM-JJ, jamais pour un profil d'usine), logiciel,
+    /// texte et le chemin du profil. Rien de tout cela ne part chez Claude (get_status : `nommer`).
+    static func json(_ a: Affichage) -> JSONValue {
         var objet: [String: JSONValue] = [
             "nom": .string(a.nom),
             "integre": .bool(a.integre),
@@ -428,21 +360,27 @@ public enum Ecran {
         if let logiciel = a.profil?.logiciel {
             objet["logiciel"] = .string(logiciel)
         }
-        if detail, let chemin = a.profil?.chemin {
+        if let chemin = a.profil?.chemin {
             objet["chemin"] = .string(chemin)
         }
         return .object(objet)
     }
 
-    /// L'état en JSON : `principal` et `autres` ; avec `detail` (fenêtre Claude, --ecran), les
-    /// chemins des profils et le texte de la boîte (`detail`).
-    public static func json(_ e: Etat, detail: Bool = false) -> JSONValue {
-        var objet: [String: JSONValue] = [
-            "principal": json(e.principal, detail: detail),
-            "autres": .array(e.autres.map { json($0, detail: detail) }),
+    /// L'état en JSON, pour `--ecran` (le développement) : `principal` et `autres`, chemins des
+    /// profils compris.
+    public static func json(_ e: Etat) -> JSONValue {
+        [
+            "principal": json(e.principal),
+            "autres": .array(e.autres.map { json($0) }),
         ]
-        if detail {
-            objet["detail"] = .string(Ecran.detail(e))
+    }
+
+    /// L'écran pour Claude (get_status) : le nom de l'écran principal, et ceux des autres écrans
+    /// s'il y en a ; rien de son profil ni de son étalonnage (correctif 1.3.6).
+    public static func nommer(_ e: Etat) -> JSONValue {
+        var objet: [String: JSONValue] = ["nom": .string(e.principal.nom)]
+        if !e.autres.isEmpty {
+            objet["autres"] = .array(e.autres.map { .string($0.nom) })
         }
         return .object(objet)
     }

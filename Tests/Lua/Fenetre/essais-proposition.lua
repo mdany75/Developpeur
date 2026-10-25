@@ -147,7 +147,7 @@ essai("Proposition dépassée (constaté le 22 octobre 2026) : une proposition q
     local c = Moteur.courante
     ouvrirFenetre(function(p)
         Fenetre.rafraichir()
-        egal('notation', p.onglet)
+        egal('focus', p.onglet, "Focus à l'ouverture (correctif 1.3.6)")
         Fenetre.majPhoto()
         egal(true, p.peutObtenir, 'Obtenir : une photo seule, Claude libre, rien en attente')
         -- Une proposition (sans photo_id : la photo active), qui attend : l'onglet Proposition la
@@ -392,7 +392,7 @@ essai("Conversation d'avant le correctif 1.3.6 : ses éléments lecon et exercic
     egal(true, Moteur.ouvrir('ancienne-135'), 'ouverte comme une autre')
     ouvrirFenetre(function(p)
         Fenetre.rafraichir()
-        egal('notation', p.onglet)
+        egal('focus', p.onglet, "Focus à l'ouverture (correctif 1.3.6)")
         egal(false, p.enAttente)
         contient(p.propositionTexte, "Aucune proposition en attente.", "l'aide de la carte")
         egal(nil, p.titreJeLeFais)

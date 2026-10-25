@@ -1,13 +1,13 @@
--- essais-carnet.lua : le carnet de progrès dans la fenêtre Claude, hors de Lightroom (LuaJIT,
--- Lightroom simulé par Simulation.lua) : l'onglet Suivi (correctif 1.3.6, à la place de Leçon ; la
--- page Carnet de progrès du fil, son entrée dans la liste des conversations et sa ligne « Demander
--- à Claude ce qu'il en pense › » sont retirées avec le volet) : le texte de sa carte
--- (Fil.texteSuivi : note, défauts mois par mois, tendances, à travailler ; coupé à la largeur de la
--- carte en 12, chaque caractère mesuré), l'onglet ouvert seulement par un clic (jamais une bascule,
--- source comprise), le résumé lu dans une tâche, la boucle qui suit Carnet.version tant que
--- l'onglet est montré, « Photos d'un défaut… » et la fenêtre des photos d'un défaut (leurs
--- constats seulement, plus les leçons d'avant le correctif 1.3.6 ; « Retirer du carnet… » par appel
--- direct), et la puce Carnet des consignes. Le registre est le vrai (Carnet.lua), rangé dans un
+-- essais-carnet.lua : le carnet de progrès, hors de Lightroom (LuaJIT, Lightroom simulé par
+-- Simulation.lua) : la fenêtre Suivi (FenetreSuivi.lua, correctif 1.3.6 : d'abord l'onglet Suivi, à
+-- la place de Leçon, puis une fenêtre à part le 25 octobre 2026, ouverte par le bouton Suivi de
+-- l'en-tête de la fenêtre Claude ; la page Carnet de progrès du fil, son entrée dans la liste des
+-- conversations et sa ligne « Demander à Claude ce qu'il en pense › » sont retirées avec le volet) :
+-- son texte (Fil.texteSuivi : note, défauts mois par mois, tendances, à travailler ; coupé à sa
+-- largeur en 12, chaque caractère mesuré), le bouton Suivi (plus d'onglet, ni de carte), le résumé
+-- lu à l'ouverture, page par page, la boucle qui suit Carnet.version, « Photos d'un défaut… » et la
+-- fenêtre des photos d'un défaut (leurs constats seulement, plus les leçons d'avant le correctif
+-- 1.3.6 ; « Retirer du carnet… » par appel direct), et la puce Carnet des consignes. Le registre est le vrai (Carnet.lua), rangé dans un
 -- dossier personnel temporaire ; ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
@@ -113,6 +113,7 @@ local propositionVraie = Notation.proposition
 Notation.proposition = function() return nil end
 
 local Fenetre = require 'Fenetre'
+local FenetreSuivi = require 'FenetreSuivi'
 local Moteur = require 'Moteur'
 local prefs = Chemins.prefs()
 prefs.nouvelleParPhoto = false
@@ -127,10 +128,10 @@ local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(
 prefs.cheminClaude = dossierTests .. '/faux-claude.sh'
 prefs.cheminConnecteur = '/bin/echo'
 
--- La largeur du texte de la carte Suivi (D.largeurSuivi, à l'intérieur de la carte), et celle
--- qu'une ligne ne dépasse jamais (Fenetre.lignesCarte la coupe à sa marge près).
+-- La largeur du texte de la fenêtre Suivi (FenetreSuivi.LARGEUR), et celle qu'une ligne ne dépasse
+-- jamais (Fil.lignesCarte la coupe à sa marge près).
 local D = Dispositions.dimensions()
-local LARGEUR = D.largeurSuivi
+local LARGEUR = FenetreSuivi.LARGEUR
 local LARGEUR_LIGNE = LARGEUR - Fil.MARGE
 
 local function photoActive(id, nom)
@@ -165,16 +166,43 @@ local function segment(titre)
     error('segment introuvable : ' .. titre, 2)
 end
 
--- Un tour de la boucle de la fenêtre (Fenetre.boucle), sans attendre : la pause de la fin du tour
--- l'arrête.
+-- Un tour de la boucle de la fenêtre Suivi (FenetreSuivi.boucle), sans attendre : la pause de la fin
+-- du tour l'arrête.
 local function unTourDeBoucle()
     local LrTasks = S.modules.LrTasks
-    local sleep, generation = LrTasks.sleep, Fenetre.generation
-    LrTasks.sleep = function() Fenetre.generation = generation + 1000 end
-    local ok, erreur = pcall(Fenetre.boucle, generation)
+    local sleep, generation = LrTasks.sleep, FenetreSuivi.generation
+    LrTasks.sleep = function() FenetreSuivi.generation = generation + 1000 end
+    local ok, erreur = pcall(FenetreSuivi.boucle, generation)
     LrTasks.sleep = sleep
-    Fenetre.generation = generation
+    FenetreSuivi.generation = generation
     vrai(ok, erreur)
+end
+
+-- Ouvre la fenêtre Suivi et appelle fn(p, args) pendant qu'elle est ouverte (sa boucle, partie dans
+-- une tâche, ne tourne pas : unTourDeBoucle) ; une erreur de fn remonte une fois la fenêtre fermée.
+local function ouvrirSuivi(fn)
+    local erreur
+    local taches = #S.taches
+    S.pendantFenetre = function(args)
+        local ok, e = xpcall(function() fn(FenetreSuivi.p, args, taches) end, debug.traceback)
+        erreur = not ok and e or nil
+    end
+    FenetreSuivi.afficher()
+    S.pendantFenetre = nil
+    oublierTaches(taches)
+    if erreur then
+        error(erreur, 0)
+    end
+end
+
+-- Le bouton de ce titre dans un arbre.
+local function boutonDe(contenu, titre)
+    for _, v in ipairs(vues(contenu)) do
+        if S.BOUTONS[v.genre] and v.args.title == titre then
+            return v
+        end
+    end
+    return nil
 end
 
 -- Une conversation qui a des messages, en tête de la liste (son titre posé comme un titre choisi
@@ -295,12 +323,12 @@ local function fabriquerType()
     fabriquer(entrees)
 end
 
--- Les lignes de la carte Suivi pour ce texte, coupées comme la fenêtre les coupe (Fenetre.lignesCarte,
--- en 12, l'emphase en gras 12) : chacune dans la largeur de la carte, ses balises fermées, chaque
+-- Les lignes de la fenêtre Suivi pour ce texte, coupées comme elle les coupe (Fil.lignesCarte, en
+-- 12, l'emphase en gras 12) : chacune dans la largeur de la fenêtre, ses balises fermées, chaque
 -- caractère mesuré dans les deux polices (Metriques ; pas de barres ▁…█, U+2581 à U+2588 : il
 -- faudrait remesurer les polices).
 local function lignesDeLaCarte(texte)
-    local lignes = Fenetre.lignesCarte(texte, LARGEUR, 'texte12', 'gras12')
+    local lignes = Fil.lignesCarte(texte, LARGEUR, 'texte12', 'gras12')
     for _, l in ipairs(lignes) do
         local largeur = Fil.largeur(l, 'texte12', 'gras12')
         vrai(largeur <= LARGEUR_LIGNE, string.format('hors de la carte (%.0f pour %d) : %s', largeur, LARGEUR_LIGNE, l))
@@ -375,12 +403,12 @@ essai("Plus de page Carnet de progrès dans le fil, ni d'entrée dans une liste,
     -- Une ligne qui porterait un défaut ou une action (comme celles de la page) n'est qu'une ligne.
     egal(nil, Fenetre.sorteDeClic({ genre = 'outil', texte = 'x', defaut = 'flou' }, nil))
     egal(nil, Fenetre.sorteDeClic({ genre = 'apercu', texte = 'y', action = 'demander' }, nil))
-    egal(Carnet.TITRES.carnet, Fenetre.TITRE_CARNET, 'le titre du registre, seule copie')
+    egal(Carnet.TITRES.carnet, FenetreSuivi.TITRE_CARNET, 'le titre du registre, seule copie')
 end)
 
 -- Fil.texteSuivi ---------------------------------------------------------------------------------
 
-essai('Fil.texteSuivi : note, défauts mois par mois (libellés en gras), tendances, à travailler ; chaque ligne dans la carte en 12', function()
+essai('Fil.texteSuivi : note, défauts mois par mois (libellés en gras), tendances, à travailler ; chaque ligne dans la fenêtre Suivi en 12', function()
     fabriquerType()
     local page = Carnet.resumer(os.time())
     egal(6, #page.mois)
@@ -424,14 +452,14 @@ essai('Fil.texteSuivi : note, défauts mois par mois (libellés en gras), tendan
     -- Plus de ligne d'action, ni la leçon d'avant de 1024.
     vrai(not texte:find('Demander à Claude', 1, true), "plus de « Demander à Claude ce qu'il en pense › »")
     vrai(not texte:find('Horizon un peu bas', 1, true) and not texte:find('Leçon', 1, true), "rien de la leçon d'avant")
-    -- Dans la carte : chaque ligne tient, ses balises fermées, chaque caractère mesuré ; le résumé se
-    -- lit en deux pages au plus.
+    -- Dans la fenêtre : chaque ligne tient, ses balises fermées, chaque caractère mesuré ; le résumé
+    -- se lit en deux pages au plus.
     local carte = lignesDeLaCarte(texte)
-    vrai(#carte >= #lignes, 'les lignes de la carte')
-    vrai(#carte <= 2 * D.suiviLignes, string.format('deux pages au plus (%d lignes pour %d)', #carte, D.suiviLignes))
+    vrai(#carte >= #lignes, 'les lignes de la fenêtre')
+    vrai(#carte <= 2 * FenetreSuivi.LIGNES, string.format('deux pages au plus (%d lignes pour %d)', #carte, FenetreSuivi.LIGNES))
 end)
 
-essai('Fil.texteSuivi : vide, en lecture, en erreur ; sans tendance ; années ; libellé long coupé dans la carte ; balises du registre retirées', function()
+essai('Fil.texteSuivi : vide, en lecture, en erreur ; sans tendance ; années ; libellé long coupé dans la fenêtre ; balises du registre retirées', function()
     -- Vide : la note qui explique, ni défauts ni tendances.
     fabriquer({})
     local vide = Fil.texteSuivi(Carnet.resumer(os.time()))
@@ -444,7 +472,8 @@ essai('Fil.texteSuivi : vide, en lecture, en erreur ; sans tendance ; années ; 
     -- Fait main : deux années (les mois les disent), un libellé trop long, un libellé et une note qui
     -- portent une balise (retirée : seules celles de la carte restent), ni tendance ni défaut à
     -- travailler (leurs phrases du résumé), une remarque.
-    local long = string.rep('Défaut au libellé très long ', 3)
+    -- (Assez long pour la fenêtre Suivi, plus large que la carte de l'onglet d'avant.)
+    local long = string.rep('Défaut au libellé très long ', 5)
     local page = {
         vide = false, photos = 3, note = 'Note du <EM>résumé</EM>.', remarque = 'Seulement 3 photos.',
         titres = Carnet.TITRES,
@@ -480,202 +509,214 @@ essai('Fil.texteSuivi : vide, en lecture, en erreur ; sans tendance ; années ; 
     egal('•  Photo floue ou bougée : 0 % puis 40 %.', seul[recule + 1])
 end)
 
--- L'onglet Suivi dans la fenêtre -----------------------------------------------------------------
+-- Le bouton Suivi et la fenêtre Suivi ---------------------------------------------------------------
 
-essai("Onglet Suivi : le dernier segment, ouvert seulement par un clic (jamais une bascule, source comprise) ; le résumé lu dans une tâche, la carte page par page", function()
-    local ordre = {}
+essai("Bouton Suivi : en haut à droite, au bout de la rangée des voyants, il ouvre la fenêtre Suivi sans envoyer la demande ; plus d'onglet Suivi, ni sa carte, ni sa lecture dans la fenêtre Claude", function()
+    -- Plus d'onglet Suivi (décision de Dany du 25 octobre 2026) : ni segment, ni carte, ni crochet.
     for _, o in ipairs(D.onglets) do
-        ordre[#ordre + 1] = o.valeur
+        vrai(o.valeur ~= 'suivi' and o.image ~= 'seg-suivi', "plus d'onglet Suivi")
     end
-    egal('apercu focus proposition notation suivi', table.concat(ordre, ' '), 'Suivi à la place de Leçon, en dernier')
-    egal('suivi', D.ongletSuivi)
-    egal('Suivi', D.onglets[5].titre)
-    egal('seg-suivi', D.onglets[5].image)
-    -- Aucun onglet où la fenêtre bascule d'elle-même n'est Suivi.
-    for _, cle in ipairs({ 'ongletParDefaut', 'ongletProposition', 'ongletNotation', 'ongletEtape', 'ongletFocus' }) do
-        vrai(D[cle] ~= 'suivi', cle .. ' : jamais Suivi')
-    end
-    -- Ni Fenetre.lua ni aucun autre fichier du module ne le choisissent d'eux-mêmes.
-    for _, nom in ipairs({ 'Fenetre.lua', 'Vues.lua', 'Dispositions.lua', 'Moteur.lua', 'Conversation.lua', 'Carnet.lua' }) do
-        local source = assert(Fichiers.lire(S.plugin .. '/' .. nom), nom)
-        for _, morceau in ipairs({ 'choisirOnglet(T.ongletSuivi', 'choisirOnglet(Fenetre.T.ongletSuivi', "choisirOnglet('suivi'",
-            'p.onglet = T.ongletSuivi', "p.onglet = 'suivi'" }) do
-            vrai(not source:find(morceau, 1, true), nom .. ' : ' .. morceau)
-        end
+    egal(nil, D.ongletSuivi)
+    egal(nil, D.suiviLignes)
+    egal(nil, Dispositions.IMAGES['carte-suivi'])
+    egal(nil, Fenetre.CARTES.suivi)
+    egal(nil, Fenetre.surOnglet.suivi)
+    for _, nom in ipairs({ 'suiviMontre', 'rafraichirSuivi', 'lireSuivi', 'suivreSuivi', 'choisirDefaut', 'montrerDefaut',
+        'retirerDuCarnet', 'TITRE_CARNET', 'pageSuivi' }) do
+        egal(nil, Fenetre[nom], 'Fenetre.' .. nom .. ' : dans la fenêtre Suivi')
     end
     fabriquerType()
     photoActive(53636309, 'DSCF4961.RAF')
     Moteur.courante = conversation('Lac au matin')
-    local choisis = {}
-    local choisir = Fenetre.choisirOnglet
-    Fenetre.choisirOnglet = function(valeur)
-        choisis[#choisis + 1] = tostring(valeur)
-        return choisir(valeur)
-    end
+    local afficher, ouvertures = FenetreSuivi.afficher, 0
+    FenetreSuivi.afficher = function() ouvertures = ouvertures + 1 end
     local ok, erreur = pcall(ouvrirFenetre, function(p, args)
-        -- La carte : son titre en gras 12, son texte en 12 (l'emphase en gras 12), D.suiviLignes lignes.
+        for _, v in ipairs(vues(args.contents)) do
+            local t = v.args.title
+            vrai(not (v.genre == 'static_text' and type(t) == 'table' and (t.key == 'suiviTexte' or t.key == 'suiviTitre')),
+                'plus de carte Suivi')
+        end
+        egal(nil, p.suiviTexte)
+        egal(nil, Carnet.observateurs.fenetre, "la fenêtre Claude ne suit plus le carnet")
+        -- Le bouton : un carré small, en haut à droite, au bout de la rangée des voyants, après la photo
+        -- active (le voyant Écran est retiré au même correctif).
+        local bouton = boutonDe(args.contents, 'Suivi')
+        vrai(bouton, 'le bouton Suivi')
+        egal('square_button', bouton.genre)
+        egal('small', bouton.args.size)
+        egal(Fenetre.POLICES.petit, bouton.args.font)
+        egal(D.boutonSuivi, bouton.args.width)
+        vrai(D.boutonSuivi >= Fenetre.largeurLibelle('Suivi', 'petit') + 20, 'son titre et le jeu du carré')
+        vrai(Fenetre.parBouton(bouton.args.action), 'passe par Fenetre.bouton')
+        vrai(S.montreeDansFenetre(bouton), 'montré')
+        local rangee
+        for _, v in ipairs(vues(args.contents)) do
+            if v.genre == 'row' then
+                for _, enfant in ipairs(v.args) do
+                    if enfant == bouton then
+                        rangee = v
+                    end
+                end
+            end
+        end
+        vrai(rangee, 'la rangée du bouton')
+        local voyant, info, indiceBouton
+        for k, enfant in ipairs(rangee.args) do
+            if enfant == bouton then
+                indiceBouton = k
+            elseif type(enfant) == 'table' and enfant.genre == 'row' and type(enfant.args[2]) == 'table'
+                and type(enfant.args[2].args.title) == 'table' and enfant.args[2].args.title.key == 'texteLightroom' then
+                voyant = k
+            elseif type(enfant) == 'table' and enfant.genre == 'static_text' and type(enfant.args.title) == 'table'
+                and enfant.args.title.key == 'infoPhoto' then
+                info = k
+            end
+        end
+        vrai(voyant and info and voyant < info, 'la rangée des voyants et de la photo active')
+        vrai(indiceBouton == info + 2 and indiceBouton == #rangee.args, 'au bout de la rangée, après la photo active et son écart')
+        -- Un clic après une frappe sans Retour : la fenêtre Suivi s'ouvre, la demande tapée ne part pas.
+        local champ
+        for _, v in ipairs(vues(args.contents)) do
+            if v.genre == 'edit_field' and type(v.args.value) == 'table' and v.args.value.key == 'saisie' then
+                champ = v
+            end
+        end
+        S.taper(champ, 'Texte validé par le clic')
+        S.cliquer(bouton)
+        egal(1, ouvertures, 'la fenêtre Suivi')
+        egal(nil, Fenetre.envoiAuto, "le clic n'envoie pas la demande")
+        p.saisie = ''
+    end)
+    FenetreSuivi.afficher = afficher
+    assert(ok, erreur)
+end)
+
+essai("Fenêtre Suivi : « Claude · Suivi », le résumé lu à l'ouverture, ses constats page par page (en 12, gras 12) ; déjà ouverte, elle passe devant ; rien de la fenêtre Claude", function()
+    fabriquerType()
+    local devant = S.devant or 0
+    ouvrirSuivi(function(p, args, taches)
+        egal(FenetreSuivi.TITRE, args.title)
+        egal('Claude · Suivi', args.title)
+        egal('DeveloppeurCarnet', args.save_frame, "son cadre, pas celui de la fenêtre de la liaison (DeveloppeurSuivi)")
         local texte, titre
         for _, v in ipairs(vues(args.contents)) do
             local t = v.args.title
-            if v.genre == 'static_text' and type(t) == 'table' and t.key == 'suiviTexte' then
+            if v.genre == 'static_text' and type(t) == 'table' and t.key == 'texte' then
                 texte = v
-            elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'suiviTitre' then
+            elseif v.genre == 'static_text' and type(t) == 'table' and t.key == 'titre' then
                 titre = v
             end
         end
-        vrai(texte and titre, 'la carte Suivi')
-        egal(Fenetre.POLICES.texte12, texte.args.font)
-        egal(Fenetre.POLICES.gras12, texte.args.emphasis_font)
-        egal(Fenetre.COULEURS.texte, texte.args.emphasis_color)
-        egal(D.carte, texte.args.width)
-        egal(D.suiviLignes, texte.args.height_in_lines)
-        egal(Fenetre.POLICES.gras12, titre.args.font)
-        egal('gras12', Fenetre.CARTES.suivi.emphase)
-        -- À l'ouverture : Note ; rien de lu, la carte vide.
-        egal('notation', p.onglet)
-        egal(nil, Fenetre.pageSuivi)
-        egal('', p.suiviTexte)
-        egal(false, p.suiviADefauts)
-        egal('Carnet de progrès', p.suiviTitre)
-        -- Un clic sur le segment : l'onglet, « Lecture… », puis le résumé lu dans une tâche.
-        local taches = #S.taches
-        segment('Suivi')
-        egal('suivi', p.onglet)
-        egal(taches + 1, #S.taches, 'le résumé se lit dans une tâche')
-        egal(Fil.LECTURE_CARNET, p.suiviTexte)
-        lancerTaches(taches)
-        local page = Fenetre.pageSuivi
+        vrai(texte and titre, 'le titre et le texte')
+        egal(FenetreSuivi.POLICES.texte12, texte.args.font)
+        egal(FenetreSuivi.POLICES.gras12, texte.args.emphasis_font)
+        egal(LARGEUR, texte.args.width)
+        egal(FenetreSuivi.LIGNES, texte.args.height_in_lines)
+        egal(FenetreSuivi.POLICES.gras, titre.args.font)
+        -- Ouverte : « Lecture… », le titre du registre ; la boucle partie dans une tâche.
+        egal('Carnet de progrès', p.titre)
+        egal(Fil.LECTURE_CARNET, p.texte)
+        egal(false, p.aDefauts)
+        vrai(#S.taches > taches, 'la boucle dans une tâche')
+        egal('function', type(Carnet.observateurs.suivi), 'abonnée au registre')
+        -- Son premier tour : le résumé.
+        unTourDeBoucle()
+        local page = FenetreSuivi.resume
         vrai(type(page) == 'table' and page.photos == 13, 'le résumé lu')
-        egal(Carnet.version, Fenetre.versionSuivi)
-        local attendues = Fenetre.lignesCarte(Fil.texteSuivi(page), D.largeurSuivi, 'texte12', 'gras12')
+        egal(Carnet.version, FenetreSuivi.versionLue)
+        local attendues = Fil.lignesCarte(Fil.texteSuivi(page), LARGEUR, 'texte12', 'gras12')
         local premiere = {}
-        for i = 1, math.min(#attendues, D.suiviLignes) do
+        for i = 1, math.min(#attendues, FenetreSuivi.LIGNES) do
             premiere[i] = attendues[i]
         end
-        egal(table.concat(premiere, '\n'), p.suiviTexte, 'la première page de la carte')
-        egal(true, p.suiviADefauts)
-        egal(#attendues > D.suiviLignes, p.suiviDescend)
-        egal(false, p.suiviMonte)
-        -- Page par page (une carte plus courte) : ▼ descend d'une page moins une ligne, la place se
-        -- garde quand le résumé se relit pareil, ▲ remonte.
-        local T = Fenetre.T
-        local hauteur = T.suiviLignes
-        T.suiviLignes = 10
-        Fenetre.rafraichirSuivi()
-        egal(true, p.suiviDescend)
-        Fenetre.defilerTexte('suivi', 1)
-        egal(attendues[10], lignesDe(p.suiviTexte)[1], '▼')
-        egal(true, p.suiviMonte)
-        Fenetre.rafraichirSuivi()
-        egal(attendues[10], lignesDe(p.suiviTexte)[1], 'la place gardée')
-        Fenetre.defilerTexte('suivi', -1)
-        egal(attendues[1], lignesDe(p.suiviTexte)[1], '▲')
-        T.suiviLignes = hauteur
-        Fenetre.rafraichirSuivi()
-        -- L'aperçu de l'onglet est celui de la photo active (pas d'aperçu à lui).
-        egal(nil, Fenetre.apercuOnglet.suivi)
-        -- Un autre onglet, puis Suivi de nouveau : un vrai clic relit.
-        segment('Note')
-        local avant = #S.taches
-        segment('Suivi')
-        egal(avant + 1, #S.taches, 'un vrai clic relit')
-        lancerTaches(avant)
-        -- Ce qui arrive de Claude (une note, une proposition) bascule vers son onglet, jamais vers Suivi.
-        segment('Note')
-        Fenetre.choisirOnglet(D.ongletProposition)
-        Fenetre.choisirOnglet(D.ongletNotation)
-        egal('notation', p.onglet)
+        egal(table.concat(premiere, '\n'), p.texte, 'la première page')
+        egal(true, p.aDefauts)
+        egal(#attendues > FenetreSuivi.LIGNES, p.descend)
+        egal(false, p.monte)
+        -- Page par page (une page plus courte) : ▼ descend d'une page moins une ligne, la place se
+        -- garde quand le résumé se relit pareil, ▲ remonte ; ▲ ▼ en petit.
+        local hauteur = FenetreSuivi.LIGNES
+        FenetreSuivi.LIGNES = 10
+        FenetreSuivi.rafraichir()
+        egal(true, p.descend)
+        local bas = boutonDe(args.contents, '▼')
+        egal('mini', bas.args.size)
+        S.cliquer(bas)
+        egal(attendues[10], lignesDe(p.texte)[1], '▼')
+        egal(true, p.monte)
+        FenetreSuivi.lire()
+        egal(attendues[10], lignesDe(p.texte)[1], 'la place gardée')
+        S.cliquer(boutonDe(args.contents, '▲'))
+        egal(attendues[1], lignesDe(p.texte)[1], '▲')
+        FenetreSuivi.LIGNES = hauteur
+        FenetreSuivi.rafraichir()
+        -- Déjà ouverte : le bouton Suivi la remet devant, sans en ouvrir une autre.
+        FenetreSuivi.afficher()
+        egal(devant + 1, S.devant, 'devant')
+        -- Ni la fenêtre Claude ni ses onglets : un texte de constats, sans leçon.
+        vrai(not p.texte:find('Leçon', 1, true), 'rien de la leçon')
     end)
-    Fenetre.choisirOnglet = choisir
-    assert(ok, erreur)
-    for _, v in ipairs(choisis) do
-        vrai(v ~= 'suivi', 'une bascule vers Suivi : ' .. table.concat(choisis, ', '))
-    end
+    egal(false, FenetreSuivi.ouverte)
+    egal(nil, Carnet.observateurs.suivi, 'désabonnée à la fermeture')
 end)
 
-essai("Boucle : le registre change (abonnement, Carnet.version), la carte se relit si l'onglet Suivi est montré ; caché, rien ; désabonnée à la fermeture", function()
+essai("Fenêtre Suivi, sa boucle : le registre change (abonnement, Carnet.version), le résumé se relit ; un résumé illisible le dit, sans le relire sans fin", function()
     fabriquerType()
-    Moteur.courante = conversation('Lac au matin')
-    ouvrirFenetre(function(p)
-        local taches = #S.taches
-        egal('function', type(Carnet.observateurs.fenetre), 'abonnée')
-        -- Onglet caché : un changement du registre ne fait rien lire.
-        Carnet.signaler('constat')
-        egal(true, Fenetre.aRafraichirSuivi, "l'abonnement l'a dit")
+    ouvrirSuivi(function(p)
         unTourDeBoucle()
-        egal(nil, Fenetre.pageSuivi, 'rien lu, onglet caché')
-        segment('Suivi')
-        lancerTaches(taches)
-        egal(13, Fenetre.pageSuivi.photos)
-        egal(false, Fenetre.aRafraichirSuivi)
-        -- Un retrait (d'un autre client du connecteur, ici le registre lui-même) : la carte se relit au
-        -- tour suivant.
+        egal(13, FenetreSuivi.resume.photos)
+        -- Rien de changé : rien de relu.
+        local lue = FenetreSuivi.resume
+        unTourDeBoucle()
+        egal(lue, FenetreSuivi.resume, 'rien de changé : rien relu')
+        -- Un retrait (d'un autre client du connecteur, ici le registre lui-même) : relu au tour suivant.
         local version = Carnet.version
         Carnet.commande({ action = 'retirer', photos = { 1001 } })
         vrai(Carnet.version > version, 'nouvelle version')
-        egal(true, Fenetre.aRafraichirSuivi)
+        egal(true, FenetreSuivi.aRelire, "l'abonnement l'a dit")
         unTourDeBoucle()
-        egal(12, Fenetre.pageSuivi.photos, 'carte relue')
-        egal(false, Fenetre.aRafraichirSuivi)
-        egal(Carnet.version, Fenetre.versionSuivi)
-        contient(p.suiviTexte, 'sur 12 photos')
+        egal(12, FenetreSuivi.resume.photos, 'relu')
+        egal(false, FenetreSuivi.aRelire)
+        egal(Carnet.version, FenetreSuivi.versionLue)
+        contient(p.texte, 'sur 12 photos')
         -- La version seule suffit aussi (un changement sans abonnement).
         Carnet.oublier()
-        Fenetre.versionSuivi = Carnet.version - 1
-        local lue = Fenetre.pageSuivi
+        FenetreSuivi.versionLue = Carnet.version - 1
+        lue = FenetreSuivi.resume
         unTourDeBoucle()
-        vrai(Fenetre.pageSuivi ~= lue, 'relue par la version')
-        -- Caché de nouveau : une version nouvelle ne fait rien lire.
-        segment('Note')
-        Fenetre.versionSuivi = -1
-        lue = Fenetre.pageSuivi
-        unTourDeBoucle()
-        egal(lue, Fenetre.pageSuivi, 'caché : rien')
-        -- Un résumé qui ne se lit pas : la carte le dit, la boucle ne le relit pas sans fin.
-        local avant = #S.taches
-        segment('Suivi')
-        lancerTaches(avant)
+        vrai(FenetreSuivi.resume ~= lue, 'relu par la version')
+        -- Un résumé qui ne se lit pas : le texte le dit, la boucle ne le relit pas sans fin.
         local resumer = Carnet.resumer
         Carnet.resumer = function() error('carnet.json illisible', 0) end
-        Fenetre.versionSuivi = -1
+        FenetreSuivi.versionLue = -1
         unTourDeBoucle()
         Carnet.resumer = resumer
-        egal('carnet.json illisible', Fenetre.pageSuivi.erreur)
-        egal(Carnet.version, Fenetre.versionSuivi)
-        egal("Le carnet de progrès ne s'est pas lu : carnet.json illisible", p.suiviTexte)
-        egal(false, p.suiviADefauts)
-        oublierTaches(taches)
+        egal('carnet.json illisible', FenetreSuivi.resume.erreur)
+        egal(Carnet.version, FenetreSuivi.versionLue)
+        egal("Le carnet de progrès ne s'est pas lu : carnet.json illisible", p.texte)
+        egal(false, p.aDefauts)
+        lue = FenetreSuivi.resume
+        unTourDeBoucle()
+        egal(lue, FenetreSuivi.resume, 'pas relu sans fin')
     end)
-    egal(nil, Carnet.observateurs.fenetre, 'désabonnée à la fermeture')
 end)
 
 -- Photos d'un défaut -------------------------------------------------------------------------------
 
 essai("« Photos d'un défaut… » : la liste des défauts du résumé (tables neuves), puis la fenêtre des photos du défaut choisi ; sans défaut, grisé et rien", function()
     fabriquerType()
-    Moteur.courante = conversation('Lac au matin')
-    ouvrirFenetre(function(p, args)
-        local taches = #S.taches
-        local bouton
-        for _, v in ipairs(vues(args.contents)) do
-            if S.BOUTONS[v.genre] and v.args.title == "Photos d'un défaut…" then
-                bouton = v
-            end
-        end
-        vrai(bouton, "« Photos d'un défaut… » sous la carte Suivi")
-        egal('square_button', bouton.genre)
-        egal(26, S.bezelVisible(bouton))
-        egal('suiviADefauts', bouton.args.enabled.key)
-        egal(D.photosDefaut, bouton.args.width)
-        vrai(Fenetre.parBouton(bouton.args.action), 'passe par Fenetre.bouton')
+    ouvrirSuivi(function(p, args)
+        local bouton = boutonDe(args.contents, "Photos d'un défaut…")
+        vrai(bouton, "« Photos d'un défaut… » en bas de la fenêtre Suivi")
+        egal('push_button', bouton.genre)
+        egal('aDefauts', bouton.args.enabled.key)
         -- Avant la lecture : grisé, et rien sans résumé.
-        egal(false, p.suiviADefauts)
+        egal(false, p.aDefauts)
         local dialogues = #S.dialogues
-        egal(false, Fenetre.choisirDefaut())
+        egal(false, FenetreSuivi.choisirDefaut())
         egal(dialogues, #S.dialogues)
-        segment('Suivi')
-        lancerTaches(taches)
-        egal(true, p.suiviADefauts)
+        unTourDeBoucle()
+        egal(true, p.aDefauts)
         -- Dany choisit le ciel brûlé, puis ferme la fenêtre de ses photos.
         local presenter = S.modules.LrDialogs.presentModalDialog
         local recus = {}
@@ -698,7 +739,7 @@ essai("« Photos d'un défaut… » : la liste des défauts du résumé (tables 
         egal('Voir ses photos', recus[1].actionVerb)
         local liste = vueDe(recus[1].contents, 'simple_list')
         S.neuve(liste.args.items, 'défauts du carnet')
-        egal(#Fenetre.pageSuivi.defauts, #liste.args.items)
+        egal(#FenetreSuivi.resume.defauts, #liste.args.items)
         egal('horizon_penche', liste.args.items[1].value, "dans l'ordre du résumé")
         egal("Ciel ou haut de l'image brûlé · 3 photos sur 13", liste.args.items[3].title)
         egal('Mise au point à côté · 1 photo sur 1', liste.args.items[6].title)
@@ -706,30 +747,26 @@ essai("« Photos d'un défaut… » : la liste des défauts du résumé (tables 
         -- Annulé : la liste seule.
         S.reponseModal = 'cancel'
         dialogues = #S.dialogues
-        egal(false, Fenetre.choisirDefaut())
+        egal(false, FenetreSuivi.choisirDefaut())
         egal(dialogues + 1, #S.dialogues, 'la liste seule')
         S.reponseModal = nil
         -- Sans défaut (un carnet vide) : grisé, rien.
         fabriquer({})
-        Fenetre.versionSuivi = -1
+        FenetreSuivi.versionLue = -1
         unTourDeBoucle()
-        egal(false, p.suiviADefauts)
+        egal(false, p.aDefauts)
         dialogues = #S.dialogues
-        egal(false, Fenetre.choisirDefaut())
+        egal(false, FenetreSuivi.choisirDefaut())
         egal(dialogues, #S.dialogues)
-        oublierTaches(taches)
     end)
 end)
 
 essai("La fenêtre des photos d'un défaut : éléments neufs, la plus récente d'abord, leurs constats sans la leçon d'avant ; une ligne penchée en degrés ; une mesure seule", function()
     fabriquerType()
-    Moteur.courante = conversation('Lac au matin')
-    ouvrirFenetre(function()
-        local taches = #S.taches
-        segment('Suivi')
-        lancerTaches(taches)
+    ouvrirSuivi(function()
+        unTourDeBoucle()
         local dialogues = #S.dialogues
-        egal(false, Fenetre.montrerDefaut('ciel_brule'), 'Fermer')
+        egal(false, FenetreSuivi.montrerDefaut('ciel_brule'), 'Fermer')
         egal(dialogues + 1, #S.dialogues)
         local d = S.dialogues[#S.dialogues]
         egal("Carnet de progrès · Ciel ou haut de l'image brûlé", d.title)
@@ -760,48 +797,44 @@ essai("La fenêtre des photos d'un défaut : éléments neufs, la plus récente 
         egal(nil, vueDe(d.contents, 'edit_field'), 'plus de champ de la leçon')
         vrai(not table.concat(textes, '\n'):find('Leçon', 1, true), 'rien de la leçon')
         -- Un défaut cherché mais jamais trouvé : la fenêtre le dit, sans liste ni retrait.
-        Fenetre.montrerDefaut('bruit')
+        FenetreSuivi.montrerDefaut('bruit')
         local vide = S.dialogues[#S.dialogues]
         egal(nil, vide.otherVerb)
         egal(nil, vueDe(vide.contents, 'simple_list'))
         contient(vueDe(vide.contents, 'static_text').args.title, "Aucune photo n'a ce défaut")
         -- Une ligne penchée (l'angle rangé dans l'entrée, sans texte) : son inclinaison en degrés.
-        Fenetre.montrerDefaut('horizon_penche')
+        FenetreSuivi.montrerDefaut('horizon_penche')
         local angles = vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items
         egal(2, #angles)
         contient(angles[1].title, 'DSCF1026.RAF · ligne penchée de 1,2°')
         contient(angles[2].title, 'DSCF1014.RAF · ligne penchée de 0,8°')
-        egal('mars 2026 · DSCF0001.RAF · ligne penchée de 1,3°', Fenetre.textePhotoDuDefaut({ mois_libelle = 'mars 2026',
+        egal('mars 2026 · DSCF0001.RAF · ligne penchée de 1,3°', FenetreSuivi.textePhotoDuDefaut({ mois_libelle = 'mars 2026',
             fichier = 'DSCF0001.RAF', mesure = -1.26, angle = true }))
         -- Une seule photo : pas de « la plus récente d'abord ».
-        Fenetre.montrerDefaut('mise_au_point')
+        FenetreSuivi.montrerDefaut('mise_au_point')
         egal('1 photo dans les mois du carnet.', vueDe(S.dialogues[#S.dialogues].contents, 'static_text').args.title)
         -- Une autre mesure sans texte se dit telle quelle (mise au point, 8,5).
         contient(vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title, 'DSCF1001.RAF · mesure : 8,5')
-        egal('mars 2026 · DSCF1001.RAF · mesure : 8,5', Fenetre.textePhotoDuDefaut({ mois_libelle = 'mars 2026', fichier = 'DSCF1001.RAF',
+        egal('mars 2026 · DSCF1001.RAF · mesure : 8,5', FenetreSuivi.textePhotoDuDefaut({ mois_libelle = 'mars 2026', fichier = 'DSCF1001.RAF',
             mesure = 8.5 }))
         -- L'angle d'une entrée ne vaut que pour son code : la mise au point de la même photo reste
         -- une mesure.
         fabriquer({ entree(1101, moisIl(0), CHERCHES, { 'mise_au_point' }, { angle = { le = 1101, photo = 1101, inclinaison = 2,
             code = 'horizon_penche', source = 'measure_angle' } }) })
-        Fenetre.montrerDefaut('mise_au_point')
+        FenetreSuivi.montrerDefaut('mise_au_point')
         egal('DSCF1101.RAF · mesure : 8,5', vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title:match('DSCF.*$'))
-        Fenetre.montrerDefaut('horizon_penche')
+        FenetreSuivi.montrerDefaut('horizon_penche')
         egal('DSCF1101.RAF · ligne penchée de 2,0°', vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title:match('DSCF.*$'))
         fabriquerType()
-        egal('mars 2026 · photo 77', Fenetre.textePhotoDuDefaut({ mois_libelle = 'mars 2026', original = 77 }))
-        oublierTaches(taches)
+        egal('mars 2026 · photo 77', FenetreSuivi.textePhotoDuDefaut({ mois_libelle = 'mars 2026', original = 77 }))
     end)
 end)
 
-essai('« Retirer du carnet… » : la photo choisie, après confirmation, par appel direct au registre avec l\'id de l\'original ; la carte se relit', function()
+essai('« Retirer du carnet… » : la photo choisie, après confirmation, par appel direct au registre avec l\'id de l\'original ; le résumé se relit, le bas de la fenêtre le dit', function()
     fabriquerType()
-    Moteur.courante = conversation('Lac au matin')
-    ouvrirFenetre(function(p)
-        local taches = #S.taches
-        segment('Suivi')
-        lancerTaches(taches)
-        egal(13, Fenetre.pageSuivi.photos)
+    ouvrirSuivi(function(p)
+        unTourDeBoucle()
+        egal(13, FenetreSuivi.resume.photos)
         local commande, recues = Carnet.commande, {}
         Carnet.commande = function(params)
             recues[#recues + 1] = params
@@ -816,37 +849,37 @@ essai('« Retirer du carnet… » : la photo choisie, après confirmation, par a
         end
         -- Annulé à la confirmation : rien ne sort.
         S.reponseConfirm = 'cancel'
-        egal(false, Fenetre.montrerDefaut('ciel_brule'))
+        egal(false, FenetreSuivi.montrerDefaut('ciel_brule'))
         egal(0, #recues)
         vrai(Carnet.entree(1025), 'toujours au carnet')
         contient(S.confirmation[1], 'Retirer DSCF1025.RAF du carnet de progrès ?')
+        contient(S.confirmation[2], 'ne comptent plus dans la fenêtre Suivi')
         contient(S.confirmation[2], 'La photo et ses retouches ne changent pas.')
         -- Confirmé : retirée par Carnet.commande, l'identifiant de l'original.
         S.reponseConfirm = 'ok'
         local version = Carnet.version
-        egal(true, Fenetre.montrerDefaut('ciel_brule'))
+        egal(true, FenetreSuivi.montrerDefaut('ciel_brule'))
         egal(1, #recues)
         egal('retirer', recues[1].action)
         egal(1025, recues[1].photos[1])
         egal(1, #recues[1].photos)
         egal(nil, Carnet.entree(1025), 'retirée')
         vrai(Carnet.entree(1024), 'les autres restent')
-        vrai(Carnet.version > version, 'la carte se relira')
+        vrai(Carnet.version > version, 'le résumé se relira')
         egal('DSCF1025.RAF est retirée du carnet de progrès.', p.message)
         -- Fermer : rien.
         S.modules.LrDialogs.presentModalDialog = function(args)
             S.dialogues[#S.dialogues + 1] = args
             return 'ok'
         end
-        egal(false, Fenetre.montrerDefaut('ciel_brule'))
+        egal(false, FenetreSuivi.montrerDefaut('ciel_brule'))
         egal(1, #recues)
         S.modules.LrDialogs.presentModalDialog = presenter
         Carnet.commande = commande
         S.reponseConfirm = nil
-        -- La carte, montrée, se relit au tour suivant de la boucle.
+        -- Le résumé se relit au tour suivant de la boucle.
         unTourDeBoucle()
-        egal(12, Fenetre.pageSuivi.photos, 'la carte relue')
-        oublierTaches(taches)
+        egal(12, FenetreSuivi.resume.photos, 'le résumé relu')
     end)
 end)
 

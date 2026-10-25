@@ -3,11 +3,12 @@ import Foundation
 import XCTest
 @testable import DeveloppeurKit
 
-/// L'écran nommé (1.2) : lecture des profils ICC, classement, textes et JSON. Tests purs, sur les
-/// profils du système et des copies dans un dossier temporaire ; la lecture des vrais écrans n'est
-/// éprouvée que pour l'absence de plantage, sans aucune valeur attendue. Au connecteur : get_status
-/// et la remarque du premier aperçu, sur des écrans fabriqués (ToolHandler.lireEcran), et l'étape
-/// de la recette, avec un faux module TCP.
+/// L'écran nommé (1.2) : lecture des profils ICC, classement, textes et JSON de `--ecran` (le
+/// développement). Tests purs, sur les profils du système et des copies dans un dossier
+/// temporaire ; la lecture des vrais écrans n'est éprouvée que pour l'absence de plantage, sans
+/// aucune valeur attendue. Au connecteur, depuis le correctif 1.3.6 (plus rien sur l'étalonnage) :
+/// get_status ne dit que le nom des écrans, aucun aperçu n'ajoute de remarque, sur des écrans
+/// fabriqués (ToolHandler.lireEcran) ; et l'étape de la recette, avec un faux module TCP.
 final class EcranTests: XCTestCase {
     static let systeme = "/System/Library/ColorSync/Profiles/"
     static let displayP3 = URL(fileURLWithPath: systeme + "Display P3.icc")
@@ -195,7 +196,7 @@ final class EcranTests: XCTestCase {
                              createur: "lcms", date: Ecran.Jour(annee: 2025, mois: 1, jour: 1)),
         etalonnage: .personnalise)
 
-    func testTextesEtRemarque() throws {
+    func testTextes() {
         let usine = Ecran.texte(Self.odyssey)
         XCTAssertEqual(usine, "Odyssey G85SD · profil d'usine, non mesuré sur ce Mac")
         XCTAssertFalse(usine.contains("2026"), "pas de date pour un profil d'usine (celle du branchement)")
@@ -214,39 +215,14 @@ final class EcranTests: XCTestCase {
         XCTAssertEqual(Ecran.texte(illisible), "DELL U2723QE · profil illisible")
         XCTAssertEqual(Ecran.dateEnMots(Ecran.Jour(annee: 2022, mois: 1, jour: 1)), "1er janvier 2022")
         XCTAssertEqual(Ecran.dateEnMots(Ecran.Jour(annee: 2026, mois: 8, jour: 15)), "15 août 2026")
-
-        // La remarque : nil pour un écran mesuré ; sinon elle nomme l'écran et la peau, les couleurs.
-        XCTAssertNil(Ecran.remarque(Self.mesure))
-        let remarque = try XCTUnwrap(Ecran.remarque(Self.odyssey))
-        XCTAssertTrue(remarque.hasPrefix("Écran principal de l'utilisateur : Odyssey G85SD, profil d'usine, non mesuré sur ce Mac."), remarque)
-        XCTAssertTrue(remarque.contains("peau, couleurs") && remarque.contains("n'est pas étalonné"), remarque)
-        XCTAssertTrue(remarque.utf16.count < 300, "\(remarque.utf16.count) caractères")
-        let doute = try XCTUnwrap(Ecran.remarque(Self.perso))
-        XCTAssertTrue(doute.contains("peau, couleurs") && doute.contains("lui demander si son écran est étalonné"), doute)
-
-        // Le détail de la fenêtre : l'écran, son profil, puis le conseil ; un autre écran en plus.
-        let detail = Ecran.detail(Ecran.Etat(principal: Self.odyssey, autres: [Self.perso]), langue: "fr-CA")
-        XCTAssertTrue(detail.hasPrefix("Écran principal : Odyssey G85SD (gamut large).\n"
-            + "Profil de couleur : « Odyssey G85SD », le profil d'usine de l'écran, non mesuré sur ce Mac."), detail)
-        XCTAssertTrue(detail.contains("Autre écran : DELL U2723QE · profil personnalisé"), detail)
-        XCTAssertTrue(detail.contains("Night Shift"), detail)
-        // Les Réglages nommés comme sur le Mac : « Écrans » en français du Canada (celui de Dany),
-        // « Moniteurs » en français de France (libellés relevés dans DisplaysExt.appex).
-        XCTAssertTrue(detail.contains("(Réglages système › Écrans › Profil de couleur)"), detail)
-        XCTAssertFalse(detail.contains("Moniteurs"), detail)
-        for (langue, attendu) in [("fr_CA", "Réglages système › Écrans"), ("fr-FR", "Réglages Système › Moniteurs"),
-                                  ("fr", "Réglages Système › Moniteurs"), (nil, "Réglages Système › Moniteurs")] {
-            XCTAssertTrue(Ecran.detail(Ecran.Etat(principal: Self.odyssey), langue: langue).contains(attendu), String(describing: langue))
-        }
-        let detailMesure = Ecran.detail(Ecran.Etat(principal: Self.mesure), langue: "fr-CA")
-        XCTAssertTrue(detailMesure.contains("mesuré par une sonde (DisplayCAL), profil du 3 mars 2026."), detailMesure)
-        XCTAssertTrue(detailMesure.contains("vous la jugez sur un écran étalonné"), detailMesure)
-        XCTAssertFalse(detailMesure.contains("Night Shift"))
     }
 
     func testJSON() throws {
+        // --ecran (le développement) : le profil classé et son chemin ; plus de texte de boîte, la
+        // fenêtre Claude n'a plus de voyant Écran (correctif 1.3.6).
         let etat = Ecran.Etat(principal: Self.odyssey, autres: [Self.perso])
         guard case .object(let simple) = Ecran.json(etat) else { return XCTFail("objet attendu") }
+        XCTAssertEqual(Set(simple.keys), ["principal", "autres"])
         let principal = try XCTUnwrap(simple["principal"]?.object)
         XCTAssertEqual(principal["nom"]?.string, "Odyssey G85SD")
         XCTAssertEqual(principal["etalonnage"]?.string, "usine")
@@ -256,20 +232,27 @@ final class EcranTests: XCTestCase {
         XCTAssertEqual(principal["profil"]?.string, "Odyssey G85SD")
         XCTAssertEqual(principal["texte"]?.string, Ecran.texte(Self.odyssey))
         XCTAssertNil(principal["date_profil"], "jamais la date d'un profil d'usine")
-        XCTAssertNil(principal["chemin"], "le chemin ne part pas chez Claude")
+        XCTAssertEqual(principal["chemin"]?.string, "/Library/ColorSync/Profiles/Displays/Odyssey G85SD-60EC80AD.icc")
         XCTAssertNil(simple["detail"])
         let autre = try XCTUnwrap(simple["autres"]?.array?.first?.object)
         XCTAssertEqual(autre["mesure"]?.isNull, true, "on ne sait pas : null")
         XCTAssertEqual(autre["date_profil"]?.string, "2025-01-01")
-        XCTAssertFalse(JSONCoding.line(Ecran.json(etat)).contains("/Users/"), "aucun chemin")
-        // Avec le détail (--ecran, pour la fenêtre Claude) : les chemins et le texte de la boîte.
-        guard case .object(let complet) = Ecran.json(etat, detail: true) else { return XCTFail("objet attendu") }
-        XCTAssertEqual(complet["principal"]?.object?["chemin"]?.string, "/Library/ColorSync/Profiles/Displays/Odyssey G85SD-60EC80AD.icc")
-        XCTAssertEqual(complet["detail"]?.string, Ecran.detail(etat))
+        XCTAssertEqual(autre["chemin"]?.string, "/Users/essai/Library/ColorSync/Profiles/Mon profil.icc")
         let sonde = try XCTUnwrap(Ecran.json(Ecran.Etat(principal: Self.mesure)).object?["principal"]?.object)
         XCTAssertEqual(sonde["mesure"]?.bool, true)
         XCTAssertEqual(sonde["logiciel"]?.string, "DisplayCAL")
         XCTAssertEqual(sonde["date_profil"]?.string, "2026-03-03")
+    }
+
+    /// Pour Claude (get_status) : le nom des écrans, rien de leur profil ni de leur étalonnage.
+    func testNommer() {
+        XCTAssertEqual(Ecran.nommer(Ecran.Etat(principal: Self.odyssey)), ["nom": "Odyssey G85SD"])
+        XCTAssertEqual(Ecran.nommer(Ecran.Etat(principal: Self.mesure, autres: [Self.perso, Self.odyssey])),
+                       ["nom": "ColorEdge CS2400S", "autres": ["DELL U2723QE", "Odyssey G85SD"]])
+        let ligne = JSONCoding.line(Ecran.nommer(Ecran.Etat(principal: Self.mesure, autres: [Self.perso]))).lowercased()
+        for mot in ["mesur", "étalonn", "etalonn", "sonde", "profil", "displaycal", "chemin", "/users/", "colorsync"] {
+            XCTAssertFalse(ligne.contains(mot), "« \(mot) » : \(ligne)")
+        }
     }
 
     // MARK: - Au connecteur
@@ -279,7 +262,7 @@ final class EcranTests: XCTestCase {
         resultat.content.compactMap { if case .text(let texte) = $0 { return texte }; return nil }
     }
 
-    func testGetStatusDitLEcran() throws {
+    func testGetStatusNeDitQueLeNomDeLEcran() throws {
         let fake = FakeLightroom()
         fake.replies["etat"] = ["module": "Développeur"]
         let tools = ToolHandler(lightroom: fake)
@@ -287,79 +270,64 @@ final class EcranTests: XCTestCase {
         XCTAssertNil(try JSONCoding.parse(tools.call(name: "get_status", arguments: [:]).text)["ecran"])
         tools.lireEcran = { Ecran.Etat(principal: Self.odyssey, autres: [Self.perso]) }
         let statut = try JSONCoding.parse(tools.call(name: "get_status", arguments: [:]).text)
-        let principal = try XCTUnwrap(statut["ecran"]?["principal"])
-        XCTAssertEqual(principal["nom"]?.string, "Odyssey G85SD")
-        XCTAssertEqual(principal["etalonnage"]?.string, "usine")
-        XCTAssertEqual(principal["mesure"]?.bool, false)
-        XCTAssertEqual(principal["texte"]?.string, Ecran.texte(Self.odyssey))
-        XCTAssertEqual(statut["ecran"]?["autres"]?.array?.count, 1)
-        XCTAssertNil(statut["ecran"]?["detail"], "le texte de la boîte de la fenêtre ne part pas chez Claude")
-        XCTAssertFalse(JSONCoding.line(statut).contains("ColorSync/Profiles"), "ni le chemin d'un profil")
+        XCTAssertEqual(statut["ecran"], ["nom": "Odyssey G85SD", "autres": ["DELL U2723QE"]])
         XCTAssertEqual(statut["module"]?.string, "Développeur", "l'état de la liaison reste")
+        let ligne = JSONCoding.line(statut).lowercased()
+        for mot in ["mesur", "étalonn", "etalonn", "sonde", "colorsync/profiles"] {
+            XCTAssertFalse(ligne.contains(mot), "« \(mot) » dans get_status : \(ligne)")
+        }
         let description = try XCTUnwrap(tools.definitions.first { $0["name"] == "get_status" }?["description"]?.string)
-        XCTAssertTrue(description.contains("(ecran : nom, profil de couleur, mesuré par une sonde ou non)"), description)
-        XCTAssertTrue(description.contains("quand son avis compte (peau, couleurs)"), description)
+        XCTAssertTrue(description.contains("ecran : le nom de l'écran principal du Mac."), description)
         XCTAssertLessThan(try XCTUnwrap(description.range(of: "ecran :")).lowerBound,
                           try XCTUnwrap(description.range(of: "request_backup demande")).lowerBound, "l'écran avant la sauvegarde")
+        // Ni get_status ni aucun autre outil ne parle plus d'étalonnage de l'écran, ni les consignes.
+        for outil in tools.definitions {
+            let texte = JSONCoding.line(outil).lowercased()
+            for mot in ["sonde", "écran non étalonné", "écran est étalonné", "étalonné ?", "non mesuré"] {
+                XCTAssertFalse(texte.contains(mot), "« \(mot) » dans \(outil["name"]?.string ?? "?")")
+            }
+        }
+        XCTAssertFalse(ServerInfo.instructions.lowercased().contains("sonde"))
     }
 
-    func testRemarqueUneFoisAuPremierApercu() throws {
+    /// Plus de remarque d'écran au premier aperçu (correctif 1.3.6) : view_photo, preview_settings et
+    /// compare_variants rendent leurs seuls blocs, et l'écran n'est même pas lu ; seul get_status le lit.
+    func testAucuneRemarqueDEcranAuxApercus() throws {
         let fake = FakeLightroom()
-        let image = TestSupport.jpeg(red: 120, green: 120, blue: 120)
-        fake.onSend = { [unowned fake] command, _ in
+        fake.onSend = { [unowned fake] command, params in
             if ["apercu", "essayer"].contains(command) {
-                fake.replies[command] = ["chemin": .string(TestSupport.previewFile(image)), "photo": ["id": 1]]
+                let couleur: UInt8 = params["instantane"]?.string == "chaude" ? 200 : 120
+                fake.replies[command] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: couleur, green: 120, blue: 120))),
+                                         "photo": ["id": 1],
+                                         "instantane": params["instantane"]?.string.map { .string("Claude · " + $0) } ?? .null]
             }
         }
         fake.replies["etat"] = ["module": "Développeur"]
-        let usine = Ecran.Etat(principal: Self.odyssey)
         var lectures = 0
         let tools = ToolHandler(lightroom: fake)
-        tools.lireEcran = { lectures += 1; return usine }
+        tools.lireEcran = { lectures += 1; return Ecran.Etat(principal: Self.odyssey) }
 
-        // Un aperçu en échec ne la consomme pas, ni un outil sans aperçu.
-        fake.errors["apercu"] = LightroomError.plugin("aperçu impossible")
-        XCTAssertTrue(tools.call(name: "view_photo", arguments: [:]).isError)
-        fake.errors["apercu"] = nil
-        XCTAssertEqual(Self.textes(tools.call(name: "list_selection", arguments: [:])).count, 1)
-        XCTAssertEqual(lectures, 0)
-
-        // Le premier aperçu réussi : la remarque dans un bloc à part, le JSON reste lisible.
-        let premier = tools.call(name: "view_photo", arguments: [:])
-        XCTAssertFalse(premier.isError, premier.text)
-        let blocs = Self.textes(premier)
-        XCTAssertEqual(blocs.count, 2)
-        XCTAssertNotNil(try JSONCoding.parse(blocs[0])["mesures"])
-        XCTAssertEqual(blocs.last, Ecran.remarque(Self.odyssey))
-        XCTAssertTrue(blocs.last?.contains("non mesuré sur ce Mac") == true)
-        // Une fois par processus : ni le suivant, ni une proposition.
-        XCTAssertEqual(Self.textes(tools.call(name: "view_photo", arguments: [:])).count, 1)
-        XCTAssertEqual(Self.textes(tools.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 0.3]])).count, 1)
-        XCTAssertEqual(lectures, 1, "l'écran lu une seule fois")
-
-        // Une proposition, si elle est le premier aperçu.
-        let proposition = ToolHandler(lightroom: fake)
-        proposition.lireEcran = { usine }
-        let essai = proposition.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 0.3]])
-        XCTAssertFalse(essai.isError, essai.text)
-        XCTAssertEqual(Self.textes(essai).last, Ecran.remarque(Self.odyssey))
-
-        // Un écran mesuré par une sonde : rien à dire.
-        let sonde = ToolHandler(lightroom: fake)
-        sonde.lireEcran = { Ecran.Etat(principal: Self.mesure) }
-        XCTAssertEqual(Self.textes(sonde.call(name: "view_photo", arguments: [:])).count, 1)
-
-        // get_status l'a déjà dit : le premier aperçu ne le redit pas.
-        let statut = ToolHandler(lightroom: fake)
-        statut.lireEcran = { usine }
-        _ = statut.call(name: "get_status", arguments: [:])
-        XCTAssertEqual(Self.textes(statut.call(name: "view_photo", arguments: [:])).count, 1)
-
-        // Par défaut (aucun écran lu) : aucune remarque, le texte se lit en JSON tel quel.
-        let defaut = ToolHandler(lightroom: fake)
-        let vue = defaut.call(name: "view_photo", arguments: [:])
-        XCTAssertEqual(Self.textes(vue).count, 1)
+        let vue = tools.call(name: "view_photo", arguments: [:])
+        XCTAssertFalse(vue.isError, vue.text)
+        XCTAssertTrue(vue.porteUneImage)
+        XCTAssertEqual(Self.textes(vue).count, 1, "un seul bloc de texte : le JSON de l'aperçu")
         XCTAssertNotNil(try JSONCoding.parse(vue.text)["mesures"])
+        let proposition = tools.call(name: "preview_settings", arguments: ["settings": ["Exposure2012": 0.3]])
+        XCTAssertFalse(proposition.isError, proposition.text)
+        XCTAssertEqual(Self.textes(proposition).count, 1)
+        let variantes = tools.call(name: "compare_variants", arguments: ["photo_id": 1, "variants": [
+            ["name": "naturelle", "settings": ["Exposure2012": 0.2]],
+            ["name": "chaude", "settings": ["Temperature": 6500]],
+        ]])
+        XCTAssertFalse(variantes.isError, variantes.text)
+        XCTAssertTrue(variantes.porteUneImage)
+        XCTAssertEqual(Self.textes(variantes).count, 1)
+        for resultat in [vue, proposition, variantes] {
+            XCTAssertFalse(resultat.text.contains("Écran principal de l'utilisateur"), resultat.text)
+        }
+        XCTAssertEqual(lectures, 0, "aucun aperçu ne lit l'écran")
+        _ = tools.call(name: "get_status", arguments: [:])
+        XCTAssertEqual(lectures, 1, "get_status seul le lit, pour son nom")
     }
 
     /// La recette dit la liaison fermée et l'écran nommé avec le vrai pont seulement (ici, vers un
@@ -391,7 +359,7 @@ final class EcranTests: XCTestCase {
         recette.lancer(raw: nil, jpeg: nil, flash: nil)
         XCTAssertEqual(recette.etapes.map(\.nom), ["liaison fermée (jeton privé)", "écran nommé (get_status)"])
         XCTAssertTrue(recette.reussie, recette.etapes.map(\.detail).joined(separator: " | "))
-        XCTAssertEqual(recette.etapes[1].detail, Ecran.texte(Self.odyssey))
+        XCTAssertEqual(recette.etapes[1].detail, "Odyssey G85SD", "le nom seulement, sans l'étalonnage")
         XCTAssertEqual(lectures, 1)
         XCTAssertNil(recette.tools.lireEcran(), "l'écran n'est plus lu après l'étape")
         // Une commande sans jeton, une avec un autre jeton, toutes deux refusées ; puis le jeton de la
@@ -448,7 +416,7 @@ final class EcranTests: XCTestCase {
         XCTAssertTrue(etat.principal.principal)
         XCTAssertTrue(Ecran.Etalonnage.allCases.contains(etat.principal.etalonnage))
         XCTAssertFalse(Ecran.texte(etat.principal).isEmpty)
-        XCTAssertFalse(Ecran.detail(etat).isEmpty)
+        XCTAssertEqual(Ecran.nommer(etat)["nom"]?.string, etat.principal.nom)
         for autre in etat.autres {
             XCTAssertFalse(autre.principal)
         }
