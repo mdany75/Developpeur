@@ -645,13 +645,24 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   (`MesureEclairage.neutre`, posé par `view_photo` et `mesurerImage`, gardé avec la vue) ; au-delà
   de `Eclairage.toleranceNeutre` du gris, `couleur › dominante_globale` le dit (`dominanteGlobale`,
   `lectureDominanteGlobale`) et la lecture des tons neutres y renvoie ; l'aperçu entier y ajoute
-  `balance_proposee` (`ToolHandler.balanceGlobale`, mêmes pentes) et `conseilDominante`. Pour un
-  grand écart, les pentes de `PentesSerie` dépassent la cible (ce portrait : 6 968 K et +2 viraient
-  au vert, la pipette sur le gravier à 7 881 K et −2 au jaune-vert ; 7 000 K et +28 le laissaient
+  `conseilDominante` (la balance proposée d'un seul coup est retirée le 25 octobre 2026 : Claude en
+  tirait des chiffres timides, 6 400 K et +14, qui laissaient le gravier bleu). Pour un grand
+  écart, les pentes de `PentesSerie` dépassent la cible (ce portrait : 6 968 K et +2 viraient au
+  vert, la pipette sur le gravier à 7 881 K et −2 au jaune-vert ; 7 000 K et +28 le laissaient
   neutre) : `white_balance_point` avec `{scene: true}` (`mesurerScene`) prend le point neutre de
   toute l'image, sans les refus du point (chroma, brûlé, noir), et apply_settings le remesure en
   seconde passe (essai sur « XH2S0312 (Essai ombre) » des Essais : 6 890 K et +1, puis 7 054 K et
-  +31, gravier a* 3,7, b* −1,2, défait ensuite). Le bilan compare aussi `dominante_globale` ; quand
+  +31, gravier a* 3,7, b* −1,2, défait ensuite) ; puis `validerParLAuto` (« deux passes et l'Auto »,
+  choix de Dany du 25 octobre 2026) rend l'Auto de Lightroom en proposition (`essayer`, à
+  `analysisSize`), mesure son point neutre de même et le pose (« … : balance, Auto de Lightroom »)
+  s'il est plus près du gris d'au moins `margeAuto` (`balance_point › gardee`). Les deux se trompent
+  tour à tour : l'Auto rendait neutre le gravier de XH2S0312 (Copie 3) que 6 400 K et +14 laissaient
+  bleu, mais virait au magenta sur XH2S0310 (cheveux gris a* 8,7, b* −7,5 contre 2,7 et −3,3 pour
+  Claude) ; sur l'Essai ombre, la balance mesurée (à 4,8 du gris) l'emportait sur l'Auto (6,7). Les
+  valeurs de l'Auto ne se relisent qu'une fois la photo affichée dans le module Développement
+  (sinon « auto (calculé quand… ) ») : le rendu mesuré seul compte. Les écarts de tonalité avec
+  l'Auto (XH2S0310 : exposition +0,10 contre +0,45, ombres +53 contre +25, noirs −19 contre −5) sont
+  un rendu plus plat, pas une erreur. Le bilan compare aussi `dominante_globale` ; quand
   elle se rapproche du gris d'au moins `regressionDominante`, une dominante accentuée sur les tons
   suivis passe dans `a_verifier` (ils reprennent la couleur de leur objet). Seuil et conseil
   provisoires, à éprouver sur d'autres scènes (sable, intérieur à la lampe, coucher de soleil).

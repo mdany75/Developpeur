@@ -76,14 +76,6 @@ extension ToolHandler {
         return balancePourLumiere(lumiere, reponse: reponse)
     }
 
-    /// Balance qui ramène au gris le point neutre de toute l'image (view_photo › mesures › couleur ›
-    /// dominante_globale › balance_proposee), par les mêmes pentes. Nil sans dominante globale ou
-    /// sans Temperature lue dans `reponse`.
-    static func balanceGlobale(_ mesures: PhotoMeasurements, reponse: JSONValue) -> (temperature: Double, tint: Double)? {
-        guard let globale = mesures.dominanteGlobale else { return nil }
-        return balancePourLumiere(MesureEclairage.Dominante(a: globale.a, b: globale.b, part: 0, pixels: 0), reponse: reponse)
-    }
-
     /// Balance qui neutralise une lumière mesurée, depuis la balance que donne `reponse`
     /// (echelle_temperature, reglages) ; nil sans Temperature lue. Le relevé de l'éclairage
     /// (`--eclairage`) la donne aussi pour une photo que le seuil provisoire ne dit pas mixte.
@@ -171,7 +163,8 @@ extension ToolHandler {
     }
 
     /// Seconde passe après une retouche écrite : le point remesuré ; s'il garde une dominante, une
-    /// correction de l'écart, en une étape à part (« … : balance, passe 2 »).
+    /// correction de l'écart, en une étape à part (« … : balance, passe 2 »). Pour toute l'image
+    /// (`scene`), la balance mesurée est ensuite comparée à l'Auto de Lightroom (`validerParLAuto`).
     func secondePasseBalance(_ balance: BalancePoint, args: Arguments) -> JSONValue {
         var rapport: [String: JSONValue] = ["mesure_avant": Self.pointJSON(balance.avant)]
         guard let mesure = try? mesurerBalance(photo: balance.photo, point: balance.point) else {
@@ -179,28 +172,87 @@ extension ToolHandler {
             return .object(rapport)
         }
         rapport["apres_passe_1"] = Self.pointJSON(mesure.point)
-        guard max(abs(mesure.point.a), abs(mesure.point.b)) >= Self.seuilPointNeutre else {
-            rapport["base"] = "a* et b* du point (L*a*b*), 0 = neutre ; sous 1, l'écart ne se voit pas."
-            return .object(rapport)
-        }
-        let cible = Self.balancePourPoint(mesure.point, raw: mesure.raw, temperature: mesure.temperature, tint: mesure.tint)
-        let nom = "\(args.string("step_name") ?? "retouche") : balance, passe 2"
-        do {
-            var (params, _) = try developParameters(Arguments(raw: ["settings": ["Temperature": .number(cible.temperature), "Tint": .number(cible.tint)]]))
-            if let photo = balance.photo { params["photos"] = [.number(Double(photo))] }
-            var ecriture = writeParameters(Arguments(raw: ["step_name": .string(nom), "reason": args.raw["reason"] ?? .null,
-                                                           "confirm": args.raw["confirm"] ?? .null]), defaultStep: nom)
-            ecriture["raison"] = ecriture["raison"] ?? .string("Balance sur le point neutre, écart restant.")
-            params.merge(ecriture) { _, new in new }
-            _ = try lightroom.send("appliquer", params, timeout: 120)
-            rapport["passe_2"] = .string("Claude · " + nom)
-            if let final = try? mesurerBalance(photo: balance.photo, point: balance.point) {
-                rapport["apres"] = Self.pointJSON(final.point)
+        var finale = mesure.point
+        if max(abs(mesure.point.a), abs(mesure.point.b)) >= Self.seuilPointNeutre {
+            let cible = Self.balancePourPoint(mesure.point, raw: mesure.raw, temperature: mesure.temperature, tint: mesure.tint)
+            let nom = "\(args.string("step_name") ?? "retouche") : balance, passe 2"
+            do {
+                try ecrireBalance(["Temperature": .number(cible.temperature), "Tint": .number(cible.tint)], nom: nom, photo: balance.photo,
+                                  args: args, raisonParDefaut: "Balance sur le point neutre, écart restant.")
+                rapport["passe_2"] = .string("Claude · " + nom)
+                if let final = try? mesurerBalance(photo: balance.photo, point: balance.point) {
+                    rapport["apres"] = Self.pointJSON(final.point)
+                    finale = final.point
+                }
+            } catch {
+                rapport["remarque"] = .string("Seconde passe non faite : \(error.localizedDescription)")
             }
-        } catch {
-            rapport["remarque"] = .string("Seconde passe non faite : \(error.localizedDescription)")
+        }
+        if balance.point == nil {
+            validerParLAuto(finale, photo: balance.photo, args: args, rapport: &rapport)
         }
         rapport["base"] = "a* et b* du point (L*a*b*), 0 = neutre ; sous 1, l'écart ne se voit pas."
         return .object(rapport)
+    }
+
+    /// Une balance écrite en une étape à part : Temperature et Tint, ou le préréglage « Auto ».
+    func ecrireBalance(_ reglages: [String: JSONValue], preset: String? = nil, nom: String, photo: Int?, args: Arguments,
+                       raisonParDefaut: String) throws {
+        var brut: [String: JSONValue] = [:]
+        if !reglages.isEmpty { brut["settings"] = .object(reglages) }
+        if let preset { brut["white_balance"] = .string(preset) }
+        var (params, _) = try developParameters(Arguments(raw: brut))
+        if let photo { params["photos"] = [.number(Double(photo))] }
+        var ecriture = writeParameters(Arguments(raw: ["step_name": .string(nom), "reason": args.raw["reason"] ?? .null,
+                                                       "confirm": args.raw["confirm"] ?? .null]), defaultStep: nom)
+        ecriture["raison"] = ecriture["raison"] ?? .string(raisonParDefaut)
+        params.merge(ecriture) { _, new in new }
+        _ = try lightroom.send("appliquer", params, timeout: 120)
+    }
+
+    /// Écart au gris (a*b*) dont l'Auto de Lightroom doit faire mieux que la balance mesurée pour
+    /// la remplacer : sous `seuilPointNeutre` d'écart, la différence ne se voit pas.
+    static let margeAuto = seuilPointNeutre
+
+    /// La balance de toute l'image validée contre l'Auto de Lightroom (demandé par Dany le 25 octobre
+    /// 2026, « deux passes et l'Auto ») : l'Auto rendu en proposition (commande « essayer », rien de
+    /// gardé ; deux étapes « Claude · essai » dans l'Historique), à la taille de l'aperçu d'analyse,
+    /// son point neutre mesuré comme celui de la balance mesurée ; s'il est plus près du gris d'au
+    /// moins `margeAuto`, il est posé en une étape à part (« … : balance, Auto de Lightroom »). Les
+    /// deux se trompent tour à tour (constaté le 24 octobre 2026) : sur un portrait à l'ombre des
+    /// feuillus, l'Auto laissait le gravier neutre quand 6 400 K et +14 le laissaient bleu ; sur un
+    /// selfie au verger, l'Auto virait au magenta (cheveux gris a* 8,7, b* −7,5, contre 2,7 et −3,3).
+    func validerParLAuto(_ finale: PointNeutre, photo: Int?, args: Arguments, rapport: inout [String: JSONValue]) {
+        rapport["balance_mesuree"] = Self.pointJSON(finale)
+        let auto: PointNeutre
+        do {
+            var (params, _) = try developParameters(Arguments(raw: ["white_balance": "auto"]))
+            params["action"] = "appliquer"
+            params["etape"] = "balance Auto de Lightroom"
+            params["taille"] = .number(Double(Self.analysisSize))
+            params["comparer"] = false
+            if let photo { params["photo"] = .number(Double(photo)) }
+            let resultat = try lightroom.send("essayer", params, timeout: 240)
+            guard let mesure = Self.mesurerScene(try Self.readPreview(resultat["chemin"]?.string)) else {
+                throw LightroomError.plugin("aperçu illisible")
+            }
+            auto = mesure
+        } catch {
+            rapport["auto_lightroom"] = .string("non rendu (\(error.localizedDescription)) : la balance mesurée est gardée")
+            return
+        }
+        rapport["auto_lightroom"] = Self.pointJSON(auto)
+        guard auto.chroma + Self.margeAuto <= finale.chroma else {
+            rapport["gardee"] = "la balance mesurée : l'Auto de Lightroom n'est pas plus neutre"
+            return
+        }
+        let nom = "\(args.string("step_name") ?? "retouche") : balance, Auto de Lightroom"
+        do {
+            try ecrireBalance([:], preset: "auto", nom: nom, photo: photo, args: args,
+                              raisonParDefaut: "L'Auto de Lightroom laisse l'image plus neutre que la balance mesurée.")
+            rapport["gardee"] = .string("l'Auto de Lightroom, plus neutre (étape « Claude · \(nom) »)")
+        } catch {
+            rapport["gardee"] = .string("la balance mesurée : l'Auto de Lightroom n'a pas pu être posé (\(error.localizedDescription))")
+        }
     }
 }

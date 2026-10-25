@@ -2,8 +2,8 @@ import XCTest
 @testable import DeveloppeurKit
 
 /// La dominante de toute l'image (24 octobre 2026, signalée par Dany : Retouche pro laissait bleu
-/// un portrait à l'ombre des feuillus) : le point neutre de l'image dit dans view_photo, la balance
-/// qui le ramène au gris, et le bilan qui ne prend pas sa correction pour une dominante accentuée.
+/// un portrait à l'ombre des feuillus) : le point neutre de l'image dit dans view_photo, le conseil
+/// qui mène à sa correction, et le bilan qui ne prend pas sa correction pour une dominante accentuée.
 final class DominanteGlobaleTests: XCTestCase {
     func mesures(a: Double = 0, b: Double = 0, part: Double = 10, point: MesureEclairage.Neutre? = nil) -> PhotoMeasurements {
         var m = PhotoMeasurements(meanL: 40, percentilesL: [1: 5, 5: 7, 25: 20, 50: 33, 75: 48, 95: 67, 99: 82],
@@ -33,21 +33,18 @@ final class DominanteGlobaleTests: XCTestCase {
         }
     }
 
-    /// La balance proposée réchauffe une image bleue, et le conseil ne part qu'avec une dominante.
-    func testLaBalanceProposeeEtLeConseilSuiventLaDominante() throws {
+    /// Le conseil ne part qu'avec une dominante, sans balance chiffrée d'un seul coup : il mène à la
+    /// balance de toute l'image en deux passes, validée par l'Auto de Lightroom.
+    func testLeConseilMeneALaBalanceDeTouteLImage() throws {
         let photo = mesures(point: MesureEclairage.Neutre(a: 3.4, b: -17.7))
-        let reponse: JSONValue = ["echelle_temperature": "kelvins (RAW : 2000 à 50000)", "reglages": ["Temperature": 5150, "Tint": 34]]
-        let balance = try XCTUnwrap(ToolHandler.balanceGlobale(photo, reponse: reponse))
-        XCTAssertGreaterThan(balance.temperature, 6500, "bleue : nettement plus chaude")
-        XCTAssertLessThan(balance.tint, 34, "un peu magenta : moins de teinte")
-        let json = ToolHandler.conseilDominanteGlobale(photo.json, balance: balance)
-        let globale = try XCTUnwrap(json["couleur"]?["dominante_globale"])
-        XCTAssertEqual(globale["balance_proposee"]?["Temperature"]?.double, balance.temperature)
-        XCTAssertTrue(globale["conseil"]?.string?.contains("white_balance_point") == true)
+        let globale = try XCTUnwrap(ToolHandler.conseilDominanteGlobale(photo.json)["couleur"]?["dominante_globale"])
+        XCTAssertNil(globale["balance_proposee"])
+        let conseil = try XCTUnwrap(globale["conseil"]?.string)
+        XCTAssertTrue(conseil.contains("white_balance_point {scene: true}") && conseil.contains("Auto de Lightroom"), conseil)
+        XCTAssertTrue(conseil.contains("sans poser Temperature ni Tint à la main"), conseil)
 
         let balancee = mesures(point: MesureEclairage.Neutre(a: 2, b: 4))
-        XCTAssertNil(ToolHandler.balanceGlobale(balancee, reponse: reponse))
-        XCTAssertEqual(ToolHandler.conseilDominanteGlobale(balancee.json, balance: nil), balancee.json)
+        XCTAssertEqual(ToolHandler.conseilDominanteGlobale(balancee.json), balancee.json)
     }
 
     /// Corriger une forte dominante fait prendre aux tons suivis la couleur de leur objet : à

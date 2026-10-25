@@ -333,7 +333,8 @@ avant de proposer un cadre.
   portrait à l'ombre des arbres, bleu sous la lumière du ciel ; une lampe), Claude le voit, avec la
   balance qui la ramène au neutre. Les tons presque neutres seuls la sous-estimaient : sous une
   forte dominante, un chandail blanc ou un chemin n'en font plus partie. Claude la corrige en
-  première passe, en deux passes mesurées, sauf si la lumière est voulue (coucher de soleil, lampe).
+  première passe, en deux passes mesurées, puis compare avec l'Auto de Lightroom et garde la
+  balance la plus neutre des deux, sauf si la lumière est voulue (coucher de soleil, lampe).
 - La nature de l'écrêtage (1.3.4) : des hautes lumières brûlées par la luminance (une zone presque
   blanche : les Hautes lumières ou les Blancs la corrigent) ou par la gamme (une couleur trop
   saturée pour l'espace de l'aperçu, un rouge de fleur, un coucher de soleil, un vêtement vif : la
@@ -441,7 +442,7 @@ avant de proposer un cadre.
 - Balance des blancs et tonalité automatiques de Lightroom, préréglages de balance (lumière du
   jour, nuageux, tungstène…), et balance sur un point neutre de l'image, comme la pipette, ou sur
   toute l'image (son point neutre) : Claude mesure, ramène au neutre, puis remesure et corrige
-  l'écart qui reste.
+  l'écart qui reste ; pour toute l'image, l'Auto de Lightroom est gardé s'il est plus neutre.
 - Flou d'objectif : arrière-plan flou d'après la profondeur que Lightroom estime, intensité, forme
   du bokeh, et le pinceau d'affinage pour un contour mal détouré (des cheveux, par exemple).
 - Débruitage IA, détails bruts et super résolution, que Lightroom calcule lui-même : la photo

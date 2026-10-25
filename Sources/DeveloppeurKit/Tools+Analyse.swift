@@ -226,7 +226,7 @@ extension ToolHandler {
                 if let eclairage {
                     mesures = Self.merged(mesures, ["eclairage": eclairage.json(balance: Self.balanceProposee(eclairage, reponse: result))])
                 }
-                mesures = Self.conseilDominanteGlobale(mesures, balance: Self.balanceGlobale(measures, reponse: result))
+                mesures = Self.conseilDominanteGlobale(mesures)
                 // Les points chauds (1.3.4) : sur l'aperçu entier seulement, hors des visages et de la
                 // zone d'intérêt ; dits, jamais corrigés d'office.
                 let sujet = (vision?.faces.map(\.box) ?? []) + [vision?.salientArea].compactMap { $0 }
@@ -411,18 +411,13 @@ extension ToolHandler {
                             eclairage: eclairage)
     }
 
-    /// Ce que l'aperçu entier de view_photo ajoute à couleur › dominante_globale : la balance qui la
-    /// ramène au gris et quoi en faire. Rien sans dominante globale.
-    static func conseilDominanteGlobale(_ mesures: JSONValue, balance: (temperature: Double, tint: Double)?) -> JSONValue {
+    /// Ce que l'aperçu entier de view_photo ajoute à couleur › dominante_globale : quoi en faire.
+    /// Plus de balance proposée d'un seul coup (retirée le 25 octobre 2026) : Claude en posait des
+    /// chiffres timides à la main (6 400 K et +14 laissaient bleu le portrait à l'ombre des
+    /// feuillus). Rien sans dominante globale.
+    static func conseilDominanteGlobale(_ mesures: JSONValue) -> JSONValue {
         guard var objet = mesures.object, var couleur = objet["couleur"]?.object,
               var globale = couleur["dominante_globale"]?.object else { return mesures }
-        if let balance {
-            globale["balance_proposee"] = [
-                "Temperature": .number(balance.temperature),
-                "Tint": .number(balance.tint),
-                "remarque": "un seul calcul, d'après les pentes de match_series : pour un grand écart, il dépasse souvent la cible ; white_balance_point avec scene la remesure",
-            ]
-        }
         globale["conseil"] = .string(conseilDominante)
         couleur["dominante_globale"] = .object(globale)
         objet["couleur"] = .object(couleur)
@@ -430,11 +425,10 @@ extension ToolHandler {
     }
 
     static let conseilDominante = "À confirmer à l'œil : une lumière voulue (coucher de soleil, lampe) ou une scène aux couleurs franches "
-        + "(sable, bois) décale aussi le point neutre. Si un blanc ou un gris de la scène la montre (vêtement blanc, chemin, mur, "
-        + "nuages) : la corriger en première passe, avant le reste, par apply_settings avec white_balance_point (deux passes "
-        + "mesurées) : {scene: true} pour toute l'image, ou {x, y} sur un gris terne (un blanc vif peut dépasser la chroma "
-        + "admise) ; un écart de 1 000 K ou plus est normal (ombre, ciel couvert, lampe). Puis view_photo : dominante_globale "
-        + "disparaît, la peau est naturelle."
+        + "(sable, bois) décale aussi le point neutre. Sinon, la corriger en passe 1, sans poser Temperature ni Tint à la main : "
+        + "apply_settings avec white_balance_point {scene: true} (les autres réglages à côté) : deux passes mesurées, puis l'Auto "
+        + "de Lightroom gardé s'il est plus neutre (balance_point › gardee : le dire). Un écart de 1 000 K ou plus est normal "
+        + "(ombre, ciel couvert, lampe). Puis view_photo : dominante_globale disparaît, la peau est naturelle."
 
     /// Le profil de Lightroom de la simulation choisie au boîtier, pour l'appareil de la photo
     /// (`appareil` de l'aperçu : marque, modèle) : profil DCP du catalogue ou Look installé ; nil

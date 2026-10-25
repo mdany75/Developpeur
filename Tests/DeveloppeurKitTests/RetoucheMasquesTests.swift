@@ -178,8 +178,51 @@ final class RetoucheMasquesTests: XCTestCase {
         XCTAssertLessThan(rapport["mesure_avant"]?["b"]?.double ?? 0, -15)
         XCTAssertGreaterThan(rapport["apres_passe_1"]?["b"]?.double ?? 0, 5)
         XCTAssertEqual(rapport["apres"]?["b"]?.double ?? 99, 0, accuracy: 1)
+        // L'Auto de Lightroom n'a pas été rendu (le faux module ne rend rien) : la balance mesurée reste.
+        XCTAssertTrue(rapport["auto_lightroom"]?.string?.hasPrefix("non rendu") == true, rapport["auto_lightroom"]?.string ?? "")
         // Ni point ni scene : refusé, et le refus dit les deux formes.
         XCTAssertTrue(call("apply_settings", ["white_balance_point": ["scene": false], "step_name": "x"]).text.contains("{scene: true}"))
+    }
+
+    /// Toute l'image : après les deux passes, l'Auto de Lightroom, rendu en proposition et mesuré de
+    /// même, est posé s'il est nettement plus neutre ; sinon la balance mesurée reste.
+    func testWhiteBalanceOnTheWholeSceneKeepsLightroomAutoWhenMoreNeutral() throws {
+        for (autoGris, attendu) in [(true, 3), (false, 2)] {
+            fake = FakeLightroom()
+            tools = ToolHandler(lightroom: fake)
+            var couleur: (UInt8, UInt8, UInt8) = (110, 125, 170)
+            fake.onSend = { [unowned fake] command, params in
+                if command == "apercu" {
+                    fake?.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: couleur.0, green: couleur.1, blue: couleur.2))),
+                                               "echelle_temperature": "kelvins (RAW : 2000 à 50000)",
+                                               "reglages": ["Temperature": 5150, "Tint": 34]]
+                }
+                if command == "essayer" {
+                    // L'Auto de Lightroom : neutre, ou plus bleu que la balance mesurée.
+                    let rendu: (UInt8, UInt8, UInt8) = autoGris ? (128, 128, 128) : (110, 125, 170)
+                    XCTAssertEqual(params["balance"]?.string, "Auto")
+                    fake?.replies["essayer"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: rendu.0, green: rendu.1, blue: rendu.2)))]
+                }
+                if command == "appliquer" {
+                    // Les deux passes laissent un reste bleu (b* vers −8).
+                    couleur = (122, 128, 142)
+                }
+            }
+            let result = call("apply_settings", ["white_balance_point": ["scene": true], "photo_ids": [4], "step_name": "balance"])
+            XCTAssertFalse(result.isError, result.text)
+            let ecritures = fake.calls.filter { $0.command == "appliquer" }
+            XCTAssertEqual(ecritures.count, attendu, autoGris ? "l'Auto, plus neutre, posé en troisième étape" : "l'Auto, plus bleu, écarté")
+            XCTAssertEqual(fake.calls.filter { $0.command == "essayer" }.count, 1, "l'Auto rendu une fois")
+            let rapport = try XCTUnwrap(try JSONCoding.parse(result.text)["balance_point"])
+            XCTAssertNotNil(rapport["auto_lightroom"]?["b"]?.double)
+            if autoGris {
+                XCTAssertEqual(ecritures.last?.params["balance"]?.string, "Auto")
+                XCTAssertEqual(ecritures.last?.params["etape"]?.string, "balance : balance, Auto de Lightroom")
+                XCTAssertTrue(rapport["gardee"]?.string?.hasPrefix("l'Auto de Lightroom") == true)
+            } else {
+                XCTAssertTrue(rapport["gardee"]?.string?.hasPrefix("la balance mesurée") == true)
+            }
+        }
     }
 
     func testWhiteBalanceForAPointOnAJpegIsRelative() {
