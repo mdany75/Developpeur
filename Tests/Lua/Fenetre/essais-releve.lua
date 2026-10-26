@@ -929,7 +929,7 @@ essai("Bornes : les originaux vus le moins récemment sortent au-delà de max_or
     depart()
     egal(20000, Releve.MAX_ORIGINAUX, 'max_originaux du contrat')
     egal(20, Releve.MAX_VUES, 'max_vues du contrat')
-    egal(1000, Releve.MAX_SELECTION, 'max_selection du contrat')
+    egal(10000, Releve.MAX_SELECTION, 'max_selection du contrat')
     egal(10, Releve.LOT_ANALYSE, 'lot_analyse du contrat')
     egal(3, Releve.ESSAIS_ANALYSE, 'essais_analyse du contrat')
     -- Trois originaux au relevé, vus à des heures différentes.

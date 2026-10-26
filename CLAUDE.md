@@ -231,6 +231,11 @@ carnet en texte de la fenêtre Suivi (`Fil.texteSuivi`) est retiré. Le module g
 publication : l'essai réel dans la fenêtre Claude et la Demande rapide, et la fenêtre Suivi sur de
 vraies photos (`docs/SPEC.md`, Correctif 1.3.7).
 
+Le correctif 1.3.8 (« ## 1.3.8 — 2026-10-26 », demandé par Dany le même matin : un dossier de 3 500
+photos se sélectionnait par tranches de 1 000) : `Releve.MAX_SELECTION` passe de 1 000 à 10 000, et
+n'est plus borné par `Lightroom.MAX_GROUPE` (2 000, la clé d'un groupe de conversation, inchangée) ;
+`max_selection` du contrat `suivi.json` aussi.
+
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 
 ## Règles
@@ -415,7 +420,7 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   retire. Qui entre : la sélection que voient `Fenetre.suivreSelection` et
   `FenetreRapide.suivreSelection` (`Releve.voirSelection` : une même clé ne compte qu'une fois,
   `Releve.revoir` à l'ouverture ou au rappel d'une fenêtre la fait compter même inchangée, une autre
-  photo active dans le même groupe ne revoit qu'elle ; `MAX_SELECTION` 1 000, le reste dit au
+  photo active dans le même groupe ne revoit qu'elle ; `MAX_SELECTION` 10 000 depuis le correctif 1.3.8, 1 000 avant, le reste dit au
   journal), par son original (`masterPhoto` d'une copie virtuelle, une seule fois), sauf les vidéos
   et les photos de « Développeur › Essais » (`Carnet.estPhotoDEssai` : elle ou son original). La
   famille (l'original et ses copies hors Essais, `virtualCopies`, par lectures groupées, sinon une à

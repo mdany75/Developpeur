@@ -106,7 +106,10 @@ local Releve = {
 Releve.FORMAT = 1
 Releve.MAX_ORIGINAUX = 20000
 Releve.MAX_VUES = 20
-Releve.MAX_SELECTION = 1000
+-- 10 000 depuis le correctif 1.3.8 (1 000 avant ; demandé par Dany le 26 octobre 2026 : un dossier
+-- de 3 500 photos se sélectionnait par tranches) : un dossier entier passe d'un coup, la file
+-- d'analyse est plus longue derrière.
+Releve.MAX_SELECTION = 10000
 Releve.LOT_ANALYSE = 10
 Releve.ESSAIS_ANALYSE = 3
 -- Vignette demandée à Lightroom pour l'analyse (Detail.side du connecteur, 1 024 px).
@@ -730,7 +733,9 @@ function Releve.voirSelection(info)
     Releve.cleVue, Releve.groupeVu, Releve.aRevoir = info.cle, info.groupe, false
     local photos = { active }
     if entier then
-        local max = math.min(Releve.MAX_SELECTION, Lightroom.MAX_GROUPE)
+        -- Pas Lightroom.MAX_GROUPE (2 000, la clé d'un groupe de conversation) : la sélection se lit
+        -- ici entière, par getTargetPhotos.
+        local max = Releve.MAX_SELECTION
         local deja, auDela = { [active.localIdentifier] = true }, 0
         for _, photo in ipairs(cat:getTargetPhotos() or {}) do
             if not deja[photo.localIdentifier] then

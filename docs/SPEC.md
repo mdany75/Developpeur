@@ -6373,8 +6373,8 @@ vers une vue est une copie neuve, sans métatable ; rien n'est écrit au catalog
   `Lightroom.photos`) : une même clé ne compte qu'une fois ; `Releve.revoir`, à chaque ouverture
   d'une de ces fenêtres (et à son rappel par le menu ou ⌃⌥C, ⌘⌃⌥C), la fait compter même inchangée ;
   dans le même groupe (`info.groupe`), une autre photo active ne revoit qu'elle, pour ne pas relire
-  1 000 photos à chaque clic. D'une sélection, `MAX_SELECTION` (1 000, le plus petit de la borne du
-  contrat et de `Lightroom.MAX_GROUPE`) photos au plus, la photo active d'abord ; le reste est dit
+  10 000 photos à chaque clic. D'une sélection, `MAX_SELECTION` (10 000 depuis le correctif 1.3.8, 1 000
+  avant ; plus borné par `Lightroom.MAX_GROUPE`, la clé d'un groupe de conversation) photos au plus, la photo active d'abord ; le reste est dit
   au journal. `voirSelection` ne lit que la sélection : la tâche range la vue.
 - Une vue se range (`rangerVue`) par lectures groupées du catalogue (`LOT_LECTURE` 500), sinon une
   à une : chaque photo entre par son original (`masterPhoto` d'une copie virtuelle, une seule fois :

@@ -1,5 +1,14 @@
 # Changements
 
+## 1.3.8 — 2026-10-26
+
+### Changé
+- Le Suivi prend jusqu'à 10 000 photos d'une même sélection, au lieu de 1 000 : un dossier entier
+  (3 500 photos, par exemple) y entre d'un coup, sans le sélectionner par tranches. L'analyse se
+  fait toujours en arrière-plan, sur votre Mac, sans Claude ni forfait : elle dure seulement plus
+  longtemps derrière une grande sélection. Au-delà de 10 000, les premières comptent, et le journal
+  du module le dit. Après l'installation : quitter puis relancer Lightroom.
+
 ## 1.3.7 — 2026-10-26
 
 Le correctif 1.3.7, le Suivi en graphiques, décidé avec vous le 25 octobre 2026 : chaque photo que

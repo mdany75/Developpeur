@@ -288,7 +288,7 @@ Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claud
 **Les photos qui comptent**
 
 - Toute photo que vous ouvrez dans la fenêtre Claude ou la Demande rapide, seule ou dans une
-  sélection (ses 1 000 premières photos), entre au Suivi : à l'ouverture de ces fenêtres, puis à
+  sélection (ses 10 000 premières photos depuis la 1.3.8), entre au Suivi : à l'ouverture de ces fenêtres, puis à
   chaque autre photo ou autre sélection pendant qu'elles sont ouvertes. Rien d'avant
   l'installation : le Suivi part de zéro.
 - Par l'original : une copie virtuelle compte pour son original, une seule fois (ni son ISO ni sa
