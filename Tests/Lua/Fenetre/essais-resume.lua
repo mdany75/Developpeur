@@ -565,6 +565,88 @@ essai("Lecture d'un grand groupe sans les lectures groupées : les MAX_GROUPE pr
     egal("Résumé de la sélection : 5 photos (les 3 premières lues)", Texte.lignes(Historique.resumeGroupe(g))[1])
 end)
 
+essai("Lecture d'une grande sélection (toute la bibliothèque ; lots réduits ici à 2) : le résumé et le groupe se lisent par lots de LOT_LECTURE, la main rendue entre deux, les mêmes comptes ; un lot dont les lectures échouent, une à une parmi les MAX_GROUPE premières seulement, et au-delà la lecture s'arrête là (les lues sont les premières)", function()
+    for id = 501, 507 do
+        photo(id, { appareil = id <= 503 and 'X-T20' or 'X-H2S', prise = le(2026, 9, id - 500), note = id % 2 })
+    end
+    retoucheeParClaude(photos[502])
+    journal(photos[505], { etape('2026-10-20 10:00', 'tonalité', "Ombres relevées.") })
+    choisir(507, 501, 502, 503, 504, 505, 506)
+    lecturesGroupees(true)
+    -- Les lectures groupées : la taille de chacune ; elles échouent, à la fin, pour les lots de la
+    -- 502 (3e et 4e de la sélection) et de la 506 (7e).
+    local tailles, echoue = {}, false
+    for _, nom in ipairs({ 'batchGetFormattedMetadata', 'batchGetRawMetadata', 'batchGetPropertyForPlugin' }) do
+        local lire = S.catalogue[nom]
+        S.catalogue[nom] = function(cat, liste, ...)
+            tailles[#tailles + 1] = #liste
+            for _, p in ipairs(liste) do
+                if echoue and (p == photos[502] or p == photos[506]) then
+                    error('lecture groupée refusée')
+                end
+            end
+            return lire(cat, liste, ...)
+        end
+    end
+    local LrTasks = S.modules.LrTasks
+    local yield, n = LrTasks.yield, 0
+    LrTasks.yield = function() n = n + 1 end
+    local lot = Historique.LOT_LECTURE
+    Historique.LOT_LECTURE = 2
+    local ok, erreur = pcall(function()
+        local g = lireGroupe()
+        for _, t in ipairs(tailles) do
+            vrai(t <= 2, 'une lecture groupée de ' .. t .. ' photos')
+        end
+        egal(12, #tailles, 'trois lectures par lot, quatre lots')
+        vrai(n >= 4, 'la main rendue entre deux lots : ' .. n)
+        egal(7, g.m)
+        egal(7, g.lues)
+        egal('1 sept. 2026', g.debut)
+        egal('7 sept. 2026', g.fin)
+        egal('X-H2S:4 X-T20:3', g.appareils[1].nom .. ':' .. g.appareils[1].n .. ' ' .. g.appareils[2].nom .. ':' .. g.appareils[2].n)
+        egal(1, g.retouchees)
+        egal(4, g.notees)
+        -- Le résumé court du groupe (Historique.lireGroupe) : de même.
+        tailles, n = {}, 0
+        local court = Historique.lireGroupe()
+        egal(7, court.m)
+        egal(7, court.lues)
+        egal(1, court.n, 'la 505 a des étapes de Claude')
+        egal(8, #tailles, 'deux lectures par lot')
+        vrai(n >= 4, 'la main rendue entre deux lots')
+        -- Un lot dont les lectures échouent : une à une, parmi les MAX_GROUPE premières seulement.
+        echoue = true
+        local max = Historique.MAX_GROUPE
+        Historique.MAX_GROUPE = 5
+        local g2 = lireGroupe()
+        local court2 = Historique.lireGroupe()
+        Historique.MAX_GROUPE = max
+        egal(7, g2.m)
+        egal(6, g2.lues, 'la 506 (7e) au-delà des cinq premières : pas lue')
+        egal(1, g2.retouchees, 'la 502 (3e), lue une à une')
+        egal(6, court2.lues)
+        egal(1, court2.n, 'la 505, de son lot lu groupé')
+        -- Un lot du milieu en échec au-delà des MAX_GROUPE premières (la 502 et la 503, 3e et 4e) :
+        -- la lecture s'arrête là, les lues restent les premières de la sélection (pas de trou), et
+        -- les textes disent vrai.
+        Historique.MAX_GROUPE = 2
+        local g3 = lireGroupe()
+        local court3 = Historique.lireGroupe()
+        Historique.MAX_GROUPE = max
+        egal(2, g3.lues, 'la 507 et la 501, puis arrêtée')
+        egal('X-H2S:1 X-T20:1', g3.appareils[1].nom .. ':' .. g3.appareils[1].n .. ' ' .. g3.appareils[2].nom .. ':' .. g3.appareils[2].n)
+        egal("Résumé de la sélection : 7 photos (les 2 premières lues)", Texte.lignes(Historique.resumeGroupe(g3))[1])
+        egal(2, court3.lues)
+        egal(0, court3.n, 'la 505, après le lot en échec : pas lue')
+        egal("Aucune des 2 premières de ces 7 photos n'a encore d'étape de Claude.", Historique.groupe(court3).texte)
+    end)
+    Historique.LOT_LECTURE = lot
+    LrTasks.yield = yield
+    lecturesGroupees(false)
+    assert(ok, erreur)
+end)
+
 -- Dans la fenêtre ---------------------------------------------------------------------------------
 
 essai("Photo neuve, à l'ouverture : le résumé de la photo en haut du fil, sous son historique, en gris (l'icône sur l'en-tête, les puces en retrait), d'aucun élément ni tour ; un clic n'y fait rien", function()

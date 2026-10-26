@@ -505,6 +505,43 @@ local function dansLesEssais(photo)
     return ok and oui == true
 end
 
+-- Les photos de « Développeur › Essais », lues d'un coup (correctif 1.3.8 : pour une grande
+-- sélection, le Suivi ne demande plus ses collections à chaque photo, Releve.lua) : l'ensemble des
+-- localIdentifier des photos de chaque collection Essais (pas une collection dynamique) d'un ensemble
+-- Développeur du catalogue, la même règle que dansLesEssais. Rend { [localIdentifier] = true }, ou
+-- nil si les collections ne se lisent pas (chaque photo se juge alors par Carnet.estPhotoDEssai).
+function Carnet.photosDesEssais()
+    local ok, ids = LrTasks.pcall(function()
+        local trouvees = {}
+        local function parcourir(parent, nom, profondeur)
+            if nom == Carnet.ESSAIS.ensemble then
+                for _, collection in ipairs(parent:getChildCollections() or {}) do
+                    local dynamique = type(collection.isSmartCollection) == 'function' and collection:isSmartCollection()
+                    if not dynamique and collection:getName() == Carnet.ESSAIS.collection then
+                        for _, photo in ipairs(collection:getPhotos() or {}) do
+                            trouvees[photo.localIdentifier] = true
+                        end
+                    end
+                end
+            end
+            if profondeur < 20 then
+                for _, ensemble in ipairs(parent:getChildCollectionSets() or {}) do
+                    parcourir(ensemble, ensemble:getName(), profondeur + 1)
+                end
+            end
+        end
+        parcourir(Photos.catalogue(), nil, 0)
+        return trouvees
+    end)
+    return ok and type(ids) == 'table' and ids or nil
+end
+
+-- Photo d'essai d'après Carnet.photosDesEssais : elle, ou son original (`original`, sa photo
+-- maîtresse déjà lue ; nil pour un original), en est.
+function Carnet.estDansLesEssais(essais, photo, original)
+    return essais[photo.localIdentifier] == true or (original ~= nil and original ~= photo and essais[original.localIdentifier] == true)
+end
+
 -- Photo d'essai : elle, ou son original, est dans « Développeur › Essais ».
 function Carnet.estPhotoDEssai(photo)
     if dansLesEssais(photo) then

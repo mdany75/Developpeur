@@ -46,6 +46,30 @@ Historique.ETAPES_MONTREES = 8
 Historique.REPRISES_MONTREES = 8
 Historique.NOMS_GROUPE = 5
 Historique.MAX_GROUPE = 500
+-- Photos par lecture groupée du catalogue d'une sélection (correctif 1.3.8 : toute la bibliothèque
+-- sélectionnée, 88 000 photos, se lisait en une seule lecture, sans rendre la main), et les photos
+-- décrites entre deux fois où la main est rendue à Lightroom.
+Historique.LOT_LECTURE = 500
+Historique.PAS = 2000
+-- Photos lues une à une (lectures groupées en échec) entre deux fois où la main est rendue.
+Historique.PAS_UNE_A_UNE = 50
+
+-- Rend la main à Lightroom entre deux lots : Photos.rendreLaMain, la seule copie (Releve.rendreLaMain
+-- aussi).
+local rendreLaMain = Photos.rendreLaMain
+
+-- Les lots de Historique.LOT_LECTURE photos d'une sélection : rend { debut, photos } pour chacun.
+local function lots(selection)
+    local liste = {}
+    for debut = 1, #selection, Historique.LOT_LECTURE do
+        local morceau = {}
+        for i = debut, math.min(#selection, debut + Historique.LOT_LECTURE - 1) do
+            morceau[#morceau + 1] = selection[i]
+        end
+        liste[#liste + 1] = { debut = debut, photos = morceau }
+    end
+    return liste
+end
 
 -- Le début des puces (celui des listes de Claude dans le fil, Fil.ligneMarkdown).
 Historique.PUCE = '•  '
@@ -188,38 +212,50 @@ local function avecEtapes(photo, champs, brutes)
 end
 
 -- Le groupe de la sélection de Lightroom : { m (photos sélectionnées), lues (celles qui ont été
--- regardées : toute la sélection par les lectures groupées du catalogue, qui en tiennent des
--- milliers ; les MAX_GROUPE premières, une à une, si elles échouent), n (celles qui ont des étapes de
--- Claude, parmi les lues), noms (les NOMS_GROUPE premiers de celles-là) } ; nil si la sélection ne se
--- lit pas.
+-- regardées : toute la sélection par les lectures groupées du catalogue, par lots de LOT_LECTURE, la
+-- main rendue entre deux ; d'un lot dont elles échouent, les photos parmi les MAX_GROUPE premières
+-- de la sélection se lisent une à une, et au-delà la lecture s'arrête là : les lues sont toujours les
+-- premières de la sélection, comme le texte le dit, Historique.groupe), n (celles qui ont des étapes
+-- de Claude, parmi les lues), noms (les NOMS_GROUPE premiers de celles-là) } ; nil si la sélection ne
+-- se lit pas.
 function Historique.lireGroupe()
     local groupe
     LrTasks.pcall(function()
         local cat = LrApplication.activeCatalog()
         local selection = cat:getTargetPhotos()
-        local okChamps, champs = LrTasks.pcall(function()
-            return cat:batchGetPropertyForPlugin(selection, _PLUGIN, { 'journalClaude', 'proprietaireMemoire' })
-        end)
-        local okBrutes, brutes = LrTasks.pcall(function() return cat:batchGetRawMetadata(selection, { 'uuid' }) end)
-        champs = okChamps and type(champs) == 'table' and champs or nil
-        brutes = okBrutes and type(brutes) == 'table' and brutes or nil
-        local photos = selection
-        if not champs and #selection > Historique.MAX_GROUPE then
-            photos = {}
-            for i = 1, Historique.MAX_GROUPE do
-                photos[i] = selection[i]
+        local g = { m = #selection, lues = 0, n = 0, noms = {} }
+        local arretee = false
+        for _, lot in ipairs(lots(selection)) do
+            if arretee then
+                break
             end
-        end
-        groupe = { m = #selection, lues = #photos, n = 0, noms = {} }
-        for _, photo in ipairs(photos) do
-            local ok, oui = LrTasks.pcall(avecEtapes, photo, champs, brutes)
-            if ok and oui then
-                groupe.n = groupe.n + 1
-                if #groupe.noms < Historique.NOMS_GROUPE then
-                    groupe.noms[#groupe.noms + 1] = nomDe(photo)
+            local okChamps, champs = LrTasks.pcall(function()
+                return cat:batchGetPropertyForPlugin(lot.photos, _PLUGIN, { 'journalClaude', 'proprietaireMemoire' })
+            end)
+            local okBrutes, brutes = LrTasks.pcall(function() return cat:batchGetRawMetadata(lot.photos, { 'uuid' }) end)
+            rendreLaMain()
+            champs = okChamps and type(champs) == 'table' and champs or nil
+            brutes = okBrutes and type(brutes) == 'table' and brutes or nil
+            for j, photo in ipairs(lot.photos) do
+                if not champs and lot.debut + j - 1 > Historique.MAX_GROUPE then
+                    -- Ni groupée ni une à une : la suite n'est pas lue (pas de trou au milieu des lues).
+                    arretee = true
+                    break
+                end
+                g.lues = g.lues + 1
+                local ok, oui = LrTasks.pcall(avecEtapes, photo, champs, brutes)
+                if ok and oui then
+                    g.n = g.n + 1
+                    if #g.noms < Historique.NOMS_GROUPE then
+                        g.noms[#g.noms + 1] = nomDe(photo)
+                    end
+                end
+                if not champs and j % Historique.PAS_UNE_A_UNE == 0 then
+                    rendreLaMain()
                 end
             end
         end
+        groupe = g
     end)
     return groupe
 end
@@ -731,13 +767,20 @@ end
 -- La description d'une photo pour le résumé, en table neuve : appareil, objectif, focale,
 -- ouverture, vitesse, iso (textes de Lightroom), prise (« AAAA-MM-JJ HH:MM »), note (0 à 5), drapeau
 -- ('retenue', 'aucun', 'rejetee'), retouchee (par Claude). `f`, `b` et `m` lisent une métadonnée
--- formatée, brute, ou un champ du module ; `retouchee` dit si la mémoire est celle de la photo.
-local function decrire(f, b, retouchee)
+-- formatée, brute, ou un champ du module ; `retouchee` dit si la mémoire est celle de la photo. Avec
+-- `brute` (le résumé d'une sélection), la date reste celle de Lightroom (priseT, un nombre) : seules
+-- la plus ancienne et la plus récente se mettent en texte (lireResumeGroupe).
+local function decrire(f, b, retouchee, brute)
     local d = {}
     for _, cle in ipairs(Historique.CLES_PRISE) do
         d[NOMS_PRISE[cle]] = texteOuNil(f(cle))
     end
-    d.prise = aLHeureLocale(b('dateTimeOriginal'))
+    if brute then
+        local t = b('dateTimeOriginal')
+        d.priseT = type(t) == 'number' and t or nil
+    else
+        d.prise = aLHeureLocale(b('dateTimeOriginal'))
+    end
     d.note = math.max(0, math.min(5, math.floor(tonumber(b('rating')) or 0)))
     d.drapeau = DRAPEAUX[tonumber(b('pickStatus')) or 0] or 'aucun'
     d.retouchee = retouchee()
@@ -745,40 +788,62 @@ local function decrire(f, b, retouchee)
 end
 
 -- Les descriptions de ces photos (Historique.lireResumePhoto, Historique.lireResumeGroupe), par les
--- trois lectures groupées du catalogue ; une photo qu'elles n'ont pas donnée se lit une à une, parmi
--- les `uneAUne` premières seulement. Une photo absente de la lecture groupée des champs du module,
--- quand elle a réussi, n'en a aucun (comme Historique.lireGroupe). Rend la liste (dans l'ordre des
--- photos lues) et le nombre de photos lues.
-local function lireDescriptions(cat, photos, uneAUne)
-    local okF, formatees = LrTasks.pcall(function() return cat:batchGetFormattedMetadata(photos, Historique.CLES_PRISE) end)
-    local okB, brutes = LrTasks.pcall(function() return cat:batchGetRawMetadata(photos, CLES_BRUTES) end)
-    local okC, champs = LrTasks.pcall(function() return cat:batchGetPropertyForPlugin(photos, _PLUGIN, CHAMPS_RETOUCHE) end)
-    local champsLus = okC and type(champs) == 'table'
-    formatees = okF and type(formatees) == 'table' and formatees or {}
-    brutes = okB and type(brutes) == 'table' and brutes or {}
-    champs = champsLus and champs or {}
+-- trois lectures groupées du catalogue, par lots de LOT_LECTURE (la main rendue entre deux, et toutes
+-- les PAS photos décrites) ; une photo qu'elles n'ont pas donnée se lit une à une, parmi les
+-- `uneAUne` premières seulement : au-delà, la lecture s'arrête là (les photos lues sont toujours les
+-- premières, comme l'en-tête du résumé le dit). Une photo absente de la lecture groupée des champs
+-- du module, quand elle a réussi, n'en a aucun (comme Historique.lireGroupe). `brute` : les dates de
+-- Lightroom telles quelles (decrire). Rend la liste (dans l'ordre des photos lues) et le nombre de
+-- photos lues.
+local function lireDescriptions(cat, photos, uneAUne, brute)
     local liste = {}
-    for i, photo in ipairs(photos) do
-        local fp, bp, mp = formatees[photo], brutes[photo], champs[photo]
-        if mp == nil and champsLus then
-            mp = {}
+    local arretee = false
+    for _, lot in ipairs(lots(photos)) do
+        if arretee then
+            break
         end
-        if type(fp) == 'table' and type(bp) == 'table' and type(mp) == 'table' then
-            liste[#liste + 1] = decrire(function(cle) return fp[cle] end, function(cle) return bp[cle] end, function()
-                if mp.retoucheeParClaude ~= 'oui' then
-                    return false
+        local okF, formatees = LrTasks.pcall(function() return cat:batchGetFormattedMetadata(lot.photos, Historique.CLES_PRISE) end)
+        local okB, brutes = LrTasks.pcall(function() return cat:batchGetRawMetadata(lot.photos, CLES_BRUTES) end)
+        local okC, champs = LrTasks.pcall(function() return cat:batchGetPropertyForPlugin(lot.photos, _PLUGIN, CHAMPS_RETOUCHE) end)
+        rendreLaMain()
+        local champsLus = okC and type(champs) == 'table'
+        formatees = okF and type(formatees) == 'table' and formatees or {}
+        brutes = okB and type(brutes) == 'table' and brutes or {}
+        champs = champsLus and champs or {}
+        for j, photo in ipairs(lot.photos) do
+            local i = lot.debut + j - 1
+            local fp, bp, mp = formatees[photo], brutes[photo], champs[photo]
+            if mp == nil and champsLus then
+                mp = {}
+            end
+            if not (type(fp) == 'table' and type(bp) == 'table' and type(mp) == 'table') and i > uneAUne then
+                -- Ni groupée ni une à une : la suite n'est pas lue (pas de trou au milieu des lues).
+                arretee = true
+                break
+            end
+            if type(fp) == 'table' and type(bp) == 'table' and type(mp) == 'table' then
+                liste[#liste + 1] = decrire(function(cle) return fp[cle] end, function(cle) return bp[cle] end, function()
+                    if mp.retoucheeParClaude ~= 'oui' then
+                        return false
+                    end
+                    if type(mp.proprietaireMemoire) == 'string' and mp.proprietaireMemoire ~= '' then
+                        return mp.proprietaireMemoire == bp.uuid
+                    end
+                    return Photos.lireChamp(photo, 'retoucheeParClaude') == 'oui'
+                end, brute)
+            else
+                local ok, d = LrTasks.pcall(decrire, function(cle) return Photos.meta(photo, cle) end,
+                    function(cle) return Photos.brut(photo, cle) end,
+                    function() return Photos.lireChamp(photo, 'retoucheeParClaude') == 'oui' end, brute)
+                if ok and d then
+                    liste[#liste + 1] = d
                 end
-                if type(mp.proprietaireMemoire) == 'string' and mp.proprietaireMemoire ~= '' then
-                    return mp.proprietaireMemoire == bp.uuid
+                if i % Historique.PAS_UNE_A_UNE == 0 then
+                    rendreLaMain()
                 end
-                return Photos.lireChamp(photo, 'retoucheeParClaude') == 'oui'
-            end)
-        elseif i <= uneAUne then
-            local ok, d = LrTasks.pcall(decrire, function(cle) return Photos.meta(photo, cle) end,
-                function(cle) return Photos.brut(photo, cle) end,
-                function() return Photos.lireChamp(photo, 'retoucheeParClaude') == 'oui' end)
-            if ok and d then
-                liste[#liste + 1] = d
+            end
+            if i % Historique.PAS == 0 then
+                rendreLaMain()
             end
         end
     end
@@ -823,37 +888,43 @@ function Historique.lireResumeGroupe()
     LrTasks.pcall(function()
         local cat = LrApplication.activeCatalog()
         local selection = cat:getTargetPhotos()
-        local liste, lues = lireDescriptions(cat, selection, Historique.MAX_GROUPE)
-        g = { m = #selection, lues = lues, sansDate = 0, appareils = {}, sansAppareil = 0, retouchees = 0, notees = 0, rejetees = 0 }
+        local liste, lues = lireDescriptions(cat, selection, Historique.MAX_GROUPE, true)
+        local r = { m = #selection, lues = lues, sansDate = 0, appareils = {}, sansAppareil = 0, retouchees = 0, notees = 0, rejetees = 0 }
+        -- Les dates de Lightroom comparées telles quelles : seules les deux extrêmes se mettent en
+        -- texte (à toute la bibliothèque, 88 000 dates en moins).
         local premiere, derniere
         local parNom = {}
-        for _, d in ipairs(liste) do
-            if d.prise then
-                premiere = (not premiere or d.prise < premiere) and d.prise or premiere
-                derniere = (not derniere or d.prise > derniere) and d.prise or derniere
+        for k, d in ipairs(liste) do
+            if d.priseT then
+                premiere = (not premiere or d.priseT < premiere) and d.priseT or premiere
+                derniere = (not derniere or d.priseT > derniere) and d.priseT or derniere
             else
-                g.sansDate = g.sansDate + 1
+                r.sansDate = r.sansDate + 1
             end
             if d.appareil then
                 if not parNom[d.appareil] then
                     parNom[d.appareil] = { nom = d.appareil, n = 0 }
-                    g.appareils[#g.appareils + 1] = parNom[d.appareil]
+                    r.appareils[#r.appareils + 1] = parNom[d.appareil]
                 end
                 parNom[d.appareil].n = parNom[d.appareil].n + 1
             else
-                g.sansAppareil = g.sansAppareil + 1
+                r.sansAppareil = r.sansAppareil + 1
             end
-            g.retouchees = g.retouchees + (d.retouchee and 1 or 0)
-            g.notees = g.notees + ((d.note or 0) > 0 and 1 or 0)
-            g.rejetees = g.rejetees + (d.drapeau == 'rejetee' and 1 or 0)
+            r.retouchees = r.retouchees + (d.retouchee and 1 or 0)
+            r.notees = r.notees + ((d.note or 0) > 0 and 1 or 0)
+            r.rejetees = r.rejetees + (d.drapeau == 'rejetee' and 1 or 0)
+            if k % Historique.PAS == 0 then
+                rendreLaMain()
+            end
         end
-        table.sort(g.appareils, function(a, b)
+        table.sort(r.appareils, function(a, b)
             if a.n ~= b.n then
                 return a.n > b.n
             end
             return a.nom < b.nom
         end)
-        g.debut, g.fin = jour(premiere), jour(derniere)
+        r.debut, r.fin = jour(aLHeureLocale(premiere)), jour(aLHeureLocale(derniere))
+        g = r
     end)
     return g
 end

@@ -2019,10 +2019,13 @@ conversation :
   DSCF4962.RAF, … » (les `NOMS_GROUPE` 5 premiers noms), ou « Aucune de ces 12 photos n'a encore
   d'étape de Claude. ». `Historique.lireGroupe` lit toute la sélection par les lectures groupées
   du catalogue (`batchGetPropertyForPlugin` de `journalClaude` et `proprietaireMemoire`,
-  `batchGetRawMetadata` de `uuid`, comme `Photos.decrireTout`) ; une mémoire sans propriétaire
-  passe par `Photos.lireJson` ; si les lectures groupées échouent, seules les `MAX_GROUPE` (500)
-  premières photos sont lues une à une, et le texte le dit (« 3 des 500 premières de ces 600
-  photos… »).
+  `batchGetRawMetadata` de `uuid`, comme `Photos.decrireTout`), par lots de `LOT_LECTURE` (500)
+  depuis le correctif 1.3.8, la main rendue entre deux (toute la bibliothèque sélectionnée se lisait
+  d'un coup) ; une mémoire sans propriétaire passe par `Photos.lireJson` ; d'un lot dont les
+  lectures groupées échouent, seules les photos parmi les `MAX_GROUPE` (500) premières sont lues une
+  à une, et au-delà la lecture s'arrête là (correctif 1.3.8 : un lot du milieu en échec laissait
+  sinon un trou parmi les lues, que « premières » aurait dit à tort) ; le texte le dit (« 3 des
+  500 premières de ces 600 photos… »).
 
 **Le résumé des réglages** (`Historique.ecarts(reglages, raw)`, pure ; demandé par Dany le
 25 octobre 2026). Pour une photo sans étape de Claude, `Historique.etat` lit ses réglages
@@ -2172,9 +2175,12 @@ Ses textes et ses lectures sont à `Historique.lua` (section « Le résumé de l
 
 Les lectures passent par les trois lectures groupées du catalogue (`batchGetFormattedMetadata`,
 `batchGetRawMetadata`, `batchGetPropertyForPlugin`), par appel direct, dans une tâche (la boucle,
-`Fenetre.majPhoto`, l'ouverture) ; si l'une échoue, une à une (`Photos.meta`, `Photos.brut`,
-`Photos.lireChamp`, exporté pour lui), les `Historique.MAX_GROUPE` premières d'un groupe
-seulement, et l'en-tête le dit (« (les 500 premières lues) »). L'état d'une photo vient
+`Fenetre.majPhoto`, l'ouverture), par lots de `Historique.LOT_LECTURE` (500) depuis le correctif
+1.3.8, la main rendue entre deux ; les dates d'un groupe se comparent telles que Lightroom les rend,
+seules la plus ancienne et la plus récente se mettent en texte ; si l'une échoue pour un lot, une à
+une (`Photos.meta`, `Photos.brut`, `Photos.lireChamp`, exporté pour lui), les
+`Historique.MAX_GROUPE` premières d'un groupe seulement, au-delà la lecture s'arrête là (les lues
+restent les premières de la sélection), et l'en-tête le dit (« (les 500 premières lues) »). L'état d'une photo vient
 d'`Historique.etat` (journal, reprises, réglages). Aucun caractère nouveau (★ · « » … → mesurés).
 
 Le résumé n'est pas gardé dans la conversation (ni sur le disque, ni envoyé à Claude) :
@@ -6361,9 +6367,11 @@ ne donne pas manque), `note` (de 0 à 5), `drapeau` (`retenue`, `aucun`, `rejete
 `retouchee_par_claude` et `classement_le`, puis `analyse` : absente (en file), réussie `{ le,
 regles, cherches, defauts }` (des codes, dans l'ordre des codes), ou manquée `{ le, erreur, essais,
 abandonnee }`. Les listes s'écrivent en tableaux JSON même vides (`Json.tableau`). `MAX_ORIGINAUX`
-20 000 par catalogue : au-delà, les entrées vues le moins récemment (`vu`, puis l'id) sortent. Le
-fichier entier se lit, puis s'écrit d'un coup (`Fichiers.ecrire` : un fichier provisoire renommé,
-`--graphiques` ne lit jamais un fichier à moitié écrit) ; illisible ou d'un autre format, il est mis
+250 000 par catalogue depuis le correctif 1.3.8 (20 000 avant) : au-delà, les entrées vues le moins
+récemment (`vu`, puis l'id) sortent. Le fichier entier se lit, puis s'écrit en entier, par morceaux
+(`Fichiers.ecrireParMorceaux` : un fichier provisoire écrit entrée par entrée, puis renommé d'un
+coup, `--graphiques` ne lit jamais un fichier à moitié écrit ; voir Toute la bibliothèque, plus
+bas) ; illisible ou d'un autre format, il est mis
 de côté avant la première écriture (`suivi-illisible-<date>.json`, jamais écrasé) ; tout ce qui sort
 vers une vue est une copie neuve, sans métatable ; rien n'est écrit au catalogue ; `uninstall.sh
 --tout` le retire avec le dossier (sans `--tout`, il le dit gardé).
@@ -6373,19 +6381,38 @@ vers une vue est une copie neuve, sans métatable ; rien n'est écrit au catalog
   `Lightroom.photos`) : une même clé ne compte qu'une fois ; `Releve.revoir`, à chaque ouverture
   d'une de ces fenêtres (et à son rappel par le menu ou ⌃⌥C, ⌘⌃⌥C), la fait compter même inchangée ;
   dans le même groupe (`info.groupe`), une autre photo active ne revoit qu'elle, pour ne pas relire
-  10 000 photos à chaque clic. D'une sélection, `MAX_SELECTION` (10 000 depuis le correctif 1.3.8, 1 000
-  avant ; plus borné par `Lightroom.MAX_GROUPE`, la clé d'un groupe de conversation) photos au plus, la photo active d'abord ; le reste est dit
-  au journal. `voirSelection` ne lit que la sélection : la tâche range la vue.
+  toute la sélection à chaque clic ; de même pour une sélection de plus de `SEUIL_REVOIR` (2 000)
+  photos revue par `Releve.revoir` moins de `REVOIR_APRES` (600 s) après sa dernière vue entière
+  (toute la bibliothèque, à chaque ouverture d'une fenêtre). D'une sélection, `MAX_SELECTION`
+  (250 000 depuis le correctif 1.3.8 : 10 000 le matin même, 1 000 avant ; plus borné par
+  `Lightroom.MAX_GROUPE`, la clé d'un groupe de conversation) photos au plus, la photo active
+  d'abord ; le reste est dit au journal. `voirSelection` ne lit que la sélection : la tâche range la
+  vue. Une sélection que la fenêtre Suivi pose (un clic sur une barre, `FenetreSuivi.montrerPhotos`,
+  par `Releve.poserSelection`, correctif 1.3.8) ne se range pas : ses photos viennent du relevé, et
+  à toute la bibliothèque une vue entière relirait des dizaines de milliers de photos à chaque clic ;
+  pendant la pose, aucune sélection vue ne compte (`Releve.selectionPosee`), puis la sélection posée
+  est notée vue (`cleVue`, `groupeVu`, `groupeVuLe`) ; une autre photo active de cette sélection ne
+  revoit qu'elle, une autre sélection compte. La fenêtre Claude, elle, la suit comme toute autre
+  sélection (sa conversation de groupe).
 - Une vue se range (`rangerVue`) par lectures groupées du catalogue (`LOT_LECTURE` 500), sinon une
   à une : chaque photo entre par son original (`masterPhoto` d'une copie virtuelle, une seule fois :
   sa vue s'ajoute à `vues`), sauf les vidéos (`fileFormat` `VIDEO`) et les photos de
-  « Développeur › Essais » (`Carnet.estPhotoDEssai` : elle ou son original). La famille (l'original
+  « Développeur › Essais » (`Carnet.estPhotoDEssai` : elle ou son original ; pour une vue d'au moins
+  `SEUIL_ESSAIS`, 200 photos, `Carnet.photosDesEssais` lit d'un coup les photos des collections
+  Essais des ensembles Développeur, la même règle, au lieu de demander les collections de chaque
+  photo ; illisibles, photo par photo comme avant). La famille (l'original
   et ses copies virtuelles, `virtualCopies`, sans celles des Essais) donne la note la plus haute, le
   drapeau (« retenue » si l'une l'est, sinon « rejetee » si toutes le sont, sinon « aucun ») et
   « retouchée par Claude » (l'une porte la mémoire de Claude, `retoucheeParClaude` et
   `proprietaireMemoire` égal à son uuid, comme `Photos.decrireTout`), relus à chaque vue d'une photo
   de la famille et, pour tout le relevé du catalogue, par `Releve.reclasser` à l'ouverture de la
-  fenêtre Suivi.
+  fenêtre Suivi (après son premier dessin, dans sa propre tâche, un seul à la fois). Depuis le
+  correctif 1.3.8, `poserClassement` ne change une entrée que si sa note, son drapeau ou
+  « retouchée par Claude » changent (`classement_le` : l'heure de ce changement, ou de leur première
+  lecture ; avant, chaque reclassement réencodait et réécrivait tout le relevé, 151 Mo à 250 000
+  originaux, à chaque ouverture de la fenêtre), et `Releve.reclasser` rend le nombre d'entrées
+  changées ; une entrée qu'une vue range pendant qu'il tourne (`Releve.revues`, que `rangerVue`
+  remplit) garde le classement de la vue, plus frais que celui qu'il a lu avant elle.
 - La file d'analyse, ce sont les entrées sans analyse, et celles dont l'analyse a une erreur sans
   `abandonnee` : rien d'autre à ranger, elle reprend d'elle-même après une fermeture de Lightroom.
   Une seule tâche à la fois (`Releve.vider`, `Releve.enCours`), lancée par `Releve.relancer` depuis
@@ -6412,22 +6439,114 @@ vers une vue est une copie neuve, sans métatable ; rien n'est écrit au catalog
   exemple `arguments`), `pas_de_reponse` (rien avant l'alarme : un essai pour chaque photo du lot),
   et deux raisons du module, `photo_introuvable` et `module`, comptent chacune un essai, réessayé
   `DELAI_REESSAI` (600 s) plus tard (une vignette de 256 px juste après une retouche : Lightroom
-  refait l'aperçu ensuite) ; au `ESSAIS_ANALYSE`-ième (3), l'entrée est `abandonnee` et ne revient
-  plus. Un connecteur absent se regarde de nouveau `DELAI_VERIFICATION` (60 s) plus tard ; rien ne
+  refait l'aperçu ensuite) : depuis le correctif 1.3.8, elle passe à son heure devant la file
+  gardée (`Releve.reessais`, dans l'ordre de leur heure, `MAX_REESSAIS` 1 000 ; au-delà, elle attend
+  que la file se refasse), sans attendre que toute la file soit épuisée ; au `ESSAIS_ANALYSE`-ième
+  (3), l'entrée est `abandonnee` et ne revient plus. Un connecteur absent se regarde de nouveau `DELAI_VERIFICATION` (60 s) plus tard ; rien ne
   change.
 - Une analyse n'est jamais refaite après une édition (les défauts disent la prise de vue ; une
   retouche les cacherait), seulement pour des règles plus récentes (une réponse dont `regles`
   dépasse celle de l'analyse ; si cette nouvelle analyse échoue, l'ancienne reste et n'est plus
-  refaite pendant la séance).
-- Les écritures du fichier, vues et analyses comprises, sont espacées d'au moins `DELAI_ECRITURE`
-  (20 s) : à 20 000 originaux, il fait 13,6 Mo (0,42 s pour la copie et `Json.encode` sous
-  `luajit -joff` ; plus dans Lightroom), écrits sans rendre la main, et une écriture par photo
-  parcourue aux flèches (une toutes les 2 s) figeait Lightroom à chaque photo. Deux exceptions : au
-  début d'une pause (Claude se met au travail) et avant un dessin de la fenêtre Suivi
-  (`Releve.ecrire`, que `FenetreSuivi.dessiner` appelle avant `--graphiques`). En fin de file, la
-  tâche attend son tour (`DELAI_ECRITURE` au plus) en rangeant les vues qui arrivent, au lieu
-  d'écrire tout de suite. `Releve.version` augmente à chaque écriture : la fenêtre Suivi y voit
-  qu'il faut redessiner.
+  refaite pendant la séance). Une réponse qui apporte des règles plus récentes que celles connues
+  (la première de la séance comprise) fait refaire la file gardée au lot suivant (correctif 1.3.8 :
+  sinon les analyses à refaire attendraient qu'elle soit épuisée).
+- Les écritures du fichier, vues et analyses comprises, sont espacées de `Releve.delaiEcriture` :
+  au moins `DELAI_ECRITURE` (20 s : à 20 000 originaux, 13,6 Mo écrits sans rendre la main jusqu'au
+  correctif 1.3.8, et une écriture par photo parcourue aux flèches, une toutes les 2 s, figeait
+  Lightroom à chaque photo) ; depuis le correctif 1.3.8, aussi `FACTEUR_ECRITURE` (10) fois la durée
+  propre de la dernière (la somme de ses morceaux : le temps que les autres tâches prennent quand elle
+  rend la main n'y compte pas, il l'aurait gonflée de plusieurs minutes ; la première après une
+  relecture refait toutes les entrées) et `SECONDES_PAR_MO` (1) par Mo du fichier, écrit ou relu
+  (chaque écriture écrit le fichier entier : à 85 000 originaux, 57 Mo toutes les 20 s faisaient plus
+  de 9 Go par heure d'analyse ; environ toutes les 57 s maintenant), au plus `DELAI_ECRITURE_MAX`
+  (60 s : ce qui n'est pas encore écrit se perd si Lightroom quitte, `Arret.lua` ne s'exécutant pas ;
+  les analyses se refont, une vue d'une photo nouvelle non). Une seule exception : avant un dessin
+  demandé de la fenêtre Suivi (`Releve.ecrire`, que `FenetreSuivi.dessiner` appelle avant
+  `--graphiques` à l'ouverture, à une autre période ou un autre défaut, et le reclassement fini ; il
+  attend d'abord une écriture en cours, qui ne remplace le fichier qu'à sa fin). Plus d'écriture au
+  début de chaque pause (correctif 1.3.8 : une liaison qui sert par moments, Claude Desktop qui
+  enchaîne ses commandes, faisait réécrire tout le relevé toutes les 7 s, juste quand une commande
+  commençait) : pendant une pause, le fichier s'écrit à son tour, comme hors d'elle. En fin de file,
+  la tâche attend son tour en rangeant les vues qui arrivent, au lieu d'écrire tout de suite.
+  `Releve.version` augmente à chaque écriture réussie : la fenêtre Suivi y voit qu'il faut
+  redessiner.
+- Toute la bibliothèque (correctif 1.3.8, demandé par Dany le 26 octobre 2026 : 88 071 photos, dont
+  3 323 vidéos, Toutes les photographies, tout sélectionner ; le matin même, son relevé, à la borne
+  de 20 000, avait perdu 9 358 originaux analysés) : `MAX_SELECTION` et `MAX_ORIGINAUX` à 250 000,
+  le relevé de 85 000 originaux pèse environ 50 Mo, celui de 250 000 environ 150 Mo, toujours au
+  format 1. Aucune tâche ne garde la main plus de quelques centièmes de seconde : `Releve.rendreLaMain`
+  (`LrTasks.yield`, seulement si `LrTasks.canYield`, sous `LrTasks.pcall`, qui ne laisse passer
+  aucune erreur : un yield à travers un `pcall` simple, que Lua 5.1 refuse, ne fait rien ; sa seule
+  copie est `Photos.rendreLaMain`, que `Historique` reprend aussi) toutes les
+  `PAS` (2 000) entrées des boucles, `PAS_UNE_A_UNE` (200) lectures une à une du catalogue,
+  `LOT_LECTURE` (500) photos des lectures groupées, `PAS_ECRITURE` (500) entrées écrites et
+  `PAS_JSON` (10 000) valeurs relues (`Json.decode(texte, rythme, pas)`, un compte propre à chaque
+  lecture). La relecture (`charger`) et l'écriture passent par `LrTasks.pcall` ; une seule relecture
+  à la fois (une autre tâche l'attend : deux registres, et ce qui change dans le premier se
+  perdrait ; hors d'une tâche, relu d'un seul morceau, le premier rangé l'emporte), chaque entrée
+  relue quittant la table décodée ; une seule écriture à la fois (une autre l'attend, ou, hors d'une
+  tâche, la laisse à la suivante), qui remet `aEcrire` à faux dès son début (ce qui se range pendant
+  s'écrit à la suivante), prend les clés d'abord (jamais un parcours par `pairs` d'une table qu'une
+  autre tâche agrandit), écrit entrée par entrée (aucun grand texte assemblé ; l'enveloppe, accolades,
+  virgules et clés, par `Json.ecrivain` : le JSON passe toujours par `Json.lua`) et s'abandonne si le
+  Suivi s'éteint (le fichier d'avant tel quel, aucun provisoire). Le texte JSON de chaque entrée est
+  gardé (`jsonDe`, clés faibles) jusqu'à ce qu'elle change (`changee`, dans `rangerVue`,
+  `poserClassement`, `manquee` et l'analyse réussie) : une écriture pendant l'analyse ne refait que
+  les entrées changées. La file d'analyse se garde d'une vue à l'autre : les originaux d'une vue rangée, et un lot
+  remis, passent devant (`mettreDevant`, la photo active d'abord, la suite dans son ordre) ; elle ne
+  se refait entière qu'épuisée (`construireFile`), par paquets de même heure de vue triés en nombres
+  (`trierParVu` : le rang dans la sélection fois 2^34 plus l'identifiant ; aucun tri de textes, que
+  Lua 5.1 compare par `strcoll`, ni comparateur Lua sur toute la liste), le même ordre qu'avant ;
+  `elaguer` ne trie qu'au-delà de la borne, d'après l'heure de vue de chaque entrée lue d'abord, en
+  nombre, et garde une entrée revue pendant ce temps (jusqu'à la revue de la 1.3.8, il comparait la
+  table à elle-même : une entrée vue pendant le tri sortait quand même). Une grande
+  vue se lit et se range par tranches ; `Releve.reclasser` aussi (les originaux retrouvés un à un,
+  les clés prises d'abord). Mesures du 26 octobre 2026 sous `luajit -joff`, sur les relevés
+  synthétiques de l'audit (le plus long morceau entre deux yields ; Lightroom : à peu près autant,
+  au plus 2,5 fois, d'après les dates des analyses du vrai relevé) :
+
+  | Chemin | 85 000 avant | 85 000 après | 250 000 avant | 250 000 après |
+  | --- | --- | --- | --- | --- |
+  | relecture (`charger`) | 1,86 s d'un morceau | 1,89 s, au plus 0,03 s | 5,63 s d'un morceau | 5,69 s, au plus 0,05 s |
+  | première écriture | 1,85 s d'un morceau | 1,94 s, au plus 0,05 s | 6,49 s d'un morceau | 6,38 s, au plus 0,08 s |
+  | écriture pendant l'analyse | 1,82 s d'un morceau | 0,11 s, au plus 0,005 s | 5,90 s d'un morceau | 0,38 s, au plus 0,01 s |
+  | file refaite | 0,11 s, à chaque vue | 0,06 s, épuisée seulement | 0,45 s, à chaque vue | 0,20 s, au plus 0,006 s |
+  | vue de 88 000 photos (Lua) | 0,66 s d'un morceau | 0,59 s, au plus 0,02 s | 0,58 s d'un morceau | 0,62 s, au plus 0,02 s |
+  | `Releve.reclasser` (écriture comprise ; 129 000 et 294 000 originaux après la vue) | 3,69 s d'un morceau | 3,26 s, au plus 0,07 s | 8,37 s d'un morceau | 8,34 s, au plus 0,14 s |
+  | réponse « Tout » de `--graphiques` | 0,21 s (3,9 Mo) | 0,22 s, au plus 0,003 s | 0,76 s (11,3 Mo) | 0,73 s, au plus 0,003 s |
+
+  La ligne de `Releve.reclasser` compte encore l'écriture de tout le relevé : depuis la revue du
+  même jour, sans rien de changé dans le catalogue, il n'écrit plus rien (l'écriture suivante, sans
+  réencodage : 0,12 s à 85 000 originaux, 0,51 s à 250 000).
+  Les plus longs morceaux qui restent (0,1 à 0,27 s, à 250 000 seulement) ne sont pas le
+  ramasse-miettes (la revue les a mesurés ramasse-miettes arrêté) : c'est l'agrandissement d'un coup
+  d'une table qui passe de 131 072 à 262 144 places, `jsonDe` (0,13 s dans `jsonDeLEntree`) ou la
+  table des chaînes de Lua (0,27 s dans l'encodage des clés). Les lectures du catalogue (lectures
+  groupées, `getPhotoByLocalId`, `getTargetPhotos` d'une sélection de 88 000 photos,
+  `setSelectedPhotos`) et le coût de `LrTasks.yield` ne se mesurent pas hors de Lightroom : à
+  constater.
+- La mémoire (correctif 1.3.8, mesurée sous `luajit -joff` par la revue ; pour Lua 5.1, celui de
+  Lightroom, d'après un modèle des tailles de ses objets, qui tombe à 5 % de la mesure pour LuaJIT) :
+  à 85 000 originaux, le registre tient 115 Mo et `jsonDe` 57 Mo sous luajit (Lua 5.1 : environ
+  0,2 Go en tout), pendant toute la séance ; la relecture monte un moment à 305 Mo et la première
+  écriture à 352 Mo (Lua 5.1 : environ 0,45 Go) ; à 250 000, 338 et 155 Mo (environ 0,6 Go), et
+  857 Mo à la relecture, 1 016 Mo à la première écriture (Lua 5.1 : 1,2 à 1,5 Go). `Json.decode`
+  bâtit tout l'arbre avant que `normaliser` ne commence, et une entrée retirée de l'arbre ne part
+  qu'au ramasse-miettes suivant : le texte, l'arbre et le registre sont un moment ensemble. Lua ne
+  rend pas ce tas avant la fermeture de Lightroom. À constater dans Lightroom.
+- Les essais du correctif 1.3.8 (`essais-releve.lua`) : « Toute la bibliothèque » (pas réduits),
+  « Écriture par morceaux », « La file se garde », « Une grande sélection revue », « Un grand relevé
+  s'écrit moins souvent » (durée propre, taille, borne), quatre essais sur de vraies tâches
+  entremêlées (des coroutines, chaque `LrTasks.yield` et `LrTasks.sleep` rendant la main à un
+  planificateur : la durée propre d'une écriture, l'élagage d'une entrée revue pendant le tri, le
+  reclassement face à une vue, `Releve.ecrire` qui attend une écriture en cours), les réessais à leur
+  heure, les règles plus récentes, le reclassement sans changement, la sélection posée, et « Taille
+  réelle » (85 000 originaux, ou `DEVELOPPEUR_SUIVI_ORIGINAUX=250000` : relecture, première écriture,
+  vue de mille photos, écriture suivante et file refaite, jamais plus de 0,3 s sans rendre la main) ;
+  `essais-suivi.lua` (le clic sur une barre de toute la bibliothèque, la sélection posée, le
+  reclassement en arrière-plan, le dessin fait de lui-même) ; `essais-resume.lua` (les lectures par
+  lots, un lot du milieu en échec). Chaque correction de la revue a été vérifiée par son essai, qui
+  échoue sans elle, sur une copie du module modifiée exprès.
 - Le Suivi ne tourne que dans Lightroom : `Releve.allume` est faux par défaut ; `Init.lua`
   l'allume (`Releve.allumer`, qui remet aussi `arrete` à faux pour une réactivation dans le
   Gestionnaire), `Arret.lua` l'éteint (`Releve.eteindre` : le module désactivé, rechargé ou
@@ -6436,10 +6555,11 @@ vers une vue est une copie neuve, sans métatable ; rien n'est écrit au catalog
   l'ancienne instance), sans lancer le connecteur ni écrire le relevé (`enregistrer` refuse quand
   `Releve.arrete` est vrai). Après un rechargement, l'ancienne instance continue de tourner et la
   nouvelle peut démarrer avant qu'elle ait fini (voir Vérifications de la 2.3) : elle ne réécrit
-  donc jamais le relevé que la nouvelle relit et tient ; ce qui n'était pas écrit (20 s de vues au
-  plus) se perd, les analyses se refont, et la réouverture de la fenêtre Claude revoit la
-  sélection. À la fermeture de Lightroom, `Arret.lua` ne s'exécute pas : les vues des 20 dernières
-  secondes peuvent se perdre. Les suites de tests ne chargent pas `Init.lua`, sauf leurs essais
+  donc jamais le relevé que la nouvelle relit et tient ; ce qui n'était pas écrit (les vues d'un
+  `Releve.delaiEcriture` au plus : 20 s pour un petit relevé, 60 s au plus depuis le correctif 1.3.8)
+  se perd, les analyses se refont, et la réouverture de la fenêtre Claude revoit la sélection. À la
+  fermeture de Lightroom, `Arret.lua` ne s'exécute pas : les vues du dernier `Releve.delaiEcriture`
+  peuvent se perdre. Les suites de tests ne chargent pas `Init.lua`, sauf leurs essais
   d'Init (`tests.lua`, `essais-une-photo.lua`), qui l'éteignent ensuite ; seul `essais-releve.lua`
   l'allume.
 - `Menage.TEMPORAIRES` gagne `Suivi` : `Temporaire/Suivi` s'efface au chargement (les vignettes
@@ -6487,7 +6607,8 @@ rien sur stdout : `usage(erreur:)` de `main.swift`). Dix vignettes de 1 720 px s
 environ.
 
 **Les graphiques (`mcp-developpeur --graphiques '<json>' <dossier>`, `Suivi.graphiques`,
-`SuiviGraphiques.swift`).** Commande exacte : `/usr/bin/perl -e 'alarm 20; exec @ARGV' <connecteur>
+`SuiviGraphiques.swift`).** Commande exacte (alarme de 60 s depuis le correctif 1.3.8, 20 s avant) :
+`/usr/bin/perl -e 'alarm 60; exec @ARGV' <connecteur>
 --graphiques '<json>' <dossier> > <réponse>.json 2>/dev/null` ; lecture seule de `suivi.json` et de
 `carnet.json` (par `JSONSerialization`) : ni Lightroom, ni le catalogue, ni un original, et aucun
 chemin par défaut (les essais passent des fichiers temporaires, jamais le vrai relevé). Entrée :
@@ -6542,8 +6663,9 @@ graphiques en points entiers, de 120 × 80 à 1 200 × 600).
   fichier, largeur, hauteur, orientation, max_barres, unite, echelle, sans_valeur, note, vide,
   barres, creneaux }` ; une barre `{ libelle, detail, valeur, texte, n, sur, ids, couleur (barre ou
   accent), x, y, largeur, hauteur (le rectangle dessiné), zone (le rectangle cliquable) }`, ses `ids`
-  les originaux, croissants, tous (pour 20 000 originaux, la ligne dépasse 650 Ko : le module la lit
-  dans un fichier, jamais par un tuyau) ; un créneau `{ x, y, largeur, hauteur, barre }`, `barre` le
+  les originaux, croissants, tous (pour 20 000 originaux, la ligne « Tout » dépasse 800 Ko, pour
+  250 000 elle fait 12 Mo : le module la lit dans un fichier, jamais par un tuyau, et la décode en
+  rendant la main) ; un créneau `{ x, y, largeur, hauteur, barre }`, `barre` le
   rang de la barre qui l'occupe (0 : vide). Les sept graphiques : `photos_par_mois` (« Photos par
   mois », « Photos par année » pour Tout ; 12 créneaux, étalé), `focales` (8), `iso` (8), `heures`
   (12), `objectifs` (8, horizontal), `defauts_frequents` (8, horizontal, en %, la barre du défaut
@@ -6572,7 +6694,9 @@ graphiques en points entiers, de 120 × 80 à 1 200 × 600).
   (JSON illisible, clé manquante ou invalide : période, apparence, couleur, taille, date),
   `defaut_inconnu`, `suivi_illisible` (JSON invalide ou format autre que 1), `dossier` (il ne se crée
   ou ne s'écrit pas), `dessin` ; code 2 pour un nombre d'arguments faux. Un relevé de 20 000
-  originaux se dessine en 0,5 s environ.
+  originaux se dessine en 0,3 s environ ; de 85 000 en 1,0 s ; de 250 000 en 2,9 s, 830 Mo de
+  mémoire (exécutable release, Mac de Dany, mesuré le 26 octobre 2026 : aucune borne du connecteur
+  ne dépend de la taille du relevé).
 
 **La fenêtre Suivi** (`FenetreSuivi.lua`, réécrite) : « Claude · Suivi », 1 310 × 1 028 points
 (contenu tiré de `FenetreSuivi.TAILLES` par `FenetreSuivi.dimensions` ; D7 : barre de titre de 33,
@@ -6598,17 +6722,27 @@ registre change, par l'abonnement `suivi`). Chaque graphique a son titre et sa n
 fenêtre d'après la sortie.
 
 - Le dessin : dans la tâche de la boucle de la fenêtre (`FenetreSuivi.suivre`,
-  `FenetreSuivi.dessiner`), `perl alarm 20` et `--graphiques`, avec exactement l'entrée du contrat
+  `FenetreSuivi.dessiner`), `perl alarm 60` (20 jusqu'au correctif 1.3.8) et `--graphiques`, avec
+  exactement l'entrée du contrat
   (`FenetreSuivi.entree` : le chemin de `suivi.json` et de `carnet.json`, celui du catalogue,
   `aujourd_hui` par `LrDate`, la période, l'apparence du module, ses six couleurs par
   `FenetreSuivi.couleursConnecteur` d'après `COULEURS_CONNECTEUR`, le défaut s'il est choisi, les
   tailles de `FenetreSuivi.GRAPHIQUES`), dans un dossier neuf par dessin
   (`Temporaire/Suivi/Graphiques-…` : Lightroom garde une image par chemin, un même chemin ne se
   redessinerait pas) ; l'avant-dernier s'efface quand le nouveau est montré, tous à la fermeture.
-  Avant chaque dessin, `Releve.ecrire`. Les images se refont à l'ouverture (après
-  `Releve.reclasser`), au changement de période ou de défaut, et quand `Releve.version` ou
-  `Carnet.version` change pendant qu'elle est ouverte, `DELAI_REDESSIN` (10 s) au moins entre deux
-  dessins faits d'eux-mêmes. La boucle relance aussi la file d'analyse (`Releve.relancer`), pour
+  Avant un dessin demandé (l'ouverture, une autre période, un autre défaut, le reclassement fini),
+  `Releve.ecrire` (qui attend d'abord une écriture en cours) ; un dessin fait de lui-même (le relevé
+  écrit, `Releve.version`, ou le carnet changé, `Carnet.version`) lit le fichier tel quel (correctif
+  1.3.8) : ce qui reste à écrire s'y montre après l'écriture suivante, qui fait redessiner. Les
+  images se refont à l'ouverture, puis une fois `Releve.reclasser` fini (dans sa propre tâche depuis
+  le correctif 1.3.8, après le premier dessin : `FenetreSuivi.reclasserEnFond`, qui redemande un
+  dessin s'il a changé des entrées et que la fenêtre est la même), au
+  changement de période ou de défaut, et quand `Releve.version` ou `Carnet.version` change pendant
+  qu'elle est ouverte, `FenetreSuivi.delaiRedessin` au moins entre deux dessins faits d'eux-mêmes
+  (`DELAI_REDESSIN` 10 s ; `DELAI_REDESSIN_GRAND` 60 s pour un relevé d'au moins `SEUIL_GRAND`, 20 000
+  originaux, que `--graphiques` lit en entier à chaque fois). La réponse se décode en rendant la
+  main (`Json.decode` avec un rythme, `PAS_JSON` 5 000, sous `LrTasks.pcall`) ; un calque se montre
+  quand sa barre a au moins un identifiant (`aDesIds`, sans les copier). La boucle relance aussi la file d'analyse (`Releve.relancer`), pour
   qu'elle avance quand seule cette fenêtre est ouverte. Sans réponse lisible, rien ne change : un
   connecteur absent (`CONNECTEUR_ABSENT`, son chemin dans le Gestionnaire), muet
   (`PAS_DE_REPONSE`) ou qui refuse (`REFUS` et son texte) le dit, les images d'avant restent ; un
@@ -6629,7 +6763,12 @@ fenêtre d'après la sortie.
   photos… ».
 - Un clic sur une barre (`FenetreSuivi.cliquer`, puis `FenetreSuivi.montrerPhotos` dans une
   tâche) : les originaux retrouvés par `getPhotoByLocalId` et vérifiés par l'uuid de leur entrée du
-  relevé (une autre photo sous ce numéro, ou une photo sortie du relevé, est sautée), puis
+  relevé (une autre photo sous ce numéro, ou une photo sortie du relevé, est sautée ; depuis le
+  correctif 1.3.8, l'entrée lue par `Releve.uuidsDe` sans copier tout le relevé, les photos
+  retrouvées par tranches de `PAS_UNE_A_UNE`, leurs uuid par lectures groupées de
+  `Releve.LOT_LECTURE`, la main rendue entre deux, et une sélection d'au moins `GRANDE_SELECTION`,
+  5 000 photos, refaite une fois par seconde au lieu de 0,2 pendant `DELAI_SOURCE` ; posée par
+  `Releve.poserSelection`, elle ne se range pas au relevé), puis
   sélectionnés en grille dans la Bibliothèque (`LrApplicationView.switchToModule('library')`,
   `showView('grid')`) ; quand la source affichée ne les a pas toutes, Toutes les photographies
   (`catalog:setActiveSources(catalog.kAllPhotos)`, d'après la référence du SDK, pas encore vue dans
@@ -6693,6 +6832,21 @@ fenêtre 337, dont `tests.lua` 64, `essais-releve` 18, `essais-suivi` 13, `essai
    fenêtres.
 7. Un rechargement du module pendant une analyse : l'ancienne instance qui s'arrête sans réécrire
    le relevé.
+8. Correctif 1.3.8 : toute la bibliothèque de Dany (88 071 photos, Toutes les photographies, tout
+   sélectionner) ouverte dans la fenêtre Claude et dans la Demande rapide sans figer Lightroom :
+   `getTargetPhotos` de 88 000 photos, que `Lightroom.photos` rappelle toutes les 2 s dans chaque
+   fenêtre ouverte, la vue rangée par lectures groupées, les résumés de groupe
+   (`Historique.lireGroupe`, `lireResumeGroupe`) et leur durée.
+9. Correctif 1.3.8 : le coût de `LrTasks.yield` dans Lightroom, et `LrTasks.canYield` vrai dans les
+   tâches du Suivi, de la fenêtre Suivi et des résumés (un yield refusé sous un `pcall` simple ne
+   ferait que laisser le travail d'un seul morceau) ; les écritures du relevé espacées comme prévu
+   (le journal et la date de `suivi.json`).
+10. Correctif 1.3.8 : la fenêtre Suivi sur toute la bibliothèque (`--graphiques` à 85 000 originaux,
+    le reclassement en arrière-plan, un clic sur une barre de milliers de photos par
+    `setSelectedPhotos`), et la mémoire de Lightroom avant et après (Moniteur d'activité).
+11. Correctif 1.3.8 : l'analyse d'office de toute la bibliothèque en quelques heures (environ 3 photos
+    par seconde), sa reprise après une fermeture de Lightroom, et un réessai 10 minutes plus tard au
+    milieu de la file.
 
 ## Correctif 1.3.6 : une photo, une conversation
 

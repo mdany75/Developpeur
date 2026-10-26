@@ -20,11 +20,17 @@
 -- 2x, dans les couleurs de l'apparence du module (Dispositions.PALETTES, seule table des couleurs,
 -- passées au connecteur : FenetreSuivi.couleursConnecteur) ; il rend aussi, en une ligne JSON, les
 -- tuiles et, pour chaque graphique, ses barres et ses créneaux. Les images se refont dans une tâche
--- (la boucle de la fenêtre, FenetreSuivi.suivre) : à l'ouverture (après Releve.reclasser, qui relit
--- la note, le drapeau et « retouchée par Claude » de chaque famille), au changement de période ou
--- de défaut, et quand le relevé ou le carnet change pendant qu'elle est ouverte (Releve.version,
--- Carnet.version ; DELAI_REDESSIN entre deux) ; avant chacune, ce que le Suivi a rangé sans
--- l'écrire encore s'écrit (Releve.ecrire : ses écritures sont espacées). Chaque dessin a son
+-- (la boucle de la fenêtre, FenetreSuivi.suivre) : à l'ouverture, puis une fois Releve.reclasser
+-- fini (il relit la note, le drapeau et « retouchée par Claude » de chaque famille, dans sa propre
+-- tâche : à toute la bibliothèque, il dure, et la fenêtre montre déjà le classement gardé), au
+-- changement de période ou de défaut, et quand le relevé ou le carnet change pendant qu'elle est
+-- ouverte (Releve.version, Carnet.version ; FenetreSuivi.delaiRedessin entre deux) ; avant un dessin
+-- demandé (ouverture, période, défaut, reclassement fini), ce que le Suivi a rangé sans l'écrire
+-- encore s'écrit (Releve.ecrire : ses écritures sont espacées) ; un dessin fait de lui-même (le relevé
+-- écrit, ou le carnet changé) lit le fichier tel quel : ce qui reste à écrire se montre après
+-- l'écriture suivante, qui fait redessiner. La réponse (à toute la bibliothèque, « Tout » : plus de 10 Mo,
+-- tous les identifiants de chaque barre) se décode en rendant la main (Json.decode avec un rythme,
+-- correctif 1.3.8). Chaque dessin a son
 -- dossier neuf (Temporaire/Suivi/Graphiques-…, Lightroom garde une image par chemin) ;
 -- l'avant-dernier s'efface quand le nouveau est montré, tous à la fermeture. Sans réponse lisible
 -- du connecteur, rien ne change et la fenêtre le dit ; sans connecteur, elle le dit aussi.
@@ -148,9 +154,23 @@ FenetreSuivi.COULEURS_CONNECTEUR = { fond = 'fondDroite', texte = 'texte', gris 
 -- faits d'eux-mêmes (le relevé s'écrit au plus toutes les 20 s pendant les analyses), et le délai
 -- pendant lequel la sélection se refait après un changement de source (comme Bibliotheque :
 -- Lightroom met un moment à afficher la source, constaté en 2.3).
-FenetreSuivi.ALARME = 20
+-- 60 s depuis le correctif 1.3.8 (20 avant) : à 250 000 originaux, --graphiques prend 2,9 s sur le
+-- Mac de Dany, plus pendant que Lightroom travaille. Un relevé d'au moins SEUIL_GRAND originaux ne
+-- se redessine de lui-même qu'au plus toutes les DELAI_REDESSIN_GRAND secondes (--graphiques le lit
+-- en entier à chaque fois). PAS_JSON : les valeurs de la réponse décodées entre deux fois où la main
+-- est rendue ; PAS_UNE_A_UNE : les photos retrouvées une à une au clic (getPhotoByLocalId) entre
+-- deux.
+FenetreSuivi.ALARME = 60
 FenetreSuivi.DELAI_REDESSIN = 10
+FenetreSuivi.DELAI_REDESSIN_GRAND = 60
+FenetreSuivi.SEUIL_GRAND = 20000
 FenetreSuivi.DELAI_SOURCE = 3
+FenetreSuivi.PAS_JSON = 5000
+FenetreSuivi.PAS_UNE_A_UNE = 200
+-- Une sélection d'au moins tant de photos se refait moins souvent pendant DELAI_SOURCE (une
+-- seconde entre deux essais au lieu de 0,2) : setSelectedPhotos et getTargetPhotos sur des dizaines
+-- de milliers de photos.
+FenetreSuivi.GRANDE_SELECTION = 5000
 
 -- La disposition, en points : marges, colonnes de 620 (la largeur des grands graphiques ; les
 -- petits, de 300, vont par deux à 20 d'écart), tuiles, hauteurs des textes. Le contenu en tire sa
@@ -179,6 +199,7 @@ FenetreSuivi.POLICES = { titre = police('titre'), gras = police('gras'), gras12 
 
 local bind = LrView.bind
 local q = Texte.shell
+local rendreLaMain = Releve.rendreLaMain
 
 local function poser(p, cle, valeur)
     if p[cle] ~= valeur then
@@ -415,6 +436,17 @@ function FenetreSuivi.barreDu(cle, i)
     return type(barre) == 'table' and barre or nil
 end
 
+-- Vrai si la barre a au moins un id (sans les copier : à toute la bibliothèque, une barre en a des
+-- dizaines de milliers, et chacun des 68 calques le demande à chaque réponse).
+local function aDesIds(barre)
+    for _, id in ipairs(type(barre) == 'table' and type(barre.ids) == 'table' and barre.ids or {}) do
+        if tonumber(id) then
+            return true
+        end
+    end
+    return false
+end
+
 -- Les ids d'une barre, en nombres (une table neuve).
 local function idsDe(barre)
     local ids = {}
@@ -484,7 +516,7 @@ function FenetreSuivi.montrer(reponse)
         for i = 1, g.max_barres do
             local visible, infobulle = FenetreSuivi.cleCalque(g.cle, i)
             local barre = valides and FenetreSuivi.barreDu(g.cle, i) or nil
-            local actif = barre ~= nil and #idsDe(barre) > 0
+            local actif = barre ~= nil and aDesIds(barre)
             poser(p, visible, actif)
             poser(p, infobulle, actif and ((texteOuNil(barre.detail) or texteOuNil(barre.libelle) or '') .. "\n"
                 .. FenetreSuivi.INFOBULLE_BARRE) or '')
@@ -517,23 +549,39 @@ local function echec(texte)
     return false
 end
 
+-- L'écart entre deux dessins faits d'eux-mêmes (le relevé ou le carnet a changé) : DELAI_REDESSIN,
+-- DELAI_REDESSIN_GRAND pour un relevé d'au moins SEUIL_GRAND originaux (celui du dernier dessin).
+function FenetreSuivi.delaiRedessin()
+    if (FenetreSuivi.originauxDessines or 0) >= FenetreSuivi.SEUIL_GRAND then
+        return FenetreSuivi.DELAI_REDESSIN_GRAND
+    end
+    return FenetreSuivi.DELAI_REDESSIN
+end
+
 -- Lance `mcp-developpeur --graphiques` (depuis une tâche) pour la période et le défaut choisis, puis
 -- montre sa réponse. Rend vrai si les graphiques sont refaits.
 function FenetreSuivi.dessiner()
     local p = FenetreSuivi.p
     local generation = FenetreSuivi.generation
+    -- Un dessin demandé (l'ouverture, une autre période, un autre défaut, le reclassement fini).
+    local demande = FenetreSuivi.aRedessiner == true
     FenetreSuivi.aRedessiner = false
-    -- Ce que le Suivi a rangé sans l'écrire encore (ses écritures sont espacées :
-    -- Releve.DELAI_ECRITURE) s'écrit d'abord : --graphiques lit le fichier.
-    local okEcrit, erreurEcrit = LrTasks.pcall(Releve.ecrire)
-    if not okEcrit then
-        Journal.noter("Fenêtre Suivi : relevé non écrit avant le dessin :", tostring(erreurEcrit))
+    -- Un dessin demandé : ce que le Suivi a rangé sans l'écrire encore (ses écritures sont espacées :
+    -- Releve.delaiEcriture) s'écrit d'abord, --graphiques lit le fichier. Un dessin fait de lui-même
+    -- (le relevé écrit, Releve.version, ou le carnet changé, Carnet.version) lit le fichier tel quel :
+    -- rien à forcer (l'écriture suivante fera redessiner).
+    if demande then
+        local okEcrit, erreurEcrit = LrTasks.pcall(Releve.ecrire)
+        if not okEcrit then
+            Journal.noter("Fenêtre Suivi : relevé non écrit avant le dessin :", tostring(erreurEcrit))
+        end
     end
     FenetreSuivi.releveDessine, FenetreSuivi.carnetDessine = Releve.version, Carnet.version
     FenetreSuivi.dessineLe = os.time()
     FenetreSuivi.derniereErreur = nil
     local okNombre, n = LrTasks.pcall(Releve.nombre)
     FenetreSuivi.sansReleve = okNombre and n == 0
+    FenetreSuivi.originauxDessines = okNombre and tonumber(n) or 0
     local connecteur = Chemins.prefs().cheminConnecteur
     if type(connecteur) ~= 'string' or connecteur == '' or not Fichiers.existe(connecteur) then
         return echec(FenetreSuivi.CONNECTEUR_ABSENT)
@@ -552,8 +600,12 @@ function FenetreSuivi.dessiner()
         Fichiers.supprimer(dossier)
         return false
     end
-    -- La réponse se lit dans son fichier (avec tous les ids, elle peut dépasser 700 Ko).
-    local ok, reponse = pcall(Json.decode, Fichiers.lire(fichierReponse) or '')
+    -- La réponse se lit dans son fichier (avec tous les ids : à toute la bibliothèque, « Tout »
+    -- dépasse 10 Mo), et se décode en rendant la main (LrTasks.pcall : un pcall simple l'en
+    -- empêcherait, Lua 5.1).
+    local texteReponse = Fichiers.lire(fichierReponse) or ''
+    local ok, reponse = LrTasks.pcall(function() return Json.decode(texteReponse, rendreLaMain, FenetreSuivi.PAS_JSON) end)
+    texteReponse = nil
     if not ok or type(reponse) ~= 'table' then
         Fichiers.supprimer(dossier)
         return echec(FenetreSuivi.PAS_DE_REPONSE)
@@ -617,17 +669,28 @@ local function selectionner(cat, photos)
     return n == #photos, n
 end
 
--- L'uuid de chaque photo, par une lecture groupée (sinon une à une).
+-- L'uuid de chaque photo, par des lectures groupées de Releve.LOT_LECTURE photos (sinon une à une),
+-- la main rendue entre deux.
 local function uuidsDe(cat, photos)
-    local ok, lus = LrTasks.pcall(function() return cat:batchGetRawMetadata(photos, { 'uuid' }) end)
     local r = {}
-    for i, photo in ipairs(photos) do
-        local uuid = ok and type(lus) == 'table' and type(lus[photo]) == 'table' and lus[photo].uuid or nil
-        if uuid == nil then
-            local okUn, u = LrTasks.pcall(photo.getRawMetadata, photo, 'uuid')
-            uuid = okUn and u or nil
+    for debut = 1, #photos, Releve.LOT_LECTURE do
+        local morceau = {}
+        for i = debut, math.min(#photos, debut + Releve.LOT_LECTURE - 1) do
+            morceau[#morceau + 1] = photos[i]
         end
-        r[i] = uuid
+        local ok, lus = LrTasks.pcall(function() return cat:batchGetRawMetadata(morceau, { 'uuid' }) end)
+        rendreLaMain()
+        for j, photo in ipairs(morceau) do
+            local uuid = ok and type(lus) == 'table' and type(lus[photo]) == 'table' and lus[photo].uuid or nil
+            if uuid == nil then
+                local okUn, u = LrTasks.pcall(photo.getRawMetadata, photo, 'uuid')
+                uuid = okUn and u or nil
+                if j % FenetreSuivi.PAS_UNE_A_UNE == 0 then
+                    rendreLaMain()
+                end
+            end
+            r[debut + j - 1] = uuid
+        end
     end
     return r
 end
@@ -645,23 +708,24 @@ end
 -- sous ce numéro, ou une photo sortie du relevé, est sautée), puis sélectionnés en grille ; quand la
 -- source affichée ne les a pas toutes, Toutes les photographies (catalog.kAllPhotos) devient la
 -- source et la sélection se refait pendant DELAI_SOURCE. Rien n'est écrit au catalogue. `quoi` : le
--- détail de la barre, pour le message. Rend le nombre de photos sélectionnées.
+-- détail de la barre, pour le message. Rend le nombre de photos sélectionnées. Une barre de toute la
+-- bibliothèque se montre par tranches, la main rendue (Releve.uuidsDe lit le relevé sans le copier,
+-- PAS_UNE_A_UNE photos retrouvées entre deux, les uuid par lectures groupées), et la sélection posée
+-- ne se range pas au relevé (Releve.poserSelection : ses photos y sont déjà).
 function FenetreSuivi.montrerPhotos(ids, quoi)
     local cat = Photos.catalogue()
-    local attendus = {}
-    for _, e in ipairs(Releve.entrees()) do
-        if tonumber(e.original) and type(e.uuid) == 'string' then
-            attendus[tonumber(e.original)] = e.uuid
-        end
-    end
+    local attendus = Releve.uuidsDe(ids)
     local trouvees, uuids = {}, {}
-    for _, id in ipairs(ids) do
+    for k, id in ipairs(ids) do
         if attendus[id] then
             local ok, photo = LrTasks.pcall(cat.getPhotoByLocalId, cat, id)
             if ok and type(photo) == 'table' then
                 trouvees[#trouvees + 1] = photo
                 uuids[#uuids + 1] = attendus[id]
             end
+        end
+        if k % FenetreSuivi.PAS_UNE_A_UNE == 0 then
+            rendreLaMain()
         end
     end
     local lus = uuidsDe(cat, trouvees)
@@ -683,20 +747,25 @@ function FenetreSuivi.montrerPhotos(ids, quoi)
         LrTasks.pcall(LrApplicationView.switchToModule, 'library')
     end
     LrTasks.pcall(LrApplicationView.showView, 'grid')
-    local toutes, n = selectionner(cat, photos)
-    local sourceChangee = false
-    if not toutes and cat.kAllPhotos ~= nil then
-        LrTasks.pcall(cat.setActiveSources, cat, cat.kAllPhotos)
-        sourceChangee = true
-        local fin = LrDate.currentTime() + FenetreSuivi.DELAI_SOURCE
-        repeat
-            toutes, n = selectionner(cat, photos)
-            if toutes then
-                break
-            end
-            LrTasks.sleep(0.2)
-        until LrDate.currentTime() > fin
-    end
+    -- Une sélection que la fenêtre pose : ses photos viennent du relevé, le Suivi ne la range pas
+    -- (Releve.poserSelection ; à toute la bibliothèque, une vue entière à chaque clic).
+    local toutes, n, sourceChangee = Releve.poserSelection(function()
+        local toutesLa, nLa = selectionner(cat, photos)
+        local changee = false
+        if not toutesLa and cat.kAllPhotos ~= nil then
+            LrTasks.pcall(cat.setActiveSources, cat, cat.kAllPhotos)
+            changee = true
+            local fin = LrDate.currentTime() + FenetreSuivi.DELAI_SOURCE
+            repeat
+                toutesLa, nLa = selectionner(cat, photos)
+                if toutesLa then
+                    break
+                end
+                LrTasks.sleep(#photos >= FenetreSuivi.GRANDE_SELECTION and 1 or 0.2)
+            until LrDate.currentTime() > fin
+        end
+        return toutesLa, nLa, changee
+    end)
     local source = sourceChangee and " (source : Toutes les photographies)" or ""
     if toutes then
         dire(quoiTexte .. " : dans la Bibliothèque" .. source .. "." .. suite)
@@ -1158,26 +1227,41 @@ end
 
 -- La boucle ------------------------------------------------------------------------------------
 
--- Un tour de la boucle (depuis une tâche) : le résumé du carnet quand le registre change ; à
--- l'ouverture, la note, le drapeau et « retouchée par Claude » relus (Releve.reclasser, avant le
--- premier dessin) ; puis le dessin, demandé (ouverture, période, défaut) ou quand le relevé ou le
--- carnet a changé (au plus toutes les DELAI_REDESSIN secondes) ; la file d'analyse relancée (comme
--- les boucles de la fenêtre Claude et de la Demande rapide).
+-- La note, le drapeau et « retouchée par Claude » relus (Releve.reclasser) dans une tâche à part : à
+-- toute la bibliothèque, ce sont des centaines de milliers de lectures du catalogue, et la boucle de
+-- la fenêtre doit suivre la période et le défaut choisis pendant ce temps. Fini, la fenêtre (encore
+-- ouverte, la même) se redessine s'il a changé des entrées (Releve.reclasser rend leur nombre : sans
+-- rien de changé dans le catalogue, ni écriture ni dessin). Rend vrai si la tâche part.
+function FenetreSuivi.reclasserEnFond()
+    local generation = FenetreSuivi.generation
+    LrTasks.startAsyncTask(function()
+        local ok, n = LrTasks.pcall(Releve.reclasser)
+        if not ok then
+            Journal.noter("Fenêtre Suivi : classement non relu :", tostring(n))
+        elseif (tonumber(n) or 0) > 0 and FenetreSuivi.ouverte and FenetreSuivi.generation == generation then
+            FenetreSuivi.aRedessiner = true
+        end
+    end)
+    return true
+end
+
+-- Un tour de la boucle (depuis une tâche) : le résumé du carnet quand le registre change ; le
+-- dessin, demandé (ouverture, période, défaut, reclassement fini) ou quand le relevé ou le carnet a
+-- changé (au plus toutes les FenetreSuivi.delaiRedessin secondes) ; après le premier dessin de
+-- l'ouverture, la note, le drapeau et « retouchée par Claude » relus en arrière-plan
+-- (FenetreSuivi.reclasserEnFond) ; la file d'analyse relancée (comme les boucles de la fenêtre
+-- Claude et de la Demande rapide).
 function FenetreSuivi.suivre()
     if FenetreSuivi.aRelire or Carnet.version ~= FenetreSuivi.versionLue then
         FenetreSuivi.lire()
     end
-    if FenetreSuivi.aReclasser then
-        FenetreSuivi.aReclasser = false
-        local ok, erreur = LrTasks.pcall(Releve.reclasser)
-        if not ok then
-            Journal.noter("Fenêtre Suivi : classement non relu :", tostring(erreur))
-        end
-        FenetreSuivi.aRedessiner = true
-    end
     local change = Releve.version ~= FenetreSuivi.releveDessine or Carnet.version ~= FenetreSuivi.carnetDessine
-    if FenetreSuivi.aRedessiner or (change and os.time() - (FenetreSuivi.dessineLe or 0) >= FenetreSuivi.DELAI_REDESSIN) then
+    if FenetreSuivi.aRedessiner or (change and os.time() - (FenetreSuivi.dessineLe or 0) >= FenetreSuivi.delaiRedessin()) then
         FenetreSuivi.dessiner()
+    end
+    if FenetreSuivi.aReclasser and FenetreSuivi.dessineLe ~= nil then
+        FenetreSuivi.aReclasser = false
+        FenetreSuivi.reclasserEnFond()
     end
     LrTasks.pcall(Releve.relancer)
 end
@@ -1227,6 +1311,7 @@ function FenetreSuivi.afficher()
         FenetreSuivi.resume, FenetreSuivi.versionLue, FenetreSuivi.aRelire = nil, nil, false
         FenetreSuivi.reponse, FenetreSuivi.calquesValides, FenetreSuivi.derniereErreur = nil, {}, nil
         FenetreSuivi.releveDessine, FenetreSuivi.carnetDessine, FenetreSuivi.dessineLe = nil, nil, nil
+        FenetreSuivi.originauxDessines = 0
         FenetreSuivi.aReclasser, FenetreSuivi.aRedessiner, FenetreSuivi.sansReleve = true, true, false
         FenetreSuivi.message = nil
         FenetreSuivi.effacerDessins()

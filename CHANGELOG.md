@@ -3,11 +3,26 @@
 ## 1.3.8 — 2026-10-26
 
 ### Changé
-- Le Suivi prend jusqu'à 10 000 photos d'une même sélection, au lieu de 1 000 : un dossier entier
-  (3 500 photos, par exemple) y entre d'un coup, sans le sélectionner par tranches. L'analyse se
-  fait toujours en arrière-plan, sur votre Mac, sans Claude ni forfait : elle dure seulement plus
-  longtemps derrière une grande sélection. Au-delà de 10 000, les premières comptent, et le journal
-  du module le dit. Après l'installation : quitter puis relancer Lightroom.
+- Le Suivi peut prendre toute votre bibliothèque d'un coup : ouvrez Toutes les photographies,
+  sélectionnez tout, puis ouvrez la fenêtre Claude ou la Demande rapide. Il accepte jusqu'à
+  250 000 photos d'une même sélection (1 000 avant) et garde jusqu'à 250 000 originaux par catalogue
+  (20 000 avant : au-delà, il oubliait les photos vues le moins récemment, analyses comprises). Vos
+  88 071 photos y entrent, sauf les vidéos.
+- Pour ne pas figer Lightroom pendant ce temps, le Suivi lit, range et écrit son relevé par petits
+  morceaux et laisse Lightroom respirer entre deux, même avec toute la bibliothèque (mesuré hors de
+  Lightroom sur des relevés de 85 000 et 250 000 photos ; à confirmer dans Lightroom avec la vôtre).
+  Le relevé reste un seul fichier, `suivi.json`, écrit sans jamais être laissé à moitié ; plus il est
+  grand, moins il s'écrit souvent, jusqu'à une minute entre deux écritures : si vous quittez
+  Lightroom, la dernière minute de photos vues peut manquer au Suivi. La fenêtre Suivi s'ouvre tout de suite sur
+  ce qu'elle sait, puis relit les notes et les drapeaux en arrière-plan et se redessine si l'un a
+  changé. Un clic sur une barre de milliers de photos les montre aussi par morceaux, sans les
+  ranger de nouveau au Suivi.
+- Ce qui reste lent : l'analyse d'office. Elle se fait en arrière-plan, sur votre Mac, sans Claude ni
+  forfait, à environ 3 photos par seconde : comptez à peu près 8 heures pour 85 000 photos. Elle
+  s'arrête quand Claude travaille et reprend ensuite, et au lancement suivant de Lightroom si vous
+  l'avez quitté. Une photo dont l'analyse a échoué (juste après une retouche, par exemple) se
+  réessaie 10 minutes plus tard, sans attendre la fin de la file.
+- Après l'installation : quitter puis relancer Lightroom.
 
 ## 1.3.7 — 2026-10-26
 

@@ -108,6 +108,9 @@ prefs.nouvelleParPhoto = false
 -- L'écart entre deux écritures du relevé dans Lightroom ; les essais écrivent à chaque fois (0),
 -- sauf ceux des écritures espacées.
 local DELAI_ECRITURE = Releve.DELAI_ECRITURE
+-- Les bornes du module, avant que les essais ne les changent (depart les remet à celles du contrat).
+local BORNES_DU_MODULE = { max_originaux = Releve.MAX_ORIGINAUX, max_vues = Releve.MAX_VUES, max_selection = Releve.MAX_SELECTION,
+    lot_analyse = Releve.LOT_ANALYSE, essais_analyse = Releve.ESSAIS_ANALYSE }
 
 local dossierTests = S.lireCommande('cd ' .. S.q((arg and arg[0] or ''):match('(.*/)') or '.') .. ' && pwd -P'):gsub('%s+$', '')
 local CONTRAT_CHEMIN = dossierTests .. '/../../Contrats/suivi.json'
@@ -246,8 +249,10 @@ end
 local PHOTOS, ACTIVE, SELECTION = {}, nil, {}
 -- Les vignettes demandées à Lightroom ({ id, taille }), et ce qui se passe à chaque demande.
 local VIGNETTES, pendantVignette = {}, nil
--- Les lectures groupées du catalogue.
+-- Les lectures groupées du catalogue, et les collections demandées photo par photo
+-- (getContainedCollections : Carnet.estPhotoDEssai).
 local GROUPEES = 0
+local COLLECTIONS_DEMANDEES = 0
 
 local COLLECTION_ESSAIS = {
     getName = function() return 'Essais' end,
@@ -306,6 +311,7 @@ local function photo(id, v)
     end
     function ph:getDevelopSettings() return {} end
     function ph:getContainedCollections()
+        COLLECTIONS_DEMANDEES = COLLECTIONS_DEMANDEES + 1
         return (self.v.essai and { COLLECTION_ESSAIS }) or (self.v.autre and { AUTRE_COLLECTION }) or {}
     end
     function ph:requestJpegThumbnail(largeur, hauteur, rappel)
@@ -361,6 +367,31 @@ S.catalogue.batchGetPropertyForPlugin = function(_, photos, plugin, cles)
     assert(plugin == _PLUGIN, 'batchGetPropertyForPlugin : _PLUGIN attendu')
     return lectureGroupee(function(ph, cle) return ph.proprietes[cle] end)(nil, photos, cles)
 end
+-- Les collections du catalogue (Carnet.photosDesEssais, une grande vue) : l'ensemble Développeur et
+-- sa collection Essais (les photos `essai`), et un ensemble Voyages qui a lui aussi une collection
+-- Essais (les photos `autre` : pas celle du Suivi).
+S.collectionEssais.getPhotos = function()
+    local liste = {}
+    for _, ph in pairs(PHOTOS) do
+        if ph.v.essai then
+            liste[#liste + 1] = ph
+        end
+    end
+    return liste
+end
+local ENSEMBLE_VOYAGES = { getName = function() return 'Voyages' end, getChildCollectionSets = function() return {} end,
+    getChildCollections = function()
+        return { { getName = function() return 'Essais' end, isSmartCollection = function() return false end, getPhotos = function()
+            local liste = {}
+            for _, ph in pairs(PHOTOS) do
+                if ph.v.autre then
+                    liste[#liste + 1] = ph
+                end
+            end
+            return liste
+        end } }
+    end }
+S.catalogue.getChildCollectionSets = function() return { S.ensembleDeveloppeur, ENSEMBLE_VOYAGES } end
 
 -- Aides ------------------------------------------------------------------------------------------
 
@@ -370,13 +401,28 @@ local function supprimerSuivi()
 end
 
 -- Un départ neuf : aucun relevé, aucune photo, le Suivi allumé, le connecteur au mode du contrat.
+-- Les pas du module (correctif 1.3.8), remis à chaque départ.
+local PAS = {}
+for _, cle in ipairs({ 'PAS', 'PAS_UNE_A_UNE', 'PAS_ECRITURE', 'PAS_JSON', 'LOT_LECTURE', 'SEUIL_ESSAIS', 'SEUIL_REVOIR', 'REVOIR_APRES',
+    'FACTEUR_ECRITURE', 'SECONDES_PAR_MO', 'DELAI_ECRITURE_MAX', 'MAX_REESSAIS', 'LOT_ANALYSE', 'DELAI_REESSAI' }) do
+    PAS[cle] = Releve[cle]
+end
+local PAS_REESSAIS = PAS.MAX_REESSAIS
+
 local function depart()
-    PHOTOS, ACTIVE, SELECTION, VIGNETTES, pendantVignette, GROUPEES = {}, nil, {}, {}, nil, 0
+    PHOTOS, ACTIVE, SELECTION, VIGNETTES, pendantVignette, GROUPEES, COLLECTIONS_DEMANDEES = {}, nil, {}, {}, nil, 0, 0
     supprimerSuivi()
     Releve.oublier()
     Releve.allume = true
     Releve.MAX_ORIGINAUX, Releve.MAX_VUES, Releve.MAX_SELECTION = BORNES.max_originaux, BORNES.max_vues, BORNES.max_selection
     Releve.DELAI_ECRITURE, Releve.MAX_EN_ATTENTE = 0, 20
+    for cle, valeur in pairs(PAS) do
+        Releve[cle] = valeur
+    end
+    -- L'écart d'après la durée de la dernière écriture : hors des essais qui le vérifient (ici, une
+    -- écriture qui passe d'une seconde à la suivante durerait 1 s : LrDate.currentTime de la
+    -- simulation est os.time).
+    Releve.FACTEUR_ECRITURE = 0
     prefs.cheminConnecteur = CONNECTEUR
     Moteur.travaille = false
     Liaison.enCours, Liaison.finCommande = nil, nil
@@ -442,6 +488,52 @@ end
 
 local function dossiersDeLots()
     return Fichiers.entrees(Chemins.temporaire() .. '/Suivi')
+end
+
+-- Les fois où le module rend la main pendant fn() (LrTasks.yield, que le module n'appelle que par
+-- Releve.rendreLaMain) : leur nombre, celles à travers un pcall simple (Lua 5.1, celui de Lightroom,
+-- refuse un yield à travers un pcall : ici, le global pcall est compté ; LrTasks.pcall de la
+-- simulation est le vrai pcall, qui ne compte pas), et le plus long morceau entre deux (os.clock).
+-- `options` : canYield (la réponse de LrTasks.canYield, vrai par défaut), pendant(n) (appelé à chaque
+-- yield, son temps hors du compte).
+local function rendreLaMainPendant(fn, options)
+    options = options or {}
+    local LrTasks = S.modules.LrTasks
+    local yield, canYield, vraiPcall = LrTasks.yield, LrTasks.canYield, pcall
+    local profondeur, r = 0, { n = 0, traversees = 0, plusLong = 0 }
+    local function emballer(...)
+        return select('#', ...), { ... }
+    end
+    _G.pcall = function(...)
+        profondeur = profondeur + 1
+        local n, resultats = emballer(vraiPcall(...))
+        profondeur = profondeur - 1
+        return unpack(resultats, 1, n)
+    end
+    local dernier = os.clock()
+    LrTasks.yield = function()
+        local t = os.clock()
+        r.plusLong = math.max(r.plusLong, t - dernier)
+        r.n = r.n + 1
+        if profondeur > 0 then
+            r.traversees = r.traversees + 1
+        end
+        if options.pendant then
+            options.pendant(r.n)
+        end
+        dernier = os.clock()
+    end
+    LrTasks.canYield = function()
+        if options.canYield == nil then
+            return true
+        end
+        return options.canYield
+    end
+    local ok, erreur = xpcall(fn, debug.traceback)
+    r.plusLong = math.max(r.plusLong, os.clock() - dernier)
+    _G.pcall, LrTasks.yield, LrTasks.canYield = vraiPcall, yield, canYield
+    assert(ok, erreur)
+    return r
 end
 
 -- Essais --------------------------------------------------------------------------------------------
@@ -768,7 +860,7 @@ local function avecLeTemps(fn)
     assert(ok, erreur)
 end
 
-essai("Écritures espacées, vues comprises : la première tout de suite, puis au plus une toutes les DELAI_ECRITURE secondes ; à la fin de la file, la tâche attend son tour en rangeant les vues qui arrivent ; au début d'une pause tout de suite", function()
+essai("Écritures espacées, vues comprises : la première tout de suite, puis au plus une toutes les DELAI_ECRITURE secondes ; à la fin de la file, la tâche attend son tour en rangeant les vues qui arrivent ; pendant une pause aussi, à son tour (plus au début de chaque pause : une liaison qui sert par moments n'écrit pas tout le relevé à chaque fois)", function()
     depart()
     egal(20, DELAI_ECRITURE, 'dans Lightroom : 20 s')
     local LrTasks = S.modules.LrTasks
@@ -802,8 +894,9 @@ essai("Écritures espacées, vues comprises : la première tout de suite, puis a
         -- photo (douze vues et analyses).
         egal(3, Releve.version - version, 'écritures')
         egal(10, sommeils, 'la tâche a attendu la dernière (20 s)')
-        -- Claude se met au travail : ce qui est rangé s'écrit au début de la pause, puis à son tour
-        -- (les vues rangées pendant la pause) ; l'analyse attend.
+        -- Claude se met au travail : ce qui est rangé s'écrit à son tour, pendant la pause comme
+        -- hors d'elle (pas au début de la pause : la dernière écriture date de 0 s) ; l'analyse
+        -- attend.
         version = Releve.version
         local analyses = #recus()
         Moteur.travaille = true
@@ -826,13 +919,13 @@ essai("Écritures espacées, vues comprises : la première tout de suite, puis a
         Moteur.travaille = false
         assert(ok, erreur)
         egal(10, sommeils, 'huit attentes de la pause, puis deux pour la dernière écriture')
-        egal(1, pendant[1].ecritures, 'au début de la pause, tout de suite (1307, 0 s après la dernière)')
-        egal(1, pendant[5].ecritures, 'pas à chaque vue pendant la pause (1308 à 1311)')
-        egal(2, pendant[6].ecritures, '10 s après : à son tour (1312)')
+        egal(0, pendant[1].ecritures, "pas au début de la pause (1307, 0 s après la dernière) : à son tour")
+        egal(0, pendant[5].ecritures, 'pas à chaque vue pendant la pause (1308 à 1311)')
+        egal(1, pendant[6].ecritures, '10 s après la dernière : à son tour, pendant la pause (1307 à 1312)')
         for i = 1, 8 do
             egal(analyses, pendant[i].analyses, 'rien analysé pendant la pause ' .. i)
         end
-        egal(3, Releve.version - version, 'la troisième à la fin de la file, 10 s après')
+        egal(2, Releve.version - version, 'la deuxième à la fin de la file, 10 s après')
         for i = 7, 12 do
             vrai(entree(1300 + i).analyse and entree(1300 + i).analyse.cherches, (1300 + i) .. ' : rangée pendant la pause, analysée après')
         end
@@ -927,9 +1020,16 @@ end)
 
 essai("Bornes : les originaux vus le moins récemment sortent au-delà de max_originaux ; une vue de plus au-delà de max_vues ne change que vu ; une sélection au-delà de max_selection, le reste dit au journal", function()
     depart()
-    egal(20000, Releve.MAX_ORIGINAUX, 'max_originaux du contrat')
+    -- 250 000 depuis le correctif 1.3.8 (toute la bibliothèque de Dany d'un coup), dans le module
+    -- comme dans le contrat.
+    egal(250000, BORNES.max_originaux, 'max_originaux du contrat')
+    egal(250000, BORNES.max_selection, 'max_selection du contrat')
+    for cle, valeur in pairs(BORNES_DU_MODULE) do
+        egal(BORNES[cle], valeur, cle .. ' du module : celle du contrat')
+    end
+    egal(250000, Releve.MAX_ORIGINAUX, 'max_originaux du contrat')
     egal(20, Releve.MAX_VUES, 'max_vues du contrat')
-    egal(10000, Releve.MAX_SELECTION, 'max_selection du contrat')
+    egal(250000, Releve.MAX_SELECTION, 'max_selection du contrat')
     egal(10, Releve.LOT_ANALYSE, 'lot_analyse du contrat')
     egal(3, Releve.ESSAIS_ANALYSE, 'essais_analyse du contrat')
     -- Trois originaux au relevé, vus à des heures différentes.
@@ -1177,6 +1277,8 @@ essai("Éteint par Arret.lua (Releve.eteindre : un rechargement, une désactivat
     -- écrite, même à la fin de la tâche.
     Releve.allumer()
     Releve.DELAI_ECRITURE = 1000
+    -- La dernière écriture loin derrière : 1603 s'écrit à son tour, tout de suite.
+    Releve.ecritLe = nil
     photo(1603)
     photo(1604)
     Moteur.travaille = true
@@ -1198,8 +1300,8 @@ essai("Éteint par Arret.lua (Releve.eteindre : un rechargement, une désactivat
     assert(ok, erreur)
     egal(2, sommeils, "la tâche s'arrête après son attente, Claude toujours au travail")
     egal(true, rangee, '1604 rangée pendant la pause (en mémoire)')
-    egal(1, Releve.version - version, 'une écriture, au début de la pause ; aucune après l\'arrêt')
-    vrai(entree(1603) ~= nil, '1603, écrite au début de la pause')
+    egal(1, Releve.version - version, 'une écriture, à son tour ; aucune après l\'arrêt')
+    vrai(entree(1603) ~= nil, '1603, écrite à son tour')
     egal(nil, entree(1604), "1604, jamais écrite : le fichier est à la nouvelle instance")
     -- Rallumé (une réactivation dans le Gestionnaire de modules externes) : tout reprend.
     Releve.allumer()
@@ -1304,6 +1406,785 @@ essai("uninstall.sh : --tout retire suivi.json et ses copies mises de côté (to
     Fichiers.ecrire(Chemins.temporaire() .. '/Suivi/Analyse-1-1/42.jpg', 'jpeg')
     vrai(Menage.temporaires() >= 1)
     egal(false, Fichiers.existe(Chemins.temporaire() .. '/Suivi'), 'Temporaire/Suivi effacé au chargement')
+end)
+
+-- Toute la bibliothèque (correctif 1.3.8) -----------------------------------------------------------
+
+essai("Toute la bibliothèque, pas réduits : une grande sélection, la relecture, l'écriture, la file et le reclassement rendent la main toutes les PAS (LrTasks.yield, seulement si LrTasks.canYield), jamais à travers un pcall simple ; les photos des Essais lues d'un coup ; rien de perdu", function()
+    depart()
+    Releve.PAS, Releve.PAS_UNE_A_UNE, Releve.PAS_ECRITURE, Releve.PAS_JSON, Releve.LOT_LECTURE = 50, 10, 50, 200, 100
+    Releve.SEUIL_ESSAIS = 100
+    prefs.cheminConnecteur = S.home .. '/absent'
+    local ids = {}
+    for i = 1, 1000 do
+        ids[i] = 20000 + i
+        photo(ids[i], { iso = 400, note = i % 6, prise = '2026-10-01 12:00' })
+    end
+    -- Des photos des Essais (une copie et son original, une copie des Essais d'un original vu), une
+    -- autre collection Essais, une vidéo.
+    photo(21001, { essai = true })
+    photo(21002, { copieDe = 21001, copie = 'Copie 1' })
+    photo(21003, { copieDe = 20001, copie = 'Copie 1', essai = true, note = 5 })
+    photo(21004, { autre = true })
+    photo(21005, { format = 'VIDEO' })
+    for _, id in ipairs({ 21001, 21002, 21003, 21004, 21005 }) do
+        ids[#ids + 1] = id
+    end
+    -- La vue : lue et rangée par tranches ; les Essais d'un coup, aucune collection photo par photo.
+    local r = rendreLaMainPendant(function()
+        voir(unpack(ids))
+        vider()
+    end)
+    vrai(r.n >= 1000 / Releve.PAS, 'la vue rend la main : ' .. r.n)
+    egal(0, r.traversees, 'jamais à travers un pcall simple')
+    egal(0, COLLECTIONS_DEMANDEES, 'aucune collection demandée photo par photo')
+    local f = fichier().catalogues[CATALOGUE].photos
+    local n = 0
+    for _ in pairs(f) do
+        n = n + 1
+    end
+    egal(1001, n, 'les mille photos et l\'autre collection Essais')
+    egal(nil, f['21001'], 'une photo des Essais')
+    egal(nil, f['21002'], "la copie d'un original des Essais")
+    egal(nil, f['21005'], 'une vidéo')
+    vrai(f['21004'] ~= nil, "une autre collection « Essais »")
+    egal(1, f['20001'].note, 'la copie des Essais ne compte pas dans la famille')
+    -- La relecture : par morceaux (Json.decode avec un rythme), puis la même.
+    Releve.oublier()
+    Releve.PAS_JSON = 200
+    r = rendreLaMainPendant(function() egal(1001, (Releve.nombre())) end)
+    vrai(r.n >= 20, 'la relecture rend la main : ' .. r.n)
+    egal(0, r.traversees)
+    -- L'écriture : par morceaux, entrée par entrée ; le fichier relu dit la même chose.
+    local avant = Fichiers.lire(Releve.fichier())
+    Releve.aEcrire = true
+    local version = Releve.version
+    r = rendreLaMainPendant(function() egal(true, Releve.ecrire()) end)
+    vrai(r.n >= 1000 / Releve.PAS_ECRITURE, "l'écriture rend la main : " .. r.n)
+    egal(0, r.traversees)
+    egal(version + 1, Releve.version)
+    memes(Json.decode(avant), fichier(), 'le même relevé')
+    -- Sans pouvoir rendre la main (hors d'une tâche) : jamais de yield, le fichier s'écrit quand même.
+    Releve.aEcrire = true
+    r = rendreLaMainPendant(function() egal(true, Releve.ecrire()) end, { canYield = false })
+    egal(0, r.n, 'aucun yield sans LrTasks.canYield')
+    egal(version + 2, Releve.version)
+    -- La file refaite entière : par paquets, la main rendue ; tous les originaux sans analyse.
+    r = rendreLaMainPendant(function() egal(1001, Releve.refaireFile()) end)
+    vrai(r.n >= 1000 / Releve.PAS, 'la file rend la main : ' .. r.n)
+    egal(0, r.traversees)
+    -- Le reclassement : chaque original retrouvé une à une, la main rendue toutes les PAS_UNE_A_UNE ;
+    -- seule l'entrée dont la note a changé change.
+    PHOTOS[20500].brut.rating = 5
+    r = rendreLaMainPendant(function() egal(1, Releve.reclasser()) end)
+    vrai(r.n >= 1000 / Releve.PAS_UNE_A_UNE, 'le reclassement rend la main : ' .. r.n)
+    egal(0, r.traversees)
+    egal(5, entree(20500).note, 'relu et écrit')
+    egal(0, COLLECTIONS_DEMANDEES, 'le reclassement non plus : les Essais lus d\'un coup')
+    -- Les collections illisibles : chaque photo jugée comme avant (Carnet.estPhotoDEssai).
+    local ensembles = S.catalogue.getChildCollectionSets
+    S.catalogue.getChildCollectionSets = function() error('collections illisibles') end
+    Releve.revoir()
+    voir(unpack(ids))
+    vider()
+    S.catalogue.getChildCollectionSets = ensembles
+    vrai(COLLECTIONS_DEMANDEES > 0, 'photo par photo')
+    egal(nil, entree(21001), 'toujours pas les Essais')
+end)
+
+essai("Écriture par morceaux : `aEcrire` remis à faux dès le début (ce qui se range pendant s'écrit à la suivante), une seule à la fois (une autre, sans pouvoir attendre, laissée à la suivante) ; le Suivi éteint pendant : abandonnée, le fichier d'avant tel quel, aucun provisoire", function()
+    depart()
+    Releve.PAS_ECRITURE = 2
+    prefs.cheminConnecteur = S.home .. '/absent'
+    local ids = {}
+    for i = 1, 10 do
+        ids[i] = 22000 + i
+        photo(ids[i])
+    end
+    voir(unpack(ids))
+    vider()
+    local LrTasks = S.modules.LrTasks
+    local version = Releve.version
+    Releve.aEcrire = true
+    local vu = {}
+    rendreLaMainPendant(function() egal(true, Releve.ecrire()) end, { pendant = function(n)
+        if n == 1 then
+            vu.remis = Releve.aEcrire
+            -- Une vue rangée par la tâche du Suivi pendant que la fenêtre Suivi écrit.
+            Releve.aEcrire = true
+            -- Une autre écriture, hors d'une tâche : elle n'attend pas, laissée à la suivante.
+            local peut = LrTasks.canYield
+            LrTasks.canYield = function() return false end
+            vu.autre = Releve.ecrire()
+            LrTasks.canYield = peut
+        end
+    end })
+    egal(false, vu.remis, '`aEcrire` remis à faux dès le début')
+    egal(false, vu.autre, 'une seule écriture à la fois')
+    egal(true, Releve.aEcrire, 'ce qui a changé pendant : à la suivante')
+    egal(version + 1, Releve.version)
+    egal(true, Releve.ecrire(), 'la suivante')
+    egal(false, Releve.aEcrire)
+    -- Le Suivi éteint pendant l'écriture (un rechargement du module) : abandonnée.
+    local texte = Fichiers.lire(Releve.fichier())
+    version = Releve.version
+    Releve.aEcrire = true
+    rendreLaMainPendant(function() egal(false, Releve.ecrire()) end, { pendant = function(n)
+        if n == 2 then
+            Releve.eteindre()
+        end
+    end })
+    egal(texte, Fichiers.lire(Releve.fichier()), "le fichier d'avant tel quel")
+    egal(false, Fichiers.existe(Releve.fichier() .. '.provisoire'), 'aucun provisoire')
+    egal(version, Releve.version, 'rien écrit')
+    Releve.allumer()
+end)
+
+essai("La file se garde d'une vue à l'autre : les originaux d'une vue passent devant (la photo active d'abord), la suite garde son ordre, sans être refaite ; le même ordre qu'une file refaite (la tête, les plus récemment vues, l'ordre de la sélection, l'identifiant)", function()
+    depart()
+    prefs.cheminConnecteur = S.home .. '/absent'
+    local ids = {}
+    for i = 1, 30 do
+        ids[i] = 23000 + i
+        photo(ids[i])
+    end
+    voir(unpack(ids))
+    vider()
+    -- Vues il y a une minute (la vue suivante est plus récente : la même seconde, l'ordre de la
+    -- sélection les départagerait).
+    local f = fichier()
+    for _, e in pairs(f.catalogues[CATALOGUE].photos) do
+        e.vu = e.vu - 60
+    end
+    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    Releve.oublier()
+    egal(30, Releve.refaireFile())
+    local avant = {}
+    for i, cle in ipairs(Releve.file.liste) do
+        avant[i] = cle
+    end
+    for i = 1, 30 do
+        egal(tostring(23000 + i), avant[i], "relue : par l'identifiant (même heure de vue, ni tête ni rang)")
+    end
+    -- Une autre sélection : ses originaux devant, la file gardée derrière.
+    voir(23026, 23027)
+    vider()
+    vrai(Releve.file ~= nil, 'la file gardée')
+    egal('23026', Releve.file.liste[1], 'la photo active de la vue en tête')
+    egal('23027', Releve.file.liste[2])
+    local k = 3
+    for _, cle in ipairs(avant) do
+        if cle ~= '23026' and cle ~= '23027' then
+            egal(cle, Releve.file.liste[k], 'la suite dans son ordre')
+            k = k + 1
+        end
+    end
+    egal(31, k, 'chacune une fois')
+    -- Refaite entière : le même ordre que la file gardée (la tête, puis les plus récemment vues,
+    -- puis par identifiant).
+    local gardee = {}
+    for i, cle in ipairs(Releve.file.liste) do
+        gardee[i] = cle
+    end
+    Releve.refaireFile()
+    for i = 1, 30 do
+        egal(gardee[i], Releve.file.liste[i], 'refaite : ' .. i)
+    end
+end)
+
+essai("Une grande sélection revue à l'ouverture (Releve.revoir) moins de REVOIR_APRES secondes après sa vue entière : seule la photo active ; plus tard, ou une petite sélection, entière", function()
+    depart()
+    Releve.SEUIL_REVOIR = 3
+    prefs.cheminConnecteur = S.home .. '/absent'
+    for id = 24001, 24005 do
+        photo(id)
+    end
+    voir(24001, 24002, 24003, 24004, 24005)
+    egal(5, #Releve.aVoir[1].photos)
+    vider()
+    Releve.revoir()
+    voir(24001, 24002, 24003, 24004, 24005)
+    egal(1, #Releve.aVoir, 'une vue')
+    egal(1, #Releve.aVoir[1].photos, 'la photo active seule')
+    vider()
+    Releve.groupeVuLe = os.time() - Releve.REVOIR_APRES
+    Releve.revoir()
+    voir(24001, 24002, 24003, 24004, 24005)
+    egal(5, #Releve.aVoir[1].photos, 'plus tard : entière')
+    vider()
+    Releve.SEUIL_REVOIR = 10
+    Releve.revoir()
+    voir(24001, 24002, 24003, 24004, 24005)
+    egal(5, #Releve.aVoir[1].photos, 'une petite sélection : entière')
+end)
+
+essai("Un grand relevé s'écrit moins souvent : l'écart entre deux écritures est d'au moins FACTEUR_ECRITURE fois la durée propre de la dernière (le temps des autres tâches, quand elle rend la main, n'y compte pas) et SECONDES_PAR_MO par Mo du fichier ; DELAI_ECRITURE au moins, DELAI_ECRITURE_MAX au plus", function()
+    depart()
+    Releve.FACTEUR_ECRITURE = PAS.FACTEUR_ECRITURE
+    egal(10, Releve.FACTEUR_ECRITURE, 'dix fois')
+    egal(1, Releve.SECONDES_PAR_MO, 'une seconde par Mo')
+    egal(60, Releve.DELAI_ECRITURE_MAX, 'une minute au plus')
+    Releve.DELAI_ECRITURE = 20
+    Releve.PAS_ECRITURE = 1
+    prefs.cheminConnecteur = S.home .. '/absent'
+    photo(25001)
+    photo(25002)
+    voir(25001, 25002)
+    vider()
+    egal(20, Releve.delaiEcriture(), 'une écriture brève : DELAI_ECRITURE')
+    local LrDate = S.modules.LrDate
+    local maintenant = LrDate.currentTime
+    local decalage = 0
+    LrDate.currentTime = function() return maintenant() + decalage end
+    local ecrireParMorceaux = Fichiers.ecrireParMorceaux
+    local ok, erreur = pcall(function()
+        -- Les autres tâches prennent 30 s chaque fois que l'écriture rend la main : pas compté.
+        Releve.aEcrire = true
+        rendreLaMainPendant(function() egal(true, Releve.ecrire()) end, { pendant = function() decalage = decalage + 30 end })
+        egal(20, Releve.delaiEcriture(), "le temps des autres tâches ne compte pas")
+        -- L'écriture elle-même dure 4 s (l'horloge avance pendant qu'elle écrit) : 40 s.
+        local function dureePropre(secondes)
+            Fichiers.ecrireParMorceaux = function(chemin, produire)
+                return ecrireParMorceaux(chemin, function(ecrire)
+                    local premier = true
+                    return produire(function(texte)
+                        if premier then
+                            decalage = decalage + secondes
+                            premier = false
+                        end
+                        ecrire(texte)
+                    end)
+                end)
+            end
+            Releve.aEcrire = true
+            rendreLaMainPendant(function() egal(true, Releve.ecrire()) end, { pendant = function() decalage = decalage + 30 end })
+            Fichiers.ecrireParMorceaux = ecrireParMorceaux
+        end
+        dureePropre(4)
+        egal(40, Releve.delaiEcriture(), 'dix fois 4 s')
+        -- 9 s : 90 s, ramené à DELAI_ECRITURE_MAX (ce qui attend se perdrait si Lightroom quittait).
+        dureePropre(9)
+        egal(60, Releve.delaiEcriture(), 'DELAI_ECRITURE_MAX au plus')
+    end)
+    LrDate.currentTime, Fichiers.ecrireParMorceaux = maintenant, ecrireParMorceaux
+    assert(ok, erreur)
+    -- La taille du fichier : SECONDES_PAR_MO par Mo, écrit ou relu (ici, une seconde pour un
+    -- millième du fichier : 45 s).
+    Releve.aEcrire = true
+    egal(true, Releve.ecrire())
+    egal(20, Releve.delaiEcriture(), 'un petit fichier')
+    local taille = #Fichiers.lire(Releve.fichier())
+    Releve.SECONDES_PAR_MO = 45.5 * 1000000 / taille
+    egal(45, Releve.delaiEcriture(), "d'après la taille écrite")
+    Releve.oublier()
+    egal(2, (Releve.nombre()))
+    egal(45, Releve.delaiEcriture(), "d'après la taille relue")
+    Releve.SECONDES_PAR_MO = 1000 * 1000000 / taille
+    egal(60, Releve.delaiEcriture(), 'DELAI_ECRITURE_MAX au plus')
+    -- Un DELAI_ECRITURE plus grand que DELAI_ECRITURE_MAX l'emporte.
+    Releve.DELAI_ECRITURE = 1000
+    egal(1000, Releve.delaiEcriture())
+    Releve.SECONDES_PAR_MO = PAS.SECONDES_PAR_MO
+end)
+
+-- De vraies tâches entremêlées (correctif 1.3.8, revue) : des coroutines, chaque LrTasks.yield et
+-- LrTasks.sleep rendant la main à un planificateur qui fait tourner chacune à son tour.
+local Planificateur = {}
+do
+    local LrTasks = S.modules.LrTasks
+    local avant
+    function Planificateur.brancher()
+        Planificateur.taches = {}
+        avant = { LrTasks.yield, LrTasks.sleep, LrTasks.canYield, LrTasks.startAsyncTask }
+        LrTasks.yield = function() coroutine.yield('yield') end
+        LrTasks.sleep = function() coroutine.yield('sleep') end
+        LrTasks.canYield = function() return coroutine.running() ~= nil end
+        LrTasks.startAsyncTask = function(fn) Planificateur.lancer('tâche', fn) end
+    end
+    function Planificateur.debrancher()
+        LrTasks.yield, LrTasks.sleep, LrTasks.canYield, LrTasks.startAsyncTask = unpack(avant)
+    end
+    function Planificateur.lancer(nom, fn)
+        Planificateur.taches[#Planificateur.taches + 1] = { co = coroutine.create(fn), nom = nom }
+    end
+    -- Fait tourner les tâches tant que l'une vit ; avantPas(pas) entre deux tours.
+    function Planificateur.tourner(avantPas)
+        for pas = 1, 1000000 do
+            local vivantes = 0
+            for _, t in ipairs(Planificateur.taches) do
+                if coroutine.status(t.co) ~= 'dead' then
+                    local ok, erreur = coroutine.resume(t.co)
+                    if not ok then
+                        error(t.nom .. ' : ' .. tostring(erreur), 0)
+                    end
+                    vivantes = vivantes + 1
+                end
+            end
+            if vivantes == 0 then
+                return pas
+            end
+            if avantPas then
+                avantPas(pas)
+            end
+        end
+        error('trop de pas')
+    end
+    -- fn() avec le planificateur branché, débranché même après une erreur.
+    function Planificateur.avec(fn)
+        Planificateur.brancher()
+        local ok, erreur = xpcall(fn, debug.traceback)
+        Planificateur.debrancher()
+        assert(ok, erreur)
+    end
+end
+
+local function compter(t)
+    local n = 0
+    for _ in pairs(t) do
+        n = n + 1
+    end
+    return n
+end
+
+essai("Tâches entremêlées : la durée propre d'une écriture ne compte pas le temps des autres tâches (une autre qui prend 0,3 s à chaque tour) ; l'écart suivant reste DELAI_ECRITURE", function()
+    depart()
+    prefs.cheminConnecteur = S.home .. '/absent'
+    Releve.FACTEUR_ECRITURE = 10
+    Releve.DELAI_ECRITURE = 20
+    Releve.PAS_ECRITURE = 10
+    local ids = {}
+    for i = 1, 2000 do
+        ids[i] = 32000 + i
+        photo(ids[i])
+    end
+    voir(unpack(ids))
+    vider()
+    local LrDate = S.modules.LrDate
+    local horloge = os.time()
+    local vraiCurrent = LrDate.currentTime
+    LrDate.currentTime = function() return horloge end
+    local ok, erreur = pcall(Planificateur.avec, function()
+        Releve.aEcrire = true
+        Planificateur.lancer('écriture', function() egal(true, Releve.ecrire()) end)
+        local autre = true
+        Planificateur.lancer('autre', function()
+            while autre do
+                horloge = horloge + 0.3
+                coroutine.yield()
+            end
+        end)
+        Planificateur.tourner(function()
+            if coroutine.status(Planificateur.taches[1].co) == 'dead' then
+                autre = false
+            end
+        end)
+    end)
+    LrDate.currentTime = vraiCurrent
+    assert(ok, erreur)
+    egal(Releve.DELAI_ECRITURE, Releve.delaiEcriture(), "l'écart suivant (200 reprises de 0,3 s : 60 s des autres tâches)")
+end)
+
+essai("Tâches entremêlées : une entrée revue pendant le tri de l'élagage (une vue rangée par la tâche du Suivi pendant que la fenêtre Suivi écrit) reste ; une autre sort à sa place", function()
+    depart()
+    prefs.cheminConnecteur = S.home .. '/absent'
+    local ids = {}
+    for i = 1, 300 do
+        ids[i] = 30000 + i
+        photo(ids[i])
+    end
+    voir(unpack(ids))
+    vider()
+    -- La plus ancienne : 30001 (vue il y a 10 min), puis 30002 (5 min), les autres il y a 1 min.
+    local f = fichier()
+    for cle, e in pairs(f.catalogues[CATALOGUE].photos) do
+        e.vu = e.vu - (cle == '30001' and 600 or cle == '30002' and 300 or 60)
+    end
+    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    Releve.oublier()
+    egal(300, (Releve.nombre()))
+    Releve.MAX_ORIGINAUX = 299
+    Releve.PAS = 1
+    Releve.DELAI_ECRITURE = 0
+    local trier = 0
+    Planificateur.avec(function()
+        Releve.aEcrire = true
+        Planificateur.lancer('écriture', function() Releve.ecrire() end)
+        Planificateur.tourner(function(pas)
+            -- Pendant le tri (l'élagage rend la main à chaque clé) : la fenêtre Claude voit 30001.
+            if pas == 260 then
+                trier = pas
+                voir(30001)
+                Releve.relancer()
+            end
+        end)
+    end)
+    egal(260, trier, 'la vue pendant le tri')
+    local relu = fichier().catalogues[CATALOGUE].photos
+    egal(299, compter(relu), 'MAX_ORIGINAUX')
+    vrai(relu['30001'] ~= nil, '30001, revue pendant le tri, reste')
+    egal(nil, relu['30002'], 'la suivante la moins récemment vue sort à sa place')
+end)
+
+essai("Tâches entremêlées : une note changée dans Lightroom et vue (rangerVue) pendant que Releve.reclasser lit le catalogue n'est pas remise à l'ancienne par lui", function()
+    depart()
+    prefs.cheminConnecteur = S.home .. '/absent'
+    local ids = {}
+    for i = 1, 200 do
+        ids[i] = 31000 + i
+        photo(ids[i], { note = 1 })
+    end
+    voir(unpack(ids))
+    vider()
+    egal(1, entree(31100).note)
+    Releve.PAS, Releve.PAS_UNE_A_UNE = 1, 1
+    Releve.DELAI_ECRITURE = 0
+    -- La lecture du classement par le reclassement repérée ; après elle, Dany pose 4 ★ et la fenêtre
+    -- Claude voit ces photos.
+    local lu, vue = false, false
+    local brut = S.catalogue.batchGetRawMetadata
+    S.catalogue.batchGetRawMetadata = function(cat, photos, cles)
+        for _, c in ipairs(cles) do
+            if c == 'rating' and not vue then
+                lu = true
+            end
+        end
+        return brut(cat, photos, cles)
+    end
+    local changees = { 31010, 31050, 31100, 31150, 31190 }
+    local n
+    local ok, erreur = pcall(Planificateur.avec, function()
+        Planificateur.lancer('reclasser', function() n = Releve.reclasser() end)
+        Planificateur.tourner(function()
+            if lu and not vue then
+                vue = true
+                for _, id in ipairs(changees) do
+                    PHOTOS[id].brut.rating = 4
+                end
+                Releve.revoir()
+                voir(unpack(changees))
+                Releve.relancer()
+            end
+        end)
+    end)
+    S.catalogue.batchGetRawMetadata = brut
+    assert(ok, erreur)
+    vrai(vue, 'vues pendant le reclassement')
+    egal(0, n, 'rien de changé par le reclassement (les autres notes sont les mêmes)')
+    for _, id in ipairs(changees) do
+        egal(4, entree(id).note, id .. ' : la note de la vue, plus fraîche')
+    end
+    egal(nil, Releve.revues, 'plus rien de noté après le reclassement')
+end)
+
+essai("Releve.ecrire (avant un dessin demandé) pendant qu'une autre tâche écrit : il attend qu'elle finisse, puis écrit ce qui reste ; --graphiques lit le relevé entier", function()
+    depart()
+    prefs.cheminConnecteur = S.home .. '/absent'
+    local ids = {}
+    for i = 1, 20 do
+        ids[i] = 35000 + i
+        photo(ids[i])
+    end
+    voir(unpack(ids))
+    vider()
+    local ancien = Fichiers.lire(Releve.fichier())
+    for i = 21, 50 do
+        ids[i] = 35000 + i
+        photo(ids[i])
+    end
+    voir(unpack(ids))
+    vider()
+    -- Le fichier d'avant remis : les 30 de plus sont rangées en mémoire, pas encore écrites.
+    Fichiers.ecrire(Releve.fichier(), ancien)
+    egal(20, compter(fichier().catalogues[CATALOGUE].photos), 'pas encore écrites')
+    Releve.PAS_ECRITURE = 1
+    local dessin
+    Planificateur.avec(function()
+        -- La tâche du Suivi écrit ; la fenêtre Suivi demande un dessin pendant ce temps.
+        Planificateur.lancer('suivi', function()
+            Releve.aEcrire = true
+            Releve.ecrire()
+        end)
+        Planificateur.tourner(function(pas)
+            if pas == 3 then
+                Planificateur.lancer('fenêtre', function()
+                    local ecrit = Releve.ecrire()
+                    dessin = { ecrit = ecrit, n = compter(fichier().catalogues[CATALOGUE].photos) }
+                end)
+            elseif pas == 6 then
+                -- Une vue de plus rangée pendant l'écriture : la fenêtre l'écrit après elle.
+                photo(35051)
+                ids[51] = 35051
+                Releve.aEcrire = true
+            end
+        end)
+    end)
+    egal(true, dessin.ecrit, 'écrit (celle attendue, puis la suivante)')
+    egal(50, dessin.n, 'le dessin demandé lit le relevé entier')
+end)
+
+-- La tâche du Suivi pour un seul lot : après --analyser, Claude se met au travail, et la pause
+-- éteint le Suivi (la tâche s'arrête après son attente) ; puis rallumé. Rend l'entrée du lot reçue
+-- par le connecteur.
+local function unLot()
+    local LrTasks = S.modules.LrTasks
+    local executer, dormir = LrTasks.execute, LrTasks.sleep
+    local recu
+    LrTasks.execute = function(commande)
+        local code = executer(commande)
+        if commande:find('--analyser', 1, true) then
+            Moteur.travaille = true
+            recu = recus()[#recus()]
+        end
+        return code
+    end
+    LrTasks.sleep = function() Releve.eteindre() end
+    Releve.prochaineVerification = 0
+    local ok, erreur = pcall(vider)
+    LrTasks.execute, LrTasks.sleep = executer, dormir
+    Moteur.travaille = false
+    Releve.allumer()
+    assert(ok, erreur)
+    return recu
+end
+
+local function idsDuLot(recu)
+    local ids = {}
+    for _, p in ipairs(recu and recu.photos or {}) do
+        ids[#ids + 1] = tostring(p.id)
+    end
+    return table.concat(ids, ' ')
+end
+
+essai("Une analyse manquée passe devant la file gardée à son heure (Releve.reessais), sans attendre que toute la file soit épuisée ; abandonnée, plus de réessai ; au-delà de MAX_REESSAIS, elle attend que la file se refasse", function()
+    depart()
+    local ids = {}
+    for i = 1, 30 do
+        ids[i] = 34000 + i
+        photo(ids[i])
+    end
+    prefs.cheminConnecteur = S.home .. '/absent'
+    voir(unpack(ids))
+    vider()
+    prefs.cheminConnecteur = CONNECTEUR
+    Releve.LOT_ANALYSE = 2
+    -- Les règles du connecteur déjà connues (une réponse plus tôt dans la séance) : la file gardée ne
+    -- se refait pas pour elles.
+    Releve.regles = 1
+    avecLeTemps(function()
+        egal(30, Releve.refaireFile())
+        egal('34001', Releve.file.liste[1])
+        -- Le connecteur muet pour le premier lot : 34001 et 34002 manquées, à réessayer dans
+        -- DELAI_REESSAI ; la suite de la file reste gardée.
+        mode('muet')
+        egal('34001 34002', idsDuLot(unLot()))
+        egal('pas_de_reponse', Releve.entree(34001).analyse.erreur, 'manquée')
+        egal(2, #Releve.reessais, 'à réessayer')
+        egal('34001', Releve.reessais[1].cle)
+        egal(os.time() + Releve.DELAI_REESSAI, Releve.reessais[1].le, 'dans DELAI_REESSAI')
+        egal(28, #Releve.file.liste - Releve.file.i + 1, 'la file gardée : les 28 autres')
+        -- Avant leur heure, le lot suivant vient de la file ; à leur heure, elles passent devant.
+        mode('contrat')
+        egal('34003 34004', idsDuLot(unLot()), 'avant leur heure : la file')
+        avancerLeTemps(Releve.DELAI_REESSAI)
+        egal('34001 34002', idsDuLot(unLot()), 'à leur heure : devant la file gardée')
+        vrai(Releve.entree(34001).analyse.cherches ~= nil, 'analysée')
+        egal(0, #Releve.reessais)
+        egal(26, #Releve.file.liste - Releve.file.i + 1, 'la file gardée, pas refaite')
+        egal('34005 34006', idsDuLot(unLot()), 'puis la file reprend')
+        -- Au troisième essai, abandonnée : plus de réessai.
+        mode('muet')
+        Releve.MAX_REESSAIS = 1
+        egal('34007 34008', idsDuLot(unLot()))
+        egal(1, #Releve.reessais, 'MAX_REESSAIS au plus : 34008 attendra que la file se refasse')
+        egal('34007', Releve.reessais[1].cle)
+        Releve.MAX_REESSAIS = PAS_REESSAIS
+        for _ = 1, 2 do
+            avancerLeTemps(Releve.DELAI_REESSAI)
+            egal('34007', idsDuLot(unLot()):match('^%d+'), 'réessayée à son heure')
+        end
+        egal(true, Releve.entree(34007).analyse.abandonnee, 'abandonnée au troisième essai')
+        for _, r in ipairs(Releve.reessais) do
+            vrai(r.cle ~= '34007', 'abandonnée : plus de réessai')
+        end
+    end)
+end)
+
+essai("Des règles plus récentes (une réponse de --analyser dont regles monte, la première de la séance comprise) : la file gardée se refait au lot suivant, une analyse faite selon les anciennes y entre ; les mêmes règles ensuite, elle se garde", function()
+    depart()
+    local ids = {}
+    for i = 1, 30 do
+        ids[i] = 36000 + i
+        photo(ids[i])
+    end
+    prefs.cheminConnecteur = S.home .. '/absent'
+    voir(unpack(ids))
+    vider()
+    prefs.cheminConnecteur = CONNECTEUR
+    -- 36030 analysée selon des règles anciennes (0) ; les autres sans analyse.
+    local f = fichier()
+    f.catalogues[CATALOGUE].photos['36030'].analyse = { le = os.time(), regles = 0, cherches = Json.tableau({ 'flou' }), defauts = Json.tableau({}) }
+    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    Releve.oublier()
+    egal(29, Releve.refaireFile(), 'la file gardée : les 29 sans analyse (règles encore inconnues)')
+    Releve.LOT_ANALYSE = 2
+    unLot()
+    egal(1, Releve.regles, 'les règles du connecteur')
+    egal(nil, Releve.file, 'à refaire au lot suivant')
+    unLot()
+    vrai(Releve.file ~= nil, 'refaite, puis gardée : les mêmes règles')
+    local dedans = false
+    for i = 1, #Releve.file.liste do
+        dedans = dedans or Releve.file.liste[i] == '36030'
+    end
+    vrai(dedans, '36030, analysée selon des règles plus anciennes, entre dans la file refaite')
+end)
+
+essai("Releve.reclasser sans rien de changé dans le catalogue : aucune entrée changée (ni classement_le ni texte JSON refait), rien écrit ; une note changée : cette entrée seule", function()
+    depart()
+    prefs.cheminConnecteur = S.home .. '/absent'
+    for i = 1, 20 do
+        photo(37000 + i, { note = i % 6 })
+    end
+    local ids = {}
+    for i = 1, 20 do
+        ids[i] = 37000 + i
+    end
+    voir(unpack(ids))
+    vider()
+    local avant = Fichiers.lire(Releve.fichier())
+    local version = Releve.version
+    egal(0, Releve.reclasser(), 'rien de changé')
+    egal(version, Releve.version, 'rien écrit')
+    -- Une écriture forcée ensuite ne refait le texte d'aucune entrée.
+    local encode, encodees = Json.encode, 0
+    Json.encode = function(v)
+        if type(v) == 'table' and v.uuid then
+            encodees = encodees + 1
+        end
+        return encode(v)
+    end
+    local ok, erreur = pcall(function()
+        Releve.aEcrire = true
+        egal(true, Releve.ecrire())
+        egal(0, encodees, 'aucune entrée réencodée')
+        memes(Json.decode(avant), fichier(), 'le même relevé')
+        PHOTOS[37005].brut.rating = 3
+        egal(1, Releve.reclasser(), 'une note changée')
+        egal(1, encodees, 'cette entrée seule réencodée')
+        egal(3, entree(37005).note)
+    end)
+    Json.encode = encode
+    assert(ok, erreur)
+end)
+
+essai("La fenêtre Suivi pose une sélection (Releve.poserSelection) : pendant qu'elle la pose, aucune sélection vue ne compte ; posée, elle est vue sans être rangée ; une autre photo active du même groupe ne revoit qu'elle ; une autre sélection compte", function()
+    depart()
+    prefs.cheminConnecteur = S.home .. '/absent'
+    for id = 38001, 38006 do
+        photo(id)
+    end
+    voir(38001)
+    vider()
+    local pendant
+    local r = Releve.poserSelection(function()
+        choisir(38002, 38003)
+        pendant = Releve.voirSelection(Lightroom.photos())
+        choisir(38002, 38003, 38004, 38005)
+        return 'posée'
+    end)
+    egal('posée', r, 'ce que la pose rend')
+    egal(false, pendant, 'à moitié posée : pas une vue')
+    egal(0, Releve.selectionPosee)
+    egal(0, #Releve.aVoir, 'rien à ranger')
+    egal(false, voir(38002, 38003, 38004, 38005), 'posée : déjà vue')
+    egal(true, voir(38004, 38002, 38003, 38005), 'une autre photo active du même groupe')
+    egal(1, #Releve.aVoir[1].photos, 'elle seule')
+    egal(true, voir(38006), 'une autre sélection')
+    -- Une erreur de la pose remonte, le compte revient à zéro.
+    vrai(not pcall(Releve.poserSelection, function() error('refusée') end), "l'erreur remonte")
+    egal(0, Releve.selectionPosee)
+end)
+
+-- Un relevé de N originaux (de la forme de ceux du contrat), écrit dans suivi.json : la moitié
+-- analysés, une copie virtuelle vue sur cent.
+local function grandReleve(n)
+    local modele = REGISTRE.catalogues[CATALOGUE].photos['4302']
+    local analyse = ANALYSER.dans_le_registre['4302']
+    local photos = {}
+    local vu = os.time() - 86400
+    for k = 1, n do
+        local id = 1000000 + k * 3
+        local uuid = string.format('%08X-0000-4000-8000-%012d', k, k)
+        local e = { original = id, uuid = uuid, fichier = 'XH2S' .. k .. '.RAF', ajout = vu, ajout_le = '2026-10-25 10:00',
+            vu = vu + math.floor(k / 5000) * 60, prise_de_vue = sansNotes(modele.prise_de_vue), note = k % 6, drapeau = 'aucun',
+            retouchee_par_claude = false, classement_le = vu,
+            vues = Json.tableau({ { id = id, uuid = uuid, copie_virtuelle = false, fichier = 'XH2S' .. k .. '.RAF', le = vu } }) }
+        if k % 100 == 0 then
+            e.vues[2] = { id = id + 1, uuid = uuid .. '-c', copie_virtuelle = true, fichier = 'XH2S' .. k .. '.RAF (Copie 1)', le = vu }
+        end
+        if k % 2 == 0 then
+            e.analyse = { le = vu, regles = 1, cherches = Json.tableau({ 'sous_exposition', 'surexposition', 'ciel_brule', 'flou' }),
+                defauts = Json.tableau(k % 10 == 0 and { 'flou' } or {}) }
+        end
+        photos[tostring(id)] = e
+    end
+    Fichiers.ecrire(Releve.fichier(), Json.encode({ format = 1, catalogues = { [CATALOGUE] = { photos = photos } } }))
+    return analyse
+end
+
+-- La taille réelle : 85 000 originaux (la bibliothèque de Dany), ou DEVELOPPEUR_SUIVI_ORIGINAUX
+-- (250 000, la borne : plus long).
+local ORIGINAUX = tonumber(os.getenv('DEVELOPPEUR_SUIVI_ORIGINAUX') or '') or 85000
+
+essai(string.format("Taille réelle, %d originaux : la relecture, l'écriture (la première, puis pendant l'analyse), la file refaite et une vue de mille photos ne gardent jamais la main plus de 0,3 s ; l'écriture pendant l'analyse ne refait que les entrées changées", ORIGINAUX), function()
+    depart()
+    prefs.cheminConnecteur = S.home .. '/absent'
+    local t0 = os.clock()
+    grandReleve(ORIGINAUX)
+    -- Le relevé fabriqué ici n'est pas celui que Lightroom aurait en mémoire : rendu au ramasse-miettes.
+    collectgarbage('collect')
+    Releve.oublier()
+    local morceaux = {}
+    local r = rendreLaMainPendant(function() egal(ORIGINAUX, (Releve.nombre())) end)
+    morceaux.relecture = r
+    Releve.aEcrire = true
+    r = rendreLaMainPendant(function() egal(true, Releve.ecrire()) end)
+    morceaux.premiere = r
+    local premiere = os.clock()
+    -- Mille photos du relevé revues (une sélection), rangées : mille entrées changées, écrites
+    -- ensuite (une écriture pendant l'analyse).
+    local ids = {}
+    for k = 1, 1000 do
+        local id = 1000000 + k * 3
+        ids[k] = id
+        photo(id, { uuid = string.format('%08X-0000-4000-8000-%012d', k, k) })
+    end
+    local version = Releve.version
+    r = rendreLaMainPendant(function()
+        voir(unpack(ids))
+        vider()
+    end)
+    morceaux.vue = r
+    egal(version + 1, Releve.version, 'la vue écrite')
+    -- Rien de changé depuis : une écriture de plus ne refait aucune entrée.
+    local t1 = os.clock()
+    Releve.aEcrire = true
+    r = rendreLaMainPendant(function() egal(true, Releve.ecrire()) end)
+    morceaux.suivante = r
+    local suivante = os.clock() - t1
+    r = rendreLaMainPendant(function() vrai(Releve.refaireFile() >= ORIGINAUX / 2) end)
+    morceaux.file = r
+    for _, nom in ipairs({ 'relecture', 'premiere', 'vue', 'suivante', 'file' }) do
+        local m = morceaux[nom]
+        print(string.format('       %-10s plus long morceau %.3f s (%d yields)', nom, m.plusLong, m.n))
+        vrai(m.plusLong < 0.3, nom .. ' : un morceau de ' .. string.format('%.3f', m.plusLong) .. ' s sans rendre la main')
+        egal(0, m.traversees, nom .. ' : à travers un pcall simple')
+    end
+    vrai(suivante < (premiere - t0) / 4, string.format("l'écriture suivante ne refait que les entrées changées : %.3f s", suivante))
+    local relu = fichier().catalogues[CATALOGUE].photos
+    egal('DSCF1000003.RAF', relu['1000003'].fichier, 'la vue écrite, relue')
+    egal(1, #relu['1000003'].vues)
+    print(string.format('       en tout %.1f s', os.clock() - t0))
 end)
 
 -- Fin -----------------------------------------------------------------------------------------------

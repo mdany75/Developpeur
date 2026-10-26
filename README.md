@@ -24,7 +24,7 @@ Publication… et Consommation….*
 
 ### La fenêtre Claude dans Lightroom
 
-- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur v1.3.7 » dans sa barre de titre
+- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur v1.3.8 » dans sa barre de titre
   (la version du module installé) : Fichier ›
   Module externe - Extras › Ouvrir la fenêtre Claude (même entrée dans le menu Bibliothèque, et
   raccourci ⌃⌥C une fois posé). Elle reste ouverte pendant que vous travaillez, dans tous les
@@ -288,9 +288,16 @@ Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claud
 **Les photos qui comptent**
 
 - Toute photo que vous ouvrez dans la fenêtre Claude ou la Demande rapide, seule ou dans une
-  sélection (ses 10 000 premières photos depuis la 1.3.8), entre au Suivi : à l'ouverture de ces fenêtres, puis à
-  chaque autre photo ou autre sélection pendant qu'elles sont ouvertes. Rien d'avant
-  l'installation : le Suivi part de zéro.
+  sélection (jusqu'à 250 000 photos depuis la 1.3.8, 1 000 avant), entre au Suivi : à l'ouverture
+  de ces fenêtres, puis à chaque autre photo ou autre sélection pendant qu'elles sont ouvertes.
+  Rien d'avant l'installation : le Suivi part de zéro.
+- Toute la bibliothèque d'un coup : ouvrez Toutes les photographies, sélectionnez tout (⌘A), puis
+  ouvrez la fenêtre Claude ou la Demande rapide. Le Suivi garde jusqu'à 250 000 photos originales
+  par catalogue (20 000 avant la 1.3.8). Pour ne pas figer Lightroom, le Suivi range, lit et écrit
+  son relevé par petits morceaux et lui rend la main entre deux (mesuré hors de Lightroom ; à
+  confirmer avec toute votre bibliothèque). Plus le relevé est grand, moins il s'écrit souvent,
+  jusqu'à une minute entre deux écritures : si vous quittez Lightroom, la dernière minute de photos
+  vues peut manquer.
 - Par l'original : une copie virtuelle compte pour son original, une seule fois (ni son ISO ni sa
   focale ne comptent deux fois). La note est la plus haute de l'original et de ses copies, le
   drapeau « retenue » si l'une l'est, et la photo compte « retouchée par Claude » si l'une d'elles
@@ -305,7 +312,8 @@ Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claud
   et yeux fermés (seulement sur un visage dont les yeux se lisent). Sur le Mac, sans Claude, sans
   forfait et sans réseau ; rien n'est écrit dans le catalogue.
 - En arrière-plan, par lots de 10 photos, la photo active d'abord : une sélection de 300 photos
-  passe en quelques minutes sans vous bloquer. L'analyse attend pendant que Claude travaille
+  passe en quelques minutes sans vous bloquer ; toute une bibliothèque, à environ 3 photos par
+  seconde, en quelques heures (8 h environ pour 85 000 photos). L'analyse attend pendant que Claude travaille
   (fenêtre Claude, Demande rapide, ou Claude Desktop qui passe par la liaison) ; ce qui reste à
   analyser reprend au lancement suivant de Lightroom.
 - Une photo s'analyse une seule fois, telle qu'elle a été prise : une retouche ne la fait pas
@@ -987,8 +995,8 @@ Ce qui reste sur le Mac :
   photo originale, 3 000 au plus par catalogue, les plus anciennes sortent au-delà ; les leçons
   d'avant le correctif 1.3.6 y restent, sans être montrées), le relevé du Suivi (`suivi.json` :
   une table par catalogue, une entrée par photo originale ouverte, avec sa prise de vue, sa note,
-  son drapeau et les codes des défauts de son analyse, 20 000 au plus par catalogue, les moins
-  récemment vues sortent au-delà), le rendu de fin de chaque retouche
+  son drapeau et les codes des défauts de son analyse, 250 000 au plus par catalogue depuis la
+  1.3.8, 20 000 avant, les moins récemment vues sortent au-delà ; environ 50 Mo pour 85 000 photos), le rendu de fin de chaque retouche
   (`rendus.json`), et l'avant/après des étapes de Claude
   (`Etapes/`, une image avant et une après par étape, de 0,6 à 0,9 Mo ; ménage au chargement du
   module : 30 jours, 500 Mo au plus), dans `~/Library/Application Support/Developpeur/` ; les
@@ -1239,7 +1247,7 @@ temporaire), ce que la 1.2 ajoute (bilan, éclairage, lecture des fichiers Fujif
 dosage de la peau) et la 1.3 (composition lue, carnet de progrès, recette de la 1.3 sur un module
 simulé), puis l'onglet Focus (mise au point Fujifilm en détail, ses cadres, `--focus`), le rendu
 reproductible et le Suivi (`--analyser` sur des vignettes fabriquées, `--graphiques` sur des
-relevés fabriqués, jusqu'à 20 000 photos, et ses images), sur des images, des fichiers et des
+relevés fabriqués, et ses images), sur des images, des fichiers et des
 profils de couleur fabriqués (les valeurs d'une vraie photo, jamais la photo). Les contrats de la
 composition et du Suivi entre le connecteur et le module (`Tests/Contrats/`) sont lus par les deux
 suites (celui de « Je le fais » est retiré avec lui).
@@ -1254,8 +1262,10 @@ Le module, avec LuaJIT : forme du module, syntaxe et globales de chaque fichier,
 compris, leçons d'avant gardées telles quelles) et `Tests/Lua/Fenetre` (la fenêtre Claude avec un
 faux Claude Code, une photo une conversation, le résumé en haut du fil, la Demande rapide, ses
 images et ses apparences, l'onglet Focus avec un faux connecteur (une photo verticale comprise),
-Agrandir avec le vrai `sips`, le relevé du Suivi et son analyse d'office, la fenêtre Suivi en
-graphiques (chacun avec un faux connecteur qui lit le contrat), Publication et Consommation) ;
+Agrandir avec le vrai `sips`, le relevé du Suivi et son analyse d'office (toute une bibliothèque
+comprise : un relevé de 85 000 photos relu et écrit sans garder la main plus de 0,3 s, 250 000 avec
+`DEVELOPPEUR_SUIVI_ORIGINAUX=250000`), la fenêtre Suivi en graphiques (chacun avec un faux
+connecteur qui lit le contrat), Publication et Consommation) ;
 dans chacune, les essais `essais-*.lua`
 tournent après `tests.lua`. La simulation de la fenêtre imite ce qui a été constaté dans
 Lightroom (Retour, clics, vues masquées, texte riche…) et refuse ce qui n'y marche pas.

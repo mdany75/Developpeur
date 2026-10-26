@@ -531,15 +531,22 @@ end)
 
 -- L'entrée et la sortie ---------------------------------------------------------------------------
 
-essai("Premier tour : Releve.reclasser, puis --graphiques sous perl (alarme de 20 s) avec exactement l'entrée de l'exemple des 12 mois ; sa sortie montrée (tuiles, titres, notes, images, calques, menu du défaut)", function()
+essai("Premier tour : --graphiques sous perl (alarme de 60 s) avec exactement l'entrée de l'exemple des 12 mois, puis Releve.reclasser dans sa propre tâche ; sa sortie montrée (tuiles, titres, notes, images, calques, menu du défaut)", function()
     depart()
     ouvrirSuivi(function(p)
         local commandes = #(S.dernieresCommandes or {})
+        local taches = #S.taches
         unTour()
         local r = recus()
         egal(1, #r, 'un appel')
+        -- La note, le drapeau et « retouchée par Claude » relus après le premier dessin, dans une
+        -- tâche à part (à toute la bibliothèque, il dure : la boucle suit la période pendant ce temps).
+        egal(0, #reclassements, 'pas dans la boucle')
+        egal(taches + 1, #S.taches, 'la tâche du reclassement')
+        S.taches[#S.taches]()
         egal(1, #reclassements, 'la note, le drapeau et « retouchée par Claude » relus')
-        egal(0, reclassements[1], 'avant --graphiques')
+        egal(1, reclassements[1], 'après le premier --graphiques')
+        egal(false, FenetreSuivi.aRedessiner, 'rien de relu (0) : pas de second dessin')
         memes(entreeAttendue('graphiques_12_mois'), r[1].entree)
         -- La commande : perl et son alarme, le connecteur, l'entrée et un dossier neuf.
         local commande
@@ -549,7 +556,8 @@ essai("Premier tour : Releve.reclasser, puis --graphiques sous perl (alarme de 2
             end
         end
         vrai(commande, 'la commande')
-        egal(1, select(2, commande:gsub("/usr/bin/perl %-e 'alarm 20; exec @ARGV' ", '')), commande)
+        egal(1, select(2, commande:gsub("/usr/bin/perl %-e 'alarm 60; exec @ARGV' ", '')), commande)
+        contient(CONTRAT.regles.graphiques.commande, "alarm 60", "l'alarme du contrat")
         contient(commande, S.q(CONNECTEUR) .. ' --graphiques ')
         contient(r[1].dossier, Chemins.temporaire() .. '/Suivi/Graphiques-')
         -- La sortie : tuiles, titres, notes, images et calques.
@@ -671,6 +679,7 @@ local function bibliotheque(autres)
     local b = { source = 'dossier', selection = {}, sources = {}, visibles = {}, filtrees = {}, garder = false, photos = {} }
     local function photoDe(id, uuid)
         return { localIdentifier = id, uuid = uuid, getRawMetadata = function(self, k) return k == 'uuid' and self.uuid or nil end,
+            getFormattedMetadata = function(self, k) return k == 'fileName' and ('DSCF' .. self.localIdentifier .. '.RAF') or nil end,
             setPropertyForPlugin = function() error("le Suivi n'écrit rien dans le catalogue", 2) end }
     end
     for cle, e in pairs(REGISTRE.catalogues[CATALOGUE].photos) do
@@ -799,6 +808,68 @@ essai("Clic sur une barre : ses photos dans la Bibliothèque (grille), retrouvé
     egal(ecritures, S.ecrituresPrivees or 0, "aucune écriture, même privée")
 end)
 
+essai("Clic sur une barre de toute la bibliothèque : le relevé lu sans être copié (Releve.uuidsDe, jamais Releve.entrees), les photos retrouvées et leurs uuid lus par tranches, la main rendue entre deux", function()
+    depart()
+    local b, remettre = bibliotheque()
+    b.visibles = { [3502] = true, [3640] = true, [4211] = true }
+    local LrTasks = S.modules.LrTasks
+    local entrees, yield, pas, lot = Releve.entrees, LrTasks.yield, FenetreSuivi.PAS_UNE_A_UNE, Releve.LOT_LECTURE
+    local n = 0
+    Releve.entrees = function() error('Releve.entrees copie tout le relevé', 2) end
+    LrTasks.yield = function() n = n + 1 end
+    FenetreSuivi.PAS_UNE_A_UNE, Releve.LOT_LECTURE = 1, 1
+    local ok, erreur = pcall(ouvrirSuivi, function(p, args)
+        unTour()
+        local calques = calquesDe(args.contents)
+        local avant = #S.taches
+        n = 0
+        S.cliquer(calques.focales[2].vue)
+        lancerTaches(avant)
+        egal('3502 3640 4211', b.ids(), "les photos de la barre, sans celle d'un autre uuid")
+        vrai(n >= 4 + 3, 'la main rendue : ' .. n)
+        contient(p.message, 'dans la Bibliothèque')
+    end)
+    Releve.entrees, LrTasks.yield, FenetreSuivi.PAS_UNE_A_UNE, Releve.LOT_LECTURE = entrees, yield, pas, lot
+    remettre()
+    assert(ok, erreur)
+end)
+
+essai("Clic sur une barre : la sélection posée ne se range pas au relevé (ses photos y sont déjà : Releve.poserSelection) ; pendant qu'elle se pose, aucune sélection vue par la fenêtre Claude ne compte ; une autre ensuite, si", function()
+    depart()
+    local b, remettre = bibliotheque()
+    b.visibles = { [3502] = true, [3640] = true, [4211] = true }
+    local Lightroom = require 'Lightroom'
+    local vues = {}
+    Releve.allume = true
+    local selectionner = S.catalogue.setSelectedPhotos
+    local ok, erreur = pcall(ouvrirSuivi, function(p, args)
+        unTour()
+        local calques = calquesDe(args.contents)
+        S.catalogue.setSelectedPhotos = function(...)
+            selectionner(...)
+            -- La boucle de la fenêtre Claude regarde la sélection pendant qu'elle se pose.
+            vues[#vues + 1] = tostring(Releve.voirSelection(Lightroom.photos()))
+        end
+        local avant = #S.taches
+        S.cliquer(calques.focales[2].vue)
+        lancerTaches(avant)
+        S.catalogue.setSelectedPhotos = selectionner
+        egal('3502 3640 4211', b.ids())
+        vrai(#vues > 0, 'la sélection regardée pendant la pose')
+        egal('false', table.concat(vues, ' '), 'pendant la pose : pas une vue')
+        egal(false, Releve.voirSelection(Lightroom.photos()), 'posée : déjà vue')
+        egal(0, #Releve.aVoir, 'rien à ranger')
+        -- Dany choisit une autre photo : elle compte.
+        b.selection = { b.photos[4105] }
+        egal(true, Releve.voirSelection(Lightroom.photos()), 'une autre sélection')
+    end)
+    S.catalogue.setSelectedPhotos = selectionner
+    Releve.allume = false
+    Releve.oublier()
+    remettre()
+    assert(ok, erreur)
+end)
+
 essai("Clic sur une barre, sélection vérifiée par les photos et non leur nombre : aucune de la barre dans la grille (le film fixe en a autant, ou une autre photo reste sélectionnée), puis un filtre qui les cache toutes ou une seule ; jamais le nombre de photos du film fixe", function()
     depart()
     local b, remettre = bibliotheque(30)
@@ -867,7 +938,7 @@ essai("Clic sur une barre, sélection vérifiée par les photos et non leur nomb
     assert(ok, erreur)
 end)
 
-essai("Avant chaque dessin, ce que le Suivi a rangé sans l'écrire encore s'écrit (Releve.ecrire), puis --graphiques lit le fichier", function()
+essai("Avant chaque dessin demandé (l'ouverture, une autre période), ce que le Suivi a rangé sans l'écrire encore s'écrit (Releve.ecrire), puis --graphiques lit le fichier", function()
     depart()
     local ecrire = Releve.ecrire
     local appels = {}
@@ -883,7 +954,7 @@ essai("Avant chaque dessin, ce que le Suivi a rangé sans l'écrire encore s'éc
     Releve.ecrire = ecrire
     assert(ok, erreur)
     egal(2, #recus(), 'deux dessins')
-    egal('0 1', table.concat(appels, ' '), 'Releve.ecrire avant chaque --graphiques')
+    egal('0 1', table.concat(appels, ' '), 'Releve.ecrire avant chaque --graphiques demandé')
 end)
 
 -- Relevé vide, connecteur absent, muet, qui refuse -------------------------------------------------------
@@ -976,6 +1047,83 @@ essai("Des créneaux autres que ceux de la fenêtre : les barres de ce graphique
 end)
 
 -- Le relevé change, les dossiers ---------------------------------------------------------------------
+
+essai("Le reclassement fini en arrière-plan : la fenêtre se redessine (un dessin demandé, Releve.ecrire avant) ; fermée entre-temps, ou rien de relu, non", function()
+    depart()
+    local reclasser = Releve.reclasser
+    local relues = 3
+    Releve.reclasser = function()
+        reclassements[#reclassements + 1] = #recus()
+        return relues
+    end
+    local ok, erreur = pcall(ouvrirSuivi, function()
+        local taches = #S.taches
+        unTour()
+        egal(1, #recus(), 'le premier dessin, sans attendre le reclassement')
+        egal(taches + 1, #S.taches, 'la tâche du reclassement')
+        S.taches[#S.taches]()
+        egal(true, FenetreSuivi.aRedessiner, 'trois familles relues : à redessiner')
+        unTour()
+        egal(2, #recus(), 'redessinée')
+        unTour()
+        egal(2, #recus(), 'une fois')
+        -- Une fenêtre rouverte (une autre génération) : le reclassement de la précédente ne la touche pas.
+        taches = #S.taches
+        FenetreSuivi.reclasserEnFond()
+        egal(taches + 1, #S.taches)
+        local tache = S.taches[#S.taches]
+        FenetreSuivi.generation = FenetreSuivi.generation + 1
+        tache()
+        FenetreSuivi.generation = FenetreSuivi.generation - 1
+        egal(false, FenetreSuivi.aRedessiner, "pas pour une autre fenêtre")
+    end)
+    Releve.reclasser = reclasser
+    assert(ok, erreur)
+end)
+
+essai("Un dessin fait de lui-même (le relevé vient d'être écrit) ne force pas l'écriture ; un grand relevé (SEUIL_GRAND originaux) ne se redessine de lui-même qu'au plus toutes les DELAI_REDESSIN_GRAND secondes ; la réponse se décode en rendant la main", function()
+    depart()
+    local ecrire, nombre = Releve.ecrire, Releve.nombre
+    local LrTasks = S.modules.LrTasks
+    local yield, pas = LrTasks.yield, FenetreSuivi.PAS_JSON
+    local appels, yields = {}, 0
+    Releve.ecrire = function()
+        appels[#appels + 1] = #recus()
+        return false
+    end
+    LrTasks.yield = function() yields = yields + 1 end
+    FenetreSuivi.PAS_JSON = 50
+    local ok, erreur = pcall(ouvrirSuivi, function(p, args)
+        unTour()
+        egal(1, #appels, "l'ouverture : écrit avant")
+        vrai(yields >= 10, 'la réponse décodée en rendant la main : ' .. yields)
+        egal('12', p.tuileTexte1, 'décodée entière')
+        -- Le relevé écrit : redessiné après DELAI_REDESSIN, sans forcer l'écriture.
+        Releve.version = Releve.version + 1
+        FenetreSuivi.dessineLe = os.time() - FenetreSuivi.DELAI_REDESSIN
+        unTour()
+        egal(2, #recus(), 'redessinée')
+        egal(1, #appels, "rien de forcé : elle suit une écriture")
+        -- Un grand relevé (le nombre d'originaux du dernier dessin) : DELAI_REDESSIN_GRAND.
+        egal(FenetreSuivi.DELAI_REDESSIN, FenetreSuivi.delaiRedessin())
+        Releve.nombre = function() return FenetreSuivi.SEUIL_GRAND, 0 end
+        S.choisir(liee(args.contents, 'popup_menu', 'periode'), '3_mois')
+        unTour()
+        egal(3, #recus(), 'une autre période')
+        egal(2, #appels, 'un dessin demandé : écrit avant')
+        egal(FenetreSuivi.DELAI_REDESSIN_GRAND, FenetreSuivi.delaiRedessin())
+        Releve.version = Releve.version + 1
+        FenetreSuivi.dessineLe = os.time() - FenetreSuivi.DELAI_REDESSIN
+        unTour()
+        egal(3, #recus(), 'trop tôt pour un grand relevé')
+        FenetreSuivi.dessineLe = os.time() - FenetreSuivi.DELAI_REDESSIN_GRAND
+        unTour()
+        egal(4, #recus(), 'après DELAI_REDESSIN_GRAND')
+    end)
+    Releve.ecrire, LrTasks.yield, FenetreSuivi.PAS_JSON = ecrire, yield, pas
+    Releve.nombre = nombre
+    assert(ok, erreur)
+end)
 
 essai("Le relevé ou le carnet change pendant qu'elle est ouverte : les graphiques se refont (au plus toutes les DELAI_REDESSIN secondes) ; un dossier neuf par dessin, l'avant-dernier effacé, tous à la fermeture", function()
     depart()

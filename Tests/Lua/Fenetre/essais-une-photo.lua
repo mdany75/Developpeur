@@ -714,7 +714,7 @@ essai("Groupe : les photos qui ont des étapes de Claude, par les lectures group
     egal('DSCF0451.RAF DSCF0453.RAF', table.concat(g.noms, ' '))
 end)
 
-essai("Groupe de plus de 500 photos : compté sur toute la sélection par les lectures groupées ; si elles échouent, les 500 premières, et le texte le dit", function()
+essai("Groupe de plus de 500 photos : compté sur toute la sélection par les lectures groupées, par lots de LOT_LECTURE (500 : toute la bibliothèque sélectionnée ne se lit plus d'un coup, correctif 1.3.8) ; si elles échouent, les 500 premières, et le texte le dit", function()
     -- 600 photos, dont seules les 100 dernières ont des étapes de Claude.
     local ids, champs, brutes = {}, {}, {}
     for k = 1, 600 do
@@ -737,7 +737,8 @@ essai("Groupe de plus de 500 photos : compté sur toute la sélection par les le
     local ok, g = pcall(Historique.lireGroupe)
     S.catalogue.batchGetPropertyForPlugin, S.catalogue.batchGetRawMetadata = nil, nil
     assert(ok, g)
-    egal('600', table.concat(lus, ' '), 'une lecture groupée de toute la sélection')
+    egal(500, Historique.LOT_LECTURE)
+    egal('500 100', table.concat(lus, ' '), 'toute la sélection, par lots de 500')
     egal(600, g.m)
     egal(600, g.lues)
     egal(100, g.n, 'les 100 au-delà de la 500e comptées')

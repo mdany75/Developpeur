@@ -1,6 +1,12 @@
 -- Json.lua : lecture et écriture JSON (Lightroom n'en fournit pas aux modules externes).
 -- Les nombres sont lus et écrits sans passer par la locale du système : avec une locale
 -- française, la bibliothèque C écrirait « 0,35 ».
+-- Json.decode(texte, rythme, pas) : avec `rythme`, une fonction appelée toutes les `pas` valeurs
+-- lues dans un objet ou un tableau (5 000 par défaut), un grand texte se lit par morceaux : le relevé
+-- du Suivi (Releve.lua, jusqu'à 250 000 originaux, plus de 100 Mo) et la réponse de --graphiques
+-- (FenetreSuivi.lua) y rendent la main à Lightroom (correctif 1.3.8). Le compte est propre à chaque
+-- lecture : deux lectures de deux tâches qui s'entremêlent ne se gênent pas. Json.ecrivain(ecrire)
+-- écrit un objet morceau par morceau (le relevé du Suivi, entrée par entrée).
 
 local Json = {}
 
@@ -108,6 +114,42 @@ end
 
 function Json.encode(valeur)
     return ecrire(valeur, {})
+end
+
+-- Un objet JSON écrit morceau par morceau par `ecrire(texte)` (correctif 1.3.8 : le relevé du Suivi,
+-- jusqu'à 250 000 originaux, s'écrit entrée par entrée, Fichiers.ecrireParMorceaux) : `ouvrir()` et
+-- `fermer()` un objet, `cle(k)` avant chaque valeur, puis `valeur(v)` (comme Json.encode) ou
+-- `brut(t)` (un texte déjà rendu par Json.encode, écrit tel quel). Les accolades, les virgules et
+-- les clés se font ici : le JSON passe toujours par Json.lua.
+function Json.ecrivain(ecrireTexte)
+    -- Pour chaque objet ouvert : vrai tant qu'il n'a aucune paire (pas de virgule avant la première).
+    local vides = {}
+    local w = {}
+    function w.ouvrir()
+        ecrireTexte('{')
+        vides[#vides + 1] = true
+    end
+    function w.fermer()
+        vides[#vides] = nil
+        ecrireTexte('}')
+    end
+    function w.cle(k)
+        local n = #vides
+        if vides[n] then
+            vides[n] = false
+        else
+            ecrireTexte(',')
+        end
+        ecrireTexte(chaine(tostring(k)))
+        ecrireTexte(':')
+    end
+    function w.valeur(v)
+        ecrireTexte(ecrire(v, {}))
+    end
+    function w.brut(t)
+        ecrireTexte(t)
+    end
+    return w
 end
 
 -- Lecture --------------------------------------------------------------------
@@ -221,7 +263,16 @@ local function lireNombre(s, i)
     return valeur, i
 end
 
-lireValeur = function(s, i)
+-- `r` : le rythme d'une lecture ({ n, pas, fn }), nil sans rythme.
+local function compter(r)
+    r.n = r.n + 1
+    if r.n >= r.pas then
+        r.n = 0
+        r.fn()
+    end
+end
+
+lireValeur = function(s, i, r)
     i = blancs(s, i)
     local c = s:sub(i, i)
     if c == '{' then
@@ -242,9 +293,12 @@ lireValeur = function(s, i)
                 echec(s, i, "« : » attendu")
             end
             local valeur
-            valeur, i = lireValeur(s, i + 1)
+            valeur, i = lireValeur(s, i + 1, r)
             if valeur ~= Json.null then
                 objet[cle] = valeur
+            end
+            if r then
+                compter(r)
             end
             i = blancs(s, i)
             local suite = s:sub(i, i)
@@ -263,8 +317,11 @@ lireValeur = function(s, i)
         end
         while true do
             local valeur
-            valeur, i = lireValeur(s, i)
+            valeur, i = lireValeur(s, i, r)
             tableau[#tableau + 1] = valeur
+            if r then
+                compter(r)
+            end
             i = blancs(s, i)
             local suite = s:sub(i, i)
             if suite == ']' then
@@ -288,12 +345,14 @@ lireValeur = function(s, i)
     echec(s, i, "valeur attendue")
 end
 
--- Dans un objet, null efface la clé ; dans un tableau, il reste Json.null.
-function Json.decode(texte)
+-- Dans un objet, null efface la clé ; dans un tableau, il reste Json.null. `rythme` (facultatif) :
+-- appelé toutes les `pas` valeurs (voir l'en-tête).
+function Json.decode(texte, rythme, pas)
     if type(texte) ~= 'string' then
         error("Json : texte attendu", 0)
     end
-    local valeur, i = lireValeur(texte, 1)
+    local r = type(rythme) == 'function' and { n = 0, pas = math.max(1, tonumber(pas) or 5000), fn = rythme } or nil
+    local valeur, i = lireValeur(texte, 1, r)
     i = blancs(texte, i)
     if i <= #texte then
         echec(texte, i, "caractères en trop")

@@ -28,6 +28,17 @@ end
 
 local MAX_PHOTOS = 500
 
+-- Rend la main à Lightroom (correctif 1.3.8 : le Suivi et les résumés de groupe parcourent toute la
+-- bibliothèque) : seulement dans une tâche qui le peut (LrTasks.canYield : jamais dans un
+-- observateur), et sous LrTasks.pcall, qui ne laisse passer aucune erreur : un yield à travers un
+-- pcall simple (Lua 5.1 le refuse) ne fait rien, le travail continue d'un seul morceau plutôt que
+-- d'échouer. La seule copie : Releve.rendreLaMain et Historique y passent.
+function Photos.rendreLaMain()
+    if LrTasks.canYield() then
+        LrTasks.pcall(LrTasks.yield)
+    end
+end
+
 local function catalogue()
     return LrApplication.activeCatalog()
 end
