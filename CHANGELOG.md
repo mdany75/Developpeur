@@ -10,7 +10,7 @@ même jour : un clic sur une étape à la place de « Pourquoi ? », les onglets
 Proposition, Agrandir plus grand, le carnet de progrès dans la fenêtre Suivi, plus rien sur
 l'étalonnage de l'écran, les réglages d'une photo sans étape de Claude et la version dans la barre
 de titre ; et votre deuxième retour : une photo verticale toujours debout, Agrandir qui remplit la
-place, un résumé en bas du fil, ni Détail… dans l'onglet Aperçu ni « ＋ Garder la demande ».
+place, un résumé en haut du fil, ni Détail… dans l'onglet Aperçu ni « ＋ Garder la demande ».
 Après l'installation : quitter puis relancer Lightroom (le module gagne deux fichiers : un
 rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code
 (le connecteur passe à 35 outils).
@@ -47,14 +47,17 @@ rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle sessi
 - Trois boutons dans la Demande rapide, à gauche de la demande, chacun une demande toute faite pour toutes
   les photos sélectionnées : noter (Claude pose ses notes, de 0 à 5 ★ ou un rejet), Retouche pro
   et Portrait, comme les invites de la fenêtre Claude.
-- Un résumé en bas du fil, fait par la fenêtre sans Claude ni forfait, à l'ouverture de la fenêtre
-  et chaque fois qu'une autre photo ou une autre sélection change la conversation montrée. Pour une
+- Un résumé en haut du fil, fait par la fenêtre sans Claude ni forfait, à l'ouverture de la fenêtre
+  et chaque fois qu'une autre photo ou une autre sélection change la conversation montrée : sous
+  l'historique de la photo (ou le résumé court du groupe), au-dessus de votre première demande, en
+  tête du fil sans historique ; « Depuis la dernière fois » reste à sa place, plus bas. Pour une
   photo : sa prise de vue (appareil, objectif, focale, ouverture, vitesse, ISO, date), sa note et
   son drapeau, et son état (ses étapes de Claude, vos reprises à la main, ses réglages hors de leur
   valeur par défaut). Pour plusieurs photos : leur nombre, leurs dates (du … au …), leurs appareils,
-  et combien sont retouchées par Claude, notées, rejetées. Il reste en bas, se refait à la fin de
-  chaque tour de Claude et suit la note posée ; il n'est ni gardé dans la conversation, ni envoyé à
-  Claude.
+  et combien sont retouchées par Claude, notées, rejetées. Il reste à cette place (d'abord en bas du
+  fil, déplacé à votre demande du même jour), se refait à la fin de chaque tour de Claude et suit la
+  note posée ; le fil s'ouvre toujours sur son bas, la dernière réponse. Il n'est ni gardé dans la
+  conversation, ni envoyé à Claude.
 
 ### Changé
 - La fenêtre Claude passe à 1 623 × 1 200 points (1 948 de large avant), sans le volet de gauche ;

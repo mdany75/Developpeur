@@ -2087,14 +2087,38 @@ l'ouverture et « Obtenir »,
 le Gestionnaire et les consignes), et `essais-moteur.lua` (une conversation sans photo ni clé d'une
 photo seule ne se montre pas).
 
-**Le résumé en bas du fil** (deuxième retour de Dany du 25 octobre 2026, accepté tel quel). À
-l'ouverture de la fenêtre (et quand le menu ou ⌃⌥C la rappelle), et chaque fois qu'une autre photo
-ou un autre groupe change la conversation montrée, la fenêtre fait un résumé, sans Claude ni
-jetons, montré en bas du fil, sous la conversation (et sous l'aide d'une conversation vide,
-`Fenetre.lignesAide`), après une ligne vide : `Fenetre.ajouterResume`, ses lignes par
-`Fil.lignesResume`, comme un élément `historique` (genre `note`, l'icône ⓘ sur l'en-tête, les puces
-en retrait), mais d'aucun élément (un clic n'y fait rien) ni d'aucun tour. Ses textes et ses
-lectures sont à `Historique.lua` (section « Le résumé de la fenêtre ») :
+**Le résumé en haut du fil** (deuxième retour de Dany du 25 octobre 2026, accepté tel quel ;
+d'abord en bas du fil, sous la conversation, déplacé en haut à sa demande du même jour, après son
+essai : « en haut des réponses, entre historique et vous »). À l'ouverture de la fenêtre (et quand
+le menu ou ⌃⌥C la rappelle), et chaque fois qu'une autre photo ou un autre groupe change la
+conversation montrée, la fenêtre fait un résumé, sans Claude ni jetons, montré en haut du fil :
+`Fenetre.ajouterResume`, depuis `Fenetre.rafraichirFil`, puis `Fil.avecResume` (pur : une table
+neuve, les lignes du fil telles quelles), ses lignes par `Fil.lignesResume`, comme un élément
+`historique` (genre `note`, l'icône ⓘ sur l'en-tête, les puces en retrait), mais d'aucun élément
+(un clic n'y fait rien) ni d'aucun tour. Sa place :
+
+- sous les éléments de tête de la conversation (`Fil.tete` : ses éléments `historique` de sorte
+  `historique`, « Historique de la photo », ou `groupe`, le résumé court d'un groupe, qui
+  l'ouvrent ; jamais `depuis`), après une ligne vide, et au-dessus de la première demande de Dany
+  (« Vous »), une ligne vide entre eux ;
+- en tête du fil sans eux (une photo sans étape de Claude ni retouche, dont la conversation n'a pas
+  d'historique ; une conversation d'avant le correctif), au-dessus de la première demande, ou de
+  l'aide d'une conversation vide (`Fenetre.lignesAide`) ;
+- « Depuis la dernière fois », ajouté plus tard, reste à sa place, sous lui (en bas, après les
+  échanges qu'il suit), comme l'historique qui rejoint le fil après une session perdue ;
+- jamais en double : une seule `Fenetre.resume`, insérée à chaque rafraîchissement dans des lignes
+  neuves, refaite à l'ouverture et à chaque autre photo, au retour sur la même photo aussi.
+
+La page montrée reste le bas du fil, la dernière réponse : une conversation montrée l'est depuis
+le bas (`conversationMontree`, `Fenetre.defilement` à 0), et le résumé n'est visible qu'en
+remontant quand la conversation dépasse la page. `Fenetre.total` (« ce qui arrive ne déplace pas ce
+qu'il lit ») compte les lignes sans le résumé : un lecteur remonté ne bouge pas quand le résumé se
+refait plus long ou plus court en haut, ni quand des lignes arrivent en bas. Ce qui est sous le
+résumé garde sa place depuis le bas ; lu tout en haut (le défilement à son maximum, d'après les
+lignes montrées la dernière fois, résumé compris), le fil reste en haut (`enHaut` de
+`Fenetre.rafraichirFil`), et un pas vers le bas (▼) l'en fait quitter.
+
+Ses textes et ses lectures sont à `Historique.lua` (section « Le résumé de la fenêtre ») :
 
 - une photo (`Historique.lireResumePhoto`, `Historique.resumePhoto`) : « Résumé de la photo :
   DSCF4961.RAF (Copie 2) », puis « Prise de vue : » l'appareil, l'objectif, la focale,
@@ -2132,12 +2156,16 @@ même pendant que Claude travaille ; et, Claude libre, quand un tour a fini (`Mo
 que le registre des notes a changé (`Notation.version`) ou qu'il est périmé (la fenêtre rappelée
 par le menu : gardé et montré jusque-là). Changer de photo active dans le même groupe ne le refait
 pas. La note et le drapeau d'une photo suivent ceux de la photo active que `Fenetre.majPhoto` lit
-toutes les 2 s (`Fenetre.suivreNoteDuResume`), sans relire le catalogue. Il reste en bas : ce qui
-arrive (la demande, la réponse de Claude) se met au-dessus.
+toutes les 2 s (`Fenetre.suivreNoteDuResume`), sans relire le catalogue. Il reste en haut : ce qui
+arrive (la demande, la réponse de Claude) se met sous lui.
 
 Essais : `Tests/Lua/Fenetre/essais-resume.lua` (ses textes et leurs caractères, les lectures
-groupées et une à une, la fenêtre : ouverture, autre photo, groupe, fin d'un tour, travail de
-Claude, note suivie, conversation vide ou sans photo, rappel par le menu, jamais gardé ni envoyé).
+groupées et une à une, sa place (pure, `Fil.tete` et `Fil.avecResume`), la fenêtre : photo neuve à
+l'ouverture puis sa première demande, photo reprise avec ses échanges et « Depuis la dernière
+fois », groupe, conversation sans historique ou d'avant le correctif, retour sur la même photo sans
+doublon, longue conversation ouverte sur son bas et lecteur remonté immobile, lu tout en haut qui
+y reste, autre photo, fin d'un tour, travail de Claude, note suivie, conversation vide ou sans
+photo, rappel par le menu, jamais gardé ni envoyé).
 
 ### Demande rapide (correctif 1.3.3, revue au correctif 1.3.6)
 
@@ -6233,10 +6261,11 @@ gagne deux fichiers (`Historique.lua`, `FenetreSuivi.lua`) : relancer Lightroom.
   la photo active se redresse avant d'être montrée ou marquée ; Agrandir remplit toujours
   2 000 × 1 250, en agrandissant une image plus petite, et redemande la photo active en grand au
   clic (une vignette de 2 048, sinon un rendu) ; le bouton Détail… de l'onglet Aperçu est retiré ;
-  un résumé en bas du fil, fait par la fenêtre à l'ouverture et à chaque autre photo ou autre
-  groupe, jamais gardé ni envoyé à Claude ; « ＋ Garder la demande » et la ligne « Demande à garder »
-  de Claude sont retirés (le menu Mes demandes reste). Voir Fenêtre B › Agrandir, Une photo, une
-  conversation (Le résumé en bas du fil) et Mes demandes.
+  un résumé en haut du fil (sous l'historique, au-dessus de la première demande ; d'abord en bas,
+  déplacé à la demande de Dany du même jour), fait par la fenêtre à l'ouverture et à chaque autre
+  photo ou autre groupe, jamais gardé ni envoyé à Claude ; « ＋ Garder la demande » et la ligne
+  « Demande à garder » de Claude sont retirés (le menu Mes demandes reste). Voir Fenêtre B ›
+  Agrandir, Une photo, une conversation (Le résumé en haut du fil) et Mes demandes.
 - **Retirés** : la leçon de la photo et « Je le fais », partout (voir leurs sections, gardées comme
   historique) ; dans le protocole, la commande `lecon`, `journal` avec `detaille`, `exercice` et
   `sans_rendu` d'`essayer`, `comparer = versionClaude` d'`apercu`.
@@ -6332,10 +6361,11 @@ dans Lightroom. Reste à constater :
     (`editCount` à 0), et Claude qui en tient compte sans le répéter.
 14. Plus rien sur l'étalonnage : `get_status` dans Claude Desktop ne dit que le nom de l'écran, et
     aucune remarque d'écran au premier aperçu d'une session.
-15. Le résumé en bas du fil : les textes que rendent les lectures groupées de Lightroom 15.6 pour la
+15. Le résumé en haut du fil : les textes que rendent les lectures groupées de Lightroom 15.6 pour la
     focale, l'ouverture, la vitesse et l'ISO (supposés ceux de `getFormattedMetadata`), la date à
-    l'heure locale, sa durée sur une sélection de 500 photos et plus, le résumé qui reste en bas
-    pendant que Claude écrit, refait à la fin du tour, et la note suivie après Accepter.
+    l'heure locale, sa durée sur une sélection de 500 photos et plus, le résumé qui reste entre
+    l'historique et la première demande pendant que Claude écrit, refait à la fin du tour sans
+    déplacer la page lue, et la note suivie après Accepter.
 
 ## Correctif 1.3.5 : huit chantiers de la feuille de route
 

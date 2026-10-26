@@ -1,15 +1,19 @@
--- essais-resume.lua : le résumé que la fenêtre Claude montre en bas du fil (correctif 1.3.6,
+-- essais-resume.lua : le résumé que la fenêtre Claude montre en haut du fil (correctif 1.3.6,
 -- deuxième retour de Dany du 25 octobre 2026), hors de Lightroom (LuaJIT, Lightroom simulé par
 -- Simulation.lua) : ses textes pour une photo (prise de vue, note et drapeau, état, reprises à la
 -- main, réglages hors de leur valeur par défaut) et pour un groupe (nombre, dates, appareils,
 -- retouchées par Claude, notées, rejetées) ; leurs lectures, groupées, sinon une à une (les
--- premières d'un grand groupe) ; dans la fenêtre : à l'ouverture, en bas du fil, sous l'historique
--- et sous l'aide d'une conversation vide, d'aucun élément ; refait quand une autre photo ou un autre
--- groupe change la conversation montrée, pas quand la photo active change dans le même groupe ;
--- jamais gardé dans la conversation, ni sur le disque, ni envoyé à Claude ; toujours en bas après
--- une demande, refait à la fin d'un tour de Claude, jamais pendant son travail ; la note et le
--- drapeau suivis sans relire le catalogue ; rien pour une conversation sans photo ; refait quand le
--- menu rappelle la fenêtre ; aucun caractère non mesuré.
+-- premières d'un grand groupe) ; dans la fenêtre : à l'ouverture, en haut du fil, sous l'historique
+-- de la photo ou le résumé court du groupe et au-dessus de la première demande de Dany (demandé par
+-- Dany le 25 octobre 2026, d'abord en bas du fil), en tête du fil sans eux (au-dessus de l'aide
+-- d'une conversation vide), d'aucun élément ; « Depuis la dernière fois » à sa place, sous lui ;
+-- jamais en double, au retour sur la même photo non plus ; la page montrée à l'ouverture, le bas
+-- du fil, et ce que lit un lecteur remonté, qu'il ne déplace pas (lu tout en haut, le fil y
+-- reste) ; refait quand une autre photo ou un autre groupe change la conversation montrée, pas
+-- quand la photo active change dans le même groupe ; jamais gardé dans la conversation, ni sur le disque, ni envoyé à Claude ; refait à la fin
+-- d'un tour de Claude, jamais pendant son travail ; la note et le drapeau suivis sans relire le
+-- catalogue ; rien pour une conversation sans photo ; refait quand le menu rappelle la fenêtre ;
+-- aucun caractère non mesuré.
 -- Le catalogue est complété ici, sans toucher Simulation.lua : des photos par identifiant, avec
 -- leur prise de vue (textes de Lightroom), leur date, leur note et leur drapeau, leur journal de
 -- Claude, editCount, lastEditTime et leurs réglages, et les trois lectures groupées du catalogue
@@ -294,20 +298,97 @@ local function demander(texte)
     return recus[#recus].message
 end
 
--- Les lignes du résumé dans le fil montré (Fenetre.lignes) : celles qui suivent la dernière ligne
--- d'un élément de la conversation (ou de l'aide), à partir de son en-tête.
+-- Vrai pour l'en-tête du résumé (« Résumé de la photo : … », « Résumé de la sélection : … »).
+local function enTeteDuResume(l)
+    return l.texte ~= nil and (l.texte:find(Historique.TITRE_RESUME .. ' : ', 1, true) ~= nil
+        or l.texte:find(Historique.TITRE_RESUME_GROUPE .. ' : ', 1, true) ~= nil)
+end
+
+-- Les lignes du résumé dans le fil montré (Fenetre.lignes) : son en-tête, puis ses puces, jusqu'à
+-- la ligne vide ou la ligne d'un élément qui le suit ; et le rang de son en-tête dans le fil.
 local function lignesDuResume()
-    local liste, dedans = {}, false
-    for _, l in ipairs(Fenetre.lignes or {}) do
-        if l.texte and (l.texte:find(Historique.TITRE_RESUME, 1, true) or l.texte:find(Historique.TITRE_RESUME_GROUPE, 1, true)) then
-            dedans = true
-            liste = {}
+    local liste, debut = {}, nil
+    for k, l in ipairs(Fenetre.lignes or {}) do
+        if not debut and enTeteDuResume(l) then
+            debut = k
         end
-        if dedans then
+        if debut then
+            if l.genre == 'vide' or l.element ~= nil then
+                break
+            end
             liste[#liste + 1] = l
         end
     end
-    return liste
+    return liste, debut
+end
+
+-- Combien de résumés le fil montré porte (un au plus).
+local function nombreDeResumes()
+    local n = 0
+    for _, l in ipairs(Fenetre.lignes or {}) do
+        if enTeteDuResume(l) then
+            n = n + 1
+        end
+    end
+    return n
+end
+
+-- Le rang dans le fil montré de la première et de la dernière ligne du premier élément de `c` de ce
+-- genre (et de cette sorte, pour un élément de la fenêtre) ; nil sans lui ou sans ligne.
+local function rangs(c, genre, sorte)
+    local indice
+    for i, e in ipairs(c.elements) do
+        if e.genre == genre and (sorte == nil or e.sorte == sorte) then
+            indice = i
+            break
+        end
+    end
+    local premier, dernier
+    for k, l in ipairs(Fenetre.lignes or {}) do
+        if indice and l.element == indice then
+            premier, dernier = premier or k, k
+        end
+    end
+    return premier, dernier
+end
+
+-- Le rang dans le fil montré de la ligne de ce texte (la première) ; nil sans elle.
+local function rangDuTexte(texte)
+    for k, l in ipairs(Fenetre.lignes or {}) do
+        if l.texte == texte then
+            return k
+        end
+    end
+    return nil
+end
+
+-- Les textes de la grille du fil (p.t1 à p.tN).
+local function grille(p)
+    local t = {}
+    for i = 1, Fenetre.T.lignes do
+        t[i] = p['t' .. i]
+    end
+    return table.concat(t, '\n')
+end
+
+-- Une conversation gardée de la photo `id` : son historique en tête (Moteur.preparerPhoto : s'il y
+-- en a un, et `avecHistorique`), puis `n` échanges (« Demande k », « Réponse k. ») ; ce qu'elle a vu
+-- de la photo (son état d'à présent).
+local function gardee(id, n, avecHistorique)
+    local c = Conversation.nouvelle()
+    if avecHistorique then
+        Moteur.preparerPhoto(c, id)
+    end
+    c.photo = id
+    for k = 1, n do
+        Conversation.ajouterDemande(c, 'Demande ' .. k)
+        c.elements[#c.elements + 1] = { id = 'claude-' .. id .. '-' .. k, genre = 'claude', texte = 'Réponse ' .. k .. '.', date = os.time(),
+            images = {}, changements = {} }
+    end
+    c.titre, c.titreAuto, c.modifiee = 'Photo ' .. id, true, os.time()
+    local etat = Historique.lire(id)
+    c.vu = etat and Historique.vu(etat) or nil
+    return c
 end
 
 local function texteDu(liste)
@@ -486,7 +567,7 @@ end)
 
 -- Dans la fenêtre ---------------------------------------------------------------------------------
 
-essai("Ouverture : le résumé de la photo en bas du fil, sous son historique, en gris (l'icône sur l'en-tête, les puces en retrait), d'aucun élément ni tour ; un clic n'y fait rien", function()
+essai("Photo neuve, à l'ouverture : le résumé de la photo en haut du fil, sous son historique, en gris (l'icône sur l'en-tête, les puces en retrait), d'aucun élément ni tour ; un clic n'y fait rien", function()
     photo301()
     lecturesGroupees(true)
     depart({})
@@ -495,9 +576,12 @@ essai("Ouverture : le résumé de la photo en bas du fil, sous son historique, e
         local c = Moteur.courante
         egal(301, c.photo)
         egal(1, lectures.photo, "lu une fois à l'ouverture")
-        local resume = lignesDuResume()
+        local resume, debut = lignesDuResume()
         vrai(#resume >= 6, "l'en-tête et ses puces : " .. #resume)
-        egal(Fenetre.lignes[#Fenetre.lignes], resume[#resume], 'en bas du fil')
+        local _, finHistorique = rangs(c, 'historique', 'historique')
+        egal(finHistorique + 2, debut, "sous l'historique, après une ligne vide")
+        egal(Fenetre.lignes[#Fenetre.lignes], resume[#resume], 'rien encore sous lui (aucune demande)')
+        egal(1, nombreDeResumes(), 'une seule fois')
         contient(resume[1].texte, 'Résumé de la photo : DSCF0301.RAF')
         egal('note', resume[1].icone, "l'icône sur l'en-tête")
         for k, l in ipairs(resume) do
@@ -530,11 +614,21 @@ essai("Ouverture : le résumé de la photo en bas du fil, sous son historique, e
         local taches = #S.taches
         Fenetre.cliquerLigne(derniere)
         egal(taches, #S.taches, 'aucune tâche')
+        -- La première demande de Dany (« Vous ») vient sous lui, pas au-dessus (capture de Dany du
+        -- 25 octobre 2026 : le résumé restait en bas, sous « Vous : ajuste la balance des blanc »).
+        demander('ajuste la balance des blanc')
+        voir()
+        Fenetre.rafraichir()
+        resume, debut = lignesDuResume()
+        egal(finHistorique + 2, debut, "toujours sous l'historique")
+        egal(debut + #resume + 1, rangs(c, 'dany'), 'au-dessus de « Vous »')
+        egal('dany', Fenetre.lignes[debut + #resume + 1].auteur, "« Vous » sur la ligne de la demande")
+        egal(1, nombreDeResumes())
     end)
     lecturesGroupees(false)
 end)
 
-essai("Jamais gardé ni envoyé : ni dans les éléments de la conversation, ni sur le disque, ni dans le message à Claude ; toujours en bas après la demande", function()
+essai("Jamais gardé ni envoyé : ni dans les éléments de la conversation, ni sur le disque, ni dans le message à Claude ; toujours entre l'historique et la première demande", function()
     photo301()
     depart({})
     choisir(301)
@@ -548,21 +642,25 @@ essai("Jamais gardé ni envoyé : ni dans les éléments de la conversation, ni 
         absent(message, 'Note et drapeau', 'le message à Claude')
         vrai(Fichiers.existe(Stockage.fichier(c.id)), 'gardée à sa première demande')
         absent(Fichiers.lire(Stockage.fichier(c.id)), Historique.TITRE_RESUME, 'le fichier de la conversation')
-        -- La réponse de Claude arrive : le résumé reste en bas, après elle.
+        -- La réponse de Claude arrive : le résumé reste en haut, entre l'historique et la demande ;
+        -- la réponse est en bas du fil.
         c.elements[#c.elements + 1] = { id = 'claude-1', genre = 'claude', texte = 'Voilà qui est fait.', date = os.time(), images = {}, changements = {} }
         voir()
         Fenetre.rafraichir()
-        local resume = lignesDuResume()
+        local resume, debut = lignesDuResume()
         vrai(#resume > 0, 'le résumé')
-        egal(Fenetre.lignes[#Fenetre.lignes], resume[#resume], 'toujours en bas')
-        local reponse
-        for k, l in ipairs(Fenetre.lignes) do
-            if l.texte == 'Voilà qui est fait.' then
-                reponse = k
-            end
+        local _, finHistorique = rangs(c, 'historique', 'historique')
+        local demande = rangs(c, 'dany')
+        local reponse = rangDuTexte('Voilà qui est fait.')
+        vrai(finHistorique and demande and reponse, "l'historique, la demande et la réponse dans le fil")
+        egal(finHistorique + 2, debut, "sous l'historique")
+        egal('vide', Fenetre.lignes[debut + #resume].genre, 'une ligne vide sous le résumé')
+        egal(debut + #resume + 1, demande, 'au-dessus de la demande de Dany')
+        vrai(demande < reponse, 'la réponse sous la demande')
+        for k = reponse + 1, #Fenetre.lignes do
+            egal('', Fenetre.lignes[k].texte, 'la réponse en bas du fil (puis la ligne de son heure)')
         end
-        vrai(reponse, 'la réponse de Claude')
-        vrai(reponse < #Fenetre.lignes - #resume, 'la réponse au-dessus du résumé')
+        egal(1, nombreDeResumes(), 'une seule fois')
     end)
 end)
 
@@ -655,17 +753,20 @@ essai("La note et le drapeau posés sur la photo active : le résumé les suit (
     end)
 end)
 
-essai("Une photo sans historique (conversation vide) : l'aide, puis le résumé ; une conversation sans photo (case Autre photo décochée) : l'aide seule", function()
+essai("Une photo sans historique (conversation vide) : le résumé en tête du fil, puis l'aide ; une conversation sans photo (case Autre photo décochée) : l'aide seule", function()
     photo(310, { appareil = 'X-T20', prise = le(2026, 9, 1) })
     depart({})
     choisir(310)
     ouvrir(function(p)
         egal(0, #Moteur.courante.elements, 'sans étape de Claude ni retouche : pas d\'historique')
-        egal(Fenetre.FIL_VIDE_TITRE, p.t2, "le titre de l'aide")
-        local resume = lignesDuResume()
-        contient(resume[1] and resume[1].texte, 'Résumé de la photo : DSCF0310.RAF')
+        local resume, debut = lignesDuResume()
+        egal(1, debut, 'en tête du fil')
+        contient(p.t1, 'Résumé de la photo : DSCF0310.RAF')
         contient(texteDu(resume), 'État : sans étape de Claude ni retouche')
-        egal(Fenetre.lignes[#Fenetre.lignes], resume[#resume], 'en bas, sous l\'aide')
+        egal('vide', Fenetre.lignes[#resume + 1].genre, 'une ligne vide sous le résumé')
+        egal(#resume + 2, rangDuTexte(Fenetre.FIL_VIDE_TITRE), "puis le titre de l'aide")
+        egal(Fenetre.FIL_VIDE_TITRE, p['t' .. (#resume + 2)])
+        egal(1, nombreDeResumes())
     end)
     -- La case décochée : la conversation montrée (vide, sans photo) reste ; aucun résumé.
     prefs.nouvelleParPhoto = false
@@ -701,6 +802,332 @@ essai("Le menu (ou ⌃⌥C) rappelle la fenêtre ouverte : le résumé se refait
     -- Une nouvelle ouverture : refait.
     ouvrir(function()
         egal(3, lectures.photo, "refait à l'ouverture")
+    end)
+end)
+
+-- La place du résumé (demandé par Dany le 25 octobre 2026 : « en haut des réponses, entre
+-- historique et vous », d'abord en bas du fil) ------------------------------------------------------
+
+-- Les éléments de la fenêtre de `c`, de cette sorte ('historique', 'depuis', 'groupe').
+local function sortes(c, sorte)
+    local n = 0
+    for _, e in ipairs(c.elements) do
+        if e.genre == 'historique' and e.sorte == sorte then
+            n = n + 1
+        end
+    end
+    return n
+end
+
+essai("Place du résumé (pur) : sous les éléments de tête (historique de la photo, résumé court du groupe), jamais sous « Depuis la dernière fois » ; en tête sans eux ; une ligne vide de chaque côté ; les lignes du fil inchangées", function()
+    local function element(genre, sorte)
+        return { genre = genre, sorte = sorte }
+    end
+    egal(1, Fil.tete({ elements = { element('historique', 'historique'), element('dany'), element('claude') } }))
+    egal(1, Fil.tete({ elements = { element('historique', 'groupe'), element('dany') } }))
+    egal(1, Fil.tete({ elements = { element('historique', 'historique'), element('historique', 'depuis'), element('dany') } }),
+        '« Depuis » ajouté plus tard : sous le résumé')
+    egal(0, Fil.tete({ elements = { element('historique', 'depuis'), element('dany') } }))
+    egal(0, Fil.tete({ elements = { element('dany'), element('claude'), element('historique', 'historique') } }),
+        "l'historique rejoint après une session perdue (Moteur.envoyer) : à sa place, dans le fil")
+    egal(0, Fil.tete({ elements = {} }))
+    egal(0, Fil.tete(nil))
+    -- Les lignes : l'historique (élément 1), une ligne vide, la demande (élément 2).
+    local h1 = { genre = 'note', texte = 'Historique de la photo : …', element = 1, icone = 'note' }
+    local h2 = { genre = 'note', texte = '•  une étape', element = 1 }
+    local vide = { genre = 'vide', texte = '' }
+    local dany = { genre = 'dany', texte = 'Retouche-la', element = 2, auteur = 'dany' }
+    local heure = { genre = 'vide', texte = '', heure = '19 h 42' }
+    local r1, r2 = { genre = 'note', texte = 'Résumé de la photo : A', icone = 'note' }, { genre = 'note', texte = '•  Note' }
+    local c = { elements = { element('historique', 'historique'), element('dany') } }
+    local lignes = { h1, h2, vide, dany, heure }
+    local avec = Fil.avecResume(lignes, { r1, r2 }, c)
+    egal(8, #avec)
+    egal(h1, avec[1])
+    egal(h2, avec[2])
+    egal('vide', avec[3].genre)
+    egal(r1, avec[4], 'sous l\'historique, après une ligne vide')
+    egal(r2, avec[5])
+    egal(vide, avec[6], 'la ligne vide qui suivait l\'historique')
+    egal(dany, avec[7], 'au-dessus de la demande, ses lignes telles quelles')
+    egal(heure, avec[8])
+    egal(5, #lignes, 'les lignes du fil inchangées')
+    -- Sans élément de tête : en tête, puis une ligne vide avant la demande.
+    avec = Fil.avecResume({ dany, heure }, { r1, r2 }, { elements = { element('dany') } })
+    egal(r1, avec[1])
+    egal('vide', avec[3].genre)
+    egal(dany, avec[4])
+    egal(5, #avec)
+    -- L'aide d'une conversation vide commence par une ligne vide : aucune autre.
+    local aide = { vide, { genre = 'titre', texte = 'Demandez à Claude.' } }
+    avec = Fil.avecResume(aide, { r1 }, { elements = {} })
+    egal(3, #avec)
+    egal(r1, avec[1])
+    egal(vide, avec[2])
+    egal('titre', avec[3].genre)
+    -- Seul l'historique : le résumé sous lui, rien après.
+    avec = Fil.avecResume({ h1, h2 }, { r1 }, { elements = { element('historique', 'historique') } })
+    egal(4, #avec)
+    egal(r1, avec[4])
+    -- Sans résumé : les mêmes lignes.
+    egal(lignes, Fil.avecResume(lignes, {}, c))
+end)
+
+essai("Photo reprise, avec ses échanges puis « Depuis la dernière fois » : le résumé entre l'historique et la première demande ; le complément à sa place, sous la dernière réponse ; une seule fois", function()
+    local p = photo301()
+    photo(302, { appareil = 'X-T20', prise = le(2026, 10, 3) })
+    depart({})
+    choisir(301)
+    ouvrir(function(grilleFil)
+        local c = Moteur.courante
+        demander('Retouche-la')
+        c.elements[#c.elements + 1] = { id = 'claude-r1', genre = 'claude', texte = 'Lumière remontée.', date = os.time(), images = {}, changements = {} }
+        demander('Et le ciel ?')
+        c.elements[#c.elements + 1] = { id = 'claude-r2', genre = 'claude', texte = 'Ciel assombri.', date = os.time(), images = {}, changements = {} }
+        -- Plus tard : une autre photo ; la 301 reprise à la main ; puis de retour sur elle.
+        Moteur.finTravail = os.time() - 60
+        choisir(302)
+        voir()
+        egal(302, Moteur.courante.photo, 'une autre photo')
+        retoucherALaMain(p, 'Shadows2012', 15)
+        choisir(301)
+        voir()
+        egal(c, Moteur.courante, 'sa conversation reprise')
+        egal(1, sortes(c, 'historique'))
+        egal(1, sortes(c, 'depuis'), 'le complément, ajouté à la fin')
+        local resume, debut = lignesDuResume()
+        contient(resume[1] and resume[1].texte, 'Résumé de la photo : DSCF0301.RAF')
+        contient(texteDu(resume), 'Ombres 0 → 15', 'refait pour la photo reprise')
+        local _, finHistorique = rangs(c, 'historique', 'historique')
+        local demande = rangs(c, 'dany')
+        local reponse1, reponse2 = rangDuTexte('Lumière remontée.'), rangDuTexte('Ciel assombri.')
+        local depuis = rangs(c, 'historique', 'depuis')
+        vrai(finHistorique and demande and reponse1 and reponse2 and depuis, 'tout est dans le fil')
+        egal(finHistorique + 2, debut, "sous l'historique")
+        egal(debut + #resume + 1, demande, 'au-dessus de la première demande')
+        vrai(demande < reponse1 and reponse1 < reponse2 and reponse2 < depuis, 'les échanges, puis le complément')
+        egal(1, nombreDeResumes(), 'une seule fois')
+        contient(grilleFil.t1, 'Historique de la photo', "l'historique en tête de la grille")
+        -- Rafraîchi, puis de nouveau une autre photo et de retour : jamais en double, toujours à sa
+        -- place ; rien de changé, aucun complément de plus.
+        Fenetre.rafraichir()
+        Fenetre.rafraichir()
+        egal(1, nombreDeResumes())
+        choisir(302)
+        voir()
+        choisir(301)
+        voir()
+        egal(c, Moteur.courante)
+        egal(1, sortes(c, 'depuis'), 'rien de changé : rien ajouté')
+        egal(1, nombreDeResumes(), 'au retour sur la photo, une seule fois')
+        resume, debut = lignesDuResume()
+        egal(finHistorique + 2, debut, 'à la même place')
+        egal(debut + #resume + 1, rangs(c, 'dany'))
+    end)
+end)
+
+essai("Groupe : le résumé de la sélection sous le résumé court du groupe, au-dessus de la première demande", function()
+    photo301()
+    photo(302, { appareil = 'X-T20', prise = le(2026, 10, 3), pickStatus = -1 })
+    photo(303, { appareil = 'X-H2S', prise = le(2026, 10, 12), note = 2 })
+    depart({})
+    choisir(301, 302, 303)
+    ouvrir(function(grilleFil)
+        local c = Moteur.courante
+        vrai(c.groupe ~= nil, 'la conversation du groupe')
+        egal(1, sortes(c, 'groupe'))
+        contient(grilleFil.t1, 'de ces 3 photos', 'le résumé court en tête')
+        local resume, debut = lignesDuResume()
+        contient(resume[1] and resume[1].texte, 'Résumé de la sélection : 3 photos')
+        local _, finGroupe = rangs(c, 'historique', 'groupe')
+        egal(finGroupe + 2, debut, 'sous le résumé court du groupe')
+        demander('Harmonise-les')
+        voir()
+        Fenetre.rafraichir()
+        egal(c, Moteur.courante, 'le même groupe')
+        resume, debut = lignesDuResume()
+        egal(finGroupe + 2, debut)
+        egal(debut + #resume + 1, rangs(c, 'dany'), 'au-dessus de la demande')
+        egal(1, nombreDeResumes())
+    end)
+end)
+
+essai("Conversation sans historique (une photo sans étape ni retouche, une conversation d'avant le correctif) : le résumé en tête du fil, au-dessus de la première demande", function()
+    -- Sans étape de Claude ni retouche : Moteur.preparerPhoto n'y met pas d'historique.
+    photo(320, { appareil = 'X-T20', prise = le(2026, 9, 2) })
+    local c320 = gardee(320, 2, true)
+    egal(0, sortes(c320, 'historique'), "pas d'historique")
+    depart({ c320 })
+    choisir(320)
+    ouvrir(function(grilleFil)
+        egal(c320, Moteur.courante)
+        egal('dany', c320.elements[1].genre, "aucun élément de la fenêtre en tête")
+        local resume, debut = lignesDuResume()
+        egal(1, debut, 'en tête du fil')
+        contient(grilleFil.t1, 'Résumé de la photo : DSCF0320.RAF')
+        egal('vide', Fenetre.lignes[#resume + 1].genre)
+        egal(#resume + 2, rangs(c320, 'dany'), 'au-dessus de la première demande')
+        egal(1, nombreDeResumes())
+    end)
+    -- Une conversation d'avant le correctif : sa photo a des étapes de Claude, mais elle n'a pas
+    -- d'élément « Historique de la photo ».
+    local p321 = photo(321, { appareil = 'X-H2S', prise = le(2026, 9, 3) })
+    journal(p321, { etape('2026-10-20 09:00', 'passe 1 : lumière', 'Sombre.') })
+    retoucheeParClaude(p321)
+    local c321 = gardee(321, 1, false)
+    depart({ c321 })
+    choisir(321)
+    ouvrir(function(grilleFil)
+        egal(c321, Moteur.courante)
+        egal(0, sortes(c321, 'historique'))
+        local resume, debut = lignesDuResume()
+        egal(1, debut, 'en tête du fil')
+        contient(grilleFil.t1, 'Résumé de la photo : DSCF0321.RAF')
+        contient(texteDu(resume), 'État : 1 étape de Claude')
+        egal(#resume + 2, rangs(c321, 'dany'))
+    end)
+end)
+
+essai("Retour sur la même photo (sa conversation neuve, pas encore gardée) : un seul historique, un seul résumé, à sa place ; rafraîchi, rappelé par le menu, rouvert : jamais en double", function()
+    photo301()
+    photo(302, { appareil = 'X-T20', prise = le(2026, 10, 3) })
+    depart({})
+    choisir(301)
+    ouvrir(function()
+        choisir(302)
+        voir()
+        choisir(301)
+        voir()
+        local c = Moteur.courante
+        egal(301, c.photo)
+        egal(1, sortes(c, 'historique'), 'un seul historique')
+        egal(1, nombreDeResumes(), 'un seul résumé')
+        local _, finHistorique = rangs(c, 'historique', 'historique')
+        local _, debut = lignesDuResume()
+        egal(finHistorique + 2, debut)
+        Fenetre.rafraichir()
+        Fenetre.rafraichir()
+        egal(1, nombreDeResumes(), 'rafraîchi')
+        -- Le menu (ou ⌃⌥C) rappelle la fenêtre : le résumé se refait, une seule fois.
+        Fenetre.afficher()
+        S.taches[#S.taches]()
+        Fenetre.rafraichir()
+        egal(1, nombreDeResumes(), 'rappelée par le menu')
+        egal(1, sortes(c, 'historique'))
+        -- Une demande la garde ; une autre photo, puis de retour : sa conversation, son historique et
+        -- son résumé une seule fois chacun, le résumé entre eux et la demande.
+        demander('Retouche-la')
+        Moteur.finTravail = os.time() - 60
+        choisir(302)
+        voir()
+        choisir(301)
+        voir()
+        egal(c, Moteur.courante, 'sa conversation gardée, reprise')
+        egal(1, sortes(c, 'historique'))
+        egal(1, nombreDeResumes(), 'au retour, une seule fois')
+        local resume
+        resume, debut = lignesDuResume()
+        egal(finHistorique + 2, debut)
+        egal(debut + #resume + 1, rangs(c, 'dany'), 'au-dessus de la demande')
+    end)
+    ouvrir(function()
+        egal(301, Moteur.courante.photo)
+        egal(1, sortes(Moteur.courante, 'historique'))
+        egal(1, nombreDeResumes(), 'rouverte')
+        local resume, debut = lignesDuResume()
+        egal(debut + #resume + 1, rangs(Moteur.courante, 'dany'), 'rouverte : au-dessus de la demande')
+    end)
+end)
+
+essai("Longue conversation : la page montrée à l'ouverture est le bas du fil (la dernière réponse), le résumé plus haut ; un lecteur remonté ne bouge pas quand le résumé se refait plus long en haut et qu'un « Depuis » arrive en bas", function()
+    local p = photo(330, { appareil = 'X-H2S', prise = le(2026, 10, 20) })
+    journal(p, { etape('2026-10-24 10:02', 'passe 1 : lumière', 'Sous-exposée.') })
+    p.editCount, p.lastEditTime, p.reglages.Exposure2012 = 1, 50, 0.3
+    apresClaude(p, 'passe 1 : lumière', { Exposure2012 = 0.3, Shadows2012 = 0 })
+    retoucheeParClaude(p)
+    local c = gardee(330, 30, true)
+    egal(1, sortes(c, 'historique'), "l'historique en tête")
+    depart({ c })
+    choisir(330)
+    ouvrir(function(grilleFil)
+        egal(c, Moteur.courante)
+        egal(0, Fenetre.defilement, 'depuis le bas')
+        local _, debut = lignesDuResume()
+        vrai(debut and debut < Fenetre.premiere, 'le résumé plus haut, hors de la page montrée')
+        egal(#Fenetre.lignes, Fenetre.premiere + Fenetre.T.lignes - 1, 'la page du bas')
+        vrai(rangDuTexte('Réponse 30.') >= Fenetre.premiere, 'la dernière réponse montrée')
+        absent(grille(grilleFil), Historique.TITRE_RESUME, 'le résumé hors de la page')
+        egal(false, grilleFil.peutDescendre)
+        egal(true, grilleFil.peutMonter)
+        -- Remonté de 5 lignes, Dany lit ; la photo reprise à la main, la fenêtre rappelée par le menu :
+        -- le résumé se refait plus long (en haut), « Depuis la dernière fois » arrive (en bas).
+        Fenetre.defiler(5)
+        local lue = grille(grilleFil)
+        local avant = #lignesDuResume()
+        retoucherALaMain(p, 'Shadows2012', 15)
+        Fenetre.afficher()
+        S.taches[#S.taches]()
+        Fenetre.rafraichir()
+        vrai(#lignesDuResume() > avant, string.format('le résumé refait plus long : %d puis %d lignes', avant, #lignesDuResume()))
+        egal(1, sortes(c, 'depuis'), 'le complément, en bas')
+        egal(lue, grille(grilleFil), 'ce que le lecteur lit ne bouge pas')
+        vrai(Fenetre.defilement > 5, 'les lignes arrivées en bas comptent, pas celles du résumé')
+        -- En bas du fil : le complément.
+        Fenetre.defiler('fin')
+        contient(grille(grilleFil), 'Depuis la dernière fois : des reprises à la main.')
+    end)
+end)
+
+essai("Longue conversation lue tout en haut : le fil y reste quand le résumé se refait plus long (l'historique toujours en première ligne), puis un pas vers le bas le fait quitter", function()
+    local p = photo(331, { appareil = 'X-H2S', prise = le(2026, 10, 20) })
+    journal(p, { etape('2026-10-24 10:02', 'passe 1 : lumière', 'Sous-exposée.') })
+    p.editCount, p.lastEditTime, p.reglages.Exposure2012 = 1, 50, 0.3
+    apresClaude(p, 'passe 1 : lumière', { Exposure2012 = 0.3, Shadows2012 = 0 })
+    retoucheeParClaude(p)
+    local c = gardee(331, 30, true)
+    depart({ c })
+    choisir(331)
+    ouvrir(function(grilleFil)
+        egal(c, Moteur.courante)
+        vrai(#Fenetre.lignes > Fenetre.T.lignes, 'plus long que la page')
+        -- Tout en haut : l'historique en première ligne, le résumé dans la page.
+        Fenetre.defiler(1000)
+        egal(1, Fenetre.premiere, 'tout en haut')
+        local premiere = rangs(c, 'historique')
+        egal(1, premiere, "l'historique en première ligne")
+        local _, debut = lignesDuResume()
+        vrai(debut and debut <= Fenetre.T.lignes, 'le résumé dans la page du haut')
+        egal(false, grilleFil.peutMonter)
+        -- Ce que la page montre au-dessus du résumé, son en-tête compris : l'historique de la photo.
+        local function hautDeLaPage()
+            local t = {}
+            for i = 1, debut do
+                t[i] = grilleFil['t' .. i]
+            end
+            return table.concat(t, '\n')
+        end
+        local lue = hautDeLaPage()
+        local avant = #lignesDuResume()
+        -- La photo reprise à la main, la fenêtre rappelée par le menu : le résumé se refait plus long
+        -- (en haut), « Depuis la dernière fois » arrive (en bas) ; le lecteur reste en haut.
+        retoucherALaMain(p, 'Shadows2012', 15)
+        Fenetre.afficher()
+        S.taches[#S.taches]()
+        Fenetre.rafraichir()
+        vrai(#lignesDuResume() > avant, string.format('le résumé refait plus long : %d puis %d lignes', avant, #lignesDuResume()))
+        egal(1, sortes(c, 'depuis'), 'le complément, en bas')
+        egal(1, Fenetre.premiere, 'toujours tout en haut')
+        egal(1, (rangs(c, 'historique')), "l'historique toujours en première ligne")
+        egal(false, grilleFil.peutMonter)
+        egal(debut, select(2, lignesDuResume()), 'le résumé à la même place')
+        egal(lue, hautDeLaPage(), "l'historique et l'en-tête du résumé ne bougent pas")
+        contient(grille(grilleFil), Historique.TITRE_RESUME .. ' : ', 'le résumé refait, dans la page du haut')
+        -- Un pas vers le bas (▼) quitte le haut : le fil descend de ce pas, il n'y est pas ramené.
+        Fenetre.defiler(-5)
+        egal(6, Fenetre.premiere, 'cinq lignes plus bas')
+        egal(true, grilleFil.peutMonter)
+        Fenetre.rafraichir()
+        egal(6, Fenetre.premiere, 'pas ramené en haut au rafraîchissement suivant')
     end)
 end)
 

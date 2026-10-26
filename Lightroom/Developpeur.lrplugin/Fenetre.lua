@@ -646,21 +646,28 @@ function Fenetre.repartir()
     return true
 end
 
--- Le résumé en bas du fil (deuxième retour de Dany du 25 octobre 2026) ---------------------------
+-- Le résumé en haut du fil (deuxième retour de Dany du 25 octobre 2026) --------------------------
 -- À l'ouverture de la fenêtre (et quand le menu ou ⌃⌥C la rappelle), et chaque fois qu'une autre
 -- photo ou un autre groupe change la conversation montrée, la fenêtre fait un résumé, sans Claude ni
--- jetons, montré en bas du fil, sous la conversation (Fenetre.ajouterResume) : pour une photo, sa
--- prise de vue, sa note et son drapeau, et son état ; pour plusieurs photos, leur nombre, leurs dates,
--- leurs appareils, et combien sont retouchées par Claude, notées, rejetées (Historique.lua, section
--- « Le résumé de la fenêtre » : lectures groupées du catalogue par appel direct, dans une tâche). Il
--- n'est pas gardé dans la conversation (ni sur le disque, ni envoyé à Claude) : `Fenetre.resume` {
--- conversation, photo ou groupe, donnees, texte, fin, versionNotation, perime }, refait à chaque
--- fois. Il est celui de la conversation montrée : de sa photo (c.photo), ou de la sélection si elle
--- est son groupe (c.groupe) ; rien pour une conversation sans photo ni groupe (la case Autre photo
--- décochée). Il se refait aussi à la fin d'un tour de Claude ou quand le registre des notes change
--- (la photo a pu changer : Fenetre.suivreResume, depuis la boucle), jamais pendant que Claude
--- travaille, sauf pour une autre conversation montrée ; la note et le drapeau d'une photo suivent ceux
--- que Fenetre.majPhoto lit toutes les 2 s (Fenetre.suivreNoteDuResume).
+-- jetons, montré en haut du fil, sous l'historique de la photo ou le résumé court du groupe qui
+-- ouvre la conversation et au-dessus de la première demande de Dany, sinon en tête du fil
+-- (Fenetre.ajouterResume, Fil.avecResume ; demandé par Dany le 25 octobre 2026 : d'abord en bas,
+-- sous la conversation) ; « Depuis la dernière fois », ajouté plus tard, reste à sa place, sous lui.
+-- La page du fil montrée reste le bas (la dernière réponse) : une conversation montrée l'est depuis
+-- le bas (conversationMontree), et le résumé refait ne déplace pas ce que lit un lecteur remonté :
+-- ce qui est sous lui garde sa place, et lu tout en haut, le fil reste en haut
+-- (Fenetre.rafraichirFil). Pour une photo, sa prise de vue, sa note et son drapeau, et son état ;
+-- pour plusieurs photos, leur nombre, leurs dates, leurs appareils, et combien sont retouchées par
+-- Claude, notées, rejetées (Historique.lua, section « Le résumé de la fenêtre » : lectures groupées
+-- du catalogue par appel direct, dans une tâche). Il n'est pas gardé dans la conversation (ni sur le
+-- disque, ni envoyé à Claude) : `Fenetre.resume` { conversation, photo ou groupe, donnees, texte,
+-- fin, versionNotation, perime }, refait à chaque fois. Il est celui de la conversation montrée : de
+-- sa photo (c.photo), ou de la sélection si elle est son groupe (c.groupe) ; rien pour une
+-- conversation sans photo ni groupe (la case Autre photo décochée). Il se refait aussi à la fin d'un
+-- tour de Claude ou quand le registre des notes change (la photo a pu changer : Fenetre.suivreResume,
+-- depuis la boucle), jamais pendant que Claude travaille, sauf pour une autre conversation montrée ;
+-- la note et le drapeau d'une photo suivent ceux que Fenetre.majPhoto lit toutes les 2 s
+-- (Fenetre.suivreNoteDuResume).
 Fenetre.resume = nil
 
 -- Fait le résumé de la conversation montrée (dans une tâche).
@@ -713,8 +720,12 @@ function Fenetre.suivreNoteDuResume(info)
     return true
 end
 
--- Ajoute à `lignes` (celles du fil de `c`) les lignes du résumé, s'il est celui de `c`, après une
--- ligne vide ; ses lignes se gardent tant que son texte et la largeur ne changent pas.
+-- Les lignes du fil de `c` (`lignes` : Fil.lignes, ou l'aide d'une conversation vide) avec celles
+-- du résumé, s'il est celui de `c` : en haut du fil, sous l'historique de la photo ou le résumé
+-- court du groupe qui ouvre la conversation, au-dessus de la première demande de Dany ; en tête du
+-- fil sans eux (Fil.avecResume ; demandé par Dany le 25 octobre 2026, d'abord en bas du fil). Rend
+-- une table neuve, ou `lignes` sans résumé. Ses lignes se gardent tant que son texte et la largeur
+-- ne changent pas.
 function Fenetre.ajouterResume(lignes, c)
     local r = Fenetre.resume
     if not (r and r.conversation == c and r.texte) then
@@ -724,13 +735,7 @@ function Fenetre.ajouterResume(lignes, c)
     if not (r.lignes and r.largeur == largeur and r.lignesDe == r.texte) then
         r.lignes, r.largeur, r.lignesDe = Fil.lignesResume(r.texte, largeur), largeur, r.texte
     end
-    if #r.lignes > 0 and lignes[#lignes] and lignes[#lignes].genre ~= 'vide' then
-        lignes[#lignes + 1] = { genre = 'vide', texte = '' }
-    end
-    for _, l in ipairs(r.lignes) do
-        lignes[#lignes + 1] = l
-    end
-    return lignes
+    return Fil.avecResume(lignes, r.lignes, c)
 end
 
 -- Fil -----------------------------------------------------------------------------------------
@@ -765,6 +770,11 @@ function Fenetre.rafraichirFil()
         return
     end
     local c = Moteur.courante
+    -- Lecteur tout en haut du fil (le défilement à son maximum, d'après les lignes montrées la
+    -- dernière fois, résumé compris : un pas vers le bas, Fenetre.defiler, l'a déjà quitté) : il y
+    -- reste quand le résumé se refait, plus long ou plus court.
+    local enHaut = Fenetre.conversationAffichee == c and Fenetre.defilement > 0 and Fenetre.lignes ~= nil
+        and Fenetre.defilement >= #Fenetre.lignes - T.lignes
     if Fenetre.conversationAffichee ~= c then
         Fenetre.defilement = 0
         Fenetre.cache = {}
@@ -773,18 +783,25 @@ function Fenetre.rafraichirFil()
         Fenetre.etape = nil
     end
     local lignes = c and Fil.lignes(c, Fenetre.largeurTexte(), Fenetre.cache) or {}
-    -- Une conversation vide : son titre et l'aide ; puis, sous la conversation, le résumé de la
-    -- fenêtre (Fenetre.resume).
+    -- Une conversation vide : son titre et l'aide.
     if #lignes == 0 then
         lignes = Fenetre.lignesAide()
     end
-    Fenetre.ajouterResume(lignes, c)
-    -- Lecteur remonté dans le fil : ce qui arrive ne déplace pas ce qu'il lit.
+    -- Lecteur remonté dans le fil : ce qui arrive (en bas) ne déplace pas ce qu'il lit. Le résumé de
+    -- la fenêtre n'y compte pas : il se met en haut du fil (Fenetre.ajouterResume), et ce qui est
+    -- sous lui garde sa place depuis le bas quand il se refait ; lu tout en haut, le fil reste en
+    -- haut (enHaut, plus bas).
     if Fenetre.defilement > 0 and Fenetre.total and #lignes > Fenetre.total then
         Fenetre.defilement = Fenetre.defilement + (#lignes - Fenetre.total)
     end
     Fenetre.conversationAffichee = c
     Fenetre.total = #lignes
+    -- Le résumé de la fenêtre (Fenetre.resume), en haut du fil : sous l'historique de la photo ou le
+    -- résumé court du groupe, au-dessus de la première demande de Dany.
+    lignes = Fenetre.ajouterResume(lignes, c)
+    if enHaut then
+        Fenetre.defilement = math.max(0, #lignes - T.lignes)
+    end
     Fenetre.lignes = lignes
     local premiere, defilement = Fil.fenetre(#lignes, T.lignes, Fenetre.defilement)
     Fenetre.defilement = defilement
@@ -4194,7 +4211,7 @@ function Fenetre.boucle(generation)
         tic = tic + 1
         local p = Fenetre.p
         if p then
-            -- Le résumé en bas du fil : celui de la conversation montrée, refait après un tour de
+            -- Le résumé en haut du fil : celui de la conversation montrée, refait après un tour de
             -- Claude (avant le rafraîchissement, qu'il demande).
             local okResume, erreurResume = LrTasks.pcall(Fenetre.suivreResume)
             if not okResume then
@@ -4436,7 +4453,7 @@ function Fenetre.afficher()
         Fenetre.rafraichir()
         Fenetre.majPhoto()
         LrTasks.pcall(Fenetre.revoirPhoto)
-        -- Le résumé en bas du fil, dès l'ouverture.
+        -- Le résumé en haut du fil, dès l'ouverture.
         LrTasks.pcall(Fenetre.suivreResume)
         -- La conversation de la photo choisie (Fenetre.suivreSelection) et le résumé se montrent dès
         -- l'ouverture.

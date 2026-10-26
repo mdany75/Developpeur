@@ -123,9 +123,12 @@ colonnes, avec les onglets Focus, Note, Aperçu et Proposition et le bouton Suiv
   réponse. ▲, ▼ et Fin pour
   s'y déplacer ; à droite, ce que fait Claude, sinon le dernier relevé du forfait (5 heures et
   semaine).
-- En bas du fil, toujours, le résumé que fait la fenêtre (sans Claude ni forfait), en gris : à
-  l'ouverture de la fenêtre, et chaque fois qu'une autre photo ou une autre sélection change la
-  conversation montrée. Pour une photo, « Résumé de la photo : … » : sa prise de vue (appareil,
+- En haut du fil, toujours, le résumé que fait la fenêtre (sans Claude ni forfait), en gris : sous
+  l'historique de la photo (ou le résumé court du groupe) et au-dessus de votre première demande
+  (« Vous »), en tête du fil s'il n'y a pas d'historique ; « Depuis la dernière fois » reste à sa
+  place, plus bas. Il se fait à l'ouverture de la fenêtre, et chaque fois qu'une autre photo ou une
+  autre sélection change la conversation montrée ; le fil, lui, s'ouvre toujours sur son bas (la
+  dernière réponse). Pour une photo, « Résumé de la photo : … » : sa prise de vue (appareil,
   objectif, focale, ouverture, vitesse, ISO, date, comme Lightroom les écrit), sa note et son drapeau
   (« 3 ★ · retenue »), son état (ses étapes de Claude, la dernière avec sa date, vos reprises à la
   main) et ses réglages hors de leur valeur par défaut. Pour plusieurs photos, « Résumé de la
@@ -1168,7 +1171,7 @@ Le module, avec LuaJIT : forme du module, syntaxe et globales de chaque fichier,
 `relais.sh`, liens entre les fichiers, puis deux suites, chacune sur son Lightroom simulé :
 `Tests/Lua/Liaison` (les commandes du connecteur, notes proposées, avant/après des étapes, carnet
 compris, leçons d'avant gardées telles quelles) et `Tests/Lua/Fenetre` (la fenêtre Claude avec un
-faux Claude Code, une photo une conversation, le résumé en bas du fil, la Demande rapide, ses
+faux Claude Code, une photo une conversation, le résumé en haut du fil, la Demande rapide, ses
 images et ses apparences, l'onglet Focus avec un faux connecteur (une photo verticale comprise),
 Agrandir avec le vrai `sips`, la fenêtre Suivi, Publication
 et Consommation) ;

@@ -20,10 +20,11 @@
 -- Lightroom qui s'écartent de leur valeur par défaut (Historique.ecarts ; demandé par Dany le
 -- 25 octobre 2026).
 --
--- Aussi le résumé que la fenêtre montre en bas du fil (deuxième retour de Dany du 25 octobre 2026,
--- section « Le résumé de la fenêtre » en bas de ce fichier) : la prise de vue, la note et l'état
--- d'une photo, ou les dates, les appareils et les comptes d'un groupe. Lui n'a que la forme du fil :
--- il n'est jamais gardé dans la conversation, ni envoyé à Claude.
+-- Aussi le résumé que la fenêtre montre en haut du fil, sous l'historique de la photo ou le résumé
+-- court du groupe (deuxième retour de Dany du 25 octobre 2026, section « Le résumé de la fenêtre »
+-- en bas de ce fichier) : la prise de vue, la note et l'état d'une photo, ou les dates, les
+-- appareils et les comptes d'un groupe. Lui n'a que la forme du fil : il n'est jamais gardé dans la
+-- conversation, ni envoyé à Claude.
 
 local LrApplication = import 'LrApplication'
 local LrDate = import 'LrDate'
@@ -676,13 +677,16 @@ end
 
 -- Le résumé de la fenêtre (deuxième retour de Dany du 25 octobre 2026) -------------------------
 -- À l'ouverture de la fenêtre Claude, et chaque fois qu'une autre photo ou un autre groupe change la
--- conversation montrée, la fenêtre fait un résumé, sans Claude ni jetons, montré en bas du fil
--- (Fenetre.resume, Fil.lignesResume) : pour une photo, sa prise de vue (appareil, objectif, focale,
--- ouverture, vitesse, ISO, date), sa note et son drapeau, et son état (ses étapes de Claude, ses
--- reprises à la main, ses réglages hors de leur valeur par défaut : ce que l'historique sait déjà) ;
--- pour plusieurs photos, leur nombre, leurs dates (de … à …), leurs appareils, et combien sont
--- retouchées par Claude, notées, rejetées. Il n'est pas gardé dans la conversation (ni sur le disque,
--- ni envoyé à Claude) : il n'a que la forme du fil, l'en-tête puis des puces, refaite à chaque fois.
+-- conversation montrée, la fenêtre fait un résumé, sans Claude ni jetons, montré en haut du fil :
+-- sous l'historique de la photo ou le résumé court du groupe qui ouvre la conversation, au-dessus de
+-- la première demande de Dany, sinon en tête du fil (Fenetre.resume, Fil.lignesResume,
+-- Fil.avecResume ; demandé par Dany le 25 octobre 2026, d'abord en bas, sous la conversation) : pour
+-- une photo, sa prise de vue (appareil, objectif, focale, ouverture, vitesse, ISO, date), sa note et
+-- son drapeau, et son état (ses étapes de Claude, ses reprises à la main, ses réglages hors de leur
+-- valeur par défaut : ce que l'historique sait déjà) ; pour plusieurs photos, leur nombre, leurs
+-- dates (de … à …), leurs appareils, et combien sont retouchées par Claude, notées, rejetées. Il
+-- n'est pas gardé dans la conversation (ni sur le disque, ni envoyé à Claude) : il n'a que la forme
+-- du fil, l'en-tête puis des puces, refaite à chaque fois.
 -- Les lectures se font par les lectures groupées du catalogue (batchGetFormattedMetadata,
 -- batchGetRawMetadata, batchGetPropertyForPlugin, comme Photos.decrireTout), dans une tâche ; si
 -- l'une échoue, les photos se lisent une à une, les MAX_GROUPE premières d'un groupe seulement. Les

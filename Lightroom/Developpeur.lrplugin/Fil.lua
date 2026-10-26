@@ -35,10 +35,13 @@
 -- Historique.lua) reprend le genre `note` (en gris, l'icône ⓘ sur sa première ligne), ses puces
 -- en retrait sur leurs lignes de suite ; il n'est d'aucun tour de parole (ni « Vous » ni « Claude »,
 -- ni heure : Fil.lignes).
--- Le résumé que la fenêtre montre en bas du fil (deuxième retour de Dany du 25 octobre 2026,
+-- Le résumé que la fenêtre montre en haut du fil (deuxième retour de Dany du 25 octobre 2026,
 -- Historique.resumePhoto et Historique.resumeGroupe, Fenetre.resume) se met en lignes comme un
 -- élément `historique` (Fil.lignesResume), mais n'est d'aucun élément de la conversation : un clic
--- n'y fait rien, et il n'est ni gardé ni envoyé à Claude.
+-- n'y fait rien, et il n'est ni gardé ni envoyé à Claude. Il se met sous l'historique de la photo
+-- ou le résumé court du groupe qui ouvre la conversation, au-dessus de la première demande de Dany,
+-- sinon en tête du fil (Fil.avecResume ; d'abord en bas, sous la conversation, jusqu'à la demande
+-- de Dany du 25 octobre 2026).
 -- Une demande faite par la Demande rapide dans la conversation d'une photo (correctif 1.3.6,
 -- Moteur.envoyerRapide : elle et ce qui y répond portent `rapide`) se dit d'une ligne « Demande
 -- rapide » sous son texte (Fil.MENTION_RAPIDE, en note, comme le style choisi).
@@ -824,6 +827,57 @@ function Fil.lignesResume(texte, largeur)
         return {}
     end
     return Fil.lignesElement({ genre = 'historique', texte = texte }, nil, largeur - Fil.MARGE)
+end
+
+-- Le nombre d'éléments qui ouvrent la conversation `c` et sous lesquels le résumé de la fenêtre se
+-- met (Fil.avecResume) : ses éléments `historique` de tête, « Historique de la photo » (sorte
+-- 'historique') ou le résumé court d'un groupe ('groupe') ; 0 sans eux. « Depuis la dernière
+-- fois » ('depuis') n'en est jamais : ajouté plus tard, il reste à sa place, sous le résumé.
+function Fil.tete(c)
+    local n = 0
+    for _, e in ipairs(type(c) == 'table' and c.elements or {}) do
+        if e.genre ~= 'historique' or e.sorte == 'depuis' then
+            break
+        end
+        n = n + 1
+    end
+    return n
+end
+
+-- Les lignes du fil de `c` (`lignes` : Fil.lignes, ou l'aide d'une conversation vide) avec celles du
+-- résumé de la fenêtre (`resume` : Fil.lignesResume), en table neuve (demandé par Dany le 25 octobre
+-- 2026 : « en haut des réponses, entre historique et vous ») : sous les lignes des éléments de tête
+-- (Fil.tete), après une ligne vide, et au-dessus de la première demande de Dany ; en tête du fil sans
+-- eux (au-dessus de l'aide d'une conversation vide). Une ligne vide le sépare de ce qui suit ; les
+-- lignes de `lignes` ne changent pas (ni copiées : leur élément, leur auteur, leur heure restent).
+function Fil.avecResume(lignes, resume, c)
+    if #(resume or {}) == 0 then
+        return lignes
+    end
+    local tete = Fil.tete(c)
+    local fin = 0
+    for k, l in ipairs(lignes) do
+        if l.element and l.element <= tete then
+            fin = k
+        end
+    end
+    local r = {}
+    for k = 1, fin do
+        r[#r + 1] = lignes[k]
+    end
+    if fin > 0 then
+        r[#r + 1] = { genre = 'vide', texte = '' }
+    end
+    for _, l in ipairs(resume) do
+        r[#r + 1] = l
+    end
+    if lignes[fin + 1] and lignes[fin + 1].genre ~= 'vide' then
+        r[#r + 1] = { genre = 'vide', texte = '' }
+    end
+    for k = fin + 1, #lignes do
+        r[#r + 1] = lignes[k]
+    end
+    return r
 end
 
 -- Suivi : le carnet de progrès (correctif 1.3.6) --------------------------------------------------
