@@ -212,11 +212,14 @@ inchangé.
 
 Le correctif 1.3.7, le Suivi en graphiques (décidé avec Dany le 25 octobre 2026 pendant les essais
 de la 1.3.6 ; fiche `build/conception/1-3-7-a-faire.md`, contrat figé dans
-`Tests/Contrats/suivi.json`), publié avec la 1.3.6 qu'il contient : la section « ## 1.3.6 —
-2026-10-25 » de `CHANGELOG.md` est devenue « ## 1.3.7 — 2026-10-25 », qui commence par lui puis
-reprend la 1.3.6 en disant qu'elle a été essayée par Dany mais jamais publiée seule (la date sera
-celle de la publication ; les trois numéros passent à 1.3.7 avant `build.sh`, qui refuse tant
-qu'ils diffèrent de la section). Toute photo ouverte dans la fenêtre Claude ou la Demande rapide
+`Tests/Contrats/suivi.json`), publié avec la 1.3.6 qu'il contient : la section « ## 1.3.7 —
+2026-10-26 » de `CHANGELOG.md` commence par lui puis reprend la 1.3.6 en disant qu'elle a été
+essayée par Dany mais jamais publiée seule. Publié le 26 octobre 2026 vers 1 h 30 sur l'ordre de
+Dany (« fini la 1.3.7 et capture publie »), après les deux suites, sa recette (85 étapes : celles de
+la leçon et de « Je le fais » retirées) et `--graphiques` de l'exécutable installé essayé sur les
+exemples du contrat, mais sans l'essai dans la fenêtre Claude ni les captures : l'accès de Claude à
+Lightroom (contrôle de l'écran) a été refusé cette nuit-là ; restent l'essai réel, la fenêtre Suivi
+sur de vraies photos et `docs/capture.png` et `docs/carnet.png`, à faire avec l'accord de Dany. Toute photo ouverte dans la fenêtre Claude ou la Demande rapide
 entre au relevé du Suivi par son original (`Releve.lua`, `suivi.json`) et s'analyse d'office, sans
 Claude ni jetons, par `mcp-developpeur --analyser` sur la vignette du cache de Lightroom ; la
 fenêtre Suivi montre le relevé et le carnet en graphiques dessinés par `--graphiques`, avec 68
@@ -224,9 +227,9 @@ calques posés une fois pour toutes (puce La fenêtre Suivi) ; Publication… et
 reviennent dans l'en-tête, à droite de Suivi ; `PriseDeVue` gagne `yeux_fermes` (17 codes). Le
 carnet en texte de la fenêtre Suivi (`Fil.texteSuivi`) est retiré. Le module gagne `Releve.lua`
 (trois fichiers depuis la 1.3.5 : quitter et relancer Lightroom), le connecteur `Suivi.swift`,
-`SuiviGraphiques.swift` et `SuiviDessin.swift`, sans outil nouveau (35). Avant le tag : la
-recette, puis l'essai réel dans la fenêtre Claude et la Demande rapide, et la fenêtre Suivi sur de
-vraies photos (ce que `docs/SPEC.md`, Correctif 1.3.7, garde à constater).
+`SuiviGraphiques.swift` et `SuiviDessin.swift`, sans outil nouveau (35). À constater après la
+publication : l'essai réel dans la fenêtre Claude et la Demande rapide, et la fenêtre Suivi sur de
+vraies photos (`docs/SPEC.md`, Correctif 1.3.7).
 
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 
