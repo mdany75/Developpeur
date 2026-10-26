@@ -9,6 +9,7 @@ local LrTasks = import 'LrTasks'
 local Chemins = require 'Chemins'
 local Conversation = require 'Conversation'
 local Fichiers = require 'Fichiers'
+local Geometrie = require 'Geometrie'
 local Journal = require 'Journal'
 local Json = require 'Json'
 local Texte = require 'Texte'
@@ -105,6 +106,79 @@ function Images.dimensions(chemin)
     return l, h
 end
 
+-- Une vignette toujours à l'endroit (correctif 1.3.6, retour de Dany du 25 octobre 2026). Juste
+-- après une retouche, Lightroom refuse les vignettes de 512 px et plus et rend encore celle de 256
+-- (Fenetre.TAILLE_SECOURS_FOCUS) ; pour une photo verticale (XH2S0407.RAF (Copie 1), 4160 × 6240),
+-- elle était couchée : 320 × 213, le fichier avant le quart de tour de Lightroom, l'image de Focus et
+-- d'Agrandir couchées. Les autres vignettes sont tournées (1 146 × 1 720, 573 × 860), et aucune ne
+-- porte de balise d'orientation (relevé le même jour dans Temporaire/PhotoActive). Une vignette qui
+-- n'a pas les proportions de la photo telle que Lightroom l'affiche (Vignettes.decrireVignette :
+-- dimensions, orientation et cadre, passés par Geometrie.apercu), mais celles du fichier avant son
+-- quart de tour, se tourne de ce quart de tour avant d'être montrée ou marquée (le connecteur dessine
+-- ses cadres dans l'image affichée). Un demi-tour (CD) ne se voit pas aux proportions : il reste.
+-- La vignette de secours peut dater d'avant la retouche (l'aperçu n'est pas refait) : une photo que
+-- la retouche vient de recadrer (en 4:5, par exemple) la rend encore aux proportions de la photo
+-- entière, couchée (320 × 213). Elle se compare donc aussi à la photo entière, sans le cadre
+-- (dimensions de la géométrie) : couchée à l'une ou à l'autre, elle se tourne.
+Images.ECART_PROPORTIONS = 0.08 -- écart toléré entre deux proportions, en logarithme (environ 8 %)
+
+-- La rotation qui manque à une vignette de `largeur` × `hauteur` pixels (pur) : 90 ou 270, en degrés
+-- dans le sens des aiguilles d'une montre (ceux de sips -r), ou nil (déjà à l'endroit, carrée,
+-- proportions qui ne sont ni l'une ni l'autre, géométrie inconnue, pas de quart de tour). BC tourne
+-- le fichier d'un quart dans le sens des aiguilles, DA dans l'autre (Recadrage.versAffichage).
+-- D'abord le cadre actuel : debout à ce cadre, elle reste (même si elle est aussi couchée à la photo
+-- entière : un portrait recadré en paysage) ; couchée à ce cadre, elle se tourne. Puis la photo
+-- entière : couchée, et plus près que debout, elle se tourne (une vignette debout d'avant le cadre
+-- reste).
+function Images.rotationManquante(largeur, hauteur, geometrie)
+    largeur, hauteur = tonumber(largeur), tonumber(hauteur)
+    if not largeur or not hauteur or largeur <= 0 or hauteur <= 0 or type(geometrie) ~= 'table' then
+        return nil
+    end
+    local quart = ({ BC = 90, DA = 270 })[geometrie.orientation]
+    if not quart then
+        return nil
+    end
+    local ok, ctx = pcall(Geometrie.contexte, geometrie.largeur, geometrie.hauteur, geometrie.orientation, geometrie.cadre)
+    if not ok then
+        return nil
+    end
+    local la, ha = Geometrie.apercu(ctx)
+    if not (la > 0 and ha > 0) then
+        return nil
+    end
+    local ecart, affichee = math.log(largeur / hauteur), math.log(la / ha)
+    local droite, couchee = math.abs(ecart - affichee), math.abs(ecart + affichee)
+    if droite <= Images.ECART_PROPORTIONS and droite <= couchee then
+        return nil
+    end
+    if couchee < droite and couchee <= Images.ECART_PROPORTIONS then
+        return quart
+    end
+    -- La photo entière (sans le cadre), affichée à `largeur` × `hauteur` de la géométrie.
+    local entiere = math.log(tonumber(geometrie.largeur) / tonumber(geometrie.hauteur))
+    local droiteEntiere, coucheeEntiere = math.abs(ecart - entiere), math.abs(ecart + entiere)
+    if coucheeEntiere < droiteEntiere and coucheeEntiere <= Images.ECART_PROPORTIONS then
+        return quart
+    end
+    return nil
+end
+
+-- Remet à l'endroit, sur place (sips -r), une vignette couchée de la photo de géométrie `geometrie`
+-- (Images.rotationManquante). Rend son chemin, et les degrés tournés (nil : rien à tourner, ou
+-- illisible).
+function Images.redresser(chemin, geometrie)
+    if type(chemin) ~= 'string' or not Fichiers.existe(chemin) then
+        return chemin
+    end
+    local l, h = Images.dimensions(chemin)
+    local degres = Images.rotationManquante(l, h, geometrie)
+    if degres and executer(string.format('/usr/bin/sips -r %d %s --out %s >/dev/null 2>&1', degres, q(chemin), q(chemin))) then
+        return chemin, degres
+    end
+    return chemin
+end
+
 -- Le point de mise au point d'un fichier Fujifilm dessiné sur sa vignette (l'aperçu de la photo
 -- active) par le connecteur, qui lit l'original (`mcp-developpeur --marquer-af`, temps borné) :
 -- `geometrie` comme la décrit Vignettes.decrireVignette. Rend le chemin de la vignette marquée
@@ -163,21 +237,23 @@ function Images.lireFocus(connecteur, original, geometrie, source)
     return json, (json.dessinee == true and Fichiers.existe(sortie)) and sortie or nil
 end
 
--- La version à montrer en grand (Agrandir), qui tient dans largeurMax × hauteurMax : chemin,
--- largeur, hauteur. Une image plus grande est réduite (sips, rangée dans .vignettes à côté) ; une
--- image qui y tient est montrée à sa vraie taille, jamais étirée ni recompressée : son propre
--- chemin et ses dimensions (correctif 1.3.6, décision de Dany du 25 octobre 2026). nil : illisible.
+-- La version à montrer en grand (Agrandir), qui remplit largeurMax × hauteurMax à ses proportions :
+-- chemin, largeur, hauteur. Une image plus grande est réduite, une plus petite agrandie (un peu plus
+-- douce, jamais minuscule : retour de Dany du 25 octobre 2026, qui voyait la vignette de secours de
+-- 320 × 213 à sa vraie taille), par sips, rangée dans .vignettes à côté ; une image qui a déjà la
+-- taille : son propre chemin. nil : illisible.
 function Images.grande(dossier, nom, largeurMax, hauteurMax)
     local source = LrPathUtils.child(dossier, nom)
     local l, h = Images.dimensions(source)
     if not l or not h then
         return nil
     end
-    if l <= largeurMax and h <= hauteurMax then
+    local echelle = math.min(largeurMax / l, hauteurMax / h)
+    local lf = math.max(1, math.min(largeurMax, math.floor(l * echelle + 0.5)))
+    local hf = math.max(1, math.min(hauteurMax, math.floor(h * echelle + 0.5)))
+    if lf == l and hf == h then
         return source, l, h
     end
-    local echelle = math.min(largeurMax / l, hauteurMax / h)
-    local lf, hf = math.max(1, math.floor(l * echelle)), math.max(1, math.floor(h * echelle))
     local base = LrPathUtils.removeExtension(LrPathUtils.leafName(nom))
     local destination = LrPathUtils.child(LrPathUtils.child(dossier, '.vignettes'), string.format('%s-%dx%d.jpg', base, lf, hf))
     if not Fichiers.existe(destination) then

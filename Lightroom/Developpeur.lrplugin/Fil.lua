@@ -5,9 +5,9 @@
 -- à la largeur de la colonne d'après la chasse mesurée des polices (Metriques.lua).
 --
 -- Ligne : { genre, texte, icone, element (indice dans le fil), image (chemin relatif), etape (vrai :
---   la ligne d'une étape de Claude, qu'un clic ouvre dans l'onglet Aperçu), actions ('note',
---   'demande' ou 'note+demande' : la ligne des boutons « ☆ Voir
---   la note » et « ＋ Garder la demande », avec notation et demande, les indices de leurs éléments) ;
+--   la ligne d'une étape de Claude, qu'un clic ouvre dans l'onglet Aperçu), actions ('note' : la
+--   ligne du bouton « ☆ Voir la note », avec notation, l'indice de son élément ; « ＋ Garder la
+--   demande », 'demande' et 'note+demande' sont retirés au correctif 1.3.6) ;
 --   auteur ('dany' ou 'claude', sur la première ligne d'un tour de parole) et heure (« 19 h 42 »,
 --   sur la ligne suivante), posés par Fil.lignes sur des copies }
 --   genres : 'dany', 'claude', 'titre', 'outil', 'appel', 'apercu', 'proposition', 'note',
@@ -35,6 +35,10 @@
 -- Historique.lua) reprend le genre `note` (en gris, l'icône ⓘ sur sa première ligne), ses puces
 -- en retrait sur leurs lignes de suite ; il n'est d'aucun tour de parole (ni « Vous » ni « Claude »,
 -- ni heure : Fil.lignes).
+-- Le résumé que la fenêtre montre en bas du fil (deuxième retour de Dany du 25 octobre 2026,
+-- Historique.resumePhoto et Historique.resumeGroupe, Fenetre.resume) se met en lignes comme un
+-- élément `historique` (Fil.lignesResume), mais n'est d'aucun élément de la conversation : un clic
+-- n'y fait rien, et il n'est ni gardé ni envoyé à Claude.
 -- Une demande faite par la Demande rapide dans la conversation d'une photo (correctif 1.3.6,
 -- Moteur.envoyerRapide : elle et ce qui y répond portent `rapide`) se dit d'une ligne « Demande
 -- rapide » sous son texte (Fil.MENTION_RAPIDE, en note, comme le style choisi).
@@ -736,44 +740,16 @@ end
 -- élément) sur la suivante, ligne vide comprise ; le dernier tour, d'une seule ligne, en reçoit une
 -- vide pour son heure. Un tour de Claude qui a rangé des notes (élément `notation`) finit par sa
 -- ligne d'actions, comme dans la maquette : « ☆ Voir la note » (`actions` : 'note' ; `notation` :
--- l'indice de la dernière notation du tour). Un tour qui a retouché (Conversation.estRetouche) et
--- dont le texte de Claude finit par « Demande à garder : « … » » (Conversation.demandeAGarder) y
--- gagne « ＋ Garder la demande » (Mes demandes, demandé par Dany le 22 octobre 2026) : `actions`
--- prend le suffixe '+demande' ('demande' seule, 'note+demande', Fil.valeurActions), `demande`
--- l'indice de ce texte. Ces lignes (auteur, heure, actions) sont faites à chaque appel, sur des
--- copies : les lignes gardées dans le cache ne changent pas. (« Leçon de la photo », 'lecon' et
--- 'les deux' : retirés avec la leçon au correctif 1.3.6.)
-
--- La valeur `actions` d'une ligne d'actions : 'note', avec '+demande' quand elle porte « ＋ Garder
--- la demande » ('demande' seule) ; nil sans rien.
-function Fil.valeurActions(notation, demande)
-    local base = notation and 'note' or nil
-    if demande then
-        return base and (base .. '+demande') or 'demande'
-    end
-    return base
-end
-
--- Ce que montre une valeur `actions` : sa base ('note' ou '') et vrai si « ＋ Garder la demande » y
--- est (Vues.ligneFil).
-function Fil.lireActions(valeur)
-    valeur = tostring(valeur or '')
-    if valeur == 'demande' then
-        return '', true
-    end
-    local base = valeur:match('^(.-)%+demande$')
-    if base then
-        return base, true
-    end
-    return valeur, false
-end
-
+-- l'indice de la dernière notation du tour). Ces lignes (auteur, heure, actions) sont faites à
+-- chaque appel, sur des copies : les lignes gardées dans le cache ne changent pas. (« Leçon de la
+-- photo », 'lecon' et 'les deux' : retirés avec la leçon au correctif 1.3.6 ; « ＋ Garder la
+-- demande » après une retouche, 'demande' et 'note+demande', avec la ligne « Demande à garder » de
+-- Claude au même correctif, deuxième retour de Dany du 25 octobre 2026.)
 function Fil.lignes(c, largeur, cache)
     largeur = largeur - Fil.MARGE
     local lignes, tours = {}, {}
     local precedent, auteurPrecedent
-    -- Les actions du tour de Claude en cours (notation, demande : des indices d'éléments ;
-    -- retouche : vrai si le tour a retouché).
+    -- Les actions du tour de Claude en cours (notation : l'indice de sa dernière notation).
     local actions = {}
     local function pousser(e, siennes, auteur, date)
         if precedent and not colles(precedent, e) then
@@ -788,14 +764,11 @@ function Fil.lignes(c, largeur, cache)
         precedent, auteurPrecedent = e, auteur
     end
     local function finirTour()
-        local demande = actions.retouche and actions.demande or nil
-        if not (actions.notation or demande) then
+        if not actions.notation then
             actions = {}
             return
         end
-        local quoi = Fil.valeurActions(actions.notation, demande)
-        local ligne = { genre = 'actions', texte = '', element = actions.notation or demande, actions = quoi,
-            notation = actions.notation, demande = demande }
+        local ligne = { genre = 'actions', texte = '', element = actions.notation, actions = 'note', notation = actions.notation }
         if auteurPrecedent == 'claude' then
             lignes[#lignes + 1] = ligne
         else
@@ -827,10 +800,6 @@ function Fil.lignes(c, largeur, cache)
         end
         if e.genre == 'notation' and e.etat ~= 'erreur' and e.etat ~= 'enCours' and #(e.notes or {}) > 0 then
             actions.notation, actions.date = i, actions.date or e.date
-        elseif Conversation.estRetouche(e) then
-            actions.retouche = true
-        elseif e.genre == 'claude' and not e.partiel and Conversation.demandeAGarder(e.texte) then
-            actions.demande, actions.date = i, actions.date or e.date
         end
         if #siennes > 0 then
             pousser(e, siennes, auteur, e.date)
@@ -845,6 +814,16 @@ function Fil.lignes(c, largeur, cache)
         end
     end
     return lignes
+end
+
+-- Les lignes du résumé de la fenêtre (Fenetre.resume) : celles d'un élément `historique` (en gris,
+-- l'icône ⓘ sur la première, les puces en retrait sur leurs lignes de suite), sans élément ni
+-- auteur. `largeur` : celle du texte du fil, dont la marge se retire ici comme dans Fil.lignes.
+function Fil.lignesResume(texte, largeur)
+    if Texte.nettoyer(texte or '') == '' then
+        return {}
+    end
+    return Fil.lignesElement({ genre = 'historique', texte = texte }, nil, largeur - Fil.MARGE)
 end
 
 -- Suivi : le carnet de progrès (correctif 1.3.6) --------------------------------------------------

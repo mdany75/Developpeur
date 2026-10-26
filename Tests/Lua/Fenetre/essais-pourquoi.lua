@@ -4,7 +4,7 @@
 -- revert_to_original, conversation de la 1.2 relue sans id), leur ligne d'appel (Fil, drapeau
 -- `etape` ; fenêtre B, lot B4 : plus de repère dans le texte ; plus de bouton « Pourquoi ? » à son
 -- bout depuis le correctif 1.3.6), leur stockage en tableaux (Stockage), l'onglet Aperçu, l'ancien
--- Pourquoi ? (un clic sur une étape, avant/après dans l'aperçu, carte, ◀ ▶, Détail…, Agrandir à
+-- Pourquoi ? (un clic sur une étape, avant/après dans l'aperçu, carte, ◀ ▶, Agrandir à
 -- deux images, mode suivre, images arrivées quand Etapes.version change, pas de bascule pour une
 -- étape), un clic sur une image du fil et une image de Claude qui arrive (correctif 1.3.6 :
 -- l'onglet Aperçu, l'image et le pourquoi de l'étape qui la précède, les classements sautés ; une
@@ -555,7 +555,7 @@ essai("Fenêtre : Etapes.actifPour posé à l'ouverture (fenêtre ouverte, puis 
     Moteur.travaille = false
 end)
 
-essai("Fenêtre : un clic sur une étape ouvre l'onglet Aperçu ; l'après, puis l'avant ; Étape n sur N ; ◀ ▶ ; Détail… ; Note rend l'aperçu d'avant", function()
+essai("Fenêtre : un clic sur une étape ouvre l'onglet Aperçu ; l'après, puis l'avant ; Étape n sur N ; ◀ ▶ ; plus de Détail… ; Note rend l'aperçu d'avant", function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     local c = Moteur.courante
@@ -603,7 +603,7 @@ essai("Fenêtre : un clic sur une étape ouvre l'onglet Aperçu ; l'après, puis
         egal(false, p.etapePrecedente)
         egal(true, p.etapeSuivante)
         egal(true, p.etapeAImages)
-        egal(true, p.etapeADetail)
+        egal(nil, p.etapeADetail, 'plus de Détail…')
         egal("Voir l'avant", p.titreBascule)
         -- ◀ ▶ de l'aperçu : rien dans l'onglet Pourquoi ? (ni ici, ni pour l'onglet Note ensuite).
         Fenetre.changerImage(-1)
@@ -631,13 +631,8 @@ essai("Fenêtre : un clic sur une étape ouvre l'onglet Aperçu ; l'après, puis
         egal(seconde, Conversation.etapes(c, 4961)[2].element)
         bouton(args.contents, p, '◀', 'etapePrecedente').args.action()
         egal('Étape 1 sur 2 · passe 1 : balance', p.etapeTitre)
-        -- Détail… : l'appel et sa réponse, dans une tâche.
-        local dialogues = #S.dialogues
-        taches = #S.taches
-        bouton(args.contents, p, 'Détail…', 'etapeADetail').args.action()
-        lancerTaches(taches)
-        egal(dialogues + 1, #S.dialogues)
-        egal('Claude · apply_settings · passe 1 : balance', S.dialogues[#S.dialogues].title)
+        -- Plus de Détail… sous la carte (correctif 1.3.6, retour de Dany du 25 octobre 2026).
+        egal(false, (pcall(bouton, args.contents, p, 'Détail…')), 'plus de Détail…')
         -- Un clic sur un autre outil ouvre toujours son détail ; l'étape montrée ne change pas.
         taches = #S.taches
         Fenetre.cliquerLigne((ligneDe(apercu)))
@@ -659,7 +654,7 @@ essai("Fenêtre : un clic sur une étape ouvre l'onglet Aperçu ; l'après, puis
         egal(nil, Fenetre.etape)
         egal(Fenetre.TITRE_ETAPE, p.etapeTitre, 'le titre de la carte sans étape')
         egal(Fenetre.AIDE_ETAPE, (p.etapeTexte:gsub('\n', ' ')))
-        egal(false, p.etapeADetail)
+        egal(nil, p.etapeADetail, 'plus de Détail…')
         vrai(not p.legendeApercu:find('Étape', 1, true), "l'aperçu d'avant : " .. p.legendeApercu)
         p.onglet = 'notation'
     end)
@@ -921,7 +916,7 @@ essai("Fenêtre : un clic sur une ligne d'image ouvre l'onglet Aperçu : l'image
         egal(nil, Fenetre.etape)
         egal(Fenetre.TITRE_ETAPE, p.etapeTitre)
         egal(Fenetre.SANS_ETAPE_IMAGE, (p.etapeTexte:gsub('\n', ' ')))
-        egal(false, p.etapeADetail)
+        egal(nil, p.etapeADetail, 'plus de Détail…')
         Fenetre.rafraichir()
         egal(nil, Fenetre.etape, 'un rafraîchissement ne choisit pas la dernière étape')
         egal('1 sur 3 · view_photo', p.legendeApercu)
@@ -1090,7 +1085,7 @@ essai("Fenêtre : l'image d'une proposition ou une photo jointe n'a pas le pourq
         egal(nil, Fenetre.etape, "pas l'étape du tour d'avant")
         egal(Fenetre.TITRE_ETAPE, p.etapeTitre)
         egal(Fenetre.SANS_ETAPE_JOINTE, (p.etapeTexte:gsub('\n', ' ')))
-        egal(false, p.etapeADetail)
+        egal(nil, p.etapeADetail, 'plus de Détail…')
         -- ◀ : l'image de la proposition, dans l'onglet Aperçu ; la carte suit et le dit.
         taches = #S.taches
         Fenetre.changerImage(-1)

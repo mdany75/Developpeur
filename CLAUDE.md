@@ -38,7 +38,9 @@ composition lue (`read_composition`) et le carnet de progrès (constats de `view
 1 948 × 1 200. Le correctif 1.3.6 retire la leçon de la photo (`photo_lesson` : 35 outils) et
 « Je le fais », le volet de gauche et la rangée Mode de la fenêtre Claude (1 623 × 1 200 ; après
 l'essai de Dany, les onglets Focus, Note, Aperçu et Proposition, un clic sur une étape à la place de
-« Pourquoi ? », le carnet de progrès dans la fenêtre Suivi, plus rien sur l'étalonnage de l'écran),
+« Pourquoi ? », le carnet de progrès dans la fenêtre Suivi, plus rien sur l'étalonnage de l'écran ;
+après son deuxième retour, le résumé en bas du fil, Agrandir qui remplit la place, une vignette de la
+photo active toujours à l'endroit, ni Détail… dans l'onglet Aperçu ni « ＋ Garder la demande »),
 et donne à chaque photo sa conversation (`Historique.lua`) ; le
 rendu reproductible se garde au `view_photo` avec `compare = before_claude`. L'exécutable a aussi
 ses commandes de développement (`--status`, `--call`,
@@ -146,7 +148,8 @@ libellé de couleur qu'il pose lui-même), venu de la section 1.1 de la feuille 
 maintenant le texte de `Notation.standard` (voir Règles). Le correctif 1.3.2 (« ## 1.3.2 — 2026-10-22 ») :
 une proposition qu'une étape de Claude dépasse n'attend plus, Claude note de 0 à 5 ★, la carte
 Note perd la rangée des passes et la ligne du plafond, l'onglet Focus (la mise au point Fujifilm
-comme Focus-Points, `--focus`) et Mes demandes (menu à droite de Style, « ＋ Garder la demande ») ;
+comme Focus-Points, `--focus`) et Mes demandes (menu à droite de Style, « ＋ Garder la demande »,
+retiré au correctif 1.3.6) ;
 demandés par Dany le 22 octobre 2026. Le correctif 1.3.4 (« ## 1.3.4 — 2026-10-23 », demandé par
 Dany le 23 octobre 2026, quatre chantiers tirés de la 1.4 et de la 1.5 de la feuille de route, tous
 côté connecteur) : la règle de la rafale pour les yeux fermés, la nature de l'écrêtage (luminance ou
@@ -181,13 +184,21 @@ jour, les retours de Dany après son essai de la 1.3.6 installée (tous accepté
 clic sur une étape ou une image du fil à la place du bouton « Pourquoi ? » ; les onglets Focus,
 Note, Aperçu et Proposition, la fenêtre ouverte sur Focus et ramenée à Focus à chaque autre photo ;
 une image de Claude qui arrive ouvre Aperçu, une proposition Proposition, une note Note ; Agrandir
-jusqu'à 2 000 × 1 250 ; le carnet de progrès dans la fenêtre Suivi (bouton Suivi de l'en-tête, à la
+jusqu'à 2 000 × 1 250 (qu'il remplit depuis le deuxième retour, plus bas) ; le carnet de progrès dans la fenêtre Suivi (bouton Suivi de l'en-tête, à la
 place de l'onglet Suivi qui avait remplacé Leçon ; les graphiques et l'ajout de chaque photo au
 carnet attendent le correctif 1.3.7) ; plus rien sur l'étalonnage de l'écran (ni voyant Écran, ni
 section Écran des consignes, ni remarque au premier aperçu, `get_status` ne dit que le nom) ; les
 réglages hors des valeurs par défaut dans l'historique d'une photo sans étape de Claude ; la barre
 de titre « Développeur v1.3.6 ». Il ajoute deux fichiers au module (`Historique.lua`,
-`FenetreSuivi.lua`) : quitter et relancer Lightroom.
+`FenetreSuivi.lua`) : quitter et relancer Lightroom. Puis, le même jour, le deuxième retour de Dany
+(accepté tel quel, numéro gardé) : une vignette de la photo active toujours à l'endroit (juste après
+une retouche, la vignette de secours d'une photo verticale arrivait couchée dans Focus et Agrandir) ;
+Agrandir qui remplit toujours 2 000 × 1 250, en agrandissant une image plus petite, et redemande la
+photo active en grand au clic (sinon un rendu) ; le bouton Détail… de l'onglet Aperçu retiré ; un
+résumé en bas du fil, fait par la fenêtre, jamais gardé ni envoyé à Claude ; « ＋ Garder la
+demande » retiré avec la ligne « Demande à garder » de Claude et sa section des consignes (le menu
+Mes demandes reste). Aucun fichier nouveau au module (`essais-resume.lua` aux essais), connecteur
+inchangé.
 
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 
@@ -922,9 +933,11 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   l'essentiel en tête, et un test de longueur pour les plus longues (`add_mask` 2 048 au plus,
   `view_photo` 1 850, `read_composition` 1 000, `preview_settings` 600, `analyze_photos` 520,
   `export_journal` avec sa propriété `notebook` 450, `reason` 160). Les consignes de la fenêtre
-  (`Consignes.texte`, lues à chaque demande) font 6 331 caractères pour un plafond de 7 500
-  (`essais-moteur.lua` ; 6 646 avant les retours de Dany du 25 octobre 2026, qui retirent la
-  section Écran et disent la raison d'une étape « (onglet Aperçu, d'un clic sur l'étape du fil) » ;
+  (`Consignes.texte`, lues à chaque demande) font 5 922 caractères pour un plafond de 7 500
+  (`essais-moteur.lua` ; 6 331 avant le deuxième retour de Dany du 25 octobre 2026, qui retire la
+  section Demande à garder, avec « ＋ Garder la demande » ; 6 646 avant ses premiers retours du même
+  jour, qui retirent la section Écran et disent la raison d'une étape « (onglet Aperçu, d'un clic
+  sur l'étape du fil) » ;
   7 476 au correctif 1.3.5 ; au correctif 1.3.6, 6 208 sans les sections
   Je le fais et Leçon de la photo, 6 470 avec le Contexte d'une photo, une conversation
   (« [Historique de la photo : …] », « [Depuis la dernière fois : …] » ou le résumé d'un groupe),
@@ -1043,10 +1056,13 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   balise (`transform`) ; une ligne d'étape prend toute la largeur du texte (« Pourquoi ? », un carré
   small de 80 à son bout, `q..i`, `Fenetre.pourquoi`, `D.pourquoi` et `Fil.PLACE_POURQUOI`, est
   retiré par les retours de Dany du 25 octobre 2026 : un clic sur la ligne en tient lieu) ; le tour
-  de Claude finit par sa ligne d'actions (`x..i` : « ☆ Voir la note » ; après une retouche et sa
-  « Demande à garder », « ＋ Garder la demande » au bout de la ligne, à droite, une rangée à
-  `margin_left`, D6 : `x..i` prend le suffixe `+demande`, `Fil.lireActions` ;
-  « Leçon de la photo » est retirée au correctif 1.3.6). Un élément `historique` (correctif 1.3.6)
+  de Claude qui a noté finit par sa ligne d'actions (`x..i` : `note`, « ☆ Voir la note », seul ;
+  « Leçon de la photo » est retirée au correctif 1.3.6, et « ＋ Garder la demande », au bout de la
+  ligne après une retouche, avec le suffixe `+demande` de `x..i`, `Fil.valeurActions`,
+  `Fil.lireActions` et `Fenetre.lireActions`, au deuxième retour de Dany du même jour). Une
+  conversation vide montre son titre et l'aide (`Fenetre.lignesAide`, des lignes d'aucun élément),
+  et le résumé de la fenêtre vient toujours en dernier, sous la conversation (puce Le résumé en bas
+  du fil). Un élément `historique` (correctif 1.3.6)
   reprend le genre `note` (ⓘ sur sa première ligne, ses puces « •  » en retrait), sans auteur ni
   heure, et clôt le tour de Claude d'avant ; une demande faite par la Demande rapide porte sous son
   texte la ligne « Demande rapide » (`Fil.MENTION_RAPIDE`). Le fil ne montre que la conversation
@@ -1073,15 +1089,15 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   rouvertes sur un refus après le clic. Rangées par `Stockage.lua` seul (section Mes demandes) dans
   `mes-demandes.json` de `Chemins.racine()` : écrit d'un coup, relu à chaque ouverture et avant
   chaque changement, illisible mis de côté avant la première écriture (jamais écrasé), trié par
-  nom ; `uninstall.sh --tout` le retire. Après une retouche, Claude finit sa réponse par
-  « Demande à garder : « … » » (section des consignes) : `Conversation.demandeAGarder` la lit,
-  `Conversation.estRetouche` dit si le tour a retouché (une étape écrite hors des classements,
-  `match_series` abouti ; jamais une proposition, une notation ou un classement seuls),
-  et « ＋ Garder la demande » (`Fenetre.garderDemande`) ouvre Ajouter… pré-rempli
-  (`Conversation.preparerDemande`, un nom pris rendu libre par `Stockage.nomLibre` ; sa ponctuation
-  finale retirée sans caractère de plusieurs octets dans une classe de Lua 5.1, « … » à part).
-  Essais :
-  `essais-mes-demandes.lua`.
+  nom ; `uninstall.sh --tout` le retire. Ajouter… est pré-rempli du texte du champ, sans nom
+  proposé. « ＋ Garder la demande » est retiré au correctif 1.3.6 (deuxième retour de Dany du
+  25 octobre 2026, accepté tel quel) : la ligne « Demande à garder : « … » » que Claude écrivait à
+  la fin d'une retouche, la section « ## Demande à garder » des consignes, `Fenetre.garderDemande`,
+  `Conversation.demandeAGarder`, `Conversation.estRetouche` (qui ne servait qu'à elle),
+  `Conversation.preparerDemande`, `Conversation.LIGNE_DEMANDE`, `Stockage.nomLibre`,
+  `D.garderDemande` et `D.ecartActions` ; une ligne « Demande à garder » d'une conversation d'avant
+  reste un texte de Claude comme un autre. Essais : `essais-mes-demandes.lua` (qui vérifie aussi
+  que ces noms ont disparu).
 - Les cartes (Note, Proposition, Aperçu, Focus) sont des colonnes superposées sur leurs
   images (carte-note, carte-proposition, carte-etape, carte-focus ; carte-lecon et carte-suivi
   retirées au correctif 1.3.6), le texte à 472 en
@@ -1168,22 +1184,64 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   (`Conversation.infoEtape`) ; `Stockage` écrit `etapes`, `annule` et `revenu` en tableaux. La carte
   sans étape garde son titre « Pourquoi ? » (`Fenetre.TITRE_ETAPE`) et son aide dit de cliquer une
   étape (`Fenetre.AIDE_ETAPE`) ; la consigne de la raison dit « (onglet Aperçu, d'un clic sur
-  l'étape du fil) ».
-- **Agrandir** (retours de Dany du 25 octobre 2026 ; 1 100 × 740 jusque-là) : l'image en grand tient
-  dans `Fenetre.GRANDE` (2 000 × 1 250, qui laisse la barre de titre et Fermer de la fenêtre modale
-  sur l'écran de 3 440 × 1 440 de Dany : environ 1 330 de haut en tout), sous chacune de ses formes,
-  la photo active, la vignette Focus, une image du fil ou de la proposition, une image d'étape seule
-  (`Fenetre.agrandirUne`, une seule fonction pour les quatre), et l'avant et l'après côte à côte, les
-  deux ensemble avec leurs titres et la légende (`Fenetre.agrandirDeux`, place par
-  `Fenetre.cadreDeux`, pure : 994 de large au plus par image, `ECART_DEUX` 12, `ECART_TITRE` 4,
-  `ECART_LEGENDE` 8, une ligne de 16 d'après `Metriques`, une image illisible sur
+  l'étape du fil) ». Sous la carte (`Vues.etape`) : ▲ ▼, ◀ ▶ et Voir l'avant / Voir l'après
+  (`titreBascule`) ; Détail… (l'appel de l'outil et sa réponse : `D.detail`, `Fenetre.detailEtape`,
+  la clé `etapeADetail`) est retiré au deuxième retour de Dany du 25 octobre 2026.
+- **Agrandir** (retours de Dany du 25 octobre 2026 ; 1 100 × 740 jusque-là) : l'image en grand
+  remplit `Fenetre.GRANDE` (2 000 × 1 250, qui laisse la barre de titre et Fermer de la fenêtre
+  modale sur l'écran de 3 440 × 1 440 de Dany : environ 1 330 de haut en tout), sous chacune de ses
+  formes, la photo active, la vignette Focus, une image du fil ou de la proposition, une image
+  d'étape seule (`Fenetre.agrandirUne`, une seule fonction pour les quatre), et l'avant et l'après
+  côte à côte, les deux ensemble avec leurs titres et la légende (`Fenetre.agrandirDeux`, place par
+  `Fenetre.cadreDeux`, pure, sans plafond à 1 : 994 de large au plus par image, `ECART_DEUX` 12,
+  `ECART_TITRE` 4, `ECART_LEGENDE` 8, une ligne de 16 d'après `Metriques`, une image illisible sur
   `LARGEUR_ILLISIBLE` 200 ; une légende longue réduit la hauteur des images). `Images.grande`
-  n'agrandit jamais : une image qui tient est montrée à sa vraie taille, son propre fichier, sans
-  `sips` ni recompression ; une plus grande est réduite en gardant ses proportions ; illisible,
-  « Aperçu illisible » (Focus et la photo active compris). `TAILLE_PHOTO_ACTIVE` reste 1 024 : la
-  vignette du cache est déjà plus grande (1 720 pixels pour un RAW, constaté le 17 octobre 2026) ;
-  les images d'étape font 1 024 (`Etapes.COTE`). Pas encore vu dans Lightroom ; essais avec le vrai
-  `sips` dans `essais-integration.lua`, purs dans `essais-dispositions.lua`.
+  remplit toujours la place à ses proportions (deuxième retour de Dany du même jour, qui voyait la
+  vignette de secours de Focus, 320 × 213, à sa vraie taille : minuscule) : une image plus grande
+  est réduite, une plus petite agrandie par `sips` (un peu plus douce ; 300 × 200 donne
+  1 875 × 1 250), rangée dans `.vignettes` à côté ; une image qui a déjà la taille garde son propre
+  fichier ; illisible, « Aperçu illisible ». La photo active (Focus, l'aperçu de la photo active) se
+  redemande en grand au clic (`Fenetre.agrandirActive`, dans une tâche ; `Fenetre.preparerGrande`) :
+  une vignette de `Fenetre.TAILLE_GRANDE` (2 048, le plafond de `Vignettes`) ; refusée (juste après
+  une retouche), un rendu par `Rendu.rendre`, le chemin des aperçus de `view_photo`
+  (`Fenetre.rendreActive`, copié dans `PhotoActive/Grande-…`), sauf pendant que Claude travaille
+  (`Moteur.travaille`) ou qu'une commande de la liaison est en cours ou a fini depuis moins de
+  `Lightroom.DELAI_LIAISON_LIBRE` (5 s) (`Lightroom.liaisonOccupee`, d'après `Liaison.enCours`,
+  compté par `Liaison.recevoir` de la vérification du jeton à `apresCommande` ou `abandonner`, même
+  en erreur, une ligne refusée non comptée, et `Liaison.finCommande` : Claude Desktop ou Claude Code
+  en terminal, que `Moteur.travaille` ne voit pas ; le rendu se mêlerait à leurs commandes) ; sinon
+  l'image du panneau, agrandie. Comme un aperçu de `view_photo`, ce rendu calcule d'abord les
+  réglages IA (`calculerAvantRendu`), fait passer `isExported` à vrai et note la photo
+  `apercuSeulement` (écriture privée, rien dans Édition › Annuler). La grande image se redresse
+  (puce suivante), puis se marque comme celle du panneau : les cadres de Focus (`Images.lireFocus` :
+  un `--focus` de plus, donc une ouverture de plus de l'original au clic), le carré des autres
+  onglets (`Fenetre.marquerMiseAuPoint`) ; son dossier s'efface à la fermeture. La vignette du
+  panneau reste à `TAILLE_PHOTO_ACTIVE` 1 024 (le cache rend plus grand, 1 720 pixels pour un RAW,
+  constaté le 17 octobre 2026) ; les images d'étape font 1 024 (`Etapes.COTE`) et remplissent leur
+  moitié. Pas encore vu dans Lightroom (ni le rendu lancé depuis la fenêtre, ni la netteté d'une
+  image agrandie) ; essais avec le vrai `sips` dans `essais-integration.lua`, purs dans
+  `essais-dispositions.lua`, la photo active et Focus dans `essais-focus.lua` (`Rendu` y est
+  remplacé : `Rendu.lua` ne se charge pas dans la simulation de la fenêtre, sans `LrApplicationView`).
+- **Une vignette de la photo active toujours à l'endroit** (`Images.rotationManquante`, pure, et
+  `Images.redresser` ; deuxième retour de Dany du 25 octobre 2026) : sur XH2S0407.RAF (Copie 1),
+  4160 × 6240, juste après une retouche, la vignette de secours de Focus
+  (`Fenetre.TAILLE_SECOURS_FOCUS`, 256) était couchée (320 × 213 : le fichier avant le quart de tour
+  de Lightroom), et l'image de Focus et d'Agrandir aussi ; aucune vignette de Lightroom ne porte de
+  balise d'orientation, et les autres sont tournées (1 146 × 1 720, 573 × 860, 520 × 780 : relevé le
+  même jour dans `Temporaire/PhotoActive`). Une vignette se compare à la photo telle que Lightroom
+  l'affiche (dimensions, orientation et cadre de `Vignettes.decrireVignette`, par
+  `Geometrie.contexte` et `Geometrie.apercu`, à `Images.ECART_PROPORTIONS` près, 0,08 en
+  logarithme) : debout au cadre actuel, elle reste ; couchée au cadre, elle se tourne du quart de
+  tour de son orientation (BC : `sips -r 90`, DA : `sips -r 270`) ; sinon elle se compare à la photo
+  entière, sans le cadre (la vignette de secours peut dater d'avant la retouche qui vient de
+  recadrer la photo, en 4:5 par exemple) : couchée et plus près que debout, elle se tourne, debout
+  elle reste. Un demi-tour (CD) ne se voit pas aux proportions et reste. Elle se redresse avant
+  d'être montrée ou marquée, partout où la fenêtre prend une vignette de la photo active : l'aperçu
+  commun (avant `--marquer-af`), Focus (la vignette de secours comprise, avant `--focus`) et
+  Agrandir. Le connecteur ne tourne rien : il dessine dans l'image affichée sur les pixels reçus.
+  Reste à constater dans Lightroom : `sips -r` sur une vraie vignette couchée, et que la vignette de
+  secours date bien d'avant la retouche. Essais : `essais-focus.lua` (une photo verticale simulée,
+  sa vignette de 256 couchée).
 - La leçon et « Je le fais » dans la fenêtre sont retirés au correctif 1.3.6 : l'onglet Leçon,
   l'action « Leçon de la photo » du fil, la case Leçon du Gestionnaire (`leconFinRetouche`),
   « [Sans leçon] » (`Consignes.sansLecon`), les sections Leçon de la photo et Je le fais des
@@ -1229,7 +1287,14 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   (`Vignettes.demander`,
   `requestJpegThumbnail`, dans une tâche), dans un dossier à elle sous
   `Chemins.temporaire()/PhotoActive` (l'ancien s'efface), réduite au cadre par `Images.vignette`,
-  refaite à chaque ouverture. Une image nouvelle de la conversation montrée (`Fenetre.nbImages`)
+  refaite à chaque ouverture. Juste après une retouche, Lightroom refuse la vignette de 1 024 (« error
+  loading thumb ») : comme Focus, elle se redemande une fois par seconde, `ESSAIS_VIGNETTE_FOCUS`
+  fois, puis à `TAILLE_SECOURS_FOCUS`, redressée et marquée, notée de secours
+  (`Fenetre.apercuActif.secours`, deuxième retour de Dany du 25 octobre 2026 : l'aperçu restait vide,
+  Agrandir grisé) ; la grande se redemande à un rafraîchissement suivant,
+  `Fenetre.DELAI_SECOURS_ACTIVE` (10 s) au moins après la dernière demande (la fin de chaque demande
+  rafraîchit l'aperçu : sans ce délai, elle en relancerait une autre sans fin), et un échec relance
+  le délai. Une image nouvelle de la conversation montrée (`Fenetre.nbImages`)
   la remplace (une image de Claude ouvre en plus l'onglet Aperçu : puce Les onglets) ; ◀ revient
   aux images de la conversation, ▶ depuis la dernière y retourne ; un clic sur une ligne d'image
   relit les images d'abord, puis ouvre l'onglet Aperçu sur la sienne. Les onglets montrent toujours
@@ -1244,7 +1309,9 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   le point dans l'original en temps borné, le passe dans l'image affichée et écrit `<nom>-af.jpg`
   à côté de la vignette, carré vert, rouge si l'appareil a signalé la mise au point manquée ;
   code 1 sans point (l'aperçu reste sans carré, sans rien au journal). Autre marque : pas d'appel,
-  l'original n'est pas ouvert. Agrandir montre la vignette marquée.
+  l'original n'est pas ouvert. La vignette est redressée avant (`Images.redresser`) ; la
+  description de la photo se lit une fois pour les deux (`Fenetre.decrireActive`). Agrandir
+  redemande la photo en grand, puis la marque de même (puce Agrandir).
 - **L'onglet Focus** (demandé par Dany le 22 octobre 2026 ; `docs/SPEC.md`, Onglet Focus), le
   premier des onglets depuis les retours de Dany du 25 octobre 2026 (entre Aperçu et Proposition
   avant ; clé `focus`, `D.ongletFocus`, segment de 62) : la photo active comme le
@@ -1274,7 +1341,10 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   l'aperçu, il répond « error loading thumb » à une vignette de 512 px ou plus mais rend celle de 256
   (constaté le même jour, plus d'une minute après) : la vignette se redemande une fois par seconde,
   `Fenetre.ESSAIS_VIGNETTE_FOCUS` (3) fois, puis à `Fenetre.TAILLE_SECOURS_FOCUS` (256), sans
-  signature (la grande se relit au clic suivant ou à la fin d'un tour de Claude). Une lecture finie
+  signature (la grande se relit au clic suivant ou à la fin d'un tour de Claude), redressée avant
+  `--focus` (`Images.redresser` : celle d'une photo verticale arrive couchée, constaté le 25 octobre
+  2026 sur XH2S0407.RAF (Copie 1) ; puce de la vignette à l'endroit). Agrandir y redemande la photo
+  en grand et relance `--focus` sur elle (`Fenetre.agrandirActive`, puce Agrandir). Une lecture finie
   quand sa photo n'est plus la photo active ne touche pas `Fenetre.focus` (son dossier s'efface) ;
   une lecture en erreur garde un résultat d'échec sans signature (« non lue », pas de relecture à
   chaque rafraîchissement ; un vrai clic relit). Rien de lu : la raison du connecteur
@@ -1412,6 +1482,51 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   U+2212, espace fine insécable U+202F des milliers et devant « K », tous mesurés dans
   `Metriques.lua`). Rien pour une photo qui a des étapes de Claude. Essais :
   `essais-une-photo.lua` (l'exemple de Dany, chaque panneau, les défauts d'un RAW et d'un JPEG).
+- **Le résumé en bas du fil** (deuxième retour de Dany du 25 octobre 2026, accepté tel quel ;
+  `docs/SPEC.md`, Une photo, une conversation › Le résumé en bas du fil) : à l'ouverture de la
+  fenêtre (et quand le menu ou ⌃⌥C la rappelle), et chaque fois qu'une autre photo ou un autre groupe
+  change la conversation montrée, la fenêtre fait un résumé sans Claude ni jetons, toujours en bas
+  du fil, sous la conversation (ou sous l'aide d'une conversation vide), après une ligne vide
+  (`Fenetre.ajouterResume`, depuis `Fenetre.rafraichirFil`) : ses lignes par `Fil.lignesResume`,
+  comme un élément `historique` (genre `note`, ⓘ sur l'en-tête, puces en retrait), mais d'aucun
+  élément ni tour (un clic n'y fait rien). Ses lectures et ses textes ne sont qu'à `Historique.lua`
+  (section « Le résumé de la fenêtre ») : une photo (`Historique.lireResumePhoto`,
+  `Historique.resumePhoto`, « Résumé de la photo : <nom> ») : « Prise de vue : » l'appareil,
+  l'objectif, la focale, l'ouverture, la vitesse et l'ISO tels que Lightroom les écrit
+  (`Historique.CLES_PRISE`, métadonnées formatées), puis la date de prise de vue à l'heure locale
+  (`timeToUserFormat`) ; « Note et drapeau : 3 ★ · retenue » (`Historique.texteNote`) ; « État : »
+  ses étapes de Claude (combien, la dernière, sa date et son nom), sinon « retouchée à la main, sans
+  étape de Claude » (editCount) ou « sans étape de Claude ni retouche » ; puis les reprises à la main
+  et les réglages hors des valeurs par défaut (`Historique.etat`, `Historique.texteReprises`,
+  `Historique.texteReglages`, ici même après des étapes de Claude) ; plusieurs photos
+  (`Historique.lireResumeGroupe`, `Historique.resumeGroupe`, « Résumé de la sélection : N photos »)
+  : « Prises du … au … » (ou « le … », « (N sans date) », « Dates de prise de vue inconnues »), les
+  appareils les plus fréquents (`Historique.APPAREILS_MONTRES` 4, puis « … » ; « inconnu (N) »), et
+  « Retouchées par Claude : … · notées : … · rejetées : … » (retouchée : `retoucheeParClaude`
+  seulement si `proprietaireMemoire` est l'uuid de la photo, comme `Photos.decrireTout` ; notée : au
+  moins 1 ★). Lectures par les trois lectures groupées du catalogue (`batchGetFormattedMetadata`,
+  `batchGetRawMetadata`, `batchGetPropertyForPlugin`), par appel direct, dans une tâche ; si l'une
+  échoue, une à une (`Photos.meta`, `Photos.brut`, `Photos.lireChamp`, exporté pour lui), les
+  `Historique.MAX_GROUPE` premières d'un groupe seulement, et l'en-tête le dit ; une photo absente
+  de la lecture groupée des champs du module n'en a aucun (supposé, comme `Historique.lireGroupe`).
+  Jamais gardé dans la conversation, ni sur le disque, ni envoyé à Claude : `Fenetre.resume`
+  { conversation, photo ou groupe, donnees, texte, fin, versionNotation, perime }, en mémoire
+  seulement, remis à nil à chaque ouverture. Il est celui de la conversation montrée : de sa photo
+  (`c.photo`), ou de la sélection quand elle est son groupe (`c.groupe` égal à celui de
+  `Lightroom.photos`) ; rien pour une conversation sans photo ni groupe (case Autre photo décochée).
+  `Fenetre.suivreResume` (`Fenetre.refaireResume`) : depuis la boucle, avant le rafraîchissement,
+  aussitôt quand `Fenetre.suivreSelection` change la conversation montrée, après « Repartir à neuf »
+  et à l'ouverture ; il le refait pour une autre conversation montrée, même pendant que Claude
+  travaille, et, Claude libre, quand un tour a fini (`Moteur.finTravail`), que le registre des notes
+  a changé (`Notation.version`) ou qu'il est périmé (`perime`, la fenêtre rappelée : gardé et montré
+  jusque-là) ; jamais pendant le travail de Claude pour la même conversation, ni pour la photo active
+  changée dans le même groupe. La note et le drapeau d'une photo suivent ceux de la photo active que
+  `Fenetre.majPhoto` lit toutes les 2 s (`Fenetre.suivreNoteDuResume`), sans relire le catalogue.
+  Aucun caractère nouveau (un essai vérifie que tout ce qu'il écrit est mesuré dans `Metriques`) ; un
+  caractère d'un texte de Lightroom non mesuré compte comme « M » (une coupe prudente). Reste à
+  constater dans Lightroom : les textes formatés réels, la date, sa durée sur 500 photos et plus, et
+  la note suivie après Accepter (`docs/SPEC.md`, Correctif 1.3.6, point 15). Essais :
+  `essais-resume.lua`.
 - **La Demande rapide** (correctif 1.3.3, demandée par Dany le 22 octobre 2026 ; `FenetreRapide.lua`,
   `MenuRapide.lua`) : une fenêtre flottante à part, d'environ 1 000 × 250 (`save_frame`
   `DeveloppeurRapide-<N>`, à augmenter quand la taille change). Depuis le correctif 1.3.6
@@ -1427,7 +1542,9 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   case décochée : une conversation neuve (`c.rapide`, jamais gardée, `enregistrer` sauté, images
   dans `Temporaire/Rapide/<id>`, effacé à la suivante et au chargement du module,
   `Menage.temporaires` ; session neuve), avec le résumé court du groupe ; `Consignes.rapide`
-  (toute la sélection, sans noter d'abord, ni titre, ni « Demande à garder »). La fenêtre ne montre
+  (toute la sélection, sans noter d'abord, « Pas de titre. » ; `Consignes.rapide` et
+  `Consignes.rapidePhoto` disaient « Ni titre, ni « Demande à garder ». » jusqu'au deuxième retour
+  de Dany du 25 octobre 2026). La fenêtre ne montre
   que la réponse à sa demande (`Moteur.reponseRapide`). Un seul Claude Code à la fois : il est
   réservé avant les lectures du catalogue (`Moteur.travaille`, `Moteur.tourRapide =
   Moteur.RESERVE_RAPIDE`, rendu par `libererRapide` si une lecture échoue), et
@@ -1561,7 +1678,8 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   disposition, la fenêtre B de la 1.3.2 après une retouche pro : ses étapes, « Pourquoi ? »,
   « ＋ Garder la demande », le menu Mes demandes et l'onglet Focus, refaite le 22 octobre 2026 ;
   à refaire au correctif 1.3.6 : elle montrera la fenêtre de 1 623 × 1 200, sans volet ni Mode,
-  ses onglets Focus, Note, Aperçu et Proposition et le bouton Suivi ;
+  ses onglets Focus, Note, Aperçu et Proposition, le bouton Suivi et le résumé en bas du fil, sans
+  « Pourquoi ? » ni « ＋ Garder la demande » ;
   `docs/carnet.png`, la page Carnet de progrès, à refaire au correctif 1.3.6 : elle montrera
   la fenêtre Suivi ; `publication.png`, `consommation.png`,
   `suivi.png` : les autres fenêtres ; `seance.png` est retirée avec la Séance en 1.1.1,
@@ -1575,12 +1693,12 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
 - `Sources/MCPDeveloppeur/main.swift` : options de ligne de commande (dont `--marquer-af`, pour l'aperçu de la photo active de la fenêtre Claude, `--focus`, pour son onglet Focus, et `--ecran`, pour le développement depuis le correctif 1.3.6 (plus de voyant Écran) ; `--boitier`, `--eclairage` et `--constats`, relevés à la main ; `--recette` avec `--horizon` et `--hauteur-horizon` ; `--status`, avec l'état du jeton et le nom de l'écran) et boucle stdio ; `outils()` pose `Ecran.lire` pour le serveur et `--call` (`get_status` seulement) ; `noterAuCarnet` vrai et `registreRendus` posé dans `serve()` seulement
 - `Lightroom/Developpeur.lrplugin/`, le module :
   - déclaration et cycle de vie : `Info.lua` (« Développeur », `com.danymenard.developpeur`, menus, version), `Init.lua` / `Arret.lua`, `Menage.lua` (paramètres prédéfinis invisibles effacés ; au chargement, depuis le correctif 1.3.6, les dossiers temporaires des groupes et des demandes rapides : `Menage.temporaires`), `PluginInfoProvider.lua` (Gestionnaire de modules externes : section liaison, avec Mise au point et Carnet et, au diagnostic, l'état du jeton, les commandes refusées et les photos du carnet, et section fenêtre Claude, avec modèle, effort, apparence, Autre photo (reprendre sa conversation, sinon une nouvelle) et Avant/après ; les cases Leçon et « À l'ouverture » sont retirées au correctif 1.3.6), `Preferences.lua` (réglages de la liaison, dont `pointMiseAuPoint` et `carnet` ; ceux de la fenêtre dans `Chemins.defauts`, même table), `Metadonnees.lua` (champs privés), `Menu*.lua` (les neuf entrées de Module externe - Extras, dans Fichier et Bibliothèque)
-  - la liaison : `Liaison.lua` (prises LrSocket, jeton privé et refus des lignes sans lui, `module.log`), `Commandes.lua` (répartition des commandes du serveur) et les modules qui les portent : `Lecture.lua` (état, avec `liaison_fermee`, sélection, réglages, paramètres prédéfinis, diagnostic, journal), `Rendu.lua` (aperçus, avec `point_af` : photo décrite par `Vignettes.decrireVignette`, évaluation, et `etapes_claude` pour le bilan ; image entière et cadre relu, `sansRecadrage` partagé avec le recalage ; la vue gardée pour `Etapes` ; propositions, `essayer` avec `entier`, rendus du recalage), `Etapes.lua` (avant/après des étapes : empreinte, vue, capture autour de chaque commande, commande `etapes`, `Etapes.images` pour la fenêtre, ménage), `Carnet.lua` (registre `carnet.json` : commande `carnet`, `constater`, `Carnet.resumer`, `photosDuDefaut`, `vocabulaire`, `estPhotoDEssai` ; les leçons d'avant le correctif 1.3.6 gardées telles quelles), `Retouche.lua` (appliquer, recadrer, masquer, retoucher, copier), `Amelioration.lua` (débruitage, détails bruts, super résolution), `Suppression.lua` (reflets, retrait de la poussière), `Masques.lua` (reprendre un masque : commande `masques` ; masques vides), `Conversions.lua` (rotation d'un quart de tour), `Progression.lua` (barre de progression de Lightroom pendant une série : commande `progression`), `Vignettes.lua` (vignettes du cache d'aperçus : commande `vignettes` ; `decrireVignette`, aussi pour l'aperçu de `view_photo`), `Notation.lua` (registre des notes proposées, `notation.json` : commande `notation`, avec `remettre` pour la recette, `Notation.poser`), `Livraison.lua` (exporter, fenêtre d'exportation, options de livraison, dossier choisi dans une fenêtre, noms exacts, aperçus dynamiques), `Services.lua` (services de publication et réglages des services Disque dur, lus seulement), `Variantes.lua` (variantes en instantanés), `Annulation.lua` (annuler, revenir), `Bibliotheque.lua` (classement, paramètres prédéfinis de métadonnées, mots-clés, collections, recherche, copies virtuelles, photo montrée et filtre de la Bibliothèque : commandes `metadonnees`, `motsCles`, `collections`, `chercher`, `copieVirtuelle`, `montrer` ; notes acceptées ou posées sur demande : `Bibliotheque.noter` ; photo active et sélection remises : `Bibliotheque.remettreSelection`) ; leur socle : `Photos.lua` (photos visées, description, sensibilité ISO en nombre, mémoire de Claude), `Reglages.lua` (valeurs de développement), `Recalage.lua` (géométrie, grille du serveur), `Plans.lua` (ce qu'une retouche changera), `Ecriture.lua` (écriture dans le catalogue, étapes avec leur id, `Ecriture.nouvelleEtape`, journal, `Ecriture.difference`), `Profils.lua` (profil relu après l'écriture), `Recadrage.lua` (calcul du cadre), `Geometrie.lua` (positions de l'aperçu vers le fichier), `Locaux.lua` (tables des masques, taches et yeux rouges) — ces trois-là sans SDK —, `Json.lua`, `Suivi.lua` (fenêtre de la liaison « Claude · liaison », menu « Afficher la fenêtre de la liaison », « fenêtre de suivi » jusqu'au correctif 1.3.6 ; `MenuSuivi.lua` garde son nom)
-  - la fenêtre Claude : `Fenetre.lua` (la fenêtre : état, actions, boucle, apparence, calques et boutons, bandeau, textes des cartes page par page, carte Note B, aperçu de la photo active et son carré de mise au point, « Obtenir » (la proposition demandée sous la carte Proposition, à la place de celle préparée à l'ouverture), une photo, une conversation (`suivreSelection`, `suivrePhotos`, conversation neuve ou de groupe, « Repartir à neuf »), voyants de l'en-tête (Claude Code et Lightroom ; versions et mode dans l'infobulle du voyant Lightroom ; le voyant Écran retiré) et bouton Suivi (`ouvrirSuivi`), titre « Développeur v… » (`titreFenetre`), aide d'une liaison sans jeton, menu Mes demandes et ses fenêtres Ajouter…, Renommer… et Supprimer…, « ＋ Garder la demande » ; onglets Focus, Note, Aperçu et Proposition : la mise au point de la photo active, la note, l'étape ou l'image du fil cliquée avec son pourquoi (`voirImageDuFil`, `etapeAvant`, `choisirEtapeDeLImage`), la proposition et la composition ; ouverture sur Focus et retour à Focus (`revenirAFocus`), bascules vers Aperçu, Proposition et Note ; Agrandir dans 2 000 × 1 250 (`GRANDE`, `agrandirUne`, `agrandirDeux`, `cadreDeux`) ; plus de volet, de liste, de Mode, de Leçon, de « Je le fais », d'onglet Suivi ni de « Pourquoi ? » depuis le correctif 1.3.6), `Vues.lua` (ses pièces : aplats, images, boutons bleus, éléments inactifs, ligne du fil, en-tête (titre, « Repartir à neuf », deux voyants, bouton Suivi), saisie, menu Mes demandes et bandeau, segments, aperçu, cartes Proposition, Aperçu, Focus et Note, et la fabrique masquable des onglets ; ni Noter ni Évaluer), `Dispositions.lua` (la fenêtre B, seule disposition : tailles, dimensions, onglets (`ONGLETS`, seule liste), images, apparences et palettes), `Fil.lua` (le fil en lignes : texte riche, appel, auteur et heure, actions, dont « ＋ Garder la demande », éléments `historique`, mention « Demande rapide » ; `lignesCarte`, les textes des cartes coupés ; le texte de l'onglet Focus et de la fenêtre Suivi), `Metriques.lua` (chasse des polices, produite par `scripts/metriques.swift`), `Moteur.lua` (conversations et processus de Claude Code, indépendants de la fenêtre ; la conversation de chaque photo : `conversationDe`, `preparerPhoto`, `completerDepuis`, `resumerGroupe`, `ecarter`, `noterVu` ; la Demande rapide : `envoyerRapide`, `conversationPour`, `reponseRapide` ; modèle et effort d'une demande), `Historique.lua` (correctif 1.3.6 : ce que la fenêtre dit d'une photo sans Claude ni jetons, « Historique de la photo », « Depuis la dernière fois » et le résumé d'un groupe, seule copie de leurs textes ; lectures du journal de Claude et des reprises à la main, `Historique.vu` ; les réglages hors des valeurs par défaut d'une photo sans étape de Claude, `Historique.ecarts`), `FenetreSuivi.lua` (correctif 1.3.6 : la fenêtre Suivi, le carnet de progrès, ses photos d'un défaut et « Retirer du carnet… »), `FenetreRapide.lua` et `MenuRapide.lua` (la Demande rapide), `Session.lua` (un processus Claude Code par `relais.sh`), `relais.sh`, `Evenements.lua` (lignes stream-json de Claude Code), `Conversation.lua` (éléments d'une conversation : étapes, cadre demandé, dernier zoom, éléments `historique` ; champs `photo`, `vu`, `ecartee`, `groupe` ; retouche du tour et « Demande à garder » de Claude ; les éléments `lecon` et `exercice` d'avant le correctif 1.3.6 gardés sans ligne au fil), `Stockage.lua` (conversations sur le disque, jamais effacées depuis le correctif 1.3.6, et Mes demandes : `mes-demandes.json`), `Images.lua` (aperçus et photos jointes, base64 et `sips` ; carré de mise au point par le connecteur : `Images.marquerMiseAuPoint` ; onglet Focus : `Images.lireFocus`), `presse-papiers.js` (lecture du presse-papiers par `osascript`), `Consignes.lua` (consignes ajoutées, dont les puces Peau (sans chiffres), Notes (la note d'abord de chaque photo traitée) et Mise au point montrée, et le résumé chiffré du bilan ; depuis la 1.3, les sections Composition et Raison de chaque étape, et la puce Carnet ; depuis le correctif 1.3.6, l'historique dans le Contexte et la fin d'une retouche par `view_photo` avec `compare = before_claude` (les sections Je le fais, Leçon de la photo et Écran retirées) ; la section Demande à garder (Mes demandes) ; sept invites en raccourcis, dont Portrait, Paysage et Noir et blanc qui demandent la méthode du tireur sans chiffres, et Composition ; ajustements du cadre ; demande d'« Obtenir » (`Consignes.obtenir`, à la place de `proposerOuverture`), réponses aux propositions, règles de la Demande rapide (`rapide`, `rapidePhoto`), styles, modèles et efforts), `Lightroom.lua` (photo active, sa note et sa légende, sélection, sa clé et celle de son groupe, état et mode de la liaison, connexion de Claude Code, valeurs de l'onglet Focus : `Lightroom.infosFocus` ; l'écran principal n'y est plus lu depuis le correctif 1.3.6), `Composants.lua` (versions du module et du connecteur, dans l'infobulle du voyant Lightroom depuis le correctif 1.3.6 ; celle du module dans la barre de titre de la fenêtre Claude), `Raccourcis.lua` (⌃⌥C), `Chemins.lua` (dossiers et réglages de la fenêtre), `Fichiers.lua`, `Texte.lua` (UTF-8), `Journal.lua` (`conversation.log`), `Compat.lua` (`os.time`, `os.date`), `images/` et `images/sombre/` (les images de la fenêtre B en 2x, un jeu par apparence, dont `vide-498x332.png`, l'image « aucun aperçu ») ; `FenetrePublication.lua` et `Publication.lua` (profils et exportation de la fenêtre Publication), `FenetreConsommation.lua` et `Consommation.lua` (jetons comptés, budget de la semaine). La Séance de notation (`FenetreNotation.lua`, `MenuNotation.lua`) est retirée depuis la 1.1.1 (demandé par Dany le 20 octobre 2026)
+  - la liaison : `Liaison.lua` (prises LrSocket, jeton privé et refus des lignes sans lui, `module.log`), `Commandes.lua` (répartition des commandes du serveur) et les modules qui les portent : `Lecture.lua` (état, avec `liaison_fermee`, sélection, réglages, paramètres prédéfinis, diagnostic, journal), `Rendu.lua` (aperçus, avec `point_af` : photo décrite par `Vignettes.decrireVignette`, évaluation, et `etapes_claude` pour le bilan ; image entière et cadre relu, `sansRecadrage` partagé avec le recalage ; la vue gardée pour `Etapes` ; propositions, `essayer` avec `entier`, rendus du recalage), `Etapes.lua` (avant/après des étapes : empreinte, vue, capture autour de chaque commande, commande `etapes`, `Etapes.images` pour la fenêtre, ménage), `Carnet.lua` (registre `carnet.json` : commande `carnet`, `constater`, `Carnet.resumer`, `photosDuDefaut`, `vocabulaire`, `estPhotoDEssai` ; les leçons d'avant le correctif 1.3.6 gardées telles quelles), `Retouche.lua` (appliquer, recadrer, masquer, retoucher, copier), `Amelioration.lua` (débruitage, détails bruts, super résolution), `Suppression.lua` (reflets, retrait de la poussière), `Masques.lua` (reprendre un masque : commande `masques` ; masques vides), `Conversions.lua` (rotation d'un quart de tour), `Progression.lua` (barre de progression de Lightroom pendant une série : commande `progression`), `Vignettes.lua` (vignettes du cache d'aperçus : commande `vignettes` ; `decrireVignette`, aussi pour l'aperçu de `view_photo`), `Notation.lua` (registre des notes proposées, `notation.json` : commande `notation`, avec `remettre` pour la recette, `Notation.poser`), `Livraison.lua` (exporter, fenêtre d'exportation, options de livraison, dossier choisi dans une fenêtre, noms exacts, aperçus dynamiques), `Services.lua` (services de publication et réglages des services Disque dur, lus seulement), `Variantes.lua` (variantes en instantanés), `Annulation.lua` (annuler, revenir), `Bibliotheque.lua` (classement, paramètres prédéfinis de métadonnées, mots-clés, collections, recherche, copies virtuelles, photo montrée et filtre de la Bibliothèque : commandes `metadonnees`, `motsCles`, `collections`, `chercher`, `copieVirtuelle`, `montrer` ; notes acceptées ou posées sur demande : `Bibliotheque.noter` ; photo active et sélection remises : `Bibliotheque.remettreSelection`) ; leur socle : `Photos.lua` (photos visées, description, sensibilité ISO en nombre, mémoire de Claude ; `lireChamp` exporté pour le résumé du fil), `Reglages.lua` (valeurs de développement), `Recalage.lua` (géométrie, grille du serveur), `Plans.lua` (ce qu'une retouche changera), `Ecriture.lua` (écriture dans le catalogue, étapes avec leur id, `Ecriture.nouvelleEtape`, journal, `Ecriture.difference`), `Profils.lua` (profil relu après l'écriture), `Recadrage.lua` (calcul du cadre), `Geometrie.lua` (positions de l'aperçu vers le fichier), `Locaux.lua` (tables des masques, taches et yeux rouges) — ces trois-là sans SDK —, `Json.lua`, `Suivi.lua` (fenêtre de la liaison « Claude · liaison », menu « Afficher la fenêtre de la liaison », « fenêtre de suivi » jusqu'au correctif 1.3.6 ; `MenuSuivi.lua` garde son nom) ; `Liaison.lua` compte aussi les commandes en cours (`Liaison.enCours`, `Liaison.finCommande`, correctif 1.3.6), pour qu'Agrandir ne rende pas la photo pendant elles
+  - la fenêtre Claude : `Fenetre.lua` (la fenêtre : état, actions, boucle, apparence, calques et boutons, bandeau, textes des cartes page par page, carte Note B, aperçu de la photo active et son carré de mise au point, « Obtenir » (la proposition demandée sous la carte Proposition, à la place de celle préparée à l'ouverture), une photo, une conversation (`suivreSelection`, `suivrePhotos`, conversation neuve ou de groupe, « Repartir à neuf »), voyants de l'en-tête (Claude Code et Lightroom ; versions et mode dans l'infobulle du voyant Lightroom ; le voyant Écran retiré) et bouton Suivi (`ouvrirSuivi`), titre « Développeur v… » (`titreFenetre`), aide d'une liaison sans jeton, menu Mes demandes et ses fenêtres Ajouter…, Renommer… et Supprimer… (« ＋ Garder la demande » retiré au correctif 1.3.6), le résumé en bas du fil (`resume`, `suivreResume`, `suivreNoteDuResume`, `ajouterResume`, `lignesAide`) ; onglets Focus, Note, Aperçu et Proposition : la mise au point de la photo active, la note, l'étape ou l'image du fil cliquée avec son pourquoi (`voirImageDuFil`, `etapeAvant`, `choisirEtapeDeLImage`), la proposition et la composition ; ouverture sur Focus et retour à Focus (`revenirAFocus`), bascules vers Aperçu, Proposition et Note ; Agrandir qui remplit 2 000 × 1 250 (`GRANDE`, `agrandirUne`, `agrandirDeux`, `cadreDeux` ; la photo active redemandée en grand : `agrandirActive`, `preparerGrande`, `rendreActive`, `TAILLE_GRANDE`) ; la vignette de secours de l'aperçu de la photo active (`DELAI_SECOURS_ACTIVE`, `decrireActive`) ; plus de volet, de liste, de Mode, de Leçon, de « Je le fais », d'onglet Suivi, de « Pourquoi ? » ni de Détail… dans l'onglet Aperçu depuis le correctif 1.3.6), `Vues.lua` (ses pièces : aplats, images, boutons bleus, éléments inactifs, ligne du fil, en-tête (titre, « Repartir à neuf », deux voyants, bouton Suivi), saisie, menu Mes demandes et bandeau, segments, aperçu, cartes Proposition, Aperçu (sans Détail… depuis le correctif 1.3.6), Focus et Note, et la fabrique masquable des onglets ; ni Noter ni Évaluer), `Dispositions.lua` (la fenêtre B, seule disposition : tailles, dimensions, onglets (`ONGLETS`, seule liste), images, apparences et palettes), `Fil.lua` (le fil en lignes : texte riche, appel, auteur et heure, actions (« ☆ Voir la note » ; « ＋ Garder la demande » retiré au correctif 1.3.6), éléments `historique`, mention « Demande rapide », le résumé de la fenêtre (`lignesResume`) ; `lignesCarte`, les textes des cartes coupés ; le texte de l'onglet Focus et de la fenêtre Suivi), `Metriques.lua` (chasse des polices, produite par `scripts/metriques.swift`), `Moteur.lua` (conversations et processus de Claude Code, indépendants de la fenêtre ; la conversation de chaque photo : `conversationDe`, `preparerPhoto`, `completerDepuis`, `resumerGroupe`, `ecarter`, `noterVu` ; la Demande rapide : `envoyerRapide`, `conversationPour`, `reponseRapide` ; modèle et effort d'une demande), `Historique.lua` (correctif 1.3.6 : ce que la fenêtre dit d'une photo sans Claude ni jetons, « Historique de la photo », « Depuis la dernière fois » et le résumé d'un groupe, seule copie de leurs textes ; lectures du journal de Claude et des reprises à la main, `Historique.vu` ; les réglages hors des valeurs par défaut d'une photo sans étape de Claude, `Historique.ecarts` ; le résumé en bas du fil, section « Le résumé de la fenêtre » : `lireResumePhoto`, `lireResumeGroupe`, `resumePhoto`, `resumeGroupe`, `texteNote`), `FenetreSuivi.lua` (correctif 1.3.6 : la fenêtre Suivi, le carnet de progrès, ses photos d'un défaut et « Retirer du carnet… »), `FenetreRapide.lua` et `MenuRapide.lua` (la Demande rapide), `Session.lua` (un processus Claude Code par `relais.sh`), `relais.sh`, `Evenements.lua` (lignes stream-json de Claude Code), `Conversation.lua` (éléments d'une conversation : étapes, cadre demandé, dernier zoom, éléments `historique` ; champs `photo`, `vu`, `ecartee`, `groupe` (la retouche du tour et « Demande à garder » de Claude retirées au correctif 1.3.6) ; les éléments `lecon` et `exercice` d'avant le correctif 1.3.6 gardés sans ligne au fil), `Stockage.lua` (conversations sur le disque, jamais effacées depuis le correctif 1.3.6, et Mes demandes : `mes-demandes.json`), `Images.lua` (aperçus et photos jointes, base64 et `sips` ; carré de mise au point par le connecteur : `Images.marquerMiseAuPoint` ; onglet Focus : `Images.lireFocus` ; vignette remise à l'endroit : `Images.rotationManquante`, `Images.redresser` ; Agrandir : `Images.grande`, qui remplit la place), `presse-papiers.js` (lecture du presse-papiers par `osascript`), `Consignes.lua` (consignes ajoutées, dont les puces Peau (sans chiffres), Notes (la note d'abord de chaque photo traitée) et Mise au point montrée, et le résumé chiffré du bilan ; depuis la 1.3, les sections Composition et Raison de chaque étape, et la puce Carnet ; depuis le correctif 1.3.6, l'historique dans le Contexte et la fin d'une retouche par `view_photo` avec `compare = before_claude` (les sections Je le fais, Leçon de la photo, Écran et Demande à garder retirées) ; sept invites en raccourcis, dont Portrait, Paysage et Noir et blanc qui demandent la méthode du tireur sans chiffres, et Composition ; ajustements du cadre ; demande d'« Obtenir » (`Consignes.obtenir`, à la place de `proposerOuverture`), réponses aux propositions, règles de la Demande rapide (`rapide`, `rapidePhoto`), styles, modèles et efforts), `Lightroom.lua` (photo active, sa note et sa légende, sélection, sa clé et celle de son groupe, état et mode de la liaison, liaison occupée (`Lightroom.liaisonOccupee`, correctif 1.3.6), connexion de Claude Code, valeurs de l'onglet Focus : `Lightroom.infosFocus` ; l'écran principal n'y est plus lu depuis le correctif 1.3.6), `Composants.lua` (versions du module et du connecteur, dans l'infobulle du voyant Lightroom depuis le correctif 1.3.6 ; celle du module dans la barre de titre de la fenêtre Claude), `Raccourcis.lua` (⌃⌥C), `Chemins.lua` (dossiers et réglages de la fenêtre), `Fichiers.lua`, `Texte.lua` (UTF-8), `Journal.lua` (`conversation.log`), `Compat.lua` (`os.time`, `os.date`), `images/` et `images/sombre/` (les images de la fenêtre B en 2x, un jeu par apparence, dont `vide-498x332.png`, l'image « aucun aperçu ») ; `FenetrePublication.lua` et `Publication.lua` (profils et exportation de la fenêtre Publication), `FenetreConsommation.lua` et `Consommation.lua` (jetons comptés, budget de la semaine). La Séance de notation (`FenetreNotation.lua`, `MenuNotation.lua`) est retirée depuis la 1.1.1 (demandé par Dany le 20 octobre 2026)
 - `Tests/DeveloppeurKitTests/` : tests XCTest avec `FakeLightroom` et `FakePlugin` (TCP, dans `LightroomBridgeTests` ; `jetonAttendu` : le jeton qu'il exige, nil pour un module d'avant la 1.2) ; pour la 1.2 : `PeauTests`, `BoitierTests` (fichiers Fujifilm fabriqués, tons en SLONG et en LONG), `EclairageTests`, `BilanTests` (longueur des descriptions de `view_photo`, `preview_settings` et `analyze_photos` comprise), `EcranTests` (tests purs, `nommer`, `get_status` qui ne dit que le nom, aucune remarque aux aperçus depuis le correctif 1.3.6 ; la lecture du vrai écran avec `DEVELOPPEUR_ECRAN_REEL=1` seulement), `JetonLiaisonTests` ; pour la 1.3 : `PriseDeVueTests`, `PourquoiTests`, `CompositionTests` et `ContratCompositionTests`, `CarnetTests`, `Recette13Tests` (un module simulé à état ; `LeconTests`, `JeLeFaisTests` et `ContratJeLeFaisTests` sont retirés au correctif 1.3.6) ; pour la 1.3.5 : `Version135Tests` (le rendu reproductible au `before_claude` et ses séries compris) ; pour la 1.3.4 : `CarteMasqueTests` (carte du masque, lecture, alertes, `add_mask` avec `mask_map` face au faux module) et `EcretageEtPointsChaudsTests` ; la règle de la rafale dans `NotationTests` et `TriTests` ; pour l'onglet Focus : `FocusTests` et, dans `BoitierTests`, les valeurs de DSCF2402 (`BoitierTests.dscf2402`, jamais la photo). `FakeLightroom` note `progression` et `carnet` à part (`progressions`, `carnets`)
 - `Tests/Contrats/` : `composition.json`, l'échange figé entre le serveur et le module, lu par les essais Swift et Lua (un changement voulu se fait des deux côtés ; `je-le-fais.json` est retiré au correctif 1.3.6)
-- `Tests/Lua/Liaison/` : `Simulation.lua` (SDK de Lightroom simulé pour les commandes du serveur ; `LrTasks.execute` n'y imite que les deux commandes du fichier du jeton et refuse toute autre ; un `Mask/CircularGradient` sans `Flipped = true` ou sans `MaskInverted` booléen y est refusé ; `isoSpeedRating` brut y est un nombre, jamais le texte formaté ; le film fixe suit la source affichée, `S.visiblesSous` ; un `MaskGroupBasedCorrections` vide tombe aux rendus du recalage), `Aides.lua` (aides communes et remise à zéro par module, `A.remiseAZero`), `tests.lua`, les essais à part `essais-carnet.lua`, `essais-composition.lua`, `essais-etapes.lua`, `essais-registre.lua` (les leçons d'avant le correctif 1.3.6 gardées dans `carnet.json`), et `liens.lua` (chaque champ lu d'un module requis existe, dans tous les fichiers du module)
-- `Tests/Lua/Fenetre/` : `Simulation.lua` (SDK simulé pour la fenêtre, dossier personnel temporaire, liaison jamais démarrée ; refuse `visible` sur `row`, `column`, `group_box`, `tab_view` et `scrolled_view`, évalue les liaisons à plusieurs clés ; d'après les constats du 21 octobre 2026, refuse aussi `background_color` sur `row`, `column`, `view`, `group_box` et la fenêtre, `primary_line_color`, `mouse_down` sur un `f:picture`, un `f:picture` sans taille ou sans image ni fond, `image_name` avec un titre, plus d'un `default = true`, un `<EM>` mal formé ou sans `emphasis_font`, `presse-papiers.js` sans nom ; imite la frappe, Retour et les clics, `S.taper`, `S.retour`, `S.cliquer`, et le choix dans un menu, `S.choisir` (ni séparateur ni élément grisé : `S.refusElements`, relevé dans `AgViewUtils.getPopupMenu`), et refuse un geste sur une vue masquée ou inactive ; donne `copyName`, `cameraModel` et `dateTimeOriginal`), `faux-claude.sh` (imite Claude Code en stream-json), `tests.lua`, et les essais à part `essais-*.lua` (chacun charge la simulation, la complète localement sans toucher `Simulation.lua`, a ses propres aides et sort en échec si un essai échoue ; tous lancés par `tester-module.sh`) : `essais-dispositions.lua`, `essais-moteur.lua`, `essais-integration.lua` (de bout en bout avec les vrais modules, `sips` compris, Agrandir dans 2 000 × 1 250 aussi), `essais-gestionnaire.lua`, `essais-images.lua` (palettes et images des deux apparences), `essais-fenetre-b.lua` (cadre, tailles, contrôles, carte Note B, bandeau), `essais-pourquoi.lua` (un clic sur une étape ou une image du fil, le pourquoi de l'étape qui précède, l'image d'une proposition et une photo jointe, les bascules vers Aperçu), `essais-composition.lua`, `essais-carnet.lua` (le bouton Suivi et la fenêtre Suivi, « Photos d'un défaut… »), `essais-une-photo.lua` (une photo, une conversation : historique et son résumé des réglages, « Depuis la dernière fois », groupe, retour à Focus, « Repartir à neuf », conversations d'avant le correctif 1.3.6, plus de proposition à l'ouverture, « Obtenir », ménage des dossiers temporaires), `essais-proposition.lua` (la proposition dépassée, venue d'`essais-lecon.lua`, et une conversation d'avant le correctif 1.3.6 qui porte des éléments `lecon` et `exercice`), `essais-focus.lua` (l'onglet Focus, avec un faux `mcp-developpeur --focus` comme celui de `--marquer-af` d'`essais-integration.lua`), `essais-mes-demandes.lua` (le menu Mes demandes, ses fenêtres, `mes-demandes.json`, « ＋ Garder la demande »), `essais-rapide.lua` (la Demande rapide : boutons à icône sans ♻, réponse effacée par une autre sélection, la conversation de la photo seule, la demande jetable de plusieurs photos, Claude Code réservé avant les lectures) ; `essais-lecon.lua` et `essais-jelefais.lua` sont retirés au correctif 1.3.6, comme les cas LECON, « Je le fais » et « J'ai fini » de `faux-claude.sh`
+- `Tests/Lua/Liaison/` : `Simulation.lua` (SDK de Lightroom simulé pour les commandes du serveur ; `LrTasks.execute` n'y imite que les deux commandes du fichier du jeton et refuse toute autre ; un `Mask/CircularGradient` sans `Flipped = true` ou sans `MaskInverted` booléen y est refusé ; `isoSpeedRating` brut y est un nombre, jamais le texte formaté ; le film fixe suit la source affichée, `S.visiblesSous` ; un `MaskGroupBasedCorrections` vide tombe aux rendus du recalage), `Aides.lua` (aides communes et remise à zéro par module, `A.remiseAZero`), `tests.lua` (dont `Liaison.enCours`), les essais à part `essais-carnet.lua`, `essais-composition.lua`, `essais-etapes.lua`, `essais-registre.lua` (les leçons d'avant le correctif 1.3.6 gardées dans `carnet.json`), et `liens.lua` (chaque champ lu d'un module requis existe, dans tous les fichiers du module)
+- `Tests/Lua/Fenetre/` : `Simulation.lua` (SDK simulé pour la fenêtre, dossier personnel temporaire, liaison jamais démarrée ; refuse `visible` sur `row`, `column`, `group_box`, `tab_view` et `scrolled_view`, évalue les liaisons à plusieurs clés ; d'après les constats du 21 octobre 2026, refuse aussi `background_color` sur `row`, `column`, `view`, `group_box` et la fenêtre, `primary_line_color`, `mouse_down` sur un `f:picture`, un `f:picture` sans taille ou sans image ni fond, `image_name` avec un titre, plus d'un `default = true`, un `<EM>` mal formé ou sans `emphasis_font`, `presse-papiers.js` sans nom ; imite la frappe, Retour et les clics, `S.taper`, `S.retour`, `S.cliquer`, et le choix dans un menu, `S.choisir` (ni séparateur ni élément grisé : `S.refusElements`, relevé dans `AgViewUtils.getPopupMenu`), et refuse un geste sur une vue masquée ou inactive ; donne `copyName`, `cameraModel` et `dateTimeOriginal`), `faux-claude.sh` (imite Claude Code en stream-json), `tests.lua`, et les essais à part `essais-*.lua` (chacun charge la simulation, la complète localement sans toucher `Simulation.lua`, a ses propres aides et sort en échec si un essai échoue ; tous lancés par `tester-module.sh`) : `essais-dispositions.lua`, `essais-moteur.lua`, `essais-integration.lua` (de bout en bout avec les vrais modules, `sips` compris, Agrandir dans 2 000 × 1 250 aussi), `essais-gestionnaire.lua`, `essais-images.lua` (palettes et images des deux apparences), `essais-fenetre-b.lua` (cadre, tailles, contrôles, carte Note B, bandeau), `essais-pourquoi.lua` (un clic sur une étape ou une image du fil, le pourquoi de l'étape qui précède, l'image d'une proposition et une photo jointe, les bascules vers Aperçu), `essais-composition.lua`, `essais-carnet.lua` (le bouton Suivi et la fenêtre Suivi, « Photos d'un défaut… »), `essais-une-photo.lua` (une photo, une conversation : historique et son résumé des réglages, « Depuis la dernière fois », groupe, retour à Focus, « Repartir à neuf », conversations d'avant le correctif 1.3.6, plus de proposition à l'ouverture, « Obtenir », ménage des dossiers temporaires), `essais-resume.lua` (le résumé en bas du fil : ses textes et leurs caractères, les lectures groupées et une à une, l'ouverture, une autre photo, un groupe, la fin d'un tour, la note suivie, le rappel par le menu, jamais gardé ni envoyé), `essais-proposition.lua` (la proposition dépassée, venue d'`essais-lecon.lua`, et une conversation d'avant le correctif 1.3.6 qui porte des éléments `lecon` et `exercice`), `essais-focus.lua` (l'onglet Focus, avec un faux `mcp-developpeur --focus` comme celui de `--marquer-af` d'`essais-integration.lua` ; une photo verticale simulée, XH2S0407.RAF (Copie 1), et sa vignette de secours couchée, `rotationManquante`, Agrandir sur Focus et sur la photo active : grande vignette, rendu, liaison occupée, vignette de secours de l'aperçu), `essais-mes-demandes.lua` (le menu Mes demandes, ses fenêtres, `mes-demandes.json`, et l'absence de « ＋ Garder la demande », retiré au correctif 1.3.6), `essais-rapide.lua` (la Demande rapide : boutons à icône sans ♻, réponse effacée par une autre sélection, la conversation de la photo seule, la demande jetable de plusieurs photos, Claude Code réservé avant les lectures) ; `essais-lecon.lua` et `essais-jelefais.lua` sont retirés au correctif 1.3.6, comme les cas LECON, « Je le fais » et « J'ai fini » de `faux-claude.sh`
 - `scripts/` : `tester-module.sh` (vérification du module avec LuaJIT, essais à part des deux suites compris), `metriques.swift` (chasse des polices de la fenêtre), `gabarits.lua` (les tailles des images et les palettes de `Dispositions.lua`, en JSON), lu par `images-fenetre.swift` (les images de la fenêtre B, en deux jeux) et `images-vides.swift` (l'image « aucun aperçu » de chaque apparence, `vide-498x332.png`)
 - `.github/workflows/tests.yml` : syntaxe des scripts et les deux suites à chaque envoi sur `main` (macOS)
 - `build.sh` (tests, compilation, signature, archive notarisée), `install.sh`, `uninstall.sh`

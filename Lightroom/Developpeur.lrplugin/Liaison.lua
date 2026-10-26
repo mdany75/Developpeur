@@ -48,6 +48,11 @@ local Liaison = {
     erreur = nil,
     generation = 0,
     dernierEchange = nil,
+    -- Commandes reçues qui ne sont pas finies (Liaison.recevoir : de la vérification du jeton à
+    -- l'après de leur étape), et l'heure où la dernière a fini : la fenêtre Claude ne rend pas une
+    -- photo pendant ce temps (Agrandir, Lightroom.liaisonOccupee), son rendu se mêlerait à elles.
+    enCours = 0,
+    finCommande = nil,
 
     journal = {},
     -- Photo de chaque ligne du journal (ou false), pour la sélectionner d'un clic dans la fenêtre de la liaison.
@@ -424,7 +429,35 @@ end
 -- n'atteint pas Commandes.executer (ni la pause, ni « Proposer d'abord ») et n'emporte pas
 -- l'événement de la photo active. Autour de la commande, l'avant/après des étapes (Etapes.lua,
 -- 1.3) : avantCommande après le jeton, apresCommande une fois la réponse partie (Claude a déjà sa
--- réponse pendant le rendu de l'après), abandonner une fois l'erreur répondue.
+-- réponse pendant le rendu de l'après), abandonner une fois l'erreur répondue. Une commande acceptée
+-- compte dans Liaison.enCours jusque-là (correctif 1.3.6), même si elle échoue.
+local function traiter(requete)
+    local Commandes = require 'Commandes'
+    local Etapes = require 'Etapes'
+    local params = type(requete.params) == 'table' and requete.params or {}
+    -- Seuls les menus, la fenêtre de la liaison et la carte Note lèvent la pause et l'accord dans
+    -- Lightroom, par appel direct : une ligne du réseau ne le peut pas.
+    params.depuisLightroom = nil
+    -- Avant/après des étapes (1.3) : la commande attend une capture en cours, et l'avant d'une
+    -- étape se prépare ; l'après se rend une fois la réponse partie. Aucune erreur de ces
+    -- crochets n'atteint la commande.
+    local prete, cle = LrTasks.pcall(Etapes.avantCommande, requete.command, params)
+    cle = prete and cle or nil
+    local ok, resultat = LrTasks.pcall(Commandes.executer, requete.command, params)
+    if ok then
+        Liaison.repondre({ id = requete.id, result = resultat })
+        LrTasks.pcall(Etapes.apresCommande, requete.command, params, resultat, cle)
+    else
+        local texte = Liaison.messageErreur(resultat)
+        if requete.command ~= 'ping' and texte:sub(1, #Liaison.EN_ATTENTE) ~= Liaison.EN_ATTENTE then
+            Liaison.noter("Refusé : " .. texte)
+        end
+        Liaison.repondre({ id = requete.id, error = texte })
+        -- Après la réponse : abandonner peut rendre l'après d'une étape laissée en cours.
+        LrTasks.pcall(Etapes.abandonner, cle)
+    end
+end
+
 function Liaison.recevoir(message)
     LrTasks.startAsyncTask(function()
         local lu, requete = pcall(Json.decode, message)
@@ -439,29 +472,12 @@ function Liaison.recevoir(message)
             return
         end
         Liaison.dernierEchange = LrDate.currentTime()
-        local Commandes = require 'Commandes'
-        local Etapes = require 'Etapes'
-        local params = type(requete.params) == 'table' and requete.params or {}
-        -- Seuls les menus, la fenêtre de la liaison et la carte Note lèvent la pause et l'accord dans
-        -- Lightroom, par appel direct : une ligne du réseau ne le peut pas.
-        params.depuisLightroom = nil
-        -- Avant/après des étapes (1.3) : la commande attend une capture en cours, et l'avant d'une
-        -- étape se prépare ; l'après se rend une fois la réponse partie. Aucune erreur de ces
-        -- crochets n'atteint la commande.
-        local prete, cle = LrTasks.pcall(Etapes.avantCommande, requete.command, params)
-        cle = prete and cle or nil
-        local ok, resultat = LrTasks.pcall(Commandes.executer, requete.command, params)
-        if ok then
-            Liaison.repondre({ id = requete.id, result = resultat })
-            LrTasks.pcall(Etapes.apresCommande, requete.command, params, resultat, cle)
-        else
-            local texte = Liaison.messageErreur(resultat)
-            if requete.command ~= 'ping' and texte:sub(1, #Liaison.EN_ATTENTE) ~= Liaison.EN_ATTENTE then
-                Liaison.noter("Refusé : " .. texte)
-            end
-            Liaison.repondre({ id = requete.id, error = texte })
-            -- Après la réponse : abandonner peut rendre l'après d'une étape laissée en cours.
-            LrTasks.pcall(Etapes.abandonner, cle)
+        Liaison.enCours = (tonumber(Liaison.enCours) or 0) + 1
+        local fini, erreur = LrTasks.pcall(traiter, requete)
+        Liaison.enCours = math.max(0, (tonumber(Liaison.enCours) or 1) - 1)
+        Liaison.finCommande = LrDate.currentTime()
+        if not fini then
+            error(erreur, 0)
         end
         Liaison.signaler()
     end)

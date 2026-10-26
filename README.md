@@ -114,7 +114,7 @@ colonnes, avec les onglets Focus, Note, Aperçu et Proposition et le bouton Suiv
   pause, accord attendu : la raison est sur chaque ligne). L'historique de la photo et « Depuis la
   dernière fois » sont en gris, sans « Vous » ni « Claude » ; une demande faite par la Demande
   rapide porte dessous la mention « Demande rapide ». Le tour de Claude qui a noté finit par
-  « ☆ Voir la note », et celui qui a retouché, par « ＋ Garder la demande » (voir Mes demandes).
+  « ☆ Voir la note ».
   Un clic sur une étape de Claude ouvre l'onglet Aperçu : son avant/après et sa raison (voir
   Apprendre avec Claude). Un clic sur une image (« Aperçu de Claude · cliquer pour le voir, avec son
   pourquoi ») l'ouvre aussi, sur cette image, avec le pourquoi de l'étape qui la précède ; l'image
@@ -123,6 +123,16 @@ colonnes, avec les onglets Focus, Note, Aperçu et Proposition et le bouton Suiv
   réponse. ▲, ▼ et Fin pour
   s'y déplacer ; à droite, ce que fait Claude, sinon le dernier relevé du forfait (5 heures et
   semaine).
+- En bas du fil, toujours, le résumé que fait la fenêtre (sans Claude ni forfait), en gris : à
+  l'ouverture de la fenêtre, et chaque fois qu'une autre photo ou une autre sélection change la
+  conversation montrée. Pour une photo, « Résumé de la photo : … » : sa prise de vue (appareil,
+  objectif, focale, ouverture, vitesse, ISO, date, comme Lightroom les écrit), sa note et son drapeau
+  (« 3 ★ · retenue »), son état (ses étapes de Claude, la dernière avec sa date, vos reprises à la
+  main) et ses réglages hors de leur valeur par défaut. Pour plusieurs photos, « Résumé de la
+  sélection : 12 photos » : leurs dates (« Prises du 3 oct. 2026 au 25 oct. 2026 »), leurs appareils
+  (« X-H2S (10), X-T20 (2) »), et combien sont retouchées par Claude, notées, rejetées. Il se refait
+  à la fin de chaque tour de Claude et suit la note posée sur la photo ; il n'est ni gardé dans la
+  conversation, ni envoyé à Claude.
 - Les onglets de droite, dans l'ordre : Focus (la mise au point de la photo active, comme
   Focus-Points la montre), Note (la carte Note), Aperçu (l'étape ou l'image cliquée dans le fil, et
   les images de Claude) et Proposition (la retouche que Claude propose). La fenêtre s'ouvre sur
@@ -135,9 +145,13 @@ colonnes, avec les onglets Focus, Note, Aperçu et Proposition et le bouton Suiv
   que vous choisissez une autre photo), la photo active, avec sa légende (son nom, son appareil et
   sa date de prise de vue) ; puis les images que Claude regarde et les photos jointes. ◀ ▶ pour les
   parcourir (▶ depuis la dernière revient à la photo active), Agrandir pour les voir en grand :
-  jusqu'à 2 000 × 1 250 points (1 100 × 740 avant le correctif 1.3.6), l'avant et l'après d'une
-  étape côte à côte ensemble dans ce cadre ; une image plus petite garde sa vraie taille, jamais
-  étirée.
+  l'image remplit 2 000 × 1 250 points (1 100 × 740 avant le correctif 1.3.6), l'avant et l'après
+  d'une étape côte à côte ensemble dans ce cadre ; une image plus petite est agrandie (un peu plus
+  douce, jamais minuscule). La photo active (Focus, l'aperçu) se redemande en grand à Lightroom au
+  clic ; juste après une retouche, quand il la refuse, un rendu de la photo la remplace (sauf
+  pendant que Claude travaille, dans la fenêtre ou par Claude Desktop : l'image du panneau,
+  agrandie). Juste après une retouche, l'aperçu montre une petite vignette en attendant la grande.
+  Une photo verticale est toujours montrée debout.
 - Le point de mise au point sur la photo active, pour une photo Fujifilm (RAF, ou JPEG de
   l'appareil) : un cadre rouge avec un point au centre, comme dans l'onglet Focus (le carré vert
   d'avant reste pour un point dont la taille ne se lit pas : rouge si l'appareil a signalé la mise
@@ -159,7 +173,7 @@ colonnes, avec les onglets Focus, Note, Aperçu et Proposition et le bouton Suiv
   Quand la mise au point d'une photo Fujifilm ne se lit pas, la carte dit pourquoi : original
   introuvable, trop long à ouvrir, ou format pas encore lu (comme un HEIF de l'appareil).
   L'onglet suit la photo active et ses retouches : quand Claude a fini de retoucher, l'onglet
-  montré relit la photo ; un clic sur l'onglet la relit aussi si elle a été recadrée ou retouchée. Agrandir montre la photo et ses cadres en grand. Le point
+  montré relit la photo ; un clic sur l'onglet la relit aussi si elle a été recadrée ou retouchée. Agrandir montre la photo et ses cadres en grand, redemandée à Lightroom au clic. Le point
   unique est un carré de la taille que Focus-Points lui donne par défaut ; une zone de 5 × 5 est
   dessinée à sa taille approchée.
 - Une proposition sur demande, par Obtenir (correctif 1.3.6) : sous la carte de l'onglet
@@ -201,11 +215,8 @@ colonnes, avec les onglets Focus, Note, Aperçu et Proposition et le bouton Suiv
   du menu, Ajouter… (un nom, une courte description et le texte ; celui du champ y est déjà, s'il y
   en a un), Renommer… (le nom, la description ou le texte d'une demande) et Supprimer… (après
   confirmation). Un nom vide ou déjà pris est refusé, avec la raison ; le menu est grisé pendant
-  que Claude travaille. Après une retouche, Claude finit sa réponse par une ligne « Demande à
-  garder : « … » », la demande qui referait son travail sur une photo semblable : « ＋ Garder la
-  demande », sur la ligne d'actions de sa réponse, ouvre Ajouter… déjà rempli (nom et description
-  proposés, à changer avant de garder). Rien de tel après une simple proposition, une notation ou
-  un classement.
+  que Claude travaille. (« ＋ Garder la demande », qui gardait la demande que Claude écrivait à la
+  fin d'une retouche, est retiré au correctif 1.3.6.)
 - Joindre une photo du disque (📎 : JPEG, PNG, HEIC, TIFF, WebP) ou coller l'image du
   presse-papiers (📋 : capture d'écran, image copiée, photo copiée dans le Finder), comme exemple
   ou comme référence de style. Les photos jointes s'affichent dans le bandeau ; un clic les retire.
@@ -241,7 +252,7 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
   résumé court du groupe (« 3 de ces 12 photos ont déjà des étapes de Claude : … ») ; la demande
   vise toutes les photos sélectionnées dans Lightroom, pas seulement la photo active (sauf si elle
   en nomme une).
-- Claude répond sans noter les photos d'abord, sans titre ni « Demande à garder ».
+- Claude répond sans noter les photos d'abord, et sans titre.
 - Un seul Claude à la fois : pendant que la fenêtre Claude travaille, la Demande rapide refuse, et
   inversement ; la barre du fil de la fenêtre Claude dit alors « pour la Demande rapide ».
 - Au-dessus, la réponse, page par page : ▲ et ▼, au-dessus d'Envoyer, la font défiler comme les
@@ -275,9 +286,8 @@ correctif 1.3.6, à votre demande du 25 octobre 2026 ; les leçons déjà rangé
   ce que l'étape y fait), et les réglages changés. Si l'étape a été annulée ensuite (`undo_last`) ou
   défaite (retour à « Avant Claude »), la carte le dit.
 - L'aperçu montre l'après de l'étape ; Voir l'avant et Voir l'après passent de l'un à l'autre,
-  Agrandir les montre côte à côte en grand (jusqu'à 2 000 × 1 250 points pour les deux), ◀ ▶
-  passent d'une étape à l'autre de la même photo, et Détail… montre l'appel de l'outil et sa
-  réponse.
+  Agrandir les montre côte à côte en grand (2 000 × 1 250 points pour les deux), et ◀ ▶ passent
+  d'une étape à l'autre de la même photo.
 - Un clic sur une image du fil l'ouvre aussi dans l'onglet Aperçu, avec le pourquoi de l'étape qui
   la précède (un classement est sauté : il ne change pas l'image) ; ◀ ▶ vont alors d'une image à
   l'autre, et la carte suit. Chaque nouvelle image de Claude s'y ouvre d'elle-même. L'image d'une
@@ -1158,8 +1168,9 @@ Le module, avec LuaJIT : forme du module, syntaxe et globales de chaque fichier,
 `relais.sh`, liens entre les fichiers, puis deux suites, chacune sur son Lightroom simulé :
 `Tests/Lua/Liaison` (les commandes du connecteur, notes proposées, avant/après des étapes, carnet
 compris, leçons d'avant gardées telles quelles) et `Tests/Lua/Fenetre` (la fenêtre Claude avec un
-faux Claude Code, une photo une conversation, la Demande rapide, ses images et ses apparences,
-l'onglet Focus avec un faux connecteur, Agrandir avec le vrai `sips`, la fenêtre Suivi, Publication
+faux Claude Code, une photo une conversation, le résumé en bas du fil, la Demande rapide, ses
+images et ses apparences, l'onglet Focus avec un faux connecteur (une photo verticale comprise),
+Agrandir avec le vrai `sips`, la fenêtre Suivi, Publication
 et Consommation) ;
 dans chacune, les essais `essais-*.lua`
 tournent après `tests.lua`. La simulation de la fenêtre imite ce qui a été constaté dans

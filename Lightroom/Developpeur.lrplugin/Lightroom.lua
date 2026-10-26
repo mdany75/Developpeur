@@ -181,6 +181,21 @@ function Lightroom.liaison()
     return 'active'
 end
 
+-- Vrai quand une commande du connecteur est en cours dans la liaison (Claude Desktop, Claude Code en
+-- terminal, que Moteur.travaille ne voit pas), ou a fini depuis moins de DELAI_LIAISON_LIBRE secondes
+-- (la suivante d'une série peut arriver) : la fenêtre ne rend pas alors une photo (Agrandir,
+-- Fenetre.rendreActive), dont le rendu (réglages IA, exportation, écriture privée) se mêlerait à ses
+-- commandes (correctif 1.3.6).
+Lightroom.DELAI_LIAISON_LIBRE = 5
+
+function Lightroom.liaisonOccupee()
+    if (tonumber(Liaison.enCours) or 0) > 0 then
+        return true
+    end
+    local fin = tonumber(Liaison.finCommande)
+    return fin ~= nil and LrDate.currentTime() - fin < Lightroom.DELAI_LIAISON_LIBRE
+end
+
 -- Démarre la liaison si elle est arrêtée, ou la relance après une erreur (clic sur le voyant de
 -- la fenêtre).
 function Lightroom.demarrerLiaison()

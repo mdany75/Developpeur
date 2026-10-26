@@ -65,6 +65,7 @@ local Etapes = require 'Etapes'
 local FenetreSuivi = require 'FenetreSuivi'
 local Fichiers = require 'Fichiers'
 local Fil = require 'Fil'
+local Historique = require 'Historique'
 local Images = require 'Images'
 local Journal = require 'Journal'
 local Json = require 'Json'
@@ -376,10 +377,6 @@ function Fenetre.lierSaisie()
     }
 end
 
--- Ce que montre la ligne d'actions d'un tour de Claude (Vues.ligneFil) : sa base et « ＋ Garder la
--- demande » (Fil.lireActions).
-Fenetre.lireActions = Fil.lireActions
-
 -- Une clé de la fenêtre que pose une pièce elle-même (l'enfoncement d'un bouton bleu) : sa valeur
 -- avant l'ouverture, comme toute clé liée.
 function Fenetre.preparerCle(cle, valeur)
@@ -645,7 +642,95 @@ function Fenetre.repartir()
     Journal.noter("Repartir à neuf : conversation neuve pour la photo", tostring(id))
     p.message = Fenetre.REPARTIE
     Fenetre.poserRepartir()
+    Fenetre.suivreResume()
     return true
+end
+
+-- Le résumé en bas du fil (deuxième retour de Dany du 25 octobre 2026) ---------------------------
+-- À l'ouverture de la fenêtre (et quand le menu ou ⌃⌥C la rappelle), et chaque fois qu'une autre
+-- photo ou un autre groupe change la conversation montrée, la fenêtre fait un résumé, sans Claude ni
+-- jetons, montré en bas du fil, sous la conversation (Fenetre.ajouterResume) : pour une photo, sa
+-- prise de vue, sa note et son drapeau, et son état ; pour plusieurs photos, leur nombre, leurs dates,
+-- leurs appareils, et combien sont retouchées par Claude, notées, rejetées (Historique.lua, section
+-- « Le résumé de la fenêtre » : lectures groupées du catalogue par appel direct, dans une tâche). Il
+-- n'est pas gardé dans la conversation (ni sur le disque, ni envoyé à Claude) : `Fenetre.resume` {
+-- conversation, photo ou groupe, donnees, texte, fin, versionNotation, perime }, refait à chaque
+-- fois. Il est celui de la conversation montrée : de sa photo (c.photo), ou de la sélection si elle
+-- est son groupe (c.groupe) ; rien pour une conversation sans photo ni groupe (la case Autre photo
+-- décochée). Il se refait aussi à la fin d'un tour de Claude ou quand le registre des notes change
+-- (la photo a pu changer : Fenetre.suivreResume, depuis la boucle), jamais pendant que Claude
+-- travaille, sauf pour une autre conversation montrée ; la note et le drapeau d'une photo suivent ceux
+-- que Fenetre.majPhoto lit toutes les 2 s (Fenetre.suivreNoteDuResume).
+Fenetre.resume = nil
+
+-- Fait le résumé de la conversation montrée (dans une tâche).
+function Fenetre.refaireResume()
+    local c = Moteur.courante
+    local r = { conversation = c, fin = Moteur.finTravail or 0, versionNotation = Notation.version }
+    local info = Fenetre.info
+    if c and c.photo ~= nil and c.groupe == nil then
+        r.photo = c.photo
+        r.donnees = Historique.lireResumePhoto(c.photo)
+        r.texte = r.donnees and Historique.resumePhoto(r.donnees) or nil
+    elseif c and c.groupe ~= nil and type(info) == 'table' and info.groupe == c.groupe then
+        r.groupe = c.groupe
+        r.donnees = Historique.lireResumeGroupe()
+        r.texte = r.donnees and Historique.resumeGroupe(r.donnees) or nil
+    end
+    Fenetre.resume = r
+    Fenetre.aRafraichir = true
+    return r
+end
+
+-- Refait le résumé s'il n'est plus celui de la conversation montrée, ou, Claude libre, si un tour
+-- de Claude a fini ou que le registre des notes a changé depuis, ou s'il est périmé (la fenêtre
+-- rappelée). Rend vrai s'il est refait. Dans une tâche.
+function Fenetre.suivreResume()
+    local r, c = Fenetre.resume, Moteur.courante
+    local autre = r == nil or r.conversation ~= c
+    if not autre and (Moteur.travaille or (r.fin == (Moteur.finTravail or 0) and r.versionNotation == Notation.version and not r.perime)) then
+        return false
+    end
+    Fenetre.refaireResume()
+    return true
+end
+
+-- La note et le drapeau de la photo du résumé, s'ils ont changé sur la photo active (`info` :
+-- Lightroom.photos) : le résumé se refait sans relire le catalogue.
+function Fenetre.suivreNoteDuResume(info)
+    local r = Fenetre.resume
+    local a = type(info) == 'table' and info.active or nil
+    if not (r and r.donnees and r.photo ~= nil and r.conversation == Moteur.courante and a and a.note ~= nil
+        and Conversation.clePhoto(a.id) == Conversation.clePhoto(r.photo)) then
+        return false
+    end
+    if r.donnees.note == a.note and r.donnees.drapeau == a.drapeau then
+        return false
+    end
+    r.donnees.note, r.donnees.drapeau = a.note, a.drapeau
+    r.texte = Historique.resumePhoto(r.donnees)
+    Fenetre.aRafraichir = true
+    return true
+end
+
+-- Ajoute à `lignes` (celles du fil de `c`) les lignes du résumé, s'il est celui de `c`, après une
+-- ligne vide ; ses lignes se gardent tant que son texte et la largeur ne changent pas.
+function Fenetre.ajouterResume(lignes, c)
+    local r = Fenetre.resume
+    if not (r and r.conversation == c and r.texte) then
+        return lignes
+    end
+    local largeur = Fenetre.largeurTexte()
+    if not (r.lignes and r.largeur == largeur and r.lignesDe == r.texte) then
+        r.lignes, r.largeur, r.lignesDe = Fil.lignesResume(r.texte, largeur), largeur, r.texte
+    end
+    if #r.lignes > 0 and lignes[#lignes] and lignes[#lignes].genre ~= 'vide' then
+        lignes[#lignes + 1] = { genre = 'vide', texte = '' }
+    end
+    for _, l in ipairs(r.lignes) do
+        lignes[#lignes + 1] = l
+    end
+    return lignes
 end
 
 -- Fil -----------------------------------------------------------------------------------------
@@ -664,6 +749,16 @@ end
 Fenetre.FIL_VIDE_TITRE = "Demandez à Claude."
 Fenetre.FIL_VIDE = "Claude voit la photo active et la sélection de Lightroom, et retouche avec le connecteur MCP-Développeur."
 
+-- Les lignes du fil d'une conversation vide (sur la deuxième ligne, le titre, puis l'aide entière,
+-- sans « … ») ; d'aucun élément : un clic n'y fait rien.
+function Fenetre.lignesAide()
+    local lignes = { { genre = 'vide', texte = '' }, { genre = 'titre', texte = Fenetre.FIL_VIDE_TITRE } }
+    for _, t in ipairs(Fil.couper(Fenetre.FIL_VIDE, Fenetre.largeurTexte() - Fil.MARGE - Fil.retrait('note'), Fil.polices.note)) do
+        lignes[#lignes + 1] = { genre = 'note', texte = t }
+    end
+    return lignes
+end
+
 function Fenetre.rafraichirFil()
     local p, T = Fenetre.p, Fenetre.T
     if not p then
@@ -678,6 +773,12 @@ function Fenetre.rafraichirFil()
         Fenetre.etape = nil
     end
     local lignes = c and Fil.lignes(c, Fenetre.largeurTexte(), Fenetre.cache) or {}
+    -- Une conversation vide : son titre et l'aide ; puis, sous la conversation, le résumé de la
+    -- fenêtre (Fenetre.resume).
+    if #lignes == 0 then
+        lignes = Fenetre.lignesAide()
+    end
+    Fenetre.ajouterResume(lignes, c)
     -- Lecteur remonté dans le fil : ce qui arrive ne déplace pas ce qu'il lit.
     if Fenetre.defilement > 0 and Fenetre.total and #lignes > Fenetre.total then
         Fenetre.defilement = Fenetre.defilement + (#lignes - Fenetre.total)
@@ -689,9 +790,9 @@ function Fenetre.rafraichirFil()
     Fenetre.defilement = defilement
     Fenetre.premiere = premiere
     -- Chaque ligne : son texte, son genre et son icône ; sa colonne auteur (`a..i` : 'dany',
-    -- 'claude', 'heure' ou rien ; l'heure dans `h..i`) ; ses actions (`x..i` : 'note', 'demande',
-    -- 'note+demande' ou rien). (« Pourquoi ? », `q..i`, est retiré au correctif 1.3.6 : un clic sur
-    -- la ligne d'une étape en tient lieu.)
+    -- 'claude', 'heure' ou rien ; l'heure dans `h..i`) ; ses actions (`x..i` : 'note' ou rien).
+    -- (« Pourquoi ? », `q..i`, est retiré au correctif 1.3.6 : un clic sur la ligne d'une étape en
+    -- tient lieu ; « ＋ Garder la demande », 'demande' et 'note+demande', au même correctif.)
     for i = 1, T.lignes do
         local l = lignes[premiere + i - 1]
         poser(p, 't' .. i, l and l.texte or '')
@@ -700,18 +801,6 @@ function Fenetre.rafraichirFil()
         poser(p, 'a' .. i, l and (l.auteur or (l.heure and 'heure')) or '')
         poser(p, 'h' .. i, l and l.heure or '')
         poser(p, 'x' .. i, l and l.actions or '')
-    end
-    if #lignes == 0 then
-        poser(p, 't2', Fenetre.FIL_VIDE_TITRE)
-        poser(p, 'g2', 'titre')
-        -- L'aide coupée comme une ligne du fil (genre note, son retrait compris) : entière, sans « … ».
-        local aide = Fil.couper(Fenetre.FIL_VIDE, Fenetre.largeurTexte() - Fil.MARGE - Fil.retrait('note'), Fil.polices.note)
-        for k, t in ipairs(aide) do
-            if 2 + k <= T.lignes then
-                poser(p, 't' .. (2 + k), t)
-                poser(p, 'g' .. (2 + k), 'note')
-            end
-        end
     end
     local derniere = math.min(premiere + T.lignes - 1, #lignes)
     poser(p, 'positionFil', #lignes > T.lignes and string.format("Lignes %d à %d sur %d", premiere, derniere, #lignes) or '')
@@ -735,8 +824,8 @@ end
 -- 2026) : une étape (la ligne d'un appel, Conversation.estEtape) s'ouvre dans l'onglet Aperçu, son
 -- avant/après dans l'aperçu et sa raison dans la carte (Fenetre.montrerEtape) ; une image aussi,
 -- montrée dans l'aperçu, avec dans la carte le pourquoi de l'étape qui la précède dans le fil s'il
--- y en a une (Fenetre.voirImageDuFil). La ligne d'actions d'une notation n'a pas de texte : ses
--- boutons (Fenetre.voirNote, Fenetre.garderDemande).
+-- y en a une (Fenetre.voirImageDuFil). La ligne d'actions d'une notation n'a pas de texte : son
+-- bouton (Fenetre.voirNote).
 function Fenetre.estEtape(e)
     return Conversation.estEtape(e)
 end
@@ -981,14 +1070,31 @@ end
 -- cadre de l'aperçu, et se refait à chaque ouverture (la photo a pu être retouchée).
 Fenetre.TAILLE_PHOTO_ACTIVE = 1024
 
--- Le carré de mise au point sur la vignette de la photo active, pour un fichier Fujifilm (demandé
--- par Dany le 20 octobre 2026) : le connecteur le lit dans l'original et le dessine
--- (Images.marquerMiseAuPoint) ; rien pour une autre marque (son original n'est pas ouvert).
-function Fenetre.marquerMiseAuPoint(id, source)
+-- Juste après une retouche, Lightroom refuse la vignette de 1 024 (« error loading thumb ») plus
+-- d'une minute : comme l'onglet Focus (Fenetre.preparerFocus), elle se redemande une fois par
+-- seconde, ESSAIS_VIGNETTE_FOCUS fois au plus, puis à TAILLE_SECOURS_FOCUS, redressée
+-- (Images.redresser). Ce résultat de secours (`secours`) se montre, et la grande se redemande à un
+-- rafraîchissement suivant, DELAI_SECOURS_ACTIVE secondes au moins après la dernière demande (sinon
+-- la fin de chaque demande, qui rafraîchit l'aperçu, en relancerait une autre). L'aperçu a ainsi une
+-- image, et Agrandir passe par Fenetre.agrandirActive (la grande au clic, sinon un rendu).
+Fenetre.DELAI_SECOURS_ACTIVE = 10
+
+-- La description de la photo `id` (Vignettes.decrireVignette : marque, original, géométrie), lue
+-- dans une tâche ; nil si elle ne se lit pas.
+function Fenetre.decrireActive(id)
     local ok, d = LrTasks.pcall(function()
         return require('Vignettes').decrireVignette(require('Photos').photoParId(id))
     end)
-    if not ok or type(d) ~= 'table' or not Fenetre.estFujifilm(d) then
+    return ok and type(d) == 'table' and d or nil
+end
+
+-- Le carré de mise au point sur la vignette de la photo active, pour un fichier Fujifilm (demandé
+-- par Dany le 20 octobre 2026) : le connecteur le lit dans l'original et le dessine
+-- (Images.marquerMiseAuPoint) ; rien pour une autre marque (son original n'est pas ouvert). `d` :
+-- la description déjà lue (Fenetre.decrireActive), sinon lue ici.
+function Fenetre.marquerMiseAuPoint(id, source, d)
+    d = d or Fenetre.decrireActive(id)
+    if not d or not Fenetre.estFujifilm(d) then
         return nil
     end
     return Images.marquerMiseAuPoint(Chemins.prefs().cheminConnecteur, d.chemin_original, d.geometrie, source)
@@ -1009,28 +1115,47 @@ local function montrerActive(p, T, active, n)
     if a and a.id == active.id and a.T == T then
         poser(p, 'imageApercu', a.chemin)
         poser(p, 'aImage', true)
-        return
+        -- Une vignette de secours reste montrée ; la grande se redemande, une fois le délai passé.
+        if not a.secours or os.time() - (a.le or 0) < Fenetre.DELAI_SECOURS_ACTIVE then
+            return
+        end
+    else
+        poser(p, 'imageApercu', Fenetre.imageVide())
+        poser(p, 'aImage', false)
     end
-    poser(p, 'imageApercu', Fenetre.imageVide())
-    poser(p, 'aImage', false)
     if Fenetre.demandeActive == active.id then
         return
     end
     Fenetre.demandeActive = active.id
     LrTasks.startAsyncTask(function()
-        local ok, chemin, dossier, fichier = LrTasks.pcall(function()
+        local ok, chemin, dossier, fichier, secours = LrTasks.pcall(function()
             -- Un dossier par vignette (Images.vignette garde ses réductions par nom de fichier).
             local d = LrPathUtils.child(LrPathUtils.child(Chemins.temporaire(), 'PhotoActive'), Conversation.identifiant())
             local Vignettes = require 'Vignettes'
             local chemins, erreurs = Vignettes.demander({ active.id }, Fenetre.TAILLE_PHOTO_ACTIVE, d)
             local source = chemins[active.id]
+            -- Refusée (juste après une retouche) : redemandée, puis la petite (DELAI_SECOURS_ACTIVE).
+            local essais, petite = 1, false
+            while not source and essais < Fenetre.ESSAIS_VIGNETTE_FOCUS do
+                LrTasks.sleep(1)
+                essais = essais + 1
+                chemins, erreurs = Vignettes.demander({ active.id }, Fenetre.TAILLE_PHOTO_ACTIVE, d)
+                source = chemins[active.id]
+            end
+            if not source then
+                chemins, erreurs = Vignettes.demander({ active.id }, Fenetre.TAILLE_SECOURS_FOCUS, d)
+                source, petite = chemins[active.id], true
+            end
             if not source then
                 Journal.noter("Aperçu de la photo active :", tostring(erreurs[active.id]))
                 return nil
             end
-            source = Fenetre.marquerMiseAuPoint(active.id, source) or source
+            -- À l'endroit avant le carré (Images.redresser : une vignette couchée se tourne).
+            local description = Fenetre.decrireActive(active.id)
+            source = Images.redresser(source, description and description.geometrie)
+            source = Fenetre.marquerMiseAuPoint(active.id, source, description) or source
             local d, f = LrPathUtils.parent(source), LrPathUtils.leafName(source)
-            return vignetteApercu(T, d, f), d, f
+            return vignetteApercu(T, d, f), d, f, petite
         end)
         if Fenetre.demandeActive == active.id then
             Fenetre.demandeActive = nil
@@ -1041,12 +1166,20 @@ local function montrerActive(p, T, active, n)
             if avant and avant.dossier ~= dossier then
                 Fichiers.supprimer(avant.dossier)
             end
-            Fenetre.apercuActif = { id = active.id, T = T, chemin = chemin, dossier = dossier, fichier = fichier }
+            Fenetre.apercuActif = { id = active.id, T = T, chemin = chemin, dossier = dossier, fichier = fichier,
+                secours = secours or nil, le = os.time() }
             if Fenetre.p and Fenetre.T == T then
                 Fenetre.rafraichirApercu()
             end
-        elseif not ok then
-            Journal.noter("Aperçu de la photo active :", tostring(chemin))
+        else
+            if not ok then
+                Journal.noter("Aperçu de la photo active :", tostring(chemin))
+            end
+            -- Rien de rendu : une vignette de secours déjà montrée attend de nouveau le délai.
+            local montree = Fenetre.apercuActif
+            if montree and montree.id == active.id and montree.secours then
+                montree.le = os.time()
+            end
         end
     end)
 end
@@ -1203,13 +1336,13 @@ local function titreAgrandi(defaut)
 end
 
 -- Agrandir (décision de Dany du 25 octobre 2026, correctif 1.3.6 ; 1 100 × 740 jusque-là) : l'image
--- en grand tient dans GRANDE, sous chacune de ses formes (l'aperçu, Focus, la photo active, une
--- image du fil, et l'avant et l'après d'une étape côte à côte : les deux ensemble, Fenetre.cadreDeux) ;
+-- en grand remplit GRANDE, sous chacune de ses formes (l'aperçu, Focus, la photo active, une image
+-- du fil, et l'avant et l'après d'une étape côte à côte : les deux ensemble, Fenetre.cadreDeux) ;
 -- elle laisse à la fenêtre modale sa barre de titre et son bouton Fermer sur l'écran de Dany, de
--- 3 440 × 1 440. Une image plus petite est montrée à sa vraie taille, jamais étirée (Images.grande) :
--- la vignette de la photo active est celle que Lightroom a en cache, plus grande que
--- TAILLE_PHOTO_ACTIVE (1 720 pixels de grand côté pour un RAW, constaté le 17 octobre 2026), celles
--- des étapes ont 1 024 pixels (Etapes.COTE).
+-- 3 440 × 1 440. Une image plus petite est agrandie, un peu plus douce, jamais minuscule
+-- (Images.grande ; retour de Dany du même jour : la vignette de secours de Focus, 320 × 213, était
+-- montrée à sa vraie taille) ; celles des étapes ont 1 024 pixels (Etapes.COTE). La photo active
+-- (Focus, l'aperçu de la photo active) se redemande en grand au clic (Fenetre.agrandirActive).
 Fenetre.GRANDE = { largeur = 2000, hauteur = 1250 }
 
 -- Une image en grand (`dossier`, `nom`) dans une fenêtre à part, titrée `titre`, depuis une tâche
@@ -1233,6 +1366,84 @@ function Fenetre.agrandirUne(titre, dossier, nom)
     return true
 end
 
+-- La photo active en grand (l'onglet Focus, l'aperçu de la photo active ; retour de Dany du
+-- 25 octobre 2026) : la vignette du panneau (1 024 px, 256 juste après une retouche) était trop
+-- petite. Au clic, dans une tâche, la fenêtre demande à Lightroom une vignette de TAILLE_GRANDE ;
+-- refusée (juste après une retouche, « error loading thumb »), un rendu de la photo par le chemin des
+-- aperçus de la liaison (Fenetre.rendreActive), sauf pendant que Claude travaille ou qu'une commande
+-- de la liaison est en cours ou vient de finir (Lightroom.liaisonOccupee : Claude Desktop, Claude
+-- Code en terminal ; le rendu se mêlerait à leurs commandes) ; sinon l'image du panneau, agrandie.
+-- Comme un aperçu de view_photo, ce rendu note la photo apercuSeulement (écriture privée, rien dans
+-- Édition › Annuler) et fait passer isExported à vrai. La vignette se redresse
+-- (Images.redresser), puis se marque comme celle du panneau : les cadres de Focus
+-- (Images.lireFocus), le carré des autres onglets (Fenetre.marquerMiseAuPoint) ; son dossier
+-- (PhotoActive/Grande-…) s'efface à la fermeture.
+Fenetre.TAILLE_GRANDE = 2048
+
+-- Un rendu de la photo active (Rendu.rendre, comme les aperçus de view_photo : réglages IA calculés
+-- d'abord, photo notée apercuSeulement), copié dans `dossier` ; le dossier propre au rendu s'efface.
+-- Rend son chemin, nil s'il ne se fait pas (dit au journal). Depuis une tâche.
+function Fenetre.rendreActive(photo, dossier)
+    local ok, chemin = LrTasks.pcall(function()
+        return (require('Rendu').rendre(photo, Fenetre.TAILLE_GRANDE))
+    end)
+    if not ok or type(chemin) ~= 'string' or not Fichiers.existe(chemin) then
+        Journal.noter("Agrandir : pas de rendu de la photo active :", tostring(chemin))
+        return nil
+    end
+    Fichiers.creerDossier(dossier)
+    local destination = LrPathUtils.child(dossier, 'rendu-' .. LrPathUtils.leafName(chemin))
+    local copiee = Fichiers.copier(chemin, destination)
+    Fichiers.supprimer(LrPathUtils.parent(chemin))
+    return copiee and Fichiers.existe(destination) and destination or nil
+end
+
+-- La grande image de la photo `active` (Fenetre.agrandirActive) : la vignette de TAILLE_GRANDE,
+-- sinon un rendu, redressée puis marquée (`focus` : les cadres de Focus, sinon le carré). Rend son
+-- dossier et son nom, ou nil (le dossier effacé) : rien de lisible.
+function Fenetre.preparerGrande(active, focus)
+    local Vignettes = require 'Vignettes'
+    local ok, photo = LrTasks.pcall(function() return require('Photos').photoParId(active.id) end)
+    photo = ok and photo or nil
+    local d = Fenetre.decrireActive(active.id) or {}
+    local dossier = LrPathUtils.child(LrPathUtils.child(Chemins.temporaire(), 'PhotoActive'), 'Grande-' .. Conversation.identifiant())
+    local source = Vignettes.demander({ active.id }, Fenetre.TAILLE_GRANDE, dossier)[active.id]
+    if not source and photo and not Moteur.travaille and not Lightroom.liaisonOccupee() then
+        source = Fenetre.rendreActive(photo, dossier)
+    end
+    source = source and Images.redresser(source, d.geometrie)
+    if source and focus then
+        local connecteur = Chemins.prefs().cheminConnecteur
+        if Fenetre.estFujifilm(d) and type(connecteur) == 'string' and Fichiers.existe(connecteur) then
+            local _, marquee = Images.lireFocus(connecteur, d.chemin_original, d.geometrie, source)
+            source = marquee or source
+        end
+    elseif source then
+        source = Fenetre.marquerMiseAuPoint(active.id, source, d) or source
+    end
+    if not source or not Images.dimensions(source) then
+        Fichiers.supprimer(dossier)
+        return nil
+    end
+    return dossier, LrPathUtils.leafName(source)
+end
+
+-- Agrandir la photo `active` (depuis une tâche) : sa grande image (Fenetre.preparerGrande), sinon
+-- l'image du panneau (`panneau` : { dossier, fichier }), agrandie.
+function Fenetre.agrandirActive(titre, active, focus, panneau)
+    local ok, dossier, nom = LrTasks.pcall(Fenetre.preparerGrande, active, focus)
+    if not ok then
+        Journal.noter("Agrandir :", tostring(dossier))
+        dossier, nom = nil, nil
+    end
+    if dossier and nom then
+        local montree = Fenetre.agrandirUne(titre, dossier, nom)
+        Fichiers.supprimer(dossier)
+        return montree
+    end
+    return Fenetre.agrandirUne(titre, panneau and panneau.dossier, panneau and panneau.fichier)
+end
+
 -- L'aperçu en grand, dans une fenêtre à part ; pour une étape (onglet Aperçu), son avant et son
 -- après côte à côte (Fenetre.agrandirEtape).
 function Fenetre.agrandir()
@@ -1240,20 +1451,21 @@ function Fenetre.agrandir()
         Fenetre.agrandirEtape()
         return
     end
-    -- L'onglet Focus : la vignette de la photo active avec ses cadres de mise au point ; sauf après
-    -- un clic sur une ligne d'image du fil, que l'aperçu montre alors (comme Fenetre.modeEtape) :
-    -- c'est elle qu'Agrandir montre.
+    -- L'onglet Focus : la photo active avec ses cadres de mise au point, redemandée en grand
+    -- (Fenetre.agrandirActive) ; sauf après un clic sur une ligne d'image du fil, que l'aperçu
+    -- montre alors (comme Fenetre.modeEtape) : c'est elle qu'Agrandir montre.
+    local active = Fenetre.info and Fenetre.info.active
     local r = Fenetre.focusMontre() and not Fenetre.imageCliquee and Fenetre.focusActif()
     if r and r.fichier then
-        enTache(Fenetre.agrandirUne, titreAgrandi("Focus"), r.dossier, r.fichier)
+        enTache(Fenetre.agrandirActive, titreAgrandi("Focus"), active, true, { dossier = r.dossier, fichier = r.fichier })
         return
     end
     -- L'image de la proposition montrée par l'onglet Proposition (le cadre proposé en pointillés,
     -- Composition lue, 1.3) : celle-là, même si la photo active a changé entre-temps.
     local _, indiceProposition = Fenetre.imagePropositionMontree()
-    local a, active = Fenetre.apercuActif, Fenetre.info and Fenetre.info.active
+    local a = Fenetre.apercuActif
     if not indiceProposition and Fenetre.voirActive and active and a and a.id == active.id then
-        enTache(Fenetre.agrandirUne, titreAgrandi("photo active"), a.dossier, a.fichier)
+        enTache(Fenetre.agrandirActive, titreAgrandi("photo active"), active, false, { dossier = a.dossier, fichier = a.fichier })
         return
     end
     local c = Moteur.courante
@@ -1281,7 +1493,8 @@ Fenetre.LARGEUR_ILLISIBLE = 200
 -- donner à Images.grande pour que les deux, chacune sous son titre (une ligne de gras) et au-dessus
 -- de la légende (coupée à leur largeur ensemble, Fenetre.lignesCarte), tiennent dans GRANDE.
 -- `dimensions` : une entrée par image, { largeur, hauteur } en pixels, ou false (illisible : la
--- place de son texte). La légende prend sa hauteur aux images ; des images plus petites
+-- place de son texte). Chaque image remplit sa place, réduite ou agrandie (Images.grande, retour de
+-- Dany du 25 octobre 2026). La légende prend sa hauteur aux images ; des images plus étroites
 -- l'allongent : la place se refait tant que ses lignes changent (quatre fois au plus). Rend la
 -- largeur, la hauteur et les lignes de la légende à cette place.
 function Fenetre.cadreDeux(dimensions, legende)
@@ -1294,7 +1507,7 @@ function Fenetre.cadreDeux(dimensions, legende)
         local total = Fenetre.ECART_DEUX
         for _, d in ipairs(dimensions or {}) do
             if type(d) == 'table' and tonumber(d[1]) and tonumber(d[2]) then
-                total = total + math.floor(d[1] * math.min(demi / d[1], hauteur / d[2], 1))
+                total = total + math.floor(d[1] * math.min(demi / d[1], hauteur / d[2]) + 0.5)
             else
                 total = total + Fenetre.LARGEUR_ILLISIBLE
             end
@@ -1556,6 +1769,9 @@ function Fenetre.preparerFocus(active, T, garde)
         source = Vignettes.demander({ active.id }, Fenetre.TAILLE_SECOURS_FOCUS, dossier)[active.id]
         signature = nil
     end
+    -- À l'endroit avant les cadres (Images.redresser : la vignette de secours d'une photo verticale
+    -- est couchée, constaté le 25 octobre 2026).
+    source = source and Images.redresser(source, d.geometrie)
     local etat, boitier, marquee = 'autre_marque', nil, nil
     if Fenetre.estFujifilm(d) then
         local connecteur = Chemins.prefs().cheminConnecteur
@@ -1959,8 +2175,9 @@ end
 -- après (ou son avant : Voir l'avant / Voir l'après), que
 -- le module a gardé au moment de l'étape sans rien écrire au catalogue (Etapes.lua) ; dans la
 -- carte (Vues.etape), « Étape 2 sur 4 · <but> », la raison donnée par Claude et les réglages
--- changés, page par page ; ◀ ▶ d'une étape à l'autre de la même photo ; Détail… (l'appel et sa
--- réponse) ; Agrandir, l'avant et l'après côte à côte (Fenetre.agrandirDeux).
+-- changés, page par page ; ◀ ▶ d'une étape à l'autre de la même photo (Détail…, l'appel et sa
+-- réponse, est retiré au correctif 1.3.6) ; Agrandir, l'avant et l'après côte à côte
+-- (Fenetre.agrandirDeux).
 -- Fenetre.etape = { conversation, photo, id (etape_id du module, nil sans), element (id de
 -- l'élément du fil), vue ('apres' ou 'avant'), suivre } : l'étape montrée, remise à nil quand la
 -- conversation montrée change. En mode suivre (la dernière étape de sa photo, ou l'onglet ouvert
@@ -2483,7 +2700,6 @@ function Fenetre.rafraichirEtape(sansApercu)
         poser(p, 'etapePrecedente', false)
         poser(p, 'etapeSuivante', false)
         poser(p, 'etapeAImages', false)
-        poser(p, 'etapeADetail', false)
         poser(p, 'titreBascule', "Voir l'avant")
     else
         local im = Fenetre.imagesDe(x)
@@ -2492,7 +2708,6 @@ function Fenetre.rafraichirEtape(sansApercu)
         Fenetre.montrerPage('etape', Fenetre.texteEtape(x, Fenetre.etatImages(x)))
         poser(p, 'etapePrecedente', n > 1)
         poser(p, 'etapeSuivante', n < #liste)
-        poser(p, 'etapeADetail', true)
         poser(p, 'etapeAImages', im ~= nil and im.avant ~= nil and im.apres ~= nil)
         poser(p, 'titreBascule', Fenetre.etape.vue == 'avant' and "Voir l'après" or "Voir l'avant")
         Fenetre.demanderImagesEtape(x)
@@ -2570,15 +2785,6 @@ function Fenetre.basculerEtape()
     Fenetre.imageCliquee = nil
     et.vue = et.vue == 'avant' and 'apres' or 'avant'
     Fenetre.rafraichirEtape()
-end
-
--- Détail… (depuis une tâche) : l'appel de l'outil de l'étape et sa réponse.
-function Fenetre.detailEtape()
-    local x = Fenetre.etapeCourante()
-    local _, e = elementParId(Moteur.courante, x and x.elementId)
-    if e then
-        Fenetre.montrerDetail(e)
-    end
 end
 
 -- Agrandir dans l'onglet Aperçu : l'avant et l'après côte à côte (Fenetre.agrandirDeux), la
@@ -3292,6 +3498,7 @@ function Fenetre.majPhoto()
         p.infoPhoto = "Aucune photo active"
     end
     Fenetre.suivreSelection(info)
+    Fenetre.suivreNoteDuResume(info)
     Fenetre.poserRepartir()
     Fenetre.poserObtenir()
     Fenetre.rafraichirNotation()
@@ -3361,6 +3568,8 @@ function Fenetre.suivreSelection(info)
         Fenetre.cleVue, Fenetre.cleVueLe = avant, vueLe
     elseif Moteur.courante ~= c then
         Fenetre.revenirAFocus()
+        -- Le résumé de la conversation montrée, aussitôt (Fenetre.suivreResume).
+        Fenetre.suivreResume()
     end
 end
 
@@ -3627,9 +3836,9 @@ end
 -- Choisir une demande la met dans le champ, à la place du texte tapé, sans l'envoyer
 -- (Fenetre.mettreDemande ; Retour l'envoie, Fenetre.lierSaisie) ; le menu revient à son titre, pour
 -- rechoisir la même. Ajouter…, Renommer… et Supprimer… ouvrent chacun une petite fenêtre, dans une
--- tâche. Après une retouche, « ＋ Garder la demande » de la ligne d'actions du tour de Claude
--- (Fenetre.garderDemande) ouvre Ajouter… pré-rempli de la demande que Claude a donnée
--- (Conversation.demandeAGarder, Conversation.preparerDemande).
+-- tâche. (« ＋ Garder la demande », qui ouvrait Ajouter… pré-rempli de la demande que Claude
+-- donnait à la fin d'une retouche, est retiré au correctif 1.3.6 : deuxième retour de Dany du
+-- 25 octobre 2026.)
 
 Fenetre.MES_DEMANDES = "Mes demandes"
 -- La valeur du menu quand rien n'est choisi : son titre.
@@ -3802,9 +4011,8 @@ local function fenetreDemande(q, titre, verbe, contenu, ecrire)
     end
 end
 
--- Ajouter… : une nouvelle demande, pré-remplie de `preremplie` ({ nom, description, texte } :
--- le texte du champ depuis le menu, la demande de Claude depuis « ＋ Garder la demande »). Un nom
--- proposé déjà pris en reçoit un libre (« … 2 »). Dans une tâche.
+-- Ajouter… : une nouvelle demande, pré-remplie de `preremplie` ({ nom, description, texte } : le
+-- texte du champ, depuis le menu). Dans une tâche.
 function Fenetre.ajouterDemande(preremplie)
     preremplie = preremplie or {}
     local liste = Fenetre.lireMesDemandes()
@@ -3812,8 +4020,7 @@ function Fenetre.ajouterDemande(preremplie)
     local gardee = false
     LrFunctionContext.callWithContext('Claude · mes demandes', function(context)
         local q = LrBinding.makePropertyTable(context)
-        remplirDemande(q, { nom = Stockage.nomLibre(liste, preremplie.nom or ''), description = preremplie.description,
-            texte = Texte.nettoyer(preremplie.texte) })
+        remplirDemande(q, { nom = preremplie.nom, description = preremplie.description, texte = Texte.nettoyer(preremplie.texte) })
         verifierDemande(q, liste)
         for _, cle in ipairs({ 'nom', 'texte' }) do
             q:addObserver(cle, function() verifierDemande(q, liste) end)
@@ -3928,22 +4135,6 @@ function Fenetre.supprimerDemande()
     return true
 end
 
--- « ＋ Garder la demande » de la ligne i (la ligne d'actions d'un tour qui a retouché) : la fenêtre
--- Ajouter… pré-remplie de la demande que Claude a donnée (nom et description proposés, texte),
--- dans une tâche. Rend vrai si la ligne en porte une.
-function Fenetre.garderDemande(i)
-    Fenetre.annulerEnvoiAuto()
-    local l = ligneMontree(i)
-    local c = Moteur.courante
-    local e = l and l.demande and c and c.elements[l.demande]
-    local demande = e and e.genre == 'claude' and Conversation.demandeAGarder(e.texte)
-    if not demande then
-        return false
-    end
-    enTache(Fenetre.ajouterDemande, Conversation.preparerDemande(demande))
-    return true
-end
-
 -- (Publication… et Consommation…, dans le volet, sont retirés avec lui au correctif 1.3.6 : elles
 -- restent au menu Module externe - Extras, MenuPublication.lua et MenuConsommation.lua.)
 
@@ -4003,6 +4194,12 @@ function Fenetre.boucle(generation)
         tic = tic + 1
         local p = Fenetre.p
         if p then
+            -- Le résumé en bas du fil : celui de la conversation montrée, refait après un tour de
+            -- Claude (avant le rafraîchissement, qu'il demande).
+            local okResume, erreurResume = LrTasks.pcall(Fenetre.suivreResume)
+            if not okResume then
+                Journal.noter("Résumé :", tostring(erreurResume))
+            end
             if Fenetre.aRafraichir then
                 Fenetre.aRafraichir = false
                 local ok, erreur = LrTasks.pcall(Fenetre.rafraichir)
@@ -4073,7 +4270,6 @@ local function initialiserEtape(p)
     p.etapePrecedente = false
     p.etapeSuivante = false
     p.etapeAImages = false
-    p.etapeADetail = false
     p.titreBascule = "Voir l'avant"
 end
 
@@ -4088,11 +4284,16 @@ function Fenetre.afficher()
     if Fenetre.ouverte then
         if Fenetre.controle and Fenetre.controle.toFront then
             Fenetre.controle.toFront()
-            -- Rouverte par le menu ou ⌃⌥C : l'aperçu remontre la photo active, refait.
+            -- Rouverte par le menu ou ⌃⌥C : l'aperçu remontre la photo active, refait, et le résumé
+            -- du fil se refait (gardé jusque-là, même pendant que Claude travaille).
             Fenetre.idActif, Fenetre.apercuActif = nil, nil
+            if Fenetre.resume then
+                Fenetre.resume.perime = true
+            end
             LrTasks.startAsyncTask(function()
                 LrTasks.pcall(Fenetre.majPhoto)
                 LrTasks.pcall(Fenetre.revoirPhoto)
+                LrTasks.pcall(Fenetre.suivreResume)
             end)
         end
         return
@@ -4141,6 +4342,8 @@ function Fenetre.afficher()
         local attend = Moteur.courante and Conversation.propositionEnAttente(Moteur.courante)
         Fenetre.propositionVue = attend and attend.id or nil
         Fenetre.info = nil
+        -- Le résumé du fil se refait à chaque ouverture (Fenetre.suivreResume).
+        Fenetre.resume = nil
         Fenetre.noteVue, Fenetre.notePhoto = nil, nil
         Fenetre.noteEnCours = false
         -- Aucune étape choisie (onglet Aperçu) ; ses images se relisent, les copies d'avant
@@ -4233,7 +4436,10 @@ function Fenetre.afficher()
         Fenetre.rafraichir()
         Fenetre.majPhoto()
         LrTasks.pcall(Fenetre.revoirPhoto)
-        -- La conversation de la photo choisie (Fenetre.suivreSelection) se montre dès l'ouverture.
+        -- Le résumé en bas du fil, dès l'ouverture.
+        LrTasks.pcall(Fenetre.suivreResume)
+        -- La conversation de la photo choisie (Fenetre.suivreSelection) et le résumé se montrent dès
+        -- l'ouverture.
         if Fenetre.aRafraichir then
             Fenetre.aRafraichir = false
             Fenetre.rafraichir()

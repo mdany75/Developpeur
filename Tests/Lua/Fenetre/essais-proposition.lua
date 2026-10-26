@@ -362,8 +362,7 @@ essai("Conversation d'avant le correctif 1.3.6 : ses éléments lecon et exercic
         if l.element then
             parElement[l.element] = (parElement[l.element] or 0) + 1
         end
-        vrai(l.actions == nil or l.actions == 'note' or l.actions == 'demande' or l.actions == 'note+demande',
-            'ligne d\'actions : ' .. tostring(l.actions))
+        vrai(l.actions == nil or l.actions == 'note', 'ligne d\'actions : ' .. tostring(l.actions))
     end
     egal(1, parElement[2], "l'appel de photo_lesson, une ligne")
     egal(nil, parElement[3], 'la leçon : aucune ligne')

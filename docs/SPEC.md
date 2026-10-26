@@ -306,7 +306,12 @@ comprises) et notés au journal au plus une fois par 10 s et par genre (`DELAI_R
 refusée sans jeton (connecteur d'avant la 1.2, ou autre programme) », « Commande refusée : mauvais
 jeton », « Message illisible ignoré ») : une inondation de lignes ne remplit pas `module.log`.
 `depuisLightroom` est retiré des paramètres reçus du réseau : seuls les menus, la fenêtre de la
-liaison et la carte Note le posent, par appel direct.
+liaison et la carte Note le posent, par appel direct. Une ligne acceptée compte dans
+`Liaison.enCours` de la vérification du jeton jusqu'à l'après de son étape (`apresCommande` ou
+`abandonner`), même si la commande échoue, et `Liaison.finCommande` garde l'heure où la dernière a
+fini (correctif 1.3.6) : la fenêtre Claude ne rend pas la photo active pendant ce temps, ni
+`Lightroom.DELAI_LIAISON_LIBRE` (5 s) après (`Lightroom.liaisonOccupee`, voir Fenêtre B ›
+Agrandir). Une ligne refusée ne compte pas.
 
 **Le serveur** (`JetonLiaison.swift`, `LightroomBridge`) ne crée jamais ce fichier et n'en dit
 jamais la valeur. `JetonLiaison.lire` n'accepte qu'un fichier ordinaire (ni lien, ni dossier, ni
@@ -671,7 +676,8 @@ retouche d'une photo (pas dans une [Demande rapide]), finir par `view_photo` ave
 section « ## Écran » (de la 1.2) est retirée, avec tout ce qui parlait d'étalonnage (voir Écran), et
 « ## Raison de chaque étape » dit « (onglet Aperçu, d'un clic sur l'étape du fil) » au lieu du
 bouton Pourquoi ? du fil. `Consignes.texte` fait 6 331 caractères (6 646 avant ces retours, 7 476
-au correctif 1.3.5), sous le plafond de 7 500. Hors du plafond, `Consignes.jeLeFais`,
+au correctif 1.3.5), sous le plafond de 7 500 ; 5 922 après le deuxième retour de Dany, qui retire
+la section « ## Demande à garder » (voir Mes demandes). Hors du plafond, `Consignes.jeLeFais`,
 `Consignes.jaiFini`, `Consignes.carnet` (la ligne d'action de la page du carnet) et
 `Consignes.sansLecon` sont retirés ; `Consignes.rapide` perd « ni leçon », et
 `Consignes.rapidePhoto` s'y ajoute, pour une demande rapide dans la conversation d'une photo (voir
@@ -1151,7 +1157,8 @@ la fenêtre B de la 1.3 ; le correctif la change ainsi :
   il clôt le tour de Claude d'avant sans en commencer un) ; une demande faite par la Demande
   rapide, et ce qui y répond, portent `rapide`, et la demande a dessous une ligne « Demande
   rapide » en note (`Fil.MENTION_RAPIDE`). La ligne d'actions perd « Leçon de la photo »
-  (`TAILLES.voirLecon`, `Fenetre.voirLecon`) : `actions` vaut `note`, `note+demande` ou `demande`.
+  (`TAILLES.voirLecon`, `Fenetre.voirLecon`) : `actions` vaut `note` (`note+demande` et `demande`
+  retirés au deuxième retour de Dany, avec « ＋ Garder la demande »).
   Un clic sur une ligne se répartit en image, étape, sinon détail de l'outil (`Fenetre.clics` :
   plus de ligne du carnet ni de leçon) ;
 - le bandeau : `CHOISIR_CONVERSATION` (la page du carnet) et `EXERCICE_CONTINUE` partent ;
@@ -1219,7 +1226,7 @@ le numéro gardé). Ils changent encore le correctif :
   « Claude · Demande rapide ».
 - `Fenetre.FORME` reste 5 : la taille de la fenêtre ne change pas.
 
-**Agrandir** (retours de Dany du 25 octobre 2026) : l'image en grand tient dans `Fenetre.GRANDE`,
+**Agrandir** (retours de Dany du 25 octobre 2026) : l'image en grand remplit `Fenetre.GRANDE`,
 2 000 × 1 250, qui laisse à la fenêtre modale sa barre de titre et Fermer sur l'écran de Dany
 (3 440 × 1 440 ; environ 1 330 de haut en tout, pas encore vu), sous chacune de ses formes : la
 photo active, la vignette de l'onglet Focus, une image du fil ou de la proposition, une image
@@ -1230,14 +1237,57 @@ plus par image, `ECART_DEUX` 12 entre elles, `ECART_TITRE` 4 sous chaque titre, 
 avant la légende, une ligne de 16 d'après `Metriques`, une image illisible sur `LARGEUR_ILLISIBLE`
 200 ; la légende coupée à leur largeur ensemble, et une légende longue réduit la hauteur des
 images, la place refaite tant que ses lignes changent, quatre fois au plus). `Images.grande`
-n'agrandit jamais : une image qui tient dans la limite est montrée à sa vraie taille, son propre
-fichier, sans `sips` ni recompression ; une plus grande est réduite en gardant ses proportions, en
-paysage comme en portrait (3 000 × 1 500 : 2 000 × 1 000 ; 1 000 × 2 500 : 500 × 1 250) ; une
-image illisible dit « Aperçu illisible », Focus et la photo active compris (rien ne s'ouvrait
-avant). La taille demandée pour la vignette de la photo active ne change pas
-(`Fenetre.TAILLE_PHOTO_ACTIVE` 1 024) : Lightroom rend son aperçu standard en cache, plus grand
-(1 720 pixels pour un RAW, constaté le 17 octobre 2026) ; les images d'étape font 1 024
-(`Etapes.COTE`) et sont ramenées à 994 de large côte à côte. Essais : `essais-integration.lua`
+remplit la place à ses proportions (retour de Dany du 25 octobre 2026, qui voyait la vignette de
+secours de Focus, 320 × 213, à sa vraie taille : minuscule) : une image plus grande est réduite,
+une plus petite agrandie par `sips` (un peu plus douce), en paysage comme en portrait
+(3 000 × 1 500 : 2 000 × 1 000 ; 1 000 × 2 500 : 500 × 1 250 ; 300 × 200 : 1 875 × 1 250) ; une
+image qui a déjà la taille garde son propre fichier ; une image illisible dit « Aperçu illisible ».
+La photo active (Focus, l'aperçu de la photo active) se redemande en grand au clic
+(`Fenetre.agrandirActive`, dans une tâche) : une vignette de `Fenetre.TAILLE_GRANDE` (2 048, le
+plafond de `Vignettes`) ; refusée (juste après une retouche), un rendu de la photo par
+`Rendu.rendre`, le chemin des aperçus de `view_photo` (réglages IA calculés d'abord, photo notée
+`apercuSeulement`), copié dans `PhotoActive/Grande-…` (`Fenetre.rendreActive`), sauf pendant que
+Claude travaille (`Moteur.travaille` : le rendu se mêlerait à ses commandes) et pendant qu'une
+commande de la liaison est en cours ou vient de finir (`Lightroom.liaisonOccupee` :
+`Liaison.enCours`, ou `Liaison.finCommande` à moins de `Lightroom.DELAI_LIAISON_LIBRE`, 5 s ; Claude
+Desktop ou Claude Code en terminal, que `Moteur.travaille` ne voit pas) ; sinon l'image du panneau,
+agrandie. Comme un aperçu de `view_photo`, ce rendu calcule d'abord les réglages IA
+(`calculerAvantRendu`, qui peut ouvrir « Mises à jour IA recommandées »), fait passer `isExported`
+à vrai et note la photo `apercuSeulement` (écriture privée par `Ecriture.ecrireMemoire` : rien dans
+Édition › Annuler) : un clic sur Agrandir juste après une retouche écrit donc ce champ privé. La grande image se redresse (`Images.redresser`), puis se marque comme celle du
+panneau : les cadres de Focus (`Images.lireFocus`, un `--focus` de plus, donc une ouverture de plus
+de l'original au clic), le carré des autres onglets (`Fenetre.marquerMiseAuPoint`) ; son dossier
+s'efface à la fermeture. La vignette du panneau garde sa taille (`Fenetre.TAILLE_PHOTO_ACTIVE`
+1 024 : Lightroom rend son aperçu standard en cache, plus grand, 1 720 pixels pour un RAW, constaté
+le 17 octobre 2026) ; juste après une retouche, Lightroom la refuse : l'aperçu de la photo active la
+redemande comme Focus (`ESSAIS_VIGNETTE_FOCUS` fois, une par seconde), puis prend la petite
+(`TAILLE_SECOURS_FOCUS`), redressée et marquée, notée de secours (`Fenetre.apercuActif.secours`) :
+l'aperçu a une image et Agrandir passe par `Fenetre.agrandirActive` ; la grande se redemande à un
+rafraîchissement de l'aperçu, `Fenetre.DELAI_SECOURS_ACTIVE` (10 s) au moins après la dernière
+demande (la fin de chaque demande rafraîchit l'aperçu : sans ce délai, les demandes ne finiraient
+pas tant que Lightroom refuse) ; les images d'étape font 1 024 (`Etapes.COTE`) et remplissent leur moitié,
+994 de large au plus, côte à côte.
+
+Une vignette toujours à l'endroit (`Images.redresser`, `Images.rotationManquante`, pure ; retour de
+Dany du 25 octobre 2026) : sur XH2S0407.RAF (Copie 1), 4160 × 6240, juste après une retouche, la
+vignette de secours de Focus (256, `Fenetre.TAILLE_SECOURS_FOCUS`) était couchée (320 × 213, le
+fichier avant le quart de tour de Lightroom), l'image de Focus et d'Agrandir aussi. Relevé le même
+jour dans `Temporaire/PhotoActive` : aucune vignette de Lightroom ne porte de balise d'orientation,
+et les autres sont tournées (1 146 × 1 720, 573 × 860, 520 × 780). Une vignette dont les
+proportions sont celles de la photo affichée couchée (dimensions, orientation et cadre de
+`Vignettes.decrireVignette`, passés par `Geometrie.apercu` ; à `Images.ECART_PROPORTIONS` près, en
+logarithme, environ 8 %) se tourne du quart de tour de son orientation (BC : `sips -r 90`, DA :
+`sips -r 270`) avant d'être montrée ou marquée : le connecteur (`--focus`, `--marquer-af`) dessine
+ses cadres dans l'image affichée et ne tourne rien lui-même (il reçoit les pixels tels quels). Un
+demi-tour (CD) ne se voit pas aux proportions et reste. La vignette de secours peut dater d'avant la
+retouche (l'aperçu pas encore refait) : pour une photo que la retouche vient de recadrer (en 4:5,
+par exemple), elle a encore les proportions de la photo entière, couchée (320 × 213), ni debout ni
+couchée au cadre actuel. Elle se compare donc aussi à la photo entière, sans le cadre (les
+dimensions de la géométrie) : debout au cadre actuel, elle reste (un portrait recadré en paysage
+est aussi « couché » à la photo entière) ; couchée au cadre, ou couchée à la photo entière et plus
+près que debout, elle se tourne ; debout à la photo entière (d'avant le cadre), elle reste. Reste à
+constater dans Lightroom que la vignette de secours date bien d'avant la retouche. Partout où la fenêtre prend une vignette de la photo active : l'aperçu commun,
+Focus (la vignette de secours comprise) et Agrandir. Essais : `essais-integration.lua`
 (avec le vrai `sips`), `essais-dispositions.lua` (`cadreDeux`, pur), `essais-fenetre-b.lua`.
 
 **Dimensions** (`Dispositions.TAILLES`, puis `Dispositions.dimensions()`, qui en tire le reste) :
@@ -1320,8 +1370,9 @@ Le tour de Claude qui a noté ou donné une leçon (la leçon jusqu'à la 1.3.5)
 `actions` (`x..i`) : « ☆ Voir la note » (`Fenetre.voirNote` → `montrerNote` : l'onglet Note, comme
 un vrai clic ; `Fenetre.NOTE_AUTRE_PHOTO` au bandeau si la photo active n'est pas celle notée),
 « Leçon de la photo » (`Fenetre.voirLecon` → `montrerLecon`), ou les deux ; celui qui a retouché et
-donné sa « Demande à garder » y gagne « ＋ Garder la demande », au bout de la ligne, à droite (voir
-Mes demandes). La barre (`Vues.defilement`) : ▲ ▼ en icônes, Fin, la position dans le fil, et à
+donné sa « Demande à garder » y gagnait « ＋ Garder la demande », au bout de la ligne, à droite
+(retiré au correctif 1.3.6, deuxième retour de Dany : voir Mes demandes). La barre
+(`Vues.defilement`) : ▲ ▼ en icônes, Fin, la position dans le fil, et à
 droite l'activité de Claude (orange) ou le relevé du forfait. Un clic sur une ligne se répartit par
 `Fenetre.sorteDeClic` (`Fenetre.clics`) : image, ligne du carnet, leçon, étape, sinon détail de
 l'outil.
@@ -1664,9 +1715,10 @@ l'observateur, comme une demande tapée ; Envoyer l'envoie aussi.
 
 **Ajouter…, Renommer…, Supprimer…** (dans une tâche, `Fenetre.enTache`) : de petites fenêtres
 modales. Ajouter… (`Fenetre.ajouterDemande`) : Nom, Description (courte, montrée dans le menu
-après le nom) et Texte (six lignes), pré-remplis du texte du champ (depuis le menu) ou de la
-demande de Claude (depuis « ＋ Garder la demande ») ; un nom proposé déjà pris en reçoit un libre
-(« … 2 », `Stockage.nomLibre`). Renommer… (`Fenetre.renommerDemande`) : un menu « Demande : »
+après le nom) et Texte (six lignes), pré-remplis du texte du champ (depuis le menu ; de la demande
+de Claude depuis « ＋ Garder la demande » jusqu'au correctif 1.3.6, un nom proposé déjà pris
+recevant un libre, « … 2 », `Stockage.nomLibre`, retirés avec lui). Renommer…
+(`Fenetre.renommerDemande`) : un menu « Demande : »
 (les noms), puis les mêmes champs, remplis de la demande choisie. Supprimer…
 (`Fenetre.supprimerDemande`) : le même menu, le texte de la demande, puis `LrDialogs.confirm`. Le
 refus (`Stockage.refusDemande` : `NOM_VIDE`, `NOM_PRIS` — majuscules et accents ne comptent pas
@@ -1687,9 +1739,10 @@ silence : dit au journal et au bandeau (`Fenetre.DEMANDES_ILLISIBLES`), il est m
 peut pas l'être, rien n'est écrit. Tout ce qui en sort est fait de tables neuves. `uninstall.sh
 --tout` le retire (tout le dossier) ; sans `--tout`, il reste, dit avec le reste.
 
-**La demande de Claude** : la section « Demande à garder » des consignes de la fenêtre
-(`Consignes.texte`) : après une retouche (une étape écrite ; pas une proposition, une notation, un
-classement ou une leçon seuls), Claude finit sa réponse par une ligne seule « Demande à garder :
+**La demande de Claude** (retirée au correctif 1.3.6, voir plus bas) : la section « Demande à
+garder » des consignes de la fenêtre (`Consignes.texte`) : après une retouche (une étape écrite ;
+pas une proposition, une notation, un classement ou une leçon seuls), Claude finit sa réponse par
+une ligne seule « Demande à garder :
 « … » », une ou deux phrases qui referaient son travail sur une photo semblable, sans identifiant
 ni nom de fichier ; la section Leçon dit « rien après (sauf Demande à garder) » (au correctif
 1.3.6, la section Leçon part, et la leçon de la liste : « pas une proposition, notation ou
@@ -1712,6 +1765,18 @@ premiers mots, sans la ponctuation de sa fin (« … » retiré en entier, jamai
 Lua 5.1, qui en prendrait chaque octet à part : « Retouche ÉTÉ À » perdait l'octet 0x80 de « À »,
 relu le 22 octobre 2026) ; la description, la suite, coupée aux mots (60 caractères au plus,
 `Conversation.preparerDemande`) ; le texte entier. La ligne reste dans le fil : Dany la lit.
+
+**Retirée au correctif 1.3.6** (deuxième retour de Dany du 25 octobre 2026, accepté tel quel) :
+« ＋ Garder la demande », la ligne « Demande à garder : « … » » que Claude écrivait à la fin d'une
+retouche et la section « ## Demande à garder » des consignes (`Consignes.texte` : 6 331 → 5 922
+caractères ; `Consignes.rapide` et `Consignes.rapidePhoto` disent « Pas de titre. » au lieu de « Ni
+titre, ni « Demande à garder ». »), avec `Conversation.estRetouche` (qui ne servait qu'à elle),
+`Conversation.demandeAGarder`, `Conversation.preparerDemande`, `Fenetre.garderDemande`,
+`Stockage.nomLibre`, le suffixe `+demande` des actions (`Fil.valeurActions`, `Fil.lireActions`,
+`Fenetre.lireActions`), `D.garderDemande` et `D.ecartActions`. La ligne d'actions d'un tour ne
+porte plus que « ☆ Voir la note » (`actions` : 'note'). Une ligne « Demande à garder » d'une
+conversation d'avant reste un texte de Claude comme un autre. Le menu Mes demandes reste, avec
+Ajouter… (pré-rempli du texte du champ), Renommer… et Supprimer….
 
 Essais : `Tests/Lua/Fenetre/essais-mes-demandes.lua`.
 
@@ -2022,6 +2087,58 @@ l'ouverture et « Obtenir »,
 le Gestionnaire et les consignes), et `essais-moteur.lua` (une conversation sans photo ni clé d'une
 photo seule ne se montre pas).
 
+**Le résumé en bas du fil** (deuxième retour de Dany du 25 octobre 2026, accepté tel quel). À
+l'ouverture de la fenêtre (et quand le menu ou ⌃⌥C la rappelle), et chaque fois qu'une autre photo
+ou un autre groupe change la conversation montrée, la fenêtre fait un résumé, sans Claude ni
+jetons, montré en bas du fil, sous la conversation (et sous l'aide d'une conversation vide,
+`Fenetre.lignesAide`), après une ligne vide : `Fenetre.ajouterResume`, ses lignes par
+`Fil.lignesResume`, comme un élément `historique` (genre `note`, l'icône ⓘ sur l'en-tête, les puces
+en retrait), mais d'aucun élément (un clic n'y fait rien) ni d'aucun tour. Ses textes et ses
+lectures sont à `Historique.lua` (section « Le résumé de la fenêtre ») :
+
+- une photo (`Historique.lireResumePhoto`, `Historique.resumePhoto`) : « Résumé de la photo :
+  DSCF4961.RAF (Copie 2) », puis « Prise de vue : » l'appareil, l'objectif, la focale,
+  l'ouverture, la vitesse et l'ISO tels que Lightroom les écrit (`getFormattedMetadata`, clés de
+  `Historique.CLES_PRISE`), puis la date à l'heure locale (« 25 oct. 2026, 14 h 30 ») ; « Note et
+  drapeau : 3 ★ · retenue » (« pas encore notée », « sans drapeau », « rejetée » :
+  `Historique.texteNote`) ; « État : » ses étapes de Claude (combien, la dernière, sa date et son
+  nom), « puis des reprises à la main », sinon « retouchée à la main, sans étape de Claude » ou
+  « sans étape de Claude ni retouche » ; puis les puces de l'historique : les reprises à la main
+  (`Historique.texteReprises`) et les réglages hors de leur valeur par défaut
+  (`Historique.texteReglages`, ici même après des étapes de Claude) ;
+- plusieurs photos (`Historique.lireResumeGroupe`, `Historique.resumeGroupe`) : « Résumé de la
+  sélection : 12 photos », « Prises du 3 oct. 2026 au 25 oct. 2026 » (« Prises le … » pour un seul
+  jour, « (N sans date) », « Dates de prise de vue inconnues »), « Appareils : X-H2S (10), X-T20
+  (2) » (les `APPAREILS_MONTRES` 4 plus fréquents, puis « … » ; « inconnu (N) »), « Retouchées par
+  Claude : 3 · notées : 5 · rejetées : 1 » (retouchée : `retoucheeParClaude` seulement si la
+  mémoire est celle de la photo, comme `Photos.decrireTout` ; notée : au moins 1 ★ ; rejetée : le
+  drapeau).
+
+Les lectures passent par les trois lectures groupées du catalogue (`batchGetFormattedMetadata`,
+`batchGetRawMetadata`, `batchGetPropertyForPlugin`), par appel direct, dans une tâche (la boucle,
+`Fenetre.majPhoto`, l'ouverture) ; si l'une échoue, une à une (`Photos.meta`, `Photos.brut`,
+`Photos.lireChamp`, exporté pour lui), les `Historique.MAX_GROUPE` premières d'un groupe
+seulement, et l'en-tête le dit (« (les 500 premières lues) »). L'état d'une photo vient
+d'`Historique.etat` (journal, reprises, réglages). Aucun caractère nouveau (★ · « » … → mesurés).
+
+Le résumé n'est pas gardé dans la conversation (ni sur le disque, ni envoyé à Claude) :
+`Fenetre.resume` { conversation, photo ou groupe, donnees, texte, fin, versionNotation, perime },
+remis à nil à chaque ouverture. Il est celui de la conversation montrée : de sa photo (`c.photo`),
+ou de la sélection quand elle est son groupe (`c.groupe` égal à celui de `Lightroom.photos`) ; rien
+pour une conversation sans photo ni groupe (la case Autre photo décochée). `Fenetre.suivreResume`
+(depuis la boucle, avant le rafraîchissement ; aussitôt quand `Fenetre.suivreSelection` change la
+conversation montrée, et après « Repartir à neuf ») le refait pour une autre conversation montrée,
+même pendant que Claude travaille ; et, Claude libre, quand un tour a fini (`Moteur.finTravail`),
+que le registre des notes a changé (`Notation.version`) ou qu'il est périmé (la fenêtre rappelée
+par le menu : gardé et montré jusque-là). Changer de photo active dans le même groupe ne le refait
+pas. La note et le drapeau d'une photo suivent ceux de la photo active que `Fenetre.majPhoto` lit
+toutes les 2 s (`Fenetre.suivreNoteDuResume`), sans relire le catalogue. Il reste en bas : ce qui
+arrive (la demande, la réponse de Claude) se met au-dessus.
+
+Essais : `Tests/Lua/Fenetre/essais-resume.lua` (ses textes et leurs caractères, les lectures
+groupées et une à une, la fenêtre : ouverture, autre photo, groupe, fin d'un tour, travail de
+Claude, note suivie, conversation vide ou sans photo, rappel par le menu, jamais gardé ni envoyé).
+
 ### Demande rapide (correctif 1.3.3, revue au correctif 1.3.6)
 
 `FenetreRapide.lua` et `MenuRapide.lua` (Fichier ou Bibliothèque › Module externe - Extras ›
@@ -2059,7 +2176,8 @@ le champ ; Échap n'arrive pas à une fenêtre flottante.
   Le titre reste le provisoire : la demande rapide ne joint pas `Consignes.rappelTitre`, la
   première demande de la fenêtre Claude le fait. Règles jointes : `Consignes.rapidePhoto` (une
   seule demande, dans la conversation de cette photo, que la fenêtre Claude reprendra ; elle vise
-  la photo active, seule sélectionnée ; sans noter d'abord ; ni titre, ni « Demande à garder ») ;
+  la photo active, seule sélectionnée ; sans noter d'abord ; « Pas de titre. » ; « ni « Demande à
+  garder » » jusqu'au deuxième retour de Dany) ;
 - plusieurs photos, ou la case décochée : comme avant, une conversation neuve (`c.rapide`,
   `titreAuto`), jamais gardée (ni sur le disque, ni parmi les conversations), ses images dans
   `Temporaire/Rapide/<id>`, effacé à la demande rapide suivante ; le résumé court du groupe en tête
@@ -4584,7 +4702,8 @@ fichier sans la MakerNote de Fujifilm, une autre marque).
   d'elle-même : seul un vrai clic l'ouvrait ;
 - l'aperçu de l'onglet (`Fenetre.apercuOnglet.focus`) : la vignette de la photo active avec ses
   cadres (sans, pour une autre marque), sa légende, l'image vide pendant la lecture, ◀ ▶ coupés ;
-  Agrandir montre la vignette marquée en grand (jusqu'à 2 000 × 1 250 depuis le correctif 1.3.6).
+  Agrandir montre la photo marquée en grand (2 000 × 1 250 depuis le correctif 1.3.6, redemandée
+  à Lightroom au clic : voir Fenêtre B › Agrandir).
   Un clic sur une ligne d'image du fil ouvre l'onglet Aperçu depuis les retours de Dany ; avant,
   l'aperçu de Focus montrait cette image (`Fenetre.imageCliquee`), et Agrandir aussi, jusqu'à un
   autre onglet. L'aperçu de la photo active des autres onglets,
@@ -5364,7 +5483,8 @@ page par page (`etapeTexte`, `D.etapeLignes`). L'aperçu montre l'après (« Ét
 ou avant, « avant/après en préparation… », « pas d'avant/après ») ; ses ◀ ▶ sont coupés ; ◀ ▶ de la
 carte passent d'une étape à l'autre de la même photo (la dernière reprend le mode suivre, qui suit
 la dernière étape à mesure que Claude travaille) ; Voir l'avant / Voir l'après (`titreBascule`) ;
-Détail… (l'appel et sa réponse) ; Agrandir montre l'avant et l'après côte à côte
+Détail… (l'appel et sa réponse, retiré au correctif 1.3.6, retour de Dany du 25 octobre 2026) ;
+Agrandir montre l'avant et l'après côte à côte
 (`Fenetre.agrandirDeux`, titre « Claude · <titre> » ; chaque image dans 540 × 700,
 `Fenetre.GRANDE_DEUX`, jusqu'au correctif 1.3.6, puis les deux ensemble dans 2 000 × 1 250 :
 voir Fenêtre B › Agrandir), ou la seule image qui existe. Les images se lisent par `Etapes.images` dans une tâche,
@@ -6074,7 +6194,8 @@ Correctif 1.3.6 :
     dans le champ Texte de six lignes) ; avec le vrai Claude, une retouche finie par « Demande à
     garder : « … » » (une ou deux phrases, sans identifiant), après la leçon, et rien de tel après
     une proposition, une notation ou une leçon seule ; « ＋ Garder la demande » au bout de la ligne
-    d'actions, à droite, et sa fenêtre pré-remplie ; le bandeau de 324 (deux lignes) ; le temps
+    d'actions, à droite, et sa fenêtre pré-remplie (sans objet depuis le correctif 1.3.6 : la ligne
+    de Claude et le bouton sont retirés) ; le bandeau de 324 (deux lignes) ; le temps
     d'ouverture de la fenêtre avec 86 vues de plus.
 
 ## Correctif 1.3.6 : une photo, une conversation
@@ -6100,13 +6221,22 @@ gagne deux fichiers (`Historique.lua`, `FenetreSuivi.lua`) : relancer Lightroom.
   une étape ou une image du fil à la place du bouton « Pourquoi ? » ; les onglets Focus, Note,
   Aperçu et Proposition, la fenêtre ouverte sur Focus et ramenée à Focus à chaque autre photo ; une
   image de Claude qui arrive ouvre Aperçu, une proposition Proposition, une note Note ; Agrandir
-  jusqu'à 2 000 × 1 250, une image plus petite à sa vraie taille ; le bouton Suivi et la fenêtre
-  Suivi à la place de l'onglet (les graphiques et l'ajout de chaque photo au carnet attendent le
+  jusqu'à 2 000 × 1 250, une image plus petite à sa vraie taille (puis agrandie : deuxième retour,
+  ci-dessous) ; le bouton Suivi et la fenêtre Suivi à la place de l'onglet (les graphiques et l'ajout de chaque photo au carnet attendent le
   correctif 1.3.7) ; plus rien sur l'étalonnage de l'écran (ni voyant Écran, ni section Écran des
   consignes, ni remarque au premier aperçu, `get_status` ne dit que le nom) ; le résumé des
   réglages d'une photo sans étape de Claude dans son historique ; la barre de titre « Développeur
   v1.3.6 ». Voir Fenêtre B (Retours de Dany après son essai, Agrandir), Voyants et liaison, Écran,
   Carnet de progrès et Une photo, une conversation (le résumé des réglages).
+- **Le deuxième retour de Dany** (25 octobre 2026, accepté tel quel) : une photo verticale couchée
+  dans Focus et dans Agrandir juste après une retouche (XH2S0407.RAF (Copie 1)) : toute vignette de
+  la photo active se redresse avant d'être montrée ou marquée ; Agrandir remplit toujours
+  2 000 × 1 250, en agrandissant une image plus petite, et redemande la photo active en grand au
+  clic (une vignette de 2 048, sinon un rendu) ; le bouton Détail… de l'onglet Aperçu est retiré ;
+  un résumé en bas du fil, fait par la fenêtre à l'ouverture et à chaque autre photo ou autre
+  groupe, jamais gardé ni envoyé à Claude ; « ＋ Garder la demande » et la ligne « Demande à garder »
+  de Claude sont retirés (le menu Mes demandes reste). Voir Fenêtre B › Agrandir, Une photo, une
+  conversation (Le résumé en bas du fil) et Mes demandes.
 - **Retirés** : la leçon de la photo et « Je le fais », partout (voir leurs sections, gardées comme
   historique) ; dans le protocole, la commande `lecon`, `journal` avec `detaille`, `exercice` et
   `sans_rendu` d'`essayer`, `comparer = versionClaude` d'`apercu`.
@@ -6139,6 +6269,11 @@ Les deux suites passent (25 octobre 2026, après les retours de Dany : `swift te
 0 échec : la liaison 331, dont `tests.lua` 246, la fenêtre 283, dont `tests.lua` 64,
 `essais-une-photo` 20, `essais-pourquoi` 20, `essais-rapide` 12, `essais-moteur` 19,
 `essais-fenetre-b` 36, `essais-dispositions` 24, `essais-carnet` 10, `essais-integration` 10).
+Après le deuxième retour de Dany (25 octobre 2026, ses corrections comprises) : `swift test` 522
+tests, dont 1 sauté sans `DEVELOPPEUR_ECRAN_REEL=1`, 0 échec (aucun fichier Swift n'a changé) ;
+`scripts/tester-module.sh` 633 tests et essais, 0 échec : la liaison 332, dont `tests.lua` 247
+(`Liaison.enCours` compris), la fenêtre 301, dont `tests.lua` 64, `essais-resume` 14, nouveau,
+`essais-focus` 20, `essais-mes-demandes` 15.
 Dany a vu la fenêtre de 1 623 × 1 200 à son essai, d'où ses retours ; rien d'eux n'a encore été vu
 dans Lightroom. Reste à constater :
 
@@ -6190,12 +6325,17 @@ dans Lightroom. Reste à constater :
     ◀ ▶.
 12. Agrandir à 2 000 × 1 250 : la fenêtre modale entière sur l'écran de Dany (environ 1 330 de haut
     avec la barre de titre et Fermer, pour 1 440), l'avant/après côte à côte et sa légende, une image
-    plus petite à sa vraie taille ; la photo active et Focus à la taille du cache de Lightroom.
+    plus petite agrandie ; la photo active et Focus redemandées en grand au clic (une vignette de
+    2 048, sinon un rendu juste après une retouche), une photo verticale debout partout.
 13. Le résumé des réglages sur de vraies photos de Dany retouchées à la main, et sur un JPEG : le
     profil par défaut d'un JPEG (Embedded, supposé), une photo importée avec un paramètre prédéfini
     (`editCount` à 0), et Claude qui en tient compte sans le répéter.
 14. Plus rien sur l'étalonnage : `get_status` dans Claude Desktop ne dit que le nom de l'écran, et
     aucune remarque d'écran au premier aperçu d'une session.
+15. Le résumé en bas du fil : les textes que rendent les lectures groupées de Lightroom 15.6 pour la
+    focale, l'ouverture, la vitesse et l'ISO (supposés ceux de `getFormattedMetadata`), la date à
+    l'heure locale, sa durée sur une sélection de 500 photos et plus, le résumé qui reste en bas
+    pendant que Claude écrit, refait à la fin du tour, et la note suivie après Accepter.
 
 ## Correctif 1.3.5 : huit chantiers de la feuille de route
 

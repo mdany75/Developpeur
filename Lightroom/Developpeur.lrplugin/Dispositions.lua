@@ -65,12 +65,12 @@ Dispositions.TAILLES = {
     -- d'au moins 16 ; leur nombre (D.lignes, 42) est celui que la hauteur du fil tient, le reste va à
     -- la marge du bas, où il ne gêne rien.
     -- Chaque ligne : la colonne auteur (« Vous », « Claude », l'heure) de 60, un écart de 12, puis
-    -- le texte (maquette) ; les boutons d'actions en carrés small (« ☆ Voir la note », « ＋ Garder la
-    -- demande » : bezel de 15 dans une case de 21, constaté le 21 octobre 2026, D6, pour « Pourquoi ? »,
-    -- retiré au correctif 1.3.6 : un clic sur la ligne de l'étape en tient lieu), aux largeurs de
-    -- leurs titres en petit et 22 de jeu.
+    -- le texte (maquette) ; le bouton d'actions en carré small (« ☆ Voir la note » : bezel de 15 dans
+    -- une case de 21, constaté le 21 octobre 2026, D6, pour « Pourquoi ? », retiré au correctif 1.3.6 :
+    -- un clic sur la ligne de l'étape en tient lieu), à la largeur de son titre en petit et 22 de jeu
+    -- (« ＋ Garder la demande », 136, retiré au même correctif).
     hauteurLigne = 21, margeHautFil = 20, margeBasFil = 16,
-    auteur = 60, ecartAuteur = 12, voirNote = 96, garderDemande = 136, ecartActions = 8,
+    auteur = 60, ecartAuteur = 12, voirNote = 96,
     -- Le menu Mes demandes, à droite du menu Style sous le champ (demandé par Dany le 22 octobre
     -- 2026) : assez large pour « Nom — petite description » (Fenetre.titreDemande coupe chaque
     -- élément à sa largeur, moins la place de ses flèches) ; le bandeau prend ce qu'il laisse (324).
@@ -498,12 +498,11 @@ function Dispositions.dimensions()
     -- Les rangées sous les cartes Proposition, Aperçu (étape) et Focus, comme celle de la carte Note
     -- (bezel de 26, titres en 13, 8 entre les boutons ; demandé par Dany le 21 octobre 2026) : ▲ ▼ à
     -- gauche, puis, à droite, Obtenir (D.obtenir, de TAILLES), Refuser et Ajuster… en carrés et
-    -- Accepter en bleu (Vues.proposition) ; ◀ ▶, Voir l'avant (ou l'après) et Détail… en carrés
+    -- Accepter en bleu (Vues.proposition) ; ◀ ▶ et Voir l'avant (ou l'après) en carrés
     -- (Vues.etape) ; ▲ ▼ seulement (Vues.focus). (« Photos d'un défaut… » est passé de la carte Suivi
     -- à la fenêtre Suivi, FenetreSuivi.lua.)
     D.refuser, D.ajuster = 80, 86
     D.bascule = 104
-    D.detail = 80
     return D
 end
 

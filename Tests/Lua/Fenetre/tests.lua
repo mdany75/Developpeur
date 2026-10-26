@@ -1015,7 +1015,8 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         egal(nil, boutons['Je le fais'], nom .. ' : plus de bouton Je le fais')
         -- La carte de l'étape (1.3, onglet Aperçu), sur son image : titre (« Pourquoi ? » sans étape),
         -- sous-titre, texte de D.etapeLignes lignes en 12 ; sous elle, comme sous la carte Note, ▲ ▼
-        -- puis ◀ ▶, Voir l'avant (titre lié) et Détail… en carrés, inactifs à l'ouverture.
+        -- puis ◀ ▶ et Voir l'avant (titre lié) en carrés, inactifs à l'ouverture (Détail… est retiré
+        -- au correctif 1.3.6, retour de Dany du 25 octobre 2026).
         local carteEtape, rangeeEtape
         parcourir(args.contents, function(v)
             for _, enfant in ipairs(v.args) do
@@ -1055,8 +1056,9 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         egal('etapeTitre etapeSousTitre etapeTexte', table.concat(champs, ' '), nom .. " : textes de la carte de l'étape")
         egal(Fenetre.TITRE_ETAPE, p.etapeTitre, nom .. " : sans étape, le titre « Pourquoi ? »")
         egal("▲/mini/etapeMonte ▼/mini/etapeDescend ◀/square_button/etapePrecedente ▶/square_button/etapeSuivante "
-            .. "Voir l'avant/square_button/etapeAImages Détail…/square_button/etapeADetail", table.concat(boutonsEtape, ' '),
-            nom .. " : boutons de la carte de l'étape")
+            .. "Voir l'avant/square_button/etapeAImages", table.concat(boutonsEtape, ' '),
+            nom .. " : boutons de la carte de l'étape (plus de Détail…)")
+        egal(nil, p.etapeADetail, nom .. ' : plus de Détail…')
         -- Les rangées de boutons sous la carte de l'étape et sous la carte Proposition tiennent dans
         -- la largeur intérieure du panneau, avec l'un et l'autre titre lié (Voir l'avant ou Voir
         -- l'après).

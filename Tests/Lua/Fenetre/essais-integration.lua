@@ -564,8 +564,10 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
         egal(Fenetre.T.pixelsApercu, l)
         egal(Fenetre.T.pixelsApercuHauteur, h)
         egal('Étape 1 sur 1 · avant', p.legendeApercu)
-        -- Agrandir : l'avant et l'après côte à côte, à leur vraie taille (les deux ensemble dans
-        -- 2 000 × 1 250 : correctif 1.3.6).
+        -- Agrandir : l'avant et l'après côte à côte, agrandis pour remplir leur place (les deux
+        -- ensemble dans 2 000 × 1 250, légende comprise : correctif 1.3.6, retour de Dany du
+        -- 25 octobre 2026) : l'avant en paysage prend la largeur de sa moitié, l'après en portrait la
+        -- hauteur que la légende laisse.
         local agrandir
         parcourir(args.contents, function(v)
             if S.BOUTONS[v.genre] and v.args.title == '⤢ Agrandir' then
@@ -588,7 +590,7 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
             vrai(Fichiers.existe(image.args.value), image.args.value)
             tailles[#tailles + 1] = colonne.args[1].args.title .. ' ' .. image.args.width .. 'x' .. image.args.height
         end
-        egal('Avant 300x200 | Après 200x300', table.concat(tailles, ' | '))
+        egal('Avant 994x663 | Après 772x1158', table.concat(tailles, ' | '))
         -- Rien d'écrit par la fenêtre dans le dossier Etapes du module : ses images seulement.
         egal(id .. '-apres.jpg ' .. id .. '-avant.jpg', table.concat(Fichiers.entrees(dossier), ' '))
         vrai(not Fichiers.existe(dossier .. '/.vignettes'), 'aucune réduction dans le dossier du module')
@@ -603,9 +605,9 @@ essai('Pourquoi ? de bout en bout : réponse du connecteur, images rangées par 
 end)
 
 -- Agrandir (décision de Dany du 25 octobre 2026, correctif 1.3.6), par Images et sips, les vrais :
--- jusqu'à 2 000 × 1 250 ; une image plus petite à sa vraie taille, jamais étirée ; avant et après
--- côte à côte, les deux ensemble, titres et légende compris.
-essai('Agrandir (sips) : dans 2 000 × 1 250 ; une image plus petite à sa vraie taille, son propre fichier ; une plus grande réduite, en paysage comme en portrait ; avant et après côte à côte, ensemble', function()
+-- l'image remplit 2 000 × 1 250 ; une plus petite est agrandie, jamais minuscule (retour de Dany du
+-- même jour) ; avant et après côte à côte, les deux ensemble, titres et légende compris.
+essai('Agrandir (sips) : remplit 2 000 × 1 250 ; une image plus petite agrandie, une plus grande réduite, en paysage comme en portrait ; à la taille, son propre fichier ; avant et après côte à côte, ensemble', function()
     local Fichiers = require 'Fichiers'
     local Images = require 'Images'
     local Metriques = require 'Metriques'
@@ -623,30 +625,33 @@ essai('Agrandir (sips) : dans 2 000 × 1 250 ; une image plus petite à sa vraie
     image('juste.jpg', 2000, 1250)
     image('large.jpg', 3000, 1500)
     image('haute.jpg', 1000, 2500)
-    -- Plus petite, ou juste à la taille : son propre fichier, à sa taille, sans rien réduire.
-    for _, cas in ipairs({ { 'petite.jpg', 300, 200 }, { 'juste.jpg', 2000, 1250 } }) do
-        local chemin, l, h = Images.grande(dossier, cas[1], 2000, 1250)
-        egal(dossier .. '/' .. cas[1], chemin, cas[1] .. ' : son propre fichier')
-        egal(cas[2] .. 'x' .. cas[3], l .. 'x' .. h, cas[1] .. ' : sa vraie taille')
-    end
-    vrai(not Fichiers.existe(dossier .. '/.vignettes'), 'rien de réduit')
+    -- Juste à la taille : son propre fichier, sans rien refaire.
+    local chemin, l, h = Images.grande(dossier, 'juste.jpg', 2000, 1250)
+    egal(dossier .. '/juste.jpg', chemin, 'à la taille : son propre fichier')
+    egal('2000x1250', l .. 'x' .. h)
+    vrai(not Fichiers.existe(dossier .. '/.vignettes'), 'rien de refait')
+    -- Plus petite : agrandie à ses proportions, jusqu'à la hauteur ici.
+    chemin, l, h = Images.grande(dossier, 'petite.jpg', 2000, 1250)
+    egal('1875x1250', l .. 'x' .. h, 'petite : agrandie')
+    contient(chemin, '/.vignettes/petite-1875x1250.jpg')
+    egal('1875x1250', table.concat({ Images.dimensions(chemin) }, 'x'), 'le fichier agrandi a la taille dite')
     -- Plus grande : réduite, à ses proportions, dans les deux sens.
-    local chemin, l, h = Images.grande(dossier, 'large.jpg', 2000, 1250)
+    chemin, l, h = Images.grande(dossier, 'large.jpg', 2000, 1250)
     egal('2000x1000', l .. 'x' .. h, 'paysage : la largeur fait la limite')
     contient(chemin, '/.vignettes/large-2000x1000.jpg')
     local lu, hu = Images.dimensions(chemin)
     egal('2000x1000', lu .. 'x' .. hu, 'le fichier réduit a la taille dite')
     chemin, l, h = Images.grande(dossier, 'haute.jpg', 2000, 1250)
     egal('500x1250', l .. 'x' .. h, 'portrait : la hauteur fait la limite')
-    -- La fenêtre d'une image : sa vraie taille ; illisible, elle est dite.
+    -- La fenêtre d'une image : elle remplit la place ; illisible, elle est dite.
     local dialogues, messages = #S.dialogues, #S.messages
     egal(true, Fenetre.agrandirUne('Claude · essai', dossier, 'petite.jpg'))
     egal(dialogues + 1, #S.dialogues)
     local d = S.dialogues[#S.dialogues]
     egal('Claude · essai', d.title)
     egal('picture', d.contents.genre)
-    egal(dossier .. '/petite.jpg', d.contents.args.value)
-    egal('300x200', d.contents.args.width .. 'x' .. d.contents.args.height, 'jamais étirée')
+    egal(dossier .. '/.vignettes/petite-1875x1250.jpg', d.contents.args.value)
+    egal('1875x1250', d.contents.args.width .. 'x' .. d.contents.args.height, 'jamais minuscule')
     egal(false, Fenetre.agrandirUne('Claude · essai', dossier, 'absente.jpg'))
     egal(dialogues + 1, #S.dialogues, 'pas de fenêtre pour une image illisible')
     egal(messages + 1, #S.messages)

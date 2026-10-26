@@ -9,7 +9,9 @@ balance des blancs de toute l'image et la Demande rapide revue, puis vos retours
 même jour : un clic sur une étape à la place de « Pourquoi ? », les onglets Focus, Note, Aperçu et
 Proposition, Agrandir plus grand, le carnet de progrès dans la fenêtre Suivi, plus rien sur
 l'étalonnage de l'écran, les réglages d'une photo sans étape de Claude et la version dans la barre
-de titre. Après l'installation : quitter puis relancer Lightroom (le module gagne deux fichiers : un
+de titre ; et votre deuxième retour : une photo verticale toujours debout, Agrandir qui remplit la
+place, un résumé en bas du fil, ni Détail… dans l'onglet Aperçu ni « ＋ Garder la demande ».
+Après l'installation : quitter puis relancer Lightroom (le module gagne deux fichiers : un
 rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code
 (le connecteur passe à 35 outils).
 
@@ -45,6 +47,14 @@ rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle sessi
 - Trois boutons dans la Demande rapide, à gauche de la demande, chacun une demande toute faite pour toutes
   les photos sélectionnées : noter (Claude pose ses notes, de 0 à 5 ★ ou un rejet), Retouche pro
   et Portrait, comme les invites de la fenêtre Claude.
+- Un résumé en bas du fil, fait par la fenêtre sans Claude ni forfait, à l'ouverture de la fenêtre
+  et chaque fois qu'une autre photo ou une autre sélection change la conversation montrée. Pour une
+  photo : sa prise de vue (appareil, objectif, focale, ouverture, vitesse, ISO, date), sa note et
+  son drapeau, et son état (ses étapes de Claude, vos reprises à la main, ses réglages hors de leur
+  valeur par défaut). Pour plusieurs photos : leur nombre, leurs dates (du … au …), leurs appareils,
+  et combien sont retouchées par Claude, notées, rejetées. Il reste en bas, se refait à la fin de
+  chaque tour de Claude et suit la note posée ; il n'est ni gardé dans la conversation, ni envoyé à
+  Claude.
 
 ### Changé
 - La fenêtre Claude passe à 1 623 × 1 200 points (1 948 de large avant), sans le volet de gauche ;
@@ -63,8 +73,12 @@ rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle sessi
   accord s'ouvre dans l'onglet Proposition, et une photo jointe n'a pas de pourquoi.
 - Les onglets suivent Claude d'eux-mêmes : chaque nouvelle image de Claude (un aperçu, une
   comparaison) ouvre l'onglet Aperçu, une proposition l'onglet Proposition, une note l'onglet Note.
-- Agrandir montre l'image jusqu'à 2 000 × 1 250 points (1 100 × 740 avant), l'avant et l'après
-  côte à côte ensemble dans ce cadre ; une image plus petite garde sa vraie taille, jamais étirée.
+- Agrandir montre l'image en 2 000 × 1 250 points (1 100 × 740 avant), l'avant et l'après côte à
+  côte ensemble dans ce cadre ; une image plus petite est agrandie pour remplir la place (un peu
+  plus douce, jamais minuscule). La photo active (onglet Focus, aperçu de la photo active) se
+  redemande en grand à Lightroom au moment du clic ; juste après une retouche, quand Lightroom la
+  refuse, un rendu de la photo la remplace (pendant que Claude travaille, dans la fenêtre ou par
+  Claude Desktop : l'image du panneau, agrandie).
 - Le mode (Appliquer directement, ou Proposer d'abord) se règle seulement dans le Gestionnaire de
   modules externes (section Liaison avec Claude, « Avant d'appliquer ») ; la fenêtre suit ce
   réglage.
@@ -127,8 +141,19 @@ rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle sessi
   version » déjà rangé reste dans le panneau Instantanés de sa photo : effacez-le là si vous n'en
   voulez plus.
 - Le bouton ♻ de la Demande rapide : une autre sélection fait place nette d'elle-même.
+- Le bouton Détail… sous la carte de l'onglet Aperçu.
+- « ＋ Garder la demande » au bout d'un tour de Claude qui a retouché, avec la ligne « Demande à
+  garder : « … » » que Claude écrivait à la fin d'une retouche. Le menu Mes demandes reste, avec
+  Ajouter…, Renommer… et Supprimer… (Ajouter… part du texte du champ).
 
 ### Corrigé
+- Une photo verticale juste après une retouche (signalé le 25 octobre 2026 sur XH2S0407.RAF
+  (Copie 1)) : l'onglet Focus et Agrandir la montraient couchée, et minuscule dans Agrandir.
+  Lightroom rend alors une petite vignette sans la rotation de la photo ; toute vignette de la photo
+  active qui n'a pas les proportions de la photo telle que Lightroom l'affiche est maintenant
+  tournée avant d'être montrée ou marquée (cadres de Focus, carré de mise au point), même quand la
+  retouche vient de la recadrer. L'aperçu de la photo active, qui restait vide à ce moment (Agrandir
+  grisé), montre cette petite vignette en attendant la grande.
 - Les dossiers temporaires des demandes rapides sur plusieurs photos (et ceux des nouvelles
   conversations de groupe) s'effacent au chargement du module : quand Lightroom quittait sur une
   demande rapide, ses images restaient sur le disque.

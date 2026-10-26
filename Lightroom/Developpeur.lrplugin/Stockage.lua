@@ -289,19 +289,6 @@ function Stockage.refusDemande(liste, d, ancien)
     return nil
 end
 
--- Un nom libre tiré de `nom` : lui-même, sinon « nom 2 », « nom 3 »…
-function Stockage.nomLibre(liste, nom)
-    nom = uneLigne(nom)
-    if nom == '' or not Stockage.indiceDemande(liste, nom) then
-        return nom
-    end
-    local n = 2
-    while Stockage.indiceDemande(liste, nom .. ' ' .. n) do
-        n = n + 1
-    end
-    return nom .. ' ' .. n
-end
-
 -- Relit le fichier, applique `changer(liste)` (qui rend nil, ou la raison d'un refus), puis écrit.
 -- Rend vrai et la liste écrite, ou faux et la raison.
 local function changerDemandes(changer)

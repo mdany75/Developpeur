@@ -1385,10 +1385,6 @@ essai("Fil : le tour de Claude qui a noté finit par une ligne d'actions, après
     end
     egal('note:' .. n .. ':nil@' .. #lignes, table.concat(actions, ' '), 'une ligne, à la fin du tour ; plus de leçon (correctif 1.3.6)')
     contient(lignes[#lignes - 1].texte, 'feuillage', 'après le texte de Claude')
-    egal(nil, Fil.valeurActions(nil, nil))
-    egal('note', Fil.valeurActions(n, nil))
-    egal('note+demande', Fil.valeurActions(n, 9))
-    egal('demande', Fil.valeurActions(nil, 9))
     -- Une demande entre les notes et le texte de Claude : la ligne d'actions finit le tour des notes.
     local d = conversationMaquette()
     local m = elementDe(d, 'notation')
@@ -1600,7 +1596,11 @@ essai("Fil dans la fenêtre : une conversation vide montre son titre, puis l'aid
     Moteur.nouvelle()
     ouvrirFenetre(function(p)
         Fenetre.rafraichir()
-        egal(0, #Fenetre.lignes)
+        -- Les lignes de l'aide (Fenetre.lignesAide) ne sont d'aucun élément : un clic n'y fait rien.
+        vrai(#Fenetre.lignes >= 3, "le titre et l'aide")
+        for _, l in ipairs(Fenetre.lignes) do
+            egal(nil, l.element, "une ligne de l'aide")
+        end
         egal(Fenetre.FIL_VIDE_TITRE, p.t2)
         egal('titre', p.g2)
         local morceaux = {}
@@ -2084,7 +2084,8 @@ essai('Inventaire des cartes Proposition et Aperçu (étape) : titres, textes, c
             p.enAttente = false
         end)
         -- La carte de l'étape : titre (« Pourquoi ? » sans étape), sous-titre, texte ; sous elle,
-        -- comme sous la carte Note, ▲ ▼, puis ◀ ▶, Voir l'avant et Détail… en carrés de 26.
+        -- comme sous la carte Note, ▲ ▼, puis ◀ ▶ et Voir l'avant en carrés de 26 (plus de Détail…,
+        -- correctif 1.3.6, retour de Dany du 25 octobre 2026).
         egal('Pourquoi ?', p.etapeTitre)
         cles = {}
         for _, x in ipairs(vues(apercu)) do
@@ -2096,7 +2097,7 @@ essai('Inventaire des cartes Proposition et Aperçu (étape) : titres, textes, c
                 end
             end
         end
-        egal('▲=etapeMonte ▼=etapeDescend ◀=etapePrecedente ▶=etapeSuivante [titreBascule]=etapeAImages Détail…=etapeADetail', table.concat(cles, ' '))
+        egal('▲=etapeMonte ▼=etapeDescend ◀=etapePrecedente ▶=etapeSuivante [titreBascule]=etapeAImages', table.concat(cles, ' '))
         p.onglet = 'notation'
     end)
 end)

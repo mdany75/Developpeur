@@ -776,10 +776,10 @@ essai('Pourquoi ? : propriétés posées avant l\'ouverture, carte sans étape (
         vu = true
         local p, T = Fenetre.p, Fenetre.T
         for cle, valeur in pairs({ etapeTitre = Fenetre.TITRE_ETAPE, etapeSousTitre = '', etapePrecedente = false, etapeSuivante = false,
-            etapeAImages = false, etapeADetail = false, titreBascule = "Voir l'avant", etapeMonte = false, etapeDescend = false }) do
+            etapeAImages = false, titreBascule = "Voir l'avant", etapeMonte = false, etapeDescend = false }) do
             egal(valeur, p[cle], cle .. ' avant l\'ouverture')
         end
-        for _, cle in ipairs({ 'titreJeLeFais', 'peutJeLeFais', 'exerciceEtat', 'leconTitre', 'leconTexte', 'mode' }) do
+        for _, cle in ipairs({ 'titreJeLeFais', 'peutJeLeFais', 'exerciceEtat', 'leconTitre', 'leconTexte', 'mode', 'etapeADetail' }) do
             egal(nil, p[cle], cle .. ' : retiré (correctif 1.3.6)')
         end
         -- Sans étape dans le fil, la carte de l'étape montre l'aide (lot 12), coupée à sa largeur.
@@ -804,9 +804,9 @@ essai('Pourquoi ? : propriétés posées avant l\'ouverture, carte sans étape (
         egal(nil, Fenetre.envoiAuto, 'un clic de la carte annule l\'envoi automatique')
         bouton(args.contents, p, '▶', 'etapeSuivante').args.action()
         bouton(args.contents, p, "Voir l'avant", 'etapeAImages').args.action()
-        bouton(args.contents, p, 'Détail…', 'etapeADetail').args.action()
-        egal(taches + 1, #S.taches, 'Détail… passe par une tâche')
-        S.taches[#S.taches]()
+        -- Plus de Détail… (correctif 1.3.6, retour de Dany du 25 octobre 2026).
+        egal(false, (pcall(bouton, args.contents, p, 'Détail…')), 'plus de Détail…')
+        egal(taches, #S.taches, 'aucune tâche')
         egal(dialogues, #S.dialogues, 'aucune fenêtre ouverte')
         egal(messages, #S.messages, 'aucun message')
         egal(false, Moteur.travaille, 'rien envoyé à Claude')
@@ -1141,7 +1141,8 @@ end)
 
 essai('Agrandir à deux images : avant et après côte à côte, titres au-dessus, légende dessous ; les deux ensemble dans 2 000 × 1 250 (correctif 1.3.6)', function()
     local grande, dimensions, demandes = Images.grande, Images.dimensions, {}
-    -- Les pixels de chaque image ; Images.grande réduit comme le vrai (jamais au-delà de 1).
+    -- Les pixels de chaque image ; Images.grande les met à leur place comme le vrai, réduites ou
+    -- agrandies (retour de Dany du 25 octobre 2026).
     local tailles = { ['/etapes/e2-avant.jpg'] = { 3000, 2000 }, ['/etapes/e2-apres.jpg'] = { 3000, 2000 }, ['/x/avant.jpg'] = { 540, 360 } }
     Images.dimensions = function(chemin)
         local d = tailles[chemin]
@@ -1156,7 +1157,7 @@ essai('Agrandir à deux images : avant et après côte à côte, titres au-dessu
         if not d then
             return nil
         end
-        local e = math.min(largeur / d[1], hauteur / d[2], 1)
+        local e = math.min(largeur / d[1], hauteur / d[2])
         return dossier .. '/.vignettes/' .. nom, math.floor(d[1] * e), math.floor(d[2] * e)
     end
     local dialogues, messages = #S.dialogues, #S.messages
@@ -1196,8 +1197,8 @@ essai('Agrandir à deux images : avant et après côte à côte, titres au-dessu
     egal('/x/avant.jpg 994x1230 /x/illisible.jpg 994x1230', table.concat(demandes, ' '))
     d = S.dialogues[#S.dialogues]
     egal(1, #d.contents.args, 'sans légende')
-    egal('540x360', d.contents.args[1].args[1].args[2].args.width .. 'x' .. d.contents.args[1].args[1].args[2].args.height,
-        'plus petite : à sa vraie taille')
+    egal('994x662', d.contents.args[1].args[1].args[2].args.width .. 'x' .. d.contents.args[1].args[1].args[2].args.height,
+        'plus petite : agrandie à sa place')
     egal('Après : image illisible', d.contents.args[1].args[2].args[1].args.title)
     egal(Fenetre.LARGEUR_ILLISIBLE, d.contents.args[1].args[2].args[1].args.width)
     -- Aucune image lisible : un message, pas de fenêtre.
@@ -1218,7 +1219,7 @@ essai("Agrandir à deux images (pur) : la place de chacune pour que les deux, le
         local l, h, lignes = Fenetre.cadreDeux(dims, legende)
         local largeur, hauteur = Fenetre.ECART_DEUX, 0
         for _, d in ipairs(dims) do
-            local e = math.min(l / d[1], h / d[2], 1)
+            local e = math.min(l / d[1], h / d[2])
             largeur, hauteur = largeur + math.floor(d[1] * e), math.max(hauteur, math.floor(d[2] * e))
         end
         local total = titre + hauteur + (#lignes > 0 and (Fenetre.ECART_LEGENDE + #lignes * ligne) or 0)
@@ -1241,12 +1242,14 @@ essai("Agrandir à deux images (pur) : la place de chacune pour que les deux, le
             egal(legende and true or false, #lignes > 0, quoi .. ' : lignes de la légende')
         end
     end
-    -- Sans légende : la pleine hauteur sous les titres ; des petites images à leur vraie taille.
+    -- Sans légende : la pleine hauteur sous les titres ; des petites images agrandies pour remplir
+    -- leur place (retour de Dany du 25 octobre 2026) : le paysage sa moitié, le portrait la hauteur.
     local l, h = Fenetre.cadreDeux({ { 300, 200 }, { 200, 300 } })
     egal('994x' .. (G.hauteur - titre), l .. 'x' .. h)
     local largeur, total = occupe({ { 300, 200 }, { 200, 300 } })
-    egal(Fenetre.ECART_DEUX + 300 + 200, largeur, 'petites : à leur vraie taille')
-    egal(titre + 300, total)
+    local attendue = Fenetre.ECART_DEUX + 994 + math.floor(200 * (G.hauteur - titre) / 300)
+    vrai(largeur <= attendue and largeur >= attendue - 1, 'petites : agrandies (au pixel près) : ' .. largeur)
+    egal(G.hauteur, total, 'la hauteur remplie')
     -- Une longue légende prend sa hauteur aux portraits, qui la laissent tenir.
     local _, totalPortraits, _, hPortraits, lignes = occupe({ { 2000, 3000 }, { 2000, 3000 } }, longue)
     vrai(#lignes >= 4, 'longue légende : ' .. #lignes .. ' lignes')

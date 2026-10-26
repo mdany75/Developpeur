@@ -437,6 +437,7 @@ Photos.dimensionsAffichees = dimensionsAffichees
 Photos.garder = garder
 Photos.nouvelleEcriture = nouvelleEcriture
 Photos.libelle = libelle
+Photos.lireChamp = lireChamp
 Photos.lireJson = lireJson
 Photos.meta = meta
 Photos.nomFichier = nomFichier

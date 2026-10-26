@@ -5,11 +5,11 @@
 -- gardée » grisé) ; un choix remplit le champ sans envoi ni bascule (S.choisir, le champ validé
 -- d'abord comme par un clic), le menu revient à son titre, Retour l'envoie ; les fenêtres Ajouter…,
 -- Renommer… et Supprimer… (refus d'un nom vide ou pris, d'un texte vide) ; mes-demandes.json écrit
--- d'un coup, relu à chaque ouverture, illisible mis de côté ; la ligne « Demande à garder : « … » »
--- de Claude reconnue (Conversation.demandeAGarder), « ＋ Garder la demande » sur la ligne d'actions
--- d'un tour qui a retouché, et sa fenêtre Ajouter… pré-remplie ; aucun bouton sans retouche ; les
--- consignes sous leur plafond ; uninstall.sh. Ni Claude, ni quota ; les fichiers vont dans un
--- dossier personnel temporaire.
+-- d'un coup, relu à chaque ouverture, illisible mis de côté ; « ＋ Garder la demande » et la ligne
+-- « Demande à garder : « … » » de Claude retirés (correctif 1.3.6, deuxième retour de Dany du
+-- 25 octobre 2026) : ni fonction, ni bouton, ni section des consignes ; les consignes sous leur
+-- plafond ; uninstall.sh. Ni Claude, ni quota ; les fichiers vont dans un dossier personnel
+-- temporaire.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
 local S = require 'Simulation'
@@ -671,131 +671,54 @@ essai('Fichier illisible : rien n\'est perdu en silence ; dit au journal et au b
     egal(false, select(2, Stockage.lireDemandes()))
 end)
 
-essai('Ligne « Demande à garder » : reconnue (guillemets, gras, puce, point final), la dernière gardée ; ni le gabarit, ni une ligne vide, ni une autre ligne', function()
-    egal(PORTRAIT.texte, Conversation.demandeAGarder("Voilà.\n\n" .. LIGNE))
-    egal(PORTRAIT.texte, Conversation.demandeAGarder('**Demande à garder :** « ' .. PORTRAIT.texte .. ' »'))
-    egal(PORTRAIT.texte, Conversation.demandeAGarder('- Demande à garder : « ' .. PORTRAIT.texte .. ' ».'))
-    egal(PORTRAIT.texte, Conversation.demandeAGarder('Demande à garder : “' .. PORTRAIT.texte .. '”'))
-    egal(PORTRAIT.texte, Conversation.demandeAGarder('Demande à garder :\194\160«\194\160' .. PORTRAIT.texte .. '\194\160»'))
-    egal('Sans guillemets.', Conversation.demandeAGarder('Demande à garder : Sans guillemets.'))
-    egal('Deuxième.', Conversation.demandeAGarder('Demande à garder : « Première. »\nDemande à garder : « Deuxième. »'))
-    egal(nil, Conversation.demandeAGarder('Demande à garder : « <ta demande> »'), 'le gabarit des consignes')
-    egal(nil, Conversation.demandeAGarder('Demande à garder : « »'))
-    egal(nil, Conversation.demandeAGarder('Demande à garder'))
-    egal(nil, Conversation.demandeAGarder('La demande à garder serait : « x »'))
-    egal(nil, Conversation.demandeAGarder(nil))
-    -- Les consignes elles-mêmes n'en donnent pas (leur ligne est le gabarit).
-    egal(nil, Conversation.demandeAGarder(Consignes.texte))
-end)
-
-essai('Nom et description proposés : ce qui précède « : », puis la suite raccourcie ; sans « : », les premiers mots ; le texte entier', function()
-    local d = Conversation.preparerDemande("Retouche ce portrait en intérieur : simulation PROVIA, balance plus neutre, ombres relevées, hautes lumières retenues, rendu naturel.")
-    egal('Retouche ce portrait en intérieur', d.nom)
-    egal('simulation PROVIA, balance plus neutre, ombres relevées…', d.description)
-    vrai(Texte.longueur(d.description) <= Conversation.DESCRIPTION_DEMANDE, d.description)
-    egal("Retouche ce portrait en intérieur : simulation PROVIA, balance plus neutre, ombres relevées, hautes lumières retenues, rendu naturel.", d.texte)
-    local court = Conversation.preparerDemande('Paysage : ciel retenu.')
-    egal('Paysage', court.nom)
-    egal('ciel retenu', court.description)
-    local sans = Conversation.preparerDemande('Débruite la photo de nuit puis relève doucement les ombres sans lisser.')
-    egal('Débruite la photo de', sans.nom)
-    egal('nuit puis relève doucement les ombres sans lisser', sans.description)
-    -- Ce qui précède « : » trop long pour un nom : ses premiers mots.
-    local long = Conversation.preparerDemande(string.rep('mot ', 15) .. ': suite')
-    egal('mot mot mot mot', long.nom)
-    vrai(Texte.longueur(long.nom) <= Conversation.NOM_DEMANDE)
-    -- Un nom qui finit par « À » (C3 80) ou « π » (CF 80) garde ses octets : le « … » d'une
-    -- classe de Lua 5.1 ne lui retire plus le dernier (l'UTF-8 resterait coupé).
-    egal('Retouche ÉTÉ À', Conversation.preparerDemande('Retouche ÉTÉ À').nom)
-    egal('Cercle π', Conversation.preparerDemande('Cercle π : suite').nom)
-    egal('Éclairage doux', Conversation.preparerDemande('Éclairage doux… : suite').nom, '« … » retiré en entier')
-    egal('Nuit claire', Conversation.preparerDemande('Nuit claire !… : suite').nom)
-    egal('Plage à Cancún', Conversation.preparerDemande('Plage à Cancún. : suite').nom)
-end)
-
-essai('Fil : « ＋ Garder la demande » sur la ligne d\'actions d\'un tour qui a retouché et donné sa demande ; avec la note ; jamais sans retouche ni sans la ligne', function()
-    local texte = element('claude', { texte = "C'est fait.\n" .. LIGNE })
-    -- Une retouche et sa demande : la ligne d'actions, seule.
-    local c = conversation(retouche(), texte)
-    local l = ligneActions(c)
-    vrai(l, "la ligne d'actions")
-    egal('demande', l.actions)
-    egal(3, l.demande, "l'indice du texte de Claude")
-    egal('actions', Fil.lignes(c, D.texteFil)[#Fil.lignes(c, D.texteFil)].genre, 'à la fin du tour')
-    -- Avec une notation dans le même tour ; une leçon d'une conversation d'avant le correctif 1.3.6
-    -- (élément `lecon`) n'ajoute plus rien.
-    local notation = element('notation', { etat = 'fait', notes = { { photo = 4961, note = 3 } } })
-    local lecon = element('lecon', { etat = 'fait', photo = 4961, points = {} })
-    egal('note+demande', ligneActions(conversation(notation, retouche(), texte)).actions)
-    egal('demande', ligneActions(conversation(retouche(), lecon, texte)).actions)
-    egal('note+demande', ligneActions(conversation(notation, retouche(), lecon, texte)).actions)
-    egal('note', ligneActions(conversation(notation, retouche(), lecon, element('claude', { texte = 'Sans ligne.' }))).actions,
-        'sans la ligne : pas de bouton')
-    -- Pas de retouche dans le tour : ni une proposition, ni une notation, ni un classement, ni une
-    -- leçon d'avant seuls, ni une retouche en erreur ou en cours, ni une étape sans rien d'écrit.
-    local proposition = element('outil', { outil = 'preview_settings', etat = 'fait', texte = 'proposition' })
-    egal(nil, ligneActions(conversation(proposition, element('proposition', { etat = 'enAttente' }), texte)), 'une proposition')
-    egal('note', ligneActions(conversation(notation, texte)).actions, 'une notation')
-    egal(nil, ligneActions(conversation(retouche('set_metadata'), texte)), 'un classement')
-    egal(nil, ligneActions(conversation(lecon, texte)), "une leçon d'avant : rien")
-    local enErreur = retouche()
-    enErreur.etat = 'erreur'
-    egal(nil, ligneActions(conversation(enErreur, texte)), 'une retouche en erreur')
-    local enCours = retouche()
-    enCours.etat = 'enCours'
-    egal(nil, ligneActions(conversation(enCours, texte)), 'une retouche en cours')
-    local vide = retouche()
-    vide.etapes = {}
-    egal(nil, ligneActions(conversation(vide, texte)), "rien d'écrit")
-    -- match_series (sans etape_id dans sa réponse) compte, abouti.
-    local serie = retouche('match_series')
-    serie.etapes = {}
-    egal('demande', ligneActions(conversation(serie, texte)).actions)
-    -- Le texte de Claude encore en train d'arriver : pas encore.
-    local partiel = element('claude', { texte = LIGNE, partiel = true })
-    egal(nil, ligneActions(conversation(retouche(), partiel)))
-    -- Une retouche dans un tour, la demande dans le suivant : chacun son tour.
-    local deux = conversation(retouche(), element('claude', { texte = 'Fait.' }), element('dany', { texte = 'Et la demande ?' }), texte)
-    egal(nil, ligneActions(deux), 'la retouche était dans le tour d\'avant')
-    -- Valeurs lues par la fenêtre (Fil.lireActions).
-    for valeur, attendu in pairs({ demande = '|true', ['note+demande'] = 'note|true', note = 'note|false', [''] = '|false' }) do
-        local b, d = Fil.lireActions(valeur)
-        egal(attendu, b .. '|' .. tostring(d), valeur)
+essai('« ＋ Garder la demande » retiré (correctif 1.3.6) : plus de fonction ; un tour qui a retouché et écrit la ligne « Demande à garder » n\'a pas de ligne d\'actions ; avec une notation, « ☆ Voir la note » seul', function()
+    for nom, module in pairs({ demandeAGarder = Conversation, preparerDemande = Conversation, estRetouche = Conversation,
+        LIGNE_DEMANDE = Conversation, nomLibre = Stockage, garderDemande = Fenetre, lireActions = Fenetre,
+        valeurActions = Fil }) do
+        egal(nil, module[nom], nom .. ' retiré')
     end
+    egal(nil, Fil.lireActions, 'Fil.lireActions retiré')
+    egal(nil, D.garderDemande, 'sa largeur retirée')
+    egal(nil, D.ecartActions, "l'écart entre deux boutons d'actions retiré")
+    local texte = element('claude', { texte = "C'est fait.\n" .. LIGNE })
+    egal(nil, ligneActions(conversation(retouche(), texte)), "une retouche et la ligne : pas de ligne d'actions")
+    egal(nil, ligneActions(conversation(retouche('match_series'), texte)), 'match_series non plus')
+    local notation = element('notation', { etat = 'fait', notes = { { photo = 4961, note = 3 } } })
+    local l = ligneActions(conversation(notation, retouche(), texte))
+    egal('note', l.actions, 'avec une notation : la note seule')
+    egal(nil, l.demande, 'sans indice de demande')
+    -- La ligne de Claude reste un texte comme un autre, dans le fil.
+    local montre = {}
+    for _, x in ipairs(Fil.lignes(conversation(retouche(), texte), D.texteFil)) do
+        montre[#montre + 1] = x.texte
+    end
+    contient(table.concat(montre, '\n'), 'Demande à garder', 'le texte de Claude montré tel quel')
 end)
 
--- Les boutons montrés de la ligne i de la grille (`x..i`), par titre, avec la marge de leur rangée.
+-- Les boutons de la ligne i de la grille (`x..i`), par titre.
 local function boutonsMontres(contenu, i)
     local montres = {}
     for _, v in ipairs(vues(contenu)) do
         if S.BOUTONS[v.genre] and type(v.args.visible) == 'table' and table.concat(S.cles(v.args.visible), ' ') == 'x' .. i
             and S.montreeDansFenetre(v) then
-            local marge = 0
-            for _, r in ipairs(vues(contenu)) do
-                if r.genre == 'row' then
-                    for _, e in ipairs(r.args) do
-                        if e == v then
-                            marge = r.args.margin_left or 0
-                        end
-                    end
-                end
-            end
-            montres[#montres + 1] = v.args.title .. '@' .. marge
+            montres[#montres + 1] = v.args.title
         end
     end
     table.sort(montres)
     return table.concat(montres, ' ')
 end
 
-essai('Fenêtre : « ＋ Garder la demande » au bout de la ligne d\'actions, à droite (une rangée poussée par margin_left, D6), avec ou sans les autres boutons ; son clic ouvre Ajouter… pré-remplie, un nom pris en reçoit un libre', function()
-    ranger({ nom = 'Retouche ce portrait en intérieur', description = '', texte = 'ancienne' })
+essai('Fenêtre : plus de bouton « ＋ Garder la demande » (ni montré, ni caché) ; la ligne d\'actions d\'une notation montre « ☆ Voir la note » seul', function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.charger()
     Moteur.nouvelle()
-    local c = conversation(retouche(), element('claude', { texte = "C'est fait.\n" .. LIGNE }))
-    Moteur.courante = c
+    local notation = element('notation', { etat = 'fait', notes = { { photo = 4961, note = 3 } } })
+    Moteur.courante = conversation(notation, retouche(), element('claude', { texte = "C'est fait.\n" .. LIGNE }))
     ouvrirFenetre(function(p, contenu)
         Fenetre.rafraichir()
+        for _, v in ipairs(vues(contenu)) do
+            vrai(not (S.BOUTONS[v.genre] and tostring(v.args.title):find('Garder la demande', 1, true)), 'aucun bouton Garder la demande')
+        end
         local i
         for k = 1, D.lignes do
             if p['x' .. k] ~= '' then
@@ -803,68 +726,21 @@ essai('Fenêtre : « ＋ Garder la demande » au bout de la ligne d\'actions, à
             end
         end
         vrai(i, "une ligne d'actions dans la grille")
-        egal('demande', p['x' .. i])
-        local droite = D.texteFil - D.garderDemande
-        egal('＋ Garder la demande@' .. droite, boutonsMontres(contenu, i), 'au bout de la ligne')
-        p['x' .. i] = 'note+demande'
-        egal('☆ Voir la note@0 ＋ Garder la demande@' .. droite, boutonsMontres(contenu, i))
-        vrai(D.voirNote + D.ecartActions <= droite, "sans chevaucher l'autre")
-        p['x' .. i] = 'note'
-        egal('☆ Voir la note@0', boutonsMontres(contenu, i), 'sans demande : comme avant')
-        p['x' .. i] = 'demande'
-        -- Le bouton : carré small, en petit, à sa largeur mesurée ; dans sa ligne.
-        local bouton
-        for _, v in ipairs(vues(contenu)) do
-            if S.BOUTONS[v.genre] and v.args.title == '＋ Garder la demande' and S.montreeDansFenetre(v) then
-                bouton = v
-            end
-        end
-        egal('square_button', bouton.genre)
-        egal('small', bouton.args.size)
-        egal(Fenetre.POLICES.petit, bouton.args.font)
-        egal(D.garderDemande, bouton.args.width)
-        vrai(Fil.largeur('＋ Garder la demande', 'petit') + 20 <= D.garderDemande, 'le titre y tient')
-        vrai(Fenetre.parBouton(bouton.args.action), 'par Fenetre.bouton')
-        -- Son clic : Ajouter… pré-remplie, dans une tâche ; le nom pris en reçoit un libre.
-        local taches = #S.taches
-        S.cliquer(bouton)
-        egal(taches + 1, #S.taches, 'dans une tâche')
-        jouer({ function(args, q)
-            egal('Ajouter une demande', args.title)
-            egal('Retouche ce portrait en intérieur 2', q.nom, 'un nom libre')
-            egal('simulation PROVIA, balance plus neutre, ombres relevées…', q.description)
-            egal(PORTRAIT.texte, q.texte)
-            egal('', q.erreur)
-            q.nom = 'Portrait intérieur PROVIA'
-            return 'ok'
-        end }, function() lancerTaches(taches) end)
-        egal('Portrait intérieur PROVIA | Retouche ce portrait en intérieur', select(2, demandesDuFichier()))
-        egal(Fenetre.DEMANDE_GARDEE, p.message)
-        -- Une ligne sans demande (rafraîchie) : le clic ne fait rien.
-        egal(false, Fenetre.garderDemande(i + 1))
+        egal('note', p['x' .. i])
+        egal('☆ Voir la note', boutonsMontres(contenu, i))
     end)
     Moteur.courante = nil
 end)
 
-essai('Consignes : la section « Demande à garder » (la ligne exacte, après une retouche seulement, une ou deux phrases, ni identifiant ni fichier, l\'exemple reconnu), la dernière ; le texte sous 7 500', function()
+essai('Consignes : plus de section « Demande à garder », ni de ligne à écrire, ni dans la Demande rapide ; plus de section Leçon ; le texte sous 7 500', function()
     local texte = Consignes.texte
-    local debut = texte:find('\n## Demande à garder\n', 1, true)
-    vrai(debut, 'section Demande à garder')
-    local fin = texte:find('\n## ', debut + 1, true) or (#texte + 1)
-    local section = texte:sub(debut + 1, fin - 1)
-    for _, morceau in ipairs({ 'Après une retouche', 'une étape écrite', 'pas une proposition, notation ou classement seuls',
-        'finis ta réponse par une ligne seule', '\nDemande à garder : « <ta demande> »\n', 'Une ou deux phrases',
-        'sur une photo semblable', 'sans identifiant ni nom de fichier' }) do
-        contient(section, morceau, 'section Demande à garder')
+    egal(nil, texte:find('Demande à garder', 1, true), 'plus de section Demande à garder')
+    egal(nil, texte:find('<ta demande>', 1, true), 'plus de gabarit')
+    for _, quoi in ipairs({ 'rapide', 'rapidePhoto' }) do
+        egal(nil, Consignes[quoi]:find('Demande à garder', 1, true), quoi)
+        contient(Consignes[quoi], 'Pas de titre.', quoi)
     end
-    -- L'exemple des consignes, écrit comme la ligne attendue, est reconnu tel quel.
-    local exemple = section:match('par exemple « (.-) »%.')
-    vrai(exemple, "l'exemple")
-    egal(exemple, Conversation.demandeAGarder('Demande à garder : « ' .. exemple .. ' »'))
-    vrai(not exemple:find('%d'), "l'exemple sans identifiant")
-    -- Plus de section Leçon (correctif 1.3.6) : cette ligne est la dernière chose dite.
     egal(nil, texte:find('\n## Leçon de la photo\n', 1, true), 'plus de section Leçon')
-    egal(nil, texte:find('\n## ', debut + 1, true), 'la dernière section')
     vrai(Texte.longueur(texte) <= 7500, string.format('plafond des consignes : %d', Texte.longueur(texte)))
     vrai(not texte:find('\\\n', 1, true), 'lignes recollées')
 end)

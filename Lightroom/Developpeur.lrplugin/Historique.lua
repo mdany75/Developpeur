@@ -19,8 +19,14 @@
 -- Une photo sans étape de Claude a dans son historique le résumé de ses réglages : ceux de
 -- Lightroom qui s'écartent de leur valeur par défaut (Historique.ecarts ; demandé par Dany le
 -- 25 octobre 2026).
+--
+-- Aussi le résumé que la fenêtre montre en bas du fil (deuxième retour de Dany du 25 octobre 2026,
+-- section « Le résumé de la fenêtre » en bas de ce fichier) : la prise de vue, la note et l'état
+-- d'une photo, ou les dates, les appareils et les comptes d'un groupe. Lui n'a que la forme du fil :
+-- il n'est jamais gardé dans la conversation, ni envoyé à Claude.
 
 local LrApplication = import 'LrApplication'
+local LrDate = import 'LrDate'
 local LrTasks = import 'LrTasks'
 
 local Conversation = require 'Conversation'
@@ -105,6 +111,16 @@ end
 
 -- Lectures (dans une tâche) --------------------------------------------------------------------
 
+-- Les réglages d'une photo hors de leur valeur par défaut, en mots (Historique.ecarts) ; nil sans
+-- écart, ou s'ils ne se lisent pas.
+local function ecartsDe(photo)
+    local ok, ecarts = LrTasks.pcall(function()
+        local reglages = photo:getDevelopSettings()
+        return type(reglages) == 'table' and Historique.ecarts(reglages, Reglages.estRaw(photo, reglages)) or nil
+    end)
+    return ok and type(ecarts) == 'table' and #ecarts > 0 and ecarts or nil
+end
+
 -- L'état d'une photo (un LrPhoto) : { id, nom, journal (ses entrées, des plus anciennes aux plus
 -- récentes), editCount, lastEditTime (métadonnées brutes, des nombres), reprises (nil, ou
 -- { etape, changements = { { cle, claude, maintenant } } } : ce que Dany a changé à la main depuis
@@ -132,11 +148,7 @@ function Historique.etat(photo, sansReprises)
             etat.reprises = #reprises.changements > 0 and reprises or nil
         end
         if #journal == 0 then
-            local okR, ecarts = LrTasks.pcall(function()
-                local reglages = photo:getDevelopSettings()
-                return type(reglages) == 'table' and Historique.ecarts(reglages, Reglages.estRaw(photo, reglages)) or nil
-            end)
-            etat.reglages = okR and type(ecarts) == 'table' and #ecarts > 0 and ecarts or nil
+            etat.reglages = ecartsDe(photo)
         end
     end
     return etat
@@ -660,6 +672,283 @@ function Historique.groupe(g)
     end
     local noms = table.concat(g.noms, ", ") .. (g.n > #g.noms and ", …" or "")
     return element(string.format("%d %s %s déjà des étapes de Claude : %s.", g.n, de, g.n == 1 and "a" or "ont", noms), {})
+end
+
+-- Le résumé de la fenêtre (deuxième retour de Dany du 25 octobre 2026) -------------------------
+-- À l'ouverture de la fenêtre Claude, et chaque fois qu'une autre photo ou un autre groupe change la
+-- conversation montrée, la fenêtre fait un résumé, sans Claude ni jetons, montré en bas du fil
+-- (Fenetre.resume, Fil.lignesResume) : pour une photo, sa prise de vue (appareil, objectif, focale,
+-- ouverture, vitesse, ISO, date), sa note et son drapeau, et son état (ses étapes de Claude, ses
+-- reprises à la main, ses réglages hors de leur valeur par défaut : ce que l'historique sait déjà) ;
+-- pour plusieurs photos, leur nombre, leurs dates (de … à …), leurs appareils, et combien sont
+-- retouchées par Claude, notées, rejetées. Il n'est pas gardé dans la conversation (ni sur le disque,
+-- ni envoyé à Claude) : il n'a que la forme du fil, l'en-tête puis des puces, refaite à chaque fois.
+-- Les lectures se font par les lectures groupées du catalogue (batchGetFormattedMetadata,
+-- batchGetRawMetadata, batchGetPropertyForPlugin, comme Photos.decrireTout), dans une tâche ; si
+-- l'une échoue, les photos se lisent une à une, les MAX_GROUPE premières d'un groupe seulement. Les
+-- textes de la prise de vue sont ceux de Lightroom (getFormattedMetadata, comme son panneau
+-- Métadonnées), la date à l'heure locale (timeToUserFormat, comme Lightroom.legende).
+
+Historique.TITRE_RESUME = "Résumé de la photo"
+Historique.TITRE_RESUME_GROUPE = "Résumé de la sélection"
+-- Appareils nommés dans le résumé d'un groupe (les plus fréquents ; les autres : « … »).
+Historique.APPAREILS_MONTRES = 4
+
+-- Ce que le résumé lit de chaque photo : la prise de vue en textes de Lightroom, la date, la note
+-- et le drapeau bruts, et les champs du module qui disent « retouchée par Claude » (seulement si la
+-- mémoire est celle de la photo : proprietaireMemoire, comme Photos.decrireTout).
+Historique.CLES_PRISE = { 'cameraModel', 'lens', 'focalLength', 'aperture', 'shutterSpeed', 'isoSpeedRating' }
+local NOMS_PRISE = { cameraModel = 'appareil', lens = 'objectif', focalLength = 'focale', aperture = 'ouverture',
+    shutterSpeed = 'vitesse', isoSpeedRating = 'iso' }
+local CLES_BRUTES = { 'dateTimeOriginal', 'rating', 'pickStatus', 'uuid' }
+local CHAMPS_RETOUCHE = { 'retoucheeParClaude', 'proprietaireMemoire' }
+
+-- Le drapeau (pickStatus : 1, 0 ou −1) comme Lightroom.photos le donne de la photo active.
+local DRAPEAUX = { [1] = 'retenue', [0] = 'aucun', [-1] = 'rejetee' }
+
+-- Un texte de Lightroom (une métadonnée formatée peut être un nombre), nil s'il est vide.
+local function texteOuNil(v)
+    if type(v) == 'number' then
+        v = tostring(v)
+    end
+    v = type(v) == 'string' and Texte.nettoyer(v) or ''
+    return v ~= '' and v or nil
+end
+
+-- « AAAA-MM-JJ HH:MM » d'une date de LrDate, à l'heure locale ; nil sans date.
+local function aLHeureLocale(t)
+    if type(t) ~= 'number' then
+        return nil
+    end
+    local ok, texte = LrTasks.pcall(LrDate.timeToUserFormat, t, '%Y-%m-%d %H:%M')
+    return ok and type(texte) == 'string' and texte or nil
+end
+
+-- La description d'une photo pour le résumé, en table neuve : appareil, objectif, focale,
+-- ouverture, vitesse, iso (textes de Lightroom), prise (« AAAA-MM-JJ HH:MM »), note (0 à 5), drapeau
+-- ('retenue', 'aucun', 'rejetee'), retouchee (par Claude). `f`, `b` et `m` lisent une métadonnée
+-- formatée, brute, ou un champ du module ; `retouchee` dit si la mémoire est celle de la photo.
+local function decrire(f, b, retouchee)
+    local d = {}
+    for _, cle in ipairs(Historique.CLES_PRISE) do
+        d[NOMS_PRISE[cle]] = texteOuNil(f(cle))
+    end
+    d.prise = aLHeureLocale(b('dateTimeOriginal'))
+    d.note = math.max(0, math.min(5, math.floor(tonumber(b('rating')) or 0)))
+    d.drapeau = DRAPEAUX[tonumber(b('pickStatus')) or 0] or 'aucun'
+    d.retouchee = retouchee()
+    return d
+end
+
+-- Les descriptions de ces photos (Historique.lireResumePhoto, Historique.lireResumeGroupe), par les
+-- trois lectures groupées du catalogue ; une photo qu'elles n'ont pas donnée se lit une à une, parmi
+-- les `uneAUne` premières seulement. Une photo absente de la lecture groupée des champs du module,
+-- quand elle a réussi, n'en a aucun (comme Historique.lireGroupe). Rend la liste (dans l'ordre des
+-- photos lues) et le nombre de photos lues.
+local function lireDescriptions(cat, photos, uneAUne)
+    local okF, formatees = LrTasks.pcall(function() return cat:batchGetFormattedMetadata(photos, Historique.CLES_PRISE) end)
+    local okB, brutes = LrTasks.pcall(function() return cat:batchGetRawMetadata(photos, CLES_BRUTES) end)
+    local okC, champs = LrTasks.pcall(function() return cat:batchGetPropertyForPlugin(photos, _PLUGIN, CHAMPS_RETOUCHE) end)
+    local champsLus = okC and type(champs) == 'table'
+    formatees = okF and type(formatees) == 'table' and formatees or {}
+    brutes = okB and type(brutes) == 'table' and brutes or {}
+    champs = champsLus and champs or {}
+    local liste = {}
+    for i, photo in ipairs(photos) do
+        local fp, bp, mp = formatees[photo], brutes[photo], champs[photo]
+        if mp == nil and champsLus then
+            mp = {}
+        end
+        if type(fp) == 'table' and type(bp) == 'table' and type(mp) == 'table' then
+            liste[#liste + 1] = decrire(function(cle) return fp[cle] end, function(cle) return bp[cle] end, function()
+                if mp.retoucheeParClaude ~= 'oui' then
+                    return false
+                end
+                if type(mp.proprietaireMemoire) == 'string' and mp.proprietaireMemoire ~= '' then
+                    return mp.proprietaireMemoire == bp.uuid
+                end
+                return Photos.lireChamp(photo, 'retoucheeParClaude') == 'oui'
+            end)
+        elseif i <= uneAUne then
+            local ok, d = LrTasks.pcall(decrire, function(cle) return Photos.meta(photo, cle) end,
+                function(cle) return Photos.brut(photo, cle) end,
+                function() return Photos.lireChamp(photo, 'retoucheeParClaude') == 'oui' end)
+            if ok and d then
+                liste[#liste + 1] = d
+            end
+        end
+    end
+    return liste, #liste
+end
+
+-- Le résumé de la photo `id` (localIdentifier), en table neuve : sa description (lireDescriptions),
+-- son nom et son état (Historique.etat : journal, reprises à la main, et ici ses réglages hors de
+-- leur valeur par défaut même quand Claude y a fait des étapes) ; nil si elle ne se lit pas.
+function Historique.lireResumePhoto(id)
+    local r
+    LrTasks.pcall(function()
+        local cat = LrApplication.activeCatalog()
+        local photo = cat:getPhotoByLocalId(tonumber(id))
+        if not photo then
+            return
+        end
+        local d = lireDescriptions(cat, { photo }, 1)[1] or {}
+        local etat = Historique.etat(photo)
+        if #etat.journal > 0 then
+            etat.reglages = ecartsDe(photo)
+        end
+        d.id, d.nom, d.etat = photo.localIdentifier, etat.nom, etat
+        r = d
+    end)
+    return r
+end
+
+-- « 25 oct. 2026 » pour « 2026-10-25 … ».
+local function jour(t)
+    local a, m, j = tostring(t or ''):match('^(%d%d%d%d)-(%d%d)-(%d%d)')
+    local mois = a and require('Carnet').MOIS_COURTS[tonumber(m)]
+    return mois and string.format('%d %s %s', tonumber(j), mois, a) or nil
+end
+
+-- Le résumé de la sélection de Lightroom, en table neuve : m (photos sélectionnées), lues (celles
+-- décrites), debut et fin (« 3 oct. 2026 », la plus ancienne et la plus récente prise de vue, nil sans
+-- date), sansDate, appareils (liste { nom, n }, des plus fréquents aux moins, puis par nom), sansAppareil,
+-- retouchees (par Claude), notees (au moins 1 ★), rejetees ; nil si la sélection ne se lit pas.
+function Historique.lireResumeGroupe()
+    local g
+    LrTasks.pcall(function()
+        local cat = LrApplication.activeCatalog()
+        local selection = cat:getTargetPhotos()
+        local liste, lues = lireDescriptions(cat, selection, Historique.MAX_GROUPE)
+        g = { m = #selection, lues = lues, sansDate = 0, appareils = {}, sansAppareil = 0, retouchees = 0, notees = 0, rejetees = 0 }
+        local premiere, derniere
+        local parNom = {}
+        for _, d in ipairs(liste) do
+            if d.prise then
+                premiere = (not premiere or d.prise < premiere) and d.prise or premiere
+                derniere = (not derniere or d.prise > derniere) and d.prise or derniere
+            else
+                g.sansDate = g.sansDate + 1
+            end
+            if d.appareil then
+                if not parNom[d.appareil] then
+                    parNom[d.appareil] = { nom = d.appareil, n = 0 }
+                    g.appareils[#g.appareils + 1] = parNom[d.appareil]
+                end
+                parNom[d.appareil].n = parNom[d.appareil].n + 1
+            else
+                g.sansAppareil = g.sansAppareil + 1
+            end
+            g.retouchees = g.retouchees + (d.retouchee and 1 or 0)
+            g.notees = g.notees + ((d.note or 0) > 0 and 1 or 0)
+            g.rejetees = g.rejetees + (d.drapeau == 'rejetee' and 1 or 0)
+        end
+        table.sort(g.appareils, function(a, b)
+            if a.n ~= b.n then
+                return a.n > b.n
+            end
+            return a.nom < b.nom
+        end)
+        g.debut, g.fin = jour(premiere), jour(derniere)
+    end)
+    return g
+end
+
+-- Les textes du résumé (purs).
+
+-- « 3 ★ · retenue », « pas encore notée · sans drapeau », « 2 ★ · rejetée ».
+function Historique.texteNote(note, drapeau)
+    local n = math.floor(tonumber(note) or 0)
+    local etoiles = n > 0 and (n .. " ★") or "pas encore notée"
+    local mots = ({ retenue = "retenue", rejetee = "rejetée" })[drapeau or ''] or "sans drapeau"
+    return etoiles .. " · " .. mots
+end
+
+-- L'état d'une photo en une puce : ses étapes de Claude (combien, la dernière et sa date), sinon ce
+-- que editCount dit d'une retouche à la main.
+local function etatPhoto(etat)
+    local journal = etat.journal or {}
+    if #journal == 0 then
+        if (etat.editCount or 0) > 0 then
+            return "retouchée à la main, sans étape de Claude"
+        end
+        return "sans étape de Claude ni retouche"
+    end
+    local derniere = journal[#journal]
+    local nom = Conversation.nomEtape(derniere.etape)
+    return etapes(#journal) .. ", la dernière le " .. Historique.date(derniere.date)
+        .. (nom ~= '' and (" (« " .. nom .. " »)") or '') .. (etat.reprises and ", puis des reprises à la main" or '')
+end
+
+-- Le résumé d'une photo (Historique.lireResumePhoto) : « Résumé de la photo : DSCF4961.RAF », puis
+-- la prise de vue (les textes de Lightroom, dans l'ordre de son panneau Métadonnées, puis la date),
+-- la note et le drapeau, l'état, les reprises à la main et les réglages hors de leur valeur par
+-- défaut (les puces de l'historique, Historique.texteReprises et Historique.texteReglages).
+function Historique.resumePhoto(d)
+    local prise = {}
+    for _, cle in ipairs(Historique.CLES_PRISE) do
+        local v = d[NOMS_PRISE[cle]]
+        if (v or '') ~= '' then
+            prise[#prise + 1] = v
+        end
+    end
+    if (d.prise or '') ~= '' then
+        prise[#prise + 1] = Historique.date(d.prise)
+    end
+    local etat = type(d.etat) == 'table' and d.etat or { journal = {} }
+    local puces = {
+        "Prise de vue : " .. (#prise > 0 and table.concat(prise, " · ") or "rien de lu"),
+        "Note et drapeau : " .. Historique.texteNote(d.note, d.drapeau),
+        "État : " .. etatPhoto(etat),
+    }
+    if etat.reprises then
+        puces[#puces + 1] = (Historique.texteReprises(etat.reprises))
+    end
+    if type(etat.reglages) == 'table' and #etat.reglages > 0 then
+        puces[#puces + 1] = Historique.texteReglages(etat.reglages)
+    end
+    local nom = (d.nom or '') ~= '' and d.nom or ("photo " .. tostring(d.id or '?'))
+    return element(Historique.TITRE_RESUME .. " : " .. nom, puces).texte
+end
+
+-- Le résumé d'un groupe (Historique.lireResumeGroupe) : « Résumé de la sélection : 12 photos », puis
+-- les dates de prise de vue, les appareils (« X-H2S (10), X-T20 (2) ») et les comptes. Quand seules
+-- les premières ont été lues (lectures groupées en échec), l'en-tête le dit.
+function Historique.resumeGroupe(g)
+    local tete = Historique.TITRE_RESUME_GROUPE .. " : " .. (g.m == 1 and "1 photo" or (g.m .. " photos"))
+    if (g.lues or g.m) < g.m then
+        tete = tete .. " (les " .. g.lues .. " premières lues)"
+    end
+    local puces = {}
+    local dates
+    if not g.debut then
+        dates = "Dates de prise de vue inconnues"
+    elseif g.debut == g.fin then
+        dates = "Prises le " .. g.debut
+    else
+        dates = "Prises du " .. g.debut .. " au " .. g.fin
+    end
+    if g.debut and (g.sansDate or 0) > 0 then
+        dates = dates .. " (" .. g.sansDate .. " sans date)"
+    end
+    puces[#puces + 1] = dates
+    local appareils = {}
+    for k, a in ipairs(g.appareils or {}) do
+        if k > Historique.APPAREILS_MONTRES then
+            appareils[#appareils + 1] = "…"
+            break
+        end
+        appareils[#appareils + 1] = (#g.appareils == 1 and (g.sansAppareil or 0) == 0) and a.nom or (a.nom .. " (" .. a.n .. ")")
+    end
+    if (g.sansAppareil or 0) > 0 then
+        appareils[#appareils + 1] = "inconnu (" .. g.sansAppareil .. ")"
+    end
+    if #appareils > 0 then
+        puces[#puces + 1] = (#appareils == 1 and #(g.appareils or {}) <= 1 and "Appareil : " or "Appareils : ") .. table.concat(appareils, ", ")
+    end
+    puces[#puces + 1] = string.format("Retouchées par Claude : %d · notées : %d · rejetées : %d", g.retouchees or 0, g.notees or 0,
+        g.rejetees or 0)
+    return element(tete, puces).texte
 end
 
 return Historique

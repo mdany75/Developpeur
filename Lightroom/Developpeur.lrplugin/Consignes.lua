@@ -99,14 +99,6 @@ bilan de view_photo à l'appui (par exemple « hautes lumières écrêtées : 2,
 cliquant dans le fil : ton résumé ne répète pas chaque raison. Après une tâche sur plusieurs \
 photos, donne aussi les numéros des photos à revoir. Chaque étape est dans l'Historique de \
 Lightroom sous « Claude · … ».
-
-## Demande à garder
-Après une retouche (une étape écrite ; pas une proposition, notation ou classement seuls), finis \
-ta réponse par une ligne seule :
-Demande à garder : « <ta demande> »
-Une ou deux phrases qui referaient ton travail sur une photo semblable, sans identifiant ni nom de \
-fichier, par exemple « Retouche ce portrait en intérieur : PROVIA, balance plus neutre, ombres \
-relevées, rendu naturel. ».
 ]]
 
 -- Les lignes coupées par « \ » dans le texte ci-dessus sont recollées.
@@ -311,8 +303,8 @@ Consignes.ajustementsCadre = { "Plus serré", "Plus large", "Horizon au tiers ha
 -- sans suite ni carte. `rapide` : plusieurs photos (ou la case Autre photo décochée), dans une
 -- conversation jamais gardée ; `rapidePhoto` : une photo seule, dans sa conversation, que la fenêtre
 -- Claude reprendra (correctif 1.3.6, « une photo, une conversation »).
-Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Elle vise toutes les photos sélectionnées dans Lightroom (list_selection, puis chacune, ou selection = true), pas seulement la photo active, sauf si elle en nomme une. Fais ce qui est demandé sans noter les photos d'abord (sauf si on te le demande), puis dis ce qui a changé, photo par photo si elles sont plusieurs. Ni titre, ni « Demande à garder »."
-Consignes.rapidePhoto = "[Demande rapide] Une seule demande, faite depuis la fenêtre Demande rapide dans la conversation de cette photo, que la fenêtre Claude reprendra : la Demande rapide ne montre que ta réponse, et rien n'y pourra être accepté. Elle vise la photo active, seule sélectionnée. Fais ce qui est demandé sans noter la photo d'abord (sauf si on te le demande), puis dis ce qui a changé. Ni titre, ni « Demande à garder »."
+Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Elle vise toutes les photos sélectionnées dans Lightroom (list_selection, puis chacune, ou selection = true), pas seulement la photo active, sauf si elle en nomme une. Fais ce qui est demandé sans noter les photos d'abord (sauf si on te le demande), puis dis ce qui a changé, photo par photo si elles sont plusieurs. Pas de titre."
+Consignes.rapidePhoto = "[Demande rapide] Une seule demande, faite depuis la fenêtre Demande rapide dans la conversation de cette photo, que la fenêtre Claude reprendra : la Demande rapide ne montre que ta réponse, et rien n'y pourra être accepté. Elle vise la photo active, seule sélectionnée. Fais ce qui est demandé sans noter la photo d'abord (sauf si on te le demande), puis dis ce qui a changé. Pas de titre."
 
 -- Les boutons de la Demande rapide, à gauche du champ (FenetreRapide.ACTIONS, demandés par Dany le
 -- 24 octobre 2026), visent toutes les photos sélectionnées, comme une demande tapée : le premier

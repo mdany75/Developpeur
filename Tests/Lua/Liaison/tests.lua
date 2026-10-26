@@ -3086,6 +3086,41 @@ test("Liaison : textes d'état et messages d'erreur", function()
     egal(Liaison.messageErreur("Aucune photo"), "Aucune photo")
 end)
 
+test("Liaison : une commande acceptée compte dans enCours jusqu'à sa fin, même en erreur ; une ligne refusée ne compte pas", function()
+    Liaison.prise = { send = function(self, texte) S.envois[#S.envois + 1] = texte end }
+    Liaison.reponsesConnectee = true
+    Liaison.enCours, Liaison.finCommande = 0, nil
+    local executer, vus = Commandes.executer, {}
+    Commandes.executer = function(...)
+        vus[#vus + 1] = Liaison.enCours
+        return executer(...)
+    end
+    local ok, erreur = pcall(function()
+        S.horloge = 100
+        Liaison.recevoir(ligne({ id = 6, command = 'ping', params = {} }))
+        egal(vus[1], 1, "comptée pendant la commande")
+        egal(Liaison.enCours, 0, "finie")
+        egal(Liaison.finCommande, 100, "l'heure de sa fin")
+        S.horloge = 120
+        Liaison.recevoir(ligne({ id = 7, command = 'pivoter' }))
+        egal(vus[2], 1)
+        egal(Liaison.enCours, 0, "finie en erreur")
+        egal(Liaison.finCommande, 120)
+        S.horloge = 140
+        Liaison.recevoir(ligne({ id = 8, command = 'ping', params = {} }, false))
+        egal(#vus, 2, "refusée sans jeton : pas de commande")
+        egal(Liaison.enCours, 0)
+        egal(Liaison.finCommande, 120, "une ligne refusée ne finit rien")
+    end)
+    Commandes.executer = executer
+    Liaison.prise, Liaison.reponsesConnectee = nil, false
+    Liaison.finCommande = nil
+    S.horloge = 0
+    if not ok then
+        error(erreur, 0)
+    end
+end)
+
 test("Liaison : sans prise des réponses, la réponse est abandonnée après l'attente", function()
     Liaison.prise = nil
     Liaison.reponsesConnectee = false

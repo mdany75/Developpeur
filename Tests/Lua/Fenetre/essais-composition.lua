@@ -608,8 +608,11 @@ essai("Aperçu : l'image de la proposition arrive ; un vrai clic sur Proposition
         lancerTaches(avant)
         egal(dialogues + 1, #S.dialogues)
         egal('Claude · 2 sur 3 · preview_settings', S.dialogues[#S.dialogues].title)
-        -- Plus petite que 2 000 × 1 250 : son propre fichier, à sa vraie taille (correctif 1.3.6).
-        contient(S.dialogues[#S.dialogues].contents.args.value, '/p1.jpg', "l'image de la proposition en grand")
+        -- Plus petite que 2 000 × 1 250 : agrandie, à ses proportions, pour remplir la place
+        -- (correctif 1.3.6, retour de Dany du 25 octobre 2026).
+        local grande = S.dialogues[#S.dialogues].contents.args
+        contient(grande.value, '/.vignettes/p1-', "l'image de la proposition en grand")
+        egal(1250, grande.height, 'agrandie jusqu\'à la hauteur de la place')
         -- ◀ depuis elle, la photo active ayant changé : l'image d'avant la proposition.
         Fenetre.changerImage(-1)
         egal('1 sur 3 · view_photo', p.legendeApercu, '◀ part de la proposition')

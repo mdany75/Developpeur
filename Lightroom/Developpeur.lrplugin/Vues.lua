@@ -114,14 +114,12 @@ end
 --   la ligne d'un appel d'outil est un texte riche (le nom en <EM>, Menlo), et les autres variantes
 --   reçoivent le texte sans balise (une variante cachée ne voit jamais une balise qu'elle ne sait
 --   pas montrer) ;
---   la rangée d'actions selon `x..i` (« ☆ Voir la note » ; « ＋ Garder la demande » à droite après
---   une retouche : Fil.lireActions), en variantes superposées, des carrés small dans des rangées
---   poussées à droite par margin_left (constaté le 21 octobre 2026, D6 : ils répondent, et la
---   rangée ne prend pas les clics du texte).
+--   la rangée d'actions selon `x..i` (« ☆ Voir la note »), un carré small dans sa rangée (constaté
+--   le 21 octobre 2026, D6 : il répond, et la rangée ne prend pas les clics du texte).
 -- Un clic sur le texte est réparti par Fenetre.cliquerLigne (une image ou une étape dans l'onglet
 -- Aperçu, sinon le détail d'un outil : « Pourquoi ? », au bout d'une étape, est retiré au
--- correctif 1.3.6, décision de Dany du 25 octobre 2026) ; les boutons appellent F.voirNote et
--- F.garderDemande, qui relisent la ligne.
+-- correctif 1.3.6, décision de Dany du 25 octobre 2026) ; le bouton appelle F.voirNote, qui relit
+-- la ligne.
 function Vues.ligneFil(f, F, i, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     local largeur = D.texteFil
@@ -166,24 +164,16 @@ function Vues.ligneFil(f, F, i, D)
     end
     -- Les actions d'une notation : « ☆ Voir la note » (onglet Note), à la place des icônes de la
     -- maquette (un glyphe dans le titre : une icône d'image_name chevaucherait le titre, constaté
-    -- B3). Après une retouche, « ＋ Garder la demande » (Mes demandes) au bout de la même ligne, à
-    -- droite : une rangée poussée par margin_left (D6). (« Leçon de la photo » est retiré avec la
-    -- leçon au correctif 1.3.6, comme « Pourquoi ? » au bout d'une étape.)
+    -- B3). (« Leçon de la photo » est retiré avec la leçon au correctif 1.3.6, comme « Pourquoi ? »
+    -- au bout d'une étape et « ＋ Garder la demande », au bout de la ligne après une retouche.)
     local actions = 'x' .. i
     texte[#texte + 1] = f:column {
         place = 'overlapping',
         f:row {
             F.bouton(f, { carre = true, size = 'small', title = "☆ Voir la note", font = P.petit, width = D.voirNote,
                 tooltip = "La note proposée de la photo active, dans l'onglet Note",
-                visible = F.condition(actions, function(v) return F.lireActions(v) == 'note' end),
+                visible = F.egal(actions, 'note'),
                 action = function() F.voirNote(i) end }),
-        },
-        f:row {
-            margin_left = largeur - D.garderDemande,
-            F.bouton(f, { carre = true, size = 'small', title = "＋ Garder la demande", font = P.petit, width = D.garderDemande,
-                tooltip = "Garder la demande de Claude dans Mes demandes (à droite de Style), pour la refaire sur une autre photo",
-                visible = F.condition(actions, function(v) return select(2, F.lireActions(v)) end),
-                action = function() F.garderDemande(i) end }),
         },
     }
     return f:row {
@@ -602,8 +592,9 @@ end
 -- « Pourquoi ? » sans étape, Fenetre.TITRE_ETAPE), son sous-titre en gris (fichier, outil,
 -- « annulée ensuite »), sa raison et ses réglages changés page par page (`etapeTexte`,
 -- D.etapeLignes lignes en 12, coupées par Fenetre.montrerPage) ; sous la carte, ▲ ▼, puis ◀ ▶
--- (étape précédente ou suivante de la même photo), Voir l'avant / Voir l'après (titre lié
--- `titreBascule` : un seul bouton) et Détail… (l'appel de l'outil et sa réponse) en carrés.
+-- (étape précédente ou suivante de la même photo) et Voir l'avant / Voir l'après (titre lié
+-- `titreBascule` : un seul bouton) en carrés. (Détail…, l'appel de l'outil et sa réponse, est
+-- retiré au correctif 1.3.6, retour de Dany du 25 octobre 2026.)
 function Vues.etape(f, F, largeur, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     return carteEtRangee(f, F, largeur, D, 'carte-etape', {
@@ -622,10 +613,6 @@ function Vues.etape(f, F, largeur, D)
         F.bouton(f, { carre = true, bezel = 26, title = bind 'titreBascule', font = P.systeme13, width = D.bascule,
             tooltip = "Montrer l'avant ou l'après de cette étape dans l'aperçu", enabled = bind 'etapeAImages',
             action = function() F.basculerEtape() end }),
-        f:spacer { width = 8 },
-        F.bouton(f, { carre = true, bezel = 26, title = "Détail…", font = P.systeme13, width = D.detail,
-            tooltip = "Ce que Claude a demandé au connecteur pour cette étape, puis sa réponse", enabled = bind 'etapeADetail',
-            action = function() F.enTache(F.detailEtape) end }),
     })
 end
 

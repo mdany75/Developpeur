@@ -70,6 +70,7 @@ local Fil = require 'Fil'
 local Images = require 'Images'
 local Journal = require 'Journal'
 local Json = require 'Json'
+local Liaison = require 'Liaison'
 local Lightroom = require 'Lightroom'
 local Notation = require 'Notation'
 local Vignettes = require 'Vignettes'
@@ -118,6 +119,17 @@ do
     f:close()
 end
 
+-- La même, debout (200 × 300) : la vignette d'une photo verticale, que Lightroom rend tournée.
+local JPEG_DEBOUT
+do
+    local chemin = S.home .. '/source-debout.jpg'
+    S.executer('/usr/bin/sips -s format jpeg -z 300 200 ' .. S.q(S.plugin .. '/' .. Dispositions.imageVide('claire')) .. ' --out '
+        .. S.q(chemin) .. ' >/dev/null 2>&1')
+    local f = assert(io.open(chemin, 'rb'), 'JPEG debout')
+    JPEG_DEBOUT = f:read('*a')
+    f:close()
+end
+
 -- Ce que Lightroom Classic 15.6 donnerait de DSCF2402 (la copie d'essai 53709912, d'après la
 -- capture de Focus-Points de Dany), en textes formatés ; et un HEIC d'iPhone.
 local PRISE_2402 = os.time { year = 2026, month = 1, day = 13, hour = 9, min = 13, sec = 4 }
@@ -145,6 +157,8 @@ local function photo(id, valeurs, description)
     end
     function ph:requestJpegThumbnail(largeur, _, rappel)
         self.demandesVignette = (self.demandesVignette or 0) + 1
+        self.tailles = self.tailles or {}
+        self.tailles[#self.tailles + 1] = largeur
         -- Après une retouche, Lightroom répond « error loading thumb » à 512 px et plus tant que son
         -- aperçu n'est pas refait, mais rend encore la vignette de 256 (constaté).
         if self.grandeRefusee and largeur >= 512 then
@@ -156,7 +170,7 @@ local function photo(id, valeurs, description)
             rappel(nil, 'error loading thumb')
             return {}
         end
-        rappel(JPEG)
+        rappel(self.vignette and self:vignette(largeur) or JPEG)
         return {}
     end
     PHOTOS[id] = ph
@@ -173,6 +187,16 @@ photo(2403, { fileName = 'DSCF2403.RAF', cameraMake = 'FUJIFILM' },
     { marque = 'FUJIFILM', chemin_original = '/Volumes/Photos/Eloise/DSCF2403.RAF', geometrie = { largeur = 6240, hauteur = 4160, orientation = 'AB' } })
 photo(3001, { fileName = 'IMG_3001.HEIC', cameraMake = 'Apple', cameraModel = 'iPhone 15 Pro', isoSpeedRating = 'ISO 80' },
     { marque = 'Apple', chemin_original = '/Volumes/Photos/iPhone/IMG_3001.HEIC', geometrie = { largeur = 4032, hauteur = 3024, orientation = 'AB' } })
+-- XH2S0407.RAF (Copie 1), 4160 × 6240, l'appareil tenu en hauteur (retour de Dany du 25 octobre
+-- 2026) : Lightroom rend sa vignette debout, sauf celle de 256 juste après une retouche, couchée
+-- (le fichier avant son quart de tour : 320 × 213, l'image de Focus et d'Agrandir couchées) ;
+-- `couchee` : toutes couchées.
+photo(407, { fileName = 'XH2S0407.RAF', copyName = 'Copie 1', cameraMake = 'FUJIFILM', dimensions = '4160 x 6240',
+    croppedDimensions = '4160 x 6240' },
+    { marque = 'FUJIFILM', chemin_original = '/Volumes/Photos/XH2S0407.RAF', geometrie = { largeur = 4160, hauteur = 6240, orientation = 'DA' } })
+PHOTOS[407].vignette = function(self, largeur)
+    return (self.couchee or largeur < 512) and JPEG or JPEG_DEBOUT
+end
 S.catalogue.getPhotoByLocalId = function(_, id) return PHOTOS[tonumber(id)] end
 
 -- La description de Vignettes (marque, original, géométrie), celle de la photo simulée : une copie
@@ -397,12 +421,17 @@ essai("Fujifilm : à l'ouverture, Focus montré lit dans une tâche (perl, alarm
         egal(D.pixelsApercu, l, "au cadre de l'aperçu")
         egal(D.pixelsApercuHauteur, h)
         contient(p.legendeApercu, '<EM>DSCF2402.RAF (Essai)</EM>')
-        -- Agrandir : la vignette marquée, en grand.
+        -- Agrandir : la photo redemandée en grand (Fenetre.agrandirActive), marquée de même : un
+        -- --focus de plus, sur la grande vignette ; elle remplit 2 000 × 1 250.
         local dialogues = #S.dialogues
         Fenetre.agrandir()
         lancerTaches()
         egal(dialogues + 1, #S.dialogues, 'Agrandir')
         contient(S.dialogues[#S.dialogues].title, 'DSCF2402.RAF')
+        egal(avant + 2, commandesFocus(), 'la grande vignette marquée')
+        local grande = S.dialogues[#S.dialogues].contents.args
+        egal('1875x1250', grande.width .. 'x' .. grande.height, 'dans 2 000 × 1 250')
+        contient(grande.value, '/Grande-')
         -- Un autre onglet : l'aperçu de la photo active (avec le carré de --marquer-af), pas la
         -- vignette de Focus.
         S.cliquer(segment(contenu, 'Note'))
@@ -412,7 +441,7 @@ essai("Fujifilm : à l'ouverture, Focus montré lit dans une tâche (perl, alarm
         -- Le résultat est gardé : un vrai clic de nouveau, même géométrie, rien n'est relu.
         S.cliquer(segment(contenu, 'Focus'))
         lancerTaches()
-        egal(avant + 1, commandesFocus(), 'même photo, même géométrie : rien de relu')
+        egal(avant + 2, commandesFocus(), 'même photo, même géométrie : rien de relu')
         egal(r0, Fenetre.focus, 'le résultat gardé')
         egal(r0.chemin, p.imageApercu)
         -- La photo recadrée dans Lightroom : un vrai clic relit, avec la nouvelle géométrie.
@@ -421,8 +450,8 @@ essai("Fujifilm : à l'ouverture, Focus montré lit dans une tâche (perl, alarm
             cadre = { CropLeft = 0.1, CropTop = 0, CropRight = 0.9, CropBottom = 1, CropAngle = 0 } }
         S.cliquer(segment(contenu, 'Focus'))
         lancerTaches()
-        egal(avant + 2, commandesFocus(), 'géométrie changée : relue')
-        egal(0.1, Json.decode(recus()[2].geometrie).cadre.CropLeft)
+        egal(avant + 3, commandesFocus(), 'géométrie changée : relue')
+        egal(0.1, Json.decode(recus()[3].geometrie).cadre.CropLeft)
         vrai(Fenetre.focus ~= r0, 'un nouveau résultat')
         vrai(not Fichiers.existe(r0.dossier), "la vignette d'avant s'efface")
         PHOTOS[2402].description.geometrie = { largeur = 6240, hauteur = 4160, orientation = 'AB' }
@@ -604,7 +633,7 @@ essai("Focus montré, une image de Claude arrive : l'onglet Aperçu la montre, A
         egal(r0.chemin, p.imageApercu)
         Fenetre.agrandir()
         lancerTaches()
-        contient(S.dialogues[#S.dialogues].contents.args.value, r0.dossier, 'la vignette Focus en grand')
+        contient(S.dialogues[#S.dialogues].contents.args.value, '/PhotoActive/Grande-', 'la photo active en grand, comme Focus')
         -- Un clic sur la ligne de l'image, Focus montré : l'onglet Aperçu, l'image.
         local ligne
         for i = 1, Fenetre.T.lignes do
@@ -920,6 +949,280 @@ essai("Après une retouche, Lightroom refait son aperçu : la vignette se redema
             table.remove(journal, i)
         end
     end
+    sansErreur()
+end)
+
+-- Une photo verticale, Agrandir (retour de Dany du 25 octobre 2026) ---------------------------------
+
+-- Les commandes passées par LrTasks.execute qui contiennent `morceau`.
+local function commandes(morceau)
+    local n = 0
+    for _, c in ipairs(S.dernieresCommandes or {}) do
+        if c:find(morceau, 1, true) then
+            n = n + 1
+        end
+    end
+    return n
+end
+
+local function taille(chemin)
+    local l, h = Images.dimensions(chemin)
+    return tostring(l) .. 'x' .. tostring(h)
+end
+
+-- Le rendu de la liaison (Rendu.rendre, une exportation de Lightroom, qui ne se charge pas dans
+-- cette simulation), imité : un JPEG debout de 400 × 600 dans un dossier à lui, comme le vrai ;
+-- `rendus` note la photo et la taille demandées.
+local rendus = {}
+package.loaded.Rendu = {
+    rendre = function(ph, cote)
+        rendus[#rendus + 1] = { id = ph.localIdentifier, taille = cote }
+        local dossier = S.home .. '/rendu-' .. #rendus
+        S.executer('mkdir -p ' .. S.q(dossier) .. ' && /usr/bin/sips -s format jpeg -z 600 400 ' .. S.q(S.home .. '/source.jpg')
+            .. ' --out ' .. S.q(dossier .. '/XH2S0407.jpg') .. ' >/dev/null 2>&1')
+        return dossier .. '/XH2S0407.jpg', true
+    end,
+}
+
+essai("Images.rotationManquante (pur) : le quart de tour qui manque à une vignette couchée, d'après la géométrie (orientation, cadre) ; rien pour une vignette à l'endroit, carrée, un demi-tour", function()
+    local debout = { largeur = 4160, hauteur = 6240, orientation = 'DA' }
+    egal(270, Images.rotationManquante(320, 213, debout), 'DA, couchée : 270° dans le sens des aiguilles (sips -r)')
+    egal(90, Images.rotationManquante(320, 213, { largeur = 4160, hauteur = 6240, orientation = 'BC' }), 'BC, couchée')
+    egal(nil, Images.rotationManquante(213, 320, debout), 'déjà debout')
+    egal(nil, Images.rotationManquante(1146, 1720, debout), 'la vignette de 1 024, debout (relevée le 25 octobre 2026)')
+    egal(nil, Images.rotationManquante(320, 213, { largeur = 6240, hauteur = 4160, orientation = 'AB' }), 'en paysage')
+    egal(nil, Images.rotationManquante(213, 320, { largeur = 6240, hauteur = 4160, orientation = 'CD' }), 'un demi-tour ne se voit pas aux proportions')
+    egal(nil, Images.rotationManquante(200, 200, debout), 'carrée')
+    egal(nil, Images.rotationManquante(320, 213, nil), 'sans géométrie')
+    egal(nil, Images.rotationManquante(320, 213, { orientation = 'DA' }), 'dimensions inconnues')
+    egal(nil, Images.rotationManquante(nil, 213, debout), 'vignette illisible')
+    -- Le cadre compte : recadrée à la moitié de sa hauteur dans le fichier, elle s'affiche en 1:3 debout.
+    local recadree = { largeur = 4160, hauteur = 6240, orientation = 'DA',
+        cadre = { CropLeft = 0, CropTop = 0, CropRight = 1, CropBottom = 0.5, CropAngle = 0 } }
+    egal(nil, Images.rotationManquante(100, 300, recadree), 'recadrée, à l\'endroit')
+    egal(270, Images.rotationManquante(300, 100, recadree), 'recadrée, couchée')
+    -- Une vignette d'avant le cadre (l'aperçu pas encore refait après la retouche) : les proportions
+    -- de la photo entière ; couchée, elle se tourne ; debout, elle reste.
+    egal(270, Images.rotationManquante(320, 213, recadree), "d'avant le cadre, couchée : tournée")
+    egal(nil, Images.rotationManquante(213, 320, recadree), "d'avant le cadre, debout : rien")
+    egal(nil, Images.rotationManquante(400, 100, recadree), "ni l'une ni l'autre : rien")
+    -- Recadrée en 4:5 (le cas du retour de Dany) : la vignette de secours de 320 × 213, couchée.
+    local quatreCinq = { largeur = 4160, hauteur = 6240, orientation = 'DA',
+        cadre = { CropLeft = 1 / 12, CropTop = 0, CropRight = 11 / 12, CropBottom = 1, CropAngle = 0 } }
+    egal(270, Images.rotationManquante(320, 213, quatreCinq), '4:5, la vignette de secours couchée : tournée')
+    egal(nil, Images.rotationManquante(213, 320, quatreCinq), "4:5, d'avant le cadre, debout : rien")
+    egal(nil, Images.rotationManquante(400, 500, quatreCinq), '4:5, à l\'endroit')
+    egal(270, Images.rotationManquante(500, 400, quatreCinq), '4:5, couchée au cadre')
+    egal(90, Images.rotationManquante(320, 213, { largeur = 4160, hauteur = 6240, orientation = 'BC', cadre = quatreCinq.cadre }), 'BC, 4:5')
+    -- Un portrait recadré en paysage 3:2 : la bonne vignette est aussi couchée à la photo entière ;
+    -- debout au cadre, elle reste (le cadre d'abord).
+    local paysage = { largeur = 4160, hauteur = 6240, orientation = 'DA',
+        cadre = { CropLeft = 0, CropTop = 0, CropRight = 4 / 9, CropBottom = 1, CropAngle = 0 } }
+    egal(nil, Images.rotationManquante(300, 200, paysage), 'recadré en paysage, à l\'endroit : rien')
+    egal(270, Images.rotationManquante(200, 300, paysage), 'recadré en paysage, couchée au cadre')
+end)
+
+essai("Photo verticale juste après une retouche (XH2S0407.RAF (Copie 1)) : la vignette de secours, couchée, se redresse avant d'être marquée ; Focus la montre debout", function()
+    activer(407)
+    repondre(REPONSE_2402)
+    Fichiers.supprimer(RECUS)
+    Moteur.nouvelle()
+    PHOTOS[407].grandeRefusee, PHOTOS[407].tailles = true, {}
+    local tournees = commandes('/usr/bin/sips -r 270 ')
+    ouvrirFenetre(function(p)
+        egal('focus', p.onglet)
+        lancerTaches()
+        egal(Fenetre.TAILLE_SECOURS_FOCUS, PHOTOS[407].tailles[#PHOTOS[407].tailles], 'la vignette de secours')
+        local r = Fenetre.focus
+        vrai(r and r.fichier, "l'image de l'onglet")
+        -- La vignette donnée au connecteur (le faux la recopie : l'image marquée) est debout : il
+        -- dessine ses cadres dans l'image affichée.
+        egal('200x300', taille(r.dossier .. '/' .. r.fichier), "redressée avant d'être marquée")
+        egal(tournees + 1, commandes('/usr/bin/sips -r 270 '), 'le quart de tour de DA')
+        egal(r.chemin, p.imageApercu)
+    end)
+    PHOTOS[407].grandeRefusee = nil
+    sansErreur()
+end)
+
+essai("DA recadrée 4:5 par la retouche, vignette de secours 320 × 213 couchée (d'avant le cadre) : redressée avant --focus", function()
+    activer(407)
+    repondre(REPONSE_2402)
+    Fichiers.supprimer(RECUS)
+    Moteur.nouvelle()
+    local description = PHOTOS[407].description
+    local geometrie = description.geometrie
+    description.geometrie = { largeur = 4160, hauteur = 6240, orientation = 'DA',
+        cadre = { CropLeft = 1 / 12, CropTop = 0, CropRight = 11 / 12, CropBottom = 1, CropAngle = 0 } }
+    PHOTOS[407].grandeRefusee, PHOTOS[407].tailles = true, {}
+    local tournees = commandes('/usr/bin/sips -r 270 ')
+    local ok, erreur = pcall(ouvrirFenetre, function(p)
+        egal('focus', p.onglet)
+        lancerTaches()
+        egal(Fenetre.TAILLE_SECOURS_FOCUS, PHOTOS[407].tailles[#PHOTOS[407].tailles], 'la vignette de secours')
+        local r = Fenetre.focus
+        vrai(r and r.fichier, "l'image de l'onglet")
+        -- Ni debout ni couchée au cadre de 4:5 : couchée à la photo entière, elle se tourne.
+        egal('200x300', taille(r.dossier .. '/' .. r.fichier), "redressée avant d'être marquée")
+        egal(tournees + 1, commandes('/usr/bin/sips -r 270 '), 'le quart de tour de DA')
+        local recu = recus()[#recus()]
+        vrai(recu, '--focus reçu')
+        vrai(math.abs(Json.decode(recu.geometrie).cadre.CropLeft - 1 / 12) < 1e-6, 'le cadre passé au connecteur : ' .. recu.geometrie)
+    end)
+    description.geometrie = geometrie
+    PHOTOS[407].grandeRefusee = nil
+    vrai(ok, erreur)
+    sansErreur()
+end)
+
+essai("Agrandir sur Focus : une grande vignette demandée au clic ; refusée, un rendu de la photo (pas pendant que Claude travaille : l'image de l'onglet) ; debout, marquée, dans 2 000 × 1 250", function()
+    activer(407)
+    repondre(REPONSE_2402)
+    Fichiers.supprimer(RECUS)
+    Moteur.nouvelle()
+    PHOTOS[407].grandeRefusee = true
+    ouvrirFenetre(function(p)
+        lancerTaches()
+        local r = Fenetre.focus
+        vrai(r and r.fichier, "l'image de l'onglet")
+        local function agrandir()
+            local dialogues, n = #S.dialogues, commandesFocus()
+            PHOTOS[407].tailles = {}
+            Fenetre.agrandir()
+            lancerTaches()
+            egal(dialogues + 1, #S.dialogues, 'Agrandir')
+            local d = S.dialogues[#S.dialogues]
+            contient(d.title, 'XH2S0407.RAF')
+            egal('picture', d.contents.genre)
+            return d.contents.args, commandesFocus() - n
+        end
+        -- La grande refusée (juste après une retouche) : un rendu de la photo, par la liaison.
+        local avant = #rendus
+        local image, marquee = agrandir()
+        egal(Fenetre.TAILLE_GRANDE, PHOTOS[407].tailles[1], 'la grande vignette, demandée au clic')
+        egal(avant + 1, #rendus, 'refusée : un rendu')
+        egal(407, rendus[#rendus].id)
+        egal(Fenetre.TAILLE_GRANDE, rendus[#rendus].taille)
+        egal('833x1250', image.width .. 'x' .. image.height, 'agrandie dans 2 000 × 1 250, debout')
+        egal(1, marquee, 'ses cadres dessinés par le connecteur')
+        vrai(not Fichiers.existe(image.value), 'effacée à la fermeture : ' .. image.value)
+        -- Claude travaille : pas de rendu (il attendrait la liaison) ; l'image de l'onglet, agrandie.
+        Moteur.travaille = true
+        image, marquee = agrandir()
+        Moteur.travaille = false
+        egal(avant + 1, #rendus, 'pas de rendu pendant que Claude travaille')
+        egal('833x1250', image.width .. 'x' .. image.height, "l'image de l'onglet, debout, agrandie")
+        contient(image.value, r.dossier .. '/.vignettes/')
+        egal(0, marquee, 'déjà marquée')
+        -- Une commande de la liaison en cours (Claude Desktop, Claude Code en terminal : Moteur.travaille
+        -- ne les voit pas), ou qui vient de finir : pas de rendu non plus, l'image de l'onglet.
+        Liaison.enCours = 1
+        image, marquee = agrandir()
+        Liaison.enCours = 0
+        egal(avant + 1, #rendus, 'pas de rendu pendant une commande de la liaison')
+        egal('833x1250', image.width .. 'x' .. image.height, "l'image de l'onglet, agrandie")
+        contient(image.value, r.dossier .. '/.vignettes/')
+        Liaison.finCommande = os.time()
+        image = agrandir()
+        egal(avant + 1, #rendus, 'pas de rendu juste après une commande de la liaison')
+        contient(image.value, r.dossier .. '/.vignettes/')
+        Liaison.finCommande = os.time() - Lightroom.DELAI_LIAISON_LIBRE - 1
+        image = agrandir()
+        egal(avant + 2, #rendus, 'la liaison libre depuis DELAI_LIAISON_LIBRE : un rendu')
+        Liaison.finCommande = nil
+        -- La grande rendue : elle, marquée ; pas de rendu.
+        PHOTOS[407].grandeRefusee = nil
+        image, marquee = agrandir()
+        egal(avant + 2, #rendus, 'la grande vignette : pas de rendu')
+        egal('833x1250', image.width .. 'x' .. image.height)
+        egal(1, marquee)
+    end)
+    PHOTOS[407].grandeRefusee = nil
+    Liaison.enCours, Liaison.finCommande = 0, nil
+    sansErreur()
+end)
+
+essai("Aperçu de la photo active juste après une retouche (onglet Note) : la vignette de secours, redressée et marquée, à la place de l'image vide ; Agrandir passe par la grande ; la grande se redemande ensuite", function()
+    activer(407)
+    repondre(REPONSE_2402)
+    Moteur.nouvelle()
+    PHOTOS[407].grandeRefusee, PHOTOS[407].tailles = true, {}
+    ouvrirFenetre(function(p, contenu)
+        S.cliquer(segment(contenu, 'Note'))
+        lancerTaches()
+        local a = Fenetre.apercuActif
+        vrai(a and a.fichier, "l'aperçu de la photo active : la vignette de secours")
+        egal(true, a.secours, 'notée de secours')
+        local tailles = {}
+        for _, t in ipairs(PHOTOS[407].tailles) do
+            tailles[#tailles + 1] = tostring(t)
+        end
+        contient(table.concat(tailles, ' '), string.rep(Fenetre.TAILLE_PHOTO_ACTIVE .. ' ', Fenetre.ESSAIS_VIGNETTE_FOCUS)
+            .. Fenetre.TAILLE_SECOURS_FOCUS, 'la grande redemandée, puis la petite')
+        vrai(a.fichier:find('%-af%.jpg$'), 'marquée par --marquer-af : ' .. a.fichier)
+        egal('200x300', taille(a.dossier .. '/' .. a.fichier), "redressée avant d'être marquée")
+        egal(a.chemin, p.imageApercu)
+        egal(true, p.aImage, 'Agrandir actif')
+        -- Agrandir : la grande demandée au clic, refusée, un rendu de la photo (la liaison libre).
+        local dialogues, avant = #S.dialogues, #rendus
+        PHOTOS[407].tailles = {}
+        Fenetre.agrandir()
+        lancerTaches()
+        egal(dialogues + 1, #S.dialogues, 'Agrandir')
+        egal(Fenetre.TAILLE_GRANDE, PHOTOS[407].tailles[1], 'la grande vignette, demandée au clic')
+        egal(avant + 1, #rendus, 'refusée : un rendu')
+        egal('833x1250', S.dialogues[#S.dialogues].contents.args.width .. 'x' .. S.dialogues[#S.dialogues].contents.args.height)
+        -- Lightroom a refait son aperçu. Un rafraîchissement dans le délai garde la petite (la fin de
+        -- chaque demande rafraîchit l'aperçu : pas de demandes sans fin).
+        PHOTOS[407].grandeRefusee, PHOTOS[407].tailles = nil, {}
+        Fenetre.rafraichirApercu()
+        lancerTaches()
+        egal(0, #PHOTOS[407].tailles, 'dans le délai : rien de redemandé')
+        egal(a, Fenetre.apercuActif)
+        -- Le délai passé : la grande redemandée, montrée, sans secours.
+        a.le = os.time() - Fenetre.DELAI_SECOURS_ACTIVE
+        Fenetre.rafraichirApercu()
+        egal(a.chemin, p.imageApercu, 'la petite reste montrée pendant la demande')
+        lancerTaches()
+        egal(Fenetre.TAILLE_PHOTO_ACTIVE, PHOTOS[407].tailles[1], 'la grande redemandée')
+        local b = Fenetre.apercuActif
+        vrai(b ~= a and b.fichier, 'la grande, à sa place')
+        egal(nil, b.secours)
+        egal(b.chemin, p.imageApercu)
+        vrai(not Fichiers.existe(a.dossier), "le dossier de la petite effacé")
+        -- Plus de secours : un rafraîchissement ne redemande rien.
+        PHOTOS[407].tailles = {}
+        b.le = os.time() - Fenetre.DELAI_SECOURS_ACTIVE
+        Fenetre.rafraichirApercu()
+        lancerTaches()
+        egal(0, #PHOTOS[407].tailles, 'la grande gardée')
+    end)
+    PHOTOS[407].grandeRefusee = nil
+    sansErreur()
+end)
+
+essai("Aperçu de la photo active (onglet Note) : une vignette couchée se redresse avant le carré de mise au point ; Agrandir la demande en grand, debout, avec son carré", function()
+    activer(407)
+    repondre(REPONSE_2402)
+    Moteur.nouvelle()
+    PHOTOS[407].couchee = true
+    ouvrirFenetre(function(p, contenu)
+        S.cliquer(segment(contenu, 'Note'))
+        lancerTaches()
+        local a = Fenetre.apercuActif
+        vrai(a and a.fichier, "l'aperçu de la photo active")
+        vrai(a.fichier:find('%-af%.jpg$'), 'marquée par --marquer-af : ' .. a.fichier)
+        egal('200x300', taille(a.dossier .. '/' .. a.fichier), "redressée avant d'être marquée")
+        local dialogues, marques, avant = #S.dialogues, commandes(' --marquer-af '), #rendus
+        Fenetre.agrandir()
+        lancerTaches()
+        egal(dialogues + 1, #S.dialogues, 'Agrandir')
+        local image = S.dialogues[#S.dialogues].contents.args
+        egal('833x1250', image.width .. 'x' .. image.height, 'debout, dans 2 000 × 1 250')
+        egal(marques + 1, commandes(' --marquer-af '), 'le carré sur la grande')
+        egal(avant, #rendus, 'la grande vignette : pas de rendu')
+    end)
+    PHOTOS[407].couchee = nil
     sansErreur()
 end)
 

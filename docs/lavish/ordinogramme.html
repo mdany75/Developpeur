@@ -158,7 +158,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line)
 
 <section class="etape" id="selection">
   <div class="titre"><span class="eyebrow">Étape 1 · Lightroom et la fenêtre</span><h2>Sélection de la photo : sa conversation</h2></div>
-  <p>Tu cliques la photo dans la Bibliothèque. La fenêtre Claude relit la sélection toutes les 2 secondes : une photo seule montre sa conversation, ou une neuve qui commence par son historique ; plusieurs photos, une conversation de groupe. Puis elle refait l'aperçu, avec le cadre de mise au point pour un fichier Fujifilm.</p>
+  <p>Tu cliques la photo dans la Bibliothèque. La fenêtre Claude relit la sélection toutes les 2 secondes : une photo seule montre sa conversation, ou une neuve qui commence par son historique ; plusieurs photos, une conversation de groupe. En bas du fil, elle refait son résumé de la photo ou de la sélection. Puis elle refait l'aperçu, avec le cadre de mise au point pour un fichier Fujifilm.</p>
   <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
 flowchart TD
   A[/"Tu cliques la photo dans la Bibliothèque"/] --> B{"Fenêtre Claude ouverte ?"}
@@ -176,16 +176,17 @@ flowchart TD
   I -->|oui| I1["Elle revient ; Claude reprendra sa session"]
   I1 --> I2{"La photo a changé depuis ?&lt;br/&gt;étapes de Claude ailleurs, reprises à la main"}
   I2 -->|oui| I3["Élément « Depuis la dernière fois »"]
-  I2 -->|non| V
+  I2 -->|non| R
   I -->|non| J["Conversation neuve, pas encore gardée,&lt;br/&gt;titrée du nom du fichier"]
   J --> J1{"Étapes de Claude ou retouches à la main ?"}
   J1 -->|oui| J2["Élément « Historique de la photo » :&lt;br/&gt;étapes, raisons, dates, reprises à la main ;&lt;br/&gt;sans étape de Claude, réglages hors des valeurs par défaut"]
-  J1 -->|non| V
+  J1 -->|non| R
   E1 --> V
   F1 --> V
-  H1 --> V
-  I3 --> V
-  J2 --> V
+  H1 --> R
+  I3 --> R
+  J2 --> R
+  R["Résumé en bas du fil, fait par la fenêtre :&lt;br/&gt;prise de vue, note et drapeau, état ;&lt;br/&gt;pour un groupe, dates, appareils, comptes"] --> V
   V["Vignette demandée au cache de Lightroom&lt;br/&gt;(requestJpegThumbnail, dans une tâche)"] --> W{"Fichier Fujifilm ?&lt;br/&gt;(marque, ou original .RAF)"}
   W -->|non| Z
   W -->|oui| X["mcp-developpeur --marquer-af&lt;br/&gt;lancé par perl, alarme de 5 s"]
@@ -199,6 +200,7 @@ flowchart TD
   <div class="exemple"><strong>Dans l'exemple</strong><p>La fenêtre montrait la conversation d'une autre photo. DSCF7731 n'en a pas : une conversation neuve commence, sans élément Historique (ni étape de Claude, ni retouche à la main), titrée « DSCF7731.RAF » jusqu'à ce que Claude lui en donne un. Le RAF est lu à temps, le cadre AF rouge tombe sur l'œil gauche.</p></div>
   <div class="regles">
     <p><b>Rien sur le disque</b> avant ta première demande : parcourir 300 photos ne crée aucun fichier. Le résumé et le complément sont faits par la fenêtre, sans Claude ni forfait.</p>
+    <p><b>Le résumé en bas du fil</b> (ton deuxième retour du 25 octobre) se refait à chaque autre photo ou autre groupe, à l'ouverture, à la fin de chaque tour de Claude, et suit la note posée ; il n'est ni gardé dans la conversation ni envoyé à Claude. Changer de photo active dans la même sélection ne le refait pas.</p>
     <p><b>Repartir à neuf</b>, à droite du titre, commence une conversation neuve pour la photo, avec son historique ; l'ancienne reste sur le disque, mise de côté.</p>
     <p><b>Jamais de réponse à macOS.</b> Si macOS demande l'accès au volume Photos, <code>open()</code> attend : la lecture est sautée, Claude ne répond jamais à la demande à ta place.</p>
     <p><b>L'onglet Focus</b> : la fenêtre s'ouvre sur lui et y revient chaque fois que la conversation montrée change pour une autre photo ; il lit alors la photo active. Caché, il ne lit rien.</p>
@@ -207,14 +209,14 @@ flowchart TD
 
 <section class="etape" id="ouverture">
   <div class="titre"><span class="eyebrow">Étape 2 · Fenêtre Claude</span><h2>Ouverture, puis « Obtenir »</h2></div>
-  <p>À l'ouverture (ou quand ⌃⌥C la rappelle), la fenêtre vérifie la liaison et ses deux voyants, dans l'en-tête, et montre la conversation de la photo, sur l'onglet Focus ; elle ne prépare plus de proposition d'elle-même. Pour en avoir une, tu cliques Obtenir, sous la carte de l'onglet Proposition : Claude propose une retouche de la photo, sans rien appliquer.</p>
+  <p>À l'ouverture (ou quand ⌃⌥C la rappelle), la fenêtre vérifie la liaison et ses deux voyants, dans l'en-tête, et montre la conversation de la photo, avec son résumé en bas du fil, sur l'onglet Focus ; elle ne prépare plus de proposition d'elle-même. Pour en avoir une, tu cliques Obtenir, sous la carte de l'onglet Proposition : Claude propose une retouche de la photo, sans rien appliquer.</p>
   <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
 flowchart TD
   A[/"Tu tapes ⌃⌥C, ou Fichier › Module externe - Extras"/] --> B["Fenetre.afficher : apparence et palette,&lt;br/&gt;nouvelle génération de la fenêtre"]
   B --> C["Voyants de l'en-tête : Claude Code, Lightroom&lt;br/&gt;(infobulle : versions, mode de la liaison)"]
   C --> D{"Liaison démarrée avec&lt;br/&gt;son jeton privé ?"}
   D -->|non| D1["Voyant rouge et son aide :&lt;br/&gt;aucune prise ouverte"]
-  D -->|oui| E["Fenetre.majPhoto : la conversation de la photo,&lt;br/&gt;ce qui a changé depuis, l'aperçu (étape 1)"]
+  D -->|oui| E["Fenetre.majPhoto : la conversation de la photo,&lt;br/&gt;ce qui a changé depuis, le résumé, l'aperçu (étape 1)"]
   E --> F1(["La fenêtre attend ta demande"])
   F1 --> O[/"Tu cliques Obtenir, sous la carte de l'onglet Proposition"/]
   O --> F{"Claude libre (fenêtre et Demande rapide),&lt;br/&gt;photo seule, aucune proposition en attente ?"}
@@ -511,7 +513,7 @@ flowchart TD
 
 <section class="etape" id="fin">
   <div class="titre"><span class="eyebrow">Étape 10 · Fin du tour de Claude</span><h2>Avant/après, rendu reproductible, résumé</h2></div>
-  <p>Claude finit la retouche par l'avant/après depuis l'état d'avant Claude : son bilan chiffre ce qui a changé, et le rendu se garde pour la prochaine retouche de la photo. Puis il résume ce qui a changé et pourquoi, et te propose de garder la demande. La leçon de la photo est retirée au correctif 1.3.6.</p>
+  <p>Claude finit la retouche par l'avant/après depuis l'état d'avant Claude : son bilan chiffre ce qui a changé, et le rendu se garde pour la prochaine retouche de la photo. Puis il résume ce qui a changé et pourquoi, et le résumé de la fenêtre, en bas du fil, se refait. La leçon de la photo est retirée au correctif 1.3.6, comme « Demande à garder » et « ＋ Garder la demande » (ton deuxième retour).</p>
   <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
 flowchart TD
   A{{"view_photo avec compare = before_claude"}} --> B["Deux étapes « Claude · comparaison » :&lt;br/&gt;l'état d'avant, puis l'état actuel remis"]
@@ -523,15 +525,9 @@ flowchart TD
   F -->|non| G
   F -->|oui| F1["rendu_reproductible : Claude dit l'écart&lt;br/&gt;et te demande laquelle suit ton goût"]
   F1 --> G["Le résumé de Claude : ce qui a changé, et pourquoi,&lt;br/&gt;chiffres du bilan à l'appui"]
-  G --> H{"Le tour a retouché ?"}
-  H -->|oui| I["« Demande à garder : « … » » en fin de réponse,&lt;br/&gt;« ＋ Garder la demande » au bout de la ligne"]
-  I --> I1[/"Tu cliques : Ajouter… s'ouvre prérempli"/]
-  I1 --> I2{"Nom vide, nom déjà pris, texte vide ?"}
-  I2 -->|oui| I3["Refus en direct, bouton grisé"]
-  I2 -->|non| I4[("mes-demandes.json")]
-  H -->|non| J
-  I4 --> J["État laissé par Claude noté, en écriture privée ;&lt;br/&gt;ce que la conversation a vu de la photo, relu"]
-  J --> K(["Claude libre : fil, cartes et voyants à jour"])
+  G --> J["État laissé par Claude noté, en écriture privée ;&lt;br/&gt;ce que la conversation a vu de la photo, relu"]
+  J --> J1["Le résumé en bas du fil, refait par la fenêtre :&lt;br/&gt;les étapes de Claude, la note"]
+  J1 --> K(["Claude libre : fil, cartes et voyants à jour"])
 </pre></div>
   <div class="exemple"><strong>Dans l'exemple</strong><p>Première retouche de DSCF7731 : le rendu est gardé, sans rien à comparer. Le résumé dit le débruitage à 35, la balance sur le visage, la fenêtre récupérée, et le passant qui reste à faire à la main.</p></div>
   <div class="regles">
@@ -574,7 +570,7 @@ flowchart TD
 </section>
 
 <footer>
-  <p>D'après le code et les règles de Développeur 1.3.3 (CLAUDE.md, README, docs/SPEC.md), le 23 octobre 2026, puis le code du correctif 1.3.6 (une photo, une conversation, en cours de publication), le 25 octobre 2026, avec tes retours après l'essai. Les seuils dits provisoires y restent à relever.</p>
+  <p>D'après le code et les règles de Développeur 1.3.3 (CLAUDE.md, README, docs/SPEC.md), le 23 octobre 2026, puis le code du correctif 1.3.6 (une photo, une conversation, en cours de publication), le 25 octobre 2026, avec tes deux retours après l'essai. Les seuils dits provisoires y restent à relever.</p>
   <p>La photo DSCF7731.RAF et ses chiffres sont inventés pour l'exemple.</p>
 </footer>
 
