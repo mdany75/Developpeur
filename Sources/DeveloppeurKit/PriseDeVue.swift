@@ -49,7 +49,7 @@ public enum PriseDeVue {
     public static let longueurLibelle = 40
     public static let longueurConseil = 140
 
-    /// Les seize défauts, dans l'ordre où le carnet les montre.
+    /// Les dix-sept défauts (seize jusqu'au correctif 1.3.6), dans l'ordre où le carnet les montre.
     public static let defauts: [Defaut] = [
         Defaut(code: "horizon_penche", domaine: .composition,
                libelle: "Horizon ou ligne penchée",
@@ -103,6 +103,13 @@ public enum PriseDeVue {
                libelle: "Mise au point à côté",
                conseil: "Un seul collimateur, posé sur le sujet (les yeux d'un portrait), et l'AF continu (AF-C) s'il bouge.",
                mesure: true),
+        // Correctif 1.3.7 : les yeux fermés, que le Suivi compte d'après l'analyse de la vignette
+        // (Suivi.analyser, mcp-developpeur --analyser), comme le tri ; le carnet de view_photo ne
+        // les cherche pas (`mesure` faux : Carnet.constatsVue ne change pas).
+        Defaut(code: "yeux_fermes", domaine: .nettete,
+               libelle: "Yeux fermés ou plissés",
+               conseil: "Prendre deux ou trois vues de suite d'un portrait ou d'un groupe : l'une aura tous les yeux ouverts.",
+               mesure: false),
         Defaut(code: "dominante", domaine: .couleur,
                libelle: "Dominante de couleur",
                conseil: "Régler la balance des blancs selon la lumière, ou la mesurer sur un gris ; en RAW, elle se rattrape sans perte.",

@@ -7,12 +7,16 @@
 --                                              ses consignes (consignes.md, écrites à son lancement)
 --       Atelier/                               dossier de travail de Claude Code (vide)
 --       Temporaire/                            fichiers de passage (images collées, sorties de
---                                              commandes)
+--                                              commandes, vignettes du Suivi)
 --       connecteur.json                        configuration MCP, écrite à chaque lancement
 --       consommation.json, publication.json    jetons comptés, profils de publication de l'utilisateur
 --       notation.json                          notes proposées par Claude
 --       carnet.json                            carnet de progrès (Carnet.lua, 1.3), une table par
 --                                              catalogue ; les leçons d'avant la 1.3.6 y restent
+--       suivi.json                             relevé du Suivi (Releve.lua, 1.3.7) : les photos
+--                                              ouvertes, par original, et leur analyse ; une table
+--                                              par catalogue (suivi-illisible-<date>.json : un
+--                                              relevé illisible mis de côté)
 --       mes-demandes.json                      les demandes du menu Mes demandes de la fenêtre
 --                                              (Stockage.lua)
 --       Etapes/                                avant/après de chaque étape de Claude (1.3)

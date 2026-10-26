@@ -1096,14 +1096,18 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         vrai(not menus.modele and not menus.effort and not menus.disposition, nom .. ' : ni modèle, ni effort, ni disposition')
         egal(nil, p.modele)
         egal(nil, p.disposition)
-        -- Plus de volet (correctif 1.3.6) : ni Nouvelle conversation, Renommer…, Supprimer…,
-        -- Publication… et Consommation… (au menu), ni Rechercher ; les deux voyants dans l'en-tête,
-        -- dans cet ordre : Claude Code, Lightroom (plus de voyant Écran : correctif 1.3.6).
-        local ordre = {}
+        -- Plus de volet (correctif 1.3.6) : ni Nouvelle conversation, Renommer…, Supprimer…, ni
+        -- Rechercher ; Publication… et Consommation…, au menu, reviennent dans l'en-tête à droite de
+        -- Suivi (correctif 1.3.7 : essais-suivi.lua), une fois chacun ; les deux voyants dans
+        -- l'en-tête, dans cet ordre : Claude Code, Lightroom (plus de voyant Écran : correctif 1.3.6).
+        local ordre, enTete = {}, {}
         parcourir(args.contents, function(v)
             local t = v.args.title
-            vrai(not (S.BOUTONS[v.genre] and (t == '＋ Nouvelle conversation' or t == 'Renommer…' or t == 'Supprimer…'
-                or t == 'Publication…' or t == 'Consommation…')), nom .. ' : bouton du volet restant : ' .. tostring(t))
+            vrai(not (S.BOUTONS[v.genre] and (t == '＋ Nouvelle conversation' or t == 'Renommer…' or t == 'Supprimer…')),
+                nom .. ' : bouton du volet restant : ' .. tostring(t))
+            if S.BOUTONS[v.genre] and (t == 'Suivi' or t == 'Publication…' or t == 'Consommation…') then
+                enTete[#enTete + 1] = t
+            end
             vrai(not (v.genre == 'edit_field' and type(v.args.value) == 'table' and v.args.value.key == 'recherche'),
                 nom .. ' : plus de Rechercher')
             if v.genre == 'static_text' and type(t) == 'table' and (t.key == 'texteClaude' or t.key == 'texteLightroom'
@@ -1112,6 +1116,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
             end
         end)
         egal('texteClaude texteLightroom', table.concat(ordre, ' '), nom .. ' : les voyants de l\'en-tête')
+        egal('Suivi Publication… Consommation…', table.concat(enTete, ' '), nom .. " : les boutons de l'en-tête, une fois chacun")
         -- La carte Note (fenêtre B, lot B5), avec la note posée de la photo active : Laisser,
         -- Changer… et Accepter (un bouton bleu en image, cliqué par son calque).
         vrai(textes.notePoseeTitre and textes.nt1, nom .. ' : carte Note')
@@ -2260,7 +2265,7 @@ essai('Versions : lecture, comparaison et alerte', function()
     egal(-1, Composants.comparer('1.0', '1.1'))
     egal(0, Composants.comparer('1.0', '1.0.0'))
     egal(1, Composants.comparer('1.10', '1.9'))
-    egal('1.3.6', Composants.module(), 'la version de Info.lua')
+    egal('1.3.7', Composants.module(), 'la version de Info.lua')
     -- Deux lignes : ce module et le connecteur, installés ensemble au même numéro.
     local l = Composants.lignes('1.0', '1.0')
     egal(2, #l)
@@ -2369,13 +2374,20 @@ end)
 
 -- Chargement et arrêt du module -------------------------------------------------------------
 
-essai('Arret.lua : Claude Code est fermé avec le module (la liaison aussi)', function()
+essai('Arret.lua : Claude Code est fermé avec le module (la liaison aussi), le Suivi éteint', function()
     local ok = Moteur.envoyer('Avant l\'arrêt')
     vrai(ok)
     vrai(attendre(function() return not Moteur.travaille end))
     local s = Moteur.session
     vrai(s and s:actif(), 'Claude Code ouvert')
+    local Releve = require 'Releve'
+    Releve.allume = true
     dofile(S.plugin .. '/Arret.lua')
+    -- Le Suivi éteint (correctif 1.3.7) : sa tâche s'arrête, l'ancienne instance n'écrit plus le
+    -- relevé (essais-releve.lua).
+    egal(false, Releve.allume, 'Suivi éteint')
+    egal(true, Releve.arrete, 'relevé plus écrit')
+    Releve.arrete = false
     egal(nil, Moteur.session, 'session fermée')
     egal(false, Moteur.boucle)
     vrai(Fichiers.existe(s.dossier .. '/arreter'), 'relais.sh prié de fermer Claude Code')
@@ -2392,6 +2404,9 @@ essai("Init.lua : les sessions d'une séance précédente sont fermées ou effac
     prefs.demarrerAuLancement = false
     local avant = #S.taches
     dofile(S.plugin .. '/Init.lua')
+    -- Init.lua allume le Suivi (Releve.allumer), sans tâche ; il ne tourne pas dans les essais.
+    egal(true, require('Releve').allume, 'le Suivi allumé')
+    require('Releve').allume = false
     egal(avant + 1, #S.taches, 'le ménage des sessions dans une tâche')
     S.taches[#S.taches]()
     egal(false, Fichiers.existe(finie), 'session finie effacée')

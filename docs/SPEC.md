@@ -30,7 +30,8 @@ Lightroom (photo active remise, texture au point de mise au point, faux visages,
 empreinte des étapes, registre des notes remis par la recette).
 
 Le correctif 1.3.6 (« une photo, une conversation », décidé avec Dany le 25 octobre 2026, numéroté
-« ## 1.3.6 — 2026-10-25 » dans `CHANGELOG.md`, installé pour ses essais, pas encore publié) donne
+« ## 1.3.6 — 2026-10-25 » dans `CHANGELOG.md`, installé pour ses essais, jamais publié seul : il
+part avec le correctif 1.3.7, dont la section « ## 1.3.7 — 2026-10-25 » reprend la sienne) donne
 à chaque photo sa conversation dans la fenêtre Claude, ouverte sur l'historique de la photo, et la
 Demande rapide sur une photo seule écrit dans la même (voir Fenêtre Claude › Une photo, une
 conversation, et Demande rapide) ; la fenêtre perd son volet de gauche et sa rangée Mode ; la
@@ -42,6 +43,14 @@ Aperçu), Agrandir jusqu'à 2 000 × 1 250, le carnet de progrès dans la fenêt
 onglet Suivi, à la place de Leçon), plus rien sur l'étalonnage de l'écran, les réglages hors des
 valeurs par défaut dans l'historique, « Développeur v1.3.6 » dans la barre de titre. Le tout est
 résumé dans Correctif 1.3.6.
+
+Le correctif 1.3.7 (le Suivi en graphiques, décidé avec Dany le 25 octobre 2026 pendant ses essais
+de la 1.3.6 ; contrat figé dans `Tests/Contrats/suivi.json`) fait entrer toute photo ouverte dans
+la fenêtre Claude ou la Demande rapide au relevé du Suivi (`Releve.lua`, `suivi.json`), analysée
+d'office par le connecteur sur la vignette de son original, sans Claude ni jetons
+(`mcp-developpeur --analyser`) ; la fenêtre Suivi montre ce relevé et le carnet de progrès en graphiques que dessine
+le connecteur (`--graphiques`) ; Publication… et Consommation… reviennent dans l'en-tête de la
+fenêtre Claude ; `PriseDeVue` gagne `yeux_fermes`. Voir Correctif 1.3.7.
 
 ## Architecture
 
@@ -61,8 +70,9 @@ Deux pièces :
   l'avant/après des étapes (`Etapes.lua`) et le carnet de progrès (`Carnet.lua`, `carnet.json` ;
   les leçons des photos, de la 1.3 à la 1.3.5, y restent telles quelles), depuis le correctif 1.3.3
   la Demande rapide (`FenetreRapide.lua`), depuis le correctif 1.3.6 l'historique d'une photo
-  (`Historique.lua`) et la fenêtre Suivi du carnet de progrès (« Claude · Suivi »,
-  `FenetreSuivi.lua`), et la fenêtre de la liaison (« Claude · liaison », `Suivi.lua` ; « fenêtre de
+  (`Historique.lua`) et la fenêtre Suivi (« Claude · Suivi », `FenetreSuivi.lua` ; le carnet de
+  progrès en texte, puis en graphiques au correctif 1.3.7, avec les photos ouvertes), depuis le
+  correctif 1.3.7 le relevé du Suivi (`Releve.lua`, `suivi.json`), et la fenêtre de la liaison (« Claude · liaison », `Suivi.lua` ; « fenêtre de
   suivi » jusqu'au correctif 1.3.6, quand le carnet de progrès a pris ce mot).
   Journaux :
   `~/Library/Logs/Developpeur/`
@@ -93,6 +103,12 @@ un refus de connexion pendant 3 s et une poignée de main ratée une fois.
 La fenêtre Claude lance Claude Code (`claude -p`), qui lance son propre `mcp-developpeur` :
 celui-ci se connecte à la liaison du module comme celui de Claude Desktop (voir Fenêtre Claude).
 
+Hors de la liaison, le module lance aussi l'exécutable lui-même, par `LrTasks.execute` sous
+l'alarme de `perl`, pour ce qui se calcule sans Lightroom ni Claude : `--marquer-af` et `--focus`
+(la photo active de la fenêtre Claude), et depuis le correctif 1.3.7 `--analyser` et `--graphiques`
+(le Suivi). Chacun répond une ligne JSON, rangée dans un fichier que le module relit ; aucun ne
+passe par les ports de la liaison, ni ne porte le jeton.
+
 Menus du module (Fichier et Bibliothèque › Module externe - Extras, `Info.lua`) : Ouvrir la fenêtre
 Claude (⌃⌥C), Demande rapide (⌘⌃⌥C, correctif 1.3.3), Publication…, Consommation…, Afficher la
 fenêtre de la liaison (« Afficher la fenêtre de suivi » jusqu'au correctif 1.3.6 ; `MenuSuivi.lua`
@@ -103,7 +119,9 @@ liaison avec Claude, Arrêter la liaison avec Claude (la 1.1 avait aussi Séance
 l'ensemble de collections « Claude » et les copies virtuelles « Claude » portent le nom de Claude :
 c'est ce que Claude a fait. Seule la barre de titre de la fenêtre Claude dit « Développeur », depuis
 la 1.1.1 (demandé par Dany le 20 octobre 2026) ; ses menus et la documentation l'appellent toujours
-« fenêtre Claude ».
+« fenêtre Claude ». La fenêtre Suivi (« Claude · Suivi ») n'a pas d'entrée au menu : seul le bouton
+Suivi de l'en-tête de la fenêtre Claude l'ouvre ; Publication… et Consommation… ont, en plus de
+leur menu, leurs boutons dans cet en-tête (de nouveau depuis le correctif 1.3.7).
 
 ## Messages entre le serveur et le module
 
@@ -468,7 +486,8 @@ leçon et « Je le fais » partent de partout ailleurs : l'outil `photo_lesson` 
 `JeLeFais.swift` ; `descriptionRaisonProposition` perd « (my_turn : celle de l'exercice) ».
 `PriseDeVue.defauts` reste la seule liste des défauts, pour le carnet seul : sans clé anglaise ni
 axe de leçon (`PriseDeVue.Axe`), les seize codes gardés, car les leçons déjà rangées dans
-`carnet.json` y renvoient. La description de `compare` de `view_photo` gagne « En fin de retouche,
+`carnet.json` y renvoient (dix-sept au correctif 1.3.7, avec `yeux_fermes` pour le Suivi : voir
+Correctif 1.3.7). La description de `compare` de `view_photo` gagne « En fin de retouche,
 before_claude garde aussi le rendu ; rendu_reproductible (une retouche repartie de l'origine) :
 l'écart avec la précédente, à dire. » (voir Correctif 1.3.6). `Consignes.lua`, pour la fenêtre :
 voir Fenêtre Claude › Claude Code.
@@ -495,7 +514,7 @@ correctif 1.3.6 par le bouton Obtenir de l'onglet Proposition). Ces
 changements font partie de la 1.2, qui ajoute à la fenêtre un quatrième voyant, Écran, l'aide
 d'une liaison qui n'a pas pu préparer son jeton privé, et des consignes pour la peau, l'écran, le
 bilan et la méthode du tireur (voir Voyants et liaison, et Claude Code). Captures :
-`docs/capture.png` (la fenêtre Claude, en Conversation claire ; à refaire au correctif 1.3.6, voir
+`docs/capture.png` (la fenêtre Claude, en Conversation claire ; à refaire au correctif 1.3.7, voir
 plus bas), `docs/publication.png`,
 `docs/consommation.png` et `docs/suivi.png` (la fenêtre de la liaison) ;
 `docs/atelier.png` et `docs/panneau.png`, les deux autres dispositions, sont retirées avec elles.
@@ -512,7 +531,7 @@ ce qui y a changé est dit en tête de chacune. Les cinq chantiers de la 1.3 ont
 « dans la fenêtre » dans leur section (Pourquoi ?, Leçon de la photo, Je le fais, Composition lue,
 Carnet de progrès). `docs/capture.png` montre encore la fenêtre B de la 1.3 (une retouche, ses
 étapes avec « Pourquoi ? » et la leçon de la photo), et `docs/carnet.png` la page Carnet de
-progrès : à refaire au correctif 1.3.6 (voir plus bas).
+progrès : à refaire au correctif 1.3.7 (voir plus bas).
 
 Au correctif 1.3.6 (décisions de Dany du 25 octobre 2026), une photo, une conversation : la photo
 seule choisie dans Lightroom montre sa conversation, ou une neuve qui s'ouvre sur l'historique de
@@ -531,8 +550,16 @@ l'image du fil (voir Fenêtre B, Retours de Dany après son essai). La barre de 
 « Développeur v1.3.6 » (`Fenetre.titreFenetre`, d'après `Composants.module()`). Les captures
 `docs/capture.png` et `docs/carnet.png` montrent encore la fenêtre d'avant le correctif
 (1 948 × 1 200, le volet et la rangée Mode ; la page Carnet de progrès du fil) : à refaire au
-correctif 1.3.6, dans Lightroom ; elles montreront la fenêtre de 1 623 × 1 200, en deux colonnes,
-ses quatre onglets et le bouton Suivi, et la fenêtre Suivi.
+correctif 1.3.7 (la 1.3.6 n'a pas été publiée seule), dans Lightroom ; elles montreront la fenêtre
+de 1 623 × 1 200, en deux colonnes, ses quatre onglets et les boutons Suivi, Publication… et
+Consommation…, et la fenêtre Suivi en graphiques.
+
+Au correctif 1.3.7 (décisions de Dany du 25 octobre 2026), la fenêtre Claude et la Demande rapide
+passent chaque sélection qu'elles voient au relevé du Suivi (`Releve.voirSelection`, depuis
+`Fenetre.suivreSelection` et `FenetreRapide.suivreSelection` ; `Releve.revoir` à l'ouverture), et
+leurs boucles relancent sa file d'analyse (`Releve.relancer`) ; Publication… et Consommation…
+reviennent dans l'en-tête, à droite de Suivi ; la fenêtre Suivi passe en graphiques (voir
+Correctif 1.3.7).
 
 ### Relais vers Claude Code
 
@@ -882,7 +909,12 @@ Depuis les retours de Dany du 25 octobre 2026 (correctif 1.3.6), deux voyants se
 Code (125) et Lightroom (150), 14 points entre eux, puis la photo active (`D.info`, le reste de la
 rangée) et, au bout de la rangée, en haut à droite sous « Repartir à neuf », le bouton Suivi
 (`Vues.boutonSuivi` : un carré small comme les boutons d'actions du fil, titre « Suivi » en petit,
-`TAILLES.boutonSuivi` 56 ; il ouvre la fenêtre Suivi, voir Carnet de progrès). Le voyant Écran est
+`TAILLES.boutonSuivi` 56 ; il ouvre la fenêtre Suivi, voir Correctif 1.3.7), puis, depuis le
+correctif 1.3.7 (décision de Dany du 25 octobre 2026), Publication… et Consommation… côte à côte
+(`Vues.boutonPublication` 92, `Vues.boutonConsommation` 112, carrés small comme Suivi, toujours
+actifs, `TAILLES.ecartBoutons` 6 ; `Fenetre.ouvrirPublication` et `Fenetre.ouvrirConsommation`
+ouvrent leurs fenêtres comme leurs menus, requises au clic) ; la photo active garde 407 points
+(`D.info`). Le voyant Écran est
 retiré avec tout ce qui parlait d'étalonnage (Dany n'achètera jamais de sonde ; voir Écran) :
 `Vues.voyantEcran`, `TAILLES.voyantEcran`, `Fenetre.poserEcran`, `Fenetre.montrerEcran`, les
 propriétés `texteEcran` et `etatEcran`, `Lightroom.etatEcran`, `Lightroom.decrireEcran` et les
@@ -2262,7 +2294,11 @@ autre sélection, la conversation d'une photo, le groupe, la réservation de Cla
                                             <nom>-af.jpg ; en 1.1, Notation/<séance>/ : vignettes
                                             de la séance ; Rapide/<id>/ et, depuis le correctif
                                             1.3.6, Groupes/<id>/ : images des conversations
-                                            jamais gardées, effacées au chargement du module)
+                                            jamais gardées, effacées au chargement du module ;
+                                            depuis le correctif 1.3.7, Suivi/ : Analyse-<n>/, les
+                                            vignettes d'un lot du Suivi, et Graphiques-<n>/, les
+                                            images d'un dessin de la fenêtre Suivi, effacé au
+                                            chargement du module)
     liaison.jeton                           jeton privé de la liaison (1.2), écrit par le module à
                                             chaque démarrage, droits 600 ; liaison.jeton.nouveau,
                                             son fichier provisoire (voir Liaison fermée)
@@ -2276,6 +2312,11 @@ autre sélection, la conversation d'une photo, le groupe, la réservation de Cla
                                             telles quelles ; voir Carnet de progrès) ;
                                             carnet-illisible-<date>.json : un fichier illisible
                                             mis de côté, jamais écrasé
+    suivi.json                              relevé du Suivi (correctif 1.3.7, format 1, tenu par
+                                            Releve.lua seul, lu par --graphiques : une table par
+                                            catalogue, une entrée par original ouvert ; voir
+                                            Correctif 1.3.7) ; suivi-illisible-<date>.json : un
+                                            relevé illisible mis de côté, jamais écrasé
     Etapes/<uuid>/                          avant/après des étapes de Claude (1.3) : <id>-avant.jpg,
                                             <id>-apres.jpg, <id>.json ; vue.jpg et prepare-<n>.jpg,
                                             d'une session (voir Pourquoi ? : l'avant/après des
@@ -2292,9 +2333,9 @@ Dans le module (1.3) : `images/` et `images/sombre/`, les images de la fenêtre 
 apparence (voir Fenêtre B ; au correctif 1.3.6, `carte-lecon`, `seg-lecon`, `seg-lecon-actif`,
 `loupe` et `selection` partent, `carte-suivi`, `seg-suivi` et `seg-suivi-actif` arrivent, puis
 repartent avec l'onglet Suivi après l'essai de Dany, et les segments Focus, Aperçu et Proposition
-sont refaits pour leur nouvel ordre), et `Historique.lua` et `FenetreSuivi.lua` (nouveaux au
-correctif 1.3.6 : relancer Lightroom). `uninstall.sh` garde
-`carnet.json` et `Etapes/` ; `--tout` retire tout le dossier, eux compris.
+sont refaits pour leur nouvel ordre), `Historique.lua` et `FenetreSuivi.lua` (nouveaux au
+correctif 1.3.6) et `Releve.lua` (nouveau au correctif 1.3.7) : relancer Lightroom. `uninstall.sh`
+garde `carnet.json`, `suivi.json` et `Etapes/` ; `--tout` retire tout le dossier, eux compris.
 
 ### Préférences
 
@@ -2376,7 +2417,9 @@ JPEG). Le script lit seulement ; les essais passent par un presse-papiers nommé
 
 ### Publication
 
-Fenêtre à part (`FenetrePublication.lua`, « Claude · Publication »), sans Claude ni quota :
+Fenêtre à part (`FenetrePublication.lua`, « Claude · Publication » ; menu Publication…, et bouton
+Publication… de l'en-tête de la fenêtre Claude, retiré avec le volet au correctif 1.3.6, revenu au
+correctif 1.3.7), sans Claude ni quota :
 `LrExportSession` (`Publication.lua`) avec les identifiants de réglages de la livraison
 (`Livraison.lua`, voir Livraison) : `LR_collisionHandling = 'rename'`, jamais d'écrasement ; taille
 en mégapixels, grand ou petit côté ; `LR_jpeg_limitSize` pour un poids maximal ; filigrane
@@ -2399,7 +2442,8 @@ la demande), trois mois gardés ; jetons comptés = entrée + sortie + écriture
 cache / 10. Semaine du forfait : sept jours avant la reprise donnée par Claude Code, sinon lundi.
 Budget (2 M par défaut) : alerte à 80 %, refus des demandes à 100 %. Les barres sont des caractères
 (Menlo : fond « ░ », part pleine « █ » superposée). Fenêtre « Claude · Consommation »
-(`FenetreConsommation.lua`).
+(`FenetreConsommation.lua` ; menu Consommation…, et bouton Consommation… de l'en-tête de la
+fenêtre Claude depuis le correctif 1.3.7, comme Publication…).
 
 ### Versions
 
@@ -2407,7 +2451,7 @@ Au correctif 1.3.6, dans l'infobulle du voyant Lightroom (voir Voyants et liaiso
 l'ouverture (`Composants.lire`, dans `Fenetre.verifier(true)`) ; une version à mettre à jour ou un
 connecteur introuvable passent le voyant à l'orange. `Vues.versions` est retiré avec le volet.
 Après l'essai de Dany, la version du module est aussi dans la barre de titre de la fenêtre Claude :
-« Développeur v1.3.6 » (`Fenetre.titreFenetre`, d'après `Composants.module()`, lu de `VERSION`
+« Développeur v1.3.6 », « Développeur v1.3.7 » au correctif 1.3.7 (`Fenetre.titreFenetre`, d'après `Composants.module()`, lu de `VERSION`
 d'`Info.lua` ; « Développeur » seul si elle ne se lit pas) ; la Demande rapide garde « Claude ·
 Demande rapide ».
 En 1.3, en bas du volet, au-dessus du voyant Écran, en gris des en-têtes (`Vues.versions`). Jusqu'à
@@ -2488,13 +2532,16 @@ un simple rechargement du module ne suffit pas.
   contenu rapetisse) ; la fenêtre rouvre alors une fois à la position par défaut. Les autres
   fenêtres ont leur cadre : `DeveloppeurPublication`, `DeveloppeurConsommation`,
   `DeveloppeurSuivi` (la fenêtre de la liaison), `DeveloppeurCarnet` (la fenêtre Suivi du carnet,
-  correctif 1.3.6), et en 1.1 `DeveloppeurNotation` (Séance de notation, retirée en 1.1.1).
+  correctif 1.3.6), `DeveloppeurSuiviGraphiques-1` (la fenêtre Suivi en graphiques, correctif
+  1.3.7 : un nom neuf pour sa taille), et en 1.1 `DeveloppeurNotation` (Séance de notation, retirée
+  en 1.1.1).
 - Quand une fenêtre du module est devant (ou que Lightroom n'est pas l'application active), le
   menu Fichier de Lightroom est réduit (Nouveau catalogue, Ouvrir le catalogue, Mise en page,
   Imprimante) : les entrées du module et le Gestionnaire de modules n'y sont pas. D'où les boutons
   Publication et Consommation dans la fenêtre Claude (retirés avec le volet au correctif 1.3.6,
   décision de Dany : ces fenêtres s'ouvrent par le menu, la fenêtre principale de Lightroom
-  devant ; et, en 1.1, Séance… et le menu Disposition,
+  devant ; revenus dans l'en-tête au correctif 1.3.7, décision de Dany du 25 octobre 2026 ; et, en
+  1.1, Séance… et le menu Disposition,
   retirés en 1.1.1 : le modèle et l'effort se choisissent dans le Gestionnaire, la fenêtre
   principale de Lightroom devant, comme la disposition en 1.1.1, retirée depuis).
 - Publication : JPEG 5 Mpx d'un RAF de X-H2S, 2738 × 1825, sRGB, sans position GPS ; dossier créé,
@@ -5945,7 +5992,8 @@ une entrée qui n'a plus que des leçons reste, sans compter au carnet ; `retire
 ou dans un défaut, une tendance). La case Carnet coupe donc tout ce qui entre au carnet.
 
 **La fenêtre Suivi** (retours de Dany du 25 octobre 2026, correctif 1.3.6 ; `FenetreSuivi.lua`,
-nouveau : relancer Lightroom). Le carnet quitte l'onglet Suivi pour une fenêtre à part,
+nouveau : relancer Lightroom ; en graphiques au correctif 1.3.7, qui remplace le texte décrit ici :
+voir Correctif 1.3.7). Le carnet quitte l'onglet Suivi pour une fenêtre à part,
 « Claude · Suivi » (`FenetreSuivi.TITRE`, cadre `DeveloppeurCarnet`), comme Publication et
 Consommation : ses contrôles sont ceux du système (ni aplat ni image : l'apparence de macOS), toute
 table donnée à Lightroom est neuve. Seul le bouton Suivi de l'en-tête de la fenêtre Claude l'ouvre
@@ -5965,9 +6013,13 @@ défauts du résumé (`FenetreSuivi.choisirDefaut`), puis la fenêtre des photos
 (`FenetreSuivi.retirerDuCarnet`, appel direct à `Carnet.commande`, jamais une ligne TCP), son
 message en bas de la fenêtre Suivi : ce qui servait aux défauts quitte `Fenetre.lua`. Rien n'est
 écrit dans le catalogue ni demandé à Claude. La fenêtre Claude n'a plus ni l'onglet, ni sa carte,
-ni son abonnement au carnet, ni sa lecture dans la boucle. Les graphiques du carnet et l'ajout de
-chaque photo au carnet viendront au correctif 1.3.7. Essais : `Tests/Lua/Fenetre/essais-carnet.lua`
-(ouverture, lecture, pages, boucle, désabonnement, Photos d'un défaut…, Retirer du carnet…).
+ni son abonnement au carnet, ni sa lecture dans la boucle. Au correctif 1.3.7, le texte
+(`Fil.texteSuivi` et ses constantes, `FenetreSuivi.LARGEUR`, `LIGNES`, les pages ▲ ▼) laisse la
+place aux graphiques, avec chaque photo ouverte analysée d'office (le relevé du Suivi, à part du
+carnet) ; « Photos d'un défaut… », « Retirer du carnet… », l'abonnement au carnet et la lecture
+du résumé (pour la liste des défauts) restent. Essais : `Tests/Lua/Fenetre/essais-carnet.lua`
+(ouverture, lecture, boucle, désabonnement, Photos d'un défaut…, Retirer du carnet… ; ses pages de
+texte retirées au correctif 1.3.7).
 
 **D'abord, au correctif 1.3.6 : l'onglet Suivi** (à la place de Leçon, jusqu'aux retours de Dany ;
 seul l'onglet était renommé : la case Carnet, `carnet.json`, `Carnet.lua` et le carnet
@@ -6226,13 +6278,431 @@ Correctif 1.3.6 :
     de Claude et le bouton sont retirés) ; le bandeau de 324 (deux lignes) ; le temps
     d'ouverture de la fenêtre avec 86 vues de plus.
 
+## Correctif 1.3.7 : le Suivi en graphiques
+
+Décidé avec Dany le 25 octobre 2026, pendant ses essais de la 1.3.6 (série de questions, maquette
+montrée dans la conversation ; fiche `build/conception/1-3-7-a-faire.md`). La 1.3.6 n'a jamais été
+publiée seule : elle part avec lui, et la section « ## 1.3.6 — 2026-10-25 » de `CHANGELOG.md` est
+devenue « ## 1.3.7 — 2026-10-25 », qui commence par le Suivi puis reprend la 1.3.6. Le module
+gagne `Releve.lua` (trois fichiers depuis la 1.3.5, avec `Historique.lua` et `FenetreSuivi.lua` :
+relancer Lightroom) ; le connecteur, `Suivi.swift`, `SuiviGraphiques.swift` et `SuiviDessin.swift`
+(`--analyser`, `--graphiques`), sans outil nouveau (35).
+
+**Ce que Dany a décidé.**
+
+- Dans l'en-tête de la fenêtre Claude, au bout de la rangée sous « Repartir à neuf » : Suivi,
+  Publication… et Consommation… côte à côte (les deux derniers, perdus avec le volet au correctif
+  1.3.6, reviennent ; ils restent aussi au menu Module externe - Extras).
+- Toute photo ouverte dans la fenêtre Claude ou la Demande rapide, seule ou dans une sélection,
+  compte au Suivi : analysée d'office par le connecteur, sans Claude ni jetons, en arrière-plan,
+  sur la vignette du cache de Lightroom, comme le tri d'une séance (exposition, hautes lumières,
+  netteté, bruit selon l'ISO, yeux fermés) ; une sélection de 300 photos passe en quelques minutes
+  sans le bloquer. L'horizon penché ne se mesure que quand Claude regarde la photo.
+- Par l'original : une copie virtuelle compte pour son original, une seule fois (ni l'ISO ni la
+  focale deux fois) ; la retouche de Claude compte si l'une de ses copies est retouchée. Pas de
+  rattrapage : le Suivi part de zéro à l'installation. Les photos de « Développeur › Essais »
+  restent hors du Suivi, comme au carnet.
+- La fenêtre Suivi, à part (« Claude · Suivi »), avec un menu Période (3 derniers mois, 12 derniers
+  mois par défaut, Tout) ; quatre tuiles chiffrées (photos ouvertes, retouchées par Claude, notées
+  4 ★ ou plus, défaut le plus fréquent) ; « Mes prises de vue » (photos par mois, par date de prise
+  de vue ; focales ; ISO ; heure de la prise de vue ; objectifs) ; « Mon carnet de progrès » (les
+  défauts les plus fréquents en % des photos ; l'évolution mois par mois d'un défaut, le plus
+  fréquent par défaut, un menu pour un autre) ; un clic sur une barre montre ses photos dans la
+  Bibliothèque ; les graphiques sont des images dessinées par le connecteur, dans les couleurs de
+  l'apparence, refaites à l'ouverture : Lightroom ne trace pas de graphique.
+
+Laissé à l'étape technique, puis tranché : un fichier à lui (`suivi.json`, pas `carnet.json`
+étendu) ; une seule tâche, reprise d'elle-même, en pause pendant que Claude travaille ; 1 000
+photos au plus d'une sélection ; une analyse jamais refaite après une édition ; le défaut le plus
+fréquent cherché sur au moins 5 photos.
+
+**Le contrat** (`Tests/Contrats/suivi.json`, comme `composition.json`). Ses `regles` (`codes`,
+`registre`, `analyser`, `graphiques`, `periodes`, `tranches`, `textes`, `geometrie`, `couleurs`,
+`erreurs`) disent ce que les deux côtés appliquent ; ses `exemples`, commentés par des clés
+`_note`, en découlent au nombre près : un relevé de 17 originaux (une copie virtuelle sous son
+original, une photo vue seulement par sa copie, une en file, une abandonnée, un scan sans date, des
+photos de 2009 à 2026), un carnet à fusionner (une entrée d'un autre uuid et une absente du relevé,
+ignorées), l'entrée et la sortie de `--analyser` avec ses refus, puis `--graphiques` sur 12 mois
+(en entier), sur 3 mois et sur Tout (leurs clés données), avec ses refus. `ContratSuiviTests` côté
+connecteur, `essais-releve.lua` et `essais-suivi.lua` côté module (chacun avec un faux connecteur,
+un script LuaJIT qui lit ce fichier) le vérifient : un changement voulu se fait des deux côtés.
+Les heures des exemples supposent le fuseau America/Toronto.
+
+**Les codes.** Le Suivi compte huit codes de `PriseDeVue`, dans son ordre (`Suivi.codes`) : six
+que `--analyser` cherche sur la vignette (`sous_exposition`, `surexposition`, `ciel_brule`,
+`bruit`, `flou`, `yeux_fermes` : `Suivi.codesAnalyse`) et deux que seul Claude mesure, rangés au
+carnet quand il regarde la photo (`horizon_penche`, `mise_au_point` : `Suivi.codesCarnet`).
+`yeux_fermes` est nouveau (17 codes au lieu de 16) : domaine netteté, juste après `mise_au_point`,
+libellé « Yeux fermés ou plissés », `mesure` faux (le carnet de `view_photo` ne le cherche pas :
+`PriseDeVue.mesures` et `Carnet.constatsVue` ne changent pas ; `PriseDeVueTests` suit). Pour une
+entrée du relevé que le carnet a sous la même clé (l'id de l'original), avec le même uuid, dans le
+même catalogue, chaque code que le carnet a cherché (`vue.cherches`, et le code de l'angle) prend
+son résultat, mesuré sur l'aperçu de `view_photo`, au point de mise au point ; les autres codes,
+celui de l'analyse. Un autre uuid : l'entrée du carnet est ignorée ; une entrée du carnet absente
+du relevé ne compte jamais (pas de rattrapage) ; un carnet illisible fait une remarque
+(« carnet.json illisible : l'horizon et la mise au point vus par Claude ne comptent pas. »). Aucune
+liste de défauts dans le module : il range et renvoie des codes, la fenêtre prend les libellés
+dans la sortie de `--graphiques`.
+
+**Le relevé** (`suivi.json`, dans `Chemins.racine()`, à côté de `carnet.json`), tenu par
+`Releve.lua` seul (`Suivi.lua` est la fenêtre de la liaison, d'où ce nom) ; le connecteur le lit
+(`--graphiques`), jamais ne l'écrit. Format 1 : `{ format, catalogues = { [chemin du catalogue] =
+{ photos = { ['<id de l'original>'] = entrée } } } }`. Une entrée : `original` (localIdentifier),
+`uuid` (une autre photo sous ce numéro remplace l'entrée, comme au carnet), `fichier`, `ajout`
+(`os.time` de la première vue) et `ajout_le` (« AAAA-MM-JJ HH:MM » à l'heure locale, par
+`os.date` : `LrDate.timeToUserFormat` compte depuis 2001, `os.time` en secondes Unix, et se serait
+trompé de 31 ans ; c'est la date d'une photo sans date de prise de vue), `vu` (la dernière vue),
+`vues` (chaque photo vue de la famille, dans l'ordre de sa première vue : `{ id, uuid,
+copie_virtuelle, fichier, le }`, `MAX_VUES` 20 ; au-delà, une vue de plus ne change que `vu`),
+`prise_de_vue` (celle de l'original, relue à chaque vue : `le` d'après `dateTimeOriginal` par
+`timeToUserFormat`, `appareil`, `objectif`, `focale` réelle en mm
+(`getRawMetadata('focalLength')`), `ouverture`, `vitesse`, `iso` par `Photos.sensibilite` ; une valeur que Lightroom
+ne donne pas manque), `note` (de 0 à 5), `drapeau` (`retenue`, `aucun`, `rejetee`),
+`retouchee_par_claude` et `classement_le`, puis `analyse` : absente (en file), réussie `{ le,
+regles, cherches, defauts }` (des codes, dans l'ordre des codes), ou manquée `{ le, erreur, essais,
+abandonnee }`. Les listes s'écrivent en tableaux JSON même vides (`Json.tableau`). `MAX_ORIGINAUX`
+20 000 par catalogue : au-delà, les entrées vues le moins récemment (`vu`, puis l'id) sortent. Le
+fichier entier se lit, puis s'écrit d'un coup (`Fichiers.ecrire` : un fichier provisoire renommé,
+`--graphiques` ne lit jamais un fichier à moitié écrit) ; illisible ou d'un autre format, il est mis
+de côté avant la première écriture (`suivi-illisible-<date>.json`, jamais écrasé) ; tout ce qui sort
+vers une vue est une copie neuve, sans métatable ; rien n'est écrit au catalogue ; `uninstall.sh
+--tout` le retire avec le dossier (sans `--tout`, il le dit gardé).
+
+- Qui entre : toute sélection que voient la fenêtre Claude (`Fenetre.suivreSelection`) et la
+  Demande rapide (`FenetreRapide.suivreSelection`) passe à `Releve.voirSelection(info)` (la clé de
+  `Lightroom.photos`) : une même clé ne compte qu'une fois ; `Releve.revoir`, à chaque ouverture
+  d'une de ces fenêtres (et à son rappel par le menu ou ⌃⌥C, ⌘⌃⌥C), la fait compter même inchangée ;
+  dans le même groupe (`info.groupe`), une autre photo active ne revoit qu'elle, pour ne pas relire
+  1 000 photos à chaque clic. D'une sélection, `MAX_SELECTION` (1 000, le plus petit de la borne du
+  contrat et de `Lightroom.MAX_GROUPE`) photos au plus, la photo active d'abord ; le reste est dit
+  au journal. `voirSelection` ne lit que la sélection : la tâche range la vue.
+- Une vue se range (`rangerVue`) par lectures groupées du catalogue (`LOT_LECTURE` 500), sinon une
+  à une : chaque photo entre par son original (`masterPhoto` d'une copie virtuelle, une seule fois :
+  sa vue s'ajoute à `vues`), sauf les vidéos (`fileFormat` `VIDEO`) et les photos de
+  « Développeur › Essais » (`Carnet.estPhotoDEssai` : elle ou son original). La famille (l'original
+  et ses copies virtuelles, `virtualCopies`, sans celles des Essais) donne la note la plus haute, le
+  drapeau (« retenue » si l'une l'est, sinon « rejetee » si toutes le sont, sinon « aucun ») et
+  « retouchée par Claude » (l'une porte la mémoire de Claude, `retoucheeParClaude` et
+  `proprietaireMemoire` égal à son uuid, comme `Photos.decrireTout`), relus à chaque vue d'une photo
+  de la famille et, pour tout le relevé du catalogue, par `Releve.reclasser` à l'ouverture de la
+  fenêtre Suivi.
+- La file d'analyse, ce sont les entrées sans analyse, et celles dont l'analyse a une erreur sans
+  `abandonnee` : rien d'autre à ranger, elle reprend d'elle-même après une fermeture de Lightroom.
+  Une seule tâche à la fois (`Releve.vider`, `Releve.enCours`), lancée par `Releve.relancer` depuis
+  les boucles de la fenêtre Claude, de la Demande rapide et de la fenêtre Suivi (aucune tâche de
+  `suivreSelection` : les essais qui comptent les tâches ne changent pas). Elle range d'abord les
+  vues (des lectures du catalogue : elles se rangent même pendant que Claude travaille, et une
+  photo que Dany parcourt pendant une Retouche pro compte ; les sélections que Claude change
+  lui-même, `show_photo`, se rangent donc aussi), puis analyse par lots de `LOT_ANALYSE` (10), la
+  photo active nouvellement vue en tête : la vignette de l'original du cache de Lightroom
+  (`Vignettes.demander`, à `TAILLE_VIGNETTE` 1 024, dans un dossier neuf par lot,
+  `Temporaire/Suivi/Analyse-<n>`, effacé après la réponse), redressée (`Images.redresser`, la
+  géométrie de `Vignettes.decrireVignette` de l'original), puis `perl alarm 60` et `--analyser`,
+  la réponse dans un fichier ; `retouchee` est vrai quand l'original porte la mémoire de Claude.
+  Au-delà de `MAX_EN_ATTENTE` (20) vues en attente (un lot qui dure, la tâche pas encore partie),
+  elles se fondent en une seule (`fusionnerVues` : la photo active de la plus récente en tête, puis
+  les photos des vues, de la plus récente à la plus ancienne, sans doublon, `MAX_SELECTION` au
+  plus) : aucune photo perdue.
+- La pause : l'analyse attend pendant que Claude travaille (`Moteur.travaille` : la fenêtre Claude
+  ou la Demande rapide) et pendant que la liaison sert (`Lightroom.liaisonOccupee` : une commande
+  en cours, ou finie depuis moins de 5 s ; Claude Desktop, Claude Code en terminal, la recette ; un
+  trou de plus de 5 s entre deux commandes de la recette laisserait partir un lot), regardée toutes
+  les `PAUSE` (2) secondes ; un lot commencé juste avant est remis sans compter d'essai.
+- Les erreurs : une raison par photo de `--analyser`, un refus de tout l'appel (sa raison, par
+  exemple `arguments`), `pas_de_reponse` (rien avant l'alarme : un essai pour chaque photo du lot),
+  et deux raisons du module, `photo_introuvable` et `module`, comptent chacune un essai, réessayé
+  `DELAI_REESSAI` (600 s) plus tard (une vignette de 256 px juste après une retouche : Lightroom
+  refait l'aperçu ensuite) ; au `ESSAIS_ANALYSE`-ième (3), l'entrée est `abandonnee` et ne revient
+  plus. Un connecteur absent se regarde de nouveau `DELAI_VERIFICATION` (60 s) plus tard ; rien ne
+  change.
+- Une analyse n'est jamais refaite après une édition (les défauts disent la prise de vue ; une
+  retouche les cacherait), seulement pour des règles plus récentes (une réponse dont `regles`
+  dépasse celle de l'analyse ; si cette nouvelle analyse échoue, l'ancienne reste et n'est plus
+  refaite pendant la séance).
+- Les écritures du fichier, vues et analyses comprises, sont espacées d'au moins `DELAI_ECRITURE`
+  (20 s) : à 20 000 originaux, il fait 13,6 Mo (0,42 s pour la copie et `Json.encode` sous
+  `luajit -joff` ; plus dans Lightroom), écrits sans rendre la main, et une écriture par photo
+  parcourue aux flèches (une toutes les 2 s) figeait Lightroom à chaque photo. Deux exceptions : au
+  début d'une pause (Claude se met au travail) et avant un dessin de la fenêtre Suivi
+  (`Releve.ecrire`, que `FenetreSuivi.dessiner` appelle avant `--graphiques`). En fin de file, la
+  tâche attend son tour (`DELAI_ECRITURE` au plus) en rangeant les vues qui arrivent, au lieu
+  d'écrire tout de suite. `Releve.version` augmente à chaque écriture : la fenêtre Suivi y voit
+  qu'il faut redessiner.
+- Le Suivi ne tourne que dans Lightroom : `Releve.allume` est faux par défaut ; `Init.lua`
+  l'allume (`Releve.allumer`, qui remet aussi `arrete` à faux pour une réactivation dans le
+  Gestionnaire), `Arret.lua` l'éteint (`Releve.eteindre` : le module désactivé, rechargé ou
+  déchargé). Éteint, aucune vue ne s'ajoute, aucune tâche ne part ; celle qui tourne s'arrête après
+  son attente (vignettes, `--analyser`, une pause, même si `Moteur.travaille` reste vrai dans
+  l'ancienne instance), sans lancer le connecteur ni écrire le relevé (`enregistrer` refuse quand
+  `Releve.arrete` est vrai). Après un rechargement, l'ancienne instance continue de tourner et la
+  nouvelle peut démarrer avant qu'elle ait fini (voir Vérifications de la 2.3) : elle ne réécrit
+  donc jamais le relevé que la nouvelle relit et tient ; ce qui n'était pas écrit (20 s de vues au
+  plus) se perd, les analyses se refont, et la réouverture de la fenêtre Claude revoit la
+  sélection. À la fermeture de Lightroom, `Arret.lua` ne s'exécute pas : les vues des 20 dernières
+  secondes peuvent se perdre. Les suites de tests ne chargent pas `Init.lua`, sauf leurs essais
+  d'Init (`tests.lua`, `essais-une-photo.lua`), qui l'éteignent ensuite ; seul `essais-releve.lua`
+  l'allume.
+- `Menage.TEMPORAIRES` gagne `Suivi` : `Temporaire/Suivi` s'efface au chargement (les vignettes
+  d'un lot interrompu, les dessins d'une fenêtre Suivi restée ouverte).
+
+**L'analyse (`mcp-developpeur --analyser '<json>'`, `Suivi.analyser`).** Commande exacte : `/usr/bin/perl
+-e 'alarm 60; exec @ARGV' <connecteur> --analyser '<json>' > <réponse>.json 2>/dev/null`. Entrée :
+`{ photos = [ { id, vignette, iso, cache, retouchee } ] }`, de 1 à 20 photos dans l'ordre voulu (le
+module en envoie 10) : `id` l'original, `vignette` le chemin d'un JPEG déjà redressé, `iso` absent
+s'il est inconnu, `cache` vrai pour une vignette du cache de Lightroom (absent : faux, la netteté
+n'est pas ramenée), `retouchee` facultatif. Chaque vignette passe par les mesures et les règles du
+tri et du carnet, sans Lightroom ni original (ni point de mise au point, ni intention : la mise au
+point et l'horizon ne se cherchent pas ici) :
+
+- `sous_exposition` et `ciel_brule` : `Carnet.constatsVue` (L* médian sous 28 et 95e centile sous
+  80 ; plus de 3 % du tiers haut en blanc pur), sur la réduction à 512 px, comme le carnet de
+  `view_photo` ;
+- `surexposition` : plus de `PhotoTriee.partBlancPurBrulee` (35 %) de l'image en blanc pur, la photo
+  « brûlée » de `PhotoTriee.defautsMesures` ;
+- `bruit` : `max(noise, shadowNoise)` d'au moins `DetailMeasurements.bruitFort` (1,5), cherché
+  seulement à un ISO connu d'au moins `Carnet.isoEleve` (1 600, `Carnet.bruitCherche`) ;
+- `flou` : `PhotoTriee.defautsNettete` sans point de mise au point (aucune zone nette : la netteté
+  la plus forte, ramenée par `thumbnailSharpnessFactor` si `cache`, sous 15) ;
+- `yeux_fermes` : `PhotoTriee.yeuxFermes`, cherché seulement s'il y a des sujets dont les yeux se
+  lisent (`PhotoTriee.sujetsAuxYeuxLus` : les visages d'au moins la moitié de la largeur du plus
+  grand, à l'ouverture lue ; `yeuxOuverts` la reprend sans changer de sens).
+
+Netteté, bruit et Vision à 1 024 px de grand côté (`Detail.side`), comme le tri ; sous 900 px
+(`ToolHandler.minimumCullSide`), la vignette ne s'analyse pas (`vignette_petite`) ; de 900 à
+1 023 px, ni flou ni bruit ne se cherchent. Avec `retouchee`, seuls `flou` et `yeux_fermes` se
+cherchent (`Suivi.codesSiRetouchee` : une retouche cacherait l'exposition, le ciel et le bruit).
+Vision deux photos à la fois au plus (`ToolHandler.parallelMeasures`). Le temps est borné
+(`mesurerBorne`) : 15 s par photo (`delaiParPhoto`) et 50 s pour l'appel (`delaiAnalyse`), pour que
+la ligne parte toujours avant l'alarme ; une photo qui n'a pas fini a la raison `delai` (une raison
+de plus que le contrat, que le module range comme les autres). Sortie : `{ ok = true, regles = 1,
+photos = [ { id, cherches, defauts, mesures } ] }` dans le même ordre (`defauts` ⊂ `cherches`, en
+codes, dans l'ordre des codes ; `mesures` pour le journal et les essais : `cote`, `mediane_l`,
+`p95_l`, `blanc_pur`, `blanc_pur_haut`, `nettete`, `bruit`, `visages`, `ouverture_yeux`, que le
+module ne range pas), ou `{ id, raison, texte }` (`vignette_absente`, `vignette_illisible`,
+`vignette_petite`, `delai`). Le connecteur n'efface pas les vignettes : le module efface le dossier
+du lot. Codes de sortie : 0 (même quand des photos ont une raison) ; 1 pour un refus de tout
+l'appel, une ligne `{ ok = false, raison, texte }` (`arguments` : le JSON ne se lit pas ou n'a pas
+la forme ; `trop_de_photos` : plus de 20) ; 2 pour un nombre d'arguments faux (l'aide sur stderr,
+rien sur stdout : `usage(erreur:)` de `main.swift`). Dix vignettes de 1 720 px s'analysent en 1 s
+environ.
+
+**Les graphiques (`mcp-developpeur --graphiques '<json>' <dossier>`, `Suivi.graphiques`,
+`SuiviGraphiques.swift`).** Commande exacte : `/usr/bin/perl -e 'alarm 20; exec @ARGV' <connecteur>
+--graphiques '<json>' <dossier> > <réponse>.json 2>/dev/null` ; lecture seule de `suivi.json` et de
+`carnet.json` (par `JSONSerialization`) : ni Lightroom, ni le catalogue, ni un original, et aucun
+chemin par défaut (les essais passent des fichiers temporaires, jamais le vrai relevé). Entrée :
+`suivi` (son chemin ; absent du disque : un relevé vide, rien n'est refusé), `carnet` (facultatif),
+`catalogue` (sa table du relevé et du carnet), `aujourd_hui` (« AAAA-MM-JJ », la date locale que
+donne le module : les périodes, et les essais, ne dépendent pas de l'horloge du connecteur ; année
+1900 au moins), `periode` (`3_mois`, `12_mois`, `tout`), `apparence` (`claire`, `sombre`),
+`couleurs` (six couleurs en hexadécimal, tirées de `Dispositions.PALETTES[apparence]` par les clés
+`fond` = `fondDroite`, `texte`, `gris`, `filet` = `filetDroite`, `barre` = `bleu`, `accent` =
+`orange` : `fondDroite` est le fond des fenêtres de macOS dans chaque apparence, l'image s'y fond),
+`defaut` (facultatif : l'un des huit codes comptés ; absent, le plus fréquent), `tailles` (les sept
+graphiques en points entiers, de 120 × 80 à 1 200 × 600).
+
+- Périodes : une photo est dans la période par sa date de prise de vue, sinon par sa date d'ajout ;
+  après la fin du mois d'`aujourd_hui` (horloge de l'appareil fausse), hors de toute période. 3
+  mois : le mois d'`aujourd_hui` et les deux d'avant ; 12 mois : et les onze d'avant ; Tout : une
+  colonne par année de prise de vue, de la plus ancienne à celle d'`aujourd_hui` (années sans photo
+  comprises) ; plus de 12 années, la première colonne « < A » (détail « avant A ») réunit les
+  années d'avant A = l'année d'`aujourd_hui` − 10, puis une colonne pour chacune des 11 dernières ;
+  aucune photo datée, l'année d'`aujourd_hui` seule. Les graphiques par mois (par année pour Tout),
+  par heure et l'évolution ne prennent que les photos datées ; les autres comptent dans
+  `sans_valeur`, et leur note le dit.
+- Tranches fixes : focales réelles arrondies au mm, ≤ 15, 23, 35, 55, 90, 150, 300, puis > 300 (un
+  iPhone, 6,8 mm, tombe dans « ≤ 15 ») ; ISO ≤ 200, 400, 800, 1 600 (la borne de `Carnet.isoEleve`),
+  3 200, 6 400, 12 800, puis > 12 800 ; douze tranches de deux heures (« 0 h » … « 22 h ») ;
+  objectifs, un groupe par texte exact, rangés par nombre de photos décroissant puis par nom,
+  « Inconnu » sans objectif lu ; plus de huit groupes, les sept premiers puis « Autres », qui réunit
+  le reste, ses `ids` compris ; défauts, les codes cherchés au moins une fois dans la période, par
+  pourcentage décroissant (exact, avant l'arrondi). Une focale ou un ISO nul, négatif, ou de 1e6 et
+  plus compte « sans focale lue » ou « sans ISO lu » ; une note est ramenée de 0 à 5 ; une valeur
+  hors de la plage d'`Int` ou qui n'est pas un nombre ne fait jamais planter (`Suivi.arrondi`,
+  `Int(exactly:)` sous 2^53 ; une entrée non valide est ignorée).
+- Comptes : un défaut, sur les photos d'un ensemble (la période, une colonne), `n` celles où il est
+  trouvé, `sur` celles où il est cherché, l'analyse et le carnet fusionnés ; une photo en file ou
+  abandonnée n'est cherchée pour aucun code de l'analyse. Le défaut le plus fréquent : parmi les
+  codes cherchés sur au moins 5 photos de la période (`Suivi.photosSuffisantes`, le seuil de
+  `Carnet.PHOTOS_SUFFISANTES`) et trouvés au moins une fois, le plus haut pourcentage exact, puis
+  le plus grand `n`, puis l'ordre des codes ; sinon parmi tous les codes trouvés ; aucun trouvé, pas
+  de défaut le plus fréquent (l'évolution est vide). Le défaut suivi : celui de l'entrée (`choisi`
+  vrai), même cherché sur aucune photo, sinon le plus fréquent.
+- Textes (`regles.textes`) : les comptes groupés par trois chiffres (« 1 284 ») ; un pourcentage
+  « — » quand `sur` = 0, « 0 % », « < 1 % » sous 1, sinon l'entier le plus proche (demi vers le
+  haut) ; « 0 photo », « 1 photo », « 2 photos » ; le détail d'une barre « <colonne> · N photo(s) »,
+  ou « <colonne> · N photo(s) sur S (P %) » pour un graphique en %. Les tuiles : « Photos ouvertes »
+  (détail : « N en cours d'analyse » et « N non analysée(s) », sinon « toutes analysées »),
+  « Retouchées par Claude » et « Notées 4 ★ ou plus » (« P % des photos ouvertes »), « Défaut le
+  plus fréquent » (« <libellé> · N photo(s) sur S » ; sans défaut trouvé « Aucun », « aucun défaut
+  trouvé sur les N photos analysées », au singulier pour une seule ; sans photo analysée « — »).
+- Sortie : `{ ok, catalogue, aujourd_hui, periode = { code, libelle, debut, fin, par }, photos,
+  sans_date, analyse = { analysees, en_attente, en_echec }, tuiles, defauts (les huit codes comptés,
+  le menu du défaut suivi), defaut_suivi, graphiques, remarques }` ; chaque graphique `{ titre,
+  fichier, largeur, hauteur, orientation, max_barres, unite, echelle, sans_valeur, note, vide,
+  barres, creneaux }` ; une barre `{ libelle, detail, valeur, texte, n, sur, ids, couleur (barre ou
+  accent), x, y, largeur, hauteur (le rectangle dessiné), zone (le rectangle cliquable) }`, ses `ids`
+  les originaux, croissants, tous (pour 20 000 originaux, la ligne dépasse 650 Ko : le module la lit
+  dans un fichier, jamais par un tuyau) ; un créneau `{ x, y, largeur, hauteur, barre }`, `barre` le
+  rang de la barre qui l'occupe (0 : vide). Les sept graphiques : `photos_par_mois` (« Photos par
+  mois », « Photos par année » pour Tout ; 12 créneaux, étalé), `focales` (8), `iso` (8), `heures`
+  (12), `objectifs` (8, horizontal), `defauts_frequents` (8, horizontal, en %, la barre du défaut
+  suivi en accent ; sa note toujours : « En % des photos où il est cherché : bruit à ISO 1 600 et
+  plus, yeux sur un visage, horizon et mise au point quand Claude regarde la photo. ») et
+  `evolution_defaut` (12, étalé, en %, toutes en accent ; « <défaut>, mois par mois », « …, année
+  par année » pour Tout, sinon « Évolution d'un défaut » ; sans défaut suivi « Aucun défaut trouvé
+  dans la période. »).
+- Géométrie (`regles.geometrie`), en points entiers dans le repère de l'image (origine en haut à
+  gauche) : les créneaux ne dépendent que de la taille et du graphique (verticaux : `x_i = 8 +
+  floor((i − 1) × (L − 16) / n)`, `x_(n+1) = L − 8` ; horizontaux : `y_i = 4 + floor((i − 1) ×
+  (H − 8) / n)`, `y_(n+1) = H − 4`) ; un graphique étalé de k barres en donne `s = floor(n / k)` à
+  chacune, centrées (12 mois : un chacun ; 3 mois : quatre chacun ; 5 années : deux chacun, à partir
+  du deuxième) ; la barre verticale fait 0,6 de sa zone, sur une hauteur utile `H − 36` (16 au-dessus
+  pour les valeurs, 20 au-dessous pour les libellés), l'horizontale part de `floor(0,4 × L) + 4`,
+  avec 48 points de valeurs à droite ; une barre de valeur 0 n'a ni hauteur ni valeur écrite.
+- Dessin (`SuiviDessin.swift`, CoreGraphics et CoreText comme `PreviewImages`) : sept PNG en 2x
+  (`<graphique>.png`, 2 × largeur par 2 × hauteur pixels), sobres : le fond `fond`, des barres
+  arrondies au bout, une grille discrète (la moitié et le haut de l'échelle, en pointillés), la
+  ligne de base au filet, les libellés en français dessous ou à gauche, tous de la même taille
+  dans un graphique (la plus grande, de 10 à 7 points, où tiennent tous ceux qui peuvent tenir ; les
+  autres coupés « … »), les valeurs au-dessus ou à droite ; un graphique vide dit « Aucune photo »
+  au milieu (« Aucun défaut » pour l'évolution sans défaut suivi). Le titre et la note ne sont pas
+  dessinés : la fenêtre les écrit.
+- Refus : une ligne `{ ok = false, raison, texte }` et le code 1, sans PNG laissé : `arguments`
+  (JSON illisible, clé manquante ou invalide : période, apparence, couleur, taille, date),
+  `defaut_inconnu`, `suivi_illisible` (JSON invalide ou format autre que 1), `dossier` (il ne se crée
+  ou ne s'écrit pas), `dessin` ; code 2 pour un nombre d'arguments faux. Un relevé de 20 000
+  originaux se dessine en 0,5 s environ.
+
+**La fenêtre Suivi** (`FenetreSuivi.lua`, réécrite) : « Claude · Suivi », 1 310 × 1 028 points
+(contenu tiré de `FenetreSuivi.TAILLES` par `FenetreSuivi.dimensions` ; D7 : barre de titre de 33,
+1 de marge ; elle tient sur l'écran de Dany, 1 440 de haut, avec la barre des menus et le Dock),
+cadre `DeveloppeurSuiviGraphiques-1` (un nom neuf : celui de la 1.3.6, `DeveloppeurCarnet`,
+n'avait pas cette taille). Seul le bouton Suivi de l'en-tête de la fenêtre Claude l'ouvre
+(`Fenetre.ouvrirSuivi`, `FenetreSuivi.afficher` ; ouverte, elle passe devant). En haut, « Suivi de
+vos photos » en gras 16, le menu Période (`FenetreSuivi.PERIODES`, « 12 derniers mois » à chaque
+ouverture, pas gardé) et la ligne d'état (`FenetreSuivi.texteEtat` : la période, de quel mois à
+quel mois, ses photos ouvertes et celles sans date, les remarques ; sans photo au relevé, l'accueil
+`FenetreSuivi.ACCUEIL` ; sans photo dans la période, « Aucune photo ouverte dans cette période. »
+et, hors de Tout, « Choisissez « Tout » pour voir les autres. ») ; les quatre tuiles (305 × 84,
+chiffre en gras 24) ; puis deux colonnes de 620, à 28 l'une de l'autre : à gauche « Mes prises de
+vue » (photos par mois 620 × 150 ; focales et ISO, 300 × 130 chacun, côte à côte à 20 ; heures
+620 × 120 ; objectifs 300 × 170), à droite « Mon carnet de progrès » (défauts les plus fréquents
+620 × 180 ; l'évolution 620 × 140 sous son titre et le menu du défaut suivi,
+`FenetreSuivi.elementsDefaut` : « Le plus fréquent : <libellé> », un séparateur, puis les huit
+défauts de la réponse avec leur pourcentage), l'aide (`FenetreSuivi.AIDE`), le message du bas et
+« Photos d'un défaut… » (actif s'il y a des défauts au carnet : `choisirDefaut`, `montrerDefaut`,
+« Retirer du carnet… » par `retirerDuCarnet`, appel direct à `Carnet.commande`, comme à la 1.3.6 ;
+le résumé du carnet, `Carnet.resumer`, ne se lit plus que pour sa liste, à l'ouverture et quand le
+registre change, par l'abonnement `suivi`). Chaque graphique a son titre et sa note, écrits par la
+fenêtre d'après la sortie.
+
+- Le dessin : dans la tâche de la boucle de la fenêtre (`FenetreSuivi.suivre`,
+  `FenetreSuivi.dessiner`), `perl alarm 20` et `--graphiques`, avec exactement l'entrée du contrat
+  (`FenetreSuivi.entree` : le chemin de `suivi.json` et de `carnet.json`, celui du catalogue,
+  `aujourd_hui` par `LrDate`, la période, l'apparence du module, ses six couleurs par
+  `FenetreSuivi.couleursConnecteur` d'après `COULEURS_CONNECTEUR`, le défaut s'il est choisi, les
+  tailles de `FenetreSuivi.GRAPHIQUES`), dans un dossier neuf par dessin
+  (`Temporaire/Suivi/Graphiques-…` : Lightroom garde une image par chemin, un même chemin ne se
+  redessinerait pas) ; l'avant-dernier s'efface quand le nouveau est montré, tous à la fermeture.
+  Avant chaque dessin, `Releve.ecrire`. Les images se refont à l'ouverture (après
+  `Releve.reclasser`), au changement de période ou de défaut, et quand `Releve.version` ou
+  `Carnet.version` change pendant qu'elle est ouverte, `DELAI_REDESSIN` (10 s) au moins entre deux
+  dessins faits d'eux-mêmes. La boucle relance aussi la file d'analyse (`Releve.relancer`), pour
+  qu'elle avance quand seule cette fenêtre est ouverte. Sans réponse lisible, rien ne change : un
+  connecteur absent (`CONNECTEUR_ABSENT`, son chemin dans le Gestionnaire), muet
+  (`PAS_DE_REPONSE`) ou qui refuse (`REFUS` et son texte) le dit, les images d'avant restent ; un
+  chemin de catalogue illisible aussi (`SANS_CATALOGUE`).
+- La structure fixe (règle de la fenêtre B : une fenêtre ouverte ne change pas de structure) :
+  sept `f:picture` liées (`image_<g>`, avec `width` et `height`) et, sur elles, 68 calques, un par
+  créneau possible (12, 8, 8, 12, 8, 8, 12). Les rectangles des créneaux ne dépendent que de la
+  taille du graphique : le module les calcule lui-même par les formules du contrat
+  (`FenetreSuivi.creneaux`) avant toute réponse, pose chaque calque à sa place une fois pour toutes,
+  dans une colonne poussée par ses marges (supposé, à constater : une telle colonne ne prend pas les
+  clics, comme la rangée du constat D6), et vérifie ceux de chaque réponse ; une réponse aux
+  créneaux autres laisse les calques de ce graphique cachés (`calquesValides`), et le journal le
+  dit. Seule la barre qui occupe un créneau change d'une réponse à l'autre, d'où sa visibilité liée
+  (`c_<g>_<i>` : une barre qui a des photos) et son infobulle liée (`i_<g>_<i>` : le détail de la
+  barre, `INFOBULLE_BARRE`). Un calque est un `f:static_text` vide de taille fixe
+  (`FenetreSuivi.calque`, constat C1 : un `f:picture` ne reçoit aucun clic) ; les essais vérifient
+  que tous passent par lui (`FenetreSuivi.parCalque`). Les calques suffisent : pas de menu « Voir les
+  photos… ».
+- Un clic sur une barre (`FenetreSuivi.cliquer`, puis `FenetreSuivi.montrerPhotos` dans une
+  tâche) : les originaux retrouvés par `getPhotoByLocalId` et vérifiés par l'uuid de leur entrée du
+  relevé (une autre photo sous ce numéro, ou une photo sortie du relevé, est sautée), puis
+  sélectionnés en grille dans la Bibliothèque (`LrApplicationView.switchToModule('library')`,
+  `showView('grid')`) ; quand la source affichée ne les a pas toutes, Toutes les photographies
+  (`catalog:setActiveSources(catalog.kAllPhotos)`, d'après la référence du SDK, pas encore vue dans
+  Lightroom) devient la source et la sélection se refait pendant `DELAI_SOURCE` (3 s). Seules
+  comptent les photos demandées que Lightroom cible, la photo active parmi elles (sans sélection,
+  `getTargetPhotos` rend tout le film fixe : son nombre ne prouve rien). Le message dit ce qui est
+  montré, la source changée, ce que le filtre de la Bibliothèque cache, et les photos qui ne sont
+  plus au catalogue. Rien n'est écrit au catalogue.
+- L'apparence : fonds en aplats (un `f:picture` sans image, comme la fenêtre Claude) et textes aux
+  couleurs de l'apparence du module (`fondDroite`, `texte`, `gris`), pour que les images s'y fondent
+  même quand l'apparence de macOS est autre (la fenêtre de la 1.3.6 suivait macOS) ; menus et
+  boutons du système. `LrColor` s'importe à l'ouverture (`preparerCouleurs`), pas au chargement :
+  `liens.lua` charge ce que le fichier requiert sans `LrColor`. Toute table donnée à Lightroom est
+  neuve : la réponse décodée ne sert qu'à faire des textes et des booléens.
+- Le carnet en texte de la 1.3.6 est retiré (`Fil.texteSuivi`, `Fil.LECTURE_CARNET`,
+  `ERREUR_CARNET`, `MOIS_PAR_MOIS`, `AIDE_DEFAUTS_SUIVI`, `celluleCarnet`, `ligneDefautSuivi`,
+  `FenetreSuivi.LARGEUR` et `LIGNES`, et ses deux essais d'`essais-carnet.lua`) : ce qui progresse,
+  ce qui recule et ce qu'il faut travailler, Claude le dit sur demande (`export_journal` avec
+  `notebook`, qui lit le carnet ; aucun outil ne lit `suivi.json`).
+
+**L'en-tête de la fenêtre Claude.** Suivi, Publication… et Consommation… côte à côte au bout de la
+rangée des voyants, en haut à droite sous « Repartir à neuf » (`Vues.boutonSuivi` 56,
+`Vues.boutonPublication` 92, `Vues.boutonConsommation` 112 : des carrés small par `Fenetre.bouton`,
+leur titre en petit, 6 points d'écart, `TAILLES.ecartBoutons`) ; la photo active garde 407 points
+(`D.info`). Publication… et Consommation… ouvrent leurs fenêtres de la 1.2 comme leurs menus
+(`Fenetre.ouvrirPublication`, `Fenetre.ouvrirConsommation`), requises au clic : elles créent leurs
+couleurs au chargement, et `liens.lua` charge `Fenetre.lua` sans `LrColor`. Comme tout bouton, ils
+annulent l'envoi automatique : la demande tapée ne part pas. `Dispositions.IMAGES` et `PALETTES`
+ne changent pas : aucune image à refaire.
+
+**Les essais.** Côté connecteur : `ContratSuiviTests` (8 tests : les règles reprises, les trois
+exemples de `--graphiques` comparés exactement, leurs sept PNG vérifiés, de deux fois la taille et
+pas d'une seule couleur, tous les refus sans PNG écrit, `--analyser` sur le lot de l'exemple avec
+des vignettes fabriquées, ses refus) et `SuiviTests` (textes et arrondis, tranches, dates, Tout sur
+5 et sur plus de 12 années, créneaux qui ne dépendent que de la taille, défaut le plus fréquent,
+« Autres », carnet absent, illisible ou d'un autre uuid, carnet qui l'emporte, nombres hors de
+plage, refus, codes cherchés selon les visages, l'ISO, la taille et `retouchee`, temps borné, aucun
+chemin par défaut dans les sources du Suivi). Côté module : `essais-releve.lua` et
+`essais-suivi.lua`, chacun avec son faux connecteur ; chaque correction a été vérifiée par un essai
+qui échoue sans elle, sur une copie du module modifiée exprès. `tests.lua` vérifie aussi que
+`Arret.lua` éteint le Suivi. Les deux suites passent (26 octobre 2026, la documentation faite) :
+`swift test` 550 tests, dont 1 sauté sans `DEVELOPPEUR_ECRAN_REEL=1`, 0 échec ;
+`scripts/tester-module.sh` 669 tests et essais, 0 échec : la liaison 332, dont `tests.lua` 247, la
+fenêtre 337, dont `tests.lua` 64, `essais-releve` 18, `essais-suivi` 13, `essais-carnet` 8.
+
+**À constater dans Lightroom** (les simulations ne le peuvent pas) :
+
+1. `getRawMetadata('focalLength')` rend un nombre (un texte « 23 mm » se lit aussi) ;
+   `batchGetRawMetadata` accepte `masterPhoto` et `virtualCopies`, et `virtualCopies` rend les
+   copies d'un original (sinon le module lit photo par photo).
+2. Une vignette de 1 024 px se rend pour l'analyse, juste après une importation et après une
+   retouche (sinon la raison et le réessai 10 minutes plus tard).
+3. Une sélection de 300 photos analysée en quelques minutes, sans gêner Dany ni Claude ; la pause
+   pendant une Retouche pro, Claude Desktop et la recette ; la reprise après une fermeture de
+   Lightroom.
+4. La fenêtre Suivi de 1 310 × 1 028 ouverte à cette taille, en claire et en sombre ; les images
+   liées par leur chemin qui se rafraîchissent ; une infobulle sur deux lignes.
+5. Les 68 calques qui reçoivent les clics à travers les colonnes poussées par leurs marges ;
+   `catalog.kAllPhotos` ; la sélection en grille d'une barre de plusieurs centaines de photos.
+6. Les trois boutons de l'en-tête à leur place, Publication… et Consommation… qui ouvrent leurs
+   fenêtres.
+7. Un rechargement du module pendant une analyse : l'ancienne instance qui s'arrête sans réécrire
+   le relevé.
+
 ## Correctif 1.3.6 : une photo, une conversation
 
 Décidé avec Dany le 25 octobre 2026 (séance de questions, toutes ses réponses données), numéroté
 (« ## 1.3.6 — 2026-10-25 » de `CHANGELOG.md`, avec la balance des blancs de toute l'image et la
 Demande rapide sans ♻, qui attendaient sous « ## Non publié »), installé pour les essais de Dany,
-pas encore publié ; complété le même jour par ses retours après cet essai (numéro gardé). Le module
-gagne deux fichiers (`Historique.lua`, `FenetreSuivi.lua`) : relancer Lightroom.
+jamais publié seul : il part avec le correctif 1.3.7 (voir Correctif 1.3.7), dont la section
+« ## 1.3.7 — 2026-10-25 » de `CHANGELOG.md` reprend la sienne ; complété le même jour par ses
+retours après cet essai (numéro gardé). Le module gagne deux fichiers (`Historique.lua`,
+`FenetreSuivi.lua`) : relancer Lightroom.
 
 - **Une photo, une conversation** dans la fenêtre Claude, avec l'historique de la photo,
   « Depuis la dernière fois », la conversation d'un groupe jamais gardée et « Repartir à neuf » :
@@ -6250,8 +6720,8 @@ gagne deux fichiers (`Historique.lua`, `FenetreSuivi.lua`) : relancer Lightroom.
   Aperçu et Proposition, la fenêtre ouverte sur Focus et ramenée à Focus à chaque autre photo ; une
   image de Claude qui arrive ouvre Aperçu, une proposition Proposition, une note Note ; Agrandir
   jusqu'à 2 000 × 1 250, une image plus petite à sa vraie taille (puis agrandie : deuxième retour,
-  ci-dessous) ; le bouton Suivi et la fenêtre Suivi à la place de l'onglet (les graphiques et l'ajout de chaque photo au carnet attendent le
-  correctif 1.3.7) ; plus rien sur l'étalonnage de l'écran (ni voyant Écran, ni section Écran des
+  ci-dessous) ; le bouton Suivi et la fenêtre Suivi à la place de l'onglet (ses graphiques et chaque
+  photo ouverte au Suivi sont venus au correctif 1.3.7) ; plus rien sur l'étalonnage de l'écran (ni voyant Écran, ni section Écran des
   consignes, ni remarque au premier aperçu, `get_status` ne dit que le nom) ; le résumé des
   réglages d'une photo sans étape de Claude dans son historique ; la barre de titre « Développeur
   v1.3.6 ». Voir Fenêtre B (Retours de Dany après son essai, Agrandir), Voyants et liaison, Écran,
@@ -6340,12 +6810,12 @@ dans Lightroom. Reste à constater :
 8. Avec le vrai Claude, une retouche finie dans la fenêtre par `view_photo` avec
    `compare = before_claude` avant le résumé ; `rendu_reproductible` après un retour à l'origine et
    une seconde retouche, et l'écart dit à la fin seulement.
-9. La fenêtre Suivi (à la place de l'onglet) : son texte riche sur 600 points en 12 (les défauts
-   et leurs mois sur une ligne, sans coupure d'un défaut au milieu), ▲ ▼, sa relecture quand un
-   constat arrive, « Photos d'un défaut… » et sa fenêtre, « Retirer du carnet… » sur une vraie photo
-   désignée par Dany ; les leçons d'avant restées dans `carnet.json` après une écriture.
-10. Publication… et Consommation… par le menu seulement : le menu Fichier réduit quand une fenêtre du
-    module est devant (constaté le 19 octobre 2026) gêne-t-il Dany ?
+9. La fenêtre Suivi (à la place de l'onglet) : son texte riche est remplacé par les graphiques au
+   correctif 1.3.7 (voir son À constater) ; restent « Photos d'un défaut… » et sa fenêtre,
+   « Retirer du carnet… » sur une vraie photo désignée par Dany, et les leçons d'avant restées dans
+   `carnet.json` après une écriture.
+10. Publication… et Consommation… par le menu seulement : sans objet, leurs boutons reviennent dans
+    l'en-tête au correctif 1.3.7 (décision de Dany du 25 octobre 2026).
 11. Les retours de Dany dans le vrai Lightroom : un clic sur une ligne d'étape ou d'image qui change
     d'onglet puis pose l'image (des observateurs de propriétés synchrones, supposés) ; la fenêtre
     ouverte sur Focus, et ramenée à Focus à chaque autre photo choisie (et pas pour Obtenir ni

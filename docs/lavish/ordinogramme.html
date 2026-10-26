@@ -96,7 +96,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line)
 <div class="page">
 
 <header class="intro">
-  <span class="eyebrow">Correctif 1.3.6 · fenêtre Claude · mode Appliquer directement</span>
+  <span class="eyebrow">Correctifs 1.3.6 et 1.3.7 · fenêtre Claude · mode Appliquer directement</span>
   <h1>Ordinogramme d'une retouche</h1>
   <p>Le parcours complet d'une seule photo, de ton clic dans la Bibliothèque jusqu'à la note posée : ce que fait Lightroom, la fenêtre Claude, Claude Code, le connecteur MCP et le module, avec chaque décision prise en route. La photo est inventée pour réunir le plus de cas possibles.</p>
 </header>
@@ -201,6 +201,7 @@ flowchart TD
   <div class="regles">
     <p><b>Rien sur le disque</b> avant ta première demande : parcourir 300 photos ne crée aucun fichier. Le résumé et le complément sont faits par la fenêtre, sans Claude ni forfait.</p>
     <p><b>Le résumé en haut du fil</b> (ton deuxième retour du 25 octobre ; d'abord en bas, monté entre l'historique et ta première demande à ta demande du même jour, « Depuis la dernière fois » restant à sa place) se refait à chaque autre photo ou autre groupe, à l'ouverture, à la fin de chaque tour de Claude, et suit la note posée ; il n'est ni gardé dans la conversation ni envoyé à Claude. Changer de photo active dans la même sélection ne le refait pas.</p>
+    <p><b>Le Suivi</b> (correctif 1.3.7) : la photo vue, seule ou dans sa sélection, entre aussi au relevé du Suivi par son original (une copie virtuelle compte pour lui), sauf une photo des Essais ou une vidéo. Le connecteur l'analyse ensuite d'office sur la vignette du cache de Lightroom, en arrière-plan, sans Claude ni forfait (<code>mcp-developpeur --analyser</code>, une seule fois par photo, en pause pendant que Claude travaille) ; rien n'est écrit au catalogue, rien ne part chez Anthropic. La fenêtre Suivi, qu'ouvre le bouton Suivi de l'en-tête, en montre les graphiques.</p>
     <p><b>Repartir à neuf</b>, à droite du titre, commence une conversation neuve pour la photo, avec son historique ; l'ancienne reste sur le disque, mise de côté.</p>
     <p><b>Jamais de réponse à macOS.</b> Si macOS demande l'accès au volume Photos, <code>open()</code> attend : la lecture est sautée, Claude ne répond jamais à la demande à ta place.</p>
     <p><b>L'onglet Focus</b> : la fenêtre s'ouvre sur lui et y revient chaque fois que la conversation montrée change pour une autre photo ; il lit alors la photo active. Caché, il ne lit rien.</p>
@@ -570,7 +571,7 @@ flowchart TD
 </section>
 
 <footer>
-  <p>D'après le code et les règles de Développeur 1.3.3 (CLAUDE.md, README, docs/SPEC.md), le 23 octobre 2026, puis le code du correctif 1.3.6 (une photo, une conversation, en cours de publication), le 25 octobre 2026, avec tes deux retours après l'essai. Les seuils dits provisoires y restent à relever.</p>
+  <p>D'après le code et les règles de Développeur 1.3.3 (CLAUDE.md, README, docs/SPEC.md), le 23 octobre 2026, puis le code du correctif 1.3.6 (une photo, une conversation), le 25 octobre 2026, avec tes deux retours après l'essai, et celui du correctif 1.3.7 (le Suivi en graphiques), le 26 octobre 2026 ; les deux se publieront ensemble. Les seuils dits provisoires y restent à relever.</p>
   <p>La photo DSCF7731.RAF et ses chiffres sont inventés pour l'exemple.</p>
 </footer>
 

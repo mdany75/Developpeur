@@ -51,5 +51,5 @@ return {
         { title = "Arrêter la liaison avec Claude", file = 'MenuArreter.lua' },
     },
 
-    VERSION = { major = 1, minor = 3, revision = 6, build = 11 },
+    VERSION = { major = 1, minor = 3, revision = 7, build = 12 },
 }

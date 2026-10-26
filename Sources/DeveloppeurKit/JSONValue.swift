@@ -82,9 +82,9 @@ public extension JSONValue {
     var bool: Bool? { if case .bool(let value) = self { return value }; return nil }
     var double: Double? { if case .number(let value) = self { return value }; return nil }
     var int: Int? {
-        guard case .number(let value) = self, value.rounded() == value,
-              value >= Double(Int.min), value <= Double(Int.max) else { return nil }
-        return Int(value)
+        // Int(exactly:) et non une garde sur Double(Int.max), qui vaut 2^63 : Int(2^63) plantait.
+        guard case .number(let value) = self else { return nil }
+        return Int(exactly: value)
     }
     var array: [JSONValue]? { if case .array(let value) = self { return value }; return nil }
     var object: [String: JSONValue]? { if case .object(let value) = self { return value }; return nil }

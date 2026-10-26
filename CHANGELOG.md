@@ -1,21 +1,68 @@
 # Changements
 
-## 1.3.6 — 2026-10-25
+## 1.3.7 — 2026-10-26
 
-Le correctif 1.3.6, « une photo, une conversation », décidé avec vous le 25 octobre 2026 : chaque
-photo a sa conversation, qui s'ouvre sur son historique ; la fenêtre Claude s'allège (plus de volet
-à gauche, plus de rangée Mode) ; la leçon de la photo et « Je le fais » sont retirés. Avec lui, la
-balance des blancs de toute l'image et la Demande rapide revue, puis vos retours après l'essai du
-même jour : un clic sur une étape à la place de « Pourquoi ? », les onglets Focus, Note, Aperçu et
-Proposition, Agrandir plus grand, le carnet de progrès dans la fenêtre Suivi, plus rien sur
-l'étalonnage de l'écran, les réglages d'une photo sans étape de Claude et la version dans la barre
-de titre ; et votre deuxième retour : une photo verticale toujours debout, Agrandir qui remplit la
+Le correctif 1.3.7, le Suivi en graphiques, décidé avec vous le 25 octobre 2026 : chaque photo que
+vous ouvrez dans la fenêtre Claude ou la Demande rapide entre au Suivi et s'analyse d'office sur le
+Mac, sans Claude ni forfait ; la fenêtre Suivi montre vos prises de vue et votre carnet de progrès
+en graphiques ; Publication… et Consommation… reviennent dans l'en-tête de la fenêtre Claude, à
+droite de Suivi.
+
+Il reprend aussi tout ce qu'apportait la 1.3.6, « une photo, une conversation », que vous avez
+essayée le 25 octobre 2026 (avec vos deux retours, faits le même jour) mais qui n'a jamais été
+publiée seule : chaque photo a sa conversation, qui s'ouvre sur son historique ; la fenêtre Claude
+s'allège (plus de volet à gauche, plus de rangée Mode) ; la leçon de la photo et « Je le fais »
+sont retirés ; la balance des blancs de toute l'image et la Demande rapide revue ; un clic sur une
+étape à la place de « Pourquoi ? », les onglets Focus, Note, Aperçu et Proposition, Agrandir plus
+grand, plus rien sur l'étalonnage de l'écran, les réglages d'une photo sans étape de Claude et la
+version dans la barre de titre ; une photo verticale toujours debout, Agrandir qui remplit la
 place, un résumé en haut du fil, ni Détail… dans l'onglet Aperçu ni « ＋ Garder la demande ».
-Après l'installation : quitter puis relancer Lightroom (le module gagne deux fichiers : un
-rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle session de Claude Code
-(le connecteur passe à 35 outils).
+
+Après l'installation : quitter puis relancer Lightroom (le module gagne trois fichiers depuis la
+1.3.5 : un rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle session de
+Claude Code (le connecteur passe à 35 outils).
 
 ### Ajouté
+- Le Suivi de vos photos : toute photo que vous ouvrez dans la fenêtre Claude ou la Demande rapide,
+  seule ou dans une sélection (les 1 000 premières d'une sélection), y entre, à chaque ouverture de
+  ces fenêtres et à chaque autre photo ou autre sélection. Une copie virtuelle compte pour son
+  original, une seule fois (ni son ISO ni sa focale ne comptent deux fois) ; la note, le drapeau et
+  « retouchée par Claude » sont ceux de l'original et de ses copies (la plus haute note, retenue si
+  l'une l'est). Les vidéos et les photos de « Développeur › Essais » n'y entrent pas. Pas de
+  rattrapage : le Suivi part de zéro à l'installation.
+- L'analyse d'office de chaque photo ouverte, par le connecteur, sur la vignette de son original
+  dans le cache de Lightroom, comme le tri d'une séance : sous-exposition, surexposition, ciel
+  brûlé, flou, bruit (seulement à ISO 1 600 ou plus) et yeux fermés (seulement sur un visage dont
+  les yeux se lisent). Elle se fait sur le Mac, sans Claude, sans forfait et sans réseau, en
+  arrière-plan, par lots de 10 photos, la photo active d'abord ; elle attend pendant que Claude
+  travaille (fenêtre Claude, Demande rapide, Claude Desktop) et reprend d'elle-même au lancement
+  suivant de Lightroom. Une photo s'analyse une seule fois, telle qu'elle a été prise : une retouche
+  ne la fait pas refaire (elle cacherait les défauts) ; sur une photo déjà retouchée par Claude,
+  seuls le flou et les yeux fermés se cherchent. Une analyse manquée (une vignette illisible ou
+  trop petite) se réessaie 10 minutes plus tard ; après trois essais, la photo reste sans analyse.
+  Rien n'est écrit dans le catalogue, et rien de l'analyse ne part chez Anthropic. L'horizon penché et la mise au point manquée viennent toujours
+  de ce que Claude mesure en regardant la photo (le carnet de progrès).
+- La fenêtre Suivi en graphiques, qu'ouvre le bouton Suivi de l'en-tête (1 310 × 1 028 points) : un
+  menu Période (3 derniers mois, 12 derniers mois à l'ouverture, ou Tout, année par année) ;
+  quatre tuiles chiffrées : photos ouvertes (et combien attendent leur analyse), retouchées par
+  Claude, notées 4 ★ ou plus, défaut le plus fréquent ; « Mes prises de vue » : photos par mois
+  (par date de prise de vue), focales, ISO, heure de la prise de vue (par deux heures), objectifs ;
+  « Mon carnet de progrès » : les défauts les plus fréquents, en pourcentage des photos où chacun
+  est cherché, et l'évolution mois par mois d'un défaut (le plus fréquent, ou celui que vous
+  choisissez dans son menu). Les graphiques sont dessinés par le connecteur dans les couleurs de
+  l'apparence claire ou sombre du module, refaits à l'ouverture, à chaque autre période ou autre
+  défaut, et quand une analyse arrive pendant que la fenêtre est ouverte. Une photo sans date de
+  prise de vue compte à sa date d'ajout, hors des graphiques par mois, par heure et de
+  l'évolution (une note sous le graphique le dit). Dessous, « Photos d'un défaut… » montre les
+  photos d'un défaut du carnet et permet de les en retirer.
+- Un clic sur une barre d'un graphique montre ses photos dans la Bibliothèque, en grille, sans rien
+  changer (la source passe à Toutes les photographies quand la source affichée ne les a pas
+  toutes) ; l'infobulle de la barre en dit le détail (« octobre 2026 · 42 photos »).
+- Un nouveau défaut de la prise de vue, « Yeux fermés ou plissés » (17 au lieu de 16), que le Suivi
+  compte d'après son analyse ; le carnet de `view_photo` ne le cherche pas.
+- Publication… et Consommation… dans l'en-tête de la fenêtre Claude, à droite de Suivi : perdus
+  avec le volet de gauche à l'essai de la 1.3.6, ils ouvrent leurs fenêtres comme avant, et restent
+  aussi au menu Fichier › Module externe - Extras.
 - Une photo, une conversation, dans la fenêtre Claude : choisir une seule photo dans Lightroom
   montre sa conversation, telle que vous l'avez laissée, et Claude reprend où il en était. Chaque
   copie virtuelle a la sienne. Une photo choisie fenêtre fermée compte aussi, à la réouverture.
@@ -41,9 +88,9 @@ rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle sessi
   avec son historique. L'ancienne reste sur le disque, mise de côté, jamais effacée. Grisé pendant
   que Claude travaille, sans photo seule, ou quand la conversation montrée n'est pas celle de la
   photo active.
-- Le bouton Suivi, en haut à droite de l'en-tête de la fenêtre Claude : le carnet de progrès (ses
-  constats) dans une fenêtre à part, comme Publication et Consommation, page par page avec ▲ ▼ ;
-  « Photos d'un défaut… » montre les photos d'un défaut et permet de les retirer du carnet.
+- Le bouton Suivi, en haut à droite de l'en-tête de la fenêtre Claude : la fenêtre Suivi, à part,
+  comme Publication et Consommation (à l'essai de la 1.3.6, le carnet de progrès en texte, page par
+  page ; en graphiques depuis le correctif 1.3.7, plus haut).
 - Trois boutons dans la Demande rapide, à gauche de la demande, chacun une demande toute faite pour toutes
   les photos sélectionnées : noter (Claude pose ses notes, de 0 à 5 ★ ou un rejet), Retouche pro
   et Portrait, comme les invites de la fenêtre Claude.
@@ -60,13 +107,18 @@ rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle sessi
   conversation, ni envoyé à Claude.
 
 ### Changé
+- Le carnet de progrès se voit en graphiques dans la fenêtre Suivi (les défauts les plus fréquents,
+  l'évolution d'un défaut), et non plus en texte, mois par mois : ce qui progresse et ce qu'il faut
+  travailler à la prochaine sortie, demandez-le à Claude (« Comment progressent mes prises de
+  vue ? »), qui lit toujours le carnet. Ses constats, sa case du Gestionnaire de modules externes
+  et « Photos d'un défaut… » ne changent pas.
 - La fenêtre Claude passe à 1 623 × 1 200 points (1 948 de large avant), sans le volet de gauche ;
   le fil garde sa largeur. Les deux voyants (Claude Code, Lightroom) sont dans l'en-tête. Sa barre
-  de titre dit la version du module : « Développeur v1.3.6 » (la Demande rapide garde son titre).
+  de titre dit la version du module : « Développeur v1.3.7 » (la Demande rapide garde son titre).
   Les versions du module et du connecteur, et le mode de la liaison, sont dans l'infobulle du
   voyant Lightroom, qui passe à l'orange quand l'une des deux versions est à mettre à jour ou que
-  le connecteur est introuvable. Publication… et Consommation… s'ouvrent par Fichier › Module
-  externe - Extras.
+  le connecteur est introuvable. Publication… et Consommation…, qui étaient dans le volet, sont en
+  haut à droite de l'en-tête, à côté de Suivi.
 - Les onglets de droite sont, dans l'ordre, Focus, Note, Aperçu et Proposition. La fenêtre s'ouvre
   sur Focus et y revient chaque fois que vous choisissez une autre photo ; une proposition qui
   attend déjà garde son onglet sans reprendre la main.
@@ -118,16 +170,17 @@ rechargement ne suffit pas), rouvrir Claude Desktop et ouvrir une nouvelle sessi
   chaque avant/après de ce genre, même avant d'être finie, et un écart trop grand vous est dit à la
   fin de la retouche.
 - Le menu « Afficher la fenêtre de suivi » devient « Afficher la fenêtre de la liaison » (le bouton
-  du Gestionnaire de modules externes aussi) : le mot « Suivi » est maintenant celui du carnet de
-  progrès.
+  du Gestionnaire de modules externes aussi) : le mot « Suivi » est maintenant celui de la fenêtre
+  Suivi, vos prises de vue et votre carnet de progrès.
 - Le carnet de progrès (`export_journal` avec `notebook`, fenêtre Suivi) ne montre plus que les
   constats ; les leçons déjà rangées restent dans `carnet.json`, telles quelles, sans être montrées.
 
 ### Retiré
 - Le volet de gauche de la fenêtre Claude : « ＋ Nouvelle conversation », Rechercher, la liste des
   conversations, Renommer… et Supprimer… (une conversation n'est plus jamais effacée), et la page
-  Carnet de progrès du fil, avec « Demander à Claude ce qu'il en pense › » : pour son avis,
-  demandez-le-lui (« Comment progressent mes prises de vue ? »).
+  Carnet de progrès du fil, avec « Demander à Claude ce qu'il en pense › » : le carnet se voit dans
+  la fenêtre Suivi, et pour son avis, demandez-le à Claude (« Comment progressent mes prises de
+  vue ? »).
 - La rangée Mode de l'en-tête (Appliquer, Proposer d'abord, Je le fais).
 - Le bouton « Pourquoi ? » au bout des étapes du fil : un clic sur la ligne de l'étape en tient
   lieu.

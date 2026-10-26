@@ -5,11 +5,11 @@ import XCTest
 /// de la photo, qui le reprenait aussi, est retirée en 1.3.6), et la définition de read_composition,
 /// dont la longueur de la description est gardée.
 final class PriseDeVueTests: XCTestCase {
-    /// Les seize codes, dans l'ordre du carnet.
+    /// Les dix-sept codes, dans l'ordre du carnet (yeux_fermes depuis le correctif 1.3.7, pour le Suivi).
     static let codes = [
         "horizon_penche", "verticales_fuyantes", "cadrage_large", "sujet_centre", "bords_encombres",
         "sous_exposition", "surexposition", "ciel_brule", "ombres_bouchees", "contraste_plat",
-        "bruit", "flou", "mise_au_point", "dominante", "eclairage_mixte", "couleurs_ternes",
+        "bruit", "flou", "mise_au_point", "yeux_fermes", "dominante", "eclairage_mixte", "couleurs_ternes",
     ]
     static let motsInterdits = ["photoshop", "galerie", "gallery", "concours", "client", "mariage", "firefly", "agrandissement",
                                 "crédit adobe", "expand_photo"]
@@ -34,15 +34,17 @@ final class PriseDeVueTests: XCTestCase {
         XCTAssertEqual(PriseDeVue.Domaine.allCases.map(\.code), ["lumiere", "nettete", "couleur", "composition"])
         XCTAssertEqual(PriseDeVue.Domaine.allCases.map(\.nom), ["Lumière", "Netteté", "Couleur", "Composition"])
         XCTAssertEqual(Set(PriseDeVue.defauts.map(\.domaine)), Set(PriseDeVue.Domaine.allCases), "chaque domaine sert")
-        XCTAssertEqual(PriseDeVue.defauts.filter { $0.domaine == .nettete }.map(\.code), ["bruit", "flou", "mise_au_point"])
+        XCTAssertEqual(PriseDeVue.defauts.filter { $0.domaine == .nettete }.map(\.code), ["bruit", "flou", "mise_au_point", "yeux_fermes"])
         XCTAssertEqual(PriseDeVue.defauts.filter { $0.domaine == .couleur }.map(\.code), ["dominante", "eclairage_mixte", "couleurs_ternes"])
     }
 
     /// Le carnet ne compte d'après une mesure que six défauts ; les autres venaient des leçons
-    /// (retirées en 1.3.6) et restent dans la liste.
+    /// (retirées en 1.3.6) et restent dans la liste, avec yeux_fermes (1.3.7), que seul le Suivi
+    /// compte (analyse de la vignette), jamais le carnet de view_photo.
     func testSixDefautsMesures() {
         XCTAssertEqual(PriseDeVue.mesures.map(\.code), ["horizon_penche", "sous_exposition", "ciel_brule", "bruit", "flou", "mise_au_point"])
-        XCTAssertEqual(PriseDeVue.defauts.filter { !$0.mesure }.count, 10)
+        XCTAssertEqual(PriseDeVue.defauts.filter { !$0.mesure }.count, 11)
+        XCTAssertEqual(PriseDeVue.defaut(code: "yeux_fermes")?.mesure, false)
     }
 
     func testTextesCourtsEtPourUnAmateur() {

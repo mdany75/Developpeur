@@ -6,8 +6,9 @@
 -- pointillés dans l'aperçu, ses ajustements dans Ajuster…), la note qu'il propose pour la photo
 -- active, le pourquoi de chaque étape (onglet Aperçu, l'ancien Pourquoi ?, 1.3), la mise au point
 -- de la photo active comme Focus-Points la montre (onglet Focus, demandé par Dany le 22 octobre
--- 2026), le bouton Suivi qui ouvre le carnet de progrès dans sa fenêtre (FenetreSuivi.lua,
--- correctif 1.3.6), et dans l'infobulle du voyant Lightroom les versions du module et du
+-- 2026), le bouton Suivi qui ouvre le Suivi en graphiques dans sa fenêtre (FenetreSuivi.lua,
+-- correctifs 1.3.6 et 1.3.7) et, à sa droite, Publication… et Consommation… (correctif 1.3.7), et
+-- dans l'infobulle du voyant Lightroom les versions du module et du
 -- connecteur MCP-Développeur. La leçon de la photo (onglet
 -- Leçon) et « Je le fais » (son bouton, son exercice et le radio du Mode) sont retirés au
 -- correctif 1.3.6, comme les radios du Mode : la fenêtre suit la préférence `mode` du Gestionnaire.
@@ -73,6 +74,7 @@ local Lightroom = require 'Lightroom'
 local Metriques = require 'Metriques'
 local Moteur = require 'Moteur'
 local Notation = require 'Notation'
+local Releve = require 'Releve'
 local Stockage = require 'Stockage'
 local Texte = require 'Texte'
 
@@ -1961,13 +1963,27 @@ function Fenetre.revenirAFocus()
     Fenetre.choisirOnglet(T.ongletFocus)
 end
 
--- Suivi : le carnet de progrès (correctif 1.3.6) -------------------------------------------------
--- Le bouton Suivi de l'en-tête (Vues.boutonSuivi) ouvre le carnet de progrès dans sa fenêtre à part
--- (FenetreSuivi.lua ; décision de Dany du 25 octobre 2026), comme Publication et Consommation : le
--- résumé du carnet, ses constats et « Photos d'un défaut… », que montrait l'onglet Suivi (sa carte,
--- Vues.suivi, son segment et leurs images sont retirés). Ouverte, elle passe devant.
+-- Suivi, Publication, Consommation (correctifs 1.3.6 et 1.3.7) ------------------------------------
+-- Le bouton Suivi de l'en-tête (Vues.boutonSuivi) ouvre le Suivi dans sa fenêtre à part
+-- (FenetreSuivi.lua ; décision de Dany du 25 octobre 2026), comme Publication et Consommation : en
+-- graphiques depuis le correctif 1.3.7 (le relevé du Suivi et le carnet de progrès), avec « Photos
+-- d'un défaut… », que montrait l'onglet Suivi (sa carte, Vues.suivi, son segment et leurs images
+-- sont retirés). Ouverte, elle passe devant.
 function Fenetre.ouvrirSuivi()
     FenetreSuivi.afficher()
+end
+
+-- Publication… et Consommation… de l'en-tête (Vues.boutonPublication, Vues.boutonConsommation ;
+-- correctif 1.3.7, décision de Dany du 25 octobre 2026) : leurs fenêtres de la 1.2, comme leurs
+-- menus (MenuPublication.lua, MenuConsommation.lua) ; ouvertes, elles passent devant. Requises au
+-- clic, comme par leurs menus (elles créent leurs couleurs au chargement, et liens.lua charge ce
+-- que ce fichier requiert sans LrColor).
+function Fenetre.ouvrirPublication()
+    require('FenetrePublication').afficher()
+end
+
+function Fenetre.ouvrirConsommation()
+    require('FenetreConsommation').afficher()
 end
 
 -- Proposition ---------------------------------------------------------------------------------
@@ -3542,6 +3558,13 @@ function Fenetre.voirSelection(cle)
 end
 
 function Fenetre.suivreSelection(info)
+    -- Le Suivi (correctif 1.3.7) : toute sélection vue entre au relevé par ses originaux, puis dans
+    -- la file d'analyse (Releve.voirSelection ne lit que la sélection, et rien si elle n'a pas
+    -- changé ; la tâche du Suivi range la vue).
+    local okReleve, erreurReleve = LrTasks.pcall(Releve.voirSelection, info)
+    if not okReleve then
+        Journal.noter("Suivi :", tostring(erreurReleve))
+    end
     local cle = info and info.cle
     if not cle then
         return
@@ -4250,6 +4273,8 @@ function Fenetre.boucle(generation)
             end
             poser(p, 'activite', Moteur.texteTravail(math.floor(tic / 2)))
             poser(p, 'travaille', Moteur.travaille)
+            -- Le Suivi : sa file se vide dans sa propre tâche, une seule à la fois.
+            LrTasks.pcall(Releve.relancer)
             if tic % 8 == 0 then
                 Fenetre.periodique()
             end
@@ -4308,6 +4333,8 @@ function Fenetre.afficher()
                 Fenetre.resume.perime = true
             end
             LrTasks.startAsyncTask(function()
+                -- Une ouverture : la sélection compte au Suivi, même inchangée.
+                Releve.revoir()
                 LrTasks.pcall(Fenetre.majPhoto)
                 LrTasks.pcall(Fenetre.revoirPhoto)
                 LrTasks.pcall(Fenetre.suivreResume)
@@ -4451,6 +4478,9 @@ function Fenetre.afficher()
 
         local contenu = Fenetre.construire(f, p, D)
         Fenetre.rafraichir()
+        -- Une ouverture : la sélection compte au Suivi, même inchangée (Releve.voirSelection, depuis
+        -- Fenetre.suivreSelection).
+        Releve.revoir()
         Fenetre.majPhoto()
         LrTasks.pcall(Fenetre.revoirPhoto)
         -- Le résumé en haut du fil, dès l'ouverture.

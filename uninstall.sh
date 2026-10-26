@@ -13,8 +13,10 @@
 #                  reste sans cette option : guide de style, conversations de la fenêtre Claude,
 #                  mes demandes de la fenêtre Claude (mes-demandes.json), profils de
 #                  publication, registre de consommation, notes proposées (notation.json),
-#                  carnet de progrès et leçons des photos (carnet.json), avant/après des étapes
-#                  de Claude (Etapes/), et les journaux (~/Library/Logs/Developpeur)
+#                  carnet de progrès et leçons des photos (carnet.json), suivi des photos
+#                  ouvertes (suivi.json, et suivi-illisible-*.json, un relevé illisible mis de
+#                  côté), avant/après des étapes de Claude (Etapes/), et les journaux
+#                  (~/Library/Logs/Developpeur)
 #
 # Le catalogue et les photos ne sont jamais touchés : les retouches déjà faites restent (elles
 # s'annulent dans le panneau Historique).
@@ -86,7 +88,8 @@ if [[ -d "${PRESETS_DIR}" ]]; then
 fi
 
 if [[ "${TOUT}" == 1 ]]; then
-    # Tout le dossier : carnet.json, Etapes/ et mes-demandes.json compris.
+    # Tout le dossier : carnet.json, suivi.json (et ses copies mises de côté), Etapes/ et
+    # mes-demandes.json compris.
     retirer "${DEST_DIR}"
     retirer "${JOURNAUX}"
 else
@@ -99,7 +102,7 @@ else
         rmdir "${DEST_DIR}" 2>/dev/null && printf 'Supprimé : %s\n' "${DEST_DIR}"
     fi
     GARDES=()
-    [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, mes demandes, profils de publication, consommation, notes proposées, carnet de progrès et leçons, avant/après des étapes)")
+    [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, mes demandes, profils de publication, consommation, notes proposées, carnet de progrès et leçons, suivi des photos ouvertes, avant/après des étapes)")
     [[ -d "${JOURNAUX}" ]] && GARDES+=("${JOURNAUX} (journaux)")
     if [[ ${#GARDES[@]} -gt 0 ]]; then
         printf 'Gardé pour vous :\n'

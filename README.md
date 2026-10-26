@@ -7,22 +7,24 @@ Il note aussi vos photos selon un standard clair : il propose une note, que vous
 changez dans Lightroom, ou il la pose lui-même si vous le lui demandez. Chaque photo a sa
 conversation, qui s'ouvre sur ce que Claude y a déjà fait. Pour vous faire progresser, il dit
 pourquoi il fait chaque étape, lit la composition et tient un carnet de progrès de vos prises de
-vue. Il est fait pour le
+vue ; la fenêtre Suivi montre en graphiques vos prises de vue et ce carnet, chaque photo ouverte y
+étant analysée d'office sur le Mac, sans Claude. Il est fait pour le
 photographe amateur qui veut des photos d'allure professionnelle sans être un pro. Deux pièces : le
 connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en Swift, et le module
 « Développeur » de Lightroom Classic, qui exécute ses demandes et porte la fenêtre Claude.
 
 ![La fenêtre Claude dans Lightroom Classic](docs/capture.png)
 
-*Capture à refaire au correctif 1.3.6 : elle montre encore la fenêtre d'avant (1 948 × 1 200, avec
-le volet des conversations et la rangée Mode) ; elle montrera la fenêtre de 1 623 × 1 200, en deux
-colonnes, avec les onglets Focus, Note, Aperçu et Proposition et le bouton Suivi.*
+*Capture à refaire au correctif 1.3.7 : elle montre encore la fenêtre d'avant la 1.3.6 (1 948 ×
+1 200, avec le volet des conversations et la rangée Mode) ; elle montrera la fenêtre de 1 623 ×
+1 200, en deux colonnes, avec les onglets Focus, Note, Aperçu et Proposition et les boutons Suivi,
+Publication… et Consommation….*
 
 ## Fonctions
 
 ### La fenêtre Claude dans Lightroom
 
-- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur v1.3.6 » dans sa barre de titre
+- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur v1.3.7 » dans sa barre de titre
   (la version du module installé) : Fichier ›
   Module externe - Extras › Ouvrir la fenêtre Claude (même entrée dans le menu Bibliothèque, et
   raccourci ⌃⌥C une fois posé). Elle reste ouverte pendant que vous travaillez, dans tous les
@@ -53,13 +55,13 @@ colonnes, avec les onglets Focus, Note, Aperçu et Proposition et le bouton Suiv
 - Deux colonnes :
   - au centre, l'en-tête (le titre de la conversation et, à sa droite, « Repartir à neuf » ;
     dessous, les voyants Claude Code et Lightroom, la photo active et le nombre de photos
-    sélectionnées, puis, en haut à droite, le bouton Suivi), le fil, ▲ ▼ Fin, puis la saisie : les
-    invites, le champ de demande, 📎, 📋, « Style » et son menu, Mes demandes, le bandeau des
-    messages et Envoyer ;
+    sélectionnées, puis, en haut à droite, les boutons Suivi, Publication… et Consommation…), le
+    fil, ▲ ▼ Fin, puis la saisie : les invites, le champ de demande, 📎, 📋, « Style » et son menu,
+    Mes demandes, le bandeau des messages et Envoyer ;
   - à droite, les onglets Focus (montré à l'ouverture), Note, Aperçu et Proposition, l'aperçu
     commun aux quatre (◀ légende ▶ et ⤢ Agrandir dessous), puis la carte de l'onglet choisi.
 
-  Publication… et Consommation… s'ouvrent par Fichier › Module externe - Extras, la fenêtre
+  Publication… et Consommation… s'ouvrent aussi par Fichier › Module externe - Extras, la fenêtre
   principale de Lightroom devant (quand une fenêtre du module est devant, Lightroom réduit son
   menu Fichier).
 - Claude y travaille par Claude Code et votre forfait claude.ai, avec les seuls outils du
@@ -233,8 +235,11 @@ colonnes, avec les onglets Focus, Note, Aperçu et Proposition et le bouton Suiv
   d'Envoyer, montre un message de la fenêtre (son
   infobulle le donne en entier), sinon l'aide en rouge d'un voyant quand quelque chose manque (un
   clic l'affiche en entier), sinon les photos jointes ; sans rien de tout cela, il reste vide.
-- Le bouton Suivi, en haut à droite de l'en-tête : le carnet de progrès dans sa fenêtre à part
-  (voir Apprendre avec Claude).
+- Trois boutons en haut à droite de l'en-tête, toujours actifs : Suivi, vos prises de vue et votre
+  carnet de progrès en graphiques, dans une fenêtre à part (voir Le Suivi de vos photos) ;
+  Publication… et Consommation…, leurs fenêtres (voir Publication et Consommation), comme par le
+  menu du module (correctif 1.3.7 : perdus avec le volet de gauche au correctif 1.3.6, ils
+  reviennent).
 - Fermer la fenêtre n'arrête pas Claude : le travail continue et se retrouve à la réouverture.
   Claude Code reste ouvert entre deux demandes (réponses plus rapides) et se ferme après 15 minutes
   sans demande (5 minutes ou 1 heure au choix) ou quand Lightroom quitte.
@@ -273,6 +278,70 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
   accepter : prenez le mode Appliquer, ou la fenêtre Claude.
 - Échap ne la ferme pas (une fenêtre flottante de Lightroom ne reçoit pas cette touche) : le bouton
   de fermeture rouge, en haut à gauche.
+
+### Le Suivi de vos photos
+
+Une fenêtre à part, « Claude · Suivi », qu'ouvre le bouton Suivi en haut à droite de la fenêtre
+Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claude ni forfait
+(correctif 1.3.7, décidé avec vous le 25 octobre 2026).
+
+**Les photos qui comptent**
+
+- Toute photo que vous ouvrez dans la fenêtre Claude ou la Demande rapide, seule ou dans une
+  sélection (ses 1 000 premières photos), entre au Suivi : à l'ouverture de ces fenêtres, puis à
+  chaque autre photo ou autre sélection pendant qu'elles sont ouvertes. Rien d'avant
+  l'installation : le Suivi part de zéro.
+- Par l'original : une copie virtuelle compte pour son original, une seule fois (ni son ISO ni sa
+  focale ne comptent deux fois). La note est la plus haute de l'original et de ses copies, le
+  drapeau « retenue » si l'une l'est, et la photo compte « retouchée par Claude » si l'une d'elles
+  l'est.
+- Les vidéos et les photos de « Développeur › Essais » n'y entrent pas.
+
+**L'analyse d'office**
+
+- Le connecteur analyse chaque photo ouverte sur la vignette de son original, celle du cache de
+  Lightroom (1 024 px), avec les mesures du tri d'une séance : sous-exposition, surexposition
+  (plus de 35 % de l'image en blanc pur), ciel brûlé, flou, bruit (seulement à ISO 1 600 ou plus)
+  et yeux fermés (seulement sur un visage dont les yeux se lisent). Sur le Mac, sans Claude, sans
+  forfait et sans réseau ; rien n'est écrit dans le catalogue.
+- En arrière-plan, par lots de 10 photos, la photo active d'abord : une sélection de 300 photos
+  passe en quelques minutes sans vous bloquer. L'analyse attend pendant que Claude travaille
+  (fenêtre Claude, Demande rapide, ou Claude Desktop qui passe par la liaison) ; ce qui reste à
+  analyser reprend au lancement suivant de Lightroom.
+- Une photo s'analyse une seule fois, telle qu'elle a été prise : une retouche ne la fait pas
+  refaire (elle cacherait ses défauts). Une photo déjà retouchée par Claude n'est cherchée que pour
+  le flou et les yeux fermés. Une analyse manquée (une vignette illisible ou trop petite) se
+  réessaie 10 minutes plus tard ; après trois essais, la photo reste sans analyse.
+- L'horizon penché et la mise au point manquée ne se mesurent que quand Claude regarde la photo :
+  le Suivi les reprend du carnet de progrès (voir Apprendre avec Claude), qui l'emporte sur
+  l'analyse pour ce qu'il a cherché.
+
+**La fenêtre**
+
+- 1 310 × 1 028 points. En haut, le menu Période : 3 derniers mois, 12 derniers mois (à chaque
+  ouverture) ou Tout (une colonne par année ; au-delà de douze années, la première réunit les plus
+  anciennes) ; une ligne dit la période et son nombre de photos.
+- Quatre tuiles : photos ouvertes (et combien attendent leur analyse), retouchées par Claude,
+  notées 4 ★ ou plus, et le défaut le plus fréquent (parmi ceux cherchés sur au moins 5 photos).
+- Mes prises de vue : photos par mois (par date de prise de vue), focales (de « ≤ 15 » à
+  « > 300 » mm), sensibilité (de « ≤ 200 » à « > 12 800 » ISO), heure de la prise de vue (par
+  deux heures) et objectifs (les sept premiers, puis « Autres »).
+- Mon carnet de progrès : les défauts les plus fréquents, en pourcentage des photos où chacun est
+  cherché, et l'évolution mois par mois d'un défaut, le plus fréquent ou celui que vous choisissez
+  dans son menu.
+- Un clic sur une barre montre ses photos dans la Bibliothèque, en grille, sans rien changer (la
+  source passe à Toutes les photographies quand celle affichée ne les a pas toutes ; le message du
+  bas dit ce que le filtre de la Bibliothèque en cache) ; l'infobulle de la barre en dit le détail.
+- Une photo sans date de prise de vue compte à sa date d'ajout au Suivi, mais pas dans les
+  graphiques par mois, par heure ni dans l'évolution : une note sous le graphique le dit.
+- Les graphiques sont des images que dessine le connecteur (Lightroom n'en trace pas), dans les
+  couleurs de l'apparence claire ou sombre du module. Ils se refont à l'ouverture, à chaque autre
+  période ou autre défaut, et quand une analyse arrive pendant que la fenêtre est ouverte. Sans
+  connecteur, ou s'il ne répond pas à temps, la fenêtre le dit et garde les graphiques d'avant.
+- « Photos d'un défaut… », en bas : les photos d'un défaut du carnet, leurs constats, et
+  « Retirer du carnet… », après confirmation.
+- Pour l'avis de Claude, demandez-le-lui (« Comment progressent mes prises de vue ? ») : il lit le
+  carnet de progrès. Le Suivi, lui, reste sur le Mac : Claude ne le voit pas.
 
 ### Apprendre avec Claude
 
@@ -324,19 +393,16 @@ correctif 1.3.6, à votre demande du 25 octobre 2026 ; les leçons déjà rangé
   ISO 1 600 ou plus (seuil provisoire) : à ISO bas, la texture d'un reflet d'eau ou d'un sous-bois
   ressemble à du bruit, et « garder l'ISO plus bas » n'y aurait pas de sens.
   Ils sont comptés par mois de prise de vue ; une photo sans date compte au mois où Claude l'a vue.
-- La fenêtre Suivi, qu'ouvre le bouton Suivi en haut à droite de la fenêtre Claude (correctif
-  1.3.6 : d'abord un onglet Suivi, à la place de Leçon, puis une fenêtre à part après votre essai,
-  comme Publication et Consommation) : le carnet, page par page avec ▲ ▼. Les défauts des six
-  derniers mois, un par ligne (« Ciel brûlé · sept. 1/4 · oct. 2/5 » : le défaut sur 2 des 5
-  photos où il a été cherché en octobre ; « — » : pas cherché), puis ce qui progresse ou recule
-  (les deux derniers mois contre les trois d'avant, dès 15 points d'écart, avec au moins 5 photos
-  de chaque côté), et à travailler à la prochaine sortie (un défaut sur au moins 20 % des photos
-  récentes et au moins 2 photos, trois au plus), avec ce qui aide à la prise de vue. Ouverte, elle
-  se relit quand un constat arrive. Les graphiques du carnet et l'ajout de chaque photo viendront au correctif 1.3.7.
-- « Photos d'un défaut… », au bas de la fenêtre : choisissez un défaut, puis voyez ses photos et
-  leurs constats ; « Retirer du carnet… » en retire une, après confirmation. Pour l'avis de Claude,
-  demandez-le-lui (« Comment progressent mes prises de vue ? ») : il lit le carnet et répond en
-  trois puces (ce qui progresse, ce qui revient, quoi essayer à la prochaine sortie).
+- La fenêtre Suivi, qu'ouvre le bouton Suivi en haut à droite de la fenêtre Claude, le montre en
+  graphiques depuis le correctif 1.3.7, avec les défauts que le connecteur trouve d'office sur
+  chaque photo ouverte (voir Le Suivi de vos photos) : les défauts les plus fréquents et
+  l'évolution d'un défaut, mois par mois. Le carnet l'emporte pour ce qu'il a cherché sur une
+  photo (il mesure sur l'aperçu, au point de mise au point).
+- « Photos d'un défaut… », au bas de la fenêtre Suivi : choisissez un défaut, puis voyez ses photos
+  et leurs constats ; « Retirer du carnet… » en retire une, après confirmation.
+- Ce qui progresse ou recule, et quoi travailler à la prochaine sortie : demandez-le à Claude
+  (« Comment progressent mes prises de vue ? ») ; il lit le carnet et répond en trois puces (ce qui
+  progresse, ce qui revient, quoi essayer à la prochaine sortie).
 - Seules vos vraies prises de vue comptent : les photos de « Développeur › Essais » n'y entrent
   pas, ni leurs constats. La case Carnet du Gestionnaire de modules externes (section Liaison avec
   Claude) arrête les constats.
@@ -346,8 +412,8 @@ correctif 1.3.6, à votre demande du 25 octobre 2026 ; les leçons déjà rangé
 
 ![Le Carnet de progrès dans la fenêtre Claude](docs/carnet.png)
 
-*Capture à refaire au correctif 1.3.6 : elle montre encore la page Carnet de progrès du fil ; elle
-montrera la fenêtre Suivi.*
+*Capture à refaire au correctif 1.3.7 : elle montre encore la page Carnet de progrès du fil ; elle
+montrera la fenêtre Suivi en graphiques.*
 
 ### Ce que Claude sait faire par le connecteur
 
@@ -783,9 +849,9 @@ fin de l'invite `noter`.
 
 ### Publication
 
-Une fenêtre à part (Publication…, dans le menu du module ; le bouton de la fenêtre Claude est retiré
-avec son volet au correctif 1.3.6), pour publier des photos en fichiers sans Claude, donc sans
-quota.
+Une fenêtre à part (Publication…, en haut à droite de la fenêtre Claude ou dans le menu du module ;
+le bouton, parti avec le volet au correctif 1.3.6, revient dans l'en-tête au correctif 1.3.7), pour
+publier des photos en fichiers sans Claude, donc sans quota.
 
 - Cinq profils : JPEG 5 Mpx, JPEG pleine qualité, Web (2048 px), Instagram (1080 px de petit côté,
   à recadrer en 4:5 avant) et Impression (TIFF 16 bits, Adobe RVB) ; et les vôtres (Nouveau profil… :
@@ -803,7 +869,8 @@ quota.
 
 ### Consommation
 
-Une fenêtre à part (Consommation…) pour suivre ce que la fenêtre Claude consomme de votre forfait.
+Une fenêtre à part (Consommation…, en haut à droite de la fenêtre Claude ou dans le menu du
+module) pour suivre ce que la fenêtre Claude consomme de votre forfait.
 
 - Les économies actives : seulement le connecteur, aucun outil intégré ni compétence de Claude
   Code, un dossier de travail à part, la publication sans Claude, Claude Code gardé ouvert entre
@@ -902,6 +969,10 @@ Ce qui reste sur le Mac :
   l'original pour le point de mise au point et l'intention de la prise de vue (seul ce qui en est
   lu part, jamais l'original) ; la lecture de l'écran, sans réseau ni permission ; le tri lit les
   vignettes du cache de Lightroom sur le Mac et n'en envoie que les résultats ;
+- tout le Suivi : l'analyse d'office des photos ouvertes, faite par le connecteur sur les vignettes
+  du cache de Lightroom, sans Claude ni réseau, son relevé et ses graphiques ; rien n'en part chez
+  Anthropic, et Claude ne le lit pas (seul le carnet de progrès lui est donné, quand il le
+  demande) ;
 - le jeton privé de la liaison (`liaison.jeton`), qui ne part jamais chez Claude ni dans un
   journal ;
 - les fichiers exportés, et toute la fenêtre Publication, qui ne parle jamais à Claude ;
@@ -914,7 +985,10 @@ Ce qui reste sur le Mac :
   registre de consommation, les notes proposées avec l'évaluation de chaque photo
   (`notation.json`), le carnet de progrès (`carnet.json` : une table par catalogue, une entrée par
   photo originale, 3 000 au plus par catalogue, les plus anciennes sortent au-delà ; les leçons
-  d'avant le correctif 1.3.6 y restent, sans être montrées), le rendu de fin de chaque retouche
+  d'avant le correctif 1.3.6 y restent, sans être montrées), le relevé du Suivi (`suivi.json` :
+  une table par catalogue, une entrée par photo originale ouverte, avec sa prise de vue, sa note,
+  son drapeau et les codes des défauts de son analyse, 20 000 au plus par catalogue, les moins
+  récemment vues sortent au-delà), le rendu de fin de chaque retouche
   (`rendus.json`), et l'avant/après des étapes de Claude
   (`Etapes/`, une image avant et une après par étape, de 0,6 à 0,9 Mo ; ménage au chargement du
   module : 30 jours, 500 Mo au plus), dans `~/Library/Application Support/Developpeur/` ; les
@@ -991,14 +1065,15 @@ Le script, sans droits d'administrateur :
 5. dit si Claude Code manque pour la fenêtre Claude.
 
 Ce qui est déjà là reste : guide de style, conversations, profils de publication, registre de
-consommation, notes proposées, carnet de progrès, avant/après des étapes, journaux. Le catalogue
+consommation, notes proposées, carnet de progrès, suivi des photos, avant/après des étapes,
+journaux. Le catalogue
 et les photos ne sont jamais touchés.
 
 Ensuite :
 
 - quitter et relancer Lightroom Classic : le module se charge et démarre la liaison (recharger le
-  module ne suffit pas quand une version lui ajoute des fichiers, comme la 1.3 ou le correctif
-  1.3.6) ;
+  module ne suffit pas quand une version lui ajoute des fichiers, comme la 1.3 ou les correctifs
+  1.3.6 et 1.3.7) ;
 - ouvrir Claude Desktop : le connecteur `MCP-Developpeur` apparaît dans ses outils ;
 - dans Claude Code, ouvrir une nouvelle session (`/clear` ne relance pas le connecteur) ; depuis la
   1.2, la liaison refuse un connecteur plus ancien resté ouvert (voir En cas de problème) ;
@@ -1040,8 +1115,8 @@ retire l'inscription dans Claude, le connecteur, le module, ses paramètres pré
 réécrit : relancer le script après l'avoir quitté), et garde votre guide de style, vos
 conversations, vos demandes (`mes-demandes.json`), vos profils de publication, le registre de
 consommation, les notes proposées, le carnet de progrès (`carnet.json`, leçons d'avant le
-correctif 1.3.6 comprises), l'avant/après des étapes (`Etapes/`) et les
-journaux ; `bash uninstall.sh --tout` les retire aussi. Les retouches déjà faites restent dans le
+correctif 1.3.6 comprises), le suivi des photos (`suivi.json`), l'avant/après des étapes
+(`Etapes/`) et les journaux ; `bash uninstall.sh --tout` les retire aussi. Les retouches déjà faites restent dans le
 catalogue (elles s'annulent dans le panneau Historique).
 
 ### Premiers pas
@@ -1060,7 +1135,7 @@ historique. Une photo que Claude traite est d'abord notée : sa note attend « �
 carte Note. Pour une proposition de retouche sans rien appliquer, cliquez Obtenir sous la carte de
 l'onglet Proposition : elle y attend votre accord. Après une
 retouche, un clic sur une étape du fil en montre l'avant/après et la raison, dans l'onglet Aperçu,
-et le bouton Suivi, en haut à droite, le carnet de progrès de vos prises de vue.
+et le bouton Suivi, en haut à droite, vos prises de vue et votre carnet de progrès en graphiques.
 
 Claude regarde la photo, pose un diagnostic chiffré (avec ce que l'appareil Fujifilm a noté de la
 prise de vue, et un éclairage mixte s'il y en a un), applique une première passe (profil, balance
@@ -1119,9 +1194,13 @@ fenêtre Claude attendent la fin.
   propagées aux autres photos sélectionnées ; la couper quand même pendant que Claude travaille, par
   précaution.
 - **« Le module de Lightroom ne connaît pas encore le carnet de progrès »** : le module chargé dans
-  Lightroom est plus ancien que le connecteur ; quitter puis relancer Lightroom (la 1.3 et le
-  correctif 1.3.6 ajoutent des fichiers au module, qu'un rechargement ne voit pas), et réinstaller
-  Développeur si le message revient.
+  Lightroom est plus ancien que le connecteur ; quitter puis relancer Lightroom (la 1.3 et les
+  correctifs 1.3.6 et 1.3.7 ajoutent des fichiers au module, qu'un rechargement ne voit pas), et
+  réinstaller Développeur si le message revient.
+- **Les graphiques du Suivi ne se dessinent pas** : la fenêtre Suivi dit pourquoi. Connecteur
+  introuvable : régler son chemin dans le Gestionnaire de modules externes, ou réinstaller
+  Développeur. Pas de réponse à temps : les graphiques d'avant restent, et se refont à l'analyse
+  suivante ou à l'ouverture suivante. Le détail est dans `~/Library/Logs/Developpeur/conversation.log`.
 - **Une retouche refusée** : le message dit pourquoi (mode « Proposer d'abord », photo protégée,
   plafond de photos, liaison en pause). Le diagnostic du Gestionnaire de modules externes et les
   journaux `~/Library/Logs/Developpeur/module.log` (liaison) et `conversation.log` (fenêtre Claude)
@@ -1158,10 +1237,12 @@ Le connecteur : protocole MCP, outils, catalogue des réglages, inscription dans
 fichiers temporaires), liaison TCP avec un faux module Lightroom (jeton compris, dans un fichier
 temporaire), ce que la 1.2 ajoute (bilan, éclairage, lecture des fichiers Fujifilm, écran,
 dosage de la peau) et la 1.3 (composition lue, carnet de progrès, recette de la 1.3 sur un module
-simulé), puis l'onglet Focus (mise au point Fujifilm en détail, ses cadres, `--focus`) et le rendu
-reproductible, sur des images, des fichiers et des profils de couleur fabriqués (les valeurs d'une
-vraie photo, jamais la photo). Le contrat de la composition entre le connecteur et le module
-(`Tests/Contrats/`) est lu par les deux suites (celui de « Je le fais » est retiré avec lui).
+simulé), puis l'onglet Focus (mise au point Fujifilm en détail, ses cadres, `--focus`), le rendu
+reproductible et le Suivi (`--analyser` sur des vignettes fabriquées, `--graphiques` sur des
+relevés fabriqués, jusqu'à 20 000 photos, et ses images), sur des images, des fichiers et des
+profils de couleur fabriqués (les valeurs d'une vraie photo, jamais la photo). Les contrats de la
+composition et du Suivi entre le connecteur et le module (`Tests/Contrats/`) sont lus par les deux
+suites (celui de « Je le fais » est retiré avec lui).
 
 ```bash
 scripts/tester-module.sh
@@ -1173,8 +1254,8 @@ Le module, avec LuaJIT : forme du module, syntaxe et globales de chaque fichier,
 compris, leçons d'avant gardées telles quelles) et `Tests/Lua/Fenetre` (la fenêtre Claude avec un
 faux Claude Code, une photo une conversation, le résumé en haut du fil, la Demande rapide, ses
 images et ses apparences, l'onglet Focus avec un faux connecteur (une photo verticale comprise),
-Agrandir avec le vrai `sips`, la fenêtre Suivi, Publication
-et Consommation) ;
+Agrandir avec le vrai `sips`, le relevé du Suivi et son analyse d'office, la fenêtre Suivi en
+graphiques (chacun avec un faux connecteur qui lit le contrat), Publication et Consommation) ;
 dans chacune, les essais `essais-*.lua`
 tournent après `tests.lua`. La simulation de la fenêtre imite ce qui a été constaté dans
 Lightroom (Retour, clics, vues masquées, texte riche…) et refuse ce qui n'y marche pas.
@@ -1208,6 +1289,14 @@ parle au module y passe avec le jeton de la liaison, comme le connecteur :
   de mise au point, intention de la prise de vue comme dans `view_photo`, mise au point en détail
   comme dans l'onglet Focus, et valeurs lues sous les noms d'exiftool, une ligne JSON (code 1 si
   rien n'est lu), sans Lightroom ni liaison ;
+- `--analyser '<json>'` : ce que le Suivi lance pour analyser un lot de photos (20 au plus) sur
+  leurs vignettes : les défauts de la prise de vue en codes (sous-exposition, surexposition, ciel
+  brûlé, bruit à ISO élevé, flou, yeux fermés), une ligne JSON, sans Lightroom ni liaison, jamais
+  l'original (`Tests/Contrats/suivi.json` en donne la forme) ;
+- `--graphiques '<json>' <dossier>` : ce que la fenêtre Suivi lance pour ses graphiques : les tuiles
+  et les sept graphiques d'une période, d'après `suivi.json` et `carnet.json`, lus seulement,
+  dessinés en PNG dans le dossier, puis une ligne JSON avec les barres et leurs photos, sans
+  Lightroom ni liaison ;
 - `--ecran` : l'écran principal et son profil de couleur classé (d'usine, standard, à l'œil, sonde…),
   une ligne JSON (`{"lu": false}` sans écran), sans Lightroom ni liaison ; pour la mise au point
   seulement depuis le correctif 1.3.6 : ni la fenêtre Claude ni Claude ne le lisent ;
@@ -1246,18 +1335,20 @@ parle au module y passe avec le jeton de la liaison, comme le connecteur :
 - `Sources/DeveloppeurKit/` : le connecteur (protocole MCP, outils, invites, catalogue des
   réglages, standard de notation, dosage de la peau, mesures et Vision, éclairage, bilan d'une
   passe à l'autre, lecture des fichiers Fujifilm, écran, défauts de la prise de vue, composition
-  lue, carnet de progrès, rendu reproductible, liaison TCP avec le module et son jeton)
+  lue, carnet de progrès, rendu reproductible, analyse et graphiques du Suivi, liaison TCP avec le
+  module et son jeton)
 - `Sources/MCPDeveloppeur/main.swift` : l'exécutable `mcp-developpeur` (options de ligne de
   commande, boucle stdio)
 - `Lightroom/Developpeur.lrplugin/` : le module Lightroom Classic, en Lua 5.1 (liaison avec le
   connecteur, registre des notes proposées, avant/après des étapes, carnet de progrès, fenêtre
   Claude avec la conversation de chaque photo et son historique, Demande rapide, `relais.sh` qui
-  lance Claude Code, fenêtre Suivi du carnet, Publication, Consommation, fenêtre de la liaison) ; ses images, en deux jeux,
+  lance Claude Code, relevé du Suivi et sa fenêtre en graphiques, Publication, Consommation,
+  fenêtre de la liaison) ; ses images, en deux jeux,
   dans `images/` (apparence claire) et `images/sombre/`
 - `Tests/DeveloppeurKitTests/` : tests du connecteur, avec un faux Lightroom et un faux module TCP
 - `Tests/Lua/Liaison/`, `Tests/Lua/Fenetre/` : tests du module, chacun sur son Lightroom simulé
-- `Tests/Contrats/` : l'échange de la composition entre le connecteur et le module, lu par les deux
-  suites
+- `Tests/Contrats/` : les échanges de la composition et du Suivi entre le connecteur et le module,
+  lus par les deux suites
 - `scripts/` : `tester-module.sh` ; `metriques.swift` (chasse des polices de la fenêtre Claude),
   `gabarits.lua` (tailles et couleurs des images de la fenêtre), lu par `images-fenetre.swift` et
   `images-vides.swift`, qui les dessinent (images de la fenêtre, image « aucun aperçu »)

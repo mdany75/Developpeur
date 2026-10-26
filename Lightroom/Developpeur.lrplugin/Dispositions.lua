@@ -1,7 +1,8 @@
 -- Dispositions.lua : la fenêtre Claude, assemblée des pièces de Vues.lua, et ses dimensions. Une
 -- seule disposition, la « Conversation claire », à l'allure de la fenêtre B (1.3, maquette
 -- « B · Conversation claire ») : deux colonnes sur des aplats, au centre l'en-tête (ses deux
--- voyants et, en haut à droite, le bouton Suivi), le fil, sa barre et la zone de saisie, à droite les segments
+-- voyants et, en haut à droite, les boutons Suivi, Publication… et Consommation…), le fil, sa barre
+-- et la zone de saisie, à droite les segments
 -- Focus | Note | Aperçu | Proposition sur le panneau, l'aperçu commun et la carte de l'onglet
 -- (Focus : demandé par Dany le 22 octobre 2026 ; cet ordre, décidé par Dany le 25 octobre 2026,
 -- correctif 1.3.6). Suivi, le carnet de progrès (l'onglet qui avait pris la place de Leçon), est
@@ -9,7 +10,8 @@
 -- ouvre. Le volet des conversations de gauche (Nouvelle conversation, Rechercher, la liste,
 -- Renommer…, Supprimer…, Publication… et Consommation…, les versions et le voyant Écran) est retiré
 -- au correctif 1.3.6 (décision de Dany du 25 octobre 2026) : Publication… et Consommation… restent
--- au menu Module externe - Extras, et le voyant Écran, passé d'abord dans l'en-tête, est retiré au
+-- au menu Module externe - Extras, et reviennent dans l'en-tête, à droite de Suivi, au correctif
+-- 1.3.7 (décision de Dany du 25 octobre 2026) ; le voyant Écran, passé d'abord dans l'en-tête, est retiré au
 -- même correctif (plus rien sur l'étalonnage de l'écran). L'Atelier, le Panneau et le choix de la
 -- disposition sont retirés, comme le choix de la taille (demandés par Dany le 20 octobre 2026).
 -- Son cadre enregistré (Fenetre.cadre) : Lightroom rend sa taille enregistrée à une fenêtre
@@ -82,6 +84,12 @@ Dispositions.TAILLES = {
     -- D6, dans la rangée des voyants), son titre en petit (« Suivi » : environ 24) et 22 de jeu ; la
     -- photo active prend le reste de la rangée, entre eux.
     voyantClaude = 125, voyantLightroom = 150, ecartVoyants = 14, boutonSuivi = 56,
+    -- À sa droite, côte à côte (correctif 1.3.7, décision de Dany du 25 octobre 2026) :
+    -- Publication… et Consommation…, perdus avec le volet au correctif 1.3.6, qui ouvrent leurs
+    -- fenêtres comme leurs menus ; des carrés small comme Suivi, leur titre en petit (« Publication… »
+    -- environ 70, « Consommation… » 90) et 22 de jeu, 6 entre deux boutons ; la photo active garde
+    -- 407 points (essais-fenetre-b.lua).
+    boutonPublication = 92, boutonConsommation = 112, ecartBoutons = 6,
     -- « Repartir à neuf », à droite du titre (correctif 1.3.6) : un carré de bezel 22, son titre en
     -- 12 (environ 87 points) et du jeu.
     repartir = 120,
@@ -405,8 +413,9 @@ function Dispositions.dimensions()
     D.largeurContenu = D.largeurFenetre - 2 * D.margeDialogue
     D.hauteurContenu = hauteurContenu(D)
     -- Centre : 1 024 utiles. L'en-tête : le titre (gras 16) et « Repartir à neuf », puis les voyants
-    -- Claude Code et Lightroom, la photo active, alignée à droite, et le bouton Suivi sur la marge,
-    -- sous « Repartir à neuf » (la rangée fait les 1 024 : un texte de taille fixe ne s'étire pas) ;
+    -- Claude Code et Lightroom, la photo active, alignée à droite, et les boutons Suivi,
+    -- Publication… et Consommation… (correctif 1.3.7), le dernier sur la marge, sous « Repartir à
+    -- neuf » (la rangée fait les 1 024 : un texte de taille fixe ne s'étire pas) ;
     -- le fil ; la barre, dont l'activité (ou le forfait) finit de même sur la marge de droite, comme
     -- dans la maquette ; la saisie (Style, Mes demandes, bandeau, Envoyer). Le titre prend ce que le
     -- Mode laissait (sa place à 1 280 × 800 : 590 − 270), où « Repartir à neuf » (D.repartir) se
@@ -415,7 +424,7 @@ function Dispositions.dimensions()
     D.placeRepartir = 320
     D.titre = D.fil - D.placeRepartir
     D.info = D.fil - (8 + 6 + D.voyantClaude) - D.ecartVoyants - (8 + 6 + D.voyantLightroom) - D.ecartVoyants
-        - D.boutonSuivi - D.ecartVoyants
+        - D.boutonSuivi - D.ecartBoutons - D.boutonPublication - D.ecartBoutons - D.boutonConsommation - D.ecartVoyants
     -- Le fil : autant de lignes que sa hauteur en tient entre ses marges (42 dans 920), le reste à
     -- la marge du bas.
     D.hauteurFil = D.hauteurContenu - (D.entete + D.filet) - D.barre - D.saisie

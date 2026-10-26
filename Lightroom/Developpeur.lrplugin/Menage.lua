@@ -26,9 +26,11 @@ end
 -- s'effacent que quand leur conversation est quittée ou oubliée (Moteur.montrer,
 -- Moteur.oublierRapide) : une séance qui finit sur l'une d'elles (Lightroom quitté, module
 -- rechargé) les laisserait pour toujours. Au chargement, aucune n'est en mémoire : ils s'effacent en
--- entier. Rien d'autre de Temporaire, ni les conversations gardées. Rend le nombre de dossiers
--- effacés. Dans une tâche (Init.lua).
-Menage.TEMPORAIRES = { 'Groupes', 'Rapide' }
+-- entier. Depuis le correctif 1.3.7, aussi ceux du Suivi (Temporaire/Suivi : les vignettes d'un lot
+-- d'analyse, Releve.lua, qu'une séance finie pendant le lot laisserait). Rien d'autre de
+-- Temporaire, ni les conversations gardées. Rend le nombre de dossiers effacés. Dans une tâche
+-- (Init.lua).
+Menage.TEMPORAIRES = { 'Groupes', 'Rapide', 'Suivi' }
 
 function Menage.temporaires()
     local Chemins = require 'Chemins'

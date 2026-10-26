@@ -248,7 +248,8 @@ function Vues.voyant(f, F, v)
 end
 
 -- Les deux voyants de l'en-tête : Claude Code (sans clic) et la liaison (un clic la démarre), en
--- tête du centre ; dans leur rangée, au bout à droite, le bouton Suivi (Vues.boutonSuivi). Le
+-- tête du centre ; dans leur rangée, au bout à droite, les boutons Suivi, Publication… et
+-- Consommation… (Vues.boutonSuivi…). Le
 -- voyant Écran (de la 1.2) est retiré au correctif 1.3.6 (décision de Dany du 25 octobre 2026 :
 -- plus rien sur l'étalonnage de l'écran).
 function Vues.voyantClaude(f, F, D)
@@ -268,15 +269,32 @@ function Vues.voyantLightroom(f, F, D)
         end })
 end
 
--- Le bouton Suivi, en haut à droite (décision de Dany du 25 octobre 2026, correctif 1.3.6 : au bout
--- de la rangée des voyants, après la photo active, sous « Repartir à neuf ») : le carnet de
--- progrès dans sa fenêtre à part (F.ouvrirSuivi, FenetreSuivi.lua), comme Publication et
--- Consommation, à la place de l'onglet Suivi. Un carré small comme les boutons d'actions du fil
--- (bezel de 15, D6), son titre en petit ; toujours actif : le carnet se lit sans Claude.
+-- Le bouton Suivi, en haut à droite (décision de Dany du 25 octobre 2026, correctif 1.3.6 : dans
+-- la rangée des voyants, après la photo active, sous « Repartir à neuf ») : le Suivi en graphiques
+-- dans sa fenêtre à part (F.ouvrirSuivi, FenetreSuivi.lua ; le carnet de progrès en texte
+-- jusqu'au correctif 1.3.7), comme Publication et Consommation, à la place de l'onglet Suivi. Un
+-- carré small comme les boutons d'actions du fil (bezel de 15, D6), son titre en petit ; toujours
+-- actif : le Suivi se lit sans Claude.
 function Vues.boutonSuivi(f, F, D)
     return F.bouton(f, { carre = true, size = 'small', title = "Suivi", font = F.POLICES.petit, width = D.boutonSuivi,
-        place_vertical = 0.5, tooltip = "Le carnet de progrès (ce que Claude a constaté de vos prises de vue), dans une fenêtre à part",
+        place_vertical = 0.5, tooltip = "Le suivi de vos photos en graphiques : vos prises de vue et votre carnet de progrès, dans une fenêtre à part",
         action = function() F.ouvrirSuivi() end })
+end
+
+-- Publication… et Consommation…, à droite du bouton Suivi (correctif 1.3.7, décision de Dany du
+-- 25 octobre 2026 : perdus avec le volet au correctif 1.3.6, ils reviennent dans l'en-tête et
+-- restent au menu Module externe - Extras) : leurs fenêtres de la 1.2 (F.ouvrirPublication,
+-- F.ouvrirConsommation), comme leurs menus. Des carrés small comme Suivi ; toujours actifs.
+function Vues.boutonPublication(f, F, D)
+    return F.bouton(f, { carre = true, size = 'small', title = "Publication…", font = F.POLICES.petit, width = D.boutonPublication,
+        place_vertical = 0.5, tooltip = "Exporter les photos sélectionnées selon vos profils (fenêtre Publication), sans Claude",
+        action = function() F.ouvrirPublication() end })
+end
+
+function Vues.boutonConsommation(f, F, D)
+    return F.bouton(f, { carre = true, size = 'small', title = "Consommation…", font = F.POLICES.petit, width = D.boutonConsommation,
+        place_vertical = 0.5, tooltip = "Les jetons de votre forfait claude.ai employés par la fenêtre Claude (fenêtre Consommation)",
+        action = function() F.ouvrirConsommation() end })
 end
 
 -- Le bandeau, dans la place du menu Modèle de la maquette (D.bandeau, retiré : décision de Dany) :
@@ -319,8 +337,9 @@ end
 -- Gestionnaire), « Repartir à neuf » (F.repartir : une conversation neuve pour la photo seule,
 -- l'ancienne mise de côté ; grisé pendant que Claude travaille et sans photo seule) ; dessous, les
 -- voyants Claude Code et Lightroom, la photo active (`infoPhoto`, texte riche : nom et sélection en
--- <EM>), puis le bouton Suivi (Vues.boutonSuivi) au bout de la rangée, en haut à droite, sous
--- « Repartir à neuf ».
+-- <EM>), puis les boutons Suivi, Publication… et Consommation… (Vues.boutonSuivi,
+-- Vues.boutonPublication, Vues.boutonConsommation ; correctif 1.3.7) au bout de la rangée, en haut à
+-- droite, sous « Repartir à neuf ».
 function Vues.entete(f, F, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     return f:column {
@@ -348,6 +367,10 @@ function Vues.entete(f, F, D)
                 emphasis_color = C.texte, alignment = 'right', width = D.info, truncation = 'middle' },
             f:spacer { width = D.ecartVoyants },
             Vues.boutonSuivi(f, F, D),
+            f:spacer { width = D.ecartBoutons },
+            Vues.boutonPublication(f, F, D),
+            f:spacer { width = D.ecartBoutons },
+            Vues.boutonConsommation(f, F, D),
         },
     }
 end

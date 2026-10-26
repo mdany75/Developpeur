@@ -26,8 +26,10 @@ func executablePath() -> String {
 let pluginPath = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Application Support/Adobe/Lightroom/Modules/Developpeur.lrplugin").path
 
-func usage() {
-    print(line: """
+/// L'aide, sur stdout (--help, ou une option inconnue) ; sur stderr avec `erreur` : une commande du
+/// Suivi lancée par le module avec un mauvais nombre d'arguments n'écrit rien sur stdout (code 2).
+func usage(erreur: Bool = false) {
+    let texte = """
     mcp-developpeur \(ServerInfo.version) — MCP-Développeur, le serveur MCP du module Développeur de Lightroom Classic
 
     Usage : mcp-developpeur              lance le serveur (stdio, pour Claude)
@@ -36,7 +38,8 @@ func usage() {
             mcp-developpeur --status     inscriptions, module Lightroom, jeton de la liaison, écran, liaison et mise à jour (par gh)
             mcp-developpeur --version
 
-    Pour le développement (parlent au module Lightroom directement, sauf --marquer-af, --focus, --ecran et --boitier) :
+    Pour la fenêtre Claude et le développement (parlent au module Lightroom directement, sauf --marquer-af, --focus,
+    --analyser, --graphiques, --ecran et --boitier) :
             mcp-developpeur --call <outil> ['{"json": …}'] [--image <fichier.jpg>]
                 appelle un outil comme le ferait Claude (et enregistre les images qu'il renvoie)
             mcp-developpeur --module <commande> ['{"json": …}']   commande brute du module (diagnostic…)
@@ -51,6 +54,13 @@ func usage() {
                 l'onglet Focus de la fenêtre Claude : les cadres de la mise au point d'un fichier Fujifilm (point
                 ou zone AF à sa taille en rouge, visages et éléments du sujet en coins jaunes) dessinés sur sa
                 vignette, puis ce que l'appareil en dit, une ligne JSON ; code 1 si rien n'est lu
+            mcp-developpeur --analyser '<json>'
+                le Suivi (fenêtre Claude) : les défauts de la prise de vue mesurés sur les vignettes du cache de
+                Lightroom données (exposition, hautes lumières, netteté, bruit à ISO élevé, yeux fermés), comme le tri ;
+                ni Lightroom ni l'original ; 20 photos au plus, une ligne JSON (Tests/Contrats/suivi.json)
+            mcp-developpeur --graphiques '<json>' <dossier>
+                le Suivi : les tuiles et les sept graphiques d'une période d'après suivi.json (et carnet.json), lus
+                seulement, dessinés en PNG 2x dans le dossier, puis une ligne JSON avec les rectangles des barres
             mcp-developpeur --ecran   l'écran principal et son profil de couleur, classé (d'usine, standard, à
                 l'œil, sonde…), une ligne JSON ; {"lu": false} sans écran ; lu sur le Mac sans Lightroom
             mcp-developpeur --eclairage <id photo>… [<fichier.jpg>…] [--essai '{"settings": {"Temperature": 3200}}']
@@ -85,7 +95,12 @@ func usage() {
     DEVELOPPEUR_VERBOSE=1 journalise la durée des réponses et de chaque commande du module (stderr).
     DEVELOPPEUR_LIMITE=<s> change la limite d'un appel d'outil sans jeton de progression, après laquelle
     le serveur répond d'attendre (défaut 50 s, sous les 60 s de Claude Desktop).
-    """)
+    """
+    if erreur {
+        FileHandle.standardError.write(Data((texte + "\n").utf8))
+    } else {
+        print(line: texte)
+    }
 }
 
 let verbose = ProcessInfo.processInfo.environment["DEVELOPPEUR_VERBOSE"] == "1"
@@ -248,6 +263,20 @@ case "--focus":
                            entree: URL(fileURLWithPath: arguments[3]), sortie: URL(fileURLWithPath: arguments[4]))
     print(line: JSONCoding.line(focus))
     if focus["lue"]?.bool != true { exit(1) }
+case "--analyser":
+    // Le Suivi (correctif 1.3.7, Releve.lua) : les défauts mesurés sur les vignettes d'un lot, sous
+    // l'alarme de 60 s de perl ; une ligne JSON, code 1 pour un refus de tout l'appel.
+    guard arguments.count == 2 else { usage(erreur: true); exit(2) }
+    let analyse = Suivi.analyser(arguments[1])
+    print(line: JSONCoding.line(analyse.ligne))
+    exit(analyse.code)
+case "--graphiques":
+    // Le Suivi (FenetreSuivi.lua) : les graphiques d'une période, dessinés dans le dossier donné, sous
+    // l'alarme de 20 s de perl ; une ligne JSON (le module la lit dans un fichier), code 1 pour un refus.
+    guard arguments.count == 3 else { usage(erreur: true); exit(2) }
+    let graphiques = Suivi.graphiques(arguments[1], dossier: arguments[2])
+    print(line: JSONCoding.line(graphiques.ligne))
+    exit(graphiques.code)
 case "--ecran":
     // Pour le développement seulement depuis le correctif 1.3.6 (la fenêtre Claude n'a plus de voyant
     // Écran) : une seule ligne JSON, le profil classé et son chemin compris ; sans écran lu,

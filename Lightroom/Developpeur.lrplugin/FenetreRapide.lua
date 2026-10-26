@@ -24,6 +24,7 @@ local Fil = require 'Fil'
 local Journal = require 'Journal'
 local Lightroom = require 'Lightroom'
 local Moteur = require 'Moteur'
+local Releve = require 'Releve'
 local Texte = require 'Texte'
 
 local FenetreRapide = { ouverte = false }
@@ -228,6 +229,12 @@ end
 FenetreRapide.DELAI_APRES_TRAVAIL = 4
 
 function FenetreRapide.suivreSelection(info)
+    -- Le Suivi (correctif 1.3.7) : la sélection vue entre au relevé, comme dans la fenêtre Claude
+    -- (Fenetre.suivreSelection).
+    local okReleve, erreurReleve = LrTasks.pcall(Releve.voirSelection, info)
+    if not okReleve then
+        Journal.noter("Suivi :", tostring(erreurReleve))
+    end
     local cle = info and info.cle
     if not cle then
         return
@@ -263,6 +270,8 @@ local function boucle()
                 end
                 FenetreRapide.montrer(FenetreRapide.texte(tic))
                 poser(p, 'libre', not Moteur.travaille)
+                -- Le Suivi : sa file se vide dans sa propre tâche, une seule à la fois.
+                Releve.relancer()
             end)
             if not ok then
                 Journal.noter("Demande rapide :", tostring(erreur))
@@ -274,6 +283,8 @@ local function boucle()
 end
 
 function FenetreRapide.afficher()
+    -- Une ouverture (ou un rappel par le menu, ⌘⌃⌥C) : la sélection compte au Suivi, même inchangée.
+    Releve.revoir()
     if FenetreRapide.ouverte then
         if FenetreRapide.controle and FenetreRapide.controle.toFront then
             FenetreRapide.controle.toFront()

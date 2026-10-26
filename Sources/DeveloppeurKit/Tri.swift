@@ -78,12 +78,23 @@ public struct PhotoTriee {
     static func r(_ value: Double) -> String { DevelopCatalogue.format((value * 10).rounded() / 10).replacingOccurrences(of: ".", with: ",") }
     static func r2(_ value: Double) -> String { DevelopCatalogue.format((value * 100).rounded() / 100).replacingOccurrences(of: ".", with: ",") }
 
+    /// Part de l'image en blanc pur (`PhotoMeasurements.pureWhite`) au-delà de laquelle elle est
+    /// brûlée (`defautsMesures`) ; le Suivi en tire sa surexposition (correctif 1.3.7).
+    static let partBlancPurBrulee = 35.0
+
+    /// Les sujets dont les yeux se lisent : les visages d'au moins la moitié de la largeur du plus
+    /// grand, assez grands pour lire leurs yeux. Vide sans visage, ou sans yeux lisibles ; le Suivi
+    /// (correctif 1.3.7) ne cherche les yeux fermés que s'il y en a.
+    var sujetsAuxYeuxLus: [VisionReport.Face] {
+        let visages = vision?.faces ?? []
+        guard let grand = visages.map({ Double($0.box.width) }).max(), grand > 0 else { return [] }
+        return visages.filter { Double($0.box.width) >= 0.5 * grand && $0.eyesClosed != nil }
+    }
+
     /// Yeux fermés ou plissés sur un sujet : un visage d'au moins la moitié de la largeur du plus
     /// grand, assez grand pour lire ses yeux (`VisionAnalysis.closedEyesThreshold`). Nil sinon.
     var yeuxFermes: String? {
-        let visages = vision?.faces ?? []
-        guard let grand = visages.map({ Double($0.box.width) }).max(), grand > 0 else { return nil }
-        let sujets = visages.filter { Double($0.box.width) >= 0.5 * grand && $0.eyesClosed != nil }
+        let sujets = sujetsAuxYeuxLus
         let fermes = sujets.filter { $0.eyesClosed == true }
         guard !fermes.isEmpty else { return nil }
         if sujets.count == 1, let ouverture = fermes[0].eyeOpenness {
@@ -95,9 +106,7 @@ public struct PhotoTriee {
     /// Yeux ouverts sur tous les sujets dont les yeux se lisent (les mêmes sujets que `yeuxFermes`) :
     /// la vue d'une rafale ou d'une pile qui fait proposer au rejet celles aux yeux fermés (1.3.4).
     var yeuxOuverts: Bool {
-        let visages = vision?.faces ?? []
-        guard let grand = visages.map({ Double($0.box.width) }).max(), grand > 0 else { return false }
-        let lus = visages.filter { Double($0.box.width) >= 0.5 * grand }.compactMap(\.eyesClosed)
+        let lus = sujetsAuxYeuxLus.compactMap(\.eyesClosed)
         return !lus.isEmpty && !lus.contains(true)
     }
 
@@ -133,7 +142,7 @@ public struct PhotoTriee {
         if let yeux = yeuxFermes { liste.append((.yeuxFermes, yeux)) }
         if let mesures {
             if mesures.medianL < 6 { liste.append((.presqueNoire, "presque noire (L* médian \(Self.r(mesures.medianL)))")) }
-            if mesures.pureWhite > 35 { liste.append((.brulee, "brûlée (\(Self.r(mesures.pureWhite)) % de blanc pur)")) }
+            if mesures.pureWhite > Self.partBlancPurBrulee { liste.append((.brulee, "brûlée (\(Self.r(mesures.pureWhite)) % de blanc pur)")) }
         }
         return liste
     }

@@ -232,6 +232,15 @@ modules.LrExportSession = function(args)
     return session
 end
 
+-- Le module affiché et la vue de la Bibliothèque (la fenêtre Suivi, correctif 1.3.7 : un clic sur
+-- une barre montre ses photos en grille) : notés dans S.moduleLightroom et S.vuesLightroom.
+S.moduleLightroom, S.vuesLightroom = 'library', {}
+modules.LrApplicationView = {
+    getCurrentModuleName = function() return S.moduleLightroom end,
+    switchToModule = function(nom) S.moduleLightroom = nom end,
+    showView = function(nom) S.vuesLightroom[#S.vuesLightroom + 1] = nom end,
+}
+
 modules.LrColor = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end
 
 modules.LrShell = { revealInShell = function() end }

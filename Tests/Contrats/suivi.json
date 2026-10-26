@@ -1,0 +1,1311 @@
+{
+  "_lisez_moi": [
+    "Contrat du Suivi (correctif 1.3.7, fiche build/conception/1-3-7-a-faire.md, section « Contrat figé ») entre le module (Releve.lua, le registre et la file d'analyse ; FenetreSuivi.lua, la fenêtre) et le connecteur (mcp-developpeur --analyser et --graphiques), qui ne se parlent, hors de la liaison, que par l'exécutable lancé par LrTasks.execute sous l'alarme de perl, comme --focus.",
+    "Trois échanges : le relevé suivi.json (écrit par le module seul, lu par --graphiques), --analyser (les défauts de la prise de vue mesurés sur la vignette du cache de Lightroom) et --graphiques (les tuiles et les sept graphiques, dessinés en PNG, avec les rectangles des barres pour les clics). « regles » dit ce que les deux côtés appliquent ; chaque nombre des exemples en découle exactement.",
+    "Les clés « _note » sont des commentaires : les essais les retirent avant de comparer, et un lecteur les ignore (le relevé d'exemple en porte dans ses entrées). Aucune valeur null n'est écrite : une clé sans valeur manque (Json.decode efface un null d'objet).",
+    "Textes à remplacer : <suivi.json>, <carnet.json> (des fichiers temporaires où les essais écrivent exemples.registre.fichier et exemples.carnet.fichier), <dossier> (le dossier passé à --graphiques ; fichier vaut <dossier>/<graphique>.png), <lot> (le dossier des vignettes d'un lot d'analyse), <connecteur> (le chemin de mcp-developpeur, cheminConnecteur).",
+    "Un exemple marqué « partiel » ne fige que les clés qu'il donne (les graphiques omis suivent les mêmes règles que ceux de graphiques_12_mois) ; les autres se comparent en entier : noms, formes (tableau ou objet, nombre, texte, booléen), valeurs, ordre des tableaux.",
+    "Côté connecteur (par exemple Tests/DeveloppeurKitTests/ContratSuiviTests.swift) : --graphiques sur exemples.registre et exemples.carnet rend exactement les sorties des trois exemples, et des PNG de 2 × la taille demandée ; --analyser se vérifie sur des vignettes fabriquées par sa forme (clés, types, codes cherchés selon l'ISO, les visages, retouchee et la taille) et ses refus, pas par ses mesures au dixième, qui dépendent de l'image.",
+    "Côté module (par exemple Tests/Lua/Fenetre/essais-suivi.lua) : pour des photos simulées comme celles de l'exemple, Releve.lua écrit exactement exemples.registre.fichier (sans _note) ; la fenêtre envoie exactement exemples.graphiques_12_mois.entree et lit sa sortie (un faux mcp-developpeur qui la rend, comme celui de --focus dans essais-focus.lua), pose un calque par créneau et montre, au clic, les ids de la barre du créneau.",
+    "Un changement voulu du contrat se fait des deux côtés : changer le code, puis ce fichier, et les deux suites doivent passer."
+  ],
+  "regles": {
+    "codes": {
+      "_note": "Les codes de PriseDeVue.defauts, seule liste des défauts (aucune dans le module : il range et renvoie des codes, la fenêtre prend les libellés dans la sortie de --graphiques). Le Suivi en compte huit, dans l'ordre de PriseDeVue : six que --analyser cherche sur la vignette, et deux que seul Claude mesure, rangés au carnet (carnet.json) quand il regarde la photo (view_photo, measure_angle, read_composition).",
+      "comptes": [
+        "horizon_penche",
+        "sous_exposition",
+        "surexposition",
+        "ciel_brule",
+        "bruit",
+        "flou",
+        "mise_au_point",
+        "yeux_fermes"
+      ],
+      "analyser": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou", "yeux_fermes"],
+      "carnet": ["horizon_penche", "mise_au_point"],
+      "nouveau_code": {
+        "_note": "yeux_fermes s'ajoute à PriseDeVue.defauts (17 codes), dans le domaine netteté, juste après mise_au_point : comme la photo floue et la mise au point manquée, un défaut majeur du tri (Notation.plafond : 0 et rejet proposé). mesure reste faux : le carnet de view_photo ne le cherche pas (PriseDeVue.mesures garde ses six codes, Carnet.constatsVue ne change pas). PriseDeVueTests suit (codes, domaine netteté, 11 défauts non mesurés). essais-carnet.lua l'emploie déjà comme code hors de son vocabulaire d'essai (une liste locale) : sans effet.",
+        "code": "yeux_fermes",
+        "domaine": "nettete",
+        "libelle": "Yeux fermés ou plissés",
+        "conseil": "Prendre deux ou trois vues de suite d'un portrait ou d'un groupe : l'une aura tous les yeux ouverts.",
+        "mesure": false
+      },
+      "fusion_avec_le_carnet": "Pour une entrée du relevé que le carnet a sous la même clé (l'id de l'original), avec le même uuid, dans le même catalogue : pour chaque code que le carnet a cherché (vue.cherches, et le code de l'angle quand il en a un), son résultat l'emporte (trouvé : dans vue.defauts, ou le code de l'angle), car il est mesuré sur l'aperçu de view_photo, au point de mise au point ; pour les autres codes, celui de l'analyse. Un autre uuid : l'entrée du carnet est ignorée. Une entrée du carnet absente du relevé ne compte jamais (pas de rattrapage). Carnet absent : l'analyse seule ; illisible : de même, avec une remarque."
+    },
+    "registre": {
+      "_note": "suivi.json, dans Chemins.racine() (à côté de carnet.json). Tenu par le module seul (Releve.lua : Suivi.lua est déjà la fenêtre de la liaison) ; le connecteur le lit (--graphiques), jamais ne l'écrit. Une table par catalogue (sous son chemin, cat:getPath()), une entrée par original sous son id en texte. Écrit d'un coup par Fichiers.ecrire (un fichier provisoire, puis renommé : --graphiques ne lit jamais un fichier à moitié écrit), au plus une fois par lot analysé et par photo vue. Illisible, ou d'un autre format : mis de côté (suivi-illisible-<os.time>.json) avant la première écriture, jamais écrasé. uninstall.sh --tout le retire avec le dossier (à nommer dans son en-tête). Les listes s'écrivent en tableaux JSON même vides (Json.tableau) : vues, analyse.cherches, analyse.defauts ; prise_de_vue vide s'écrit {}.",
+      "format": 1,
+      "qui_entre": "Toute photo que la fenêtre Claude voit (la photo active, la sélection : Lightroom.photos) ou que la Demande rapide reçoit (sa sélection), seule ou en groupe, depuis l'installation de la 1.3.7 (pas de rattrapage), sauf les vidéos et les photos de « Développeur › Essais » (Carnet.estPhotoDEssai : elle ou son original). Une copie virtuelle entre sous son original (masterPhoto), une seule fois : sa vue s'ajoute à vues. D'une sélection, les max_selection premières photos seulement (le reste est dit au journal).",
+      "famille": "L'original et ses copies virtuelles (getRawMetadata virtualCopies, à constater dans Lightroom), sans celles de « Développeur › Essais ». note : la plus haute de la famille ; drapeau : « retenue » si l'une l'est, sinon « rejetee » si toutes le sont, sinon « aucun » ; retouchee_par_claude : vrai si l'une porte la mémoire de Claude (retoucheeParClaude = 'oui' et proprietaireMemoire = son uuid, comme Photos.decrireTout). Relus à chaque vue d'une photo de la famille, et, par lectures groupées, à l'ouverture de la fenêtre Suivi avant --graphiques (classement_le).",
+      "prise_de_vue": "Celle de l'original, lue à sa première vue et relue à chaque vue (une date de prise de vue changée dans Lightroom se relit). Une valeur que Lightroom ne donne pas manque.",
+      "file_d_analyse": "La file, ce sont les entrées sans analyse, et celles dont l'analyse a une erreur sans abandonnee : elle reprend d'elle-même après une fermeture de Lightroom. Une seule tâche la vide, par lots de lot_analyse, en pause pendant que Claude travaille (Moteur.travaille), sans rien écrire au catalogue ; la photo active nouvellement vue passe en tête. La vignette est celle de l'original (Vignettes.demander(…, 1024, <lot>), du cache de Lightroom, <lot> un dossier neuf par lot, par exemple Temporaire/Suivi/Analyse-<n>, effacé après la réponse), redressée (Images.redresser, géométrie de Vignettes.decrireVignette de l'original). Une analyse n'est jamais refaite après une édition (les défauts disent la prise de vue ; une retouche les cacherait) ; une erreur : essais + 1, puis abandonnee à essais_analyse. Une réponse dont regles dépasse celle d'une entrée la fait refaire (versions à venir).",
+      "bornes": {"max_originaux": 20000, "max_vues": 20, "max_selection": 1000, "lot_analyse": 10, "essais_analyse": 3},
+      "elagage": "Au-delà de max_originaux dans un catalogue, les entrées vues le moins récemment (vu, puis l'id) sortent. Au-delà de max_vues, une vue de plus ne change que vu.",
+      "entree": {
+        "original": "nombre : localIdentifier de l'original ; la clé de l'entrée est le même nombre en texte",
+        "uuid": "texte : uuid de l'original ; une autre photo sous ce numéro remplace l'entrée (comme au carnet)",
+        "fichier": "texte : nom du fichier de l'original (Photos.nomFichier)",
+        "ajout": "nombre : os.time de la première vue (secondes Unix)",
+        "ajout_le": "texte « AAAA-MM-JJ HH:MM » : la même date à l'heure locale (LrDate.timeToUserFormat, comme Carnet.datesPrise) ; la date d'une photo sans date de prise de vue",
+        "vu": "nombre : os.time de la dernière vue",
+        "vues": "tableau, jamais vide : chaque photo vue de la famille, dans l'ordre de sa première vue : { id, uuid, copie_virtuelle (booléen), fichier (avec sa copie : « … (Copie 1) »), le (os.time de sa première vue) }",
+        "prise_de_vue.le": "texte « AAAA-MM-JJ HH:MM » à l'heure locale (dateTimeOriginal par timeToUserFormat) ; absent : sans date",
+        "prise_de_vue.appareil": "texte de Lightroom (cameraModel, getFormattedMetadata)",
+        "prise_de_vue.objectif": "texte de Lightroom (lens)",
+        "prise_de_vue.focale": "nombre : la focale réelle en mm (getRawMetadata focalLength ; à constater : un nombre)",
+        "prise_de_vue.ouverture": "texte de Lightroom (aperture : « f/4,0 »)",
+        "prise_de_vue.vitesse": "texte de Lightroom (shutterSpeed : « 1/250 s »)",
+        "prise_de_vue.iso": "nombre (Photos.sensibilite)",
+        "note": "nombre de 0 à 5 (famille)",
+        "drapeau": "« retenue », « aucun » ou « rejetee » (famille)",
+        "retouchee_par_claude": "booléen (famille)",
+        "classement_le": "nombre : os.time de la dernière lecture de note, drapeau et retouchee_par_claude",
+        "analyse": "absente : en file ; réussie : { le, regles, cherches, defauts } (codes de --analyser, dans l'ordre des codes) ; manquée : { le, erreur (la raison de --analyser, ou « pas_de_reponse »), essais, abandonnee (seulement vrai) }"
+      }
+    },
+    "analyser": {
+      "_note": "Les défauts de la prise de vue d'un lot de photos, mesurés sur leurs vignettes comme au tri (ToolHandler.mesurer, sans point de mise au point) et au carnet (Carnet.constatsVue, sans intention du boîtier), rendus en codes. Jamais Lightroom, jamais l'original (ni point de mise au point, ni intention : mise_au_point et horizon_penche ne se cherchent pas ici). Le connecteur n'efface pas les vignettes : le module efface le dossier du lot après la réponse.",
+      "commande": "/usr/bin/perl -e 'alarm 60; exec @ARGV' <connecteur> --analyser '<json>' > <réponse>.json 2>/dev/null",
+      "entree": {
+        "photos": "tableau de 1 à 20 photos, dans l'ordre voulu : { id (nombre : l'original), vignette (chemin d'un JPEG, déjà redressé), iso (nombre ; absent : inconnu), cache (booléen : vignette du cache de Lightroom, dont la netteté se ramène par thumbnailSharpnessFactor ; toujours vrai pour le Suivi), retouchee (booléen, absent : faux ; vrai quand l'original porte la mémoire de Claude, retoucheeParClaude = 'oui' et propriétaire = son uuid : seuls flou et yeux_fermes se cherchent alors) }"
+      },
+      "sortie": {
+        "ok": "vrai",
+        "regles": "nombre : la version de ces règles (1) ; le module la range dans analyse.regles",
+        "photos": "une par photo reçue, dans le même ordre : { id, cherches, defauts, mesures } (cherches et defauts : des codes, dans l'ordre des codes ; defauts ⊂ cherches), ou { id, raison, texte } quand la vignette ne s'analyse pas"
+      },
+      "regles_des_codes": {
+        "sous_exposition": "Carnet.constatsVue : L* médian sous 28 et 95e centile sous 80 (medianeSousExposee, p95SousExposee), sans intention du boîtier ; toujours cherché, sauf retouchee",
+        "surexposition": "plus de 35 % de l'image en blanc pur (PhotoMeasurements.pureWhite : la photo « brûlée » de PhotoTriee.defautsMesures) ; toujours cherché, sauf retouchee",
+        "ciel_brule": "Carnet.constatsVue : plus de 3 % du tiers haut en blanc pur (partBlancPurHaut) ; toujours cherché, sauf retouchee",
+        "bruit": "Carnet.constatsVue : max(noise, shadowNoise) d'au moins 1,5 (DetailMeasurements.bruitFort) ; cherché seulement à un ISO connu d'au moins 1 600 (Carnet.bruitCherche) et à 1 024 px, sauf retouchee (le débruitage le cache)",
+        "flou": "PhotoTriee.defautsNettete sans point AF : aucune zone nette (netteté la plus forte, ramenée par 1,13 si cache, sous 15) ; cherché à 1 024 px (Detail.side), même retouchee",
+        "yeux_fermes": "PhotoTriee.yeuxFermes (VisionAnalysis.closedEyesThreshold, sujets d'au moins la moitié du plus grand visage) ; cherché seulement si les yeux d'un sujet se lisent, même retouchee"
+      },
+      "taille": "La vignette est ramenée à 1 024 px de grand côté (Detail.side), comme au tri ; sous 900 px (ToolHandler.minimumCullSide), elle ne s'analyse pas (raison vignette_petite) ; de 900 à 1 023 px, ni flou ni bruit ne se cherchent (leurs seuils sont relevés à 1 024).",
+      "mesures": {
+        "_note": "Pour le journal détaillé, les relevés et les essais ; le module ne les range pas. Une mesure qui ne se fait pas manque.",
+        "cote": "nombre : grand côté de la vignette lue, en pixels",
+        "mediane_l": "L* médian (Measurements), au dixième",
+        "p95_l": "95e centile de L*, au dixième",
+        "blanc_pur": "% de l'image en blanc pur, au dixième",
+        "blanc_pur_haut": "% du tiers haut en blanc pur (Carnet.blancPurHaut), au dixième",
+        "nettete": "netteté de la zone la plus nette, ramenée si cache, au dixième",
+        "bruit": "max(noise, shadowNoise), au centième",
+        "visages": "nombre de visages vus par Vision",
+        "ouverture_yeux": "la plus petite ouverture des sujets dont les yeux se lisent (hauteur sur largeur, l'œil le plus ouvert de chaque visage), au centième ; absente sans yeux lus"
+      },
+      "raisons_par_photo": {"vignette_absente": "pas de fichier au chemin donné", "vignette_illisible": "le fichier n'est pas une image lisible", "vignette_petite": "grand côté sous 900 px"},
+      "limites": "20 photos au plus par appel (le module en envoie 10) ; deux mesures à la fois (Vision, ToolHandler.parallelMeasures). Sans réponse avant l'alarme : le module compte un essai à chaque photo du lot (erreur « pas_de_reponse »).",
+      "codes_de_sortie": "0 : ok vrai (même quand des photos ont une raison) ; 1 : ok faux, avec sa ligne ; 2 : nombre d'arguments faux (l'aide sur stderr, rien sur stdout)."
+    },
+    "graphiques": {
+      "_note": "Les agrégats du relevé (et du carnet) sur une période, dessinés en PNG par CoreGraphics (comme PreviewImages), en 2x, dans les couleurs de l'apparence du module ; et pour chaque graphique ses barres et ses créneaux, dans le repère de l'image en points (origine en haut à gauche, y vers le bas). Lightroom ne trace pas de graphique : la fenêtre montre ces images (f:picture avec width et height) et pose ses calques sur les créneaux. Lecture seule de suivi.json et de carnet.json : ni Lightroom, ni le catalogue, ni un original.",
+      "commande": "/usr/bin/perl -e 'alarm 20; exec @ARGV' <connecteur> --graphiques '<json>' <dossier> > <réponse>.json 2>/dev/null",
+      "dossier": "Un dossier neuf à chaque appel (par exemple Temporaire/Suivi/Graphiques-<n>, Chemins.temporaire() : Lightroom garde une image par chemin, un même chemin ne se redessinerait pas) ; le connecteur le crée s'il manque et y écrit les sept <graphique>.png, de 2 × largeur par 2 × hauteur pixels ; le module efface le précédent une fois les nouvelles images montrées.",
+      "entree": {
+        "suivi": "chemin de suivi.json (absent du disque : un relevé vide, rien n'est refusé)",
+        "carnet": "chemin de carnet.json, facultatif (codes.fusion_avec_le_carnet)",
+        "catalogue": "chemin du catalogue ouvert (cat:getPath()) : sa table du relevé et du carnet",
+        "aujourd_hui": "« AAAA-MM-JJ », la date du jour à l'heure locale, donnée par le module : les périodes, et les essais, ne dépendent pas de l'horloge du connecteur",
+        "periode": "« 3_mois », « 12_mois » (par défaut dans la fenêtre) ou « tout »",
+        "apparence": "« claire » ou « sombre » (Dispositions.apparence de la préférence apparence)",
+        "couleurs": "les six couleurs de couleurs.cles, en six chiffres hexadécimaux, tirées de Dispositions.PALETTES[apparence] (seule table des couleurs)",
+        "defaut": "facultatif : le code suivi par l'évolution, l'un des huit codes comptés ; absent : le plus fréquent",
+        "tailles": "les sept graphiques, chacun { largeur, hauteur } en points entiers, de 120 × 80 à 1 200 × 600"
+      },
+      "sortie": {
+        "ok": "vrai",
+        "catalogue": "repris de l'entrée",
+        "aujourd_hui": "repris de l'entrée",
+        "periode": "{ code, libelle (« 3 derniers mois », « 12 derniers mois », « Tout »), debut et fin (« AAAA-MM »), par (« mois » ou « annee ») }",
+        "photos": "les originaux de la période",
+        "sans_date": "ceux d'entre eux sans date de prise de vue",
+        "analyse": "{ analysees (analyse avec cherches), en_attente (ni analysée ni abandonnée), en_echec (abandonnee) }, dans la période",
+        "tuiles": "tableau des quatre tuiles, dans cet ordre : { cle, titre, valeur, texte, detail } et code pour defaut_frequent quand il y en a un",
+        "defauts": "les huit codes comptés, dans leur ordre : { code, libelle, n, sur, valeur, texte } (le menu du défaut suivi)",
+        "defaut_suivi": "{ code, libelle, choisi (vrai : celui de l'entrée) } ; absent sans défaut à suivre",
+        "graphiques": "objet des sept graphiques (graphiques.liste), chacun { titre, fichier, largeur, hauteur, orientation, max_barres, unite, echelle, sans_valeur, note (absente sans rien à dire), vide, barres, creneaux }",
+        "remarques": "tableau de textes (vide le plus souvent : un carnet illisible)",
+        "barre": "{ libelle (court, dessiné), detail (entier, pour l'infobulle du calque), valeur, texte, n, sur (graphiques en %), ids, couleur (« barre » ou « accent »), x, y, largeur, hauteur (le rectangle dessiné), zone (le rectangle cliquable : ses créneaux) }",
+        "ids": "les originaux de la barre (les clés de leurs entrées), croissants, tous (pour 20 000 originaux, la ligne peut dépasser 700 Ko : le module la lit dans un fichier, jamais par un tuyau). La fenêtre les retrouve par getPhotoByLocalId, vérifie l'uuid de leur entrée, puis les montre dans la Bibliothèque (Bibliotheque, comme « Photos d'un défaut… » ; toutes les photos du catalogue comme source quand elles ne sont pas dans la source affichée : à l'étape de la fenêtre).",
+        "creneau": "{ x, y, largeur, hauteur, barre } : barre est le rang (à partir de 1) dans barres de la barre qui l'occupe, 0 pour un créneau vide. Les rectangles des créneaux ne dépendent que de la taille et du graphique : les mêmes à chaque appel (la fenêtre pose ses calques à la création d'après la première réponse) ; seul barre change."
+      },
+      "liste": {
+        "photos_par_mois": {"orientation": "verticale", "max_barres": 12, "unite": "photos", "etale": true, "titre": "« Photos par mois », ou « Photos par année » pour Tout", "barres": "une par colonne de la période (periodes), photos datées seulement", "note": "« N photo(s) sans date de prise de vue n'y est (sont) pas. »"},
+        "focales": {"orientation": "verticale", "max_barres": 8, "unite": "photos", "etale": false, "titre": "« Focales (mm) »", "barres": "les huit tranches.focales", "note": "« N photo(s) sans focale lue n'y est (sont) pas. »"},
+        "iso": {"orientation": "verticale", "max_barres": 8, "unite": "photos", "etale": false, "titre": "« Sensibilité (ISO) »", "barres": "les huit tranches.iso", "note": "« N photo(s) sans ISO lu n'y est (sont) pas. »"},
+        "heures": {"orientation": "verticale", "max_barres": 12, "unite": "photos", "etale": false, "titre": "« Heure de la prise de vue »", "barres": "les douze tranches.heures, photos datées seulement", "note": "comme photos_par_mois"},
+        "objectifs": {"orientation": "horizontale", "max_barres": 8, "unite": "photos", "etale": false, "titre": "« Objectifs »", "barres": "tranches.objectifs, de haut en bas"},
+        "defauts_frequents": {
+          "orientation": "horizontale",
+          "max_barres": 8,
+          "unite": "%",
+          "etale": false,
+          "titre": "« Défauts les plus fréquents »",
+          "barres": "tranches.defauts, de haut en bas ; la barre du défaut suivi en accent",
+          "note": "toujours : « En % des photos où il est cherché : bruit à ISO 1 600 et plus, yeux sur un visage, horizon et mise au point quand Claude regarde la photo. »"
+        },
+        "evolution_defaut": {
+          "orientation": "verticale",
+          "max_barres": 12,
+          "unite": "%",
+          "etale": true,
+          "titre": "« <libellé du défaut suivi>, mois par mois » (Tout : « …, année par année »), sinon « Évolution d'un défaut »",
+          "barres": "les colonnes de photos_par_mois : n et sur du défaut suivi parmi les photos datées de la colonne ; toutes en accent",
+          "note": "« N photo(s) sans date de prise de vue n'y est (sont) pas. » (celles où le défaut est cherché), ou « Aucun défaut trouvé dans la période. » sans défaut suivi"
+        }
+      },
+      "tuiles": {
+        "photos_ouvertes": "« Photos ouvertes » : photos ; detail : « N en cours d'analyse » et « N non analysée(s) » joints par « · », « toutes analysées » sans l'un ni l'autre, « aucune photo ouverte dans la période » à zéro",
+        "retouchees_par_claude": "« Retouchées par Claude » : retouchee_par_claude ; detail « P % des photos ouvertes » (« — » à zéro photo)",
+        "notees_4_plus": "« Notées 4 ★ ou plus » : note d'au moins 4 ; detail comme la précédente",
+        "defaut_frequent": "« Défaut le plus fréquent » : valeur et texte en % du défaut le plus fréquent, detail « <libellé> · N photo(s) sur S », code ; sans défaut trouvé : valeur 0, texte « Aucun », detail « aucun défaut trouvé sur les N photos analysées », sans code ; sans photo analysée : texte « — », detail « aucune photo analysée »"
+      },
+      "defaut_le_plus_frequent": "Parmi les codes cherchés sur au moins 5 photos de la période (Carnet.PHOTOS_SUFFISANTES) et trouvés au moins une fois : le plus haut pourcentage exact, puis le plus grand n, puis l'ordre des codes ; s'il n'y en a pas, parmi tous les codes trouvés au moins une fois ; aucun trouvé : pas de défaut le plus fréquent.",
+      "defaut_suivi": "Le defaut de l'entrée (l'un des huit codes, même cherché sur aucune photo de la période : ses colonnes le disent), choisi vrai ; absent : le plus fréquent, choisi faux ; sans plus fréquent : defaut_suivi absent, l'évolution vide.",
+      "comptes": "Un défaut, sur les photos d'un ensemble (la période, une colonne) : n = celles où il est trouvé, sur = celles où il est cherché, l'analyse et le carnet fusionnés (codes.fusion_avec_le_carnet). Une photo abandonnée ou en file n'est cherchée pour aucun code de l'analyse (le carnet peut en avoir).",
+      "vide": "vrai quand aucune barre n'a de photo (n = 0 partout ; pour un graphique en %, sur = 0 partout, ou aucune barre).",
+      "codes_de_sortie": "0 : ok vrai ; 1 : ok faux, avec sa ligne ; 2 : nombre d'arguments faux (l'aide sur stderr, rien sur stdout)."
+    },
+    "periodes": {
+      "date": "Une photo est dans la période par sa date de prise de vue (prise_de_vue.le), sinon par sa date d'ajout (ajout_le). Après la fin du mois d'aujourd_hui (horloge de l'appareil fausse) : hors de toute période. Les graphiques par mois, par année et par heure, et l'évolution, ne prennent que les photos datées ; les autres comptent dans sans_valeur, et la note le dit.",
+      "3_mois": "le mois d'aujourd_hui et les deux d'avant : 3 colonnes",
+      "12_mois": "le mois d'aujourd_hui et les onze d'avant : 12 colonnes",
+      "tout": "jusqu'à la fin du mois d'aujourd_hui ; une colonne par année de prise de vue, de la plus ancienne des photos datées de la période à celle d'aujourd_hui (années sans photo comprises) ; plus de 12 années : la première colonne « < A » (détail « avant A ») réunit toutes les années d'avant A = l'année d'aujourd_hui − 10, puis une colonne pour chacune des 11 dernières ; aucune photo datée : l'année d'aujourd_hui seule",
+      "debut_fin": "« AAAA-MM » ; pour Tout, debut est le mois de la plus ancienne photo de la période (date de prise de vue ou d'ajout), celui d'aujourd_hui sans photo",
+      "colonnes": "libellé d'un mois : Carnet.MOIS_COURTS (« oct. »), détail « octobre 2026 · … » (Carnet.MOIS) ; d'une année : « 2024 », détail « 2024 · … »"
+    },
+    "tranches": {
+      "focales": {
+        "_note": "La focale réelle arrondie au mm (demi vers le haut), dans la première tranche dont elle ne dépasse pas la borne (jusqua) ; la dernière n'a pas de borne. Faites pour les focales des objectifs Fujifilm (16-80, 23, 56, 70-300) ; un iPhone (6,8 mm) tombe dans « ≤ 15 ».",
+        "liste": [
+          {"jusqua": 15, "libelle": "≤ 15", "detail": "15 mm ou moins"},
+          {"jusqua": 23, "libelle": "≤ 23", "detail": "16 à 23 mm"},
+          {"jusqua": 35, "libelle": "≤ 35", "detail": "24 à 35 mm"},
+          {"jusqua": 55, "libelle": "≤ 55", "detail": "36 à 55 mm"},
+          {"jusqua": 90, "libelle": "≤ 90", "detail": "56 à 90 mm"},
+          {"jusqua": 150, "libelle": "≤ 150", "detail": "91 à 150 mm"},
+          {"jusqua": 300, "libelle": "≤ 300", "detail": "151 à 300 mm"},
+          {"libelle": "> 300", "detail": "plus de 300 mm"}
+        ]
+      },
+      "iso": {
+        "_note": "L'ISO tel quel, dans la première tranche dont il ne dépasse pas la borne. Carnet.isoEleve (1 600) est la borne de « ≤ 1 600 » : le bruit fort se cherche à ISO 1 600 et au-dessus.",
+        "liste": [
+          {"jusqua": 200, "libelle": "≤ 200", "detail": "ISO 200 ou moins"},
+          {"jusqua": 400, "libelle": "≤ 400", "detail": "ISO 201 à 400"},
+          {"jusqua": 800, "libelle": "≤ 800", "detail": "ISO 401 à 800"},
+          {"jusqua": 1600, "libelle": "≤ 1 600", "detail": "ISO 801 à 1 600"},
+          {"jusqua": 3200, "libelle": "≤ 3 200", "detail": "ISO 1 601 à 3 200"},
+          {"jusqua": 6400, "libelle": "≤ 6 400", "detail": "ISO 3 201 à 6 400"},
+          {"jusqua": 12800, "libelle": "≤ 12 800", "detail": "ISO 6 401 à 12 800"},
+          {"libelle": "> 12 800", "detail": "plus de ISO 12 800"}
+        ]
+      },
+      "heures": "Douze tranches de deux heures, d'après l'heure de prise_de_vue.le (déjà à l'heure locale) : la tranche k (de 0 à 11) prend les heures 2k et 2k + 1 ; libellé « 2k h » (« 0 h » … « 22 h »), détail « de 2k h à 2k+2 h · … » (« de 16 h à 18 h · 3 photos »).",
+      "objectifs": "Un groupe par texte exact de l'objectif ; absent ou vide : « Inconnu » (détail « Objectif inconnu · … »). Rangés par nombre de photos décroissant, à égalité par nom (le texte en minuscules, comparé octet par octet), « Inconnu » après les objectifs nommés à égalité. Huit groupes ou moins : tous ; plus de huit : les sept premiers, puis « Autres » (détail « N autres objectifs · … », « 1 autre objectif » au singulier), qui réunit tout le reste, ses ids compris. Le libellé est le nom entier ; le dessin le coupe à sa place.",
+      "defauts": "Les codes comptés cherchés au moins une fois dans la période (sur > 0), rangés par pourcentage décroissant (exact, avant l'arrondi), à égalité par n décroissant, puis dans l'ordre des codes ; huit au plus (tous les codes comptés), jamais « Autres ». Libellé : celui de PriseDeVue ; détail « <libellé> · N photo(s) sur S (P %) »."
+    },
+    "textes": {
+      "compte": "valeur : un entier ; texte : ses chiffres groupés par trois avec une espace (« 1 284 »)",
+      "pourcentage": "valeur : 100 × n / sur, arrondi au dixième (demi vers le haut), 0 quand sur = 0 ; texte : « — » quand sur = 0, « 0 % » quand n = 0, « < 1 % » sous 1, sinon l'entier le plus proche (demi vers le haut) et « % »",
+      "photos": "« 0 photo », « 1 photo », « 2 photos » (et « 1 284 photos »)",
+      "detail_compte": "« <détail de la colonne ou de la tranche> · N photo(s) »",
+      "detail_pourcentage": "« <colonne> · N photo(s) sur S (P %) », ou « <colonne> · défaut cherché sur aucune photo » quand sur = 0"
+    },
+    "geometrie": {
+      "_note": "En points entiers, dans le repère de l'image (origine en haut à gauche, y vers le bas) ; L et H, la taille du graphique ; n, max_barres ; floor, l'arrondi vers le bas ; arrondi, au plus proche, demi vers le haut. echelle = la plus grande valeur des barres du graphique (0 sans barre). Le reste du dessin est libre (polices, valeurs écrites au-dessus ou au bout des barres, libellés dessous ou à gauche, ligne de base au filet), dans ces rectangles : un libellé qui ne tient pas à sa place est réduit (de 10 à 7 points), puis coupé « … » ; une barre de valeur 0 ne porte pas de valeur écrite ; un graphique vide dit « Aucune photo » au milieu (l'évolution sans défaut suivi : « Aucun défaut »).",
+      "verticale": {
+        "creneaux": "x_i = 8 + floor((i − 1) × (L − 16) / n) pour i de 1 à n, x_(n+1) = L − 8 ; créneau i = { x: x_i, y: 0, largeur: x_(i+1) − x_i, hauteur: H }",
+        "etalement": "Un graphique étalé (etale) de k barres : s = floor(n / k) créneaux par barre, décalage d = floor((n − s × k) / 2) ; la barre j (de 1 à k) occupe les créneaux d + (j − 1) × s + 1 à d + j × s (12 mois : un chacun ; 3 mois : quatre chacun ; 5 années : deux chacun, à partir du deuxième créneau). Sinon, la barre j occupe le créneau j.",
+        "zone": "{ x: x du premier créneau, y: 0, largeur: (x après le dernier) − x, hauteur: H }",
+        "barre": "tracé de hauteur T = H − 36 (16 au-dessus pour les valeurs, 20 au-dessous pour les libellés) ; largeur = max(1, floor(0,6 × zone.largeur)) ; x = zone.x + floor((zone.largeur − largeur) / 2) ; hauteur = 0 si valeur = 0, sinon max(1, arrondi(valeur / echelle × T)) ; y = 16 + T − hauteur"
+      },
+      "horizontale": {
+        "creneaux": "y_i = 4 + floor((i − 1) × (H − 8) / n) pour i de 1 à n, y_(n+1) = H − 4 ; créneau i = { x: 0, y: y_i, largeur: L, hauteur: y_(i+1) − y_i } ; la barre j occupe le créneau j (zone : ce créneau)",
+        "barre": "libellés sur les floor(0,4 × L) premiers points, valeurs sur les 48 derniers ; x = floor(0,4 × L) + 4 ; longueur B = L − 52 − x ; largeur = 0 si valeur = 0, sinon max(1, arrondi(valeur / echelle × B)) ; hauteur = max(1, floor(0,6 × zone.hauteur)) ; y = zone.y + floor((zone.hauteur − hauteur) / 2)"
+      }
+    },
+    "couleurs": {
+      "_note": "Les six couleurs que le module tire de Dispositions.PALETTES[apparence] (aucune autre table de couleurs) : fond de l'image, libellés, valeurs et notes, ligne de base et repères, barres, barres du défaut suivi (et de l'évolution). fondDroite est le fond des fenêtres de macOS dans chaque apparence : l'image s'y fond.",
+      "cles": {"fond": "fondDroite", "texte": "texte", "gris": "gris", "filet": "filetDroite", "barre": "bleu", "accent": "orange"},
+      "claire": {"fond": "ECECEC", "texte": "1D1D1F", "gris": "6B6B6B", "filet": "C9C9C9", "barre": "0A64D8", "accent": "E0800D"},
+      "sombre": {"fond": "323232", "texte": "E8E8E8", "gris": "9A9A9A", "filet": "4A4A4A", "barre": "5AA2F6", "accent": "E8963A"}
+    },
+    "erreurs": {
+      "_note": "Une erreur de tout l'appel : une seule ligne { ok: false, raison, texte } et le code 1 ; le texte se lit tel quel (fenêtre, journal). Sans réponse avant l'alarme (fichier de réponse vide), le module dit « Le connecteur n'a pas répondu à temps » et ne change rien.",
+      "analyser": {"arguments": "le JSON ne se lit pas, ou n'a pas la forme de analyser.entree", "trop_de_photos": "plus de 20 photos"},
+      "graphiques": {"arguments": "le JSON ne se lit pas, ou une clé de graphiques.entree manque ou est invalide (période, apparence, couleur, taille, date)", "defaut_inconnu": "defaut n'est pas l'un des huit codes comptés", "suivi_illisible": "suivi.json existe mais ne se lit pas (JSON invalide, ou format autre que 1)", "dossier": "le dossier ne se crée pas ou ne s'écrit pas", "dessin": "un graphique ne se dessine pas"},
+      "remarques": {"carnet_illisible": "carnet.json illisible : l'horizon et la mise au point vus par Claude ne comptent pas."}
+    }
+  },
+  "exemples": {
+    "registre": {
+      "_note": "Le relevé d'un catalogue de 17 originaux, au 20 novembre 2026 (aujourd_hui des exemples de --graphiques), le Suivi installé le 27 octobre : douze pris dans les 12 derniers mois (dont un scan sans date, ajouté en novembre), un en août 2025 et quatre de 2009 à 2019, ouverts depuis. Un original vu par lui-même et sa copie (4211), un vu seulement par sa copie (4106), un en file (4302), un abandonné (3990). Aucune photo de « Développeur › Essais », aucune vidéo : elles n'entrent pas. Les heures sont celles de Toronto (os.time en secondes Unix, ajout_le à l'heure locale).",
+      "fichier": {
+        "format": 1,
+        "catalogues": {
+          "/Volumes/Photos/Lightroom/Catalogue.lrcat": {
+            "photos": {
+              "4211": {
+                "_note": "Un portrait ouvert d'abord seul, puis par sa copie virtuelle 4388 (Retouche pro) : une seule entrée, celle de l'original, avec ses deux vues. La note (4 ★ sur la copie) et la retouche de Claude (sur la copie) sont celles de la famille. Le carnet (carnet.json) a une vue de la copie : il l'emporte pour les codes qu'il a cherchés.",
+                "original": 4211,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004211",
+                "fichier": "XH2S1208.RAF",
+                "ajout": 1794273300,
+                "ajout_le": "2026-11-09 20:15",
+                "vu": 1794490200,
+                "vues": [
+                  {"id": 4211, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004211", "copie_virtuelle": false, "fichier": "XH2S1208.RAF", "le": 1794273300},
+                  {"id": 4388, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004388", "copie_virtuelle": true, "fichier": "XH2S1208.RAF (Copie 1)", "le": 1794490200}
+                ],
+                "prise_de_vue": {"le": "2026-11-08 17:42", "appareil": "X-H2S", "objectif": "XF16-80mmF4 R OIS WR", "focale": 23, "ouverture": "f/4,0", "vitesse": "1/250 s", "iso": 160},
+                "note": 4,
+                "drapeau": "aucun",
+                "retouchee_par_claude": true,
+                "classement_le": 1794490200,
+                "analyse": {"le": 1794273360, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": []}
+              },
+              "4230": {
+                "_note": "Ouverte dans la même sélection que 4211 (même ajout). ISO 3 200 : le bruit est cherché (Carnet.isoEleve, 1 600) et trouvé ; pas de visage : les yeux ne sont pas cherchés.",
+                "original": 4230,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004230",
+                "fichier": "XH2S1231.RAF",
+                "ajout": 1794273300,
+                "ajout_le": "2026-11-09 20:15",
+                "vu": 1794273300,
+                "vues": [
+                  {"id": 4230, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004230", "copie_virtuelle": false, "fichier": "XH2S1231.RAF", "le": 1794273300}
+                ],
+                "prise_de_vue": {"le": "2026-11-08 18:05", "appareil": "X-H2S", "objectif": "XF16-80mmF4 R OIS WR", "focale": 80, "ouverture": "f/4,0", "vitesse": "1/60 s", "iso": 3200},
+                "note": 2,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1794273300,
+                "analyse": {"le": 1794273360, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou"], "defauts": ["bruit", "flou"]}
+              },
+              "4231": {
+                "_note": "Un paysage : le carnet a son angle (horizon penché de 1,8°, measure_angle) et une vue ; l'horizon ne se trouve que là.",
+                "original": 4231,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004231",
+                "fichier": "DSCF5590.RAF",
+                "ajout": 1794754920,
+                "ajout_le": "2026-11-15 10:02",
+                "vu": 1794754920,
+                "vues": [
+                  {"id": 4231, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004231", "copie_virtuelle": false, "fichier": "DSCF5590.RAF", "le": 1794754920}
+                ],
+                "prise_de_vue": {"le": "2026-11-14 09:14", "appareil": "X-T4", "objectif": "XF23mmF2 R WR", "focale": 23, "ouverture": "f/8,0", "vitesse": "1/500 s", "iso": 400},
+                "note": 0,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1794754920,
+                "analyse": {"le": 1794754980, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["ciel_brule"]}
+              },
+              "4302": {
+                "_note": "Ouverte ce matin, pas encore analysée : sans clé analyse, elle est dans la file. Elle compte déjà dans les photos ouvertes et les graphiques des prises de vue, pas dans les défauts.",
+                "original": 4302,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004302",
+                "fichier": "XH2S1340.RAF",
+                "ajout": 1795183920,
+                "ajout_le": "2026-11-20 09:12",
+                "vu": 1795183920,
+                "vues": [
+                  {"id": 4302, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004302", "copie_virtuelle": false, "fichier": "XH2S1340.RAF", "le": 1795183920}
+                ],
+                "prise_de_vue": {"le": "2026-11-19 15:30", "appareil": "X-H2S", "objectif": "XF56mmF1.2 R WR", "focale": 56, "ouverture": "f/1,2", "vitesse": "1/1000 s", "iso": 250},
+                "note": 0,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1795183920
+              },
+              "4105": {
+                "_note": "Le carnet a une entrée sous ce numéro, mais d'un autre uuid (une autre photo) : elle est ignorée.",
+                "original": 4105,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004105",
+                "fichier": "XH2S1050.RAF",
+                "ajout": 1793230800,
+                "ajout_le": "2026-10-28 19:40",
+                "vu": 1793230800,
+                "vues": [
+                  {"id": 4105, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004105", "copie_virtuelle": false, "fichier": "XH2S1050.RAF", "le": 1793230800}
+                ],
+                "prise_de_vue": {"le": "2026-10-03 16:20", "appareil": "X-H2S", "objectif": "XF70-300mmF4-5.6 R LM OIS WR", "focale": 300, "ouverture": "f/5,6", "vitesse": "1/320 s", "iso": 800},
+                "note": 3,
+                "drapeau": "retenue",
+                "retouchee_par_claude": false,
+                "classement_le": 1793230800,
+                "analyse": {"le": 1793230860, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["flou"]}
+              },
+              "4106": {
+                "_note": "Seule sa copie virtuelle 4410 a été ouverte : l'entrée est quand même celle de l'original 4106, et l'analyse se fait sur la vignette de l'original.",
+                "original": 4106,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004106",
+                "fichier": "XH2S1051.RAF",
+                "ajout": 1793230800,
+                "ajout_le": "2026-10-28 19:40",
+                "vu": 1793408700,
+                "vues": [
+                  {"id": 4410, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004410", "copie_virtuelle": true, "fichier": "XH2S1051.RAF (Copie 2)", "le": 1793230800}
+                ],
+                "prise_de_vue": {"le": "2026-10-03 16:21", "appareil": "X-H2S", "objectif": "XF70-300mmF4-5.6 R LM OIS WR", "focale": 210, "ouverture": "f/5,6", "vitesse": "1/320 s", "iso": 1600},
+                "note": 5,
+                "drapeau": "retenue",
+                "retouchee_par_claude": true,
+                "classement_le": 1793408700,
+                "analyse": {"le": 1793230860, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou"], "defauts": []}
+              },
+              "3988": {
+                "_note": "iPhone : focale réelle 6,765 mm (la tranche « ≤ 15 ») ; un visage aux yeux fermés.",
+                "original": 3988,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003988",
+                "fichier": "IMG_2210.HEIC",
+                "ajout": 1793661600,
+                "ajout_le": "2026-11-02 18:20",
+                "vu": 1793661600,
+                "vues": [
+                  {"id": 3988, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003988", "copie_virtuelle": false, "fichier": "IMG_2210.HEIC", "le": 1793661600}
+                ],
+                "prise_de_vue": {"le": "2026-09-15 20:47", "appareil": "iPhone 15 Pro", "objectif": "iPhone 15 Pro back triple camera 6.765mm f/1.78", "focale": 6.765, "ouverture": "f/1,8", "vitesse": "1/30 s", "iso": 1250},
+                "note": 0,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1793661600,
+                "analyse": {"le": 1793661660, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": ["sous_exposition", "yeux_fermes"]}
+              },
+              "3990": {
+                "_note": "Trois essais sans vignette assez grande (Lightroom ne rendait que 256 px) : abandonnée, elle ne revient plus dans la file. Elle compte dans les photos ouvertes, jamais dans les défauts.",
+                "original": 3990,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003990",
+                "fichier": "IMG_2212.HEIC",
+                "ajout": 1793661600,
+                "ajout_le": "2026-11-02 18:20",
+                "vu": 1793661600,
+                "vues": [
+                  {"id": 3990, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003990", "copie_virtuelle": false, "fichier": "IMG_2212.HEIC", "le": 1793661600}
+                ],
+                "prise_de_vue": {"le": "2026-09-15 21:02", "appareil": "iPhone 15 Pro", "objectif": "iPhone 15 Pro back triple camera 6.765mm f/1.78", "focale": 6.765, "ouverture": "f/1,8", "vitesse": "1/15 s", "iso": 2000},
+                "note": 0,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1793661600,
+                "analyse": {"le": 1793796900, "erreur": "vignette_petite", "essais": 3, "abandonnee": true}
+              },
+              "3801": {
+                "original": 3801,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003801",
+                "fichier": "DSCF3801.RAF",
+                "ajout": 1793905200,
+                "ajout_le": "2026-11-05 14:00",
+                "vu": 1793905200,
+                "vues": [
+                  {"id": 3801, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003801", "copie_virtuelle": false, "fichier": "DSCF3801.RAF", "le": 1793905200}
+                ],
+                "prise_de_vue": {"le": "2026-07-02 11:30", "appareil": "X-T20", "objectif": "XF18-55mmF2.8-4 R LM OIS", "focale": 35, "ouverture": "f/8,0", "vitesse": "1/680 s", "iso": 200},
+                "note": 4,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1793905200,
+                "analyse": {"le": 1793905260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["ciel_brule"]}
+              },
+              "3640": {
+                "original": 3640,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003640",
+                "fichier": "DSCF3640.RAF",
+                "ajout": 1793905200,
+                "ajout_le": "2026-11-05 14:00",
+                "vu": 1793905200,
+                "vues": [
+                  {"id": 3640, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003640", "copie_virtuelle": false, "fichier": "DSCF3640.RAF", "le": 1793905200}
+                ],
+                "prise_de_vue": {"le": "2026-04-21 13:05", "appareil": "X-T20", "objectif": "XF18-55mmF2.8-4 R LM OIS", "focale": 18, "ouverture": "f/5,6", "vitesse": "1/60 s", "iso": 200},
+                "note": 1,
+                "drapeau": "rejetee",
+                "retouchee_par_claude": false,
+                "classement_le": 1793905200,
+                "analyse": {"le": 1793905260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["sous_exposition", "flou"]}
+              },
+              "3502": {
+                "_note": "Le carnet (view_photo, au point de mise au point) l'a trouvée avec la mise au point à côté : le Suivi le compte, l'analyse de la vignette ne la cherche pas.",
+                "original": 3502,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003502",
+                "fichier": "DSCF3502.RAF",
+                "ajout": 1794018600,
+                "ajout_le": "2026-11-06 21:30",
+                "vu": 1794018600,
+                "vues": [
+                  {"id": 3502, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003502", "copie_virtuelle": false, "fichier": "DSCF3502.RAF", "le": 1794018600}
+                ],
+                "prise_de_vue": {"le": "2026-01-24 19:10", "appareil": "X-T4", "objectif": "XF23mmF2 R WR", "focale": 23, "ouverture": "f/2,0", "vitesse": "1/125 s", "iso": 6400},
+                "note": 4,
+                "drapeau": "aucun",
+                "retouchee_par_claude": true,
+                "classement_le": 1794018600,
+                "analyse": {"le": 1794018660, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou", "yeux_fermes"], "defauts": []}
+              },
+              "3420": {
+                "_note": "Un scan sans date de prise de vue ni appareil : prise_de_vue vide ; il compte à sa date d'ajout (novembre 2026) dans la période, les tuiles, les objectifs (« Inconnu ») et les défauts, mais ni par mois, ni par heure, ni dans les focales et l'ISO (sans_valeur).",
+                "original": 3420,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003420",
+                "fichier": "Scan-0042.tif",
+                "ajout": 1793631600,
+                "ajout_le": "2026-11-02 10:00",
+                "vu": 1793631600,
+                "vues": [
+                  {"id": 3420, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003420", "copie_virtuelle": false, "fichier": "Scan-0042.tif", "le": 1793631600}
+                ],
+                "prise_de_vue": {},
+                "note": 0,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1793631600,
+                "analyse": {"le": 1793631660, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": []}
+              },
+              "2950": {
+                "_note": "Prise en août 2025 : hors des 12 derniers mois (par date de prise de vue), même ouverte en novembre 2026.",
+                "original": 2950,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D002950",
+                "fichier": "DSCF2950.RAF",
+                "ajout": 1793905800,
+                "ajout_le": "2026-11-05 14:10",
+                "vu": 1793905800,
+                "vues": [
+                  {"id": 2950, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D002950", "copie_virtuelle": false, "fichier": "DSCF2950.RAF", "le": 1793905800}
+                ],
+                "prise_de_vue": {"le": "2025-08-04 15:00", "appareil": "X-T20", "objectif": "XF18-55mmF2.8-4 R LM OIS", "focale": 55, "ouverture": "f/8,0", "vitesse": "1/500 s", "iso": 200},
+                "note": 3,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1793905800,
+                "analyse": {"le": 1793905860, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["ciel_brule"]}
+              },
+              "2105": {
+                "original": 2105,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D002105",
+                "fichier": "DSCF2105.RAF",
+                "ajout": 1794085200,
+                "ajout_le": "2026-11-07 16:00",
+                "vu": 1794085200,
+                "vues": [
+                  {"id": 2105, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D002105", "copie_virtuelle": false, "fichier": "DSCF2105.RAF", "le": 1794085200}
+                ],
+                "prise_de_vue": {"le": "2019-05-11 08:40", "appareil": "X-T20", "objectif": "XF35mmF2 R WR", "focale": 35, "ouverture": "f/2,0", "vitesse": "1/1000 s", "iso": 400},
+                "note": 0,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1794085200,
+                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["flou"]}
+              },
+              "1203": {
+                "original": 1203,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D001203",
+                "fichier": "IMG_1203.CR2",
+                "ajout": 1794085200,
+                "ajout_le": "2026-11-07 16:00",
+                "vu": 1794085200,
+                "vues": [
+                  {"id": 1203, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D001203", "copie_virtuelle": false, "fichier": "IMG_1203.CR2", "le": 1794085200}
+                ],
+                "prise_de_vue": {"le": "2015-08-20 14:10", "appareil": "Canon EOS 450D", "objectif": "EF-S18-55mm f/3.5-5.6 IS", "focale": 18, "ouverture": "f/8,0", "vitesse": "1/200 s", "iso": 100},
+                "note": 0,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1794085200,
+                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["sous_exposition"]}
+              },
+              "855": {
+                "original": 855,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D000855",
+                "fichier": "IMG_0855.CR2",
+                "ajout": 1794085200,
+                "ajout_le": "2026-11-07 16:00",
+                "vu": 1794085200,
+                "vues": [
+                  {"id": 855, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D000855", "copie_virtuelle": false, "fichier": "IMG_0855.CR2", "le": 1794085200}
+                ],
+                "prise_de_vue": {"le": "2013-02-14 10:12", "appareil": "Canon EOS 450D", "objectif": "EF-S18-55mm f/3.5-5.6 IS", "focale": 55, "ouverture": "f/5,6", "vitesse": "1/250 s", "iso": 800},
+                "note": 0,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1794085200,
+                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": []}
+              },
+              "402": {
+                "_note": "Un compact sans objectif lu : il compte sous « Inconnu » dans les objectifs.",
+                "original": 402,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D000402",
+                "fichier": "IMG_0402.JPG",
+                "ajout": 1794085200,
+                "ajout_le": "2026-11-07 16:00",
+                "vu": 1794085200,
+                "vues": [
+                  {"id": 402, "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D000402", "copie_virtuelle": false, "fichier": "IMG_0402.JPG", "le": 1794085200}
+                ],
+                "prise_de_vue": {"le": "2009-12-25 18:30", "appareil": "Canon PowerShot A590 IS", "focale": 5.8, "ouverture": "f/2,6", "vitesse": "1/30 s", "iso": 200},
+                "note": 0,
+                "drapeau": "aucun",
+                "retouchee_par_claude": false,
+                "classement_le": 1794085200,
+                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["flou"]}
+              }
+            }
+          }
+        }
+      }
+    },
+    "carnet": {
+      "_note": "carnet.json (format 1, tenu par Carnet.lua) tel que --graphiques le lit, pour la fusion : 4211, 4231 et 3502 comptent (même uuid que le relevé) ; 4105 a un autre uuid (une autre photo sous ce numéro) et 5000 n'est pas au relevé : ignorés. Seules comptent vue.cherches, vue.defauts (leurs codes) et angle.code ; le reste est celui du carnet.",
+      "fichier": {
+        "format": 1,
+        "catalogues": {
+          "/Volumes/Photos/Lightroom/Catalogue.lrcat": {
+            "photos": {
+              "4211": {
+                "photo": 4211,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004211",
+                "fichier": "XH2S1208.RAF",
+                "prise": "2026-11",
+                "prise_le": "2026-11-08 17:42",
+                "le": 1794490500,
+                "vue": {"le": 1794490500, "photo": 4388, "cherches": ["horizon_penche", "sous_exposition", "ciel_brule", "flou", "mise_au_point"], "defauts": []}
+              },
+              "4231": {
+                "photo": 4231,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004231",
+                "fichier": "DSCF5590.RAF",
+                "prise": "2026-11",
+                "prise_le": "2026-11-14 09:14",
+                "le": 1794756000,
+                "vue": {
+                  "le": 1794755400,
+                  "photo": 4231,
+                  "cherches": ["horizon_penche", "sous_exposition", "ciel_brule", "flou"],
+                  "defauts": [
+                    {"code": "ciel_brule", "mesure": 4.2, "texte": "ciel ou haut de l'image brûlé : 4,2 % du tiers haut en blanc pur"}
+                  ]
+                },
+                "angle": {"le": 1794756000, "photo": 4231, "inclinaison": 1.8, "code": "horizon_penche", "source": "measure_angle"}
+              },
+              "3502": {
+                "photo": 3502,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003502",
+                "fichier": "DSCF3502.RAF",
+                "prise": "2026-01",
+                "prise_le": "2026-01-24 19:10",
+                "le": 1794019200,
+                "vue": {
+                  "le": 1794019200,
+                  "photo": 3502,
+                  "cherches": ["sous_exposition", "ciel_brule", "bruit", "flou", "mise_au_point"],
+                  "defauts": [
+                    {"code": "mise_au_point", "mesure": 9.4, "texte": "mise au point manquée : floue au point AF (9,4), nette ailleurs (41,2)"}
+                  ]
+                }
+              },
+              "4105": {
+                "photo": 4105,
+                "uuid": "9B7E0D44-1C2A-4F3B-8E55-6D0C1A2B3C4D",
+                "fichier": "IMG_4105.JPG",
+                "prise": "2024-06",
+                "prise_le": "2024-06-01 12:00",
+                "le": 1792501200,
+                "vue": {
+                  "le": 1792501200,
+                  "photo": 4105,
+                  "cherches": ["sous_exposition", "ciel_brule", "flou"],
+                  "defauts": [
+                    {"code": "sous_exposition", "mesure": 21.3, "texte": "sous-exposée : L* médian 21,3, aucune partie claire (95e centile 71,0)"}
+                  ]
+                }
+              },
+              "5000": {
+                "photo": 5000,
+                "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D005000",
+                "fichier": "DSCF5000.RAF",
+                "prise": "2026-10",
+                "prise_le": "2026-10-10 10:10",
+                "le": 1792584000,
+                "vue": {"le": 1792584000, "photo": 5000, "cherches": ["sous_exposition", "ciel_brule", "flou"], "defauts": [{"code": "flou", "mesure": 11.2, "texte": "floue : aucune zone nette (netteté 11,2)"}]}
+              }
+            }
+          }
+        }
+      }
+    },
+    "analyser": {
+      "_note": "Un lot de six photos. 4302 : un portrait à ISO 250 (yeux lus et ouverts, pas de bruit cherché). 4303 : une rue la nuit à ISO 5 000 (bruit trouvé ; les lumières tiennent le 95e centile au-dessus de 80 : pas sous-exposée). 4304 : un JPEG sans ISO lu, très clair (surexposé, ciel brûlé). 4306 : un original déjà retouché par Claude, à ISO 3 200 : seuls le flou et les yeux se cherchent, pas de visage. 4307 : une vignette de 256 px (Lightroom vient de retoucher la photo) : un premier essai, elle reste en file. 4305 : pas de vignette. Les mesures sont celles qu'une vraie vignette pourrait donner : les essais n'en vérifient que la forme.",
+      "entree": {
+        "photos": [
+          {"id": 4302, "vignette": "<lot>/4302.jpg", "iso": 250, "cache": true},
+          {"id": 4303, "vignette": "<lot>/4303.jpg", "iso": 5000, "cache": true},
+          {"id": 4304, "vignette": "<lot>/4304.jpg", "cache": true},
+          {"id": 4306, "vignette": "<lot>/4306.jpg", "iso": 3200, "cache": true, "retouchee": true},
+          {"id": 4307, "vignette": "<lot>/4307.jpg", "iso": 2000, "cache": true},
+          {"id": 4305, "vignette": "<lot>/4305.jpg", "iso": 400, "cache": true}
+        ]
+      },
+      "sortie": {
+        "ok": true,
+        "regles": 1,
+        "photos": [
+          {
+            "id": 4302,
+            "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"],
+            "defauts": [],
+            "mesures": {"cote": 1720, "mediane_l": 46.2, "p95_l": 88.4, "blanc_pur": 0.3, "blanc_pur_haut": 0.1, "nettete": 52.7, "bruit": 0.41, "visages": 1, "ouverture_yeux": 0.31}
+          },
+          {
+            "id": 4303,
+            "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou"],
+            "defauts": ["bruit"],
+            "mesures": {"cote": 1720, "mediane_l": 14.8, "p95_l": 91.2, "blanc_pur": 1.9, "blanc_pur_haut": 0.4, "nettete": 38.6, "bruit": 1.87, "visages": 0}
+          },
+          {
+            "id": 4304,
+            "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"],
+            "defauts": ["surexposition", "ciel_brule"],
+            "mesures": {"cote": 1024, "mediane_l": 78.5, "p95_l": 100, "blanc_pur": 38.2, "blanc_pur_haut": 61.7, "nettete": 24.3, "bruit": 0.22, "visages": 0}
+          },
+          {
+            "id": 4306,
+            "cherches": ["flou"],
+            "defauts": [],
+            "mesures": {"cote": 1720, "mediane_l": 41.0, "p95_l": 86.9, "blanc_pur": 0.0, "blanc_pur_haut": 0.0, "nettete": 44.1, "bruit": 0.58, "visages": 0}
+          },
+          {"id": 4307, "raison": "vignette_petite", "texte": "Vignette de 256 px de grand côté : il en faut 900 au moins."},
+          {"id": 4305, "raison": "vignette_absente", "texte": "Vignette introuvable : <lot>/4305.jpg."}
+        ]
+      },
+      "dans_le_registre": {
+        "_note": "Ce que le module range ensuite (le à l'heure de la réponse) : une analyse réussie remplace l'entrée analyse ; une raison ajoute un essai (abandonnee au troisième, comme 3990 du relevé). Les mesures ne sont pas rangées.",
+        "4302": {"le": 1795184100, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": []},
+        "4307": {"le": 1795184100, "erreur": "vignette_petite", "essais": 1}
+      }
+    },
+    "analyser_refus": {
+      "_note": "Les refus de tout l'appel : une seule ligne, code 1 ; aucune photo n'est mesurée.",
+      "trop_de_photos": {
+        "sortie": {"ok": false, "raison": "trop_de_photos", "texte": "Au plus 20 photos par appel de --analyser (25 reçues)."}
+      },
+      "arguments": {
+        "entree": {"photos": [{"id": "4302", "vignette": "<lot>/4302.jpg", "cache": true}]},
+        "sortie": {"ok": false, "raison": "arguments", "texte": "Arguments de --analyser : photos[1].id est un nombre (l'id de l'original)."}
+      }
+    },
+    "graphiques_12_mois": {
+      "_note": "La période par défaut, dans l'apparence claire, sans défaut choisi : le plus fréquent est le flou (30 %, sur 10 photos) ; l'horizon et la mise au point font 50 %, mais sur 2 photos seulement (moins de 5). Douze photos : les onze datées de décembre 2025 à novembre 2026 et le scan, ajouté en novembre ; 2950 (août 2025) est hors période. 4302 est en file, 3990 abandonnée : ni l'une ni l'autre ne compte dans les défauts.",
+      "commande": "<connecteur> --graphiques '<entree>' <dossier>",
+      "entree": {
+        "suivi": "<suivi.json>",
+        "carnet": "<carnet.json>",
+        "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
+        "aujourd_hui": "2026-11-20",
+        "periode": "12_mois",
+        "apparence": "claire",
+        "couleurs": {"fond": "ECECEC", "texte": "1D1D1F", "gris": "6B6B6B", "filet": "C9C9C9", "barre": "0A64D8", "accent": "E0800D"},
+        "tailles": {
+          "photos_par_mois": {"largeur": 620, "hauteur": 150},
+          "focales": {"largeur": 300, "hauteur": 130},
+          "iso": {"largeur": 300, "hauteur": 130},
+          "heures": {"largeur": 620, "hauteur": 120},
+          "objectifs": {"largeur": 300, "hauteur": 170},
+          "defauts_frequents": {"largeur": 620, "hauteur": 180},
+          "evolution_defaut": {"largeur": 620, "hauteur": 140}
+        }
+      },
+      "sortie": {
+        "ok": true,
+        "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
+        "aujourd_hui": "2026-11-20",
+        "periode": {"code": "12_mois", "libelle": "12 derniers mois", "debut": "2025-12", "fin": "2026-11", "par": "mois"},
+        "photos": 12,
+        "sans_date": 1,
+        "analyse": {"analysees": 10, "en_attente": 1, "en_echec": 1},
+        "tuiles": [
+          {"cle": "photos_ouvertes", "titre": "Photos ouvertes", "valeur": 12, "texte": "12", "detail": "1 en cours d'analyse · 1 non analysée"},
+          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "25 % des photos ouvertes"},
+          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "33 % des photos ouvertes"},
+          {"cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": 30, "texte": "30 %", "detail": "Photo floue ou bougée · 3 photos sur 10", "code": "flou"}
+        ],
+        "defauts": [
+          {"code": "horizon_penche", "libelle": "Horizon ou ligne penchée", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"},
+          {"code": "sous_exposition", "libelle": "Photo sous-exposée", "n": 2, "sur": 10, "valeur": 20, "texte": "20 %"},
+          {"code": "surexposition", "libelle": "Photo surexposée", "n": 0, "sur": 10, "valeur": 0, "texte": "0 %"},
+          {"code": "ciel_brule", "libelle": "Ciel ou haut de l'image brûlé", "n": 2, "sur": 10, "valeur": 20, "texte": "20 %"},
+          {"code": "bruit", "libelle": "Bruit fort (ISO élevé)", "n": 1, "sur": 3, "valeur": 33.3, "texte": "33 %"},
+          {"code": "flou", "libelle": "Photo floue ou bougée", "n": 3, "sur": 10, "valeur": 30, "texte": "30 %"},
+          {"code": "mise_au_point", "libelle": "Mise au point à côté", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"},
+          {"code": "yeux_fermes", "libelle": "Yeux fermés ou plissés", "n": 1, "sur": 3, "valeur": 33.3, "texte": "33 %"}
+        ],
+        "defaut_suivi": {"code": "flou", "libelle": "Photo floue ou bougée", "choisi": false},
+        "graphiques": {
+          "photos_par_mois": {
+            "titre": "Photos par mois",
+            "fichier": "<dossier>/photos_par_mois.png",
+            "largeur": 620,
+            "hauteur": 150,
+            "orientation": "verticale",
+            "max_barres": 12,
+            "unite": "photos",
+            "echelle": 4,
+            "sans_valeur": 1,
+            "note": "1 photo sans date de prise de vue n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "déc.", "detail": "décembre 2025 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 18, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 8, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "janv.", "detail": "janvier 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3502], "couleur": "barre", "x": 68, "y": 101, "largeur": 30, "hauteur": 29, "zone": {"x": 58, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "févr.", "detail": "février 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 118, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 108, "y": 0, "largeur": 51, "hauteur": 150}},
+              {"libelle": "mars", "detail": "mars 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 169, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 159, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "avr.", "detail": "avril 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3640], "couleur": "barre", "x": 219, "y": 101, "largeur": 30, "hauteur": 29, "zone": {"x": 209, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "mai", "detail": "mai 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 269, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 259, "y": 0, "largeur": 51, "hauteur": 150}},
+              {"libelle": "juin", "detail": "juin 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 320, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 310, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "juil.", "detail": "juillet 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3801], "couleur": "barre", "x": 370, "y": 101, "largeur": 30, "hauteur": 29, "zone": {"x": 360, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "août", "detail": "août 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 420, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 410, "y": 0, "largeur": 51, "hauteur": 150}},
+              {"libelle": "sept.", "detail": "septembre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 471, "y": 73, "largeur": 30, "hauteur": 57, "zone": {"x": 461, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "oct.", "detail": "octobre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4105, 4106], "couleur": "barre", "x": 521, "y": 73, "largeur": 30, "hauteur": 57, "zone": {"x": 511, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "nov.", "detail": "novembre 2026 · 4 photos", "valeur": 4, "texte": "4", "n": 4, "ids": [4211, 4230, 4231, 4302], "couleur": "barre", "x": 571, "y": 16, "largeur": 30, "hauteur": 114, "zone": {"x": 561, "y": 0, "largeur": 51, "hauteur": 150}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 50, "hauteur": 150, "barre": 1},
+              {"x": 58, "y": 0, "largeur": 50, "hauteur": 150, "barre": 2},
+              {"x": 108, "y": 0, "largeur": 51, "hauteur": 150, "barre": 3},
+              {"x": 159, "y": 0, "largeur": 50, "hauteur": 150, "barre": 4},
+              {"x": 209, "y": 0, "largeur": 50, "hauteur": 150, "barre": 5},
+              {"x": 259, "y": 0, "largeur": 51, "hauteur": 150, "barre": 6},
+              {"x": 310, "y": 0, "largeur": 50, "hauteur": 150, "barre": 7},
+              {"x": 360, "y": 0, "largeur": 50, "hauteur": 150, "barre": 8},
+              {"x": 410, "y": 0, "largeur": 51, "hauteur": 150, "barre": 9},
+              {"x": 461, "y": 0, "largeur": 50, "hauteur": 150, "barre": 10},
+              {"x": 511, "y": 0, "largeur": 50, "hauteur": 150, "barre": 11},
+              {"x": 561, "y": 0, "largeur": 51, "hauteur": 150, "barre": 12}
+            ]
+          },
+          "focales": {
+            "titre": "Focales (mm)",
+            "fichier": "<dossier>/focales.png",
+            "largeur": 300,
+            "hauteur": 130,
+            "orientation": "verticale",
+            "max_barres": 8,
+            "unite": "photos",
+            "echelle": 4,
+            "sans_valeur": 1,
+            "note": "1 photo sans focale lue n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "≤ 15", "detail": "15 mm ou moins · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 15, "y": 63, "largeur": 21, "hauteur": 47, "zone": {"x": 8, "y": 0, "largeur": 35, "hauteur": 130}},
+              {"libelle": "≤ 23", "detail": "16 à 23 mm · 4 photos", "valeur": 4, "texte": "4", "n": 4, "ids": [3502, 3640, 4211, 4231], "couleur": "barre", "x": 50, "y": 16, "largeur": 21, "hauteur": 94, "zone": {"x": 43, "y": 0, "largeur": 36, "hauteur": 130}},
+              {"libelle": "≤ 35", "detail": "24 à 35 mm · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3801], "couleur": "barre", "x": 86, "y": 86, "largeur": 21, "hauteur": 24, "zone": {"x": 79, "y": 0, "largeur": 35, "hauteur": 130}},
+              {"libelle": "≤ 55", "detail": "36 à 55 mm · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 121, "y": 110, "largeur": 21, "hauteur": 0, "zone": {"x": 114, "y": 0, "largeur": 36, "hauteur": 130}},
+              {"libelle": "≤ 90", "detail": "56 à 90 mm · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4230, 4302], "couleur": "barre", "x": 157, "y": 63, "largeur": 21, "hauteur": 47, "zone": {"x": 150, "y": 0, "largeur": 35, "hauteur": 130}},
+              {"libelle": "≤ 150", "detail": "91 à 150 mm · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 192, "y": 110, "largeur": 21, "hauteur": 0, "zone": {"x": 185, "y": 0, "largeur": 36, "hauteur": 130}},
+              {"libelle": "≤ 300", "detail": "151 à 300 mm · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4105, 4106], "couleur": "barre", "x": 228, "y": 63, "largeur": 21, "hauteur": 47, "zone": {"x": 221, "y": 0, "largeur": 35, "hauteur": 130}},
+              {"libelle": "> 300", "detail": "plus de 300 mm · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 263, "y": 110, "largeur": 21, "hauteur": 0, "zone": {"x": 256, "y": 0, "largeur": 36, "hauteur": 130}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 35, "hauteur": 130, "barre": 1},
+              {"x": 43, "y": 0, "largeur": 36, "hauteur": 130, "barre": 2},
+              {"x": 79, "y": 0, "largeur": 35, "hauteur": 130, "barre": 3},
+              {"x": 114, "y": 0, "largeur": 36, "hauteur": 130, "barre": 4},
+              {"x": 150, "y": 0, "largeur": 35, "hauteur": 130, "barre": 5},
+              {"x": 185, "y": 0, "largeur": 36, "hauteur": 130, "barre": 6},
+              {"x": 221, "y": 0, "largeur": 35, "hauteur": 130, "barre": 7},
+              {"x": 256, "y": 0, "largeur": 36, "hauteur": 130, "barre": 8}
+            ]
+          },
+          "iso": {
+            "titre": "Sensibilité (ISO)",
+            "fichier": "<dossier>/iso.png",
+            "largeur": 300,
+            "hauteur": 130,
+            "orientation": "verticale",
+            "max_barres": 8,
+            "unite": "photos",
+            "echelle": 3,
+            "sans_valeur": 1,
+            "note": "1 photo sans ISO lu n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "≤ 200", "detail": "ISO 200 ou moins · 3 photos", "valeur": 3, "texte": "3", "n": 3, "ids": [3640, 3801, 4211], "couleur": "barre", "x": 15, "y": 16, "largeur": 21, "hauteur": 94, "zone": {"x": 8, "y": 0, "largeur": 35, "hauteur": 130}},
+              {"libelle": "≤ 400", "detail": "ISO 201 à 400 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4231, 4302], "couleur": "barre", "x": 50, "y": 47, "largeur": 21, "hauteur": 63, "zone": {"x": 43, "y": 0, "largeur": 36, "hauteur": 130}},
+              {"libelle": "≤ 800", "detail": "ISO 401 à 800 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [4105], "couleur": "barre", "x": 86, "y": 79, "largeur": 21, "hauteur": 31, "zone": {"x": 79, "y": 0, "largeur": 35, "hauteur": 130}},
+              {"libelle": "≤ 1 600", "detail": "ISO 801 à 1 600 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 4106], "couleur": "barre", "x": 121, "y": 47, "largeur": 21, "hauteur": 63, "zone": {"x": 114, "y": 0, "largeur": 36, "hauteur": 130}},
+              {"libelle": "≤ 3 200", "detail": "ISO 1 601 à 3 200 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3990, 4230], "couleur": "barre", "x": 157, "y": 47, "largeur": 21, "hauteur": 63, "zone": {"x": 150, "y": 0, "largeur": 35, "hauteur": 130}},
+              {"libelle": "≤ 6 400", "detail": "ISO 3 201 à 6 400 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3502], "couleur": "barre", "x": 192, "y": 79, "largeur": 21, "hauteur": 31, "zone": {"x": 185, "y": 0, "largeur": 36, "hauteur": 130}},
+              {"libelle": "≤ 12 800", "detail": "ISO 6 401 à 12 800 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 228, "y": 110, "largeur": 21, "hauteur": 0, "zone": {"x": 221, "y": 0, "largeur": 35, "hauteur": 130}},
+              {"libelle": "> 12 800", "detail": "plus de ISO 12 800 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 263, "y": 110, "largeur": 21, "hauteur": 0, "zone": {"x": 256, "y": 0, "largeur": 36, "hauteur": 130}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 35, "hauteur": 130, "barre": 1},
+              {"x": 43, "y": 0, "largeur": 36, "hauteur": 130, "barre": 2},
+              {"x": 79, "y": 0, "largeur": 35, "hauteur": 130, "barre": 3},
+              {"x": 114, "y": 0, "largeur": 36, "hauteur": 130, "barre": 4},
+              {"x": 150, "y": 0, "largeur": 35, "hauteur": 130, "barre": 5},
+              {"x": 185, "y": 0, "largeur": 36, "hauteur": 130, "barre": 6},
+              {"x": 221, "y": 0, "largeur": 35, "hauteur": 130, "barre": 7},
+              {"x": 256, "y": 0, "largeur": 36, "hauteur": 130, "barre": 8}
+            ]
+          },
+          "heures": {
+            "titre": "Heure de la prise de vue",
+            "fichier": "<dossier>/heures.png",
+            "largeur": 620,
+            "hauteur": 120,
+            "orientation": "verticale",
+            "max_barres": 12,
+            "unite": "photos",
+            "echelle": 3,
+            "sans_valeur": 1,
+            "note": "1 photo sans date de prise de vue n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "0 h", "detail": "de 0 h à 2 h · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 18, "y": 100, "largeur": 30, "hauteur": 0, "zone": {"x": 8, "y": 0, "largeur": 50, "hauteur": 120}},
+              {"libelle": "2 h", "detail": "de 2 h à 4 h · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 68, "y": 100, "largeur": 30, "hauteur": 0, "zone": {"x": 58, "y": 0, "largeur": 50, "hauteur": 120}},
+              {"libelle": "4 h", "detail": "de 4 h à 6 h · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 118, "y": 100, "largeur": 30, "hauteur": 0, "zone": {"x": 108, "y": 0, "largeur": 51, "hauteur": 120}},
+              {"libelle": "6 h", "detail": "de 6 h à 8 h · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 169, "y": 100, "largeur": 30, "hauteur": 0, "zone": {"x": 159, "y": 0, "largeur": 50, "hauteur": 120}},
+              {"libelle": "8 h", "detail": "de 8 h à 10 h · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [4231], "couleur": "barre", "x": 219, "y": 72, "largeur": 30, "hauteur": 28, "zone": {"x": 209, "y": 0, "largeur": 50, "hauteur": 120}},
+              {"libelle": "10 h", "detail": "de 10 h à 12 h · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3801], "couleur": "barre", "x": 269, "y": 72, "largeur": 30, "hauteur": 28, "zone": {"x": 259, "y": 0, "largeur": 51, "hauteur": 120}},
+              {"libelle": "12 h", "detail": "de 12 h à 14 h · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3640], "couleur": "barre", "x": 320, "y": 72, "largeur": 30, "hauteur": 28, "zone": {"x": 310, "y": 0, "largeur": 50, "hauteur": 120}},
+              {"libelle": "14 h", "detail": "de 14 h à 16 h · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [4302], "couleur": "barre", "x": 370, "y": 72, "largeur": 30, "hauteur": 28, "zone": {"x": 360, "y": 0, "largeur": 50, "hauteur": 120}},
+              {"libelle": "16 h", "detail": "de 16 h à 18 h · 3 photos", "valeur": 3, "texte": "3", "n": 3, "ids": [4105, 4106, 4211], "couleur": "barre", "x": 420, "y": 16, "largeur": 30, "hauteur": 84, "zone": {"x": 410, "y": 0, "largeur": 51, "hauteur": 120}},
+              {"libelle": "18 h", "detail": "de 18 h à 20 h · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3502, 4230], "couleur": "barre", "x": 471, "y": 44, "largeur": 30, "hauteur": 56, "zone": {"x": 461, "y": 0, "largeur": 50, "hauteur": 120}},
+              {"libelle": "20 h", "detail": "de 20 h à 22 h · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 521, "y": 44, "largeur": 30, "hauteur": 56, "zone": {"x": 511, "y": 0, "largeur": 50, "hauteur": 120}},
+              {"libelle": "22 h", "detail": "de 22 h à 24 h · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 571, "y": 100, "largeur": 30, "hauteur": 0, "zone": {"x": 561, "y": 0, "largeur": 51, "hauteur": 120}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 50, "hauteur": 120, "barre": 1},
+              {"x": 58, "y": 0, "largeur": 50, "hauteur": 120, "barre": 2},
+              {"x": 108, "y": 0, "largeur": 51, "hauteur": 120, "barre": 3},
+              {"x": 159, "y": 0, "largeur": 50, "hauteur": 120, "barre": 4},
+              {"x": 209, "y": 0, "largeur": 50, "hauteur": 120, "barre": 5},
+              {"x": 259, "y": 0, "largeur": 51, "hauteur": 120, "barre": 6},
+              {"x": 310, "y": 0, "largeur": 50, "hauteur": 120, "barre": 7},
+              {"x": 360, "y": 0, "largeur": 50, "hauteur": 120, "barre": 8},
+              {"x": 410, "y": 0, "largeur": 51, "hauteur": 120, "barre": 9},
+              {"x": 461, "y": 0, "largeur": 50, "hauteur": 120, "barre": 10},
+              {"x": 511, "y": 0, "largeur": 50, "hauteur": 120, "barre": 11},
+              {"x": 561, "y": 0, "largeur": 51, "hauteur": 120, "barre": 12}
+            ]
+          },
+          "objectifs": {
+            "titre": "Objectifs",
+            "fichier": "<dossier>/objectifs.png",
+            "largeur": 300,
+            "hauteur": 170,
+            "orientation": "horizontale",
+            "max_barres": 8,
+            "unite": "photos",
+            "echelle": 2,
+            "sans_valeur": 0,
+            "vide": false,
+            "barres": [
+              {"libelle": "iPhone 15 Pro back triple camera 6.765mm f/1.78", "detail": "iPhone 15 Pro back triple camera 6.765mm f/1.78 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 124, "y": 8, "largeur": 124, "hauteur": 12, "zone": {"x": 0, "y": 4, "largeur": 300, "hauteur": 20}},
+              {"libelle": "XF16-80mmF4 R OIS WR", "detail": "XF16-80mmF4 R OIS WR · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4211, 4230], "couleur": "barre", "x": 124, "y": 28, "largeur": 124, "hauteur": 12, "zone": {"x": 0, "y": 24, "largeur": 300, "hauteur": 20}},
+              {"libelle": "XF18-55mmF2.8-4 R LM OIS", "detail": "XF18-55mmF2.8-4 R LM OIS · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3640, 3801], "couleur": "barre", "x": 124, "y": 48, "largeur": 124, "hauteur": 12, "zone": {"x": 0, "y": 44, "largeur": 300, "hauteur": 20}},
+              {"libelle": "XF23mmF2 R WR", "detail": "XF23mmF2 R WR · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3502, 4231], "couleur": "barre", "x": 124, "y": 68, "largeur": 124, "hauteur": 12, "zone": {"x": 0, "y": 64, "largeur": 300, "hauteur": 21}},
+              {"libelle": "XF70-300mmF4-5.6 R LM OIS WR", "detail": "XF70-300mmF4-5.6 R LM OIS WR · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4105, 4106], "couleur": "barre", "x": 124, "y": 89, "largeur": 124, "hauteur": 12, "zone": {"x": 0, "y": 85, "largeur": 300, "hauteur": 20}},
+              {"libelle": "XF56mmF1.2 R WR", "detail": "XF56mmF1.2 R WR · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [4302], "couleur": "barre", "x": 124, "y": 109, "largeur": 62, "hauteur": 12, "zone": {"x": 0, "y": 105, "largeur": 300, "hauteur": 20}},
+              {"libelle": "Inconnu", "detail": "Objectif inconnu · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3420], "couleur": "barre", "x": 124, "y": 129, "largeur": 62, "hauteur": 12, "zone": {"x": 0, "y": 125, "largeur": 300, "hauteur": 20}}
+            ],
+            "creneaux": [
+              {"x": 0, "y": 4, "largeur": 300, "hauteur": 20, "barre": 1},
+              {"x": 0, "y": 24, "largeur": 300, "hauteur": 20, "barre": 2},
+              {"x": 0, "y": 44, "largeur": 300, "hauteur": 20, "barre": 3},
+              {"x": 0, "y": 64, "largeur": 300, "hauteur": 21, "barre": 4},
+              {"x": 0, "y": 85, "largeur": 300, "hauteur": 20, "barre": 5},
+              {"x": 0, "y": 105, "largeur": 300, "hauteur": 20, "barre": 6},
+              {"x": 0, "y": 125, "largeur": 300, "hauteur": 20, "barre": 7},
+              {"x": 0, "y": 145, "largeur": 300, "hauteur": 21, "barre": 0}
+            ]
+          },
+          "defauts_frequents": {
+            "titre": "Défauts les plus fréquents",
+            "fichier": "<dossier>/defauts_frequents.png",
+            "largeur": 620,
+            "hauteur": 180,
+            "orientation": "horizontale",
+            "max_barres": 8,
+            "unite": "%",
+            "echelle": 50,
+            "sans_valeur": 0,
+            "note": "En % des photos où il est cherché : bruit à ISO 1 600 et plus, yeux sur un visage, horizon et mise au point quand Claude regarde la photo.",
+            "vide": false,
+            "barres": [
+              {"libelle": "Horizon ou ligne penchée", "detail": "Horizon ou ligne penchée · 1 photo sur 2 (50 %)", "valeur": 50, "texte": "50 %", "n": 1, "sur": 2, "ids": [4231], "couleur": "barre", "x": 252, "y": 8, "largeur": 316, "hauteur": 12, "zone": {"x": 0, "y": 4, "largeur": 620, "hauteur": 21}},
+              {"libelle": "Mise au point à côté", "detail": "Mise au point à côté · 1 photo sur 2 (50 %)", "valeur": 50, "texte": "50 %", "n": 1, "sur": 2, "ids": [3502], "couleur": "barre", "x": 252, "y": 29, "largeur": 316, "hauteur": 13, "zone": {"x": 0, "y": 25, "largeur": 620, "hauteur": 22}},
+              {"libelle": "Bruit fort (ISO élevé)", "detail": "Bruit fort (ISO élevé) · 1 photo sur 3 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 1, "sur": 3, "ids": [4230], "couleur": "barre", "x": 252, "y": 51, "largeur": 210, "hauteur": 12, "zone": {"x": 0, "y": 47, "largeur": 620, "hauteur": 21}},
+              {"libelle": "Yeux fermés ou plissés", "detail": "Yeux fermés ou plissés · 1 photo sur 3 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 1, "sur": 3, "ids": [3988], "couleur": "barre", "x": 252, "y": 72, "largeur": 210, "hauteur": 13, "zone": {"x": 0, "y": 68, "largeur": 620, "hauteur": 22}},
+              {"libelle": "Photo floue ou bougée", "detail": "Photo floue ou bougée · 3 photos sur 10 (30 %)", "valeur": 30, "texte": "30 %", "n": 3, "sur": 10, "ids": [3640, 4105, 4230], "couleur": "accent", "x": 252, "y": 94, "largeur": 190, "hauteur": 12, "zone": {"x": 0, "y": 90, "largeur": 620, "hauteur": 21}},
+              {"libelle": "Photo sous-exposée", "detail": "Photo sous-exposée · 2 photos sur 10 (20 %)", "valeur": 20, "texte": "20 %", "n": 2, "sur": 10, "ids": [3640, 3988], "couleur": "barre", "x": 252, "y": 115, "largeur": 126, "hauteur": 13, "zone": {"x": 0, "y": 111, "largeur": 620, "hauteur": 22}},
+              {"libelle": "Ciel ou haut de l'image brûlé", "detail": "Ciel ou haut de l'image brûlé · 2 photos sur 10 (20 %)", "valeur": 20, "texte": "20 %", "n": 2, "sur": 10, "ids": [3801, 4231], "couleur": "barre", "x": 252, "y": 137, "largeur": 126, "hauteur": 12, "zone": {"x": 0, "y": 133, "largeur": 620, "hauteur": 21}},
+              {"libelle": "Photo surexposée", "detail": "Photo surexposée · 0 photo sur 10 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 10, "ids": [], "couleur": "barre", "x": 252, "y": 158, "largeur": 0, "hauteur": 13, "zone": {"x": 0, "y": 154, "largeur": 620, "hauteur": 22}}
+            ],
+            "creneaux": [
+              {"x": 0, "y": 4, "largeur": 620, "hauteur": 21, "barre": 1},
+              {"x": 0, "y": 25, "largeur": 620, "hauteur": 22, "barre": 2},
+              {"x": 0, "y": 47, "largeur": 620, "hauteur": 21, "barre": 3},
+              {"x": 0, "y": 68, "largeur": 620, "hauteur": 22, "barre": 4},
+              {"x": 0, "y": 90, "largeur": 620, "hauteur": 21, "barre": 5},
+              {"x": 0, "y": 111, "largeur": 620, "hauteur": 22, "barre": 6},
+              {"x": 0, "y": 133, "largeur": 620, "hauteur": 21, "barre": 7},
+              {"x": 0, "y": 154, "largeur": 620, "hauteur": 22, "barre": 8}
+            ]
+          },
+          "evolution_defaut": {
+            "titre": "Photo floue ou bougée, mois par mois",
+            "fichier": "<dossier>/evolution_defaut.png",
+            "largeur": 620,
+            "hauteur": 140,
+            "orientation": "verticale",
+            "max_barres": 12,
+            "unite": "%",
+            "echelle": 100,
+            "sans_valeur": 1,
+            "note": "1 photo sans date de prise de vue n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "déc.", "detail": "décembre 2025 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 18, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 8, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "janv.", "detail": "janvier 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 68, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 58, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "févr.", "detail": "février 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 118, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 108, "y": 0, "largeur": 51, "hauteur": 140}},
+              {"libelle": "mars", "detail": "mars 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 169, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 159, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "avr.", "detail": "avril 2026 · 1 photo sur 1 (100 %)", "valeur": 100, "texte": "100 %", "n": 1, "sur": 1, "ids": [3640], "couleur": "accent", "x": 219, "y": 16, "largeur": 30, "hauteur": 104, "zone": {"x": 209, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "mai", "detail": "mai 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 269, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 259, "y": 0, "largeur": 51, "hauteur": 140}},
+              {"libelle": "juin", "detail": "juin 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 320, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 310, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "juil.", "detail": "juillet 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 370, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 360, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "août", "detail": "août 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 420, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 410, "y": 0, "largeur": 51, "hauteur": 140}},
+              {"libelle": "sept.", "detail": "septembre 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 471, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 461, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "oct.", "detail": "octobre 2026 · 1 photo sur 2 (50 %)", "valeur": 50, "texte": "50 %", "n": 1, "sur": 2, "ids": [4105], "couleur": "accent", "x": 521, "y": 68, "largeur": 30, "hauteur": 52, "zone": {"x": 511, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "nov.", "detail": "novembre 2026 · 1 photo sur 3 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 1, "sur": 3, "ids": [4230], "couleur": "accent", "x": 571, "y": 85, "largeur": 30, "hauteur": 35, "zone": {"x": 561, "y": 0, "largeur": 51, "hauteur": 140}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 50, "hauteur": 140, "barre": 1},
+              {"x": 58, "y": 0, "largeur": 50, "hauteur": 140, "barre": 2},
+              {"x": 108, "y": 0, "largeur": 51, "hauteur": 140, "barre": 3},
+              {"x": 159, "y": 0, "largeur": 50, "hauteur": 140, "barre": 4},
+              {"x": 209, "y": 0, "largeur": 50, "hauteur": 140, "barre": 5},
+              {"x": 259, "y": 0, "largeur": 51, "hauteur": 140, "barre": 6},
+              {"x": 310, "y": 0, "largeur": 50, "hauteur": 140, "barre": 7},
+              {"x": 360, "y": 0, "largeur": 50, "hauteur": 140, "barre": 8},
+              {"x": 410, "y": 0, "largeur": 51, "hauteur": 140, "barre": 9},
+              {"x": 461, "y": 0, "largeur": 50, "hauteur": 140, "barre": 10},
+              {"x": 511, "y": 0, "largeur": 50, "hauteur": 140, "barre": 11},
+              {"x": 561, "y": 0, "largeur": 51, "hauteur": 140, "barre": 12}
+            ]
+          }
+        },
+        "remarques": []
+      }
+    },
+    "graphiques_3_mois": {
+      "_note": "Partiel : la période courte, dans l'apparence sombre, avec le défaut « yeux_fermes » choisi. Trois colonnes de quatre créneaux chacune ; en octobre, les yeux ne sont cherchés sur aucune photo (sans visage) : sur 0, texte « — ».",
+      "partiel": true,
+      "entree": {
+        "suivi": "<suivi.json>",
+        "carnet": "<carnet.json>",
+        "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
+        "aujourd_hui": "2026-11-20",
+        "periode": "3_mois",
+        "apparence": "sombre",
+        "couleurs": {"fond": "323232", "texte": "E8E8E8", "gris": "9A9A9A", "filet": "4A4A4A", "barre": "5AA2F6", "accent": "E8963A"},
+        "defaut": "yeux_fermes",
+        "tailles": {
+          "photos_par_mois": {"largeur": 620, "hauteur": 150},
+          "focales": {"largeur": 300, "hauteur": 130},
+          "iso": {"largeur": 300, "hauteur": 130},
+          "heures": {"largeur": 620, "hauteur": 120},
+          "objectifs": {"largeur": 300, "hauteur": 170},
+          "defauts_frequents": {"largeur": 620, "hauteur": 180},
+          "evolution_defaut": {"largeur": 620, "hauteur": 140}
+        }
+      },
+      "sortie": {
+        "ok": true,
+        "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
+        "aujourd_hui": "2026-11-20",
+        "periode": {"code": "3_mois", "libelle": "3 derniers mois", "debut": "2026-09", "fin": "2026-11", "par": "mois"},
+        "photos": 9,
+        "sans_date": 1,
+        "analyse": {"analysees": 7, "en_attente": 1, "en_echec": 1},
+        "tuiles": [
+          {"cle": "photos_ouvertes", "titre": "Photos ouvertes", "valeur": 9, "texte": "9", "detail": "1 en cours d'analyse · 1 non analysée"},
+          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 2, "texte": "2", "detail": "22 % des photos ouvertes"},
+          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 2, "texte": "2", "detail": "22 % des photos ouvertes"},
+          {"cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": 28.6, "texte": "29 %", "detail": "Photo floue ou bougée · 2 photos sur 7", "code": "flou"}
+        ],
+        "defauts": [
+          {"code": "horizon_penche", "libelle": "Horizon ou ligne penchée", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"},
+          {"code": "sous_exposition", "libelle": "Photo sous-exposée", "n": 1, "sur": 7, "valeur": 14.3, "texte": "14 %"},
+          {"code": "surexposition", "libelle": "Photo surexposée", "n": 0, "sur": 7, "valeur": 0, "texte": "0 %"},
+          {"code": "ciel_brule", "libelle": "Ciel ou haut de l'image brûlé", "n": 1, "sur": 7, "valeur": 14.3, "texte": "14 %"},
+          {"code": "bruit", "libelle": "Bruit fort (ISO élevé)", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"},
+          {"code": "flou", "libelle": "Photo floue ou bougée", "n": 2, "sur": 7, "valeur": 28.6, "texte": "29 %"},
+          {"code": "mise_au_point", "libelle": "Mise au point à côté", "n": 0, "sur": 1, "valeur": 0, "texte": "0 %"},
+          {"code": "yeux_fermes", "libelle": "Yeux fermés ou plissés", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"}
+        ],
+        "defaut_suivi": {"code": "yeux_fermes", "libelle": "Yeux fermés ou plissés", "choisi": true},
+        "graphiques": {
+          "photos_par_mois": {
+            "titre": "Photos par mois",
+            "fichier": "<dossier>/photos_par_mois.png",
+            "largeur": 620,
+            "hauteur": 150,
+            "orientation": "verticale",
+            "max_barres": 12,
+            "unite": "photos",
+            "echelle": 4,
+            "sans_valeur": 1,
+            "note": "1 photo sans date de prise de vue n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "sept.", "detail": "septembre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 48, "y": 73, "largeur": 120, "hauteur": 57, "zone": {"x": 8, "y": 0, "largeur": 201, "hauteur": 150}},
+              {"libelle": "oct.", "detail": "octobre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4105, 4106], "couleur": "barre", "x": 249, "y": 73, "largeur": 120, "hauteur": 57, "zone": {"x": 209, "y": 0, "largeur": 201, "hauteur": 150}},
+              {"libelle": "nov.", "detail": "novembre 2026 · 4 photos", "valeur": 4, "texte": "4", "n": 4, "ids": [4211, 4230, 4231, 4302], "couleur": "barre", "x": 450, "y": 16, "largeur": 121, "hauteur": 114, "zone": {"x": 410, "y": 0, "largeur": 202, "hauteur": 150}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 50, "hauteur": 150, "barre": 1},
+              {"x": 58, "y": 0, "largeur": 50, "hauteur": 150, "barre": 1},
+              {"x": 108, "y": 0, "largeur": 51, "hauteur": 150, "barre": 1},
+              {"x": 159, "y": 0, "largeur": 50, "hauteur": 150, "barre": 1},
+              {"x": 209, "y": 0, "largeur": 50, "hauteur": 150, "barre": 2},
+              {"x": 259, "y": 0, "largeur": 51, "hauteur": 150, "barre": 2},
+              {"x": 310, "y": 0, "largeur": 50, "hauteur": 150, "barre": 2},
+              {"x": 360, "y": 0, "largeur": 50, "hauteur": 150, "barre": 2},
+              {"x": 410, "y": 0, "largeur": 51, "hauteur": 150, "barre": 3},
+              {"x": 461, "y": 0, "largeur": 50, "hauteur": 150, "barre": 3},
+              {"x": 511, "y": 0, "largeur": 50, "hauteur": 150, "barre": 3},
+              {"x": 561, "y": 0, "largeur": 51, "hauteur": 150, "barre": 3}
+            ]
+          },
+          "evolution_defaut": {
+            "titre": "Yeux fermés ou plissés, mois par mois",
+            "fichier": "<dossier>/evolution_defaut.png",
+            "largeur": 620,
+            "hauteur": 140,
+            "orientation": "verticale",
+            "max_barres": 12,
+            "unite": "%",
+            "echelle": 100,
+            "sans_valeur": 0,
+            "vide": false,
+            "barres": [
+              {"libelle": "sept.", "detail": "septembre 2026 · 1 photo sur 1 (100 %)", "valeur": 100, "texte": "100 %", "n": 1, "sur": 1, "ids": [3988], "couleur": "accent", "x": 48, "y": 16, "largeur": 120, "hauteur": 104, "zone": {"x": 8, "y": 0, "largeur": 201, "hauteur": 140}},
+              {"libelle": "oct.", "detail": "octobre 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 249, "y": 120, "largeur": 120, "hauteur": 0, "zone": {"x": 209, "y": 0, "largeur": 201, "hauteur": 140}},
+              {"libelle": "nov.", "detail": "novembre 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 450, "y": 120, "largeur": 121, "hauteur": 0, "zone": {"x": 410, "y": 0, "largeur": 202, "hauteur": 140}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 50, "hauteur": 140, "barre": 1},
+              {"x": 58, "y": 0, "largeur": 50, "hauteur": 140, "barre": 1},
+              {"x": 108, "y": 0, "largeur": 51, "hauteur": 140, "barre": 1},
+              {"x": 159, "y": 0, "largeur": 50, "hauteur": 140, "barre": 1},
+              {"x": 209, "y": 0, "largeur": 50, "hauteur": 140, "barre": 2},
+              {"x": 259, "y": 0, "largeur": 51, "hauteur": 140, "barre": 2},
+              {"x": 310, "y": 0, "largeur": 50, "hauteur": 140, "barre": 2},
+              {"x": 360, "y": 0, "largeur": 50, "hauteur": 140, "barre": 2},
+              {"x": 410, "y": 0, "largeur": 51, "hauteur": 140, "barre": 3},
+              {"x": 461, "y": 0, "largeur": 50, "hauteur": 140, "barre": 3},
+              {"x": 511, "y": 0, "largeur": 50, "hauteur": 140, "barre": 3},
+              {"x": 561, "y": 0, "largeur": 51, "hauteur": 140, "barre": 3}
+            ]
+          }
+        },
+        "remarques": []
+      }
+    },
+    "graphiques_tout": {
+      "_note": "Partiel : Tout, avec le défaut « flou » choisi. De 2009 à 2026, dix-huit années : « < 2016 » réunit 2009, 2013 et 2015, puis 2016 à 2026, sans photo comprises. Neuf groupes d'objectifs : les sept premiers, puis « Autres » (XF35 et XF56).",
+      "partiel": true,
+      "entree": {
+        "suivi": "<suivi.json>",
+        "carnet": "<carnet.json>",
+        "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
+        "aujourd_hui": "2026-11-20",
+        "periode": "tout",
+        "apparence": "claire",
+        "couleurs": {"fond": "ECECEC", "texte": "1D1D1F", "gris": "6B6B6B", "filet": "C9C9C9", "barre": "0A64D8", "accent": "E0800D"},
+        "defaut": "flou",
+        "tailles": {
+          "photos_par_mois": {"largeur": 620, "hauteur": 150},
+          "focales": {"largeur": 300, "hauteur": 130},
+          "iso": {"largeur": 300, "hauteur": 130},
+          "heures": {"largeur": 620, "hauteur": 120},
+          "objectifs": {"largeur": 300, "hauteur": 170},
+          "defauts_frequents": {"largeur": 620, "hauteur": 180},
+          "evolution_defaut": {"largeur": 620, "hauteur": 140}
+        }
+      },
+      "sortie": {
+        "ok": true,
+        "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
+        "aujourd_hui": "2026-11-20",
+        "periode": {"code": "tout", "libelle": "Tout", "debut": "2009-12", "fin": "2026-11", "par": "annee"},
+        "photos": 17,
+        "sans_date": 1,
+        "analyse": {"analysees": 15, "en_attente": 1, "en_echec": 1},
+        "tuiles": [
+          {"cle": "photos_ouvertes", "titre": "Photos ouvertes", "valeur": 17, "texte": "17", "detail": "1 en cours d'analyse · 1 non analysée"},
+          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "18 % des photos ouvertes"},
+          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "24 % des photos ouvertes"},
+          {"cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": 33.3, "texte": "33 %", "detail": "Photo floue ou bougée · 5 photos sur 15", "code": "flou"}
+        ],
+        "defauts": [
+          {"code": "horizon_penche", "libelle": "Horizon ou ligne penchée", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"},
+          {"code": "sous_exposition", "libelle": "Photo sous-exposée", "n": 3, "sur": 15, "valeur": 20, "texte": "20 %"},
+          {"code": "surexposition", "libelle": "Photo surexposée", "n": 0, "sur": 15, "valeur": 0, "texte": "0 %"},
+          {"code": "ciel_brule", "libelle": "Ciel ou haut de l'image brûlé", "n": 3, "sur": 15, "valeur": 20, "texte": "20 %"},
+          {"code": "bruit", "libelle": "Bruit fort (ISO élevé)", "n": 1, "sur": 3, "valeur": 33.3, "texte": "33 %"},
+          {"code": "flou", "libelle": "Photo floue ou bougée", "n": 5, "sur": 15, "valeur": 33.3, "texte": "33 %"},
+          {"code": "mise_au_point", "libelle": "Mise au point à côté", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"},
+          {"code": "yeux_fermes", "libelle": "Yeux fermés ou plissés", "n": 1, "sur": 3, "valeur": 33.3, "texte": "33 %"}
+        ],
+        "defaut_suivi": {"code": "flou", "libelle": "Photo floue ou bougée", "choisi": true},
+        "graphiques": {
+          "photos_par_mois": {
+            "titre": "Photos par année",
+            "fichier": "<dossier>/photos_par_mois.png",
+            "largeur": 620,
+            "hauteur": 150,
+            "orientation": "verticale",
+            "max_barres": 12,
+            "unite": "photos",
+            "echelle": 11,
+            "sans_valeur": 1,
+            "note": "1 photo sans date de prise de vue n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "< 2016", "detail": "avant 2016 · 3 photos", "valeur": 3, "texte": "3", "n": 3, "ids": [402, 855, 1203], "couleur": "barre", "x": 18, "y": 99, "largeur": 30, "hauteur": 31, "zone": {"x": 8, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "2016", "detail": "2016 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 68, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 58, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "2017", "detail": "2017 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 118, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 108, "y": 0, "largeur": 51, "hauteur": 150}},
+              {"libelle": "2018", "detail": "2018 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 169, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 159, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "2019", "detail": "2019 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [2105], "couleur": "barre", "x": 219, "y": 120, "largeur": 30, "hauteur": 10, "zone": {"x": 209, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "2020", "detail": "2020 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 269, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 259, "y": 0, "largeur": 51, "hauteur": 150}},
+              {"libelle": "2021", "detail": "2021 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 320, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 310, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "2022", "detail": "2022 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 370, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 360, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "2023", "detail": "2023 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 420, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 410, "y": 0, "largeur": 51, "hauteur": 150}},
+              {"libelle": "2024", "detail": "2024 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 471, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 461, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "2025", "detail": "2025 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [2950], "couleur": "barre", "x": 521, "y": 120, "largeur": 30, "hauteur": 10, "zone": {"x": 511, "y": 0, "largeur": 50, "hauteur": 150}},
+              {"libelle": "2026", "detail": "2026 · 11 photos", "valeur": 11, "texte": "11", "n": 11, "ids": [3502, 3640, 3801, 3988, 3990, 4105, 4106, 4211, 4230, 4231, 4302], "couleur": "barre", "x": 571, "y": 16, "largeur": 30, "hauteur": 114, "zone": {"x": 561, "y": 0, "largeur": 51, "hauteur": 150}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 50, "hauteur": 150, "barre": 1},
+              {"x": 58, "y": 0, "largeur": 50, "hauteur": 150, "barre": 2},
+              {"x": 108, "y": 0, "largeur": 51, "hauteur": 150, "barre": 3},
+              {"x": 159, "y": 0, "largeur": 50, "hauteur": 150, "barre": 4},
+              {"x": 209, "y": 0, "largeur": 50, "hauteur": 150, "barre": 5},
+              {"x": 259, "y": 0, "largeur": 51, "hauteur": 150, "barre": 6},
+              {"x": 310, "y": 0, "largeur": 50, "hauteur": 150, "barre": 7},
+              {"x": 360, "y": 0, "largeur": 50, "hauteur": 150, "barre": 8},
+              {"x": 410, "y": 0, "largeur": 51, "hauteur": 150, "barre": 9},
+              {"x": 461, "y": 0, "largeur": 50, "hauteur": 150, "barre": 10},
+              {"x": 511, "y": 0, "largeur": 50, "hauteur": 150, "barre": 11},
+              {"x": 561, "y": 0, "largeur": 51, "hauteur": 150, "barre": 12}
+            ]
+          },
+          "objectifs": {
+            "titre": "Objectifs",
+            "fichier": "<dossier>/objectifs.png",
+            "largeur": 300,
+            "hauteur": 170,
+            "orientation": "horizontale",
+            "max_barres": 8,
+            "unite": "photos",
+            "echelle": 3,
+            "sans_valeur": 0,
+            "vide": false,
+            "barres": [
+              {"libelle": "XF18-55mmF2.8-4 R LM OIS", "detail": "XF18-55mmF2.8-4 R LM OIS · 3 photos", "valeur": 3, "texte": "3", "n": 3, "ids": [2950, 3640, 3801], "couleur": "barre", "x": 124, "y": 8, "largeur": 124, "hauteur": 12, "zone": {"x": 0, "y": 4, "largeur": 300, "hauteur": 20}},
+              {"libelle": "EF-S18-55mm f/3.5-5.6 IS", "detail": "EF-S18-55mm f/3.5-5.6 IS · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [855, 1203], "couleur": "barre", "x": 124, "y": 28, "largeur": 83, "hauteur": 12, "zone": {"x": 0, "y": 24, "largeur": 300, "hauteur": 20}},
+              {"libelle": "iPhone 15 Pro back triple camera 6.765mm f/1.78", "detail": "iPhone 15 Pro back triple camera 6.765mm f/1.78 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 124, "y": 48, "largeur": 83, "hauteur": 12, "zone": {"x": 0, "y": 44, "largeur": 300, "hauteur": 20}},
+              {"libelle": "XF16-80mmF4 R OIS WR", "detail": "XF16-80mmF4 R OIS WR · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4211, 4230], "couleur": "barre", "x": 124, "y": 68, "largeur": 83, "hauteur": 12, "zone": {"x": 0, "y": 64, "largeur": 300, "hauteur": 21}},
+              {"libelle": "XF23mmF2 R WR", "detail": "XF23mmF2 R WR · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3502, 4231], "couleur": "barre", "x": 124, "y": 89, "largeur": 83, "hauteur": 12, "zone": {"x": 0, "y": 85, "largeur": 300, "hauteur": 20}},
+              {"libelle": "XF70-300mmF4-5.6 R LM OIS WR", "detail": "XF70-300mmF4-5.6 R LM OIS WR · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4105, 4106], "couleur": "barre", "x": 124, "y": 109, "largeur": 83, "hauteur": 12, "zone": {"x": 0, "y": 105, "largeur": 300, "hauteur": 20}},
+              {"libelle": "Inconnu", "detail": "Objectif inconnu · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [402, 3420], "couleur": "barre", "x": 124, "y": 129, "largeur": 83, "hauteur": 12, "zone": {"x": 0, "y": 125, "largeur": 300, "hauteur": 20}},
+              {"libelle": "Autres", "detail": "2 autres objectifs · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [2105, 4302], "couleur": "barre", "x": 124, "y": 149, "largeur": 83, "hauteur": 12, "zone": {"x": 0, "y": 145, "largeur": 300, "hauteur": 21}}
+            ],
+            "creneaux": [
+              {"x": 0, "y": 4, "largeur": 300, "hauteur": 20, "barre": 1},
+              {"x": 0, "y": 24, "largeur": 300, "hauteur": 20, "barre": 2},
+              {"x": 0, "y": 44, "largeur": 300, "hauteur": 20, "barre": 3},
+              {"x": 0, "y": 64, "largeur": 300, "hauteur": 21, "barre": 4},
+              {"x": 0, "y": 85, "largeur": 300, "hauteur": 20, "barre": 5},
+              {"x": 0, "y": 105, "largeur": 300, "hauteur": 20, "barre": 6},
+              {"x": 0, "y": 125, "largeur": 300, "hauteur": 20, "barre": 7},
+              {"x": 0, "y": 145, "largeur": 300, "hauteur": 21, "barre": 8}
+            ]
+          },
+          "evolution_defaut": {
+            "titre": "Photo floue ou bougée, année par année",
+            "fichier": "<dossier>/evolution_defaut.png",
+            "largeur": 620,
+            "hauteur": 140,
+            "orientation": "verticale",
+            "max_barres": 12,
+            "unite": "%",
+            "echelle": 100,
+            "sans_valeur": 1,
+            "note": "1 photo sans date de prise de vue n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "< 2016", "detail": "avant 2016 · 1 photo sur 3 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 1, "sur": 3, "ids": [402], "couleur": "accent", "x": 18, "y": 85, "largeur": 30, "hauteur": 35, "zone": {"x": 8, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "2016", "detail": "2016 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 68, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 58, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "2017", "detail": "2017 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 118, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 108, "y": 0, "largeur": 51, "hauteur": 140}},
+              {"libelle": "2018", "detail": "2018 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 169, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 159, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "2019", "detail": "2019 · 1 photo sur 1 (100 %)", "valeur": 100, "texte": "100 %", "n": 1, "sur": 1, "ids": [2105], "couleur": "accent", "x": 219, "y": 16, "largeur": 30, "hauteur": 104, "zone": {"x": 209, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "2020", "detail": "2020 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 269, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 259, "y": 0, "largeur": 51, "hauteur": 140}},
+              {"libelle": "2021", "detail": "2021 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 320, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 310, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "2022", "detail": "2022 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 370, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 360, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "2023", "detail": "2023 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 420, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 410, "y": 0, "largeur": 51, "hauteur": 140}},
+              {"libelle": "2024", "detail": "2024 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 471, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 461, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "2025", "detail": "2025 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 521, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 511, "y": 0, "largeur": 50, "hauteur": 140}},
+              {"libelle": "2026", "detail": "2026 · 3 photos sur 9 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 3, "sur": 9, "ids": [3640, 4105, 4230], "couleur": "accent", "x": 571, "y": 85, "largeur": 30, "hauteur": 35, "zone": {"x": 561, "y": 0, "largeur": 51, "hauteur": 140}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 50, "hauteur": 140, "barre": 1},
+              {"x": 58, "y": 0, "largeur": 50, "hauteur": 140, "barre": 2},
+              {"x": 108, "y": 0, "largeur": 51, "hauteur": 140, "barre": 3},
+              {"x": 159, "y": 0, "largeur": 50, "hauteur": 140, "barre": 4},
+              {"x": 209, "y": 0, "largeur": 50, "hauteur": 140, "barre": 5},
+              {"x": 259, "y": 0, "largeur": 51, "hauteur": 140, "barre": 6},
+              {"x": 310, "y": 0, "largeur": 50, "hauteur": 140, "barre": 7},
+              {"x": 360, "y": 0, "largeur": 50, "hauteur": 140, "barre": 8},
+              {"x": 410, "y": 0, "largeur": 51, "hauteur": 140, "barre": 9},
+              {"x": 461, "y": 0, "largeur": 50, "hauteur": 140, "barre": 10},
+              {"x": 511, "y": 0, "largeur": 50, "hauteur": 140, "barre": 11},
+              {"x": 561, "y": 0, "largeur": 51, "hauteur": 140, "barre": 12}
+            ]
+          }
+        },
+        "remarques": []
+      }
+    },
+    "graphiques_refus": {
+      "_note": "Les refus de tout l'appel : une seule ligne, code 1, aucun PNG écrit.",
+      "periode": {
+        "entree_change": {"periode": "6_mois"},
+        "sortie": {"ok": false, "raison": "arguments", "texte": "Arguments de --graphiques : periode vaut 3_mois, 12_mois ou tout."}
+      },
+      "taille": {
+        "entree_change": {"tailles": {"focales": {"largeur": 60, "hauteur": 130}}},
+        "sortie": {"ok": false, "raison": "arguments", "texte": "Arguments de --graphiques : tailles.focales va de 120 × 80 à 1 200 × 600 points."}
+      },
+      "couleur": {
+        "entree_change": {"couleurs": {"barre": "bleu"}},
+        "sortie": {"ok": false, "raison": "arguments", "texte": "Arguments de --graphiques : couleurs.barre est une couleur en six chiffres hexadécimaux (0A64D8)."}
+      },
+      "defaut_inconnu": {
+        "entree_change": {"defaut": "dominante"},
+        "sortie": {
+          "ok": false,
+          "raison": "defaut_inconnu",
+          "texte": "« dominante » n'est pas un défaut que le Suivi compte (horizon_penche, sous_exposition, surexposition, ciel_brule, bruit, flou, mise_au_point, yeux_fermes)."
+        }
+      },
+      "suivi_illisible": {
+        "_note": "suivi.json tronqué, ou d'un format 2.",
+        "sortie": {"ok": false, "raison": "suivi_illisible", "texte": "suivi.json illisible (JSON invalide, ou format autre que 1) : rien n'est dessiné."}
+      }
+    }
+  }
+}

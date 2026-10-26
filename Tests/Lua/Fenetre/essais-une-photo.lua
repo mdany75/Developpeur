@@ -773,6 +773,8 @@ essai("Chargement du module : les dossiers temporaires des groupes et des demand
     local taches = #S.taches
     local ok, erreur = pcall(dofile, S.plugin .. '/Init.lua')
     prefs.demarrerAuLancement = demarrer
+    -- Init.lua allume le Suivi (Releve.allumer) : il ne tourne pas dans les essais.
+    require('Releve').allume = false
     assert(ok, erreur)
     egal(taches + 1, #S.taches, 'le ménage dans une tâche')
     S.taches[#S.taches]()

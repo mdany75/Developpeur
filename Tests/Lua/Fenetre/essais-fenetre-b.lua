@@ -360,16 +360,22 @@ essai('Cadre : la fenêtre demandée par Dany, sans son volet (1 623 × 1 200), 
     vrai(bas >= D.margeBasFil, string.format('marge du bas du fil : %d (au moins %d)', bas, D.margeBasFil))
     vrai(bas - D.hauteurLigne < D.margeBasFil, string.format('une ligne de plus tiendrait (%d lignes, marge du bas de %d)', D.lignes, bas))
     -- Le titre de l'en-tête prend ce que le Mode laisse ; la photo active, ce que les deux voyants
-    -- et le bouton Suivi (décision de Dany du 25 octobre 2026) laissent (le voyant Écran est retiré :
-    -- sa place lui revient).
+    -- et les boutons Suivi (décision de Dany du 25 octobre 2026), Publication… et Consommation…
+    -- (correctif 1.3.7, décision du même jour) laissent (le voyant Écran est retiré : sa place lui
+    -- revient) ; chaque bouton tient son titre en petit et le jeu du carré.
     egal(D.fil, D.titre + D.placeRepartir, 'le titre et la place de « Repartir à neuf » (celle du Mode)')
     egal(nil, D.placeMode)
     vrai(D.repartir <= D.placeRepartir, 'Repartir à neuf tient dans sa place')
     vrai(require('Fil').largeur('Repartir à neuf', 'texte12') + 2 * 12 <= D.repartir, 'son titre tient dans le bouton')
     egal(nil, D.voyantEcran, 'plus de voyant Écran')
     egal(D.fil, (8 + 6 + D.voyantClaude) + D.ecartVoyants + (8 + 6 + D.voyantLightroom) + D.ecartVoyants
-        + D.boutonSuivi + D.ecartVoyants + D.info, 'les voyants, le bouton Suivi et la photo active')
+        + D.boutonSuivi + D.ecartBoutons + D.boutonPublication + D.ecartBoutons + D.boutonConsommation + D.ecartVoyants + D.info,
+        'les voyants, les boutons Suivi, Publication… et Consommation…, et la photo active')
     vrai(D.info >= 400, 'la photo active garde sa place : ' .. D.info)
+    for titre, largeur in pairs({ ['Suivi'] = D.boutonSuivi, ['Publication…'] = D.boutonPublication,
+        ['Consommation…'] = D.boutonConsommation }) do
+        vrai(largeur >= Fenetre.largeurLibelle(titre, 'petit') + 20, titre .. ' : son titre et le jeu du carré (' .. largeur .. ')')
+    end
     -- Les images de Dispositions.IMAGES concordent avec les tailles (plus de fond de sélection ni de
     -- loupe : le volet est retiré).
     local I = Dispositions.IMAGES
@@ -591,11 +597,11 @@ end)
 
 -- Inventaire ---------------------------------------------------------------------------------------
 
-essai("Plus de volet (correctif 1.3.6) : ni Nouvelle conversation, Rechercher, cases, Renommer…, Supprimer…, ni versions ; Publication… et Consommation… au menu", function()
+essai("Plus de volet (correctif 1.3.6) : ni Nouvelle conversation, Rechercher, cases, Renommer…, Supprimer…, ni versions ; Publication… et Consommation… au menu (et dans l'en-tête depuis le correctif 1.3.7)", function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
-        for _, titre in ipairs({ '＋ Nouvelle conversation', 'Renommer…', 'Supprimer…', 'Publication…', 'Consommation…' }) do
+        for _, titre in ipairs({ '＋ Nouvelle conversation', 'Renommer…', 'Supprimer…' }) do
             refuse(function() parTitre(contenu, titre) end, 'introuvable', 'plus de « ' .. titre .. ' »')
         end
         refuse(function() liee(contenu, 'edit_field', 'recherche') end, 'introuvable', 'plus de Rechercher')
@@ -616,7 +622,8 @@ essai("Plus de volet (correctif 1.3.6) : ni Nouvelle conversation, Rechercher, c
         -- Fenetre.nouvelle reste (une conversation vide, sans photo) ; une photo choisie dans Lightroom
         -- montre la sienne (Fenetre.suivreSelection, essais-une-photo.lua).
         egal('function', type(Fenetre.nouvelle))
-        -- Publication… et Consommation… restent au menu Module externe - Extras, dans les deux.
+        -- Publication… et Consommation… restent au menu Module externe - Extras, dans les deux (et
+        -- reviennent dans l'en-tête au correctif 1.3.7 : essais-suivi.lua).
         local info = dofile(S.plugin .. '/Info.lua')
         for _, menu in ipairs({ info.LrExportMenuItems, info.LrLibraryMenuItems }) do
             local titres = {}
@@ -632,7 +639,7 @@ essai("Plus de volet (correctif 1.3.6) : ni Nouvelle conversation, Rechercher, c
     end)
 end)
 
-essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, « Repartir à neuf » à la place du Mode, voyants Claude Code et Lightroom (versions et mode dans son infobulle), photo active en texte riche, bouton Suivi au bout, en haut à droite', function()
+essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, « Repartir à neuf » à la place du Mode, voyants Claude Code et Lightroom (versions et mode dans son infobulle), photo active en texte riche, boutons Suivi, Publication… et Consommation… au bout, en haut à droite', function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
@@ -683,17 +690,25 @@ essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, « Repartir à neu
             end
         end
         egal('texteClaude texteLightroom', table.concat(ordre, ' '), 'les deux voyants dans la rangée de la photo active')
-        -- Le bouton Suivi (décision de Dany du 25 octobre 2026), en haut à droite : au bout de la
-        -- rangée des voyants, après la photo active (un seul espace entre eux), sous « Repartir à
-        -- neuf » ; il ouvre la fenêtre Suivi (essais-carnet.lua).
+        -- Le bouton Suivi (décision de Dany du 25 octobre 2026), en haut à droite : dans la rangée
+        -- des voyants, après la photo active (un seul espace entre eux), sous « Repartir à neuf », puis
+        -- Publication… et Consommation…, côte à côte, au bout (correctif 1.3.7) ; ils ouvrent leurs
+        -- fenêtres (essais-suivi.lua).
         local suivi = parTitre(contenu, 'Suivi')
+        local publication, consommation = parTitre(contenu, 'Publication…'), parTitre(contenu, 'Consommation…')
         egal('square_button', suivi.genre)
         egal(rangee, rangeeDe(contenu, suivi), 'dans la rangée des voyants')
+        egal(rangee, rangeeDe(contenu, publication), 'Publication… dans la rangée des voyants')
+        egal(rangee, rangeeDe(contenu, consommation), 'Consommation… dans la rangée des voyants')
         local info = liee(contenu, 'static_text', 'infoPhoto')
         local rangs = {}
         for k, e in ipairs(rangee.args) do
             if e == suivi then
                 rangs.suivi = k
+            elseif e == publication then
+                rangs.publication = k
+            elseif e == consommation then
+                rangs.consommation = k
             elseif e == info then
                 rangs.info = k
             elseif type(e) == 'table' and e.genre == 'row' and e.args[2] == liaison then
@@ -703,8 +718,14 @@ essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, « Repartir à neu
         egal(rangs.liaison + 2, rangs.info, 'la photo active après le voyant Lightroom et son espace')
         egal(rangs.info + 2, rangs.suivi, 'le bouton Suivi après la photo active et son espace')
         egal('spacer', rangee.args[rangs.info + 1].genre)
-        egal(#rangee.args, rangs.suivi, 'au bout de la rangée, à droite')
-        vrai(S.bezelVisible(suivi) + S.MARGE_BEZEL <= D.entete, "dans l'en-tête")
+        egal(rangs.suivi + 2, rangs.publication, 'Publication… après Suivi et son espace')
+        egal(rangs.publication + 2, rangs.consommation, 'Consommation… après Publication… et son espace')
+        egal(D.ecartBoutons, rangee.args[rangs.suivi + 1].args.width)
+        egal(D.ecartBoutons, rangee.args[rangs.publication + 1].args.width)
+        egal(#rangee.args, rangs.consommation, 'Consommation… au bout de la rangée, à droite')
+        for _, b in ipairs({ suivi, publication, consommation }) do
+            vrai(S.bezelVisible(b) + S.MARGE_BEZEL <= D.entete, "dans l'en-tête")
+        end
         -- Les versions et le mode, dans les mots de l'infobulle.
         egal("Liaison avec le connecteur MCP-Développeur : active. Versions : Développeur 1.3.6 ; MCP-Développeur 1.3.5 · à mettre à jour. "
             .. "Mode de la liaison : Proposer d'abord (Gestionnaire de modules externes).",
