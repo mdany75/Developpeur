@@ -26,7 +26,8 @@ final class SuiviTests: XCTestCase {
     static let tailles: JSONValue = [
         "photos_par_mois": ["largeur": 620, "hauteur": 150], "focales": ["largeur": 300, "hauteur": 130],
         "iso": ["largeur": 300, "hauteur": 130], "heures": ["largeur": 620, "hauteur": 120],
-        "objectifs": ["largeur": 300, "hauteur": 170], "defauts_frequents": ["largeur": 620, "hauteur": 180],
+        "objectifs": ["largeur": 300, "hauteur": 170], "notes": ["largeur": 300, "hauteur": 170],
+        "defauts_frequents": ["largeur": 620, "hauteur": 180],
         "evolution_defaut": ["largeur": 620, "hauteur": 140],
     ]
     static let claire: JSONValue = ["fond": "ECECEC", "texte": "1D1D1F", "gris": "6B6B6B", "filet": "C9C9C9", "barre": "0A64D8", "accent": "E0800D"]
@@ -34,7 +35,8 @@ final class SuiviTests: XCTestCase {
 
     /// Une entrée du relevé (format 1), comme Releve.lua l'écrit.
     func photo(_ id: Int, prise: String? = "2026-11-08 17:42", ajout: String = "2026-11-10 09:00", objectif: String? = "XF23mmF2 R WR",
-               focale: Double? = 23, iso: Double? = 400, note: Int = 0, retouchee: Bool = false, cherches: [String]? = s4,
+               focale: Double? = 23, iso: Double? = 400, note: Double = 0, drapeau: String = "aucun", retouchee: Bool = false,
+               cherches: [String]? = s4,
                defauts: [String] = [], abandonnee: Bool = false, uuid: String? = nil) -> (String, JSONValue) {
         var prisDeVue: [String: JSONValue] = [:]
         if let prise { prisDeVue["le"] = .string(prise) }
@@ -44,7 +46,7 @@ final class SuiviTests: XCTestCase {
         var entree: [String: JSONValue] = [
             "original": .number(Double(id)), "uuid": .string(uuid ?? "UUID-\(id)"), "fichier": .string("P\(id).RAF"),
             "ajout": 1_794_000_000, "ajout_le": .string(ajout), "vu": 1_794_000_000, "vues": [],
-            "prise_de_vue": .object(prisDeVue), "note": .number(Double(note)), "drapeau": "aucun",
+            "prise_de_vue": .object(prisDeVue), "note": .number(note), "drapeau": .string(drapeau),
             "retouchee_par_claude": .bool(retouchee), "classement_le": 1_794_000_000,
         ]
         if let cherches {
@@ -65,10 +67,13 @@ final class SuiviTests: XCTestCase {
         return chemin
     }
 
-    func entree(suivi: String, carnet: String? = nil, periode: String = "12_mois", defaut: String? = nil,
-                aujourdHui: String = "2026-11-20", change: [String: JSONValue] = [:]) -> String {
-        var objet: [String: JSONValue] = ["suivi": .string(suivi), "catalogue": .string(Self.catalogue), "aujourd_hui": .string(aujourdHui),
-                                          "periode": .string(periode), "apparence": "claire", "couleurs": Self.claire, "tailles": Self.tailles]
+    /// L'entrée de `--graphiques` : par défaut, l'année qui finit le 20 novembre 2026 (celle que la
+    /// fenêtre Suivi montre d'abord) ; `debut` nil : depuis la première photo.
+    func entree(suivi: String, carnet: String? = nil, debut: String? = "2025-11-20", fin: String = "2026-11-20", defaut: String? = nil,
+                change: [String: JSONValue] = [:]) -> String {
+        var objet: [String: JSONValue] = ["suivi": .string(suivi), "catalogue": .string(Self.catalogue), "fin": .string(fin),
+                                          "apparence": "claire", "couleurs": Self.claire, "tailles": Self.tailles]
+        if let debut { objet["debut"] = .string(debut) }
         if let carnet { objet["carnet"] = .string(carnet) }
         if let defaut { objet["defaut"] = .string(defaut) }
         for (cle, valeur) in change { objet[cle] = valeur }
@@ -76,10 +81,10 @@ final class SuiviTests: XCTestCase {
     }
 
     /// `--graphiques` sur un relevé ; la réponse doit être ok.
-    func graphiques(_ photos: [(String, JSONValue)], periode: String = "12_mois", defaut: String? = nil, carnet: String? = nil,
-                    file: StaticString = #filePath, line: UInt = #line) throws -> JSONValue {
+    func graphiques(_ photos: [(String, JSONValue)], debut: String? = "2025-11-20", fin: String = "2026-11-20", defaut: String? = nil,
+                    carnet: String? = nil, file: StaticString = #filePath, line: UInt = #line) throws -> JSONValue {
         let suivi = try ecrire(photos)
-        let reponse = Suivi.graphiques(entree(suivi: suivi, carnet: carnet, periode: periode, defaut: defaut),
+        let reponse = Suivi.graphiques(entree(suivi: suivi, carnet: carnet, debut: debut, fin: fin, defaut: defaut),
                                        dossier: dossier.appendingPathComponent("png-\(UUID().uuidString)").path)
         XCTAssertEqual(reponse.code, 0, JSONCoding.line(reponse.ligne), file: file, line: line)
         return reponse.ligne
@@ -148,7 +153,8 @@ final class SuiviTests: XCTestCase {
         XCTAssertEqual(reponse.code, 0, JSONCoding.line(reponse.ligne))
         let sortie = reponse.ligne
         XCTAssertEqual(sortie["photos"]?.int, 0)
-        XCTAssertEqual(sortie["periode"], ["code": "12_mois", "libelle": "12 derniers mois", "debut": "2025-12", "fin": "2026-11", "par": "mois"])
+        XCTAssertEqual(sortie["periode"], ["debut": "2025-11-20", "fin": "2026-11-20", "libelle": "du 20 novembre 2025 au 20 novembre 2026",
+                                           "par": "mois", "depuis_le_debut": false])
         let tuiles = try XCTUnwrap(sortie["tuiles"]?.array)
         XCTAssertEqual(tuiles[0]["detail"]?.string, "aucune photo ouverte dans la période")
         XCTAssertEqual(tuiles[1]["detail"]?.string, "—")
@@ -163,18 +169,76 @@ final class SuiviTests: XCTestCase {
         let evolution = try XCTUnwrap(sortie["graphiques"]?["evolution_defaut"])
         XCTAssertEqual(evolution["titre"]?.string, "Évolution d'un défaut")
         XCTAssertEqual(evolution["note"]?.string, "Aucun défaut trouvé dans la période.")
-        XCTAssertEqual(barres(sortie, "evolution_defaut").count, 12)
+        XCTAssertEqual(barres(sortie, "evolution_defaut").count, 13, "treize mois touchés : de novembre à novembre")
         XCTAssertEqual(barres(sortie, "objectifs").count, 0)
         XCTAssertEqual(creneaux(sortie, "objectifs"), [Int](repeating: 0, count: 8))
     }
 
-    /// Une date d'après la fin du mois d'aujourd'hui (horloge de l'appareil fausse) : hors de toute
-    /// période ; une photo sans date du tout aussi.
-    func testPhotoApresLaFinDuMois() throws {
-        let sortie = try graphiques([photo(1, prise: "2026-12-01 08:00"), photo(2, prise: "2026-11-30 23:59"),
-                                     photo(3, prise: nil, ajout: "pas une date")], periode: "tout")
-        XCTAssertEqual(sortie["photos"]?.int, 1)
+    /// Une date d'après le jour de fin (horloge de l'appareil fausse, ou une fin choisie) : hors de la
+    /// période, comme une date d'avant le jour de début ; le jour de début et celui de fin sont
+    /// compris, à toute heure ; une photo sans date du tout n'est d'aucune période.
+    func testPhotoApresLaFin() throws {
+        let photos = [photo(1, prise: "2026-11-21 08:00"), photo(2, prise: "2026-11-20 23:59"), photo(3, prise: nil, ajout: "pas une date"),
+                      photo(4, prise: "2026-03-01 00:10"), photo(5, prise: "2026-02-28 23:59")]
+        var sortie = try graphiques(photos, debut: nil)
+        XCTAssertEqual(sortie["photos"]?.int, 3, "ni le 21 novembre, ni la photo sans date")
         XCTAssertEqual(barres(sortie, "photos_par_mois").last?["ids"], [2])
+        sortie = try graphiques(photos, debut: "2026-03-01")
+        XCTAssertEqual(sortie["photos"]?.int, 2, "le 1er mars et le 20 novembre")
+        XCTAssertEqual(sortie["periode"]?["libelle"]?.string, "du 1er mars 2026 au 20 novembre 2026")
+        XCTAssertEqual(barres(sortie, "photos_par_mois").map { $0["libelle"]?.string ?? "" },
+                       ["mars 2026", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov."])
+        XCTAssertEqual(barres(sortie, "photos_par_mois").first?["detail"]?.string, "mars 2026 · 1 photo", "dès le 1er : le mois entier")
+        sortie = try graphiques(photos, debut: "2026-11-20")
+        XCTAssertEqual(sortie["periode"]?["libelle"]?.string, "le 20 novembre 2026")
+        XCTAssertEqual(sortie["photos"]?.int, 1)
+        XCTAssertEqual(barres(sortie, "photos_par_mois").first?["detail"]?.string, "novembre 2026, le 20 · 1 photo")
+        sortie = try graphiques(photos, debut: "2026-11-03")
+        XCTAssertEqual(barres(sortie, "photos_par_mois").first?["detail"]?.string, "novembre 2026, du 3 au 20 · 1 photo")
+        sortie = try graphiques(photos, debut: "2026-03-01", fin: "2026-11-01")
+        XCTAssertEqual(barres(sortie, "photos_par_mois").last?["detail"]?.string, "novembre 2026, le 1er · 0 photo",
+                       "le seul 1er novembre : « le 1er », pas « jusqu'au 1er »")
+        sortie = try graphiques(photos, debut: "2026-03-01", fin: "2026-11-02")
+        XCTAssertEqual(barres(sortie, "photos_par_mois").last?["detail"]?.string, "novembre 2026, jusqu'au 2 · 0 photo")
+        // Un seul jour au bord d'un mois : « le 1er », « le 30 », « le 29 » (février bissextile).
+        for (jourSeul, attendu) in [("2026-11-01", "novembre 2026, le 1er"), ("2026-11-30", "novembre 2026, le 30"),
+                                    ("2028-02-29", "février 2028, le 29")] {
+            sortie = try graphiques(photos, debut: jourSeul, fin: jourSeul)
+            XCTAssertEqual(barres(sortie, "photos_par_mois").first?["detail"]?.string, "\(attendu) · 0 photo", jourSeul)
+        }
+        // Une première colonne couverte seulement sur son dernier jour.
+        sortie = try graphiques(photos, debut: "2025-10-31", fin: "2026-10-20")
+        XCTAssertEqual(barres(sortie, "photos_par_mois").first?["detail"]?.string, "octobre 2025, le 31 · 0 photo")
+    }
+
+    /// Une année comptée d'un jour au même jour de l'année suivante touche treize mois : treize
+    /// colonnes, une par créneau ; une période plus longue, mais de treize trimestres au plus, se
+    /// montre par trimestre (« T1 2024 », « janvier à mars 2024 »).
+    func testMoisEtTrimestres() throws {
+        let photos = [photo(1, prise: "2025-11-20 10:00"), photo(2, prise: "2025-11-19 10:00"), photo(3, prise: "2024-02-10 10:00", defauts: ["flou"]),
+                      photo(4, prise: "2026-11-20 10:00")]
+        var sortie = try graphiques(photos)
+        let mois = barres(sortie, "photos_par_mois")
+        XCTAssertEqual(mois.count, 13)
+        XCTAssertEqual(mois.first?["detail"]?.string, "novembre 2025, à partir du 20 · 1 photo", "le 19 novembre est avant le début")
+        XCTAssertEqual(mois.last?["detail"]?.string, "novembre 2026, jusqu'au 20 · 1 photo")
+        XCTAssertEqual(mois.map { $0["libelle"]?.string ?? "" },
+                       ["nov. 2025", "déc.", "janv. 2026", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov."],
+                       "l'année au premier mois et à janvier : novembre revient")
+        XCTAssertEqual(creneaux(sortie, "photos_par_mois"), Array(1...13))
+        XCTAssertEqual(sortie["graphiques"]?["photos_par_mois"]?["titre"]?.string, "Photos par mois")
+        sortie = try graphiques(photos, debut: "2024-01-01", defaut: "flou")
+        XCTAssertEqual(sortie["periode"]?["par"]?.string, "trimestre")
+        let trimestres = barres(sortie, "photos_par_mois")
+        XCTAssertEqual(trimestres.count, 12)
+        XCTAssertEqual(trimestres.first?["libelle"]?.string, "T1 2024")
+        XCTAssertEqual(trimestres.first?["detail"]?.string, "janvier à mars 2024 · 1 photo")
+        XCTAssertEqual(trimestres.last?["libelle"]?.string, "T4 2026")
+        XCTAssertEqual(trimestres.last?["detail"]?.string, "octobre à décembre 2026, jusqu'au 20 novembre · 1 photo")
+        XCTAssertEqual(trimestres[7]["ids"], [1, 2], "T4 2025 : les 19 et 20 novembre 2025")
+        XCTAssertEqual(sortie["graphiques"]?["photos_par_mois"]?["titre"]?.string, "Photos par trimestre")
+        XCTAssertEqual(sortie["graphiques"]?["evolution_defaut"]?["titre"]?.string, "Photo floue ou bougée, trimestre par trimestre")
+        XCTAssertEqual(creneaux(sortie, "photos_par_mois"), Array(1...12) + [0], "douze barres sur treize créneaux : la dernière place vide")
     }
 
     /// Un relevé lisible (JSON valide, format 1) dont des nombres sortent de la plage d'Int, abîmé ou
@@ -225,25 +289,34 @@ final class SuiviTests: XCTestCase {
         XCTAssertEqual(JSONValue.number(42).int, 42)
     }
 
-    /// Tout sans photo datée : l'année d'aujourd'hui seule, étalée sur les douze créneaux ; le début
-    /// de la période est le mois d'ajout de la photo.
-    func testToutSansPhotoDatee() throws {
-        let sortie = try graphiques([photo(1, prise: nil, ajout: "2026-10-02 10:00")], periode: "tout")
-        XCTAssertEqual(sortie["periode"]?["debut"]?.string, "2026-10")
+    /// Depuis la première photo, sans photo datée : du jour d'ajout de la photo au jour de fin, mois
+    /// par mois (deux colonnes de six créneaux) ; sans photo du tout, le mois de la fin seul.
+    func testDepuisLeDebutSansPhotoDatee() throws {
+        let sortie = try graphiques([photo(1, prise: nil, ajout: "2026-10-02 10:00")], debut: nil)
+        XCTAssertEqual(sortie["periode"], ["debut": "2026-10-02", "fin": "2026-11-20",
+                                           "libelle": "depuis la première photo, le 2 octobre 2026, jusqu'au 20 novembre 2026",
+                                           "par": "mois", "depuis_le_debut": true])
         XCTAssertEqual(sortie["sans_date"]?.int, 1)
-        XCTAssertEqual(barres(sortie, "photos_par_mois").compactMap { $0["libelle"]?.string }, ["2026"])
-        XCTAssertEqual(creneaux(sortie, "photos_par_mois"), [Int](repeating: 1, count: 12))
+        XCTAssertEqual(barres(sortie, "photos_par_mois").compactMap { $0["libelle"]?.string }, ["oct. 2026", "nov."])
+        XCTAssertEqual(barres(sortie, "photos_par_mois").first?["detail"]?.string, "octobre 2026 · 0 photo",
+                       "sans début, la première colonne n'est pas dite en partie")
+        XCTAssertEqual(creneaux(sortie, "photos_par_mois"), [Int](repeating: 1, count: 6) + [Int](repeating: 2, count: 6) + [0])
+        let vide = try graphiques([], debut: nil)
+        XCTAssertEqual(vide["periode"]?["libelle"]?.string, "jusqu'au 20 novembre 2026")
+        XCTAssertEqual(barres(vide, "photos_par_mois").compactMap { $0["libelle"]?.string }, ["nov. 2026"])
         XCTAssertEqual(sortie["graphiques"]?["photos_par_mois"]?["note"]?.string, "1 photo sans date de prise de vue n'y est pas.")
         XCTAssertEqual(sortie["graphiques"]?["heures"]?["sans_valeur"]?.int, 1)
         XCTAssertEqual(barres(sortie, "objectifs").first?["libelle"]?.string, "XF23mmF2 R WR", "l'objectif compte, lui")
     }
 
-    /// Cinq années : deux créneaux chacune, à partir du deuxième ; le premier et le dernier restent
-    /// vides. Les rectangles des créneaux, eux, ne changent pas avec les barres.
-    func testToutCinqAnnees() throws {
-        let sortie = try graphiques([photo(1, prise: "2022-05-01 10:00", defauts: ["flou"]), photo(2, prise: "2026-05-01 10:00")], periode: "tout")
+    /// Cinq années (plus de treize trimestres) : deux créneaux chacune, à partir du deuxième ; le
+    /// premier et les deux derniers restent vides. Les rectangles des créneaux, eux, ne changent pas
+    /// avec les barres.
+    func testCinqAnnees() throws {
+        let sortie = try graphiques([photo(1, prise: "2022-05-01 10:00", defauts: ["flou"]), photo(2, prise: "2026-05-01 10:00")], debut: nil)
         XCTAssertEqual(barres(sortie, "photos_par_mois").compactMap { $0["libelle"]?.string }, ["2022", "2023", "2024", "2025", "2026"])
-        XCTAssertEqual(creneaux(sortie, "photos_par_mois"), [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 0])
+        XCTAssertEqual(creneaux(sortie, "photos_par_mois"), [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 0, 0])
+        XCTAssertEqual(sortie["graphiques"]?["photos_par_mois"]?["titre"]?.string, "Photos par année")
         XCTAssertEqual(sortie["graphiques"]?["evolution_defaut"]?["titre"]?.string, "Photo floue ou bougée, année par année")
         let douze = try graphiques([photo(1)])
         func rectangles(_ s: JSONValue, _ g: String) -> [JSONValue] {
@@ -257,16 +330,20 @@ final class SuiviTests: XCTestCase {
         }
     }
 
-    /// Treize années et plus : « < A » réunit les années d'avant les onze dernières.
-    func testToutPlusDeDouzeAnnees() throws {
-        let sortie = try graphiques([photo(1, prise: "2014-05-01 10:00"), photo(2, prise: "2015-07-01 10:00"),
-                                     photo(3, prise: "2016-01-01 10:00"), photo(4, prise: "2026-01-01 10:00")], periode: "tout")
+    /// Treize années tiennent, une par colonne ; au-delà, « < A » réunit les années d'avant les douze
+    /// dernières.
+    func testPlusDeTreizeAnnees() throws {
+        let treize = try graphiques([photo(1, prise: "2014-05-01 10:00"), photo(2, prise: "2026-01-01 10:00")], debut: nil)
+        XCTAssertEqual(barres(treize, "photos_par_mois").first?["libelle"]?.string, "2014")
+        XCTAssertEqual(barres(treize, "photos_par_mois").count, 13)
+        let sortie = try graphiques([photo(1, prise: "2012-05-01 10:00"), photo(2, prise: "2014-07-01 10:00"),
+                                     photo(3, prise: "2015-01-01 10:00"), photo(4, prise: "2026-01-01 10:00")], debut: nil)
         let libelles = barres(sortie, "photos_par_mois").compactMap { $0["libelle"]?.string }
-        XCTAssertEqual(libelles.count, 12)
-        XCTAssertEqual(libelles.first, "< 2016")
+        XCTAssertEqual(libelles.count, 13)
+        XCTAssertEqual(libelles.first, "< 2015")
         XCTAssertEqual(barres(sortie, "photos_par_mois").first?["ids"], [1, 2])
-        XCTAssertEqual(barres(sortie, "photos_par_mois").first?["detail"]?.string, "avant 2016 · 2 photos")
-        XCTAssertEqual(libelles[1], "2016")
+        XCTAssertEqual(barres(sortie, "photos_par_mois").first?["detail"]?.string, "avant 2015 · 2 photos")
+        XCTAssertEqual(libelles[1], "2015")
     }
 
     // MARK: Défauts
@@ -301,7 +378,7 @@ final class SuiviTests: XCTestCase {
         XCTAssertEqual(sortie["defaut_suivi"], ["code": "horizon_penche", "libelle": "Horizon ou ligne penchée", "choisi": true])
         let evolution = barres(sortie, "evolution_defaut")
         XCTAssertTrue(evolution.allSatisfy { $0["texte"]?.string == "—" && $0["sur"]?.int == 0 && $0["couleur"]?.string == "accent" })
-        XCTAssertEqual(evolution.last?["detail"]?.string, "novembre 2026 · défaut cherché sur aucune photo")
+        XCTAssertEqual(evolution.last?["detail"]?.string, "novembre 2026, jusqu'au 20 · défaut cherché sur aucune photo")
         XCTAssertEqual(sortie["graphiques"]?["evolution_defaut"]?["vide"], true)
         XCTAssertEqual(sortie["graphiques"]?["evolution_defaut"]?["titre"]?.string, "Horizon ou ligne penchée, mois par mois")
         // Une photo abandonnée ou en file n'est cherchée pour aucun code de l'analyse.
@@ -323,6 +400,32 @@ final class SuiviTests: XCTestCase {
         XCTAssertEqual(objectifs.last?["detail"]?.string, "2 autres objectifs · 2 photos")
         XCTAssertEqual(objectifs.last?["ids"], [8, 9])
         XCTAssertEqual(creneaux(sortie, "objectifs"), Array(1...8))
+    }
+
+    /// Les notes (correctif 1.3.8) : six barres de 0 ★ (pas encore notée) à 5 ★, la note de la
+    /// famille bornée et tronquée comme le module la relit ; une photo rejetée compte à sa note, et la
+    /// note du graphique le dit (au singulier, au pluriel) ; sans photo, le graphique est vide.
+    func testNotes() throws {
+        let photos = [photo(1, note: 5), photo(2, note: 4, drapeau: "retenue"), photo(3, note: 4.9), photo(4, note: 0, drapeau: "rejetee"),
+                      photo(5, note: 1e20), photo(6, note: -3), photo(7, note: 2, drapeau: "rejetee")]
+        let sortie = try graphiques(photos)
+        let notes = barres(sortie, "notes")
+        XCTAssertEqual(notes.map { $0["libelle"]?.string ?? "" }, ["0 ★", "1 ★", "2 ★", "3 ★", "4 ★", "5 ★"])
+        XCTAssertEqual(notes.map { $0["ids"] ?? .null }, [[4, 6], [], [7], [], [2, 3], [1, 5]])
+        XCTAssertEqual(notes[0]["detail"]?.string, "0 ★, pas encore notée · 2 photos")
+        XCTAssertEqual(notes[5]["detail"]?.string, "5 ★ · 2 photos")
+        XCTAssertEqual(notes[1]["detail"]?.string, "1 ★ · 0 photo")
+        XCTAssertEqual(creneaux(sortie, "notes"), Array(1...6))
+        let graphique = try XCTUnwrap(sortie["graphiques"]?["notes"])
+        XCTAssertEqual(graphique["titre"]?.string, "Notes")
+        XCTAssertEqual(graphique["note"]?.string, "Dont 2 rejetées (drapeau), comptées à leur note.")
+        XCTAssertEqual(graphique["vide"], false)
+        XCTAssertEqual(graphique["orientation"]?.string, "verticale")
+        XCTAssertEqual(sortie["tuiles"]?.array?[2]["valeur"]?.int, 4, "la tuile « Notées 4 ★ ou plus » : les deux dernières barres")
+        let une = try graphiques([photo(1, note: 3, drapeau: "rejetee"), photo(2, note: 3)])
+        XCTAssertEqual(une["graphiques"]?["notes"]?["note"]?.string, "Dont 1 rejetée (drapeau), comptée à sa note.")
+        XCTAssertNil(try graphiques([photo(1, note: 3)])["graphiques"]?["notes"]?["note"], "rien à dire sans rejet")
+        XCTAssertEqual(try graphiques([])["graphiques"]?["notes"]?["vide"], true)
     }
 
     // MARK: Le carnet
@@ -367,11 +470,16 @@ final class SuiviTests: XCTestCase {
         func refus(_ texte: String) -> Suivi.Reponse { Suivi.graphiques(texte, dossier: png) }
         let cas: [(String, String, String)] = [
             ("pas du JSON", "arguments", "Arguments de --graphiques : le JSON ne se lit pas (un objet attendu, comme graphiques.entree du contrat)."),
-            (entree(suivi: suivi, change: ["aujourd_hui": "20/11/2026"]), "arguments",
-             "Arguments de --graphiques : aujourd_hui est la date du jour à l'heure locale, AAAA-MM-JJ."),
+            (entree(suivi: suivi, change: ["fin": "20/11/2026"]), "arguments",
+             "Arguments de --graphiques : fin est le dernier jour de la période, AAAA-MM-JJ, à l'heure locale."),
+            (entree(suivi: suivi, change: ["fin": "2026-02-29"]), "arguments",
+             "Arguments de --graphiques : fin est le dernier jour de la période, AAAA-MM-JJ, à l'heure locale."),
+            (entree(suivi: suivi, change: ["debut": "2026-04-31"]), "arguments",
+             "Arguments de --graphiques : debut, facultatif, est le premier jour de la période, AAAA-MM-JJ, à l'heure locale."),
+            (entree(suivi: suivi, change: ["debut": "2026-11-21"]), "arguments", "Arguments de --graphiques : debut ne vient pas après fin."),
             (entree(suivi: suivi, change: ["apparence": "auto"]), "arguments", "Arguments de --graphiques : apparence vaut claire ou sombre."),
-            (entree(suivi: suivi, change: ["aujourd_hui": "0000-01-05"]), "arguments",
-             "Arguments de --graphiques : aujourd_hui est la date du jour à l'heure locale, AAAA-MM-JJ."),
+            (entree(suivi: suivi, change: ["fin": "0000-01-05"]), "arguments",
+             "Arguments de --graphiques : fin est le dernier jour de la période, AAAA-MM-JJ, à l'heure locale."),
             (entree(suivi: suivi, change: ["tailles": ["focales": ["largeur": 300, "hauteur": 130]]]), "arguments",
              "Arguments de --graphiques : tailles.photos_par_mois va de 120 × 80 à 1 200 × 600 points."),
             (entree(suivi: suivi, change: ["catalogue": 3]), "arguments", "Arguments de --graphiques : catalogue est le chemin du catalogue ouvert."),

@@ -7,7 +7,7 @@ import XCTest
 /// Le contrat du Suivi (correctif 1.3.7) entre le module (Releve.lua, FenetreSuivi.lua) et le
 /// connecteur (`--analyser`, `--graphiques`), figé dans Tests/Contrats/suivi.json : ses `regles`
 /// disent ce que les deux côtés appliquent, ses `exemples` en découlent exactement. Ici :
-/// `--graphiques` sur le relevé et le carnet d'exemple rend exactement les sorties des trois exemples
+/// `--graphiques` sur le relevé et le carnet d'exemple rend exactement les sorties des cinq exemples
 /// (les clés données pour un exemple « partiel ») et des PNG de 2 × la taille demandée ; les refus de
 /// tout l'appel rendent exactement leur ligne ; `--analyser` se vérifie sur des vignettes fabriquées
 /// par sa forme (clés, types, codes cherchés selon l'ISO, retouchee et la taille) et ses refus.
@@ -143,7 +143,7 @@ final class ContratSuiviTests: XCTestCase {
         XCTAssertEqual(tous.firstIndex(of: "yeux_fermes"), try XCTUnwrap(tous.firstIndex(of: "mise_au_point")) + 1)
     }
 
-    /// Les sept graphiques, leurs créneaux fixes (68), les tranches, les couleurs et les tailles.
+    /// Les huit graphiques, leurs créneaux fixes (76), les tranches, les couleurs et les tailles.
     func testGraphiquesTranchesEtCouleurs() throws {
         let regles = try XCTUnwrap(contrat()["regles"])
         let liste = try objet(regles["graphiques"]?["liste"], "graphiques.liste")
@@ -155,7 +155,7 @@ final class ContratSuiviTests: XCTestCase {
             XCTAssertEqual(definition.unite, attendu["unite"]?.string, cle)
             XCTAssertEqual(definition.etale, attendu["etale"]?.bool, cle)
         }
-        XCTAssertEqual(Suivi.graphiques.compactMap { Suivi.definitions[$0]?.maxBarres }.reduce(0, +), 68, "68 calques")
+        XCTAssertEqual(Suivi.graphiques.compactMap { Suivi.definitions[$0]?.maxBarres }.reduce(0, +), 76, "76 calques")
         for (nom, tranches) in [("focales", Suivi.tranchesFocales), ("iso", Suivi.tranchesISO)] {
             let attendues = try XCTUnwrap(regles["tranches"]?[nom]?["liste"]?.array, nom)
             XCTAssertEqual(attendues.count, tranches.count, nom)
@@ -189,7 +189,7 @@ final class ContratSuiviTests: XCTestCase {
         XCTAssertEqual(reponse.code, 0, JSONCoding.line(reponse.ligne))
         let attendue = Self.remplacer(Self.sansNotes(try XCTUnwrap(exemple["sortie"])), textes)
         let obtenus = try objet(reponse.ligne["graphiques"], "graphiques de la réponse")
-        XCTAssertEqual(Set(obtenus.keys), Set(Suivi.graphiques), "les sept graphiques, même pour un exemple partiel")
+        XCTAssertEqual(Set(obtenus.keys), Set(Suivi.graphiques), "les huit graphiques, même pour un exemple partiel")
         if exemple["partiel"]?.bool == true {
             for (cle, valeur) in try objet(attendue, "sortie") where cle != "graphiques" {
                 memeObjet(reponse.ligne[cle] ?? .null, valeur, "\(nom).\(cle)")
@@ -201,7 +201,7 @@ final class ContratSuiviTests: XCTestCase {
             memeObjet(reponse.ligne, attendue, nom)
             XCTAssertEqual(reponse.ligne, attendue, nom)
         }
-        // Les sept PNG, en 2x, chacun dans le fichier que dit la réponse.
+        // Les huit PNG, en 2x, chacun dans le fichier que dit la réponse.
         for (cle, graphique) in obtenus {
             let chemin = try XCTUnwrap(graphique["fichier"]?.string)
             XCTAssertEqual(chemin, "\(sortie)/\(cle).png")
@@ -209,14 +209,16 @@ final class ContratSuiviTests: XCTestCase {
         }
     }
 
-    func testGraphiques12Mois() throws { try verifierGraphiques("graphiques_12_mois") }
-    func testGraphiques3Mois() throws { try verifierGraphiques("graphiques_3_mois") }
-    func testGraphiquesTout() throws { try verifierGraphiques("graphiques_tout") }
+    func testGraphiquesUnAn() throws { try verifierGraphiques("graphiques_un_an") }
+    func testGraphiquesTreizeMois() throws { try verifierGraphiques("graphiques_treize_mois") }
+    func testGraphiquesTroisMois() throws { try verifierGraphiques("graphiques_trois_mois") }
+    func testGraphiquesDepuisLeDebut() throws { try verifierGraphiques("graphiques_depuis_le_debut") }
+    func testGraphiquesTrimestres() throws { try verifierGraphiques("graphiques_trimestres") }
 
     /// Les refus de tout l'appel : une seule ligne, code 1, aucun PNG écrit.
     func testRefusDeGraphiques() throws {
         let textes = try ecrireRegistreEtCarnet()
-        let base = Self.remplacer(try XCTUnwrap(exemple("graphiques_12_mois")["entree"]), textes)
+        let base = Self.remplacer(try XCTUnwrap(exemple("graphiques_un_an")["entree"]), textes)
         let refus = try exemple("graphiques_refus")
         for (nom, cas) in refus where nom != "_note" && cas["entree_change"] != nil {
             let sortie = dossier.appendingPathComponent("refus-\(nom)").path

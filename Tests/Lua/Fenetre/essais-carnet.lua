@@ -4,10 +4,10 @@
 -- l'en-tête de la fenêtre Claude ; la page Carnet de progrès du fil, son entrée dans la liste des
 -- conversations et sa ligne « Demander à Claude ce qu'il en pense › » sont retirées avec le volet ;
 -- son texte, Fil.texteSuivi, est remplacé par des graphiques au correctif 1.3.7, éprouvés par
--- essais-suivi.lua) : le bouton Suivi (plus d'onglet, ni de carte), le résumé du carnet lu au
--- premier tour de la boucle, la boucle qui suit Carnet.version, « Photos d'un défaut… » et la
--- fenêtre des photos d'un défaut (leurs constats seulement, plus les leçons d'avant le correctif
--- 1.3.6 ; « Retirer du carnet… » par appel direct), et la puce Carnet des consignes. Le registre est le vrai (Carnet.lua), rangé dans un
+-- essais-suivi.lua) : le bouton Suivi (plus d'onglet, ni de carte), la fenêtre Suivi sans
+-- « Photos d'un défaut… » ni sa fenêtre des photos d'un défaut, ni « Retirer du carnet… » (retirés
+-- au correctif 1.3.8, demandé par Dany le 26 octobre 2026 : la fenêtre ne lit plus le résumé du
+-- carnet), et la puce Carnet des consignes. Le registre est le vrai (Carnet.lua), rangé dans un
 -- dossier personnel temporaire ; ni Claude, ni quota.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
 
@@ -336,7 +336,7 @@ essai("Plus de page Carnet de progrès dans le fil, ni d'entrée dans une liste,
     -- Une ligne qui porterait un défaut ou une action (comme celles de la page) n'est qu'une ligne.
     egal(nil, Fenetre.sorteDeClic({ genre = 'outil', texte = 'x', defaut = 'flou' }, nil))
     egal(nil, Fenetre.sorteDeClic({ genre = 'apercu', texte = 'y', action = 'demander' }, nil))
-    egal(Carnet.TITRES.carnet, FenetreSuivi.TITRE_CARNET, 'le titre du registre, seule copie')
+    egal(nil, FenetreSuivi.TITRE_CARNET, "le titre du carnet partait avec « Photos d'un défaut… » (correctif 1.3.8)")
 end)
 
 -- Le bouton Suivi et la fenêtre Suivi ---------------------------------------------------------------
@@ -423,10 +423,15 @@ essai("Bouton Suivi : en haut à droite, dans la rangée des voyants après la p
     assert(ok, erreur)
 end)
 
-essai("Fenêtre Suivi : « Claude · Suivi », le résumé du carnet lu au premier tour de sa boucle (pour « Photos d'un défaut… ») ; plus de texte du carnet (les graphiques : essais-suivi.lua) ; déjà ouverte, elle passe devant", function()
+essai("Fenêtre Suivi : « Claude · Suivi » ; plus de « Photos d'un défaut… », ni sa liste, ni la fenêtre des photos d'un défaut, ni « Retirer du carnet… » (correctif 1.3.8) : elle ne lit plus le résumé du carnet et ne s'abonne pas au registre ; déjà ouverte, elle passe devant", function()
     fabriquerType()
     local devant = S.devant or 0
-    ouvrirSuivi(function(p, args, taches)
+    local resumer, lus = Carnet.resumer, 0
+    Carnet.resumer = function(...)
+        lus = lus + 1
+        return resumer(...)
+    end
+    local ok, erreur = pcall(ouvrirSuivi, function(p, args, taches)
         egal(FenetreSuivi.TITRE, args.title)
         egal('Claude · Suivi', args.title)
         egal(FenetreSuivi.CADRE, args.save_frame, "son cadre, ni celui de la fenêtre de la liaison (DeveloppeurSuivi) ni celui de la 1.3.6")
@@ -438,243 +443,29 @@ essai("Fenêtre Suivi : « Claude · Suivi », le résumé du carnet lu au premi
         egal(nil, Fil.texteSuivi, 'le texte du carnet retiré de Fil')
         egal(nil, Fil.LECTURE_CARNET)
         egal(nil, boutonDe(args.contents, '▼'))
-        -- Ouverte : la boucle partie dans une tâche, abonnée au registre ; rien de lu encore.
-        egal(false, p.aDefauts)
+        -- Ni le bouton, ni ce qui le servait (correctif 1.3.8).
+        egal(nil, boutonDe(args.contents, "Photos d'un défaut…"), "plus de « Photos d'un défaut… »")
+        egal(nil, p.aDefauts)
+        for _, nom in ipairs({ 'choisirDefaut', 'montrerDefaut', 'retirerDuCarnet', 'textePhotoDuDefaut', 'nomPhotoCarnet', 'aDefauts',
+            'lire', 'resume', 'versionLue', 'TITRE_DEFAUTS' }) do
+            egal(nil, FenetreSuivi[nom], 'FenetreSuivi.' .. nom .. ' retiré')
+        end
+        egal(nil, Carnet.photosDuDefaut, 'Carnet.photosDuDefaut retiré avec elle')
         vrai(#S.taches > taches, 'la boucle dans une tâche')
-        egal('function', type(Carnet.observateurs.suivi), 'abonnée au registre')
-        -- Son premier tour : le résumé.
+        egal(nil, Carnet.observateurs.suivi, "pas d'abonnement au registre : les graphiques suivent Carnet.version")
+        local dialogues = #S.dialogues
         unTourDeBoucle()
-        local page = FenetreSuivi.resume
-        vrai(type(page) == 'table' and page.photos == 13, 'le résumé lu')
-        egal(Carnet.version, FenetreSuivi.versionLue)
-        egal(true, p.aDefauts)
+        Carnet.commande({ action = 'retirer', photos = { 1001 } })
+        unTourDeBoucle()
+        egal(0, lus, 'le résumé du carnet ne se lit plus')
+        egal(dialogues, #S.dialogues, 'aucune fenêtre ouverte')
         -- Déjà ouverte : le bouton Suivi la remet devant, sans en ouvrir une autre.
         FenetreSuivi.afficher()
         egal(devant + 1, S.devant, 'devant')
     end)
+    Carnet.resumer = resumer
+    assert(ok, erreur)
     egal(false, FenetreSuivi.ouverte)
-    egal(nil, Carnet.observateurs.suivi, 'désabonnée à la fermeture')
-end)
-
-essai("Fenêtre Suivi, sa boucle : le registre change (abonnement, Carnet.version), le résumé se relit ; un résumé illisible grise « Photos d'un défaut… », sans le relire sans fin", function()
-    fabriquerType()
-    ouvrirSuivi(function(p)
-        unTourDeBoucle()
-        egal(13, FenetreSuivi.resume.photos)
-        -- Rien de changé : rien de relu.
-        local lue = FenetreSuivi.resume
-        unTourDeBoucle()
-        egal(lue, FenetreSuivi.resume, 'rien de changé : rien relu')
-        -- Un retrait (d'un autre client du connecteur, ici le registre lui-même) : relu au tour suivant.
-        local version = Carnet.version
-        Carnet.commande({ action = 'retirer', photos = { 1001 } })
-        vrai(Carnet.version > version, 'nouvelle version')
-        egal(true, FenetreSuivi.aRelire, "l'abonnement l'a dit")
-        unTourDeBoucle()
-        egal(12, FenetreSuivi.resume.photos, 'relu')
-        egal(false, FenetreSuivi.aRelire)
-        egal(Carnet.version, FenetreSuivi.versionLue)
-        -- La version seule suffit aussi (un changement sans abonnement).
-        Carnet.oublier()
-        FenetreSuivi.versionLue = Carnet.version - 1
-        lue = FenetreSuivi.resume
-        unTourDeBoucle()
-        vrai(FenetreSuivi.resume ~= lue, 'relu par la version')
-        -- Un résumé qui ne se lit pas : « Photos d'un défaut… » grisé, la boucle ne le relit pas sans fin.
-        local resumer = Carnet.resumer
-        Carnet.resumer = function() error('carnet.json illisible', 0) end
-        FenetreSuivi.versionLue = -1
-        unTourDeBoucle()
-        Carnet.resumer = resumer
-        egal('carnet.json illisible', FenetreSuivi.resume.erreur)
-        egal(Carnet.version, FenetreSuivi.versionLue)
-        egal(false, p.aDefauts)
-        lue = FenetreSuivi.resume
-        unTourDeBoucle()
-        egal(lue, FenetreSuivi.resume, 'pas relu sans fin')
-    end)
-end)
-
--- Photos d'un défaut -------------------------------------------------------------------------------
-
-essai("« Photos d'un défaut… » : la liste des défauts du résumé (tables neuves), puis la fenêtre des photos du défaut choisi ; sans défaut, grisé et rien", function()
-    fabriquerType()
-    ouvrirSuivi(function(p, args)
-        local bouton = boutonDe(args.contents, "Photos d'un défaut…")
-        vrai(bouton, "« Photos d'un défaut… » en bas de la fenêtre Suivi")
-        egal('push_button', bouton.genre)
-        egal('aDefauts', bouton.args.enabled.key)
-        -- Avant la lecture : grisé, et rien sans résumé.
-        egal(false, p.aDefauts)
-        local dialogues = #S.dialogues
-        egal(false, FenetreSuivi.choisirDefaut())
-        egal(dialogues, #S.dialogues)
-        unTourDeBoucle()
-        egal(true, p.aDefauts)
-        -- Dany choisit le ciel brûlé, puis ferme la fenêtre de ses photos.
-        local presenter = S.modules.LrDialogs.presentModalDialog
-        local recus = {}
-        S.modules.LrDialogs.presentModalDialog = function(d)
-            S.dialogues[#S.dialogues + 1] = d
-            recus[#recus + 1] = d
-            if #recus == 1 then
-                d.contents.args.bind_to_object.choix = { 'ciel_brule' }
-            end
-            return 'ok'
-        end
-        local avant = #S.taches
-        S.cliquer(bouton)
-        egal(avant + 1, #S.taches, 'dans une tâche')
-        local ok, erreur = pcall(lancerTaches, avant)
-        S.modules.LrDialogs.presentModalDialog = presenter
-        assert(ok, erreur)
-        egal(2, #recus, 'la liste des défauts, puis la fenêtre des photos')
-        egal("Carnet de progrès · Photos d'un défaut", recus[1].title)
-        egal('Voir ses photos', recus[1].actionVerb)
-        local liste = vueDe(recus[1].contents, 'simple_list')
-        S.neuve(liste.args.items, 'défauts du carnet')
-        egal(#FenetreSuivi.resume.defauts, #liste.args.items)
-        egal('horizon_penche', liste.args.items[1].value, "dans l'ordre du résumé")
-        egal("Ciel ou haut de l'image brûlé · 3 photos sur 13", liste.args.items[3].title)
-        egal('Mise au point à côté · 1 photo sur 1', liste.args.items[6].title)
-        egal("Carnet de progrès · Ciel ou haut de l'image brûlé", recus[2].title)
-        -- Annulé : la liste seule.
-        S.reponseModal = 'cancel'
-        dialogues = #S.dialogues
-        egal(false, FenetreSuivi.choisirDefaut())
-        egal(dialogues + 1, #S.dialogues, 'la liste seule')
-        S.reponseModal = nil
-        -- Sans défaut (un carnet vide) : grisé, rien.
-        fabriquer({})
-        FenetreSuivi.versionLue = -1
-        unTourDeBoucle()
-        egal(false, p.aDefauts)
-        dialogues = #S.dialogues
-        egal(false, FenetreSuivi.choisirDefaut())
-        egal(dialogues, #S.dialogues)
-    end)
-end)
-
-essai("La fenêtre des photos d'un défaut : éléments neufs, la plus récente d'abord, leurs constats sans la leçon d'avant ; une ligne penchée en degrés ; une mesure seule", function()
-    fabriquerType()
-    ouvrirSuivi(function()
-        unTourDeBoucle()
-        local dialogues = #S.dialogues
-        egal(false, FenetreSuivi.montrerDefaut('ciel_brule'), 'Fermer')
-        egal(dialogues + 1, #S.dialogues)
-        local d = S.dialogues[#S.dialogues]
-        egal("Carnet de progrès · Ciel ou haut de l'image brûlé", d.title)
-        egal('Fermer', d.actionVerb)
-        egal('Retirer du carnet…', d.otherVerb)
-        local liste = vueDe(d.contents, 'simple_list')
-        S.neuve(liste.args.items, 'photos du défaut')
-        egal(3, #liste.args.items)
-        -- La plus récente d'abord, puis par fichier : 1024 et 1025 ce mois-ci, 1021 le mois d'avant.
-        egal(1024, liste.args.items[1].value)
-        egal(1025, liste.args.items[2].value, "l'original, même mesuré sur sa copie virtuelle")
-        egal(1021, liste.args.items[3].value)
-        egal('DSCF1024.RAF · ciel brûlé : 4,2 % du tiers haut en blanc pur', liste.args.items[1].title:match('DSCF.*$'),
-            "le constat seul, plus « leçon » (correctif 1.3.6)")
-        contient(liste.args.items[3].title, Carnet.MOIS[tonumber(moisIl(1):sub(6, 7))])
-        local textes = {}
-        for _, v in ipairs(vues(d.contents)) do
-            if v.genre == 'static_text' then
-                textes[#textes + 1] = v.args.title
-            end
-        end
-        contient(table.concat(textes, '\n'), "3 photos dans les mois du carnet, la plus récente d'abord.")
-        contient(table.concat(textes, '\n'), 'À la prise de vue : Exposer pour le ciel')
-        -- La photo choisie, 1024 d'abord ; sa leçon d'avant ne se montre plus (correctif 1.3.6).
-        local q = d.contents.args.bind_to_object
-        egal(1024, q.choix[1])
-        egal(nil, q.lecon)
-        egal(nil, vueDe(d.contents, 'edit_field'), 'plus de champ de la leçon')
-        vrai(not table.concat(textes, '\n'):find('Leçon', 1, true), 'rien de la leçon')
-        -- Un défaut cherché mais jamais trouvé : la fenêtre le dit, sans liste ni retrait.
-        FenetreSuivi.montrerDefaut('bruit')
-        local vide = S.dialogues[#S.dialogues]
-        egal(nil, vide.otherVerb)
-        egal(nil, vueDe(vide.contents, 'simple_list'))
-        contient(vueDe(vide.contents, 'static_text').args.title, "Aucune photo n'a ce défaut")
-        -- Une ligne penchée (l'angle rangé dans l'entrée, sans texte) : son inclinaison en degrés.
-        FenetreSuivi.montrerDefaut('horizon_penche')
-        local angles = vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items
-        egal(2, #angles)
-        contient(angles[1].title, 'DSCF1026.RAF · ligne penchée de 1,2°')
-        contient(angles[2].title, 'DSCF1014.RAF · ligne penchée de 0,8°')
-        egal('mars 2026 · DSCF0001.RAF · ligne penchée de 1,3°', FenetreSuivi.textePhotoDuDefaut({ mois_libelle = 'mars 2026',
-            fichier = 'DSCF0001.RAF', mesure = -1.26, angle = true }))
-        -- Une seule photo : pas de « la plus récente d'abord ».
-        FenetreSuivi.montrerDefaut('mise_au_point')
-        egal('1 photo dans les mois du carnet.', vueDe(S.dialogues[#S.dialogues].contents, 'static_text').args.title)
-        -- Une autre mesure sans texte se dit telle quelle (mise au point, 8,5).
-        contient(vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title, 'DSCF1001.RAF · mesure : 8,5')
-        egal('mars 2026 · DSCF1001.RAF · mesure : 8,5', FenetreSuivi.textePhotoDuDefaut({ mois_libelle = 'mars 2026', fichier = 'DSCF1001.RAF',
-            mesure = 8.5 }))
-        -- L'angle d'une entrée ne vaut que pour son code : la mise au point de la même photo reste
-        -- une mesure.
-        fabriquer({ entree(1101, moisIl(0), CHERCHES, { 'mise_au_point' }, { angle = { le = 1101, photo = 1101, inclinaison = 2,
-            code = 'horizon_penche', source = 'measure_angle' } }) })
-        FenetreSuivi.montrerDefaut('mise_au_point')
-        egal('DSCF1101.RAF · mesure : 8,5', vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title:match('DSCF.*$'))
-        FenetreSuivi.montrerDefaut('horizon_penche')
-        egal('DSCF1101.RAF · ligne penchée de 2,0°', vueDe(S.dialogues[#S.dialogues].contents, 'simple_list').args.items[1].title:match('DSCF.*$'))
-        fabriquerType()
-        egal('mars 2026 · photo 77', FenetreSuivi.textePhotoDuDefaut({ mois_libelle = 'mars 2026', original = 77 }))
-    end)
-end)
-
-essai('« Retirer du carnet… » : la photo choisie, après confirmation, par appel direct au registre avec l\'id de l\'original ; le résumé se relit, le bas de la fenêtre le dit', function()
-    fabriquerType()
-    ouvrirSuivi(function(p)
-        unTourDeBoucle()
-        egal(13, FenetreSuivi.resume.photos)
-        local commande, recues = Carnet.commande, {}
-        Carnet.commande = function(params)
-            recues[#recues + 1] = params
-            return commande(params)
-        end
-        local presenter = S.modules.LrDialogs.presentModalDialog
-        -- Dany choisit la deuxième photo (1025, mesurée sur sa copie 5025), puis Retirer du carnet….
-        S.modules.LrDialogs.presentModalDialog = function(args)
-            S.dialogues[#S.dialogues + 1] = args
-            args.contents.args.bind_to_object.choix = { 1025 }
-            return 'other'
-        end
-        -- Annulé à la confirmation : rien ne sort.
-        S.reponseConfirm = 'cancel'
-        egal(false, FenetreSuivi.montrerDefaut('ciel_brule'))
-        egal(0, #recues)
-        vrai(Carnet.entree(1025), 'toujours au carnet')
-        contient(S.confirmation[1], 'Retirer DSCF1025.RAF du carnet de progrès ?')
-        contient(S.confirmation[2], 'ne comptent plus dans la fenêtre Suivi')
-        contient(S.confirmation[2], 'La photo et ses retouches ne changent pas.')
-        -- Confirmé : retirée par Carnet.commande, l'identifiant de l'original.
-        S.reponseConfirm = 'ok'
-        local version = Carnet.version
-        egal(true, FenetreSuivi.montrerDefaut('ciel_brule'))
-        egal(1, #recues)
-        egal('retirer', recues[1].action)
-        egal(1025, recues[1].photos[1])
-        egal(1, #recues[1].photos)
-        egal(nil, Carnet.entree(1025), 'retirée')
-        vrai(Carnet.entree(1024), 'les autres restent')
-        vrai(Carnet.version > version, 'le résumé se relira')
-        egal('DSCF1025.RAF est retirée du carnet de progrès.', p.message)
-        -- Fermer : rien.
-        S.modules.LrDialogs.presentModalDialog = function(args)
-            S.dialogues[#S.dialogues + 1] = args
-            return 'ok'
-        end
-        egal(false, FenetreSuivi.montrerDefaut('ciel_brule'))
-        egal(1, #recues)
-        S.modules.LrDialogs.presentModalDialog = presenter
-        Carnet.commande = commande
-        S.reponseConfirm = nil
-        -- Le résumé se relit au tour suivant de la boucle.
-        unTourDeBoucle()
-        egal(12, FenetreSuivi.resume.photos, 'le résumé relu')
-    end)
 end)
 
 -- Consignes ----------------------------------------------------------------------------------------

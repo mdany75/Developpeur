@@ -1,17 +1,19 @@
 -- essais-suivi.lua : la fenêtre Suivi en graphiques (correctif 1.3.7, FenetreSuivi.lua), hors de
 -- Lightroom (LuaJIT, Lightroom simulé par Simulation.lua), d'après le contrat figé
--- (Tests/Contrats/suivi.json) : sa construction (structure fixe : sept images liées, 68 calques posés
--- sur les créneaux du contrat, menus Période et défaut suivi, tuiles, aplats aux couleurs de
--- l'apparence), l'entrée envoyée à `mcp-developpeur --graphiques` (exactement celle des exemples du
--- contrat), sa sortie montrée (tuiles, titres, notes, images, calques visibles sur les barres qui
--- ont des photos, infobulles), la période et le défaut choisis, un clic sur une barre (ses photos
+-- (Tests/Contrats/suivi.json) : sa construction (structure fixe : huit images liées, les notes à côté
+-- des objectifs, 76 calques posés sur les créneaux du contrat, champs « Du » et « au », menu du défaut
+-- suivi, tuiles, aplats aux couleurs de l'apparence ; plus de « Photos d'un défaut… »), l'entrée
+-- envoyée à `mcp-developpeur --graphiques` (exactement celle des exemples du contrat), sa sortie
+-- montrée (tuiles, titres, notes, images, calques visibles sur les barres qui ont des photos,
+-- infobulles), la période (les dates tapées, lues, gardées d'une ouverture à l'autre ; correctif
+-- 1.3.8) et le défaut choisis, un clic sur une barre (ses photos
 -- dans la Bibliothèque, l'uuid vérifié, Toutes les photographies comme source au besoin, rien
 -- d'écrit), un relevé vide (le texte d'accueil), un connecteur absent, muet ou qui refuse (le
 -- message, les images d'avant gardées), le relevé ou le carnet changé pendant qu'elle est ouverte,
 -- ses dossiers effacés, et les boutons Suivi, Publication… et Consommation… de l'en-tête de la
 -- fenêtre Claude. Le connecteur est imité par un faux `mcp-developpeur --graphiques` (un script
 -- LuaJIT écrit ici), qui lit le contrat et rend la sortie de l'exemple de la période demandée (les
--- graphiques qu'un exemple partiel omet viennent de celui des 12 mois, comme le contrat le dit), avec
+-- graphiques qu'un exemple partiel omet viennent de celui d'un an, comme le contrat le dit), avec
 -- de vraies images PNG. Ni Lightroom, ni Claude, ni vraies photos ; les fichiers vont dans un
 -- dossier personnel temporaire.
 -- Lancé par scripts/tester-module.sh dans Tests/Lua/Fenetre, avec PLUGIN_DIR.
@@ -131,18 +133,17 @@ local CONTRAT = sansNotes(Json.decode(assert(Fichiers.lire(CONTRAT_CHEMIN), 'con
 local EXEMPLES = CONTRAT.exemples
 local REGISTRE = EXEMPLES.registre.fichier
 local CATALOGUE = next(REGISTRE.catalogues)
-local AUJOURDHUI = EXEMPLES.graphiques_12_mois.entree.aujourd_hui
-local PAR_PERIODE = { ['12_mois'] = 'graphiques_12_mois', ['3_mois'] = 'graphiques_3_mois', tout = 'graphiques_tout' }
+local AUJOURDHUI = EXEMPLES.graphiques_un_an.entree.fin
 
 S.catalogue.getPath = function() return CATALOGUE end
 FenetreSuivi.aujourdhui = function() return AUJOURDHUI end
 
--- La sortie que le faux connecteur rend pour une période : celle de son exemple, les graphiques
--- qu'un exemple partiel omet pris dans celui des 12 mois (le contrat : « les graphiques omis suivent
--- les mêmes règles »), leurs fichiers dans `dossier`.
-local function sortieAttendue(periode, dossier)
-    local sortie = sansNotes(Json.decode(Json.encode(EXEMPLES[PAR_PERIODE[periode]].sortie)))
-    for cle, g in pairs(EXEMPLES.graphiques_12_mois.sortie.graphiques) do
+-- La sortie que le faux connecteur rend pour un exemple : la sienne, les graphiques qu'un exemple
+-- partiel omet pris dans celui d'un an (le contrat : « les graphiques omis suivent les mêmes
+-- règles »), leurs fichiers dans `dossier`.
+local function sortieAttendue(exemple, dossier)
+    local sortie = sansNotes(Json.decode(Json.encode(EXEMPLES[exemple].sortie)))
+    for cle, g in pairs(EXEMPLES.graphiques_un_an.sortie.graphiques) do
         if sortie.graphiques[cle] == nil then
             sortie.graphiques[cle] = sansNotes(Json.decode(Json.encode(g)))
         end
@@ -206,9 +207,14 @@ end
 local entree = Json.decode(arg[2])
 local dossier = arg[3]
 local contrat = Json.decode(lire(%q))
-local exemples = { ['12_mois'] = 'graphiques_12_mois', ['3_mois'] = 'graphiques_3_mois', tout = 'graphiques_tout' }
-local sortie = contrat.exemples[exemples[entree.periode]].sortie
-for cle, g in pairs(contrat.exemples.graphiques_12_mois.sortie.graphiques) do
+-- L'exemple de la période demandée : celui qui a ce début (ou aucun) et cette fin ; sinon celui d'un an.
+local sortie = contrat.exemples.graphiques_un_an.sortie
+for nom, x in pairs(contrat.exemples) do
+    if nom:match('^graphiques_') and type(x.entree) == 'table' and x.entree.debut == entree.debut and x.entree.fin == entree.fin then
+        sortie = x.sortie
+    end
+end
+for cle, g in pairs(contrat.exemples.graphiques_un_an.sortie.graphiques) do
     if sortie.graphiques[cle] == nil then sortie.graphiques[cle] = g end
 end
 if mode == 'vide' then
@@ -281,6 +287,8 @@ local function depart(apparence)
     mode('contrat')
     prefs.cheminConnecteur = CONNECTEUR
     prefs.apparence = apparence or 'claire'
+    -- Aucune période gardée : les douze derniers mois, du 1er du mois onze mois plus tôt à aujourd'hui.
+    prefs.suiviDebut, prefs.suiviFin = nil, nil
     Releve.allume = false
     reclassements = {}
     journal = {}
@@ -297,6 +305,12 @@ local function unTour()
     LrTasks.sleep = sleep
     FenetreSuivi.generation = generation
     vrai(ok, erreur)
+end
+
+-- Une date validée dans « Du » ('debut') ou « au » ('fin') : Lightroom pose le texte du champ dans
+-- la table (Retour, ou le champ quitté), et son observateur le lit.
+local function taperDate(p, borne, texte)
+    p[borne == 'debut' and 'debutTexte' or 'finTexte'] = texte
 end
 
 -- Ouvre la fenêtre Suivi et appelle fn(p, args, taches) pendant qu'elle est ouverte ; une erreur de
@@ -390,8 +404,11 @@ end
 
 -- Construction ------------------------------------------------------------------------------------
 
-essai("Contrat : tailles, créneaux (rectangles et nombre : 68), couleurs des deux apparences et périodes, ceux du contrat", function()
-    local entree = EXEMPLES.graphiques_12_mois.entree
+local EXEMPLES_GRAPHIQUES = { 'graphiques_un_an', 'graphiques_treize_mois', 'graphiques_trois_mois', 'graphiques_depuis_le_debut',
+    'graphiques_trimestres' }
+
+essai("Contrat : tailles, créneaux (rectangles et nombre : 76), couleurs des deux apparences, ceux du contrat ; les notes à côté des objectifs", function()
+    local entree = EXEMPLES.graphiques_un_an.entree
     local total = 0
     for _, g in ipairs(FenetreSuivi.GRAPHIQUES) do
         local liste = CONTRAT.regles.graphiques.liste[g.cle]
@@ -402,7 +419,7 @@ essai("Contrat : tailles, créneaux (rectangles et nombre : 68), couleurs des de
         egal(entree.tailles[g.cle].hauteur, g.hauteur, g.cle .. ' : hauteur')
         total = total + g.max_barres
         -- Les rectangles ne dépendent que de la taille : ceux de chaque exemple.
-        for _, exemple in ipairs({ 'graphiques_12_mois', 'graphiques_3_mois', 'graphiques_tout' }) do
+        for _, exemple in ipairs(EXEMPLES_GRAPHIQUES) do
             local rendu = EXEMPLES[exemple].sortie.graphiques[g.cle]
             if rendu then
                 local creneaux = FenetreSuivi.creneaux(g)
@@ -416,8 +433,11 @@ essai("Contrat : tailles, créneaux (rectangles et nombre : 68), couleurs des de
             end
         end
     end
-    egal(7, #FenetreSuivi.GRAPHIQUES)
-    egal(68, total, 'les 68 calques du contrat')
+    egal(8, #FenetreSuivi.GRAPHIQUES)
+    egal(76, total, 'les 76 calques du contrat')
+    egal(6, FenetreSuivi.graphique('notes').max_barres, 'les notes : de 0 à 5 ★')
+    egal(13, FenetreSuivi.graphique('photos_par_mois').max_barres, 'treize mois au plus')
+    egal(FenetreSuivi.graphique('objectifs').hauteur, FenetreSuivi.graphique('notes').hauteur, 'les notes de la taille des objectifs')
     for cle in pairs(CONTRAT.regles.graphiques.liste) do
         vrai(FenetreSuivi.graphique(cle), 'graphique de la fenêtre : ' .. cle)
     end
@@ -426,21 +446,18 @@ essai("Contrat : tailles, créneaux (rectangles et nombre : 68), couleurs des de
     memes(CONTRAT.regles.couleurs.claire, FenetreSuivi.couleursConnecteur('claire'))
     memes(CONTRAT.regles.couleurs.sombre, FenetreSuivi.couleursConnecteur('sombre'))
     memes(CONTRAT.regles.couleurs.claire, FenetreSuivi.couleursConnecteur('inconnue'), 'une apparence inconnue : la claire')
-    -- Les périodes et celle de l'ouverture.
-    local valeurs = {}
-    for _, x in ipairs(FenetreSuivi.elementsPeriode()) do
-        valeurs[#valeurs + 1] = x.title .. '=' .. x.value
-    end
-    egal('3 derniers mois=3_mois|12 derniers mois=12_mois|Tout=tout', table.concat(valeurs, '|'))
-    egal('12_mois', FenetreSuivi.PERIODE)
+    -- Plus de menu Période (correctif 1.3.8).
+    egal(nil, FenetreSuivi.PERIODES)
+    egal(nil, FenetreSuivi.PERIODE)
+    egal(nil, FenetreSuivi.elementsPeriode)
     -- Les tuiles, dans l'ordre du contrat.
-    for k, t in ipairs(EXEMPLES.graphiques_12_mois.sortie.tuiles) do
+    for k, t in ipairs(EXEMPLES.graphiques_un_an.sortie.tuiles) do
         egal(t.cle, FenetreSuivi.TUILES[k].cle)
         egal(t.titre, FenetreSuivi.TUILES[k].titre)
     end
 end)
 
-essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran de Dany), l'aplat du fond, sept images liées à leur taille, 68 calques sur les créneaux, les menus, les tuiles ; rien avant la première réponse", function()
+essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran de Dany), l'aplat du fond, huit images liées à leur taille, 76 calques sur les créneaux, les champs « Du » et « au », le menu du défaut, les tuiles ; rien avant la première réponse", function()
     depart()
     local D = FenetreSuivi.dimensions()
     vrai(D.hauteurFenetre <= 1440 - 100, "la fenêtre tient dans la hauteur de l'écran de Dany : " .. D.hauteurFenetre)
@@ -465,7 +482,7 @@ essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran d
         local c = Dispositions.couleurs('claire').fondDroite
         egal(c[1], fond.args.background_color.r)
         egal(c[3], fond.args.background_color.b)
-        -- Sept images liées, à la taille demandée au connecteur, cachées avant la première réponse.
+        -- Huit images liées, à la taille demandée au connecteur, cachées avant la première réponse.
         for _, g in ipairs(FenetreSuivi.GRAPHIQUES) do
             local image = liee(args.contents, 'picture', 'image_' .. g.cle)
             egal(g.largeur, image.args.width, g.cle)
@@ -474,12 +491,12 @@ essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran d
             egal(false, p['pret_' .. g.cle])
             vrai(Fichiers.existe(p['image_' .. g.cle]), "une image existante avant la première (cachée)")
         end
-        -- 68 calques, chacun sur son créneau (sa colonne poussée par ses marges), à sa taille,
+        -- 76 calques, chacun sur son créneau (sa colonne poussée par ses marges), à sa taille,
         -- visibilité et infobulle liées, cachés avant la première réponse.
         local calques, n = calquesDe(args.contents)
-        egal(68, n, 'les calques')
+        egal(76, n, 'les calques')
         for _, g in ipairs(FenetreSuivi.GRAPHIQUES) do
-            local attendus = EXEMPLES.graphiques_12_mois.sortie.graphiques[g.cle].creneaux
+            local attendus = EXEMPLES.graphiques_un_an.sortie.graphiques[g.cle].creneaux
             for i, cr in ipairs(attendus) do
                 local calque = calques[g.cle][i]
                 vrai(calque, g.cle .. ' : calque ' .. i)
@@ -495,11 +512,19 @@ essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran d
                 egal(false, S.montreeDansFenetre(calque.vue), 'caché')
             end
         end
-        -- Les menus : Période (tables neuves, 12 derniers mois), le défaut suivi (le plus fréquent).
-        local periode = liee(args.contents, 'popup_menu', 'periode')
-        S.neuve(periode.args.items, 'périodes')
-        egal(3, #periode.args.items)
-        egal('12_mois', p.periode)
+        -- « Du » et « au » : deux champs validés par Retour (immediate faux), sans rien de gardé les
+        -- douze derniers mois (du 1er du mois onze mois plus tôt à aujourd'hui) ; plus de menu Période.
+        -- Le menu du défaut suivi (le plus fréquent).
+        local du, au = liee(args.contents, 'edit_field', 'debutTexte'), liee(args.contents, 'edit_field', 'finTexte')
+        egal(false, du.args.immediate)
+        egal(false, au.args.immediate)
+        egal(FenetreSuivi.INFOBULLE_DEBUT, du.args.tooltip)
+        egal('1er décembre 2025', p.debutTexte)
+        egal("aujourd'hui", p.finTexte)
+        egal(nil, p.periode)
+        for _, v in ipairs(liste) do
+            vrai(not (v.genre == 'popup_menu' and type(v.args.value) == 'table' and v.args.value.key == 'periode'), 'plus de menu Période')
+        end
         local defaut = liee(args.contents, 'popup_menu', 'elementsDefaut')
         egal('defaut', defaut.args.value.key)
         egal(FenetreSuivi.LE_PLUS_FREQUENT, p.defaut)
@@ -512,7 +537,7 @@ essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran d
         end
         egal(FenetreSuivi.LECTURE, p.etat)
         egal(FenetreSuivi.ATTENTE, p.attente)
-        -- Les sections et « Photos d'un défaut… » (la place tient).
+        -- Les sections ; plus de « Photos d'un défaut… » (correctif 1.3.8).
         local textes = {}
         for _, v in ipairs(liste) do
             if v.genre == 'static_text' and type(v.args.title) == 'string' then
@@ -521,9 +546,18 @@ essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran d
         end
         vrai(textes[FenetreSuivi.PRISES_DE_VUE] and textes[FenetreSuivi.CARNET], 'Mes prises de vue, Mon carnet de progrès')
         vrai(textes[FenetreSuivi.AIDE], "l'aide des clics")
-        local defauts = bouton(args.contents, "Photos d'un défaut…")
-        vrai(defauts, "« Photos d'un défaut… » garde sa place")
-        egal('aDefauts', defauts.args.enabled.key)
+        egal(nil, bouton(args.contents, "Photos d'un défaut…"), "plus de « Photos d'un défaut… »")
+        egal(nil, p.aDefauts)
+        -- Les notes à côté des objectifs, dans la même rangée.
+        local objectifs, notes = liee(args.contents, 'picture', 'image_objectifs'), liee(args.contents, 'picture', 'image_notes')
+        local _, parent = parents(args.contents)
+        local function rangee(v)
+            while v and v.genre ~= 'row' do
+                v = parent[v]
+            end
+            return v
+        end
+        vrai(rangee(objectifs) and rangee(objectifs) == rangee(notes), 'les notes et les objectifs dans la même rangée')
         -- Rien n'est demandé au connecteur avant le premier tour de la boucle.
         egal(0, #recus())
     end)
@@ -547,7 +581,7 @@ essai("Premier tour : --graphiques sous perl (alarme de 60 s) avec exactement l'
         egal(1, #reclassements, 'la note, le drapeau et « retouchée par Claude » relus')
         egal(1, reclassements[1], 'après le premier --graphiques')
         egal(false, FenetreSuivi.aRedessiner, 'rien de relu (0) : pas de second dessin')
-        memes(entreeAttendue('graphiques_12_mois'), r[1].entree)
+        memes(entreeAttendue('graphiques_un_an'), r[1].entree)
         -- La commande : perl et son alarme, le connecteur, l'entrée et un dossier neuf.
         local commande
         for i = commandes + 1, #S.dernieresCommandes do
@@ -561,7 +595,7 @@ essai("Premier tour : --graphiques sous perl (alarme de 60 s) avec exactement l'
         contient(commande, S.q(CONNECTEUR) .. ' --graphiques ')
         contient(r[1].dossier, Chemins.temporaire() .. '/Suivi/Graphiques-')
         -- La sortie : tuiles, titres, notes, images et calques.
-        local sortie = sortieAttendue('12_mois', r[1].dossier)
+        local sortie = sortieAttendue('graphiques_un_an', r[1].dossier)
         for k, t in ipairs(sortie.tuiles) do
             egal(t.titre, p['tuileTitre' .. k])
             egal(t.texte, p['tuileTexte' .. k])
@@ -585,8 +619,16 @@ essai("Premier tour : --graphiques sous perl (alarme de 60 s) avec exactement l'
         egal("16 à 23 mm · 4 photos\n" .. FenetreSuivi.INFOBULLE_BARRE, p.i_focales_2)
         egal(false, p.c_photos_par_mois_1)
         -- La ligne d'état : la période et ses photos.
-        egal("12 derniers mois : de décembre 2025 à novembre 2026 · 12 photos ouvertes, dont 1 sans date de prise de vue (à leur "
+        egal("Du 1er décembre 2025 au 20 novembre 2026 · 12 photos ouvertes, dont 1 sans date de prise de vue (à leur "
             .. "date d'ajout).", p.etat)
+        -- L'année au premier mois et à janvier ; le dernier mois, jusqu'au jour de fin.
+        contient(p.i_photos_par_mois_2, 'janvier 2026 · 1 photo')
+        contient(p.i_photos_par_mois_12, "novembre 2026, jusqu'au 20 · 4 photos")
+        egal(false, p.c_photos_par_mois_13, 'douze mois : le treizième créneau vide')
+        -- Les notes : 0 ★ (cinq photos) se clique, sa note dit la photo rejetée.
+        egal(true, p.c_notes_1)
+        egal("0 ★, pas encore notée · 5 photos\n" .. FenetreSuivi.INFOBULLE_BARRE, p.i_notes_1)
+        egal('Dont 1 rejetée (drapeau), comptée à sa note.', p.note_notes)
         -- Le menu du défaut suivi : le plus fréquent (dit), puis les huit défauts du contrat, dans leur
         -- ordre, avec leur pourcentage ; des tables neuves.
         local items = p.elementsDefaut
@@ -606,62 +648,259 @@ essai("Premier tour : --graphiques sous perl (alarme de 60 s) avec exactement l'
     end)
 end)
 
-essai("Période et défaut choisis (apparence sombre) : 3 derniers mois, puis « Yeux fermés » : exactement l'entrée de l'exemple des 3 mois ; quatre créneaux par mois ; le plus fréquent rechoisi, sans défaut", function()
+essai("Période et défaut choisis (apparence sombre) : du 1er septembre 2026, puis « Yeux fermés » : exactement l'entrée de l'exemple des trois mois ; quatre créneaux par mois ; la période gardée ; le plus fréquent rechoisi, sans défaut", function()
     depart('sombre')
     ouvrirSuivi(function(p, args)
         unTour()
         -- Le fond dans l'apparence sombre.
         local fond = parents(args.contents)[2]
         egal(Dispositions.couleurs('sombre').fondDroite[1], fond.args.background_color.r)
-        S.choisir(liee(args.contents, 'popup_menu', 'periode'), '3_mois')
+        taperDate(p, 'debut', '1er sept. 2026')
         egal(true, FenetreSuivi.aRedessiner, 'une autre période : à refaire')
+        egal('1er septembre 2026', p.debutTexte, 'le champ réécrit au propre')
+        egal('2026-09-01', prefs.suiviDebut, 'gardée')
+        egal(FenetreSuivi.AUJOURDHUI, prefs.suiviFin, "la fin telle qu'elle est montrée")
         unTour()
         local r = recus()
         egal(2, #r)
-        egal('3_mois', r[2].entree.periode)
+        egal('2026-09-01', r[2].entree.debut)
+        egal(AUJOURDHUI, r[2].entree.fin)
         egal(nil, r[2].entree.defaut)
         local menu = liee(args.contents, 'popup_menu', 'elementsDefaut')
         S.choisir(menu, 'yeux_fermes')
         unTour()
         r = recus()
         egal(3, #r)
-        memes(entreeAttendue('graphiques_3_mois'), r[3].entree)
-        local sortie = sortieAttendue('3_mois', r[3].dossier)
+        memes(entreeAttendue('graphiques_trois_mois'), r[3].entree)
+        local sortie = sortieAttendue('graphiques_trois_mois', r[3].dossier)
         verifierCalques(p, sortie)
-        -- Trois mois de quatre créneaux : septembre sur les quatre premiers.
+        -- Trois mois de quatre créneaux : septembre sur les quatre premiers ; le treizième, vide.
         for i = 1, 4 do
             egal(true, p['c_photos_par_mois_' .. i], 'septembre, créneau ' .. i)
             contient(p['i_photos_par_mois_' .. i], 'septembre 2026')
         end
         contient(p.i_photos_par_mois_9, 'novembre 2026')
+        egal(false, p.c_photos_par_mois_13)
         egal('Yeux fermés ou plissés, mois par mois', p.titre_evolution_defaut)
-        contient(p.etat, '3 derniers mois : de septembre 2026 à novembre 2026')
+        contient(p.etat, 'Du 1er septembre 2026 au 20 novembre 2026 · 9 photos ouvertes')
         -- Le plus fréquent rechoisi : sans défaut dans l'entrée.
         S.choisir(menu, FenetreSuivi.LE_PLUS_FREQUENT)
         unTour()
         r = recus()
         egal(4, #r)
         egal(nil, r[4].entree.defaut)
-        egal('3_mois', r[4].entree.periode)
+        egal('2026-09-01', r[4].entree.debut)
+    end)
+    -- Rouverte : la période gardée revient, dans les champs et dans l'entrée.
+    ouvrirSuivi(function(p)
+        egal('1er septembre 2026', p.debutTexte)
+        egal("aujourd'hui", p.finTexte)
+        unTour()
+        local r = recus()
+        egal('2026-09-01', r[#r].entree.debut)
+        egal(AUJOURDHUI, r[#r].entree.fin)
     end)
 end)
 
-essai("Tout, avec « Photo floue » : exactement l'entrée de l'exemple de Tout ; une colonne par année, les années d'avant 2016 d'abord ; les objectifs, « Autres » en dernier", function()
+essai("Depuis la première photo, avec « Photo floue » : exactement l'entrée de l'exemple sans début ; une colonne par année, les années d'avant 2015 d'abord ; les objectifs, « Autres » en dernier", function()
     depart()
     ouvrirSuivi(function(p, args)
         unTour()
-        S.choisir(liee(args.contents, 'popup_menu', 'periode'), 'tout')
+        taperDate(p, 'debut', '')
+        egal(FenetreSuivi.PREMIERE_PHOTO, p.debutTexte)
+        egal('', prefs.suiviDebut, 'gardée : depuis la première photo')
         S.choisir(liee(args.contents, 'popup_menu', 'elementsDefaut'), 'flou')
         unTour()
         local r = recus()
         egal(2, #r, 'un seul dessin pour les deux choix du même tour')
-        memes(entreeAttendue('graphiques_tout'), r[2].entree)
-        verifierCalques(p, sortieAttendue('tout', r[2].dossier))
-        contient(p.i_photos_par_mois_1, 'avant 2016 · 3 photos')
+        memes(entreeAttendue('graphiques_depuis_le_debut'), r[2].entree)
+        verifierCalques(p, sortieAttendue('graphiques_depuis_le_debut', r[2].dossier))
+        contient(p.i_photos_par_mois_1, 'avant 2015 · 2 photos')
         egal('Photos par année', p.titre_photos_par_mois)
         contient(p.i_objectifs_8, '2 autres objectifs · 2 photos')
-        egal("Tout : de décembre 2009 à novembre 2026 · 17 photos ouvertes, dont 1 sans date de prise de vue (à leur date d'ajout).", p.etat)
+        egal("Depuis la première photo, le 25 décembre 2009, jusqu'au 20 novembre 2026 · 17 photos ouvertes, dont 1 sans date de prise de vue "
+            .. "(à leur date d'ajout).", p.etat)
+        -- « première photo », tapée telle quelle, se lit aussi ; rien ne change.
+        taperDate(p, 'debut', 'Première photo ')
+        egal(FenetreSuivi.PREMIERE_PHOTO, p.debutTexte)
+        egal(false, FenetreSuivi.aRedessiner)
     end)
+end)
+
+essai("Plus de treize mois : par trimestre (l'entrée de l'exemple des trimestres) ; une fin fixe gardée ; une date qui ne se lit pas, ou un début après la fin : la ligne d'état le dit, les champs reprennent la période gardée, rien n'est refait", function()
+    depart()
+    ouvrirSuivi(function(p)
+        unTour()
+        taperDate(p, 'debut', '01/01/2024')
+        unTour()
+        local r = recus()
+        egal(2, #r)
+        memes(entreeAttendue('graphiques_trimestres'), r[2].entree)
+        egal('Photos par trimestre', p.titre_photos_par_mois)
+        contient(p.i_photos_par_mois_7, 'juillet à septembre 2025 · 1 photo')
+        egal(false, p.c_photos_par_mois_13)
+        -- Une fin fixe : gardée telle quelle, elle n'avance plus.
+        taperDate(p, 'fin', '25 janvier 2026')
+        egal('25 janvier 2026', p.finTexte)
+        egal('2026-01-25', prefs.suiviFin)
+        unTour()
+        r = recus()
+        egal('2026-01-25', r[3].entree.fin)
+        egal('2024-01-01', r[3].entree.debut)
+        -- Une date qui ne se lit pas : dite, la période gardée revient dans le champ.
+        taperDate(p, 'fin', '31 février 2026')
+        egal(string.format(FenetreSuivi.FIN_ILLISIBLE, '31 février 2026'), p.etat)
+        egal('25 janvier 2026', p.finTexte)
+        egal('2026-01-25', prefs.suiviFin)
+        egal(false, FenetreSuivi.aRedessiner)
+        taperDate(p, 'debut', 'hier')
+        egal(string.format(FenetreSuivi.DEBUT_ILLISIBLE, 'hier'), p.etat)
+        egal('1er janvier 2024', p.debutTexte)
+        -- Un début après la fin : refusé.
+        taperDate(p, 'debut', '2026-02-01')
+        egal(string.format(FenetreSuivi.DEBUT_APRES_FIN, '1er février 2026', '25 janvier 2026'), p.etat)
+        contient(p.etat, "changez d'abord « au »")
+        egal('1er janvier 2024', p.debutTexte)
+        egal('2024-01-01', prefs.suiviDebut)
+        -- Une fin avant le début : refusée aussi, avec le champ à changer d'abord.
+        taperDate(p, 'fin', '2023')
+        egal(string.format(FenetreSuivi.FIN_AVANT_DEBUT, '31 décembre 2023', '1er janvier 2024'), p.etat)
+        contient(p.etat, "changez d'abord « Du »")
+        egal('25 janvier 2026', p.finTexte)
+        egal('2026-01-25', prefs.suiviFin)
+        -- La même date retapée, autrement écrite : rien de gardé ni de refait.
+        taperDate(p, 'debut', '01/01/2024')
+        egal('1er janvier 2024', p.debutTexte)
+        egal(false, FenetreSuivi.aRedessiner)
+        unTour()
+        egal(3, #recus(), 'rien de refait')
+        -- « aujourd'hui » : la fin avance de nouveau.
+        taperDate(p, 'fin', "Aujourd'hui")
+        egal("aujourd'hui", p.finTexte)
+        egal(FenetreSuivi.AUJOURDHUI, prefs.suiviFin)
+    end)
+end)
+
+essai("Sans période gardée : l'écho de ce que la fenêtre écrit ne garde rien ; la date affichée retapée autrement se garde ; l'autre borne est celle que montre le champ, même un mois plus tard sans dessin ; chaque dessin recale les champs sur le jour", function()
+    depart()
+    local aujourdhui = FenetreSuivi.aujourdhui
+    local ok, erreur = pcall(ouvrirSuivi, function(p)
+        unTour()
+        egal('1er décembre 2025', p.debutTexte)
+        -- L'écho (un observateur appelé plus tard, avec le texte que la fenêtre a écrit) : rien.
+        egal(false, FenetreSuivi.changerDate('debut', '1er décembre 2025'))
+        egal(false, FenetreSuivi.changerDate('fin', "aujourd'hui"))
+        egal(nil, prefs.suiviDebut, "l'écho ne garde rien")
+        egal(nil, prefs.suiviFin)
+        -- La date affichée, retapée autrement : Dany l'a choisie, elle se garde (« Du » ne suit plus
+        -- le mois) ; la période dessinée ne change pas.
+        taperDate(p, 'debut', '2025-12-01')
+        egal('1er décembre 2025', p.debutTexte)
+        egal('2025-12-01', prefs.suiviDebut)
+        egal(FenetreSuivi.AUJOURDHUI, prefs.suiviFin)
+        FenetreSuivi.aujourdhui = function() return '2027-01-05' end
+        egal('2025-12-01', FenetreSuivi.iso(FenetreSuivi.periode().debut), 'gardée : le mois passé, elle reste')
+        FenetreSuivi.aujourdhui = aujourdhui
+        -- Rien de gardé de nouveau ; un mois passe sans dessin (relevé et carnet inchangés) : « au »
+        -- tapé garde le début que « Du » montre, pas celui du nouveau mois.
+        prefs.suiviDebut, prefs.suiviFin = nil, nil
+        FenetreSuivi.poserChamps(FenetreSuivi.periode())
+        egal('1er décembre 2025', p.debutTexte)
+        FenetreSuivi.aujourdhui = function() return '2026-12-02' end
+        taperDate(p, 'fin', '15 novembre 2026')
+        egal('2025-12-01', prefs.suiviDebut, 'le début montré, pas le 1er janvier 2026')
+        egal('2026-11-15', prefs.suiviFin)
+        egal('1er décembre 2025', p.debutTexte)
+        egal('15 novembre 2026', p.finTexte)
+        -- Chaque dessin recale les champs : rien de gardé, la fenêtre restée ouverte d'un mois à
+        -- l'autre montre la période qu'elle dessine.
+        prefs.suiviDebut, prefs.suiviFin = nil, nil
+        FenetreSuivi.aujourdhui = function() return '2027-01-05' end
+        FenetreSuivi.aRedessiner = true
+        unTour()
+        egal('1er février 2026', p.debutTexte, 'recalé au dessin')
+        egal("aujourd'hui", p.finTexte)
+        local r = recus()
+        egal('2026-02-01', r[#r].entree.debut)
+        egal('2027-01-05', r[#r].entree.fin)
+    end)
+    FenetreSuivi.aujourdhui = aujourdhui
+    prefs.suiviDebut, prefs.suiviFin = nil, nil
+    assert(ok, erreur)
+end)
+
+essai("Les dates tapées (FenetreSuivi.lireDate) : jour, mois et année en mots ou en chiffres, sans tenir compte des accents ni des majuscules ; un mois ou une année seuls ; vide, première photo, aujourd'hui ; ce qui ne se lit pas", function()
+    local function lue(texte, borne)
+        local d = FenetreSuivi.lireDate(texte, borne or 'debut', '2026-11-20')
+        if d == nil then
+            return 'nil'
+        end
+        if d.premiere then
+            return 'premiere'
+        end
+        if d.aujourdhui then
+            return 'aujourdhui'
+        end
+        return FenetreSuivi.iso(d)
+    end
+    egal('2025-01-25', lue('25 janvier 2025'))
+    egal('2025-01-25', lue('  25  Janvier  2025 '))
+    egal('2025-01-01', lue('1er janvier 2025'))
+    egal('2025-02-25', lue('25 fevrier 2025'))
+    egal('2025-02-25', lue('25 FÉVR. 2025'))
+    egal('2025-08-15', lue('15 août 2025'))
+    egal('2025-08-15', lue('15 aou 2025'))
+    egal('2025-12-01', lue('1 déc 2025'))
+    egal('2025-01-25', lue('25/01/2025'))
+    egal('2025-01-05', lue('5-1-2025'))
+    egal('2025-01-05', lue('5.1.2025'))
+    egal('2025-01-25', lue('2025-01-25'))
+    egal('2025-03-01', lue('mars 2025'))
+    egal('2025-03-31', lue('mars 2025', 'fin'))
+    egal('2024-02-29', lue('février 2024', 'fin'), 'bissextile')
+    egal('2025-02-28', lue('février 2025', 'fin'))
+    egal('2025-01-01', lue('2025'))
+    egal('2025-12-31', lue('2025', 'fin'))
+    egal('premiere', lue(''))
+    egal('premiere', lue('la première photo'))
+    egal('aujourdhui', lue('', 'fin'))
+    egal('aujourdhui', lue("AUJOURD'HUI", 'fin'))
+    egal('aujourdhui', lue('aujourd’hui', 'fin'), "l'apostrophe typographique")
+    egal('2026-11-20', lue("aujourd'hui"), 'au début : le jour même')
+    egal('nil', lue('31 avril 2025'))
+    egal('nil', lue('29 février 2025'))
+    egal('nil', lue('25 jui 2025'), 'juin ou juillet ?')
+    egal('nil', lue('2e janvier 2025'))
+    egal('nil', lue('25/13/2025'))
+    egal('nil', lue('1899'))
+    egal('nil', lue('hier'))
+    egal('nil', lue('première photo', 'fin'))
+    -- En français : « 1er » le premier du mois.
+    egal('1er mars 2026', FenetreSuivi.texteDate({ annee = 2026, mois = 3, jour = 1 }))
+    egal('25 janvier 2025', FenetreSuivi.texteDate({ annee = 2025, mois = 1, jour = 25 }))
+    -- La période sans rien de gardé : les douze derniers mois, du 1er du mois onze mois plus tôt à
+    -- aujourd'hui (d'une année à l'autre).
+    local aujourdhui = FenetreSuivi.aujourdhui
+    FenetreSuivi.aujourdhui = function() return '2028-02-29' end
+    prefs.suiviDebut, prefs.suiviFin = nil, nil
+    local periode = FenetreSuivi.periode()
+    egal('2027-03-01', FenetreSuivi.iso(periode.debut))
+    egal('2028-02-29', FenetreSuivi.iso(periode.fin))
+    egal(true, periode.finAujourdhui)
+    FenetreSuivi.aujourdhui = function() return '2026-12-31' end
+    egal('2026-01-01', FenetreSuivi.iso(FenetreSuivi.periode().debut), 'en décembre : depuis janvier')
+    FenetreSuivi.aujourdhui = function() return '2026-11-30' end
+    egal('2025-12-01', FenetreSuivi.iso(FenetreSuivi.periode().debut))
+    FenetreSuivi.aujourdhui = function() return '2028-02-29' end
+    -- Une préférence éditée à la main, ou un début gardé après la fin : la période par défaut.
+    prefs.suiviDebut, prefs.suiviFin = 'pas une date', '2026-13-01'
+    periode = FenetreSuivi.periode()
+    egal('2027-03-01', FenetreSuivi.iso(periode.debut))
+    egal(true, periode.finAujourdhui)
+    prefs.suiviDebut, prefs.suiviFin = '2026-06-01', '2026-01-25'
+    egal('2025-02-01', FenetreSuivi.iso(FenetreSuivi.periode().debut))
+    FenetreSuivi.aujourdhui = aujourdhui
+    prefs.suiviDebut, prefs.suiviFin = nil, nil
 end)
 
 -- Un clic sur une barre ---------------------------------------------------------------------------
@@ -948,7 +1187,7 @@ essai("Avant chaque dessin demandé (l'ouverture, une autre période), ce que le
     end
     local ok, erreur = pcall(ouvrirSuivi, function(p, args)
         unTour()
-        S.choisir(liee(args.contents, 'popup_menu', 'periode'), '3_mois')
+        taperDate(p, 'debut', '1er septembre 2026')
         unTour()
     end)
     Releve.ecrire = ecrire
@@ -980,8 +1219,11 @@ essai("Relevé vide : le texte d'accueil ; les graphiques « Aucune photo » du 
         end
     end)
     -- Un relevé qui a des photos, mais pas dans la période : ce qu'il faut choisir.
-    egal(FenetreSuivi.SANS_PHOTO_PERIODE .. FenetreSuivi.VOIR_TOUT, FenetreSuivi.texteEtat({ photos = 0, periode = { code = '3_mois' } }, false))
-    egal(FenetreSuivi.SANS_PHOTO_PERIODE, FenetreSuivi.texteEtat({ photos = 0, periode = { code = 'tout' } }, false))
+    egal(FenetreSuivi.SANS_PHOTO_PERIODE .. FenetreSuivi.VOIR_TOUT, FenetreSuivi.texteEtat({ photos = 0, periode = { depuis_le_debut = false,
+        fin = AUJOURDHUI } }, false))
+    egal(FenetreSuivi.SANS_PHOTO_PERIODE .. FenetreSuivi.VOIR_TOUT, FenetreSuivi.texteEtat({ photos = 0, periode = { depuis_le_debut = true,
+        fin = '2026-01-25' } }, false), "depuis la première photo, mais jusqu'à une fin passée : il y en a peut-être d'autres")
+    egal(FenetreSuivi.SANS_PHOTO_PERIODE, FenetreSuivi.texteEtat({ photos = 0, periode = { depuis_le_debut = true, fin = AUJOURDHUI } }, false))
 end)
 
 essai("Connecteur absent, puis muet, puis qui refuse : le message dit pourquoi ; sans réponse, les images d'avant restent", function()
@@ -1004,7 +1246,7 @@ essai("Connecteur absent, puis muet, puis qui refuse : le message dit pourquoi ;
         egal(FenetreSuivi.CONNECTEUR_ABSENT, p.etat)
         -- Le connecteur retrouvé (une autre période choisie) : dessinés.
         prefs.cheminConnecteur = CONNECTEUR
-        S.choisir(liee(args.contents, 'popup_menu', 'periode'), '3_mois')
+        taperDate(p, 'debut', '1er septembre 2026')
         unTour()
         egal(1, #recus())
         egal(true, p.pret_focales)
@@ -1012,7 +1254,7 @@ essai("Connecteur absent, puis muet, puis qui refuse : le message dit pourquoi ;
         -- Muet (l'alarme, un vieux connecteur) : le message, les images d'avant gardées, le dossier du
         -- dessin manqué effacé.
         mode('muet')
-        S.choisir(liee(args.contents, 'popup_menu', 'periode'), '12_mois')
+        taperDate(p, 'debut', '20 novembre 2025')
         unTour()
         local r = recus()
         egal(2, #r)
@@ -1023,7 +1265,7 @@ essai("Connecteur absent, puis muet, puis qui refuse : le message dit pourquoi ;
         vrai(not Fichiers.existe(r[2].dossier), 'le dossier du dessin manqué effacé')
         -- Qui refuse (ok faux, code 1) : son texte, au journal aussi.
         mode('refus')
-        S.choisir(liee(args.contents, 'popup_menu', 'periode'), 'tout')
+        taperDate(p, 'debut', '')
         unTour()
         egal(FenetreSuivi.REFUS .. "« dominante » n'est pas un défaut que le Suivi compte.", p.etat)
         vrai(journal[#journal]:find('--graphiques refusé', 1, true), 'au journal')
@@ -1107,7 +1349,7 @@ essai("Un dessin fait de lui-même (le relevé vient d'être écrit) ne force pa
         -- Un grand relevé (le nombre d'originaux du dernier dessin) : DELAI_REDESSIN_GRAND.
         egal(FenetreSuivi.DELAI_REDESSIN, FenetreSuivi.delaiRedessin())
         Releve.nombre = function() return FenetreSuivi.SEUIL_GRAND, 0 end
-        S.choisir(liee(args.contents, 'popup_menu', 'periode'), '3_mois')
+        taperDate(p, 'debut', '1er septembre 2026')
         unTour()
         egal(3, #recus(), 'une autre période')
         egal(2, #appels, 'un dessin demandé : écrit avant')

@@ -20,7 +20,7 @@
 --           read_composition) ; refusé seulement si la géométrie est touchée (recadrage tourné,
 --           Upright, perspective ou distorsion manuelle), pas après une passe de tonalité ;
 --   vocabulaire : la liste des défauts du connecteur (PriseDeVue.vocabulaire) ; les codes de la vue
---           et de l'angle doivent y être. Elle est rangée (la fenêtre Suivi en tire libellés et
+--           et de l'angle doivent y être. Elle est rangée (le résumé en tire libellés et
 --           conseils) : aucune liste de défauts n'est écrite dans ce module.
 -- Tout constat est refusé si la case Carnet est décochée (préférence carnet), et pour une photo
 -- de « Développeur › Essais » (Carnet.estPhotoDEssai), sauf avec essai_recette = true, que seule la
@@ -31,8 +31,10 @@
 -- Le résumé (Carnet.resumer) compte, pour chaque défaut et par mois de prise de vue (les six
 -- derniers qui ont des photos), les photos où il a été trouvé sur celles où il a été cherché ; il
 -- dit ce qui progresse ou recule, et quoi travailler à la prochaine sortie. Ses phrases ne sont
--- écrites qu'ici : la fenêtre Suivi (FenetreSuivi.lua ; la page du carnet jusqu'au correctif
--- 1.3.6, puis un onglet Suivi de la fenêtre Claude) et export_journal (serveur) les reprennent.
+-- écrites qu'ici : export_journal (serveur) les reprend. La fenêtre Suivi (FenetreSuivi.lua ; la
+-- page du carnet jusqu'au correctif 1.3.6, puis un onglet Suivi de la fenêtre Claude) les montrait
+-- aussi, jusqu'au correctif 1.3.8 : elle montre le carnet en graphiques, que --graphiques tire de
+-- carnet.json, et ne lit plus ce résumé.
 --
 -- Un seul fichier pour tous les catalogues : chacun garde sa table, sous son chemin (un
 -- identifiant de photo ne vaut que dans son catalogue) ; changer de catalogue ne fait rien perdre
@@ -74,7 +76,8 @@ local Photos = require 'Photos'
 local Carnet = {
     -- +1 à chaque changement du registre : une fenêtre compare pour savoir s'il faut redessiner.
     version = 0,
-    -- Fenêtres abonnées (nom → fonction), comme Notation.abonner.
+    -- Abonnés (nom → fonction), comme Notation.abonner : aucun dans le module depuis le correctif
+    -- 1.3.8 (la fenêtre Suivi compare Carnet.version) ; les essais s'en servent.
     observateurs = {},
 }
 
@@ -117,7 +120,7 @@ Carnet.MOIS = { 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet'
     'novembre', 'décembre' }
 Carnet.MOIS_COURTS = { 'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.' }
 
--- Titres du résumé, repris par la fenêtre Suivi et par export_journal.
+-- Titres du résumé, repris par export_journal.
 Carnet.TITRES = {
     carnet = "Carnet de progrès",
     defaut = "Défaut",
@@ -428,7 +431,7 @@ local function changer(quoi)
     return ok, raison
 end
 
--- Lectures pour la fenêtre (copies neuves) ----------------------------------------------------
+-- Lectures (copies neuves ; pour les essais et le diagnostic) ----------------------------------------------------
 
 -- Les clés des entrées du catalogue ouvert qui ont des constats, triées par identifiant de
 -- l'original.
@@ -1166,34 +1169,6 @@ function Carnet.resumer(maintenant)
     end
     resume.remarque = #remarques > 0 and table.concat(remarques, ' ') or nil
     return resume
-end
-
--- Les photos où un défaut a été trouvé, dans les mois du résumé (au même moment) : le plus récent
--- d'abord. { { original, photo (la photo mesurée), fichier, mois, mois_libelle, mesure, texte } },
--- des tables neuves (la fenêtre de ce défaut).
-function Carnet.photosDuDefaut(codeDefaut, maintenant)
-    local sel = selection(tonumber(maintenant) or os.time())
-    local trouvees = {}
-    for _, cle in ipairs(sel.mois) do
-        for _, x in ipairs(sel.parMois[cle]) do
-            local t = x.trouves[codeDefaut]
-            if t then
-                local e = x.entree
-                trouvees[#trouvees + 1] = { original = e.photo, photo = t.photo or e.photo, fichier = e.fichier, mois = cle,
-                    mois_libelle = decrireMois(cle).libelle, mesure = t.mesure, texte = t.texte }
-            end
-        end
-    end
-    table.sort(trouvees, function(a, b)
-        if a.mois ~= b.mois then
-            return a.mois > b.mois
-        end
-        if (a.fichier or '') ~= (b.fichier or '') then
-            return (a.fichier or '') < (b.fichier or '')
-        end
-        return a.original < b.original
-    end)
-    return trouvees
 end
 
 -- Commande carnet -------------------------------------------------------------------------------

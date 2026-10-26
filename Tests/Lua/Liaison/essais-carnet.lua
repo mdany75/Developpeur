@@ -590,12 +590,14 @@ test("carnet lire : les constats de chaque photo vers le serveur, sans les leço
     sansMetatable(Carnet.entrees(), 'entrees')
     sansMetatable(Carnet.vocabulaire(), 'vocabulaire')
     sansMetatable(Carnet.resumer(maintenant), 'resume')
-    sansMetatable(Carnet.photosDuDefaut('ciel_brule', maintenant), 'photosDuDefaut')
     local copie = Carnet.entree(1)
     copie.vue.defauts[1].code = 'change'
     Carnet.vocabulaire()[1].libelle = 'change'
     egal(Carnet.entree(1).vue.defauts[1].code, 'ciel_brule', "une copie : le registre ne change pas")
     egal(Carnet.vocabulaire()[1].libelle, "Horizon ou ligne penchée")
+    -- « Photos d'un défaut… » est retiré de la fenêtre Suivi au correctif 1.3.8 (demandé par Dany le
+    -- 26 octobre 2026), avec la lecture qui ne servait qu'à lui.
+    egal(Carnet.photosDuDefaut, nil)
 
     Carnet.oublier()
     sansMetatable(Carnet.entrees(), 'entrees relues')
@@ -787,18 +789,6 @@ test("résumé : chaque défaut sur sa propre base (mise au point si le point AF
     egal(defautDe(resume, 'flou').domaine, 'nettete')
     egal(defautDe(resume, 'mise_au_point').taux, 33)
     egal(defautDe(resume, 'yeux_fermes').taux, 0)
-
-    local horizon = Carnet.photosDuDefaut('horizon_penche', le(2026, 10))
-    egal(#horizon, 1)
-    egal(horizon[1].fichier, 'DSCF0001.RAF')
-    egal(horizon[1].photo, 501, "la photo mesurée")
-    proche(horizon[1].mesure, 1.4)
-    egal(horizon[1].mois, '2026-09')
-    egal(horizon[1].mois_libelle, 'septembre 2026')
-    local map = Carnet.photosDuDefaut('mise_au_point', le(2026, 10))
-    egal(#map, 1)
-    egal(map[1].mesure, 1)
-    egal(#Carnet.photosDuDefaut('dominante', le(2026, 10)), 0)
 end)
 
 test("résumé : progresse et recule à 15 points (pas 14), avec 5 photos de chaque côté (pas 4) ; le mois le plus ancien hors tendance", function()

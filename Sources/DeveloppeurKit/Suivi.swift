@@ -12,7 +12,7 @@ import Foundation
 ///   (`Carnet.constatsVue`, sans intention du boîtier), rendus en codes de `PriseDeVue`. Jamais
 ///   Lightroom, jamais l'original.
 /// - `mcp-developpeur --graphiques '<json>' <dossier>` (`Suivi.graphiques`, SuiviGraphiques.swift) :
-///   les tuiles et les sept graphiques d'une période, d'après le relevé `suivi.json` (tenu par
+///   les tuiles et les huit graphiques d'une période, d'après le relevé `suivi.json` (tenu par
 ///   Releve.lua seul) et le carnet `carnet.json` (l'horizon et la mise au point vus par Claude),
 ///   lus seulement ; les PNG dessinés en 2x (SuiviDessin.swift) et les rectangles des barres.
 ///

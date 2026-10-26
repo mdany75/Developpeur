@@ -508,8 +508,8 @@ function Dispositions.dimensions()
     -- (bezel de 26, titres en 13, 8 entre les boutons ; demandé par Dany le 21 octobre 2026) : ▲ ▼ à
     -- gauche, puis, à droite, Obtenir (D.obtenir, de TAILLES), Refuser et Ajuster… en carrés et
     -- Accepter en bleu (Vues.proposition) ; ◀ ▶ et Voir l'avant (ou l'après) en carrés
-    -- (Vues.etape) ; ▲ ▼ seulement (Vues.focus). (« Photos d'un défaut… » est passé de la carte Suivi
-    -- à la fenêtre Suivi, FenetreSuivi.lua.)
+    -- (Vues.etape) ; ▲ ▼ seulement (Vues.focus). (« Photos d'un défaut… », passé de la carte Suivi
+    -- à la fenêtre Suivi, est retiré au correctif 1.3.8.)
     D.refuser, D.ajuster = 80, 86
     D.bascule = 104
     return D

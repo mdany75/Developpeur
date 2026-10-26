@@ -5961,8 +5961,9 @@ catalogues, chacun sa table sous son chemin ; une entrée par original (`masterP
 uuid, fichier, prise 'AAAA-MM', prise_le 'AAAA-MM-JJ HH:MM' (heure locale), sans_date, le, vue?,
 angle?, lecons}` ; 3 000 originaux au plus par catalogue (`MAX_PHOTOS`, les plus anciens sortent) ;
 un fichier illisible est mis de côté avant la première écriture ; tout ce qui sort vers une vue est
-une copie neuve, vers le serveur des tableaux JSON même vides ; `Carnet.version` et
-`Carnet.abonner` pour la fenêtre. `constater` : contrôles avant toute lecture (vue ou angle, pas
+une copie neuve, vers le serveur des tableaux JSON même vides ; `Carnet.version` (que la
+fenêtre Suivi compare pour se redessiner) et `Carnet.abonner` (plus aucun abonné dans le module depuis
+le correctif 1.3.8 ; les essais s'en servent). `constater` : contrôles avant toute lecture (vue ou angle, pas
 les deux ; vocabulaire obligatoire, 40 défauts au plus ; codes connus, 12 au plus ; au moins un
 défaut cherché ; mesures finies ; textes de 200 octets au plus) ; puis les refus, dans cet ordre :
 `preference` (la case Carnet décochée, avant toute lecture du catalogue ; `Preferences` et
@@ -5979,8 +5980,9 @@ base propre à chaque défaut) ; la tendance compare les 2 derniers mois aux 3 d
 ou « recule » dès 15 points d'écart avec au moins 5 photos de chaque côté ; `a_travailler` : 20 %
 des photos récentes et au moins 2, trois au plus, avec le conseil et « À la prise de vue : … » ;
 une remarque sous 5 photos. Les phrases du résumé n'existent que dans `Carnet.lua` (`Carnet.TITRES`,
-`Carnet.MOIS`, `Carnet.MOIS_COURTS`). `Carnet.photosDuDefaut(code, maintenant)` et
-`Carnet.vocabulaire()` servent la fenêtre.
+`Carnet.MOIS`, `Carnet.MOIS_COURTS`). `Carnet.vocabulaire()` sert aux essais ;
+`Carnet.photosDuDefaut(code, maintenant)`, qui servait la fenêtre, est retiré avec « Photos d'un
+défaut… » au correctif 1.3.8.
 
 La case Carnet (préférence `carnet`) ne coupe encore que les constats : `lecon garder` ne la lit
 pas (Dany a décidé le 24 octobre 2026 qu'elle coupera aussi les leçons, au prochain correctif). `lecon garder` refuse en revanche une photo d'essai, comme `constater`
@@ -6023,9 +6025,11 @@ ni son abonnement au carnet, ni sa lecture dans la boucle. Au correctif 1.3.7, l
 (`Fil.texteSuivi` et ses constantes, `FenetreSuivi.LARGEUR`, `LIGNES`, les pages ▲ ▼) laisse la
 place aux graphiques, avec chaque photo ouverte analysée d'office (le relevé du Suivi, à part du
 carnet) ; « Photos d'un défaut… », « Retirer du carnet… », l'abonnement au carnet et la lecture
-du résumé (pour la liste des défauts) restent. Essais : `Tests/Lua/Fenetre/essais-carnet.lua`
+du résumé (pour la liste des défauts) restent, jusqu'au correctif 1.3.8, qui les retire (demandé par
+Dany le 26 octobre 2026 : un clic sur la barre d'un défaut montre déjà ses photos). Essais : `Tests/Lua/Fenetre/essais-carnet.lua`
 (ouverture, lecture, boucle, désabonnement, Photos d'un défaut…, Retirer du carnet… ; ses pages de
-texte retirées au correctif 1.3.7).
+texte retirées au correctif 1.3.7 ; depuis le correctif 1.3.8, il vérifie seulement que la fenêtre
+Suivi ne lit plus le résumé et que ces noms ont disparu).
 
 **D'abord, au correctif 1.3.6 : l'onglet Suivi** (à la place de Leçon, jusqu'aux retours de Dany ;
 seul l'onglet était renommé : la case Carnet, `carnet.json`, `Carnet.lua` et le carnet
@@ -6309,7 +6313,8 @@ relancer Lightroom) ; le connecteur, `Suivi.swift`, `SuiviGraphiques.swift` et `
   rattrapage : le Suivi part de zéro à l'installation. Les photos de « Développeur › Essais »
   restent hors du Suivi, comme au carnet.
 - La fenêtre Suivi, à part (« Claude · Suivi »), avec un menu Période (3 derniers mois, 12 derniers
-  mois par défaut, Tout) ; quatre tuiles chiffrées (photos ouvertes, retouchées par Claude, notées
+  mois par défaut, Tout ; remplacé au correctif 1.3.8 par deux dates gardées, « Du » et « au »,
+  plus bas) ; quatre tuiles chiffrées (photos ouvertes, retouchées par Claude, notées
   4 ★ ou plus, défaut le plus fréquent) ; « Mes prises de vue » (photos par mois, par date de prise
   de vue ; focales ; ISO ; heure de la prise de vue ; objectifs) ; « Mon carnet de progrès » (les
   défauts les plus fréquents en % des photos ; l'évolution mois par mois d'un défaut, le plus
@@ -6328,8 +6333,9 @@ fréquent cherché sur au moins 5 photos.
 `_note`, en découlent au nombre près : un relevé de 17 originaux (une copie virtuelle sous son
 original, une photo vue seulement par sa copie, une en file, une abandonnée, un scan sans date, des
 photos de 2009 à 2026), un carnet à fusionner (une entrée d'un autre uuid et une absente du relevé,
-ignorées), l'entrée et la sortie de `--analyser` avec ses refus, puis `--graphiques` sur 12 mois
-(en entier), sur 3 mois et sur Tout (leurs clés données), avec ses refus. `ContratSuiviTests` côté
+ignorées), l'entrée et la sortie de `--analyser` avec ses refus, puis `--graphiques` sur un an (en entier : la période par défaut de la fenêtre), sur treize mois, sur
+trois mois, depuis la première photo et par trimestre (leurs clés données ; depuis le correctif
+1.3.8, sur 12 mois, 3 mois et Tout avant), avec ses refus. `ContratSuiviTests` côté
 connecteur, `essais-releve.lua` et `essais-suivi.lua` côté module (chacun avec un faux connecteur,
 un script LuaJIT qui lit ce fichier) le vérifient : un changement voulu se fait des deux côtés.
 Les heures des exemples supposent le fuseau America/Toronto.
@@ -6547,6 +6553,20 @@ vers une vue est une copie neuve, sans métatable ; rien n'est écrit au catalog
   reclassement en arrière-plan, le dessin fait de lui-même) ; `essais-resume.lua` (les lectures par
   lots, un lot du milieu en échec). Chaque correction de la revue a été vérifiée par son essai, qui
   échoue sans elle, sur une copie du module modifiée exprès.
+- Puis, le même jour, trois demandes de Dany pour la fenêtre Suivi (« Photos d'un défaut… » retiré,
+  le graphique des notes, la période en deux dates gardées ; voir plus bas, Les graphiques et La
+  fenêtre Suivi). Essais : `SuiviTests` (`testNotes`, `testPhotoApresLaFin`, `testMoisEtTrimestres`,
+  `testDepuisLeDebutSansPhotoDatee`, `testCinqAnnees`, `testPlusDeTreizeAnnees`, les refus de
+  `debut` et de `fin`), `ContratSuiviTests` (les cinq exemples, 76 créneaux), `essais-suivi.lua`
+  (les dates tapées et leurs refus, la période gardée d'une ouverture à l'autre, la période par
+  trimestre, les notes à côté des objectifs, plus de menu Période ni de « Photos d'un défaut… »),
+  `essais-carnet.lua` (la fenêtre Suivi qui ne lit plus le résumé du carnet) et
+  `Tests/Lua/Liaison/essais-carnet.lua` (`Carnet.photosDuDefaut` retiré). Les deux suites passent
+  (26 octobre 2026, après deux relectures adverses et leurs corrections : la période par défaut en
+  mois entiers, l'année au premier mois et à janvier, les colonnes couvertes en partie, l'autre borne
+  prise dans son champ, l'écho, le recalage au dessin) : `swift test` 554 tests, dont 1 sauté sans
+  `DEVELOPPEUR_ECRAN_REEL=1`, 0 échec ; `scripts/tester-module.sh` 687 tests et essais, 0 échec (la
+  liaison 332, la fenêtre 355).
 - Le Suivi ne tourne que dans Lightroom : `Releve.allume` est faux par défaut ; `Init.lua`
   l'allume (`Releve.allumer`, qui remet aussi `arrete` à faux pour une réactivation dans le
   Gestionnaire), `Arret.lua` l'éteint (`Releve.eteindre` : le module désactivé, rechargé ou
@@ -6613,24 +6633,36 @@ environ.
 `carnet.json` (par `JSONSerialization`) : ni Lightroom, ni le catalogue, ni un original, et aucun
 chemin par défaut (les essais passent des fichiers temporaires, jamais le vrai relevé). Entrée :
 `suivi` (son chemin ; absent du disque : un relevé vide, rien n'est refusé), `carnet` (facultatif),
-`catalogue` (sa table du relevé et du carnet), `aujourd_hui` (« AAAA-MM-JJ », la date locale que
-donne le module : les périodes, et les essais, ne dépendent pas de l'horloge du connecteur ; année
-1900 au moins), `periode` (`3_mois`, `12_mois`, `tout`), `apparence` (`claire`, `sombre`),
+`catalogue` (sa table du relevé et du carnet), `debut` (facultatif : « AAAA-MM-JJ », le premier
+jour de la période ; absent, depuis la première photo) et `fin` (« AAAA-MM-JJ », le dernier jour,
+compris, que donne le module : le jour même pour une fin « aujourd'hui » ; les périodes, et les
+essais, ne dépendent pas de l'horloge du connecteur ; des jours qui existent, de 1900 à 9999,
+`debut` pas après `fin` ; depuis le correctif 1.3.8, à la place d'`aujourd_hui` et de `periode`,
+`3_mois`, `12_mois` ou `tout`), `apparence` (`claire`, `sombre`),
 `couleurs` (six couleurs en hexadécimal, tirées de `Dispositions.PALETTES[apparence]` par les clés
 `fond` = `fondDroite`, `texte`, `gris`, `filet` = `filetDroite`, `barre` = `bleu`, `accent` =
 `orange` : `fondDroite` est le fond des fenêtres de macOS dans chaque apparence, l'image s'y fond),
-`defaut` (facultatif : l'un des huit codes comptés ; absent, le plus fréquent), `tailles` (les sept
+`defaut` (facultatif : l'un des huit codes comptés ; absent, le plus fréquent), `tailles` (les huit
 graphiques en points entiers, de 120 × 80 à 1 200 × 600).
 
-- Périodes : une photo est dans la période par sa date de prise de vue, sinon par sa date d'ajout ;
-  après la fin du mois d'`aujourd_hui` (horloge de l'appareil fausse), hors de toute période. 3
-  mois : le mois d'`aujourd_hui` et les deux d'avant ; 12 mois : et les onze d'avant ; Tout : une
-  colonne par année de prise de vue, de la plus ancienne à celle d'`aujourd_hui` (années sans photo
-  comprises) ; plus de 12 années, la première colonne « < A » (détail « avant A ») réunit les
-  années d'avant A = l'année d'`aujourd_hui` − 10, puis une colonne pour chacune des 11 dernières ;
-  aucune photo datée, l'année d'`aujourd_hui` seule. Les graphiques par mois (par année pour Tout),
-  par heure et l'évolution ne prennent que les photos datées ; les autres comptent dans
-  `sans_valeur`, et leur note le dit.
+- Périodes (`regles.periodes`, correctif 1.3.8) : une photo est dans la période par sa date de
+  prise de vue, sinon par sa date d'ajout, comparées au jour, du jour de `debut` (sans `debut`,
+  aucune borne) au jour de `fin`, compris ; après `fin` (horloge de l'appareil fausse, ou une fin
+  choisie), hors de la période. Les colonnes du temps, d'après le premier jour (`debut`, sinon celui
+  de la plus ancienne photo de la période, sinon `fin`) et `fin`, treize au plus
+  (`Suivi.colonnesMax`, le nombre de créneaux des graphiques étalés : une année comptée d'un jour au
+  même jour de l'année suivante touche treize mois) : un mois chacune si la période en touche 13 au
+  plus (« oct. », « octobre 2026 ») ; sinon un trimestre (« T1 2025 », « janvier à mars 2025 ») si
+  elle en touche 13 au plus ; sinon une année (années sans photo comprises) ; plus de 13 années, la
+  première colonne « < A » (détail « avant A ») réunit les années d'avant A = l'année de `fin` − 11,
+  puis une colonne pour chacune des 12 dernières. Le premier mois et chaque janvier portent leur
+  année (« déc. 2025 », « janv. 2026 » : sur treize mois, le même mois revient). La première et la
+  dernière colonne peuvent n'avoir qu'une partie de leur mois, trimestre ou année : leur détail le dit
+  (`Suivi.nomsDesColonnes` : « novembre 2025, à partir du 20 », « novembre 2026, jusqu'au 20 »,
+  « 2026, jusqu'au 20 novembre » ; sans `debut`, jamais la première). Les graphiques du temps, par heure et l'évolution
+  ne prennent que les photos datées ; les autres comptent dans `sans_valeur`, et leur note le dit.
+  Jusqu'au correctif 1.3.8 : trois périodes fixes d'après `aujourd_hui` (3 mois et 12 mois, du mois
+  d'`aujourd_hui` en arrière ; Tout, une colonne par année, plus de 12 années en 11 et « < A »).
 - Tranches fixes : focales réelles arrondies au mm, ≤ 15, 23, 35, 55, 90, 150, 300, puis > 300 (un
   iPhone, 6,8 mm, tombe dans « ≤ 15 ») ; ISO ≤ 200, 400, 800, 1 600 (la borne de `Carnet.isoEleve`),
   3 200, 6 400, 12 800, puis > 12 800 ; douze tranches de deux heures (« 0 h » … « 22 h ») ;
@@ -6657,32 +6689,40 @@ graphiques en points entiers, de 120 × 80 à 1 200 × 600).
   « Retouchées par Claude » et « Notées 4 ★ ou plus » (« P % des photos ouvertes »), « Défaut le
   plus fréquent » (« <libellé> · N photo(s) sur S » ; sans défaut trouvé « Aucun », « aucun défaut
   trouvé sur les N photos analysées », au singulier pour une seule ; sans photo analysée « — »).
-- Sortie : `{ ok, catalogue, aujourd_hui, periode = { code, libelle, debut, fin, par }, photos,
+- Sortie : `{ ok, catalogue, periode = { debut, fin (« AAAA-MM-JJ »), libelle (« du 20 novembre 2025
+  au 20 novembre 2026 », « le … » pour un seul jour, « depuis la première photo, le 25 décembre 2009,
+  jusqu'au … » sans `debut`, « jusqu'au … » sans photo), par (`mois`, `trimestre`, `annee`),
+  depuis_le_debut }, photos,
   sans_date, analyse = { analysees, en_attente, en_echec }, tuiles, defauts (les huit codes comptés,
   le menu du défaut suivi), defaut_suivi, graphiques, remarques }` ; chaque graphique `{ titre,
   fichier, largeur, hauteur, orientation, max_barres, unite, echelle, sans_valeur, note, vide,
   barres, creneaux }` ; une barre `{ libelle, detail, valeur, texte, n, sur, ids, couleur (barre ou
   accent), x, y, largeur, hauteur (le rectangle dessiné), zone (le rectangle cliquable) }`, ses `ids`
-  les originaux, croissants, tous (pour 20 000 originaux, la ligne « Tout » dépasse 800 Ko, pour
-  250 000 elle fait 12 Mo : le module la lit dans un fichier, jamais par un tuyau, et la décode en
+  les originaux, croissants, tous (pour 20 000 originaux, la ligne de toute la bibliothèque fait
+  0,7 Mo, pour 250 000 10,6 Mo, le graphique des notes compris : le module la lit dans un fichier, jamais par un tuyau, et la décode en
   rendant la main) ; un créneau `{ x, y, largeur, hauteur, barre }`, `barre` le
-  rang de la barre qui l'occupe (0 : vide). Les sept graphiques : `photos_par_mois` (« Photos par
-  mois », « Photos par année » pour Tout ; 12 créneaux, étalé), `focales` (8), `iso` (8), `heures`
-  (12), `objectifs` (8, horizontal), `defauts_frequents` (8, horizontal, en %, la barre du défaut
+  rang de la barre qui l'occupe (0 : vide). Les huit graphiques : `photos_par_mois` (« Photos par
+  mois », « … par trimestre », « … par année » ; 13 créneaux depuis le correctif 1.3.8, 12 avant,
+  étalé), `focales` (8), `iso` (8), `heures` (12), `objectifs` (8, horizontal), `notes` (correctif
+  1.3.8, demandé par Dany le 26 octobre 2026 : 6, vertical, « Notes », de « 0 ★ » à « 5 ★ » d'après
+  la note de l'entrée, celle de la famille, détail « 0 ★, pas encore notée · N photo(s) », puis
+  « 1 ★ · … » ; une photo dont le drapeau est « rejetee » compte à sa note, et la note du graphique
+  le dit : « Dont 1 rejetée (drapeau), comptée à sa note. », « Dont N rejetées (drapeau), comptées à
+  leur note. », absente sans rejet), `defauts_frequents` (8, horizontal, en %, la barre du défaut
   suivi en accent ; sa note toujours : « En % des photos où il est cherché : bruit à ISO 1 600 et
   plus, yeux sur un visage, horizon et mise au point quand Claude regarde la photo. ») et
-  `evolution_defaut` (12, étalé, en %, toutes en accent ; « <défaut>, mois par mois », « …, année
-  par année » pour Tout, sinon « Évolution d'un défaut » ; sans défaut suivi « Aucun défaut trouvé
+  `evolution_defaut` (13, étalé, en %, toutes en accent ; « <défaut>, mois par mois », « …,
+  trimestre par trimestre », « …, année par année », sinon « Évolution d'un défaut » ; sans défaut suivi « Aucun défaut trouvé
   dans la période. »).
 - Géométrie (`regles.geometrie`), en points entiers dans le repère de l'image (origine en haut à
   gauche) : les créneaux ne dépendent que de la taille et du graphique (verticaux : `x_i = 8 +
   floor((i − 1) × (L − 16) / n)`, `x_(n+1) = L − 8` ; horizontaux : `y_i = 4 + floor((i − 1) ×
   (H − 8) / n)`, `y_(n+1) = H − 4`) ; un graphique étalé de k barres en donne `s = floor(n / k)` à
-  chacune, centrées (12 mois : un chacun ; 3 mois : quatre chacun ; 5 années : deux chacun, à partir
-  du deuxième) ; la barre verticale fait 0,6 de sa zone, sur une hauteur utile `H − 36` (16 au-dessus
+  chacune, centrées (13 mois : un chacun ; 3 mois : quatre chacun, le treizième créneau vide ;
+  5 années : deux chacun, à partir du deuxième) ; la barre verticale fait 0,6 de sa zone, sur une hauteur utile `H − 36` (16 au-dessus
   pour les valeurs, 20 au-dessous pour les libellés), l'horizontale part de `floor(0,4 × L) + 4`,
   avec 48 points de valeurs à droite ; une barre de valeur 0 n'a ni hauteur ni valeur écrite.
-- Dessin (`SuiviDessin.swift`, CoreGraphics et CoreText comme `PreviewImages`) : sept PNG en 2x
+- Dessin (`SuiviDessin.swift`, CoreGraphics et CoreText comme `PreviewImages`) : huit PNG en 2x
   (`<graphique>.png`, 2 × largeur par 2 × hauteur pixels), sobres : le fond `fond`, des barres
   arrondies au bout, une grille discrète (la moitié et le haut de l'échelle, en pointillés), la
   ligne de base au filet, les libellés en français dessous ou à gauche, tous de la même taille
@@ -6691,12 +6731,16 @@ graphiques en points entiers, de 120 × 80 à 1 200 × 600).
   au milieu (« Aucun défaut » pour l'évolution sans défaut suivi). Le titre et la note ne sont pas
   dessinés : la fenêtre les écrit.
 - Refus : une ligne `{ ok = false, raison, texte }` et le code 1, sans PNG laissé : `arguments`
-  (JSON illisible, clé manquante ou invalide : période, apparence, couleur, taille, date),
+  (JSON illisible, clé manquante ou invalide : début, fin, début après la fin, apparence, couleur,
+  taille),
   `defaut_inconnu`, `suivi_illisible` (JSON invalide ou format autre que 1), `dossier` (il ne se crée
   ou ne s'écrit pas), `dessin` ; code 2 pour un nombre d'arguments faux. Un relevé de 20 000
   originaux se dessine en 0,3 s environ ; de 85 000 en 1,0 s ; de 250 000 en 2,9 s, 830 Mo de
-  mémoire (exécutable release, Mac de Dany, mesuré le 26 octobre 2026 : aucune borne du connecteur
-  ne dépend de la taille du relevé).
+  mémoire (exécutable release, Mac de Dany, mesuré le 26 octobre 2026 sur le relevé de l'audit :
+  aucune borne du connecteur ne dépend de la taille du relevé). Remesuré le même jour avec le
+  graphique des notes, qui ajoute une fois de plus les ids de toute la période (environ 15 % de la
+  ligne), sur un relevé synthétique de photos de 2010 à 2026, « Du » vide : 20 000 originaux en
+  0,33 s, une ligne de 0,7 Mo ; 250 000 en 2,6 s, 0,7 Go de mémoire, une ligne de 10,6 Mo.
 
 **La fenêtre Suivi** (`FenetreSuivi.lua`, réécrite) : « Claude · Suivi », 1 310 × 1 028 points
 (contenu tiré de `FenetreSuivi.TAILLES` par `FenetreSuivi.dimensions` ; D7 : barre de titre de 33,
@@ -6704,33 +6748,60 @@ graphiques en points entiers, de 120 × 80 à 1 200 × 600).
 cadre `DeveloppeurSuiviGraphiques-1` (un nom neuf : celui de la 1.3.6, `DeveloppeurCarnet`,
 n'avait pas cette taille). Seul le bouton Suivi de l'en-tête de la fenêtre Claude l'ouvre
 (`Fenetre.ouvrirSuivi`, `FenetreSuivi.afficher` ; ouverte, elle passe devant). En haut, « Suivi de
-vos photos » en gras 16, le menu Période (`FenetreSuivi.PERIODES`, « 12 derniers mois » à chaque
-ouverture, pas gardé) et la ligne d'état (`FenetreSuivi.texteEtat` : la période, de quel mois à
-quel mois, ses photos ouvertes et celles sans date, les remarques ; sans photo au relevé, l'accueil
-`FenetreSuivi.ACCUEIL` ; sans photo dans la période, « Aucune photo ouverte dans cette période. »
-et, hors de Tout, « Choisissez « Tout » pour voir les autres. ») ; les quatre tuiles (305 × 84,
+vos photos » en gras 16, la période et la ligne d'état (`FenetreSuivi.texteEtat` : le libellé de la
+période que rend le connecteur, avec une majuscule, ses photos ouvertes et celles sans date, les
+remarques ; sans photo au relevé, l'accueil `FenetreSuivi.ACCUEIL` ; sans photo dans la période,
+« Aucune photo ouverte dans cette période. » et, sauf pour une période depuis la première photo
+jusqu'à aujourd'hui, « Élargissez la période pour en voir d'autres (« Du » vide : depuis la première
+photo ; « au » : aujourd'hui). », `VOIR_TOUT`). La période (correctif 1.3.8, demandé par Dany le
+26 octobre 2026, à la place du menu Période, `FenetreSuivi.PERIODES`, « 12 derniers mois » à chaque
+ouverture, pas gardé) : deux `f:edit_field`, « Du » et « au » (`debutTexte`, `finTexte`,
+`immediate = false` : Retour, ou le champ quitté, les valide ; `TAILLES.champDate` 150), lus par
+`FenetreSuivi.lireDate` (pure : « 25 janvier 2025 », « 1er janv. 2025 », « 25/01/2025 »,
+« 25-01-2025 », « 2025-01-25 », un mois seul ou une année seule, leur premier jour pour le début et
+leur dernier pour la fin, sans tenir compte des accents ni des majuscules, `Texte.plier` ; vide ou
+« première photo » pour le début, vide ou « aujourd'hui » pour la fin ; le 31 avril, non), à leur
+validation (`FenetreSuivi.changerDate`, l'observateur du champ) : une date lue se garde dans les
+préférences du module avec l'autre borne telle que la fenêtre la montre (`suiviDebut` :
+« AAAA-MM-JJ », ou '' depuis la première photo ; `suiviFin` : « AAAA-MM-JJ », ou
+`FenetreSuivi.AUJOURDHUI`, la fin qui avance chaque jour), les champs se réécrivent au propre
+(`FenetreSuivi.texteDate`, « 1er mars 2026 » ; `FenetreSuivi.poserChamps`, sans se relire) et les
+graphiques se refont ; l'autre borne est celle que montre son champ (`FenetreSuivi.champsEcrits`,
+ce que `poserChamps` a écrit : même un mois plus tard sans dessin, Dany garde ce qu'il voit) ;
+l'écho de cette écriture (un observateur appelé plus tard avec ce texte) ne fait rien, mais la date
+affichée retapée autrement se garde (« Du » ne suit plus le mois), sans redessin si la période
+gardée ne change pas ; une date qui ne se lit pas
+(`DEBUT_ILLISIBLE`, `FIN_ILLISIBLE`) ou une période à l'envers (`DEBUT_APRES_FIN`,
+`FIN_AVANT_DEBUT`, qui disent le champ à changer d'abord) : la ligne d'état le dit, les champs
+reprennent la période gardée, rien ne se refait. Les champs se recalent aussi à chaque dessin (une
+fenêtre restée ouverte après minuit, sans rien de gardé). `FenetreSuivi.periode()` lit la période
+gardée ; sans rien de gardé, ou une préférence qui ne se lit pas : les douze derniers mois, du 1er
+du mois onze mois plus tôt à aujourd'hui (le même jour un an plus tôt, essayé d'abord, faisait un
+premier mois de quelques jours et deux colonnes « oct. » : trouvé par la relecture adverse).
+Elle se garde d'une ouverture à l'autre et d'un lancement de Lightroom à l'autre (`LrPrefs`). les quatre tuiles (305 × 84,
 chiffre en gras 24) ; puis deux colonnes de 620, à 28 l'une de l'autre : à gauche « Mes prises de
 vue » (photos par mois 620 × 150 ; focales et ISO, 300 × 130 chacun, côte à côte à 20 ; heures
-620 × 120 ; objectifs 300 × 170), à droite « Mon carnet de progrès » (défauts les plus fréquents
+620 × 120 ; objectifs et notes, 300 × 170 chacun, côte à côte à 20, depuis le correctif 1.3.8), à droite « Mon carnet de progrès » (défauts les plus fréquents
 620 × 180 ; l'évolution 620 × 140 sous son titre et le menu du défaut suivi,
 `FenetreSuivi.elementsDefaut` : « Le plus fréquent : <libellé> », un séparateur, puis les huit
-défauts de la réponse avec leur pourcentage), l'aide (`FenetreSuivi.AIDE`), le message du bas et
-« Photos d'un défaut… » (actif s'il y a des défauts au carnet : `choisirDefaut`, `montrerDefaut`,
-« Retirer du carnet… » par `retirerDuCarnet`, appel direct à `Carnet.commande`, comme à la 1.3.6 ;
-le résumé du carnet, `Carnet.resumer`, ne se lit plus que pour sa liste, à l'ouverture et quand le
-registre change, par l'abonnement `suivi`). Chaque graphique a son titre et sa note, écrits par la
+défauts de la réponse avec leur pourcentage), l'aide (`FenetreSuivi.AIDE`) et le message du bas.
+« Photos d'un défaut… » (`choisirDefaut`, `montrerDefaut`, « Retirer du carnet… » par
+`retirerDuCarnet`, appel direct à `Carnet.commande`, comme à la 1.3.6), la lecture du résumé du
+carnet (`FenetreSuivi.lire`, `Carnet.resumer`, pour sa liste) et l'abonnement `suivi` au registre
+sont retirés au correctif 1.3.8 (demandé par Dany le 26 octobre 2026) : un clic sur la barre d'un
+défaut montre ses photos dans la Bibliothèque. Chaque graphique a son titre et sa note, écrits par la
 fenêtre d'après la sortie.
 
 - Le dessin : dans la tâche de la boucle de la fenêtre (`FenetreSuivi.suivre`,
   `FenetreSuivi.dessiner`), `perl alarm 60` (20 jusqu'au correctif 1.3.8) et `--graphiques`, avec
   exactement l'entrée du contrat
   (`FenetreSuivi.entree` : le chemin de `suivi.json` et de `carnet.json`, celui du catalogue,
-  `aujourd_hui` par `LrDate`, la période, l'apparence du module, ses six couleurs par
+  la période gardée, `debut` et `fin`, l'apparence du module, ses six couleurs par
   `FenetreSuivi.couleursConnecteur` d'après `COULEURS_CONNECTEUR`, le défaut s'il est choisi, les
   tailles de `FenetreSuivi.GRAPHIQUES`), dans un dossier neuf par dessin
   (`Temporaire/Suivi/Graphiques-…` : Lightroom garde une image par chemin, un même chemin ne se
   redessinerait pas) ; l'avant-dernier s'efface quand le nouveau est montré, tous à la fermeture.
-  Avant un dessin demandé (l'ouverture, une autre période, un autre défaut, le reclassement fini),
+  Avant un dessin demandé (l'ouverture, une autre date gardée, un autre défaut, le reclassement fini),
   `Releve.ecrire` (qui attend d'abord une écriture en cours) ; un dessin fait de lui-même (le relevé
   écrit, `Releve.version`, ou le carnet changé, `Carnet.version`) lit le fichier tel quel (correctif
   1.3.8) : ce qui reste à écrire s'y montre après l'écriture suivante, qui fait redessiner. Les
@@ -6748,8 +6819,8 @@ fenêtre d'après la sortie.
   (`PAS_DE_REPONSE`) ou qui refuse (`REFUS` et son texte) le dit, les images d'avant restent ; un
   chemin de catalogue illisible aussi (`SANS_CATALOGUE`).
 - La structure fixe (règle de la fenêtre B : une fenêtre ouverte ne change pas de structure) :
-  sept `f:picture` liées (`image_<g>`, avec `width` et `height`) et, sur elles, 68 calques, un par
-  créneau possible (12, 8, 8, 12, 8, 8, 12). Les rectangles des créneaux ne dépendent que de la
+  huit `f:picture` liées (`image_<g>`, avec `width` et `height`) et, sur elles, 76 calques, un par
+  créneau possible (13, 8, 8, 12, 8, 6, 8, 13 depuis le correctif 1.3.8 ; 68 avant). Les rectangles des créneaux ne dépendent que de la
   taille du graphique : le module les calcule lui-même par les formules du contrat
   (`FenetreSuivi.creneaux`) avant toute réponse, pose chaque calque à sa place une fois pour toutes,
   dans une colonne poussée par ses marges (supposé, à constater : une telle colonne ne prend pas les
@@ -6799,7 +6870,10 @@ couleurs au chargement, et `liens.lua` charge `Fenetre.lua` sans `LrColor`. Comm
 annulent l'envoi automatique : la demande tapée ne part pas. `Dispositions.IMAGES` et `PALETTES`
 ne changent pas : aucune image à refaire.
 
-**Les essais.** Côté connecteur : `ContratSuiviTests` (8 tests : les règles reprises, les trois
+**Les essais** (au correctif 1.3.7 ; au correctif 1.3.8, `ContratSuiviTests` a 10 tests, cinq
+exemples et huit PNG, et les périodes fixes de `SuiviTests` deviennent `testCinqAnnees`,
+`testPlusDeTreizeAnnees` et `testDepuisLeDebutSansPhotoDatee` : voir Toute la bibliothèque, plus
+haut). Côté connecteur : `ContratSuiviTests` (8 tests : les règles reprises, les trois
 exemples de `--graphiques` comparés exactement, leurs sept PNG vérifiés, de deux fois la taille et
 pas d'une seule couleur, tous les refus sans PNG écrit, `--analyser` sur le lot de l'exemple avec
 des vignettes fabriquées, ses refus) et `SuiviTests` (textes et arrondis, tranches, dates, Tout sur
@@ -6826,7 +6900,7 @@ fenêtre 337, dont `tests.lua` 64, `essais-releve` 18, `essais-suivi` 13, `essai
    Lightroom.
 4. La fenêtre Suivi de 1 310 × 1 028 ouverte à cette taille, en claire et en sombre ; les images
    liées par leur chemin qui se rafraîchissent ; une infobulle sur deux lignes.
-5. Les 68 calques qui reçoivent les clics à travers les colonnes poussées par leurs marges ;
+5. Les 76 calques qui reçoivent les clics à travers les colonnes poussées par leurs marges ;
    `catalog.kAllPhotos` ; la sélection en grille d'une barre de plusieurs centaines de photos.
 6. Les trois boutons de l'en-tête à leur place, Publication… et Consommation… qui ouvrent leurs
    fenêtres.
@@ -6847,6 +6921,10 @@ fenêtre 337, dont `tests.lua` 64, `essais-releve` 18, `essais-suivi` 13, `essai
 11. Correctif 1.3.8 : l'analyse d'office de toute la bibliothèque en quelques heures (environ 3 photos
     par seconde), sa reprise après une fermeture de Lightroom, et un réessai 10 minutes plus tard au
     milieu de la file.
+12. Correctif 1.3.8 : les champs « Du » et « au » dans une fenêtre flottante, validés par Retour et
+    quand on les quitte, leur observateur appelé tout de suite (le champ réécrit au propre, ou remis
+    après un refus), la période gardée après un lancement de Lightroom ; le graphique des notes, ses
+    libellés « 0 ★ » à « 5 ★ » dessinés en entier, et ses six calques.
 
 ## Correctif 1.3.6 : une photo, une conversation
 
@@ -6965,8 +7043,8 @@ dans Lightroom. Reste à constater :
    `compare = before_claude` avant le résumé ; `rendu_reproductible` après un retour à l'origine et
    une seconde retouche, et l'écart dit à la fin seulement.
 9. La fenêtre Suivi (à la place de l'onglet) : son texte riche est remplacé par les graphiques au
-   correctif 1.3.7 (voir son À constater) ; restent « Photos d'un défaut… » et sa fenêtre,
-   « Retirer du carnet… » sur une vraie photo désignée par Dany, et les leçons d'avant restées dans
+   correctif 1.3.7 (voir son À constater) ; « Photos d'un défaut… », sa fenêtre et « Retirer du
+   carnet… » sont sans objet (retirés au correctif 1.3.8) ; restent les leçons d'avant restées dans
    `carnet.json` après une écriture.
 10. Publication… et Consommation… par le menu seulement : sans objet, leurs boutons reviennent dans
     l'en-tête au correctif 1.3.7 (décision de Dany du 25 octobre 2026).

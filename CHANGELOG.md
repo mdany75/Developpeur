@@ -22,6 +22,28 @@
   s'arrête quand Claude travaille et reprend ensuite, et au lancement suivant de Lightroom si vous
   l'avez quitté. Une photo dont l'analyse a échoué (juste après une retouche, par exemple) se
   réessaie 10 minutes plus tard, sans attendre la fin de la file.
+- La période de la fenêtre Suivi se choisit maintenant par deux dates, « Du » et « au », à la place
+  du menu Période (3 derniers mois, 12 derniers mois, Tout), et se garde d'une ouverture à l'autre.
+  Tapez une date comme vous l'écrivez : « 25 janvier 2025 », « 25/01/2025 », « 2025-01-25 », un
+  mois ou une année seuls ; « au » accepte « aujourd'hui » (la fin avance alors chaque jour), et
+  « Du » vide prend tout depuis la première photo. Sans période choisie : les douze derniers mois,
+  jusqu'à aujourd'hui. Les graphiques du temps vont mois par mois jusqu'à treize mois (une année d'un
+  25 janvier au suivant en touche treize), puis par trimestre, puis par année ; le premier mois et
+  chaque janvier portent leur année, et l'infobulle d'un mois que la période ne couvre qu'en partie
+  le dit (« janvier 2025, à partir du 25 »). Une date qui ne se lit pas, ou une période à l'envers,
+  est refusée, et la ligne sous les champs dit lequel changer d'abord.
+
+### Ajouté
+- Un graphique des notes dans la fenêtre Suivi, à côté des objectifs : combien de photos à 0 ★ (pas
+  encore notées) et de 1 à 5 ★ dans la période (la note la plus haute de la photo et de ses copies
+  virtuelles). Un clic sur une barre montre ses photos dans la Bibliothèque ; une photo rejetée
+  compte à sa note, et la note sous le graphique dit combien il y en a.
+
+### Retiré
+- « Photos d'un défaut… », au bas de la fenêtre Suivi, avec sa fenêtre des photos d'un défaut et
+  « Retirer du carnet… » : un clic sur la barre d'un défaut montre déjà ses photos.
+
+### À savoir
 - Après l'installation : quitter puis relancer Lightroom.
 
 ## 1.3.7 — 2026-10-26

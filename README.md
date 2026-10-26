@@ -326,17 +326,31 @@ Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claud
 
 **La fenêtre**
 
-- 1 310 × 1 028 points. En haut, le menu Période : 3 derniers mois, 12 derniers mois (à chaque
-  ouverture) ou Tout (une colonne par année ; au-delà de douze années, la première réunit les plus
-  anciennes) ; une ligne dit la période et son nombre de photos.
+- 1 310 × 1 028 points. En haut, la période : deux champs, « Du » et « au » (depuis le correctif
+  1.3.8, à la place du menu Période). Tapez une date comme vous l'écrivez : « 25 janvier 2025 »,
+  « 1er janv. 2025 », « 25/01/2025 », « 2025-01-25 », un mois (« janvier 2025 ») ou une année
+  (« 2025 ») ; « au » accepte « aujourd'hui », et la fin avance alors chaque jour ; « Du » vide
+  prend tout depuis la première photo. Retour, ou un clic ailleurs, valide le champ. La période se
+  garde d'une ouverture à l'autre, et même d'un lancement de Lightroom à l'autre ; tant que vous
+  n'en avez choisi aucune, ce sont les douze derniers mois, du 1er du mois onze mois plus tôt à
+  aujourd'hui. Une date qui ne se lit pas, ou une période à l'envers, est refusée, et la ligne sous
+  les champs dit pourquoi et quel champ changer d'abord ; sinon, cette ligne dit la période et son
+  nombre de photos. Les graphiques du temps vont mois par mois (treize mois au plus), puis par
+  trimestre (« T1 2025 »), puis par année (au-delà de treize années, la première réunit les plus
+  anciennes) ; le premier mois et chaque janvier portent leur année (« déc. 2025 », « janv. 2026 »),
+  et l'infobulle d'une colonne que la période ne couvre qu'en partie le dit (« janvier 2025, à
+  partir du 25 », « novembre 2026, jusqu'au 20 »).
 - Quatre tuiles : photos ouvertes (et combien attendent leur analyse), retouchées par Claude,
   notées 4 ★ ou plus, et le défaut le plus fréquent (parmi ceux cherchés sur au moins 5 photos).
 - Mes prises de vue : photos par mois (par date de prise de vue), focales (de « ≤ 15 » à
   « > 300 » mm), sensibilité (de « ≤ 200 » à « > 12 800 » ISO), heure de la prise de vue (par
-  deux heures) et objectifs (les sept premiers, puis « Autres »).
+  deux heures), objectifs (les sept premiers, puis « Autres ») et, à côté, les notes (correctif
+  1.3.8) : combien de photos à 0 ★ (pas encore notées), 1 ★, … 5 ★, la note la plus haute de la
+  photo et de ses copies virtuelles ; une photo rejetée compte à sa note, et la note sous le
+  graphique dit combien il y en a.
 - Mon carnet de progrès : les défauts les plus fréquents, en pourcentage des photos où chacun est
-  cherché, et l'évolution mois par mois d'un défaut, le plus fréquent ou celui que vous choisissez
-  dans son menu.
+  cherché, et l'évolution d'un défaut (mois par mois, par trimestre ou par année, comme les photos),
+  le plus fréquent ou celui que vous choisissez dans son menu.
 - Un clic sur une barre montre ses photos dans la Bibliothèque, en grille, sans rien changer (la
   source passe à Toutes les photographies quand celle affichée ne les a pas toutes ; le message du
   bas dit ce que le filtre de la Bibliothèque en cache) ; l'infobulle de la barre en dit le détail.
@@ -346,8 +360,8 @@ Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claud
   couleurs de l'apparence claire ou sombre du module. Ils se refont à l'ouverture, à chaque autre
   période ou autre défaut, et quand une analyse arrive pendant que la fenêtre est ouverte. Sans
   connecteur, ou s'il ne répond pas à temps, la fenêtre le dit et garde les graphiques d'avant.
-- « Photos d'un défaut… », en bas : les photos d'un défaut du carnet, leurs constats, et
-  « Retirer du carnet… », après confirmation.
+- « Photos d'un défaut… » et son « Retirer du carnet… » sont retirés au correctif 1.3.8, à votre
+  demande : un clic sur la barre d'un défaut montre déjà ses photos dans la Bibliothèque.
 - Pour l'avis de Claude, demandez-le-lui (« Comment progressent mes prises de vue ? ») : il lit le
   carnet de progrès. Le Suivi, lui, reste sur le Mac : Claude ne le voit pas.
 
@@ -404,10 +418,9 @@ correctif 1.3.6, à votre demande du 25 octobre 2026 ; les leçons déjà rangé
 - La fenêtre Suivi, qu'ouvre le bouton Suivi en haut à droite de la fenêtre Claude, le montre en
   graphiques depuis le correctif 1.3.7, avec les défauts que le connecteur trouve d'office sur
   chaque photo ouverte (voir Le Suivi de vos photos) : les défauts les plus fréquents et
-  l'évolution d'un défaut, mois par mois. Le carnet l'emporte pour ce qu'il a cherché sur une
-  photo (il mesure sur l'aperçu, au point de mise au point).
-- « Photos d'un défaut… », au bas de la fenêtre Suivi : choisissez un défaut, puis voyez ses photos
-  et leurs constats ; « Retirer du carnet… » en retire une, après confirmation.
+  l'évolution d'un défaut. Le carnet l'emporte pour ce qu'il a cherché sur une photo (il mesure
+  sur l'aperçu, au point de mise au point). Un clic sur la barre d'un défaut montre ses photos dans
+  la Bibliothèque (« Photos d'un défaut… » et « Retirer du carnet… » sont retirés au correctif 1.3.8).
 - Ce qui progresse ou recule, et quoi travailler à la prochaine sortie : demandez-le à Claude
   (« Comment progressent mes prises de vue ? ») ; il lit le carnet et répond en trois puces (ce qui
   progresse, ce qui revient, quoi essayer à la prochaine sortie).
@@ -1304,7 +1317,7 @@ parle au module y passe avec le jeton de la liaison, comme le connecteur :
   brûlé, bruit à ISO élevé, flou, yeux fermés), une ligne JSON, sans Lightroom ni liaison, jamais
   l'original (`Tests/Contrats/suivi.json` en donne la forme) ;
 - `--graphiques '<json>' <dossier>` : ce que la fenêtre Suivi lance pour ses graphiques : les tuiles
-  et les sept graphiques d'une période, d'après `suivi.json` et `carnet.json`, lus seulement,
+  et les huit graphiques d'une période (d'un jour à un autre), d'après `suivi.json` et `carnet.json`, lus seulement,
   dessinés en PNG dans le dossier, puis une ligne JSON avec les barres et leurs photos, sans
   Lightroom ni liaison ;
 - `--ecran` : l'écran principal et son profil de couleur classé (d'usine, standard, à l'œil, sonde…),

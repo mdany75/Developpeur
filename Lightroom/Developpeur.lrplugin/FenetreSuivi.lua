@@ -4,18 +4,22 @@
 -- (Fenetre.ouvrirSuivi) ; ouverte, il la remet devant. Elle montre le relevé du Suivi (suivi.json,
 -- tenu par Releve.lua : toute photo ouverte dans la fenêtre Claude ou la Demande rapide, analysée
 -- d'office par le connecteur) et le carnet de progrès (carnet.json, ce que Claude a vu), sur une
--- période (menu Période : 3 derniers mois, 12 derniers mois par défaut, Tout) :
+-- période choisie par deux champs, « Du » et « au », gardée d'une ouverture à l'autre (correctif
+-- 1.3.8, demandé par Dany le 26 octobre 2026, à la place du menu Période et de ses trois périodes
+-- fixes ; sans rien de choisi, les douze derniers mois, du 1er du mois onze mois plus tôt à
+-- aujourd'hui) :
 --
 --   - quatre tuiles chiffrées : photos ouvertes, retouchées par Claude, notées 4 ★ ou plus, défaut
 --     le plus fréquent ;
---   - « Mes prises de vue » : photos par mois (par date de prise de vue), focales, ISO, heure de la
---     prise de vue, objectifs ;
+--   - « Mes prises de vue » : photos par mois (par trimestre, par année pour une longue période ;
+--     par date de prise de vue), focales, ISO, heure de la prise de vue, objectifs, et les notes (de
+--     0 ★ à 5 ★, correctif 1.3.8) ;
 --   - « Mon carnet de progrès » : les défauts les plus fréquents (en % des photos où ils sont
---     cherchés) et l'évolution mois par mois d'un défaut (le plus fréquent par défaut, un menu pour
---     en choisir un autre) ; dessous, « Photos d'un défaut… » (les photos d'un défaut du carnet, et
---     « Retirer du carnet… »), comme dans la fenêtre de la 1.3.6.
+--     cherchés) et l'évolution d'un défaut (le plus fréquent par défaut, un menu pour en choisir un
+--     autre). « Photos d'un défaut… » et « Retirer du carnet… », de la fenêtre de la 1.3.6, sont
+--     retirés au correctif 1.3.8 (demandé par Dany le 26 octobre 2026).
 --
--- Lightroom ne trace pas de graphique : les sept images sont dessinées par le connecteur
+-- Lightroom ne trace pas de graphique : les huit images sont dessinées par le connecteur
 -- (`mcp-developpeur --graphiques '<json>' <dossier>`, sous l'alarme de perl comme --focus), en PNG
 -- 2x, dans les couleurs de l'apparence du module (Dispositions.PALETTES, seule table des couleurs,
 -- passées au connecteur : FenetreSuivi.couleursConnecteur) ; il rend aussi, en une ligne JSON, les
@@ -28,16 +32,16 @@
 -- demandé (ouverture, période, défaut, reclassement fini), ce que le Suivi a rangé sans l'écrire
 -- encore s'écrit (Releve.ecrire : ses écritures sont espacées) ; un dessin fait de lui-même (le relevé
 -- écrit, ou le carnet changé) lit le fichier tel quel : ce qui reste à écrire se montre après
--- l'écriture suivante, qui fait redessiner. La réponse (à toute la bibliothèque, « Tout » : plus de 10 Mo,
+-- l'écriture suivante, qui fait redessiner. La réponse (à toute la bibliothèque : plus de 10 Mo,
 -- tous les identifiants de chaque barre) se décode en rendant la main (Json.decode avec un rythme,
 -- correctif 1.3.8). Chaque dessin a son
 -- dossier neuf (Temporaire/Suivi/Graphiques-…, Lightroom garde une image par chemin) ;
 -- l'avant-dernier s'efface quand le nouveau est montré, tous à la fermeture. Sans réponse lisible
 -- du connecteur, rien ne change et la fenêtre le dit ; sans connecteur, elle le dit aussi.
 --
--- Structure fixe à la création (règle de la fenêtre B) : sept f:picture liées (`image_<g>`), et sur
--- chacune un calque par créneau possible (photos par mois 12, focales 8, ISO 8, heures 12,
--- objectifs 8, défauts 8, évolution 12 : 68 calques). Les rectangles des créneaux ne dépendent que
+-- Structure fixe à la création (règle de la fenêtre B) : huit f:picture liées (`image_<g>`), et sur
+-- chacune un calque par créneau possible (photos par mois 13, focales 8, ISO 8, heures 12,
+-- objectifs 8, notes 6, défauts 8, évolution 13 : 76 calques). Les rectangles des créneaux ne dépendent que
 -- de la taille du graphique (contrat : regles.geometrie, FenetreSuivi.creneaux) : chaque calque est
 -- posé à sa place une fois pour toutes, dans une colonne poussée par ses marges (la colonne ne prend
 -- pas les clics : constaté D6) ; seule la barre qui l'occupe change d'une réponse à l'autre, d'où sa
@@ -64,7 +68,6 @@ local LrView = import 'LrView'
 require 'Compat'
 local Carnet = require 'Carnet'
 local Chemins = require 'Chemins'
-local Conversation = require 'Conversation'
 local Dispositions = require 'Dispositions'
 local Fichiers = require 'Fichiers'
 local Journal = require 'Journal'
@@ -76,14 +79,11 @@ local Texte = require 'Texte'
 
 local FenetreSuivi = { ouverte = false }
 
--- Le titre de la fenêtre (les fenêtres du module gardent « Claude · … »), son cadre gardé (un nom
+-- Le titre de la fenêtre (les fenêtres du module gardent « Claude · … ») et son cadre gardé (un nom
 -- neuf pour la fenêtre en graphiques : celle de la 1.3.6, « DeveloppeurCarnet », n'avait pas cette
--- taille ; le nom change avec la taille du contenu) et le titre du carnet, que le registre donne
--- (seule copie).
+-- taille ; le nom change avec la taille du contenu, que le correctif 1.3.8 ne change pas).
 FenetreSuivi.TITRE = "Claude · Suivi"
 FenetreSuivi.CADRE = 'DeveloppeurSuiviGraphiques-1'
-FenetreSuivi.TITRE_CARNET = Carnet.TITRES.carnet
-FenetreSuivi.TITRE_DEFAUTS = "Photos d'un défaut"
 
 -- Les textes de la fenêtre.
 FenetreSuivi.ENTETE = "Suivi de vos photos"
@@ -95,7 +95,19 @@ FenetreSuivi.ACCUEIL = "Le Suivi part de zéro : chaque photo que vous ouvrez da
     .. "seule ou dans une sélection, et le connecteur l'analyse d'office sur sa vignette, sans Claude ni forfait. Les graphiques se "
     .. "remplissent au fil de vos photos."
 FenetreSuivi.SANS_PHOTO_PERIODE = "Aucune photo ouverte dans cette période."
-FenetreSuivi.VOIR_TOUT = " Choisissez « Tout » pour voir les autres."
+FenetreSuivi.VOIR_TOUT = " Élargissez la période pour en voir d'autres (« Du » vide : depuis la première photo ; « au » : "
+    .. "aujourd'hui)."
+FenetreSuivi.DEBUT_ILLISIBLE = "« %s » ne se lit pas comme une date de début : écrivez par exemple 25 janvier 2025, 25/01/2025, "
+    .. "2025-01-25, janvier 2025 ou 2025 (vide : depuis la première photo). La période ne change pas."
+FenetreSuivi.FIN_ILLISIBLE = "« %s » ne se lit pas comme une date de fin : écrivez par exemple 25 janvier 2026, 25/01/2026, "
+    .. "2026-01-25, janvier 2026 ou 2026, ou aujourd'hui (la fin avance alors chaque jour). La période ne change pas."
+FenetreSuivi.DEBUT_APRES_FIN = "Le début (%s) viendrait après la fin (%s) : changez d'abord « au » (par exemple aujourd'hui). "
+    .. "La période ne change pas."
+FenetreSuivi.FIN_AVANT_DEBUT = "La fin (%s) viendrait avant le début (%s) : changez d'abord « Du ». La période ne change pas."
+FenetreSuivi.INFOBULLE_DEBUT = "Le premier jour de la période : 25 janvier 2025, 25/01/2025, 2025-01-25, janvier 2025 ou 2025 ; "
+    .. "vide : depuis la première photo. Gardé d'une ouverture à l'autre."
+FenetreSuivi.INFOBULLE_FIN = "Le dernier jour de la période, compris ; « aujourd'hui » : la fin avance chaque jour. Gardé d'une "
+    .. "ouverture à l'autre."
 FenetreSuivi.CONNECTEUR_ABSENT = "Le connecteur mcp-developpeur est introuvable (son chemin : Gestionnaire de modules externes › "
     .. "Développeur) : les graphiques ne se dessinent pas."
 FenetreSuivi.PAS_DE_REPONSE = "Le connecteur n'a pas répondu à temps : les graphiques ne sont pas refaits."
@@ -107,14 +119,15 @@ FenetreSuivi.AIDE = "Un clic sur une barre montre ses photos dans la Bibliothèq
     .. "a vu en regardant la photo."
 FenetreSuivi.INFOBULLE_BARRE = "Un clic : ces photos dans la Bibliothèque"
 
--- Les périodes du menu, dans leur ordre (contrat : graphiques.entree.periode), et celle de
--- l'ouverture.
-FenetreSuivi.PERIODES = {
-    { title = "3 derniers mois", value = '3_mois' },
-    { title = "12 derniers mois", value = '12_mois' },
-    { title = "Tout", value = 'tout' },
-}
-FenetreSuivi.PERIODE = '12_mois'
+-- La période : un jour de début (ou la première photo) et un jour de fin (ou aujourd'hui, qui
+-- avance chaque jour), gardés dans les préférences du module (suiviDebut : « AAAA-MM-JJ », ou '' :
+-- depuis la première photo ; suiviFin : « AAAA-MM-JJ », ou FenetreSuivi.AUJOURDHUI). Sans rien de
+-- gardé : les douze derniers mois, du 1er du mois onze mois plus tôt à aujourd'hui (des mois entiers,
+-- comme les « 12 derniers mois » d'avant ; le même jour un an plus tôt ferait un premier mois de
+-- quelques jours, et deux colonnes du même mois). Les textes que les champs montrent pour la
+-- première photo et pour aujourd'hui.
+FenetreSuivi.AUJOURDHUI = "aujourd'hui"
+FenetreSuivi.PREMIERE_PHOTO = "première photo"
 
 -- La valeur du menu du défaut suivi qui n'en choisit aucun : le plus fréquent (le connecteur le
 -- cherche ; contrat : graphiques.defaut_suivi).
@@ -130,18 +143,22 @@ FenetreSuivi.TUILES = {
     { cle = 'defaut_frequent', titre = "Défaut le plus fréquent" },
 }
 
--- Les sept graphiques (contrat : graphiques.liste), dans l'ordre de la fenêtre : leur taille en
+-- Les huit graphiques (contrat : graphiques.liste), dans l'ordre de la fenêtre : leur taille en
 -- points (celle que la fenêtre demande au connecteur : graphiques.entree.tailles), leur nombre de
--- créneaux et leur sens, d'où les rectangles des créneaux ; le titre avant la première réponse.
+-- créneaux et leur sens, d'où les rectangles des créneaux ; le titre avant la première réponse. Les
+-- notes (correctif 1.3.8) vont à côté des objectifs, de même taille ; les graphiques du temps ont
+-- treize créneaux depuis le même correctif (douze avant : une année comptée d'un jour au même jour
+-- de l'année suivante touche treize mois).
 FenetreSuivi.GRAPHIQUES = {
-    { cle = 'photos_par_mois', titre = "Photos par mois", largeur = 620, hauteur = 150, max_barres = 12, orientation = 'verticale' },
+    { cle = 'photos_par_mois', titre = "Photos par mois", largeur = 620, hauteur = 150, max_barres = 13, orientation = 'verticale' },
     { cle = 'focales', titre = "Focales (mm)", largeur = 300, hauteur = 130, max_barres = 8, orientation = 'verticale' },
     { cle = 'iso', titre = "Sensibilité (ISO)", largeur = 300, hauteur = 130, max_barres = 8, orientation = 'verticale' },
     { cle = 'heures', titre = "Heure de la prise de vue", largeur = 620, hauteur = 120, max_barres = 12, orientation = 'verticale' },
     { cle = 'objectifs', titre = "Objectifs", largeur = 300, hauteur = 170, max_barres = 8, orientation = 'horizontale' },
+    { cle = 'notes', titre = "Notes", largeur = 300, hauteur = 170, max_barres = 6, orientation = 'verticale' },
     { cle = 'defauts_frequents', titre = "Défauts les plus fréquents", largeur = 620, hauteur = 180, max_barres = 8,
         orientation = 'horizontale', lignesNote = 2 },
-    { cle = 'evolution_defaut', titre = "Évolution d'un défaut", largeur = 620, hauteur = 140, max_barres = 12, orientation = 'verticale' },
+    { cle = 'evolution_defaut', titre = "Évolution d'un défaut", largeur = 620, hauteur = 140, max_barres = 13, orientation = 'verticale' },
 }
 
 -- Les six couleurs passées au connecteur, tirées de Dispositions.PALETTES[apparence] (contrat :
@@ -183,7 +200,7 @@ FenetreSuivi.TAILLES = {
     tuile = 305, hauteurTuile = 84, ecartTuile = 16,
     section = 18, sousSection = 8, titreGraphique = 16, sousTitre = 4, sousGraphique = 2, ligneNote = 14,
     enteteEvolution = 22, aide = 44, bas = 28,
-    periode = 170, etiquettePeriode = 62, defaut = 290, defautsBouton = 170,
+    champDate = 150, etiquetteDu = 24, etiquetteAu = 20, defaut = 290,
 }
 
 local function police(cle)
@@ -234,7 +251,7 @@ function FenetreSuivi.dimensions()
         G[g.cle] = g
     end
     D.gauche = T.section + T.sousSection + bloc(G.photos_par_mois) + T.ecartBlocs + math.max(bloc(G.focales), bloc(G.iso))
-        + T.ecartBlocs + bloc(G.heures) + T.ecartBlocs + bloc(G.objectifs)
+        + T.ecartBlocs + bloc(G.heures) + T.ecartBlocs + math.max(bloc(G.objectifs), bloc(G.notes))
     D.droite = T.section + T.sousSection + bloc(G.defauts_frequents) + T.ecartBlocs
         + (T.enteteEvolution - T.titreGraphique) + bloc(G.evolution_defaut) + T.ecartBlocs + T.aide + T.ecartBlocs + T.bas
     D.hauteurContenu = T.marge + T.entete + T.ecartEtat + T.etat + T.ecartTuiles + T.hauteurTuile + T.sousTuiles
@@ -292,10 +309,230 @@ end
 
 -- L'entrée de --graphiques -----------------------------------------------------------------------
 
--- La date du jour à l'heure locale (« AAAA-MM-JJ ») : les périodes ne dépendent pas de l'horloge du
--- connecteur (contrat : graphiques.entree.aujourd_hui).
+-- La date du jour à l'heure locale (« AAAA-MM-JJ ») : la fin « aujourd'hui » et la période par
+-- défaut ne dépendent pas de l'horloge du connecteur (contrat : graphiques.entree.fin).
 function FenetreSuivi.aujourdhui()
     return os.date('%Y-%m-%d')
+end
+
+-- La période ------------------------------------------------------------------------------------------
+
+-- Le nombre de jours d'un mois.
+local function joursDuMois(annee, mois)
+    if mois == 2 then
+        return (annee % 4 == 0 and (annee % 100 ~= 0 or annee % 400 == 0)) and 29 or 28
+    end
+    return (mois == 4 or mois == 6 or mois == 9 or mois == 11) and 30 or 31
+end
+
+-- Une date { annee, mois, jour } en « AAAA-MM-JJ », et en français (« 25 janvier 2025 », « 1er mars
+-- 2026 » : Carnet.MOIS, seule copie des noms des mois).
+function FenetreSuivi.iso(d)
+    return string.format('%04d-%02d-%02d', d.annee, d.mois, d.jour)
+end
+
+function FenetreSuivi.texteDate(d)
+    return (d.jour == 1 and '1er' or tostring(d.jour)) .. ' ' .. Carnet.MOIS[d.mois] .. ' ' .. d.annee
+end
+
+-- Une date « AAAA-MM-JJ » qui existe, de 1900 à 9999 (comme le connecteur) ; nil sinon.
+local function versDate(texte)
+    local a, m, j = tostring(texte or ''):match('^(%d%d%d%d)%-(%d%d)%-(%d%d)$')
+    a, m, j = tonumber(a), tonumber(m), tonumber(j)
+    if not a or a < 1900 or m < 1 or m > 12 or j < 1 or j > joursDuMois(a, m) then
+        return nil
+    end
+    return { annee = a, mois = m, jour = j }
+end
+
+-- Le mois d'un mot : son nom (Carnet.MOIS) ou le début de son nom, trois lettres au moins, sans tenir
+-- compte des accents, des majuscules ni d'un point final (« janv. », « fevrier », « AOÛT ») ; nil
+-- s'il n'en désigne aucun, ou deux (« jui »).
+local function moisDuMot(mot)
+    mot = mot:gsub('%.$', '')
+    if #mot < 3 then
+        return nil
+    end
+    local trouve
+    for i, nom in ipairs(Carnet.MOIS) do
+        if Texte.plier(nom):sub(1, #mot) == mot then
+            if trouve then
+                return nil
+            end
+            trouve = i
+        end
+    end
+    return trouve
+end
+
+-- Une date tapée dans « Du » (`borne` 'debut') ou « au » ('fin'), lue (pure) : { annee, mois, jour }.
+-- Se lisent « 25 janvier 2025 », « 1er janv. 2025 », « 25/01/2025 », « 25-01-2025 », « 2025-01-25 »,
+-- un mois seul (« janvier 2025 ») et une année seule (« 2025 ») : leur premier jour pour le début,
+-- leur dernier pour la fin. Vide, ou « première photo », pour le début : { premiere = true } ; vide,
+-- ou « aujourd'hui », pour la fin : { aujourdhui = true } ; « aujourd'hui » pour le début : le jour
+-- `aujourdhui` (« AAAA-MM-JJ »). Rend nil pour une date qui ne se lit pas ou n'existe pas (le 31 avril).
+function FenetreSuivi.lireDate(texte, borne, aujourdhui)
+    local t = Texte.plier(Texte.nettoyer(texte)):gsub('%s+', ' ')
+    if t == '' or (borne == 'debut' and (t == 'premiere photo' or t == 'la premiere photo' or t == 'depuis la premiere photo')) then
+        return borne == 'debut' and { premiere = true } or { aujourdhui = true }
+    end
+    if t == "aujourd'hui" or t == 'aujourdhui' then
+        if borne ~= 'debut' then
+            return { aujourdhui = true }
+        end
+        return versDate(aujourdhui)
+    end
+    local a, m, j
+    local x, y, z = t:match('^(%d%d%d%d)%-(%d%d?)%-(%d%d?)$')
+    if x then
+        a, m, j = tonumber(x), tonumber(y), tonumber(z)
+    else
+        x, y, z = t:match('^(%d%d?)[/%.%-](%d%d?)[/%.%-](%d%d%d%d)$')
+        if x then
+            j, m, a = tonumber(x), tonumber(y), tonumber(z)
+        end
+    end
+    if not a then
+        local jour, suffixe, mot, annee = t:match('^(%d%d?)(%a*) (%S+) (%d%d%d%d)$')
+        if jour and (suffixe == '' or (suffixe == 'er' and tonumber(jour) == 1)) then
+            j, m, a = tonumber(jour), moisDuMot(mot), tonumber(annee)
+        end
+    end
+    if not a then
+        local mot, annee = t:match('^(%a[%a%.]*) (%d%d%d%d)$')
+        local mois = mot and moisDuMot(mot)
+        if mois then
+            a, m = tonumber(annee), mois
+            j = borne == 'fin' and joursDuMois(a, m) or 1
+        end
+    end
+    if not a then
+        local annee = t:match('^(%d%d%d%d)$')
+        if annee then
+            a, m, j = tonumber(annee), borne == 'fin' and 12 or 1, borne == 'fin' and 31 or 1
+        end
+    end
+    if not (a and m and j) or a < 1900 or m < 1 or m > 12 or j < 1 or j > joursDuMois(a, m) then
+        return nil
+    end
+    return { annee = a, mois = m, jour = j }
+end
+
+-- Le début par défaut d'une fin : le 1er du mois onze mois plus tôt (douze mois entiers, le dernier
+-- jusqu'à la fin).
+local function debutParDefaut(fin)
+    local rang = fin.annee * 12 + (fin.mois - 1) - 11
+    return { annee = math.floor(rang / 12), mois = rang % 12 + 1, jour = 1 }
+end
+
+-- La période gardée (préférences suiviDebut et suiviFin), lue : { debut (une date, nil : depuis la
+-- première photo), fin (une date), finAujourdhui (vrai : la fin avance chaque jour) } ; des tables
+-- neuves. Sans rien de gardé, ou une préférence qui ne se lit pas (éditée à la main) : la fin est
+-- aujourd'hui, le début celui par défaut (debutParDefaut) ; un début gardé après la fin, de même.
+function FenetreSuivi.periode()
+    local prefs = Chemins.prefs()
+    local fin = versDate(prefs.suiviFin)
+    local finAujourdhui = fin == nil
+    fin = fin or versDate(FenetreSuivi.aujourdhui())
+    local debut
+    if prefs.suiviDebut ~= '' then
+        debut = versDate(prefs.suiviDebut) or debutParDefaut(fin)
+        if FenetreSuivi.iso(debut) > FenetreSuivi.iso(fin) then
+            debut = debutParDefaut(fin)
+        end
+    end
+    return { debut = debut, fin = fin, finAujourdhui = finAujourdhui }
+end
+
+-- Les textes des champs « Du » et « au » pour une période.
+function FenetreSuivi.textesPeriode(periode)
+    return periode.debut and FenetreSuivi.texteDate(periode.debut) or FenetreSuivi.PREMIERE_PHOTO,
+        periode.finAujourdhui and FenetreSuivi.AUJOURDHUI or FenetreSuivi.texteDate(periode.fin)
+end
+
+-- Écrit les champs « Du » et « au » d'après une période, sans les relire, et retient ce qu'ils
+-- montrent (FenetreSuivi.champsEcrits) : FenetreSuivi.changerDate y prend l'autre borne, telle que la
+-- fenêtre la montre, et y reconnaît l'écho de cette écriture (un observateur appelé plus tard).
+function FenetreSuivi.poserChamps(periode)
+    local debut, fin = FenetreSuivi.textesPeriode(periode)
+    FenetreSuivi.champsEcrits = { debut = debut, fin = fin }
+    local p = FenetreSuivi.p
+    if not p then
+        return
+    end
+    FenetreSuivi.ecritChamps = true
+    local ok, erreur = pcall(function()
+        poser(p, 'debutTexte', debut)
+        poser(p, 'finTexte', fin)
+    end)
+    FenetreSuivi.ecritChamps = false
+    if not ok then
+        error(erreur, 0)
+    end
+end
+
+-- La période que montrent les champs (FenetreSuivi.champsEcrits), lue au jour présent ; sinon la
+-- période gardée. Une table neuve, comme FenetreSuivi.periode.
+local function periodeMontree()
+    local ecrits = FenetreSuivi.champsEcrits
+    local aujourdhui = FenetreSuivi.aujourdhui()
+    local d = type(ecrits) == 'table' and FenetreSuivi.lireDate(ecrits.debut, 'debut', aujourdhui) or nil
+    local f = type(ecrits) == 'table' and FenetreSuivi.lireDate(ecrits.fin, 'fin', aujourdhui) or nil
+    if not d or not f then
+        return FenetreSuivi.periode()
+    end
+    local finAujourdhui = f.aujourdhui == true
+    return { debut = not d.premiere and d or nil, fin = finAujourdhui and versDate(aujourdhui) or f, finAujourdhui = finAujourdhui }
+end
+
+-- Une date validée dans « Du » ou « au » (l'observateur du champ ; `borne` 'debut' ou 'fin') : lue,
+-- elle se garde dans les préférences avec l'autre borne telle que la fenêtre la montre (même si un
+-- jour ou un mois a passé depuis), les champs se réécrivent au propre et, si la période gardée
+-- change, les graphiques se refont ; la date affichée retapée autrement se garde donc aussi (« Du »
+-- ne suit plus le mois). L'écho de ce que la fenêtre vient d'écrire dans le champ (un observateur
+-- appelé plus tard) ne fait rien. Une date qui ne se lit pas, ou une période à l'envers : la ligne
+-- d'état le dit, avec le champ à changer d'abord, et les champs reprennent ce qu'ils montraient.
+-- Rend vrai si la période gardée change.
+function FenetreSuivi.changerDate(borne, texte)
+    if FenetreSuivi.ecritChamps or not FenetreSuivi.p then
+        return false
+    end
+    local ecrits = FenetreSuivi.champsEcrits
+    if type(ecrits) == 'table' and texte == ecrits[borne] then
+        return false
+    end
+    local actuelle = periodeMontree()
+    local debut, fin, finAujourdhui = actuelle.debut, actuelle.fin, actuelle.finAujourdhui
+    local lue = FenetreSuivi.lireDate(texte, borne, FenetreSuivi.aujourdhui())
+    local refus
+    if not lue then
+        refus = string.format(borne == 'debut' and FenetreSuivi.DEBUT_ILLISIBLE or FenetreSuivi.FIN_ILLISIBLE, Texte.nettoyer(texte))
+    elseif borne == 'debut' then
+        debut = not lue.premiere and lue or nil
+    else
+        finAujourdhui = lue.aujourdhui == true
+        fin = finAujourdhui and versDate(FenetreSuivi.aujourdhui()) or lue
+    end
+    if not refus and debut and FenetreSuivi.iso(debut) > FenetreSuivi.iso(fin) then
+        refus = borne == 'debut'
+            and string.format(FenetreSuivi.DEBUT_APRES_FIN, FenetreSuivi.texteDate(debut), FenetreSuivi.texteDate(fin))
+            or string.format(FenetreSuivi.FIN_AVANT_DEBUT, FenetreSuivi.texteDate(fin), FenetreSuivi.texteDate(debut))
+    end
+    if refus then
+        poser(FenetreSuivi.p, 'etat', refus)
+        FenetreSuivi.poserChamps(actuelle)
+        return false
+    end
+    local prefs = Chemins.prefs()
+    local avant = tostring(prefs.suiviDebut) .. '|' .. tostring(prefs.suiviFin)
+    prefs.suiviDebut = debut and FenetreSuivi.iso(debut) or ''
+    prefs.suiviFin = finAujourdhui and FenetreSuivi.AUJOURDHUI or FenetreSuivi.iso(fin)
+    FenetreSuivi.poserChamps(FenetreSuivi.periode())
+    if avant == prefs.suiviDebut .. '|' .. prefs.suiviFin then
+        return false
+    end
+    FenetreSuivi.aRedessiner = true
+    return true
 end
 
 -- L'apparence du module (préférence `apparence`, Dispositions.apparence).
@@ -322,9 +559,9 @@ local function cheminCatalogue()
     return ok and texteOuNil(chemin) or nil
 end
 
--- L'entrée de --graphiques (contrat : graphiques.entree), pour cette période et ce défaut (nil :
+-- L'entrée de --graphiques (contrat : graphiques.entree), pour la période gardée et ce défaut (nil :
 -- le plus fréquent). Rend nil et la raison sans catalogue lisible.
-function FenetreSuivi.entree(periode, defaut)
+function FenetreSuivi.entree(defaut)
     local catalogue = cheminCatalogue()
     if not catalogue then
         return nil, FenetreSuivi.SANS_CATALOGUE
@@ -334,12 +571,13 @@ function FenetreSuivi.entree(periode, defaut)
     for _, g in ipairs(FenetreSuivi.GRAPHIQUES) do
         tailles[g.cle] = { largeur = g.largeur, hauteur = g.hauteur }
     end
+    local periode = FenetreSuivi.periode()
     local entree = {
         suivi = Releve.fichier(),
         carnet = Carnet.fichier(),
         catalogue = catalogue,
-        aujourd_hui = FenetreSuivi.aujourdhui(),
-        periode = periode or FenetreSuivi.PERIODE,
+        debut = periode.debut and FenetreSuivi.iso(periode.debut) or nil,
+        fin = FenetreSuivi.iso(periode.fin),
         apparence = apparence,
         couleurs = FenetreSuivi.couleursConnecteur(apparence),
         tailles = tailles,
@@ -352,15 +590,9 @@ end
 
 -- La réponse : textes, menu et calques ------------------------------------------------------------
 
--- « décembre 2025 » d'un mois « 2025-12 » (Carnet.MOIS, seule copie des noms des mois).
-local function nomDuMois(aaaamm)
-    local a, m = tostring(aaaamm or ''):match('^(%d%d%d%d)%-(%d%d)$')
-    local nom = m and Carnet.MOIS[tonumber(m)]
-    return nom and (nom .. ' ' .. a) or nil
-end
-
--- La ligne d'état d'une réponse : la période et ses photos, et ses remarques ; sans photo au relevé,
--- le texte d'accueil ; sans photo dans la période, ce qu'il faut choisir.
+-- La ligne d'état d'une réponse : la période (son libellé, que le connecteur donne : « du 20 novembre
+-- 2025 au 20 novembre 2026 ») et ses photos, et ses remarques ; sans photo au relevé, le texte
+-- d'accueil ; sans photo dans la période, ce qu'il faut faire.
 function FenetreSuivi.texteEtat(reponse, sansReleve)
     if sansReleve then
         return FenetreSuivi.ACCUEIL
@@ -369,11 +601,11 @@ function FenetreSuivi.texteEtat(reponse, sansReleve)
     local periode = type(reponse) == 'table' and type(reponse.periode) == 'table' and reponse.periode or {}
     local n = type(reponse) == 'table' and tonumber(reponse.photos) or 0
     if n == 0 then
-        morceaux[1] = FenetreSuivi.SANS_PHOTO_PERIODE .. (periode.code ~= 'tout' and FenetreSuivi.VOIR_TOUT or '')
+        local toutes = periode.depuis_le_debut == true and periode.fin == FenetreSuivi.aujourdhui()
+        morceaux[1] = FenetreSuivi.SANS_PHOTO_PERIODE .. (toutes and '' or FenetreSuivi.VOIR_TOUT)
     else
-        local debut, fin = nomDuMois(periode.debut), nomDuMois(periode.fin)
-        local quand = (debut and fin) and (debut == fin and ("en " .. fin) or ("de " .. debut .. " à " .. fin)) or nil
-        morceaux[1] = (texteOuNil(periode.libelle) or "Période") .. (quand and (" : " .. quand) or "")
+        local libelle = texteOuNil(periode.libelle)
+        morceaux[1] = (libelle and (libelle:sub(1, 1):upper() .. libelle:sub(2)) or "Période")
             .. string.format(" · %d photo%s ouverte%s", n, n > 1 and "s" or "", n > 1 and "s" or "")
         local sansDate = tonumber(reponse.sans_date) or 0
         if sansDate > 0 then
@@ -437,7 +669,7 @@ function FenetreSuivi.barreDu(cle, i)
 end
 
 -- Vrai si la barre a au moins un id (sans les copier : à toute la bibliothèque, une barre en a des
--- dizaines de milliers, et chacun des 68 calques le demande à chaque réponse).
+-- dizaines de milliers, et chacun des 76 calques le demande à chaque réponse).
 local function aDesIds(barre)
     for _, id in ipairs(type(barre) == 'table' and type(barre.ids) == 'table' and barre.ids or {}) do
         if tonumber(id) then
@@ -586,7 +818,10 @@ function FenetreSuivi.dessiner()
     if type(connecteur) ~= 'string' or connecteur == '' or not Fichiers.existe(connecteur) then
         return echec(FenetreSuivi.CONNECTEUR_ABSENT)
     end
-    local entree, raison = FenetreSuivi.entree(p and p.periode, p and p.defaut)
+    -- Les champs disent la période dessinée (sans rien de gardé, elle suit le jour : une fenêtre
+    -- restée ouverte après minuit).
+    FenetreSuivi.poserChamps(FenetreSuivi.periode())
+    local entree, raison = FenetreSuivi.entree(p and p.defaut)
     if not entree then
         return echec(raison)
     end
@@ -600,8 +835,8 @@ function FenetreSuivi.dessiner()
         Fichiers.supprimer(dossier)
         return false
     end
-    -- La réponse se lit dans son fichier (avec tous les ids : à toute la bibliothèque, « Tout »
-    -- dépasse 10 Mo), et se décode en rendant la main (LrTasks.pcall : un pcall simple l'en
+    -- La réponse se lit dans son fichier (avec tous les ids : à toute la bibliothèque, « Du » vide,
+    -- elle dépasse 10 Mo), et se décode en rendant la main (LrTasks.pcall : un pcall simple l'en
     -- empêcherait, Lua 5.1).
     local texteReponse = Fichiers.lire(fichierReponse) or ''
     local ok, reponse = LrTasks.pcall(function() return Json.decode(texteReponse, rendreLaMain, FenetreSuivi.PAS_JSON) end)
@@ -812,195 +1047,6 @@ function FenetreSuivi.parCalque(fn)
     return parCalque[fn] == true
 end
 
--- Le résumé du carnet, pour « Photos d'un défaut… » ---------------------------------------------
-
--- Le résumé lu (Carnet.resumer ; nil avant la première lecture, { erreur } s'il ne s'est pas lu) et
--- la version du registre qu'il a lue : « Photos d'un défaut… » en prend la liste des défauts.
-FenetreSuivi.resume, FenetreSuivi.versionLue = nil, nil
-
--- Vrai quand le résumé lu a des défauts : « Photos d'un défaut… » actif.
-function FenetreSuivi.aDefauts()
-    local page = FenetreSuivi.resume
-    return type(page) == 'table' and page.vide ~= true and type(page.defauts) == 'table' and #page.defauts > 0
-end
-
--- Relit le résumé du carnet (depuis une tâche).
-function FenetreSuivi.lire()
-    FenetreSuivi.versionLue, FenetreSuivi.aRelire = Carnet.version, false
-    local ok, page = LrTasks.pcall(Carnet.resumer, os.time())
-    if not ok then
-        Journal.noter("Carnet de progrès :", tostring(page))
-        page = { erreur = tostring(page) }
-    end
-    FenetreSuivi.resume = page
-    if FenetreSuivi.p then
-        poser(FenetreSuivi.p, 'aDefauts', FenetreSuivi.aDefauts())
-    end
-    return page
-end
-
--- Les photos d'un défaut du carnet ---------------------------------------------------------------
-
--- Le nom d'une photo du carnet (Carnet.photosDuDefaut) : son fichier, sinon son identifiant.
-function FenetreSuivi.nomPhotoCarnet(x)
-    return texteOuNil(x.fichier) or ("photo " .. Conversation.clePhoto(x.original or x.photo))
-end
-
--- Une inclinaison en degrés, au dixième, sans signe (« 1,2° »), comme le carnet la note.
-local function degres(x)
-    local d = math.floor(math.abs(x) * 10 + 0.5)
-    return string.format('%d,%d°', math.floor(d / 10), d % 10)
-end
-
--- Une photo d'un défaut, sur une ligne : « octobre 2026 · DSCF4961.RAF · ciel brûlé : 4,2 % … »
--- (le constat, sinon sa mesure ; `angle` : une ligne penchée, dite en degrés).
-function FenetreSuivi.textePhotoDuDefaut(x)
-    local morceaux = { texteOuNil(x.mois_libelle) or tostring(x.mois or '?'), FenetreSuivi.nomPhotoCarnet(x) }
-    local mesure = type(x.mesure) == 'number' and (x.angle and ("ligne penchée de " .. degres(x.mesure))
-        or ("mesure : " .. Texte.nombre(x.mesure))) or nil
-    local constat = texteOuNil(x.texte) or mesure
-    if constat then
-        morceaux[#morceaux + 1] = constat
-    end
-    return table.concat(morceaux, " · ")
-end
-
--- Le défaut `code` du résumé lu (libellé, conseil), sinon du vocabulaire rangé au carnet.
-local function defautDuCarnet(code)
-    local page = FenetreSuivi.resume
-    for _, d in ipairs(type(page) == 'table' and type(page.defauts) == 'table' and page.defauts or {}) do
-        if d.code == code then
-            return d
-        end
-    end
-    for _, d in ipairs(Carnet.vocabulaire()) do
-        if d.code == code then
-            return d
-        end
-    end
-    return { code = code }
-end
-
--- La fenêtre des photos d'un défaut (depuis une tâche) : bâtie au clic, des tables neuves
--- (Carnet.photosDuDefaut, dans les mois du résumé), la plus récente d'abord, leurs constats
--- seulement (la leçon de la photo choisie, dessous, est retirée au correctif 1.3.6) ; « Retirer du
--- carnet… » retire la photo choisie (FenetreSuivi.retirerDuCarnet).
-function FenetreSuivi.montrerDefaut(code)
-    local photos = Carnet.photosDuDefaut(code, os.time())
-    -- Une ligne penchée (measure_angle, read_composition) n'a que son inclinaison, sans texte :
-    -- celle de l'angle rangé dans l'entrée de l'original sous ce code.
-    for _, x in ipairs(photos) do
-        if texteOuNil(x.texte) == nil and type(x.mesure) == 'number' then
-            local e = Carnet.entree(x.original)
-            x.angle = type(e) == 'table' and type(e.angle) == 'table' and e.angle.code == code or nil
-        end
-    end
-    local d = defautDuCarnet(code)
-    local libelle = texteOuNil(d.libelle) or tostring(code)
-    local f = LrView.osFactory()
-    local aRetirer
-    LrFunctionContext.callWithContext('Claude · carnet', function(context)
-        local qp = LrBinding.makePropertyTable(context)
-        local items, parId = {}, {}
-        for _, x in ipairs(photos) do
-            items[#items + 1] = { title = FenetreSuivi.textePhotoDuDefaut(x), value = x.original }
-            parId[x.original] = x
-        end
-        local function choisie(valeur)
-            local id = type(valeur) == 'table' and valeur[1] or valeur
-            return id ~= nil and parId[id] or nil
-        end
-        qp.choix = #photos > 0 and { photos[1].original } or {}
-        local entete = #photos == 0 and "Aucune photo n'a ce défaut dans les mois du carnet."
-            or #photos == 1 and "1 photo dans les mois du carnet."
-            or string.format("%d photos dans les mois du carnet, la plus récente d'abord.", #photos)
-        local contenu = {
-            bind_to_object = qp,
-            spacing = f:control_spacing(),
-            f:static_text { title = entete, width = 640 },
-        }
-        if texteOuNil(d.conseil) then
-            contenu[#contenu + 1] = f:static_text { title = "À la prise de vue : " .. texteOuNil(d.conseil), width = 640, height_in_lines = 2 }
-        end
-        if #photos > 0 then
-            contenu[#contenu + 1] = f:simple_list { items = items, value = bind 'choix', allows_multiple_selection = false, width = 640, height = 160 }
-        end
-        local reponse = LrDialogs.presentModalDialog {
-            title = FenetreSuivi.TITRE_CARNET .. " · " .. libelle,
-            contents = f:column(contenu),
-            actionVerb = "Fermer",
-            cancelVerb = '< exclude >',
-            otherVerb = #photos > 0 and "Retirer du carnet…" or nil,
-        }
-        if reponse == 'other' then
-            aRetirer = choisie(qp.choix)
-        end
-    end)
-    if aRetirer then
-        return FenetreSuivi.retirerDuCarnet(aRetirer)
-    end
-    return false
-end
-
--- Retire une photo du carnet, après confirmation : par appel direct au registre du module
--- (Carnet.commande, jamais une ligne de la liaison), avec l'identifiant de l'original (la clé de
--- son entrée). Le résumé et les graphiques se refont ensuite (Carnet.version). Rend vrai si elle est
--- retirée ; ce qui s'est passé se dit en bas de la fenêtre.
-function FenetreSuivi.retirerDuCarnet(x)
-    local nom = FenetreSuivi.nomPhotoCarnet(x)
-    local reponse = LrDialogs.confirm("Retirer " .. nom .. " du carnet de progrès ?",
-        "Ses constats sortent du carnet et ne comptent plus dans la fenêtre Suivi. La photo et ses retouches ne changent pas.",
-        "Retirer", "Annuler")
-    if reponse ~= 'ok' then
-        return false
-    end
-    local ok, r = LrTasks.pcall(Carnet.commande, { action = 'retirer', photos = { x.original } })
-    local retiree = ok and type(r) == 'table' and (tonumber(r.retirees) or 0) > 0
-    dire(retiree and (nom .. " est retirée du carnet de progrès.")
-        or ("Le carnet n'a pas retiré " .. nom .. (ok and " : elle n'y est plus." or (" : " .. tostring(r)))))
-    return retiree
-end
-
--- « Photos d'un défaut… » (depuis une tâche) : la liste des défauts du résumé lu (tables neuves :
--- libellé, photos où il est vu et sur combien il a été cherché), puis, le défaut choisi, la fenêtre
--- de ses photos (FenetreSuivi.montrerDefaut). Rend ce qu'elle rend, faux sans défaut ou sans choix.
-function FenetreSuivi.choisirDefaut()
-    if not FenetreSuivi.aDefauts() then
-        return false
-    end
-    local defauts = FenetreSuivi.resume.defauts
-    local f = LrView.osFactory()
-    local code
-    LrFunctionContext.callWithContext('Claude · défauts du carnet', function(context)
-        local qp = LrBinding.makePropertyTable(context)
-        local items = {}
-        for _, d in ipairs(defauts) do
-            local n, sur = tonumber(d.n) or 0, tonumber(d.sur) or 0
-            items[#items + 1] = { title = string.format("%s · %d photo%s sur %d", texteOuNil(d.libelle) or tostring(d.code),
-                n, n > 1 and "s" or "", sur), value = d.code }
-        end
-        qp.choix = { defauts[1].code }
-        local reponse = LrDialogs.presentModalDialog {
-            title = FenetreSuivi.TITRE_CARNET .. " · " .. FenetreSuivi.TITRE_DEFAUTS,
-            contents = f:column {
-                bind_to_object = qp,
-                spacing = f:control_spacing(),
-                f:static_text { title = "Choisissez un défaut : ses photos, dans les mois du carnet.", width = 480 },
-                f:simple_list { items = items, value = bind 'choix', allows_multiple_selection = false, width = 480, height = 200 },
-            },
-            actionVerb = "Voir ses photos",
-        }
-        if reponse == 'ok' then
-            local v = qp.choix
-            code = type(v) == 'table' and v[1] or v
-        end
-    end)
-    if code == nil then
-        return false
-    end
-    return FenetreSuivi.montrerDefaut(code)
-end
-
 -- La fenêtre ---------------------------------------------------------------------------------------
 
 -- Les couleurs de l'apparence, en LrColor, refaites à chaque ouverture (Dispositions.couleurs).
@@ -1099,16 +1145,16 @@ local function section(f, D, C, P, titre)
     return texte(f, { title = titre, font = P.gras, text_color = C.texte, width = D.colonne, height = D.section })
 end
 
--- Le contenu : l'aplat du fond, puis l'en-tête (titre, Période), la ligne d'état, les tuiles, et
--- les deux colonnes : Mes prises de vue, Mon carnet de progrès (avec le menu du défaut suivi, l'aide,
--- le message et « Photos d'un défaut… »).
+-- Le contenu : l'aplat du fond, puis l'en-tête (titre, « Du » et « au »), la ligne d'état, les
+-- tuiles, et les deux colonnes : Mes prises de vue (les notes à côté des objectifs), Mon carnet de
+-- progrès (avec le menu du défaut suivi, l'aide et le message).
 function FenetreSuivi.construire(f, p)
     local D, C, P = FenetreSuivi.dimensions(), FenetreSuivi.COULEURS, FenetreSuivi.POLICES
     local tuiles = { spacing = D.ecartTuile }
     for k = 1, #FenetreSuivi.TUILES do
         tuiles[#tuiles + 1] = tuile(f, D, C, P, k)
     end
-    local largeurTitre = D.interieur - D.etiquettePeriode - D.periode - 2 * 8
+    local largeurTitre = D.interieur - D.etiquetteDu - D.etiquetteAu - 2 * D.champDate - 4 * 8
     local gauche = f:column {
         spacing = 0,
         width = D.colonne,
@@ -1120,7 +1166,7 @@ function FenetreSuivi.construire(f, p)
         f:spacer { height = D.ecartBlocs },
         bloc(f, D, C, P, 'heures'),
         f:spacer { height = D.ecartBlocs },
-        bloc(f, D, C, P, 'objectifs'),
+        f:row { spacing = D.ecartPetits, bloc(f, D, C, P, 'objectifs'), bloc(f, D, C, P, 'notes') },
     }
     local enteteEvolution = f:row {
         spacing = 8,
@@ -1128,7 +1174,7 @@ function FenetreSuivi.construire(f, p)
         texte(f, { title = bind 'titre_evolution_defaut', font = P.gras12, text_color = C.texte, width = D.colonne - D.defaut - 8,
             truncation = 'tail', place_vertical = 0.5 }),
         f:popup_menu { items = bind 'elementsDefaut', value = bind 'defaut', width = D.defaut, place_vertical = 0.5,
-            tooltip = "Le défaut suivi mois par mois : le plus fréquent, ou celui que vous choisissez" },
+            tooltip = "Le défaut suivi au fil de la période : le plus fréquent, ou celui que vous choisissez" },
     }
     local droite = f:column {
         spacing = 0,
@@ -1141,22 +1187,8 @@ function FenetreSuivi.construire(f, p)
         f:spacer { height = D.ecartBlocs },
         texte(f, { title = FenetreSuivi.AIDE, font = P.petit, text_color = C.gris, width = D.colonne, height = D.aide, height_in_lines = 3 }),
         f:spacer { height = D.ecartBlocs },
-        f:row {
-            spacing = 8,
-            height = D.bas,
-            texte(f, { title = bind 'message', font = P.petit, text_color = C.texte, width = D.colonne - D.defautsBouton - 8, height = D.bas,
-                height_in_lines = 2, truncation = 'tail', tooltip = bind 'message', place_vertical = 0.5 }),
-            f:push_button { title = "Photos d'un défaut…", width = D.defautsBouton, enabled = bind 'aDefauts', place_vertical = 0.5,
-                tooltip = "Les photos où un défaut du carnet a été vu par Claude, et « Retirer du carnet… »",
-                action = function()
-                    LrTasks.startAsyncTask(function()
-                        local ok, erreur = LrTasks.pcall(FenetreSuivi.choisirDefaut)
-                        if not ok then
-                            Journal.noter("Fenêtre Suivi :", tostring(erreur))
-                        end
-                    end)
-                end },
-        },
+        texte(f, { title = bind 'message', font = P.petit, text_color = C.texte, width = D.colonne, height = D.bas, height_in_lines = 2,
+            truncation = 'tail', tooltip = bind 'message' }),
     }
     return f:view {
         bind_to_object = p,
@@ -1172,10 +1204,14 @@ function FenetreSuivi.construire(f, p)
                 spacing = 8,
                 height = D.entete,
                 texte(f, { title = FenetreSuivi.ENTETE, font = P.titre, text_color = C.texte, width = largeurTitre, place_vertical = 0.5 }),
-                texte(f, { title = "Période :", font = P.texte12, text_color = C.gris, alignment = 'right', width = D.etiquettePeriode,
+                texte(f, { title = "Du", font = P.texte12, text_color = C.gris, alignment = 'right', width = D.etiquetteDu,
                     place_vertical = 0.5 }),
-                f:popup_menu { items = FenetreSuivi.elementsPeriode(), value = bind 'periode', width = D.periode, place_vertical = 0.5,
-                    tooltip = "Les photos de la période, par leur date de prise de vue" },
+                f:edit_field { value = bind 'debutTexte', immediate = false, width = D.champDate, place_vertical = 0.5,
+                    tooltip = FenetreSuivi.INFOBULLE_DEBUT },
+                texte(f, { title = "au", font = P.texte12, text_color = C.gris, alignment = 'right', width = D.etiquetteAu,
+                    place_vertical = 0.5 }),
+                f:edit_field { value = bind 'finTexte', immediate = false, width = D.champDate, place_vertical = 0.5,
+                    tooltip = FenetreSuivi.INFOBULLE_FIN },
             },
             f:spacer { height = D.ecartEtat },
             texte(f, { title = bind 'etat', font = P.petit, text_color = C.gris, width = D.interieur, height = D.etat, height_in_lines = 2,
@@ -1188,24 +1224,15 @@ function FenetreSuivi.construire(f, p)
     }
 end
 
--- Les éléments du menu Période (tables neuves).
-function FenetreSuivi.elementsPeriode()
-    local items = {}
-    for _, x in ipairs(FenetreSuivi.PERIODES) do
-        items[#items + 1] = { title = x.title, value = x.value }
-    end
-    return items
-end
-
 -- Les valeurs de la fenêtre avant la première réponse (chaque clé liée en a une avant l'ouverture).
 local function preparer(p)
     p.etat = FenetreSuivi.LECTURE
     p.message = ''
     p.attente = FenetreSuivi.ATTENTE
-    p.periode = FenetreSuivi.PERIODE
+    p.debutTexte, p.finTexte = FenetreSuivi.textesPeriode(FenetreSuivi.periode())
+    FenetreSuivi.champsEcrits = { debut = p.debutTexte, fin = p.finTexte }
     p.defaut = FenetreSuivi.LE_PLUS_FREQUENT
     p.elementsDefaut = FenetreSuivi.elementsDefaut(nil)
-    p.aDefauts = false
     for k, t in ipairs(FenetreSuivi.TUILES) do
         p['tuileTitre' .. k] = t.titre
         p['tuileTexte' .. k] = "—"
@@ -1245,16 +1272,13 @@ function FenetreSuivi.reclasserEnFond()
     return true
 end
 
--- Un tour de la boucle (depuis une tâche) : le résumé du carnet quand le registre change ; le
--- dessin, demandé (ouverture, période, défaut, reclassement fini) ou quand le relevé ou le carnet a
+-- Un tour de la boucle (depuis une tâche) : le dessin, demandé (ouverture, période, défaut,
+-- reclassement fini) ou quand le relevé ou le carnet a
 -- changé (au plus toutes les FenetreSuivi.delaiRedessin secondes) ; après le premier dessin de
 -- l'ouverture, la note, le drapeau et « retouchée par Claude » relus en arrière-plan
 -- (FenetreSuivi.reclasserEnFond) ; la file d'analyse relancée (comme les boucles de la fenêtre
 -- Claude et de la Demande rapide).
 function FenetreSuivi.suivre()
-    if FenetreSuivi.aRelire or Carnet.version ~= FenetreSuivi.versionLue then
-        FenetreSuivi.lire()
-    end
     local change = Releve.version ~= FenetreSuivi.releveDessine or Carnet.version ~= FenetreSuivi.carnetDessine
     if FenetreSuivi.aRedessiner or (change and os.time() - (FenetreSuivi.dessineLe or 0) >= FenetreSuivi.delaiRedessin()) then
         FenetreSuivi.dessiner()
@@ -1272,7 +1296,7 @@ function FenetreSuivi.boucle(generation)
     while FenetreSuivi.ouverte and FenetreSuivi.generation == generation do
         local ok, erreur = LrTasks.pcall(FenetreSuivi.suivre)
         if not ok then
-            FenetreSuivi.versionLue, FenetreSuivi.aRelire, FenetreSuivi.aRedessiner = Carnet.version, false, false
+            FenetreSuivi.aRedessiner = false
             FenetreSuivi.releveDessine, FenetreSuivi.carnetDessine = Releve.version, Carnet.version
             Journal.noter("Fenêtre Suivi :", tostring(erreur))
         end
@@ -1300,7 +1324,6 @@ function FenetreSuivi.afficher()
             if FenetreSuivi.generation == generation then
                 FenetreSuivi.ouverte = false
                 FenetreSuivi.p = nil
-                Carnet.desabonner('suivi')
                 FenetreSuivi.effacerDessins()
             end
             Journal.noter("Fenêtre Suivi :", tostring(erreur))
@@ -1308,7 +1331,6 @@ function FenetreSuivi.afficher()
         end)
         local f = LrView.osFactory()
         local p = LrBinding.makePropertyTable(context)
-        FenetreSuivi.resume, FenetreSuivi.versionLue, FenetreSuivi.aRelire = nil, nil, false
         FenetreSuivi.reponse, FenetreSuivi.calquesValides, FenetreSuivi.derniereErreur = nil, {}, nil
         FenetreSuivi.releveDessine, FenetreSuivi.carnetDessine, FenetreSuivi.dessineLe = nil, nil, nil
         FenetreSuivi.originauxDessines = 0
@@ -1319,10 +1341,11 @@ function FenetreSuivi.afficher()
         preparer(p)
         FenetreSuivi.p = p
         local contenu = FenetreSuivi.construire(f, p)
-        -- Une autre période ou un autre défaut choisi : les graphiques se refont au tour suivant.
-        p:addObserver('periode', function() FenetreSuivi.aRedessiner = true end)
+        -- Une autre date (gardée : FenetreSuivi.changerDate) ou un autre défaut choisi : les graphiques
+        -- se refont au tour suivant.
+        p:addObserver('debutTexte', function(_, _, valeur) FenetreSuivi.changerDate('debut', valeur) end)
+        p:addObserver('finTexte', function(_, _, valeur) FenetreSuivi.changerDate('fin', valeur) end)
         p:addObserver('defaut', function() FenetreSuivi.aRedessiner = true end)
-        Carnet.abonner('suivi', function() FenetreSuivi.aRelire = true end)
         LrTasks.startAsyncTask(function() FenetreSuivi.boucle(generation) end)
         LrDialogs.presentFloatingDialog(_PLUGIN, {
             title = FenetreSuivi.TITRE,
@@ -1340,7 +1363,6 @@ function FenetreSuivi.afficher()
                 end
                 FenetreSuivi.ouverte = false
                 FenetreSuivi.controle = nil
-                Carnet.desabonner('suivi')
             end,
         })
         -- Au cas où blockTask ne bloquerait pas : garder le contexte (et la table) en vie.

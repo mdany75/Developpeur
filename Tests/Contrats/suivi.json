@@ -1,12 +1,12 @@
 {
   "_lisez_moi": [
     "Contrat du Suivi (correctif 1.3.7, fiche build/conception/1-3-7-a-faire.md, section « Contrat figé ») entre le module (Releve.lua, le registre et la file d'analyse ; FenetreSuivi.lua, la fenêtre) et le connecteur (mcp-developpeur --analyser et --graphiques), qui ne se parlent, hors de la liaison, que par l'exécutable lancé par LrTasks.execute sous l'alarme de perl, comme --focus.",
-    "Trois échanges : le relevé suivi.json (écrit par le module seul, lu par --graphiques), --analyser (les défauts de la prise de vue mesurés sur la vignette du cache de Lightroom) et --graphiques (les tuiles et les sept graphiques, dessinés en PNG, avec les rectangles des barres pour les clics). « regles » dit ce que les deux côtés appliquent ; chaque nombre des exemples en découle exactement.",
+    "Trois échanges : le relevé suivi.json (écrit par le module seul, lu par --graphiques), --analyser (les défauts de la prise de vue mesurés sur la vignette du cache de Lightroom) et --graphiques (les tuiles et les huit graphiques, dessinés en PNG, avec les rectangles des barres pour les clics). « regles » dit ce que les deux côtés appliquent ; chaque nombre des exemples en découle exactement.",
     "Les clés « _note » sont des commentaires : les essais les retirent avant de comparer, et un lecteur les ignore (le relevé d'exemple en porte dans ses entrées). Aucune valeur null n'est écrite : une clé sans valeur manque (Json.decode efface un null d'objet).",
     "Textes à remplacer : <suivi.json>, <carnet.json> (des fichiers temporaires où les essais écrivent exemples.registre.fichier et exemples.carnet.fichier), <dossier> (le dossier passé à --graphiques ; fichier vaut <dossier>/<graphique>.png), <lot> (le dossier des vignettes d'un lot d'analyse), <connecteur> (le chemin de mcp-developpeur, cheminConnecteur).",
-    "Un exemple marqué « partiel » ne fige que les clés qu'il donne (les graphiques omis suivent les mêmes règles que ceux de graphiques_12_mois) ; les autres se comparent en entier : noms, formes (tableau ou objet, nombre, texte, booléen), valeurs, ordre des tableaux.",
-    "Côté connecteur (par exemple Tests/DeveloppeurKitTests/ContratSuiviTests.swift) : --graphiques sur exemples.registre et exemples.carnet rend exactement les sorties des trois exemples, et des PNG de 2 × la taille demandée ; --analyser se vérifie sur des vignettes fabriquées par sa forme (clés, types, codes cherchés selon l'ISO, les visages, retouchee et la taille) et ses refus, pas par ses mesures au dixième, qui dépendent de l'image.",
-    "Côté module (par exemple Tests/Lua/Fenetre/essais-suivi.lua) : pour des photos simulées comme celles de l'exemple, Releve.lua écrit exactement exemples.registre.fichier (sans _note) ; la fenêtre envoie exactement exemples.graphiques_12_mois.entree et lit sa sortie (un faux mcp-developpeur qui la rend, comme celui de --focus dans essais-focus.lua), pose un calque par créneau et montre, au clic, les ids de la barre du créneau.",
+    "Un exemple marqué « partiel » ne fige que les clés qu'il donne (les graphiques omis suivent les mêmes règles que ceux de graphiques_un_an) ; les autres se comparent en entier : noms, formes (tableau ou objet, nombre, texte, booléen), valeurs, ordre des tableaux.",
+    "Côté connecteur (par exemple Tests/DeveloppeurKitTests/ContratSuiviTests.swift) : --graphiques sur exemples.registre et exemples.carnet rend exactement les sorties des cinq exemples (graphiques_un_an, graphiques_treize_mois, graphiques_trois_mois, graphiques_depuis_le_debut, graphiques_trimestres), et des PNG de 2 × la taille demandée ; --analyser se vérifie sur des vignettes fabriquées par sa forme (clés, types, codes cherchés selon l'ISO, les visages, retouchee et la taille) et ses refus, pas par ses mesures au dixième, qui dépendent de l'image.",
+    "Côté module (par exemple Tests/Lua/Fenetre/essais-suivi.lua) : pour des photos simulées comme celles de l'exemple, Releve.lua écrit exactement exemples.registre.fichier (sans _note) ; la fenêtre envoie exactement exemples.graphiques_un_an.entree et lit sa sortie (un faux mcp-developpeur qui la rend, comme celui de --focus dans essais-focus.lua), pose un calque par créneau et montre, au clic, les ids de la barre du créneau.",
     "Un changement voulu du contrat se fait des deux côtés : changer le code, puis ce fichier, et les deux suites doivent passer."
   ],
   "regles": {
@@ -104,41 +104,41 @@
     "graphiques": {
       "_note": "Les agrégats du relevé (et du carnet) sur une période, dessinés en PNG par CoreGraphics (comme PreviewImages), en 2x, dans les couleurs de l'apparence du module ; et pour chaque graphique ses barres et ses créneaux, dans le repère de l'image en points (origine en haut à gauche, y vers le bas). Lightroom ne trace pas de graphique : la fenêtre montre ces images (f:picture avec width et height) et pose ses calques sur les créneaux. Lecture seule de suivi.json et de carnet.json : ni Lightroom, ni le catalogue, ni un original.",
       "commande": "/usr/bin/perl -e 'alarm 60; exec @ARGV' <connecteur> --graphiques '<json>' <dossier> > <réponse>.json 2>/dev/null",
-      "dossier": "Un dossier neuf à chaque appel (par exemple Temporaire/Suivi/Graphiques-<n>, Chemins.temporaire() : Lightroom garde une image par chemin, un même chemin ne se redessinerait pas) ; le connecteur le crée s'il manque et y écrit les sept <graphique>.png, de 2 × largeur par 2 × hauteur pixels ; le module efface le précédent une fois les nouvelles images montrées.",
+      "dossier": "Un dossier neuf à chaque appel (par exemple Temporaire/Suivi/Graphiques-<n>, Chemins.temporaire() : Lightroom garde une image par chemin, un même chemin ne se redessinerait pas) ; le connecteur le crée s'il manque et y écrit les huit <graphique>.png, de 2 × largeur par 2 × hauteur pixels ; le module efface le précédent une fois les nouvelles images montrées.",
       "entree": {
         "suivi": "chemin de suivi.json (absent du disque : un relevé vide, rien n'est refusé)",
         "carnet": "chemin de carnet.json, facultatif (codes.fusion_avec_le_carnet)",
         "catalogue": "chemin du catalogue ouvert (cat:getPath()) : sa table du relevé et du carnet",
-        "aujourd_hui": "« AAAA-MM-JJ », la date du jour à l'heure locale, donnée par le module : les périodes, et les essais, ne dépendent pas de l'horloge du connecteur",
-        "periode": "« 3_mois », « 12_mois » (par défaut dans la fenêtre) ou « tout »",
+        "debut": "facultatif : « AAAA-MM-JJ », le premier jour de la période, à l'heure locale ; absent : depuis la première photo (correctif 1.3.8, demandé par Dany le 26 octobre 2026 : trois périodes fixes avant, « 3_mois », « 12_mois » et « tout », d'après aujourd_hui, retiré)",
+        "fin": "« AAAA-MM-JJ », le dernier jour de la période (compris), à l'heure locale, donné par le module (le jour même quand la fin choisie est « aujourd'hui ») : les périodes, et les essais, ne dépendent pas de l'horloge du connecteur ; debut ne vient pas après fin",
         "apparence": "« claire » ou « sombre » (Dispositions.apparence de la préférence apparence)",
         "couleurs": "les six couleurs de couleurs.cles, en six chiffres hexadécimaux, tirées de Dispositions.PALETTES[apparence] (seule table des couleurs)",
         "defaut": "facultatif : le code suivi par l'évolution, l'un des huit codes comptés ; absent : le plus fréquent",
-        "tailles": "les sept graphiques, chacun { largeur, hauteur } en points entiers, de 120 × 80 à 1 200 × 600"
+        "tailles": "les huit graphiques, chacun { largeur, hauteur } en points entiers, de 120 × 80 à 1 200 × 600"
       },
       "sortie": {
         "ok": "vrai",
         "catalogue": "repris de l'entrée",
-        "aujourd_hui": "repris de l'entrée",
-        "periode": "{ code, libelle (« 3 derniers mois », « 12 derniers mois », « Tout »), debut et fin (« AAAA-MM »), par (« mois » ou « annee ») }",
+        "periode": "{ debut, fin (« AAAA-MM-JJ » : debut est celui de l'entrée, sinon le jour de la plus ancienne photo de la période, date de prise de vue ou d'ajout, la fin sans photo), libelle (periodes.libelle), par (« mois », « trimestre » ou « annee » : periodes.colonnes), depuis_le_debut (vrai sans debut dans l'entrée) }",
         "photos": "les originaux de la période",
         "sans_date": "ceux d'entre eux sans date de prise de vue",
         "analyse": "{ analysees (analyse avec cherches), en_attente (ni analysée ni abandonnée), en_echec (abandonnee) }, dans la période",
         "tuiles": "tableau des quatre tuiles, dans cet ordre : { cle, titre, valeur, texte, detail } et code pour defaut_frequent quand il y en a un",
         "defauts": "les huit codes comptés, dans leur ordre : { code, libelle, n, sur, valeur, texte } (le menu du défaut suivi)",
         "defaut_suivi": "{ code, libelle, choisi (vrai : celui de l'entrée) } ; absent sans défaut à suivre",
-        "graphiques": "objet des sept graphiques (graphiques.liste), chacun { titre, fichier, largeur, hauteur, orientation, max_barres, unite, echelle, sans_valeur, note (absente sans rien à dire), vide, barres, creneaux }",
+        "graphiques": "objet des huit graphiques (graphiques.liste), chacun { titre, fichier, largeur, hauteur, orientation, max_barres, unite, echelle, sans_valeur, note (absente sans rien à dire), vide, barres, creneaux }",
         "remarques": "tableau de textes (vide le plus souvent : un carnet illisible)",
         "barre": "{ libelle (court, dessiné), detail (entier, pour l'infobulle du calque), valeur, texte, n, sur (graphiques en %), ids, couleur (« barre » ou « accent »), x, y, largeur, hauteur (le rectangle dessiné), zone (le rectangle cliquable : ses créneaux) }",
-        "ids": "les originaux de la barre (les clés de leurs entrées), croissants, tous (pour 20 000 originaux, la ligne « Tout » dépasse 800 Ko, et 10 Mo pour 250 000 : le module la lit dans un fichier, jamais par un tuyau, et la décode en rendant la main à Lightroom). La fenêtre les retrouve par getPhotoByLocalId, vérifie l'uuid de leur entrée, puis les montre dans la Bibliothèque (Bibliotheque, comme « Photos d'un défaut… » ; toutes les photos du catalogue comme source quand elles ne sont pas dans la source affichée : à l'étape de la fenêtre).",
+        "ids": "les originaux de la barre (les clés de leurs entrées), croissants, tous (pour 20 000 originaux, la ligne de toute la bibliothèque fait environ 0,7 Mo, et 10,6 Mo pour 250 000, le graphique des notes compris : le module la lit dans un fichier, jamais par un tuyau, et la décode en rendant la main à Lightroom). La fenêtre les retrouve par getPhotoByLocalId, vérifie l'uuid de leur entrée, puis les montre dans la Bibliothèque, en grille (toutes les photos du catalogue comme source quand elles ne sont pas dans la source affichée : à l'étape de la fenêtre).",
         "creneau": "{ x, y, largeur, hauteur, barre } : barre est le rang (à partir de 1) dans barres de la barre qui l'occupe, 0 pour un créneau vide. Les rectangles des créneaux ne dépendent que de la taille et du graphique : les mêmes à chaque appel (la fenêtre pose ses calques à la création d'après la première réponse) ; seul barre change."
       },
       "liste": {
-        "photos_par_mois": {"orientation": "verticale", "max_barres": 12, "unite": "photos", "etale": true, "titre": "« Photos par mois », ou « Photos par année » pour Tout", "barres": "une par colonne de la période (periodes), photos datées seulement", "note": "« N photo(s) sans date de prise de vue n'y est (sont) pas. »"},
+        "photos_par_mois": {"orientation": "verticale", "max_barres": 13, "unite": "photos", "etale": true, "titre": "« Photos par mois », « Photos par trimestre » ou « Photos par année » (periodes.colonnes)", "barres": "une par colonne de la période (periodes), photos datées seulement", "note": "« N photo(s) sans date de prise de vue n'y est (sont) pas. »"},
         "focales": {"orientation": "verticale", "max_barres": 8, "unite": "photos", "etale": false, "titre": "« Focales (mm) »", "barres": "les huit tranches.focales", "note": "« N photo(s) sans focale lue n'y est (sont) pas. »"},
         "iso": {"orientation": "verticale", "max_barres": 8, "unite": "photos", "etale": false, "titre": "« Sensibilité (ISO) »", "barres": "les huit tranches.iso", "note": "« N photo(s) sans ISO lu n'y est (sont) pas. »"},
         "heures": {"orientation": "verticale", "max_barres": 12, "unite": "photos", "etale": false, "titre": "« Heure de la prise de vue »", "barres": "les douze tranches.heures, photos datées seulement", "note": "comme photos_par_mois"},
         "objectifs": {"orientation": "horizontale", "max_barres": 8, "unite": "photos", "etale": false, "titre": "« Objectifs »", "barres": "tranches.objectifs, de haut en bas"},
+        "notes": {"orientation": "verticale", "max_barres": 6, "unite": "photos", "etale": false, "titre": "« Notes »", "barres": "six, de 0 ★ à 5 ★ (libellés « 0 ★ » à « 5 ★ ») : la note de l'entrée (celle de la famille), partie entière bornée de 0 à 5 ; détail « 0 ★, pas encore notée · N photo(s) », puis « 1 ★ · … » à « 5 ★ · … » (correctif 1.3.8)", "note": "les photos dont le drapeau est « rejetee » y comptent à leur note : « Dont 1 rejetée (drapeau), comptée à sa note. », « Dont N rejetées (drapeau), comptées à leur note. » ; absente sans photo rejetée dans la période"},
         "defauts_frequents": {
           "orientation": "horizontale",
           "max_barres": 8,
@@ -150,10 +150,10 @@
         },
         "evolution_defaut": {
           "orientation": "verticale",
-          "max_barres": 12,
+          "max_barres": 13,
           "unite": "%",
           "etale": true,
-          "titre": "« <libellé du défaut suivi>, mois par mois » (Tout : « …, année par année »), sinon « Évolution d'un défaut »",
+          "titre": "« <libellé du défaut suivi>, mois par mois » (« …, trimestre par trimestre », « …, année par année » : periodes.colonnes), sinon « Évolution d'un défaut »",
           "barres": "les colonnes de photos_par_mois : n et sur du défaut suivi parmi les photos datées de la colonne ; toutes en accent",
           "note": "« N photo(s) sans date de prise de vue n'y est (sont) pas. » (celles où le défaut est cherché), ou « Aucun défaut trouvé dans la période. » sans défaut suivi"
         }
@@ -171,12 +171,10 @@
       "codes_de_sortie": "0 : ok vrai ; 1 : ok faux, avec sa ligne ; 2 : nombre d'arguments faux (l'aide sur stderr, rien sur stdout)."
     },
     "periodes": {
-      "date": "Une photo est dans la période par sa date de prise de vue (prise_de_vue.le), sinon par sa date d'ajout (ajout_le). Après la fin du mois d'aujourd_hui (horloge de l'appareil fausse) : hors de toute période. Les graphiques par mois, par année et par heure, et l'évolution, ne prennent que les photos datées ; les autres comptent dans sans_valeur, et la note le dit.",
-      "3_mois": "le mois d'aujourd_hui et les deux d'avant : 3 colonnes",
-      "12_mois": "le mois d'aujourd_hui et les onze d'avant : 12 colonnes",
-      "tout": "jusqu'à la fin du mois d'aujourd_hui ; une colonne par année de prise de vue, de la plus ancienne des photos datées de la période à celle d'aujourd_hui (années sans photo comprises) ; plus de 12 années : la première colonne « < A » (détail « avant A ») réunit toutes les années d'avant A = l'année d'aujourd_hui − 10, puis une colonne pour chacune des 11 dernières ; aucune photo datée : l'année d'aujourd_hui seule",
-      "debut_fin": "« AAAA-MM » ; pour Tout, debut est le mois de la plus ancienne photo de la période (date de prise de vue ou d'ajout), celui d'aujourd_hui sans photo",
-      "colonnes": "libellé d'un mois : Carnet.MOIS_COURTS (« oct. »), détail « octobre 2026 · … » (Carnet.MOIS) ; d'une année : « 2024 », détail « 2024 · … »"
+      "date": "Une photo est dans la période par sa date de prise de vue (prise_de_vue.le), sinon par sa date d'ajout (ajout_le), comparées au jour : du jour de debut (sans debut : aucune borne) au jour de fin, compris, à toute heure. Après fin (horloge de l'appareil fausse, ou une fin choisie) : hors de la période. Les graphiques par mois, par trimestre, par année et par heure, et l'évolution, ne prennent que les photos datées ; les autres comptent dans sans_valeur, et la note le dit.",
+      "colonnes": "D'après le premier jour (periode.debut) et fin, au plus 13 colonnes (le nombre de créneaux des graphiques étalés : une année comptée d'un jour au même jour de l'année suivante touche treize mois) : un mois chacune si la période en touche 13 au plus ; sinon un trimestre chacune si elle en touche 13 au plus ; sinon une année chacune (années sans photo comprises) ; plus de 13 années : la première colonne « < A » (détail « avant A ») réunit toutes les années d'avant A = l'année de fin − 11, puis une colonne pour chacune des 12 dernières. La première et la dernière colonne peuvent n'avoir qu'une partie de leur mois, trimestre ou année.",
+      "noms": "libellé d'un mois : Carnet.MOIS_COURTS (« oct. »), avec l'année au premier mois et à chaque janvier (« déc. 2025 », « janv. 2026 » : sur treize mois, le même mois revient), détail « octobre 2026 · … » (Carnet.MOIS) ; d'un trimestre : « T1 2025 », détail « janvier à mars 2025 · … » ; d'une année : « 2024 », détail « 2024 · … » ; les années d'avant : « < 2015 », détail « avant 2015 · … ». Une colonne que la période ne couvre qu'en partie le dit après son nom : « novembre 2025, à partir du 20 », « novembre 2026, jusqu'au 20 », « novembre 2026, du 3 au 20 », « novembre 2026, le 20 » (le jour seul pour un mois ; avec le mois pour un trimestre ou une année : « 2026, jusqu'au 20 novembre » ; « 1er » le premier du mois) ; sans debut, la première colonne ne l'est jamais (aucune photo avant elle), ni les années d'avant. Titres : « Photos par mois », « … par trimestre », « … par année » ; l'évolution : « <libellé>, mois par mois », « …, trimestre par trimestre », « …, année par année ».",
+      "libelle": "« du 20 novembre 2025 au 20 novembre 2026 » (le 1er : « 1er »), « le 20 novembre 2026 » quand debut est fin ; sans debut : « depuis la première photo, le 25 décembre 2009, jusqu'au 20 novembre 2026 », ou « jusqu'au 20 novembre 2026 » sans photo. La fenêtre l'écrit en tête de sa ligne d'état, avec une majuscule. Sans période gardée, la fenêtre demande les douze derniers mois : du 1er du mois onze mois plus tôt au jour même (graphiques_un_an)."
     },
     "tranches": {
       "focales": {
@@ -220,7 +218,7 @@
       "_note": "En points entiers, dans le repère de l'image (origine en haut à gauche, y vers le bas) ; L et H, la taille du graphique ; n, max_barres ; floor, l'arrondi vers le bas ; arrondi, au plus proche, demi vers le haut. echelle = la plus grande valeur des barres du graphique (0 sans barre). Le reste du dessin est libre (polices, valeurs écrites au-dessus ou au bout des barres, libellés dessous ou à gauche, ligne de base au filet), dans ces rectangles : un libellé qui ne tient pas à sa place est réduit (de 10 à 7 points), puis coupé « … » ; une barre de valeur 0 ne porte pas de valeur écrite ; un graphique vide dit « Aucune photo » au milieu (l'évolution sans défaut suivi : « Aucun défaut »).",
       "verticale": {
         "creneaux": "x_i = 8 + floor((i − 1) × (L − 16) / n) pour i de 1 à n, x_(n+1) = L − 8 ; créneau i = { x: x_i, y: 0, largeur: x_(i+1) − x_i, hauteur: H }",
-        "etalement": "Un graphique étalé (etale) de k barres : s = floor(n / k) créneaux par barre, décalage d = floor((n − s × k) / 2) ; la barre j (de 1 à k) occupe les créneaux d + (j − 1) × s + 1 à d + j × s (12 mois : un chacun ; 3 mois : quatre chacun ; 5 années : deux chacun, à partir du deuxième créneau). Sinon, la barre j occupe le créneau j.",
+        "etalement": "Un graphique étalé (etale) de k barres : s = floor(n / k) créneaux par barre, décalage d = floor((n − s × k) / 2) ; la barre j (de 1 à k) occupe les créneaux d + (j − 1) × s + 1 à d + j × s (13 mois : un chacun ; 3 mois : quatre chacun, le treizième créneau vide ; 5 années : deux chacun, à partir du deuxième créneau). Sinon, la barre j occupe le créneau j.",
         "zone": "{ x: x du premier créneau, y: 0, largeur: (x après le dernier) − x, hauteur: H }",
         "barre": "tracé de hauteur T = H − 36 (16 au-dessus pour les valeurs, 20 au-dessous pour les libellés) ; largeur = max(1, floor(0,6 × zone.largeur)) ; x = zone.x + floor((zone.largeur − largeur) / 2) ; hauteur = 0 si valeur = 0, sinon max(1, arrondi(valeur / echelle × T)) ; y = 16 + T − hauteur"
       },
@@ -244,7 +242,7 @@
   },
   "exemples": {
     "registre": {
-      "_note": "Le relevé d'un catalogue de 17 originaux, au 20 novembre 2026 (aujourd_hui des exemples de --graphiques), le Suivi installé le 27 octobre : douze pris dans les 12 derniers mois (dont un scan sans date, ajouté en novembre), un en août 2025 et quatre de 2009 à 2019, ouverts depuis. Un original vu par lui-même et sa copie (4211), un vu seulement par sa copie (4106), un en file (4302), un abandonné (3990). Aucune photo de « Développeur › Essais », aucune vidéo : elles n'entrent pas. Les heures sont celles de Toronto (os.time en secondes Unix, ajout_le à l'heure locale).",
+      "_note": "Le relevé d'un catalogue de 17 originaux, au 20 novembre 2026 (le jour de fin des exemples de --graphiques), le Suivi installé le 27 octobre : douze pris dans les 12 derniers mois (dont un scan sans date, ajouté en novembre), un en août 2025 et quatre de 2009 à 2019, ouverts depuis. Un original vu par lui-même et sa copie (4211), un vu seulement par sa copie (4106), un en file (4302), un abandonné (3990). Aucune photo de « Développeur › Essais », aucune vidéo : elles n'entrent pas. Les heures sont celles de Toronto (os.time en secondes Unix, ajout_le à l'heure locale).",
       "fichier": {
         "format": 1,
         "catalogues": {
@@ -695,15 +693,15 @@
         "sortie": {"ok": false, "raison": "arguments", "texte": "Arguments de --analyser : photos[1].id est un nombre (l'id de l'original)."}
       }
     },
-    "graphiques_12_mois": {
-      "_note": "La période par défaut, dans l'apparence claire, sans défaut choisi : le plus fréquent est le flou (30 %, sur 10 photos) ; l'horizon et la mise au point font 50 %, mais sur 2 photos seulement (moins de 5). Douze photos : les onze datées de décembre 2025 à novembre 2026 et le scan, ajouté en novembre ; 2950 (août 2025) est hors période. 4302 est en file, 3990 abandonnée : ni l'une ni l'autre ne compte dans les défauts.",
+    "graphiques_un_an": {
+      "_note": "La période que la fenêtre montre d'abord, sans rien de choisi : les douze derniers mois, du 1er du mois onze mois plus tôt à aujourd'hui (du 1er décembre 2025 au 20 novembre 2026), dans l'apparence claire, sans défaut choisi ; douze colonnes sur les treize créneaux, la dernière place vide ; l'année au premier mois et à janvier (« déc. 2025 », « janv. 2026 ») ; novembre 2026 « jusqu'au 20 ». Le plus fréquent est le flou (30 %, sur 10 photos) ; l'horizon et la mise au point font 50 %, mais sur 2 photos seulement (moins de 5). Douze photos : les onze datées de décembre 2025 à novembre 2026 et le scan, ajouté en novembre ; 2950 (août 2025) est hors période. 4302 est en file, 3990 abandonnée : ni l'une ni l'autre ne compte dans les défauts. Les notes : cinq photos à 0 ★ (le scan compris), trois à 4 ★ ; 3640, rejetée, compte à sa note (1 ★).",
       "commande": "<connecteur> --graphiques '<entree>' <dossier>",
       "entree": {
         "suivi": "<suivi.json>",
         "carnet": "<carnet.json>",
         "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
-        "aujourd_hui": "2026-11-20",
-        "periode": "12_mois",
+        "debut": "2025-12-01",
+        "fin": "2026-11-20",
         "apparence": "claire",
         "couleurs": {"fond": "ECECEC", "texte": "1D1D1F", "gris": "6B6B6B", "filet": "C9C9C9", "barre": "0A64D8", "accent": "E0800D"},
         "tailles": {
@@ -712,6 +710,7 @@
           "iso": {"largeur": 300, "hauteur": 130},
           "heures": {"largeur": 620, "hauteur": 120},
           "objectifs": {"largeur": 300, "hauteur": 170},
+          "notes": {"largeur": 300, "hauteur": 170},
           "defauts_frequents": {"largeur": 620, "hauteur": 180},
           "evolution_defaut": {"largeur": 620, "hauteur": 140}
         }
@@ -719,8 +718,7 @@
       "sortie": {
         "ok": true,
         "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
-        "aujourd_hui": "2026-11-20",
-        "periode": {"code": "12_mois", "libelle": "12 derniers mois", "debut": "2025-12", "fin": "2026-11", "par": "mois"},
+        "periode": {"debut": "2025-12-01", "fin": "2026-11-20", "libelle": "du 1er décembre 2025 au 20 novembre 2026", "par": "mois", "depuis_le_debut": false},
         "photos": 12,
         "sans_date": 1,
         "analyse": {"analysees": 10, "en_attente": 1, "en_echec": 1},
@@ -748,39 +746,40 @@
             "largeur": 620,
             "hauteur": 150,
             "orientation": "verticale",
-            "max_barres": 12,
+            "max_barres": 13,
             "unite": "photos",
             "echelle": 4,
             "sans_valeur": 1,
             "note": "1 photo sans date de prise de vue n'y est pas.",
             "vide": false,
             "barres": [
-              {"libelle": "déc.", "detail": "décembre 2025 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 18, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 8, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "janv.", "detail": "janvier 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3502], "couleur": "barre", "x": 68, "y": 101, "largeur": 30, "hauteur": 29, "zone": {"x": 58, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "févr.", "detail": "février 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 118, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 108, "y": 0, "largeur": 51, "hauteur": 150}},
-              {"libelle": "mars", "detail": "mars 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 169, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 159, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "avr.", "detail": "avril 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3640], "couleur": "barre", "x": 219, "y": 101, "largeur": 30, "hauteur": 29, "zone": {"x": 209, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "mai", "detail": "mai 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 269, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 259, "y": 0, "largeur": 51, "hauteur": 150}},
-              {"libelle": "juin", "detail": "juin 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 320, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 310, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "juil.", "detail": "juillet 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3801], "couleur": "barre", "x": 370, "y": 101, "largeur": 30, "hauteur": 29, "zone": {"x": 360, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "août", "detail": "août 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 420, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 410, "y": 0, "largeur": 51, "hauteur": 150}},
-              {"libelle": "sept.", "detail": "septembre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 471, "y": 73, "largeur": 30, "hauteur": 57, "zone": {"x": 461, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "oct.", "detail": "octobre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4105, 4106], "couleur": "barre", "x": 521, "y": 73, "largeur": 30, "hauteur": 57, "zone": {"x": 511, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "nov.", "detail": "novembre 2026 · 4 photos", "valeur": 4, "texte": "4", "n": 4, "ids": [4211, 4230, 4231, 4302], "couleur": "barre", "x": 571, "y": 16, "largeur": 30, "hauteur": 114, "zone": {"x": 561, "y": 0, "largeur": 51, "hauteur": 150}}
+              {"libelle": "déc. 2025", "detail": "décembre 2025 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 17, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 8, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "janv. 2026", "detail": "janvier 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3502], "couleur": "barre", "x": 63, "y": 101, "largeur": 27, "hauteur": 29, "zone": {"x": 54, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "févr.", "detail": "février 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 109, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 100, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "mars", "detail": "mars 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 156, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 147, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "avr.", "detail": "avril 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3640], "couleur": "barre", "x": 202, "y": 101, "largeur": 28, "hauteur": 29, "zone": {"x": 193, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "mai", "detail": "mai 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 249, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 240, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "juin", "detail": "juin 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 295, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 286, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "juil.", "detail": "juillet 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3801], "couleur": "barre", "x": 342, "y": 101, "largeur": 27, "hauteur": 29, "zone": {"x": 333, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "août", "detail": "août 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 388, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 379, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "sept.", "detail": "septembre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 435, "y": 73, "largeur": 27, "hauteur": 57, "zone": {"x": 426, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "oct.", "detail": "octobre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4105, 4106], "couleur": "barre", "x": 481, "y": 73, "largeur": 28, "hauteur": 57, "zone": {"x": 472, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "nov.", "detail": "novembre 2026, jusqu'au 20 · 4 photos", "valeur": 4, "texte": "4", "n": 4, "ids": [4211, 4230, 4231, 4302], "couleur": "barre", "x": 528, "y": 16, "largeur": 27, "hauteur": 114, "zone": {"x": 519, "y": 0, "largeur": 46, "hauteur": 150}}
             ],
             "creneaux": [
-              {"x": 8, "y": 0, "largeur": 50, "hauteur": 150, "barre": 1},
-              {"x": 58, "y": 0, "largeur": 50, "hauteur": 150, "barre": 2},
-              {"x": 108, "y": 0, "largeur": 51, "hauteur": 150, "barre": 3},
-              {"x": 159, "y": 0, "largeur": 50, "hauteur": 150, "barre": 4},
-              {"x": 209, "y": 0, "largeur": 50, "hauteur": 150, "barre": 5},
-              {"x": 259, "y": 0, "largeur": 51, "hauteur": 150, "barre": 6},
-              {"x": 310, "y": 0, "largeur": 50, "hauteur": 150, "barre": 7},
-              {"x": 360, "y": 0, "largeur": 50, "hauteur": 150, "barre": 8},
-              {"x": 410, "y": 0, "largeur": 51, "hauteur": 150, "barre": 9},
-              {"x": 461, "y": 0, "largeur": 50, "hauteur": 150, "barre": 10},
-              {"x": 511, "y": 0, "largeur": 50, "hauteur": 150, "barre": 11},
-              {"x": 561, "y": 0, "largeur": 51, "hauteur": 150, "barre": 12}
+              {"x": 8, "y": 0, "largeur": 46, "hauteur": 150, "barre": 1},
+              {"x": 54, "y": 0, "largeur": 46, "hauteur": 150, "barre": 2},
+              {"x": 100, "y": 0, "largeur": 47, "hauteur": 150, "barre": 3},
+              {"x": 147, "y": 0, "largeur": 46, "hauteur": 150, "barre": 4},
+              {"x": 193, "y": 0, "largeur": 47, "hauteur": 150, "barre": 5},
+              {"x": 240, "y": 0, "largeur": 46, "hauteur": 150, "barre": 6},
+              {"x": 286, "y": 0, "largeur": 47, "hauteur": 150, "barre": 7},
+              {"x": 333, "y": 0, "largeur": 46, "hauteur": 150, "barre": 8},
+              {"x": 379, "y": 0, "largeur": 47, "hauteur": 150, "barre": 9},
+              {"x": 426, "y": 0, "largeur": 46, "hauteur": 150, "barre": 10},
+              {"x": 472, "y": 0, "largeur": 47, "hauteur": 150, "barre": 11},
+              {"x": 519, "y": 0, "largeur": 46, "hauteur": 150, "barre": 12},
+              {"x": 565, "y": 0, "largeur": 47, "hauteur": 150, "barre": 0}
             ]
           },
           "focales": {
@@ -921,6 +920,35 @@
               {"x": 0, "y": 145, "largeur": 300, "hauteur": 21, "barre": 0}
             ]
           },
+          "notes": {
+            "titre": "Notes",
+            "fichier": "<dossier>/notes.png",
+            "largeur": 300,
+            "hauteur": 170,
+            "orientation": "verticale",
+            "max_barres": 6,
+            "unite": "photos",
+            "echelle": 5,
+            "sans_valeur": 0,
+            "note": "Dont 1 rejetée (drapeau), comptée à sa note.",
+            "vide": false,
+            "barres": [
+              {"libelle": "0 ★", "detail": "0 ★, pas encore notée · 5 photos", "valeur": 5, "texte": "5", "n": 5, "ids": [3420, 3988, 3990, 4231, 4302], "couleur": "barre", "x": 17, "y": 16, "largeur": 28, "hauteur": 134, "zone": {"x": 8, "y": 0, "largeur": 47, "hauteur": 170}},
+              {"libelle": "1 ★", "detail": "1 ★ · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3640], "couleur": "barre", "x": 64, "y": 123, "largeur": 28, "hauteur": 27, "zone": {"x": 55, "y": 0, "largeur": 47, "hauteur": 170}},
+              {"libelle": "2 ★", "detail": "2 ★ · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [4230], "couleur": "barre", "x": 112, "y": 123, "largeur": 28, "hauteur": 27, "zone": {"x": 102, "y": 0, "largeur": 48, "hauteur": 170}},
+              {"libelle": "3 ★", "detail": "3 ★ · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [4105], "couleur": "barre", "x": 159, "y": 123, "largeur": 28, "hauteur": 27, "zone": {"x": 150, "y": 0, "largeur": 47, "hauteur": 170}},
+              {"libelle": "4 ★", "detail": "4 ★ · 3 photos", "valeur": 3, "texte": "3", "n": 3, "ids": [3502, 3801, 4211], "couleur": "barre", "x": 206, "y": 70, "largeur": 28, "hauteur": 80, "zone": {"x": 197, "y": 0, "largeur": 47, "hauteur": 170}},
+              {"libelle": "5 ★", "detail": "5 ★ · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [4106], "couleur": "barre", "x": 254, "y": 123, "largeur": 28, "hauteur": 27, "zone": {"x": 244, "y": 0, "largeur": 48, "hauteur": 170}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 47, "hauteur": 170, "barre": 1},
+              {"x": 55, "y": 0, "largeur": 47, "hauteur": 170, "barre": 2},
+              {"x": 102, "y": 0, "largeur": 48, "hauteur": 170, "barre": 3},
+              {"x": 150, "y": 0, "largeur": 47, "hauteur": 170, "barre": 4},
+              {"x": 197, "y": 0, "largeur": 47, "hauteur": 170, "barre": 5},
+              {"x": 244, "y": 0, "largeur": 48, "hauteur": 170, "barre": 6}
+            ]
+          },
           "defauts_frequents": {
             "titre": "Défauts les plus fréquents",
             "fichier": "<dossier>/defauts_frequents.png",
@@ -960,54 +988,192 @@
             "largeur": 620,
             "hauteur": 140,
             "orientation": "verticale",
-            "max_barres": 12,
+            "max_barres": 13,
             "unite": "%",
             "echelle": 100,
             "sans_valeur": 1,
             "note": "1 photo sans date de prise de vue n'y est pas.",
             "vide": false,
             "barres": [
-              {"libelle": "déc.", "detail": "décembre 2025 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 18, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 8, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "janv.", "detail": "janvier 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 68, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 58, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "févr.", "detail": "février 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 118, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 108, "y": 0, "largeur": 51, "hauteur": 140}},
-              {"libelle": "mars", "detail": "mars 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 169, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 159, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "avr.", "detail": "avril 2026 · 1 photo sur 1 (100 %)", "valeur": 100, "texte": "100 %", "n": 1, "sur": 1, "ids": [3640], "couleur": "accent", "x": 219, "y": 16, "largeur": 30, "hauteur": 104, "zone": {"x": 209, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "mai", "detail": "mai 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 269, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 259, "y": 0, "largeur": 51, "hauteur": 140}},
-              {"libelle": "juin", "detail": "juin 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 320, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 310, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "juil.", "detail": "juillet 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 370, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 360, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "août", "detail": "août 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 420, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 410, "y": 0, "largeur": 51, "hauteur": 140}},
-              {"libelle": "sept.", "detail": "septembre 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 471, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 461, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "oct.", "detail": "octobre 2026 · 1 photo sur 2 (50 %)", "valeur": 50, "texte": "50 %", "n": 1, "sur": 2, "ids": [4105], "couleur": "accent", "x": 521, "y": 68, "largeur": 30, "hauteur": 52, "zone": {"x": 511, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "nov.", "detail": "novembre 2026 · 1 photo sur 3 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 1, "sur": 3, "ids": [4230], "couleur": "accent", "x": 571, "y": 85, "largeur": 30, "hauteur": 35, "zone": {"x": 561, "y": 0, "largeur": 51, "hauteur": 140}}
+              {"libelle": "déc. 2025", "detail": "décembre 2025 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 17, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 8, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "janv. 2026", "detail": "janvier 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 63, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 54, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "févr.", "detail": "février 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 109, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 100, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "mars", "detail": "mars 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 156, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 147, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "avr.", "detail": "avril 2026 · 1 photo sur 1 (100 %)", "valeur": 100, "texte": "100 %", "n": 1, "sur": 1, "ids": [3640], "couleur": "accent", "x": 202, "y": 16, "largeur": 28, "hauteur": 104, "zone": {"x": 193, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "mai", "detail": "mai 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 249, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 240, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "juin", "detail": "juin 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 295, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 286, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "juil.", "detail": "juillet 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 342, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 333, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "août", "detail": "août 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 388, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 379, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "sept.", "detail": "septembre 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 435, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 426, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "oct.", "detail": "octobre 2026 · 1 photo sur 2 (50 %)", "valeur": 50, "texte": "50 %", "n": 1, "sur": 2, "ids": [4105], "couleur": "accent", "x": 481, "y": 68, "largeur": 28, "hauteur": 52, "zone": {"x": 472, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "nov.", "detail": "novembre 2026, jusqu'au 20 · 1 photo sur 3 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 1, "sur": 3, "ids": [4230], "couleur": "accent", "x": 528, "y": 85, "largeur": 27, "hauteur": 35, "zone": {"x": 519, "y": 0, "largeur": 46, "hauteur": 140}}
             ],
             "creneaux": [
-              {"x": 8, "y": 0, "largeur": 50, "hauteur": 140, "barre": 1},
-              {"x": 58, "y": 0, "largeur": 50, "hauteur": 140, "barre": 2},
-              {"x": 108, "y": 0, "largeur": 51, "hauteur": 140, "barre": 3},
-              {"x": 159, "y": 0, "largeur": 50, "hauteur": 140, "barre": 4},
-              {"x": 209, "y": 0, "largeur": 50, "hauteur": 140, "barre": 5},
-              {"x": 259, "y": 0, "largeur": 51, "hauteur": 140, "barre": 6},
-              {"x": 310, "y": 0, "largeur": 50, "hauteur": 140, "barre": 7},
-              {"x": 360, "y": 0, "largeur": 50, "hauteur": 140, "barre": 8},
-              {"x": 410, "y": 0, "largeur": 51, "hauteur": 140, "barre": 9},
-              {"x": 461, "y": 0, "largeur": 50, "hauteur": 140, "barre": 10},
-              {"x": 511, "y": 0, "largeur": 50, "hauteur": 140, "barre": 11},
-              {"x": 561, "y": 0, "largeur": 51, "hauteur": 140, "barre": 12}
+              {"x": 8, "y": 0, "largeur": 46, "hauteur": 140, "barre": 1},
+              {"x": 54, "y": 0, "largeur": 46, "hauteur": 140, "barre": 2},
+              {"x": 100, "y": 0, "largeur": 47, "hauteur": 140, "barre": 3},
+              {"x": 147, "y": 0, "largeur": 46, "hauteur": 140, "barre": 4},
+              {"x": 193, "y": 0, "largeur": 47, "hauteur": 140, "barre": 5},
+              {"x": 240, "y": 0, "largeur": 46, "hauteur": 140, "barre": 6},
+              {"x": 286, "y": 0, "largeur": 47, "hauteur": 140, "barre": 7},
+              {"x": 333, "y": 0, "largeur": 46, "hauteur": 140, "barre": 8},
+              {"x": 379, "y": 0, "largeur": 47, "hauteur": 140, "barre": 9},
+              {"x": 426, "y": 0, "largeur": 46, "hauteur": 140, "barre": 10},
+              {"x": 472, "y": 0, "largeur": 47, "hauteur": 140, "barre": 11},
+              {"x": 519, "y": 0, "largeur": 46, "hauteur": 140, "barre": 12},
+              {"x": 565, "y": 0, "largeur": 47, "hauteur": 140, "barre": 0}
             ]
           }
         },
         "remarques": []
       }
     },
-    "graphiques_3_mois": {
-      "_note": "Partiel : la période courte, dans l'apparence sombre, avec le défaut « yeux_fermes » choisi. Trois colonnes de quatre créneaux chacune ; en octobre, les yeux ne sont cherchés sur aucune photo (sans visage) : sur 0, texte « — ».",
+    "graphiques_treize_mois": {
+      "_note": "Partiel : une année comptée d'un jour au même jour (du 20 novembre 2025 au 20 novembre 2026) touche treize mois : treize colonnes, une par créneau ; novembre revient, d'où l'année au premier mois et à janvier (« nov. 2025 », « janv. 2026 ») ; le premier mois « à partir du 20 », le dernier « jusqu'au 20 ».",
       "partiel": true,
       "entree": {
         "suivi": "<suivi.json>",
         "carnet": "<carnet.json>",
         "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
-        "aujourd_hui": "2026-11-20",
-        "periode": "3_mois",
+        "debut": "2025-11-20",
+        "fin": "2026-11-20",
+        "apparence": "claire",
+        "couleurs": {"fond": "ECECEC", "texte": "1D1D1F", "gris": "6B6B6B", "filet": "C9C9C9", "barre": "0A64D8", "accent": "E0800D"},
+        "tailles": {
+          "photos_par_mois": {"largeur": 620, "hauteur": 150},
+          "focales": {"largeur": 300, "hauteur": 130},
+          "iso": {"largeur": 300, "hauteur": 130},
+          "heures": {"largeur": 620, "hauteur": 120},
+          "objectifs": {"largeur": 300, "hauteur": 170},
+          "notes": {"largeur": 300, "hauteur": 170},
+          "defauts_frequents": {"largeur": 620, "hauteur": 180},
+          "evolution_defaut": {"largeur": 620, "hauteur": 140}
+        }
+      },
+      "sortie": {
+        "ok": true,
+        "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
+        "periode": {"debut": "2025-11-20", "fin": "2026-11-20", "libelle": "du 20 novembre 2025 au 20 novembre 2026", "par": "mois", "depuis_le_debut": false},
+        "photos": 12,
+        "sans_date": 1,
+        "analyse": {"analysees": 10, "en_attente": 1, "en_echec": 1},
+        "tuiles": [
+          {"cle": "photos_ouvertes", "titre": "Photos ouvertes", "valeur": 12, "texte": "12", "detail": "1 en cours d'analyse · 1 non analysée"},
+          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "25 % des photos ouvertes"},
+          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "33 % des photos ouvertes"},
+          {"cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": 30, "texte": "30 %", "detail": "Photo floue ou bougée · 3 photos sur 10", "code": "flou"}
+        ],
+        "defauts": [
+          {"code": "horizon_penche", "libelle": "Horizon ou ligne penchée", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"},
+          {"code": "sous_exposition", "libelle": "Photo sous-exposée", "n": 2, "sur": 10, "valeur": 20, "texte": "20 %"},
+          {"code": "surexposition", "libelle": "Photo surexposée", "n": 0, "sur": 10, "valeur": 0, "texte": "0 %"},
+          {"code": "ciel_brule", "libelle": "Ciel ou haut de l'image brûlé", "n": 2, "sur": 10, "valeur": 20, "texte": "20 %"},
+          {"code": "bruit", "libelle": "Bruit fort (ISO élevé)", "n": 1, "sur": 3, "valeur": 33.3, "texte": "33 %"},
+          {"code": "flou", "libelle": "Photo floue ou bougée", "n": 3, "sur": 10, "valeur": 30, "texte": "30 %"},
+          {"code": "mise_au_point", "libelle": "Mise au point à côté", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"},
+          {"code": "yeux_fermes", "libelle": "Yeux fermés ou plissés", "n": 1, "sur": 3, "valeur": 33.3, "texte": "33 %"}
+        ],
+        "defaut_suivi": {"code": "flou", "libelle": "Photo floue ou bougée", "choisi": false},
+        "graphiques": {
+          "photos_par_mois": {
+            "titre": "Photos par mois",
+            "fichier": "<dossier>/photos_par_mois.png",
+            "largeur": 620,
+            "hauteur": 150,
+            "orientation": "verticale",
+            "max_barres": 13,
+            "unite": "photos",
+            "echelle": 4,
+            "sans_valeur": 1,
+            "note": "1 photo sans date de prise de vue n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "nov. 2025", "detail": "novembre 2025, à partir du 20 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 17, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 8, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "déc.", "detail": "décembre 2025 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 63, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 54, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "janv. 2026", "detail": "janvier 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3502], "couleur": "barre", "x": 109, "y": 101, "largeur": 28, "hauteur": 29, "zone": {"x": 100, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "févr.", "detail": "février 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 156, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 147, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "mars", "detail": "mars 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 202, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 193, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "avr.", "detail": "avril 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3640], "couleur": "barre", "x": 249, "y": 101, "largeur": 27, "hauteur": 29, "zone": {"x": 240, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "mai", "detail": "mai 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 295, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 286, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "juin", "detail": "juin 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 342, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 333, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "juil.", "detail": "juillet 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3801], "couleur": "barre", "x": 388, "y": 101, "largeur": 28, "hauteur": 29, "zone": {"x": 379, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "août", "detail": "août 2026 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 435, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 426, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "sept.", "detail": "septembre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 481, "y": 73, "largeur": 28, "hauteur": 57, "zone": {"x": 472, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "oct.", "detail": "octobre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4105, 4106], "couleur": "barre", "x": 528, "y": 73, "largeur": 27, "hauteur": 57, "zone": {"x": 519, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "nov.", "detail": "novembre 2026, jusqu'au 20 · 4 photos", "valeur": 4, "texte": "4", "n": 4, "ids": [4211, 4230, 4231, 4302], "couleur": "barre", "x": 574, "y": 16, "largeur": 28, "hauteur": 114, "zone": {"x": 565, "y": 0, "largeur": 47, "hauteur": 150}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 46, "hauteur": 150, "barre": 1},
+              {"x": 54, "y": 0, "largeur": 46, "hauteur": 150, "barre": 2},
+              {"x": 100, "y": 0, "largeur": 47, "hauteur": 150, "barre": 3},
+              {"x": 147, "y": 0, "largeur": 46, "hauteur": 150, "barre": 4},
+              {"x": 193, "y": 0, "largeur": 47, "hauteur": 150, "barre": 5},
+              {"x": 240, "y": 0, "largeur": 46, "hauteur": 150, "barre": 6},
+              {"x": 286, "y": 0, "largeur": 47, "hauteur": 150, "barre": 7},
+              {"x": 333, "y": 0, "largeur": 46, "hauteur": 150, "barre": 8},
+              {"x": 379, "y": 0, "largeur": 47, "hauteur": 150, "barre": 9},
+              {"x": 426, "y": 0, "largeur": 46, "hauteur": 150, "barre": 10},
+              {"x": 472, "y": 0, "largeur": 47, "hauteur": 150, "barre": 11},
+              {"x": 519, "y": 0, "largeur": 46, "hauteur": 150, "barre": 12},
+              {"x": 565, "y": 0, "largeur": 47, "hauteur": 150, "barre": 13}
+            ]
+          },
+          "evolution_defaut": {
+            "titre": "Photo floue ou bougée, mois par mois",
+            "fichier": "<dossier>/evolution_defaut.png",
+            "largeur": 620,
+            "hauteur": 140,
+            "orientation": "verticale",
+            "max_barres": 13,
+            "unite": "%",
+            "echelle": 100,
+            "sans_valeur": 1,
+            "note": "1 photo sans date de prise de vue n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "nov. 2025", "detail": "novembre 2025, à partir du 20 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 17, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 8, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "déc.", "detail": "décembre 2025 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 63, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 54, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "janv. 2026", "detail": "janvier 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 109, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 100, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "févr.", "detail": "février 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 156, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 147, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "mars", "detail": "mars 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 202, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 193, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "avr.", "detail": "avril 2026 · 1 photo sur 1 (100 %)", "valeur": 100, "texte": "100 %", "n": 1, "sur": 1, "ids": [3640], "couleur": "accent", "x": 249, "y": 16, "largeur": 27, "hauteur": 104, "zone": {"x": 240, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "mai", "detail": "mai 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 295, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 286, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "juin", "detail": "juin 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 342, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 333, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "juil.", "detail": "juillet 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 388, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 379, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "août", "detail": "août 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 435, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 426, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "sept.", "detail": "septembre 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 481, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 472, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "oct.", "detail": "octobre 2026 · 1 photo sur 2 (50 %)", "valeur": 50, "texte": "50 %", "n": 1, "sur": 2, "ids": [4105], "couleur": "accent", "x": 528, "y": 68, "largeur": 27, "hauteur": 52, "zone": {"x": 519, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "nov.", "detail": "novembre 2026, jusqu'au 20 · 1 photo sur 3 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 1, "sur": 3, "ids": [4230], "couleur": "accent", "x": 574, "y": 85, "largeur": 28, "hauteur": 35, "zone": {"x": 565, "y": 0, "largeur": 47, "hauteur": 140}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 46, "hauteur": 140, "barre": 1},
+              {"x": 54, "y": 0, "largeur": 46, "hauteur": 140, "barre": 2},
+              {"x": 100, "y": 0, "largeur": 47, "hauteur": 140, "barre": 3},
+              {"x": 147, "y": 0, "largeur": 46, "hauteur": 140, "barre": 4},
+              {"x": 193, "y": 0, "largeur": 47, "hauteur": 140, "barre": 5},
+              {"x": 240, "y": 0, "largeur": 46, "hauteur": 140, "barre": 6},
+              {"x": 286, "y": 0, "largeur": 47, "hauteur": 140, "barre": 7},
+              {"x": 333, "y": 0, "largeur": 46, "hauteur": 140, "barre": 8},
+              {"x": 379, "y": 0, "largeur": 47, "hauteur": 140, "barre": 9},
+              {"x": 426, "y": 0, "largeur": 46, "hauteur": 140, "barre": 10},
+              {"x": 472, "y": 0, "largeur": 47, "hauteur": 140, "barre": 11},
+              {"x": 519, "y": 0, "largeur": 46, "hauteur": 140, "barre": 12},
+              {"x": 565, "y": 0, "largeur": 47, "hauteur": 140, "barre": 13}
+            ]
+          }
+        },
+        "remarques": []
+      }
+    },
+    "graphiques_trois_mois": {
+      "_note": "Partiel : du 1er septembre au 20 novembre 2026, dans l'apparence sombre, avec le défaut « yeux_fermes » choisi. Trois colonnes de quatre créneaux chacune, la treizième place vide (« sept. 2026 », « oct. », « nov. ») ; en octobre, les yeux ne sont cherchés sur aucune photo (sans visage) : sur 0, texte « — ».",
+      "partiel": true,
+      "entree": {
+        "suivi": "<suivi.json>",
+        "carnet": "<carnet.json>",
+        "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
+        "debut": "2026-09-01",
+        "fin": "2026-11-20",
         "apparence": "sombre",
         "couleurs": {"fond": "323232", "texte": "E8E8E8", "gris": "9A9A9A", "filet": "4A4A4A", "barre": "5AA2F6", "accent": "E8963A"},
         "defaut": "yeux_fermes",
@@ -1017,6 +1183,7 @@
           "iso": {"largeur": 300, "hauteur": 130},
           "heures": {"largeur": 620, "hauteur": 120},
           "objectifs": {"largeur": 300, "hauteur": 170},
+          "notes": {"largeur": 300, "hauteur": 170},
           "defauts_frequents": {"largeur": 620, "hauteur": 180},
           "evolution_defaut": {"largeur": 620, "hauteur": 140}
         }
@@ -1024,8 +1191,7 @@
       "sortie": {
         "ok": true,
         "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
-        "aujourd_hui": "2026-11-20",
-        "periode": {"code": "3_mois", "libelle": "3 derniers mois", "debut": "2026-09", "fin": "2026-11", "par": "mois"},
+        "periode": {"debut": "2026-09-01", "fin": "2026-11-20", "libelle": "du 1er septembre 2026 au 20 novembre 2026", "par": "mois", "depuis_le_debut": false},
         "photos": 9,
         "sans_date": 1,
         "analyse": {"analysees": 7, "en_attente": 1, "en_echec": 1},
@@ -1053,30 +1219,31 @@
             "largeur": 620,
             "hauteur": 150,
             "orientation": "verticale",
-            "max_barres": 12,
+            "max_barres": 13,
             "unite": "photos",
             "echelle": 4,
             "sans_valeur": 1,
             "note": "1 photo sans date de prise de vue n'y est pas.",
             "vide": false,
             "barres": [
-              {"libelle": "sept.", "detail": "septembre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 48, "y": 73, "largeur": 120, "hauteur": 57, "zone": {"x": 8, "y": 0, "largeur": 201, "hauteur": 150}},
-              {"libelle": "oct.", "detail": "octobre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4105, 4106], "couleur": "barre", "x": 249, "y": 73, "largeur": 120, "hauteur": 57, "zone": {"x": 209, "y": 0, "largeur": 201, "hauteur": 150}},
-              {"libelle": "nov.", "detail": "novembre 2026 · 4 photos", "valeur": 4, "texte": "4", "n": 4, "ids": [4211, 4230, 4231, 4302], "couleur": "barre", "x": 450, "y": 16, "largeur": 121, "hauteur": 114, "zone": {"x": 410, "y": 0, "largeur": 202, "hauteur": 150}}
+              {"libelle": "sept. 2026", "detail": "septembre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [3988, 3990], "couleur": "barre", "x": 45, "y": 73, "largeur": 111, "hauteur": 57, "zone": {"x": 8, "y": 0, "largeur": 185, "hauteur": 150}},
+              {"libelle": "oct.", "detail": "octobre 2026 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [4105, 4106], "couleur": "barre", "x": 230, "y": 73, "largeur": 111, "hauteur": 57, "zone": {"x": 193, "y": 0, "largeur": 186, "hauteur": 150}},
+              {"libelle": "nov.", "detail": "novembre 2026, jusqu'au 20 · 4 photos", "valeur": 4, "texte": "4", "n": 4, "ids": [4211, 4230, 4231, 4302], "couleur": "barre", "x": 416, "y": 16, "largeur": 111, "hauteur": 114, "zone": {"x": 379, "y": 0, "largeur": 186, "hauteur": 150}}
             ],
             "creneaux": [
-              {"x": 8, "y": 0, "largeur": 50, "hauteur": 150, "barre": 1},
-              {"x": 58, "y": 0, "largeur": 50, "hauteur": 150, "barre": 1},
-              {"x": 108, "y": 0, "largeur": 51, "hauteur": 150, "barre": 1},
-              {"x": 159, "y": 0, "largeur": 50, "hauteur": 150, "barre": 1},
-              {"x": 209, "y": 0, "largeur": 50, "hauteur": 150, "barre": 2},
-              {"x": 259, "y": 0, "largeur": 51, "hauteur": 150, "barre": 2},
-              {"x": 310, "y": 0, "largeur": 50, "hauteur": 150, "barre": 2},
-              {"x": 360, "y": 0, "largeur": 50, "hauteur": 150, "barre": 2},
-              {"x": 410, "y": 0, "largeur": 51, "hauteur": 150, "barre": 3},
-              {"x": 461, "y": 0, "largeur": 50, "hauteur": 150, "barre": 3},
-              {"x": 511, "y": 0, "largeur": 50, "hauteur": 150, "barre": 3},
-              {"x": 561, "y": 0, "largeur": 51, "hauteur": 150, "barre": 3}
+              {"x": 8, "y": 0, "largeur": 46, "hauteur": 150, "barre": 1},
+              {"x": 54, "y": 0, "largeur": 46, "hauteur": 150, "barre": 1},
+              {"x": 100, "y": 0, "largeur": 47, "hauteur": 150, "barre": 1},
+              {"x": 147, "y": 0, "largeur": 46, "hauteur": 150, "barre": 1},
+              {"x": 193, "y": 0, "largeur": 47, "hauteur": 150, "barre": 2},
+              {"x": 240, "y": 0, "largeur": 46, "hauteur": 150, "barre": 2},
+              {"x": 286, "y": 0, "largeur": 47, "hauteur": 150, "barre": 2},
+              {"x": 333, "y": 0, "largeur": 46, "hauteur": 150, "barre": 2},
+              {"x": 379, "y": 0, "largeur": 47, "hauteur": 150, "barre": 3},
+              {"x": 426, "y": 0, "largeur": 46, "hauteur": 150, "barre": 3},
+              {"x": 472, "y": 0, "largeur": 47, "hauteur": 150, "barre": 3},
+              {"x": 519, "y": 0, "largeur": 46, "hauteur": 150, "barre": 3},
+              {"x": 565, "y": 0, "largeur": 47, "hauteur": 150, "barre": 0}
             ]
           },
           "evolution_defaut": {
@@ -1085,44 +1252,44 @@
             "largeur": 620,
             "hauteur": 140,
             "orientation": "verticale",
-            "max_barres": 12,
+            "max_barres": 13,
             "unite": "%",
             "echelle": 100,
             "sans_valeur": 0,
             "vide": false,
             "barres": [
-              {"libelle": "sept.", "detail": "septembre 2026 · 1 photo sur 1 (100 %)", "valeur": 100, "texte": "100 %", "n": 1, "sur": 1, "ids": [3988], "couleur": "accent", "x": 48, "y": 16, "largeur": 120, "hauteur": 104, "zone": {"x": 8, "y": 0, "largeur": 201, "hauteur": 140}},
-              {"libelle": "oct.", "detail": "octobre 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 249, "y": 120, "largeur": 120, "hauteur": 0, "zone": {"x": 209, "y": 0, "largeur": 201, "hauteur": 140}},
-              {"libelle": "nov.", "detail": "novembre 2026 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 450, "y": 120, "largeur": 121, "hauteur": 0, "zone": {"x": 410, "y": 0, "largeur": 202, "hauteur": 140}}
+              {"libelle": "sept. 2026", "detail": "septembre 2026 · 1 photo sur 1 (100 %)", "valeur": 100, "texte": "100 %", "n": 1, "sur": 1, "ids": [3988], "couleur": "accent", "x": 45, "y": 16, "largeur": 111, "hauteur": 104, "zone": {"x": 8, "y": 0, "largeur": 185, "hauteur": 140}},
+              {"libelle": "oct.", "detail": "octobre 2026 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 230, "y": 120, "largeur": 111, "hauteur": 0, "zone": {"x": 193, "y": 0, "largeur": 186, "hauteur": 140}},
+              {"libelle": "nov.", "detail": "novembre 2026, jusqu'au 20 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 416, "y": 120, "largeur": 111, "hauteur": 0, "zone": {"x": 379, "y": 0, "largeur": 186, "hauteur": 140}}
             ],
             "creneaux": [
-              {"x": 8, "y": 0, "largeur": 50, "hauteur": 140, "barre": 1},
-              {"x": 58, "y": 0, "largeur": 50, "hauteur": 140, "barre": 1},
-              {"x": 108, "y": 0, "largeur": 51, "hauteur": 140, "barre": 1},
-              {"x": 159, "y": 0, "largeur": 50, "hauteur": 140, "barre": 1},
-              {"x": 209, "y": 0, "largeur": 50, "hauteur": 140, "barre": 2},
-              {"x": 259, "y": 0, "largeur": 51, "hauteur": 140, "barre": 2},
-              {"x": 310, "y": 0, "largeur": 50, "hauteur": 140, "barre": 2},
-              {"x": 360, "y": 0, "largeur": 50, "hauteur": 140, "barre": 2},
-              {"x": 410, "y": 0, "largeur": 51, "hauteur": 140, "barre": 3},
-              {"x": 461, "y": 0, "largeur": 50, "hauteur": 140, "barre": 3},
-              {"x": 511, "y": 0, "largeur": 50, "hauteur": 140, "barre": 3},
-              {"x": 561, "y": 0, "largeur": 51, "hauteur": 140, "barre": 3}
+              {"x": 8, "y": 0, "largeur": 46, "hauteur": 140, "barre": 1},
+              {"x": 54, "y": 0, "largeur": 46, "hauteur": 140, "barre": 1},
+              {"x": 100, "y": 0, "largeur": 47, "hauteur": 140, "barre": 1},
+              {"x": 147, "y": 0, "largeur": 46, "hauteur": 140, "barre": 1},
+              {"x": 193, "y": 0, "largeur": 47, "hauteur": 140, "barre": 2},
+              {"x": 240, "y": 0, "largeur": 46, "hauteur": 140, "barre": 2},
+              {"x": 286, "y": 0, "largeur": 47, "hauteur": 140, "barre": 2},
+              {"x": 333, "y": 0, "largeur": 46, "hauteur": 140, "barre": 2},
+              {"x": 379, "y": 0, "largeur": 47, "hauteur": 140, "barre": 3},
+              {"x": 426, "y": 0, "largeur": 46, "hauteur": 140, "barre": 3},
+              {"x": 472, "y": 0, "largeur": 47, "hauteur": 140, "barre": 3},
+              {"x": 519, "y": 0, "largeur": 46, "hauteur": 140, "barre": 3},
+              {"x": 565, "y": 0, "largeur": 47, "hauteur": 140, "barre": 0}
             ]
           }
         },
         "remarques": []
       }
     },
-    "graphiques_tout": {
-      "_note": "Partiel : Tout, avec le défaut « flou » choisi. De 2009 à 2026, dix-huit années : « < 2016 » réunit 2009, 2013 et 2015, puis 2016 à 2026, sans photo comprises. Neuf groupes d'objectifs : les sept premiers, puis « Autres » (XF35 et XF56).",
+    "graphiques_depuis_le_debut": {
+      "_note": "Partiel : sans jour de début (depuis la première photo, le 25 décembre 2009), jusqu'au 20 novembre 2026, avec le défaut « flou » choisi. De 2009 à 2026, dix-huit années : « < 2015 » réunit 2009 et 2013, puis 2015 à 2026, sans photo comprises ; 2026 « jusqu'au 20 novembre ». Neuf groupes d'objectifs : les sept premiers, puis « Autres » (XF35 et XF56).",
       "partiel": true,
       "entree": {
         "suivi": "<suivi.json>",
         "carnet": "<carnet.json>",
         "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
-        "aujourd_hui": "2026-11-20",
-        "periode": "tout",
+        "fin": "2026-11-20",
         "apparence": "claire",
         "couleurs": {"fond": "ECECEC", "texte": "1D1D1F", "gris": "6B6B6B", "filet": "C9C9C9", "barre": "0A64D8", "accent": "E0800D"},
         "defaut": "flou",
@@ -1132,6 +1299,7 @@
           "iso": {"largeur": 300, "hauteur": 130},
           "heures": {"largeur": 620, "hauteur": 120},
           "objectifs": {"largeur": 300, "hauteur": 170},
+          "notes": {"largeur": 300, "hauteur": 170},
           "defauts_frequents": {"largeur": 620, "hauteur": 180},
           "evolution_defaut": {"largeur": 620, "hauteur": 140}
         }
@@ -1139,8 +1307,7 @@
       "sortie": {
         "ok": true,
         "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
-        "aujourd_hui": "2026-11-20",
-        "periode": {"code": "tout", "libelle": "Tout", "debut": "2009-12", "fin": "2026-11", "par": "annee"},
+        "periode": {"debut": "2009-12-25", "fin": "2026-11-20", "libelle": "depuis la première photo, le 25 décembre 2009, jusqu'au 20 novembre 2026", "par": "annee", "depuis_le_debut": true},
         "photos": 17,
         "sans_date": 1,
         "analyse": {"analysees": 15, "en_attente": 1, "en_echec": 1},
@@ -1168,39 +1335,41 @@
             "largeur": 620,
             "hauteur": 150,
             "orientation": "verticale",
-            "max_barres": 12,
+            "max_barres": 13,
             "unite": "photos",
             "echelle": 11,
             "sans_valeur": 1,
             "note": "1 photo sans date de prise de vue n'y est pas.",
             "vide": false,
             "barres": [
-              {"libelle": "< 2016", "detail": "avant 2016 · 3 photos", "valeur": 3, "texte": "3", "n": 3, "ids": [402, 855, 1203], "couleur": "barre", "x": 18, "y": 99, "largeur": 30, "hauteur": 31, "zone": {"x": 8, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "2016", "detail": "2016 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 68, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 58, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "2017", "detail": "2017 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 118, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 108, "y": 0, "largeur": 51, "hauteur": 150}},
-              {"libelle": "2018", "detail": "2018 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 169, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 159, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "2019", "detail": "2019 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [2105], "couleur": "barre", "x": 219, "y": 120, "largeur": 30, "hauteur": 10, "zone": {"x": 209, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "2020", "detail": "2020 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 269, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 259, "y": 0, "largeur": 51, "hauteur": 150}},
-              {"libelle": "2021", "detail": "2021 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 320, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 310, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "2022", "detail": "2022 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 370, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 360, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "2023", "detail": "2023 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 420, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 410, "y": 0, "largeur": 51, "hauteur": 150}},
-              {"libelle": "2024", "detail": "2024 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 471, "y": 130, "largeur": 30, "hauteur": 0, "zone": {"x": 461, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "2025", "detail": "2025 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [2950], "couleur": "barre", "x": 521, "y": 120, "largeur": 30, "hauteur": 10, "zone": {"x": 511, "y": 0, "largeur": 50, "hauteur": 150}},
-              {"libelle": "2026", "detail": "2026 · 11 photos", "valeur": 11, "texte": "11", "n": 11, "ids": [3502, 3640, 3801, 3988, 3990, 4105, 4106, 4211, 4230, 4231, 4302], "couleur": "barre", "x": 571, "y": 16, "largeur": 30, "hauteur": 114, "zone": {"x": 561, "y": 0, "largeur": 51, "hauteur": 150}}
+              {"libelle": "< 2015", "detail": "avant 2015 · 2 photos", "valeur": 2, "texte": "2", "n": 2, "ids": [402, 855], "couleur": "barre", "x": 17, "y": 109, "largeur": 27, "hauteur": 21, "zone": {"x": 8, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "2015", "detail": "2015 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [1203], "couleur": "barre", "x": 63, "y": 120, "largeur": 27, "hauteur": 10, "zone": {"x": 54, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "2016", "detail": "2016 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 109, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 100, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "2017", "detail": "2017 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 156, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 147, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "2018", "detail": "2018 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 202, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 193, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "2019", "detail": "2019 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [2105], "couleur": "barre", "x": 249, "y": 120, "largeur": 27, "hauteur": 10, "zone": {"x": 240, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "2020", "detail": "2020 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 295, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 286, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "2021", "detail": "2021 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 342, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 333, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "2022", "detail": "2022 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 388, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 379, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "2023", "detail": "2023 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 435, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 426, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "2024", "detail": "2024 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 481, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 472, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "2025", "detail": "2025 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [2950], "couleur": "barre", "x": 528, "y": 120, "largeur": 27, "hauteur": 10, "zone": {"x": 519, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "2026", "detail": "2026, jusqu'au 20 novembre · 11 photos", "valeur": 11, "texte": "11", "n": 11, "ids": [3502, 3640, 3801, 3988, 3990, 4105, 4106, 4211, 4230, 4231, 4302], "couleur": "barre", "x": 574, "y": 16, "largeur": 28, "hauteur": 114, "zone": {"x": 565, "y": 0, "largeur": 47, "hauteur": 150}}
             ],
             "creneaux": [
-              {"x": 8, "y": 0, "largeur": 50, "hauteur": 150, "barre": 1},
-              {"x": 58, "y": 0, "largeur": 50, "hauteur": 150, "barre": 2},
-              {"x": 108, "y": 0, "largeur": 51, "hauteur": 150, "barre": 3},
-              {"x": 159, "y": 0, "largeur": 50, "hauteur": 150, "barre": 4},
-              {"x": 209, "y": 0, "largeur": 50, "hauteur": 150, "barre": 5},
-              {"x": 259, "y": 0, "largeur": 51, "hauteur": 150, "barre": 6},
-              {"x": 310, "y": 0, "largeur": 50, "hauteur": 150, "barre": 7},
-              {"x": 360, "y": 0, "largeur": 50, "hauteur": 150, "barre": 8},
-              {"x": 410, "y": 0, "largeur": 51, "hauteur": 150, "barre": 9},
-              {"x": 461, "y": 0, "largeur": 50, "hauteur": 150, "barre": 10},
-              {"x": 511, "y": 0, "largeur": 50, "hauteur": 150, "barre": 11},
-              {"x": 561, "y": 0, "largeur": 51, "hauteur": 150, "barre": 12}
+              {"x": 8, "y": 0, "largeur": 46, "hauteur": 150, "barre": 1},
+              {"x": 54, "y": 0, "largeur": 46, "hauteur": 150, "barre": 2},
+              {"x": 100, "y": 0, "largeur": 47, "hauteur": 150, "barre": 3},
+              {"x": 147, "y": 0, "largeur": 46, "hauteur": 150, "barre": 4},
+              {"x": 193, "y": 0, "largeur": 47, "hauteur": 150, "barre": 5},
+              {"x": 240, "y": 0, "largeur": 46, "hauteur": 150, "barre": 6},
+              {"x": 286, "y": 0, "largeur": 47, "hauteur": 150, "barre": 7},
+              {"x": 333, "y": 0, "largeur": 46, "hauteur": 150, "barre": 8},
+              {"x": 379, "y": 0, "largeur": 47, "hauteur": 150, "barre": 9},
+              {"x": 426, "y": 0, "largeur": 46, "hauteur": 150, "barre": 10},
+              {"x": 472, "y": 0, "largeur": 47, "hauteur": 150, "barre": 11},
+              {"x": 519, "y": 0, "largeur": 46, "hauteur": 150, "barre": 12},
+              {"x": 565, "y": 0, "largeur": 47, "hauteur": 150, "barre": 13}
             ]
           },
           "objectifs": {
@@ -1241,39 +1410,134 @@
             "largeur": 620,
             "hauteur": 140,
             "orientation": "verticale",
-            "max_barres": 12,
+            "max_barres": 13,
             "unite": "%",
             "echelle": 100,
             "sans_valeur": 1,
             "note": "1 photo sans date de prise de vue n'y est pas.",
             "vide": false,
             "barres": [
-              {"libelle": "< 2016", "detail": "avant 2016 · 1 photo sur 3 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 1, "sur": 3, "ids": [402], "couleur": "accent", "x": 18, "y": 85, "largeur": 30, "hauteur": 35, "zone": {"x": 8, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "2016", "detail": "2016 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 68, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 58, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "2017", "detail": "2017 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 118, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 108, "y": 0, "largeur": 51, "hauteur": 140}},
-              {"libelle": "2018", "detail": "2018 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 169, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 159, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "2019", "detail": "2019 · 1 photo sur 1 (100 %)", "valeur": 100, "texte": "100 %", "n": 1, "sur": 1, "ids": [2105], "couleur": "accent", "x": 219, "y": 16, "largeur": 30, "hauteur": 104, "zone": {"x": 209, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "2020", "detail": "2020 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 269, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 259, "y": 0, "largeur": 51, "hauteur": 140}},
-              {"libelle": "2021", "detail": "2021 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 320, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 310, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "2022", "detail": "2022 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 370, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 360, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "2023", "detail": "2023 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 420, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 410, "y": 0, "largeur": 51, "hauteur": 140}},
-              {"libelle": "2024", "detail": "2024 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 471, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 461, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "2025", "detail": "2025 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 521, "y": 120, "largeur": 30, "hauteur": 0, "zone": {"x": 511, "y": 0, "largeur": 50, "hauteur": 140}},
-              {"libelle": "2026", "detail": "2026 · 3 photos sur 9 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 3, "sur": 9, "ids": [3640, 4105, 4230], "couleur": "accent", "x": 571, "y": 85, "largeur": 30, "hauteur": 35, "zone": {"x": 561, "y": 0, "largeur": 51, "hauteur": 140}}
+              {"libelle": "< 2015", "detail": "avant 2015 · 1 photo sur 2 (50 %)", "valeur": 50, "texte": "50 %", "n": 1, "sur": 2, "ids": [402], "couleur": "accent", "x": 17, "y": 68, "largeur": 27, "hauteur": 52, "zone": {"x": 8, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "2015", "detail": "2015 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 63, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 54, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "2016", "detail": "2016 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 109, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 100, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "2017", "detail": "2017 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 156, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 147, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "2018", "detail": "2018 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 202, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 193, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "2019", "detail": "2019 · 1 photo sur 1 (100 %)", "valeur": 100, "texte": "100 %", "n": 1, "sur": 1, "ids": [2105], "couleur": "accent", "x": 249, "y": 16, "largeur": 27, "hauteur": 104, "zone": {"x": 240, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "2020", "detail": "2020 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 295, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 286, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "2021", "detail": "2021 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 342, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 333, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "2022", "detail": "2022 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 388, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 379, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "2023", "detail": "2023 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 435, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 426, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "2024", "detail": "2024 · défaut cherché sur aucune photo", "valeur": 0, "texte": "—", "n": 0, "sur": 0, "ids": [], "couleur": "accent", "x": 481, "y": 120, "largeur": 28, "hauteur": 0, "zone": {"x": 472, "y": 0, "largeur": 47, "hauteur": 140}},
+              {"libelle": "2025", "detail": "2025 · 0 photo sur 1 (0 %)", "valeur": 0, "texte": "0 %", "n": 0, "sur": 1, "ids": [], "couleur": "accent", "x": 528, "y": 120, "largeur": 27, "hauteur": 0, "zone": {"x": 519, "y": 0, "largeur": 46, "hauteur": 140}},
+              {"libelle": "2026", "detail": "2026, jusqu'au 20 novembre · 3 photos sur 9 (33 %)", "valeur": 33.3, "texte": "33 %", "n": 3, "sur": 9, "ids": [3640, 4105, 4230], "couleur": "accent", "x": 574, "y": 85, "largeur": 28, "hauteur": 35, "zone": {"x": 565, "y": 0, "largeur": 47, "hauteur": 140}}
             ],
             "creneaux": [
-              {"x": 8, "y": 0, "largeur": 50, "hauteur": 140, "barre": 1},
-              {"x": 58, "y": 0, "largeur": 50, "hauteur": 140, "barre": 2},
-              {"x": 108, "y": 0, "largeur": 51, "hauteur": 140, "barre": 3},
-              {"x": 159, "y": 0, "largeur": 50, "hauteur": 140, "barre": 4},
-              {"x": 209, "y": 0, "largeur": 50, "hauteur": 140, "barre": 5},
-              {"x": 259, "y": 0, "largeur": 51, "hauteur": 140, "barre": 6},
-              {"x": 310, "y": 0, "largeur": 50, "hauteur": 140, "barre": 7},
-              {"x": 360, "y": 0, "largeur": 50, "hauteur": 140, "barre": 8},
-              {"x": 410, "y": 0, "largeur": 51, "hauteur": 140, "barre": 9},
-              {"x": 461, "y": 0, "largeur": 50, "hauteur": 140, "barre": 10},
-              {"x": 511, "y": 0, "largeur": 50, "hauteur": 140, "barre": 11},
-              {"x": 561, "y": 0, "largeur": 51, "hauteur": 140, "barre": 12}
+              {"x": 8, "y": 0, "largeur": 46, "hauteur": 140, "barre": 1},
+              {"x": 54, "y": 0, "largeur": 46, "hauteur": 140, "barre": 2},
+              {"x": 100, "y": 0, "largeur": 47, "hauteur": 140, "barre": 3},
+              {"x": 147, "y": 0, "largeur": 46, "hauteur": 140, "barre": 4},
+              {"x": 193, "y": 0, "largeur": 47, "hauteur": 140, "barre": 5},
+              {"x": 240, "y": 0, "largeur": 46, "hauteur": 140, "barre": 6},
+              {"x": 286, "y": 0, "largeur": 47, "hauteur": 140, "barre": 7},
+              {"x": 333, "y": 0, "largeur": 46, "hauteur": 140, "barre": 8},
+              {"x": 379, "y": 0, "largeur": 47, "hauteur": 140, "barre": 9},
+              {"x": 426, "y": 0, "largeur": 46, "hauteur": 140, "barre": 10},
+              {"x": 472, "y": 0, "largeur": 47, "hauteur": 140, "barre": 11},
+              {"x": 519, "y": 0, "largeur": 46, "hauteur": 140, "barre": 12},
+              {"x": 565, "y": 0, "largeur": 47, "hauteur": 140, "barre": 13}
+            ]
+          }
+        },
+        "remarques": []
+      }
+    },
+    "graphiques_trimestres": {
+      "_note": "Partiel : du 1er janvier 2024 au 20 novembre 2026, trente-cinq mois touchés (plus de treize) : douze trimestres, de « T1 2024 » à « T4 2026 » (« jusqu'au 20 novembre »), un créneau chacun, la treizième place vide.",
+      "partiel": true,
+      "entree": {
+        "suivi": "<suivi.json>",
+        "carnet": "<carnet.json>",
+        "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
+        "debut": "2024-01-01",
+        "fin": "2026-11-20",
+        "apparence": "claire",
+        "couleurs": {"fond": "ECECEC", "texte": "1D1D1F", "gris": "6B6B6B", "filet": "C9C9C9", "barre": "0A64D8", "accent": "E0800D"},
+        "tailles": {
+          "photos_par_mois": {"largeur": 620, "hauteur": 150},
+          "focales": {"largeur": 300, "hauteur": 130},
+          "iso": {"largeur": 300, "hauteur": 130},
+          "heures": {"largeur": 620, "hauteur": 120},
+          "objectifs": {"largeur": 300, "hauteur": 170},
+          "notes": {"largeur": 300, "hauteur": 170},
+          "defauts_frequents": {"largeur": 620, "hauteur": 180},
+          "evolution_defaut": {"largeur": 620, "hauteur": 140}
+        }
+      },
+      "sortie": {
+        "ok": true,
+        "catalogue": "/Volumes/Photos/Lightroom/Catalogue.lrcat",
+        "periode": {"debut": "2024-01-01", "fin": "2026-11-20", "libelle": "du 1er janvier 2024 au 20 novembre 2026", "par": "trimestre", "depuis_le_debut": false},
+        "photos": 13,
+        "sans_date": 1,
+        "analyse": {"analysees": 11, "en_attente": 1, "en_echec": 1},
+        "tuiles": [
+          {"cle": "photos_ouvertes", "titre": "Photos ouvertes", "valeur": 13, "texte": "13", "detail": "1 en cours d'analyse · 1 non analysée"},
+          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "23 % des photos ouvertes"},
+          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "31 % des photos ouvertes"},
+          {"cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": 27.3, "texte": "27 %", "detail": "Ciel ou haut de l'image brûlé · 3 photos sur 11", "code": "ciel_brule"}
+        ],
+        "defauts": [
+          {"code": "horizon_penche", "libelle": "Horizon ou ligne penchée", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"},
+          {"code": "sous_exposition", "libelle": "Photo sous-exposée", "n": 2, "sur": 11, "valeur": 18.2, "texte": "18 %"},
+          {"code": "surexposition", "libelle": "Photo surexposée", "n": 0, "sur": 11, "valeur": 0, "texte": "0 %"},
+          {"code": "ciel_brule", "libelle": "Ciel ou haut de l'image brûlé", "n": 3, "sur": 11, "valeur": 27.3, "texte": "27 %"},
+          {"code": "bruit", "libelle": "Bruit fort (ISO élevé)", "n": 1, "sur": 3, "valeur": 33.3, "texte": "33 %"},
+          {"code": "flou", "libelle": "Photo floue ou bougée", "n": 3, "sur": 11, "valeur": 27.3, "texte": "27 %"},
+          {"code": "mise_au_point", "libelle": "Mise au point à côté", "n": 1, "sur": 2, "valeur": 50, "texte": "50 %"},
+          {"code": "yeux_fermes", "libelle": "Yeux fermés ou plissés", "n": 1, "sur": 3, "valeur": 33.3, "texte": "33 %"}
+        ],
+        "defaut_suivi": {"code": "ciel_brule", "libelle": "Ciel ou haut de l'image brûlé", "choisi": false},
+        "graphiques": {
+          "photos_par_mois": {
+            "titre": "Photos par trimestre",
+            "fichier": "<dossier>/photos_par_mois.png",
+            "largeur": 620,
+            "hauteur": 150,
+            "orientation": "verticale",
+            "max_barres": 13,
+            "unite": "photos",
+            "echelle": 6,
+            "sans_valeur": 1,
+            "note": "1 photo sans date de prise de vue n'y est pas.",
+            "vide": false,
+            "barres": [
+              {"libelle": "T1 2024", "detail": "janvier à mars 2024 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 17, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 8, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "T2 2024", "detail": "avril à juin 2024 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 63, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 54, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "T3 2024", "detail": "juillet à septembre 2024 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 109, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 100, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "T4 2024", "detail": "octobre à décembre 2024 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 156, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 147, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "T1 2025", "detail": "janvier à mars 2025 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 202, "y": 130, "largeur": 28, "hauteur": 0, "zone": {"x": 193, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "T2 2025", "detail": "avril à juin 2025 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 249, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 240, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "T3 2025", "detail": "juillet à septembre 2025 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [2950], "couleur": "barre", "x": 295, "y": 111, "largeur": 28, "hauteur": 19, "zone": {"x": 286, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "T4 2025", "detail": "octobre à décembre 2025 · 0 photo", "valeur": 0, "texte": "0", "n": 0, "ids": [], "couleur": "barre", "x": 342, "y": 130, "largeur": 27, "hauteur": 0, "zone": {"x": 333, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "T1 2026", "detail": "janvier à mars 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3502], "couleur": "barre", "x": 388, "y": 111, "largeur": 28, "hauteur": 19, "zone": {"x": 379, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "T2 2026", "detail": "avril à juin 2026 · 1 photo", "valeur": 1, "texte": "1", "n": 1, "ids": [3640], "couleur": "barre", "x": 435, "y": 111, "largeur": 27, "hauteur": 19, "zone": {"x": 426, "y": 0, "largeur": 46, "hauteur": 150}},
+              {"libelle": "T3 2026", "detail": "juillet à septembre 2026 · 3 photos", "valeur": 3, "texte": "3", "n": 3, "ids": [3801, 3988, 3990], "couleur": "barre", "x": 481, "y": 73, "largeur": 28, "hauteur": 57, "zone": {"x": 472, "y": 0, "largeur": 47, "hauteur": 150}},
+              {"libelle": "T4 2026", "detail": "octobre à décembre 2026, jusqu'au 20 novembre · 6 photos", "valeur": 6, "texte": "6", "n": 6, "ids": [4105, 4106, 4211, 4230, 4231, 4302], "couleur": "barre", "x": 528, "y": 16, "largeur": 27, "hauteur": 114, "zone": {"x": 519, "y": 0, "largeur": 46, "hauteur": 150}}
+            ],
+            "creneaux": [
+              {"x": 8, "y": 0, "largeur": 46, "hauteur": 150, "barre": 1},
+              {"x": 54, "y": 0, "largeur": 46, "hauteur": 150, "barre": 2},
+              {"x": 100, "y": 0, "largeur": 47, "hauteur": 150, "barre": 3},
+              {"x": 147, "y": 0, "largeur": 46, "hauteur": 150, "barre": 4},
+              {"x": 193, "y": 0, "largeur": 47, "hauteur": 150, "barre": 5},
+              {"x": 240, "y": 0, "largeur": 46, "hauteur": 150, "barre": 6},
+              {"x": 286, "y": 0, "largeur": 47, "hauteur": 150, "barre": 7},
+              {"x": 333, "y": 0, "largeur": 46, "hauteur": 150, "barre": 8},
+              {"x": 379, "y": 0, "largeur": 47, "hauteur": 150, "barre": 9},
+              {"x": 426, "y": 0, "largeur": 46, "hauteur": 150, "barre": 10},
+              {"x": 472, "y": 0, "largeur": 47, "hauteur": 150, "barre": 11},
+              {"x": 519, "y": 0, "largeur": 46, "hauteur": 150, "barre": 12},
+              {"x": 565, "y": 0, "largeur": 47, "hauteur": 150, "barre": 0}
             ]
           }
         },
@@ -1282,9 +1546,13 @@
     },
     "graphiques_refus": {
       "_note": "Les refus de tout l'appel : une seule ligne, code 1, aucun PNG écrit.",
-      "periode": {
-        "entree_change": {"periode": "6_mois"},
-        "sortie": {"ok": false, "raison": "arguments", "texte": "Arguments de --graphiques : periode vaut 3_mois, 12_mois ou tout."}
+      "fin": {
+        "entree_change": {"fin": "2026-11-31"},
+        "sortie": {"ok": false, "raison": "arguments", "texte": "Arguments de --graphiques : fin est le dernier jour de la période, AAAA-MM-JJ, à l'heure locale."}
+      },
+      "debut_apres_fin": {
+        "entree_change": {"debut": "2026-11-21"},
+        "sortie": {"ok": false, "raison": "arguments", "texte": "Arguments de --graphiques : debut ne vient pas après fin."}
       },
       "taille": {
         "entree_change": {"tailles": {"focales": {"largeur": 60, "hauteur": 130}}},

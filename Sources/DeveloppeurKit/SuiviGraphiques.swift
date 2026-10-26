@@ -3,7 +3,8 @@ import Foundation
 
 /// `mcp-developpeur --graphiques '<json>' <dossier>` (correctif 1.3.7) : les agrégats du relevé
 /// `suivi.json` (et du carnet `carnet.json`, pour l'horizon et la mise au point vus par Claude) sur
-/// une période, les tuiles, et les sept graphiques avec leurs barres et leurs créneaux, dans le repère
+/// une période (d'un jour de début, ou de la première photo, à un jour de fin, depuis le correctif
+/// 1.3.8 : demandé par Dany le 26 octobre 2026 ; trois périodes fixes avant), les tuiles, et les huit graphiques avec leurs barres et leurs créneaux, dans le repère
 /// de l'image en points (origine en haut à gauche, y vers le bas). Les règles sont celles de
 /// `regles.graphiques`, `regles.periodes`, `regles.tranches`, `regles.textes` et `regles.geometrie`
 /// de Tests/Contrats/suivi.json ; chaque nombre de ses exemples en découle. Lecture seule des deux
@@ -25,22 +26,28 @@ extension Suivi {
         var etale: Bool
     }
 
-    /// Les sept graphiques, dans l'ordre de la fenêtre (68 créneaux en tout).
-    public static let graphiques = ["photos_par_mois", "focales", "iso", "heures", "objectifs", "defauts_frequents", "evolution_defaut"]
+    /// Les huit graphiques, dans l'ordre de la fenêtre (76 créneaux en tout ; les notes depuis le
+    /// correctif 1.3.8, demandées par Dany le 26 octobre 2026).
+    public static let graphiques = ["photos_par_mois", "focales", "iso", "heures", "objectifs", "notes", "defauts_frequents",
+                                    "evolution_defaut"]
     static let definitions: [String: Definition] = [
-        "photos_par_mois": Definition(orientation: .verticale, maxBarres: 12, unite: "photos", etale: true),
+        "photos_par_mois": Definition(orientation: .verticale, maxBarres: 13, unite: "photos", etale: true),
         "focales": Definition(orientation: .verticale, maxBarres: 8, unite: "photos", etale: false),
         "iso": Definition(orientation: .verticale, maxBarres: 8, unite: "photos", etale: false),
         "heures": Definition(orientation: .verticale, maxBarres: 12, unite: "photos", etale: false),
         "objectifs": Definition(orientation: .horizontale, maxBarres: 8, unite: "photos", etale: false),
+        "notes": Definition(orientation: .verticale, maxBarres: 6, unite: "photos", etale: false),
         "defauts_frequents": Definition(orientation: .horizontale, maxBarres: 8, unite: "%", etale: false),
-        "evolution_defaut": Definition(orientation: .verticale, maxBarres: 12, unite: "%", etale: true),
+        "evolution_defaut": Definition(orientation: .verticale, maxBarres: 13, unite: "%", etale: true),
     ]
     /// Les tailles permises d'un graphique, en points.
     static let largeurs = 120...1200, hauteurs = 80...600
     /// Les six couleurs que le module tire de Dispositions.PALETTES (seule table des couleurs).
     static let clesCouleurs = ["fond", "texte", "gris", "filet", "barre", "accent"]
-    static let periodes = ["3_mois", "12_mois", "tout"]
+    /// Les colonnes du temps au plus (le nombre de créneaux des graphiques étalés) : treize, pour qu'une
+    /// année comptée d'un jour au même jour de l'année suivante (treize mois touchés) se montre mois par
+    /// mois.
+    static let colonnesMax = 13
     /// Un défaut cherché sur moins de photos ne peut être « le plus fréquent » que s'il n'y en a pas
     /// d'autre : le même seuil que Carnet.PHOTOS_SUFFISANTES du module.
     static let photosSuffisantes = 5
@@ -105,6 +112,33 @@ extension Suivi {
             (self.annee, self.mois, self.jour, self.heure) = (annee, mois, jour, heure)
         }
 
+        /// Le jour, pour comparer (année × 10 000 + mois × 100 + jour).
+        var cle: Int { annee * 10000 + mois * 100 + jour }
+        /// Le trimestre (année × 4 + trimestre − 1).
+        var rangTrimestre: Int { annee * 4 + (mois - 1) / 3 }
+        /// Le même jour, sans l'heure.
+        var jourSeul: DateLocale { DateLocale(annee: annee, mois: mois, jour: jour) }
+        /// « AAAA-MM-JJ ».
+        var iso: String { String(format: "%04d-%02d-%02d", annee, mois, jour) }
+        /// « 20 novembre 2026 », « 1er mars 2026 ».
+        var texte: String { "\(jour == 1 ? "1er" : String(jour)) \(Suivi.moisLongs[mois - 1]) \(annee)" }
+
+        /// Le nombre de jours du mois.
+        static func jours(annee: Int, mois: Int) -> Int {
+            switch mois {
+            case 2: return annee % 4 == 0 && (annee % 100 != 0 || annee % 400 == 0) ? 29 : 28
+            case 4, 6, 9, 11: return 30
+            default: return 31
+            }
+        }
+
+        /// Un jour « AAAA-MM-JJ » qui existe (le 31 avril, non), de 1900 à 9999 ; nil sinon.
+        static func jourExact(_ texte: String?) -> DateLocale? {
+            guard let texte, texte.utf8.count == 10, let d = DateLocale(texte), d.annee >= 1900,
+                  d.jour <= jours(annee: d.annee, mois: d.mois) else { return nil }
+            return d
+        }
+
         init?(_ texte: String?) {
             guard let texte else { return nil }
             let c = Array(texte.utf8)
@@ -129,9 +163,10 @@ extension Suivi {
         var suivi: String
         var carnet: String?
         var catalogue: String
-        var aujourdHui: String
-        var jour: DateLocale
-        var periode: String
+        /// Le premier jour de la période ; nil : depuis la première photo.
+        var debut: DateLocale?
+        /// Le dernier jour de la période (compris).
+        var fin: DateLocale
         var apparence: String
         var couleurs: [String: String]
         var defaut: String?
@@ -153,12 +188,16 @@ extension Suivi {
         guard let catalogue = objet["catalogue"]?.string, !catalogue.isEmpty else {
             throw refus("catalogue est le chemin du catalogue ouvert.")
         }
-        guard let aujourdHui = objet["aujourd_hui"]?.string, aujourdHui.utf8.count == 10, let jour = DateLocale(aujourdHui),
-              jour.annee >= 1900 else {
-            throw refus("aujourd_hui est la date du jour à l'heure locale, AAAA-MM-JJ.")
+        guard let fin = DateLocale.jourExact(objet["fin"]?.string) else {
+            throw refus("fin est le dernier jour de la période, AAAA-MM-JJ, à l'heure locale.")
         }
-        guard let periode = objet["periode"]?.string, periodes.contains(periode) else {
-            throw refus("periode vaut 3_mois, 12_mois ou tout.")
+        var debut: DateLocale?
+        if let valeur = objet["debut"] {
+            guard let jour = DateLocale.jourExact(valeur.string) else {
+                throw refus("debut, facultatif, est le premier jour de la période, AAAA-MM-JJ, à l'heure locale.")
+            }
+            guard jour.cle <= fin.cle else { throw refus("debut ne vient pas après fin.") }
+            debut = jour
         }
         guard let apparence = objet["apparence"]?.string, ["claire", "sombre"].contains(apparence) else {
             throw refus("apparence vaut claire ou sombre.")
@@ -183,7 +222,7 @@ extension Suivi {
             defaut = code
         }
         guard let taillesDonnees = objet["tailles"]?.object else {
-            throw refus("tailles donne les sept graphiques (\(graphiques.joined(separator: ", "))), chacun { largeur, hauteur }.")
+            throw refus("tailles donne les huit graphiques (\(graphiques.joined(separator: ", "))), chacun { largeur, hauteur }.")
         }
         var tailles: [String: (largeur: Int, hauteur: Int)] = [:]
         for cle in graphiques {
@@ -193,8 +232,8 @@ extension Suivi {
             }
             tailles[cle] = (largeur, hauteur)
         }
-        return EntreeGraphiques(suivi: suivi, carnet: carnet, catalogue: catalogue, aujourdHui: aujourdHui, jour: jour,
-                                periode: periode, apparence: apparence, couleurs: couleurs, defaut: defaut, tailles: tailles)
+        return EntreeGraphiques(suivi: suivi, carnet: carnet, catalogue: catalogue, debut: debut, fin: fin, apparence: apparence,
+                                couleurs: couleurs, defaut: defaut, tailles: tailles)
     }
 
     /// Une couleur en six chiffres hexadécimaux (« 0A64D8 »), en sRVB ; nil sinon.
@@ -221,6 +260,8 @@ extension Suivi {
         var focale: Double?
         var iso: Double?
         var note: Int
+        /// Le drapeau de la famille vaut « rejetee » (toutes ses photos rejetées).
+        var rejetee: Bool
         var retouchee: Bool
         var etat: Etat
         /// Pour chaque code cherché : trouvé ou non (l'analyse, puis le carnet par-dessus).
@@ -311,7 +352,8 @@ extension Suivi {
             return PhotoSuivie(cle: cle, id: id, uuid: entree["uuid"] as? String, prise: DateLocale(prise["le"] as? String),
                                ajout: DateLocale(entree["ajout_le"] as? String), objectif: objectif,
                                focale: plausible(nombre(prise["focale"])), iso: plausible(nombre(prise["iso"])),
-                               note: noteBornee(nombre(entree["note"])), retouchee: booleen(entree["retouchee_par_claude"]) ?? false,
+                               note: noteBornee(nombre(entree["note"])), rejetee: entree["drapeau"] as? String == "rejetee",
+                               retouchee: booleen(entree["retouchee_par_claude"]) ?? false,
                                etat: etat, resultats: resultats)
         }
     }
@@ -463,13 +505,15 @@ extension Suivi {
 
     // MARK: Les agrégats
 
-    /// Une colonne du temps : un mois (son rang), une année, ou les années d'avant une année (Tout).
+    /// Une colonne du temps : un mois (son rang), un trimestre (son rang), une année, ou les années
+    /// d'avant une année.
     enum Colonne {
-        case mois(Int), annee(Int), avant(Int)
+        case mois(Int), trimestre(Int), annee(Int), avant(Int)
 
         func contient(_ date: DateLocale) -> Bool {
             switch self {
             case .mois(let rang): return date.rangMois == rang
+            case .trimestre(let rang): return date.rangTrimestre == rang
             case .annee(let annee): return date.annee == annee
             case .avant(let annee): return date.annee < annee
             }
@@ -481,9 +525,69 @@ extension Suivi {
             case .mois(let rang):
                 let mois = (rang % 12 + 12) % 12
                 return (Suivi.moisCourts[mois], "\(Suivi.moisLongs[mois]) \((rang - mois) / 12)")
+            case .trimestre(let rang):
+                let t = (rang % 4 + 4) % 4, annee = (rang - t) / 4
+                return ("T\(t + 1) \(annee)", "\(Suivi.moisLongs[3 * t]) à \(Suivi.moisLongs[3 * t + 2]) \(annee)")
             case .annee(let annee): return ("\(annee)", "\(annee)")
             case .avant(let annee): return ("< \(annee)", "avant \(annee)")
             }
+        }
+
+        /// Le premier et le dernier jour de la colonne ; nil pour les années d'avant une année.
+        var bornes: (premier: DateLocale, dernier: DateLocale)? {
+            func jours(_ annee: Int, de premierMois: Int, a dernierMois: Int) -> (premier: DateLocale, dernier: DateLocale) {
+                (DateLocale(annee: annee, mois: premierMois, jour: 1),
+                 DateLocale(annee: annee, mois: dernierMois, jour: DateLocale.jours(annee: annee, mois: dernierMois)))
+            }
+            switch self {
+            case .mois(let rang):
+                let mois = (rang % 12 + 12) % 12
+                return jours((rang - mois) / 12, de: mois + 1, a: mois + 1)
+            case .trimestre(let rang):
+                let t = (rang % 4 + 4) % 4
+                return jours((rang - t) / 4, de: 3 * t + 1, a: 3 * t + 3)
+            case .annee(let annee): return jours(annee, de: 1, a: 12)
+            case .avant: return nil
+            }
+        }
+    }
+
+    /// Les libellés et les détails des colonnes du temps (correctif 1.3.8) : l'année au premier mois et
+    /// à chaque janvier (« déc. 2025 », « janv. 2026 » : sur treize mois, le même mois revient) ; une
+    /// colonne que la période ne couvre qu'en partie le dit dans son détail (« novembre 2025, à partir
+    /// du 20 », « novembre 2026, jusqu'au 20 », « juillet à septembre 2025, à partir du 25 août »). Sans
+    /// `debut` (depuis la première photo), la première colonne n'est jamais dite en partie : aucune
+    /// photo n'est avant elle.
+    static func nomsDesColonnes(_ colonnes: [Colonne], debut: DateLocale?, fin: DateLocale) -> [(libelle: String, detail: String)] {
+        func jour(_ d: DateLocale, avecMois: Bool) -> String {
+            "\(d.jour == 1 ? "1er" : String(d.jour))" + (avecMois ? " \(moisLongs[d.mois - 1])" : "")
+        }
+        return colonnes.enumerated().map { index, colonne in
+            var (libelle, detail) = colonne.noms
+            if case .mois(let rang) = colonne {
+                let mois = (rang % 12 + 12) % 12
+                if index == 0 || mois == 0 { libelle += " \((rang - mois) / 12)" }
+            }
+            guard let bornes = colonne.bornes else { return (libelle, detail) }
+            var avecMois = true
+            if case .mois = colonne { avecMois = false }
+            // Ce que la période couvre de la colonne : de `premier` (le début, s'il tombe après son
+            // premier jour) à `dernier` (la fin, si elle tombe avant son dernier jour) ; un seul jour,
+            // même au bord de la colonne (le 1er, le 30), se dit « le … ».
+            let apres = debut.flatMap { $0.cle > bornes.premier.cle ? $0 : nil }
+            let avant = fin.cle < bornes.dernier.cle ? fin : nil
+            let premier = apres ?? bornes.premier, dernier = avant ?? bornes.dernier
+            if apres == nil && avant == nil { return (libelle, detail) }
+            if premier.cle == dernier.cle {
+                detail += ", le \(jour(premier, avecMois: avecMois))"
+            } else if let a = apres, let b = avant {
+                detail += ", du \(jour(a, avecMois: avecMois)) au \(jour(b, avecMois: avecMois))"
+            } else if let a = apres {
+                detail += ", à partir du \(jour(a, avecMois: avecMois))"
+            } else if let b = avant {
+                detail += ", jusqu'au \(jour(b, avecMois: avecMois))"
+            }
+            return (libelle, detail)
         }
     }
 
@@ -534,13 +638,14 @@ extension Suivi {
     /// Ce que `--graphiques` calcule, sans rien écrire : la sortie et les graphiques à dessiner.
     static func calculer(_ entree: EntreeGraphiques, photos tous: [PhotoSuivie], remarques: [String],
                          dossier: String) -> (sortie: JSONValue, graphiques: [Graphique]) {
-        let fin = entree.jour.rangMois
-        let nombreDeMois = entree.periode == "3_mois" ? 3 : 12
-        let debut: Int? = entree.periode == "tout" ? nil : fin - (nombreDeMois - 1)
+        // La période : du jour de début (ou de la première photo) au jour de fin, compris ; une photo
+        // datée après la fin (horloge de l'appareil fausse, ou une fin choisie) n'y est pas.
+        let fin = entree.fin
         let periode = tous.filter { photo in
-            guard let rang = photo.date?.rangMois else { return false }
-            return rang <= fin && debut.map { rang >= $0 } ?? true
+            guard let cle = photo.date?.cle else { return false }
+            return cle <= fin.cle && entree.debut.map { cle >= $0.cle } ?? true
         }.sorted { $0.id < $1.id }
+        let debut = entree.debut ?? periode.compactMap(\.date).min { $0.cle < $1.cle }?.jourSeul ?? fin
         let datees = periode.filter { $0.prise != nil }
         let analysees = periode.filter { $0.etat == .analysee }.count
         let enEchec = periode.filter { $0.etat == .enEchec }.count
@@ -551,15 +656,27 @@ extension Suivi {
         let frequent = plusFrequent(stats)
         let suivi = entree.defaut ?? frequent
 
-        func mois(_ rang: Int) -> String { String(format: "%04d-%02d", rang / 12, rang % 12 + 1) }
-        let periodeJSON: JSONValue
-        if let debut {
-            periodeJSON = ["code": .string(entree.periode), "libelle": .string(entree.periode == "3_mois" ? "3 derniers mois" : "12 derniers mois"),
-                           "debut": .string(mois(debut)), "fin": .string(mois(fin)), "par": "mois"]
+        // Les colonnes du temps (colonnesMax au plus) : les mois de la période, sinon ses trimestres,
+        // sinon ses années, la première réunissant au besoin les années d'avant les douze dernières.
+        let colonnes: [Colonne], par: String
+        if fin.rangMois - debut.rangMois < colonnesMax {
+            (colonnes, par) = ((debut.rangMois...fin.rangMois).map { .mois($0) }, "mois")
+        } else if fin.rangTrimestre - debut.rangTrimestre < colonnesMax {
+            (colonnes, par) = ((debut.rangTrimestre...fin.rangTrimestre).map { .trimestre($0) }, "trimestre")
+        } else if fin.annee - debut.annee < colonnesMax {
+            (colonnes, par) = ((debut.annee...fin.annee).map { .annee($0) }, "annee")
         } else {
-            let premier = periode.compactMap { $0.date?.rangMois }.min() ?? fin
-            periodeJSON = ["code": "tout", "libelle": "Tout", "debut": .string(mois(premier)), "fin": .string(mois(fin)), "par": "annee"]
+            let premiere = fin.annee - (colonnesMax - 2)
+            (colonnes, par) = ([.avant(premiere)] + (premiere...fin.annee).map { .annee($0) }, "annee")
         }
+        let libellePeriode: String
+        if entree.debut == nil {
+            libellePeriode = periode.isEmpty ? "jusqu'au \(fin.texte)" : "depuis la première photo, le \(debut.texte), jusqu'au \(fin.texte)"
+        } else {
+            libellePeriode = debut.cle == fin.cle ? "le \(fin.texte)" : "du \(debut.texte) au \(fin.texte)"
+        }
+        let periodeJSON: JSONValue = ["debut": .string(debut.iso), "fin": .string(fin.iso), "libelle": .string(libellePeriode),
+                                      "par": .string(par), "depuis_le_debut": .bool(entree.debut == nil)]
 
         // Les tuiles.
         let total = periode.count
@@ -598,19 +715,6 @@ extension Suivi {
                     "valeur": .number(valeurPourcentage(s.n, sur: s.sur)), "texte": .string(textePourcentage(s.n, sur: s.sur))]
         }
 
-        // Les colonnes du temps : les mois de la période, ou les années de Tout (12 au plus, la première
-        // réunissant les années d'avant les 11 dernières).
-        var colonnes: [Colonne]
-        if let debut {
-            colonnes = (debut...fin).map { .mois($0) }
-        } else {
-            let anneeFin = entree.jour.annee
-            let anneeMin = datees.compactMap { $0.prise?.annee }.min() ?? anneeFin
-            colonnes = anneeFin - anneeMin + 1 > 12
-                ? [.avant(anneeFin - 10)] + (anneeFin - 10...anneeFin).map { .annee($0) }
-                : (anneeMin...anneeFin).map { .annee($0) }
-        }
-
         func base(_ cle: String, _ titre: String) -> Graphique {
             let taille = entree.tailles[cle] ?? (largeurs.lowerBound, hauteurs.lowerBound)
             var chemin = dossier
@@ -624,10 +728,13 @@ extension Suivi {
             resultat.append(g)
         }
 
-        // Photos par mois (par année pour Tout) : les photos datées seulement.
-        var g = base("photos_par_mois", debut == nil ? "Photos par année" : "Photos par mois")
-        g.barres = colonnes.map { colonne in
-            barreCompte(colonne.noms.libelle, colonne.noms.detail, datees.filter { colonne.contient($0.prise!) }.map { $0.id })
+        // Photos par mois (par trimestre, par année pour une longue période) : les photos datées
+        // seulement.
+        let unite = ["mois": "mois", "trimestre": "trimestre", "annee": "année"][par] ?? par
+        let noms = nomsDesColonnes(colonnes, debut: entree.debut, fin: fin)
+        var g = base("photos_par_mois", "Photos par \(unite)")
+        g.barres = colonnes.indices.map { i in
+            barreCompte(noms[i].libelle, noms[i].detail, datees.filter { colonnes[i].contient($0.prise!) }.map { $0.id })
         }
         g.sansValeur = periode.count - datees.count
         if g.sansValeur > 0 { g.note = noteSans(g.sansValeur, "sans date de prise de vue") }
@@ -684,6 +791,21 @@ extension Suivi {
         g.vide = g.barres.isEmpty
         finir(&g)
 
+        // Notes : celle de la famille (la plus haute de l'original et de ses copies virtuelles), de
+        // 0 ★ (pas encore notée : le standard de notation) à 5 ★. Une photo rejetée (le drapeau) compte
+        // à sa note, et la note du graphique le dit.
+        g = base("notes", "Notes")
+        g.barres = (0...5).map { note in
+            barreCompte("\(note) ★", note == 0 ? "0 ★, pas encore notée" : "\(note) ★", periode.filter { $0.note == note }.map { $0.id })
+        }
+        let rejetees = periode.filter(\.rejetee).count
+        if rejetees > 0 {
+            g.note = rejetees == 1 ? "Dont 1 rejetée (drapeau), comptée à sa note."
+                : "Dont \(milliers(rejetees)) rejetées (drapeau), comptées à leur note."
+        }
+        g.vide = !g.barres.contains { $0.n > 0 }
+        finir(&g)
+
         // Défauts les plus fréquents : les codes cherchés dans la période, par pourcentage exact
         // décroissant, puis n décroissant, puis l'ordre des codes ; le défaut suivi en accent.
         g = base("defauts_frequents", "Défauts les plus fréquents")
@@ -707,11 +829,11 @@ extension Suivi {
         finir(&g)
 
         // L'évolution du défaut suivi, colonne par colonne, parmi les photos datées.
-        let rythme = debut == nil ? "année par année" : "mois par mois"
+        let rythme = "\(unite) par \(unite)"
         g = base("evolution_defaut", suivi.map { "\(libelle($0)), \(rythme)" } ?? "Évolution d'un défaut")
-        g.barres = colonnes.map { colonne in
-            let (libelleColonne, detailColonne) = colonne.noms
-            let s = suivi.map { code in compte(code, datees.filter { colonne.contient($0.prise!) }) } ?? aucun
+        g.barres = colonnes.indices.map { i in
+            let (libelleColonne, detailColonne) = noms[i]
+            let s = suivi.map { code in compte(code, datees.filter { colonnes[i].contient($0.prise!) }) } ?? aucun
             let detail = s.sur > 0 ? "\(detailColonne) · \(photos(s.n)) sur \(milliers(s.sur)) (\(textePourcentage(s.n, sur: s.sur)))"
                 : "\(detailColonne) · défaut cherché sur aucune photo"
             return Barre(libelle: libelleColonne, detail: detail, valeur: valeurPourcentage(s.n, sur: s.sur),
@@ -728,7 +850,7 @@ extension Suivi {
         finir(&g)
 
         var sortie: [String: JSONValue] = [
-            "ok": true, "catalogue": .string(entree.catalogue), "aujourd_hui": .string(entree.aujourdHui), "periode": periodeJSON,
+            "ok": true, "catalogue": .string(entree.catalogue), "periode": periodeJSON,
             "photos": .number(Double(total)), "sans_date": .number(Double(periode.count - datees.count)),
             "analyse": ["analysees": .number(Double(analysees)), "en_attente": .number(Double(enAttente)), "en_echec": .number(Double(enEchec))],
             "tuiles": .array(tuiles), "defauts": .array(defautsJSON),
@@ -744,7 +866,7 @@ extension Suivi {
     // MARK: La commande
 
     /// `--graphiques '<json>' <dossier>` : lit l'entrée, le relevé et le carnet, calcule, crée le
-    /// dossier et y dessine les sept PNG ; une ligne JSON, ou un refus de tout l'appel (aucun PNG
+    /// dossier et y dessine les huit PNG ; une ligne JSON, ou un refus de tout l'appel (aucun PNG
     /// laissé).
     public static func graphiques(_ texte: String, dossier: String) -> Reponse {
         do {
