@@ -395,5 +395,113 @@ final class GroupesLumiereTests: XCTestCase {
         _ = call("contact_sheet", ["selection": true, "offset": 30])
         XCTAssertEqual(fake.calls.first { $0.command == "vignettes" }?.params["photos"]?.array?.compactMap(\.int), Array(31...40))
     }
-}
 
+    // MARK: Une grande série se note planche par planche (26 octobre 2026)
+
+    /// Le tri de 951 photos faisait 147 000 caractères, dont 80 % de plafonds, une ligne par photo :
+    /// Claude Code dans la fenêtre le rangeait dans un fichier qu'il ne pouvait pas lire.
+    func testUneGrandeSerieDitSesPlafondsParMotif() throws {
+        func photo(_ id: Int, nettete: Double = 60, bruit: Double = 0.3) -> PhotoTriee {
+            var p = PhotoTriee(id: id, fichier: "P\(id).RAF")
+            p.detail = DetailMeasurements(zones: Array(repeating: nettete, count: 9), noise: bruit, shadowNoise: nil, side: 1024)
+            return p
+        }
+        let douces = (1...60).map { photo($0, nettete: 20 + Double($0 % 10)) }
+        let bruitees = (61...100).map { photo($0, bruit: 1.6 + Double($0 % 4) / 10) }
+        let nettes = (101...150).map { photo($0) }
+        let bilan = Tri.bilan(douces + bruitees + nettes)
+        XCTAssertNil(bilan["plafonds"], "au-delà de \(Tri.plafondsParPhotoMax) photos, plus une ligne par photo")
+        let motifs = try XCTUnwrap(bilan["plafonds_par_motif"]?.array)
+        XCTAssertEqual(motifs.count, 2, JSONCoding.line(.array(motifs)))
+        XCTAssertEqual(motifs[0]["note_max"]?.int, 2)
+        XCTAssertEqual(motifs[0]["pourquoi"]?.string, "douce (netteté sous 35)")
+        XCTAssertEqual(motifs[0]["nombre"]?.int, 60)
+        XCTAssertEqual(motifs[0]["photos"]?.array?.compactMap(\.int), Array(1...60))
+        XCTAssertNil(motifs[0]["a_verifier"])
+        XCTAssertEqual(motifs[1]["note_max"]?.int, 5)
+        XCTAssertEqual(motifs[1]["a_verifier"]?.bool, true)
+        XCTAssertEqual(motifs[1]["pourquoi"]?.string, "bruit fort : à noter après le débruitage (enhance_photo)")
+        XCTAssertEqual(motifs[1]["photos"]?.array?.compactMap(\.int), Array(61...100))
+        // Une petite séance garde la raison de chaque photo, mesures comprises.
+        let petite = Tri.bilan(Array(douces.prefix(3)))
+        XCTAssertTrue(petite["plafonds"]?["1"]?["pourquoi"]?.string?.contains("douce (netteté 21") == true)
+        XCTAssertNil(petite["plafonds_par_motif"])
+        // Le plafond posé reste celui de chaque photo (propose_ratings le fait respecter).
+        XCTAssertEqual(Tri.plafonds(douces + bruitees + nettes)[1]?.note, 2)
+    }
+
+    /// La première planche d'une grande sélection : refusée sans offset jusqu'au 26 octobre 2026.
+    func testLaPlancheDUneGrandeSelectionCommenceSansOffset() throws {
+        let nette = TriTests.damier()
+        fake.onSend = { [unowned fake] command, params in
+            guard let fake else { return }
+            if command == "selection" {
+                let decalage = params["decalage"]?.int ?? 0, limite = params["limite"]?.int ?? 50
+                let ids = Array((decalage + 1)...min(951, decalage + limite))
+                fake.replies["selection"] = ["total": 951, "decalage": .number(Double(decalage)),
+                                             "photos": .array(ids.map { ["id": .number(Double($0)), "fichier": "P"] })]
+            } else if command == "vignettes" {
+                let ids = (params["photos"]?.array ?? []).compactMap(\.int)
+                fake.replies["vignettes"] = ["photos": .array(ids.map { ["id": .number(Double($0)), "fichier": "P", "note": 0, "drapeau": "aucun",
+                                                                          "vignette": .string(TestSupport.previewFile(nette))] })]
+            }
+        }
+        let premiere = call("contact_sheet", ["selection": true])
+        XCTAssertFalse(premiere.isError, premiere.text)
+        XCTAssertEqual(fake.calls.filter { $0.command == "vignettes" }.flatMap { $0.params["photos"]?.array?.compactMap(\.int) ?? [] }, Array(1...30))
+        XCTAssertTrue(premiere.text.contains("921 photo(s) de plus : rappeler avec offset = 30"), premiere.text)
+        let derniere = call("contact_sheet", ["selection": true, "offset": 930])
+        XCTAssertFalse(derniere.isError, derniere.text)
+        XCTAssertFalse(derniere.text.contains("de plus"), "la dernière planche : rien de plus")
+        XCTAssertEqual(fake.calls.last { $0.command == "vignettes" }?.params["photos"]?.array?.compactMap(\.int), Array(931...951))
+    }
+
+    /// Les vidéos écartées comptent dans l'offset de la suite (sans elles, des photos revenaient
+    /// d'une planche à l'autre), et une tranche faite de vidéos seulement donne la suite au lieu
+    /// d'arrêter le parcours (relecture du 26 octobre 2026).
+    func testLaPlancheSauteLesVideosSansRemontrerDePhotos() throws {
+        let nette = TriTests.damier()
+        let videos = Set([15, 100] + Array(31...60))
+        fake.onSend = { [unowned fake] command, params in
+            guard let fake else { return }
+            if command == "selection" {
+                let decalage = params["decalage"]?.int ?? 0, limite = params["limite"]?.int ?? 50
+                let ids = Array((decalage + 1)...min(100, decalage + limite))
+                fake.replies["selection"] = ["total": 100, "decalage": .number(Double(decalage)),
+                                             "photos": .array(ids.map { ["id": .number(Double($0)), "fichier": "P", "video": .bool(videos.contains($0))] })]
+            } else if command == "vignettes" {
+                let ids = (params["photos"]?.array ?? []).compactMap(\.int)
+                fake.replies["vignettes"] = ["photos": .array(ids.map { ["id": .number(Double($0)), "fichier": "P", "note": 0, "drapeau": "aucun",
+                                                                          "vignette": .string(TestSupport.previewFile(nette))] })]
+            }
+        }
+        func vignettes(depuis debut: Int) -> [Int] {
+            fake.calls.dropFirst(debut).filter { $0.command == "vignettes" }.flatMap { $0.params["photos"]?.array?.compactMap(\.int) ?? [] }
+        }
+        let premiere = call("contact_sheet", ["selection": true])
+        XCTAssertFalse(premiere.isError, premiere.text)
+        XCTAssertEqual(vignettes(depuis: 0), (1...30).filter { $0 != 15 })
+        XCTAssertTrue(premiere.text.contains("70 photo(s) de plus : rappeler avec offset = 30"), premiere.text)
+        XCTAssertTrue(premiere.text.contains("1 vidéo(s) écartée(s)"), premiere.text)
+        // Les positions de la planche, vidéos comprises, pour la ligne d'état de la fenêtre.
+        let info = try JSONCoding.parse(premiere.text)
+        XCTAssertEqual(info["planche"]?["premiere"]?.int, 1)
+        XCTAssertEqual(info["planche"]?["derniere"]?.int, 30)
+        XCTAssertEqual(info["planche"]?["sur"]?.int, 100)
+        // Trente vidéos d'affilée : pas d'erreur, la suite.
+        var avant = fake.calls.count
+        let videosSeules = call("contact_sheet", ["selection": true, "offset": 30])
+        XCTAssertFalse(videosSeules.isError, videosSeules.text)
+        XCTAssertTrue(videosSeules.text.contains("rappeler avec offset = 60"), videosSeules.text)
+        XCTAssertEqual(vignettes(depuis: avant), [], "aucune vignette à demander")
+        // La dernière tranche finit sur une vidéo : rien de plus à demander.
+        avant = fake.calls.count
+        let derniere = call("contact_sheet", ["selection": true, "offset": 90])
+        XCTAssertFalse(derniere.isError, derniere.text)
+        XCTAssertEqual(vignettes(depuis: avant), Array(91...99))
+        XCTAssertFalse(derniere.text.contains("de plus"), derniere.text)
+        // Une liste de photos donnée n'a ni planche ni suite.
+        let liste = call("contact_sheet", ["photo_ids": [1, 2, 3]])
+        XCTAssertNil(try JSONCoding.parse(liste.text)["planche"])
+    }
+}

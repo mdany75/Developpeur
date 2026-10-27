@@ -1294,6 +1294,110 @@ function Conversation.dernierZoom(c, photo)
 end
 
 -- Nombre d'outils terminés depuis la dernière demande.
+-- Les photos que vise un appel d'outil, d'après son entrée (la partie de `detail` avant la
+-- réponse) : photo_id, photo_ids, ou les photo_id de ratings ; chacune une fois, dans l'ordre. Lu
+-- une fois par élément (l'entrée ne change plus).
+local ciblesLues = setmetatable({}, { __mode = 'k' })
+
+local function cibles(e)
+    local deja = ciblesLues[e]
+    if deja then
+        return deja
+    end
+    local liste, vues = {}, {}
+    local function ajouter(id)
+        id = tonumber(id)
+        if id and not vues[id] then
+            vues[id] = true
+            liste[#liste + 1] = id
+        end
+    end
+    local texte = tostring(e.detail or '')
+    local ok, entree = pcall(Json.decode, texte:match('^(.-)\n\n— Réponse —\n') or texte)
+    if ok and type(entree) == 'table' then
+        ajouter(entree.photo_id)
+        if type(entree.photo_ids) == 'table' then
+            for _, id in ipairs(entree.photo_ids) do
+                ajouter(id)
+            end
+        end
+        if type(entree.ratings) == 'table' then
+            for _, r in ipairs(entree.ratings) do
+                if type(r) == 'table' then
+                    ajouter(r.photo_id)
+                end
+            end
+        end
+    end
+    ciblesLues[e] = liste
+    return liste
+end
+
+-- La tranche d'une série que montre une planche contact, d'après sa réponse (`planche` : positions
+-- dans la série, vidéos comprises, et son total) ; nil avant la réponse ou sans elle.
+local planchesLues = setmetatable({}, { __mode = 'k' })
+
+local function planche(e)
+    if e.outil ~= 'contact_sheet' then
+        return nil
+    end
+    local deja = planchesLues[e]
+    if deja ~= nil then
+        return deja or nil
+    end
+    local reponse = tostring(e.detail or ''):match('\n\n— Réponse —\n(.*)$')
+    if not reponse then
+        return nil
+    end
+    local ok, r = pcall(Json.decode, reponse)
+    local p = ok and type(r) == 'table' and type(r.planche) == 'table' and r.planche or {}
+    local premier, dernier, total = tonumber(p.premiere), tonumber(p.derniere), tonumber(p.sur)
+    planchesLues[e] = premier and dernier and total and { premier = premier, dernier = math.min(dernier, total), total = total } or false
+    return planchesLues[e] or nil
+end
+
+-- Où en est le tour de Claude dans les photos, pour la ligne d'état (demandé par Dany le 26 octobre
+-- 2026 : « sur quelle photo de la sélection il travaille ») : la photo que vise le dernier outil du
+-- tour, s'il n'en vise qu'une, avec son rang dans l'ordre où le tour a visé les photos la première
+-- fois ; sinon la dernière planche contact du tour (le parcours d'une grande série : Claude note la
+-- planche après l'avoir vue), avec son total ; sinon les photos que vise le dernier outil. Rend
+-- { premier, dernier, nombre, id } (`id` : une seule photo ; `total` : celui d'une planche), ou nil
+-- (un dernier outil qui ne nomme aucune photo : la photo active, la sélection entière).
+function Conversation.photosEnCours(c)
+    local debut = #c.elements + 1
+    for i = #c.elements, 1, -1 do
+        if c.elements[i].genre == 'dany' then
+            break
+        end
+        debut = i
+    end
+    local rangs, n, derniere, tranche = {}, 0, nil, nil
+    for i = debut, #c.elements do
+        local e = c.elements[i]
+        if e.genre == 'outil' then
+            derniere = cibles(e)
+            tranche = planche(e) or tranche
+            for _, id in ipairs(derniere) do
+                if not rangs[id] then
+                    n = n + 1
+                    rangs[id] = n
+                end
+            end
+        end
+    end
+    if tranche and not (derniere and #derniere == 1) then
+        return { premier = tranche.premier, dernier = tranche.dernier, nombre = tranche.dernier - tranche.premier + 1, total = tranche.total }
+    end
+    if not derniere or #derniere == 0 then
+        return nil
+    end
+    local premier, dernier = math.huge, 0
+    for _, id in ipairs(derniere) do
+        premier, dernier = math.min(premier, rangs[id]), math.max(dernier, rangs[id])
+    end
+    return { premier = premier, dernier = dernier, nombre = #derniere, id = #derniere == 1 and derniere[1] or nil }
+end
+
 function Conversation.outilsFaits(c)
     local n = 0
     for i = #c.elements, 1, -1 do

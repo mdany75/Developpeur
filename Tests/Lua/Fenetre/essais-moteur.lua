@@ -472,6 +472,7 @@ S.modules.LrTasks.execute = function(commande)
 end
 
 local Moteur = require 'Moteur'
+local Lightroom = require 'Lightroom'
 
 local function attendre(condition, secondes)
     for _ = 1, (secondes or 10) * 10 do
@@ -589,6 +590,58 @@ essai("Moteur : une ancienne séance de notation ne s'ouvre pas, ni au chargemen
     for _, c in ipairs({ principale, groupe, ancienne }) do
         vrai(Fichiers.existe(Stockage.fichier(c.id)), 'gardée : ' .. c.id)
     end
+end)
+
+-- La ligne d'état : sur quelle photo de la sélection Claude travaille (26 octobre 2026) ----------
+
+essai("Ligne d'état : la photo de la sélection où en est Claude", function()
+    local nomDePhoto = Lightroom.nomDePhoto
+    Lightroom.nomDePhoto = function(id) return 'P' .. id .. '.RAF' end
+    local c = Conversation.nouvelle()
+    Conversation.ajouterDemande(c, 'Retouche ces photos', os.time(), {})
+    local function outil(entree, reponse, nom)
+        c.elements[#c.elements + 1] = { genre = 'outil', etat = 'fait', outil = nom,
+            detail = Json.encode(entree) .. (reponse and ('\n\n— Réponse —\n' .. reponse) or '') }
+    end
+    vrai(Conversation.photosEnCours(c) == nil, 'aucun outil')
+    outil({ selection = true })
+    vrai(Conversation.photosEnCours(c) == nil, 'la sélection entière : aucune photo nommée')
+    outil({ photo_id = 11 }, '{"ok": true}')
+    egal('photo 1 de 3 : P11.RAF', Moteur.texteCible(Conversation.photosEnCours(c), 3))
+    outil({ photo_id = 12 })
+    egal('photo 2 de 3 : P12.RAF', Moteur.texteCible(Conversation.photosEnCours(c), 3))
+    outil({ photo_ids = { 11 } })
+    egal('photo 1 de 3 : P11.RAF', Moteur.texteCible(Conversation.photosEnCours(c), 3), 'une photo revue garde son rang')
+    vrai(Moteur.texteCible(Conversation.photosEnCours(c), 1) == nil, 'une photo seule sélectionnée : rien de plus')
+    outil({ ratings = { { photo_id = 13 }, { photo_id = 14 }, { photo_id = 15 } } })
+    egal('photos 3 à 5 de 951', Moteur.texteCible(Conversation.photosEnCours(c), 951))
+    egal('photos 3 à 5', Moteur.texteCible(Conversation.photosEnCours(c), 4), 'au-delà de la sélection : sans « de N »')
+    outil({ photo_ids = { 11, 15 } })
+    egal('2 photos de 951', Moteur.texteCible(Conversation.photosEnCours(c), 951), 'des rangs qui ne se suivent pas')
+    -- Une grande série, planche par planche : la planche vue (positions, vidéos comprises, et son
+    -- total) reste dite pendant que Claude note ses photos ; une photo seule regardée passe devant.
+    outil({ selection = true, offset = 30 }, nil, 'contact_sheet')
+    vrai(Conversation.photosEnCours(c) == nil, 'la première planche, sans réponse encore : rien de lu')
+    c.elements[#c.elements].detail = c.elements[#c.elements].detail
+        .. '\n\n— Réponse —\n{"planche": {"premiere": 31, "derniere": 60, "sur": 951}, "photos": []}'
+    egal('photos 31 à 60 de 951', Moteur.texteCible(Conversation.photosEnCours(c), 3), 'le total de la planche')
+    outil({ ratings = { { photo_id = 31 }, { photo_id = 32 } } }, nil, 'propose_ratings')
+    egal('photos 31 à 60 de 951', Moteur.texteCible(Conversation.photosEnCours(c), 3))
+    outil({ photo_id = 32 }, nil, 'view_photo')
+    egal('photo 7 : P32.RAF', Moteur.texteCible(Conversation.photosEnCours(c), 3), 'au-delà de la sélection : sans « de N »')
+    outil({ selection = true, offset = 60 }, nil, 'contact_sheet')
+    egal('photos 31 à 60 de 951', Moteur.texteCible(Conversation.photosEnCours(c), 3), 'la planche suivante se dessine : la précédente reste dite')
+    vrai(Moteur.texteCible(Conversation.photosEnCours(c), nil) == nil, 'avant que la demande parte : rien')
+    -- Dans la ligne d'état, après la durée ; une demande suivante repart du rang 1.
+    Moteur.travaille, Moteur.enCours, Moteur.selectionTravail, Moteur.debutTravail = true, c, 3, os.time()
+    outil({ photo_id = 12 })
+    local texte = Moteur.texteTravail(0, c)
+    vrai(texte:find(' s · photo 2 de 3 : P12.RAF$'), texte)
+    Conversation.ajouterDemande(c, 'Et celle-ci', os.time(), {})
+    outil({ photo_id = 12 })
+    vrai(Moteur.texteTravail(0, c):find('photo 1 de 3 : P12.RAF', 1, true), Moteur.texteTravail(0, c))
+    Moteur.travaille, Moteur.enCours, Moteur.selectionTravail, Moteur.debutTravail = false, nil, nil, nil
+    Lightroom.nomDePhoto = nomDePhoto
 end)
 
 -- Fin ------------------------------------------------------------------------------------------

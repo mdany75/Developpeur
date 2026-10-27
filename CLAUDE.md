@@ -812,6 +812,38 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   flash à la dernière photo du groupe qui le dit (deux boîtiers mêlés, l'un sans flash lu), et une
   photo seule dit ce qui la sépare avant et après elle (trouvailles de la relecture du 26 octobre
   2026 ; une vignette trop petite y est rendue comme un aperçu, comme au tri).
+- **Noter une grande sélection** (1.4, constaté le soir du 26 octobre 2026 : « note la série » sur
+  951 photos, par la Demande rapide, n'en notait que 24) : Claude Code range une réponse d'outil de
+  plus de 25 000 jetons (son défaut) dans un fichier, et Claude ne peut rien lire dans la fenêtre
+  (`--tools ""`) ; le tri de 951 photos faisait 147 000 caractères, dont 80 % de `plafonds`, une
+  ligne par photo, et `list_selection` à 500, 168 000. `relais.sh` pose donc
+  `MAX_MCP_OUTPUT_TOKENS=100000` (essai de bout en bout de `tests.lua`, par `faux-claude.sh`) ; au-delà
+  de `Tri.plafondsParPhotoMax` (100) photos, le tri dit `plafonds_par_motif` à la place de `plafonds`
+  (les photos de chaque plafond regroupées par `Notation.Plafond.motif`, la raison sans les mesures de
+  chaque photo ; 43 000 caractères estimés pour ces 951 photos, 27 motifs), le plafond de chaque
+  photo restant gardé pour `propose_ratings` (`dernierTri`) ; `contact_sheet` prend une sélection plus
+  longue que sa planche dès l'offset 0 (`parTranches` ; refusée jusque-là, alors qu'un offset de 30
+  passait), et sa suite compte les vidéos écartées (`decalage` + photos + vidéos : sans elles, des
+  photos revenaient d'une planche à l'autre), une tranche faite de vidéos seulement donnant la suite au
+  lieu d'une erreur ; sa réponse dit `planche` (`premiere`, `derniere` : positions dans la série,
+  vidéos comprises ; `sur`), sauf pour `photo_ids` ; les consignes de la fenêtre (puce Notes, `Consignes.rapide`, `Consignes.noterRapide`)
+  disent de noter plus de 30 photos planche par planche (`contact_sheet` avec `selection` et `offset`,
+  puis `propose_ratings`), sans `list_selection` pour les parcourir. Essais :
+  `GroupesLumiereTests` (plafonds par motif, première planche d'une grande sélection, vidéos sautées).
+  Trouvailles d'une relecture adverse du même soir (vidéos, planche de vidéos, ligne d'état), corrigées.
+- **La photo en cours dans la ligne d'état** (1.4, demandé par Dany le 26 octobre 2026 : « sur
+  quelle photo de la sélection il travaille ») : `Moteur.texteTravail` finit par
+  `Moteur.texteCible` : « photo 2 de 3 : XH2S8390.RAF » (une photo), « photos 31 à 60 de 951 » (des
+  rangs qui se suivent), sinon « 4 photos de 12 », d'après `Conversation.photosEnCours` (les photos
+  que vise le dernier outil du tour, `photo_id`, `photo_ids` ou les `photo_id` de `ratings`, lues
+  dans son entrée, rangées dans l'ordre où le tour les a visées la première fois ; rien pour un outil
+  sans photo nommée, la photo active ou `selection`) ; quand ce dernier outil ne vise pas une seule
+  photo, la dernière planche contact du tour l'emporte (`planche` de sa réponse, avec son propre
+  total : pendant que Claude rédige les notes d'une planche, le dernier outil reste `contact_sheet`) ;
+  et `Moteur.selectionTravail`, le nombre de photos sélectionnées, posé juste après la demande
+  (`Moteur.envoyer`, `Moteur.envoyerRapide` ; remis à nil au début d'un envoi : rien du tour d'avant) ;
+  rien pour une photo seule sélectionnée, sans « de N » au-delà de la sélection. Le nom vient de `Lightroom.nomDePhoto` (gardé
+  une fois lu ; rien hors d'une tâche). Essai : `essais-moteur.lua`.
 - Le module signale la photo active changée avec sa réponse suivante (`evenements`, avec son `id`,
   seulement si elle n'est plus celle signalée la dernière fois) ; le serveur le transmet aux
   clients abonnés (`resources/subscribe`), sinon le dit une fois au résultat d'outil suivant
@@ -1219,7 +1251,8 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
 - **Jamais l'API** : la fenêtre Claude passe par Claude Code et la connexion claude.ai.
   `relais.sh` retire de l'environnement les clés d'API et les autres fournisseurs
   (`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, Bedrock, Vertex) ; ne jamais
-  lire ni copier les jetons de connexion de Claude Code.
+  lire ni copier les jetons de connexion de Claude Code. Il pose `MAX_MCP_OUTPUT_TOKENS` (puce Noter
+  une grande sélection).
 - Lightroom ne sait pas tenir un processus par ses tuyaux : `relais.sh`, lancé par
   `LrTasks.execute`, garde Claude Code ouvert pour une conversation (`entree.jsonl` passé par
   `tail -f`, `sortie.jsonl` relu par le moteur) et le ferme quand Lightroom n'est plus là. Claude

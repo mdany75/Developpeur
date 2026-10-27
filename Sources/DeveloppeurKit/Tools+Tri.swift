@@ -57,7 +57,7 @@ extension ToolHandler {
                  ],
                  required: []),
             tool("contact_sheet",
-                 "Planche contact : une seule image de \(Self.maxContactSheet) vignettes au plus, numérotées, avec le nom de chaque fichier, pour voir une série d'un coup d'œil (choisir, comparer, harmoniser, juger l'Impact sur 20 à 30 vignettes) en bien moins de jetons qu'une image par photo. Vignettes du cache d'aperçus de Lightroom (elles peuvent dater d'avant la dernière retouche : la netteté et la finition se jugent par view_photo) ; légende : numéro, id, fichier, note, drapeau (au-delà de 20 vignettes, les noms se lisent mal sur l'image : la légende fait foi). Pour la suite d'une sélection ou d'une collection : offset, et les numéros continuent d'une planche à l'autre.",
+                 "Planche contact : une seule image de \(Self.maxContactSheet) vignettes au plus, numérotées, avec le nom de chaque fichier, pour voir une série d'un coup d'œil (choisir, comparer, harmoniser, juger l'Impact sur 20 à 30 vignettes) en bien moins de jetons qu'une image par photo. Vignettes du cache d'aperçus de Lightroom (elles peuvent dater d'avant la dernière retouche : la netteté et la finition se jugent par view_photo) ; légende : numéro, id, fichier, note, drapeau (au-delà de 20 vignettes, les noms se lisent mal sur l'image : la légende fait foi). Une sélection, une collection ou un dossier plus longs se montrent planche par planche (« suite » dit l'offset suivant), les numéros continuant d'une planche à l'autre ; une grande série se note ainsi, propose_ratings après chaque planche.",
                  properties: series("Photos de la planche (champ « id »), dans l'ordre voulu ; ou selection, collection ou folder (pas de défaut : une planche montre une série).") + [
                     ("offset", prop("integer", "Avec selection, collection ou folder : photos à sauter (planche suivante : offset + \(Self.maxContactSheet)).")),
                     ("columns", prop("integer", "Colonnes (défaut : 2 jusqu'à 4 photos, 3 jusqu'à 9, 4 jusqu'à 16, 5 jusqu'à 25, puis 6).")),
@@ -264,7 +264,7 @@ extension ToolHandler {
         }
         bilan["vignettes"] = ["cache_de_lightroom": .number(Double(depuisCache)), "apercus_rendus": .number(Double(rendues)),
                               "duree": .string(FileOutils.duree(Date().timeIntervalSince(debut)))]
-        bilan["base"] = .string("Mesures sur les vignettes du cache d'aperçus de Lightroom, réduites à \(Detail.side) px (celles d'une photo retouchée depuis peuvent dater d'avant) ; une photo sans vignette assez grande est rendue comme un aperçu. Netteté : 95e centile du laplacien, ramenée à l'échelle d'un aperçu exporté (moins de 15 floue, plus de 35 nette), au point AF de l'appareil quand le fichier le donne (Fujifilm), sinon dans la zone la plus nette. Yeux : fermés ou plissés si l'œil le plus ouvert d'un sujet (visage d'au moins la moitié du plus grand) a une ouverture sous \(DevelopCatalogue.format(VisionAnalysis.closedEyesThreshold)) (hauteur sur largeur du contour de Vision), seulement pour un visage assez grand ; à confirmer par un zoom. Rafales : photos consécutives où Vision voit la même scène, prises à moins de 4 s d'intervalle ; piles : celles de Lightroom, la meilleure de chacune nommée. Classement (ordre) : un ordre de lecture (netteté, note esthétique de Vision à demi-poids), pas une note. Plafonds, d'après le standard de notation (propose_ratings avec read_standard, ou developpeur://notation) : défaut majeur (floue, mise au point manquée, yeux fermés) 0 et rejet proposé ; douce ou mise au point signalée manquée par l'appareil 2 ; presque noire ou brûlée 1, à vérifier (rattrapable par la retouche) ; capture ou document selon Vision 1 ; pas la meilleure de sa rafale ou de sa pile 2 ; sans défaut, pas de plafond (\(Notation.noteMaximale)) ; bruit fort : à noter après le débruitage. Un plafond borne la note, il ne la donne pas ; les étoiles se proposent par propose_ratings. Rejets à présenter à l'utilisateur, puis à poser après accord avec set_metadata (photo_ids et flag reject) ; une photo qui porte déjà un drapeau ou une note n'est pas proposée. À confirmer à l'œil (contact_sheet, view_photo).")
+        bilan["base"] = .string("Mesures sur les vignettes du cache d'aperçus de Lightroom, réduites à \(Detail.side) px (celles d'une photo retouchée depuis peuvent dater d'avant) ; une photo sans vignette assez grande est rendue comme un aperçu. Netteté : 95e centile du laplacien, ramenée à l'échelle d'un aperçu exporté (moins de 15 floue, plus de 35 nette), au point AF de l'appareil quand le fichier le donne (Fujifilm), sinon dans la zone la plus nette. Yeux : fermés ou plissés si l'œil le plus ouvert d'un sujet (visage d'au moins la moitié du plus grand) a une ouverture sous \(DevelopCatalogue.format(VisionAnalysis.closedEyesThreshold)) (hauteur sur largeur du contour de Vision), seulement pour un visage assez grand ; à confirmer par un zoom. Rafales : photos consécutives où Vision voit la même scène, prises à moins de 4 s d'intervalle ; piles : celles de Lightroom, la meilleure de chacune nommée. Classement (ordre) : un ordre de lecture (netteté, note esthétique de Vision à demi-poids), pas une note. Plafonds, d'après le standard de notation (propose_ratings avec read_standard, ou developpeur://notation) : défaut majeur (floue, mise au point manquée, yeux fermés) 0 et rejet proposé ; douce ou mise au point signalée manquée par l'appareil 2 ; presque noire ou brûlée 1, à vérifier (rattrapable par la retouche) ; capture ou document selon Vision 1 ; pas la meilleure de sa rafale ou de sa pile 2 ; sans défaut, pas de plafond (\(Notation.noteMaximale)) ; bruit fort : à noter après le débruitage. Au-delà de \(Tri.plafondsParPhotoMax) photos, plafonds_par_motif à la place de plafonds : les photos de chaque plafond, regroupées par motif, sans les mesures de chacune. Un plafond borne la note, il ne la donne pas ; les étoiles se proposent par propose_ratings. Rejets à présenter à l'utilisateur, puis à poser après accord avec set_metadata (photo_ids et flag reject) ; une photo qui porte déjà un drapeau ou une note n'est pas proposée. À confirmer à l'œil (contact_sheet, view_photo).")
         return .object(bilan)
     }
 
@@ -338,11 +338,25 @@ extension ToolHandler {
 
     func contactSheet(_ args: Arguments) throws -> ToolResult {
         let decalage = max(0, args.int("offset") ?? 0)
-        let (ids, total) = try seriesPhotos(args, maximum: Self.maxContactSheet, decalage: decalage)
+        // Une sélection plus longue que la planche se montre planche par planche, comme une
+        // collection : la première sans offset (refusée jusqu'au 26 octobre 2026), la suite dite.
+        let serie = try seriesPhotosSansVideos(args, maximum: Self.maxContactSheet, decalage: decalage, parTranches: true)
+        let (ids, total) = (serie.ids, serie.total)
+        let liste = (try args.intList("photo_ids"))?.isEmpty == false
         // Numéros suivis d'une planche à l'autre : la photo 13 d'une sélection porte 13 sur la
         // deuxième planche (photo_ids : la liste donnée, numérotée depuis 1).
-        let premier = (try args.intList("photo_ids"))?.isEmpty == false ? 1 : decalage + 1
-        guard !ids.isEmpty else { throw LightroomError.invalid("Aucune photo pour la planche.") }
+        let premier = liste ? 1 : decalage + 1
+        // La tranche suivante commence après les vidéos écartées de celle-ci (sans elles, « suite »
+        // remontrait des photos ; relecture du 26 octobre 2026).
+        let suivant = decalage + ids.count + serie.videos
+        guard !ids.isEmpty else {
+            // Une tranche faite de vidéos seulement : la suite, pas une erreur qui arrêterait le
+            // parcours d'une grande série.
+            guard !liste, serie.videos > 0, suivant < total else { throw LightroomError.invalid("Aucune photo pour la planche.") }
+            return json(["planche": ["premiere": .number(Double(decalage + 1)), "derniere": .number(Double(suivant)), "sur": .number(Double(total))],
+                         "videos_ecartees": .string("\(serie.videos) vidéo(s) écartée(s) : aucune photo dans cette tranche."),
+                         "suite": .string("\(total - suivant) photo(s) de plus : rappeler avec offset = \(suivant).")])
+        }
         if let colonnes = args.int("columns"), !(1...6).contains(colonnes) {
             throw LightroomError.invalid("« columns » va de 1 à 6.")
         }
@@ -363,8 +377,16 @@ extension ToolHandler {
         }
         var info: [String: JSONValue] = ["photos": .array(legende),
                                          "base": "Vignettes du cache d'aperçus de Lightroom : elles peuvent dater d'avant la dernière retouche (view_photo montre l'état actuel)."]
-        if decalage + ids.count < total {
-            info["suite"] = .string("\(total - decalage - ids.count) photo(s) de plus : rappeler avec offset = \(decalage + ids.count).")
+        // Où en est le parcours de la série (positions, vidéos comprises) : la ligne d'état de la
+        // fenêtre Claude le dit pendant que Claude note la planche.
+        if !liste {
+            info["planche"] = ["premiere": .number(Double(decalage + 1)), "derniere": .number(Double(suivant)), "sur": .number(Double(total))]
+        }
+        if serie.videos > 0 {
+            info["videos_ecartees"] = .string("\(serie.videos) vidéo(s) écartée(s) de la planche.")
+        }
+        if suivant < total {
+            info["suite"] = .string("\(total - suivant) photo(s) de plus : rappeler avec offset = \(suivant).")
         }
         // Recompressée au besoin : Claude Desktop refuse une réponse d'environ 1 Mo.
         return ToolResult(content: [Self.imageContent(image), .text(JSONCoding.pretty(.object(info)))])

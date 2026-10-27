@@ -39,6 +39,10 @@ esac
 # Le forfait, pas une clé d'API ni un autre fournisseur hérités de l'environnement.
 unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+# Une réponse d'outil plus longue que 25 000 tokens (le défaut de Claude Code) serait rangée dans un
+# fichier que Claude ne peut pas lire ici (--tools "") : constaté le 26 octobre 2026, le tri de
+# 951 photos (147 000 caractères) et list_selection à 500 perdus.
+export MAX_MCP_OUTPUT_TOKENS=100000
 
 touch entree.jsonl
 rm -f tuyau

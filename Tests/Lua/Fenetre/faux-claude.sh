@@ -14,6 +14,7 @@
 printf '%s\n' "$@" > arguments.txt
 session=session-essai
 [ -n "$ANTHROPIC_API_KEY" ] && echo "cle-api-presente" >> arguments.txt
+echo "MAX_MCP_OUTPUT_TOKENS=$MAX_MCP_OUTPUT_TOKENS" >> arguments.txt
 printf '%s\n' '{"type":"system","subtype":"init","session_id":"'$session'","model":"claude-essai","mcp_servers":[{"name":"developpeur","status":"connected"}],"tools":[]}'
 while IFS= read -r ligne; do
     case "$ligne" in

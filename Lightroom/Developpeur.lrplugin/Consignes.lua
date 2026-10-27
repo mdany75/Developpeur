@@ -51,7 +51,10 @@ af_point = true, puis propose_ratings sans apply ; ta note arrive « à vérifie
 Note, Dany l'accepte ou la change. Une photo déjà évaluée (view_photo : evaluation) ne se renote \
 pas, sauf s'il le demande. Quand Dany demande que tu notes (« note ces photos », « pose les \
 notes »), apply = true. De 0 à 5 ★ ; jamais de libellé de couleur (ses coups de cœur) sans sa \
-demande.
+demande. Plus de 30 photos : cull_photos une fois avec selection = true (offset de 1 000 en 1 000 \
+au-delà), puis planche par planche, contact_sheet avec selection = true (offset 0, puis celui que \
+dit « suite ») et propose_ratings pour ses photos, jusqu'à la dernière ; jamais list_selection pour \
+les parcourir, view_photo seulement pour un 3 ★ ou plus.
 - Mise au point montrée ou jugée : view_photo avec af_point = true, sur l'aperçu entier comme sur \
 un zoom (region) : le carré y est dessiné, s'il tombe dans la zone (point_af : dans_la_zone).
 - Une préférence de Dany remarquée (corrections_utilisateur, demandes répétées) : propose-la sur \
@@ -303,7 +306,7 @@ Consignes.ajustementsCadre = { "Plus serré", "Plus large", "Horizon au tiers ha
 -- sans suite ni carte. `rapide` : plusieurs photos (ou la case Autre photo décochée), dans une
 -- conversation jamais gardée ; `rapidePhoto` : une photo seule, dans sa conversation, que la fenêtre
 -- Claude reprendra (correctif 1.3.6, « une photo, une conversation »).
-Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Elle vise toutes les photos sélectionnées dans Lightroom (list_selection, puis chacune, ou selection = true), pas seulement la photo active, sauf si elle en nomme une. Fais ce qui est demandé sans noter les photos d'abord (sauf si on te le demande), puis dis ce qui a changé, photo par photo si elles sont plusieurs. Pas de titre."
+Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Elle vise toutes les photos sélectionnées dans Lightroom (selection = true ; list_selection puis chacune jusqu'à 30 photos), pas seulement la photo active, sauf si elle en nomme une. Fais ce qui est demandé sans noter les photos d'abord (sauf si on te le demande), puis dis ce qui a changé, photo par photo si elles sont plusieurs. Pas de titre."
 Consignes.rapidePhoto = "[Demande rapide] Une seule demande, faite depuis la fenêtre Demande rapide dans la conversation de cette photo, que la fenêtre Claude reprendra : la Demande rapide ne montre que ta réponse, et rien n'y pourra être accepté. Elle vise la photo active, seule sélectionnée. Fais ce qui est demandé sans noter la photo d'abord (sauf si on te le demande), puis dis ce qui a changé. Pas de titre."
 
 -- Les boutons de la Demande rapide, à gauche du champ (FenetreRapide.ACTIONS, demandés par Dany le
@@ -311,7 +314,7 @@ Consignes.rapidePhoto = "[Demande rapide] Une seule demande, faite depuis la fen
 -- les note et pose les notes de Claude (le clic vaut la demande, comme « note ces photos ») ; les
 -- deux autres reprennent les invites Retouche pro et Portrait (Consignes.invite : une seule copie
 -- de leurs messages), pour chaque photo sélectionnée (Consignes.surLaSelection).
-Consignes.noterRapide = "Note chaque photo sélectionnée selon le standard de notation, même déjà évaluée : cull_photos avec selection = true, view_photo avec af_point = true sur chacune, puis propose_ratings avec apply = true pour poser les notes. Dis chaque note posée et sa raison en une phrase."
+Consignes.noterRapide = "Note chaque photo sélectionnée selon le standard de notation, même déjà évaluée : cull_photos avec selection = true, view_photo avec af_point = true sur chacune (plus de 30 photos : planche par planche, puce Notes de tes consignes), puis propose_ratings avec apply = true pour poser les notes. Dis chaque note posée et sa raison en une phrase."
 
 function Consignes.invite(id)
     for _, invite in ipairs(Consignes.invites) do

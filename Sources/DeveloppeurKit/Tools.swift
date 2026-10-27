@@ -466,7 +466,7 @@ public final class ToolHandler {
             "find_photos": schema("Photos du catalogue qui répondent aux critères, par page.", ["total": nombre, "photos": liste]),
             "cull_photos": schema("Bilan d'une séance : photos à défaut, rafales, ordre de lecture, plafonds de note mesurés, proposition de rejet.",
                                   ["photos_analysees": nombre, "floues_ou_ratees": liste, "rafales": liste, "classement": liste,
-                                   "plafonds": objet, "propositions": liste, "vignettes": objet]),
+                                   "plafonds": objet, "plafonds_par_motif": liste, "propositions": liste, "vignettes": objet]),
             "propose_ratings": schema("Propositions rangées pour la carte Note, et posées avec apply ; ou le standard de notation.",
                                       ["propositions": liste, "refusees": liste, "posees": liste, "erreur_pose": ["type": ["string", "null"]],
                                        "standard": texte]),

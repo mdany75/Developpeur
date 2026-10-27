@@ -124,6 +124,10 @@ public enum Notation {
         public var rejet: Bool
         /// Rattrapable par la retouche ou douteux : à vérifier par l'utilisateur.
         public var aVerifier: Bool
+        /// La raison sans les mesures de la photo, la même pour toutes les photos au même plafond
+        /// pour les mêmes défauts : le tri d'une grande série regroupe ses plafonds par motif
+        /// (`Tri.plafondsParPhotoMax`). Vide sans plafond.
+        public var motif: String = ""
     }
 
     /// Le plafond d'une photo triée, d'après le standard et les seuils déjà relevés (netteté 15 et
@@ -140,7 +144,7 @@ public enum Notation {
     /// vérifier. Nil si rien n'a pu être mesuré (vignette illisible).
     public static func plafond(_ photo: PhotoTriee, doublon: Bool, autreVueYeuxOuverts: Bool = false) -> Plafond? {
         guard photo.erreur == nil else { return nil }
-        var limites: [(note: Int, raison: String)] = []
+        var limites: [(note: Int, raison: String, motif: String)] = []
         var rejet = false, aVerifier = false
         let raw = ["RAW", "DNG"].contains(photo.format?.uppercased() ?? "")
         for (genre, texte) in photo.defautsMesures {
@@ -148,44 +152,51 @@ public enum Notation {
             case .miseAuPointManquee where photo.af?.douteuse == true:
                 // Texture faible autour du point (DetailMeasurements.textureDouteuse) : un doute, pas
                 // un rejet (le bord d'un nuage, relevé le 21 octobre 2026).
-                limites.append((1, texte + " ; texture faible autour du point : à vérifier par un zoom à 100 %"))
+                limites.append((1, texte + " ; texture faible autour du point : à vérifier par un zoom à 100 %",
+                                "mise au point manquée sur une texture faible : à vérifier par un zoom à 100 %"))
                 aVerifier = true
             case .floue, .miseAuPointManquee:
-                limites.append((0, texte))
+                limites.append((0, texte, genre == .floue ? "floue" : "mise au point manquée"))
                 rejet = true
             case .yeuxFermes where autreVueYeuxOuverts:
-                limites.append((0, texte + " ; une autre vue de sa rafale les a ouverts"))
+                limites.append((0, texte + " ; une autre vue de sa rafale les a ouverts",
+                                "yeux fermés ou plissés ; une autre vue de sa rafale les a ouverts"))
                 rejet = true
             case .yeuxFermes:
                 // La règle de la rafale (1.3.4) : la seule vue de son moment (la seule photo d'un
                 // groupe) ne se jette pas pour un clignement.
-                limites.append((1, texte + " ; aucune autre vue de sa rafale ne les a ouverts : la seule de son moment ne se jette pas pour un clignement, à vérifier"))
+                let suite = " ; aucune autre vue de sa rafale ne les a ouverts : la seule de son moment ne se jette pas pour un clignement, à vérifier"
+                limites.append((1, texte + suite, "yeux fermés ou plissés" + suite))
                 aVerifier = true
             case .miseAuPointSignalee:
-                limites.append((2, texte))
+                limites.append((2, texte, "mise au point signalée manquée par l'appareil"))
             case .presqueNoire, .brulee:
-                limites.append((1, texte + (raw ? " : rattrapable par la retouche (RAW), à vérifier" : " : à vérifier après la retouche")))
+                let suite = raw ? " : rattrapable par la retouche (RAW), à vérifier" : " : à vérifier après la retouche"
+                limites.append((1, texte + suite, (genre == .presqueNoire ? "presque noire" : "brûlée") + suite))
                 aVerifier = true
             }
         }
         let signalee = photo.defautsMesures.contains { $0.genre == .miseAuPointSignalee }
         if !rejet, !signalee, let nettete = photo.nettete, nettete < DetailMeasurements.seuilNet {
-            limites.append((2, "douce (netteté \(PhotoTriee.r(nettete))\(photo.af?.netteteJugee != nil ? " au point AF" : "") ; nette à partir de \(PhotoTriee.r(DetailMeasurements.seuilNet)))"))
+            limites.append((2, "douce (netteté \(PhotoTriee.r(nettete))\(photo.af?.netteteJugee != nil ? " au point AF" : "") ; nette à partir de \(PhotoTriee.r(DetailMeasurements.seuilNet)))",
+                            "douce (netteté sous \(PhotoTriee.r(DetailMeasurements.seuilNet)))"))
         }
         if photo.vision?.utility == true {
-            limites.append((1, "capture ou document selon Vision"))
+            limites.append((1, "capture ou document selon Vision", "capture ou document selon Vision"))
         }
         if doublon {
-            limites.append((2, "pas la meilleure de sa rafale ou de sa pile (un 3 est la meilleure vue de son moment)"))
+            let texte = "pas la meilleure de sa rafale ou de sa pile (un 3 est la meilleure vue de son moment)"
+            limites.append((2, texte, texte))
         }
         if let detail = photo.detail, max(detail.noise, detail.shadowNoise ?? 0) >= DetailMeasurements.bruitFort {
-            limites.append((noteMaximale, "bruit fort (\(PhotoTriee.r2(max(detail.noise, detail.shadowNoise ?? 0)))) : à noter après le débruitage (enhance_photo)"))
+            limites.append((noteMaximale, "bruit fort (\(PhotoTriee.r2(max(detail.noise, detail.shadowNoise ?? 0)))) : à noter après le débruitage (enhance_photo)",
+                            "bruit fort : à noter après le débruitage (enhance_photo)"))
             aVerifier = true
         }
         let note = limites.map(\.note).min() ?? noteMaximale
-        let raison = limites.isEmpty
-            ? "aucun défaut mesuré : pas de plafond"
-            : limites.sorted { $0.note < $1.note }.map(\.raison).joined(separator: " ; ")
-        return Plafond(note: min(note, noteMaximale), raison: raison, rejet: rejet, aVerifier: aVerifier)
+        let tries = limites.sorted { $0.note < $1.note }
+        let raison = limites.isEmpty ? "aucun défaut mesuré : pas de plafond" : tries.map(\.raison).joined(separator: " ; ")
+        return Plafond(note: min(note, noteMaximale), raison: raison, rejet: rejet, aVerifier: aVerifier,
+                       motif: tries.map(\.motif).joined(separator: " ; "))
     }
 }

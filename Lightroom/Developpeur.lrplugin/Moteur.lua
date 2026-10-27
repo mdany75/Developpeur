@@ -460,6 +460,8 @@ function Moteur.envoyer(texte, options)
     Moteur.travaille = true
     Moteur.interruptionLe = nil
     Moteur.tourRapide, Moteur.selectionRapide = nil, nil
+    -- La ligne d'état ne redit pas les photos du tour d'avant (posée avec la demande).
+    Moteur.selectionTravail = nil
     local c = Moteur.courante or Conversation.nouvelle()
     Moteur.courante = c
     Moteur.enCours = c
@@ -479,7 +481,8 @@ function Moteur.envoyer(texte, options)
             texte = #jointes > 1 and "Regarde les photos jointes." or "Regarde la photo jointe."
         end
         local style = Consignes.style(options.style)
-        local contexte = Lightroom.contexte(Lightroom.photos())
+        local info = Lightroom.photos()
+        local contexte = Lightroom.contexte(info)
         rejoindreHistorique(c)
         -- L'historique de la photo et ce qui a changé depuis (ou le résumé du groupe), faits par la
         -- fenêtre : joints une seule fois, à la demande qui les suit (marqués envoyés une fois la
@@ -488,6 +491,7 @@ function Moteur.envoyer(texte, options)
         local message = Conversation.messagePourClaude(c, texte, contexte, Consignes.ligneStyle(options.style), historiques)
         local affiche = type(options.affiche) == 'string' and Texte.nettoyer(options.affiche) or ''
         Conversation.ajouterDemande(c, affiche ~= '' and affiche or texte, os.time(), chemins, style and style.definition and style.title or nil)
+        Moteur.selectionTravail = info.selection
         -- Une conversation neuve est gardée à sa première demande ; celle d'un groupe, jamais.
         if c.groupe == nil and not dansListe(c) then
             table.insert(Moteur.conversations, 1, c)
@@ -601,6 +605,7 @@ function Moteur.envoyerRapide(texte)
     Moteur.enCours = nil
     Moteur.tourRapide = Moteur.RESERVE_RAPIDE
     Moteur.debutTravail = os.time()
+    Moteur.selectionTravail = nil
     local info, photoSeule, c
     local okLu, erreurLue = LrTasks.pcall(function()
         -- Les conversations gardées, même si la fenêtre Claude ne s'est pas encore ouverte : celle
@@ -659,6 +664,7 @@ function Moteur.envoyerRapide(texte)
         end
         morceaux[#morceaux + 1] = texte
         Conversation.ajouterDemande(c, texte, os.time(), {})
+        Moteur.selectionTravail = info.selection
         local demande = c.elements[#c.elements]
         demande.rapide = true
         Moteur.demandeRapide = demande
@@ -969,7 +975,36 @@ function Moteur.texteTravail(tic, vue)
     end
     local duree = os.time() - (Moteur.debutTravail or os.time())
     morceaux[#morceaux + 1] = duree >= 60 and string.format("%d min %02d", math.floor(duree / 60), duree % 60) or (duree .. " s")
+    local cible = c and Moteur.texteCible(Conversation.photosEnCours(c), Moteur.selectionTravail)
+    if cible then
+        morceaux[#morceaux + 1] = cible
+    end
     return table.concat(morceaux, " · ")
+end
+
+-- Sur quelle photo de la sélection Claude travaille (demandé par Dany le 26 octobre 2026) : « photo 2
+-- de 3 : XH2S8390.RAF », « photos 31 à 60 de 951 », « 4 photos de 12 » (rangs qui ne se suivent
+-- pas), d'après `cible` (Conversation.photosEnCours) et `total`, la sélection de la demande (nil
+-- tant que la demande n'est pas partie : rien) ; une planche contact donne son propre total. Rien
+-- pour une photo seule ; sans « de N » au-delà (une copie que Claude a faite). Le nom du fichier se
+-- lit dans le catalogue (Lightroom.nomDePhoto).
+function Moteur.texteCible(cible, total)
+    if not cible or not total then
+        return nil
+    end
+    total = cible.total or total
+    if total <= 1 then
+        return nil
+    end
+    local de = cible.dernier <= total and (" de " .. Texte.nombre(total)) or ''
+    if cible.id then
+        local nom = Lightroom.nomDePhoto(cible.id)
+        return "photo " .. Texte.nombre(cible.premier) .. de .. (nom and (" : " .. nom) or '')
+    end
+    if cible.dernier - cible.premier + 1 == cible.nombre then
+        return "photos " .. Texte.nombre(cible.premier) .. " à " .. Texte.nombre(cible.dernier) .. de
+    end
+    return Texte.nombre(cible.nombre) .. " photos" .. de
 end
 
 -- « Forfait : 5 h 23 % · semaine 41 % » d'après le dernier relevé de Claude Code.

@@ -6398,6 +6398,29 @@ reste rien, « aucune photo dans la période » à zéro) ; clé `photos_analyse
 exemples régénérés). Le même soir, à sa demande (« enlève le mot ouvertes »), les autres tuiles
 disent « P % des photos » (« des photos ouvertes » avant).
 
+**Noter une grande sélection** (constaté le même soir : « note la série » sur 951 photos, par la
+Demande rapide, Haiku à l'effort bas, n'en notait que 24). Claude Code range une réponse d'outil de
+plus de 25 000 jetons (son défaut, `MAX_MCP_OUTPUT_TOKENS`) dans un fichier, que Claude ne peut pas
+lire dans la fenêtre (aucun outil intégré) : le tri de 951 photos (147 000 caractères, dont 117 000 de
+`plafonds`, une ligne par photo) et `list_selection` à 500 (168 000) y étaient perdus, et la planche
+contact refusait la sélection sans offset. Depuis : `relais.sh` pose `MAX_MCP_OUTPUT_TOKENS=100000` ;
+au-delà de `Tri.plafondsParPhotoMax` (100) photos, `cull_photos` dit `plafonds_par_motif`
+(`note_max`, `a_verifier`, `pourquoi` sans les mesures de chaque photo : `Notation.Plafond.motif`,
+`nombre`, `photos`) à la place de `plafonds` (43 000 caractères estimés pour ces 951 photos, en
+27 motifs) ; `contact_sheet` montre une grande sélection planche par planche dès l'offset 0, sa suite
+compte les vidéos écartées (une tranche de vidéos seulement donne la suite, sans erreur) et sa réponse
+dit `planche` (`premiere`, `derniere`, `sur` : positions dans la série, vidéos comprises) ; les
+consignes de la fenêtre disent de noter plus de 30 photos planche par planche (`contact_sheet` avec
+`selection` et `offset`, puis `propose_ratings` pour ses photos), sans `list_selection`.
+
+**La photo en cours dans la ligne d'état** (demandée par Dany le même soir) : « Claude travaille ·
+3 outils faits · 11 s · photo 2 de 3 : XH2S8390.RAF », ou « photos 31 à 60 de 951 », d'après les
+photos que nomme l'entrée du dernier outil du tour (`photo_id`, `photo_ids`, les `photo_id` de
+`ratings`), rangées dans l'ordre où le tour les a visées (`Conversation.photosEnCours`), sinon la
+dernière planche contact du tour (`planche` de sa réponse : elle reste dite pendant que Claude note
+ses photos), et le nombre de photos sélectionnées à la demande (`Moteur.selectionTravail`, nil tant
+que la demande n'est pas partie ; `Moteur.texteCible`).
+
 **À constater dans Lightroom** (l'essai de la 1.4, sur une vraie sortie d'au moins 500 photos en
 copies virtuelles) :
 
@@ -6410,7 +6433,10 @@ copies virtuelles) :
 4. `cull_photos` sur 1 000 photos d'un coup (durée, réponse d'attente de Claude Desktop) et par
    tranches avec `offset` ; `selection` avec `decalage` sur une grande sélection ;
 5. la tuile « Photos analysées » et son détail dans la fenêtre Suivi (coupé par « … » au-delà de la
-   tuile, l'infobulle le donne en entier).
+   tuile, l'infobulle le donne en entier) ;
+6. « note la série » sur une grande sélection dans la fenêtre Claude et la Demande rapide : le tri
+   reçu en entier (`MAX_MCP_OUTPUT_TOKENS` lu par la version de Claude Code installée), les planches
+   jusqu'à la dernière, la durée, et la photo en cours dans la ligne d'état.
 
 ## Correctif 1.3.7 : le Suivi en graphiques
 

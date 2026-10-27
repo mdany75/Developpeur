@@ -161,6 +161,25 @@ function Lightroom.etoiles(note)
     return string.rep('★', n) .. string.rep('☆', 5 - n)
 end
 
+-- Le nom du fichier d'une photo, par son identifiant, pour la ligne d'état (« photo 2 de 3 :
+-- XH2S8390.RAF ») ; gardé une fois lu. Nil hors d'une tâche, ou si la photo ne se lit pas.
+local noms = {}
+
+function Lightroom.nomDePhoto(id)
+    id = tonumber(id)
+    if not id then
+        return nil
+    end
+    if noms[id] == nil and LrTasks.canYield() then
+        local ok, nom = LrTasks.pcall(function()
+            local photo = LrApplication.activeCatalog():getPhotoByLocalId(id)
+            return photo and photo:getFormattedMetadata('fileName')
+        end)
+        noms[id] = ok and type(nom) == 'string' and nom ~= '' and nom or false
+    end
+    return noms[id] or nil
+end
+
 -- La ligne de contexte jointe à chaque demande.
 function Lightroom.contexte(info)
     if not info.active then

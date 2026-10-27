@@ -34,6 +34,15 @@ souper n'ont pas la même lumière, et une seule référence les rendait tous fa
 - Le tri d'une sortie entière : Claude trie jusqu'à 1 000 photos d'un coup (500 avant), et une sortie
   plus grande par tranches, sans que vous ayez à réduire la sélection ; les groupes de lumière
   prennent jusqu'à 2 000 photos d'un coup.
+- Noter toute une sélection : « note la série » sur 951 photos ne notait que les 24 premières.
+  Dans la fenêtre Claude et la Demande rapide, Claude reçoit maintenant le tri entier (il était
+  trop long pour lui), puis note la sélection planche par planche, 30 photos à la fois, jusqu'à la
+  dernière ; la planche contact prend une grande sélection dès la première planche. Au-delà de 100
+  photos, le tri regroupe les plafonds de note par raison : sa réponse est trois fois plus courte
+  (43 000 caractères au lieu de 147 000 pour ces 951 photos).
+- Pendant que Claude travaille, la ligne d'état dit sur quelle photo de la sélection il en est
+  (« Claude travaille · 3 outils faits · 11 s · photo 2 de 3 : XH2S8390.RAF »), ou quelles photos
+  (« photos 31 à 60 de 951 »).
 - Dans la fenêtre Suivi, la première tuile s'appelle « Photos analysées » (« Photos ouvertes »
   avant) : elle compte les photos déjà analysées de la période, et dit dessous combien il y en a en
   tout et ce qui reste (« sur 84 582 photos · 474 non analysées »). Le mot « ouvertes » quitte aussi

@@ -216,6 +216,8 @@ public enum Tri {
     /// de 0 à 1) : un indice d'Impact, pas un critère du standard.
     static let poidsEsthetique = 0.5
     static let tailleClassement = 15
+    /// Au-delà, les plafonds se disent par motif (`plafonds_par_motif`), pas photo par photo.
+    static let plafondsParPhotoMax = 100
     /// Deux photos consécutives sont de la même rafale si Vision y voit la même scène et si elles
     /// sont prises à moins de `ecartRafale` secondes l'une de l'autre. Relevé le 17 octobre 2026
     /// sur une vraie séance de 329 photos : sans l'écart de temps, les photos semblables de
@@ -389,14 +391,33 @@ public enum Tri {
         let yeux = photos.indices.filter { photos[$0].yeuxFermes != nil }
         if !yeux.isEmpty { resultat["yeux_fermes"] = ids(yeux) }
 
-        // Plafonds : seulement ceux qui bornent la note, ou qui demandent une vérification.
-        var plafonds: [String: JSONValue] = [:]
-        for (i, plafond) in analyse.plafonds where plafond.note < Notation.noteMaximale || plafond.aVerifier {
-            var item: [String: JSONValue] = ["note_max": .number(Double(plafond.note)), "pourquoi": .string(plafond.raison)]
-            if plafond.aVerifier { item["a_verifier"] = true }
-            plafonds[String(photos[i].id)] = .object(item)
+        // Plafonds : seulement ceux qui bornent la note, ou qui demandent une vérification. Une
+        // grande série les regroupe par motif (sans les mesures de chaque photo) : une ligne par
+        // photo faisait 80 % de la réponse du tri de 951 photos (147 000 caractères, 26 octobre 2026).
+        let bornes = analyse.plafonds.filter { $0.value.note < Notation.noteMaximale || $0.value.aVerifier }
+        if !bornes.isEmpty, photos.count <= plafondsParPhotoMax {
+            var plafonds: [String: JSONValue] = [:]
+            for (i, plafond) in bornes {
+                var item: [String: JSONValue] = ["note_max": .number(Double(plafond.note)), "pourquoi": .string(plafond.raison)]
+                if plafond.aVerifier { item["a_verifier"] = true }
+                plafonds[String(photos[i].id)] = .object(item)
+            }
+            resultat["plafonds"] = .object(plafonds)
+        } else if !bornes.isEmpty {
+            var parMotif: [String: (plafond: Notation.Plafond, photos: [Int])] = [:]
+            for (i, plafond) in bornes {
+                let cle = "\(plafond.note)|\(plafond.aVerifier)|\(plafond.motif)"
+                parMotif[cle, default: (plafond, [])].photos.append(i)
+            }
+            resultat["plafonds_par_motif"] = .array(parMotif.values
+                .sorted { ($0.plafond.note, -$0.photos.count, $0.plafond.motif) < ($1.plafond.note, -$1.photos.count, $1.plafond.motif) }
+                .map { groupe in
+                    var item: [String: JSONValue] = ["note_max": .number(Double(groupe.plafond.note)), "pourquoi": .string(groupe.plafond.motif),
+                                                     "nombre": .number(Double(groupe.photos.count)), "photos": ids(groupe.photos)]
+                    if groupe.plafond.aVerifier { item["a_verifier"] = true }
+                    return .object(item)
+                })
         }
-        if !plafonds.isEmpty { resultat["plafonds"] = .object(plafonds) }
 
         // Le standard n'a qu'un drapeau, Rejeter : pour un défaut majeur seulement, à confirmer à l'œil.
         var propositions: [JSONValue] = []

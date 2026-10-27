@@ -354,6 +354,8 @@ essai('Moteur : une demande, de bout en bout par relais.sh', function()
     vrai(a:find('--strict-mcp-config', 1, true) and a:find('--permission-prompts\nnone', 1, true), 'options de Claude Code')
     vrai(not a:find('--resume', 1, true), 'nouvelle session')
     vrai(not a:find('cle-api-presente', 1, true), "aucune clé d'API ne passe")
+    -- Une longue réponse d'outil arrive à Claude, qui ne peut lire aucun fichier (26 octobre 2026).
+    vrai(a:find('MAX_MCP_OUTPUT_TOKENS=100000', 1, true), 'réponses longues des outils permises')
     vrai(Fichiers.existe(Stockage.fichier(c.id)), 'conversation enregistrée')
     vrai(Moteur.session and Moteur.session:actif(), 'Claude Code reste ouvert')
     -- Le connecteur seul, nommé developpeur : ses outils sont mcp__developpeur__* (relais.sh).
