@@ -88,22 +88,15 @@ Dans cet ordre :
    l'une de ces photos, défaite ensuite. L'essai doit réussir avant le tag.
 4. `git tag -a vX.Y -m "Version X.Y" && git push origin vX.Y`
 5. `gh release create vX.Y "build/Developpeur.zip" --title "Développeur X.Y" --notes "$(~/.claude/skills/standard-projet/scripts/notes-version.sh X.Y)"`
-6. Mettre à jour la feuille de route, dans sa page Lavish seulement (artefact privé
-   https://claude.ai/artifact/1nTRUJhgpvrkYybt7pNVns ; demandé par Dany le 24 octobre 2026, qui a
-   fait supprimer l'ancien document Claude Docs le même jour) : la relire (Artifact, `read`), retirer
-   ce que la version vient de livrer et corriger ce qui est devenu faux (frise des versions,
-   bilan et décisions compris), l'ouvrir dans Lavish (`npx -y lavish-axi <fichier>`, source dans
-   `docs/lavish/`, commitée et poussée depuis le 24 octobre 2026 : le dépôt est public) pour la
-   relecture de Dany, puis la republier à la même adresse. De même pour
-   les pages que la version rend fausses : Les 35 outils
-   (https://claude.ai/artifact/KniGdYp5yt4DPsLcbsLoCL, source `les-36-outils.html`, nom gardé) et
-   Ordinogramme d'une retouche (https://claude.ai/artifact/RzGhic1X61H3crEBFYjTLd), et Analyse du
-   Développeur (https://claude.ai/artifact/9kQ7kKQk5VuXrrAWFrvVKS, source `analyse-1-5.html`,
-   analyse de la 1.4 du 27 octobre 2026 : ses constats livrés s'y marquent faits) ; Guide des
-   demandes et Apprendre avec Claude sont supprimées, avec leurs sources, à la demande de Dany le
-   27 octobre 2026. Tout document nouveau pour Dany (guide,
-   compte rendu, plan) se fait de même : une page Lavish publiée en artefact, sa source dans
-   `docs/lavish/`, jamais un document Claude Docs.
+6. Mettre à jour la page Analyse du Développeur, en artefact privé
+   (https://claude.ai/artifact/9kQ7kKQk5VuXrrAWFrvVKS, source `docs/lavish/analyse-1-5.html`,
+   analyse de la 1.4 du 27 octobre 2026) : la relire (Artifact, `read`), marquer faits les constats
+   que la version livre et corriger ce qui est devenu faux, puis la republier à la même adresse.
+   Feuille de route, Les 35 outils et Ordinogramme d'une retouche sont supprimées, avec leurs
+   sources, à la demande de Dany le 27 octobre 2026, comme Guide des demandes et Apprendre avec
+   Claude le même jour. Tout document nouveau pour Dany (guide, compte rendu, plan) se fait en
+   page Lavish publiée en artefact (`npx -y lavish-axi <fichier>` pour sa relecture), sa source
+   dans `docs/lavish/`, commitée et poussée, jamais un document Claude Docs.
 
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 
@@ -1118,4 +1111,4 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
 - `.github/workflows/tests.yml` : syntaxe des scripts et les deux suites à chaque envoi sur `main` (macOS)
 - `build.sh` (tests, compilation, signature, archive notarisée), `install.sh`, `uninstall.sh`
 - `Resources/Info.plist` : identifiant `com.danymenard.mcp-developpeur` et version (incrusté par `-sectcreate` dans `Package.swift`)
-- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, les chantiers de la 1.3 et ce qui en reste à constater, et la fenêtre Claude (architecture, contraintes du SDK, fenêtre B et ses constats, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude, fenêtre B de la 1.3.2 avec l'onglet Focus, capture principale du README ; à refaire au correctif 1.3.7 : la fenêtre de 1 623 × 1 200), `carnet.png` (la page Carnet de progrès ; à refaire au correctif 1.3.7 : la fenêtre Suivi en graphiques), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de la liaison) ; `docs/lavish/` : les sources des pages Lavish publiées en artefacts (feuille de route, Les 35 outils (`les-36-outils.html`, nom gardé), Ordinogramme d'une retouche, Analyse du Développeur (`analyse-1-5.html`)), une par page, à garder identiques à leur artefact
+- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, les chantiers de la 1.3 et ce qui en reste à constater, et la fenêtre Claude (architecture, contraintes du SDK, fenêtre B et ses constats, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude, fenêtre B de la 1.3.2 avec l'onglet Focus, capture principale du README ; à refaire au correctif 1.3.7 : la fenêtre de 1 623 × 1 200), `carnet.png` (la page Carnet de progrès ; à refaire au correctif 1.3.7 : la fenêtre Suivi en graphiques), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de la liaison) ; `docs/lavish/` : les sources des pages Lavish publiées en artefacts (Analyse du Développeur, `analyse-1-5.html`), une par page, à garder identiques à leur artefact
