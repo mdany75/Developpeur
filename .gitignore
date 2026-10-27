@@ -52,3 +52,5 @@ desktop.ini
 
 # Dépôt git tenu hors de la synchronisation iCloud (ancienne astuce)
 .git.nosync/
+
+.claude/worktrees/

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analyse du Développeur</title>
+<style>
+  :root {
+    --texte: #1D1D1F; --gris: #6B6B6B; --bleu: #0A64D8; --mono: #3D3D45;
+    --vert: #1F7A35; --orange: #A85A00; --rouge: #B3261E;
+    --fond: #FFFFFF; --volet: #F2F2F2; --carte: #FAFAFA; --filet: #E2E2E2;
+    --vert-doux: #E6F2E9; --orange-doux: #FCEFDF; --bleu-doux: #E3EEFC; --rouge-doux: #FBE9E7; --gris-doux: #EBEBEB;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --texte: #E8E8E8; --gris: #9A9A9A; --bleu: #5AA2F6; --mono: #C8C8D0;
+      --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+      --fond: #1E1E1E; --volet: #2A2A2A; --carte: #262626; --filet: #343434;
+      --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #333333;
+      color-scheme: dark;
+    }
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { background: var(--volet); }
+  body { margin: 0; background: var(--volet); color: var(--texte); font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  code { font-family: Menlo, ui-monospace, monospace; font-size: .86em; color: var(--mono); background: var(--gris-doux); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .page { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 30px; line-height: 1.2; }
+  h2 { margin: 40px 0 6px; font-size: 21px; }
+  .sous { color: var(--gris); margin: 0 0 18px; }
+  .bilan { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+  .chiffre { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 14px; }
+  .chiffre b { display: block; font-size: 26px; }
+  .chiffre span { color: var(--gris); font-size: 13px; }
+  .carte { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 14px 16px; margin: 10px 0; }
+  .carte h3 { margin: 0 0 6px; font-size: 15.5px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .carte p { margin: 4px 0; overflow-wrap: anywhere; }
+  .preuve { color: var(--gris); font-size: 13px; }
+  .pastille { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .fort { background: var(--rouge-doux); color: var(--rouge); }
+  .moyen { background: var(--orange-doux); color: var(--orange); }
+  .faible { background: var(--gris-doux); color: var(--gris); }
+  .petit { background: var(--vert-doux); color: var(--vert); }
+  .moyen-e { background: var(--bleu-doux); color: var(--bleu); }
+  .grand { background: var(--gris-doux); color: var(--texte); }
+  .type { background: var(--bleu-doux); color: var(--bleu); }
+  table { width: 100%; border-collapse: collapse; background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--filet); vertical-align: top; overflow-wrap: anywhere; }
+  th { background: var(--carte); font-size: 13px; color: var(--gris); }
+  .encadre { background: var(--bleu-doux); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
+  .alerte { background: var(--orange-doux); }
+  @media (max-width: 640px) { th, td { padding: 7px 8px; font-size: 13.5px; } }
+</style>
+</head>
+<body>
+<div class="page">
+<h1>Analyse du connecteur et du module Développeur</h1>
+<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne).</p>
+
+<div class="encadre"><b>Verdict.</b> La base est solide : 585 tests Swift, des tests Lua sur un SDK simulé, un jeton de liaison bien conçu, une couverture très large des réglages du module Développeur. Les gains viennent maintenant de trois endroits : <b>alléger ce que le modèle lit</b> (23 000 caractères de descriptions), <b>fiabiliser le pont</b> avec Lightroom, et <b>protéger la photo de l'empilement</b> de réglages.</div>
+
+<div class="bilan">
+  <div class="chiffre"><b>35</b><span>outils exposés, ≈ 6 à 7 000 jetons à chaque session</span></div>
+  <div class="chiffre"><b>56</b><span>constats classés par impact</span></div>
+  <div class="chiffre"><b>3</b><span>erreurs réelles à corriger tout de suite</span></div>
+  <div class="chiffre"><b>1 931</b><span>lignes de notes retirées (CLAUDE.md, CHANGELOG, README)</span></div>
+</div>
+
+<h2>1. À corriger tout de suite (petit effort, fort effet)</h2>
+<div class="carte"><h3>Les consignes serveur citent un paramètre qui n'existe pas <span class="pastille fort">fort</span><span class="pastille petit">petit</span></h3>
+<p>« preview_settings, preview = true » : <code>preview</code> n'existe que sur <code>add_mask</code> et <code>edit_mask</code>. Les paramètres inconnus étant refusés, un modèle qui suit la consigne obtient une erreur.</p>
+<p class="preuve">ServerInfo.swift · Tools+Retouche.swift:124-137 · Tools+Locales.swift:209</p>
+<p><b>Faire :</b> corriger la phrase, et ajouter un test qui vérifie que chaque paramètre cité dans les consignes existe dans l'outil nommé (la limite de longueur est à 3 787 sur 3 796 : refaire le calcul).</p></div>
+<div class="carte"><h3>CI : ni la version ni le build release ne sont vérifiés <span class="pastille fort">fort</span><span class="pastille petit">petit</span></h3>
+<p><b>Faire :</b> ajouter <code>swift build -c release</code> puis comparer <code>--version</code> à Info.plist ; sortir le contrôle de versions de <code>build.sh</code> dans <code>scripts/verifier-versions.sh</code>.</p></div>
+<div class="carte"><h3>Le Suivi et le « classement » : fonctions faites, mais sans bouton <span class="pastille fort">fort</span><span class="pastille petit">petit</span></h3>
+<p>Mots-clés, lieu et légende existent comme outils, sans invite ni bouton dans la Demande rapide. <b>Faire :</b> invite « Classer » + 4ᵉ bouton, en « Proposer d'abord » par défaut.</p></div>
+
+<h2>2. Le connecteur MCP (ce que le modèle voit)</h2>
+<div class="carte"><h3>Ciblage des photos différent d'un outil à l'autre <span class="pastille type">modifier</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
+<p>Trois formes : <code>photo_id</code> seul (12 outils), <code>photo_ids</code> + <code>selection</code> (6 outils), <code>collection</code>/<code>folder</code> (tri, planche, export). Quatre outils refusent plusieurs photos sans que le schéma le dise.</p><p><b>Faire :</b> un seul vocabulaire, ou « une seule » écrit dans le schéma, avec un test de cohérence.</p></div>
+<div class="carte"><h3>tools/list trop lourd <span class="pastille type">améliorer</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
+<p><code>view_photo</code> ≈ 1 825 caractères, <code>export_photos</code> ≈ 1 288, <code>propose_ratings</code> ≈ 1 200… <b>Faire :</b> budget global testé (≈ 16 000), plafond de 1 000 par outil, détails de procédure déplacés vers les ressources <code>developpeur://</code>.</p></div>
+<div class="carte"><h3>Fusionner ce qui sert le même moment <span class="pastille type">améliorer</span><span class="pastille moyen">moyen</span></h3>
+<p><code>list_profiles</code> + <code>list_presets</code> → <code>list_looks</code> ; <code>compare_variants</code> + <code>choose_variant</code> → <code>variants</code> ; <code>export_photos</code> avec <code>action</code> (liste, dossier, export). Scinder <code>set_metadata</code> en classement (quotidien) et métadonnées (rare).</p></div>
+<div class="carte"><h3>Erreurs sans code lisible par le modèle <span class="pastille type">améliorer</span><span class="pastille moyen">moyen</span></h3>
+<p><b>Faire :</b> <code>{code, reessayable, action}</code> en <code>structuredContent</code> (liaison_fermee, mode_proposer, original_introuvable, delai…) et des <code>outputSchema</code> pour les cinq sorties clés.</p></div>
+<div class="carte"><h3>Détails de cohérence <span class="pastille faible">faible</span></h3>
+<p><code>step_name</code> obligatoire alors que <code>reason</code> ne l'est pas · pagination en trois dialectes (<code>limit</code>/<code>offset</code> partout, défaut 50) · <code>remove_distractions</code> promet « reflets » mais couvre aussi la poussière (retrait seulement) · branche « outil inconnu » inatteignable.</p></div>
+
+<h2>3. Le module Lightroom (Lua) et le pont</h2>
+<div class="carte"><h3>Réponse perdue : aucune trace, aucune reprise <span class="pastille type">améliorer</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
+<p><b>Faire :</b> journaliser la réponse abandonnée, garder les 20 derniers résultats par id, commande « reprendre ». Un identifiant de session aléatoire (nonce) évite qu'un compteur entre en collision entre deux sessions.</p></div>
+<div class="carte"><h3>Aucune annulation, pas de progression pour les commandes seules <span class="pastille type">ajouter</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
+<p><b>Faire :</b> un <code>LrProgressScope</code> « Claude : commande » dès 3 s, avec croix ; lectures et rendus s'arrêtent à la croix.</p></div>
+<div class="carte"><h3>Prise occupée : cinq essais puis échec définitif <span class="pastille type">améliorer</span><span class="pastille moyen">moyen</span><span class="pastille petit">petit</span></h3>
+<p><b>Faire :</b> attente croissante (1 à 30 s), état « en attente du port » dans le voyant, port en préférence.</p></div>
+<div class="carte"><h3>Autres <span class="pastille moyen">moyen</span></h3>
+<p>Rappels de <code>LrSocket</code> jamais exercés par les tests · compatibilité découverte à l'usage (ajouter un objet <code>capacites</code> à <code>get_status</code>) · fenêtre figée à 1 623 × 1 200 (mode compact) · dossiers d'aperçus jamais balayés · corrections manuelles détectées par comparaison, sans observateur.</p></div>
+
+<h2>4. La retouche : qualité et garde-fous</h2>
+<div class="carte"><h3>Pas de plafond dur sur Clarté, Dehaze, Texture, netteté locale <span class="pastille type">ajouter</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
+<p><b>Faire :</b> une table de doses par réglage et par type de masque (comme pour la peau) ; au-delà, refuser ou exiger une demande explicite.</p></div>
+<div class="carte"><h3>Empilement : le nombre de passes n'est pas contrôlé <span class="pastille type">améliorer</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
+<p><b>Faire :</b> cumul par session et par réglage, renvoyé avec une alerte (Clarté > 25, Dehaze > 20, Saturation/Vibrance > 30).</p></div>
+<div class="carte"><h3>match_series n'harmonise que exposition, balance des blancs, contraste <span class="pastille type">ajouter</span><span class="pastille fort">fort</span><span class="pastille grand">grand</span></h3>
+<p><b>Faire :</b> ajouter saturation et ombres/noirs, déjà mesurés dans le bilan.</p></div>
+<div class="carte"><h3>Le guide de style est de la prose que personne n'applique en chiffres <span class="pastille type">améliorer</span><span class="pastille fort">fort</span><span class="pastille grand">grand</span></h3>
+<p><b>Faire :</b> un « style numérique » (profil préféré par scène, décalages moyens, courbe signature, grain) proposé comme point de départ.</p></div>
+<div class="carte"><h3>Fragilités à réparer <span class="pastille moyen">moyen</span><span class="pastille petit">petit</span></h3>
+<p>Apprentissage : rubrique fausse (test <code>contains</code> au lieu du préfixe exact) · parseur des effets locaux qui s'arrête à la première accolade fermante (tables imbriquées) · seuils réglés sur huit copies d'essai : monter un jeu de 40 photos avec vérité terrain.</p></div>
+
+<h2>5. Le parcours du photographe</h2>
+<table>
+<tr><th>Manque ou excès</th><th>Proposition</th><th>Impact · effort</th></tr>
+<tr><td>Aucun geste d'import</td><td>Invite « Nouvelle sortie » : tri, groupes de lumière, notation des photos ajoutées</td><td>fort · moyen</td></tr>
+<tr><td>Pas d'avant/après de la photo entière</td><td>Bouton « Avant Claude / Maintenant » dans l'Aperçu</td><td>moyen · moyen</td></tr>
+<tr><td>Export sans livraison type</td><td>Bouton « Partager » (écran, courriel, Instagram, impression)</td><td>moyen · petit</td></tr>
+<tr><td>Notation sans revue rapide</td><td>« Accepter tout sauf les rejets », « Voir les 2 ★ et plus »</td><td>moyen · moyen</td></tr>
+<tr><td>Raccourcis : manipulation système</td><td>Expliquer au premier lancement : Fichier › Module externe - Extras</td><td>moyen · petit</td></tr>
+<tr><td>Suivi surdimensionné (≈ 8 657 lignes Lua)</td><td>Garder photos par mois, notes, 3 défauts ; retirer calendrier et champ Du/au</td><td>fort · grand</td></tr>
+<tr><td>Onze genres de photo, peu fiables</td><td>Garder portrait, paysage, famille, animaux ; le reste sous « Autre »</td><td>moyen · moyen</td></tr>
+</table>
+
+<h2>6. Qualité logicielle et livraison</h2>
+<table>
+<tr><th>Constat</th><th>Proposition</th></tr>
+<tr><td>Installation sans retour arrière</td><td>Garder <code>.precedent</code>, tester <code>--version</code> avant le <code>mv</code></td></tr>
+<tr><td>Mise à jour sans contrôle d'intégrité, tributaire de <code>gh</code></td><td>Publier <code>.sha256</code>, repli sur l'API publique GitHub</td></tr>
+<tr><td>Code de recette dans le binaire livré</td><td>Cible <code>RecetteKit</code> séparée</td></tr>
+<tr><td>Pont local : le jeton ne protège pas d'un processus du même compte</td><td>Confirmation « depuis Lightroom » pour export, rejets, retour à l'original</td></tr>
+<tr><td>Fichiers Lua et <code>MotsClesVision.swift</code> très gros</td><td>Découper <code>Fenetre.lua</code> par écran, mots-clés en ressource JSON</td></tr>
+<tr><td>Pas de workflow de publication</td><td>Tag <code>v*</code> qui refuse si tag ≠ Info.plist</td></tr>
+</table>
+
+<h2>7. Alléger la relecture (nettoyage des notes)</h2>
+<div class="encadre"><b>Fait le 27 octobre 2026.</b> L'historique de ce qui est livré est retiré des trois fichiers (commit 26da2b9, 1 931 lignes) ; il reste dans git. Les dossiers hors git sont vidés.</div>
+<table>
+<tr><th>Fichier</th><th>Avant</th><th>Maintenant</th></tr>
+<tr><td>CLAUDE.md</td><td>2 208 lignes · 256 Ko</td><td>1 119 lignes · 144 Ko</td></tr>
+<tr><td>CHANGELOG.md</td><td>1 085 lignes</td><td>365 lignes</td></tr>
+<tr><td>README.md</td><td>1 433 lignes</td><td>1 312 lignes</td></tr>
+<tr><td>.claude/worktrees</td><td>567 Mo, <b>hors git</b></td><td>vide, et ignoré par git</td></tr>
+<tr><td>build/conception/</td><td>dossier de conception 1.2/1.3, <b>hors git</b></td><td>retiré</td></tr>
+</table>
+<p class="sous">À ne pas toucher : <code>.build</code> (793 Mo, cache de compilation régénérable, à vider seulement si tu veux de la place) et <code>build/Developpeur.zip</code>.</p>
+
+<h2>Ordre conseillé</h2>
+<table>
+<tr><th>Vague</th><th>Contenu</th></tr>
+<tr><td>1 · Cette semaine</td><td>Les 3 corrections rapides · garde-fous de dose et cumul · progression et annulation · nonce et reprise</td></tr>
+<tr><td>2 · Ensuite</td><td>Budget de descriptions · fusion des outils · codes d'erreur · invites Classer / Nouvelle sortie / Partager · retour arrière de l'installation</td></tr>
+<tr><td>3 · Plus tard</td><td>Style numérique · harmonisation de série élargie · allègement du Suivi · découpage de <code>Fenetre.lua</code></td></tr>
+</table>
+</div>
+</body>
+</html>
