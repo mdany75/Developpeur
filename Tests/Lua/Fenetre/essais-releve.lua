@@ -1640,8 +1640,11 @@ essai("Un grand relevé s'écrit moins souvent : l'écart entre deux écritures 
     egal(20, Releve.delaiEcriture(), 'une écriture brève : DELAI_ECRITURE')
     local LrDate = S.modules.LrDate
     local maintenant = LrDate.currentTime
-    local decalage = 0
-    LrDate.currentTime = function() return maintenant() + decalage end
+    -- Une horloge figée, qui n'avance que de decalage : celle de la simulation est os.time, et
+    -- une écriture qui passerait d'une seconde à la suivante durerait 1 s de plus (constaté le
+    -- 27 octobre 2026 sur GitHub : 50 au lieu de 40).
+    local base, decalage = maintenant(), 0
+    LrDate.currentTime = function() return base + decalage end
     local ecrireParMorceaux = Fichiers.ecrireParMorceaux
     local ok, erreur = pcall(function()
         -- Les autres tâches prennent 30 s chaque fois que l'écriture rend la main : pas compté.
