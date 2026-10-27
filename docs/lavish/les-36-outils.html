@@ -216,8 +216,8 @@
     { id: "trier", nom: "Trier et noter",
       intro: "Trois outils jugent une séance. Claude note de 0 à 5 ★ ; tes coups de cœur sont un libellé de couleur que tu poses toi-même, et une note proposée attend ton accord dans la carte Note.",
       outils: [
-        { nom: "cull_photos", titre: "Trier une séance", fait: "Mesure netteté, exposition, yeux fermés et rafales ; propose les rejets et le plafond de note de chaque photo ; sans photos désignées, juge la photo active.", ajout: ["1.3.4 · 1.3.5 · 1.4", "Des yeux fermés ne font proposer un rejet que si une autre vue de la rafale les a ouverts ; deux boîtiers ne font plus une rafale ; les vidéos sont écartées ; 1 000 photos d'un coup, et une sortie plus grande par tranches (offset)."], change: "non" },
-        { nom: "contact_sheet", titre: "Planche contact", fait: "Une planche de 30 vignettes numérotées au plus, pour voir une sortie d'un coup.", change: "non" },
+        { nom: "cull_photos", titre: "Trier une séance", fait: "Mesure netteté, exposition, yeux fermés et rafales ; propose les rejets et le plafond de note de chaque photo ; sans photos désignées, juge la photo active.", ajout: ["1.3.4 · 1.3.5 · 1.4", "Des yeux fermés ne font proposer un rejet que si une autre vue de la rafale les a ouverts ; deux boîtiers ne font plus une rafale ; les vidéos sont écartées ; 1 000 photos d'un coup, et une sortie plus grande par tranches (offset) ; au-delà de 100 photos, les plafonds regroupés par raison."], change: "non" },
+        { nom: "contact_sheet", titre: "Planche contact", fait: "Une planche de 30 vignettes numérotées au plus, pour voir une sortie d'un coup ; une grande sélection, planche par planche (offset).", ajout: ["1.4", "Une grande sélection se montre dès la première planche, les vidéos sautées ; Claude note ainsi toute une sortie, planche par planche."], change: "non" },
         { nom: "propose_ratings", titre: "Noter des photos", fait: "Propose une note de 0 à 5 ★, « à vérifier », selon le standard de notation ; la pose si tu le demandes.", change: "classement", precision: "seulement sur ta demande" },
       ] },
     { id: "livrer", nom: "Livrer",

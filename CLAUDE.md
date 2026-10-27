@@ -232,7 +232,7 @@ publication : l'essai réel dans la fenêtre Claude et la Demande rapide, et la 
 vraies photos (`docs/SPEC.md`, Correctif 1.3.7).
 
 Le correctif 1.3.8 (construit le 26 octobre 2026, jamais publié seul : il part avec la 1.4, plus bas,
-dont la section « ## 1.4 — 2026-10-26 » de `CHANGELOG.md` le reprend ; demandé par Dany le
+dont la section « ## 1.4 — 2026-10-27 » de `CHANGELOG.md` le reprend ; demandé par Dany le
 même matin : un dossier de 3 500 photos se sélectionnait par tranches de 1 000, puis « monte à
 250 000 » : toute sa bibliothèque, 88 071 photos dont 3 323 vidéos, Toutes les photographies, tout
 sélectionner) : `Releve.MAX_SELECTION` passe de 1 000 à 250 000 (10 000 le matin même), et n'est plus
@@ -310,8 +310,9 @@ ni nuit n'y étaient. Reste à constater dans Lightroom (`docs/SPEC.md`, Correct
 points 13 à 15) : le calendrier (fenêtre modale depuis la fenêtre Suivi, clics, fermeture par
 `LrDialogs.stopModalWithResult`), le genre de toute la bibliothèque en arrière-plan, et l'en-tête.
 
-La 1.4, une sortie entière, du tri à l'harmonisation (« ## 1.4 — 2026-10-26 », construite le même
-soir, pas encore publiée ; demandée par Dany : « on finit 1.4, 1.5 et 1.6 » ; la 1.5 et la 1.6 sont
+La 1.4, une sortie entière, du tri à l'harmonisation (« ## 1.4 — 2026-10-27 », construite le
+26 octobre au soir, publiée le 27 octobre vers 2 h sur l'ordre de Dany (« go »), après les deux
+suites et sa recette (86 étapes) ; demandée par Dany : « on finit 1.4, 1.5 et 1.6 » ; la 1.5 et la 1.6 sont
 livrées en code par les correctifs 1.3.4 et 1.3.5, il ne leur reste que l'usage de Dany : un vrai
 tirage, ses reprises à la main pour `remember_style` avec `learn`, les recettes des styles à juger).
 Le dernier chantier de la feuille de route, « Harmoniser par lumière », et le tri d'une sortie
@@ -331,10 +332,14 @@ photos · … » ; puis, le même soir, le mot « ouvertes » retiré des tuiles
 ouvertes » : « P % des photos », « aucune photo dans la période », « toutes les photos ») (contrat
 `suivi.json`, `regles.textes.tuiles`). Le module ajoute `prise_de_vue` (ouverture, vitesse,
 compensation, flash en nombres) à la description des vignettes ; aucun fichier nouveau au module
-depuis le correctif 1.3.8 (`Calendrier.lua`), 35 outils. Elle se publie après son essai réel : la
-recette, puis une vraie sortie d'au moins 500 photos de Dany, en copies virtuelles, groupée,
-harmonisée et notée, renotée en partie quelques jours plus tard (feuille de route, Décisions de
-Dany) ; les seuils des groupes s'y relèvent.
+depuis le correctif 1.3.8 (`Calendrier.lua`), 35 outils. Son essai réel, prévu avant la publication
+(une vraie sortie d'au moins 500 photos, groupée, harmonisée et notée, renotée en partie quelques
+jours plus tard : feuille de route, Décisions de Dany), est fait en partie : la notation de 951
+photos de Dany par la Demande rapide (27 octobre 2026, Haiku à l'effort bas, 12 min : un tri,
+32 planches, 895 à 1 ★, 19 à 2 ★, 5 rejets) ; restent les groupes de lumière et l'harmonisation sur
+une vraie sortie (les seuils des groupes s'y relèvent), la renotation d'un échantillon, et une demande
+dans la fenêtre Claude. La recette du 27 octobre a constaté le flash lu en booléen par
+`getRawMetadata` (`prise_de_vue`, un oui, deux non sur les trois copies d'essai).
 
 Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/download/Developpeur.zip`.
 

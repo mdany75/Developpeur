@@ -1,6 +1,6 @@
 # Changements
 
-## 1.4 — 2026-10-26
+## 1.4 — 2026-10-27
 
 La 1.4, une sortie entière, du tri à l'harmonisation : un voyage ou une fête de famille, c'est des
 centaines de photos, plusieurs lumières, parfois deux boîtiers. Claude les trie toutes d'un coup, puis
