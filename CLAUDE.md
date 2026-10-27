@@ -828,7 +828,11 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   lieu d'une erreur ; sa réponse dit `planche` (`premiere`, `derniere` : positions dans la série,
   vidéos comprises ; `sur`), sauf pour `photo_ids` ; les consignes de la fenêtre (puce Notes, `Consignes.rapide`, `Consignes.noterRapide`)
   disent de noter plus de 30 photos planche par planche (`contact_sheet` avec `selection` et `offset`,
-  puis `propose_ratings`), sans `list_selection` pour les parcourir. Essais :
+  puis `propose_ratings`), jusqu'à la dernière dans le même tour (la planche suffit pour confirmer les
+  rejets du tri), sans `list_selection` pour les parcourir ; `Consignes.rapide` ne dit plus « sans
+  suite » (Claude, Haiku à l'effort bas, renonçait alors à noter les 951 photos après le tri, reçu
+  en entier : « je ne peux pas le faire fidèlement dans cette demande sans suite »), mais de faire la
+  demande en entier dans le tour, même longue. Essais :
   `GroupesLumiereTests` (plafonds par motif, première planche d'une grande sélection, vidéos sautées).
   Trouvailles d'une relecture adverse du même soir (vidéos, planche de vidéos, ligne d'état), corrigées.
 - **La photo en cours dans la ligne d'état** (1.4, demandé par Dany le 26 octobre 2026 : « sur

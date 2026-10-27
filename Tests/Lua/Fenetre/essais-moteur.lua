@@ -592,6 +592,19 @@ essai("Moteur : une ancienne séance de notation ne s'ouvre pas, ni au chargemen
     end
 end)
 
+-- Une grande sélection se note en entier, même par la Demande rapide (26 octobre 2026) --------
+
+essai('Consignes : une grande sélection se note planche par planche, en entier, même en Demande rapide', function()
+    -- « Une seule demande, sans suite » faisait renoncer Claude à noter 951 photos.
+    vrai(not Consignes.rapide:find('sans suite', 1, true), Consignes.rapide)
+    contient(Consignes.rapide, 'fais-la en entier dans ce tour')
+    contient(Consignes.rapide, "jusqu'à la dernière")
+    local texte = Consignes.texte
+    contient(texte, 'contact_sheet avec selection = true')
+    contient(texte, "jusqu'à la dernière, dans le même tour")
+    contient(texte, 'confirmer les rejets')
+end)
+
 -- La ligne d'état : sur quelle photo de la sélection Claude travaille (26 octobre 2026) ----------
 
 essai("Ligne d'état : la photo de la sélection où en est Claude", function()

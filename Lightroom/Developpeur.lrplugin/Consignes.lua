@@ -53,7 +53,8 @@ pas, sauf s'il le demande. Quand Dany demande que tu notes (« note ces photos �
 notes »), apply = true. De 0 à 5 ★ ; jamais de libellé de couleur (ses coups de cœur) sans sa \
 demande. Plus de 30 photos : cull_photos une fois avec selection = true (offset de 1 000 en 1 000 \
 au-delà), puis planche par planche, contact_sheet avec selection = true (offset 0, puis celui que \
-dit « suite ») et propose_ratings pour ses photos, jusqu'à la dernière ; jamais list_selection pour \
+dit « suite ») et propose_ratings pour ses photos, jusqu'à la dernière, dans le même tour : la \
+planche suffit pour juger et confirmer les rejets que le tri propose ; jamais list_selection pour \
 les parcourir, view_photo seulement pour un 3 ★ ou plus.
 - Mise au point montrée ou jugée : view_photo avec af_point = true, sur l'aperçu entier comme sur \
 un zoom (region) : le carré y est dessiné, s'il tombe dans la zone (point_af : dans_la_zone).
@@ -303,10 +304,11 @@ Consignes.ajustementsCadre = { "Plus serré", "Plus large", "Horizon au tiers ha
 
 
 -- Joint à chaque demande de la fenêtre Demande rapide (Moteur.envoyerRapide) : une seule demande,
--- sans suite ni carte. `rapide` : plusieurs photos (ou la case Autre photo décochée), dans une
+-- sans carte, faite en entier dans le tour (« sans suite » faisait renoncer Claude à noter 951 photos
+-- planche par planche, le 26 octobre 2026). `rapide` : plusieurs photos (ou la case Autre photo décochée), dans une
 -- conversation jamais gardée ; `rapidePhoto` : une photo seule, dans sa conversation, que la fenêtre
 -- Claude reprendra (correctif 1.3.6, « une photo, une conversation »).
-Consignes.rapide = "[Demande rapide] Une seule demande, sans suite : la conversation n'est pas gardée et rien ne pourra être accepté ensuite. Elle vise toutes les photos sélectionnées dans Lightroom (selection = true ; list_selection puis chacune jusqu'à 30 photos), pas seulement la photo active, sauf si elle en nomme une. Fais ce qui est demandé sans noter les photos d'abord (sauf si on te le demande), puis dis ce qui a changé, photo par photo si elles sont plusieurs. Pas de titre."
+Consignes.rapide = "[Demande rapide] Une seule demande : la conversation n'est pas gardée et rien ne pourra être accepté ensuite, alors fais-la en entier dans ce tour, même longue (noter une grande sélection : toutes ses planches, jusqu'à la dernière), sans t'arrêter pour demander la suite. Elle vise toutes les photos sélectionnées dans Lightroom (selection = true ; list_selection puis chacune jusqu'à 30 photos), pas seulement la photo active, sauf si elle en nomme une. Fais ce qui est demandé sans noter les photos d'abord (sauf si on te le demande), puis dis ce qui a changé, photo par photo si elles sont plusieurs (plus de 30 : en résumé). Pas de titre."
 Consignes.rapidePhoto = "[Demande rapide] Une seule demande, faite depuis la fenêtre Demande rapide dans la conversation de cette photo, que la fenêtre Claude reprendra : la Demande rapide ne montre que ta réponse, et rien n'y pourra être accepté. Elle vise la photo active, seule sélectionnée. Fais ce qui est demandé sans noter la photo d'abord (sauf si on te le demande), puis dis ce qui a changé. Pas de titre."
 
 -- Les boutons de la Demande rapide, à gauche du champ (FenetreRapide.ACTIONS, demandés par Dany le
