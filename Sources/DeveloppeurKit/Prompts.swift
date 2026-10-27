@@ -140,7 +140,7 @@ public enum Prompts {
 
     /// Une passe du standard de notation, telle que l'invite noter la donne.
     private static func passeNotation(_ arguments: [String: String]) -> String {
-        guard let passe = argument(arguments, "passe") else { return " Toutes les passes du standard, une question à la fois (pass = 1, puis 2, puis 3 ; la 4, monter à 5 étoiles, après le développement)." }
+        guard let passe = argument(arguments, "passe") else { return " Toutes les passes du standard, une question à la fois (pass = 1, puis 2, puis 3 ; la 4, monter à 4 étoiles, et à 5 pour l'exceptionnel, après le développement)." }
         switch passe {
         case "1", "2", "3", "4": return " Passe \(passe) du standard (« Les passes ») : pass = \(passe) dans propose_ratings."
         default: return " Passe : \(passe)."
@@ -152,7 +152,7 @@ public enum Prompts {
         description: "Noter des photos selon le standard de notation, passe par passe, avec une raison par critère : des notes proposées de 0 à 5 étoiles, que l'utilisateur accepte dans Lightroom (jamais de libellé de couleur).",
         arguments: [
             .init(name: "photos", description: "Où sont les photos : « la sélection », le nom d'une collection ou le chemin d'un dossier."),
-            .init(name: "passe", description: "La passe : 1 (rejeter ou non), 2 (3 étoiles ou non), 3 (monter à 4 étoiles), 4 (monter à 5 étoiles, après le développement), ou une consigne (« revoir les 3 étoiles »)."),
+            .init(name: "passe", description: "La passe : 1 (rejeter ou non), 2 (2 étoiles ou non), 3 (monter à 3 étoiles), 4 (monter à 4 étoiles, et à 5 pour l'exceptionnel, après le développement), ou une consigne (« revoir les 2 étoiles »)."),
         ],
         render: { arguments in
             let ou = argument(arguments, "photos").map { "Photos : \($0)." }
@@ -162,8 +162,8 @@ public enum Prompts {
 
             1. cull_photos sur ces photos : le plancher technique (défauts, plafonds de note), les rafales et les piles, les rejets proposés. Une photo de nuit ou au bruit fort se note après le débruitage.
             2. contact_sheet par planches de 24 à 30 (offset ; les numéros continuent d'une planche à l'autre) : l'Impact et les Qualités se jugent sur toute la sortie vue d'un coup.
-            3. view_photo, avec region sur le sujet, pour les candidates à 4 et 5 étoiles (nette à 100 % sur le sujet, meilleure vue de son moment) et pour les cas douteux ; la Finition ne se juge que là (les vignettes peuvent dater d'avant la dernière retouche).
-            4. propose_ratings, avec pass : une note de 0 à \(Notation.noteMaximale) ou flag reject, une raison par critère (impact, qualities, technical_floor ; finish pour une photo développée), une phrase (reason), to_check pour un cas douteux ; jamais au-dessus du plafond de cull_photos, sauf un défaut voulu et maîtrisé, dit dans technical_floor, avec to_check. 5 étoiles : rares, après le développement (passe 4). Jamais de libellé de couleur : ses coups de cœur, qu'il pose lui-même (set_metadata, seulement à sa demande). S'il demande que tu poses les notes, apply = true.
+            3. view_photo, avec region sur le sujet, pour les candidates à 3 étoiles et plus (nette à 100 % sur le sujet, meilleure vue de son moment) et pour les cas douteux ; la Finition ne se juge que là (les vignettes peuvent dater d'avant la dernière retouche).
+            4. propose_ratings, avec pass : une note de 0 à \(Notation.noteMaximale) ou flag reject, une raison par critère (impact, qualities, technical_floor ; finish pour une photo développée), une phrase (reason), to_check pour un cas douteux ; jamais au-dessus du plafond de cull_photos, sauf un défaut voulu et maîtrisé, dit dans technical_floor, avec to_check. Dans le doute entre deux notes, la plus basse ; 4 étoiles : rares, 5 : l'exceptionnel, quelques-unes par année au plus, après le développement (passe 4). Jamais de libellé de couleur : ses coups de cœur, qu'il pose lui-même (set_metadata, seulement à sa demande). S'il demande que tu poses les notes, apply = true.
             5. Résume : combien par note, les cas douteux, et que l'utilisateur accepte ou change chaque note, arrivée à vérifier, dans Lightroom (carte Note). Jamais set_metadata pour une note sans sa demande ; une photo déjà notée par lui garde sa note, sauf s'il le demande.
 
             Standard de notation (aussi : ressource developpeur://notation, propose_ratings avec read_standard) :

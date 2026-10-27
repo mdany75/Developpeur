@@ -251,8 +251,8 @@ flowchart TD
   E3 --> F
   F{"Défaut mesuré ?"}
   F -->|"floue, MAP manquée, yeux fermés"| F1["Plafond 0 ★, rejet proposé"]
-  F -->|"douce, pas la meilleure de sa rafale"| F2["Plafond 3 ★"]
-  F -->|"presque noire ou brûlée, doute de MAP"| F3["Plafond 2 ★, à vérifier"]
+  F -->|"douce, pas la meilleure de sa rafale"| F2["Plafond 2 ★"]
+  F -->|"presque noire ou brûlée, doute de MAP"| F3["Plafond 1 ★, à vérifier"]
   F -->|"capture d'écran"| F4["Plafond 1 ★"]
   F -->|"aucun"| F5["Pas de plafond"]
   F1 --> G
@@ -273,7 +273,7 @@ flowchart TD
   N -->|oui| O[("notation.json : la note « à vérifier »")]
   O --> P(["Carte Note : Accepter, Laisser,&lt;br/&gt;Changer…, les étoiles"])
 </pre></div>
-  <div class="exemple"><strong>Dans l'exemple</strong><p>Œil net, yeux ouverts, pas de rafale : aucun plafond. Au carnet, le bruit fort est constaté (2,0, cherché dès ISO 1 600) ; la sous-exposition est écartée, car −0,7 IL dit une photo voulue sombre. Claude propose 3 ★, à vérifier.</p></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>Œil net, yeux ouverts, pas de rafale : aucun plafond. Au carnet, le bruit fort est constaté (2,0, cherché dès ISO 1 600) ; la sous-exposition est écartée, car −0,7 IL dit une photo voulue sombre. Claude propose 2 ★, à vérifier.</p></div>
   <div class="regles">
     <p><b>Une note, un niveau fixe.</b> 0 ★ = pas encore jugée ; rejeter = un drapeau ; Claude note de 0 à 5 ★, jamais un libellé de couleur.</p>
     <p><b>Les photos d'Essais</b> n'entrent jamais au carnet : leurs constats n'y sont pas notés.</p>
@@ -542,8 +542,8 @@ flowchart TD
   <p>La proposition de Claude attend dans la carte Note. Rien n'est posé au catalogue tant que tu ne l'as pas acceptée, changée, ou que tu ne lui as pas demandé de la poser.</p>
   <div class="diagramme"><pre class="mermaid">%%{init: {"flowchart": {"useMaxWidth": false}} }%%
 flowchart TD
-  A(["Carte Note : 3 ★ proposée, à vérifier"]) --> B{"Tu décides"}
-  B -->|"Accepter 3 ★"| C
+  A(["Carte Note : 2 ★ proposée, à vérifier"]) --> B{"Tu décides"}
+  B -->|"Accepter 2 ★"| C
   B -->|"Changer…, ou une étoile"| C
   B -->|"Rejeter"| C
   B -->|"Laisser à N ★"| B1[("Proposition écartée,&lt;br/&gt;rien d'écrit au catalogue")]
@@ -563,7 +563,7 @@ flowchart TD
   I -->|non| J
   I1 --> J(["Photo notée : fin du parcours"])
 </pre></div>
-  <div class="exemple"><strong>Dans l'exemple</strong><p>Tu acceptes 3 ★ : une écriture, une étape « Claude · notation » que undo_last défait. Claude ne renote pas après la retouche, sauf si tu le lui demandes.</p></div>
+  <div class="exemple"><strong>Dans l'exemple</strong><p>Tu acceptes 2 ★ : une écriture, une étape « Claude · notation » que undo_last défait. Claude ne renote pas après la retouche, sauf si tu le lui demandes.</p></div>
   <div class="regles">
     <p><b>Rejeter</b> pose le drapeau sans toucher les étoiles ; une note ne retire qu'un rejet déjà posé, un drapeau Retenue reste.</p>
     <p><b>Revenir à « Avant Claude »</b> laisse la note en place : seule undo_last la défait, étape par étape.</p>

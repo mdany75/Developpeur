@@ -2207,8 +2207,9 @@ essai('Étoiles de « Votre note » : la k-e pose k ★ (5 comprises) par Notati
         ouvrirSurNote(function(p, contenu)
             Fenetre.rafraichir()
             egal(3, p.noteCatalogue)
-            egal('Tient seule', p.notePoseeTitre)
+            egal("A de l'impact", p.notePoseeTitre, "l'échelle resserrée d'une étoile (26 octobre 2026) : 3 ★, l'impact")
             egal('3 ★ dans le catalogue', p.notePoseeSous)
+            vrai(Fenetre.SENS_NOTES[2] == 'Tient seule' and Fenetre.SENS_NOTES[5] == 'Exceptionnelle', 'le 2 ★ tient seule, le 5 ★ est exceptionnel')
             local note = variantes(contenu).notation
             -- Les étoiles pleines jusqu'à la note posée.
             local pleines = 0

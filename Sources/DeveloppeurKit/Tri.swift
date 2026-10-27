@@ -52,7 +52,7 @@ public struct PhotoTriee {
     public var format: String?
     /// Pile de Lightroom (empilage à la main, ou automatique par heure de prise de vue) :
     /// l'identifiant de la photo du dessus. La meilleure de la pile est nommée ; les autres ne
-    /// montent pas à 4 (`Notation.plafond`).
+    /// montent pas à 3 (`Notation.plafond` : 2 depuis l'échelle resserrée de la 1.4).
     public var pile: Int?
     /// Numéro de série du boîtier (1.3.5, `serie_boitier` de la description) : deux boîtiers sur la
     /// même scène ne forment pas une rafale.
@@ -117,7 +117,7 @@ public struct PhotoTriee {
     /// (`MiseAuPoint.jugeable`, `DetailMeasurements.textureMin`) : sur du sable lisse ou un ciel uni,
     /// elle est « non jugée » et ne plafonne pas la note (faux constat du sable relevé le 21 octobre
     /// 2026 ; celui du nuage, qui a plus de texture, n'est plus qu'un doute : `textureDouteuse`,
-    /// 2 à vérifier dans `Notation.plafond`). Seule copie de ces
+    /// 1 à vérifier dans `Notation.plafond`, 2 avant l'échelle resserrée de la 1.4). Seule copie de ces
     /// règles : le tri (`defautsMesures`) et le carnet de progrès
     /// (`Carnet.constatsVue`) les reprennent.
     static func defautsNettete(detail: DetailMeasurements?, af: MiseAuPoint?) -> [(genre: Defaut, texte: String)] {
@@ -224,7 +224,7 @@ public enum Tri {
     /// Sans date, une ressemblance plus stricte (même photo, ou presque).
     static let distanceSansDate = 0.35
 
-    /// Groupes dont seule la meilleure vue échappe au plafond de 3 ★ : les rafales, et les piles de
+    /// Groupes dont seule la meilleure vue échappe au plafond de 2 ★ (3 ★ avant le 26 octobre 2026) : les rafales, et les piles de
     /// Lightroom (une pile et une rafale qui se touchent n'en font qu'un). `pile` : la photo du
     /// dessus, si le groupe porte une pile.
     static func groupes(_ photos: [PhotoTriee]) -> [(membres: [Int], pile: Int?)] {

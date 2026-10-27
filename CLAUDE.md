@@ -631,7 +631,7 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   copies d'Essais) : sous `DetailMeasurements.textureMin` (18 : sable lisse, ciel uni), la mise au
   point est « non jugée » (pas de plafond, pas de constat au carnet sauf si l'appareil l'a
   signalée) ; jusqu'à `textureDouteuse` (30 : le bord d'un nuage), une mise au point manquée n'est
-  qu'un doute : 2, à vérifier, sans rejet proposé (`Notation.plafond`), et le carnet ne la compte
+  qu'un doute : 1 (2 avant l'échelle resserrée de la 1.4), à vérifier, sans rejet proposé (`Notation.plafond`), et le carnet ne la compte
   pas. À relever sur un mur, de la neige et une vraie mise au point manquée avant de les changer.
 - Un profil d'appareil se pose toujours par `libererProfil`, qui vide `MissingCameraProfile` :
   Lightroom y garde un nom introuvable, et tant qu'il y reste, tout profil suivant retombe à Adobe
@@ -948,7 +948,7 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   surexposition, et les yeux fermés ne s'y cherchent que s'il y a des `sujetsAuxYeuxLus`, les
   sujets de `yeuxFermes` et de `yeuxOuverts`) ; `analyze_photos`, l'éclairage et le bilan les reprennent aussi, avec
   leurs propres seuils (puces suivantes). Au tri, une pile de Lightroom compte comme une rafale
-  (seule sa meilleure vue échappe au plafond de 3 ★). Le tri (`cull_photos`) mesure les vignettes
+  (seule sa meilleure vue échappe au plafond de 2 ★, 3 ★ avant l'échelle resserrée de la 1.4). Le tri (`cull_photos`) mesure les vignettes
   du cache de Lightroom (commande `vignettes`) et ramène leur netteté à celle d'un aperçu exporté
   (`thumbnailSharpnessFactor`, relevé ; le 21 octobre 2026, le tri donnait encore 11 à 23 % de plus
   que l'aperçu, en classant pareil : gardé). Vision ne s'appelle pas en grand parallèle
@@ -1087,20 +1087,29 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   `Notation.plafond` en tire les plafonds de `cull_photos` (0 et rejet proposé pour une photo
   floue, une mise au point manquée, ou des yeux fermés quand une autre vue de sa rafale ou de sa
   pile les a ouverts, `PhotoTriee.yeuxOuverts`, `autreVueYeuxOuverts` ; la règle de la rafale,
-  correctif 1.3.4 : sinon 2, à vérifier, la seule vue de son moment ne se jetant pas pour un
+  correctif 1.3.4 : sinon 1, à vérifier, la seule vue de son moment ne se jetant pas pour un
   clignement, et le tri d'une seule photo, la note d'abord de la fenêtre, n'en rejette jamais ;
-  3 pour une photo douce ou qui n'est pas la
-  meilleure de sa rafale ; 2, à vérifier, pour une photo presque noire ou brûlée, ou une mise au
+  2 pour une photo douce, à la mise au point signalée manquée, ou qui n'est pas la
+  meilleure de sa rafale ; 1, à vérifier, pour une photo presque noire ou brûlée, ou une mise au
   point manquée sur une texture faible, 1.3 ; 1 pour une capture), que `dernierTri`
   (`ToolHandler`) garde pour le processus du serveur ; sans défaut, aucun plafond sous 5 (« aucun
-  défaut mesuré : pas de plafond », correctif 1.3.2). Une scène sur fond noir voulu (L* médian 3,9)
+  défaut mesuré : pas de plafond », correctif 1.3.2). **L'échelle resserrée d'une étoile** (1.4,
+  26 octobre 2026, demandé par Dany : « je trouve que tu notes élevé », « tout baisser d'une
+  étoile », « mais tu peux toujours donner un 5 étoiles ») : 1 ★ gardée, correcte (l'ancien 1 ★ et
+  l'ancien 2 ★) ; 2 ★ tient seule (l'ancien 3 ★ ; un bon souvenir bien fait n'y suffit pas) ; 3 ★
+  l'impact (l'ancien 4 ★) ; 4 ★ à côté des meilleures (l'ancien 5 ★) ; 5 ★ l'exceptionnel, très rare ;
+  dans le doute, la plus basse ; les plafonds descendent d'une étoile (ceux d'avant : 3 et 2) ; les
+  notes posées avant gardent l'ancienne échelle ; `Fenetre.SENS_NOTES` suit (« Gardée », « Tient
+  seule », « A de l'impact », « Parmi vos meilleures », « Exceptionnelle »). Relevé du registre le
+  même soir : sur 345 propositions, 16 % de rejets, 12 % à 1 ★, 55 % à 2 ★, 16 % à 3 ★, 1 % à 4 ★,
+  dont deux 4 ★ données à des photos de famille notées seules, sans avoir vu la sortie. Une scène sur fond noir voulu (L* médian 3,9)
   reste dite « presque noire » : à revoir, hors de la 1.3.
 - **Claude note de 0 à 5 ★, jamais un libellé de couleur sans demande** (correctif 1.3.2, demandé
   par Dany le 22 octobre 2026 : « si moi je veux une photo 5 étoiles, je placerai un code de
   couleur ») : `propose_ratings` refuse une note hors de 0 à 5 avant tout envoi
   (`Notation.noteMaximale = 5`, 4 jusqu'à la 1.3.1), et le module la refuse encore
-  (`Notation.NOTE_MAX_PROPOSEE = 5`) ; la passe 4 (monter à 5, après le développement) se propose
-  comme les autres. Le standard (section « Les coups de cœur »), les descriptions de
+  (`Notation.NOTE_MAX_PROPOSEE = 5`) ; la passe 4 (monter à 4, et à 5 pour l'exceptionnel, après
+  le développement, depuis l'échelle resserrée de la 1.4) se propose comme les autres. Le standard (section « Les coups de cœur »), les descriptions de
   `propose_ratings` et de `color_label` (`set_metadata`), les invites `noter` et `tri_seance`,
   `ServerInfo.instructions` (« libellé de couleur : sur sa demande ») et `Consignes.texte` (« De 0 à
   5 ★ ; jamais de libellé de couleur (ses coups de cœur) sans sa demande. ») disent que les coups de

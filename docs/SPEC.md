@@ -1840,7 +1840,8 @@ plafond retirée). La carte, de haut en bas :
 - « Votre note : » : cinq étoiles de 24 sous des calques de 30 (`Vues.etoilesNote`, constaté C4 :
   le clic sur la 3e pose 3 ★) qui appellent `Fenetre.poserEtoile(k)` ; un clic sur la note posée
   la retire (0 ★) ; 5 ★ se pose. À droite, `notePoseeTitre` (le sens du standard,
-  `Fenetre.SENS_NOTES` : « Pas encore jugée », « Correcte », « Tient seule »…) et `notePoseeSous`
+  `Fenetre.SENS_NOTES` : « Pas encore jugée », « Gardée », « Tient seule »… depuis l'échelle
+  resserrée de la 1.4, « Correcte » pour 2 ★ avant) et `notePoseeSous`
   (« 2 ★ · drapeau Retenue ») ;
 - « Drapeau : » : « ⚑ Retenir » et « ⊗ Rejeter » (carrés de bezel 24, `Fenetre.poserDrapeau` : le
   drapeau, ou aucun si la photo l'a déjà ; les étoiles restent. Retenir, ou retirer un drapeau, ne
@@ -4504,7 +4505,7 @@ vert du point AF effacé), la mise au point est « non jugée » (`PhotoTriee.Mi
 pas de « manquée », pas de plafond, et le carnet ne la cherche pas, sauf si l'appareil l'a
 signalée (la zone la plus nette la confirme alors). De 18 à `textureDouteuse` (30 : le bord du
 nuage à 23,6 et 24,1, autant qu'un petit visage flou, 21,3 à 27,2), une mise au point manquée n'est
-qu'un doute (`douteuse`) : `Notation.plafond` donne 2, à vérifier par un zoom à 100 %, sans rejet
+qu'un doute (`douteuse`) : `Notation.plafond` donne 1 (2 avant l'échelle resserrée de la 1.4), à vérifier par un zoom à 100 %, sans rejet
 proposé, et le carnet ne la compte pas. Les sujets nets relevés vont de 28,4 à 64,6 (un petit
 visage net de 25,8 à 28,4). `view_photo` (`point_af.mise_au_point`) et `cull_photos` (`point_af`,
 `pourquoi`) disent « non jugée : zone sans texture autour du point » ou « à vérifier : texture
@@ -4517,10 +4518,11 @@ Depuis la 1.1, le bilan suit le standard de notation (voir Notation) :
   sous 4 ou à vérifier ; chaque ligne de `details` porte aussi `plafond`). Le plancher technique
   du standard, par `Notation.plafond(_:doublon:)`, avec les seuils déjà relevés (aucun nouveau) :
   floue, mise au point manquée ou yeux fermés, 0 et rejet proposé ; douce (netteté sous 35) ou
-  mise au point signalée manquée par l'appareil, 3 ; presque noire ou brûlée, 2 et à vérifier
+  mise au point signalée manquée par l'appareil, 2 ; presque noire ou brûlée, 1 et à vérifier
   (souvent rattrapable par la retouche, surtout en RAW ou DNG : le format de la photo est lu) ;
   capture ou document selon Vision (`utility`), 1 ; pas la meilleure de sa rafale ou de sa pile,
-  3 (un 4 est la meilleure vue de son moment) ; bruit fort (1,5 et plus,
+  2 (un 3 est la meilleure vue de son moment ; ces plafonds, une étoile plus bas qu'avant l'échelle
+  resserrée de la 1.4) ; bruit fort (1,5 et plus,
   `DetailMeasurements.bruitFort`), pas de plafond mais à vérifier (à noter après le débruitage) ;
   sinon pas de plafond, 5 (depuis le correctif 1.3.2 ; jusqu'à la 1.3.1, 4, 5 étant à l'utilisateur
   seul). Le plus bas l'emporte, raisons jointes ; une vignette
@@ -4530,7 +4532,7 @@ Depuis la 1.1, le bilan suit le standard de notation (voir Notation) :
   proposition) ; pour la seule photo de sa scène, `pourquoi` conseille plutôt 1 ★ à vérifier
   (`propose_ratings` avec `to_check`). Plus de `pick` ni d'étoile.
 - `rafales[].meilleure` et `piles[].meilleure` nomment la meilleure de chaque groupe ;
-  `rafales_moins_bonnes`, les autres photos sans défaut des groupes (plafonnées à 3) ; `classement`
+  `rafales_moins_bonnes`, les autres photos sans défaut des groupes (plafonnées à 2, 3 avant l'échelle resserrée de la 1.4) ; `classement`
   (les 15 premières photos sans défaut, dans l'ordre de lecture) ; `deja_classees`, combien de
   photos portent déjà un drapeau ou une note.
 - Les plafonds de ce tri remplacent ceux d'un tri précédent des mêmes photos dans `dernierTri`
@@ -4876,27 +4878,36 @@ rappel de la Séance de notation, retirés en 1.1.1, y renvoyaient aussi. En ré
   libellé de couleur qu'il pose lui-même (section « Les coups de cœur », 1.3.2). 0 ★ veut dire
   « pas encore jugée ». L'échelle de Claude va de 0 à 5 ★, plus le rejet.
 - Rejet : défaut majeur, involontaire, confirmé à l'œil (la seule photo de sa scène : plutôt 1 ★,
-  à vérifier). 1 ★ : gardée, sous le niveau 2. 2 ★ : correcte, aucun défaut visible à la taille
-  d'usage. 3 ★ : tient seule devant quelqu'un qui ne connaît ni les gens ni le lieu. 4 ★ : une
-  3 ★ qui a de l'impact (vue en premier sur une planche de 20 à 30 vignettes, nette à 100 % sur
-  le sujet, meilleure vue de son moment ; souvent 5 à 10 % d'une sortie, sans quota). 5 ★ : une
-  4 ★ qui tient à côté des meilleures photos de l'utilisateur, toutes sorties confondues ;
-  développement fini, sans excès, la Finition vue à 100 % ; toujours forte quelques jours plus
-  tard ; rare (bien moins que les 4 ★, souvent aucune dans une sortie), jamais avant le
-  développement ni sans avoir vu toute la sortie (jusqu'à la 1.3.1 : posée par l'utilisateur
-  seul). Une photo qui ne remplit pas les conditions d'une note reçoit celle d'en dessous.
+  à vérifier). Depuis le 26 octobre 2026 (1.4, demandé par Dany : « je trouve que tu notes élevé »,
+  puis « tout baisser d'une étoile », « mais tu peux toujours donner un 5 étoiles »), l'échelle est
+  resserrée d'une étoile : 1 ★ : gardée, correcte (l'ancien 1 ★ et l'ancien 2 ★). 2 ★ : tient seule
+  devant quelqu'un qui ne connaît ni les gens ni le lieu (un bon souvenir bien fait n'y suffit pas).
+  3 ★ : une 2 ★ qui a de l'impact (vue en premier sur une planche de 20 à 30 vignettes, nette à
+  100 % sur le sujet, meilleure vue de son moment ; souvent 5 à 10 % d'une sortie, sans quota).
+  4 ★ : une 3 ★ qui tient à côté des meilleures photos de l'utilisateur, toutes sorties
+  confondues ; développement fini, sans excès, la Finition vue à 100 % ; toujours forte quelques
+  jours plus tard ; rare, jamais avant le développement ni sans avoir vu toute la sortie. 5 ★ : une
+  4 ★ exceptionnelle, parmi les toutes meilleures de l'utilisateur, de celles qu'on imprime en
+  grand ; très rare, quelques-unes par année au plus, mêmes conditions. Une photo qui ne remplit
+  pas les conditions d'une note reçoit celle d'en dessous : dans le doute, la plus basse. Les notes
+  posées avant gardent l'ancienne échelle (relevé du registre le même soir : sur 345 propositions,
+  16 % de rejets, 12 % à 1 ★, 55 % à 2 ★, 16 % à 3 ★, 1 % à 4 ★, dont deux 4 ★ données à des photos
+  notées seules, de famille, sans avoir vu la sortie).
 - Critères, du plus lourd au plus léger : Impact (aucune mesure ne le voit), Qualités de l'image,
   Plancher technique (mesuré par `cull_photos` : il plafonne la note, il ne la donne pas),
-  Finition (pour le 5 ★). Un défaut visible à la taille d'usage plafonne à 2 ★, visible seulement
-  à 100 % à 3 ★ ; un défaut voulu et maîtrisé ne compte pas.
+  Finition (pour le 4 ★ et le 5 ★). Un défaut visible à la taille d'usage plafonne à 1 ★, visible
+  seulement à 100 % à 2 ★ (2 ★ et 3 ★ avant la 1.4) ; un défaut voulu et maîtrisé ne compte pas ;
+  les plafonds de `Notation.plafond` descendent de même (douce, mise au point signalée et doublon
+  d'une rafale 2 ; presque noire, brûlée, yeux fermés de la seule vue et mise au point douteuse 1 ;
+  capture 1).
 - Selon le genre (famille, portrait, paysage, nuit notée après le débruitage, sport, rue), puis
-  quatre passes, une question chacune : 1 rejeter ou non ; 2 3 ★ ou non (sinon 2 ★, 1 ★ au
-  passage) ; 3 parmi les 3 ★, monter à 4 ; 4 après le développement, parmi les 4 ★, monter à 5
-  (les candidates vues à 100 %, Finition comprise ; aucune si aucune ne tient à côté des
-  meilleures de l'utilisateur).
+  quatre passes, une question chacune : 1 rejeter ou non ; 2 2 ★ ou non (sinon 1 ★) ; 3 parmi
+  les 2 ★, monter à 3 ; 4 après le développement, parmi les 3 ★, monter à 4, et à 5 pour
+  l'exceptionnel (les candidates vues à 100 %, Finition comprise ; aucune si aucune ne tient à côté
+  des meilleures de l'utilisateur).
 - Les mesures fixent le plancher et départagent une rafale ; elles ne justifient jamais seules un
-  4 ★ ni un 5 ★. Photos étalons : la collection « Développeur › Étalons », si elle existe (entre 3
-  et 4, et entre 4 et 5).
+  3 ★ ni plus. Photos étalons : la collection « Développeur › Étalons », si elle existe (entre 2 et
+  3, entre 3 et 4, et entre 4 et 5).
 
 `Notation.noteMaximale` = 5 depuis le correctif 1.3.2 (4 avant) : Claude propose de 0 à 5
 étoiles. `set_metadata` pose toujours une note de 0 à 5 quand l'utilisateur le demande ; son
@@ -4950,7 +4961,8 @@ Arguments :
   posées dans le catalogue, « à vérifier » comprises (réponse : `posees`). `false` ou absent :
   propositions seulement. La description de l'outil le dit, et ajoute (1.3.2) : jamais de libellé
   de couleur, les coups de cœur de l'utilisateur, qu'il pose lui-même (`set_metadata`, seulement à
-  sa demande) ; un 5 se regarde à 100 % (jusqu'à la 1.3.1 : jamais 5 étoiles ici).
+  sa demande) ; un 3 ou plus se regarde à 100 % (un 4 ou un 5 avant l'échelle resserrée de la 1.4 ;
+  jusqu'à la 1.3.1 : jamais 5 étoiles ici).
 
 En 1.1, `session` (l'identifiant d'une séance) et `read_session` (la séance ouverte dans
 Lightroom, par l'action `seance`) servaient à la Séance de notation : retirés en 1.1.1.
@@ -4992,8 +5004,9 @@ demandé. `notation` n'est pas une lecture que `LightroomBridge` rejoue après u
 
 L'invite `noter` (arguments `photos` et `passe` : 1, 2, 3, 4 ou une consigne ; sans le guide de
 style) : `cull_photos`, `contact_sheet` par planches de 24 à 30, `view_photo` sur le sujet pour les
-candidates à 4 et 5 ★ et les cas douteux, `propose_ratings` avec `pass`, puis un résumé ; jamais
-`set_metadata` pour une note sans demande ; 5 ★ rares, après le développement (passe 4) ; jamais
+candidates à 3 ★ et plus et les cas douteux, `propose_ratings` avec `pass`, puis un résumé ; jamais
+`set_metadata` pour une note sans demande ; dans le doute, la plus basse ; 4 ★ rares, 5 ★
+l'exceptionnel, après le développement (passe 4) ; jamais
 de libellé de couleur (ses coups de cœur, qu'il pose lui-même : `set_metadata`, seulement à sa
 demande) ; `apply = true` si l'utilisateur demande que Claude pose les notes ; la passe 4 se
 propose comme les autres depuis le correctif 1.3.2 (jusqu'à la 1.3.1 : jamais 5 ★ de lui-même, et
@@ -7366,7 +7379,7 @@ correctif 1.3.2, les libellés de couleur sont ses coups de cœur).
 `PhotoTriee.yeuxOuverts` ; `Tri.analyser`). Des yeux fermés ne font proposer le rejet (plafond 0)
 que si une autre vue du même groupe (rafale ou pile, `Tri.groupes`) a les yeux ouverts sur tous
 ses sujets lus (les mêmes sujets que `yeuxFermes` : un visage d'au moins la moitié de la largeur du
-plus grand, aux yeux lisibles). Sinon : 2, à vérifier, sans rejet. Le tri d'une seule photo (la
+plus grand, aux yeux lisibles). Sinon : 1 (2 avant l'échelle resserrée de la 1.4), à vérifier, sans rejet. Le tri d'une seule photo (la
 note d'abord de la fenêtre) n'a pas de groupe : il ne rejette jamais pour des yeux fermés. Le
 standard de notation le dit (plancher technique).
 

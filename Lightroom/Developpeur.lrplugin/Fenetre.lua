@@ -2916,7 +2916,9 @@ Fenetre.AIDE_NOTATION = "Claude note d'abord chaque photo qu'il traite, de 0 à 
     .. "ci-dessus posent votre note dans Lightroom."
 
 -- Le sens de la note posée, d'après le standard (« Les notes ») : le titre à droite des étoiles.
-Fenetre.SENS_NOTES = { [0] = "Pas encore jugée", "Gardée", "Correcte", "Tient seule", "A de l'impact", "Parmi vos meilleures" }
+-- L'échelle du standard (Notation.standard), resserrée d'une étoile le 26 octobre 2026 à la demande
+-- de Dany (Claude notait trop haut) : « Correcte » et « Gardée » font le 1 ★, le 5 ★ l'exceptionnel.
+Fenetre.SENS_NOTES = { [0] = "Pas encore jugée", "Gardée", "Tient seule", "A de l'impact", "Parmi vos meilleures", "Exceptionnelle" }
 
 -- La raison gardée d'une note ou d'un drapeau posés depuis la carte (Notation.poser).
 Fenetre.RAISON_NOTE = "Note choisie dans la fenêtre Claude"
@@ -2941,7 +2943,7 @@ local function entre(n, mini, maxi)
 end
 
 -- La note posée de la photo active, en titre (gras) et sous-titre (gris), à droite des étoiles :
--- « Pas encore jugée » / « 0 ★ dans le catalogue », « Tient seule » / « 3 ★ · drapeau Retenue »,
+-- « Pas encore jugée » / « 0 ★ dans le catalogue », « Tient seule » / « 2 ★ · drapeau Retenue »,
 -- « Rejetée » / « 0 ★ · drapeau Rejeter ».
 function Fenetre.notePosee(active)
     if not active then

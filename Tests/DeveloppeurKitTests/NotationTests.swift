@@ -20,15 +20,23 @@ final class NotationTests: XCTestCase {
     func testTheStandardIsTheSourceTextFromZeroToFiveStarsWithoutColorLabels() {
         let standard = Notation.standard
         XCTAssertTrue(standard.hasPrefix("# Standard de notation\n\nUne étoile dit un niveau de qualité, et rien d'autre."))
-        XCTAssertTrue(standard.hasSuffix("3 » et une « presque 3 », de même entre 3 et 4 et entre 4 et 5, par genre."))
+        XCTAssertTrue(standard.hasSuffix("2 » et une « presque 2 », de même entre 2 et 3, entre 3 et 4 et entre 4 et 5, par genre."))
         for titre in ["## Les notes", "## Les coups de cœur", "## Les critères, du plus lourd au plus léger", "## Selon le genre",
                       "## Les passes, une question à la fois", "## Ce que valent les mesures", "## Photos étalons"] {
             XCTAssertTrue(standard.contains("\n\(titre)\n"), titre)
         }
         // Correctif 1.3.2 : l'échelle de Claude va jusqu'à 5 ; les coups de cœur, un libellé de couleur.
         XCTAssertTrue(standard.contains("L'échelle de Claude va de 0 à 5 ★, plus le rejet."))
-        XCTAssertTrue(standard.contains("- **5 ★** : une 4 ★ qui tient à côté des meilleures photos de l'utilisateur"))
-        XCTAssertTrue(standard.contains("4. Après le développement, parmi les 4 ★, monter à 5 ★ ?"))
+        // L'échelle resserrée d'une étoile (26 octobre 2026, demandé par Dany : Claude notait trop
+        // haut) : le 2 ★ tient seule, le 3 ★ a de l'impact, le 4 ★ tient à côté des meilleures, le 5 ★
+        // reste possible, pour l'exceptionnel.
+        XCTAssertTrue(standard.contains("- **2 ★** : elle tient seule devant quelqu'un qui ne connaît ni les gens ni le lieu"))
+        XCTAssertTrue(standard.contains("- **3 ★** : une 2 ★ qui a de l'impact"))
+        XCTAssertTrue(standard.contains("- **4 ★** : une 3 ★ qui tient à côté des meilleures photos de l'utilisateur"))
+        XCTAssertTrue(standard.contains("- **5 ★** : une 4 ★ exceptionnelle"))
+        XCTAssertTrue(standard.contains("dans le\ndoute entre deux notes, la plus basse"))
+        XCTAssertTrue(standard.contains("4. Après le développement, parmi les 3 ★, monter à 4 ★, et, pour l'exceptionnel, à 5 ★ ?"))
+        XCTAssertTrue(standard.contains("un défaut visible à la taille d'usage plafonne à 1 ★"))
         XCTAssertTrue(standard.contains("Claude ne propose, ne pose ni ne change jamais un libellé de couleur de lui-même :\nseulement à la demande explicite de l'utilisateur (set_metadata)."))
         XCTAssertFalse(standard.contains("jamais 5 ★"))
         XCTAssertFalse(standard.contains("L'utilisateur seul"))
@@ -59,10 +67,10 @@ final class NotationTests: XCTestCase {
         XCTAssertTrue(floue.raison.hasPrefix("floue"))
         // Douce (15 à 35) : un défaut visible seulement à 100 %.
         let douce = try XCTUnwrap(Notation.plafond(photo(nettete: 24), doublon: false))
-        XCTAssertEqual(douce.note, 3)
+        XCTAssertEqual(douce.note, 2, "une étoile plus bas depuis le 26 octobre 2026")
         XCTAssertFalse(douce.rejet)
         XCTAssertTrue(douce.raison.contains("douce (netteté 24"), douce.raison)
-        // Mise au point manquée au point AF, nette ailleurs : rejet ; signalée par l'appareil : 3.
+        // Mise au point manquée au point AF, nette ailleurs : rejet ; signalée par l'appareil : 2.
         var manquee = photo()
         manquee.af = .init(point: CGPoint(x: 0.3, y: 0.3), nettete: 8, avertissement: false)
         XCTAssertEqual(Notation.plafond(manquee, doublon: false)?.note, 0)
@@ -70,15 +78,15 @@ final class NotationTests: XCTestCase {
         var signalee = photo()
         signalee.af = .init(point: CGPoint(x: 0.3, y: 0.3), nettete: 20, avertissement: true)
         let parAppareil = try XCTUnwrap(Notation.plafond(signalee, doublon: false))
-        XCTAssertEqual(parAppareil.note, 3)
+        XCTAssertEqual(parAppareil.note, 2)
         XCTAssertFalse(parAppareil.raison.contains("douce"), "un seul motif pour la même netteté")
         // Yeux fermés du sujet (la règle de la rafale, 1.3.4) : rejet seulement si une autre vue de la
-        // rafale les a ouverts ; la seule vue de son moment, 2 à vérifier, sans rejet.
+        // rafale les a ouverts ; la seule vue de son moment, 1 à vérifier, sans rejet.
         var yeux = photo()
         yeux.vision = VisionReport(faces: [VisionReport.Face(box: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.3), pupils: [], eyeWidth: nil,
                                                              quality: 0.5, eyeOpenness: 0.05)], aesthetics: nil, utility: false, salientArea: nil)
         let seule = try XCTUnwrap(Notation.plafond(yeux, doublon: false))
-        XCTAssertEqual(seule.note, 2)
+        XCTAssertEqual(seule.note, 1)
         XCTAssertFalse(seule.rejet, "la seule vue de son moment ne se jette pas pour un clignement")
         XCTAssertTrue(seule.aVerifier)
         XCTAssertTrue(seule.raison.contains("clignement"))
@@ -89,21 +97,21 @@ final class NotationTests: XCTestCase {
         var document = photo()
         document.vision = VisionReport(faces: [], aesthetics: nil, utility: true, salientArea: nil)
         XCTAssertEqual(Notation.plafond(document, doublon: false)?.note, 1)
-        // Pas la meilleure de sa rafale : 3 (un 4 est la meilleure vue de son moment).
-        XCTAssertEqual(Notation.plafond(photo(), doublon: true)?.note, 3)
+        // Pas la meilleure de sa rafale : 2 (un 3 est la meilleure vue de son moment).
+        XCTAssertEqual(Notation.plafond(photo(), doublon: true)?.note, 2)
         // Vignette illisible : rien de mesuré, pas de plafond.
         var illisible = PhotoTriee(id: 2, fichier: "DSCF2.RAF")
         illisible.erreur = "pas de vignette"
         XCTAssertNil(Notation.plafond(illisible, doublon: false))
     }
 
-    /// Presque noire ou brûlée : 2 et à vérifier, plus de rejet (rattrapable, surtout en RAW).
+    /// Presque noire ou brûlée : 1 et à vérifier, plus de rejet (rattrapable, surtout en RAW).
     func testExposureDefectsAreCheckedNotRejected() throws {
         var noire = photo()
         noire.mesures = Measurements.analyze(try XCTUnwrap(PreviewImages.image(TestSupport.jpeg(red: 4, green: 4, blue: 4))))
         noire.format = "RAW"
         let plafond = try XCTUnwrap(Notation.plafond(noire, doublon: false))
-        XCTAssertEqual(plafond.note, 2)
+        XCTAssertEqual(plafond.note, 1)
         XCTAssertTrue(plafond.aVerifier)
         XCTAssertFalse(plafond.rejet)
         XCTAssertTrue(plafond.raison.contains("presque noire"))
@@ -112,7 +120,7 @@ final class NotationTests: XCTestCase {
         brulee.mesures = Measurements.analyze(try XCTUnwrap(PreviewImages.image(TestSupport.jpeg(red: 255, green: 255, blue: 255))))
         brulee.format = "JPG"
         let jpeg = try XCTUnwrap(Notation.plafond(brulee, doublon: false))
-        XCTAssertEqual(jpeg.note, 2)
+        XCTAssertEqual(jpeg.note, 1)
         XCTAssertTrue(jpeg.raison.contains("brûlée"))
         XCTAssertTrue(jpeg.raison.contains("à vérifier après la retouche"), jpeg.raison)
     }
@@ -161,7 +169,8 @@ final class NotationTests: XCTestCase {
         XCTAssertTrue(description.contains("Jamais de libellé de couleur : ce sont les coups de cœur de l'utilisateur, qu'il pose lui-même (set_metadata, seulement à sa demande)."))
         XCTAssertTrue(description.contains("read_standard"))
         let passe = definition["inputSchema"]?["properties"]?["pass"]?["description"]?.string ?? ""
-        XCTAssertTrue(passe.contains("4 monter à cinq parmi les quatre, après le développement"), passe)
+        // L'échelle resserrée d'une étoile (1.4) : la passe 4 monte à quatre, et à cinq pour l'exceptionnel.
+        XCTAssertTrue(passe.contains("2 deux étoiles ou non, 3 monter à trois parmi les deux, 4 monter à quatre parmi les trois, et à cinq pour l'exceptionnel, après le développement"), passe)
         XCTAssertTrue(description.contains("apply = true quand l'utilisateur demande que tu notes"))
     }
 

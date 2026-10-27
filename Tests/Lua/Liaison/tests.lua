@@ -5154,7 +5154,7 @@ test("notation : proposer range les propositions sans rien écrire ; au-delà de
     echoue(function() Commandes.executer('notation', { action = 'effacer' }) end, "Action de notation inconnue")
     local sansRefus = Json.encode(proposer({ { photo = 1, note = 3, criteres = CRITERES } }))
     egal(sansRefus:find('"refusees":[]', 1, true) ~= nil, true, sansRefus)
-    -- 5 étoiles, à la passe 4 (monter à 5, après le développement) : rangées « à vérifier ».
+    -- 5 étoiles, à la passe 4 (monter à 4, et à 5 pour l'exceptionnel, après le développement) : rangées « à vérifier ».
     local cinq = proposer({ { photo = 1, note = 5, criteres = CRITERES, raison = "Parmi les meilleures." } }, { passe = 4 })
     egal(cinq.propositions[1].etat, 'a_verifier')
     egal(Notation.proposition(1).note, 5)

@@ -683,13 +683,13 @@ cadre.
   technique du standard de notation (voir Noter vos photos). Floue ou mise au point manquée : rejet
   proposé. Yeux fermés : rejet proposé seulement si une autre vue de sa rafale ou de sa pile les a
   ouverts (la règle de la rafale, 1.3.4) ; la seule vue de son moment, la seule photo d'un groupe,
-  ne se jette pas pour un clignement : 2 ★ au plus, à vérifier. La mise au point ne se juge que sur une zone qui a du détail : posée sur
+  ne se jette pas pour un clignement : 1 ★ au plus, à vérifier. La mise au point ne se juge que sur une zone qui a du détail : posée sur
   du sable lisse ou un ciel uni, elle est « non jugée » ; sur une texture faible (le bord d'un
-  nuage), une mise au point manquée n'est qu'un doute, 2 ★ au plus, à vérifier par un zoom à
-  100 %, sans rejet proposé. Douce, ou mise au point signalée manquée par l'appareil : 3 ★ au plus.
-  Presque noire ou brûlée : 2 ★ au plus et « à vérifier », sans rejet proposé, car la retouche la
+  nuage), une mise au point manquée n'est qu'un doute, 1 ★ au plus, à vérifier par un zoom à
+  100 %, sans rejet proposé. Douce, ou mise au point signalée manquée par l'appareil : 2 ★ au plus.
+  Presque noire ou brûlée : 1 ★ au plus et « à vérifier », sans rejet proposé, car la retouche la
   rattrape souvent (surtout en RAW). Capture d'écran ou document : 1 ★. Pas la meilleure de sa
-  rafale ou de sa pile : 3 ★. Bruit fort : à noter après le débruitage. Sans défaut mesuré : pas
+  rafale ou de sa pile : 2 ★. (Une étoile plus bas qu'avant la 1.4, comme toute l'échelle.) Bruit fort : à noter après le débruitage. Sans défaut mesuré : pas
   de plafond, jusqu'à 5 ★.
 - Claude propose les rejets et des mots-clés (ceux de Vision, traduits en français), et ne les pose
   qu'après votre accord ; une photo que vous avez déjà notée ou marquée d'un drapeau n'est pas
@@ -740,13 +740,13 @@ cadre.
   s'annule comme un classement. Votre demande vaut accord, même en mode « Proposer d'abord » (avec
   « l'accord se donne ici », il attend encore le bouton Accepter de la fenêtre de la liaison) ; la
   pause de la liaison l'arrête, et les photos protégées restent protégées.
-- 5 ★ sont rares : une photo développée qui tient à côté de vos meilleures, vue à 100 % (la
-  dernière passe du standard). Vos coups de cœur ne sont pas des étoiles : c'est un libellé de
+- 4 ★ sont rares : une photo développée qui tient à côté de vos meilleures, vue à 100 % (la
+  dernière passe du standard) ; 5 ★, l'exceptionnel, quelques-unes par année au plus. Vos coups de cœur ne sont pas des étoiles : c'est un libellé de
   couleur que vous posez vous-même ; Claude n'en propose, n'en pose ni n'en change jamais sans que
   vous le lui demandiez. Une note au-dessus du plafond mesuré au tri est refusée, sauf un défaut
   voulu et maîtrisé, que Claude nomme et vous laisse « à vérifier ».
 - L'invite `noter` : une sortie notée passe par passe (le tri, des planches de 24 à 30 vignettes,
-  les candidates à 4 et 5 ★ regardées à 100 %, puis les propositions). Sans précision, elle note la
+  les candidates à 3 ★ et plus regardées à 100 %, puis les propositions). Sans précision, elle note la
   sélection.
 
 **Bibliothèque**
@@ -852,25 +852,32 @@ de couleur que vous posez vous-même (Claude n'y touche pas sans votre demande).
 
 - Rejet (drapeau) : un défaut majeur, involontaire, confirmé à l'œil. La seule photo de sa scène
   reçoit plutôt 1 ★, à vérifier.
-- 1 ★ : gardée, mais pas au niveau du 2 ★.
-- 2 ★ : correcte, sans défaut visible à la taille d'usage (écran, album) ; elle a besoin de l'album
-  ou du récit pour exister.
-- 3 ★ : elle tient seule devant quelqu'un qui ne connaît ni les gens ni le lieu.
-- 4 ★ : une 3 ★ qui a de l'impact : vue en premier sur une planche de 20 à 30 vignettes, nette à
+- 1 ★ : gardée, correcte : elle a besoin de l'album ou du récit pour exister. La plupart des photos
+  gardées d'une sortie.
+- 2 ★ : elle tient seule devant quelqu'un qui ne connaît ni les gens ni le lieu. Un bon souvenir
+  bien fait (un sourire, une belle lumière) n'y suffit pas.
+- 3 ★ : une 2 ★ qui a de l'impact : vue en premier sur une planche de 20 à 30 vignettes, nette à
   100 % sur le sujet, meilleure vue de son moment. Souvent 5 à 10 % d'une sortie, sans proportion
   imposée : une sortie faible peut n'en avoir aucune.
-- 5 ★ : une 4 ★ qui tient à côté de vos meilleures photos, toutes sorties confondues,
-  développement fini et finition vue à 100 %. Rare : souvent aucune dans une sortie. Claude peut la
-  proposer, après le développement ; elle arrive « à vérifier », comme les autres.
+- 4 ★ : une 3 ★ qui tient à côté de vos meilleures photos, toutes sorties confondues,
+  développement fini et finition vue à 100 %. Rare : souvent aucune dans une sortie.
+- 5 ★ : une 4 ★ exceptionnelle, parmi vos toutes meilleures, de celles qu'on imprime en grand. Très
+  rare : quelques-unes par année au plus. Claude peut la proposer, après le développement ; elle
+  arrive « à vérifier », comme les autres.
+
+Dans le doute entre deux notes, Claude prend la plus basse. L'échelle a été resserrée d'une étoile
+à la 1.4, à votre demande (Claude notait trop haut) : le 2 ★ d'aujourd'hui est le 3 ★ d'avant. Les
+notes déjà posées gardent l'ancienne échelle.
 
 Les critères, du plus lourd au plus léger : l'impact (la photo arrête l'œil ; aucune mesure ne le
 voit), les qualités de l'image (lumière, sujet clair, composition, moment, couleur), le plancher
 technique (netteté, exposition, yeux, bruit, mesurés au tri : il plafonne la note sans la donner)
-et, pour le 5 ★ seulement, la finition (halos aux bords des masques, peau plastique, saturation).
-Un défaut visible à la taille d'usage plafonne la note à 2 ★, un défaut visible seulement à 100 %
-à 3 ★ ; un défaut voulu et maîtrisé ne compte pas, ni l'effort de la prise de vue, ni la valeur
-affective. Une sortie se note en quatre passes, une question chacune : rejeter ou non ; 3 ★ ou
-non ; parmi les 3 ★, monter à 4 ; après le développement, parmi les 4 ★, monter à 5.
+et, pour le 4 ★ et le 5 ★ seulement, la finition (halos aux bords des masques, peau plastique,
+saturation). Un défaut visible à la taille d'usage plafonne la note à 1 ★, un défaut visible
+seulement à 100 % à 2 ★ ; un défaut voulu et maîtrisé ne compte pas, ni l'effort de la prise de vue, ni la valeur
+affective. Une sortie se note en quatre passes, une question chacune : rejeter ou non ; 2 ★ ou
+non ; parmi les 2 ★, monter à 3 ; après le développement, parmi les 3 ★, monter à 4, et à 5 pour
+l'exceptionnel.
 
 Le standard entier (selon le genre, ce que valent les mesures, les photos étalons d'une collection
 « Développeur › Étalons ») : la ressource `developpeur://notation` du connecteur, reprise aussi à la
@@ -879,8 +886,8 @@ fin de l'invite `noter`.
 **La carte Note**
 
 - Dans l'onglet Note de la fenêtre Claude, sous l'aperçu, pour la photo active :
-  - Votre note : cinq étoiles cliquables, la note posée dans Lightroom et son sens (« Correcte »,
-    « Tient seule »…) ; un clic pose la note, un clic sur la note posée la retire ;
+  - Votre note : cinq étoiles cliquables, la note posée dans Lightroom et son sens (« Gardée »,
+    « Tient seule »…, depuis l'échelle resserrée de la 1.4) ; un clic pose la note, un clic sur la note posée la retire ;
   - Drapeau : « ⚑ Retenir » et « ⊗ Rejeter » posent le drapeau (un second clic le retire) ;
     « ? À vérifier » est posé, grisé, sans action ;
   - Claude propose : sa note en petites étoiles, « rejeter », ou « rien pour l'instant » ; puis

@@ -24,6 +24,13 @@ souper n'ont pas la même lumière, et une seule référence les rendait tous fa
   Sur une photo sans tons neutres (la balance y reste), il dit aussi quand la peau diffère.
 
 ### Changé
+- Claude note plus sévèrement, à votre demande : toute l'échelle descend d'une étoile. Une photo
+  gardée et correcte reçoit 1 ★ ; 2 ★ veut dire qu'elle tient seule devant quelqu'un qui ne connaît
+  ni les gens ni le lieu (un bon souvenir bien fait n'y suffit plus) ; 3 ★, qu'elle a de l'impact ;
+  4 ★, qu'elle tient à côté de vos meilleures photos. Le 5 ★ reste possible, pour l'exceptionnel :
+  quelques photos par année au plus. Dans le doute entre deux notes, Claude prend la plus basse, et
+  les plafonds du tri descendent aussi d'une étoile. Les notes déjà posées dans votre catalogue ne
+  changent pas.
 - Le tri d'une sortie entière : Claude trie jusqu'à 1 000 photos d'un coup (500 avant), et une sortie
   plus grande par tranches, sans que vous ayez à réduire la sélection ; les groupes de lumière
   prennent jusqu'à 2 000 photos d'un coup.

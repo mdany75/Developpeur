@@ -66,11 +66,12 @@ final class Version24Tests: XCTestCase {
         XCTAssertEqual(piles.first?["dessus"]?.int, 1)
         XCTAssertEqual(bilan["rafales"]?.array?.count, 0)
         // 1.1 : plus de proposition « retenue » ; la meilleure de la pile est nommée, les autres
-        // sont des doublons, plafonnés à 3 (un 4 est la meilleure vue de son moment).
+        // sont des doublons, plafonnés à 2 (un 3 est la meilleure vue de son moment, depuis l'échelle
+        // resserrée du 26 octobre 2026).
         XCTAssertNil((bilan["propositions"]?.array ?? []).first { $0["flag"]?.string == "pick" })
         XCTAssertEqual(bilan["rafales_moins_bonnes"]?.array?.compactMap(\.int), [1, 3])
-        XCTAssertEqual(bilan["plafonds"]?["1"]?["note_max"]?.int, 3)
-        XCTAssertEqual(bilan["plafonds"]?["3"]?["note_max"]?.int, 3)
+        XCTAssertEqual(bilan["plafonds"]?["1"]?["note_max"]?.int, 2)
+        XCTAssertEqual(bilan["plafonds"]?["3"]?["note_max"]?.int, 2)
         XCTAssertNil(bilan["plafonds"]?["2"], "la meilleure de la pile")
     }
 

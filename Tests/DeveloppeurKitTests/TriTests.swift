@@ -202,8 +202,8 @@ final class TriTests: XCTestCase {
         XCTAssertGreaterThan(portrait.scoreDansGroupe, paysage.scoreDansGroupe)
         let bilan = Tri.bilan([paysage, portrait])
         XCTAssertEqual(bilan["piles"]?.array?.first?["meilleure"]?.int, 1, "dans la pile, le meilleur visage")
-        XCTAssertEqual(bilan["plafonds"]?["2"]?["note_max"]?.int, 3, "pas la meilleure de sa pile : 3 au plus")
-        XCTAssertNil(bilan["plafonds"]?["1"], "la meilleure, sans défaut : rien ne la borne sous 4")
+        XCTAssertEqual(bilan["plafonds"]?["2"]?["note_max"]?.int, 2, "pas la meilleure de sa pile : 2 au plus (3 avant le 26 octobre 2026)")
+        XCTAssertNil(bilan["plafonds"]?["1"], "la meilleure, sans défaut : aucun plafond (sous 5)")
     }
 
     /// La règle de la rafale (1.3.4) : des yeux fermés ne font proposer le rejet que si une autre vue
@@ -227,7 +227,7 @@ final class TriTests: XCTestCase {
             .flatMap { $0["photo_ids"]?.array?.compactMap(\.int) ?? [] }
         XCTAssertEqual(rejets, [1], "seule la vue aux yeux fermés d'une pile qui a une autre vue aux yeux ouverts")
         XCTAssertEqual(bilan["plafonds"]?["1"]?["note_max"]?.int, 0)
-        XCTAssertEqual(bilan["plafonds"]?["3"]?["note_max"]?.int, 2, "la seule vue de son moment : 2 au plus")
+        XCTAssertEqual(bilan["plafonds"]?["3"]?["note_max"]?.int, 1, "la seule vue de son moment : 1 au plus, à vérifier")
         XCTAssertEqual(bilan["plafonds"]?["3"]?["a_verifier"]?.bool, true)
         XCTAssertEqual(bilan["yeux_fermes"]?.array?.compactMap(\.int), [1, 3], "les yeux fermés restent dits")
         // Toute la pile aux yeux fermés : aucune autre vue ne les a ouverts, aucun rejet.
@@ -610,14 +610,14 @@ final class TriTests: XCTestCase {
 
         // Le nuage (texture 23,6 à 24,1, mesurée sur les 81 blocs) reste jugé : autant de texture qu'un
         // petit visage flou (21,3 à 27,2), que le plancher doit garder jugé. Sous textureDouteuse (30),
-        // sa mise au point manquée n'est qu'un doute : 2, à vérifier, sans rejet proposé ; la texture
+        // sa mise au point manquée n'est qu'un doute : 1, à vérifier, sans rejet proposé ; la texture
         // d'un nuage sans relief, elle, l'écarte.
         XCTAssertEqual(DetailMeasurements.textureDouteuse, 30)
         let nuage = photo(nettete: 171.9, auPoint: 6.6, texture: 23.6)
         XCTAssertEqual(nuage.defautsMesures.map(\.genre), [.miseAuPointManquee], "relevé du 21 octobre 2026")
         XCTAssertTrue(try XCTUnwrap(nuage.af).douteuse)
         let plafondNuage = try XCTUnwrap(Notation.plafond(nuage, doublon: false))
-        XCTAssertEqual(plafondNuage.note, 2, plafondNuage.raison)
+        XCTAssertEqual(plafondNuage.note, 1, plafondNuage.raison)
         XCTAssertFalse(plafondNuage.rejet, "un doute ne propose pas de rejet")
         XCTAssertTrue(plafondNuage.aVerifier)
         XCTAssertTrue(plafondNuage.raison.contains("à vérifier par un zoom à 100 %"), plafondNuage.raison)
@@ -626,10 +626,10 @@ final class TriTests: XCTestCase {
         XCTAssertEqual(nuageLisse.defautsMesures.count, 0)
         XCTAssertEqual(try XCTUnwrap(Notation.plafond(nuageLisse, doublon: false)).note, Notation.noteMaximale)
         // Le petit visage flouté de 3 px (21,3), une vraie mise au point manquée : jugé, mais à
-        // vérifier (même texture qu'un nuage) : 2 sans rejet.
+        // vérifier (même texture qu'un nuage) : 1 sans rejet.
         let petitVisage = photo(nettete: 60, auPoint: 1.8, texture: 21.3)
         XCTAssertEqual(petitVisage.defautsMesures.map(\.genre), [.miseAuPointManquee])
-        XCTAssertEqual(try XCTUnwrap(Notation.plafond(petitVisage, doublon: false)).note, 2)
+        XCTAssertEqual(try XCTUnwrap(Notation.plafond(petitVisage, doublon: false)).note, 1)
 
         // Un vrai sujet flou au point (de la texture) : mise au point manquée, 0 et rejet proposé.
         let manquee = photo(nettete: 60, auPoint: 8, texture: 30)

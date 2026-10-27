@@ -45,7 +45,8 @@ local Notation = {
 
 -- Claude propose de 0 à 5 étoiles (correctif 1.3.2, demandé par Dany le 22 octobre 2026 : ses
 -- coups de cœur sont un libellé de couleur qu'il pose lui-même) ; au-delà, refus (second
--- garde-fou, après le serveur). La passe 4 (monter à 5, après le développement) est à Claude aussi.
+-- garde-fou, après le serveur). La passe 4 (monter à 4, et à 5 pour l'exceptionnel,
+-- après le développement, depuis l'échelle resserrée de la 1.4) est à Claude aussi.
 Notation.NOTE_MAX_PROPOSEE = 5
 Notation.PASSES = 4
 -- Taille du registre, réécrit à chaque décision : les propositions les plus anciennes sortent

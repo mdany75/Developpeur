@@ -71,7 +71,7 @@ public struct DetailMeasurements: Equatable {
     /// un doute (le bord d'un nuage, 23,6 à 24,1, a autant de texture qu'un petit visage flou, 21,3
     /// à 27,2 ; les sujets nets relevés le 21 octobre 2026 vont de 28,4 à 64,6, sauf le petit visage
     /// net de 53709579, de 25,8 à 28,4). De `textureMin` à cette valeur, une mise au point manquée
-    /// plafonne à 2, à vérifier par un zoom à 100 %, sans rejet proposé (`Notation.plafond`), et le
+    /// plafonne à 1 (2 avant l'échelle resserrée de la 1.4), à vérifier par un zoom à 100 %, sans rejet proposé (`Notation.plafond`), et le
     /// carnet ne la compte pas : une mesure douteuse ne propose pas de jeter une photo. Choisi par
     /// Claude le 21 octobre 2026 sur ces seuls relevés (huit copies d'Essais) : à relever encore.
     static let textureDouteuse = 30.0

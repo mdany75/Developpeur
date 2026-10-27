@@ -1143,7 +1143,7 @@ essai('Fenêtre : la Conversation claire, seule disposition', function()
         egal(nil, Fenetre.verifierNote, nom .. ' : pas de fonction À vérifier')
         egal(nil, boutons['Séance…'], nom .. ' : plus de Séance de notation (1.1.1)')
         egal(2, p.noteCatalogue)
-        egal('Correcte', p.notePoseeTitre)
+        egal('Tient seule', p.notePoseeTitre, "2 ★ depuis l'échelle resserrée (26 octobre 2026)")
         egal('2 ★ dans le catalogue', p.notePoseeSous)
         -- Le titre de la conversation, sans ✎ (ni Renommer…, retiré avec le volet), et la photo active.
         vrai(textes.titre and textes.infoPhoto, nom .. ' : titre et photo active')

@@ -518,7 +518,7 @@ essai('Carte Note : proposition, Accepter, Changer… jusqu\'à 5 ★, à vérif
         -- La note posée (2 ★, retenue) et ce que Claude propose ; plus de rangée des passes
         -- (correctif 1.3.2) : la passe reste dans l'en-tête de la grille.
         egal(2, p.noteCatalogue)
-        egal('Correcte', p.notePoseeTitre)
+        egal('Tient seule', p.notePoseeTitre, "2 ★ depuis l'échelle resserrée (26 octobre 2026)")
         egal('2 ★ · drapeau Retenue', p.notePoseeSous)
         egal(nil, p.notePasse, 'plus de passes dans la carte')
         egal(3, p.noteClaude)

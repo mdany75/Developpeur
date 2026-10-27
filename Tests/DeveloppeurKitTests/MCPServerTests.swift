@@ -130,7 +130,7 @@ final class MCPServerTests: XCTestCase {
         XCTAssertTrue(texte.contains("Photos : la collection Été."))
         XCTAssertTrue(texte.contains("pass = 3 dans propose_ratings"))
         XCTAssertTrue(texte.hasSuffix(Notation.standard), "le standard, en entier, à la fin")
-        for etape in ["cull_photos", "contact_sheet par planches de 24 à 30", "view_photo", "propose_ratings", "5 étoiles : rares, après le développement (passe 4)",
+        for etape in ["cull_photos", "contact_sheet par planches de 24 à 30", "view_photo", "propose_ratings", "Dans le doute entre deux notes, la plus basse ; 4 étoiles : rares, 5 : l'exceptionnel, quelques-unes par année au plus, après le développement (passe 4)",
                       "Jamais de libellé de couleur", "Jamais set_metadata pour une note sans sa demande"] {
             XCTAssertTrue(texte.contains(etape), etape)
         }
