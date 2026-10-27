@@ -1,6 +1,49 @@
 # Changements
 
-## 1.3.8 — 2026-10-26
+## 1.4 — 2026-10-26
+
+La 1.4, une sortie entière, du tri à l'harmonisation : un voyage ou une fête de famille, c'est des
+centaines de photos, plusieurs lumières, parfois deux boîtiers. Claude les trie toutes d'un coup, puis
+les harmonise groupe par groupe, chacun sur sa propre photo de référence : le musée, la plage et le
+souper n'ont pas la même lumière, et une seule référence les rendait tous faux.
+
+### Ajouté
+- Harmoniser par lumière : demandez à Claude d'harmoniser une sortie (« harmonise ma sortie par
+  lumière »). Il la partage d'abord en groupes de photos prises sous la même lumière : un groupe
+  commence après une pause de plus de 10 minutes (sauf si la photo montre le même lieu, dans l'heure,
+  comme après le repas), quand le flash s'allume ou s'éteint, ou quand la lumière de la scène change
+  nettement (d'après l'ouverture, la vitesse, l'ISO et la compensation : le soleil et l'ombre d'un
+  arbre, le dehors et le dedans). Deux boîtiers sur la même scène restent ensemble. Pour chaque
+  groupe, il propose une photo de référence (une photo qu'il a déjà retouchée, sinon la mieux classée
+  au tri, avec un visage s'il y en a), la retouche, puis harmonise les autres sur elle, une soixantaine
+  à la fois. Rien ne change avant votre accord ; une photo seule sous sa lumière se retouche à part.
+- Le témoin du teint : quand la photo de référence montre un visage, Claude compare la peau de chaque
+  photo à la sienne, avant et après l'harmonisation, sur le visage pris à pleine taille dans l'aperçu
+  qu'il mesure. Si la correction éloigne nettement la peau de celle de la référence, il vous le
+  signale, à vérifier à l'œil : deux personnes n'ont pas la même peau, c'est un témoin, pas une règle.
+  Sur une photo sans tons neutres (la balance y reste), il dit aussi quand la peau diffère.
+
+### Changé
+- Le tri d'une sortie entière : Claude trie jusqu'à 1 000 photos d'un coup (500 avant), et une sortie
+  plus grande par tranches, sans que vous ayez à réduire la sélection ; les groupes de lumière
+  prennent jusqu'à 2 000 photos d'un coup.
+- Dans la fenêtre Suivi, la première tuile s'appelle « Photos analysées » (« Photos ouvertes »
+  avant) : elle compte les photos déjà analysées de la période, et dit dessous combien il y en a en
+  tout et ce qui reste (« sur 84 582 photos · 474 non analysées »). Le mot « ouvertes » quitte aussi
+  les autres tuiles : « 25 % des photos ».
+
+### À savoir
+- Les seuils des groupes (10 minutes de pause, 2,5 IL de lumière, la ressemblance du même lieu) sont
+  des premiers choix : l'essai de la 1.4, sur une vraie sortie d'au moins 500 photos, servira à les
+  régler. Regardez les coupures que Claude propose, et dites-lui de rapprocher ou de séparer des
+  groupes au besoin.
+- Après l'installation : quitter puis relancer Lightroom (le module a un fichier nouveau), rouvrir
+  Claude Desktop et ouvrir une nouvelle session de Claude Code.
+
+Elle reprend aussi le correctif 1.3.8, construit le même jour et jamais publié seul : le Suivi qui
+prend toute la bibliothèque sans figer Lightroom, les graphiques des notes et des genres de photos,
+la période en deux dates gardées avec son calendrier, les boutons de l'en-tête sur la ligne du titre,
+et l'historique d'une photo redit par le résumé.
 
 ### Changé
 - Le Suivi peut prendre toute votre bibliothèque d'un coup : ouvrez Toutes les photographies,

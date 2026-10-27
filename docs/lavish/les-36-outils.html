@@ -188,7 +188,7 @@
         { nom: "retouch_spots", titre: "Taches et yeux rouges", fait: "Retire des taches, corrige les yeux rouges.", change: "oui" },
         { nom: "remove_distractions", titre: "Supprimer les reflets", fait: "Supprime les reflets d'une vitre.", change: "oui" },
         { nom: "copy_settings", titre: "Copier une retouche", fait: "Copie la retouche d'une photo vers d'autres.", change: "oui" },
-        { nom: "match_series", titre: "Harmoniser une série", fait: "Accorde l'exposition et la balance d'une série sur une photo de référence.", ajout: ["1.3.5", "Écarte les vidéos de la série et dit combien."], change: "oui" },
+        { nom: "match_series", titre: "Harmoniser une série", fait: "Accorde l'exposition et la balance d'une série sur une photo de référence.", ajout: ["1.3.5 · 1.4", "Écarte les vidéos de la série et dit combien ; partage une sortie entière en groupes de lumière (groups), une référence proposée par groupe, et compare la peau des visages à celle de la référence (témoin du teint)."], change: "oui" },
         { nom: "compare_variants", titre: "Comparer des variantes", fait: "Prépare plusieurs interprétations en instantanés, à comparer côte à côte.", change: "oui", precision: "en instantanés" },
         { nom: "choose_variant", titre: "Choisir une variante", fait: "Pose la variante choisie.", change: "oui" },
       ] },
@@ -216,7 +216,7 @@
     { id: "trier", nom: "Trier et noter",
       intro: "Trois outils jugent une séance. Claude note de 0 à 5 ★ ; tes coups de cœur sont un libellé de couleur que tu poses toi-même, et une note proposée attend ton accord dans la carte Note.",
       outils: [
-        { nom: "cull_photos", titre: "Trier une séance", fait: "Mesure netteté, exposition, yeux fermés et rafales ; propose les rejets et le plafond de note de chaque photo ; sans photos désignées, juge la photo active.", ajout: ["1.3.4 · 1.3.5", "Des yeux fermés ne font proposer un rejet que si une autre vue de la rafale les a ouverts ; deux boîtiers ne font plus une rafale ; les vidéos sont écartées."], change: "non" },
+        { nom: "cull_photos", titre: "Trier une séance", fait: "Mesure netteté, exposition, yeux fermés et rafales ; propose les rejets et le plafond de note de chaque photo ; sans photos désignées, juge la photo active.", ajout: ["1.3.4 · 1.3.5 · 1.4", "Des yeux fermés ne font proposer un rejet que si une autre vue de la rafale les a ouverts ; deux boîtiers ne font plus une rafale ; les vidéos sont écartées ; 1 000 photos d'un coup, et une sortie plus grande par tranches (offset)."], change: "non" },
         { nom: "contact_sheet", titre: "Planche contact", fait: "Une planche de 30 vignettes numérotées au plus, pour voir une sortie d'un coup.", change: "non" },
         { nom: "propose_ratings", titre: "Noter des photos", fait: "Propose une note de 0 à 5 ★, « à vérifier », selon le standard de notation ; la pose si tu le demandes.", change: "classement", precision: "seulement sur ta demande" },
       ] },

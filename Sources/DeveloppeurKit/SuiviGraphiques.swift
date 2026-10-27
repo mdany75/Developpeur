@@ -689,9 +689,12 @@ extension Suivi {
         var etatAnalyse: [String] = []
         if enAttente > 0 { etatAnalyse.append("\(milliers(enAttente)) en cours d'analyse") }
         if enEchec > 0 { etatAnalyse.append("\(milliers(enEchec)) non analysée\(enEchec > 1 ? "s" : "")") }
-        let detailOuvertes = total == 0 ? "aucune photo ouverte dans la période"
-            : etatAnalyse.isEmpty ? "toutes analysées" : etatAnalyse.joined(separator: " · ")
-        func partDesOuvertes(_ k: Int) -> String { total == 0 ? "—" : "\(textePourcentage(k, sur: total)) des photos ouvertes" }
+        // « Photos analysées » (1.4, demandé par Dany le 26 octobre 2026, « Photos ouvertes » avant) :
+        // les photos de la période déjà analysées ; le détail dit combien il y en a en tout et le
+        // reste. Le mot « ouvertes » est retiré des tuiles à sa demande du même soir.
+        let detailAnalysees = total == 0 ? "aucune photo dans la période"
+            : etatAnalyse.isEmpty ? "toutes les photos" : (["sur \(photos(total))"] + etatAnalyse).joined(separator: " · ")
+        func partDesPhotos(_ k: Int) -> String { total == 0 ? "—" : "\(textePourcentage(k, sur: total)) des photos" }
         func tuile(_ cle: String, _ titre: String, _ valeur: Int, _ detail: String) -> JSONValue {
             ["cle": .string(cle), "titre": .string(titre), "valeur": .number(Double(valeur)), "texte": .string(milliers(valeur)),
              "detail": .string(detail)]
@@ -699,9 +702,9 @@ extension Suivi {
         let retouchees = periode.filter(\.retouchee).count
         let notees = periode.filter { $0.note >= 4 }.count
         var tuiles: [JSONValue] = [
-            tuile("photos_ouvertes", "Photos ouvertes", total, detailOuvertes),
-            tuile("retouchees_par_claude", "Retouchées par Claude", retouchees, partDesOuvertes(retouchees)),
-            tuile("notees_4_plus", "Notées 4 ★ ou plus", notees, partDesOuvertes(notees)),
+            tuile("photos_analysees", "Photos analysées", analysees, detailAnalysees),
+            tuile("retouchees_par_claude", "Retouchées par Claude", retouchees, partDesPhotos(retouchees)),
+            tuile("notees_4_plus", "Notées 4 ★ ou plus", notees, partDesPhotos(notees)),
         ]
         if let frequent, let s = stats[frequent] {
             tuiles.append(["cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": .number(valeurPourcentage(s.n, sur: s.sur)),

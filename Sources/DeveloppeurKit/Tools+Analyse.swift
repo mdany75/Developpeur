@@ -114,6 +114,8 @@ extension ToolHandler {
             photo.removeValue(forKey: "serie_boitier")
             // La sensibilité en nombre sert au carnet (bruit fort à ISO élevé) ; Claude a son texte (iso).
             photo.removeValue(forKey: "sensibilite")
+            // L'ouverture, la vitesse et le flash en nombres servent aux groupes de lumière (1.4).
+            photo.removeValue(forKey: "prise_de_vue")
             info["photo"] = .object(photo)
         }
         if let settings = result["reglages"]?.object {

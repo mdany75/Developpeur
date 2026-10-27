@@ -166,8 +166,8 @@
         }
       },
       "tuiles": {
-        "photos_ouvertes": "« Photos ouvertes » : photos ; detail : « N en cours d'analyse » et « N non analysée(s) » joints par « · », « toutes analysées » sans l'un ni l'autre, « aucune photo ouverte dans la période » à zéro",
-        "retouchees_par_claude": "« Retouchées par Claude » : retouchee_par_claude ; detail « P % des photos ouvertes » (« — » à zéro photo)",
+        "photos_analysees": "« Photos analysées » (« Photos ouvertes » jusqu'à la 1.4, demandé par Dany le 26 octobre 2026) : les photos de la période analysées ; detail : « sur N photo(s) », puis « N en cours d'analyse » et « N non analysée(s) », joints par « · » ; « toutes les photos » sans l'un ni l'autre, « aucune photo dans la période » à zéro (le mot « ouvertes » retiré des tuiles à la demande de Dany, le même soir)",
+        "retouchees_par_claude": "« Retouchées par Claude » : retouchee_par_claude ; detail « P % des photos » (« des photos ouvertes » jusqu'à la 1.4 ; « — » à zéro photo)",
         "notees_4_plus": "« Notées 4 ★ ou plus » : note d'au moins 4 ; detail comme la précédente",
         "defaut_frequent": "« Défaut le plus fréquent » : valeur et texte en % du défaut le plus fréquent, detail « <libellé> · N photo(s) sur S », code ; sans défaut trouvé : valeur 0, texte « Aucun », detail « aucun défaut trouvé sur les N photos analysées », sans code ; sans photo analysée : texte « — », detail « aucune photo analysée »"
       },
@@ -311,7 +311,7 @@
                 "analyse": {"le": 1794754980, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["ciel_brule"], "genre": "paysage", "regles_genre": 1}
               },
               "4302": {
-                "_note": "Ouverte ce matin, pas encore analysée : sans clé analyse, elle est dans la file. Elle compte déjà dans les photos ouvertes et les graphiques des prises de vue, pas dans les défauts.",
+                "_note": "Ouverte ce matin, pas encore analysée : sans clé analyse, elle est dans la file. Elle compte déjà dans les photos ouvertes (le « sur N photos » de la tuile Photos analysées) et les graphiques des prises de vue, pas dans les défauts.",
                 "original": 4302,
                 "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D004302",
                 "fichier": "XH2S1340.RAF",
@@ -382,7 +382,7 @@
                 "analyse": {"le": 1793661660, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": ["sous_exposition", "yeux_fermes"], "genre": "famille", "regles_genre": 1}
               },
               "3990": {
-                "_note": "Trois essais sans vignette assez grande (Lightroom ne rendait que 256 px) : abandonnée, elle ne revient plus dans la file. Elle compte dans les photos ouvertes, jamais dans les défauts.",
+                "_note": "Trois essais sans vignette assez grande (Lightroom ne rendait que 256 px) : abandonnée, elle ne revient plus dans la file. Elle compte dans les photos ouvertes (le « sur N photos » de la tuile Photos analysées), jamais dans les défauts.",
                 "original": 3990,
                 "uuid": "3F2A6C1E-8B4D-4E7A-9C11-0A5B7D003990",
                 "fichier": "IMG_2212.HEIC",
@@ -736,9 +736,9 @@
         "sans_date": 1,
         "analyse": {"analysees": 10, "en_attente": 1, "en_echec": 1},
         "tuiles": [
-          {"cle": "photos_ouvertes", "titre": "Photos ouvertes", "valeur": 12, "texte": "12", "detail": "1 en cours d'analyse · 1 non analysée"},
-          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "25 % des photos ouvertes"},
-          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "33 % des photos ouvertes"},
+          {"cle": "photos_analysees", "titre": "Photos analysées", "valeur": 10, "texte": "10", "detail": "sur 12 photos · 1 en cours d'analyse · 1 non analysée"},
+          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "25 % des photos"},
+          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "33 % des photos"},
           {"cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": 30, "texte": "30 %", "detail": "Photo floue ou bougée · 3 photos sur 10", "code": "flou"}
         ],
         "defauts": [
@@ -1107,9 +1107,9 @@
         "sans_date": 1,
         "analyse": {"analysees": 10, "en_attente": 1, "en_echec": 1},
         "tuiles": [
-          {"cle": "photos_ouvertes", "titre": "Photos ouvertes", "valeur": 12, "texte": "12", "detail": "1 en cours d'analyse · 1 non analysée"},
-          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "25 % des photos ouvertes"},
-          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "33 % des photos ouvertes"},
+          {"cle": "photos_analysees", "titre": "Photos analysées", "valeur": 10, "texte": "10", "detail": "sur 12 photos · 1 en cours d'analyse · 1 non analysée"},
+          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "25 % des photos"},
+          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "33 % des photos"},
           {"cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": 30, "texte": "30 %", "detail": "Photo floue ou bougée · 3 photos sur 10", "code": "flou"}
         ],
         "defauts": [
@@ -1246,9 +1246,9 @@
         "sans_date": 1,
         "analyse": {"analysees": 7, "en_attente": 1, "en_echec": 1},
         "tuiles": [
-          {"cle": "photos_ouvertes", "titre": "Photos ouvertes", "valeur": 9, "texte": "9", "detail": "1 en cours d'analyse · 1 non analysée"},
-          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 2, "texte": "2", "detail": "22 % des photos ouvertes"},
-          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 2, "texte": "2", "detail": "22 % des photos ouvertes"},
+          {"cle": "photos_analysees", "titre": "Photos analysées", "valeur": 7, "texte": "7", "detail": "sur 9 photos · 1 en cours d'analyse · 1 non analysée"},
+          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 2, "texte": "2", "detail": "22 % des photos"},
+          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 2, "texte": "2", "detail": "22 % des photos"},
           {"cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": 28.6, "texte": "29 %", "detail": "Photo floue ou bougée · 2 photos sur 7", "code": "flou"}
         ],
         "defauts": [
@@ -1363,9 +1363,9 @@
         "sans_date": 1,
         "analyse": {"analysees": 15, "en_attente": 1, "en_echec": 1},
         "tuiles": [
-          {"cle": "photos_ouvertes", "titre": "Photos ouvertes", "valeur": 17, "texte": "17", "detail": "1 en cours d'analyse · 1 non analysée"},
-          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "18 % des photos ouvertes"},
-          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "24 % des photos ouvertes"},
+          {"cle": "photos_analysees", "titre": "Photos analysées", "valeur": 15, "texte": "15", "detail": "sur 17 photos · 1 en cours d'analyse · 1 non analysée"},
+          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "18 % des photos"},
+          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "24 % des photos"},
           {"cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": 33.3, "texte": "33 %", "detail": "Photo floue ou bougée · 5 photos sur 15", "code": "flou"}
         ],
         "defauts": [
@@ -1569,9 +1569,9 @@
         "sans_date": 1,
         "analyse": {"analysees": 11, "en_attente": 1, "en_echec": 1},
         "tuiles": [
-          {"cle": "photos_ouvertes", "titre": "Photos ouvertes", "valeur": 13, "texte": "13", "detail": "1 en cours d'analyse · 1 non analysée"},
-          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "23 % des photos ouvertes"},
-          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "31 % des photos ouvertes"},
+          {"cle": "photos_analysees", "titre": "Photos analysées", "valeur": 11, "texte": "11", "detail": "sur 13 photos · 1 en cours d'analyse · 1 non analysée"},
+          {"cle": "retouchees_par_claude", "titre": "Retouchées par Claude", "valeur": 3, "texte": "3", "detail": "23 % des photos"},
+          {"cle": "notees_4_plus", "titre": "Notées 4 ★ ou plus", "valeur": 4, "texte": "4", "detail": "31 % des photos"},
           {"cle": "defaut_frequent", "titre": "Défaut le plus fréquent", "valeur": 27.3, "texte": "27 %", "detail": "Ciel ou haut de l'image brûlé · 3 photos sur 11", "code": "ciel_brule"}
         ],
         "defauts": [

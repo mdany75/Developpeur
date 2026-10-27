@@ -65,14 +65,17 @@ function Lecture.etat(params)
     }
 end
 
+-- La sélection, décrite à partir de la photo `decalage` + 1 (1.4 : le tri d'une sortie entière
+-- la prend par tranches ; la réponse redit le décalage, qu'un serveur d'avant ignore).
 function Lecture.selection(params)
     local limite = tonumber(params.limite) or 50
+    local decalage = math.max(0, math.floor(tonumber(params.decalage) or 0))
     local cat = catalogue()
     local photos = cat:getTargetPhotos()
     local active = cat:getTargetPhoto()
     local premieres = {}
-    for i = 1, math.min(#photos, limite) do
-        premieres[i] = photos[i]
+    for i = decalage + 1, math.min(#photos, decalage + limite) do
+        premieres[#premieres + 1] = photos[i]
     end
     local liste = Json.tableau()
     for i, d in ipairs(Photos.decrireTout(premieres)) do
@@ -81,7 +84,7 @@ function Lecture.selection(params)
         end
         liste[#liste + 1] = d
     end
-    return { total = #photos, renvoyees = #liste, photos = liste }
+    return { total = #photos, decalage = decalage, renvoyees = #liste, photos = liste }
 end
 
 -- Copie de tout ce que range Lightroom, pour le JSON : tables imbriquées, nombres, textes et

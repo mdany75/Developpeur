@@ -9,8 +9,9 @@ import Foundation
 /// Dany) ; ses coups de cœur sont un libellé de couleur qu'il pose lui-même : Claude n'en propose,
 /// n'en pose ni n'en change jamais de lui-même (set_metadata, seulement à sa demande).
 extension ToolHandler {
-    /// Propositions d'un appel au plus : une séance triée d'un coup (cull_photos).
-    static let maxRatings = maxCulledPhotos
+    /// Propositions d'un appel au plus : une séance triée d'un coup jusqu'à la 1.4 (500) ; depuis que
+    /// le tri prend 2 000 photos (une sortie entière), une sortie se note en plusieurs appels.
+    static let maxRatings = 500
     /// Clés d'une proposition. Une clé inconnue est refusée à la main : parametresInconnus ne voit
     /// que le premier niveau des arguments (le piège photo_id et photo_ids s'y rejouerait).
     static let ratingKeys = ["photo_id", "rating", "flag", "criteria", "reason", "to_check"]

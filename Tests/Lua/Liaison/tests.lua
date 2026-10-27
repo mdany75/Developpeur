@@ -113,6 +113,21 @@ test("selection : limite et photo active", function()
     egal(Json.encode(Commandes.executer('selection', { limite = 0 }).photos), '[]', "liste vide en tableau JSON")
 end)
 
+test("selection : à partir d'un décalage (1.4, le tri d'une sortie par tranches)", function()
+    local a, b, c = photoRaw(), photoJpeg(), photoFuji()
+    S.active = c
+    S.selection = { a, b, c }
+    local resultat = Commandes.executer('selection', { limite = 2, decalage = 1 })
+    egal(resultat.total, 3)
+    egal(resultat.decalage, 1, "le décalage redit : le serveur sait que la tranche commence là")
+    egal(resultat.renvoyees, 2)
+    egal(resultat.photos[1].id, b.localIdentifier)
+    egal(resultat.photos[2].active, true)
+    egal(Commandes.executer('selection', { limite = 5, decalage = 3 }).renvoyees, 0)
+    egal(Commandes.executer('selection', { limite = 1 }).decalage, 0)
+    egal(Commandes.executer('selection', { limite = 1, decalage = -4 }).photos[1].id, a.localIdentifier)
+end)
+
 test("reglages : valeurs demandées et échelle de température", function()
     S.active = photoRaw()
     local resultat = Commandes.executer('reglages', { cles = { 'Temperature', 'Exposure2012', 'Absent' } })
@@ -3155,6 +3170,29 @@ test("vignettes : une vignette par photo, écrite dans un dossier temporaire, av
     egal(premiere.geometrie.cadre.CropAngle, 2)
     egal(resultat.photos[2].geometrie.cadre, nil, "pas de cadre sans recadrage")
     egal(premiere.fichier:find(raw.meta.fileName, 1, true), 1, "description de la photo")
+end)
+
+test("vignettes : la prise de vue en nombres, pour les groupes de lumière (1.4)", function()
+    local photo = photoFuji()
+    photo.brut.aperture, photo.brut.shutterSpeed, photo.brut.exposureBias, photo.brut.flash = 2.8, 1 / 250, -0.67, false
+    S.active, S.selection = photo, { photo }
+    local function prise()
+        return Commandes.executer('vignettes', { photos = Json.tableau({ photo.localIdentifier }), taille = 1024 }).photos[1].prise_de_vue
+    end
+    local p = prise()
+    egal(p.ouverture, 2.8)
+    egal(p.vitesse, 1 / 250)
+    egal(p.compensation, -0.67)
+    egal(p.flash, false, "un flash qui n'a pas éclairé se dit : faux, pas inconnu")
+    photo.brut.flash = true
+    egal(prise().flash, true)
+    -- Un texte (getFormattedMetadata) n'est pas un booléen : inconnu.
+    photo.brut.flash = 'Non déclenché'
+    egal(prise().flash, nil)
+    -- Rien de connu (un scan) : pas de bloc.
+    photo.brut.aperture, photo.brut.shutterSpeed, photo.brut.exposureBias, photo.brut.flash = nil, nil, nil, nil
+    photo.meta.aperture, photo.meta.shutterSpeed = 'f/2,8', '1/250 s'
+    egal(prise(), nil)
 end)
 
 test("vignettes : rappels différés attendus, échec d'une photo sans bloquer les autres, limites", function()

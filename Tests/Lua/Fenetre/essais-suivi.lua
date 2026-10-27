@@ -222,7 +222,7 @@ if mode == 'vide' then
     sortie.analyse = { analysees = 0, en_attente = 0, en_echec = 0 }
     for _, t in ipairs(sortie.tuiles) do
         t.valeur, t.texte, t.code = 0, t.cle == 'defaut_frequent' and '—' or '0', nil
-        t.detail = t.cle == 'photos_ouvertes' and "aucune photo ouverte dans la période" or t.cle == 'defaut_frequent'
+        t.detail = t.cle == 'photos_analysees' and "aucune photo dans la période" or t.cle == 'defaut_frequent'
             and "aucune photo analysée" or "—"
     end
     for _, d in ipairs(sortie.defauts) do d.n, d.sur, d.valeur, d.texte = 0, 0, 0, '—' end
@@ -631,8 +631,10 @@ essai("Premier tour : --graphiques sous perl (alarme de 60 s) avec exactement l'
             egal(t.texte, p['tuileTexte' .. k])
             egal(t.detail, p['tuileDetail' .. k])
         end
-        egal('12', p.tuileTexte1)
-        egal("1 en cours d'analyse · 1 non analysée", p.tuileDetail1)
+        egal("Photos analysées", p.tuileTitre1, "« Photos ouvertes » jusqu'à la 1.4")
+        egal('10', p.tuileTexte1)
+        egal("sur 12 photos · 1 en cours d'analyse · 1 non analysée", p.tuileDetail1)
+        egal("25 % des photos", p.tuileDetail2, "plus « des photos ouvertes » (demandé par Dany le 26 octobre 2026)")
         egal('30 %', p.tuileTexte4)
         for _, g in ipairs(FenetreSuivi.GRAPHIQUES) do
             local rendu = sortie.graphiques[g.cle]
@@ -1661,7 +1663,7 @@ essai("Relevé vide : le texte d'accueil ; les graphiques « Aucune photo » du 
         contient(p.etat, 'Le Suivi part de zéro')
         contient(p.etat, 'sans Claude ni forfait')
         egal('0', p.tuileTexte1)
-        egal('aucune photo ouverte dans la période', p.tuileDetail1)
+        egal('aucune photo dans la période', p.tuileDetail1)
         for _, g in ipairs(FenetreSuivi.GRAPHIQUES) do
             egal(true, p['pret_' .. g.cle], g.cle .. ' : image du connecteur')
             for i = 1, g.max_barres do
@@ -1790,7 +1792,7 @@ essai("Un dessin fait de lui-même (le relevé vient d'être écrit) ne force pa
         unTour()
         egal(1, #appels, "l'ouverture : écrit avant")
         vrai(yields >= 10, 'la réponse décodée en rendant la main : ' .. yields)
-        egal('12', p.tuileTexte1, 'décodée entière')
+        egal('10', p.tuileTexte1, 'décodée entière')
         -- Le relevé écrit : redessiné après DELAI_REDESSIN, sans forcer l'écriture.
         Releve.version = Releve.version + 1
         FenetreSuivi.dessineLe = os.time() - FenetreSuivi.DELAI_REDESSIN

@@ -9,7 +9,7 @@
 -- fixes ; sans rien de choisi, les douze derniers mois, du 1er du mois onze mois plus tôt à
 -- aujourd'hui) :
 --
---   - quatre tuiles chiffrées : photos ouvertes, retouchées par Claude, notées 4 ★ ou plus, défaut
+--   - quatre tuiles chiffrées : photos analysées (« Photos ouvertes » jusqu'à la 1.4), retouchées par Claude, notées 4 ★ ou plus, défaut
 --     le plus fréquent ;
 --   - « Mes prises de vue » : photos par mois (par trimestre, par année pour une longue période ;
 --     par date de prise de vue), focales, ISO, heure de la prise de vue, objectifs, et les notes (de
@@ -145,7 +145,7 @@ FenetreSuivi.TITRE_PLUS_FREQUENT = "Le plus fréquent"
 -- Les quatre tuiles, dans l'ordre du contrat (graphiques.tuiles) : leur clé et leur titre avant la
 -- première réponse (le connecteur rend le sien).
 FenetreSuivi.TUILES = {
-    { cle = 'photos_ouvertes', titre = "Photos ouvertes" },
+    { cle = 'photos_analysees', titre = "Photos analysées" },
     { cle = 'retouchees_par_claude', titre = "Retouchées par Claude" },
     { cle = 'notees_4_plus', titre = "Notées 4 ★ ou plus" },
     { cle = 'defaut_frequent', titre = "Défaut le plus fréquent" },

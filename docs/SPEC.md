@@ -6291,6 +6291,114 @@ Correctif 1.3.6 :
     de Claude et le bouton sont retirés) ; le bandeau de 324 (deux lignes) ; le temps
     d'ouverture de la fenêtre avec 86 vues de plus.
 
+## 1.4 : une sortie entière, du tri à l'harmonisation
+
+Demandée par Dany le 26 octobre 2026 au soir (« on finit 1.4, 1.5 et 1.6 ») : la 1.5 et la 1.6 sont
+livrées en code par les correctifs 1.3.4 et 1.3.5 (il ne leur reste que l'usage : un vrai tirage, des
+reprises à la main pour `remember_style` avec `learn`) ; la 1.4 garde son dernier chantier,
+« Harmoniser par lumière », et le tri d'une sortie entière. Elle reprend le correctif 1.3.8, jamais
+publié seul. Un voyage ou une fête de famille, c'est des centaines de photos, plusieurs lumières,
+parfois deux boîtiers : `match_series` ne visait qu'une référence pour toute la journée, et
+`cull_photos` ne triait que 500 photos.
+
+**Les groupes de lumière** (`GroupesLumiere.swift`, `Tools+Lumiere.swift`). `match_series` avec
+`groups = true`, sans `reference_id` (refusé avec lui), sur `photo_ids`, la sélection, une collection
+ou un dossier (2 000 photos au plus, `maxPhotosSortie`) : les vignettes de toute la sortie se mesurent
+comme au tri (`ToolHandler.mesurer` : netteté, mesures, Vision, empreinte), deux à la fois, sans ouvrir
+aucun original (la description perd `geometrie` avant la mesure, le point de mise au point ne se lit
+pas). Puis `GroupesLumiere.former`, pure, dans l'ordre de prise de vue (les photos sans date après,
+dans l'ordre donné ; la première d'entre elles commence un groupe, `sansDate`). Une photo commence un
+groupe, dans cet ordre de raison :
+
+1. le flash change (les deux connus ; inconnu, il ne coupe pas) ;
+2. la lumière de la scène s'écarte de 2,5 IL ou plus (`ecartIL`) de la médiane des 5 dernières photos
+   du groupe (`fenetreLumiere`) qui ne sont pas au flash : `Prise.lumiere`, en IL à 100 ISO,
+   log2(N²/t) − log2(ISO/100) plus la compensation (une photo éclaircie d'une IL a reçu une IL de
+   plus d'une scène qui n'a pas changé) ; jamais pour une photo au flash (l'éclair fait la lumière).
+   Une lumière qui baisse peu à peu (un coucher de soleil, une demi-IL toutes les 3 minutes) reste un
+   groupe : la médiane suit ;
+3. une pause de plus de 10 minutes (`pauseMax`), sauf si la photo montre le même lieu que l'une des 3
+   dernières du groupe (`fenetreLieu` ; empreinte de Vision à moins de 0,7, `distanceMemeLieu`, entre
+   la même scène d'une rafale, 0,5, et deux photos différentes, 0,8 à 1) et que la pause reste sous
+   une heure (`pauseMemeLieu`) : le même lieu après le repas.
+
+Deux boîtiers sur la même scène restent ensemble (la même lumière ; `match_series` rapproche ensuite
+leurs rendus). Tous ces seuils sont provisoires, choisis hors de Lightroom : la sortie de l'essai de la
+1.4 (au moins 500 photos de Dany) sert à les relever.
+
+La référence proposée (`GroupesLumiere.reference`) : parmi les photos sans défaut mesuré (toutes si
+aucune), une photo déjà retouchée par Claude (`retouchee_par_claude` de la description : elle donne
+déjà le rendu du groupe), sinon la mieux classée au tri (`PhotoTriee.score`, netteté et note
+esthétique) parmi celles qui ont un visage plausible d'au moins 4 % de largeur (le témoin du teint),
+sinon parmi toutes ; « à retoucher d'abord » sauf la déjà retouchée. Le plan (`planDesGroupes`) :
+`groupes` (numéro, photos, nombre, `commence` : la raison de la coupure en mots, `prises` : de quand à
+quand, `lumiere` : « au flash » si plus de la moitié l'est, sinon le nom de la médiane (`nomLumiere` :
+plein jour à partir de 14 IL, ombre ou ciel couvert de 11 à 14, intérieur clair ou fin du jour de 8 à
+11, intérieur de 5 à 8, intérieur sombre ou nuit en dessous) et sa valeur, `iso`, `boitiers` s'il y en
+a plus d'un, `photos_avec_visage`, `reference_proposee` { id, fichier, pourquoi }, et `lots` au-delà de
+60 photos à harmoniser), `photos_seules` (une photo seule sous sa lumière, à retoucher à part),
+`photos_non_groupees` au-delà de 2 000, `videos_ecartees`, `base`, `suite`, `rien_n_est_applique`,
+`duree`. Rien n'est écrit. Ensuite, groupe par groupe : la référence retouchée, `copy_settings`, puis
+`match_series` avec `reference_id` et les `photo_ids` du groupe (60 au plus par appel), comme avant.
+L'invite `harmoniser_serie` le dit (étape 2).
+
+**Ce que le module donne** (protocole) : la description des vignettes (`Vignettes.decrireVignette`)
+porte `prise_de_vue = { ouverture, vitesse, compensation, flash }`, de `getRawMetadata` (`aperture`
+en nombre f, `shutterSpeed` en secondes, `exposureBias` en IL, `flash` booléen : vrai s'il a éclairé,
+rien s'il est inconnu ou n'est pas un booléen ; d'après la référence du SDK, à constater), absent sans
+aucune des quatre ; `view_photo` le retire avant Claude, comme `sensibilite`.
+
+**Le témoin du teint** (`Teint.swift`). Dans `match_series` avec `reference_id` (mesure), la référence
+se mesure avec sa peau : le plus grand visage plausible (`VNDetectFaceRectanglesRequest`, sans ceux à
+l'envers, `Composition.visagePlausible`) d'au moins 4 % de largeur, son milieu (joues et nez :
+`Teint.interieur`, le cadre de l'éclairage) pris dans l'aperçu de mesure à pleine résolution (le zoom
+du visage, sans autre rendu), aux bornes de peau de l'éclairage (L* de 25 à 92, C* de 6 à 50, aucune
+composante écrêtée), 60 pixels au moins ; médianes de L*, a*, b*. Sans visage sur la référence, aucune
+autre photo ne se lit (pas de Vision de plus) et `reference.teint` le dit. Sinon chaque photo a son
+`teint` : écart a*b* et angle de teinte avant, et après l'harmonisation ; `a_verifier` (sur la photo et
+dans la liste du résultat) quand l'écart, après, atteint 5 (`ecartVisible`) et a grandi d'au moins 2
+(`hausseAlerte`) : à regarder par `view_photo` avec `region` sur le visage. Un témoin, jamais la
+correction : deux personnes n'ont pas la même peau, et les tons neutres décident. Sur une photo sans
+assez de tons neutres (sa balance reste), une remarque dit quand la peau diffère de 5 ou plus. Seuils
+provisoires ; Vision ne voit aucun visage dans les images fabriquées des tests (la lecture d'un vrai
+visage, par `Teint.lire`, reste à constater sur l'essai).
+
+**Le tri d'une sortie entière.** `cull_photos` trie 1 000 photos par appel (500 avant, et avec
+`details`) : la réponse d'un tri de 2 000 photos toutes floues pèserait 0,9 Mo (texte et forme
+structurée ; 1 000 en font 0,45), au bord de ce que Claude Desktop accepte (mesuré le 26 octobre 2026,
+après la relecture). Avec `offset`
+(sélection, collection ou dossier ; pas avec `photo_ids`), la tranche suivante. Une sélection plus
+longue n'est plus refusée (`parTranches` de `seriesPhotosSansVideos`) : `photos_non_triees` dit le
+nombre restant et l'`offset` suivant. Une rafale à cheval sur deux tranches s'y coupe. La commande
+`selection` du module prend `decalage` (la tranche commence à la photo `decalage` + 1) et le redit dans
+sa réponse ; un module d'avant, qui ne le connaît pas, décrit le début de la sélection : le connecteur
+la redemande une fois assez loin (`decalage` plus la tranche) et saute lui-même les premières. La
+commande `chercher` (collection, dossier) décrit jusqu'à 2 000 photos (500 avant ; `find_photos` reste
+à 500 côté connecteur). Dans les groupes, le flash se compare à la dernière photo du groupe qui le dit,
+et une photo seule dit ce qui la sépare avant et après elle ; une vignette trop petite est rendue
+comme un aperçu, comme au tri (relecture du 26 octobre 2026).
+
+**La tuile « Photos analysées »** (demandée par Dany le même soir, à la place de « Photos ouvertes ») :
+le connecteur (`--graphiques`) compte les photos analysées de la période, et le détail dit « sur N
+photos », puis ce qui est en cours d'analyse et ce qui ne le sera pas (« toutes les photos » s'il ne
+reste rien, « aucune photo dans la période » à zéro) ; clé `photos_analysees` (contrat `suivi.json`,
+exemples régénérés). Le même soir, à sa demande (« enlève le mot ouvertes »), les autres tuiles
+disent « P % des photos » (« des photos ouvertes » avant).
+
+**À constater dans Lightroom** (l'essai de la 1.4, sur une vraie sortie d'au moins 500 photos en
+copies virtuelles) :
+
+1. `getRawMetadata` : `aperture`, `shutterSpeed`, `exposureBias` en nombres et `flash` booléen sur des
+   RAF et des JPEG (X-H2S, X-T4, X-T20), et rien pour une photo sans Exif ;
+2. les groupes : les coupures d'une vraie sortie jugées à l'œil (les seuils de la pause, de la lumière
+   et du même lieu) ; la durée de `match_series` avec `groups` sur 500 photos (celle du tri) ;
+3. le témoin du teint sur de vrais visages : peau lue, écarts entre photos d'une même personne et de
+   deux personnes, alertes justes ou fausses ;
+4. `cull_photos` sur 1 000 photos d'un coup (durée, réponse d'attente de Claude Desktop) et par
+   tranches avec `offset` ; `selection` avec `decalage` sur une grande sélection ;
+5. la tuile « Photos analysées » et son détail dans la fenêtre Suivi (coupé par « … » au-delà de la
+   tuile, l'infobulle le donne en entier).
+
 ## Correctif 1.3.7 : le Suivi en graphiques
 
 Décidé avec Dany le 25 octobre 2026, pendant ses essais de la 1.3.6 (série de questions, maquette
@@ -6317,7 +6425,7 @@ relancer Lightroom) ; le connecteur, `Suivi.swift`, `SuiviGraphiques.swift` et `
   restent hors du Suivi, comme au carnet.
 - La fenêtre Suivi, à part (« Claude · Suivi »), avec un menu Période (3 derniers mois, 12 derniers
   mois par défaut, Tout ; remplacé au correctif 1.3.8 par deux dates gardées, « Du » et « au »,
-  plus bas) ; quatre tuiles chiffrées (photos ouvertes, retouchées par Claude, notées
+  plus bas) ; quatre tuiles chiffrées (photos ouvertes, « Photos analysées » depuis la 1.4, retouchées par Claude, notées
   4 ★ ou plus, défaut le plus fréquent) ; « Mes prises de vue » (photos par mois, par date de prise
   de vue ; focales ; ISO ; heure de la prise de vue ; objectifs) ; « Mon carnet de progrès » (les
   défauts les plus fréquents en % des photos ; l'évolution mois par mois d'un défaut, le plus
@@ -6690,9 +6798,12 @@ graphiques en points entiers, de 120 × 80 à 1 200 × 600).
 - Textes (`regles.textes`) : les comptes groupés par trois chiffres (« 1 284 ») ; un pourcentage
   « — » quand `sur` = 0, « 0 % », « < 1 % » sous 1, sinon l'entier le plus proche (demi vers le
   haut) ; « 0 photo », « 1 photo », « 2 photos » ; le détail d'une barre « <colonne> · N photo(s) »,
-  ou « <colonne> · N photo(s) sur S (P %) » pour un graphique en %. Les tuiles : « Photos ouvertes »
-  (détail : « N en cours d'analyse » et « N non analysée(s) », sinon « toutes analysées »),
-  « Retouchées par Claude » et « Notées 4 ★ ou plus » (« P % des photos ouvertes »), « Défaut le
+  ou « <colonne> · N photo(s) sur S (P %) » pour un graphique en %. Les tuiles : « Photos analysées »
+  (« Photos ouvertes » jusqu'à la 1.4, renommée à la demande de Dany le 26 octobre 2026 : depuis, elle
+  compte les photos analysées de la période ; détail : « sur N photo(s) », puis « N en cours
+  d'analyse » et « N non analysée(s) », sinon « toutes les photos », « aucune photo dans la
+  période » à zéro), « Retouchées par Claude » et « Notées 4 ★ ou plus » (« P % des photos » ; « des
+  photos ouvertes » jusqu'à la 1.4), « Défaut le
   plus fréquent » (« <libellé> · N photo(s) sur S » ; sans défaut trouvé « Aucun », « aucun défaut
   trouvé sur les N photos analysées », au singulier pour une seule ; sans photo analysée « — »).
 - Sortie : `{ ok, catalogue, periode = { debut, fin (« AAAA-MM-JJ »), libelle (« du 20 novembre 2025

@@ -7,7 +7,15 @@ import Foundation
 /// travaillent sur les vignettes du cache d'aperçus de Lightroom (commande vignettes), sans
 /// exporter chaque photo ; une photo sans vignette est rendue comme un aperçu.
 extension ToolHandler {
-    static let maxCulledPhotos = 500
+    /// Une sortie par tranches (1.4) : 500 jusqu'au correctif 1.3.8. Pas plus : la réponse d'un tri
+    /// de 2 000 photos toutes floues pèserait 0,9 Mo, texte et forme structurée (mesuré le
+    /// 26 octobre 2026), au bord de ce que Claude Desktop accepte ; 1 000 en font 0,45.
+    static let maxCulledPhotos = 1_000
+    /// Avec `details` (une ligne par photo, deux fois plus lourde), la tranche de toujours.
+    static let maxCulledDetails = 500
+    /// Les groupes de lumière d'une sortie entière (`match_series` avec `groups`, 1.4) : leur
+    /// réponse est petite (les identifiants des groupes).
+    static let maxPhotosSortie = 2_000
     static let thumbnailsPerCommand = 25
     static let cullThumbnailSize = Detail.side
     /// Une planche de 20 à 30 vignettes : le standard de notation y cherche les photos vues en premier.
@@ -41,10 +49,11 @@ extension ToolHandler {
         }
         return [
             tool("cull_photos",
-                 "Trie une séance (jusqu'à \(Self.maxCulledPhotos) photos) sur les vignettes du cache d'aperçus de Lightroom, sans rien changer : photos floues ou ratées (netteté, mise au point manquée au point AF lu dans les RAW et JPEG Fujifilm, yeux fermés ou plissés, presque noires, brûlées), rafales (photos consécutives semblables, prises coup sur coup) et piles de Lightroom, avec la meilleure de chacune, ordre de lecture (classement : netteté et note esthétique, pas une note), plafonds de note mesurés (plafonds : le plancher technique du standard de notation, qui borne la note sans la donner ; propose_ratings les fait respecter) et proposition de rejet (flag reject, pour un défaut majeur). Aucune étoile : elles se proposent par propose_ratings, après avoir regardé les photos. Présenter les rejets à l'utilisateur, puis, après son accord, les poser avec set_metadata ; undo_last les défait. Avec keywords, des mots-clés proposés par Vision, en français. Long sur une grande séance : la progression se suit photo par photo. Sans photo_ids, selection, collection ni folder : la photo active de Lightroom.",
+                 "Trie une séance ou une sortie entière (jusqu'à \(Self.maxCulledPhotos) photos par appel ; la suite par offset ; \(Self.maxCulledDetails) avec details) sur les vignettes du cache d'aperçus de Lightroom, sans rien changer : photos floues ou ratées (netteté, mise au point manquée au point AF lu dans les RAW et JPEG Fujifilm, yeux fermés ou plissés, presque noires, brûlées), rafales (photos consécutives semblables, prises coup sur coup) et piles de Lightroom, avec la meilleure de chacune, ordre de lecture (classement : netteté et note esthétique, pas une note), plafonds de note mesurés (plafonds : le plancher technique du standard de notation, qui borne la note sans la donner ; propose_ratings les fait respecter) et proposition de rejet (flag reject, pour un défaut majeur). Aucune étoile : elles se proposent par propose_ratings, après avoir regardé les photos. Présenter les rejets à l'utilisateur, puis, après son accord, les poser avec set_metadata ; undo_last les défait. Avec keywords, des mots-clés proposés par Vision, en français. Long sur une grande séance : la progression se suit photo par photo. Sans photo_ids, selection, collection ni folder : la photo active de Lightroom.",
                  properties: series("Photos à trier (champ « id »), dans l'ordre voulu. Défaut : la photo active de Lightroom.") + [
                     ("keywords", prop("boolean", "true = proposer aussi des mots-clés par photo (Vision, traduits en français), à poser avec set_metadata après accord.")),
                     ("details", prop("boolean", "true = une ligne de mesures par photo (ordre de lecture, plafond, défauts, point AF, mots-clés).")),
+                    ("offset", prop("integer", "Avec selection, collection ou folder : photos à sauter (la tranche suivante d'une grande sortie : l'offset que donne photos_non_triees).")),
                  ],
                  required: []),
             tool("contact_sheet",
@@ -80,8 +89,10 @@ extension ToolHandler {
     /// La même série sans ses vidéos (1.3.5) : le tri, la série et la livraison les sautent et
     /// disent combien. Elles se lisent dans les descriptions d'une collection, d'un dossier ou de la
     /// sélection ; des photo_ids ne sont pas décrits ici (le tri les écarte à la lecture des
-    /// vignettes, la livraison dans le module).
-    func seriesPhotosSansVideos(_ args: Arguments, maximum: Int, decalage: Int = 0) throws -> (ids: [Int], total: Int, videos: Int) {
+    /// vignettes, la livraison dans le module). `parTranches` (le tri, 1.4) : une sélection plus
+    /// longue que `maximum` se prend par tranches au lieu d'être refusée ; le total dit la suite.
+    func seriesPhotosSansVideos(_ args: Arguments, maximum: Int, decalage: Int = 0,
+                                parTranches: Bool = false) throws -> (ids: [Int], total: Int, videos: Int) {
         if let ids = try args.intList("photo_ids"), !ids.isEmpty {
             guard ids.count <= maximum else { throw LightroomError.invalid("Au plus \(maximum) photos par appel.") }
             return (ids, ids.count, 0)
@@ -103,10 +114,24 @@ extension ToolHandler {
         guard args.bool("selection") == true else {
             throw LightroomError.invalid("Photos à traiter : photo_ids, selection = true, collection ou folder.")
         }
-        reponse = try lightroom.send("selection", ["limite": .number(Double(Self.maxSelectionLimit))], timeout: 60)
-        let decrites = Array((reponse["photos"]?.array ?? []).dropFirst(decalage).prefix(maximum))
+        // Le module décrit la tranche demandée (1.4 : decalage, et autant de photos que la série en
+        // prend, au-delà de la limite de list_selection) ; un module d'avant, qui ne connaît pas
+        // decalage, décrit le début de la sélection : la réponse le dit (decalage absent).
+        let tranche = max(maximum, Self.maxSelectionLimit)
+        reponse = try lightroom.send("selection", ["limite": .number(Double(tranche)), "decalage": .number(Double(decalage))],
+                                     timeout: Self.libraryTimeout)
+        var dejaDecalee = reponse["decalage"]?.int == decalage
+        // Un module d'avant n'a décrit que le début : il faut l'en redemander assez pour atteindre
+        // la tranche voulue (une seule fois).
+        if !dejaDecalee, decalage > 0, (reponse["photos"]?.array ?? []).count < decalage + maximum,
+           (reponse["total"]?.int ?? 0) > (reponse["photos"]?.array ?? []).count {
+            reponse = try lightroom.send("selection", ["limite": .number(Double(decalage + tranche)), "decalage": .number(Double(decalage))],
+                                         timeout: Self.libraryTimeout)
+            dejaDecalee = reponse["decalage"]?.int == decalage
+        }
+        let decrites = Array((reponse["photos"]?.array ?? []).dropFirst(dejaDecalee ? 0 : decalage).prefix(maximum))
         let total = reponse["total"]?.int ?? (reponse["photos"]?.array ?? []).count
-        guard decalage > 0 || total <= maximum else {
+        guard parTranches || decalage > 0 || total <= maximum else {
             throw LightroomError.invalid("\(total) photos sélectionnées : au plus \(maximum) par appel. Réduire la sélection ou donner photo_ids.")
         }
         return (decrites.filter { !Self.estVideo($0) }.compactMap { $0["id"]?.int }, total, decrites.filter(Self.estVideo).count)
@@ -180,8 +205,12 @@ extension ToolHandler {
         let debut = Date()
         let ids: [Int], total: Int
         var videos = 0
+        // Une sortie de plus de maxCulledPhotos photos se trie par tranches (1.4) : offset.
+        let maximumTri = args.bool("details") == true ? Self.maxCulledDetails : Self.maxCulledPhotos
+        let photoIds = (try? args.intList("photo_ids")) ?? nil
+        let decalage = (photoIds?.isEmpty ?? true) ? max(0, args.int("offset") ?? 0) : 0
         if Self.serieDonnee(args) {
-            (ids, total, videos) = try seriesPhotosSansVideos(args, maximum: Self.maxCulledPhotos)
+            (ids, total, videos) = try seriesPhotosSansVideos(args, maximum: maximumTri, decalage: decalage, parTranches: true)
         } else {
             // Sans cible, la photo active de Lightroom, comme les autres outils (la note d'abord d'une
             // photo dans la fenêtre Claude) ; sans photo active, le refus de toujours.
@@ -223,8 +252,9 @@ extension ToolHandler {
         // Les plafonds de ce tri remplacent ceux d'un tri précédent des mêmes photos (propose_ratings).
         let plafonds = Tri.plafonds(photos)
         for photo in photos { dernierTri[photo.id] = plafonds[photo.id] }
-        if total > ids.count {
-            bilan["photos_non_triees"] = .string("\(total - ids.count) photo(s) de plus dans la série : au plus \(Self.maxCulledPhotos) par appel.")
+        let suite = total - decalage - ids.count - videos
+        if suite > 0 {
+            bilan["photos_non_triees"] = .string("\(suite) photo(s) de plus dans la série : au plus \(maximumTri) par appel ; la tranche suivante : offset = \(decalage + ids.count + videos).")
         }
         if videos > 0 {
             bilan["videos_ecartees"] = .string("\(videos) vidéo(s) écartée(s) : le tri ne juge que les photos.")

@@ -48,7 +48,9 @@ local function echouer(message)
     error(message, 0)
 end
 
-local MAX_RESULTATS = 500
+-- Photos décrites au plus par la commande chercher : find_photos s'arrête à 500 côté connecteur ;
+-- une série (le tri d'une sortie, les groupes de lumière de match_series, 1.4) en prend jusqu'à 2 000.
+local MAX_RESULTATS = 2000
 -- Secondes au plus pour sélectionner une photo dans le dossier que le module vient d'afficher.
 local DELAI_SOURCE = 3
 -- Photos au plus pour trier ou filtrer après la recherche de Lightroom (dates, dossier, copies).

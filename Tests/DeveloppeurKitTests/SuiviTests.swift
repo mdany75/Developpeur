@@ -161,7 +161,7 @@ final class SuiviTests: XCTestCase {
         XCTAssertEqual(sortie["periode"], ["debut": "2025-11-20", "fin": "2026-11-20", "libelle": "du 20 novembre 2025 au 20 novembre 2026",
                                            "par": "mois", "depuis_le_debut": false])
         let tuiles = try XCTUnwrap(sortie["tuiles"]?.array)
-        XCTAssertEqual(tuiles[0]["detail"]?.string, "aucune photo ouverte dans la période")
+        XCTAssertEqual(tuiles[0]["detail"]?.string, "aucune photo dans la période")
         XCTAssertEqual(tuiles[1]["detail"]?.string, "—")
         XCTAssertEqual(tuiles[3]["texte"]?.string, "—")
         XCTAssertEqual(tuiles[3]["detail"]?.string, "aucune photo analysée")
@@ -389,7 +389,10 @@ final class SuiviTests: XCTestCase {
         // Une photo abandonnée ou en file n'est cherchée pour aucun code de l'analyse.
         let autre = try graphiques([photo(1, cherches: nil, abandonnee: true), photo(2, cherches: nil)])
         XCTAssertEqual(autre["analyse"], ["analysees": 0, "en_attente": 1, "en_echec": 1])
-        XCTAssertEqual(autre["tuiles"]?.array?.first?["detail"]?.string, "1 en cours d'analyse · 1 non analysée")
+        // La tuile « Photos analysées » (1.4) : aucune analysée, et le reste dit dessous.
+        XCTAssertEqual(autre["tuiles"]?.array?.first?["titre"]?.string, "Photos analysées")
+        XCTAssertEqual(autre["tuiles"]?.array?.first?["valeur"]?.int, 0)
+        XCTAssertEqual(autre["tuiles"]?.array?.first?["detail"]?.string, "sur 2 photos · 1 en cours d'analyse · 1 non analysée")
         XCTAssertTrue((autre["defauts"]?.array ?? []).allSatisfy { $0["sur"]?.int == 0 })
     }
 

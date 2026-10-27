@@ -260,8 +260,9 @@ final class TriTests: XCTestCase {
         XCTAssertTrue(sansActive.isError, "sans cible ni photo active, il faut dire quelles photos")
         XCTAssertTrue(sansActive.text.contains("Photos à traiter : photo_ids, selection = true, collection ou folder"), sansActive.text)
         XCTAssertEqual(fake.commands, ["etat"])
-        fake.replies["selection"] = ["total": 900, "photos": []]
-        XCTAssertTrue(tools.call(name: "cull_photos", arguments: ["selection": true]).text.contains("au plus 500"))
+        // 1.4 : une grande sélection n'est plus refusée, elle se trie par tranches (GroupesLumiereTests).
+        fake.replies["selection"] = ["total": 2_500, "photos": []]
+        XCTAssertTrue(tools.call(name: "cull_photos", arguments: ["selection": true]).text.contains("Aucune photo à trier"))
         XCTAssertFalse(fake.commands.contains("vignettes"))
     }
 

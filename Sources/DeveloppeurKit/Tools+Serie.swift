@@ -8,6 +8,9 @@ import Foundation
 /// moyennes, la seconde de celles que la photo a montrées. Chaque `appliquer` d'une série porte
 /// `sans_avant_apres` (1.3) : le module ne garde pas l'avant/après de ces étapes (Etapes.lua), même
 /// sur la photo active, pour ne pas ralentir la série ni faire attendre l'aperçu de mesure suivant.
+/// Depuis la 1.4 (« Harmoniser par lumière ») : `groups` partage d'abord une sortie entière en
+/// groupes de lumière, une référence proposée par groupe (`Tools+Lumiere`), et le teint du plus
+/// grand visage de chaque photo se compare à celui de la référence, en témoin (`Teint`).
 extension ToolHandler {
     static let maxMatchedPhotos = 60
     static let matchDimensions = ["exposure", "white_balance", "contrast"]
@@ -39,7 +42,7 @@ extension ToolHandler {
     var seriesDefinitions: [JSONValue] {
         [
             tool("match_series",
-                 "Harmonise une série sur une photo de référence, en chiffres : exposition (IL), balance des blancs (dominante des tons neutres, a* et b*, traduite en Temperature et Tint) et contraste (Contrast2012). Sans confirm : le plan, photo par photo (écarts mesurés et corrections proposées), sans rien changer : le montrer à l'utilisateur. Avec confirm = true : corrections relatives (une étape « Claude · <step_name> » par photo, que undo_last défait), nouvelle mesure, puis une seconde correction si un écart visible reste ; le résultat donne les écarts avant et après. Les photos sans assez de tons neutres gardent leur balance (dit). Pour les autres réglages (profil, couleurs, masques), copy_settings depuis la référence d'abord.",
+                 "Harmonise une série sur une photo de référence, en chiffres : exposition (IL), balance des blancs (dominante des tons neutres, a* et b*, traduite en Temperature et Tint) et contraste (Contrast2012). Sans confirm : le plan, photo par photo (écarts mesurés et corrections proposées), sans rien changer : le montrer à l'utilisateur. Avec confirm = true : corrections relatives (une étape « Claude · <step_name> » par photo, que undo_last défait), nouvelle mesure, puis une seconde correction si un écart visible reste ; le résultat donne les écarts avant et après. Les photos sans assez de tons neutres gardent leur balance (dit). Avec un visage sur la référence, la peau de chaque photo s'y compare en témoin (teint ; a_verifier si l'harmonisation l'en éloigne). Pour les autres réglages (profil, couleurs, masques), copy_settings depuis la référence d'abord. Une sortie entière sous plusieurs lumières : d'abord groups = true, sans reference_id (jusqu'à \(Self.maxPhotosSortie) photos) : des groupes de photos prises sous la même lumière (pause, ressemblance, lumière de la scène, flash), une référence proposée par groupe, rien de changé ; puis chaque groupe sur sa référence retouchée.",
                  properties: [
                     ("reference_id", prop("integer", "Photo de référence, déjà retouchée.")),
                     ("photo_ids", listProp("integer", "Photos à harmoniser (sans la référence).")),
@@ -48,8 +51,9 @@ extension ToolHandler {
                     ("adjust", ["type": "array", "items": ["type": "string", "enum": .array(Self.matchDimensions.map(JSONValue.string))],
                                 "description": "Ce qu'il faut rapprocher (défaut : les trois)."]),
                     ("by", enumProp(["measure", "exif"], "measure (défaut) : d'après les aperçus mesurés. exif : l'exposition seule, d'après l'ouverture, la vitesse et l'ISO de chaque photo, sans mesure (« Reproduire toutes les expositions » de Lightroom) : pour une série prise en manuel, ou un bracketing à ramener à la même luminosité.")),
+                    ("groups", prop("boolean", "true = sans reference_id : les groupes de lumière de toute la sortie (photo_ids, selection, collection ou folder), avec la référence proposée de chacun ; rien n'est changé.")),
                  ] + writeProperties,
-                 required: ["reference_id"]),
+                 required: []),
         ]
     }
 
@@ -62,10 +66,15 @@ extension ToolHandler {
         var mesures: PhotoMeasurements
         /// Tons neutres suivis (mêmes pixels d'une passe à l'autre).
         var neutres: Measurements.NeutresSuivis?
+        /// La peau du plus grand visage (le témoin du teint, 1.4), lue seulement si la référence en a.
+        var peau: Teint.Mesure? = nil
     }
 
     func matchSeries(_ args: Arguments) throws -> JSONValue {
-        guard let reference = args.int("reference_id") else { throw LightroomError.invalid("« reference_id » : la photo de référence.") }
+        if args.bool("groups") == true { return try groupesDeLumiere(args) }
+        guard let reference = args.int("reference_id") else {
+            throw LightroomError.invalid("« reference_id » : la photo de référence (ou groups = true pour former d'abord les groupes de lumière d'une sortie).")
+        }
         let dimensions = Set((args.array("adjust") ?? Self.matchDimensions.map(JSONValue.string)).compactMap(\.string))
         guard !dimensions.isEmpty, dimensions.isSubset(of: Self.matchDimensions) else {
             throw LightroomError.invalid("« adjust » : \(Self.matchDimensions.joined(separator: ", ")).")
@@ -85,28 +94,38 @@ extension ToolHandler {
         let total = ids.count * (confirme ? 3 : 1) + 1
         var fait = 0
         avancer(0, sur: total, "Mesure de la référence", titre: "harmonisation de la série")
-        let ref = try mesurerSerie(reference)
+        // Le témoin du teint : la peau de la référence d'abord ; sans visage sur elle, aucune autre
+        // photo ne se lit (pas de Vision de plus).
+        let ref = try mesurerSerie(reference, teint: true)
+        let teint = ref.peau != nil
         fait += 1
         var lignes: [JSONValue] = []
+        var aVerifier: [JSONValue] = []
         for id in ids {
             try contexte.verifier()
             // Chaque photo part des pentes relevées : celles d'une autre photo ne lui valent rien.
             var pentes = PentesSerie()
-            let photo = try mesurerSerie(id)
+            let photo = try mesurerSerie(id, teint: teint)
             fait += 1
             avancer(fait, sur: total, "Mesure de \(photo.fichier.string ?? "la photo \(id)")", titre: "harmonisation de la série")
             let ecart = Self.ecartSerie(photo, ref)
             var correction = Self.correction(ecart, photo: photo, dimensions: dimensions, pentes: pentes)
             var ligne: [String: JSONValue] = ["id": .number(Double(id)), "fichier": photo.fichier, "ecart_avant": Self.ecartJSON(ecart)]
+            // Sans tons neutres, la balance reste : la peau dit si elle diffère de celle de la référence.
+            if ecart.a == nil, let peau = photo.peau, let reference = ref.peau, Teint.ecart(peau, reference) >= Teint.ecartVisible {
+                correction.remarques.append("La peau diffère de celle de la référence (écart a*b* \(PhotoTriee.r(Teint.ecart(peau, reference)))) : si c'est la même personne, corriger la balance à l'œil.")
+            }
             if correction.reglages.isEmpty {
                 ligne["correction"] = "aucune : déjà proche de la référence"
                 if !correction.remarques.isEmpty { ligne["remarques"] = .array(correction.remarques.map(JSONValue.string)) }
+                if teint, let temoin = Teint.json(reference: ref.peau, avant: photo.peau, apres: nil) { ligne["teint"] = temoin }
                 lignes.append(.object(ligne))
                 continue
             }
             ligne["correction_proposee"] = .object(correction.reglages.mapValues { .number(($0 * 100).rounded() / 100) })
             if !correction.remarques.isEmpty { ligne["remarques"] = .array(correction.remarques.map(JSONValue.string)) }
             guard confirme else {
+                if teint, let temoin = Teint.json(reference: ref.peau, avant: photo.peau, apres: nil) { ligne["teint"] = temoin }
                 lignes.append(.object(ligne))
                 continue
             }
@@ -127,7 +146,7 @@ extension ToolHandler {
                 _ = try lightroom.send("appliquer", params, timeout: 180)
                 etapes.append(.string("Claude · " + nom))
                 let avant = mesuree
-                mesuree = try mesurerSerie(id, masque: photo.neutres?.masque)
+                mesuree = try mesurerSerie(id, masque: photo.neutres?.masque, teint: teint)
                 fait += 1
                 avancer(min(fait, total), sur: total, "\(photo.fichier.string ?? "Photo \(id)") : passe \(passe) mesurée", titre: "harmonisation de la série")
                 let reste = Self.ecartSerie(mesuree, ref)
@@ -137,13 +156,22 @@ extension ToolHandler {
             }
             ligne["etapes"] = .array(etapes)
             ligne["ecart_apres"] = Self.ecartJSON(Self.ecartSerie(mesuree, ref))
+            if teint, let temoin = Teint.json(reference: ref.peau, avant: photo.peau, apres: mesuree.peau) {
+                ligne["teint"] = temoin
+                if let texte = temoin["a_verifier"]?.string {
+                    aVerifier.append(["id": .number(Double(id)), "fichier": photo.fichier, "pourquoi": .string(texte)])
+                }
+            }
             lignes.append(.object(ligne))
         }
+        var referenceJSON: [String: JSONValue] = ["id": .number(Double(reference)), "fichier": ref.fichier]
+        referenceJSON["teint"] = Teint.jsonReference(ref.peau)
         var resultat: [String: JSONValue] = [
-            "reference": ["id": .number(Double(reference)), "fichier": ref.fichier],
+            "reference": .object(referenceJSON),
             "photos": .array(lignes),
-            "base": "Écarts « référence moins photo » : exposition en IL (luminance médiane), dominante a* (vert − / magenta +) et b* (bleu − / jaune +) des tons neutres, contraste (L* P95 − P5).",
+            "base": "Écarts « référence moins photo » : exposition en IL (luminance médiane), dominante a* (vert − / magenta +) et b* (bleu − / jaune +) des tons neutres, contraste (L* P95 − P5). Teint (témoin) : la peau du plus grand visage, lue au milieu du visage dans l'aperçu de mesure à pleine résolution, écart a*b* avec celle de la référence ; deux personnes n'ont pas la même peau : un témoin, jamais la correction.",
         ]
+        if !aVerifier.isEmpty { resultat["a_verifier"] = .array(aVerifier) }
         if nonHarmonisees > 0 {
             resultat["photos_non_harmonisees"] = .number(Double(nonHarmonisees))
             resultat["remarque"] = .string("\(nonHarmonisees) photo(s) laissée(s) de côté : au plus \(Self.maxMatchedPhotos) par appel ; les harmoniser par photo_ids, par lots.")
@@ -240,8 +268,9 @@ extension ToolHandler {
         secondes >= 0.5 ? "\(DevelopCatalogue.format((secondes * 10).rounded() / 10)) s" : "1/\(Int((1 / secondes).rounded())) s"
     }
 
-    /// Aperçu d'analyse, mesures, et balance actuelle (kelvins pour un RAW).
-    func mesurerSerie(_ id: Int, masque: [Bool]? = nil) throws -> PhotoSerie {
+    /// Aperçu d'analyse, mesures, et balance actuelle (kelvins pour un RAW). `teint` : lire aussi la
+    /// peau du plus grand visage (1.4).
+    func mesurerSerie(_ id: Int, masque: [Bool]? = nil, teint: Bool = false) throws -> PhotoSerie {
         let reponse = try lightroom.send("apercu", ["photo": .number(Double(id)), "taille": .number(Double(Self.analysisSize)),
                                                     "cles": ["Temperature", "Tint"]], timeout: 120)
         let data = try Self.readPreview(reponse["chemin"]?.string)
@@ -249,8 +278,10 @@ extension ToolHandler {
         let raw = reponse["echelle_temperature"]?.string?.contains("kelvins") == true
         var neutres = Measurements.neutres(data, masque: masque)
         if neutres == nil, masque != nil { neutres = Measurements.neutres(data) }
-        return PhotoSerie(id: id, fichier: reponse["photo"]?["fichier"] ?? .null, raw: raw,
-                          temperature: reponse["reglages"]?["Temperature"]?.double, mesures: mesures, neutres: neutres)
+        var photo = PhotoSerie(id: id, fichier: reponse["photo"]?["fichier"] ?? .null, raw: raw,
+                               temperature: reponse["reglages"]?["Temperature"]?.double, mesures: mesures, neutres: neutres)
+        if teint, let image = PreviewImages.image(data) { photo.peau = Teint.lire(image) }
+        return photo
     }
 
     struct EcartSerie: Equatable {

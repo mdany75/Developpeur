@@ -88,6 +88,8 @@ public final class Recette {
         if let mixte { sequenceEclairage(mixte, unique: raw == mixte ? nil : raw) }
         if let raw, let jpeg { try? sequenceSerie(reference: raw, autre: jpeg) }
         if let raw, let flash { try? sequenceExpositions(reference: raw, autre: flash) }
+        // 1.4, les groupes de lumière (Recette+14.swift) : sur toutes les photos données, en lecture seule.
+        try? sequenceLumiere([raw, jpeg, flash, xt20, portrait, mixte, horizon].compactMap { $0 })
     }
 
     // MARK: - Liaison et écran (vrai pont seulement)

@@ -24,7 +24,7 @@ Publication… et Consommation….*
 
 ### La fenêtre Claude dans Lightroom
 
-- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur v1.3.8 » dans sa barre de titre
+- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur v1.4 » dans sa barre de titre
   (la version du module installé) : Fichier ›
   Module externe - Extras › Ouvrir la fenêtre Claude (même entrée dans le menu Bibliothèque, et
   raccourci ⌃⌥C une fois posé). Elle reste ouverte pendant que vous travaillez, dans tous les
@@ -349,7 +349,8 @@ Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claud
   anciennes) ; le premier mois et chaque janvier portent leur année (« déc. 2025 », « janv. 2026 »),
   et l'infobulle d'une colonne que la période ne couvre qu'en partie le dit (« janvier 2025, à
   partir du 25 », « novembre 2026, jusqu'au 20 »).
-- Quatre tuiles : photos ouvertes (et combien attendent leur analyse), retouchées par Claude,
+- Quatre tuiles : photos analysées (« Photos ouvertes » jusqu'à la 1.4 ; dessous, combien de photos
+  sont ouvertes et combien attendent leur analyse), retouchées par Claude,
   notées 4 ★ ou plus, et le défaut le plus fréquent (parmi ceux cherchés sur au moins 5 photos).
 - Mes prises de vue : photos par mois (par date de prise de vue), focales (de « ≤ 15 » à
   « > 300 » mm), sensibilité (de « ≤ 200 » à « > 12 800 » ISO), heure de la prise de vue (par
@@ -671,7 +672,8 @@ cadre.
 
 **Séries et tri**
 
-- Trier une séance, jusqu'à 500 photos (sélection, collection ou dossier ; sans rien de désigné, la
+- Trier une séance ou une sortie entière, jusqu'à 1 000 photos d'un coup (500 jusqu'à la 1.4, et
+  avec le détail par photo ; une sortie plus grande, par tranches ; sélection, collection ou dossier ; sans rien de désigné, la
   photo active), sur les vignettes que Lightroom garde déjà en cache, sans exporter chaque photo : photos floues, mise au point manquée
   (au point de mise au point lu dans les RAW et JPEG Fujifilm), yeux fermés ou plissés, photos
   presque noires ou brûlées, rafales et piles de Lightroom avec la meilleure de chacune, et un ordre
@@ -700,6 +702,18 @@ cadre.
   contraste. Claude montre d'abord le plan photo par photo ; avec votre accord, il corrige en deux
   passes mesurées. Ou l'exposition seule, d'après l'ouverture, la vitesse et l'ISO (une série prise
   en manuel, un bracketing).
+- Harmoniser une sortie entière par lumière (1.4) : Claude la partage d'abord en groupes de photos
+  prises sous la même lumière, d'après l'heure de prise de vue (une pause de plus de 10 minutes,
+  sauf au même lieu dans l'heure, selon Vision), le flash qui s'allume ou s'éteint, et la lumière de
+  la scène (l'ouverture, la vitesse, l'ISO et la compensation : plus de 2,5 IL d'écart avec les
+  dernières photos du groupe). Deux boîtiers sur la même scène restent ensemble. Pour chaque groupe,
+  il propose une photo de référence (une photo qu'il a déjà retouchée, sinon la mieux classée au tri,
+  avec un visage si le groupe en a), sans rien changer ; puis il la retouche et harmonise les autres
+  sur elle, 60 photos au plus par passage. Seuils provisoires, à régler sur une vraie sortie.
+- Le témoin du teint (1.4) : avec un visage sur la photo de référence, la peau de chaque photo (le
+  milieu du plus grand visage, pris à pleine taille dans l'aperçu mesuré) se compare à la sienne,
+  avant et après l'harmonisation ; si la correction l'en éloigne nettement, Claude le signale, à
+  vérifier à l'œil (deux personnes n'ont pas la même peau : un témoin, jamais la correction).
 - Une longue série montre sa progression photo par photo, dans Claude Code et dans la barre de
   progression de Lightroom, et s'arrête proprement si vous l'interrompez (Échap dans Claude Code,
   croix de la barre dans Lightroom). Avant des centaines de photos, Claude propose une sauvegarde du
@@ -1167,8 +1181,8 @@ active, rendu naturel et un peu chaud », « Passe-la en CLASSIC CHROME et redre
 « Assombris le ciel sans toucher au bâtiment », « Éclaircis et assombris pour mener l'œil au
 visage », « Efface les poussières du capteur », « Débruite cette photo de nuit », « Montre-moi
 d'abord ce que tu proposes », « Montre-moi trois interprétations : naturelle, chaude et noir et
-blanc », « Harmonise cette série sur la troisième photo », « Trie la séance et propose-moi les
-meilleures », « Note ces photos » (Claude pose les notes), « Lis la composition et propose un
+blanc », « Harmonise cette série sur la troisième photo », « Harmonise ma sortie par lumière »,
+« Trie la séance et propose-moi les meilleures », « Note ces photos » (Claude pose les notes), « Lis la composition et propose un
 cadre », « Comment progressent mes prises de vue ? » (le carnet de progrès) ou « Prépare la
 sélection pour Instagram ». Dans la fenêtre Claude, chaque photo a sa conversation : choisissez-en
 une dans Lightroom, et la fenêtre montre la sienne, ou en commence une, son résumé en haut du fil

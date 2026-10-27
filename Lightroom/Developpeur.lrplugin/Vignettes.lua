@@ -67,6 +67,17 @@ local function decrireVignette(photo, d)
     -- Le numéro de série du boîtier (1.3.5) : deux boîtiers sur la même scène ne forment pas une
     -- rafale (Tri.memeRafale). Lu seul, par Photos.meta : une clé refusée ne casse aucun lot.
     d.serie_boitier = Photos.meta(photo, 'cameraSerialNumber')
+    -- La prise de vue en nombres (1.4, groupes de lumière de match_series : la lumière de la scène
+    -- et le flash) : ouverture (nombre f), vitesse (secondes), compensation (IL), flash (vrai s'il a
+    -- éclairé, nil si inconnu), d'après getRawMetadata.
+    local ouverture, vitesse = tonumber(brut(photo, 'aperture')), tonumber(brut(photo, 'shutterSpeed'))
+    local compensation, flash = tonumber(brut(photo, 'exposureBias')), brut(photo, 'flash')
+    if type(flash) ~= 'boolean' then
+        flash = nil
+    end
+    if ouverture or vitesse or compensation or flash ~= nil then
+        d.prise_de_vue = { ouverture = ouverture, vitesse = vitesse, compensation = compensation, flash = flash }
+    end
     d.geometrie = {
         largeur = largeur, hauteur = hauteur,
         orientation = (orientationAffichage(photo, raw, largeur, hauteur)),
