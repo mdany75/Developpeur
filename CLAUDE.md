@@ -121,11 +121,10 @@ Dans cet ordre :
    `docs/lavish/`, commitée et poussée depuis le 24 octobre 2026 : le dépôt est public) pour la
    relecture de Dany, puis la republier à la même adresse. De même pour
    les pages que la version rend fausses : Les 35 outils
-   (https://claude.ai/artifact/KniGdYp5yt4DPsLcbsLoCL, source `les-36-outils.html`, nom gardé),
-   Guide des demandes
-   (https://claude.ai/artifact/F7uUKLaAnzo3BX6kWxBGPP), Apprendre avec Claude
-   (https://claude.ai/artifact/CZR9wrRWk73gGGBb46HxXU), Ordinogramme d'une retouche
-   (https://claude.ai/artifact/RzGhic1X61H3crEBFYjTLd). Tout document nouveau pour Dany (guide,
+   (https://claude.ai/artifact/KniGdYp5yt4DPsLcbsLoCL, source `les-36-outils.html`, nom gardé) et
+   Ordinogramme d'une retouche (https://claude.ai/artifact/RzGhic1X61H3crEBFYjTLd) ; Guide des
+   demandes et Apprendre avec Claude sont supprimées, avec leurs sources, à la demande de Dany le
+   27 octobre 2026. Tout document nouveau pour Dany (guide,
    compte rendu, plan) se fait de même : une page Lavish publiée en artefact, sa source dans
    `docs/lavish/`, jamais un document Claude Docs.
 
