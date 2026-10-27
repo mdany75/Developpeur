@@ -15,10 +15,6 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 
 ![La fenêtre Claude dans Lightroom Classic](docs/capture.png)
 
-*Capture à refaire au correctif 1.3.7 : elle montre encore la fenêtre d'avant la 1.3.6 (1 948 ×
-1 200, avec le volet des conversations et la rangée Mode) ; elle montrera la fenêtre de 1 623 ×
-1 200, en deux colonnes, avec les onglets Focus, Note, Aperçu et Proposition et les boutons Suivi,
-Publication… et Consommation….*
 
 ## Fonctions
 
@@ -101,10 +97,6 @@ Publication… et Consommation….*
     historique. L'ancienne reste sur le disque, mise de côté : elle ne revient plus, et elle n'est
     jamais effacée. Grisé pendant que Claude travaille, sans photo seule, et quand la conversation
     montrée n'est pas celle de la photo active (case Autre photo décochée, par exemple).
-  - Les conversations d'avant le correctif 1.3.6 : celle dont la dernière demande portait sur une
-    seule photo devient la conversation de cette photo (la plus récente, s'il y en a plusieurs) ;
-    celles de plusieurs photos restent sur le disque, sans plus se montrer. Rien n'est effacé ; les
-    anciennes séances de notation ne s'ouvrent toujours pas.
 - Le titre : le nom de la photo (« DSCF4961.RAF (Copie 2) »), ou « 12 photos » pour un groupe,
   jusqu'à celui que Claude donne d'après ce qu'il voit sur la photo (« Flamant rose au bord de
   l'eau ») ; il ne se renomme pas. Une conversation commencée par la Demande rapide reçoit le sien à
@@ -381,8 +373,6 @@ Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claud
   couleurs de l'apparence claire ou sombre du module. Ils se refont à l'ouverture, à chaque autre
   période ou autre défaut, et quand une analyse arrive pendant que la fenêtre est ouverte. Sans
   connecteur, ou s'il ne répond pas à temps, la fenêtre le dit et garde les graphiques d'avant.
-- « Photos d'un défaut… » et son « Retirer du carnet… » sont retirés au correctif 1.3.8, à votre
-  demande : un clic sur la barre d'un défaut montre déjà ses photos dans la Bibliothèque.
 - Pour l'avis de Claude, demandez-le-lui (« Comment progressent mes prises de vue ? ») : il lit le
   carnet de progrès. Le Suivi, lui, reste sur le Mac : Claude ne le voit pas.
 
@@ -436,26 +426,13 @@ correctif 1.3.6, à votre demande du 25 octobre 2026 ; les leçons déjà rangé
   ISO 1 600 ou plus (seuil provisoire) : à ISO bas, la texture d'un reflet d'eau ou d'un sous-bois
   ressemble à du bruit, et « garder l'ISO plus bas » n'y aurait pas de sens.
   Ils sont comptés par mois de prise de vue ; une photo sans date compte au mois où Claude l'a vue.
-- La fenêtre Suivi, qu'ouvre le bouton Suivi en haut à droite de la fenêtre Claude, le montre en
-  graphiques depuis le correctif 1.3.7, avec les défauts que le connecteur trouve d'office sur
-  chaque photo ouverte (voir Le Suivi de vos photos) : les défauts les plus fréquents et
-  l'évolution d'un défaut. Le carnet l'emporte pour ce qu'il a cherché sur une photo (il mesure
-  sur l'aperçu, au point de mise au point). Un clic sur la barre d'un défaut montre ses photos dans
-  la Bibliothèque (« Photos d'un défaut… » et « Retirer du carnet… » sont retirés au correctif 1.3.8).
 - Ce qui progresse ou recule, et quoi travailler à la prochaine sortie : demandez-le à Claude
   (« Comment progressent mes prises de vue ? ») ; il lit le carnet et répond en trois puces (ce qui
   progresse, ce qui revient, quoi essayer à la prochaine sortie).
 - Seules vos vraies prises de vue comptent : les photos de « Développeur › Essais » n'y entrent
   pas, ni leurs constats. La case Carnet du Gestionnaire de modules externes (section Liaison avec
   Claude) arrête les constats.
-  Les seuils de la sous-exposition (moitié des tons sous L* 28 et 95 % sous L* 80, sauf une photo
-  voulue sombre) et du ciel brûlé (plus de 3 % du tiers haut en blanc pur) sont provisoires : aucun
-  vrai cas parmi les photos d'essai.
 
-![Le Carnet de progrès dans la fenêtre Claude](docs/carnet.png)
-
-*Capture à refaire au correctif 1.3.7 : elle montre encore la page Carnet de progrès du fil ; elle
-montrera la fenêtre Suivi en graphiques.*
 
 ### Ce que Claude sait faire par le connecteur
 
@@ -554,8 +531,6 @@ cadre.
   c'est la protection des hautes lumières à la prise de vue : il remonte l'exposition en les
   gardant ; en « priorité à l'ambiance », la chaleur des lampes reste. Donnée avec l'aperçu entier,
   pas avec un zoom ni un avant/après.
-- L'écran principal du Mac (`get_status`) : son nom seul (et celui des autres écrans), lu sur ce
-  Mac sans réseau ni permission.
 - L'évaluation que Claude garde pour la photo, donnée avec l'aperçu entier et avec un zoom (pas
   avec un avant/après) : pas encore évaluée, note proposée à vérifier, acceptée ou changée par vous
   (voir Noter vos photos).
@@ -723,10 +698,6 @@ cadre.
   le volume du catalogue y est : un disque externe n'y entre que s'il est ajouté dans les options de
   Time Machine). Lues seulement : Claude ne règle rien, il vous le dit avant d'écrire sur des
   centaines de photos.
-- Les rafales par boîtier (1.3.5) : le numéro de série du boîtier entre dans la description ; deux
-  boîtiers sur la même scène (X-H2S et X-T4) ne forment plus une rafale.
-- Les vidéos écartées (1.3.5) : marquées dans la description, le tri, l'harmonisation d'une série et
-  la livraison les sautent et disent combien.
 
 **Noter**
 
@@ -740,11 +711,6 @@ cadre.
   s'annule comme un classement. Votre demande vaut accord, même en mode « Proposer d'abord » (avec
   « l'accord se donne ici », il attend encore le bouton Accepter de la fenêtre de la liaison) ; la
   pause de la liaison l'arrête, et les photos protégées restent protégées.
-- 4 ★ sont rares : une photo développée qui tient à côté de vos meilleures, vue à 100 % (la
-  dernière passe du standard) ; 5 ★, l'exceptionnel, quelques-unes par année au plus. Vos coups de cœur ne sont pas des étoiles : c'est un libellé de
-  couleur que vous posez vous-même ; Claude n'en propose, n'en pose ni n'en change jamais sans que
-  vous le lui demandiez. Une note au-dessus du plafond mesuré au tri est refusée, sauf un défaut
-  voulu et maîtrisé, que Claude nomme et vous laisse « à vérifier ».
 - L'invite `noter` : une sortie notée passe par passe (le tri, des planches de 24 à 30 vignettes,
   les candidates à 3 ★ et plus regardées à 100 %, puis les propositions). Sans précision, elle note la
   sélection.
@@ -1295,34 +1261,11 @@ connecteur ; le signe ; puis produit `build/Developpeur.zip` (connecteur, module
 swift test
 ```
 
-Le connecteur : protocole MCP, outils, catalogue des réglages, inscription dans Claude (sur des
-fichiers temporaires), liaison TCP avec un faux module Lightroom (jeton compris, dans un fichier
-temporaire), ce que la 1.2 ajoute (bilan, éclairage, lecture des fichiers Fujifilm, écran,
-dosage de la peau) et la 1.3 (composition lue, carnet de progrès, recette de la 1.3 sur un module
-simulé), puis l'onglet Focus (mise au point Fujifilm en détail, ses cadres, `--focus`), le rendu
-reproductible et le Suivi (`--analyser` sur des vignettes fabriquées, `--graphiques` sur des
-relevés fabriqués, et ses images), sur des images, des fichiers et des
-profils de couleur fabriqués (les valeurs d'une vraie photo, jamais la photo). Les contrats de la
-composition et du Suivi entre le connecteur et le module (`Tests/Contrats/`) sont lus par les deux
-suites (celui de « Je le fais » est retiré avec lui).
 
 ```bash
 scripts/tester-module.sh
 ```
 
-Le module, avec LuaJIT : forme du module, syntaxe et globales de chaque fichier, syntaxe de
-`relais.sh`, liens entre les fichiers, puis deux suites, chacune sur son Lightroom simulé :
-`Tests/Lua/Liaison` (les commandes du connecteur, notes proposées, avant/après des étapes, carnet
-compris, leçons d'avant gardées telles quelles) et `Tests/Lua/Fenetre` (la fenêtre Claude avec un
-faux Claude Code, une photo une conversation, le résumé en haut du fil, la Demande rapide, ses
-images et ses apparences, l'onglet Focus avec un faux connecteur (une photo verticale comprise),
-Agrandir avec le vrai `sips`, le relevé du Suivi et son analyse d'office (toute une bibliothèque
-comprise : un relevé de 85 000 photos relu et écrit sans garder la main plus de 0,3 s, 250 000 avec
-`DEVELOPPEUR_SUIVI_ORIGINAUX=250000`), la fenêtre Suivi en graphiques (chacun avec un faux
-connecteur qui lit le contrat), Publication et Consommation) ;
-dans chacune, les essais `essais-*.lua`
-tournent après `tests.lua`. La simulation de la fenêtre imite ce qui a été constaté dans
-Lightroom (Retour, clics, vues masquées, texte riche…) et refuse ce qui n'y marche pas.
 
 Aucun test ne touche Lightroom, Claude, vos photos ni les fichiers de Claude, et aucun ne consomme
 de quota. Un test relit seulement, s'il les trouve, les doses de la peau rangées dans l'application
@@ -1330,70 +1273,6 @@ Lightroom Classic ; aucun ne lit votre écran, sauf sur demande :
 `DEVELOPPEUR_ECRAN_REEL=1 swift test`. Les deux suites tournent aussi à chaque envoi sur `main`
 (GitHub Actions).
 
-Pour la mise au point, Lightroom ouvert et liaison démarrée, l'exécutable installé
-(`~/Library/Application Support/Developpeur/mcp-developpeur`) offre aussi ce qui suit ; ce qui
-parle au module y passe avec le jeton de la liaison, comme le connecteur :
-
-- `--call <outil> '{…}'` : appelle un outil comme le ferait Claude ;
-- `--module diagnostic` : les fonctions du SDK que Lightroom offre au module
-  (`'{"valeurs": true}'` lit aussi le jeu de libellés, le filtre de la Bibliothèque et l'original
-  de la photo active) ;
-- `--dump [<id>]` : tous les réglages bruts d'une photo, une clé par ligne, à comparer avec `diff`
-  avant et après une opération faite à la main ;
-- `--recalage <id>` : les écarts du recalage des positions sur la géométrie actuelle de la photo ;
-- `--marquer-af <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` : le carré de mise au
-  point d'un fichier Fujifilm dessiné sur une vignette, comme dans l'aperçu de la photo active de
-  la fenêtre Claude (code 1 sans point), sans Lightroom ni liaison ;
-- `--focus <original> '<géométrie JSON>' <vignette.jpg> <sortie.jpg>` : l'onglet Focus de la
-  fenêtre Claude : les cadres de la mise au point d'un fichier Fujifilm (point ou zone AF en rouge,
-  visages et éléments du sujet en coins jaunes) dessinés sur une vignette, puis ce que l'appareil
-  en dit (Image, Prise de vue, Mise au point, en français), une ligne JSON (rien de lu : la
-  raison, `delai`, `introuvable` ou `illisible`, et le code 1), sans Lightroom ni liaison ;
-- `--boitier <original>` : ce que l'appareil a rangé dans un fichier Fujifilm (RAF ou JPEG) : point
-  de mise au point, intention de la prise de vue comme dans `view_photo`, mise au point en détail
-  comme dans l'onglet Focus, et valeurs lues sous les noms d'exiftool, une ligne JSON (code 1 si
-  rien n'est lu), sans Lightroom ni liaison ;
-- `--analyser '<json>'` : ce que le Suivi lance pour analyser un lot de photos (20 au plus) sur
-  leurs vignettes : les défauts de la prise de vue en codes (sous-exposition, surexposition, ciel
-  brûlé, bruit à ISO élevé, flou, yeux fermés) et, depuis le correctif 1.3.8, le genre de chaque
-  photo, une ligne JSON, sans Lightroom ni liaison, jamais l'original (`Tests/Contrats/suivi.json`
-  en donne la forme) ;
-- `--graphiques '<json>' <dossier>` : ce que la fenêtre Suivi lance pour ses graphiques : les tuiles
-  et les neuf graphiques d'une période (d'un jour à un autre), d'après `suivi.json` et `carnet.json`, lus seulement,
-  dessinés en PNG dans le dossier, puis une ligne JSON avec les barres et leurs photos, sans
-  Lightroom ni liaison ;
-- `--ecran` : l'écran principal et son profil de couleur classé (d'usine, standard, à l'œil, sonde…),
-  une ligne JSON (`{"lu": false}` sans écran), sans Lightroom ni liaison ; pour la mise au point
-  seulement depuis le correctif 1.3.6 : ni la fenêtre Claude ni Claude ne le lisent ;
-- `--eclairage <id>… [<fichier.jpg>…] [--essai '{…}']` : le relevé de l'éclairage mixte (couleur des
-  tons neutres par case et par zone tonale, visages, à plusieurs bornes), en lecture seule ; un
-  fichier JPEG se mesure sans Lightroom ; `--essai` mesure sous une autre balance par
-  `preview_settings` (deux étapes « Claude · essai » dans l'Historique), sur une copie virtuelle
-  seulement ;
-- `--constats <id>… [<fichier.jpg>…]` : le relevé des seuils du carnet de progrès (luminosité,
-  blanc pur du tiers haut, netteté et texture au point de mise au point, bruit, l'ISO et si le
-  bruit fort y est cherché (l'Exif pour un fichier), boîtier, géométrie, puis les défauts que
-  `view_photo` noterait), en lecture seule : rien n'est noté au
-  carnet ; un fichier JPEG se mesure sans Lightroom ;
-- `--recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>]`
-  `[--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--horizon <id> [--hauteur-horizon <0 à 1>]]` :
-  rejoue une séquence complète dans le vrai
-  Lightroom, sur des copies virtuelles de la collection « Développeur › Essais » (des originaux
-  seulement avec `--original`), vérifie chaque étape sur les réglages relus, puis remet chaque
-  photo dans son état de départ, même après un échec. Elle commence par la liaison fermée (une
-  commande sans jeton, ou avec un autre, refusée) et l'écran nommé, en lecture seule ; le RAW
-  passe aussi par l'intention lue au boîtier, le bilan chiffré d'une passe à l'autre (une étape
-  écrite puis annulée) et éclaircir et assombrir (en propositions), le X-T20 par l'intention ;
-  `--portrait` y ajoute la peau dosée sur un portrait (trois doses en propositions, l'intensité 50
-  qui vaut la moitié, le refus d'une peau trop lissée, la dose par défaut posée puis annulée),
-  `--mixte` une photo à deux lumières lue mixte, puis le RAW lu à une seule lumière, en lecture
-  seule. Le RAW passe aussi par la 1.3 : l'avant/après d'une étape et le carnet (la copie d'essai
-  notée pour la recette, puis retirée) ; les étapes de la leçon et de « Je le fais » sont retirées
-  avec eux au correctif 1.3.6 ; `--horizon` vérifie la composition lue sur une copie
-  d'essai qui a un vrai horizon (sans horizon net à `--hauteur-horizon`, 0,5 par défaut, la
-  dernière étape, le cadre appliqué, est sautée avec sa raison). La recette remet aussi le registre
-  des notes comme elle l'a trouvé ;
-- `--version`.
 
 ## Organisation
 
