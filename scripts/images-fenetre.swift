@@ -429,6 +429,14 @@ func dessins(_ p: Palette) -> [String: Dessin] {
     d["chevron-haut"] = icone(boite: B16, couleur: p["texte"], trait: 1.6, traits: [trace("M4 10l4-4 4 4")])
     d["chevron-bas"] = icone(boite: B16, couleur: p["texte"], trait: 1.6, traits: [trace("M4 6l4 4 4-4")])
 
+    // Le calendrier des champs « Du » et « au » de la fenêtre Suivi (correctif 1.3.8) : une page à deux
+    // anneaux, sa barre du haut, et quatre jours.
+    let jours = [rect(4.6, 8.4, 1.6, 1.6, rx: 0.3), rect(7.2, 8.4, 1.6, 1.6, rx: 0.3), rect(9.8, 8.4, 1.6, 1.6, rx: 0.3),
+                 rect(4.6, 11, 1.6, 1.6, rx: 0.3)]
+    d["calendrier"] = icone(boite: B16, couleur: p["texte"], trait: 1.3, traits: [
+        rect(2.2, 3.2, 11.6, 10.8, rx: 1.6), trace("M2.2 6.6h11.6"), trace("M5.4 1.8v2.8"), trace("M10.6 1.8v2.8"),
+    ], pleins: jours)
+
     // Les boutons de la Demande rapide, à gauche du champ (demandés par Dany le 24 octobre 2026) : trois
     // étoiles ambre (noter) ; une photo et un portrait à l'encre du texte, chacun avec l'étincelle
     // orange de l'IA en haut à droite (Retouche pro, Portrait).

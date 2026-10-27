@@ -27,7 +27,7 @@ final class SuiviTests: XCTestCase {
         "photos_par_mois": ["largeur": 620, "hauteur": 150], "focales": ["largeur": 300, "hauteur": 130],
         "iso": ["largeur": 300, "hauteur": 130], "heures": ["largeur": 620, "hauteur": 120],
         "objectifs": ["largeur": 300, "hauteur": 170], "notes": ["largeur": 300, "hauteur": 170],
-        "defauts_frequents": ["largeur": 620, "hauteur": 180],
+        "genres": ["largeur": 620, "hauteur": 190], "defauts_frequents": ["largeur": 620, "hauteur": 180],
         "evolution_defaut": ["largeur": 620, "hauteur": 140],
     ]
     static let claire: JSONValue = ["fond": "ECECEC", "texte": "1D1D1F", "gris": "6B6B6B", "filet": "C9C9C9", "barre": "0A64D8", "accent": "E0800D"]
@@ -37,7 +37,7 @@ final class SuiviTests: XCTestCase {
     func photo(_ id: Int, prise: String? = "2026-11-08 17:42", ajout: String = "2026-11-10 09:00", objectif: String? = "XF23mmF2 R WR",
                focale: Double? = 23, iso: Double? = 400, note: Double = 0, drapeau: String = "aucun", retouchee: Bool = false,
                cherches: [String]? = s4,
-               defauts: [String] = [], abandonnee: Bool = false, uuid: String? = nil) -> (String, JSONValue) {
+               defauts: [String] = [], abandonnee: Bool = false, uuid: String? = nil, genre: String? = nil) -> (String, JSONValue) {
         var prisDeVue: [String: JSONValue] = [:]
         if let prise { prisDeVue["le"] = .string(prise) }
         if let objectif { prisDeVue["objectif"] = .string(objectif) }
@@ -50,8 +50,13 @@ final class SuiviTests: XCTestCase {
             "retouchee_par_claude": .bool(retouchee), "classement_le": 1_794_000_000,
         ]
         if let cherches {
-            entree["analyse"] = ["le": 1_794_000_060, "regles": 1, "cherches": .array(cherches.map(JSONValue.string)),
-                                 "defauts": .array(defauts.map(JSONValue.string))]
+            var analyse: [String: JSONValue] = ["le": 1_794_000_060, "regles": 1, "cherches": .array(cherches.map(JSONValue.string)),
+                                                "defauts": .array(defauts.map(JSONValue.string))]
+            if let genre {
+                analyse["genre"] = .string(genre)
+                analyse["regles_genre"] = 1
+            }
+            entree["analyse"] = .object(analyse)
         } else if abandonnee {
             entree["analyse"] = ["le": 1_794_000_060, "erreur": "vignette_petite", "essais": 3, "abandonnee": true]
         }
@@ -400,6 +405,59 @@ final class SuiviTests: XCTestCase {
         XCTAssertEqual(objectifs.last?["detail"]?.string, "2 autres objectifs · 2 photos")
         XCTAssertEqual(objectifs.last?["ids"], [8, 9])
         XCTAssertEqual(creneaux(sortie, "objectifs"), Array(1...8))
+    }
+
+    /// Le graphique des genres (correctif 1.3.8) : un genre par barre, ceux qui ont des photos, par
+    /// nombre décroissant puis dans l'ordre des genres, « Autre » toujours en dernier ; le détail en %
+    /// des photos classées ; une photo sans genre (en file, abandonnée, analysée avant le genre, ou d'un
+    /// code inconnu) n'y est pas, et la note le dit ; sans genre, vide.
+    func testGenres() throws {
+        let photos = [photo(1, genre: "autre"), photo(2, genre: "autre"), photo(3, genre: "autre"), photo(4, genre: "paysage"),
+                      photo(5, genre: "paysage"), photo(6, genre: "portrait"), photo(7, genre: "sport"), photo(8, genre: "famille"),
+                      photo(9), photo(10, cherches: nil), photo(11, cherches: nil, abandonnee: true), photo(12, genre: "inconnu")]
+        let sortie = try graphiques(photos)
+        let genres = barres(sortie, "genres")
+        XCTAssertEqual(genres.compactMap { $0["libelle"]?.string }, ["Paysage", "Sport", "Famille et groupes", "Portrait", "Autre"],
+                       "par nombre, puis l'ordre des genres ; Autre en dernier même plus nombreux")
+        XCTAssertEqual(genres.first?["detail"]?.string, "Paysage · 2 photos (25 %)")
+        XCTAssertEqual(genres.last?["detail"]?.string, "Autre · 3 photos (38 %)")
+        XCTAssertEqual(genres.first?["ids"], [4, 5])
+        XCTAssertEqual(genres.last?["ids"], [1, 2, 3])
+        let graphique = try XCTUnwrap(sortie["graphiques"]?["genres"])
+        XCTAssertEqual(graphique["titre"]?.string, "Genres de photos")
+        XCTAssertEqual(graphique["orientation"]?.string, "horizontale")
+        XCTAssertEqual(graphique["max_barres"]?.int, 11)
+        XCTAssertEqual(graphique["sans_valeur"]?.int, 4, "en file, abandonnée, sans genre, code inconnu")
+        XCTAssertEqual(graphique["note"]?.string,
+                       "Lu sur la vignette par Vision (Apple) : une tendance. 3 photos pas encore classées · 1 non analysée.",
+                       "l'abandonnée ne sera jamais classée : dite à part, comme la tuile")
+        XCTAssertEqual(creneaux(sortie, "genres"), [1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0])
+        let seule = try graphiques([photo(1, genre: "macro")])
+        XCTAssertEqual(seule["graphiques"]?["genres"]?["note"]?.string, "Lu sur la vignette par Vision (Apple) : une tendance, pas un classement sûr.")
+        XCTAssertEqual(barres(seule, "genres").first?["detail"]?.string, "Macro et gros plans · 1 photo (100 %)")
+        let une = try graphiques([photo(1, genre: "macro"), photo(2)])
+        XCTAssertEqual(une["graphiques"]?["genres"]?["note"]?.string, "Lu sur la vignette par Vision (Apple) : une tendance. 1 photo pas encore classée.")
+        let sans = try graphiques([photo(1), photo(2)])
+        XCTAssertEqual(sans["graphiques"]?["genres"]?["vide"], true)
+        XCTAssertEqual(barres(sans, "genres").count, 0)
+        XCTAssertEqual(try graphiques([])["graphiques"]?["genres"]?["vide"], true)
+        let abandonnees = try graphiques([photo(1, cherches: nil, abandonnee: true), photo(2, cherches: nil, abandonnee: true)])
+        XCTAssertEqual(abandonnees["graphiques"]?["genres"]?["note"]?.string,
+                       "Lu sur la vignette par Vision (Apple) : une tendance. 2 non analysées.")
+        // Le texte d'un graphique vide : « Pas encore classées » s'il y a des photos dans la période,
+        // « Aucune photo » sinon, comme les autres graphiques.
+        func texteVide(_ photos: [(String, JSONValue)]) throws -> String? {
+            let entree = try Suivi.lireEntree(entree(suivi: try ecrire(photos)))
+            let lus = try Suivi.lireReleve(entree.suivi, catalogue: entree.catalogue)
+            return Suivi.calculer(entree, photos: lus, remarques: [], dossier: dossier.path).graphiques.first { $0.cle == "genres" }?.texteVide
+        }
+        XCTAssertEqual(try texteVide([photo(1), photo(2)]), "Pas encore classées")
+        XCTAssertEqual(try texteVide([]), "Aucune photo")
+        XCTAssertEqual(try texteVide([photo(1, prise: "2019-05-01 10:00")]), "Aucune photo", "une photo hors de la période")
+        // Tous les genres à la fois : onze barres, autant que de créneaux.
+        let tous = try graphiques(Genre.codes.enumerated().map { photo($0.offset + 1, genre: $0.element) })
+        XCTAssertEqual(barres(tous, "genres").count, 11)
+        XCTAssertEqual(barres(tous, "genres").compactMap { $0["libelle"]?.string }, Genre.liste.map(\.libelle), "à égalité : l'ordre des genres")
     }
 
     /// Les notes (correctif 1.3.8) : six barres de 0 ★ (pas encore notée) à 5 ★, la note de la

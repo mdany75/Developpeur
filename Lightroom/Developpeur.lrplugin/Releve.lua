@@ -29,7 +29,11 @@
 --      disent la prise de vue ; une retouche les cacherait) ; une erreur compte
 --      un essai, réessayé DELAI_REESSAI secondes plus tard, puis l'entrée est abandonnée au
 --      ESSAIS_ANALYSE-ième (elle ne revient plus). Une réponse dont `regles` dépasse celle d'une
---      analyse la fait refaire (versions à venir).
+--      analyse la fait refaire (versions à venir). Le genre de la photo (correctif 1.3.8, demandé par
+--      Dany le 26 octobre 2026 : le graphique des genres de la fenêtre Suivi) a ses propres règles
+--      (`regles_genre`) : une analyse d'avant lui, ou de règles de genre plus anciennes, se refait
+--      pour le genre seul, ses défauts gardés (ils disent la prise de vue ; une retouche faite depuis
+--      les cacherait). L'objectif de la prise de vue part avec chaque photo (le genre macro).
 --
 -- Le Suivi ne tourne que dans Lightroom : Init.lua l'allume (Releve.allumer), Arret.lua l'éteint
 -- (Releve.eteindre : le module désactivé, rechargé ou déchargé ; après un rechargement, l'ancienne
@@ -46,8 +50,9 @@
 --     prise_de_vue = { le ('AAAA-MM-JJ HH:MM'), appareil, objectif, focale (mm), ouverture, vitesse,
 --     iso } (une valeur que Lightroom ne donne pas manque), note (0 à 5), drapeau ('retenue',
 --     'aucun', 'rejetee'), retouchee_par_claude, classement_le, analyse }
---   analyse : absente (en file) ; réussie { le, regles, cherches = { codes }, defauts = { codes } } ;
---     manquée { le, erreur, essais, abandonnee? }
+--   analyse : absente (en file) ; réussie { le, regles, cherches = { codes }, defauts = { codes },
+--     genre, regles_genre } (genre et regles_genre depuis le correctif 1.3.8 : un code que rend le
+--     connecteur, sans liste ici) ; manquée { le, erreur, essais, abandonnee? }
 -- Les codes sont ceux de PriseDeVue.defauts (connecteur) : aucune liste de défauts dans ce module.
 -- Au-delà de MAX_ORIGINAUX dans un catalogue, les entrées vues le moins récemment (vu, puis l'id)
 -- sortent. Les écritures, vues et analyses comprises, sont espacées de Releve.delaiEcriture :
@@ -129,8 +134,12 @@ local Releve = {
     -- analyse à réessayer, ou un connecteur absent).
     prochaineVerification = 0,
     -- Les règles de l'analyse rendues par le connecteur (regles de --analyser), nil avant la première
-    -- réponse de la séance.
+    -- réponse de la séance ; de même pour celles du genre (regles_genre, correctif 1.3.8). `sansGenre` :
+    -- le connecteur a répondu sans genre (d'avant le correctif 1.3.8) : les analyses sans genre ne se
+    -- refont pas de la séance.
     regles = nil,
+    reglesGenre = nil,
+    sansGenre = false,
     -- La dernière erreur de la tâche (une vue non rangée, un lot non analysé, la tâche arrêtée),
     -- aussi dite au journal ; nil sans erreur (diagnostic).
     derniereErreur = nil,
@@ -365,7 +374,8 @@ local function normaliserAnalyse(a)
         return nil
     end
     if type(a.cherches) == 'table' then
-        return { le = nombre(a.le) or 0, regles = nombre(a.regles), cherches = codes(a.cherches), defauts = codes(a.defauts) }
+        return { le = nombre(a.le) or 0, regles = nombre(a.regles), cherches = codes(a.cherches), defauts = codes(a.defauts),
+            genre = texte(a.genre), regles_genre = texte(a.genre) and nombre(a.regles_genre) or nil }
     end
     if texte(a.erreur) then
         return { le = nombre(a.le) or 0, erreur = a.erreur, essais = math.max(1, math.floor(nombre(a.essais) or 1)),
@@ -488,6 +498,7 @@ function Releve.oublier()
     Releve.cleVue, Releve.groupeVu, Releve.groupeVuLe, Releve.aRevoir, Releve.tete = nil, nil, nil, false, nil
     Releve.file, Releve.rangs, Releve.sansRefaire, Releve.reclassement, Releve.revues = nil, nil, nil, false, nil
     Releve.prochaineVerification, Releve.regles, Releve.connecteurAbsentDit, Releve.derniereErreur = 0, nil, nil, nil
+    Releve.reglesGenre, Releve.sansGenre = nil, false
     Releve.aEcrire, Releve.ecritLe, Releve.arrete = false, nil, false
     Releve.reessais, Releve.selectionPosee = {}, 0
 end
@@ -1388,14 +1399,28 @@ end
 -- La file d'analyse ---------------------------------------------------------------------------
 
 -- Quand analyser cette entrée : 0 (maintenant), un nombre de secondes (une analyse manquée à
--- réessayer), ou nil (jamais : analysée selon les règles connues, ou abandonnée).
+-- réessayer), ou nil (jamais : analysée selon les règles connues, ou abandonnée). Une analyse de
+-- règles plus anciennes que celles connues, ou d'un genre de règles plus anciennes, se refait ; une
+-- analyse sans genre (d'avant le correctif 1.3.8) aussi, même avant toute réponse de la séance (les
+-- règles ne s'apprennent que d'une réponse : quand toute la bibliothèque est déjà analysée, aucune ne
+-- viendrait), sauf si le connecteur a répondu sans genre (Releve.sansGenre).
 local function quand(cle, e, maintenant)
     local a = e.analyse
     if not a then
         return 0
     end
     if a.cherches then
-        if Releve.regles and (a.regles or 0) < Releve.regles and not (Releve.sansRefaire and Releve.sansRefaire[cle]) then
+        if Releve.sansRefaire and Releve.sansRefaire[cle] then
+            return nil
+        end
+        if Releve.regles and (a.regles or 0) < Releve.regles then
+            return 0
+        end
+        if Releve.reglesGenre then
+            if (a.regles_genre or 0) < Releve.reglesGenre then
+                return 0
+            end
+        elseif a.genre == nil and not Releve.sansGenre then
             return 0
         end
         return nil
@@ -1627,7 +1652,8 @@ local function analyserLot(c, cles, connecteur)
         end
         local e = c.photos[entrees[i]]
         liste[#liste + 1] = { id = id, vignette = LrPathUtils.child(dossier, string.format('%d.jpg', id)),
-            iso = e and e.prise_de_vue and e.prise_de_vue.iso or nil, cache = true, retouchee = retoucheeParClaude(photo, lus[i]) or nil }
+            iso = e and e.prise_de_vue and e.prise_de_vue.iso or nil, cache = true, retouchee = retoucheeParClaude(photo, lus[i]) or nil,
+            objectif = e and e.prise_de_vue and texte(e.prise_de_vue.objectif) or nil }
     end
     if not Releve.allume or Releve.occupe() then
         Fichiers.supprimer(dossier)
@@ -1658,6 +1684,22 @@ local function analyserLot(c, cles, connecteur)
                 end
                 Releve.regles = math.max(Releve.regles or 0, regles)
             end
+            -- De même pour le genre (correctif 1.3.8) : les analyses sans genre, ou d'un genre de règles
+            -- plus anciennes, sont à refaire pour lui.
+            local reglesGenre = nombre(json.regles_genre)
+            if reglesGenre then
+                if not Releve.reglesGenre or reglesGenre > Releve.reglesGenre then
+                    Releve.file = nil
+                end
+                Releve.reglesGenre = math.max(Releve.reglesGenre or 0, reglesGenre)
+            end
+            json.regles_genre = reglesGenre
+            -- Un connecteur d'avant le genre : les analyses sans genre ne se refont pas de la séance (la
+            -- file se refait sans elles).
+            if not reglesGenre and not Releve.sansGenre then
+                Releve.sansGenre = true
+                Releve.file = nil
+            end
             for _, r in ipairs(type(json.photos) == 'table' and json.photos or {}) do
                 if type(r) == 'table' and nombre(r.id) then
                     resultats[cleDe(nombre(r.id))] = r
@@ -1682,18 +1724,29 @@ local function analyserLot(c, cles, connecteur)
             if raisonDuLot then
                 manquee(cle, e, raisonDuLot, maintenant)
             elseif type(r) == 'table' and type(r.cherches) == 'table' then
-                local cherches = codes(r.cherches)
-                local dedans = {}
-                for _, code in ipairs(cherches) do
-                    dedans[code] = true
-                end
-                local defauts = {}
-                for _, code in ipairs(codes(r.defauts)) do
-                    if dedans[code] then
-                        defauts[#defauts + 1] = code
+                local avant = e.analyse
+                local genre = texte(r.genre)
+                local genreRegles = genre and json.regles_genre or nil
+                if avant and avant.cherches and (avant.regles or 0) >= (json.regles or 0) then
+                    -- Une analyse refaite pour le genre seul (ses règles de défauts sont à jour) : les
+                    -- défauts de la première analyse restent, la photo a pu être retouchée depuis.
+                    e.analyse = { le = avant.le, regles = avant.regles, cherches = avant.cherches, defauts = avant.defauts,
+                        genre = genre or avant.genre, regles_genre = genre and genreRegles or avant.regles_genre }
+                else
+                    local cherches = codes(r.cherches)
+                    local dedans = {}
+                    for _, code in ipairs(cherches) do
+                        dedans[code] = true
                     end
+                    local defauts = {}
+                    for _, code in ipairs(codes(r.defauts)) do
+                        if dedans[code] then
+                            defauts[#defauts + 1] = code
+                        end
+                    end
+                    e.analyse = { le = maintenant, regles = json.regles, cherches = cherches, defauts = defauts, genre = genre,
+                        regles_genre = genreRegles }
                 end
-                e.analyse = { le = maintenant, regles = json.regles, cherches = cherches, defauts = defauts }
                 changee(e)
             else
                 manquee(cle, e, type(r) == 'table' and texte(r.raison) or 'pas_de_reponse', maintenant)

@@ -407,7 +407,7 @@ end
 local EXEMPLES_GRAPHIQUES = { 'graphiques_un_an', 'graphiques_treize_mois', 'graphiques_trois_mois', 'graphiques_depuis_le_debut',
     'graphiques_trimestres' }
 
-essai("Contrat : tailles, créneaux (rectangles et nombre : 76), couleurs des deux apparences, ceux du contrat ; les notes à côté des objectifs", function()
+essai("Contrat : tailles, créneaux (rectangles et nombre : 87), couleurs des deux apparences, ceux du contrat ; les notes à côté des objectifs, les genres en haut de la colonne de droite", function()
     local entree = EXEMPLES.graphiques_un_an.entree
     local total = 0
     for _, g in ipairs(FenetreSuivi.GRAPHIQUES) do
@@ -433,8 +433,10 @@ essai("Contrat : tailles, créneaux (rectangles et nombre : 76), couleurs des de
             end
         end
     end
-    egal(8, #FenetreSuivi.GRAPHIQUES)
-    egal(76, total, 'les 76 calques du contrat')
+    egal(9, #FenetreSuivi.GRAPHIQUES)
+    egal(87, total, 'les 87 calques du contrat')
+    egal(11, FenetreSuivi.graphique('genres').max_barres, 'les onze genres')
+    egal('horizontale', FenetreSuivi.graphique('genres').orientation)
     egal(6, FenetreSuivi.graphique('notes').max_barres, 'les notes : de 0 à 5 ★')
     egal(13, FenetreSuivi.graphique('photos_par_mois').max_barres, 'treize mois au plus')
     egal(FenetreSuivi.graphique('objectifs').hauteur, FenetreSuivi.graphique('notes').hauteur, 'les notes de la taille des objectifs')
@@ -457,7 +459,7 @@ essai("Contrat : tailles, créneaux (rectangles et nombre : 76), couleurs des de
     end
 end)
 
-essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran de Dany), l'aplat du fond, huit images liées à leur taille, 76 calques sur les créneaux, les champs « Du » et « au », le menu du défaut, les tuiles ; rien avant la première réponse", function()
+essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran de Dany), l'aplat du fond, neuf images liées à leur taille, 87 calques sur les créneaux, les champs « Du » et « au », le menu du défaut, les tuiles ; rien avant la première réponse", function()
     depart()
     local D = FenetreSuivi.dimensions()
     vrai(D.hauteurFenetre <= 1440 - 100, "la fenêtre tient dans la hauteur de l'écran de Dany : " .. D.hauteurFenetre)
@@ -472,6 +474,34 @@ essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran d
         egal('Claude · Suivi', args.title)
         egal(FenetreSuivi.CADRE, args.save_frame)
         vrai(args.save_frame ~= 'DeveloppeurCarnet' and args.save_frame ~= 'DeveloppeurSuivi', "un nom neuf : " .. args.save_frame)
+        egal('DeveloppeurSuiviGraphiques-2', args.save_frame, 'un cadre neuf pour la taille du graphique des genres')
+        -- Les genres en haut de la colonne de droite, sous « Ce que je photographie », au-dessus du carnet.
+        do
+            local tout, parent = parents(args.contents)
+            local titreGenres, titreCarnet
+            for _, v in ipairs(tout) do
+                if v.genre == 'static_text' and v.args.title == FenetreSuivi.GENRES then
+                    titreGenres = v
+                elseif v.genre == 'static_text' and v.args.title == FenetreSuivi.CARNET then
+                    titreCarnet = v
+                end
+            end
+            vrai(titreGenres and titreCarnet, 'les deux titres de la colonne de droite')
+            local colonne = parent[titreGenres]
+            egal(colonne, parent[titreCarnet])
+            local rang = {}
+            for k, v in ipairs(colonne.args) do
+                rang[v] = k
+            end
+            egal(1, rang[titreGenres], 'en haut de la colonne')
+            vrai(rang[titreGenres] < rang[titreCarnet], 'au-dessus du carnet')
+            local image = liee(args.contents, 'picture', 'image_genres')
+            local bloc = image
+            while bloc and parent[bloc] ~= colonne do
+                bloc = parent[bloc]
+            end
+            vrai(bloc and rang[bloc] > rang[titreGenres] and rang[bloc] < rang[titreCarnet], 'le graphique entre les deux titres')
+        end
         egal(nil, S.boutonParDefaut(), 'aucun bouton par défaut')
         local liste = parents(args.contents)
         -- Le fond : un aplat de la taille du contenu, à la couleur des fenêtres (fondDroite).
@@ -482,7 +512,7 @@ essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran d
         local c = Dispositions.couleurs('claire').fondDroite
         egal(c[1], fond.args.background_color.r)
         egal(c[3], fond.args.background_color.b)
-        -- Huit images liées, à la taille demandée au connecteur, cachées avant la première réponse.
+        -- Neuf images liées, à la taille demandée au connecteur, cachées avant la première réponse.
         for _, g in ipairs(FenetreSuivi.GRAPHIQUES) do
             local image = liee(args.contents, 'picture', 'image_' .. g.cle)
             egal(g.largeur, image.args.width, g.cle)
@@ -491,10 +521,10 @@ essai("Construction : « Claude · Suivi », son cadre neuf, sa taille (écran d
             egal(false, p['pret_' .. g.cle])
             vrai(Fichiers.existe(p['image_' .. g.cle]), "une image existante avant la première (cachée)")
         end
-        -- 76 calques, chacun sur son créneau (sa colonne poussée par ses marges), à sa taille,
+        -- 87 calques, chacun sur son créneau (sa colonne poussée par ses marges), à sa taille,
         -- visibilité et infobulle liées, cachés avant la première réponse.
         local calques, n = calquesDe(args.contents)
-        egal(76, n, 'les calques')
+        egal(87, n, 'les calques')
         for _, g in ipairs(FenetreSuivi.GRAPHIQUES) do
             local attendus = EXEMPLES.graphiques_un_an.sortie.graphiques[g.cle].creneaux
             for i, cr in ipairs(attendus) do
@@ -901,6 +931,427 @@ essai("Les dates tapées (FenetreSuivi.lireDate) : jour, mois et année en mots 
     egal('2025-02-01', FenetreSuivi.iso(FenetreSuivi.periode().debut))
     FenetreSuivi.aujourdhui = aujourdhui
     prefs.suiviDebut, prefs.suiviFin = nil, nil
+end)
+
+-- Le calendrier (correctif 1.3.8) ---------------------------------------------------------------
+
+local Calendrier = require 'Calendrier'
+
+essai("Le calendrier (pur) : jours d'un mois, jour de la semaine (le lundi en premier), grille de six semaines, mois voisins, années du menu, état de chaque case", function()
+    egal(29, Calendrier.joursDuMois(2024, 2))
+    egal(28, Calendrier.joursDuMois(2100, 2))
+    egal(29, Calendrier.joursDuMois(2000, 2))
+    egal(30, Calendrier.joursDuMois(2026, 11))
+    egal(31, Calendrier.joursDuMois(2026, 12))
+    egal(1, Calendrier.jourDeLaSemaine(2026, 10, 26), 'un lundi')
+    egal(6, Calendrier.jourDeLaSemaine(2025, 1, 25), 'un samedi')
+    egal(7, Calendrier.jourDeLaSemaine(2026, 11, 1), 'un dimanche')
+    egal(6, Calendrier.jourDeLaSemaine(2000, 1, 1), 'un samedi')
+    egal(4, Calendrier.jourDeLaSemaine(2024, 2, 29), 'un jeudi')
+    -- Octobre 2026 : le 1er est un jeudi (quatrième case).
+    local g, decalage = Calendrier.grille(2026, 10)
+    egal(3, decalage)
+    egal(nil, g[3])
+    egal(1, g[4])
+    egal(31, g[34])
+    egal(nil, g[35])
+    -- Mars 2026 commence un dimanche : le 31 tombe dans la sixième semaine.
+    g = Calendrier.grille(2026, 3)
+    egal(1, g[7])
+    egal(31, g[37])
+    egal(Calendrier.CASES, 42)
+    -- Février 2027 commence un lundi : quatre semaines pleines.
+    g = Calendrier.grille(2027, 2)
+    egal(1, g[1])
+    egal(28, g[28])
+    egal(nil, g[29])
+    local a, m = Calendrier.decaler(2026, 1, -1)
+    egal('2025-12', string.format('%d-%02d', a, m))
+    a, m = Calendrier.decaler(2025, 12, 1)
+    egal('2026-1', a .. '-' .. m)
+    a, m = Calendrier.decaler(2026, 10, -11)
+    egal('2025-11', a .. '-' .. m)
+    -- Les années : de l'année prochaine à 1950, et une année montrée qui en sort.
+    local annees = Calendrier.annees(2026)
+    egal(2027, annees[1].value)
+    egal('2027', annees[1].title)
+    egal(Calendrier.ANNEE_MIN, annees[#annees].value)
+    egal(2027 - Calendrier.ANNEE_MIN + 1, #annees)
+    egal(1930, Calendrier.annees(2026, 1930)[#Calendrier.annees(2026, 1930)].value)
+    egal(2031, Calendrier.annees(2026, 2031)[1].value)
+    egal('janvier', Calendrier.mois()[1].title)
+    egal(12, Calendrier.mois()[12].value)
+    egal('1er mars 2026', Calendrier.texte({ annee = 2026, mois = 3, jour = 1 }))
+    -- Chaque case : hors du mois vide ; le jour choisi ; aujourd'hui ; le choix l'emporte sur aujourd'hui.
+    local cases = Calendrier.cases(2026, 10, { annee = 2026, mois = 10, jour = 15 }, { annee = 2026, mois = 10, jour = 26 })
+    egal('', cases[3].jour)
+    egal('vide', cases[3].etat)
+    egal('1', cases[4].jour)
+    egal('jour', cases[4].etat)
+    egal('choisi', cases[18].etat)
+    egal('15', cases[18].jour)
+    egal('aujourdhui', cases[29].etat)
+    egal('choisi', Calendrier.cases(2026, 10, { annee = 2026, mois = 10, jour = 26 }, { annee = 2026, mois = 10, jour = 26 })[29].etat)
+    egal('jour', Calendrier.cases(2026, 9, { annee = 2026, mois = 10, jour = 15 }, nil)[17].etat, "le 15 d'un autre mois")
+end)
+
+-- Le calendrier joué : chaque presentModalDialog passe d'abord la fenêtre aux règles de la simulation
+-- (ouverte puis fermée), puis `script(args, q, fermetures)` la joue sur sa table liée et rend la
+-- réponse ; LrDialogs.stopModalWithResult est compté dans `fermetures`. Une erreur du script (un essai
+-- manqué dans la fenêtre) remonte après `fn` : la tâche du calendrier la protège
+-- (FenetreSuivi.ouvrirCalendrier, LrTasks.pcall), elle ne se perdrait pas moins. Rend les fenêtres
+-- jouées.
+local function jouerCalendrier(script, fn)
+    local LrDialogs = S.modules.LrDialogs
+    local presenter, stop = LrDialogs.presentModalDialog, LrDialogs.stopModalWithResult
+    local jouees, fermetures, erreurScript = {}, {}, nil
+    LrDialogs.stopModalWithResult = function(vue, resultat) fermetures[#fermetures + 1] = { vue = vue, resultat = resultat } end
+    LrDialogs.presentModalDialog = function(args)
+        jouees[#jouees + 1] = args
+        presenter(args)
+        local etape = script[#jouees]
+        if not etape then
+            return 'cancel'
+        end
+        local okScript, reponse = xpcall(function() return etape(args, args.contents.args.bind_to_object, fermetures) end, debug.traceback)
+        if not okScript then
+            erreurScript = erreurScript or reponse
+            return 'cancel'
+        end
+        return reponse
+    end
+    local ok, erreur = xpcall(fn, debug.traceback)
+    LrDialogs.presentModalDialog, LrDialogs.stopModalWithResult = presenter, stop
+    if not ok then
+        error(erreur, 0)
+    end
+    if erreurScript then
+        error(erreurScript, 0)
+    end
+    egal(#script, #jouees, 'chaque fenêtre du script jouée')
+    return jouees
+end
+
+-- Les cases cliquables d'un calendrier (leurs calques), par numéro de case ; et un bouton par titre.
+local function casesDe(contenu)
+    local liste = {}
+    for _, v in ipairs((parents(contenu))) do
+        if v.genre == 'static_text' and Calendrier.parCalque(v.args.mouse_down) then
+            local i = tonumber(v.args.visible.key:match('^e(%d+)$'))
+            vrai(i, 'calque sans case')
+            liste[i] = v
+        end
+    end
+    return liste
+end
+
+local function boutonDe(contenu, titre)
+    for _, v in ipairs((parents(contenu))) do
+        if (v.genre == 'push_button' or v.genre == 'square_button') and v.args.title == titre then
+            return v
+        end
+    end
+    return nil
+end
+
+-- La case d'un jour du mois montré dans `q`.
+local function caseDuJour(q, jour)
+    local _, decalage = Calendrier.grille(q.annee, q.mois)
+    return decalage + jour
+end
+
+essai("Le calendrier dans la fenêtre Suivi : un bouton à icône à droite de « Du » et de « au » ; le calendrier s'ouvre sur la date du champ, un clic sur un jour la choisit et le ferme, gardée comme une date tapée ; ◀ ▶ et les menus changent de mois", function()
+    depart()
+    ouvrirSuivi(function(p, args)
+        unTour()
+        -- Les deux boutons : des carrés à l'icône du calendrier de l'apparence, sans titre, chacun à
+        -- droite de son champ, avec son infobulle ; la rangée de l'en-tête tient dans la largeur.
+        local _, parent = parents(args.contents)
+        local du, au = liee(args.contents, 'edit_field', 'debutTexte'), liee(args.contents, 'edit_field', 'finTexte')
+        local rangee = parent[du]
+        local rang, boutons = {}, {}
+        local largeur = 0
+        for k, v in ipairs(rangee.args) do
+            rang[v] = k
+            largeur = largeur + (v.args.width or 0)
+            if v.genre == 'square_button' then
+                boutons[#boutons + 1] = v
+            end
+        end
+        local D = FenetreSuivi.dimensions()
+        egal(D.interieur, largeur + (#rangee.args - 1) * rangee.args.spacing, "l'en-tête sur toute la largeur")
+        egal(2, #boutons, 'deux boutons du calendrier')
+        egal(rang[du] + 1, rang[boutons[1]], 'à droite de « Du »')
+        egal(rang[au] + 1, rang[boutons[2]], 'à droite de « au »')
+        local icone = Chemins.ressource(Dispositions.image('calendrier', 'claire'))
+        for k, b in ipairs(boutons) do
+            egal(icone, b.args.image_name)
+            egal(nil, b.args.title)
+            egal(D.calendrier, b.args.width)
+            vrai(Fichiers.existe(b.args.image_name), "l'icône existe")
+            egal(k == 1 and FenetreSuivi.INFOBULLE_CALENDRIER_DEBUT or FenetreSuivi.INFOBULLE_CALENDRIER_FIN, b.args.tooltip)
+        end
+        -- « Du » : le calendrier s'ouvre sur le 1er décembre 2025 (la période par défaut), choisi ; ▶
+        -- passe en janvier 2026 ; un clic sur le 25 le choisit et ferme la fenêtre (stopModalWithResult).
+        local taches = #S.taches
+        local jouees = jouerCalendrier({ function(a, q, fermetures)
+            egal(Calendrier.TITRE_DEBUT, a.title)
+            egal(Calendrier.CHOISIR, a.actionVerb)
+            egal(Calendrier.PREMIERE_PHOTO, a.otherVerb)
+            egal('peutChoisir', a.actionBinding.enabled.key)
+            egal(q, a.actionBinding.enabled.bind_to_object)
+            egal(2025, q.annee)
+            egal(12, q.mois)
+            egal(true, q.peutChoisir)
+            egal('choisi', q['e' .. caseDuJour(q, 1)], 'le 1er décembre choisi')
+            egal(string.format(Calendrier.CHOISI, '1er décembre 2025'), q.texteChoisi)
+            local cases = casesDe(a.contents)
+            local n = 0
+            for _ in pairs(cases) do
+                n = n + 1
+            end
+            egal(Calendrier.CASES, n, 'une case cliquable par case de la grille')
+            boutonDe(a.contents, '▶').args.action()
+            egal(2026, q.annee)
+            egal(1, q.mois)
+            egal('jour', q['e' .. caseDuJour(q, 1)], "le choix d'un autre mois n'y est pas")
+            egal('vide', q['e' .. (caseDuJour(q, 1) - 1)], 'avant le 1er : vide')
+            egal('', q['j' .. (caseDuJour(q, 1) - 1)])
+            cases[caseDuJour(q, 25)].args.mouse_down()
+            egal(25, q.choisiJour)
+            egal('choisi', q['e' .. caseDuJour(q, 25)])
+            egal(1, #fermetures, 'la fenêtre se ferme au clic')
+            egal(a.contents, fermetures[1].vue)
+            egal('ok', fermetures[1].resultat)
+            return 'ok'
+        end }, function()
+            vrai(FenetreSuivi.ouvrirCalendrier('debut'))
+            egal(false, FenetreSuivi.ouvrirCalendrier('fin'), 'un seul calendrier à la fois')
+            lancerTaches(taches)
+        end)
+        egal(1, #jouees)
+        egal(false, FenetreSuivi.calendrierOuvert)
+        egal('25 janvier 2026', p.debutTexte)
+        egal('2026-01-25', prefs.suiviDebut)
+        egal(true, FenetreSuivi.aRedessiner)
+        unTour()
+        egal('2026-01-25', recus()[#recus()].entree.debut)
+        -- « au » (aujourd'hui, la fin qui avance) : le mois présent, aucun jour choisi, aujourd'hui en
+        -- orange ; les menus Mois et Année ; « Aujourd'hui » garde la fin qui avance.
+        taches = #S.taches
+        jouerCalendrier({ function(a, q)
+            egal(Calendrier.TITRE_FIN, a.title)
+            egal(Calendrier.AUJOURDHUI, a.otherVerb)
+            egal(2026, q.annee)
+            egal(11, q.mois)
+            egal(nil, q.choisiAnnee)
+            egal(false, q.peutChoisir, '« Choisir » grisé sans jour')
+            egal(Calendrier.AUCUN, q.texteChoisi)
+            egal('aujourdhui', q['e' .. caseDuJour(q, 20)])
+            -- Le menu des années, puis celui des mois : la grille suit.
+            q.annee = 2019
+            q.mois = 2
+            egal('28', q['j' .. caseDuJour(q, 28)])
+            egal('', q['j' .. (caseDuJour(q, 28) + 1)], 'février 2019 : 28 jours')
+            egal('jour', q['e' .. caseDuJour(q, 20)], "aujourd'hui n'est pas dans ce mois")
+            return 'other'
+        end }, function()
+            FenetreSuivi.aRedessiner = false
+            FenetreSuivi.ouvrirCalendrier('fin')
+            lancerTaches(taches)
+        end)
+        egal("aujourd'hui", p.finTexte)
+        egal(FenetreSuivi.AUJOURDHUI, prefs.suiviFin)
+        egal(false, FenetreSuivi.aRedessiner, 'rien de changé')
+        -- « au » : un jour (◀ d'abord, en octobre) : une fin fixe.
+        taches = #S.taches
+        jouerCalendrier({ function(a, q)
+            boutonDe(a.contents, '◀').args.action()
+            egal(10, q.mois)
+            casesDe(a.contents)[caseDuJour(q, 31)].args.mouse_down()
+            return 'ok'
+        end }, function()
+            FenetreSuivi.ouvrirCalendrier('fin')
+            lancerTaches(taches)
+        end)
+        egal('31 octobre 2026', p.finTexte)
+        egal('2026-10-31', prefs.suiviFin)
+        -- Rouvert, il s'ouvre sur cette fin, choisie ; annulé, rien ne change.
+        taches = #S.taches
+        FenetreSuivi.aRedessiner = false
+        jouerCalendrier({ function(_, q)
+            egal(2026, q.annee)
+            egal(10, q.mois)
+            egal(31, q.choisiJour)
+            return 'cancel'
+        end }, function()
+            FenetreSuivi.ouvrirCalendrier('fin')
+            lancerTaches(taches)
+        end)
+        egal('2026-10-31', prefs.suiviFin)
+        egal(false, FenetreSuivi.aRedessiner)
+        -- Un début après la fin : refusé comme une date tapée, la période gardée revient.
+        taches = #S.taches
+        jouerCalendrier({ function(a, q)
+            boutonDe(a.contents, '▶').args.action()
+            egal(11, q.mois, 'en novembre 2026, après la fin')
+            egal(false, Calendrier.cliquer(q, 1), 'une case hors du mois ne fait rien')
+            casesDe(a.contents)[caseDuJour(q, 2)].args.mouse_down()
+            return 'ok'
+        end }, function()
+            -- Le début, en octobre 2026 (le calendrier s'ouvre sur lui).
+            prefs.suiviDebut = '2026-10-01'
+            FenetreSuivi.poserChamps(FenetreSuivi.periode())
+            FenetreSuivi.ouvrirCalendrier('debut')
+            lancerTaches(taches)
+        end)
+        egal(string.format(FenetreSuivi.DEBUT_APRES_FIN, '2 novembre 2026', '31 octobre 2026'), p.etat)
+        egal('2026-10-01', prefs.suiviDebut)
+        egal('1er octobre 2026', p.debutTexte)
+        -- « Première photo » : le début vide.
+        taches = #S.taches
+        jouerCalendrier({ function() return 'other' end }, function()
+            FenetreSuivi.ouvrirCalendrier('debut')
+            lancerTaches(taches)
+        end)
+        egal('', prefs.suiviDebut)
+        egal(FenetreSuivi.PREMIERE_PHOTO, p.debutTexte)
+        -- Ouvert depuis la première photo : sur le mois du début par défaut, sans jour choisi.
+        taches = #S.taches
+        jouerCalendrier({ function(_, q)
+            egal(2025, q.annee)
+            egal(11, q.mois, 'onze mois avant la fin (octobre 2026)')
+            egal(nil, q.choisiAnnee)
+            return 'cancel'
+        end }, function()
+            FenetreSuivi.ouvrirCalendrier('debut')
+            lancerTaches(taches)
+        end)
+        -- D'une fin fixe (le 31 octobre 2026) à « Aujourd'hui » par le calendrier : la fin avance de
+        -- nouveau, et les graphiques se refont.
+        egal('2026-10-31', prefs.suiviFin)
+        FenetreSuivi.aRedessiner = false
+        taches = #S.taches
+        jouerCalendrier({ function() return 'other' end }, function()
+            FenetreSuivi.ouvrirCalendrier('fin')
+            lancerTaches(taches)
+        end)
+        egal(FenetreSuivi.AUJOURDHUI, prefs.suiviFin)
+        egal("aujourd'hui", p.finTexte)
+        egal(true, FenetreSuivi.aRedessiner)
+    end)
+end)
+
+essai("Le calendrier sur la période par défaut : le jour que « Du » montre déjà, choisi tel quel, se garde (« Du » ne suit plus le mois) ; ◀ ▶ ne sortent pas de 1900 à 9999 ; la rangée du haut tient dans la grille", function()
+    depart()
+    ouvrirSuivi(function(p)
+        unTour()
+        egal(nil, prefs.suiviDebut, 'rien de gardé')
+        egal('1er décembre 2025', p.debutTexte)
+        local taches = #S.taches
+        jouerCalendrier({ function(a, q)
+            egal(1, q.choisiJour, 'le 1er décembre, déjà choisi')
+            casesDe(a.contents)[caseDuJour(q, 1)].args.mouse_down()
+            return 'ok'
+        end }, function()
+            FenetreSuivi.ouvrirCalendrier('debut')
+            lancerTaches(taches)
+        end)
+        egal('2025-12-01', prefs.suiviDebut, "gardé : ce n'est pas l'écho de la fenêtre")
+        egal(FenetreSuivi.AUJOURDHUI, prefs.suiviFin, "l'autre borne telle que la fenêtre la montre")
+        local aujourdhui = FenetreSuivi.aujourdhui
+        FenetreSuivi.aujourdhui = function() return '2026-12-20' end
+        local periode = FenetreSuivi.periode()
+        FenetreSuivi.aujourdhui = aujourdhui
+        egal('2025-12-01', FenetreSuivi.iso(periode.debut), 'un mois plus tard, « Du » ne bouge pas')
+        -- Les bornes : janvier 1900 et décembre 9999 ; ◀ et ▶ ne vont pas au-delà ; le menu des années
+        -- non plus.
+        taperDate(p, 'debut', '1900')
+        taches = #S.taches
+        jouerCalendrier({ function(a, q)
+            egal(1900, q.annee)
+            egal(1, q.mois)
+            egal(1900, q.elementsAnnees[#q.elementsAnnees].value)
+            boutonDe(a.contents, '◀').args.action()
+            egal(1900, q.annee, '◀ ne passe pas en 1899')
+            egal(1, q.mois)
+            -- La rangée du haut (◀, les deux menus, ▶) tient dans la largeur de la grille.
+            local _, parent = parents(a.contents)
+            local rangee = parent[boutonDe(a.contents, '◀')]
+            local largeur = 0
+            for _, v in ipairs(rangee.args) do
+                largeur = largeur + (v.args.width or 0)
+            end
+            vrai(largeur <= 7 * Calendrier.TAILLES.case, string.format('la rangée du haut : %d points pour %d', largeur, 7 * Calendrier.TAILLES.case))
+            return 'cancel'
+        end }, function()
+            FenetreSuivi.ouvrirCalendrier('debut')
+            lancerTaches(taches)
+        end)
+    end)
+    local q = { annee = 9999, mois = 12, aujourdhuiAnnee = 2026, aujourdhuiMois = 10, aujourdhuiJour = 26 }
+    egal(false, Calendrier.changerMois(q, 1), '▶ ne passe pas en 10000')
+    egal(9999, q.annee)
+    egal(Calendrier.ANNEE_PREMIERE, Calendrier.annees(2026, 1850)[#Calendrier.annees(2026, 1850)].value, 'le menu ne descend pas sous 1900')
+    egal(Calendrier.ANNEE_DERNIERE, Calendrier.annees(2026, 12000)[1].value, 'ni au-delà de 9999')
+end)
+
+essai("Le calendrier en apparence sombre : l'icône sombre ; le fond, aujourd'hui et le jour choisi aux couleurs de la palette ; une année plus ancienne que le menu s'y ajoute", function()
+    depart('sombre')
+    ouvrirSuivi(function(p, args)
+        unTour()
+        local _, parent = parents(args.contents)
+        local rangee = parent[liee(args.contents, 'edit_field', 'debutTexte')]
+        for _, v in ipairs(rangee.args) do
+            if v.genre == 'square_button' then
+                egal(Chemins.ressource(Dispositions.image('calendrier', 'sombre')), v.args.image_name)
+            end
+        end
+        taperDate(p, 'debut', '15 juin 1932')
+        egal('1932-06-15', prefs.suiviDebut)
+        local taches = #S.taches
+        jouerCalendrier({ function(a, q)
+            egal(1932, q.annee)
+            egal(6, q.mois)
+            egal(1932, q.elementsAnnees[#q.elementsAnnees].value, "l'année 1932 dans le menu")
+            local palette = Dispositions.couleurs('sombre')
+            local fond = a.contents.args[1]
+            egal('picture', fond.genre)
+            local c = fond.args.background_color
+            vrai(math.abs(c.r - palette.fondDroite[1]) < 1e-6 and math.abs(c.g - palette.fondDroite[2]) < 1e-6, 'le fond de la palette sombre')
+            -- Le jour choisi (le 15) : son aplat bleu et son texte blanc ; aujourd'hui (20 novembre 2026),
+            -- au mois présent : son texte orange.
+            local function proche(couleur, attendue)
+                return couleur ~= nil and math.abs(couleur.r - attendue[1]) < 1e-6 and math.abs(couleur.g - attendue[2]) < 1e-6
+                    and math.abs(couleur.b - attendue[3]) < 1e-6
+            end
+            local function vuesDeLaCase(i, etat)
+                local trouvees = {}
+                for _, v in ipairs((parents(a.contents))) do
+                    local vis = v.args.visible
+                    if type(vis) == 'table' and vis.key == 'e' .. i and type(vis.transform) == 'function' and vis.transform(etat) == true
+                        and not Calendrier.parCalque(v.args.mouse_down) then
+                        trouvees[#trouvees + 1] = v
+                    end
+                end
+                return trouvees
+            end
+            local choisi = vuesDeLaCase(caseDuJour(q, 15), 'choisi')
+            local aplat, texteChoisi
+            for _, v in ipairs(choisi) do
+                if v.genre == 'picture' then aplat = v elseif v.genre == 'static_text' then texteChoisi = v end
+            end
+            vrai(aplat and proche(aplat.args.background_color, palette.bleuBouton), "l'aplat du jour choisi, bleu de la palette sombre")
+            vrai(texteChoisi and proche(texteChoisi.args.text_color, palette.blanc), 'son chiffre en blanc')
+            q.annee, q.mois = 2026, 11
+            local aujourdhui = vuesDeLaCase(caseDuJour(q, 20), 'aujourdhui')
+            vrai(#aujourdhui == 1 and proche(aujourdhui[1].args.text_color, palette.orange), "aujourd'hui en orange de la palette sombre")
+            return 'cancel'
+        end }, function()
+            FenetreSuivi.ouvrirCalendrier('debut')
+            lancerTaches(taches)
+        end)
+    end)
 end)
 
 -- Un clic sur une barre ---------------------------------------------------------------------------
@@ -1402,7 +1853,7 @@ end)
 
 -- Les boutons de l'en-tête de la fenêtre Claude ------------------------------------------------------
 
-essai("En-tête de la fenêtre Claude : Suivi, Publication… et Consommation… côte à côte au bout de la rangée sous « Repartir à neuf » ; chacun ouvre sa fenêtre, sans envoyer la demande tapée", function()
+essai("En-tête de la fenêtre Claude : Suivi, Publication… et Consommation… côte à côte au bout de la rangée du titre, après « Repartir à neuf », de la même taille (correctif 1.3.8) ; chacun ouvre sa fenêtre, sans envoyer la demande tapée", function()
     local Dispo = Dispositions.dimensions()
     S.photoActive = S.photo(4961, 'DSCF4961.RAF')
     S.selection = { S.photoActive }
@@ -1428,11 +1879,13 @@ essai("En-tête de la fenêtre Claude : Suivi, Publication… et Consommation…
             egal(rang[suivi] + 2, rang[pub], 'Publication… à droite de Suivi')
             egal(rang[pub] + 2, rang[conso], 'Consommation… à droite de Publication…')
             egal(#rangee.args, rang[conso], 'au bout de la rangée')
-            -- La rangée sous « Repartir à neuf » : la colonne de l'en-tête la porte après celle du titre.
-            local colonne = parent[rangee]
+            -- La rangée de « Repartir à neuf », juste après lui (correctif 1.3.8, demandé par Dany le 26
+            -- octobre 2026 ; sous lui, dans la rangée des voyants, avant), tous de la même taille.
             local repartir = bouton(args.contents, 'Repartir à neuf')
-            egal(colonne, parent[parent[repartir]], "sous la rangée de « Repartir à neuf »")
-            for _, x in ipairs({ { suivi, Dispo.boutonSuivi }, { pub, Dispo.boutonPublication }, { conso, Dispo.boutonConsommation } }) do
+            egal(rangee, parent[repartir], "sur la rangée de « Repartir à neuf »")
+            egal(rang[repartir] + 2, rang[suivi], 'Suivi à droite de « Repartir à neuf »')
+            for _, x in ipairs({ { repartir, Dispo.repartir }, { suivi, Dispo.boutonSuivi }, { pub, Dispo.boutonPublication },
+                { conso, Dispo.boutonConsommation } }) do
                 local b, largeur = x[1], x[2]
                 egal('square_button', b.genre)
                 egal('small', b.args.size)

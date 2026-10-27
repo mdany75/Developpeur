@@ -651,10 +651,12 @@ end
 -- Le résumé en haut du fil (deuxième retour de Dany du 25 octobre 2026) --------------------------
 -- À l'ouverture de la fenêtre (et quand le menu ou ⌃⌥C la rappelle), et chaque fois qu'une autre
 -- photo ou un autre groupe change la conversation montrée, la fenêtre fait un résumé, sans Claude ni
--- jetons, montré en haut du fil, sous l'historique de la photo ou le résumé court du groupe qui
--- ouvre la conversation et au-dessus de la première demande de Dany, sinon en tête du fil
--- (Fenetre.ajouterResume, Fil.avecResume ; demandé par Dany le 25 octobre 2026 : d'abord en bas,
--- sous la conversation) ; « Depuis la dernière fois », ajouté plus tard, reste à sa place, sous lui.
+-- jetons, montré en tête du fil, au-dessus de la première demande de Dany (Fenetre.ajouterResume,
+-- Fil.avecResume ; demandé par Dany le 25 octobre 2026 : d'abord en bas, sous la conversation, puis
+-- sous l'historique de la photo ou le résumé court du groupe, qui n'ont plus de ligne depuis le
+-- correctif 1.3.8 : le résumé les redit, Fil.HISTORIQUES_CACHES) ; « Depuis la dernière fois », ajouté
+-- plus tard, reste à sa place, sous lui. Sans résumé lu, le texte de cet élément de tête en tient lieu
+-- (Fenetre.refaireResume).
 -- La page du fil montrée reste le bas (la dernière réponse) : une conversation montrée l'est depuis
 -- le bas (conversationMontree), et le résumé refait ne déplace pas ce que lit un lecteur remonté :
 -- ce qui est sous lui garde sa place, et lu tout en haut, le fil reste en haut
@@ -685,6 +687,20 @@ function Fenetre.refaireResume()
         r.groupe = c.groupe
         r.donnees = Historique.lireResumeGroupe()
         r.texte = r.donnees and Historique.resumeGroupe(r.donnees) or nil
+    end
+    -- Sans résumé lu (la sélection n'est plus le groupe de la conversation montrée : Claude l'a
+    -- changée, ou Dany pendant le travail de Claude ; une lecture qui échoue), le texte de l'élément
+    -- de tête qu'il redisait, « Historique de la photo » ou le résumé court du groupe : depuis le
+    -- correctif 1.3.8, ils n'ont plus de ligne dans le fil (Fil.HISTORIQUES_CACHES), et le fil ne dirait
+    -- plus rien des photos visées.
+    if c and not r.texte then
+        local sorte = c.groupe ~= nil and 'groupe' or 'historique'
+        for _, e in ipairs(c.elements or {}) do
+            if e.genre == 'historique' and e.sorte == sorte and type(e.texte) == 'string' and e.texte ~= '' then
+                r.texte = e.texte
+                break
+            end
+        end
     end
     Fenetre.resume = r
     Fenetre.aRafraichir = true
@@ -723,9 +739,9 @@ function Fenetre.suivreNoteDuResume(info)
 end
 
 -- Les lignes du fil de `c` (`lignes` : Fil.lignes, ou l'aide d'une conversation vide) avec celles
--- du résumé, s'il est celui de `c` : en haut du fil, sous l'historique de la photo ou le résumé
--- court du groupe qui ouvre la conversation, au-dessus de la première demande de Dany ; en tête du
--- fil sans eux (Fil.avecResume ; demandé par Dany le 25 octobre 2026, d'abord en bas du fil). Rend
+-- du résumé, s'il est celui de `c` : en tête du fil, au-dessus de la première demande de Dany
+-- (Fil.avecResume ; demandé par Dany le 25 octobre 2026, d'abord en bas du fil, puis sous l'historique
+-- de la photo ou le résumé court du groupe, qui n'ont plus de ligne depuis le correctif 1.3.8). Rend
 -- une table neuve, ou `lignes` sans résumé. Ses lignes se gardent tant que son texte et la largeur
 -- ne changent pas.
 function Fenetre.ajouterResume(lignes, c)
@@ -798,8 +814,9 @@ function Fenetre.rafraichirFil()
     end
     Fenetre.conversationAffichee = c
     Fenetre.total = #lignes
-    -- Le résumé de la fenêtre (Fenetre.resume), en haut du fil : sous l'historique de la photo ou le
-    -- résumé court du groupe, au-dessus de la première demande de Dany.
+    -- Le résumé de la fenêtre (Fenetre.resume), en tête du fil (l'historique de la photo et le résumé
+    -- court du groupe n'y ont plus de ligne depuis le correctif 1.3.8), au-dessus de la première
+    -- demande de Dany.
     lignes = Fenetre.ajouterResume(lignes, c)
     if enHaut then
         Fenetre.defilement = math.max(0, #lignes - T.lignes)

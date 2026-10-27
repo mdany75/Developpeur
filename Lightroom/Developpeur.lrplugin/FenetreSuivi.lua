@@ -14,12 +14,15 @@
 --   - « Mes prises de vue » : photos par mois (par trimestre, par année pour une longue période ;
 --     par date de prise de vue), focales, ISO, heure de la prise de vue, objectifs, et les notes (de
 --     0 ★ à 5 ★, correctif 1.3.8) ;
+--   - « Ce que je photographie » (correctif 1.3.8, demandé par Dany le 26 octobre 2026) : les genres
+--     de photos (portrait, famille et groupes, sport, paysage, macro…), lus par le connecteur sur la
+--     vignette de chaque photo (l'analyse d'office) ;
 --   - « Mon carnet de progrès » : les défauts les plus fréquents (en % des photos où ils sont
 --     cherchés) et l'évolution d'un défaut (le plus fréquent par défaut, un menu pour en choisir un
 --     autre). « Photos d'un défaut… » et « Retirer du carnet… », de la fenêtre de la 1.3.6, sont
 --     retirés au correctif 1.3.8 (demandé par Dany le 26 octobre 2026).
 --
--- Lightroom ne trace pas de graphique : les huit images sont dessinées par le connecteur
+-- Lightroom ne trace pas de graphique : les neuf images sont dessinées par le connecteur
 -- (`mcp-developpeur --graphiques '<json>' <dossier>`, sous l'alarme de perl comme --focus), en PNG
 -- 2x, dans les couleurs de l'apparence du module (Dispositions.PALETTES, seule table des couleurs,
 -- passées au connecteur : FenetreSuivi.couleursConnecteur) ; il rend aussi, en une ligne JSON, les
@@ -39,9 +42,9 @@
 -- l'avant-dernier s'efface quand le nouveau est montré, tous à la fermeture. Sans réponse lisible
 -- du connecteur, rien ne change et la fenêtre le dit ; sans connecteur, elle le dit aussi.
 --
--- Structure fixe à la création (règle de la fenêtre B) : huit f:picture liées (`image_<g>`), et sur
+-- Structure fixe à la création (règle de la fenêtre B) : neuf f:picture liées (`image_<g>`), et sur
 -- chacune un calque par créneau possible (photos par mois 13, focales 8, ISO 8, heures 12,
--- objectifs 8, notes 6, défauts 8, évolution 13 : 76 calques). Les rectangles des créneaux ne dépendent que
+-- objectifs 8, notes 6, genres 11, défauts 8, évolution 13 : 87 calques). Les rectangles des créneaux ne dépendent que
 -- de la taille du graphique (contrat : regles.geometrie, FenetreSuivi.creneaux) : chaque calque est
 -- posé à sa place une fois pour toutes, dans une colonne poussée par ses marges (la colonne ne prend
 -- pas les clics : constaté D6) ; seule la barre qui l'occupe change d'une réponse à l'autre, d'où sa
@@ -66,6 +69,7 @@ local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
 
 require 'Compat'
+local Calendrier = require 'Calendrier'
 local Carnet = require 'Carnet'
 local Chemins = require 'Chemins'
 local Dispositions = require 'Dispositions'
@@ -81,13 +85,15 @@ local FenetreSuivi = { ouverte = false }
 
 -- Le titre de la fenêtre (les fenêtres du module gardent « Claude · … ») et son cadre gardé (un nom
 -- neuf pour la fenêtre en graphiques : celle de la 1.3.6, « DeveloppeurCarnet », n'avait pas cette
--- taille ; le nom change avec la taille du contenu, que le correctif 1.3.8 ne change pas).
+-- taille ; le nom change avec la taille du contenu : « -2 » depuis le graphique des genres, au
+-- correctif 1.3.8).
 FenetreSuivi.TITRE = "Claude · Suivi"
-FenetreSuivi.CADRE = 'DeveloppeurSuiviGraphiques-1'
+FenetreSuivi.CADRE = 'DeveloppeurSuiviGraphiques-2'
 
 -- Les textes de la fenêtre.
 FenetreSuivi.ENTETE = "Suivi de vos photos"
 FenetreSuivi.PRISES_DE_VUE = "Mes prises de vue"
+FenetreSuivi.GENRES = "Ce que je photographie"
 FenetreSuivi.CARNET = "Mon carnet de progrès"
 FenetreSuivi.LECTURE = "Lecture du suivi…"
 FenetreSuivi.ATTENTE = "Dessin des graphiques…"
@@ -108,6 +114,8 @@ FenetreSuivi.INFOBULLE_DEBUT = "Le premier jour de la période : 25 janvier 2025
     .. "vide : depuis la première photo. Gardé d'une ouverture à l'autre."
 FenetreSuivi.INFOBULLE_FIN = "Le dernier jour de la période, compris ; « aujourd'hui » : la fin avance chaque jour. Gardé d'une "
     .. "ouverture à l'autre."
+FenetreSuivi.INFOBULLE_CALENDRIER_DEBUT = "Choisir le début de la période dans un calendrier"
+FenetreSuivi.INFOBULLE_CALENDRIER_FIN = "Choisir la fin de la période dans un calendrier"
 FenetreSuivi.CONNECTEUR_ABSENT = "Le connecteur mcp-developpeur est introuvable (son chemin : Gestionnaire de modules externes › "
     .. "Développeur) : les graphiques ne se dessinent pas."
 FenetreSuivi.PAS_DE_REPONSE = "Le connecteur n'a pas répondu à temps : les graphiques ne sont pas refaits."
@@ -143,12 +151,13 @@ FenetreSuivi.TUILES = {
     { cle = 'defaut_frequent', titre = "Défaut le plus fréquent" },
 }
 
--- Les huit graphiques (contrat : graphiques.liste), dans l'ordre de la fenêtre : leur taille en
+-- Les neuf graphiques (contrat : graphiques.liste), dans l'ordre de la fenêtre : leur taille en
 -- points (celle que la fenêtre demande au connecteur : graphiques.entree.tailles), leur nombre de
 -- créneaux et leur sens, d'où les rectangles des créneaux ; le titre avant la première réponse. Les
 -- notes (correctif 1.3.8) vont à côté des objectifs, de même taille ; les graphiques du temps ont
 -- treize créneaux depuis le même correctif (douze avant : une année comptée d'un jour au même jour
--- de l'année suivante touche treize mois).
+-- de l'année suivante touche treize mois). Les genres (correctif 1.3.8) vont en haut de la colonne de
+-- droite, sous leur titre, au-dessus du carnet.
 FenetreSuivi.GRAPHIQUES = {
     { cle = 'photos_par_mois', titre = "Photos par mois", largeur = 620, hauteur = 150, max_barres = 13, orientation = 'verticale' },
     { cle = 'focales', titre = "Focales (mm)", largeur = 300, hauteur = 130, max_barres = 8, orientation = 'verticale' },
@@ -156,6 +165,7 @@ FenetreSuivi.GRAPHIQUES = {
     { cle = 'heures', titre = "Heure de la prise de vue", largeur = 620, hauteur = 120, max_barres = 12, orientation = 'verticale' },
     { cle = 'objectifs', titre = "Objectifs", largeur = 300, hauteur = 170, max_barres = 8, orientation = 'horizontale' },
     { cle = 'notes', titre = "Notes", largeur = 300, hauteur = 170, max_barres = 6, orientation = 'verticale' },
+    { cle = 'genres', titre = "Genres de photos", largeur = 620, hauteur = 190, max_barres = 11, orientation = 'horizontale' },
     { cle = 'defauts_frequents', titre = "Défauts les plus fréquents", largeur = 620, hauteur = 180, max_barres = 8,
         orientation = 'horizontale', lignesNote = 2 },
     { cle = 'evolution_defaut', titre = "Évolution d'un défaut", largeur = 620, hauteur = 140, max_barres = 13, orientation = 'verticale' },
@@ -192,15 +202,15 @@ FenetreSuivi.GRANDE_SELECTION = 5000
 -- La disposition, en points : marges, colonnes de 620 (la largeur des grands graphiques ; les
 -- petits, de 300, vont par deux à 20 d'écart), tuiles, hauteurs des textes. Le contenu en tire sa
 -- taille (FenetreSuivi.dimensions), et la fenêtre la sienne (D7 : barre de titre de 33, 1 de
--- marge) : 1 310 × 1 028 points, qui tient sur l'écran de Dany (1 440 de haut) avec la barre des
--- menus et le Dock.
+-- marge) : 1 310 × 1 062 points depuis le graphique des genres (1 028 avant ; correctif 1.3.8), qui
+-- tient sur l'écran de Dany (1 440 de haut) avec la barre des menus et le Dock.
 FenetreSuivi.TAILLES = {
     marge = 20, colonne = 620, ecartColonnes = 28, ecartPetits = 20, ecartBlocs = 12,
     entete = 28, etat = 30, ecartEtat = 6, ecartTuiles = 12, sousTuiles = 18,
     tuile = 305, hauteurTuile = 84, ecartTuile = 16,
     section = 18, sousSection = 8, titreGraphique = 16, sousTitre = 4, sousGraphique = 2, ligneNote = 14,
     enteteEvolution = 22, aide = 44, bas = 28,
-    champDate = 150, etiquetteDu = 24, etiquetteAu = 20, defaut = 290,
+    champDate = 150, etiquetteDu = 24, etiquetteAu = 20, calendrier = 30, defaut = 290,
 }
 
 local function police(cle)
@@ -252,7 +262,8 @@ function FenetreSuivi.dimensions()
     end
     D.gauche = T.section + T.sousSection + bloc(G.photos_par_mois) + T.ecartBlocs + math.max(bloc(G.focales), bloc(G.iso))
         + T.ecartBlocs + bloc(G.heures) + T.ecartBlocs + math.max(bloc(G.objectifs), bloc(G.notes))
-    D.droite = T.section + T.sousSection + bloc(G.defauts_frequents) + T.ecartBlocs
+    D.droite = T.section + T.sousSection + bloc(G.genres) + T.ecartBlocs
+        + T.section + T.sousSection + bloc(G.defauts_frequents) + T.ecartBlocs
         + (T.enteteEvolution - T.titreGraphique) + bloc(G.evolution_defaut) + T.ecartBlocs + T.aide + T.ecartBlocs + T.bas
     D.hauteurContenu = T.marge + T.entete + T.ecartEtat + T.etat + T.ecartTuiles + T.hauteurTuile + T.sousTuiles
         + math.max(D.gauche, D.droite) + T.marge
@@ -317,22 +328,17 @@ end
 
 -- La période ------------------------------------------------------------------------------------------
 
--- Le nombre de jours d'un mois.
-local function joursDuMois(annee, mois)
-    if mois == 2 then
-        return (annee % 4 == 0 and (annee % 100 ~= 0 or annee % 400 == 0)) and 29 or 28
-    end
-    return (mois == 4 or mois == 6 or mois == 9 or mois == 11) and 30 or 31
-end
+-- Le nombre de jours d'un mois (Calendrier.lua, la seule copie).
+local joursDuMois = Calendrier.joursDuMois
 
 -- Une date { annee, mois, jour } en « AAAA-MM-JJ », et en français (« 25 janvier 2025 », « 1er mars
--- 2026 » : Carnet.MOIS, seule copie des noms des mois).
+-- 2026 » : Calendrier.texte, d'après Carnet.MOIS, seule copie des noms des mois).
 function FenetreSuivi.iso(d)
     return string.format('%04d-%02d-%02d', d.annee, d.mois, d.jour)
 end
 
 function FenetreSuivi.texteDate(d)
-    return (d.jour == 1 and '1er' or tostring(d.jour)) .. ' ' .. Carnet.MOIS[d.mois] .. ' ' .. d.annee
+    return Calendrier.texte(d)
 end
 
 -- Une date « AAAA-MM-JJ » qui existe, de 1900 à 9999 (comme le connecteur) ; nil sinon.
@@ -492,13 +498,15 @@ end
 -- ne suit plus le mois). L'écho de ce que la fenêtre vient d'écrire dans le champ (un observateur
 -- appelé plus tard) ne fait rien. Une date qui ne se lit pas, ou une période à l'envers : la ligne
 -- d'état le dit, avec le champ à changer d'abord, et les champs reprennent ce qu'ils montraient.
--- Rend vrai si la période gardée change.
-function FenetreSuivi.changerDate(borne, texte)
+-- `choisie` : un jour choisi au calendrier (FenetreSuivi.choisirDate), jamais un écho, même le jour
+-- que le champ montre déjà (le début par défaut choisi tel quel se garde : « Du » ne suit plus le
+-- mois). Rend vrai si la période gardée change.
+function FenetreSuivi.changerDate(borne, texte, choisie)
     if FenetreSuivi.ecritChamps or not FenetreSuivi.p then
         return false
     end
     local ecrits = FenetreSuivi.champsEcrits
-    if type(ecrits) == 'table' and texte == ecrits[borne] then
+    if not choisie and type(ecrits) == 'table' and texte == ecrits[borne] then
         return false
     end
     local actuelle = periodeMontree()
@@ -533,6 +541,55 @@ function FenetreSuivi.changerDate(borne, texte)
     end
     FenetreSuivi.aRedessiner = true
     return true
+end
+
+-- Le calendrier (correctif 1.3.8, demandé par Dany le 26 octobre 2026) : le bouton à droite de
+-- « Du » ou de « au » l'ouvre (Calendrier.lua), dans une tâche, un seul à la fois ; le choix se garde
+-- comme une date tapée (FenetreSuivi.changerDate : les mêmes refus, la même ligne d'état). Il
+-- s'ouvre sur la date que montre le champ ; « Du » sur la première photo, sur le mois du début par
+-- défaut ; « au » sur aujourd'hui (la fin qui avance), sur le mois présent, sans jour choisi.
+function FenetreSuivi.ouvrirCalendrier(borne)
+    if FenetreSuivi.calendrierOuvert or not FenetreSuivi.p then
+        return false
+    end
+    FenetreSuivi.calendrierOuvert = true
+    LrTasks.startAsyncTask(function()
+        local ok, erreur = LrTasks.pcall(function()
+            local periode = periodeMontree()
+            local aujourdhui = versDate(FenetreSuivi.aujourdhui())
+            local choisi, montre
+            if borne == 'debut' then
+                choisi = periode.debut
+                montre = periode.debut or debutParDefaut(periode.fin)
+            else
+                choisi = not periode.finAujourdhui and periode.fin or nil
+                montre = periode.fin
+            end
+            local resultat = Calendrier.ouvrir(borne, choisi, montre, aujourdhui, FenetreSuivi.apparence())
+            FenetreSuivi.choisirDate(borne, resultat)
+        end)
+        FenetreSuivi.calendrierOuvert = false
+        if not ok then
+            Journal.noter("Fenêtre Suivi : calendrier :", tostring(erreur))
+        end
+    end)
+    return true
+end
+
+-- Le choix du calendrier pour « Du » ou « au » (Calendrier.ouvrir) : un jour (sa date, comme si elle
+-- était tapée), « Première photo » (le début vide) ou « Aujourd'hui » (la fin qui avance) ; rien
+-- (annulé). Rend vrai si la période gardée change.
+function FenetreSuivi.choisirDate(borne, resultat)
+    if type(resultat) ~= 'table' or not FenetreSuivi.p then
+        return false
+    end
+    if resultat.autre then
+        return FenetreSuivi.changerDate(borne, borne == 'debut' and '' or FenetreSuivi.AUJOURDHUI)
+    end
+    if type(resultat.date) == 'table' then
+        return FenetreSuivi.changerDate(borne, FenetreSuivi.texteDate(resultat.date), true)
+    end
+    return false
 end
 
 -- L'apparence du module (préférence `apparence`, Dispositions.apparence).
@@ -669,7 +726,7 @@ function FenetreSuivi.barreDu(cle, i)
 end
 
 -- Vrai si la barre a au moins un id (sans les copier : à toute la bibliothèque, une barre en a des
--- dizaines de milliers, et chacun des 76 calques le demande à chaque réponse).
+-- dizaines de milliers, et chacun des 87 calques le demande à chaque réponse).
 local function aDesIds(barre)
     for _, id in ipairs(type(barre) == 'table' and type(barre.ids) == 'table' and barre.ids or {}) do
         if tonumber(id) then
@@ -1145,16 +1202,22 @@ local function section(f, D, C, P, titre)
     return texte(f, { title = titre, font = P.gras, text_color = C.texte, width = D.colonne, height = D.section })
 end
 
--- Le contenu : l'aplat du fond, puis l'en-tête (titre, « Du » et « au »), la ligne d'état, les
--- tuiles, et les deux colonnes : Mes prises de vue (les notes à côté des objectifs), Mon carnet de
--- progrès (avec le menu du défaut suivi, l'aide et le message).
+-- Le contenu : l'aplat du fond, puis l'en-tête (titre, « Du » et « au », chacun avec son calendrier),
+-- la ligne d'état, les tuiles, et les deux colonnes : Mes prises de vue (les notes à côté des
+-- objectifs) ; Ce que je photographie (les genres), puis Mon carnet de progrès (avec le menu du défaut
+-- suivi, l'aide et le message).
 function FenetreSuivi.construire(f, p)
     local D, C, P = FenetreSuivi.dimensions(), FenetreSuivi.COULEURS, FenetreSuivi.POLICES
     local tuiles = { spacing = D.ecartTuile }
     for k = 1, #FenetreSuivi.TUILES do
         tuiles[#tuiles + 1] = tuile(f, D, C, P, k)
     end
-    local largeurTitre = D.interieur - D.etiquetteDu - D.etiquetteAu - 2 * D.champDate - 4 * 8
+    local largeurTitre = D.interieur - D.etiquetteDu - D.etiquetteAu - 2 * D.champDate - 2 * D.calendrier - 6 * 8
+    local iconeCalendrier = Chemins.ressource(Dispositions.image('calendrier', FenetreSuivi.apparence()))
+    local function boutonCalendrier(borne, infobulle)
+        return f:square_button { image_name = iconeCalendrier, width = D.calendrier, height = Dispositions.cadreBouton(22),
+            place_vertical = 0.5, tooltip = infobulle, action = function() FenetreSuivi.ouvrirCalendrier(borne) end }
+    end
     local gauche = f:column {
         spacing = 0,
         width = D.colonne,
@@ -1179,6 +1242,10 @@ function FenetreSuivi.construire(f, p)
     local droite = f:column {
         spacing = 0,
         width = D.colonne,
+        section(f, D, C, P, FenetreSuivi.GENRES),
+        f:spacer { height = D.sousSection },
+        bloc(f, D, C, P, 'genres'),
+        f:spacer { height = D.ecartBlocs },
         section(f, D, C, P, FenetreSuivi.CARNET),
         f:spacer { height = D.sousSection },
         bloc(f, D, C, P, 'defauts_frequents'),
@@ -1208,10 +1275,12 @@ function FenetreSuivi.construire(f, p)
                     place_vertical = 0.5 }),
                 f:edit_field { value = bind 'debutTexte', immediate = false, width = D.champDate, place_vertical = 0.5,
                     tooltip = FenetreSuivi.INFOBULLE_DEBUT },
+                boutonCalendrier('debut', FenetreSuivi.INFOBULLE_CALENDRIER_DEBUT),
                 texte(f, { title = "au", font = P.texte12, text_color = C.gris, alignment = 'right', width = D.etiquetteAu,
                     place_vertical = 0.5 }),
                 f:edit_field { value = bind 'finTexte', immediate = false, width = D.champDate, place_vertical = 0.5,
                     tooltip = FenetreSuivi.INFOBULLE_FIN },
+                boutonCalendrier('fin', FenetreSuivi.INFOBULLE_CALENDRIER_FIN),
             },
             f:spacer { height = D.ecartEtat },
             texte(f, { title = bind 'etat', font = P.petit, text_color = C.gris, width = D.interieur, height = D.etat, height_in_lines = 2,

@@ -248,8 +248,7 @@ function Vues.voyant(f, F, v)
 end
 
 -- Les deux voyants de l'en-tête : Claude Code (sans clic) et la liaison (un clic la démarre), en
--- tête du centre ; dans leur rangée, au bout à droite, les boutons Suivi, Publication… et
--- Consommation… (Vues.boutonSuivi…). Le
+-- tête du centre, sous le titre ; la photo active au bout de leur rangée. Le
 -- voyant Écran (de la 1.2) est retiré au correctif 1.3.6 (décision de Dany du 25 octobre 2026 :
 -- plus rien sur l'étalonnage de l'écran).
 function Vues.voyantClaude(f, F, D)
@@ -270,8 +269,9 @@ function Vues.voyantLightroom(f, F, D)
 end
 
 -- Le bouton Suivi, en haut à droite (décision de Dany du 25 octobre 2026, correctif 1.3.6 : dans
--- la rangée des voyants, après la photo active, sous « Repartir à neuf ») : le Suivi en graphiques
--- dans sa fenêtre à part (F.ouvrirSuivi, FenetreSuivi.lua ; le carnet de progrès en texte
+-- la rangée des voyants, après la photo active, sous « Repartir à neuf » ; sur la rangée du titre,
+-- après « Repartir à neuf », depuis le correctif 1.3.8) : le Suivi en graphiques dans sa fenêtre à
+-- part (F.ouvrirSuivi, FenetreSuivi.lua ; le carnet de progrès en texte
 -- jusqu'au correctif 1.3.7), comme Publication et Consommation, à la place de l'onglet Suivi. Un
 -- carré small comme les boutons d'actions du fil (bezel de 15, D6), son titre en petit ; toujours
 -- actif : le Suivi se lit sans Claude.
@@ -332,14 +332,15 @@ end
 -- En-tête --------------------------------------------------------------------------------------
 
 -- L'en-tête du centre : le titre de la conversation (gras 16, sans ✎ : celui que Claude donne ;
--- Renommer… est retiré avec le volet au correctif 1.3.6), et à sa droite, dans la place du Mode (ses
--- trois radios sont retirés au correctif 1.3.6 : la fenêtre suit la préférence `mode` du
--- Gestionnaire), « Repartir à neuf » (F.repartir : une conversation neuve pour la photo seule,
--- l'ancienne mise de côté ; grisé pendant que Claude travaille et sans photo seule) ; dessous, les
--- voyants Claude Code et Lightroom, la photo active (`infoPhoto`, texte riche : nom et sélection en
--- <EM>), puis les boutons Suivi, Publication… et Consommation… (Vues.boutonSuivi,
--- Vues.boutonPublication, Vues.boutonConsommation ; correctif 1.3.7) au bout de la rangée, en haut à
--- droite, sous « Repartir à neuf ».
+-- Renommer… est retiré avec le volet au correctif 1.3.6), et à sa droite, côte à côte, « Repartir à
+-- neuf » (F.repartir : une conversation neuve pour la photo seule, l'ancienne mise de côté ; grisé
+-- pendant que Claude travaille et sans photo seule ; à la place du Mode, dont les trois radios sont
+-- retirés au correctif 1.3.6 : la fenêtre suit la préférence `mode` du Gestionnaire), puis les
+-- boutons Suivi, Publication… et Consommation… (Vues.boutonSuivi, Vues.boutonPublication,
+-- Vues.boutonConsommation), le dernier au bout, en haut à droite : quatre carrés small de la même
+-- taille (correctif 1.3.8, demandé par Dany le 26 octobre 2026 : les trois boutons étaient dans la
+-- rangée des voyants, « Repartir à neuf », plus grand, seul à droite du titre) ; dessous, les voyants
+-- Claude Code et Lightroom et la photo active (`infoPhoto`, texte riche : nom et sélection en <EM>).
 function Vues.entete(f, F, D)
     local bind, C, P = F.bind, F.COULEURS, F.POLICES
     return f:column {
@@ -351,11 +352,17 @@ function Vues.entete(f, F, D)
             spacing = 0,
             f:static_text { title = bind 'titre', font = P.titre, text_color = C.texte, width = D.titre, truncation = 'tail',
                 place_vertical = 0.5 },
-            f:spacer { fill_horizontal = 1 },
-            F.bouton(f, { carre = true, bezel = 22, title = "Repartir à neuf", font = P.systeme12, width = D.repartir,
+            f:spacer { width = D.ecartVoyants },
+            F.bouton(f, { carre = true, size = 'small', title = "Repartir à neuf", font = P.petit, width = D.repartir,
                 place_vertical = 0.5, enabled = bind 'peutRepartir',
                 tooltip = "Une conversation neuve pour la photo choisie, avec son historique ; l'ancienne reste sur le disque, mise de côté",
                 action = function() F.enTache(F.repartir) end }),
+            f:spacer { width = D.ecartBoutons },
+            Vues.boutonSuivi(f, F, D),
+            f:spacer { width = D.ecartBoutons },
+            Vues.boutonPublication(f, F, D),
+            f:spacer { width = D.ecartBoutons },
+            Vues.boutonConsommation(f, F, D),
         },
         f:row {
             spacing = 0,
@@ -365,12 +372,6 @@ function Vues.entete(f, F, D)
             f:spacer { width = D.ecartVoyants },
             f:static_text { title = bind 'infoPhoto', font = P.systeme12, text_color = C.gris, emphasis_font = P.systeme12,
                 emphasis_color = C.texte, alignment = 'right', width = D.info, truncation = 'middle' },
-            f:spacer { width = D.ecartVoyants },
-            Vues.boutonSuivi(f, F, D),
-            f:spacer { width = D.ecartBoutons },
-            Vues.boutonPublication(f, F, D),
-            f:spacer { width = D.ecartBoutons },
-            Vues.boutonConsommation(f, F, D),
         },
     }
 end

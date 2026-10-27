@@ -155,7 +155,7 @@ final class ContratSuiviTests: XCTestCase {
             XCTAssertEqual(definition.unite, attendu["unite"]?.string, cle)
             XCTAssertEqual(definition.etale, attendu["etale"]?.bool, cle)
         }
-        XCTAssertEqual(Suivi.graphiques.compactMap { Suivi.definitions[$0]?.maxBarres }.reduce(0, +), 76, "76 calques")
+        XCTAssertEqual(Suivi.graphiques.compactMap { Suivi.definitions[$0]?.maxBarres }.reduce(0, +), 87, "87 calques")
         for (nom, tranches) in [("focales", Suivi.tranchesFocales), ("iso", Suivi.tranchesISO)] {
             let attendues = try XCTUnwrap(regles["tranches"]?[nom]?["liste"]?.array, nom)
             XCTAssertEqual(attendues.count, tranches.count, nom)
@@ -277,7 +277,9 @@ final class ContratSuiviTests: XCTestCase {
         XCTAssertEqual(reponse.code, 0, JSONCoding.line(reponse.ligne))
         XCTAssertEqual(reponse.ligne["ok"], true)
         XCTAssertEqual(reponse.ligne["regles"]?.int, 1)
-        XCTAssertEqual(Set(reponse.ligne.object?.keys.map { $0 } ?? []), ["ok", "regles", "photos"])
+        XCTAssertEqual(reponse.ligne["regles_genre"]?.int, Genre.regles)
+        XCTAssertEqual(reponse.ligne["regles_genre"], try XCTUnwrap(exemple["sortie"]?["regles_genre"]), "les règles du genre du contrat")
+        XCTAssertEqual(Set(reponse.ligne.object?.keys.map { $0 } ?? []), ["ok", "regles", "regles_genre", "photos"])
         let photos = try XCTUnwrap(reponse.ligne["photos"]?.array)
         let attendues = try XCTUnwrap(Self.remplacer(try XCTUnwrap(exemple["sortie"]), textes)["photos"]?.array)
         XCTAssertEqual(photos.compactMap { $0["id"]?.int }, attendues.compactMap { $0["id"]?.int }, "une par photo, dans le même ordre")
@@ -289,7 +291,11 @@ final class ContratSuiviTests: XCTestCase {
                 XCTAssertEqual(photo, attendue, "\(id) : la raison et son texte, tels quels")
                 continue
             }
-            XCTAssertEqual(Set(photo.object?.keys.map { $0 } ?? []), ["id", "cherches", "defauts", "mesures"], "\(id)")
+            XCTAssertEqual(Set(photo.object?.keys.map { $0 } ?? []), ["id", "cherches", "defauts", "genre", "mesures"], "\(id)")
+            // Le genre : un code de la liste du contrat (un damier n'a ni visage ni scène : sa valeur
+            // dépend de Vision, seule sa forme se vérifie).
+            XCTAssertTrue(Genre.codes.contains(try XCTUnwrap(photo["genre"]?.string)), "\(id) : un genre de la liste")
+            XCTAssertEqual(Set(attendue.object?.keys.map { $0 } ?? []), ["id", "cherches", "defauts", "genre", "mesures"], "\(id) : le contrat")
             let cherches = try XCTUnwrap(photo["cherches"]?.array).compactMap(\.string)
             let defauts = try XCTUnwrap(photo["defauts"]?.array).compactMap(\.string)
             XCTAssertTrue(Set(defauts).isSubset(of: Set(cherches)), "\(id) : un défaut trouvé est cherché")
@@ -310,6 +316,7 @@ final class ContratSuiviTests: XCTestCase {
                 XCTAssertEqual(cherches, ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou"], "ISO 5 000 : le bruit")
             case 4304:
                 XCTAssertEqual(cherches, ["sous_exposition", "surexposition", "ciel_brule", "flou"], "ISO inconnu : pas de bruit")
+                XCTAssertEqual(photo["genre"], "macro", "l'objectif macro du contrat, sans personne")
                 XCTAssertTrue(defauts.contains("surexposition"), "60 % de blanc pur : brûlée")
                 XCTAssertTrue(defauts.contains("ciel_brule"), "le tiers haut blanc")
                 XCTAssertEqual(mesures["cote"]?.int, 1024)

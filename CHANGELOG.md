@@ -32,19 +32,43 @@
   chaque janvier portent leur année, et l'infobulle d'un mois que la période ne couvre qu'en partie
   le dit (« janvier 2025, à partir du 25 »). Une date qui ne se lit pas, ou une période à l'envers,
   est refusée, et la ligne sous les champs dit lequel changer d'abord.
+- Dans l'en-tête de la fenêtre Claude, Suivi, Publication… et Consommation… montent sur la ligne du
+  titre, à droite de « Repartir à neuf », qui prend leur taille : quatre petits boutons côte à côte, en
+  haut à droite. La photo active garde toute la ligne du dessous.
+- « Historique de la photo » ne s'affiche plus en haut du fil : le résumé de la photo, juste dessous,
+  dit déjà la même chose (de même pour le petit résumé d'une sélection de plusieurs photos). Claude le
+  reçoit toujours avec votre première demande.
 
 ### Ajouté
 - Un graphique des notes dans la fenêtre Suivi, à côté des objectifs : combien de photos à 0 ★ (pas
   encore notées) et de 1 à 5 ★ dans la période (la note la plus haute de la photo et de ses copies
   virtuelles). Un clic sur une barre montre ses photos dans la Bibliothèque ; une photo rejetée
   compte à sa note, et la note sous le graphique dit combien il y en a.
+- Un graphique des genres de photos dans la fenêtre Suivi, sous « Ce que je photographie », en haut
+  de la colonne de droite : portrait, famille et groupes, sport, paysage, macro et gros plans,
+  animaux, ville et architecture, véhicules, nourriture, fêtes et événements, et autre. Le connecteur
+  lit le genre de chaque photo sur sa vignette, avec Vision (Apple), pendant l'analyse d'office, sans
+  Claude ni forfait. C'est une tendance, pas un classement sûr : Vision ne sait pas qui sont les
+  personnes, « famille et groupes » veut dire deux personnes ou plus ; essayé sur 60 de vos photos,
+  il en range 52 sur 53 comme à l'œil (la nourriture, le macro et les fêtes n'y étaient pas). Une
+  photo faite à l'objectif macro (XF80 Macro), sans personne, compte en macro. Un clic sur une barre
+  montre ses photos dans la Bibliothèque.
+- Un calendrier pour choisir la période : un bouton à droite de « Du » et de « au » ouvre une petite
+  fenêtre du mois, dans les couleurs du module ; ◀ ▶ ou les menus Mois et Année changent de mois, un
+  clic sur un jour le choisit. « Première photo » (pour « Du ») et « Aujourd'hui » (pour « au », la
+  fin qui avance) y sont aussi. Taper la date reste possible.
 
 ### Retiré
 - « Photos d'un défaut… », au bas de la fenêtre Suivi, avec sa fenêtre des photos d'un défaut et
   « Retirer du carnet… » : un clic sur la barre d'un défaut montre déjà ses photos.
 
 ### À savoir
-- Après l'installation : quitter puis relancer Lightroom.
+- Après l'installation : quitter puis relancer Lightroom (le module a un fichier nouveau).
+- Les photos déjà analysées n'ont pas encore de genre : le Suivi les repasse toutes en arrière-plan,
+  dès que la fenêtre Claude, la Demande rapide ou la fenêtre Suivi est ouverte, pour leur genre
+  seulement (les défauts trouvés à leur première analyse restent). Comptez environ 10 heures pour
+  85 000 photos ; le graphique des genres se remplit au fil de l'analyse, et sa note dit combien de
+  photos ne sont pas encore classées.
 
 ## 1.3.7 — 2026-10-26
 

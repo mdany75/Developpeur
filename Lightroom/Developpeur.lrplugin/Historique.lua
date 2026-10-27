@@ -20,8 +20,9 @@
 -- Lightroom qui s'écartent de leur valeur par défaut (Historique.ecarts ; demandé par Dany le
 -- 25 octobre 2026).
 --
--- Aussi le résumé que la fenêtre montre en haut du fil, sous l'historique de la photo ou le résumé
--- court du groupe (deuxième retour de Dany du 25 octobre 2026, section « Le résumé de la fenêtre »
+-- Aussi le résumé que la fenêtre montre en tête du fil (l'historique de la photo et le résumé court
+-- du groupe, faits ici aussi, n'y ont plus de ligne depuis le correctif 1.3.8 : il les redit ;
+-- deuxième retour de Dany du 25 octobre 2026, section « Le résumé de la fenêtre »
 -- en bas de ce fichier) : la prise de vue, la note et l'état d'une photo, ou les dates, les
 -- appareils et les comptes d'un groupe. Lui n'a que la forme du fil : il n'est jamais gardé dans la
 -- conversation, ni envoyé à Claude.
@@ -713,10 +714,10 @@ end
 
 -- Le résumé de la fenêtre (deuxième retour de Dany du 25 octobre 2026) -------------------------
 -- À l'ouverture de la fenêtre Claude, et chaque fois qu'une autre photo ou un autre groupe change la
--- conversation montrée, la fenêtre fait un résumé, sans Claude ni jetons, montré en haut du fil :
--- sous l'historique de la photo ou le résumé court du groupe qui ouvre la conversation, au-dessus de
--- la première demande de Dany, sinon en tête du fil (Fenetre.resume, Fil.lignesResume,
--- Fil.avecResume ; demandé par Dany le 25 octobre 2026, d'abord en bas, sous la conversation) : pour
+-- conversation montrée, la fenêtre fait un résumé, sans Claude ni jetons, montré en tête du fil,
+-- au-dessus de la première demande de Dany (Fenetre.resume, Fil.lignesResume, Fil.avecResume ;
+-- demandé par Dany le 25 octobre 2026, d'abord en bas, sous la conversation ; sous l'historique de la
+-- photo ou le résumé court du groupe jusqu'au correctif 1.3.8, qui leur retire leurs lignes) : pour
 -- une photo, sa prise de vue (appareil, objectif, focale, ouverture, vitesse, ISO, date), sa note et
 -- son drapeau, et son état (ses étapes de Claude, ses reprises à la main, ses réglages hors de leur
 -- valeur par défaut : ce que l'historique sait déjà) ; pour plusieurs photos, leur nombre, leurs

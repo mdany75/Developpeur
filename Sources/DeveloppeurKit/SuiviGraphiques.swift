@@ -4,7 +4,7 @@ import Foundation
 /// `mcp-developpeur --graphiques '<json>' <dossier>` (correctif 1.3.7) : les agrégats du relevé
 /// `suivi.json` (et du carnet `carnet.json`, pour l'horizon et la mise au point vus par Claude) sur
 /// une période (d'un jour de début, ou de la première photo, à un jour de fin, depuis le correctif
-/// 1.3.8 : demandé par Dany le 26 octobre 2026 ; trois périodes fixes avant), les tuiles, et les huit graphiques avec leurs barres et leurs créneaux, dans le repère
+/// 1.3.8 : demandé par Dany le 26 octobre 2026 ; trois périodes fixes avant), les tuiles, et les neuf graphiques avec leurs barres et leurs créneaux, dans le repère
 /// de l'image en points (origine en haut à gauche, y vers le bas). Les règles sont celles de
 /// `regles.graphiques`, `regles.periodes`, `regles.tranches`, `regles.textes` et `regles.geometrie`
 /// de Tests/Contrats/suivi.json ; chaque nombre de ses exemples en découle. Lecture seule des deux
@@ -26,9 +26,9 @@ extension Suivi {
         var etale: Bool
     }
 
-    /// Les huit graphiques, dans l'ordre de la fenêtre (76 créneaux en tout ; les notes depuis le
-    /// correctif 1.3.8, demandées par Dany le 26 octobre 2026).
-    public static let graphiques = ["photos_par_mois", "focales", "iso", "heures", "objectifs", "notes", "defauts_frequents",
+    /// Les neuf graphiques, dans l'ordre de la fenêtre (87 créneaux en tout ; les notes et les genres
+    /// depuis le correctif 1.3.8, demandés par Dany le 26 octobre 2026).
+    public static let graphiques = ["photos_par_mois", "focales", "iso", "heures", "objectifs", "notes", "genres", "defauts_frequents",
                                     "evolution_defaut"]
     static let definitions: [String: Definition] = [
         "photos_par_mois": Definition(orientation: .verticale, maxBarres: 13, unite: "photos", etale: true),
@@ -37,6 +37,7 @@ extension Suivi {
         "heures": Definition(orientation: .verticale, maxBarres: 12, unite: "photos", etale: false),
         "objectifs": Definition(orientation: .horizontale, maxBarres: 8, unite: "photos", etale: false),
         "notes": Definition(orientation: .verticale, maxBarres: 6, unite: "photos", etale: false),
+        "genres": Definition(orientation: .horizontale, maxBarres: 11, unite: "photos", etale: false),
         "defauts_frequents": Definition(orientation: .horizontale, maxBarres: 8, unite: "%", etale: false),
         "evolution_defaut": Definition(orientation: .verticale, maxBarres: 13, unite: "%", etale: true),
     ]
@@ -222,7 +223,7 @@ extension Suivi {
             defaut = code
         }
         guard let taillesDonnees = objet["tailles"]?.object else {
-            throw refus("tailles donne les huit graphiques (\(graphiques.joined(separator: ", "))), chacun { largeur, hauteur }.")
+            throw refus("tailles donne les neuf graphiques (\(graphiques.joined(separator: ", "))), chacun { largeur, hauteur }.")
         }
         var tailles: [String: (largeur: Int, hauteur: Int)] = [:]
         for cle in graphiques {
@@ -266,6 +267,8 @@ extension Suivi {
         var etat: Etat
         /// Pour chaque code cherché : trouvé ou non (l'analyse, puis le carnet par-dessus).
         var resultats: [String: Bool]
+        /// Le genre lu par --analyser (un code de `Genre`, correctif 1.3.8) ; nil : pas encore classée.
+        var genre: String? = nil
 
         /// La date qui la place dans une période : la prise de vue, sinon l'ajout au Suivi.
         var date: DateLocale? { prise ?? ajout }
@@ -334,13 +337,16 @@ extension Suivi {
             throw Refus(raison: "suivi_illisible", texte: "suivi.json illisible (JSON invalide, ou format autre que 1) : rien n'est dessiné.")
         }
         let comptes = Set(codes)
+        let genres = Set(Genre.codes)
         return table.compactMap { cle, valeur -> PhotoSuivie? in
             guard let entree = valeur as? [String: Any], let id = Int(cle) ?? identifiant(nombre(entree["original"])) else { return nil }
             let prise = entree["prise_de_vue"] as? [String: Any] ?? [:]
             let objectif = (prise["objectif"] as? String).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
             var etat = PhotoSuivie.Etat.enAttente
             var resultats: [String: Bool] = [:]
+            var genre: String?
             if let analyse = entree["analyse"] as? [String: Any] {
+                if let code = analyse["genre"] as? String, genres.contains(code) { genre = code }
                 if analyse["cherches"] is [Any] {
                     etat = .analysee
                     let trouves = Set(textes(analyse["defauts"]))
@@ -354,7 +360,7 @@ extension Suivi {
                                focale: plausible(nombre(prise["focale"])), iso: plausible(nombre(prise["iso"])),
                                note: noteBornee(nombre(entree["note"])), rejetee: entree["drapeau"] as? String == "rejetee",
                                retouchee: booleen(entree["retouchee_par_claude"]) ?? false,
-                               etat: etat, resultats: resultats)
+                               etat: etat, resultats: resultats, genre: genre)
         }
     }
 
@@ -806,6 +812,42 @@ extension Suivi {
         g.vide = !g.barres.contains { $0.n > 0 }
         finir(&g)
 
+        // Genres (correctif 1.3.8, demandé par Dany le 26 octobre 2026) : le genre de chaque photo, lu par
+        // --analyser sur sa vignette (Genre) ; par nombre de photos décroissant, puis l'ordre des genres,
+        // « Autre » toujours en dernier ; seuls les genres qui ont des photos, en % des photos classées.
+        g = base("genres", "Genres de photos")
+        var parGenre: [String: [Int]] = [:]
+        for photo in periode {
+            if let genre = photo.genre { parGenre[genre, default: []].append(photo.id) }
+        }
+        let rangsGenres = Dictionary(uniqueKeysWithValues: Genre.codes.enumerated().map { ($1, $0) })
+        let presents = Genre.codes.filter { !(parGenre[$0] ?? []).isEmpty }.sorted { a, b in
+            if (a == "autre") != (b == "autre") { return b == "autre" }
+            let na = parGenre[a]!.count, nb = parGenre[b]!.count
+            if na != nb { return na > nb }
+            return rangsGenres[a]! < rangsGenres[b]!
+        }
+        let classees = periode.filter { $0.genre != nil }.count
+        g.barres = presents.map { code in
+            let ids = parGenre[code]!
+            return Barre(libelle: Genre.libelle(code), detail: "\(Genre.libelle(code)) · \(photos(ids.count)) (\(textePourcentage(ids.count, sur: classees)))",
+                         valeur: Double(ids.count), texte: milliers(ids.count), n: ids.count, sur: nil, ids: ids.sorted(), couleur: "barre")
+        }
+        // Sans genre : les photos à classer (en file, ou analysées avant le genre : l'analyse d'office y
+        // passe) et celles qui ne le seront jamais (analyse abandonnée), dites à part, comme la tuile.
+        g.sansValeur = periode.count - classees
+        let nonAnalysees = periode.filter { $0.genre == nil && $0.etat == .enEchec }.count
+        let aClasser = g.sansValeur - nonAnalysees
+        var manque: [String] = []
+        if aClasser > 0 { manque.append("\(photos(aClasser)) pas encore classée\(aClasser > 1 ? "s" : "")") }
+        if nonAnalysees > 0 { manque.append("\(milliers(nonAnalysees)) non analysée\(nonAnalysees > 1 ? "s" : "")") }
+        g.note = manque.isEmpty
+            ? "Lu sur la vignette par Vision (Apple) : une tendance, pas un classement sûr."
+            : "Lu sur la vignette par Vision (Apple) : une tendance. \(manque.joined(separator: " · "))."
+        g.texteVide = periode.isEmpty ? "Aucune photo" : "Pas encore classées"
+        g.vide = g.barres.isEmpty
+        finir(&g)
+
         // Défauts les plus fréquents : les codes cherchés dans la période, par pourcentage exact
         // décroissant, puis n décroissant, puis l'ordre des codes ; le défaut suivi en accent.
         g = base("defauts_frequents", "Défauts les plus fréquents")
@@ -866,7 +908,7 @@ extension Suivi {
     // MARK: La commande
 
     /// `--graphiques '<json>' <dossier>` : lit l'entrée, le relevé et le carnet, calcule, crée le
-    /// dossier et y dessine les huit PNG ; une ligne JSON, ou un refus de tout l'appel (aucun PNG
+    /// dossier et y dessine les neuf PNG ; une ligne JSON, ou un refus de tout l'appel (aucun PNG
     /// laissé).
     public static func graphiques(_ texte: String, dossier: String) -> Reponse {
         do {

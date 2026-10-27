@@ -59,7 +59,7 @@ func usage(erreur: Bool = false) {
                 Lightroom données (exposition, hautes lumières, netteté, bruit à ISO élevé, yeux fermés), comme le tri ;
                 ni Lightroom ni l'original ; 20 photos au plus, une ligne JSON (Tests/Contrats/suivi.json)
             mcp-developpeur --graphiques '<json>' <dossier>
-                le Suivi : les tuiles et les huit graphiques d'une période d'après suivi.json (et carnet.json), lus
+                le Suivi : les tuiles et les neuf graphiques d'une période d'après suivi.json (et carnet.json), lus
                 seulement, dessinés en PNG 2x dans le dossier, puis une ligne JSON avec les rectangles des barres
             mcp-developpeur --ecran   l'écran principal et son profil de couleur, classé (d'usine, standard, à
                 l'œil, sonde…), une ligne JSON ; {"lu": false} sans écran ; lu sur le Mac sans Lightroom

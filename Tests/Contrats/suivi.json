@@ -1,7 +1,7 @@
 {
   "_lisez_moi": [
     "Contrat du Suivi (correctif 1.3.7, fiche build/conception/1-3-7-a-faire.md, section « Contrat figé ») entre le module (Releve.lua, le registre et la file d'analyse ; FenetreSuivi.lua, la fenêtre) et le connecteur (mcp-developpeur --analyser et --graphiques), qui ne se parlent, hors de la liaison, que par l'exécutable lancé par LrTasks.execute sous l'alarme de perl, comme --focus.",
-    "Trois échanges : le relevé suivi.json (écrit par le module seul, lu par --graphiques), --analyser (les défauts de la prise de vue mesurés sur la vignette du cache de Lightroom) et --graphiques (les tuiles et les huit graphiques, dessinés en PNG, avec les rectangles des barres pour les clics). « regles » dit ce que les deux côtés appliquent ; chaque nombre des exemples en découle exactement.",
+    "Trois échanges : le relevé suivi.json (écrit par le module seul, lu par --graphiques), --analyser (les défauts de la prise de vue et, depuis le correctif 1.3.8, le genre de la photo, mesurés sur la vignette du cache de Lightroom) et --graphiques (les tuiles et les neuf graphiques, dessinés en PNG, avec les rectangles des barres pour les clics). « regles » dit ce que les deux côtés appliquent ; chaque nombre des exemples en découle exactement.",
     "Les clés « _note » sont des commentaires : les essais les retirent avant de comparer, et un lecteur les ignore (le relevé d'exemple en porte dans ses entrées). Aucune valeur null n'est écrite : une clé sans valeur manque (Json.decode efface un null d'objet).",
     "Textes à remplacer : <suivi.json>, <carnet.json> (des fichiers temporaires où les essais écrivent exemples.registre.fichier et exemples.carnet.fichier), <dossier> (le dossier passé à --graphiques ; fichier vaut <dossier>/<graphique>.png), <lot> (le dossier des vignettes d'un lot d'analyse), <connecteur> (le chemin de mcp-developpeur, cheminConnecteur).",
     "Un exemple marqué « partiel » ne fige que les clés qu'il donne (les graphiques omis suivent les mêmes règles que ceux de graphiques_un_an) ; les autres se comparent en entier : noms, formes (tableau ou objet, nombre, texte, booléen), valeurs, ordre des tableaux.",
@@ -40,7 +40,7 @@
       "qui_entre": "Toute photo que la fenêtre Claude voit (la photo active, la sélection : Lightroom.photos) ou que la Demande rapide reçoit (sa sélection), seule ou en groupe, depuis l'installation de la 1.3.7 (pas de rattrapage), sauf les vidéos et les photos de « Développeur › Essais » (Carnet.estPhotoDEssai : elle ou son original). Une copie virtuelle entre sous son original (masterPhoto), une seule fois : sa vue s'ajoute à vues. D'une sélection, les max_selection premières photos seulement (le reste est dit au journal).",
       "famille": "L'original et ses copies virtuelles (getRawMetadata virtualCopies, à constater dans Lightroom), sans celles de « Développeur › Essais ». note : la plus haute de la famille ; drapeau : « retenue » si l'une l'est, sinon « rejetee » si toutes le sont, sinon « aucun » ; retouchee_par_claude : vrai si l'une porte la mémoire de Claude (retoucheeParClaude = 'oui' et proprietaireMemoire = son uuid, comme Photos.decrireTout). Relus à chaque vue d'une photo de la famille, et, par lectures groupées, à l'ouverture de la fenêtre Suivi (Releve.reclasser, après le premier dessin depuis le correctif 1.3.8) ; classement_le dit quand ils ont changé.",
       "prise_de_vue": "Celle de l'original, lue à sa première vue et relue à chaque vue (une date de prise de vue changée dans Lightroom se relit). Une valeur que Lightroom ne donne pas manque.",
-      "file_d_analyse": "La file, ce sont les entrées sans analyse, et celles dont l'analyse a une erreur sans abandonnee : elle reprend d'elle-même après une fermeture de Lightroom. Une seule tâche la vide, par lots de lot_analyse, en pause pendant que Claude travaille (Moteur.travaille), sans rien écrire au catalogue ; la photo active nouvellement vue passe en tête. La vignette est celle de l'original (Vignettes.demander(…, 1024, <lot>), du cache de Lightroom, <lot> un dossier neuf par lot, par exemple Temporaire/Suivi/Analyse-<n>, effacé après la réponse), redressée (Images.redresser, géométrie de Vignettes.decrireVignette de l'original). Une analyse n'est jamais refaite après une édition (les défauts disent la prise de vue ; une retouche les cacherait) ; une erreur : essais + 1, puis abandonnee à essais_analyse. Une réponse dont regles dépasse celle d'une entrée la fait refaire (versions à venir).",
+      "file_d_analyse": "La file, ce sont les entrées sans analyse, et celles dont l'analyse a une erreur sans abandonnee : elle reprend d'elle-même après une fermeture de Lightroom. Une seule tâche la vide, par lots de lot_analyse, en pause pendant que Claude travaille (Moteur.travaille), sans rien écrire au catalogue ; la photo active nouvellement vue passe en tête. La vignette est celle de l'original (Vignettes.demander(…, 1024, <lot>), du cache de Lightroom, <lot> un dossier neuf par lot, par exemple Temporaire/Suivi/Analyse-<n>, effacé après la réponse), redressée (Images.redresser, géométrie de Vignettes.decrireVignette de l'original). Une analyse n'est jamais refaite après une édition (les défauts disent la prise de vue ; une retouche les cacherait) ; une erreur : essais + 1, puis abandonnee à essais_analyse. Une réponse dont regles dépasse celle d'une entrée la fait refaire (versions à venir). Le genre (correctif 1.3.8) a ses propres règles, regles_genre : une analyse réussie sans genre (d'avant lui), ou d'un genre de règles plus anciennes, se refait pour le genre seul, ses défauts gardés (avec leur le et leur regles : ils disent la prise de vue, qu'une retouche faite depuis cacherait) ; une analyse sans genre se refait même avant toute réponse de la séance (les règles ne s'apprennent que d'une réponse), sauf si le connecteur répond sans regles_genre (d'avant le correctif 1.3.8 : elle attend la séance suivante). Une analyse refaite qui échoue garde l'ancienne, et n'est plus refaite de la séance.",
       "bornes": {"_note": "max_originaux et max_selection à 250 000 depuis le correctif 1.3.8 (20 000 et 1 000 avant ; 10 000 le matin même, jamais publié ; demandé par Dany le 26 octobre 2026 : toute sa bibliothèque, 88 071 photos, d'un coup). À cette taille le relevé fait environ 170 Mo : le module le relit et l'écrit par morceaux, en rendant la main à Lightroom (Releve.lua), toujours au format 1.", "max_originaux": 250000, "max_vues": 20, "max_selection": 250000, "lot_analyse": 10, "essais_analyse": 3},
       "elagage": "Au-delà de max_originaux dans un catalogue, les entrées vues le moins récemment (vu, puis l'id) sortent. Au-delà de max_vues, une vue de plus ne change que vu.",
       "entree": {
@@ -62,19 +62,20 @@
         "drapeau": "« retenue », « aucun » ou « rejetee » (famille)",
         "retouchee_par_claude": "booléen (famille)",
         "classement_le": "nombre : os.time du dernier changement de note, drapeau ou retouchee_par_claude (ou de leur première lecture) ; une lecture qui ne change rien ne le change pas (correctif 1.3.8 : Releve.reclasser ne réécrit pas tout le relevé à chaque ouverture de la fenêtre Suivi)",
-        "analyse": "absente : en file ; réussie : { le, regles, cherches, defauts } (codes de --analyser, dans l'ordre des codes) ; manquée : { le, erreur (la raison de --analyser, ou « pas_de_reponse »), essais, abandonnee (seulement vrai) }"
+        "analyse": "absente : en file ; réussie : { le, regles, cherches, defauts, genre, regles_genre } (codes de --analyser, dans l'ordre des codes ; genre : un code de analyser.genres, et regles_genre, depuis le correctif 1.3.8, absents d'une analyse d'avant lui) ; manquée : { le, erreur (la raison de --analyser, ou « pas_de_reponse »), essais, abandonnee (seulement vrai) }"
       }
     },
     "analyser": {
-      "_note": "Les défauts de la prise de vue d'un lot de photos, mesurés sur leurs vignettes comme au tri (ToolHandler.mesurer, sans point de mise au point) et au carnet (Carnet.constatsVue, sans intention du boîtier), rendus en codes. Jamais Lightroom, jamais l'original (ni point de mise au point, ni intention : mise_au_point et horizon_penche ne se cherchent pas ici). Le connecteur n'efface pas les vignettes : le module efface le dossier du lot après la réponse.",
+      "_note": "Les défauts de la prise de vue d'un lot de photos, mesurés sur leurs vignettes comme au tri (ToolHandler.mesurer, sans point de mise au point) et au carnet (Carnet.constatsVue, sans intention du boîtier), rendus en codes ; et, depuis le correctif 1.3.8, le genre de chaque photo (analyser.genres). Jamais Lightroom, jamais l'original (ni point de mise au point, ni intention : mise_au_point et horizon_penche ne se cherchent pas ici). Le connecteur n'efface pas les vignettes : le module efface le dossier du lot après la réponse.",
       "commande": "/usr/bin/perl -e 'alarm 60; exec @ARGV' <connecteur> --analyser '<json>' > <réponse>.json 2>/dev/null",
       "entree": {
-        "photos": "tableau de 1 à 20 photos, dans l'ordre voulu : { id (nombre : l'original), vignette (chemin d'un JPEG, déjà redressé), iso (nombre ; absent : inconnu), cache (booléen : vignette du cache de Lightroom, dont la netteté se ramène par thumbnailSharpnessFactor ; toujours vrai pour le Suivi), retouchee (booléen, absent : faux ; vrai quand l'original porte la mémoire de Claude, retoucheeParClaude = 'oui' et propriétaire = son uuid : seuls flou et yeux_fermes se cherchent alors) }"
+        "photos": "tableau de 1 à 20 photos, dans l'ordre voulu : { id (nombre : l'original), vignette (chemin d'un JPEG, déjà redressé), iso (nombre ; absent : inconnu), cache (booléen : vignette du cache de Lightroom, dont la netteté se ramène par thumbnailSharpnessFactor ; toujours vrai pour le Suivi), retouchee (booléen, absent : faux ; vrai quand l'original porte la mémoire de Claude, retoucheeParClaude = 'oui' et propriétaire = son uuid : seuls flou et yeux_fermes se cherchent alors), objectif (texte : prise_de_vue.objectif de l'entrée ; absent : inconnu ; correctif 1.3.8, pour le genre macro) }"
       },
       "sortie": {
         "ok": "vrai",
         "regles": "nombre : la version de ces règles (1) ; le module la range dans analyse.regles",
-        "photos": "une par photo reçue, dans le même ordre : { id, cherches, defauts, mesures } (cherches et defauts : des codes, dans l'ordre des codes ; defauts ⊂ cherches), ou { id, raison, texte } quand la vignette ne s'analyse pas"
+        "regles_genre": "nombre : la version des règles du genre (1, correctif 1.3.8) ; le module la range dans analyse.regles_genre",
+        "photos": "une par photo reçue, dans le même ordre : { id, cherches, defauts, genre, mesures } (cherches et defauts : des codes, dans l'ordre des codes ; defauts ⊂ cherches ; genre : un code de analyser.genres, même retouchee), ou { id, raison, texte } quand la vignette ne s'analyse pas"
       },
       "regles_des_codes": {
         "sous_exposition": "Carnet.constatsVue : L* médian sous 28 et 95e centile sous 80 (medianeSousExposee, p95SousExposee), sans intention du boîtier ; toujours cherché, sauf retouchee",
@@ -95,7 +96,12 @@
         "nettete": "netteté de la zone la plus nette, ramenée si cache, au dixième",
         "bruit": "max(noise, shadowNoise), au centième",
         "visages": "nombre de visages vus par Vision",
-        "ouverture_yeux": "la plus petite ouverture des sujets dont les yeux se lisent (hauteur sur largeur, l'œil le plus ouvert de chaque visage), au centième ; absente sans yeux lus"
+        "ouverture_yeux": "la plus petite ouverture des sujets dont les yeux se lisent (hauteur sur largeur, l'œil le plus ouvert de chaque visage), au centième ; absente sans yeux lus",
+        "etiquettes": "les trois étiquettes de Vision les plus sûres (VNClassifyImageRequest, en anglais), d'où vient le genre (correctif 1.3.8)"
+      },
+      "genres": {
+        "_note": "Le genre de la photo (correctif 1.3.8, demandé par Dany le 26 octobre 2026), lu par Vision sur la vignette à 1 024 px (Genre.swift, seule liste des genres et de leurs règles ; le module n'en a aucune) : une tendance, pas un classement sûr. La première règle qui convient, dans cet ordre (seuils provisoires, relevés le 26 octobre 2026 sur les vignettes de 60 photos de Dany) : sport (une étiquette de sport à 0,4), fêtes et événements (0,5), famille et groupes (deux personnes comparables : visages d'au moins 5 % de la hauteur, le second d'au moins la moitié du premier, ou corps d'au moins 4 % de l'image, le second d'au moins 40 % du premier), portrait (un visage d'au moins 8 % de la hauteur, ou une personne d'au moins 10 % de l'image ; un visage à l'envers, roulis de 3π/4 ou plus, Composition.visagePlausible, ne compte pas), macro (un insecte à 0,4, ou un objectif macro sans personne), animaux (0,5, ou un chien ou un chat vu à 0,5 sur 2 % de l'image), nourriture (0,6, et plus sûre que la fleur : le pissenlit donne aussi « food »), macro (une fleur à 0,6 sans scène de nature à 0,5, « plant » et « foliage » mis à part : Vision les donne avec toute fleur), véhicules (0,6, pas plus de 0,15 sous la scène), ville et architecture (0,5, ou 0,3 sans moins que la nature), paysage (0,4), sinon autre. Vision ne sait ni qui sont les personnes ni si c'est la famille.",
+        "liste": [["sport", "Sport"], ["evenement", "Fêtes et événements"], ["famille", "Famille et groupes"], ["portrait", "Portrait"], ["macro", "Macro et gros plans"], ["animaux", "Animaux"], ["nourriture", "Nourriture"], ["vehicules", "Véhicules"], ["ville", "Ville et architecture"], ["paysage", "Paysage"], ["autre", "Autre"]]
       },
       "raisons_par_photo": {"vignette_absente": "pas de fichier au chemin donné", "vignette_illisible": "le fichier n'est pas une image lisible", "vignette_petite": "grand côté sous 900 px"},
       "limites": "20 photos au plus par appel (le module en envoie 10) ; deux mesures à la fois (Vision, ToolHandler.parallelMeasures). Sans réponse avant l'alarme : le module compte un essai à chaque photo du lot (erreur « pas_de_reponse »).",
@@ -104,7 +110,7 @@
     "graphiques": {
       "_note": "Les agrégats du relevé (et du carnet) sur une période, dessinés en PNG par CoreGraphics (comme PreviewImages), en 2x, dans les couleurs de l'apparence du module ; et pour chaque graphique ses barres et ses créneaux, dans le repère de l'image en points (origine en haut à gauche, y vers le bas). Lightroom ne trace pas de graphique : la fenêtre montre ces images (f:picture avec width et height) et pose ses calques sur les créneaux. Lecture seule de suivi.json et de carnet.json : ni Lightroom, ni le catalogue, ni un original.",
       "commande": "/usr/bin/perl -e 'alarm 60; exec @ARGV' <connecteur> --graphiques '<json>' <dossier> > <réponse>.json 2>/dev/null",
-      "dossier": "Un dossier neuf à chaque appel (par exemple Temporaire/Suivi/Graphiques-<n>, Chemins.temporaire() : Lightroom garde une image par chemin, un même chemin ne se redessinerait pas) ; le connecteur le crée s'il manque et y écrit les huit <graphique>.png, de 2 × largeur par 2 × hauteur pixels ; le module efface le précédent une fois les nouvelles images montrées.",
+      "dossier": "Un dossier neuf à chaque appel (par exemple Temporaire/Suivi/Graphiques-<n>, Chemins.temporaire() : Lightroom garde une image par chemin, un même chemin ne se redessinerait pas) ; le connecteur le crée s'il manque et y écrit les neuf <graphique>.png, de 2 × largeur par 2 × hauteur pixels ; le module efface le précédent une fois les nouvelles images montrées.",
       "entree": {
         "suivi": "chemin de suivi.json (absent du disque : un relevé vide, rien n'est refusé)",
         "carnet": "chemin de carnet.json, facultatif (codes.fusion_avec_le_carnet)",
@@ -114,7 +120,7 @@
         "apparence": "« claire » ou « sombre » (Dispositions.apparence de la préférence apparence)",
         "couleurs": "les six couleurs de couleurs.cles, en six chiffres hexadécimaux, tirées de Dispositions.PALETTES[apparence] (seule table des couleurs)",
         "defaut": "facultatif : le code suivi par l'évolution, l'un des huit codes comptés ; absent : le plus fréquent",
-        "tailles": "les huit graphiques, chacun { largeur, hauteur } en points entiers, de 120 × 80 à 1 200 × 600"
+        "tailles": "les neuf graphiques, chacun { largeur, hauteur } en points entiers, de 120 × 80 à 1 200 × 600"
       },
       "sortie": {
         "ok": "vrai",
@@ -126,10 +132,10 @@
         "tuiles": "tableau des quatre tuiles, dans cet ordre : { cle, titre, valeur, texte, detail } et code pour defaut_frequent quand il y en a un",
         "defauts": "les huit codes comptés, dans leur ordre : { code, libelle, n, sur, valeur, texte } (le menu du défaut suivi)",
         "defaut_suivi": "{ code, libelle, choisi (vrai : celui de l'entrée) } ; absent sans défaut à suivre",
-        "graphiques": "objet des huit graphiques (graphiques.liste), chacun { titre, fichier, largeur, hauteur, orientation, max_barres, unite, echelle, sans_valeur, note (absente sans rien à dire), vide, barres, creneaux }",
+        "graphiques": "objet des neuf graphiques (graphiques.liste), chacun { titre, fichier, largeur, hauteur, orientation, max_barres, unite, echelle, sans_valeur, note (absente sans rien à dire), vide, barres, creneaux }",
         "remarques": "tableau de textes (vide le plus souvent : un carnet illisible)",
         "barre": "{ libelle (court, dessiné), detail (entier, pour l'infobulle du calque), valeur, texte, n, sur (graphiques en %), ids, couleur (« barre » ou « accent »), x, y, largeur, hauteur (le rectangle dessiné), zone (le rectangle cliquable : ses créneaux) }",
-        "ids": "les originaux de la barre (les clés de leurs entrées), croissants, tous (pour 20 000 originaux, la ligne de toute la bibliothèque fait environ 0,7 Mo, et 10,6 Mo pour 250 000, le graphique des notes compris : le module la lit dans un fichier, jamais par un tuyau, et la décode en rendant la main à Lightroom). La fenêtre les retrouve par getPhotoByLocalId, vérifie l'uuid de leur entrée, puis les montre dans la Bibliothèque, en grille (toutes les photos du catalogue comme source quand elles ne sont pas dans la source affichée : à l'étape de la fenêtre).",
+        "ids": "les originaux de la barre (les clés de leurs entrées), croissants, tous (pour 20 000 originaux, la ligne de toute la bibliothèque fait environ 0,8 Mo, et 12 Mo pour 250 000, les graphiques des notes et des genres compris : le module la lit dans un fichier, jamais par un tuyau, et la décode en rendant la main à Lightroom). La fenêtre les retrouve par getPhotoByLocalId, vérifie l'uuid de leur entrée, puis les montre dans la Bibliothèque, en grille (toutes les photos du catalogue comme source quand elles ne sont pas dans la source affichée : à l'étape de la fenêtre).",
         "creneau": "{ x, y, largeur, hauteur, barre } : barre est le rang (à partir de 1) dans barres de la barre qui l'occupe, 0 pour un créneau vide. Les rectangles des créneaux ne dépendent que de la taille et du graphique : les mêmes à chaque appel (la fenêtre pose ses calques à la création d'après la première réponse) ; seul barre change."
       },
       "liste": {
@@ -139,6 +145,7 @@
         "heures": {"orientation": "verticale", "max_barres": 12, "unite": "photos", "etale": false, "titre": "« Heure de la prise de vue »", "barres": "les douze tranches.heures, photos datées seulement", "note": "comme photos_par_mois"},
         "objectifs": {"orientation": "horizontale", "max_barres": 8, "unite": "photos", "etale": false, "titre": "« Objectifs »", "barres": "tranches.objectifs, de haut en bas"},
         "notes": {"orientation": "verticale", "max_barres": 6, "unite": "photos", "etale": false, "titre": "« Notes »", "barres": "six, de 0 ★ à 5 ★ (libellés « 0 ★ » à « 5 ★ ») : la note de l'entrée (celle de la famille), partie entière bornée de 0 à 5 ; détail « 0 ★, pas encore notée · N photo(s) », puis « 1 ★ · … » à « 5 ★ · … » (correctif 1.3.8)", "note": "les photos dont le drapeau est « rejetee » y comptent à leur note : « Dont 1 rejetée (drapeau), comptée à sa note. », « Dont N rejetées (drapeau), comptées à leur note. » ; absente sans photo rejetée dans la période"},
+        "genres": {"orientation": "horizontale", "max_barres": 11, "unite": "photos", "etale": false, "titre": "« Genres de photos »", "barres": "un genre par barre, de haut en bas : ceux qui ont des photos dans la période (analyse.genre de l'entrée ; une entrée sans genre n'y est pas), par nombre de photos décroissant, à égalité dans l'ordre de analyser.genres, « Autre » toujours en dernier ; libellé : celui du genre ; détail « <libellé> · N photo(s) (P %) », P en % des photos de la période qui ont un genre (correctif 1.3.8)", "note": "toujours : « Lu sur la vignette par Vision (Apple) : une tendance, pas un classement sûr. », ou, avec des photos sans genre dans la période : « Lu sur la vignette par Vision (Apple) : une tendance. N photo(s) pas encore classée(s) · M non analysée(s). » (pas encore classées : en file, ou analysées avant le genre ; non analysées : abandonnées, qui ne le seront jamais, comme la tuile ; chaque partie seulement si elle compte) ; sans_valeur : toutes ces photos ; vide sans genre : « Pas encore classées » s'il y a des photos dans la période, sinon « Aucune photo »"},
         "defauts_frequents": {
           "orientation": "horizontale",
           "max_barres": 8,
@@ -215,7 +222,7 @@
       "detail_pourcentage": "« <colonne> · N photo(s) sur S (P %) », ou « <colonne> · défaut cherché sur aucune photo » quand sur = 0"
     },
     "geometrie": {
-      "_note": "En points entiers, dans le repère de l'image (origine en haut à gauche, y vers le bas) ; L et H, la taille du graphique ; n, max_barres ; floor, l'arrondi vers le bas ; arrondi, au plus proche, demi vers le haut. echelle = la plus grande valeur des barres du graphique (0 sans barre). Le reste du dessin est libre (polices, valeurs écrites au-dessus ou au bout des barres, libellés dessous ou à gauche, ligne de base au filet), dans ces rectangles : un libellé qui ne tient pas à sa place est réduit (de 10 à 7 points), puis coupé « … » ; une barre de valeur 0 ne porte pas de valeur écrite ; un graphique vide dit « Aucune photo » au milieu (l'évolution sans défaut suivi : « Aucun défaut »).",
+      "_note": "En points entiers, dans le repère de l'image (origine en haut à gauche, y vers le bas) ; L et H, la taille du graphique ; n, max_barres ; floor, l'arrondi vers le bas ; arrondi, au plus proche, demi vers le haut. echelle = la plus grande valeur des barres du graphique (0 sans barre). Le reste du dessin est libre (polices, valeurs écrites au-dessus ou au bout des barres, libellés dessous ou à gauche, ligne de base au filet), dans ces rectangles : un libellé qui ne tient pas à sa place est réduit (de 10 à 7 points), puis coupé « … » ; une barre de valeur 0 ne porte pas de valeur écrite ; un graphique vide dit « Aucune photo » au milieu (l'évolution sans défaut suivi : « Aucun défaut » ; les genres, des photos dans la période mais aucune classée : « Pas encore classées »).",
       "verticale": {
         "creneaux": "x_i = 8 + floor((i − 1) × (L − 16) / n) pour i de 1 à n, x_(n+1) = L − 8 ; créneau i = { x: x_i, y: 0, largeur: x_(i+1) − x_i, hauteur: H }",
         "etalement": "Un graphique étalé (etale) de k barres : s = floor(n / k) créneaux par barre, décalage d = floor((n − s × k) / 2) ; la barre j (de 1 à k) occupe les créneaux d + (j − 1) × s + 1 à d + j × s (13 mois : un chacun ; 3 mois : quatre chacun, le treizième créneau vide ; 5 années : deux chacun, à partir du deuxième créneau). Sinon, la barre j occupe le créneau j.",
@@ -265,7 +272,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": true,
                 "classement_le": 1794490200,
-                "analyse": {"le": 1794273360, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": []}
+                "analyse": {"le": 1794273360, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": [], "genre": "portrait", "regles_genre": 1}
               },
               "4230": {
                 "_note": "Ouverte dans la même sélection que 4211 (même ajout). ISO 3 200 : le bruit est cherché (Carnet.isoEleve, 1 600) et trouvé ; pas de visage : les yeux ne sont pas cherchés.",
@@ -283,7 +290,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": false,
                 "classement_le": 1794273300,
-                "analyse": {"le": 1794273360, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou"], "defauts": ["bruit", "flou"]}
+                "analyse": {"le": 1794273360, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou"], "defauts": ["bruit", "flou"], "genre": "ville", "regles_genre": 1}
               },
               "4231": {
                 "_note": "Un paysage : le carnet a son angle (horizon penché de 1,8°, measure_angle) et une vue ; l'horizon ne se trouve que là.",
@@ -301,7 +308,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": false,
                 "classement_le": 1794754920,
-                "analyse": {"le": 1794754980, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["ciel_brule"]}
+                "analyse": {"le": 1794754980, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["ciel_brule"], "genre": "paysage", "regles_genre": 1}
               },
               "4302": {
                 "_note": "Ouverte ce matin, pas encore analysée : sans clé analyse, elle est dans la file. Elle compte déjà dans les photos ouvertes et les graphiques des prises de vue, pas dans les défauts.",
@@ -336,7 +343,7 @@
                 "drapeau": "retenue",
                 "retouchee_par_claude": false,
                 "classement_le": 1793230800,
-                "analyse": {"le": 1793230860, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["flou"]}
+                "analyse": {"le": 1793230860, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["flou"], "genre": "sport", "regles_genre": 1}
               },
               "4106": {
                 "_note": "Seule sa copie virtuelle 4410 a été ouverte : l'entrée est quand même celle de l'original 4106, et l'analyse se fait sur la vignette de l'original.",
@@ -354,7 +361,7 @@
                 "drapeau": "retenue",
                 "retouchee_par_claude": true,
                 "classement_le": 1793408700,
-                "analyse": {"le": 1793230860, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou"], "defauts": []}
+                "analyse": {"le": 1793230860, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou"], "defauts": [], "genre": "animaux", "regles_genre": 1}
               },
               "3988": {
                 "_note": "iPhone : focale réelle 6,765 mm (la tranche « ≤ 15 ») ; un visage aux yeux fermés.",
@@ -372,7 +379,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": false,
                 "classement_le": 1793661600,
-                "analyse": {"le": 1793661660, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": ["sous_exposition", "yeux_fermes"]}
+                "analyse": {"le": 1793661660, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": ["sous_exposition", "yeux_fermes"], "genre": "famille", "regles_genre": 1}
               },
               "3990": {
                 "_note": "Trois essais sans vignette assez grande (Lightroom ne rendait que 256 px) : abandonnée, elle ne revient plus dans la file. Elle compte dans les photos ouvertes, jamais dans les défauts.",
@@ -407,7 +414,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": false,
                 "classement_le": 1793905200,
-                "analyse": {"le": 1793905260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["ciel_brule"]}
+                "analyse": {"le": 1793905260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["ciel_brule"], "genre": "paysage", "regles_genre": 1}
               },
               "3640": {
                 "original": 3640,
@@ -424,7 +431,7 @@
                 "drapeau": "rejetee",
                 "retouchee_par_claude": false,
                 "classement_le": 1793905200,
-                "analyse": {"le": 1793905260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["sous_exposition", "flou"]}
+                "analyse": {"le": 1793905260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["sous_exposition", "flou"], "genre": "nourriture", "regles_genre": 1}
               },
               "3502": {
                 "_note": "Le carnet (view_photo, au point de mise au point) l'a trouvée avec la mise au point à côté : le Suivi le compte, l'analyse de la vignette ne la cherche pas.",
@@ -442,7 +449,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": true,
                 "classement_le": 1794018600,
-                "analyse": {"le": 1794018660, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou", "yeux_fermes"], "defauts": []}
+                "analyse": {"le": 1794018660, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou", "yeux_fermes"], "defauts": [], "genre": "portrait", "regles_genre": 1}
               },
               "3420": {
                 "_note": "Un scan sans date de prise de vue ni appareil : prise_de_vue vide ; il compte à sa date d'ajout (novembre 2026) dans la période, les tuiles, les objectifs (« Inconnu ») et les défauts, mais ni par mois, ni par heure, ni dans les focales et l'ISO (sans_valeur).",
@@ -478,7 +485,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": false,
                 "classement_le": 1793905800,
-                "analyse": {"le": 1793905860, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["ciel_brule"]}
+                "analyse": {"le": 1793905860, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["ciel_brule"], "genre": "paysage", "regles_genre": 1}
               },
               "2105": {
                 "original": 2105,
@@ -495,7 +502,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": false,
                 "classement_le": 1794085200,
-                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["flou"]}
+                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["flou"], "genre": "ville", "regles_genre": 1}
               },
               "1203": {
                 "original": 1203,
@@ -512,7 +519,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": false,
                 "classement_le": 1794085200,
-                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["sous_exposition"]}
+                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["sous_exposition"], "genre": "paysage", "regles_genre": 1}
               },
               "855": {
                 "original": 855,
@@ -529,7 +536,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": false,
                 "classement_le": 1794085200,
-                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": []}
+                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": [], "genre": "famille", "regles_genre": 1}
               },
               "402": {
                 "_note": "Un compact sans objectif lu : il compte sous « Inconnu » dans les objectifs.",
@@ -547,7 +554,7 @@
                 "drapeau": "aucun",
                 "retouchee_par_claude": false,
                 "classement_le": 1794085200,
-                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["flou"]}
+                "analyse": {"le": 1794085260, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"], "defauts": ["flou"], "genre": "evenement", "regles_genre": 1}
               }
             }
           }
@@ -634,12 +641,12 @@
       }
     },
     "analyser": {
-      "_note": "Un lot de six photos. 4302 : un portrait à ISO 250 (yeux lus et ouverts, pas de bruit cherché). 4303 : une rue la nuit à ISO 5 000 (bruit trouvé ; les lumières tiennent le 95e centile au-dessus de 80 : pas sous-exposée). 4304 : un JPEG sans ISO lu, très clair (surexposé, ciel brûlé). 4306 : un original déjà retouché par Claude, à ISO 3 200 : seuls le flou et les yeux se cherchent, pas de visage. 4307 : une vignette de 256 px (Lightroom vient de retoucher la photo) : un premier essai, elle reste en file. 4305 : pas de vignette. Les mesures sont celles qu'une vraie vignette pourrait donner : les essais n'en vérifient que la forme.",
+      "_note": "Un lot de six photos. 4302 : un portrait à ISO 250 (yeux lus et ouverts, pas de bruit cherché). 4303 : une rue la nuit à ISO 5 000 (bruit trouvé ; les lumières tiennent le 95e centile au-dessus de 80 : pas sous-exposée). 4304 : un JPEG sans ISO lu, très clair (surexposé, ciel brûlé), fait à l'objectif macro (son genre : macro). 4306 : un original déjà retouché par Claude, à ISO 3 200 : seuls le flou et les yeux se cherchent, pas de visage. 4307 : une vignette de 256 px (Lightroom vient de retoucher la photo) : un premier essai, elle reste en file. 4305 : pas de vignette. Les mesures sont celles qu'une vraie vignette pourrait donner : les essais n'en vérifient que la forme. Les genres (correctif 1.3.8) : 4302 un portrait, 4303 la ville, 4304 macro, 4306 un paysage.",
       "entree": {
         "photos": [
-          {"id": 4302, "vignette": "<lot>/4302.jpg", "iso": 250, "cache": true},
+          {"id": 4302, "vignette": "<lot>/4302.jpg", "iso": 250, "cache": true, "objectif": "XF56mmF1.2 R WR"},
           {"id": 4303, "vignette": "<lot>/4303.jpg", "iso": 5000, "cache": true},
-          {"id": 4304, "vignette": "<lot>/4304.jpg", "cache": true},
+          {"id": 4304, "vignette": "<lot>/4304.jpg", "cache": true, "objectif": "XF80mmF2.8 R LM OIS WR Macro"},
           {"id": 4306, "vignette": "<lot>/4306.jpg", "iso": 3200, "cache": true, "retouchee": true},
           {"id": 4307, "vignette": "<lot>/4307.jpg", "iso": 2000, "cache": true},
           {"id": 4305, "vignette": "<lot>/4305.jpg", "iso": 400, "cache": true}
@@ -648,29 +655,34 @@
       "sortie": {
         "ok": true,
         "regles": 1,
+        "regles_genre": 1,
         "photos": [
           {
             "id": 4302,
             "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"],
             "defauts": [],
+            "genre": "portrait",
             "mesures": {"cote": 1720, "mediane_l": 46.2, "p95_l": 88.4, "blanc_pur": 0.3, "blanc_pur_haut": 0.1, "nettete": 52.7, "bruit": 0.41, "visages": 1, "ouverture_yeux": 0.31}
           },
           {
             "id": 4303,
             "cherches": ["sous_exposition", "surexposition", "ciel_brule", "bruit", "flou"],
             "defauts": ["bruit"],
+            "genre": "ville",
             "mesures": {"cote": 1720, "mediane_l": 14.8, "p95_l": 91.2, "blanc_pur": 1.9, "blanc_pur_haut": 0.4, "nettete": 38.6, "bruit": 1.87, "visages": 0}
           },
           {
             "id": 4304,
             "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou"],
             "defauts": ["surexposition", "ciel_brule"],
+            "genre": "macro",
             "mesures": {"cote": 1024, "mediane_l": 78.5, "p95_l": 100, "blanc_pur": 38.2, "blanc_pur_haut": 61.7, "nettete": 24.3, "bruit": 0.22, "visages": 0}
           },
           {
             "id": 4306,
             "cherches": ["flou"],
             "defauts": [],
+            "genre": "paysage",
             "mesures": {"cote": 1720, "mediane_l": 41.0, "p95_l": 86.9, "blanc_pur": 0.0, "blanc_pur_haut": 0.0, "nettete": 44.1, "bruit": 0.58, "visages": 0}
           },
           {"id": 4307, "raison": "vignette_petite", "texte": "Vignette de 256 px de grand côté : il en faut 900 au moins."},
@@ -678,8 +690,8 @@
         ]
       },
       "dans_le_registre": {
-        "_note": "Ce que le module range ensuite (le à l'heure de la réponse) : une analyse réussie remplace l'entrée analyse ; une raison ajoute un essai (abandonnee au troisième, comme 3990 du relevé). Les mesures ne sont pas rangées.",
-        "4302": {"le": 1795184100, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": []},
+        "_note": "Ce que le module range ensuite (le à l'heure de la réponse) : une analyse réussie remplace l'entrée analyse, avec son genre et regles_genre (correctif 1.3.8 ; une analyse refaite pour le genre seul garde ses défauts, son le et son regles) ; une raison ajoute un essai (abandonnee au troisième, comme 3990 du relevé). Les mesures ne sont pas rangées.",
+        "4302": {"le": 1795184100, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": [], "genre": "portrait", "regles_genre": 1},
         "4307": {"le": 1795184100, "erreur": "vignette_petite", "essais": 1}
       }
     },
@@ -694,7 +706,7 @@
       }
     },
     "graphiques_un_an": {
-      "_note": "La période que la fenêtre montre d'abord, sans rien de choisi : les douze derniers mois, du 1er du mois onze mois plus tôt à aujourd'hui (du 1er décembre 2025 au 20 novembre 2026), dans l'apparence claire, sans défaut choisi ; douze colonnes sur les treize créneaux, la dernière place vide ; l'année au premier mois et à janvier (« déc. 2025 », « janv. 2026 ») ; novembre 2026 « jusqu'au 20 ». Le plus fréquent est le flou (30 %, sur 10 photos) ; l'horizon et la mise au point font 50 %, mais sur 2 photos seulement (moins de 5). Douze photos : les onze datées de décembre 2025 à novembre 2026 et le scan, ajouté en novembre ; 2950 (août 2025) est hors période. 4302 est en file, 3990 abandonnée : ni l'une ni l'autre ne compte dans les défauts. Les notes : cinq photos à 0 ★ (le scan compris), trois à 4 ★ ; 3640, rejetée, compte à sa note (1 ★).",
+      "_note": "La période que la fenêtre montre d'abord, sans rien de choisi : les douze derniers mois, du 1er du mois onze mois plus tôt à aujourd'hui (du 1er décembre 2025 au 20 novembre 2026), dans l'apparence claire, sans défaut choisi ; douze colonnes sur les treize créneaux, la dernière place vide ; l'année au premier mois et à janvier (« déc. 2025 », « janv. 2026 ») ; novembre 2026 « jusqu'au 20 ». Le plus fréquent est le flou (30 %, sur 10 photos) ; l'horizon et la mise au point font 50 %, mais sur 2 photos seulement (moins de 5). Douze photos : les onze datées de décembre 2025 à novembre 2026 et le scan, ajouté en novembre ; 2950 (août 2025) est hors période. 4302 est en file, 3990 abandonnée : ni l'une ni l'autre ne compte dans les défauts. Les notes : cinq photos à 0 ★ (le scan compris), trois à 4 ★ ; 3640, rejetée, compte à sa note (1 ★). Les genres (correctif 1.3.8) : neuf photos classées (deux portraits, deux paysages, puis à une photo, dans l'ordre des genres : sport, famille et groupes, animaux, nourriture, ville et architecture) ; deux pas encore classées, 4302 en file et le scan, analysé avant le genre (analyse sans genre), et une non analysée, 3990, abandonnée (elle ne le sera jamais, comme la tuile le dit).",
       "commande": "<connecteur> --graphiques '<entree>' <dossier>",
       "entree": {
         "suivi": "<suivi.json>",
@@ -711,6 +723,7 @@
           "heures": {"largeur": 620, "hauteur": 120},
           "objectifs": {"largeur": 300, "hauteur": 170},
           "notes": {"largeur": 300, "hauteur": 170},
+          "genres": {"largeur": 620, "hauteur": 190},
           "defauts_frequents": {"largeur": 620, "hauteur": 180},
           "evolution_defaut": {"largeur": 620, "hauteur": 140}
         }
@@ -949,6 +962,41 @@
               {"x": 244, "y": 0, "largeur": 48, "hauteur": 170, "barre": 6}
             ]
           },
+          "genres": {
+            "titre": "Genres de photos",
+            "fichier": "<dossier>/genres.png",
+            "largeur": 620,
+            "hauteur": 190,
+            "orientation": "horizontale",
+            "max_barres": 11,
+            "unite": "photos",
+            "echelle": 2,
+            "sans_valeur": 3,
+            "note": "Lu sur la vignette par Vision (Apple) : une tendance. 2 photos pas encore classées · 1 non analysée.",
+            "vide": false,
+            "barres": [
+              {"libelle": "Portrait", "detail": "Portrait · 2 photos (22 %)", "valeur": 2, "texte": "2", "n": 2, "ids": [3502, 4211], "couleur": "barre", "x": 252, "y": 7, "largeur": 316, "hauteur": 9, "zone": {"x": 0, "y": 4, "largeur": 620, "hauteur": 16}},
+              {"libelle": "Paysage", "detail": "Paysage · 2 photos (22 %)", "valeur": 2, "texte": "2", "n": 2, "ids": [3801, 4231], "couleur": "barre", "x": 252, "y": 23, "largeur": 316, "hauteur": 10, "zone": {"x": 0, "y": 20, "largeur": 620, "hauteur": 17}},
+              {"libelle": "Sport", "detail": "Sport · 1 photo (11 %)", "valeur": 1, "texte": "1", "n": 1, "ids": [4105], "couleur": "barre", "x": 252, "y": 40, "largeur": 158, "hauteur": 9, "zone": {"x": 0, "y": 37, "largeur": 620, "hauteur": 16}},
+              {"libelle": "Famille et groupes", "detail": "Famille et groupes · 1 photo (11 %)", "valeur": 1, "texte": "1", "n": 1, "ids": [3988], "couleur": "barre", "x": 252, "y": 56, "largeur": 158, "hauteur": 10, "zone": {"x": 0, "y": 53, "largeur": 620, "hauteur": 17}},
+              {"libelle": "Animaux", "detail": "Animaux · 1 photo (11 %)", "valeur": 1, "texte": "1", "n": 1, "ids": [4106], "couleur": "barre", "x": 252, "y": 73, "largeur": 158, "hauteur": 9, "zone": {"x": 0, "y": 70, "largeur": 620, "hauteur": 16}},
+              {"libelle": "Nourriture", "detail": "Nourriture · 1 photo (11 %)", "valeur": 1, "texte": "1", "n": 1, "ids": [3640], "couleur": "barre", "x": 252, "y": 89, "largeur": 158, "hauteur": 10, "zone": {"x": 0, "y": 86, "largeur": 620, "hauteur": 17}},
+              {"libelle": "Ville et architecture", "detail": "Ville et architecture · 1 photo (11 %)", "valeur": 1, "texte": "1", "n": 1, "ids": [4230], "couleur": "barre", "x": 252, "y": 106, "largeur": 158, "hauteur": 9, "zone": {"x": 0, "y": 103, "largeur": 620, "hauteur": 16}}
+            ],
+            "creneaux": [
+              {"x": 0, "y": 4, "largeur": 620, "hauteur": 16, "barre": 1},
+              {"x": 0, "y": 20, "largeur": 620, "hauteur": 17, "barre": 2},
+              {"x": 0, "y": 37, "largeur": 620, "hauteur": 16, "barre": 3},
+              {"x": 0, "y": 53, "largeur": 620, "hauteur": 17, "barre": 4},
+              {"x": 0, "y": 70, "largeur": 620, "hauteur": 16, "barre": 5},
+              {"x": 0, "y": 86, "largeur": 620, "hauteur": 17, "barre": 6},
+              {"x": 0, "y": 103, "largeur": 620, "hauteur": 16, "barre": 7},
+              {"x": 0, "y": 119, "largeur": 620, "hauteur": 17, "barre": 0},
+              {"x": 0, "y": 136, "largeur": 620, "hauteur": 16, "barre": 0},
+              {"x": 0, "y": 152, "largeur": 620, "hauteur": 17, "barre": 0},
+              {"x": 0, "y": 169, "largeur": 620, "hauteur": 17, "barre": 0}
+            ]
+          },
           "defauts_frequents": {
             "titre": "Défauts les plus fréquents",
             "fichier": "<dossier>/defauts_frequents.png",
@@ -1046,6 +1094,7 @@
           "heures": {"largeur": 620, "hauteur": 120},
           "objectifs": {"largeur": 300, "hauteur": 170},
           "notes": {"largeur": 300, "hauteur": 170},
+          "genres": {"largeur": 620, "hauteur": 190},
           "defauts_frequents": {"largeur": 620, "hauteur": 180},
           "evolution_defaut": {"largeur": 620, "hauteur": 140}
         }
@@ -1184,6 +1233,7 @@
           "heures": {"largeur": 620, "hauteur": 120},
           "objectifs": {"largeur": 300, "hauteur": 170},
           "notes": {"largeur": 300, "hauteur": 170},
+          "genres": {"largeur": 620, "hauteur": 190},
           "defauts_frequents": {"largeur": 620, "hauteur": 180},
           "evolution_defaut": {"largeur": 620, "hauteur": 140}
         }
@@ -1283,7 +1333,7 @@
       }
     },
     "graphiques_depuis_le_debut": {
-      "_note": "Partiel : sans jour de début (depuis la première photo, le 25 décembre 2009), jusqu'au 20 novembre 2026, avec le défaut « flou » choisi. De 2009 à 2026, dix-huit années : « < 2015 » réunit 2009 et 2013, puis 2015 à 2026, sans photo comprises ; 2026 « jusqu'au 20 novembre ». Neuf groupes d'objectifs : les sept premiers, puis « Autres » (XF35 et XF56).",
+      "_note": "Partiel : sans jour de début (depuis la première photo, le 25 décembre 2009), jusqu'au 20 novembre 2026, avec le défaut « flou » choisi. De 2009 à 2026, dix-huit années : « < 2015 » réunit 2009 et 2013, puis 2015 à 2026, sans photo comprises ; 2026 « jusqu'au 20 novembre ». Neuf groupes d'objectifs : les sept premiers, puis « Autres » (XF35 et XF56). Les genres : quatorze photos classées, les fêtes et événements comprises (Noël 2009), deux pas encore classées et une non analysée.",
       "partiel": true,
       "entree": {
         "suivi": "<suivi.json>",
@@ -1300,6 +1350,7 @@
           "heures": {"largeur": 620, "hauteur": 120},
           "objectifs": {"largeur": 300, "hauteur": 170},
           "notes": {"largeur": 300, "hauteur": 170},
+          "genres": {"largeur": 620, "hauteur": 190},
           "defauts_frequents": {"largeur": 620, "hauteur": 180},
           "evolution_defaut": {"largeur": 620, "hauteur": 140}
         }
@@ -1404,6 +1455,42 @@
               {"x": 0, "y": 145, "largeur": 300, "hauteur": 21, "barre": 8}
             ]
           },
+          "genres": {
+            "titre": "Genres de photos",
+            "fichier": "<dossier>/genres.png",
+            "largeur": 620,
+            "hauteur": 190,
+            "orientation": "horizontale",
+            "max_barres": 11,
+            "unite": "photos",
+            "echelle": 4,
+            "sans_valeur": 3,
+            "note": "Lu sur la vignette par Vision (Apple) : une tendance. 2 photos pas encore classées · 1 non analysée.",
+            "vide": false,
+            "barres": [
+              {"libelle": "Paysage", "detail": "Paysage · 4 photos (29 %)", "valeur": 4, "texte": "4", "n": 4, "ids": [1203, 2950, 3801, 4231], "couleur": "barre", "x": 252, "y": 7, "largeur": 316, "hauteur": 9, "zone": {"x": 0, "y": 4, "largeur": 620, "hauteur": 16}},
+              {"libelle": "Famille et groupes", "detail": "Famille et groupes · 2 photos (14 %)", "valeur": 2, "texte": "2", "n": 2, "ids": [855, 3988], "couleur": "barre", "x": 252, "y": 23, "largeur": 158, "hauteur": 10, "zone": {"x": 0, "y": 20, "largeur": 620, "hauteur": 17}},
+              {"libelle": "Portrait", "detail": "Portrait · 2 photos (14 %)", "valeur": 2, "texte": "2", "n": 2, "ids": [3502, 4211], "couleur": "barre", "x": 252, "y": 40, "largeur": 158, "hauteur": 9, "zone": {"x": 0, "y": 37, "largeur": 620, "hauteur": 16}},
+              {"libelle": "Ville et architecture", "detail": "Ville et architecture · 2 photos (14 %)", "valeur": 2, "texte": "2", "n": 2, "ids": [2105, 4230], "couleur": "barre", "x": 252, "y": 56, "largeur": 158, "hauteur": 10, "zone": {"x": 0, "y": 53, "largeur": 620, "hauteur": 17}},
+              {"libelle": "Sport", "detail": "Sport · 1 photo (7 %)", "valeur": 1, "texte": "1", "n": 1, "ids": [4105], "couleur": "barre", "x": 252, "y": 73, "largeur": 79, "hauteur": 9, "zone": {"x": 0, "y": 70, "largeur": 620, "hauteur": 16}},
+              {"libelle": "Fêtes et événements", "detail": "Fêtes et événements · 1 photo (7 %)", "valeur": 1, "texte": "1", "n": 1, "ids": [402], "couleur": "barre", "x": 252, "y": 89, "largeur": 79, "hauteur": 10, "zone": {"x": 0, "y": 86, "largeur": 620, "hauteur": 17}},
+              {"libelle": "Animaux", "detail": "Animaux · 1 photo (7 %)", "valeur": 1, "texte": "1", "n": 1, "ids": [4106], "couleur": "barre", "x": 252, "y": 106, "largeur": 79, "hauteur": 9, "zone": {"x": 0, "y": 103, "largeur": 620, "hauteur": 16}},
+              {"libelle": "Nourriture", "detail": "Nourriture · 1 photo (7 %)", "valeur": 1, "texte": "1", "n": 1, "ids": [3640], "couleur": "barre", "x": 252, "y": 122, "largeur": 79, "hauteur": 10, "zone": {"x": 0, "y": 119, "largeur": 620, "hauteur": 17}}
+            ],
+            "creneaux": [
+              {"x": 0, "y": 4, "largeur": 620, "hauteur": 16, "barre": 1},
+              {"x": 0, "y": 20, "largeur": 620, "hauteur": 17, "barre": 2},
+              {"x": 0, "y": 37, "largeur": 620, "hauteur": 16, "barre": 3},
+              {"x": 0, "y": 53, "largeur": 620, "hauteur": 17, "barre": 4},
+              {"x": 0, "y": 70, "largeur": 620, "hauteur": 16, "barre": 5},
+              {"x": 0, "y": 86, "largeur": 620, "hauteur": 17, "barre": 6},
+              {"x": 0, "y": 103, "largeur": 620, "hauteur": 16, "barre": 7},
+              {"x": 0, "y": 119, "largeur": 620, "hauteur": 17, "barre": 8},
+              {"x": 0, "y": 136, "largeur": 620, "hauteur": 16, "barre": 0},
+              {"x": 0, "y": 152, "largeur": 620, "hauteur": 17, "barre": 0},
+              {"x": 0, "y": 169, "largeur": 620, "hauteur": 17, "barre": 0}
+            ]
+          },
           "evolution_defaut": {
             "titre": "Photo floue ou bougée, année par année",
             "fichier": "<dossier>/evolution_defaut.png",
@@ -1469,6 +1556,7 @@
           "heures": {"largeur": 620, "hauteur": 120},
           "objectifs": {"largeur": 300, "hauteur": 170},
           "notes": {"largeur": 300, "hauteur": 170},
+          "genres": {"largeur": 620, "hauteur": 190},
           "defauts_frequents": {"largeur": 620, "hauteur": 180},
           "evolution_defaut": {"largeur": 620, "hauteur": 140}
         }

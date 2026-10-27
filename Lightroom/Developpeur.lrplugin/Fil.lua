@@ -35,14 +35,16 @@
 -- Un élément `historique` (correctif 1.3.6 : ce que la fenêtre dit de la photo ou du groupe,
 -- Historique.lua) reprend le genre `note` (en gris, l'icône ⓘ sur sa première ligne), ses puces
 -- en retrait sur leurs lignes de suite ; il n'est d'aucun tour de parole (ni « Vous » ni « Claude »,
--- ni heure : Fil.lignes).
+-- ni heure : Fil.lignes). Depuis le correctif 1.3.8, seul « Depuis la dernière fois » se montre :
+-- « Historique de la photo » et le résumé court d'un groupe n'ont plus de ligne
+-- (Fil.HISTORIQUES_CACHES), le résumé de la fenêtre les redit ; ils partent toujours à Claude.
 -- Le résumé que la fenêtre montre en haut du fil (deuxième retour de Dany du 25 octobre 2026,
 -- Historique.resumePhoto et Historique.resumeGroupe, Fenetre.resume) se met en lignes comme un
 -- élément `historique` (Fil.lignesResume), mais n'est d'aucun élément de la conversation : un clic
--- n'y fait rien, et il n'est ni gardé ni envoyé à Claude. Il se met sous l'historique de la photo
--- ou le résumé court du groupe qui ouvre la conversation, au-dessus de la première demande de Dany,
--- sinon en tête du fil (Fil.avecResume ; d'abord en bas, sous la conversation, jusqu'à la demande
--- de Dany du 25 octobre 2026).
+-- n'y fait rien, et il n'est ni gardé ni envoyé à Claude. Il se met sous les éléments qui ouvrent la
+-- conversation (Fil.tete ; sans ligne depuis le correctif 1.3.8, il vient donc en tête),
+-- au-dessus de la première demande de Dany (Fil.avecResume ; d'abord en bas, sous la conversation,
+-- jusqu'à la demande de Dany du 25 octobre 2026).
 -- Une demande faite par la Demande rapide dans la conversation d'une photo (correctif 1.3.6,
 -- Moteur.envoyerRapide : elle et ce qui y répond portent `rapide`) se dit d'une ligne « Demande
 -- rapide » sous son texte (Fil.MENTION_RAPIDE, en note, comme le style choisi).
@@ -72,6 +74,14 @@ Fil.RETRAITS = { appel = Fil.RETRAIT_ICONE, apercu = Fil.RETRAIT_ICONE, proposit
 
 -- La mention d'une demande faite par la Demande rapide (Fil.lignesBrutes).
 Fil.MENTION_RAPIDE = "Demande rapide"
+
+-- Les éléments `historique` que le fil ne montre pas (correctif 1.3.8, demandé par Dany le 26 octobre
+-- 2026 : « pas besoin de voir, tu fais le résumé de l'image après ») : « Historique de la photo »
+-- (sorte 'historique') et le résumé court d'un groupe ('groupe'), que le résumé de la fenêtre, en haut
+-- du fil, redit. Ils restent dans la conversation et partent toujours à Claude, une fois, avec la
+-- demande suivante (Conversation.historiquesAEnvoyer). « Depuis la dernière fois » ('depuis') se
+-- montre toujours : le résumé ne le dit pas.
+Fil.HISTORIQUES_CACHES = { historique = true, groupe = true }
 
 function Fil.retrait(genre)
     return Fil.RETRAITS[genre] or 0
@@ -689,6 +699,8 @@ function Fil.lignesBrutes(e, i, largeur)
         end
     elseif g == 'note' then
         ajouterTexte(lignes, e.texte or '', 'note', largeur, i, 'note')
+    elseif g == 'historique' and Fil.HISTORIQUES_CACHES[e.sorte] then
+        return lignes
     elseif g == 'historique' then
         -- L'en-tête, puis ses puces (« •  », Historique.PUCE), dont les lignes de suite s'alignent
         -- sur le texte de la puce.

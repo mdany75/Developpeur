@@ -9,10 +9,10 @@ import Foundation
 /// - `mcp-developpeur --analyser '<json>'` (`Suivi.analyser`) : les défauts de la prise de vue
 ///   mesurés sur les vignettes du cache de Lightroom que le module donne, par les mesures et les
 ///   règles du tri (`ToolHandler.mesurer`, sans point de mise au point) et du carnet
-///   (`Carnet.constatsVue`, sans intention du boîtier), rendus en codes de `PriseDeVue`. Jamais
-///   Lightroom, jamais l'original.
+///   (`Carnet.constatsVue`, sans intention du boîtier), rendus en codes de `PriseDeVue` ; et, depuis
+///   le correctif 1.3.8, le genre de chaque photo (`Genre`). Jamais Lightroom, jamais l'original.
 /// - `mcp-developpeur --graphiques '<json>' <dossier>` (`Suivi.graphiques`, SuiviGraphiques.swift) :
-///   les tuiles et les huit graphiques d'une période, d'après le relevé `suivi.json` (tenu par
+///   les tuiles et les neuf graphiques d'une période, d'après le relevé `suivi.json` (tenu par
 ///   Releve.lua seul) et le carnet `carnet.json` (l'horizon et la mise au point vus par Claude),
 ///   lus seulement ; les PNG dessinés en 2x (SuiviDessin.swift) et les rectangles des barres.
 ///
@@ -116,17 +116,19 @@ public enum Suivi {
     public static let delaiParPhoto: TimeInterval = 15
     public static let delaiAnalyse: TimeInterval = 50
 
-    /// Une photo à analyser, telle que le module la donne.
+    /// Une photo à analyser, telle que le module la donne (`objectif`, depuis le correctif 1.3.8 :
+    /// celui de la prise de vue, pour le genre macro ; absent : inconnu).
     public struct AAnalyser: Equatable {
         public var id: Int
         public var vignette: String
         public var iso: Double?
         public var cache: Bool
         public var retouchee: Bool
+        public var objectif: String? = nil
     }
 
-    /// `--analyser '<json>'` : une ligne `{ok, regles, photos}` (une photo par photo reçue, dans le
-    /// même ordre), ou un refus de tout l'appel. `mesurer` et les délais se remplacent pour les essais.
+    /// `--analyser '<json>'` : une ligne `{ok, regles, regles_genre, photos}` (une photo par photo
+    /// reçue, dans le même ordre), ou un refus de tout l'appel. `mesurer` et les délais se remplacent pour les essais.
     public static func analyser(_ texte: String, delaiParPhoto: TimeInterval = delaiParPhoto, delaiTotal: TimeInterval = delaiAnalyse,
                                 mesurer: @escaping (AAnalyser) -> JSONValue = analyserPhoto) -> Reponse {
         let photos: [AAnalyser]
@@ -138,7 +140,8 @@ public enum Suivi {
             return Refus(raison: "arguments", texte: "Arguments de --analyser : \(error.localizedDescription)").reponse
         }
         let mesurees = mesurerBorne(photos, mesurer: mesurer, parPhoto: delaiParPhoto, total: delaiTotal)
-        return Reponse(ligne: ["ok": true, "regles": .number(Double(reglesAnalyse)), "photos": .array(mesurees)], code: 0)
+        return Reponse(ligne: ["ok": true, "regles": .number(Double(reglesAnalyse)), "regles_genre": .number(Double(Genre.regles)),
+                               "photos": .array(mesurees)], code: 0)
     }
 
     /// Les photos de l'entrée, vérifiées avant toute mesure (`analyser.entree` du contrat) ; le premier
@@ -157,7 +160,7 @@ public enum Suivi {
         }
         return try liste.enumerated().map { index, element in
             let rang = "photos[\(index + 1)]"
-            guard let photo = element.object else { throw refus("\(rang) est un objet { id, vignette, iso, cache, retouchee }.") }
+            guard let photo = element.object else { throw refus("\(rang) est un objet { id, vignette, iso, cache, retouchee, objectif }.") }
             guard let id = photo["id"]?.int else { throw refus("\(rang).id est un nombre (l'id de l'original).") }
             guard let vignette = photo["vignette"]?.string, !vignette.isEmpty else {
                 throw refus("\(rang).vignette est le chemin d'un JPEG (la vignette, déjà redressée).")
@@ -172,7 +175,13 @@ public enum Suivi {
                 guard let oui = valeur.bool else { throw refus("\(rang).\(cle) est un booléen.") }
                 return oui
             }
-            return AAnalyser(id: id, vignette: vignette, iso: iso, cache: try booleen("cache"), retouchee: try booleen("retouchee"))
+            var objectif: String?
+            if let valeur = photo["objectif"] {
+                guard let texte = valeur.string else { throw refus("\(rang).objectif est un texte (absent : inconnu).") }
+                objectif = texte
+            }
+            return AAnalyser(id: id, vignette: vignette, iso: iso, cache: try booleen("cache"), retouchee: try booleen("retouchee"),
+                             objectif: objectif)
         }
     }
 
@@ -209,6 +218,7 @@ public enum Suivi {
             return ramenee
         }
         let vision = VisionAnalysis.analyze(grande)
+        let indices = Genre.lire(grande, visages: Genre.visages(vision), objectif: photo.objectif)
         let trouves = codesTrouves(mesures: mesures, detail: detail, reduite: reduite, vision: vision, iso: photo.iso,
                                    retouchee: photo.retouchee)
 
@@ -229,8 +239,9 @@ public enum Suivi {
             triee.vision = vision
             if let ouverture = triee.sujetsAuxYeuxLus.compactMap(\.eyeOpenness).min() { lues["ouverture_yeux"] = centieme(ouverture) }
         }
+        lues["etiquettes"] = .array(Genre.principales(indices.etiquettes).map(JSONValue.string))
         return ["id": .number(Double(photo.id)), "cherches": .array(trouves.cherches.map(JSONValue.string)),
-                "defauts": .array(trouves.defauts.map(JSONValue.string)), "mesures": .object(lues)]
+                "defauts": .array(trouves.defauts.map(JSONValue.string)), "genre": .string(Genre.classer(indices)), "mesures": .object(lues)]
     }
 
     /// Les défauts cherchés et trouvés sur une vignette mesurée (`analyser.regles_des_codes` du

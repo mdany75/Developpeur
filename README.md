@@ -53,9 +53,9 @@ Publication… et Consommation….*
   du même Gestionnaire (« Avant d'appliquer ») : la fenêtre suit ce réglage, et l'infobulle de son
   voyant Lightroom le rappelle (la rangée Mode de l'en-tête est retirée au correctif 1.3.6).
 - Deux colonnes :
-  - au centre, l'en-tête (le titre de la conversation et, à sa droite, « Repartir à neuf » ;
-    dessous, les voyants Claude Code et Lightroom, la photo active et le nombre de photos
-    sélectionnées, puis, en haut à droite, les boutons Suivi, Publication… et Consommation…), le
+  - au centre, l'en-tête (le titre de la conversation et, à sa droite, quatre petits boutons côte à
+    côte : « Repartir à neuf », Suivi, Publication… et Consommation… ; dessous, les voyants Claude
+    Code et Lightroom, la photo active et le nombre de photos sélectionnées), le
     fil, ▲ ▼ Fin, puis la saisie : les invites, le champ de demande, 📎, 📋, « Style » et son menu,
     Mes demandes, le bandeau des messages et Envoyer ;
   - à droite, les onglets Focus (montré à l'ouverture), Note, Aperçu et Proposition, l'aperçu
@@ -70,8 +70,9 @@ Publication… et Consommation….*
   Lightroom, la fenêtre montre sa conversation, telle que vous l'avez laissée, et Claude reprend sa
   session (ce qui s'y est dit et fait). Chaque copie virtuelle a la sienne. Une photo choisie
   pendant que la fenêtre est fermée compte aussi, à la réouverture.
-  - Une photo qui n'a pas encore de conversation en commence une, qui s'ouvre sur l'historique de
-    la photo, en gris : ses étapes de Claude avec leur raison et leur date (les huit dernières,
+  - Une photo qui n'a pas encore de conversation en commence une, avec l'historique de la photo
+    (depuis le correctif 1.3.8, il ne s'affiche plus dans le fil : le résumé de la photo, en haut du
+    fil, dit déjà où elle en est ; Claude le reçoit toujours avec votre première demande) : ses étapes de Claude avec leur raison et leur date (les huit dernières,
     faites dans la fenêtre, par la Demande rapide ou par Claude Desktop), et ce que vous avez repris
     à la main depuis la dernière (« Exposition 0,45 → 0,6 ») ; « retouchée à la main, sans étape de
     Claude » pour une photo que vous seul avez développée, avec ses réglages qui s'écartent de leur
@@ -88,8 +89,9 @@ Publication… et Consommation….*
     d'où il repart. Lightroom ne laisse pas lire son panneau Historique : l'historique, c'est le
     journal de Claude et vos reprises à la main.
   - Plusieurs photos sélectionnées : une conversation de groupe, le temps du travail, jamais
-    gardée, qui commence par un résumé court (« 3 de ces 12 photos ont déjà des étapes de Claude :
-    DSCF4961.RAF, … »). Changer de photo active dans la même sélection ne change pas de
+    gardée, qui commence par un résumé court pour Claude (« 3 de ces 12 photos ont déjà des étapes
+    de Claude : DSCF4961.RAF, … » ; plus affiché dans le fil depuis le correctif 1.3.8 : le résumé de
+    la sélection le redit). Changer de photo active dans la même sélection ne change pas de
     conversation. Ce que Claude y fait arrive dans le journal de chaque photo, que sa conversation
     lira ensuite.
   - Rien ne change pendant que Claude travaille : ce qu'il change lui-même (une photo qu'il montre,
@@ -113,8 +115,8 @@ Publication… et Consommation….*
   proposées · passe 2 · 14 photos », puis une ligne par photo, « à vérifier » quand Claude doute) ;
   quand vous lui avez demandé de les poser : « Notes à poser » pendant l'appel, puis « Notes
   posées » (« posée » sur chaque ligne), ou « Notes non posées » si aucune ne l'a été (liaison en
-  pause, accord attendu : la raison est sur chaque ligne). L'historique de la photo et « Depuis la
-  dernière fois » sont en gris, sans « Vous » ni « Claude » ; une demande faite par la Demande
+  pause, accord attendu : la raison est sur chaque ligne). « Depuis la dernière fois » est en gris,
+  sans « Vous » ni « Claude » ; une demande faite par la Demande
   rapide porte dessous la mention « Demande rapide ». Le tour de Claude qui a noté finit par
   « ☆ Voir la note ».
   Un clic sur une étape de Claude ouvre l'onglet Aperçu : son avant/après et sa raison (voir
@@ -125,10 +127,9 @@ Publication… et Consommation….*
   réponse. ▲, ▼ et Fin pour
   s'y déplacer ; à droite, ce que fait Claude, sinon le dernier relevé du forfait (5 heures et
   semaine).
-- En haut du fil, toujours, le résumé que fait la fenêtre (sans Claude ni forfait), en gris : sous
-  l'historique de la photo (ou le résumé court du groupe) et au-dessus de votre première demande
-  (« Vous »), en tête du fil s'il n'y a pas d'historique ; « Depuis la dernière fois » reste à sa
-  place, plus bas. Il se fait à l'ouverture de la fenêtre, et chaque fois qu'une autre photo ou une
+- En haut du fil, toujours, le résumé que fait la fenêtre (sans Claude ni forfait), en gris : en
+  tête du fil, au-dessus de votre première demande (« Vous ») ; « Depuis la dernière fois » reste à
+  sa place, plus bas. Il se fait à l'ouverture de la fenêtre, et chaque fois qu'une autre photo ou une
   autre sélection change la conversation montrée ; le fil, lui, s'ouvre toujours sur son bas (la
   dernière réponse). Pour une photo, « Résumé de la photo : … » : sa prise de vue (appareil,
   objectif, focale, ouverture, vitesse, ISO, date, comme Lightroom les écrit), sa note et son drapeau
@@ -235,7 +236,8 @@ Publication… et Consommation….*
   d'Envoyer, montre un message de la fenêtre (son
   infobulle le donne en entier), sinon l'aide en rouge d'un voyant quand quelque chose manque (un
   clic l'affiche en entier), sinon les photos jointes ; sans rien de tout cela, il reste vide.
-- Trois boutons en haut à droite de l'en-tête, toujours actifs : Suivi, vos prises de vue et votre
+- Trois boutons en haut à droite de l'en-tête, toujours actifs, sur la ligne du titre, à droite de
+  « Repartir à neuf » et de la même taille (correctif 1.3.8) : Suivi, vos prises de vue et votre
   carnet de progrès en graphiques, dans une fenêtre à part (voir Le Suivi de vos photos) ;
   Publication… et Consommation…, leurs fenêtres (voir Publication et Consommation), comme par le
   menu du module (correctif 1.3.7 : perdus avec le volet de gauche au correctif 1.3.6, ils
@@ -309,15 +311,18 @@ Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claud
 - Le connecteur analyse chaque photo ouverte sur la vignette de son original, celle du cache de
   Lightroom (1 024 px), avec les mesures du tri d'une séance : sous-exposition, surexposition
   (plus de 35 % de l'image en blanc pur), ciel brûlé, flou, bruit (seulement à ISO 1 600 ou plus)
-  et yeux fermés (seulement sur un visage dont les yeux se lisent). Sur le Mac, sans Claude, sans
-  forfait et sans réseau ; rien n'est écrit dans le catalogue.
+  et yeux fermés (seulement sur un visage dont les yeux se lisent). Depuis le correctif 1.3.8, il y
+  lit aussi le genre de la photo (voir La fenêtre, Ce que je photographie). Sur le Mac, sans
+  Claude, sans forfait et sans réseau ; rien n'est écrit dans le catalogue.
 - En arrière-plan, par lots de 10 photos, la photo active d'abord : une sélection de 300 photos
   passe en quelques minutes sans vous bloquer ; toute une bibliothèque, à environ 3 photos par
   seconde, en quelques heures (8 h environ pour 85 000 photos). L'analyse attend pendant que Claude travaille
   (fenêtre Claude, Demande rapide, ou Claude Desktop qui passe par la liaison) ; ce qui reste à
   analyser reprend au lancement suivant de Lightroom.
 - Une photo s'analyse une seule fois, telle qu'elle a été prise : une retouche ne la fait pas
-  refaire (elle cacherait ses défauts). Une photo déjà retouchée par Claude n'est cherchée que pour
+  refaire (elle cacherait ses défauts). Les photos analysées avant le correctif 1.3.8 repassent une
+  fois, en arrière-plan, pour leur genre seulement : les défauts de leur première analyse restent
+  (environ 10 heures pour 85 000 photos ; le graphique des genres se remplit au fil de l'analyse). Une photo déjà retouchée par Claude n'est cherchée que pour
   le flou et les yeux fermés. Une analyse manquée (une vignette illisible ou trop petite) se
   réessaie 10 minutes plus tard ; après trois essais, la photo reste sans analyse.
 - L'horizon penché et la mise au point manquée ne se mesurent que quand Claude regarde la photo :
@@ -326,8 +331,12 @@ Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claud
 
 **La fenêtre**
 
-- 1 310 × 1 028 points. En haut, la période : deux champs, « Du » et « au » (depuis le correctif
-  1.3.8, à la place du menu Période). Tapez une date comme vous l'écrivez : « 25 janvier 2025 »,
+- 1 310 × 1 062 points. En haut, la période : deux champs, « Du » et « au » (depuis le correctif
+  1.3.8, à la place du menu Période), chacun avec un bouton qui ouvre un calendrier : une petite
+  fenêtre du mois, dans les couleurs du module ; ◀ ▶ ou les menus Mois et Année changent de mois,
+  aujourd'hui est en orange, un clic sur un jour le choisit et ferme le calendrier ; « Première
+  photo » (pour « Du ») et « Aujourd'hui » (pour « au », la fin qui avance) y sont aussi. Ou tapez
+  une date comme vous l'écrivez : « 25 janvier 2025 »,
   « 1er janv. 2025 », « 25/01/2025 », « 2025-01-25 », un mois (« janvier 2025 ») ou une année
   (« 2025 ») ; « au » accepte « aujourd'hui », et la fin avance alors chaque jour ; « Du » vide
   prend tout depuis la première photo. Retour, ou un clic ailleurs, valide le champ. La période se
@@ -348,6 +357,17 @@ Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claud
   1.3.8) : combien de photos à 0 ★ (pas encore notées), 1 ★, … 5 ★, la note la plus haute de la
   photo et de ses copies virtuelles ; une photo rejetée compte à sa note, et la note sous le
   graphique dit combien il y en a.
+- Ce que je photographie (correctif 1.3.8), en haut de la colonne de droite : les genres de vos
+  photos, du plus fréquent au moins fréquent, « Autre » en dernier : portrait, famille et groupes,
+  sport, paysage, macro et gros plans, animaux, ville et architecture, véhicules, nourriture, fêtes
+  et événements. Le connecteur lit le genre sur la vignette avec Vision (Apple) : une tendance, pas un
+  classement sûr. Vision ne sait pas qui sont les personnes : « famille et groupes », ce sont deux
+  personnes ou plus de taille comparable ; un portrait, un visage assez grand ou une personne en pied.
+  Une photo faite à l'objectif macro, sans personne, compte en macro. Essayé sur 60 de vos photos,
+  il en range 52 sur 53 comme à l'œil (la nourriture, le macro et les fêtes n'y étaient pas : à
+  éprouver). La note sous le graphique dit combien de photos ne sont pas encore classées, et à part
+  combien ne le seront pas (leur analyse a échoué trois fois, comme la tuile les dit « non
+  analysées »).
 - Mon carnet de progrès : les défauts les plus fréquents, en pourcentage des photos où chacun est
   cherché, et l'évolution d'un défaut (mois par mois, par trimestre ou par année, comme les photos),
   le plus fréquent ou celui que vous choisissez dans son menu.
@@ -1151,8 +1171,8 @@ blanc », « Harmonise cette série sur la troisième photo », « Trie la séan
 meilleures », « Note ces photos » (Claude pose les notes), « Lis la composition et propose un
 cadre », « Comment progressent mes prises de vue ? » (le carnet de progrès) ou « Prépare la
 sélection pour Instagram ». Dans la fenêtre Claude, chaque photo a sa conversation : choisissez-en
-une dans Lightroom, et la fenêtre montre la sienne, ou en commence une qui s'ouvre sur son
-historique. Une photo que Claude traite est d'abord notée : sa note attend « à vérifier » dans la
+une dans Lightroom, et la fenêtre montre la sienne, ou en commence une, son résumé en haut du fil
+(Claude reçoit son historique avec votre première demande). Une photo que Claude traite est d'abord notée : sa note attend « à vérifier » dans la
 carte Note. Pour une proposition de retouche sans rien appliquer, cliquez Obtenir sous la carte de
 l'onglet Proposition : elle y attend votre accord. Après une
 retouche, un clic sur une étape du fil en montre l'avant/après et la raison, dans l'onglet Aperçu,
@@ -1314,10 +1334,11 @@ parle au module y passe avec le jeton de la liaison, comme le connecteur :
   rien n'est lu), sans Lightroom ni liaison ;
 - `--analyser '<json>'` : ce que le Suivi lance pour analyser un lot de photos (20 au plus) sur
   leurs vignettes : les défauts de la prise de vue en codes (sous-exposition, surexposition, ciel
-  brûlé, bruit à ISO élevé, flou, yeux fermés), une ligne JSON, sans Lightroom ni liaison, jamais
-  l'original (`Tests/Contrats/suivi.json` en donne la forme) ;
+  brûlé, bruit à ISO élevé, flou, yeux fermés) et, depuis le correctif 1.3.8, le genre de chaque
+  photo, une ligne JSON, sans Lightroom ni liaison, jamais l'original (`Tests/Contrats/suivi.json`
+  en donne la forme) ;
 - `--graphiques '<json>' <dossier>` : ce que la fenêtre Suivi lance pour ses graphiques : les tuiles
-  et les huit graphiques d'une période (d'un jour à un autre), d'après `suivi.json` et `carnet.json`, lus seulement,
+  et les neuf graphiques d'une période (d'un jour à un autre), d'après `suivi.json` et `carnet.json`, lus seulement,
   dessinés en PNG dans le dossier, puis une ligne JSON avec les barres et leurs photos, sans
   Lightroom ni liaison ;
 - `--ecran` : l'écran principal et son profil de couleur classé (d'usine, standard, à l'œil, sonde…),

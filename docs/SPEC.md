@@ -1179,12 +1179,15 @@ la fenêtre B de la 1.3 ; le correctif la change ainsi :
 - l'en-tête : le titre (gras 16, `D.titre`, 1 024 − 320) et, à sa droite, dans la place du Mode
   (`D.placeRepartir`, 320), « Repartir à neuf » (carré de bezel 22, titre en 12, `TAILLES.repartir`
   120 ; `enabled = peutRepartir`, `Fenetre.repartir` dans une tâche ; voir Une photo, une
-  conversation) ; dessous, les trois voyants et la photo active. La rangée Mode est retirée
+  conversation) ; dessous, les trois voyants et la photo active (au correctif 1.3.8, « Repartir à
+  neuf » prend la taille des boutons Suivi, Publication… et Consommation…, qui le rejoignent sur la
+  rangée du titre : `D.placeBoutons`, voir Correctif 1.3.8). La rangée Mode est retirée
   (`Vues.mode`, `Fenetre.modeMontre`, `Fenetre.modeAuto`, `Fenetre.changerMode`,
   `Fenetre.reposerMode`, `TOUR_REPOSER_MODE`) : la fenêtre suit la préférence `mode` du
   Gestionnaire ; `Fenetre.lierRadio` reste pour le menu Mes demandes ;
 - le fil : l'élément `historique` (l'historique de la photo, « Depuis la dernière fois », le
-  résumé d'un groupe) reprend le genre `note` (gris, ⓘ sur sa première ligne, ses puces « •  » en
+  résumé d'un groupe ; depuis le correctif 1.3.8, seul « Depuis la dernière fois » a des lignes :
+  `Fil.HISTORIQUES_CACHES`, voir Correctif 1.3.8) reprend le genre `note` (gris, ⓘ sur sa première ligne, ses puces « •  » en
   retrait sur leurs lignes de suite), d'aucun tour de parole (ni « Vous », ni « Claude », ni heure :
   il clôt le tour de Claude d'avant sans en commencer un) ; une demande faite par la Demande
   rapide, et ce qui y répond, portent `rapide`, et la demande a dessous une ligne « Demande
@@ -2538,8 +2541,8 @@ un simple rechargement du module ne suffit pas.
   contenu rapetisse) ; la fenêtre rouvre alors une fois à la position par défaut. Les autres
   fenêtres ont leur cadre : `DeveloppeurPublication`, `DeveloppeurConsommation`,
   `DeveloppeurSuivi` (la fenêtre de la liaison), `DeveloppeurCarnet` (la fenêtre Suivi du carnet,
-  correctif 1.3.6), `DeveloppeurSuiviGraphiques-1` (la fenêtre Suivi en graphiques, correctif
-  1.3.7 : un nom neuf pour sa taille), et en 1.1 `DeveloppeurNotation` (Séance de notation, retirée
+  correctif 1.3.6), `DeveloppeurSuiviGraphiques-2` (la fenêtre Suivi en graphiques, correctif
+  1.3.7, `-1` jusqu'au graphique des genres du correctif 1.3.8 : un nom neuf pour chaque taille), et en 1.1 `DeveloppeurNotation` (Séance de notation, retirée
   en 1.1.1).
 - Quand une fenêtre du module est devant (ou que Lightroom n'est pas l'application active), le
   menu Fichier de Lightroom est réduit (Nouveau catalogue, Ouvrir le catalogue, Mise en page,
@@ -6587,10 +6590,11 @@ vers une vue est une copie neuve, sans métatable ; rien n'est écrit au catalog
 
 **L'analyse (`mcp-developpeur --analyser '<json>'`, `Suivi.analyser`).** Commande exacte : `/usr/bin/perl
 -e 'alarm 60; exec @ARGV' <connecteur> --analyser '<json>' > <réponse>.json 2>/dev/null`. Entrée :
-`{ photos = [ { id, vignette, iso, cache, retouchee } ] }`, de 1 à 20 photos dans l'ordre voulu (le
-module en envoie 10) : `id` l'original, `vignette` le chemin d'un JPEG déjà redressé, `iso` absent
-s'il est inconnu, `cache` vrai pour une vignette du cache de Lightroom (absent : faux, la netteté
-n'est pas ramenée), `retouchee` facultatif. Chaque vignette passe par les mesures et les règles du
+`{ photos = [ { id, vignette, iso, cache, retouchee, objectif } ] }`, de 1 à 20 photos dans l'ordre
+voulu (le module en envoie 10) : `id` l'original, `vignette` le chemin d'un JPEG déjà redressé, `iso`
+absent s'il est inconnu, `cache` vrai pour une vignette du cache de Lightroom (absent : faux, la
+netteté n'est pas ramenée), `retouchee` facultatif, `objectif` facultatif (celui de la prise de
+vue, pour le genre macro ; correctif 1.3.8). Chaque vignette passe par les mesures et les règles du
 tri et du carnet, sans Lightroom ni original (ni point de mise au point, ni intention : la mise au
 point et l'horizon ne se cherchent pas ici) :
 
@@ -6615,9 +6619,11 @@ Vision deux photos à la fois au plus (`ToolHandler.parallelMeasures`). Le temps
 (`mesurerBorne`) : 15 s par photo (`delaiParPhoto`) et 50 s pour l'appel (`delaiAnalyse`), pour que
 la ligne parte toujours avant l'alarme ; une photo qui n'a pas fini a la raison `delai` (une raison
 de plus que le contrat, que le module range comme les autres). Sortie : `{ ok = true, regles = 1,
-photos = [ { id, cherches, defauts, mesures } ] }` dans le même ordre (`defauts` ⊂ `cherches`, en
+regles_genre = 1, photos = [ { id, cherches, defauts, genre, mesures } ] }` dans le même ordre
+(`genre` et `regles_genre` depuis le correctif 1.3.8 : voir Correctif 1.3.8, plus bas) (`defauts` ⊂ `cherches`, en
 codes, dans l'ordre des codes ; `mesures` pour le journal et les essais : `cote`, `mediane_l`,
-`p95_l`, `blanc_pur`, `blanc_pur_haut`, `nettete`, `bruit`, `visages`, `ouverture_yeux`, que le
+`p95_l`, `blanc_pur`, `blanc_pur_haut`, `nettete`, `bruit`, `visages`, `ouverture_yeux`, et
+`etiquettes`, les trois étiquettes de Vision les plus sûres, depuis le correctif 1.3.8, que le
 module ne range pas), ou `{ id, raison, texte }` (`vignette_absente`, `vignette_illisible`,
 `vignette_petite`, `delai`). Le connecteur n'efface pas les vignettes : le module efface le dossier
 du lot. Codes de sortie : 0 (même quand des photos ont une raison) ; 1 pour un refus de tout
@@ -6699,16 +6705,17 @@ graphiques en points entiers, de 120 × 80 à 1 200 × 600).
   barres, creneaux }` ; une barre `{ libelle, detail, valeur, texte, n, sur, ids, couleur (barre ou
   accent), x, y, largeur, hauteur (le rectangle dessiné), zone (le rectangle cliquable) }`, ses `ids`
   les originaux, croissants, tous (pour 20 000 originaux, la ligne de toute la bibliothèque fait
-  0,7 Mo, pour 250 000 10,6 Mo, le graphique des notes compris : le module la lit dans un fichier, jamais par un tuyau, et la décode en
+  0,7 Mo, pour 250 000 10,6 Mo, le graphique des notes compris ; un peu plus avec celui des genres : le module la lit dans un fichier, jamais par un tuyau, et la décode en
   rendant la main) ; un créneau `{ x, y, largeur, hauteur, barre }`, `barre` le
-  rang de la barre qui l'occupe (0 : vide). Les huit graphiques : `photos_par_mois` (« Photos par
+  rang de la barre qui l'occupe (0 : vide). Les neuf graphiques : `photos_par_mois` (« Photos par
   mois », « … par trimestre », « … par année » ; 13 créneaux depuis le correctif 1.3.8, 12 avant,
   étalé), `focales` (8), `iso` (8), `heures` (12), `objectifs` (8, horizontal), `notes` (correctif
   1.3.8, demandé par Dany le 26 octobre 2026 : 6, vertical, « Notes », de « 0 ★ » à « 5 ★ » d'après
   la note de l'entrée, celle de la famille, détail « 0 ★, pas encore notée · N photo(s) », puis
   « 1 ★ · … » ; une photo dont le drapeau est « rejetee » compte à sa note, et la note du graphique
   le dit : « Dont 1 rejetée (drapeau), comptée à sa note. », « Dont N rejetées (drapeau), comptées à
-  leur note. », absente sans rejet), `defauts_frequents` (8, horizontal, en %, la barre du défaut
+  leur note. », absente sans rejet), `genres` (correctif 1.3.8, demandé par Dany le même jour : 11,
+  horizontal, « Genres de photos » ; voir Correctif 1.3.8, plus bas), `defauts_frequents` (8, horizontal, en %, la barre du défaut
   suivi en accent ; sa note toujours : « En % des photos où il est cherché : bruit à ISO 1 600 et
   plus, yeux sur un visage, horizon et mise au point quand Claude regarde la photo. ») et
   `evolution_defaut` (13, étalé, en %, toutes en accent ; « <défaut>, mois par mois », « …,
@@ -6722,7 +6729,7 @@ graphiques en points entiers, de 120 × 80 à 1 200 × 600).
   5 années : deux chacun, à partir du deuxième) ; la barre verticale fait 0,6 de sa zone, sur une hauteur utile `H − 36` (16 au-dessus
   pour les valeurs, 20 au-dessous pour les libellés), l'horizontale part de `floor(0,4 × L) + 4`,
   avec 48 points de valeurs à droite ; une barre de valeur 0 n'a ni hauteur ni valeur écrite.
-- Dessin (`SuiviDessin.swift`, CoreGraphics et CoreText comme `PreviewImages`) : huit PNG en 2x
+- Dessin (`SuiviDessin.swift`, CoreGraphics et CoreText comme `PreviewImages`) : neuf PNG en 2x
   (`<graphique>.png`, 2 × largeur par 2 × hauteur pixels), sobres : le fond `fond`, des barres
   arrondies au bout, une grille discrète (la moitié et le haut de l'échelle, en pointillés), la
   ligne de base au filet, les libellés en français dessous ou à gauche, tous de la même taille
@@ -6742,11 +6749,12 @@ graphiques en points entiers, de 120 × 80 à 1 200 × 600).
   ligne), sur un relevé synthétique de photos de 2010 à 2026, « Du » vide : 20 000 originaux en
   0,33 s, une ligne de 0,7 Mo ; 250 000 en 2,6 s, 0,7 Go de mémoire, une ligne de 10,6 Mo.
 
-**La fenêtre Suivi** (`FenetreSuivi.lua`, réécrite) : « Claude · Suivi », 1 310 × 1 028 points
+**La fenêtre Suivi** (`FenetreSuivi.lua`, réécrite) : « Claude · Suivi », 1 310 × 1 062 points
+depuis le graphique des genres (1 028 avant, correctif 1.3.8)
 (contenu tiré de `FenetreSuivi.TAILLES` par `FenetreSuivi.dimensions` ; D7 : barre de titre de 33,
 1 de marge ; elle tient sur l'écran de Dany, 1 440 de haut, avec la barre des menus et le Dock),
-cadre `DeveloppeurSuiviGraphiques-1` (un nom neuf : celui de la 1.3.6, `DeveloppeurCarnet`,
-n'avait pas cette taille). Seul le bouton Suivi de l'en-tête de la fenêtre Claude l'ouvre
+cadre `DeveloppeurSuiviGraphiques-2` (`-1` avant le graphique des genres ; un nom neuf : celui de
+la 1.3.6, `DeveloppeurCarnet`, n'avait pas cette taille). Seul le bouton Suivi de l'en-tête de la fenêtre Claude l'ouvre
 (`Fenetre.ouvrirSuivi`, `FenetreSuivi.afficher` ; ouverte, elle passe devant). En haut, « Suivi de
 vos photos » en gras 16, la période et la ligne d'état (`FenetreSuivi.texteEtat` : le libellé de la
 période que rend le connecteur, avec une majuscule, ses photos ouvertes et celles sans date, les
@@ -6819,8 +6827,8 @@ fenêtre d'après la sortie.
   (`PAS_DE_REPONSE`) ou qui refuse (`REFUS` et son texte) le dit, les images d'avant restent ; un
   chemin de catalogue illisible aussi (`SANS_CATALOGUE`).
 - La structure fixe (règle de la fenêtre B : une fenêtre ouverte ne change pas de structure) :
-  huit `f:picture` liées (`image_<g>`, avec `width` et `height`) et, sur elles, 76 calques, un par
-  créneau possible (13, 8, 8, 12, 8, 6, 8, 13 depuis le correctif 1.3.8 ; 68 avant). Les rectangles des créneaux ne dépendent que de la
+  neuf `f:picture` liées (`image_<g>`, avec `width` et `height`) et, sur elles, 87 calques, un par
+  créneau possible (13, 8, 8, 12, 8, 6, 11, 8, 13 depuis le correctif 1.3.8 ; 68 avant). Les rectangles des créneaux ne dépendent que de la
   taille du graphique : le module les calcule lui-même par les formules du contrat
   (`FenetreSuivi.creneaux`) avant toute réponse, pose chaque calque à sa place une fois pour toutes,
   dans une colonne poussée par ses marges (supposé, à constater : une telle colonne ne prend pas les
@@ -6864,7 +6872,8 @@ fenêtre d'après la sortie.
 rangée des voyants, en haut à droite sous « Repartir à neuf » (`Vues.boutonSuivi` 56,
 `Vues.boutonPublication` 92, `Vues.boutonConsommation` 112 : des carrés small par `Fenetre.bouton`,
 leur titre en petit, 6 points d'écart, `TAILLES.ecartBoutons`) ; la photo active garde 407 points
-(`D.info`). Publication… et Consommation… ouvrent leurs fenêtres de la 1.2 comme leurs menus
+(`D.info`). Au correctif 1.3.8 (demandé par Dany le 26 octobre 2026), ils montent sur la rangée du
+titre, à droite de « Repartir à neuf », qui prend leur taille : voir Correctif 1.3.8, plus bas. Publication… et Consommation… ouvrent leurs fenêtres de la 1.2 comme leurs menus
 (`Fenetre.ouvrirPublication`, `Fenetre.ouvrirConsommation`), requises au clic : elles créent leurs
 couleurs au chargement, et `liens.lua` charge `Fenetre.lua` sans `LrColor`. Comme tout bouton, ils
 annulent l'envoi automatique : la demande tapée ne part pas. `Dispositions.IMAGES` et `PALETTES`
@@ -6888,6 +6897,140 @@ qui échoue sans elle, sur une copie du module modifiée exprès. `tests.lua` v�
 `scripts/tester-module.sh` 669 tests et essais, 0 échec : la liaison 332, dont `tests.lua` 247, la
 fenêtre 337, dont `tests.lua` 64, `essais-releve` 18, `essais-suivi` 13, `essais-carnet` 8.
 
+**Correctif 1.3.8 : les genres, le calendrier, l'en-tête et l'historique caché** (demandés par Dany
+le 26 octobre 2026, au soir ; même correctif, numéro gardé, pas encore publié).
+
+- *Les genres de photos* (« est-ce possible d'avoir un graphique par style de photo, par catégorie :
+  sport, paysage, portrait, famille, macro… », glissé dans une liste de demandes : une demande).
+  `Genre.swift` est la seule liste des genres et de leurs règles (onze codes : `sport`, `evenement`,
+  `famille`, `portrait`, `macro`, `animaux`, `nourriture`, `vehicules`, `ville`, `paysage`, `autre` ;
+  libellés « Sport », « Fêtes et événements », « Famille et groupes », « Portrait », « Macro et gros
+  plans », « Animaux », « Nourriture », « Véhicules », « Ville et architecture », « Paysage »,
+  « Autre ») ; le module n'en connaît aucun. `--analyser` lit, sur la vignette déjà ramenée à
+  1 024 px, les étiquettes de `VNClassifyImageRequest` (1 303, en anglais, hiérarchiques), les
+  personnes (`VNDetectHumanRectanglesRequest`), les chiens et chats (`VNRecognizeAnimalsRequest`) et
+  reprend les visages déjà mesurés (`VisionReport`), sauf les visages à l'envers que Composition
+  écarte (`Genre.visages`, `Composition.visagePlausible` : le devant de la voiture de 53709912, au
+  roulis −π, n'est pas une personne) ; `Genre.classer`, pure, prend la première règle
+  qui convient : sport (une étiquette de sport à 0,4), fêtes et événements (0,5), famille et groupes
+  (deux personnes comparables : visages d'au moins 5 % de la hauteur, le second d'au moins la moitié
+  du premier, ou corps d'au moins 4 % de l'image, le second d'au moins 40 % du premier), portrait (un
+  visage d'au moins 8 % de la hauteur, ou une personne d'au moins 10 % de l'image), macro (un insecte
+  à 0,4, ou un objectif macro sans personne : `Genre.estMacro`, « Macro » dans le nom de l'objectif,
+  comme l'XF80 de Dany, 76 photos), animaux (0,5, ou un chien ou un chat vu à 0,5 sur 2 % de
+  l'image), nourriture (0,6, et plus sûre que la fleur : le pissenlit donne aussi « food »), macro
+  (une fleur à 0,6 sans scène de nature à 0,5, « plant » et « foliage » mis à part :
+  `Genre.sceneAutourDUneFleur`, Vision les donnant à la confiance de toute fleur), véhicules (0,6, et
+  pas plus de 0,15 sous la scène : un voilier au loin reste un paysage), ville et architecture (0,5,
+  ou 0,3 sans moins que la nature), paysage (0,4), sinon autre. Vision ne sait ni qui sont les
+  personnes ni si c'est la famille. Seuils relevés le 26 octobre 2026 sur les vignettes de 60 photos
+  de Dany (celles que la fenêtre Claude avait gardées dans `Temporaire/PhotoActive`, lues seulement,
+  copiées dans le dossier de travail de la session) : des 53 assez grandes pour `--analyser`, 52
+  rangées comme à l'œil (le château Frontenac la nuit reste un paysage : « castle » à 0,25) ; le
+  sport descendu de 0,5 à 0,4 (un terrain de soccer le soir, joueuses au loin, donnait 0,52 à pleine
+  taille, sous 0,5 à 1 024 px ; aucune autre vignette n'avait d'étiquette de sport au-dessus de
+  0,2). Ni nourriture, ni macro, ni fête, ni nuit dans ce relevé : leurs seuils sont à éprouver.
+  Coût : les quatre requêtes de Vision sur 1 024 px, quelques dizaines de millisecondes par photo
+  (136 vignettes en 2 s pour le relevé). Sortie de `--analyser` : `regles_genre` (1, `Genre.regles`)
+  et, par photo, `genre` (même retouchée par Claude) et `mesures.etiquettes`.
+- *Le relevé* (`Releve.lua`) : l'analyse réussie garde `genre` et `regles_genre` ; l'objectif part
+  avec chaque photo. Le genre a ses propres règles : une analyse sans genre, ou d'un genre de règles
+  plus anciennes, se refait pour le genre seul, ses défauts, son `le` et son `regles` gardés (ils
+  disent la prise de vue, qu'une retouche faite depuis cacherait ; une analyse de règles de défauts
+  plus anciennes se refait entière). Les règles ne s'apprennent que d'une réponse ; or toute la
+  bibliothèque de Dany (84 582 originaux) était déjà analysée, sans genre : aucune analyse ne serait
+  partie. Une analyse sans genre entre donc dans la file même avant toute réponse de la séance, sauf
+  si le connecteur répond sans `regles_genre` (d'avant le correctif 1.3.8 : `Releve.sansGenre`, la
+  file se refait sans elles, pour la séance). Un genre refait qui échoue garde l'analyse d'avant et
+  n'est plus refait de la séance (`manquee`, `Releve.sansRefaire`). Toute la bibliothèque repasse
+  donc une fois, en arrière-plan, comme sa première analyse (environ 10 heures pour 85 000 photos,
+  d'après le relevé de Dany : 84 582 analysés en 10 heures le 26 octobre 2026).
+- *Le graphique* « Genres de photos » (`--graphiques`, `genres`, 620 × 190, 11 créneaux,
+  horizontal), en haut de la colonne de droite de la fenêtre Suivi, sous « Ce que je photographie »
+  (`FenetreSuivi.GENRES`), au-dessus du carnet : un genre par barre, ceux qui ont des photos, par
+  nombre décroissant puis dans l'ordre des genres, « Autre » toujours en dernier ; détail « Portrait
+  · 12 photos (23 %) », en % des photos classées ; une entrée sans genre (en file, abandonnée,
+  analysée avant le genre, d'un code inconnu) n'y est pas, `sans_valeur` les compte et la note le
+  dit, les abandonnées à part, comme la tuile (« Lu sur la vignette par Vision (Apple) : une tendance.
+  2 photos pas encore classées · 1 non analysée. », sinon « … : une tendance, pas un classement
+  sûr. ») ; vide sans genre : « Pas encore classées », ou « Aucune photo » sans photo dans la
+  période. La
+  fenêtre passe à 1 310 × 1 062 points (cadre `DeveloppeurSuiviGraphiques-2`), 87 calques.
+- *Le calendrier* (« un calendrier fait dans le module » : Dany a écarté celui de macOS, qui
+  s'ouvrirait derrière Lightroom, et trois menus). Lightroom a un `date_picker` dans sa fabrique
+  interne (`AgViewCocoaFactory`, `AgDatePicker`), mais `LrView.osFactory` ne le prête pas aux modules
+  (la liste des contrôles de `LrView.lua`, relevée en lecture seule dans Lightroom Classic 15.6). Il
+  est fait dans `Calendrier.lua` (fichier nouveau : quitter et relancer Lightroom) : des calculs purs
+  (`joursDuMois`, la seule copie, que `FenetreSuivi` reprend ; `jourDeLaSemaine`, la méthode de
+  Sakamoto, le lundi en premier ; `grille`, six semaines de sept cases ; `decaler` ; `annees`, de
+  l'année prochaine à 1950 et l'année montrée si elle en sort ; `cases`, l'état de chaque case :
+  vide, jour, aujourd'hui, choisi) et une fenêtre modale (`LrDialogs.presentModalDialog`, dans une
+  tâche, `Calendrier.ouvrir`) de vues simples : en haut ◀, le menu des mois, celui des années, ▶ ;
+  la ligne des jours (« lun. » à « dim. ») ; 42 cases, chacune un `f:view` superposé d'un aplat bleu
+  (le jour choisi), de trois textes (le jour, aujourd'hui en orange gras, le choisi en blanc gras)
+  et d'un calque (`static_text` vide à `mouse_down`, un `f:picture` ne recevant aucun clic, C1),
+  leur visibilité liée (`bind` avec `transform` : des vues simples seulement) ; le fond en aplat `fondDroite` de
+  l'apparence ; le texte du choix et l'aide. Boutons : « Choisir » (grisé sans jour :
+  `actionBinding`), « Annuler » et, selon le champ, « Première photo » (« Du » : depuis la première
+  photo) ou « Aujourd'hui » (« au » : la fin qui avance ; un clic sur le jour d'aujourd'hui, lui,
+  garde cette date fixe). Un clic sur un jour le choisit et ferme la fenêtre
+  (`LrDialogs.stopModalWithResult(contenu, 'ok')`, sous `pcall` : s'il ne la ferme pas, « Choisir »
+  prend le jour). Les boutons à icône (`Dispositions.IMAGES.calendrier`, 14 × 14, dessinée par
+  `scripts/images-fenetre.swift`, une page à deux anneaux) à droite de chaque champ
+  (`square_button` à `image_name`, sans titre, B3 ; `TAILLES.calendrier` 30) ouvrent le calendrier
+  (`FenetreSuivi.ouvrirCalendrier`, dans une tâche, un seul à la fois) sur la date que montre le
+  champ (« Du » sur la première photo : le mois du début par défaut ; « au » sur aujourd'hui : le mois
+  présent, sans jour choisi) ; le choix passe par `FenetreSuivi.choisirDate`, puis
+  `FenetreSuivi.changerDate`, comme une date tapée (mêmes refus, même ligne d'état, même période
+  gardée ; un jour choisi n'est jamais pris pour l'écho de la fenêtre, `changerDate(borne, texte,
+  true)` : le début par défaut, choisi tel quel, se garde). ◀ et ▶ ne sortent pas de 1900 à 9999
+  (`Calendrier.ANNEE_PREMIERE`, `ANNEE_DERNIERE`, les bornes de `lireDate` et du connecteur), ni le
+  menu des années ; la rangée du haut tient dans la grille (258 points pour 266). Taper la date
+  reste possible.
+- *L'en-tête de la fenêtre Claude* : Suivi, Publication… et Consommation… montent sur la rangée du
+  titre, à droite de « Repartir à neuf », qui prend leur taille (« de la grosseur de l'image 1 ») :
+  quatre carrés small, titre en petit (`TAILLES.repartir` 100, `boutonSuivi` 56, `boutonPublication`
+  92, `boutonConsommation` 112), 6 points entre deux, 14 devant ; `D.placeBoutons` (392) leur garde la
+  place, `D.titre` prend le reste (632 ; 704 avant) ; la photo active a toute la rangée des voyants
+  (`D.info` 693 ; 407 avant). `D.placeRepartir` est retiré.
+- *L'historique caché* (« pas besoin de voir, tu fais le résumé de l'image après ») : « Historique de
+  la photo » et le résumé court d'un groupe n'ont plus de ligne dans le fil
+  (`Fil.HISTORIQUES_CACHES`, dans `Fil.lignesBrutes`) ; ils restent dans la conversation et partent
+  toujours à Claude, une fois, avec la demande suivante. Le résumé de la fenêtre vient donc en tête du
+  fil (`Fil.tete` les compte toujours, `Fil.avecResume` les trouve sans ligne) ; une conversation qui
+  n'a qu'eux montre l'aide sous le résumé ; « Depuis la dernière fois » se montre toujours, et
+  l'historique qui rejoint le fil après une session perdue n'a plus de ligne non plus. Sans résumé
+  lu (la sélection n'est plus le groupe de la conversation montrée, changée par Claude ou pendant
+  son travail ; une lecture qui échoue), le texte de cet élément de tête en tient lieu
+  (`Fenetre.refaireResume`) : le fil dit toujours quelles photos la conversation vise.
+- *Relecture adverse* (le même soir, quatre relecteurs et un sceptique chacun) : douze trouvailles
+  retenues, toutes corrigées et vérifiées par un essai qui échoue sans elles : la règle de la fleur
+  qui ne s'appliquait jamais (et le pissenlit pris pour de la nourriture, « prairie » inconnue de
+  Vision), les visages à l'envers, les photos abandonnées dites « pas encore classées », « Aucune
+  photo » sans photo, le début par défaut choisi au calendrier pris pour un écho, les bornes de 1900
+  à 9999, la rangée du haut trop large, les essais du calendrier (une erreur dans la fenêtre jouée se
+  perdait dans la protection de sa tâche ; les couleurs ; une fin fixe vers « Aujourd'hui »), le
+  résumé du groupe perdu quand la sélection change pendant le travail de Claude, des noms d'essais et
+  des commentaires restés sur l'historique visible. Écartées : l'objectif macro avant les autres
+  règles (voulu et dit), et trois cas du relevé que le code gère déjà.
+- *Essais* : `GenreTests` (9 : la liste, le contrat, l'objectif macro, les cas du relevé du 26 octobre
+  2026, macro et nourriture et l'ordre des règles (les fleurs comme Vision les rend), chaque étiquette
+  connue de Vision, les visages à l'envers, les étiquettes principales, Vision sur une image unie), `SuiviTests.testGenres`, `ContratSuiviTests` (le genre et `regles_genre` de `--analyser`,
+  4304 en macro par son objectif, 87 calques) ; `essais-releve.lua` (« Le genre » : rangé, refait seul
+  même avant toute réponse, défauts gardés, l'objectif envoyé ; des règles du genre plus récentes, un
+  connecteur sans genre sans boucle, un genre refait qui échoue), `essais-suivi.lua` (le calendrier
+  pur ; le calendrier dans la fenêtre : boutons, ouverture sur la date du champ, ◀ ▶ et menus, clic
+  qui ferme, « Première photo » et « Aujourd'hui », refus, annulation, un seul à la fois ; en
+  apparence sombre ; les genres en haut de la colonne de droite, 87 calques), `essais-fenetre-b.lua`,
+  `essais-carnet.lua` (l'en-tête), `essais-resume.lua` et `essais-une-photo.lua` (l'historique sans
+  ligne, le résumé en tête), `essais-images.lua` (l'icône). Chaque correction du relevé vérifiée par
+  un essai qui échoue sans elle (copie du module modifiée exprès). Le contrat
+  (`Tests/Contrats/suivi.json`) : `regles.analyser.genres`, `regles.graphiques.liste.genres`, les
+  genres du relevé d'exemple, l'objectif et les genres de l'exemple `--analyser`, et les exemples de
+  `--graphiques` refaits (un an et depuis le début montrent les genres). Les deux suites passent
+  (26 octobre 2026, au soir, la relecture corrigée) : `swift test` 564 tests, dont 1 sauté sans
+  `DEVELOPPEUR_ECRAN_REEL=1`, 0 échec ; `scripts/tester-module.sh` 695 tests et essais, 0 échec.
+
 **À constater dans Lightroom** (les simulations ne le peuvent pas) :
 
 1. `getRawMetadata('focalLength')` rend un nombre (un texte « 23 mm » se lit aussi) ;
@@ -6898,9 +7041,9 @@ fenêtre 337, dont `tests.lua` 64, `essais-releve` 18, `essais-suivi` 13, `essai
 3. Une sélection de 300 photos analysée en quelques minutes, sans gêner Dany ni Claude ; la pause
    pendant une Retouche pro, Claude Desktop et la recette ; la reprise après une fermeture de
    Lightroom.
-4. La fenêtre Suivi de 1 310 × 1 028 ouverte à cette taille, en claire et en sombre ; les images
+4. La fenêtre Suivi de 1 310 × 1 062 (1 028 jusqu'au graphique des genres) ouverte à cette taille, en claire et en sombre ; les images
    liées par leur chemin qui se rafraîchissent ; une infobulle sur deux lignes.
-5. Les 76 calques qui reçoivent les clics à travers les colonnes poussées par leurs marges ;
+5. Les 87 calques (76 avant les genres) qui reçoivent les clics à travers les colonnes poussées par leurs marges ;
    `catalog.kAllPhotos` ; la sélection en grille d'une barre de plusieurs centaines de photos.
 6. Les trois boutons de l'en-tête à leur place, Publication… et Consommation… qui ouvrent leurs
    fenêtres.
@@ -6925,6 +7068,15 @@ fenêtre 337, dont `tests.lua` 64, `essais-releve` 18, `essais-suivi` 13, `essai
     quand on les quitte, leur observateur appelé tout de suite (le champ réécrit au propre, ou remis
     après un refus), la période gardée après un lancement de Lightroom ; le graphique des notes, ses
     libellés « 0 ★ » à « 5 ★ » dessinés en entier, et ses six calques.
+13. Correctif 1.3.8 : le calendrier, une fenêtre modale ouverte depuis la fenêtre Suivi flottante ;
+    ses 42 calques qui reçoivent les clics ; `LrDialogs.stopModalWithResult` qui la ferme au clic sur
+    un jour (sinon « Choisir ») ; ses menus, ses couleurs en claire et en sombre ; l'icône sur le
+    bouton carré à droite de chaque champ.
+14. Correctif 1.3.8 : le genre de toute la bibliothèque repassé en arrière-plan (environ 10 heures),
+    sans figer Lightroom, et le graphique des genres sur les vraies photos de Dany (la nourriture, le
+    macro, les fêtes et la nuit, que le relevé n'avait pas).
+15. Correctif 1.3.8 : les quatre boutons de l'en-tête sur la rangée du titre, de la même taille ; le
+    fil sans l'historique, le résumé en tête.
 
 ## Correctif 1.3.6 : une photo, une conversation
 

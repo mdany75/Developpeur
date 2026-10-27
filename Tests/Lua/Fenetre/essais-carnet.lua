@@ -341,7 +341,7 @@ end)
 
 -- Le bouton Suivi et la fenêtre Suivi ---------------------------------------------------------------
 
-essai("Bouton Suivi : en haut à droite, dans la rangée des voyants après la photo active, il ouvre la fenêtre Suivi sans envoyer la demande ; plus d'onglet Suivi, ni sa carte, ni sa lecture dans la fenêtre Claude", function()
+essai("Bouton Suivi : en haut à droite, sur la rangée du titre après « Repartir à neuf » (correctif 1.3.8), il ouvre la fenêtre Suivi sans envoyer la demande ; plus d'onglet Suivi, ni sa carte, ni sa lecture dans la fenêtre Claude", function()
     -- Plus d'onglet Suivi (décision de Dany du 25 octobre 2026) : ni segment, ni carte, ni crochet.
     for _, o in ipairs(D.onglets) do
         vrai(o.valeur ~= 'suivi' and o.image ~= 'seg-suivi', "plus d'onglet Suivi")
@@ -368,8 +368,8 @@ essai("Bouton Suivi : en haut à droite, dans la rangée des voyants après la p
         end
         egal(nil, p.suiviTexte)
         egal(nil, Carnet.observateurs.fenetre, "la fenêtre Claude ne suit plus le carnet")
-        -- Le bouton : un carré small, en haut à droite, au bout de la rangée des voyants, après la photo
-        -- active (le voyant Écran est retiré au même correctif).
+        -- Le bouton : un carré small, en haut à droite, sur la rangée du titre (correctif 1.3.8 ; dans
+        -- la rangée des voyants, après la photo active, avant lui).
         local bouton = boutonDe(args.contents, 'Suivi')
         vrai(bouton, 'le bouton Suivi')
         egal('square_button', bouton.genre)
@@ -402,10 +402,12 @@ essai("Bouton Suivi : en haut à droite, dans la rangée des voyants après la p
                 info = k
             end
         end
-        vrai(voyant and info and voyant < info, 'la rangée des voyants et de la photo active')
-        -- Après la photo active et son écart ; Publication… et Consommation… le suivent au bout de la
-        -- rangée (correctif 1.3.7 : essais-suivi.lua).
-        vrai(indiceBouton == info + 2 and indiceBouton == #rangee.args - 4, 'après la photo active et son écart, avant Publication… et Consommation…')
+        -- Sur la rangée du titre depuis le correctif 1.3.8 (demandé par Dany le 26 octobre 2026) : après
+        -- « Repartir à neuf » et son écart, avant Publication… et Consommation… (essais-fenetre-b.lua).
+        egal(nil, voyant, 'plus dans la rangée des voyants')
+        egal(nil, info)
+        egal('Repartir à neuf', rangee.args[indiceBouton - 2].args.title, 'après « Repartir à neuf »')
+        vrai(indiceBouton == #rangee.args - 4, 'avant Publication… et Consommation…')
         -- Un clic après une frappe sans Retour : la fenêtre Suivi s'ouvre, la demande tapée ne part pas.
         local champ
         for _, v in ipairs(vues(args.contents)) do

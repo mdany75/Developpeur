@@ -416,8 +416,9 @@ end
 
 -- La session de la conversation est perdue (Moteur.processusFini : la reprise a échoué) : Claude
 -- repart de zéro, sans ce qui s'est dit ni fait avant. L'historique actuel de sa photo (ses étapes de
--- Claude, ses reprises à la main) s'ajoute alors au fil, et part avec la demande renvoyée. À appeler
--- depuis une tâche.
+-- Claude, ses reprises à la main) s'ajoute alors à la conversation (sans ligne dans le fil depuis le
+-- correctif 1.3.8 : Fil.HISTORIQUES_CACHES), et part avec la demande renvoyée. À appeler depuis une
+-- tâche.
 local function rejoindreHistorique(c)
     if not c.sessionPerdue then
         return

@@ -307,7 +307,7 @@ essai("Photo seule : sa conversation revient ; sinon une neuve (son nom en titre
     end)
 end)
 
-essai("Historique de la photo : ses étapes (raison, date), ses reprises à la main ; dans le fil sans auteur, joint une seule fois à la demande", function()
+essai("Historique de la photo : ses étapes (raison, date), ses reprises à la main ; sans ligne dans le fil (correctif 1.3.8), joint une seule fois à la demande", function()
     local p201 = photo(201)
     local entrees = {}
     for k = 1, 10 do
@@ -331,17 +331,13 @@ essai("Historique de la photo : ses étapes (raison, date), ses reprises à la m
         egal("•  13 oct. 2026, 9 h 03 · passe 3 — raison 3", lignes[2], 'les plus anciennes montrées, dans l\'ordre')
         egal("•  25 oct. 2026, 14 h 30 · passe 2 : finitions — Peau trop rouge : teinte baissée.", lignes[9])
         egal("•  Repris à la main depuis « passe 2 : finitions » : Exposition 0,45 → 0,6", lignes[10])
-        -- Dans le fil : le genre note, l'icône sur la première ligne, ni « Vous » ni « Claude » ni heure.
+        -- Dans le fil : aucune ligne (correctif 1.3.8, demandé par Dany le 26 octobre 2026 : le résumé de
+        -- la fenêtre, en tête du fil, le redit) ; ses lignes, si un jour il se montrait, restent celles
+        -- d'une note (Fil.lignesResume les fait encore pour le résumé).
         Fenetre.rafraichir()
-        local fil = Fil.lignes(c, Fenetre.largeurTexte())
-        egal('note', fil[1].genre)
-        egal('note', fil[1].icone)
-        for _, l in ipairs(fil) do
-            egal(nil, l.auteur, "l'historique n'est d'aucun tour")
-            egal(nil, l.heure)
-            vrai(Fil.occupe(l) <= Fenetre.largeurTexte(), 'coupée à la largeur')
-        end
-        contient(p.t1, 'Historique de la photo')
+        egal(0, #Fil.lignes(c, Fenetre.largeurTexte()), "l'historique n'a plus de ligne")
+        egal(0, #Fil.lignesElement(h[1], 1, Fenetre.largeurTexte()))
+        absent(p.t1, 'Historique de la photo')
         -- Chaque caractère est mesuré (Metriques) : aucun nouveau.
         for car in Texte.caracteres(h[1].texte .. h[1].pourClaude) do
             vrai(car == '\n' or Metriques.texte.chasse[car], 'caractère non mesuré : ' .. car)
@@ -606,7 +602,7 @@ essai("Historique joint : envoyé seulement une fois la demande partie ; Claude 
     contient(message, '[Depuis la dernière fois : 1 étape de Claude', 'le complément rejoint la demande renvoyée')
     contient(message, '[Historique de la photo : 3 étapes de Claude', "l'historique actuel de la photo aussi")
     local tous = historiques(c, 'historique')
-    egal(2, #tous, "l'historique actuel dans le fil")
+    egal(2, #tous, "l'historique actuel dans la conversation (sans ligne dans le fil depuis le correctif 1.3.8)")
     egal(true, tous[2].envoye)
     egal(nil, c.sessionPerdue)
     fin('s-851b')

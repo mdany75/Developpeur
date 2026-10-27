@@ -78,21 +78,18 @@ Dispositions.TAILLES = {
     -- élément à sa largeur, moins la place de ses flèches) ; le bandeau prend ce qu'il laisse (324).
     mesDemandes = 280,
     -- Les deux voyants de l'en-tête (Claude Code, Lightroom ; le voyant Écran, de 150, est retiré
-    -- au correctif 1.3.6), chacun avec sa pastille de 8 et 6 d'écart, 14 entre eux, et au bout de
-    -- leur rangée, en haut à droite, le bouton Suivi (le carnet de progrès dans sa fenêtre, décision
-    -- de Dany du 25 octobre 2026) : un carré small, comme les boutons d'actions du fil (bezel de 15,
-    -- D6, dans la rangée des voyants), son titre en petit (« Suivi » : environ 24) et 22 de jeu ; la
-    -- photo active prend le reste de la rangée, entre eux.
-    voyantClaude = 125, voyantLightroom = 150, ecartVoyants = 14, boutonSuivi = 56,
-    -- À sa droite, côte à côte (correctif 1.3.7, décision de Dany du 25 octobre 2026) :
-    -- Publication… et Consommation…, perdus avec le volet au correctif 1.3.6, qui ouvrent leurs
-    -- fenêtres comme leurs menus ; des carrés small comme Suivi, leur titre en petit (« Publication… »
-    -- environ 70, « Consommation… » 90) et 22 de jeu, 6 entre deux boutons ; la photo active garde
-    -- 407 points (essais-fenetre-b.lua).
-    boutonPublication = 92, boutonConsommation = 112, ecartBoutons = 6,
-    -- « Repartir à neuf », à droite du titre (correctif 1.3.6) : un carré de bezel 22, son titre en
-    -- 12 (environ 87 points) et du jeu.
-    repartir = 120,
+    -- au correctif 1.3.6), chacun avec sa pastille de 8 et 6 d'écart, 14 entre eux ; la photo active
+    -- prend le reste de leur rangée.
+    voyantClaude = 125, voyantLightroom = 150, ecartVoyants = 14,
+    -- Les quatre boutons de l'en-tête, sur la rangée du titre, à sa droite, côte à côte, 6 entre deux
+    -- (correctif 1.3.8, demandé par Dany le 26 octobre 2026 : Suivi, Publication… et Consommation…,
+    -- dans la rangée des voyants depuis les correctifs 1.3.6 et 1.3.7, montent sur la ligne de
+    -- « Repartir à neuf », qui prend leur taille) : « Repartir à neuf » (correctif 1.3.6), puis Suivi
+    -- (le Suivi dans sa fenêtre, décision de Dany du 25 octobre 2026), Publication… et Consommation…
+    -- (correctif 1.3.7). Des carrés small, comme les boutons d'actions du fil (bezel de 15, D6), leur
+    -- titre en petit (« Repartir à neuf » environ 78, « Suivi » 25, « Publication… » 67,
+    -- « Consommation… » 88, Metriques) et 22 de jeu.
+    repartir = 100, boutonSuivi = 56, boutonPublication = 92, boutonConsommation = 112, ecartBoutons = 6,
     -- « Obtenir », sous la carte Proposition (correctif 1.3.6, décision de Dany du 25 octobre 2026),
     -- comme Refuser (80) : un carré de bezel 26, son titre en 13 et le jeu du carré. Avec ▲ ▼,
     -- Refuser, Ajuster… et Accepter en bleu, la rangée tient dans l'intérieur du panneau
@@ -229,6 +226,9 @@ Dispositions.IMAGES = {
     ['presse-papiers'] = taille(14, 14),
     ['chevron-haut'] = taille(12, 12),
     ['chevron-bas'] = taille(12, 12),
+    -- L'icône des boutons du calendrier, à droite des champs « Du » et « au » de la fenêtre Suivi
+    -- (correctif 1.3.8, demandé par Dany le 26 octobre 2026 ; Calendrier.lua).
+    calendrier = taille(14, 14),
     -- Les icônes des boutons de la Demande rapide, à gauche du champ (FenetreRapide.ACTIONS ; demandés
     -- par Dany le 24 octobre 2026) : noter, Retouche pro, Portrait, dans des carrés de 55.
     ['rapide-noter'] = taille(30, 30),
@@ -412,19 +412,18 @@ function Dispositions.dimensions()
     -- Le contenu de la fenêtre (D7) : 1 621 × 1 166 pour 1 623 × 1 200.
     D.largeurContenu = D.largeurFenetre - 2 * D.margeDialogue
     D.hauteurContenu = hauteurContenu(D)
-    -- Centre : 1 024 utiles. L'en-tête : le titre (gras 16) et « Repartir à neuf », puis les voyants
-    -- Claude Code et Lightroom, la photo active, alignée à droite, et les boutons Suivi,
-    -- Publication… et Consommation… (correctif 1.3.7), le dernier sur la marge, sous « Repartir à
-    -- neuf » (la rangée fait les 1 024 : un texte de taille fixe ne s'étire pas) ;
-    -- le fil ; la barre, dont l'activité (ou le forfait) finit de même sur la marge de droite, comme
-    -- dans la maquette ; la saisie (Style, Mes demandes, bandeau, Envoyer). Le titre prend ce que le
-    -- Mode laissait (sa place à 1 280 × 800 : 590 − 270), où « Repartir à neuf » (D.repartir) se
-    -- pose à droite depuis que les radios du Mode sont retirés (correctif 1.3.6) : D.placeRepartir.
+    -- Centre : 1 024 utiles. L'en-tête : le titre (gras 16) et, à sa droite, « Repartir à neuf »,
+    -- Suivi, Publication… et Consommation… (correctif 1.3.8 : les trois derniers étaient dans la
+    -- rangée des voyants), le dernier sur la marge ; puis les voyants Claude Code et Lightroom et la
+    -- photo active, alignée à droite, sur la marge (la rangée fait les 1 024 : un texte de taille fixe
+    -- ne s'étire pas) ; le fil ; la barre, dont l'activité (ou le forfait) finit de même sur la marge
+    -- de droite, comme dans la maquette ; la saisie (Style, Mes demandes, bandeau, Envoyer). Les
+    -- boutons ont leur place (D.placeBoutons : eux, leurs écarts, et 14 devant), le titre le reste.
     D.fil = D.centre - 2 * D.margeCentre
-    D.placeRepartir = 320
-    D.titre = D.fil - D.placeRepartir
+    D.placeBoutons = D.ecartVoyants + D.repartir + D.ecartBoutons + D.boutonSuivi + D.ecartBoutons + D.boutonPublication
+        + D.ecartBoutons + D.boutonConsommation
+    D.titre = D.fil - D.placeBoutons
     D.info = D.fil - (8 + 6 + D.voyantClaude) - D.ecartVoyants - (8 + 6 + D.voyantLightroom) - D.ecartVoyants
-        - D.boutonSuivi - D.ecartBoutons - D.boutonPublication - D.ecartBoutons - D.boutonConsommation - D.ecartVoyants
     -- Le fil : autant de lignes que sa hauteur en tient entre ses marges (42 dans 920), le reste à
     -- la marge du bas.
     D.hauteurFil = D.hauteurContenu - (D.entete + D.filet) - D.barre - D.saisie

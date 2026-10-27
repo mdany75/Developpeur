@@ -169,9 +169,11 @@ end
 
 -- `mcp-developpeur --analyser '<json>'` : note ce qu'il reçoit (une ligne par appel), puis répond
 -- d'après son mode (fichier faux-mode) : « contrat » (la sortie du contrat pour les photos qu'il
--- donne, sinon les défauts cherchés de ses règles, aucun trouvé), « regles2 » (de même, règles 2),
--- « muet » (rien : l'alarme, ou un vieux connecteur), « refus » (ok faux). Une vignette absente le
--- dit, comme le vrai.
+-- donne, sinon les défauts cherchés de ses règles, aucun trouvé, et le genre « paysage » ; un objectif
+-- macro donne « macro »), « regles2 » (de même, règles 2), « genre2 » (de même, règles du genre 2, le
+-- genre « ville »), « sansgenre » (un connecteur d'avant le correctif 1.3.8 : ni genre ni
+-- regles_genre), « muet » (rien : l'alarme, ou un vieux connecteur), « refus » (ok faux). Une vignette
+-- absente le dit, comme le vrai.
 local CONNECTEUR = S.home .. '/bin/mcp-developpeur'
 local RECUS = S.home .. '/analyser-recus.txt'
 local MODE = S.home .. '/faux-mode'
@@ -213,6 +215,7 @@ for _, p in ipairs(entree.photos) do
     elseif sorties[p.id] then
         local s = sorties[p.id]
         if s.texte then s.texte = s.texte:gsub('<lot>', lot) end
+        if mode == 'sansgenre' then s.genre = nil end
         photos[#photos + 1] = s
     else
         local cherches = Json.tableau()
@@ -221,10 +224,13 @@ for _, p in ipairs(entree.photos) do
             if (p.iso or 0) >= 1600 then cherches[#cherches + 1] = 'bruit' end
         end
         cherches[#cherches + 1] = 'flou'
-        photos[#photos + 1] = { id = p.id, cherches = cherches, defauts = Json.tableau(), mesures = { cote = 1024 } }
+        local genre = mode == 'genre2' and 'ville' or (p.objectif and p.objectif:lower():find('macro', 1, true)) and 'macro' or 'paysage'
+        photos[#photos + 1] = { id = p.id, cherches = cherches, defauts = Json.tableau(), genre = mode ~= 'sansgenre' and genre or nil,
+            mesures = { cote = 1024 } }
     end
 end
-print(Json.encode({ ok = true, regles = mode == 'regles2' and 2 or 1, photos = photos }))
+print(Json.encode({ ok = true, regles = mode == 'regles2' and 2 or 1, regles_genre = mode == 'genre2' and 2 or mode ~= 'sansgenre' and 1 or nil,
+    photos = photos }))
 ]==], S.plugin, RECUS, MODE, CONTRAT_CHEMIN))
     Fichiers.ecrire(CONNECTEUR, string.format('#!/bin/sh\nexec %s %s "$@"\n', S.q(luajit), S.q(script)))
     S.executer('chmod +x ' .. S.q(CONNECTEUR))
@@ -585,11 +591,11 @@ essai("Une photo seule : son entrée au relevé (celle du contrat), puis l'analy
     egal(false, Releve.relancer(), 'rien à faire : pas de tâche')
 end)
 
-essai("Un groupe de six photos : l'entrée de --analyser est celle du contrat (ordre, iso, cache, retouchee), le relevé ensuite comme dans_le_registre", function()
+essai("Un groupe de six photos : l'entrée de --analyser est celle du contrat (ordre, iso, cache, retouchee, objectif), le relevé ensuite comme dans_le_registre (le genre compris)", function()
     depart()
     photoDuContrat(4302)
     photo(4303, { iso = 5000 })
-    photo(4304, { format = 'RAW' })
+    photo(4304, { format = 'RAW', objectif = 'XF80mmF2.8 R LM OIS WR Macro' })
     photo(4306, { iso = 3200, retouchee = true })
     photo(4307, { iso = 2000 })
     photo(4305, { iso = 400, sansVignette = true })
@@ -1967,9 +1973,9 @@ essai("Une analyse manquée passe devant la file gardée à son heure (Releve.re
     vider()
     prefs.cheminConnecteur = CONNECTEUR
     Releve.LOT_ANALYSE = 2
-    -- Les règles du connecteur déjà connues (une réponse plus tôt dans la séance) : la file gardée ne
-    -- se refait pas pour elles.
-    Releve.regles = 1
+    -- Les règles du connecteur déjà connues (une réponse plus tôt dans la séance), celles du genre
+    -- comprises : la file gardée ne se refait pas pour elles.
+    Releve.regles, Releve.reglesGenre = 1, 1
     avecLeTemps(function()
         egal(30, Releve.refaireFile())
         egal('34001', Releve.file.liste[1])
@@ -2020,9 +2026,10 @@ essai("Des règles plus récentes (une réponse de --analyser dont regles monte,
     voir(unpack(ids))
     vider()
     prefs.cheminConnecteur = CONNECTEUR
-    -- 36030 analysée selon des règles anciennes (0) ; les autres sans analyse.
+    -- 36030 analysée selon des règles anciennes (0), son genre à jour ; les autres sans analyse.
     local f = fichier()
-    f.catalogues[CATALOGUE].photos['36030'].analyse = { le = os.time(), regles = 0, cherches = Json.tableau({ 'flou' }), defauts = Json.tableau({}) }
+    f.catalogues[CATALOGUE].photos['36030'].analyse = { le = os.time(), regles = 0, cherches = Json.tableau({ 'flou' }), defauts = Json.tableau({}),
+        genre = 'paysage', regles_genre = 1 }
     Fichiers.ecrire(Releve.fichier(), Json.encode(f))
     Releve.oublier()
     egal(29, Releve.refaireFile(), 'la file gardée : les 29 sans analyse (règles encore inconnues)')
@@ -2037,6 +2044,107 @@ essai("Des règles plus récentes (une réponse de --analyser dont regles monte,
         dedans = dedans or Releve.file.liste[i] == '36030'
     end
     vrai(dedans, '36030, analysée selon des règles plus anciennes, entre dans la file refaite')
+end)
+
+essai("Le genre (correctif 1.3.8) : rangé avec l'analyse ; une analyse d'avant le genre se refait pour lui seul, même avant toute réponse de la séance, ses défauts gardés ; l'objectif part au connecteur (macro)", function()
+    depart()
+    local ids = {}
+    for i = 1, 4 do
+        ids[i] = 38000 + i
+        photo(ids[i], { objectif = i == 4 and 'XF80mmF2.8 R LM OIS WR Macro' or 'XF23mmF2 R WR' })
+    end
+    prefs.cheminConnecteur = S.home .. '/absent'
+    voir(unpack(ids))
+    vider()
+    prefs.cheminConnecteur = CONNECTEUR
+    -- 38001 et 38002 analysées avant le genre (d'un connecteur 1.3.7), 38001 avec un défaut trouvé
+    -- que la vignette d'aujourd'hui (retouchée depuis) ne montrerait plus ; 38003 et 38004 en file.
+    local f = fichier()
+    local photos = f.catalogues[CATALOGUE].photos
+    photos['38001'].analyse = { le = 1000, regles = 1, cherches = Json.tableau({ 'sous_exposition', 'flou' }), defauts = Json.tableau({ 'flou' }) }
+    photos['38002'].analyse = { le = 1000, regles = 1, cherches = Json.tableau({ 'flou' }), defauts = Json.tableau({}) }
+    Fichiers.ecrire(Releve.fichier(), Json.encode(f))
+    Releve.oublier()
+    -- Les règles ne sont pas encore connues (aucune réponse de la séance) : les analyses sans genre
+    -- entrent quand même dans la file (toute la bibliothèque déjà analysée n'attendrait aucune vue).
+    egal(4, Releve.refaireFile(), 'les deux en file et les deux sans genre')
+    vider()
+    local a1 = entree(38001).analyse
+    egal('paysage', a1.genre)
+    egal(1, a1.regles_genre)
+    egal(1000, a1.le, 'la date de la première analyse, gardée')
+    memes(Json.tableau({ 'sous_exposition', 'flou' }), a1.cherches, 'les défauts cherchés, gardés')
+    memes(Json.tableau({ 'flou' }), a1.defauts, 'le défaut trouvé, gardé (la vignette retouchée ne le montrerait plus)')
+    egal('macro', entree(38004).analyse.genre, "l'objectif macro, parti au connecteur")
+    local recu
+    for _, r in ipairs(recus()) do
+        for _, p in ipairs(r.photos) do
+            if p.id == 38004 then
+                recu = p
+            end
+        end
+    end
+    egal('XF80mmF2.8 R LM OIS WR Macro', recu and recu.objectif, "l'objectif dans l'entrée de --analyser")
+    vrai(entree(38003).analyse.le > 1000, 'une analyse neuve : son heure')
+    egal(1, Releve.reglesGenre, 'les règles du genre, apprises de la réponse')
+    -- Tout a son genre : rien à refaire.
+    local appels = #recus()
+    Releve.revoir()
+    voir(38001)
+    vider()
+    egal(appels, #recus(), 'rien de refait')
+    -- Relu du disque : le genre et ses règles restent.
+    Releve.oublier()
+    egal(0, Releve.refaireFile())
+    egal('paysage', Releve.entree(38001).analyse.genre)
+    egal(1, Releve.entree(38001).analyse.regles_genre)
+end)
+
+essai("Le genre : des règles du genre plus récentes le font refaire seul (défauts gardés) ; un connecteur sans genre (d'avant le correctif 1.3.8) ne fait rien refaire en boucle ; un genre refait qui échoue garde l'analyse d'avant", function()
+    depart()
+    local ids = {}
+    for i = 1, 3 do
+        ids[i] = 39000 + i
+        photo(ids[i])
+    end
+    voir(unpack(ids))
+    vider()
+    egal('paysage', entree(39001).analyse.genre)
+    local le = entree(39001).analyse.le
+    -- Les règles du genre montent (2) : refait pour lui seul.
+    mode('genre2')
+    Releve.revoir()
+    photo(39004)
+    voir(39004)
+    vider()
+    egal(2, Releve.reglesGenre)
+    egal('ville', entree(39001).analyse.genre, 'refait pour des règles du genre plus récentes')
+    egal(2, entree(39001).analyse.regles_genre)
+    egal(le, entree(39001).analyse.le, 'les défauts gardés, avec leur heure')
+    egal(1, entree(39001).analyse.regles)
+    -- Un connecteur sans genre : une analyse sans genre ne se refait pas en boucle.
+    depart()
+    for i = 1, 3 do
+        photo(39100 + i)
+    end
+    mode('sansgenre')
+    voir(39101, 39102, 39103)
+    vider()
+    egal(nil, entree(39101).analyse.genre, 'sans genre')
+    vrai(entree(39101).analyse.cherches ~= nil, 'les défauts, eux, rangés')
+    egal(true, Releve.sansGenre, 'le connecteur ne donne pas de genre')
+    egal(0, Releve.refaireFile(), 'rien à refaire de la séance')
+    egal(false, Releve.relancer(), 'rien à faire : pas de tâche, aucun appel de plus')
+    -- La séance suivante, un connecteur à jour : leur genre vient.
+    Releve.oublier()
+    mode('contrat')
+    egal(3, Releve.refaireFile(), 'sans genre : en file')
+    -- Le connecteur muet : l'analyse d'avant reste, et ne se refait plus de la séance.
+    mode('muet')
+    vider()
+    vrai(entree(39101).analyse.cherches ~= nil, "l'analyse d'avant, gardée")
+    egal(nil, entree(39101).analyse.erreur)
+    egal(0, Releve.refaireFile(), 'plus refaite de la séance')
 end)
 
 essai("Releve.reclasser sans rien de changé dans le catalogue : aucune entrée changée (ni classement_le ni texte JSON refait), rien écrit ; une note changée : cette entrée seule", function()

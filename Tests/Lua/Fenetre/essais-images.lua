@@ -91,6 +91,8 @@ local ATTENDUES = {
     ['presse-papiers'] = { 14, 14 },
     ['chevron-haut'] = { 12, 12 },
     ['chevron-bas'] = { 12, 12 },
+    -- Les boutons du calendrier de la fenêtre Suivi (correctif 1.3.8).
+    calendrier = { 14, 14 },
     -- Les boutons à icône de la Demande rapide (24 octobre 2026).
     ['rapide-noter'] = { 30, 30 },
     ['rapide-retouche'] = { 30, 30 },
