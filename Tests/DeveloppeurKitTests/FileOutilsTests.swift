@@ -62,8 +62,10 @@ final class FileOutilsTests: XCTestCase {
         XCTAssertTrue(texts(other).contains("« get_status » n'a pas été lancé"), texts(other))
         XCTAssertTrue(texts(other).contains("« add_mask »"))
 
-        // Le rendu finit : le même appel reçoit son résultat, sans nouvel essai.
+        // Le rendu finit : le même appel reçoit son résultat, sans nouvel essai. Un délai large
+        // désormais : sur une machine lente (GitHub Actions), 0,3 s ne suffisait pas à le rendre.
         porte.signal()
+        server.toolBudget = 5
         let again = try call(server, toolLine(id: 3, "add_mask", maskPreview))
         XCTAssertEqual(again["id"]?.int, 3)
         XCTAssertTrue(hasImage(again))
