@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outils comparés</title>
+<style>
+  :root {
+    --texte: #1D1D1F; --gris: #6B6B6B; --bleu: #0A64D8; --mono: #3D3D45;
+    --vert: #1F7A35; --orange: #A85A00; --rouge: #B3261E;
+    --fond: #FFFFFF; --volet: #F2F2F2; --carte: #FAFAFA; --filet: #E2E2E2;
+    --vert-doux: #E6F2E9; --orange-doux: #FCEFDF; --bleu-doux: #E3EEFC; --rouge-doux: #FBE9E7; --gris-doux: #EBEBEB;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --texte: #E8E8E8; --gris: #9A9A9A; --bleu: #5AA2F6; --mono: #C8C8D0;
+      --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+      --fond: #1E1E1E; --volet: #2A2A2A; --carte: #262626; --filet: #343434;
+      --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #333333;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --texte: #E8E8E8; --gris: #9A9A9A; --bleu: #5AA2F6; --mono: #C8C8D0;
+    --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+    --fond: #1E1E1E; --volet: #2A2A2A; --carte: #262626; --filet: #343434;
+    --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #333333;
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { background: var(--volet); }
+  body { margin: 0; background: var(--volet); color: var(--texte); font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  code { font-family: Menlo, ui-monospace, monospace; font-size: .86em; color: var(--mono); background: var(--gris-doux); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .page { max-width: 1180px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 30px; line-height: 1.2; }
+  h2 { margin: 40px 0 6px; font-size: 21px; }
+  .sous { color: var(--gris); margin: 0 0 18px; }
+  .bilan { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
+  .chiffre { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 14px; min-width: 0; }
+  .chiffre b { display: block; font-size: 26px; }
+  .chiffre span { color: var(--gris); font-size: 13px; }
+  .encadre { background: var(--bleu-doux); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
+  .legende { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 10px 0 0; font-size: 13px; color: var(--gris); }
+  .pastille { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; display: inline-block; }
+  .ici { background: var(--vert-doux); color: var(--vert); }
+  .eux { background: var(--orange-doux); color: var(--orange); }
+  .egal { background: var(--gris-doux); color: var(--texte); }
+  .seul { background: var(--bleu-doux); color: var(--bleu); }
+  .table { overflow-x: auto; border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; background: var(--fond); border: 1px solid var(--filet); table-layout: fixed; min-width: 760px; }
+  col.c1 { width: 33%; } col.c2 { width: 41%; } col.c3 { width: 26%; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--filet); vertical-align: top; overflow-wrap: anywhere; }
+  th { background: var(--carte); font-size: 13px; color: var(--gris); }
+  td p { margin: 3px 0 0; font-size: 13.5px; }
+  td ul { margin: 0; padding: 0; list-style: none; }
+  td li { margin: 0 0 6px; font-size: 13.5px; }
+  td li:last-child { margin-bottom: 0; }
+  td li code, td > code { font-weight: 600; }
+  .aucun { color: var(--gris); font-style: italic; font-size: 13.5px; }
+  .note { font-size: 13px; color: var(--gris); margin-top: 4px; }
+  @media (max-width: 640px) { th, td { padding: 8px; } h1 { font-size: 25px; } }
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>Outils comparés : Développeur et lightroom-mcp</h1>
+  <p class="sous">Les 35 outils de MCP-Développeur 1.4 face aux 71 de <a href="https://github.com/Automaat/lightroom-mcp">Automaat/lightroom-mcp</a> 0.26.0, rangés par domaine. Descriptions tirées de <code>tools/list</code> du connecteur et du README de lightroom-mcp, le 27 octobre 2026.</p>
+
+  <div class="bilan">
+    <div class="chiffre"><b>35</b><span>outils de Développeur, plus 10 invites</span></div>
+    <div class="chiffre"><b>71</b><span>outils de lightroom-mcp (seul le groupe <code>core</code> est montré par défaut)</span></div>
+    <div class="chiffre"><b>8</b><span>outils de Développeur sans équivalent direct chez eux</span></div>
+    <div class="chiffre"><b>8</b><span>outils de lightroom-mcp sans équivalent direct ici</span></div>
+  </div>
+
+  <div class="encadre">
+    <b>À lire ainsi :</b> un outil de Développeur couvre souvent plusieurs outils de lightroom-mcp. Par exemple, <code>add_mask</code> fait le travail de neuf de leurs outils de masques, et <code>set_metadata</code> celui de six. Leurs outils restent proches du SDK de Lightroom. Les nôtres regroupent une tâche de retouche entière, avec une étape nommée, sa raison et son annulation.
+    <div class="legende">
+      <span><span class="pastille ici">Plus complet ici</span></span>
+      <span><span class="pastille eux">Plus complet chez eux</span></span>
+      <span><span class="pastille egal">À peu près égal</span></span>
+      <span><span class="pastille seul">Seulement ici</span></span>
+    </div>
+  </div>
+
+  <h2>Liaison, sélection et recherche</h2>
+  <div class="table"><table>
+    <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+    <thead><tr><th>Développeur</th><th>lightroom-mcp</th><th>Écart</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>get_status</code><p>État de la liaison : versions, photo active, mode (appliquer ou proposer d'abord), pause, limites, nom de l'écran ; demande une sauvegarde du catalogue avant une longue série.</p></td>
+        <td><span class="aucun">Aucun outil. L'état se lit dans Lightroom (Gestionnaire de modules › Show Status).</span></td>
+        <td><span class="pastille seul">Seulement ici</span><p class="note">Claude ne peut pas vérifier la liaison chez eux.</p></td>
+      </tr>
+      <tr>
+        <td><code>list_selection</code><p>Photos sélectionnées (ou tout le film fixe), avec leur prise de vue, note, drapeau et libellé ; la photo active est marquée.</p></td>
+        <td><ul><li><code>get_selected_photos</code> : photos sélectionnées (ou le film fixe).</li></ul></td>
+        <td><span class="pastille egal">À peu près égal</span><p class="note">Chez eux, le chemin du fichier se demande à part (<code>include_path</code>).</p></td>
+      </tr>
+      <tr>
+        <td><code>find_photos</code><p>Recherche dans tout le catalogue : texte, mot-clé, note, drapeau, libellé, appareil, objectif, ISO, format, dates, dossier, collection, retouchées par Claude ou non, exportées ou jamais. Total et page de résultats.</p></td>
+        <td><ul>
+          <li><code>search_photos</code> : nom, mots-clés, note, date, appareil, objectif, ISO, focale, drapeau, libellé, édité ou non, type, dossier.</li>
+          <li><code>list_folders</code> : dossiers du catalogue en arbre, avec leur nombre de photos.</li>
+          <li><code>get_folder_photos</code> : photos d'un dossier, sous-dossiers compris au choix.</li>
+        </ul></td>
+        <td><span class="pastille egal">À peu près égal</span><p class="note">Ici : « retouchée par Claude » et « exportée ». Chez eux : la focale et la liste des dossiers.</p></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2>Voir, mesurer, analyser</h2>
+  <div class="table"><table>
+    <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+    <thead><tr><th>Développeur</th><th>lightroom-mcp</th><th>Écart</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>view_photo</code><p>La photo développée, avec ses réglages et ses mesures : L*, centiles, écrêtage par canal, contraste, dominante, éclairage mixte, netteté, bruit, Vision (visages, yeux, saillance), point AF Fujifilm, intention du boîtier, évaluation, bilan d'une passe à l'autre. Zoom (<code>region</code>) et avant/après (<code>compare</code>).</p></td>
+        <td><ul>
+          <li><code>get_photo_preview</code> : aperçu JPEG d'une photo, recadrable sur une zone (512 pour trier, 1024 pour le détail).</li>
+          <li><code>get_photo_stats</code> : histogramme de luminance, écrêtage, luminance moyenne et netteté de 20 photos au plus.</li>
+        </ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Chez eux, ni Vision, ni dominante, ni bruit, ni avant/après, ni bilan.</p></td>
+      </tr>
+      <tr>
+        <td><code>analyze_photos</code><p>Mesures de plusieurs photos sans les afficher (luminosité, contraste, écrêtage, dominante, saturation, netteté, bruit, visages, note esthétique), photos semblables et meilleure de chaque groupe ; écarts avec une référence.</p></td>
+        <td><ul>
+          <li><code>get_photo_stats</code> : voir ci-dessus.</li>
+          <li><code>find_duplicate_groups</code> : quasi-doublons et rafales par empreinte d'image (dHash) et heure de prise de vue, 100 photos au plus.</li>
+        </ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Leur dHash est une piste simple et rapide pour les doublons.</p></td>
+      </tr>
+      <tr>
+        <td><code>measure_angle</code><p>Angle exact d'une ligne (horizon, toit, poteau) entre deux points, affiné sur le contour, pour redresser au dixième de degré.</p></td>
+        <td><span class="aucun">Aucun.</span></td>
+        <td><span class="pastille seul">Seulement ici</span></td>
+      </tr>
+      <tr>
+        <td><code>read_composition</code><p>Composition lue sur l'image entière non recadrée : horizon, sujet (visages, zone d'intérêt), regard, tiers ; cadre proposé, dessiné sur l'image.</p></td>
+        <td><span class="aucun">Aucun.</span></td>
+        <td><span class="pastille seul">Seulement ici</span></td>
+      </tr>
+      <tr>
+        <td><code>get_settings</code><p>Tous les réglages de développement, groupés comme dans Développement : profil, recadrage, courbes, masques, couleurs ponctuelles, taches, et le classement de la Bibliothèque.</p></td>
+        <td><ul>
+          <li><code>get_photo_metadata</code> : mots-clés, Exif, GPS, IPTC, droits d'auteur de 1 à 100 photos ; réglages de développement sur demande (<code>sections</code>).</li>
+          <li><code>summarize_develop_settings</code> : médianes et plages de vos réglages par appareil et par tranche d'ISO, sur vos photos de 4 ★ et plus (200 au plus).</li>
+        </ul></td>
+        <td><span class="pastille egal">À peu près égal</span><p class="note">Le résumé de votre style par appareil et ISO n'existe pas ici : une idée à reprendre.</p></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2>Retouche globale</h2>
+  <div class="table"><table>
+    <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+    <thead><tr><th>Développeur</th><th>lightroom-mcp</th><th>Écart</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>apply_settings</code><p>Une retouche globale en une étape « Claude · … » : réglages, profil, recadrage, courbe, couleur ponctuelle, balance ou tonalité automatique, flou d'objectif, paramètre prédéfini. Valeurs absolues ou relatives, raison au journal, état d'avant Claude gardé, respect de « Proposer d'abord ».</p></td>
+        <td><ul>
+          <li><code>set_develop_settings</code> : écrit des clés du SDK telles quelles (courbes par points comprises).</li>
+          <li><code>apply_auto_adjustments</code> : tonalité automatique, balance automatique, ou les deux.</li>
+          <li><code>apply_develop_preset</code> : applique un paramètre prédéfini exact ; recalcule les masques IA.</li>
+          <li><code>get_lens_blur</code>, <code>set_lens_blur</code> : lit et règle le flou d'objectif (mise au point, bokeh), avec relecture.</li>
+          <li><code>set_process_version</code> : change la version de processus (1 à 6), avec confirmation.</li>
+        </ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Chez eux : régler finement le flou d'objectif et changer la version de processus, que Développeur ne fait pas.</p></td>
+      </tr>
+      <tr>
+        <td><code>preview_settings</code><p>Montre le rendu d'une retouche sans la garder (deux étapes « Claude · essai »), avec un bilan chiffré et le cadre proposé dessiné.</p></td>
+        <td><ul><li><code>dry_run</code> de <code>copy_develop_settings</code> et d'<code>apply_develop_preset</code> : les réglages qui changeraient, sans rendu.</li></ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Chez eux, aucune image d'une proposition.</p></td>
+      </tr>
+      <tr>
+        <td><code>enhance_photo</code><p>Débruitage IA, détails bruts et super résolution, calculés par Lightroom ; l'étape s'annule.</p></td>
+        <td><ul><li><code>apply_denoise</code> : débruitage IA à une intensité donnée (Lightroom 15 et plus).</li></ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Ils disent la super résolution et les détails bruts impossibles par le SDK ; Développeur les fait par <code>LrDevelopController</code>.</p></td>
+      </tr>
+      <tr>
+        <td><code>remove_distractions</code><p>Supprime les reflets d'une vitre (modèles IA de Lightroom), retire une suppression de la poussière.</p></td>
+        <td><span class="aucun">Aucun.</span></td>
+        <td><span class="pastille seul">Seulement ici</span></td>
+      </tr>
+      <tr>
+        <td><code>list_profiles</code><p>Profils utilisables pour une photo : simulations Fujifilm, profils Adobe, créatifs et installés, et ceux dont l'intensité se règle ; profils d'objectif installés.</p></td>
+        <td><span class="aucun">Aucun.</span></td>
+        <td><span class="pastille seul">Seulement ici</span></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2>Masques et taches</h2>
+  <div class="table"><table>
+    <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+    <thead><tr><th>Développeur</th><th>lightroom-mcp</th><th>Écart</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>add_mask</code><p>Masques avec leurs réglages locaux, en une étape : IA (sujet, ciel, arrière-plan, parties et personne précise, paysage, objet), dégradés linéaire et radial, plages de luminance, de couleur et de profondeur, pinceau le long de traits, combinés (ajouter, soustraire, intersection). Dosage de la peau gardé, proposition (<code>preview</code>), carte du masque.</p></td>
+        <td><ul>
+          <li><code>create_mask</code> : sujet, ciel, arrière-plan, parties d'une personne ou éléments de paysage (pas une personne précise).</li>
+          <li><code>create_mask_batch</code> : le même masque IA sur 200 photos au plus.</li>
+          <li><code>create_gradient_mask</code> : dégradé linéaire ou radial.</li>
+          <li><code>create_brush_mask</code> : pinceau en tracés (points, rayon, flux, contour progressif, densité, gomme).</li>
+          <li><code>create_range_mask</code> : plage de luminance, de couleur ou de profondeur.</li>
+          <li><code>combine_mask</code> : ajouter, soustraire ou intersecter un composant IA.</li>
+          <li><code>set_mask_adjustments</code> : réglages locaux d'un masque.</li>
+          <li><code>set_mask_curves</code> : courbe de tonalité locale, par canal.</li>
+          <li><code>edit_mask_point_colors</code> : couleurs ponctuelles d'un masque.</li>
+        </ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Chez eux : un vrai pinceau (rayon, flux, densité, gomme), une courbe locale par masque et un masque sur 200 photos d'un coup. Ici : une personne précise, l'objet désigné, la peau dosée.</p></td>
+      </tr>
+      <tr>
+        <td><code>edit_mask</code><p>Reprend un masque sans défaire l'étape : lister, masquer, montrer, retirer, dupliquer (inversé au choix), affiner le contour, recalculer un masque IA, changer ses réglages.</p></td>
+        <td><ul>
+          <li><code>list_masks</code> : masques, composants et plages stockées.</li>
+          <li><code>get_mask</code> : réglages, courbes et couleurs ponctuelles d'un masque.</li>
+          <li><code>invert_mask</code> : inverser, sur place ou en copie.</li>
+          <li><code>delete_masks</code> : supprimer des masques, ou les masques vides de 1 000 photos.</li>
+          <li><code>update_gradient_mask</code> : déplacer ou reformer un dégradé.</li>
+          <li><code>add_brush_strokes</code> : ajouter des tracés à un pinceau.</li>
+        </ul></td>
+        <td><span class="pastille egal">À peu près égal</span><p class="note">Leurs écritures de masques sont relues et remises comme avant si le résultat diffère.</p></td>
+      </tr>
+      <tr>
+        <td><code>retouch_spots</code><p>Efface des taches et corrige des yeux rouges, positions prises dans l'image de <code>view_photo</code>.</p></td>
+        <td><ul>
+          <li><code>list_spots</code> : taches existantes et leurs paramètres.</li>
+          <li><code>update_spot</code> : opacité d'une tache.</li>
+          <li><code>delete_spot</code> : supprimer une tache.</li>
+        </ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Ils ne savent pas créer une tache ; Développeur ne sait pas en lister une à part (<code>get_settings</code> les montre).</p></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2>Copier, harmoniser, paramètres prédéfinis, variantes</h2>
+  <div class="table"><table>
+    <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+    <thead><tr><th>Développeur</th><th>lightroom-mcp</th><th>Écart</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>copy_settings</code><p>Copie une retouche vers d'autres photos, groupes au choix, comme Synchroniser ; pas de balance RAW vers JPEG ; une étape par photo.</p></td>
+        <td><ul><li><code>copy_develop_settings</code> : copie entre photos, recalcule les masques IA ; <code>dry_run</code> pour voir avant.</li></ul></td>
+        <td><span class="pastille egal">À peu près égal</span></td>
+      </tr>
+      <tr>
+        <td><code>match_series</code><p>Harmonise une série sur une référence, en chiffres : exposition, balance (tons neutres), contraste ; plan d'abord, puis corrections. Avec <code>groups</code> : les groupes de lumière d'une sortie et leur référence proposée. Témoin du teint.</p></td>
+        <td><ul><li><code>match_photo_style</code> : reprend le style global après un instantané de chaque photo ; garde cadrage, balance, objectif et masques.</li></ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Le leur copie un style ; le nôtre mesure et corrige les écarts.</p></td>
+      </tr>
+      <tr>
+        <td><code>list_presets</code><p>Paramètres prédéfinis de développement d'Adobe et de l'utilisateur, par dossier.</p></td>
+        <td><ul>
+          <li><code>list_develop_presets</code> : recherche par nom ou dossier, par pages.</li>
+          <li><code>get_develop_preset</code> : réglages et fichier d'un paramètre prédéfini.</li>
+        </ul></td>
+        <td><span class="pastille eux">Plus complet chez eux</span></td>
+      </tr>
+      <tr>
+        <td><code>save_preset</code><p>Crée un paramètre prédéfini XMP (groupe « Claude ») depuis une photo, groupes au choix ; visible au prochain lancement.</p></td>
+        <td><ul>
+          <li><code>create_develop_preset</code> : point de contrôle versionné, jamais écrasé.</li>
+          <li><code>compare_develop_presets</code> : écarts entre deux versions.</li>
+          <li><code>export_develop_preset</code> : copie le fichier sans écraser.</li>
+        </ul></td>
+        <td><span class="pastille eux">Plus complet chez eux</span><p class="note">Versions et comparaison de paramètres prédéfinis.</p></td>
+      </tr>
+      <tr>
+        <td><code>compare_variants</code><p>Deux à quatre interprétations rangées en instantanés « Claude · … » et montrées côte à côte ; rien n'est posé.</p></td>
+        <td rowspan="2"><ul>
+          <li><code>list_develop_snapshots</code> : instantanés d'une photo.</li>
+          <li><code>create_develop_snapshot</code> : garder les réglages actuels.</li>
+          <li><code>apply_develop_snapshot</code> : poser un instantané.</li>
+          <li><code>delete_develop_snapshot</code> : supprimer un instantané.</li>
+        </ul></td>
+        <td rowspan="2"><span class="pastille ici">Plus complet ici</span><p class="note">Les mêmes instantanés, mais ici avec la planche des variantes et une étape qui s'annule.</p></td>
+      </tr>
+      <tr>
+        <td><code>choose_variant</code><p>Pose la variante choisie en une étape que <code>undo_last</code> défait ; liste ou efface les variantes.</p></td>
+      </tr>
+      <tr>
+        <td><code>create_virtual_copy</code><p>Une copie virtuelle nommée de chaque photo, pour essayer sans toucher à l'original.</p></td>
+        <td><ul><li><code>create_virtual_copies</code> : copies nommées de 25 photos au plus, sélection remise.</li></ul></td>
+        <td><span class="pastille egal">À peu près égal</span></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2>Annuler et garder une trace</h2>
+  <div class="table"><table>
+    <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+    <thead><tr><th>Développeur</th><th>lightroom-mcp</th><th>Écart</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>undo_last</code><p>Annule la dernière retouche de Claude sur une photo (réglages, masques, taches ou classement), et seulement elle.</p></td>
+        <td><ul><li><code>undo_last_step</code> : annule une étape de l'historique commun de Lightroom, la vôtre comprise.</li></ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Le leur peut défaire ce que vous avez fait à la main.</p></td>
+      </tr>
+      <tr>
+        <td><code>revert_to_original</code><p>Remet la photo dans son état d'avant Claude (seulement ce que Claude a changé).</p></td>
+        <td><ul><li><code>reset_develop_adjustments</code> : remet tous les réglages par défaut de 100 photos au plus.</li></ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Le leur efface aussi vos propres retouches.</p></td>
+      </tr>
+      <tr>
+        <td><code>export_journal</code><p>Journal des retouches de Claude (date, étape, raison, réglages), ou le carnet de progrès, en Markdown.</p></td>
+        <td><ul>
+          <li><code>set_ai_metadata</code> : range une note IA (0 à 100) et une raison dans un champ privé.</li>
+          <li><code>get_ai_metadata</code> : relit ces notes et raisons, 1 000 photos au plus.</li>
+        </ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Chez eux, une raison par photo, pas un journal des étapes.</p></td>
+      </tr>
+      <tr>
+        <td><code>remember_style</code><p>Guide de style personnel en Markdown : le lire avant de retoucher, y ajouter une préférence après accord.</p></td>
+        <td><span class="aucun">Aucun outil. Leur compétence <code>raw-photo-lightroom-preset</code> donne une méthode et une bibliothèque de styles.</span></td>
+        <td><span class="pastille seul">Seulement ici</span></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2>Bibliothèque : classer, mots-clés, collections</h2>
+  <div class="table"><table>
+    <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+    <thead><tr><th>Développeur</th><th>lightroom-mcp</th><th>Écart</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>set_metadata</code><p>Note, drapeau, libellé, titre, légende, droits d'auteur, texte alternatif, IPTC (lieu, événement, personnes), GPS (donné ou pris d'une photo de téléphone), mots-clés, paramètre prédéfini de métadonnées. Annulable.</p></td>
+        <td><ul>
+          <li><code>set_rating_and_flag</code> : note de 0 à 5, drapeau, ou les deux.</li>
+          <li><code>set_color_label</code> : libellé de couleur.</li>
+          <li><code>set_metadata</code> : titre, légende, titre court, créateur, droits d'auteur.</li>
+          <li><code>set_gps</code> : position GPS.</li>
+          <li><code>set_location</code> : lieu IPTC (ville, région, pays…).</li>
+          <li><code>set_keywords</code> : ajouter ou retirer des mots-clés, par chemin.</li>
+        </ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Ici aussi : texte alternatif, GPS tiré d'un téléphone, annulation.</p></td>
+      </tr>
+      <tr>
+        <td><code>list_keywords</code><p>Mots-clés avec leur chemin et leur nombre de photos.</p></td>
+        <td><ul>
+          <li><code>list_keywords</code> : la hiérarchie, avec les synonymes.</li>
+          <li><code>rename_keyword</code> : renommer partout.</li>
+          <li><code>remove_keyword_subtree</code> : retirer un mot-clé parent et ses enfants des photos.</li>
+        </ul></td>
+        <td><span class="pastille eux">Plus complet chez eux</span><p class="note">Ici, renommer passe par <code>manage_collections</code>. Retirer une branche de mots-clés n'existe pas.</p></td>
+      </tr>
+      <tr>
+        <td><code>manage_collections</code><p>Lister, créer (dynamique au choix), ajouter, retirer, renommer, déplacer, changer les critères ; renommer un mot-clé et ses synonymes. Jamais de suppression.</p></td>
+        <td><ul>
+          <li><code>list_collections</code>, <code>get_collection_photos</code> : lister.</li>
+          <li><code>create_collection</code>, <code>create_smart_collection</code> : créer.</li>
+          <li><code>add_to_collection</code>, <code>remove_from_collection</code> : changer le contenu.</li>
+          <li><code>delete_collection</code> : supprimer (les photos restent).</li>
+        </ul></td>
+        <td><span class="pastille egal">À peu près égal</span><p class="note">Ici, renommer et déplacer ; chez eux, supprimer.</p></td>
+      </tr>
+      <tr>
+        <td><code>show_photo</code><p>Montre des photos dans Lightroom : loupe, grille, comparaison, ensemble, Développement, avant/après ; filtre de la Bibliothèque.</p></td>
+        <td><span class="aucun">Aucun.</span></td>
+        <td><span class="pastille seul">Seulement ici</span></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2>Trier et noter</h2>
+  <div class="table"><table>
+    <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+    <thead><tr><th>Développeur</th><th>lightroom-mcp</th><th>Écart</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>cull_photos</code><p>Trie une séance (1 000 photos par appel, la suite par <code>offset</code>) sur les vignettes : floues, mise au point manquée (point AF Fujifilm), yeux fermés, presque noires, brûlées, rafales et piles, plafonds de note, rejets proposés ; rien n'est changé.</p></td>
+        <td><ul>
+          <li><code>get_photo_previews</code> : 20 vignettes à la fois, que Claude regarde.</li>
+          <li><code>find_duplicate_groups</code> : doublons et rafales.</li>
+          <li>Leur méthode : Claude propose les rejets, vous les acceptez, puis <code>set_rating_and_flag</code>.</li>
+        </ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">Chez eux, le tri repose sur l'œil de Claude, 20 photos à la fois.</p></td>
+      </tr>
+      <tr>
+        <td><code>contact_sheet</code><p>Une seule image de 30 vignettes numérotées, pour juger une série en peu de jetons ; planche par planche pour une grande sélection.</p></td>
+        <td><ul><li><code>get_photo_previews</code> : 20 images séparées.</li></ul></td>
+        <td><span class="pastille ici">Plus complet ici</span></td>
+      </tr>
+      <tr>
+        <td><code>propose_ratings</code><p>Note de 0 à 5 ★ selon le standard de notation, raison par critère, proposition « à vérifier » dans la carte Note ; posée avec <code>apply</code>.</p></td>
+        <td><ul><li><code>set_rating_and_flag</code> et <code>set_ai_metadata</code> : poser une note et en garder la raison. Leur README dit de laisser les étoiles à l'utilisateur.</li></ul></td>
+        <td><span class="pastille seul">Seulement ici</span></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2>Entrer et sortir du catalogue</h2>
+  <div class="table"><table>
+    <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+    <thead><tr><th>Développeur</th><th>lightroom-mcp</th><th>Écart</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>export_photos</code><p>Exporte (écran, web, partage, impression, archive) dans un dossier choisi, sans jamais écraser : livraisons types de vos services Disque dur, modèles de noms, filigranes, HDR, poids visé, réimportation empilée, aperçus dynamiques.</p></td>
+        <td><ul>
+          <li><code>export_photos</code> : format, qualité, dimensions.</li>
+          <li><code>export_photo_metadata</code> : les métadonnées de nombreuses photos dans un fichier JSON.</li>
+        </ul></td>
+        <td><span class="pastille ici">Plus complet ici</span><p class="note">L'export des métadonnées en JSON n'existe pas ici.</p></td>
+      </tr>
+      <tr>
+        <td><span class="aucun">Aucun.</span></td>
+        <td><ul><li><code>import_photos</code> : importer un fichier ou un dossier.</li></ul></td>
+        <td><span class="pastille eux">Seulement chez eux</span></td>
+      </tr>
+      <tr>
+        <td><span class="aucun">Aucun (jamais de suppression, par principe).</span></td>
+        <td><ul><li><code>remove_photos_from_catalog</code> : retirer 100 photos au plus du catalogue (les fichiers restent), avec confirmation.</li></ul></td>
+        <td><span class="pastille eux">Seulement chez eux</span></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2>Récapitulatif</h2>
+  <div class="table"><table>
+    <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+    <thead><tr><th>Seulement dans Développeur (8)</th><th>Seulement dans lightroom-mcp (8)</th></tr></thead>
+    <tbody><tr>
+      <td><ul>
+        <li><code>get_status</code> : état de la liaison</li>
+        <li><code>measure_angle</code> : angle d'une ligne</li>
+        <li><code>read_composition</code> : composition et cadre proposé</li>
+        <li><code>remove_distractions</code> : reflets</li>
+        <li><code>list_profiles</code> : profils de rendu</li>
+        <li><code>remember_style</code> : guide de style</li>
+        <li><code>show_photo</code> : montrer dans Lightroom</li>
+        <li><code>propose_ratings</code> : notation selon un standard</li>
+      </ul></td>
+      <td><ul>
+        <li><code>summarize_develop_settings</code> : votre style par appareil et ISO</li>
+        <li><code>find_duplicate_groups</code> : doublons par dHash</li>
+        <li><code>set_process_version</code> : version de processus</li>
+        <li><code>set_lens_blur</code> : flou d'objectif réglé en détail</li>
+        <li><code>compare_develop_presets</code> : versions de paramètres prédéfinis</li>
+        <li><code>import_photos</code> : importer</li>
+        <li><code>remove_photos_from_catalog</code> : retirer du catalogue</li>
+        <li><code>export_photo_metadata</code> : métadonnées en JSON</li>
+      </ul></td>
+    </tr></tbody>
+  </table></div>
+  <p class="note">Ces deux listes comptent les outils sans équivalent direct de l'autre côté. Le tri mesuré, la planche contact et le journal ont chez eux un ersatz partiel (vignettes, raisons privées) ; le flou d'objectif et les photos semblables, un ersatz partiel ici. Les autres outils se recouvrent, l'un plus complet que l'autre selon le cas (colonne Écart).</p>
+</main>
+</body>
+</html>
