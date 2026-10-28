@@ -1086,16 +1086,12 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   rapide ; ne jamais publier une archive non notarisée, ni construite avec `--sans-tests`.
 - Avant de pousser une fonctionnalité : README et `CHANGELOG.md` à jour, capture d'écran refaite
   dans Lightroom si l'interface a changé (`docs/capture.png` : la fenêtre Claude, sa seule
-  disposition, la fenêtre B de la 1.3.2 après une retouche pro : ses étapes, « Pourquoi ? »,
-  « ＋ Garder la demande », le menu Mes demandes et l'onglet Focus, refaite le 22 octobre 2026 ;
-  à refaire au correctif 1.3.7, la 1.3.6 n'ayant pas été publiée seule : elle montrera la fenêtre
-  de 1 623 × 1 200, sans volet ni Mode, ses onglets Focus, Note, Aperçu et Proposition, les boutons
-  Suivi, Publication… et Consommation… et le résumé en haut du fil, sans « Pourquoi ? » ni
-  « ＋ Garder la demande » ;
-  `docs/carnet.png`, la page Carnet de progrès, à refaire au correctif 1.3.7 : elle montrera
-  la fenêtre Suivi en graphiques ; `publication.png`, `consommation.png`,
-  `suivi.png` : les autres fenêtres ; `seance.png` est retirée avec la Séance en 1.1.1,
-  `atelier.png` et `panneau.png` avec l'Atelier et le Panneau en 1.2), et une nouvelle version si ce
+  disposition, après une retouche pro et une Demande rapide sur une copie d'essai du portrait
+  DSCF2402, onglet Focus ; `suivi-graphiques.png` : la fenêtre Suivi ; `demande-rapide.png`,
+  `publication.png`, `consommation.png`, `suivi.png` (fenêtre de la liaison) : les autres
+  fenêtres ; toutes refaites le 28 octobre 2026 avec le module 1.4, par `screencapture -o -l <id>`
+  de la fenêtre ; `carnet.png` est retirée le même jour (la page Carnet de progrès n'existe plus),
+  `seance.png` avec la Séance en 1.1.1, `atelier.png` et `panneau.png` avec l'Atelier et le Panneau en 1.2), et une nouvelle version si ce
   qu'on installe a changé.
 - Pousser sur `main` directement.
 
@@ -1111,4 +1107,4 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
 - `.github/workflows/tests.yml` : syntaxe des scripts et les deux suites à chaque envoi sur `main` (macOS)
 - `build.sh` (tests, compilation, signature, archive notarisée), `install.sh`, `uninstall.sh`
 - `Resources/Info.plist` : identifiant `com.danymenard.mcp-developpeur` et version (incrusté par `-sectcreate` dans `Package.swift`)
-- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, les chantiers de la 1.3 et ce qui en reste à constater, et la fenêtre Claude (architecture, contraintes du SDK, fenêtre B et ses constats, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures : `capture.png` (la fenêtre Claude, fenêtre B de la 1.3.2 avec l'onglet Focus, capture principale du README ; à refaire au correctif 1.3.7 : la fenêtre de 1 623 × 1 200), `carnet.png` (la page Carnet de progrès ; à refaire au correctif 1.3.7 : la fenêtre Suivi en graphiques), `publication.png`, `consommation.png`, `suivi.png` (fenêtre de la liaison) ; `docs/lavish/` : les sources des pages Lavish publiées en artefacts (Analyse du Développeur, `analyse-1-5.html`), une par page, à garder identiques à leur artefact
+- `docs/SPEC.md` : cahier des charges, protocole entre le serveur et le module, les chantiers de la 1.3 et ce qui en reste à constater, et la fenêtre Claude (architecture, contraintes du SDK, fenêtre B et ses constats, fichiers) ; `docs/aide-adobe-developpement.md` : notes sur l'aide d'Adobe (outils de développement, ordre d'utilisation, écarts avec la méthode du connecteur, ce qui reste à faire à la main), à relire avant de changer les consignes (`ServerInfo`, `Consignes.lua`) ou les invites (`Prompts`) ; captures, refaites le 28 octobre 2026 : `capture.png` (la fenêtre Claude, capture principale du README), `suivi-graphiques.png` (la fenêtre Suivi), `demande-rapide.png`, `publication.png`, `consommation.png`, `suivi.png` (fenêtre de la liaison) ; `docs/lavish/` : les sources des pages Lavish publiées en artefacts (Analyse du Développeur, `analyse-1-5.html`), une par page, à garder identiques à leur artefact

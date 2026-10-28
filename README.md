@@ -243,6 +243,8 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 Une petite fenêtre à part pour une question vite faite : Fichier › Module externe - Extras ›
 Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une fois le raccourci posé.
 
+![La Demande rapide](docs/demande-rapide.png)
+
 - En bas, la demande sur trois lignes ; Retour l'envoie, comme Envoyer à sa droite.
 - Sur une seule photo (correctif 1.3.6), la demande part dans la conversation de cette photo, la
   même que dans la fenêtre Claude, et Claude y reprend sa session ; une photo sans conversation en
@@ -278,6 +280,8 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
 Une fenêtre à part, « Claude · Suivi », qu'ouvre le bouton Suivi en haut à droite de la fenêtre
 Claude : vos prises de vue et votre carnet de progrès en graphiques, sans Claude ni forfait
 (correctif 1.3.7, décidé avec vous le 25 octobre 2026).
+
+![La fenêtre Suivi](docs/suivi-graphiques.png)
 
 **Les photos qui comptent**
 

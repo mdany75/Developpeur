@@ -15,6 +15,10 @@
 
 local S = { taches = {}, dialogues = {}, messages = {}, prefs = {} }
 
+-- Le Lua de Lightroom n'a pas table.maxn (constaté le 26 octobre 2026 : « attempt to call field
+-- 'maxn' » au clic sur une barre de la fenêtre Suivi) : LuaJIT l'a, la simulation le retire.
+table.maxn = nil
+
 local function q(s)
     return "'" .. tostring(s):gsub("'", "'\\''") .. "'"
 end

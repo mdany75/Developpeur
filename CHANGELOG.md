@@ -1,5 +1,17 @@
 # Changements
 
+## Non publié
+
+### Corrigé
+- Fenêtre Suivi : un clic sur une barre montre de nouveau ses photos dans la Bibliothèque (il
+  échouait, le Lua de Lightroom n'ayant pas une fonction que le module employait).
+- Fenêtre Claude : une conversation ne prend plus pour titre un texte d'attente que Claude écrivait
+  avant d'avoir vu la photo (« à définir après aperçu ») ; il donne son vrai titre à la vue suivante.
+
+### Documentation
+- Les captures du README sont refaites avec la 1.4 : la fenêtre Claude, la fenêtre Suivi en
+  graphiques, la Demande rapide, Publication, Consommation et la fenêtre de la liaison.
+
 ## 1.4 — 2026-10-27
 
 La 1.4, une sortie entière, du tri à l'harmonisation : un voyage ou une fête de famille, c'est des

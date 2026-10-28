@@ -1198,9 +1198,15 @@ end
 -- bibliothèque une vue entière relirait des dizaines de milliers de photos à chaque clic. Une autre
 -- photo active ensuite dans la même sélection ne revoit qu'elle ; une autre sélection compte. Rend ce
 -- que `poser` rend ; son erreur remonte.
+-- Les valeurs rendues, nil compris, et leur nombre (`n`) : le Lua de Lightroom n'a pas table.maxn
+-- (constaté le 26 octobre 2026).
+local function paquet(...)
+    return { n = select('#', ...), ... }
+end
+
 function Releve.poserSelection(poser)
     Releve.selectionPosee = Releve.selectionPosee + 1
-    local resultats = { LrTasks.pcall(poser) }
+    local resultats = paquet(LrTasks.pcall(poser))
     Releve.selectionPosee = math.max(0, Releve.selectionPosee - 1)
     local info = Lightroom.photos()
     if Releve.selectionPosee == 0 and type(info) == 'table' and info.cle then
@@ -1209,7 +1215,7 @@ function Releve.poserSelection(poser)
     if not resultats[1] then
         error(resultats[2], 0)
     end
-    return unpack(resultats, 2, table.maxn(resultats))
+    return unpack(resultats, 2, resultats.n)
 end
 
 -- Range une vue : ses originaux au relevé (créés à leur première vue), leur prise de vue et le

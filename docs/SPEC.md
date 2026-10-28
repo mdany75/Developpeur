@@ -529,9 +529,8 @@ sombre.
 Les sections Disposition, Voyants et liaison, Carte Note et Bas de la fenêtre décrivent la 1.2 :
 ce qui y a changé est dit en tête de chacune. Les cinq chantiers de la 1.3 ont chacun leur partie
 « dans la fenêtre » dans leur section (Pourquoi ?, Leçon de la photo, Je le fais, Composition lue,
-Carnet de progrès). `docs/capture.png` montre encore la fenêtre B de la 1.3 (une retouche, ses
-étapes avec « Pourquoi ? » et la leçon de la photo), et `docs/carnet.png` la page Carnet de
-progrès : à refaire au correctif 1.3.7 (voir plus bas).
+Carnet de progrès). Les captures de `docs/` sont refaites le 28 octobre 2026
+avec le module 1.4 (`docs/carnet.png`, la page Carnet de progrès, est retirée : voir plus bas).
 
 Au correctif 1.3.6 (décisions de Dany du 25 octobre 2026), une photo, une conversation : la photo
 seule choisie dans Lightroom montre sa conversation, ou une neuve qui s'ouvre sur l'historique de
@@ -548,11 +547,10 @@ proposition). La leçon de la photo et « Je le fais » sont retirés de la fen�
 connecteur (leurs sections restent, comme historique) ; Pourquoi ? devient un clic sur l'étape ou
 l'image du fil (voir Fenêtre B, Retours de Dany après son essai). La barre de titre dit
 « Développeur v1.3.6 » (`Fenetre.titreFenetre`, d'après `Composants.module()`). Les captures
-`docs/capture.png` et `docs/carnet.png` montrent encore la fenêtre d'avant le correctif
-(1 948 × 1 200, le volet et la rangée Mode ; la page Carnet de progrès du fil) : à refaire au
-correctif 1.3.7 (la 1.3.6 n'a pas été publiée seule), dans Lightroom ; elles montreront la fenêtre
-de 1 623 × 1 200, en deux colonnes, ses quatre onglets et les boutons Suivi, Publication… et
-Consommation…, et la fenêtre Suivi en graphiques.
+sont refaites le 28 octobre 2026, dans Lightroom, avec le module 1.4 : `docs/capture.png`, la
+fenêtre de 1 623 × 1 200 en deux colonnes, ses quatre onglets et les boutons Suivi, Publication…
+et Consommation… ; `docs/suivi-graphiques.png`, la fenêtre Suivi en graphiques, à la place de
+`docs/carnet.png`.
 
 Au correctif 1.3.7 (décisions de Dany du 25 octobre 2026), la fenêtre Claude et la Demande rapide
 passent chaque sélection qu'elles voient au relevé du Suivi (`Releve.voirSelection`, depuis

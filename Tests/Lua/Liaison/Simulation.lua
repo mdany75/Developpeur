@@ -5,6 +5,10 @@
 local S = {}
 S.enAttente = {}
 
+-- Le Lua de Lightroom n'a pas table.maxn (constaté le 26 octobre 2026 : « attempt to call field
+-- 'maxn' » au clic sur une barre de la fenêtre Suivi) : LuaJIT l'a, la simulation le retire.
+table.maxn = nil
+
 local catalogue = {}
 
 -- Lightroom bloque sans erreur sur une table qui porte une métatable (tableau relu par

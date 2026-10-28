@@ -93,6 +93,11 @@ end
 
 local LONGUEUR_TITRE = 60
 
+-- Morceaux d'un titre d'attente, en minuscules (« À » majuscule n'est pas abaissé par Lua 5.1 :
+-- « définir » suffit).
+local TITRES_D_ATTENTE = { 'définir', 'definir', 'à venir', 'a venir', 'après aperçu', 'apres apercu',
+    'en attente', 'provisoire', 'inconnu', 'sans titre' }
+
 -- Le titre, sans guillemets, point final ni espaces en trop ; nil pour un titre vide ou pour le
 -- gabarit de la consigne répété tel quel (« <ce que montre la photo> »).
 function Conversation.nettoyerTitre(brut)
@@ -111,8 +116,16 @@ function Conversation.nettoyerTitre(brut)
         end
     end
     titre = titre:gsub('%s+', ' ')
-    if titre == '' or (titre:sub(1, 1) == '<' and titre:sub(-1) == '>') then
+    if titre == '' or titre:find('[<>]') then
         return nil
+    end
+    -- Un titre d'attente, écrit avant d'avoir vu la photo (constaté le 28 octobre 2026 :
+    -- « à définir après aperçu ») : refusé, Claude en donnera un vrai à la vue suivante.
+    local bas = titre:lower()
+    for _, attente in ipairs(TITRES_D_ATTENTE) do
+        if bas:find(attente, 1, true) then
+            return nil
+        end
     end
     return Texte.raccourcir(titre, LONGUEUR_TITRE)
 end
