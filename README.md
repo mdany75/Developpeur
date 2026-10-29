@@ -669,12 +669,6 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   zone chacun, un passage de Fibo 2 par changement, toutes les zones recollées dans le même TIFF,
   donc une seule nouvelle photo. Deux zones qui se chevauchent, se touchent ou presque (leurs bords
   fondus se recouvriraient) se font en deux fois, la seconde sur la nouvelle photo.
-- **Avec le contexte de toute la photo** (sur demande, `context` = `full_and_crop`) : Fibo 2 voit
-  aussi la photo entière, pour la lumière et le style, et ne modifie que le recadrage (sans masque :
-  seule la zone désignée est reprise de sa sortie ; si sa sortie ne s'aligne pas sur le recadrage,
-  rien n'en est repris, et Claude le dit). Ce mode est nouveau : rien ne dit encore qu'il
-  fait mieux que le recadrage seul. Pour en juger, demandez le même changement des deux façons
-  (deux nouvelles photos, empilées) et comparez-les.
 - **Dans l'ordre** : d'abord les corrections de base sur la photo (profil, balance des blancs,
   exposition), puis Fibo 2, puis les finitions (réglages, masques) sur la nouvelle photo.
 - **Ce qui se passe** : la photo développée part en TIFF 16 bits (Adobe RGB, taille réelle,
@@ -695,8 +689,9 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
 - **Défaire** : `undo_last` ne retire pas la nouvelle photo ; pour l'enlever, Photo › Retirer du
   catalogue, à la main (le fichier reste dans le dossier, à mettre à la Corbeille vous-même si
   vous n'en voulez plus).
-- **Durée** : quelques minutes par changement en qualité normale (50 étapes, décodage en pleine
-  précision, la meilleure qualité) ; en qualité rapide (Turbo, 4 étapes), bien moins, avec un
+- **Durée** : environ 8 minutes pour une zone en qualité normale (50 étapes, décodage en pleine
+  précision, la meilleure qualité), SeedVR2 compris (essai du 29 octobre 2026 : 471 s pour une tuque
+  sur une photo de 26 mégapixels) ; en qualité rapide (Turbo, 4 étapes), bien moins, avec un
   résultat moins fidèle. La première fois, le modèle se télécharge d'abord. Au-delà de 15 minutes
   par passage, le calcul s'arrête et rien n'est importé. Tout l'appel se suit dans une seule barre
   de progression de Lightroom, de 0 à 100 % (« Fibo 2 : jupe (1 sur 2), 24 % — environ 3 min

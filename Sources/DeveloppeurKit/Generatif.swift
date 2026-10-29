@@ -71,23 +71,17 @@ public enum Generatif {
         return (multiple16(l), multiple16(h))
     }
 
-    /// Les arguments de mflux, en tableau (aucun shell). Avec `contexte` (mode full_and_crop), deux
-    /// images : <image_1> la photo entière, pour le contexte, <image_2> le recadrage à modifier ; la
-    /// consigne est enveloppée (`consigneDeuxImages`) et sans masque (mflux ne le permet qu'avec une
-    /// seule image). Toujours --low-ram (constaté le 29 octobre 2026 : sans lui, mflux prenait 39 Go
+    /// Les arguments de mflux, en tableau (aucun shell) : l'entrée (le recadrage autour de la zone, ou
+    /// la photo entière sans zone) et, avec une zone, son masque (`--mask-path`, PNG RVB, accepté par
+    /// mflux 0.24, constaté le 29 octobre 2026). Toujours --low-ram (constaté le 29 octobre 2026 : sans lui, mflux prenait 39 Go
     /// sur les 48 du Mac Studio et Lightroom ne répondait plus ; avec lui, 20,6 Go et la même image
     /// au pixel près). Qualité normale : décodage en pleine précision (--vae-full-precision, sans
     /// coût de mémoire avec --low-ram) ; jamais --quantize (-q 8 : 38 Go, et moins fidèle) ni
     /// --step-cache-ratio, qui dégradent l'image.
     static func arguments(entree: URL, masque: URL?, instruction: String, taille: (largeur: Int, hauteur: Int),
-                          qualite: Qualite, graine: Int, sortie: URL, modeleRapide: URL?, contexte: URL? = nil) -> [String] {
-        var args: [String]
-        if let contexte {
-            args = ["--prompt", consigneDeuxImages(instruction), "--image-paths", contexte.path, entree.path]
-        } else {
-            args = ["--prompt", instruction, "--image-paths", entree.path]
-            if let masque { args += ["--mask-path", masque.path] }
-        }
+                          qualite: Qualite, graine: Int, sortie: URL, modeleRapide: URL?) -> [String] {
+        var args = ["--prompt", instruction, "--image-paths", entree.path]
+        if let masque { args += ["--mask-path", masque.path] }
         switch qualite {
         case .normal:
             args += ["--steps", String(etapesNormal), "--vae-full-precision"]
@@ -112,11 +106,6 @@ public enum Generatif {
         return FileManager.default.fileExists(atPath: instantane.appendingPathComponent("model_index.json").path) ? instantane : nil
     }
 
-    /// La consigne du mode à deux images (full_and_crop).
-    static func consigneDeuxImages(_ instruction: String) -> String {
-        "Edit <image_2> only: \(instruction). <image_1> shows the whole scene for context (light, colors, style); do not copy it."
-    }
-
     // MARK: Modifications
 
     /// Une modification demandée : son nom court en français (« jupe »), l'instruction donnée à Fibo 2
@@ -126,13 +115,6 @@ public enum Generatif {
         var instruction: String
         var instructionFr: String
         var region: CGRect?
-    }
-
-    /// Le mode de l'entrée de Fibo pour une zone : le recadrage seul (crop, par défaut), ou la photo
-    /// entière en plus, pour le contexte (full_and_crop).
-    enum ModeContexte: String {
-        case crop
-        case fullAndCrop = "full_and_crop"
     }
 
     static let maxModifications = 4
@@ -665,26 +647,6 @@ public enum Generatif {
             for i in 0..<n { zone[i] *= borne[i] }
         }
         return zone
-    }
-
-    /// Au-delà de cette part du pourtour changée (mode full_and_crop, sans masque), la sortie de
-    /// Fibo ne s'aligne pas sur le recadrage (reprise de <image_1>, sujet cadré autrement) : rien
-    /// n'en est repris. Provisoire, à relever sur de vraies sorties.
-    static let partPourtourMax = 0.3
-
-    /// La part du pourtour de la zone (le recadrage hors de la zone élargie de la marge et du fondu)
-    /// que Fibo a changée ; nil si ce pourtour est trop petit pour en juger.
-    static func partDuPourtourChangee(entree: [UInt8], sortie: [UInt8], largeur: Int, hauteur: Int, region: CGRect) -> Double? {
-        let changee = zoneChangee(entree: entree, sortie: sortie, largeur: largeur, hauteur: hauteur, region: nil)
-        let borne = masqueRegionDoux(region, largeur: largeur, hauteur: hauteur)
-        guard changee.count == borne.count else { return nil }
-        var dehors = 0, change = 0
-        for i in borne.indices where borne[i] < 1e-4 {
-            dehors += 1
-            if changee[i] > 0.5 { change += 1 }
-        }
-        guard dehors >= max(256, borne.count / 100) else { return nil }
-        return Double(change) / Double(dehors)
     }
 
     /// La zone de mélange : avec une zone donnée, toute la sortie de Fibo dans cette zone (élargie de

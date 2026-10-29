@@ -23,8 +23,6 @@
     seulement toute la photo réduite ; le reste de la photo garde ses pixels.
   - Jusqu'à 4 changements en un seul appel (« une jupe et un sac »), une zone chacun, recollés dans
     une seule nouvelle photo ; deux zones qui se chevauchent ou se touchent se font en deux fois.
-  - Sur demande, Fibo 2 voit aussi la photo entière, pour la lumière et le style (à comparer avec
-    le recadrage seul).
   - SeedVR2 remet une zone rendue trop petite à sa taille, avec plus de détail (modèle de quelques
     Go téléchargé au premier usage), seulement pour une zone désignée et un agrandissement mesuré ;
     sans lui, mise à la taille ordinaire, et Claude le dit.
@@ -48,6 +46,11 @@
   - Un seul calcul de Fibo 2 à la fois sur le Mac : une autre session de Claude (Claude Desktop, la
     fenêtre Claude, le terminal) est refusée pendant ce temps, de même qu'un calcul en cours dans
     Fibo 2 Studio, deux calculs ensemble dépassant la mémoire.
+  - Essai réel du 29 octobre 2026 (une tuque rouge à pompon sur un portrait de 26 mégapixels) :
+    environ 8 minutes en qualité normale, SeedVR2 compris, raccord invisible à 100 %, sans que
+    Lightroom cesse de répondre. Le mode qui montrait aussi la photo entière à Fibo 2 est retiré :
+    à cet essai, Fibo 2 y a redessiné une seconde tête, plus petite, que la vérification
+    d'alignement n'a pas vue ; le recadrage autour de la zone reste le seul chemin.
 
 ### Corrigé
 - Fenêtre Suivi : un clic sur une barre montre de nouveau ses photos dans la Bibliothèque (il

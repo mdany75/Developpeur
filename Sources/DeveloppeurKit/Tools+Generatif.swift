@@ -216,7 +216,6 @@ extension ToolHandler {
                                "description": "Plusieurs modifications en un appel (à la place de instruction, instruction_fr, region) : chacune avec sa region, sans chevauchement ; deux zones qui se touchent ou presque : deux appels, le second sur la nouvelle photo.",
                                "items": objectProp("Une modification.", ["label": label, "instruction": instruction, "instruction_fr": francais, "region": region],
                                                    required: ["instruction", "instruction_fr", "region"])]),
-                    ("context", enumProp(["crop", "full_and_crop"], "crop (défaut) : Fibo 2 reçoit le recadrage autour de la zone ; full_and_crop : aussi la photo entière, pour la lumière et le style (sans masque ; avec region seulement).")),
                     ("upscale", prop("boolean", "Vrai par défaut : une zone que Fibo 2 rend plus petite que sa taille dans la photo passe par SeedVR2 (plus de détail) ; faux : mise à la taille ordinaire.")),
                     ("quality", enumProp(["normal", "fast"], "normal (défaut) : \(Generatif.etapesNormal) étapes, pleine précision, quelques minutes ; fast : Turbo, \(Generatif.etapesRapide) étapes, plus rapide et moins fidèle.")),
                     ("seed", prop("integer", "Graine (facultative) : la même graine et la même instruction redonnent la même image ; sans elle, une graine au hasard, rendue dans la réponse.")),
@@ -249,8 +248,6 @@ extension ToolHandler {
         var sortieEntiere = false
         var seedVRFait = false
         var remarqueSeedVR: String?
-        /// Une sortie qui ne s'aligne pas sur le recadrage (full_and_crop) : rien n'en est repris.
-        var nonAlignee: String?
         /// La mémoire libre lue juste avant de lancer Fibo pour cette modification.
         var memoireLibre: UInt64?
         /// Pas assez de mémoire libre au lancement : Fibo n'a pas été lancé, rien n'en est repris.
@@ -267,11 +264,6 @@ extension ToolHandler {
         let modifications = try Generatif.modifications(args.raw)
         let qualiteTexte = args.string("quality") ?? "normal"
         guard let qualite = Generatif.Qualite(rawValue: qualiteTexte) else { throw LightroomError.invalid("« quality » : normal ou fast.") }
-        let modeTexte = args.string("context") ?? "crop"
-        guard let mode = Generatif.ModeContexte(rawValue: modeTexte) else { throw LightroomError.invalid("« context » : crop ou full_and_crop.") }
-        if mode == .fullAndCrop, modifications.contains(where: { $0.region == nil }) {
-            throw LightroomError.invalid("« context » = full_and_crop : seulement avec une region (la zone à modifier). Rien n'a été fait.")
-        }
         let agrandir = args.bool("upscale") ?? true
         let graine: Int
         if args.has("seed") {
@@ -385,17 +377,6 @@ extension ToolHandler {
             return Passage(modif: modif, cadre: cadre, regionCadre: regionCadre, taille: taille, seedVRPrevu: prevu)
         }
         barre.avancement = Generatif.Avancement(seedVR: passages.map(\.seedVRPrevu))
-        // La photo entière à ~1 Mpx, pour le contexte (full_and_crop), écrite une fois.
-        var cheminContexte: URL?
-        if mode == .fullAndCrop {
-            let taille = Generatif.tailleCible(largeur: origine.width, hauteur: origine.height)
-            guard let pixels = Generatif.entree(origine, cadre: nil, taille: taille),
-                  let image = Generatif.image8(pixels, largeur: taille.largeur, hauteur: taille.hauteur) else {
-                throw LightroomError.plugin("Entrée de Fibo 2 impossible à préparer. Rien n'a été fait.")
-            }
-            cheminContexte = dossier.appendingPathComponent("contexte.png")
-            try Generatif.ecrirePNG(image, vers: cheminContexte!)
-        }
 
         // 3. Fibo 2, une fois par modification, chacune depuis le TIFF exporté.
         let modeleRapide = qualite == .fast ? Generatif.modeleLocal(depot: Generatif.depotRapide, cache: fibo.cacheHF) : nil
@@ -419,7 +400,7 @@ extension ToolHandler {
             let cheminEntree = dossier.appendingPathComponent("entree-\(n).png")
             try Generatif.ecrirePNG(imageEntree, vers: cheminEntree)
             var cheminMasque: URL?
-            if let regionCadre = passage.regionCadre, mode == .crop {
+            if let regionCadre = passage.regionCadre {
                 let masque = Generatif.masqueRegion(regionCadre, largeur: taille.largeur, hauteur: taille.hauteur)
                 guard let image = Generatif.imageMasque(masque, largeur: taille.largeur, hauteur: taille.hauteur) else {
                     throw LightroomError.plugin("Masque de Fibo 2 impossible à préparer. Rien n'a été fait.")
@@ -429,8 +410,7 @@ extension ToolHandler {
             }
             let cheminSortie = dossier.appendingPathComponent("sortie-\(n).png")
             let arguments = Generatif.arguments(entree: cheminEntree, masque: cheminMasque, instruction: passage.modif.instruction, taille: taille,
-                                                qualite: qualite, graine: graine, sortie: cheminSortie, modeleRapide: modeleRapide,
-                                                contexte: cheminContexte)
+                                                qualite: qualite, graine: graine, sortie: cheminSortie, modeleRapide: modeleRapide)
             let avant = Set((try? FileManager.default.contentsOfDirectory(atPath: dossier.path)) ?? [])
             barre.montrer(.chargement(rang), passage.modif.label, rang: n, detail: "chargement du modèle")
             let debutFibo = Date()
@@ -471,17 +451,6 @@ extension ToolHandler {
             }
             try contexte.verifier()
 
-            // Sans masque (full_and_crop), une sortie qui ne s'aligne pas sur le recadrage (reprise de
-            // la photo entière, sujet cadré autrement) : le pourtour de la zone a changé ; rien n'en
-            // est repris.
-            if mode == .fullAndCrop, let regionCadre = passage.regionCadre,
-               let pourtour = Generatif.partDuPourtourChangee(entree: entree, sortie: sortie, largeur: taille.largeur, hauteur: taille.hauteur, region: regionCadre),
-               pourtour > Generatif.partPourtourMax {
-                passage.nonAlignee = "La sortie de Fibo 2 ne s'aligne pas sur le recadrage (\(Int((pourtour * 100).rounded())) % du pourtour de la zone changé) : rien n'en est repris. Réessayer avec context = crop, ou une autre seed."
-                passages[rang] = passage
-                continue
-            }
-
             // La zone changée (dans le repère du recadrage), et la zone de mélange.
             let changee = Generatif.zoneChangee(entree: entree, sortie: sortie, largeur: taille.largeur, hauteur: taille.hauteur, region: passage.regionCadre)
             let partCadre = Generatif.part(changee)
@@ -517,10 +486,6 @@ extension ToolHandler {
         guard !pieces.isEmpty else {
             if let manque = passages.compactMap(\.sansMemoire).first {
                 throw LightroomError.plugin(avecMuet(manque.replacingOccurrences(of: "rien n'en est repris", with: "rien n'a été importé") + " Fermer des applications gourmandes, puis réessayer ; Lightroom peut rester ouvert."))
-            }
-            let nonAlignees = passages.compactMap(\.nonAlignee)
-            if !nonAlignees.isEmpty, nonAlignees.count == passages.count {
-                throw LightroomError.plugin(nonAlignees[0].replacingOccurrences(of: "rien n'en est repris", with: "rien n'a été importé"))
             }
             let dans = modifications.count > 1 ? " dans aucune des zones" : (modifications[0].region == nil ? "" : " dans la zone")
             throw LightroomError.plugin("Fibo 2 n'a rien changé de visible\(dans) : rien n'a été importé. Reformuler l'instruction (plus précise, en anglais), ou changer seed.")
@@ -586,7 +551,6 @@ extension ToolHandler {
             "duree_fibo_s": .number(dureeFibo.rounded()),
             "a_savoir": .string(Self.aSavoir(importee, id: nouvelle)),
         ]
-        if mode == .fullAndCrop { resultat["contexte"] = .string(mode.rawValue) }
         if let memoireAuDepart {
             resultat["memoire_libre_go"] = .number(Generatif.nombreGo(memoireAuDepart))
         } else {
@@ -598,13 +562,9 @@ extension ToolHandler {
         if !sansMemoire.isEmpty {
             resultat["remarque_memoire"] = .string("Mémoire libre insuffisante pour lancer Fibo 2 pour « \(sansMemoire.joined(separator: " », « ")) » : rien n'en est repris ; fermer des applications gourmandes, puis le redemander sur la nouvelle photo.")
         }
-        let sansChangement = passages.filter { $0.piece == nil && $0.nonAlignee == nil && $0.sansMemoire == nil }.map(\.modif.label)
+        let sansChangement = passages.filter { $0.piece == nil && $0.sansMemoire == nil }.map(\.modif.label)
         if !sansChangement.isEmpty {
             resultat["remarque_zones"] = .string("Fibo 2 n'a rien changé de visible pour « \(sansChangement.joined(separator: " », « ")) » : rien n'en est repris ; le redemander (instruction plus précise, ou autre seed) sur la nouvelle photo.")
-        }
-        let nonAlignees = passages.filter { $0.nonAlignee != nil }.map(\.modif.label)
-        if !nonAlignees.isEmpty {
-            resultat["remarque_alignement"] = .string("La sortie de Fibo 2 ne s'aligne pas sur le recadrage pour « \(nonAlignees.joined(separator: " », « ")) » : rien n'en est repris ; le redemander avec context = crop, ou une autre seed, sur la nouvelle photo.")
         }
         if let passage = passages.first, passages.count == 1,
            let remarque = Generatif.remarqueSortieEntiere(partChangee: passage.partChangee, sortieEntiere: passage.sortieEntiere) {
@@ -644,7 +604,7 @@ extension ToolHandler {
         objet["resolution_zone"] = .string(quoi + comment)
         if let remarque = passage.remarqueSeedVR { objet["remarque_seedvr2"] = .string(remarque) }
         if let libre = passage.memoireLibre { objet["memoire_libre_go"] = .number(Generatif.nombreGo(libre)) }
-        if passage.piece == nil { objet["remarque"] = .string(passage.sansMemoire ?? passage.nonAlignee ?? "Fibo 2 n'a rien changé de visible ici : rien n'en est repris.") }
+        if passage.piece == nil { objet["remarque"] = .string(passage.sansMemoire ?? "Fibo 2 n'a rien changé de visible ici : rien n'en est repris.") }
         return .object(objet)
     }
 

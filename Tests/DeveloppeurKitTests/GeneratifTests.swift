@@ -173,7 +173,7 @@ final class GeneratifTests: XCTestCase {
         while [ $# -gt 0 ]; do
           case "$1" in
             --output) out="$2"; shift ;;
-            --image-paths) shift; while [ $# -gt 0 ] && [ "${1#--}" = "$1" ]; do img="$1"; shift; done; continue ;;
+            --image-paths) img="$2"; shift ;;
             --mask-path) mask="$2"; shift ;;
           esac
           shift
@@ -379,10 +379,9 @@ final class GeneratifTests: XCTestCase {
         }
         XCTAssertEqual(outil["inputSchema"]?["required"], [], "instruction ou edits")
         let proprietes = try XCTUnwrap(outil["inputSchema"]?["properties"]?.object)
-        XCTAssertEqual(Set(proprietes.keys), ["photo_id", "instruction", "instruction_fr", "region", "label", "edits", "context", "upscale", "quality", "seed", "confirm", "reason"])
+        XCTAssertEqual(Set(proprietes.keys), ["photo_id", "instruction", "instruction_fr", "region", "label", "edits", "upscale", "quality", "seed", "confirm", "reason"])
         XCTAssertEqual(proprietes["edits"]?["maxItems"]?.int, 4)
         XCTAssertEqual(proprietes["edits"]?["items"]?["required"], ["instruction", "instruction_fr", "region"])
-        XCTAssertEqual(proprietes["context"]?["enum"], ["crop", "full_and_crop"])
         XCTAssertTrue(ServerInfo.instructions.contains("generative_edit, sur sa demande"))
         XCTAssertFalse(ServerInfo.instructions.contains("suppression générative"))
     }
@@ -449,8 +448,10 @@ final class GeneratifTests: XCTestCase {
         XCTAssertTrue(editer(["instruction": "x", "region": ["x": 0.8, "y": 0, "width": 0.5, "height": 0.5]]).text.contains("region"))
         XCTAssertTrue(editer(["instruction": "x", "seed": -1]).text.contains("seed"))
         XCTAssertTrue(tools.call(name: "generative_edit", arguments: ["instruction": "x"]).text.contains("instruction_fr"), "traduction exigée")
-        XCTAssertTrue(editer(["instruction": "x", "context": "tout"]).text.contains("crop ou full_and_crop"))
-        XCTAssertTrue(editer(["instruction": "x", "context": "full_and_crop"]).text.contains("seulement avec une region"))
+        // Le mode à deux images est retiré (essai du 29 octobre 2026) : « context » est un paramètre
+        // inconnu comme un autre, refusé avant tout envoi.
+        let contexte = editer(["instruction": "x", "region": ["x": 0.3, "y": 0.4, "width": 0.2, "height": 0.3], "context": "full_and_crop"])
+        XCTAssertTrue(contexte.isError && contexte.text.contains("context"), contexte.text)
         XCTAssertTrue(editer(["edits": []]).text.contains("de 1 à 4"))
         let cinq: [JSONValue] = (0..<5).map { k in ["instruction": "x", "instruction_fr": "x", "region": ["x": .number(0.18 * Double(k)), "y": 0, "width": 0.1, "height": 0.1]] }
         XCTAssertTrue(editer(["edits": .array(cinq)]).text.contains("de 1 à 4"))
@@ -729,7 +730,7 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(dossiersTemporairesRestants, [])
     }
 
-    // MARK: Recadrage, plusieurs modifications, deux images, SeedVR2, progression
+    // MARK: Recadrage, plusieurs modifications, SeedVR2, progression
 
     /// Le recadrage autour d'une zone : marge de 50 % de chaque côté, au moins 35 % du petit côté,
     /// coupé aux bords, ~1 Mpx au-delà (jamais plus grand que natif), la zone dans son repère.
@@ -940,30 +941,6 @@ final class GeneratifTests: XCTestCase {
         XCTAssertFalse(sousLeSeuil.lancer); XCTAssertNil(sousLeSeuil.raison, "× 1,17 : rien à dire")
     }
 
-    /// full_and_crop : <image_1> la photo entière, <image_2> le recadrage ; consigne enveloppée, pas
-    /// de masque ; la sortie a la taille du recadrage, bornée par la zone.
-    func testDeuxImagesPhotoEntiereEtRecadrage() throws {
-        let region = CGRect(x: 0.05, y: 0.2, width: 0.3, height: 0.6)
-        fauxMflux(sortie: sortiePreparee(region: region) { fx, fy, p, i in
-            if fx > 0.1, fx < 0.3, fy > 0.3, fy < 0.7 { Self.rouge(&p, i) }
-            if fx > 0.44, fx < 0.46 { Self.bleu(&p, i) }
-        })
-        let resultat = editer(["instruction": "replace the trousers with a skirt", "region": ["x": 0.05, "y": 0.2, "width": 0.3, "height": 0.6],
-                               "context": "full_and_crop"])
-        XCTAssertFalse(resultat.isError, resultat.text)
-        let args = argumentsPasses
-        let images = try XCTUnwrap(args.firstIndex(of: "--image-paths"))
-        XCTAssertEqual(URL(fileURLWithPath: args[images + 1]).lastPathComponent, "contexte.png", "<image_1> : la photo entière")
-        XCTAssertEqual(URL(fileURLWithPath: args[images + 2]).lastPathComponent, "entree-1.png", "<image_2> : le recadrage")
-        XCTAssertNil(valeur("--mask-path"), "pas de masque avec deux images")
-        XCTAssertEqual(valeur("--prompt"), "Edit <image_2> only: replace the trousers with a skirt. <image_1> shows the whole scene for context (light, colors, style); do not copy it.")
-        XCTAssertEqual(valeur("--width"), "288"); XCTAssertEqual(valeur("--height"), "400")
-        let avant = try XCTUnwrap(Self.pixels16(source)), apres = try XCTUnwrap(Self.pixels16(importe))
-        XCTAssertEqual(Self.pixel(apres, 270, 200), Self.pixel(avant, 270, 200), "hors de la zone, rien n'est repris")
-        XCTAssertGreaterThan(Self.pixel(apres, 120, 200)[0], 45_000)
-        XCTAssertEqual(try JSONCoding.parse(resultat.text)["contexte"]?.string, "full_and_crop")
-    }
-
     /// Une source plus grande (1 600 × 1 200) : le recadrage de toute la photo (1,92 Mpx) revient de
     /// ~1 Mpx, agrandi de 1,35 fois : SeedVR2 d'abord (côté court natif, 7B, par tuiles).
     func testSeedVRAuDelaDeUnVirguleVingtCinq() throws {
@@ -1050,19 +1027,6 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(modification["seedvr2"]?.bool, false)
         XCTAssertTrue(modification["remarque_seedvr2"]?.string?.contains("Sans region") == true, resultat.text)
         XCTAssertFalse(fake.progressions.contains { $0["message"]?.string?.contains("SeedVR2") == true }, "la barre ne lui réserve rien")
-    }
-
-    /// full_and_crop, sans masque : une sortie qui ne s'aligne pas sur le recadrage (tout le pourtour
-    /// changé) n'est pas reprise ; rien n'est importé.
-    func testDeuxImagesSortieNonAligneeRienDImporte() {
-        let region = CGRect(x: 0.05, y: 0.2, width: 0.3, height: 0.6)
-        fauxMflux(sortie: sortiePreparee(region: region) { _, _, p, i in Self.rouge(&p, i) })
-        let resultat = editer(["instruction": "x", "region": ["x": 0.05, "y": 0.2, "width": 0.3, "height": 0.6], "context": "full_and_crop"])
-        XCTAssertTrue(resultat.isError)
-        XCTAssertTrue(resultat.text.contains("ne s'aligne pas") && resultat.text.contains("context = crop"), resultat.text)
-        XCTAssertFalse(fake.commands.contains("importerGeneree"))
-        // La même sortie en mode crop (masque donné) : la zone est reprise, bornée par elle.
-        XCTAssertFalse(editer(["instruction": "x", "region": ["x": 0.05, "y": 0.2, "width": 0.3, "height": 0.6]]).isError)
     }
 
     /// La croix de Lightroom se lit pendant un chargement muet du modèle (la même progression renvoyée
@@ -1170,9 +1134,10 @@ final class GeneratifTests: XCTestCase {
         let e = URL(fileURLWithPath: "/tmp/e.png"), s = URL(fileURLWithPath: "/tmp/s.png")
         let normal = Generatif.arguments(entree: e, masque: nil, instruction: "x", taille: (1024, 1024), qualite: .normal, graine: 1, sortie: s, modeleRapide: nil)
         let rapide = Generatif.arguments(entree: e, masque: nil, instruction: "x", taille: (1024, 1024), qualite: .fast, graine: 1, sortie: s, modeleRapide: nil)
-        let deuxImages = Generatif.arguments(entree: e, masque: nil, instruction: "x", taille: (1024, 1024), qualite: .normal, graine: 1, sortie: s,
-                                             modeleRapide: nil, contexte: URL(fileURLWithPath: "/tmp/c.png"))
-        for args in [normal, rapide, deuxImages] {
+        let masque = Generatif.arguments(entree: e, masque: URL(fileURLWithPath: "/tmp/m.png"), instruction: "x", taille: (1024, 1024), qualite: .normal,
+                                         graine: 1, sortie: s, modeleRapide: nil)
+        XCTAssertEqual(Array(masque.prefix(6)), ["--prompt", "x", "--image-paths", "/tmp/e.png", "--mask-path", "/tmp/m.png"], "une seule image, son masque")
+        for args in [normal, rapide, masque] {
             XCTAssertEqual(args.filter { $0 == "--low-ram" }.count, 1, "\(args)")
             XCTAssertFalse(args.contains("-q") || args.contains("--quantize"), "\(args)")
         }

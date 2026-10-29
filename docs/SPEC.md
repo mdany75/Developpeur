@@ -7475,8 +7475,11 @@ en sort, `Bibliotheque.annulerCumul` : sinon un retrait annulé laisserait au re
 photo dans la collection où Claude l'avait mise). Comme
 `Amelioration`, ce n'est pas un réglage : `annuler` et `revenir` l'écartent de
 `applyDevelopSettings` (la simulation le refuse) et la remettent par `Bibliotheque.remettre`, dans
-la même écriture ; une comparaison (`comparer`) n'a rien à rendre pour un classement. Un classement
-ne fait pas « Retouchée par Claude », et l'instantané « Avant Claude » vient à la première
+la même écriture ; une comparaison (`comparer`) n'a rien à rendre pour un classement. Le retour à
+l'origine remet donc aussi les collections : une copie d'essai rangée dans « Développeur › Essais »
+par Claude, puis remise à l'origine, n'y est plus (constaté le 29 octobre 2026, essai de Fibo 2 :
+le TIFF a été empilé avec le vrai original) ; ranger une copie d'essai **après** la remise à
+l'origine. Un classement ne fait pas « Retouchée par Claude », et l'instantané « Avant Claude » vient à la première
 retouche du développement même après un classement (`Ecriture.sansRetouche`). « Proposer d'abord »
 et la pause s'y appliquent. Une copie virtuelle ou une collection créée reste : le SDK ne
 supprime pas de photo, et le module ne supprime rien.
@@ -7869,8 +7872,7 @@ Arguments : `photo_id` (sans lui, la photo active de `etat`), `instruction` (2 0
 plus, en anglais : ce qui change et ce qui reste), `instruction_fr` (exigée : sa traduction pour
 Dany), `region` (facultative pour une seule modification : `{x, y, width, height}` de 0 à 1 dans
 l'image que montre `view_photo`), `label` (nom court), ou à leur place `edits` (1 à 4 modifications ;
-voir Recadrage, plusieurs modifications, deux images, SeedVR2), `context` (`crop` par défaut,
-`full_and_crop`), `upscale` (vrai par défaut : SeedVR2), `quality` (`normal`, par défaut, 50 étapes,
+voir Recadrage, plusieurs modifications, SeedVR2), `upscale` (vrai par défaut : SeedVR2), `quality` (`normal`, par défaut, 50 étapes,
 pleine précision ; `fast`, Turbo, 4 étapes), `seed` (0 à 2³¹ − 1 ; sans elle, une graine au hasard,
 rendue), `confirm`, `reason` ; aucun argument exigé par le schéma (`instruction` ou `edits`). Titre « Retouche générative (Fibo 2) », `destructiveHint` faux (rien
 n'est retiré : une photo s'ajoute), description de moins de 1 200 caractères.
@@ -8024,30 +8026,33 @@ un trait d'un pixel retiré, dans la zone changée ; la zone donnée prise en en
 
 Dans Lightroom :
 
-- `catalog:addPhoto` avec la pile `'above'` sur l'original, et la place de la photo dans la pile,
-  repliée ou non ;
+- la place de la photo dans la pile, repliée ou non (`catalog:addPhoto` avec la pile `'above'` sur
+  l'original : constaté le 29 octobre 2026) ;
 - la photo ajoutée illisible dans l'écriture qui l'a créée, et relue juste après ;
 - un chemin déjà au catalogue refusé par `addPhoto` ;
-- `LrFileUtils.copy` sur `/Volumes/Photos`, et sa valeur de retour ;
-- la nouvelle photo rendue active et sélectionnée, y compris quand la source affichée est une
-  collection (Essais) ;
+- la valeur de retour de `LrFileUtils.copy` (la copie dans le dossier de l'original a réussi :
+  constaté le 29 octobre 2026) ;
+- la nouvelle photo rendue active et sélectionnée quand la source affichée est une collection
+  (Essais) (active depuis le dossier de l'original : constaté le 29 octobre 2026) ;
 - `addPhoto` sans pile (photo d'essai), puis la photo ajoutée à la collection Essais dans
   l'écriture suivante ;
 - sous « Copies virtuelles seulement », `createVirtualCopies` sur la photo importée juste après son
   ajout, et la copie rendue active ;
 - l'accord dans Lightroom demandé une seule fois (exportation puis importation).
 
-Côté Fibo 2 :
+Constaté le 29 octobre 2026 (essai réel, détails sous « Constaté à l'essai réel » plus bas) :
+`addPhoto` empilé au-dessus de l'original, dans son dossier, et la nouvelle photo rendue active ;
+le masque PNG RVB lu par `--mask-path` ; la durée d'une zone en qualité normale (471 s, SeedVR2
+compris).
 
-- le masque PNG en RVB (blanc sur noir) lu par `--mask-path` ;
-- le seuil de la zone changée (`seuilEcart`) sur de vraies sorties : Fibo peut décaler un peu les
+Côté Fibo 2, reste :
+
+- le seuil de la zone changée (`seuilEcart`) sur d'autres sorties : Fibo peut décaler un peu les
   couleurs de toute l'image ;
-- la durée réelle d'une génération, en qualité normale et rapide, et celle du premier
-  téléchargement du modèle ; la progression vue de bout en bout (le faux mflux finit avant la
-  première lecture) ;
-- la mémoire en pointe sur une grande photo.
+- la durée en qualité rapide, et celle du premier téléchargement du modèle ;
+- la mémoire en pointe du connecteur sur une grande photo.
 
-### Recadrage, plusieurs modifications, deux images, SeedVR2 (29 octobre 2026)
+### Recadrage, plusieurs modifications, SeedVR2 (29 octobre 2026)
 
 Demandés par Dany le même jour ; la recomposition reste celle d'avant (hors des zones, les pixels
 du TIFF exporté au bit près).
@@ -8082,15 +8087,15 @@ du TIFF exporté au bit près).
   reprise (dit par `remarque_zones`) ; aucune : refus, rien d'importé.
 - **Consigne** : `instruction` en anglais, `instruction_fr` exigée ; la consigne du module (accord
   et journal) est le texte français (`consigneJournal` : « jupe : … ; sac : … — raison »).
-- **Deux images** : `context` = `full_and_crop` (avec une zone seulement) : `--image-paths
-  contexte.png entree-<n>.png` (la photo entière à ~1 Mpx, puis le recadrage), consigne « Edit
-  <image_2> only: … <image_1> shows the whole scene for context (light, colors, style); do not copy
-  it. », sans `--mask-path` (mflux ne le permet qu'avec une image) ; la zone de mélange reste le
-  garde-fou. Sans masque, rien ne garantit que la sortie s'aligne sur le recadrage (reprise de
-  `<image_1>`, sujet cadré autrement) : si plus de `partPourtourMax` (30 %, provisoire) du pourtour
-  de la zone (le recadrage hors de la zone élargie de sa marge et de son fondu) a changé
-  (`partDuPourtourChangee`), la pièce n'est pas reprise (`remarque_alignement`, ou refus si aucune ne
-  l'est).
+- **Deux images : retiré le 29 octobre 2026.** Le mode `context` = `full_and_crop` (la photo
+  entière à ~1 Mpx en `<image_1>`, le recadrage en `<image_2>`, sans masque) a échoué à l'essai réel
+  (même photo, même consigne, même graine que le recadrage seul) : 771 s, Fibo 2 a redessiné une
+  seconde tête de la personne, plus petite, dans le recadrage ; la garde d'alignement (part du
+  pourtour de la zone changée, au-delà de 30 %) ne l'a pas vue (2 % changés, pièce reprise), et la
+  seconde tête a été collée au-dessus de la vraie. Le recadrage seul, avec son masque, reste le seul
+  chemin avec une zone ; `context`, la consigne à deux images, `contexte.png`, la garde
+  d'alignement et `remarque_alignement` sont retirés. Un `context` encore reçu est refusé comme tout
+  paramètre inconnu.
 - **Qualité** : `--vae-full-precision` en qualité normale ; jamais `--quantize` ni
   `--step-cache-ratio` ; Turbo seulement avec `quality` = `fast`.
 - **Mémoire** (constaté le 29 octobre 2026, essai réel) : sans `--low-ram`, Fibo 2 a pris environ
@@ -8181,23 +8186,34 @@ du TIFF exporté au bit près).
   `reprise`, `part_changee_pct` (de la photo), `region` et `recadrage_px`, `resolution_zone`,
   `seedvr2` (et `remarque_seedvr2`).
 
-Reste à constater (rien n'a encore tourné avec le vrai mflux ni le vrai SeedVR2 ; les essais passent
-par de faux scripts qui écrivent un PNG) :
+**Constaté à l'essai réel du 29 octobre 2026** (après les corrections de mémoire), sur une copie
+d'essai de DSCF2402.RAF (26 Mpx), Lightroom ouvert, consigne « une tuque rouge à pompon », `region`
+`{x 0,27, y 0,09, width 0,18, height 0,17}`, graine 42, qualité normale, recadrage seul : réussi.
+Recadrage de 2 247 × 1 456 px, sortie de Fibo 1 280 × 832, SeedVR2 7B (× 1,8) ; 2,7 % de la photo
+changés ; tuque nette, tricot détaillé, raccord invisible à 100 %. 471 s en tout, dont 417 s pour
+Fibo 2 et SeedVR2 ; 32,4 Go de mémoire libre au départ, jamais moins de 72 % libre pendant le
+calcul ; chaque commande `progression` a répondu (0,00 s) ; `importerGeneree` en 11,96 s ;
+`addPhoto` empilé au-dessus de l'original (la pile du vrai DSCF2402, dans le dossier de l'original),
+la photo devenue active ; le masque PNG RVB accepté par `--mask-path` ; `--low-ram` et
+`--vae-full-precision` acceptés par mflux 0.24 ; SeedVR2 7B téléchargé et lancé avec `--low-ram`.
+Le même essai en mode à deux images a échoué : voir Deux images, plus haut (mode retiré).
 
-- `--image-paths` à deux images accepté par mflux 0.24 (`--vae-full-precision` et `--low-ram` le
-  sont : mesurés le 29 octobre 2026, Mémoire plus haut) ; la mémoire de SeedVR2 7B avec `--low-ram`,
-  pour fixer `memoireMinimaleSeedVR` ;
-- le masque PNG en RVB (blanc sur noir) lu par `--mask-path` sur un recadrage ;
-- la durée réelle d'un appel : chargement du modèle, étapes en qualité normale et rapide, une à
-  quatre modifications, et le temps restant annoncé contre le temps vrai ;
-- la qualité du mode à deux images (`full_and_crop`) contre le recadrage seul, sur la même photo et
-  la même consigne (même `seed`) : lumière, couleurs, raccord au bord de la zone ;
-- SeedVR2 7B sur une vraie zone : détail gagné contre la mise à la taille ordinaire, raccord avec le
-  reste de la photo, durée, mémoire et premier téléchargement, et ses bornes (× 4, 16 Mpx) ;
+Remettre une copie d'essai à l'origine (`revert_to_original`) après l'avoir rangée dans
+« Développeur › Essais » défait ce rangement (le classement est gardé dans la mémoire
+`Bibliotheque`, voir Bibliothèque) : à cet essai, la copie n'était plus dans Essais, et le TIFF a
+été empilé avec le vrai original au lieu d'aller dans Essais. Ranger la copie dans Essais **après**
+la remise à l'origine.
+
+Reste à constater (les essais passent par de faux scripts qui écrivent un PNG) :
+
+- la mémoire en pointe de SeedVR2 7B avec `--low-ram`, pour fixer `memoireMinimaleSeedVR` ;
+- la durée en qualité rapide, avec deux à quatre modifications, et le temps restant annoncé contre
+  le temps vrai ;
+- SeedVR2 7B contre la mise à la taille ordinaire sur la même zone, et ses bornes (× 4, 16 Mpx) ;
 - la progression de SeedVR2, lue sur ses barres tqdm hors chargement (approximative), et son poids
   de 15 % dans la barre ;
-- le seuil d'alignement du mode à deux images (`partPourtourMax`) sur de vraies sorties ;
-- la marge de contexte (`margeContexte`, `contexteMin`) sur de vraies photos.
+- la marge de contexte (`margeContexte`, `contexteMin`) sur d'autres photos (une zone contre un
+  bord, une zone allongée).
 
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 
