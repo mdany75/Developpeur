@@ -8108,27 +8108,19 @@ du TIFF exporté au bit près).
   défaut ; `--low-ram --vae-full-precision` 20,6 Go, identique à `--vae-full-precision` seul ;
   `-q 8` 38,0 Go et moins fidèle (écart moyen 1,2, max 146). D'où : **toujours `--low-ram`** (normal
   et rapide ; `--vae-full-precision` gardé en normal ; jamais `-q`), et `--low-ram` pour SeedVR2 aussi
-  (il implique `--vae-tiling`, qui n'est plus passé). **Garde** : avant chaque lancement de mflux,
-  la mémoire disponible (`Generatif.memoireDisponible` : `host_statistics64`, `free_count` (qui
-  comprend déjà les spéculatives : vm_stat affiche « Pages free » = free_count − speculative_count)
-  plus `inactive_count`, fois la taille de page ; ni les spéculatives une seconde fois ni les
-  purgeables, déjà dans les files active et inactive : la mesure était surestimée, relecture du
-  29 octobre 2026 ; injectable, `Fibo.memoireLibre`)
-  doit atteindre `Generatif.memoireMinimale` (24 Go, 20,6 mesurés plus une marge, provisoire) :
-  au départ, refus avant tout envoi au module (« Mémoire libre insuffisante pour Fibo 2 : X Go
-  libres, 24 Go nécessaires ; fermer des applications… ») ; plus tard dans l'appel (après
-  l'exportation, avant une modification suivante), cette modification n'est pas lancée
-  (`remarque_memoire`, et refus si aucune n'est reprise). Avant SeedVR2, `memoireMinimaleSeedVR`
-  (16 Go, provisoire) : en dessous, mise à la taille ordinaire, dite (`remarque_seedvr2`), pas
-  d'échec. Une mesure illisible ne refuse rien, mais la réponse le dit (`remarque_garde_memoire` :
-  « Mémoire libre non lue : la garde de mémoire n'a pas été appliquée… ») et stderr aussi. **Un seul
-  calcul à la fois** : avant la garde, `Fibo.prendreVerrou` prend sans attendre un `flock` sur
+  (il implique `--vae-tiling`, qui n'est plus passé). **Plus de garde de mémoire** (retirée le
+  29 octobre 2026 au soir, à la demande de Dany : « le Mac créera du swap au besoin ») : la garde
+  d'abord posée (mémoire disponible lue par `host_statistics64` avant chaque lancement, 24 Go exigés
+  pour Fibo 2, 16 Go pour SeedVR2, refus ou saut en dessous) n'existe plus ; rien n'est refusé ni
+  sauté faute de mémoire libre, SeedVR2 se lance dès que ses autres conditions sont remplies, et la
+  réponse ne dit plus rien de la mémoire (`memoire_libre_go`, `memoire_minimale_go`,
+  `remarque_memoire`, `remarque_garde_memoire` retirés). `--low-ram` (20,6 Go) et un seul calcul à
+  la fois suffisent : au-delà de la mémoire libre, macOS se sert du swap. **Un seul
+  calcul à la fois** : d'abord, `Fibo.prendreVerrou` prend sans attendre un `flock` sur
   `<racine>/Temporaire/fibo-en-cours.verrou` (hors de `Temporaire/Fibo`, que le ménage efface), tenu
   tout l'appel et rendu par le noyau si le serveur meurt ; tenu par un autre serveur (Claude
   Desktop, la fenêtre Claude, Claude Code en terminal ont chacun leur `FileOutils`), refus avant tout
-  envoi : deux serveurs qui liraient chacun 40 Go libres pendant que le premier mflux charge
-  encore son modèle passeraient la garde, et deux mflux à 20,6 Go dépassent 48 Go. Puis un mflux lancé hors du serveur (Fibo 2 Studio, le Terminal), que le verrou ne voit pas : `Fibo.autreCalcul` (`pgrep -f "mflux-(generate|upscale)"`), refus « Fibo 2 calcule déjà sur ce Mac… » avant la mémoire et tout envoi (le 29 octobre 2026, Fibo 2 Studio calculait pendant l'essai qui a fait geler le Mac). La réponse donne `memoire_libre_go` (au départ, et
-  par modification au lancement) et `memoire_minimale_go`.
+  envoi : deux mflux à 20,6 Go dépassent les 48 Go du Mac Studio. Puis un mflux lancé hors du serveur (Fibo 2 Studio, le Terminal), que le verrou ne voit pas : `Fibo.autreCalcul` (`pgrep -f "mflux-(generate|upscale)"`), refus « Fibo 2 calcule déjà sur ce Mac… » avant tout envoi (le 29 octobre 2026, Fibo 2 Studio calculait pendant l'essai qui a fait geler le Mac).
 - **Résultat gardé** : `importerGeneree` jamais livré (`.unreachable` : connexion refusée, ping sans
   réponse, `nonLivree`) se réessaie une fois après `Fibo.delaiReessaiImport` (5 s) ; jamais après un
   délai (`.timeout`) ni une coupure (`.interrupted`) : la commande est partie, le module peut
@@ -8151,7 +8143,7 @@ du TIFF exporté au bit près).
   compte les envois sans réponse de suite, et à partir de `echecsSignales` (3) la réponse le dit
   (`remarque_lightroom` : « Lightroom ne répondait plus pendant le calcul … : mémoire ? »), comme
   toute erreur levée après le premier envoi de la barre (mflux en erreur, hors délai, sortie
-  illisible, mémoire manquante au lancement, importation manquée) ; rien ne s'arrête pour autant.
+  illisible, importation manquée) ; rien ne s'arrête pour autant.
   Un mflux arrêté par un signal (`FinProcessus.echec` avec `signal`, `terminationReason`
   `.uncaughtSignal` : SIGKILL du système faute de mémoire) le dit dans l'erreur.
 - **SeedVR2** : `Fibo.seedVR` (`mflux-upscale-seedvr2`, à côté de mflux par défaut : le faux dossier
@@ -8206,7 +8198,7 @@ la remise à l'origine.
 
 Reste à constater (les essais passent par de faux scripts qui écrivent un PNG) :
 
-- la mémoire en pointe de SeedVR2 7B avec `--low-ram`, pour fixer `memoireMinimaleSeedVR` ;
+- la mémoire en pointe de SeedVR2 7B avec `--low-ram` ;
 - la durée en qualité rapide, avec deux à quatre modifications, et le temps restant annoncé contre
   le temps vrai ;
 - SeedVR2 7B contre la mise à la taille ordinaire sur la même zone, et ses bornes (× 4, 16 Mpx) ;

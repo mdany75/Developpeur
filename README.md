@@ -716,11 +716,9 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   (`briaai/Fibo-2.0-dev` et, pour la qualité rapide, `briaai/Fibo-2.0-edit-turbo` : demander
   l'accès sur leur page, puis `hf auth login` dans le Terminal). Ces modèles sont sous licence
   CC BY-NC : usage personnel, non commercial seulement, ce qui convient à vos propres photos.
-  Sans mflux, Claude le dit et ne fait rien. Il faut aussi environ 21 Go de mémoire libre
-  (Fibo 2 tourne en mode économe, `--low-ram`, sans perte de qualité) : sous 24 Go libres, Claude
-  refuse avant de commencer et vous demande de fermer des applications gourmandes ; Lightroom reste
-  ouvert. SeedVR2 demande 16 Go libres ; en dessous, la zone est mise à la taille ordinaire, et
-  Claude le dit. Un seul calcul de Fibo 2 à la fois sur le Mac : une
+  Sans mflux, Claude le dit et ne fait rien. Fibo 2 prend environ 21 Go de mémoire (il tourne en
+  mode économe, `--low-ram`, sans perte de qualité) ; Claude ne vérifie pas la mémoire libre : s'il
+  en manque, le Mac se sert de son swap, plus lentement. Un seul calcul de Fibo 2 à la fois sur le Mac : une
   autre session de Claude qui le demande pendant ce temps est refusée, et Claude attend que Fibo 2
   Studio ait fini son calcul s'il en fait un. Si Lightroom ne peut pas
   importer le résultat, Claude réessaie une fois quand Lightroom n'a pas reçu la demande, puis garde

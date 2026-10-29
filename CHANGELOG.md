@@ -34,9 +34,8 @@
     au journal de la photo.
   - Mémoire ménagée (après un premier essai qui a fait geler le Mac, Fibo 2 prenant 39 Go sur 48) :
     Fibo 2 et SeedVR2 tournent en mode économe (environ 21 Go pour Fibo 2, même image au pixel
-    près) ; sous 24 Go de mémoire libre, Claude refuse avant de commencer et vous demande de fermer
-    des applications ; Lightroom peut rester ouvert. Sous 16 Go libres, SeedVR2 est sauté (mise à la
-    taille ordinaire, dite).
+    près). Claude ne refuse rien faute de mémoire libre : s'il en manque, le Mac se sert de son
+    swap.
   - Le résultat ne se perd plus : si Lightroom ne peut pas l'importer, Claude réessaie une fois
     (seulement si Lightroom n'a pas reçu la demande, pour ne jamais l'importer deux fois), puis garde
     le TIFF dans « Fibo non importées » (dossier du Développeur) et vous dit où il est, à importer à

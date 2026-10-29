@@ -6,8 +6,9 @@ import Foundation
 /// où vont les dossiers temporaires (`<racine>/Temporaire/Fibo/<uuid>/`, que le module vide aussi à
 /// son chargement). Les tests passent de faux exécutables (des scripts) et des dossiers temporaires ;
 /// SeedVR2 est cherché par défaut à côté de mflux (le faux dossier des tests, jamais le vrai).
-/// `memoireLibre` lit la mémoire disponible du Mac avant chaque lancement (les tests en passent une
-/// fabriquée) ; `delaiReessaiImport` sépare les deux essais d'importerGeneree.
+/// `delaiReessaiImport` sépare les deux essais d'importerGeneree. Aucune garde de mémoire (retirée le
+/// 29 octobre 2026, à la demande de Dany : « le Mac créera du swap au besoin ») : --low-ram et un
+/// seul calcul à la fois suffisent.
 public struct Fibo {
     public var executable: URL
     public var seedVR: URL
@@ -15,8 +16,6 @@ public struct Fibo {
     public var racine: URL
     /// Délai maximal de chaque passage de Fibo, et de chaque passage de SeedVR2.
     public var delaiMax: TimeInterval
-    /// La mémoire disponible du Mac, en octets (nil : non lue, rien n'est refusé).
-    public var memoireLibre: () -> UInt64?
     /// Attente avant de réessayer importerGeneree quand Lightroom ne répond pas (5 s).
     public var delaiReessaiImport: TimeInterval
     /// Vrai si un mflux tourne déjà hors de ce serveur (Fibo 2 Studio, le Terminal), que le verrou
@@ -24,7 +23,7 @@ public struct Fibo {
     public var autreCalcul: () -> Bool
 
     public init(executable: URL? = nil, seedVR: URL? = nil, cacheHF: URL? = nil, racine: URL? = nil, delaiMax: TimeInterval = Generatif.delaiMax,
-                memoireLibre: (() -> UInt64?)? = nil, delaiReessaiImport: TimeInterval = 5, autreCalcul: (() -> Bool)? = nil) {
+                delaiReessaiImport: TimeInterval = 5, autreCalcul: (() -> Bool)? = nil) {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let executable = executable ?? home.appendingPathComponent(".local/bin/" + Generatif.nomExecutable)
         self.executable = executable
@@ -32,7 +31,6 @@ public struct Fibo {
         self.cacheHF = cacheHF ?? home.appendingPathComponent(".cache/huggingface/hub")
         self.racine = racine ?? home.appendingPathComponent("Library/Application Support/Developpeur")
         self.delaiMax = delaiMax
-        self.memoireLibre = memoireLibre ?? Generatif.memoireDisponible
         self.delaiReessaiImport = delaiReessaiImport
         self.autreCalcul = autreCalcul ?? Fibo.mfluxEnCours
     }
@@ -248,10 +246,6 @@ extension ToolHandler {
         var sortieEntiere = false
         var seedVRFait = false
         var remarqueSeedVR: String?
-        /// La mémoire libre lue juste avant de lancer Fibo pour cette modification.
-        var memoireLibre: UInt64?
-        /// Pas assez de mémoire libre au lancement : Fibo n'a pas été lancé, rien n'en est repris.
-        var sansMemoire: String?
     }
 
     private func retoucheGenerative(_ args: Arguments) throws -> JSONValue {
@@ -279,24 +273,13 @@ extension ToolHandler {
         }
         // Un seul calcul de Fibo 2 à la fois sur ce Mac, quel que soit le serveur : deux mflux à
         // environ 21 Go chacun dépassent la mémoire (manque de mémoire constaté la nuit du 28 octobre
-        // 2026, deux mflux à 36 Go). La garde de mémoire seule ne le voit pas : le second lit encore
-        // la mémoire libre pendant que le premier charge son modèle.
+        // 2026, deux mflux à 36 Go).
         guard let verrou = fibo.prendreVerrou() else {
             throw LightroomError.invalid("Un autre calcul de Fibo 2 est en cours sur ce Mac (une autre session de Claude) : attendre sa fin, puis réessayer. Rien n'a été fait.")
         }
         defer { if verrou >= 0 { close(verrou) } }
         guard !fibo.autreCalcul() else {
             throw LightroomError.invalid("Fibo 2 calcule déjà sur ce Mac (Fibo 2 Studio ou le Terminal) : deux calculs ensemble dépassent la mémoire. Attendre sa fin, puis réessayer. Rien n'a été fait.")
-        }
-        // La mémoire d'abord, avant tout envoi au module : mflux sans assez de mémoire a fait geler le
-        // Mac (29 octobre 2026), Lightroom ouvert. Non lue : rien n'est refusé, mais la réponse et le
-        // journal le disent.
-        let memoireAuDepart = fibo.memoireLibre()
-        if let manque = Generatif.manqueDeMemoire(libre: memoireAuDepart, minimale: Generatif.memoireMinimale) {
-            throw LightroomError.invalid(Generatif.refusMemoire(manque))
-        }
-        if memoireAuDepart == nil {
-            FileHandle.standardError.write(Data("[mcp-developpeur] generative_edit : mémoire libre non lue, garde de mémoire non appliquée\n".utf8))
         }
         let confirme = args.bool("confirm") ?? false
         let etat = try lightroom.send("etat", [:], timeout: 10)
@@ -385,14 +368,6 @@ extension ToolHandler {
         for rang in passages.indices {
             var passage = passages[rang]
             let n = rang + 1, taille = passage.taille
-            // La mémoire relue avant chaque lancement (l'exportation, une modification précédente) :
-            // en dessous du seuil, rien n'est lancé pour cette modification.
-            passage.memoireLibre = fibo.memoireLibre()
-            if let manque = Generatif.manqueDeMemoire(libre: passage.memoireLibre, minimale: Generatif.memoireMinimale) {
-                passage.sansMemoire = "Mémoire libre insuffisante pour Fibo 2 au lancement de cette modification (\(manque)) : non lancée, rien n'en est repris."
-                passages[rang] = passage
-                continue
-            }
             guard let entree = Generatif.entree(origine, cadre: passage.modif.region == nil ? nil : passage.cadre, taille: taille),
                   let imageEntree = Generatif.image8(entree, largeur: taille.largeur, hauteur: taille.hauteur) else {
                 throw LightroomError.plugin("Entrée de Fibo 2 impossible à préparer. Rien n'a été fait.")
@@ -467,8 +442,6 @@ extension ToolHandler {
                 } else {
                     if !seedVRPresent {
                         passage.remarqueSeedVR = "SeedVR2 est absent de ce Mac (\(fibo.seedVR.path)) : mise à la taille ordinaire, moins de détail. L'installer avec mflux (uv tool install mflux)."
-                    } else if let manque = Generatif.manqueDeMemoire(libre: fibo.memoireLibre(), minimale: Generatif.memoireMinimaleSeedVR) {
-                        passage.remarqueSeedVR = "Mémoire libre insuffisante pour SeedVR2 (\(manque)) : non lancé, mise à la taille ordinaire, moins de détail."
                     } else {
                         let (agrandie, remarque) = try passerSeedVR(cheminSortie: sortieDeFibo(cheminSortie, dossier: dossier, avant: avant), rang: rang, passage: passage,
                                                                     graine: graine, dossier: dossier, fibo: fibo, barre: &barre)
@@ -484,9 +457,6 @@ extension ToolHandler {
         // 4. La recomposition en pleine résolution, toutes les zones dans le même TIFF.
         let pieces = passages.compactMap(\.piece)
         guard !pieces.isEmpty else {
-            if let manque = passages.compactMap(\.sansMemoire).first {
-                throw LightroomError.plugin(avecMuet(manque.replacingOccurrences(of: "rien n'en est repris", with: "rien n'a été importé") + " Fermer des applications gourmandes, puis réessayer ; Lightroom peut rester ouvert."))
-            }
             let dans = modifications.count > 1 ? " dans aucune des zones" : (modifications[0].region == nil ? "" : " dans la zone")
             throw LightroomError.plugin("Fibo 2 n'a rien changé de visible\(dans) : rien n'a été importé. Reformuler l'instruction (plus précise, en anglais), ou changer seed.")
         }
@@ -551,18 +521,8 @@ extension ToolHandler {
             "duree_fibo_s": .number(dureeFibo.rounded()),
             "a_savoir": .string(Self.aSavoir(importee, id: nouvelle)),
         ]
-        if let memoireAuDepart {
-            resultat["memoire_libre_go"] = .number(Generatif.nombreGo(memoireAuDepart))
-        } else {
-            resultat["remarque_garde_memoire"] = .string(Generatif.memoireNonLue)
-        }
-        resultat["memoire_minimale_go"] = .number(Double(Generatif.memoireMinimale / Generatif.go))
         if let remarque = barre.lightroomMuet { resultat["remarque_lightroom"] = .string(remarque) }
-        let sansMemoire = passages.filter { $0.sansMemoire != nil }.map(\.modif.label)
-        if !sansMemoire.isEmpty {
-            resultat["remarque_memoire"] = .string("Mémoire libre insuffisante pour lancer Fibo 2 pour « \(sansMemoire.joined(separator: " », « ")) » : rien n'en est repris ; fermer des applications gourmandes, puis le redemander sur la nouvelle photo.")
-        }
-        let sansChangement = passages.filter { $0.piece == nil && $0.sansMemoire == nil }.map(\.modif.label)
+        let sansChangement = passages.filter { $0.piece == nil }.map(\.modif.label)
         if !sansChangement.isEmpty {
             resultat["remarque_zones"] = .string("Fibo 2 n'a rien changé de visible pour « \(sansChangement.joined(separator: " », « ")) » : rien n'en est repris ; le redemander (instruction plus précise, ou autre seed) sur la nouvelle photo.")
         }
@@ -603,8 +563,7 @@ extension ToolHandler {
         }
         objet["resolution_zone"] = .string(quoi + comment)
         if let remarque = passage.remarqueSeedVR { objet["remarque_seedvr2"] = .string(remarque) }
-        if let libre = passage.memoireLibre { objet["memoire_libre_go"] = .number(Generatif.nombreGo(libre)) }
-        if passage.piece == nil { objet["remarque"] = .string(passage.sansMemoire ?? "Fibo 2 n'a rien changé de visible ici : rien n'en est repris.") }
+        if passage.piece == nil { objet["remarque"] = .string("Fibo 2 n'a rien changé de visible ici : rien n'en est repris.") }
         return .object(objet)
     }
 

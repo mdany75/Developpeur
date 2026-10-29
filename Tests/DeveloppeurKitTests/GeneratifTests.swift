@@ -21,11 +21,6 @@ final class GeneratifTests: XCTestCase {
     /// Copie du TIFF final reçu par importerGeneree (le dossier temporaire est effacé après).
     var importe: URL { gardes.appendingPathComponent("importe.tif") }
     var largeur = 600, hauteur = 400
-    /// La mémoire libre fabriquée, lue à chaque garde (jamais celle du Mac) : 64 Go par défaut ;
-    /// `memoires` passe d'abord ses valeurs, une par lecture, dans l'ordre.
-    var memoire: UInt64? = 64 * Generatif.go
-    var memoires: [UInt64?] = []
-    var lecturesDeMemoire = 0
     /// Un mflux lancé hors du serveur (Fibo 2 Studio) : jamais le vrai pgrep dans les tests.
     var autreCalcul = false
 
@@ -38,10 +33,7 @@ final class GeneratifTests: XCTestCase {
         fake = FakeLightroom()
         tools = ToolHandler(lightroom: fake, guideStyle: GuideStyle(fichier: dossier.appendingPathComponent("guide.md")))
         tools.fibo = Fibo(executable: script, cacheHF: dossier.appendingPathComponent("hf"), racine: racine, delaiMax: 60,
-                          memoireLibre: { [unowned self] in
-                              self.lecturesDeMemoire += 1
-                              return self.memoires.isEmpty ? self.memoire : self.memoires.removeFirst()
-                          }, delaiReessaiImport: 0.05, autreCalcul: { [unowned self] in self.autreCalcul })
+                          delaiReessaiImport: 0.05, autreCalcul: { [unowned self] in self.autreCalcul })
         fake.replies["etat"] = ["mode": "appliquer directement", "pause": false, "photo_active": ["id": 7]]
         fake.replies["importerGeneree"] = ["id": 99, "fichier": "DSCF2402-Fibo.tif", "chemin": "/Volumes/Photos/2026/DSCF2402-Fibo.tif",
                                            "empilee": true, "active": true]
@@ -1126,7 +1118,7 @@ final class GeneratifTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: dossierAppel.path), "le dossier de l'appel est effacé")
     }
 
-    // MARK: Mémoire et résultat gardé (constat du 29 octobre 2026)
+    // MARK: --low-ram, un seul calcul et résultat gardé (constat du 29 octobre 2026)
 
     /// --low-ram toujours (normal et rapide), --vae-full-precision en normal seulement, jamais -q ;
     /// SeedVR2 avec --low-ram, sans --vae-tiling (impliqué).
@@ -1148,100 +1140,33 @@ final class GeneratifTests: XCTestCase {
         XCTAssertFalse(seedVR.contains("--vae-tiling"))
     }
 
-    /// La garde : rien sous le seuil, rien sur une mesure absente ; la vraie lecture du Mac rend un
-    /// nombre (lecture seule, aucune valeur attendue).
-    func testGardeDeMemoire() {
-        XCTAssertEqual(Generatif.memoireMinimale, 24 * Generatif.go)
-        XCTAssertEqual(Generatif.memoireMinimaleSeedVR, 16 * Generatif.go)
-        XCTAssertNil(Generatif.manqueDeMemoire(libre: 24 * Generatif.go, minimale: Generatif.memoireMinimale))
-        XCTAssertNil(Generatif.manqueDeMemoire(libre: nil, minimale: Generatif.memoireMinimale))
-        XCTAssertEqual(Generatif.manqueDeMemoire(libre: 12 * Generatif.go + Generatif.go * 3 / 10, minimale: Generatif.memoireMinimale),
-                       "12,3 Go libres, 24 Go nécessaires")
-        XCTAssertGreaterThan(Generatif.memoireDisponible() ?? 0, 0)
-    }
-
-    /// Sous 24 Go libres : refus clair avant tout envoi au module, mflux jamais lancé.
-    func testMemoireInsuffisanteRefuseAvantToutEnvoi() {
-        fauxMflux(sortie: sortiePreparee(carreRouge))
-        memoire = 12 * Generatif.go
-        let resultat = editer(["instruction": "replace the trousers with a skirt"])
-        XCTAssertTrue(resultat.isError)
-        XCTAssertTrue(resultat.text.contains("Mémoire libre insuffisante pour Fibo 2 : 12,0 Go libres, 24 Go nécessaires"), resultat.text)
-        XCTAssertTrue(resultat.text.contains("Fermer des applications"), resultat.text)
-        XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
-        XCTAssertTrue(fake.progressions.isEmpty)
-        XCTAssertEqual(appelsDeMflux, 0)
-        XCTAssertEqual(dossiersTemporairesRestants, [])
-    }
-
-    /// Assez de mémoire au départ, plus assez après l'exportation : mflux n'est pas lancé, rien
-    /// n'est importé.
-    func testMemoireInsuffisanteAuLancementRienDeLance() {
-        fauxMflux(sortie: sortiePreparee(carreRouge))
-        memoires = [64 * Generatif.go, 10 * Generatif.go]
-        let resultat = editer(["instruction": "replace the trousers with a skirt"])
-        XCTAssertTrue(resultat.isError)
-        XCTAssertTrue(resultat.text.contains("Mémoire libre insuffisante pour Fibo 2"), resultat.text)
-        XCTAssertTrue(resultat.text.contains("rien n'a été importé"), resultat.text)
-        XCTAssertEqual(fake.commands, ["etat", "exporter"])
-        XCTAssertEqual(appelsDeMflux, 0)
-        XCTAssertEqual(dossiersTemporairesRestants, [])
-    }
-
-    /// Deux modifications, la mémoire manque pour la seconde : la première est importée, la seconde
-    /// n'est pas lancée, dit dans la réponse.
-    func testSecondeModificationSansMemoire() throws {
-        let jupe = CGRect(x: 0.05, y: 0.1, width: 0.25, height: 0.3), sac = CGRect(x: 0.6, y: 0.55, width: 0.3, height: 0.35)
-        fauxMflux(sorties: [sortiePreparee(region: jupe, nom: "jupe.png") { _, _, p, i in Self.rouge(&p, i) }])
+    /// Aucune garde de mémoire (retirée le 29 octobre 2026, à la demande de Dany : « le Mac créera du
+    /// swap au besoin ») : deux modifications lancées, SeedVR2 aussi, et la réponse ne dit rien de la
+    /// mémoire.
+    func testAucuneGardeDeMemoire() throws {
+        ecrireSource(largeur: 3000, hauteur: 2000)
+        fauxSeedVR()
+        let gauche = CGRect(x: 0.05, y: 0.1, width: 0.3, height: 0.35), droite = CGRect(x: 0.6, y: 0.55, width: 0.3, height: 0.35)
+        fauxMflux(sorties: [sortiePreparee(region: gauche, nom: "gauche.png") { _, _, p, i in Self.rouge(&p, i) },
+                            sortiePreparee(region: droite, nom: "droite.png") { _, _, p, i in Self.bleu(&p, i) }])
         func zone(_ r: CGRect) -> JSONValue { ["x": .number(r.minX), "y": .number(r.minY), "width": .number(r.width), "height": .number(r.height)] }
-        memoires = [64 * Generatif.go, 30 * Generatif.go, 8 * Generatif.go]
         let resultat = tools.call(name: "generative_edit", arguments: ["edits": [
-            ["label": "jupe", "instruction": "replace the trousers with a skirt", "instruction_fr": "remplacer le pantalon par une jupe", "region": zone(jupe)],
-            ["label": "sac", "instruction": "add a blue bag", "instruction_fr": "ajouter un sac bleu", "region": zone(sac)],
+            ["label": "rouge", "instruction": "add a red square", "instruction_fr": "ajouter un carré rouge", "region": zone(gauche)],
+            ["label": "bleu", "instruction": "add a blue square", "instruction_fr": "ajouter un carré bleu", "region": zone(droite)],
         ]])
         XCTAssertFalse(resultat.isError, resultat.text)
-        XCTAssertEqual(appelsDeMflux, 1)
+        XCTAssertEqual(appelsDeMflux, 2)
+        XCTAssertNotNil(argumentsSeedVR, "SeedVR2 lancé")
         XCTAssertEqual(fake.commands, ["etat", "exporter", "importerGeneree"])
         let reponse = try JSONCoding.parse(resultat.text)
-        XCTAssertTrue(reponse["remarque_memoire"]?.string?.contains("« sac »") == true, resultat.text)
-        XCTAssertNil(reponse["remarque_zones"], "pas « rien changé de visible » pour une modification non lancée")
-        let modifications = try XCTUnwrap(reponse["modifications"]?.array)
-        XCTAssertEqual(modifications[0]["reprise"]?.bool, true)
-        XCTAssertEqual(modifications[0]["memoire_libre_go"]?.double, 30)
-        XCTAssertEqual(modifications[1]["reprise"]?.bool, false)
-        XCTAssertTrue(modifications[1]["remarque"]?.string?.contains("Mémoire libre insuffisante") == true, resultat.text)
-    }
-
-    /// La mesure et le seuil dans la réponse ; Lightroom qui répond : pas de remarque.
-    func testMemoireDansLaReponse() throws {
-        fauxMflux(sortie: sortiePreparee(carreRouge))
-        memoire = 40 * Generatif.go + Generatif.go / 2
-        let resultat = editer(["instruction": "add a red square"])
-        XCTAssertFalse(resultat.isError, resultat.text)
-        let reponse = try JSONCoding.parse(resultat.text)
-        XCTAssertEqual(reponse["memoire_libre_go"]?.double, 40.5)
-        XCTAssertEqual(reponse["memoire_minimale_go"]?.double, 24)
-        XCTAssertEqual(reponse["modifications"]?.array?.first?["memoire_libre_go"]?.double, 40.5)
-        XCTAssertNil(reponse["remarque_lightroom"])
-        XCTAssertEqual(lecturesDeMemoire, 2, "au départ, puis au lancement de mflux")
-    }
-
-    /// Sous 16 Go libres au moment de SeedVR2 : pas lancé, mise à la taille ordinaire, remarque ;
-    /// l'outil réussit.
-    func testSeedVRSauteSousSonSeuilDeMemoire() throws {
-        ecrireSource(largeur: 1600, hauteur: 1200)
-        fauxSeedVR()
-        let region = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
-        fauxMflux(sortie: sortiePreparee(region: region, carreRouge))
-        memoires = [64 * Generatif.go, 64 * Generatif.go, 15 * Generatif.go]
-        let resultat = editer(["instruction": "add a red square", "region": ["x": 0.25, "y": 0.25, "width": 0.5, "height": 0.5]])
-        XCTAssertFalse(resultat.isError, resultat.text)
-        XCTAssertNil(argumentsSeedVR, "SeedVR2 jamais lancé")
-        let modification = try XCTUnwrap(try JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
-        XCTAssertEqual(modification["seedvr2"]?.bool, false)
-        XCTAssertTrue(modification["remarque_seedvr2"]?.string?.contains("Mémoire libre insuffisante pour SeedVR2 (15,0 Go libres, 16 Go nécessaires)") == true, resultat.text)
-        XCTAssertTrue(modification["resolution_zone"]?.string?.contains("mise à la taille ordinaire") == true, resultat.text)
-        XCTAssertTrue(fake.commands.contains("importerGeneree"))
+        for cle in ["memoire_libre_go", "memoire_minimale_go", "remarque_memoire", "remarque_garde_memoire"] {
+            XCTAssertNil(reponse[cle], cle)
+        }
+        for modification in try XCTUnwrap(reponse["modifications"]?.array) {
+            XCTAssertEqual(modification["reprise"]?.bool, true, resultat.text)
+            XCTAssertNil(modification["memoire_libre_go"])
+        }
+        XCTAssertFalse(resultat.text.contains("Mémoire libre"), resultat.text)
     }
 
     /// importerGeneree refusé par le module : pas de second essai ; le TIFF final est déplacé dans
@@ -1412,7 +1337,6 @@ final class GeneratifTests: XCTestCase {
         XCTAssertTrue(resultat.text.contains("Un autre calcul de Fibo 2 est en cours"), resultat.text)
         XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
         XCTAssertEqual(appelsDeMflux, 0)
-        XCTAssertEqual(lecturesDeMemoire, 0)
         close(autre)
         resultat = editer(["instruction": "add a red square"])
         XCTAssertFalse(resultat.isError, resultat.text)
@@ -1421,8 +1345,8 @@ final class GeneratifTests: XCTestCase {
         close(suivant)
     }
 
-    /// Un mflux lancé hors du serveur (Fibo 2 Studio, le Terminal) : refus avant tout envoi, la
-    /// mémoire pas même lue (constaté le 29 octobre 2026 : deux calculs ensemble ont gelé le Mac).
+    /// Un mflux lancé hors du serveur (Fibo 2 Studio, le Terminal) : refus avant tout envoi
+    /// (constaté le 29 octobre 2026 : deux calculs ensemble ont gelé le Mac).
     func testFiboStudioQuiCalculeDejaRefuse() {
         fauxMflux(sortie: sortiePreparee(carreRouge))
         autreCalcul = true
@@ -1431,29 +1355,9 @@ final class GeneratifTests: XCTestCase {
         XCTAssertTrue(resultat.text.contains("Fibo 2 calcule déjà sur ce Mac"), resultat.text)
         XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
         XCTAssertEqual(appelsDeMflux, 0)
-        XCTAssertEqual(lecturesDeMemoire, 0)
         autreCalcul = false
         resultat = editer(["instruction": "add a red square"])
         XCTAssertFalse(resultat.isError, resultat.text)
-    }
-
-    /// La mémoire disponible : les pages libres (spéculatives comprises) et les inactives, sans les
-    /// spéculatives une seconde fois ni les purgeables.
-    func testMemoireDisponibleSansDoubleCompte() {
-        XCTAssertEqual(Generatif.memoireDisponible(libres: 1_032_504, inactives: 1_000_000, taillePage: 16_384),
-                       (1_032_504 + 1_000_000) * 16_384)
-    }
-
-    /// La mémoire libre qui ne se lit pas : rien n'est refusé, mais la réponse dit que la garde n'a
-    /// pas joué.
-    func testMemoireNonLueDite() throws {
-        fauxMflux(sortie: sortiePreparee(carreRouge))
-        memoire = nil
-        let resultat = editer(["instruction": "add a red square"])
-        XCTAssertFalse(resultat.isError, resultat.text)
-        let reponse = try JSONCoding.parse(resultat.text)
-        XCTAssertNil(reponse["memoire_libre_go"])
-        XCTAssertEqual(reponse["remarque_garde_memoire"]?.string, Generatif.memoireNonLue)
     }
 
     /// Les pixels d'un PNG (canal rouge), pour lire le masque.
