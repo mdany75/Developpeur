@@ -8212,8 +8212,8 @@ Reste à constater (les essais passent par de faux scripts qui écrivent un PNG)
 **Constaté le 29 octobre 2026 au soir** (essai réel en qualité rapide, Lightroom ouvert, copie
 d'essai de DSCF2402.RAF, 26 Mpx, arrière-plan remplacé par Times Square) : 41 s en tout, dont 22 s
 de Fibo 2 ; masque de 79,2 %, aligné au TIFF exporté ; ancien fond entièrement remplacé, personne
-intacte ; bord des cheveux net mais découpé (pas de mèches fines) : à reprendre (fondu plus large ou
-masque doux).
+intacte ; bord des cheveux net mais découpé (pas de mèches fines) : repris le même soir par le bord
+doux (ci-dessous, Zone de mélange), demandé par Dany (« adoucis-le »).
 
 Demandé par Dany le soir du 29 octobre 2026 (« je constate souvent des erreurs quand je te demande
 de changer un arrière-plan dans Fibo 2 ; pourrais-tu faire un masque par Lightroom et l'envoyer dans
@@ -8274,21 +8274,90 @@ ne la remplit pas ; le gain est un masque précis.
   (« … couvre toute la photo : inversé, ou Lightroom n'a trouvé aucun sujet ? Pour un sujet
   minuscule, donner region… ») : un petit sujet (un oiseau de 0,4 % du cadre, son arrière-plan à
   99,6 %) passe, ce que la borne de 99,5 % refusait. Des rendus d'une autre taille que le TIFF
-  exporté : le masque y est remis au plus proche voisin (`redimensionner`), relu et revérifié.
+  exporté : le masque y est remis au plus proche voisin (`redimensionner`), relu et revérifié ; son
+  opacité, en bilinéaire (`redimensionnerOpacite` : le plus proche voisin referait des marches au bord
+  doux), puis 0 hors du binaire remis à la taille et élargi de `margeOpacite`.
 - **Recadrage et entrée de Fibo** : le cadre englobant du masque (`cadreDuMasque`) tient lieu de
   `region` pour `Generatif.recadrage` (un arrière-plan donne d'ordinaire toute la photo). Le masque
   donné à Fibo (`masquePourFibo`) : la part couverte de chaque pixel de l'entrée (les pixels de la
   photo qu'il couvre dans le recadrage), blanc à la moitié ou plus, puis élargi de `margeMasque`
   (1 % du petit côté de l'entrée, environ 10 px à 1 Mpx) pour que Fibo redessine aussi le bord.
-- **Zone de mélange en pleine résolution** (`zoneDuMasque`) : le masque binaire du recadrage, fondu
-  de `fonduMasque` (0,15 % du petit côté de la photo, au moins 2 px : 6 px pour 4 160 px), sans
-  élargissement ; deux flous en boîte en place aux sommes entières (`sommeBoiteEnPlace`, un anneau
-  de lignes pour le passage vertical) : hors du masque et du fondu, la zone vaut exactement 0, et
-  la photo garde ses pixels au bit près. La pièce (`Generatif.Piece`) a la taille du recadrage
+- **Zone de mélange en pleine résolution : le bord doux de Lightroom** (`Generatif.OpaciteDuMasque`,
+  `zoneDuMasque`). Le premier bord, le masque binaire fondu de 0,15 % (`fonduBinaire`), était net
+  mais découpé (constaté à l'essai réel) : le seuil de 6 range dans le masque les pixels où
+  l'opacité du masque IA de Lightroom n'est que de 0 à 20 % (sur 10 304 pixels du bord : 6 523 à
+  moins de 10 %, 3 092 de 10 à 20 %), et les mèches fines passaient entières à Fibo. Le masque IA
+  est une rampe lisse d'environ 20 px autour des cheveux, presque toute dans le binaire (des pixels
+  partiels jusqu'à 48 px du bord, aucun au-delà de 64). L'opacité se lit dans les mêmes rendus,
+  avant qu'ils ne soient libérés (`masqueDesRendus` la rend avec le binaire ; le dernier témoin
+  resservi, l'autre redécodé : un seul rendu de 26 Mpx de plus à la fois) :
+  - par témoin et par canal, l'écart d = log2(linéaire du témoin + ε) − log2(linéaire de l'état
+    actuel + ε) (`opaciteEpsilon` 0,002) : en lumière linéaire, l'effet d'une exposition locale est
+    proportionnel à l'opacité ;
+  - l'effet plein f, la médiane de d dans l'intérieur sûr (pixels du binaire à plus de
+    `opaciteErosion`, 0,3 % du petit côté, au moins 2 px, 12 px à 4 160 px, du dehors ; un pixel sur
+    sept), par canal et par valeur de l'état actuel : une table de 256, cases de 1/32 IL de −5 à +3
+    centrées sur 0 (un écart nul vaut 0), au moins 40 échantillons, les valeurs manquantes
+    interpolées (aux bouts, la plus proche), moyenne mobile de 7 ; elle tient compte de la courbe de
+    tonalité, des noirs relevés et des blancs écrêtés (relevé : le sombre vaut environ −3,5 en tons
+    moyens et −0,3 au noir ; le clair +2,9 au noir et +0,2 au blanc) ;
+  - α = (Σ d·f + λ·binaire) / (Σ f² + λ), les moindres carrés sur 2 témoins × 3 canaux
+    (`opaciteAPriori`, λ 0,3) : un canal noir ou écrêté (f ≈ 0) ne compte presque pas ;
+  - la rampe renforcée, en smoothstep, de `opaciteBas` (0,03) à `opaciteHaut` (0,35) : toute opacité
+    d'au moins 0,35 compte pleine (de 0,12 à 0,85, un voile gris de l'ancien fond restait entre les
+    mèches ; raidie vers le bas, le halo empirait) ; puis le lissage d'un pixel (`lisserOpacite` :
+    deux boîtes de rayon 1, noyau 1, 2, 3, 2, 1, en entiers, un anneau de cinq lignes) ;
+  - là où les témoins ne disent presque rien (Σ f² sous `opaciteAppui`, 1 ; un ton moyen en donne
+    une quarantaine ; ou aucun intérieur sûr), glissement vers le binaire fondu (`fonduBinaire`) sur
+    toute sa largeur, jamais plus dur que l'ancien bord : hors du binaire, le repli s'étend jusqu'à
+    `margeOpacite` (2 px, ou l'étendue du fondu binaire, `etendueFondu`, si elle est plus large :
+    6 px à 4 160 px), dans la part de repli la plus forte des pixels calculés voisins
+    (`maximumCarre`) ;
+  - le calcul couvre tout le binaire élargi de `opaciteMarge`, 2 px (`classe`, un octet par pixel ;
+    distances en échiquier, `distanceEchiquier`, deux parcours), huit octets par pixel calculé (les
+    deux sommes, dans l'ordre des pixels, sans liste d'indices) ; l'opacité n'est jamais forcée
+    pleine à une profondeur fixe : pleine seulement là où α atteint `opaciteHaut`. Jusqu'à la
+    relecture du 29 octobre 2026 au soir, une bande de 50 px seulement (`opaciteProfondeur`, 1,2 % du
+    petit côté), pleine au-delà : un masque partiel sur plus de 50 px (radial ou dégradé fondus,
+    luminance, couleur, profondeur, bord affiné, brume d'un ciel) y faisait une marche le long du
+    contour (simulée : de 0,74 à 1 d'un pixel à l'autre, là où Lightroom ne met que 18 %). Sur le
+    portrait de l'essai, la même opacité à 326 pixels près (au fond, à plus de 50 px du bord, 25
+    niveaux au plus). Sur une longue rampe, l'effet plein relevé dans un intérieur sûr qui a des
+    pixels partiels est sous-estimé (la médiane par valeur les compte) : la zone y monte plus tôt
+    que Lightroom, mais sans marche ; et le binaire n'y commence que vers 10 % d'opacité (le seuil de
+    6 niveaux), d'où un départ en saut au bord du binaire, comme avant ; au-delà du binaire élargi
+    (de 2 px, ou de `margeOpacite` pour le repli), l'opacité vaut exactement 0, et la photo garde
+    ses pixels au bit près.
+  `zoneDuMasque` ramène l'opacité (0 à 255) de 0 à 1 dans le recadrage. Le masque donné à Fibo reste
+  le binaire élargi de 1 % : Fibo redessine du fond sous les mèches. Choisi au labo du 29 octobre
+  2026 sur les vraies images de l'essai (recadrages des cheveux en haut et sur les côtés, de
+  l'épaule et du poncho noir, des mains et manchettes), parmi quatre bords jugés par deux juges : un
+  fondu large asymétrique (25 px, 75 % dans le sujet : propre, mais « collé flou », sans mèche) ; un
+  filtre guidé en couleur (quelques mèches, liseré clair au poncho) ; l'opacité décontaminée,
+  F = (A − α·B)/(1 − α) (le plus de mèches, mais des blocs de 8 px des JPEG témoins et une frange
+  bleu-violet au poncho, 3 % de canaux hors gamme) ; et celui-ci, le seul net au poncho, sans bloc
+  ni liseré, mèches gardées sur le nouveau fond. Mesures sur la photo : aucun pixel du sujet à plus
+  de 2 px du masque touché (5 361 424) ; transition de 6,5 à 11,7 px selon la zone (9,3 à 10,5 pour
+  l'ancien bord) ; il reste un léger voile translucide de l'ancien fond, sur quelques pixels, là où
+  Lightroom met lui-même une opacité moyenne (halo mesuré de 27 à 47 % de l'ancien fond au bord des
+  cheveux flous, contre 15 à 32 %) : décontaminer le fond ou affiner par la couleur y faisaient des
+  taches. Durée, compilé en `-O`, décodages des trois JPEG compris : masque binaire et opacité
+  0,53 à 0,59 s ; recomposition inchangée. Seuils provisoires : un seul portrait (fond clair, cheveux
+  bruns, poncho noir) ; à éprouver sur un sujet clair devant un fond sombre et sur un ciel ; non
+  encore vu dans un essai réel. La pièce (`Generatif.Piece`) a la taille du recadrage
   (`largeurZone` = `cadre.largeur`). La zone changée (`zoneChangee`, avec `borne` : le masque donné
   à Fibo) et le refus sous `partMinimale` restent, mesurés dans le masque. Mémoire : le masque
-  binaire (1 octet par pixel, 26 Mo à 26 Mpx) est gardé pendant le calcul de Fibo, la zone en Float
-  (104 Mo) n'est faite qu'après.
+  binaire et son opacité (1 octet par pixel chacun, 2 × 26 Mo à 26 Mpx) sont gardés pendant les
+  calculs de Fibo et de SeedVR2, la zone en Float (104 Mo) n'est faite qu'après ; à la lecture du
+  masque, avant Fibo, en plus de deux rendus décodés (2 × 104 Mo) : la classe (26 Mo) et les deux
+  sommes de chaque pixel calculé (8 octets, 165 Mo pour un arrière-plan de 79 % à 26 Mpx), et, s'il
+  y a des pixels sans appui, le fondu binaire de toute la photo en Float (104 Mo) et la part de repli
+  (26 Mo). Mesuré sur l'essai (26 Mpx, `-O`, `/usr/bin/time -l`) : 1,2 Go en pointe pour la lecture
+  et deux recompositions (1,04 Go avec la bande de 50 px). `DEVELOPPEUR_FIBO_GARDER=<dossier>`, pour
+  le développement seulement (`Fibo.garderDans`, posé par main.swift) : chaque appel y copie, dans un
+  sous-dossier à son nom, ses fichiers avant leur effacement (rendus du masque, `masque-actuel.jpg`,
+  `masque-temoin-1.jpg` et `-2` s'ils ont été lus à ce rang, le TIFF exporté avec ses métadonnées,
+  GPS compris, l'entrée, le masque et la sortie de Fibo) ; rien n'y est jamais effacé.
 - **SeedVR2** : un masque compte comme une zone (`avecRegion`), mêmes règles et bornes que `region`
   par son cadre (un arrière-plan de toute la photo dépasse d'ordinaire × 4 : mise à la taille
   ordinaire, dite). Sa remarque (`seedVR` avec `avecMasque`) dit que c'est attendu pour un
@@ -8309,15 +8378,20 @@ ne la remplit pas ; le gain est un masque précis.
   SeedVR2 d'un masque trop étendu ; rendus d'une autre taille ; refus avec region, dans edits, avec
   un effet ; masque binaire et union des deux témoins, nettoyage (points et petits trous retirés,
   vrai trou, jour entre le bras et le corps, sangle et mèche gardés), refus d'un petit sujet évité,
-  redimension, masque de Fibo élargi, zone fondue, flou en place ; et un masque de 26 Mpx en temps
-  borné), `CarteMasqueTests` (les cartes de `mask_map` envoient `temoin`), `essais-generatif.lua`
+  redimension, masque de Fibo élargi, binaire fondu, flou en place ; le bord doux : sur un bord de
+  Lightroom synthétique, une rampe de 10 px rendue par −2 IL et +1,5 IL en lumière linéaire, le
+  bord suit la rampe renforcée à 0,12 près là où l'ancien bord dur mettait déjà Fibo aux deux tiers
+  sur une mèche à 15 % (ce test échoue avec l'ancien bord), plein au-delà de l'opacité haute, 0
+  exactement à plus de 2 px du masque ; témoins muets : repli sur le binaire fondu ; table de
+  l'effet plein ; distance en échiquier et lissage ; et un masque de 26 Mpx en temps borné, opacité
+  comprise), `CarteMasqueTests` (les cartes de `mask_map` envoient `temoin`), `essais-generatif.lua`
   (essayer avec `temoin` : aucun accord, l'accord donné reste, taille 0 sans borne ; une personne
   non reconnue dite, rien de gardé).
 
 Durées mesurées sur 26 Mpx (6 240 × 4 160, un disque de 1 500 px de rayon et 20 000 points de
 bruit), le 29 octobre 2026, par `testMasqueDeVingtSixMegapixelsEnTempsBorne`, compilé pour le
 débogage (`swift test`) : masque binaire des deux témoins 3,4 s, nettoyage 5,3 s, masque de Fibo
-2,0 s, zone de mélange 17 s ; le premier relevé en release (`swift test -c release -Xswiftc
+2,0 s, opacité du bord (témoins refaits par le test compris) et zone de mélange de l'ordre de 22 s ; le premier relevé en release (`swift test -c release -Xswiftc
 -enable-testing`, avant le second témoin et le nettoyage par composantes) donnait 0,22 s en tout.
 Le test ne borne strictement la durée (30 s) que compilé pour la publication ; en débogage, 240 s
 (la machine virtuelle des tests GitHub est plusieurs fois plus lente que le Mac Studio). Ni le
@@ -8326,9 +8400,9 @@ décodage des JPEG pleine taille ni la recomposition ne sont dans ces chiffres.
 Reste à constater dans Lightroom : les deux rendus pleine taille d'`essayer` sur 26 Mpx (leur durée,
 leurs JPEG, le calcul du masque IA avant chacun), leur alignement au pixel avec le TIFF exporté
 (même cadre, même taille), les deux témoins sur un noir pur, un fond très sombre et un blanc brûlé,
-le seuil de 6 sur un masque IA au bord doux (cheveux), une personne non reconnue
+le bord doux dans un essai réel (cheveux), une personne non reconnue
 (`personnes_non_reconnues`), et les seuils provisoires (`grilleNettoyage`, `margeMasque`,
-`fonduMasque`, `partMasqueMin`) sur de vrais arrière-plans changés.
+`fonduMasque`, `partMasqueMin`, ceux de l'opacité) sur de vrais arrière-plans changés.
 
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 

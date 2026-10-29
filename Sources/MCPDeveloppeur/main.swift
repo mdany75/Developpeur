@@ -112,7 +112,12 @@ func outils() -> ToolHandler {
     tools.lireEcran = Ecran.lire
     tools.lireSauvegardes = Sauvegardes.lire
     // Fibo 2 (generative_edit) : le vrai mflux de ce Mac, pour le serveur et --call seulement.
-    tools.fibo = Fibo()
+    var fibo = Fibo()
+    // Développement : garder les fichiers d'un appel (DEVELOPPEUR_FIBO_GARDER=<dossier>).
+    if let garde = ProcessInfo.processInfo.environment["DEVELOPPEUR_FIBO_GARDER"], !garde.isEmpty {
+        fibo.garderDans = URL(fileURLWithPath: garde)
+    }
+    tools.fibo = fibo
     return tools
 }
 

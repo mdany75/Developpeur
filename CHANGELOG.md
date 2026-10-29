@@ -55,15 +55,17 @@
   calculé par Lightroom (outil `generative_edit`, argument `mask`), plus avec un rectangle. Fibo 2
   reçoit le masque précis de ce qui doit changer (il gardait parfois des morceaux de l'ancien fond,
   un panneau ou une lettre, quand on ne lui donnait qu'un rectangle) ; seul le masque revient dans
-  la photo, fondu de quelques pixels, et le reste garde ses pixels exacts. Lightroom calcule le
+  la photo, avec le bord doux du masque de Lightroom : les mèches fines des cheveux restent sur le
+  nouveau fond, au lieu d'un contour découpé à l'allure de « photo collée » (un léger voile de
+  l'ancien fond peut rester là où Lightroom lui-même hésite) ; le reste garde ses pixels exacts. Lightroom calcule le
   masque en pleine résolution sur deux rendus d'essai (un plus sombre, un plus clair : les noirs
   purs et les blancs brûlés du fond y sont aussi), après l'exportation de la photo (en « Proposer
   d'abord », l'accord se donne donc avant ces rendus) ; rien n'est gardé dans les réglages de la
   photo, mais quatre étapes « Claude · essai » restent dans son Historique. Un masque vide, qui
   couvre toute la photo, ou une personne que Lightroom n'a pas reconnue est refusé avant tout
   calcul de Fibo 2 ; les traits fins du masque (une mèche, le jour entre le bras et le corps) sont
-  gardés. Les seuils (élargissement, fondu, nettoyage, masque vide ou total) sont provisoires, à
-  vérifier sur de vraies photos.
+  gardés. Les seuils (élargissement, bord doux, nettoyage, masque vide ou total) sont provisoires,
+  à vérifier sur de vraies photos.
 - La carte d'un masque (`add_mask` avec `mask_map`) ne demande plus d'accord dans Lightroom en
   « Proposer d'abord » : ce n'est qu'un rendu témoin, rien n'en est gardé (sa demande effaçait
   l'accord qu'attendait l'écriture des masques).

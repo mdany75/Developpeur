@@ -22,6 +22,12 @@ public struct Fibo {
     /// Vrai si un mflux tourne déjà hors de ce serveur (Fibo 2 Studio, le Terminal), que le verrou
     /// ne voit pas : deux calculs ensemble ont fait geler le Mac le 29 octobre 2026.
     public var autreCalcul: () -> Bool
+    /// Pour le développement seulement (`DEVELOPPEUR_FIBO_GARDER`, posé par main.swift) : un dossier
+    /// où copier les fichiers de chaque appel, dans un sous-dossier à son nom (rendus du masque, TIFF
+    /// exporté, entrée, masque et sortie de Fibo), avant leur effacement, pour régler les seuils sur
+    /// de vraies images. Rien n'y est jamais effacé (le TIFF garde ses métadonnées, GPS compris). Nil
+    /// par défaut.
+    public var garderDans: URL?
 
     public init(executable: URL? = nil, seedVR: URL? = nil, cacheHF: URL? = nil, racine: URL? = nil, delaiMax: TimeInterval = Generatif.delaiMax,
                 delaiReessaiImport: TimeInterval = 5, autreCalcul: (() -> Bool)? = nil) {
@@ -268,6 +274,8 @@ extension ToolHandler {
         var nom: String
         var inverse: Bool
         var masque: [UInt8] = []
+        /// L'opacité au bord (de 0 à 255), la zone de mélange : `Generatif.OpaciteDuMasque`.
+        var opacite: [UInt8] = []
         var largeur = 0
         var hauteur = 0
         var part = 0.0
@@ -338,8 +346,16 @@ extension ToolHandler {
         // Le TIFF final qui n'a pu quitter le dossier de l'appel après un échec de l'importation :
         // il y reste (le reste est effacé), jusqu'au prochain chargement du module.
         var tiffLaisse: URL?
+        // Développement : les fichiers de cet appel, gardés dans leur propre sous-dossier.
+        let gardeAppel = fibo.garderDans?.appendingPathComponent(dossier.lastPathComponent)
         defer {
             travailFibo.finir()
+            if let garde = gardeAppel {
+                try? FileManager.default.createDirectory(at: garde, withIntermediateDirectories: true)
+                for nom in (try? FileManager.default.contentsOfDirectory(atPath: dossier.path)) ?? [] {
+                    try? FileManager.default.copyItem(at: dossier.appendingPathComponent(nom), to: garde.appendingPathComponent(nom))
+                }
+            }
             if let tiffLaisse {
                 for nom in (try? FileManager.default.contentsOfDirectory(atPath: dossier.path)) ?? [] where nom != tiffLaisse.lastPathComponent {
                     try? FileManager.default.removeItem(at: dossier.appendingPathComponent(nom))
@@ -391,11 +407,13 @@ extension ToolHandler {
         // englobant tient lieu de region pour le recadrage.
         if var masque = masqueLR {
             barre.montrer(.export, "masque de Lightroom (rendu en pleine taille)", rang: nil, detail: nil)
-            try lireMasque(&masque, photo: photo)
+            try lireMasque(&masque, photo: photo, garde: gardeAppel)
             try contexte.verifier()
             if masque.largeur != origine.width || masque.hauteur != origine.height {
                 masque.masque = Generatif.redimensionner(masque.masque, largeur: masque.largeur, hauteur: masque.hauteur,
                                                          versLargeur: origine.width, versHauteur: origine.height)
+                masque.opacite = Generatif.redimensionnerOpacite(masque.opacite, largeur: masque.largeur, hauteur: masque.hauteur,
+                                                                 binaire: masque.masque, versLargeur: origine.width, versHauteur: origine.height)
                 masque.largeur = origine.width
                 masque.hauteur = origine.height
                 (masque.part, masque.cadre) = Generatif.cadreDuMasque(masque.masque, largeur: masque.largeur, hauteur: masque.hauteur)
@@ -503,11 +521,12 @@ extension ToolHandler {
             let partCadre = Generatif.part(changee)
             passage.partChangee = partCadre * Double(passage.cadre.largeur * passage.cadre.hauteur) / Double(origine.width * origine.height)
             if partCadre >= Generatif.partMinimale {
-                // La zone de mélange : avec un masque de Lightroom, le masque lui-même en pleine
-                // résolution, fondu de quelques pixels (hors de lui, la photo garde ses pixels).
+                // La zone de mélange : avec un masque de Lightroom, son opacité en pleine résolution,
+                // douce au bord comme dans Lightroom (les mèches fines gardées) ; hors du masque élargi
+                // de deux pixels, la photo garde ses pixels.
                 var zone: [Float], largeurZone = taille.largeur, hauteurZone = taille.hauteur
                 if passage.avecMasque, let lr = masqueLR {
-                    zone = Generatif.zoneDuMasque(lr.masque, largeurPhoto: lr.largeur, hauteurPhoto: lr.hauteur, cadre: passage.cadre)
+                    zone = Generatif.zoneDuMasque(lr.opacite, largeurPhoto: lr.largeur, cadre: passage.cadre)
                     (largeurZone, hauteurZone) = (passage.cadre.largeur, passage.cadre.hauteur)
                 } else {
                     let (melange, entiere) = Generatif.zoneDeMelange(changee: changee, region: passage.regionCadre, largeur: taille.largeur, hauteur: taille.hauteur)
@@ -658,10 +677,11 @@ extension ToolHandler {
     /// étapes « Claude · essai » chacun dans l'Historique), le sombre puis le clair
     /// (`Generatif.temoinsMasque`), comparés à l'état actuel rendu par la première commande, à taille 0
     /// (pleine résolution, comme le TIFF exporté) ; l'union de leurs écarts, nettoyée, puis refusée si
-    /// elle est presque vide ou presque totale. Une personne précise que Lightroom n'a pas reconnue
+    /// elle est presque vide ou presque totale ; et l'opacité du bord, lue dans les mêmes rendus, avant
+    /// qu'ils ne soient libérés (la zone de mélange). Une personne précise que Lightroom n'a pas reconnue
     /// est refusée dès le premier rendu. Les couleurs prélevées, les cadres des personnes (Vision) et
     /// les recalages, comme add_mask ; les remarques du module sont gardées pour la réponse.
-    private func lireMasque(_ masque: inout MasqueLightroom, photo: Int) throws {
+    private func lireMasque(_ masque: inout MasqueLightroom, photo: Int, garde: URL? = nil) throws {
         var zones = [JSONValue.object(masque.zone)]
         if zones.contains(where: Self.aDesCouleurs) || zones.contains(where: Self.aDesPersonnes) {
             zones = try prelever(zones, photo: photo)
@@ -692,7 +712,14 @@ extension ToolHandler {
             let reponse = try lightroom.send("essayer", params, timeout: Self.delaiMasque)
             // Les rendus sont lus (et effacés) avant tout refus.
             if rang == 0 { donneesActuel = try? Self.readPreview(reponse["chemin_actuel"]?.string) }
-            if let donnees = try? Self.readPreview(reponse["chemin"]?.string) { donneesTemoins.append(donnees) }
+            let donneesTemoin = try? Self.readPreview(reponse["chemin"]?.string)
+            if let donneesTemoin { donneesTemoins.append(donneesTemoin) }
+            if let garde {
+                // Seulement les rendus lus à ce rang : jamais le témoin précédent sous un autre nom.
+                try? FileManager.default.createDirectory(at: garde, withIntermediateDirectories: true)
+                if rang == 0 { try? donneesActuel?.write(to: garde.appendingPathComponent("masque-actuel.jpg")) }
+                try? donneesTemoin?.write(to: garde.appendingPathComponent("masque-temoin-\(rang + 1).jpg"))
+            }
             for remarque in reponse["remarques"]?.array ?? [] where !masque.remarques.contains(remarque) {
                 // Le masque témoin n'est pas gardé : la remarque d'une clé sans valeur d'avant ne le concerne pas.
                 if remarque.string?.hasSuffix("il garde celle de la proposition.") == true { continue }
@@ -711,7 +738,7 @@ extension ToolHandler {
         guard temoins.count == donneesTemoins.count, let lu = Generatif.masqueDesRendus(actuel: actuel, temoins: temoins) else {
             throw LightroomError.plugin("Le masque de Lightroom n'a pas pu se lire (rendus absents, illisibles ou de tailles différentes). Rien n'a été fait.")
         }
-        (masque.masque, masque.largeur, masque.hauteur) = lu
+        (masque.masque, masque.opacite, masque.largeur, masque.hauteur) = lu
         (masque.part, masque.cadre) = Generatif.cadreDuMasque(lu.masque, largeur: lu.largeur, hauteur: lu.hauteur)
         if let refus = Generatif.refusMasque(part: masque.part) { throw LightroomError.invalid(refus) }
     }
@@ -729,7 +756,7 @@ extension ToolHandler {
             "inverse": .bool(masque.inverse),
             "part_de_la_photo_pct": .number((masque.part * 1000).rounded() / 10),
             "calcule_par": "Lightroom",
-            "lecture": .string("Le masque a été calculé par Lightroom, lu sur deux rendus témoins en pleine résolution (rien n'est gardé dans les réglages de la photo) ; Fibo 2 a redessiné ce qu'il couvre, élargi d'un peu pour le bord, et seul le masque revient dans la photo, fondu de quelques pixels : hors de lui, la photo garde ses pixels."),
+            "lecture": .string("Le masque a été calculé par Lightroom, lu sur deux rendus témoins en pleine résolution (rien n'est gardé dans les réglages de la photo) ; Fibo 2 a redessiné ce qu'il couvre, élargi d'un peu pour le bord, et seul le masque revient dans la photo, avec le bord doux de Lightroom (son opacité, lue dans les rendus : les mèches fines restent) : hors de lui, la photo garde ses pixels."),
         ]
         if let cadre = masque.cadre {
             func r(_ v: CGFloat) -> JSONValue { .number((Double(v) * 1000).rounded() / 1000) }

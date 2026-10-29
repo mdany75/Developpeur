@@ -1505,13 +1505,13 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(entree[25 * 50 + 22], 0, "hors du masque et de sa marge")
     }
 
-    /// La zone de mélange en pleine résolution : 1 dans le masque, 0 exactement hors du fondu.
-    func testZoneDuMasqueFondueSansElargissement() {
+    /// Le masque binaire fondu (le repli de l'opacité) : 1 dans le masque, 0 exactement hors du fondu.
+    func testFonduBinaireSansElargissement() {
         let l = 2000, h = 1400
         var masque = [UInt8](repeating: 0, count: l * h)
         for y in 0..<h { for x in 1000..<l { masque[y * l + x] = 1 } }
         let cadre = Generatif.Pixels(x: 800, y: 100, largeur: 1200, hauteur: 1200)
-        let zone = Generatif.zoneDuMasque(masque, largeurPhoto: l, hauteurPhoto: h, cadre: cadre)
+        let zone = Generatif.fonduBinaire(masque, largeurPhoto: l, hauteurPhoto: h, cadre: cadre)
         XCTAssertEqual(zone.count, 1200 * 1200)
         let rayon = max(2, Int((Double(h) * Generatif.fonduMasque).rounded()))
         XCTAssertEqual(rayon, 2)
@@ -1521,6 +1521,298 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(z(1000 + rayon + 1), 1, "dans le masque, loin du bord : 1")
         XCTAssertGreaterThan(z(1000), 0.4); XCTAssertLessThan(z(999), 0.6)
         XCTAssertGreaterThan(z(999), 0, "le fondu passe le bord")
+    }
+
+    // MARK: Le bord doux (opacité du masque de Lightroom)
+
+    /// Un bord doux de Lightroom, comme les cheveux : un sujet (brun) à gauche, l'ancien fond à droite,
+    /// du gris foncé en haut au gris clair en bas (toutes les valeurs de l'état actuel se voient aussi
+    /// pleines, comme sur une vraie photo) ; l'opacité du masque d'arrière-plan monte de 0 à 1 sur dix
+    /// pixels, de x 600 à 610, et l'état actuel y mêle les deux (des mèches sur le fond). Les témoins
+    /// appliquent −2 IL et +1,5 IL en lumière linéaire, en proportion de l'opacité, comme un réglage
+    /// local de Lightroom.
+    static func bordDoux(largeur l: Int, hauteur h: Int, avecEffet: Bool = true) -> (actuel: [UInt8], temoins: [[UInt8]], opacite: (Int) -> Double) {
+        func opacite(_ x: Int) -> Double { min(1, max(0, (Double(x) + 0.5 - 600) / 10)) }
+        func lin(_ v: Double) -> Double { let c = v / 255; return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        func srgb(_ v: Double) -> UInt8 {
+            let c = min(1, max(0, v))
+            let e = c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1 / 2.4) - 0.055
+            return UInt8((e * 255).rounded())
+        }
+        let sujet: [Double] = [70, 50, 40]
+        var actuel = [UInt8](repeating: 255, count: l * h * 4)
+        var temoins = [actuel, actuel]
+        for y in 0..<h {
+            let gris = 40 + 150 * Double(y) / Double(h)
+            let fond = [gris, gris, gris - 8]
+            for x in 0..<l {
+                let o = opacite(x), i = (y * l + x) * 4
+                for k in 0..<3 {
+                    let a = srgb(lin(sujet[k]) * (1 - o) + lin(fond[k]) * o)
+                    actuel[i + k] = a
+                    temoins[0][i + k] = avecEffet ? srgb(lin(Double(a)) * pow(2, -2 * o)) : a
+                    temoins[1][i + k] = avecEffet ? srgb(lin(Double(a)) * pow(2, 1.5 * o)) : a
+                }
+            }
+        }
+        return (actuel, temoins, opacite)
+    }
+
+    /// Le masque binaire de ces rendus, comme le connecteur le fait (seuil, union, nettoyage).
+    static func binaire(_ actuel: [UInt8], _ temoins: [[UInt8]], largeur l: Int, hauteur h: Int) -> [UInt8] {
+        var masque = [UInt8](repeating: 0, count: l * h)
+        for t in temoins { Generatif.ajouterAuMasque(&masque, actuel: actuel, temoin: t) }
+        Generatif.nettoyer(&masque, largeur: l, hauteur: h)
+        return masque
+    }
+
+    /// L'opacité lue suit le bord doux de Lightroom : là où il ne met qu'un peu de fond (une mèche à
+    /// 15 % d'opacité), la photo garde l'essentiel de ses pixels, alors que l'ancien bord dur (le
+    /// masque binaire fondu) y mettait Fibo presque entier (« photo collée ») ; pleine dès que
+    /// Lightroom dépasse l'opacité haute ; 0 exactement à plus de deux pixels hors du masque binaire.
+    func testOpaciteSuitLeBordDouxDeLightroom() {
+        let l = 1200, h = 1000
+        let (actuel, temoins, vraie) = Self.bordDoux(largeur: l, hauteur: h)
+        let masque = Self.binaire(actuel, temoins, largeur: l, hauteur: h)
+        let premier = (0..<l).first { masque[500 * l + $0] != 0 }!
+        XCTAssertEqual(premier, 601, "le seuil du binaire prend déjà le pixel à 15 % d'opacité")
+        var calcul = Generatif.OpaciteDuMasque(binaire: masque, largeur: l, hauteur: h)
+        XCTAssertEqual(Generatif.OpaciteDuMasque.erosion(largeur: l, hauteur: h), 3)
+        XCTAssertEqual(Generatif.margeOpacite(largeur: l, hauteur: h), Generatif.opaciteMarge, "à 1 000 px, le fondu binaire ne dépasse pas 2 px")
+        for t in temoins { calcul.ajouter(actuel: actuel, temoin: t) }
+        let doux = calcul.opacite(binaire: masque)
+        let cadre = Generatif.Pixels(x: 0, y: 0, largeur: l, hauteur: h)
+        let zone = Generatif.zoneDuMasque(doux, largeurPhoto: l, cadre: cadre)
+        let ancien = Generatif.fonduBinaire(masque, largeurPhoto: l, hauteurPhoto: h, cadre: cadre)
+        func z(_ x: Int) -> Float { zone[500 * l + x] }
+        func a(_ x: Int) -> Float { ancien[500 * l + x] }
+        // Le bord suit la rampe renforcée de l'opacité de Lightroom (à un lissage d'un pixel près) ;
+        // l'ancien bord dur, non : à x 601 (15 % d'opacité), il mettait déjà Fibo aux deux tiers, et
+        // presque entier à x 602 (25 %).
+        func attendu(_ x: Int) -> Float {
+            let t = Float(min(1, max(0, (vraie(x) - Generatif.opaciteBas) / (Generatif.opaciteHaut - Generatif.opaciteBas))))
+            return t * t * (3 - 2 * t)
+        }
+        XCTAssertEqual(vraie(601), 0.15, accuracy: 1e-9)
+        XCTAssertGreaterThan(a(601), 0.6, "l'ancien bord dur : Fibo aux deux tiers sur une mèche à 15 %")
+        XCTAssertGreaterThan(a(602), 0.85)
+        for x in 601...603 {
+            XCTAssertEqual(z(x), attendu(x), accuracy: 0.12, "le bord doux suit Lightroom (x \(x))")
+        }
+        XCTAssertGreaterThan(abs(a(601) - attendu(601)), 0.25, "l'ancien bord dur ne le suivait pas")
+        XCTAssertLessThan(z(601), 0.45, "une mèche à 15 % garde plus de la moitié de ses pixels")
+        XCTAssertLessThan(z(600), z(601)); XCTAssertLessThan(z(601), z(602))
+        for x in 605..<640 { XCTAssertGreaterThan(z(x), 0.97, "au-delà de l'opacité haute, plein (x \(x))") }
+        for x in 700..<l { XCTAssertEqual(z(x), 1, "intérieur profond (x \(x))") }
+        for x in 0..<(600 - Generatif.opaciteMarge) { XCTAssertEqual(z(x), 0, "hors du masque élargi : 0 exactement (x \(x))") }
+        XCTAssertGreaterThan(z(600 - 1), 0, "le lissage passe le bord d'un pixel")
+        // La même chose sur toute la hauteur : aucun pixel du sujet loin du masque n'est touché.
+        for i in 0..<(l * h) where i % l < 598 { if zone[i] != 0 { XCTFail("sujet touché en \(i)"); break } }
+    }
+
+    /// Des témoins qui ne disent rien du bord (aucun effet dans la bande : un canal noir ou écrêté
+    /// partout, ou aucun intérieur sûr) : l'opacité retombe sur l'ancien bord, le masque binaire
+    /// fondu, jamais plus dur ; l'intérieur profond reste plein, le dehors à 0.
+    func testOpaciteSansAppuiRetombeSurLeFonduBinaire() {
+        let l = 1200, h = 1000
+        let (actuel, temoins, _) = Self.bordDoux(largeur: l, hauteur: h)
+        let masque = Self.binaire(actuel, temoins, largeur: l, hauteur: h)
+        let (_, muets, _) = Self.bordDoux(largeur: l, hauteur: h, avecEffet: false)
+        var calcul = Generatif.OpaciteDuMasque(binaire: masque, largeur: l, hauteur: h)
+        for t in muets { calcul.ajouter(actuel: actuel, temoin: t) }
+        XCTAssertTrue(calcul.denominateur.allSatisfy { $0 == 0 }, "un écart nul tombe sur 0 dans la table")
+        let doux = calcul.opacite(binaire: masque)
+        let repli = Generatif.fonduBinaire(masque, largeurPhoto: l, hauteurPhoto: h, cadre: Generatif.Pixels(x: 0, y: 0, largeur: l, hauteur: h))
+        for x in 590..<640 {
+            let i = 500 * l + x
+            if x < 600 - Generatif.opaciteMarge { XCTAssertEqual(doux[i], 0, "x \(x)"); continue }
+            XCTAssertEqual(Float(doux[i]) / 255, repli[i], accuracy: 1 / 255 + 1e-6, "le repli : le fondu binaire (x \(x))")
+        }
+        XCTAssertEqual(doux[500 * l + 900], 255)
+    }
+
+    /// La table de l'effet plein relevée dans l'intérieur sûr : −2 IL et +1,5 IL en lumière linéaire,
+    /// à la valeur du fond ; une valeur jamais vue prend la plus proche.
+    func testTableDeLEffetPlein() {
+        let l = 1200, h = 1000
+        let (actuel, temoins, _) = Self.bordDoux(largeur: l, hauteur: h)
+        let masque = Self.binaire(actuel, temoins, largeur: l, hauteur: h)
+        let calcul = Generatif.OpaciteDuMasque(binaire: masque, largeur: l, hauteur: h)
+        let fond = Int(actuel[(500 * l + 1000) * 4])
+        for (t, attendu) in zip(temoins, [-2.0, 1.5]) {
+            let table = actuel.withUnsafeBufferPointer { a in t.withUnsafeBufferPointer { calcul.table(actuel: a, temoin: $0) } }
+            XCTAssertEqual(Double(table[fond]), attendu, accuracy: 0.08, "l'effet plein au fond (\(fond))")
+            XCTAssertEqual(Double(table[10]), Double(table[40]), accuracy: 0.05, "une valeur jamais vue en bas : la plus proche")
+            XCTAssertEqual(Double(table[250]), Double(table[190]), accuracy: 0.05, "en haut aussi")
+        }
+    }
+
+    /// Des rendus témoins d'un bord doux quelconque : l'opacité de Lightroom en chaque pixel (x, y),
+    /// le sujet (brun) mêlé au fond (un gris par ligne, `fond`) en proportion de l'opacité ; chaque
+    /// témoin applique, canal par canal, un effet plein f(canal, valeur de l'état actuel) en IL de
+    /// lumière linéaire, en proportion de l'opacité (écrêté à 255 en sRGB, comme un rendu).
+    static func rendusDoux(largeur l: Int, hauteur h: Int, opacite: (Int, Int) -> Double, fond: (Int) -> Double,
+                           effets: [(Int, Int) -> Double]) -> (actuel: [UInt8], temoins: [[UInt8]]) {
+        func lin(_ v: Double) -> Double { let c = v / 255; return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        func srgb(_ v: Double) -> UInt8 {
+            let c = min(1, max(0, v))
+            let e = c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1 / 2.4) - 0.055
+            return UInt8((e * 255).rounded())
+        }
+        let sujet: [Double] = [70, 50, 40]
+        var actuel = [UInt8](repeating: 255, count: l * h * 4)
+        var temoins = [[UInt8]](repeating: actuel, count: effets.count)
+        for y in 0..<h {
+            let gris = fond(y), couleurFond = [gris, gris, max(0, gris - 8)]
+            for x in 0..<l {
+                let o = opacite(x, y), i = (y * l + x) * 4
+                for k in 0..<3 {
+                    let a = srgb(lin(sujet[k]) * (1 - o) + lin(couleurFond[k]) * o)
+                    actuel[i + k] = a
+                    for (t, effet) in effets.enumerated() { temoins[t][i + k] = srgb(lin(Double(a)) * pow(2, o * effet(k, Int(a)))) }
+                }
+            }
+        }
+        return (actuel, temoins)
+    }
+
+    /// La zone de mélange de ces rendus, comme le connecteur la fait (binaire, opacité).
+    static func zoneDesRendus(_ actuel: [UInt8], _ temoins: [[UInt8]], largeur l: Int, hauteur h: Int) -> [Float] {
+        let masque = binaire(actuel, temoins, largeur: l, hauteur: h)
+        var calcul = Generatif.OpaciteDuMasque(binaire: masque, largeur: l, hauteur: h)
+        for t in temoins { calcul.ajouter(actuel: actuel, temoin: t) }
+        return Generatif.zoneDuMasque(calcul.opacite(binaire: masque), largeurPhoto: l, cadre: Generatif.Pixels(x: 0, y: 0, largeur: l, hauteur: h))
+    }
+
+    /// La rampe renforcée attendue pour une opacité de Lightroom.
+    static func rampe(_ o: Double) -> Float {
+        let t = Float(min(1, max(0, (o - Generatif.opaciteBas) / (Generatif.opaciteHaut - Generatif.opaciteBas))))
+        return t * t * (3 - 2 * t)
+    }
+
+    /// Un masque de Lightroom partiel sur des centaines de pixels (un radial ou un dégradé fondus, un
+    /// bord affiné) : l'opacité se lit sur toute la rampe, sans marche à l'intérieur du masque binaire ;
+    /// elle n'est jamais forcée pleine à une profondeur fixe (une profondeur de 6 px, ici, mettait Fibo
+    /// entier là où Lightroom n'en met que 12 %, une marche d'environ 55 % le long du contour). Le
+    /// binaire ne commence qu'à environ 10 % d'opacité (le seuil de 6 niveaux), d'où un saut de départ
+    /// au bord du binaire, comme avant ; et l'effet plein, relevé dans un intérieur sûr qui a ici des
+    /// pixels partiels, y est sous-estimé : la zone monte plus tôt que Lightroom, sans marche.
+    func testOpaciteSansMarcheSurUneLongueRampe() {
+        let l = 1600, h = 300
+        func o(_ x: Int, _ y: Int) -> Double { min(1, max(0, (Double(x) + 0.5 - 400) / 400)) }
+        let (actuel, temoins) = Self.rendusDoux(largeur: l, hauteur: h, opacite: o, fond: { 20 + 220 * Double($0) / Double(h) },
+                                                effets: [{ _, _ in -2 }, { _, _ in 1.5 }])
+        let zone = Self.zoneDesRendus(actuel, temoins, largeur: l, hauteur: h)
+        let masque = Self.binaire(actuel, temoins, largeur: l, hauteur: h)
+        for y in [60, 150, 240] {
+            func z(_ x: Int) -> Float { zone[y * l + x] }
+            let bord = (0..<l).first { masque[y * l + $0] != 0 }!
+            XCTAssertEqual(o(bord, y), 0.1, accuracy: 0.03, "le binaire commence vers 10 % d'opacité (y \(y))")
+            XCTAssertLessThan(z(bord), 0.45, "un départ doux au bord du binaire (y \(y))")
+            var sautMax: Float = 0
+            for x in (bord + 4)..<1200 {
+                sautMax = max(sautMax, abs(z(x + 1) - z(x)))
+                XCTAssertGreaterThanOrEqual(z(x + 1), z(x) - 0.01, "la zone monte avec l'opacité (x \(x), y \(y))")
+            }
+            XCTAssertLessThan(sautMax, 0.04, "aucune marche dans le masque (y \(y))")
+            XCTAssertLessThan(z(bord + 6), 0.6, "jamais plein à quelques pixels du bord : Lightroom n'y met que 12 % (y \(y))")
+            XCTAssertLessThan(z(480), 0.95, "ni à 20 % d'opacité (y \(y))")
+            for x in stride(from: 650, to: l, by: 50) { XCTAssertGreaterThan(z(x), 0.97, "plein là où Lightroom l'est presque (x \(x))") }
+        }
+    }
+
+    /// L'effet plein se lit par canal et par valeur de l'état actuel : des témoins dont l'effet change
+    /// avec la valeur (une courbe de tonalité : le sombre baisse plus les tons clairs ; des noirs
+    /// relevés : le clair monte plus les tons sombres, et s'écrête au blanc), et plus froids (le bleu
+    /// monte, le rouge baisse). L'opacité suit Lightroom sur une ligne sombre comme sur une ligne où le
+    /// témoin clair s'écrête ; une table lue par la valeur du témoin s'en écarterait.
+    func testOpaciteSuitUnEffetQuiDependDeLaValeur() {
+        let l = 1200, h = 1000
+        func o(_ x: Int, _ y: Int) -> Double { min(1, max(0, (Double(x) + 0.5 - 600) / 10)) }
+        func froid(_ k: Int) -> Double { k == 2 ? 0.4 : k == 0 ? -0.4 : 0 }
+        let sombre: (Int, Int) -> Double = { k, v in -1.2 - 2.8 * Double(v) / 255 + froid(k) }
+        let clair: (Int, Int) -> Double = { k, v in 0.4 + 4 * pow(1 - Double(v) / 255, 3) + froid(k) }
+        let (actuel, temoins) = Self.rendusDoux(largeur: l, hauteur: h, opacite: o, fond: { 12 + 233 * Double($0) / Double(h - 1) },
+                                                effets: [sombre, clair])
+        // Le témoin clair s'écrête au blanc dans le fond des lignes claires.
+        XCTAssertEqual(temoins[1][(950 * l + 1000) * 4 + 2], 255)
+        let zone = Self.zoneDesRendus(actuel, temoins, largeur: l, hauteur: h)
+        for y in [60, 120, 500, 900, 960] {
+            for x in 601...603 {
+                XCTAssertEqual(zone[y * l + x], Self.rampe(o(x, y)), accuracy: 0.12, "x \(x), y \(y)")
+            }
+            XCTAssertEqual(zone[y * l + 900], 1, "plein dans le fond (y \(y))")
+            XCTAssertEqual(zone[y * l + 590], 0, "hors du masque élargi (y \(y))")
+        }
+    }
+
+    /// Le repli (des témoins muets) garde tout l'ancien bord, même là où le fondu binaire dépasse les
+    /// deux pixels du calcul (4 px pour une photo de 2 400 px de côté, 6 px à 4 160 px) : jamais plus
+    /// dur que lui.
+    func testRepliSurToutLaLargeurDuFonduBinaire() {
+        let l = 2400, h = 2400
+        XCTAssertEqual(Generatif.etendueFondu(largeur: l, hauteur: h), 4)
+        XCTAssertGreaterThan(Generatif.margeOpacite(largeur: l, hauteur: h), Generatif.opaciteMarge)
+        var masque = [UInt8](repeating: 0, count: l * h)
+        for y in 0..<h { for x in 1200..<l { masque[y * l + x] = 1 } }
+        let actuel = [UInt8](repeating: 128, count: l * h * 4)
+        var calcul = Generatif.OpaciteDuMasque(binaire: masque, largeur: l, hauteur: h)
+        calcul.ajouter(actuel: actuel, temoin: actuel)
+        calcul.ajouter(actuel: actuel, temoin: actuel)
+        let doux = calcul.opacite(binaire: masque)
+        let repli = Generatif.fonduBinaire(masque, largeurPhoto: l, hauteurPhoto: h, cadre: Generatif.Pixels(x: 0, y: 0, largeur: l, hauteur: h))
+        let ligne = 1200 * l
+        XCTAssertGreaterThan(repli[ligne + 1200 - 3], 0, "le fondu binaire passe les deux pixels")
+        for x in 1185..<1215 {
+            XCTAssertEqual(Float(doux[ligne + x]) / 255, repli[ligne + x], accuracy: 1 / 255 + 1e-6, "le repli : tout le fondu binaire (x \(x))")
+        }
+        XCTAssertEqual(doux[ligne + 1200 - 5], 0, "au-delà du fondu, 0")
+    }
+
+    /// L'opacité remise à une autre taille (rendus plus petits que le TIFF) reste douce : bilinéaire,
+    /// sans marche plus haute que la moitié d'un pas d'origine ; 0 hors du binaire remis à la taille et
+    /// élargi.
+    func testOpaciteRemiseALaTailleEnDouceur() {
+        let l = 300, h = 200, nl = 600, nh = 400
+        var opacite = [UInt8](repeating: 0, count: l * h), masque = [UInt8](repeating: 0, count: l * h)
+        for y in 0..<h {
+            for x in 0..<l {
+                opacite[y * l + x] = UInt8(min(255, max(0, (x - 140) * 255 / 20)))
+                masque[y * l + x] = x >= 141 ? 1 : 0
+            }
+        }
+        let binaire = Generatif.redimensionner(masque, largeur: l, hauteur: h, versLargeur: nl, versHauteur: nh)
+        let grande = Generatif.redimensionnerOpacite(opacite, largeur: l, hauteur: h, binaire: binaire, versLargeur: nl, versHauteur: nh)
+        XCTAssertEqual(grande.count, nl * nh)
+        let ligne = 200 * nl
+        var saut = 0, intermediaires = 0
+        for x in 0..<(nl - 1) {
+            let a = Int(grande[ligne + x]), b = Int(grande[ligne + x + 1])
+            XCTAssertGreaterThanOrEqual(b, a, "monotone (x \(x))")
+            saut = max(saut, b - a)
+            if a > 0 && a < 255 { intermediaires += 1 }
+        }
+        XCTAssertLessThanOrEqual(saut, 8, "au plus proche voisin, une marche de 12 tous les deux pixels")
+        XCTAssertGreaterThan(intermediaires, 30)
+        let premier = (0..<nl).first { binaire[ligne + $0] != 0 }!
+        for x in 0..<(premier - Generatif.margeOpacite(largeur: nl, hauteur: nh)) { XCTAssertEqual(grande[ligne + x], 0, "x \(x)") }
+        XCTAssertEqual(grande[ligne + nl - 1], 255)
+    }
+
+    /// La distance en échiquier (dedans et dehors), et le lissage entier qui garde 0 et 255 loin de
+    /// tout bord.
+    func testDistanceEchiquierEtLissage() {
+        let l = 7, h = 5
+        var masque = [UInt8](repeating: 0, count: l * h)
+        for y in 0..<h { for x in 3..<l { masque[y * l + x] = 1 } }
+        let dedans = Generatif.distanceEchiquier(masque, largeur: l, hauteur: h, dedans: true, plafond: 10)
+        XCTAssertEqual(Array(dedans[(2 * l)..<(3 * l)]), [0, 0, 0, 1, 2, 3, 4], "le bord de l'image n'est pas une frontière")
+        let dehors = Generatif.distanceEchiquier(masque, largeur: l, hauteur: h, dedans: false, plafond: 2)
+        XCTAssertEqual(Array(dehors[(2 * l)..<(3 * l)]), [2, 2, 1, 0, 0, 0, 0], "plafonnée")
+        var v = [UInt8](repeating: 0, count: 20 * 20)
+        for y in 0..<20 { for x in 10..<20 { v[y * 20 + x] = 255 } }
+        Generatif.lisserOpacite(&v, largeur: 20, hauteur: 20)
+        XCTAssertEqual(Array(v[(10 * 20 + 6)..<(10 * 20 + 14)]), [0, 0, 28, 85, 170, 227, 255, 255])
     }
 
     /// Le flou en place (sommes entières, un anneau de lignes) rend le même fondu que deux flous en
@@ -1568,14 +1860,35 @@ final class GeneratifTests: XCTestCase {
         debut = Date()
         let entree = Generatif.masquePourFibo(masque, largeurPhoto: l, cadre: cadre, taille: taille)
         let dureeEntree = Date().timeIntervalSince(debut)
+        // L'opacité du bord : les témoins refaits (le sombre, puis le clair), l'un après l'autre.
         debut = Date()
-        let zone = Generatif.zoneDuMasque(masque, largeurPhoto: l, hauteurPhoto: h, cadre: cadre)
-        let dureeZone = Date().timeIntervalSince(debut)
+        var opacite = Generatif.OpaciteDuMasque(binaire: masque, largeur: l, hauteur: h)
+        for sombre in [true, false] {
+            var actuel = [UInt8](repeating: 128, count: n * 4), temoin = actuel
+            temoin.withUnsafeMutableBufferPointer { t in
+                masque.withUnsafeBufferPointer { m in
+                    for p in 0..<n where m[p] != 0 {
+                        if sombre { t[p * 4] = 40; t[p * 4 + 2] = 170 } else { t[p * 4] = 200 }
+                    }
+                }
+            }
+            opacite.ajouter(actuel: actuel, temoin: temoin)
+            actuel = []; temoin = []
+        }
+        let doux = opacite.opacite(binaire: masque)
+        let dureeOpacite = Date().timeIntervalSince(debut)
+        let dansLeMasque = masque.withUnsafeBufferPointer { m in (0..<n).reduce(0) { $0 + Int(m[$1]) } }
+        XCTAssertGreaterThanOrEqual(opacite.numerateur.count, dansLeMasque, "tout le masque binaire, jamais forcé plein en profondeur")
+        XCTAssertLessThan(opacite.numerateur.count, dansLeMasque + n / 100, "et le bord hors de lui, de deux pixels")
+        debut = Date()
+        let zone = Generatif.zoneDuMasque(doux, largeurPhoto: l, cadre: cadre)
+        let dureeZone = Date().timeIntervalSince(debut) + dureeOpacite
+        XCTAssertEqual(zone[100 * cadre.largeur + 100], 1, "l'arrière-plan, loin du sujet : plein")
         XCTAssertEqual(zone.count, cadre.largeur * cadre.hauteur)
         XCTAssertEqual(entree.count, taille.largeur * taille.hauteur)
         XCTAssertEqual(zone[2080 * cadre.largeur + 3120 - cadre.x], 0, "le centre (le sujet) reste hors du masque")
         let total = dureeBinaire + dureeNettoyage + dureeEntree + dureeZone
-        print("Masque de 26 Mpx : binaire \(Self.secondes(dureeBinaire)), nettoyage \(Self.secondes(dureeNettoyage)), masque de Fibo \(Self.secondes(dureeEntree)), zone de mélange \(Self.secondes(dureeZone)), en tout \(Self.secondes(total))")
+        print("Masque de 26 Mpx : binaire \(Self.secondes(dureeBinaire)), nettoyage \(Self.secondes(dureeNettoyage)), masque de Fibo \(Self.secondes(dureeEntree)), opacité du bord et zone de mélange \(Self.secondes(dureeZone)) (dont témoins refaits), en tout \(Self.secondes(total))")
         #if DEBUG
         XCTAssertLessThan(total, 240, "temps borné, compilé pour le débogage (machine virtuelle lente comprise)")
         #else
@@ -1676,6 +1989,41 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(Self.pixel(apres, 300, 200), Self.pixel(avant, 300, 200), "la personne, au milieu")
         XCTAssertGreaterThan(Self.pixel(apres, 20, 20)[2], 40_000)
         XCTAssertEqual(try JSONCoding.parse(resultat.text)["masque"]?["part_de_la_photo_pct"]?.double ?? 0, 92, accuracy: 2)
+    }
+
+    /// Développement (`DEVELOPPEUR_FIBO_GARDER`) : les fichiers de chaque appel sont copiés dans un
+    /// sous-dossier à son nom, rendus du masque compris ; un témoin qui ne se lit pas n'est pas écrit
+    /// (jamais le précédent sous son nom).
+    func testFichiersGardesPourLeDeveloppement() throws {
+        let garde = dossier.appendingPathComponent("garde")
+        tools.fibo?.garderDans = garde
+        masqueRendu = { !Self.dansLaPersonne($0, $1) }
+        fauxMflux(sortie: sortiePreparee(region: CGRect(x: 0, y: 0, width: 1, height: 1)) { _, _, p, i in Self.bleu(&p, i) })
+        let resultat = editer(["instruction": "replace the background", "mask": ["kind": "background"]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        let appels = try FileManager.default.contentsOfDirectory(atPath: garde.path)
+        XCTAssertEqual(appels.count, 1)
+        let fichiers = Set(try FileManager.default.contentsOfDirectory(atPath: garde.appendingPathComponent(appels[0]).path))
+        for nom in ["masque-actuel.jpg", "masque-temoin-1.jpg", "masque-temoin-2.jpg", "DSCF2402.tif"] {
+            XCTAssertTrue(fichiers.contains(nom), "\(nom) dans \(fichiers.sorted())")
+        }
+        XCTAssertEqual(dossiersTemporairesRestants, [], "le dossier de l'appel est effacé comme toujours")
+
+        // Le second témoin ne se lit pas : le premier n'est pas écrit sous son nom.
+        let precedent = fake.onSend
+        fake.onSend = { [unowned self] commande, params in
+            precedent?(commande, params)
+            if commande == "essayer", params["comparer"]?.bool == false, var reponse = self.fake.replies["essayer"]?.object {
+                reponse["chemin"] = .string(self.dossier.appendingPathComponent("absent.jpg").path)
+                self.fake.replies["essayer"] = .object(reponse)
+            }
+        }
+        let echec = editer(["instruction": "replace the background", "mask": ["kind": "background"]])
+        XCTAssertTrue(echec.isError && echec.text.contains("n'a pas pu se lire"), echec.text)
+        let second = try XCTUnwrap(try FileManager.default.contentsOfDirectory(atPath: garde.path).first { $0 != appels[0] })
+        let lus = Set(try FileManager.default.contentsOfDirectory(atPath: garde.appendingPathComponent(second).path))
+        XCTAssertTrue(lus.contains("masque-temoin-1.jpg"), "\(lus.sorted())")
+        XCTAssertFalse(lus.contains("masque-temoin-2.jpg"), "\(lus.sorted())")
     }
 
     /// Un masque presque vide ou presque total est refusé avant tout calcul de Fibo 2 (après

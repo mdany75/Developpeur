@@ -58,7 +58,7 @@ Ce projet suit le standard commun des projets de Dany (`/standard-projet` le vé
 | Graphiques du Suivi | `./.build/debug/mcp-developpeur --graphiques '<json>' <dossier>` (ce que la fenêtre Suivi lance, par `perl` et son alarme de 60 s depuis le correctif 1.3.8, 20 s avant, la réponse dans un fichier : lit seulement `suivi.json` et `carnet.json` aux chemins donnés, aucun par défaut, et la table du catalogue donné ; d'après `debut` (facultatif : depuis la première photo) et `fin`, des jours « AAAA-MM-JJ » que donne le module (rien ne dépend de l'horloge du connecteur ; à la place d'`aujourd_hui` et de `periode`, `3_mois`, `12_mois` ou `tout`, depuis le correctif 1.3.8), `apparence` et ses six couleurs tirées de `Dispositions.PALETTES`, `defaut` (absent : le plus fréquent) et les tailles en points, dessine les neuf PNG en 2x dans le dossier (créé s'il manque ; `SuiviDessin.swift`) et écrit une ligne JSON : période (`debut`, `fin`, `libelle`, `par` : `mois`, `trimestre` ou `annee`, treize colonnes au plus, `depuis_le_debut`), photos, quatre tuiles, les huit défauts comptés, neuf graphiques (les notes de 0 à 5 ★ et les genres de photos depuis le correctif 1.3.8) avec leurs barres (rectangle dessiné, zone cliquable, `ids` croissants des originaux) et leurs créneaux ; refus `{ok: false, raison, texte}` et code 1 (`arguments`, `defaut_inconnu`, `suivi_illisible`, `dossier`, `dessin`), sans PNG laissé ; code 2 comme `--analyser` ; un relevé de 20 000 originaux en 0,3 s environ, une ligne de toute la bibliothèque de 0,7 Mo ; de 250 000 en 2,6 s, 0,7 Go de mémoire, une ligne de 10,6 Mo, que la fenêtre décode en rendant la main (mesuré le 26 octobre 2026 avec le graphique des notes, sur un relevé synthétique de photos de 2010 à 2026, « Du » vide ; le graphique des notes y ajoute une fois de plus les ids de toute la période, environ 15 %) ; forme figée dans `Tests/Contrats/suivi.json`) |
 | Relevé du carnet | `./.build/debug/mcp-developpeur --constats <id>… [<fichier.jpg>…]` (pour fixer les seuils du carnet de progrès, en lecture seule : aperçu avec `point_af` à 1 344 px et les clés de la géométrie, jamais `carnet constater` ; par photo, L* médian et 95e centile, blanc pur du tiers haut, netteté et texture (au point de mise au point aussi), bruit, ISO et si le bruit y est cherché (1.3.1 ; l'Exif d'un fichier), boîtier, géométrie, étapes de Claude, défauts cherchés et retenus, puis un résumé ; un JPEG se mesure sans Lightroom, sans point ni intention ; lignes ✘ et code 1 en cas d'échec) |
 | Relevé de l'éclairage | `./.build/debug/mcp-developpeur --eclairage <id>… [<fichier.jpg>…] [--essai '{…}']` (pour fixer les seuils de l'éclairage mixte : dominantes des tons neutres par case 3 × 3 et par zone tonale, visages, zone d'intérêt et scène de Vision, aux bornes 12, 15, 20, 25 et 30 de l'écart a*b* au centre des tons neutres, chaque ligne « borne N : … ; point neutre a* x b* y, centre a* x b* y », durée de la mesure, puis un résumé ; lecture seule par la commande `apercu`, sans point AF ni original ouvert ; un fichier JPEG se mesure sans Lightroom ; `--essai` passe par `preview_settings` (deux étapes « Claude · essai »), copies virtuelles seulement) |
-| Journal détaillé | `DEVELOPPEUR_VERBOSE=1` (durée des réponses et de chaque commande du module, sur stderr) ; `DEVELOPPEUR_LIMITE=<s>` pour essayer la réponse d'attente ; `DEVELOPPEUR_PORT=<port>` pour un autre port |
+| Journal détaillé | `DEVELOPPEUR_VERBOSE=1` (durée des réponses et de chaque commande du module, sur stderr) ; `DEVELOPPEUR_LIMITE=<s>` pour essayer la réponse d'attente ; `DEVELOPPEUR_PORT=<port>` pour un autre port ; `DEVELOPPEUR_FIBO_GARDER=<dossier>` (développement seulement : chaque appel de `generative_edit` y copie, dans un sous-dossier à son nom, les rendus du masque, le TIFF exporté avec ses métadonnées, GPS compris, l'entrée, le masque et la sortie de Fibo ; rien n'y est jamais effacé : ne pas la laisser posée) |
 | Journaux du module | `~/Library/Logs/Developpeur/module.log` (liaison, avec les commandes refusées faute du bon jeton : une ligne par genre de refus toutes les 10 s au plus, jamais le jeton) et `conversation.log` (fenêtre Claude, Demande rapide, et depuis le correctif 1.3.7 le relevé et la fenêtre Suivi), gardés sous 1 Mo ; échanges avec Claude Code : `~/Library/Application Support/Developpeur/Sessions/` |
 | Recharger le module dans Lightroom | Fermer les fenêtres du module (devant, elles réduisent le menu Fichier), Lightroom au premier plan, puis Fichier › Gestionnaire de modules externes › Développeur › Outils de l'auteur du module externe › Charger de nouveau le module ext. Un fichier `.lua` ajouté depuis le lancement ne se charge pas ainsi (« Could not load toolkit script »), ni donc un fichier qui le requiert (`Commandes.lua` requiert `Notation.lua`, nouveau en 1.1, et `Etapes.lua` et `Carnet.lua`, nouveaux en 1.3 ; `Moteur.lua` requiert `Historique.lua`, et `Fenetre.lua` `FenetreSuivi.lua`, nouveaux au correctif 1.3.6 ; `Fenetre.lua`, `FenetreRapide.lua` et `FenetreSuivi.lua` requièrent `Releve.lua`, nouveau au correctif 1.3.7 ; `FenetreSuivi.lua` requiert `Calendrier.lua`, nouveau au correctif 1.3.8), ni un raccourci clavier changé : quitter et relancer Lightroom, après toute version qui ajoute un fichier `.lua` |
 | Remesurer les polices | `swift scripts/metriques.swift > Lightroom/Developpeur.lrplugin/Metriques.lua` (la police du système, `'<system>'` en 13, 12 et 11 et `'<system/bold>'` en 13, 12, 11 et 16, et Menlo 11 : clés `texte`, `texte12`, `petit`, `gras`, `gras12`, `gras11`, `titre`, `mono` ; si une police du fil ou des cartes change dans `Fenetre.lua`, ou pour un caractère nouveau, comme ★ ☆ ⚑ ＋ ⊗ ⤢) |
@@ -614,22 +614,55 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   le corps, garde ses pixels : l'ancien nettoyage par blocs les effaçait, trouvaille de la
   relecture), refusé si moins de 0,01 % de la photo est dans le masque ou hors de lui
   (`partMasqueMin`, `refusMasque` : un petit sujet, un oiseau de 0,4 %, passe), remis à la taille du
-  TIFF au plus proche voisin s'il le faut ; son cadre englobant tient lieu de `region` (recadrage,
+  TIFF au plus proche voisin s'il le faut (son opacité en bilinéaire, `redimensionnerOpacite`, puis 0
+  hors du binaire remis à la taille et élargi) ; son cadre englobant tient lieu de `region` (recadrage,
   SeedVR2, dont la remarque d'un masque trop étendu ne conseille jamais region : `avecMasque`) ; Fibo
   reçoit la part couverte de chaque pixel d'entrée, élargie de `margeMasque` (1 %) ; mflux grise
-  lui-même la zone (jamais remplie par le connecteur) ; zone de mélange en pleine résolution
-  (`zoneDuMasque`, fondu `fonduMasque` 0,15 %, au moins 2 px, sans élargissement, exactement 0 hors
-  du fondu : `sommeBoiteEnPlace`) ; réponse `masque` (kind, inverse, part, cadre, `calcule_par`,
-  lecture, remarques). Durée relevée sur 26 Mpx, compilé pour le débogage : masque binaire 3,4 s,
-  nettoyage 5,3 s, masque de Fibo 2,0 s, zone de mélange 17 s (le test ne borne strictement qu'en
-  publication). **Constaté le 29 octobre 2026 au soir** (essai réel, Lightroom ouvert, nouvelle copie
+  lui-même la zone (jamais remplie par le connecteur) ; zone de mélange en pleine résolution : **le
+  bord doux de Lightroom** (`Generatif.OpaciteDuMasque`, demandé par Dany le 29 octobre 2026 au
+  soir : « adoucis-le »), l'opacité du masque IA lue dans les mêmes rendus, avant qu'ils ne soient
+  libérés (`masqueDesRendus` rend `opacite`, un octet par pixel ; le dernier témoin resservi, le
+  premier redécodé) : par témoin et par canal, l'écart en log2 de la lumière linéaire
+  (`opaciteEpsilon` 0,002) ; l'effet plein, médiane des écarts dans l'intérieur sûr (à plus de
+  `opaciteErosion`, 0,3 % du petit côté, 12 px, du dehors), par valeur de l'état actuel (table de
+  256, cases centrées sur 0, lissée) ; α par moindres carrés sur 2 témoins × 3 canaux avec le
+  binaire en a priori (`opaciteAPriori`, λ 0,3) ; rampe renforcée en smoothstep (`opaciteBas` 0,03,
+  `opaciteHaut` 0,35 : de 0,12 à 0,85, un voile gris de l'ancien fond restait) ; lissage d'un pixel
+  (`lisserOpacite`, deux passages, en entiers) ; calculé sur tout le binaire élargi de
+  `opaciteMarge`, 2 px (`classe`, distances par `distanceEchiquier`), jamais forcé plein à une
+  profondeur fixe (relecture du même soir : un radial, un dégradé ou un bord affiné restent partiels
+  sur des centaines de pixels, et la profondeur pleine de 50 px, `opaciteProfondeur`, retirée, y
+  faisait une marche ; pleine seulement là où α atteint `opaciteHaut`) ; là où les témoins ne disent
+  presque rien (Σ f² sous `opaciteAppui`, 1), repli vers l'ancien bord, le binaire fondu
+  (`fonduBinaire`, `fonduMasque` 0,15 %), sur toute sa largeur (`margeOpacite` : 2 px, ou
+  `etendueFondu` s'il est plus large, 6 px à 4 160 px ; la part de repli étendue en carré,
+  `maximumCarre`) ; exactement 0 au-delà (la photo y garde ses pixels au bit près ; `zoneDuMasque`
+  lit l'opacité). Sur une longue rampe, l'effet plein relevé dans un intérieur sûr qui a des pixels
+  partiels est sous-estimé : la zone y monte plus tôt que Lightroom, sans marche ; et le binaire n'y
+  commence que vers 10 % d'opacité (le seuil), d'où un départ en saut au bord, comme avant. Masque de Fibo inchangé (le binaire élargi de 1 %). Relevé
+  sur les vraies images de l'essai (labo du 29 octobre 2026, quatre bords comparés par deux juges :
+  fondu large asymétrique, filtre guidé, opacité décontaminée, celui-ci) : le bord binaire tombait
+  à 0 à 20 % d'opacité de Lightroom, mèches fines mangées ; le masque IA est une rampe d'environ
+  20 px, des partiels jusqu'à 48 px dans le binaire ; avec le bord doux, mèches gardées sur le
+  nouveau fond, poncho net, aucun pixel du sujet touché à plus de 2 px du masque (5,36 millions) ;
+  reste un léger voile de l'ancien fond là où Lightroom met une opacité moyenne. Masque binaire et
+  opacité en 0,53 à 0,59 s sur 26 Mpx (décodages compris, `-O`), 1,04 Go en pointe pour tout le chemin
+  avec deux recompositions ; calculée sur tout le masque (relecture du même soir), 0,7 à 0,9 s et
+  1,2 Go, la même opacité sur ce portrait à 326 pixels près (au fond, à plus de 50 px du bord, 25
+  niveaux au plus). Seuils provisoires : un seul portrait ; à éprouver sur un sujet clair
+  devant un fond sombre et sur un ciel. Réponse `masque` (kind, inverse, part, cadre,
+  `calcule_par`, lecture, remarques). Durée relevée sur 26 Mpx, compilé pour le débogage : masque
+  binaire 3,4 s, nettoyage 5,3 s, masque de Fibo 2,0 s, opacité et zone de mélange de l'ordre de
+  22 s (le test ne borne strictement qu'en publication). **Constaté le 29 octobre 2026 au soir**
+  (essai réel, Lightroom ouvert, nouvelle copie
   d'essai de DSCF2402.RAF, 26 Mpx, `mask` `background`, Times Square, graine 42, qualité rapide,
   demandée par Dany : « fais les tests en turbo mode ») : réussi en 41 s, dont 22 s de Fibo 2 ;
   masque de 79,2 % de la photo, cadre de toute la photo, aligné au TIFF exporté (aucun décalage
   visible au bord) ; tout l'ancien fond remplacé (ni panneau ni « R »), la personne intacte ;
-  80,8 % changés ; SeedVR2 non lancé (× 5,0), mise à la taille ordinaire ; le bord des cheveux est
-  net mais découpé (pas de mèches fines sur le nouveau fond), à reprendre par un fondu plus large
-  ou un masque doux. Seuils provisoires ; restent à constater dans Lightroom les deux témoins sur un
+  80,8 % changés ; SeedVR2 non lancé (× 5,0), mise à la taille ordinaire ; le bord des cheveux était
+  net mais découpé (pas de mèches fines sur le nouveau fond) : repris par le bord doux ci-dessus,
+  vérifié sur ces images (recomposition refaite par le code du connecteur), pas encore par un essai
+  réel. Seuils provisoires ; restent à constater dans Lightroom les deux témoins sur un
   noir pur, un fond très sombre et un blanc brûlé, et une personne non reconnue.
   Voir `docs/SPEC.md`, Retouche générative par Fibo 2 (Masque de Lightroom).
 - La suppression des reflets (`Suppression.lua`, commande `supprimer`) suit le même chemin que le

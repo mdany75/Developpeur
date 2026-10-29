@@ -676,9 +676,63 @@ public enum Generatif {
     /// Élargissement du masque donné à Fibo (part du petit côté de son entrée), pour qu'il redessine
     /// aussi le bord : environ 10 px à 1 Mpx. Provisoire.
     static let margeMasque = 0.01
-    /// Fondu de la zone de mélange, en pleine résolution (part du petit côté de la photo, au moins
-    /// 2 px : 6 px pour une photo de 4 160 px de haut), sans élargissement. Provisoire.
+    /// Fondu du masque binaire (`fonduBinaire`), en pleine résolution (part du petit côté de la photo,
+    /// au moins 2 px : 6 px pour une photo de 4 160 px de haut), sans élargissement : le repli de
+    /// l'opacité là où les témoins ne disent rien. Provisoire.
     static let fonduMasque = 0.0015
+
+    // Le bord doux : l'opacité du masque de Lightroom (`OpaciteDuMasque`), lue dans l'écart entre
+    // l'état actuel et les deux témoins. Relevé du 29 octobre 2026 sur l'essai réel (portrait
+    // DSCF2402, 6 240 × 4 160, arrière-plan remplacé par Times Square, cheveux bruns, poncho noir) :
+    // le bord du masque binaire tombait là où l'opacité de Lightroom n'est que de 0 à 20 %, et les
+    // mèches fines passaient entières à Fibo (« photo collée ») ; le masque IA de Lightroom est une
+    // rampe lisse d'environ 20 px autour des cheveux, presque toute dans le masque binaire (des pixels
+    // partiels jusqu'à 48 px du bord, aucun au-delà de 64). Comparé au labo à trois autres bords
+    // (fondu large asymétrique, filtre guidé, opacité décontaminée) : le seul net au poncho, sans
+    // bloc ni liseré, mèches gardées sur le nouveau fond ; il reste un léger voile de l'ancien fond là
+    // où Lightroom met lui-même une opacité moyenne. Tous provisoires : un seul portrait, à éprouver
+    // sur un sujet clair devant un fond sombre et sur un ciel.
+
+    /// La rampe renforcée de l'opacité : sous `opaciteBas`, 0 ; à `opaciteHaut` ou plus, pleine ; entre
+    /// les deux, une courbe douce (smoothstep). Une rampe de 0,12 à 0,85 laissait un voile gris de
+    /// l'ancien fond entre les mèches ; de 0,03 à 0,35, nettement moins. Provisoires.
+    static let opaciteBas = 0.03
+    static let opaciteHaut = 0.35
+    /// Poids du masque binaire en a priori dans les moindres carrés (λ) : là où les témoins changent
+    /// peu un pixel (noir pur au témoin sombre, blanc brûlé au clair), le binaire reprend la main.
+    /// Provisoire.
+    static let opaciteAPriori: Float = 0.3
+    /// ε de log2(lumière linéaire + ε) : les écarts se lisent en lumière linéaire, où l'effet d'une
+    /// exposition locale est proportionnel à l'opacité. Provisoire.
+    static let opaciteEpsilon = 0.002
+    /// Intérieur sûr (où l'effet plein se relève) : les pixels du masque binaire à plus de cette part
+    /// du petit côté de tout pixel hors de lui (au moins 2 px ; 12 px à 4 160 px). Provisoire.
+    static let opaciteErosion = 0.003
+    /// Le calcul de l'opacité s'étend de ce nombre de pixels hors du masque binaire (le lissage d'un
+    /// pixel, deux passages) ; le repli (`opaciteAppui`) s'étend de toute l'étendue du fondu binaire
+    /// si elle est plus large (`margeOpacite`) ; au-delà, la zone vaut exactement 0 : la photo garde
+    /// ses pixels au bit près.
+    static let opaciteMarge = 2
+    /// Sous cette somme des carrés des effets pleins (Σ f²), les témoins ne disent presque rien d'un
+    /// pixel : l'opacité y glisse vers le masque binaire fondu (`fonduBinaire`), comme avant le
+    /// 29 octobre 2026, sur toute la largeur de ce fondu ; rien n'en devient plus dur qu'avant. Un ton
+    /// moyen en donne une quarantaine. Provisoire.
+    static let opaciteAppui: Float = 1
+
+    /// L'étendue du fondu binaire (`fonduBinaire`) de part et d'autre du bord, en pixels : deux boîtes
+    /// de la moitié du rayon (`fonduMasque` du petit côté, au moins 2 px) ; 2 px à 1 000 px, 6 px à
+    /// 4 160 px.
+    static func etendueFondu(largeur l: Int, hauteur h: Int) -> Int {
+        let rayon = max(2, Int((Double(min(l, h)) * fonduMasque).rounded()))
+        return 2 * max(1, rayon / 2)
+    }
+
+    /// Jusqu'où la zone peut s'étendre hors du masque binaire : `opaciteMarge`, ou l'étendue du fondu
+    /// binaire si elle est plus large (le repli garde ainsi tout l'ancien bord ; l'opacité lue, elle,
+    /// s'arrête à `opaciteMarge`).
+    static func margeOpacite(largeur l: Int, hauteur h: Int) -> Int {
+        max(opaciteMarge, etendueFondu(largeur: l, hauteur: h))
+    }
 
     /// Le masque témoin à rendre : la zone (kind, inversion, composants), un effet témoin seul
     /// (`temoinsMasque`), à pleine intensité.
@@ -718,19 +772,32 @@ public enum Generatif {
     }
 
     /// Le masque binaire de l'état actuel et des témoins (tous de même taille) : l'union de leurs
-    /// écarts, nettoyée ; nil si les rendus n'ont pas la même taille ou ne se lisent pas. Les témoins
-    /// se décodent l'un après l'autre (un seul rendu de 26 Mpx de plus en mémoire à la fois).
-    static func masqueDesRendus(actuel: CGImage, temoins: [CGImage]) -> (masque: [UInt8], largeur: Int, hauteur: Int)? {
+    /// écarts, nettoyée ; et son opacité au bord (`OpaciteDuMasque`), de 0 à 255 ; nil si les rendus
+    /// n'ont pas la même taille ou ne se lisent pas. Les témoins se décodent l'un après l'autre (un
+    /// seul rendu de 26 Mpx de plus en mémoire à la fois) ; le dernier sert encore à l'opacité, les
+    /// autres s'y décodent une seconde fois (le binaire doit être fini avant).
+    static func masqueDesRendus(actuel: CGImage, temoins: [CGImage])
+        -> (masque: [UInt8], opacite: [UInt8], largeur: Int, hauteur: Int)? {
         let l = actuel.width, h = actuel.height
         guard l > 0, h > 0, !temoins.isEmpty, temoins.allSatisfy({ $0.width == l && $0.height == h }),
-              let a = pixelsRGBA8(actuel, largeur: l, hauteur: h) else { return nil }
+              var a = pixelsRGBA8(actuel, largeur: l, hauteur: h) else { return nil }
         var masque = [UInt8](repeating: 0, count: l * h)
-        for temoin in temoins {
+        var dernier: [UInt8] = []
+        for (rang, temoin) in temoins.enumerated() {
             guard let t = pixelsRGBA8(temoin, largeur: l, hauteur: h) else { return nil }
             ajouterAuMasque(&masque, actuel: a, temoin: t)
+            if rang == temoins.count - 1 { dernier = t }
         }
         nettoyer(&masque, largeur: l, hauteur: h)
-        return (masque, l, h)
+        var opacite = OpaciteDuMasque(binaire: masque, largeur: l, hauteur: h)
+        opacite.ajouter(actuel: a, temoin: dernier)
+        dernier = []
+        for temoin in temoins.dropLast() {
+            guard let t = pixelsRGBA8(temoin, largeur: l, hauteur: h) else { return nil }
+            opacite.ajouter(actuel: a, temoin: t)
+        }
+        a = []
+        return (masque, opacite.opacite(binaire: masque), l, h)
     }
 
     /// L'aire (en pixels) sous laquelle une composante du masque est retirée (îlot) ou bouchée (trou).
@@ -821,6 +888,40 @@ public enum Generatif {
         return sortie
     }
 
+    /// L'opacité du masque (de 0 à 255) remise à une autre taille, en bilinéaire (le plus proche voisin
+    /// referait des marches au bord doux) ; puis 0 exactement hors du masque binaire déjà remis à cette
+    /// taille (`binaire`) et élargi de `margeOpacite` à cette taille, comme à la lecture.
+    static func redimensionnerOpacite(_ opacite: [UInt8], largeur l: Int, hauteur h: Int, binaire: [UInt8],
+                                      versLargeur nl: Int, versHauteur nh: Int) -> [UInt8] {
+        guard l > 0, h > 0, nl > 0, nh > 0, opacite.count == l * h, binaire.count == nl * nh else { return [] }
+        if l == nl, h == nh { return opacite }
+        // Les deux voisins et le poids de chaque colonne (centres de pixels alignés, bords répétés).
+        func voisins(_ i: Int, _ n: Int, _ nn: Int) -> (Int, Int, Float) {
+            let s = max(0, min(Double(n - 1), (Double(i) + 0.5) * Double(n) / Double(nn) - 0.5))
+            let a = Int(s.rounded(.down))
+            return (a, min(n - 1, a + 1), Float(s - Double(a)))
+        }
+        let colonnes = (0..<nl).map { voisins($0, l, nl) }
+        let marge = UInt8(margeOpacite(largeur: nl, hauteur: nh))
+        let dehors = distanceEchiquier(binaire, largeur: nl, hauteur: nh, dedans: false, plafond: Int(marge) + 1)
+        var sortie = [UInt8](repeating: 0, count: nl * nh)
+        opacite.withUnsafeBufferPointer { o in
+            sortie.withUnsafeMutableBufferPointer { s in
+                for y in 0..<nh {
+                    let (y0, y1, v) = voisins(y, h, nh)
+                    let l0 = y0 * l, l1 = y1 * l, base = y * nl
+                    for x in 0..<nl where dehors[base + x] <= marge {
+                        let (x0, x1, u) = colonnes[x]
+                        let haut = Float(o[l0 + x0]) * (1 - u) + Float(o[l0 + x1]) * u
+                        let bas = Float(o[l1 + x0]) * (1 - u) + Float(o[l1 + x1]) * u
+                        s[base + x] = UInt8(min(255, max(0, (haut * (1 - v) + bas * v).rounded())))
+                    }
+                }
+            }
+        }
+        return sortie
+    }
+
     /// La part de la photo couverte par le masque (de 0 à 1) et son cadre englobant (de 0 à 1 depuis
     /// le coin haut gauche ; nil s'il est vide).
     static func cadreDuMasque(_ masque: [UInt8], largeur l: Int, hauteur h: Int) -> (part: Double, cadre: CGRect?) {
@@ -884,10 +985,12 @@ public enum Generatif {
         return flouBoite(binaire, largeur: tl, hauteur: th, rayon: rayon).map { $0 > 0.0001 ? 255 : 0 }
     }
 
-    /// La zone de mélange d'un masque de Lightroom, en pleine résolution, dans le recadrage : le masque
-    /// binaire, fondu de `fonduMasque` du petit côté de la photo (au moins 2 px), sans élargissement :
-    /// hors du masque et de ce fondu, la zone vaut exactement 0 (la photo garde ses pixels au bit près).
-    static func zoneDuMasque(_ masque: [UInt8], largeurPhoto: Int, hauteurPhoto: Int, cadre: Pixels) -> [Float] {
+    /// Le masque binaire fondu, en pleine résolution, dans le recadrage : fondu de `fonduMasque` du
+    /// petit côté de la photo (au moins 2 px), sans élargissement ; hors du masque et de ce fondu, 0
+    /// exactement. C'était la zone de mélange jusqu'au 29 octobre 2026 (un bord net mais découpé, les
+    /// mèches fines mangées) ; c'est le repli de l'opacité (`OpaciteDuMasque`) là où les témoins ne
+    /// disent rien.
+    static func fonduBinaire(_ masque: [UInt8], largeurPhoto: Int, hauteurPhoto: Int, cadre: Pixels) -> [Float] {
         let cl = cadre.largeur, ch = cadre.hauteur
         guard cl > 0, ch > 0, masque.count >= (cadre.y + ch) * largeurPhoto else { return [] }
         var zone = [Float](repeating: 0, count: cl * ch)
@@ -899,10 +1002,368 @@ public enum Generatif {
                 }
             }
         }
-        let rayon = max(2, Int((Double(min(largeurPhoto, hauteurPhoto)) * fonduMasque).rounded()))
-        // Deux flous en boîte de la moitié du rayon : le fondu s'étend du rayon de part et d'autre du bord.
-        sommeBoiteEnPlace(&zone, largeur: cl, hauteur: ch, rayon: max(1, rayon / 2), passages: 2)
+        // Deux flous en boîte de la moitié du rayon : le fondu s'étend de `etendueFondu` de part et
+        // d'autre du bord.
+        let etendue = etendueFondu(largeur: largeurPhoto, hauteur: hauteurPhoto)
+        sommeBoiteEnPlace(&zone, largeur: cl, hauteur: ch, rayon: etendue / 2, passages: 2)
         return zone
+    }
+
+    /// La zone de mélange d'un masque de Lightroom, en pleine résolution, dans le recadrage : son
+    /// opacité (`OpaciteDuMasque.opacite`, de 0 à 255) ramenée de 0 à 1. Hors du masque binaire
+    /// élargi de `margeOpacite`, elle vaut exactement 0 (la photo garde ses pixels au bit près).
+    static func zoneDuMasque(_ opacite: [UInt8], largeurPhoto: Int, cadre: Pixels) -> [Float] {
+        let cl = cadre.largeur, ch = cadre.hauteur
+        guard cl > 0, ch > 0, opacite.count >= (cadre.y + ch) * largeurPhoto else { return [] }
+        var zone = [Float](repeating: 0, count: cl * ch)
+        opacite.withUnsafeBufferPointer { o in
+            zone.withUnsafeMutableBufferPointer { z in
+                for y in 0..<ch {
+                    let base = (cadre.y + y) * largeurPhoto + cadre.x, ligne = y * cl
+                    for x in 0..<cl where o[base + x] != 0 { z[ligne + x] = Float(o[base + x]) / 255 }
+                }
+            }
+        }
+        return zone
+    }
+
+    /// La distance (en échiquier : un voisin, en diagonale compris, est à 1) de chaque pixel d'une
+    /// classe (`dedans` : le masque ; sinon hors de lui) au plus proche pixel de l'autre classe,
+    /// plafonnée ; 0 pour les pixels de l'autre classe. Le bord de l'image n'est pas une frontière.
+    /// Deux parcours, en avant puis en arrière : exact pour cette distance.
+    static func distanceEchiquier(_ masque: [UInt8], largeur l: Int, hauteur h: Int, dedans: Bool, plafond: Int) -> [UInt8] {
+        guard l > 0, h > 0, masque.count == l * h else { return [] }
+        let cap = UInt8(max(1, min(255, plafond)))
+        var d = [UInt8](repeating: 0, count: l * h)
+        masque.withUnsafeBufferPointer { m in
+            d.withUnsafeMutableBufferPointer { p in
+                for i in 0..<(l * h) where (m[i] != 0) == dedans { p[i] = cap }
+                func plus(_ v: UInt8) -> UInt8 { v == 255 ? 255 : v + 1 }
+                for y in 0..<h {
+                    for x in 0..<l {
+                        let i = y * l + x
+                        var v = p[i]
+                        guard v != 0 else { continue }
+                        if x > 0 { v = min(v, plus(p[i - 1])) }
+                        if y > 0 {
+                            v = min(v, plus(p[i - l]))
+                            if x > 0 { v = min(v, plus(p[i - l - 1])) }
+                            if x < l - 1 { v = min(v, plus(p[i - l + 1])) }
+                        }
+                        p[i] = v
+                    }
+                }
+                for y in stride(from: h - 1, through: 0, by: -1) {
+                    for x in stride(from: l - 1, through: 0, by: -1) {
+                        let i = y * l + x
+                        var v = p[i]
+                        guard v != 0 else { continue }
+                        if x < l - 1 { v = min(v, plus(p[i + 1])) }
+                        if y < h - 1 {
+                            v = min(v, plus(p[i + l]))
+                            if x < l - 1 { v = min(v, plus(p[i + l + 1])) }
+                            if x > 0 { v = min(v, plus(p[i + l - 1])) }
+                        }
+                        p[i] = v
+                    }
+                }
+            }
+        }
+        return d
+    }
+
+    /// Le lissage de l'opacité, en place : deux flous en boîte de rayon 1 (le noyau 1, 2, 3, 2, 1 dans
+    /// chaque sens, en entiers, arrondi) ; un pixel loin de toute valeur non nulle reste 0, loin de
+    /// toute valeur sous 255 reste 255. Un anneau de cinq lignes filtrées en largeur, sans copie de
+    /// l'image.
+    static func lisserOpacite(_ v: inout [UInt8], largeur l: Int, hauteur h: Int) {
+        guard l > 0, h > 0, v.count == l * h else { return }
+        var anneau = [UInt16](repeating: 0, count: 5 * l)
+        v.withUnsafeMutableBufferPointer { p in
+            anneau.withUnsafeMutableBufferPointer { a in
+                // La ligne y (bornée) filtrée en largeur, rangée à sa place dans l'anneau.
+                func filtrer(_ y: Int) {
+                    let source = min(max(y, 0), h - 1) * l, cible = ((y % 5) + 5) % 5 * l
+                    for x in 0..<l {
+                        func q(_ k: Int) -> UInt16 { UInt16(p[source + min(max(x + k, 0), l - 1)]) }
+                        a[cible + x] = q(-2) + 2 * q(-1) + 3 * q(0) + 2 * q(1) + q(2)
+                    }
+                }
+                for y in -2...1 { filtrer(y) }
+                for y in 0..<h {
+                    filtrer(y + 2)   // la ligne y + 2 n'est pas encore réécrite
+                    let base = y * l
+                    // Les lignes y − 2 à y + 2 dans l'anneau (rangées par y modulo 5).
+                    let r = (0..<5).map { (((y + $0 - 2) % 5) + 5) % 5 * l }
+                    let (r0, r1, r2, r3, r4) = (r[0], r[1], r[2], r[3], r[4])
+                    for x in 0..<l {
+                        let s = UInt32(a[r0 + x]) + 2 * UInt32(a[r1 + x]) + 3 * UInt32(a[r2 + x]) + 2 * UInt32(a[r3 + x]) + UInt32(a[r4 + x])
+                        p[base + x] = UInt8(min(255, (s + 40) / 81))
+                    }
+                }
+            }
+        }
+    }
+
+    /// L'opacité du masque de Lightroom au bord, lue dans les rendus témoins : là où le masque IA est
+    /// doux (cheveux), l'effet d'un témoin n'est qu'une part de l'effet plein. Pour chaque témoin,
+    /// l'écart d = log2(linéaire du témoin + ε) − log2(linéaire de l'état actuel + ε), canal par canal ;
+    /// l'effet plein f, la médiane de d dans l'intérieur sûr du masque binaire, par canal et par valeur
+    /// de l'état actuel (une table de 256, qui tient compte de la courbe de tonalité, des noirs relevés
+    /// et des blancs écrêtés) ; puis α = (Σ d·f + λ·binaire) / (Σ f² + λ), les moindres carrés sur les
+    /// témoins et les trois canaux (un canal noir ou écrêté, f ≈ 0, ne compte presque pas).
+    /// Le calcul couvre tout le masque binaire, élargi de `opaciteMarge` : l'opacité se lit partout,
+    /// jamais forcée pleine à une profondeur fixe (un radial, un dégradé ou un bord affiné peuvent
+    /// rester partiels sur des centaines de pixels ; une profondeur pleine y faisait une marche). Un
+    /// octet par pixel pour la classe, et huit par pixel calculé (les deux sommes des moindres
+    /// carrés, rangées dans l'ordre des pixels, sans liste d'indices). Au-delà, jusqu'à
+    /// `margeOpacite`, seul le repli peut prolonger l'ancien bord. Les témoins s'ajoutent l'un
+    /// après l'autre (`ajouter`) : un seul rendu de 26 Mpx de plus en mémoire à la fois.
+    struct OpaciteDuMasque {
+        let largeur: Int, hauteur: Int
+        /// 0 : hors du masque élargi ; 1 : calculé ; 2 : calculé, dans l'intérieur sûr (où se relève
+        /// l'effet plein) ; 3 : hors du calcul, où seul le repli prolonge le fondu binaire (de
+        /// `opaciteMarge` à `margeOpacite` hors du masque binaire).
+        private(set) var classe: [UInt8]
+        /// Les sommes des moindres carrés de chaque pixel calculé (classe 1 ou 2), dans l'ordre des
+        /// pixels de la photo.
+        private(set) var numerateur: [Float]
+        private(set) var denominateur: [Float]
+
+        /// log2(linéaire + ε) d'une valeur sRGB 8 bits.
+        static let logLineaire: [Float] = (0..<256).map { v in
+            let c = Double(v) / 255
+            let lineaire = c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+            return Float(log2(lineaire + Generatif.opaciteEpsilon))
+        }
+        /// L'histogramme des écarts : 256 cases de −5 à +3 (en IL), centrées sur les multiples du pas
+        /// (un écart nul tombe sur 0 exactement), un pixel sur `pasEchantillon` de
+        /// l'intérieur sûr, au moins `echantillonsMin` par valeur pour une médiane.
+        static let cases = 256, ecartMin: Float = -5, pasCase: Float = 8 / 256
+        static let pasEchantillon = 7, echantillonsMin: Int32 = 40
+
+        /// L'érosion de l'intérieur sûr en pixels, d'après le petit côté de la photo.
+        static func erosion(largeur l: Int, hauteur h: Int) -> Int {
+            min(250, max(2, Int((Double(min(l, h)) * Generatif.opaciteErosion).rounded())))
+        }
+
+        init(binaire: [UInt8], largeur l: Int, hauteur h: Int) {
+            largeur = l; hauteur = h
+            let n = l * h
+            guard l > 0, h > 0, binaire.count == n else {
+                classe = []; numerateur = []; denominateur = []
+                return
+            }
+            let erosion = Self.erosion(largeur: l, hauteur: h), margeOpacite = Generatif.margeOpacite(largeur: l, hauteur: h)
+            var classe = Generatif.distanceEchiquier(binaire, largeur: l, hauteur: h, dedans: true, plafond: erosion + 1)
+            let dehors = Generatif.distanceEchiquier(binaire, largeur: l, hauteur: h, dedans: false, plafond: margeOpacite + 1)
+            var nombre = 0
+            let marge = UInt8(Generatif.opaciteMarge), margeRepli = UInt8(margeOpacite), e = UInt8(erosion)
+            classe.withUnsafeMutableBufferPointer { cl in
+                dehors.withUnsafeBufferPointer { de in
+                    for i in 0..<n {
+                        let d = cl[i]
+                        let c: UInt8
+                        if d == 0 { c = de[i] <= marge ? 1 : de[i] <= margeRepli ? 3 : 0 } else if d > e { c = 2 } else { c = 1 }
+                        cl[i] = c
+                        if c == 1 || c == 2 { nombre += 1 }
+                    }
+                }
+            }
+            self.classe = classe
+            numerateur = [Float](repeating: 0, count: nombre)
+            denominateur = [Float](repeating: 0, count: nombre)
+        }
+
+        /// L'effet plein d'un témoin (`ecart` → f), par canal et par valeur de l'état actuel (3 × 256),
+        /// tiré de l'intérieur sûr : la médiane ; une valeur sans assez d'échantillons prend
+        /// l'interpolation de ses voisines connues (aux bouts, la plus proche) ; puis une moyenne
+        /// mobile de sept valeurs. Toute la table vaut 0 si l'intérieur sûr est vide.
+        func table(actuel a: UnsafeBufferPointer<UInt8>, temoin t: UnsafeBufferPointer<UInt8>) -> [Float] {
+            let cases = Self.cases
+            var histo = [Int32](repeating: 0, count: 3 * 256 * cases)
+            Self.logLineaire.withUnsafeBufferPointer { logv in
+            classe.withUnsafeBufferPointer { c in
+                histo.withUnsafeMutableBufferPointer { hi in
+                    var i = 0
+                    while i < c.count {
+                        if c[i] == 2 {
+                            for k in 0..<3 {
+                                let va = Int(a[i * 4 + k])
+                                let d = logv[Int(t[i * 4 + k])] - logv[va]
+                                let b = min(cases - 1, max(0, Int(((d - Self.ecartMin) / Self.pasCase).rounded())))
+                                hi[(k * 256 + va) * cases + b] += 1
+                            }
+                        }
+                        i += Self.pasEchantillon
+                    }
+                }
+            }
+            }
+            var table = [Float](repeating: 0, count: 3 * 256)
+            for k in 0..<3 {
+                var connues: [Int] = []
+                for v in 0..<256 {
+                    let base = (k * 256 + v) * cases
+                    var total: Int32 = 0
+                    for b in 0..<cases { total += histo[base + b] }
+                    guard total >= Self.echantillonsMin else { continue }
+                    var cumul: Int32 = 0
+                    for b in 0..<cases {
+                        cumul += histo[base + b]
+                        if 2 * cumul >= total { table[k * 256 + v] = Self.ecartMin + Float(b) * Self.pasCase; break }
+                    }
+                    connues.append(v)
+                }
+                guard let premiere = connues.first, let derniere = connues.last else { continue }
+                var rang = 0
+                for v in 0..<256 {
+                    while rang + 1 < connues.count, connues[rang + 1] <= v { rang += 1 }
+                    if v < premiere { table[k * 256 + v] = table[k * 256 + premiere]; continue }
+                    if v > derniere { table[k * 256 + v] = table[k * 256 + derniere]; continue }
+                    let g = connues[rang]
+                    guard g != v, rang + 1 < connues.count else { continue }
+                    let d = connues[rang + 1], u = Float(v - g) / Float(d - g)
+                    table[k * 256 + v] = table[k * 256 + g] * (1 - u) + table[k * 256 + d] * u
+                }
+                let brute = Array(table[(k * 256)..<(k * 256 + 256)])
+                for v in 0..<256 {
+                    var s: Float = 0, nombre = 0
+                    for w in max(0, v - 3)...min(255, v + 3) { s += brute[w]; nombre += 1 }
+                    table[k * 256 + v] = s / Float(nombre)
+                }
+            }
+            return table
+        }
+
+        /// Ajoute un témoin (pixels RGBA 8 bits sRGB de l'état actuel et du témoin, de la taille du
+        /// masque) aux moindres carrés des pixels calculés.
+        mutating func ajouter(actuel: [UInt8], temoin: [UInt8]) {
+            let n = largeur * hauteur
+            guard n > 0, actuel.count >= n * 4, temoin.count >= n * 4, !numerateur.isEmpty else { return }
+            actuel.withUnsafeBufferPointer { a in
+                temoin.withUnsafeBufferPointer { t in
+                    let table = table(actuel: a, temoin: t)
+                    table.withUnsafeBufferPointer { f in
+                    Self.logLineaire.withUnsafeBufferPointer { logv in
+                    classe.withUnsafeBufferPointer { c in
+                        numerateur.withUnsafeMutableBufferPointer { nu in
+                            denominateur.withUnsafeMutableBufferPointer { de in
+                                var j = 0
+                                for p in 0..<n where c[p] == 1 || c[p] == 2 {
+                                    let i = p * 4
+                                    var sn: Float = 0, sd: Float = 0
+                                    for k in 0..<3 {
+                                        let va = Int(a[i + k])
+                                        let d = logv[Int(t[i + k])] - logv[va], effet = f[k * 256 + va]
+                                        sn += d * effet
+                                        sd += effet * effet
+                                    }
+                                    nu[j] += sn
+                                    de[j] += sd
+                                    j += 1
+                                }
+                            }
+                        }
+                    }
+                    }
+                    }
+                }
+            }
+        }
+
+        /// L'opacité finale, de 0 à 255 par pixel de la photo : α par la rampe renforcée
+        /// (`opaciteBas`, `opaciteHaut`, en smoothstep), lissé (`lisserOpacite`), et glissé vers le
+        /// masque binaire fondu là où les témoins ne disent presque rien (`opaciteAppui`), sur toute
+        /// la largeur de ce fondu (la part de repli des pixels calculés, étendue en carré jusqu'à
+        /// `margeOpacite`) ; pleine seulement là où α atteint l'opacité haute ; 0 exactement hors du
+        /// masque élargi.
+        func opacite(binaire: [UInt8]) -> [UInt8] {
+            let n = largeur * hauteur
+            guard n > 0, binaire.count == n, classe.count == n else { return [] }
+            var v = [UInt8](repeating: 0, count: n)
+            let lambda = Generatif.opaciteAPriori, bas = Float(Generatif.opaciteBas)
+            let etendue = max(Float(0.01), Float(Generatif.opaciteHaut) - bas)
+            var sansAppui = false
+            classe.withUnsafeBufferPointer { c in
+                binaire.withUnsafeBufferPointer { b in
+                    numerateur.withUnsafeBufferPointer { nu in
+                        denominateur.withUnsafeBufferPointer { de in
+                            v.withUnsafeMutableBufferPointer { o in
+                                var j = 0
+                                for i in 0..<n where c[i] == 1 || c[i] == 2 {
+                                    let alpha = (nu[j] + lambda * Float(b[i])) / (de[j] + lambda)
+                                    let t = min(1, max(0, (alpha - bas) / etendue))
+                                    o[i] = UInt8((t * t * (3 - 2 * t) * 255).rounded())
+                                    if de[j] < Generatif.opaciteAppui { sansAppui = true }
+                                    j += 1
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Generatif.lisserOpacite(&v, largeur: largeur, hauteur: hauteur)
+            if sansAppui {
+                let appui = Generatif.opaciteAppui
+                let repli = Generatif.fonduBinaire(binaire, largeurPhoto: largeur, hauteurPhoto: hauteur,
+                                                   cadre: Pixels(x: 0, y: 0, largeur: largeur, hauteur: hauteur))
+                // La part de repli (1 − w) de chaque pixel calculé, de 0 à 255.
+                var manque = [UInt8](repeating: 0, count: n)
+                var j = 0
+                for i in 0..<n where classe[i] == 1 || classe[i] == 2 {
+                    defer { j += 1 }
+                    guard denominateur[j] < appui else { continue }
+                    let w = max(0, denominateur[j]) / appui
+                    v[i] = UInt8(min(255, max(0, (w * Float(v[i]) + (1 - w) * repli[i] * 255).rounded())))
+                    manque[i] = UInt8(((1 - w) * 255).rounded())
+                }
+                // Au-delà du calcul, jusqu'à `margeOpacite` : le fondu binaire, dans la part de repli la
+                // plus forte des pixels calculés voisins.
+                let rayon = Generatif.margeOpacite(largeur: largeur, hauteur: hauteur) - Generatif.opaciteMarge
+                if rayon > 0 {
+                    Generatif.maximumCarre(&manque, largeur: largeur, hauteur: hauteur, rayon: rayon)
+                    for i in 0..<n where classe[i] == 3 {
+                        v[i] = UInt8(min(255, max(0, (Float(manque[i]) * repli[i]).rounded())))
+                    }
+                }
+            }
+            classe.withUnsafeBufferPointer { c in
+                v.withUnsafeMutableBufferPointer { o in
+                    for i in 0..<n where c[i] == 0 || (c[i] == 3 && !sansAppui) { o[i] = 0 }
+                }
+            }
+            return v
+        }
+    }
+
+    /// Le maximum de chaque carré de côté 2 × rayon + 1, en place (séparable : en largeur puis en
+    /// hauteur ; bords répétés).
+    static func maximumCarre(_ v: inout [UInt8], largeur l: Int, hauteur h: Int, rayon r: Int) {
+        guard r > 0, l > 0, h > 0, v.count == l * h else { return }
+        var ligne = [UInt8](repeating: 0, count: l)
+        for y in 0..<h {
+            let base = y * l
+            for x in 0..<l { ligne[x] = v[base + x] }
+            for x in 0..<l {
+                var m: UInt8 = 0
+                for k in max(0, x - r)...min(l - 1, x + r) where ligne[k] > m { m = ligne[k] }
+                v[base + x] = m
+            }
+        }
+        // En hauteur, ligne à ligne (une colonne à la fois serait lente sur 26 Mpx), depuis une copie.
+        let copie = v
+        copie.withUnsafeBufferPointer { c in
+            v.withUnsafeMutableBufferPointer { o in
+                for y in 0..<h {
+                    let base = y * l
+                    for k in max(0, y - r)...min(h - 1, y + r) where k != y {
+                        let autre = k * l
+                        for x in 0..<l where c[autre + x] > o[base + x] { o[base + x] = c[autre + x] }
+                    }
+                }
+            }
+        }
     }
 
     /// Flou en boîte séparable, en place, répété `passages` fois : les sommes restent entières (exactes

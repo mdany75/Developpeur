@@ -673,8 +673,10 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   les blancs brûlés du fond y soient aussi) : rien n'est gardé dans les réglages de la photo, mais
   quatre étapes « Claude · essai » restent dans son Historique. Fibo 2 reçoit ce masque
   (un peu élargi, pour qu'il redessine aussi le bord) et redessine ce qu'il couvre ; seul le masque
-  revient dans la photo, fondu de quelques pixels : le reste (la personne devant un nouveau fond,
-  par exemple) garde ses pixels exacts. Un rectangle laissait à Fibo 2 des morceaux de l'ancien
+  revient dans la photo, avec le bord doux que Lightroom lui donne : les mèches fines des cheveux
+  restent sur le nouveau fond, sans contour découpé (un léger voile de l'ancien fond peut rester là
+  où Lightroom lui-même hésite) ; le reste (la personne devant un nouveau fond, par exemple) garde
+  ses pixels exacts. Un rectangle laissait à Fibo 2 des morceaux de l'ancien
   fond (un panneau, une lettre) et le laissait parfois toucher à la personne. Les traits fins du
   masque (une mèche, le jour entre le bras et le corps) sont gardés. Un masque où Lightroom ne
   trouve rien, qui couvre toute la photo, ou une personne qu'il n'a pas reconnue est refusé avant
