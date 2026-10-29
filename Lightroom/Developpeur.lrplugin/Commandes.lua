@@ -89,6 +89,12 @@
 --                                          existants, echecs) ou retirés
 --   retirerReimportees {chemins}        → recette : retire du catalogue les fichiers que le module
 --                                          vient d'y réimporter (même session, 30 min)
+--   importerGeneree {photo, chemin, nom, consigne, confirme} → retouche générative (Fibo 2,
+--                                          generative_edit) : le TIFF final de Temporaire/Fibo copié
+--                                          à côté de l'original (« <nom>.tif », sinon « -2 »…),
+--                                          ajouté au catalogue, empilé au-dessus de lui, et devenu la
+--                                          photo active : { id, fichier, chemin, empilee, active } ;
+--                                          jamais rejouée (absente de LightroomBridge.lectures)
 --   variantes   {photo?, action, nom?, noms?, effacer_autres?, etape, raison?, confirme} → variantes
 --                                          rangées en instantanés : lister, choisir, effacer
 --                                          (essayer avec `instantane` les prépare)
@@ -140,7 +146,8 @@
 --   Vignettes.lua    vignettes
 --   Suppression.lua  supprimer
 --   Livraison.lua    exporter, fenetreExport, livraison, choisirDossier, nomsFichiers,
---                    apercusDynamiques, retirerReimportees (réglages des services : Services.lua)
+--                    apercusDynamiques, retirerReimportees, importerGeneree (réglages des services :
+--                    Services.lua)
 --   Variantes.lua    variantes
 --   Masques.lua      masques
 --   Progression.lua  progression
@@ -206,6 +213,7 @@ local table_commandes = {
     nomsFichiers = Livraison.nomsFichiers,
     apercusDynamiques = Livraison.apercusDynamiques,
     retirerReimportees = Livraison.retirerReimportees,
+    importerGeneree = Livraison.importerGeneree,
     variantes = Variantes.variantes,
     masques = Masques.masques,
     progression = Progression.progression,

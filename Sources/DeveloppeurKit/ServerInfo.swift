@@ -33,21 +33,21 @@ public enum ServerInfo {
     Profil : la base des couleurs et du contraste, à choisir avant le reste (list_profiles ; RAW Fujifilm : d'abord la simulation du boîtier, intention_boitier). \
     Couleur : une dominante verte ou magenta restée dans les seules ombres se corrige par ShadowTint, pas par Tint ; \
     le mélangeur TSL touche toutes les couleurs semblables : pour un seul objet, un masque ; dents, iris, peau : add_mask avec effect. \
-    Géométrie : mesurer une inclinaison avec measure_angle (sous 0,5°, elle ne se voit pas) ; redresser par crop.angle, ou par Upright après les corrections d'objectif. \
+    Géométrie : mesurer une inclinaison avec measure_angle (sous 0,5°, invisible) ; redresser par crop.angle, ou par Upright après les corrections d'objectif. \
     Recadrer (read_composition) seulement sur demande ou si la composition y gagne nettement, et le dire. \
-    Bruit fort (mesure au-dessus de 1,5, ISO élevé, ombres relevées) : enhance_photo (denoise de 20 à 50), avant netteté, \
+    Bruit fort (mesure > 1,5, ISO élevé, ombres relevées) : enhance_photo (denoise de 20 à 50), avant netteté, \
     masques IA et retouch_spots ; super résolution seulement pour un grand tirage ou un fort recadrage. \
     Série : copy_settings depuis une référence, puis match_series ; trier : \
     cull_photos (rejets : set_metadata après accord ; show_photo avec filter pour le montrer), contact_sheet ; noter : propose_ratings (0 à 5 ★, standard developpeur://notation ; apply = true s'il demande de noter ; libellé de couleur : sur sa demande) ; \
     classer : find_photos, set_metadata, \
     manage_collections ; undo_last défait aussi un classement. \
-    Interprétations : compare_variants, puis choose_variant. \
-    Partager ou imprimer : export_photos (list = true d'abord ; dossier choisi avec l'utilisateur, choose_folder). Goûts : remember_style (le lire ; n'y ajouter qu'après accord) ; corrections_utilisateur (ses reprises à la main) : en tenir compte, proposer de les retenir. \
+    Variantes : compare_variants, puis choose_variant. \
+    Partager ou imprimer : export_photos (list = true d'abord ; dossier choisi avec lui, choose_folder). Goûts : remember_style (le lire ; n'y ajouter qu'après accord) ; corrections_utilisateur (ses reprises à la main) : en tenir compte, proposer de les retenir. \
     Un outil « pas fini » après 50 s se rappelle avec les mêmes arguments. \
     Rester naturel sauf style demandé ; Vibrance plutôt que Saturation ; modéré sur Clarity2012, Dehaze, Texture et les réglages locaux. \
     Mode « Proposer d'abord » : montrer le rendu (preview_settings, preview = true) ou les changements, attendre l'accord, puis confirm = true. \
-    Reflets d'une vitre : remove_distractions, avant toute autre retouche. Original introuvable : le dire, avec la raison donnée. \
-    À proposer de faire à la main dans Lightroom : passants (Suppression des distractions › Personnes), poussière (› Poussière ; série : Copier puis Coller de Lightroom), suppression générative, correction de champ plat, \
+    Reflets d'une vitre : remove_distractions, avant toute autre retouche. Changer un objet, un vêtement : generative_edit, sur sa demande. Original introuvable : le dire, avec sa raison. \
+    À proposer de faire à la main dans Lightroom : passants (Suppression des distractions › Personnes), poussière (› Poussière ; série : Copier puis Coller de Lightroom), correction de champ plat, \
     fusions HDR et panorama.
     """
 }

@@ -50,7 +50,8 @@ public struct ToolResult: Equatable {
 /// (Tools+Gestion), Bibliothèque (Tools+Bibliotheque), tri d'une séance et planche contact
 /// (Tools+Tri), notes proposées selon le standard de notation (Tools+Notation), guide de style
 /// (Tools+Style), livraison en fichiers (Tools+Livraison), variantes (Tools+Variantes),
-/// harmonisation d'une série (Tools+Serie) et composition lue (Tools+Composition).
+/// harmonisation d'une série (Tools+Serie), composition lue (Tools+Composition) et retouche
+/// générative par Fibo 2, sur demande (Tools+Generatif).
 public final class ToolHandler {
     let lightroom: LightroomServing
     let lookProfiles: LookProfileLibrary
@@ -103,6 +104,13 @@ public final class ToolHandler {
     /// Faux par défaut : seul le serveur lancé par Claude (`serve` de main.swift) le pose ; ni
     /// `--call`, ni la recette, ni les tests ne remplissent le carnet.
     public var noterAuCarnet = false
+    /// Fibo 2 sur ce Mac (generative_edit) : l'exécutable de mflux, le cache du modèle et la racine des
+    /// fichiers temporaires. Nil par défaut (generative_edit refuse alors sans rien lancer), comme
+    /// `lireEcran` : seul main.swift le pose (serve() et --call), avec `Fibo()` ; les tests passent un
+    /// faux exécutable et des dossiers temporaires, jamais le vrai mflux.
+    public var fibo: Fibo?
+    /// Le calcul de Fibo 2 en cours, que main.swift arrête à la fin de l'entrée (TravailFibo).
+    public let travailFibo = TravailFibo()
     /// Version de ce serveur (celle du Info.plist ; « dev » en développement : pas de comparaison).
     var versionServeur = ServerInfo.version
     /// Modèles de noms de fichiers de Lightroom et ses préférences (dossiers d'exportation récents) :
@@ -150,7 +158,7 @@ public final class ToolHandler {
         "apply_settings", "preview_settings", "enhance_photo", "add_mask", "edit_mask", "retouch_spots", "copy_settings",
         "list_profiles", "list_presets", "save_preset", "undo_last", "revert_to_original", "export_journal",
         "find_photos", "set_metadata", "list_keywords", "manage_collections", "create_virtual_copy", "show_photo",
-        "cull_photos", "contact_sheet", "propose_ratings", "remove_distractions", "remember_style",
+        "cull_photos", "contact_sheet", "propose_ratings", "remove_distractions", "generative_edit", "remember_style",
         "export_photos", "compare_variants", "choose_variant", "match_series",
     ]
 
@@ -204,7 +212,7 @@ public final class ToolHandler {
         ]
         return core + analysisDefinitions + compositionDefinitions + developDefinitions + localDefinitions + managementDefinitions
             + libraryDefinitions + cullDefinitions + notationDefinitions + styleDefinitions + deliveryDefinitions + variantDefinitions
-            + seriesDefinitions
+            + seriesDefinitions + generativeDefinitions
     }
 
     /// Titre lisible de chaque outil (annotations MCP, `title`), que le client montre à la place
@@ -221,7 +229,7 @@ public final class ToolHandler {
         "find_photos": "Chercher des photos", "set_metadata": "Classer des photos", "list_keywords": "Mots-clés",
         "manage_collections": "Collections", "create_virtual_copy": "Créer une copie virtuelle", "show_photo": "Montrer dans Lightroom",
         "cull_photos": "Trier une séance", "contact_sheet": "Planche contact", "propose_ratings": "Noter des photos",
-        "remove_distractions": "Supprimer les reflets",
+        "remove_distractions": "Supprimer les reflets", "generative_edit": "Retouche générative (Fibo 2)",
         "remember_style": "Guide de style", "export_photos": "Exporter des photos", "compare_variants": "Comparer des variantes",
         "choose_variant": "Choisir une variante", "match_series": "Harmoniser une série",
     ]
@@ -394,6 +402,7 @@ public final class ToolHandler {
             case "preview_settings": return try previewSettings(args)
             case "enhance_photo": return json(try enhancePhoto(args))
             case "remove_distractions": return json(try removeDistractions(args))
+            case "generative_edit": return json(try generativeEdit(args))
             case "remember_style": return json(try rememberStyle(args))
             case "export_photos": return json(try exportPhotos(args))
             case "compare_variants": return try compareVariants(args)

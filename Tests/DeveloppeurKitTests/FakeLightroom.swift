@@ -37,6 +37,9 @@ final class FakeLightroom: LightroomServing {
         verrou.lock(); defer { verrou.unlock() }; return notesAPart[command] ?? []
     }
     var progressions: [[String: JSONValue]] { aPart("progression") }
+    /// La réponse d'une commande à part, calculée à chaque envoi (nil : celle de `replies`) : posée
+    /// avant l'appel, elle évite de changer `replies` pendant qu'un outil tourne sur un autre fil.
+    var reponseAPart: ((String, [String: JSONValue]) -> JSONValue?)?
     var carnets: [[String: JSONValue]] { aPart("carnet") }
 
     func send(_ command: String, _ params: [String: JSONValue], timeout: TimeInterval) throws -> JSONValue {
@@ -45,6 +48,7 @@ final class FakeLightroom: LightroomServing {
             notesAPart[command, default: []].append(params)
             verrou.unlock()
             if let error = errors[command] { throw error }
+            if let reponse = reponseAPart?(command, params) { return reponse }
             return replies[command] ?? [:]
         }
         appels.append(Call(command: command, params: params, timeout: timeout))

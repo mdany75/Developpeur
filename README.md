@@ -440,7 +440,8 @@ correctif 1.3.6, à votre demande du 25 octobre 2026 ; les leçons déjà rangé
 
 ### Ce que Claude sait faire par le connecteur
 
-Les mêmes 35 outils (36 de la 1.3 à la 1.3.5, avec `photo_lesson`) servent dans la fenêtre Claude,
+Les mêmes 36 outils (dont `generative_edit`, la retouche générative par Fibo 2 ; 36 aussi de la
+1.3 à la 1.3.5, avec `photo_lesson`, retiré au correctif 1.3.6) servent dans la fenêtre Claude,
 dans Claude Desktop et dans Claude Code. Dix invites prêtes à l'emploi s'y ajoutent, dans le menu
 « + » de Claude Desktop et parmi les commandes « / » de Claude Code : `retouche_pro` (une photo, en
 deux passes vérifiées, puis au plus deux passes correctives si un défaut reste), `a_ma_facon`
@@ -648,6 +649,80 @@ cadre.
   l'outil Supprimer sans IA générative ; corriger des yeux rouges.
 - Des positions justes malgré la correction d'objectif, Upright ou la perspective : le connecteur
   mesure le déplacement sur deux rendus de la photo et recale chaque position.
+
+**Retouche générative par Fibo 2 (sur votre demande)**
+
+Ce que Lightroom ne sait pas faire, comme remplacer un pantalon par une jupe, ajouter, retirer ou
+changer un objet, Claude peut le faire faire par Fibo 2 (le modèle d'édition de Bria), sur ce Mac,
+sans rien envoyer sur Internet : outil `generative_edit`. Claude ne s'en sert **que si vous le
+demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développeur.
+
+- **Comment le demander** : dites ce qui doit changer (« remplace son pantalon par une jupe bleu
+  marine aux genoux »). Claude écrit la consigne pour Fibo 2 en anglais (plus fidèle), précise sur
+  ce qui change et ce qui doit rester (pose, lumière, reste du corps), et vous en montre la
+  traduction française ; il désigne la zone à changer. Fibo 2 reçoit alors un recadrage autour de
+  cette zone (avec une marge de contexte), à environ 1 mégapixel, sans jamais l'agrandir au-delà de
+  sa taille dans la photo ; seule la zone est reprise de sa sortie (un détail fin comme un fil
+  retiré n'y est pas perdu), et le reste de la photo garde ses pixels. La couleur d'un objet seul se
+  change dans Lightroom, par un masque, sans Fibo 2.
+- **Plusieurs changements à la fois** (jusqu'à 4, « une jupe et un sac bleu ») : un seul appel, une
+  zone chacun, un passage de Fibo 2 par changement, toutes les zones recollées dans le même TIFF,
+  donc une seule nouvelle photo. Deux zones qui se chevauchent, se touchent ou presque (leurs bords
+  fondus se recouvriraient) se font en deux fois, la seconde sur la nouvelle photo.
+- **Avec le contexte de toute la photo** (sur demande, `context` = `full_and_crop`) : Fibo 2 voit
+  aussi la photo entière, pour la lumière et le style, et ne modifie que le recadrage (sans masque :
+  seule la zone désignée est reprise de sa sortie ; si sa sortie ne s'aligne pas sur le recadrage,
+  rien n'en est repris, et Claude le dit). Ce mode est nouveau : rien ne dit encore qu'il
+  fait mieux que le recadrage seul. Pour en juger, demandez le même changement des deux façons
+  (deux nouvelles photos, empilées) et comparez-les.
+- **Dans l'ordre** : d'abord les corrections de base sur la photo (profil, balance des blancs,
+  exposition), puis Fibo 2, puis les finitions (réglages, masques) sur la nouvelle photo.
+- **Ce qui se passe** : la photo développée part en TIFF 16 bits (Adobe RGB, taille réelle,
+  métadonnées et position gardées) dans un dossier temporaire ; Fibo 2 la modifie à environ
+  1 mégapixel (le recadrage de chaque zone, ou toute la photo sans zone) ; sans zone désignée, le connecteur repère ce qui a changé et ne reprend que cela dans
+  la photo en pleine résolution : ailleurs, les pixels restent ceux du TIFF exporté. Le résultat, un
+  TIFF 16 bits (compression ZIP, comme Lightroom ; toutes les métadonnées de la photo, libellé et
+  mots-clés compris) nommé `<nom de la photo>-Fibo.tif` (`-Fibo-2.tif`… si le nom est pris), est
+  rangé dans le dossier de l'original, ajouté au catalogue **empilé au-dessus de l'original**, et
+  devient la photo active. **L'original reste intact.** Le journal de Claude de la nouvelle photo
+  garde la consigne, en français. Ce passage par un TIFF temporaire ne compte pas comme une
+  exportation de la photo (la recherche des photos jamais exportées la trouve encore).
+- **Garde-fous** : ceux du Gestionnaire de modules externes valent comme pour toute retouche (une
+  photo à libellé protégé ou rejetée protégée est refusée). Avec « Copies virtuelles seulement »,
+  partez d'une copie virtuelle : la nouvelle photo reçoit alors sa propre copie virtuelle, où se
+  font les finitions. Sur une photo d'essai (collection « Développeur › Essais »), la nouvelle photo
+  n'est pas empilée avec votre original : elle va dans la collection Essais.
+- **Défaire** : `undo_last` ne retire pas la nouvelle photo ; pour l'enlever, Photo › Retirer du
+  catalogue, à la main (le fichier reste dans le dossier, à mettre à la Corbeille vous-même si
+  vous n'en voulez plus).
+- **Durée** : quelques minutes par changement en qualité normale (50 étapes, décodage en pleine
+  précision, la meilleure qualité) ; en qualité rapide (Turbo, 4 étapes), bien moins, avec un
+  résultat moins fidèle. La première fois, le modèle se télécharge d'abord. Au-delà de 15 minutes
+  par passage, le calcul s'arrête et rien n'est importé. Tout l'appel se suit dans une seule barre
+  de progression de Lightroom, de 0 à 100 % (« Fibo 2 : jupe (1 sur 2), 24 % — environ 3 min
+  restantes »), dont la croix arrête tout sans rien importer, même pendant le chargement du modèle
+  ou la recomposition.
+- **Finesse de la zone** : quand la zone revient de Fibo 2 plus petite que sa taille dans la photo
+  (plus de 1,25 fois), SeedVR2 (`mflux-upscale-seedvr2`, modèle téléchargé au premier usage,
+  quelques Go) la remet d'abord à sa taille, avec plus de détail ; sans lui, ou s'il échoue, la mise
+  à la taille ordinaire prend le relais, et Claude le dit. SeedVR2 ne sert qu'avec une zone désignée
+  (jamais sur toute la photo), pour un agrandissement de 4 fois au plus, vers 16 mégapixels au plus :
+  au-delà, mise à la taille ordinaire, dite aussi. La zone reste un peu moins fine que le
+  reste, ce qui peut se voir sur un grand tirage ou un fort zoom.
+  Sans zone désignée, si Fibo 2 change plus de 60 % de l'image, toute sa sortie est prise, et Claude
+  le dit : mieux vaut alors redemander en désignant la seule partie à changer. Si Fibo 2 ne change rien de visible,
+  rien n'est importé.
+- **Mode « Proposer d'abord »** : Claude vous décrit le changement et attend votre accord avant de
+  lancer Fibo 2. En mode « Confirmer dans Lightroom », la fenêtre de la liaison vous montre la
+  consigne donnée à Fibo 2 (étape « Claude · Fibo 2 ») ; l'accord donné vaut aussi pour
+  l'importation qui suit (dans les 3 heures, le temps de quatre changements).
+- **Prérequis** : mflux installé (`uv tool install mflux`, qui fournit
+  `~/.local/bin/mflux-generate-fibo2-edit`) et l'accès aux modèles de Bria sur Hugging Face
+  (`briaai/Fibo-2.0-dev` et, pour la qualité rapide, `briaai/Fibo-2.0-edit-turbo` : demander
+  l'accès sur leur page, puis `hf auth login` dans le Terminal). Ces modèles sont sous licence
+  CC BY-NC : usage personnel, non commercial seulement, ce qui convient à vos propres photos.
+  Sans mflux, Claude le dit et ne fait rien. Si Lightroom ou Claude se ferment pendant le calcul,
+  Fibo 2 s'arrête aussi (il occupe plusieurs Go de mémoire).
 
 **Séries et tri**
 
@@ -1056,8 +1131,10 @@ Le SDK de Lightroom ne donne pas tout aux modules. Claude vous propose de faire 
   photo). Un module ne peut ni la lancer ni la faire refaire ; Claude peut seulement la retirer.
 - **Passants** : Suppression des distractions › Personnes, qui passe par le remplissage génératif
   d'Adobe.
-- **Suppression générative** : l'outil Supprimer avec l'IA générative ; les taches de Claude
-  emploient l'outil Supprimer sans elle.
+- **Suppression générative d'Adobe** : l'outil Supprimer avec l'IA générative ; les taches de
+  Claude emploient l'outil Supprimer sans elle. Pour changer ou retirer un objet sur votre demande,
+  Claude peut aussi passer par Fibo 2 (Retouche générative par Fibo 2, plus haut), qui crée une
+  nouvelle photo à côté de l'original.
 - **Upright avec repères** : Claude pose les repères, mais Lightroom ne calcule la correction qu'au
   clic sur « Mettre à jour » (panneau Transformation), que Claude vous demande.
 - **Anciennes versions de processus** : une photo en version 1 ou 2 (2003, 2010) se met à jour à
@@ -1272,7 +1349,7 @@ scripts/tester-module.sh
 
 
 Aucun test ne touche Lightroom, Claude, vos photos ni les fichiers de Claude, et aucun ne consomme
-de quota. Un test relit seulement, s'il les trouve, les doses de la peau rangées dans l'application
+de quota ; aucun ne lance le vrai Fibo 2 ni le vrai SeedVR2 (de faux scripts tiennent lieu de mflux et de SeedVR2). Un test relit seulement, s'il les trouve, les doses de la peau rangées dans l'application
 Lightroom Classic ; aucun ne lit votre écran, sauf sur demande :
 `DEVELOPPEUR_ECRAN_REEL=1 swift test`. Les deux suites tournent aussi à chaque envoi sur `main`
 (GitHub Actions).
@@ -1283,8 +1360,8 @@ Lightroom Classic ; aucun ne lit votre écran, sauf sur demande :
 - `Sources/DeveloppeurKit/` : le connecteur (protocole MCP, outils, invites, catalogue des
   réglages, standard de notation, dosage de la peau, mesures et Vision, éclairage, bilan d'une
   passe à l'autre, lecture des fichiers Fujifilm, écran, défauts de la prise de vue, composition
-  lue, carnet de progrès, rendu reproductible, analyse et graphiques du Suivi, liaison TCP avec le
-  module et son jeton)
+  lue, carnet de progrès, rendu reproductible, analyse et graphiques du Suivi, retouche générative
+  par Fibo 2, liaison TCP avec le module et son jeton)
 - `Sources/MCPDeveloppeur/main.swift` : l'exécutable `mcp-developpeur` (options de ligne de
   commande, boucle stdio)
 - `Lightroom/Developpeur.lrplugin/` : le module Lightroom Classic, en Lua 5.1 (liaison avec le

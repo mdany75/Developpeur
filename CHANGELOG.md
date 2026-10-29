@@ -2,6 +2,39 @@
 
 ## Non publié
 
+### Ajouté
+- Retouche générative par Fibo 2, sur votre demande seulement (outil `generative_edit`, le 36e) :
+  ce que Lightroom ne sait pas faire, comme remplacer un pantalon par une jupe ou changer un objet,
+  Claude le fait faire par Fibo 2 sur ce Mac (mflux, sans rien envoyer sur Internet). La photo
+  développée part en TIFF 16 bits, Fibo 2 la modifie, seule la zone changée est reprise dans la
+  photo en pleine résolution, et le résultat entre au catalogue en TIFF, empilé au-dessus de
+  l'original, qui reste intact ; il devient la photo active, et Claude y fait les finitions.
+  La zone changée peut rester un peu moins fine que le reste (Fibo 2 travaille à environ
+  1 mégapixel). Il faut mflux
+  (`uv tool install mflux`) et l'accès aux modèles Fibo 2 de Bria (licence CC BY-NC : usage
+  personnel). `undo_last` ne retire pas la nouvelle photo : Photo › Retirer du catalogue, à la main.
+  Les garde-fous des photos valent comme pour toute retouche (avec « Copies virtuelles seulement »,
+  la nouvelle photo reçoit sa copie virtuelle, où se font les finitions) ; une photo d'essai va dans
+  « Développeur › Essais », sans pile avec votre original ; le passage par un TIFF temporaire ne
+  compte pas comme une exportation ; le TIFF garde toutes les métadonnées (libellé, mots-clés) en
+  compression ZIP ; Fibo 2 s'arrête si Lightroom ou Claude se ferment pendant le calcul.
+- Retouche générative, plus fine et plus complète :
+  - Fibo 2 reçoit un recadrage autour de la zone à changer (avec une marge de contexte), plus
+    seulement toute la photo réduite ; le reste de la photo garde ses pixels.
+  - Jusqu'à 4 changements en un seul appel (« une jupe et un sac »), une zone chacun, recollés dans
+    une seule nouvelle photo ; deux zones qui se chevauchent ou se touchent se font en deux fois.
+  - Sur demande, Fibo 2 voit aussi la photo entière, pour la lumière et le style (à comparer avec
+    le recadrage seul).
+  - SeedVR2 remet une zone rendue trop petite à sa taille, avec plus de détail (modèle de quelques
+    Go téléchargé au premier usage), seulement pour une zone désignée et un agrandissement mesuré ;
+    sans lui, mise à la taille ordinaire, et Claude le dit.
+  - Qualité maximale par défaut (décodage en pleine précision) ; le mode rapide seulement sur
+    demande.
+  - Une seule barre de progression dans Lightroom, de 0 à 100 %, avec le changement en cours et le
+    temps restant ; sa croix arrête tout sans rien importer, à tout moment.
+  - La consigne part en anglais pour Fibo 2 ; Claude vous en montre la traduction française, gardée
+    au journal de la photo.
+
 ### Corrigé
 - Fenêtre Suivi : un clic sur une barre montre de nouveau ses photos dans la Bibliothèque (il
   échouait, le Lua de Lightroom n'ayant pas une fonction que le module employait).

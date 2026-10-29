@@ -42,7 +42,7 @@ final class MCPServerTests: XCTestCase {
         XCTAssertNil(try call(#"{"jsonrpc":"2.0","id":2,"method":"initialize","params":{}}"#)["result"]?["serverInfo"]?["title"], "sans titre donné, pas de title")
 
         let outils = try call(#"{"jsonrpc":"2.0","id":3,"method":"tools/list"}"#)["result"]?["tools"]?.array ?? []
-        XCTAssertEqual(outils.count, 35)
+        XCTAssertEqual(outils.count, 36)
         XCTAssertFalse(ToolHandler.toolNames.contains("expand_photo"))
         XCTAssertFalse(ToolHandler.toolNames.contains("photo_lesson"), "la leçon de la photo est retirée (1.3.6)")
         let refus = try call(#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"expand_photo","arguments":{}}}"#)
@@ -164,7 +164,7 @@ final class MCPServerTests: XCTestCase {
             "avant netteté, masques IA et retouch_spots",
             "Contraindre le recadrage", "coins vides", "un cadre demandé alors que la géométrie est déjà posée", "au centre et à la taille demandés",
             "JPEG sRGB", "le HDR ne se voit pas",
-            "Reflets d'une vitre : remove_distractions, avant toute autre retouche", "Personnes", "Poussière ; série : Copier puis Coller de Lightroom", "suppression générative",
+            "Reflets d'une vitre : remove_distractions, avant toute autre retouche", "Personnes", "Poussière ; série : Copier puis Coller de Lightroom", "generative_edit, sur sa demande",
             "cull_photos", "contact_sheet", "set_metadata après accord",
             "champ plat", "fusions HDR et panorama", "en HDR (HDREditMode), le rendu SDR", "yeux fermés ou plissés",
             "request_backup", "ne pas l'annoncer comme appliqué",
@@ -326,11 +326,11 @@ final class MCPServerTests: XCTestCase {
     // MARK: Socle de la 1.3
 
     /// 1.3 : deux outils de plus, read_composition et photo_lesson ; 1.3.6 : photo_lesson retiré,
-    /// 35 en tout. read_composition après measure_angle, en lecture seule (ni les photos ni le
+    /// 35 en tout ; 36 avec generative_edit (Fibo 2, 29 octobre 2026). read_composition après measure_angle, en lecture seule (ni les photos ni le
     /// catalogue ne changent), avec son titre ; match_series en dernier.
     func testLOutilDeLa13() throws {
-        XCTAssertEqual(ToolHandler.toolNames.count, 35)
-        XCTAssertEqual(Set(ToolHandler.toolNames).count, 35, "pas de doublon")
+        XCTAssertEqual(ToolHandler.toolNames.count, 36)
+        XCTAssertEqual(Set(ToolHandler.toolNames).count, 36, "pas de doublon")
         let mesure = try XCTUnwrap(ToolHandler.toolNames.firstIndex(of: "measure_angle"))
         XCTAssertEqual(ToolHandler.toolNames[mesure + 1], "read_composition")
         XCTAssertEqual(ToolHandler.toolNames.last, "match_series")

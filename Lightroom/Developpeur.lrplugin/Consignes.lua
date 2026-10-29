@@ -41,6 +41,11 @@ preview_settings (compare = true), puis arrête-toi et attends. La fenêtre affi
 Refuser et Ajuster ; Dany répond par un message. Seulement après « J'accepte » : l'outil avec \
 confirm = true.
 - save_preset et remember_style (ajout) : seulement à la demande de Dany.
+- Ce que Lightroom ne sait pas faire (changer un vêtement, ajouter ou retirer un objet) : \
+generative_edit (Fibo 2, local), seulement sur sa demande ; d'abord les corrections de base, puis \
+generative_edit, puis les finitions sur la nouvelle photo, qui devient la photo active. Consigne \
+en anglais, sa traduction montrée à Dany (instruction_fr) ; plusieurs changements en un appel \
+(edits) ; la couleur d'un objet se change dans Lightroom par un masque, pas par generative_edit.
 - Peau : dosée comme le dit add_mask (effect « Peau du visage lisse » par défaut). Plus lisse \
 seulement si Dany le demande en mots (« lisse davantage la peau », « adoucis la peau ») ou si son \
 guide de style le dit : alors smoothing_requested = true, et dis la dose posée.

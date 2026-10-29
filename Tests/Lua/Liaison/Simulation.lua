@@ -509,6 +509,7 @@ function S.Photo(id, reglages, meta, brut)
     -- (« 0 EV », « Non déclenché », « Priorité d'ouverture », « Moyenne pondérée ») : la simulation
     -- rend ce que l'essai a rangé dans meta, sans refus.
     function photo:getFormattedMetadata(cle)
+        lisible(self, 'photo')
         return self.meta[cle]
     end
     -- Constaté dans Lightroom Classic 15.6 (diagnostic) : getRawMetadata refuse le titre, la
@@ -516,6 +517,7 @@ function S.Photo(id, reglages, meta, brut)
     -- getFormattedMetadata donne ; colorNameForLabel est la couleur du libellé dans le jeu de
     -- libellés actif (S.jeuLibelles ; « none » sans libellé, « custom » hors du jeu : supposé).
     function photo:getRawMetadata(cle)
+        lisible(self, 'photo')
         if RAW_REFUSEES[cle] then
             error("getRawMetadata : clé inconnue " .. cle, 2)
         end
@@ -1278,6 +1280,33 @@ function catalogue:findPhotoByPath(chemin)
         if photo.brut.path == chemin and not photo.retireeDuCatalogue then return photo end
     end
     return nil
+end
+
+-- Fichier ajouté au catalogue (référence du SDK 3.0 : addPhoto(path, stackWithPhoto, position,
+-- metadataPresetUUID), la photo rendue) : dans une écriture (supposé, comme toute écriture du
+-- catalogue) ; le fichier doit être sur le disque ; un chemin déjà au catalogue est refusé
+-- (supposé) ; empilée avec stackWithPhoto (son original, pour une copie virtuelle : Lightroom empile
+-- une copie avec lui), au-dessus ('above') ou au-dessous ('below'). Supposé comme une collection : la
+-- photo ajoutée ne se lit pas dans l'écriture qui l'a créée. S.ajoutImpossible : Lightroom refuse le
+-- fichier, avec ce message. Tout reste à constater dans Lightroom (retouche générative, Fibo 2).
+function catalogue:addPhoto(chemin, pileAvec, position)
+    assert(S.ecritureEnCours, "addPhoto hors de withWriteAccessDo")
+    assert(S.fichiers[chemin] ~= nil and S.fichiers[chemin] ~= 'dossier', "addPhoto : fichier absent du disque " .. tostring(chemin))
+    assert(pileAvec == nil or position == 'above' or position == 'below', "addPhoto : position de la pile 'above' ou 'below'")
+    if S.ajoutImpossible then
+        error(S.ajoutImpossible, 0)
+    end
+    if self:findPhotoByPath(chemin) then
+        error("addPhoto : « " .. chemin .. " » est déjà dans le catalogue", 0)
+    end
+    local photo = S.Photo(nouvelId(), {}, { fileName = chemin:match('[^/]+$'), fileFormat = 'TIFF' }, { path = chemin })
+    photo.nee = naissance()
+    if pileAvec then
+        photo.empileeAvec = pileAvec.brut.masterPhoto or pileAvec
+        photo.positionPile = position
+    end
+    S.ajoutees[#S.ajoutees + 1] = photo
+    return photo
 end
 
 -- Aperçus dynamiques (référence du SDK 5.0) : created, existed, failed ; rien pour une photo dont
@@ -2048,7 +2077,17 @@ local modules = {
             if valeur == nil then return false end
             return valeur == 'dossier' and 'directory' or 'file'
         end,
+        -- Un dossier s'efface avec tout ce qu'il contient, comme dans Lightroom.
         delete = function(chemin)
+            local dedans = {}
+            for autre in pairs(S.fichiers) do
+                if autre:sub(1, #chemin + 1) == chemin .. '/' then
+                    dedans[#dedans + 1] = autre
+                end
+            end
+            for _, autre in ipairs(dedans) do
+                S.fichiers[autre], S.datesFichiers[autre] = nil, nil
+            end
             S.fichiers[chemin], S.datesFichiers[chemin] = nil, nil
             return true
         end,
@@ -2058,6 +2097,15 @@ local modules = {
                 return nil
             end
             return { fileSize = #S.fichiers[chemin], fileModificationDate = S.datesFichiers[chemin] or S.horloge }
+        end,
+        -- À la corbeille du Finder (récupérable) : noté dans S.corbeille.
+        moveToTrash = function(chemin)
+            if S.fichiers[chemin] == nil then
+                return false
+            end
+            S.corbeille[#S.corbeille + 1] = chemin
+            S.fichiers[chemin], S.datesFichiers[chemin] = nil, nil
+            return true
         end,
         move = function(de, vers)
             S.fichiers[vers], S.fichiers[de] = S.fichiers[de], nil
@@ -2346,6 +2394,9 @@ function S.reinitialiser()
     S.reprendreTachesA = 0
     S.fenetreExport = nil
     S.exportsLivres = {}
+    S.ajoutees = {}
+    S.ajoutImpossible = nil
+    S.corbeille = {}
     S.ecriturePriveeEnCours = false
     S.ecrituresPrivees = 0
     S.quantitesPresets = {}

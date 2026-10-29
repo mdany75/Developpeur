@@ -27,10 +27,12 @@ end
 -- Moteur.oublierRapide) : une séance qui finit sur l'une d'elles (Lightroom quitté, module
 -- rechargé) les laisserait pour toujours. Au chargement, aucune n'est en mémoire : ils s'effacent en
 -- entier. Depuis le correctif 1.3.7, aussi ceux du Suivi (Temporaire/Suivi : les vignettes d'un lot
--- d'analyse, Releve.lua, qu'une séance finie pendant le lot laisserait). Rien d'autre de
+-- d'analyse, Releve.lua, qu'une séance finie pendant le lot laisserait), et depuis la retouche
+-- générative (29 octobre 2026) ceux de Fibo 2 (Temporaire/Fibo : l'exportation, l'entrée et la sortie
+-- de Fibo d'un appel de generative_edit que Lightroom a quitté en cours). Rien d'autre de
 -- Temporaire, ni les conversations gardées. Rend le nombre de dossiers effacés. Dans une tâche
 -- (Init.lua).
-Menage.TEMPORAIRES = { 'Groupes', 'Rapide', 'Suivi' }
+Menage.TEMPORAIRES = { 'Groupes', 'Rapide', 'Suivi', 'Fibo' }
 
 function Menage.temporaires()
     local Chemins = require 'Chemins'

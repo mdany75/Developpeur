@@ -3,7 +3,9 @@
 -- (options : modèles de noms de fichiers, paramètres prédéfinis de métadonnées, services de
 -- publication et réglages des services Disque dur), et ce qui l'entoure : le dossier choisi dans
 -- une fenêtre (choisirDossier), les noms que Lightroom calculera (nomsFichiers) et les aperçus
--- dynamiques (apercusDynamiques).
+-- dynamiques (apercusDynamiques). Depuis la retouche générative (Fibo 2, 29 octobre 2026) : la
+-- photo que le connecteur a fait faire par Fibo 2, importée dans le catalogue et empilée au-dessus
+-- de son original (importerGeneree).
 --
 -- L'exportation passe par la même LrExportSession que les aperçus, mais vers le dossier choisi par
 -- l'utilisateur, et sans jamais écraser un fichier : LR_collisionHandling = 'rename' (Lightroom
@@ -22,16 +24,21 @@ local LrPathUtils = import 'LrPathUtils'
 local LrTasks = import 'LrTasks'
 
 local Bibliotheque = require 'Bibliotheque'
+local Carnet = require 'Carnet'
+local Chemins = require 'Chemins'
 local Ecriture = require 'Ecriture'
+local Fichiers = require 'Fichiers'
 local Json = require 'Json'
 local Liaison = require 'Liaison'
 local Photos = require 'Photos'
 local Preferences = require 'Preferences'
 local Services = require 'Services'
+local Texte = require 'Texte'
 
 local brut, decrire, nomFichier = Photos.brut, Photos.decrire, Photos.nomFichier
 local photosVisees = Photos.photosVisees
 local accordDansLightroom, calculerAvantRendu = Ecriture.accordDansLightroom, Ecriture.calculerAvantRendu
+local verifierProtection = Ecriture.verifierProtection
 local modeTexte, verifierPause = Ecriture.modeTexte, Ecriture.verifierPause
 
 local Livraison = {}
@@ -251,7 +258,64 @@ local function photosReimportees(entrees)
     until LrDate.currentTime() > fin
 end
 
--- Le dossier de livraison : un chemin complet, créé au besoin.
+-- Retouche générative (Fibo 2) : le dossier de passage des fichiers, <racine>/Temporaire/Fibo, que
+-- le connecteur emploie pour l'exportation, l'entrée et la sortie de Fibo 2 (un dossier neuf par
+-- appel), et que Menage.temporaires vide au chargement.
+function Livraison.dossierFibo()
+    return LrPathUtils.child(Chemins.temporaire(), 'Fibo')
+end
+
+-- Vrai pour un chemin complet sous le dossier de Fibo, sans « . » ni « .. » qui en sortirait.
+local function dansFibo(chemin)
+    if type(chemin) ~= 'string' or chemin:sub(1, 1) ~= '/' then
+        return false
+    end
+    local prefixe = Livraison.dossierFibo() .. '/'
+    if chemin:sub(1, #prefixe) ~= prefixe or #chemin == #prefixe then
+        return false
+    end
+    for morceau in (chemin:sub(#prefixe + 1) .. '/'):gmatch('([^/]*)/') do
+        if morceau == '' or morceau == '.' or morceau == '..' then
+            return false
+        end
+    end
+    return true
+end
+Livraison.dansFibo = dansFibo
+
+-- L'étape que la fenêtre de la liaison montre pour une retouche générative.
+local ETAPE_FIBO = "Claude · Fibo 2"
+
+-- L'exportation de passage d'une retouche générative (vers Temporaire/Fibo) : l'accord se demande au
+-- nom de generative_edit, jamais d'export_photos (Claude rappellerait export_photos, une vraie
+-- livraison, et l'accord y partirait), avec l'étape et la raison que le connecteur envoie (la
+-- consigne de Fibo 2), pour que la fenêtre de la liaison dise ce qu'elle fait approuver. Les
+-- garde-fous des photos (copies virtuelles seulement, libellé protégé, rejetées) s'appliquent
+-- avant tout calcul : la retouche générative est une écriture.
+local function verifierFibo(prefs, params, photos)
+    if prefs.mode == 'proposer' and not params.confirme then
+        echouer("Mode « Proposer d'abord » actif dans Lightroom : rien n'a été fait. Dire à l'utilisateur ce que Fibo 2 "
+            .. "changerait, attendre son accord, puis rappeler generative_edit avec confirm = true.")
+    end
+    verifierProtection(photos, prefs, params, 'generative_edit')
+    local demande = {}
+    for cle, valeur in pairs(params) do
+        demande[cle] = valeur
+    end
+    demande.etape = type(params.etape) == 'string' and params.etape ~= '' and params.etape or ETAPE_FIBO
+    accordDansLightroom(prefs, demande, 'generative_edit')
+end
+
+-- Photos exportées vers le dossier de Fibo dans cette session (localIdentifier → heure) : l'accord
+-- donné à cette exportation (mode « Proposer d'abord », accord dans Lightroom) vaut pour
+-- l'importation de la même retouche générative, qui suit dans le même appel de generative_edit,
+-- après les calculs : jusqu'à 4 modifications, chacune Fibo 2 puis SeedVR2, 15 min au plus chacun
+-- (2 h en tout), d'où DUREE_GENEREE de 3 h. L'accord ne vaut qu'une fois. Les essais le vident.
+Livraison.exportsFibo = {}
+local DUREE_GENEREE = 3 * 3600
+
+-- Le dossier de livraison : un chemin complet, créé au besoin (celui d'une retouche générative avec
+-- ses parents : Temporaire/Fibo est vidé au chargement du module).
 local function dossierDeLivraison(chemin)
     if type(chemin) ~= 'string' or chemin:sub(1, 1) ~= '/' then
         echouer("« folder » : le chemin complet du dossier de livraison (/Users/…, /Volumes/…).")
@@ -260,7 +324,9 @@ local function dossierDeLivraison(chemin)
     if nature == 'file' then
         echouer("« " .. chemin .. " » est un fichier, pas un dossier.")
     end
-    if not nature then
+    if not nature and dansFibo(chemin) then
+        LrFileUtils.createAllDirectories(chemin)
+    elseif not nature then
         local parent = LrPathUtils.parent(chemin)
         if not parent or not LrFileUtils.exists(parent) then
             echouer("Le dossier parent de « " .. chemin .. " » n'existe pas (disque débranché ?) : rien n'a été exporté.")
@@ -274,7 +340,11 @@ end
 function Livraison.exporter(params)
     verifierPause(params)
     local prefs = Preferences.lire()
-    verifierAccordLivraison(prefs, params, 'export_photos', "exporté")
+    -- Exportation de passage d'une retouche générative (generative_edit) : son propre accord.
+    local pourFibo = dansFibo(params.dossier)
+    if not pourFibo then
+        verifierAccordLivraison(prefs, params, 'export_photos', "exporté")
+    end
     -- Les vidéos (1.3.5) : sautées et comptées ; une livraison de photos ne les prend pas.
     local visees, videos = {}, 0
     for _, photo in ipairs(photosVisees(params)) do
@@ -283,6 +353,9 @@ function Livraison.exporter(params)
         else
             visees[#visees + 1] = photo
         end
+    end
+    if pourFibo then
+        verifierFibo(prefs, params, visees)
     end
     if #visees == 0 then
         echouer(videos > 0 and string.format("Aucune photo à exporter : %d vidéo(s), qu'une livraison de photos ne prend pas.", videos)
@@ -329,8 +402,12 @@ function Livraison.exporter(params)
         end
     end
     local parId, fichiers = {}, Json.tableau()
+    -- Exportées avant (isExported lu avant l'exportation) : celle de passage vers Fibo 2 ne compte pas
+    -- comme une livraison (comme un aperçu de Claude : apercuSeulement).
+    local dejaExportees = {}
     for _, photo in ipairs(photos) do
         parId[photo.localIdentifier] = { photo = decrire(photo, false), depuis_apercu_dynamique = apercus[photo] or nil }
+        dejaExportees[photo] = Photos.brut(photo, 'isExported') == true
     end
     local export = LrExportSession { photosToExport = photos, exportSettings = reglages }
     local fini, erreur = LrTasks.pcall(function()
@@ -370,25 +447,259 @@ function Livraison.exporter(params)
     if reglages.LR_reimportExportedPhoto then
         photosReimportees(livrees)
     end
-    -- Livrées pour de bon : elles ne sont plus « exportées seulement en aperçu ».
-    local exportees = {}
-    for _, photo in ipairs(photos) do
-        local entree = parId[photo.localIdentifier]
-        if entree and entree.chemin and photo:getPropertyForPlugin(_PLUGIN, 'apercuSeulement') == 'oui' then
-            exportees[#exportees + 1] = photo
-        end
-    end
-    if #exportees > 0 then
-        LrTasks.pcall(Ecriture.ecrireMemoire, "Claude · livraison", function()
-            for _, photo in ipairs(exportees) do
-                photo:setPropertyForPlugin(_PLUGIN, 'apercuSeulement', nil)
+    if pourFibo then
+        -- Exportée pour Fibo 2 : l'accord de cette exportation vaudra pour son importation. Ce n'est
+        -- pas une livraison : une photo qui n'était pas exportée est notée apercuSeulement (Lightroom
+        -- vient de faire passer isExported à vrai), comme après un aperçu de Claude (Rendu.lua).
+        local apercues = {}
+        for _, photo in ipairs(photos) do
+            local entree = parId[photo.localIdentifier]
+            if entree and entree.chemin then
+                Livraison.exportsFibo[photo.localIdentifier] = LrDate.currentTime()
+                if not dejaExportees[photo] and Photos.brut(photo, 'isExported') == true
+                    and photo:getPropertyForPlugin(_PLUGIN, 'apercuSeulement') ~= 'oui' then
+                    apercues[#apercues + 1] = photo
+                end
             end
-        end)
+        end
+        if #apercues > 0 then
+            LrTasks.pcall(Ecriture.ecrireMemoire, ETAPE_FIBO, function()
+                for _, photo in ipairs(apercues) do
+                    photo:setPropertyForPlugin(_PLUGIN, 'apercuSeulement', 'oui')
+                end
+            end)
+        end
+    else
+        -- Livrées pour de bon : elles ne sont plus « exportées seulement en aperçu ».
+        local exportees = {}
+        for _, photo in ipairs(photos) do
+            local entree = parId[photo.localIdentifier]
+            if entree and entree.chemin and photo:getPropertyForPlugin(_PLUGIN, 'apercuSeulement') == 'oui' then
+                exportees[#exportees + 1] = photo
+            end
+        end
+        if #exportees > 0 then
+            LrTasks.pcall(Ecriture.ecrireMemoire, "Claude · livraison", function()
+                for _, photo in ipairs(exportees) do
+                    photo:setPropertyForPlugin(_PLUGIN, 'apercuSeulement', nil)
+                end
+            end)
+        end
     end
     Liaison.noter(string.format("Livraison : %d fichier(s) exporté(s) vers %s", reussies, dossier))
     return { mode = modeTexte(prefs), dossier = dossier, format = format, fichiers = fichiers,
         reimportees = reglages.LR_reimportExportedPhoto or nil, empilees = reglages.LR_reimport_stackWithOriginal or nil,
         videos_ecartees = videos > 0 and videos or nil }
+end
+
+-- Retouche générative (Fibo 2, commande importerGeneree ; outil generative_edit du connecteur,
+-- demandé par Dany le 29 octobre 2026) : ce que Lightroom ne sait pas faire (changer un vêtement,
+-- ajouter ou retirer un objet), le connecteur le fait faire par Fibo 2, en local, d'après un TIFF
+-- exporté (commande exporter, vers Temporaire/Fibo) ; il en tire un TIFF final en pleine
+-- résolution, que cette commande range à côté de l'original et ajoute au catalogue, empilé
+-- au-dessus de lui (catalog:addPhoto, dans une écriture), puis montre comme photo active : les
+-- finitions se font sur elle. L'original n'est jamais touché. undo_last ne la retire pas (aucune
+-- étape « Claude · » : Photo › Retirer du catalogue, à la main). Reste à constater dans Lightroom :
+-- addPhoto avec la pile ('above') et la photo ajoutée relue après l'écriture.
+-- Les garde-fous des photos (verifierProtection) valent comme pour toute écriture ; sous « Copies
+-- virtuelles seulement », les finitions se font sur une copie virtuelle de la nouvelle photo, qui
+-- devient la photo active (son id dans la réponse). Une photo d'essai (« Développeur › Essais »,
+-- elle ou son original) : la nouvelle photo n'est pas empilée avec le vrai original, elle va dans
+-- les mêmes collections Essais, et la recette peut la retirer (retirerReimportees).
+--
+-- params : photo (id de la photo d'origine ; sans lui, la photo active), chemin (le TIFF final,
+-- sous Temporaire/Fibo), nom (nom de base proposé, sans extension), consigne (l'instruction donnée
+-- à Fibo 2, pour le journal et la demande d'accord), confirme. Réponse : { id, fichier, chemin,
+-- empilee, active } ; essai = true pour une photo d'essai ; sous « Copies virtuelles seulement »,
+-- copie_virtuelle (id = la copie) et photo_fibo (le TIFF importé).
+
+-- Le nom de base du fichier : sans dossier, ni caractère que le Finder refuse, ni point en tête ;
+-- sinon celui de l'original suivi de « -Fibo ».
+local function nomDeBase(nom, origine)
+    local base = type(nom) == 'string' and nom or ''
+    base = base:gsub('%.[Tt][Ii][Ff][Ff]?$', ''):gsub('[%c/:\\]', '-'):gsub('^[%s%.]+', ''):gsub('%s+$', '')
+    if base == '' then
+        local fichier = tostring(Photos.meta(origine, 'fileName') or LrPathUtils.leafName(tostring(brut(origine, 'path') or '')) or 'photo')
+        base = fichier:gsub('%.[^.]*$', '') .. '-Fibo'
+    end
+    return Texte.debut(base, 100)
+end
+
+-- « <nom>.tif », sinon « <nom>-2.tif », « <nom>-3.tif »… dans le dossier : jamais d'écrasement.
+local function cheminLibre(dossier, base)
+    local chemin = LrPathUtils.child(dossier, base .. '.tif')
+    local n = 1
+    while LrFileUtils.exists(chemin) do
+        n = n + 1
+        if n > 999 then
+            echouer("Aucun nom libre pour « " .. base .. ".tif » dans « " .. dossier .. " » : rien n'a été importé.")
+        end
+        chemin = LrPathUtils.child(dossier, base .. '-' .. n .. '.tif')
+    end
+    return chemin
+end
+
+-- Les collections « Développeur › Essais » de la photo et de son original (une photo d'essai).
+local function collectionsEssais(photo)
+    local trouvees, vues = {}, {}
+    local ok = LrTasks.pcall(function()
+        local original = brut(photo, 'isVirtualCopy') == true and brut(photo, 'masterPhoto') or photo
+        for _, p in ipairs({ photo, original }) do
+            for _, collection in ipairs(p:getContainedCollections() or {}) do
+                local parent = collection:getParent()
+                if not vues[collection] and collection:getName() == Carnet.ESSAIS.collection
+                    and parent and parent:getName() == Carnet.ESSAIS.ensemble then
+                    vues[collection] = true
+                    trouvees[#trouvees + 1] = collection
+                end
+            end
+        end
+    end)
+    return ok and trouvees or {}
+end
+
+-- Sous « Copies virtuelles seulement » (Gestionnaire de modules externes) : une copie virtuelle de
+-- la photo importée, sur laquelle se font les finitions (l'original TIFF les refuserait). La photo
+-- doit être seule sélectionnée (createVirtualCopies agit sur la sélection) ; rend la copie, ou nil.
+local function copiePourLesFinitions(cat, nouvelle)
+    local copies
+    local ok = LrTasks.pcall(Ecriture.ecrire, "Claude · copie virtuelle", function()
+        copies = cat:createVirtualCopies("Claude")
+    end)
+    if not ok then
+        return nil
+    end
+    local copie = type(copies) == 'table' and copies[1] or nil
+    if not copie then
+        local lues, liste = LrTasks.pcall(brut, nouvelle, 'virtualCopies')
+        copie = lues and type(liste) == 'table' and liste[1] or nil
+    end
+    return copie
+end
+
+function Livraison.importerGeneree(params)
+    verifierPause(params)
+    local prefs = Preferences.lire()
+    if prefs.mode == 'proposer' and not params.confirme then
+        echouer("Mode « Proposer d'abord » actif dans Lightroom : rien n'a été importé. Dire à l'utilisateur ce que Fibo 2 "
+            .. "changerait, attendre son accord, puis rappeler generative_edit avec confirm = true.")
+    end
+    local chemin = params.chemin
+    if not dansFibo(chemin) then
+        echouer("« " .. tostring(chemin) .. " » n'est pas dans le dossier de passage de Fibo 2 (" .. Livraison.dossierFibo()
+            .. ") : rien n'a été importé.")
+    end
+    if not tostring(chemin):lower():match('%.tiff?$') then
+        echouer("« " .. LrPathUtils.leafName(chemin) .. " » n'est pas un TIFF : rien n'a été importé.")
+    end
+    if LrFileUtils.exists(chemin) ~= 'file' then
+        echouer("Fichier de Fibo 2 introuvable : « " .. chemin .. " » ; rien n'a été importé. Recommencer generative_edit.")
+    end
+    local photo = Photos.photoVisee(params)
+    -- Les garde-fous des photos, comme toute écriture (déjà vus à l'exportation ; la photo peut avoir
+    -- changé pendant le calcul de Fibo 2).
+    verifierProtection({ photo }, prefs, params, 'generative_edit')
+    -- Une copie virtuelle : la nouvelle photo va à côté de son original, empilée avec lui.
+    local origine = brut(photo, 'isVirtualCopy') == true and brut(photo, 'masterPhoto') or photo
+    local cheminOriginal = brut(origine, 'path')
+    local dossier = type(cheminOriginal) == 'string' and LrPathUtils.parent(cheminOriginal) or nil
+    if Photos.originalAbsent(origine) or not dossier or LrFileUtils.exists(dossier) ~= 'directory' then
+        echouer(Photos.raisonOriginalAbsent(origine, "La photo de Fibo 2 se range dans son dossier : rien n'a été importé."))
+    end
+    -- L'accord de l'exportation vaut pour l'importation qui la suit (Livraison.exportsFibo) ;
+    -- sinon, celui de la fenêtre de la liaison, comme les autres écritures, avec la consigne.
+    local exportee = Livraison.exportsFibo[photo.localIdentifier]
+    if not (exportee and LrDate.currentTime() - exportee <= DUREE_GENEREE) then
+        local demande = {}
+        for cle, valeur in pairs(params) do
+            demande[cle] = valeur
+        end
+        demande.etape = ETAPE_FIBO
+        demande.raison = type(params.consigne) == 'string' and params.consigne ~= '' and params.consigne or nil
+        accordDansLightroom(prefs, demande, 'generative_edit')
+    end
+    -- Une photo d'essai (« Développeur › Essais ») : la nouvelle photo va dans les mêmes collections
+    -- Essais, sans pile avec le vrai original (une photo de Dany, à ne pas toucher), et la recette peut
+    -- la retirer (retirerReimportees).
+    local essais = collectionsEssais(photo)
+    local essai = #essais > 0
+    local destination = cheminLibre(dossier, nomDeBase(params.nom, origine))
+    if not LrFileUtils.copy(chemin, destination) or LrFileUtils.exists(destination) ~= 'file' then
+        echouer("Lightroom n'a pas copié la photo de Fibo 2 dans « " .. dossier .. " » (disque plein ou protégé ?) : rien n'a été importé.")
+    end
+    local cat = Photos.catalogue()
+    local nouvelle
+    local ajoutee, erreur = LrTasks.pcall(Ecriture.ecrire, ETAPE_FIBO, function()
+        if essai then
+            nouvelle = cat:addPhoto(destination)
+        else
+            nouvelle = cat:addPhoto(destination, origine, 'above')
+        end
+    end)
+    if not ajoutee then
+        -- Le fichier copié n'est pas au catalogue : à la corbeille du Finder, jamais laissé seul.
+        Fichiers.corbeille(destination)
+        echouer("Lightroom n'a pas importé la photo de Fibo 2 : " .. Liaison.messageErreur(erreur) .. " Rien n'a été ajouté au catalogue.")
+    end
+    -- La photo ajoutée ne se lit qu'après l'écriture : rendue par addPhoto, sinon par son chemin.
+    if not nouvelle then
+        local trouvee, parChemin = LrTasks.pcall(cat.findPhotoByPath, cat, destination)
+        nouvelle = trouvee and parChemin or nil
+    end
+    if not nouvelle then
+        echouer("Lightroom ne retrouve pas la photo de Fibo 2 importée (« " .. destination .. " ») : la chercher dans son dossier.")
+    end
+    Livraison.exportsFibo[photo.localIdentifier] = nil
+    -- La recette seule retire une photo importée par le module dans la session (retirerReimportees).
+    reimporteesSession[destination] = LrDate.currentTime()
+    -- Le journal de Claude de la nouvelle photo : ce que Fibo 2 y a fait (sans étape à défaire), et
+    -- « retouchée par Claude ». Écriture de la mémoire seule (privée) ; un échec ne défait rien.
+    local consigne = Texte.nettoyer(type(params.consigne) == 'string' and params.consigne or '')
+    local notee, erreurJournal = LrTasks.pcall(Ecriture.ecrireMemoire, ETAPE_FIBO, function()
+        local journal = {}
+        Ecriture.ajouterJournal(journal, { etape = ETAPE_FIBO .. " : " .. Texte.raccourcir(consigne ~= '' and consigne or "retouche générative", 120),
+            type = 'retouche', raison = consigne ~= '' and consigne or nil, origine = photo.localIdentifier })
+        Photos.garder(nouvelle, 'journalClaude', Json.encode(journal))
+        Photos.garder(nouvelle, 'retoucheeParClaude', 'oui')
+    end)
+    if not notee then
+        Liaison.noter("Journal de la photo de Fibo 2 non écrit : " .. Liaison.messageErreur(erreurJournal))
+    end
+    -- Elle devient la photo active, seule sélectionnée (son dossier affiché au besoin).
+    local okSelection, active = LrTasks.pcall(Bibliotheque.selectionnerAvecSource, { nouvelle })
+    active = okSelection and active == true
+    -- Copies virtuelles seulement : les finitions se font sur une copie virtuelle de la nouvelle photo.
+    local copie
+    if prefs.copiesSeulement and active then
+        copie = copiePourLesFinitions(cat, nouvelle)
+        if copie then
+            local okCopie, copieActive = LrTasks.pcall(Bibliotheque.selectionnerAvecSource, { copie })
+            active = okCopie and copieActive == true
+        end
+    end
+    -- Dans les collections Essais, dans une écriture suivante (une photo ajoutée ne se lit pas dans
+    -- l'écriture qui l'a créée).
+    if essai then
+        local rangee, erreurEssais = LrTasks.pcall(Ecriture.ecrire, ETAPE_FIBO, function()
+            for _, collection in ipairs(essais) do
+                collection:addPhotos(copie and { nouvelle, copie } or { nouvelle })
+            end
+        end)
+        if not rangee then
+            Liaison.noter("Photo de Fibo 2 non rangée dans Développeur › Essais : " .. Liaison.messageErreur(erreurEssais))
+        end
+    end
+    Fichiers.supprimer(chemin)
+    local fichier = LrPathUtils.leafName(destination)
+    Liaison.noter("Fibo 2 : « " .. fichier .. " » importée" .. (essai and ", rangée dans Développeur › Essais (sans pile)"
+        or (", empilée au-dessus de « " .. nomFichier(origine) .. " »")), nouvelle.localIdentifier)
+    local reponse = { id = (copie or nouvelle).localIdentifier, fichier = fichier, chemin = destination, empilee = not essai,
+        active = active, essai = essai or nil }
+    if prefs.copiesSeulement then
+        reponse.copie_virtuelle = copie ~= nil
+        reponse.photo_fibo = nouvelle.localIdentifier
+    end
+    return reponse
 end
 
 -- Recette seulement (pas d'outil) : retire du catalogue les fichiers que le module vient d'y

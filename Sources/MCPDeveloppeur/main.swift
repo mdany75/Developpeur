@@ -105,12 +105,14 @@ func usage(erreur: Bool = false) {
 
 let verbose = ProcessInfo.processInfo.environment["DEVELOPPEUR_VERBOSE"] == "1"
 
-/// Les outils du serveur et de --call, qui lisent le nom de l'écran du Mac pour get_status (les
-/// tests, non : ToolHandler le laisse à nil).
+/// Les outils du serveur et de --call, qui lisent le nom de l'écran du Mac pour get_status et
+/// lancent le vrai Fibo 2 (les tests, non : ToolHandler les laisse à nil).
 func outils() -> ToolHandler {
     let tools = ToolHandler(lightroom: LightroomBridge.fromEnvironment())
     tools.lireEcran = Ecran.lire
     tools.lireSauvegardes = Sauvegardes.lire
+    // Fibo 2 (generative_edit) : le vrai mflux de ce Mac, pour le serveur et --call seulement.
+    tools.fibo = Fibo()
     return tools
 }
 
@@ -129,6 +131,12 @@ func serve() {
         server.toolBudget = seconds
     }
     log("démarré (version \(ServerInfo.version))")
+    // Terminé par un signal (Claude Code, Claude Desktop ou relais.sh qui l'arrêtent), le serveur
+    // arrête aussi mflux, qui ne lui survivrait pas sans délai, et efface son dossier.
+    let signaux = tools.travailFibo.arreterAuxSignaux { numero in
+        log("signal \(numero) : arrêt")
+        exit(128 + numero)
+    }
 
     // Le fil principal lit sans arrêt : les appels d'outils passent un à un vers Lightroom, dans
     // la file du serveur, et leur réponse part de leur propre fil (ping et listes répondent pendant
@@ -140,6 +148,9 @@ func serve() {
             if verbose { log(String(format: "réponse en %.2f s", Date().timeIntervalSince(started))) }
         }
     }
+    // Un calcul de Fibo 2 en cours ne survit pas au serveur : mflux arrêté, son dossier effacé.
+    tools.travailFibo.arreter()
+    withExtendedLifetime(signaux) {}
     log("fin de l'entrée : arrêt")
 }
 

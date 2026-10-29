@@ -62,7 +62,8 @@ Deux pièces :
   et inscrit sous la clé `MCP-Developpeur` dans Claude Desktop et Claude Code ; 35 outils (34
   jusqu'à la 1.2 ; la 1.3 ajoute `read_composition` après `measure_angle` et `photo_lesson` à la
   fin, tous deux en lecture seule : 36 jusqu'à la 1.3.5 ; `photo_lesson` est retiré au correctif
-  1.3.6) et 10 invites (a_ma_facon depuis la 1.3.5) ;
+  1.3.6 ; `generative_edit`, la retouche générative par Fibo 2, le 29 octobre 2026 : 36) et 10
+  invites (a_ma_facon depuis la 1.3.5) ;
 - le module Lightroom « Développeur » (`Lightroom/Developpeur.lrplugin`, identifiant
   `com.danymenard.developpeur`, Lightroom Classic 13.3 au moins), qui porte la liaison avec le
   serveur (`Liaison.lua`), la fenêtre Claude (voir Fenêtre Claude), les fenêtres Publication et
@@ -194,6 +195,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `nomsFichiers` | `photos?` ou `selection?`, `modele` (nom), `texte_perso?`, `sequence?` | `modele`, `noms` (20 au plus : photo, `nom` sans l'extension, ou `erreur`) |
 | `apercusDynamiques` | `photos?` ou `selection?`, `retirer?` | `crees`, `existants`, `echecs`, `sans_original`, `retires`, `absents`, `taille_mo` |
 | `retirerReimportees` | `chemins` | `retires` : recette seulement ; fichiers que le module vient de réimporter (même session, 30 min) |
+| `importerGeneree` (29 octobre 2026) | `photo` (id de la photo d'origine ; sans lui, la photo active), `chemin` (le TIFF final, sous `<racine>/Temporaire/Fibo/`), `nom` (nom de base proposé, sans extension), `consigne` (le texte français des modifications, et la raison, pour le journal), `confirme` | `{id, fichier, chemin, empilee, active}` (plus `essai` pour une photo d'essai, `copie_virtuelle` et `photo_fibo` sous « Copies virtuelles seulement ») : la photo de Fibo 2 copiée dans le dossier de l'original et ajoutée au catalogue, empilée au-dessus de lui (une photo d'essai : dans Développeur › Essais, sans pile) ; jamais rejouée (voir Retouche générative par Fibo 2) |
 | `masques` | `photo?`, `action` (`lister`, `masquer`, `afficher`, `retirer`, `dupliquer`, `recalculer`, `affiner`, `retirer_vides`), `masque?`, `inverser?`, `nom?`, `contour?`, `decalage?`, `etape`, `raison?`, `confirme` | `lister` : `photo`, `masques` ; sinon `resultats` comme `appliquer`, et `masques` (la liste après l'écriture) ; voir Masques : pistes de la 2.1 |
 | `progression` | `id`, `titre?`, `fait?`, `total?`, `message?`, `fin?` | `annulee` (croix de la barre de Lightroom), `fermee` à la fin |
 | `variantes` | `photo?`, `action` (`lister`, `choisir`, `effacer`), `nom?`, `noms?`, `effacer_autres?`, `etape`, `raison?`, `confirme` | `lister` : `variantes` (nom, réglages touchés, date) ; `choisir` : `etape`, `instantane`, `changements`, `effaces` ; `effacer` : `effaces` ; voir Variantes |
@@ -209,7 +211,8 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 une étape : `avant_apres` (la recette seulement, jamais un outil : force l'avant/après, même hors
 de la photo active) et `sans_avant_apres` (`match_series` : jamais d'avant/après). Les lectures
 que le serveur rejoue une fois après une coupure (`LightroomBridge.lectures`) gagnent `etapes` ;
-`carnet` n'y est pas (ni `lecon`, jusqu'à la 1.3.5) : il écrit `carnet.json`.
+`carnet` n'y est pas (ni `lecon`, jusqu'à la 1.3.5) : il écrit `carnet.json` ; ni
+`importerGeneree` (rejouée, elle importerait la photo deux fois).
 
 Sans `photo`, `photos` ni `selection`, la commande vise la photo active. L'aperçu est rendu dans
 un dossier temporaire propre à chaque demande ; le serveur lit le fichier, l'envoie à Claude en
@@ -2911,8 +2914,9 @@ Constaté dans Lightroom Classic 15.6 :
   la tonalité automatique et un masque IA. La chute aux butées d'une balance de JPEG sans cette
   remise n'a pas été observée directement.
 
-Exclus : suppression générative, fusions HDR et panorama, retouche au pixel, que le SDK n'expose
-pas. Le débruitage, les détails bruts et la super résolution passent par `ameliorer` (voir
+Exclus : suppression générative d'Adobe, fusions HDR et panorama, retouche au pixel, que le SDK
+n'expose pas. Changer un vêtement ou un objet, sur demande, passe hors de Lightroom par Fibo 2 (voir
+Retouche générative par Fibo 2). Le débruitage, les détails bruts et la super résolution passent par `ameliorer` (voir
 Débruitage, détails bruts, super résolution).
 
 ## Profil
@@ -7845,6 +7849,297 @@ copie d'essai JPEG renommé une minute) : la livraison à 1200 px part de l'aper
 (802 × 1200 px), la pleine résolution est refusée avec sa raison ; `checkPhotoAvailability` a vu
 l'absence plus de 12 s après le renommage (une livraison faite avant passe quand même par
 l'aperçu, sans le dire). Un aperçu fait 0,3 Mo pour ce JPEG de 1489 × 2227 px.
+
+## Retouche générative par Fibo 2 (`generative_edit`, `importerGeneree`)
+
+Demandée par Dany le 29 octobre 2026 : « si tu ne peux pas le faire dans Lightroom (remplacer un
+pantalon par une jupe), exporte, fais faire par Fibo 2, importe l'image dans Lightroom et fais le
+reste de la correction par le MCP ». Le seul chemin génératif du Développeur, **seulement sur
+demande**, jamais d'initiative : la description de l'outil, `ServerInfo.instructions` (« Changer un
+objet, un vêtement : generative_edit, sur sa demande. ») et une puce des garde-fous de
+`Consignes.texte` le disent. Ni Photoshop, ni service d'Adobe : Fibo 2 (Bria, modèles
+`briaai/Fibo-2.0-dev` et `briaai/Fibo-2.0-edit-turbo`, licence CC BY-NC, accès à demander sur
+Hugging Face) tourne sur ce Mac par mflux 0.24 (`~/.local/bin/mflux-generate-fibo2-edit`). Les
+taches de Claude restent `patchmatch`.
+
+### L'outil (`Tools+Generatif.swift`)
+
+Arguments : `photo_id` (sans lui, la photo active de `etat`), `instruction` (2 000 caractères au
+plus, en anglais : ce qui change et ce qui reste), `instruction_fr` (exigée : sa traduction pour
+Dany), `region` (facultative pour une seule modification : `{x, y, width, height}` de 0 à 1 dans
+l'image que montre `view_photo`), `label` (nom court), ou à leur place `edits` (1 à 4 modifications ;
+voir Recadrage, plusieurs modifications, deux images, SeedVR2), `context` (`crop` par défaut,
+`full_and_crop`), `upscale` (vrai par défaut : SeedVR2), `quality` (`normal`, par défaut, 50 étapes,
+pleine précision ; `fast`, Turbo, 4 étapes), `seed` (0 à 2³¹ − 1 ; sans elle, une graine au hasard,
+rendue), `confirm`, `reason` ; aucun argument exigé par le schéma (`instruction` ou `edits`). Titre « Retouche générative (Fibo 2) », `destructiveHint` faux (rien
+n'est retiré : une photo s'ajoute), description de moins de 1 200 caractères.
+
+Déroulé :
+
+1. Avant tout envoi : Fibo 2 configuré (`ToolHandler.fibo`, nil par défaut : seul `outils()` de
+   main.swift pose `Fibo()`, pour `serve()` et `--call` ; un ToolHandler neuf, celui des essais,
+   refuse sans rien lancer), l'exécutable (`FileManager.isExecutableFile` ; sinon refus, « uv tool
+   install mflux », rien d'envoyé), puis la commande `etat` : pause, ou « Proposer d'abord » sans
+   `confirm`, refusent avant des minutes de calcul.
+2. `exporter` (la commande d'`export_photos`) : `{format = TIFF, espace = AdobeRGB, profondeur = 16,
+   metadonnees = all, sans_lieu = false}`, sans taille ni filigrane ni réimportation, `confirme` =
+   `confirm`, `etape` « Claude · Fibo 2 » et `raison` (la consigne), vers un dossier neuf
+   `<racine>/Temporaire/Fibo/<uuid>/` (racine : `~/Library/Application Support/Developpeur`),
+   toujours effacé à la fin (`defer`, et à l'arrêt du serveur : `TravailFibo`). Le module crée ce
+   dossier avec ses parents (`Temporaire/Fibo` est vidé au chargement, `Menage.TEMPORAIRES`) et note
+   la photo exportée (`Livraison.exportsFibo`). Une exportation vers `Temporaire/Fibo` n'est pas une
+   livraison (`Livraison.exporter`, `dansFibo`) : « Proposer d'abord » et l'accord dans Lightroom y
+   nomment `generative_edit`, avec l'étape et la consigne dans la fenêtre de la liaison (au nom
+   d'`export_photos`, Claude aurait rappelé une vraie livraison, qui aurait pris l'accord) ; les
+   garde-fous des photos (`verifierProtection`) refusent avant tout calcul ; une photo qui n'était pas
+   exportée est notée `apercuSeulement` (Lightroom vient de faire passer `isExported` à vrai), comme
+   après un aperçu, et le champ n'est pas effacé : `Photos.exportee` reste faux.
+3. L'entrée de Fibo : un PNG sRGB 8 bits d'environ 1 mégapixel (`Generatif.tailleCible` : même
+   proportion, bornée de 1:8 à 8:1, côtés multiples de 16, 256 au moins) ; avec `region`, un masque
+   PNG blanc sur noir à la même taille, la zone élargie de `margeRegion` (3 % du petit côté), écrit en
+   RVB.
+4. mflux par `Process`, sans shell, arguments en tableau (`Generatif.arguments` : `--prompt`,
+   `--image-paths`, `--mask-path`, `--steps 50` ou, pour Turbo, la copie locale du cache Hugging Face
+   par `--model <instantané> --base-model fibo2-edit-turbo` quand elle est complète, sinon `--model
+   fibo2-edit-turbo` ; `--width`, `--height`, `--seed`, `--output`) ; environnement : `PATH` avec
+   `~/.local/bin` et `/opt/homebrew/bin`, `HF_HUB_DISABLE_TELEMETRY=1`, `PYTHONUNBUFFERED=1`, sans
+   `HF_HUB_OFFLINE` (le modèle se télécharge au premier usage). stdin vide ; stdout et stderr dans un
+   tuyau (le stdout du serveur reste au protocole). La barre tqdm (« 12/50 [ », découpée sur \r et
+   \n, `Generatif.Lignes`) donne la progression, envoyée par `avancer` au client et à la barre de
+   Lightroom (lue toutes les 0,25 s). Une annulation (client, croix de la barre :
+   `contexte.verifier()`) ou le délai (`Generatif.delaiMax`, 900 s) arrête mflux (SIGTERM, puis
+   SIGKILL après 3 s) ; rien n'est importé. mflux et le dossier de l'appel sont tenus par
+   `TravailFibo` (`ToolHandler.travailFibo`) : à la fin de l'entrée (Lightroom quitté, module
+   rechargé, Claude Desktop fermé), `serve()` arrête mflux, qui tient plusieurs Go, et efface le
+   dossier, avant que le serveur ne se termine. Une erreur est expliquée (`Generatif.expliquer`) :
+   accès au modèle refusé (`hf auth login` ; reconnu à « 401 Client Error », « 403 Client Error »,
+   « Unauthorized », « Forbidden », « GatedRepo », jamais à « 401 » seul, qu'une barre de
+   téléchargement écrit : « 401M/9.95G »), modèle incomplet (`hf download`), réseau, sinon le code de
+   sortie et les trois dernières lignes. Un appel de plus de 50 s répond « pas fini » par
+   `FileOutils`, comme tout outil : Claude le rappelle avec les mêmes arguments.
+5. Recomposition en pleine résolution (`Generatif.swift`, fonctions pures) : voir ci-dessous.
+6. `importerGeneree` (contrat ci-dessous), puis la réponse : `photo_origine`, `nouvelle_photo`
+   (`id`, `fichier`, `chemin`, `empilee`, `active`, et `essai`, `copie_virtuelle`, `photo_fibo` s'il
+   y en a), `instruction`, `qualite`, `graine`, `duree_s`, `duree_fibo_s`, `part_changee_pct` (part
+   de l'image), `resolution_zone` (la taille de la sortie de Fibo et l'agrandissement), `region`,
+   `sortie_entiere` et `remarque` au besoin, et `a_savoir` (`ToolHandler.aSavoir`) : l'original est
+   intact ; la nouvelle photo, empilée au-dessus de lui (ou, photo d'essai, rangée dans Développeur ›
+   Essais sans pile) et active, ou sa copie virtuelle sous « Copies virtuelles seulement », reçoit
+   les finitions par son id ; `undo_last` ne la retire pas (Photo › Retirer du catalogue, à la main).
+
+### La recomposition
+
+- **Zone changée** (`Generatif.zoneChangee`, à la petite taille) : l'écart entre l'entrée et la
+  sortie de Fibo (le plus grand des trois canaux, après un flou de 3 × 3) au-delà de `seuilEcart`
+  (0,10 sur 1 : le décodage du modèle déplace un peu tous les pixels ; provisoire), les points
+  isolés retirés (un pixel ne compte que si la majorité de son voisinage de 5 × 5 compte), élargie
+  de `elargissement` (2 % du petit côté) puis fondue (`fondu`, 0,5 %, deux flous en boîte) ; coupée
+  par `region` élargie de la marge et fondue, si elle est donnée. Le flou reste de 3 × 3 à toute
+  taille : de 5 × 5 à 1 Mpx (le premier réglage), un trait d'un pixel d'écart 0,47 (un fil retiré)
+  tombait sous le seuil et la recomposition gardait le fil (`GeneratifTests`).
+- **Seuils** : sous `partMinimale` (0,05 % de l'image), Fibo n'a rien changé de visible : refus,
+  rien d'importé (reformuler, changer `seed`).
+- **Zone de mélange** (`Generatif.zoneDeMelange`) : avec `region`, toute la zone donnée, élargie de
+  la marge et fondue (`masqueRegionDoux`) : Fibo n'a travaillé que là, sous son masque, et un
+  changement fin ou peu contrasté que la mesure manquerait y est repris quand même ; la zone changée
+  ne sert alors qu'à mesurer (`part_changee_pct`, refus sous `partMinimale`). Sans `region`, la zone
+  changée, ou, au-delà de `partSortieEntiere` (60 % de l'image), toute la sortie de Fibo, ce que la
+  réponse dit (`sortie_entiere`, `remarque` en part de l'image, `remarqueSortieEntiere` : moins de
+  détail ; redemander avec une `region` sur la seule partie à changer).
+- **Mélange** (`Generatif.recomposer`) : la sortie de Fibo agrandie à la taille du TIFF exporté,
+  mêlée à lui selon la zone lue en bilinéaire ; hors de la zone (0), les pixels du TIFF restent
+  identiques au bit près (`GeneratifTests` le vérifie). La zone changée a donc la résolution de la
+  sortie de Fibo, environ 1 mégapixel, agrandie : moins fine que le reste.
+- **TIFF final** (`Generatif.ecrireTIFF`) : RVB 16 bits dans l'espace du TIFF exporté (Adobe RGB),
+  compression Deflate (`compressionTIFF`, 8, comme les TIFF de Lightroom ; le LZW sans prédicteur
+  grossissait un TIFF 16 bits bruité d'environ 30 %, mesuré par la relecture du 29 octobre 2026),
+  avec le paquet XMP entier du TIFF exporté (`Generatif.lireMetadonnees`,
+  `CGImageDestinationAddImageAndMetadata` : ce qui n'existe qu'en XMP, libellé, texte alternatif,
+  mots-clés hiérarchiques de Lightroom, se perdait par les seules propriétés ; constaté le 29 octobre
+  2026 : avec le paquet XMP, ImageIO ne lit la compression qu'au premier niveau des options) et ses
+  propriétés (Exif, IPTC, GPS, TIFF) ;
+  nommé `<nom du TIFF exporté>-Fibo` (`ToolHandler.nomGenere`, sans doubler « -Fibo » pour une photo
+  déjà faite par Fibo 2). Mémoire du connecteur : environ 0,7 Go en pointe pour 40 Mpx (estimé).
+
+### La commande `importerGeneree` (`Livraison.lua`)
+
+Paramètres `{photo, chemin, nom, consigne, confirme}` (le connecteur joint `reason` à `consigne`
+après « — », pour que la raison aille au journal comme ailleurs). Le module :
+
+- refuse en pause (`verifierPause`) et en « Proposer d'abord » sans `confirme` ; demande l'accord
+  dans Lightroom comme les autres écritures (étape « Claude · Fibo 2 », la consigne pour raison),
+  sauf si la même photo vient d'être exportée vers `Temporaire/Fibo` (`Livraison.exportsFibo`, dans
+  les 3 h, `DUREE_GENEREE` : jusqu'à 4 modifications, Fibo 2 puis SeedVR2, 15 min au plus chacun) :
+  l'accord de l'exportation vaut une fois pour l'importation, qui suit les calculs ; refuse une photo protégée (`verifierProtection` : copies virtuelles
+  seulement, libellé protégé, rejetées), comme toute écriture ;
+- refuse un chemin hors de `<racine>/Temporaire/Fibo/` (`Livraison.dansFibo` : chemin complet, ni
+  « . », ni « .. », ni segment vide), qui n'est pas un `.tif` ou `.tiff`, ou qui manque ;
+- range le fichier dans le dossier de l'original (`masterPhoto` d'une copie virtuelle) ; refus avec
+  la raison habituelle (`Photos.raisonOriginalAbsent`) si l'original ou son dossier manque. Nom :
+  `nom` sans extension, sans `/`, `:`, `\`, caractère de contrôle ni point en tête, 100 caractères au
+  plus (sinon le nom de l'original suivi de « -Fibo »), puis `.tif`, `-2.tif`, `-3.tif`… : jamais
+  d'écrasement ; copie par `LrFileUtils.copy` ;
+- ajoute la copie au catalogue dans une écriture (`Ecriture.ecrire`, « Claude · Fibo 2 ») :
+  `catalog:addPhoto(destination, original, 'above')`, empilée au-dessus de l'original ; pour une
+  photo d'essai (elle ou son original dans « Développeur › Essais »), `addPhoto(destination)` sans
+  pile : le vrai original de Dany n'est pas touché. Si Lightroom
+  refuse, la copie va à la Corbeille (`Fichiers.corbeille`) et rien n'entre au catalogue. La photo
+  ajoutée ne se lit qu'après l'écriture (supposé, comme une collection) : celle que rend `addPhoto`,
+  sinon `findPhotoByPath` ;
+- écrit le journal de Claude de la nouvelle photo, en écriture privée de la mémoire seule
+  (`Ecriture.ecrireMemoire`) : l'entrée « Claude · Fibo 2 : <consigne> » (type `retouche`, `raison`,
+  `origine`), et `retoucheeParClaude`. Aucune étape : `undo_last` ne retire pas la photo ; un échec du
+  journal n'est que noté au journal du module ;
+- note le chemin pour `retirerReimportees` (la recette seule retire du catalogue une photo que le
+  module y a mise dans la session) ;
+- la rend photo active, seule sélectionnée (`Bibliotheque.selectionnerAvecSource`, qui affiche son
+  dossier si la source la cache) ; sous « Copies virtuelles seulement », crée sa copie virtuelle
+  « Claude » (`createVirtualCopies`, dans une écriture, la nouvelle photo seule sélectionnée) et rend
+  la copie active : les finitions se font sur elle, l'original TIFF les refuserait ;
+- range une photo d'essai, et sa copie, dans les mêmes collections Essais, dans une écriture
+  suivante (une photo ajoutée ne se lit pas dans l'écriture qui l'a créée) : le Suivi et le carnet
+  la voient comme une photo d'essai (`Carnet.estPhotoDEssai`) ;
+- efface le fichier temporaire et répond `{id, fichier, chemin, empilee, active}`, plus `essai`
+  (`empilee` faux) et, sous « Copies virtuelles seulement », `copie_virtuelle` (`id` est celui de la
+  copie) et `photo_fibo` (le TIFF importé).
+
+Dans la fenêtre Claude, la photo active qui change pendant que Claude travaille ne fait que
+mettre à jour la photo de la conversation en cours, comme `create_virtual_copy` avec `afficher`.
+
+Essais : `GeneratifTests` (un faux mflux en script shell qui écrit un PNG, dossiers temporaires,
+`ToolHandler.fibo` injecté ; jamais le vrai mflux) et `essais-generatif.lua` (la simulation de la
+liaison imite `catalog:addPhoto` : refusé hors d'une écriture, fichier exigé, position `'above'` ou
+`'below'`, pile notée, photo illisible dans l'écriture qui l'a créée ; `LrFileUtils.moveToTrash` et
+`LrFileUtils.delete` récursif). Ils vérifient aussi, après la relecture du 29 octobre 2026 : l'accord
+d'une exportation vers Fibo demandé au nom de `generative_edit` avec l'étape et la consigne (jamais
+`export_photos`) ; `Photos.exportee` faux après elle ; les trois garde-fous des photos à l'exportation
+et à l'importation ; la copie virtuelle sous « Copies virtuelles seulement » ; la photo d'essai sans
+pile, dans Essais, retirable par la recette ; un ToolHandler sans Fibo 2 qui ne lance rien ; mflux
+arrêté et son dossier effacé à l'arrêt du serveur ; le paquet XMP (libellé, mots-clés hiérarchiques)
+et la compression Deflate du TIFF final ; une barre de téléchargement qui n'est pas un accès refusé ;
+un trait d'un pixel retiré, dans la zone changée ; la zone donnée prise en entier.
+
+### Reste à constater
+
+Dans Lightroom :
+
+- `catalog:addPhoto` avec la pile `'above'` sur l'original, et la place de la photo dans la pile,
+  repliée ou non ;
+- la photo ajoutée illisible dans l'écriture qui l'a créée, et relue juste après ;
+- un chemin déjà au catalogue refusé par `addPhoto` ;
+- `LrFileUtils.copy` sur `/Volumes/Photos`, et sa valeur de retour ;
+- la nouvelle photo rendue active et sélectionnée, y compris quand la source affichée est une
+  collection (Essais) ;
+- `addPhoto` sans pile (photo d'essai), puis la photo ajoutée à la collection Essais dans
+  l'écriture suivante ;
+- sous « Copies virtuelles seulement », `createVirtualCopies` sur la photo importée juste après son
+  ajout, et la copie rendue active ;
+- l'accord dans Lightroom demandé une seule fois (exportation puis importation).
+
+Côté Fibo 2 :
+
+- le masque PNG en RVB (blanc sur noir) lu par `--mask-path` ;
+- le seuil de la zone changée (`seuilEcart`) sur de vraies sorties : Fibo peut décaler un peu les
+  couleurs de toute l'image ;
+- la durée réelle d'une génération, en qualité normale et rapide, et celle du premier
+  téléchargement du modèle ; la progression vue de bout en bout (le faux mflux finit avant la
+  première lecture) ;
+- la mémoire en pointe sur une grande photo.
+
+### Recadrage, plusieurs modifications, deux images, SeedVR2 (29 octobre 2026)
+
+Demandés par Dany le même jour ; la recomposition reste celle d'avant (hors des zones, les pixels
+du TIFF exporté au bit près).
+
+- **Recadrage par zone** : une modification avec `region` envoie à Fibo un recadrage autour d'elle
+  (`Generatif.recadrage`) : la zone agrandie de `margeContexte` (50 % de sa taille) de chaque côté,
+  d'au moins `contexteMin` (35 % du petit côté de la photo), centrée, coupée aux bords sans être
+  déplacée (choix gardé à la relecture : contre un bord, le recadrage reste petit et garde plus
+  souvent sa taille native ; à revoir si Fibo y manque de contexte), jamais plus allongée que 8:1
+  (`rapportMax` : le petit côté grandit dans la photo, plutôt qu'une entrée déformée dans un seul
+  sens) ; au-delà de 1 Mpx, `tailleCible`, chaque côté borné au natif ; en deçà, sa taille native,
+  ramenée aux multiples de 16 par `ajuster16` : resserrée hors de la zone et de son fondu
+  (`etendueMelange`), du côté qui laisse le plus de place ; sinon agrandie jusqu'au multiple suivant
+  dans la photo ; sinon (zone qui touche les deux bords) gardée entière, l'entrée de Fibo au multiple
+  inférieur, à peine réduite : jamais une bande de la zone coupée au bord de la photo, qui laissait
+  une couture (trouvaille de la relecture du 29 octobre 2026). Le masque et la zone de mélange
+  sont dans le repère du recadrage (`regionDansRecadrage`) ; la sortie revient à sa place
+  (`Generatif.Piece`, `recomposer(origine:pieces:)`). Sans zone (une seule modification) : toute la
+  photo, comme avant.
+- **Plusieurs modifications** : `edits`, 1 à 4 `{ label, instruction, instruction_fr, region }`,
+  jamais avec `instruction`, `instruction_fr`, `region` ou `label` ; dès deux, une zone chacune ;
+  deux zones qui ont une aire commune sont refusées avant tout envoi (`chevauchement`), et, après
+  l'exportation (la taille de la photo connue), deux zones dont les zones de mélange se recouvrent
+  (`zonesTropProches` : chaque zone élargie de `etendueMelange`, la marge du masque et le fondu, dans
+  son recadrage) : les pièces se recollent l'une après l'autre, et la seconde effacerait le bord de
+  la première (sa sortie y montre l'ancien contenu). Deux appels, le second sur la nouvelle photo.
+  Une `region` qui n'est pas un objet (un texte JSON, une liste) est refusée, jamais prise pour une
+  absence de zone.
+  Un seul export, un passage de Fibo par modification depuis ce même TIFF (`entree-<n>.png`,
+  `masque-<n>.png`, `sortie-<n>.png`), toutes les zones recollées l'une après l'autre dans le même
+  TIFF, une seule commande `importerGeneree`. Une modification sans changement visible n'est pas
+  reprise (dit par `remarque_zones`) ; aucune : refus, rien d'importé.
+- **Consigne** : `instruction` en anglais, `instruction_fr` exigée ; la consigne du module (accord
+  et journal) est le texte français (`consigneJournal` : « jupe : … ; sac : … — raison »).
+- **Deux images** : `context` = `full_and_crop` (avec une zone seulement) : `--image-paths
+  contexte.png entree-<n>.png` (la photo entière à ~1 Mpx, puis le recadrage), consigne « Edit
+  <image_2> only: … <image_1> shows the whole scene for context (light, colors, style); do not copy
+  it. », sans `--mask-path` (mflux ne le permet qu'avec une image) ; la zone de mélange reste le
+  garde-fou. Sans masque, rien ne garantit que la sortie s'aligne sur le recadrage (reprise de
+  `<image_1>`, sujet cadré autrement) : si plus de `partPourtourMax` (30 %, provisoire) du pourtour
+  de la zone (le recadrage hors de la zone élargie de sa marge et de son fondu) a changé
+  (`partDuPourtourChangee`), la pièce n'est pas reprise (`remarque_alignement`, ou refus si aucune ne
+  l'est).
+- **Qualité** : `--vae-full-precision` en qualité normale ; jamais `--quantize` ni
+  `--step-cache-ratio` ; Turbo seulement avec `quality` = `fast`.
+- **SeedVR2** : `Fibo.seedVR` (`mflux-upscale-seedvr2`, à côté de mflux par défaut : le faux dossier
+  des essais, jamais le vrai). Quand le facteur recadrage / sortie dépasse `seuilSeedVR` (1,25) et que
+  `upscale` est vrai (défaut) : `--model seedvr2-7b --image-path <sortie> --resolution <côté court
+  natif du recadrage> --seed <graine> --output … --vae-tiling`, même environnement, délai et
+  annulation que Fibo (`ToolHandler.executer`) ; absent, en erreur ou hors délai : mise à la taille
+  ordinaire, dite (`remarque_seedvr2`), l'outil réussit. Borné (`Generatif.seedVR`, relecture du
+  29 octobre 2026 : SeedVR2 7B ne découpe en tuiles que son décodeur) : jamais sans zone (il
+  agrandirait toute la photo), un facteur de plus de 1,25 sur les deux côtés, au plus
+  `facteurMaxSeedVR` (4) et `pixelsMaxSeedVR` (16 Mpx) en sortie ; au-delà, mise à la taille
+  ordinaire, dite aussi. Bornes provisoires. La zone changée se mesure sur la sortie de
+  Fibo, avant SeedVR2.
+- **Progression** : une barre de 0 à 100 % (`Generatif.Avancement`, par poids : exportation 3, par
+  modification chargement 10, étapes 70, SeedVR2 15 s'il est prévu, recomposition et importation 5),
+  texte « Fibo 2 : jupe (1 sur 2), 24 % — environ 3 min restantes » (`texteProgression`),
+  « chargement du modèle » avant la première étape, « agrandissement (SeedVR2) » pendant lui ; temps
+  restant (`tempsRestant`) d'après le rythme des étapes faites, rien avant deux étapes, avec le
+  chargement et les étapes des modifications suivantes (SeedVR2 n'y compte pas). La barre ne recule
+  jamais ; une barre de chargement ou de téléchargement (« Fetching », « Loading », « Download » :
+  `estUnChargement`) ne compte ni comme étapes ni comme avancée de SeedVR2, une étape plus petite
+  que la dernière lue fait repartir le rythme, et une barre d'un autre total remplace la fraction de
+  SeedVR2. La croix ne se lit que dans la réponse de la commande `progression` : `BarreFibo` la
+  renvoie au moins toutes les 3 s (`relecture`) même sans changement de texte (chargement du modèle,
+  premier téléchargement, SeedVR2), et une fois de plus juste avant `importerGeneree` (`relire`,
+  après la recomposition et l'écriture du TIFF) ; la croix arrête le processus en cours, rien n'est
+  importé. La barre finit à 100 % une fois la photo importée (`terminer`). Un signal qui termine le
+  serveur (SIGTERM, SIGINT, SIGHUP) arrête aussi mflux et efface le dossier de l'appel
+  (`TravailFibo.arreterAuxSignaux`, posé par `serve()`). La sortie du processus n'a qu'un lecteur,
+  jusqu'à sa fin (2 s au plus après lui) : les dernières lignes d'une erreur restent dans l'ordre.
+- **Réponse** : `modifications`, une par modification : `label`, `instruction`, `instruction_fr`,
+  `reprise`, `part_changee_pct` (de la photo), `region` et `recadrage_px`, `resolution_zone`,
+  `seedvr2` (et `remarque_seedvr2`).
+
+Reste à constater (rien n'a encore tourné avec le vrai mflux ni le vrai SeedVR2 ; les essais passent
+par de faux scripts qui écrivent un PNG) :
+
+- `--image-paths` à deux images et `--vae-full-precision` acceptés par mflux 0.24, et la mémoire
+  du décodage en pleine précision (environ 8,6 Go à 1 Mpx, annoncé) ;
+- le masque PNG en RVB (blanc sur noir) lu par `--mask-path` sur un recadrage ;
+- la durée réelle d'un appel : chargement du modèle, étapes en qualité normale et rapide, une à
+  quatre modifications, et le temps restant annoncé contre le temps vrai ;
+- la qualité du mode à deux images (`full_and_crop`) contre le recadrage seul, sur la même photo et
+  la même consigne (même `seed`) : lumière, couleurs, raccord au bord de la zone ;
+- SeedVR2 7B sur une vraie zone : détail gagné contre la mise à la taille ordinaire, raccord avec le
+  reste de la photo, durée, mémoire et premier téléchargement, et ses bornes (× 4, 16 Mpx) ;
+- la progression de SeedVR2, lue sur ses barres tqdm hors chargement (approximative), et son poids
+  de 15 % dans la barre ;
+- le seuil d'alignement du mode à deux images (`partPourtourMax`) sur de vraies sorties ;
+- la marge de contexte (`margeContexte`, `contexteMin`) sur de vraies photos.
 
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 
