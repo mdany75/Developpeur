@@ -177,31 +177,19 @@ local function verifierPersonnes(plan)
         return
     end
     local liste = pourLightroom(plan.photo:getDevelopSettings().MaskGroupBasedCorrections or {})
+    local nonReconnues, horsCadre = Plans.lirePersonnes(plan, liste)
     local retires, nombre = {}, 0
-    for _, p in ipairs(plan.personnes) do
-        for _, correction in ipairs(liste) do
-            local m = correction.CorrectionID == p.correctionID and type(correction.CorrectionMasks) == 'table'
-                and correction.CorrectionMasks[p.composant]
-            if type(m) == 'table' and m.MaskDigest ~= nil then
-                local nom = tostring(correction.CorrectionName)
-                if not Locaux.numeroPersonne(m) or tonumber(m.MaskSubType) ~= 0 then
-                    if not retires[correction.CorrectionID] then
-                        retires[correction.CorrectionID] = true
-                        nombre = nombre + 1
-                    end
-                    noter(plan, string.format("Masque « %s » retiré : Lightroom n'a pas reconnu la personne %d (sur %d trouvées par Vision) ; "
-                        .. "le faire à la main (Masquage › Personnes).", nom, p.numero, p.trouvees))
-                elseif type(p.cadre) == 'table' then
-                    local px, py = tostring(m.ReferencePoint or ''):match('^(%S+)%s+(%S+)$')
-                    px, py = tonumber(px), tonumber(py)
-                    local c, marge = p.cadre, 0.02
-                    if px and py and not (px >= c.Left - marge and px <= c.Right + marge and py >= c.Top - marge and py <= c.Bottom + marge) then
-                        noter(plan, string.format("Masque « %s » : Lightroom l'a calculé hors du cadre de la personne %d ; vérifier avec view_photo.",
-                            nom, p.numero))
-                    end
-                end
-            end
+    for _, p in ipairs(nonReconnues) do
+        if not retires[p.correctionID] then
+            retires[p.correctionID] = true
+            nombre = nombre + 1
         end
+        noter(plan, string.format("Masque « %s » retiré : Lightroom n'a pas reconnu la personne %d (sur %d trouvées par Vision) ; "
+            .. "le faire à la main (Masquage › Personnes).", p.nom, p.numero, p.trouvees))
+    end
+    for _, p in ipairs(horsCadre) do
+        noter(plan, string.format("Masque « %s » : Lightroom l'a calculé hors du cadre de la personne %d ; vérifier avec view_photo.",
+            p.nom, p.numero))
     end
     if nombre > 0 then
         local reste = {}

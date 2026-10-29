@@ -1283,8 +1283,42 @@ local function preparerCopie(source, photo, params)
     return plan
 end
 
+-- Les personnes précises d'un plan de masques, lues dans les masques calculés (liste : les
+-- MaskGroupBasedCorrections relues après le calcul) : celles que Lightroom n'a pas reconnues (sans
+-- numéro, ou d'un autre sous-type : il retire InstanceIDs et calcule un sous-type 3, constaté le
+-- 18 octobre 2026), et celles qu'il a calculées hors du cadre de Vision. En lecture seule :
+-- Retouche.verifierPersonnes retire ensuite les premières, Rendu.essayer (un rendu témoin) les dit.
+local function lirePersonnes(plan, liste)
+    local nonReconnues, horsCadre = {}, {}
+    if type(plan.personnes) ~= 'table' then
+        return nonReconnues, horsCadre
+    end
+    for _, p in ipairs(plan.personnes) do
+        for _, correction in ipairs(liste or {}) do
+            local m = correction.CorrectionID == p.correctionID and type(correction.CorrectionMasks) == 'table'
+                and correction.CorrectionMasks[p.composant]
+            if type(m) == 'table' and m.MaskDigest ~= nil then
+                local nom = tostring(correction.CorrectionName)
+                if not Locaux.numeroPersonne(m) or tonumber(m.MaskSubType) ~= 0 then
+                    nonReconnues[#nonReconnues + 1] = { correctionID = correction.CorrectionID, nom = nom,
+                        numero = p.numero, trouvees = p.trouvees }
+                elseif type(p.cadre) == 'table' then
+                    local px, py = tostring(m.ReferencePoint or ''):match('^(%S+)%s+(%S+)$')
+                    px, py = tonumber(px), tonumber(py)
+                    local c, marge = p.cadre, 0.02
+                    if px and py and not (px >= c.Left - marge and px <= c.Right + marge and py >= c.Top - marge and py <= c.Bottom + marge) then
+                        horsCadre[#horsCadre + 1] = { nom = nom, numero = p.numero }
+                    end
+                end
+            end
+        end
+    end
+    return nonReconnues, horsCadre
+end
+
 Plans.aDesChangements = aDesChangements
 Plans.cadreARecadrer = cadreARecadrer
+Plans.lirePersonnes = lirePersonnes
 Plans.masquesParPreset = masquesParPreset
 Plans.presetMasques = presetMasques
 Plans.noter = noter

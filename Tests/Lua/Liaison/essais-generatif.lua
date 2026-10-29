@@ -302,13 +302,14 @@ test("Ménage : Temporaire/Fibo s'efface au chargement du module", function()
     egal(S.fichiers[FIBO .. '/A1B2C3'], nil)
 end)
 
-test("Consignes de la fenêtre : generative_edit, seulement sur demande, après les corrections de base, consigne en anglais traduite, plusieurs changements, la couleur par un masque ; le texte sous 7 500", function()
+test("Consignes de la fenêtre : generative_edit, seulement sur demande, après les corrections de base, consigne en anglais traduite, plusieurs changements, l'arrière-plan par mask, la couleur par un masque ; le texte sous 7 500", function()
     local texte = Consignes.texte
     egal(texte:find("generative_edit (Fibo 2, local), seulement sur sa demande", 1, true) ~= nil, true)
     egal(texte:find("puis les finitions sur la nouvelle photo, qui devient la photo active", 1, true) ~= nil, true)
     egal(texte:find("en anglais, sa traduction montrée à Dany (instruction_fr)", 1, true) ~= nil, true)
     egal(texte:find("plusieurs changements en un appel", 1, true) ~= nil, true)
     egal(texte:find("la couleur d'un objet se change dans Lightroom par un masque, pas par generative_edit", 1, true) ~= nil, true)
+    egal(texte:find("l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region", 1, true) ~= nil, true)
     local Texte = require 'Texte'
     egal(Texte.longueur(texte) <= 7500, true, "plafond des consignes : " .. Texte.longueur(texte))
     for _, mot in ipairs({ 'photoshop', 'firefly', 'agrandissement' }) do
@@ -427,6 +428,65 @@ test("Photo d'essai : la nouvelle photo va dans « Développeur › Essais », s
     -- La recette la retire du catalogue par son chemin (retirerReimportees).
     local retrait = Commandes.executer('retirerReimportees', { chemins = { r.chemin } })
     egal(retrait.retires[1], r.chemin)
+end)
+
+test("essayer avec temoin (masque de Lightroom de generative_edit, carte d'add_mask) : aucun accord demandé, rien de gardé ; taille 0 rend en pleine résolution", function()
+    local photo = A.photoFuji()
+    S.active, S.selection = photo, { photo }
+    S.prefs.mode = 'proposer'
+    S.prefs.accordDansLightroom = true
+    -- Un accord donné dans Lightroom (celui qu'attend l'exportation qui suit) n'est pas effacé.
+    Liaison.repondreProposition(true)
+    local accord = Liaison.accord
+    local function masqueTemoin()
+        return Json.tableau({ { type = 'ia', soustype = 0, categorie = 22, inverser = false, nom = 'Claude · masque pour Fibo 2', quantite = 1,
+            locaux = { LocalExposure2012 = -0.5, LocalBlacks2012 = 0.3, LocalTemperature = -0.4 } } })
+    end
+    local r = Commandes.executer('essayer', { action = 'masquer', masques = masqueTemoin(), etape = 'masque pour Fibo 2',
+        taille = 0, comparer = true, temoin = true, photo = 4 })
+    egal(Liaison.propositionEnAttente, nil, "aucun accord demandé pour un rendu témoin")
+    egal(Liaison.accord, accord, "l'accord donné reste")
+    egal(r.chemin ~= nil and r.chemin_actuel ~= nil, true, "l'état actuel et le témoin")
+    egal(#S.rendus, 2)
+    for _, rendu in ipairs(S.rendus) do
+        egal(rendu.exportSettings.LR_size_doConstrain, false, "taille 0 : pleine résolution, sans borne")
+    end
+    egal(S.rendus[2].reglagesRendus.MaskGroupBasedCorrections[1].CorrectionName, 'Claude · masque pour Fibo 2')
+    egal(photo.reglages.MaskGroupBasedCorrections and #photo.reglages.MaskGroupBasedCorrections or 0, 0, "rien n'est gardé dans la photo")
+    egal(photo.proprietes.journalClaude, nil, "rien au journal")
+    -- Sans temoin, la proposition attend l'accord, comme avant.
+    Commandes.executer('essayer', { action = 'masquer', masques = masqueTemoin(), etape = 'ciel', taille = 800, photo = 4 })
+    egal(Liaison.propositionEnAttente and Liaison.propositionEnAttente.outil, 'add_mask', "une proposition ordinaire demande l'accord")
+    egal(S.rendus[3].exportSettings.LR_size_doConstrain, true)
+end)
+
+test("essayer avec temoin : une personne précise que Lightroom n'a pas reconnue est dite (personnes_non_reconnues), rien de retiré ni de gardé", function()
+    local photo = A.photoFuji()
+    photo.personnes = { { Left = 0.2, Right = 0.38, Top = 0.28, Bottom = 1 }, { Left = 0.35, Right = 0.46, Top = 0.34, Bottom = 1 },
+        { Left = 0.45, Right = 0.57, Top = 0.35, Bottom = 1 } }
+    S.active, S.selection = photo, { photo }
+    local cadres = Json.tableau({ { Left = 0.21, Right = 0.37, Top = 0.29, Bottom = 0.99 }, { Left = 0.36, Right = 0.45, Top = 0.33, Bottom = 0.98 },
+        { Left = 0.46, Right = 0.56, Top = 0.36, Bottom = 0.99 } })
+    local function temoin(lesCadres)
+        return Json.tableau({ { type = 'personne', numero = 2, cadres = lesCadres, inverser = false, nom = 'Claude · masque pour Fibo 2',
+            quantite = 1, locaux = { LocalExposure2012 = -0.5, LocalTemperature = -0.4 } } })
+    end
+    -- Un seul cadre : Lightroom ne reconnaît pas la personne (constaté le 18 octobre 2026).
+    local r = Commandes.executer('essayer', { action = 'masquer', masques = temoin(Json.tableau({ cadres[2] })), etape = 'masque pour Fibo 2',
+        taille = 0, comparer = true, temoin = true, photo = 4 })
+    egal(type(r.personnes_non_reconnues), 'table', "la personne non reconnue est dite")
+    egal(#r.personnes_non_reconnues, 1)
+    egal(r.personnes_non_reconnues[1].numero, 2)
+    egal(r.personnes_non_reconnues[1].trouvees, 1)
+    egal(A.contient(r.remarques, "n'a pas reconnu la personne 2"), true)
+    egal(photo.reglages.MaskGroupBasedCorrections and #photo.reglages.MaskGroupBasedCorrections or 0, 0, "rien n'est gardé dans la photo")
+    -- Avec les cadres de toutes les personnes : reconnue, rien à dire.
+    r = Commandes.executer('essayer', { action = 'masquer', masques = temoin(cadres), etape = 'masque pour Fibo 2',
+        taille = 0, comparer = true, temoin = true, photo = 4 })
+    egal(r.personnes_non_reconnues, nil)
+    -- Sans temoin (une proposition ordinaire d'add_mask), rien n'est dit ici : add_mask le vérifie à l'écriture.
+    r = Commandes.executer('essayer', { action = 'masquer', masques = temoin(Json.tableau({ cadres[2] })), etape = 'personne', taille = 800, photo = 4 })
+    egal(r.personnes_non_reconnues, nil)
 end)
 
 A.bilan()

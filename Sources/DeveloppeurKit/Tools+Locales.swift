@@ -112,15 +112,12 @@ extension ToolHandler {
     static let maxSpots = 60
     static let maxRedEyes = 10
 
-    var localDefinitions: [JSONValue] {
-        var adjustments: [String: JSONValue] = [:]
-        for item in Self.localAdjustments {
-            adjustments[item.name] = prop("number", "\(item.label.prefix(1).uppercased() + item.label.dropFirst()) (\(Self.format(item.range.lowerBound)) à \(Self.format(item.range.upperBound)))")
-        }
+    /// Ce qui décrit une zone, pour un masque comme pour un composant combiné (add_mask), et pour le
+    /// masque de Lightroom de generative_edit (mask).
+    var proprietesZone: [String: JSONValue] {
         let personParts = Self.aiMasks.keys.filter { $0.hasPrefix("person_part/") }.map { String($0.dropFirst(12)) }.sorted()
         let landscapeParts = Self.aiMasks.keys.filter { $0.hasPrefix("landscape/") }.map { String($0.dropFirst(10)) }.sorted()
-        // Ce qui décrit une zone, pour un masque comme pour un composant combiné.
-        let area: [String: JSONValue] = [
+        return [
             "kind": enumProp(Self.maskKinds,
                              "subject, sky, background, person_part, landscape : masques IA calculés par Lightroom ; person : une personne précise (ou l'une de ses parties, avec part), désignée par person ou person_at ; person_part : les parties de toutes les personnes ; object : sélection d'objet par IA, d'après box (son cadre) ou strokes passés sur l'objet ; linear : dégradé linéaire ; radial : dégradé radial ; luminance : plage de luminance ; color : plage de couleurs, d'après samples (couleurs prélevées dans l'image) ; depth : plage de profondeur (photo Portrait d'un iPhone, qui porte une carte de profondeur) ; brush : pinceau, le long de strokes (éclaircir et assombrir à la main)."),
             "part": enumProp(personParts + landscapeParts, "Pour person et person_part : \(personParts.joined(separator: ", ")) (sans part, person prend la personne entière). Pour landscape : \(landscapeParts.joined(separator: ", "))."),
@@ -162,12 +159,25 @@ extension ToolHandler {
             ], required: ["x", "y", "width", "height"]),
             "auto_mask": prop("boolean", "Pinceau : masquage automatique (le trait s'arrête aux contours ; défaut false)."),
         ]
-        var componentProperties = area
+    }
+
+    /// Un composant combiné au premier (combine), tel qu'add_mask et generative_edit le décrivent.
+    var proprieteComposant: JSONValue {
+        var componentProperties = proprietesZone
         componentProperties["mode"] = enumProp(Self.combineModes.map(\.name),
                                                "add : ajouter cette zone au masque ; subtract : la retirer ; intersect : ne garder que ce qui est aussi dans cette zone.")
         componentProperties["invert"] = prop("boolean", "true = inverser ce composant avant de le combiner (subtract d'une zone inversée = intersect).")
-        let component = objectProp("Un composant combiné au masque : une zone, décrite comme un masque, sans réglages.", componentProperties,
-                                   required: ["mode", "kind"])
+        return objectProp("Un composant combiné au masque : une zone, décrite comme un masque, sans réglages.", componentProperties,
+                          required: ["mode", "kind"])
+    }
+
+    var localDefinitions: [JSONValue] {
+        var adjustments: [String: JSONValue] = [:]
+        for item in Self.localAdjustments {
+            adjustments[item.name] = prop("number", "\(item.label.prefix(1).uppercased() + item.label.dropFirst()) (\(Self.format(item.range.lowerBound)) à \(Self.format(item.range.upperBound)))")
+        }
+        let area = proprietesZone
+        let component = proprieteComposant
         var maskProperties = area
         maskProperties["invert"] = prop("boolean", "true = inverser le masque (par exemple tout sauf le sujet ; pour un dégradé radial, l'extérieur). Avec combine, seulement le premier composant (kind).")
         maskProperties["amount"] = prop("number", "Intensité du masque, de 0 à 100 (défaut 100).")
@@ -366,6 +376,8 @@ extension ToolHandler {
             essai["etape"] = "carte du masque"
             essai["taille"] = .number(Double(Self.previewSizes.lowerBound))
             essai["comparer"] = .bool(actuel == nil)
+            // Un rendu témoin : rien n'est gardé, aucun accord à demander dans Lightroom.
+            essai["temoin"] = true
             do {
                 let reponse = try lightroom.send("essayer", essai, timeout: 240)
                 if actuel == nil {
@@ -476,8 +488,14 @@ extension ToolHandler {
         guard ids.count <= 1, args.bool("selection") != true else {
             throw LightroomError.invalid("Une plage de couleurs se prélève sur une seule photo : donner un seul photo_ids (ou la photo active).")
         }
+        return try prelever(masks, photo: ids.first)
+    }
+
+    /// Les couleurs prélevées et les cadres des personnes d'une photo (la photo active sans `photo`),
+    /// pour add_mask comme pour le masque de Lightroom de generative_edit.
+    func prelever(_ masks: [JSONValue], photo: Int?) throws -> [JSONValue] {
         var params: [String: JSONValue] = ["taille": .number(Double(Detail.side)), "cles": []]
-        if let id = ids.first { params["photo"] = .number(Double(id)) }
+        if let id = photo { params["photo"] = .number(Double(id)) }
         let apercu = try lightroom.send("apercu", params, timeout: 120)
         guard let image = PreviewImages.image(try Self.readPreview(apercu["chemin"]?.string)) else {
             throw LightroomError.plugin("Aperçu illisible : couleur ou personnes impossibles à relever.")
@@ -631,15 +649,44 @@ extension ToolHandler {
             name = given
         }
         result["nom"] = .string("Claude · " + String(name.prefix(40)))
-        if let combine = mask["combine"], !combine.isNull {
-            guard let list = combine.array, (1...Self.maxCombined).contains(list.count) else {
-                throw LightroomError.invalid("« \(path).combine » : de 1 à \(Self.maxCombined) composants.")
-            }
-            result["composants"] = .array(try list.enumerated().map { try combinedParameter($1, path: "\(path).combine[\($0)]") })
-        }
+        if let composants = try composantsParameter(mask, path: path) { result["composants"] = composants }
         // Garde-fou de la peau (Peau.swift) : add_mask seul passe ici, avant tout envoi au module.
         try Peau.verifier(mask, locaux: locals, quantite: result["quantite"]?.double ?? 1, chemin: path)
         return .object(result)
+    }
+
+    /// Les composants combinés au premier (combine), s'il y en a : de 1 à `maxCombined`.
+    func composantsParameter(_ mask: [String: JSONValue], path: String) throws -> JSONValue? {
+        guard let combine = mask["combine"], !combine.isNull else { return nil }
+        guard let list = combine.array, (1...Self.maxCombined).contains(list.count) else {
+            throw LightroomError.invalid("« \(path).combine » : de 1 à \(Self.maxCombined) composants.")
+        }
+        return .array(try list.enumerated().map { try combinedParameter($1, path: "\(path).combine[\($0)]") })
+    }
+
+    /// Les clés d'une zone seule (le masque de Lightroom de generative_edit) : ce qui la désigne, comme
+    /// un masque d'add_mask, avec invert et combine ; jamais un effet ni un réglage.
+    var clesZone: Set<String> { Set(proprietesZone.keys).union(["invert", "combine"]) }
+
+    /// Une zone seule, telle que l'attend le module (sa forme, son inversion, ses composants), sans
+    /// réglage local ni nom : la validation et la construction d'add_mask (areaParameter,
+    /// composantsParameter), sans effet, intensité ni garde-fou de la peau, qui ne la concernent pas.
+    /// Une clé d'effet ou de réglage (effect, adjustments, amount…) est refusée comme inconnue.
+    func zoneParameter(_ value: JSONValue, path: String) throws -> (zone: [String: JSONValue], nom: String) {
+        guard let mask = value.object else {
+            throw LightroomError.invalid("« \(path) » : un objet { kind, … } qui désigne la zone, comme un masque d'add_mask (sans effet ni réglage). Rien n'a été fait.")
+        }
+        let inconnues = mask.keys.filter { !clesZone.contains($0) }.sorted()
+        guard inconnues.isEmpty else {
+            throw LightroomError.invalid("« \(path) » : la zone seulement (kind, part, person, invert, combine… comme un masque d'add_mask), sans effet ni réglage : pas \(inconnues.joined(separator: ", ")). Rien n'a été fait.")
+        }
+        guard let kind = mask["kind"]?.string else {
+            throw LightroomError.invalid("« \(path).kind » : \(Self.maskKinds.joined(separator: ", ")). Rien n'a été fait.")
+        }
+        var (result, name) = try areaParameter(mask, kind: kind, path: path)
+        result["inverser"] = .bool(mask["invert"]?.bool ?? false)
+        if let composants = try composantsParameter(mask, path: path) { result["composants"] = composants }
+        return (result, name)
     }
 
     /// Un composant combiné au premier : sa zone, son mode et son inversion.

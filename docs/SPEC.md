@@ -173,7 +173,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `retoucher` | `photo?`, `taches`, `yeux`, `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
 | `geometrie` | `photo?`, `photos?` ou `selection?`, `rendre?`, `taille?` | `photos` : par photo, `active` (correction géométrique), `transformation` (Upright, perspective ou distorsion manuelle), `empreinte` ; avec `rendre`, `chemin_corrige` et `chemin_origine` (voir Recalage de la géométrie) |
 | `copier` | `source`, `photos?` ou `selection?`, `cles`, `inclure`, `etape`, `raison?`, `confirme` | comme `appliquer`, sans la photo source |
-| `essayer` | `action` (`appliquer`, `masquer`, `retoucher`), `photo?`, `taille`, `comparer?`, `instantane?`, `entier?`, et les paramètres de l'action | `chemin` (et `chemin_actuel`), `changements`, `remarques` ; avec `instantane`, l'état proposé est rangé en instantané « Claude · <nom> » avant le rendu (`instantane` dans la réponse) ; la photo est remise comme avant. De la 1.3 à la 1.3.5, `exercice` (« Je le fais ») et `sans_rendu` : retirés au correctif 1.3.6 (voir Je le fais). `entier`, avec un recadrage proposé (action `appliquer`, cadre non retiré) : `cadre_propose` (le cadre que Lightroom a gardé, relu), `dimensions` et `chemin_entier` (troisième étape « Claude · essai : image entière ») ; sans image entière, la remarque « Image entière non rendue : … » (voir Composition lue) |
+| `essayer` | `action` (`appliquer`, `masquer`, `retoucher`), `photo?`, `taille` (0 : pleine résolution), `comparer?`, `instantane?`, `entier?`, `temoin?` (un rendu témoin : carte de `mask_map`, masque de Lightroom de `generative_edit` ; aucun accord demandé), et les paramètres de l'action | `chemin` (et `chemin_actuel`), `changements`, `remarques` ; avec `instantane`, l'état proposé est rangé en instantané « Claude · <nom> » avant le rendu (`instantane` dans la réponse) ; la photo est remise comme avant. De la 1.3 à la 1.3.5, `exercice` (« Je le fais ») et `sans_rendu` : retirés au correctif 1.3.6 (voir Je le fais). `entier`, avec un recadrage proposé (action `appliquer`, cadre non retiré) : `cadre_propose` (le cadre que Lightroom a gardé, relu), `dimensions` et `chemin_entier` (troisième étape « Claude · essai : image entière ») ; sans image entière, la remarque « Image entière non rendue : … » (voir Composition lue) |
 | `presets` | `filtre?`, `limite` | `total`, `presets` (dossier, nom, UUID) |
 | `creerPreset` | `nom`, `photo?`, `cles`, `inclure` | `reglages` de la photo, dont le serveur fait un fichier XMP |
 | `journal` | `photos?` ou `selection?` | par photo : `entrees` (date, étape, raison, changements ou note ; `etape_id` depuis la 1.3) ; de la 1.3 à la 1.3.5, `detaille` (pour `photo_lesson`) y ajoutait la photo décrite en entier et `prise_de_vue_plus` : retiré au correctif 1.3.6 (voir Leçon de la photo) |
@@ -8206,6 +8206,123 @@ Reste à constater (les essais passent par de faux scripts qui écrivent un PNG)
   de 15 % dans la barre ;
 - la marge de contexte (`margeContexte`, `contexteMin`) sur d'autres photos (une zone contre un
   bord, une zone allongée).
+
+### Masque de Lightroom (`mask`, 29 octobre 2026)
+
+Demandé par Dany le soir du 29 octobre 2026 (« je constate souvent des erreurs quand je te demande
+de changer un arrière-plan dans Fibo 2 ; pourrais-tu faire un masque par Lightroom et l'envoyer dans
+Fibo 2 ») : sur une vraie demande, avec un rectangle (`region`) pour un arrière-plan, Fibo a gardé un
+panneau bleu et un grand « R » de l'ancien fond. mflux grise déjà lui-même la zone blanche du masque
+(`fibo2_edit_images.py`, `grey_out`, masque binarisé à 128, comme à l'entraînement) : le connecteur
+ne la remplit pas ; le gain est un masque précis.
+
+- **L'argument** : `mask`, une seule modification (instruction, instruction_fr, mask), la zone comme
+  un masque d'add_mask (`kind` : background, sky, subject, person avec son numéro ou `person_at`,
+  person_part, landscape, object, et les autres ; `invert` ; `combine`), sans effet ni réglage
+  (`effect`, `adjustments`, `amount`, `name`… refusés). Refusé avec `region` (l'un ou l'autre), avec
+  `edits` et dans un élément d'`edits` ; « Rien n'a été fait ». La validation et la construction
+  sont celles d'add_mask (`ToolHandler.zoneParameter` : `areaParameter`, `composantsParameter`,
+  communs avec `maskParameter` ; `proprietesZone` et `proprieteComposant` pour le schéma), sans
+  `Peau.verifier` ; les couleurs prélevées et les cadres des personnes de Vision par
+  `prelever(_:photo:)`, les positions recalées par `recalages`, comme add_mask.
+  Un masque affiné (`refine`) demande Lightroom Classic 15.5 (`verifierVersion`, avant tout envoi,
+  comme add_mask).
+- **Le masque, après l'exportation** (trouvaille de la relecture du même soir : lu avant, en
+  « Proposer d'abord » avec l'accord dans Lightroom, ses rendus en pleine taille se faisaient avant
+  que l'exportation demande l'accord, se perdaient, puis se refaisaient au rappel, entre l'accord
+  donné et l'exportation qui devait le consommer). L'accord se demande donc à l'exportation, avant
+  tout rendu du masque ; un refus du masque vient après une exportation, effacée avec le dossier de
+  l'appel. Deux commandes `essayer`, action `masquer`, l'une après l'autre, avec un masque témoin
+  (`Generatif.masqueTemoin` ; `quantite` 1 ; nom « Claude · masque pour Fibo 2 »), `taille` 0
+  (pleine résolution : `rendre(photo, 0)`, sans borne de taille) et `temoin` : la première avec le
+  témoin sombre (`temoinSombre` : LocalExposure2012 −0,5, −2 IL, qui change aussi les blancs brûlés ;
+  LocalTemperature −0,4) et `comparer` (`chemin_actuel` et `chemin`), la seconde avec le témoin
+  clair (`temoinClair` : LocalExposure2012 +0,375, +1,5 IL, comme `CarteMasque.temoin` ;
+  LocalBlacks2012 +0,3, qui change le noir pur ; LocalTemperature −0,4). Aucun témoin ne mêle deux
+  réglages de sens contraire : le premier témoin (−2 IL et noirs +30 ensemble) laissait une plage de
+  tons sombres où les deux s'annulaient, sous le seuil (trouvaille de la relecture). Avec `temoin`,
+  `Rendu.essayer` ne demande aucun accord dans Lightroom (une demande effacerait celui qu'attend la
+  commande suivante ; les cartes de `mask_map` l'envoient aussi), et, pour des masques, dit les
+  personnes précises que Lightroom n'a pas reconnues (`personnes_non_reconnues` { `numero`,
+  `trouvees`, `masque` } et une remarque : `Plans.lirePersonnes`, en lecture seule, la lecture que
+  `Retouche.verifierPersonnes` reprend pour retirer le masque) ; le connecteur refuse alors dès le
+  premier rendu (« Lightroom n'a pas reconnu la personne 2 (sur 3 trouvées par Vision)… Rien n'a été
+  fait. »). Les remarques du module (le recalage) vont dans la réponse, une fois, sans celle d'une
+  clé sans valeur d'avant. Rien n'est gardé dans les réglages de la photo (`essayer` la remet), mais
+  chaque `essayer` laisse deux étapes « Claude · essai » dans l'Historique, quatre en tout. La barre
+  dit « masque de Lightroom (rendu en pleine taille) », dans la phase de l'exportation.
+- **Le masque binaire** (`Generatif.masqueDesRendus`, pur sauf le décodage) : un pixel est dans le
+  masque si un canal s'écarte d'au moins `seuilMasque` (6, celui de `CarteMasque.seuilEcart`) entre
+  l'état actuel et l'un des deux témoins (`ajouterAuMasque`, l'union) ; les JPEG décodés au dessin,
+  sans cache, l'un après l'autre. Puis `nettoyer` : les îlots (composantes de 1), puis les trous
+  (composantes de 0), en 8-connexité, de moins de `aireNettoyage` pixels (un carré du grand côté
+  divisé par `grilleNettoyage`, 512 : 13 px de côté, 169 px, pour 6 240 px) changent de valeur ;
+  tout le reste garde ses pixels. Chaque composante n'est suivie que jusqu'à cette aire, ou jusqu'à
+  une composante déjà jugée grande (temps borné, un octet par pixel). Un trait fin mais long (une
+  mèche, une sangle, le jour entre le bras et le corps) est une grande composante : gardé au pixel.
+  Le premier nettoyage, par blocs de 13 px et majorité 3 × 3, effaçait tout trait d'environ un bloc
+  de large (trouvaille de la relecture : un jour de 15 px entre le bras et le corps passait de
+  9 000 pixels à 0, et l'ancien fond y restait). Refus (`refusMasque`, avant tout calcul de Fibo 2)
+  si moins de `partMasqueMin` (0,01 % : environ 2 600 px à 26 Mpx) de la photo est dans le masque
+  (« Le masque de Lightroom ne couvre presque rien… ou le sujet est minuscule ») ou hors de lui
+  (« … couvre toute la photo : inversé, ou Lightroom n'a trouvé aucun sujet ? Pour un sujet
+  minuscule, donner region… ») : un petit sujet (un oiseau de 0,4 % du cadre, son arrière-plan à
+  99,6 %) passe, ce que la borne de 99,5 % refusait. Des rendus d'une autre taille que le TIFF
+  exporté : le masque y est remis au plus proche voisin (`redimensionner`), relu et revérifié.
+- **Recadrage et entrée de Fibo** : le cadre englobant du masque (`cadreDuMasque`) tient lieu de
+  `region` pour `Generatif.recadrage` (un arrière-plan donne d'ordinaire toute la photo). Le masque
+  donné à Fibo (`masquePourFibo`) : la part couverte de chaque pixel de l'entrée (les pixels de la
+  photo qu'il couvre dans le recadrage), blanc à la moitié ou plus, puis élargi de `margeMasque`
+  (1 % du petit côté de l'entrée, environ 10 px à 1 Mpx) pour que Fibo redessine aussi le bord.
+- **Zone de mélange en pleine résolution** (`zoneDuMasque`) : le masque binaire du recadrage, fondu
+  de `fonduMasque` (0,15 % du petit côté de la photo, au moins 2 px : 6 px pour 4 160 px), sans
+  élargissement ; deux flous en boîte en place aux sommes entières (`sommeBoiteEnPlace`, un anneau
+  de lignes pour le passage vertical) : hors du masque et du fondu, la zone vaut exactement 0, et
+  la photo garde ses pixels au bit près. La pièce (`Generatif.Piece`) a la taille du recadrage
+  (`largeurZone` = `cadre.largeur`). La zone changée (`zoneChangee`, avec `borne` : le masque donné
+  à Fibo) et le refus sous `partMinimale` restent, mesurés dans le masque. Mémoire : le masque
+  binaire (1 octet par pixel, 26 Mo à 26 Mpx) est gardé pendant le calcul de Fibo, la zone en Float
+  (104 Mo) n'est faite qu'après.
+- **SeedVR2** : un masque compte comme une zone (`avecRegion`), mêmes règles et bornes que `region`
+  par son cadre (un arrière-plan de toute la photo dépasse d'ordinaire × 4 : mise à la taille
+  ordinaire, dite). Sa remarque (`seedVR` avec `avecMasque`) dit que c'est attendu pour un
+  arrière-plan ou un ciel entier et ne conseille jamais region, qui ne suivrait pas le bord du sujet
+  (trouvaille de la relecture : la remarque d'une region poussait Claude vers le rectangle).
+- **La réponse** : `masque` { `kind` (« person_part/hair »…), `nom`, `inverse`,
+  `part_de_la_photo_pct`, `cadre` (de 0 à 1), `calcule_par` « Lightroom », `lecture`, et les
+  `remarques` du module s'il y en a } ; la modification n'a pas de `region`, mais son
+  `recadrage_px`. Journal et consigne inchangés.
+- **Essais** : `GeneratifTests` (le faux module rend en PNG, sans perte, l'état actuel avec un noir
+  pur et un blanc pur dans l'arrière-plan, et le témoin sombre ou clair, différent dans une zone
+  connue : de bout en bout, `exporter` puis les deux `essayer`, à taille 0, avec `temoin`, `comparer`
+  le premier seulement, le noir pur et le blanc pur du fond repeints (l'union), la personne au bit
+  près jusqu'à 3 px de son bord même là où Fibo a tout repeint ; masque vide ou total refusé sans
+  calcul de Fibo ; l'accord de l'exportation avant tout rendu du masque ; une personne précise
+  (aperçu de Vision, recalages, cadres de toutes les personnes ; non reconnue, refusée dès le premier
+  rendu) ; un radial recalé et les remarques du module ; `refine` refusé avant 15.5 ; la remarque de
+  SeedVR2 d'un masque trop étendu ; rendus d'une autre taille ; refus avec region, dans edits, avec
+  un effet ; masque binaire et union des deux témoins, nettoyage (points et petits trous retirés,
+  vrai trou, jour entre le bras et le corps, sangle et mèche gardés), refus d'un petit sujet évité,
+  redimension, masque de Fibo élargi, zone fondue, flou en place ; et un masque de 26 Mpx en temps
+  borné), `CarteMasqueTests` (les cartes de `mask_map` envoient `temoin`), `essais-generatif.lua`
+  (essayer avec `temoin` : aucun accord, l'accord donné reste, taille 0 sans borne ; une personne
+  non reconnue dite, rien de gardé).
+
+Durées mesurées sur 26 Mpx (6 240 × 4 160, un disque de 1 500 px de rayon et 20 000 points de
+bruit), le 29 octobre 2026, par `testMasqueDeVingtSixMegapixelsEnTempsBorne`, compilé pour le
+débogage (`swift test`) : masque binaire des deux témoins 3,4 s, nettoyage 5,3 s, masque de Fibo
+2,0 s, zone de mélange 17 s ; le premier relevé en release (`swift test -c release -Xswiftc
+-enable-testing`, avant le second témoin et le nettoyage par composantes) donnait 0,22 s en tout.
+Le test ne borne strictement la durée (30 s) que compilé pour la publication ; en débogage, 240 s
+(la machine virtuelle des tests GitHub est plusieurs fois plus lente que le Mac Studio). Ni le
+décodage des JPEG pleine taille ni la recomposition ne sont dans ces chiffres.
+
+Reste à constater dans Lightroom : les deux rendus pleine taille d'`essayer` sur 26 Mpx (leur durée,
+leurs JPEG, le calcul du masque IA avant chacun), leur alignement au pixel avec le TIFF exporté
+(même cadre, même taille), les deux témoins sur un noir pur, un fond très sombre et un blanc brûlé,
+le seuil de 6 sur un masque IA au bord doux (cheveux), une personne non reconnue
+(`personnes_non_reconnues`), et les seuils provisoires (`grilleNettoyage`, `margeMasque`,
+`fonduMasque`, `partMasqueMin`) sur de vrais arrière-plans changés.
 
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 

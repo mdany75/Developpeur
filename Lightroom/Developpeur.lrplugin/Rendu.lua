@@ -538,7 +538,10 @@ end
 -- cadre (troisième étape « Claude · essai : image entière »), et le cadre que Lightroom a gardé
 -- (cadre_propose), même si cette image ne se rend pas. essayer n'est pas une étape : Etapes.lua
 -- n'en garde pas d'avant/après. (L'exercice « Je le fais », exercice et sans_rendu, est retiré au
--- correctif 1.3.6.)
+-- correctif 1.3.6.) Avec temoin (un rendu témoin du connecteur : la carte d'un masque, le masque de
+-- Lightroom de generative_edit), aucun accord n'est demandé ; taille 0 rend en pleine résolution ; et,
+-- pour des masques, les personnes précises que Lightroom n'a pas reconnues sont dites
+-- (personnes_non_reconnues, comme Retouche.verifierPersonnes, sans rien retirer : rien n'est gardé).
 function Rendu.essayer(params)
     verifierPause(params)
     local prefs = Preferences.lire()
@@ -564,7 +567,7 @@ function Rendu.essayer(params)
     local entier = params.entier == true and params.action ~= 'masquer' and params.action ~= 'retoucher'
         and type(params.recadrage) == 'table' and params.recadrage.retirer ~= true
     local cadrePropose, dimensionsEntiere, cheminEntier, cadreRetire
-    local cheminActuel
+    local cheminActuel, personnesNonReconnues
     if params.comparer then
         cheminActuel = rendre(photo, taille)
     end
@@ -584,6 +587,20 @@ function Rendu.essayer(params)
         -- dans l'état de la proposition, sans mémoire pour la défaire.
         local ok, resultat = LrTasks.pcall(function()
             calculerIA({ plan })
+            -- Un rendu témoin d'un masque : une personne précise que Lightroom n'a pas reconnue est
+            -- dite (le connecteur refuse alors le masque de Fibo 2), en lecture seule.
+            if params.temoin == true and params.action == 'masquer' and type(plan.personnes) == 'table' and #plan.personnes > 0 then
+                local liste = pourLightroom(photo:getDevelopSettings().MaskGroupBasedCorrections or {})
+                local nonReconnues = Plans.lirePersonnes(plan, liste)
+                if #nonReconnues > 0 then
+                    personnesNonReconnues = {}
+                    for _, p in ipairs(nonReconnues) do
+                        personnesNonReconnues[#personnesNonReconnues + 1] = { numero = p.numero, trouvees = p.trouvees, masque = p.nom }
+                        noter(plan, string.format("Lightroom n'a pas reconnu la personne %d (sur %d trouvées par Vision) dans le masque « %s ».",
+                            p.numero, p.trouvees, p.nom))
+                    end
+                end
+            end
             -- Un profil qui ne tient pas : ses autres orthographes, puis la remarque ; le rendu montre
             -- ce que Lightroom a gardé.
             local voulu = plan.profilVoulu
@@ -647,7 +664,10 @@ function Rendu.essayer(params)
     end
     Liaison.noter("Proposition montrée à Claude : " .. etape, photo.localIdentifier)
     -- Accord véritable : l'utilisateur répond dans la fenêtre de la liaison (Accepter ou Refuser).
-    if prefs.mode == 'proposer' and prefs.accordDansLightroom and not params.instantane then
+    -- Jamais pour un rendu témoin (temoin : la carte d'un masque d'add_mask, le masque de Lightroom
+    -- de generative_edit) : rien n'en est gardé ni proposé, et une demande d'accord effacerait celui
+    -- qu'attend la commande suivante.
+    if prefs.mode == 'proposer' and prefs.accordDansLightroom and not params.instantane and params.temoin ~= true then
         local lignes = {}
         for i, changement in ipairs(plan.changements) do
             if i <= 6 then
@@ -672,6 +692,7 @@ function Rendu.essayer(params)
         chemin_entier = cheminEntier,
         cadre_propose = cadrePropose,
         dimensions = dimensionsEntiere,
+        personnes_non_reconnues = personnesNonReconnues,
     }
     return reponse
 end

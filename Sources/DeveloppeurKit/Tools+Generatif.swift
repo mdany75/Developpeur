@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import ImageIO
 
 /// Fibo 2 sur ce Mac : l'exécutable de mflux, celui de SeedVR2 (la zone remise à sa taille), le
 /// cache de Hugging Face (le modèle Turbo local) et la racine des fichiers de travail du Développeur,
@@ -201,15 +202,22 @@ extension ToolHandler {
         let instruction = prop("string", "En anglais, précise : ce qui change et ce qui doit rester (pose, lumière, reste du corps) ; « replace the trousers with a knee-length navy skirt, keep the pose, the light and everything else unchanged ».")
         let francais = prop("string", "Exigée : la traduction française de instruction, montrée à l'utilisateur et gardée au journal.")
         let label = prop("string", "Nom court en français de la modification (« jupe »), pour la barre de progression et la réponse.")
+        var zone = proprietesZone
+        zone["invert"] = prop("boolean", "true = inverser le masque (tout sauf le sujet, par exemple).")
+        zone["combine"] = ["type": "array", "items": proprieteComposant, "minItems": 1, "maxItems": .number(Double(Self.maxCombined)),
+                           "description": "D'autres zones ajoutées, soustraites ou intersectées, comme combine d'add_mask."]
+        let masque = objectProp("Changer l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region. La zone comme un masque d'add_mask (kind : background, sky, subject, person avec son numéro, person_part, landscape… ; invert ; combine), sans effet ni réglage. Lightroom le calcule en pleine résolution ; Fibo 2 redessine ce qu'il couvre, le reste garde ses pixels. Une seule modification, sans region ni edits.",
+                                zone, required: ["kind"])
         return [
             tool("generative_edit",
-                 "Retouche générative par Fibo 2, sur ce Mac : seulement sur demande explicite de l'utilisateur, jamais d'initiative, pour ce que Lightroom ne sait pas faire (changer un vêtement, ajouter, retirer ou changer un objet ; la seule couleur d'un objet : add_mask). Ordre : d'abord les corrections de base sur la photo d'origine (profil, balance, exposition), puis generative_edit, puis les finitions (apply_settings, add_mask…) sur la nouvelle photo, par son id. instruction : en anglais, précise (ce qui change et ce qui reste : pose, lumière, reste du corps) ; instruction_fr : sa traduction, pour l'utilisateur ; region : la zone, la plus juste possible (Fibo 2 travaille sur un recadrage autour d'elle ; le reste garde ses pixels). Plusieurs changements : edits (4 au plus, une region chacune, sans chevauchement), un seul appel, une seule nouvelle photo. Le résultat entre au catalogue en TIFF, empilé au-dessus de l'original (intact), et devient la photo active ; undo_last ne le retire pas. Quelques minutes par modification (« pas fini » : rappeler avec les mêmes arguments). Vérifier ensuite avec view_photo. Mode « Proposer d'abord » : décrire, attendre l'accord, puis confirm = true.",
+                 "Retouche générative par Fibo 2, sur ce Mac : seulement sur demande explicite de l'utilisateur, jamais d'initiative, pour ce que Lightroom ne sait pas faire (changer un vêtement, ajouter, retirer ou changer un objet ; la seule couleur d'un objet : add_mask). D'abord les corrections de base (profil, balance, exposition), puis generative_edit, puis les finitions (apply_settings, add_mask…) sur la nouvelle photo, par son id. instruction : en anglais, précise (ce qui change et ce qui reste : pose, lumière, reste du corps) ; instruction_fr : sa traduction, pour l'utilisateur ; region : la zone, au plus juste (Fibo 2 travaille sur un recadrage autour d'elle ; le reste garde ses pixels). Changer l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region. Plusieurs changements : edits (4 au plus, une region chacune, sans chevauchement), une seule nouvelle photo. Le résultat entre au catalogue en TIFF, empilé sur l'original (intact), devient la photo active ; undo_last ne le retire pas. Quelques minutes par modification (« pas fini » : rappeler à l'identique). Vérifier avec view_photo. Mode « Proposer d'abord » : décrire, attendre l'accord, puis confirm = true.",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("instruction", instruction),
                     ("instruction_fr", francais),
                     ("region", region),
                     ("label", label),
+                    ("mask", masque),
                     ("edits", ["type": "array", "minItems": 1, "maxItems": .number(Double(Generatif.maxModifications)),
                                "description": "Plusieurs modifications en un appel (à la place de instruction, instruction_fr, region) : chacune avec sa region, sans chevauchement ; deux zones qui se touchent ou presque : deux appels, le second sur la nouvelle photo.",
                                "items": objectProp("Une modification.", ["label": label, "instruction": instruction, "instruction_fr": francais, "region": region],
@@ -246,6 +254,25 @@ extension ToolHandler {
         var sortieEntiere = false
         var seedVRFait = false
         var remarqueSeedVR: String?
+        /// La zone est le masque de Lightroom (mask), son cadre englobant tenant lieu de region.
+        var avecMasque = false
+        /// Une zone donnée : region, ou le masque de Lightroom.
+        var avecZone: Bool { modif.region != nil || avecMasque }
+    }
+
+    /// Le masque de Lightroom d'un appel (mask), lu après l'exportation : sa zone telle que le module
+    /// la reçoit, sa description pour la réponse, puis le masque binaire en pleine résolution.
+    private struct MasqueLightroom {
+        var zone: [String: JSONValue]
+        var kind: String
+        var nom: String
+        var inverse: Bool
+        var masque: [UInt8] = []
+        var largeur = 0
+        var hauteur = 0
+        var part = 0.0
+        var cadre: CGRect?
+        var remarques: [JSONValue] = []
     }
 
     private func retoucheGenerative(_ args: Arguments) throws -> JSONValue {
@@ -256,6 +283,13 @@ extension ToolHandler {
             throw LightroomError.invalid("Fibo 2 n'est pas configuré dans ce serveur : rien n'a été fait.")
         }
         let modifications = try Generatif.modifications(args.raw)
+        // Le masque de Lightroom (mask) : validé ici, avant tout envoi, comme un masque d'add_mask.
+        var masqueLR: MasqueLightroom?
+        if let brut = args.raw["mask"], !brut.isNull {
+            let (zone, nom) = try zoneParameter(brut, path: "mask")
+            let kind = [brut["kind"]?.string, brut["part"]?.string].compactMap { $0 }.joined(separator: "/")
+            masqueLR = MasqueLightroom(zone: zone, kind: kind, nom: nom, inverse: zone["inverser"]?.bool ?? false)
+        }
         let qualiteTexte = args.string("quality") ?? "normal"
         guard let qualite = Generatif.Qualite(rawValue: qualiteTexte) else { throw LightroomError.invalid("« quality » : normal ou fast.") }
         let agrandir = args.bool("upscale") ?? true
@@ -291,6 +325,11 @@ extension ToolHandler {
         }
         guard let photo = args.int("photo_id") ?? etat["photo_active"]?["id"]?.int else {
             throw LightroomError.invalid("Aucune photo active : donner photo_id.")
+        }
+        // Un masque affiné (refine) : Lightroom Classic 15.5 au moins, comme add_mask, avant tout envoi.
+        if let masque = masqueLR, Self.affine(.object(masque.zone)) {
+            versionLightroom = etat["lightroom"]?.string ?? versionLightroom
+            try verifierVersion([("refine", "15.5")])
         }
 
         let dossier = fibo.dossierTemporaire.appendingPathComponent(UUID().uuidString)
@@ -344,11 +383,32 @@ extension ToolHandler {
             throw LightroomError.invalid("Les zones de « \(modifications[a].label) » et de « \(modifications[b].label) » se touchent ou sont trop proches : leurs bords fondus se recouvriraient, et la seconde effacerait le bord de la première. Les faire en deux appels successifs (le second sur la nouvelle photo, par son id). Rien n'a été importé.")
         }
 
+        // Le masque de Lightroom (mask), après l'exportation : en « Proposer d'abord » avec l'accord dans
+        // Lightroom, l'accord se demande à l'exportation, avant ces rendus en pleine taille (rendus
+        // avant, ils se perdaient et se refaisaient au rappel). Un masque vide, total, ou une personne
+        // que Lightroom n'a pas reconnue est refusé avant tout calcul de Fibo 2. Puis le masque à la
+        // taille du TIFF exporté (il l'a d'ordinaire déjà : même état, même cadre) ; son cadre
+        // englobant tient lieu de region pour le recadrage.
+        if var masque = masqueLR {
+            barre.montrer(.export, "masque de Lightroom (rendu en pleine taille)", rang: nil, detail: nil)
+            try lireMasque(&masque, photo: photo)
+            try contexte.verifier()
+            if masque.largeur != origine.width || masque.hauteur != origine.height {
+                masque.masque = Generatif.redimensionner(masque.masque, largeur: masque.largeur, hauteur: masque.hauteur,
+                                                         versLargeur: origine.width, versHauteur: origine.height)
+                masque.largeur = origine.width
+                masque.hauteur = origine.height
+                (masque.part, masque.cadre) = Generatif.cadreDuMasque(masque.masque, largeur: masque.largeur, hauteur: masque.hauteur)
+                if let refus = Generatif.refusMasque(part: masque.part) { throw LightroomError.invalid(refus) }
+            }
+            masqueLR = masque
+        }
+
         // 2. Le recadrage et la taille de l'entrée de chaque modification ; SeedVR2 prévu ou non.
         let seedVRPresent = FileManager.default.isExecutableFile(atPath: fibo.seedVR.path)
         var passages: [Passage] = modifications.map { modif in
             let cadre: Generatif.Pixels, taille: (largeur: Int, hauteur: Int), regionCadre: CGRect?
-            if let region = modif.region {
+            if let region = modif.region ?? masqueLR?.cadre {
                 (cadre, taille) = Generatif.recadrage(region, largeur: origine.width, hauteur: origine.height)
                 regionCadre = Generatif.regionDansRecadrage(region, cadre: cadre, largeur: origine.width, hauteur: origine.height)
             } else {
@@ -356,8 +416,10 @@ extension ToolHandler {
                 taille = Generatif.tailleCible(largeur: origine.width, hauteur: origine.height)
                 regionCadre = nil
             }
-            let prevu = seedVRPresent && Generatif.seedVR(cadre: cadre, taille: taille, avecRegion: modif.region != nil, demande: agrandir).lancer
-            return Passage(modif: modif, cadre: cadre, regionCadre: regionCadre, taille: taille, seedVRPrevu: prevu)
+            let avecZone = modif.region != nil || masqueLR != nil
+            let prevu = seedVRPresent && Generatif.seedVR(cadre: cadre, taille: taille, avecRegion: avecZone, demande: agrandir,
+                                                          avecMasque: masqueLR != nil).lancer
+            return Passage(modif: modif, cadre: cadre, regionCadre: regionCadre, taille: taille, seedVRPrevu: prevu, avecMasque: masqueLR != nil)
         }
         barre.avancement = Generatif.Avancement(seedVR: passages.map(\.seedVRPrevu))
 
@@ -368,15 +430,24 @@ extension ToolHandler {
         for rang in passages.indices {
             var passage = passages[rang]
             let n = rang + 1, taille = passage.taille
-            guard let entree = Generatif.entree(origine, cadre: passage.modif.region == nil ? nil : passage.cadre, taille: taille),
+            guard let entree = Generatif.entree(origine, cadre: passage.avecZone ? passage.cadre : nil, taille: taille),
                   let imageEntree = Generatif.image8(entree, largeur: taille.largeur, hauteur: taille.hauteur) else {
                 throw LightroomError.plugin("Entrée de Fibo 2 impossible à préparer. Rien n'a été fait.")
             }
             let cheminEntree = dossier.appendingPathComponent("entree-\(n).png")
             try Generatif.ecrirePNG(imageEntree, vers: cheminEntree)
             var cheminMasque: URL?
+            // Avec un masque de Lightroom, la zone de mesure (la zone changée n'est cherchée que là) :
+            // le masque donné à Fibo, élargi.
+            var borne: [Float]?
             if let regionCadre = passage.regionCadre {
-                let masque = Generatif.masqueRegion(regionCadre, largeur: taille.largeur, hauteur: taille.hauteur)
+                let masque: [UInt8]
+                if passage.avecMasque, let lr = masqueLR {
+                    masque = Generatif.masquePourFibo(lr.masque, largeurPhoto: lr.largeur, cadre: passage.cadre, taille: taille)
+                    borne = masque.map { Float($0) / 255 }
+                } else {
+                    masque = Generatif.masqueRegion(regionCadre, largeur: taille.largeur, hauteur: taille.hauteur)
+                }
                 guard let image = Generatif.imageMasque(masque, largeur: taille.largeur, hauteur: taille.hauteur) else {
                     throw LightroomError.plugin("Masque de Fibo 2 impossible à préparer. Rien n'a été fait.")
                 }
@@ -427,16 +498,27 @@ extension ToolHandler {
             try contexte.verifier()
 
             // La zone changée (dans le repère du recadrage), et la zone de mélange.
-            let changee = Generatif.zoneChangee(entree: entree, sortie: sortie, largeur: taille.largeur, hauteur: taille.hauteur, region: passage.regionCadre)
+            let changee = Generatif.zoneChangee(entree: entree, sortie: sortie, largeur: taille.largeur, hauteur: taille.hauteur,
+                                                region: passage.regionCadre, borne: borne)
             let partCadre = Generatif.part(changee)
             passage.partChangee = partCadre * Double(passage.cadre.largeur * passage.cadre.hauteur) / Double(origine.width * origine.height)
             if partCadre >= Generatif.partMinimale {
-                let (zone, entiere) = Generatif.zoneDeMelange(changee: changee, region: passage.regionCadre, largeur: taille.largeur, hauteur: taille.hauteur)
-                passage.sortieEntiere = entiere
+                // La zone de mélange : avec un masque de Lightroom, le masque lui-même en pleine
+                // résolution, fondu de quelques pixels (hors de lui, la photo garde ses pixels).
+                var zone: [Float], largeurZone = taille.largeur, hauteurZone = taille.hauteur
+                if passage.avecMasque, let lr = masqueLR {
+                    zone = Generatif.zoneDuMasque(lr.masque, largeurPhoto: lr.largeur, hauteurPhoto: lr.hauteur, cadre: passage.cadre)
+                    (largeurZone, hauteurZone) = (passage.cadre.largeur, passage.cadre.hauteur)
+                } else {
+                    let (melange, entiere) = Generatif.zoneDeMelange(changee: changee, region: passage.regionCadre, largeur: taille.largeur, hauteur: taille.hauteur)
+                    zone = melange
+                    passage.sortieEntiere = entiere
+                }
                 var image = generee
                 // SeedVR2 : la sortie remise à la taille native de son recadrage (côté court), sinon
                 // mise à la taille ordinaire, dite dans la réponse.
-                let decision = Generatif.seedVR(cadre: passage.cadre, taille: taille, avecRegion: passage.modif.region != nil, demande: agrandir)
+                let decision = Generatif.seedVR(cadre: passage.cadre, taille: taille, avecRegion: passage.avecZone, demande: agrandir,
+                                                avecMasque: passage.avecMasque)
                 if !decision.lancer {
                     passage.remarqueSeedVR = decision.raison
                 } else {
@@ -449,7 +531,7 @@ extension ToolHandler {
                         passage.remarqueSeedVR = remarque
                     }
                 }
-                passage.piece = Generatif.Piece(generee: image, zone: zone, largeurZone: taille.largeur, hauteurZone: taille.hauteur, cadre: passage.cadre)
+                passage.piece = Generatif.Piece(generee: image, zone: zone, largeurZone: largeurZone, hauteurZone: hauteurZone, cadre: passage.cadre)
             }
             passages[rang] = passage
         }
@@ -457,7 +539,8 @@ extension ToolHandler {
         // 4. La recomposition en pleine résolution, toutes les zones dans le même TIFF.
         let pieces = passages.compactMap(\.piece)
         guard !pieces.isEmpty else {
-            let dans = modifications.count > 1 ? " dans aucune des zones" : (modifications[0].region == nil ? "" : " dans la zone")
+            let dans = modifications.count > 1 ? " dans aucune des zones"
+                : (masqueLR != nil ? " dans le masque" : (modifications[0].region == nil ? "" : " dans la zone"))
             throw LightroomError.plugin("Fibo 2 n'a rien changé de visible\(dans) : rien n'a été importé. Reformuler l'instruction (plus précise, en anglais), ou changer seed.")
         }
         barre.montrer(.fin, "recomposition et importation", rang: nil, detail: nil)
@@ -521,6 +604,7 @@ extension ToolHandler {
             "duree_fibo_s": .number(dureeFibo.rounded()),
             "a_savoir": .string(Self.aSavoir(importee, id: nouvelle)),
         ]
+        if let masque = masqueLR { resultat["masque"] = Self.decrire(masque) }
         if let remarque = barre.lightroomMuet { resultat["remarque_lightroom"] = .string(remarque) }
         let sansChangement = passages.filter { $0.piece == nil }.map(\.modif.label)
         if !sansChangement.isEmpty {
@@ -548,10 +632,12 @@ extension ToolHandler {
         ]
         if let region = passage.modif.region {
             objet["region"] = ["x": .number(region.minX), "y": .number(region.minY), "width": .number(region.width), "height": .number(region.height)]
+        }
+        if passage.avecZone {
             objet["recadrage_px"] = ["x": .number(Double(c.x)), "y": .number(Double(c.y)), "width": .number(Double(c.largeur)), "height": .number(Double(c.hauteur))]
         }
         let facteur = Generatif.facteur(cadre: c, taille: t)
-        let quoi = passage.modif.region == nil ? "La zone changée vient de la sortie de Fibo 2, \(t.largeur) × \(t.hauteur) px, pour toute la photo, \(c.largeur) × \(c.hauteur) px"
+        let quoi = !passage.avecZone ? "La zone changée vient de la sortie de Fibo 2, \(t.largeur) × \(t.hauteur) px, pour toute la photo, \(c.largeur) × \(c.hauteur) px"
             : "La zone vient de la sortie de Fibo 2, \(t.largeur) × \(t.hauteur) px, pour un recadrage de \(c.largeur) × \(c.hauteur) px de la photo"
         let comment: String
         if facteur <= 1.0001 {
@@ -564,6 +650,92 @@ extension ToolHandler {
         objet["resolution_zone"] = .string(quoi + comment)
         if let remarque = passage.remarqueSeedVR { objet["remarque_seedvr2"] = .string(remarque) }
         if passage.piece == nil { objet["remarque"] = .string("Fibo 2 n'a rien changé de visible ici : rien n'en est repris.") }
+        return .object(objet)
+    }
+
+    /// Le masque de Lightroom en pleine résolution : deux rendus témoins (commande essayer, action
+    /// masquer, `temoin` : rien n'est gardé dans les réglages de la photo, aucun accord demandé ; deux
+    /// étapes « Claude · essai » chacun dans l'Historique), le sombre puis le clair
+    /// (`Generatif.temoinsMasque`), comparés à l'état actuel rendu par la première commande, à taille 0
+    /// (pleine résolution, comme le TIFF exporté) ; l'union de leurs écarts, nettoyée, puis refusée si
+    /// elle est presque vide ou presque totale. Une personne précise que Lightroom n'a pas reconnue
+    /// est refusée dès le premier rendu. Les couleurs prélevées, les cadres des personnes (Vision) et
+    /// les recalages, comme add_mask ; les remarques du module sont gardées pour la réponse.
+    private func lireMasque(_ masque: inout MasqueLightroom, photo: Int) throws {
+        var zones = [JSONValue.object(masque.zone)]
+        if zones.contains(where: Self.aDesCouleurs) || zones.contains(where: Self.aDesPersonnes) {
+            zones = try prelever(zones, photo: photo)
+        }
+        var base: [String: JSONValue] = [
+            "photo": .number(Double(photo)),
+            "action": "masquer",
+            "libelles": DevelopCatalogue.labels(for: ["MaskGroupBasedCorrections"]),
+            "etape": "masque pour Fibo 2",
+            "taille": 0,
+            "temoin": true,
+        ]
+        if zones.contains(where: Self.positionne) {
+            let (grilles, remarques) = recalages(["photo": .number(Double(photo))])
+            base["recalages"] = grilles
+            masque.remarques += remarques
+        }
+        // Décodées au dessin (sans cache) : les rendus de 26 Mpx ne tiennent ainsi qu'une fois en mémoire.
+        func image(_ donnees: Data) -> CGImage? {
+            CGImageSourceCreateWithData(donnees as CFData, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, [kCGImageSourceShouldCache: false] as CFDictionary) }
+        }
+        var donneesActuel: Data?
+        var donneesTemoins: [Data] = []
+        for (rang, locaux) in Generatif.temoinsMasque.enumerated() {
+            var params = base
+            params["masques"] = .array(zones.map { Generatif.masqueTemoin($0.object ?? [:], locaux: locaux) })
+            params["comparer"] = .bool(rang == 0)
+            let reponse = try lightroom.send("essayer", params, timeout: Self.delaiMasque)
+            // Les rendus sont lus (et effacés) avant tout refus.
+            if rang == 0 { donneesActuel = try? Self.readPreview(reponse["chemin_actuel"]?.string) }
+            if let donnees = try? Self.readPreview(reponse["chemin"]?.string) { donneesTemoins.append(donnees) }
+            for remarque in reponse["remarques"]?.array ?? [] where !masque.remarques.contains(remarque) {
+                // Le masque témoin n'est pas gardé : la remarque d'une clé sans valeur d'avant ne le concerne pas.
+                if remarque.string?.hasSuffix("il garde celle de la proposition.") == true { continue }
+                masque.remarques.append(remarque)
+            }
+            if let personnes = reponse["personnes_non_reconnues"]?.array, let premiere = personnes.first {
+                let numero = premiere["numero"]?.int.map(String.init) ?? "?"
+                let trouvees = premiere["trouvees"]?.int.map { " (sur \($0) trouvées par Vision)" } ?? ""
+                throw LightroomError.invalid("Lightroom n'a pas reconnu la personne \(numero)\(trouvees) : son masque désignerait autre chose. Le vérifier avec add_mask et mask_map, ou prendre une autre personne, subject, ou region. Rien n'a été fait.")
+            }
+        }
+        guard let donneesActuel, let actuel = image(donneesActuel), donneesTemoins.count == Generatif.temoinsMasque.count else {
+            throw LightroomError.plugin("Le masque de Lightroom n'a pas pu se lire (rendus absents, illisibles ou de tailles différentes). Rien n'a été fait.")
+        }
+        let temoins = donneesTemoins.compactMap(image)
+        guard temoins.count == donneesTemoins.count, let lu = Generatif.masqueDesRendus(actuel: actuel, temoins: temoins) else {
+            throw LightroomError.plugin("Le masque de Lightroom n'a pas pu se lire (rendus absents, illisibles ou de tailles différentes). Rien n'a été fait.")
+        }
+        (masque.masque, masque.largeur, masque.hauteur) = lu
+        (masque.part, masque.cadre) = Generatif.cadreDuMasque(lu.masque, largeur: lu.largeur, hauteur: lu.hauteur)
+        if let refus = Generatif.refusMasque(part: masque.part) { throw LightroomError.invalid(refus) }
+    }
+
+    /// Délai de la commande essayer du masque : deux rendus en pleine résolution (et le calcul du
+    /// masque IA).
+    static let delaiMasque: TimeInterval = 300
+
+    /// Le masque de Lightroom dans la réponse : ce qu'il désigne, la part de la photo qu'il couvre, son
+    /// cadre, et comment il a servi.
+    private static func decrire(_ masque: MasqueLightroom) -> JSONValue {
+        var objet: [String: JSONValue] = [
+            "kind": .string(masque.kind),
+            "nom": .string(masque.nom),
+            "inverse": .bool(masque.inverse),
+            "part_de_la_photo_pct": .number((masque.part * 1000).rounded() / 10),
+            "calcule_par": "Lightroom",
+            "lecture": .string("Le masque a été calculé par Lightroom, lu sur deux rendus témoins en pleine résolution (rien n'est gardé dans les réglages de la photo) ; Fibo 2 a redessiné ce qu'il couvre, élargi d'un peu pour le bord, et seul le masque revient dans la photo, fondu de quelques pixels : hors de lui, la photo garde ses pixels."),
+        ]
+        if let cadre = masque.cadre {
+            func r(_ v: CGFloat) -> JSONValue { .number((Double(v) * 1000).rounded() / 1000) }
+            objet["cadre"] = ["x": r(cadre.minX), "y": r(cadre.minY), "width": r(cadre.width), "height": r(cadre.height)]
+        }
+        if !masque.remarques.isEmpty { objet["remarques"] = .array(masque.remarques) }
         return .object(objet)
     }
 

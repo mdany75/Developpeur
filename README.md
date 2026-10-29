@@ -665,6 +665,22 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   sa taille dans la photo ; seule la zone est reprise de sa sortie (un détail fin comme un fil
   retiré n'y est pas perdu), et le reste de la photo garde ses pixels. La couleur d'un objet seul se
   change dans Lightroom, par un masque, sans Fibo 2.
+- **Changer l'arrière-plan, le ciel, une personne** (« mets-la devant un fond de studio gris ») :
+  Claude ne désigne plus un rectangle, mais demande à Lightroom le masque de ce qui doit changer
+  (arrière-plan, ciel, sujet, une personne précise, une partie d'elle, un élément du paysage…,
+  inversé ou combiné comme un masque de la retouche locale). Lightroom le calcule en pleine
+  résolution, sur deux rendus d'essai (un plus sombre, un plus clair, pour que les noirs purs et
+  les blancs brûlés du fond y soient aussi) : rien n'est gardé dans les réglages de la photo, mais
+  quatre étapes « Claude · essai » restent dans son Historique. Fibo 2 reçoit ce masque
+  (un peu élargi, pour qu'il redessine aussi le bord) et redessine ce qu'il couvre ; seul le masque
+  revient dans la photo, fondu de quelques pixels : le reste (la personne devant un nouveau fond,
+  par exemple) garde ses pixels exacts. Un rectangle laissait à Fibo 2 des morceaux de l'ancien
+  fond (un panneau, une lettre) et le laissait parfois toucher à la personne. Les traits fins du
+  masque (une mèche, le jour entre le bras et le corps) sont gardés. Un masque où Lightroom ne
+  trouve rien, qui couvre toute la photo, ou une personne qu'il n'a pas reconnue est refusé avant
+  tout calcul de Fibo 2 (en « Proposer d'abord », l'accord se donne avant ces rendus) ; la réponse
+  de Claude dit la part de la photo que le masque couvrait. Un seul changement par demande avec un
+  masque.
 - **Plusieurs changements à la fois** (jusqu'à 4, « une jupe et un sac bleu ») : un seul appel, une
   zone chacun, un passage de Fibo 2 par changement, toutes les zones recollées dans le même TIFF,
   donc une seule nouvelle photo. Deux zones qui se chevauchent, se touchent ou presque (leurs bords

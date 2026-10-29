@@ -125,6 +125,15 @@ public enum Generatif {
     /// modification, chaque zone est exigée, et deux zones ne se chevauchent pas.
     static func modifications(_ raw: [String: JSONValue]) throws -> [Modification] {
         let simples = ["instruction", "instruction_fr", "region", "label"].filter { raw[$0].map { !$0.isNull } ?? false }
+        // Un masque de Lightroom (mask) : une seule modification, sans region (l'un ou l'autre).
+        if let masque = raw["mask"], !masque.isNull {
+            if let edits = raw["edits"], !edits.isNull {
+                throw LightroomError.invalid("« mask » et « edits » ensemble : un masque de Lightroom vaut pour une seule modification (instruction, instruction_fr, mask) ; les autres changements dans un second appel, sur la nouvelle photo. Rien n'a été fait.")
+            }
+            if let region = raw["region"], !region.isNull {
+                throw LightroomError.invalid("« mask » et « region » ensemble : l'un ou l'autre (mask, un masque calculé par Lightroom : l'arrière-plan, le ciel, une personne ; region, un rectangle). Rien n'a été fait.")
+            }
+        }
         var liste: [Modification] = []
         if let edits = raw["edits"], !edits.isNull {
             guard simples.isEmpty else {
@@ -136,6 +145,9 @@ public enum Generatif {
             for (rang, element) in elements.enumerated() {
                 guard let objet = element.object else {
                     throw LightroomError.invalid("« edits » : chaque modification est un objet { label, instruction, instruction_fr, region }. Rien n'a été fait.")
+                }
+                if objet["mask"] != nil {
+                    throw LightroomError.invalid("« edits » : pas de mask dans une liste de modifications ; un masque de Lightroom vaut pour une seule modification par appel (instruction, instruction_fr, mask). Rien n'a été fait.")
                 }
                 let inconnues = objet.keys.filter { !["label", "instruction", "instruction_fr", "region"].contains($0) }.sorted()
                 guard inconnues.isEmpty else {
@@ -364,7 +376,10 @@ public enum Generatif {
     /// avec une zone donnée (sans elle, il agrandirait toute la photo), si la sortie de Fibo doit être
     /// agrandie de plus de `seuilSeedVR` sur ses deux côtés, au plus `facteurMaxSeedVR` fois, vers
     /// `pixelsMaxSeedVR` au plus.
-    static func seedVR(cadre: Pixels, taille: (largeur: Int, hauteur: Int), avecRegion: Bool, demande: Bool) -> (lancer: Bool, raison: String?) {
+    /// Avec un masque de Lightroom (`avecMasque`), une zone trop grande le dit sans conseiller region :
+    /// un arrière-plan ou un ciel entier dépasse d'ordinaire ce que SeedVR2 agrandit, et region ne
+    /// suivrait pas le bord du sujet.
+    static func seedVR(cadre: Pixels, taille: (largeur: Int, hauteur: Int), avecRegion: Bool, demande: Bool, avecMasque: Bool = false) -> (lancer: Bool, raison: String?) {
         let fx = Double(cadre.largeur) / Double(max(1, taille.largeur)), fy = Double(cadre.hauteur) / Double(max(1, taille.hauteur))
         guard demande, min(fx, fy) > seuilSeedVR else { return (false, nil) }
         guard avecRegion else {
@@ -372,6 +387,9 @@ public enum Generatif {
         }
         let pixels = cadre.largeur * cadre.hauteur
         guard max(fx, fy) <= facteurMaxSeedVR, pixels <= pixelsMaxSeedVR else {
+            if avecMasque {
+                return (false, "Masque trop étendu pour SeedVR2 (× \(ToolHandler.nombre(max(fx, fy))), \(ToolHandler.nombre(Double(pixels) / 1_000_000)) Mpx ; × \(Int(facteurMaxSeedVR)) et \(pixelsMaxSeedVR / 1_000_000) Mpx au plus) : mise à la taille ordinaire, moins de détail dans ce qu'il couvre. C'est attendu pour un arrière-plan ou un ciel entier ; le masque garde le bord du sujet.")
+            }
             return (false, "Zone trop grande pour SeedVR2 (× \(ToolHandler.nombre(max(fx, fy))), \(ToolHandler.nombre(Double(pixels) / 1_000_000)) Mpx ; × \(Int(facteurMaxSeedVR)) et \(pixelsMaxSeedVR / 1_000_000) Mpx au plus) : mise à la taille ordinaire, moins de détail. Une region plus juste en garde davantage.")
         }
         return (true, nil)
@@ -561,7 +579,7 @@ public enum Generatif {
     /// élargi puis fondu ; coupée par la zone donnée (élargie de la marge, fondue), s'il y en a une.
     /// Avec une zone donnée, elle ne sert qu'à mesurer ce qui a changé : la recomposition prend la
     /// zone entière (`zoneDeMelange`).
-    static func zoneChangee(entree: [UInt8], sortie: [UInt8], largeur: Int, hauteur: Int, region: CGRect?) -> [Float] {
+    static func zoneChangee(entree: [UInt8], sortie: [UInt8], largeur: Int, hauteur: Int, region: CGRect?, borne: [Float]? = nil) -> [Float] {
         let n = largeur * hauteur
         guard n > 0, entree.count >= n * 4, sortie.count >= n * 4 else { return [] }
         var ecart = [Float](repeating: 0, count: n)
@@ -580,7 +598,9 @@ public enum Generatif {
             .map { $0 > 0.0001 ? Float(1) : 0 }
         let rayonFondu = max(1, Int(petit * fondu))
         var zone = flouBoite(flouBoite(elargi, largeur: largeur, hauteur: hauteur, rayon: rayonFondu), largeur: largeur, hauteur: hauteur, rayon: rayonFondu)
-        if let region {
+        if let borne, borne.count == n {
+            for i in 0..<n { zone[i] *= borne[i] }
+        } else if let region {
             let borne = masqueRegionDoux(region, largeur: largeur, hauteur: hauteur)
             for i in 0..<n { zone[i] *= borne[i] }
         }
@@ -620,6 +640,321 @@ public enum Generatif {
     static func part(_ zone: [Float]) -> Double {
         guard !zone.isEmpty else { return 0 }
         return Double(zone.reduce(0) { $0 + ($1 > 0.5 ? 1 : 0) }) / Double(zone.count)
+    }
+
+    // MARK: Masque de Lightroom (mask)
+
+    /// Les deux effets témoins du masque de Fibo, aux clés d'une correction de masque, rendus l'un après
+    /// l'autre (deux commandes essayer) : un pixel est dans le masque si l'un des deux le change.
+    /// Aucun ne mêle deux réglages de sens contraire (−2 IL et des noirs relevés s'annulaient dans une
+    /// plage de tons sombres, qui échappait au masque). Le sombre, −2 IL (LocalExposure2012 de −0,5)
+    /// et une température plus froide, change tous les tons, blancs brûlés compris, sauf le noir pur et
+    /// les tons les plus sombres (moins de 6 niveaux d'écart) ; le clair, +1,5 IL (comme la carte
+    /// d'add_mask, CarteMasque.temoin), les noirs relevés (+30) et la même température, change ceux-là,
+    /// mais plus un blanc brûlé. Provisoires : reste à constater dans Lightroom sur un noir pur, un fond
+    /// très sombre et un blanc brûlé.
+    static let temoinSombre: [String: JSONValue] = ["LocalExposure2012": .number(-0.5), "LocalTemperature": .number(-0.4)]
+    static let temoinClair: [String: JSONValue] = ["LocalExposure2012": .number(0.375), "LocalBlacks2012": .number(0.3),
+                                                    "LocalTemperature": .number(-0.4)]
+    static let temoinsMasque = [temoinSombre, temoinClair]
+    /// Le nom du masque témoin (et de l'étape d'essai, qui n'est pas gardée).
+    static let nomMasqueTemoin = "Claude · masque pour Fibo 2"
+    /// Écart d'un canal (sur 255) entre l'état actuel et un témoin à partir duquel un pixel est dans le
+    /// masque : celui de la carte d'add_mask (les blocs JPEG au bord du masque bougent de 1 à 3).
+    static let seuilMasque = CarteMasque.seuilEcart
+    /// Un masque qui couvre moins que cette part de la photo est vide (Lightroom n'y a rien trouvé) ;
+    /// un masque qui en laisse moins hors de lui couvre toute la photo (inversé, ou aucun sujet trouvé).
+    /// 0,01 % : environ 2 600 px à 26 Mpx (51 × 51) ; un petit sujet (un oiseau de 0,4 % du cadre, et
+    /// l'arrière-plan à 99,6 %) passe. Provisoire.
+    static let partMasqueMin = 0.0001
+    /// Le nettoyage retire du masque chaque îlot et bouche chaque trou (composantes connexes, en
+    /// 8-connexité) de moins de pixels qu'un carré du grand côté de la photo divisé par ce nombre
+    /// (13 px de côté, 169 px, pour une photo de 6 240 px) : les points du bruit JPEG ; un trait fin
+    /// mais long (une mèche, une sangle, le jour entre le bras et le corps) est une grande composante,
+    /// gardé au pixel. Provisoire.
+    static let grilleNettoyage = 512
+    /// Élargissement du masque donné à Fibo (part du petit côté de son entrée), pour qu'il redessine
+    /// aussi le bord : environ 10 px à 1 Mpx. Provisoire.
+    static let margeMasque = 0.01
+    /// Fondu de la zone de mélange, en pleine résolution (part du petit côté de la photo, au moins
+    /// 2 px : 6 px pour une photo de 4 160 px de haut), sans élargissement. Provisoire.
+    static let fonduMasque = 0.0015
+
+    /// Le masque témoin à rendre : la zone (kind, inversion, composants), un effet témoin seul
+    /// (`temoinsMasque`), à pleine intensité.
+    static func masqueTemoin(_ zone: [String: JSONValue], locaux: [String: JSONValue]) -> JSONValue {
+        var objet = zone
+        objet["locaux"] = .object(locaux)
+        objet["quantite"] = .number(1)
+        objet["nom"] = .string(nomMasqueTemoin)
+        return .object(objet)
+    }
+
+    /// Ajoute au masque binaire (1 dedans, 0 dehors) les pixels où un canal s'écarte d'au moins
+    /// `seuilMasque` entre l'état actuel et un témoin (pixels RGBA 8 bits, même taille).
+    static func ajouterAuMasque(_ masque: inout [UInt8], actuel: [UInt8], temoin: [UInt8]) {
+        let nombre = masque.count
+        guard nombre > 0, actuel.count >= nombre * 4, temoin.count >= nombre * 4 else { return }
+        let seuil = Int16(seuilMasque)
+        actuel.withUnsafeBufferPointer { a in
+            temoin.withUnsafeBufferPointer { t in
+                masque.withUnsafeMutableBufferPointer { m in
+                    for i in 0..<nombre where m[i] == 0 {
+                        let k = i * 4
+                        if abs(Int16(a[k]) - Int16(t[k])) >= seuil || abs(Int16(a[k + 1]) - Int16(t[k + 1])) >= seuil
+                            || abs(Int16(a[k + 2]) - Int16(t[k + 2])) >= seuil { m[i] = 1 }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Le masque binaire d'un seul témoin.
+    static func masqueBinaire(actuel: [UInt8], temoin: [UInt8], nombre: Int) -> [UInt8] {
+        guard nombre > 0, actuel.count >= nombre * 4, temoin.count >= nombre * 4 else { return [] }
+        var masque = [UInt8](repeating: 0, count: nombre)
+        ajouterAuMasque(&masque, actuel: actuel, temoin: temoin)
+        return masque
+    }
+
+    /// Le masque binaire de l'état actuel et des témoins (tous de même taille) : l'union de leurs
+    /// écarts, nettoyée ; nil si les rendus n'ont pas la même taille ou ne se lisent pas. Les témoins
+    /// se décodent l'un après l'autre (un seul rendu de 26 Mpx de plus en mémoire à la fois).
+    static func masqueDesRendus(actuel: CGImage, temoins: [CGImage]) -> (masque: [UInt8], largeur: Int, hauteur: Int)? {
+        let l = actuel.width, h = actuel.height
+        guard l > 0, h > 0, !temoins.isEmpty, temoins.allSatisfy({ $0.width == l && $0.height == h }),
+              let a = pixelsRGBA8(actuel, largeur: l, hauteur: h) else { return nil }
+        var masque = [UInt8](repeating: 0, count: l * h)
+        for temoin in temoins {
+            guard let t = pixelsRGBA8(temoin, largeur: l, hauteur: h) else { return nil }
+            ajouterAuMasque(&masque, actuel: a, temoin: t)
+        }
+        nettoyer(&masque, largeur: l, hauteur: h)
+        return (masque, l, h)
+    }
+
+    /// L'aire (en pixels) sous laquelle une composante du masque est retirée (îlot) ou bouchée (trou).
+    static func aireNettoyage(largeur l: Int, hauteur h: Int) -> Int {
+        let cote = max(1, Int((Double(max(l, h)) / Double(grilleNettoyage)).rounded(.up)))
+        return cote * cote
+    }
+
+    /// Le nettoyage d'un masque binaire : les îlots (composantes de 1), puis les trous (composantes de
+    /// 0), en 8-connexité, de moins de `aireNettoyage` pixels changent de valeur ; tout le reste garde
+    /// ses pixels. En temps borné : chaque composante n'est suivie que jusqu'à cette aire, ou jusqu'à
+    /// une composante déjà jugée grande ; un pixel n'est ainsi parcouru qu'un nombre borné de fois, et
+    /// la mémoire tient en un octet par pixel et une liste de l'aire.
+    static func nettoyer(_ masque: inout [UInt8], largeur l: Int, hauteur h: Int) {
+        guard l > 0, h > 0, masque.count == l * h else { return }
+        let aire = aireNettoyage(largeur: l, hauteur: h)
+        guard aire > 1 else { return }
+        // 0 : pas encore vu ; 1 : dans la composante suivie ; 2 : d'une grande composante (gardée).
+        var etat = [UInt8](repeating: 0, count: l * h)
+        var suivis = [Int](repeating: 0, count: aire)
+        // Les huit voisins, par leur décalage dans l'image (loin des bords) et leur pas en x et en y.
+        let pasX = [-1, 0, 1, -1, 1, -1, 0, 1], pasY = [-1, -1, -1, 0, 0, 1, 1, 1]
+        let decalages = (0..<8).map { pasY[$0] * l + pasX[$0] }
+        masque.withUnsafeMutableBufferPointer { m in
+            etat.withUnsafeMutableBufferPointer { e in
+                suivis.withUnsafeMutableBufferPointer { liste in
+                    for valeur in [UInt8(1), 0] {
+                        for i in 0..<(l * h) { e[i] = 0 }
+                        var depart = 0
+                        while depart < l * h {
+                            defer { depart += 1 }
+                            guard m[depart] == valeur, e[depart] == 0 else { continue }
+                            // Suivi en largeur : la liste sert de file, jusqu'à `aire` pixels.
+                            var nombre = 1, lu = 0, grande = false
+                            liste[0] = depart
+                            e[depart] = 1
+                            while lu < nombre, !grande {
+                                let p = liste[lu]
+                                lu += 1
+                                let x = p % l, y = p / l
+                                let interieur = x > 0 && x < l - 1 && y > 0 && y < h - 1
+                                var k = 0
+                                while k < 8 {
+                                    let q: Int
+                                    if interieur {
+                                        q = p + decalages[k]
+                                    } else {
+                                        let nx = x + pasX[k], ny = y + pasY[k]
+                                        guard nx >= 0, nx < l, ny >= 0, ny < h else { k += 1; continue }
+                                        q = ny * l + nx
+                                    }
+                                    k += 1
+                                    guard m[q] == valeur else { continue }
+                                    let eq = e[q]
+                                    if eq == 2 { grande = true; break }
+                                    if eq == 0 {
+                                        e[q] = 1
+                                        liste[nombre] = q
+                                        nombre += 1
+                                        if nombre == aire { grande = true; break }
+                                    }
+                                }
+                            }
+                            if grande {
+                                for k in 0..<nombre { e[liste[k]] = 2 }
+                            } else {
+                                // Une petite composante : elle change de valeur (et n'est plus suivie).
+                                for k in 0..<nombre { m[liste[k]] = 1 - valeur; e[liste[k]] = 2 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Le masque remis à une autre taille (celle du TIFF exporté), au plus proche voisin.
+    static func redimensionner(_ masque: [UInt8], largeur l: Int, hauteur h: Int, versLargeur nl: Int, versHauteur nh: Int) -> [UInt8] {
+        guard l > 0, h > 0, nl > 0, nh > 0, masque.count == l * h else { return [] }
+        if l == nl, h == nh { return masque }
+        let colonne = (0..<nl).map { min(l - 1, Int((Double($0) + 0.5) * Double(l) / Double(nl))) }
+        var sortie = [UInt8](repeating: 0, count: nl * nh)
+        for y in 0..<nh {
+            let sy = min(h - 1, Int((Double(y) + 0.5) * Double(h) / Double(nh)))
+            let base = sy * l, o = y * nl
+            for x in 0..<nl { sortie[o + x] = masque[base + colonne[x]] }
+        }
+        return sortie
+    }
+
+    /// La part de la photo couverte par le masque (de 0 à 1) et son cadre englobant (de 0 à 1 depuis
+    /// le coin haut gauche ; nil s'il est vide).
+    static func cadreDuMasque(_ masque: [UInt8], largeur l: Int, hauteur h: Int) -> (part: Double, cadre: CGRect?) {
+        guard l > 0, h > 0, masque.count == l * h else { return (0, nil) }
+        var compte = 0, x0 = l, x1 = -1, y0 = h, y1 = -1
+        masque.withUnsafeBufferPointer { m in
+            for y in 0..<h {
+                let base = y * l
+                var premier = -1, dernier = -1
+                for x in 0..<l where m[base + x] != 0 {
+                    compte += 1
+                    if premier < 0 { premier = x }
+                    dernier = x
+                }
+                if premier >= 0 {
+                    x0 = min(x0, premier); x1 = max(x1, dernier)
+                    y0 = min(y0, y); y1 = y
+                }
+            }
+        }
+        guard compte > 0 else { return (0, nil) }
+        let cadre = CGRect(x: Double(x0) / Double(l), y: Double(y0) / Double(h),
+                           width: Double(x1 - x0 + 1) / Double(l), height: Double(y1 - y0 + 1) / Double(h))
+        return (Double(compte) / Double(l * h), cadre)
+    }
+
+    /// Le refus d'un masque presque vide ou presque total (nil s'il convient), avant tout calcul de
+    /// Fibo 2 : moins de `partMasqueMin` de la photo dans le masque, ou hors de lui.
+    static func refusMasque(part: Double) -> String? {
+        let texte = CarteMasque.pourcent(part * 100)
+        if part < partMasqueMin {
+            return "Le masque de Lightroom ne couvre presque rien de la photo (\(texte)) : Lightroom n'y a sans doute rien trouvé (kind, part, person ?), ou le sujet est minuscule. Le vérifier avec add_mask et mask_map, ou donner region. Rien n'a été fait."
+        }
+        if 1 - part < partMasqueMin {
+            return "Le masque de Lightroom couvre toute la photo (\(texte)) : inversé, ou Lightroom n'a trouvé aucun sujet ? Pour un sujet minuscule, donner region ; pour changer toute la photo, ni mask ni region. Rien n'a été fait."
+        }
+        return nil
+    }
+
+    /// Le masque donné à Fibo, à la taille de son entrée (0 ou 255 par pixel) : la part couverte de
+    /// chaque pixel d'entrée (la moyenne des pixels de la photo qu'il couvre, dans le recadrage),
+    /// blanc à la moitié ou plus, puis élargi de `margeMasque` du petit côté de l'entrée, pour que
+    /// Fibo redessine aussi le bord. mflux grise lui-même la zone blanche (comme à l'entraînement).
+    static func masquePourFibo(_ masque: [UInt8], largeurPhoto: Int, cadre: Pixels, taille: (largeur: Int, hauteur: Int)) -> [UInt8] {
+        let tl = taille.largeur, th = taille.hauteur, cl = cadre.largeur, ch = cadre.hauteur
+        guard tl > 0, th > 0, cl > 0, ch > 0, masque.count >= (cadre.y + ch) * largeurPhoto else { return [] }
+        let colonne = (0..<cl).map { min(tl - 1, $0 * tl / cl) }
+        var compte = [Int32](repeating: 0, count: tl * th), aire = [Int32](repeating: 0, count: tl * th)
+        masque.withUnsafeBufferPointer { m in
+            for y in 0..<ch {
+                let iy = min(th - 1, y * th / ch), base = (cadre.y + y) * largeurPhoto + cadre.x, ligne = iy * tl
+                for x in 0..<cl {
+                    let i = ligne + colonne[x]
+                    aire[i] += 1
+                    if m[base + x] != 0 { compte[i] += 1 }
+                }
+            }
+        }
+        let binaire = (0..<(tl * th)).map { aire[$0] > 0 && 2 * compte[$0] >= aire[$0] ? Float(1) : 0 }
+        let rayon = max(1, Int((Double(min(tl, th)) * margeMasque).rounded()))
+        return flouBoite(binaire, largeur: tl, hauteur: th, rayon: rayon).map { $0 > 0.0001 ? 255 : 0 }
+    }
+
+    /// La zone de mélange d'un masque de Lightroom, en pleine résolution, dans le recadrage : le masque
+    /// binaire, fondu de `fonduMasque` du petit côté de la photo (au moins 2 px), sans élargissement :
+    /// hors du masque et de ce fondu, la zone vaut exactement 0 (la photo garde ses pixels au bit près).
+    static func zoneDuMasque(_ masque: [UInt8], largeurPhoto: Int, hauteurPhoto: Int, cadre: Pixels) -> [Float] {
+        let cl = cadre.largeur, ch = cadre.hauteur
+        guard cl > 0, ch > 0, masque.count >= (cadre.y + ch) * largeurPhoto else { return [] }
+        var zone = [Float](repeating: 0, count: cl * ch)
+        masque.withUnsafeBufferPointer { m in
+            zone.withUnsafeMutableBufferPointer { z in
+                for y in 0..<ch {
+                    let base = (cadre.y + y) * largeurPhoto + cadre.x, o = y * cl
+                    for x in 0..<cl where m[base + x] != 0 { z[o + x] = 1 }
+                }
+            }
+        }
+        let rayon = max(2, Int((Double(min(largeurPhoto, hauteurPhoto)) * fonduMasque).rounded()))
+        // Deux flous en boîte de la moitié du rayon : le fondu s'étend du rayon de part et d'autre du bord.
+        sommeBoiteEnPlace(&zone, largeur: cl, hauteur: ch, rayon: max(1, rayon / 2), passages: 2)
+        return zone
+    }
+
+    /// Flou en boîte séparable, en place, répété `passages` fois : les sommes restent entières (exactes
+    /// en Float jusqu'à 2^24), divisées une seule fois à la fin ; une valeur loin de tout 1 reste donc
+    /// exactement 0. Bords répétés. Le passage vertical garde les lignes d'origine encore utiles dans
+    /// un anneau de `rayon + 1` lignes, et lit la mémoire ligne à ligne (une colonne à la fois, sur
+    /// 26 Mpx, prenait dix fois plus de temps).
+    static func sommeBoiteEnPlace(_ valeurs: inout [Float], largeur l: Int, hauteur h: Int, rayon r: Int, passages: Int) {
+        guard r > 0, l > 0, h > 0, passages > 0, valeurs.count == l * h else { return }
+        var ligne = [Float](repeating: 0, count: l)
+        var anneau = [Float](repeating: 0, count: (r + 1) * l)
+        var somme = [Float](repeating: 0, count: l)
+        valeurs.withUnsafeMutableBufferPointer { p in
+            ligne.withUnsafeMutableBufferPointer { li in
+                anneau.withUnsafeMutableBufferPointer { an in
+                    somme.withUnsafeMutableBufferPointer { so in
+                        for _ in 0..<passages {
+                            // En largeur : une ligne de travail.
+                            for y in 0..<h {
+                                let base = y * l
+                                for x in 0..<l { li[x] = p[base + x] }
+                                var s: Float = 0
+                                for k in -r...r { s += li[min(max(k, 0), l - 1)] }
+                                for x in 0..<l {
+                                    p[base + x] = s
+                                    s += li[min(x + r + 1, l - 1)] - li[max(x - r, 0)]
+                                }
+                            }
+                            // En hauteur : la somme des lignes y − r à y + r, mise à jour ligne à ligne.
+                            for x in 0..<l { so[x] = 0 }
+                            for k in -r...r {
+                                let base = min(max(k, 0), h - 1) * l
+                                for x in 0..<l { so[x] += p[base + x] }
+                            }
+                            for y in 0..<h {
+                                let base = y * l, garde = (y % (r + 1)) * l
+                                for x in 0..<l { an[garde + x] = p[base + x] }
+                                for x in 0..<l { p[base + x] = so[x] }
+                                guard y + 1 < h else { break }
+                                let entre = min(y + r + 1, h - 1) * l
+                                let sort = (max(y - r, 0) % (r + 1)) * l
+                                for x in 0..<l { so[x] += p[entre + x] - an[sort + x] }
+                            }
+                        }
+                        let fenetre = Float(2 * r + 1)
+                        var diviseur: Float = 1
+                        for _ in 0..<(2 * passages) { diviseur *= fenetre }
+                        for i in 0..<p.count { p[i] = min(1, p[i] / diviseur) }
+                    }
+                }
+            }
+        }
     }
 
     // MARK: Images

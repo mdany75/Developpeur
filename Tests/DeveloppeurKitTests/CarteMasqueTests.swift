@@ -98,6 +98,13 @@ final class CarteMasqueTests: XCTestCase {
         let essais = fake.calls.filter { $0.command == "essayer" }
         XCTAssertEqual(essais.count, 2, "un rendu témoin par masque")
         XCTAssertEqual(essais.map { $0.params["comparer"]?.bool }, [true, false], "l'état actuel une seule fois")
+        for essai in essais {
+            // Un rendu témoin : rien n'est gardé, aucun accord demandé dans Lightroom (sinon il
+            // effacerait celui qu'attend l'écriture des masques qui suit).
+            XCTAssertEqual(essai.params["temoin"]?.bool, true)
+            XCTAssertEqual(essai.params["taille"]?.int, ToolHandler.previewSizes.lowerBound)
+            XCTAssertEqual(essai.params["etape"]?.string, "carte du masque")
+        }
         XCTAssertEqual(essais[0].params["masques"]?.array?.count, 1)
         XCTAssertEqual(essais[0].params["masques"]?.array?.first?["locaux"], .object(CarteMasque.temoin))
         XCTAssertEqual(fake.commands.last, "masquer", "les masques posés après les cartes")

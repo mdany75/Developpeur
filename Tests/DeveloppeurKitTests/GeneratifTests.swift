@@ -23,6 +23,13 @@ final class GeneratifTests: XCTestCase {
     var largeur = 600, hauteur = 400
     /// Un mflux lancé hors du serveur (Fibo 2 Studio) : jamais le vrai pgrep dans les tests.
     var autreCalcul = false
+    /// Le masque que le faux module « calcule » pour essayer (fx, fy de 0 à 1 dans la photo) : le
+    /// rendu témoin s'écarte de l'état actuel là seulement. Et la taille de ses deux rendus (celle
+    /// du TIFF par défaut).
+    var masqueRendu: (Double, Double) -> Bool = { _, _ in false }
+    var tailleRendu: (largeur: Int, hauteur: Int)?
+    /// Ce que le faux module dit des personnes non reconnues (Rendu.essayer avec temoin).
+    var personnesNonReconnues: JSONValue?
 
     override func setUp() {
         dossier = TestSupport.temporaryDirectory()
@@ -44,6 +51,31 @@ final class GeneratifTests: XCTestCase {
                 try? FileManager.default.copyItem(at: self.source, to: cible)
                 self.fake.replies["exporter"] = ["dossier": .string(cible.deletingLastPathComponent().path), "format": "TIFF",
                                                  "fichiers": [["photo": ["id": 7, "fichier": "DSCF2402.RAF"], "chemin": .string(cible.path), "octets": 1000]]]
+            case "essayer":
+                // Comme Rendu.essayer, en pleine taille : l'état actuel (avec comparer) et le témoin, en PNG
+                // (sans perte : le bord du masque est exact). L'état actuel a, dans l'arrière-plan, un noir
+                // pur (en bas à gauche) et un blanc pur (en bas à droite) : le témoin sombre (−2 IL) ne
+                // change pas le noir pur, le clair (+1,5 IL, noirs relevés) pas le blanc pur ; seule leur
+                // union fait le masque entier.
+                let (l, h) = self.tailleRendu ?? (self.largeur, self.hauteur)
+                let sombre = (params["masques"]?.array?.first?["locaux"]?["LocalExposure2012"]?.double ?? 0) < 0
+                func couleur(_ x: Int, _ y: Int) -> (UInt8, UInt8, UInt8) {
+                    if y >= h * 8 / 10, x < l / 10 { return (0, 0, 0) }
+                    if y >= h * 8 / 10, x >= l * 9 / 10 { return (255, 255, 255) }
+                    return (UInt8(60 + x * 120 / l), UInt8(80 + y * 100 / h), 120)
+                }
+                let temoin = Self.png(largeur: l, hauteur: h) { x, y in
+                    let (r, g, b) = couleur(x, y)
+                    guard self.masqueRendu((Double(x) + 0.5) / Double(l), (Double(y) + 0.5) / Double(h)) else { return (r, g, b) }
+                    func clair(_ v: UInt8) -> UInt8 { UInt8(min(255, 2 * Int(v) + 30)) }
+                    return sombre ? (r / 3, g / 3, b / 3) : (clair(r), clair(g), clair(b))
+                }
+                var reponse: [String: JSONValue] = ["chemin": .string(TestSupport.previewFile(temoin)), "etape": "Claude · essai : masque pour Fibo 2"]
+                if params["comparer"]?.bool == true {
+                    reponse["chemin_actuel"] = .string(TestSupport.previewFile(Self.png(largeur: l, hauteur: h, couleur)))
+                }
+                if let personnes = self.personnesNonReconnues { reponse["personnes_non_reconnues"] = personnes }
+                self.fake.replies["essayer"] = .object(reponse)
             case "importerGeneree":
                 try? FileManager.default.removeItem(at: self.importe)
                 try? FileManager.default.copyItem(atPath: params["chemin"]?.string ?? "", toPath: self.importe.path)
@@ -57,6 +89,16 @@ final class GeneratifTests: XCTestCase {
     }
 
     // MARK: Aides
+
+    /// Une image sRGB en PNG (sans perte), comme un rendu du module dont le bord se lit au pixel.
+    static func png(largeur: Int, hauteur: Int, _ couleur: (Int, Int) -> (UInt8, UInt8, UInt8)) -> Data {
+        let image = TestSupport.imagePixels(width: largeur, height: hauteur, couleur)
+        let sortie = NSMutableData()
+        let destination = CGImageDestinationCreateWithData(sortie, "public.png" as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, image, nil)
+        CGImageDestinationFinalize(destination)
+        return sortie as Data
+    }
 
     /// Le TIFF « développé » de la photo 7, en dégradé, à la taille donnée.
     func ecrireSource(largeur l: Int, hauteur h: Int) {
@@ -371,7 +413,7 @@ final class GeneratifTests: XCTestCase {
         }
         XCTAssertEqual(outil["inputSchema"]?["required"], [], "instruction ou edits")
         let proprietes = try XCTUnwrap(outil["inputSchema"]?["properties"]?.object)
-        XCTAssertEqual(Set(proprietes.keys), ["photo_id", "instruction", "instruction_fr", "region", "label", "edits", "upscale", "quality", "seed", "confirm", "reason"])
+        XCTAssertEqual(Set(proprietes.keys), ["photo_id", "instruction", "instruction_fr", "region", "label", "mask", "edits", "upscale", "quality", "seed", "confirm", "reason"])
         XCTAssertEqual(proprietes["edits"]?["maxItems"]?.int, 4)
         XCTAssertEqual(proprietes["edits"]?["items"]?["required"], ["instruction", "instruction_fr", "region"])
         XCTAssertTrue(ServerInfo.instructions.contains("generative_edit, sur sa demande"))
@@ -1358,6 +1400,423 @@ final class GeneratifTests: XCTestCase {
         autreCalcul = false
         resultat = editer(["instruction": "add a red square"])
         XCTAssertFalse(resultat.isError, resultat.text)
+    }
+
+    // MARK: Masque de Lightroom (mask)
+
+    /// Une personne au milieu de la photo (de 40 à 60 % en largeur, de 30 à 70 % en hauteur) ;
+    /// l'arrière-plan est tout le reste.
+    static func dansLaPersonne(_ fx: Double, _ fy: Double) -> Bool { fx > 0.4 && fx < 0.6 && fy > 0.3 && fy < 0.7 }
+
+    func testMasqueBinaireAuSeuil() {
+        let actuel: [UInt8] = [100, 100, 100, 255, 100, 100, 100, 255, 100, 100, 100, 255]
+        let temoin: [UInt8] = [100, 100, 100, 255, 105, 98, 100, 255, 100, 100, 94, 255]
+        XCTAssertEqual(Generatif.masqueBinaire(actuel: actuel, temoin: temoin, nombre: 3), [0, 0, 1], "un canal à 6 de l'état actuel : dans le masque")
+        XCTAssertEqual(Generatif.seuilMasque, CarteMasque.seuilEcart)
+        XCTAssertEqual(Generatif.temoinSombre["LocalExposure2012"]?.double ?? 0, -0.5, accuracy: 1e-9, "−2 IL : les blancs brûlés changent aussi")
+    }
+
+    /// Les deux témoins : aucun ne mêle deux réglages de sens contraire (−2 IL et des noirs relevés
+    /// s'annulaient dans une plage de tons sombres) ; le masque est l'union de leurs écarts : le noir
+    /// pur (que le sombre ne change pas) et le blanc pur (que le clair ne change pas) y sont.
+    func testUnionDesDeuxTemoins() {
+        for temoin in Generatif.temoinsMasque {
+            let signes = ["LocalExposure2012", "LocalBlacks2012", "LocalShadows2012", "LocalWhites2012", "LocalHighlights2012"]
+                .compactMap { temoin[$0]?.double }.filter { $0 != 0 }.map { $0 > 0 }
+            XCTAssertTrue(Set(signes).count <= 1, "réglages de tons du même sens : \(temoin)")
+        }
+        XCTAssertNil(Generatif.temoinSombre["LocalBlacks2012"])
+        XCTAssertGreaterThan(Generatif.temoinClair["LocalBlacks2012"]?.double ?? 0, 0, "le noir pur change dans le clair")
+        // Noir pur, gris foncé, blanc pur, gris moyen hors du masque.
+        let actuel: [UInt8] = [0, 0, 0, 255, 12, 12, 12, 255, 255, 255, 255, 255, 128, 128, 128, 255]
+        let sombre: [UInt8] = [0, 0, 0, 255, 4, 4, 4, 255, 85, 85, 85, 255, 128, 128, 128, 255]
+        let clair: [UInt8] = [30, 30, 30, 255, 54, 54, 54, 255, 255, 255, 255, 255, 128, 128, 128, 255]
+        XCTAssertEqual(Generatif.masqueBinaire(actuel: actuel, temoin: sombre, nombre: 4), [0, 1, 1, 0])
+        XCTAssertEqual(Generatif.masqueBinaire(actuel: actuel, temoin: clair, nombre: 4), [1, 1, 0, 0])
+        var masque = [UInt8](repeating: 0, count: 4)
+        Generatif.ajouterAuMasque(&masque, actuel: actuel, temoin: sombre)
+        Generatif.ajouterAuMasque(&masque, actuel: actuel, temoin: clair)
+        XCTAssertEqual(masque, [1, 1, 1, 0], "l'union")
+    }
+
+    /// Le nettoyage retire les petites composantes (îlots et trous), jamais un trait fin mais long :
+    /// le jour entre le bras et le corps, une mèche, une sangle gardent leurs pixels.
+    func testNettoyageDuMasque() {
+        let l = 2600, h = 1000
+        XCTAssertEqual(Generatif.aireNettoyage(largeur: l, hauteur: h), 36, "un carré de 6 px (2 600 / 512)")
+        var masque = [UInt8](repeating: 0, count: l * h)
+        func poser(_ x0: Int, _ x1: Int, _ y0: Int, _ y1: Int, _ v: UInt8) {
+            for y in y0..<y1 { for x in x0..<x1 { masque[y * l + x] = v } }
+        }
+        poser(0, 1300, 0, h, 1)                          // le masque (l'arrière-plan) à gauche
+        poser(1300, 1302, 300, 301, 1)                   // une dent au bord
+        poser(2000, 2003, 500, 503, 1)                   // un point isolé de 9 px dans le vide
+        poser(2100, 2105, 500, 505, 1)                   // un îlot de 25 px
+        poser(200, 202, 200, 202, 0)                     // un petit trou de 4 px dans le plein
+        poser(600, 610, 600, 610, 0)                     // un vrai trou de 100 px (entre deux doigts)
+        poser(900, 905, 100, 900, 0)                     // le jour de 5 px entre le bras et le corps : du vide dans le plein
+        poser(1300, 2500, 700, 702, 1)                   // une sangle de 2 px, attachée au masque
+        for k in 0..<200 { masque[(100 + k) * l + 1500 + k] = 1 } // une mèche d'un pixel, en diagonale, seule
+        Generatif.nettoyer(&masque, largeur: l, hauteur: h)
+        func v(_ x: Int, _ y: Int) -> UInt8 { masque[y * l + x] }
+        XCTAssertEqual(v(2001, 501), 0, "point isolé retiré"); XCTAssertEqual(v(2102, 502), 0, "petit îlot retiré")
+        XCTAssertEqual(v(200, 200), 1, "petit trou bouché"); XCTAssertEqual(v(201, 201), 1)
+        XCTAssertEqual(v(605, 605), 0, "un trou plus grand que l'aire reste")
+        for x in 900..<905 { XCTAssertEqual(v(x, 500), 0, "le jour entre le bras et le corps reste, au pixel (x \(x))") }
+        XCTAssertEqual(v(899, 500), 1); XCTAssertEqual(v(905, 500), 1)
+        for x in stride(from: 1300, to: 2500, by: 50) { XCTAssertEqual(v(x, 700), 1, "la sangle reste (x \(x))"); XCTAssertEqual(v(x, 702), 0) }
+        for k in stride(from: 0, to: 200, by: 7) { XCTAssertEqual(v(1500 + k, 100 + k), 1, "la mèche en diagonale reste") }
+        XCTAssertEqual(v(1501, 100), 0)
+        XCTAssertEqual(v(1301, 300), 1, "le bord garde son détail au pixel"); XCTAssertEqual(v(1301, 301), 0)
+        XCTAssertEqual(v(1299, 301), 1); XCTAssertEqual(v(1303, 300), 0)
+    }
+
+    func testRedimensionnementEtCadreDuMasque() {
+        let petit: [UInt8] = [1, 0,
+                              0, 0]
+        XCTAssertEqual(Generatif.redimensionner(petit, largeur: 2, hauteur: 2, versLargeur: 4, versHauteur: 4),
+                       [1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "au plus proche voisin")
+        let (part, cadre) = Generatif.cadreDuMasque([0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0], largeur: 4, hauteur: 3)
+        XCTAssertEqual(part, 3.0 / 12, accuracy: 1e-9)
+        XCTAssertEqual(cadre, CGRect(x: 0, y: 1.0 / 3, width: 0.5, height: 2.0 / 3))
+        XCTAssertNil(Generatif.cadreDuMasque([0, 0], largeur: 2, hauteur: 1).cadre)
+        XCTAssertTrue(Generatif.refusMasque(part: 0.00005)?.contains("ne couvre presque rien") == true)
+        XCTAssertTrue(Generatif.refusMasque(part: 0.99995)?.contains("couvre toute la photo") == true)
+        XCTAssertTrue(Generatif.refusMasque(part: 0.99995)?.contains("sujet minuscule") == true)
+        XCTAssertNil(Generatif.refusMasque(part: 0.5))
+        // Un petit sujet (un oiseau de 0,4 % du cadre) : son arrière-plan (99,6 %) et lui passent ; une
+        // personne lointaine de 0,04 % aussi.
+        XCTAssertNil(Generatif.refusMasque(part: 0.996))
+        XCTAssertNil(Generatif.refusMasque(part: 0.004))
+        XCTAssertNil(Generatif.refusMasque(part: 0.0004))
+    }
+
+    /// Le masque donné à Fibo : la part couverte de chaque pixel d'entrée (à moitié : blanc), élargi
+    /// de margeMasque ; dans le repère du recadrage.
+    func testMasqueDonneAFiboElargi() {
+        let l = 200, h = 100
+        var masque = [UInt8](repeating: 0, count: l * h)
+        for y in 0..<h { for x in 100..<150 { masque[y * l + x] = 1 } }
+        let cadre = Generatif.Pixels(x: 50, y: 0, largeur: 100, hauteur: 100)
+        let entree = Generatif.masquePourFibo(masque, largeurPhoto: l, cadre: cadre, taille: (50, 50))
+        XCTAssertEqual(entree.count, 2500)
+        XCTAssertEqual(entree[25 * 50 + 40], 255, "dans le masque")
+        XCTAssertEqual(entree[25 * 50 + 24], 255, "élargi d'un pixel (1 % de 50)")
+        XCTAssertEqual(entree[25 * 50 + 22], 0, "hors du masque et de sa marge")
+    }
+
+    /// La zone de mélange en pleine résolution : 1 dans le masque, 0 exactement hors du fondu.
+    func testZoneDuMasqueFondueSansElargissement() {
+        let l = 2000, h = 1400
+        var masque = [UInt8](repeating: 0, count: l * h)
+        for y in 0..<h { for x in 1000..<l { masque[y * l + x] = 1 } }
+        let cadre = Generatif.Pixels(x: 800, y: 100, largeur: 1200, hauteur: 1200)
+        let zone = Generatif.zoneDuMasque(masque, largeurPhoto: l, hauteurPhoto: h, cadre: cadre)
+        XCTAssertEqual(zone.count, 1200 * 1200)
+        let rayon = max(2, Int((Double(h) * Generatif.fonduMasque).rounded()))
+        XCTAssertEqual(rayon, 2)
+        func z(_ x: Int) -> Float { zone[600 * 1200 + x - 800] }
+        XCTAssertEqual(z(1000 - rayon - 1), 0, "hors du masque et du fondu : exactement 0")
+        XCTAssertEqual(z(850), 0)
+        XCTAssertEqual(z(1000 + rayon + 1), 1, "dans le masque, loin du bord : 1")
+        XCTAssertGreaterThan(z(1000), 0.4); XCTAssertLessThan(z(999), 0.6)
+        XCTAssertGreaterThan(z(999), 0, "le fondu passe le bord")
+    }
+
+    /// Le flou en place (sommes entières, un anneau de lignes) rend le même fondu que deux flous en
+    /// boîte ordinaires.
+    func testFlouEnPlaceCommeDeuxFlousEnBoite() {
+        let l = 37, h = 23
+        var valeurs = (0..<(l * h)).map { Float(($0 * 7919) % 13 < 5 ? 1 : 0) }
+        let attendu = Generatif.flouBoite(Generatif.flouBoite(valeurs, largeur: l, hauteur: h, rayon: 3), largeur: l, hauteur: h, rayon: 3)
+        Generatif.sommeBoiteEnPlace(&valeurs, largeur: l, hauteur: h, rayon: 3, passages: 2)
+        for i in 0..<(l * h) { XCTAssertEqual(valeurs[i], attendu[i], accuracy: 1e-5, "\(i)") }
+    }
+
+    /// 26 Mpx (une photo de X-H2S) : masque binaire des deux témoins, nettoyage, masque de Fibo et zone
+    /// de mélange en temps borné. La durée est dite dans le journal des tests ; la borne n'est stricte
+    /// que compilé pour la publication (la machine virtuelle des tests GitHub, en débogage, est
+    /// plusieurs fois plus lente que le Mac Studio).
+    func testMasqueDeVingtSixMegapixelsEnTempsBorne() {
+        let l = 6240, h = 4160, n = l * h
+        var actuel = [UInt8](repeating: 128, count: n * 4)
+        var sombre = actuel, clair = actuel
+        for y in 0..<h {
+            for x in 0..<l where hypot(Double(x - 3120), Double(y - 2080)) > 1500 {
+                let i = (y * l + x) * 4
+                sombre[i] = 40; sombre[i + 2] = 170
+                clair[i] = 200
+            }
+        }
+        // Du bruit : des points isolés hors du masque, et des trous d'un pixel dans lui.
+        for k in 0..<20_000 {
+            let i = (k * 7_919 % n) * 4
+            if hypot(Double((i / 4) % l - 3120), Double((i / 4) / l - 2080)) < 1400 { sombre[i] = 120 } else { sombre[i] = 128; clair[i] = 128 }
+        }
+        var debut = Date()
+        var masque = [UInt8](repeating: 0, count: n)
+        Generatif.ajouterAuMasque(&masque, actuel: actuel, temoin: sombre)
+        Generatif.ajouterAuMasque(&masque, actuel: actuel, temoin: clair)
+        actuel = []; sombre = []; clair = []
+        let dureeBinaire = Date().timeIntervalSince(debut)
+        debut = Date()
+        Generatif.nettoyer(&masque, largeur: l, hauteur: h)
+        let dureeNettoyage = Date().timeIntervalSince(debut)
+        let (part, cadreRelatif) = Generatif.cadreDuMasque(masque, largeur: l, hauteur: h)
+        XCTAssertEqual(part, 1 - Double.pi * 1500 * 1500 / Double(n), accuracy: 0.002)
+        let (cadre, taille) = Generatif.recadrage(cadreRelatif!, largeur: l, hauteur: h)
+        debut = Date()
+        let entree = Generatif.masquePourFibo(masque, largeurPhoto: l, cadre: cadre, taille: taille)
+        let dureeEntree = Date().timeIntervalSince(debut)
+        debut = Date()
+        let zone = Generatif.zoneDuMasque(masque, largeurPhoto: l, hauteurPhoto: h, cadre: cadre)
+        let dureeZone = Date().timeIntervalSince(debut)
+        XCTAssertEqual(zone.count, cadre.largeur * cadre.hauteur)
+        XCTAssertEqual(entree.count, taille.largeur * taille.hauteur)
+        XCTAssertEqual(zone[2080 * cadre.largeur + 3120 - cadre.x], 0, "le centre (le sujet) reste hors du masque")
+        let total = dureeBinaire + dureeNettoyage + dureeEntree + dureeZone
+        print("Masque de 26 Mpx : binaire \(Self.secondes(dureeBinaire)), nettoyage \(Self.secondes(dureeNettoyage)), masque de Fibo \(Self.secondes(dureeEntree)), zone de mélange \(Self.secondes(dureeZone)), en tout \(Self.secondes(total))")
+        #if DEBUG
+        XCTAssertLessThan(total, 240, "temps borné, compilé pour le débogage (machine virtuelle lente comprise)")
+        #else
+        XCTAssertLessThan(total, 30, "temps borné")
+        #endif
+    }
+
+    static func secondes(_ t: TimeInterval) -> String { String(format: "%.2f s", t) }
+
+    /// mask : le masque calculé par Lightroom (l'arrière-plan) remplace region ; il est lu après
+    /// l'exportation (l'accord de Lightroom s'y demande d'abord) par deux essayer (taille 0, temoin ;
+    /// l'état actuel avec le premier, le témoin sombre puis le clair) ; Fibo reçoit ce masque, élargi ;
+    /// hors du masque (la personne), les pixels du TIFF exporté restent au bit près, même si Fibo l'a
+    /// changée, jusqu'au fondu du bord (pas jusqu'à l'élargissement donné à Fibo).
+    func testMasqueDeLightroomDeBoutEnBout() throws {
+        masqueRendu = { !Self.dansLaPersonne($0, $1) }
+        fauxMflux(sortie: sortiePreparee(region: CGRect(x: 0, y: 0, width: 1, height: 1)) { _, _, p, i in Self.bleu(&p, i) })
+        let resultat = editer(["instruction": "replace the background with a plain blue studio backdrop, keep the person unchanged",
+                               "mask": ["kind": "background"], "label": "fond"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(fake.commands, ["etat", "exporter", "essayer", "essayer", "importerGeneree"],
+                       "l'exportation (et son accord) d'abord, puis les deux témoins ; aucun recalage pour un masque IA")
+        let essais = fake.calls.filter { $0.command == "essayer" }.map(\.params)
+        for essai in essais {
+            XCTAssertEqual(essai["taille"]?.int, 0, "pleine résolution")
+            XCTAssertEqual(essai["temoin"]?.bool, true, "aucun accord demandé dans Lightroom")
+            XCTAssertEqual(essai["action"]?.string, "masquer")
+            XCTAssertEqual(essai["photo"]?.int, 7)
+        }
+        XCTAssertEqual(essais.map { $0["comparer"]?.bool }, [true, false], "l'état actuel une seule fois")
+        XCTAssertEqual(essais.map { $0["masques"]?.array?.first?["locaux"] }, Generatif.temoinsMasque.map { JSONValue.object($0) },
+                       "le témoin sombre, puis le clair")
+        let temoin = try XCTUnwrap(essais.first?["masques"]?.array?.first)
+        XCTAssertEqual(temoin["type"]?.string, "ia"); XCTAssertEqual(temoin["soustype"]?.int, 0); XCTAssertEqual(temoin["categorie"]?.int, 22)
+        XCTAssertEqual(temoin["quantite"]?.double, 1)
+        XCTAssertEqual(temoin["inverser"]?.bool, false)
+        XCTAssertEqual(temoin["nom"]?.string, "Claude · masque pour Fibo 2")
+
+        // Le masque donné à Fibo : l'arrière-plan, élargi ; la personne en noir.
+        let (_, taille) = Generatif.recadrage(CGRect(x: 0, y: 0, width: 1, height: 1), largeur: largeur, hauteur: hauteur)
+        XCTAssertEqual(valeur("--width"), String(taille.largeur))
+        let masque = try XCTUnwrap(Self.pixels8(gardes.appendingPathComponent("masque.png")))
+        XCTAssertEqual(masque.largeur, taille.largeur); XCTAssertEqual(masque.hauteur, taille.hauteur)
+        XCTAssertEqual(masque.valeur(10, 10), 255, "l'arrière-plan")
+        XCTAssertEqual(masque.valeur(taille.largeur / 2, taille.hauteur / 2), 0, "la personne")
+        let bordGauche = Int(0.4 * Double(taille.largeur))
+        XCTAssertEqual(masque.valeur(bordGauche + 2, taille.hauteur / 2), 255, "élargi : Fibo redessine aussi le bord")
+        XCTAssertNil(argumentsSeedVR)
+
+        // Le TIFF final : la personne (x de 240 à 359, y de 120 à 279), hors du fondu du bord (2 px),
+        // au bit près, jusqu'à 3 px du bord : l'élargissement donné à Fibo (environ 4 px) n'y revient pas.
+        let avant = try XCTUnwrap(Self.pixels16(source)), apres = try XCTUnwrap(Self.pixels16(importe))
+        var identiques = 0, compares = 0
+        for y in 0..<hauteur {
+            for x in 0..<largeur {
+                guard x >= 240 + 3, x <= 359 - 3, y >= 120 + 3, y <= 279 - 3 else { continue }
+                compares += 1
+                if Self.pixel(avant, x, y) == Self.pixel(apres, x, y) { identiques += 1 }
+            }
+        }
+        XCTAssertGreaterThan(compares, 15_000)
+        XCTAssertEqual(identiques, compares, "hors du masque, les pixels du TIFF exporté, même là où Fibo a tout repeint")
+        for (x, y) in [(20, 20), (20, 380), (580, 380)] {
+            let p = Self.pixel(apres, x, y)
+            XCTAssertGreaterThan(p[2], 40_000, "repeint par Fibo en (\(x), \(y)), noir pur et blanc pur du fond compris : \(p)")
+            XCTAssertLessThan(p[0], 15_000, "\(p)")
+        }
+        XCTAssertNotEqual(Self.pixel(apres, 237, 200), Self.pixel(avant, 237, 200), "le fond, juste hors de la personne")
+
+        // La réponse : le bloc masque, sans region, le recadrage.
+        let reponse = try JSONCoding.parse(resultat.text)
+        let bloc = try XCTUnwrap(reponse["masque"])
+        XCTAssertEqual(bloc["kind"]?.string, "background")
+        XCTAssertEqual(bloc["inverse"]?.bool, false)
+        XCTAssertEqual(bloc["calcule_par"]?.string, "Lightroom")
+        XCTAssertEqual(bloc["part_de_la_photo_pct"]?.double ?? 0, 92, accuracy: 1)
+        XCTAssertEqual(bloc["cadre"]?["width"]?.double, 1)
+        XCTAssertTrue(bloc["lecture"]?.string?.contains("garde ses pixels") == true)
+        XCTAssertNil(bloc["remarques"])
+        let modification = try XCTUnwrap(reponse["modifications"]?.array?.first)
+        XCTAssertNil(modification["region"])
+        XCTAssertNotNil(modification["recadrage_px"])
+        XCTAssertEqual(modification["reprise"]?.bool, true)
+        XCTAssertTrue(modification["resolution_zone"]?.string?.hasPrefix("La zone vient de la sortie de Fibo 2") == true, resultat.text)
+        let messages = fake.progressions.compactMap { $0["message"]?.string }
+        XCTAssertTrue(messages.contains { $0.hasPrefix("Fibo 2 : masque de Lightroom (rendu en pleine taille), 0 %") }, "\(messages)")
+        XCTAssertEqual(dossiersTemporairesRestants, [])
+    }
+
+    /// Des rendus d'une autre taille que le TIFF exporté : le masque est remis à sa taille.
+    func testMasqueRemisALaTailleDuTIFF() throws {
+        tailleRendu = (300, 200)
+        masqueRendu = { !Self.dansLaPersonne($0, $1) }
+        fauxMflux(sortie: sortiePreparee(region: CGRect(x: 0, y: 0, width: 1, height: 1)) { _, _, p, i in Self.bleu(&p, i) })
+        let resultat = editer(["instruction": "replace the background", "mask": ["kind": "background"]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        let avant = try XCTUnwrap(Self.pixels16(source)), apres = try XCTUnwrap(Self.pixels16(importe))
+        XCTAssertEqual(Self.pixel(apres, 300, 200), Self.pixel(avant, 300, 200), "la personne, au milieu")
+        XCTAssertGreaterThan(Self.pixel(apres, 20, 20)[2], 40_000)
+        XCTAssertEqual(try JSONCoding.parse(resultat.text)["masque"]?["part_de_la_photo_pct"]?.double ?? 0, 92, accuracy: 2)
+    }
+
+    /// Un masque presque vide ou presque total est refusé avant tout calcul de Fibo 2 (après
+    /// l'exportation, où l'accord se demande) ; mflux ne tourne pas, rien n'est importé.
+    func testMasqueVideOuTotalRefuseSansCalculer() {
+        fauxMflux()
+        masqueRendu = { _, _ in false }
+        let vide = editer(["instruction": "replace the sky", "mask": ["kind": "sky"]])
+        XCTAssertTrue(vide.isError); XCTAssertTrue(vide.text.contains("ne couvre presque rien") && vide.text.contains("Rien n'a été fait"), vide.text)
+        XCTAssertEqual(fake.commands, ["etat", "exporter", "essayer", "essayer"])
+        masqueRendu = { _, _ in true }
+        fake.calls = []
+        let total = editer(["instruction": "replace the background", "mask": ["kind": "background"]])
+        XCTAssertTrue(total.isError); XCTAssertTrue(total.text.contains("couvre toute la photo"), total.text)
+        XCTAssertEqual(fake.commands, ["etat", "exporter", "essayer", "essayer"])
+        XCTAssertEqual(appelsDeMflux, 0)
+        XCTAssertEqual(dossiersTemporairesRestants, [])
+    }
+
+    /// « Proposer d'abord » avec l'accord dans Lightroom : l'accord se demande à l'exportation, avant
+    /// tout rendu du masque (rendus avant, ils se perdaient et se refaisaient au rappel).
+    func testMasqueApresLAccordDeLExportation() {
+        fauxMflux()
+        masqueRendu = { !Self.dansLaPersonne($0, $1) }
+        fake.replies["etat"] = ["mode": "proposer d'abord", "pause": false, "photo_active": ["id": 7]]
+        fake.errors["exporter"] = LightroomError.plugin("Proposition en attente de votre accord : rien n'a été écrit. L'utilisateur accepte la proposition dans la fenêtre de la liaison de Lightroom (bouton Accepter, ouverte pour lui) ; ensuite, rappeler generative_edit avec confirm = true.")
+        let resultat = editer(["instruction": "replace the background", "mask": ["kind": "background"], "confirm": true])
+        XCTAssertTrue(resultat.isError && resultat.text.contains("en attente de votre accord"), resultat.text)
+        XCTAssertEqual(fake.commands, ["etat", "exporter"], "aucun rendu du masque avant l'accord")
+        XCTAssertEqual(appelsDeMflux, 0)
+    }
+
+    /// Une personne précise : ses cadres (Vision, sur l'aperçu) partent avec le masque témoin, et ses
+    /// recalages ; une personne que Lightroom n'a pas reconnue est refusée dès le premier rendu.
+    func testMasqueDUnePersonne() throws {
+        fauxMflux(sortie: sortiePreparee(region: CGRect(x: 0, y: 0, width: 1, height: 1)) { _, _, p, i in Self.bleu(&p, i) })
+        masqueRendu = { Self.dansLaPersonne($0, $1) }
+        tools.detecterPersonnes = { _ in [CGRect(x: 0.1, y: 0.3, width: 0.15, height: 0.6), CGRect(x: 0.4, y: 0.3, width: 0.2, height: 0.4),
+                                          CGRect(x: 0.7, y: 0.3, width: 0.15, height: 0.6)] }
+        fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 120, green: 120, blue: 120)))]
+        let resultat = editer(["instruction": "replace the jacket with a red sweater", "mask": ["kind": "person", "person": 2]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(fake.commands, ["etat", "exporter", "apercu", "geometrie", "essayer", "essayer", "importerGeneree"],
+                       "l'aperçu de Vision et les recalages avant les rendus")
+        let apercu = try XCTUnwrap(fake.calls.first { $0.command == "apercu" }).params
+        XCTAssertEqual(apercu["photo"]?.int, 7)
+        for essai in fake.calls.filter({ $0.command == "essayer" }) {
+            let temoin = try XCTUnwrap(essai.params["masques"]?.array?.first)
+            XCTAssertEqual(temoin["type"]?.string, "personne")
+            XCTAssertEqual(temoin["numero"]?.int, 2)
+            XCTAssertEqual(temoin["cadres"]?.array?.count, 3, "les cadres de toutes les personnes (InstanceBounds)")
+        }
+        XCTAssertEqual(try JSONCoding.parse(resultat.text)["masque"]?["kind"]?.string, "person")
+
+        // Lightroom ne la reconnaît pas : refusée avant le second rendu, sans Fibo 2.
+        fake.calls = []
+        let avant = appelsDeMflux
+        personnesNonReconnues = [["numero": 2, "trouvees": 3, "masque": "Claude · masque pour Fibo 2"]]
+        fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 120, green: 120, blue: 120)))]
+        let refus = editer(["instruction": "replace the jacket with a red sweater", "mask": ["kind": "person", "person": 2]])
+        XCTAssertTrue(refus.isError && refus.text.contains("n'a pas reconnu la personne 2 (sur 3 trouvées par Vision)") && refus.text.contains("Rien n'a été fait"), refus.text)
+        XCTAssertEqual(fake.commands, ["etat", "exporter", "apercu", "geometrie", "essayer"])
+        XCTAssertEqual(appelsDeMflux, avant)
+        XCTAssertEqual(dossiersTemporairesRestants, [])
+    }
+
+    /// Une zone positionnée (un dégradé radial) : recalée comme dans add_mask ; les remarques du module
+    /// reviennent dans le bloc masque (sauf celle, sans objet, d'une clé sans valeur d'avant).
+    func testMasqueRadialRecaleEtRemarques() throws {
+        fauxMflux(sortie: sortiePreparee(region: CGRect(x: 0, y: 0, width: 1, height: 1)) { _, _, p, i in Self.bleu(&p, i) })
+        masqueRendu = { hypot($0 - 0.5, $1 - 0.5) < 0.2 }
+        let precedent = fake.onSend
+        fake.onSend = { [unowned self] commande, params in
+            precedent?(commande, params)
+            if commande == "essayer", var reponse = self.fake.replies["essayer"]?.object {
+                reponse["remarques"] = ["MaskGroupBasedCorrections n'avait pas de valeur : il garde celle de la proposition.",
+                                        "La photo est redressée par Upright : positions recalées."]
+                self.fake.replies["essayer"] = .object(reponse)
+            }
+        }
+        let resultat = editer(["instruction": "replace the vase with a bowl of oranges",
+                               "mask": ["kind": "radial", "center_x": 0.5, "center_y": 0.5, "radius_x": 0.2, "radius_y": 0.2]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(fake.commands, ["etat", "exporter", "geometrie", "essayer", "essayer", "importerGeneree"])
+        XCTAssertEqual(fake.calls.first { $0.command == "essayer" }?.params["masques"]?.array?.first?["type"]?.string, "radial")
+        let remarques = try XCTUnwrap(JSONCoding.parse(resultat.text)["masque"]?["remarques"]?.array)
+        XCTAssertEqual(remarques, ["La photo est redressée par Upright : positions recalées."], "une fois, sans la remarque sans objet")
+    }
+
+    /// refine (affinage de Lightroom 15.5) : refusé avant tout envoi sur une version plus ancienne,
+    /// comme add_mask.
+    func testMasqueAffineRefuseAvantLightroom155() {
+        fauxMflux()
+        fake.replies["etat"] = ["mode": "appliquer directement", "pause": false, "photo_active": ["id": 7], "lightroom": "15.4"]
+        let refus = editer(["instruction": "replace the background", "mask": ["kind": "background", "refine": ["feather": 40]]])
+        XCTAssertTrue(refus.isError && refus.text.contains("refine (depuis la 15.5)"), refus.text)
+        XCTAssertEqual(fake.commands, ["etat"], "ni exportation ni rendu")
+    }
+
+    /// SeedVR2 et un masque trop étendu (un arrière-plan entier) : la remarque ne conseille jamais
+    /// region, qui ne suivrait pas le bord du sujet.
+    func testSeedVRAvecUnMasqueTropEtendu() {
+        let cadre = Generatif.Pixels(x: 0, y: 0, largeur: 6240, hauteur: 4160)
+        let avecMasque = Generatif.seedVR(cadre: cadre, taille: (1248, 832), avecRegion: true, demande: true, avecMasque: true)
+        XCTAssertFalse(avecMasque.lancer)
+        let raison = avecMasque.raison ?? ""
+        XCTAssertTrue(raison.contains("arrière-plan") && raison.contains("Masque trop étendu"), raison)
+        XCTAssertFalse(raison.contains("region"), raison)
+        let avecRegion = Generatif.seedVR(cadre: cadre, taille: (1248, 832), avecRegion: true, demande: true)
+        XCTAssertTrue(avecRegion.raison?.contains("Une region plus juste") == true)
+    }
+
+    /// mask : avec region, dans edits ou avec edits, avec un effet ou un réglage : refusé avant tout envoi.
+    func testMasqueRefusAvantToutEnvoi() {
+        fauxMflux()
+        let avecRegion = editer(["instruction": "x", "mask": ["kind": "background"], "region": ["x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2]])
+        XCTAssertTrue(avecRegion.isError && avecRegion.text.contains("l'un ou l'autre"), avecRegion.text)
+        let dansEdits = editer(["edits": [["instruction": "x", "instruction_fr": "x", "mask": ["kind": "sky"]]]])
+        XCTAssertTrue(dansEdits.isError && dansEdits.text.contains("pas de mask"), dansEdits.text)
+        let avecEdits = editer(["mask": ["kind": "sky"], "edits": [["instruction": "x", "instruction_fr": "x", "region": ["x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2]]]])
+        XCTAssertTrue(avecEdits.isError && avecEdits.text.contains("une seule modification"), avecEdits.text)
+        for (cle, valeur) in [("effect", JSONValue.string("Peau du visage lisse")), ("adjustments", ["Exposure": 0.5]), ("amount", 50)] {
+            let refus = editer(["instruction": "x", "mask": ["kind": "background", .init(stringLiteral: cle): valeur]])
+            XCTAssertTrue(refus.isError && refus.text.contains("sans effet ni réglage") && refus.text.contains(cle), refus.text)
+        }
+        XCTAssertTrue(editer(["instruction": "x", "mask": ["part": "hair"]]).text.contains("kind"))
+        XCTAssertTrue(editer(["instruction": "x", "mask": ["kind": "landscape", "part": "hair"]]).text.contains("part"))
+        XCTAssertTrue(editer(["instruction": "x", "mask": "background"]).text.contains("un objet"))
+        XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
+    }
+
+    /// Le schéma : mask décrit comme une zone d'add_mask, et ce qu'il faut savoir pour choisir.
+    func testMaskDansLeSchema() throws {
+        let outil = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "generative_edit" })
+        let masque = try XCTUnwrap(outil["inputSchema"]?["properties"]?["mask"])
+        let description = try XCTUnwrap(masque["description"]?.string)
+        XCTAssertTrue(description.hasPrefix("Changer l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region"), description)
+        let cles = Set(masque["properties"]?.object?.keys.map { $0 } ?? [])
+        XCTAssertTrue(cles.isSuperset(of: ["kind", "part", "person", "person_at", "invert", "combine", "box", "strokes"]), "\(cles)")
+        XCTAssertTrue(cles.isDisjoint(with: ["effect", "adjustments", "amount", "name", "tone_curve", "point_colors"]), "\(cles)")
+        XCTAssertTrue(outil["description"]?.string?.contains("Changer l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region") == true)
     }
 
     /// Les pixels d'un PNG (canal rouge), pour lire le masque.

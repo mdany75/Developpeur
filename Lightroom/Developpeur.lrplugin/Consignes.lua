@@ -45,7 +45,8 @@ confirm = true.
 generative_edit (Fibo 2, local), seulement sur sa demande ; d'abord les corrections de base, puis \
 generative_edit, puis les finitions sur la nouvelle photo, qui devient la photo active. Consigne \
 en anglais, sa traduction montrée à Dany (instruction_fr) ; plusieurs changements en un appel \
-(edits) ; la couleur d'un objet se change dans Lightroom par un masque, pas par generative_edit.
+(edits) ; l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region ; \
+la couleur d'un objet se change dans Lightroom par un masque, pas par generative_edit.
 - Peau : dosée comme le dit add_mask (effect « Peau du visage lisse » par défaut). Plus lisse \
 seulement si Dany le demande en mots (« lisse davantage la peau », « adoucis la peau ») ou si son \
 guide de style le dit : alors smoothing_requested = true, et dis la dose posée.
