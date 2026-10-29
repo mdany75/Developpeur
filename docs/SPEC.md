@@ -8209,6 +8209,12 @@ Reste à constater (les essais passent par de faux scripts qui écrivent un PNG)
 
 ### Masque de Lightroom (`mask`, 29 octobre 2026)
 
+**Constaté le 29 octobre 2026 au soir** (essai réel en qualité rapide, Lightroom ouvert, copie
+d'essai de DSCF2402.RAF, 26 Mpx, arrière-plan remplacé par Times Square) : 41 s en tout, dont 22 s
+de Fibo 2 ; masque de 79,2 %, aligné au TIFF exporté ; ancien fond entièrement remplacé, personne
+intacte ; bord des cheveux net mais découpé (pas de mèches fines) : à reprendre (fondu plus large ou
+masque doux).
+
 Demandé par Dany le soir du 29 octobre 2026 (« je constate souvent des erreurs quand je te demande
 de changer un arrière-plan dans Fibo 2 ; pourrais-tu faire un masque par Lightroom et l'envoyer dans
 Fibo 2 ») : sur une vraie demande, avec un rectangle (`region`) pour un arrière-plan, Fibo a gardé un

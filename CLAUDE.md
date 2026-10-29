@@ -622,9 +622,15 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   du fondu : `sommeBoiteEnPlace`) ; réponse `masque` (kind, inverse, part, cadre, `calcule_par`,
   lecture, remarques). Durée relevée sur 26 Mpx, compilé pour le débogage : masque binaire 3,4 s,
   nettoyage 5,3 s, masque de Fibo 2,0 s, zone de mélange 17 s (le test ne borne strictement qu'en
-  publication). Seuils provisoires ; restent à constater dans Lightroom le rendu pleine taille
-  d'`essayer` sur 26 Mpx, sa durée, son alignement avec le TIFF exporté, les deux témoins sur un noir
-  pur, un fond très sombre et un blanc brûlé, et une personne non reconnue.
+  publication). **Constaté le 29 octobre 2026 au soir** (essai réel, Lightroom ouvert, nouvelle copie
+  d'essai de DSCF2402.RAF, 26 Mpx, `mask` `background`, Times Square, graine 42, qualité rapide,
+  demandée par Dany : « fais les tests en turbo mode ») : réussi en 41 s, dont 22 s de Fibo 2 ;
+  masque de 79,2 % de la photo, cadre de toute la photo, aligné au TIFF exporté (aucun décalage
+  visible au bord) ; tout l'ancien fond remplacé (ni panneau ni « R »), la personne intacte ;
+  80,8 % changés ; SeedVR2 non lancé (× 5,0), mise à la taille ordinaire ; le bord des cheveux est
+  net mais découpé (pas de mèches fines sur le nouveau fond), à reprendre par un fondu plus large
+  ou un masque doux. Seuils provisoires ; restent à constater dans Lightroom les deux témoins sur un
+  noir pur, un fond très sombre et un blanc brûlé, et une personne non reconnue.
   Voir `docs/SPEC.md`, Retouche générative par Fibo 2 (Masque de Lightroom).
 - La suppression des reflets (`Suppression.lua`, commande `supprimer`) suit le même chemin que le
   débruitage (photo affichée, hors de `withWriteAccessDo`, un seul traitement à la fois) ; l'état
