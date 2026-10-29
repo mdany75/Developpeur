@@ -16,7 +16,8 @@
 #                  carnet de progrès et leçons des photos (carnet.json), suivi des photos
 #                  ouvertes (suivi.json, et suivi-illisible-*.json, un relevé illisible mis de
 #                  côté), avant/après des étapes de Claude (Etapes/), et les journaux
-#                  (~/Library/Logs/Developpeur)
+#                  (~/Library/Logs/Developpeur) ; « Fibo non importées » (les photos de Fibo 2
+#                  que Lightroom n'a pas pu importer) reste toujours s'il n'est pas vide
 #
 # Le catalogue et les photos ne sont jamais touchés : les retouches déjà faites restent (elles
 # s'annulent dans le panneau Historique).
@@ -89,8 +90,15 @@ fi
 
 if [[ "${TOUT}" == 1 ]]; then
     # Tout le dossier : carnet.json, suivi.json (et ses copies mises de côté), Etapes/ et
-    # mes-demandes.json compris.
-    retirer "${DEST_DIR}"
+    # mes-demandes.json compris ; sauf les photos de Fibo 2 jamais importées, des photos à vous.
+    NON_IMPORTEES="${DEST_DIR}/Fibo non importées"
+    if [[ -d "${NON_IMPORTEES}" && -n "$(ls -A "${NON_IMPORTEES}" 2>/dev/null)" ]]; then
+        find "${DEST_DIR}" -mindepth 1 -maxdepth 1 ! -name 'Fibo non import*' -exec rm -rf {} +
+        printf 'Supprimé : %s (sauf « Fibo non importées »)\n' "${DEST_DIR}"
+        printf 'Gardé : %s (photos de Fibo 2 jamais importées : les importer dans Lightroom, ou les supprimer à la main)\n' "${NON_IMPORTEES}"
+    else
+        retirer "${DEST_DIR}"
+    fi
     retirer "${JOURNAUX}"
 else
     for chemin in "${TRAVAIL[@]}"; do
@@ -102,7 +110,7 @@ else
         rmdir "${DEST_DIR}" 2>/dev/null && printf 'Supprimé : %s\n' "${DEST_DIR}"
     fi
     GARDES=()
-    [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, mes demandes, profils de publication, consommation, notes proposées, carnet de progrès et leçons, suivi des photos ouvertes, avant/après des étapes)")
+    [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, mes demandes, profils de publication, consommation, notes proposées, carnet de progrès et leçons, suivi des photos ouvertes, avant/après des étapes, photos de Fibo 2 non importées)")
     [[ -d "${JOURNAUX}" ]] && GARDES+=("${JOURNAUX} (journaux)")
     if [[ ${#GARDES[@]} -gt 0 ]]; then
         printf 'Gardé pour vous :\n'

@@ -327,14 +327,17 @@ public final class ToolHandler {
 
     /// Une avancée d'une longue série : au client (progression MCP) et dans Lightroom, par sa barre de
     /// progression (commande progression, LrProgressScope), dont la croix arrête la série.
-    func avancer(_ fait: Int, sur total: Int, _ message: String, titre: String?) {
+    /// Rend vrai si Lightroom a reçu la progression, faux s'il n'a pas répondu, nil sans envoi.
+    @discardableResult
+    func avancer(_ fait: Int, sur total: Int, _ message: String, titre: String?) -> Bool? {
         contexte.avancer(fait, sur: total, message)
-        guard let titre, total > 1 else { return }
+        guard let titre, total > 1 else { return nil }
         let params: [String: JSONValue] = ["id": .string(contexte.identifiant), "titre": .string(titre), "fait": .number(Double(fait)),
                                            "total": .number(Double(total)), "message": .string(message)]
-        guard let reponse = try? lightroom.send("progression", params, timeout: 10) else { return }
+        guard let reponse = try? lightroom.send("progression", params, timeout: 10) else { return false }
         contexte.barreOuverte = true
         if reponse["annulee"]?.bool == true { contexte.arreterDansLightroom() }
+        return true
     }
 
     /// La barre de progression de Lightroom se ferme à la fin de l'appel.

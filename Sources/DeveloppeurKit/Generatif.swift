@@ -74,8 +74,11 @@ public enum Generatif {
     /// Les arguments de mflux, en tableau (aucun shell). Avec `contexte` (mode full_and_crop), deux
     /// images : <image_1> la photo entière, pour le contexte, <image_2> le recadrage à modifier ; la
     /// consigne est enveloppée (`consigneDeuxImages`) et sans masque (mflux ne le permet qu'avec une
-    /// seule image). Qualité normale : décodage en pleine précision (--vae-full-precision) ; jamais
-    /// --quantize ni --step-cache-ratio, qui dégradent l'image.
+    /// seule image). Toujours --low-ram (constaté le 29 octobre 2026 : sans lui, mflux prenait 39 Go
+    /// sur les 48 du Mac Studio et Lightroom ne répondait plus ; avec lui, 20,6 Go et la même image
+    /// au pixel près). Qualité normale : décodage en pleine précision (--vae-full-precision, sans
+    /// coût de mémoire avec --low-ram) ; jamais --quantize (-q 8 : 38 Go, et moins fidèle) ni
+    /// --step-cache-ratio, qui dégradent l'image.
     static func arguments(entree: URL, masque: URL?, instruction: String, taille: (largeur: Int, hauteur: Int),
                           qualite: Qualite, graine: Int, sortie: URL, modeleRapide: URL?, contexte: URL? = nil) -> [String] {
         var args: [String]
@@ -96,7 +99,7 @@ public enum Generatif {
                 args += ["--model", "fibo2-edit-turbo"]
             }
         }
-        args += ["--width", String(taille.largeur), "--height", String(taille.hauteur), "--seed", String(graine), "--output", sortie.path]
+        args += ["--low-ram", "--width", String(taille.largeur), "--height", String(taille.hauteur), "--seed", String(graine), "--output", sortie.path]
         return args
     }
 
@@ -392,10 +395,73 @@ public enum Generatif {
         return (true, nil)
     }
 
-    /// Les arguments de SeedVR2 : le côté court natif du recadrage, décodage par tuiles.
+    /// Les arguments de SeedVR2 : le côté court natif du recadrage, --low-ram (comme Fibo ; il
+    /// implique le décodage par tuiles, --vae-tiling, qui n'est donc plus passé).
     static func argumentsSeedVR(entree: URL, resolution: Int, graine: Int, sortie: URL) -> [String] {
         ["--model", modeleSeedVR, "--image-path", entree.path, "--resolution", String(resolution),
-         "--seed", String(graine), "--output", sortie.path, "--vae-tiling"]
+         "--seed", String(graine), "--output", sortie.path, "--low-ram"]
+    }
+
+    // MARK: Mémoire
+
+    /// Un gigaoctet (2^30 octets, comme le « peak memory footprint » de /usr/bin/time -l).
+    static let go: UInt64 = 1 << 30
+    /// Mémoire libre exigée avant chaque lancement de Fibo 2 : 20,6 Go mesurés avec --low-ram le
+    /// 29 octobre 2026 (image de 1 248 × 832, 6 étapes, Lightroom fermé), plus une marge ;
+    /// provisoire. Sans garde, mflux avait fait geler le Mac (Lightroom ouvert, 39 Go sans --low-ram).
+    static let memoireMinimale: UInt64 = 24 * go
+    /// Mémoire libre exigée avant SeedVR2 (7B, --low-ram) ; provisoire, sa vraie empreinte reste à
+    /// mesurer. En dessous, mise à la taille ordinaire, dite dans la réponse (pas d'échec).
+    static let memoireMinimaleSeedVR: UInt64 = 16 * go
+
+    /// La mémoire disponible du Mac (host_statistics64) : les pages libres (`free_count`, qui
+    /// comprend déjà les spéculatives : vm_stat affiche « Pages free » = free_count − speculative_count)
+    /// et les inactives, fois la taille d'une page ; nil si elle ne se lit pas. Ni les spéculatives
+    /// une seconde fois, ni les purgeables (déjà dans les files active et inactive) : la mémoire
+    /// serait surestimée, et la garde laisserait passer un Mac sans la marge prévue.
+    public static func memoireDisponible() -> UInt64? {
+        var stats = vm_statistics64()
+        var nombre = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.stride / MemoryLayout<integer_t>.stride)
+        let hote = mach_host_self()
+        defer { mach_port_deallocate(mach_task_self_, hote) }
+        let resultat = withUnsafeMutablePointer(to: &stats) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(nombre)) {
+                host_statistics64(hote, HOST_VM_INFO64, $0, &nombre)
+            }
+        }
+        var taillePage: vm_size_t = 0
+        guard resultat == KERN_SUCCESS, host_page_size(hote, &taillePage) == KERN_SUCCESS, taillePage > 0 else { return nil }
+        return memoireDisponible(libres: UInt64(stats.free_count), inactives: UInt64(stats.inactive_count), taillePage: UInt64(taillePage))
+    }
+
+    /// Le calcul de `memoireDisponible`, pur : `libres` est `free_count` (spéculatives comprises).
+    static func memoireDisponible(libres: UInt64, inactives: UInt64, taillePage: UInt64) -> UInt64 {
+        (libres + inactives) * taillePage
+    }
+
+    /// Ce que dit la réponse quand la mémoire libre ne se lit pas : la garde n'a pas joué.
+    static let memoireNonLue = "Mémoire libre non lue : la garde de mémoire n'a pas été appliquée. Fermer des applications gourmandes avant le prochain appel (Fibo 2 prend environ 21 Go)."
+
+    /// Des octets en Go, une décimale, virgule française (« 12,3 »).
+    static func texteGo(_ octets: UInt64) -> String {
+        String(format: "%.1f", Double(octets) / Double(go)).replacingOccurrences(of: ".", with: ",")
+    }
+
+    /// Des octets en Go pour la réponse (une décimale).
+    static func nombreGo(_ octets: UInt64) -> Double {
+        (Double(octets) / Double(go) * 10).rounded() / 10
+    }
+
+    /// Ce qui manque pour lancer `quoi` : nil si `libre` atteint `minimale` (ou ne se lit pas : rien
+    /// n'est refusé sur une mesure absente), sinon « 12,3 Go libres, 24 Go nécessaires ».
+    static func manqueDeMemoire(libre: UInt64?, minimale: UInt64) -> String? {
+        guard let libre, libre < minimale else { return nil }
+        return "\(texteGo(libre)) Go libres, \(minimale / go) Go nécessaires"
+    }
+
+    /// Le refus de Fibo 2 avant tout envoi au module.
+    static func refusMemoire(_ manque: String) -> String {
+        "Mémoire libre insuffisante pour Fibo 2 : \(manque) (il en prend environ 21 Go). Fermer des applications gourmandes (navigateur, autres logiciels de photo ou de calcul), puis réessayer ; Lightroom peut rester ouvert. Rien n'a été fait."
     }
 
     // MARK: Progression

@@ -21,6 +21,13 @@ final class GeneratifTests: XCTestCase {
     /// Copie du TIFF final reçu par importerGeneree (le dossier temporaire est effacé après).
     var importe: URL { gardes.appendingPathComponent("importe.tif") }
     var largeur = 600, hauteur = 400
+    /// La mémoire libre fabriquée, lue à chaque garde (jamais celle du Mac) : 64 Go par défaut ;
+    /// `memoires` passe d'abord ses valeurs, une par lecture, dans l'ordre.
+    var memoire: UInt64? = 64 * Generatif.go
+    var memoires: [UInt64?] = []
+    var lecturesDeMemoire = 0
+    /// Un mflux lancé hors du serveur (Fibo 2 Studio) : jamais le vrai pgrep dans les tests.
+    var autreCalcul = false
 
     override func setUp() {
         dossier = TestSupport.temporaryDirectory()
@@ -30,7 +37,11 @@ final class GeneratifTests: XCTestCase {
         ecrireSource(largeur: 600, hauteur: 400)
         fake = FakeLightroom()
         tools = ToolHandler(lightroom: fake, guideStyle: GuideStyle(fichier: dossier.appendingPathComponent("guide.md")))
-        tools.fibo = Fibo(executable: script, cacheHF: dossier.appendingPathComponent("hf"), racine: racine, delaiMax: 60)
+        tools.fibo = Fibo(executable: script, cacheHF: dossier.appendingPathComponent("hf"), racine: racine, delaiMax: 60,
+                          memoireLibre: { [unowned self] in
+                              self.lecturesDeMemoire += 1
+                              return self.memoires.isEmpty ? self.memoire : self.memoires.removeFirst()
+                          }, delaiReessaiImport: 0.05, autreCalcul: { [unowned self] in self.autreCalcul })
         fake.replies["etat"] = ["mode": "appliquer directement", "pause": false, "photo_active": ["id": 7]]
         fake.replies["importerGeneree"] = ["id": 99, "fichier": "DSCF2402-Fibo.tif", "chemin": "/Volumes/Photos/2026/DSCF2402-Fibo.tif",
                                            "empilee": true, "active": true]
@@ -497,7 +508,8 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(valeur("--prompt"), "replace the trousers with a knee-length navy skirt")
         XCTAssertEqual(valeur("--steps"), "50")
         XCTAssertTrue(argumentsPasses.contains("--vae-full-precision"), "\(argumentsPasses)")
-        XCTAssertFalse(argumentsPasses.contains("--quantize") || argumentsPasses.contains("--step-cache-ratio"))
+        XCTAssertTrue(argumentsPasses.contains("--low-ram"), "\(argumentsPasses)")
+        XCTAssertFalse(argumentsPasses.contains("--quantize") || argumentsPasses.contains("-q") || argumentsPasses.contains("--step-cache-ratio"))
         XCTAssertEqual(valeur("--seed"), "42")
         XCTAssertEqual(valeur("--width"), String(taille.largeur)); XCTAssertEqual(valeur("--height"), String(taille.hauteur))
         XCTAssertEqual(Int(valeur("--width")!)! % 16, 0); XCTAssertEqual(Int(valeur("--height")!)! % 16, 0)
@@ -967,7 +979,8 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(valeurSeedVR("--model"), "seedvr2-7b")
         XCTAssertEqual(valeurSeedVR("--resolution"), "1200", "le côté court natif du recadrage")
         XCTAssertEqual(valeurSeedVR("--seed"), "3")
-        XCTAssertTrue(argumentsSeedVR?.contains("--vae-tiling") == true)
+        XCTAssertTrue(argumentsSeedVR?.contains("--low-ram") == true, "\(argumentsSeedVR ?? [])")
+        XCTAssertFalse(argumentsSeedVR?.contains("--vae-tiling") == true, "impliqué par --low-ram")
         XCTAssertTrue(valeurSeedVR("--image-path")?.hasSuffix("sortie-1.png") == true)
         let modification = try XCTUnwrap(try JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
         XCTAssertEqual(modification["seedvr2"]?.bool, true)
@@ -1147,6 +1160,335 @@ final class GeneratifTests: XCTestCase {
         wait(for: [sorti], timeout: 10)
         XCTAssertFalse(processus.isRunning, "mflux est arrêté")
         XCTAssertFalse(FileManager.default.fileExists(atPath: dossierAppel.path), "le dossier de l'appel est effacé")
+    }
+
+    // MARK: Mémoire et résultat gardé (constat du 29 octobre 2026)
+
+    /// --low-ram toujours (normal et rapide), --vae-full-precision en normal seulement, jamais -q ;
+    /// SeedVR2 avec --low-ram, sans --vae-tiling (impliqué).
+    func testArgumentsToujoursLowRam() {
+        let e = URL(fileURLWithPath: "/tmp/e.png"), s = URL(fileURLWithPath: "/tmp/s.png")
+        let normal = Generatif.arguments(entree: e, masque: nil, instruction: "x", taille: (1024, 1024), qualite: .normal, graine: 1, sortie: s, modeleRapide: nil)
+        let rapide = Generatif.arguments(entree: e, masque: nil, instruction: "x", taille: (1024, 1024), qualite: .fast, graine: 1, sortie: s, modeleRapide: nil)
+        let deuxImages = Generatif.arguments(entree: e, masque: nil, instruction: "x", taille: (1024, 1024), qualite: .normal, graine: 1, sortie: s,
+                                             modeleRapide: nil, contexte: URL(fileURLWithPath: "/tmp/c.png"))
+        for args in [normal, rapide, deuxImages] {
+            XCTAssertEqual(args.filter { $0 == "--low-ram" }.count, 1, "\(args)")
+            XCTAssertFalse(args.contains("-q") || args.contains("--quantize"), "\(args)")
+        }
+        XCTAssertTrue(normal.contains("--vae-full-precision"))
+        XCTAssertFalse(rapide.contains("--vae-full-precision"))
+        let seedVR = Generatif.argumentsSeedVR(entree: e, resolution: 1200, graine: 1, sortie: s)
+        XCTAssertTrue(seedVR.contains("--low-ram"))
+        XCTAssertFalse(seedVR.contains("--vae-tiling"))
+    }
+
+    /// La garde : rien sous le seuil, rien sur une mesure absente ; la vraie lecture du Mac rend un
+    /// nombre (lecture seule, aucune valeur attendue).
+    func testGardeDeMemoire() {
+        XCTAssertEqual(Generatif.memoireMinimale, 24 * Generatif.go)
+        XCTAssertEqual(Generatif.memoireMinimaleSeedVR, 16 * Generatif.go)
+        XCTAssertNil(Generatif.manqueDeMemoire(libre: 24 * Generatif.go, minimale: Generatif.memoireMinimale))
+        XCTAssertNil(Generatif.manqueDeMemoire(libre: nil, minimale: Generatif.memoireMinimale))
+        XCTAssertEqual(Generatif.manqueDeMemoire(libre: 12 * Generatif.go + Generatif.go * 3 / 10, minimale: Generatif.memoireMinimale),
+                       "12,3 Go libres, 24 Go nécessaires")
+        XCTAssertGreaterThan(Generatif.memoireDisponible() ?? 0, 0)
+    }
+
+    /// Sous 24 Go libres : refus clair avant tout envoi au module, mflux jamais lancé.
+    func testMemoireInsuffisanteRefuseAvantToutEnvoi() {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        memoire = 12 * Generatif.go
+        let resultat = editer(["instruction": "replace the trousers with a skirt"])
+        XCTAssertTrue(resultat.isError)
+        XCTAssertTrue(resultat.text.contains("Mémoire libre insuffisante pour Fibo 2 : 12,0 Go libres, 24 Go nécessaires"), resultat.text)
+        XCTAssertTrue(resultat.text.contains("Fermer des applications"), resultat.text)
+        XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
+        XCTAssertTrue(fake.progressions.isEmpty)
+        XCTAssertEqual(appelsDeMflux, 0)
+        XCTAssertEqual(dossiersTemporairesRestants, [])
+    }
+
+    /// Assez de mémoire au départ, plus assez après l'exportation : mflux n'est pas lancé, rien
+    /// n'est importé.
+    func testMemoireInsuffisanteAuLancementRienDeLance() {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        memoires = [64 * Generatif.go, 10 * Generatif.go]
+        let resultat = editer(["instruction": "replace the trousers with a skirt"])
+        XCTAssertTrue(resultat.isError)
+        XCTAssertTrue(resultat.text.contains("Mémoire libre insuffisante pour Fibo 2"), resultat.text)
+        XCTAssertTrue(resultat.text.contains("rien n'a été importé"), resultat.text)
+        XCTAssertEqual(fake.commands, ["etat", "exporter"])
+        XCTAssertEqual(appelsDeMflux, 0)
+        XCTAssertEqual(dossiersTemporairesRestants, [])
+    }
+
+    /// Deux modifications, la mémoire manque pour la seconde : la première est importée, la seconde
+    /// n'est pas lancée, dit dans la réponse.
+    func testSecondeModificationSansMemoire() throws {
+        let jupe = CGRect(x: 0.05, y: 0.1, width: 0.25, height: 0.3), sac = CGRect(x: 0.6, y: 0.55, width: 0.3, height: 0.35)
+        fauxMflux(sorties: [sortiePreparee(region: jupe, nom: "jupe.png") { _, _, p, i in Self.rouge(&p, i) }])
+        func zone(_ r: CGRect) -> JSONValue { ["x": .number(r.minX), "y": .number(r.minY), "width": .number(r.width), "height": .number(r.height)] }
+        memoires = [64 * Generatif.go, 30 * Generatif.go, 8 * Generatif.go]
+        let resultat = tools.call(name: "generative_edit", arguments: ["edits": [
+            ["label": "jupe", "instruction": "replace the trousers with a skirt", "instruction_fr": "remplacer le pantalon par une jupe", "region": zone(jupe)],
+            ["label": "sac", "instruction": "add a blue bag", "instruction_fr": "ajouter un sac bleu", "region": zone(sac)],
+        ]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(appelsDeMflux, 1)
+        XCTAssertEqual(fake.commands, ["etat", "exporter", "importerGeneree"])
+        let reponse = try JSONCoding.parse(resultat.text)
+        XCTAssertTrue(reponse["remarque_memoire"]?.string?.contains("« sac »") == true, resultat.text)
+        XCTAssertNil(reponse["remarque_zones"], "pas « rien changé de visible » pour une modification non lancée")
+        let modifications = try XCTUnwrap(reponse["modifications"]?.array)
+        XCTAssertEqual(modifications[0]["reprise"]?.bool, true)
+        XCTAssertEqual(modifications[0]["memoire_libre_go"]?.double, 30)
+        XCTAssertEqual(modifications[1]["reprise"]?.bool, false)
+        XCTAssertTrue(modifications[1]["remarque"]?.string?.contains("Mémoire libre insuffisante") == true, resultat.text)
+    }
+
+    /// La mesure et le seuil dans la réponse ; Lightroom qui répond : pas de remarque.
+    func testMemoireDansLaReponse() throws {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        memoire = 40 * Generatif.go + Generatif.go / 2
+        let resultat = editer(["instruction": "add a red square"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        let reponse = try JSONCoding.parse(resultat.text)
+        XCTAssertEqual(reponse["memoire_libre_go"]?.double, 40.5)
+        XCTAssertEqual(reponse["memoire_minimale_go"]?.double, 24)
+        XCTAssertEqual(reponse["modifications"]?.array?.first?["memoire_libre_go"]?.double, 40.5)
+        XCTAssertNil(reponse["remarque_lightroom"])
+        XCTAssertEqual(lecturesDeMemoire, 2, "au départ, puis au lancement de mflux")
+    }
+
+    /// Sous 16 Go libres au moment de SeedVR2 : pas lancé, mise à la taille ordinaire, remarque ;
+    /// l'outil réussit.
+    func testSeedVRSauteSousSonSeuilDeMemoire() throws {
+        ecrireSource(largeur: 1600, hauteur: 1200)
+        fauxSeedVR()
+        let region = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
+        fauxMflux(sortie: sortiePreparee(region: region, carreRouge))
+        memoires = [64 * Generatif.go, 64 * Generatif.go, 15 * Generatif.go]
+        let resultat = editer(["instruction": "add a red square", "region": ["x": 0.25, "y": 0.25, "width": 0.5, "height": 0.5]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertNil(argumentsSeedVR, "SeedVR2 jamais lancé")
+        let modification = try XCTUnwrap(try JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
+        XCTAssertEqual(modification["seedvr2"]?.bool, false)
+        XCTAssertTrue(modification["remarque_seedvr2"]?.string?.contains("Mémoire libre insuffisante pour SeedVR2 (15,0 Go libres, 16 Go nécessaires)") == true, resultat.text)
+        XCTAssertTrue(modification["resolution_zone"]?.string?.contains("mise à la taille ordinaire") == true, resultat.text)
+        XCTAssertTrue(fake.commands.contains("importerGeneree"))
+    }
+
+    /// importerGeneree refusé par le module : pas de second essai ; le TIFF final est déplacé dans
+    /// « Fibo non importées » (nom libre, -2 au suivant), l'erreur le dit avec son chemin.
+    func testTIFFGardeApresUnEchecDImportation() throws {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        fake.errors["importerGeneree"] = LightroomError.plugin("Accord refusé dans Lightroom.")
+        let gardees = racine.appendingPathComponent("Fibo non importées")
+        for rang in 1...2 {
+            let resultat = editer(["instruction": "add a red square"])
+            XCTAssertTrue(resultat.isError)
+            let nom = rang == 1 ? "DSCF2402-Fibo.tif" : "DSCF2402-Fibo-2.tif"
+            let garde = gardees.appendingPathComponent(nom)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: garde.path), resultat.text)
+            XCTAssertTrue(resultat.text.contains(garde.path), resultat.text)
+            XCTAssertTrue(resultat.text.contains("Fichier › Importer"), resultat.text)
+            XCTAssertTrue(resultat.text.contains("Accord refusé dans Lightroom."), resultat.text)
+            XCTAssertEqual(fake.commands.filter { $0 == "importerGeneree" }.count, rang, "un refus du module ne se réessaie pas")
+            XCTAssertEqual(dossiersTemporairesRestants, [], "déplacé, pas copié ; le dossier temporaire effacé")
+        }
+        let lu = try XCTUnwrap(Self.pixels16(gardees.appendingPathComponent("DSCF2402-Fibo.tif")))
+        XCTAssertEqual(lu.largeur, largeur)
+        XCTAssertGreaterThan(Self.pixel(lu, 300, 200)[0], 45_000, "le résultat de Fibo, recomposé")
+    }
+
+    /// Lightroom injoignable (la commande n'est jamais partie) : un second essai (après le délai),
+    /// qui réussit.
+    func testImportationReessayeeUneFoisQuandLightroomNeRepondPas() throws {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        var essais = 0
+        let precedent = fake.onSend
+        fake.onSend = { [unowned self] commande, params in
+            precedent?(commande, params)
+            guard commande == "importerGeneree" else { return }
+            essais += 1
+            self.fake.errors["importerGeneree"] = essais == 1 ? LightroomError.unreachable(LightroomBridge.unreachableMessage) : nil
+        }
+        let resultat = editer(["instruction": "add a red square"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(fake.commands.filter { $0 == "importerGeneree" }.count, 2)
+        XCTAssertEqual(try JSONCoding.parse(resultat.text)["nouvelle_photo"]?["id"]?.int, 99)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: racine.appendingPathComponent("Fibo non importées").path))
+    }
+
+    /// Lightroom muet aux deux essais : le TIFF gardé ; et Lightroom muet pendant le calcul (la barre
+    /// refusée de suite, 3 fois au moins) : dit dans l'erreur.
+    func testImportationAbandonneeApresDeuxEssais() {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        fake.errors["importerGeneree"] = LightroomError.unreachable(LightroomBridge.unreachableMessage)
+        fake.errors["progression"] = LightroomError.timeout("Lightroom n'a pas répondu à temps (commande « progression »).")
+        let resultat = editer(["instruction": "add a red square"])
+        XCTAssertTrue(resultat.isError)
+        XCTAssertEqual(fake.commands.filter { $0 == "importerGeneree" }.count, 2, "un seul second essai")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: racine.appendingPathComponent("Fibo non importées/DSCF2402-Fibo.tif").path), resultat.text)
+        XCTAssertTrue(resultat.text.contains("Lightroom ne répondait plus pendant le calcul"), resultat.text)
+        XCTAssertEqual(dossiersTemporairesRestants, [])
+    }
+
+    /// La barre refusée de suite pendant le calcul : la réponse le signale, sans arrêter Fibo.
+    func testLightroomMuetPendantLeCalculSignale() throws {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        fake.errors["progression"] = LightroomError.timeout("Lightroom n'a pas répondu à temps (commande « progression »).")
+        let resultat = editer(["instruction": "add a red square"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertGreaterThanOrEqual(fake.progressions.count, BarreFibo.echecsSignales)
+        let remarque = try XCTUnwrap(try JSONCoding.parse(resultat.text)["remarque_lightroom"]?.string, resultat.text)
+        XCTAssertTrue(remarque.contains("Lightroom ne répondait plus pendant le calcul") && remarque.contains("mémoire ?"), remarque)
+        XCTAssertTrue(fake.commands.contains("importerGeneree"))
+    }
+
+    /// Commande partie sans réponse (délai, liaison coupée) : jamais rejouée (une écriture : la photo
+    /// serait importée deux fois) ; le TIFF gardé, et l'erreur dit de vérifier la pile de l'original
+    /// avant de l'importer.
+    func testImportationSansReponseJamaisRejouee() {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        for erreur in [LightroomError.timeout("Lightroom n'a pas répondu à temps (commande « importerGeneree »)."),
+                       LightroomError.interrupted("La liaison avec Lightroom a été coupée pendant la commande « importerGeneree ».")] {
+            fake.calls = []
+            fake.errors["importerGeneree"] = erreur
+            let resultat = editer(["instruction": "add a red square"])
+            XCTAssertTrue(resultat.isError)
+            XCTAssertEqual(fake.commands.filter { $0 == "importerGeneree" }.count, 1, "jamais rejouée : \(erreur)")
+            XCTAssertTrue(resultat.text.contains("Fibo non importées"), resultat.text)
+            XCTAssertTrue(resultat.text.contains("peut-être déjà au catalogue") && resultat.text.contains("pile de l'original"), resultat.text)
+            XCTAssertEqual(dossiersTemporairesRestants, [])
+        }
+    }
+
+    /// Délai dépassé, mais le module a importé la photo et effacé le TIFF temporaire : jamais « rien
+    /// n'a été importé », l'erreur dit qu'elle l'a sans doute été (la chercher avant de relancer).
+    func testImportationSansReponseTIFFParti() {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        let precedent = fake.onSend
+        fake.onSend = { commande, params in
+            precedent?(commande, params)
+            if commande == "importerGeneree" { try? FileManager.default.removeItem(atPath: params["chemin"]?.string ?? "") }
+        }
+        fake.errors["importerGeneree"] = LightroomError.timeout("Lightroom n'a pas répondu à temps (commande « importerGeneree »).")
+        let resultat = editer(["instruction": "add a red square"])
+        XCTAssertTrue(resultat.isError)
+        XCTAssertEqual(fake.commands.filter { $0 == "importerGeneree" }.count, 1)
+        XCTAssertTrue(resultat.text.contains("sans doute importée") && resultat.text.contains("avant de relancer generative_edit"), resultat.text)
+        XCTAssertFalse(resultat.text.contains("rien n'a été importé"), resultat.text)
+        XCTAssertFalse(resultat.text.contains("rien n'a pu être gardé"), resultat.text)
+    }
+
+    /// Le déplacement vers « Fibo non importées » impossible (un fichier à sa place) : le TIFF final
+    /// reste dans le dossier de l'appel, seul (jamais effacé), et l'erreur donne son chemin.
+    func testTIFFLaisseSurPlaceSiLeDeplacementEchoue() throws {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        try Data("pas un dossier".utf8).write(to: racine.appendingPathComponent("Fibo non importées"))
+        fake.errors["importerGeneree"] = LightroomError.plugin("Accord refusé dans Lightroom.")
+        let resultat = editer(["instruction": "add a red square"])
+        XCTAssertTrue(resultat.isError)
+        XCTAssertEqual(dossiersTemporairesRestants.count, 1, resultat.text)
+        let appel = racine.appendingPathComponent("Temporaire/Fibo").appendingPathComponent(dossiersTemporairesRestants[0])
+        let restants = try FileManager.default.contentsOfDirectory(atPath: appel.path)
+        XCTAssertEqual(restants, ["DSCF2402-Fibo.tif"], "le TIFF final seul, le reste effacé")
+        XCTAssertTrue(resultat.text.contains(appel.appendingPathComponent("DSCF2402-Fibo.tif").path), resultat.text)
+        XCTAssertTrue(resultat.text.contains("prochain chargement du module"), resultat.text)
+    }
+
+    /// Un nom pris dans « Fibo non importées » : le rang suivant, d'un coup (renamex_np, RENAME_EXCL),
+    /// sans jamais écraser.
+    func testGarderNonImporteeNEcraseJamais() throws {
+        let gardees = racine.appendingPathComponent("Fibo non importées")
+        try FileManager.default.createDirectory(at: gardees, withIntermediateDirectories: true)
+        try Data("premier".utf8).write(to: gardees.appendingPathComponent("A-Fibo.tif"))
+        try Data("deuxième".utf8).write(to: gardees.appendingPathComponent("A-Fibo-2.tif"))
+        let fichier = dossier.appendingPathComponent("final.tif")
+        try Data("nouveau".utf8).write(to: fichier)
+        let garde = try ToolHandler.garderNonImportee(fichier, nom: "A-Fibo", dans: gardees)
+        XCTAssertEqual(garde.lastPathComponent, "A-Fibo-3.tif")
+        XCTAssertEqual(try String(contentsOf: gardees.appendingPathComponent("A-Fibo.tif"), encoding: .utf8), "premier")
+        XCTAssertEqual(try String(contentsOf: garde, encoding: .utf8), "nouveau")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fichier.path), "déplacé, pas copié")
+    }
+
+    /// mflux en erreur pendant que Lightroom ne répondait plus : l'erreur le dit ; tué par un signal
+    /// (le système, faute de mémoire) : dit aussi.
+    func testErreurDeMfluxAvecLightroomMuetEtSignal() {
+        fake.errors["progression"] = LightroomError.timeout("Lightroom n'a pas répondu à temps (commande « progression »).")
+        fauxMflux(fin: "printf '  0/50 [00:00\\n'; sleep 4; echo 'ValueError: boom'; exit 2")
+        var resultat = editer(["instruction": "x"])
+        XCTAssertTrue(resultat.isError)
+        XCTAssertTrue(resultat.text.contains("code 2") && resultat.text.contains("Lightroom ne répondait plus pendant le calcul"), resultat.text)
+
+        fake.errors["progression"] = nil
+        fauxMflux(fin: "kill -9 $$")
+        resultat = editer(["instruction": "x"])
+        XCTAssertTrue(resultat.isError)
+        XCTAssertTrue(resultat.text.contains("signal 9") && resultat.text.contains("faute de mémoire"), resultat.text)
+        XCTAssertFalse(resultat.text.contains("Lightroom ne répondait plus"), resultat.text)
+        XCTAssertEqual(dossiersTemporairesRestants, [])
+    }
+
+    /// Un autre calcul de Fibo 2 en cours sur ce Mac (le verrou tenu par une autre ouverture) : refus
+    /// avant tout envoi ; le verrou rendu, l'appel suivant passe.
+    func testUnSeulCalculDeFiboALaFois() throws {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        let fibo = try XCTUnwrap(tools.fibo)
+        try FileManager.default.createDirectory(at: fibo.fichierVerrou.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let autre = open(fibo.fichierVerrou.path, O_CREAT | O_RDWR, 0o600)
+        XCTAssertGreaterThanOrEqual(autre, 0)
+        XCTAssertEqual(flock(autre, LOCK_EX | LOCK_NB), 0)
+        var resultat = editer(["instruction": "add a red square"])
+        XCTAssertTrue(resultat.isError)
+        XCTAssertTrue(resultat.text.contains("Un autre calcul de Fibo 2 est en cours"), resultat.text)
+        XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
+        XCTAssertEqual(appelsDeMflux, 0)
+        XCTAssertEqual(lecturesDeMemoire, 0)
+        close(autre)
+        resultat = editer(["instruction": "add a red square"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        // Rendu à la fin de l'appel : un autre le prend aussitôt.
+        let suivant = try XCTUnwrap(fibo.prendreVerrou())
+        close(suivant)
+    }
+
+    /// Un mflux lancé hors du serveur (Fibo 2 Studio, le Terminal) : refus avant tout envoi, la
+    /// mémoire pas même lue (constaté le 29 octobre 2026 : deux calculs ensemble ont gelé le Mac).
+    func testFiboStudioQuiCalculeDejaRefuse() {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        autreCalcul = true
+        var resultat = editer(["instruction": "add a red square"])
+        XCTAssertTrue(resultat.isError)
+        XCTAssertTrue(resultat.text.contains("Fibo 2 calcule déjà sur ce Mac"), resultat.text)
+        XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
+        XCTAssertEqual(appelsDeMflux, 0)
+        XCTAssertEqual(lecturesDeMemoire, 0)
+        autreCalcul = false
+        resultat = editer(["instruction": "add a red square"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+    }
+
+    /// La mémoire disponible : les pages libres (spéculatives comprises) et les inactives, sans les
+    /// spéculatives une seconde fois ni les purgeables.
+    func testMemoireDisponibleSansDoubleCompte() {
+        XCTAssertEqual(Generatif.memoireDisponible(libres: 1_032_504, inactives: 1_000_000, taillePage: 16_384),
+                       (1_032_504 + 1_000_000) * 16_384)
+    }
+
+    /// La mémoire libre qui ne se lit pas : rien n'est refusé, mais la réponse dit que la garde n'a
+    /// pas joué.
+    func testMemoireNonLueDite() throws {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        memoire = nil
+        let resultat = editer(["instruction": "add a red square"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        let reponse = try JSONCoding.parse(resultat.text)
+        XCTAssertNil(reponse["memoire_libre_go"])
+        XCTAssertEqual(reponse["remarque_garde_memoire"]?.string, Generatif.memoireNonLue)
     }
 
     /// Les pixels d'un PNG (canal rouge), pour lire le masque.

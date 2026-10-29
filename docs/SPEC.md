@@ -195,7 +195,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `nomsFichiers` | `photos?` ou `selection?`, `modele` (nom), `texte_perso?`, `sequence?` | `modele`, `noms` (20 au plus : photo, `nom` sans l'extension, ou `erreur`) |
 | `apercusDynamiques` | `photos?` ou `selection?`, `retirer?` | `crees`, `existants`, `echecs`, `sans_original`, `retires`, `absents`, `taille_mo` |
 | `retirerReimportees` | `chemins` | `retires` : recette seulement ; fichiers que le module vient de réimporter (même session, 30 min) |
-| `importerGeneree` (29 octobre 2026) | `photo` (id de la photo d'origine ; sans lui, la photo active), `chemin` (le TIFF final, sous `<racine>/Temporaire/Fibo/`), `nom` (nom de base proposé, sans extension), `consigne` (le texte français des modifications, et la raison, pour le journal), `confirme` | `{id, fichier, chemin, empilee, active}` (plus `essai` pour une photo d'essai, `copie_virtuelle` et `photo_fibo` sous « Copies virtuelles seulement ») : la photo de Fibo 2 copiée dans le dossier de l'original et ajoutée au catalogue, empilée au-dessus de lui (une photo d'essai : dans Développeur › Essais, sans pile) ; jamais rejouée (voir Retouche générative par Fibo 2) |
+| `importerGeneree` (29 octobre 2026) | `photo` (id de la photo d'origine ; sans lui, la photo active), `chemin` (le TIFF final, sous `<racine>/Temporaire/Fibo/`), `nom` (nom de base proposé, sans extension), `consigne` (le texte français des modifications, et la raison, pour le journal), `confirme` | `{id, fichier, chemin, empilee, active}` (plus `essai` pour une photo d'essai, `copie_virtuelle` et `photo_fibo` sous « Copies virtuelles seulement ») : la photo de Fibo 2 copiée dans le dossier de l'original et ajoutée au catalogue, empilée au-dessus de lui (une photo d'essai : dans Développeur › Essais, sans pile) ; rejouée une seule fois, et seulement si elle n'a pas été livrée (`.unreachable`), jamais après un délai ni une coupure (voir Retouche générative par Fibo 2) |
 | `masques` | `photo?`, `action` (`lister`, `masquer`, `afficher`, `retirer`, `dupliquer`, `recalculer`, `affiner`, `retirer_vides`), `masque?`, `inverser?`, `nom?`, `contour?`, `decalage?`, `etape`, `raison?`, `confirme` | `lister` : `photo`, `masques` ; sinon `resultats` comme `appliquer`, et `masques` (la liste après l'écriture) ; voir Masques : pistes de la 2.1 |
 | `progression` | `id`, `titre?`, `fait?`, `total?`, `message?`, `fin?` | `annulee` (croix de la barre de Lightroom), `fermee` à la fin |
 | `variantes` | `photo?`, `action` (`lister`, `choisir`, `effacer`), `nom?`, `noms?`, `effacer_autres?`, `etape`, `raison?`, `confirme` | `lister` : `variantes` (nom, réglages touchés, date) ; `choisir` : `etape`, `instantane`, `changements`, `effaces` ; `effacer` : `effaces` ; voir Variantes |
@@ -212,7 +212,8 @@ une étape : `avant_apres` (la recette seulement, jamais un outil : force l'avan
 de la photo active) et `sans_avant_apres` (`match_series` : jamais d'avant/après). Les lectures
 que le serveur rejoue une fois après une coupure (`LightroomBridge.lectures`) gagnent `etapes` ;
 `carnet` n'y est pas (ni `lecon`, jusqu'à la 1.3.5) : il écrit `carnet.json` ; ni
-`importerGeneree` (rejouée, elle importerait la photo deux fois).
+`importerGeneree` (rejouée après un délai ou une coupure, elle importerait la photo deux fois ;
+seul `generative_edit` la renvoie une fois quand elle n'est jamais partie, `.unreachable`).
 
 Sans `photo`, `photos` ni `selection`, la commande vise la photo active. L'aperçu est rendu dans
 un dossier temporaire propre à chaque demande ; le serveur lit le fichier, l'envoie à Claude en
@@ -8092,10 +8093,66 @@ du TIFF exporté au bit près).
   l'est).
 - **Qualité** : `--vae-full-precision` en qualité normale ; jamais `--quantize` ni
   `--step-cache-ratio` ; Turbo seulement avec `quality` = `fast`.
+- **Mémoire** (constaté le 29 octobre 2026, essai réel) : sans `--low-ram`, Fibo 2 a pris environ
+  39 Go sur les 48 du Mac Studio ; Lightroom ouvert ne répondait plus (chaque commande `progression`
+  refusée pendant 13 min, puis `importerGeneree` « Lightroom ne répond pas »), le TIFF final est
+  parti avec le dossier temporaire, puis le Mac a gelé ; une nuit plus tôt, deux mflux à 36 Go
+  chacun avaient déclenché un manque de mémoire (JetsamEvent). Mesures, Lightroom fermé (image
+  1 248 × 832, 6 étapes, `/usr/bin/time -l`, « peak memory footprint ») : défaut 39,0 Go (58 s) ;
+  `--vae-full-precision` 39,2 Go ; `--low-ram` 20,6 Go (54 s), image identique au pixel près au
+  défaut ; `--low-ram --vae-full-precision` 20,6 Go, identique à `--vae-full-precision` seul ;
+  `-q 8` 38,0 Go et moins fidèle (écart moyen 1,2, max 146). D'où : **toujours `--low-ram`** (normal
+  et rapide ; `--vae-full-precision` gardé en normal ; jamais `-q`), et `--low-ram` pour SeedVR2 aussi
+  (il implique `--vae-tiling`, qui n'est plus passé). **Garde** : avant chaque lancement de mflux,
+  la mémoire disponible (`Generatif.memoireDisponible` : `host_statistics64`, `free_count` (qui
+  comprend déjà les spéculatives : vm_stat affiche « Pages free » = free_count − speculative_count)
+  plus `inactive_count`, fois la taille de page ; ni les spéculatives une seconde fois ni les
+  purgeables, déjà dans les files active et inactive : la mesure était surestimée, relecture du
+  29 octobre 2026 ; injectable, `Fibo.memoireLibre`)
+  doit atteindre `Generatif.memoireMinimale` (24 Go, 20,6 mesurés plus une marge, provisoire) :
+  au départ, refus avant tout envoi au module (« Mémoire libre insuffisante pour Fibo 2 : X Go
+  libres, 24 Go nécessaires ; fermer des applications… ») ; plus tard dans l'appel (après
+  l'exportation, avant une modification suivante), cette modification n'est pas lancée
+  (`remarque_memoire`, et refus si aucune n'est reprise). Avant SeedVR2, `memoireMinimaleSeedVR`
+  (16 Go, provisoire) : en dessous, mise à la taille ordinaire, dite (`remarque_seedvr2`), pas
+  d'échec. Une mesure illisible ne refuse rien, mais la réponse le dit (`remarque_garde_memoire` :
+  « Mémoire libre non lue : la garde de mémoire n'a pas été appliquée… ») et stderr aussi. **Un seul
+  calcul à la fois** : avant la garde, `Fibo.prendreVerrou` prend sans attendre un `flock` sur
+  `<racine>/Temporaire/fibo-en-cours.verrou` (hors de `Temporaire/Fibo`, que le ménage efface), tenu
+  tout l'appel et rendu par le noyau si le serveur meurt ; tenu par un autre serveur (Claude
+  Desktop, la fenêtre Claude, Claude Code en terminal ont chacun leur `FileOutils`), refus avant tout
+  envoi : deux serveurs qui liraient chacun 40 Go libres pendant que le premier mflux charge
+  encore son modèle passeraient la garde, et deux mflux à 20,6 Go dépassent 48 Go. Puis un mflux lancé hors du serveur (Fibo 2 Studio, le Terminal), que le verrou ne voit pas : `Fibo.autreCalcul` (`pgrep -f "mflux-(generate|upscale)"`), refus « Fibo 2 calcule déjà sur ce Mac… » avant la mémoire et tout envoi (le 29 octobre 2026, Fibo 2 Studio calculait pendant l'essai qui a fait geler le Mac). La réponse donne `memoire_libre_go` (au départ, et
+  par modification au lancement) et `memoire_minimale_go`.
+- **Résultat gardé** : `importerGeneree` jamais livré (`.unreachable` : connexion refusée, ping sans
+  réponse, `nonLivree`) se réessaie une fois après `Fibo.delaiReessaiImport` (5 s) ; jamais après un
+  délai (`.timeout`) ni une coupure (`.interrupted`) : la commande est partie, le module peut
+  l'exécuter (une écriture, pas une lecture), et la rejouer importerait deux fois ; un refus du
+  module ne se réessaie pas non plus. En cas d'échec (ou sans
+  `id` dans la réponse), le TIFF final est **déplacé** (pas copié) vers `<racine>/Fibo non
+  importées/<nom>.tif` (`-2`, `-3`… jamais d'écrasement ; `garderNonImportee`), hors de
+  `Temporaire`, que le ménage vide, et l'erreur le dit avec son chemin et l'importation à la main
+  (Fichier › Importer des photos et des vidéos…). Après une commande partie sans réponse
+  (`peutEtreExecutee`), l'erreur ajoute que la photo est peut-être déjà au catalogue, dans la pile
+  de l'original, à vérifier avant d'importer le TIFF gardé ; si le TIFF temporaire a disparu (le
+  module l'efface après une importation réussie), elle dit que la photo a sans doute été importée,
+  à chercher avant de relancer, jamais « rien n'a été importé ». Le déplacement se fait par
+  `renamex_np` avec `RENAME_EXCL` (même volume ; `moveItem` sinon) : un nom pris entre-temps par un
+  autre serveur fait passer au rang suivant, sans fenêtre entre vérifier et déplacer. Un
+  déplacement impossible (autre erreur) laisse le TIFF final seul dans le dossier de l'appel (le
+  reste effacé, lui jamais), et l'erreur donne son chemin en prévenant que le prochain chargement du
+  module vide ce dossier. `uninstall.sh --tout` garde « Fibo non importées » s'il n'est pas vide.
+- **Lightroom muet** : `ToolHandler.avancer` rend si Lightroom a reçu la progression ; `BarreFibo`
+  compte les envois sans réponse de suite, et à partir de `echecsSignales` (3) la réponse le dit
+  (`remarque_lightroom` : « Lightroom ne répondait plus pendant le calcul … : mémoire ? »), comme
+  toute erreur levée après le premier envoi de la barre (mflux en erreur, hors délai, sortie
+  illisible, mémoire manquante au lancement, importation manquée) ; rien ne s'arrête pour autant.
+  Un mflux arrêté par un signal (`FinProcessus.echec` avec `signal`, `terminationReason`
+  `.uncaughtSignal` : SIGKILL du système faute de mémoire) le dit dans l'erreur.
 - **SeedVR2** : `Fibo.seedVR` (`mflux-upscale-seedvr2`, à côté de mflux par défaut : le faux dossier
   des essais, jamais le vrai). Quand le facteur recadrage / sortie dépasse `seuilSeedVR` (1,25) et que
   `upscale` est vrai (défaut) : `--model seedvr2-7b --image-path <sortie> --resolution <côté court
-  natif du recadrage> --seed <graine> --output … --vae-tiling`, même environnement, délai et
+  natif du recadrage> --seed <graine> --output … --low-ram`, même environnement, délai et
   annulation que Fibo (`ToolHandler.executer`) ; absent, en erreur ou hors délai : mise à la taille
   ordinaire, dite (`remarque_seedvr2`), l'outil réussit. Borné (`Generatif.seedVR`, relecture du
   29 octobre 2026 : SeedVR2 7B ne découpe en tuiles que son décodeur) : jamais sans zone (il
@@ -8127,8 +8184,9 @@ du TIFF exporté au bit près).
 Reste à constater (rien n'a encore tourné avec le vrai mflux ni le vrai SeedVR2 ; les essais passent
 par de faux scripts qui écrivent un PNG) :
 
-- `--image-paths` à deux images et `--vae-full-precision` acceptés par mflux 0.24, et la mémoire
-  du décodage en pleine précision (environ 8,6 Go à 1 Mpx, annoncé) ;
+- `--image-paths` à deux images accepté par mflux 0.24 (`--vae-full-precision` et `--low-ram` le
+  sont : mesurés le 29 octobre 2026, Mémoire plus haut) ; la mémoire de SeedVR2 7B avec `--low-ram`,
+  pour fixer `memoireMinimaleSeedVR` ;
 - le masque PNG en RVB (blanc sur noir) lu par `--mask-path` sur un recadrage ;
 - la durée réelle d'un appel : chargement du modèle, étapes en qualité normale et rapide, une à
   quatre modifications, et le temps restant annoncé contre le temps vrai ;

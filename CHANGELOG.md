@@ -34,6 +34,20 @@
     temps restant ; sa croix arrête tout sans rien importer, à tout moment.
   - La consigne part en anglais pour Fibo 2 ; Claude vous en montre la traduction française, gardée
     au journal de la photo.
+  - Mémoire ménagée (après un premier essai qui a fait geler le Mac, Fibo 2 prenant 39 Go sur 48) :
+    Fibo 2 et SeedVR2 tournent en mode économe (environ 21 Go pour Fibo 2, même image au pixel
+    près) ; sous 24 Go de mémoire libre, Claude refuse avant de commencer et vous demande de fermer
+    des applications ; Lightroom peut rester ouvert. Sous 16 Go libres, SeedVR2 est sauté (mise à la
+    taille ordinaire, dite).
+  - Le résultat ne se perd plus : si Lightroom ne peut pas l'importer, Claude réessaie une fois
+    (seulement si Lightroom n'a pas reçu la demande, pour ne jamais l'importer deux fois), puis garde
+    le TIFF dans « Fibo non importées » (dossier du Développeur) et vous dit où il est, à importer à
+    la main ; si Lightroom a reçu la demande sans répondre, il vous dit de chercher d'abord la photo
+    dans la pile de l'original. Si Lightroom ne répondait plus pendant le calcul, Claude le signale,
+    même quand Fibo 2 échoue.
+  - Un seul calcul de Fibo 2 à la fois sur le Mac : une autre session de Claude (Claude Desktop, la
+    fenêtre Claude, le terminal) est refusée pendant ce temps, de même qu'un calcul en cours dans
+    Fibo 2 Studio, deux calculs ensemble dépassant la mémoire.
 
 ### Corrigé
 - Fenêtre Suivi : un clic sur une barre montre de nouveau ses photos dans la Bibliothèque (il
