@@ -661,8 +661,9 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   visible au bord) ; tout l'ancien fond remplacé (ni panneau ni « R »), la personne intacte ;
   80,8 % changés ; SeedVR2 non lancé (× 5,0), mise à la taille ordinaire ; le bord des cheveux était
   net mais découpé (pas de mèches fines sur le nouveau fond) : repris par le bord doux ci-dessus,
-  vérifié sur ces images (recomposition refaite par le code du connecteur), pas encore par un essai
-  réel. Seuils provisoires ; restent à constater dans Lightroom les deux témoins sur un
+  vérifié sur ces images (recomposition refaite par le code du connecteur), puis par un second essai
+  réel le même soir (nouvelle copie d'essai, Turbo, 40 s) : mèches fines gardées sur le nouveau fond,
+  plus d'effet découpé ; essai défait (photo retirée, TIFF à la Corbeille). Seuils provisoires ; restent à constater dans Lightroom les deux témoins sur un
   noir pur, un fond très sombre et un blanc brûlé, et une personne non reconnue.
   Voir `docs/SPEC.md`, Retouche générative par Fibo 2 (Masque de Lightroom).
 - La suppression des reflets (`Suppression.lua`, commande `supprimer`) suit le même chemin que le
