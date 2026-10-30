@@ -583,7 +583,8 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(reponse["qualite"]?.string, "équilibrée (30 étapes, guidage sur 60 % d'entre elles)")
         XCTAssertEqual(reponse["guidage"]?.double, 5)
         XCTAssertEqual(reponse["fiche_fibo_vlm"]?.bool, false)
-        XCTAssertTrue(reponse["remarque_fiche"]?.string?.contains("phrase seule") == true, resultat.text)
+        // Fiche non demandée (faux par défaut) : aucune remarque.
+        XCTAssertNil(reponse["remarque_fiche"], resultat.text)
         XCTAssertNil(reponse["sortie_entiere"])
         let modification = try XCTUnwrap(reponse["modifications"]?.array?.first)
         XCTAssertEqual(reponse["modifications"]?.array?.count, 1)
@@ -2261,7 +2262,7 @@ final class GeneratifTests: XCTestCase {
         fauxVLM()
         let region = CGRect(x: 0.3, y: 0.3, width: 0.3, height: 0.4)
         fauxMflux(sortie: sortiePreparee(region: region) { fx, fy, p, i in if fx > 0.35, fx < 0.55, fy > 0.35, fy < 0.65 { Self.rouge(&p, i) } })
-        let resultat = editer(["instruction": "replace the trousers with a knee-length navy skirt", "label": "jupe", "seed": 42,
+        let resultat = editer(["structured_prompt": true, "instruction": "replace the trousers with a knee-length navy skirt", "label": "jupe", "seed": 42,
                                "region": ["x": 0.3, "y": 0.3, "width": 0.3, "height": 0.4]])
         XCTAssertFalse(resultat.isError, resultat.text)
         XCTAssertEqual(appelsDuVLM, 1)
@@ -2324,7 +2325,7 @@ final class GeneratifTests: XCTestCase {
 
         // Sans zone : l'image entière, sans gris ni --use-mask.
         fauxMflux(sortie: sortiePreparee(carreRouge))
-        XCTAssertFalse(editer(["instruction": "add a red scarf"]).isError)
+        XCTAssertFalse(editer(["structured_prompt": true, "instruction": "add a red scarf"]).isError)
         XCTAssertFalse(argumentsVLM(2).contains("--use-mask"))
         XCTAssertFalse(argumentsVLM(2).contains("--image-originale"))
     }
@@ -2334,7 +2335,7 @@ final class GeneratifTests: XCTestCase {
     func testFicheEnEchecPhraseSeule() throws {
         fauxVLM(fin: "echo 'erreur FIBO-vlm : boom'\nexit 1")
         fauxMflux(sortie: sortiePreparee(carreRouge))
-        var resultat = editer(["instruction": "add a red scarf"])
+        var resultat = editer(["structured_prompt": true, "instruction": "add a red scarf"])
         XCTAssertFalse(resultat.isError, resultat.text)
         XCTAssertEqual(valeur("--prompt"), "add a red scarf"); XCTAssertNil(valeur("--prompt-file"))
         var modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
@@ -2344,7 +2345,7 @@ final class GeneratifTests: XCTestCase {
 
         // Une fiche qui n'est pas un objet JSON.
         fauxVLM(fiche: "pas du JSON")
-        resultat = editer(["instruction": "add a red scarf"])
+        resultat = editer(["structured_prompt": true, "instruction": "add a red scarf"])
         XCTAssertFalse(resultat.isError, resultat.text)
         XCTAssertNil(valeur("--prompt-file"))
         modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
@@ -2352,7 +2353,7 @@ final class GeneratifTests: XCTestCase {
 
         // Une fiche sans edit_instruction : l'instruction donnée y est jointe.
         fauxVLM(fiche: #"{"short_description": "a red scarf"}"#)
-        resultat = editer(["instruction": "add a red scarf"])
+        resultat = editer(["structured_prompt": true, "instruction": "add a red scarf"])
         XCTAssertFalse(resultat.isError, resultat.text)
         let n = appelsDeMflux
         XCTAssertEqual(try JSONCoding.parse(Data(contentsOf: gardes.appendingPathComponent("fiche-recue-\(n).json")))["edit_instruction"]?.string, "add a red scarf")
@@ -2365,7 +2366,7 @@ final class GeneratifTests: XCTestCase {
         tools.fibo?.delaiFiche = 0.5
         fauxVLM(fin: "sleep 30")
         let debut = Date()
-        resultat = editer(["instruction": "add a red scarf"])
+        resultat = editer(["structured_prompt": true, "instruction": "add a red scarf"])
         XCTAssertFalse(resultat.isError, resultat.text)
         XCTAssertLessThan(Date().timeIntervalSince(debut), 20)
         XCTAssertEqual(valeur("--prompt"), "add a red scarf")
@@ -2379,14 +2380,14 @@ final class GeneratifTests: XCTestCase {
     func testSansFiboVLMPhraseSeule() throws {
         fauxVLM(avecModele: false)
         fauxMflux(sortie: sortiePreparee(carreRouge))
-        var resultat = editer(["instruction": "add a red scarf"])
+        var resultat = editer(["structured_prompt": true, "instruction": "add a red scarf"])
         XCTAssertFalse(resultat.isError, resultat.text)
         XCTAssertEqual(appelsDuVLM, 0)
         XCTAssertTrue(try JSONCoding.parse(resultat.text)["remarque_fiche"]?.string?.contains("hf download briaai/FIBO-vlm") == true, resultat.text)
 
         Self.modeleVLM(dans: dossier.appendingPathComponent("hf"))
         tools.fibo?.python = dossier.appendingPathComponent("absent/python")
-        resultat = editer(["instruction": "add a red scarf"])
+        resultat = editer(["structured_prompt": true, "instruction": "add a red scarf"])
         XCTAssertTrue(try JSONCoding.parse(resultat.text)["remarque_fiche"]?.string?.contains("Python de mflux") == true, resultat.text)
 
         fauxVLM()
@@ -2413,7 +2414,7 @@ final class GeneratifTests: XCTestCase {
         if [ -n "$fiche" ]; then echo "ValueError: The JSON caption does not have the format FIBO 2 reads:" >&2; exit 2; fi
         cp "\(gardes.path)/sortie.png" "$out"
         """)
-        let resultat = editer(["instruction": "add a red scarf"])
+        let resultat = editer(["structured_prompt": true, "instruction": "add a red scarf"])
         XCTAssertFalse(resultat.isError, resultat.text)
         XCTAssertEqual(appelsDeMflux, 2)
         XCTAssertNotNil(argumentsDeLAppel(1).firstIndex(of: "--prompt-file"))
@@ -2436,7 +2437,7 @@ final class GeneratifTests: XCTestCase {
         autreCalcul = true
         fauxVLM()
         fauxMflux()
-        let refus = editer(["instruction": "x"])
+        let refus = editer(["structured_prompt": true, "instruction": "x"])
         XCTAssertTrue(refus.isError && refus.text.contains("Fibo 2 calcule déjà"), refus.text)
         XCTAssertEqual(appelsDuVLM, 0)
         XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
@@ -2608,7 +2609,7 @@ final class GeneratifTests: XCTestCase {
         tools.fibo?.cacheHF = dossier.appendingPathComponent("hf-vide")
         fauxVLM(avecModele: false)
         fauxMflux(sortie: sortiePreparee(carreRouge))
-        let resultat = editer(["instruction": "add a red scarf"])
+        let resultat = editer(["structured_prompt": true, "instruction": "add a red scarf"])
         XCTAssertTrue(try JSONCoding.parse(resultat.text)["remarque_fiche"]?.string?.contains("--revision \(Generatif.revisionVLM)") == true, resultat.text)
     }
 
@@ -2689,7 +2690,7 @@ final class GeneratifTests: XCTestCase {
         """)
         let region = CGRect(x: 0.3, y: 0.3, width: 0.3, height: 0.4)
         fauxMflux(sortie: sortiePreparee(region: region) { fx, fy, p, i in if fx > 0.35, fx < 0.55, fy > 0.35, fy < 0.65 { Self.rouge(&p, i) } })
-        let resultat = editer(["instruction": "replace the trousers with a skirt", "region": ["x": 0.3, "y": 0.3, "width": 0.3, "height": 0.4]])
+        let resultat = editer(["structured_prompt": true, "instruction": "replace the trousers with a skirt", "region": ["x": 0.3, "y": 0.3, "width": 0.3, "height": 0.4]])
         XCTAssertFalse(resultat.isError, resultat.text)
         XCTAssertNotNil(valeur("--prompt-file"), "la fiche ordinaire sert")
         let modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
@@ -2705,7 +2706,7 @@ final class GeneratifTests: XCTestCase {
         // Vrai dès que la fiche est finie (le faux VLM touche vlm-fin à sa fin).
         let fin = gardes.appendingPathComponent("vlm-fin")
         tools.fibo?.autreCalcul = { FileManager.default.fileExists(atPath: fin.path) }
-        let refus = editer(["instruction": "add a red scarf"])
+        let refus = editer(["structured_prompt": true, "instruction": "add a red scarf"])
         XCTAssertTrue(refus.isError && refus.text.contains("lancé pendant cet appel") && refus.text.contains("avant Fibo 2"), refus.text)
         XCTAssertEqual(appelsDuVLM, 1)
         XCTAssertEqual(appelsDeMflux, 0, "mflux jamais lancé")

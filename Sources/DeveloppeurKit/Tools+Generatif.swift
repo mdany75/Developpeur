@@ -269,7 +269,7 @@ extension ToolHandler {
                                                    required: ["instruction", "instruction_fr", "region"])]),
                     ("upscale", prop("boolean", "Vrai par défaut : une zone que Fibo 2 rend plus petite que sa taille dans la photo passe par SeedVR2 (plus de détail) ; faux : mise à la taille ordinaire.")),
                     ("quality", enumProp(["balanced", "normal", "fast"], "balanced (défaut) : \(Generatif.etapesEquilibre) étapes, guidage sur 60 % d'entre elles, à peu près le rendu de normal en deux fois moins de temps ; normal : \(Generatif.etapesNormal) étapes ; fast : Turbo, \(Generatif.etapesRapide) étapes, sans guidage, plus rapide et moins fidèle.")),
-                    ("structured_prompt", prop("boolean", "Vrai par défaut : FIBO-vlm rédige sur ce Mac, avant Fibo 2, une fiche détaillée de la modification (une minute ou deux de plus) ; faux : la phrase seule.")),
+                    ("structured_prompt", prop("boolean", "Faux par défaut. Vrai : FIBO-vlm rédige sur ce Mac, avant Fibo 2, une fiche détaillée (lourd : environ 40 Go et 7 min, constaté) ; seulement si l'utilisateur le demande.")),
                     ("avoid", prop("string", "En anglais, ce que Fibo 2 doit éviter en plus de sa liste (texte, logos, filigrane, personne ou membres en double, déformé) : « sunglasses, a second dog ». Hors fast.")),
                     ("guidance", prop("number", "Guidage, de \(Generatif.texteNombre(Generatif.guidageMin)) à \(Generatif.texteNombre(Generatif.guidageMax)) (absent : \(Generatif.texteNombre(Generatif.guidageParDefaut))) : plus haut, Fibo 2 suit l'instruction de plus près, au risque d'un rendu forcé. Hors fast ; seulement sur demande.")),
                     ("seed", prop("integer", "Graine (facultative) : la même graine et la même instruction redonnent la même image ; sans elle, une graine au hasard, rendue dans la réponse.")),
@@ -441,7 +441,7 @@ extension ToolHandler {
         // L'étape et la raison que la fenêtre de la liaison montre avec une demande d'accord, et que
         // le journal de la nouvelle photo garde : le texte français (et la raison donnée).
         let consigne = Generatif.consigneJournal(modifications, raison: Self.raison(args))
-        // La fiche de FIBO-vlm : demandée (structured_prompt, vrai par défaut) et possible sur ce Mac ;
+        // La fiche de FIBO-vlm : demandée (structured_prompt, faux par défaut) et possible sur ce Mac ;
         // sinon la phrase seule, et la réponse dit pourquoi.
         let raisonSansFiche = reglages.fiche ? fibo.raisonSansFiche() : nil
         let avecFiche = reglages.fiche && raisonSansFiche == nil
@@ -772,11 +772,13 @@ extension ToolHandler {
     }
 
     /// Les réglages de Fibo 2 d'un appel, validés avant tout envoi : la fiche de FIBO-vlm
-    /// (structured_prompt, vrai par défaut), ce que Fibo 2 doit éviter en plus de la liste par défaut
+    /// (structured_prompt, faux par défaut), ce que Fibo 2 doit éviter en plus de la liste par défaut
     /// (avoid, en anglais) et le guidage (guidance) ; en Turbo, distillé sans guidage, avoid et guidance
     /// ne servent pas, et la remarque le dit ; à guidance 1 non plus.
     struct ReglagesFibo {
-        var fiche = true
+        // Faux par défaut : constaté le 29 octobre 2026, FIBO-vlm a pris 39,7 Go en pointe et 402 s
+        // (le Mac de 48 Go en swap), et son mode masqué a échoué. Seulement sur demande, en attendant mieux.
+        var fiche = false
         var avoid: String?
         var guidage: Double?
         var remarque: String?
@@ -786,7 +788,7 @@ extension ToolHandler {
         var reglages = ReglagesFibo()
         if args.has("structured_prompt") {
             guard let fiche = args.bool("structured_prompt") else {
-                throw LightroomError.invalid("« structured_prompt » : true (défaut, la fiche de FIBO-vlm) ou false (la phrase seule). Rien n'a été fait.")
+                throw LightroomError.invalid("« structured_prompt » : true (la fiche de FIBO-vlm) ou false (défaut, la phrase seule). Rien n'a été fait.")
             }
             reglages.fiche = fiche
         }
