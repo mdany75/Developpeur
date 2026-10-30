@@ -542,6 +542,8 @@ end
 -- Lightroom de generative_edit), aucun accord n'est demandé ; taille 0 rend en pleine résolution ; et,
 -- pour des masques, les personnes précises que Lightroom n'a pas reconnues sont dites
 -- (personnes_non_reconnues, comme Retouche.verifierPersonnes, sans rien retirer : rien n'est gardé).
+-- Une zone { type = 'existant', masque = <nom> } (mask.existing de generative_edit : le masque que
+-- Dany a peint) reprend ce masque de la photo dans le témoin, un masque nouveau (Plans.preparerMasques).
 function Rendu.essayer(params)
     verifierPause(params)
     local prefs = Preferences.lire()

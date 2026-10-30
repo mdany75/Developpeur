@@ -14,9 +14,21 @@ public enum Generatif {
     static let nomExecutable = "mflux-generate-fibo2-edit"
     static let depotNormal = "briaai/Fibo-2.0-dev"
     static let depotRapide = "briaai/Fibo-2.0-edit-turbo"
-    /// Étapes du modèle : 50 en qualité normale, 4 pour Turbo (qui n'en prend pas d'autre).
+    /// Étapes du modèle : 50 en qualité normale, 30 en qualité équilibrée, 4 pour Turbo (qui n'en
+    /// prend pas d'autre).
     static let etapesNormal = 50
+    static let etapesEquilibre = 30
     static let etapesRapide = 4
+    /// Qualité équilibrée : le guidage (CFG) ne tourne que sur les premiers 60 % des étapes
+    /// (--cfg-end 0.6), les autres sans sa seconde passe. Mesures de mflux reprises par Fibo 2 Studio
+    /// (30 étapes à 60 % : environ le rendu de 50 étapes, en deux fois moins de temps) ; le rendu reste
+    /// à constater sur de vraies photos de Dany : provisoire.
+    static let finGuidageEquilibre = 0.6
+    /// Le guidage (--guidance) que l'appel peut donner : de 1 (sans guidage) à 10 ; absent, celui de
+    /// mflux (5 pour Fibo 2 Dev). Turbo, distillé, n'en a pas.
+    static let guidageMin = 1.0
+    static let guidageMax = 10.0
+    static let guidageParDefaut = 5.0
     /// Délai maximal d'une génération (un premier téléchargement du modèle compris).
     public static let delaiMax: TimeInterval = 900
     /// Au-delà de cette part de l'image changée, toute la sortie de Fibo est prise.
@@ -36,11 +48,32 @@ public enum Generatif {
     static let elargissement = 0.02
     static let fondu = 0.005
 
+    /// La qualité d'un appel : équilibrée par défaut (30 étapes, guidage sur 60 % d'entre elles),
+    /// normale (50 étapes, guidage sur toutes), rapide (Turbo, 4 étapes, sans guidage).
     public enum Qualite: String {
-        case normal, fast
-        var etapes: Int { self == .normal ? Generatif.etapesNormal : Generatif.etapesRapide }
-        var texte: String { self == .normal ? "normale (\(etapes) étapes)" : "rapide (Turbo, \(etapes) étapes)" }
+        case balanced, normal, fast
+        var etapes: Int {
+            switch self {
+            case .balanced: return Generatif.etapesEquilibre
+            case .normal: return Generatif.etapesNormal
+            case .fast: return Generatif.etapesRapide
+            }
+        }
+        var texte: String {
+            switch self {
+            case .balanced: return "équilibrée (\(etapes) étapes, guidage sur 60 % d'entre elles)"
+            case .normal: return "normale (\(etapes) étapes)"
+            case .fast: return "rapide (Turbo, \(etapes) étapes)"
+            }
+        }
+        /// Turbo est distillé pour tourner sans guidage : ni phrase d'exclusion, ni guidance, ni --cfg-end.
+        var avecGuidage: Bool { self != .fast }
+        /// La part des étapes avec guidage (nil : toutes).
+        var finGuidage: Double? { self == .balanced ? Generatif.finGuidageEquilibre : nil }
     }
+
+    /// La qualité par défaut d'un appel.
+    static let qualiteParDefaut = Qualite.balanced
 
     // MARK: Arguments
 
@@ -71,20 +104,31 @@ public enum Generatif {
         return (multiple16(l), multiple16(h))
     }
 
-    /// Les arguments de mflux, en tableau (aucun shell) : l'entrée (le recadrage autour de la zone, ou
-    /// la photo entière sans zone) et, avec une zone, son masque (`--mask-path`, PNG RVB, accepté par
+    /// Les arguments de mflux, en tableau (aucun shell) : la demande (la fiche JSON de FIBO-vlm par
+    /// --prompt-file, sinon la phrase anglaise par --prompt), l'entrée (le recadrage autour de la zone,
+    /// ou la photo entière sans zone) et, avec une zone, son masque (`--mask-path`, PNG RVB, accepté par
     /// mflux 0.24, constaté le 29 octobre 2026). Toujours --low-ram (constaté le 29 octobre 2026 : sans lui, mflux prenait 39 Go
     /// sur les 48 du Mac Studio et Lightroom ne répondait plus ; avec lui, 20,6 Go et la même image
-    /// au pixel près). Qualité normale : décodage en pleine précision (--vae-full-precision, sans
-    /// coût de mémoire avec --low-ram) ; jamais --quantize (-q 8 : 38 Go, et moins fidèle) ni
-    /// --step-cache-ratio, qui dégradent l'image.
+    /// au pixel près). Qualités normale et équilibrée : décodage en pleine précision
+    /// (--vae-full-precision, sans coût de mémoire avec --low-ram), le guidage (--guidance, s'il est
+    /// donné), la phrase d'exclusion (--negative-prompt) et, en équilibrée, --cfg-end ; ces trois-là
+    /// seulement avec le guidage au-dessus de 1 (à 1, mflux ne fait pas la seconde passe qui les lit).
+    /// Turbo, distillé sans guidage, n'en reçoit aucun (comme Fibo 2 Studio). Jamais --quantize (-q 8 :
+    /// 38 Go, et moins fidèle) ni --step-cache-ratio, qui dégradent l'image.
     static func arguments(entree: URL, masque: URL?, instruction: String, taille: (largeur: Int, hauteur: Int),
-                          qualite: Qualite, graine: Int, sortie: URL, modeleRapide: URL?) -> [String] {
-        var args = ["--prompt", instruction, "--image-paths", entree.path]
+                          qualite: Qualite, graine: Int, sortie: URL, modeleRapide: URL?,
+                          fiche: URL? = nil, exclusion: String? = nil, guidage: Double? = nil) -> [String] {
+        var args = fiche.map { ["--prompt-file", $0.path] } ?? ["--prompt", instruction]
+        args += ["--image-paths", entree.path]
         if let masque { args += ["--mask-path", masque.path] }
         switch qualite {
-        case .normal:
-            args += ["--steps", String(etapesNormal), "--vae-full-precision"]
+        case .normal, .balanced:
+            args += ["--steps", String(qualite.etapes), "--vae-full-precision"]
+            if let guidage { args += ["--guidance", texteNombre(guidage)] }
+            if (guidage ?? guidageParDefaut) > 1 {
+                if let fin = qualite.finGuidage { args += ["--cfg-end", texteNombre(fin)] }
+                if let exclusion, !exclusion.isEmpty { args += ["--negative-prompt", exclusion] }
+            }
         case .fast:
             // mflux 0.24 réclame une version de Turbo que Bria a retirée : la copie locale du cache.
             if let modeleRapide {
@@ -95,6 +139,282 @@ public enum Generatif {
         }
         args += ["--low-ram", "--width", String(taille.largeur), "--height", String(taille.hauteur), "--seed", String(graine), "--output", sortie.path]
         return args
+    }
+
+    /// Un nombre pour la ligne de commande : point décimal, sans zéros inutiles (« 0.6 », « 7.5 », « 5 »).
+    static func texteNombre(_ valeur: Double) -> String {
+        let arrondi = (valeur * 100).rounded() / 100
+        return arrondi == arrondi.rounded() ? String(Int(arrondi)) : String(arrondi)
+    }
+
+    // MARK: Phrase d'exclusion
+
+    /// Ce que Fibo 2 doit éviter, par défaut (--negative-prompt, en anglais) : le texte, les logos et
+    /// filigranes qu'un modèle génératif invente, une personne ou une tête en double, des membres en
+    /// trop, un corps déformé. Seulement hors Turbo. Elle **remplace** le négatif de mflux pour une
+    /// retouche, la légende nulle sur laquelle Fibo 2 a été entraîné (`Fibo2PromptEncoder.NULL_CAPTION`,
+    /// `negative_prompt or default` dans fibo2_core.py) : elle part donc au format de cette légende
+    /// (`legendeExclusion`), ses clés vides, la liste sous `aesthetics.artifacts`, comme le négatif de
+    /// la génération de la fiche du modèle (`TEXT_TO_IMAGE_NEGATIVE`), jamais en mots libres. Provisoire :
+    /// son effet sur le rendu reste à constater (même graine, avec et sans).
+    static let exclusionTexte = ["text", "letters", "words", "caption", "logo", "watermark", "signature"]
+    static let exclusionCorps = ["duplicate person", "extra head", "extra face", "extra arms", "extra legs", "extra hands",
+                                 "extra fingers", "deformed", "disfigured", "distorted anatomy"]
+    /// La longueur de « avoid » (ce que l'appel ajoute).
+    static let longueurExclusion = 500
+
+    /// Une instruction qui parle de texte (« change the sign to "Open" ») : la partie texte de la
+    /// phrase d'exclusion est laissée de côté, sinon elle empêcherait la demande.
+    static func parleDeTexte(_ instruction: String) -> Bool {
+        instruction.contains("\"") || instruction.contains("«") || instruction.contains("“")
+            || instruction.range(of: #"(?i)\b(text|texts|letter|letters|lettering|word|words|writ\w*|sign|signs|signage|label|labels|logo|logos|caption|inscription|title|font)\b"#,
+                                 options: .regularExpression) != nil
+    }
+
+    /// Une instruction qui ajoute une personne (« add a man walking in the background », « a second
+    /// person ») : « duplicate person » est laissé de côté, sinon la passe négative pousserait contre
+    /// la demande. Une instruction qui parle seulement d'une personne déjà là (« the woman's trousers »)
+    /// le garde : c'est là qu'une tête en double s'est vue (essai du 29 octobre 2026).
+    static func ajouteUnePersonne(_ instruction: String) -> Bool {
+        let personne = #"(person|persons|people|man|men|woman|women|boy|boys|girl|girls|child|children|kid|kids|baby|babies|someone|somebody|crowd|pedestrian|pedestrians|passerby|passersby|couple|family|friend|friends|figure|figures)"#
+        // Le verbe, puis la personne à deux mots au plus (« add a young woman », « add two people ») :
+        // jamais « put a hat on the woman », qui ne fait que l'habiller.
+        let motifs = [#"(?i)\b(add|adds|adding|insert|inserting|put|place|include|including)\s+((a|an|one|some)\s+)?(\w+\s+){0,2}"# + personne + #"\b"#,
+                      #"(?i)\b(another|second|third|more|two|three|four|several|extra)\s+(\w+\s+)?"# + personne + #"\b"#]
+        return motifs.contains { instruction.range(of: $0, options: .regularExpression) != nil }
+    }
+
+    /// Les termes de la phrase d'exclusion d'une modification : la liste par défaut (sans sa partie
+    /// texte si l'instruction parle de texte, sans « duplicate person » si elle ajoute une personne),
+    /// puis « avoid » de l'appel.
+    static func termesExclusion(instruction: String, avoid: String?) -> [String] {
+        var termes = (parleDeTexte(instruction) ? [] : exclusionTexte) + exclusionCorps
+        if ajouteUnePersonne(instruction) { termes.removeAll { $0 == "duplicate person" } }
+        if let avoid = avoid?.trimmingCharacters(in: .whitespacesAndNewlines), !avoid.isEmpty { termes.append(avoid) }
+        return termes
+    }
+
+    /// La légende négative passée à --negative-prompt : la légende nulle de mflux (mêmes clés, même
+    /// ordre, toutes vides), les termes sous `aesthetics.artifacts`, en JSON compact comme mflux
+    /// l'écrit (l'ordre des clés est celui de l'entraînement : écrite à la main, jamais par
+    /// JSONCoding, qui trie les clés).
+    static func legendeExclusion(_ termes: [String]) -> String {
+        let liste = termes.map { JSONCoding.line(.string($0)) }.joined(separator: ",")
+        return #"{"short_description":"","objects":[],"background_setting":"","lighting":{},"#
+            + #""aesthetics":{"artifacts":["# + liste + #"]},"photographic_characteristics":{},"style_medium":"","#
+            + #""context":"","artistic_style":""}"#
+    }
+
+    /// La phrase d'exclusion d'une modification, telle que mflux la reçoit (`legendeExclusion`).
+    static func exclusion(instruction: String, avoid: String?) -> String {
+        legendeExclusion(termesExclusion(instruction: instruction, avoid: avoid))
+    }
+
+    // MARK: Fiche JSON (FIBO-vlm)
+
+    /// FIBO-vlm (briaai/FIBO-vlm, environ 8 Go) rédige sur ce Mac, avant chaque passage de Fibo, une
+    /// fiche structurée (VGL) de la modification : la légende du résultat et l'instruction réécrite
+    /// (edit_instruction), que mflux lit par --prompt-file (fibo2 edit accepte un objet JSON avec
+    /// « edit_instruction » et la légende, mflux/models/fibo2/README.md). Lancé par le Python de mflux
+    /// (`-I`, sans shell) sur un script du connecteur écrit dans le dossier de l'appel, sur le modèle
+    /// de fibo_vlm_tool.py de Fibo 2 Studio (la tâche edit seulement). Son processus est fini avant le
+    /// lancement de mflux : jamais les deux en mémoire ensemble.
+    static let depotVLM = "briaai/FIBO-vlm"
+    /// La révision de FIBO-vlm que mflux 0.24 charge, épinglée (`ModelRevisions.PINNED` de
+    /// mflux/models/common/resolution/model_revisions.py) : hors ligne, il ne lit que cet instantané du
+    /// cache (`path_resolution`, `revision`, `local_files_only`), jamais celui de `refs/main`. À relire
+    /// à chaque mise à jour de mflux.
+    static let revisionVLM = "bd13da5e0b73c808014d6260963e311c8cdf0d8b"
+    /// Ce que le script écrit sur sa sortie quand FIBO-vlm a refusé la fiche masquée et qu'il l'a
+    /// refaite sans masque (lu par le connecteur, dit dans la réponse).
+    static let marqueRepliFiche = "repli : fiche ordinaire sans masque"
+    /// Le téléchargement du modèle à conseiller : la révision que mflux charge.
+    static var conseilVLM: String { "hf download \(depotVLM) --revision \(revisionVLM)" }
+    /// Le nom du script (que Fibo.motifAutreCalcul reconnaît aussi).
+    static let nomScriptFiche = "fiche-fibo-vlm.py"
+    /// Délai de la rédaction d'une fiche (chargement du modèle compris) ; au-delà, arrêtée, et Fibo 2
+    /// reçoit la phrase seule. Durée réelle et mémoire du VLM : provisoires, restent à constater.
+    public static let delaiFiche: TimeInterval = 300
+    /// Durée attendue d'une fiche, pour la barre seulement (provisoire).
+    static let dureeFicheEstimee: TimeInterval = 90
+    /// Le gris de mflux (Fibo2EditImages.grey_out) dans la zone à régénérer.
+    static let grisMasque: UInt8 = 128
+
+    /// Le script Python que le connecteur écrit dans le dossier de l'appel : charge FiboVLM (le modèle
+    /// du cache, hors ligne), lui donne l'image (grisée dans la zone, avec --use-mask) et l'instruction,
+    /// et écrit la fiche dans --output, dans l'ordre des clés que FIBO-vlm a rédigé (celui des légendes
+    /// de l'entraînement de Fibo 2 : le connecteur ne la réécrit pas). En mode masque, FiboVLM.edit
+    /// refuse tout repli et lève une ValueError quand sa sortie n'a pas d'edit_instruction (« Masked edit
+    /// prompt generation failed; refusing fallback… ») ; le script refait alors, comme fibo_vlm_tool.py
+    /// de Fibo 2 Studio, une fiche ordinaire sur l'image non grisée (--image-originale, le modèle déjà
+    /// chargé), et le dit (`marqueRepliFiche`) : Fibo 2 applique de toute façon le masque. Hors masque,
+    /// FiboVLM.edit en garantit une ; s'il en manque une, l'instruction donnée est jointe à la fin. Code
+    /// 0 si tout va bien, 1 sinon (le message sur stdout).
+    static let scriptFiche = #"""
+    """fiche-fibo-vlm.py — fiche JSON (VGL) d'une modification pour Fibo 2, rédigée sur ce Mac par
+    FIBO-vlm (via mflux), pour generative_edit du Développeur. Écrit par le connecteur dans le dossier
+    de l'appel, lancé par le Python de mflux en -I, effacé avec ce dossier.
+      --image entree.png --instruction "texte anglais" --output fiche.json [--seed N]
+      [--use-mask --image-originale entree-non-grisee.png]
+    """
+
+    import argparse
+    import json
+    import sys
+    from pathlib import Path
+
+
+    def main() -> int:
+        parser = argparse.ArgumentParser(description="Fiche JSON Fibo 2 par FIBO-vlm (tâche edit)")
+        parser.add_argument("--image", type=Path, required=True)
+        parser.add_argument("--instruction", required=True)
+        parser.add_argument("--output", type=Path, required=True)
+        parser.add_argument("--seed", type=int, default=42)
+        parser.add_argument("--use-mask", action="store_true", help="l'image a une zone grisée à régénérer")
+        parser.add_argument("--image-originale", type=Path, help="l'image non grisée, pour le repli sans masque")
+        args = parser.parse_args()
+
+        from mflux.models.fibo_vlm.model.fibo_vlm import FiboVLM
+        from mflux.models.fibo_vlm.model.util import FiboVLMUtil
+
+        vlm = FiboVLM()
+        try:
+            texte = vlm.edit(image=FiboVLMUtil.load_image(args.image), edit_instruction=args.instruction,
+                             use_mask=args.use_mask, seed=args.seed)
+        except ValueError as exc:
+            # FIBO-vlm oublie parfois l'edit_instruction avec le gris, et FiboVLM.edit refuse alors tout
+            # repli en mode masque : une fiche ordinaire sur l'image non grisée (Fibo 2 Studio fait de même).
+            if not args.use_mask or args.image_originale is None:
+                raise
+            print(f"repli : fiche ordinaire sans masque ({exc})", flush=True)
+            texte = vlm.edit(image=FiboVLMUtil.load_image(args.image_originale), edit_instruction=args.instruction,
+                             use_mask=False, seed=args.seed)
+        fiche = json.loads(texte)
+        if not isinstance(fiche, dict):
+            print("erreur FIBO-vlm : la fiche n'est pas un objet JSON")
+            return 1
+        consigne = fiche.get("edit_instruction")
+        if not isinstance(consigne, str) or not consigne.strip():
+            fiche["edit_instruction"] = args.instruction
+        args.output.write_text(json.dumps(fiche, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"fiche écrite : {args.output}", flush=True)
+        return 0
+
+
+    if __name__ == "__main__":
+        try:
+            sys.exit(main())
+        except Exception as exc:  # un message lisible pour le connecteur, pas une trace Python
+            print(f"erreur FIBO-vlm : {exc}", flush=True)
+            sys.exit(1)
+    """#
+
+    /// Les arguments du Python de mflux pour une fiche : -I (isolé : ni variables PYTHON*, ni dossier
+    /// du script dans le chemin des modules), le script, l'image, l'instruction, la sortie, la graine
+    /// de l'appel et, avec une zone, --use-mask (le prompt système EDIT_WITH_MASK de FiboVLM attend une
+    /// image à zones grises).
+    /// Avec une zone, `originale` est l'image non grisée (le repli sans masque).
+    static func argumentsFiche(script: URL, image: URL, instruction: String, sortie: URL, graine: Int, originale: URL?) -> [String] {
+        var args = ["-I", script.path, "--image", image.path, "--instruction", instruction, "--output", sortie.path, "--seed", String(graine)]
+        if let originale { args += ["--use-mask", "--image-originale", originale.path] }
+        return args
+    }
+
+    /// L'image que FIBO-vlm reçoit avec une zone : l'entrée de Fibo grisée dans le masque exactement
+    /// comme mflux le fait avant de l'encoder (Fibo2EditImages.grey_out : le masque rendu binaire à 128,
+    /// un gris plat de 128) ; pixels RGBA 8 bits, masque d'un octet par pixel, même taille.
+    static func griser(_ pixels: [UInt8], masque: [UInt8]) -> [UInt8] {
+        guard masque.count * 4 <= pixels.count else { return pixels }
+        var sortie = pixels
+        for i in masque.indices where masque[i] >= 128 {
+            sortie[i * 4] = grisMasque; sortie[i * 4 + 1] = grisMasque; sortie[i * 4 + 2] = grisMasque
+        }
+        return sortie
+    }
+
+    /// Le modèle FIBO-vlm complet dans le cache Hugging Face : l'instantané de la révision que mflux
+    /// charge (`revisionVLM`, jamais celui de `refs/main`, qu'un téléchargement plus récent déplace), sa
+    /// configuration, son index de poids et chaque fichier de poids qu'il nomme ; nil s'il manque quoi
+    /// que ce soit.
+    static func vlmLocal(cache: URL, revision: String = revisionVLM) -> URL? {
+        let dossier = cache.appendingPathComponent("models--" + depotVLM.replacingOccurrences(of: "/", with: "--"))
+        let instantane = dossier.appendingPathComponent("snapshots/" + revision)
+        guard FileManager.default.fileExists(atPath: instantane.appendingPathComponent("config.json").path),
+              let donnees = try? Data(contentsOf: instantane.appendingPathComponent("model.safetensors.index.json")),
+              let index = try? JSONCoding.parse(donnees), let poids = index["weight_map"]?.object else { return nil }
+        let fichiers = Set(poids.values.compactMap(\.string))
+        guard !fichiers.isEmpty, fichiers.allSatisfy({ FileManager.default.fileExists(atPath: instantane.appendingPathComponent($0).path) }) else { return nil }
+        return instantane
+    }
+
+    /// La fiche écrite par FIBO-vlm, lue : un objet JSON, son edit_instruction non vide (l'instruction
+    /// donnée sinon, comme le script) ; nil si elle est illisible.
+    static func lireFiche(_ donnees: Data, instruction: String) -> [String: JSONValue]? {
+        guard let valeur = try? JSONCoding.parse(donnees), var fiche = valeur.object, !fiche.isEmpty else { return nil }
+        if (fiche["edit_instruction"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty {
+            fiche["edit_instruction"] = .string(instruction)
+        }
+        return fiche
+    }
+
+    /// Un court résumé de la fiche pour la réponse (quelques champs, jamais tout le JSON) : l'instruction
+    /// réécrite, la description, l'arrière-plan, la lumière, le nombre d'objets décrits.
+    static func resumeFiche(_ fiche: [String: JSONValue]) -> JSONValue {
+        func court(_ texte: String?, _ n: Int) -> JSONValue? {
+            guard let texte = texte?.trimmingCharacters(in: .whitespacesAndNewlines), !texte.isEmpty else { return nil }
+            return .string(texte.count > n ? String(texte.prefix(n - 1)) + "…" : texte)
+        }
+        var resume: [String: JSONValue] = ["redigee_par": "FIBO-vlm"]
+        resume["edit_instruction"] = court(fiche["edit_instruction"]?.string, 400)
+        resume["description"] = court(fiche["short_description"]?.string, 300)
+        resume["arriere_plan"] = court(fiche["background_setting"]?.string, 200)
+        resume["lumiere"] = court(fiche["lighting"]?["conditions"]?.string, 120)
+        if let objets = fiche["objects"]?.array { resume["objets_decrits"] = .number(Double(objets.count)) }
+        return .object(resume)
+    }
+
+    /// mflux a refusé la fiche : seulement les messages de refus de `Fibo2CaptionCheck` et de
+    /// `Fibo2PromptEncoder.check_edit_prompt` (le format de légende que Fibo 2 lit, un JSON mal formé,
+    /// une edit_instruction absente ou qui n'est pas un texte), que mflux vérifie avant de charger le
+    /// modèle ; l'appel la remplace alors par la phrase seule, une fois. Jamais un simple mot
+    /// (« edit_instruction ») : la trace Python d'une autre erreur (mémoire pendant l'encodage de la
+    /// légende) montre les lignes de source qui le contiennent.
+    static let refusDeFiche = ["The JSON caption does not have the format FIBO 2 reads",
+                               "The prompt starts like a JSON caption but is not valid JSON",
+                               "\"edit_instruction\" has to be a string",
+                               "A JSON edit prompt needs an \"edit_instruction\" key",
+                               "A \"structured_caption\" must hold the whole caption"]
+    static func ficheRefusee(_ journal: String) -> Bool {
+        refusDeFiche.contains(where: journal.contains)
+    }
+
+    /// La fiche telle que FIBO-vlm l'a écrite, à passer à mflux sans la réécrire (l'ordre des clés est
+    /// celui des légendes de l'entraînement ; JSONCoding les trierait) ; sans edit_instruction non vide
+    /// (le script en garantit une), l'instruction donnée est jointe à la fin du texte, l'ordre gardé
+    /// (Python garde la dernière valeur d'une clé en double). Nil si ce n'est pas un objet JSON.
+    static func ficheAvecInstruction(_ texte: String, instruction: String) -> String? {
+        guard let valeur = try? JSONCoding.parse(Data(texte.utf8)), let fiche = valeur.object, !fiche.isEmpty else { return nil }
+        if !(fiche["edit_instruction"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty { return texte }
+        let net = texte.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard net.hasSuffix("}") else { return nil }
+        let corps = net.dropLast().trimmingCharacters(in: .whitespacesAndNewlines)
+        return corps + ",\n  \"edit_instruction\": " + JSONCoding.line(.string(instruction)) + "\n}\n"
+    }
+
+    /// La dernière ligne non vide d'un journal, bornée (pour une remarque).
+    static func derniereLigne(_ journal: String) -> String {
+        let ligne = journal.split(separator: "\n").last { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        return ligne.map { String($0.prefix(300)) } ?? "sans message"
+    }
+
+    /// Pourquoi la fiche n'a pas été rédigée (FIBO-vlm en échec), en mots simples, d'après son journal.
+    static func expliquerFiche(journal: String, code: Int32) -> String {
+        if ["requires approval", "GatedRepo", "Unauthorized", "Forbidden"].contains(where: journal.contains) {
+            return "accès au modèle \(depotVLM) refusé (le demander sur huggingface.co/\(depotVLM))"
+        }
+        let erreur = journal.split(separator: "\n").last { $0.contains("erreur FIBO-vlm") }
+            ?? journal.split(separator: "\n").last
+        return erreur.map { String($0.prefix(300)) } ?? "code \(code)"
     }
 
     /// Le dossier du modèle dans le cache Hugging Face (version « main » téléchargée), s'il est complet.
@@ -408,19 +728,31 @@ public enum Generatif {
     /// chargement du modèle (avant la première étape), les étapes de Fibo et SeedVR2 (s'il tourne),
     /// enfin la recomposition et l'importation.
     struct Avancement {
-        static let poidsExport = 3.0, poidsChargement = 10.0, poidsEtapes = 70.0, poidsSeedVR = 15.0, poidsFin = 5.0
+        static let poidsExport = 3.0, poidsFiche = 10.0, poidsChargement = 10.0, poidsEtapes = 70.0, poidsSeedVR = 15.0, poidsFin = 5.0
         /// SeedVR2 prévu, par modification.
         var seedVR: [Bool]
+        /// La fiche de FIBO-vlm prévue, par modification (avant le chargement de Fibo 2).
+        var fiche: [Bool]
+
+        init(seedVR: [Bool], fiche: [Bool]? = nil) {
+            self.seedVR = seedVR
+            self.fiche = fiche ?? seedVR.map { _ in false }
+        }
 
         enum Phase {
             case export
+            /// La fiche de FIBO-vlm en cours (sa fraction, d'après sa durée attendue).
+            case fiche(Int, fraction: Double)
             case chargement(Int)
             case etapes(Int, fait: Int, sur: Int)
             case seedVR(Int, fraction: Double)
             case fin
         }
 
-        private func poids(_ rang: Int) -> Double { Self.poidsChargement + Self.poidsEtapes + (seedVR[rang] ? Self.poidsSeedVR : 0) }
+        private func poidsFiche(_ rang: Int) -> Double { rang < fiche.count && fiche[rang] ? Self.poidsFiche : 0 }
+        private func poids(_ rang: Int) -> Double {
+            poidsFiche(rang) + Self.poidsChargement + Self.poidsEtapes + (seedVR[rang] ? Self.poidsSeedVR : 0)
+        }
         private var total: Double { Self.poidsExport + seedVR.indices.reduce(0) { $0 + poids($1) } + Self.poidsFin }
         private func avant(_ rang: Int) -> Double { Self.poidsExport + (0..<rang).reduce(0) { $0 + poids($1) } }
 
@@ -429,11 +761,12 @@ public enum Generatif {
             let fait: Double
             switch phase {
             case .export: fait = 0
-            case .chargement(let rang): fait = avant(rang)
+            case .fiche(let rang, let fraction): fait = avant(rang) + poidsFiche(rang) * min(1, max(0, fraction))
+            case .chargement(let rang): fait = avant(rang) + poidsFiche(rang)
             case .etapes(let rang, let etape, let sur):
-                fait = avant(rang) + Self.poidsChargement + Self.poidsEtapes * min(1, max(0, Double(etape) / Double(max(1, sur))))
+                fait = avant(rang) + poidsFiche(rang) + Self.poidsChargement + Self.poidsEtapes * min(1, max(0, Double(etape) / Double(max(1, sur))))
             case .seedVR(let rang, let fraction):
-                fait = avant(rang) + Self.poidsChargement + Self.poidsEtapes + Self.poidsSeedVR * min(1, max(0, fraction))
+                fait = avant(rang) + poidsFiche(rang) + Self.poidsChargement + Self.poidsEtapes + Self.poidsSeedVR * min(1, max(0, fraction))
             case .fin: fait = total - Self.poidsFin
             }
             return min(99, Int((fait / total * 100).rounded(.down)))
@@ -441,14 +774,15 @@ public enum Generatif {
     }
 
     /// Le temps restant d'après le rythme des étapes déjà faites de la modification en cours (rien
-    /// avant deux étapes) : ses étapes restantes, puis, pour chaque modification suivante, le même
-    /// chargement du modèle et toutes ses étapes. SeedVR2 n'y compte pas (aucun rythme connu).
+    /// avant deux étapes) : ses étapes restantes, puis, pour chaque modification suivante, la même
+    /// fiche de FIBO-vlm (`fiche` : la durée de la dernière, 0 sans fiche), le même chargement du
+    /// modèle et toutes ses étapes. SeedVR2 n'y compte pas (aucun rythme connu).
     static func tempsRestant(etape: Int, sur: Int, premiere: Int, secondesDepuisPremiere: TimeInterval,
-                             chargement: TimeInterval, suivantes: Int) -> TimeInterval? {
+                             chargement: TimeInterval, suivantes: Int, fiche: TimeInterval = 0) -> TimeInterval? {
         let faites = etape - premiere
         guard faites >= 2, secondesDepuisPremiere > 0 else { return nil }
         let parEtape = secondesDepuisPremiere / Double(faites)
-        return Double(max(0, sur - etape)) * parEtape + Double(suivantes) * (chargement + Double(sur) * parEtape)
+        return Double(max(0, sur - etape)) * parEtape + Double(suivantes) * (fiche + chargement + Double(sur) * parEtape)
     }
 
     /// « environ 3 min restantes », « environ 1 min restante », « moins d'une minute restante ».
@@ -949,9 +1283,20 @@ public enum Generatif {
     }
 
     /// Le refus d'un masque presque vide ou presque total (nil s'il convient), avant tout calcul de
-    /// Fibo 2 : moins de `partMasqueMin` de la photo dans le masque, ou hors de lui.
-    static func refusMasque(part: Double) -> String? {
+    /// Fibo 2 : moins de `partMasqueMin` de la photo dans le masque, ou hors de lui. `peint` : le nom
+    /// d'un masque que l'utilisateur a peint (mask.existing) ; ce n'est pas Lightroom qui a calculé sa
+    /// zone, le refus le dit sans renvoyer à un masque calculé (kind, add_mask), qui le remplacerait.
+    static func refusMasque(part: Double, peint: String? = nil) -> String? {
         let texte = CarteMasque.pourcent(part * 100)
+        if let nom = peint {
+            if part < partMasqueMin {
+                return "Le masque « \(nom) » peint dans Lightroom ne couvre presque rien de la photo (\(texte)) : le repeindre plus large dans le panneau Masquage, ou donner region. Rien n'a été fait."
+            }
+            if 1 - part < partMasqueMin {
+                return "Le masque « \(nom) » peint dans Lightroom couvre toute la photo (\(texte)) : inversé dans le panneau Masquage ? Pour changer toute la photo, ni mask ni region. Rien n'a été fait."
+            }
+            return nil
+        }
         if part < partMasqueMin {
             return "Le masque de Lightroom ne couvre presque rien de la photo (\(texte)) : Lightroom n'y a sans doute rien trouvé (kind, part, person ?), ou le sujet est minuscule. Le vérifier avec add_mask et mask_map, ou donner region. Rien n'a été fait."
         }

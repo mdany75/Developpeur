@@ -26,8 +26,7 @@
   - SeedVR2 remet une zone rendue trop petite à sa taille, avec plus de détail (modèle de quelques
     Go téléchargé au premier usage), seulement pour une zone désignée et un agrandissement mesuré ;
     sans lui, mise à la taille ordinaire, et Claude le dit.
-  - Qualité maximale par défaut (décodage en pleine précision) ; le mode rapide seulement sur
-    demande.
+  - Décodage en pleine précision (hors qualité rapide) ; le mode rapide seulement sur demande.
   - Une seule barre de progression dans Lightroom, de 0 à 100 %, avec le changement en cours et le
     temps restant ; sa croix arrête tout sans rien importer, à tout moment.
   - La consigne part en anglais pour Fibo 2 ; Claude vous en montre la traduction française, gardée
@@ -50,6 +49,34 @@
     Lightroom cesse de répondre. Le mode qui montrait aussi la photo entière à Fibo 2 est retiré :
     à cet essai, Fibo 2 y a redessiné une seconde tête, plus petite, que la vérification
     d'alignement n'a pas vue ; le recadrage autour de la zone reste le seul chemin.
+
+- Retouche générative, cinq fonctions reprises de Fibo 2 Studio :
+  - Une fiche détaillée de chaque changement, rédigée sur le Mac par FIBO-vlm (le modèle de Bria
+    qui décrit l'image, environ 8 Go) avant Fibo 2 : ce qui change, ce qui reste, la lumière, le
+    décor ; Fibo 2 devrait mieux la suivre qu'une phrase (à constater). Elle prend une minute ou deux
+    de plus, tourne seule avant Fibo 2 (jamais les deux en mémoire ensemble), et n'est jamais
+    bloquante : sans le modèle, ou en cas d'échec, Fibo 2 reçoit la phrase seule et Claude le dit.
+    Quand FIBO-vlm refuse la fiche de la zone grisée, il en rédige une ordinaire, comme Fibo 2
+    Studio. Claude vous en donne un court résumé.
+  - Une liste de ce que Fibo 2 doit éviter (du texte ou un logo inventé, une personne ou une tête
+    en double, des membres en trop, un corps déformé), à laquelle Claude peut ajouter ce que vous
+    voulez éviter ; pas en qualité rapide (Turbo n'en tient pas compte). Elle remplace la
+    description vide sur laquelle Fibo 2 a été entraîné pour se guider : elle en garde la forme, et
+    son effet sur le rendu reste à mesurer.
+  - Une qualité « équilibrée », la nouvelle qualité par défaut : environ le rendu de la qualité
+    normale en deux fois moins de temps (30 étapes au lieu de 50) ; la normale et la rapide restent.
+  - Un masque que vous peignez vous-même dans Lightroom (au pinceau ou avec tout autre outil du
+    panneau Masquage) peut désigner la zone à changer : donnez-lui un nom (« Fibo ») et dites-le à
+    Claude. Votre masque n'est ni changé ni retiré ; s'il manque, ou si deux masques portent ce
+    nom, Claude vous le dit avec la liste des noms.
+  - Le guidage (de 1 à 10, 5 par défaut) se règle sur demande : plus haut, Fibo 2 suit l'instruction
+    de plus près.
+  - Un calcul de Fibo 2 Studio lancé pendant le vôtre arrête le vôtre avant son étape suivante
+    (fiche, Fibo 2 ou SeedVR2) : jamais deux calculs ensemble sur le Mac.
+  - Provisoire : la durée et la mémoire de FIBO-vlm, l'effet de la fiche, le rendu de la qualité
+    équilibrée, l'effet de la liste à éviter et celui du guidage restent à constater sur vos photos.
+    Un essai en qualité rapide ne vérifie que la fiche et le masque peint : la qualité équilibrée,
+    la liste à éviter et le guidage demandent un essai en qualité équilibrée ou normale.
 
 - Retouche générative : changer l'arrière-plan, le ciel ou une personne se fait avec un masque
   calculé par Lightroom (outil `generative_edit`, argument `mask`), plus avec un rectangle. Fibo 2

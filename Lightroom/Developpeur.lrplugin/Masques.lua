@@ -129,16 +129,7 @@ end
 local function renouveler(correction)
     correction.CorrectionID = Locaux.uuid()
     correction.CorrectionSyncID = Locaux.syncId()
-    local function masques(liste)
-        for _, m in ipairs(liste or {}) do
-            if type(m) == 'table' then
-                m.MaskID = Locaux.uuid()
-                m.MaskSyncID = Locaux.syncId()
-                masques(m.Masks)
-            end
-        end
-    end
-    masques(correction.CorrectionMasks)
+    Locaux.nouveauxIdentifiants(correction.CorrectionMasks)
 end
 
 -- Retire les masques vides de la photo d'un plan (catalog:deleteAllEmptyMasks), et note ceux que

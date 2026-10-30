@@ -173,7 +173,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `retoucher` | `photo?`, `taches`, `yeux`, `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
 | `geometrie` | `photo?`, `photos?` ou `selection?`, `rendre?`, `taille?` | `photos` : par photo, `active` (correction géométrique), `transformation` (Upright, perspective ou distorsion manuelle), `empreinte` ; avec `rendre`, `chemin_corrige` et `chemin_origine` (voir Recalage de la géométrie) |
 | `copier` | `source`, `photos?` ou `selection?`, `cles`, `inclure`, `etape`, `raison?`, `confirme` | comme `appliquer`, sans la photo source |
-| `essayer` | `action` (`appliquer`, `masquer`, `retoucher`), `photo?`, `taille` (0 : pleine résolution), `comparer?`, `instantane?`, `entier?`, `temoin?` (un rendu témoin : carte de `mask_map`, masque de Lightroom de `generative_edit` ; aucun accord demandé), et les paramètres de l'action | `chemin` (et `chemin_actuel`), `changements`, `remarques` ; avec `instantane`, l'état proposé est rangé en instantané « Claude · <nom> » avant le rendu (`instantane` dans la réponse) ; la photo est remise comme avant. De la 1.3 à la 1.3.5, `exercice` (« Je le fais ») et `sans_rendu` : retirés au correctif 1.3.6 (voir Je le fais). `entier`, avec un recadrage proposé (action `appliquer`, cadre non retiré) : `cadre_propose` (le cadre que Lightroom a gardé, relu), `dimensions` et `chemin_entier` (troisième étape « Claude · essai : image entière ») ; sans image entière, la remarque « Image entière non rendue : … » (voir Composition lue) |
+| `essayer` | `action` (`appliquer`, `masquer`, `retoucher`), `photo?`, `taille` (0 : pleine résolution), `comparer?`, `instantane?`, `entier?`, `temoin?` (un rendu témoin : carte de `mask_map`, masque de Lightroom de `generative_edit` ; aucun accord demandé), et les paramètres de l'action (pour `masquer`, une zone `{type = 'existant', masque = <nom>}` reprend un masque déjà sur la photo dans un masque nouveau : voir Masque peint dans Lightroom) | `chemin` (et `chemin_actuel`), `changements`, `remarques` ; avec `instantane`, l'état proposé est rangé en instantané « Claude · <nom> » avant le rendu (`instantane` dans la réponse) ; la photo est remise comme avant. De la 1.3 à la 1.3.5, `exercice` (« Je le fais ») et `sans_rendu` : retirés au correctif 1.3.6 (voir Je le fais). `entier`, avec un recadrage proposé (action `appliquer`, cadre non retiré) : `cadre_propose` (le cadre que Lightroom a gardé, relu), `dimensions` et `chemin_entier` (troisième étape « Claude · essai : image entière ») ; sans image entière, la remarque « Image entière non rendue : … » (voir Composition lue) |
 | `presets` | `filtre?`, `limite` | `total`, `presets` (dossier, nom, UUID) |
 | `creerPreset` | `nom`, `photo?`, `cles`, `inclure` | `reglages` de la photo, dont le serveur fait un fichier XMP |
 | `journal` | `photos?` ou `selection?` | par photo : `entrees` (date, étape, raison, changements ou note ; `etape_id` depuis la 1.3) ; de la 1.3 à la 1.3.5, `detaille` (pour `photo_lesson`) y ajoutait la photo décrite en entier et `prise_de_vue_plus` : retiré au correctif 1.3.6 (voir Leçon de la photo) |
@@ -7872,8 +7872,10 @@ Arguments : `photo_id` (sans lui, la photo active de `etat`), `instruction` (2 0
 plus, en anglais : ce qui change et ce qui reste), `instruction_fr` (exigée : sa traduction pour
 Dany), `region` (facultative pour une seule modification : `{x, y, width, height}` de 0 à 1 dans
 l'image que montre `view_photo`), `label` (nom court), ou à leur place `edits` (1 à 4 modifications ;
-voir Recadrage, plusieurs modifications, SeedVR2), `upscale` (vrai par défaut : SeedVR2), `quality` (`normal`, par défaut, 50 étapes,
-pleine précision ; `fast`, Turbo, 4 étapes), `seed` (0 à 2³¹ − 1 ; sans elle, une graine au hasard,
+voir Recadrage, plusieurs modifications, SeedVR2), `upscale` (vrai par défaut : SeedVR2), `quality` (`balanced`, par défaut
+depuis le 29 octobre 2026 au soir, 30 étapes avec `--cfg-end 0.6` ; `normal`, 50 étapes, pleine précision ; `fast`, Turbo,
+4 étapes), `structured_prompt`, `avoid`, `guidance` (voir Fiche de FIBO-vlm, exclusion, qualité
+équilibrée, guidage, masque peint), `seed` (0 à 2³¹ − 1 ; sans elle, une graine au hasard,
 rendue), `confirm`, `reason` ; aucun argument exigé par le schéma (`instruction` ou `edits`). Titre « Retouche générative (Fibo 2) », `destructiveHint` faux (rien
 n'est retiré : une photo s'ajoute), description de moins de 1 200 caractères.
 
@@ -8403,6 +8405,151 @@ leurs JPEG, le calcul du masque IA avant chacun), leur alignement au pixel avec 
 le bord doux dans un essai réel (cheveux), une personne non reconnue
 (`personnes_non_reconnues`), et les seuils provisoires (`grilleNettoyage`, `margeMasque`,
 `fonduMasque`, `partMasqueMin`, ceux de l'opacité) sur de vrais arrière-plans changés.
+
+### Fiche de FIBO-vlm, exclusion, qualité équilibrée, guidage, masque peint (29 octobre 2026)
+
+Demandé par Dany le 29 octobre 2026 au soir : reprendre cinq fonctions de Fibo 2 Studio
+(`~/Developer/Fibo2Studio`, lu seulement : `Generator.swift`, `Resources/fibo_vlm_tool.py`,
+`MaskEditor.swift`).
+
+**Fiche JSON par FIBO-vlm** (`structured_prompt`, vrai par défaut). Avant chaque passage de Fibo,
+FIBO-vlm (`briaai/FIBO-vlm`, Qwen3-VL, environ 8 Go de poids) rédige sur ce Mac une fiche structurée
+(VGL) de la modification : la légende du résultat (`short_description`, `objects`,
+`background_setting`, `lighting`, `aesthetics`, `photographic_characteristics`, `style_medium`,
+`context`…) et l'instruction réécrite (`edit_instruction`). mflux la lit par `--prompt-file` à la
+place de `--prompt` (`mflux-generate-fibo2-edit` accepte un objet JSON avec `edit_instruction` et la
+légende, en clés propres ou sous `structured_caption` : `mflux/models/fibo2/README.md`,
+`Fibo2PromptEncoder.edit_prompt` ; la légende est vérifiée par `Fibo2CaptionCheck` avant le chargement
+du modèle). `FiboVLM.edit` (mflux 0.24, `models/fibo_vlm/model/fibo_vlm.py`) rend une
+`edit_instruction` non vide ou lève (`_normalize_edit_output`) ; hors masque, il se replie d'abord sur
+la tâche `refine` avec l'instruction donnée ; **en mode masque (`use_mask`), il refuse tout repli** et
+lève « Masked edit prompt generation failed; refusing fallback… » (lignes 246 à 250). Le script
+attrape cette erreur et refait, comme `fibo_vlm_tool.py` de Fibo 2 Studio (qui grise à 128 lui aussi,
+puis se replie), une fiche ordinaire sur l'image **non grisée** (`--image-originale`, le modèle déjà
+chargé) ; il l'écrit sur sa sortie (`Generatif.marqueRepliFiche`), et la réponse le dit
+(`remarque_fiche` : « fiche ordinaire, sur l'image non grisée ») : Fibo 2 applique de toute façon la
+zone. Si une fiche arrive quand même sans `edit_instruction`, l'instruction donnée y est jointe à la
+fin (le script, et `Generatif.ficheAvecInstruction`).
+**La fiche passe à mflux telle que FIBO-vlm l'a écrite** : l'ordre de ses clés est celui des
+légendes de l'entraînement de Fibo 2 (mflux le garde : `json.loads`, puis `json.dumps` sans tri dans
+`Fibo2PromptEncoder.edit_prompt`) ; le connecteur ne la réécrit jamais par `JSONCoding`, qui trie les
+clés (`Generatif.lireFiche` ne sert qu'à la valider et au résumé).
+
+- Lancement (`ToolHandler.redigerFiche`) : le Python de l'outil mflux (`Fibo.python`, par défaut à
+  côté du vrai exécutable de mflux, le lien de `~/.local/bin` suivi :
+  `~/.local/share/uv/tools/mflux/bin/python`), en `-I`, sur un script du connecteur
+  (`Generatif.scriptFiche`, écrit dans le dossier de l'appel sous `fiche-fibo-vlm.py`, sur le modèle
+  de `fibo_vlm_tool.py`, la tâche `edit` seulement), sans shell, arguments en tableau
+  (`Generatif.argumentsFiche` : `--image`, `--instruction` anglaise, `--output`, `--seed` de l'appel,
+  `--use-mask` et `--image-originale` avec une zone), sortie dans un tuyau, par `ToolHandler.executer` (annulation, croix de
+  la barre, arrêt du serveur par `TravailFibo`, comme mflux), délai `Fibo.delaiFiche`
+  (`Generatif.delaiFiche`, 300 s), hors ligne (`HF_HUB_OFFLINE=1`, `HF_HUB_CACHE` = le cache où le
+  modèle a été vu).
+- Entrée : l'image d'entrée de Fibo (le recadrage à environ 1 Mpx, ou la photo entière), et avec
+  une zone (`region`, masque de Lightroom, masque peint) cette image **grisée** dans la zone
+  exactement comme mflux le fait avant de l'encoder (`Fibo2EditImages.grey_out` : masque binaire à
+  128, gris plat de 128 ; `Generatif.griser`), avec `--use-mask` : le prompt système
+  `EDIT_WITH_MASK` de FiboVLM attend une image à zones grises. Fibo 2 Studio grise de même, et se
+  replie sur la photo non grisée sans masque quand FiboVLM refuse : ce connecteur aussi (ci-dessus).
+- Jamais bloquant : le Python ou le modèle absents (`Fibo.raisonSansFiche` : `Generatif.vlmLocal`
+  exige l'instantané de la révision que mflux épingle, `Generatif.revisionVLM`
+  `bd13da5e0b73c808014d6260963e311c8cdf0d8b` (`ModelRevisions.PINNED`, à relire à chaque mise à jour
+  de mflux : hors ligne, mflux ne charge que lui, jamais celui de `refs/main`), avec `config.json`,
+  `model.safetensors.index.json` et chaque fichier de poids qu'il nomme ; le conseil
+  `Generatif.conseilVLM` télécharge cette révision ; aucun téléchargement par le connecteur), un échec,
+  un délai, une fiche illisible : la phrase seule, et la réponse le dit (`remarque_fiche`, au premier
+  niveau quand le VLM ne peut pas tourner, sinon par modification). Une fiche que mflux refuse
+  (`Generatif.ficheRefusee` : seulement les messages de refus de `Fibo2CaptionCheck` et de
+  `check_edit_prompt`, `Generatif.refusDeFiche`, jamais un simple mot comme `edit_instruction`, que la
+  trace d'une autre erreur montre) : mflux relancé une fois avec la phrase seule (il la vérifie avant
+  de charger le modèle).
+- Mémoire : le VLM tourne seul, avant mflux ; son processus est fini (ou arrêté) quand mflux part
+  (`executer` attend sa fin). `Fibo.motifAutreCalcul` (`pgrep -f`) voit aussi `fibo_vlm_tool.py` de
+  Fibo 2 Studio et `fiche-fibo-vlm.py` d'un autre serveur : jamais deux calculs ensemble sur ce Mac.
+  `Fibo.autreCalcul` se relit au début de l'appel, puis juste avant chaque lancement (FIBO-vlm, mflux,
+  SeedVR2 ; `seulSurLeMac`) : un calcul lancé ailleurs pendant l'appel l'arrête avant ce lancement,
+  rien d'importé (les processus de l'appel sont alors finis : pgrep ne voit qu'un autre).
+- Barre : une phase « fiche (FIBO-vlm) » par modification, avant le chargement de Fibo
+  (`Generatif.Avancement`, `poidsFiche` 10 ; sa fraction d'après `dureeFicheEstimee`, 90 s,
+  provisoire) ; le temps restant compte la fiche de chaque modification suivante (`tempsRestant`,
+  `fiche`).
+- Réponse : par modification, un court résumé de la fiche (`fiche` : `redigee_par`,
+  `edit_instruction`, `description`, `arriere_plan`, `lumiere`, `objets_decrits` ; jamais tout le
+  JSON) ou `remarque_fiche` ; au premier niveau `fiche_fibo_vlm` et `duree_fiches_s`.
+
+**Phrase d'exclusion** (`--negative-prompt`) : `Generatif.termesExclusion` : par défaut, le texte
+(`text, letters, words, caption, logo, watermark, signature`, laissés de côté quand l'instruction
+parle de texte : `Generatif.parleDeTexte`, guillemets ou mots comme « sign », « label », « text »)
+et le corps (`duplicate person, extra head, extra face, extra arms, extra legs, extra hands, extra
+fingers, deformed, disfigured, distorted anatomy` ; sans `duplicate person` quand l'instruction ajoute
+une personne, `Generatif.ajouteUnePersonne` : « add a man », « a second person », jamais « put a hat
+on the man »), puis `avoid` (anglais, 500 caractères au plus), ajouté à la fin. **Elle remplace le
+négatif de mflux** : pour une retouche, mflux passe d'ordinaire la légende nulle sur laquelle Fibo 2
+a été entraîné (`Fibo2PromptEncoder.NULL_CAPTION`, toutes les clés vides ; `negative_prompt or
+default` dans `fibo2_core.py`), et Fibo 2 Studio ne passe rien par défaut. Elle part donc au format de
+cette légende, jamais en mots libres (`Generatif.legendeExclusion` : les clés de la légende nulle,
+dans son ordre, vides, les termes sous `aesthetics.artifacts`, comme le négatif de génération de la
+fiche du modèle, `TEXT_TO_IMAGE_NEGATIVE` ; JSON compact écrit à la main). Le guidage pousse entre la
+fiche et cette légende : son effet sur le rendu reste à constater (même graine, avec et sans). Hors Turbo seulement : Turbo est distillé sans guidage (CFG), Fibo 2 Studio ne la
+lui passe pas, et mflux ne la lit qu'au guidage au-dessus de 1 (`GUIDANCE_OPTIONS`). La réponse la
+dit par modification (`exclusion`) ; en Turbo, `remarque_guidage` dit qu'`avoid` (et `guidance`)
+n'ont pas servi.
+
+**Qualité équilibrée** (`quality = balanced`, la qualité par défaut, `Generatif.qualiteParDefaut`) :
+`--steps 30 --cfg-end 0.6 --vae-full-precision` (mesures de mflux reprises par Fibo 2 Studio :
+30 étapes avec le guidage sur 60 % d'entre elles donnent à peu près le rendu de 50 étapes, en deux
+fois moins de temps ; Studio estime 1 min 40 contre 3 min 40). `normal` (50 étapes) et `fast`
+(Turbo) restent. `--cfg-end` ne part qu'au guidage au-dessus de 1.
+
+**Guidage** (`guidance`, de 1 à 10, `Generatif.guidageMin` et `guidageMax` ; absent : celui de
+mflux, 5 pour Fibo 2 Dev, que la réponse dit dans `guidage`) : `--guidance`, hors Turbo seulement
+(dit en Turbo). À 1, mflux ne fait pas la seconde passe du guidage : ni exclusion ni `--cfg-end`
+(`remarque_guidage`).
+
+**Masque peint dans Lightroom** (`mask: {existing: "Fibo"}`) : un masque déjà sur la photo, que Dany
+peint lui-même (pinceau ou tout autre outil du panneau Masquage), désigné par son nom exact, casse
+indifférente ; seul dans `mask` (ni `kind`, ni `invert`, ni `combine` : inverser ou combiner se fait
+sur le masque, dans Lightroom). Avant l'exportation, la commande `masques` (action `lister`, lecture
+seule) le cherche (`ToolHandler.masqueExistant`) : absent, ou porté par deux masques, refusé avec la
+liste des noms ; trouvé, son nom exact part au module. Dans les deux rendus témoins (`essayer`,
+`temoin`), la zone `{type = 'existant', masque = <nom>}` fait reprendre par `Plans.preparerMasques`
+(`composantsExistants`) les `CorrectionMasks` de ce masque, copiés par `pourLightroom` (sans
+métatable), avec de nouveaux identifiants (`Locaux.nouveauxIdentifiants`, partagé avec
+`Masques.renouveler`), dans un masque témoin **nouveau** (`Locaux.correction`, actif, intensité 1,
+l'effet témoin) : l'effet du masque de Dany reste dans l'état actuel comme dans le témoin, et seule la
+différence du témoin compte ; ses empreintes de masque IA restent (rien à recalculer) ; la photo est
+remise comme toute proposition ; rien de Dany n'est changé ni retiré. Le reste du chemin (masque
+binaire, opacité du bord, recadrage, zone de mélange) est celui de `mask`. La simulation de la liaison
+refuse un `CorrectionID` ou un `MaskID` en double sur la photo (supposé, d'après
+`Masques.renouveler`).
+
+Essais : `GeneratifTests` (`testFicheDeFiboVLMAvantMflux` : un faux Python de mflux, jamais le vrai
+ni le vrai FIBO-vlm, qui écrit une fiche ; image grisée, `--use-mask`, `-I`, hors ligne, mflux par
+`--prompt-file`, la fiche octet pour octet telle que le VLM l'a écrite, VLM fini avant mflux ;
+`testFicheEnEchecPhraseSeule`, `testSansFiboVLMPhraseSeule`, `testFicheRefuseeParMfluxPhraseSeule`,
+`testAutreCalculVoitLeVLM`, `testAutreCalculVuAvantChaqueLancement`, `testArgumentsParQualite`,
+`testExclusionEtGuidage`, `testAvancementAvecFiche`, `testGriserLireEtResumerLaFiche`,
+`testModeleVLMALaRevisionEpinglee`, `testScriptDeFicheReplieSansMasque` (le vrai script, lancé par un
+Python 3 de Homebrew sur un faux paquet mflux, jamais le vrai FIBO-vlm ; sauté sans Python 3),
+`testRepliSansMasqueDitDansLaReponse`, `testMasquePeintDansLightroom`,
+`testMasquePeintVideOuPresqueVide`), `essais-generatif.lua` (masque existant repris dans un témoin
+neuf, absent ou en double refusé avec les noms, rien de rendu ni d'écrit, identifiants en double
+refusés par la simulation).
+
+Un masque peint vidé (ses `composants` listés vides par la commande `masques`) est refusé par le
+connecteur avant l'exportation et l'accord (le module le refuse encore au premier témoin) ; un masque
+peint presque vide ou total a son propre refus (`Generatif.refusMasque` avec `peint` : le repeindre
+plus large, region, ou inversé dans le panneau Masquage ?), jamais celui d'un masque calculé, qui
+renverrait à `kind` et `add_mask`.
+
+Provisoire et reste à constater : la durée et la mémoire de FIBO-vlm sur ce Mac (chargement
+compris ; `dureeFicheEstimee`, `delaiFiche`), l'effet de la fiche sur le rendu, le rendu de la
+qualité équilibrée sur de vraies photos de Dany, l'effet de la phrase d'exclusion par défaut, le
+masque peint au pinceau dans un vrai Lightroom (sa copie dans le témoin rendue comme le sien, son
+bord doux lu), le repli sans masque de la fiche sur un vrai FIBO-vlm, et `HF_HUB_OFFLINE` avec le
+modèle du cache. Un essai en qualité rapide (Turbo) ne vérifie que la fiche et le masque peint :
+Turbo ne lit ni l'exclusion, ni le guidage, ni `--cfg-end` ; la qualité équilibrée, la phrase
+d'exclusion et le guidage demandent un essai en qualité équilibrée ou normale.
 
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 

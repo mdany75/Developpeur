@@ -356,7 +356,33 @@ end
 local CATEGORIES_PERSONNE = { [20036] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true,
     [7] = true, [8] = true, [9] = true, [11] = true, [12] = true }
 
+-- Identifiants des masques (supposé, d'après Masques.renouveler : « Lightroom les veut uniques sur la
+-- photo ») : un CorrectionID ou un MaskID en double sur la photo est refusé ; une copie d'un masque
+-- (dupliquer d'edit_mask, le masque témoin d'un masque existant de generative_edit) en prend de neufs.
+local function verifierIdentifiants(liste)
+    local vus = {}
+    local function voir(genre, id)
+        if id ~= nil then
+            assert(not vus[genre .. tostring(id)], genre .. " en double sur la photo (" .. tostring(id) .. ") : une copie de masque prend de nouveaux identifiants")
+            vus[genre .. tostring(id)] = true
+        end
+    end
+    local function composants(masques)
+        for _, m in ipairs(type(masques) == 'table' and masques or {}) do
+            if type(m) == 'table' then
+                voir('MaskID', m.MaskID)
+                composants(m.Masks)
+            end
+        end
+    end
+    for _, correction in ipairs(liste) do
+        voir('CorrectionID', correction.CorrectionID)
+        composants(correction.CorrectionMasks)
+    end
+end
+
 local function verifierMasques(reglages)
+    verifierIdentifiants(type(reglages.MaskGroupBasedCorrections) == 'table' and reglages.MaskGroupBasedCorrections or {})
     for _, correction in ipairs(type(reglages.MaskGroupBasedCorrections) == 'table' and reglages.MaskGroupBasedCorrections or {}) do
         for _, texte in ipairs(correction.LocalPointColors or {}) do
             local n = 0

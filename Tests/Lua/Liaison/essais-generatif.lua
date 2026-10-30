@@ -302,7 +302,7 @@ test("Ménage : Temporaire/Fibo s'efface au chargement du module", function()
     egal(S.fichiers[FIBO .. '/A1B2C3'], nil)
 end)
 
-test("Consignes de la fenêtre : generative_edit, seulement sur demande, après les corrections de base, consigne en anglais traduite, plusieurs changements, l'arrière-plan par mask, la couleur par un masque ; le texte sous 7 500", function()
+test("Consignes de la fenêtre : generative_edit, seulement sur demande, après les corrections de base, consigne en anglais traduite, plusieurs changements, l'arrière-plan par mask, la zone peinte par mask.existing, la couleur par un masque ; le texte sous 7 500", function()
     local texte = Consignes.texte
     egal(texte:find("generative_edit (Fibo 2, local), seulement sur sa demande", 1, true) ~= nil, true)
     egal(texte:find("puis les finitions sur la nouvelle photo, qui devient la photo active", 1, true) ~= nil, true)
@@ -310,6 +310,7 @@ test("Consignes de la fenêtre : generative_edit, seulement sur demande, après 
     egal(texte:find("plusieurs changements en un appel", 1, true) ~= nil, true)
     egal(texte:find("la couleur d'un objet se change dans Lightroom par un masque, pas par generative_edit", 1, true) ~= nil, true)
     egal(texte:find("l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region", 1, true) ~= nil, true)
+    egal(texte:find("une zone que Dany a peinte dans Lightroom : mask avec existing, son nom", 1, true) ~= nil, true)
     local Texte = require 'Texte'
     egal(Texte.longueur(texte) <= 7500, true, "plafond des consignes : " .. Texte.longueur(texte))
     for _, mot in ipairs({ 'photoshop', 'firefly', 'agrandissement' }) do
@@ -487,6 +488,109 @@ test("essayer avec temoin : une personne précise que Lightroom n'a pas reconnue
     -- Sans temoin (une proposition ordinaire d'add_mask), rien n'est dit ici : add_mask le vérifie à l'écriture.
     r = Commandes.executer('essayer', { action = 'masquer', masques = temoin(Json.tableau({ cadres[2] })), etape = 'personne', taille = 800, photo = 4 })
     egal(r.personnes_non_reconnues, nil)
+end)
+
+-- Le masque que Dany a peint lui-même au pinceau (« Fibo ») et un masque du ciel, déjà sur la photo.
+local function photoAvecMasques(autres)
+    local photo = A.photoFuji()
+    local masques = {
+        { What = 'Correction', CorrectionActive = true, CorrectionAmount = 1, CorrectionID = 'C-CIEL', CorrectionName = 'Ciel',
+          CorrectionSyncID = 'S-CIEL', LocalExposure2012 = -0.2,
+          CorrectionMasks = { { What = 'Mask/Image', MaskActive = true, MaskBlendMode = 0, MaskID = 'M-CIEL', MaskInverted = false,
+                                MaskName = 'Ciel 1', MaskSubType = 2, MaskVersion = 1, MaskDigest = 'EMPREINTE-CIEL' } } },
+        { What = 'Correction', CorrectionActive = false, CorrectionAmount = 0.8, CorrectionID = 'C-FIBO', CorrectionName = 'Fibo',
+          CorrectionSyncID = 'S-FIBO', LocalExposure2012 = 0,
+          CorrectionMasks = { { What = 'Mask/Paint', MaskActive = true, MaskBlendMode = 0, MaskID = 'M-FIBO', MaskInverted = false,
+                                MaskName = 'Pinceau 1', MaskVersion = 1,
+                                Dabs = { 'd 0.400000 0.300000', 'd 0.420000 0.320000' }, Radius = 0.05, Flow = 0.7, CenterWeight = 0.4 } } },
+    }
+    for _, autre in ipairs(autres or {}) do
+        masques[#masques + 1] = autre
+    end
+    photo.reglages.MaskGroupBasedCorrections = masques
+    S.active, S.selection = photo, { photo }
+    return photo
+end
+
+local function temoinExistant(nom)
+    return Json.tableau({ { type = 'existant', masque = nom, inverser = false, nom = 'Claude · masque pour Fibo 2', quantite = 1,
+        locaux = { LocalExposure2012 = -0.5, LocalTemperature = -0.4 } } })
+end
+
+test("essayer avec temoin, masque existant (mask.existing de generative_edit) : le masque peint par Dany repris dans un témoin neuf, le sien ni changé ni retiré", function()
+    local photo = photoAvecMasques()
+    local avant = Json.encode(photo.reglages.MaskGroupBasedCorrections)
+    local r = Commandes.executer('essayer', { action = 'masquer', masques = temoinExistant('fibo'), etape = 'masque pour Fibo 2',
+        taille = 0, comparer = true, temoin = true, photo = 4 })
+    egal(r.chemin ~= nil and r.chemin_actuel ~= nil, true, "l'état actuel et le témoin")
+    egal(#S.rendus, 2)
+    local rendus = S.rendus[2].reglagesRendus.MaskGroupBasedCorrections
+    egal(#rendus, 3, "les deux masques de la photo, puis le témoin")
+    egal(rendus[2].CorrectionName, 'Fibo')
+    egal(rendus[2].CorrectionActive, false, "le masque de Dany tel quel (masqué, à 80 %)")
+    egal(rendus[2].CorrectionAmount, 0.8)
+    egal(rendus[2].CorrectionMasks[1].MaskID, 'M-FIBO')
+    local temoin = rendus[3]
+    egal(temoin.CorrectionName, 'Claude · masque pour Fibo 2')
+    egal(temoin.CorrectionActive, true, "le témoin agit, même si le masque de Dany est masqué")
+    egal(temoin.CorrectionAmount, 1)
+    egal(temoin.LocalExposure2012, -0.5)
+    egal(temoin.CorrectionMasks[1].What, 'Mask/Paint', "les composants du masque de Dany, tels quels")
+    egal(temoin.CorrectionMasks[1].Dabs[2], 'd 0.420000 0.320000')
+    egal(temoin.CorrectionMasks[1].Flow, 0.7)
+    egal(temoin.CorrectionMasks[1].Radius, 0.05)
+    egal(temoin.CorrectionMasks[1].MaskID ~= 'M-FIBO', true, "de nouveaux identifiants")
+    egal(temoin.CorrectionID ~= 'C-FIBO', true)
+    egal(Json.encode(photo.reglages.MaskGroupBasedCorrections), avant, "la photo remise : les masques de Dany comme avant")
+    egal(photo.proprietes.journalClaude, nil, "rien au journal")
+    -- Un masque IA calculé (le ciel) se reprend aussi avec son empreinte : rien à recalculer.
+    S.rendus = {}
+    Commandes.executer('essayer', { action = 'masquer', masques = temoinExistant('  CIEL '), etape = 'masque pour Fibo 2',
+        taille = 0, comparer = true, temoin = true, photo = 4 })
+    local ciel = S.rendus[2].reglagesRendus.MaskGroupBasedCorrections[3]
+    egal(ciel.CorrectionMasks[1].MaskDigest, 'EMPREINTE-CIEL')
+    egal(ciel.CorrectionMasks[1].MaskID ~= 'M-CIEL', true)
+end)
+
+test("essayer avec temoin, masque existant : absent ou porté par deux masques, refusé avec la liste des noms, rien de rendu ni d'écrit", function()
+    local photo = photoAvecMasques()
+    local avant = Json.encode(photo.reglages.MaskGroupBasedCorrections)
+    echoue(function()
+        Commandes.executer('essayer', { action = 'masquer', masques = temoinExistant('Peinture'), etape = 'masque pour Fibo 2',
+            taille = 0, comparer = true, temoin = true, photo = 4 })
+    end, "Aucun masque « Peinture » sur cette photo (ses masques : « Ciel », « Fibo »)")
+    egal(#S.rendus, 0)
+    egal(#S.ecritures, 0)
+    egal(Json.encode(photo.reglages.MaskGroupBasedCorrections), avant)
+    photo = photoAvecMasques({ { What = 'Correction', CorrectionActive = true, CorrectionAmount = 1, CorrectionID = 'C-FIBO2',
+        CorrectionName = 'FIBO', CorrectionSyncID = 'S-FIBO2', CorrectionMasks = { { What = 'Mask/Paint', MaskID = 'M-FIBO2', Dabs = { 'd 0.1 0.1' } } } } })
+    -- L'état de cette photo-ci (trois masques), relevé avant l'appel : il doit rester tel quel.
+    local avantDouble = Json.encode(photo.reglages.MaskGroupBasedCorrections)
+    egal(#photo.reglages.MaskGroupBasedCorrections, 3)
+    echoue(function()
+        Commandes.executer('essayer', { action = 'masquer', masques = temoinExistant('Fibo'), etape = 'masque pour Fibo 2',
+            taille = 0, comparer = true, temoin = true, photo = 4 })
+    end, "2 masques s'appellent « Fibo »")
+    egal(#S.rendus, 0)
+    egal(#S.ecritures, 0)
+    egal(Json.encode(photo.reglages.MaskGroupBasedCorrections), avantDouble)
+end)
+
+test("Simulation : un CorrectionID ou un MaskID en double sur la photo est refusé (une copie de masque prend de nouveaux identifiants)", function()
+    local photo = photoAvecMasques()
+    local Reglages = require 'Reglages'
+    local liste = Reglages.pourLightroom(photo.reglages.MaskGroupBasedCorrections)
+    local copie = Reglages.pourLightroom(liste[2])
+    copie.CorrectionID = 'C-COPIE'
+    liste[#liste + 1] = copie
+    local cat = (import 'LrApplication').activeCatalog()
+    echoue(function()
+        cat:withWriteAccessDo('essai', function() photo:applyDevelopSettings({ MaskGroupBasedCorrections = liste }, 'essai') end)
+    end, "MaskID en double")
+    -- Avec de nouveaux identifiants (Locaux.nouveauxIdentifiants), accepté.
+    require('Locaux').nouveauxIdentifiants(copie.CorrectionMasks)
+    cat:withWriteAccessDo('essai', function() photo:applyDevelopSettings({ MaskGroupBasedCorrections = liste }, 'essai') end)
+    egal(#photo.reglages.MaskGroupBasedCorrections, 3)
 end)
 
 A.bilan()

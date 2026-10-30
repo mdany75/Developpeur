@@ -29,6 +29,18 @@ function Locaux.syncId()
     return hexa(32)
 end
 
+-- De nouveaux identifiants pour les composants d'un masque copié (et leurs sous-masques) :
+-- Lightroom les veut uniques sur la photo (Masques.renouveler, le masque témoin d'un masque existant).
+function Locaux.nouveauxIdentifiants(liste)
+    for _, m in ipairs(liste or {}) do
+        if type(m) == 'table' then
+            m.MaskID = Locaux.uuid()
+            m.MaskSyncID = Locaux.syncId()
+            Locaux.nouveauxIdentifiants(m.Masks)
+        end
+    end
+end
+
 -- Nombre à six décimales (ou chiffres) avec un point, quelle que soit la locale (string.format('%f')
 -- écrirait « 0,500000 » en français).
 function Locaux.decimal(x, chiffres)

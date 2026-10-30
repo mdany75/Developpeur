@@ -683,6 +683,29 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   tout calcul de Fibo 2 (en « Proposer d'abord », l'accord se donne avant ces rendus) ; la réponse
   de Claude dit la part de la photo que le masque couvrait. Un seul changement par demande avec un
   masque.
+- **Un masque que vous peignez vous-même** : peignez dans Lightroom (panneau Masquage, au pinceau
+  ou avec tout autre outil) la zone à changer, nommez le masque (« Fibo »), puis dites à Claude de
+  changer « la zone du masque Fibo ». Claude le cherche par son nom (majuscules indifférentes) ; s'il
+  manque, ou si deux masques portent ce nom, il vous le dit avec la liste des noms. Votre masque
+  n'est ni changé ni retiré : Lightroom le recopie le temps de deux rendus d'essai, et la suite est
+  celle d'un masque calculé (bord doux compris).
+- **Une fiche détaillée par FIBO-vlm** : avant chaque passage de Fibo 2, FIBO-vlm (le modèle de Bria
+  qui décrit l'image, `briaai/FIBO-vlm`, environ 8 Go, sur ce Mac) rédige une fiche de ce que doit
+  devenir l'image (ce qui change, ce qui reste, la lumière, le décor), avec la zone à changer grisée
+  comme Fibo 2 la voit ; Fibo 2 devrait mieux la suivre qu'une phrase (à constater). Si FIBO-vlm
+  refuse la fiche de la zone grisée, il en rédige une ordinaire, sur l'image non grisée (comme Fibo 2
+  Studio) ; Fibo 2 applique quand même la zone. Elle tourne seule, avant Fibo 2 (jamais les deux en
+  mémoire ensemble), et prend une minute ou deux de plus (à mesurer). Sans le modèle sur le Mac
+  (`hf download briaai/FIBO-vlm --revision bd13da5e0b73c808014d6260963e311c8cdf0d8b`, la version que
+  mflux charge, une fois, dans le Terminal), ou si elle échoue, Fibo 2 reçoit la phrase seule, et
+  Claude le dit ; il vous donne un court résumé de chaque fiche.
+- **Ce que Fibo 2 doit éviter** : du texte ou un logo inventé, un filigrane, une personne ou une tête
+  en double, des membres en trop, un corps déformé ; Claude peut y ajouter ce que vous voulez éviter
+  (« pas de lunettes de soleil »). Le texte n'y est pas quand le changement porte sur un texte (un
+  panneau, une inscription), ni « personne en double » quand le changement ajoute une personne. Pas
+  en qualité rapide, qui n'en tient pas compte. Cette liste remplace la description vide sur laquelle
+  Fibo 2 a été entraîné pour se guider (elle en garde la forme) : son effet sur le rendu reste à
+  mesurer, avec et sans, à la même graine.
 - **Plusieurs changements à la fois** (jusqu'à 4, « une jupe et un sac bleu ») : un seul appel, une
   zone chacun, un passage de Fibo 2 par changement, toutes les zones recollées dans le même TIFF,
   donc une seule nouvelle photo. Deux zones qui se chevauchent, se touchent ou presque (leurs bords
@@ -707,10 +730,13 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
 - **Défaire** : `undo_last` ne retire pas la nouvelle photo ; pour l'enlever, Photo › Retirer du
   catalogue, à la main (le fichier reste dans le dossier, à mettre à la Corbeille vous-même si
   vous n'en voulez plus).
-- **Durée** : environ 8 minutes pour une zone en qualité normale (50 étapes, décodage en pleine
-  précision, la meilleure qualité), SeedVR2 compris (essai du 29 octobre 2026 : 471 s pour une tuque
-  sur une photo de 26 mégapixels) ; en qualité rapide (Turbo, 4 étapes), bien moins, avec un
-  résultat moins fidèle. La première fois, le modèle se télécharge d'abord. Au-delà de 15 minutes
+- **Qualité et durée** : par défaut, la qualité **équilibrée** (30 étapes, guidage sur 60 % d'entre
+  elles, décodage en pleine précision : environ le rendu de la normale en deux fois moins de temps,
+  à confirmer sur vos photos) ; la qualité normale (50 étapes) prenait environ 8 minutes pour une
+  zone, SeedVR2 compris (essai du 29 octobre 2026 : 471 s pour une tuque sur une photo de
+  26 mégapixels) ; en qualité rapide (Turbo, 4 étapes), bien moins, avec un résultat moins fidèle.
+  Le guidage (de 1 à 10, 5 par défaut) se règle sur demande, hors qualité rapide : plus haut,
+  Fibo 2 suit l'instruction de plus près, au risque d'un rendu forcé. La première fois, le modèle se télécharge d'abord. Au-delà de 15 minutes
   par passage, le calcul s'arrête et rien n'est importé. Tout l'appel se suit dans une seule barre
   de progression de Lightroom, de 0 à 100 % (« Fibo 2 : jupe (1 sur 2), 24 % — environ 3 min
   restantes »), dont la croix arrête tout sans rien importer, même pendant le chargement du modèle
@@ -731,14 +757,16 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   l'importation qui suit (dans les 3 heures, le temps de quatre changements).
 - **Prérequis** : mflux installé (`uv tool install mflux`, qui fournit
   `~/.local/bin/mflux-generate-fibo2-edit`) et l'accès aux modèles de Bria sur Hugging Face
-  (`briaai/Fibo-2.0-dev` et, pour la qualité rapide, `briaai/Fibo-2.0-edit-turbo` : demander
+  (`briaai/Fibo-2.0-dev` et, pour la qualité rapide, `briaai/Fibo-2.0-edit-turbo` ; pour la fiche,
+  `briaai/FIBO-vlm`, téléchargé une fois à la main : demander
   l'accès sur leur page, puis `hf auth login` dans le Terminal). Ces modèles sont sous licence
   CC BY-NC : usage personnel, non commercial seulement, ce qui convient à vos propres photos.
   Sans mflux, Claude le dit et ne fait rien. Fibo 2 prend environ 21 Go de mémoire (il tourne en
   mode économe, `--low-ram`, sans perte de qualité) ; Claude ne vérifie pas la mémoire libre : s'il
   en manque, le Mac se sert de son swap, plus lentement. Un seul calcul de Fibo 2 à la fois sur le Mac : une
   autre session de Claude qui le demande pendant ce temps est refusée, et Claude attend que Fibo 2
-  Studio ait fini son calcul s'il en fait un. Si Lightroom ne peut pas
+  Studio ait fini son calcul s'il en fait un (Fibo 2 ou sa fiche par FIBO-vlm) ; un calcul de Fibo 2
+  Studio lancé pendant le vôtre arrête le vôtre avant son étape suivante, sans rien importer. Si Lightroom ne peut pas
   importer le résultat, Claude réessaie une fois quand Lightroom n'a pas reçu la demande, puis garde
   le TIFF dans `~/Library/Application Support/Developpeur/Fibo non importées/`
   et vous donne son chemin, à importer à la main (Fichier › Importer des photos et des vidéos…) ;

@@ -1024,6 +1024,38 @@ local function composant(ctx, m, nom)
     echouer("Type de masque inconnu : " .. tostring(m.type))
 end
 
+-- Un masque déjà sur la photo, désigné par son nom exact (casse indifférente) : le masque que Dany a
+-- peint lui-même dans le panneau Masquage, que generative_edit (mask.existing) reprend comme zone.
+-- Ses composants (CorrectionMasks) sont copiés tels quels (pourLightroom : des tables neuves, sans
+-- métatable), avec de nouveaux identifiants, dans le masque témoin, une correction nouvelle : le
+-- masque de Dany n'est ni changé ni retiré (son effet est dans l'état actuel comme dans le témoin, et
+-- seule la différence du témoin compte). Absent, ou porté par deux masques : refusé, avec les noms.
+local function composantsExistants(existants, designation)
+    local voulu = minuscules(tostring(designation or ''):match('^%s*(.-)%s*$'))
+    local trouves, noms = {}, {}
+    for i, correction in ipairs(existants) do
+        local nom = tostring(correction.CorrectionName or '')
+        noms[#noms + 1] = '« ' .. (nom ~= '' and nom or 'sans nom') .. ' »'
+        if minuscules(nom:match('^%s*(.-)%s*$')) == voulu then
+            trouves[#trouves + 1] = i
+        end
+    end
+    local liste = #noms > 0 and ('ses masques : ' .. table.concat(noms, ', ')) or "elle n'a aucun masque"
+    if #trouves == 0 then
+        echouer("Aucun masque « " .. tostring(designation) .. " » sur cette photo (" .. liste .. ").")
+    end
+    if #trouves > 1 then
+        echouer(#trouves .. " masques s'appellent « " .. tostring(designation) .. " » sur cette photo (" .. liste
+            .. ") : en renommer un dans le panneau Masquage de Lightroom.")
+    end
+    local copie = pourLightroom(existants[trouves[1]].CorrectionMasks or {})
+    if #copie == 0 then
+        echouer("Le masque « " .. tostring(designation) .. " » n'a aucun composant.")
+    end
+    Locaux.nouveauxIdentifiants(copie)
+    return copie
+end
+
 -- Masques (commande « masquer ») : ajoutés à ceux de la photo, dans l'ordre demandé. Avec un
 -- masque IA, le paramètre prédéfini porte aussi les masques existants, tels que Lightroom les a
 -- rangés : leurs empreintes (MaskDigest…) sont celles de cette photo, il n'a pas à les recalculer.
@@ -1038,46 +1070,54 @@ local function preparerMasques(photo, params)
     local ajoutes, geometriques = {}, false
     for _, m in ipairs(type(params.masques) == 'table' and params.masques or {}) do
         local nom = tostring(m.nom or "Claude · masque")
-        local premier, estIA, positionne = composant(ctx, m, nom)
-        local masques = { premier }
-        ia = ia or estIA
-        geometriques = geometriques or positionne
-        -- Contour d'un masque IA (affinage) : celui du masque, ou celui d'un composant.
-        local function affiner(cible, affinage)
-            if type(affinage) == 'table' then
-                Locaux.affiner(cible, tonumber(affinage.contour), tonumber(affinage.decalage))
-            end
-        end
-        affiner(premier, m.affinage)
-        for _, c in ipairs(type(m.composants) == 'table' and m.composants or {}) do
-            local autre
-            autre, estIA, positionne = composant(ctx, c, tostring(c.nom or nom))
-            masques[#masques + 1] = Locaux.combiner(autre, c.mode, c.inverser == true)
-            affiner(autre, c.affinage or m.affinage)
+        if m.type == 'existant' then
+            -- Le masque peint par Dany, repris tel quel dans une correction nouvelle (rien à calculer :
+            -- ses empreintes de masque IA restent, comme une copie d'edit_mask).
+            liste[#liste + 1] = Locaux.correction(nom, tonumber(m.quantite) or 1, pourLightroom(m.locaux),
+                composantsExistants(existants, m.masque))
+            ajoutes[#ajoutes + 1] = nom
+        else
+            local premier, estIA, positionne = composant(ctx, m, nom)
+            local masques = { premier }
             ia = ia or estIA
             geometriques = geometriques or positionne
-        end
-        local correction = Locaux.correction(nom, tonumber(m.quantite) or 1, pourLightroom(m.locaux), masques)
-        if type(m.couleurs_ponctuelles) == 'table' and #m.couleurs_ponctuelles > 0 then
-            correction.LocalPointColors, correction.LocalColorVariance = Locaux.couleursPonctuelles(m.couleurs_ponctuelles)
-        end
-        -- Personnes précises : vérifiées après le calcul (Retouche.verifierPersonnes).
-        local sources = { m }
-        for _, c in ipairs(type(m.composants) == 'table' and m.composants or {}) do
-            sources[#sources + 1] = c
-        end
-        for k, source in ipairs(sources) do
-            local mk = masques[k]
-            if source.type == 'personne' and mk then
-                local numero = Locaux.numeroPersonne(mk) or 1
-                local bornes = bornesPersonnes(ctx, source.cadres) or {}
-                plan.personnes = plan.personnes or {}
-                plan.personnes[#plan.personnes + 1] = { correctionID = correction.CorrectionID, composant = k, numero = numero,
-                    cadre = bornes[numero], trouvees = #bornes }
+            -- Contour d'un masque IA (affinage) : celui du masque, ou celui d'un composant.
+            local function affiner(cible, affinage)
+                if type(affinage) == 'table' then
+                    Locaux.affiner(cible, tonumber(affinage.contour), tonumber(affinage.decalage))
+                end
             end
+            affiner(premier, m.affinage)
+            for _, c in ipairs(type(m.composants) == 'table' and m.composants or {}) do
+                local autre
+                autre, estIA, positionne = composant(ctx, c, tostring(c.nom or nom))
+                masques[#masques + 1] = Locaux.combiner(autre, c.mode, c.inverser == true)
+                affiner(autre, c.affinage or m.affinage)
+                ia = ia or estIA
+                geometriques = geometriques or positionne
+            end
+            local correction = Locaux.correction(nom, tonumber(m.quantite) or 1, pourLightroom(m.locaux), masques)
+            if type(m.couleurs_ponctuelles) == 'table' and #m.couleurs_ponctuelles > 0 then
+                correction.LocalPointColors, correction.LocalColorVariance = Locaux.couleursPonctuelles(m.couleurs_ponctuelles)
+            end
+            -- Personnes précises : vérifiées après le calcul (Retouche.verifierPersonnes).
+            local sources = { m }
+            for _, c in ipairs(type(m.composants) == 'table' and m.composants or {}) do
+                sources[#sources + 1] = c
+            end
+            for k, source in ipairs(sources) do
+                local mk = masques[k]
+                if source.type == 'personne' and mk then
+                    local numero = Locaux.numeroPersonne(mk) or 1
+                    local bornes = bornesPersonnes(ctx, source.cadres) or {}
+                    plan.personnes = plan.personnes or {}
+                    plan.personnes[#plan.personnes + 1] = { correctionID = correction.CorrectionID, composant = k, numero = numero,
+                        cadre = bornes[numero], trouvees = #bornes }
+                end
+            end
+            liste[#liste + 1] = correction
+            ajoutes[#ajoutes + 1] = nom
         end
-        liste[#liste + 1] = correction
-        ajoutes[#ajoutes + 1] = nom
     end
     if geometriques then
         noterTransformation(plan, ctx)

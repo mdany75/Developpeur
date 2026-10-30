@@ -203,18 +203,24 @@ final class GeneratifTests: XCTestCase {
         printf '%s\\n' "$@" > "\(g)/arguments-$n.txt"
         cp "\(g)/arguments-$n.txt" "\(g)/arguments.txt"
         echo $$ > "\(g)/pid.txt"
-        out=""; img=""; mask=""
+        out=""; img=""; mask=""; fiche=""; etapes=4
         while [ $# -gt 0 ]; do
           case "$1" in
             --output) out="$2"; shift ;;
             --image-paths) img="$2"; shift ;;
             --mask-path) mask="$2"; shift ;;
+            --prompt-file) fiche="$2"; shift ;;
+            --steps) etapes="$2"; shift ;;
           esac
           shift
         done
         [ -n "$mask" ] && cp "$mask" "\(g)/masque.png"
+        [ -n "$fiche" ] && cp "$fiche" "\(g)/fiche-recue-$n.json"
+        # FIBO-vlm (le faux Python) : fini avant mflux, jamais vivant en même temps.
+        if [ -f "\(g)/vlm-pid" ] && kill -0 "$(cat "\(g)/vlm-pid")" 2>/dev/null; then echo vivant > "\(g)/vlm-vivant-$n"; fi
+        [ -f "\(g)/vlm-fin" ] && echo oui > "\(g)/vlm-fini-avant-$n"
         \(fin ?? """
-        printf '  0/50 [00:00\\r 25/50 [00:01\\r 50/50 [00:02\\n' >&2
+        printf "  0/$etapes [00:00\\r $((etapes / 2))/$etapes [00:01\\r $etapes/$etapes [00:02\\n" >&2
         if [ -f "\(g)/sortie-$n.png" ]; then cp "\(g)/sortie-$n.png" "$out"
         elif [ -f "\(g)/sortie.png" ]; then cp "\(g)/sortie.png" "$out"
         else cp "$img" "$out"; fi
@@ -413,7 +419,10 @@ final class GeneratifTests: XCTestCase {
         }
         XCTAssertEqual(outil["inputSchema"]?["required"], [], "instruction ou edits")
         let proprietes = try XCTUnwrap(outil["inputSchema"]?["properties"]?.object)
-        XCTAssertEqual(Set(proprietes.keys), ["photo_id", "instruction", "instruction_fr", "region", "label", "mask", "edits", "upscale", "quality", "seed", "confirm", "reason"])
+        XCTAssertEqual(Set(proprietes.keys), ["photo_id", "instruction", "instruction_fr", "region", "label", "mask", "edits", "upscale", "quality",
+                                              "structured_prompt", "avoid", "guidance", "seed", "confirm", "reason"])
+        XCTAssertEqual(proprietes["quality"]?["enum"], ["balanced", "normal", "fast"])
+        XCTAssertTrue(proprietes["quality"]?["description"]?.string?.hasPrefix("balanced (défaut)") == true)
         XCTAssertEqual(proprietes["edits"]?["maxItems"]?.int, 4)
         XCTAssertEqual(proprietes["edits"]?["items"]?["required"], ["instruction", "instruction_fr", "region"])
         XCTAssertTrue(ServerInfo.instructions.contains("generative_edit, sur sa demande"))
@@ -537,11 +546,16 @@ final class GeneratifTests: XCTestCase {
         let dossierExport = try XCTUnwrap(exporter["dossier"]?.string)
         XCTAssertTrue(dossierExport.hasPrefix(racine.appendingPathComponent("Temporaire/Fibo").path + "/"), dossierExport)
 
-        // mflux : qualité normale, 50 étapes, pleine précision, graine, taille multiple de 16, pas de
-        // masque ; jamais --quantize ni --step-cache-ratio.
+        // mflux : qualité équilibrée par défaut (30 étapes, guidage arrêté à 60 %), pleine précision,
+        // phrase d'exclusion par défaut, graine, taille multiple de 16, pas de masque ; jamais
+        // --quantize ni --step-cache-ratio. Sans FIBO-vlm sur ce Mac (les essais), la phrase seule.
         let taille = Generatif.tailleCible(largeur: largeur, hauteur: hauteur)
         XCTAssertEqual(valeur("--prompt"), "replace the trousers with a knee-length navy skirt")
-        XCTAssertEqual(valeur("--steps"), "50")
+        XCTAssertNil(valeur("--prompt-file"))
+        XCTAssertEqual(valeur("--steps"), "30")
+        XCTAssertEqual(valeur("--cfg-end"), "0.6")
+        XCTAssertNil(valeur("--guidance"), "le guidage de mflux, sans guidance donné")
+        XCTAssertEqual(valeur("--negative-prompt"), Generatif.exclusion(instruction: "replace the trousers with a knee-length navy skirt", avoid: nil))
         XCTAssertTrue(argumentsPasses.contains("--vae-full-precision"), "\(argumentsPasses)")
         XCTAssertTrue(argumentsPasses.contains("--low-ram"), "\(argumentsPasses)")
         XCTAssertFalse(argumentsPasses.contains("--quantize") || argumentsPasses.contains("-q") || argumentsPasses.contains("--step-cache-ratio"))
@@ -566,6 +580,10 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(reponse["nouvelle_photo"]?["id"]?.int, 99)
         XCTAssertEqual(reponse["nouvelle_photo"]?["active"]?.bool, true)
         XCTAssertEqual(reponse["graine"]?.int, 42)
+        XCTAssertEqual(reponse["qualite"]?.string, "équilibrée (30 étapes, guidage sur 60 % d'entre elles)")
+        XCTAssertEqual(reponse["guidage"]?.double, 5)
+        XCTAssertEqual(reponse["fiche_fibo_vlm"]?.bool, false)
+        XCTAssertTrue(reponse["remarque_fiche"]?.string?.contains("phrase seule") == true, resultat.text)
         XCTAssertNil(reponse["sortie_entiere"])
         let modification = try XCTUnwrap(reponse["modifications"]?.array?.first)
         XCTAssertEqual(reponse["modifications"]?.array?.count, 1)
@@ -2161,10 +2179,638 @@ final class GeneratifTests: XCTestCase {
         let masque = try XCTUnwrap(outil["inputSchema"]?["properties"]?["mask"])
         let description = try XCTUnwrap(masque["description"]?.string)
         XCTAssertTrue(description.hasPrefix("Changer l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region"), description)
+        XCTAssertTrue(description.contains("existing, un masque que l'utilisateur a peint"), description)
         let cles = Set(masque["properties"]?.object?.keys.map { $0 } ?? [])
-        XCTAssertTrue(cles.isSuperset(of: ["kind", "part", "person", "person_at", "invert", "combine", "box", "strokes"]), "\(cles)")
+        XCTAssertTrue(cles.isSuperset(of: ["kind", "part", "person", "person_at", "invert", "combine", "box", "strokes", "existing"]), "\(cles)")
         XCTAssertTrue(cles.isDisjoint(with: ["effect", "adjustments", "amount", "name", "tone_curve", "point_colors"]), "\(cles)")
-        XCTAssertTrue(outil["description"]?.string?.contains("Changer l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region") == true)
+        XCTAssertTrue((masque["required"]?.array ?? []).isEmpty, "kind ou existing")
+        XCTAssertTrue(outil["description"]?.string?.contains("Changer l'arrière-plan, le ciel, une personne, ou la zone que l'utilisateur a peinte : mask plutôt que region") == true)
+    }
+
+    // MARK: Fiche de FIBO-vlm, qualité équilibrée, exclusion, guidage, masque peint (29 octobre 2026)
+
+    /// Le faux Python de mflux (jamais le vrai, ni le vrai FIBO-vlm) : note ses arguments et son
+    /// environnement, garde l'image reçue, écrit son pid, puis (sauf `fin`) une fiche JSON dans --output
+    /// et le marqueur de sa fin. Et le modèle FIBO-vlm du faux cache Hugging Face, complet.
+    var fauxPython: URL { dossier.appendingPathComponent("python/bin/python") }
+
+    func fauxVLM(fin: String? = nil, fiche: String? = nil, avecModele: Bool = true) {
+        let g = gardes.path
+        let json = fiche ?? #"{"short_description": "A woman in a navy knee-length skirt on a city street.", "objects": [{"description": "a woman"}], "background_setting": "a city street", "lighting": {"conditions": "overcast daylight", "direction": "front-lit"}, "edit_instruction": "Change the trousers in the masked region to a knee-length navy skirt."}"#
+        try? json.write(to: gardes.appendingPathComponent("fiche-modele.json"), atomically: true, encoding: .utf8)
+        let texte = """
+        #!/bin/sh
+        n=$(cat "\(g)/vlm-compte" 2>/dev/null || echo 0); n=$((n + 1)); echo $n > "\(g)/vlm-compte"
+        printf '%s\\n' "$@" > "\(g)/vlm-arguments-$n.txt"
+        echo "$HF_HUB_OFFLINE|$HF_HUB_CACHE" > "\(g)/vlm-env.txt"
+        echo $$ > "\(g)/vlm-pid"
+        rm -f "\(g)/vlm-fin"
+        out=""; img=""
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --output) out="$2"; shift ;;
+            --image) img="$2"; shift ;;
+          esac
+          shift
+        done
+        cp "$img" "\(g)/vlm-image-$n.png"
+        \(fin ?? """
+        cp "\(g)/fiche-modele.json" "$out"
+        echo "fiche écrite : $out"
+        """)
+        touch "\(g)/vlm-fin"
+        """
+        try? FileManager.default.createDirectory(at: fauxPython.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? texte.write(to: fauxPython, atomically: true, encoding: .utf8)
+        chmod(fauxPython.path, 0o755)
+        tools.fibo?.python = fauxPython
+        if avecModele { Self.modeleVLM(dans: dossier.appendingPathComponent("hf")) }
+    }
+
+    /// Un modèle FIBO-vlm complet (refs/main, config, index des poids et ses fichiers) dans un cache,
+    /// sous la révision donnée (par défaut celle que mflux épingle), `refs/main` pointant sur `main`.
+    static func modeleVLM(dans cache: URL, revision: String = Generatif.revisionVLM, main: String? = nil) {
+        let depot = cache.appendingPathComponent("models--briaai--FIBO-vlm")
+        let instantane = depot.appendingPathComponent("snapshots/" + revision)
+        try? FileManager.default.createDirectory(at: instantane, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: depot.appendingPathComponent("refs"), withIntermediateDirectories: true)
+        try? ((main ?? revision) + "\n").write(to: depot.appendingPathComponent("refs/main"), atomically: true, encoding: .utf8)
+        try? "{}".write(to: instantane.appendingPathComponent("config.json"), atomically: true, encoding: .utf8)
+        try? #"{"weight_map": {"a": "model-00001-of-00002.safetensors", "b": "model-00002-of-00002.safetensors"}}"#
+            .write(to: instantane.appendingPathComponent("model.safetensors.index.json"), atomically: true, encoding: .utf8)
+        for nom in ["model-00001-of-00002.safetensors", "model-00002-of-00002.safetensors"] {
+            try? "poids".write(to: instantane.appendingPathComponent(nom), atomically: true, encoding: .utf8)
+        }
+    }
+
+    func argumentsVLM(_ n: Int) -> [String] {
+        (try? String(contentsOf: gardes.appendingPathComponent("vlm-arguments-\(n).txt"), encoding: .utf8))?
+            .split(separator: "\n", omittingEmptySubsequences: false).map(String.init).dropLast().map { $0 } ?? []
+    }
+
+    var appelsDuVLM: Int {
+        Int((try? String(contentsOf: gardes.appendingPathComponent("vlm-compte"), encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0
+    }
+
+    func existe(_ nom: String) -> Bool { FileManager.default.fileExists(atPath: gardes.appendingPathComponent(nom).path) }
+
+    /// La fiche de FIBO-vlm, avant mflux : l'image grisée dans la zone comme mflux la grise, --use-mask,
+    /// l'instruction anglaise et la graine ; le Python en -I, hors ligne ; mflux reçoit la fiche par
+    /// --prompt-file (sans --prompt), et le processus du VLM est fini avant son lancement.
+    func testFicheDeFiboVLMAvantMflux() throws {
+        fauxVLM()
+        let region = CGRect(x: 0.3, y: 0.3, width: 0.3, height: 0.4)
+        fauxMflux(sortie: sortiePreparee(region: region) { fx, fy, p, i in if fx > 0.35, fx < 0.55, fy > 0.35, fy < 0.65 { Self.rouge(&p, i) } })
+        let resultat = editer(["instruction": "replace the trousers with a knee-length navy skirt", "label": "jupe", "seed": 42,
+                               "region": ["x": 0.3, "y": 0.3, "width": 0.3, "height": 0.4]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(appelsDuVLM, 1)
+        XCTAssertEqual(appelsDeMflux, 1)
+        let args = argumentsVLM(1)
+        XCTAssertEqual(args.first, "-I", "Python isolé")
+        XCTAssertEqual(URL(fileURLWithPath: args[1]).lastPathComponent, "fiche-fibo-vlm.py")
+        func apres(_ option: String) -> String? { args.firstIndex(of: option).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil } }
+        XCTAssertEqual(apres("--instruction"), "replace the trousers with a knee-length navy skirt")
+        XCTAssertEqual(apres("--seed"), "42")
+        XCTAssertTrue(args.contains("--use-mask"))
+        // Le repli sans masque du script : l'entrée de Fibo, non grisée.
+        XCTAssertEqual(apres("--image-originale").map { URL(fileURLWithPath: $0).lastPathComponent }, "entree-1.png")
+        XCTAssertEqual(URL(fileURLWithPath: try XCTUnwrap(apres("--image"))).lastPathComponent, "fiche-entree-1.png")
+        XCTAssertEqual((try? String(contentsOf: gardes.appendingPathComponent("vlm-env.txt"), encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       "1|" + dossier.appendingPathComponent("hf").path, "hors ligne, le cache où le modèle a été vu")
+        // L'image du VLM : l'entrée de Fibo, grisée (128) dans le masque, intacte ailleurs.
+        let image = try XCTUnwrap(Generatif.lireImage(gardes.appendingPathComponent("vlm-image-1.png"))?.image)
+        let pixels = try XCTUnwrap(Generatif.pixelsRGBA8(image, largeur: image.width, hauteur: image.height))
+        let masque = try XCTUnwrap(Self.pixels8(gardes.appendingPathComponent("masque.png")))
+        XCTAssertEqual(image.width, masque.largeur); XCTAssertEqual(image.height, masque.hauteur)
+        var grises = 0, hors = 0
+        for y in stride(from: 0, to: image.height, by: 4) {
+            for x in stride(from: 0, to: image.width, by: 4) {
+                let i = (y * image.width + x) * 4
+                if masque.valeur(x, y) >= 128 {
+                    XCTAssertEqual([pixels[i], pixels[i + 1], pixels[i + 2]], [128, 128, 128]); grises += 1
+                } else if pixels[i] != 128 || pixels[i + 1] != 128 || pixels[i + 2] != 128 { hors += 1 }
+            }
+        }
+        XCTAssertGreaterThan(grises, 100); XCTAssertGreaterThan(hors, 100)
+        // mflux : la fiche, sans la phrase ; le VLM fini avant.
+        XCTAssertEqual(URL(fileURLWithPath: try XCTUnwrap(valeur("--prompt-file"))).lastPathComponent, "fiche-1.json")
+        XCTAssertNil(valeur("--prompt"))
+        let recue = try JSONCoding.parse(Data(contentsOf: gardes.appendingPathComponent("fiche-recue-1.json")))
+        XCTAssertEqual(recue["edit_instruction"]?.string, "Change the trousers in the masked region to a knee-length navy skirt.")
+        // Telle que FIBO-vlm l'a écrite, octet pour octet : l'ordre de ses clés (celui des légendes de
+        // l'entraînement de Fibo 2) n'est jamais retrié.
+        XCTAssertEqual(try String(contentsOf: gardes.appendingPathComponent("fiche-recue-1.json"), encoding: .utf8),
+                       try String(contentsOf: gardes.appendingPathComponent("fiche-modele.json"), encoding: .utf8))
+        XCTAssertEqual(recue["short_description"]?.string, "A woman in a navy knee-length skirt on a city street.")
+        XCTAssertTrue(existe("vlm-fini-avant-1"), "FIBO-vlm a fini avant le lancement de mflux")
+        XCTAssertFalse(existe("vlm-vivant-1"), "jamais les deux en mémoire ensemble")
+        // La réponse : un court résumé de la fiche, pas tout le JSON.
+        let reponse = try JSONCoding.parse(resultat.text)
+        XCTAssertEqual(reponse["fiche_fibo_vlm"]?.bool, true)
+        XCTAssertNil(reponse["remarque_fiche"])
+        let fiche = try XCTUnwrap(reponse["modifications"]?.array?.first?["fiche"])
+        XCTAssertEqual(fiche["redigee_par"]?.string, "FIBO-vlm")
+        XCTAssertEqual(fiche["edit_instruction"]?.string, "Change the trousers in the masked region to a knee-length navy skirt.")
+        XCTAssertEqual(fiche["lumiere"]?.string, "overcast daylight")
+        XCTAssertEqual(fiche["objets_decrits"]?.int, 1)
+        XCTAssertNil(fiche["objects"]); XCTAssertNil(fiche["lighting"])
+        // La barre : la fiche avant le chargement du modèle.
+        let messages = fake.progressions.compactMap { $0["message"]?.string }
+        let iFiche = try XCTUnwrap(messages.firstIndex { $0.hasPrefix("Fibo 2 : jupe, ") && $0.hasSuffix("— fiche (FIBO-vlm)") }, "\(messages)")
+        let iChargement = try XCTUnwrap(messages.firstIndex { $0.hasSuffix("— chargement du modèle") }, "\(messages)")
+        XCTAssertLessThan(iFiche, iChargement)
+        XCTAssertEqual(dossiersTemporairesRestants, [], "le script et la fiche partent avec le dossier de l'appel")
+
+        // Sans zone : l'image entière, sans gris ni --use-mask.
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        XCTAssertFalse(editer(["instruction": "add a red scarf"]).isError)
+        XCTAssertFalse(argumentsVLM(2).contains("--use-mask"))
+        XCTAssertFalse(argumentsVLM(2).contains("--image-originale"))
+    }
+
+    /// FIBO-vlm en échec, hors délai, ou fiche illisible : jamais bloquant ; la phrase seule, et la
+    /// réponse le dit.
+    func testFicheEnEchecPhraseSeule() throws {
+        fauxVLM(fin: "echo 'erreur FIBO-vlm : boom'\nexit 1")
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        var resultat = editer(["instruction": "add a red scarf"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(valeur("--prompt"), "add a red scarf"); XCTAssertNil(valeur("--prompt-file"))
+        var modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
+        XCTAssertTrue(modification["remarque_fiche"]?.string?.contains("boom") == true, resultat.text)
+        XCTAssertTrue(modification["remarque_fiche"]?.string?.contains("phrase seule") == true, resultat.text)
+        XCTAssertNil(modification["fiche"])
+
+        // Une fiche qui n'est pas un objet JSON.
+        fauxVLM(fiche: "pas du JSON")
+        resultat = editer(["instruction": "add a red scarf"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertNil(valeur("--prompt-file"))
+        modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
+        XCTAssertTrue(modification["remarque_fiche"]?.string?.contains("sans fiche lisible") == true, resultat.text)
+
+        // Une fiche sans edit_instruction : l'instruction donnée y est jointe.
+        fauxVLM(fiche: #"{"short_description": "a red scarf"}"#)
+        resultat = editer(["instruction": "add a red scarf"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        let n = appelsDeMflux
+        XCTAssertEqual(try JSONCoding.parse(Data(contentsOf: gardes.appendingPathComponent("fiche-recue-\(n).json")))["edit_instruction"]?.string, "add a red scarf")
+        // Jointe à la fin, l'ordre des clés gardé.
+        let texte = try String(contentsOf: gardes.appendingPathComponent("fiche-recue-\(n).json"), encoding: .utf8)
+        let iDescription = try XCTUnwrap(texte.range(of: "short_description")), iConsigne = try XCTUnwrap(texte.range(of: "edit_instruction"))
+        XCTAssertLessThan(iDescription.lowerBound, iConsigne.lowerBound, texte)
+
+        // Hors délai : arrêté, puis mflux avec la phrase.
+        tools.fibo?.delaiFiche = 0.5
+        fauxVLM(fin: "sleep 30")
+        let debut = Date()
+        resultat = editer(["instruction": "add a red scarf"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertLessThan(Date().timeIntervalSince(debut), 20)
+        XCTAssertEqual(valeur("--prompt"), "add a red scarf")
+        modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
+        XCTAssertTrue(modification["remarque_fiche"]?.string?.contains("n'a pas fini") == true, resultat.text)
+        XCTAssertFalse(existe("vlm-vivant-\(appelsDeMflux)"), "le VLM arrêté avant mflux")
+    }
+
+    /// Sans le Python de mflux, ou sans le modèle dans le cache : la phrase seule, le VLM jamais lancé ;
+    /// structured_prompt = false : la phrase seule, sans remarque.
+    func testSansFiboVLMPhraseSeule() throws {
+        fauxVLM(avecModele: false)
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        var resultat = editer(["instruction": "add a red scarf"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(appelsDuVLM, 0)
+        XCTAssertTrue(try JSONCoding.parse(resultat.text)["remarque_fiche"]?.string?.contains("hf download briaai/FIBO-vlm") == true, resultat.text)
+
+        Self.modeleVLM(dans: dossier.appendingPathComponent("hf"))
+        tools.fibo?.python = dossier.appendingPathComponent("absent/python")
+        resultat = editer(["instruction": "add a red scarf"])
+        XCTAssertTrue(try JSONCoding.parse(resultat.text)["remarque_fiche"]?.string?.contains("Python de mflux") == true, resultat.text)
+
+        fauxVLM()
+        resultat = editer(["instruction": "add a red scarf", "structured_prompt": false])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(appelsDuVLM, 0, "la phrase seule, demandée")
+        XCTAssertNil(try JSONCoding.parse(resultat.text)["remarque_fiche"])
+        XCTAssertEqual(valeur("--prompt"), "add a red scarf")
+        XCTAssertTrue(editer(["instruction": "x", "structured_prompt": "oui"]).text.contains("structured_prompt"))
+
+        // Le Python par défaut : à côté du vrai exécutable de mflux (son lien suivi), jamais un autre.
+        let lien = dossier.appendingPathComponent("lien/mflux-generate-fibo2-edit")
+        try FileManager.default.createDirectory(at: lien.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: lien, withDestinationURL: script)
+        XCTAssertEqual(Fibo(executable: lien).python?.resolvingSymlinksInPath().path,
+                       script.deletingLastPathComponent().appendingPathComponent("python").resolvingSymlinksInPath().path)
+    }
+
+    /// Une fiche que mflux refuse (format de légende) : la phrase seule, une fois, et la réponse le dit.
+    func testFicheRefuseeParMfluxPhraseSeule() throws {
+        fauxVLM()
+        let preparee = sortiePreparee(carreRouge)
+        fauxMflux(sortie: preparee, fin: """
+        if [ -n "$fiche" ]; then echo "ValueError: The JSON caption does not have the format FIBO 2 reads:" >&2; exit 2; fi
+        cp "\(gardes.path)/sortie.png" "$out"
+        """)
+        let resultat = editer(["instruction": "add a red scarf"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(appelsDeMflux, 2)
+        XCTAssertNotNil(argumentsDeLAppel(1).firstIndex(of: "--prompt-file"))
+        XCTAssertEqual(argumentsDeLAppel(2).firstIndex(of: "--prompt").map { argumentsDeLAppel(2)[$0 + 1] }, "add a red scarf")
+        let modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
+        XCTAssertTrue(modification["remarque_fiche"]?.string?.contains("mflux a refusé la fiche") == true, resultat.text)
+        XCTAssertNil(modification["fiche"])
+    }
+
+    /// Fibo 2 Studio (fibo_vlm_tool.py) ou le script de fiche d'un autre serveur : vus comme un calcul en cours.
+    func testAutreCalculVoitLeVLM() throws {
+        let motif = try NSRegularExpression(pattern: Fibo.motifAutreCalcul)
+        func voit(_ ligne: String) -> Bool { motif.firstMatch(in: ligne, range: NSRange(ligne.startIndex..., in: ligne)) != nil }
+        XCTAssertTrue(voit("/Users/x/.local/share/uv/tools/mflux/bin/python -I /Applications/Fibo 2 Studio.app/Contents/Resources/fibo_vlm_tool.py edit --image a.png"))
+        XCTAssertTrue(voit("/Users/x/.local/share/uv/tools/mflux/bin/python -I /x/Temporaire/Fibo/ABC/fiche-fibo-vlm.py --image a.png"))
+        XCTAssertTrue(voit("/Users/x/.local/share/uv/tools/mflux/bin/python /Users/x/.local/bin/mflux-generate-fibo2-edit --prompt x"))
+        XCTAssertTrue(voit("mflux-upscale-seedvr2 --model seedvr2-7b"))
+        XCTAssertFalse(voit("/usr/bin/python3 autre.py"))
+        XCTAssertFalse(voit("fibo_vlm_toolXpy"), "le point est littéral")
+        autreCalcul = true
+        fauxVLM()
+        fauxMflux()
+        let refus = editer(["instruction": "x"])
+        XCTAssertTrue(refus.isError && refus.text.contains("Fibo 2 calcule déjà"), refus.text)
+        XCTAssertEqual(appelsDuVLM, 0)
+        XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
+    }
+
+    /// Les arguments de mflux par qualité : équilibrée (30 étapes, --cfg-end 0.6), normale (50, sans
+    /// --cfg-end), rapide (Turbo : ni guidage, ni exclusion, ni --cfg-end) ; le guidage et l'exclusion ;
+    /// à guidance 1, ni exclusion ni --cfg-end ; la fiche à la place de la phrase.
+    func testArgumentsParQualite() {
+        let e = URL(fileURLWithPath: "/tmp/e.png"), s = URL(fileURLWithPath: "/tmp/s.png"), f = URL(fileURLWithPath: "/tmp/fiche.json")
+        func args(_ q: Generatif.Qualite, fiche: URL? = nil, exclusion: String? = "text, logo", guidage: Double? = nil) -> [String] {
+            Generatif.arguments(entree: e, masque: nil, instruction: "x", taille: (1024, 1024), qualite: q, graine: 1, sortie: s, modeleRapide: nil,
+                                fiche: fiche, exclusion: exclusion, guidage: guidage)
+        }
+        func valeur(_ a: [String], _ o: String) -> String? { a.firstIndex(of: o).map { a[$0 + 1] } }
+        let equilibre = args(.balanced)
+        XCTAssertEqual(valeur(equilibre, "--steps"), "30"); XCTAssertEqual(valeur(equilibre, "--cfg-end"), "0.6")
+        XCTAssertEqual(valeur(equilibre, "--negative-prompt"), "text, logo"); XCTAssertNil(valeur(equilibre, "--guidance"))
+        XCTAssertTrue(equilibre.contains("--vae-full-precision") && equilibre.contains("--low-ram"))
+        let normal = args(.normal, guidage: 7.5)
+        XCTAssertEqual(valeur(normal, "--steps"), "50"); XCTAssertNil(valeur(normal, "--cfg-end"))
+        XCTAssertEqual(valeur(normal, "--guidance"), "7.5"); XCTAssertEqual(valeur(normal, "--negative-prompt"), "text, logo")
+        let rapide = args(.fast, guidage: 7)
+        for option in ["--steps", "--cfg-end", "--negative-prompt", "--guidance", "--vae-full-precision"] {
+            XCTAssertFalse(rapide.contains(option), option)
+        }
+        let sansGuidage = args(.balanced, guidage: 1)
+        XCTAssertEqual(valeur(sansGuidage, "--guidance"), "1")
+        XCTAssertNil(valeur(sansGuidage, "--negative-prompt")); XCTAssertNil(valeur(sansGuidage, "--cfg-end"))
+        let avecFiche = args(.balanced, fiche: f)
+        XCTAssertEqual(valeur(avecFiche, "--prompt-file"), "/tmp/fiche.json"); XCTAssertFalse(avecFiche.contains("--prompt"))
+        XCTAssertEqual(Array(args(.fast, fiche: f).prefix(2)), ["--prompt-file", "/tmp/fiche.json"], "la fiche sert aussi au Turbo")
+        XCTAssertEqual(Generatif.texteNombre(5), "5"); XCTAssertEqual(Generatif.texteNombre(0.6), "0.6"); XCTAssertEqual(Generatif.texteNombre(7.25), "7.25")
+        XCTAssertEqual(Generatif.qualiteParDefaut, .balanced)
+        XCTAssertEqual(Generatif.Qualite.balanced.etapes, 30)
+    }
+
+    /// avoid et guidance : validés avant tout envoi, passés hors Turbo ; en Turbo, la réponse dit qu'ils
+    /// n'ont pas servi. La phrase d'exclusion laisse sa partie texte quand l'instruction parle de texte.
+    func testExclusionEtGuidage() throws {
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        let resultatExclusion = editer(["instruction": "add a red scarf", "avoid": "sunglasses, a second dog", "guidance": 7.5])
+        XCTAssertFalse(resultatExclusion.isError, resultatExclusion.text)
+        XCTAssertEqual(valeur("--guidance"), "7.5")
+        // La légende négative remplace la légende nulle de mflux : au format de cette légende (mêmes clés,
+        // même ordre, toutes vides), les termes sous aesthetics.artifacts ; jamais des mots libres.
+        let exclusion = try XCTUnwrap(valeur("--negative-prompt"))
+        XCTAssertTrue(exclusion.hasPrefix(#"{"short_description":"","objects":[],"background_setting":"","lighting":{},"aesthetics":{"artifacts":["text","letters","words""#), exclusion)
+        XCTAssertTrue(exclusion.hasSuffix(#""sunglasses, a second dog"]},"photographic_characteristics":{},"style_medium":"","context":"","artistic_style":""}"#), exclusion)
+        let legende = try JSONCoding.parse(Data(exclusion.utf8))
+        let artefacts = try XCTUnwrap(legende["aesthetics"]?["artifacts"]?.array?.compactMap(\.string))
+        XCTAssertTrue(artefacts.contains("duplicate person") && artefacts.contains("extra head") && artefacts.contains("deformed"), exclusion)
+        XCTAssertEqual(artefacts.last, "sunglasses, a second dog")
+        XCTAssertEqual(Set(legende.object?.keys.map { $0 } ?? []),
+                       ["short_description", "objects", "background_setting", "lighting", "aesthetics", "photographic_characteristics", "style_medium", "context", "artistic_style"],
+                       "les clés de la légende nulle de mflux (Fibo2PromptEncoder.NULL_CAPTION)")
+        XCTAssertEqual(try JSONCoding.parse(resultatExclusion.text)["modifications"]?.array?.first?["exclusion"]?.string?.hasSuffix("distorted anatomy, sunglasses, a second dog"), true)
+        for (cle, valeurRefusee) in [("guidance", JSONValue.number(11)), ("guidance", 0.5), ("guidance", "fort"), ("avoid", "  "),
+                                     ("avoid", .string(String(repeating: "a", count: 501)))] {
+            let refus = editer(["instruction": "x", .init(stringLiteral: cle): valeurRefusee])
+            XCTAssertTrue(refus.isError && refus.text.contains(cle), refus.text)
+        }
+        XCTAssertTrue(editer(["instruction": "x", "guidance": 11]).text.contains("de 1 à 10"))
+        let avant = fake.commands.count
+        _ = editer(["instruction": "x", "guidance": 0])
+        XCTAssertEqual(fake.commands.count, avant, "refusé avant tout envoi")
+
+        // En Turbo : rien de cela, et la réponse le dit.
+        let turbo = editer(["instruction": "add a red scarf", "quality": "fast", "avoid": "sunglasses", "guidance": 8])
+        XCTAssertFalse(turbo.isError, turbo.text)
+        XCTAssertNil(valeur("--negative-prompt")); XCTAssertNil(valeur("--guidance"))
+        let reponse = try JSONCoding.parse(turbo.text)
+        XCTAssertTrue(reponse["remarque_guidage"]?.string?.contains("avoid et guidance n'ont pas servi") == true, turbo.text)
+        XCTAssertNil(reponse["guidage"])
+        XCTAssertNil(reponse["modifications"]?.array?.first?["exclusion"])
+
+        // Sans avoid ni guidance en Turbo : pas de remarque.
+        XCTAssertNil(try JSONCoding.parse(editer(["instruction": "add a red scarf", "quality": "fast"]).text)["remarque_guidage"])
+
+        // Une instruction qui parle de texte : la partie texte de l'exclusion est laissée de côté.
+        XCTAssertFalse(Generatif.termesExclusion(instruction: #"change the sign to "Open""#, avoid: nil).contains("letters"))
+        XCTAssertFalse(Generatif.termesExclusion(instruction: "write HELLO on the mug", avoid: nil).contains("text"))
+        XCTAssertEqual(Array(Generatif.termesExclusion(instruction: "replace the trousers with a skirt", avoid: nil).prefix(2)), ["text", "letters"])
+        // Une instruction qui ajoute une personne : sans « duplicate person », qui pousserait contre elle ;
+        // une personne déjà là (l'habiller) le garde.
+        for ajout in ["Add a person walking in the background", "add two people on the bench", "Insert a young woman near the door",
+                      "a second man behind the car", "add another child"] {
+            XCTAssertFalse(Generatif.termesExclusion(instruction: ajout, avoid: nil).contains("duplicate person"), ajout)
+            XCTAssertTrue(Generatif.termesExclusion(instruction: ajout, avoid: nil).contains("extra head"), ajout)
+        }
+        for habiller in ["replace the woman's trousers with a skirt", "put a hat on the man", "make the person's jacket red"] {
+            XCTAssertTrue(Generatif.termesExclusion(instruction: habiller, avoid: nil).contains("duplicate person"), habiller)
+        }
+        // Un terme avec des guillemets reste du JSON valide.
+        XCTAssertEqual(try JSONCoding.parse(Data(Generatif.exclusion(instruction: "x", avoid: #"a "logo""#).utf8))["aesthetics"]?["artifacts"]?.array?.last?.string, #"a "logo""#)
+        XCTAssertFalse(Generatif.parleDeTexte("redesign the garden"), "design n'est pas sign")
+    }
+
+    func testAvancementAvecFiche() {
+        let sans = Generatif.Avancement(seedVR: [false])
+        let avec = Generatif.Avancement(seedVR: [false], fiche: [true])
+        XCTAssertEqual(avec.pourcentage(.fiche(0, fraction: 0)), sans.pourcentage(.chargement(0)), "la fiche commence où commençait le chargement")
+        XCTAssertGreaterThan(avec.pourcentage(.chargement(0)), avec.pourcentage(.fiche(0, fraction: 0.5)))
+        XCTAssertGreaterThan(avec.pourcentage(.fiche(0, fraction: 0.5)), avec.pourcentage(.fiche(0, fraction: 0)))
+        XCTAssertEqual(avec.pourcentage(.fin), 94)
+        let deux = Generatif.Avancement(seedVR: [false, false], fiche: [true, true])
+        XCTAssertGreaterThan(deux.pourcentage(.fiche(1, fraction: 0)), deux.pourcentage(.etapes(0, fait: 30, sur: 30)) - 1)
+        // Le temps restant compte la fiche de chaque modification suivante.
+        XCTAssertEqual(Generatif.tempsRestant(etape: 10, sur: 50, premiere: 0, secondesDepuisPremiere: 20, chargement: 30, suivantes: 1, fiche: 60) ?? 0,
+                       270, accuracy: 1e-9)
+    }
+
+    /// Le gris de mflux (Fibo2EditImages.grey_out : binaire à 128, gris plat de 128) ; le modèle complet
+    /// du cache ; la fiche lue et résumée.
+    func testGriserLireEtResumerLaFiche() throws {
+        let pixels: [UInt8] = [10, 20, 30, 255, 40, 50, 60, 255, 70, 80, 90, 255]
+        XCTAssertEqual(Generatif.griser(pixels, masque: [0, 127, 128]), [10, 20, 30, 255, 40, 50, 60, 255, 128, 128, 128, 255])
+        let cache = dossier.appendingPathComponent("cache")
+        XCTAssertNil(Generatif.vlmLocal(cache: cache))
+        Self.modeleVLM(dans: cache)
+        XCTAssertNotNil(Generatif.vlmLocal(cache: cache))
+        try FileManager.default.removeItem(at: cache.appendingPathComponent("models--briaai--FIBO-vlm/snapshots/\(Generatif.revisionVLM)/model-00002-of-00002.safetensors"))
+        XCTAssertNil(Generatif.vlmLocal(cache: cache), "un fichier de poids manque")
+        XCTAssertNil(Generatif.lireFiche(Data("[1, 2]".utf8), instruction: "x"))
+        XCTAssertNil(Generatif.lireFiche(Data("{}".utf8), instruction: "x"))
+        let fiche = try XCTUnwrap(Generatif.lireFiche(Data(#"{"short_description": "\#(String(repeating: "a", count: 500))", "edit_instruction": " "}"#.utf8), instruction: "add a hat"))
+        XCTAssertEqual(fiche["edit_instruction"]?.string, "add a hat")
+        let resume = Generatif.resumeFiche(fiche)
+        XCTAssertEqual(resume["description"]?.string?.count, 300)
+        XCTAssertTrue(resume["description"]?.string?.hasSuffix("…") == true)
+        XCTAssertTrue(Generatif.scriptFiche.contains("vlm.edit(") && Generatif.scriptFiche.contains("use_mask=args.use_mask"))
+        XCTAssertTrue(Generatif.scriptFiche.contains(Generatif.marqueRepliFiche), "le script écrit la marque que le connecteur lit")
+        XCTAssertTrue(Generatif.ficheRefusee("ValueError: The JSON caption does not have the format FIBO 2 reads:"))
+        XCTAssertTrue(Generatif.ficheRefusee("mflux-generate-fibo2-edit: error: The prompt starts like a JSON caption but is not valid JSON: Expecting ',' at line 3, column 2."))
+        XCTAssertTrue(Generatif.ficheRefusee(#"error: "edit_instruction" has to be a string, not a list."#))
+        XCTAssertFalse(Generatif.ficheRefusee("RuntimeError: out of memory"))
+        // La trace d'une autre erreur, qui montre une ligne de source avec edit_instruction : pas un refus.
+        XCTAssertFalse(Generatif.ficheRefusee("""
+        Traceback (most recent call last):
+          File "/x/mflux/models/fibo2/model/fibo2_text_encoder/prompt_encoder.py", line 68, in edit_prompt
+            edit["edit_instruction"] = instruction
+          File "/x/mflux/models/fibo2/variants/fibo2_core.py", line 109, in generate_image
+            negative_embeds = self._encode_prompt(negative_prompt or default)
+        RuntimeError: [metal::malloc] Attempting to allocate 9663676416 bytes which is greater than the maximum allowed buffer size; structured_caption
+        """))
+        // La fiche passée telle quelle (l'ordre de ses clés gardé), l'instruction jointe à la fin s'il en manque.
+        let ecrite = "{\n  \"short_description\": \"a hat\",\n  \"objects\": [],\n  \"edit_instruction\": \"Add a hat.\"\n}\n"
+        XCTAssertEqual(Generatif.ficheAvecInstruction(ecrite, instruction: "x"), ecrite)
+        let jointe = try XCTUnwrap(Generatif.ficheAvecInstruction(#"{"short_description": "a hat", "background_setting": "a park"}"#, instruction: "add a hat"))
+        XCTAssertEqual(jointe, "{\"short_description\": \"a hat\", \"background_setting\": \"a park\",\n  \"edit_instruction\": \"add a hat\"\n}\n")
+        XCTAssertEqual(try JSONCoding.parse(Data(jointe.utf8))["edit_instruction"]?.string, "add a hat")
+        XCTAssertNil(Generatif.ficheAvecInstruction("[1]", instruction: "x"))
+        XCTAssertNil(Generatif.ficheAvecInstruction("{}", instruction: "x"))
+    }
+
+    /// FIBO-vlm : mflux le charge à sa révision épinglée, hors ligne ; le cache se juge sur cet
+    /// instantané, jamais sur refs/main, et le conseil de téléchargement la nomme.
+    func testModeleVLMALaRevisionEpinglee() throws {
+        let cache = dossier.appendingPathComponent("cache-revision")
+        // refs/main sur une version plus récente, la révision épinglée absente : pas de modèle.
+        Self.modeleVLM(dans: cache, revision: "f00dcafe")
+        XCTAssertNil(Generatif.vlmLocal(cache: cache), "refs/main ne compte pas")
+        // La révision épinglée présente, refs/main ailleurs : le modèle est là.
+        Self.modeleVLM(dans: cache, main: "f00dcafe")
+        XCTAssertEqual(Generatif.vlmLocal(cache: cache)?.lastPathComponent, Generatif.revisionVLM)
+        XCTAssertEqual(Generatif.revisionVLM, "bd13da5e0b73c808014d6260963e311c8cdf0d8b", "ModelRevisions.PINNED de mflux 0.24")
+        XCTAssertTrue(Generatif.conseilVLM.hasSuffix("--revision bd13da5e0b73c808014d6260963e311c8cdf0d8b"))
+        // La réponse conseille ce téléchargement-là.
+        tools.fibo?.cacheHF = dossier.appendingPathComponent("hf-vide")
+        fauxVLM(avecModele: false)
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        let resultat = editer(["instruction": "add a red scarf"])
+        XCTAssertTrue(try JSONCoding.parse(resultat.text)["remarque_fiche"]?.string?.contains("--revision \(Generatif.revisionVLM)") == true, resultat.text)
+    }
+
+    /// Le vrai script de fiche (Generatif.scriptFiche), lancé par un Python du système sur un faux paquet
+    /// mflux (jamais le vrai FIBO-vlm) : en mode masque, FiboVLM.edit lève quand sa sortie n'a pas
+    /// d'edit_instruction ; le script refait une fiche ordinaire sur l'image non grisée, le dit, et écrit
+    /// la fiche dans l'ordre de FIBO-vlm. Sauté sans Python 3 sur ce Mac.
+    func testScriptDeFicheReplieSansMasque() throws {
+        guard let python = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3"].first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
+            throw XCTSkip("pas de Python 3 (Homebrew) sur ce Mac")
+        }
+        let racinePaquet = dossier.appendingPathComponent("faux-mflux")
+        let paquet = racinePaquet.appendingPathComponent("mflux/models/fibo_vlm/model")
+        try FileManager.default.createDirectory(at: paquet, withIntermediateDirectories: true)
+        for sous in ["mflux", "mflux/models", "mflux/models/fibo_vlm", "mflux/models/fibo_vlm/model"] {
+            try "".write(to: racinePaquet.appendingPathComponent(sous + "/__init__.py"), atomically: true, encoding: .utf8)
+        }
+        let journal = dossier.appendingPathComponent("faux-vlm.log")
+        try """
+        import json
+        JOURNAL = \(JSONCoding.line(.string(journal.path)))
+
+        class FiboVLM:
+            def edit(self, image, edit_instruction, use_mask=False, seed=None):
+                with open(JOURNAL, "a") as f:
+                    f.write(f"{image}|{use_mask}|{seed}\\n")
+                if use_mask:
+                    raise ValueError("Masked edit prompt generation failed; refusing fallback that could ignore the masked regions.")
+                return '\\n{\\n  "short_description": "a hat",\\n  "objects": [],\\n  "background_setting": "a park",\\n  "edit_instruction": "Add a red hat."\\n}\\n'
+        """.write(to: paquet.appendingPathComponent("fibo_vlm.py"), atomically: true, encoding: .utf8)
+        try """
+        class FiboVLMUtil:
+            @staticmethod
+            def load_image(path):
+                return str(path)
+        """.write(to: paquet.appendingPathComponent("util.py"), atomically: true, encoding: .utf8)
+        let script = dossier.appendingPathComponent("fiche-fibo-vlm.py")
+        try Generatif.scriptFiche.write(to: script, atomically: true, encoding: .utf8)
+        func lancer(_ arguments: [String]) throws -> (code: Int32, sortie: String) {
+            let processus = Process()
+            processus.executableURL = URL(fileURLWithPath: python)
+            processus.arguments = arguments
+            var environnement = ProcessInfo.processInfo.environment
+            environnement["PYTHONPATH"] = racinePaquet.path
+            processus.environment = environnement
+            let tuyau = Pipe()
+            processus.standardOutput = tuyau; processus.standardError = tuyau
+            try processus.run()
+            let donnees = tuyau.fileHandleForReading.readDataToEndOfFile()
+            processus.waitUntilExit()
+            return (processus.terminationStatus, String(decoding: donnees, as: UTF8.self))
+        }
+        let grisee = dossier.appendingPathComponent("grisee.png"), originale = dossier.appendingPathComponent("originale.png")
+        let sortie = dossier.appendingPathComponent("fiche.json")
+        // Sans -I (le faux paquet passe par PYTHONPATH) ; les mêmes arguments que le connecteur sinon.
+        let args = Array(Generatif.argumentsFiche(script: script, image: grisee, instruction: "add a red hat", sortie: sortie, graine: 7,
+                                                  originale: originale).dropFirst())
+        let (code, texte) = try lancer(args)
+        XCTAssertEqual(code, 0, texte)
+        XCTAssertTrue(texte.contains(Generatif.marqueRepliFiche), texte)
+        let appels = try String(contentsOf: journal, encoding: .utf8).split(separator: "\n").map(String.init)
+        XCTAssertEqual(appels, [grisee.path + "|True|7", originale.path + "|False|7"], "la fiche masquée, puis l'ordinaire sur l'image non grisée")
+        let fiche = try String(contentsOf: sortie, encoding: .utf8)
+        let positions = try ["short_description", "objects", "background_setting", "edit_instruction"].map { try XCTUnwrap(fiche.range(of: $0)).lowerBound }
+        XCTAssertEqual(positions, positions.sorted(), "l'ordre de FIBO-vlm : \(fiche)")
+        // Sans zone, aucun repli : la même erreur reste une erreur (code 1, message lisible).
+        try? FileManager.default.removeItem(at: journal)
+        let sansZone = try lancer([script.path, "--image", grisee.path, "--instruction", "x", "--output", sortie.path, "--use-mask"])
+        XCTAssertEqual(sansZone.code, 1, sansZone.sortie)
+        XCTAssertTrue(sansZone.sortie.contains("erreur FIBO-vlm : Masked edit prompt generation failed"), sansZone.sortie)
+    }
+
+    /// Le repli sans masque du script, dit dans la réponse : la fiche sert quand même.
+    func testRepliSansMasqueDitDansLaReponse() throws {
+        fauxVLM(fin: """
+        echo "repli : fiche ordinaire sans masque (Masked edit prompt generation failed)"
+        cp "\(gardes.path)/fiche-modele.json" "$out"
+        """)
+        let region = CGRect(x: 0.3, y: 0.3, width: 0.3, height: 0.4)
+        fauxMflux(sortie: sortiePreparee(region: region) { fx, fy, p, i in if fx > 0.35, fx < 0.55, fy > 0.35, fy < 0.65 { Self.rouge(&p, i) } })
+        let resultat = editer(["instruction": "replace the trousers with a skirt", "region": ["x": 0.3, "y": 0.3, "width": 0.3, "height": 0.4]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertNotNil(valeur("--prompt-file"), "la fiche ordinaire sert")
+        let modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
+        XCTAssertNotNil(modification["fiche"])
+        XCTAssertTrue(modification["remarque_fiche"]?.string?.contains("fiche ordinaire, sur l'image non grisée") == true, resultat.text)
+    }
+
+    /// Un calcul lancé ailleurs pendant l'appel (Fibo 2 Studio, après la fiche) : l'appel s'arrête avant
+    /// le lancement suivant ; jamais deux calculs ensemble, rien d'importé.
+    func testAutreCalculVuAvantChaqueLancement() throws {
+        fauxVLM()
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        // Vrai dès que la fiche est finie (le faux VLM touche vlm-fin à sa fin).
+        let fin = gardes.appendingPathComponent("vlm-fin")
+        tools.fibo?.autreCalcul = { FileManager.default.fileExists(atPath: fin.path) }
+        let refus = editer(["instruction": "add a red scarf"])
+        XCTAssertTrue(refus.isError && refus.text.contains("lancé pendant cet appel") && refus.text.contains("avant Fibo 2"), refus.text)
+        XCTAssertEqual(appelsDuVLM, 1)
+        XCTAssertEqual(appelsDeMflux, 0, "mflux jamais lancé")
+        XCTAssertFalse(fake.commands.contains("importerGeneree"))
+        XCTAssertEqual(dossiersTemporairesRestants, [])
+
+        // Avant SeedVR2 : vrai dès que mflux a écrit sa sortie.
+        try? FileManager.default.removeItem(at: fin)
+        fauxSeedVR()
+        ecrireSource(largeur: 1600, hauteur: 1200)
+        let region = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
+        fauxMflux(sortie: sortiePreparee(region: region, carreRouge))
+        let compte = gardes.appendingPathComponent("compte")
+        tools.fibo?.autreCalcul = { FileManager.default.fileExists(atPath: compte.path) }
+        let refusSeedVR = editer(["instruction": "add a red square", "structured_prompt": false,
+                                  "region": ["x": 0.25, "y": 0.25, "width": 0.5, "height": 0.5]])
+        XCTAssertTrue(refusSeedVR.isError && refusSeedVR.text.contains("avant SeedVR2"), refusSeedVR.text)
+        XCTAssertNil(argumentsSeedVR, "SeedVR2 jamais lancé")
+        XCTAssertFalse(fake.commands.contains("importerGeneree"))
+    }
+
+    /// Un masque que l'utilisateur a peint (mask.existing) : cherché par son nom avant l'exportation
+    /// (casse indifférente), repris dans le témoin par son nom exact ; absent ou en double : refusé avec
+    /// les noms, rien d'exporté ; existing seul dans mask.
+    func testMasquePeintDansLightroom() throws {
+        fake.replies["masques"] = ["masques": [["numero": 1, "nom": "Ciel"], ["numero": 2, "nom": "Fibo"]]]
+        masqueRendu = { Self.dansLaPersonne($0, $1) }
+        fauxMflux(sortie: sortiePreparee(region: CGRect(x: 0, y: 0, width: 1, height: 1)) { _, _, p, i in Self.bleu(&p, i) })
+        let resultat = editer(["instruction": "replace the jacket with a red raincoat", "mask": ["existing": "  fibo "], "label": "imperméable"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(fake.commands, ["etat", "masques", "exporter", "essayer", "essayer", "importerGeneree"],
+                       "le masque cherché avant l'exportation, en lecture seule")
+        XCTAssertEqual(fake.calls.first { $0.command == "masques" }?.params["photo"]?.int, 7)
+        XCTAssertNil(fake.calls.first { $0.command == "masques" }?.params["action"], "lister, rien d'autre")
+        for essai in fake.calls.filter({ $0.command == "essayer" }).map(\.params) {
+            let temoin = try XCTUnwrap(essai["masques"]?.array?.first)
+            XCTAssertEqual(temoin["type"]?.string, "existant")
+            XCTAssertEqual(temoin["masque"]?.string, "Fibo", "le nom exact")
+            XCTAssertEqual(temoin["nom"]?.string, "Claude · masque pour Fibo 2")
+            XCTAssertEqual(essai["temoin"]?.bool, true)
+        }
+        let bloc = try XCTUnwrap(JSONCoding.parse(resultat.text)["masque"])
+        XCTAssertEqual(bloc["kind"]?.string, "existing")
+        XCTAssertEqual(bloc["nom"]?.string, "Fibo")
+        XCTAssertEqual(bloc["calcule_par"]?.string, "l'utilisateur, dans Lightroom")
+        XCTAssertTrue(bloc["lecture"]?.string?.contains("ni changé ni retiré") == true, resultat.text)
+        // Le TIFF : la zone peinte repeinte, le reste au bit près.
+        let avant = try XCTUnwrap(Self.pixels16(source)), apres = try XCTUnwrap(Self.pixels16(importe))
+        XCTAssertEqual(Self.pixel(apres, 30, 30), Self.pixel(avant, 30, 30))
+        XCTAssertGreaterThan(Self.pixel(apres, largeur / 2, hauteur / 2)[2], 40_000)
+
+        // Absent : refusé avec les noms, avant l'exportation.
+        fake.calls.removeAll()
+        let absent = editer(["instruction": "x", "mask": ["existing": "Peinture"]])
+        XCTAssertTrue(absent.isError && absent.text.contains("Aucun masque « Peinture »") && absent.text.contains("« Ciel », « Fibo »"), absent.text)
+        XCTAssertEqual(fake.commands, ["etat", "masques"])
+        // Deux masques du même nom.
+        fake.replies["masques"] = ["masques": [["nom": "Fibo"], ["nom": "FIBO"]]]
+        fake.calls.removeAll()
+        let double = editer(["instruction": "x", "mask": ["existing": "Fibo"]])
+        XCTAssertTrue(double.isError && double.text.contains("2 masques s'appellent « Fibo »"), double.text)
+        XCTAssertFalse(fake.commands.contains("exporter"))
+        // Aucun masque sur la photo.
+        fake.replies["masques"] = ["masques": []]
+        XCTAssertTrue(editer(["instruction": "x", "mask": ["existing": "Fibo"]]).text.contains("elle n'a aucun masque"))
+        // existing seul ; un nom vide.
+        fake.calls.removeAll()
+        let avecKind = editer(["instruction": "x", "mask": ["existing": "Fibo", "kind": "background"]])
+        XCTAssertTrue(avecKind.isError && avecKind.text.contains("sans kind"), avecKind.text)
+        XCTAssertTrue(editer(["instruction": "x", "mask": ["existing": "Fibo", "invert": true]]).text.contains("sans invert"))
+        XCTAssertTrue(editer(["instruction": "x", "mask": ["existing": " "]]).text.contains("le nom exact"))
+        XCTAssertTrue(fake.commands.isEmpty, "refusés avant tout envoi : \(fake.commands)")
+        XCTAssertEqual(try ToolHandler.masqueExistant("ciel", parmi: [["nom": "Ciel"]]), "Ciel")
+    }
+
+    /// Un masque peint vidé (ses traits effacés) : refusé avant l'exportation et l'accord, d'après les
+    /// composants que la commande masques liste ; un masque peint presque vide ou total : refusé avec un
+    /// texte pour un masque peint (le repeindre, region), jamais celui d'un masque calculé (kind, add_mask).
+    func testMasquePeintVideOuPresqueVide() throws {
+        fake.replies["masques"] = ["masques": [["numero": 1, "nom": "Ciel", "composants": [["type": "Image"]]],
+                                               ["numero": 2, "nom": "Fibo", "composants": []]]]
+        fake.replies["etat"] = ["mode": "proposer d'abord", "pause": false, "photo_active": ["id": 7]]
+        fauxMflux()
+        let vide = editer(["instruction": "x", "mask": ["existing": "fibo"], "confirm": true])
+        XCTAssertTrue(vide.isError && vide.text.contains("Le masque « Fibo » n'a aucun composant") && vide.text.contains("Rien n'a été fait"), vide.text)
+        XCTAssertEqual(fake.commands, ["etat", "masques"], "ni exportation, ni accord demandé")
+        XCTAssertEqual(appelsDeMflux, 0)
+
+        // Peint, mais presque rien : le texte d'un masque peint.
+        fake.replies["etat"] = ["mode": "appliquer directement", "pause": false, "photo_active": ["id": 7]]
+        fake.replies["masques"] = ["masques": [["numero": 1, "nom": "Fibo", "composants": [["type": "Paint"]]]]]
+        masqueRendu = { fx, fy in fx < 0.004 && fy < 0.004 }
+        let petit = editer(["instruction": "x", "mask": ["existing": "Fibo"]])
+        XCTAssertTrue(petit.isError && petit.text.contains("Le masque « Fibo » peint dans Lightroom ne couvre presque rien"), petit.text)
+        XCTAssertTrue(petit.text.contains("le repeindre plus large") && petit.text.contains("region"), petit.text)
+        XCTAssertFalse(petit.text.contains("add_mask") || petit.text.contains("kind"), petit.text)
+        XCTAssertEqual(appelsDeMflux, 0)
+        // Peint sur toute la photo (inversé ?).
+        masqueRendu = { _, _ in true }
+        let total = editer(["instruction": "x", "mask": ["existing": "Fibo"]])
+        XCTAssertTrue(total.isError && total.text.contains("peint dans Lightroom couvre toute la photo") && total.text.contains("inversé dans le panneau Masquage"), total.text)
+        XCTAssertFalse(total.text.contains("Lightroom n'a trouvé aucun sujet"), total.text)
+        // Un masque calculé garde son texte.
+        XCTAssertTrue(Generatif.refusMasque(part: 0.00005)?.contains("add_mask") == true)
+        XCTAssertNil(Generatif.refusMasque(part: 0.5, peint: "Fibo"))
     }
 
     /// Les pixels d'un PNG (canal rouge), pour lire le masque.
