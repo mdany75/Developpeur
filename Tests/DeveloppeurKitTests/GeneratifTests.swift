@@ -2274,8 +2274,7 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(apres("--instruction"), "replace the trousers with a knee-length navy skirt")
         XCTAssertEqual(apres("--seed"), "42")
         XCTAssertTrue(args.contains("--use-mask"))
-        // Le repli sans masque du script : l'entrée de Fibo, non grisée.
-        XCTAssertEqual(apres("--image-originale").map { URL(fileURLWithPath: $0).lastPathComponent }, "entree-1.png")
+        XCTAssertFalse(args.contains("--image-originale"), "plus de repli sans masque : une seule génération, en mode masqué")
         XCTAssertEqual(URL(fileURLWithPath: try XCTUnwrap(apres("--image"))).lastPathComponent, "fiche-entree-1.png")
         XCTAssertEqual((try? String(contentsOf: gardes.appendingPathComponent("vlm-env.txt"), encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines),
                        "1|" + dossier.appendingPathComponent("hf").path, "hors ligne, le cache où le modèle a été vu")
@@ -2568,8 +2567,18 @@ final class GeneratifTests: XCTestCase {
         let resume = Generatif.resumeFiche(fiche)
         XCTAssertEqual(resume["description"]?.string?.count, 300)
         XCTAssertTrue(resume["description"]?.string?.hasSuffix("…") == true)
-        XCTAssertTrue(Generatif.scriptFiche.contains("vlm.edit(") && Generatif.scriptFiche.contains("use_mask=args.use_mask"))
-        XCTAssertTrue(Generatif.scriptFiche.contains(Generatif.marqueRepliFiche), "le script écrit la marque que le connecteur lit")
+        // Le réglage léger : une seule génération, cache de MLX borné, 8 bits, 1 536 jetons au plus.
+        let script = Generatif.scriptFiche
+        XCTAssertTrue(script.contains("vlm._generate_internal(") && script.contains("use_mask=args.use_mask"))
+        XCTAssertFalse(script.contains("vlm.edit("), "ni FiboVLM.edit ni ses replis")
+        XCTAssertFalse(script.contains("--image-originale"))
+        XCTAssertTrue(script.contains("mx.set_cache_limit(CACHE_MLX)") && script.contains("CACHE_MLX = 4 * 1024 ** 3"))
+        XCTAssertTrue(script.contains("QUANTIZE = 8") && script.contains("FiboVLM(quantize=QUANTIZE)"))
+        XCTAssertTrue(script.contains("MAX_JETONS = 1536"))
+        XCTAssertTrue(script.contains(#"VERSION_RELEVEE = "0.24.0""#) && script.contains(#"MARQUE_VERSION = "\#(Generatif.marqueVersionFiche)""#),
+                      "le script écrit la marque que le connecteur lit")
+        XCTAssertFalse(script.contains("/private/tmp") || script.contains("scratchpad"), "aucun chemin du dossier temporaire")
+        XCTAssertEqual(Generatif.delaiFiche, 180); XCTAssertEqual(Generatif.dureeFicheEstimee, 45)
         XCTAssertTrue(Generatif.ficheRefusee("ValueError: The JSON caption does not have the format FIBO 2 reads:"))
         XCTAssertTrue(Generatif.ficheRefusee("mflux-generate-fibo2-edit: error: The prompt starts like a JSON caption but is not valid JSON: Expecting ',' at line 3, column 2."))
         XCTAssertTrue(Generatif.ficheRefusee(#"error: "edit_instruction" has to be a string, not a list."#))
@@ -2613,89 +2622,384 @@ final class GeneratifTests: XCTestCase {
         XCTAssertTrue(try JSONCoding.parse(resultat.text)["remarque_fiche"]?.string?.contains("--revision \(Generatif.revisionVLM)") == true, resultat.text)
     }
 
-    /// Le vrai script de fiche (Generatif.scriptFiche), lancé par un Python du système sur un faux paquet
-    /// mflux (jamais le vrai FIBO-vlm) : en mode masque, FiboVLM.edit lève quand sa sortie n'a pas
-    /// d'edit_instruction ; le script refait une fiche ordinaire sur l'image non grisée, le dit, et écrit
-    /// la fiche dans l'ordre de FIBO-vlm. Sauté sans Python 3 sur ce Mac.
-    func testScriptDeFicheReplieSansMasque() throws {
+    /// Le vrai script de fiche (Generatif.scriptFiche), lancé par un Python de Homebrew sur de faux
+    /// paquets mlx et mflux (jamais le vrai FIBO-vlm) qui imitent ce qu'il touche de mflux 0.24 :
+    /// `mx.set_cache_limit`, `FiboVLM(quantize:)`, `_generate_internal` (un jeton par caractère, tiré
+    /// par `Qwen3VLUtil.sample_top_p`), `_normalize_edit_output` calqué sur celui de mflux 0.24 (le
+    /// meilleur objet parmi plusieurs, les valeurs vides retirées, `aesthetics` complété, et qui lève
+    /// sans edit_instruction), et la version du paquet ; à la sortie, il note si les deux attributs
+    /// remplacés par le script sont revenus. Sauté sans Python 3 sur ce Mac.
+    func testScriptDeFicheReglageLeger() throws {
         guard let python = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3"].first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
             throw XCTSkip("pas de Python 3 (Homebrew) sur ce Mac")
         }
         let racinePaquet = dossier.appendingPathComponent("faux-mflux")
-        let paquet = racinePaquet.appendingPathComponent("mflux/models/fibo_vlm/model")
-        try FileManager.default.createDirectory(at: paquet, withIntermediateDirectories: true)
-        for sous in ["mflux", "mflux/models", "mflux/models/fibo_vlm", "mflux/models/fibo_vlm/model"] {
+        for sous in ["mlx", "mflux", "mflux/models", "mflux/models/common_models", "mflux/models/common_models/qwen3_vl",
+                     "mflux/models/fibo_vlm", "mflux/models/fibo_vlm/model"] {
+            try FileManager.default.createDirectory(at: racinePaquet.appendingPathComponent(sous), withIntermediateDirectories: true)
             try "".write(to: racinePaquet.appendingPathComponent(sous + "/__init__.py"), atomically: true, encoding: .utf8)
         }
-        let journal = dossier.appendingPathComponent("faux-vlm.log")
         try """
+        import os
+
+        def set_cache_limit(n):
+            with open(os.environ["FAUX_VLM_JOURNAL"], "a") as f:
+                f.write(f"cache {n}\\n")
+            return 0
+        """.write(to: racinePaquet.appendingPathComponent("mlx/core.py"), atomically: true, encoding: .utf8)
+        try """
+        class Jeton:
+            def __init__(self, n):
+                self.n = n
+
+            def item(self):
+                return self.n
+
+
+        class Qwen3VLUtil:
+            @staticmethod
+            def sample_top_p(logits, top_p, temperature=1.0):
+                return Jeton(logits)  # le « logit » du faux modèle est déjà le jeton
+        """.write(to: racinePaquet.appendingPathComponent("mflux/models/common_models/qwen3_vl/qwen3_vl_util.py"), atomically: true, encoding: .utf8)
+        try """
+        import atexit
         import json
-        JOURNAL = \(JSONCoding.line(.string(journal.path)))
+        import os
+        from mflux.models.common_models.qwen3_vl.qwen3_vl_util import Qwen3VLUtil
+
+
+        def journal(ligne):
+            with open(os.environ["FAUX_VLM_JOURNAL"], "a") as f:
+                f.write(ligne + "\\n")
+
+
+        class Tokenizer:
+            def decode(self, jetons, skip_special_tokens=True):
+                return "".join(chr(j) for j in jetons)
+
+
+        class Processor:
+            tokenizer = Tokenizer()
+
 
         class FiboVLM:
-            def edit(self, image, edit_instruction, use_mask=False, seed=None):
-                with open(JOURNAL, "a") as f:
-                    f.write(f"{image}|{use_mask}|{seed}\\n")
-                if use_mask:
-                    raise ValueError("Masked edit prompt generation failed; refusing fallback that could ignore the masked regions.")
-                return '\\n{\\n  "short_description": "a hat",\\n  "objects": [],\\n  "background_setting": "a park",\\n  "edit_instruction": "Add a red hat."\\n}\\n'
-        """.write(to: paquet.appendingPathComponent("fibo_vlm.py"), atomically: true, encoding: .utf8)
+            def __init__(self, quantize=None):
+                journal(f"quantize {quantize}")
+                self.processor = Processor()
+
+            def edit(self, *args, **kwargs):
+                raise AssertionError("FiboVLM.edit ne sert plus")
+
+            def _generate_internal(self, task, *, image=None, editing_instructions=None, top_p=0.9, temperature=0.2,
+                                   max_tokens=4096, stop=None, seed=None, use_mask=False, **autres):
+                journal(f"generer {task}|{image}|{editing_instructions}|{max_tokens}|{seed}|{use_mask}")
+                with open(os.environ["FAUX_VLM_TEXTE"], encoding="utf-8") as f:
+                    texte = f.read()
+                if texte == "LEVER":
+                    raise ValueError("forme incompatible (MLX)")  # avant toute normalisation
+                jetons = [int(Qwen3VLUtil.sample_top_p(ord(c), top_p, temperature).item()) for c in texte[:max_tokens]]
+                journal(f"tires {len(jetons)}")
+                return FiboVLM._normalize_edit_output(self.processor.tokenizer.decode(jetons))
+
+            # Calqués sur mflux 0.24 (fibo_vlm.py) : le meilleur objet JSON complet du texte, les valeurs
+            # vides retirées, aesthetics complété, edit_instruction exigée (ou celle de repli).
+            @staticmethod
+            def _normalize_edit_output(text, fallback_edit_instruction=None):
+                payload = FiboVLM._extract_single_json_object(text)
+                aesthetics = payload.setdefault("aesthetics", {})
+                if not isinstance(aesthetics, dict):
+                    raise ValueError("VLM edit output must contain an object at `aesthetics`.")
+                aesthetics.setdefault("preference_score", "very high")
+                aesthetics.setdefault("aesthetic_score", "very high")
+                payload = FiboVLM._remove_empty_values(payload)
+                consigne = payload.get("edit_instruction")
+                if not isinstance(consigne, str) or not consigne.strip():
+                    repli = (fallback_edit_instruction or "").strip()
+                    if not repli:
+                        raise ValueError("VLM edit output must include a non-empty `edit_instruction`.")
+                    payload["edit_instruction"] = repli[0].upper() + repli[1:]
+                return "\\n" + json.dumps(payload, indent=2, ensure_ascii=False) + "\\n"
+
+            @staticmethod
+            def _extract_single_json_object(text):
+                candidat = text.strip()
+                try:
+                    lu = json.loads(candidat)
+                except json.JSONDecodeError:
+                    lu = None
+                if isinstance(lu, dict):
+                    return lu
+                objets, debut, profondeur, chaine, echappe = [], None, 0, False, False
+                for i, c in enumerate(candidat):
+                    if chaine:
+                        if echappe:
+                            echappe = False
+                        elif c == "\\\\":
+                            echappe = True
+                        elif c == '"':
+                            chaine = False
+                        continue
+                    if c == '"':
+                        chaine = True
+                    elif c == "{":
+                        if profondeur == 0:
+                            debut = i
+                        profondeur += 1
+                    elif c == "}" and profondeur > 0:
+                        profondeur -= 1
+                        if profondeur == 0 and debut is not None:
+                            try:
+                                lu = json.loads(candidat[debut:i + 1])
+                            except json.JSONDecodeError:
+                                lu = None
+                            if isinstance(lu, dict):
+                                objets.append(lu)
+                            debut = None
+                if not objets:
+                    raise ValueError("VLM edit output must contain exactly one JSON object.")
+                return max(objets, key=FiboVLM._score)
+
+            @staticmethod
+            def _score(c):
+                score = 10 if isinstance(c.get("edit_instruction"), str) and c["edit_instruction"].strip() else 0
+                score += 3 if isinstance(c.get("short_description"), str) and c["short_description"].strip() else 0
+                score += 2 if isinstance(c.get("objects"), list) else 0
+                score += 2 if isinstance(c.get("lighting"), dict) else 0
+                score += 3 if isinstance(c.get("aesthetics"), dict) else 0
+                return score, len(json.dumps(c, ensure_ascii=False))
+
+            @staticmethod
+            def _remove_empty_values(v):
+                vides = (None, "", {}, [])
+                if isinstance(v, dict):
+                    net = {k: FiboVLM._remove_empty_values(x) for k, x in v.items() if x not in vides}
+                    return {k: x for k, x in net.items() if x not in vides}
+                if isinstance(v, list):
+                    return [x for x in (FiboVLM._remove_empty_values(y) for y in v) if x not in vides]
+                return v
+
+
+        # À la sortie du script : les attributs qu'il remplace pendant la génération sont-ils revenus ?
+        ORIGINAUX = (FiboVLM.__dict__["_normalize_edit_output"].__func__, Qwen3VLUtil.__dict__["sample_top_p"].__func__)
+
+
+        def remis():
+            actuels = (FiboVLM.__dict__["_normalize_edit_output"].__func__, Qwen3VLUtil.__dict__["sample_top_p"].__func__)
+            journal(f"remis {actuels == ORIGINAUX}")
+
+
+        atexit.register(remis)
+        """.write(to: racinePaquet.appendingPathComponent("mflux/models/fibo_vlm/model/fibo_vlm.py"), atomically: true, encoding: .utf8)
         try """
         class FiboVLMUtil:
             @staticmethod
             def load_image(path):
                 return str(path)
-        """.write(to: paquet.appendingPathComponent("util.py"), atomically: true, encoding: .utf8)
+        """.write(to: racinePaquet.appendingPathComponent("mflux/models/fibo_vlm/model/util.py"), atomically: true, encoding: .utf8)
+        func version(_ v: String?) throws {
+            for ancienne in (try? FileManager.default.contentsOfDirectory(atPath: racinePaquet.path)) ?? [] where ancienne.hasSuffix(".dist-info") {
+                try FileManager.default.removeItem(at: racinePaquet.appendingPathComponent(ancienne))
+            }
+            guard let v else { return }
+            let info = racinePaquet.appendingPathComponent("mflux-\(v).dist-info")
+            try FileManager.default.createDirectory(at: info, withIntermediateDirectories: true)
+            try "Metadata-Version: 2.1\nName: mflux\nVersion: \(v)\n".write(to: info.appendingPathComponent("METADATA"), atomically: true, encoding: .utf8)
+        }
         let script = dossier.appendingPathComponent("fiche-fibo-vlm.py")
         try Generatif.scriptFiche.write(to: script, atomically: true, encoding: .utf8)
-        func lancer(_ arguments: [String]) throws -> (code: Int32, sortie: String) {
+        let journal = dossier.appendingPathComponent("faux-vlm.log"), modele = dossier.appendingPathComponent("faux-vlm.txt")
+        let image = dossier.appendingPathComponent("grisee.png"), sortie = dossier.appendingPathComponent("fiche.json")
+        /// Le script sur le texte que le faux FIBO-vlm écrira ; sans -I (les faux paquets passent par
+        /// PYTHONPATH), les mêmes arguments que le connecteur sinon.
+        func lancer(texte: String, masque: Bool) throws -> (code: Int32, sortie: String, journal: [String]) {
+            try? FileManager.default.removeItem(at: journal); try? FileManager.default.removeItem(at: sortie)
+            try texte.write(to: modele, atomically: true, encoding: .utf8)
             let processus = Process()
             processus.executableURL = URL(fileURLWithPath: python)
-            processus.arguments = arguments
+            let arguments = Generatif.argumentsFiche(script: script, image: image, instruction: "add a red hat", sortie: sortie, graine: 7, masque: masque)
+            XCTAssertEqual(arguments.first, "-I")
+            processus.arguments = Array(arguments.dropFirst())
             var environnement = ProcessInfo.processInfo.environment
             environnement["PYTHONPATH"] = racinePaquet.path
+            environnement["FAUX_VLM_JOURNAL"] = journal.path
+            environnement["FAUX_VLM_TEXTE"] = modele.path
             processus.environment = environnement
             let tuyau = Pipe()
             processus.standardOutput = tuyau; processus.standardError = tuyau
             try processus.run()
             let donnees = tuyau.fileHandleForReading.readDataToEndOfFile()
             processus.waitUntilExit()
-            return (processus.terminationStatus, String(decoding: donnees, as: UTF8.self))
+            let lignes = ((try? String(contentsOf: journal, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
+            return (processus.terminationStatus, String(decoding: donnees, as: UTF8.self), lignes)
         }
-        let grisee = dossier.appendingPathComponent("grisee.png"), originale = dossier.appendingPathComponent("originale.png")
-        let sortie = dossier.appendingPathComponent("fiche.json")
-        // Sans -I (le faux paquet passe par PYTHONPATH) ; les mêmes arguments que le connecteur sinon.
-        let args = Array(Generatif.argumentsFiche(script: script, image: grisee, instruction: "add a red hat", sortie: sortie, graine: 7,
-                                                  originale: originale).dropFirst())
-        let (code, texte) = try lancer(args)
-        XCTAssertEqual(code, 0, texte)
-        XCTAssertTrue(texte.contains(Generatif.marqueRepliFiche), texte)
-        let appels = try String(contentsOf: journal, encoding: .utf8).split(separator: "\n").map(String.init)
-        XCTAssertEqual(appels, [grisee.path + "|True|7", originale.path + "|False|7"], "la fiche masquée, puis l'ordinaire sur l'image non grisée")
-        let fiche = try String(contentsOf: sortie, encoding: .utf8)
-        let positions = try ["short_description", "objects", "background_setting", "edit_instruction"].map { try XCTUnwrap(fiche.range(of: $0)).lowerBound }
-        XCTAssertEqual(positions, positions.sorted(), "l'ordre de FIBO-vlm : \(fiche)")
-        // Sans zone, aucun repli : la même erreur reste une erreur (code 1, message lisible).
-        try? FileManager.default.removeItem(at: journal)
-        let sansZone = try lancer([script.path, "--image", grisee.path, "--instruction", "x", "--output", sortie.path, "--use-mask"])
-        XCTAssertEqual(sansZone.code, 1, sansZone.sortie)
-        XCTAssertTrue(sansZone.sortie.contains("erreur FIBO-vlm : Masked edit prompt generation failed"), sansZone.sortie)
+        func jetonsTires(_ texte: String) -> Int? {
+            guard let r = texte.range(of: #"\((\d+) jetons\)"#, options: .regularExpression) else { return nil }
+            return Int(texte[r].dropFirst().prefix { $0.isNumber })
+        }
+        func cles(_ fiche: String) throws -> [String] {
+            try ["short_description", "objects", "background_setting", "artistic_style", "aesthetics", "text_render", "context", "edit_instruction"]
+                .filter { fiche.contains("\"\($0)\"") }
+                .sorted { try XCTUnwrap(fiche.range(of: "\"\($0)\"")).lowerBound < XCTUnwrap(fiche.range(of: "\"\($1)\"")).lowerBound }
+        }
+        func lireFiche() throws -> JSONValue { try JSONCoding.parse(Data(contentsOf: sortie)) }
+        let boucleApres = String(repeating: #","context":"a park again""#, count: 300)
+
+        // Mode masqué : FIBO-vlm n'écrit pas edit_instruction et boucle après text_render. Le script
+        // s'arrête dès que text_render est fermé, ferme l'objet et pose edit_instruction lui-même.
+        try version("0.24.0")
+        let debut = #"{"short_description":"a hat on a woman","objects":[{"description":"a woman"}],"background_setting":"a park","text_render":[{"text":"PARK","location":"a sign"}]"#
+        let boucle = debut + boucleApres
+        XCTAssertGreaterThan(boucle.count, 1536, "sans l'arrêt, la borne de jetons couperait au milieu d'une clé")
+        var resultat = try lancer(texte: boucle, masque: true)
+        XCTAssertEqual(resultat.code, 0, resultat.sortie)
+        XCTAssertFalse(resultat.sortie.contains(Generatif.marqueVersionFiche), "mflux 0.24.0 : rien à dire")
+        XCTAssertEqual(Array(resultat.journal.prefix(3)), ["cache \(4 * 1024 * 1024 * 1024)", "quantize 8", "generer edit|\(image.path)|add a red hat|1536|7|True"],
+                       "cache de MLX borné avant le chargement, 8 bits, une seule génération de 1 536 jetons au plus")
+        XCTAssertFalse(resultat.journal.contains { $0.hasPrefix("tires ") }, "arrêtée avant sa fin : \(resultat.journal)")
+        XCTAssertEqual(resultat.journal.last, "remis True", "sample_top_p et _normalize_edit_output remis après la génération")
+        let tires = try XCTUnwrap(jetonsTires(resultat.sortie), resultat.sortie)
+        XCTAssertGreaterThanOrEqual(tires, debut.count); XCTAssertLessThan(tires, debut.count + 4, "relu tous les 4 jetons")
+        var fiche = try String(contentsOf: sortie, encoding: .utf8)
+        var lue = try JSONCoding.parse(Data(fiche.utf8))
+        XCTAssertEqual(lue["edit_instruction"]?.string, "Fill the masked area: add a red hat")
+        XCTAssertNil(lue["context"], "rien de la boucle")
+        XCTAssertEqual(lue["text_render"]?.array?.first?["text"]?.string, "PARK")
+        XCTAssertEqual(try cles(fiche), ["short_description", "objects", "background_setting", "text_render", "aesthetics", "edit_instruction"],
+                       "l'ordre de FIBO-vlm, puis ce que la normalisation de mflux ajoute : \(fiche)")
+
+        // Mode masqué, des crochets dans un texte à rendre : la fin de text_render se cherche hors des
+        // chaînes (ni boucle jusqu'à la borne, ni coupe au milieu d'un texte).
+        for texte in ["OPEN [24h]", "Sale]", "[SALE", #"a \"quoted\" [x]"#] {
+            let avecCrochets = #"{"short_description":"a shop","objects":[{"description":"a sign"}],"text_render":[{"text":"\#(texte)","location":"[left]"}]"#
+            resultat = try lancer(texte: avecCrochets + boucleApres, masque: true)
+            XCTAssertEqual(resultat.code, 0, "\(texte) : \(resultat.sortie)")
+            XCTAssertFalse(resultat.journal.contains { $0.hasPrefix("tires ") }, "\(texte) : arrêtée avant la borne")
+            XCTAssertLessThan(try XCTUnwrap(jetonsTires(resultat.sortie)), avecCrochets.count + 4, texte)
+            lue = try lireFiche()
+            XCTAssertEqual(lue["text_render"]?.array?.first?["text"]?.string, texte.replacingOccurrences(of: #"\""#, with: "\""))
+            XCTAssertEqual(lue["text_render"]?.array?.first?["location"]?.string, "[left]")
+            XCTAssertNil(lue["context"], texte)
+        }
+
+        // Mode masqué, la génération finit juste après text_render, sans fermer l'objet, à chacun des
+        // quatre alignements de la relecture : le texte final se coupe et se ferme de même.
+        for remplissage in 0..<4 {
+            let fini = #"{"short_description":"a hat\#(String(repeating: " ", count: remplissage))","text_render":[{"text":"HI"}]"#
+            resultat = try lancer(texte: fini, masque: true)
+            XCTAssertEqual(resultat.code, 0, "remplissage \(remplissage) : \(resultat.sortie)")
+            lue = try lireFiche()
+            XCTAssertEqual(lue["edit_instruction"]?.string, "Fill the masked area: add a red hat", "remplissage \(remplissage)")
+            XCTAssertEqual(lue["text_render"]?.array?.first?["text"]?.string, "HI")
+        }
+
+        // Mode masqué, une accolade fermée trop tôt, puis la boucle après text_render : arrêt et réparation
+        // ensemble ; les clés d'après l'accolade gardées.
+        let tropTotMasque = #"{"short_description":"a hat","aesthetics":{"composition":"centered"}},"background_setting":"a park","text_render":[{"text":"HI"}]"#
+        resultat = try lancer(texte: tropTotMasque + boucleApres, masque: true)
+        XCTAssertEqual(resultat.code, 0, resultat.sortie)
+        lue = try lireFiche()
+        XCTAssertEqual(lue["background_setting"]?.string, "a park", "réparée : \(resultat.sortie)")
+        XCTAssertEqual(lue["aesthetics"]?["composition"]?.string, "centered")
+        XCTAssertEqual(lue["edit_instruction"]?.string, "Fill the masked area: add a red hat")
+        XCTAssertNil(lue["context"])
+
+        // Sans zone : la génération va à son terme (edit_instruction vient après text_render), et une
+        // accolade fermée trop tôt se répare ; edit_instruction de FIBO-vlm gardée. Une autre version
+        // de mflux est dite sur la sortie.
+        try version("0.25.0")
+        let tropTot = #"{"short_description":"a hat","objects":[{"description":"a woman"}],"artistic_style":"photo"},"text_render":[{"text":"HI"}],"edit_instruction":"Add a red hat to the woman."}"#
+        resultat = try lancer(texte: tropTot, masque: false)
+        XCTAssertEqual(resultat.code, 0, resultat.sortie)
+        XCTAssertTrue(resultat.sortie.contains("\(Generatif.marqueVersionFiche) 0.25.0 (script réglé sur 0.24.0)"), resultat.sortie)
+        XCTAssertTrue(resultat.journal.contains("generer edit|\(image.path)|add a red hat|1536|7|False"), "\(resultat.journal)")
+        XCTAssertTrue(resultat.journal.contains("tires \(tropTot.count)"), "pas d'arrêt sans zone : \(resultat.journal)")
+        XCTAssertEqual(resultat.journal.last, "remis True")
+        fiche = try String(contentsOf: sortie, encoding: .utf8)
+        lue = try JSONCoding.parse(Data(fiche.utf8))
+        XCTAssertEqual(lue["edit_instruction"]?.string, "Add a red hat to the woman.")
+        XCTAssertEqual(lue["artistic_style"]?.string, "photo")
+        XCTAssertEqual(try cles(fiche), ["short_description", "objects", "artistic_style", "text_render", "edit_instruction", "aesthetics"], fiche)
+
+        // Sans zone, un blanc entre l'accolade de trop et la virgule : réparée aussi (les clés d'après
+        // gardées, edit_instruction de FIBO-vlm comprise).
+        resultat = try lancer(texte: #"{"short_description":"a","aesthetics":{"x":"y"}} ,"edit_instruction":"Add a hat."}"#, masque: false)
+        XCTAssertEqual(resultat.code, 0, resultat.sortie)
+        XCTAssertEqual(try lireFiche()["edit_instruction"]?.string, "Add a hat.")
+        resultat = try lancer(texte: "{\"short_description\":\"a\",\"aesthetics\":{\"x\":\"y\"}}\n  ,\n \"edit_instruction\":\"Add a hat.\"}", masque: false)
+        XCTAssertEqual(try lireFiche()["edit_instruction"]?.string, "Add a hat.", resultat.sortie)
+
+        // Sans zone, une fiche complète suivie d'un second objet commencé : rien n'est « réparé » (la
+        // suite ne reprend pas par une clé) ; la normalisation de mflux garde la fiche complète.
+        let deuxObjets = #"{"short_description":"a","objects":[{"description":"x"}],"edit_instruction":"Add a hat."},{"short_description":"b","objects":[{"d"#
+        resultat = try lancer(texte: deuxObjets, masque: false)
+        XCTAssertEqual(resultat.code, 0, resultat.sortie)
+        lue = try lireFiche()
+        XCTAssertEqual(lue["edit_instruction"]?.string, "Add a hat.")
+        XCTAssertEqual(lue["short_description"]?.string, "a")
+
+        // Une réparation qui ne mène pas à un texte lisible : le texte d'origine, dont la normalisation
+        // choisit l'objet complet (ici le premier, fermé trop tôt), sans lever.
+        resultat = try lancer(texte: #"{"short_description":"a","objects":[{"description":"x"}]},"edit_instruction":"Add a hat.","context":"#, masque: false)
+        XCTAssertEqual(resultat.code, 0, resultat.sortie)
+        lue = try lireFiche()
+        XCTAssertEqual(lue["short_description"]?.string, "a")
+        XCTAssertEqual(lue["edit_instruction"]?.string, "Add a red hat", "l'instruction donnée, la suite étant illisible")
+
+        // Sans zone, sans edit_instruction : l'instruction donnée, sans « Fill the masked area ».
+        resultat = try lancer(texte: #"{"short_description":"a hat","text_render":[]}"#, masque: false)
+        XCTAssertEqual(resultat.code, 0, resultat.sortie)
+        XCTAssertEqual(try lireFiche()["edit_instruction"]?.string, "Add a red hat")
+
+        // Une erreur levée avant toute normalisation (MLX) : dite telle quelle, code 1, pas de fiche.
+        resultat = try lancer(texte: "LEVER", masque: true)
+        XCTAssertEqual(resultat.code, 1, resultat.sortie)
+        XCTAssertTrue(resultat.sortie.contains("erreur FIBO-vlm : forme incompatible (MLX)"), resultat.sortie)
+        XCTAssertFalse(resultat.sortie.contains("aucune réponse"), resultat.sortie)
+        XCTAssertEqual(resultat.journal.last, "remis True")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sortie.path))
+
+        // Une sortie illisible : code 1 et un message lisible, sans fiche ; une version introuvable est dite.
+        try version(nil)
+        resultat = try lancer(texte: "pas du JSON", masque: false)
+        XCTAssertEqual(resultat.code, 1, resultat.sortie)
+        XCTAssertTrue(resultat.sortie.contains("erreur FIBO-vlm : fiche illisible"), resultat.sortie)
+        XCTAssertTrue(resultat.sortie.contains("\(Generatif.marqueVersionFiche) inconnue"), resultat.sortie)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sortie.path))
+        XCTAssertEqual(Generatif.expliquerFiche(journal: resultat.sortie, code: 1).prefix(15), "erreur FIBO-vlm")
     }
 
-    /// Le repli sans masque du script, dit dans la réponse : la fiche sert quand même.
-    func testRepliSansMasqueDitDansLaReponse() throws {
+    /// Une autre version de mflux que celle du réglage du script : la fiche sert, et la réponse le dit.
+    func testVersionDeMfluxDiteDansLaReponse() throws {
         fauxVLM(fin: """
-        echo "repli : fiche ordinaire sans masque (Masked edit prompt generation failed)"
+        echo "\(Generatif.marqueVersionFiche) 0.25.0 (script réglé sur \(Generatif.versionMfluxFiche))"
         cp "\(gardes.path)/fiche-modele.json" "$out"
         """)
         let region = CGRect(x: 0.3, y: 0.3, width: 0.3, height: 0.4)
         fauxMflux(sortie: sortiePreparee(region: region) { fx, fy, p, i in if fx > 0.35, fx < 0.55, fy > 0.35, fy < 0.65 { Self.rouge(&p, i) } })
-        let resultat = editer(["structured_prompt": true, "instruction": "replace the trousers with a skirt", "region": ["x": 0.3, "y": 0.3, "width": 0.3, "height": 0.4]])
+        var resultat = editer(["structured_prompt": true, "instruction": "replace the trousers with a skirt", "region": ["x": 0.3, "y": 0.3, "width": 0.3, "height": 0.4]])
         XCTAssertFalse(resultat.isError, resultat.text)
-        XCTAssertNotNil(valeur("--prompt-file"), "la fiche ordinaire sert")
-        let modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
+        XCTAssertNotNil(valeur("--prompt-file"), "la fiche sert")
+        var modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
         XCTAssertNotNil(modification["fiche"])
-        XCTAssertTrue(modification["remarque_fiche"]?.string?.contains("fiche ordinaire, sur l'image non grisée") == true, resultat.text)
+        let remarque = try XCTUnwrap(modification["remarque_fiche"]?.string, resultat.text)
+        XCTAssertEqual(remarque, "mflux installé : 0.25.0 ; le script de la fiche est réglé sur 0.24.0 : à revérifier.",
+                       "la version lue seule, sans la ligne du script recopiée ni FIBO-vlm nommé")
+        XCTAssertEqual(Generatif.versionDite("\(Generatif.marqueVersionFiche) inconnue (script réglé sur 0.24.0)"), "inconnue")
+        XCTAssertNil(Generatif.versionDite("fiche écrite : x (12 jetons)"))
+
+        // Avec un échec : les deux dans la même remarque.
+        fauxVLM(fin: """
+        echo "\(Generatif.marqueVersionFiche) 0.25.0 (script réglé sur \(Generatif.versionMfluxFiche))"
+        echo "erreur FIBO-vlm : boom"
+        exit 1
+        """)
+        fauxMflux(sortie: sortiePreparee(carreRouge))
+        resultat = editer(["structured_prompt": true, "instruction": "add a red scarf"])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(valeur("--prompt"), "add a red scarf")
+        modification = try XCTUnwrap(JSONCoding.parse(resultat.text)["modifications"]?.array?.first)
+        let echec = try XCTUnwrap(modification["remarque_fiche"]?.string, resultat.text)
+        XCTAssertTrue(echec.contains("boom") && echec.contains("phrase seule") && echec.contains("0.25.0"), echec)
     }
 
     /// Un calcul lancé ailleurs pendant l'appel (Fibo 2 Studio, après la fiche) : l'appel s'arrête avant

@@ -689,13 +689,16 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   manque, ou si deux masques portent ce nom, il vous le dit avec la liste des noms. Votre masque
   n'est ni changé ni retiré : Lightroom le recopie le temps de deux rendus d'essai, et la suite est
   celle d'un masque calculé (bord doux compris).
-- **Une fiche détaillée par FIBO-vlm**, seulement sur demande (trop lourde pour l'instant : environ 40 Go de mémoire et 7 min mesurés) : avant chaque passage de Fibo 2, FIBO-vlm (le modèle de Bria
+- **Une fiche détaillée par FIBO-vlm**, toujours seulement sur demande (plus légère maintenant : environ 16 Go de mémoire et 35 à 60 s mesurés, au lieu de 40 Go et 7 min ; à confirmer dans une vraie retouche) : avant chaque passage de Fibo 2, FIBO-vlm (le modèle de Bria
   qui décrit l'image, `briaai/FIBO-vlm`, environ 8 Go, sur ce Mac) rédige une fiche de ce que doit
   devenir l'image (ce qui change, ce qui reste, la lumière, le décor), avec la zone à changer grisée
-  comme Fibo 2 la voit ; Fibo 2 devrait mieux la suivre qu'une phrase (à constater). Si FIBO-vlm
-  refuse la fiche de la zone grisée, il en rédige une ordinaire, sur l'image non grisée (comme Fibo 2
-  Studio) ; Fibo 2 applique quand même la zone. Elle tourne seule, avant Fibo 2 (jamais les deux en
-  mémoire ensemble), et prend une minute ou deux de plus (à mesurer). Sans le modèle sur le Mac
+  comme Fibo 2 la voit ; Fibo 2 devrait mieux la suivre qu'une phrase (à constater). FIBO-vlm tourne
+  en 8 bits, avec une mémoire de travail bornée ; avec une zone, il s'arrête dès que la fiche est
+  complète, et le Développeur y ajoute lui-même la consigne de la zone. Elle tourne seule, avant
+  Fibo 2 (jamais les deux en mémoire ensemble), prend de 35 s (avec une zone) à une minute (sans
+  zone) de plus et s'arrête au bout de 3 min. Le réglage
+  suit mflux 0.24 : après une mise à jour de mflux, Claude signale que la fiche est à revérifier.
+  Sans le modèle sur le Mac
   (`hf download briaai/FIBO-vlm --revision bd13da5e0b73c808014d6260963e311c8cdf0d8b`, la version que
   mflux charge, une fois, dans le Terminal), ou si elle échoue, Fibo 2 reçoit la phrase seule, et
   Claude le dit ; il vous donne un court résumé de chaque fiche.

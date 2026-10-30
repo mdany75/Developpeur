@@ -8412,7 +8412,7 @@ Demandé par Dany le 29 octobre 2026 au soir : reprendre cinq fonctions de Fibo 
 (`~/Developer/Fibo2Studio`, lu seulement : `Generator.swift`, `Resources/fibo_vlm_tool.py`,
 `MaskEditor.swift`).
 
-**Fiche JSON par FIBO-vlm** (`structured_prompt`, faux par défaut). **Désactivée par défaut** (constaté le 29 octobre 2026 au soir, essai réel : FIBO-vlm a pris 39,7 Go en pointe et 6 min 42 s sur ce Mac de 48 Go, en swap, et son mode avec masque a échoué) : seulement sur demande (`structured_prompt` = true), en attendant un réglage plus léger.  Avant chaque passage de Fibo,
+**Fiche JSON par FIBO-vlm** (`structured_prompt`, faux par défaut). **Désactivée par défaut** (constaté le 29 octobre 2026 au soir, essai réel : FIBO-vlm a pris 39,7 Go en pointe et 6 min 42 s sur ce Mac de 48 Go, en swap, et son mode avec masque a échoué) : seulement sur demande (`structured_prompt` = true) ; le réglage léger ci-dessous (environ 16 Go, 33 à 58 s) garde ce défaut jusqu'à un essai réel de bout en bout. Avant chaque passage de Fibo,
 FIBO-vlm (`briaai/FIBO-vlm`, Qwen3-VL, environ 8 Go de poids) rédige sur ce Mac une fiche structurée
 (VGL) de la modification : la légende du résultat (`short_description`, `objects`,
 `background_setting`, `lighting`, `aesthetics`, `photographic_characteristics`, `style_medium`,
@@ -8420,16 +8420,59 @@ FIBO-vlm (`briaai/FIBO-vlm`, Qwen3-VL, environ 8 Go de poids) rédige sur ce Mac
 place de `--prompt` (`mflux-generate-fibo2-edit` accepte un objet JSON avec `edit_instruction` et la
 légende, en clés propres ou sous `structured_caption` : `mflux/models/fibo2/README.md`,
 `Fibo2PromptEncoder.edit_prompt` ; la légende est vérifiée par `Fibo2CaptionCheck` avant le chargement
-du modèle). `FiboVLM.edit` (mflux 0.24, `models/fibo_vlm/model/fibo_vlm.py`) rend une
-`edit_instruction` non vide ou lève (`_normalize_edit_output`) ; hors masque, il se replie d'abord sur
-la tâche `refine` avec l'instruction donnée ; **en mode masque (`use_mask`), il refuse tout repli** et
-lève « Masked edit prompt generation failed; refusing fallback… » (lignes 246 à 250). Le script
-attrape cette erreur et refait, comme `fibo_vlm_tool.py` de Fibo 2 Studio (qui grise à 128 lui aussi,
-puis se replie), une fiche ordinaire sur l'image **non grisée** (`--image-originale`, le modèle déjà
-chargé) ; il l'écrit sur sa sortie (`Generatif.marqueRepliFiche`), et la réponse le dit
-(`remarque_fiche` : « fiche ordinaire, sur l'image non grisée ») : Fibo 2 applique de toute façon la
-zone. Si une fiche arrive quand même sans `edit_instruction`, l'instruction donnée y est jointe à la
-fin (le script, et `Generatif.ficheAvecInstruction`).
+du modèle).
+
+**Réglage léger** (mesuré le 29 octobre 2026 au soir hors du connecteur, Mac de 48 Go, Lightroom
+ouvert, un calcul à la fois, `/usr/bin/time -l`, deux graines : 33 à 45 s et 15,6 à 16,0 Go de pointe
+en mode masqué ; sans zone, 58 s et 16,7 Go, la génération allant à son terme ; au lieu de 402 s et
+39,7 Go par `FiboVLM.edit`). Le script ne passe plus par
+`FiboVLM.edit` (mflux 0.24, `models/fibo_vlm/model/fibo_vlm.py`) ni par ses replis :
+
+- `mx.set_cache_limit(4 Go)` avant le chargement : la pointe venait du cache de tampons de MLX, non
+  borné (32,7 Go de tampons libérés gardés ; `lm_head` recopié en float32 à chaque jeton) ;
+- `FiboVLM(quantize=8)` : 5,5 Go actifs au lieu de 8,9, fiche aussi fidèle (4 et 6 bouclent) ;
+- `max_tokens` 1 536 : les fiches font de 568 à 1 012 jetons ; une génération qui boucle était
+  coupée vers 115 s ;
+- **une seule génération** (`FiboVLM._generate_internal`, tâche `edit`, `top_p` 0,9, température
+  0,2, la graine de l'appel). En mode masqué, FIBO-vlm n'écrit jamais `edit_instruction` : après
+  `text_render`, il recommence des clés jusqu'à la borne, ou ferme l'objet au hasard ; c'était la
+  cause de « Masked edit prompt generation failed; refusing fallback… » (`FiboVLM.edit` lève sans
+  `edit_instruction` en mode masque). Le script remplace `Qwen3VLUtil.sample_top_p` le temps de la
+  génération pour garder chaque jeton, relit le texte partiel tous les 4 jetons et s'arrête dès que
+  `"text_render":[…]` est fermé (`fin_text_render` : la fin de la liste cherchée en JSON, chaînes et
+  échappements sautés, la clé au premier niveau seulement ; un motif qui ignorait les chaînes faisait
+  boucler jusqu'à la borne sur « OPEN [24h] » et couper dans la chaîne sur « Sale] ») ; une génération
+  finie entre deux relectures, juste après le `]` sans fermer l'objet, se coupe et se ferme de même
+  sur le texte final ; il ferme l'objet et pose lui-même `edit_instruction` (« Fill the
+  masked area: » suivi de l'instruction, par `_normalize_edit_output` avec
+  `fallback_edit_instruction`). Le texte brut est gardé au passage de `_normalize_edit_output`
+  (remplacé lui aussi le temps de la génération) quand la sortie lève ;
+- sans zone, la fiche se rédige sans masque et va à son terme (`edit_instruction` vient après
+  `text_render`). Dans les deux modes, une accolade fermée trop tôt (« …"artistic_style":"x"} ,"context":… »)
+  se répare (`reparer` : l'accolade de trop retirée seulement si la virgule qui suit, blancs permis,
+  est suivie d'un guillemet, cinq fois au plus ; la réparation n'est gardée que si le texte se lit
+  alors en entier, sinon le texte d'origine passe à la normalisation de mflux, dont
+  `_extract_single_json_object` garde le meilleur objet complet : une fiche complète suivie d'un
+  second objet commencé, « …"Add a hat."},{"short_description"… », devenait illisible après une
+  réparation aveugle). Sans `edit_instruction`, l'instruction donnée est posée (le script, et
+  `Generatif.ficheAvecInstruction`). Une `ValueError` levée avant la normalisation (MLX, image) est
+  dite telle quelle (« erreur FIBO-vlm : … »), jamais « aucune réponse » ; `sample_top_p` et
+  `_normalize_edit_output` sont remis après la génération (`finally`).
+
+Plus de repli sans masque ni de `--image-originale` (ni `marqueRepliFiche`). Le script dépend de
+détails internes de mflux 0.24 (`_generate_internal`, `_normalize_edit_output`,
+`Qwen3VLUtil.sample_top_p`) : il lit la version installée (`importlib.metadata`) et, si elle n'est
+pas `Generatif.versionMfluxFiche` (0.24.0), l'écrit sur sa sortie (`Generatif.marqueVersionFiche`,
+« version de mflux : 0.25.0 (script réglé sur 0.24.0) ») ; le connecteur n'en garde que la version
+(`Generatif.versionDite`) et la dit dans `remarque_fiche` (« mflux installé : 0.25.0 ; le script de
+la fiche est réglé sur 0.24.0 : à revérifier. », `Generatif.remarqueVersion`), réussite comprise. Toute exception : code 1 et
+« erreur FIBO-vlm : … » sur la sortie, la phrase seule. `testScriptDeFicheReglageLeger` fait tourner
+le vrai script sous un Python de Homebrew sur de faux paquets mlx et mflux, la normalisation calquée
+sur celle de mflux 0.24 (`_extract_single_json_object`, `_remove_empty_values`, `aesthetics`
+complété) : arrêt à `text_render`, crochets dans un texte à rendre, fin entre deux relectures (les
+quatre alignements), accolade fermée trop tôt avec et sans zone (blancs compris), deux objets à la
+suite, réparation sans issue, `edit_instruction` posée, erreur avant la normalisation, attributs
+remis, marque de version, code 1.
 **La fiche passe à mflux telle que FIBO-vlm l'a écrite** : l'ordre de ses clés est celui des
 légendes de l'entraînement de Fibo 2 (mflux le garde : `json.loads`, puis `json.dumps` sans tri dans
 `Fibo2PromptEncoder.edit_prompt`) ; le connecteur ne la réécrit jamais par `JSONCoding`, qui trie les
@@ -8438,19 +8481,20 @@ clés (`Generatif.lireFiche` ne sert qu'à la valider et au résumé).
 - Lancement (`ToolHandler.redigerFiche`) : le Python de l'outil mflux (`Fibo.python`, par défaut à
   côté du vrai exécutable de mflux, le lien de `~/.local/bin` suivi :
   `~/.local/share/uv/tools/mflux/bin/python`), en `-I`, sur un script du connecteur
-  (`Generatif.scriptFiche`, écrit dans le dossier de l'appel sous `fiche-fibo-vlm.py`, sur le modèle
-  de `fibo_vlm_tool.py`, la tâche `edit` seulement), sans shell, arguments en tableau
+  (`Generatif.scriptFiche`, écrit dans le dossier de l'appel sous `fiche-fibo-vlm.py`, en réglage
+  léger, la tâche `edit` seulement), sans shell, arguments en tableau
   (`Generatif.argumentsFiche` : `--image`, `--instruction` anglaise, `--output`, `--seed` de l'appel,
-  `--use-mask` et `--image-originale` avec une zone), sortie dans un tuyau, par `ToolHandler.executer` (annulation, croix de
+  `--use-mask` avec une zone), sortie dans un tuyau, par `ToolHandler.executer` (annulation, croix de
   la barre, arrêt du serveur par `TravailFibo`, comme mflux), délai `Fibo.delaiFiche`
-  (`Generatif.delaiFiche`, 300 s), hors ligne (`HF_HUB_OFFLINE=1`, `HF_HUB_CACHE` = le cache où le
+  (`Generatif.delaiFiche`, 180 s ; 300 avant le réglage léger), hors ligne (`HF_HUB_OFFLINE=1`, `HF_HUB_CACHE` = le cache où le
   modèle a été vu).
 - Entrée : l'image d'entrée de Fibo (le recadrage à environ 1 Mpx, ou la photo entière), et avec
   une zone (`region`, masque de Lightroom, masque peint) cette image **grisée** dans la zone
   exactement comme mflux le fait avant de l'encoder (`Fibo2EditImages.grey_out` : masque binaire à
   128, gris plat de 128 ; `Generatif.griser`), avec `--use-mask` : le prompt système
-  `EDIT_WITH_MASK` de FiboVLM attend une image à zones grises. Fibo 2 Studio grise de même, et se
-  replie sur la photo non grisée sans masque quand FiboVLM refuse : ce connecteur aussi (ci-dessus).
+  `EDIT_WITH_MASK` de FiboVLM attend une image à zones grises. Fibo 2 Studio grise de même (et se
+  replie sur la photo non grisée sans masque quand FiboVLM refuse ; ce connecteur ne le fait plus :
+  l'arrêt à `text_render` rend ce repli inutile).
 - Jamais bloquant : le Python ou le modèle absents (`Fibo.raisonSansFiche` : `Generatif.vlmLocal`
   exige l'instantané de la révision que mflux épingle, `Generatif.revisionVLM`
   `bd13da5e0b73c808014d6260963e311c8cdf0d8b` (`ModelRevisions.PINNED`, à relire à chaque mise à jour
@@ -8470,8 +8514,9 @@ clés (`Generatif.lireFiche` ne sert qu'à la valider et au résumé).
   SeedVR2 ; `seulSurLeMac`) : un calcul lancé ailleurs pendant l'appel l'arrête avant ce lancement,
   rien d'importé (les processus de l'appel sont alors finis : pgrep ne voit qu'un autre).
 - Barre : une phase « fiche (FIBO-vlm) » par modification, avant le chargement de Fibo
-  (`Generatif.Avancement`, `poidsFiche` 10 ; sa fraction d'après `dureeFicheEstimee`, 90 s,
-  provisoire) ; le temps restant compte la fiche de chaque modification suivante (`tempsRestant`,
+  (`Generatif.Avancement`, `poidsFiche` 10 ; sa fraction d'après `dureeFicheEstimee`, 45 s (sans zone, 58 s mesurées : la barre attend une
+  dizaine de secondes à 95 %),
+  la durée mesurée du réglage léger) ; le temps restant compte la fiche de chaque modification suivante (`tempsRestant`,
   `fiche`).
 - Réponse : par modification, un court résumé de la fiche (`fiche` : `redigee_par`,
   `edit_instruction`, `description`, `arriere_plan`, `lumiere`, `objets_decrits` ; jamais tout le
@@ -8542,12 +8587,13 @@ peint presque vide ou total a son propre refus (`Generatif.refusMasque` avec `pe
 plus large, region, ou inversé dans le panneau Masquage ?), jamais celui d'un masque calculé, qui
 renverrait à `kind` et `add_mask`.
 
-Provisoire et reste à constater : la durée et la mémoire de FIBO-vlm sur ce Mac (chargement
-compris ; `dureeFicheEstimee`, `delaiFiche`), l'effet de la fiche sur le rendu, le rendu de la
-qualité équilibrée sur de vraies photos de Dany, l'effet de la phrase d'exclusion par défaut, le
-masque peint au pinceau dans un vrai Lightroom (sa copie dans le témoin rendue comme le sien, son
-bord doux lu), le repli sans masque de la fiche sur un vrai FIBO-vlm, et `HF_HUB_OFFLINE` avec le
-modèle du cache. Un essai en qualité rapide (Turbo) ne vérifie que la fiche et le masque peint :
+Provisoire et reste à constater : le réglage léger de FIBO-vlm de bout en bout dans
+`generative_edit` (sa durée et sa mémoire, chargement compris, ne sont mesurées que hors du
+connecteur ; `dureeFicheEstimee`, `delaiFiche`), qui décidera du défaut de `structured_prompt`,
+l'effet de la fiche sur le rendu, le rendu de la qualité équilibrée sur de vraies photos de Dany,
+l'effet de la phrase d'exclusion par défaut, le masque peint au pinceau dans un vrai Lightroom (sa
+copie dans le témoin rendue comme le sien, son bord doux lu), et `HF_HUB_OFFLINE` avec le modèle du
+cache. Un essai en qualité rapide (Turbo) ne vérifie que la fiche et le masque peint :
 Turbo ne lit ni l'exclusion, ni le guidage, ni `--cfg-end` ; la qualité équilibrée, la phrase
 d'exclusion et le guidage demandent un essai en qualité équilibrée ou normale.
 

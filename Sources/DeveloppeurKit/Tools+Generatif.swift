@@ -206,13 +206,14 @@ final class SuiviProcessus {
         return (etapeLue, premiereLue, fractionLue)
     }
 
-    /// Une ligne marquante vue sur la sortie (le repli sans masque de la fiche de FIBO-vlm).
-    private var marqueVue = false
-    func noterMarque() {
+    /// La première ligne marquante vue sur la sortie (la version de mflux que le script de la fiche
+    /// de FIBO-vlm signale), bornée.
+    private var marqueVue: String?
+    func noterMarque(_ ligne: String) {
         verrou.lock(); defer { verrou.unlock() }
-        marqueVue = true
+        if marqueVue == nil { marqueVue = String(ligne.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200)) }
     }
-    var marque: Bool {
+    var marque: String? {
         verrou.lock(); defer { verrou.unlock() }
         return marqueVue
     }
@@ -269,7 +270,7 @@ extension ToolHandler {
                                                    required: ["instruction", "instruction_fr", "region"])]),
                     ("upscale", prop("boolean", "Vrai par défaut : une zone que Fibo 2 rend plus petite que sa taille dans la photo passe par SeedVR2 (plus de détail) ; faux : mise à la taille ordinaire.")),
                     ("quality", enumProp(["balanced", "normal", "fast"], "balanced (défaut) : \(Generatif.etapesEquilibre) étapes, guidage sur 60 % d'entre elles, à peu près le rendu de normal en deux fois moins de temps ; normal : \(Generatif.etapesNormal) étapes ; fast : Turbo, \(Generatif.etapesRapide) étapes, sans guidage, plus rapide et moins fidèle.")),
-                    ("structured_prompt", prop("boolean", "Faux par défaut. Vrai : FIBO-vlm rédige sur ce Mac, avant Fibo 2, une fiche détaillée (lourd : environ 40 Go et 7 min, constaté) ; seulement si l'utilisateur le demande.")),
+                    ("structured_prompt", prop("boolean", "Faux par défaut. Vrai : FIBO-vlm rédige sur ce Mac, avant Fibo 2, une fiche détaillée (environ 16 Go et 35 à 60 s mesurés) ; seulement si l'utilisateur le demande.")),
                     ("avoid", prop("string", "En anglais, ce que Fibo 2 doit éviter en plus de sa liste (texte, logos, filigrane, personne ou membres en double, déformé) : « sunglasses, a second dog ». Hors fast.")),
                     ("guidance", prop("number", "Guidage, de \(Generatif.texteNombre(Generatif.guidageMin)) à \(Generatif.texteNombre(Generatif.guidageMax)) (absent : \(Generatif.texteNombre(Generatif.guidageParDefaut))) : plus haut, Fibo 2 suit l'instruction de plus près, au risque d'un rendu forcé. Hors fast ; seulement sur demande.")),
                     ("seed", prop("integer", "Graine (facultative) : la même graine et la même instruction redonnent la même image ; sans elle, une graine au hasard, rendue dans la réponse.")),
@@ -568,7 +569,7 @@ extension ToolHandler {
             if let scriptFiche {
                 let debutFiche = Date()
                 try seulSurLeMac(avant: "la fiche de FIBO-vlm de « \(passage.modif.label) »")
-                let redigee = try redigerFiche(script: scriptFiche, entree: entree, cheminEntree: cheminEntree, masque: masqueFibo,
+                let redigee = try redigerFiche(script: scriptFiche, entree: entree, masque: masqueFibo,
                                                taille: taille, rang: rang, passage: passage, graine: graine, dossier: dossier,
                                                fibo: fibo, barre: &barre)
                 cheminFiche = redigee.chemin
@@ -777,7 +778,8 @@ extension ToolHandler {
     /// ne servent pas, et la remarque le dit ; à guidance 1 non plus.
     struct ReglagesFibo {
         // Faux par défaut : constaté le 29 octobre 2026, FIBO-vlm a pris 39,7 Go en pointe et 402 s
-        // (le Mac de 48 Go en swap), et son mode masqué a échoué. Seulement sur demande, en attendant mieux.
+        // (le Mac de 48 Go en swap), et son mode masqué a échoué. Le réglage léger de Generatif.scriptFiche
+        // (environ 16 Go, 33 à 58 s, mesuré hors du connecteur) garde ce défaut jusqu'à un essai réel de bout en bout.
         var fiche = false
         var avoid: String?
         var guidage: Double?
@@ -858,8 +860,9 @@ extension ToolHandler {
     /// hors ligne (le modèle est dans le cache), sa sortie dans un tuyau, borné par `delaiFiche`, arrêté
     /// par l'annulation et l'arrêt du serveur comme mflux (`executer`, TravailFibo). Jamais bloquant :
     /// un échec, un délai ou une fiche illisible rendent la remarque, et Fibo 2 reçoit la phrase seule.
-    /// L'annulation, elle, est levée.
-    private func redigerFiche(script: URL, entree: [UInt8], cheminEntree: URL, masque: [UInt8]?, taille: (largeur: Int, hauteur: Int),
+    /// Une autre version de mflux que celle du réglage du script (`marqueVersionFiche`) s'ajoute à la
+    /// remarque, réussite comprise. L'annulation, elle, est levée.
+    private func redigerFiche(script: URL, entree: [UInt8], masque: [UInt8]?, taille: (largeur: Int, hauteur: Int),
                               rang: Int, passage: Passage, graine: Int, dossier: URL, fibo: Fibo, barre: inout BarreFibo)
         throws -> (chemin: URL?, resume: JSONValue?, remarque: String?) {
         let n = rang + 1
@@ -871,9 +874,8 @@ extension ToolHandler {
         guard let cg = Generatif.image8(pixels, largeur: taille.largeur, hauteur: taille.hauteur), (try? Generatif.ecrirePNG(cg, vers: image)) != nil else {
             return (nil, nil, "L'image de FIBO-vlm n'a pas pu se préparer" + repli)
         }
-        // Avec une zone, l'entrée de Fibo non grisée : le repli sans masque du script.
         let arguments = Generatif.argumentsFiche(script: script, image: image, instruction: passage.modif.instruction, sortie: sortie,
-                                                 graine: graine, originale: masque != nil ? cheminEntree : nil)
+                                                 graine: graine, masque: masque != nil)
         let detail = "fiche (FIBO-vlm)"
         barre.montrer(.fiche(rang, fraction: 0), passage.modif.label, rang: n, detail: detail)
         let suivi = SuiviProcessus()
@@ -881,36 +883,39 @@ extension ToolHandler {
         let fin = try executer(python, arguments, dossier: dossier, delai: fibo.delaiFiche, suivi: suivi,
                                environnement: ["HF_HUB_OFFLINE": "1", "HF_HUB_CACHE": fibo.cacheHF.path],
                                lire: { ligne in
-                                   if ligne.contains(Generatif.marqueRepliFiche) { suivi.noterMarque() }
+                                   if ligne.contains(Generatif.marqueVersionFiche) { suivi.noterMarque(ligne) }
                                    return false
                                },
                                tic: {
                                    let fraction = min(0.95, Date().timeIntervalSince(suivi.debut) / Generatif.dureeFicheEstimee)
                                    copie.montrer(.fiche(rang, fraction: fraction), passage.modif.label, rang: n, detail: detail)
                                })
+        // La version de mflux que le script a signalée : dite avec la remarque, ou seule.
+        let version = suivi.marque.flatMap(Generatif.versionDite).map(Generatif.remarqueVersion)
+        func avecVersion(_ remarque: String?) -> String? {
+            guard let version else { return remarque }
+            return remarque.map { $0 + " " + version } ?? version
+        }
         switch fin {
         case .reussi:
             guard let donnees = try? Data(contentsOf: sortie), let texte = String(data: donnees, encoding: .utf8),
                   let fiche = Generatif.lireFiche(donnees, instruction: passage.modif.instruction),
                   let complete = Generatif.ficheAvecInstruction(texte, instruction: passage.modif.instruction) else {
-                return (nil, nil, "FIBO-vlm a fini sans fiche lisible" + repli)
+                return (nil, nil, avecVersion("FIBO-vlm a fini sans fiche lisible" + repli))
             }
             // La fiche passe à mflux telle que FIBO-vlm l'a écrite (l'ordre de ses clés est celui des
             // légendes de l'entraînement) ; réécrite seulement si l'instruction a dû y être jointe.
             if complete != texte {
                 guard (try? Data(complete.utf8).write(to: sortie)) != nil else {
-                    return (nil, nil, "La fiche de FIBO-vlm n'a pas pu s'écrire" + repli)
+                    return (nil, nil, avecVersion("La fiche de FIBO-vlm n'a pas pu s'écrire" + repli))
                 }
             }
-            let remarque = suivi.marque
-                ? "FIBO-vlm a refusé la fiche de la zone grisée (sans edit_instruction) : fiche ordinaire, sur l'image non grisée ; Fibo 2 applique quand même la zone."
-                : nil
-            return (sortie, Generatif.resumeFiche(fiche), remarque)
+            return (sortie, Generatif.resumeFiche(fiche), avecVersion(nil))
         case .echec(let code, let journal, let signal):
             let raison = signal ? "arrêté par le signal \(code)" : Generatif.expliquerFiche(journal: journal, code: code)
-            return (nil, nil, "FIBO-vlm n'a pas rédigé la fiche (\(raison))" + repli)
+            return (nil, nil, avecVersion("FIBO-vlm n'a pas rédigé la fiche (\(raison))" + repli))
         case .delai:
-            return (nil, nil, "FIBO-vlm n'a pas fini la fiche en \(Int(fibo.delaiFiche / 60)) min, arrêté" + repli)
+            return (nil, nil, avecVersion("FIBO-vlm n'a pas fini la fiche en \(Int(fibo.delaiFiche.rounded())) s, arrêté" + repli))
         case .lancement(let raison):
             return (nil, nil, "FIBO-vlm ne se lance pas (\(raison))" + repli)
         }

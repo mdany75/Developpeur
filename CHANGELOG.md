@@ -51,13 +51,19 @@
     d'alignement n'a pas vue ; le recadrage autour de la zone reste le seul chemin.
 
 - Retouche générative, cinq fonctions reprises de Fibo 2 Studio :
-  - Sur demande seulement (environ 40 Go de mémoire et 7 min mesurés : trop lourd pour l'activer d'office), une fiche détaillée de chaque changement, rédigée sur le Mac par FIBO-vlm (le modèle de Bria
-    qui décrit l'image, environ 8 Go) avant Fibo 2 : ce qui change, ce qui reste, la lumière, le
-    décor ; Fibo 2 devrait mieux la suivre qu'une phrase (à constater). Elle prend une minute ou deux
-    de plus, tourne seule avant Fibo 2 (jamais les deux en mémoire ensemble), et n'est jamais
-    bloquante : sans le modèle, ou en cas d'échec, Fibo 2 reçoit la phrase seule et Claude le dit.
-    Quand FIBO-vlm refuse la fiche de la zone grisée, il en rédige une ordinaire, comme Fibo 2
-    Studio. Claude vous en donne un court résumé.
+  - Sur demande seulement, une fiche détaillée de chaque changement, rédigée sur le Mac par
+    FIBO-vlm (le modèle de Bria qui décrit l'image, environ 8 Go) avant Fibo 2 : ce qui change, ce
+    qui reste, la lumière, le décor ; Fibo 2 devrait mieux la suivre qu'une phrase (à constater).
+    Elle est maintenant bien plus légère : environ 16 Go de mémoire et 35 à 60 s mesurés (une
+    trentaine de secondes avec une zone, une minute sans), au lieu de 40 Go et 7 min (modèle en
+    8 bits, mémoire de travail bornée, une seule rédaction, arrêtée dès que la fiche est complète
+    avec une zone) ; elle reste désactivée d'office jusqu'à un essai réel complet. Avec une zone,
+    la fiche est celle de la zone grisée : FIBO-vlm n'y a plus buté lors des essais mesurés (deux
+    graines) ; en cas d'échec, Fibo 2 reçoit la phrase seule, comme avant, et plus de fiche
+    ordinaire de secours. Elle tourne seule avant Fibo 2 (jamais les deux en
+    mémoire ensemble), s'arrête au bout de 3 min, et n'est jamais bloquante : sans le modèle, ou en
+    cas d'échec, Fibo 2 reçoit la phrase seule et Claude le dit ; si mflux a changé de version
+    depuis le réglage (0.24), Claude le signale. Claude vous en donne un court résumé.
   - Une liste de ce que Fibo 2 doit éviter (du texte ou un logo inventé, une personne ou une tête
     en double, des membres en trop, un corps déformé), à laquelle Claude peut ajouter ce que vous
     voulez éviter ; pas en qualité rapide (Turbo n'en tient pas compte). Elle remplace la
@@ -73,7 +79,7 @@
     de plus près.
   - Un calcul de Fibo 2 Studio lancé pendant le vôtre arrête le vôtre avant son étape suivante
     (fiche, Fibo 2 ou SeedVR2) : jamais deux calculs ensemble sur le Mac.
-  - Provisoire : la durée et la mémoire de FIBO-vlm, l'effet de la fiche, le rendu de la qualité
+  - Provisoire : la fiche légère de bout en bout dans une vraie retouche, l'effet de la fiche, le rendu de la qualité
     équilibrée, l'effet de la liste à éviter et celui du guidage restent à constater sur vos photos.
     Un essai en qualité rapide ne vérifie que la fiche et le masque peint : la qualité équilibrée,
     la liste à éviter et le guidage demandent un essai en qualité équilibrée ou normale.

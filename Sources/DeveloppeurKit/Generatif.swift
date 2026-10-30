@@ -213,49 +213,81 @@ public enum Generatif {
     // MARK: Fiche JSON (FIBO-vlm)
 
     /// FIBO-vlm (briaai/FIBO-vlm, environ 8 Go) rédige sur ce Mac, avant chaque passage de Fibo, une
-    /// fiche structurée (VGL) de la modification : la légende du résultat et l'instruction réécrite
+    /// fiche structurée (VGL) de la modification : la légende du résultat et l'instruction
     /// (edit_instruction), que mflux lit par --prompt-file (fibo2 edit accepte un objet JSON avec
     /// « edit_instruction » et la légende, mflux/models/fibo2/README.md). Lancé par le Python de mflux
-    /// (`-I`, sans shell) sur un script du connecteur écrit dans le dossier de l'appel, sur le modèle
-    /// de fibo_vlm_tool.py de Fibo 2 Studio (la tâche edit seulement). Son processus est fini avant le
-    /// lancement de mflux : jamais les deux en mémoire ensemble.
+    /// (`-I`, sans shell) sur un script du connecteur écrit dans le dossier de l'appel (`scriptFiche`).
+    /// Son processus est fini avant le lancement de mflux : jamais les deux en mémoire ensemble.
     static let depotVLM = "briaai/FIBO-vlm"
     /// La révision de FIBO-vlm que mflux 0.24 charge, épinglée (`ModelRevisions.PINNED` de
     /// mflux/models/common/resolution/model_revisions.py) : hors ligne, il ne lit que cet instantané du
     /// cache (`path_resolution`, `revision`, `local_files_only`), jamais celui de `refs/main`. À relire
     /// à chaque mise à jour de mflux.
     static let revisionVLM = "bd13da5e0b73c808014d6260963e311c8cdf0d8b"
-    /// Ce que le script écrit sur sa sortie quand FIBO-vlm a refusé la fiche masquée et qu'il l'a
-    /// refaite sans masque (lu par le connecteur, dit dans la réponse).
-    static let marqueRepliFiche = "repli : fiche ordinaire sans masque"
+    /// La version de mflux sur laquelle le script de la fiche a été réglé et mesuré : il se sert de
+    /// détails internes de mflux (`FiboVLM._generate_internal`, `FiboVLM._normalize_edit_output`,
+    /// `Qwen3VLUtil.sample_top_p`), à revérifier à chaque mise à jour.
+    static let versionMfluxFiche = "0.24.0"
+    /// Ce que le script écrit sur sa sortie quand la version de mflux installée n'est pas
+    /// `versionMfluxFiche` (suivi de la version lue) : le connecteur la reprend en remarque.
+    static let marqueVersionFiche = "version de mflux :"
+    /// La version de mflux qu'une ligne du script dit après `marqueVersionFiche` (jusqu'à la
+    /// parenthèse : « 0.25.0 », ou « inconnue ») ; nil sans la marque.
+    static func versionDite(_ ligne: String) -> String? {
+        guard let marque = ligne.range(of: marqueVersionFiche) else { return nil }
+        let suite = ligne[marque.upperBound...].prefix { $0 != "(" }.trimmingCharacters(in: .whitespaces)
+        return suite.isEmpty ? nil : String(suite.prefix(40))
+    }
+    /// La remarque d'une autre version de mflux que celle du réglage du script.
+    static func remarqueVersion(_ lue: String) -> String {
+        "mflux installé : \(lue) ; le script de la fiche est réglé sur \(versionMfluxFiche) : à revérifier."
+    }
     /// Le téléchargement du modèle à conseiller : la révision que mflux charge.
     static var conseilVLM: String { "hf download \(depotVLM) --revision \(revisionVLM)" }
     /// Le nom du script (que Fibo.motifAutreCalcul reconnaît aussi).
     static let nomScriptFiche = "fiche-fibo-vlm.py"
     /// Délai de la rédaction d'une fiche (chargement du modèle compris) ; au-delà, arrêtée, et Fibo 2
-    /// reçoit la phrase seule. Durée réelle et mémoire du VLM : provisoires, restent à constater.
-    public static let delaiFiche: TimeInterval = 300
-    /// Durée attendue d'une fiche, pour la barre seulement (provisoire).
-    static let dureeFicheEstimee: TimeInterval = 90
+    /// reçoit la phrase seule. Mesuré le 29 octobre 2026 avec le réglage léger : 33 à 45 s avec une
+    /// zone, 58 s sans zone.
+    public static let delaiFiche: TimeInterval = 180
+    /// Durée attendue d'une fiche, pour la barre seulement (mesurée : 33 à 45 s avec une zone ; 58 s
+    /// sans zone, où la barre attend une dizaine de secondes à 95 %).
+    static let dureeFicheEstimee: TimeInterval = 45
     /// Le gris de mflux (Fibo2EditImages.grey_out) dans la zone à régénérer.
     static let grisMasque: UInt8 = 128
 
-    /// Le script Python que le connecteur écrit dans le dossier de l'appel : charge FiboVLM (le modèle
-    /// du cache, hors ligne), lui donne l'image (grisée dans la zone, avec --use-mask) et l'instruction,
-    /// et écrit la fiche dans --output, dans l'ordre des clés que FIBO-vlm a rédigé (celui des légendes
-    /// de l'entraînement de Fibo 2 : le connecteur ne la réécrit pas). En mode masque, FiboVLM.edit
-    /// refuse tout repli et lève une ValueError quand sa sortie n'a pas d'edit_instruction (« Masked edit
-    /// prompt generation failed; refusing fallback… ») ; le script refait alors, comme fibo_vlm_tool.py
-    /// de Fibo 2 Studio, une fiche ordinaire sur l'image non grisée (--image-originale, le modèle déjà
-    /// chargé), et le dit (`marqueRepliFiche`) : Fibo 2 applique de toute façon le masque. Hors masque,
-    /// FiboVLM.edit en garantit une ; s'il en manque une, l'instruction donnée est jointe à la fin. Code
-    /// 0 si tout va bien, 1 sinon (le message sur stdout).
+    /// Le script Python que le connecteur écrit dans le dossier de l'appel, en réglage léger (mesuré le
+    /// 29 octobre 2026 sur le Mac de 48 Go, Lightroom ouvert, un calcul à la fois : 33 à 45 s et 15,6 à
+    /// 16,0 Go en pointe en mode masqué, deux graines, et 58 s et 16,7 Go sans zone, au lieu de 402 s et
+    /// 39,7 Go par `FiboVLM.edit`) :
+    /// le cache de tampons de MLX borné à 4 Go avant le chargement (sans borne, il gardait 32,7 Go de
+    /// tampons libérés : `lm_head` recopié en float32 à chaque jeton) ; le modèle quantifié en 8 bits
+    /// (5,5 Go actifs au lieu de 8,9, fiche aussi fidèle ; 4 et 6 bouclent) ; 1 536 jetons au plus (une
+    /// fiche en fait de 568 à 1 012 ; une boucle était coupée vers 115 s) ; une seule génération
+    /// (`_generate_internal`), sans les replis de `FiboVLM.edit`. En mode masqué, FIBO-vlm n'écrit jamais
+    /// edit_instruction : après text_render, il recommence des clés jusqu'à la borne ou ferme l'objet au
+    /// hasard (la cause de « Masked edit prompt generation failed ») ; le script s'arrête dès que
+    /// `"text_render":[…]` est fermé (cherché hors des chaînes JSON, `fin_text_render` : un crochet dans
+    /// un texte à rendre ne compte pas ; relu tous les 4 jetons, puis sur le texte final), ferme l'objet
+    /// et pose lui-même edit_instruction (« Fill the masked area: » et l'instruction). Sans zone, la
+    /// génération va à son terme (edit_instruction vient après text_render). Une accolade fermée trop
+    /// tôt se répare (`reparer` : seulement si la suite reprend par une clé, et gardée seulement si le
+    /// texte se lit alors en entier ; sinon le texte d'origine, que la normalisation de mflux lit). La fiche s'écrit dans l'ordre des clés de
+    /// FIBO-vlm (celui des légendes de l'entraînement de Fibo 2 : le connecteur ne la réécrit pas). Code
+    /// 0 et la fiche dans --output ; toute exception, code 1 et le message sur la sortie (le connecteur
+    /// passe alors à la phrase seule). Une autre version de mflux que `versionMfluxFiche` est dite
+    /// (`marqueVersionFiche`).
     static let scriptFiche = #"""
     """fiche-fibo-vlm.py — fiche JSON (VGL) d'une modification pour Fibo 2, rédigée sur ce Mac par
     FIBO-vlm (via mflux), pour generative_edit du Développeur. Écrit par le connecteur dans le dossier
     de l'appel, lancé par le Python de mflux en -I, effacé avec ce dossier.
-      --image entree.png --instruction "texte anglais" --output fiche.json [--seed N]
-      [--use-mask --image-originale entree-non-grisee.png]
+      --image entree.png --instruction "texte anglais" --output fiche.json [--seed N] [--use-mask]
+
+    Réglage léger, mesuré le 29 octobre 2026 (Mac de 48 Go, Lightroom ouvert) : 33 à 45 s et environ
+    16 Go en pointe en mode masqué, 58 s et 16,7 Go sans zone, au lieu de 402 s et 39,7 Go par
+    FiboVLM.edit.
+    Réglé sur mflux \#(versionMfluxFiche) : il se sert de ses détails internes (FiboVLM._generate_internal,
+    FiboVLM._normalize_edit_output, Qwen3VLUtil.sample_top_p) ; une autre version est dite sur la sortie.
     """
 
     import argparse
@@ -263,41 +295,195 @@ public enum Generatif {
     import sys
     from pathlib import Path
 
+    VERSION_RELEVEE = "\#(versionMfluxFiche)"
+    MARQUE_VERSION = "\#(marqueVersionFiche)"
+    # Sans borne, le cache de MLX gardait 32,7 Go de tampons libérés (lm_head recopié en float32 à
+    # chaque jeton) : borné avant le chargement du modèle.
+    CACHE_MLX = 4 * 1024 ** 3
+    # 8 bits : 5,5 Go actifs au lieu de 8,9, fiche aussi fidèle ; 4 et 6 bouclent.
+    QUANTIZE = 8
+    # Une fiche fait de 568 à 1 012 jetons ; une génération qui boucle s'arrête là.
+    MAX_JETONS = 1536
+    # Tous les combien de jetons le texte partiel est relu (en mode masqué).
+    PAS_RELECTURE = 4
+
+
+    class FicheFermee(Exception):
+        """Levée pendant la génération, en mode masqué, dès que text_render est fermé : porte la fiche."""
+
+
+    def verifier_version() -> None:
+        """Dit sur la sortie une version de mflux autre que celle du réglage (le connecteur la reprend)."""
+        try:
+            from importlib.metadata import version
+            lue = version("mflux")
+        except Exception:
+            lue = "inconnue"
+        if lue != VERSION_RELEVEE:
+            print(f"{MARQUE_VERSION} {lue} (script réglé sur {VERSION_RELEVEE})", flush=True)
+
+
+    def fin_text_render(texte: str):
+        """La position juste après le « ] » qui ferme la liste "text_render" (la dernière clé que
+        FIBO-vlm écrit en mode masqué), ou None tant qu'elle n'est pas fermée. Le texte se parcourt
+        en JSON : chaînes et échappements sautés (un crochet dans un texte à rendre, « OPEN [24h] »,
+        ne compte pas), la clé cherchée au premier niveau de l'objet seulement."""
+        if '"text_render"' not in texte:
+            return None
+        profondeur = 0
+        attendre = False  # la clé text_render et ses deux-points lus : sa valeur vient
+        cible = None      # la profondeur de la liste text_render, une fois ouverte
+        i, n = 0, len(texte)
+        while i < n:
+            c = texte[i]
+            if c == '"':
+                j, echappe = i + 1, False
+                while j < n:
+                    if echappe:
+                        echappe = False
+                    elif texte[j] == "\\":
+                        echappe = True
+                    elif texte[j] == '"':
+                        break
+                    j += 1
+                if j >= n:
+                    return None  # chaîne pas encore fermée
+                if cible is None and profondeur <= 1 and texte[i + 1:j] == "text_render":
+                    k = j + 1
+                    while k < n and texte[k].isspace():
+                        k += 1
+                    attendre = texte[k:k + 1] == ":"
+                i = j + 1
+                continue
+            if attendre and not c.isspace() and c != ":":
+                attendre = False
+                if c == "[":
+                    cible = profondeur + 1
+            if c in "[{":
+                profondeur += 1
+            elif c in "]}":
+                profondeur -= 1
+                if c == "]" and cible is not None and profondeur == cible - 1:
+                    return i + 1
+            i += 1
+        return None
+
+
+    def reparer(texte: str) -> str:
+        """FIBO-vlm ferme parfois l'objet trop tôt (« …"artistic_style":"x"} ,"context":… ») : retire
+        l'accolade de trop quand la suite reprend par une clé (une virgule puis un guillemet, blancs
+        permis ; cinq fois au plus). La réparation n'est gardée que si le texte se lit alors en entier ;
+        sinon le texte d'origine, dont la normalisation de mflux choisit le meilleur objet (une fiche
+        complète suivie d'un second objet commencé reste ainsi lisible)."""
+        origine = texte = texte.strip()
+        for _ in range(6):
+            try:
+                json.loads(texte)
+                return texte
+            except json.JSONDecodeError as e:
+                avant = texte[:e.pos].rstrip()
+                apres = texte[e.pos + 1:].lstrip()
+                if (e.msg != "Extra data" or texte[e.pos:e.pos + 1] != "," or not avant.endswith("}")
+                        or not apres.startswith('"')):
+                    return origine
+                texte = avant[:-1] + texte[e.pos:]
+        return origine
+
+
+    def rediger(args) -> tuple:
+        """Une seule génération de FIBO-vlm (tâche edit) ; rend son texte brut (None s'il n'y en a pas),
+        le nombre de jetons tirés, la normalisation de mflux et l'erreur levée, s'il y en a une."""
+        import mlx.core as mx
+        mx.set_cache_limit(CACHE_MLX)
+
+        from mflux.models.common_models.qwen3_vl.qwen3_vl_util import Qwen3VLUtil
+        from mflux.models.fibo_vlm.model.fibo_vlm import FiboVLM
+        from mflux.models.fibo_vlm.model.util import FiboVLMUtil
+
+        vlm = FiboVLM(quantize=QUANTIZE)
+        jetons = []
+        tirer = Qwen3VLUtil.sample_top_p
+
+        # Chaque jeton tiré est gardé ; en mode masqué, le texte partiel est relu, et la génération
+        # s'arrête dès que text_render est fermé (FIBO-vlm n'écrirait plus rien d'utile).
+        def tirer_et_surveiller(logits, top_p, temperature=1.0):
+            jeton = tirer(logits, top_p, temperature)
+            jetons.append(int(jeton.item()))
+            if args.use_mask and len(jetons) % PAS_RELECTURE == 0:
+                partiel = vlm.processor.tokenizer.decode(jetons, skip_special_tokens=True)
+                fin = fin_text_render(partiel)
+                if fin is not None:
+                    raise FicheFermee(partiel[:fin] + "}")
+            return jeton
+
+        # _generate_internal normalise sa sortie et lève si edit_instruction manque : le texte brut
+        # est gardé au passage, pour être réparé et complété ici.
+        normaliser = FiboVLM._normalize_edit_output
+        brut = None
+        erreur = None
+        fermee_par_le_script = False
+
+        def garder_brut(texte, fallback_edit_instruction=None):
+            nonlocal brut
+            brut = texte
+            return normaliser(texte, fallback_edit_instruction)
+
+        Qwen3VLUtil.sample_top_p = staticmethod(tirer_et_surveiller)
+        FiboVLM._normalize_edit_output = staticmethod(garder_brut)
+        try:
+            vlm._generate_internal(task="edit", image=FiboVLMUtil.load_image(args.image),
+                                   editing_instructions=args.instruction, top_p=0.9, temperature=0.2,
+                                   max_tokens=MAX_JETONS, stop=["<|im_end|>", "<|end_of_text|>"],
+                                   seed=args.seed, use_mask=args.use_mask)
+        except FicheFermee as fermee:
+            brut = str(fermee)
+            fermee_par_le_script = True
+        except ValueError as exc:
+            # Sortie sans edit_instruction, ou mal fermée : le texte brut est gardé. Levée avant la
+            # normalisation (MLX, image), brut reste None et l'erreur est dite telle quelle.
+            erreur = exc
+        finally:
+            Qwen3VLUtil.sample_top_p = staticmethod(tirer)
+            FiboVLM._normalize_edit_output = staticmethod(normaliser)
+        # En mode masqué, la génération a pu finir juste après text_render, entre deux relectures,
+        # sans fermer l'objet (ou couper une boucle à la borne) : coupé et fermé de même.
+        if args.use_mask and brut is not None and not fermee_par_le_script:
+            try:
+                json.loads(brut.strip())
+            except ValueError:
+                fin = fin_text_render(brut)
+                if fin is not None:
+                    brut = brut[:fin] + "}"
+        return brut, len(jetons), normaliser, erreur
+
 
     def main() -> int:
-        parser = argparse.ArgumentParser(description="Fiche JSON Fibo 2 par FIBO-vlm (tâche edit)")
+        parser = argparse.ArgumentParser(description="Fiche JSON Fibo 2 par FIBO-vlm (tâche edit, réglage léger)")
         parser.add_argument("--image", type=Path, required=True)
         parser.add_argument("--instruction", required=True)
         parser.add_argument("--output", type=Path, required=True)
         parser.add_argument("--seed", type=int, default=42)
         parser.add_argument("--use-mask", action="store_true", help="l'image a une zone grisée à régénérer")
-        parser.add_argument("--image-originale", type=Path, help="l'image non grisée, pour le repli sans masque")
         args = parser.parse_args()
 
-        from mflux.models.fibo_vlm.model.fibo_vlm import FiboVLM
-        from mflux.models.fibo_vlm.model.util import FiboVLMUtil
-
-        vlm = FiboVLM()
-        try:
-            texte = vlm.edit(image=FiboVLMUtil.load_image(args.image), edit_instruction=args.instruction,
-                             use_mask=args.use_mask, seed=args.seed)
-        except ValueError as exc:
-            # FIBO-vlm oublie parfois l'edit_instruction avec le gris, et FiboVLM.edit refuse alors tout
-            # repli en mode masque : une fiche ordinaire sur l'image non grisée (Fibo 2 Studio fait de même).
-            if not args.use_mask or args.image_originale is None:
-                raise
-            print(f"repli : fiche ordinaire sans masque ({exc})", flush=True)
-            texte = vlm.edit(image=FiboVLMUtil.load_image(args.image_originale), edit_instruction=args.instruction,
-                             use_mask=False, seed=args.seed)
-        fiche = json.loads(texte)
-        if not isinstance(fiche, dict):
-            print("erreur FIBO-vlm : la fiche n'est pas un objet JSON")
+        verifier_version()
+        brut, jetons, normaliser, erreur = rediger(args)
+        if brut is None:
+            print(f"erreur FIBO-vlm : {erreur}" if erreur else "erreur FIBO-vlm : aucune réponse", flush=True)
             return 1
-        consigne = fiche.get("edit_instruction")
-        if not isinstance(consigne, str) or not consigne.strip():
-            fiche["edit_instruction"] = args.instruction
+        # edit_instruction : celle de FIBO-vlm s'il en a écrit une, sinon posée ici (en mode masqué,
+        # il n'en écrit jamais).
+        consigne = ("Fill the masked area: " if args.use_mask else "") + args.instruction.strip()
+        try:
+            fiche = json.loads(normaliser(reparer(brut), consigne))
+        except ValueError as exc:
+            print(f"erreur FIBO-vlm : fiche illisible ({exc})", flush=True)
+            return 1
+        if not isinstance(fiche, dict):
+            print("erreur FIBO-vlm : la fiche n'est pas un objet JSON", flush=True)
+            return 1
         args.output.write_text(json.dumps(fiche, indent=2, ensure_ascii=False), encoding="utf-8")
-        print(f"fiche écrite : {args.output}", flush=True)
+        print(f"fiche écrite : {args.output} ({jetons} jetons)", flush=True)
         return 0
 
 
@@ -311,12 +497,11 @@ public enum Generatif {
 
     /// Les arguments du Python de mflux pour une fiche : -I (isolé : ni variables PYTHON*, ni dossier
     /// du script dans le chemin des modules), le script, l'image, l'instruction, la sortie, la graine
-    /// de l'appel et, avec une zone, --use-mask (le prompt système EDIT_WITH_MASK de FiboVLM attend une
-    /// image à zones grises).
-    /// Avec une zone, `originale` est l'image non grisée (le repli sans masque).
-    static func argumentsFiche(script: URL, image: URL, instruction: String, sortie: URL, graine: Int, originale: URL?) -> [String] {
+    /// de l'appel et, avec une zone (`masque`), --use-mask (le prompt système EDIT_WITH_MASK de
+    /// FiboVLM attend une image à zones grises).
+    static func argumentsFiche(script: URL, image: URL, instruction: String, sortie: URL, graine: Int, masque: Bool) -> [String] {
         var args = ["-I", script.path, "--image", image.path, "--instruction", instruction, "--output", sortie.path, "--seed", String(graine)]
-        if let originale { args += ["--use-mask", "--image-originale", originale.path] }
+        if masque { args.append("--use-mask") }
         return args
     }
 
