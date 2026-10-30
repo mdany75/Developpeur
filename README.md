@@ -689,7 +689,7 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   manque, ou si deux masques portent ce nom, il vous le dit avec la liste des noms. Votre masque
   n'est ni changé ni retiré : Lightroom le recopie le temps de deux rendus d'essai, et la suite est
   celle d'un masque calculé (bord doux compris).
-- **Une fiche détaillée par FIBO-vlm**, toujours seulement sur demande (plus légère maintenant : environ 16 Go de mémoire et 35 à 60 s mesurés, au lieu de 40 Go et 7 min ; à confirmer dans une vraie retouche) : avant chaque passage de Fibo 2, FIBO-vlm (le modèle de Bria
+- **Une fiche détaillée par FIBO-vlm**, active par défaut (environ 16 Go de mémoire et 35 s de plus, mesurés dans une vraie retouche, au lieu de 40 Go et 7 min avec le premier réglage ; `structured_prompt` = false pour s'en passer) : avant chaque passage de Fibo 2, FIBO-vlm (le modèle de Bria
   qui décrit l'image, `briaai/FIBO-vlm`, environ 8 Go, sur ce Mac) rédige une fiche de ce que doit
   devenir l'image (ce qui change, ce qui reste, la lumière, le décor), avec la zone à changer grisée
   comme Fibo 2 la voit ; Fibo 2 devrait mieux la suivre qu'une phrase (à constater). FIBO-vlm tourne

@@ -8412,7 +8412,7 @@ Demandé par Dany le 29 octobre 2026 au soir : reprendre cinq fonctions de Fibo 
 (`~/Developer/Fibo2Studio`, lu seulement : `Generator.swift`, `Resources/fibo_vlm_tool.py`,
 `MaskEditor.swift`).
 
-**Fiche JSON par FIBO-vlm** (`structured_prompt`, faux par défaut). **Désactivée par défaut** (constaté le 29 octobre 2026 au soir, essai réel : FIBO-vlm a pris 39,7 Go en pointe et 6 min 42 s sur ce Mac de 48 Go, en swap, et son mode avec masque a échoué) : seulement sur demande (`structured_prompt` = true) ; le réglage léger ci-dessous (environ 16 Go, 33 à 58 s) garde ce défaut jusqu'à un essai réel de bout en bout. Avant chaque passage de Fibo,
+**Fiche JSON par FIBO-vlm** (`structured_prompt`, vrai par défaut). Désactivée quelques heures le 29 octobre 2026 au soir (premier réglage : 39,7 Go en pointe et 6 min 42 s sur ce Mac de 48 Go, en swap, et le mode avec masque en échec), puis remise par défaut avec le réglage léger ci-dessous, après son essai réel de bout en bout du 29 octobre 2026 au soir (nouvelle copie d'essai de DSCF2402.RAF, arrière-plan Times Square, Turbo, graine 42) : fiche en 35 s, appel en 74 s, environ 10 Go résidents pendant la fiche ; fiche fidèle (femme, lunettes, cape noire, Times Square) et rendu plus vivant (passants à l'échelle, taxis). Avant chaque passage de Fibo,
 FIBO-vlm (`briaai/FIBO-vlm`, Qwen3-VL, environ 8 Go de poids) rédige sur ce Mac une fiche structurée
 (VGL) de la modification : la légende du résultat (`short_description`, `objects`,
 `background_setting`, `lighting`, `aesthetics`, `photographic_characteristics`, `style_medium`,

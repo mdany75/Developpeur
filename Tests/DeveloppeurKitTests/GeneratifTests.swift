@@ -583,8 +583,8 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(reponse["qualite"]?.string, "équilibrée (30 étapes, guidage sur 60 % d'entre elles)")
         XCTAssertEqual(reponse["guidage"]?.double, 5)
         XCTAssertEqual(reponse["fiche_fibo_vlm"]?.bool, false)
-        // Fiche non demandée (faux par défaut) : aucune remarque.
-        XCTAssertNil(reponse["remarque_fiche"], resultat.text)
+        // Fiche demandée par défaut, mais pas de FIBO-vlm dans ce test : la phrase seule, dite.
+        XCTAssertTrue(reponse["remarque_fiche"]?.string?.contains("phrase seule") == true, resultat.text)
         XCTAssertNil(reponse["sortie_entiere"])
         let modification = try XCTUnwrap(reponse["modifications"]?.array?.first)
         XCTAssertEqual(reponse["modifications"]?.array?.count, 1)

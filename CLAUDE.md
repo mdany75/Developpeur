@@ -668,7 +668,7 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   Voir `docs/SPEC.md`, Retouche générative par Fibo 2 (Masque de Lightroom).
   **Cinq fonctions de Fibo 2 Studio** (demandées par Dany le soir du 29 octobre 2026 ;
   `~/Developer/Fibo2Studio` se lit seulement, jamais d'écriture) : (1) **fiche de FIBO-vlm**
-  (`structured_prompt`, faux par défaut depuis le 29 octobre 2026 au soir : FIBO-vlm a pris 39,7 Go en pointe et 402 s, en swap, et son mode masqué a échoué ; seulement sur demande, défaut gardé jusqu'à un essai réel de bout en bout du réglage léger ci-dessous) : avant chaque passage de Fibo, `briaai/FIBO-vlm` (environ
+  (`structured_prompt`, vrai par défaut : faux quelques heures le 29 octobre 2026 au soir, après 39,7 Go et 402 s en swap et un mode masqué en échec, puis remis vrai avec le réglage léger ci-dessous, après son essai réel de bout en bout du 29 octobre 2026 au soir (nouvelle copie d'essai de DSCF2402.RAF, arrière-plan Times Square, Turbo, graine 42) : fiche en 35 s, appel en 74 s, environ 10 Go résidents pendant la fiche ; fiche fidèle (femme, lunettes, cape noire, Times Square) et rendu plus vivant (passants à l'échelle, taxis)) : avant chaque passage de Fibo, `briaai/FIBO-vlm` (environ
   8 Go) rédige une fiche VGL (légende du résultat et `edit_instruction`), passée à mflux par
   `--prompt-file` ; le Python de mflux (`Fibo.python`, par défaut à côté du vrai exécutable, lien
   suivi : celui des essais n'en a pas) en `-I`, sur `Generatif.scriptFiche` écrit dans le dossier de

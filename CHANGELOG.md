@@ -51,7 +51,7 @@
     d'alignement n'a pas vue ; le recadrage autour de la zone reste le seul chemin.
 
 - Retouche générative, cinq fonctions reprises de Fibo 2 Studio :
-  - Sur demande seulement, une fiche détaillée de chaque changement, rédigée sur le Mac par
+  - Par défaut (une trentaine de secondes et environ 16 Go en plus, dans un calcul à part fini avant Fibo 2), une fiche détaillée de chaque changement, rédigée sur le Mac par
     FIBO-vlm (le modèle de Bria qui décrit l'image, environ 8 Go) avant Fibo 2 : ce qui change, ce
     qui reste, la lumière, le décor ; Fibo 2 devrait mieux la suivre qu'une phrase (à constater).
     Elle est maintenant bien plus légère : environ 16 Go de mémoire et 35 à 60 s mesurés (une
