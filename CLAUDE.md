@@ -706,6 +706,17 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   un masque peint vidé (`composants` vides) est refusé par le connecteur avant l'exportation et
   l'accord, et un masque peint presque vide ou total a son propre refus (`refusMasque` avec
   `peint`), jamais celui d'un masque calculé.
+  **Constaté le 29 octobre 2026 au soir** (essais réels en Turbo, Lightroom ouvert, Fibo 2 Studio
+  ouvert sans calcul, nouvelles copies d'essai de DSCF2402.RAF, graine 42) : (A) arrière-plan avec la
+  fiche demandée : FIBO-vlm n'a pas fini en 300 s, repli sur la phrase seule, l'appel a réussi
+  (342 s) ; mesuré seul ensuite (`/usr/bin/time -l`) : 402 s et 39,7 Go de pointe, en swap, et son
+  mode masqué a levé « Masked edit prompt generation failed » (repli sans masque) : d'où
+  `structured_prompt` faux par défaut ; (B) masque existant « Claude · Fibo » (vêtements, posé par
+  add_mask) : poncho noir changé en rouge en 36 s, dont 22 s de Fibo 2, 15,6 % de la photo, 10,2 Go
+  de pointe ; plis, maille, manchettes et mains gardés ; un peu de noir reste sur les épaules sous
+  les mèches, hors du masque de Lightroom. Un pgrep dont la ligne de commande contient le motif
+  (une boucle de suivi) fait refuser l'appel (« Fibo 2 calcule déjà… ») : suivre la mémoire par un
+  script dont la ligne ne le contient pas.
   (6) **Guidage** (`guidance`, de 1 à 10, absent : 5, celui de mflux) hors Turbo ; à 1, ni exclusion
   ni `--cfg-end`. Arguments de mflux dans `Generatif.arguments` (pur, testé). Provisoires et restent
   à constater : durée et mémoire de FIBO-vlm, effet de la fiche et de l'exclusion (avec et sans, même
