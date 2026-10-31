@@ -1433,9 +1433,9 @@ Lightroom Classic ; aucun ne lit votre écran, sauf sur demande :
 - `Resources/Info.plist` : identifiant et numéro de version du connecteur
 - `docs/` : captures, `SPEC.md` (cahier des charges, protocole entre le connecteur et le module,
   et la fenêtre Claude), `aide-adobe-developpement.md` (notes sur l'aide d'Adobe)
-- `docs/lavish/` : la page Analyse du Développeur (`analyse-1-5.html`), à ouvrir dans un
-  navigateur ; faite avec [Lavish](https://www.npmjs.com/package/lavish-axi)
-  (`npx -y lavish-axi <fichier>` pour l'annoter)
+- `docs/artefacts/` : les pages Analyse du Développeur (`analyse-1-5.html`) et Outils comparés
+  (`comparaison-lightroom-mcp.html`), à ouvrir dans un navigateur ; sources des pages publiées
+  en artefacts Claude
 - `build.sh`, `install.sh`, `uninstall.sh` : construire, installer, désinstaller
 
 ## Licence
