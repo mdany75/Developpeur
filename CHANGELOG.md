@@ -50,6 +50,14 @@
     à cet essai, Fibo 2 y a redessiné une seconde tête, plus petite, que la vérification
     d'alignement n'a pas vue ; le recadrage autour de la zone reste le seul chemin.
 
+- Retouche générative d'après une autre photo (« mets le fond de cette photo-là ») : une photo de
+  votre catalogue, ou une partie d'elle, sert de modèle de décor, de vêtement ou d'objet (argument
+  `reference` de `generative_edit`). Il faut désigner la zone à changer (un rectangle ou un masque
+  de Lightroom) : seule elle change, le reste garde ses pixels exacts. La photo de référence est
+  seulement lue, jamais modifiée. Sans fiche de FIBO-vlm (il ne voit qu'une image). Un visage qui
+  apparaît dans la zone, peut-être recopié de l'autre photo, est signalé à vérifier. À constater sur
+  vos photos : Fibo 2 a déjà dessiné une seconde tête quand il recevait deux images.
+
 - Retouche générative, cinq fonctions reprises de Fibo 2 Studio :
   - Par défaut (une trentaine de secondes et environ 16 Go en plus, dans un calcul à part fini avant Fibo 2), une fiche détaillée de chaque changement, rédigée sur le Mac par
     FIBO-vlm (le modèle de Bria qui décrit l'image, environ 8 Go) avant Fibo 2 : ce qui change, ce
@@ -57,7 +65,8 @@
     Elle est maintenant bien plus légère : environ 16 Go de mémoire et 35 à 60 s mesurés (une
     trentaine de secondes avec une zone, une minute sans), au lieu de 40 Go et 7 min (modèle en
     8 bits, mémoire de travail bornée, une seule rédaction, arrêtée dès que la fiche est complète
-    avec une zone) ; elle reste désactivée d'office jusqu'à un essai réel complet. Avec une zone,
+    avec une zone) ; active par défaut depuis son essai réel complet (fiche en 35 s, retouche en
+    74 s en qualité rapide). Avec une zone,
     la fiche est celle de la zone grisée : FIBO-vlm n'y a plus buté lors des essais mesurés (deux
     graines) ; en cas d'échec, Fibo 2 reçoit la phrase seule, comme avant, et plus de fiche
     ordinaire de secours. Elle tourne seule avant Fibo 2 (jamais les deux en
@@ -79,7 +88,7 @@
     de plus près.
   - Un calcul de Fibo 2 Studio lancé pendant le vôtre arrête le vôtre avant son étape suivante
     (fiche, Fibo 2 ou SeedVR2) : jamais deux calculs ensemble sur le Mac.
-  - Provisoire : la fiche légère de bout en bout dans une vraie retouche, l'effet de la fiche, le rendu de la qualité
+  - Provisoire : l'effet de la fiche, le rendu de la qualité
     équilibrée, l'effet de la liste à éviter et celui du guidage restent à constater sur vos photos.
     Un essai en qualité rapide ne vérifie que la fiche et le masque peint : la qualité équilibrée,
     la liste à éviter et le guidage demandent un essai en qualité équilibrée ou normale.

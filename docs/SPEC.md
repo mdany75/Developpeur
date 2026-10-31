@@ -8587,15 +8587,56 @@ peint presque vide ou total a son propre refus (`Generatif.refusMasque` avec `pe
 plus large, region, ou inversé dans le panneau Masquage ?), jamais celui d'un masque calculé, qui
 renverrait à `kind` et `add_mask`.
 
-Provisoire et reste à constater : le réglage léger de FIBO-vlm de bout en bout dans
-`generative_edit` (sa durée et sa mémoire, chargement compris, ne sont mesurées que hors du
-connecteur ; `dureeFicheEstimee`, `delaiFiche`), qui décidera du défaut de `structured_prompt`,
-l'effet de la fiche sur le rendu, le rendu de la qualité équilibrée sur de vraies photos de Dany,
+Le réglage léger de FIBO-vlm a réussi son essai réel de bout en bout dans `generative_edit` le
+29 octobre 2026 au soir (Turbo, arrière-plan de Times Square : fiche en 35 s, appel en 74 s,
+environ 10 Go résidents pendant la fiche) : `structured_prompt` est vrai par défaut depuis.
+Provisoire et reste à constater : la mémoire en pointe de la fiche dans le connecteur (mesurée hors
+de lui seulement ; `dureeFicheEstimee`, `delaiFiche`), l'effet de la fiche sur le rendu, le rendu de la qualité équilibrée sur de vraies photos de Dany,
 l'effet de la phrase d'exclusion par défaut, le masque peint au pinceau dans un vrai Lightroom (sa
 copie dans le témoin rendue comme le sien, son bord doux lu), et `HF_HUB_OFFLINE` avec le modèle du
 cache. Un essai en qualité rapide (Turbo) ne vérifie que la fiche et le masque peint :
 Turbo ne lit ni l'exclusion, ni le guidage, ni `--cfg-end` ; la qualité équilibrée, la phrase
 d'exclusion et le guidage demandent un essai en qualité équilibrée ou normale.
+
+### Photo de référence (`reference`, 30 octobre 2026)
+
+Demandée par Dany (« mets le fond de cette photo-là ») : une photo du catalogue, ou une partie d'elle,
+sert de modèle de décor, de vêtement ou d'objet. `reference` : `{ photo_id, region }` (`region`
+facultative, de 0 à 1 dans la photo de référence), validé avant tout envoi (`Generatif.reference`) :
+une seule modification (jamais avec `edits`) et une zone exigée (`region` ou `mask`) ; sans zone,
+Fibo 2 redessinerait toute la photo d'après l'autre (le mode à deux images retiré le 29 octobre 2026
+avait dessiné une seconde tête).
+
+mflux 0.24 prend jusqu'à 5 images (`--image-paths`, nommées `<image_1>`, `<image_2>`… dans
+l'instruction), mais refuse `--mask-path` avec plus d'une (`Fibo2EditImages.prepare`). Son masque
+n'est qu'un grisage de l'entrée (`grey_out` : masque binaire à 128, gris plat 128), sans autre signal
+au modèle (`fibo2_core.py`) : le connecteur grise donc lui-même la zone dans l'entrée
+(`Generatif.griser`, comme pour la fiche) et passe les deux images sans masque
+(`Generatif.arguments` avec `reference`). La zone changée se mesure contre l'entrée non grisée, et
+seule la zone revient dans la photo (zone de mélange de `region` ou du masque de Lightroom, comme
+sans référence) : hors d'elle, les pixels du TIFF exporté au bit près.
+
+Avec plusieurs images, mflux recadre chacune, la première comprise, à la taille d'entraînement de son
+propre rapport (`trained_size`), et non à `--width` × `--height` : l'entrée est donc mise exactement
+à cette taille (`Generatif.tailleEntrainee`, port de `trained_size`, vérifié contre son vrai code le
+31 octobre 2026 ; `tailleAvecReference` la reprend pour son propre rapport, où elle est stable), le
+recadrage étiré d'au plus ce que mflux aurait coupé, puis remis à sa taille à la recomposition ;
+`--width` et `--height` disent la même taille. La seconde image est recadrée au centre par mflux à sa
+propre taille d'entraînement.
+
+La photo de référence se rend par la commande `apercu` (lecture seule, aucun réglage écrit ; à
+`Generatif.coteReference`, 1 536 px), après l'exportation et le masque : la partie `region`, ramenée à
+1 536 px de grand côté au plus (`Generatif.imageReference`), en PNG sRGB dans le dossier de l'appel
+(`reference.png`). L'instruction la nomme `<image_2>` ; sinon le connecteur ajoute « Use <image_2> as
+the reference for this change. » (`instructionAvecReference`). Pas de fiche de FIBO-vlm (il ne voit
+qu'une image : `remarque_fiche`). Les visages de la sortie dont le centre tombe dans la zone et
+qu'aucun visage de l'entrée ne recouvre à 30 % (`Generatif.visagesNouveaux`, `Teint.visages`) font un
+`a_verifier` dans la modification, jamais un refus. Réponse : `reference` (`photo_id`, `fichier`,
+`largeur_px`, `hauteur_px`, `region`).
+
+Reste à constater : le rendu d'une vraie photo de référence (décor, vêtement), l'alignement de la
+sortie sur l'entrée avec deux images, une seconde tête ou une personne recopiée, et la durée (deux
+images à encoder).
 
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 

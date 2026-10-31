@@ -750,13 +750,29 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   script dont la ligne ne le contient pas.
   (6) **Guidage** (`guidance`, de 1 à 10, absent : 5, celui de mflux) hors Turbo ; à 1, ni exclusion
   ni `--cfg-end`. Arguments de mflux dans `Generatif.arguments` (pur, testé). Provisoires et restent
-  à constater : le réglage léger de FIBO-vlm de bout en bout dans `generative_edit` (durée et
-  mémoire mesurées hors du connecteur seulement), effet de la fiche et de l'exclusion (avec et sans,
+  à constater : la mémoire en pointe de la fiche dans le connecteur (mesurée hors de lui ; son essai
+  réel de bout en bout a réussi, 35 s), effet de la fiche et de l'exclusion (avec et sans,
   même graine), rendu de la qualité équilibrée, effet du guidage,
   masque peint au pinceau dans un vrai Lightroom ; un essai en Turbo ne vérifie que la fiche et le
   masque peint (Turbo ne lit ni l'exclusion, ni le guidage, ni `--cfg-end`). Voir `docs/SPEC.md`,
   Retouche générative par Fibo 2 (Fiche de FIBO-vlm, exclusion, qualité équilibrée, guidage, masque
   peint).
+  **Photo de référence** (`reference` : `{ photo_id, region }`, demandée par Dany : « mets le fond de
+  cette photo-là ») : `Generatif.reference`, avant tout envoi : une seule modification (jamais avec
+  `edits`), une zone exigée (`region` ou `mask` : sans zone, Fibo redessinerait toute la photo d'après
+  l'autre). mflux 0.24 refuse `--mask-path` avec plusieurs images, et son masque n'est qu'un grisage
+  (`grey_out`) : l'entrée est grisée dans la zone par le connecteur (`Generatif.griser`), les deux images
+  passées sans masque (`--image-paths entree reference`, `Generatif.arguments` avec `reference`) ; avec
+  plusieurs images, mflux recadre chacune à sa taille d'entraînement (`trained_size`), la première
+  comprise : l'entrée y est mise exactement (`Generatif.tailleEntrainee`, port vérifié contre le vrai
+  code le 31 octobre 2026 ; `tailleAvecReference`), `--width` et `--height` la même. La référence se
+  rend par la commande `apercu` (lecture seule, `coteReference` 1 536 px ; `imageReference` coupe
+  `region` et borne le grand côté), en PNG dans le dossier de l'appel, après l'exportation et le
+  masque ; l'instruction la nomme `<image_2>` (sinon « Use <image_2> as the reference for this
+  change. » ajouté, `instructionAvecReference`) ; jamais de fiche de FIBO-vlm (il ne voit qu'une
+  image) ; un visage nouveau dans la zone (`Generatif.visagesNouveaux`, `Teint.visages`) fait un
+  `a_verifier`, jamais un refus ; réponse `reference`. Reste à constater : le rendu sur de vraies
+  photos, l'alignement de la sortie avec deux images, une personne recopiée, la durée.
 - La suppression des reflets (`Suppression.lua`, commande `supprimer`) suit le même chemin que le
   débruitage (photo affichée, hors de `withWriteAccessDo`, un seul traitement à la fois) ; l'état
   d'avant va dans la mémoire sous la clé `Suppression`, qui n'est jamais un réglage (la simulation
@@ -1342,8 +1358,8 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   l'essentiel en tête, et un test de longueur pour les plus longues (`add_mask` 2 048 au plus,
   `view_photo` 1 850, `read_composition` 1 000, `preview_settings` 600, `analyze_photos` 520,
   `export_journal` avec sa propriété `notebook` 450, `reason` 160). Les consignes de la fenêtre
-  (`Consignes.texte`, lues à chaque demande) font 6 996 caractères pour un plafond de 7 500
-  (`essais-moteur.lua` ; 6 922 avant la mention du masque peint, `mask` avec `existing`, le soir du
+  (`Consignes.texte`, lues à chaque demande) font 7 074 caractères pour un plafond de 7 500
+  (`essais-moteur.lua` ; 6 996 avant la photo de référence, `reference`, le 31 octobre 2026 ; 6 922 avant la mention du masque peint, `mask` avec `existing`, le soir du
   29 octobre 2026 ; 6 835 avant la mention de `mask` (masque de Lightroom) dans la puce de la
   retouche générative, le soir du 29 octobre 2026 ; 6 635 avec la première puce de la retouche générative, avant ses ajouts
   du même jour (consigne en anglais traduite, plusieurs changements en un appel, la couleur d'un

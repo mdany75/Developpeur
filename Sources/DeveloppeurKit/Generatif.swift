@@ -117,10 +117,16 @@ public enum Generatif {
     /// 38 Go, et moins fidèle) ni --step-cache-ratio, qui dégradent l'image.
     static func arguments(entree: URL, masque: URL?, instruction: String, taille: (largeur: Int, hauteur: Int),
                           qualite: Qualite, graine: Int, sortie: URL, modeleRapide: URL?,
-                          fiche: URL? = nil, exclusion: String? = nil, guidage: Double? = nil) -> [String] {
+                          fiche: URL? = nil, exclusion: String? = nil, guidage: Double? = nil, reference: URL? = nil) -> [String] {
         var args = fiche.map { ["--prompt-file", $0.path] } ?? ["--prompt", instruction]
-        args += ["--image-paths", entree.path]
-        if let masque { args += ["--mask-path", masque.path] }
+        // Avec une photo de référence, deux images et jamais --mask-path (mflux refuse un masque avec
+        // plusieurs images) : la zone est déjà grisée dans l'entrée (`griser`), comme mflux l'aurait fait.
+        if let reference {
+            args += ["--image-paths", entree.path, reference.path]
+        } else {
+            args += ["--image-paths", entree.path]
+            if let masque { args += ["--mask-path", masque.path] }
+        }
         switch qualite {
         case .normal, .balanced:
             args += ["--steps", String(qualite.etapes), "--vae-full-precision"]
@@ -856,6 +862,158 @@ public enum Generatif {
         let source = cadre.flatMap { origine.cropping(to: $0.rect) } ?? origine
         if let cadre, source.width != cadre.largeur || source.height != cadre.hauteur { return nil }
         return pixelsRGBA8(source, largeur: taille.largeur, hauteur: taille.hauteur)
+    }
+
+    // MARK: Photo de référence
+
+    /// Une photo de référence (`reference`, demandé par Dany le 30 octobre 2026 : « mets le fond de cette
+    /// photo-là ») : une autre photo du catalogue, ou une partie d'elle (`region`), que Fibo 2 reçoit en
+    /// seconde image (`<image_2>`) comme modèle de lieu, de vêtement ou d'objet.
+    struct Reference: Equatable {
+        var photo: Int
+        var region: CGRect?
+    }
+
+    /// Le nom de la photo de référence dans l'instruction (mflux : `<image_1>`, `<image_2>`… dans
+    /// l'ordre des images ; la photo à changer est `<image_1>`).
+    static let marqueReference = "<image_2>"
+    /// Le grand côté de la photo de référence rendue : mflux la ramène de toute façon à environ 1 Mpx
+    /// (sa taille d'entraînement), et FIBO 2 la lit à 768 px pour le texte.
+    static let coteReference = 1536
+
+    /// La photo de référence demandée (`reference` : { photo_id, region }), validée avant tout envoi ;
+    /// nil sans elle. Une seule modification (ni edits) et une zone exigée (region ou mask) : mflux
+    /// refuse un masque avec deux images ; la zone est donc grisée dans l'entrée par le connecteur,
+    /// comme mflux le fait, et seule elle revient dans la photo. Sans zone, Fibo redessinerait toute la
+    /// photo d'après l'autre (le mode à deux images a déjà dessiné une seconde tête, le 29 octobre 2026).
+    static func reference(_ raw: [String: JSONValue]) throws -> Reference? {
+        guard let brut = raw["reference"], !brut.isNull else { return nil }
+        guard let objet = brut.object else {
+            throw LightroomError.invalid("« reference » : un objet { photo_id, region } (la photo du catalogue qui sert de modèle). Rien n'a été fait.")
+        }
+        let inconnues = objet.keys.filter { !["photo_id", "region"].contains($0) }.sorted()
+        guard inconnues.isEmpty else {
+            throw LightroomError.invalid("« reference » : photo_id et region seulement (pas \(inconnues.joined(separator: ", "))). Rien n'a été fait.")
+        }
+        guard let photo = objet["photo_id"]?.int, photo > 0 else {
+            throw LightroomError.invalid("« reference.photo_id » : l'identifiant de la photo du catalogue qui sert de modèle (find_photos, list_selection). Rien n'a été fait.")
+        }
+        if let zone = objet["region"], !zone.isNull, zone.object == nil {
+            throw LightroomError.invalid("« reference.region » : un objet { x, y, width, height } de 0 à 1 dans la photo de référence (la partie à reprendre : le vêtement, le décor). Rien n'a été fait.")
+        }
+        if let edits = raw["edits"], !edits.isNull {
+            throw LightroomError.invalid("« reference » et « edits » ensemble : une photo de référence vaut pour une seule modification (instruction, instruction_fr, region ou mask). Rien n'a été fait.")
+        }
+        let avecRegion = raw["region"].map { !$0.isNull } ?? false
+        let avecMasque = raw["mask"].map { !$0.isNull } ?? false
+        guard avecRegion || avecMasque else {
+            throw LightroomError.invalid("« reference » sans zone : donner region ou mask (la partie de la photo à remplacer d'après la référence). Sans zone, Fibo 2 redessinerait toute la photo d'après l'autre. Rien n'a été fait.")
+        }
+        let zone: CGRect?
+        do {
+            zone = try region(objet["region"]?.object)
+        } catch {
+            throw LightroomError.invalid("« reference.region » : x, y, width et height de 0 à 1 dans la photo de référence (x, y ≥ 0 ; width, height > 0 ; x + width et y + height ≤ 1). Rien n'a été fait.")
+        }
+        return Reference(photo: photo, region: zone)
+    }
+
+    /// La taille de l'aperçu de la photo de référence : `coteReference` sans region ; avec elle, assez
+    /// grand pour que la partie gardée fasse environ `coteReference` de grand côté (sinon mflux
+    /// agrandirait une petite découpe floue), 4 096 px au plus (la borne de rendre, Rendu.lua).
+    static func tailleApercuReference(region: CGRect?) -> Int {
+        guard let region, max(region.width, region.height) > 0 else { return coteReference }
+        return min(4096, max(coteReference, Int((Double(coteReference) / Double(max(region.width, region.height))).rounded(.up))))
+    }
+
+    /// L'instruction donnée à Fibo 2 avec une photo de référence : telle quelle si elle la nomme
+    /// (`<image_2>`), sinon suivie d'une phrase qui la nomme (sans elle, Fibo 2 ne sait pas quoi en faire).
+    static func instructionAvecReference(_ instruction: String) -> String {
+        guard !instruction.contains(marqueReference) else { return instruction }
+        let fin = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
+        let point = fin.last.map { ".!?".contains($0) } ?? true ? "" : "."
+        return fin + point + " Use \(marqueReference) as the reference for this change."
+    }
+
+    /// La taille d'entraînement de FIBO 2 pour un rapport des côtés (mflux 0.24,
+    /// `Fibo2EditImages.trained_size`) : parmi les tailles de 0,9 à 1,1 Mpx, côtés multiples de 16 et
+    /// d'au moins 64, celle qui recadre le moins, puis la plus proche du mégapixel, puis la plus large.
+    /// Avec deux images, mflux recadre chacune à cette taille, la première comprise (une seule image
+    /// l'est à la taille demandée) : l'entrée de Fibo y est mise exactement (`tailleAvecReference`),
+    /// pour que la sortie reste alignée sur elle.
+    static func tailleEntrainee(rapport: Double) -> (largeur: Int, hauteur: Int) {
+        let multiple = 16, aire = 1024 * 1024, cote = 4 * multiple
+        var meilleure: (recadre: Double, ecart: Int, largeur: Int, hauteur: Int)?
+        for l in stride(from: cote, to: 2 * aire / cote, by: multiple) {
+            for h in stride(from: cote, to: 2 * aire / l, by: multiple) {
+                let a = l * h
+                guard 0.9 * Double(aire) <= Double(a), Double(a) <= 1.1 * Double(aire) else { continue }
+                let r = Double(l) / Double(h)
+                let recadre = ((1 - min(r / rapport, rapport / r)) * 1e9).rounded() / 1e9
+                let candidate = (recadre, abs(a - aire), l, h)
+                if let m = meilleure {
+                    let avant = candidate.0 != m.recadre ? candidate.0 < m.recadre
+                        : candidate.1 != m.ecart ? candidate.1 < m.ecart
+                        : candidate.2 != m.largeur ? candidate.2 > m.largeur
+                        : candidate.3 < m.hauteur
+                    if avant { meilleure = candidate }
+                } else {
+                    meilleure = candidate
+                }
+            }
+        }
+        return meilleure.map { ($0.largeur, $0.hauteur) } ?? tailleCible(largeur: Int(rapport * 1024), hauteur: 1024)
+    }
+
+    /// La taille de l'entrée de Fibo avec une photo de référence : la taille d'entraînement du
+    /// recadrage, puis celle de son propre rapport (celle que mflux choisira pour elle : jamais un
+    /// recadrage de plus), le recadrage mis à cette taille (à peine déformé : moins que ce que mflux
+    /// aurait coupé), remis à la sienne à la recomposition.
+    static func tailleAvecReference(cadre: Pixels) -> (largeur: Int, hauteur: Int) {
+        let t = tailleEntrainee(rapport: Double(cadre.largeur) / Double(max(cadre.hauteur, 1)))
+        return tailleEntrainee(rapport: Double(t.largeur) / Double(t.hauteur))
+    }
+
+    /// La photo de référence rendue, prête pour Fibo : la partie `region` (de 0 à 1) de l'aperçu, ramenée
+    /// à `coteReference` de grand côté au plus, en pixels RGBA 8 bits sRGB ; nil si elle fait moins de
+    /// 16 px de côté ou est plus allongée que 8:1.
+    static func imageReference(_ apercu: CGImage, region: CGRect?) -> CGImage? {
+        var source = apercu
+        if let region {
+            let l = Double(apercu.width), h = Double(apercu.height)
+            let rect = CGRect(x: (region.minX * l).rounded(.down), y: (region.minY * h).rounded(.down),
+                              width: (region.width * l).rounded(.up), height: (region.height * h).rounded(.up))
+                .intersection(CGRect(x: 0, y: 0, width: l, height: h))
+            // Jamais plus allongée que 8:1 (`rapportMax`) : mflux la mettrait à une taille d'entraînement
+            // de plus de 8 192 px de côté, et refuserait.
+            guard rect.width >= 16, rect.height >= 16, max(rect.width, rect.height) <= rapportMax * min(rect.width, rect.height),
+                  let coupee = apercu.cropping(to: rect) else { return nil }
+            source = coupee
+        }
+        let echelle = min(1, Double(coteReference) / Double(max(source.width, source.height)))
+        let l = max(16, Int((Double(source.width) * echelle).rounded())), h = max(16, Int((Double(source.height) * echelle).rounded()))
+        guard let pixels = pixelsRGBA8(source, largeur: l, hauteur: h) else { return nil }
+        return image8(pixels, largeur: l, hauteur: h)
+    }
+
+    /// Les visages apparus dans la zone (le masque de Fibo, binaire à 128) : ceux de la sortie dont le
+    /// centre tombe dans la zone et qu'aucun visage de l'entrée ne recouvre (au moins 30 % en commun).
+    /// Cadres en fractions depuis le haut gauche. Avec une photo de référence, Fibo 2 peut y recopier
+    /// une personne de l'autre photo (une seconde tête, constaté le 29 octobre 2026 avec deux images).
+    static func visagesNouveaux(avant: [CGRect], apres: [CGRect], masque: [UInt8], largeur: Int, hauteur: Int) -> Int {
+        guard largeur > 0, hauteur > 0, masque.count == largeur * hauteur else { return 0 }
+        func recouvrement(_ a: CGRect, _ b: CGRect) -> Double {
+            let i = a.intersection(b)
+            guard !i.isNull, i.width > 0, i.height > 0 else { return 0 }
+            let commun = Double(i.width * i.height)
+            return commun / Double(a.width * a.height + b.width * b.height - i.width * i.height)
+        }
+        return apres.filter { visage in
+            let x = min(largeur - 1, max(0, Int(visage.midX * Double(largeur))))
+            let y = min(hauteur - 1, max(0, Int(visage.midY * Double(hauteur))))
+            guard masque[y * largeur + x] >= 128 else { return false }
+            return !avant.contains { recouvrement($0, visage) >= 0.3 }
+        }.count
     }
 
     // MARK: SeedVR2

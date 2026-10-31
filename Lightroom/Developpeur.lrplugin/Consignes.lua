@@ -47,6 +47,7 @@ generative_edit, puis les finitions sur la nouvelle photo, qui devient la photo 
 en anglais, sa traduction montrée à Dany (instruction_fr) ; plusieurs changements en un appel \
 (edits) ; l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region ; \
 une zone que Dany a peinte dans Lightroom : mask avec existing, son nom ; \
+le décor ou un vêtement d'une autre photo : reference (avec region ou mask) ; \
 la couleur d'un objet se change dans Lightroom par un masque, pas par generative_edit.
 - Peau : dosée comme le dit add_mask (effect « Peau du visage lisse » par défaut). Plus lisse \
 seulement si Dany le demande en mots (« lisse davantage la peau », « adoucis la peau ») ou si son \

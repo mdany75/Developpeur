@@ -215,6 +215,7 @@ final class GeneratifTests: XCTestCase {
           shift
         done
         [ -n "$mask" ] && cp "$mask" "\(g)/masque.png"
+        [ -n "$img" ] && cp "$img" "\(g)/entree-recue-$n.png"
         [ -n "$fiche" ] && cp "$fiche" "\(g)/fiche-recue-$n.json"
         # FIBO-vlm (le faux Python) : fini avant mflux, jamais vivant en même temps.
         if [ -f "\(g)/vlm-pid" ] && kill -0 "$(cat "\(g)/vlm-pid")" 2>/dev/null; then echo vivant > "\(g)/vlm-vivant-$n"; fi
@@ -419,7 +420,7 @@ final class GeneratifTests: XCTestCase {
         }
         XCTAssertEqual(outil["inputSchema"]?["required"], [], "instruction ou edits")
         let proprietes = try XCTUnwrap(outil["inputSchema"]?["properties"]?.object)
-        XCTAssertEqual(Set(proprietes.keys), ["photo_id", "instruction", "instruction_fr", "region", "label", "mask", "edits", "upscale", "quality",
+        XCTAssertEqual(Set(proprietes.keys), ["photo_id", "instruction", "instruction_fr", "region", "label", "mask", "edits", "reference", "upscale", "quality",
                                               "structured_prompt", "avoid", "guidance", "seed", "confirm", "reason"])
         XCTAssertEqual(proprietes["quality"]?["enum"], ["balanced", "normal", "fast"])
         XCTAssertTrue(proprietes["quality"]?["description"]?.string?.hasPrefix("balanced (défaut)") == true)
@@ -3123,5 +3124,184 @@ final class GeneratifTests: XCTestCase {
         guard let (image, _) = Generatif.lireImage(url), let pixels = Generatif.pixelsRGBA8(image, largeur: image.width, hauteur: image.height) else { return nil }
         let l = image.width
         return (l, image.height, { x, y in pixels[(y * l + x) * 4] })
+    }
+
+    // MARK: Photo de référence (30 octobre 2026)
+
+    /// La taille d'entraînement, comme mflux 0.24 (Fibo2EditImages.trained_size, valeurs relevées par
+    /// son vrai code le 31 octobre 2026), et stable pour son propre rapport.
+    func testTailleEntraineeCommeMflux() {
+        let attendues: [(Double, Int, Int)] = [(1, 1024, 1024), (1.5, 1248, 832), (2.0 / 3, 832, 1248), (288.0 / 400, 864, 1200),
+                                               (4, 2048, 512), (0.125, 368, 2944), (2247.0 / 1456, 1232, 800), (1.7777, 1392, 784)]
+        for (rapport, l, h) in attendues {
+            let t = Generatif.tailleEntrainee(rapport: rapport)
+            XCTAssertTrue(t == (l, h), "\(rapport) : \(t)")
+            let stable = Generatif.tailleEntrainee(rapport: Double(t.largeur) / Double(t.hauteur))
+            XCTAssertTrue(stable == t, "\(rapport) : \(stable)")
+        }
+        let cadre = Generatif.Pixels(x: 6, y: 0, largeur: 288, hauteur: 400)
+        XCTAssertTrue(Generatif.tailleAvecReference(cadre: cadre) == (864, 1200))
+    }
+
+    func testInstructionAvecReference() {
+        XCTAssertEqual(Generatif.instructionAvecReference("Replace the grey area of <image_1> with the beach of <image_2>"),
+                       "Replace the grey area of <image_1> with the beach of <image_2>", "déjà nommée")
+        XCTAssertEqual(Generatif.instructionAvecReference("replace the background with this beach"),
+                       "replace the background with this beach. Use <image_2> as the reference for this change.")
+        XCTAssertEqual(Generatif.instructionAvecReference("put on this coat. "), "put on this coat. Use <image_2> as the reference for this change.")
+    }
+
+    func testReferenceRefuseeAvantToutEnvoi() {
+        fauxMflux()
+        let zone: JSONValue = ["x": 0.1, "y": 0.1, "width": 0.3, "height": 0.3]
+        let cas: [([String: JSONValue], String)] = [
+            (["instruction": "x", "reference": ["photo_id": 12]], "sans zone"),
+            (["instruction": "x", "region": zone, "reference": 12], "un objet"),
+            (["instruction": "x", "region": zone, "reference": ["photo_id": 0]], "reference.photo_id"),
+            (["instruction": "x", "region": zone, "reference": ["photo": 12]], "photo_id et region seulement"),
+            (["instruction": "x", "region": zone, "reference": ["photo_id": 12, "region": "haut"]], "reference.region"),
+            (["instruction": "x", "region": zone, "reference": ["photo_id": 12, "region": ["x": 0.5, "y": 0, "width": 0.8, "height": 1]]], "« reference.region » : x, y, width et height"),
+            (["edits": [["instruction": "x", "instruction_fr": "x", "region": zone]], "reference": ["photo_id": 12]], "edits"),
+        ]
+        for (args, attendu) in cas {
+            let resultat = editer(args)
+            XCTAssertTrue(resultat.isError, "\(args)")
+            XCTAssertTrue(resultat.text.contains(attendu), resultat.text)
+        }
+        XCTAssertTrue(fake.commands.isEmpty, "\(fake.commands)")
+        XCTAssertEqual(appelsDeMflux, 0)
+    }
+
+    /// De bout en bout : la photo de référence rendue par apercu (lecture seule), en seconde image ; la
+    /// zone grisée dans l'entrée par le connecteur, jamais --mask-path ; l'entrée à la taille
+    /// d'entraînement ; sans fiche ; hors de la zone, les pixels au bit près.
+    func testPhotoDeReferenceDeBoutEnBout() throws {
+        fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 30, green: 160, blue: 220, width: 400, height: 300))),
+                                  "photo": ["id": 12, "fichier": "plage.jpg"]]
+        fauxMflux()
+        let region = CGRect(x: 0.05, y: 0.2, width: 0.3, height: 0.6)
+        let resultat = editer(["instruction": "replace the background with this beach", "instruction_fr": "mettre la plage de l'autre photo",
+                               "region": ["x": 0.05, "y": 0.2, "width": 0.3, "height": 0.6], "seed": 42,
+                               "reference": ["photo_id": 12, "region": ["x": 0, "y": 0, "width": 0.5, "height": 1]]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertEqual(fake.commands, ["etat", "apercu", "exporter", "importerGeneree"], "la référence avant l'exportation")
+        let apercu = try XCTUnwrap(fake.calls.first { $0.command == "apercu" }).params
+        XCTAssertEqual(apercu["photo"]?.int, 12)
+        XCTAssertEqual(apercu["taille"]?.int, 1536, "la moitié gauche garde toute la hauteur : 1 536 px suffisent")
+
+        let args = argumentsPasses
+        let i = try XCTUnwrap(args.firstIndex(of: "--image-paths"))
+        XCTAssertEqual(URL(fileURLWithPath: args[i + 1]).lastPathComponent, "entree-1.png")
+        XCTAssertEqual(URL(fileURLWithPath: args[i + 2]).lastPathComponent, "reference.png")
+        XCTAssertFalse(args.contains("--mask-path"), "mflux refuse un masque avec deux images")
+        XCTAssertNil(valeur("--prompt-file"), "pas de fiche avec une référence")
+        XCTAssertEqual(valeur("--prompt"), "replace the background with this beach. Use <image_2> as the reference for this change.")
+        let (cadre, _) = Generatif.recadrage(region, largeur: largeur, hauteur: hauteur)
+        let taille = Generatif.tailleAvecReference(cadre: cadre)
+        XCTAssertEqual(valeur("--width"), String(taille.largeur)); XCTAssertEqual(valeur("--height"), String(taille.hauteur))
+
+        // La sortie du faux mflux est son entrée : grisée dans la zone (128), intacte autour.
+        let reponse = try JSONCoding.parse(resultat.text)
+        XCTAssertEqual(reponse["reference"]?["photo_id"]?.int, 12)
+        XCTAssertEqual(reponse["reference"]?["fichier"]?.string, "plage.jpg")
+        XCTAssertEqual(reponse["reference"]?["largeur_px"]?.int, 200, "la moitié gauche de l'aperçu")
+        XCTAssertEqual(reponse["fiche_fibo_vlm"]?.bool, false)
+        XCTAssertTrue(reponse["remarque_fiche"]?.string?.contains("photo de référence") == true, resultat.text)
+        let modification = try XCTUnwrap(reponse["modifications"]?.array?.first)
+        XCTAssertNil(modification["a_verifier"], "aucun visage")
+        let avant = try XCTUnwrap(Self.pixels16(source)), apres = try XCTUnwrap(Self.pixels16(importe))
+        XCTAssertEqual(Self.pixel(apres, 500, 200), Self.pixel(avant, 500, 200), "hors du recadrage")
+        XCTAssertEqual(Self.pixel(apres, 270, 200), Self.pixel(avant, 270, 200), "hors de la zone")
+        XCTAssertNotEqual(Self.pixel(apres, 120, 200), Self.pixel(avant, 120, 200), "la zone, grisée")
+    }
+
+    /// Avec le masque de Lightroom : la zone du masque grisée dans l'entrée, toujours sans --mask-path.
+    func testPhotoDeReferenceAvecUnMasque() throws {
+        masqueRendu = { fx, _ in fx < 0.3 }
+        fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 30, green: 160, blue: 220)))]
+        fauxMflux()
+        let resultat = editer(["instruction": "Replace the grey area of <image_1> with the beach of <image_2>", "mask": ["kind": "background"],
+                               "reference": ["photo_id": 12]])
+        XCTAssertFalse(resultat.isError, resultat.text)
+        XCTAssertFalse(argumentsPasses.contains("--mask-path"))
+        XCTAssertEqual(valeur("--prompt"), "Replace the grey area of <image_1> with the beach of <image_2>")
+        let entree = try XCTUnwrap(Self.pixels8(gardes.appendingPathComponent("entree-recue-1.png")))
+        XCTAssertEqual(entree.valeur(2, entree.hauteur / 2), 128, "dans le masque, grisé")
+        XCTAssertNotEqual(entree.valeur(entree.largeur - 3, entree.hauteur / 2), 128, "hors du masque")
+    }
+
+    /// Une référence introuvable ou trop petite : refusée avant l'exportation, sans rien rendre ni lancer.
+    func testReferenceIllisibleRefuseeAvantLExportation() {
+        fauxMflux()
+        fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 30, green: 160, blue: 220, width: 400, height: 300)))]
+        let petite = editer(["instruction": "x", "region": ["x": 0.1, "y": 0.1, "width": 0.3, "height": 0.3],
+                             "reference": ["photo_id": 12, "region": ["x": 0.5, "y": 0.5, "width": 0.01, "height": 0.01]]])
+        XCTAssertTrue(petite.isError)
+        XCTAssertTrue(petite.text.contains("16 px au moins"), petite.text)
+        XCTAssertEqual(fake.commands, ["etat", "apercu"], "ni exportation, ni masque")
+        XCTAssertEqual(appelsDeMflux, 0)
+        fake.errors["apercu"] = LightroomError.plugin("Photo introuvable : 999999.")
+        let introuvable = editer(["instruction": "x", "mask": ["kind": "background"], "reference": ["photo_id": 999999]])
+        XCTAssertTrue(introuvable.isError)
+        XCTAssertFalse(fake.commands.contains("exporter"), "\(fake.commands)")
+        XCTAssertFalse(fake.commands.contains("essayer"), "\(fake.commands)")
+    }
+
+    func testImageEtTailleDeLaReference() throws {
+        let grand = try XCTUnwrap(PreviewImages.image(TestSupport.jpeg(red: 200, green: 100, blue: 50, width: 3000, height: 2000)))
+        let entiere = try XCTUnwrap(Generatif.imageReference(grand, region: nil))
+        XCTAssertEqual(entiere.width, 1536); XCTAssertEqual(entiere.height, 1024)
+        let partie = try XCTUnwrap(Generatif.imageReference(grand, region: CGRect(x: 0.9, y: 0, width: 0.1, height: 0.5)))
+        XCTAssertEqual(partie.width, 300); XCTAssertEqual(partie.height, 1000, "au bord droit, dans l'image")
+        XCTAssertNil(Generatif.imageReference(grand, region: CGRect(x: 0, y: 0, width: 0.004, height: 0.5)), "moins de 16 px")
+        XCTAssertNil(Generatif.imageReference(grand, region: CGRect(x: 0, y: 0, width: 1, height: 0.05)), "3 000 × 100 : plus de 8:1")
+        XCTAssertEqual(Generatif.tailleApercuReference(region: nil), 1536)
+        XCTAssertEqual(Generatif.tailleApercuReference(region: CGRect(x: 0, y: 0, width: 0.5, height: 0.25)), 3072)
+        XCTAssertEqual(Generatif.tailleApercuReference(region: CGRect(x: 0, y: 0, width: 0.1, height: 0.1)), 4096, "borne de rendre")
+        XCTAssertEqual(Generatif.tailleApercuReference(region: CGRect(x: 0, y: 0, width: 1, height: 1)), 1536)
+    }
+
+    func testReferenceDansLeSchema() throws {
+        let outil = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "generative_edit" })
+        XCTAssertTrue(outil["description"]?.string?.contains("reference") == true)
+        let reference = try XCTUnwrap(outil["inputSchema"]?["properties"]?["reference"])
+        XCTAssertEqual(reference["required"], ["photo_id"])
+        XCTAssertEqual(Set(reference["properties"]?.object?.keys.map { $0 } ?? []), ["photo_id", "region"])
+        XCTAssertEqual(reference["properties"]?["region"]?["required"], ["x", "y", "width", "height"])
+        XCTAssertTrue(reference["description"]?.string?.contains("<image_2>") == true)
+    }
+
+    func testVisagesNouveauxDansLaZone() {
+        var masque = [UInt8](repeating: 0, count: 100 * 100)
+        for y in 0..<100 { for x in 0..<50 { masque[y * 100 + x] = 255 } }
+        let ancien = CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2)
+        let horsZone = CGRect(x: 0.7, y: 0.1, width: 0.2, height: 0.2)
+        let nouveau = CGRect(x: 0.1, y: 0.6, width: 0.2, height: 0.2)
+        XCTAssertEqual(Generatif.visagesNouveaux(avant: [ancien], apres: [ancien.offsetBy(dx: 0.01, dy: 0), horsZone, nouveau],
+                                                 masque: masque, largeur: 100, hauteur: 100), 1, "seul le visage nouveau dans la zone")
+        XCTAssertEqual(Generatif.visagesNouveaux(avant: [], apres: [horsZone], masque: masque, largeur: 100, hauteur: 100), 0)
+        XCTAssertEqual(Generatif.visagesNouveaux(avant: [], apres: [nouveau], masque: [], largeur: 100, hauteur: 100), 0, "masque invalide")
+        // Orientation : la moitié haute dans la zone (y depuis le haut).
+        var haut = [UInt8](repeating: 0, count: 100 * 100)
+        for y in 0..<50 { for x in 0..<100 { haut[y * 100 + x] = 255 } }
+        XCTAssertEqual(Generatif.visagesNouveaux(avant: [], apres: [ancien, nouveau], masque: haut, largeur: 100, hauteur: 100), 1, "seul celui du haut")
+        // Seuil de 30 % en commun : 0,25 compte comme nouveau, 0,35 non.
+        let a = CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2)
+        func decale(_ iou: Double) -> CGRect {
+            // Deux carrés de côté 0,2 décalés en x de d : IoU = (0,2 − d) / (0,2 + d).
+            let d = 0.2 * (1 - iou) / (1 + iou)
+            return a.offsetBy(dx: d, dy: 0)
+        }
+        XCTAssertEqual(Generatif.visagesNouveaux(avant: [a], apres: [decale(0.25)], masque: masque, largeur: 100, hauteur: 100), 1)
+        XCTAssertEqual(Generatif.visagesNouveaux(avant: [a], apres: [decale(0.35)], masque: masque, largeur: 100, hauteur: 100), 0)
+    }
+
+    func testArgumentsAvecReference() {
+        let e = URL(fileURLWithPath: "/tmp/e.png"), r = URL(fileURLWithPath: "/tmp/r.png"), m = URL(fileURLWithPath: "/tmp/m.png")
+        let args = Generatif.arguments(entree: e, masque: m, instruction: "x", taille: (864, 1200), qualite: .fast, graine: 1,
+                                       sortie: URL(fileURLWithPath: "/tmp/s.png"), modeleRapide: nil, reference: r)
+        XCTAssertEqual(Array(args.prefix(5)), ["--prompt", "x", "--image-paths", "/tmp/e.png", "/tmp/r.png"])
+        XCTAssertFalse(args.contains("--mask-path"))
+        XCTAssertTrue(args.contains("--low-ram"))
     }
 }

@@ -256,7 +256,7 @@ extension ToolHandler {
                                 zone, required: [])
         return [
             tool("generative_edit",
-                 "Retouche générative par Fibo 2, sur ce Mac : seulement sur demande explicite de l'utilisateur, jamais d'initiative, pour ce que Lightroom ne sait pas faire (changer un vêtement, ajouter, retirer ou changer un objet ; la seule couleur d'un objet : add_mask). D'abord les corrections de base (profil, balance, exposition), puis generative_edit, puis les finitions (apply_settings, add_mask…) sur la nouvelle photo, par son id. instruction : en anglais, précise (ce qui change et ce qui reste : pose, lumière, reste du corps) ; instruction_fr : sa traduction, pour l'utilisateur ; region : la zone, au plus juste (le reste garde ses pixels). Changer l'arrière-plan, le ciel, une personne, ou la zone que l'utilisateur a peinte : mask plutôt que region. Plusieurs changements : edits (4 au plus, une region chacune, sans chevauchement), une seule nouvelle photo. Le résultat entre au catalogue en TIFF, empilé sur l'original (intact), devient la photo active ; undo_last ne le retire pas. Quelques minutes par modification (« pas fini » : rappeler à l'identique). Vérifier avec view_photo. Mode « Proposer d'abord » : décrire, attendre l'accord, puis confirm = true.",
+                 "Retouche générative par Fibo 2, sur ce Mac : seulement sur demande explicite de l'utilisateur, jamais d'initiative, pour ce que Lightroom ne sait pas faire (changer un vêtement, ajouter, retirer ou changer un objet ; la seule couleur d'un objet : add_mask). D'abord les corrections de base (profil, balance, exposition), puis generative_edit, puis les finitions (apply_settings, add_mask…) sur la nouvelle photo, par son id. instruction : en anglais, précise (ce qui change et ce qui reste : pose, lumière, reste du corps) ; instruction_fr : sa traduction, pour l'utilisateur ; region : la zone, au plus juste (le reste garde ses pixels). Changer l'arrière-plan, le ciel, une personne, ou la zone que l'utilisateur a peinte : mask plutôt que region. D'après une autre photo : reference. Plusieurs changements : edits (4 au plus, une region chacune, sans chevauchement), une seule nouvelle photo. Le résultat entre au catalogue en TIFF, empilé sur l'original (intact), devient la photo active ; undo_last ne le retire pas. Quelques minutes par modification (« pas fini » : rappeler à l'identique). Vérifier avec view_photo. Mode « Proposer d'abord » : décrire, attendre l'accord, puis confirm = true.",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("instruction", instruction),
@@ -268,6 +268,13 @@ extension ToolHandler {
                                "description": "Plusieurs modifications en un appel (à la place de instruction, instruction_fr, region) : chacune avec sa region, sans chevauchement ; deux zones qui se touchent ou presque : deux appels, le second sur la nouvelle photo.",
                                "items": objectProp("Une modification.", ["label": label, "instruction": instruction, "instruction_fr": francais, "region": region],
                                                    required: ["instruction", "instruction_fr", "region"])]),
+                    ("reference", objectProp("Une photo du catalogue qui sert de modèle (« mets le fond de cette photo-là », « ce manteau-là ») : Fibo 2 la reçoit en seconde image ; l'instruction la nomme <image_2> (la photo à changer : <image_1>, grisée dans la zone) : « Replace the grey area of <image_1> with the beach of <image_2>, keep the person unchanged ». Exige region ou mask (seule la zone change) ; une seule modification, sans edits ; pas de fiche de FIBO-vlm. Un visage qui apparaît dans la zone est signalé (a_verifier).",
+                                             ["photo_id": prop("integer", "L'identifiant de la photo de référence (find_photos, list_selection)."),
+                                              "region": objectProp("Facultative : la partie de la photo de référence à reprendre (le vêtement, le décor), de 0 à 1 dans l'image que montre view_photo pour elle.",
+                                                                   ["x": prop("number", "Bord gauche, de 0 à 1."), "y": prop("number", "Bord haut, de 0 à 1."),
+                                                                    "width": prop("number", "Largeur, de 0 à 1."), "height": prop("number", "Hauteur, de 0 à 1.")],
+                                                                   required: ["x", "y", "width", "height"])],
+                                             required: ["photo_id"])),
                     ("upscale", prop("boolean", "Vrai par défaut : une zone que Fibo 2 rend plus petite que sa taille dans la photo passe par SeedVR2 (plus de détail) ; faux : mise à la taille ordinaire.")),
                     ("quality", enumProp(["balanced", "normal", "fast"], "balanced (défaut) : \(Generatif.etapesEquilibre) étapes, guidage sur 60 % d'entre elles, à peu près le rendu de normal en deux fois moins de temps ; normal : \(Generatif.etapesNormal) étapes ; fast : Turbo, \(Generatif.etapesRapide) étapes, sans guidage, plus rapide et moins fidèle.")),
                     ("structured_prompt", prop("boolean", "Vrai par défaut : FIBO-vlm rédige sur ce Mac, avant Fibo 2, une fiche détaillée (environ 16 Go et 35 à 60 s mesurés) ; faux : la phrase seule.")),
@@ -310,6 +317,8 @@ extension ToolHandler {
         var remarqueFiche: String?
         /// La phrase d'exclusion passée à mflux (nil en Turbo).
         var exclusion: String?
+        /// Les visages apparus dans la zone avec une photo de référence (`Generatif.visagesNouveaux`).
+        var visagesNouveaux = 0
         /// Une zone donnée : region, ou le masque de Lightroom.
         var avecZone: Bool { modif.region != nil || avecMasque }
     }
@@ -340,7 +349,13 @@ extension ToolHandler {
         guard let fibo else {
             throw LightroomError.invalid("Fibo 2 n'est pas configuré dans ce serveur : rien n'a été fait.")
         }
-        let modifications = try Generatif.modifications(args.raw)
+        var modifications = try Generatif.modifications(args.raw)
+        // La photo de référence (reference) : une seule modification, avec une zone ; l'instruction la
+        // nomme (<image_2>), sinon une phrase la nomme.
+        let reference = try Generatif.reference(args.raw)
+        if reference != nil {
+            modifications[0].instruction = Generatif.instructionAvecReference(modifications[0].instruction)
+        }
         // Le masque de Lightroom (mask) : validé ici, avant tout envoi, comme un masque d'add_mask ; ou
         // un masque déjà sur la photo, par son nom (mask.existing : celui que l'utilisateur a peint).
         var masqueLR: MasqueLightroom?
@@ -415,6 +430,30 @@ extension ToolHandler {
             masqueLR = masque
         }
 
+        // La photo de référence, rendue par la commande apercu (lecture seule : rien n'est écrit, aucun
+        // accord), avant l'exportation : une référence introuvable, illisible, trop petite ou trop
+        // allongée est refusée avant tout envoi. Avec une region, rendue assez grande pour que la partie
+        // gardée fasse environ coteReference ; écrite en PNG une fois le dossier de l'appel créé.
+        var imageReference: CGImage?
+        var descriptionReference: [String: JSONValue]?
+        if let ref = reference {
+            let rendu = try lightroom.send("apercu", ["photo": .number(Double(ref.photo)), "taille": .number(Double(Generatif.tailleApercuReference(region: ref.region))),
+                                                      "cles": []], timeout: 120)
+            let donnees = try Self.readPreview(rendu["chemin"]?.string)
+            guard let apercu = PreviewImages.image(donnees), let image = Generatif.imageReference(apercu, region: ref.region) else {
+                throw LightroomError.invalid("La photo de référence \(ref.photo) est illisible\(ref.region == nil ? "" : ", ou sa region trop petite (16 px au moins) ou trop allongée (8:1 au plus)") : rien n'a été fait.")
+            }
+            imageReference = image
+            var decrite: [String: JSONValue] = ["photo_id": .number(Double(ref.photo)), "largeur_px": .number(Double(image.width)),
+                                                "hauteur_px": .number(Double(image.height))]
+            if let fichierRef = rendu["photo"]?["fichier"] { decrite["fichier"] = fichierRef }
+            if let r = ref.region {
+                decrite["region"] = ["x": .number(r.minX), "y": .number(r.minY), "width": .number(r.width), "height": .number(r.height)]
+            }
+            descriptionReference = decrite
+            try contexte.verifier()
+        }
+
         let dossier = fibo.dossierTemporaire.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dossier, withIntermediateDirectories: true)
         travailFibo.commencer(dossier: dossier)
@@ -444,7 +483,10 @@ extension ToolHandler {
         let consigne = Generatif.consigneJournal(modifications, raison: Self.raison(args))
         // La fiche de FIBO-vlm : demandée (structured_prompt, vrai par défaut) et possible sur ce Mac ;
         // sinon la phrase seule, et la réponse dit pourquoi.
-        let raisonSansFiche = reglages.fiche ? fibo.raisonSansFiche() : nil
+        // Avec une photo de référence, jamais : FIBO-vlm ne voit qu'une image (il décrirait la photo
+        // sans la référence, et la fiche l'emporterait sur l'instruction qui la nomme).
+        let raisonSansFiche = reglages.fiche
+            ? (reference != nil ? "photo de référence : FIBO-vlm ne voit qu'une image" : fibo.raisonSansFiche()) : nil
         let avecFiche = reglages.fiche && raisonSansFiche == nil
         var barre = BarreFibo(handler: self, avancement: Generatif.Avancement(seedVR: modifications.map { _ in false },
                                                                                 fiche: modifications.map { _ in avecFiche }),
@@ -503,12 +545,23 @@ extension ToolHandler {
             masqueLR = masque
         }
 
+        // La seconde image de Fibo (<image_2>), dans le dossier de l'appel.
+        var cheminReference: URL?
+        if let image = imageReference {
+            let url = dossier.appendingPathComponent("reference.png")
+            try Generatif.ecrirePNG(image, vers: url)
+            cheminReference = url
+        }
+
         // 2. Le recadrage et la taille de l'entrée de chaque modification ; SeedVR2 prévu ou non.
         let seedVRPresent = FileManager.default.isExecutableFile(atPath: fibo.seedVR.path)
         var passages: [Passage] = modifications.map { modif in
-            let cadre: Generatif.Pixels, taille: (largeur: Int, hauteur: Int), regionCadre: CGRect?
+            let cadre: Generatif.Pixels, regionCadre: CGRect?
+            var taille: (largeur: Int, hauteur: Int)
             if let region = modif.region ?? masqueLR?.cadre {
                 (cadre, taille) = Generatif.recadrage(region, largeur: origine.width, hauteur: origine.height)
+                // Deux images : mflux met la première à sa taille d'entraînement ; elle y est déjà.
+                if reference != nil { taille = Generatif.tailleAvecReference(cadre: cadre) }
                 regionCadre = Generatif.regionDansRecadrage(region, cadre: cadre, largeur: origine.width, hauteur: origine.height)
             } else {
                 cadre = Generatif.Pixels(x: 0, y: 0, largeur: origine.width, hauteur: origine.height)
@@ -564,6 +617,15 @@ extension ToolHandler {
                 try Generatif.ecrirePNG(image, vers: cheminMasque!)
                 masqueFibo = masque
             }
+            // Avec une photo de référence, l'entrée de Fibo est grisée dans la zone par le connecteur,
+            // exactement comme mflux le fait avec --mask-path, qu'il refuse avec deux images. La zone
+            // changée se mesure toujours contre l'entrée non grisée.
+            if cheminReference != nil, let masque = masqueFibo {
+                guard let grisee = Generatif.image8(Generatif.griser(entree, masque: masque), largeur: taille.largeur, hauteur: taille.hauteur) else {
+                    throw LightroomError.plugin("Entrée de Fibo 2 impossible à préparer. Rien n'a été fait.")
+                }
+                try Generatif.ecrirePNG(grisee, vers: cheminEntree)
+            }
             // La fiche de FIBO-vlm, avant mflux : son processus est fini (ou arrêté) quand mflux part.
             var cheminFiche: URL?
             if let scriptFiche {
@@ -585,7 +647,7 @@ extension ToolHandler {
             func argumentsFibo(fiche: URL?) -> [String] {
                 Generatif.arguments(entree: cheminEntree, masque: cheminMasque, instruction: passage.modif.instruction, taille: taille,
                                     qualite: qualite, graine: graine, sortie: cheminSortie, modeleRapide: modeleRapide,
-                                    fiche: fiche, exclusion: exclusion, guidage: reglages.guidage)
+                                    fiche: fiche, exclusion: exclusion, guidage: reglages.guidage, reference: cheminReference)
             }
             var arguments = argumentsFibo(fiche: cheminFiche)
             let avant = Set((try? FileManager.default.contentsOfDirectory(atPath: dossier.path)) ?? [])
@@ -646,6 +708,13 @@ extension ToolHandler {
             let changee = Generatif.zoneChangee(entree: entree, sortie: sortie, largeur: taille.largeur, hauteur: taille.hauteur,
                                                 region: passage.regionCadre, borne: borne)
             let partCadre = Generatif.part(changee)
+            // Une personne de la photo de référence recopiée dans la zone : un visage nouveau, signalé
+            // (jamais refusé : un vêtement porté ou un décor peuplé en montrent à bon droit).
+            if cheminReference != nil, let masque = masqueFibo {
+                let avant = Teint.visages(imageEntree)
+                passage.visagesNouveaux = Generatif.visagesNouveaux(avant: avant, apres: Teint.visages(generee), masque: masque,
+                                                                    largeur: taille.largeur, hauteur: taille.hauteur)
+            }
             passage.partChangee = partCadre * Double(passage.cadre.largeur * passage.cadre.hauteur) / Double(origine.width * origine.height)
             if partCadre >= Generatif.partMinimale {
                 // La zone de mélange : avec un masque de Lightroom, son opacité en pleine résolution,
@@ -759,6 +828,7 @@ extension ToolHandler {
         if let remarque = reglages.remarque { resultat["remarque_guidage"] = .string(remarque) }
         if let raison = raisonSansFiche { resultat["remarque_fiche"] = .string("Pas de fiche de FIBO-vlm (\(raison)) : Fibo 2 a reçu la phrase seule.") }
         if let masque = masqueLR { resultat["masque"] = Self.decrire(masque) }
+        if let decrite = descriptionReference { resultat["reference"] = .object(decrite) }
         if let remarque = barre.lightroomMuet { resultat["remarque_lightroom"] = .string(remarque) }
         let sansChangement = passages.filter { $0.piece == nil }.map(\.modif.label)
         if !sansChangement.isEmpty {
@@ -955,6 +1025,9 @@ extension ToolHandler {
         if let remarque = passage.remarqueFiche { objet["remarque_fiche"] = .string(remarque) }
         if let exclusion = passage.exclusion { objet["exclusion"] = .string(exclusion) }
         if let remarque = passage.remarqueSeedVR { objet["remarque_seedvr2"] = .string(remarque) }
+        if passage.visagesNouveaux > 0, passage.piece != nil {
+            objet["a_verifier"] = .string("\(passage.visagesNouveaux == 1 ? "Un visage est apparu" : "\(passage.visagesNouveaux) visages sont apparus") dans la zone, peut-être recopié de la photo de référence : le regarder (view_photo avec region), et le dire à l'utilisateur.")
+        }
         if passage.piece == nil { objet["remarque"] = .string("Fibo 2 n'a rien changé de visible ici : rien n'en est repris.") }
         return .object(objet)
     }
