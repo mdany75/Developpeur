@@ -8634,9 +8634,13 @@ qu'aucun visage de l'entrée ne recouvre à 30 % (`Generatif.visagesNouveaux`, `
 `a_verifier` dans la modification, jamais un refus. Réponse : `reference` (`photo_id`, `fichier`,
 `largeur_px`, `hauteur_px`, `region`).
 
-Reste à constater : le rendu d'une vraie photo de référence (décor, vêtement), l'alignement de la
-sortie sur l'entrée avec deux images, une seconde tête ou une personne recopiée, et la durée (deux
-images à encoder).
+Constaté le 31 octobre 2026 (essai réel en Turbo, nouvelle copie d'essai de DSCF2402.RAF, masque
+de l'arrière-plan, référence la copie d'essai de la dune DSCF1595, graine 42) : 55 s en tout, dont
+36 s de Fibo 2 ; entrée 1 248 × 832, sortie alignée sur elle (la femme au même endroit, intacte) ;
+le décor de la dune repris en entier (ciel, arbres, sable, voiture téléguidée, et le petit
+personnage au loin, recopié lui aussi : trop petit pour un visage) ; aucune seconde tête ; bord des
+cheveux doux. Reste à constater : hors Turbo (exclusion et guidage), un vêtement, une personne
+recopiée assez grande pour `a_verifier`.
 
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 

@@ -771,8 +771,13 @@ Le README pointe vers `https://github.com/mdany75/Developpeur/releases/latest/do
   masque ; l'instruction la nomme `<image_2>` (sinon « Use <image_2> as the reference for this
   change. » ajouté, `instructionAvecReference`) ; jamais de fiche de FIBO-vlm (il ne voit qu'une
   image) ; un visage nouveau dans la zone (`Generatif.visagesNouveaux`, `Teint.visages`) fait un
-  `a_verifier`, jamais un refus ; réponse `reference`. Reste à constater : le rendu sur de vraies
-  photos, l'alignement de la sortie avec deux images, une personne recopiée, la durée.
+  `a_verifier`, jamais un refus ; réponse `reference`. **Constaté le 31 octobre 2026** (essai réel en
+  Turbo, nouvelle copie d'essai 53796103 de DSCF2402.RAF, `mask` `background`, référence la dune
+  53709786, graine 42) : réussi en 55 s, dont 36 s de Fibo 2 ; entrée 1 248 × 832 (taille
+  d'entraînement), sortie alignée sur l'entrée, la femme intacte, le décor de la dune repris (ciel,
+  arbres, sable, voiture téléguidée et le petit personnage au loin), aucune seconde tête, bord des
+  cheveux doux ; 73,7 % changés ; essai défait (photo retirée, TIFF à la Corbeille). Reste à
+  constater : hors Turbo, un vêtement, une personne recopiée assez grande pour `a_verifier`.
 - La suppression des reflets (`Suppression.lua`, commande `supprimer`) suit le même chemin que le
   débruitage (photo affichée, hors de `withWriteAccessDo`, un seul traitement à la fois) ; l'état
   d'avant va dans la mémoire sous la clé `Suppression`, qui n'est jamais un réglage (la simulation
