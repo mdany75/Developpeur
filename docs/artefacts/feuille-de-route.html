@@ -61,86 +61,94 @@
   .ecartee:first-child { border-top: 0; }
   .ecartee b { font-weight: 600; }
   .ecartee p { margin: 0; font-size: 14px; color: var(--gris); }
-  .pied { margin-top: 30px; font-size: 13px; color: var(--gris); max-width: 72ch; }
-  @media (max-width: 520px) { h1 { font-size: 25px; } }
-</style>
-
-<main class="page">
+  .livre { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; }
+  .livre ul { <main class="page">
   <header class="entete">
     <h1>Feuille de route de Développeur</h1>
-    <p class="sous">Les améliorations que je te suggère après la comparaison avec lightroom-mcp et une relecture des chantiers ouverts. Chacune a été évaluée dans le code le 1<sup>er</sup> novembre 2026 : ce qui existe déjà, ce qu'il faut construire, la taille et le risque.</p>
-    <div class="encadre fait"><p><b>Fait la nuit du 1<sup>er</sup> novembre 2026 :</b> les étapes 1, 2 et 3, réunies dans la <b>version 1.5</b> (une seule version plutôt que 1.5 puis 1.6 : une seule recette, un seul essai réel). Elle est publiée le matin même (tag v1.5, Release GitHub), après la recette et un essai réussi dans la fenêtre Claude. L'essai de l'étape 1 a confirmé le risque : une plage de couleurs à deux prélèvements fait planter Lightroom 15.6 ; un seul prélèvement par plage depuis. Reste l'étape 4.</p></div>
-    <div class="encadre"><p><b>En résumé :</b> d'abord ranger le dépôt et vérifier un risque, puis publier la retouche générative avec son annulation, puis deux petits ajouts utiles. Le reste attend une vraie raison. Trois idées de lightroom-mcp sont écartées : Développeur fait déjà mieux.</p></div>
+    <p class="sous">Ce qui vient après la version 1.5, dans l'ordre où le faire. Mise à jour le 1<sup>er</sup> novembre 2026, d'après la nuit de travail sur la 1.5, la comparaison avec lightroom-mcp et la page <a href="https://claude.ai/artifact/9kQ7kKQk5VuXrrAWFrvVKS">Analyse du Développeur</a>. Chaque chantier est vérifié dans le code : ce qui existe déjà, ce qu'il faut construire, la taille et le risque.</p>
+    <div class="encadre"><p><b>En résumé :</b> un petit correctif 1.5.1 pour trois défauts trouvés en chemin, puis les constats de Fibo 2 qui manquent, puis la 1.6 avec les garde-fous que l'Analyse jugeait les plus utiles. Le reste attend une vraie raison.</p></div>
   </header>
 
   <div class="etapes">
 
     <section class="etape">
-      <div class="etape-tete"><span class="num">1</span><h2>Ranger et vérifier</h2><span class="quand">tout de suite, sans nouvelle version</span></div>
+      <div class="etape-tete"><h2>Livré dans la 1.5</h2><span class="quand">publiée le 1<sup>er</sup> novembre 2026 au matin (tag v1.5)</span></div>
+      <div class="livre">
+        <ul>
+          <li><span class="coche">✓</span> <b>Retouche générative par Fibo 2</b>, en local (<code>generative_edit</code>, le 36<sup>e</sup> outil). Qualité équilibrée constatée : environ 5 minutes et 12 Go de mémoire pour une voiture changée de couleur.</li>
+          <li><span class="coche">✓</span> <b>« Défais ça » retire la photo de Fibo 2</b> : <code>undo_last</code> défait les finitions, puis retire la nouvelle photo du catalogue et met son fichier à la Corbeille. Constaté dans Lightroom.</li>
+          <li><span class="coche">✓</span> <b>Voir avant de copier</b> : <code>copy_settings</code> avec <code>plan</code> montre ce qui changerait sur chaque photo, sans rien écrire.</li>
+          <li><span class="coche">✓</span> <b>Chercher par focale</b> dans <code>find_photos</code>.</li>
+          <li><span class="coche">✓</span> <b>Avertissement de version</b> : <code>get_status</code> et <code>add_mask</code> le disent quand Lightroom n'est plus la 15.6, où les formes des masques ont été relevées.</li>
+          <li><span class="coche">✓</span> <b>Une couleur par plage</b> : deux prélèvements dans une même plage font planter Lightroom 15.6 (constaté, catalogue sauvegardé avant). Une autre couleur passe par une seconde plage dans le même masque.</li>
+          <li><span class="coche">✓</span> Les règles du projet rangées dans <code>docs/regles/</code>, vérifiées règle par règle, et les deux skills du projet entrés dans git.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="etape">
+      <div class="etape-tete"><span class="num">1</span><h2>Correctif 1.5.1 : trois défauts trouvés en chemin</h2><span class="quand">tout de suite</span></div>
       <div class="chantiers">
         <article class="chantier">
-          <h3>Commiter les règles réorganisées</h3>
+          <h3>Les consignes citent un paramètre qui n'existe pas</h3>
           <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Les trois CLAUDE.md allégés et 19 fichiers de <code>docs/regles/</code> ne sont pas dans git, alors que le CLAUDE.md déjà poussé y renvoie. Une nouvelle session sur un autre Mac ne trouverait pas ces règles. À faire avant la prochaine version, qui les prendrait sinon sans relecture.</p>
-          <p class="deja">Travail : vérifier qu'aucune règle retirée ne s'est perdue, surtout celles que vérifient des tests, puis commiter. Aucun code. Ces changements étaient en cours avant cette session : à confirmer avec toi avant de les commiter.</p>
+          <p>Les consignes du connecteur disent « preview_settings, preview = true ». Or <code>preview_settings</code> n'a pas de paramètre <code>preview</code> : un Claude qui suit la consigne en mode « Proposer d'abord » se fait refuser l'appel. La page Analyse l'avait signalé le 27 octobre ; c'est toujours là.</p>
+          <p class="deja">Travail : corriger la phrase de <code>ServerInfo.swift</code>, et un test qui vérifie que chaque paramètre cité dans les consignes existe dans l'outil nommé. Les consignes sont presque pleines : la phrase doit rester aussi courte.</p>
         </article>
         <article class="chantier">
-          <h3>Vérifier les plages de couleur à plusieurs prélèvements</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Le code de lightroom-mcp dit qu'une plage de couleur à deux prélèvements fait planter Lightroom 15.6, et le catalogue à sa réouverture. Développeur en accepte jusqu'à 5. Aucun constat de Développeur ne porte sur plus d'un prélèvement.</p>
-          <p class="deja">Travail : sur ton ordre, un essai sur une copie d'Essais, catalogue sauvegardé (un masque couleur à deux prélèvements, puis quitter et rouvrir Lightroom). S'il plante : un seul prélèvement par masque, règle dans la simulation et test, comme pour tout constat.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="etape">
-      <div class="etape-tete"><span class="num">2</span><h2>Version 1.5 : la retouche générative</h2><span class="quand">la prochaine version</span></div>
-      <div class="chantiers">
-        <article class="chantier">
-          <h3>Publier <code>generative_edit</code> (Fibo 2)</h3>
-          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 5/5</span></div>
-          <p>Changer un vêtement, un objet ou un fond, en local sur ton Mac, deviendrait une vraie version installée par l'archive notarisée. C'est la plus grosse fonction en attente : déjà finie, documentée et essayée le 29 octobre.</p>
-          <p class="deja">Reste : l'essai en qualité équilibrée que demande le CHANGELOG, puis la procédure de publication (numéro aux trois endroits, build notarisé, recette sur Essais, demande dans la fenêtre Claude, tag, Release, page Analyse).</p>
+          <h3>Fibo 2 : changer un objet entier avec un masque d'objet</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Cette nuit, la zone rectangulaire était plus étroite que la voiture : un bout est resté orange. <code>generative_edit</code> accepte déjà un masque de Lightroom comme zone, objet compris (<code>mask</code> avec <code>kind: object</code> et son cadre) : Lightroom trouve tout l'objet, et Fibo 2 change l'objet entier.</p>
+          <p class="deja">Travail : un essai réel sur une copie d'Essais (même voiture, masque d'objet), puis une phrase dans la description de l'outil (« un objet : mask kind object plutôt que region »), qui est à sa limite de 1 200 caractères.</p>
         </article>
         <article class="chantier">
-          <h3><code>undo_last</code> retire aussi la photo créée par Fibo 2</h3>
-          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Si la retouche générative ne plaît pas (une seconde tête est apparue à l'essai), « défais ça » suffirait. Aujourd'hui, il faut aller dans Photo › Retirer du catalogue, à la main.</p>
-          <p class="deja">Déjà là : le retrait sûr d'une photo réimportée, constaté sans fenêtre en 0,5 s, et la liste des photos importées dans la session. Le TIFF irait à la Corbeille, jamais effacé, et l'original redeviendrait la photo active. Peut aussi suivre en 1.5.1.</p>
-        </article>
-        <article class="chantier">
-          <h3>Premiers constats de Fibo 2 pendant l'essai</h3>
-          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Pendant l'essai de la 1.5, mesurer de quoi régler le seuil de la zone changée (0,10, provisoire), les durées et la mémoire. Claude annoncerait des durées justes, et la zone recollée serait juste sur d'autres photos que celle de l'essai.</p>
-          <p class="deja">Chaque constat va dans <code>docs/SPEC.md</code>, avec sa règle dans la simulation et un test.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="etape">
-      <div class="etape-tete"><span class="num">3</span><h2>Version 1.6 : deux petits ajouts</h2><span class="quand">après la 1.5</span></div>
-      <div class="chantiers">
-        <article class="chantier">
-          <h3>Voir avant de copier une retouche sur une série</h3>
-          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Avant de copier une retouche sur toute une sortie, tu verrais pour chaque photo les réglages qui bougeraient, de quelle valeur à quelle valeur, et ce que Lightroom recalculera lui-même (masques IA, Upright, profil adaptatif). Aucune photo n'est touchée tant que tu n'as pas dit oui. C'est le seul outil de série qui écrit aujourd'hui sans rien montrer avant.</p>
-          <p class="deja">Déjà là : le module prépare ce plan avant chaque copie (<code>Plans.lua</code>). Il suffit de le renvoyer au lieu de l'écrire. Idée reprise de leur <code>dry_run</code>.</p>
-        </article>
-        <article class="chantier">
-          <h3>Chercher par focale</h3>
+          <h3>Le titre de la fenêtre dans CLAUDE.md</h3>
           <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 2/5</span></div>
-          <p>« Mes photos au 56 mm », « tout ce que j'ai pris au grand-angle ». Tu peux déjà chercher par dossier, appareil, objectif, ISO et dates.</p>
-          <p class="deja">Travail : deux paramètres de plus dans <code>find_photos</code>, en lecture seule, sur la lecture groupée qui existe déjà.</p>
-        </article>
-        <article class="chantier">
-          <h3>Avertir quand Lightroom change de version</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Les formes des dégradés et des pinceaux ont été relevées dans Lightroom 15.6. Si une mise à jour change ce format, <code>get_status</code> et <code>add_mask</code> le diraient, au lieu de poser en silence un éclaircissement au mauvais endroit.</p>
-          <p class="deja">C'est la forme légère de leur écriture gardée des masques. La forme complète vient plus bas.</p>
+          <p><code>CLAUDE.md</code> dit que la barre de titre affiche « Développeur v1.4 ». Elle affiche le numéro installé (« Développeur v1.5 » ce matin) : la règle doit le dire sans numéro.</p>
+          <p class="deja">Documentation seulement.</p>
         </article>
       </div>
     </section>
-
+    <section class="etape">
+      <div class="etape-tete"><span class="num">2</span><h2>Constats de Fibo 2 qui manquent</h2><span class="quand">à l'usage, sur des copies d'Essais</span></div>
+      <div class="chantiers">
+        <article class="chantier">
+          <h3>La liste à éviter et le guidage</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Leur effet propre n'est pas encore mesuré. La seule façon de le juger : refaire la même modification à la même graine, en changeant un seul réglage, et comparer.</p>
+          <p class="deja">Trois ou quatre essais en qualité équilibrée (5 minutes chacun), chaque constat dans <code>docs/SPEC.md</code> avec sa règle dans la simulation.</p>
+        </article>
+        <article class="chantier">
+          <h3>Le seuil de la zone changée, sur d'autres photos</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Le seuil qui décide quelle zone revient dans la photo (0,10) n'a été vu que sur deux photos. Un fond changé par masque, un vêtement, une personne recopiée assez grande pour que Claude la signale : à voir chacun une fois.</p>
+          <p class="deja">En même temps que les essais ci-dessus.</p>
+        </article>
+      </div>
+    </section>
+    <section class="etape">
+      <div class="etape-tete"><span class="num">3</span><h2>Version 1.6 : les garde-fous de l'Analyse</h2><span class="quand">après le correctif</span></div>
+      <div class="chantiers">
+        <article class="chantier">
+          <h3>Plafonds de dose et cumul des passes</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Rien n'empêche aujourd'hui Clarté, Correction du voile ou Texture de monter haut, ni plusieurs passes de s'empiler. Une table de doses par réglage (comme pour la peau) et un cumul par réglage, avec une alerte (Clarté au-delà de 25, Correction du voile au-delà de 20, Saturation ou Vibrance au-delà de 30), protégeraient le rendu naturel que tu veux.</p>
+          <p class="deja">Signalé « fort » par la page Analyse. Au-delà du plafond : refus, sauf demande explicite de ta part.</p>
+        </article>
+        <article class="chantier">
+          <h3>Progression et arrêt d'une commande longue</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Une commande seule (un rendu, une lecture) n'a ni barre de progression ni croix pour l'arrêter. Une barre « Claude : commande » dès 3 secondes, avec sa croix, te laisserait reprendre la main.</p>
+          <p class="deja">Signalé « fort » par la page Analyse.</p>
+        </article>
+        <article class="chantier">
+          <h3>Ne plus perdre une réponse</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Quand une réponse du module se perd (délai dépassé, liaison coupée), rien ne la garde. Le module garderait les 20 derniers résultats, et le connecteur pourrait les reprendre au lieu de tout recommencer.</p>
+          <p class="deja">Signalé « fort » par la page Analyse.</p>
+        </article>
+      </div>
+    </section>
     <section class="etape">
       <div class="etape-tete"><span class="num">4</span><h2>Plus tard</h2><span class="quand">quand une vraie raison se présente</span></div>
       <div class="chantiers">
@@ -148,24 +156,24 @@
           <h3>Relever les seuils provisoires</h3>
           <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
           <p>Le bruit cherché à ISO 1 600 ou plus, la netteté et le bruit du bilan, les couleurs hors gamme, les points chauds, le contrôle des masques, les groupes de lumière. Réglés sur tes vraies photos Fujifilm, ils donneraient moins de fausses alertes et moins d'oublis.</p>
-          <p class="deja">D'abord un relevé, en lecture seule, sans toucher au code : <code>--constats</code> et <code>--eclairage</code> sur une soixantaine de tes photos, plus les comptes du Suivi. Puis un compte rendu avec les seuils proposés, et seulement ensuite les changements.</p>
+          <p class="deja">D'abord un relevé en lecture seule (<code>--constats</code>, <code>--eclairage</code>, les comptes du Suivi), puis un compte rendu, et seulement ensuite les changements.</p>
         </article>
         <article class="chantier">
           <h3>Ton style en chiffres</h3>
           <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Comment tu règles d'habitude tes photos de 4 ★ et plus, par appareil et selon l'ISO. Claude te proposerait quelques phrases pour ton guide de style, que tu acceptes ou non. Ça complète <code>learn</code> : lui voit ce que tu corriges chez Claude, ceci verrait ce que tu gardes.</p>
-          <p class="deja">Difficulté : séparer tes retouches de celles de Claude ; et des moyennes sur des scènes très différentes en disent peu.</p>
+          <p>Comment tu règles d'habitude tes photos de 4 ★ et plus, par appareil et selon l'ISO, proposé en quelques phrases pour ton guide de style. Ça complète <code>learn</code>, qui voit ce que tu corriges chez Claude.</p>
+          <p class="deja">Difficulté : séparer tes retouches de celles de Claude ; des moyennes sur des scènes très différentes en disent peu.</p>
         </article>
         <article class="chantier">
           <h3>Masques relus après l'écriture, avec retour en arrière</h3>
           <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Après chaque dégradé ou pinceau, le module relirait ce que Lightroom a gardé. En cas d'écart, il retirerait le masque et le dirait. Rien ne casse aujourd'hui : à faire à la prochaine grande mise à jour de Lightroom Classic.</p>
-          <p class="deja">Risque : retirer de bons masques à cause d'un arrondi de Lightroom. Il faut d'abord constater la tolérance réelle.</p>
+          <p>Après chaque dégradé ou pinceau, le module relirait ce que Lightroom a gardé et retirerait un masque mal posé. L'avertissement de la 1.5 couvre le cas courant ; la forme complète, à la prochaine grande mise à jour de Lightroom Classic.</p>
+          <p class="deja">Il faut d'abord constater la tolérance réelle, pour ne pas retirer de bons masques à cause d'un arrondi.</p>
         </article>
         <article class="chantier">
           <h3>Trier la liste « À constater dans Lightroom »</h3>
           <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 2/5</span></div>
-          <p>Dans <code>docs/SPEC.md</code>, 62 points restent ouverts pour la 1.3. Quatre au moins sont sans objet depuis le retrait de Leçon et de Je le fais. Une liste courte et à jour dirait quoi vérifier à la prochaine recette.</p>
+          <p>Dans <code>docs/SPEC.md</code>, 62 points restent ouverts pour la 1.3, dont plusieurs sans objet. Une liste courte et à jour dirait quoi vérifier à la prochaine recette.</p>
           <p class="deja">Documentation seulement.</p>
         </article>
       </div>
@@ -174,9 +182,16 @@
     <section class="etape">
       <div class="etape-tete"><h2>Écartées</h2><span class="quand">idées de lightroom-mcp que Développeur n'a pas besoin de reprendre</span></div>
       <div class="ecartees">
-        <div class="ecartee"><b>Quasi-doublons par empreinte dHash</b><p>Le tri regroupe déjà les rafales et les piles par l'empreinte de Vision, plus fine qu'un dHash, et nomme la meilleure de chaque groupe. À revoir seulement si le tri laisse passer des doublons.</p></div>
-        <div class="ecartee"><b>Plage de couleur copiée d'une autre photo</b><p><code>copy_settings</code> copie déjà les plages de couleur, et Développeur recalcule un prélèvement sur chaque photo. Eux ne savent pas le faire, d'où leur besoin de copier. Seul le risque des prélèvements multiples, à l'étape 1, vaut la peine.</p></div>
-        <div class="ecartee"><b>Mode lecture seule</b><p>La pause fait déjà « Claude regarde, ne retouche pas », et tu travailles en mode Appliquer. Cacher les outils demanderait de relancer Claude Desktop et chaque session. Une version légère, une case qui survit au relancement de Lightroom, se ferait vite si tu la demandes un jour.</p></div>
+        <div class="ecartee"><b>Quasi-doublons par empreinte dHash</b><p>Le tri regroupe déjà les rafales et les piles par l'empreinte de Vision, plus fine qu'un dHash, et nomme la meilleure de chaque groupe.</p></div>
+        <div class="ecartee"><b>Plage de couleur copiée d'une autre photo</b><p><code>copy_settings</code> copie déjà les plages de couleur, et Développeur recalcule un prélèvement sur chaque photo. Le seul vrai risque, les prélèvements multiples, est réglé dans la 1.5.</p></div>
+        <div class="ecartee"><b>Mode lecture seule</b><p>La pause fait déjà « Claude regarde, ne retouche pas », et tu travailles en mode Appliquer. Une case qui survit au relancement de Lightroom se ferait vite si tu la demandes un jour.</p></div>
+      </div>
+    </section>
+
+  </div>
+
+  <p class="pied">Taille : petite, quelques heures ; moyenne, une journée ou deux, tests compris. Le risque vise les photos et le catalogue : tout essai se fait sur des copies d'Essais, sur ton ordre, et se défait ensuite. Source : <code>docs/artefacts/feuille-de-route.html</code>.</p>
+</main> tu la demandes un jour.</p></div>
       </div>
     </section>
 
