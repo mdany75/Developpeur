@@ -90,8 +90,9 @@
     de plus près.
   - Un calcul de Fibo 2 Studio lancé pendant le vôtre arrête le vôtre avant son étape suivante
     (fiche, Fibo 2 ou SeedVR2) : jamais deux calculs ensemble sur le Mac.
-  - Provisoire : l'effet de la fiche, le rendu de la qualité
-    équilibrée, l'effet de la liste à éviter et celui du guidage restent à constater sur vos photos.
+  - La qualité équilibrée est constatée sur une photo d'essai (une voiture changée de couleur) :
+    environ 5 minutes en tout, dont 3 ½ pour Fibo 2, et 12 Go de mémoire en pointe. Provisoire :
+    l'effet propre de la liste à éviter et celui du guidage restent à comparer sur vos photos.
     Un essai en qualité rapide ne vérifie que la fiche et le masque peint : la qualité équilibrée,
     la liste à éviter et le guidage demandent un essai en qualité équilibrée ou normale.
 

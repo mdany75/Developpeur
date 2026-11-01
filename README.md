@@ -741,8 +741,9 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   photo active. Cela vaut tant que Lightroom n'a pas été relancé ; après, Photo › Retirer du
   catalogue, à la main.
 - **Qualité et durée** : par défaut, la qualité **équilibrée** (30 étapes, guidage sur 60 % d'entre
-  elles, décodage en pleine précision : environ le rendu de la normale en deux fois moins de temps,
-  à confirmer sur vos photos) ; la qualité normale (50 étapes) prenait environ 8 minutes pour une
+  elles, décodage en pleine précision : environ le rendu de la normale en deux fois moins de temps ;
+  essai du 1er novembre 2026 : 315 s pour une voiture changée de couleur, dont 207 s de Fibo 2, et
+  environ 12 Go de mémoire en pointe) ; la qualité normale (50 étapes) prenait environ 8 minutes pour une
   zone, SeedVR2 compris (essai du 29 octobre 2026 : 471 s pour une tuque sur une photo de
   26 mégapixels) ; en qualité rapide (Turbo, 4 étapes), bien moins, avec un résultat moins fidèle.
   Le guidage (de 1 à 10, 5 par défaut) se règle sur demande, hors qualité rapide : plus haut,

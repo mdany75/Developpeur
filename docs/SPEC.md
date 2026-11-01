@@ -8649,6 +8649,21 @@ personnage au loin, recopié lui aussi : trop petit pour un visage) ; aucune sec
 cheveux doux. Reste à constater : hors Turbo (exclusion et guidage), un vêtement, une personne
 recopiée assez grande pour `a_verifier`.
 
+Constaté le 1er novembre 2026 (essai réel en qualité équilibrée, nouvelle copie d'essai « Essai Fibo
+équilibrée » de DSCF2402.RAF, `region` sur la voiture orange en bas à gauche, 0 ; 0,74 ; 0,2 ×
+0,26, instruction « replace the orange sports car… with a dark green sports car », fiche
+FIBO-vlm, guidage 5, liste à éviter par défaut, graine 731438191) : 315 s en tout, dont 61 s de
+fiches et 207 s de Fibo 2 (30 étapes) ; mémoire en pointe des processus du connecteur, de mflux et
+de Python : environ 12,4 Go (relevée toutes les 2 s) ; recadrage de 1 872 × 1 623 px, sortie de
+Fibo 2 de 1 104 × 960 px remise à la taille par SeedVR2 ; 4,9 % de la photo changée. La voiture
+devient vert foncé, reflets et lumière de la salle gardés, la main et le poncho de la femme intacts
+(dans le recadrage de contexte, hors de la zone) ; aucune lettre ni seconde tête. Une `region` plus
+étroite que l'objet laisse son reste tel quel (un bout orange à droite de la zone) : la zone doit
+couvrir l'objet entier. Puis `undo_last` sur la nouvelle photo (sans finitions) : retirée du
+catalogue sans fenêtre, son TIFF dans la Corbeille du volume (`.Trashes`), la copie d'origine
+redevenue la photo active ; `find_photos` ne la trouve plus. L'effet propre de la liste à éviter et
+du guidage reste à juger par comparaison (même graine, réglage changé).
+
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 
 `compare_variants` (serveur) fait une proposition par variante (`essayer`, `instantane = nom`) :
