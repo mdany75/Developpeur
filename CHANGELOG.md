@@ -1,6 +1,12 @@
 # Changements
 
-## Non publié
+## 1.5 — 2026-11-01
+
+La 1.5, ce que Lightroom ne sait pas faire : changer un vêtement, un objet ou un fond, en local sur
+votre Mac, par Fibo 2, et le défaire d'un mot si le résultat ne plaît pas. Avant de copier une
+retouche sur toute une sortie, Claude montre ce qui changerait sur chaque photo, sans rien écrire.
+Et une correction importante : une plage de couleurs ne prend plus qu'une couleur, parce que deux
+faisaient planter Lightroom.
 
 ### Ajouté
 - Voir avant de copier : `copy_settings` avec `plan = true` montre, sans rien écrire, ce qu'une copie
