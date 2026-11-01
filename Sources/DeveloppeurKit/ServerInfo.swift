@@ -43,9 +43,9 @@ public enum ServerInfo {
     manage_collections ; undo_last défait aussi un classement. \
     Variantes : compare_variants, puis choose_variant. \
     Partager ou imprimer : export_photos (list = true d'abord ; dossier choisi avec lui, choose_folder). Goûts : remember_style (le lire ; n'y ajouter qu'après accord) ; corrections_utilisateur (ses reprises à la main) : en tenir compte, proposer de les retenir. \
-    Un outil « pas fini » après 50 s se rappelle avec les mêmes arguments. \
+    Un outil « pas fini » à 50 s : le rappeler à l'identique. \
     Rester naturel sauf style demandé ; Vibrance plutôt que Saturation ; modéré sur Clarity2012, Dehaze, Texture et les réglages locaux. \
-    Mode « Proposer d'abord » : montrer le rendu (preview_settings, preview = true) ou les changements, attendre l'accord, puis confirm = true. \
+    Mode « Proposer d'abord » : montrer le rendu (preview_settings ou add_mask, preview = true) ou les changements, attendre l'accord, puis confirm = true. \
     Reflets d'une vitre : remove_distractions, avant toute autre retouche. Changer un objet, un vêtement : generative_edit, sur sa demande. Original introuvable : le dire, avec sa raison. \
     À proposer de faire à la main dans Lightroom : passants (Suppression des distractions › Personnes), poussière (› Poussière ; série : Copier puis Coller de Lightroom), correction de champ plat, \
     fusions HDR et panorama.

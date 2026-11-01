@@ -203,6 +203,28 @@ final class Version24Tests: XCTestCase {
         XCTAssertEqual(fake.progressions.count, avant)
     }
 
+    /// Chaque paramètre que les consignes donnent à un outil nommé juste avant (« outil, param = »,
+    /// « outil (param = », « outil avec param = ») existe dans cet outil. Avant la 1.5.1, elles disaient
+    /// « preview_settings, preview = true » : preview_settings n'a pas de preview, l'appel était refusé.
+    func testInstructionsCiteOnlyExistingParameters() throws {
+        let definitions = ToolHandler(lightroom: FakeLightroom()).definitions
+        var proprietes: [String: Set<String>] = [:]
+        for definition in definitions {
+            guard let nom = definition["name"]?.string else { continue }
+            proprietes[nom] = Set(definition["inputSchema"]?["properties"]?.object?.keys.map { $0 } ?? [])
+        }
+        let texte = ServerInfo.instructions
+        let motif = try NSRegularExpression(pattern: "\\b([a-z]+_[a-z_]+)(?:, | \\(| avec )([a-z_]+) = ")
+        let paires = motif.matches(in: texte, range: NSRange(texte.startIndex..., in: texte)).compactMap { m -> (String, String)? in
+            guard let outil = Range(m.range(at: 1), in: texte), let param = Range(m.range(at: 2), in: texte) else { return nil }
+            return (String(texte[outil]), String(texte[param]))
+        }
+        XCTAssertFalse(paires.isEmpty, "les consignes citent des paramètres d'outils")
+        for (outil, param) in paires where proprietes[outil] != nil {
+            XCTAssertTrue(proprietes[outil]!.contains(param), "les consignes donnent « \(param) » à \(outil), qui ne l'a pas")
+        }
+    }
+
     func testInstructionsLeaveRoomUnderTheLimit() {
         XCTAssertLessThanOrEqual(ServerInfo.instructions.utf16.count, ServerInfo.instructionsLimit - 300,
                                  "de la marge pour la prochaine consigne")

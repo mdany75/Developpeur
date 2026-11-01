@@ -1,5 +1,22 @@
 # Changements
 
+## 1.5.1 — 2026-11-01
+
+Un petit correctif de la 1.5. Les consignes que Claude reçoit citaient un réglage qui n'existe pas
+(« preview » de `preview_settings`) : c'est corrigé, et un test vérifie maintenant chaque réglage
+qu'elles citent. Et pour changer un objet entier par Fibo 2 (une voiture, un meuble), Claude prend
+le masque d'objet de Lightroom plutôt qu'une zone tracée au jugé : essayé sur une voiture, elle
+change en entier, sans reste de l'ancienne couleur.
+
+### Corrigé
+- Consignes du connecteur : « Proposer d'abord » montre le rendu par `preview_settings` ou par
+  `add_mask` avec `preview = true` (`preview_settings` n'a pas de `preview`) ; un test vérifie que
+  chaque paramètre cité avec un outil existe dans son schéma.
+- `generative_edit` : sa description et celle de `mask` nomment l'objet entier (`kind: object`,
+  avec sa boîte) parmi les zones à prendre par masque plutôt que par `region`.
+- Règles du projet : la barre de titre de la fenêtre Claude dit « Développeur » suivi du numéro
+  installé.
+
 ## 1.5 — 2026-11-01
 
 La 1.5, ce que Lightroom ne sait pas faire : changer un vêtement, un objet ou un fond, en local sur

@@ -8664,6 +8664,16 @@ catalogue sans fenêtre, son TIFF dans la Corbeille du volume (`.Trashes`), la c
 redevenue la photo active ; `find_photos` ne la trouve plus. L'effet propre de la liste à éviter et
 du guidage reste à juger par comparaison (même graine, réglage changé).
 
+Constaté le 1er novembre 2026 au matin (même essai, nouvelle copie « Essai Fibo objet » de
+DSCF2402.RAF, `mask` `kind: object` avec la boîte 0 ; 0,73 ; 0,31 × 0,27 autour de la voiture,
+même instruction, qualité équilibrée, graine 179195990) : 319 s en tout, dont 48 s de fiches et
+204 s de Fibo 2 ; masque calculé par Lightroom (cadre 0 ; 0,738 ; 0,255 × 0,262, 4,8 % de la
+photo, positions recalées jusqu'à 56 px), recadrage de 2 387 × 1 634 px, 4,9 % changés. La voiture
+entière devient vert foncé, sans reste orange, reflets, jante et pneu gardés, bord fondu sans
+liseré ; la main et le poncho intacts. Pour changer un objet entier : `mask` `kind: object`
+plutôt qu'une `region`, qui doit couvrir l'objet au jugé. Puis `undo_last` : photo retirée, TIFF
+à la Corbeille, copie d'origine active.
+
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 
 `compare_variants` (serveur) fait une proposition par variante (`essayer`, `instantane = nom`) :

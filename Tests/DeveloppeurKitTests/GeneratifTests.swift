@@ -2180,13 +2180,14 @@ final class GeneratifTests: XCTestCase {
         let outil = try XCTUnwrap(tools.definitions.first { $0["name"]?.string == "generative_edit" })
         let masque = try XCTUnwrap(outil["inputSchema"]?["properties"]?["mask"])
         let description = try XCTUnwrap(masque["description"]?.string)
-        XCTAssertTrue(description.hasPrefix("Changer l'arrière-plan, le ciel, une personne : mask (masque de Lightroom) plutôt que region"), description)
+        XCTAssertTrue(description.hasPrefix("Changer l'arrière-plan, le ciel, une personne, un objet entier : mask (masque de Lightroom) plutôt que region"), description)
+        XCTAssertTrue(description.contains("object avec sa box"), description)
         XCTAssertTrue(description.contains("existing, un masque que l'utilisateur a peint"), description)
         let cles = Set(masque["properties"]?.object?.keys.map { $0 } ?? [])
         XCTAssertTrue(cles.isSuperset(of: ["kind", "part", "person", "person_at", "invert", "combine", "box", "strokes", "existing"]), "\(cles)")
         XCTAssertTrue(cles.isDisjoint(with: ["effect", "adjustments", "amount", "name", "tone_curve", "point_colors"]), "\(cles)")
         XCTAssertTrue((masque["required"]?.array ?? []).isEmpty, "kind ou existing")
-        XCTAssertTrue(outil["description"]?.string?.contains("Changer l'arrière-plan, le ciel, une personne, ou la zone que l'utilisateur a peinte : mask plutôt que region") == true)
+        XCTAssertTrue(outil["description"]?.string?.contains("Changer l'arrière-plan, le ciel, une personne, un objet entier (kind object) ou la zone peinte : mask plutôt que region") == true)
     }
 
     // MARK: Fiche de FIBO-vlm, qualité équilibrée, exclusion, guidage, masque peint (29 octobre 2026)
