@@ -13,7 +13,8 @@ Dans cet ordre :
 
 1. Mettre le numéro à jour aux trois endroits : `CFBundleShortVersionString` dans
    `Resources/Info.plist`, `VERSION` dans `Lightroom/Developpeur.lrplugin/Info.lua` et
-   `Liaison.VERSION` dans `Liaison.lua` ; ajouter la section `## X.Y — AAAA-MM-JJ` dans
+   `Liaison.VERSION` dans `Liaison.lua` (et l'essai « Versions » de `Tests/Lua/Fenetre/tests.lua`,
+   qui attend le numéro de `Info.lua`) ; ajouter la section `## X.Y — AAAA-MM-JJ` dans
    `CHANGELOG.md`, écrite pour l'utilisateur. `build.sh` refuse si les trois numéros diffèrent ou si
    cette section n'est pas la plus récente des sections numérotées (« ## Non publié » peut rester
    au-dessus).
