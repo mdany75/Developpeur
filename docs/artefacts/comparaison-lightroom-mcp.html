@@ -65,12 +65,12 @@
 <body>
 <main class="page">
   <h1>Outils comparés : Développeur et lightroom-mcp</h1>
-  <p class="sous">Les 35 outils de MCP-Développeur 1.4 face aux 71 de <a href="https://github.com/Automaat/lightroom-mcp">Automaat/lightroom-mcp</a> 0.26.0, rangés par domaine. Descriptions tirées de <code>tools/list</code> du connecteur et du README de lightroom-mcp, le 27 octobre 2026.</p>
+  <p class="sous">Les 36 outils de MCP-Développeur 1.4 (avec <code>generative_edit</code>, pas encore publié) face aux 71 de <a href="https://github.com/Automaat/lightroom-mcp">Automaat/lightroom-mcp</a> 0.26.0, publié sur npm sous le nom <code>@mskalski/lightroom-mcp</code>. Outils rangés par domaine, puis la liaison, la sécurité et les idées à reprendre. Comparaison faite le 27 octobre 2026, revue dans les sources des deux dépôts le 1<sup>er</sup> novembre 2026 : la 0.26.0 est toujours leur dernière version, et leur dépôt n'a reçu depuis que des mises à jour de dépendances.</p>
 
   <div class="bilan">
-    <div class="chiffre"><b>35</b><span>outils de Développeur, plus 10 invites</span></div>
-    <div class="chiffre"><b>71</b><span>outils de lightroom-mcp (seul le groupe <code>core</code> est montré par défaut)</span></div>
-    <div class="chiffre"><b>8</b><span>outils de Développeur sans équivalent direct chez eux</span></div>
+    <div class="chiffre"><b>36</b><span>outils de Développeur, tous actifs, plus 10 invites</span></div>
+    <div class="chiffre"><b>71</b><span>outils de lightroom-mcp : 32 <code>core</code>, actifs par défaut, 24 <code>develop</code> et 15 <code>masks</code> à activer, et une invite</span></div>
+    <div class="chiffre"><b>9</b><span>outils de Développeur sans équivalent direct chez eux</span></div>
     <div class="chiffre"><b>8</b><span>outils de lightroom-mcp sans équivalent direct ici</span></div>
   </div>
 
@@ -183,6 +183,11 @@
         <td><code>remove_distractions</code><p>Supprime les reflets d'une vitre (modèles IA de Lightroom), retire une suppression de la poussière.</p></td>
         <td><span class="aucun">Aucun.</span></td>
         <td><span class="pastille seul">Seulement ici</span></td>
+      </tr>
+      <tr>
+        <td><code>generative_edit</code><p>Retouche générative par Fibo 2, en local sur le Mac : change un objet, un vêtement ou une zone (rectangle, masque de Lightroom ou masque peint), avec photo de référence au choix. Seule la zone changée revient, dans un nouveau TIFF ; l'original reste intact. Sur demande seulement. Pas encore publié.</p></td>
+        <td><span class="aucun">Aucun : ni retouche générative, ni outil qui crée une correction de taches.</span></td>
+        <td><span class="pastille seul">Seulement ici</span><p class="note">Lourd : environ 21 Go de mémoire ; modèles sous licence CC BY-NC.</p></td>
       </tr>
       <tr>
         <td><code>list_profiles</code><p>Profils utilisables pour une photo : simulations Fujifilm, profils Adobe, créatifs et installés, et ceux dont l'intensité se règle ; profils d'objectif installés.</p></td>
@@ -417,16 +422,54 @@
     </tbody>
   </table></div>
 
+  <h2>Liaison, sécurité, installation</h2>
+  <p class="sous">Ce qui ne se voit pas dans la liste des outils. Vérifié dans les sources des deux dépôts le 1<sup>er</sup> novembre 2026.</p>
+  <div class="table"><table>
+    <colgroup><col style="width:18%"><col style="width:41%"><col style="width:41%"></colgroup>
+    <thead><tr><th>Point</th><th>Développeur</th><th>lightroom-mcp</th></tr></thead>
+    <tbody>
+      <tr><td><b>Langage</b></td><td>Serveur Swift natif, sans Node ni Python. Module Lua.</td><td>Serveur TypeScript (Node 20 au moins). Module Lua <code>LightroomMCP.lrplugin</code>.</td></tr>
+      <tr><td><b>Liaison</b></td><td>TCP local, ports fixes 54770 et 54771. Une connexion par commande : Claude Desktop, Claude Code et la fenêtre Claude passent chacun leur tour.</td><td>TCP local, ports 58763 et 58764 (ceux de MIDI2LR), modifiables. Une connexion qui reste ouverte. Si plusieurs serveurs démarrent, un seul tient la liaison et relaie les autres.</td></tr>
+      <tr><td><b>Jeton</b></td><td>32 octets aléatoires à chaque démarrage, dans un fichier lisible par vous seul (droits 600). Vérifié sur chaque ligne, avant toute commande.</td><td>256 bits à chaque « Start Server », vérifiés sur chaque message. Le fichier n'a pas de droits restreints : leur code conseille un <code>chmod</code> à la main.</td></tr>
+      <tr><td><b>Accord avant d'écrire</b></td><td>« Proposer d'abord », vérifié par le module sur toute écriture ; l'accord peut être réservé au bouton Accepter. Pause, plafonds d'exposition et de saturation, photos protégées, 20 photos au plus sans accord.</td><td>Cinq outils risqués exigent <code>confirm: true</code>, mais c'est Claude qui le remplit, pas vous. Un mode lecture seule (variable d'environnement) cache tous les outils d'écriture.</td></tr>
+      <tr><td><b>Outils longs</b></td><td>Un outil à la fois ; s'il n'a pas fini à 50 s, une réponse d'attente, puis le résultat au rappel. Claude Desktop abandonne un outil à 60 s.</td><td>Délai de 30 s par défaut, jusqu'à environ 240 s pour certains, sans réponse d'attente.</td></tr>
+      <tr><td><b>Ce que voit Claude</b></td><td>La photo développée, avec des mesures calculées sur le Mac (L*, écrêtage, dominante, bruit) et Vision d'Apple (visages, regard, saillance).</td><td>L'aperçu JPEG du cache de Lightroom, périmé environ 3,5 s après l'entrée en Développement. Histogramme et netteté, sans visages.</td></tr>
+      <tr><td><b>Installation</b></td><td>Archive signée Developer ID et notarisée, puis <code>install.sh</code>, qui inscrit le connecteur dans Claude Desktop et Claude Code.</td><td><code>.mcpb</code> en un double-clic, <code>npx</code>, ou binaires non signés (leur README fait retirer la quarantaine). Le serveur copie lui-même le module dans Lightroom ; il faut ensuite cliquer « Start Server ».</td></tr>
+      <tr><td><b>Clients et systèmes</b></td><td>Claude Desktop, Claude Code et la fenêtre Claude. macOS 14 au moins.</td><td>Claude Desktop, Claude Code, Codex, Cursor, Windsurf, VS Code. macOS et Windows.</td></tr>
+      <tr><td><b>Dans Lightroom</b></td><td>Fenêtre Claude (une conversation par photo), Demande rapide, Suivi, Publication, Consommation.</td><td>Le Gestionnaire de modules externes seulement.</td></tr>
+      <tr><td><b>Tests</b></td><td>46 fichiers de tests Swift sur un faux Lightroom, deux suites Lua sur un Lightroom simulé.</td><td>25 fichiers de tests du serveur, 7 de bout en bout, 49 specs Lua ; CI sur trois systèmes.</td></tr>
+      <tr><td><b>Licence</b></td><td>Projet personnel, en français.</td><td>MIT, en anglais.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Idées à reprendre</h2>
+  <p class="sous">De la plus utile à la moins utile. Toutes respectent les règles du projet : pour un amateur, jamais l'API, pas de Photoshop, liaison fermée.</p>
+  <div class="table"><table>
+    <colgroup><col style="width:30%"><col style="width:70%"></colgroup>
+    <thead><tr><th>Idée</th><th>Ce que ça donnerait ici</th></tr></thead>
+    <tbody>
+      <tr><td><b>Voir avant de copier</b></td><td><code>copy_settings</code> dirait, photo par photo, les réglages qui changeraient (leur <code>dry_run</code>), et ce qui ne se prédit pas. Utile en « Proposer d'abord » sur une série.</td></tr>
+      <tr><td><b>Votre style en chiffres</b></td><td>Les médianes de vos réglages par boîtier et par tranche d'ISO, sur vos photos de 4 ★ et plus (leur <code>summarize_develop_settings</code>), pour nourrir <code>remember_style</code>.</td></tr>
+      <tr><td><b>Doublons par empreinte</b></td><td>Les quasi-doublons par dHash et heure de prise de vue, dans <code>cull_photos</code>, avec un temps borné et un résultat partiel : compatible avec la file de 50 s.</td></tr>
+      <tr><td><b>Masques placés au point près</b></td><td>Dégradés et pinceaux écrits à des coordonnées précises, de façon gardée : version épinglée, relecture, retour en arrière en cas d'écart.</td></tr>
+      <tr><td><b>Plage de couleur d'une autre photo</b></td><td>Reprendre l'échantillon d'une photo de référence, au service de <code>match_series</code>.</td></tr>
+      <tr><td><b>Lecture seule</b></td><td>Un réglage du Gestionnaire, plus strict que la pause : Claude ne verrait même plus les outils d'écriture.</td></tr>
+      <tr><td><b>Recherche plus large</b></td><td>La focale et le dossier dans <code>find_photos</code> ; lectures du catalogue en lot.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">À ne pas reprendre : les annotations MCP (Développeur les a déjà), l'élection d'un serveur chef (la connexion par commande suffit), les binaires non signés et Windows (hors des règles du projet). Le zoom sur une région existe déjà ici (<code>view_photo</code>, <code>region</code>).</p>
+
   <h2>Récapitulatif</h2>
   <div class="table"><table>
     <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
-    <thead><tr><th>Seulement dans Développeur (8)</th><th>Seulement dans lightroom-mcp (8)</th></tr></thead>
+    <thead><tr><th>Seulement dans Développeur (9)</th><th>Seulement dans lightroom-mcp (8)</th></tr></thead>
     <tbody><tr>
       <td><ul>
         <li><code>get_status</code> : état de la liaison</li>
         <li><code>measure_angle</code> : angle d'une ligne</li>
         <li><code>read_composition</code> : composition et cadre proposé</li>
         <li><code>remove_distractions</code> : reflets</li>
+        <li><code>generative_edit</code> : retouche générative locale (Fibo 2)</li>
         <li><code>list_profiles</code> : profils de rendu</li>
         <li><code>remember_style</code> : guide de style</li>
         <li><code>show_photo</code> : montrer dans Lightroom</li>
