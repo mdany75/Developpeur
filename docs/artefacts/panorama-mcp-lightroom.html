@@ -1,0 +1,178 @@
+<title>Panorama des MCP Lightroom</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Même système que la page Outils comparés : une colonne large, tableaux défilants, pastilles d'état. */
+  :root {
+    --texte: #1D1D1F; --gris: #6B6B6B; --bleu: #0A64D8; --mono: #3D3D45;
+    --vert: #1F7A35; --orange: #A85A00; --rouge: #B3261E;
+    --fond: #FFFFFF; --volet: #F2F2F2; --carte: #FAFAFA; --filet: #E2E2E2;
+    --vert-doux: #E6F2E9; --orange-doux: #FCEFDF; --bleu-doux: #E3EEFC; --rouge-doux: #FBE9E7; --gris-doux: #EBEBEB;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --texte: #E8E8E8; --gris: #9A9A9A; --bleu: #5AA2F6; --mono: #C8C8D0;
+      --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+      --fond: #1E1E1E; --volet: #2A2A2A; --carte: #262626; --filet: #343434;
+      --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #333333;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --texte: #E8E8E8; --gris: #9A9A9A; --bleu: #5AA2F6; --mono: #C8C8D0;
+    --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+    --fond: #1E1E1E; --volet: #2A2A2A; --carte: #262626; --filet: #343434;
+    --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #333333;
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { background: var(--volet); }
+  body { margin: 0; background: var(--volet); color: var(--texte); font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  a { color: var(--bleu); text-decoration: none; }
+  a:hover, a:focus-visible { text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--bleu); outline-offset: 2px; border-radius: 3px; }
+  code { font-family: Menlo, ui-monospace, monospace; font-size: .86em; color: var(--mono); background: var(--gris-doux); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .page { max-width: 1180px; margin: 0 auto; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { margin: 0 0 4px; font-size: 30px; line-height: 1.2; text-wrap: balance; }
+  h2 { margin: 40px 0 6px; font-size: 21px; text-wrap: balance; }
+  h3 { margin: 18px 0 6px; font-size: 16px; }
+  .sous { color: var(--gris); margin: 0 0 18px; max-width: 75ch; }
+  p, li { max-width: 80ch; }
+  .bilan { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 20px 0; }
+  .chiffre { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 14px; min-width: 0; }
+  .chiffre b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; }
+  .chiffre span { color: var(--gris); font-size: 13px; }
+  .encadre { background: var(--bleu-doux); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
+  .encadre p { margin: 0; }
+  .pastille { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; display: inline-block; }
+  .ici { background: var(--vert-doux); color: var(--vert); }
+  .eux { background: var(--orange-doux); color: var(--orange); }
+  .egal { background: var(--gris-doux); color: var(--texte); }
+  .seul { background: var(--bleu-doux); color: var(--bleu); }
+  .non { background: var(--rouge-doux); color: var(--rouge); }
+  .table { overflow-x: auto; border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; background: var(--fond); border: 1px solid var(--filet); }
+  .large table { min-width: 1100px; }
+  .moyen table { min-width: 760px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--filet); vertical-align: top; font-size: 13.5px; }
+  th { background: var(--carte); font-size: 12.5px; color: var(--gris); font-weight: 600; }
+  td.rang, td.note { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.note b { font-size: 15px; }
+  tr.nous td { background: var(--vert-doux); }
+  .petit { color: var(--gris); font-size: 12.5px; display: block; margin-top: 2px; }
+  .colonnes { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .colonnes > section { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 4px 18px 14px; min-width: 0; }
+  ul.liste { padding-left: 18px; margin: 6px 0 0; }
+  ul.liste li { margin: 0 0 8px; }
+  .pied { color: var(--gris); font-size: 13px; margin-top: 36px; }
+  @media (max-width: 640px) { th, td { padding: 8px; } h1 { font-size: 25px; } }
+</style>
+
+<main class="page">
+  <h1>Panorama des MCP Lightroom</h1>
+  <p class="sous">Les serveurs MCP qui pilotent Lightroom, recensés et vérifiés le 1<sup>er</sup> novembre 2026, puis comparés à MCP-Développeur 1.5. Ils ont été cherchés sur GitHub, dans les annuaires MCP (mcp.so, Smithery, Glama, PulseMCP, awesome-mcp-servers, le registre officiel, npm, PyPI), dans les forums et chez Adobe. Chaque dépôt a ensuite été ouvert pour lire ses outils, son architecture, son dernier envoi et sa licence. Les notes sur 10 sont celles de cette vérification. La comparaison outil par outil avec le premier du classement est sur la page <a href="https://claude.ai/artifact/VuRGRUGNy4ZzGuYPPrmsQm">Outils comparés</a>.</p>
+
+  <div class="bilan">
+    <div class="chiffre"><b>56</b><span>candidats trouvés, sans doublons</span></div>
+    <div class="chiffre"><b>28</b><span>vrais serveurs MCP qui agissent sur Lightroom (30 fiches, deux projets en double)</span></div>
+    <div class="chiffre"><b>1</b><span>seul projet très suivi : Automaat, 169 étoiles. Les autres ont moins de 60 étoiles, souvent 0.</span></div>
+    <div class="chiffre"><b>0</b><span>MCP officiel d'Adobe pour Lightroom Classic</span></div>
+  </div>
+
+  <div class="encadre"><p><strong>En bref.</strong> Automaat/lightroom-mcp est la référence publique : le plus d'outils, le plus de masques, Mac et Windows, et une installation en un clic. Aucun autre projet n'a de diagnostic chiffré aussi poussé que Développeur. Aucun n'a non plus de méthode de retoucheur écrite, de standard de notation, de retouche générative locale ou d'exécutable natif notarisé. LrC-AVG est le plus proche dans l'esprit, mais il tourne seulement sous Windows.</p></div>
+
+  <h2>Les dix meilleurs</h2>
+  <div class="table moyen"><table>
+    <thead><tr><th>Rang</th><th>Projet</th><th>Note</th><th>Pourquoi</th><th>Étoiles · dernier envoi</th></tr></thead>
+    <tbody>
+      <tr><td class="rang">1</td><td><a href="https://github.com/Automaat/lightroom-mcp">Automaat/lightroom-mcp</a><span class="petit">npm @mskalski/lightroom-mcp · MIT</span></td><td class="note"><b>9</b></td><td>Le plus suivi et le plus complet en masques, presets et catalogue. Il s'installe par un fichier .mcpb et tourne sur Mac et Windows. Il n'a aucune méthode de retouche : Claude règle les curseurs seul.</td><td>169 · 31 oct. 2026</td></tr>
+      <tr><td class="rang">2</td><td><a href="https://github.com/jimjohnbeebe-jpg/LrC_Autonomous_Gateway">LrC-AVG</a><span class="petit">jimjohnbeebe-jpg · MIT</span></td><td class="note"><b>8</b></td><td>Le plus proche de Développeur : retouche mesurée en plusieurs passes, onze intentions de départ, variantes, jeton, réponse d'attente à 50 s, plafond de mouvement des curseurs. Il tourne seulement sous Windows.</td><td>0 · 31 oct. 2026</td></tr>
+      <tr><td class="rang">3</td><td><a href="https://github.com/LrGenius/LrGeniusAI">LrGeniusAI</a><span class="petit">Rust · AGPL-3.0</span></td><td class="note"><b>7,5</b></td><td>Le meilleur pour organiser : recherche par le sens de l'image, visages, espèces, rafales, score esthétique, avec des modèles locaux possibles. Sa retouche est faible : réglages globaux seulement, aucun masque.</td><td>56 · 31 oct. 2026</td></tr>
+      <tr><td class="rang">4</td><td><a href="https://github.com/par4987/lightroom-mcp">par4987/lightroom-mcp</a><span class="petit">fourche d'Automaat · MIT</span></td><td class="note"><b>7</b></td><td>Le dérivé d'Automaat le plus riche en retouche : taches, masques IA, courbe, aperçu vu par Claude, skill de poussière. Il exige Windows et son débruitage simule le clavier.</td><td>1 · 6 oct. 2026</td></tr>
+      <tr><td class="rang">5</td><td><a href="https://github.com/aslanoov/lightroom-ai-bridge">aslanoov/lightroom-ai-bridge</a><span class="petit">Python · MIT</span></td><td class="note"><b>6,5</b></td><td>Fait pour Claude sur Mac, avec ports fixes, jeton, étapes « Claude: » et une base de connaissances qui apprend des corrections. Il est très jeune, ses masques se limitent au ciel et au sujet, et il ne cherche pas dans le catalogue.</td><td>2 · 29 oct. 2026</td></tr>
+      <tr><td class="rang">6</td><td><a href="https://github.com/znznzna/lightroom-cli">znznzna/lightroom-cli</a><span class="petit">Python · MIT</span></td><td class="note"><b>6,5</b></td><td>107 outils, avec un niveau de risque et un essai à blanc décrits pour chaque commande. Il est inactif depuis avril et sa liaison n'a pas de jeton.</td><td>26 · 6 avr. 2026</td></tr>
+      <tr><td class="rang">7</td><td><a href="https://github.com/JeremyGuo/lightroom-mcp-unified">JeremyGuo/lightroom-mcp-unified</a><span class="petit">Node · MIT</span></td><td class="note"><b>6,5</b></td><td>Réunit Automaat et varunkumar, avec un jeton par requête, des essais réels documentés et un fonctionnement vérifié sur Mac. C'est une préversion 0.1.0, sans mesures de l'image.</td><td>0 · 20 sept. 2026</td></tr>
+      <tr><td class="rang">8</td><td><a href="https://github.com/ReefRuan/tonerelay-lightroom-mcp">ToneRelay</a><span class="petit">ReefRuan · AGPL-3.0</span></td><td class="note"><b>6</b></td><td>Pensé comme un atelier : épisodes de retouche rejouables, étalonnage d'après une image de référence, mesures de couleur par zone. Il n'est pas stabilisé et son README est surtout en chinois.</td><td>6 · 21 oct. 2026</td></tr>
+      <tr><td class="rang">9</td><td><a href="https://github.com/cyZhu98/lightroom-mcp">LightroomForge</a><span class="petit">cyZhu98 · Apache-2.0</span></td><td class="note"><b>6</b></td><td>Le plus de réglages couverts (167 annoncés, environ 93 comptés) et des masques dessinés par leur géométrie. Il n'a qu'un commit, aucun jeton visible, et son auteur juge le résultat « loin d'une image livrable ».</td><td>0 · 18 oct. 2026</td></tr>
+      <tr><td class="rang">10</td><td><a href="https://github.com/blackluzie/mhphotos-lightroom-mcp">MHPhotos Lightroom MCP</a><span class="petit">blackluzie · MIT</span></td><td class="note"><b>6</b></td><td>Garde-fous proches de « Proposer d'abord » : lecture seule par défaut, essai à blanc, journal d'audit, autotest en 16 points. Sa retouche est seulement globale et une bonne part sert un site web et Instagram.</td><td>0 · 23 oct. 2026</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Tableau comparatif</h2>
+  <p class="sous">Développeur en première ligne. Le tableau défile de côté sur un écran étroit.</p>
+  <div class="table large"><table>
+    <thead><tr><th>Projet</th><th>Cible</th><th>Architecture</th><th>Outils</th><th>Voit la photo</th><th>Masques</th><th>Catalogue et notation</th><th>Sécurité de la liaison</th><th>Licence</th></tr></thead>
+    <tbody>
+      <tr class="nous"><td><strong>MCP-Développeur 1.5</strong></td><td>Lightroom Classic 13.3 et plus, macOS</td><td>Serveur Swift natif signé et notarisé, module Lua, TCP 54770 et 54771, file d'appels</td><td>36, plus 10 invites et 5 ressources</td><td>Oui : aperçu développé et mesures (Lab, écrêtage par canal, dominante, bruit, netteté, Vision, bilan d'une passe à l'autre)</td><td>IA, dégradés, pinceaux, plages, combinés, courbe et Point Color par masque, modifiables après coup</td><td>Tout le catalogue, collections dynamiques, GPS, IPTC, mots-clés, tri, notation selon un standard écrit</td><td>Jeton sur chaque ligne, « Proposer d'abord », pause, limites</td><td>MIT</td></tr>
+      <tr><td>Automaat</td><td>Lightroom Classic, macOS et Windows</td><td>Node/TS (bun), module Lua, TCP 58763 et 58764</td><td>71</td><td>Oui : JPEG de 512 ou 1024 px, histogramme, écrêtage, netteté</td><td>Le plus riche : IA, plages, courbes et Point Color, combinaisons, lots</td><td>Très complet : collections dynamiques, GPS, doublons, import</td><td>Jeton de 256 bits, <code>confirm</code>, mode lecture seule</td><td>MIT</td></tr>
+      <tr><td>LrC-AVG</td><td>Lightroom Classic 15 et plus, Windows seulement</td><td>Node/TS, module Lua, fenêtre HUD</td><td>65 (16 en profil « edit »)</td><td>Oui : JPEG de 1600 px et écrêtage</td><td>IA, linéaires, radiaux, plages, profondeur, pinceau</td><td>Mots-clés, GPS, collections, drapeaux, synchronisation sur 500 photos</td><td>Jeton, instantané avant séance, plafond des curseurs, approbation de chaque passe</td><td>MIT</td></tr>
+      <tr><td>LrGeniusAI</td><td>Lightroom Classic, macOS et Windows</td><td>Serveur Rust (HTTP, relais stdio), module Lua</td><td>17, plus 4 invites</td><td>Oui : rendu de 256 à 2048 px, sans mesures</td><td><span class="pastille non">Aucun</span></td><td>Point fort : recherche par le sens, visages, espèces, rafales</td><td>Jeton bearer, bouton d'arrêt</td><td>AGPL-3.0</td></tr>
+      <tr><td>par4987</td><td>Lightroom Classic 13 et plus, Windows</td><td>Fourche d'Automaat</td><td>56</td><td>Oui : JPEG de 32 à 2048 px, sans mesures</td><td>IA, linéaires, radiaux, plages</td><td>Collections dynamiques, IPTC en lot, export avec filigrane</td><td>Jeton de 256 bits, relecture des écritures</td><td>MIT</td></tr>
+      <tr><td>aslanoov</td><td>Lightroom Classic 15.3 et plus, macOS</td><td>Python, module Lua, TCP 49463 et 49464, démon</td><td>46</td><td>Oui, avec inclinaison mesurée par script</td><td>Ciel et sujet seulement</td><td>Faible : sélection, notes, drapeaux</td><td>Jeton de 256 bits, décodeur strict</td><td>MIT</td></tr>
+      <tr><td>lightroom-cli</td><td>Lightroom Classic, macOS</td><td>Python (CLI, FastMCP), module Lua</td><td>107</td><td>Indirectement : chemin du fichier</td><td>Création, pinceau, intersection, soustraction, inversion</td><td>Recherche, dates, collections, notes</td><td><span class="pastille non">Aucun jeton</span></td><td>MIT</td></tr>
+      <tr><td>JeremyGuo</td><td>Lightroom Classic, vérifié sur macOS</td><td>Node 22, module Lua, TCP 58773 et 58774</td><td>31</td><td>Oui : de 64 à 2048 px</td><td>Limités</td><td>Recherche, collections, mots-clés, import</td><td>Jeton par requête</td><td>MIT</td></tr>
+      <tr><td>ToneRelay</td><td>Lightroom Classic</td><td>Python, module Lua qui interroge en HTTP</td><td>environ 52</td><td>Oui : couleur par zone, comparaison à une référence</td><td>Sujet et fond</td><td>Catalogues, import, marques confirmées</td><td>Service local, jeton non vérifié</td><td>AGPL-3.0</td></tr>
+      <tr><td>LightroomForge</td><td>Lightroom Classic, Windows</td><td>Python, module Lua</td><td>environ 93</td><td>Oui : aperçus et histogrammes</td><td>Géométrie directe, IA</td><td>Recherche, métadonnées, collections</td><td><span class="pastille non">Aucun jeton</span></td><td>Apache-2.0</td></tr>
+      <tr><td>MHPhotos</td><td>Lightroom Classic 15.6, macOS</td><td>Python, port 47831</td><td>environ 38</td><td>Oui : planche contact, avant/après</td><td><span class="pastille non">Aucun</span></td><td>Recherche avec GPS, notes, collections</td><td>Jeton renouvelé, journal d'audit</td><td>MIT</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Ce que chacun fait de mieux</h2>
+  <div class="colonnes">
+    <section>
+      <h3><span class="pastille ici">Développeur, et lui seul</span></h3>
+      <ul class="liste">
+        <li><strong>Le diagnostic chiffré le plus riche</strong> : Lab, centiles, écrêtage par canal, dominante par zone, bruit, netteté par zone, Vision, peau, teint, éclairage mixte, et un bilan qui signale une régression. Les meilleurs autres s'arrêtent à l'histogramme et à l'écrêtage.</li>
+        <li><strong>Une méthode de retoucheur écrite</strong> : l'ordre des passes, deux passes correctives au plus et seulement sur un défaut constaté, une raison pour chaque étape. Seul LrC-AVG a une boucle comparable, sous Windows.</li>
+        <li><strong>Ce qui est lu dans l'original sans le donner à Claude</strong> : le point AF et l'intention du boîtier Fujifilm.</li>
+        <li><strong>La notation selon un standard écrit</strong> (<code>developpeur://notation</code>). Les autres posent des étoiles sans règle.</li>
+        <li><strong>La fenêtre Claude dans Lightroom</strong>, une conversation par photo sur le forfait claude.ai, avec Demande rapide, Suivi, Publication et Consommation.</li>
+        <li><strong>La retouche générative locale</strong> (Fibo 2), défaisable : aucun autre projet n'en a.</li>
+        <li><strong>Le seul exécutable natif signé et notarisé</strong>, sans Node ni Python à installer.</li>
+        <li><strong>Une liaison fermée par jeton et une file d'appels</strong> contre le délai de 60 s de Claude Desktop. Plus de la moitié des autres n'ont aucun jeton.</li>
+      </ul>
+    </section>
+    <section>
+      <h3><span class="pastille eux">Chez les autres, à prendre</span></h3>
+      <ul class="liste">
+        <li><strong>Recherche par le sens de l'image, visages nommés, espèces</strong> (LrGeniusAI, avec CLIP et BioCLIP 2). Développeur cherche par critères et par dates.</li>
+        <li><strong>Doublons dans tout le catalogue par empreinte dHash</strong> (Automaat). Développeur les trouve seulement au tri d'une sélection.</li>
+        <li><strong>Étalonnage d'après une image de référence</strong> et mesures de couleur par zone (ToneRelay). <code>match_series</code> harmonise une série entre ses photos, sans viser une référence venue d'ailleurs.</li>
+        <li><strong>Plafond de mouvement des curseurs par passe</strong> et approbation de chaque passe (LrC-AVG) : un garde-fou plus fin que les limites actuelles.</li>
+        <li><strong>Épisodes rejouables</strong>, avec l'écart entre deux états (ToneRelay). <code>export_journal</code> raconte la retouche, sans la rejouer.</li>
+        <li><strong>Une base de goûts qui apprend des corrections</strong> (aslanoov, LrGeniusAI). <code>remember_style</code> s'écrit seulement après accord ; <code>corrections_utilisateur</code> s'en approche.</li>
+        <li><strong>Jeux d'outils activables et mode lecture seule</strong> (Automaat, par4987, LrC-AVG). Ce serait utile, puisque les consignes du connecteur sont presque pleines.</li>
+        <li><strong>Installation en un clic</strong> par fichier .mcpb, et plusieurs clients (Codex, Cursor, VS Code).</li>
+      </ul>
+    </section>
+  </div>
+
+  <h2>Les autres projets confirmés</h2>
+  <p class="sous">De vrais MCP Lightroom, mais plus petits, figés ou en chantier.</p>
+  <div class="table moyen"><table>
+    <thead><tr><th>Projet</th><th>Note</th><th>Ce qui le retient</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://github.com/drshy-org/lightroom-py">drshy-org/lightroom-py</a></td><td class="note">6</td><td>Le MCP n'expose que 15 outils, sans image ni masque ; l'essentiel passe par la ligne de commande. Il lit le catalogue par SQLite, une idée de vitesse valable en lecture seule.</td></tr>
+      <tr><td><a href="https://github.com/4xiomdev/lightroom-classic-mcp">4xiomdev/lightroom-classic-mcp</a></td><td class="note">6</td><td>Aucun jeton, commande brute, chemin de l'original donné à l'agent ; un seul commit en mars.</td></tr>
+      <tr><td><a href="https://github.com/noopz/lightroom_mcp">noopz/lightroom_mcp</a></td><td class="note">5</td><td>Ancêtre probable de lightroom-cli (17 étoiles), inactif depuis fin 2025, sans jeton.</td></tr>
+      <tr><td><a href="https://github.com/saril009/lightroom-mcp">saril009/lightroom-mcp</a></td><td class="note">5</td><td>Deux commits, sans licence ni masques.</td></tr>
+      <tr><td><a href="https://github.com/starlai/lightroom-mcp">starlai/lightroom-mcp</a></td><td class="note">5</td><td>Fourche d'Automaat sans aperçu ni masques : Claude y retouche à l'aveugle.</td></tr>
+      <tr><td><a href="https://github.com/OldCatCookie/lightroom-color-agent">OldCatCookie/lightroom-color-agent</a></td><td class="note">5</td><td>Retouche globale seulement, pensé pour Codex et un « look cinéma ».</td></tr>
+      <tr><td><a href="https://github.com/jasondentler/photo-workflow-mcp">jasondentler/photo-workflow-mcp</a></td><td class="note">5</td><td>Début de projet, README contradictoire, aucun jeton.</td></tr>
+      <tr><td><a href="https://github.com/synthet/lightroom-mcp">synthet/lightroom-mcp</a></td><td class="note">4,5</td><td>Aperçu tiré du fichier source, pas du développement ; aucun masque ni jeton.</td></tr>
+      <tr><td><a href="https://github.com/varunkumar/lightroom-mcp">varunkumar/lightroom-mcp</a></td><td class="note">4,5</td><td>Échange par fichiers non protégés dans /tmp, photo sélectionnée seulement.</td></tr>
+      <tr><td><a href="https://github.com/Symphon-y/lightroom-mcp">Symphon-y</a>, <a href="https://github.com/longfin/lr-mcp">longfin</a>, <a href="https://github.com/zyt-code/lightroom-thin-mcp">zyt-code</a>, <a href="https://github.com/shiyiai/lightroom-mcp">shiyiai</a>, <a href="https://github.com/Birni/lightroom-mcp">Birni</a>, <a href="https://github.com/yopiesuryadi/lightroom-classic-mcp-server">yopiesuryadi</a></td><td class="note">4</td><td>Petits ou figés : pas de retouche (Symphon-y), Lightroom cloud seulement (longfin), un seul commit (zyt-code, shiyiai), lié à WSL (Birni), en chantier (yopiesuryadi).</td></tr>
+      <tr><td><a href="https://github.com/astrobyte-dev/lightclaw">lightclaw</a>, <a href="https://github.com/baramesh/lightroom-mcp-elite">lightroom-mcp-elite</a></td><td class="note">3,5</td><td>Reprise de 4xiomdev pour OpenClaw ; dépend du module d'Automaat et passe par Photoshop.</td></tr>
+      <tr><td><a href="https://github.com/lhy5418/AI-photo-editor">lhy5418/AI-photo-editor</a></td><td class="note">3</td><td>Pilote l'écran par reconnaissance de texte, pas par le SDK ; Windows.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Écartés : ce ne sont pas des MCP Lightroom</h2>
+  <ul class="liste">
+    <li><strong>Adobe.</strong> Aucun MCP officiel pour Lightroom Classic, ni à Adobe MAX 2025 ni à MAX 2026. Le connecteur « <a href="https://www.adobe.com/adobe-connectors/adobe-for-claude.html">Adobe for creativity</a> » pour Claude (avril 2026), Adobe dans ChatGPT et l'assistant Firefly passent par le nuage d'Adobe, pas par ton catalogue. L'<a href="https://developer.adobe.com/lightroom/">API Lightroom</a> vise Lightroom cloud, sans MCP.</li>
+    <li><strong>Passerelles commerciales.</strong> <a href="https://zapier.com/mcp/adobe-photoshop-lightroom">Zapier</a> et <a href="https://pipedream.com/apps/adobe-photoshop-lightroom">Pipedream</a> exposent l'API cloud de Lightroom en MCP distant, sans rien toucher dans Lightroom Classic.</li>
+    <li><strong>Logiciels d'IA pour photographes.</strong> Imagen AI, Aftershoot et Evoto : aucun MCP trouvé.</li>
+    <li><strong>Autres logiciels.</strong> MCP Photoshop seul (adobe-mcp de zachshallbetter et d'AJSMonty, Firefly Services), <a href="https://github.com/YaddyVirus/darktable-mcp">darktable-mcp</a>, et des projets de tri ou de recherche sans Lightroom (shutter-cull-mcp, JarvisArt, viberoom, TonePilot, lightroom-ai-grading, schiffer-mcp, Lrc-mcp de masa-san-jp, adobe-plugin-skills).</li>
+  </ul>
+
+  <p class="pied">Recensement fait le 1<sup>er</sup> novembre 2026 : 4 balayages, 5 vérifications de dépôt et une synthèse. Les étoiles et les dates viennent des dépôts ce jour-là. Les capacités de Développeur ont été relues dans son code (GPS, collections dynamiques, courbes et Point Color par masque). Source de la page : <code>docs/artefacts/panorama-mcp-lightroom.html</code>.</p>
+</main>
