@@ -38,6 +38,7 @@
   .entete { display: grid; gap: 10px; margin-bottom: 28px; }
   .encadre { background: var(--bleu-doux); border-radius: 10px; padding: 12px 16px; max-width: 72ch; }
   .encadre p { margin: 0; }
+  .encadre.fait { background: var(--vert-doux); }
   .etapes { display: grid; gap: 34px; }
   .etape { display: grid; gap: 12px; }
   .etape-tete { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -68,6 +69,7 @@
   <header class="entete">
     <h1>Feuille de route de Développeur</h1>
     <p class="sous">Les améliorations que je te suggère après la comparaison avec lightroom-mcp et une relecture des chantiers ouverts. Chacune a été évaluée dans le code le 1<sup>er</sup> novembre 2026 : ce qui existe déjà, ce qu'il faut construire, la taille et le risque.</p>
+    <div class="encadre fait"><p><b>Fait la nuit du 1<sup>er</sup> novembre 2026 :</b> les étapes 1, 2 et 3, réunies dans la <b>version 1.5</b> (une seule version plutôt que 1.5 puis 1.6 : une seule recette, un seul essai réel). Elle est construite, notarisée et installée, et la recette a réussi. Restent l'essai dans la fenêtre Claude, puis le tag et la Release : l'outil à l'écran demande ton accord pour ouvrir cette fenêtre. L'essai de l'étape 1 a confirmé le risque : une plage de couleurs à deux prélèvements fait planter Lightroom 15.6 ; un seul prélèvement par plage depuis. Reste l'étape 4.</p></div>
     <div class="encadre"><p><b>En résumé :</b> d'abord ranger le dépôt et vérifier un risque, puis publier la retouche générative avec son annulation, puis deux petits ajouts utiles. Le reste attend une vraie raison. Trois idées de lightroom-mcp sont écartées : Développeur fait déjà mieux.</p></div>
   </header>
 
