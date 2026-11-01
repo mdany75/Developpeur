@@ -1,8 +1,13 @@
 -- Retouche.lua : les commandes qui écrivent des réglages : appliquer, recadrer, masquer,
 -- retoucher, copier.
 
+local LrApplication = import 'LrApplication'
+local LrTasks = import 'LrTasks'
+
 local Conversions = require 'Conversions'
 local Ecriture = require 'Ecriture'
+local Json = require 'Json'
+local Liaison = require 'Liaison'
 local Locaux = require 'Locaux'
 local Masques = require 'Masques'
 local Photos = require 'Photos'
@@ -240,6 +245,9 @@ function Retouche.masquer(params)
     noterEtatFinal(photos, etape)
     reponse = reponse or {}
     reponse.mode = modeTexte(prefs)
+    -- La version de Lightroom : le serveur dit quand elle n'est plus celle où les formes des
+    -- masques ont été relevées (ToolHandler.versionFormesMasques).
+    reponse.lightroom = LrApplication.versionString()
     reponse.resultats = resultatsPlans(plans, etape, params)
     return reponse
 end
@@ -286,10 +294,84 @@ local function relireCopie(plans, source)
     end
 end
 
+-- Copie en plan (copy_settings avec plan = true) : au plus tant de photos détaillées dans la
+-- réponse ; le résumé compte toutes les photos.
+local DETAIL_PLAN = 10
+
+-- Ce que Lightroom recalcule lui-même après une copie, d'après les changements prévus : le plan ne
+-- peut pas le prédire (les remarques que relireCopie fait après une vraie copie).
+local function nonPredit(plans)
+    local vus, liste = {}, Json.tableau()
+    local function dire(cle, texte)
+        if not vus[cle] then
+            vus[cle] = true
+            liste[#liste + 1] = texte
+        end
+    end
+    for _, plan in ipairs(plans) do
+        for _, changement in ipairs(plan.changements) do
+            if changement.cle == 'MaskGroupBasedCorrections' then
+                dire('masques', "Masques : Lightroom recalcule les masques IA (sujet, ciel, personnes…) sur chaque photo ; "
+                    .. "une personne précise peut ne pas y être reconnue.")
+            elseif changement.cle == 'UprightTransform' or changement.cle == 'PerspectiveUpright' then
+                dire('upright', "Upright : Lightroom peut recalculer la correction pour chaque photo.")
+            elseif changement.cle == 'RetouchAreas' then
+                dire('taches', "Taches : elles tombent aux mêmes positions que sur la source, à vérifier sur chaque photo.")
+            elseif changement.cle == 'CropConstrainToWarp' or tostring(changement.cle):match('^Crop') then
+                dire('cadre', "Recadrage : avec « Contraindre le recadrage », Lightroom peut resserrer le cadre de chaque photo.")
+            end
+        end
+    end
+    return liste
+end
+
+-- Le plan d'une copie, sans rien écrire : par réglage, le nombre de photos où il change ; le détail
+-- (avant → après, remarques) des premières photos ; ce que Lightroom recalculera. Permis en pause et
+-- en « Proposer d'abord » (rien n'est écrit) ; les photos protégées sont dites, pas refusées.
+local function planDeCopie(source, plans, cibles, prefs, params)
+    local libelles = type(params.libelles) == 'table' and params.libelles or {}
+    local parReglage, ordre = {}, {}
+    local touchees = 0
+    local detail = Json.tableau()
+    for i, plan in ipairs(plans) do
+        if #plan.changements > 0 then
+            touchees = touchees + 1
+        end
+        for _, changement in ipairs(plan.changements) do
+            local nom = libelles[changement.cle] or changement.cle
+            if not parReglage[nom] then
+                parReglage[nom] = 0
+                ordre[#ordre + 1] = nom
+            end
+            parReglage[nom] = parReglage[nom] + 1
+        end
+        if i <= DETAIL_PLAN then
+            detail[#detail + 1] = { photo = decrire(plan.photo, false), changements = plan.changements, remarques = plan.notes }
+        end
+    end
+    local resume = Json.tableau()
+    for _, nom in ipairs(ordre) do
+        resume[#resume + 1] = { reglage = nom, photos = parReglage[nom] }
+    end
+    local protegees, raison = LrTasks.pcall(verifierProtection, cibles, prefs, params, 'copy_settings')
+    return { mode = modeTexte(prefs), plan = true, rien_n_est_ecrit = true, source = decrire(source.photo, false),
+        photos = #plans, photos_touchees = touchees, par_reglage = resume, resultats = detail,
+        detail_limite = #plans > DETAIL_PLAN and string.format("Détail des %d premières photos sur %d ; par_reglage les compte toutes.", DETAIL_PLAN, #plans) or nil,
+        non_predit = nonPredit(plans),
+        protection = not protegees and Liaison.messageErreur(raison) or nil,
+        suite = "Rien n'a été écrit. Pour copier : copy_settings avec les mêmes arguments, sans plan"
+            .. (prefs.mode == 'proposer' and ", avec confirm = true après l'accord de l'utilisateur." or ".") }
+end
+
 function Retouche.copier(params)
-    verifierPause(params)
+    local essai = params.essai == true
+    if not essai then
+        verifierPause(params)
+    end
     local prefs = Preferences.lire()
-    verifierAccord(prefs, params, 'copy_settings')
+    if not essai then
+        verifierAccord(prefs, params, 'copy_settings')
+    end
     local photoSource = photoParId(params.source)
     local reglagesSource = photoSource:getDevelopSettings()
     local source = { photo = photoSource, reglages = reglagesSource, raw = estRaw(photoSource, reglagesSource) }
@@ -300,13 +382,18 @@ function Retouche.copier(params)
             cibles[#cibles + 1] = photo
         end
     end
-    verifierProtection(cibles, prefs, params, 'copy_settings')
+    if not essai then
+        verifierProtection(cibles, prefs, params, 'copy_settings')
+    end
     local plans = {}
     for _, photo in ipairs(cibles) do
         plans[#plans + 1] = preparerCopie(source, photo, params)
     end
     if #plans == 0 then
         echouer("Aucune photo à part la source : rien à copier.")
+    end
+    if essai then
+        return planDeCopie(source, plans, cibles, prefs, params)
     end
     ecrirePlans(plans, etape, prefs, params)
     calculerIA(plans)

@@ -509,6 +509,41 @@ final class ToolsAvancesTests: XCTestCase {
         XCTAssertEqual(fake.lastParams["inclure"]?["masques"]?.bool, false)
         XCTAssertEqual(fake.lastParams["raison"]?.string, "Même lumière.")
         XCTAssertTrue(call("copy_settings", ["source_id": 1]).isError, "photos visées obligatoires")
+        XCTAssertNil(fake.lastParams["essai"], "sans plan : une vraie copie")
+        // plan = true : le module prépare la copie sans rien écrire ; pas d'accord à transmettre.
+        _ = call("copy_settings", ["source_id": 1, "selection": true, "plan": true, "confirm": true])
+        XCTAssertEqual(fake.calls.last?.command, "copier")
+        XCTAssertEqual(fake.lastParams["essai"]?.bool, true)
+        XCTAssertNil(fake.lastParams["confirme"])
+    }
+
+    func testAvertissementQuandLightroomChangeDeVersion() {
+        XCTAssertNil(ToolHandler.avertissementFormesMasques("15.6"))
+        XCTAssertNil(ToolHandler.avertissementFormesMasques("15.6.1"), "une révision ne change pas les formes")
+        XCTAssertNil(ToolHandler.avertissementFormesMasques(""), "version inconnue : rien")
+        XCTAssertTrue(ToolHandler.avertissementFormesMasques("16.0")?.contains("relevées dans la 15.6") == true)
+        XCTAssertNotNil(ToolHandler.avertissementFormesMasques("15.7"))
+        fake.replies["etat"] = ["lightroom": "16.0", "version_module": .string(ServerInfo.version)]
+        let etat = call("get_status", [:])
+        XCTAssertTrue(etat.text.contains("avertissement_masques"), etat.text)
+        fake.replies["etat"] = ["lightroom": "15.6", "version_module": .string(ServerInfo.version)]
+        XCTAssertFalse(call("get_status", [:]).text.contains("avertissement_masques"))
+        // add_mask : la version vient avec la réponse du module ; un dégradé sous une autre version.
+        fake.replies["masquer"] = ["lightroom": "16.0", "resultats": []]
+        let masque = call("add_mask", ["step_name": "x", "masks": [["kind": "radial", "center_x": 0.5, "center_y": 0.5, "radius_x": 0.3,
+                                                                       "adjustments": ["Exposure": 0.2]]]])
+        XCTAssertTrue(masque.text.contains("relevées dans la 15.6"), masque.text)
+        fake.replies["masquer"] = ["lightroom": "15.6", "resultats": []]
+        XCTAssertFalse(call("add_mask", ["step_name": "x", "masks": [["kind": "radial", "center_x": 0.5, "center_y": 0.5, "radius_x": 0.3,
+                                                                        "adjustments": ["Exposure": 0.2]]]]).text.contains("relevées dans"))
+    }
+
+    func testFindPhotosByFocalLength() {
+        _ = call("find_photos", ["rating_min": 3, "focal_min": 50, "focal_max": 60])
+        XCTAssertEqual(fake.calls.last?.command, "chercher")
+        XCTAssertEqual(fake.lastParams["focale_min"]?.double, 50)
+        XCTAssertEqual(fake.lastParams["focale_max"]?.double, 60)
+        XCTAssertTrue(call("find_photos", ["rating_min": 3, "focal_min": 0]).isError)
     }
 
     func testExportJournalAsMarkdownAndFile() throws {

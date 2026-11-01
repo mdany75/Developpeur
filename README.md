@@ -587,7 +587,9 @@ cadre.
   rangées en instantanés « Claude · … » et montrées sur une planche numérotée ; celle que vous
   choisissez se pose comme une retouche, les autres s'effacent.
 - Copier une retouche vers d'autres photos, comme Synchroniser (sur demande avec le recadrage, les
-  masques et les taches) ; appliquer un paramètre prédéfini, à l'intensité voulue, ou en créer un
+  masques et les taches). Avant une série, Claude peut d'abord montrer ce qui changerait, sans rien
+  écrire : pour chaque réglage, sur combien de photos il bouge, le détail (avant → après) des
+  10 premières photos, et ce que Lightroom recalculera lui-même (masques IA, Upright) ; appliquer un paramètre prédéfini, à l'intensité voulue, ou en créer un
   d'après une retouche réussie (groupe « Claude », visible au lancement suivant de Lightroom).
 - Passer une photo d'une version de processus 3 à 5 à la version 6 (toujours montré d'abord),
   imposer un profil d'objectif installé (objectif manuel ou adapté), tourner d'un quart de tour,
@@ -858,8 +860,8 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
 **Bibliothèque**
 
 - Chercher dans tout le catalogue : texte, mot-clé, note, drapeau, libellé de couleur, appareil,
-  objectif, ISO, format, dates, dossier, collection, photos retouchées ou non par Claude, retenues
-  jamais exportées.
+  objectif, ISO, focale (« mes photos au 56 mm », avec un autre critère), format, dates, dossier,
+  collection, photos retouchées ou non par Claude, retenues jamais exportées.
 - Classer : note, drapeau, libellé de couleur, titre, légende, droits d'auteur, texte alternatif et
   description longue rédigés d'après la photo, champs IPTC (lieu, événement, personnes), mots-clés
   rangés dans votre hiérarchie (« Lieux > Canada > Montréal »), paramètre prédéfini de métadonnées.
@@ -1206,7 +1208,11 @@ Le SDK de Lightroom ne donne pas tout aux modules. Claude vous propose de faire 
 
 Le débruitage, les détails bruts, la super résolution et la suppression des reflets demandent
 Lightroom Classic 15.3 ou plus récent ; le contour d'un masque IA, 15.5. La plage de couleurs suit
-un modèle de couleur approché : Claude en vérifie la sélection sur l'aperçu.
+un modèle de couleur approché : Claude en vérifie la sélection sur l'aperçu ; une plage ne prend
+qu'une couleur (deux font planter Lightroom 15.6), une autre couleur s'y ajoute en seconde plage.
+Les formes des dégradés, pinceaux, objets et plages de couleurs ont été relevées dans Lightroom
+Classic 15.6 : sous une autre version, `get_status` et `add_mask` le disent, et Claude vérifie le
+premier masque de ce genre.
 
 ## Installer
 

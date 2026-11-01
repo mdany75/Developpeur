@@ -1792,6 +1792,67 @@ test("copier : réglages, balance entre RAW et JPEG, profil, masques à recalcul
     egal(#cible.reglages.MaskGroupBasedCorrections, 0)
 end)
 
+test("copier en plan : ce qui changerait, photo par photo, sans rien écrire ; permis en pause et en « Proposer d'abord »", function()
+    local source = photoFuji()
+    source.reglages.Exposure2012 = 0.5
+    source.reglages.Temperature = 6000
+    source.reglages.MaskGroupBasedCorrections = { { What = 'Correction', CorrectionMasks = { { What = 'Mask/Image', MaskSubType = 1, InputDigest = 'X', MaskDigest = 'Y' } } } }
+    local cible = S.Photo(5, { Temperature = 5000, Tint = 0, Exposure2012 = 0, WhiteBalance = 'As Shot', CameraProfile = 'Adobe Standard', Look = ADOBE_COLOR },
+        { fileName = 'C.RAF', fileFormat = 'RAW' })
+    local jpeg = photoJpeg()
+    S.prefs.mode = 'proposer'
+    Liaison.pause = true
+    local ecritures = #S.ecritures
+    local plan = Commandes.executer('copier', {
+        source = 4, photos = { 5, 2, 4 }, cles = { 'Exposure2012', 'Temperature' }, essai = true,
+        inclure = { masques = true }, etape = 'copie', libelles = { Exposure2012 = 'Exposition' },
+    })
+    Liaison.pause = false
+    egal(plan.plan, true)
+    egal(plan.rien_n_est_ecrit, true)
+    egal(#S.ecritures, ecritures, "aucune écriture")
+    egal(cible.reglages.Exposure2012, 0, "la cible n'a pas changé")
+    egal(cible.proprietes.etapesClaude, nil, "aucune étape")
+    egal(plan.photos, 2)
+    egal(plan.photos_touchees, 2)
+    egal(plan.par_reglage[1].reglage, 'Exposition')
+    egal(plan.par_reglage[1].photos, 2)
+    egal(#plan.resultats, 2)
+    local exposition
+    for _, c in ipairs(plan.resultats[1].changements) do
+        if c.cle == 'Exposure2012' then exposition = c end
+    end
+    egal(exposition.avant, 0)
+    egal(exposition.apres, 0.5)
+    egal(contient(plan.resultats[2].remarques, "Balance des blancs non copiée"), true)
+    egal(contient(plan.non_predit, "masques IA"), true, "les masques IA se recalculent : dit, pas prédit")
+    egal(contient({ plan.suite }, "confirm = true"), true)
+    egal(jpeg.reglages.Exposure2012 ~= 0.5, true)
+    -- Sans plan, en pause : refusé, comme avant.
+    Liaison.pause = true
+    echoue(function()
+        Commandes.executer('copier', { source = 4, photos = { 5 }, cles = { 'Exposure2012' }, confirme = true, etape = 'copie' })
+    end, "pause")
+    Liaison.pause = false
+end)
+
+test("copier en plan : une photo protégée est dite, pas refusée ; au-delà de 10 photos, le détail des 10 premières", function()
+    local source = photoFuji()
+    source.reglages.Exposure2012 = 0.5
+    local ids = {}
+    for i = 1, 12 do
+        S.Photo(100 + i, { Exposure2012 = 0 }, { fileName = 'P' .. i .. '.RAF', fileFormat = 'RAW' })
+        ids[#ids + 1] = 100 + i
+    end
+    S.prefs.copiesSeulement = true
+    local plan = Commandes.executer('copier', { source = 4, photos = ids, cles = { 'Exposure2012' }, essai = true, etape = 'copie' })
+    egal(plan.photos, 12)
+    egal(#plan.resultats, 10)
+    egal(type(plan.detail_limite), 'string')
+    egal(plan.par_reglage[1].photos, 12)
+    egal(type(plan.protection), 'string', "les photos protégées sont dites")
+end)
+
 -- Version 1.2 : proposition, comparaison, presets, journal ----------------------------
 
 test("essayer : applique, rend, remet comme avant, sans rien mémoriser", function()
@@ -2981,6 +3042,18 @@ test("Bibliothèque : recherche par critères, filtre des dates, tri et pages", 
     echoue(function() Commandes.executer('chercher', {}) end, "Aucun critère")
     echoue(function() Commandes.executer('chercher', { date_debut = '2026-07-01' }) end, "Préciser la recherche")
     echoue(function() Commandes.executer('chercher', { note_min = 1, date_debut = '1er juillet' }) end, "AAAA-MM-JJ")
+end)
+
+test("Bibliothèque : recherche par focale (focalLength lue en lot, nombre ou texte « 56 mm ») ; sans focale, écartée", function()
+    local a, b, c = photoRaw(), photoJpeg(), photoFuji()
+    a.brut.rating, b.brut.rating, c.brut.rating = 3, 3, 3
+    a.brut.focalLength, b.brut.focalLength, c.brut.focalLength = 23, '56 mm', nil
+    local resultat = Commandes.executer('chercher', { note_min = 3, focale_min = 50, focale_max = 60 })
+    egal(resultat.total, 1)
+    egal(resultat.photos[1].id, b.localIdentifier)
+    egal(Commandes.executer('chercher', { note_min = 3, focale_max = 30 }).photos[1].id, a.localIdentifier)
+    egal(Commandes.executer('chercher', { note_min = 3, focale_min = 10 }).total, 2, "la photo sans focale n'est pas gardée")
+    echoue(function() Commandes.executer('chercher', { focale_min = 50 }) end, "Préciser la recherche")
 end)
 
 test("Bibliothèque : recherche par mot-clé, libellé, drapeau et retouche de Claude", function()

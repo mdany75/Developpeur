@@ -3,6 +3,16 @@
 ## Non publié
 
 ### Ajouté
+- Voir avant de copier : `copy_settings` avec `plan = true` montre, sans rien écrire, ce qu'une copie
+  changerait sur une série (pour chaque réglage, le nombre de photos où il bouge ; le détail avant →
+  après des 10 premières photos ; ce que Lightroom recalculera lui-même, comme les masques IA ou
+  Upright). Permis en pause et en « Proposer d'abord » ; une photo protégée est signalée.
+- Chercher par focale : `find_photos` accepte `focal_min` et `focal_max` (en millimètres), avec un
+  autre critère (« mes photos au 56 mm de cette année »).
+- Changement de version de Lightroom : les formes des dégradés, pinceaux, objets et plages de
+  couleurs ont été relevées dans Lightroom Classic 15.6 ; sous une autre version, `get_status`
+  (`avertissement_masques`) et `add_mask` le disent, et Claude vérifie le premier masque de ce
+  genre avant d'en poser d'autres.
 - Retouche générative par Fibo 2, sur votre demande seulement (outil `generative_edit`, le 36e) :
   ce que Lightroom ne sait pas faire, comme remplacer un pantalon par une jupe ou changer un objet,
   Claude le fait faire par Fibo 2 sur ce Mac (mflux, sans rien envoyer sur Internet). La photo

@@ -26,8 +26,9 @@ extension ToolHandler {
         let presetInclusions = inclusionProperties.filter { Self.presetInclusions.contains($0.0) }
         return [
             tool("copy_settings",
-                 "Copie les réglages d'une photo vers d'autres, comme Synchroniser dans Lightroom, en une étape « Claude · <step_name> » par photo : groupes de réglages au choix, profil, courbes, couleurs ponctuelles, et sur demande recadrage, masques et retouches de taches. La balance des blancs n'est pas copiée entre un RAW et un JPEG (échelles différentes). Respecte le mode « Proposer d'abord » (confirm).",
-                 properties: [("source_id", prop("integer", "Photo dont on copie les réglages.")), ("groups", groupsProperty)]
+                 "Copie les réglages d'une photo vers d'autres, comme Synchroniser dans Lightroom, en une étape « Claude · <step_name> » par photo : groupes de réglages au choix, profil, courbes, couleurs ponctuelles, et sur demande recadrage, masques et retouches de taches. La balance des blancs n'est pas copiée entre un RAW et un JPEG (échelles différentes). plan = true d'abord pour une série : ce qui changerait, photo par photo, sans rien écrire. Respecte le mode « Proposer d'abord » (confirm).",
+                 properties: [("source_id", prop("integer", "Photo dont on copie les réglages.")), ("groups", groupsProperty),
+                              ("plan", prop("boolean", "true = voir avant de copier : par réglage, le nombre de photos où il changerait ; le détail (avant → après) des 10 premières ; ce que Lightroom recalculera lui-même. Rien n'est écrit (permis en pause et en « Proposer d'abord »)."))]
                     + inclusionProperties + writeProperties + targetProperties,
                  required: ["source_id"]),
             tool("list_profiles",
@@ -150,6 +151,10 @@ extension ToolHandler {
         params["cles"] = .array(keys.map(JSONValue.string))
         params["inclure"] = inclusionParameters(args)
         params["libelles"] = libellesCopie(keys)
+        if args.bool("plan") == true {
+            params["essai"] = true
+            params.removeValue(forKey: "confirme")
+        }
         return Self.withLabels(try lightroom.send("copier", params, timeout: 240))
     }
 

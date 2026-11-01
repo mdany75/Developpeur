@@ -1493,6 +1493,8 @@ local function recherche(params)
     if params.exportee ~= nil then
         apres.exportee = params.exportee == true
     end
+    -- Focale réelle en millimètres (focalLength, lue en lot) : filtrée après coup.
+    apres.focaleMin, apres.focaleMax = tonumber(params.focale_min), tonumber(params.focale_max)
     local desc = { combine = 'intersect' }
     for i, critere in ipairs(criteres) do
         desc[i] = critere
@@ -1562,7 +1564,7 @@ local function resultatsRecherche(params)
     elseif base then
         photos = base
     elseif next(apres) then
-        echouer("Préciser la recherche : un filtre de date, de copie virtuelle ou d'exportation seul parcourrait tout le catalogue. Ajouter un critère (texte, note, drapeau, appareil, dossier, collection, depuis_jours…).")
+        echouer("Préciser la recherche : un filtre de date, de focale, de copie virtuelle ou d'exportation seul parcourrait tout le catalogue. Ajouter un critère (texte, note, drapeau, appareil, dossier, collection, depuis_jours…).")
     else
         echouer("Aucun critère de recherche.")
     end
@@ -1571,14 +1573,14 @@ local function resultatsRecherche(params)
     if next(apres) or tri ~= 'aucun' then
         if #photos > MAX_TRI then
             if next(apres) then
-                echouer(string.format("%d photos avant le filtre des dates, des copies virtuelles, des libellés ou de l'exportation : c'est plus que %d. Préciser la recherche.", #photos, MAX_TRI))
+                echouer(string.format("%d photos avant le filtre des dates, de la focale, des copies virtuelles, des libellés ou de l'exportation : c'est plus que %d. Préciser la recherche.", #photos, MAX_TRI))
             end
             remarques[#remarques + 1] = string.format("%d photos : trop pour les trier (%d au plus) ; dans l'ordre de Lightroom.", #photos, MAX_TRI)
             tri = 'aucun'
         end
     end
     if next(apres) or tri ~= 'aucun' then
-        local donnees = catalogue():batchGetRawMetadata(photos, { 'dateTimeOriginal', 'isVirtualCopy', 'colorNameForLabel', 'rating', 'isExported' })
+        local donnees = catalogue():batchGetRawMetadata(photos, { 'dateTimeOriginal', 'isVirtualCopy', 'colorNameForLabel', 'rating', 'isExported', 'focalLength' })
         local champs = apres.exportee ~= nil and catalogue():batchGetPropertyForPlugin(photos, _PLUGIN, { 'apercuSeulement' }) or {}
         local function d(photo)
             return donnees[photo] or {}
@@ -1600,6 +1602,15 @@ local function resultatsRecherche(params)
                 if apres.exportee ~= nil
                     and Photos.exportee(photo, valeurs.isExported == true, (champs[photo] or {}).apercuSeulement) ~= apres.exportee then
                     garde = false
+                end
+                if apres.focaleMin or apres.focaleMax then
+                    -- Un nombre ; un texte « 56 mm » se lit aussi. Sans focale (scan, objectif
+                    -- manuel) : écartée.
+                    local f = tonumber(valeurs.focalLength)
+                        or tonumber((tostring(valeurs.focalLength or ''):match('[%d]+[,.]?[%d]*') or ''):gsub(',', '.'), nil)
+                    if not f or (apres.focaleMin and f < apres.focaleMin - 0.05) or (apres.focaleMax and f > apres.focaleMax + 0.05) then
+                        garde = false
+                    end
                 end
                 if apres.sansLibelle and valeurs.colorNameForLabel ~= nil and valeurs.colorNameForLabel ~= '' and valeurs.colorNameForLabel ~= 'none' then
                     garde = false

@@ -438,6 +438,10 @@ public final class ToolHandler {
     private func status(_ args: Arguments) throws -> JSONValue {
         var etat = try lightroom.send("etat", args.bool("request_backup") == true ? ["sauvegarde": true] : [:], timeout: 10).object ?? [:]
         etat["version_serveur"] = .string(versionServeur)
+        if let version = etat["lightroom"]?.string {
+            versionLightroom = version
+            if let alerte = Self.avertissementFormesMasques(version) { etat["avertissement_masques"] = .string(alerte) }
+        }
         if let module = etat["version_module"]?.string, let ecart = Self.ecartVersions(serveur: versionServeur, module: module) {
             etat["avertissement_version"] = .string(ecart)
             versionSignalee = true

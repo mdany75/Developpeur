@@ -357,7 +357,16 @@ extension ToolHandler {
             resultat = try preview(params, args: args, notes: notes)
         } else {
             params.merge(writeParameters(args, defaultStep: "masques")) { _, new in new }
-            resultat = json(Self.withLabels(try lightroom.send("masquer", params, timeout: 180), notes: notes))
+            let reponse = try lightroom.send("masquer", params, timeout: 180)
+            // La version de Lightroom vient avec la réponse : une autre que celle des formes relevées
+            // se dit (versionFormesMasques), sans rien refuser.
+            if let version = reponse["lightroom"]?.string {
+                versionLightroom = version
+                if masks.contains(where: Self.positionne), let alerte = Self.avertissementFormesMasques(version) {
+                    notes.append(.string(alerte))
+                }
+            }
+            resultat = json(Self.withLabels(reponse, notes: notes))
         }
         return cartes.map { Self.avecCarte(resultat, $0) } ?? resultat
     }
@@ -525,6 +534,20 @@ extension ToolHandler {
             if let composants = objet["composants"]?.array { objet["composants"] = .array(try composants.map(avecModeles)) }
             return .object(objet)
         }
+    }
+
+    /// Version de Lightroom Classic où les formes écrites des masques à position (dégradés,
+    /// pinceau, objet, plage de couleurs, personne précise) ont été relevées et constatées. Une
+    /// autre version peut les ranger autrement : le serveur le dit (get_status, add_mask), sans
+    /// rien refuser.
+    static let versionFormesMasques = "15.6"
+
+    /// L'avertissement pour une autre version que `versionFormesMasques` (majeure et mineure), ou
+    /// nil. Version inconnue (module ancien, faux module) : nil.
+    static func avertissementFormesMasques(_ version: String) -> String? {
+        let numeros = { (texte: String) in texte.split(separator: ".").prefix(2).map { Int($0.prefix { $0.isNumber }) ?? 0 } }
+        guard !version.isEmpty, numeros(version) != numeros(versionFormesMasques) else { return nil }
+        return "Lightroom Classic \(version) : les formes des dégradés, pinceaux, objets, plages de couleurs et personnes précises ont été relevées dans la \(versionFormesMasques). Vérifier le premier masque de ce genre (add_mask avec mask_map, ou view_photo) avant d'en poser d'autres, et dire à l'utilisateur s'il est mal placé."
     }
 
     /// Un masque (ou l'un de ses composants) a-t-il une position dans l'image : dégradé linéaire

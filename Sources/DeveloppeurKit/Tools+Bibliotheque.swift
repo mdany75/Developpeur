@@ -71,6 +71,8 @@ extension ToolHandler {
                     ("include_subfolders", prop("boolean", "Avec folder : chercher aussi dans les sous-dossiers (défaut : oui).")),
                     ("collection", prop("string", "Collection, par son nom, « Ensemble > Nom » ou son identifiant (manage_collections, action list).")),
                     ("virtual_copies", enumProp(["only", "exclude"], "only = seulement les copies virtuelles ; exclude = sans elles.")),
+                    ("focal_min", prop("number", "Focale minimale en millimètres, telle que l'appareil l'a notée (sans équivalent 24 × 36). Avec un autre critère.")),
+                    ("focal_max", prop("number", "Focale maximale en millimètres. Avec un autre critère.")),
                     ("exported", prop("boolean", "false = seulement les photos jamais exportées (retenues à exporter : flag pick et exported false) ; true = seulement celles déjà exportées. Avec un autre critère. D'après Lightroom ; un aperçu de Claude ne compte pas comme une exportation.")),
                     ("sort", enumProp(Self.searchSorts.map(\.name), "Ordre : date (défaut), date_desc, rating (meilleures d'abord) ou none.")),
                     ("include_keywords", prop("boolean", "true = donner aussi les mots-clés de chaque photo.")),
@@ -229,6 +231,11 @@ extension ToolHandler {
         if let sort = try enumValue(args, "sort", Self.searchSorts) { params["tri"] = sort }
         if args.bool("include_keywords") == true { params["mots_cles_details"] = true }
         if let exported = args.bool("exported") { params["exportee"] = .bool(exported) }
+        for (key, moduleKey) in [("focal_min", "focale_min"), ("focal_max", "focale_max")] {
+            guard let value = args.double(key) else { continue }
+            guard (1...5_000).contains(value) else { throw LightroomError.invalid("« \(key) » : une focale en millimètres, de 1 à 5000.") }
+            params[moduleKey] = .number(value)
+        }
         if params.isEmpty { throw LightroomError.invalid("Aucun critère de recherche.") }
         let limit = try intValue(args, "limit", range: 1...Int.max)?.int ?? Self.defaultSearchLimit
         params["limite"] = .number(Double(min(limit, Self.maxSearchLimit)))
