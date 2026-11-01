@@ -56,12 +56,14 @@
 <body>
 <div class="page">
 <h1>Analyse du connecteur et du module Développeur</h1>
-<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne).</p>
+<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Mise à jour le 1<sup>er</sup> novembre 2026 avec la 1.5.</p>
 
 <div class="encadre"><b>Verdict.</b> La base est solide : 585 tests Swift, des tests Lua sur un SDK simulé, un jeton de liaison bien conçu, une couverture très large des réglages du module Développeur. Les gains viennent maintenant de trois endroits : <b>alléger ce que le modèle lit</b> (23 000 caractères de descriptions), <b>fiabiliser le pont</b> avec Lightroom, et <b>protéger la photo de l'empilement</b> de réglages.</div>
 
+<div class="encadre"><b>Livré avec la 1.5 (1<sup>er</sup> novembre 2026).</b> Retouche générative par Fibo 2 en local (<code>generative_edit</code>, le 36<sup>e</sup> outil), que <code>undo_last</code> défait en retirant la nouvelle photo · <code>copy_settings</code> avec <code>plan</code> : ce qu'une copie changerait, sans rien écrire · recherche par focale · avertissement quand Lightroom n'est plus la 15.6 où les formes des masques ont été relevées · correction : une plage de couleurs à deux prélèvements faisait planter Lightroom (constaté), un seul prélèvement par plage. Aucun des constats ci-dessous n'est réglé par la 1.5 : ils restent à faire.</div>
+
 <div class="bilan">
-  <div class="chiffre"><b>35</b><span>outils exposés, ≈ 6 à 7 000 jetons à chaque session</span></div>
+  <div class="chiffre"><b>36</b><span>outils exposés depuis la 1.5 (35 à l'analyse), ≈ 6 à 7 000 jetons à chaque session</span></div>
   <div class="chiffre"><b>56</b><span>constats classés par impact</span></div>
   <div class="chiffre"><b>3</b><span>erreurs réelles à corriger tout de suite</span></div>
   <div class="chiffre"><b>1 931</b><span>lignes de notes retirées (CLAUDE.md, CHANGELOG, README)</span></div>
