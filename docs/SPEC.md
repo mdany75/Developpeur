@@ -3281,8 +3281,15 @@ d'essai RAW et relus par `get_settings` avec `all_keys` :
   saturées (érable × 0,44) mais déborde ailleurs : 100 est un compromis, et le modèle reste approché
   (mesuré sur le rendu sRGB, pas sur les données de Camera Raw). Le masque fait à la main relevé
   avant (« 0.018204 0.820061 0.667465 », un gris bleuté) ne cadre pas avec ce modèle : le pixel relevé
-  était peut-être très sombre. `kind: "color"` reçoit `samples` (1 à 5 points) et `color_range`
-  (`ColorAmount`, défaut 0,5) ; le serveur prélève sur l'aperçu de la seule photo visée ;
+  était peut-être très sombre. `kind: "color"` reçoit `samples` (un seul point) et `color_range`
+  (`ColorAmount`, défaut 0,5) ; le serveur prélève sur l'aperçu de la seule photo visée. Constaté le
+  1er novembre 2026 (Lightroom Classic 15.6, copie d'essai « Essai plage 2 couleurs » du camping) :
+  une plage écrite avec deux `PointModels` fait planter Lightroom aussitôt, le masque déjà écrit au
+  catalogue (le catalogue se rouvre ; `undo_last` le retire sans rendre la photo). Deux plages d'un
+  prélèvement chacune, réunies par `combine` (add, color), s'écrivent et se rendent bien. D'où un
+  seul prélèvement par plage (`maxColorSamples` = 1, refus dans `Plans.lua`, règle de la
+  simulation) ; une autre couleur passe par un composant combiné. Le dépôt lightroom-mcp le disait
+  aussi (une plage, un seul `PointModels`). Pas d'étape de recette : l'essai fait planter Lightroom ;
 - **Plage de profondeur** : `Type = 3` et `DepthRange`, quatre valeurs de 0 à 1 comme `LumRange`
   (`Locaux.profondeur`). Constaté le 17 octobre 2026 sur une copie d'une photo Portrait d'iPhone 13
   Pro (HEIC à carte de disparité) : 0 à 0,35 n'assombrit que le bras tendu au premier plan, 0,6 à 1

@@ -113,6 +113,10 @@
   l'accord qu'attendait l'écriture des masques).
 
 ### Corrigé
+- Plage de couleurs : une seule couleur prélevée par plage. Deux prélèvements dans une même plage
+  faisaient planter Lightroom Classic 15.6 (constaté le 1er novembre 2026 sur une copie d'essai) ;
+  une autre couleur va maintenant dans une seconde plage, réunie à la première dans le même masque,
+  qui se rend bien.
 - Fenêtre Suivi : un clic sur une barre montre de nouveau ses photos dans la Bibliothèque (il
   échouait, le Lua de Lightroom n'ayant pas une fonction que le module employait).
 - Fenêtre Claude : une conversation ne prend plus pour titre un texte d'attente que Claude écrivait

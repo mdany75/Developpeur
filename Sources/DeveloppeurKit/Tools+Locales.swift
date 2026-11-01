@@ -102,8 +102,11 @@ extension ToolHandler {
         })
         return .object(objet)
     }
-    /// Couleurs prélevées au plus dans une plage de couleurs (comme Lightroom, Maj-clic).
-    static let maxColorSamples = 5
+    /// Couleurs prélevées au plus dans une plage de couleurs : une seule. Constaté le 1er novembre
+    /// 2026 dans Lightroom Classic 15.6 : une plage écrite avec deux `PointModels` fait planter
+    /// Lightroom aussitôt. Deux plages d'un prélèvement chacune, réunies par `combine` (add, color),
+    /// se rendent bien (constaté le même jour).
+    static let maxColorSamples = 1
     /// Objet désigné par box : un rectangle (Mask/Polygon), comme le mode rectangle de l'outil
     /// Objets ; constaté le 17 octobre 2026 qu'il sélectionne l'objet entier (voir docs/SPEC.md).
     static let objectBoxAsRectangle = true
@@ -142,7 +145,7 @@ extension ToolHandler {
             "max": prop("number", "Plage de luminance ou de profondeur : haut de la plage, de 0 à 100."),
             "samples": ["type": "array", "minItems": 1, "maxItems": .number(Double(Self.maxColorSamples)),
                         "items": ["type": "array", "items": ["type": "number"], "minItems": 2, "maxItems": 2],
-                        "description": "Plage de couleurs : les points [x, y] (0 à 1, dans l'image telle que la montre view_photo) où prélever la couleur à garder, comme la pipette de Lightroom ; sur un aplat de la couleur, pas sur un bord."],
+                        "description": "Plage de couleurs : les points [x, y] (0 à 1, dans l'image telle que la montre view_photo) où prélever la couleur à garder, comme la pipette de Lightroom : un seul point, sur un aplat de la couleur, pas sur un bord ; une autre couleur : un composant combine (add, color)."],
             "color_range": prop("number", "Plage de couleurs : étendue des couleurs gardées autour de celles prélevées, de 0 (étroite) à 100 (large) ; défaut 50."),
             "strokes": ["type": "array", "minItems": 1, "maxItems": .number(Double(Self.maxStrokes)),
                         "description": "Pinceau (brush) ou objet (object) : des traits, chacun une ligne brisée dans l'image telle que la montre view_photo. Pour un objet, des traits passés sur lui suffisent ; pour éclaircir ou assombrir, suivre la zone au plus près, vérifié ensuite par un zoom.",
@@ -783,7 +786,7 @@ extension ToolHandler {
             name = "Plage de luminance"
         case "color":
             guard let raw = mask["samples"]?.array, (1...Self.maxColorSamples).contains(raw.count) else {
-                throw LightroomError.invalid("« \(path).samples » : de 1 à \(Self.maxColorSamples) points [x, y] où prélever la couleur.")
+                throw LightroomError.invalid("« \(path).samples » : un seul point [x, y] où prélever la couleur (deux prélèvements dans une même plage font planter Lightroom). Une autre couleur : un composant combine {\"mode\": \"add\", \"kind\": \"color\", \"samples\": [[x, y]]}.")
             }
             result["type"] = "couleur"
             result["prelevements"] = .array(try raw.map { point in

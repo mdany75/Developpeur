@@ -3330,19 +3330,35 @@ test("masquer : plage de couleurs prélevée, rangée comme Lightroom (PointMode
     S.active = photo
     Commandes.executer('masquer', { masques = { { type = 'couleur', nom = 'Claude · Plage de couleurs', etendue = 0.6,
         locaux = { LocalExposure2012 = -0.1 },
-        prelevements = { { x = 0.1, y = 0.47, modele = { 0.76, 0.41, 0.21 } }, { x = 0.2, y = 0.3, modele = { 0.7, 0.45, 0.3 } } } } },
+        prelevements = { { x = 0.1, y = 0.47, modele = { 0.76, 0.41, 0.21 } } } } },
         etape = 'ciel' })
     local m = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1]
     egal(m.What, 'Mask/RangeMask')
     egal(m.CorrectionRangeMask.Type, 1)
     egal(m.CorrectionRangeMask.ColorAmount, 0.6)
     egal(m.CorrectionRangeMask.PointModels[1], '0.760000 0.410000 0.210000 0.100000 0.470000 0')
-    egal(#m.CorrectionRangeMask.PointModels, 2)
+    egal(#m.CorrectionRangeMask.PointModels, 1)
     proche(m.CorrectionReferenceX, 0.1)
     egal(photo.appliques[#photo.appliques].preset, nil, "pas un masque IA : par applyDevelopSettings")
     echoue(function()
         Commandes.executer('masquer', { masques = { { type = 'couleur', nom = 'x', locaux = {}, prelevements = {} } }, etape = 'x' })
     end, "sans couleur prélevée")
+    -- Deux prélèvements dans une même plage font planter Lightroom (constaté le 1er novembre 2026) :
+    -- refusés avant toute écriture.
+    local avant = #photo.reglages.MaskGroupBasedCorrections
+    echoue(function()
+        Commandes.executer('masquer', { masques = { { type = 'couleur', nom = 'x', locaux = {},
+            prelevements = { { x = 0.1, y = 0.47, modele = { 0.76, 0.41, 0.21 } }, { x = 0.2, y = 0.3, modele = { 0.7, 0.45, 0.3 } } } } },
+            etape = 'x' })
+    end, "un seul prélèvement")
+    egal(#photo.reglages.MaskGroupBasedCorrections, avant)
+    -- La règle de la simulation : Lightroom plante sur deux PointModels.
+    local deux = Locaux.couleur({ { 0.76, 0.41, 0.21, 0.1, 0.47 }, { 0.7, 0.45, 0.3, 0.2, 0.3 } }, 0.5, 'x', false)
+    S.ecritureEnCours = true
+    echoue(function()
+        photoRaw():applyDevelopSettings({ MaskGroupBasedCorrections = { Locaux.correction('x', 1, {}, { deux }) } }, 'essai')
+    end, "Lightroom plante")
+    S.ecritureEnCours = false
 end)
 
 test("masquer : plage de profondeur rangée en DepthRange de 0 à 1", function()

@@ -979,6 +979,12 @@ local function composant(ctx, m, nom)
         if #points == 0 then
             echouer("Masque « " .. nom .. " » sans couleur prélevée.")
         end
+        -- Un seul prélèvement par plage : deux PointModels font planter Lightroom Classic 15.6
+        -- (constaté le 1er novembre 2026). Une autre couleur passe par un composant combiné.
+        if #points > 1 then
+            echouer("Masque « " .. nom .. " » : un seul prélèvement par plage de couleurs (deux font planter Lightroom) ; "
+                .. "une autre couleur va dans un composant combiné.")
+        end
         return Locaux.couleur(points, tonumber(m.etendue) or 0.5, nom, m.inverser == true), false, true
     elseif m.type == 'objet' and type(m.rectangle) == 'table' then
         -- Objet désigné par son cadre : les quatre coins, dans le repère du fichier.

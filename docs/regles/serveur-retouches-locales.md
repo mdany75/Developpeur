@@ -8,7 +8,9 @@ Sorti de `Sources/CLAUDE.md` le 31 octobre 2026 ; à lire avant de toucher à `a
   intersection est une soustraction du composant inversé (`Locaux.combiner`).
 - Formes constatées des masques récents (voir `docs/SPEC.md`, Retouches locales) : objet en
   rectangle = `Mask/Polygon` dont les `Points` sont des tables `{X, Y}` ; plage de couleurs =
-  `PointModels` « c1 c2 c3 x y 0 », modèle Lab étalonné (`ModeleCouleur`) ; plage de profondeur =
+  `PointModels` « c1 c2 c3 x y 0 », modèle Lab étalonné (`ModeleCouleur`), **un seul** par plage
+  (deux font planter Lightroom 15.6, constaté le 1er novembre 2026 ; une autre couleur : un
+  composant combiné) ; plage de profondeur =
   `Type = 3` et `DepthRange` de 0 à 1 (jamais `DepthMin`/`DepthMax`) ; couleurs ponctuelles d'un
   masque = `LocalPointColors`, des textes de 19 nombres ; dégradé radial = `Mask/CircularGradient`
   avec `Flipped = true` toujours, inversé par `MaskInverted` seul (`Locaux.radial` ; inversé, il

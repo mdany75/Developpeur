@@ -77,7 +77,8 @@ final class RetoucheAvanceeTests: XCTestCase {
             if command == "apercu" { fake?.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(image))] }
         }
         let result = tools.call(name: "add_mask", arguments: ["photo_ids": [9], "step_name": "ciel", "masks": [[
-            "kind": "color", "samples": [[0.25, 0.5], [0.75, 0.5]], "color_range": 30, "adjustments": ["Exposure": -0.3]]]])
+            "kind": "color", "samples": [[0.25, 0.5]], "color_range": 30, "adjustments": ["Exposure": -0.3],
+            "combine": [["mode": "add", "kind": "color", "samples": [[0.75, 0.5]]]]]]])
         XCTAssertFalse(result.isError, result.text)
         let apercu = try XCTUnwrap(fake.calls.first { $0.command == "apercu" })
         XCTAssertEqual(apercu.params["photo"]?.int, 9)
@@ -91,7 +92,10 @@ final class RetoucheAvanceeTests: XCTestCase {
         XCTAssertEqual(ciel[0], 0.765, accuracy: 0.01)
         XCTAssertEqual(ciel[1], 0.409, accuracy: 0.01)
         XCTAssertEqual(ciel[2], 0.211, accuracy: 0.01)
-        let rouge = try XCTUnwrap(prelevements[1]["modele"]?.array?.compactMap(\.double))
+        XCTAssertEqual(prelevements.count, 1)
+        // Une autre couleur : un composant combiné, avec son propre prélèvement.
+        let composant = try XCTUnwrap(masque["composants"]?.array?.first)
+        let rouge = try XCTUnwrap(composant["prelevements"]?.array?.first?["modele"]?.array?.compactMap(\.double))
         XCTAssertGreaterThan(rouge[1], 0.8, "rouge : a* fort")
         XCTAssertTrue(ToolHandler.positionne(masque), "positions à recaler")
 
@@ -99,6 +103,11 @@ final class RetoucheAvanceeTests: XCTestCase {
             "kind": "color", "samples": [[0.5, 0.5]], "adjustments": ["Exposure": -0.3]]]]).text.contains("une seule photo"))
         XCTAssertTrue(tools.call(name: "add_mask", arguments: ["step_name": "x", "masks": [[
             "kind": "color", "adjustments": ["Exposure": -0.3]]]]).isError, "il faut prélever une couleur")
+        // Deux prélèvements dans une même plage font planter Lightroom (constaté le 1er novembre 2026).
+        let deux = tools.call(name: "add_mask", arguments: ["photo_ids": [9], "step_name": "x", "masks": [[
+            "kind": "color", "samples": [[0.25, 0.5], [0.75, 0.5]], "adjustments": ["Exposure": -0.3]]]])
+        XCTAssertTrue(deux.isError)
+        XCTAssertTrue(deux.text.contains("un seul point"), deux.text)
     }
 
     func testColorModelIsLabAroundNeutral() {

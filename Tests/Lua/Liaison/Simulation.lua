@@ -406,6 +406,9 @@ local function verifierMasques(reglages)
             end
             local r = m.CorrectionRangeMask
             if type(r) == 'table' and r.Type == 1 then
+                -- Constaté le 1er novembre 2026 : deux PointModels dans une plage font planter
+                -- Lightroom Classic 15.6, le masque déjà écrit au catalogue.
+                assert(#(r.PointModels or {}) <= 1, "plage de couleurs à plusieurs PointModels : Lightroom plante")
                 for _, modele in ipairs(r.PointModels or {}) do
                     local n = 0
                     for _ in tostring(modele):gmatch('%S+') do n = n + 1 end
