@@ -1,0 +1,184 @@
+<title>Feuille de route de Développeur</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Mise en page : une colonne, des étapes dans l'ordre où les faire, chaque chantier en ligne de carte. */
+  :root {
+    --texte: #1D1D1F; --gris: #63666B; --bleu: #0A64D8; --mono: #3D3D45;
+    --vert: #1F7A35; --orange: #A85A00; --rouge: #B3261E;
+    --fond: #FFFFFF; --volet: #F1F2F4; --filet: #E0E2E6;
+    --vert-doux: #E6F2E9; --orange-doux: #FCEFDF; --bleu-doux: #E3EEFC; --rouge-doux: #FBE9E7; --gris-doux: #E9EAED;
+    --police: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    --police-titre: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    --police-code: Menlo, ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --texte: #E8E8E8; --gris: #9EA1A7; --bleu: #5AA2F6; --mono: #C8C8D0;
+      --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+      --fond: #1F2023; --volet: #17181A; --filet: #34363B;
+      --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #2C2E33;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --texte: #E8E8E8; --gris: #9EA1A7; --bleu: #5AA2F6; --mono: #C8C8D0;
+    --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+    --fond: #1F2023; --volet: #17181A; --filet: #34363B;
+    --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #2C2E33;
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--volet); color: var(--texte); font: 15px/1.55 var(--police); }
+  code { font-family: var(--police-code); font-size: .86em; color: var(--mono); background: var(--gris-doux); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  a { color: var(--bleu); }
+  .page { max-width: 880px; margin: 0 auto; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { margin: 0 0 6px; font: 700 30px/1.2 var(--police-titre); text-wrap: balance; }
+  h2 { margin: 0; font: 650 20px/1.3 var(--police-titre); text-wrap: balance; }
+  .sous { color: var(--gris); margin: 0; max-width: 68ch; }
+  .entete { display: grid; gap: 10px; margin-bottom: 28px; }
+  .encadre { background: var(--bleu-doux); border-radius: 10px; padding: 12px 16px; max-width: 72ch; }
+  .encadre p { margin: 0; }
+  .etapes { display: grid; gap: 34px; }
+  .etape { display: grid; gap: 12px; }
+  .etape-tete { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .num { font: 700 13px/1 var(--police-titre); color: var(--fond); background: var(--texte); border-radius: 99px; padding: 5px 9px; font-variant-numeric: tabular-nums; }
+  .quand { color: var(--gris); font-size: 13.5px; }
+  .chantiers { display: grid; gap: 10px; }
+  .chantier { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; min-width: 0; }
+  .chantier h3 { margin: 0; font: 600 16px/1.35 var(--police-titre); }
+  .chantier p { margin: 0; font-size: 14px; }
+  .chantier .deja { color: var(--gris); font-size: 13.5px; }
+  .marques { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pastille { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .petite { background: var(--vert-doux); color: var(--vert); }
+  .moyenne { background: var(--orange-doux); color: var(--orange); }
+  .faible { background: var(--gris-doux); color: var(--texte); }
+  .moyen { background: var(--rouge-doux); color: var(--rouge); }
+  .interet { background: var(--bleu-doux); color: var(--bleu); font-variant-numeric: tabular-nums; }
+  .ecartees { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; overflow: hidden; }
+  .ecartee { padding: 12px 16px; border-top: 1px solid var(--filet); display: grid; gap: 3px; }
+  .ecartee:first-child { border-top: 0; }
+  .ecartee b { font-weight: 600; }
+  .ecartee p { margin: 0; font-size: 14px; color: var(--gris); }
+  .pied { margin-top: 30px; font-size: 13px; color: var(--gris); max-width: 72ch; }
+  @media (max-width: 520px) { h1 { font-size: 25px; } }
+</style>
+
+<main class="page">
+  <header class="entete">
+    <h1>Feuille de route de Développeur</h1>
+    <p class="sous">Les améliorations que je te suggère après la comparaison avec lightroom-mcp et une relecture des chantiers ouverts. Chacune a été évaluée dans le code le 1<sup>er</sup> novembre 2026 : ce qui existe déjà, ce qu'il faut construire, la taille et le risque.</p>
+    <div class="encadre"><p><b>En résumé :</b> d'abord ranger le dépôt et vérifier un risque, puis publier la retouche générative avec son annulation, puis deux petits ajouts utiles. Le reste attend une vraie raison. Trois idées de lightroom-mcp sont écartées : Développeur fait déjà mieux.</p></div>
+  </header>
+
+  <div class="etapes">
+
+    <section class="etape">
+      <div class="etape-tete"><span class="num">1</span><h2>Ranger et vérifier</h2><span class="quand">tout de suite, sans nouvelle version</span></div>
+      <div class="chantiers">
+        <article class="chantier">
+          <h3>Commiter les règles réorganisées</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Les trois CLAUDE.md allégés et 19 fichiers de <code>docs/regles/</code> ne sont pas dans git, alors que le CLAUDE.md déjà poussé y renvoie. Une nouvelle session sur un autre Mac ne trouverait pas ces règles. À faire avant la prochaine version, qui les prendrait sinon sans relecture.</p>
+          <p class="deja">Travail : vérifier qu'aucune règle retirée ne s'est perdue, surtout celles que vérifient des tests, puis commiter. Aucun code. Ces changements étaient en cours avant cette session : à confirmer avec toi avant de les commiter.</p>
+        </article>
+        <article class="chantier">
+          <h3>Vérifier les plages de couleur à plusieurs prélèvements</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Le code de lightroom-mcp dit qu'une plage de couleur à deux prélèvements fait planter Lightroom 15.6, et le catalogue à sa réouverture. Développeur en accepte jusqu'à 5. Aucun constat de Développeur ne porte sur plus d'un prélèvement.</p>
+          <p class="deja">Travail : sur ton ordre, un essai sur une copie d'Essais, catalogue sauvegardé (un masque couleur à deux prélèvements, puis quitter et rouvrir Lightroom). S'il plante : un seul prélèvement par masque, règle dans la simulation et test, comme pour tout constat.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="etape">
+      <div class="etape-tete"><span class="num">2</span><h2>Version 1.5 : la retouche générative</h2><span class="quand">la prochaine version</span></div>
+      <div class="chantiers">
+        <article class="chantier">
+          <h3>Publier <code>generative_edit</code> (Fibo 2)</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 5/5</span></div>
+          <p>Changer un vêtement, un objet ou un fond, en local sur ton Mac, deviendrait une vraie version installée par l'archive notarisée. C'est la plus grosse fonction en attente : déjà finie, documentée et essayée le 29 octobre.</p>
+          <p class="deja">Reste : l'essai en qualité équilibrée que demande le CHANGELOG, puis la procédure de publication (numéro aux trois endroits, build notarisé, recette sur Essais, demande dans la fenêtre Claude, tag, Release, page Analyse).</p>
+        </article>
+        <article class="chantier">
+          <h3><code>undo_last</code> retire aussi la photo créée par Fibo 2</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Si la retouche générative ne plaît pas (une seconde tête est apparue à l'essai), « défais ça » suffirait. Aujourd'hui, il faut aller dans Photo › Retirer du catalogue, à la main.</p>
+          <p class="deja">Déjà là : le retrait sûr d'une photo réimportée, constaté sans fenêtre en 0,5 s, et la liste des photos importées dans la session. Le TIFF irait à la Corbeille, jamais effacé, et l'original redeviendrait la photo active. Peut aussi suivre en 1.5.1.</p>
+        </article>
+        <article class="chantier">
+          <h3>Premiers constats de Fibo 2 pendant l'essai</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Pendant l'essai de la 1.5, mesurer de quoi régler le seuil de la zone changée (0,10, provisoire), les durées et la mémoire. Claude annoncerait des durées justes, et la zone recollée serait juste sur d'autres photos que celle de l'essai.</p>
+          <p class="deja">Chaque constat va dans <code>docs/SPEC.md</code>, avec sa règle dans la simulation et un test.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="etape">
+      <div class="etape-tete"><span class="num">3</span><h2>Version 1.6 : deux petits ajouts</h2><span class="quand">après la 1.5</span></div>
+      <div class="chantiers">
+        <article class="chantier">
+          <h3>Voir avant de copier une retouche sur une série</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Avant de copier une retouche sur toute une sortie, tu verrais pour chaque photo les réglages qui bougeraient, de quelle valeur à quelle valeur, et ce que Lightroom recalculera lui-même (masques IA, Upright, profil adaptatif). Aucune photo n'est touchée tant que tu n'as pas dit oui. C'est le seul outil de série qui écrit aujourd'hui sans rien montrer avant.</p>
+          <p class="deja">Déjà là : le module prépare ce plan avant chaque copie (<code>Plans.lua</code>). Il suffit de le renvoyer au lieu de l'écrire. Idée reprise de leur <code>dry_run</code>.</p>
+        </article>
+        <article class="chantier">
+          <h3>Chercher par focale</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 2/5</span></div>
+          <p>« Mes photos au 56 mm », « tout ce que j'ai pris au grand-angle ». Tu peux déjà chercher par dossier, appareil, objectif, ISO et dates.</p>
+          <p class="deja">Travail : deux paramètres de plus dans <code>find_photos</code>, en lecture seule, sur la lecture groupée qui existe déjà.</p>
+        </article>
+        <article class="chantier">
+          <h3>Avertir quand Lightroom change de version</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Les formes des dégradés et des pinceaux ont été relevées dans Lightroom 15.6. Si une mise à jour change ce format, <code>get_status</code> et <code>add_mask</code> le diraient, au lieu de poser en silence un éclaircissement au mauvais endroit.</p>
+          <p class="deja">C'est la forme légère de leur écriture gardée des masques. La forme complète vient plus bas.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="etape">
+      <div class="etape-tete"><span class="num">4</span><h2>Plus tard</h2><span class="quand">quand une vraie raison se présente</span></div>
+      <div class="chantiers">
+        <article class="chantier">
+          <h3>Relever les seuils provisoires</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Le bruit cherché à ISO 1 600 ou plus, la netteté et le bruit du bilan, les couleurs hors gamme, les points chauds, le contrôle des masques, les groupes de lumière. Réglés sur tes vraies photos Fujifilm, ils donneraient moins de fausses alertes et moins d'oublis.</p>
+          <p class="deja">D'abord un relevé, en lecture seule, sans toucher au code : <code>--constats</code> et <code>--eclairage</code> sur une soixantaine de tes photos, plus les comptes du Suivi. Puis un compte rendu avec les seuils proposés, et seulement ensuite les changements.</p>
+        </article>
+        <article class="chantier">
+          <h3>Ton style en chiffres</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Comment tu règles d'habitude tes photos de 4 ★ et plus, par appareil et selon l'ISO. Claude te proposerait quelques phrases pour ton guide de style, que tu acceptes ou non. Ça complète <code>learn</code> : lui voit ce que tu corriges chez Claude, ceci verrait ce que tu gardes.</p>
+          <p class="deja">Difficulté : séparer tes retouches de celles de Claude ; et des moyennes sur des scènes très différentes en disent peu.</p>
+        </article>
+        <article class="chantier">
+          <h3>Masques relus après l'écriture, avec retour en arrière</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Après chaque dégradé ou pinceau, le module relirait ce que Lightroom a gardé. En cas d'écart, il retirerait le masque et le dirait. Rien ne casse aujourd'hui : à faire à la prochaine grande mise à jour de Lightroom Classic.</p>
+          <p class="deja">Risque : retirer de bons masques à cause d'un arrondi de Lightroom. Il faut d'abord constater la tolérance réelle.</p>
+        </article>
+        <article class="chantier">
+          <h3>Trier la liste « À constater dans Lightroom »</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 2/5</span></div>
+          <p>Dans <code>docs/SPEC.md</code>, 62 points restent ouverts pour la 1.3. Quatre au moins sont sans objet depuis le retrait de Leçon et de Je le fais. Une liste courte et à jour dirait quoi vérifier à la prochaine recette.</p>
+          <p class="deja">Documentation seulement.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="etape">
+      <div class="etape-tete"><h2>Écartées</h2><span class="quand">idées de lightroom-mcp que Développeur n'a pas besoin de reprendre</span></div>
+      <div class="ecartees">
+        <div class="ecartee"><b>Quasi-doublons par empreinte dHash</b><p>Le tri regroupe déjà les rafales et les piles par l'empreinte de Vision, plus fine qu'un dHash, et nomme la meilleure de chaque groupe. À revoir seulement si le tri laisse passer des doublons.</p></div>
+        <div class="ecartee"><b>Plage de couleur copiée d'une autre photo</b><p><code>copy_settings</code> copie déjà les plages de couleur, et Développeur recalcule un prélèvement sur chaque photo. Eux ne savent pas le faire, d'où leur besoin de copier. Seul le risque des prélèvements multiples, à l'étape 1, vaut la peine.</p></div>
+        <div class="ecartee"><b>Mode lecture seule</b><p>La pause fait déjà « Claude regarde, ne retouche pas », et tu travailles en mode Appliquer. Cacher les outils demanderait de relancer Claude Desktop et chaque session. Une version légère, une case qui survit au relancement de Lightroom, se ferait vite si tu la demandes un jour.</p></div>
+      </div>
+    </section>
+
+  </div>
+
+  <p class="pied">Taille : petite, quelques heures ; moyenne, une journée ou deux, tests compris. Le risque vise les photos et le catalogue : tout essai se fait sur des copies d'Essais, sur ton ordre, et se défait ensuite. Source : <code>docs/artefacts/feuille-de-route.html</code>.</p>
+</main>
