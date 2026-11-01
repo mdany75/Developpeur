@@ -735,9 +735,11 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   partez d'une copie virtuelle : la nouvelle photo reçoit alors sa propre copie virtuelle, où se
   font les finitions. Sur une photo d'essai (collection « Développeur › Essais »), la nouvelle photo
   n'est pas empilée avec votre original : elle va dans la collection Essais.
-- **Défaire** : `undo_last` ne retire pas la nouvelle photo ; pour l'enlever, Photo › Retirer du
-  catalogue, à la main (le fichier reste dans le dossier, à mettre à la Corbeille vous-même si
-  vous n'en voulez plus).
+- **Défaire** : « défais ça » suffit. `undo_last` défait d'abord les finitions faites sur la
+  nouvelle photo, une à une, puis retire la nouvelle photo du catalogue (avec sa copie virtuelle) ;
+  son fichier va à la Corbeille du Finder (récupérable, jamais effacé) et l'original redevient la
+  photo active. Cela vaut tant que Lightroom n'a pas été relancé ; après, Photo › Retirer du
+  catalogue, à la main.
 - **Qualité et durée** : par défaut, la qualité **équilibrée** (30 étapes, guidage sur 60 % d'entre
   elles, décodage en pleine précision : environ le rendu de la normale en deux fois moins de temps,
   à confirmer sur vos photos) ; la qualité normale (50 étapes) prenait environ 8 minutes pour une

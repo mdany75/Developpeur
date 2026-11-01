@@ -231,6 +231,12 @@ end
 -- Fichiers que le module a réimportés pendant cette session de Lightroom (chemin → heure) : seuls
 -- ceux-là peuvent être retirés du catalogue par retirerReimportees (recette).
 local reimporteesSession = {}
+
+-- Les photos de Fibo 2 importées dans cette session de Lightroom, par l'identifiant de la photo
+-- importée et par celui de sa copie des finitions (« Copies virtuelles seulement ») : undo_last les
+-- retire (Livraison.retirerGeneree). Perdues quand Lightroom quitte ou que le module se recharge.
+local genereesSession = {}
+
 local DUREE_RETRAIT = 30 * 60
 
 -- Les fichiers réimportés : Lightroom les ajoute au catalogue après le rendu (AgExportRendition :
@@ -498,9 +504,10 @@ end
 -- exporté (commande exporter, vers Temporaire/Fibo) ; il en tire un TIFF final en pleine
 -- résolution, que cette commande range à côté de l'original et ajoute au catalogue, empilé
 -- au-dessus de lui (catalog:addPhoto, dans une écriture), puis montre comme photo active : les
--- finitions se font sur elle. L'original n'est jamais touché. undo_last ne la retire pas (aucune
--- étape « Claude · » : Photo › Retirer du catalogue, à la main). Reste à constater dans Lightroom :
--- addPhoto avec la pile ('above') et la photo ajoutée relue après l'écriture.
+-- finitions se font sur elle. L'original n'est jamais touché. undo_last la retire du catalogue dans
+-- la même session de Lightroom, une fois ses finitions défaites (Livraison.retirerGeneree) ; après,
+-- Photo › Retirer du catalogue, à la main. Reste à constater dans Lightroom : addPhoto avec la pile
+-- ('above') et la photo ajoutée relue après l'écriture.
 -- Les garde-fous des photos (verifierProtection) valent comme pour toute écriture ; sous « Copies
 -- virtuelles seulement », les finitions se font sur une copie virtuelle de la nouvelle photo, qui
 -- devient la photo active (son id dans la réponse). Une photo d'essai (« Développeur › Essais »,
@@ -677,6 +684,12 @@ function Livraison.importerGeneree(params)
             active = okCopie and copieActive == true
         end
     end
+    -- undo_last la retire dans cette session, une fois ses finitions défaites (retirerGeneree).
+    local generee = { nouvelle = nouvelle, copie = copie, origine = photo, chemin = destination }
+    genereesSession[nouvelle.localIdentifier] = generee
+    if copie then
+        genereesSession[copie.localIdentifier] = generee
+    end
     -- Dans les collections Essais, dans une écriture suivante (une photo ajoutée ne se lit pas dans
     -- l'écriture qui l'a créée).
     if essai then
@@ -700,6 +713,74 @@ function Livraison.importerGeneree(params)
         reponse.photo_fibo = nouvelle.localIdentifier
     end
     return reponse
+end
+
+-- Retire une photo du catalogue : seule sélectionnée, LrSelection.removeFromCatalog (SDK 14.3,
+-- constaté sans fenêtre), puis attend qu'elle n'y soit plus (5 s au plus). partie() dit si elle est
+-- partie. Échoue sinon.
+local function retirerDuCatalogue(photo, nom, partie)
+    local LrSelection = import 'LrSelection'
+    local fait, changee = Bibliotheque.selectionnerAvecSource({ photo })
+    if not fait then
+        echouer("Lightroom n'a pas sélectionné « " .. nom .. " » : rien n'est retiré.")
+    end
+    LrSelection.removeFromCatalog()
+    local fin = LrDate.currentTime() + 5
+    repeat
+        LrTasks.sleep(0.25)
+        if partie() then
+            return changee
+        end
+    until LrDate.currentTime() > fin
+    if not partie() then
+        echouer("Lightroom n'a pas retiré « " .. nom .. " » du catalogue.")
+    end
+    return changee
+end
+
+-- undo_last sur une photo de Fibo 2 importée dans cette session (elle ou sa copie des finitions),
+-- quand ni l'une ni l'autre n'a plus d'étape de Claude à défaire : la copie puis la photo importée
+-- sortent du catalogue, chacune seule sélectionnée ; le TIFF va à la Corbeille du Finder (jamais
+-- effacé) ; la photo d'origine redevient la photo active. Rend le résultat de l'annulation, ou nil
+-- (pas une photo de Fibo 2 de cette session, ou des finitions encore à défaire).
+function Livraison.retirerGeneree(photo)
+    local generee = genereesSession[photo.localIdentifier]
+    if not generee or (generee.nouvelle ~= photo and generee.copie ~= photo) then
+        return nil
+    end
+    for _, p in ipairs({ generee.nouvelle, generee.copie or false }) do
+        if p and #Photos.lireJson(p, 'etapesClaude', {}) > 0 then
+            return nil
+        end
+    end
+    local cat = Photos.catalogue()
+    local description = Photos.decrire(photo, false)
+    local fichier = LrPathUtils.leafName(generee.chemin)
+    if generee.copie then
+        local id = generee.copie.localIdentifier
+        retirerDuCatalogue(generee.copie, fichier .. " (copie virtuelle)", function()
+            local lue, encore = LrTasks.pcall(cat.getPhotoByLocalId, cat, id)
+            return not (lue and encore)
+        end)
+        genereesSession[id] = nil
+    end
+    retirerDuCatalogue(generee.nouvelle, fichier, function()
+        local lue, encore = LrTasks.pcall(cat.findPhotoByPath, cat, generee.chemin)
+        return not (lue and encore)
+    end)
+    genereesSession[generee.nouvelle.localIdentifier] = nil
+    reimporteesSession[generee.chemin] = nil
+    local alaCorbeille = LrFileUtils.exists(generee.chemin) ~= 'file' or LrFileUtils.moveToTrash(generee.chemin) == true
+    local okOrigine, active = LrTasks.pcall(Bibliotheque.selectionnerAvecSource, { generee.origine })
+    Liaison.noter("Fibo 2 : « " .. fichier .. " » retirée du catalogue (undo_last)"
+        .. (alaCorbeille and ", fichier à la Corbeille" or ", fichier laissé dans son dossier"))
+    return { photo = description, annulee = true, etape = ETAPE_FIBO, etape_id = Json.null,
+        photo_fibo_retiree = true, fichier = fichier, corbeille = alaCorbeille,
+        photo_active = okOrigine and active == true and generee.origine.localIdentifier or Json.null,
+        remarque = alaCorbeille and ("La photo de Fibo 2 est retirée du catalogue et son fichier « " .. fichier
+            .. " » est à la Corbeille du Finder (récupérable) ; l'original est la photo active.")
+            or ("La photo de Fibo 2 est retirée du catalogue, mais son fichier « " .. generee.chemin
+            .. " » est resté dans son dossier : le mettre à la Corbeille à la main.") }
 end
 
 -- Recette seulement (pas d'outil) : retire du catalogue les fichiers que le module vient d'y

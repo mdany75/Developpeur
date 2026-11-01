@@ -596,7 +596,7 @@ final class GeneratifTests: XCTestCase {
         XCTAssertEqual(modification["reprise"]?.bool, true)
         let part = try XCTUnwrap(modification["part_changee_pct"]?.double)
         XCTAssertGreaterThan(part, 5); XCTAssertLessThan(part, 25)
-        XCTAssertTrue(reponse["a_savoir"]?.string?.contains("undo_last ne la retire pas") == true)
+        XCTAssertTrue(reponse["a_savoir"]?.string?.contains("undo_last défait les finitions puis la retire du catalogue") == true)
         XCTAssertTrue(modification["resolution_zone"]?.string?.contains("\(taille.largeur) × \(taille.hauteur)") == true)
         // La barre : exportation, chargement du modèle, recomposition ; de 0 à 100.
         let messages = fake.progressions.compactMap { $0["message"]?.string }

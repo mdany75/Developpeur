@@ -60,8 +60,11 @@ Sortie du CLAUDE.md principal (qui y renvoie). À lire avant de toucher à `gene
   photo d'essai) ; tout chemin importé se note pour `retirerReimportees` (la recette la retire) ; un
   refus de Lightroom met la copie à la Corbeille ; la photo ajoutée se cherche par `findPhotoByPath`
   si `addPhoto` ne la rend pas ; journal de Claude de la nouvelle photo (« Claude · Fibo 2 :
-  <consigne> », `retoucheeParClaude`) par `Ecriture.ecrireMemoire`, sans étape : `undo_last` ne la
-  retire pas (Photo › Retirer du catalogue, à la main) ; photo active par
+  <consigne> », `retoucheeParClaude`) par `Ecriture.ecrireMemoire`, sans étape ; `undo_last` la retire
+  du catalogue dans la même session, une fois les étapes de Claude défaites sur elle et sur sa copie
+  (`Livraison.retirerGeneree` : la copie puis elle, chacune seule sélectionnée, `removeFromCatalog` ;
+  le TIFF à la Corbeille par `moveToTrash`, jamais effacé ; l'original redevient la photo active ;
+  ensuite, Photo › Retirer du catalogue, à la main) ; photo active par
   `Bibliotheque.selectionnerAvecSource` ; sous « Copies virtuelles seulement », une copie virtuelle
   « Claude » de la nouvelle photo, qui devient la photo active (les finitions se font sur elle) ;
   fichier temporaire effacé. Réponse `{ id, fichier, chemin, empilee, active }`, plus `essai` pour une

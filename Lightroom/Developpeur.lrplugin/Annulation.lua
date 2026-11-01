@@ -3,7 +3,8 @@
 -- Suppression) et classement dans la Bibliothèque (clé Bibliotheque), chacun par son chemin.
 -- Depuis la 1.3, l'étape défaite est nommée par son id : etape_id dans le résultat d'annuler et
 -- dans l'entrée 'annulation' du journal ; l'entrée 'retour' garde les ids des étapes défaites
--- (etape_ids). Une étape d'avant la 1.3, sans id, s'annule toujours (etape_id null).
+-- (etape_ids). Une étape d'avant la 1.3, sans id, s'annule toujours (etape_id null). Une photo de
+-- Fibo 2 importée dans la session, sans étape restante, sort du catalogue (Livraison.retirerGeneree).
 
 local LrTasks = import 'LrTasks'
 
@@ -13,6 +14,7 @@ local Conversions = require 'Conversions'
 local Ecriture = require 'Ecriture'
 local Json = require 'Json'
 local Liaison = require 'Liaison'
+local Livraison = require 'Livraison'
 local Photos = require 'Photos'
 local Plans = require 'Plans'
 local Profils = require 'Profils'
@@ -191,7 +193,9 @@ function Annulation.annuler(params)
                 reglages = reglages, journal = lireJson(photo, 'journalClaude', {}),
                 original = lireJson(photo, 'avantClaude', {}), corrections = avertirCorrections(photo, reglages) }
         else
-            resultats[#resultats + 1] = { photo = decrire(photo, false), annulee = false, sans_retouche = true,
+            -- Une photo de Fibo 2 de cette session, ses finitions défaites : retirée du catalogue.
+            local retrait = Livraison.retirerGeneree(photo)
+            resultats[#resultats + 1] = retrait or { photo = decrire(photo, false), annulee = false, sans_retouche = true,
                 raison = "Aucune retouche de Claude à annuler sur cette photo." }
         end
     end

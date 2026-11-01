@@ -111,7 +111,7 @@ test("importerGeneree : copiée à côté de l'original, ajoutée au catalogue d
     egal(journal[1].origine, 7)
     egal(nouvelle.proprietes.retoucheeParClaude, 'oui')
     egal(nouvelle.proprietes.proprietaireMemoire, nouvelle.brut.uuid, "la mémoire est la sienne")
-    egal(nouvelle.proprietes.etapesClaude, nil, "pas d'étape : undo_last ne la retire pas")
+    egal(nouvelle.proprietes.etapesClaude, nil, "pas d'étape : undo_last la retire seulement quand plus rien n'est à défaire")
     -- L'original n'est pas touché : ni réglage, ni mémoire.
     egal(Json.encode(photo.reglages), avant, "réglages de l'original inchangés")
     egal(photo.proprietes.journalClaude, nil, "journal de l'original inchangé")
@@ -429,6 +429,53 @@ test("Photo d'essai : la nouvelle photo va dans « Développeur › Essais », s
     -- La recette la retire du catalogue par son chemin (retirerReimportees).
     local retrait = Commandes.executer('retirerReimportees', { chemins = { r.chemin } })
     egal(retrait.retires[1], r.chemin)
+end)
+
+test("undo_last : une photo de Fibo 2 de la session sort du catalogue, son TIFF va à la Corbeille, l'original redevient la photo active", function()
+    local photo = original()
+    local r = importer()
+    local nouvelle = S.ajoutees[1]
+    egal(S.active, nouvelle)
+    local annulation = Commandes.executer('annuler', { photos = { nouvelle.localIdentifier } })
+    local res = annulation.resultats[1]
+    egal(res.annulee, true)
+    egal(res.photo_fibo_retiree, true)
+    egal(res.corbeille, true)
+    egal(S.retireesDuCatalogue[1], nouvelle, "retirée du catalogue")
+    egal(S.corbeille[#S.corbeille], r.chemin, "à la Corbeille, jamais effacé")
+    egal(S.active, photo, "l'original redevient la photo active")
+    egal(photo.reglages.Exposure2012, 0.35, "l'original intact")
+    -- Une seconde fois : plus rien à retirer.
+    egal(Commandes.executer('annuler', { photos = { photo.localIdentifier } }).resultats[1].sans_retouche, true)
+end)
+
+test("undo_last : les finitions de la photo de Fibo 2 se défont d'abord, puis la photo sort du catalogue", function()
+    original()
+    importer()
+    local nouvelle = S.ajoutees[1]
+    Commandes.executer('appliquer', { photos = { nouvelle.localIdentifier }, reglages = { Exposure2012 = 0.2 },
+        plages = { Exposure2012 = { -5, 5 } }, confirme = true, etape = 'finitions' })
+    local premiere = Commandes.executer('annuler', { photos = { nouvelle.localIdentifier } }).resultats[1]
+    egal(premiere.photo_fibo_retiree, nil, "d'abord les finitions")
+    egal(#S.retireesDuCatalogue, 0)
+    local seconde = Commandes.executer('annuler', { photos = { nouvelle.localIdentifier } }).resultats[1]
+    egal(seconde.photo_fibo_retiree, true)
+    egal(S.retireesDuCatalogue[1], nouvelle)
+end)
+
+test("undo_last : sous « Copies virtuelles seulement », la copie des finitions puis la photo de Fibo 2 sortent du catalogue", function()
+    local photo = S.copieVirtuelle(original(), 8, 'Essai Fibo')
+    S.active, S.selection = photo, { photo }
+    S.prefs.copiesSeulement = true
+    local r = importer({ photo = 8 })
+    local nouvelle = S.ajoutees[1]
+    local copie = S.active
+    egal(r.id, copie.localIdentifier)
+    local res = Commandes.executer('annuler', { photos = { copie.localIdentifier } }).resultats[1]
+    egal(res.photo_fibo_retiree, true)
+    egal(S.retireesDuCatalogue[1], copie, "la copie d'abord, seule sélectionnée")
+    egal(S.retireesDuCatalogue[2], nouvelle)
+    egal(S.active, photo)
 end)
 
 test("essayer avec temoin (masque de Lightroom de generative_edit, carte d'add_mask) : aucun accord demandé, rien de gardé ; taille 0 rend en pleine résolution", function()

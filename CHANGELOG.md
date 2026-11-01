@@ -12,7 +12,9 @@
   La zone changée peut rester un peu moins fine que le reste (Fibo 2 travaille à environ
   1 mégapixel). Il faut mflux
   (`uv tool install mflux`) et l'accès aux modèles Fibo 2 de Bria (licence CC BY-NC : usage
-  personnel). `undo_last` ne retire pas la nouvelle photo : Photo › Retirer du catalogue, à la main.
+  personnel). « Défais ça » suffit : `undo_last` défait les finitions, puis retire la nouvelle photo du
+  catalogue et met son fichier à la Corbeille du Finder (récupérable), tant que Lightroom n'a pas
+  été relancé ; l'original redevient la photo active.
   Les garde-fous des photos valent comme pour toute retouche (avec « Copies virtuelles seulement »,
   la nouvelle photo reçoit sa copie virtuelle, où se font les finitions) ; une photo d'essai va dans
   « Développeur › Essais », sans pile avec votre original ; le passage par un TIFF temporaire ne

@@ -204,7 +204,7 @@ public final class ToolHandler {
                  properties: [("limit", prop("integer", "Nombre maximal de photos (défaut \(Self.defaultSelectionLimit), maximum \(Self.maxSelectionLimit))."))],
                  required: []),
             tool("undo_last",
-                 "Annule la dernière retouche faite par Claude sur une photo (réglages, profil, recadrage, masques ou taches, ou classement : note, drapeau, libellé, textes, mots-clés, collection ; remet ce que cette étape avait changé).",
+                 "Annule la dernière retouche faite par Claude sur une photo (réglages, profil, recadrage, masques ou taches, ou classement : note, drapeau, libellé, textes, mots-clés, collection ; remet ce que cette étape avait changé). Une photo de Fibo 2 (generative_edit) de cette session de Lightroom, sans finitions restantes : retirée du catalogue, son fichier à la Corbeille.",
                  properties: targetProperties, required: []),
             tool("revert_to_original",
                  "Remet une photo dans l'état où elle était avant la première retouche de Claude (seulement ce que Claude a changé, classement dans la Bibliothèque compris), et oublie l'historique de Claude pour cette photo (le journal reste).",
