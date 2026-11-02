@@ -35,7 +35,7 @@ local function formes()
     return Json.tableau({
         { type = 'lineaire', de_x = 0.123457, de_y = 0.111111, a_x = 0.876543, a_y = 0.432109, nom = 'Claude · Dégradé',
           locaux = { LocalExposure2012 = -0.2 } },
-        { type = 'radial', centre_x = 0.456789, centre_y = 0.512345, rayon_x = 0.123457, angle = 200, fondu = 50,
+        { type = 'radial', centre_x = 0.456789, centre_y = 0.512345, rayon_x = 0.123457, angle = -160, fondu = 50,
           nom = 'Claude · Rond', locaux = { LocalExposure2012 = 0.1 } },
         { type = 'pinceau', nom = 'Claude · Pinceau', locaux = { LocalExposure2012 = 0.15 },
           traits = { { points = { { 0.2, 0.3 }, { 0.25, 0.35 } }, rayon = 0.02, flux = 0.7, durete = 30 },
@@ -107,11 +107,26 @@ test("masques relus : touches d'un pinceau perdues : « écart » de structure, 
     egal(#photo.reglages.MaskGroupBasedCorrections, 4)
 end)
 
-test("masques relus : l'angle d'un radial se compare modulo 180 (200° rangé 20° : gardé)", function()
+test("masques relus : l'angle d'un radial se compare modulo 180 (−160° rangé 20° : gardé)", function()
     fuji()
     S.angleFormes = true
     local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
     egal(verdicts(resultat)['Claude · Rond'].verdict, 'gardé')
+end)
+
+test("masques relus : un radial à 170° sur une photo recadrée de 20° s'écrit 190°, rangé 10° : gardé", function()
+    -- Le seul chemin vers un angle hors de ±180 : l'angle du recadrage ajouté (Plans.lua), le
+    -- serveur refusant tout angle hors de −180…180.
+    local photo = fuji()
+    photo.reglages.CropAngle = 20
+    S.angleFormes = true
+    local resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'radial', centre_x = 0.5, centre_y = 0.5, rayon_x = 0.2, angle = 170, nom = 'Claude · Rond penché',
+          locaux = { LocalExposure2012 = 0.1 } },
+    }), etape = 'formes' })
+    local masque = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1]
+    proche(masque.Angle, 10, "190° rangé modulo 180 par la version future simulée")
+    egal(verdicts(resultat)['Claude · Rond penché'].verdict, 'gardé')
 end)
 
 test("masques relus : les masques IA (ciel, objet) ne se comparent pas ; un ciel combiné à un dégradé, si", function()
@@ -213,7 +228,7 @@ test("Locaux.comparerFormes : IA ignorée, angle modulo 180, booléens 0/1, touc
     -- Un objet dont Lightroom a déplacé ReferencePoint et retiré le geste : pas comparé.
     local objet = { What = 'Mask/Image', ReferencePoint = '0.200000 0.300000', Gesture = { { What = 'Mask/Paint' } } }
     egal(#Locaux.comparerFormes({ objet }, { { What = 'Mask/Image', ReferencePoint = '0.500000 0.500000' } }), 0)
-    -- Radial : 200° rangé 20° ou −160°, gardé ; 110°, écart d'angle.
+    -- Radial : 200° (possible par l'angle du recadrage ajouté) rangé 20° ou −160°, gardé ; 110°, écart d'angle.
     local radial = { What = 'Mask/CircularGradient', Left = 0.1, Top = 0.2, Right = 0.3, Bottom = 0.4, Angle = 200, Feather = 50,
         Midpoint = 50, Roundness = 0, Flipped = true, MaskInverted = false }
     local function avec(base, changes)
@@ -235,6 +250,10 @@ test("Locaux.comparerFormes : IA ignorée, angle modulo 180, booléens 0/1, touc
     -- Fondu : écart relatif.
     egal(#Locaux.comparerFormes({ radial }, { avec(radial, { Feather = 50.01 }) }), 0)
     egal(Locaux.comparerFormes({ radial }, { avec(radial, { Feather = 51 }) })[1].genre, 'valeur')
+    -- Une valeur sous 1 se compare aussi en relatif : flux 0,7 relu 0,7008 (0,11 %), écart.
+    local flux = { What = 'Mask/Paint', Flow = 0.7 }
+    egal(Locaux.comparerFormes({ flux }, { avec(flux, { Flow = 0.7008 }) })[1].genre, 'valeur')
+    egal(#Locaux.comparerFormes({ flux }, { avec(flux, { Flow = 0.7004 }) }), 0, "0,06 % : gardé")
     -- Pinceau : traits et touches.
     local trait = { What = 'Mask/Paint', Radius = 0.02, Flow = 0.7, CenterWeight = 0.3,
         Dabs = { 'r 0.020000', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000', 'd 0.210000 0.310000' } }
@@ -246,6 +265,14 @@ test("Locaux.comparerFormes : IA ignorée, angle modulo 180, booléens 0/1, touc
     local deplace = avec(trait, { Dabs = { 'r 0.020000', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000', 'd 0.215000 0.310000' } })
     e = Locaux.comparerFormes({ pinceau }, { avec(pinceau, { Masks = { deplace } }) })
     egal(e[1].cle, 'Dabs[5]') egal(e[1].genre, 'position')
+    -- Rayon d'un pinceau fin (part du grand côté) : 0,005 relu 0,0059 (18 % plus large), écart de
+    -- position, pour Radius comme pour la touche « r ».
+    local fin = avec(trait, { Radius = 0.005, Dabs = { 'r 0.005000', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000', 'd 0.210000 0.310000' } })
+    local large = avec(fin, { Radius = 0.0059, Dabs = { 'r 0.005900', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000', 'd 0.210000 0.310000' } })
+    e = Locaux.comparerFormes({ avec(pinceau, { Masks = { fin } }) }, { avec(pinceau, { Masks = { large } }) })
+    egal(#e, 2) egal(e[1].cle, 'Radius') egal(e[1].genre, 'position') egal(e[2].cle, 'Dabs[1]') egal(e[2].genre, 'position')
+    egal(#Locaux.comparerFormes({ avec(pinceau, { Masks = { fin } }) }, { avec(pinceau, { Masks = { avec(fin, { Radius = 0.005004 }) } }) }), 0,
+        "0,02 px sur 6240 : gardé")
     e = Locaux.comparerFormes({ pinceau }, { avec(pinceau, { Masks = {} }) })
     egal(e[1].cle, 'Masks')
     local auto = avec(trait, { Dabs = { 'r 0.020000', 'f 0.7000', 'h 0.3000', 'M 0.200000 0.300000', 'd 0.210000 0.310000' } })

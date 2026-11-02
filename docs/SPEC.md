@@ -3442,12 +3442,18 @@ pouvaient être mal rangées. Depuis la 1.6, chaque `masquer` relit ce que Light
   `S.formesIgnorees` (clés perdues), `S.arrondiFormes` (arrondi à n décimales), `S.angleFormes`
   (angle rangé de 0 à 180). Essais : `Tests/Lua/Liaison/essais-masques-relus.lua`.
 - **Recette** (`Recette.swift`, après l'étape du pinceau) : « masques relus : dégradé, radial,
-  pinceau et plage gardés tels qu'écrits » pose quatre formes aux valeurs riches (angle 200), attend
-  quatre verdicts `gardé`, puis annule : sur la 15.6, aucune bonne forme ne sort en écart avec les
-  tolérances provisoires.
+  pinceau et plage gardés tels qu'écrits » pose quatre formes aux valeurs riches
+  (`Recette.argumentsMasquesRelus`, angle −160 : le schéma d'`add_mask` refuse tout angle hors de
+  −180…180, et `RecetteArgumentsTests` passe ces arguments par lui), attend quatre verdicts `gardé`,
+  puis annule : sur la 15.6, aucune bonne forme ne sort en écart avec les tolérances provisoires.
+  Un angle écrit hors de ±180 ne vient que de l'angle du recadrage ajouté par `Plans.lua`.
 
 **Tolérances provisoires** (`Locaux.TOLERANCES_FORMES`, `provisoires = true`) : position 1e-4 en
-part de l'image (0,6 px sur 6 240), angle 0,01°, valeur 1e-3 en relatif. Pas encore constatées.
+part de l'image (0,6 px sur 6 240), rayon du pinceau compris (`Radius` et touche `r`, une part du
+grand côté : 0,005 relu 0,0059 est un écart) ; angle 0,01° ; valeur 1e-3 en relatif,
+|x − y| / max(|x|, 1e-3) (`plancher` : un écart absolu de 1e-6 pour les valeurs presque nulles),
+pour `Feather`, `Midpoint`, `Roundness`, `Flow`, `CenterWeight`, touches `f` et `h`,
+`ColorAmount`, `LumRange`, `DepthRange` et les modèles de `PointModels`. Pas encore constatées.
 
 **Relevé de développement** : `DEVELOPPEUR_RELEVE_FORMES=1` dans l'environnement du serveur
 (`main.swift` pose `ToolHandler.releveFormes` ; jamais dans les tests ni par défaut) fait envoyer
@@ -3459,8 +3465,20 @@ d'un calcul refait hors de Lightroom.
 
 ### À constater (masques relus, 1.6)
 
-Sur l'ordre de Dany, Lightroom Classic 15.6, liaison démarrée, serveur de développement
-(`swift build`), sur **de nouvelles copies virtuelles** faites par `create_virtual_copy`, remises à
+Sur l'ordre de Dany, Lightroom Classic 15.6, liaison démarrée. La relecture vit dans le module :
+le serveur de la branche ne suffit pas (le module 1.5.1 installé ignore `releve_formes` et ne rend
+ni `masques_relus` ni `releve_formes`). Avant tout appel :
+
+1. installer le module et le serveur de la branche, pour l'essai seulement (jamais publiés) :
+   `SKIP_NOTARIZE=1 ./build.sh --install`, puis `swift build` pour `./.build/debug/mcp-developpeur` ;
+2. quitter et relancer Lightroom (la 1.6 ajoute-t-elle un `.lua` ? sinon recharger le module suffit,
+   fenêtres du module fermées) ;
+3. vérifier : un `add_mask` d'essai (un `linear` sur une copie d'Essais, défait ensuite) doit
+   rendre `masques_relus` dans `resultats[0]`, et `releve_formes` avec la variable ; sinon le
+   module chargé n'est pas celui de la branche, s'arrêter ;
+4. en mode « Proposer d'abord », ajouter `"confirm": true` à chaque appel.
+
+Puis, sur **de nouvelles copies virtuelles** faites par `create_virtual_copy`, remises à
 l'origine par `revert_to_original`, **puis** rangées dans « Développeur › Essais » ; défaites
 ensuite (`undo_last` ou `revert_to_original`). Chaque appel en arrière-plan, sortie entière dans
 un fichier du scratchpad :
@@ -3468,10 +3486,11 @@ un fichier du scratchpad :
 `DEVELOPPEUR_RELEVE_FORMES=1 ./.build/debug/mcp-developpeur --call add_mask '{…}' > releve-N.json`
 
 Trois copies : A, un RAW X-H2S paysage (6 240 × 4 160) ; B, un RAW X-T20 vertical (orientation
-tournée) ; C, un JPEG. Valeurs « riches » (0,123457 ; 0,876543), angles 200° et −30°.
+tournée) ; C, un JPEG. Valeurs « riches » (0,123457 ; 0,876543), angles −160° et −30° (le schéma
+d'`add_mask` refuse tout angle hors de −180…180).
 
 1. **Appel 1, chemin `applyDevelopSettings`** (sans IA), sur A, B, C : un `linear` ; un `radial`
-   d'angle 200 ; un `radial` inversé (`invert`) d'angle −30 ; un `brush` de deux `strokes` de
+   d'angle −160 ; un `radial` inversé (`invert`) d'angle −30 ; un `brush` de deux `strokes` de
    `size` différentes (`flow` 70, `feather` 30) ; un `brush` avec `auto_mask` ; un `luminance`.
    Six formes.
 2. **Appel 2, chemin du paramètre prédéfini**, sur A et C : un `sky`, un `linear`, un `brush`, un
@@ -3479,17 +3498,20 @@ tournée) ; C, un JPEG. Valeurs « riches » (0,123457 ; 0,876543), angles 200°
    passe par un fichier : il peut arrondir.
 3. **Appel 3, bords**, sur A : un `linear` et un `brush` près des bords (0,02 et 0,98) puis un peu
    hors de l'image (−0,05 et 1,05) : Lightroom borne-t-il les valeurs ?
-4. **Persistance** : `--dump <id>` de A après un `view_photo` (premier rendu), puis après avoir
+4. **Angle du recadrage**, sur une nouvelle copie de A recadrée de 20° (`apply_settings`,
+   `crop.angle` 20) : un `radial` d'angle 170, que le module écrit 190 (angle du recadrage
+   ajouté), le seul chemin vers un angle hors de ±180 : Lightroom le range-t-il 190, 10 ou −170 ?
+5. **Persistance** : `--dump <id>` de A après un `view_photo` (premier rendu), puis après avoir
    quitté et relancé Lightroom : les formes changent-elles au rendu ou à la relecture du
    catalogue ?
 
 À regarder, pour chaque masque relu : `masques_relus[].verdict` (tous `gardé` attendus sur la 15.6) ;
 dans `releve_formes`, l'écart maximal entre `ecrit` et `relu` de chaque clé (positions, `Dabs`,
-`Angle` : 200 rangé 200, 20 ou −160 ?, `Feather`, `LumRange`, `PointModels`), les booléens (vrai ou
+`Angle` : −160 rangé −160, 20 ou 200 ? et 190 de l'appel 4, `Feather`, `Radius` et touche `r`, `LumRange`, `PointModels`), les booléens (vrai ou
 1), un `CorrectionID` gardé ou non (sinon correspondance par nom et rang à prévoir), et les
 masques IA (ReferencePoint réécrit : confirme leur exclusion). Ce que ce relevé fixe :
 `Locaux.TOLERANCES_FORMES.position` (10 × l'écart maximal relevé, 1e-5 au moins), `.angle` et la
-normalisation de l'angle (modulo 180 ou autre), `.valeur`, et, si Lightroom borne, un bornage
+normalisation de l'angle (modulo 180 ou autre), `.valeur` et `.plancher`, et, si Lightroom borne, un bornage
 avant l'écriture ; chaque constat devient une règle de `Simulation.lua` avec son essai, et
 `provisoires` passe à faux. Le retrait d'un masque mal gardé (structure seule, en une écriture
 groupée avec `verifierPersonnes`) reste pour plus tard, sur une vraie 16.x.

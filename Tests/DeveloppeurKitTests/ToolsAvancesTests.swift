@@ -628,3 +628,20 @@ final class ToolsAvancesTests: XCTestCase {
         XCTAssertEqual(Set(names).count, names.count)
     }
 }
+
+/// Les arguments d'une étape de recette passent par le vrai schéma de l'outil, contre
+/// FakeLightroom : une valeur refusée (un angle de 200 hors de −180…180) échoue ici, pas en recette.
+final class RecetteArgumentsTests: XCTestCase {
+    func testMasquesRelusAcceptesParAddMask() throws {
+        let fake = FakeLightroom()
+        fake.replies["masquer"] = ["lightroom": "15.6", "resultats": []]
+        let tools = ToolHandler(lightroom: fake)
+        var arguments = Recette.argumentsMasquesRelus
+        arguments["photo_ids"] = [1]
+        let resultat = tools.call(name: "add_mask", arguments: arguments)
+        XCTAssertFalse(resultat.isError, resultat.text)
+        let masques = try XCTUnwrap(fake.calls.last { $0.command == "masquer" }?.params["masques"]?.array)
+        XCTAssertEqual(masques.count, 4)
+        XCTAssertEqual(masques[1]["angle"]?.double, -160, "un angle permis, que Lightroom range −160, 20 ou 200")
+    }
+}

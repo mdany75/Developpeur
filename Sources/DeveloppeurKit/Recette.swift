@@ -296,16 +296,9 @@ public final class Recette {
         // Masques relus (1.6) : sur la version où les formes ont été relevées, aucune forme bien
         // écrite ne doit sortir en « écart » (tolérances provisoires de Locaux.TOLERANCES_FORMES).
         try etape(photo, "masques relus : dégradé, radial, pinceau et plage gardés tels qu'écrits") {
-            let (reponse, _) = try appel("add_mask", ["photo_ids": [photoID], "step_name": "recette", "confirm": true,
-                                                       "reason": "Recette automatisée du module.", "masks": [
-                ["kind": "linear", "name": "Recette dégradé relu", "from_x": 0.123457, "from_y": 0.111111, "to_x": 0.876543, "to_y": 0.432109,
-                 "adjustments": ["Exposure": -0.1]],
-                ["kind": "radial", "name": "Recette radial relu", "center_x": 0.456789, "center_y": 0.512345, "radius_x": 0.123457, "angle": 200,
-                 "adjustments": ["Exposure": 0.1]],
-                ["kind": "brush", "name": "Recette pinceau relu", "adjustments": ["Exposure": 0.1],
-                 "strokes": [["points": [[0.2, 0.3], [0.25, 0.35]], "size": 0.02, "flow": 70, "feather": 30]]],
-                ["kind": "luminance", "name": "Recette plage relue", "min": 70, "max": 100, "adjustments": ["Highlights": -10]],
-            ]])
+            var arguments = Self.argumentsMasquesRelus
+            arguments["photo_ids"] = [photoID]
+            let (reponse, _) = try appel("add_mask", arguments)
             let relus = reponse["resultats"]?.array?.first?["masques_relus"]?.array ?? []
             _ = try appel("undo_last", ["photo_ids": [photoID]])
             try verifierEgal(try etat(id), deuxMasques)
@@ -2220,6 +2213,21 @@ public final class Recette {
         let fichier = images.appendingPathComponent(nom)
         return (try? image.write(to: fichier)) != nil ? fichier.path : nil
     }
+
+    /// Les quatre formes de l'étape « masques relus » (sans photo_ids), aux valeurs riches. L'angle
+    /// −160 est permis par le schéma d'add_mask (−180 à 180) et dit si Lightroom le range −160, 20
+    /// ou 200 ; `RecetteArgumentsTests` les passe par le vrai schéma, pour qu'un refus échoue dans
+    /// `swift test` et non en recette.
+    static let argumentsMasquesRelus: [String: JSONValue] = [
+        "step_name": "recette", "confirm": true, "reason": "Recette automatisée du module.", "masks": [
+            ["kind": "linear", "name": "Recette dégradé relu", "from_x": 0.123457, "from_y": 0.111111, "to_x": 0.876543, "to_y": 0.432109,
+             "adjustments": ["Exposure": -0.1]],
+            ["kind": "radial", "name": "Recette radial relu", "center_x": 0.456789, "center_y": 0.512345, "radius_x": 0.123457, "angle": -160,
+             "adjustments": ["Exposure": 0.1]],
+            ["kind": "brush", "name": "Recette pinceau relu", "adjustments": ["Exposure": 0.1],
+             "strokes": [["points": [[0.2, 0.3], [0.25, 0.35]], "size": 0.02, "flow": 70, "feather": 30]]],
+            ["kind": "luminance", "name": "Recette plage relue", "min": 70, "max": 100, "adjustments": ["Highlights": -10]],
+        ]]
 
     static func nombre(_ valeur: Double) -> String { DevelopCatalogue.format((valeur * 100).rounded() / 100) }
 }

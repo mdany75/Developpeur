@@ -720,19 +720,22 @@ end
 --
 -- Tolérances PROVISOIRES, pas encore constatées (docs/SPEC.md, Masques relus, « À constater ») :
 -- le relevé DEVELOPPEUR_RELEVE_FORMES sur de nouvelles copies d'Essais les fixera.
---   position : écart absolu en part de l'image (1e-4 : 0,6 px sur 6240) ;
+--   position : écart absolu en part de l'image (1e-4 : 0,6 px sur 6240), rayon du pinceau compris
+--     (Radius et touche « r », une part du grand côté) ;
 --   angle : degrés, l'angle d'une ellipse comparé modulo 180 (elle est symétrique) ;
---   valeur : écart relatif (fondu, rayon, flux, dureté, étendue, plages).
-Locaux.TOLERANCES_FORMES = { position = 1e-4, angle = 0.01, valeur = 1e-3, provisoires = true }
+--   valeur : écart relatif |x − y| / max(|x|, plancher) (fondu, flux, dureté, étendue, plages) ;
+--     le plancher (1e-3) ne sert qu'aux valeurs presque nulles (écart absolu de 1e-6 en dessous).
+Locaux.TOLERANCES_FORMES = { position = 1e-4, angle = 0.01, valeur = 1e-3, plancher = 1e-3, provisoires = true }
 
 local POSITIONS_FORMES = {
     ['Mask/Gradient'] = { 'ZeroX', 'ZeroY', 'FullX', 'FullY' },
     ['Mask/CircularGradient'] = { 'Left', 'Top', 'Right', 'Bottom' },
     ['Mask/RangeMask'] = { 'CorrectionReferenceX', 'CorrectionReferenceY' },
+    ['Mask/Paint'] = { 'Radius' },
 }
 local VALEURS_FORMES = {
     ['Mask/CircularGradient'] = { 'Feather', 'Midpoint', 'Roundness' },
-    ['Mask/Paint'] = { 'Radius', 'Flow', 'CenterWeight' },
+    ['Mask/Paint'] = { 'Flow', 'CenterWeight' },
 }
 local BOOLEENS_FORMES = { 'MaskInverted', 'MaskActive', 'Flipped' }
 
@@ -799,7 +802,7 @@ function Locaux.comparerFormes(ecrits, relus, tol)
         if genre == 'angle' then
             ecart = ecartAngle(x, y)
         elseif genre == 'valeur' then
-            ecart = math.abs(x - y) / math.max(1, math.abs(x))
+            ecart = math.abs(x - y) / math.max(math.abs(x), tol.plancher or 1e-3)
         else
             ecart = math.abs(x - y)
         end
@@ -822,8 +825,8 @@ function Locaux.comparerFormes(ecrits, relus, tol)
             nombre(k, cle .. '[' .. i .. ']', x[i], y[i], genres[i] or 'valeur')
         end
     end
-    -- Touches d'un trait (Dabs) : même nombre et mêmes lettres ; « r », « f », « h » comparés en
-    -- valeurs, « d x y » ou « M x y » en positions.
+    -- Touches d'un trait (Dabs) : même nombre et mêmes lettres ; « f », « h » comparés en valeurs,
+    -- « r » (rayon, part du grand côté), « d x y » ou « M x y » en positions.
     local function touches(k, a, b)
         if type(a) ~= 'table' then
             return
@@ -840,7 +843,7 @@ function Locaux.comparerFormes(ecrits, relus, tol)
                 dire(k, 'Dabs[' .. i .. ']', tostring(a[i]), tostring(b[i]), nil, 'structure')
                 return
             end
-            local genre = (la == 'd' or la == 'M') and 'position' or 'valeur'
+            local genre = (la == 'd' or la == 'M' or la == 'r') and 'position' or 'valeur'
             for j = 1, #x do
                 nombre(k, 'Dabs[' .. i .. ']', x[j], y[j], genre)
             end
