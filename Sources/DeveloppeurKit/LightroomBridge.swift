@@ -36,7 +36,7 @@ public extension LightroomServing {
 /// Client TCP du module « Développeur ». Le module écoute sur 127.0.0.1 avec deux
 /// prises `LrSocket` à sens unique : l'une reçoit les commandes (`requestPort`), l'autre renvoie
 /// les réponses (`replyPort`). Chaque message est une ligne JSON :
-///   commande → `{"id": 7, "jeton": "<64 chiffres hexadécimaux>", "command": "apercu", "params": {…}}`
+///   commande → `{"id": 7, "jeton": "<64 chiffres hexadécimaux>", "commande_id": "<UUID>", "command": "apercu", "params": {…}}`
 ///   réponse  ← `{"id": 7, "result": {…}}` ou `{"id": 7, "error": "message"}`
 ///   refus    ← `{"id": 7, "error": "Liaison fermée : …", "code": "jeton"}`
 ///   arrêt    ← `{"id": 7, "error": "Arrêtée par l'utilisateur …", "code": "arret"}` (croix de la
@@ -50,6 +50,14 @@ public extension LightroomServing {
 /// du jeton (liaison redémarrée entre la lecture et le ping) fait relire le fichier une fois. Sans
 /// fichier, aucune clé `jeton` : un module d'avant la 1.2 accepte la ligne comme avant. Le jeton
 /// n'est jamais journalisé.
+///
+/// Ne plus perdre une réponse : chaque commande, sauf `ping`, part avec un `commande_id` (UUID tiré
+/// pour elle), sous lequel le module garde sa réponse (les 20 dernières, 10 minutes). Quand elle
+/// n'arrive pas (délai dépassé, liaison coupée), et que la commande écrit ou coûte
+/// (`reprendLaReponse`), le serveur la redemande par la commande système `reprendre`, avec le jeton,
+/// au lieu de la relancer : une écriture n'est jamais rejouée. Sans réponse gardée (jamais reçue,
+/// module rechargé, module d'avant la reprise), une lecture se rejoue comme avant, une écriture
+/// rend son erreur.
 public final class LightroomBridge: LightroomServing {
     public static let defaultRequestPort: UInt16 = 54770
     public static let defaultReplyPort: UInt16 = 54771
@@ -96,6 +104,31 @@ public final class LightroomBridge: LightroomServing {
     public static let lectures: Set<String> = ["etat", "selection", "reglages", "apercu", "vignettes", "chercher", "motsCles",
                                                "presets", "journal", "diagnostic", "livraison", "etapes"]
     public var delaiReprise: TimeInterval = 1
+    /// Lectures qui coûtent (rendus, vignettes, recherche dans tout le catalogue) : leur réponse
+    /// perdue se redemande au module avant de les relancer.
+    public static let lecturesCouteuses: Set<String> = ["apercu", "vignettes", "chercher"]
+    /// Délai d'une demande de reprise (le module la sert de sa mémoire, sans attendre Lightroom).
+    public var delaiRepriseReponse: TimeInterval = 3
+    /// Après une coupure, combien de temps redemander une réponse que le module dit en cours.
+    public var attenteReprise: TimeInterval = 30
+    /// Entre deux demandes d'une réponse en cours.
+    public var intervalleReprise: TimeInterval = 1
+
+    /// Vrai si la réponse perdue de cette commande se redemande au module (`reprendre`) : toute
+    /// commande qui n'est pas une lecture (une écriture ne se rejoue jamais), et les lectures
+    /// coûteuses.
+    public static func reprendLaReponse(_ command: String) -> Bool {
+        guard command != "ping", command != "reprendre" else { return false }
+        return !lectures.contains(command) || lecturesCouteuses.contains(command)
+    }
+
+    /// La commande a été faite, mais le module n'a pas gardé sa réponse (trop grosse) : rien n'est relancé.
+    public static func reponseNonGardeeMessage(_ command: String) -> String {
+        """
+        La commande « \(command) » a été faite dans Lightroom, mais sa réponse s'est perdue en route et le module \
+        ne l'a pas gardée (trop grosse) : ne pas la relancer ; relire la photo (view_photo, get_settings) pour voir où elle en est.
+        """
+    }
 
     /// Version que le module a donnée à la dernière poignée de main (`ping`).
     public private(set) var moduleVersion: String?
@@ -159,24 +192,69 @@ public final class LightroomBridge: LightroomServing {
     public func send(_ command: String, _ params: [String: JSONValue], timeout: TimeInterval) throws -> JSONValue {
         let started = Date()
         defer { journal?(String(format: "commande « %@ » : %.2f s", command, Date().timeIntervalSince(started))) }
+        let commandeID = command == "ping" ? nil : UUID().uuidString
         do {
-            return try envoyer(command, params, timeout: timeout)
-        } catch LightroomError.interrupted(let message) where Self.lectures.contains(command) {
-            journal?("liaison coupée pendant « \(command) » : reprise")
+            return try envoyer(command, params, commandeID: commandeID, timeout: timeout)
+        } catch let erreur as LightroomError {
+            let coupure: Bool
+            switch erreur {
+            case .interrupted: coupure = true
+            case .timeout: coupure = false
+            default: throw erreur
+            }
+            // D'abord la réponse gardée par le module : rien n'est refait.
+            if let commandeID, Self.reprendLaReponse(command),
+               let reprise = try reprendre(commandeID, command, attente: coupure ? attenteReprise : 0) {
+                return reprise
+            }
+            guard coupure, Self.lectures.contains(command), case .interrupted(let message) = erreur else { throw erreur }
+            journal?("liaison coupée pendant « \(command) » : relancée")
             Thread.sleep(forTimeInterval: delaiReprise)
             do {
-                return try envoyer(command, params, timeout: timeout)
+                return try envoyer(command, params, commandeID: UUID().uuidString, timeout: timeout)
             } catch {
                 throw LightroomError.interrupted(message)
             }
         }
     }
 
-    private func envoyer(_ command: String, _ params: [String: JSONValue], timeout: TimeInterval) throws -> JSONValue {
+    /// Redemande au module la réponse perdue de la commande `commandeID` (`reprendre`). Rend son
+    /// résultat, lève son erreur, ou nil si le module ne l'a pas (jamais reçue, oubliée, module
+    /// rechargé, module d'avant la reprise, Lightroom injoignable). Une commande que le module dit
+    /// en cours est redemandée pendant `attente` secondes. Ne relance jamais la commande.
+    private func reprendre(_ commandeID: String, _ command: String, attente: TimeInterval) throws -> JSONValue? {
+        let fin = Date().addingTimeInterval(attente)
+        while true {
+            let reponse: JSONValue
+            do {
+                reponse = try envoyer("reprendre", ["commande_id": .string(commandeID)], commandeID: nil, timeout: delaiRepriseReponse)
+            } catch {
+                journal?("reprise de « \(command) » impossible : \(error.localizedDescription)")
+                return nil
+            }
+            if reponse["trouve"]?.bool == true {
+                journal?("réponse de « \(command) » reprise au module")
+                if reponse["indisponible"]?.string != nil {
+                    throw LightroomError.plugin(Self.reponseNonGardeeMessage(command))
+                }
+                let gardee = reponse["reponse"] ?? .null
+                if let error = gardee["error"], !error.isNull {
+                    let texte = error.string ?? JSONCoding.line(error)
+                    if gardee["code"]?.string == "arret" { throw CommandeArretee(message: texte) }
+                    throw LightroomError.plugin(texte)
+                }
+                return gardee["result"] ?? .null
+            }
+            guard reponse["en_cours"]?.bool == true, Date() < fin else { return nil }
+            Thread.sleep(forTimeInterval: intervalleReprise)
+        }
+    }
+
+    private func envoyer(_ command: String, _ params: [String: JSONValue], commandeID: String?, timeout: TimeInterval) throws -> JSONValue {
         try connect()
         defer { disconnect() }
         do {
-            return try exchange(command, params, timeout: timeout)
+            return try exchange(command, params, commandeID: commandeID, timeout: timeout)
         } catch let refus as RefusJeton {
             // Le ping est passé avec ce jeton : la liaison a redémarré entre les deux. Rien n'a été fait.
             throw LightroomError.plugin(refus.message)
@@ -283,12 +361,16 @@ public final class LightroomBridge: LightroomServing {
 
     // MARK: Échange
 
-    private func exchange(_ command: String, _ params: [String: JSONValue], timeout: TimeInterval) throws -> JSONValue {
+    private func exchange(_ command: String, _ params: [String: JSONValue], commandeID: String? = nil,
+                          timeout: TimeInterval) throws -> JSONValue {
         let id = nextID
         nextID += 1
         var message: [String: JSONValue] = ["id": .number(Double(id)), "command": .string(command), "params": .object(params)]
         if let jeton = jetonCourant {
             message["jeton"] = .string(jeton)
+        }
+        if let commandeID {
+            message["commande_id"] = .string(commandeID)
         }
         try write(JSONCoding.line(.object(message)) + "\n")
 

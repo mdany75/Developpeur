@@ -3,11 +3,13 @@
 -- LrSocket ne fonctionne que dans un sens par prise : Lightroom écoute sur 127.0.0.1, reçoit
 -- les commandes sur PORT_COMMANDES et renvoie les réponses sur PORT_REPONSES. Chaque message
 -- est une ligne JSON :
---   commande → {"id": 7, "jeton": "<64 chiffres hexadécimaux>", "command": "apercu", "params": {…}}
+--   commande → {"id": 7, "jeton": "<64 chiffres hexadécimaux>", "commande_id": "<UUID>", "command": "apercu", "params": {…}}
 --   réponse  ← {"id": 7, "result": {…}}  ou  {"id": 7, "error": "message"}
 --   refus    ← {"id": 7, "error": "Liaison fermée : …", "code": "jeton"}
 --   arrêt    ← {"id": 7, "error": "Arrêtée par l'utilisateur …", "code": "arret"} (croix de la barre
 --              d'une commande longue, Progression.lua)
+--   reprise  → {"id": 8, "jeton": "…", "command": "reprendre", "params": {"commande_id": "…"}}
+--            ← {"id": 8, "result": {"trouve": true, "commande": "appliquer", "reponse": {"result": {…}}}}
 -- Le serveur ouvre une connexion par commande puis la ferme : plusieurs sessions de Claude
 -- (Claude Desktop, Claude Code) peuvent ainsi se succéder.
 --
@@ -25,6 +27,14 @@
 -- accrochée à une connexion morte. Quand la prise des commandes se ferme, on la ferme donc et
 -- on en ouvre une nouvelle (reconnect() sur une prise d'envoi bloque Lightroom, comme l'a
 -- constaté le module MIDI2LR).
+-- Réponses gardées (reprise d'une réponse perdue) : chaque ligne du serveur, sauf ping, porte
+-- aussi `commande_id`, un identifiant que le serveur tire pour elle. Le module garde la réponse des
+-- GARDER_RESULTATS dernières commandes (DUREE_RESULTAT_GARDE secondes au plus) sous cet
+-- identifiant ; si elle se perd (délai dépassé côté serveur, liaison coupée entre la commande et la
+-- réponse), le serveur la redemande par la commande système `reprendre` {commande_id}, avec le
+-- jeton comme toute autre, au lieu de relancer la commande : une écriture n'est jamais rejouée. Une
+-- réponse de plus de TAILLE_RESULTAT_GARDE octets, ou qui porterait le jeton, est remplacée par un
+-- marqueur (`indisponible`) : la commande est faite, son résultat n'est plus là.
 -- Les commandes elles-mêmes sont réparties par Commandes.lua ; l'état est affiché par Suivi.lua.
 
 local LrApplication = import 'LrApplication'
@@ -93,6 +103,16 @@ local Liaison = {
     -- Le fichier du jeton est vérifié tous les VERIFIER_JETON_TOUTES tours de la boucle de la
     -- liaison (0,5 s chacun : 5 s), et réécrit s'il a été effacé ou remplacé.
     VERIFIER_JETON_TOUTES = 10,
+
+    -- Réponses gardées pour la reprise (`reprendre`) : liste du plus ancien au plus récent, de
+    -- { cle, commande, le, texte } (texte : la réponse en JSON, sans id ni jeton) ou
+    -- { cle, commande, le, indisponible, octets } ; et les commandes reçues pas encore finies, par
+    -- identifiant (cle → nom de la commande).
+    resultatsGardes = {},
+    commandesEnCours = {},
+    GARDER_RESULTATS = 20,
+    TAILLE_RESULTAT_GARDE = 65536,
+    DUREE_RESULTAT_GARDE = 600,
 }
 
 -- Réponses à une ligne refusée (code 'jeton'), selon le genre du refus. Le serveur les montre
@@ -425,6 +445,91 @@ function Liaison.photoActive()
     return id, fichier
 end
 
+-- Réponses gardées (reprise) ----------------------------------------------------------------
+
+-- Vrai si l'identifiant de commande venu du serveur est utilisable : un texte de 8 à 64 lettres,
+-- chiffres ou tirets (le serveur envoie un UUID).
+function Liaison.cleValide(cle)
+    return type(cle) == 'string' and #cle >= 8 and #cle <= 64 and not cle:find('[^%w%-]')
+end
+
+-- Retire les réponses gardées trop vieilles, puis les plus anciennes au-delà de GARDER_RESULTATS.
+local function elaguerResultats()
+    local maintenant = LrDate.currentTime()
+    local gardes = {}
+    for _, entree in ipairs(Liaison.resultatsGardes or {}) do
+        if maintenant - (tonumber(entree.le) or 0) <= Liaison.DUREE_RESULTAT_GARDE then
+            gardes[#gardes + 1] = entree
+        end
+    end
+    while #gardes > Liaison.GARDER_RESULTATS do
+        table.remove(gardes, 1)
+    end
+    Liaison.resultatsGardes = gardes
+end
+
+-- Garde la réponse d'une commande ({result = …} ou {error, code}) sous son identifiant. Rien sans
+-- identifiant valable. Gardée en JSON (un texte : rien ne la change après coup) ; trop grosse, ou
+-- portant le jeton de la liaison, elle devient un marqueur.
+function Liaison.garderResultat(cle, commande, reponse)
+    if not Liaison.cleValide(cle) or commande == 'ping' or commande == 'reprendre' then
+        return
+    end
+    local entree = { cle = cle, commande = commande, le = LrDate.currentTime() }
+    local encode, texte = pcall(Json.encode, reponse)
+    if not encode or type(texte) ~= 'string' then
+        entree.indisponible, entree.octets = 'illisible', 0
+    elseif #texte > Liaison.TAILLE_RESULTAT_GARDE then
+        entree.indisponible, entree.octets = 'taille', #texte
+    elseif type(Liaison.jeton) == 'string' and texte:find(Liaison.jeton, 1, true) then
+        entree.indisponible, entree.octets = 'jeton', #texte
+    else
+        entree.texte = texte
+    end
+    local gardes = {}
+    for _, autre in ipairs(Liaison.resultatsGardes or {}) do
+        if autre.cle ~= cle then
+            gardes[#gardes + 1] = autre
+        end
+    end
+    gardes[#gardes + 1] = entree
+    Liaison.resultatsGardes = gardes
+    elaguerResultats()
+end
+
+-- Oublie toutes les réponses gardées (essais).
+function Liaison.oublierResultats()
+    Liaison.resultatsGardes, Liaison.commandesEnCours = {}, {}
+end
+
+-- Commande système `reprendre` {commande_id} : la réponse gardée de cette commande,
+-- { trouve = true, commande, reponse = {result | error, code} } ; ou, sans elle,
+-- { trouve = true, commande, indisponible, octets } (faite, résultat non gardé) ;
+-- { trouve = false, en_cours = true, commande } (pas finie) ; { trouve = false, en_cours = false }
+-- (jamais reçue, oubliée, ou module rechargé depuis). Ne lance ni ne rejoue jamais rien.
+function Liaison.reprendre(params)
+    local cle = type(params) == 'table' and params.commande_id or nil
+    if not Liaison.cleValide(cle) then
+        error("Reprise : identifiant de commande invalide.", 0)
+    end
+    elaguerResultats()
+    local gardes = Liaison.resultatsGardes
+    for i = #gardes, 1, -1 do
+        local entree = gardes[i]
+        if entree.cle == cle then
+            if entree.indisponible then
+                return { trouve = true, commande = entree.commande, indisponible = entree.indisponible, octets = entree.octets }
+            end
+            return { trouve = true, commande = entree.commande, reponse = Json.decode(entree.texte) }
+        end
+    end
+    local enCours = Liaison.commandesEnCours and Liaison.commandesEnCours[cle]
+    if enCours then
+        return { trouve = false, en_cours = true, commande = enCours }
+    end
+    return { trouve = false, en_cours = false }
+end
+
 -- Une commande reçue : traitée dans sa propre tâche (elle peut attendre un rendu ou
 -- l'accès en écriture au catalogue), puis la réponse part avec le même identifiant. Le jeton se
 -- vérifie avant tout le reste, ping compris : une ligne refusée ne compte pas comme un échange,
@@ -464,6 +569,8 @@ local function traiter(requete)
             resultat.arret_demande = Progression.ARRET_TARDIF
             Liaison.noter("Arrêt demandé trop tard : « " .. Progression.nomLisible(requete.command) .. " » faite en entier")
         end
+        -- Gardée avant de partir : une reprise arrivée pendant l'envoi la trouve.
+        LrTasks.pcall(Liaison.garderResultat, requete.commande_id, requete.command, { result = resultat })
         Liaison.repondre({ id = requete.id, result = resultat })
         LrTasks.pcall(Etapes.apresCommande, requete.command, params, resultat, cle)
     else
@@ -475,6 +582,7 @@ local function traiter(requete)
         elseif requete.command ~= 'ping' and texte:sub(1, #Liaison.EN_ATTENTE) ~= Liaison.EN_ATTENTE then
             Liaison.noter("Refusé : " .. texte)
         end
+        LrTasks.pcall(Liaison.garderResultat, requete.commande_id, requete.command, { error = texte, code = code })
         Liaison.repondre({ id = requete.id, error = texte, code = code })
         -- Après la réponse : abandonner peut rendre l'après d'une étape laissée en cours.
         LrTasks.pcall(Etapes.abandonner, cle)
@@ -495,9 +603,28 @@ function Liaison.recevoir(message)
             return
         end
         Liaison.dernierEchange = LrDate.currentTime()
+        -- Reprise d'une réponse perdue : lue dans la mémoire de la liaison, sans passer par
+        -- Commandes.executer (ni pause, ni étape, ni barre) ; elle ne compte pas dans enCours.
+        if requete.command == 'reprendre' then
+            local lu, resultat = pcall(Liaison.reprendre, requete.params)
+            if lu then
+                Liaison.repondre({ id = requete.id, result = resultat })
+            else
+                Liaison.repondre({ id = requete.id, error = Liaison.messageErreur(resultat) })
+            end
+            return
+        end
+        local cle = Liaison.cleValide(requete.commande_id) and requete.commande_id or nil
+        if cle then
+            Liaison.commandesEnCours = Liaison.commandesEnCours or {}
+            Liaison.commandesEnCours[cle] = requete.command
+        end
         Liaison.enCours = (tonumber(Liaison.enCours) or 0) + 1
         local fini, erreur = LrTasks.pcall(traiter, requete)
         Liaison.enCours = math.max(0, (tonumber(Liaison.enCours) or 1) - 1)
+        if cle then
+            Liaison.commandesEnCours[cle] = nil
+        end
         Liaison.finCommande = LrDate.currentTime()
         if not fini then
             error(erreur, 0)

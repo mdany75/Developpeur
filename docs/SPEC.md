@@ -129,7 +129,7 @@ leur menu, leurs boutons dans cet en-tête (de nouveau depuis le correctif 1.3.7
 Une ligne JSON par message, en UTF-8.
 
 ```
-→ {"id": 7, "jeton": "<64 chiffres hexadécimaux>", "command": "appliquer", "params": {…}}
+→ {"id": 7, "jeton": "<64 chiffres hexadécimaux>", "commande_id": "<UUID>", "command": "appliquer", "params": {…}}
 ← {"id": 7, "result": {…}}
 ← {"id": 7, "error": "message en français, montré tel quel à Claude"}
 ← {"id": 7, "error": "Liaison fermée : …", "code": "jeton"}
@@ -141,6 +141,10 @@ Une ligne JSON par message, en UTF-8.
 reçoit une erreur `code = "jeton"` et n'atteint pas la commande ; un serveur qui ne trouve pas le
 fichier n'envoie pas la clé (un module d'avant la 1.2 accepte alors la ligne comme avant). Voir
 Liaison fermée.
+
+`commande_id` (après la 1.5.1) : un UUID que le serveur tire pour chaque commande, sauf `ping` ;
+le module garde la réponse sous cet identifiant, pour la rendre par `reprendre` si elle se perd
+(voir Délai des appels d'outils › Réponse perdue, reprise au module). Un module d'avant l'ignore.
 
 `evenements` accompagne une réponse quand la photo active a changé dans Lightroom depuis la
 précédente (`LrApplication.addActivePhotoChangeObserver`, dans le contexte de la liaison, qui
@@ -162,6 +166,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | Commande | Paramètres | Résultat |
 | --- | --- | --- |
 | `ping` | — | `{pong: true, version}` ; depuis la 1.2, refusé lui aussi sans le bon `jeton` |
+| `reprendre` (après la 1.5.1) | `commande_id` | commande système, avec le jeton : `{trouve: true, commande, reponse: {result} ou {error, code}}`, `{trouve: true, commande, indisponible, octets}` (faite, réponse non gardée), `{trouve: false, en_cours: true, commande}` ou `{trouve: false, en_cours: false}` ; servie par `Liaison.recevoir` de sa mémoire, sans `Commandes.executer` ni pause, étape ou barre ; ne rejoue rien (voir Réponse perdue, reprise au module) |
 | `etat` | `sauvegarde?` | versions, catalogue, mode, pause, limites, photo active, `liaison_fermee` (1.2 : vrai) ; avec `sauvegarde`, la sauvegarde du catalogue demandée pour la fermeture suivante |
 | `selection` | `limite` | `total`, `renvoyees`, `photos` (id, fichier, données de prise de vue, note, drapeau, libellé, pile, `active`) |
 | `reglages` | `photo?`, `cles`, `details?`, `toutes?` | `reglages` (valeurs des clés demandées), `photo` (id, fichier, `copie_virtuelle`), `echelle_temperature`, `version_processus`, `profil`, `intensite_profil`, `appareil`, `recadrage` (angle, dimensions, orientation) ; avec `details` : `courbes_par_points`, `masques` (composants avec leur mode), `couleurs_ponctuelles`, `taches`, `yeux_rouges`, `filtres_calcules`, `amelioration` (photo affichée dans le module Développement seulement), `classement` (note, drapeau, libellé, titre, mots-clés) ; avec `toutes` : `tous`, tout ce que Lightroom range |
@@ -210,7 +215,8 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 étape ; `variantes` `choisir` le rend à plat. Deux paramètres de plus pour toute commande qui écrit
 une étape : `avant_apres` (la recette seulement, jamais un outil : force l'avant/après, même hors
 de la photo active) et `sans_avant_apres` (`match_series` : jamais d'avant/après). Les lectures
-que le serveur rejoue une fois après une coupure (`LightroomBridge.lectures`) gagnent `etapes` ;
+que le serveur rejoue une fois après une coupure (`LightroomBridge.lectures`, après la reprise de
+leur réponse pour les lectures coûteuses) gagnent `etapes` ;
 `carnet` n'y est pas (ni `lecon`, jusqu'à la 1.3.5) : il écrit `carnet.json` ; ni
 `importerGeneree` (rejouée après un délai ou une coupure, elle importerait la photo deux fois ;
 seul `generative_edit` la renvoie une fois quand elle n'est jamais partie, `.unreachable`).
@@ -285,6 +291,44 @@ dit où en est la série (« où il en est : 125 sur 329 : tri des photos »). `
 dans Lightroom va jusqu'au bout, la suite ne part pas, et aucune réponse n'est envoyée (spécification
 MCP) ; un appel pas encore commencé n'est pas lancé. Une annulation d'un appel déjà répondu est
 ignorée.
+
+### Réponse perdue, reprise au module (après la 1.5.1)
+
+Chantier « ne plus perdre une réponse » de la page Analyse : avant lui, une réponse du module qui
+n'arrivait pas (délai dépassé côté serveur, liaison coupée entre la commande et sa réponse sur le
+port 54771) était perdue ; une lecture se rejouait, une écriture rendait son erreur (« vérifier
+dans Lightroom si elle a été appliquée »), alors qu'elle était souvent faite.
+
+- **Serveur** (`LightroomBridge.send`) : chaque commande sauf `ping` porte un `commande_id` (UUID
+  neuf ; une lecture relancée en reçoit un autre). Sur `.interrupted` ou `.timeout`, si la commande
+  écrit (hors de `LightroomBridge.lectures`) ou coûte (`lecturesCouteuses` : `apercu`, `vignettes`,
+  `chercher` ; `reprendLaReponse`), il ouvre une nouvelle connexion et envoie `reprendre`
+  (`delaiRepriseReponse`, 3 s), avec le jeton. Trouvée : son résultat est rendu, ou son erreur
+  levée telle quelle (`code: "arret"` reste `CommandeArretee`) ; `indisponible` : erreur « faite
+  dans Lightroom… ne pas la relancer » (`reponseNonGardeeMessage`). En cours : après une coupure,
+  redemandée chaque seconde pendant `attenteReprise` (30 s) ; après un délai, une seule demande.
+  Rien de gardé (jamais reçue, oubliée, module rechargé ou Lightroom relancé, module d'avant la
+  reprise qui répond « Commande inconnue », Lightroom injoignable) : une lecture se relance comme
+  avant (`LightroomBridge.lectures`), une écriture rend son erreur d'origine, **jamais rejouée**.
+  `importerGeneree` en profite : coupée, sa réponse reprise ne réimporte rien.
+- **Module** (`Liaison.lua`) : `traiter` garde chaque réponse (`{result}` ou `{error, code}`) avant
+  de l'envoyer (`Liaison.garderResultat`), en JSON, sans `id` ni jeton, sous un `commande_id`
+  valable (8 à 64 lettres, chiffres ou tirets ; sinon rien n'est gardé), jamais pour `ping` ni
+  `reprendre`. Les 20 dernières (`GARDER_RESULTATS`), 10 minutes au plus
+  (`DUREE_RESULTAT_GARDE`), en mémoire seulement : perdues au rechargement du module. Une réponse
+  de plus de 64 Ko (`TAILLE_RESULTAT_GARDE`), ou qui contiendrait le jeton de la liaison, est
+  remplacée par un marqueur (`indisponible` : `taille`, `jeton`) ; les images restent des chemins
+  de fichiers, jamais gardées. `Liaison.commandesEnCours` dit qu'une commande reçue n'est pas finie.
+  `reprendre` se traite dans `Liaison.recevoir`, après le jeton (refusé sans lui comme toute
+  ligne), sans compter dans `Liaison.enCours`.
+- **Essais** : `RepriseReponseTests` (faux module TCP qui imite la mémoire) ; `essais-reprise.lua`
+  (suite Liaison). La simulation gagne `S.priseReponses` et `S.serveurParti` : une réponse envoyée
+  pendant que le serveur est parti se perd sans erreur (`S.perdues`), supposé et non constaté ; la
+  reprise n'utilise aucune commande du système, et `LrTasks.execute` n'imite toujours que les deux
+  du jeton.
+- **À constater dans Lightroom** : une réponse perdue reprise (par exemple un `add_mask` long
+  pendant lequel la prise des réponses se coupe) ; qu'un envoi de `LrSocket` vers un serveur parti se perd bien sans erreur ; et que
+  l'Historique ne montre l'écriture qu'une fois.
 
 ### Barre et arrêt d'une commande longue
 
@@ -8192,7 +8236,8 @@ du TIFF exporté au bit près).
 - **Résultat gardé** : `importerGeneree` jamais livré (`.unreachable` : connexion refusée, ping sans
   réponse, `nonLivree`) se réessaie une fois après `Fibo.delaiReessaiImport` (5 s) ; jamais après un
   délai (`.timeout`) ni une coupure (`.interrupted`) : la commande est partie, le module peut
-  l'exécuter (une écriture, pas une lecture), et la rejouer importerait deux fois ; un refus du
+  l'exécuter (une écriture, pas une lecture), et la rejouer importerait deux fois (après la 1.5.1,
+  sa réponse perdue se reprend au module, sans rien réimporter : Réponse perdue, reprise au module) ; un refus du
   module ne se réessaie pas non plus. En cas d'échec (ou sans
   `id` dans la réponse), le TIFF final est **déplacé** (pas copié) vers `<racine>/Fibo non
   importées/<nom>.tif` (`-2`, `-3`… jamais d'écrasement ; `garderNonImportee`), hors de

@@ -1,6 +1,10 @@
 -- Commandes.lua : ce que le serveur MCP peut demander à Lightroom.
 --
 --   ping        → {pong = true, version}
+--   reprendre   {commande_id}           → réponse gardée d'une commande dont la réponse s'est perdue
+--                                          (trouve, en_cours, reponse ou indisponible) ; commande
+--                                          système traitée par Liaison.recevoir, jamais ici, qui ne
+--                                          rejoue rien (Liaison.reprendre)
 --   etat        {sauvegarde?}          → versions, mode, pause, limites, photo active ; sauvegarde :
 --                                          sauvegarde du catalogue à la prochaine fermeture
 --   selection   {limite}                → photos sélectionnées et leurs données de prise de vue

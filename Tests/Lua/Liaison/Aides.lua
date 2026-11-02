@@ -66,6 +66,8 @@ function A.remettre()
     Liaison.jeton = A.JETON
     Liaison.derniersRefus = {}
     Liaison.refus = 0
+    -- Réponses gardées pour la reprise : aucune d'un essai à l'autre.
+    Liaison.oublierResultats()
     for _, nom in ipairs(ordre) do
         local module = package.loaded[nom]
         if type(module) == 'table' then

@@ -1342,7 +1342,9 @@ Développement montre l'état à l'importation, pas celui d'avant Claude).
 Claude Desktop abandonne un outil au bout de 60 secondes. Quand Lightroom travaille plus longtemps
 (plusieurs masques IA, débruitage), le connecteur répond avant : Claude dit que Lightroom finit
 encore et rappelle l'outil, qui donne alors le résultat sans rien refaire. Claude Code et la
-fenêtre Claude attendent la fin.
+fenêtre Claude attendent la fin. Si la réponse de Lightroom se perd en route (liaison coupée,
+délai dépassé), le connecteur la redemande au module, qui garde les vingt dernières : une
+retouche faite n'est jamais refaite une seconde fois.
 
 ### En cas de problème
 

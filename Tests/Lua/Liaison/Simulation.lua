@@ -2362,7 +2362,27 @@ end
 
 _PLUGIN = { id = 'com.danymenard.developpeur' }
 
+-- Prise des réponses de la liaison (LrSocket.bind en mode 'send'), à poser dans Liaison.prise :
+-- chaque ligne envoyée va dans S.envois. Avec S.serveurParti (le serveur a fermé sa connexion
+-- pendant la commande : délai dépassé de son côté, liaison coupée), la ligne se perd, sans erreur
+-- (supposé, non constaté : LrSocket ne dit rien d'un envoi qui n'arrive pas) ; elle est notée dans
+-- S.perdues, que le serveur ne reçoit jamais. La reprise (`reprendre`) n'utilise ni prise de plus
+-- ni commande du système : LrTasks.execute n'imite toujours que les deux du jeton.
+function S.priseReponses()
+    return {
+        send = function(_, texte)
+            if S.serveurParti then
+                S.perdues[#S.perdues + 1] = texte
+            else
+                S.envois[#S.envois + 1] = texte
+            end
+        end,
+    }
+end
+
 function S.reinitialiser()
+    S.serveurParti = false
+    S.perdues = {}
     S.photos = {}
     S.active = nil
     S.selection = {}
