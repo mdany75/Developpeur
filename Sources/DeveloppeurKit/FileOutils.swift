@@ -15,6 +15,10 @@ import Foundation
 /// ce qu'on vient d'appliquer). Une commande qui n'a pas pu commencer avant sa limite n'est pas
 /// lancée du tout.
 ///
+/// Le résultat gardé tombe quand une autre commande commence, car elle change peut-être la photo ;
+/// une lecture (`laisseLeResultatGarde`) le laisse : un get_status entre deux ne fait pas refaire
+/// un generative_edit de 5 minutes (Fibo 2 tournerait deux fois).
+///
 /// Un appel que le client annule (`notifications/cancelled`) s'arrête entre deux photos d'une
 /// série (`ContexteAppel`) ; pas encore commencé, il n'est pas lancé.
 final class FileOutils {
@@ -42,6 +46,14 @@ final class FileOutils {
 
     /// Durée pendant laquelle un résultat arrivé après la limite reste offert au même appel.
     static let conservation: TimeInterval = 300
+
+    /// Commandes qui ne changent ni les photos ni le catalogue : commencées, elles laissent le
+    /// résultat gardé d'un autre appel. Les outils en lecture seule (`readOnlyHint`), plus
+    /// get_status (sa demande de sauvegarde ne touche à aucune photo, d'où son absence de
+    /// `readOnlyTools`) et la lecture d'une ressource. Toute autre commande l'efface.
+    static func laisseLeResultatGarde(_ nom: String) -> Bool {
+        ToolHandler.readOnlyTools.contains(nom) || nom == "get_status" || nom == "resources/read"
+    }
 
     private let file = DispatchQueue(label: "mcp-developpeur.outils")
     private let verrou = NSLock()
@@ -72,8 +84,9 @@ final class FileOutils {
             }
             appel.commence = true
             enCours = appel
-            // Une autre commande change peut-être la photo : le résultat gardé ne vaut plus.
-            if let precedent = orphelin, precedent !== appel { orphelin = nil }
+            // Une autre commande change peut-être la photo : le résultat gardé ne vaut plus. Une
+            // lecture le laisse.
+            if let precedent = orphelin, precedent !== appel, !Self.laisseLeResultatGarde(nom) { orphelin = nil }
             verrou.unlock()
             let resultat = travail(appel.contexte)
             verrou.lock()
