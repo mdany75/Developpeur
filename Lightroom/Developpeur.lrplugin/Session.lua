@@ -55,10 +55,10 @@ end
 -- lancement (relais.sh relit entree.jsonl depuis le début).
 function Session:lancer(premiereLigne)
     if not Fichiers.existe(self.claude) then
-        error("Claude Code est introuvable (" .. tostring(self.claude) .. "). Réglez son chemin dans Fichier › Gestionnaire de modules externes › Développeur, section Fenêtre Claude.", 0)
+        error("Claude Code est introuvable (" .. tostring(self.claude) .. "). Réglez son chemin dans Fichier › Gestionnaire de modules externes › Développeur IA pour Lightroom, section Fenêtre Claude.", 0)
     end
     if not Fichiers.existe(self.connecteur) then
-        error("Le connecteur MCP-Développeur est introuvable (" .. tostring(self.connecteur) .. "). Réinstallez Développeur, ou réglez son chemin dans Fichier › Gestionnaire de modules externes › Développeur, section Fenêtre Claude.", 0)
+        error("Le connecteur MCP-Développeur est introuvable (" .. tostring(self.connecteur) .. "). Réinstallez Développeur IA, ou réglez son chemin dans Fichier › Gestionnaire de modules externes › Développeur IA pour Lightroom, section Fenêtre Claude.", 0)
     end
     numero = numero + 1
     self.dossier = LrPathUtils.child(Chemins.sessions(), string.format('%s-%d-%d', self.idConversation, os.time(), numero))

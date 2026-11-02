@@ -529,9 +529,10 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
     S.selection = { S.photoActive }
     local vues = 0
     S.pendantFenetre = function(args)
-        -- « Développeur v1.3.6 » : la version du module (correctif 1.3.6, décision de Dany).
-        egal('Développeur v' .. require('Composants').module(), args.title)
-        vrai(args.title:match('^Développeur v%d+%.%d+'), args.title)
+        -- « Développeur IA v1.5 » : la version du module (correctif 1.3.6, décision de Dany ; « IA » depuis
+        -- le 1er novembre 2026).
+        egal('Développeur IA v' .. require('Composants').module(), args.title)
+        vrai(args.title:match('^Développeur IA v%d+%.%d+'), args.title)
         -- La Conversation claire, seule disposition, toujours en grande taille (fenêtre B sans son
         -- volet : FORME 5, correctif 1.3.6).
         egal('DeveloppeurClaude-conversation-grande-5', args.save_frame)
@@ -566,7 +567,7 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
         egal(nil, p.versionTexte1)
         egal(nil, Fenetre.rafraichirVersions)
         local Composants = require 'Composants'
-        vrai(p.infobulleLightroom:find('Développeur ' .. Composants.module() .. ' ; MCP-Développeur …', 1, true), p.infobulleLightroom)
+        vrai(p.infobulleLightroom:find('Développeur IA ' .. Composants.module() .. ' ; MCP-Développeur …', 1, true), p.infobulleLightroom)
         vrai(p.infobulleLightroom:find("Mode de la liaison : Appliquer", 1, true), p.infobulleLightroom)
         -- La liaison est lue dans ce module : arrêtée, le voyant est rouge et un clic la démarre.
         local Liaison = require 'Liaison'
@@ -602,7 +603,7 @@ essai('Fenêtre : construction, liaisons et rafraîchissement', function()
         Fenetre.verifier(false)
         egal('attention', p.etatLightroom)
         egal('Lightroom', p.texteLightroom)
-        vrai(p.infobulleLightroom:find('Développeur 1.0 ; MCP-Développeur 0.9 · à mettre à jour.', 1, true), p.infobulleLightroom)
+        vrai(p.infobulleLightroom:find('Développeur IA 1.0 ; MCP-Développeur 0.9 · à mettre à jour.', 1, true), p.infobulleLightroom)
         Fenetre.versions = Composants.lignes('1.0', nil)
         Fenetre.verifier(false)
         egal('attention', p.etatLightroom)
@@ -1202,18 +1203,21 @@ essai('Fenêtre : texte JSON rendu lisible', function()
     egal('pas du json', Fenetre.lisible('pas du json'))
 end)
 
-essai("Titre de la fenêtre Claude : « Développeur v » et la version du module (son Info.lua) ; sans version lue, « Développeur » seul", function()
+essai("Titre de la fenêtre Claude : « Développeur IA v » et la version du module (son Info.lua) ; sans version lue, « Développeur IA » seul", function()
     local Composants = require 'Composants'
     local v = require('Info').VERSION
+    -- Le nom du module dans le Gestionnaire (1er novembre 2026) ; son identifiant ne change pas.
+    egal('Développeur IA pour Lightroom', require('Info').LrPluginName)
+    egal('com.danymenard.developpeur', require('Info').LrToolkitIdentifier)
     egal(Composants.formater(v.major, v.minor, v.revision), Composants.module(), 'la version de Info.lua')
-    egal('Développeur v' .. Composants.module(), Fenetre.titreFenetre())
+    egal('Développeur IA v' .. Composants.module(), Fenetre.titreFenetre())
     local module = Composants.module
     Composants.module = function() return '1.3.6' end
-    egal('Développeur v1.3.6', Fenetre.titreFenetre())
+    egal('Développeur IA v1.3.6', Fenetre.titreFenetre())
     Composants.module = function() return '?' end
-    egal('Développeur', Fenetre.titreFenetre(), 'version illisible')
+    egal('Développeur IA', Fenetre.titreFenetre(), 'version illisible')
     Composants.module = function() return nil end
-    egal('Développeur', Fenetre.titreFenetre(), 'sans version')
+    egal('Développeur IA', Fenetre.titreFenetre(), 'sans version')
     Composants.module = module
 end)
 
@@ -2275,14 +2279,14 @@ essai('Versions : lecture, comparaison et alerte', function()
     -- Deux lignes : ce module et le connecteur, installés ensemble au même numéro.
     local l = Composants.lignes('1.0', '1.0')
     egal(2, #l)
-    egal('Développeur', l[1].nom)
+    egal('Développeur IA', l[1].nom)
     egal('MCP-Développeur', l[2].nom)
     vrai(not l[1].alerte and not l[2].alerte, "mêmes versions : pas d'alerte")
     l = Composants.lignes('1.0', '0.9')
     egal('MCP-Développeur · à mettre à jour', l[2].nom)
     vrai(l[2].alerte and not l[1].alerte)
     l = Composants.lignes('1.0', '1.1')
-    egal('Développeur · à mettre à jour', l[1].nom)
+    egal('Développeur IA · à mettre à jour', l[1].nom)
     vrai(l[1].alerte and not l[2].alerte)
     l = Composants.lignes('1.0', nil)
     egal('MCP-Développeur · introuvable', l[2].nom)

@@ -118,7 +118,7 @@ done
 if [[ -z "${CLAUDE_TROUVE}" ]]; then
     CLAUDE_NOTE="  - Claude Code introuvable (~/.local/bin, /opt/homebrew/bin, /usr/local/bin) : la fenêtre Claude de
     Lightroom en a besoin, connecté au compte claude.ai. L'installer, ou régler son chemin dans
-    Fichier › Gestionnaire de modules externes › Développeur."
+    Fichier › Gestionnaire de modules externes › Développeur IA pour Lightroom."
 fi
 
 if [[ "${CLAUDE_DESKTOP_OUVERT}" == 1 ]]; then
@@ -139,7 +139,7 @@ cat <<FIN
 
 Prochaines étapes :
 ${LIGHTROOM_NOTE}
-    Il apparaît dans Fichier › Gestionnaire de modules externes, sous « Développeur ».
+    Il apparaît dans Fichier › Gestionnaire de modules externes, sous « Développeur IA pour Lightroom ».
 ${DESKTOP_NOTE}
   - Dans Claude Code, ouvrir une nouvelle session pour avoir les outils (/clear ne suffit pas).
   - Pour vérifier la liaison (Lightroom ouvert) : "${DEST}" --status

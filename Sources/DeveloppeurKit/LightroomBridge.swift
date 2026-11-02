@@ -55,7 +55,7 @@ public final class LightroomBridge: LightroomServing {
     public static let unreachableMessage = """
     Lightroom Classic ne répond pas. Ouvrir Lightroom Classic et vérifier que la liaison avec Claude est \
     démarrée (Fichier › Module externe - Extras › Démarrer la liaison avec Claude). Si le module n'apparaît pas, \
-    activer « Développeur » dans Fichier › Gestionnaire de modules externes.
+    activer « Développeur IA pour Lightroom » dans Fichier › Gestionnaire de modules externes.
     """
     /// La connexion est acceptée mais le module ne répond pas au `ping` : sa prise ne sert qu'un
     /// client à la fois, et une autre session de Claude (Claude Desktop, une autre session Claude
@@ -216,7 +216,7 @@ public final class LightroomBridge: LightroomServing {
             do {
                 let pong = try exchange("ping", [:], timeout: handshakeTimeout)
                 guard pong["pong"]?.bool == true else {
-                    throw LightroomError.plugin("Le port \(requestPort) répond, mais ce n'est pas le module Développeur.")
+                    throw LightroomError.plugin("Le port \(requestPort) répond, mais ce n'est pas le module Développeur IA pour Lightroom.")
                 }
                 moduleVersion = pong["version"]?.string
                 return

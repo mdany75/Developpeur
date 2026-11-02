@@ -114,10 +114,12 @@ bilan, peau, doses, lumière, teint, tri, notation, masques, mise au point) ;
   `title` « MCP-Développeur »), nom `developpeur` dans `connecteur.json` (`Session.SERVEUR`). Les
   fenêtres « Claude · … », les étapes « Claude · … », l'instantané « Avant Claude », l'ensemble de
   collections et les copies virtuelles « Claude » gardent le nom Claude : c'est ce que Claude a
-  fait. Seule la barre de titre de la fenêtre Claude dit « Développeur » suivi du numéro installé
-  (« Développeur v1.5 » : `Fenetre.titreFenetre`, d'après `Composants.module()` ; « Développeur »
-  seul si la version ne se lit pas) ; son menu (« Ouvrir la fenêtre Claude », ⌃⌥C, visé par
-  `Raccourcis.lua`) et la documentation disent toujours « fenêtre Claude ».
+  fait. Le nom affiché du module est « Développeur IA pour Lightroom » (`LrPluginName`, Gestionnaire
+  de modules externes), sans changer d'identifiant (`LrToolkitIdentifier`, dossiers, clé, collection
+  « Développeur › Essais ») ; la barre de titre de la fenêtre Claude dit « Développeur IA » suivi du
+  numéro installé (« Développeur IA v1.5 » : `Fenetre.titreFenetre`, d'après `Composants.module()` ;
+  « Développeur IA » seul si la version ne se lit pas) ; son menu (« Ouvrir la fenêtre Claude »,
+  ⌃⌥C, visé par `Raccourcis.lua`) et la documentation disent toujours « fenêtre Claude ».
 - Le préfixe « Claude · » des noms de masques (serveur) et d'étapes (module) n'est jamais doublé :
   un nom donné qui le porte déjà le perd d'abord.
 - Chaque constat fait dans Lightroom (« Constaté dans Lightroom Classic » de `docs/SPEC.md`, section

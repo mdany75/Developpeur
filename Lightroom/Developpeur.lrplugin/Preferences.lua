@@ -1,8 +1,8 @@
 -- Preferences.lua : réglages du module, gardés par Lightroom (LrPrefs) et modifiables dans
--- Fichier › Gestionnaire de modules externes › Développeur. Ceux de la liaison sont ici ; ceux de
--- la fenêtre Claude (disposition, modèle, chemins de Claude Code et du connecteur…) sont dans
--- Chemins.defauts, dans la même table : aucune clé ne sert aux deux. Le mode « Proposer d'abord »
--- (`mode`) est celui de la liaison, que la fenêtre montre et bascule.
+-- Fichier › Gestionnaire de modules externes › Développeur IA pour Lightroom. Ceux de la liaison
+-- sont ici ; ceux de la fenêtre Claude (disposition, modèle, chemins de Claude Code et du
+-- connecteur…) sont dans Chemins.defauts, dans la même table : aucune clé ne sert aux deux.
+-- Le mode « Proposer d'abord » (`mode`) est celui de la liaison, que la fenêtre montre et bascule.
 
 local LrPrefs = import 'LrPrefs'
 

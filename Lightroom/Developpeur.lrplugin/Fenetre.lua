@@ -1,5 +1,5 @@
--- Fenetre.lua : la fenêtre Claude du module Développeur (« Développeur v1.3.6 » dans sa barre de
--- titre, avec la version du module : Fenetre.titreFenetre ; fenêtre flottante, non bloquante) :
+-- Fenetre.lua : la fenêtre Claude du module Développeur (« Développeur IA v1.5 » dans sa
+-- barre de titre, avec la version du module : Fenetre.titreFenetre ; fenêtre flottante, non bloquante) :
 -- une conversation avec Claude Code (le fil avec les appels d'outils, les invites en raccourcis et
 -- la demande), ce que Claude regarde, sa proposition à accepter, refuser ou ajuster, le cadre qu'il
 -- propose (Composition lue, 1.3 : la ligne « Cadre : … » de la carte, son image entière en
@@ -4221,15 +4221,16 @@ function Fenetre.cadre()
     return 'DeveloppeurClaude-' .. Dispositions.NOM .. '-grande-' .. Fenetre.FORME
 end
 
--- Le titre de la fenêtre : « Développeur v1.3.6 », avec la version de ce module (Composants.module,
--- son Info.lua ; décision de Dany du 25 octobre 2026, correctif 1.3.6 : « Développeur » seul depuis
--- le 20 octobre 2026) ; « Développeur » seul si la version ne se lit pas.
+-- Le titre de la fenêtre : « Développeur IA v1.5 », avec la version de ce module (Composants.module,
+-- son Info.lua ; décision de Dany du 25 octobre 2026, correctif 1.3.6 ; « Développeur IA » depuis le
+-- 1er novembre 2026, avec le nom du module « Développeur IA pour Lightroom ») ; « Développeur IA »
+-- seul si la version ne se lit pas.
 function Fenetre.titreFenetre()
     local version = Composants.module()
     if type(version) ~= 'string' or not version:match('^%d') then
-        return "Développeur"
+        return "Développeur IA"
     end
-    return "Développeur v" .. version
+    return "Développeur IA v" .. version
 end
 
 function Fenetre.desabonner()
@@ -4517,7 +4518,7 @@ function Fenetre.afficher()
         LrTasks.startAsyncTask(function() LrTasks.pcall(Fenetre.verifier, true) end)
 
         LrDialogs.presentFloatingDialog(_PLUGIN, {
-            -- « Développeur v1.3.6 » (Fenetre.titreFenetre) ; les autres fenêtres du module gardent
+            -- « Développeur IA v1.5 » (Fenetre.titreFenetre) ; les autres fenêtres du module gardent
             -- « Claude · … », la Demande rapide le sien.
             title = Fenetre.titreFenetre(),
             contents = contenu,

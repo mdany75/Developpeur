@@ -696,7 +696,7 @@ essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, à sa droite « Re
         local Composants = require 'Composants'
         egal(Fenetre.infobulleLightroom(require('Lightroom').liaison(), Composants.lignes(Composants.module(), '…'), 'appliquer'),
             valeur(liaison, 'tooltip', p), "l'infobulle avant la lecture du connecteur")
-        contient(valeur(liaison, 'tooltip', p), 'Versions : Développeur ' .. Composants.module() .. ' ; MCP-Développeur …')
+        contient(valeur(liaison, 'tooltip', p), 'Versions : Développeur IA ' .. Composants.module() .. ' ; MCP-Développeur …')
         contient(valeur(liaison, 'tooltip', p), 'Mode de la liaison : Appliquer')
         -- Les deux voyants (chacun sa rangée : sa pastille et son texte) dans la rangée de la photo
         -- active, dans cet ordre.
@@ -732,7 +732,7 @@ essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, à sa droite « Re
         egal(#rangee.args, rangs.info, 'la photo active au bout de la rangée des voyants')
         egal(D.info, info.args.width)
         -- Les versions et le mode, dans les mots de l'infobulle.
-        egal("Liaison avec le connecteur MCP-Développeur : active. Versions : Développeur 1.3.6 ; MCP-Développeur 1.3.5 · à mettre à jour. "
+        egal("Liaison avec le connecteur MCP-Développeur : active. Versions : Développeur IA 1.3.6 ; MCP-Développeur 1.3.5 · à mettre à jour. "
             .. "Mode de la liaison : Proposer d'abord (Gestionnaire de modules externes).",
             Fenetre.infobulleLightroom('active', Composants.lignes('1.3.6', '1.3.5'), 'proposer'))
         egal(true, Fenetre.alerteVersions(Composants.lignes('1.3.6', '1.3.5')))

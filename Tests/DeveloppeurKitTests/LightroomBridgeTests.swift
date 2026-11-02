@@ -168,6 +168,12 @@ final class LightroomBridgeTests: XCTestCase {
     }
 
     /// La photo active a changé dans Lightroom : le module le dit avec sa réponse suivante.
+    /// Le nom du module dans le Gestionnaire de modules externes (LrPluginName de son Info.lua,
+    /// depuis le 1er novembre 2026) : le message dit où l'activer sous ce nom.
+    func testUnreachableMessageNamesThePluginAsShownInLightroom() {
+        XCTAssertTrue(LightroomBridge.unreachableMessage.contains("activer « Développeur IA pour Lightroom » dans Fichier › Gestionnaire"))
+    }
+
     func testEventsCarriedByARepliedCommandReachTheServer() throws {
         plugin.handler = { request in
             if request["command"]?.string == "ping" { return [self.answer(request, ["pong": true])] }

@@ -1259,8 +1259,11 @@ le numéro gardé). Ils changent encore le correctif :
   `Fil.lignesCarte`, avec un alias.
 - **Plus rien sur l'étalonnage** : le voyant Écran est retiré (voir Voyants et liaison et Écran).
 - **Le titre** : « Développeur v1.3.6 » dans la barre de titre (`Fenetre.titreFenetre` : la version
-  de `Composants.module()`, « Développeur » seul si elle ne se lit pas) ; la Demande rapide garde
-  « Claude · Demande rapide ».
+  de `Composants.module()`, « Développeur » seul si elle ne se lit pas), « Développeur IA v1.5 »
+  depuis le 1er novembre 2026 (« Développeur IA » seul), avec le nom du module « Développeur IA
+  pour Lightroom » (`LrPluginName`), sans changer d'identifiant (`LrToolkitIdentifier`, dossiers
+  d'installation, clé `MCP-Developpeur`, nom `developpeur`, « Développeur › Essais ») ; la Demande
+  rapide garde « Claude · Demande rapide ».
 - `Fenetre.FORME` reste 5 : la taille de la fenêtre ne change pas.
 
 **Agrandir** (retours de Dany du 25 octobre 2026) : l'image en grand remplit `Fenetre.GRANDE`,
@@ -2368,7 +2371,7 @@ correctif 1.3.6, voir Obtenir une proposition —, `styleChoisi`, `inactivite` e
 `disposition` (`atelier`, `conversation` par défaut, `panneau`, depuis la 1.1) l'est après la
 1.1.1 : une seule disposition (voir Disposition). Le mode « Proposer d'abord » est la clé `mode`
 de la liaison, que la fenêtre montre et bascule. Tout se règle dans Fichier › Gestionnaire de
-modules externes › Développeur (sections Liaison avec Claude et Fenêtre Claude,
+modules externes › Développeur IA pour Lightroom (sections Liaison avec Claude et Fenêtre Claude,
 `PluginInfoProvider.lua`). Depuis la 1.1.1, la section Liaison a la case « Mise au point »
 (« Montrer le carré de mise au point (Fujifilm) sur chaque aperçu »), et la section Fenêtre Claude
 les menus Modèle (« pour la demande suivante ») et Effort (« le même pour les quatre modèles »)

@@ -1,6 +1,6 @@
 -- Composants.lua (pas « Versions » : Lightroom refuse de charger un module de ce nom, constaté
 -- dans Lightroom Classic 15.6) : les deux versions affichées en bas de la fenêtre Claude, celle de
--- ce module, « Développeur » (son Info.lua), et celle du connecteur « MCP-Développeur »
+-- ce module, « Développeur IA » (son Info.lua), et celle du connecteur « MCP-Développeur »
 -- (`mcp-developpeur --version`). Les deux viennent de la même installation (build.sh --install),
 -- au même numéro : la plus ancienne des deux est à mettre à jour (réinstaller Développeur).
 -- Composants.lire s'appelle depuis une tâche.
@@ -76,7 +76,7 @@ end
 -- version sans chiffre (« … », pas encore lue) ne se compare pas.
 function Composants.lignes(module, connecteur)
     local lignes = {
-        { nom = "Développeur", version = module or '?' },
+        { nom = "Développeur IA", version = module or '?' },
         { nom = "MCP-Développeur", version = connecteur or '' },
     }
     local l1, l2 = lignes[1], lignes[2]
@@ -85,7 +85,7 @@ function Composants.lignes(module, connecteur)
     elseif l1.version:match('%d') and l2.version:match('%d') then
         local ecart = Composants.comparer(l1.version, l2.version)
         if ecart < 0 then
-            l1.nom, l1.alerte = "Développeur · à mettre à jour", true
+            l1.nom, l1.alerte = "Développeur IA · à mettre à jour", true
         elseif ecart > 0 then
             l2.nom, l2.alerte = "MCP-Développeur · à mettre à jour", true
         end

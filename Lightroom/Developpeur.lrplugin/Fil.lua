@@ -367,7 +367,7 @@ Fil.FOCUS_NON_LUE = "non lue (original illisible, introuvable ou trop long à ou
 Fil.FOCUS_INTROUVABLE = "non lue (original introuvable)"
 Fil.FOCUS_DELAI = "non lue (original trop long à ouvrir)"
 Fil.FOCUS_ILLISIBLE = "non lue (format pas encore lu, comme le HEIF, ou fichier sans les données de l'appareil)"
-Fil.FOCUS_SANS_CONNECTEUR = "non lue (connecteur introuvable : réinstaller Développeur)"
+Fil.FOCUS_SANS_CONNECTEUR = "non lue (connecteur introuvable : réinstaller Développeur IA)"
 Fil.FOCUS_EN_COURS = "lecture dans l'original…"
 
 -- « Focus · DSCF2402.RAF (Essai) » : le nom du fichier et celui de la copie virtuelle.

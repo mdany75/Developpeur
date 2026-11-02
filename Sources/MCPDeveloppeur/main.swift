@@ -30,7 +30,7 @@ let pluginPath = FileManager.default.homeDirectoryForCurrentUser
 /// Suivi lancée par le module avec un mauvais nombre d'arguments n'écrit rien sur stdout (code 2).
 func usage(erreur: Bool = false) {
     let texte = """
-    mcp-developpeur \(ServerInfo.version) — MCP-Développeur, le serveur MCP du module Développeur de Lightroom Classic
+    mcp-developpeur \(ServerInfo.version) — MCP-Développeur, le serveur MCP de Développeur IA pour Lightroom (Lightroom Classic)
 
     Usage : mcp-developpeur              lance le serveur (stdio, pour Claude)
             mcp-developpeur --install    inscrit cet exécutable dans Claude Desktop et Claude Code

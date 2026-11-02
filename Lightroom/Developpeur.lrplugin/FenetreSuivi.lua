@@ -117,7 +117,7 @@ FenetreSuivi.INFOBULLE_FIN = "Le dernier jour de la période, compris ; « aujou
 FenetreSuivi.INFOBULLE_CALENDRIER_DEBUT = "Choisir le début de la période dans un calendrier"
 FenetreSuivi.INFOBULLE_CALENDRIER_FIN = "Choisir la fin de la période dans un calendrier"
 FenetreSuivi.CONNECTEUR_ABSENT = "Le connecteur mcp-developpeur est introuvable (son chemin : Gestionnaire de modules externes › "
-    .. "Développeur) : les graphiques ne se dessinent pas."
+    .. "Développeur IA pour Lightroom) : les graphiques ne se dessinent pas."
 FenetreSuivi.PAS_DE_REPONSE = "Le connecteur n'a pas répondu à temps : les graphiques ne sont pas refaits."
 FenetreSuivi.REFUS = "Le connecteur n'a pas dessiné les graphiques : "
 FenetreSuivi.SANS_CATALOGUE = "Le chemin du catalogue ouvert ne se lit pas : les graphiques ne se dessinent pas."

@@ -52,7 +52,7 @@ end
 local function diagnostic()
     local prefs = Chemins.prefs()
     local lignes = {
-        "Développeur " .. Liaison.VERSION .. " · Lightroom Classic " .. tostring(LrApplication.versionString()),
+        "Développeur IA pour Lightroom " .. Liaison.VERSION .. " · Lightroom Classic " .. tostring(LrApplication.versionString()),
         string.format("Ports : %d (commandes) et %d (réponses)", Liaison.PORT_COMMANDES, Liaison.PORT_REPONSES),
         -- L'état du jeton, jamais sa valeur.
         string.format("Jeton : %s (%s) ; commandes refusées : %d", Liaison.jeton and "présent" or "absent",
@@ -83,7 +83,7 @@ end
 local function afficherDiagnostic()
     local f = LrView.osFactory()
     LrDialogs.presentModalDialog {
-        title = "Diagnostic de Développeur",
+        title = "Diagnostic de Développeur IA pour Lightroom",
         contents = f:column {
             f:static_text { title = "Sélectionner le texte (⌘A), le copier (⌘C), puis le coller dans la conversation avec Claude." },
             f:edit_field { value = diagnostic(), height_in_lines = 18, width_in_chars = 90 },
@@ -234,7 +234,7 @@ local function sectionFenetre(f, prefs, ligne)
         bind_to_object = prefs,
 
         f:static_text {
-            title = "La fenêtre Claude (« Développeur » dans sa barre de titre) : Fichier › Module externe - Extras › Ouvrir la fenêtre Claude. Claude Code travaille avec votre forfait claude.ai (jamais de clé d'API) et le connecteur MCP-Développeur.",
+            title = "La fenêtre Claude (« Développeur IA » dans sa barre de titre) : Fichier › Module externe - Extras › Ouvrir la fenêtre Claude. Claude Code travaille avec votre forfait claude.ai (jamais de clé d'API) et le connecteur MCP-Développeur.",
             width_in_chars = 66, height_in_lines = 3,
         },
         ligne("Claude Code :",

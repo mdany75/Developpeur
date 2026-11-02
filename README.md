@@ -1,10 +1,10 @@
-# Développeur
+# Développeur IA pour Lightroom
 
-Développeur relie Claude à Lightroom Classic sur Mac : vous écrivez à Claude dans une fenêtre de
-Lightroom (ou dans Claude Desktop ou Claude Code), et il regarde vos photos, les mesure et les
-retouche avec la méthode d'un retoucheur professionnel, en vous disant ce qu'il change et pourquoi.
-Il note aussi vos photos selon un standard clair : il propose une note, que vous acceptez ou
-changez dans Lightroom, ou il la pose lui-même si vous le lui demandez. Chaque photo a sa
+Développeur IA pour Lightroom (Développeur, en bref) relie Claude à Lightroom Classic sur Mac :
+vous écrivez à Claude dans une fenêtre de Lightroom (ou dans Claude Desktop ou Claude Code), et il
+regarde vos photos, les mesure et les retouche avec la méthode d'un retoucheur professionnel, en
+vous disant ce qu'il change et pourquoi. Il note aussi vos photos selon un standard clair : il
+propose une note, que vous acceptez ou changez dans Lightroom, ou il la pose lui-même si vous le lui demandez. Chaque photo a sa
 conversation, qui s'ouvre sur ce que Claude y a déjà fait. Pour vous faire progresser, il dit
 pourquoi il fait chaque étape, lit la composition et tient un carnet de progrès de vos prises de
 vue ; la fenêtre Suivi montre en graphiques vos prises de vue et ce carnet, chaque photo ouverte y
@@ -20,7 +20,7 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 
 ### La fenêtre Claude dans Lightroom
 
-- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur v1.4 » dans sa barre de titre
+- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur IA v1.5 » dans sa barre de titre
   (la version du module installé) : Fichier ›
   Module externe - Extras › Ouvrir la fenêtre Claude (même entrée dans le menu Bibliothèque, et
   raccourci ⌃⌥C une fois posé). Elle reste ouverte pendant que vous travaillez, dans tous les
@@ -28,7 +28,7 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   Son allure est celle de la maquette « B · Conversation claire », agrandie à votre demande, sans
   le volet des conversations de gauche depuis le correctif 1.3.6.
 - Le modèle, l'effort, l'apparence et deux cases se règlent dans Fichier › Gestionnaire de
-  modules externes › Développeur, section Fenêtre Claude, et non dans la fenêtre :
+  modules externes › Développeur IA pour Lightroom, section Fenêtre Claude, et non dans la fenêtre :
   - Modèle : Fable (le plus capable), Opus (retouche fine, par défaut), Sonnet (courant) ou Haiku
     (rapide).
   - Effort : maximal (par défaut), très élevé, élevé, moyen ou faible, le même pour les quatre
@@ -1064,8 +1064,8 @@ module) pour suivre ce que la fenêtre Claude consomme de votre forfait.
 - Un message bref au centre de l'écran à chaque retouche de Claude (désactivable).
 - Dans le menu du module : Revenir à « Avant Claude » (photos sélectionnées ; ⌘Z annule),
   Créer une copie virtuelle pour Claude, Démarrer et Arrêter la liaison avec Claude.
-- Dans Fichier › Gestionnaire de modules externes › Développeur : démarrer la liaison au lancement,
-  le mode, l'instantané « Avant Claude », la variation maximale de l'exposition par retouche (2 IL
+- Dans Fichier › Gestionnaire de modules externes › Développeur IA pour Lightroom : démarrer la
+  liaison au lancement, le mode, l'instantané « Avant Claude », la variation maximale de l'exposition par retouche (2 IL
   par défaut) et la saturation maximale (30) ; photos protégées (copies virtuelles seulement,
   photos d'un libellé de couleur, photos rejetées) ; un plafond de photos par retouche sans accord
   explicite (20 par défaut) ; le point de mise au point (Fujifilm) dessiné sur chaque aperçu et
@@ -1254,7 +1254,7 @@ Ensuite :
 - dans Claude Code, ouvrir une nouvelle session (`/clear` ne relance pas le connecteur) ; depuis la
   1.2, la liaison refuse un connecteur plus ancien resté ouvert (voir En cas de problème) ;
 - pour les raccourcis ⌃⌥C (fenêtre Claude) et ⌘⌃⌥C (Demande rapide) : Fichier › Gestionnaire de
-  modules externes › Développeur › Poser le raccourci, puis relancer Lightroom. Un module ne peut pas déclarer de raccourci : c'est un
+  modules externes › Développeur IA pour Lightroom › Poser le raccourci, puis relancer Lightroom. Un module ne peut pas déclarer de raccourci : c'est un
   raccourci d'app de macOS, qui sert quand la fenêtre principale de Lightroom est devant. Pour le
   poser à la main (Réglages Système › Clavier › Raccourcis clavier › Raccourcis des apps), taper
   trois espaces puis « Ouvrir la fenêtre Claude » : Lightroom met ces espaces devant chaque entrée
