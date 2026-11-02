@@ -78,6 +78,14 @@ func usage(erreur: Bool = false) {
                 (au point de mise au point aussi), bruit, boîtier, géométrie, puis les défauts que view_photo
                 noterait ; lecture seule (aperçus comme view_photo, rien n'est noté au carnet) ; un fichier JPEG se
                 mesure sans Lightroom
+            mcp-developpeur --mesures --echantillons <suivi.json> <dossier> [--graine <n>]
+            mcp-developpeur --mesures --collecter <lot.json> <dossier> [--taille <px>] [--par <10 à 20>]
+            mcp-developpeur --mesures --mesurer <dossier>  |  --mesures --fichiers <dossier> <fichier.jpg>…
+                relevé des seuils provisoires (1.6, développement) : lots tirés de suivi.json (lu seulement) ;
+                vignettes d'un lot demandées au module par 10 à 20 (1 024 px), copiées puis retirées du dossier
+                temporaire, avec l'heure exacte, la compensation, le flash et qui a posé la note (journal) ;
+                puis mesures sans Lightroom (Suivi, gamme, points chauds, peau, paires et groupes de lumière) en
+                CSV et JSON, avec un résumé ; rien n'est écrit dans le catalogue (docs/SPEC.md, Relevé des seuils)
             mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--horizon <id> [--hauteur-horizon <0 à 1>]] [--original] [--images <dossier>]
                 recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
                 (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
@@ -396,6 +404,11 @@ case "--constats":
     guard !ids.isEmpty || !fichiers.isEmpty else { usage(); exit(2) }
     let lignes = Carnet.releve(lightroom: LightroomBridge.fromEnvironment(), ids: ids, fichiers: fichiers) { print(line: $0) }
     exit(lignes.contains { $0.hasPrefix("✘") } ? 1 : 0)
+case "--mesures":
+    // Relevé des seuils provisoires (1.6, ReleveSeuils) : seul --collecter parle au module, par les
+    // commandes de lecture vignettes et journal.
+    let releve = ReleveSeuils.commande(Array(arguments.dropFirst()), lightroom: { LightroomBridge.fromEnvironment() }) { print(line: $0) }
+    exit(releve.code)
 case "--module":
     // Commande brute du module (diagnostic…), pour explorer ce que le SDK de Lightroom offre.
     guard arguments.count >= 2 else { usage(); exit(2) }

@@ -30,13 +30,21 @@ public enum PointsChauds {
         var part: Double
     }
 
-    /// Les zones claires hors du sujet, de la plus forte à la plus faible (écart à la médiane fois
-    /// surface). `sujet` : les cadres des visages et la zone d'intérêt, de 0 à 1 depuis le coin haut
-    /// gauche.
-    static func trouver(_ image: CGImage, sujet: [CGRect]) -> [Zone] {
+    /// La grille des L* moyens de l'image réduite à `Measurements.maxSide`, et la médiane de L* de
+    /// tous ses pixels : ce que `trouver` lit avant de choisir ses cases (extrait pour le relevé des
+    /// seuils, `ReleveSeuils`, qui rejoue d'autres seuils sur la même grille).
+    struct Grille: Equatable {
+        var colonnes: Int
+        var lignes: Int
+        /// L* moyen de chaque case, ligne par ligne depuis le haut gauche.
+        var moyennes: [Double]
+        var mediane: Double
+    }
+
+    static func lireGrille(_ image: CGImage) -> Grille? {
         let reduite = PreviewImages.scaled(image, maxSide: Measurements.maxSide)
         let largeur = reduite.width, hauteur = reduite.height
-        guard largeur > 0, hauteur > 0, let pixels = Measurements.rgba(reduite) else { return [] }
+        guard largeur > 0, hauteur > 0, let pixels = Measurements.rgba(reduite) else { return nil }
         let colonnes = largeur >= hauteur ? grille : max(1, Int((Double(grille) * Double(largeur) / Double(hauteur)).rounded()))
         let lignes = largeur >= hauteur ? max(1, Int((Double(grille) * Double(hauteur) / Double(largeur)).rounded())) : grille
         var somme = [Double](repeating: 0, count: colonnes * lignes), nombre = [Int](repeating: 0, count: colonnes * lignes)
@@ -53,9 +61,23 @@ public enum PointsChauds {
             }
         }
         tous.sort()
-        let mediane = tous[tous.count / 2]
-        let seuil = max(lMin, mediane + ecartMediane)
         let moyennes = somme.indices.map { nombre[$0] > 0 ? somme[$0] / Double(nombre[$0]) : 0 }
+        return Grille(colonnes: colonnes, lignes: lignes, moyennes: moyennes, mediane: tous[tous.count / 2])
+    }
+
+    /// Les zones claires hors du sujet, de la plus forte à la plus faible (écart à la médiane fois
+    /// surface). `sujet` : les cadres des visages et la zone d'intérêt, de 0 à 1 depuis le coin haut
+    /// gauche.
+    static func trouver(_ image: CGImage, sujet: [CGRect]) -> [Zone] {
+        guard let grille = lireGrille(image) else { return [] }
+        return zones(grille, sujet: sujet)
+    }
+
+    /// Les zones d'une grille sous ces seuils (ceux de `trouver` par défaut ; d'autres pour le relevé).
+    static func zones(_ grille: Grille, sujet: [CGRect], ecartMediane: Double = ecartMediane, lMin: Double = lMin,
+                      partMin: Double = partMin, partMax: Double = partMax) -> [Zone] {
+        let colonnes = grille.colonnes, lignes = grille.lignes, moyennes = grille.moyennes, mediane = grille.mediane
+        let seuil = max(lMin, mediane + ecartMediane)
         var chaude = moyennes.map { $0 >= seuil }
         let interet = sujet.filter { $0.width * $0.height <= zoneInteretMax }
         var zones: [Zone] = []
