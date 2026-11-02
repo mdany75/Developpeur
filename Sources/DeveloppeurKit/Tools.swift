@@ -65,6 +65,9 @@ public final class ToolHandler {
     let lensProfiles: LensProfileLibrary
     /// Cadres des personnes d'un aperçu (Vision) ; les tests le remplacent.
     var detecterPersonnes: (CGImage) -> [CGRect] = VisionAnalysis.people
+    /// Visages d'un aperçu (Vision), pour match_look ; les tests le remplacent (Vision ne voit pas de
+    /// visage dans une image de synthèse).
+    var detecterVisages: (CGImage) -> [CGRect] = Teint.visages
     /// Dossier où save_preset écrit les paramètres prédéfinis (celui de Camera Raw).
     let presetFolder: URL
     /// Guide de style personnel (remember_style, ressource, invite retouche_pro).
@@ -175,7 +178,7 @@ public final class ToolHandler {
         "list_profiles", "list_presets", "save_preset", "undo_last", "revert_to_original", "export_journal",
         "find_photos", "set_metadata", "list_keywords", "manage_collections", "create_virtual_copy", "show_photo",
         "cull_photos", "contact_sheet", "propose_ratings", "remove_distractions", "generative_edit", "remember_style",
-        "export_photos", "compare_variants", "choose_variant", "match_series",
+        "export_photos", "compare_variants", "choose_variant", "match_series", "match_look",
     ]
 
     var photoIDProperty: JSONValue {
@@ -228,7 +231,7 @@ public final class ToolHandler {
         ]
         return core + analysisDefinitions + compositionDefinitions + developDefinitions + localDefinitions + managementDefinitions
             + libraryDefinitions + cullDefinitions + notationDefinitions + styleDefinitions + deliveryDefinitions + variantDefinitions
-            + seriesDefinitions + generativeDefinitions
+            + seriesDefinitions + referenceDefinitions + generativeDefinitions
     }
 
     /// Titre lisible de chaque outil (annotations MCP, `title`), que le client montre à la place
@@ -248,6 +251,7 @@ public final class ToolHandler {
         "remove_distractions": "Supprimer les reflets", "generative_edit": "Retouche générative (Fibo 2)",
         "remember_style": "Guide de style", "export_photos": "Exporter des photos", "compare_variants": "Comparer des variantes",
         "choose_variant": "Choisir une variante", "match_series": "Harmoniser une série",
+        "match_look": "Rendu d'une référence",
     ]
     /// Outils qui ne changent rien aux photos ni au catalogue (`readOnlyHint`) : le client peut les
     /// laisser passer sans demander. Une proposition (preview_settings) passe par l'Historique : pas ici ;
@@ -438,6 +442,7 @@ public final class ToolHandler {
             case "compare_variants": return try compareVariants(args)
             case "choose_variant": return json(try chooseVariant(args))
             case "match_series": return json(try matchSeries(args))
+            case "match_look": return json(try matchLook(args))
             case "add_mask": return try addMask(args)
             case "edit_mask": return json(try editMask(args))
             case "retouch_spots": return try retouchSpots(args)
@@ -527,6 +532,8 @@ public final class ToolHandler {
                                     ["dossier": texte, "livrees": nombre, "fichiers": liste, "echecs": liste, "profils": liste, "modeles_noms": liste]),
             "match_series": schema("Harmonisation : écarts avec la référence, corrections proposées ou faites, écarts après.",
                                    ["reference": objet, "photos": liste]),
+            "match_look": schema("Rendu d'une référence : signature de la référence, écarts par zone avant et après, réglages proposés ou posés.",
+                                 ["reference": objet, "photos": liste]),
             "choose_variant": schema("Variante posée, ou variantes de la photo.", ["etape": texte, "instantane": texte, "changements": liste, "variantes": liste]),
         ]
     }()

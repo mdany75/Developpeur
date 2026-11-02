@@ -615,15 +615,20 @@ end
 
 Conversation.OUTILS_ETAPES = {
     apply_settings = true, add_mask = true, edit_mask = true, retouch_spots = true, copy_settings = true, enhance_photo = true,
-    remove_distractions = true, choose_variant = true, match_series = true, set_metadata = true, manage_collections = true,
+    remove_distractions = true, choose_variant = true, match_series = true, match_look = true, set_metadata = true,
+    manage_collections = true,
 }
 
 -- Des classements : leur étape ne change pas l'image (pas d'avant/après).
 Conversation.CLASSEMENTS = { set_metadata = true, manage_collections = true }
 
--- La réponse de match_series ne porte pas d'etape_id (une série ne garde pas d'avant/après) : pas
--- de repère pendant l'appel, qui disparaîtrait à sa réponse.
-local SANS_REPERE_EN_COURS = { match_series = true }
+-- Les outils qui écrivent en série, sans avant/après (sans_avant_apres) : match_series et, depuis la
+-- 1.6, match_look (rendu d'une référence, passes mesurées). Leur réponse ne porte pas d'etape_id :
+-- leurs étapes se lisent dans `photos` (Conversation.photosHarmonisees).
+Conversation.SERIES = { match_series = true, match_look = true }
+
+-- Pas de repère pendant l'appel d'une série, qui disparaîtrait à sa réponse.
+local SANS_REPERE_EN_COURS = Conversation.SERIES
 
 local PREFIXE_ETAPE = 'Claude · '
 
@@ -1175,7 +1180,7 @@ local function memesReglages(prop, changements)
     return lus > 0
 end
 
--- Les photos que match_series a harmonisées, lues dans sa réponse (`textes`) : sa réponse ne porte
+-- Les photos que match_series (ou match_look, 1.6) a harmonisées, lues dans sa réponse (`textes`) : sa réponse ne porte
 -- pas d'etape_id (SANS_REPERE_EN_COURS), mais chaque élément de `photos` écrit porte ses étapes,
 -- `etapes` (par la mesure) ou `etape` (by = exif) ; un plan (sans confirm), une photo déjà proche
 -- de la référence et la référence elle-même n'en ont pas. Rend { photo, nom, changements = {} }
@@ -1209,7 +1214,7 @@ function Conversation.clorePropositions(c, i, textes)
         return 0
     end
     local etapes = e.etapes or {}
-    if e.outil == 'match_series' then
+    if Conversation.SERIES[e.outil] then
         etapes = Conversation.photosHarmonisees(textes)
     end
     if #etapes == 0 then

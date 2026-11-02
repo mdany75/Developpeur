@@ -322,6 +322,22 @@ essai("Proposition dépassée : match_series clôt la proposition d'une photo qu
     egal('enAttente', surReference.etat, 'une erreur')
 end)
 
+essai("Proposition dépassée : match_look (1.6) clôt la proposition de la photo qu'il retouche, lue dans photos[].etapes ; pas un plan", function()
+    local c = Conversation.nouvelle(1000)
+    local REFERENCE = { id = 4961, fichier = 'DSCF4961.RAF' }
+    appelOutil(c, 'p1', 'preview_settings', { photo_id = 4962, settings = { Exposure2012 = 0.3 } },
+        reponseProposition(4962, 'DSCF4962.RAF', EXPOSITION))
+    local surPhoto = derniereProposition(c)
+    appelOutil(c, 'l0', 'match_look', { reference_id = 4961, photo_id = 4962 }, Json.encode({ reference = REFERENCE,
+        photos = { { id = 4962, fichier = 'DSCF4962.RAF', reglages_proposes = { SplitToningShadowHue = 200 } } }, rien_n_est_applique = 'Plan seulement.' }))
+    egal('enAttente', surPhoto.etat, 'un plan')
+    appelOutil(c, 'l1', 'match_look', { reference_id = 4961, photo_id = 4962, confirm = true, step_name = 'rendu du lac' },
+        Json.encode({ reference = REFERENCE, photos = { { id = 4962, fichier = 'DSCF4962.RAF',
+            etapes = { 'Claude · rendu du lac : passe 1', 'Claude · rendu du lac : passe 2' } } } }))
+    egal('remplacee', surPhoto.etat, 'retouchée par match_look')
+    egal('rendu du lac : passe 1', surPhoto.etapeClaude)
+end)
+
 
 -- Une conversation d'avant le correctif 1.3.6 (leçon et « Je le fais » retirés) -------------------
 

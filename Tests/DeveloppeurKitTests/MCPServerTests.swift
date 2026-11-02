@@ -42,7 +42,7 @@ final class MCPServerTests: XCTestCase {
         XCTAssertNil(try call(#"{"jsonrpc":"2.0","id":2,"method":"initialize","params":{}}"#)["result"]?["serverInfo"]?["title"], "sans titre donné, pas de title")
 
         let outils = try call(#"{"jsonrpc":"2.0","id":3,"method":"tools/list"}"#)["result"]?["tools"]?.array ?? []
-        XCTAssertEqual(outils.count, 36)
+        XCTAssertEqual(outils.count, 37, "36 et match_look (1.6)")
         XCTAssertFalse(ToolHandler.toolNames.contains("expand_photo"))
         XCTAssertFalse(ToolHandler.toolNames.contains("photo_lesson"), "la leçon de la photo est retirée (1.3.6)")
         let refus = try call(#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"expand_photo","arguments":{}}}"#)
@@ -326,14 +326,14 @@ final class MCPServerTests: XCTestCase {
     // MARK: Socle de la 1.3
 
     /// 1.3 : deux outils de plus, read_composition et photo_lesson ; 1.3.6 : photo_lesson retiré,
-    /// 35 en tout ; 36 avec generative_edit (Fibo 2, 29 octobre 2026). read_composition après measure_angle, en lecture seule (ni les photos ni le
-    /// catalogue ne changent), avec son titre ; match_series en dernier.
+    /// 35 en tout ; 36 avec generative_edit (Fibo 2, 29 octobre 2026) ; 37 avec match_look (1.6). read_composition après measure_angle, en lecture seule (ni les photos ni le
+    /// catalogue ne changent), avec son titre ; match_series puis match_look en dernier.
     func testLOutilDeLa13() throws {
-        XCTAssertEqual(ToolHandler.toolNames.count, 36)
-        XCTAssertEqual(Set(ToolHandler.toolNames).count, 36, "pas de doublon")
+        XCTAssertEqual(ToolHandler.toolNames.count, 37)
+        XCTAssertEqual(Set(ToolHandler.toolNames).count, 37, "pas de doublon")
         let mesure = try XCTUnwrap(ToolHandler.toolNames.firstIndex(of: "measure_angle"))
         XCTAssertEqual(ToolHandler.toolNames[mesure + 1], "read_composition")
-        XCTAssertEqual(ToolHandler.toolNames.last, "match_series")
+        XCTAssertEqual(Array(ToolHandler.toolNames.suffix(2)), ["match_series", "match_look"])
         XCTAssertNil(ToolHandler.titles["photo_lesson"])
         XCTAssertFalse(ToolHandler.readOnlyTools.contains("photo_lesson"))
         let outils = try call(#"{"jsonrpc":"2.0","id":3,"method":"tools/list"}"#)["result"]?["tools"]?.array ?? []
