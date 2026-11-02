@@ -29,6 +29,9 @@ local Texte = require 'Texte'
 
 local FenetreRapide = { ouverte = false }
 
+-- Ouverte ou Claude au travail : le ménage de Temporaire n'efface rien (Menage.occupe).
+require('Menage').signaler(function() return FenetreRapide.ouverte == true or Moteur.travaille == true end)
+
 -- Lignes du résultat montrées à la fois (13 points, 16,25 de haut chacune, relevé le 22 octobre
 -- 2026 : 130 pour 8 ; dans les 155 de la zone) ; ▲ et ▼ les font défiler.
 FenetreRapide.LIGNES_RESULTAT = 9

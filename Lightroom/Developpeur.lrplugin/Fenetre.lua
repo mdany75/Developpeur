@@ -80,6 +80,9 @@ local Texte = require 'Texte'
 
 local Fenetre = { ouverte = false, defilement = 0, jointes = {}, cache = {}, vignettes = {}, generation = 0 }
 
+-- Fenêtre ouverte ou Claude au travail : le ménage de Temporaire n'efface rien (Menage.occupe).
+require('Menage').signaler(function() return Fenetre.ouverte == true or Moteur.travaille == true end)
+
 -- Couleurs, polices, images, icônes et variantes des lignes, pour les pièces (Vues.lua).
 
 -- Les couleurs : celles de la palette de l'apparence (Dispositions.PALETTES, aux mêmes clés : texte,

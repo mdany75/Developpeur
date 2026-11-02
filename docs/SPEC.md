@@ -2492,7 +2492,15 @@ fenêtre Claude dit alors « pour la Demande rapide » (`Moteur.texteTravail`).
 **Ménage.** Au chargement du module, `Menage.temporaires` (depuis la tâche d'`Init.lua`, dans son
 propre `LrTasks.pcall`) efface `Temporaire/Groupes` et `Temporaire/Rapide` en entier : aucune de ces
 conversations n'est en mémoire, et une séance finie sur l'une d'elles (Lightroom quitté, module
-rechargé) laissait ses images. Rien d'autre de `Temporaire`, ni les conversations gardées.
+rechargé) laissait ses images. Jamais les conversations gardées. Depuis le chantier « ménage »
+(après la 1.6.3) : aussi `PhotoActive` (vignettes de la photo active, de la grande image et de Focus,
+un dossier par séance : 137 Mo chez Dany), `Pourquoi`, `Collees`, et les fichiers de passage laissés
+à la racine (`Menage.FICHIERS` : `dimensions-`, `version-`, `auth-`, `presse-papiers-`, `focus-`),
+en premier dans la tâche, avant `Session.menage`. Rien ne s'efface si une fenêtre s'est signalée
+ouverte ou que Claude travaille (`Menage.signaler`, `Menage.occupe`). Ce qui reste a sa raison dans
+`Menage.GARDES` (le verrou `fibo-en-cours.verrou` du connecteur) ; `essais-menage.lua` parcourt le
+code du module et du connecteur et vérifie que chaque dossier ou fichier écrit sous `Temporaire`
+est vidé ou gardé avec sa raison.
 
 Essais : `Tests/Lua/Fenetre/essais-rapide.lua` (boutons à icône sans ♻, réponse effacée par une
 autre sélection, la conversation d'une photo, le groupe, la réservation de Claude Code).
