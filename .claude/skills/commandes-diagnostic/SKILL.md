@@ -1,6 +1,6 @@
 ---
 name: commandes-diagnostic
-description: Commandes détaillées de diagnostic et d'essai de Développeur (MCP-Développeur et module Lightroom). À charger pour faire la recette dans Lightroom ou la recette d'une version, essayer un outil à la main (--status, --call, --module diagnostic), lire les réglages à plat (--dump), mesurer le recalage, la mise au point, l'écran, le boîtier Fujifilm, fixer les seuils du carnet ou de l'éclairage mixte (--constats, --eclairage), essayer --analyser ou --graphiques du Suivi, lire les journaux, utiliser les variables DEVELOPPEUR_*, remesurer les polices, regénérer les images de la fenêtre, ou désinstaller en détail.
+description: Commandes détaillées de diagnostic et d'essai de Développeur (MCP-Développeur et module Lightroom). À charger pour faire la recette dans Lightroom ou la recette d'une version, essayer un outil à la main (--status, --call, --module diagnostic), lire les réglages à plat (--dump), mesurer le recalage, la mise au point, l'écran, le boîtier Fujifilm, fixer les seuils du carnet ou de l'éclairage mixte (--constats, --eclairage) ou les pentes de l'étalonnage d'après une référence (--etalonnage), essayer --analyser ou --graphiques du Suivi, lire les journaux, utiliser les variables DEVELOPPEUR_*, remesurer les polices, regénérer les images de la fenêtre, ou désinstaller en détail.
 ---
 
 # Commandes de diagnostic et d'essai
@@ -195,6 +195,21 @@ centre des tons neutres, chaque ligne « borne N : … ; point neutre a* x b* y,
 durée de la mesure, puis un résumé ; lecture seule par la commande `apercu`, sans point AF ni
 original ouvert ; un fichier JPEG se mesure sans Lightroom ; `--essai` passe par `preview_settings`
 (deux étapes « Claude · essai »), copies virtuelles seulement)
+
+## Relevé de l'étalonnage (match_look, 1.6)
+
+`./.build/debug/mcp-developpeur --etalonnage <id>… [<fichier.jpg>…] [--balayage]` (pour fixer les
+constantes provisoires de `Reference.swift` : docs/SPEC.md, Étalonnage d'après une référence, À
+constater). Sans `--balayage`, lecture seule (commande `apercu`, ou un fichier JPEG sans
+Lightroom) : par image, une ligne « C* < N : » à chaque borne 12, 20, 30 et 45, avec la couleur
+a*b* et la part de chaque zone tonale, la chroma médiane et P90, les centiles de L*, les bandes de
+la TSL et les remarques (bandes noires, visages). Avec `--balayage` (identifiants de NOUVELLES
+copies virtuelles d'Essais remises à l'origine seulement ; un original est refusé) : 29 rendus par
+`preview_settings` (deux étapes « Claude · essai » chacun, 58 en tout, à défaire ensuite par
+`revert_to_original`), teintes 0 à 300 par zone à saturation 25, saturations 12, 25 et 50 à la
+teinte 30, Vibrance ±30 ; chaque ligne donne le décalage a*b* de chaque zone, puis un résumé
+(angle et gain dans sa zone, `vibranceParChroma`). Sortie dans un fichier, en arrière-plan, jamais
+tronquée ; lignes ✘ et code 1 en cas d'échec.
 
 ## Journal détaillé
 

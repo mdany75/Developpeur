@@ -48,10 +48,10 @@ Ce projet suit le standard commun des projets de Dany (`/standard-projet` le vé
   script Lightroom fermé.
 - Recette (dans Lightroom ou d'une version), `--module diagnostic`, `--dump`, `--recalage`,
   `--marquer-af`, `--ecran`, `--focus`, `--boitier`, `--analyser`, `--graphiques`, `--constats`,
-  `--eclairage`, variables `DEVELOPPEUR_*`, journaux, polices, images de la fenêtre, détail de la
+  `--eclairage`, `--etalonnage`, variables `DEVELOPPEUR_*`, journaux, polices, images de la fenêtre, détail de la
   désinstallation : skill `commandes-diagnostic`. Recette d'une version sur des copies remises à
   l'origine d'abord, sortie dans un fichier, en arrière-plan, jamais tronquée (`| head` la coupe au
-  milieu d'une étape). `--eclairage --essai` : copies virtuelles seulement. `--constats` en lecture
+  milieu d'une étape). `--eclairage --essai` et `--etalonnage --balayage` : copies virtuelles seulement. `--constats` en lecture
   seule (jamais `carnet constater`). Le chemin de l'original n'est jamais rendu à Claude
   (`af_point`). `--ecran` : pour le développement seulement (ni la fenêtre Claude ni Claude ne
   lisent plus l'écran). `DEVELOPPEUR_FIBO_GARDER` : développement seulement,

@@ -69,6 +69,11 @@ func usage(erreur: Bool = false) {
                 quand une dominante l'en écarte), avec le point neutre et le centre de chaque mesure ; lecture seule
                 (aperçus comme view_photo) ; --essai passe par preview_settings (deux étapes « Claude · essai »,
                 copies virtuelles d'essai seulement)
+            mcp-developpeur --etalonnage <id photo>… [<fichier.jpg>…] [--balayage]
+                relevé des constantes de match_look : signature de chaque image (couleur de chaque zone tonale,
+                chroma, bandes, bandes noires) à plusieurs bornes de chroma, en lecture seule ; --balayage : 29 rendus
+                de l'étalonnage et de la Vibrance par preview_settings (deux étapes « Claude · essai » chacun, copies
+                virtuelles d'essai seulement), décalage a*b* mesuré par zone
             mcp-developpeur --boitier <original>
                 ce que l'appareil a rangé dans un fichier Fujifilm (RAF ou JPEG), lu sans Lightroom : point de mise
                 au point, intention de la prise de vue (comme view_photo), mise au point en détail (comme l'onglet
@@ -377,6 +382,27 @@ case "--eclairage":
     guard !ids.isEmpty || !fichiers.isEmpty else { usage(); exit(2) }
     let lignes = Eclairage.releve(lightroom: LightroomBridge.fromEnvironment(), ids: ids, fichiers: fichiers, essai: essai) { print(line: $0) }
     exit(lignes.contains { $0.hasPrefix("✘") } ? 1 : 0)
+case "--etalonnage":
+    // Relevé des constantes de match_look (Reference.releve) : signatures en lecture seule (des
+    // identifiants, ou des fichiers JPEG mesurés sans Lightroom) ; --balayage : les rendus de
+    // l'étalonnage par preview_settings, sur des copies virtuelles d'Essais seulement.
+    var ids: [Int] = [], fichiers: [URL] = [], balayage = false
+    for item in arguments.dropFirst() {
+        if item == "--balayage" {
+            balayage = true
+        } else if let id = Int(item) {
+            ids.append(id)
+        } else if FileManager.default.fileExists(atPath: item) {
+            fichiers.append(URL(fileURLWithPath: item))
+        } else {
+            log("argument inconnu : \(item) (ni identifiant de photo, ni fichier, ni --balayage)")
+            usage()
+            exit(2)
+        }
+    }
+    guard !ids.isEmpty || !fichiers.isEmpty, !balayage || !ids.isEmpty else { usage(); exit(2) }
+    let lignes = Reference.releve(lightroom: LightroomBridge.fromEnvironment(), ids: ids, fichiers: fichiers, balayage: balayage) { print(line: $0) }
+    exit(lignes.contains { $0.hasPrefix("✘") || $0.hasPrefix("  ✘") } ? 1 : 0)
 case "--constats":
     // Relevé des seuils du carnet de progrès (Carnet.releve), en lecture seule : des identifiants
     // (aperçus demandés au module, comme view_photo, sans rien noter au carnet) et des fichiers JPEG

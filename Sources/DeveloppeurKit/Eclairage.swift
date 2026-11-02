@@ -719,7 +719,7 @@ extension Eclairage {
     /// Passe les commandes au module et garde le JPEG d'une proposition (commande « essayer »)
     /// avant que preview_settings ne l'efface : le relevé mesure l'aperçu tel que Lightroom l'a
     /// rendu, sans la recompression de l'image envoyée à Claude.
-    private final class Capture: LightroomServing {
+    final class Capture: LightroomServing {
         let lightroom: LightroomServing
         var apercu: Data?
         init(_ lightroom: LightroomServing) { self.lightroom = lightroom }

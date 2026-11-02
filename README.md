@@ -440,8 +440,9 @@ correctif 1.3.6, à votre demande du 25 octobre 2026 ; les leçons déjà rangé
 
 ### Ce que Claude sait faire par le connecteur
 
-Les mêmes 36 outils (dont `generative_edit`, la retouche générative par Fibo 2 ; 36 aussi de la
-1.3 à la 1.3.5, avec `photo_lesson`, retiré au correctif 1.3.6) servent dans la fenêtre Claude,
+Les mêmes 37 outils (dont `generative_edit`, la retouche générative par Fibo 2, et `match_look`,
+l'étalonnage d'après une référence, dans la 1.6 ; 36 de la 1.3 à la 1.3.5, avec `photo_lesson`,
+retiré au correctif 1.3.6) servent dans la fenêtre Claude,
 dans Claude Desktop et dans Claude Code. Dix invites prêtes à l'emploi s'y ajoutent, dans le menu
 « + » de Claude Desktop et parmi les commandes « / » de Claude Code : `retouche_pro` (une photo, en
 deux passes vérifiées, puis au plus deux passes correctives si un défaut reste), `a_ma_facon`
@@ -819,6 +820,16 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   contraste. Claude montre d'abord le plan photo par photo ; avec votre accord, il corrige en deux
   passes mesurées. Ou l'exposition seule, d'après l'ouverture, la vitesse et l'ISO (une série prise
   en manuel, un bracketing).
+- Donner à une photo le rendu d'une autre (1.6, `match_look`) : « donne-lui l'allure de cette
+  photo-ci ». Claude mesure le rendu de la photo de référence, une de vos photos déjà retouchées
+  (les tons, la couleur des ombres, des tons moyens et des hautes lumières, la saturation), le
+  traduit en réglages ordinaires (Exposition, Contraste, Étalonnage des couleurs, Vibrance ; la
+  balance seulement si vous la demandez), puis remesure et corrige une seconde fois s'il le faut.
+  Il dit zone par zone ce qui s'est rapproché. Les visages ne guident pas la mesure, et si la peau
+  bouge nettement, il en reprend la moitié et vous le signale ; les doses restent modérées
+  (saturation de l'étalonnage 25 au plus, Vibrance sous son plafond). D'abord le plan ; rien ne
+  change sans votre accord. Une image hors du catalogue : l'importer d'abord. Pentes provisoires,
+  à relever dans Lightroom.
 - Harmoniser une sortie entière par lumière (1.4) : Claude la partage d'abord en groupes de photos
   prises sous la même lumière, d'après l'heure de prise de vue (une pause de plus de 10 minutes,
   sauf au même lieu dans l'heure, selon Vision), le flash qui s'allume ou s'éteint, et la lumière de

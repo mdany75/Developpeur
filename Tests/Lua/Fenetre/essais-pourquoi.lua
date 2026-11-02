@@ -309,6 +309,12 @@ essai("Conversation : étapes lues de la réponse (etape_id, photo), raison et s
     vrai(Conversation.estEtape(c.elements[i]), 'en cours')
     i = appel(c, 's1', 'match_series', { step_name = 'série', reason = 'Même rendu.' })
     egal(false, Conversation.estEtape(c.elements[i]), 'match_series en cours')
+    -- match_look (1.6) écrit aussi en série, sans etape_id : pas de repère en cours, mais il garde
+    -- sa raison et son but (OUTILS_ETAPES).
+    i = appel(c, 'l1', 'match_look', { reference_id = 4961, photo_id = 4962, confirm = true, step_name = 'rendu', reason = 'Le style du lac.' })
+    egal(false, Conversation.estEtape(c.elements[i]), 'match_look en cours')
+    egal('Le style du lac.', c.elements[i].raison)
+    egal('rendu', c.elements[i].etape)
     -- Un outil qui n'écrit pas d'étape.
     i = appel(c, 'w1', 'view_photo', { size = 1568 }, { etape_id = 'X', photo = { id = 4961 } })
     egal(false, Conversation.estEtape(c.elements[i]), 'view_photo')

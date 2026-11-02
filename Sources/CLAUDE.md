@@ -57,6 +57,10 @@ toucher :
 
 - `match_series` compare photo et référence par la même mesure des tons neutres ; les tons suivis
   ne servent qu'aux pentes ; Teinte et Température se résolvent ensemble (`PentesSerie`).
+- **`match_look`** (1.6, `Reference.swift`) : couleur des zones sur leurs pixels peu saturés, jamais
+  par la mesure d'`Eclairage` ; la part commune aux zones est la balance (seulement avec
+  `white_balance`) ; une écriture absolue par passe, deux au plus ; pentes provisoires
+  (`--etalonnage`).
 - **Harmoniser par lumière** (`GroupesLumiere.former`, pure) : `groups` est refusé avec
   `reference_id` ; aucun original ouvert ; rien n'est écrit, le plan seulement (`planDesGroupes`).
   `view_photo` retire `prise_de_vue` avant Claude.

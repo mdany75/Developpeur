@@ -83,3 +83,15 @@ au suivi d'une longue série (`ContexteAppel`).
   progression de Lightroom par la commande `progression`, fermée à la fin de l'appel par
   `fermerBarre`), `verifier` avant chaque lot (annulation par `notifications/cancelled`, sans
   réponse ; croix de la barre de Lightroom, `ArretDansLightroom`, avec une réponse).
+- **Étalonnage d'après une référence** (1.6, `match_look`, `Reference.swift` pure,
+  `Tools+Reference.swift`) : `reference_id` seulement (pas de fichier externe dans la 1.6). La
+  couleur d'une zone se lit sur ses pixels peu saturés (C* < `chromaZone`), jamais par la mesure
+  des tons presque neutres d'`Eclairage` (C* < 12 : elle écarte le rendu à copier) ; visages
+  écartés. Seul le partage entre zones se copie : la part commune est la balance, copiée seulement
+  avec `white_balance`. Clés : `SplitToning*` (ombres, hautes lumières), `ColorGradeMidtone*` ;
+  jamais `ColorGradeShadowHue` (refusée par Lightroom). Tons par Exposition et Contraste seulement.
+  Vibrance seule, sous `plafondsDose` ; saturation de l'étalonnage sous `Reference.saturationMax`.
+  Au plus deux passes, chacune UNE écriture absolue (valeurs finales d'après les réglages relus),
+  `sans_avant_apres` ; la passe 2 vise `strength` de l'écart du départ. Peau qui bouge de
+  `Teint.ecartVisible` : moitié du changement des tons moyens, `a_verifier`. La fenêtre le traite
+  comme `match_series` (`Conversation.SERIES`). Pentes provisoires : `--etalonnage`.

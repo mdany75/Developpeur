@@ -62,7 +62,8 @@ Deux pièces :
   et inscrit sous la clé `MCP-Developpeur` dans Claude Desktop et Claude Code ; 35 outils (34
   jusqu'à la 1.2 ; la 1.3 ajoute `read_composition` après `measure_angle` et `photo_lesson` à la
   fin, tous deux en lecture seule : 36 jusqu'à la 1.3.5 ; `photo_lesson` est retiré au correctif
-  1.3.6 ; `generative_edit`, la retouche générative par Fibo 2, le 29 octobre 2026 : 36) et 10
+  1.3.6 ; `generative_edit`, la retouche générative par Fibo 2, le 29 octobre 2026 : 36 ;
+  `match_look`, l'étalonnage d'après une référence, en dernier, dans la 1.6 : 37) et 10
   invites (a_ma_facon depuis la 1.3.5) ;
 - le module Lightroom « Développeur » (`Lightroom/Developpeur.lrplugin`, identifiant
   `com.danymenard.developpeur`, Lightroom Classic 13.3 au moins), qui porte la liaison avec le
@@ -8894,6 +8895,115 @@ laissaient 4,2 de b* d'écart sur une photo que la mesure commune disait juste :
 mesurent donc par la même sélection des deux côtés, et les tons suivis ne servent qu'aux pentes.
 Essai réel (deux photos d'essai de scènes différentes) : a* de −7,1 à −1,0 et de −5,4 à −0,2, b*
 de −13,2 à −1,2, exposition à 0,05 IL près.
+
+## Étalonnage d'après une référence (`match_look`, 1.6)
+
+Donner à une photo (ou à 20 au plus par appel) le rendu d'une photo du catalogue déjà retouchée :
+« donne cette allure à ma photo ». Ce n'est pas `match_series`, qui neutralise les écarts d'une
+même sortie : `match_look` copie un style (ombres froides, hautes lumières chaudes), en réglages
+ordinaires. 1.6 : `reference_id` seulement ; pas de fichier hors du catalogue (`reference_file`,
+refusé comme paramètre inconnu), ni de courbe par points, ni de TSL par bande, ni de masques.
+
+**Mesure** (`Reference.swift`, pure). L'aperçu d'analyse de chaque photo (`apercu`, avec les clés
+de `Reference.clesLues`), réduit à 512 px et dessiné en sRGB, donne sa signature :
+
+- les centiles 5, 25, 50, 75 et 95 de L*, sur le cadre utile (les bandes noires d'un photogramme,
+  lignes et colonnes du bord sans pixel au-dessus de L* 3, un quart du côté au plus, sont
+  écartées et dites) ;
+- pour chaque zone tonale (ombres L* < 40, tons moyens de 40 à 70, hautes lumières > 70, entre
+  L* 8 et 97, comme `Eclairage.limitesTonales`), les médianes de a* et b* de ses pixels **peu
+  saturés** (C* < `Reference.chromaZone`, 30, provisoire), non écrêtés, hors des visages agrandis
+  de 10 % (Vision, `ToolHandler.detecterVisages`, si `protect_skin`) ; une zone se lit à partir de
+  3 % de l'image et 150 pixels. La mesure d'`Eclairage` (C* < 12 autour du point neutre) ne
+  convenait pas : un rendu marqué pousse justement ses gris au-delà de 12 (critique du plan,
+  bloquant) ; les couleurs vives des objets (C* ≥ 30) restent hors de la mesure ;
+- la chroma médiane et le P90 (même pixels, visages écartés), et la part de chaque bande de la TSL
+  parmi les pixels de C* ≥ 15.
+
+**Écart** « référence moins photo » : exposition en IL (luminance de la L* médiane, ±3), contraste
+(P95 − P5), chroma médiane, a*b* de chaque zone, et distance des répartitions par bande (0 à
+100 %). La part commune aux trois zones (leur moyenne) est une dominante de toute l'image, donc la
+balance : elle ne se copie qu'avec `adjust` `white_balance` (Temperature et Tint par les pentes de
+`match_series`) ; sinon seul le partage entre zones se copie (un écart égal dans les trois zones
+ne donne rien ; une seule zone lue, rien). Distance = moyenne a*b* des zones comparées, sans la
+part commune (avec elle si la balance se copie).
+
+**Traduction** (`Reference.traduire`), en valeurs finales, seulement celles qui changent :
+
+- tons : Exposure2012 (comme `match_series`, ±2 IL par passe) et Contrast2012 (`PentesSerie`,
+  30 par passe au plus) ; une seule voie pour le contraste, pas de courbe (critique du plan) ;
+- étalonnage, par zone dont l'écart relatif passe 1,5 : le vecteur actuel (teinte et saturation
+  posées, par le modèle) plus `strength` × l'écart, rendu en teinte et saturation. Clés réellement
+  acceptées par apply_settings (constaté le 1er novembre 2026) : `SplitToningShadowHue/Saturation`,
+  `ColorGradeMidtoneHue/Sat`, `SplitToningHighlightHue/Saturation` ; jamais `ColorGradeShadowHue`
+  ni l'étalonnage global. Saturation de 25 au plus par zone (`Reference.saturationMax`, 40 avec
+  `strong_dose_requested`), borne propre à match_look : `DevelopCatalogue.plafondsDose` jugerait
+  aussi les recettes de styles d'apply_settings. Fusion ou Équilibre hors de 50 et 0 : dit dans
+  `limites` (le modèle vise moins juste, la passe 2 mesurée corrige) ;
+- saturation : Vibrance seulement (jamais Saturation), d'après l'écart de chroma médiane (3 au
+  moins, `Measurements.seuilChroma`), 20 par passe au plus, sous le plafond de dose de la Vibrance
+  (30, `DevelopCatalogue.plafondsDose`, sans `strong_dose_requested`), jamais au-delà sauf pour la
+  ramener vers zéro ; pas copiée quand les scènes diffèrent (répartitions par bande à plus de
+  `seuilScenes`, 60 %, provisoire).
+
+**Passes** (`Tools+Reference.swift`). Sans `confirm`, le plan (`reglages_proposes`,
+`rien_n_est_applique`). Avec `confirm`, au plus deux passes, chacune **une seule écriture absolue**
+(`appliquer` avec `relatif` faux, une étape « Claude · <step_name> : passe N »,
+`sans_avant_apres`) : le drapeau relatif vaut pour tout un `appliquer`, donc les valeurs finales se
+calculent d'après les réglages relus par l'aperçu. Après la passe 1, une nouvelle mesure ; les
+pentes de la photo se corrigent (gain de chaque zone d'après le décalage mesuré, sans la part
+commune ; Vibrance ; exposition et contraste par `pentesObservees` de `match_series`) ; la passe 2
+vise ce qui manque pour atteindre `strength` de l'écart du départ, et ne part que si un réglage
+change. `contexte.verifier()` avant chaque photo et chaque passe, `avancer` après chaque mesure.
+
+**Peau** (`protect_skin`, défaut vrai) : les visages ne guident pas la mesure ; la peau du plus
+grand visage (`Teint.mesurer`, mêmes cadres avant et après) se lit avant et après la passe 1 ; si
+elle a bougé d'au moins `Teint.ecartVisible` (5, provisoire), la passe 2 remet les tons moyens à la
+moitié de leur changement, et le résultat le fait vérifier (`teint.a_verifier`, `a_verifier`).
+
+**Réponse** : `reference` (signature JSON, teint), puis par photo `ecart_avant` et `ecart_apres`
+(par zone sans la part commune, `commune`, `distance`), `reglages_proposes`, `etapes`,
+`rapproche_pct`, `limites`, `teint` ; `base` dit la mesure. La fenêtre Claude traite match_look
+comme match_series (`Conversation.SERIES`) : pas de repère pendant l'appel, étapes lues dans
+`photos[].etapes`, propositions closes sur les photos retouchées.
+
+### À constater (match_look)
+
+Valeurs provisoires, nommées comme telles dans le code ; chaque relevé se fait sur de NOUVELLES
+copies virtuelles d'« Développeur › Essais » remises à l'origine, sortie dans un fichier, en
+arrière-plan, jamais tronquée ; `--balayage` laisse deux étapes « Claude · essai » par rendu (29
+rendus, 58 étapes) : le défaire ensuite (revert_to_original).
+
+1. **Signature de vraies références** (fixe `Reference.chromaZone`, `partMinZone`,
+   `pixelsMinZone`, `seuilBandeNoire`) : `./.build/debug/mcp-developpeur --etalonnage <id>…
+   [<fichier.jpg>…]`, lecture seule, sur 3 ou 4 références retouchées par Dany (un rendu marqué
+   ombres froides / hautes lumières chaudes, un noir et blanc viré, une photo sans gris) et un
+   photogramme à bandes noires exporté en JPEG. Regarder, borne par borne (12, 20, 30, 45) : les
+   trois zones lues, leur a*b* stable d'une borne à l'autre au-delà de 20, la part lue, les bandes
+   noires dites. Garder la plus petite borne qui lit les trois zones sans que la couleur d'un
+   objet (feuillage, ciel) ne tire une zone.
+2. **Teinte et saturation de l'étalonnage → a*b*** (fixe `Reference.ancresTeinte`,
+   `gainDepart`) : `--etalonnage <copie> --balayage` sur une copie d'un RAW X-H2S avec sa
+   simulation, puis Adobe Couleur si le temps le permet. Le résumé donne, par zone et teinte (0 à
+   300 de 60 en 60, saturation 25), l'angle a*b* mesuré (→ `ancresTeinte`) et le gain par point
+   (→ `gainDepart`, moyenne par zone) ; les saturations 12, 25, 50 à la teinte 30 disent si le
+   gain est linéaire ; les décalages des autres zones, le débordement (Fusion 50).
+3. **Vibrance → chroma médiane** (fixe `Reference.vibranceParChromaDepart`) : même balayage, lignes
+   Vibrance ±30 (`vibranceParChroma` du résumé) ; noter la différence entre −30 et +30.
+4. **EnableSplitToning** : `--dump <copie>` après un `apply_settings` d'une seule
+   `SplitToningShadowSaturation` (sur une copie remise à l'origine) : `EnableSplitToning = true`
+   posé par Lightroom, et le rendu change bien (sinon l'écrire avec l'étalonnage).
+5. **Un essai réel** : `--call match_look '{"reference_id": <référence>, "photo_id": <copie>}'`
+   (plan seulement), puis avec `"confirm": true` sur une copie d'Essais, défait ensuite : deux passes
+   au plus, `rapproche_pct`, `limites`, et le rendu à l'œil côte à côte. Avec un portrait
+   (`protect_skin`), le déplacement de la peau (`teint.deplacement_ab`) fixe `Teint.ecartVisible`
+   pour match_look.
+6. **Scènes différentes** (fixe `Reference.seuilScenes`) : la distance des bandes lue entre une
+   référence de forêt et une photo de plage, et entre deux photos de même scène.
+
+Le rendu non linéaire de l'étalonnage (Fusion, profil) ne s'imite pas dans `swift test` : le faux
+rendu des tests (gain réel 0,3 contre 0,2 au modèle) vérifie seulement que la passe 2 corrige
+d'après la mesure. L'ordre du traitement (étalonnage avant ou après le profil) n'est pas constaté.
 
 ## Mode HDR
 
