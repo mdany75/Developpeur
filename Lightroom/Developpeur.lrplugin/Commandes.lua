@@ -33,7 +33,7 @@
 --                cadre demandé à placer sur la nouvelle géométrie (commande recadrer)
 --   masquer     {photos?|selection?, masques, etape, raison?, confirme, releve_formes?} → ajoute des masques
 --                                          (un masque peut porter des composants combinés) ; formes
---                                          sans IA relues (masques_relus), signalées, jamais retirées
+--                                          sans IA relues (masques_relus) ; une mal gardée, retirée et dite
 --   retoucher   {photo?, taches, yeux, etape, raison?, confirme}       → taches et yeux rouges
 --   ameliorer   {photo?, ameliorations, etape, raison?, confirme} → débruitage, détails bruts,
 --                                          super résolution, calculés par Lightroom

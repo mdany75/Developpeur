@@ -1265,8 +1265,9 @@ Les formes des dégradés, pinceaux, objets et plages de couleurs ont été rele
 Classic 15.6 : sous une autre version, `get_status` et `add_mask` le disent, et Claude vérifie le
 premier masque de ce genre. Depuis la 1.6, chaque dégradé, pinceau ou plage que Claude pose est
 relu tout de suite dans Lightroom et comparé à ce qui a été écrit : un masque que Lightroom n'a pas
-gardé tel quel est signalé à Claude, qui le vérifie et vous le dit ; rien n'est retiré de
-lui-même. Les objets et les personnes ne sont pas relus ainsi (Lightroom les recalcule).
+gardé tel quel est retiré tout de suite (depuis la 1.6.3), le reste de la retouche restant en
+place, et Claude vous le dit et peut le reposer autrement ; `undo_last` défait toujours l'étape
+entière. Les objets et les personnes ne sont pas relus ainsi (Lightroom les recalcule).
 
 ## Installer
 

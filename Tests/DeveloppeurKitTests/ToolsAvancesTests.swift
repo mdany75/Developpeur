@@ -552,11 +552,17 @@ final class ToolsAvancesTests: XCTestCase {
         XCTAssertFalse(texte.contains("relevées dans la 15.6"), texte)
         XCTAssertFalse(texte.contains("Objets et personnes"), texte)
         XCTAssertTrue(texte.contains("masques_relus"), "les verdicts passent tels quels")
-        for verdicts in [["gardé", "écart"], ["à relire"], ["absent"], []] {
+        for verdicts in [["gardé", "écart"], ["à relire"], ["absent"], ["retiré", "écart"], []] {
             fake.replies["masquer"] = reponse(verdicts)
             texte = call("add_mask", ["step_name": "x", "masks": [radial]]).text
             XCTAssertTrue(texte.contains("relevées dans la 15.6"), "\(verdicts) : \(texte)")
         }
+        // 1.6.3 : un masque mal gardé retiré par le module : la phrase courte dit de le reposer autrement.
+        fake.replies["masquer"] = reponse(["gardé", "retiré"])
+        texte = call("add_mask", ["step_name": "x", "masks": [radial]]).text
+        XCTAssertTrue(texte.contains("dégradés, pinceaux et plages relus, les masques que Lightroom n'a pas gardés tels qu'écrits sont retirés (masques_relus) : les reposer autrement"), texte)
+        XCTAssertFalse(texte.contains("relevées dans la 15.6"), texte)
+        XCTAssertFalse(texte.contains("gardés tels qu'écrits."), texte)
         fake.replies["masquer"] = ["lightroom": "16.0", "resultats": [[:]]]
         XCTAssertTrue(call("add_mask", ["step_name": "x", "masks": [radial]]).text.contains("relevées dans la 15.6"), "module sans relecture")
         // Un objet (masque IA à position) avec un dégradé gardé : la phrase courte dit qu'il n'est pas relu.
@@ -567,6 +573,24 @@ final class ToolsAvancesTests: XCTestCase {
         // Sur la version relevée : rien.
         fake.replies["masquer"] = ["lightroom": "15.6", "resultats": [["masques_relus": [["nom": "Rond", "verdict": "écart"]]]]]
         XCTAssertFalse(call("add_mask", ["step_name": "x", "masks": [radial]]).text.contains("Lightroom Classic 15.6 :"))
+    }
+
+    /// 1.6.3 : alerteFormes seule, sans appel ; et la description d'add_mask dit le retrait en une
+    /// phrase (plus « rien n'est retiré »), sous la longueur tenue.
+    func testAlerteFormesEtDescriptionDuRetrait() throws {
+        let radial: JSONValue = ["type": "radial", "centre_x": 0.5, "centre_y": 0.5, "rayon_x": 0.3]  // tel qu'envoyé au module
+        func reponse(_ verdicts: [String]) -> JSONValue {
+            ["resultats": [["masques_relus": .array(verdicts.map { ["nom": "Rond", "verdict": .string($0)] })]]]
+        }
+        let retire = try XCTUnwrap(ToolHandler.alerteFormes("16.0", reponse: reponse(["retiré"]), masks: [radial]))
+        XCTAssertTrue(retire.hasPrefix("Lightroom Classic 16.0 : dégradés, pinceaux et plages relus, les masques que Lightroom"), retire)
+        XCTAssertTrue(retire.contains("les reposer autrement"), retire)
+        XCTAssertEqual(ToolHandler.alerteFormes("16.0", reponse: reponse(["écart"]), masks: [radial]),
+                       ToolHandler.avertissementFormesMasques("16.0"), "un retrait échoué garde son verdict « écart » : l'avertissement entier")
+        XCTAssertNil(ToolHandler.alerteFormes("15.6", reponse: reponse(["retiré"]), masks: [radial]), "rien sur la version relevée")
+        let description = try XCTUnwrap(tools.definitions.first { $0["name"] == "add_mask" }?["description"]?.string)
+        XCTAssertTrue(description.contains("un masque que Lightroom n'a pas gardé tel qu'écrit est retiré et dit, à reposer autrement (masques_relus)"))
+        XCTAssertFalse(description.contains("rien n'est retiré"))
     }
 
     /// DEVELOPPEUR_RELEVE_FORMES (développement) : add_mask demande au module le relevé des formes ;
