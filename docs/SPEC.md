@@ -8049,6 +8049,10 @@ Par l'orchestrateur, avant la publication ; aucune commande n'écrit au catalogu
    l'encodeur de texte d'open_clip (MobileCLIP-S2, `datacompdr`) sur les phrases de
    Tests/Contrats/jetons-clip.json ; cosinus avec `vecteur_texte_debut` et les vecteurs de
    `--preparer-sens` d'au moins 0,999. Sinon : la découpe ou le nettoyage du tokeniseur à revoir.
+   **Le 2 nov. 2026 : à faire**, pas fait (il demande de télécharger open_clip et les poids
+   `datacompdr`). Les jetons restent vérifiés par la seconde implémentation en Python sur le vrai
+   vocabulaire (`TokeniseurCLIPTests`) et les jetons de « a photo of a dog » par le point 1 ; le
+   cosinus des vecteurs de texte avec open_clip n'est pas constaté.
 3. **Qualité sur les photos de Dany** (C4 réduit) : `mcp-developpeur --sens-essai --collection
    "<collection de 200 photos variées choisie avec Dany>" --nombre 200 --requetes '[…10 phrases
    de Dany, en anglais…]' > essai.json 2>essai.log` (Lightroom ouvert, liaison démarrée, en
@@ -8058,6 +8062,34 @@ Par l'orchestrateur, avant la publication ; aucune commande n'écrit au catalogu
    pertinence sous laquelle il n'y a plus de bonne photo) et décide si `query` se préfixe de « a photo
    of » (alors dans `Tools+Sens.swift`). Regarder aussi `temps.encodage_ms_moyen` (le coût ajouté à
    chaque photo du Suivi) et `semblables`.
+   **Constaté le 2 nov. 2026** (Lightroom Classic 15.6, sans Dany, lecture seule) : 196 originaux
+   choisis par `find_photos` (pas de vidéo, pas de copie) : régulièrement dans le temps parmi les
+   mots-clés Chewbacca (chien, 10), Puce, Mia, Grisou (chats, 14), Tornade (furet, 5), « karaté
+   mars » (4), Dany Ménard (35), Olivier Ménard (35), Véronique Drouin (28) et les photos notées 3 ★
+   et plus (65), de 2002 à 2026, iPhone, compacts, X-T4, X-H2S ; `--sens-essai --ids …` avec dix
+   requêtes (a dog, a cat, a ferret, snow, a beach, a sunset, a birthday cake, a christmas tree,
+   children doing karate, people eating at a table), classement entier lu (les dix premières
+   ne suffisent pas à placer un seuil) et planches des vingt premières vérifiées à l'œil.
+   - Bon classement en tête : chien 4 sur 4 en tête, chat 9 sur 10, furet 5 sur 5 dans les 10,
+     karaté aux 3 premiers rangs (la 4e du mot-clé au 41e), plage 16 sur 16 (rupture nette : 0,65
+     puis 0,42), anniversaire (gâteau, cadeaux, chapeaux) 11 sur 12 jusqu'à 0,51 puis 0,38 ; sapin de Noël et repas à table : bons
+     en tête, mêlés entre 0,45 et 0,65.
+   - **Le seuil n'est pas net** : des bonnes photos tombent sous 0,5 (chiens à 0,49 et 0,47, Père
+     Noël à 0,49, repas vers 0,45) quand des fausses passent au-dessus (0,75, 0,61, 0,55 pour le chien ;
+     0,54 et 0,51 pour le repas). Sans aucune photo qui réponde (pas de coucher de soleil dans le
+     lot), la pertinence relative fait quand même passer 21 photos au-dessus de 0,5, toutes fausses
+     (des chats) : le score brut du meilleur y est 0,14, contre 0,21 à 0,29 quand il y a de bonnes
+     photos (neige : une seule, 0,21, deuxième à 0,65). Sur 196 photos, la médiane qui sert de zéro
+     n'est pas celle d'un index de dizaines de milliers.
+   - « a photo of » ne change presque rien (mêmes premières ; un peu mieux pour le furet, un peu
+     moins bien pour la neige) : **pas de préfixe**.
+   - Encodage d'une vignette de 1 024 px : 19,8 ms en moyenne, 55,6 ms au plus ; classement de
+     196 vecteurs : 1,6 ms ; compilation 0 s (déjà faite). `semblables` (une photo du mot-clé Chewbacca,
+     un animal tenu dans les bras) : des furets et des chats tenus ou couchés, même genre d'image.
+   **`Sens.seuilPertinenceProvisoire` reste à 0,5, provisoire** (la règle « la pertinence sous
+   laquelle il n'y a plus de bonne photo » ne donne pas de valeur nette). **À faire avec Dany** :
+   refaire le relevé sur l'index du Suivi rempli (point 4) avec ses propres phrases, et juger s'il
+   faut ajouter un plancher de score brut (vers 0,18) pour ne rien rendre quand rien ne répond.
 4. **Le Suivi qui remplit l'index** : Lightroom relancé (Releve.lua change), la fenêtre Claude ouverte
    sur une sélection de quelques centaines de photos déjà analysées : le journal du module dit
    « Suivi : recherche par le sens (règles 1) » ; `get_status` voit `photos_indexees` monter ; un lot
