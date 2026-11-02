@@ -333,6 +333,9 @@ public final class ToolHandler {
             result.content.append(.text(arret.tardif ? arret.message
                 : "Arrêté par l'utilisateur dans Lightroom pendant cet appel : \(arret.message) Ce qui était fait reste ; ne rien relancer sans sa demande."))
         }
+        // L'arrêt ne vaut que pour cet appel : ce qui envoie hors d'un appel (la recette) n'en hérite pas.
+        arretable.reprendre()
+        arretable.surArret = nil
         if let remarque = remarqueVersion() {
             result.content.append(.text(remarque))
         }

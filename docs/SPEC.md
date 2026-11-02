@@ -354,9 +354,20 @@ Lightroom quand elle dure (`Progression.lua`, chantier signalé « fort » par l
   d'autre »), et le journal de la liaison note « Arrêtée par l'utilisateur : « <nom> » ».
 - La croix arrivée après le dernier point sûr laisse finir la commande : sa réponse porte
   `arret_demande` (« … elle a été faite en entier »).
-- Lightroom ne dit pas quelle tâche appelle : la croix arrête toutes les commandes en cours (une
-  seule d'ordinaire, le serveur les envoie une à une), et un point sûr ne s'arrête que si toutes
-  l'ont été (une commande venue après la croix n'est pas arrêtée à sa place).
+- Lightroom ne dit pas quelle tâche appelle : `Liaison.traiter` lie le suivi de la commande à ses
+  paramètres (`Progression.debutCommande(nom, params)`), et chaque point sûr reçoit ce suivi
+  (`Progression.suiviDe(params)`, passé à `Rendu.rendre` et à l'attente des vignettes). Un appel
+  sans suivi n'est jamais arrêté : la vignette et le rendu de la photo active de la fenêtre Claude,
+  le Suivi, l'après d'une étape. La croix ne marque que la commande de sa barre, une seule fois, au
+  premier clic vu : une commande venue ensuite (d'une autre session : Claude Desktop pendant une
+  commande de la fenêtre Claude) n'est pas arrêtée à sa place, même si la barre annulée reste
+  ouverte jusqu'à la fin de la sienne (correctif de revue).
+- Variante (`essayer` avec `instantane`, compare_variants) : un point sûr avant de ranger
+  l'instantané (une croix cliquée pendant les calculs IA ou la relecture du profil : aucun
+  instantané) ; rangé, un arrêt pendant son rendu le dit (« instantané « Claude · variante … »
+  rangé dans le panneau Instantanés, sans rendu (choose_variant, action delete, le retire) ; rien
+  d'autre n'a été fait »). Côté serveur, compare_variants arrêté dit aussi les instantanés des
+  variantes déjà rangées (« Déjà rangées en instantanés, sans planche : … »).
 - Côté serveur, `code: "arret"` devient `CommandeArretee`, dont le message va tel quel à Claude ;
   `LightroomBridge.send` ne la reprend jamais (ce n'est pas une coupure, même pour une lecture).
   Les outils parlent au module par `LiaisonArretable` : après un arrêt (ou `arret_demande`), plus
@@ -364,6 +375,9 @@ Lightroom quand elle dure (`Progression.lua`, chantier signalé « fort » par l
   s'arrête à son `verifier` suivant (`ArretDansLightroom`), et un arrêt que le résultat de l'outil
   ne dit pas (une erreur notée par photo) lui est ajouté. Arrêtée après la limite de 50 s, la
   commande n'est pas refaite : le même appel répété reçoit l'arrêt gardé par `FileOutils`.
+  L'arrêt ne vaut que pour son appel : `ToolHandler.call` le remet à zéro au début et à la fin, et
+  les ressources (`developpeur://photo/…/apercu`, `/journal`) se lisent par le pont lui-même,
+  jamais bloquées par l'arrêt d'un appel (correctif de revue).
 - La simulation de la liaison garde la tâche de surveillance (`S.surveillances`) et en fait un tour
   à chaque `LrTasks.sleep` et à chaque quart de seconde d'un rendu (`S.dureeRendu`,
   `S.pendantRendu` pour cliquer la croix). À constater dans Lightroom : la barre et sa croix à

@@ -101,4 +101,50 @@ final class ArretCommandeTests: XCTestCase {
         XCTAssertTrue(texte.contains(message), texte)
         XCTAssertEqual(fake.commands.filter { $0 == "annuler" }.count, 1, "jamais relancée")
     }
+
+    /// Revue : l'arrêt d'un appel ne bloquait pas que lui. Une ressource lue ensuite
+    /// (developpeur://photo/active/apercu, le journal) atteint le module, et ce qui envoie hors
+    /// d'un appel (la recette) aussi : l'arrêt se remet à zéro à la fin de l'appel.
+    func testApresUnAppelArreteLesRessourcesEtLaRecetteAtteignentLeModule() throws {
+        let fake = FakeLightroom()
+        let outils = ToolHandler(lightroom: fake)
+        fake.errors["apercu"] = CommandeArretee(message: message)
+        XCTAssertTrue(outils.call(name: "view_photo", arguments: [:]).isError)
+        fake.errors["apercu"] = nil
+        fake.replies["apercu"] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 120, green: 120, blue: 120)))]
+        fake.replies["journal"] = ["photos": []]
+        let avant = fake.commands.count
+        let apercu = outils.lireRessource("developpeur://photo/active/apercu")
+        XCTAssertFalse(apercu.isError, apercu.text)
+        XCTAssertFalse(outils.lireRessource("developpeur://photo/7/journal").isError)
+        XCTAssertEqual(Array(fake.commands.dropFirst(avant)), ["apercu", "journal"], "les deux lectures sont parties")
+        XCTAssertNil(outils.arretable.arretDeLAppel, "l'arrêt ne survit pas à son appel")
+        XCTAssertNoThrow(try outils.lightroom.send("reglages", [:], timeout: 5), "la recette envoie comme avant")
+    }
+
+    /// Revue : compare_variants arrêté pendant une variante dit les instantanés des variantes déjà
+    /// rangées, que Claude ne connaîtrait pas sinon.
+    func testCompareVariantsArreteDitLesInstantanesDejaRanges() throws {
+        let fake = FakeLightroom()
+        let outils = ToolHandler(lightroom: fake)
+        let arret = message
+        fake.onSend = { [unowned fake] command, params in
+            if command == "essayer" || command == "apercu" {
+                fake.replies[command] = ["chemin": .string(TestSupport.previewFile(TestSupport.jpeg(red: 120, green: 120, blue: 120))),
+                                         "instantane": params["instantane"]?.string.map { .string("Claude · variante " + $0) } ?? .null]
+            }
+            fake.errors["essayer"] = params["instantane"]?.string == "chaude" ? CommandeArretee(message: arret) : nil
+        }
+        let result = outils.call(name: "compare_variants", arguments: ["photo_id": 5, "variants": [
+            ["name": "naturelle", "settings": ["Exposure2012": 0.2]],
+            ["name": "chaude", "settings": ["Temperature": 6500]],
+            ["name": "froide", "settings": ["Temperature": 4500]],
+        ]])
+        XCTAssertTrue(result.isError)
+        XCTAssertTrue(result.text.hasPrefix(message), result.text)
+        XCTAssertTrue(result.text.contains("« Claude · variante naturelle »"), result.text)
+        XCTAssertTrue(result.text.contains("choose_variant"), result.text)
+        XCTAssertEqual(fake.commands, ["apercu", "essayer", "essayer"], "la troisième variante n'est pas partie")
+        XCTAssertFalse(result.text.contains("Arrêté par l'utilisateur dans Lightroom pendant cet appel"), "le message n'est pas doublé")
+    }
 }

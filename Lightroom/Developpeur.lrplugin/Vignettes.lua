@@ -90,8 +90,9 @@ Vignettes.decrireVignette = decrireVignette
 
 -- Demande la vignette de chaque photo (photo de Lightroom, ou identifiant), toutes à la fois, puis
 -- attend les rappels (Vignettes.DELAI au plus). Une photo introuvable ou une requête refusée finit
--- aussitôt, avec son erreur, sans bloquer les autres.
-local function demanderTout(liste, taille)
+-- aussitôt, avec son erreur, sans bloquer les autres. suivi : celui de la commande vignettes
+-- (Progression.suiviDe), nil pour la fenêtre Claude et le Suivi, que la croix n'arrête jamais.
+local function demanderTout(liste, taille, suivi)
     local demandes = {}
     for _, element in ipairs(liste) do
         local demande = { id = type(element) == 'table' and element.localIdentifier or tonumber(element) }
@@ -132,7 +133,7 @@ local function demanderTout(liste, taille)
     end
     while restantes() > 0 and LrDate.currentTime() - debut < Vignettes.DELAI do
         -- Point sûr (barre d'une commande longue) : rien n'est écrit pendant cette attente.
-        Progression.pointSur()
+        Progression.pointSur(suivi)
         LrTasks.sleep(0.05)
     end
     return demandes
@@ -202,7 +203,7 @@ function Vignettes.vignettes(params)
     local dossier = dossierTemporaire()
     LrFileUtils.createAllDirectories(dossier)
 
-    local demandes = demanderTout(ids, taille)
+    local demandes = demanderTout(ids, taille, Progression.suiviDe(params))
 
     -- Les descriptions d'abord, par lectures groupées (Photos.decrireTout).
     local trouvees = {}

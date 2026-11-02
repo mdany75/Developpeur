@@ -65,39 +65,49 @@ extension ToolHandler {
             cases.append((PreviewImages.image(try Self.readPreview(actuelle["chemin"]?.string)), "Actuelle"))
             contexte.avancer(1, sur: total, "Variantes : état actuel rendu")
         }
-        for variante in variantes {
-            try contexte.verifier()
-            let nom = variante["name"]!.string!.trimmingCharacters(in: .whitespaces)
-            var raw = variante.object ?? [:]
-            raw.removeValue(forKey: "name")
-            // Même chemin qu'apply_settings : balance sur un point neutre mesurée sur l'aperçu,
-            // repères d'Upright et pinceau du flou recalés.
-            if let id = args.raw["photo_id"], !id.isNull { raw["photo_id"] = id }
-            var vargs = Arguments(raw: raw)
-            var balance: BalancePoint?
-            if vargs.has("white_balance_point") { (vargs, balance) = try balanceSurPoint(vargs) }
-            var (develop, notes) = try developParameters(vargs)
-            if let balance {
-                notes.append(.string("Balance \(balance.point == nil ? "de toute l'image" : "du point neutre") : a* \(Self.format((balance.avant.a * 10).rounded() / 10)), b* \(Self.format((balance.avant.b * 10).rounded() / 10)) mesurés ; Temperature et Tint d'après les pentes relevées."))
+        // Les instantanés déjà rangés : un arrêt par la croix d'une barre de Lightroom les dit, pour
+        // que Claude sache qu'ils restent (la planche, elle, n'est pas faite).
+        var rangees: [String] = []
+        do {
+            for variante in variantes {
+                try contexte.verifier()
+                let nom = variante["name"]!.string!.trimmingCharacters(in: .whitespaces)
+                var raw = variante.object ?? [:]
+                raw.removeValue(forKey: "name")
+                // Même chemin qu'apply_settings : balance sur un point neutre mesurée sur l'aperçu,
+                // repères d'Upright et pinceau du flou recalés.
+                if let id = args.raw["photo_id"], !id.isNull { raw["photo_id"] = id }
+                var vargs = Arguments(raw: raw)
+                var balance: BalancePoint?
+                if vargs.has("white_balance_point") { (vargs, balance) = try balanceSurPoint(vargs) }
+                var (develop, notes) = try developParameters(vargs)
+                if let balance {
+                    notes.append(.string("Balance \(balance.point == nil ? "de toute l'image" : "du point neutre") : a* \(Self.format((balance.avant.a * 10).rounded() / 10)), b* \(Self.format((balance.avant.b * 10).rounded() / 10)) mesurés ; Temperature et Tint d'après les pentes relevées."))
+                }
+                notes += recalagesDuRecadrage(&develop, cible: cible)
+                notes += recalagesDesPositions(&develop, cible: cible)
+                var params = develop
+                params.merge(cible) { _, new in new }
+                params["action"] = "appliquer"
+                params["etape"] = .string("variante " + nom)
+                params["instantane"] = .string(nom)
+                params["taille"] = .number(taille)
+                let resultat = try lightroom.send("essayer", params, timeout: 240)
+                let image = PreviewImages.image(try Self.readPreview(resultat["chemin"]?.string))
+                cases.append((image, nom))
+                var item = Self.labelChanges(resultat).object ?? [:]
+                item = item.filter { ["instantane", "changements", "remarques"].contains($0.key) }
+                item["numero"] = .number(Double(cases.count))
+                item["nom"] = .string(nom)
+                if !notes.isEmpty { item["remarques_serveur"] = .array(notes) }
+                details.append(.object(item))
+                if let instantane = resultat["instantane"]?.string { rangees.append(instantane) }
+                contexte.avancer(cases.count, sur: total, "Variantes : « \(nom) » rendue")
             }
-            notes += recalagesDuRecadrage(&develop, cible: cible)
-            notes += recalagesDesPositions(&develop, cible: cible)
-            var params = develop
-            params.merge(cible) { _, new in new }
-            params["action"] = "appliquer"
-            params["etape"] = .string("variante " + nom)
-            params["instantane"] = .string(nom)
-            params["taille"] = .number(taille)
-            let resultat = try lightroom.send("essayer", params, timeout: 240)
-            let image = PreviewImages.image(try Self.readPreview(resultat["chemin"]?.string))
-            cases.append((image, nom))
-            var item = Self.labelChanges(resultat).object ?? [:]
-            item = item.filter { ["instantane", "changements", "remarques"].contains($0.key) }
-            item["numero"] = .number(Double(cases.count))
-            item["nom"] = .string(nom)
-            if !notes.isEmpty { item["remarques_serveur"] = .array(notes) }
-            details.append(.object(item))
-            contexte.avancer(cases.count, sur: total, "Variantes : « \(nom) » rendue")
+        } catch let erreur as CommandeArretee where !rangees.isEmpty {
+            throw CommandeArretee(message: erreur.message + " " + Self.variantesRangees(rangees))
+        } catch let erreur as ArretDansLightroom where !rangees.isEmpty {
+            throw CommandeArretee(message: erreur.localizedDescription + " " + Self.variantesRangees(rangees))
         }
         guard let planche = PreviewImages.planche(cases) else {
             throw LightroomError.plugin("Planche des variantes impossible à composer.")
@@ -111,7 +121,13 @@ extension ToolHandler {
                           structured: .object(info))
     }
 
-    func chooseVariant(_ args: Arguments) throws -> JSONValue {
+    /// Les variantes rangées en instantanés avant un arrêt dans Lightroom.
+    static func variantesRangees(_ noms: [String]) -> String {
+        "Déjà rangées en instantanés, sans planche : " + noms.map { "« \($0) »" }.joined(separator: ", ")
+            + " (choose_variant : list pour les voir, delete pour les retirer)."
+    }
+
+        func chooseVariant(_ args: Arguments) throws -> JSONValue {
         let actions = ["choose": "choisir", "list": "lister", "delete": "effacer"]
         let action = args.string("action") ?? "choose"
         guard let module = actions[action] else { throw LightroomError.invalid("« action » : choose, list ou delete.") }

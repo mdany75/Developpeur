@@ -552,13 +552,11 @@ local function traiter(requete)
     -- l'étape jusqu'à la fin de la commande ; une croix cliquée pendant l'avant arrête la commande
     -- avant qu'elle commence (point sûr).
     local Progression = require 'Progression'
-    local suivi = Progression.debutCommande(requete.command)
+    local suivi = Progression.debutCommande(requete.command, params)
     local prete, cle = LrTasks.pcall(Etapes.avantCommande, requete.command, params)
     cle = prete and cle or nil
     local ok, resultat = LrTasks.pcall(function()
-        if suivi then
-            Progression.pointSur()
-        end
+        Progression.pointSur(suivi)
         return Commandes.executer(requete.command, params)
     end)
     local arret = suivi ~= nil and suivi.arret == true

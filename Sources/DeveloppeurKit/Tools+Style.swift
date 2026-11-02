@@ -85,7 +85,9 @@ extension ToolHandler {
         ]
     }
 
-    /// Lit une ressource : `structured` = `{contents: [...]}`, ou une erreur.
+    /// Lit une ressource : `structured` = `{contents: [...]}`, ou une erreur. Par le pont lui-même
+    /// (`pont`), jamais par `LiaisonArretable` : une lecture de ressource n'est pas un appel d'outil,
+    /// et l'arrêt d'un appel par la croix d'une barre de Lightroom ne la bloque pas.
     public func lireRessource(_ uri: String) -> ToolResult {
         do {
             let contents: [JSONValue]
@@ -99,12 +101,12 @@ extension ToolHandler {
                 case "apercu":
                     var params: [String: JSONValue] = ["taille": .number(Double(Self.defaultPreviewSize)), "cles": []]
                     if let id { params["photo"] = .number(Double(id)) }
-                    let apercu = try lightroom.send("apercu", params, timeout: 120)
+                    let apercu = try pont.send("apercu", params, timeout: 120)
                     let data = Self.compact(try Self.readPreview(apercu["chemin"]?.string), maxBytes: Self.maxPreviewBytes)
                     contents = [["uri": .string(uri), "mimeType": "image/jpeg", "blob": .string(data.base64EncodedString())]]
                 case "journal":
                     guard let id else { throw LightroomError.invalid("Ressource inconnue : \(uri)") }
-                    let journal = try lightroom.send("journal", ["photos": [.number(Double(id))]], timeout: 60)
+                    let journal = try pont.send("journal", ["photos": [.number(Double(id))]], timeout: 60)
                     contents = [["uri": .string(uri), "mimeType": "text/markdown",
                                  "text": .string(Self.journalMarkdown(journal["photos"]?.array ?? [], date: Date()))]]
                 default:

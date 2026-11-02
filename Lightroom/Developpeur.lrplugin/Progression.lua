@@ -19,8 +19,11 @@
 -- proposition remet la photo comme avant ; la réponse est l'erreur ARRET (code 'arret'), que le
 -- serveur rend à Claude telle quelle sans la rejouer. Arrivée après le dernier point sûr, la croix
 -- laisse finir la commande : sa réponse porte arret_demande. Lightroom ne dit pas quelle tâche
--- appelle : la croix arrête toutes les commandes en cours (une seule d'ordinaire, le serveur les
--- envoie une à une), et un point sûr ne s'arrête que si toutes l'ont été.
+-- appelle : le point sûr reçoit donc le suivi de sa commande (Progression.suiviDe(params), que
+-- Liaison.traiter lie aux paramètres reçus), et un appel sans suivi (la fenêtre Claude, le Suivi,
+-- l'après d'une étape) n'est jamais arrêté. La croix ne marque que la commande de sa barre, une
+-- seule fois, au premier clic vu : une commande venue ensuite (d'une autre session) n'est pas
+-- arrêtée à sa place, même si la barre annulée reste ouverte jusqu'à la fin de la sienne.
 
 local LrDate = import 'LrDate'
 local LrProgressScope = import 'LrProgressScope'
@@ -66,10 +69,13 @@ function Progression.nomLisible(nom)
     return Progression.NOMS[nom] or ("commande « " .. tostring(nom) .. " »")
 end
 
--- Commandes en cours suivies : { nom, debut, arret } ; la barre de l'une d'elles : { barre, suivi }.
+-- Commandes en cours suivies : { nom, debut, arret } ; la barre de l'une d'elles : { barre, suivi,
+-- arretVu } ; le suivi de chaque commande par ses paramètres (Progression.suiviDe), tant qu'elle
+-- est en cours.
 local commandes = {}
 local barreCommande
 local surveillance = false
+local parParams = setmetatable({}, { __mode = 'k' })
 
 local function fermerBarreCommande()
     if barreCommande then
@@ -79,9 +85,12 @@ local function fermerBarreCommande()
     end
 end
 
-local function marquerArret()
-    for _, suivi in ipairs(commandes) do
-        suivi.arret = true
+-- La croix de la barre d'une commande, lue : au premier clic vu, cette commande seule est marquée
+-- arrêtée, une fois (arretVu) ; les tours suivants, barre toujours annulée, ne marquent plus rien.
+local function lireCroix()
+    if barreCommande and not barreCommande.arretVu and barreCommande.barre:isCanceled() == true then
+        barreCommande.arretVu = true
+        barreCommande.suivi.arret = true
     end
 end
 
@@ -90,9 +99,7 @@ end
 -- n'est suivi : la tâche s'arrête.
 function Progression.surveiller()
     if barreCommande then
-        if barreCommande.barre:isCanceled() == true then
-            marquerArret()
-        end
+        lireCroix()
         local suivie = false
         for _, suivi in ipairs(commandes) do
             if suivi == barreCommande.suivi then suivie = true end
@@ -117,13 +124,18 @@ function Progression.surveiller()
     return true
 end
 
--- Liaison.traiter, avant la commande : nil pour une commande sans barre.
-function Progression.debutCommande(nom)
+-- Liaison.traiter, avant la commande : nil pour une commande sans barre. params : les paramètres
+-- reçus, auxquels le suivi est lié jusqu'à finCommande (Progression.suiviDe).
+function Progression.debutCommande(nom, params)
     if Progression.SANS_BARRE[nom] then
         return nil
     end
     local suivi = { nom = nom, debut = LrDate.currentTime(), arret = false }
     commandes[#commandes + 1] = suivi
+    if type(params) == 'table' then
+        suivi.params = params
+        parParams[params] = suivi
+    end
     if not surveillance then
         surveillance = true
         LrTasks.startAsyncTask(function()
@@ -143,6 +155,9 @@ end
 function Progression.finCommande(suivi)
     if not suivi then
         return
+    end
+    if suivi.params and parParams[suivi.params] == suivi then
+        parParams[suivi.params] = nil
     end
     for i = #commandes, 1, -1 do
         if commandes[i] == suivi then
@@ -168,28 +183,35 @@ function Progression.estArret(texte)
     return type(texte) == 'string' and texte:find(Progression.ARRET, 1, true) ~= nil
 end
 
+-- Le suivi de la commande en cours à qui appartiennent ces paramètres (ceux que Commandes.executer
+-- passe à la commande), nil hors d'une commande suivie (appel direct de la fenêtre Claude, du
+-- Suivi, de l'après d'une étape, ou commande sans barre).
+function Progression.suiviDe(params)
+    if type(params) ~= 'table' then
+        return nil
+    end
+    return parParams[params]
+end
+
 -- Point sûr d'une commande (jamais dans une écriture au catalogue, ni entre une proposition et sa
--- remise) : lève l'arrêt si la croix a été cliquée pour toutes les commandes en cours. fait : ce
--- que la commande a déjà fait, à dire.
-function Progression.pointSur(fait)
-    if #commandes == 0 then
+-- remise) : lève l'arrêt si la croix de sa barre a été cliquée. suivi : celui de la commande
+-- (Progression.suiviDe) ; sans suivi, rien (l'appel ne vient pas d'une commande). fait : ce que la
+-- commande a déjà fait, à dire.
+function Progression.pointSur(suivi, fait)
+    if type(suivi) ~= 'table' then
         return
     end
-    if barreCommande and barreCommande.barre:isCanceled() == true then
-        marquerArret()
+    lireCroix()
+    if suivi.arret == true then
+        error(Progression.messageArret(fait), 0)
     end
-    for _, suivi in ipairs(commandes) do
-        if not suivi.arret then
-            return
-        end
-    end
-    error(Progression.messageArret(fait), 0)
 end
 
 -- Remise à zéro (essais) : plus rien de suivi, plus de barre.
 function Progression.oublier()
     fermerBarreCommande()
     commandes = {}
+    parParams = setmetatable({}, { __mode = 'k' })
     surveillance = false
     if courante then
         LrTasks.pcall(function() courante.barre:done() end)
@@ -216,6 +238,7 @@ function Progression.fermer()
     fermer()
     fermerBarreCommande()
     commandes = {}
+    parParams = setmetatable({}, { __mode = 'k' })
 end
 
 function Progression.progression(params)

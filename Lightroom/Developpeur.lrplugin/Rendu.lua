@@ -111,7 +111,11 @@ local function verifierRendable(photo)
     end
 end
 
-local function rendre(photo, taille)
+-- Rend la photo (JPEG dans un dossier temporaire) : le chemin, et faux si des réglages IA restaient
+-- à calculer. suivi : celui de la commande (Progression.suiviDe), qui fait des deux points sûrs, au
+-- début et à la fin, des arrêts possibles par la croix ; nil hors d'une commande (fenêtre Claude,
+-- après d'une étape) : jamais arrêté. fait : ce que la commande a déjà fait, dit par l'arrêt.
+local function rendre(photo, taille, suivi, fait)
     local dejaExportee = Photos.brut(photo, 'isExported') == true
     verifierRendable(photo)
     calculerAvantRendu(photo)
@@ -120,7 +124,7 @@ local function rendre(photo, taille)
     local pleine = taille <= 0
     taille = math.max(256, math.min(taille, 4096))
     -- Point sûr (barre d'une commande longue) : la croix cliquée avant le rendu, rien n'est rendu.
-    Progression.pointSur()
+    Progression.pointSur(suivi, fait)
 
     local racine = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'Developpeur')
     local dossier = LrPathUtils.child(racine, string.format('apercu-%d-%d', photo.localIdentifier,
@@ -182,7 +186,7 @@ local function rendre(photo, taille)
     end
     -- Point sûr : la croix cliquée pendant le rendu, qu'on ne peut pas couper ; l'image rendue
     -- n'est pas gardée (une proposition remet ensuite la photo comme avant, Rendu.essayer).
-    local continuer, arret = pcall(Progression.pointSur)
+    local continuer, arret = pcall(Progression.pointSur, suivi, fait)
     if not continuer then
         LrFileUtils.delete(chemin)
         error(arret, 0)
@@ -230,7 +234,7 @@ end
 -- Deux rendus non recadrés pour le recalage : tel quel, puis sans corrections géométriques ; la
 -- photo revient ensuite comme avant. Comme une comparaison, l'Historique de Lightroom garde les
 -- étapes « Claude · recalage ».
-local function rendreGeometrie(photo, actuels, taille)
+local function rendreGeometrie(photo, actuels, taille, suivi)
     -- La grille porte sur l'image entière : cadre retiré et case décochée le temps des rendus.
     local sansCadre, retour = sansRecadrage(actuels)
     for cle in pairs(NEUTRE_GEOMETRIE) do
@@ -248,12 +252,12 @@ local function rendreGeometrie(photo, actuels, taille)
         if next(sansCadre) then
             poser(photo, "Claude · recalage (sans recadrage)", sansCadre)
         end
-        corrige = rendre(photo, taille)
+        corrige = rendre(photo, taille, suivi)
         local neutre = {}
         for cle, valeur in pairs(sansCadre) do neutre[cle] = valeur end
         for cle, valeur in pairs(NEUTRE_GEOMETRIE) do neutre[cle] = valeur end
         poser(photo, "Claude · recalage (sans correction)", neutre)
-        origine = rendre(photo, taille)
+        origine = rendre(photo, taille, suivi)
     end)
     poser(photo, "Claude · recalage (retour)", retour)
     if not ok then
@@ -325,14 +329,15 @@ end
 -- chemin, et faux si des réglages IA n'étaient pas encore calculés (comme rendre).
 local function rendreEntier(photo, actuels, taille, params)
     local retire, retour = sansRecadrage(actuels)
+    local suivi = Progression.suiviDe(params)
     if next(retire) == nil then
-        return rendre(photo, taille)
+        return rendre(photo, taille, suivi)
     end
     verifierPause(params)
     verifierProtection({ photo }, Preferences.lire(), { confirme = true }, 'read_composition')
     verifierRendable(photo)
     poser(photo, Rendu.ETAPE_ENTIERE, retire)
-    local ok, chemin, calcules = LrTasks.pcall(rendre, photo, taille)
+    local ok, chemin, calcules = LrTasks.pcall(rendre, photo, taille, suivi)
     poser(photo, Rendu.ETAPE_ENTIERE_RETOUR, retour)
     if not ok then
         error(chemin, 0)
@@ -349,7 +354,7 @@ end
 -- Rend le cadre gardé (nil si Lightroom n'en garde aucun), les dimensions de l'image affichée
 -- entière, le chemin de l'image entière (nil si elle n'a pas pu se rendre) et les valeurs posées
 -- le temps de ce rendu (essayer les remet avec la proposition).
-local function rendreEntierPropose(photo, plan, taille)
+local function rendreEntierPropose(photo, plan, taille, suivi)
     local relus = photo:getDevelopSettings()
     local cadre, dimensions = cadreAffiche(photo, relus)
     local retire = sansRecadrage(relus)
@@ -357,7 +362,7 @@ local function rendreEntierPropose(photo, plan, taille)
         if next(retire) ~= nil then
             poser(photo, Rendu.ETAPE_ESSAI_ENTIERE, retire)
         end
-        return (rendre(photo, taille))
+        return (rendre(photo, taille, suivi))
     end)
     if not ok then
         -- La raison sans l'emplacement d'une erreur Lua ni son point final (« … occupé : réessayer
@@ -428,7 +433,7 @@ local function rendreAvant(photo, comparer, taille, params)
     ecrire("Claude · comparaison (avant)", function()
         photo:applyDevelopSettings(libererProfil(valeurs), "Claude · comparaison (avant)")
     end)
-    local ok, chemin = LrTasks.pcall(rendre, photo, taille)
+    local ok, chemin = LrTasks.pcall(rendre, photo, taille, Progression.suiviDe(params))
     ecrire("Claude · comparaison (retour)", function()
         photo:applyDevelopSettings(libererProfil(retour), "Claude · comparaison (retour)")
     end)
@@ -450,7 +455,8 @@ function Rendu.geometrie(params)
             info.empreinte = empreinteGeometrie(photo, actuels)
             if params.rendre then
                 verifierPause(params)
-                info.chemin_corrige, info.chemin_origine = rendreGeometrie(photo, actuels, tonumber(params.taille) or 2048)
+                info.chemin_corrige, info.chemin_origine = rendreGeometrie(photo, actuels, tonumber(params.taille) or 2048,
+                    Progression.suiviDe(params))
                 -- Relue après les rendus : celle de la géométrie qu'ils montrent.
                 info.empreinte = empreinteGeometrie(photo, photo:getDevelopSettings())
             end
@@ -488,7 +494,7 @@ function Rendu.apercu(params)
     if entier then
         chemin, calcules = rendreEntier(photo, entier.actuels, taille, params)
     else
-        chemin, calcules = rendre(photo, taille)
+        chemin, calcules = rendre(photo, taille, Progression.suiviDe(params))
     end
     if empreinteVue and calcules ~= false then
         LrTasks.pcall(Etapes.garderVue, photo, chemin, empreinteVue)
@@ -541,6 +547,12 @@ function Rendu.apercu(params)
     return infos
 end
 
+-- Ce qu'un arrêt par la croix dit d'une variante déjà rangée en instantané, mais pas rendue.
+local function faitVariante(instantane)
+    return "instantané « " .. tostring(instantane) .. " » rangé dans le panneau Instantanés, sans rendu "
+        .. "(choose_variant, action delete, le retire)"
+end
+
 -- Proposition visuelle : applique, rend, puis remet la photo comme avant. Rien n'est mémorisé ni
 -- journalisé ; l'Historique de Lightroom garde les deux étapes. Avec instantane (compare_variants),
 -- la proposition est aussi rangée en instantané (Variantes.ranger). Avec entier (Composition lue,
@@ -573,6 +585,7 @@ function Rendu.essayer(params)
         noter(plan, "La rotation de 90° n'est pas montrée dans une proposition : apply_settings la fait.")
     end
     local taille = tonumber(params.taille) or 1344
+    local suivi = Progression.suiviDe(params)
     -- L'image entière d'une proposition de recadrage (preview_settings y dessine le cadre gardé) :
     -- seulement pour l'action appliquer avec un recadrage proposé, jamais pour un recadrage retiré
     -- (rien à dessiner).
@@ -581,7 +594,7 @@ function Rendu.essayer(params)
     local cadrePropose, dimensionsEntiere, cheminEntier, cadreRetire
     local cheminActuel, personnesNonReconnues
     if params.comparer then
-        cheminActuel = rendre(photo, taille)
+        cheminActuel = rendre(photo, taille, suivi)
     end
     local etape = nomEtape(params, "proposition", "Claude · essai : ")
     local chemin, instantane
@@ -630,15 +643,20 @@ function Rendu.essayer(params)
                 end
             end
             -- Une variante (compare_variants) : rangée en instantané avant le rendu et le retour.
+            -- Point sûr avant de la ranger (la croix cliquée pendant les calculs IA : aucun
+            -- instantané) ; rangée, un arrêt pendant son rendu le dit (faitVariante).
+            local fait
             if params.instantane then
+                Progression.pointSur(suivi)
                 local cles = {}
                 for cle in pairs(plan.avant) do cles[cle] = true end
                 for cle in pairs(plan.nouveaux) do cles[cle] = true end
                 instantane = Variantes.ranger(photo, params.instantane, cles)
+                fait = faitVariante(instantane)
             end
-            local rendu = rendre(photo, taille)
+            local rendu = rendre(photo, taille, suivi, fait)
             if entier then
-                cadrePropose, dimensionsEntiere, cheminEntier, cadreRetire = rendreEntierPropose(photo, plan, taille)
+                cadrePropose, dimensionsEntiere, cheminEntier, cadreRetire = rendreEntierPropose(photo, plan, taille, suivi)
             end
             return rendu
         end)
@@ -669,10 +687,13 @@ function Rendu.essayer(params)
         chemin = resultat
     else
         noter(plan, "Rien ne changerait : la proposition est l'état actuel.")
+        local fait
         if params.instantane then
+            Progression.pointSur(suivi)
             instantane = Variantes.ranger(photo, params.instantane, {})
+            fait = faitVariante(instantane)
         end
-        chemin = rendre(photo, taille)
+        chemin = rendre(photo, taille, suivi, fait)
     end
     Liaison.noter("Proposition montrée à Claude : " .. etape, photo.localIdentifier)
     -- Accord véritable : l'utilisateur répond dans la fenêtre de la liaison (Accepter ou Refuser).

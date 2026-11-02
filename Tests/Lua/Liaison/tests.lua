@@ -5124,16 +5124,20 @@ test("Commande longue : la croix pendant l'attente des vignettes arrête la comm
 end)
 
 test("Commande longue : point sûr avant la commande ; jamais de barre pendant celle d'une série", function()
-    local suivi = Progression.debutCommande('appliquer')
+    local params = {}
+    local suivi = Progression.debutCommande('appliquer', params)
+    egal(Progression.suiviDe(params), suivi, "le suivi lié aux paramètres de la commande")
     S.horloge = S.horloge + 3
     Progression.surveiller()
     egal(#S.barres, 1)
-    Progression.pointSur()
+    Progression.pointSur(suivi)
     S.barres[1].annulee = true
-    echoue(function() Progression.pointSur("2 photos sur 5 classées") end, "2 photos sur 5 classées ; rien d'autre n'a été fait")
+    echoue(function() Progression.pointSur(suivi, "2 photos sur 5 classées") end, "2 photos sur 5 classées ; rien d'autre n'a été fait")
+    -- Hors d'une commande (la fenêtre Claude, le Suivi) : jamais arrêté.
+    Progression.pointSur(nil)
     Progression.finCommande(suivi)
+    egal(Progression.suiviDe(params), nil, "plus lié une fois la commande finie")
     egal(S.barres[1].finie, true)
-    Progression.pointSur()
     -- Une barre de série ouverte : la commande n'a pas la sienne.
     Commandes.executer('progression', { id = 's', titre = 'harmonisation', fait = 1, total = 4 })
     local autre = Progression.debutCommande('apercu')
@@ -5142,6 +5146,106 @@ test("Commande longue : point sûr avant la commande ; jamais de barre pendant c
     egal(#S.barres, 2, "seule la barre de la série")
     Progression.finCommande(autre)
     egal(Progression.surveiller(), false, "plus rien de suivi : la surveillance s'arrête")
+end)
+
+-- Revue : la croix n'arrête que la commande de sa barre. Lightroom ne dit pas quelle tâche appelle
+-- un point sûr : un appel direct de la fenêtre Claude pendant une commande arrêtée n'était pas à
+-- distinguer, et une commande venue après la croix (une autre session) était marquée elle aussi à
+-- chaque tour de la surveillance, la barre annulée restant ouverte.
+
+test("Commande longue : une commande venue après la croix (autre session) n'est pas arrêtée à sa place", function()
+    priseDesReponses()
+    S.active = photoRaw()
+    local executer = Commandes.executer
+    Commandes.executer = function(nom, params)
+        if nom ~= 'metadonnees' then
+            return executer(nom, params)
+        end
+        S.horloge = S.horloge + 4
+        Progression.surveiller()
+        S.barres[1].annulee = true
+        Progression.surveiller()
+        -- La croix vue ; la barre annulée reste ouverte jusqu'à la fin de cette commande. Une
+        -- commande d'une autre session arrive : son rendu fait tourner la surveillance.
+        S.dureeRendu = 2
+        Liaison.recevoir(ligne({ id = 2, command = 'apercu', params = { taille = 512, cles = {} } }))
+        return { fait = true }
+    end
+    local ok, erreur = pcall(function()
+        Liaison.recevoir(ligne({ id = 1, command = 'metadonnees', params = {} }))
+    end)
+    Commandes.executer = executer
+    if not ok then error(erreur, 0) end
+    -- L'aperçu répond le premier (il finit pendant la commande de la barre).
+    egal(reponse(1).id, 2)
+    egal(reponse(1).error, nil, "l'aperçu venu après la croix aboutit")
+    egal(reponse(1).code, nil)
+    egal(contient({ reponse(2).result.arret_demande }, "faite en entier"), true, "la commande de la barre, elle, est arrêtée")
+end)
+
+test("Commande longue : la fenêtre Claude lit sa vignette et rend la photo active pendant une commande arrêtée", function()
+    priseDesReponses()
+    local photo = photoRaw()
+    S.active = photo
+    S.dureeRendu = 8
+    local Vignettes = require 'Vignettes'
+    local Rendu = require 'Rendu'
+    local fenetre
+    S.pendantRendu = function(t)
+        if t >= 5 and S.barres[1] then S.barres[1].annulee = true end
+        if t >= 6 and not fenetre then
+            fenetre = {}
+            -- Ce que fait la fenêtre Claude (Fenetre.majPhoto, rendreActive), dans sa tâche à elle.
+            S.dureeRendu, S.vignettesDifferees = 0, true
+            fenetre.lue, fenetre.chemins = pcall(Vignettes.demander, { photo.localIdentifier }, 512)
+            fenetre.rendue, fenetre.chemin = pcall(Rendu.rendre, photo, 512)
+            S.dureeRendu, S.vignettesDifferees = 8, false
+        end
+    end
+    Liaison.recevoir(ligne({ id = 1, command = 'apercu', params = { taille = 512, cles = {} } }))
+    egal(reponse(1).code, 'arret', "l'aperçu de Claude est arrêté")
+    egal(fenetre.lue, true, tostring(fenetre.chemins))
+    egal(type(fenetre.chemins[photo.localIdentifier]), 'string', "la vignette de la photo active est là")
+    egal(fenetre.rendue, true, tostring(fenetre.chemin))
+    egal(type(fenetre.chemin), 'string', "le rendu de la fenêtre aboutit")
+end)
+
+test("Commande longue : une variante arrêtée par la croix dit son instantané, ou n'en range aucun", function()
+    priseDesReponses()
+    local Variantes = require 'Variantes'
+    local photo = photoRaw()
+    S.active = photo
+    -- La croix pendant le rendu de la variante : l'instantané est déjà rangé, l'arrêt le dit.
+    S.dureeRendu = 8
+    S.pendantRendu = function(t)
+        if t >= 5 and S.barres[1] then S.barres[1].annulee = true end
+    end
+    Liaison.recevoir(ligne({ id = 1, command = 'essayer', params = { action = 'appliquer', reglages = { Exposure2012 = 0.4 },
+        plages = { Exposure2012 = { -5, 5 } }, etape = 'variante chaude', instantane = 'chaude', taille = 800 } }))
+    local r = reponse(1)
+    egal(r.code, 'arret', tostring(r.error))
+    egal(contient({ r.error }, "instantané « " .. Variantes.nomInstantane('chaude') .. " » rangé"), true, r.error)
+    egal(#photo.snapshots, 1)
+    egal(photo.reglages.Exposure2012, 0, "la photo est remise comme avant")
+
+    -- La croix avant de ranger (pendant la relecture du profil) : aucun instantané.
+    local autre = photoRaw()
+    S.active = autre
+    S.barres, S.pendantRendu, S.dureeRendu = {}, nil, 0
+    S.pendantAttente = function()
+        -- 4 s passent ; la surveillance ouvre la barre (un tour), et Dany clique sa croix.
+        S.horloge = S.horloge + 4
+        Progression.surveiller()
+        if S.barres[1] then S.barres[1].annulee = true end
+    end
+    Liaison.recevoir(ligne({ id = 2, command = 'essayer', params = { action = 'appliquer', profil = 'Adobe Color', reglages = {},
+        etape = 'variante couleur', instantane = 'couleur', taille = 800 } }))
+    S.pendantAttente = nil
+    local r2 = reponse(2)
+    egal(r2.code, 'arret', tostring(r2.error))
+    egal(contient({ r2.error }, "rien d'autre n'a été fait"), true)
+    egal(contient({ r2.error }, "instantané"), false, r2.error)
+    egal(#autre.snapshots, 0, "aucun instantané rangé")
 end)
 
 test("2.4 : sauvegarde du catalogue demandée pour la prochaine fermeture", function()

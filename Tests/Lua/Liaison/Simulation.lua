@@ -1949,6 +1949,8 @@ local modules = {
         end,
     },
     -- Barre de progression (SDK 1.3) : la simulation garde chaque barre et ce qu'elle a montré.
+    -- Croix cliquée (annulee), isCanceled reste vrai jusqu'à done, comme dans Lightroom : la
+    -- surveillance d'une commande longue ne doit pas remarquer l'arrêt à chaque tour.
     LrProgressScope = setmetatable({}, { __call = function(_, args)
         local barre = { titre = args.title, fait = 0, total = 0, legendes = {}, annulee = false, finie = false }
         function barre:setCancelable(oui) self.annulable = oui end
