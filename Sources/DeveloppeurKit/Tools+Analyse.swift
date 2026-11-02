@@ -50,7 +50,7 @@ extension ToolHandler {
                  ],
                  required: []),
             tool("get_settings",
-                 "Donne tous les réglages de développement actuels d'une photo, groupés comme dans le module Développement, avec l'échelle de la température, le profil, le recadrage, les courbes par points, les masques, les couleurs ponctuelles, les retouches de taches, et son classement dans la Bibliothèque (note, drapeau, libellé, titre, mots-clés).",
+                 "Donne tous les réglages de développement actuels d'une photo, groupés comme dans le module Développement, avec l'échelle de la température, le profil, le recadrage, les courbes par points, les masques, les couleurs ponctuelles, les retouches de taches, et son classement dans la Bibliothèque (note, drapeau, libellé, titre, légende, droits d'auteur, champs IPTC, position GPS, mots-clés).",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("all_keys", prop("boolean", "true = ajoute « tous_les_reglages » : tout ce que Lightroom range pour la photo, même les réglages que ce serveur ne connaît pas encore (pour explorer un outil de Lightroom appliqué à la main).")),

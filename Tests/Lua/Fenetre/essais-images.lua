@@ -97,6 +97,7 @@ local ATTENDUES = {
     ['rapide-noter'] = { 30, 30 },
     ['rapide-retouche'] = { 30, 30 },
     ['rapide-portrait'] = { 30, 30 },
+    ['rapide-classer'] = { 30, 30 },
 }
 
 -- Les images qui vont par groupe (variantes d'un même contrôle) ont la même taille.
@@ -112,7 +113,7 @@ local GROUPES = {
     { 'carte-proposition', 'carte-etape', 'carte-focus' },
     { 'trombone', 'presse-papiers' },
     { 'chevron-haut', 'chevron-bas' },
-    { 'rapide-noter', 'rapide-retouche', 'rapide-portrait' },
+    { 'rapide-noter', 'rapide-retouche', 'rapide-portrait', 'rapide-classer' },
 }
 
 -- Lecture d'un PNG en Lua pur : sa signature, puis ses blocs. Rend { blocs, largeur, hauteur,

@@ -48,7 +48,7 @@ final class MCPServerTests: XCTestCase {
         let refus = try call(#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"expand_photo","arguments":{}}}"#)
         XCTAssertEqual(refus["error"]?["code"]?.int, JSONRPCError.invalidParams, "outil inconnu")
         let invites = (try call(#"{"jsonrpc":"2.0","id":5,"method":"prompts/list"}"#)["result"]?["prompts"]?.array ?? []).compactMap { $0["name"]?.string }
-        XCTAssertEqual(invites, ["retouche_pro", "a_ma_facon", "harmoniser_serie", "tri_seance", "noter", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
+        XCTAssertEqual(invites, ["retouche_pro", "a_ma_facon", "harmoniser_serie", "tri_seance", "noter", "classer", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
         let annonce = (ServerInfo.instructions + JSONCoding.line(.array(outils))
             + Prompts.all.map { Prompts.texte($0, [:], guide: nil) + $0.description }.joined()).lowercased()
         for mot in ["photoshop", "expand_photo", "firefly", "agrandissement", "galerie", "gallery", "concours", "mariage", "crédit adobe"] {
@@ -90,7 +90,7 @@ final class MCPServerTests: XCTestCase {
     func testPromptsListAndGet() throws {
         let list = try call(#"{"jsonrpc":"2.0","id":6,"method":"prompts/list"}"#)
         let names = try XCTUnwrap(list["result"]?["prompts"]?.array).compactMap { $0["name"]?.string }
-        XCTAssertEqual(names, ["retouche_pro", "a_ma_facon", "harmoniser_serie", "tri_seance", "noter", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
+        XCTAssertEqual(names, ["retouche_pro", "a_ma_facon", "harmoniser_serie", "tri_seance", "noter", "classer", "portrait", "paysage", "noir_et_blanc", "nuit_iso_eleve", "partage"])
 
         let prompt = try call(#"{"jsonrpc":"2.0","id":7,"method":"prompts/get","params":{"name":"retouche_pro","arguments":{"style":"chaud et doux"}}}"#)
         let message = try XCTUnwrap(prompt["result"]?["messages"]?.array?.first)
@@ -104,6 +104,29 @@ final class MCPServerTests: XCTestCase {
 
         let unknown = try call(#"{"jsonrpc":"2.0","id":9,"method":"prompts/get","params":{"name":"inconnue"}}"#)
         XCTAssertEqual(unknown["error"]?["code"]?.int, JSONRPCError.invalidParams)
+    }
+
+    /// L'invite classer (après la 1.6, pendant du bouton Classer de la fenêtre Claude et de la
+    /// Demande rapide) : mots-clés du catalogue d'abord, lieu seulement s'il est sûr, légende courte,
+    /// tout proposé ; set_metadata seulement après l'accord, quel que soit le mode du module.
+    func testClasserProposeSansRienEcrireAvantLAccord() throws {
+        let reponse = try call(#"{"jsonrpc":"2.0","id":10,"method":"prompts/get","params":{"name":"classer","arguments":{"photos":"la sélection"}}}"#)
+        let texte = try XCTUnwrap(reponse["result"]?["messages"]?.array?.first?["content"]?["text"]?.string)
+        XCTAssertTrue(texte.contains("Photos : la sélection."))
+        XCTAssertTrue(Prompts.classer.render([:]).contains("Photos : la photo active de Lightroom"), "par défaut, la photo active")
+        for morceau in ["sans rien écrire avant l'accord de l'utilisateur, même en mode Appliquer", "list_keywords",
+                        "seulement s'il est sûr", "position GPS", "jamais deviné", "Légende (caption) : une phrase courte",
+                        "La position GPS seule ne nomme pas le lieu", "ni d'après les coordonnées", "get_settings › classement › legende",
+                        "attends son accord", "Après son accord seulement : set_metadata", "undo_last"] {
+            XCTAssertTrue(texte.contains(morceau), "classer : « \(morceau) » manque")
+        }
+        XCTAssertLessThan(try XCTUnwrap(texte.range(of: "attends son accord")).lowerBound,
+                          try XCTUnwrap(texte.range(of: "set_metadata")).lowerBound, "la proposition avant toute écriture")
+        XCTAssertFalse(Prompts.classer.avecGuide, "le classement ne retouche pas")
+        let bas = (texte + Prompts.classer.description).lowercased()
+        for mot in ["client", "galerie", "concours", "mariage", "photoshop", "propose_ratings", "color_label", "rating"] {
+            XCTAssertFalse(bas.contains(mot), "classer ne parle pas de « \(mot) »")
+        }
     }
 
     func testCorrectivePassesOnlyOnAFoundDefectAndAtMostTwo() {

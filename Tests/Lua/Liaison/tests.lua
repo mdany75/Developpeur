@@ -3023,6 +3023,17 @@ test("Bibliothèque : get_settings donne le classement de la photo", function()
     egal(c.libelle, 'bleu')
     egal(c.titre, "Brume")
     egal(c.mots_cles[1], "Lieux > Lac")
+    egal(c.legende, '', 'sans légende')
+    egal(c.droits, '', "sans droits d'auteur")
+end)
+
+test("Bibliothèque : get_settings donne la légende et les droits d'auteur déjà écrits (relecture du 2 novembre 2026)", function()
+    local photo = photoRaw()
+    S.active = photo
+    classer({ legende = "Anniversaire de maman", droits = "© Dany" })
+    local c = Commandes.executer('reglages', { cles = {}, details = true }).classement
+    egal(c.legende, "Anniversaire de maman", "l'invite Classer la garde")
+    egal(c.droits, "© Dany", 'partage les lit ici')
 end)
 
 test("Bibliothèque : mots-clés du catalogue, par chemin, avec leur nombre de photos", function()

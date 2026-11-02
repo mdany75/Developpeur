@@ -1,12 +1,32 @@
 # Changements
 
-## Non publié
+## 1.6.2 — 2026-11-02
+
+La 1.6.2 ajoute Classer : Claude propose des mots-clés, un lieu et une légende, et n'écrit rien
+sans votre accord.
+
+### Ajouté
+- Classer : une invite de la fenêtre Claude (la huitième, après Sports) et un 4ᵉ bouton à icône
+  dans la Demande rapide (une étiquette à l'étincelle), avec son pendant `classer` dans les invites
+  du connecteur. Claude regarde la photo et propose des mots-clés (ceux du catalogue d'abord, par
+  `list_keywords`), un lieu seulement s'il est sûr (repris d'un champ ou d'un mot-clé de lieu déjà
+  posé ; d'une position GPS seule, il donne les coordonnées et vous nommez le lieu, aucun outil ne
+  la traduisant en ville) et une légende courte, sans remplacer celle que vous avez écrite ; il
+  n'écrit rien (`set_metadata`) avant votre accord, même en mode Appliquer. Le bouton de la
+  Demande rapide ne fait que proposer, et dit comment écrire ensuite (fenêtre Claude, ou nouvelle
+  demande qui nomme ce qu'il faut écrire) : la conversation d'une Demande rapide sur plusieurs
+  photos n'est pas gardée.
 
 ### Changé
 - Le contrôle des numéros de version (Info.plist, Info.lua, Liaison.lua et CHANGELOG.md d'accord)
   sort de `build.sh` dans `scripts/verifier-versions.sh`, que `build.sh` lance comme avant.
 - La CI (GitHub Actions) vérifie aussi les numéros de version et compile en release : l'exécutable
   doit donner la version d'Info.plist.
+
+### Corrigé
+- `get_settings` › `classement` rend aussi la légende (`legende`) et les droits d'auteur
+  (`droits`) : l'invite Classer garde une légende déjà écrite, et `partage` lit les droits
+  d'auteur là où elle les cherchait.
 
 ## 1.6.1 — 2026-11-02
 

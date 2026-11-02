@@ -1251,7 +1251,10 @@ end
 
 -- Commandes ------------------------------------------------------------------------------
 
--- Classement d'une photo (get_settings) : note, drapeau, libellé, titre et mots-clés.
+-- Classement d'une photo (get_settings) : note, drapeau, libellé, titre, légende, droits d'auteur,
+-- textes d'accessibilité, champs IPTC, position GPS et mots-clés. La légende et les droits d'auteur
+-- depuis la relecture du 2 novembre 2026 : l'invite Classer garde une légende déjà écrite, et
+-- partage lit les droits d'auteur ici.
 function Bibliotheque.classement(photo)
     local chemins = Json.tableau()
     for _, p in ipairs(motsClesDe(photo)) do
@@ -1271,6 +1274,8 @@ function Bibliotheque.classement(photo)
         drapeau = NOMS_DRAPEAU[drapeauDe(photo)] or tostring(drapeauDe(photo)),
         libelle = nomLibelle(meta(photo, 'label'), couleurDe(photo)),
         titre = meta(photo, 'title') or '',
+        legende = meta(photo, 'caption') or '',
+        droits = meta(photo, 'copyright') or '',
         texte_alternatif = lireTexte(photo, 'altTextAccessibility'),
         description_longue = lireTexte(photo, 'extDescrAccessibility'),
         iptc = next(iptc) and iptc or Json.null,

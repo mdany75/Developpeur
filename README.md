@@ -20,7 +20,7 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 
 ### La fenêtre Claude dans Lightroom
 
-- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur IA v1.6.1 » dans sa barre de titre
+- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur IA v1.6.2 » dans sa barre de titre
   (la version du module installé) : Fichier ›
   Module externe - Extras › Ouvrir la fenêtre Claude (même entrée dans le menu Bibliothèque, et
   raccourci ⌃⌥C une fois posé). Elle reste ouverte pendant que vous travaillez, dans tous les
@@ -188,8 +188,11 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   de la photo). La fenêtre ne prépare plus de proposition d'elle-même à son ouverture : la case
   À l'ouverture du Gestionnaire de modules externes est retirée.
 - Claude reçoit avec chaque demande la photo active et la sélection de Lightroom.
-- Sept invites en raccourcis : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé,
-  Composition, Sports. Portrait, Paysage et Noir et blanc passent en fin de retouche par éclaircir
+- Huit invites en raccourcis : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé,
+  Composition, Sports, Classer. Classer propose des mots-clés (ceux de votre catalogue d'abord), un
+  lieu seulement s'il est sûr (un champ ou un mot-clé de lieu déjà posé ; d'une position GPS seule,
+  Claude donne les coordonnées et vous nommez le lieu) et une légende courte, sans remplacer celle
+  que vous avez écrite : Claude n'écrit rien avant votre accord, même en mode Appliquer. Portrait, Paysage et Noir et blanc passent en fin de retouche par éclaircir
   et assombrir comme un tireur (voir Retouches locales), avec l'avant/après de cette étape ; en
   noir et blanc, le grain vient après. Composition lit la composition de la photo active et propose
   un cadre, sans l'appliquer.
@@ -265,13 +268,18 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
   photos ; ce que vous avez tapé reste, pour le renvoyer sur les nouvelles. La conversation d'une
   photo, elle, reste gardée : la fenêtre Claude la reprend. Une sélection que Claude change
   lui-même (pendant son travail ou juste après) garde la réponse.
-- À gauche de la demande, trois boutons font une demande toute faite pour toutes les photos sélectionnées,
+- À gauche de la demande, quatre boutons font une demande toute faite pour toutes les photos sélectionnées,
   sans toucher à ce que vous avez tapé : les étoiles les notent (Claude pose ses notes, de 0 à 5 ★
   ou un rejet, annulables par ⌘Z) ; la photo à l'étincelle fait une retouche pro de chacune, le
-  portrait à l'étincelle une retouche de portrait, comme les invites du même nom de la fenêtre
-  Claude. En mode « Proposer
+  portrait à l'étincelle une retouche de portrait, et l'étiquette à l'étincelle les classe, comme
+  les invites du même nom de la fenêtre Claude. En mode « Proposer
   d'abord », Claude ne fait que proposer ces retouches, et la Demande rapide n'a rien pour les
-  accepter : prenez le mode Appliquer, ou la fenêtre Claude.
+  accepter : prenez le mode Appliquer, ou la fenêtre Claude. Classer, lui, ne fait que proposer
+  (mots-clés, lieu, légende), quel que soit le mode, et n'écrit rien. Pour écrire : sur une photo
+  seule (case Autre photo cochée), répondez dans la fenêtre Claude, qui reprend la conversation ;
+  sur plusieurs, la proposition n'est pas gardée : passez par l'invite Classer de la fenêtre Claude,
+  ou faites une nouvelle demande qui nomme ce qu'il faut écrire (« pose les mots-clés lac et
+  automne sur ces photos »).
 - Échap ne la ferme pas (une fenêtre flottante de Lightroom ne reçoit pas cette touche) : le bouton
   de fermeture rouge, en haut à gauche.
 
@@ -443,12 +451,13 @@ correctif 1.3.6, à votre demande du 25 octobre 2026 ; les leçons déjà rangé
 Les mêmes 37 outils (dont `generative_edit`, la retouche générative par Fibo 2, et `match_look`,
 l'étalonnage d'après une référence, dans la 1.6 ; 36 de la 1.3 à la 1.3.5, avec `photo_lesson`,
 retiré au correctif 1.3.6) servent dans la fenêtre Claude,
-dans Claude Desktop et dans Claude Code. Dix invites prêtes à l'emploi s'y ajoutent, dans le menu
+dans Claude Desktop et dans Claude Code. Onze invites prêtes à l'emploi s'y ajoutent, dans le menu
 « + » de Claude Desktop et parmi les commandes « / » de Claude Code : `retouche_pro` (une photo, en
 deux passes vérifiées, puis au plus deux passes correctives si un défaut reste), `a_ma_facon`
 (1.3.5 : votre guide de style appliqué d'abord, puis la méthode habituelle pour le reste),
 `harmoniser_serie`, `tri_seance`, `noter` (une sortie, selon le standard de notation, passe par
-passe), `portrait`, `paysage`, `noir_et_blanc`, `nuit_iso_eleve` et `partage` (écran, web,
+passe), `classer` (mots-clés, lieu s'il est sûr et légende proposés, rien d'écrit sans votre
+accord), `portrait`, `paysage`, `noir_et_blanc`, `nuit_iso_eleve` et `partage` (écran, web,
 Instagram, impression), chacune avec ses précisions au choix (style, photos, garder, passe,
 destination) ; celles qui retouchent suivent votre guide de style. `portrait`, `paysage` et
 `noir_et_blanc` passent en fin de retouche par éclaircir et assombrir comme un tireur (avant le
@@ -557,7 +566,7 @@ cadre.
   proposition une étape « Claude · essai : image entière ».
 - Lire tous les réglages d'une photo, groupés comme dans le module Développement (profil,
   recadrage, courbes, masques, taches), avec son classement (note, drapeau, libellé, titre,
-  mots-clés).
+  légende, droits d'auteur, champs IPTC, position GPS, mots-clés).
 
 **Retoucher**
 

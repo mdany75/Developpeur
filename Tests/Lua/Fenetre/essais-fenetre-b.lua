@@ -754,7 +754,7 @@ essai('Inventaire de l\'en-tête : titre en gras 16 sans ✎, à sa droite « Re
     end)
 end)
 
-essai('Inventaire de la barre et de la saisie : ▲ ▼ à icône, Fin, position ; sept invites en carrés, champ de 2 lignes, 📎 📋, Style, bandeau, Envoyer et Arrêter', function()
+essai('Inventaire de la barre et de la saisie : ▲ ▼ à icône, Fin, position ; huit invites en carrés, champ de 2 lignes, 📎 📋, Style, bandeau, Envoyer et Arrêter', function()
     photoActive(4961, 'DSCF4961.RAF')
     Moteur.nouvelle()
     ouvrirFenetre(function(p, contenu)
@@ -789,8 +789,9 @@ essai('Inventaire de la barre et de la saisie : ▲ ▼ à icône, Fin, position
                 S.cliquer(b)
             end
         end)
-        egal(7, #envois, 'sept invites')
+        egal(8, #envois, 'huit invites (Classer après la 1.6)')
         egal(Consignes.invites[6].message, envois[6], 'Composition')
+        egal(Consignes.invite('classer').message, envois[8], 'Classer, la dernière')
         -- Le champ : deux lignes, à la largeur du centre, Retour le valide.
         local champ = liee(contenu, 'edit_field', 'saisie')
         egal(2, champ.args.height_in_lines)
