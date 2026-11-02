@@ -20,24 +20,10 @@
   comparaison avec l'original, dans un dossier temporaire effacé en entier ensuite (sans toucher au
   dépôt : le contrat du tokeniseur ne se réécrit qu'avec `BIOCLIP_CONTRAT=1`). L'installation copie la
   liste des espèces et prépare ses vecteurs (une quinzaine de secondes, une fois). Sans le modèle,
-  tout marche comme avant et `get_status` le dit.
+  tout marche comme avant et `get_status` le dit ; sans MobileCLIP, rien ne vérifie qu'une image
+  montre un animal ou une plante, et la réponse le dit.
 - `mcp-developpeur --especes-essai <dossier de JPEG>` (développement) : l'espèce de chaque image,
   sans Lightroom, pour juger le modèle et relever les seuils sur vos photos.
-
-### Corrigé (relecture des espèces)
-- `find_photos` avec `species` et une collection, un dossier ou un mot-clé qui gardent au plus 200
-  photos : toutes sont examinées, même celles que le Suivi n'a pas encore analysées. Avant, seules
-  comptaient les 2 000 photos du catalogue entier les plus proches du groupe dans l'index de la
-  recherche par le sens. Au-delà de 200 photos, l'index les classe toujours, mais la réponse dit
-  maintenant que les photos pas encore analysées ne sont pas examinées.
-- Sans MobileCLIP, rien ne vérifie qu'une image montre un animal ou une plante : `find_photos`,
-  `view_photo` et `get_status` le disent désormais (une capture d'écran pouvait sortir comme oiseau
-  sans avertissement).
-- Les invertébrés se cherchent aussi par les escargots, les limaces, les vers, les mille-pattes, les
-  scorpions et les insectes, plus seulement par les créatures marines.
-- Noms corrigés : Geotrygon montana est la Colombe rouviolette (pas la Colombe à croissants),
-  Eratigena atrica la Tégénaire noire, Primula malacoides la Primevère malacoïde ; les scorpions,
-  le faucheux et la tique ne sortent plus d'une recherche d'araignées.
 
 ### Changé
 - Masques relus : un dégradé, un radial, un pinceau ou une plage que Lightroom n'a pas gardé tel
@@ -52,6 +38,15 @@
   de la liaison ne citent plus le masque retiré parmi les masques ajoutés, et l'entrée du journal
   dit le retrait. Sur une autre version que la 15.6, Claude vérifie le premier masque reposé
   (carte du masque ou `view_photo`) avant d'en poser d'autres.
+
+### Documentation
+- La liste « À vérifier à la prochaine recette » de `docs/SPEC.md` reprend les points encore
+  ouverts qui lui manquaient : le menu Style choisi après une demande tapée sans Retour, la note
+  gardée après « Revenir à « Avant Claude » » et ⌘Z en une seule opération pour plusieurs notes
+  posées, le réessai de la peau sur la scène d'essai, la largeur d'un « gros plan » et la netteté
+  avec les doses par masque, `pauseMemeLieu` des groupes de lumière, le carnet sur quelques
+  centaines de photos, une photo sans Exif et le fil (boutons cachés, clignotement). Rien ne change
+  dans ce que vous installez.
 
 ## 1.6.2 — 2026-11-02
 
