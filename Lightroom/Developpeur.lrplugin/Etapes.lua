@@ -182,13 +182,20 @@ end
 
 -- Vrai si la commande sera refusée sans rien écrire : mode « Proposer d'abord » sans accord (accord
 -- dans Lightroom absent, refusé ou trop vieux, comme Ecriture.accordDansLightroom), ou photo
--- protégée (Ecriture.verifierProtection : copies virtuelles seulement, libellé, rejet). Pas de
+-- protégée (Ecriture.verifierProtection : copies virtuelles seulement, libellé, rejet), ou dose
+-- trop forte d'un appliquer (Plans.verifierDoses : plafonds dépassés sans dose_forte). Pas de
 -- rendu en vain.
-local function seraRefusee(params, photo)
+local function seraRefusee(nom, params, photo)
     local prefs = Preferences.lire()
     local Ecriture = require 'Ecriture'
     if not LrTasks.pcall(Ecriture.verifierProtection, { photo }, prefs, params, 'avant/après') then
         return true
+    end
+    if nom == 'appliquer' and type(params.plafonds) == 'table' and params.dose_forte ~= true then
+        local Plans = require 'Plans'
+        if not LrTasks.pcall(Plans.verifierDoses, { photo }, params, prefs) then
+            return true
+        end
     end
     if prefs.mode ~= 'proposer' then
         return false
@@ -441,7 +448,7 @@ function Etapes.avantCommande(nom, params)
     end
     local photo = Etapes.cible(params)
     local dossier = photo and Etapes.dossier(photo)
-    if not dossier or seraRefusee(params, photo) then
+    if not dossier or seraRefusee(nom, params, photo) then
         return nil
     end
     if genre == 'completer' then

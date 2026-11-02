@@ -331,6 +331,41 @@ test("appliquer : plafonds de dose sur la valeur finale, refus sans dose_forte, 
     egal(photo.reglages.Dehaze, 50)
 end)
 
+test("appliquer : la limite de Saturation du Gestionnaire fait foi, jamais un plafond plus bas", function()
+    local photo = photoRaw()
+    S.active = photo
+    local plages = { Saturation = { -100, 100 } }
+    -- Dany a monté la limite à 50 : une Saturation de 40 est posée, même si un plafond de 30 arrive
+    -- (le serveur n'en envoie plus pour la Saturation ; un ancien serveur le faisait).
+    S.prefs.saturationMax = 50
+    appliquer({ reglages = { Saturation = 40 }, plages = plages, plafonds = { Saturation = 30 } })
+    egal(photo.reglages.Saturation, 40, "posée sans dose_forte")
+    appliquer({ reglages = { Saturation = -50 }, plages = plages, plafonds = { Saturation = 30 } })
+    egal(photo.reglages.Saturation, -50, "en moins aussi")
+    -- Au-delà de la limite, ramenée à la limite comme toujours, sans refus.
+    local resultat = appliquer({ reglages = { Saturation = 70 }, plages = plages, plafonds = { Saturation = 30 } })
+    egal(photo.reglages.Saturation, 50)
+    egal(contient(resultat.resultats[1].remarques, "Saturation : limitée à ±50"), true)
+end)
+
+test("appliquer : recette Éclatant (Vibrance +18 en relatif) sur une base à Vibrance 15 : refusée, puis posée par le style choisi", function()
+    local photo = photoRaw()
+    photo.reglages.Vibrance = 15
+    S.active = photo
+    local plafonds = { Clarity2012 = 25, Dehaze = 20, Texture = 30, Vibrance = 30 }
+    local plages = { Vibrance = { -100, 100 }, Contrast2012 = { -100, 100 }, Clarity2012 = { -100, 100 } }
+    local recette = { Vibrance = 18, Contrast2012 = 8, Clarity2012 = 4 }
+    echoue(function()
+        appliquer({ reglages = recette, relatif = true, plages = plages, plafonds = plafonds })
+    end, "Vibrance vaudrait 33, plafond 30")
+    egal(photo.reglages.Contrast2012 or 0, 0, "rien de la recette n'est posé")
+    -- La recette le dit : le style est la demande de Dany, l'étape se repose avec dose_forte.
+    local resultat = appliquer({ reglages = recette, relatif = true, plages = plages, plafonds = plafonds, dose_forte = true })
+    egal(photo.reglages.Vibrance, 33)
+    egal(photo.reglages.Contrast2012, 8)
+    egal(contient(resultat.resultats[1].remarques, "Vibrance : 33, au-delà du plafond de 30"), true)
+end)
+
 test("essayer : une proposition au-delà d'un plafond de dose est refusée aussi, photo intacte", function()
     local photo = photoRaw()
     S.active = photo

@@ -7782,7 +7782,9 @@ créé (si la version de Lightroom le permet et que l'option est cochée).
 - Limites réglables : variation de l'exposition par retouche (2 IL par défaut), saturation
   absolue (±30 par défaut), ramenées à la limite et signalées.
 - Plafonds de dose (1.6, `DevelopCatalogue.plafondsDose`, seule table) : `Clarity2012` 25,
-  `Dehaze` 20, `Texture` 30, `Vibrance` 30, `Saturation` 30. Le serveur les envoie (`plafonds`)
+  `Dehaze` 20, `Texture` 30, `Vibrance` 30. Pas de plafond de `Saturation` : la limite du
+  Gestionnaire (`saturationMax`, réglable de 0 à 100) tient ce rôle et fait foi ; un plafond de
+  Saturation reçu (ancien serveur) ne vaut jamais moins qu'elle (`depassement`). Le serveur les envoie (`plafonds`)
   avec chaque commande `appliquer` qui passe par `developParameters` (apply_settings,
   preview_settings, compare_variants, et match_series pour ce qu'il pose) ; le module les juge sur
   la valeur **finale** de chaque photo (relative ou absolue, ramenée dans sa plage et sous les
@@ -7793,8 +7795,12 @@ créé (si la version de Lightroom le permet et que l'option est cochée).
   avant toute écriture, rotation comprise (`Plans.verifierDoses`, aussi au début de
   `Plans.preparer`, donc pour `essayer` : la proposition le signale de même, rien n'est rendu).
   `strong_dose_requested` (`dose_forte` vers le module), seulement si l'utilisateur l'a demandé en
-  mots clairs ou son guide de style, lève le plafond ; le résultat le dit en remarque, avec quoi
-  vérifier. `get_status` les donne dans `limites.plafonds_dose`. Hors plafonds : `copy_settings`
+  mots clairs, son guide de style ou la recette d'un style qu'il a choisi dans la fenêtre Claude,
+  lève le plafond ; le résultat le dit en remarque, avec quoi vérifier. Les décalages relatifs
+  d'une recette (`Consignes.texteRecette`) s'ajoutent à la retouche de base (Éclatant : Vibrance
+  +18 sur une base à 15 vaut 33) : la recette dit de reposer l'étape refusée entière avec
+  `strong_dose_requested`. Un `appliquer` que les plafonds refuseront ne prépare pas d'avant
+  (`Etapes`, refus prévisible : `Plans.verifierDoses` sous `LrTasks.pcall`). `get_status` les donne dans `limites.plafonds_dose`. Hors plafonds : `copy_settings`
   (il recopie l'état d'une photo de l'utilisateur, pas une dose de Claude), les paramètres
   prédéfinis, et les réglages locaux des masques (leurs doses : `Prompts.Tireur`, `Peau`).
 - Écritures groupées : une commande sur plusieurs photos est une seule opération (⌘Z).

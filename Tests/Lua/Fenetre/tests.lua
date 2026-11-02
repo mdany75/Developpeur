@@ -2343,9 +2343,18 @@ essai('Styles : ligne jointe à la demande et rappel dans le fil', function()
     egal('[Style demandé : Or et peau douce — tons dorés chaleureux, peau adoucie (texture et clarté réduites sur la peau seulement), contraste doux. '
         .. 'recette fixe, la même à chaque photo : l\'appliquer telle quelle après la retouche de base, en une étape « style : Or et peau douce » ; '
         .. 'en valeurs : ColorGradeGlobalHue 50, ColorGradeGlobalSat 8, ColorGradeHighlightHue 48, ColorGradeHighlightSat 10 ; '
-        .. 'en relatif (relative = true) : Contrast2012 -10 ; peau : « Adoucir la peau (Lite) » d\'add_mask, sur la peau seulement]',
+        .. 'en relatif (relative = true) : Contrast2012 -10 (refusée pour un plafond de dose : la reposer entière avec strong_dose_requested = true, ce style est sa demande) ; peau : « Adoucir la peau (Lite) » d\'add_mask, sur la peau seulement]',
         Consignes.ligneStyle('or_peau_douce'))
     vrai(Consignes.ligneStyle('ambre_eclat'):find('Vibrance +8, Highlights2012 -10, Whites2012 +8', 1, true), 'les décalages signés')
+    -- Plafonds de dose (1.6) : les décalages s'ajoutent à la base ; Éclatant (Vibrance +18) sur une
+    -- base à Vibrance 15 vaudrait 33, au-delà de 30. Le style choisi par Dany est sa demande.
+    vrai(Consignes.ligneStyle('eclatant_peau_douce'):find('Vibrance +18, Contrast2012 +8, Clarity2012 +4 (refusée pour un plafond de dose : '
+        .. 'la reposer entière avec strong_dose_requested = true, ce style est sa demande)', 1, true), 'Éclatant : plafond levé par le style choisi')
+    for _, st in ipairs(Consignes.styles) do
+        if st.recette and st.recette.relatif then
+            vrai(Consignes.texteRecette(st):find('strong_dose_requested = true', 1, true), st.value .. ' : relatif, plafond levé')
+        end
+    end
     -- Chaque style à définition a sa recette, sauf « À ma façon », qui suit le guide de Dany.
     for _, st in ipairs(Consignes.styles) do
         if st.definition and st.value ~= 'ma_facon' then vrai(Consignes.texteRecette(st), st.value .. ' : une recette') end

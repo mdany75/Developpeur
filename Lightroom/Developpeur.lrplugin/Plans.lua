@@ -798,9 +798,14 @@ end
 -- Texture, Vibrance, Saturation. Jugés sur la valeur FINALE de la photo (les passes se cumulent),
 -- en valeur absolue (une Clarté de −40 est aussi forte qu'une de +40). Une valeur qui ne s'éloigne
 -- pas de zéro par rapport à l'actuelle (la ramener vers le plafond) n'est jamais refusée. Rend le
--- plafond dépassé, ou nil.
-local function depassement(cle, params, actuel, cible)
+-- plafond dépassé, ou nil. Pour la Saturation, la limite du Gestionnaire de modules externes
+-- (`saturationMax`, réglable de 0 à 100) fait foi : un plafond plus bas ne la contredit jamais
+-- (le serveur n'en envoie plus depuis le correctif ; un ancien serveur pouvait envoyer 30).
+local function depassement(cle, params, actuel, cible, prefs)
     local plafond = type(params.plafonds) == 'table' and tonumber(params.plafonds[cle]) or nil
+    if plafond and cle == 'Saturation' then
+        plafond = math.max(plafond, tonumber(prefs and prefs.saturationMax) or 30)
+    end
     if not plafond or math.abs(cible) <= plafond or math.abs(cible) <= math.abs(actuel or 0) then
         return nil
     end
@@ -828,7 +833,7 @@ local function verifierDoses(photos, params, prefs)
         table.sort(cles)
         for _, cle in ipairs(cles) do
             local _, actuel, cible = cibleDuReglage(cle, params, actuels, raw, plages, prefs, function() end)
-            local plafond = depassement(cle, params, actuel, cible)
+            local plafond = depassement(cle, params, actuel, cible, prefs)
             if plafond then
                 local nom = #photos > 1 and (" (" .. (meta(photo, 'fileName') or ("photo " .. tostring(photo.localIdentifier))) .. ")") or ""
                 exces[#exces + 1] = string.format("%s vaudrait %s%s, plafond %s", cle, afficher(cible), nom, afficher(plafond))
@@ -883,7 +888,7 @@ local function preparer(photo, params, prefs)
         local reelle, actuel, cible = cibleDuReglage(cle, params, actuels, raw, plages, prefs, function(texte)
             noter(plan, texte)
         end)
-        local plafond = depassement(cle, params, actuel, cible)
+        local plafond = depassement(cle, params, actuel, cible, prefs)
         if plafond and params.dose_forte == true then
             noter(plan, string.format("%s : %s, au-delà du plafond de %s, à la demande de l'utilisateur (strong_dose_requested) : "
                 .. "vérifier avec view_photo (halos, grain, couleurs criardes).", cle, afficher(cible), afficher(plafond)))

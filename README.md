@@ -1086,12 +1086,13 @@ module) pour suivre ce que la fenêtre Claude consomme de votre forfait.
 ### Doses plafonnées
 
 - Pour garder un rendu naturel, Claude ne pousse pas de lui-même la Clarté au-delà de 25, la
-  Correction du voile au-delà de 20, la Texture, la Vibrance ou la Saturation au-delà de 30, en
-  plus comme en moins. Le plafond porte sur la valeur finale de la photo : plusieurs passes qui
+  Correction du voile au-delà de 20, la Texture ou la Vibrance au-delà de 30, en plus comme en
+  moins ; la Saturation suit la limite que vous réglez dans le Gestionnaire de modules externes. Le plafond porte sur la valeur finale de la photo : plusieurs passes qui
   s'additionnent sont refusées de même. Rien n'est alors changé, et le message nomme le réglage,
   la valeur et le plafond ; une proposition (« Proposer d'abord ») le dit aussi. Demandez
   clairement un effet plus fort (« plus de clarté, franchement ») et Claude le pose, en le
-  signalant. Ramener un réglage posé à la main vers le plafond n'est jamais refusé.
+  signalant ; un style choisi dans la fenêtre Claude compte comme votre demande, sa recette est
+  posée entière. Ramener un réglage posé à la main vers le plafond n'est jamais refusé.
 
 ### « Proposer d'abord »
 

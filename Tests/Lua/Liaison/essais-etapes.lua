@@ -895,6 +895,15 @@ essai("Etapes : rien de rendu pour une commande qu'une photo protégée ou un ac
     S.prefs.mode, S.prefs.accordDansLightroom = 'proposer', true
     Liaison.accord = { accepte = true, le = S.horloge - Ecriture.DUREE_ACCORD - 1 }
     refusee("accord donné dans Lightroom il y a plus de 10 minutes", 3, exposer(0.4))
+    -- Une dose au-delà de son plafond (1.6), sans dose_forte : refusée par Plans.verifierDoses,
+    -- donc pas d'avant rendu non plus (Clarté posée à la main à 15, puis +15 en relatif).
+    Liaison.accord = nil
+    S.prefs.mode, S.prefs.accordDansLightroom = 'appliquer', false
+    photo.reglages.Clarity2012 = 15
+    refusee("Clarté finale 30, plafond 25", 6, { reglages = { Clarity2012 = 15 }, relatif = true, plages = { Clarity2012 = { -100, 100 } },
+        plafonds = { Clarity2012 = 25 }, confirme = true, etape = 'passe 2' })
+    egal(photo.reglages.Clarity2012, 15, "rien d'écrit")
+    S.prefs.mode, S.prefs.accordDansLightroom = 'proposer', true
     -- Un accord récent : l'avant se rend, l'écriture se fait, puis l'après.
     Liaison.accord = { accepte = true, le = S.horloge }
     envoyer(4, 'appliquer', exposer(0.5))

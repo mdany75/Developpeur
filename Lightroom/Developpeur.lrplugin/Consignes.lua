@@ -211,7 +211,13 @@ function Consignes.texteRecette(s)
     end
     local parties = {}
     if r.valeurs and #r.valeurs > 0 then parties[#parties + 1] = "en valeurs : " .. reglagesRecette(r.valeurs, false) end
-    if r.relatif and #r.relatif > 0 then parties[#parties + 1] = "en relatif (relative = true) : " .. reglagesRecette(r.relatif, true) end
+    -- Les décalages s'ajoutent à la retouche de base : un plafond de dose du serveur peut refuser
+    -- l'étape (Vibrance de base 15 + 18). Le style, Dany l'a choisi : c'est sa demande, l'étape se
+    -- repose entière avec strong_dose_requested (plafonds : DevelopCatalogue.plafondsDose).
+    if r.relatif and #r.relatif > 0 then
+        parties[#parties + 1] = "en relatif (relative = true) : " .. reglagesRecette(r.relatif, true)
+            .. " (refusée pour un plafond de dose : la reposer entière avec strong_dose_requested = true, ce style est sa demande)"
+    end
     if r.peau then parties[#parties + 1] = "peau : « Adoucir la peau (Lite) » d'add_mask, sur la peau seulement" end
     if r.note then parties[#parties + 1] = r.note end
     return "recette fixe, la même à chaque photo : l'appliquer telle quelle après la retouche de base, en une étape « style : "

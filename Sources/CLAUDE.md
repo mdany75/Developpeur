@@ -117,9 +117,10 @@ toucher :
   libellés de chaque commande ; le module ne connaît que les plages de la température et de la
   teinte, qui dépendent de la photo (kelvins pour un RAW, relatives pour un JPEG).
 - **Les plafonds de dose n'existent qu'à un endroit** : `DevelopCatalogue.plafondsDose` (Clarté,
-  Voile, Texture, Vibrance, Saturation), envoyés en `plafonds` ; le module les juge sur la valeur
-  finale, en valeur absolue (`Plans.verifierDoses`), et refuse avant toute écriture sans
-  `strong_dose_requested` (`dose_forte`), posé seulement sur demande de Dany ou de son guide.
+  Voile, Texture, Vibrance ; la Saturation suit `saturationMax` du Gestionnaire), envoyés en
+  `plafonds` ; le module les juge sur la valeur finale, en valeur absolue (`Plans.verifierDoses`),
+  et refuse avant toute écriture sans `strong_dose_requested` (`dose_forte`), posé seulement sur
+  demande de Dany, de son guide ou de la recette d'un style qu'il a choisi.
 - **Le standard de notation n'existe qu'à un endroit** : `Notation.standard`. La fenêtre ne lit ni
   ressources ni invites : elle l'a par `read_standard` seulement. Des yeux fermés ne font rejeter
   que si une autre vue de la rafale ou de la pile les a ouverts ; le tri d'une seule photo n'en

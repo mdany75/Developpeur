@@ -422,11 +422,12 @@ public enum DevelopCatalogue {
     /// grain, couleurs criardes). Jugés par le module sur la valeur finale de la photo (les passes
     /// s'additionnent), en valeur absolue (une Clarté de −40 adoucit autant qu'une de +40 durcit) ;
     /// ramener une valeur vers zéro n'est jamais refusé. Au-delà : refus, rien d'écrit, sauf
-    /// `strong_dose_requested`. La limite de saturation du Gestionnaire de modules externes
-    /// (`saturation_max`, 30 par défaut) reste appliquée avant, comme toujours. Les réglages
+    /// `strong_dose_requested`. Pas de plafond de Saturation : la limite du Gestionnaire de modules
+    /// externes (`saturation_max`, 30 par défaut, réglable de 0 à 100) tient ce rôle, ramène la
+    /// valeur et fait foi (un plafond fixe ici l'aurait contredite au-dessus de 30). Les réglages
     /// locaux des masques ont leurs propres doses (`Prompts.Tireur`, `Peau`).
     public static let plafondsDose: [(key: String, max: Double)] = [
-        ("Clarity2012", 25), ("Dehaze", 20), ("Texture", 30), ("Vibrance", 30), ("Saturation", 30),
+        ("Clarity2012", 25), ("Dehaze", 20), ("Texture", 30), ("Vibrance", 30),
     ]
 
     /// Les plafonds envoyés au module pour les clés demandées (vide si aucune n'en a).
@@ -443,7 +444,7 @@ public enum DevelopCatalogue {
 
     /// La description de strong_dose_requested (apply_settings, preview_settings, variantes).
     public static var demandeDoseForte: String {
-        "true seulement si l'utilisateur l'a demandé en mots clairs (ou son guide de style) : un effet fort. Jamais de toi-même. Sans lui, une valeur finale (passes cumulées, en plus comme en moins) au-delà de \(plafondsTexte) est refusée, rien n'est écrit."
+        "true seulement si l'utilisateur l'a demandé en mots clairs (ou son guide de style, ou la recette d'un style qu'il a choisi) : un effet fort. Jamais de toi-même. Sans lui, une valeur finale (passes cumulées, en plus comme en moins) au-delà de \(plafondsTexte) est refusée, rien n'est écrit. Saturation : la limite du module (saturation_max)."
     }
 
     /// Libellés français envoyés au module Lightroom, pour sa fenêtre de la liaison.

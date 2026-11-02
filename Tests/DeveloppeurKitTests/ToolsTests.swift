@@ -65,7 +65,7 @@ final class ToolsTests: XCTestCase {
         _ = tools.call(name: "apply_settings", arguments: [
             "settings": ["Clarity2012": 15, "Exposure2012": 0.2, "Saturation": -10], "step_name": "passe 2", "relative": true,
         ])
-        XCTAssertEqual(fake.lastParams["plafonds"], ["Clarity2012": 25, "Saturation": 30])
+        XCTAssertEqual(fake.lastParams["plafonds"], ["Clarity2012": 25], "pas de plafond de Saturation : la limite du module fait foi")
         XCTAssertNil(fake.lastParams["dose_forte"])
 
         _ = tools.call(name: "apply_settings", arguments: [
@@ -92,7 +92,9 @@ final class ToolsTests: XCTestCase {
             let texte = try XCTUnwrap(outil["inputSchema"]?["properties"]?["strong_dose_requested"]?["description"]?.string, nom)
             XCTAssertTrue(texte.contains("seulement si l'utilisateur l'a demandé en mots clairs"), texte)
             XCTAssertTrue(texte.contains("Jamais de toi-même"), texte)
-            XCTAssertTrue(texte.contains("Clarity2012 25, Dehaze 20, Texture 30, Vibrance 30, Saturation 30"), texte)
+            XCTAssertTrue(texte.contains("Clarity2012 25, Dehaze 20, Texture 30, Vibrance 30 est refusée"), texte)
+            XCTAssertTrue(texte.contains("Saturation : la limite du module (saturation_max)"), texte)
+            XCTAssertTrue(texte.contains("la recette d'un style qu'il a choisi"), texte)
         }
     }
 
@@ -104,6 +106,7 @@ final class ToolsTests: XCTestCase {
         XCTAssertEqual(etat["limites"]?["saturation_max"], 30)
         XCTAssertEqual(etat["limites"]?["plafonds_dose"]?["Dehaze"], 20)
         XCTAssertEqual(etat["limites"]?["plafonds_dose"]?["Clarity2012"], 25)
+        XCTAssertNil(etat["limites"]?["plafonds_dose"]?["Saturation"], "la limite saturation_max du Gestionnaire, seule")
     }
 
     func testApplyTargetsPhotoIDs() {
