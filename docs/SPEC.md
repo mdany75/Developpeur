@@ -74,7 +74,7 @@ défait ensuite.
 **Masques, peau, éclairage, boîtier**
 
 - Masques relus : seuil de la table compressée d'un pinceau, radial `Flipped` faux sans inversion — à la main dans Lightroom ([masques relus](#à-constater-masques-relus-16)).
-- Peau d'un groupe (personnes reconnues sur 53709833), panneau Masque d'un effet intégré — à la main dans Lightroom ([1.2, point 2](#à-constater-dans-lightroom-12)).
+- Peau d'un groupe (personnes reconnues sur 53709833), réessai sur 53709677 (sinon l'étape des doses y échoue : « rien de lissé »), largeur des visages d'un « gros plan », netteté maximale jamais sous 35 avec les doses par masque, panneau Masque d'un effet intégré — à la main dans Lightroom ([1.2, point 2](#à-constater-dans-lightroom-12)).
 - Éclaircir et assombrir : bords sur un intérieur (53709628), fondu du radial du sujet, doses — avec Dany (à l'œil) ([1.2, point 3](#à-constater-dans-lightroom-12)).
 - Éclairage mixte : balance de 53709912 jugée par `--eclairage --essai`, anneau autour d'un visage, durée — à la main dans Lightroom ([1.2, point 5](#à-constater-dans-lightroom-12)).
 - Bilan : dominante accentuée sur une correction voulue, taille et durée de `view_photo` — à la main dans Lightroom ([1.2, point 6](#à-constater-dans-lightroom-12)).
@@ -83,7 +83,7 @@ défait ensuite.
 **Seuils provisoires**
 
 - A1 `isoEleve` (recadrages par tranche), A2 (l'œil sur 50 sous-expositions), A3, A4 (`basGamme`, `chromaGamme`) — avec Dany (à l'œil) ([relevé](#à-constater-relevé-fait-par-lorchestrateur-après-la-16-construite)).
-- A5 points chauds, A6 (`pauseMax`, `distanceMemeLieu`), A7 éclairage mixte (et un intérieur à lampe et fenêtre à ranger dans Essais) — avec Dany (à l'œil, sur planches) ([relevé](#à-constater-relevé-fait-par-lorchestrateur-après-la-16-construite)).
+- A5 points chauds, A6 (`pauseMax`, `distanceMemeLieu`, `pauseMemeLieu`), A7 éclairage mixte (et un intérieur à lampe et fenêtre à ranger dans Essais) — avec Dany (à l'œil, sur planches) ([relevé](#à-constater-relevé-fait-par-lorchestrateur-après-la-16-construite)).
 - B1 bilan de `view_photo`, B2 alertes de `mask_map` — à la main dans Lightroom (session de Claude Code, sur l'ordre de Dany) ([relevé, points 5 et 6](#à-constater-relevé-fait-par-lorchestrateur-après-la-16-construite)).
 - Lot C (intention du boîtier à ±0,6 IL, composition, rendus, apprentissage, genres, délais du Suivi et de Fibo 2) — à la main dans Lightroom ([seuils provisoires](#les-seuils-provisoires)).
 
@@ -103,10 +103,13 @@ défait ensuite.
 **Notation et sortie entière**
 
 - « Note la série » sur une grande sélection après le correctif du 26 octobre (planches jusqu'à la dernière, durée, ligne d'état, 500 notes posées avec `apply`), `match_series` avec `groups` sur 500 photos — à la main dans Lightroom ([1.4, points 2 et 6](#14--une-sortie-entière-du-tri-à-lharmonisation) ; [fenêtre, point 2](#à-constater-dans-lightroom-11-111-et-après)).
+- Note posée par `propose_ratings` gardée après « Revenir à « Avant Claude » » sur une photo que Claude a aussi retouchée ; ⌘Z en une seule opération pour une pose de plusieurs photos avec `apply` — à la main dans Lightroom ([fenêtre, point 8](#à-constater-dans-lightroom-11-111-et-après) ; [Notation](#notation-propose_ratings-notation)).
+- Groupes de lumière : rien lu pour une photo sans Exif (`aperture`, `shutterSpeed`, `exposureBias`, `flash`) — à la main dans Lightroom ([1.4, point 1](#14--une-sortie-entière-du-tri-à-lharmonisation)).
 - Claude Desktop : `outputSchema` de `propose_ratings`, invite `noter` — à la main dans Claude Desktop ([fenêtre, points 1 et 10](#à-constater-dans-lightroom-11-111-et-après)).
 
 **Suivi**
 
+- Carnet : durée de `Carnet.resumer` et taille de `carnet.json` avec quelques centaines de photos — à la main dans Lightroom ([1.3, point 17](#à-constater-dans-lightroom-13)).
 - Clics sur les calques (une barre de centaines de photos), calendrier (calques, menus, fermeture au clic), champs Du et au validés, période gardée — à la main dans Lightroom ([1.3.7, points 5, 12 et 13](#correctif-137--le-suivi-en-graphiques)).
 - Pause de l'analyse pendant une Retouche pro, Claude Desktop et la recette ; rechargement du module pendant une analyse — à la main dans Lightroom ([1.3.7, points 3 et 7](#correctif-137--le-suivi-en-graphiques)).
 - Toute la bibliothèque (88 071 photos) dans la fenêtre Claude, la Demande rapide et la fenêtre Suivi ; coût de `LrTasks.yield`, mémoire de Lightroom — à la main dans Lightroom (Moniteur d'activité) ([1.3.7, points 8 à 10](#correctif-137--le-suivi-en-graphiques)).
@@ -114,6 +117,8 @@ défait ensuite.
 **Fenêtre Claude**
 
 - Carte Note : étoiles, retrait, 5 ★, Retenir, Rejeter, Laisser, « Accepter N ★ », « Voir à 100 % », rangée du bas — à la main dans Lightroom ([1.3, points 5, 8, 12 et 21](#à-constater-dans-lightroom-13)).
+- Menu Style choisi après une demande tapée sans Retour (même sur la valeur déjà en place) : la demande part-elle, le champ est-il validé avant l'observateur qui annule l'envoi ? — à la main dans Lightroom ([1.3, point 6](#à-constater-dans-lightroom-13) ; [fenêtre, point 3](#à-constater-dans-lightroom-11-111-et-après)).
+- Fil : boutons d'actions et clic du texte quand ils sont cachés, aucun clignotement d'un genre à l'autre — à la main dans Lightroom ([1.3, point 3](#à-constater-dans-lightroom-13)).
 - Proposition : « Obtenir » (grisé, onglet), « Appliquée par Claude », « Remplacée » — à la main dans Lightroom ([1.3.6, point 7](#correctif-136--une-photo-une-conversation) ; [1.3, point 21](#à-constater-dans-lightroom-13)).
 - Clic sur une étape qui change d'onglet puis pose l'image, retour à Focus, Agrandir à 2 000 × 1 250 — à la main dans Lightroom ([1.3.6, points 11 et 12](#correctif-136--une-photo-une-conversation)).
 - Plusieurs photos (conversation de groupe, résumé de 500 photos), « Repartir à neuf », un seul Claude Code pour la fenêtre et la Demande rapide — à la main dans Lightroom ([1.3.6, points 3, 4 et 6](#correctif-136--une-photo-une-conversation)).
@@ -2965,7 +2970,7 @@ Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou
    presque noires « à vérifier », doublons de rafale plafonnés à 3). Durée de la commande
    `notation` pour 500 propositions, et pour 500 notes posées avec `apply` (dans les 60 s de
    `notationTimeout`).
-3. **Sans objet depuis la 1.3** (fenêtre B : segments, plus de colonnes superposées ; le rendu des lignes et les clics passent aux points 3 et 8 de la liste de la 1.3). Rendu de ⚑ dans les lignes du fil (Menlo 11). Les largeurs de `Metriques.lua` viennent de
+3. **En partie sans objet depuis la 1.3** (fenêtre B : segments, plus de colonnes superposées ; le rendu des lignes et les clics passent aux points 3 et 8 de la liste de la 1.3) ; **ouvert** : un choix dans un `popup_menu` (le menu Style) valide-t-il le champ de demande, avant ou après l'observateur qui annule l'envoi (avec le point 6 de la liste de la 1.3). Rendu de ⚑ dans les lignes du fil (Menlo 11). Les largeurs de `Metriques.lua` viennent de
    NSString : vérifier qu'aucune ligne n'est coupée autrement, ni dans les textes de la carte Note
    et de la Proposition, coupés de même (1.1.1). Onglets par vues simples : les boutons d'un
    onglet couvert (Accepter, Changer… et ▲ ▼ de la carte Note sous la colonne Proposition ;
@@ -2992,7 +2997,7 @@ Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou
    `rating` et `pickStatus`). La note posée se relit dans la carte. Lecture de
    `catalog:getPath()` depuis les tâches de la fenêtre. Le message « Lightroom est occupé »
    s'affiche si Claude Desktop écrit au même moment.
-8. **En partie fait** (étape de la recette « note proposée… puis posée sur demande et annulée » depuis la 1.1.1 ; notes posées sur une série en 1.4) ; **ouvert** : l'accord dans Lightroom en « Proposer d'abord », la note gardée après « Revenir à « Avant Claude » ». `propose_ratings` avec `apply` (« note ces photos ») : notes posées, une opération ⌘Z
+8. **En partie fait** (étape de la recette « note proposée… puis posée sur demande et annulée » depuis la 1.1.1 ; notes posées sur une série en 1.4) ; **ouvert** : l'accord dans Lightroom en « Proposer d'abord », la note gardée après « Revenir à « Avant Claude » », ⌘Z en une seule opération pour une pose de plusieurs photos avec `apply` (section Notation). `propose_ratings` avec `apply` (« note ces photos ») : notes posées, une opération ⌘Z
    « Claude · notation » par écriture, une étape par photo que `undo_last` défait une à une ; la
    pause de la liaison l'arrête ; en « Proposer d'abord » avec « Confirmer dans Lightroom »
    (`accordDansLightroom`), l'accord de la fenêtre de la liaison (`depuisLightroom` faux), et le
@@ -5835,7 +5840,7 @@ Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou
    (`DEVELOPPEUR_VERBOSE=1`). Un Claude Desktop resté ouvert sur un connecteur d'avant la 1.2 reçoit
    « Liaison fermée : cette commande ne porte pas le jeton… », puis marche une fois relancé ; la
    fenêtre Claude marche sans réglage ; `--status` dit l'état du jeton.
-2. **En partie fait** (étapes de la peau de la recette, passées à chaque version depuis la 1.2) ; **ouvert** : les personnes d'un groupe que Lightroom reconnaît (53709833), le panneau Masque d'un effet intégré. Peau : « un masque par personne » dans un groupe (sur 53709833, Vision ne voit que 2 personnes
+2. **En partie fait** (étapes de la peau de la recette, passées à chaque version depuis la 1.2) ; **ouvert** : les personnes d'un groupe que Lightroom reconnaît (53709833), le réessai sur 53709677 (la recette ne vise pas d'id fixe : rien ne montre qu'il a été refait), la largeur des visages qui fait un « gros plan », la netteté maximale jamais sous 35 avec les doses par masque, le panneau Masque d'un effet intégré. Peau : « un masque par personne » dans un groupe (sur 53709833, Vision ne voit que 2 personnes
    sur 4 : lesquelles Lightroom reconnaît-il pour `kind` `person` et `part` `face_skin` ?) ; sur
    53709677, le masque de la personne a été retiré à la recette du 20 octobre 2026, peut-être par
    le défaut de la personne seule corrigé depuis (voir Masques : pistes de la 2.1) : à réessayer ;
@@ -6591,7 +6596,7 @@ Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou
 2. **Fait** (captures de la 1.4 et de la 1.6.2). Les hauteurs données à des `f:row` et `f:column` (en-tête, fil, barre, grille, liste) et au champ
    Rechercher : respectées, marges comprises ? `place_vertical = 0.5` (titre blanc du bouton bleu,
    pastilles, Mode, Style, bandeau) ; les rangées sans `fill_horizontal`.
-3. **Fait** (captures ; « Pourquoi ? » : sans objet depuis le correctif 1.3.6, un clic sur l'étape le remplace). Les 42 lignes de 21 du fil et la marge du bas ; la colonne auteur, l'heure une ligne plus bas ; le
+3. **En partie fait** (captures ; « Pourquoi ? » : sans objet depuis le correctif 1.3.6, un clic sur l'étape le remplace) ; **ouvert** : les boutons d'actions et le clic du texte quand ils sont cachés, aucun clignotement d'un genre à l'autre (`transform`), qu'une capture ne montre pas. Les 42 lignes de 21 du fil et la marge du bas ; la colonne auteur, l'heure une ligne plus bas ; le
    texte riche d'une ligne d'appel (Menlo 11 dans du 12, largeur réelle contre `Metriques`) ;
    « Pourquoi ? » en police 11 explicite dans la case de 21 ; les boutons d'actions et le clic du
    texte quand ils sont cachés ; aucun clignotement d'un genre à l'autre (`transform`).
@@ -6601,7 +6606,7 @@ Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou
 5. **En partie sans objet** (« J'ai fini » : Je le fais retiré) ; la carte Focus vue aux captures ; **ouvert** : la carte Note, avec le point 12. Les cartes de 40 et 41 lignes en 12 (interligne de 15 constaté sur 12 lignes) et la grille de 35
    lignes de 16 de la carte Note ; leurs boutons au-dessus du bas ; textes 12 et emphases
    colorées ; les largeurs des carrés (« Laisser rejetée », « J'ai fini »).
-6. **Sans objet** (correctif 1.3.6). Le Mode : la valeur reposée au 2e tour de la boucle (D12) dessine-t-elle « Je le fais » inactif
+6. **En partie sans objet** (correctif 1.3.6 : le Mode) ; **ouvert** : le menu Style choisi après une demande tapée sans Retour, surtout sur la valeur déjà en place (son observateur n'annule l'envoi qu'à un changement de valeur ; avec le point 3 de la liste 1.1). Le Mode : la valeur reposée au 2e tour de la boucle (D12) dessine-t-elle « Je le fais » inactif
    et coché à la première ouverture ? Le `transform` de `Fenetre.lierRadio` sur un radio déjà coché.
    Le menu Style choisi après une demande tapée sans Retour (la simulation sait choisir dans un
    `popup_menu` depuis Mes demandes, `S.choisir`, mais le menu Style n'annule l'envoi qu'à un
@@ -6644,7 +6649,7 @@ Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou
     à ajouter à la collection) ; les étapes « Claude · composition » à l'Historique ; le dessin du
     cadre (tiers à 0,35 %) dans l'aperçu de 405 et dans Agrandir, sur fond clair et sombre ; le
     roulis de Vision sur d'autres faux visages ; la zone d'intérêt sur des paysages sans sujet.
-17. **Sans objet** (correctifs 1.3.6 et 1.3.8 : page du carnet dans le fil, fenêtre des photos d'un défaut et « Retirer du carnet… » retirées ; les seuils du carnet passent au Relevé des seuils, A1 à A3). Carnet : la page dans la grille du fil (tableau Menlo aligné, « — », mois accentués) ; la
+17. **En partie sans objet** (correctifs 1.3.6 et 1.3.8 : page du carnet dans le fil, fenêtre des photos d'un défaut et « Retirer du carnet… » retirées ; les seuils du carnet passent au Relevé des seuils, A1 à A3) ; **ouvert** : la durée de `Carnet.resumer` et la taille de `carnet.json` avec quelques centaines de photos (le carnet et sa case du Gestionnaire restent). Carnet : la page dans la grille du fil (tableau Menlo aligné, « — », mois accentués) ; la
     fenêtre des photos d'un défaut (`otherVerb` de `presentModalDialog`, jamais employé ailleurs,
     puis `LrDialogs.confirm` dans la même tâche) ; « Retirer du carnet… » sur une vraie photo
     désignée par Dany ; « Demander à Claude ce qu'il en pense » ; la durée de `Carnet.resumer` et
@@ -7025,9 +7030,9 @@ copies virtuelles) :
 
 Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou encore **ouvert** ; les points ouverts sont repris, une ligne chacun, dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
 
-1. **Fait** (relevé des seuils du 2 novembre 2026 : ouverture, vitesse, compensation et flash lus sur 4 980 photos, lot A6). `getRawMetadata` : `aperture`, `shutterSpeed`, `exposureBias` en nombres et `flash` booléen sur des
+1. **En partie fait** (relevé des seuils du 2 novembre 2026 : ouverture, vitesse, compensation et flash lus sur les 936 photos du lot A6, tirées des 4 980 du relevé) ; **ouvert** : rien pour une photo sans Exif. `getRawMetadata` : `aperture`, `shutterSpeed`, `exposureBias` en nombres et `flash` booléen sur des
    RAF et des JPEG (X-H2S, X-T4, X-T20), et rien pour une photo sans Exif ;
-2. **En partie repris** par le Relevé des seuils (A6 : `ecartIL` fixé ; `pauseMax` et `distanceMemeLieu` à juger avec Dany) ; **ouvert** : la durée de `match_series` avec `groups` sur 500 photos. les groupes : les coupures d'une vraie sortie jugées à l'œil (les seuils de la pause, de la lumière
+2. **En partie repris** par le Relevé des seuils (A6 : `ecartIL` fixé ; `pauseMax`, `distanceMemeLieu` et `pauseMemeLieu` à juger avec Dany) ; **ouvert** : la durée de `match_series` avec `groups` sur 500 photos. les groupes : les coupures d'une vraie sortie jugées à l'œil (les seuils de la pause, de la lumière
    et du même lieu) ; la durée de `match_series` avec `groups` sur 500 photos (celle du tri) ;
 3. **Fait** (relevé A8 du 2 novembre 2026 : `ecartVisible` 8,1 et `hausseAlerte` 4,05, sur 121 paires). le témoin du teint sur de vrais visages : peau lue, écarts entre photos d'une même personne et de
    deux personnes, alertes justes ou fausses ;
@@ -8506,7 +8511,7 @@ et les aperçus de `--constats` seulement).
    0,13. Tests `testUneImageSombreSansPartieClaireEstSousExposeeSaufVoulueSombre` (26 ne se dit plus
    sous-exposée) et `testLaNatureNeSeDitQuAuDelaDuSeuilReleve`. Reste l'œil sur 50 sous-expositions.
 
-Trié le 2 novembre 2026 : restent **ouverts** A1 (recadrages), A2 (l'œil sur 50 sous-expositions), A3, A4 (`basGamme`, `chromaGamme`), A5, A6 (`pauseMax`, `distanceMemeLieu`), A7 (planches de Dany), B1, B2 et le lot C : voir [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
+Trié le 2 novembre 2026 : restent **ouverts** A1 (recadrages), A2 (l'œil sur 50 sous-expositions), A3, A4 (`basGamme`, `chromaGamme`), A5, A6 (`pauseMax`, `distanceMemeLieu`, `pauseMemeLieu`), A7 (planches de Dany), B1, B2 et le lot C : voir [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
 
 ## Bibliothèque
 

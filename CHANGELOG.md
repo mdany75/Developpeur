@@ -1,5 +1,16 @@
 # Changements
 
+## Non publié
+
+### Documentation
+- La liste « À vérifier à la prochaine recette » de `docs/SPEC.md` reprend les points encore
+  ouverts qui lui manquaient : le menu Style choisi après une demande tapée sans Retour, la note
+  gardée après « Revenir à « Avant Claude » » et ⌘Z en une seule opération pour plusieurs notes
+  posées, le réessai de la peau sur la scène d'essai, la largeur d'un « gros plan » et la netteté
+  avec les doses par masque, `pauseMemeLieu` des groupes de lumière, le carnet sur quelques
+  centaines de photos, une photo sans Exif et le fil (boutons cachés, clignotement). Rien ne change
+  dans ce que vous installez.
+
 ## 1.6.2 — 2026-11-02
 
 La 1.6.2 ajoute Classer : Claude propose des mots-clés, un lieu et une légende, et n'écrit rien
