@@ -475,7 +475,7 @@ function Consignes.retoucheProSurLaSelection(message)
     return guide .. "Pour toutes les photos sélectionnées dans Lightroom, par groupes de lumière : d'abord match_series "
         .. "avec groups = true et selection = true (les groupes et la référence de chacun, rien d'écrit). Puis, dans chaque "
         .. "groupe, " .. corps .. " Ensuite copy_settings de la référence vers les autres photos du groupe, et match_series "
-        .. "(reference_id : la référence) pour les harmoniser. Une photo seule dans son groupe se retouche seule, de la même "
+        .. "(reference_id : la référence, confirm = true : c'est la demande ; en « Proposer d'abord », le plan seulement) pour les harmoniser. Une photo seule dans son groupe se retouche seule, de la même "
         .. "façon ; une seule photo sélectionnée : retouche-la, sans groupes."
 end
 

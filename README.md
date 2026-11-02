@@ -20,7 +20,7 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 
 ### La fenêtre Claude dans Lightroom
 
-- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur IA v1.6.3 » dans sa barre de titre
+- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur IA v1.6.4 » dans sa barre de titre
   (la version du module installé) : Fichier ›
   Module externe - Extras › Ouvrir la fenêtre Claude (même entrée dans le menu Bibliothèque, et
   raccourci ⌃⌥C une fois posé). Elle reste ouverte pendant que vous travaillez, dans tous les
@@ -459,7 +459,9 @@ deux passes vérifiées, puis au plus deux passes correctives si un défaut rest
 passe), `classer` (mots-clés, lieu s'il est sûr et légende proposés, rien d'écrit sans votre
 accord), `portrait`, `paysage`, `noir_et_blanc`, `nuit_iso_eleve` et `partage` (écran, web,
 Instagram, impression), chacune avec ses précisions au choix (style, photos, garder, passe,
-destination) ; celles qui retouchent suivent votre guide de style. `portrait`, `paysage` et
+destination) ; celles qui retouchent suivent votre guide de style (1.6.4 : les boutons de la
+fenêtre Claude et de la Demande rapide le font lire aussi ; Retouche pro sur plusieurs photos
+travaille par groupes de lumière, une référence retouchée par groupe, copiée puis harmonisée). `portrait`, `paysage` et
 `noir_et_blanc` passent en fin de retouche par éclaircir et assombrir comme un tireur (avant le
 grain en noir et blanc), avec un avant/après de cette étape. Les invites qui retouchent
 (`retouche_pro`, `portrait`, `paysage`, `noir_et_blanc`, `nuit_iso_eleve`) partent de ce que
@@ -893,7 +895,8 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   `similar_to`, combinés aux autres critères. Le calcul se fait sur votre Mac (MobileCLIP S2 d'Apple,
   à télécharger une fois : `hf download apple/coreml-mobileclip`), sur les vignettes que le Suivi
   analyse déjà, en arrière-plan ; aucune image ne part chez Claude. Seules les photos déjà analysées
-  par le Suivi sont dans l'index ; `get_status` dit combien. Une personne nommée dans la vue Personnes
+  par le Suivi sont dans l'index ; `get_status` dit combien. Quand rien ne ressemble vraiment à la
+  phrase (1.6.4, seuil provisoire), la réponse est vide et le dit, au lieu des « moins mauvaises ». Une personne nommée dans la vue Personnes
   de Lightroom se cherche par son nom en mot-clé.
 - Reconnaître un oiseau, un animal, une fleur, un arbre ou un champignon par son nom : « mes photos
   de cardinal rouge », « les oiseaux du voyage au Costa Rica » (`find_photos` avec `species`, un nom
@@ -931,7 +934,11 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
 - Préparer un tirage (1.3.5, `print`) : le format en centimètres (« 20x30 », « 30x45 »), la
   résolution (300 ppp par défaut) et le papier, mat ou brillant, donnent le grand côté et la netteté
   de sortie de ce papier. Un tirage sort souvent plus sombre et plus doux que l'écran : Claude
-  propose au besoin une copie virtuelle « tirage » aux ombres un peu remontées. Le profil du
+  propose au besoin une copie virtuelle « tirage » aux ombres un peu remontées. Depuis la 1.6.4, il
+  dit la résolution réelle de chaque photo recadrée pour ce format : sous 240 ppp (un oiseau très
+  recadré), il avertit et propose un format plus petit ou la super résolution, et il signale un
+  format dont la proportion diffère du recadrage (rogné ou bordé au laboratoire) ; l'export part
+  quand même. Le profil du
   laboratoire se choisit dans la fenêtre d'exportation de Lightroom : un module ne peut pas le poser.
 - Les réglages de vos services de publication « Disque dur » comme livraisons types, et vos
   dossiers d'exportation récents ; remettre un fichier livré dans le catalogue, par exemple un
@@ -1151,8 +1158,10 @@ module) pour suivre ce que la fenêtre Claude consomme de votre forfait.
 - Dans la fenêtre Claude, la proposition s'affiche (réglages avant → après) dans l'onglet
   Proposition, avec Accepter (en bleu), Refuser et Ajuster… ; Obtenir, à leur gauche, en demande
   une pour la photo active (voir La fenêtre Claude dans Lightroom). Ajuster…, c'est un texte libre,
-  ou un ajustement d'un clic (Moins chaud, Peau plus naturelle, Garder le ciel, Plus de contraste ; pour
-  un cadre : Plus serré, Plus large, Horizon au tiers haut, Format 4:5, Seulement redresser).
+  ou un ajustement d'un clic choisi d'après ce que touche la proposition, six au plus (1.6.4 : Moins
+  chaud si elle réchauffe, Plus chaud si elle refroidit, Peau plus naturelle s'il y a de la peau,
+  Garder le ciel s'il y a un ciel… ; sinon Moins chaud, Peau plus naturelle, Garder le ciel, Plus de
+  contraste) ; pour un cadre : Plus serré, Plus large, Horizon au tiers haut, Format 4:5, Seulement redresser).
   ▲ ▼ font défiler une proposition plus longue que sa place. Si vous demandez à Claude
   d'appliquer sa proposition par un message (« Applique ta proposition »), ou qu'il retouche la
   photo autrement, la carte le dit (« Appliquée par Claude » ou « Remplacée par une retouche de
@@ -1222,7 +1231,8 @@ Ce qui reste sur le Mac :
   1.3.8, 20 000 avant, les moins récemment vues sortent au-delà ; environ 50 Mo pour 85 000 photos), le rendu de fin de chaque retouche
   (`rendus.json`), et l'avant/après des étapes de Claude
   (`Etapes/`, une image avant et une après par étape, de 0,6 à 0,9 Mo ; ménage au chargement du
-  module : 30 jours, 500 Mo au plus), dans `~/Library/Application Support/Developpeur/` ; les
+  module : 30 jours, 500 Mo au plus ; les vignettes de passage de `Temporaire/`, photo active et
+  Focus comprises, s'effacent aussi au chargement depuis la 1.6.4), dans `~/Library/Application Support/Developpeur/` ; les
   journaux dans `~/Library/Logs/Developpeur/`. Les images de `Etapes/` ne partent jamais chez
   Claude. Claude Code garde aussi ses propres sessions dans `~/.claude`.
 

@@ -1,5 +1,46 @@
 # Changements
 
+## 1.6.4 — 2026-11-02
+
+La 1.6.4 fait suivre votre guide de style par tous les boutons de retouche, choisit les ajustements
+d'un clic d'après la proposition, vérifie qu'un tirage aura assez de pixels, et fait le ménage des
+fichiers de passage.
+
+### Ajouté
+- Tirage : quand vous demandez un tirage (« 30x45 »), Développeur vérifie combien de pixels il reste
+  à chaque photo après le recadrage et dit la résolution réelle. Sous 240 ppp (un oiseau très
+  recadré, par exemple), il vous avertit et propose un format plus petit qui reste net, ou la super
+  résolution. Il signale aussi un format dont la proportion ne correspond pas au recadrage : le
+  laboratoire rognerait la photo ou ajouterait des bandes. Ce n'est qu'un avertissement : l'export
+  part quand même.
+- `mcp-developpeur --especes-essai` (développement) lit maintenant les photos dans Lightroom, en
+  lecture seule (`--collection`, `--dossier`, `--ids`, ou un dossier de JPEG avec `--images`), comme
+  `--sens-essai`, et fait une planche à ouvrir dans le navigateur : sous chaque photo, l'espèce
+  proposée et ses scores, avec Juste et Faux. Le jugement copié, redonné avec `--jugement`, dit
+  quels seuils séparent le mieux les bonnes espèces des mauvaises.
+
+### Changé
+- Les boutons de retouche (Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé, Sports), dans
+  la fenêtre Claude comme dans la Demande rapide, font lire votre guide de style avant de
+  commencer ; avec le style « À ma façon », il n'est pas demandé deux fois.
+- Les ajustements d'un clic de la boîte Ajuster… suivent la proposition : « Moins chaud » si elle
+  réchauffe, « Plus chaud » si elle refroidit, « Peau plus naturelle » seulement s'il y a de la
+  peau, « Garder le ciel » seulement s'il y a un ciel, six au plus ; sinon la liste d'avant.
+- Retouche pro sur plusieurs photos (Demande rapide) travaille par groupes de lumière : Claude
+  retouche une photo de référence par groupe, copie ses réglages aux autres photos du groupe et les
+  harmonise ; une photo seule dans son groupe se retouche seule.
+- Recherche par le sens : quand rien ne ressemble vraiment à la phrase demandée (des chats pour
+  « coucher de soleil »), la réponse est vide et le dit, au lieu de proposer les « moins
+  mauvaises ». Chaque photo trouvée porte son score brut, pour fixer ce seuil provisoire au
+  prochain relevé.
+- Au chargement du module, Développeur efface les vignettes de passage de la fenêtre Claude (photo
+  active, Focus, onglet Aperçu, images collées) et les petits fichiers laissés par une commande
+  interrompue : ils s'accumulaient sans fin dans `Temporaire` (137 Mo chez vous). Vos conversations
+  ne sont jamais touchées, et rien ne s'efface tant qu'une fenêtre du module est ouverte.
+- Dans Claude Desktop, une longue retouche (Fibo 2, plusieurs minutes) garde son résultat même si
+  Claude regarde l'état de Lightroom ou relit la photo entre-temps : elle n'est plus refaite pour
+  rien. Seule une commande qui change une photo efface ce résultat gardé.
+
 ## 1.6.3 — 2026-11-02
 
 La 1.6.3 reconnaît les espèces (oiseaux, animaux, fleurs, arbres, champignons) par leur nom, retire

@@ -145,6 +145,15 @@ défait ensuite.
 - Masque : rendus pleine taille (durée), témoins sur un noir et un blanc brûlé, personne non reconnue, seuils du nettoyage et du fondu — à la main dans Lightroom ([Masque de Lightroom](#masque-de-lightroom-mask-29-octobre-2026)).
 - Fiche FIBO-vlm (mémoire, effet sur le rendu), masque peint au pinceau, `HF_HUB_OFFLINE`, personne recopiée assez grande pour `a_verifier` — avec Dany (à l'œil) ([Fiche de FIBO-vlm](#fiche-de-fibo-vlm-exclusion-qualité-équilibrée-guidage-masque-peint-29-octobre-2026) ; [Photo de référence](#photo-de-référence-reference-30-octobre-2026)).
 
+**Ajoutés par la 1.6.4**
+
+- Ajuster… à six boutons : boîte lisible, pas trop large (titres longs) ; Retouche pro sur une sélection de la Demande rapide : Claude suit groupes de lumière, référence, `copy_settings`, `match_series` avec `confirm = true`, et lit le guide au début — sur des copies d'Essais.
+- Tirage : format exact de `croppedDimensions` en français (milliers, « x » ou « × ») ; suit un recadrage tout juste posé et une photo passée en super résolution — un tirage sur une copie d'Essais très recadrée.
+- Ménage : `Temporaire/PhotoActive` et les `dimensions-*.txt` disparaissent au chargement du module, l'aperçu de la photo active et Focus s'affichent toujours.
+- File des outils : dans Claude Desktop, un appel de plus de 50 s, `get_status` pendant puis après, puis l'appel répété : « Résultat de l'appel précédent », Fibo 2 lancé une seule fois.
+- Sens : relevé `--sens-essai` sur l'index du Suivi avant de fixer le plancher de 0,17 (une phrase sans réponse rend vide ; la neige à 0,21 passe encore).
+- Espèces : `--especes-essai --collection` sur 200 photos (temps), planche dans Safari (boutons, copie du jugement), puis `--jugement` avec Dany pour fixer les seuils.
+
 ## Architecture
 
 Deux pièces :
@@ -8406,8 +8415,11 @@ BioCLIP le reconnaissait (0,44). Une fleur de dessin ou une feuille seule resten
 
 1. **La qualité sur les vraies photos de Dany** : `mcp-developpeur --especes-essai --collection
    "<collection de ses oiseaux, fleurs, animaux de voyage>"` (ou `--images <dossier de JPEG>` ; lecture
-   seule) ; Dany juge chaque case de la planche, juste ou faux, puis `--jugement` donne les seuils : fixe **`seuilConfianceProvisoire`**, **`seuilRechercheProvisoire`**,
-   **`seuilGroupeProvisoire`** et **`seuilPorteProvisoire`** (provisoires, 0,5, 0,15, 0,5 et 0,5), et
+   seule) ; Dany juge chaque case de la planche, juste ou faux, puis `--jugement` donne les seuils : propose **`seuilConfianceProvisoire`** et
+   **`seuilPorteProvisoire`** (provisoires, 0,5 et 0,5) et l'écart au deuxième ; `seuilRechercheProvisoire` et
+   `seuilGroupeProvisoire` (0,15 et 0,5) portent sur une somme d'espèces cherchées et se fixent à part, par
+   des recherches sur la collection jugée ; la porte se juge sur « animal ou plante présent », pas sur
+   l'espèce juste, et
    dit s'il faut ajouter des espèces à la liste (celles que Dany photographie et qui manquent). Un
    petit oiseau loin dans le cadre se juge sur un zoom (`view_photo` avec `region` et `species`).
 2. **`find_photos` avec `species` dans Lightroom** (Essais ou un dossier choisi avec Dany) : le temps

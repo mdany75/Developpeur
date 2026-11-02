@@ -238,6 +238,7 @@ end)
 
 essai('Consignes : Retouche pro sur une sélection, par groupes de lumière ; les autres boutons une à une (relecture du 2 novembre 2026)', function()
     local m = Consignes.retoucheProSurLaSelection(Consignes.invite('retouche_pro').message)
+    vrai(m:find('confirm = true', 1, true) ~= nil, 'l\'harmonisation de Retouche pro sur une sélection est appliquée (confirm = true)')
     for _, morceau in ipairs({ 'Pour toutes les photos sélectionnées', 'groupes de lumière', 'match_series avec groups = true',
         "rien d'écrit", 'retouche sa photo de référence comme un professionnel', 'copy_settings de la référence vers les autres photos du groupe',
         'match_series (reference_id', 'pour les harmoniser', 'Une photo seule dans son groupe se retouche seule' }) do

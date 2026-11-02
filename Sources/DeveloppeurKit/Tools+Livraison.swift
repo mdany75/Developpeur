@@ -105,7 +105,7 @@ extension ToolHandler {
 
     /// Ce que vaut une photo recadrée (largeur × hauteur en pixels) pour un tirage de ce format à
     /// cette résolution : la résolution réelle (pixels du grand côté / pouces du grand côté), et
-    /// les avertissements (sous 240 ppp : un format plus petit qui tient à 240 ppp et la super
+    /// les avertissements (sous 240 ppp : le plus grand format courant net à 240 ppp et la super
     /// résolution ; proportion différente de plus de 2 % : rognée ou bordée). Rien n'est bloqué.
     static func verifierTirage(fichier: String, pixels: (Int, Int), format: (Double, Double), ppp: Int) -> (pppReel: Int, avertissements: [String]) {
         let grandPx = Double(max(pixels.0, pixels.1)), petitPx = Double(min(pixels.0, pixels.1))
@@ -121,7 +121,7 @@ extension ToolHandler {
             var phrase = "\(fichier) : \(Int(grandPx)) × \(Int(petitPx)) px recadrée, soit \(pppReel) ppp réels en \(nomFormat) (\(ppp) ppp demandés) : "
                 + "sous \(tiragePppMin) ppp, le tirage sera flou de près ; Lightroom n'agrandit pas, le fichier gardera \(Int(grandPx)) px."
             if let plusPetit = (memeProportion.last ?? tient.last) {
-                phrase += " Plus petit format qui tient à \(tiragePppMin) ppp : \(cm(plusPetit.0))x\(cm(plusPetit.1)) cm (grand côté de \(cm(maxCm)) cm au plus)."
+                phrase += " Format plus petit, net à \(tiragePppMin) ppp : \(cm(plusPetit.0))x\(cm(plusPetit.1)) cm (grand côté de \(cm(maxCm)) cm au plus)."
             } else {
                 phrase += " À \(tiragePppMin) ppp, le grand côté tient sur \(cm(maxCm)) cm au plus."
             }
