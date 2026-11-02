@@ -18,6 +18,7 @@
 # Étapes :
 #   1. vérification que le numéro de version est le même partout (Resources/Info.plist,
 #      Info.lua et Liaison.lua du module) et que CHANGELOG.md a sa section « ## X.Y — date »
+#      (scripts/verifier-versions.sh, que la CI lance aussi)
 #   2. les deux suites de tests : swift test (serveur, faux module) et scripts/tester-module.sh
 #      (module, Lightroom simulé) ; aucune ne touche Lightroom, Claude ni les photos
 #   3. swift build -c release du produit mcp-developpeur
@@ -73,26 +74,13 @@ plutil -lint "${ROOT_DIR}/Resources/Info.plist" >/dev/null || die "Resources/Inf
 
 # --- 1. Version ----------------------------------------------------------------
 #
-# Trois endroits portent le numéro : CFBundleShortVersionString (incrusté dans l'exécutable),
-# VERSION d'Info.lua ({ major = 1, minor = 0, revision = 0, … } vaut 1.0) et Liaison.VERSION
-# (que le module annonce au serveur). Le CHANGELOG doit avoir la section de cette version, la
-# plus récente du fichier (« ## Non publié » peut rester au-dessus).
+# scripts/verifier-versions.sh compare les trois numéros (CFBundleShortVersionString d'Info.plist,
+# VERSION d'Info.lua, Liaison.VERSION) et la section la plus récente de CHANGELOG.md ; la CI le
+# lance aussi. En cas de désaccord, il dit « Erreur : … » et rend 1.
 
+VERSIONS_OK="$("${ROOT_DIR}/scripts/verifier-versions.sh")" || exit 1
 PLIST_VERSION="$(plutil -extract CFBundleShortVersionString raw "${ROOT_DIR}/Resources/Info.plist")"
-LIAISON_VERSION="$(sed -nE "/^[[:space:]]*VERSION = ['\"]/{s/^[[:space:]]*VERSION = ['\"]([^'\"]*)['\"].*/\1/p;q;}" "${PLUGIN_DIR}/Liaison.lua")"
-INFO_LUA_VERSION="$(sed -nE '/^[[:space:]]*VERSION = \{/{s/.*major = ([0-9]+), minor = ([0-9]+), revision = ([0-9]+).*/\1.\2.\3/p;q;}' "${PLUGIN_DIR}/Info.lua")"
-CHANGELOG_VERSION="$(sed -nE '/^## [0-9]+\.[0-9]+(\.[0-9]+)? — /{s/^## ([0-9.]+) — .*/\1/p;q;}' "${ROOT_DIR}/CHANGELOG.md")"
-[[ "${PLIST_VERSION}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] \
-    || die "numéro de version illisible dans Resources/Info.plist : « ${PLIST_VERSION} »"
-[[ "${LIAISON_VERSION}" == "${PLIST_VERSION}" ]] \
-    || die "version différente : Info.plist ${PLIST_VERSION}, Liaison.lua ${LIAISON_VERSION:-absente}"
-[[ "${INFO_LUA_VERSION%.0}" == "${PLIST_VERSION}" || "${INFO_LUA_VERSION}" == "${PLIST_VERSION}" ]] \
-    || die "version différente : Info.plist ${PLIST_VERSION}, Info.lua ${INFO_LUA_VERSION:-absente}"
-grep -Eq "^## ${PLIST_VERSION//./\\.} — [0-9]{4}-[0-9]{2}-[0-9]{2}" "${ROOT_DIR}/CHANGELOG.md" \
-    || die "CHANGELOG.md n'a pas de section « ## ${PLIST_VERSION} — AAAA-MM-JJ »"
-[[ "${CHANGELOG_VERSION}" == "${PLIST_VERSION}" ]] \
-    || die "la section la plus récente de CHANGELOG.md est ${CHANGELOG_VERSION:-absente}, pas ${PLIST_VERSION}"
-step "Version ${PLIST_VERSION} (Info.plist, Info.lua, Liaison.lua et CHANGELOG.md d'accord)"
+step "${VERSIONS_OK}"
 
 # --- Signature et notarisation ------------------------------------------------
 #

@@ -58,6 +58,9 @@ Ce projet suit le standard commun des projets de Dany (`/standard-projet` le vé
   rien n'y est jamais effacé (TIFF avec GPS) : ne pas la laisser posée.
 - Publier une version : skill `publier-version` (numéro aux trois endroits, `Resources/Info.plist`,
   `Info.lua` et `Liaison.VERSION`, que `build.sh` compare au `CHANGELOG.md`).
+- `scripts/verifier-versions.sh` : ces trois numéros et la section la plus récente du
+  `CHANGELOG.md` d'accord (code 1 sinon) ; `build.sh` et la CI le lancent, la CI compile aussi en
+  release et compare `--version` à `Info.plist`.
 
 Les fichiers produits vont dans `build/`, ignoré par git. Rien de compilé n'est commité.
 

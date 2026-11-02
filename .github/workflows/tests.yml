@@ -1,7 +1,8 @@
 # Les deux suites de tests à chaque envoi sur main : le serveur (swift test, avec le faux module)
 # et le module Lightroom « Développeur » (LuaJIT, avec le SDK simulé : liaison et fenêtre
-# Claude), plus la syntaxe des scripts de construction et d'installation. Aucune ne touche
-# Lightroom, Claude ni les fichiers de Claude. Environ une minute de macOS par envoi.
+# Claude), plus la syntaxe des scripts de construction et d'installation, l'accord des numéros
+# de version (scripts/verifier-versions.sh) et la compilation release, dont l'exécutable doit
+# donner la version d'Info.plist. Aucune ne touche Lightroom, Claude ni les fichiers de Claude.
 name: Tests
 
 on:
@@ -19,8 +20,17 @@ jobs:
       - name: LuaJIT
         run: brew install luajit
       - name: Scripts (syntaxe)
-        run: for script in build.sh install.sh uninstall.sh; do bash -n "${script}"; done
+        run: for script in build.sh install.sh uninstall.sh scripts/verifier-versions.sh; do bash -n "${script}"; done
+      - name: Versions
+        run: scripts/verifier-versions.sh
       - name: Serveur (swift test)
         run: swift test
       - name: Module Lightroom (LuaJIT)
         run: scripts/tester-module.sh
+      - name: Compilation release
+        run: |
+          swift build -c release --product mcp-developpeur
+          attendue="$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)"
+          obtenue="$(.build/release/mcp-developpeur --version)"
+          echo "Info.plist ${attendue}, exécutable « ${obtenue} »"
+          [ "${obtenue}" = "${attendue}" ] || { echo "Erreur : l'exécutable donne la version « ${obtenue} » au lieu de ${attendue}" >&2; exit 1; }

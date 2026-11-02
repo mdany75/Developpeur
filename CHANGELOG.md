@@ -1,5 +1,13 @@
 # Changements
 
+## Non publié
+
+### Changé
+- Le contrôle des numéros de version (Info.plist, Info.lua, Liaison.lua et CHANGELOG.md d'accord)
+  sort de `build.sh` dans `scripts/verifier-versions.sh`, que `build.sh` lance comme avant.
+- La CI (GitHub Actions) vérifie aussi les numéros de version et compile en release : l'exécutable
+  doit donner la version d'Info.plist.
+
 ## 1.6.1 — 2026-11-02
 
 Deux seuils sortis du relevé de la 1.6 sont maintenant fixés.
