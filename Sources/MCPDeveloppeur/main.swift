@@ -96,6 +96,15 @@ func usage(erreur: Bool = false) {
                 relevé des seuils des habitudes (remember_style avec habits) : la même lecture, sans plafond, chaque
                 réglage avec son nombre de photos, sa part touchée, médiane et quartiles de l'écart à la valeur
                 neutre, même sens, jours et seuils manqués ; lecture seule (rien au catalogue ni au guide)
+            mcp-developpeur --mesures --echantillons <suivi.json> <dossier> [--graine <n>] [--catalogue <.lrcat>]
+            mcp-developpeur --mesures --collecter <lot.json> <dossier> [--taille <px>] [--par <10 à 20>]
+            mcp-developpeur --mesures --mesurer <dossier>  |  --mesures --fichiers <dossier> <fichier.jpg>…
+                relevé des seuils provisoires (1.6, développement) : lots tirés de suivi.json (lu seulement) ;
+                vignettes d'un lot demandées au module par 10 à 20 (1 024 px), copiées puis retirées du dossier
+                temporaire, remises à l'endroit comme le Suivi, avec l'heure exacte, la compensation, le flash et
+                qui a posé la note de la famille (journal, inconnu s'il échoue) ;
+                puis mesures sans Lightroom (Suivi, gamme, points chauds, peau, paires et groupes de lumière) en
+                CSV et JSON, avec un résumé ; rien n'est écrit dans le catalogue (docs/SPEC.md, Relevé des seuils)
             mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--horizon <id> [--hauteur-horizon <0 à 1>]] [--original] [--images <dossier>]
                 recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
                 (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
@@ -570,6 +579,11 @@ case "--habitudes":
     let releve = outils().releveHabitudes(params)
     for block in releve.content { if case .text(let text) = block { print(line: text) } }
     if releve.isError { exit(1) }
+case "--mesures":
+    // Relevé des seuils provisoires (1.6, ReleveSeuils) : seul --collecter parle au module, par les
+    // commandes de lecture vignettes et journal.
+    let releve = ReleveSeuils.commande(Array(arguments.dropFirst()), lightroom: { LightroomBridge.fromEnvironment() }) { print(line: $0) }
+    exit(releve.code)
 case "--module":
     // Commande brute du module (diagnostic…), pour explorer ce que le SDK de Lightroom offre.
     guard arguments.count >= 2 else { usage(); exit(2) }

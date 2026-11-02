@@ -177,6 +177,18 @@ octobre 2026 avec le graphique des notes, sur un relevé synthétique de photos 
 vide ; le graphique des notes y ajoute une fois de plus les ids de toute la période, environ 15 %) ;
 forme figée dans `Tests/Contrats/suivi.json`)
 
+## Relevé des seuils provisoires (1.6)
+
+`./.build/debug/mcp-developpeur --mesures --echantillons <suivi.json> <dossier>` (lots A1 à A8 tirés
+de `suivi.json`, lu seulement, graine fixe), puis `--mesures --collecter <dossier>/lots/A1.json
+<dossier>/A1 [--taille 1024] [--par 15]` (vignettes par 10 à 20, copiées puis retirées du dossier
+temporaire du module, heure exacte, compensation et flash du catalogue, note de Claude repérée au
+journal ; reprise si relancée ; Lightroom peut rendre des aperçus manquants), puis `--mesures
+--mesurer <dossier>/A1` (sans Lightroom : `mesures.jsonl`, `mesures.csv`, `paires.csv`,
+`resume.txt`, `resume.json`) ; `--mesures --fichiers <dossier> <fichier.jpg>…` pour des fichiers.
+Seuils, commandes exactes et règles de décision : `docs/SPEC.md`, Relevé des seuils provisoires
+(1.6). En arrière-plan, sortie dans un fichier.
+
 ## Relevé du carnet
 
 `./.build/debug/mcp-developpeur --constats <id>… [<fichier.jpg>…]` (pour fixer les seuils du carnet
