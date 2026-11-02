@@ -132,6 +132,24 @@ final class HabitudesTests: XCTestCase {
         XCTAssertEqual(Habitudes.ecartee(photo(99, ["Tint": 8], raw: false)), "sans_retouche")
     }
 
+    func testDebruitageDeLightroomNiMesureNiRetouche() throws {
+        // Constaté dans Lightroom 15.6 le 2 novembre 2026 : le débruitage (Améliorer › Débruiter, sur
+        // le RAF ou dans un DNG « -Bruit » d'avant) met Réduction du bruit : couleur à 0. Sur 523
+        // X-H2S notées 4 ★, 313 à 0 (toutes débruitées) : « tu baisses Réduction du bruit : couleur
+        // de −25 » était le débruitage, pas une habitude.
+        let debruitees = serie(30, jours: 6) { _ in ["ColorNoiseReduction": 0, "ProcessVersion": "15.4"] }
+        XCTAssertTrue(Habitudes.debruitee(debruitees[0]))
+        XCTAssertEqual(Habitudes.analyser(debruitees, trouvees: 30, note: 4).ecartees, ["sans_retouche": 30],
+                       "le débruitage seul n'est pas une retouche")
+        XCTAssertNil(Habitudes.statistique("ColorNoiseReduction", debruitees))
+        let retouchees = serie(30, jours: 6) { _ in ["ColorNoiseReduction": 0, "Highlights2012": -30] }
+        XCTAssertFalse(Habitudes.analyser(retouchees, trouvees: 30, note: 4).phrases.contains { $0.phrase.contains("bruit : couleur") })
+        // Une valeur montée à la main reste mesurée ; hors RAW, 0 est la valeur neutre.
+        let montees = serie(30, jours: 6) { _ in ["ColorNoiseReduction": 40] }
+        XCTAssertEqual(try XCTUnwrap(Habitudes.statistique("ColorNoiseReduction", montees)).touchees, 30)
+        XCTAssertFalse(Habitudes.debruitee(photo(1, ["ColorNoiseReduction": 0], raw: false)))
+    }
+
     func testRecadrageLuParSesClesEtAttribue() {
         let cadre: [String: JSONValue] = ["CropLeft": 0.05, "CropTop": 0, "CropRight": 0.95, "CropBottom": 1, "CropAngle": 0]
         let redresse: [String: JSONValue] = ["CropLeft": 0.02, "CropTop": 0.02, "CropRight": 0.98, "CropBottom": 0.98, "CropAngle": 1.2]

@@ -120,8 +120,19 @@ public enum Habitudes {
     /// Ce réglage se mesure-t-il par son écart à la valeur neutre sur cette photo ? Pas la teinte d'un
     /// RAW : Lightroom la range en valeur absolue (en balance « Telle quelle », la teinte du boîtier,
     /// qui dépend de la scène, comme la température) ; hors RAW, elle est relative (0 = telle quelle).
+    /// Ni la réduction du bruit de couleur d'une photo débruitée par Lightroom (`debruitee`).
     static func mesuree(_ cle: String, _ p: Photo) -> Bool {
-        !(cle == "Tint" && p.raw)
+        if cle == "Tint" { return !p.raw }
+        if cle == "ColorNoiseReduction" { return !debruitee(p) }
+        return true
+    }
+
+    /// Débruitée par Lightroom (Améliorer › Débruiter) ? Constaté dans Lightroom 15.6 (2 novembre
+    /// 2026) : le débruitage, sur le RAW (filtre Denoise de FilterList) comme dans un DNG « -Bruit »
+    /// d'avant, met `ColorNoiseReduction` à 0 ; sur 523 X-H2S notées, les 313 RAW ou DNG à 0 étaient
+    /// tous débruités. La baisser à 0 à la main est rare : elle se confond avec le débruitage.
+    static func debruitee(_ p: Photo) -> Bool {
+        p.raw && nombre(p.valeurs["ColorNoiseReduction"]).map { abs($0) <= epsilon } == true
     }
 
     /// Le cadre neutre : aucun recadrage, aucun redressement.
@@ -157,7 +168,7 @@ public enum Habitudes {
     /// Les corrections d'objectif et la balance (teinte comprise) ne comptent pas (un réglage
     /// d'importation ou le boîtier les pose).
     static func retouchee(_ p: Photo) -> Bool {
-        for cle in clesNumeriques where cle != "Tint" && deDany(p, cle) {
+        for cle in clesNumeriques where cle != "Tint" && mesuree(cle, p) && deDany(p, cle) {
             if let v = nombre(p.valeurs[cle]), abs(v - neutre(cle, raw: p.raw)) > epsilon { return true }
         }
         for cle in ["#MaskGroupBasedCorrections", "#RetouchAreas"] where deDany(p, cle) {
@@ -396,7 +407,7 @@ public enum Habitudes {
         "Écarts à la valeur neutre de chaque réglage (médiane, quartiles P25 et P75 des photos touchées). Une phrase seulement pour un réglage lu sur au moins \(minPhotos) photos, touché sur au moins \(minJours) jours de prise de vue et \(Int(toucheMin * 100)) % des photos, dans le même sens au moins \(Int(sensMin * 100)) % du temps, sans grande dispersion (seuils provisoires). Rien n'est ajouté : proposer chaque phrase à l'utilisateur, puis remember_style avec preference, category (rubrique) et confirm = true seulement après son accord."
     }
 
-    static let aSavoir = "Ce que Claude a touché est écarté, sauf ce que l'utilisateur a repris à la main depuis sa dernière retouche (une reprise suivie d'une autre retouche de Claude ne se voit plus : sous-compté plutôt que mal attribué). Les retouches des anciens outils (MCP Lightroom, Claude pour Lightroom) et un paramètre d'importation ne se distinguent pas des siennes. Une copie virtuelle garde les clés de Claude de son original. Écartées : vidéos, photos de Développeur › Essais, copies virtuelles « Claude », ancien processus, photos sans retouche."
+    static let aSavoir = "Ce que Claude a touché est écarté, sauf ce que l'utilisateur a repris à la main depuis sa dernière retouche (une reprise suivie d'une autre retouche de Claude ne se voit plus : sous-compté plutôt que mal attribué). Les retouches des anciens outils (MCP Lightroom, Claude pour Lightroom) et un paramètre d'importation ne se distinguent pas des siennes. Une copie virtuelle garde les clés de Claude de son original. Réduction du bruit de couleur à 0 sur un RAW ou un DNG : le débruitage de Lightroom, pas compté. Écartées : vidéos, photos de Développeur › Essais, copies virtuelles « Claude », ancien processus, photos sans retouche."
 
     /// Ce que remember_style rend (plafonné : appareils, réglages et phrases les plus parlants).
     static func json(_ a: Analyse, note: Int, detaille: Bool = false) -> JSONValue {

@@ -78,7 +78,8 @@ toucher :
 - **Habitudes** (`Habitudes.swift`, `remember_style` avec `habits`, 1.6) : lecture seule, rien au
   guide sans accord ; attribution par les clés de Claude rendues dans l'espace de `etatSimple`
   (`Lecture.habitudes`, plus celles de l'original pour une copie virtuelle) ; recadrage par les
-  clés `Crop*`, jamais `HasCrop` ; ni température ni teinte d'un RAW ; écarts à la valeur neutre
+  clés `Crop*`, jamais `HasCrop` ; ni température ni teinte d'un RAW, ni bruit de couleur à 0
+  d'un RAW ou d'un DNG (le débruitage de Lightroom, `Habitudes.debruitee`) ; écarts à la valeur neutre
   (`rawDefaults` pour un RAW) ; seuils
   provisoires, à fixer par `--habitudes` (`docs/SPEC.md`, 1.6 : tes habitudes en chiffres).
 

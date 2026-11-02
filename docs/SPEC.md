@@ -6697,8 +6697,10 @@ et P75 des écarts touchés, part du sens majoritaire, jours de prise de vue dis
 touchées. Jamais la température, ni la teinte d'un RAW ou d'un DNG (`Habitudes.mesuree`) :
 Lightroom la range en valeur absolue (en balance « Telle quelle », la teinte du boîtier, +5 à +15
 sur un Fujifilm, qui dépend de la scène) ; hors RAW, elle est relative (0 = telle quelle) et se
-mesure. Profils (avec le Look), balance telle quelle, corrections
-d'objectif, recadrage et masques : des parts, sans phrase.
+mesure. Ni la réduction du bruit de couleur d'un RAW ou d'un DNG laissée à 0
+(`Habitudes.debruitee`) : c'est le débruitage de Lightroom (constaté le 2 novembre 2026, voir
+plus bas), et une photo débruitée sans autre retouche est « sans retouche ». Profils (avec le Look),
+balance telle quelle, corrections d'objectif, recadrage et masques : des parts, sans phrase.
 
 **Une phrase** seulement si tout tient (seuils **provisoires**, `Habitudes.minPhotos = 20`,
 `minJours = 5`, `toucheMin = 0.4`, `sensMin = 0.8`, `diviseurPas = 40`) : au moins 20 photos lues,
@@ -6748,6 +6750,39 @@ phrases retenues. Un processus neuf, sans la limite de 60 s.
 6. Dans la fenêtre Claude, sur Essais : « comment je règle d'habitude mes belles photos ? » : un
    seul appel `remember_style` avec `habits` (plus un rappel s'il dit « pas fini »), des phrases
    proposées, rien ajouté sans accord.
+
+**Constaté dans Lightroom Classic 15.6** (2 novembre 2026, points 1 à 5, lecture seule) :
+
+- Relevé X-H2S notées 4 ★ : 523 photos trouvées et lues (pas d'`echantillon`). Le premier relevé ne
+  sortait qu'une phrase, « tu baisses Réduction du bruit : couleur de −25 », sur 313 photos : toutes
+  débruitées par Lightroom. Le débruitage met `ColorNoiseReduction` à 0, sur le RAF (filtre
+  `Enhance`, titre `Denoise`, dans `FilterList` ; 10 RAF à 0 sur 10 l'ont, 6 RAF à 25 sur 6 ne l'ont
+  pas) comme dans les 87 DNG « -Avec accentuation-Bruit » d'avant (aucune trace dans leurs
+  réglages, `FilterList` vide). Corrigé : `Habitudes.debruitee`, ni mesurée ni retouche
+  (`testDebruitageDeLightroomNiMesureNiRetouche`). Après : 277 sans retouche, 245 photos sur 15
+  jours, 6 phrases (Hautes lumières −61, Ombres +50, Noirs −17, Vibrance +20, Contraste +6,
+  Saturation +4) ; Blancs manquent la dispersion, Exposition le sens et la dispersion ; Clarté,
+  Texture, Voile et vignetage (20 photos, 2 jours) non. Les mêmes 6 phrases en 5 ★ (489 photos,
+  216 retouchées). Le bruit par tranche d'ISO ne sort plus rien : Dany débruite, il ne touche pas
+  les curseurs.
+- X-T20 : 0 photo notée (1 603 photos, toutes de 2020, aucune note) : relevé vide, normal.
+- Seuils : inchangés et **provisoires** ; les phrases sont à montrer à Dany (« est-ce bien toi ? »,
+  à faire avec Dany). Contraste +6 (P25 6, P75 7) et Saturation +4 sur près de la moitié des photos
+  ressemblent à un préréglage : le sien reste une habitude, à lui de le dire.
+- Durée : 523 photos en 2,8 s (`--habitudes` entier, liste comprise), environ 5 ms par photo ; un
+  lot de 250, moins de 1,5 s, loin des 120 s : `Habitudes.lot` reste 250.
+- Aucune écriture : sur deux copies d'Essais notées (3 et 4 ★, l'une retouchée par Claude), avant
+  et après `--habitudes '{"collection": "Essais", "rating_min": 1}'` (7 photos lues, 7 écartées
+  `essais`) : `--dump`, `reglages` avec `details` et `toutes`, `etapes`, `journal` et le guide de
+  style (empreinte et date) identiques. L'`editCount` ne se lit par aucune commande (seulement dans
+  `Historique` et `Ecriture`, internes) : pas relevé ; l'Historique de Lightroom ne se lit pas par
+  le SDK.
+- Formats : `ProcessVersion` rendu en texte, « 15.4 » ou « 11.0 » ; sur 33 photos de 2002 à 2007
+  (E5700, KODAK DX4900, PowerShot A640), aucune sous la version 3 (toutes « 11.0 » ou « 15.4 ») :
+  le format « 5.7 » n'est pas constaté, `ancien_processus` n'écarte rien au catalogue de Dany.
+  `cameraModel` formaté : « X-H2S », « X-T20 », le nom que prend `find_photos`. `HasCrop` absent de
+  `getDevelopSettings` ; `CropLeft`…`CropAngle` présents (neutres sur un RAF jamais recadré) ;
+  `Tint` d'un RAF en « Telle quelle » non nul (+14, +21).
 
 Tests : `HabitudesTests` (quantiles, attribution, écart au neutre selon le format, seuils, rafale,
 dispersion, deux sens, ISO, photos écartées, teinte d'un RAW, recadrage de Claude ou de Dany, 8 phrases, nombres, taille, lots de 250, 5000 au plus,
