@@ -8191,7 +8191,11 @@ celui rangé de la photo ; une copie virtuelle ou une photo hors de l'index : so
 `chercher` avec `parmi` et `originaux`), tout l'index classé, les dates filtrées ici d'après `jour`
 (le module refuserait un filtre de date seul, ou au-delà de 5 000 photos : `resultatsRecherche`), la
 photo de `similar_to` écartée. Pertinence relative : 0 au score médian de l'index, 1 au meilleur ;
-sous `Sens.seuilPertinenceProvisoire` (0,5, **provisoire**) la photo ne sort pas. Puis `chercher`
+sous `Sens.seuilPertinenceProvisoire` (0,5, **provisoire**) la photo ne sort pas. Avec `query`, un
+plancher de score brut (cosinus) : si la meilleure photo (dans les dates) est sous
+`Sens.plancherScoreBrutProvisoire` (0,17, **provisoire** : 0,14 sans bonne photo, 0,21 à 0,29 avec,
+relevé du 2 nov. 2026), aucune photo et « Rien ne ressemble vraiment à « … » » dans `remarques` ;
+chaque photo gardée porte `score_brut` (pour le prochain relevé), le bloc `meilleur_score_brut`. Puis `chercher`
 avec `parmi` par tranches de `Sens.candidatsMax` (5 000, MAX_TRI du module) dans l'ordre de
 pertinence, jusqu'à remplir la page (`offset` et `limit` comptés à travers les tranches), au plus
 `Sens.tranchesMax` (10, **provisoire**) : une collection ou un mot-clé qui ne gardent que des photos

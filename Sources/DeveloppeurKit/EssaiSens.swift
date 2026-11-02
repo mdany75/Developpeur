@@ -159,6 +159,7 @@ public final class EssaiSens {
             "ok": true, "modele": .string(encodeur.modele), "dimension": .number(Double(encodeur.dimension)),
             "photos": .number(Double(photos.count)), "indexees": .number(Double(index.nombre)), "erreurs": .array(erreurs),
             "seuil_pertinence_provisoire": .number(Sens.seuilPertinenceProvisoire),
+            "plancher_score_brut_provisoire": .number((Double(Sens.plancherScoreBrutProvisoire) * 100).rounded() / 100),
             "temps": ["encodage_ms_moyen": .number((moyenne * 10000).rounded() / 10), "encodage_ms_max": .number(((durees.max() ?? 0) * 10000).rounded() / 10),
                       "classement_ms_moyen": .number(classements.isEmpty ? 0 : (classements.reduce(0, +) / Double(classements.count) * 10).rounded() / 10)],
             "requetes": .array(resultats), "semblables": semblables, "index": .string(dossier.path),

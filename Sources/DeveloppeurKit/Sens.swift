@@ -28,6 +28,13 @@ public enum Sens {
     /// (0 : le score médian de l'index, 1 : le meilleur). PROVISOIRE : à relever par
     /// `--sens-essai` sur les photos de Dany (docs/SPEC.md, À constater).
     public static let seuilPertinenceProvisoire = 0.5
+    /// Score brut (cosinus entre la phrase et l'image) sous lequel rien ne ressemble vraiment : une
+    /// phrase (`query`) dont la meilleure photo (dans les dates demandées) reste dessous ne rend
+    /// aucune photo. La pertinence relative ne suffit pas : elle fait toujours passer la meilleure.
+    /// Relevé du 2 nov. 2026 (196 photos, docs/SPEC.md) : meilleur score 0,14 sans aucune bonne photo
+    /// (« a sunset »), 0,21 à 0,29 quand il y en a. Provisoire, à fixer au prochain relevé.
+    /// Pas pour `similar_to` (image contre image : d'autres valeurs).
+    public static let plancherScoreBrutProvisoire: Float = 0.17
     /// Les photos les mieux classées qui passent au module pour les autres critères (MAX_TRI du module,
     /// au-delà duquel il refuse de filtrer après coup les dates, la focale ou les copies).
     public static let candidatsMax = 5000
