@@ -76,7 +76,7 @@ oiseau	Pigeon à couronne blanche	Patagioenas leucocephala
 oiseau	Tourterelle turque	Streptopelia decaocto
 oiseau	Colombe inca	Columbina inca
 oiseau	Colombe à queue noire	Columbina passerina
-oiseau	Colombe à ailes blanches	Zenaida asiatica
+oiseau	Tourterelle à ailes blanches	Zenaida asiatica
 oiseau	Tourterelle triste	Zenaida macroura
 oiseau	Géocoucou de Californie	Geococcyx californianus
 oiseau	Coulicou à bec jaune	Coccyzus americanus
@@ -259,7 +259,7 @@ oiseau	Milan du Mississippi	Ictinia mississippiensis
 oiseau	Busard d'Amérique	Circus hudsonius
 oiseau	Épervier brun	Accipiter striatus
 oiseau	Épervier de Cooper	Astur cooperii
-oiseau	Autour des palombes	Astur atricapillus
+oiseau	Autour d'Amérique	Astur atricapillus
 oiseau	Pygargue à tête blanche	Haliaeetus leucocephalus
 oiseau	Buse à épaulettes	Buteo lineatus
 oiseau	Petite Buse	Buteo platypterus
@@ -335,7 +335,7 @@ oiseau	Moucherolle à ventre roux	Sayornis saya
 oiseau	Moucherolle vermillon	Pyrocephalus rubinus
 oiseau	Tyran à gorge cendrée	Myiarchus cinerascens
 oiseau	Tyran huppé	Myiarchus crinitus
-oiseau	Tyran à queue rousse	Myiarchus tyrannulus
+oiseau	Tyran de Wied	Myiarchus tyrannulus
 oiseau	Tyran quiquivi	Pitangus sulphuratus
 oiseau	Tyran mélancolique	Tyrannus melancholicus
 oiseau	Tyran de Cassin	Tyrannus vociferans
@@ -355,11 +355,11 @@ oiseau	Viréo de Philadelphie	Vireo philadelphicus
 oiseau	Viréo mélodieux	Vireo gilvus
 oiseau	Viréo aux yeux rouges	Vireo olivaceus
 oiseau	Mésangeai du Canada	Perisoreus canadensis
-oiseau	Geai vert	Psilorhinus morio
-oiseau	Geai acahé	Cyanocorax yncas
+oiseau	Geai enfumé	Psilorhinus morio
+oiseau	Geai vert	Cyanocorax yncas
 oiseau	Geai de Steller	Cyanocitta stelleri
 oiseau	Geai bleu	Cyanocitta cristata
-oiseau	Geai à gorge blanche	Aphelocoma californica
+oiseau	Geai buissonnier	Aphelocoma californica
 oiseau	Geai de Floride	Aphelocoma coerulescens
 oiseau	Geai du Mexique	Aphelocoma wollweberi
 oiseau	Geai des pinèdes	Gymnorhinus cyanocephalus
@@ -437,7 +437,7 @@ oiseau	Pipit d'Amérique	Anthus rubescens
 oiseau	Pipit de Sprague	Anthus spragueii
 oiseau	Gros-bec errant	Coccothraustes vespertinus
 oiseau	Durbec des sapins	Pinicola enucleator
-oiseau	Roselin gris	Leucosticte tephrocotis
+oiseau	Roselin à tête grise	Leucosticte tephrocotis
 oiseau	Roselin familier	Haemorhous mexicanus
 oiseau	Roselin pourpré	Haemorhous purpureus
 oiseau	Roselin de Cassin	Haemorhous cassinii
@@ -634,7 +634,7 @@ oiseau	Milan noir	Milvus migrans
 oiseau	Busard des roseaux	Circus aeruginosus
 oiseau	Busard Saint-Martin	Circus cyaneus
 oiseau	Épervier d'Europe	Accipiter nisus
-oiseau	Autour d'Europe	Astur gentilis
+oiseau	Autour des palombes	Astur gentilis
 oiseau	Buse variable	Buteo buteo
 oiseau	Aigle botté	Hieraaetus pennatus
 oiseau	Circaète Jean-le-Blanc	Circaetus gallicus
@@ -769,22 +769,22 @@ oiseau	Élénie siffleuse	Elaenia martinica
 oiseau	Tourterelle à queue carrée	Zenaida aurita
 oiseau	Colombe rouviolette	Geotrygon montana
 oiseau	Pic de la Guadeloupe	Melanerpes herminieri
-oiseau	Pic des Antilles	Melanerpes superciliaris
+oiseau	Pic à sourcils noirs	Melanerpes superciliaris
 oiseau	Pic de Hoffmann	Melanerpes hoffmannii
 oiseau	Pic du Yucatan	Melanerpes pygmaeus
 oiseau	Tangara évêque	Thraupis episcopus
 oiseau	Tangara des palmiers	Thraupis palmarum
-oiseau	Tangara à tête baie	Tangara gyrola
+oiseau	Calliste rouverdin	Tangara gyrola
 oiseau	Tangara à croupion rouge	Ramphocelus passerinii
-oiseau	Tangara à ventre rouge	Ramphocelus dimidiatus
-oiseau	Calliste à galons rouges	Tangara arthus
+oiseau	Tangara à dos rouge	Ramphocelus dimidiatus
+oiseau	Calliste doré	Tangara arthus
 oiseau	Calliste septicolore	Tangara chilensis
 oiseau	Guit-guit saï	Cyanerpes cyaneus
 oiseau	Guit-guit émeraude	Chlorophanes spiza
 oiseau	Organiste louis-d'or	Euphonia violacea
 oiseau	Chlorospin des buissons	Chlorospingus flavopectus
 oiseau	Saltator gris	Saltator coerulescens
-oiseau	Oropendola de Montezuma	Psarocolius montezuma
+oiseau	Cassique de Montezuma	Psarocolius montezuma
 oiseau	Cassique à dos jaune	Cacicus cela
 oiseau	Oriole troupiale	Icterus icterus
 oiseau	Oriole à dos rayé	Icterus pustulatus
@@ -813,10 +813,10 @@ oiseau	Ara chloroptère	Ara chloropterus
 oiseau	Ara bleu	Ara ararauna
 oiseau	Ara militaire	Ara militaris
 oiseau	Amazone à front blanc	Amazona albifrons
-oiseau	Amazone à front rouge	Amazona autumnalis
+oiseau	Amazone à lores rouges	Amazona autumnalis
 oiseau	Amazone de Cuba	Amazona leucocephala
 oiseau	Amazone à tête jaune	Amazona oratrix
-oiseau	Conure à front orange	Eupsittula canicularis
+oiseau	Conure à front rouge	Eupsittula canicularis
 oiseau	Conure aztèque	Eupsittula nana
 oiseau	Conure verte	Psittacara holochlorus
 oiseau	Pione à couronne blanche	Pionus senilis
@@ -864,7 +864,7 @@ oiseau	Cormoran aptère	Nannopterum harrisi
 oiseau	Condor des Andes	Vultur gryphus
 oiseau	Autruche d'Afrique	Struthio camelus
 oiseau	Pintade de Numidie	Numida meleagris
-oiseau	Francolin à cou roux	Pternistis afer
+oiseau	Francolin à gorge rouge	Pternistis afer
 oiseau	Francolin de Swainson	Pternistis swainsonii
 oiseau	Outarde kori	Ardeotis kori
 oiseau	Grue royale	Balearica regulorum
@@ -875,7 +875,7 @@ oiseau	Calao à bec rouge	Tockus erythrorhynchus
 oiseau	Calao leucomèle	Tockus leucomelas
 oiseau	Calao trompette	Bycanistes bucinator
 oiseau	Rollier à longs brins	Coracias caudatus
-oiseau	Guêpier écarlate	Merops nubicoides
+oiseau	Guêpier carmin	Merops nubicoides
 oiseau	Guêpier nain	Merops pusillus
 oiseau	Guêpier à front blanc	Merops bullockoides
 oiseau	Martin-pêcheur pie	Ceryle rudis
@@ -1246,7 +1246,7 @@ mammifère	Lama	Lama glama
 mammifère	Alpaga	Vicugna pacos
 mammifère	Vigogne	Vicugna vicugna
 mammifère	Guanaco	Lama guanicoe
-mammifère	Paresseux à trois doigts	Bradypus variegatus
+mammifère	Paresseux à gorge brune	Bradypus variegatus
 mammifère	Paresseux à deux doigts d'Hoffmann	Choloepus hoffmanni
 mammifère	Grand fourmilier	Myrmecophaga tridactyla
 mammifère	Tamandua du Mexique	Tamandua mexicana
@@ -1571,8 +1571,8 @@ poisson	Poisson-lune	Mola mola
 poisson	Hippocampe moucheté	Hippocampus guttulatus
 poisson	Hippocampe rayé	Hippocampus erectus
 poisson	Dragon de mer feuillu	Phycodurus eques
-poisson	Poisson-clown à trois bandes	Amphiprion percula
-poisson	Poisson-clown à bande blanche	Amphiprion ocellaris
+poisson	Poisson-clown orange	Amphiprion percula
+poisson	Poisson-clown à trois bandes	Amphiprion ocellaris
 poisson	Chirurgien bleu	Paracanthurus hepatus
 poisson	Chirurgien jaune	Zebrasoma flavescens
 poisson	Chirurgien à poitrine blanche	Acanthurus leucosternon
@@ -1718,7 +1718,7 @@ papillon	Papillon hibou	Caligo memnon
 papillon	Papillon de verre	Greta oto
 papillon	Papillon 88	Diaethria anna
 papillon	Papillon malachite	Siproeta stelenes
-papillon	Mars changeant	Apatura iris
+papillon	Grand Mars changeant	Apatura iris
 papillon	Petit Mars changeant	Apatura ilia
 papillon	Grand Sylvain	Limenitis populi
 papillon	Petit Sylvain	Limenitis camilla
@@ -1733,7 +1733,7 @@ papillon	Flambé	Iphiclides podalirius
 papillon	Apollon	Parnassius apollo
 papillon	Diane	Zerynthia polyxena
 papillon	Piéride du navet	Pieris napi
-papillon	Piéride de la rave	Pieris brassicae
+papillon	Grande Piéride du chou	Pieris brassicae
 papillon	Gazé	Aporia crataegi
 papillon	Aurore	Anthocharis cardamines
 papillon	Citron	Gonepteryx rhamni
@@ -1776,7 +1776,7 @@ papillon	Sphinx bourdon	Hemaris thysbe
 papillon	Sphinx tête-de-mort	Acherontia atropos
 papillon	Sphinx du laurier-rose	Daphnis nerii
 papillon	Sphinx du tilleul	Mimas tiliae
-papillon	Moro-sphinx de la vigne	Deilephila elpenor
+papillon	Grand Sphinx de la vigne	Deilephila elpenor
 papillon	Écaille martre	Arctia caja
 papillon	Écaille chinée	Euplagia quadripunctaria
 papillon	Écaille isabelle	Pyrrharctia isabella
@@ -1869,7 +1869,7 @@ insecte	Courtilière commune	Gryllotalpa gryllotalpa
 insecte	Perce-oreille européen	Forficula auricularia
 insecte	Blatte germanique	Blattella germanica
 insecte	Blatte américaine	Periplaneta americana
-insecte	Termite subterranéen de l'Est	Reticulitermes flavipes
+insecte	Termite souterrain de l'Est	Reticulitermes flavipes
 insecte	Libellule déprimée	Libellula depressa
 insecte	Libellule à quatre taches	Libellula quadrimaculata
 insecte	Libellule gracieuse	Libellula pulchella
@@ -2303,7 +2303,7 @@ fleur	Coronille bigarrée	Securigera varia
 fleur	Baptisie australe	Baptisia australis
 fleur	Apios d'Amérique	Apios americana
 fleur	Desmodie du Canada	Desmodium canadense
-fleur	Pois de senteur sauvage	Lathyrus sylvestris
+fleur	Gesse des bois	Lathyrus sylvestris
 fleur	Carotte sauvage	Daucus carota
 fleur	Berce laineuse	Heracleum maximum
 fleur	Berce du Caucase	Heracleum mantegazzianum
@@ -2425,7 +2425,7 @@ fleur	Asphodèle blanc	Asphodelus albus
 fleur	Glaïeul des moissons	Gladiolus italicus
 fleur	Anémone sylvie	Anemone nemorosa
 fleur	Anémone pulsatille	Pulsatilla vulgaris
-fleur	Bouton d'or	Ranunculus bulbosus
+fleur	Renoncule bulbeuse	Ranunculus bulbosus
 fleur	Adonis d'été	Adonis aestivalis
 fleur	Nigelle de Damas	Nigella damascena
 fleur	Ancolie commune	Aquilegia vulgaris
@@ -2502,7 +2502,7 @@ plante	Herbe de la pampa	Cortaderia selloana
 fleur	Sénevé blanc	Sinapis alba
 fleur	Coquelicot douteux	Papaver dubium
 fleur	Bleuet de montagne	Centaurea montana
-fleur	Œillet sauvage	Dianthus armeria
+fleur	Œillet arméria	Dianthus armeria
 fleur	Rose trémière	Alcea rosea
 fleur	Rose de Damas	Rosa damascena
 fleur	Rosier rugueux	Rosa rugosa
@@ -2555,29 +2555,29 @@ fleur	Bergénia à feuilles cordées	Bergenia cordifolia
 fleur	Brunnera à grandes feuilles	Brunnera macrophylla
 fleur	Pulmonaire à feuilles étroites	Pulmonaria angustifolia
 fleur	Lamier maculé	Lamium maculatum
-fleur	Alchémille commune	Alchemilla mollis
+fleur	Alchémille molle	Alchemilla mollis
 fleur	Géranium vivace	Geranium × magnificum
 fleur	Népéta de Faassen	Nepeta × faassenii
 fleur	Sauge des bois	Salvia nemorosa
 fleur	Sauge splendide	Salvia splendens
 fleur	Sauge farineuse	Salvia farinacea
 fleur	Sauge ananas	Salvia elegans
-fleur	Sauge de Graham	Salvia greggii
+fleur	Sauge de Gregg	Salvia greggii
 fleur	Sauge officinale	Salvia officinalis
 fleur	Lavande dentée	Lavandula dentata
 fleur	Lavandin	Lavandula × intermedia
 fleur	Pérovskia	Salvia yangii
 fleur	Monarde hybride	Monarda × media
 fleur	Épiaire laineuse	Stachys byzantina
-fleur	Phlox des jardins	Phlox drummondii
+fleur	Phlox de Drummond	Phlox drummondii
 fleur	Campanule des Carpates	Campanula carpatica
 fleur	Campanule à grosses fleurs	Platycodon grandiflorus
-fleur	Campanule à fleurs de pêcher	Campanula persicifolia
+fleur	Campanule à feuilles de pêcher	Campanula persicifolia
 fleur	Œillet des fleuristes	Dianthus caryophyllus
 fleur	Œillet de poète	Dianthus barbatus
 fleur	Œillet mignardise	Dianthus plumarius
 fleur	Gypsophile paniculée	Gypsophila paniculata
-fleur	Coquelourde rose	Lychnis chalcedonica
+fleur	Croix de Malte	Lychnis chalcedonica
 fleur	Pavot d'Orient	Papaver orientale
 fleur	Pavot bleu de l'Himalaya	Meconopsis betonicifolia
 fleur	Iris barbu	Iris × germanica
@@ -2626,9 +2626,8 @@ fleur	Hélénie hybride	Helenium × hybridum
 fleur	Achillée filipendule	Achillea filipendulina
 fleur	Immortelle à bractées	Xerochrysum bracteatum
 fleur	Ageratum du Mexique	Ageratum houstonianum
-fleur	Centaurée des montagnes	Centaurea dealbata
+fleur	Centaurée de Perse	Centaurea dealbata
 fleur	Echinops	Echinops ritro
-fleur	Bleuet vivace	Cyanus montanus
 fleur	Pétunia	Petunia × atkinsiana
 fleur	Calibrachoa	Calibrachoa parviflora
 fleur	Tabac d'ornement	Nicotiana alata
@@ -2636,7 +2635,7 @@ fleur	Muflier	Antirrhinum majus
 fleur	Nemesia	Nemesia strumosa
 fleur	Torenia	Torenia fournieri
 fleur	Lobélie érine	Lobelia erinus
-fleur	Impatiente de Walléria	Impatiens walleriana
+fleur	Impatiente de Waller	Impatiens walleriana
 fleur	Impatiente de Nouvelle-Guinée	Impatiens hawkeri
 fleur	Balsamine des jardins	Impatiens balsamina
 fleur	Pensée des jardins	Viola × wittrockiana
@@ -2664,7 +2663,7 @@ fleur	Ibéris toujours vert	Iberis sempervirens
 fleur	Aubriète	Aubrieta deltoidea
 fleur	Corbeille-d'argent	Arabis caucasica
 fleur	Corbeille d'or	Aurinia saxatilis
-fleur	Œillet d'Espagne	Dianthus chinensis
+fleur	Œillet de Chine	Dianthus chinensis
 fleur	Coréopsis verticillé	Coreopsis verticillata
 fleur	Gaillarde hybride	Gaillardia × grandiflora
 fleur	Kniphofia	Kniphofia uvaria
@@ -2672,7 +2671,7 @@ fleur	Eremurus	Eremurus robustus
 fleur	Lis des Incas	Alstroemeria aurea
 fleur	Amour en cage	Alkekengi officinarum
 fleur	Monnaie-du-pape	Lunaria annua
-fleur	Rose de Noël	Helleborus × hybridus
+fleur	Rose de carême	Helleborus × hybridus
 fleur	Primevère des jardins	Primula × polyantha
 fleur	Primevère denticulée	Primula denticulata
 fleur	Primevère du Japon	Primula japonica
@@ -2728,7 +2727,7 @@ fleur	Hoya	Hoya carnosa
 fleur	Jacinthe des bois espagnole	Hyacinthoides hispanica
 fleur	Nénuphar rustique	Nymphaea × marliacea
 fleur	Lotus bleu	Nymphaea caerulea
-fleur	Iris d'eau	Iris laevigata
+fleur	Iris lisse	Iris laevigata
 plante	Fougère-à-l'autruche	Matteuccia struthiopteris
 plante	Osmonde royale	Osmunda regalis
 plante	Osmonde cannelle	Osmundastrum cinnamomeum
@@ -3227,7 +3226,7 @@ arbuste	Callicarpe	Callicarpa bodinieri
 arbuste	Caryoptéris	Caryopteris × clandonensis
 arbuste	Vitex	Vitex agnus-castus
 arbuste	Hibiscus de Syrie	Hibiscus syriacus
-arbuste	Mauve en arbre	Lavatera thuringiaca
+fleur	Lavatère de Thuringe	Lavatera thuringiaca
 arbuste	Abutilon	Callianthe megapotamica
 arbuste	Chèvrefeuille de Tartarie	Lonicera tatarica
 arbuste	Chèvrefeuille du Canada	Lonicera canadensis
@@ -3275,7 +3274,7 @@ arbuste	Bouleau nain	Betula nana
 arbuste	Aulne crispé	Alnus alnobetula
 arbuste	Myrte commun	Myrtus communis
 arbuste	Callistemon	Melaleuca citrina
-arbuste	Grevillea	Grevillea robusta
+arbre	Chêne soyeux d'Australie	Grevillea robusta
 arbuste	Leptospermum	Leptospermum scoparium
 arbuste	Hébé	Veronica speciosa
 arbuste	Pittosporum	Pittosporum tobira
@@ -3336,7 +3335,7 @@ champignon	Fausse morille	Gyromitra esculenta
 champignon	Helvelle crépue	Helvella crispa
 champignon	Pézize orangée	Aleuria aurantia
 champignon	Pézize écarlate	Sarcoscypha coccinea
-champignon	Pézize écarlate d'Amérique	Sarcoscypha austriaca
+champignon	Pézize d'Autriche	Sarcoscypha austriaca
 champignon	Truffe noire	Tuber melanosporum
 champignon	Truffe blanche d'Alba	Tuber magnatum
 champignon	Pleurote en huître	Pleurotus ostreatus
@@ -3347,7 +3346,7 @@ champignon	Champignon de Paris	Agaricus bisporus
 champignon	Rosé des prés	Agaricus campestris
 champignon	Agaric des bois	Agaricus sylvicola
 champignon	Agaric jaunissant	Agaricus xanthodermus
-champignon	Agaric champêtre géant	Agaricus augustus
+champignon	Agaric auguste	Agaricus augustus
 champignon	Coprin chevelu	Coprinus comatus
 champignon	Coprin noir d'encre	Coprinopsis atramentaria
 champignon	Coprin micacé	Coprinellus micaceus
@@ -3422,7 +3421,7 @@ champignon	Schizophylle commun	Schizophyllum commune
 champignon	Chaga	Inonotus obliquus
 champignon	Oreille de Judas	Auricularia auricula-judae
 champignon	Trémelle mésentérique	Tremella mesenterica
-champignon	Trémelle en fuseau	Calocera viscosa
+champignon	Calocère visqueuse	Calocera viscosa
 champignon	Phallus impudique	Phallus impudicus
 champignon	Satyre des chiens	Mutinus caninus
 champignon	Clathre rouge	Clathrus ruber
@@ -3444,18 +3443,18 @@ champignon	Volvaire soyeuse	Volvariella bombycina
 champignon	Entolome livide	Entoloma sinuatum
 champignon	Lait de loup	Lycogala epidendrum
 champignon	Fleur de tan	Fuligo septica
-oiseau	Grand Géocoucou	Geococcyx velox
+oiseau	Géocoucou véloce	Geococcyx velox
 oiseau	Colibri de Mulsant	Chaetocercus mulsant
 oiseau	Colibri à oreilles blanches	Basilinna leucotis
 oiseau	Viréo à moustaches	Vireo altiloquus
-oiseau	Paruline à gorge jaune des Bahamas	Setophaga flavescens
-oiseau	Tangara de Cabanis	Tangara cabanisi
-oiseau	Tangara à cinq couleurs	Tangara cyanicollis
+oiseau	Paruline des Bahamas	Setophaga flavescens
+oiseau	Calliste azuré	Tangara cabanisi
+oiseau	Calliste à cou bleu	Tangara cyanicollis
 oiseau	Pic ouentou	Dryocopus lineatus
 oiseau	Pic à bec ivoire	Campephilus principalis
-oiseau	Tyran pirate de Cuba	Tyrannus cubensis
+oiseau	Tyran de Cuba	Tyrannus cubensis
 oiseau	Coulicou manioc	Coccyzus minor
-oiseau	Engoulevent à collier roux	Antrostomus ridgwayi
+oiseau	Engoulevent de Ridgway	Antrostomus ridgwayi
 oiseau	Martinet à collier blanc	Streptoprocne zonaris
 oiseau	Busard pâle	Circus macrourus
 oiseau	Aigle impérial	Aquila heliaca
@@ -3525,10 +3524,10 @@ oiseau	Râle des genêts	Crex crex
 oiseau	Grue demoiselle	Grus virgo
 oiseau	Flamant du Chili	Phoenicopterus chilensis
 oiseau	Cigogne épiscopale	Ciconia episcopus
-oiseau	Héron crabier	Ardeola grayii
+oiseau	Crabier de Gray	Ardeola grayii
 oiseau	Aigrette intermédiaire	Ardea intermedia
 oiseau	Pélican gris	Pelecanus rufescens
-oiseau	Dendrocygne à lunules	Dendrocygna eytoni
+oiseau	Dendrocygne d'Eyton	Dendrocygna eytoni
 oiseau	Canard à bosse	Sarkidiornis melanotos
 oiseau	Sarcelle hottentote	Spatula hottentota
 oiseau	Canard à bec rouge	Anas erythrorhyncha
@@ -3538,8 +3537,8 @@ oiseau	Martin-pêcheur azuré	Ceyx azureus
 oiseau	Guêpier de Perse	Merops persicus
 oiseau	Guêpier à gorge rouge	Merops bulocki
 oiseau	Barbican à collier	Lybius torquatus
-oiseau	Calao longibande	Bycanistes subcylindricus
-oiseau	Souimanga à longue queue	Nectarinia johnstoni
+oiseau	Calao à joues grises	Bycanistes subcylindricus
+oiseau	Souimanga de Johnston	Nectarinia johnstoni
 oiseau	Moineau doré	Passer luteus
 oiseau	Moineau gris	Passer griseus
 oiseau	Tisserin baya	Ploceus philippinus
@@ -3599,7 +3598,7 @@ oiseau	Colibri géant	Patagona gigas
 oiseau	Toucan à bec rouge	Ramphastos tucanus
 oiseau	Ara hyacinthe	Anodorhynchus hyacinthinus
 oiseau	Pénélope à front noir	Penelope obscura
-oiseau	Picumne à tête ocellée	Picumnus temminckii
+oiseau	Picumne de Temminck	Picumnus temminckii
 oiseau	Fournier roux	Furnarius rufus
 oiseau	Tyran des savanes	Tyrannus savana
 oiseau	Moqueur à long bec	Mimus longicaudatus
@@ -3653,7 +3652,7 @@ mammifère	Tarsier des Philippines	Carlito syrichta
 mammifère	Loris lent	Nycticebus coucang
 mammifère	Langur de Hanuman	Semnopithecus entellus
 mammifère	Macaque à bonnet	Macaca radiata
-mammifère	Macaque crabier noir	Macaca nigra
+mammifère	Macaque à crête	Macaca nigra
 mammifère	Rhinopithèque de Roxellane	Rhinopithecus roxellana
 mammifère	Siamang	Symphalangus syndactylus
 mammifère	Panthère nébuleuse	Neofelis nebulosa
@@ -3772,7 +3771,7 @@ papillon	Papillon tigré à deux queues	Papilio multicaudata
 papillon	Papillon zébré africain	Graphium policenes
 papillon	Machaon du Japon	Papilio xuthus
 papillon	Papillon de Corse	Papilio hospiton
-papillon	Thaïs	Zerynthia rumina
+papillon	Proserpine	Zerynthia rumina
 papillon	Semi-Apollon	Parnassius mnemosyne
 papillon	Piéride du lotier	Leptidea sinapis
 papillon	Fluoré	Colias alfacariensis
@@ -3815,10 +3814,10 @@ fleur	Orchis à feuille ronde	Galearis rotundifolia
 fleur	Cypripède blanc	Cypripedium candidum
 fleur	Iris de Virginie	Iris virginica
 fleur	Hélianthe divariqué	Helianthus divaricatus
-fleur	Rudbeckie pourpre des prairies	Echinacea angustifolia
+fleur	Échinacée à feuilles étroites	Echinacea angustifolia
 fleur	Vergerette du Canada	Erigeron canadensis
 fleur	Chicorée des Alpes	Cicerbita alpina
-fleur	Grande gentiane	Gentiana purpurea
+fleur	Gentiane pourpre	Gentiana purpurea
 fleur	Gentiane croisette	Gentiana cruciata
 fleur	Orchis vanillé	Gymnadenia rhellicani
 fleur	Ophrys bécasse	Ophrys scolopax
@@ -3833,9 +3832,9 @@ fleur	Lis maritime	Pancratium maritimum
 fleur	Liseron de mer	Calystegia soldanella
 fleur	Giroflée des dunes	Matthiola sinuata
 fleur	Silène de France	Silene gallica
-fleur	Bourrache de Crète	Borago pygmaea
+fleur	Bourrache pygmée	Borago pygmaea
 fleur	Iris de Dalmatie	Iris pallida
-fleur	Iris jaune bâtard	Iris graminea
+fleur	Iris à feuilles de graminée	Iris graminea
 fleur	Asphodèle fistuleux	Asphodelus fistulosus
 fleur	Narcisse jonquille	Narcissus jonquilla
 fleur	Armérie maritime	Armeria maritima
@@ -3862,7 +3861,6 @@ fleur	Iris du Japon sauvage	Iris japonica
 fleur	Lis araignée	Lycoris radiata
 fleur	Pavot bleu du Tibet	Meconopsis grandis
 fleur	Primevère malacoïde	Primula malacoides
-fleur	Protée à fleur de roi	Protea neriifolia
 fleur	Strelitzia blanc	Strelitzia nicolai
 fleur	Marguerite de Namaqualand	Dimorphotheca sinuata
 fleur	Ixia	Ixia viridiflora
@@ -3920,7 +3918,7 @@ champignon	Hydne imbriqué	Sarcodon imbricatus
 champignon	Hygrophore des prés	Cuphophyllus pratensis
 champignon	Mycène rose	Mycena rosea
 champignon	Strophaire semi-globuleux	Protostropharia semiglobata
-champignon	Bolet à pied orange	Leccinum versipelle
+champignon	Bolet changeant	Leccinum versipelle
 champignon	Bolet radicant	Caloboletus radicans
 champignon	Bolet indigotier	Gyroporus cyanescens
 champignon	Pholiote du peuplier	Cyclocybe cylindracea
@@ -3928,7 +3926,7 @@ champignon	Pleurote du peuplier	Pleurotus populinus
 champignon	Gyromitre géant	Gyromitra gigas
 champignon	Pézize veinée	Disciotis venosa
 champignon	Langue de chat	Pseudohydnum gelatinosum
-champignon	Calocère visqueuse	Calocera cornea
+champignon	Calocère cornée	Calocera cornea
 champignon	Phallus indusié	Phallus indusiatus
 champignon	Aséroé rouge	Aseroe rubra
 champignon	Vesse-de-loup hérissée	Lycoperdon echinatum

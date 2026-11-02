@@ -8313,7 +8313,7 @@ vérifié par `Tests/Contrats/jetons-bioclip.json` (le script le compare aux jet
 réécrit qu'avec `BIOCLIP_CONTRAT=1`).
 `EncodeurMobileCLIP` sert aux deux modèles (nom `Especes.nomModele` pour BioCLIP).
 
-**Liste.** `Resources/especes/especes.tsv` : « Amérique du Nord et voyages », 3 928 espèces (groupe,
+**Liste.** `Resources/especes/especes.tsv` : « Amérique du Nord et voyages », 3 926 espèces (groupe,
 nom français courant, nom scientifique), relue le 2 nov. 2026 (noms douteux retirés plutôt que
 devinés ; pas de cultivar) ; oiseaux 1 137, fleurs 756, mammifères 421, arbres 324, insectes 188,
 champignons 163, papillons 162, plantes 160, poissons 158, arbustes 152, reptiles 130, invertébrés
@@ -8379,8 +8379,24 @@ BioCLIP le reconnaissait (0,44). Une fleur de dessin ou une feuille seule resten
 2. **`find_photos` avec `species` dans Lightroom** (Essais ou un dossier choisi avec Dany) : le temps
    de 200 vignettes de 512 px et de leur classement doit tenir sous les 50 s d'un appel (sinon
    abaisser `Especes.candidatsMax`) ; un groupe (« oiseau ») et une espèce (« Cardinal rouge »).
+   **Constaté le 2 novembre 2026** (1.6.3 installée, connecteur en release, tout le catalogue, lecture
+   seule) : « oiseau », 200 vignettes examinées en 12,6 s (appel entier) ; Grue du Japon, Ara
+   chloroptère, Hirondelle bicolore (DSCF2611, 150-600 mm), Marabout d'Afrique, Goéland à bec cerclé,
+   tous à 0,95 ou plus ; vérifiés à l'œil : l'hirondelle bicolore et le marabout sont justes.
+   « fleur » : 200 examinées en 12,5 s, 108 trouvées (Pourpier à grandes fleurs, Campanule à feuilles
+   de pêcher, Pavot d'Orient, Rose d'Inde, Renoncule âcre) ; la campanule vérifiée à l'œil, juste.
+   « cardinal rouge » : 0 en 12,2 s (aucun parmi les 200 candidates). `view_photo` avec `species` :
+   « lu_sur » carré central, porte ouverte. Le temps tient donc largement sous les 50 s. Reste
+   ouvert : une espèce précise sur une photo que Dany sait la contenir.
 3. **Après `./build.sh --install`** : `--preparer-especes` sous le runtime durci (`depuis_le_cache`,
-   `ouverture_s`), et `get_status` › `especes` › `installee`.
+   `ouverture_s`), et `get_status` › `especes` › `installee`. **Constaté le 2 novembre 2026** : sous
+   le runtime durci, 3 928 espèces, vecteurs refaits (`depuis_le_cache` false, la liste venant de
+   changer), `ouverture_s` 8,6. **Liste relue le 2 novembre 2026** (après ce constat : « Campanule à fleurs de pêcher » donné
+   pour *Campanula persicifolia*) : huit relecteurs par tranches, chaque correction contre-vérifiée
+   (Avibase et CINFO, VASCAN, INPN, Wikipédia FR, GBIF) ; 62 noms français corrigés (surtout des
+   oiseaux des voyages traduits de l'anglais : Geai vert, Autour d'Amérique, Tyran de Wied…), un
+   doublon retiré (*Cyanus montanus*, même taxon que *Centaurea montana*) et un nom faux sans
+   remplaçant sûr retiré (*Protea neriifolia*) : 3 926 espèces.
 
 ## Relevé des seuils provisoires (1.6)
 

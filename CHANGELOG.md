@@ -11,7 +11,7 @@ tout de suite un masque que Lightroom n'a pas gardé tel qu'écrit, et trie les 
   `species` (un nom en français ou en latin, ou un groupe : oiseau, mammifère, papillon, fleur,
   arbre, champignon, animal, plante…), combiné aux autres critères ; « quel est cet oiseau ? » :
   `view_photo` avec `species`, sur le carré central de la photo (la réponse le dit : un sujet près
-  d'un bord se juge sur un zoom) ou sur un zoom. La liste compte 3 928 espèces
+  d'un bord se juge sur un zoom) ou sur un zoom. La liste compte 3 926 espèces
   d'Amérique du Nord et des voyages les plus photographiés (Europe, Caraïbes, Mexique, Amérique du
   Sud, safari, Asie, Océanie), chacune avec son nom français et son nom scientifique. Tout se calcule
   sur votre Mac (BioCLIP 2, licence MIT ; MobileCLIP vérifie d'abord que la photo montre bien un
