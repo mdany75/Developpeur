@@ -54,6 +54,8 @@ A.remiseAZero('Carnet')
 -- Etapes (avant/après de chaque étape, 1.3) : remis à zéro dès qu'il existe et qu'il est chargé,
 -- par son oublier.
 A.remiseAZero('Etapes')
+-- Progression : plus de commande suivie ni de barre (Progression.oublier).
+A.remiseAZero('Progression', function(module) module.oublier() end)
 
 -- Remet tout à zéro : la simulation, la liaison, puis chaque module à registre chargé.
 function A.remettre()

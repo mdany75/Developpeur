@@ -6,6 +6,8 @@
 --   commande → {"id": 7, "jeton": "<64 chiffres hexadécimaux>", "command": "apercu", "params": {…}}
 --   réponse  ← {"id": 7, "result": {…}}  ou  {"id": 7, "error": "message"}
 --   refus    ← {"id": 7, "error": "Liaison fermée : …", "code": "jeton"}
+--   arrêt    ← {"id": 7, "error": "Arrêtée par l'utilisateur …", "code": "arret"} (croix de la barre
+--              d'une commande longue, Progression.lua)
 -- Le serveur ouvre une connexion par commande puis la ferme : plusieurs sessions de Claude
 -- (Claude Desktop, Claude Code) peuvent ainsi se succéder.
 --
@@ -441,18 +443,39 @@ local function traiter(requete)
     -- Avant/après des étapes (1.3) : la commande attend une capture en cours, et l'avant d'une
     -- étape se prépare ; l'après se rend une fois la réponse partie. Aucune erreur de ces
     -- crochets n'atteint la commande.
+    -- Barre d'une commande longue et sa croix (Progression.debutCommande) : suivie de l'avant de
+    -- l'étape jusqu'à la fin de la commande ; une croix cliquée pendant l'avant arrête la commande
+    -- avant qu'elle commence (point sûr).
+    local Progression = require 'Progression'
+    local suivi = Progression.debutCommande(requete.command)
     local prete, cle = LrTasks.pcall(Etapes.avantCommande, requete.command, params)
     cle = prete and cle or nil
-    local ok, resultat = LrTasks.pcall(Commandes.executer, requete.command, params)
+    local ok, resultat = LrTasks.pcall(function()
+        if suivi then
+            Progression.pointSur()
+        end
+        return Commandes.executer(requete.command, params)
+    end)
+    local arret = suivi ~= nil and suivi.arret == true
+    Progression.finCommande(suivi)
     if ok then
+        -- La croix arrivée après le dernier point sûr : la commande est faite, la réponse le dit.
+        if arret and type(resultat) == 'table' then
+            resultat.arret_demande = Progression.ARRET_TARDIF
+            Liaison.noter("Arrêt demandé trop tard : « " .. Progression.nomLisible(requete.command) .. " » faite en entier")
+        end
         Liaison.repondre({ id = requete.id, result = resultat })
         LrTasks.pcall(Etapes.apresCommande, requete.command, params, resultat, cle)
     else
         local texte = Liaison.messageErreur(resultat)
-        if requete.command ~= 'ping' and texte:sub(1, #Liaison.EN_ATTENTE) ~= Liaison.EN_ATTENTE then
+        -- Arrêt par la croix : code 'arret', que le serveur rend tel quel à Claude, sans le rejouer.
+        local code = (arret and Progression.estArret(texte)) and 'arret' or nil
+        if code then
+            Liaison.noter("Arrêtée par l'utilisateur : « " .. Progression.nomLisible(requete.command) .. " »")
+        elseif requete.command ~= 'ping' and texte:sub(1, #Liaison.EN_ATTENTE) ~= Liaison.EN_ATTENTE then
             Liaison.noter("Refusé : " .. texte)
         end
-        Liaison.repondre({ id = requete.id, error = texte })
+        Liaison.repondre({ id = requete.id, error = texte, code = code })
         -- Après la réponse : abandonner peut rendre l'après d'une étape laissée en cours.
         LrTasks.pcall(Etapes.abandonner, cle)
     end

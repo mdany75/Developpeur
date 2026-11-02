@@ -16,6 +16,7 @@ local LrTasks = import 'LrTasks'
 local Json = require 'Json'
 local Liaison = require 'Liaison'
 local Photos = require 'Photos'
+local Progression = require 'Progression'
 local Reglages = require 'Reglages'
 
 local brut, decrire, photoParId = Photos.brut, Photos.decrire, Photos.photoParId
@@ -130,6 +131,8 @@ local function demanderTout(liste, taille)
         return n
     end
     while restantes() > 0 and LrDate.currentTime() - debut < Vignettes.DELAI do
+        -- Point sûr (barre d'une commande longue) : rien n'est écrit pendant cette attente.
+        Progression.pointSur()
         LrTasks.sleep(0.05)
     end
     return demandes

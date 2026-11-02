@@ -39,6 +39,8 @@ public extension LightroomServing {
 ///   commande → `{"id": 7, "jeton": "<64 chiffres hexadécimaux>", "command": "apercu", "params": {…}}`
 ///   réponse  ← `{"id": 7, "result": {…}}` ou `{"id": 7, "error": "message"}`
 ///   refus    ← `{"id": 7, "error": "Liaison fermée : …", "code": "jeton"}`
+///   arrêt    ← `{"id": 7, "error": "Arrêtée par l'utilisateur …", "code": "arret"}` (croix de la
+///              barre d'une commande longue : `CommandeArretee`, jamais reprise)
 /// Une connexion par commande, fermée aussitôt après : `LrSocket` ne sert qu'un client à la fois,
 /// et Claude Desktop comme chaque session de Claude Code lancent leur propre serveur. Entre deux
 /// connexions, le module rouvre sa prise des réponses : un refus bref est donc retenté.
@@ -303,6 +305,10 @@ public final class LightroomBridge: LightroomServing {
                 let texte = error.string ?? JSONCoding.line(error)
                 if reply["code"]?.string == "jeton" {
                     throw RefusJeton(message: texte)
+                }
+                // Arrêtée par l'utilisateur (croix de la barre « Claude » de Lightroom) : jamais reprise.
+                if reply["code"]?.string == "arret" {
+                    throw CommandeArretee(message: texte)
                 }
                 throw LightroomError.plugin(texte)
             }

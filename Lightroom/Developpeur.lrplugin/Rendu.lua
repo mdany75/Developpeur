@@ -24,6 +24,7 @@ local Photos = require 'Photos'
 local Plans = require 'Plans'
 local Preferences = require 'Preferences'
 local Profils = require 'Profils'
+local Progression = require 'Progression'
 local Recadrage = require 'Recadrage'
 local Recalage = require 'Recalage'
 local Reglages = require 'Reglages'
@@ -118,6 +119,8 @@ local function rendre(photo, taille)
     taille = math.floor(tonumber(taille) or 1568)
     local pleine = taille <= 0
     taille = math.max(256, math.min(taille, 4096))
+    -- Point sûr (barre d'une commande longue) : la croix cliquée avant le rendu, rien n'est rendu.
+    Progression.pointSur()
 
     local racine = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'Developpeur')
     local dossier = LrPathUtils.child(racine, string.format('apercu-%d-%d', photo.localIdentifier,
@@ -176,6 +179,13 @@ local function rendre(photo, taille)
     local reste = Locaux.calculsEnAttente(photo:getDevelopSettings())
     if not calcules and not reste then
         Liaison.noter("Réglages IA mis à jour pendant l'exportation")
+    end
+    -- Point sûr : la croix cliquée pendant le rendu, qu'on ne peut pas couper ; l'image rendue
+    -- n'est pas gardée (une proposition remet ensuite la photo comme avant, Rendu.essayer).
+    local continuer, arret = pcall(Progression.pointSur)
+    if not continuer then
+        LrFileUtils.delete(chemin)
+        error(arret, 0)
     end
     return chemin, not reste
 end

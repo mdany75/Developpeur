@@ -72,7 +72,7 @@ public final class Recette {
     /// jamais lire le vrai écran), d'abord la liaison fermée et l'écran nommé.
     public func lancer(raw: Int?, jpeg: Int?, flash: Int?, profondeur: Int? = nil, yeuxRouges: Int? = nil, xt20: Int? = nil,
                        portrait: Int? = nil, mixte: Int? = nil, horizon: Int? = nil) {
-        if let pont = tools.lightroom as? LightroomBridge {
+        if let pont = tools.pont as? LightroomBridge {
             sequenceLiaison(pont)
             sequenceEcran()
         }

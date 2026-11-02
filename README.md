@@ -835,6 +835,11 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   progression de Lightroom, et s'arrête proprement si vous l'interrompez (Échap dans Claude Code,
   croix de la barre dans Lightroom). Avant des centaines de photos, Claude propose une sauvegarde du
   catalogue, que Lightroom fait à sa prochaine fermeture.
+- Une commande seule qui dure plus de 3 s (un rendu, une lecture) montre aussi sa barre dans
+  Lightroom, « Claude : rendu de la photo » par exemple, avec sa croix : la commande s'arrête
+  proprement au prochain point sûr (jamais au milieu d'une écriture au catalogue ; une proposition
+  remet la photo comme avant) et Claude lit « Arrêtée par l'utilisateur… : rien d'autre n'a été
+  fait », sans rien relancer.
 - La sauvegarde dite avant une série (1.3.5) : `get_status` dit la dernière sauvegarde du catalogue
   (les dossiers datés de Backups, à côté du catalogue) et Time Machine (sa dernière sauvegarde, et si
   le volume du catalogue y est : un disque externe n'y entre que s'il est ajouté dans les options de

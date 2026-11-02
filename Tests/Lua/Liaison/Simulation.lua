@@ -2020,7 +2020,16 @@ local modules = {
         pcall = pcall,
         -- Une tâche qui attend l'utilisateur (fenêtre de choix) : S.differerTaches la garde jusqu'à
         -- l'heure S.reprendreTachesA de la simulation.
-        startAsyncTask = function(fonction)
+        -- La surveillance de la barre d'une commande longue (tâche nommée « Claude · barre de la
+        -- commande », Progression.debutCommande) ne tourne pas d'elle-même : sa boucle attendrait
+        -- la fin d'une commande qui ne commence qu'après elle. Elle est gardée dans S.surveillances,
+        -- et chaque attente du module (LrTasks.sleep) en fait un tour (Progression.surveiller),
+        -- comme la vraie tâche tous les quarts de seconde.
+        startAsyncTask = function(fonction, nom)
+            if nom == "Claude · barre de la commande" then
+                S.surveillances[#S.surveillances + 1] = fonction
+                return
+            end
             if S.differerTaches then
                 S.tachesDifferees[#S.tachesDifferees + 1] = fonction
             else
@@ -2040,6 +2049,9 @@ local modules = {
                 rendre()
             end
             S.horloge = S.horloge + (tonumber(secondes) or 0)
+            if #S.surveillances > 0 and package.loaded.Progression and not package.loaded.Progression.surveiller() then
+                S.surveillances = {}
+            end
             S.avancerAmeliorations()
             for _, photo in pairs(S.photos) do
                 resoudreProfil(photo)
@@ -2281,6 +2293,19 @@ local modules = {
                             if S.renduImpossible then
                                 return false, S.renduImpossible
                             end
+                            -- Un rendu qui dure S.dureeRendu secondes : l'horloge avance d'un quart
+                            -- de seconde à la fois, et la surveillance de la barre d'une commande en
+                            -- fait un tour à chacun (la vraie tâche tourne pendant le rendu, qu'on ne
+                            -- peut pas couper) ; S.pendantRendu(t) : ce que fait l'utilisateur
+                            -- pendant ce temps (cliquer la croix d'une barre).
+                            local ecoule = 0
+                            while ecoule < (S.dureeRendu or 0) do
+                                S.horloge, ecoule = S.horloge + 0.25, ecoule + 0.25
+                                if S.pendantRendu then S.pendantRendu(ecoule) end
+                                if #S.surveillances > 0 and package.loaded.Progression and not package.loaded.Progression.surveiller() then
+                                    S.surveillances = {}
+                                end
+                            end
                             if photo.exportImpossible then
                                 return false, photo.exportImpossible
                             end
@@ -2432,6 +2457,9 @@ function S.reinitialiser()
     S.rotations = {}
     S.masquesVidesRetires = 0
     S.barres = {}
+    S.surveillances = {}
+    S.dureeRendu = 0
+    S.pendantRendu = nil
     S.sauvegardeDemandee = false
     S.filtre = { filtersActive = false }
     S.filtrePreset = nil

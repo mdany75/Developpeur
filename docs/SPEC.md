@@ -286,6 +286,46 @@ dans Lightroom va jusqu'au bout, la suite ne part pas, et aucune réponse n'est 
 MCP) ; un appel pas encore commencé n'est pas lancé. Une annulation d'un appel déjà répondu est
 ignorée.
 
+### Barre et arrêt d'une commande longue
+
+Une commande seule du module (un rendu, une lecture), hors d'une série, a sa propre barre dans
+Lightroom quand elle dure (`Progression.lua`, chantier signalé « fort » par la page Analyse) :
+
+- `Liaison.traiter` l'annonce (`Progression.debutCommande`, de l'avant de son étape à sa fin) ;
+  passé 3 s (`DELAI_COMMANDE`), une barre `LrProgressScope` « Claude : <nom lisible> » (« rendu de
+  la photo », « essai d'une retouche », « vignettes des photos »… `Progression.NOMS`) s'ouvre, avec
+  sa croix (`setCancelable`) ; elle se ferme avec la commande. Une seule tâche de surveillance la
+  tient (`Progression.surveiller`, tous les quarts de seconde, nommée « Claude · barre de la
+  commande »). Jamais deux barres : rien pendant la barre d'une série (qui ferme celle d'une
+  commande), rien pour `ping`, `progression`, `etat`, les commandes qui attendent l'utilisateur
+  (`choisirDossier`, `fenetreExport`), l'exportation (`exporter`, Lightroom montre la sienne) et les
+  calculs de Lightroom qu'une croix ne coupe pas en chemin (`ameliorer`, `supprimer`).
+- La croix ne coupe rien d'elle-même : la commande s'arrête à son prochain point sûr
+  (`Progression.pointSur`) : avant la commande elle-même (une croix cliquée pendant l'avant de son
+  étape), avant et après chaque rendu (`Rendu.rendre` : l'image rendue est effacée), pendant
+  l'attente des vignettes ; jamais au milieu d'une écriture au catalogue. Une proposition
+  (`essayer`) remet la photo comme avant, puis répond l'arrêt. La réponse est une erreur
+  `{"error": "Arrêtée par l'utilisateur (croix de la barre « Claude » de Lightroom) : rien d'autre
+  n'a été fait.", "code": "arret"}` (un point sûr peut dire ce qui a déjà été fait, avant « rien
+  d'autre »), et le journal de la liaison note « Arrêtée par l'utilisateur : « <nom> » ».
+- La croix arrivée après le dernier point sûr laisse finir la commande : sa réponse porte
+  `arret_demande` (« … elle a été faite en entier »).
+- Lightroom ne dit pas quelle tâche appelle : la croix arrête toutes les commandes en cours (une
+  seule d'ordinaire, le serveur les envoie une à une), et un point sûr ne s'arrête que si toutes
+  l'ont été (une commande venue après la croix n'est pas arrêtée à sa place).
+- Côté serveur, `code: "arret"` devient `CommandeArretee`, dont le message va tel quel à Claude ;
+  `LightroomBridge.send` ne la reprend jamais (ce n'est pas une coupure, même pour une lecture).
+  Les outils parlent au module par `LiaisonArretable` : après un arrêt (ou `arret_demande`), plus
+  aucune commande de l'appel ne part, sauf la fermeture de la barre d'une série ; une série
+  s'arrête à son `verifier` suivant (`ArretDansLightroom`), et un arrêt que le résultat de l'outil
+  ne dit pas (une erreur notée par photo) lui est ajouté. Arrêtée après la limite de 50 s, la
+  commande n'est pas refaite : le même appel répété reçoit l'arrêt gardé par `FileOutils`.
+- La simulation de la liaison garde la tâche de surveillance (`S.surveillances`) et en fait un tour
+  à chaque `LrTasks.sleep` et à chaque quart de seconde d'un rendu (`S.dureeRendu`,
+  `S.pendantRendu` pour cliquer la croix). À constater dans Lightroom : la barre et sa croix à
+  l'écran pendant un long rendu, l'arrêt à la fin du rendu, et si un rendu par `LrExportSession`
+  montre déjà une barre de Lightroom (deux barres l'une sous l'autre).
+
 ## Liaison fermée (1.2)
 
 Jusqu'à la 1.1.1, tout programme du Mac, ou une page web (un POST vers 127.0.0.1:54770), pouvait

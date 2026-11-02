@@ -89,6 +89,20 @@ modules.LrFileUtils = {
     end,
 }
 
+-- Barre de progression (Progression.lua, chargé par Vignettes et Rendu) : la fenêtre n'en ouvre
+-- pas ; chaque barre est gardée dans S.barres si un essai en ouvrait une.
+modules.LrProgressScope = setmetatable({}, { __call = function(_, args)
+    local barre = { titre = args.title, annulee = false, finie = false }
+    function barre:setCancelable(oui) self.annulable = oui end
+    function barre:setPortionComplete() end
+    function barre:setCaption() end
+    function barre:isCanceled() return self.annulee end
+    function barre:done() self.finie = true end
+    S.barres = S.barres or {}
+    S.barres[#S.barres + 1] = barre
+    return barre
+end })
+
 modules.LrTasks = {
     execute = function(commande)
         -- Jamais le vrai presse-papiers du Mac (règle de CLAUDE.md) : presse-papiers.js ne se lance

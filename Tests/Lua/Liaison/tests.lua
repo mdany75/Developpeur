@@ -4983,6 +4983,132 @@ test("2.4 : barre de progression de Lightroom, arrêtée par la croix, fermée �
     egal(S.barres[2].finie, true)
 end)
 
+-- Commande seule longue : barre « Claude : <nom> » et sa croix ---------------------------------
+
+local Progression = require 'Progression'
+
+test("Commande longue : la barre « Claude : rendu de la photo » s'ouvre après 3 s seulement, avec sa croix, et se ferme à la fin", function()
+    priseDesReponses()
+    S.active = photoRaw()
+    S.dureeRendu = 2
+    Liaison.recevoir(ligne({ id = 1, command = 'apercu', params = { taille = 512, cles = {} } }))
+    egal(reponse(1).error, nil)
+    egal(#S.barres, 0, "un rendu de 2 s : pas de barre")
+    S.dureeRendu = 5
+    Liaison.recevoir(ligne({ id = 2, command = 'apercu', params = { taille = 512, cles = {} } }))
+    egal(reponse(2).error, nil)
+    egal(#S.barres, 1, "un rendu de 5 s : une barre")
+    egal(S.barres[1].titre, "Claude : rendu de la photo")
+    egal(S.barres[1].annulable, true, "avec sa croix")
+    egal(S.barres[1].finie, true, "fermée avec la commande")
+    -- Ni le ping ni une exportation (Lightroom a sa barre) ne sont suivis.
+    egal(Progression.debutCommande('ping'), nil)
+    egal(Progression.debutCommande('exporter'), nil)
+    egal(Progression.nomLisible('pivoter'), "commande « pivoter »")
+end)
+
+test("Commande longue : la croix pendant le rendu arrête l'aperçu (code arret, image effacée, rien d'autre)", function()
+    priseDesReponses()
+    S.active = photoRaw()
+    S.dureeRendu = 8
+    S.pendantRendu = function(t)
+        if t >= 5 and S.barres[1] then S.barres[1].annulee = true end
+    end
+    local effaces, effacer = {}, import('LrFileUtils').delete
+    import('LrFileUtils').delete = function(chemin) effaces[#effaces + 1] = chemin; return effacer(chemin) end
+    local ok, erreur = pcall(function()
+        Liaison.recevoir(ligne({ id = 1, command = 'apercu', params = { taille = 512, cles = {} } }))
+    end)
+    import('LrFileUtils').delete = effacer
+    if not ok then error(erreur, 0) end
+    local r = reponse(1)
+    egal(r.result, nil)
+    egal(r.code, 'arret')
+    egal(contient({ r.error }, "Arrêtée par l'utilisateur"), true)
+    egal(contient({ r.error }, "rien d'autre n'a été fait"), true)
+    egal(#effaces, 1, "l'image rendue n'est pas gardée")
+    egal(S.barres[1].finie, true)
+    egal(contient(Liaison.journal, "Arrêtée par l'utilisateur : « rendu de la photo »"), true)
+    -- La commande suivante n'est pas arrêtée : la croix ne valait que pour celle-là.
+    S.pendantRendu, S.dureeRendu = nil, 0
+    Liaison.recevoir(ligne({ id = 2, command = 'apercu', params = { taille = 512, cles = {} } }))
+    egal(reponse(2).error, nil)
+end)
+
+test("Commande longue : la croix pendant le rendu d'une proposition remet la photo comme avant", function()
+    priseDesReponses()
+    local photo = photoRaw()
+    S.active = photo
+    S.dureeRendu = 8
+    S.pendantRendu = function(t)
+        if t >= 4 and S.barres[1] then S.barres[1].annulee = true end
+    end
+    Liaison.recevoir(ligne({ id = 1, command = 'essayer', params = { action = 'appliquer', reglages = { Exposure2012 = 0.8 },
+        plages = { Exposure2012 = { -5, 5 } }, etape = 'plus clair' } }))
+    local r = reponse(1)
+    egal(r.code, 'arret')
+    egal(S.barres[1].titre, "Claude : essai d'une retouche")
+    egal(photo.reglages.Exposure2012, 0, "la proposition est défaite")
+    egal(photo.appliques[#photo.appliques].nom, "Claude · fin de l'essai")
+end)
+
+test("Commande longue : la croix arrivée après le dernier point sûr laisse finir la commande, et la réponse le dit", function()
+    priseDesReponses()
+    local executer = Commandes.executer
+    Commandes.executer = function()
+        S.horloge = S.horloge + 4
+        Progression.surveiller()
+        S.barres[1].annulee = true
+        Progression.surveiller()
+        return { fait = true }
+    end
+    local ok, erreur = pcall(function()
+        Liaison.recevoir(ligne({ id = 1, command = 'metadonnees', params = {} }))
+    end)
+    Commandes.executer = executer
+    if not ok then error(erreur, 0) end
+    local r = reponse(1)
+    egal(r.error, nil)
+    egal(r.result.fait, true)
+    egal(contient({ r.result.arret_demande }, "faite en entier"), true)
+    egal(S.barres[1].titre, "Claude : classement")
+end)
+
+test("Commande longue : la croix pendant l'attente des vignettes arrête la commande vignettes", function()
+    priseDesReponses()
+    local photo = photoRaw()
+    photo.vignetteJamais = true
+    S.pendantAttente = function()
+        if S.horloge >= 5 and S.barres[1] then S.barres[1].annulee = true end
+    end
+    Liaison.recevoir(ligne({ id = 1, command = 'vignettes', params = { photos = { 1 }, taille = 512 } }))
+    local r = reponse(1)
+    egal(r.code, 'arret')
+    egal(S.barres[1].titre, "Claude : vignettes des photos")
+    egal(S.horloge < 10, true, "arrêtée bien avant le délai de 60 s")
+end)
+
+test("Commande longue : point sûr avant la commande ; jamais de barre pendant celle d'une série", function()
+    local suivi = Progression.debutCommande('appliquer')
+    S.horloge = S.horloge + 3
+    Progression.surveiller()
+    egal(#S.barres, 1)
+    Progression.pointSur()
+    S.barres[1].annulee = true
+    echoue(function() Progression.pointSur("2 photos sur 5 classées") end, "2 photos sur 5 classées ; rien d'autre n'a été fait")
+    Progression.finCommande(suivi)
+    egal(S.barres[1].finie, true)
+    Progression.pointSur()
+    -- Une barre de série ouverte : la commande n'a pas la sienne.
+    Commandes.executer('progression', { id = 's', titre = 'harmonisation', fait = 1, total = 4 })
+    local autre = Progression.debutCommande('apercu')
+    S.horloge = S.horloge + 10
+    Progression.surveiller()
+    egal(#S.barres, 2, "seule la barre de la série")
+    Progression.finCommande(autre)
+    egal(Progression.surveiller(), false, "plus rien de suivi : la surveillance s'arrête")
+end)
+
 test("2.4 : sauvegarde du catalogue demandée pour la prochaine fermeture", function()
     local etat = Commandes.executer('etat', { sauvegarde = true })
     egal(S.sauvegardeDemandee, true)

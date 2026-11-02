@@ -133,6 +133,9 @@
 -- part : le serveur ne le rejoue jamais (LightroomBridge.lectures).
 -- Sans « photo » ni « photos » ni « selection », la commande vise la photo active.
 -- Les erreurs sont levées avec error(message, 0) : le message part tel quel vers Claude.
+-- Une commande qui dure plus de 3 s a sa barre « Claude : <nom> » et sa croix (Progression.lua) :
+-- arrêtée, elle finit à son prochain point sûr (Progression.pointSur, jamais dans une écriture) et
+-- répond l'erreur d'arrêt, code 'arret'.
 -- Toute commande, ping compris, n'arrive ici qu'avec le jeton de la liaison (Liaison.recevoir) ;
 -- depuisLightroom n'y vient jamais du réseau.
 --

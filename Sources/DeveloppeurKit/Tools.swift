@@ -53,7 +53,11 @@ public struct ToolResult: Equatable {
 /// harmonisation d'une série (Tools+Serie), composition lue (Tools+Composition) et retouche
 /// générative par Fibo 2, sur demande (Tools+Generatif).
 public final class ToolHandler {
+    /// Le module, par `LiaisonArretable` : après un arrêt par la croix d'une barre de Lightroom,
+    /// plus rien de l'appel ne part. Le pont lui-même : `pont`.
     let lightroom: LightroomServing
+    let arretable: LiaisonArretable
+    var pont: LightroomServing { arretable.base }
     let lookProfiles: LookProfileLibrary
     /// Effets locaux de Lightroom (add_mask, effect).
     let localEffects: LocalEffectLibrary
@@ -143,7 +147,9 @@ public final class ToolHandler {
     public init(lightroom: LightroomServing, lookProfiles: LookProfileLibrary = LookProfileLibrary(),
                 presetFolder: URL = PresetXMP.defaultFolder, localEffects: LocalEffectLibrary = LocalEffectLibrary(),
                 guideStyle: GuideStyle = GuideStyle(), lensProfiles: LensProfileLibrary = LensProfileLibrary()) {
-        self.lightroom = lightroom
+        let arretable = LiaisonArretable(lightroom)
+        self.arretable = arretable
+        self.lightroom = arretable
         self.lookProfiles = lookProfiles
         self.presetFolder = presetFolder
         self.localEffects = localEffects
@@ -317,8 +323,16 @@ public final class ToolHandler {
 
     public func call(name: String, arguments: [String: JSONValue], contexte: ContexteAppel = ContexteAppel()) -> ToolResult {
         self.contexte = contexte
+        arretable.reprendre()
+        arretable.surArret = { contexte.arreterDansLightroom() }
         var result = execute(name: name, arguments: arguments)
         fermerBarre()
+        // Arrêté dans Lightroom pendant l'appel, sans que le résultat le dise (une erreur notée par
+        // photo, ou la croix arrivée trop tard) : Claude le lit, pour ne rien relancer.
+        if let arret = arretable.arretDeLAppel, !result.text.contains(arret.message) {
+            result.content.append(.text(arret.tardif ? arret.message
+                : "Arrêté par l'utilisateur dans Lightroom pendant cet appel : \(arret.message) Ce qui était fait reste ; ne rien relancer sans sa demande."))
+        }
         if let remarque = remarqueVersion() {
             result.content.append(.text(remarque))
         }

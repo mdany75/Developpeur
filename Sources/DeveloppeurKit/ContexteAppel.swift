@@ -15,6 +15,73 @@ struct ArretDansLightroom: Error, LocalizedError {
     }
 }
 
+/// Une commande seule arrêtée dans Lightroom par la croix de sa barre « Claude : <nom> » (le module
+/// répond `code: "arret"`, Progression.pointSur) : le message du module, rendu tel quel à Claude
+/// (« Arrêtée par l'utilisateur … : rien d'autre n'a été fait. »). Jamais rejouée : ni par
+/// `LightroomBridge.send` (ce n'est pas une coupure), ni par la suite de l'appel (`LiaisonArretable`).
+public struct CommandeArretee: Error, LocalizedError, Equatable {
+    public let message: String
+    public init(message: String) { self.message = message }
+    public var errorDescription: String? { message }
+}
+
+/// Le module vu par les outils pendant un appel. Après un arrêt par la croix d'une barre de
+/// Lightroom (`CommandeArretee`, ou `arret_demande` dans une réponse : la croix arrivée quand la
+/// commande ne pouvait plus s'arrêter), plus aucune commande de cet appel ne part, sauf la
+/// fermeture de la barre d'une série (`progression`) : une boucle qui note l'erreur d'une photo et
+/// passe à la suivante ne relance rien, et une série s'arrête à son prochain `verifier`
+/// (`surArret`). `reprendre` au début de chaque appel.
+final class LiaisonArretable: LightroomServing {
+    let base: LightroomServing
+    /// Appelé au premier arrêt de l'appel (le serveur arrête la série, `ContexteAppel`).
+    var surArret: (() -> Void)?
+    private let verrou = NSLock()
+    private var arret: String?
+    private var tardif = false
+
+    static let suiteArretee = "Arrêté par l'utilisateur dans Lightroom (croix de la barre « Claude ») : la suite de cet appel n'est pas partie."
+
+    init(_ base: LightroomServing) { self.base = base }
+
+    var moduleVersion: String? { base.moduleVersion }
+
+    /// Un nouvel appel : l'arrêt du précédent ne compte plus.
+    func reprendre() {
+        verrou.lock(); arret = nil; tardif = false; verrou.unlock()
+    }
+
+    /// Le message de l'arrêt de cet appel (nil sans arrêt), et s'il est arrivé trop tard (commande
+    /// faite en entier).
+    var arretDeLAppel: (message: String, tardif: Bool)? {
+        verrou.lock(); defer { verrou.unlock() }
+        return arret.map { ($0, tardif) }
+    }
+
+    private func noter(_ message: String, tardif estTardif: Bool) {
+        verrou.lock()
+        let premier = arret == nil
+        if premier { arret = message; tardif = estTardif }
+        verrou.unlock()
+        if premier { surArret?() }
+    }
+
+    func send(_ command: String, _ params: [String: JSONValue], timeout: TimeInterval) throws -> JSONValue {
+        if command != "progression", arretDeLAppel != nil {
+            throw CommandeArretee(message: Self.suiteArretee)
+        }
+        do {
+            let reponse = try base.send(command, params, timeout: timeout)
+            if let tardif = reponse["arret_demande"]?.string {
+                noter(tardif, tardif: true)
+            }
+            return reponse
+        } catch let erreur as CommandeArretee {
+            noter(erreur.message, tardif: false)
+            throw erreur
+        }
+    }
+}
+
 /// Contexte d'un appel d'outil, partagé entre la file des outils, le serveur et l'outil : où en
 /// est une longue série (photo 120 sur 300), et si le client l'a annulée. Un outil qui traite une
 /// série avance photo par photo (`avancer`) et vérifie l'annulation entre deux photos

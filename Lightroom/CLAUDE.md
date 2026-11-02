@@ -17,6 +17,11 @@ CLAUDE.md principal, qui garde les règles communes à tout le projet. Le détai
   par morceau par `Json.ecrivain` (accolades, virgules et clés restent dans `Json.lua` ; ainsi
   s'écrit le relevé du Suivi). `os.time` et `os.date` passent par `Compat.lua` (remplacés par
   `LrDate` s'ils manquaient).
+- Barre d'une commande longue (`Progression.lua`) : un point sûr (`Progression.pointSur`) jamais
+  dans une écriture au catalogue ni entre une proposition et sa remise ; jamais deux barres (rien
+  pendant celle d'une série, rien pour `SANS_BARRE`) ; la simulation tourne la surveillance à chaque
+  `LrTasks.sleep` et pendant un rendu (`S.dureeRendu`). `docs/SPEC.md`, Barre et arrêt d'une
+  commande longue.
 - Pas de calcul long en Lua sur la tâche de l'interface : base64, réductions d'images (`sips`) et
   commandes du système passent par `LrTasks.execute` (qui ne bloque que la tâche).
 - Ne jamais nommer un fichier du module `Versions.lua` : Lightroom refuse de le charger (constaté ;
