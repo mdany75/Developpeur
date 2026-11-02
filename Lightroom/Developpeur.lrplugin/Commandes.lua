@@ -54,6 +54,10 @@
 --   creerPreset {nom, photo?, cles, inclure} → réglages d'une photo, pour un paramètre prédéfini
 --   diagnostic  {modules?}              → fonctions du SDK offertes par cette version de Lightroom
 --   journal     {photos?|selection?}    → journal des retouches de Claude
+--   habitudes   {mode, …}               → lecture seule (1.6) : liste (photos notées d'une
+--                                          collection, d'un dossier ou d'un appareil, 5000 au plus)
+--                                          ou lire (250 photos au plus : réglages, clés de Claude,
+--                                          reprises de Dany) ; voir Lecture.habitudes
 --   annuler     {photos?|selection?}    → défait la dernière retouche de Claude
 --   revenir     {photos?|selection?}    → remet l'état d'avant la première retouche de Claude
 --   metadonnees {photos?|selection?, note?, drapeau?, libelle?, titre?, legende?, droits?, iptc?, gps?,
@@ -137,7 +141,7 @@
 -- depuisLightroom n'y vient jamais du réseau.
 --
 -- Chaque commande est dans le module de son domaine :
---   Lecture.lua      etat, selection, reglages, presets, creerPreset, diagnostic, journal
+--   Lecture.lua      etat, selection, reglages, presets, creerPreset, diagnostic, journal, habitudes
 --   Rendu.lua        apercu, essayer, geometrie
 --   Retouche.lua     appliquer, recadrer, masquer, retoucher, copier
 --   Amelioration.lua ameliorer
@@ -196,6 +200,7 @@ local table_commandes = {
     creerPreset = Lecture.creerPreset,
     diagnostic = Lecture.diagnostic,
     journal = Lecture.journal,
+    habitudes = Lecture.habitudes,
     annuler = Annulation.annuler,
     revenir = Annulation.revenir,
     metadonnees = Bibliotheque.metadonnees,

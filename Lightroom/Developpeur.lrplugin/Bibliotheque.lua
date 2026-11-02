@@ -1640,6 +1640,9 @@ local function resultatsRecherche(params)
     return photos, remarques
 end
 
+-- Pour la lecture des habitudes (Lecture.habitudes, 1.6) : la même recherche, sans rien décrire.
+Bibliotheque.resultatsRecherche = resultatsRecherche
+
 function Bibliotheque.chercher(params)
     local photos, remarques = resultatsRecherche(params)
     local limite = math.min(tonumber(params.limite) or 50, MAX_RESULTATS)

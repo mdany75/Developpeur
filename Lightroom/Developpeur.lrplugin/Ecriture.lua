@@ -766,8 +766,9 @@ local function difference(reference, maintenant)
 end
 
 -- Ce que l'utilisateur a changé depuis la dernière commande de Claude sur la photo, ou nil :
--- {etape, changements = {cle, claude, maintenant}}.
-local function correctionsUtilisateur(photo)
+-- {etape, changements = {cle, claude, maintenant}}. `reglages` (facultatif, 1.6) : ses réglages
+-- déjà lus par getDevelopSettings, pour ne pas les relire (Lecture.habitudes).
+local function correctionsUtilisateur(photo, reglages)
     local apres = lireJson(photo, 'apresClaude', nil)
     if type(apres) ~= 'table' or type(apres.reglages) ~= 'table' then
         return nil
@@ -777,7 +778,7 @@ local function correctionsUtilisateur(photo)
         return nil
     end
     local changements = Json.tableau()
-    for _, c in ipairs(difference(apres.reglages, etatSimple(photo:getDevelopSettings()))) do
+    for _, c in ipairs(difference(apres.reglages, etatSimple(reglages or photo:getDevelopSettings()))) do
         changements[#changements + 1] = { cle = c.cle, claude = c.avant, maintenant = c.maintenant }
     end
     if #changements == 0 then

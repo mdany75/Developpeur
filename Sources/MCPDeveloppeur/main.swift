@@ -78,6 +78,10 @@ func usage(erreur: Bool = false) {
                 (au point de mise au point aussi), bruit, boîtier, géométrie, puis les défauts que view_photo
                 noterait ; lecture seule (aperçus comme view_photo, rien n'est noté au carnet) ; un fichier JPEG se
                 mesure sans Lightroom
+            mcp-developpeur --habitudes '{"camera": "X-H2S"}'   (ou collection, folder ; rating_min, date_from, date_to)
+                relevé des seuils des habitudes (remember_style avec habits) : la même lecture, sans plafond, chaque
+                réglage avec son nombre de photos, sa part touchée, médiane et quartiles de l'écart à la valeur
+                neutre, même sens, jours et seuils manqués ; lecture seule (rien au catalogue ni au guide)
             mcp-developpeur --recette <id RAW> [--jpeg <id>] [--flash <id>] [--profondeur <id>] [--yeux-rouges <id>] [--x-t20 <id>] [--portrait <id>] [--mixte <id>] [--horizon <id> [--hauteur-horizon <0 à 1>]] [--original] [--images <dossier>]
                 recette dans le vrai Lightroom, sur les copies virtuelles de la collection « Développeur › Essais »
                 (et des originaux avec --original), remises à l'origine à la fin ; l'historique d'un original
@@ -396,6 +400,13 @@ case "--constats":
     guard !ids.isEmpty || !fichiers.isEmpty else { usage(); exit(2) }
     let lignes = Carnet.releve(lightroom: LightroomBridge.fromEnvironment(), ids: ids, fichiers: fichiers) { print(line: $0) }
     exit(lignes.contains { $0.hasPrefix("✘") } ? 1 : 0)
+case "--habitudes":
+    // Relevé des seuils des habitudes (Habitudes), en lecture seule : les arguments de remember_style
+    // avec habits, sans plafond de réponse ni limite de 60 s.
+    guard arguments.count == 2, let params = try? JSONCoding.parse(arguments[1]).object else { usage(); exit(2) }
+    let releve = outils().releveHabitudes(params)
+    for block in releve.content { if case .text(let text) = block { print(line: text) } }
+    if releve.isError { exit(1) }
 case "--module":
     // Commande brute du module (diagnostic…), pour explorer ce que le SDK de Lightroom offre.
     guard arguments.count >= 2 else { usage(); exit(2) }

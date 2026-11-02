@@ -71,6 +71,10 @@ toucher :
   noter planche par planche (`contact_sheet` puis `propose_ratings`), jusqu'à la dernière dans le
   tour, sans `list_selection`. `Consignes.rapide` ne doit pas dire « sans suite » (Haiku renonçait).
 - Une longue série passe par le `ContexteAppel` : `avancer` après chaque lot, `verifier` avant.
+- **Habitudes** (`Habitudes.swift`, `remember_style` avec `habits`, 1.6) : lecture seule, rien au
+  guide sans accord ; attribution par les clés de Claude rendues dans l'espace de `etatSimple`
+  (`Lecture.habitudes`) ; écarts à la valeur neutre (`rawDefaults` pour un RAW) ; seuils
+  provisoires, à fixer par `--habitudes` (`docs/SPEC.md`, 1.6 : tes habitudes en chiffres).
 
 ## Boîtier
 

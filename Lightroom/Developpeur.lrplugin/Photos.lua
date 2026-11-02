@@ -450,6 +450,7 @@ Photos.nouvelleEcriture = nouvelleEcriture
 Photos.libelle = libelle
 Photos.lireChamp = lireChamp
 Photos.lireJson = lireJson
+Photos.memoireEtrangere = memoireEtrangere
 Photos.meta = meta
 Photos.nomFichier = nomFichier
 Photos.orientationAffichage = orientationAffichage

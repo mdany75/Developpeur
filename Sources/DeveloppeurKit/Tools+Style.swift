@@ -7,15 +7,20 @@ extension ToolHandler {
     var styleDefinitions: [JSONValue] {
         [
             tool("remember_style",
-                 "Guide de style personnel de l'utilisateur (ses goûts en retouche : profils, contraste, couleurs, peaux, noir et blanc, grain, recadrage, livraison), dans un fichier Markdown qu'il peut modifier lui-même, inclus dans l'invite retouche_pro. read = le lire avant de retoucher ; preference = y ajouter une préférence apprise en conversation (« il aime les noirs denses », « jamais de vignetage »), seulement après l'accord explicite de l'utilisateur sur la phrase exacte (confirm = true).",
+                 "Guide de style personnel de l'utilisateur (ses goûts en retouche : profils, contraste, couleurs, peaux, noir et blanc, grain, recadrage, livraison), dans un fichier Markdown qu'il peut modifier lui-même, inclus dans l'invite retouche_pro. read = le lire avant de retoucher ; preference = y ajouter une préférence apprise en conversation (« il aime les noirs denses », « jamais de vignetage »), seulement après l'accord explicite de l'utilisateur sur la phrase exacte (confirm = true). learn = ce qu'il corrige chez Claude ; habits = ce qu'il fait seul sur ses belles photos (lecture seule, phrases à lui proposer).",
                  properties: [
                     ("read", prop("boolean", "true = lire le guide (sans rien ajouter).")),
                     ("preference", prop("string", "La préférence à ajouter, en une phrase, telle que l'utilisateur l'a approuvée.")),
                     ("category", enumProp(GuideStyle.rubriques.map(\.nom), "Rubrique : \(GuideStyle.rubriques.map { "\($0.nom) (\($0.titre.lowercased()))" }.joined(separator: ", ")).")),
                     ("confirm", prop("boolean", "true = l'utilisateur a approuvé cette phrase (exigé pour ajouter).")),
                     ("learn", prop("boolean", "true = apprendre de ses corrections (1.3.5) : ses reprises à la main depuis la dernière retouche de Claude, lues sur une série (photo_ids, selection, collection ou folder ; \(Apprentissage.maxPhotos) photos au plus) ; une règle n'est proposée que si elle revient souvent et dans le même sens, et rien n'est ajouté sans son accord.")),
-                    ("collection", prop("string", "Avec learn : une collection, par son nom ou son identifiant.")),
-                    ("folder", prop("string", "Avec learn : un dossier, par son chemin complet.")),
+                    ("habits", prop("boolean", "true = ses habitudes en chiffres (1.6), en lecture seule : les réglages de ses photos notées (rating_min, 4 ★ par défaut) d'une collection, d'un dossier (sous-dossiers compris) ou d'un appareil (camera), sans ce que Claude y a fait ; médianes par appareil et tranche d'ISO, et au plus \(Habitudes.maxPhrases) phrases à lui proposer. \(Habitudes.maxPhotos) photos au plus par appel. Long : rappeler avec les mêmes arguments tant que la réponse dit « pas fini » ; les autres outils attendent.")),
+                    ("rating_min", prop("integer", "Avec habits : note minimale, de 1 à 5 (défaut 4).")),
+                    ("camera", prop("string", "Avec habits : le modèle d'appareil, comme find_photos.")),
+                    ("date_from", prop("string", "Avec habits : prises de vue depuis ce jour (AAAA-MM-JJ) ; refusé au-delà de 5000 photos trouvées.")),
+                    ("date_to", prop("string", "Avec habits : prises de vue jusqu'à ce jour inclus (AAAA-MM-JJ).")),
+                    ("collection", prop("string", "Avec learn ou habits : une collection, par son nom ou son identifiant.")),
+                    ("folder", prop("string", "Avec learn ou habits : un dossier, par son chemin complet.")),
                  ] + targetProperties,
                  required: []),
         ]
@@ -23,6 +28,7 @@ extension ToolHandler {
 
     func rememberStyle(_ args: Arguments) throws -> JSONValue {
         if args.bool("learn") == true { return try apprendreDesCorrections(args) }
+        if args.bool("habits") == true { return try releverHabitudes(args) }
         if let preference = args.string("preference") {
             guard args.bool("confirm") == true else {
                 throw LightroomError.invalid("Rien n'a été ajouté : proposer la phrase à l'utilisateur, attendre son accord, puis rappeler remember_style avec confirm = true.")
@@ -55,6 +61,67 @@ extension ToolHandler {
             avancer(index + 1, sur: serie.ids.count, "Lecture des reprises", titre: serie.ids.count > 20 ? "reprises à la main" : nil)
         }
         return Apprentissage.json(Apprentissage.regles(parPhoto), lues: serie.ids.count, reprises: parPhoto.count, videos: serie.videos)
+    }
+
+    // MARK: Habitudes
+
+    /// Les habitudes de l'utilisateur (1.6) : la liste des photos notées (commande `habitudes
+    /// liste`), puis leurs réglages par lots (`habitudes lire`), l'annulation vérifiée et la
+    /// progression avancée entre deux lots. Rien n'est écrit, ni au catalogue ni au guide. Un appel
+    /// plus long que 50 s passe par la réponse d'attente de FileOutils : le rappel le reprend.
+    func releverHabitudes(_ args: Arguments, detaille: Bool = false) throws -> JSONValue {
+        let (photos, trouvees, note) = try lireHabitudes(args)
+        return Habitudes.json(Habitudes.analyser(photos, trouvees: trouvees, note: note), note: note, detaille: detaille)
+    }
+
+    func lireHabitudes(_ args: Arguments) throws -> (photos: [Habitudes.Photo], trouvees: Int, note: Int) {
+        if args.has("photo_ids") || args.has("selection") {
+            throw LightroomError.invalid("« habits » : une collection, un dossier (folder) ou un appareil (camera), pas photo_ids ni selection.")
+        }
+        var params: [String: JSONValue] = ["mode": "liste", "limite": .number(Double(Habitudes.maxPhotos))]
+        var note = 4
+        if args.has("rating_min") {
+            guard let n = args.int("rating_min"), (1...5).contains(n) else {
+                throw LightroomError.invalid("« rating_min » : une note entière de 1 à 5.")
+            }
+            note = n
+        }
+        params["note_min"] = .number(Double(note))
+        if let camera = args.string("camera")?.trimmingCharacters(in: .whitespaces), !camera.isEmpty { params["appareil"] = .string(camera) }
+        if let dossier = args.string("folder")?.trimmingCharacters(in: .whitespaces), !dossier.isEmpty { params["dossier"] = .string(dossier) }
+        if let id = args.int("collection") { params["collection"] = .number(Double(id)) }
+        else if let nom = args.string("collection")?.trimmingCharacters(in: .whitespaces), !nom.isEmpty { params["collection"] = .string(nom) }
+        for (cle, cleModule) in [("date_from", "date_debut"), ("date_to", "date_fin")] {
+            if let texte = args.string(cle)?.trimmingCharacters(in: .whitespaces), !texte.isEmpty { params[cleModule] = .string(texte) }
+        }
+        guard params["appareil"] != nil || params["dossier"] != nil || params["collection"] != nil else {
+            throw LightroomError.invalid("« habits » : préciser une collection, un dossier (folder) ou un appareil (camera) ; sans cela, tout le catalogue.")
+        }
+        let liste = try lightroom.send("habitudes", params, timeout: Self.libraryTimeout)
+        let ids = Array((liste["photos"]?.array ?? []).compactMap(\.int).prefix(Habitudes.maxPhotos))
+        let trouvees = liste["total"]?.int ?? ids.count
+        var photos: [Habitudes.Photo] = []
+        let titre = ids.count > Habitudes.lot ? "habitudes" : nil
+        avancer(0, sur: ids.count, "Lecture des réglages", titre: titre)
+        for debut in stride(from: 0, to: ids.count, by: Habitudes.lot) {
+            try contexte.verifier()
+            let lot = Array(ids[debut..<min(debut + Habitudes.lot, ids.count)])
+            let reponse = try lightroom.send("habitudes", ["mode": "lire", "photos": .array(lot.map { .number(Double($0)) }),
+                                                           "cles": .array(Habitudes.cles.map(JSONValue.string))], timeout: 120)
+            photos += (reponse["photos"]?.array ?? []).compactMap(Habitudes.photo)
+            avancer(min(debut + Habitudes.lot, ids.count), sur: ids.count, "Lecture des réglages", titre: titre)
+        }
+        return (photos, trouvees, note)
+    }
+
+    /// Le relevé des seuils (`--habitudes`, développement) : la même lecture, sans plafond, avec
+    /// chaque statistique et les seuils qu'elle manque. Rien n'est écrit.
+    public func releveHabitudes(_ arguments: [String: JSONValue]) -> ToolResult {
+        do {
+            return ToolResult(text: JSONCoding.pretty(try releverHabitudes(Arguments(raw: arguments), detaille: true)))
+        } catch {
+            return ToolResult(text: error.localizedDescription, isError: true)
+        }
     }
 
     // MARK: Ressources

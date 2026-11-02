@@ -911,6 +911,13 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   elle revient souvent (au moins 3 photos et 60 % des photos reprises) et dans le même sens (80 %),
   « tu baisses la Correction du voile après Claude, sur 7 photos sur 9 », et elle n'entre au guide
   qu'avec votre accord sur la phrase exacte. Seuils provisoires.
+- Vos habitudes en chiffres (1.6, `remember_style` avec `habits`) : sur vos photos notées 4 ★ et
+  plus (ou la note choisie) d'une collection, d'un dossier ou d'un appareil, Claude lit, sans rien
+  écrire, ce que vous réglez vous-même, sans ce qu'il y a fait : médianes par appareil et, pour la
+  netteté et le bruit, par tranche d'ISO. Il en tire au plus 8 phrases (« X-H2S : Hautes lumières
+  plus bas, autour de −35 »), seulement pour un réglage touché souvent, sur plusieurs jours, dans le
+  même sens ; chacune n'entre au guide qu'avec votre accord. 5000 photos au plus par demande ;
+  seuils provisoires.
 - Rendu reproductible (1.3.5) : à la fin d'une retouche, ses réglages principaux sont gardés, dans
   `rendus.json`. Depuis le correctif 1.3.6, cette fin est l'avant/après depuis l'état d'avant
   Claude (`view_photo` avec `compare = before_claude`), que les invites qui retouchent et la

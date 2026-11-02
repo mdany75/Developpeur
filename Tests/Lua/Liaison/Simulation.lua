@@ -452,8 +452,12 @@ function S.Photo(id, reglages, meta, brut)
         motsCles = {},
         metadonneesEcrites = {},
     }
+    -- Chaque lecture des réglages est comptée (S.lecturesReglages, et par photo) : la lecture des
+    -- habitudes (1.6) n'en fait qu'une par photo.
     function photo:getDevelopSettings()
         lisible(self, 'photo')
+        S.lecturesReglages = S.lecturesReglages + 1
+        self.lecturesReglages = (self.lecturesReglages or 0) + 1
         local copie = {}
         for cle, valeur in pairs(self.reglages) do
             if not CLES_CACHEES[cle] then
@@ -2438,6 +2442,7 @@ function S.reinitialiser()
     S.filtresPoses = {}
     S.presetsFiltre = {}
     S.lecturesGroupees = 0
+    S.lecturesReglages = 0
     S.jeuLibellesIllisible = false
     S.fuseau = 0
     S.cheminCatalogue = '/Users/test/Images/Catalogue.lrcat'
