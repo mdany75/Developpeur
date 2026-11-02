@@ -69,16 +69,31 @@
 
 <main class="page">
   <h1>Panorama des MCP Lightroom</h1>
-  <p class="sous">Les serveurs MCP qui pilotent Lightroom, recensés et vérifiés le 1<sup>er</sup> novembre 2026, puis comparés à MCP-Développeur 1.5. Ils ont été cherchés sur GitHub, dans les annuaires MCP (mcp.so, Smithery, Glama, PulseMCP, awesome-mcp-servers, le registre officiel, npm, PyPI), dans les forums et chez Adobe. Chaque dépôt a ensuite été ouvert pour lire ses outils, son architecture, son dernier envoi et sa licence. Les notes sur 10 sont celles de cette vérification. La comparaison outil par outil avec le premier du classement est sur la page <a href="https://claude.ai/artifact/VuRGRUGNy4ZzGuYPPrmsQm">Outils comparés</a>.</p>
+  <p class="sous">Les serveurs MCP qui pilotent Lightroom, recensés et vérifiés le 1<sup>er</sup> novembre 2026, puis comparés à MCP-Développeur 1.5. Mise à jour le 2 novembre 2026 : la 1.6 et la 1.6.3 ont repris six des huit idées à prendre. Ils ont été cherchés sur GitHub, dans les annuaires MCP (mcp.so, Smithery, Glama, PulseMCP, awesome-mcp-servers, le registre officiel, npm, PyPI), dans les forums et chez Adobe. Chaque dépôt a ensuite été ouvert pour lire ses outils, son architecture, son dernier envoi et sa licence. Les notes sur 10 sont celles de cette vérification. La comparaison outil par outil avec le premier du classement est sur la page <a href="https://claude.ai/artifact/VuRGRUGNy4ZzGuYPPrmsQm">Outils comparés</a>.</p>
 
   <div class="bilan">
     <div class="chiffre"><b>56</b><span>candidats trouvés, sans doublons</span></div>
     <div class="chiffre"><b>28</b><span>vrais serveurs MCP qui agissent sur Lightroom (30 fiches, deux projets en double)</span></div>
     <div class="chiffre"><b>1</b><span>seul projet très suivi : Automaat, 169 étoiles. Les autres ont moins de 60 étoiles, souvent 0.</span></div>
-    <div class="chiffre"><b>0</b><span>MCP officiel d'Adobe pour Lightroom Classic</span></div>
+    <div class="chiffre"><b>6 sur 8</b><span>idées à prendre faites dans Développeur 1.6 à 1.6.3</span></div>
   </div>
 
-  <div class="encadre"><p><strong>En bref.</strong> Automaat/lightroom-mcp est la référence publique : le plus d'outils, le plus de masques, Mac et Windows, et une installation en un clic. Aucun autre projet n'a de diagnostic chiffré aussi poussé que Développeur. Aucun n'a non plus de méthode de retoucheur écrite, de standard de notation, de retouche générative locale ou d'exécutable natif notarisé. LrC-AVG est le plus proche dans l'esprit, mais il tourne seulement sous Windows.</p></div>
+  <div class="encadre"><p><strong>En bref.</strong> Automaat/lightroom-mcp est la référence publique : le plus d'outils, le plus de masques, Mac et Windows, et une installation en un clic. Aucun autre projet n'a de diagnostic chiffré aussi poussé que Développeur. Aucun n'a non plus de méthode de retoucheur écrite, de standard de notation, de retouche générative locale ou d'exécutable natif notarisé. LrC-AVG est le plus proche dans l'esprit, mais il tourne seulement sous Windows. Adobe n'a aucun MCP officiel pour Lightroom Classic.</p></div>
+
+  <h2>Depuis le panorama : ce que Développeur a repris</h2>
+  <div class="table moyen"><table>
+    <thead><tr><th>Idée vue chez</th><th>État</th><th>Dans Développeur</th></tr></thead>
+    <tbody>
+      <tr><td>Recherche par le sens de l'image (LrGeniusAI)</td><td><span class="pastille ici">Fait en 1.6</span></td><td><code>find_photos</code> avec <code>query</code> ou <code>similar_to</code>, calculé sur le Mac (MobileCLIP S2).</td></tr>
+      <tr><td>Espèces (LrGeniusAI, BioCLIP 2)</td><td><span class="pastille ici">Fait en 1.6.3</span></td><td><code>find_photos</code> et <code>view_photo</code> avec <code>species</code>, 3 926 espèces nommées en français et en latin.</td></tr>
+      <tr><td>Rendu d'une image de référence (ToneRelay)</td><td><span class="pastille ici">Fait en 1.6</span></td><td><code>match_look</code>, le 37<sup>e</sup> outil : mesure, réglages, seconde correction, bilan zone par zone.</td></tr>
+      <tr><td>Plafond de mouvement des curseurs (LrC-AVG)</td><td><span class="pastille ici">Fait en 1.6</span></td><td>Plafonds de dose : Clarté 25, Correction du voile 20, Texture et Vibrance 30, sauf demande claire.</td></tr>
+      <tr><td>Goûts appris des retouches (aslanoov, LrGeniusAI)</td><td><span class="pastille ici">Fait en 1.6</span></td><td><code>remember_style</code> avec <code>habits</code> : vos réglages par appareil et par ISO, ajoutés au guide après accord.</td></tr>
+      <tr><td>Écritures relues (Automaat, JeremyGuo)</td><td><span class="pastille ici">Fait en 1.6 et 1.6.3</span></td><td>Chaque masque posé est relu ; un masque mal gardé est retiré et signalé. Une réponse perdue ne refait plus la retouche.</td></tr>
+      <tr><td>Doublons dans tout le catalogue (Automaat)</td><td><span class="pastille eux">Pas encore</span></td><td>Seulement au tri d'une sélection (<code>cull_photos</code>) ; <code>similar_to</code> s'en approche.</td></tr>
+      <tr><td>Épisodes rejouables, jeux d'outils activables, installation .mcpb</td><td><span class="pastille eux">Pas encore</span></td><td><code>export_journal</code> raconte sans rejouer ; les 37 outils sont toujours actifs ; installation par <code>build.sh --install</code>.</td></tr>
+    </tbody>
+  </table></div>
 
   <h2>Les dix meilleurs</h2>
   <div class="table moyen"><table>
@@ -133,6 +148,7 @@
     </section>
     <section>
       <h3><span class="pastille eux">Chez les autres, à prendre</span></h3>
+      <p class="petit">Liste du 1<sup>er</sup> novembre. Ce qui en est fait depuis est dans le tableau plus haut.</p>
       <ul class="liste">
         <li><strong>Recherche par le sens de l'image, visages nommés, espèces</strong> (LrGeniusAI, avec CLIP et BioCLIP 2). Développeur cherche par critères et par dates.</li>
         <li><strong>Doublons dans tout le catalogue par empreinte dHash</strong> (Automaat). Développeur les trouve seulement au tri d'une sélection.</li>
@@ -174,5 +190,5 @@
     <li><strong>Autres logiciels.</strong> MCP Photoshop seul (adobe-mcp de zachshallbetter et d'AJSMonty, Firefly Services), <a href="https://github.com/YaddyVirus/darktable-mcp">darktable-mcp</a>, et des projets de tri ou de recherche sans Lightroom (shutter-cull-mcp, JarvisArt, viberoom, TonePilot, lightroom-ai-grading, schiffer-mcp, Lrc-mcp de masa-san-jp, adobe-plugin-skills).</li>
   </ul>
 
-  <p class="pied">Recensement fait le 1<sup>er</sup> novembre 2026 : 4 balayages, 5 vérifications de dépôt et une synthèse. Les étoiles et les dates viennent des dépôts ce jour-là. Les capacités de Développeur ont été relues dans son code (GPS, collections dynamiques, courbes et Point Color par masque). Source de la page : <code>docs/artefacts/panorama-mcp-lightroom.html</code>.</p>
+  <p class="pied">Recensement fait le 1<sup>er</sup> novembre 2026 : 4 balayages, 5 vérifications de dépôt et une synthèse. Les étoiles et les dates viennent des dépôts ce jour-là. Les capacités de Développeur ont été relues dans son code (GPS, collections dynamiques, courbes et Point Color par masque). Mise à jour le 2 novembre 2026 d'après le CHANGELOG des versions 1.6 à 1.6.3. Source de la page : <code>docs/artefacts/panorama-mcp-lightroom.html</code>.</p>
 </main>
