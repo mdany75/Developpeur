@@ -34,6 +34,13 @@ final class EcretageEtPointsChaudsTests: XCTestCase {
         XCTAssertNil(nature["bande_tsl"])
     }
 
+    func testLaNatureNeSeDitQuAuDelaDuSeuilReleve() {
+        // Relevé du 2 novembre 2026 (A4) : 0,13 % (90e centile du portrait témoin), au lieu de 0,1.
+        XCTAssertEqual(PhotoMeasurements.ecretageMin, 0.13)
+        XCTAssertEqual(PhotoMeasurements.basGamme, 220)
+        XCTAssertEqual(PhotoMeasurements.chromaGamme, 30)
+    }
+
     func testRienAEcreterRienADire() throws {
         let sombre = Self.image { _, _ in (90, 100, 80) }
         let mesures = try XCTUnwrap(Measurements.analyze(sombre))

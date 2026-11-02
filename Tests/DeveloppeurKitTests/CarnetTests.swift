@@ -112,9 +112,11 @@ final class CarnetTests: XCTestCase {
         XCTAssertEqual(codes(vue(mesures: sombre, intention: IntentionBoitier(compensation: -0.3))), ["sous_exposition"])
         XCTAssertEqual(codes(vue(mesures: sombre, intention: IntentionBoitier(scene: 0x300))), [], "scène de nuit reconnue")
         XCTAssertEqual(codes(vue(mesures: sombre, intention: IntentionBoitier(modeImage: 0x5))), [], "mode scène de nuit choisi")
-        // Les bornes : médiane et 95e centile strictement sous les seuils.
-        XCTAssertEqual(codes(vue(mesures: mesures(mediane: 28, p95: 62))), [])
-        XCTAssertEqual(codes(vue(mesures: mesures(mediane: 27.9, p95: 79.9))), ["sous_exposition"])
+        // Les bornes : médiane et 95e centile strictement sous les seuils. 25 depuis le relevé du
+        // 2 novembre 2026 (A2) : une photo à L* médian 26 n'est plus sous-exposée.
+        XCTAssertEqual(codes(vue(mesures: mesures(mediane: 26, p95: 62))), [], "relevé A2 : 28 → 25")
+        XCTAssertEqual(codes(vue(mesures: mesures(mediane: 25, p95: 62))), [])
+        XCTAssertEqual(codes(vue(mesures: mesures(mediane: 24.9, p95: 79.9))), ["sous_exposition"])
         XCTAssertEqual(codes(vue(mesures: mesures(mediane: 20, p95: 80))), [], "une partie claire : pas sous-exposée")
     }
 

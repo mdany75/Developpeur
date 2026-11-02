@@ -41,7 +41,11 @@ public enum Carnet {
     /// très sombres, une nuit éclairée (L* médian 16,9, 95e centile 90,9) et une scène sur fond noir
     /// (3,9 et 89,6), sont écartées par le 95e centile, à raison ; mais aucun vrai cas de
     /// sous-exposition dans Essais pour les éprouver (ni photo voulue sombre à −2/3 IL, ni DR400).
-    public static let medianeSousExposee = 28.0
+    /// `medianeSousExposee` passe de 28 à 25 au relevé du 2 novembre 2026 (A2, Lightroom 15.6) : à
+    /// 28, 5,6 % des 90 photos que Dany a notées 3 étoiles ou plus se disaient sous-exposées ; à 25,
+    /// 3,3 %, et 90 % des 347 signalées le restent. Changé sur la décision de Dany (refait toute
+    /// l'analyse du Suivi : `Suivi.reglesAnalyse` 2).
+    public static let medianeSousExposee = 25.0
     public static let p95SousExposee = 80.0
     /// Ciel ou haut de l'image brûlé : plus de `partBlancPurHaut` % du tiers haut en blanc pur (les
     /// trois canaux à 254 ou plus, comme `PhotoMeasurements.pureWhite`), sur la réduction à 512 px

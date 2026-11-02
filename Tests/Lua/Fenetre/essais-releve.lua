@@ -132,6 +132,8 @@ local CONTRAT = sansNotes(Json.decode(assert(Fichiers.lire(CONTRAT_CHEMIN), 'con
 local REGISTRE = CONTRAT.exemples.registre.fichier
 local CATALOGUE = next(REGISTRE.catalogues)
 local ANALYSER = CONTRAT.exemples.analyser
+-- Les règles de l'analyse du connecteur d'aujourd'hui (Suivi.reglesAnalyse, 2 depuis la 1.6.1).
+local REGLES = ANALYSER.sortie.regles
 local BORNES = CONTRAT.regles.registre.bornes
 
 -- Les journaux : ce que le Suivi dit.
@@ -283,7 +285,7 @@ if sensActif and entree.catalogue then
         if not r.raison then r.sens = true end
     end
 end
-print(Json.encode({ ok = true, regles = mode == 'regles2' and 2 or 1, regles_genre = mode == 'genre2' and 2 or mode ~= 'sansgenre' and 1 or nil,
+print(Json.encode({ ok = true, regles = contrat.exemples.analyser.sortie.regles + (mode == 'regles2' and 1 or 0), regles_genre = mode == 'genre2' and 2 or mode ~= 'sansgenre' and 1 or nil,
     regles_sens = sensActif and entree.catalogue and 1 or nil, index_sens = sensActif and entree.catalogue and generation or nil,
     photos = photos }))
 ]==], S.plugin, MODE, SENS_RECUS, GENERATION, RECUS, CONTRAT_CHEMIN))
@@ -640,7 +642,7 @@ essai("Une photo seule : son entrée au relevé (celle du contrat), puis l'analy
     local dansLeRegistre = ANALYSER.dans_le_registre['4302']
     memes(dansLeRegistre.cherches, analyse.cherches, 'cherches')
     memes(dansLeRegistre.defauts, analyse.defauts, 'defauts (un tableau vide)')
-    egal(1, analyse.regles)
+    egal(REGLES, analyse.regles)
     vrai(GROUPEES > 0, 'lectures groupées du catalogue')
     -- Plus rien à faire : pas de nouvel appel, la tâche ne repart pas d'elle-même.
     egal(false, Releve.relancer(), 'rien à faire : pas de tâche')
@@ -1243,13 +1245,13 @@ essai("La file : une analyse manquée se réessaie après son délai, abandonné
     egal(appels, #recus(), 'jamais refaite après une édition')
     egal(3, entree(903).note, 'le classement relu')
     egal(true, entree(903).retouchee_par_claude)
-    -- Des règles plus récentes (2) : les analyses de règles 1 se refont, une fois.
+    -- Des règles plus récentes (REGLES + 1) : les analyses de règles REGLES se refont, une fois.
     mode('regles2')
     photo(904)
     voir(904)
     vider()
-    egal(2, entree(904).analyse.regles)
-    egal(2, entree(903).analyse.regles, 'refaite pour des règles plus récentes')
+    egal(REGLES + 1, entree(904).analyse.regles)
+    egal(REGLES + 1, entree(903).analyse.regles, 'refaite pour des règles plus récentes')
     local refaits = #recus()
     Releve.revoir()
     voir(904)
@@ -2033,7 +2035,7 @@ essai("Une analyse manquée passe devant la file gardée à son heure (Releve.re
     Releve.LOT_ANALYSE = 2
     -- Les règles du connecteur déjà connues (une réponse plus tôt dans la séance), celles du genre
     -- comprises : la file gardée ne se refait pas pour elles.
-    Releve.regles, Releve.reglesGenre = 1, 1
+    Releve.regles, Releve.reglesGenre = REGLES, 1
     avecLeTemps(function()
         egal(30, Releve.refaireFile())
         egal('34001', Releve.file.liste[1])
@@ -2093,7 +2095,7 @@ essai("Des règles plus récentes (une réponse de --analyser dont regles monte,
     egal(29, Releve.refaireFile(), 'la file gardée : les 29 sans analyse (règles encore inconnues)')
     Releve.LOT_ANALYSE = 2
     unLot()
-    egal(1, Releve.regles, 'les règles du connecteur')
+    egal(REGLES, Releve.regles, 'les règles du connecteur')
     egal(nil, Releve.file, 'à refaire au lot suivant')
     unLot()
     vrai(Releve.file ~= nil, 'refaite, puis gardée : les mêmes règles')
@@ -2119,8 +2121,8 @@ essai("Le genre (correctif 1.3.8) : rangé avec l'analyse ; une analyse d'avant 
     -- que la vignette d'aujourd'hui (retouchée depuis) ne montrerait plus ; 38003 et 38004 en file.
     local f = fichier()
     local photos = f.catalogues[CATALOGUE].photos
-    photos['38001'].analyse = { le = 1000, regles = 1, cherches = Json.tableau({ 'sous_exposition', 'flou' }), defauts = Json.tableau({ 'flou' }) }
-    photos['38002'].analyse = { le = 1000, regles = 1, cherches = Json.tableau({ 'flou' }), defauts = Json.tableau({}) }
+    photos['38001'].analyse = { le = 1000, regles = REGLES, cherches = Json.tableau({ 'sous_exposition', 'flou' }), defauts = Json.tableau({ 'flou' }) }
+    photos['38002'].analyse = { le = 1000, regles = REGLES, cherches = Json.tableau({ 'flou' }), defauts = Json.tableau({}) }
     Fichiers.ecrire(Releve.fichier(), Json.encode(f))
     Releve.oublier()
     -- Les règles ne sont pas encore connues (aucune réponse de la séance) : les analyses sans genre
@@ -2336,7 +2338,7 @@ essai("Le genre : des règles du genre plus récentes le font refaire seul (déf
     egal('ville', entree(39001).analyse.genre, 'refait pour des règles du genre plus récentes')
     egal(2, entree(39001).analyse.regles_genre)
     egal(le, entree(39001).analyse.le, 'les défauts gardés, avec leur heure')
-    egal(1, entree(39001).analyse.regles)
+    egal(REGLES, entree(39001).analyse.regles)
     -- Un connecteur sans genre : une analyse sans genre ne se refait pas en boucle.
     depart()
     for i = 1, 3 do
@@ -2446,7 +2448,7 @@ local function grandReleve(n)
             e.vues[2] = { id = id + 1, uuid = uuid .. '-c', copie_virtuelle = true, fichier = 'XH2S' .. k .. '.RAF (Copie 1)', le = vu }
         end
         if k % 2 == 0 then
-            e.analyse = { le = vu, regles = 1, cherches = Json.tableau({ 'sous_exposition', 'surexposition', 'ciel_brule', 'flou' }),
+            e.analyse = { le = vu, regles = REGLES, cherches = Json.tableau({ 'sous_exposition', 'surexposition', 'ciel_brule', 'flou' }),
                 defauts = Json.tableau(k % 10 == 0 and { 'flou' } or {}) }
         end
         photos[tostring(id)] = e

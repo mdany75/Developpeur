@@ -54,8 +54,10 @@ public struct PhotoMeasurements: Equatable {
     /// presque blanc) et C* d'au moins `chromaGamme`. `ecretageMin` : part écrêtée (%) sous laquelle
     /// la nature ne se dit pas ; `natureNette` : rapport d'une nature à l'autre au-delà duquel elle
     /// l'emporte. Provisoires, choisis hors de Lightroom : à relever sur des fleurs, un coucher de
-    /// soleil, un vêtement vif.
-    static let basGamme: UInt8 = 220, chromaGamme = 30.0, ecretageMin = 0.1, natureNette = 2.0
+    /// soleil, un vêtement vif. `ecretageMin` passe de 0,1 à 0,13 au relevé du 2 novembre 2026 (A4,
+    /// Lightroom 15.6 : 90e centile de la part écrêtée par la gamme sur 100 portraits témoins) ;
+    /// `basGamme` et `chromaGamme` restent provisoires (à juger à l'œil).
+    static let basGamme: UInt8 = 220, chromaGamme = 30.0, ecretageMin = 0.13, natureNette = 2.0
     /// Les bandes de la TSL de Lightroom, par leur teinte (TSV, en degrés).
     static let bandes: [(nom: String, teinte: Double)] = [("rouge", 0), ("orange", 30), ("jaune", 60), ("vert", 120),
                                                          ("aqua", 180), ("bleu", 240), ("violet", 270), ("magenta", 300)]

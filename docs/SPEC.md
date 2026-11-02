@@ -6245,7 +6245,7 @@ Les défauts de la prise de vue, comptés par mois de prise de vue : ce qui prog
 quoi travailler à la prochaine sortie. Rien n'est écrit dans le catalogue.
 
 **Le connecteur** (`Carnet.swift`, pur). Seuils : `horizonMin` 0,5° ; `angleNul` 0,005° (le même
-que `Carnet.ANGLE_NUL` du module) ; provisoires : `medianeSousExposee` 28 et `p95SousExposee` 80
+que `Carnet.ANGLE_NUL` du module) ; `medianeSousExposee` 25 (28 avant le relevé A2 du 2 novembre 2026, 1.6.1) ; provisoire : `p95SousExposee` 80
 (sous-exposition si les deux, sauf compensation de −0,6 IL ou moins, scène ou mode de nuit),
 `partBlancPurHaut` 3 % (ciel brûlé : le tiers haut de la réduction à 512 px en blanc pur, trois
 canaux à 254 ou plus) ; flou, mise au point et bruit fort par les seuils relevés de `Detail` (15,
@@ -8376,6 +8376,10 @@ et les aperçus de `--constats` seulement).
    `gamme_pct` du portrait témoin, 100 photos ; `basGamme` et `chromaGamme` : l'œil). A5 et A7
    attendent les planches de Dany (A7 : 180 candidates passées à `--eclairage`, 44 lues mixtes à la
    borne 12). B1 et B2 non faits (essai sur l'ordre de Dany).
+6. **1.6.1, sur l'ordre de Dany (2 novembre 2026)** : A2 `medianeSousExposee` passe à 25 et
+   `Suivi.reglesAnalyse` à 2 (le module refait toute l'analyse du Suivi) ; A4 `ecretageMin` passe à
+   0,13. Tests `testUneImageSombreSansPartieClaireEstSousExposeeSaufVoulueSombre` (26 ne se dit plus
+   sous-exposée) et `testLaNatureNeSeDitQuAuDelaDuSeuilReleve`. Reste l'œil sur 50 sous-expositions.
 
 ## Bibliothèque
 

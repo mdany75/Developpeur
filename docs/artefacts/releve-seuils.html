@@ -70,13 +70,15 @@
     <div class="chiffre"><b>4 980</b><span>photos tirées dans 8 lots</span></div>
     <div class="chiffre"><b>52 min</b><span>collecte (8 min) et mesure (44 min)</span></div>
     <div class="chiffre"><b>+406 Mo</b><span>dans les aperçus de Lightroom</span></div>
-    <div class="chiffre"><b>2 sur 8</b><span>seuils fixés (A6 et A8)</span></div>
+    <div class="chiffre"><b>4 sur 8</b><span>seuils fixés (A2, A4, A6 et A8)</span></div>
   </div>
 
   <div class="encadre fait">
     <h3>Ce qui change dans le code</h3>
     <ul>
       <li><b>Groupes de lumière</b> (<code>match_series</code>) : une nouvelle lumière commence à 1,5 IL d'écart au lieu de 2,5. Sur 10 journées, 30 coupures par la lumière au lieu de 8.</li>
+      <li><b>Sous-exposition</b> (carnet et Suivi), sur ton ordre du 2 novembre : une photo se dit sous-exposée sous un L* médian de 25 au lieu de 28. Le Suivi refait toute son analyse en tâche de fond (10 à 20 h) ; les constats d'avant et d'après ne se comparent plus.</li>
+      <li><b>Couleurs hors gamme</b> (<code>view_photo</code>) : la nature de l'écrêtage se dit à partir de 0,13 % de la photo au lieu de 0,1 %.</li>
       <li><b>Témoin du teint</b> (<code>match_series</code>) : la peau se signale à 8,1 d'écart a*b* au lieu de 5, et si l'harmonisation l'éloigne d'au moins 4,05 au lieu de 2.</li>
       <li><code>match_look</code> garde son propre seuil de 5 pour la peau qui bouge : ce n'est pas la même mesure, et c'est à juger avec toi.</li>
     </ul>
@@ -85,8 +87,7 @@
   <div class="encadre dany">
     <h3>Ce qui attend ta décision ou ton œil</h3>
     <ul>
-      <li><b>A2, sous-exposition</b> : je propose un L* médian de 25 au lieu de 28. Comme A1, A2 et A3 font refaire toute l'analyse du Suivi (10 à 20 h), rien n'est changé sans ton accord.</li>
-      <li><b>A4, gamme</b> : je propose <code>ecretageMin</code> à 0,13 au lieu de 0,1.</li>
+      <li><b>A2, sous-exposition</b> : reste à juger à l'œil 50 vraies sous-expositions, pour confirmer 25.</li>
       <li>À juger à l'œil avec toi : les recadrages du bruit (A1), le ciel brûlé (A3), les points chauds (A5), l'éclairage mixte (A7), et les paires « même lieu » (A6).</li>
       <li>Les essais B1 (bilan de <code>view_photo</code>) et B2 (alertes des masques) se font dans Lightroom sur ton ordre.</li>
     </ul>
@@ -126,11 +127,11 @@
     </div>
 
     <div class="seuil">
-      <div class="seuil-tete"><h3>A2 · Sous-exposition</h3><span class="pastille propose">proposé</span></div>
+      <div class="seuil-tete"><h3>A2 · Sous-exposition</h3><span class="pastille fixe">fixé</span></div>
       <div class="tableau"><table>
         <thead><tr><th>Constante</th><th>Actuelle</th><th>Relevée</th><th>Effectif</th><th>Décision</th></tr></thead>
         <tbody>
-          <tr><td><code>medianeSousExposee</code></td><td>28</td><td>25</td><td>90 photos notées 3 ★ ou plus par toi</td><td>Proposé, à ta décision</td></tr>
+          <tr><td><code>medianeSousExposee</code></td><td>28</td><td>25</td><td>90 photos notées 3 ★ ou plus par toi</td><td>Fixé à 25 (1.6.1)</td></tr>
           <tr><td><code>p95SousExposee</code></td><td>80</td><td>80</td><td>idem</td><td>Gardé</td></tr>
         </tbody>
       </table></div>
@@ -147,11 +148,11 @@
     </div>
 
     <div class="seuil">
-      <div class="seuil-tete"><h3>A4 · Couleurs hors gamme</h3><span class="pastille propose">proposé</span></div>
+      <div class="seuil-tete"><h3>A4 · Couleurs hors gamme</h3><span class="pastille fixe">fixé</span></div>
       <div class="tableau"><table>
         <thead><tr><th>Constante</th><th>Actuelle</th><th>Relevée</th><th>Effectif</th><th>Décision</th></tr></thead>
         <tbody>
-          <tr><td><code>ecretageMin</code></td><td>0,1 %</td><td>0,13 %</td><td>100 portraits témoins</td><td>Proposé</td></tr>
+          <tr><td><code>ecretageMin</code></td><td>0,1 %</td><td>0,13 %</td><td>100 portraits témoins</td><td>Fixé à 0,13 (1.6.1)</td></tr>
           <tr><td><code>basGamme</code>, <code>chromaGamme</code></td><td>220, 30</td><td>à juger à l'œil</td><td>490</td><td>Gardés, provisoires</td></tr>
         </tbody>
       </table></div>

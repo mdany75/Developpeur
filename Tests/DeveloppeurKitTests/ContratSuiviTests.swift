@@ -276,7 +276,7 @@ final class ContratSuiviTests: XCTestCase {
         let reponse = Suivi.analyser(JSONCoding.line(entree))
         XCTAssertEqual(reponse.code, 0, JSONCoding.line(reponse.ligne))
         XCTAssertEqual(reponse.ligne["ok"], true)
-        XCTAssertEqual(reponse.ligne["regles"]?.int, 1)
+        XCTAssertEqual(reponse.ligne["regles"]?.int, Suivi.reglesAnalyse)
         XCTAssertEqual(reponse.ligne["regles_genre"]?.int, Genre.regles)
         XCTAssertEqual(reponse.ligne["regles_genre"], try XCTUnwrap(exemple["sortie"]?["regles_genre"]), "les règles du genre du contrat")
         XCTAssertEqual(Set(reponse.ligne.object?.keys.map { $0 } ?? []), ["ok", "regles", "regles_genre", "photos"])

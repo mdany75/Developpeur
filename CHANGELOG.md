@@ -1,5 +1,17 @@
 # Changements
 
+## 1.6.1 — 2026-11-02
+
+Deux seuils sortis du relevé de la 1.6 sont maintenant fixés.
+
+### Changé
+- Sous-exposition : une photo se dit sous-exposée sous un L* médian de 25 au lieu de 28 (relevé sur
+  vos photos les mieux notées : 3,3 % d'entre elles signalées au lieu de 5,6 %). Le Suivi refait
+  toute son analyse en tâche de fond (10 à 20 h) ; ses constats d'avant ne se comparent plus à
+  ceux d'après.
+- Couleurs hors gamme : `view_photo` ne dit la nature de l'écrêtage qu'à partir de 0,13 % de la
+  photo au lieu de 0,1 %.
+
 ## 1.6 — 2026-11-02
 
 La 1.6 change de nom : le module s'appelle maintenant « Développeur IA pour Lightroom ». Claude

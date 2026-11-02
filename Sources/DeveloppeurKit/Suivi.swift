@@ -105,8 +105,9 @@ public enum Suivi {
     // MARK: --analyser
 
     /// La version des règles de l'analyse : le module la range dans `analyse.regles`, et une réponse
-    /// de règles plus récentes que celles d'une entrée la fait refaire.
-    public static let reglesAnalyse = 1
+    /// de règles plus récentes que celles d'une entrée la fait refaire. 2 depuis la 1.6.1 : la
+    /// sous-exposition passe à un L* médian de 25 (`Carnet.medianeSousExposee`).
+    public static let reglesAnalyse = 2
     /// Photos par appel (le module en envoie 10).
     public static let maxPhotosAnalyse = 20
     /// Le temps d'une photo, puis de tout l'appel : sous l'alarme de 60 s de perl (côté module), pour

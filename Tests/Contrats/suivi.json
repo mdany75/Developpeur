@@ -78,7 +78,7 @@
         "photos": "une par photo reçue, dans le même ordre : { id, cherches, defauts, genre, mesures } (cherches et defauts : des codes, dans l'ordre des codes ; defauts ⊂ cherches ; genre : un code de analyser.genres, même retouchee), ou { id, raison, texte } quand la vignette ne s'analyse pas"
       },
       "regles_des_codes": {
-        "sous_exposition": "Carnet.constatsVue : L* médian sous 28 et 95e centile sous 80 (medianeSousExposee, p95SousExposee), sans intention du boîtier ; toujours cherché, sauf retouchee",
+        "sous_exposition": "Carnet.constatsVue : L* médian sous 25 et 95e centile sous 80 (medianeSousExposee, p95SousExposee), sans intention du boîtier ; toujours cherché, sauf retouchee",
         "surexposition": "plus de 35 % de l'image en blanc pur (PhotoMeasurements.pureWhite : la photo « brûlée » de PhotoTriee.defautsMesures) ; toujours cherché, sauf retouchee",
         "ciel_brule": "Carnet.constatsVue : plus de 3 % du tiers haut en blanc pur (partBlancPurHaut) ; toujours cherché, sauf retouchee",
         "bruit": "Carnet.constatsVue : max(noise, shadowNoise) d'au moins 1,5 (DetailMeasurements.bruitFort) ; cherché seulement à un ISO connu d'au moins 1 600 (Carnet.bruitCherche) et à 1 024 px, sauf retouchee (le débruitage le cache)",
@@ -661,7 +661,7 @@
       },
       "sortie": {
         "ok": true,
-        "regles": 1,
+        "regles": 2,
         "regles_genre": 1,
         "photos": [
           {
@@ -698,7 +698,7 @@
       },
       "dans_le_registre": {
         "_note": "Ce que le module range ensuite (le à l'heure de la réponse) : une analyse réussie remplace l'entrée analyse, avec son genre et regles_genre (correctif 1.3.8 ; une analyse refaite pour le genre seul garde ses défauts, son le et son regles) ; une raison ajoute un essai (abandonnee au troisième, comme 3990 du relevé). Les mesures ne sont pas rangées.",
-        "4302": {"le": 1795184100, "regles": 1, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": [], "genre": "portrait", "regles_genre": 1},
+        "4302": {"le": 1795184100, "regles": 2, "cherches": ["sous_exposition", "surexposition", "ciel_brule", "flou", "yeux_fermes"], "defauts": [], "genre": "portrait", "regles_genre": 1},
         "4307": {"le": 1795184100, "erreur": "vignette_petite", "essais": 1}
       }
     },
