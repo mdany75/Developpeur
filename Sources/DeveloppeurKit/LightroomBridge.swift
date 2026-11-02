@@ -56,8 +56,9 @@ public extension LightroomServing {
 /// n'arrive pas (délai dépassé, liaison coupée), et que la commande écrit ou coûte
 /// (`reprendLaReponse`), le serveur la redemande par la commande système `reprendre`, avec le jeton,
 /// au lieu de la relancer : une écriture n'est jamais rejouée. Sans réponse gardée (jamais reçue,
-/// module rechargé, module d'avant la reprise), une lecture se rejoue comme avant, une écriture
-/// rend son erreur.
+/// module rechargé, module d'avant la reprise), ou faite sans réponse gardée (trop grosse), une
+/// lecture se rejoue comme avant, une écriture rend son erreur ; une écriture encore en cours
+/// rend « tourne encore… ne pas la relancer ».
 public final class LightroomBridge: LightroomServing {
     public static let defaultRequestPort: UInt16 = 54770
     public static let defaultReplyPort: UInt16 = 54771
@@ -127,6 +128,15 @@ public final class LightroomBridge: LightroomServing {
         """
         La commande « \(command) » a été faite dans Lightroom, mais sa réponse s'est perdue en route et le module \
         ne l'a pas gardée (trop grosse) : ne pas la relancer ; relire la photo (view_photo, get_settings) pour voir où elle en est.
+        """
+    }
+
+    /// La commande qui écrit tourne encore dans Lightroom quand la reprise s'arrête : rien n'est
+    /// relancé, elle finira seule.
+    public static func encoreEnCoursMessage(_ command: String) -> String {
+        """
+        La commande « \(command) » tourne encore dans Lightroom (il est occupé) : ne pas la relancer, elle finira \
+        seule ; relire la photo dans un moment (view_photo, get_settings) pour voir où elle en est.
         """
     }
 
@@ -221,7 +231,10 @@ public final class LightroomBridge: LightroomServing {
     /// Redemande au module la réponse perdue de la commande `commandeID` (`reprendre`). Rend son
     /// résultat, lève son erreur, ou nil si le module ne l'a pas (jamais reçue, oubliée, module
     /// rechargé, module d'avant la reprise, Lightroom injoignable). Une commande que le module dit
-    /// en cours est redemandée pendant `attente` secondes. Ne relance jamais la commande.
+    /// en cours est redemandée pendant `attente` secondes ; encore en cours ensuite, une écriture
+    /// lève `encoreEnCoursMessage` (relancée, elle se ferait deux fois), une lecture rend nil. Une
+    /// réponse faite mais non gardée (`indisponible`) : erreur pour une écriture, nil pour une
+    /// lecture, que `send` relance comme avant. Ne relance jamais la commande.
     private func reprendre(_ commandeID: String, _ command: String, attente: TimeInterval) throws -> JSONValue? {
         let fin = Date().addingTimeInterval(attente)
         while true {
@@ -235,6 +248,8 @@ public final class LightroomBridge: LightroomServing {
             if reponse["trouve"]?.bool == true {
                 journal?("réponse de « \(command) » reprise au module")
                 if reponse["indisponible"]?.string != nil {
+                    // Une lecture se relance sans risque (la recherche de 1 000 photos dépasse 64 Ko).
+                    if Self.lectures.contains(command) { return nil }
                     throw LightroomError.plugin(Self.reponseNonGardeeMessage(command))
                 }
                 let gardee = reponse["reponse"] ?? .null
@@ -245,7 +260,12 @@ public final class LightroomBridge: LightroomServing {
                 }
                 return gardee["result"] ?? .null
             }
-            guard reponse["en_cours"]?.bool == true, Date() < fin else { return nil }
+            guard reponse["en_cours"]?.bool == true else { return nil }
+            guard Date() < fin else {
+                if Self.lectures.contains(command) { return nil }
+                // `.timeout` : partie sans réponse, peut-être faite (`peutEtreExecutee`).
+                throw LightroomError.timeout(Self.encoreEnCoursMessage(command))
+            }
             Thread.sleep(forTimeInterval: intervalleReprise)
         }
     }

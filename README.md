@@ -1347,7 +1347,8 @@ Claude Desktop abandonne un outil au bout de 60 secondes. Quand Lightroom travai
 encore et rappelle l'outil, qui donne alors le résultat sans rien refaire. Claude Code et la
 fenêtre Claude attendent la fin. Si la réponse de Lightroom se perd en route (liaison coupée,
 délai dépassé), le connecteur la redemande au module, qui garde les vingt dernières : une
-retouche faite n'est jamais refaite une seconde fois.
+retouche faite n'est jamais refaite une seconde fois. Si Lightroom, occupé, n'a pas encore fini,
+Claude le dit et relit la photo un peu plus tard, sans relancer la retouche.
 
 ### En cas de problème
 

@@ -185,6 +185,74 @@ final class RepriseReponseTests: XCTestCase {
         XCTAssertEqual(plugin.received.filter { $0 == "appliquer" }.count, 1)
     }
 
+    /// Une recherche coupée dont la réponse était trop grosse pour être gardée (`chercher` de
+    /// 1 000 photos, plus de 64 Ko) : c'est une lecture, elle se relance comme avant la reprise, au
+    /// lieu de lever « ne pas la relancer ».
+    func testUneLectureNonGardeeSeRelance() throws {
+        var recherches = 0
+        plugin.handler = { [unowned self] request in
+            switch request["command"]?.string {
+            case "ping": return [self.answer(request, ["pong": true])]
+            case "reprendre": return [self.answer(request, ["trouve": true, "commande": "chercher", "indisponible": "taille", "octets": 420000])]
+            case "chercher":
+                recherches += 1
+                if recherches == 1 { self.plugin.dropConnections(); return [] }
+                return [self.answer(request, ["photos": [["id": 7]]])]
+            default: return []
+            }
+        }
+        let resultat = try makeBridge().send("chercher", ["limite": 1000], timeout: 5)
+        XCTAssertEqual(resultat["photos"]?.array?.count, 1)
+        XCTAssertEqual(recherches, 2, "relancée une fois")
+        XCTAssertEqual(plugin.received.filter { $0 == "reprendre" }.count, 1)
+    }
+
+    /// Délai dépassé sur une écriture que le module dit encore en cours : « tourne encore… ne pas
+    /// la relancer », jamais « réessayer dans un instant », qui la ferait poser deux fois. Une
+    /// lecture coûteuse dans le même cas garde l'erreur de délai d'origine.
+    func testUneEcritureEnCoursApresUnDelaiNeSeRelancePas() throws {
+        plugin.handler = { [unowned self] request in
+            switch request["command"]?.string {
+            case "ping": return [self.answer(request, ["pong": true])]
+            case "reprendre": return [self.repondreReprise(request)]
+            default:
+                if let cle = request["commande_id"]?.string { self.verrou.lock(); self.enCours.insert(cle); self.verrou.unlock() }
+                return [] // toujours en cours, aucune réponse
+            }
+        }
+        let bridge = makeBridge()
+        XCTAssertThrowsError(try bridge.send("masquer", [:], timeout: 0.3)) { error in
+            XCTAssertEqual(error as? LightroomError, .timeout(LightroomBridge.encoreEnCoursMessage("masquer")))
+            XCTAssertFalse(error.localizedDescription.contains("réessayer"))
+        }
+        XCTAssertEqual(plugin.received.filter { $0 == "masquer" }.count, 1)
+        XCTAssertEqual(plugin.received.filter { $0 == "reprendre" }.count, 1, "une seule demande après un délai")
+        XCTAssertThrowsError(try bridge.send("apercu", [:], timeout: 0.3)) { error in
+            guard case LightroomError.timeout(let message) = error else { return XCTFail("\(error)") }
+            XCTAssertTrue(message.contains("réessayer"))
+        }
+    }
+
+    /// Après une coupure, une écriture encore en cours au bout de `attenteReprise` le dit aussi.
+    func testUneEcritureCoupeeToujoursEnCoursLeDit() throws {
+        plugin.handler = { [unowned self] request in
+            switch request["command"]?.string {
+            case "ping": return [self.answer(request, ["pong": true])]
+            case "reprendre": return [self.repondreReprise(request)]
+            default:
+                if let cle = request["commande_id"]?.string { self.verrou.lock(); self.enCours.insert(cle); self.verrou.unlock() }
+                self.plugin.dropConnections()
+                return []
+            }
+        }
+        let bridge = makeBridge()
+        bridge.attenteReprise = 0.3
+        XCTAssertThrowsError(try bridge.send("appliquer", [:], timeout: 5)) { error in
+            XCTAssertEqual(error as? LightroomError, .timeout(LightroomBridge.encoreEnCoursMessage("appliquer")))
+        }
+        XCTAssertEqual(plugin.received.filter { $0 == "appliquer" }.count, 1)
+    }
+
     /// Une lecture coûteuse (aperçu) se reprend d'abord ; une lecture simple se relance comme
     /// avant, sans reprise ; une lecture coûteuse sans réponse gardée se relance aussi.
     func testLecturesCouteusesRepriseesLecturesSimplesRelancees() throws {

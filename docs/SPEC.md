@@ -304,9 +304,14 @@ dans Lightroom si elle a été appliquée »), alors qu'elle était souvent fait
   écrit (hors de `LightroomBridge.lectures`) ou coûte (`lecturesCouteuses` : `apercu`, `vignettes`,
   `chercher` ; `reprendLaReponse`), il ouvre une nouvelle connexion et envoie `reprendre`
   (`delaiRepriseReponse`, 3 s), avec le jeton. Trouvée : son résultat est rendu, ou son erreur
-  levée telle quelle (`code: "arret"` reste `CommandeArretee`) ; `indisponible` : erreur « faite
-  dans Lightroom… ne pas la relancer » (`reponseNonGardeeMessage`). En cours : après une coupure,
-  redemandée chaque seconde pendant `attenteReprise` (30 s) ; après un délai, une seule demande.
+  levée telle quelle (`code: "arret"` reste `CommandeArretee`) ; `indisponible` : pour une
+  écriture, erreur « faite dans Lightroom… ne pas la relancer » (`reponseNonGardeeMessage`) ; pour
+  une lecture (un `chercher` de 1 000 photos dépasse 64 Ko), traitée comme rien de gardé, donc
+  relancée après une coupure. En cours : après une coupure, redemandée chaque seconde pendant
+  `attenteReprise` (30 s) ; après un délai, une seule demande ; encore en cours ensuite, une
+  écriture lève `LightroomError.timeout` avec `encoreEnCoursMessage` (« tourne encore… ne pas la
+  relancer ; relire la photo dans un moment »), jamais « réessayer dans un instant », qui la ferait
+  faire deux fois ; une lecture garde son erreur d'origine.
   Rien de gardé (jamais reçue, oubliée, module rechargé ou Lightroom relancé, module d'avant la
   reprise qui répond « Commande inconnue », Lightroom injoignable) : une lecture se relance comme
   avant (`LightroomBridge.lectures`), une écriture rend son erreur d'origine, **jamais rejouée**.
