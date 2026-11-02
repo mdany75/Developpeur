@@ -52,13 +52,12 @@ FenetreRapide.FLECHE = 14
 -- puis à sa place quand il est retiré le même soir) : noter et poser les notes de Claude, Retouche
 -- pro et Portrait (les messages des invites de la fenêtre Claude, pour chaque photo) ; puis Classer
 -- (après la 1.6, point « Le Suivi et le classement » de la page Analyse) : mots-clés, lieu et
--- légende proposés, rien d'écrit sans l'accord de Dany (l'invite le demande, quel que soit le mode
--- du module) ; le bouton lui-même n'écrit rien. Icônes de Dispositions.IMAGES ; ESPACE : l'écart
+-- légende proposés seulement (Consignes.classerRapide, quel que soit le mode du module : la Demande
+-- rapide n'a rien pour accepter) ; le bouton lui-même n'écrit rien. Icônes de Dispositions.IMAGES ; ESPACE : l'écart
 -- entre deux carrés (un carré de 55 a un cadre de 57). Quatre carrés laissent au champ 654 points.
 FenetreRapide.CARRE = FenetreRapide.HAUTEUR_DEMANDE
 FenetreRapide.ESPACE = 6
 local retouchePro, portrait = Consignes.invite('retouche_pro'), Consignes.invite('portrait')
-local classer = Consignes.invite('classer')
 FenetreRapide.ACTIONS = {
     { icone = 'rapide-noter', message = Consignes.noterRapide,
         tooltip = "Noter les photos sélectionnées : Claude pose ses notes (0 à 5 ★, ou rejet)" },
@@ -66,7 +65,7 @@ FenetreRapide.ACTIONS = {
         tooltip = retouchePro.titre .. ", pour chaque photo sélectionnée : " .. retouchePro.message },
     { icone = 'rapide-portrait', message = Consignes.surLaSelection(portrait.message),
         tooltip = portrait.titre .. ", pour chaque photo sélectionnée : " .. portrait.message },
-    { icone = 'rapide-classer', message = Consignes.surLaSelection(classer.message),
+    { icone = 'rapide-classer', message = Consignes.classerRapide,
         tooltip = "Classer les photos sélectionnées : mots-clés, lieu et légende proposés, rien d'écrit sans ton accord" },
 }
 -- La zone du résultat : toute la hauteur au-dessus de la demande (relevé le 22 octobre 2026 : 988 ×

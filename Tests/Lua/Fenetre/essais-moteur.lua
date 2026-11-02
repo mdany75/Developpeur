@@ -178,7 +178,8 @@ essai("Consignes : invite Classer (après la 1.6), la dernière ; mots-clés, li
     egal(nil, classer.modele, 'le modèle des préférences')
     for _, morceau in ipairs({ 'photo active', "sans rien écrire d'abord", 'view_photo', 'get_settings', 'list_keywords',
         "un lieu seulement s'il est sûr", 'position GPS', 'jamais deviné', 'légende courte', 'attends mon accord avant set_metadata',
-        'même en mode Appliquer' }) do
+        'même en mode Appliquer', 'get_settings : mots-clés, légende', 'la position GPS seule ne nomme pas le lieu',
+        "sans remplacer celle que j'ai déjà écrite" }) do
         contient(classer.message, morceau, 'invite Classer')
     end
     vrai(not classer.message:find('%d'), 'invite Classer sans chiffre')
@@ -188,6 +189,22 @@ essai("Consignes : invite Classer (après la 1.6), la dernière ; mots-clés, li
     end
     -- Pour la Demande rapide : chaque photo sélectionnée.
     contient(Consignes.surLaSelection(classer.message), 'Classe chaque photo', 'Classer sur la sélection')
+end)
+
+essai("Consignes : Classer dans la Demande rapide propose seulement, sans attendre un accord qui n'y viendrait pas (relecture du 2 novembre 2026)", function()
+    local r = Consignes.classerRapide
+    contient(r, 'Classe chaque photo', 'pour chaque photo sélectionnée')
+    contient(r, "un lieu seulement s'il est sûr", 'le même corps que l\'invite')
+    contient(r, 'la position GPS seule ne nomme pas le lieu')
+    contient(r, "n'appelle pas set_metadata, même en mode Appliquer", 'proposer seulement')
+    contient(r, 'nouvelle demande qui nomme ce qu\'il faut écrire', 'comment écrire ensuite')
+    contient(r, 'fenêtre Claude', 'ou dans la fenêtre Claude')
+    vrai(not r:find('attends mon accord', 1, true), "pas d'accord attendu dans une conversation jetable")
+    vrai(not r:find('%d'), 'sans chiffre')
+    local bas = r:lower()
+    for _, mot in ipairs({ 'client', 'galerie', 'concours', 'mariage', 'photoshop', 'note', 'libellé' }) do
+        vrai(not bas:find(mot, 1, true), 'Classer rapide sans « ' .. mot .. ' »')
+    end
 end)
 
 essai('Consignes : le texte de la fenêtre, lu à chaque demande, fait 7 500 caractères au plus (1.3)', function()

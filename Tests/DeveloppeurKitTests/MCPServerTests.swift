@@ -116,6 +116,7 @@ final class MCPServerTests: XCTestCase {
         XCTAssertTrue(Prompts.classer.render([:]).contains("Photos : la photo active de Lightroom"), "par défaut, la photo active")
         for morceau in ["sans rien écrire avant l'accord de l'utilisateur, même en mode Appliquer", "list_keywords",
                         "seulement s'il est sûr", "position GPS", "jamais deviné", "Légende (caption) : une phrase courte",
+                        "La position GPS seule ne nomme pas le lieu", "ni d'après les coordonnées", "get_settings › classement › legende",
                         "attends son accord", "Après son accord seulement : set_metadata", "undo_last"] {
             XCTAssertTrue(texte.contains(morceau), "classer : « \(morceau) » manque")
         }

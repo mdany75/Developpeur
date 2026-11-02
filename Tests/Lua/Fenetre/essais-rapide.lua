@@ -234,12 +234,11 @@ essai("Les boutons à icône à gauche du champ, sans ♻ ; le titre de la fenê
     vrai(FenetreRapide.reinitialiser == nil, 'plus de reinitialiser')
 end)
 
-essai("Le 4ᵉ bouton, Classer : sa demande part avec le message de l'invite classer, pour chaque photo ; le bouton n'écrit rien au catalogue", function()
-    local classer = Consignes.invite('classer')
+essai("Le 4ᵉ bouton, Classer : sa demande part avec Consignes.classerRapide (proposer seulement, pour chaque photo) ; le bouton n'écrit rien au catalogue", function()
     egal(4, #FenetreRapide.ACTIONS, 'quatre boutons à icône')
     local action = FenetreRapide.ACTIONS[4]
     egal('rapide-classer', action.icone)
-    egal(Consignes.surLaSelection(classer.message), action.message, "le message de l'invite classer, pour chaque photo")
+    egal(Consignes.classerRapide, action.message, 'Classer de la Demande rapide, pour chaque photo')
     contient(action.tooltip, "rien d'écrit sans ton accord", 'infobulle')
     -- Plusieurs photos sélectionnées ; toute écriture au catalogue (ordinaire ou privée) et tout
     -- champ ou mot-clé posé sur une photo est compté.
@@ -278,8 +277,12 @@ essai("Le 4ᵉ bouton, Classer : sa demande part avec le message de l'invite cla
     S.taches[taches + 1]()
     vrai(#recus > recu, 'Claude Code reçoit la demande')
     local message = recus[#recus].message
-    contient(message, Consignes.surLaSelection(classer.message), "le texte de l'invite classer")
+    contient(message, Consignes.classerRapide, 'le texte de Classer pour la Demande rapide')
     contient(message, Consignes.rapide, 'comme une demande rapide sur plusieurs photos')
+    -- Relecture du 2 novembre 2026 : la conversation n'est pas gardée, un accord attendu y serait
+    -- sans issue ; Claude propose seulement.
+    vrai(not message:find('attends mon accord', 1, true), "aucun accord attendu dans la conversation jetable")
+    contient(message, "n'appelle pas set_metadata", 'proposer seulement')
     egal(0, ecritures, 'aucune écriture au catalogue')
     egal(privees, S.ecrituresPrivees or 0, 'aucune écriture privée')
     egal(0, #poses, 'aucun champ ni mot-clé posé')

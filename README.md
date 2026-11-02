@@ -190,8 +190,9 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 - Claude reçoit avec chaque demande la photo active et la sélection de Lightroom.
 - Huit invites en raccourcis : Retouche pro, Portrait, Paysage, Noir et blanc, ISO élevé,
   Composition, Sports, Classer. Classer propose des mots-clés (ceux de votre catalogue d'abord), un
-  lieu seulement s'il est sûr (position GPS ou mot-clé de lieu déjà posé) et une légende courte :
-  Claude n'écrit rien avant votre accord, même en mode Appliquer. Portrait, Paysage et Noir et blanc passent en fin de retouche par éclaircir
+  lieu seulement s'il est sûr (un champ ou un mot-clé de lieu déjà posé ; d'une position GPS seule,
+  Claude donne les coordonnées et vous nommez le lieu) et une légende courte, sans remplacer celle
+  que vous avez écrite : Claude n'écrit rien avant votre accord, même en mode Appliquer. Portrait, Paysage et Noir et blanc passent en fin de retouche par éclaircir
   et assombrir comme un tireur (voir Retouches locales), avec l'avant/après de cette étape ; en
   noir et blanc, le grain vient après. Composition lit la composition de la photo active et propose
   un cadre, sans l'appliquer.
@@ -273,10 +274,12 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
   portrait à l'étincelle une retouche de portrait, et l'étiquette à l'étincelle les classe, comme
   les invites du même nom de la fenêtre Claude. En mode « Proposer
   d'abord », Claude ne fait que proposer ces retouches, et la Demande rapide n'a rien pour les
-  accepter : prenez le mode Appliquer, ou la fenêtre Claude. Classer, lui, ne fait toujours que
-  proposer (mots-clés, lieu, légende), quel que soit le mode : rien n'est écrit sans votre accord,
-  que vous donnez dans la fenêtre Claude (sur une photo seule, elle reprend la conversation) ou par
-  une nouvelle demande.
+  accepter : prenez le mode Appliquer, ou la fenêtre Claude. Classer, lui, ne fait que proposer
+  (mots-clés, lieu, légende), quel que soit le mode, et n'écrit rien. Pour écrire : sur une photo
+  seule (case Autre photo cochée), répondez dans la fenêtre Claude, qui reprend la conversation ;
+  sur plusieurs, la proposition n'est pas gardée : passez par l'invite Classer de la fenêtre Claude,
+  ou faites une nouvelle demande qui nomme ce qu'il faut écrire (« pose les mots-clés lac et
+  automne sur ces photos »).
 - Échap ne la ferme pas (une fenêtre flottante de Lightroom ne reçoit pas cette touche) : le bouton
   de fermeture rouge, en haut à gauche.
 
@@ -563,7 +566,7 @@ cadre.
   proposition une étape « Claude · essai : image entière ».
 - Lire tous les réglages d'une photo, groupés comme dans le module Développement (profil,
   recadrage, courbes, masques, taches), avec son classement (note, drapeau, libellé, titre,
-  mots-clés).
+  légende, droits d'auteur, champs IPTC, position GPS, mots-clés).
 
 **Retoucher**
 

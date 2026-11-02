@@ -2333,12 +2333,19 @@ suit), puis ▲ ▼ et Envoyer à sa droite. À sa gauche, quatre carrés à ic�
 la 1.6 : images `rapide-noter`, `rapide-retouche`, `rapide-portrait`, `rapide-classer`), chacun une
 demande toute faite par `FenetreRapide.demander`, le champ laissé tel quel : noter
 (`Consignes.noterRapide` : `propose_ratings` avec `apply`, le clic vaut la demande), Retouche pro,
-Portrait et Classer (`Consignes.invite`, pour chaque photo par `Consignes.surLaSelection`). Classer
-(pendant du connecteur : l'invite `classer`) fait proposer mots-clés (`list_keywords` d'abord), lieu
-(seulement d'après la position GPS ou un mot-clé de lieu déjà posé) et légende courte, et rien
-n'est écrit (`set_metadata`) sans l'accord de Dany, quel que soit le mode du module ; le bouton
-lui-même n'écrit rien au catalogue (`essais-rapide.lua`). Sur plusieurs photos, la conversation
-n'est pas gardée : l'accord se donne par une nouvelle demande. Le champ garde 654 points. Le bouton ♻ (une
+Portrait (`Consignes.invite`, pour chaque photo par `Consignes.surLaSelection`) et Classer
+(`Consignes.classerRapide`). L'invite Classer (pendant du connecteur : l'invite `classer`) fait
+proposer mots-clés (`list_keywords` d'abord), lieu (seulement repris d'un champ ou d'un mot-clé de
+lieu déjà posé : aucun outil ne traduit la position GPS en ville ou en pays, Claude donne les
+coordonnées et Dany nomme le lieu) et légende courte (celle déjà écrite reste : `get_settings` ›
+`classement` › `legende`, avec `droits`, depuis la relecture du 2 novembre 2026), et rien n'est
+écrit (`set_metadata`) sans l'accord de Dany, quel que soit le mode du module. Le bouton de la
+Demande rapide ne fait que proposer : `Consignes.rapide` dit de tout faire dans ce tour et, sur
+plusieurs photos, la conversation n'est pas gardée, un « attends mon accord » y serait sans issue
+(relecture du 2 novembre 2026). Claude finit en disant comment écrire : dans la fenêtre Claude
+si la conversation est gardée (une photo, case Autre photo cochée), sinon par l'invite Classer ou
+une nouvelle demande qui nomme ce qu'il faut écrire. Le bouton lui-même n'écrit rien au catalogue
+(`essais-rapide.lua`). Le champ garde 654 points. Le bouton ♻ (une
 conversation neuve, du 22 au 24 octobre 2026) est retiré : une autre photo active ou une autre
 sélection efface la réponse (`FenetreRapide.suivreSelection`, `Lightroom.photos` toutes les 2 s,
 `Moteur.oublierRapide`), le champ gardé ; une sélection changée pendant le travail de Claude ou

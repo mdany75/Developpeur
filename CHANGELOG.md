@@ -6,9 +6,18 @@
 - Classer : une invite de la fenêtre Claude (la huitième, après Sports) et un 4ᵉ bouton à icône
   dans la Demande rapide (une étiquette à l'étincelle), avec son pendant `classer` dans les invites
   du connecteur. Claude regarde la photo et propose des mots-clés (ceux du catalogue d'abord, par
-  `list_keywords`), un lieu seulement s'il est sûr (position GPS ou mot-clé de lieu déjà posé,
-  jamais deviné) et une légende courte ; il n'écrit rien (`set_metadata`) avant votre accord, même
-  en mode Appliquer.
+  `list_keywords`), un lieu seulement s'il est sûr (repris d'un champ ou d'un mot-clé de lieu déjà
+  posé ; d'une position GPS seule, il donne les coordonnées et vous nommez le lieu, aucun outil ne
+  la traduisant en ville) et une légende courte, sans remplacer celle que vous avez écrite ; il
+  n'écrit rien (`set_metadata`) avant votre accord, même en mode Appliquer. Le bouton de la
+  Demande rapide ne fait que proposer, et dit comment écrire ensuite (fenêtre Claude, ou nouvelle
+  demande qui nomme ce qu'il faut écrire) : la conversation d'une Demande rapide sur plusieurs
+  photos n'est pas gardée.
+
+### Corrigé
+- `get_settings` › `classement` rend aussi la légende (`legende`) et les droits d'auteur
+  (`droits`) : l'invite Classer garde une légende déjà écrite, et `partage` lit les droits
+  d'auteur là où elle les cherchait.
 
 ## 1.6.1 — 2026-11-02
 
