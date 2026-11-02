@@ -69,9 +69,14 @@ func usage(erreur: Bool = false) {
                 lecture seule ; une ligne JSON, l'avancement sur stderr
             mcp-developpeur --preparer-especes   ouvre BioCLIP 2 (Developpeur/Modeles, scripts/preparer-bioclip.sh),
                 calcule et garde les vecteurs de la liste des espèces s'ils manquent (install.sh) ; une ligne JSON avec les temps
-            mcp-developpeur --especes-essai <dossier de JPEG> [--espece <nom ou groupe>] [--nombre 200]
-                développement : l'espèce la plus probable de chaque image du dossier (et les trois premières), le temps
-                par image, et avec --espece le score de l'espèce ou du groupe cherché ; ni Lightroom ni catalogue
+            mcp-developpeur --especes-essai (--collection <nom> | --dossier <chemin> | --ids 1,2,… | --images <dossier>)
+                [--espece <nom ou groupe>] [--nombre 200] [--planche <dossier>] [--jugement <fichier.json>]
+                développement : l'espèce la plus probable de chaque photo (vignettes de 512 px, comme --sens-essai ;
+                --images ou un dossier seul : sans Lightroom), les trois premières, porte, score et écart au 2e, le
+                temps par image, et avec --espece le score de l'espèce ou du groupe cherché ; lecture seule. Planche
+                HTML (planche-especes.html dans --planche, sinon le dossier --images, sinon un dossier temporaire) :
+                boutons juste et faux, JSON du jugement à copier ; --jugement le relit et dit les seuils qui
+                sépareraient le mieux justes et faux (seul : sans modèle ni Lightroom)
             mcp-developpeur --graphiques '<json>' <dossier>
                 le Suivi : les tuiles et les neuf graphiques d'une période d'après suivi.json (et carnet.json), lus
                 seulement, dessinés en PNG 2x dans le dossier, puis une ligne JSON avec les rectangles des barres
@@ -485,21 +490,57 @@ case "--preparer-especes":
         exit(1)
     }
 case "--especes-essai":
-    // Développement (1.6.3) : l'espèce de chaque JPEG d'un dossier, sans Lightroom, pour juger BioCLIP 2
-    // et relever les seuils provisoires ; une ligne JSON finale.
-    var reste = arguments.dropFirst()
-    var dossierImages: URL?
+    // Développement (1.6.3) : l'espèce de chaque photo d'une source d'essai (comme --sens-essai :
+    // dossier de JPEG sans Lightroom, ou collection, dossier, ids lus par le module), pour juger
+    // BioCLIP 2 et relever les seuils provisoires (EssaiEspeces) ; lecture seule. Une planche HTML à
+    // juger ; --jugement redonne ce jugement et dit les seuils. Une ligne JSON, l'avancement sur stderr.
+    var source: EssaiSens.Source?
     var demandeEspece: String?
     var nombreImages = 200
+    var dossierPlanche: URL?
+    var fichierJugement: URL?
+    var reste = arguments.dropFirst()
+    func suivant() -> String {
+        guard let valeur = reste.first else { usage(); exit(2) }
+        reste = reste.dropFirst()
+        return valeur
+    }
     while let option = reste.first {
         reste = reste.dropFirst()
         switch option {
-        case "--espece": guard let v = reste.first else { usage(); exit(2) }; demandeEspece = v; reste = reste.dropFirst()
-        case "--nombre": guard let v = reste.first, let n = Int(v) else { usage(); exit(2) }; nombreImages = n; reste = reste.dropFirst()
-        default: dossierImages = URL(fileURLWithPath: option)
+        case "--collection": source = .collection(suivant())
+        case "--dossier": source = .dossier(suivant())
+        case "--ids": source = .ids(suivant().split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) })
+        case "--images": source = .images(URL(fileURLWithPath: suivant()))
+        case "--espece": demandeEspece = suivant()
+        case "--nombre": guard let n = Int(suivant()) else { usage(); exit(2) }; nombreImages = n
+        case "--planche": dossierPlanche = URL(fileURLWithPath: suivant())
+        case "--jugement": fichierJugement = URL(fileURLWithPath: suivant())
+        default:
+            // L'ancienne forme : le dossier de JPEG seul.
+            guard !option.hasPrefix("--") else { usage(); exit(2) }
+            source = .images(URL(fileURLWithPath: option))
         }
     }
-    guard let dossierImages else { usage(); exit(2) }
+    var jugement: JSONValue?
+    if let fichierJugement {
+        guard let data = try? Data(contentsOf: fichierJugement), let lu = try? JSONCoding.parse(data) else {
+            print(line: JSONCoding.line(["ok": false, "erreur": .string("Jugement illisible : \(fichierJugement.path)")]))
+            exit(1)
+        }
+        jugement = EssaiEspeces.seuils(lu)
+    }
+    guard let source else {
+        // --jugement seul : les seuils, sans modèle ni Lightroom.
+        guard let jugement else { usage(); exit(2) }
+        print(line: JSONCoding.line(jugement))
+        exit(0)
+    }
+    // La planche : --planche, sinon le dossier des images, sinon un dossier temporaire gardé.
+    let planche: URL = dossierPlanche ?? {
+        if case .images(let dossier) = source { return dossier }
+        return FileManager.default.temporaryDirectory.appendingPathComponent("especes-essai-\(ProcessInfo.processInfo.processIdentifier)")
+    }()
     do {
         let ouvert = try ouvrirEspeces { fait, total in log("vecteurs des espèces : \(fait) sur \(total)") }
         let classeur = ouvert.classeur
@@ -511,48 +552,12 @@ case "--especes-essai":
             }
             cible = c
         }
-        let fichiers = ((try? FileManager.default.contentsOfDirectory(at: dossierImages, includingPropertiesForKeys: nil)) ?? [])
-            .filter { ["jpg", "jpeg", "png", "heic"].contains($0.pathExtension.lowercased()) }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }.prefix(nombreImages)
-        var lignes: [JSONValue] = []
-        var durees: [Double] = []
-        for url in fichiers {
-            guard let data = try? Data(contentsOf: url), let image = PreviewImages.image(data) else {
-                lignes.append(["fichier": .string(url.lastPathComponent), "erreur": "illisible"])
-                continue
-            }
-            let t = Date()
-            let resultat = try classeur.classer(image: image)
-            durees.append(Date().timeIntervalSince(t))
-            var ligne: [String: JSONValue] = ["fichier": .string(url.lastPathComponent), "espece": classeur.json(resultat),
-                                              "nature": resultat.nature.map { .number(($0 * 1000).rounded() / 1000) } ?? .null,
-                                              "trois_premieres": .array(resultat.meilleures(3).map { m in
-                                                  let e = classeur.liste.especes[m.indice]
-                                                  return ["nom": .string(e.nom), "latin": .string(e.latin), "probabilite": .number((m.probabilite * 1000).rounded() / 1000)]
-                                              })]
-            if let cible {
-                let indices: [Int]
-                switch cible {
-                case .espece(let i): indices = [i]
-                case .groupe(let g): indices = classeur.liste.indices(g)
-                }
-                ligne["score_cherche"] = .number((resultat.somme(indices) * 1000).rounded() / 1000)
-            }
-            lignes.append(.object(ligne))
-            log("\(url.lastPathComponent) : \(classeur.liste.especes[resultat.meilleures(1).first?.indice ?? 0].nom)")
-        }
-        let premiere = durees.first ?? 0
-        let suivantes = durees.dropFirst()
-        print(line: JSONCoding.line([
-            "ok": true, "modele": .string(Especes.nomModele), "especes": .number(Double(classeur.liste.especes.count)),
-            "ouverture_s": .number((ouvert.secondes * 10).rounded() / 10), "depuis_le_cache": .bool(classeur.depuisLeCache),
-            "seuils_provisoires": ["confiance": .number(Especes.seuilConfianceProvisoire), "recherche": .number(Especes.seuilRechercheProvisoire),
-                                   "groupe": .number(Especes.seuilGroupeProvisoire), "porte": .number(Especes.seuilPorteProvisoire)],
-            "porte": .bool(classeur.aUnePorte),
-            "temps": ["premiere_image_ms": .number((premiere * 1000).rounded()),
-                      "image_ms_moyen": .number(suivantes.isEmpty ? 0 : (suivantes.reduce(0, +) / Double(suivantes.count) * 1000).rounded())],
-            "images": .array(lignes),
-        ]))
+        let lightroom: LightroomServing? = { if case .images = source { return nil }; return LightroomBridge.fromEnvironment() }()
+        let essai = EssaiEspeces(lightroom: lightroom, classeur: classeur) { log($0) }
+        var resultat = try essai.lancer(source: source, nombre: nombreImages, cible: cible, planche: planche).object ?? [:]
+        resultat["ouverture_s"] = .number((ouvert.secondes * 10).rounded() / 10)
+        if let jugement { resultat["jugement"] = jugement }
+        print(line: JSONCoding.line(.object(resultat)))
     } catch {
         print(line: JSONCoding.line(["ok": false, "erreur": .string(error.localizedDescription)]))
         exit(1)

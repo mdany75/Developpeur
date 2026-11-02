@@ -43,6 +43,14 @@ public final class EssaiSens {
 
     /// Les photos de la source (au plus `nombre`), avec leur vignette de 1 024 px.
     func photos(_ source: Source, nombre: Int) throws -> [Photo] {
+        try Self.photos(source, nombre: nombre, taille: 1024, lightroom: lightroom, option: "--sens-essai", dire: dire)
+    }
+
+    /// Les photos d'une source d'essai (au plus `nombre`), avec leur vignette de `taille` px : un
+    /// dossier de JPEG sans Lightroom, ou les commandes `chercher` et `vignettes` du module (des
+    /// lectures seulement, vidéos sautées). Partagé par `--sens-essai` et `--especes-essai`.
+    static func photos(_ source: Source, nombre: Int, taille: Int, lightroom: LightroomServing?, option: String,
+                       dire: (String) -> Void) throws -> [Photo] {
         if case .images(let dossierImages) = source {
             let fichiers = ((try? FileManager.default.contentsOfDirectory(at: dossierImages, includingPropertiesForKeys: nil)) ?? [])
                 .filter { ["jpg", "jpeg", "png", "heic"].contains($0.pathExtension.lowercased()) }
@@ -53,7 +61,7 @@ public final class EssaiSens {
                 return Photo(id: i + 1, fichier: url.lastPathComponent, image: image, erreur: image == nil ? "illisible" : nil)
             }
         }
-        guard let lightroom else { throw LightroomError.invalid("--sens-essai : Lightroom est nécessaire pour cette source.") }
+        guard let lightroom else { throw LightroomError.invalid("\(option) : Lightroom est nécessaire pour cette source.") }
         var ids: [Int] = []
         var fichiers: [Int: String] = [:]
         switch source {
@@ -82,7 +90,7 @@ public final class EssaiSens {
         var photos: [Photo] = []
         for debut in stride(from: 0, to: ids.count, by: 50) {
             let lot = Array(ids[debut..<min(debut + 50, ids.count)])
-            let reponse = try lightroom.send("vignettes", ["photos": .array(lot.map { .number(Double($0)) }), "taille": 1024], timeout: 120)
+            let reponse = try lightroom.send("vignettes", ["photos": .array(lot.map { .number(Double($0)) }), "taille": .number(Double(taille))], timeout: 120)
             for item in reponse["photos"]?.array ?? [] {
                 guard let id = item["id"]?.int else { continue }
                 let image = item["vignette"]?.string.flatMap { try? Data(contentsOf: URL(fileURLWithPath: $0)) }.flatMap(PreviewImages.image)

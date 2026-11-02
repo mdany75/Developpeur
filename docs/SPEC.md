@@ -8372,8 +8372,14 @@ classe donc d'abord l'image entre `Especes.porteNature` et `Especes.porteAutre` 
 - L'invite `classer` demande `species` = true pour un animal ou une plante, et le nom en mot-clé
   seulement si `trouvee`, dit « probable », après l'accord de Dany (comme tout le classement).
 - Sans le modèle, `species` refuse sans rien lancer et tout le reste marche comme avant.
-- `--especes-essai <dossier de JPEG> [--espece <nom ou groupe>]` (développement) : l'espèce, les trois
-  premières, la porte et le temps de chaque image, sans Lightroom.
+- `--especes-essai` (développement, `EssaiEspeces.swift`) : les sources de `--sens-essai`
+  (`--collection`, `--dossier`, `--ids`, `--images` ou un dossier de JPEG seul, sans Lightroom ;
+  `EssaiSens.photos`, vignettes de 512 px, lecture seule) ; l'espèce, les trois premières, la porte, le
+  score et l'écart au 2e, et le temps de chaque image. Une planche HTML (`planche-especes.html` dans
+  `--planche`, sinon le dossier `--images`, sinon un dossier temporaire gardé, vignettes dans la page) :
+  boutons juste et faux, JSON du jugement à copier. `--jugement <fichier.json>` le relit
+  (`EssaiEspeces.seuils`, seul : sans modèle ni Lightroom) : pour chaque mesure, le seuil qui garde le
+  plus de justes et écarte le plus de faux, comparé au seuil provisoire.
 
 **Mesuré le 2 nov. 2026** (exécutable release, Mac de Dany, 24 images de profil de macOS, /Library/User
 Pictures) : 41 ms par image (porte et BioCLIP), 1,4 s pour la première ; ouverture 1,1 s (vecteurs
@@ -8386,9 +8392,9 @@ BioCLIP le reconnaissait (0,44). Une fleur de dessin ou une feuille seule resten
 
 ### À constater (espèces)
 
-1. **La qualité sur les vraies photos de Dany** : `mcp-developpeur --especes-essai <dossier de JPEG
-   exportés de ses oiseaux, fleurs, animaux de voyage>` (lecture seule) ; pour chaque photo, l'espèce
-   juste ou non, et sa confiance : fixe **`seuilConfianceProvisoire`**, **`seuilRechercheProvisoire`**,
+1. **La qualité sur les vraies photos de Dany** : `mcp-developpeur --especes-essai --collection
+   "<collection de ses oiseaux, fleurs, animaux de voyage>"` (ou `--images <dossier de JPEG>` ; lecture
+   seule) ; Dany juge chaque case de la planche, juste ou faux, puis `--jugement` donne les seuils : fixe **`seuilConfianceProvisoire`**, **`seuilRechercheProvisoire`**,
    **`seuilGroupeProvisoire`** et **`seuilPorteProvisoire`** (provisoires, 0,5, 0,15, 0,5 et 0,5), et
    dit s'il faut ajouter des espèces à la liste (celles que Dany photographie et qui manquent). Un
    petit oiseau loin dans le cadre se juge sur un zoom (`view_photo` avec `region` et `species`).
