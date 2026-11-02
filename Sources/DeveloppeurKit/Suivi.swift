@@ -125,32 +125,143 @@ public enum Suivi {
         public var cache: Bool
         public var retouchee: Bool
         public var objectif: String? = nil
+        /// La recherche par le sens (1.6, `sens` du contrat) : l'uuid de l'original, la date de sa
+        /// prise de vue (« AAAA-MM-JJ HH:MM » du relevé ; absente : sans date), et `sensSeul` : seule
+        /// l'empreinte est à faire (l'analyse est à jour).
+        public var uuid: String? = nil
+        public var date: String? = nil
+        public var sensSeul = false
+    }
+
+    /// L'empreinte du sens pendant l'analyse (1.6) : l'encodeur, ouvert au premier usage (MobileCLIP,
+    /// posé par main.swift seulement ; un faux dans les essais), et la racine des index
+    /// (Developpeur/Index ; un dossier temporaire dans les essais).
+    public struct IndexeurSens {
+        public var ouvrir: () throws -> EncodeurSens
+        public var racine: URL
+        /// Les fichiers du modèle qui manquent (vide : tout est là), pour get_status.
+        public var manquants: () -> [String]
+        public init(racine: URL = Sens.racineIndex, manquants: @escaping () -> [String] = { [] }, ouvrir: @escaping () throws -> EncodeurSens) {
+            self.racine = racine
+            self.manquants = manquants
+            self.ouvrir = ouvrir
+        }
     }
 
     /// `--analyser '<json>'` : une ligne `{ok, regles, regles_genre, photos}` (une photo par photo
     /// reçue, dans le même ordre), ou un refus de tout l'appel. `mesurer` et les délais se remplacent pour les essais.
+    /// Avec `sens` (le connecteur a le modèle) et un `catalogue` dans l'entrée, l'empreinte de chaque
+    /// photo qui porte son `uuid` est rangée dans l'index du catalogue, et la ligne dit `regles_sens`
+    /// (chaque photo : `sens` vrai, ou `sens_raison`). Sans eux, la ligne est celle d'avant la 1.6.
     public static func analyser(_ texte: String, delaiParPhoto: TimeInterval = delaiParPhoto, delaiTotal: TimeInterval = delaiAnalyse,
-                                mesurer: @escaping (AAnalyser) -> JSONValue = analyserPhoto) -> Reponse {
+                                mesurer: @escaping (AAnalyser) -> JSONValue = analyserPhoto, sens: IndexeurSens? = nil) -> Reponse {
         let photos: [AAnalyser]
+        let catalogue: String?
         do {
-            photos = try lireAAnalyser(texte)
+            (photos, catalogue) = try lireAAnalyser(texte)
         } catch let refus as Refus {
             return refus.reponse
         } catch {
             return Refus(raison: "arguments", texte: "Arguments de --analyser : \(error.localizedDescription)").reponse
         }
-        let mesurees = mesurerBorne(photos, mesurer: mesurer, parPhoto: delaiParPhoto, total: delaiTotal)
-        return Reponse(ligne: ["ok": true, "regles": .number(Double(reglesAnalyse)), "regles_genre": .number(Double(Genre.regles)),
-                               "photos": .array(mesurees)], code: 0)
+        var ligne: [String: JSONValue] = ["ok": true, "regles": .number(Double(reglesAnalyse)), "regles_genre": .number(Double(Genre.regles))]
+        var mesure = mesurer
+        if let sens, let catalogue {
+            let empreintes = Empreintes(sens: sens, catalogue: catalogue)
+            ligne["regles_sens"] = .number(Double(Sens.regles))
+            mesure = { photo in
+                let mesuree: JSONValue = photo.sensSeul ? ["id": .number(Double(photo.id))] : mesurer(photo)
+                guard mesuree["raison"] == nil, var r = mesuree.object else { return mesuree }
+                guard photo.uuid != nil else {
+                    return photo.sensSeul ? sansAnalyse(photo.id, "arguments", "Arguments de --analyser : sens_seul sans uuid.") : .object(r)
+                }
+                if let raison = empreintes.ranger(photo) {
+                    if photo.sensSeul { return sansAnalyse(photo.id, "sens", raison) }
+                    r["sens_raison"] = .string(raison)
+                } else {
+                    r["sens"] = true
+                }
+                return .object(r)
+            }
+        } else if photos.contains(where: \.sensSeul) {
+            let absent = mesurer
+            mesure = { photo in
+                photo.sensSeul ? sansAnalyse(photo.id, "sens_absent", "Recherche par le sens absente de ce connecteur (modèle introuvable).") : absent(photo)
+            }
+        }
+        ligne["photos"] = .array(mesurerBorne(photos, mesurer: mesure, parPhoto: delaiParPhoto, total: delaiTotal))
+        return Reponse(ligne: .object(ligne), code: 0)
+    }
+
+    /// L'encodeur et l'index d'un appel de --analyser, ouverts à la première photo, un calcul à la
+    /// fois (deux mesures tournent ensemble).
+    final class Empreintes: @unchecked Sendable {
+        let sens: IndexeurSens
+        let catalogue: String
+        private let verrou = NSLock()
+        private var ouvert: (encodeur: EncodeurSens, index: IndexSens)?
+        private var erreur: String?
+
+        init(sens: IndexeurSens, catalogue: String) {
+            self.sens = sens
+            self.catalogue = catalogue
+        }
+
+        /// Range l'empreinte de la photo ; nil si c'est fait, sinon la raison.
+        func ranger(_ photo: AAnalyser) -> String? {
+            guard let uuid = photo.uuid else { return "sans uuid" }
+            verrou.lock(); defer { verrou.unlock() }
+            if ouvert == nil, erreur == nil {
+                do {
+                    let encodeur = try sens.ouvrir()
+                    let index = try IndexSens(ecrire: IndexSens.dossier(catalogue: catalogue, racine: sens.racine), modele: encodeur.modele,
+                                              dimension: encodeur.dimension, catalogue: catalogue)
+                    ouvert = (encodeur, index)
+                } catch {
+                    erreur = error.localizedDescription
+                }
+            }
+            guard let (encodeur, index) = ouvert else { return erreur ?? "modèle absent" }
+            guard let donnees = try? Data(contentsOf: URL(fileURLWithPath: photo.vignette)), let image = PreviewImages.image(donnees) else {
+                return "vignette illisible"
+            }
+            do {
+                try index.ranger(uuid: uuid, id: photo.id, jour: photo.date, vecteur: try encodeur.vecteur(image: image))
+                return nil
+            } catch {
+                return error.localizedDescription
+            }
+        }
+    }
+
+    /// `--sens-etat '<json>'` : ce que le module demande une fois par séance (Releve.lua) pour savoir
+    /// si ce connecteur fait l'empreinte du sens : `{ok, regles_sens, modele, indexees}` quand les
+    /// fichiers du modèle sont là, sinon `{ok, manquants}` (sans regles_sens : le module n'en demande
+    /// pas). Rien n'est calculé ni compilé ; `catalogue` (facultatif) : le nombre de photos de son index.
+    public static func etatSens(_ texte: String, fichiers: (fichiers: Sens.Fichiers?, manquants: [String]), racine: URL = Sens.racineIndex) -> Reponse {
+        let catalogue = (try? JSONCoding.parse(texte))?["catalogue"]?.string
+        guard fichiers.fichiers != nil else {
+            return Reponse(ligne: ["ok": true, "manquants": .array(fichiers.manquants.map(JSONValue.string))], code: 0)
+        }
+        var ligne: [String: JSONValue] = ["ok": true, "regles_sens": .number(Double(Sens.regles)), "modele": .string(Sens.nomModele)]
+        if let catalogue {
+            ligne["indexees"] = .number(Double(IndexSens(lire: IndexSens.dossier(catalogue: catalogue, racine: racine))?.nombre ?? 0))
+        }
+        return Reponse(ligne: .object(ligne), code: 0)
     }
 
     /// Les photos de l'entrée, vérifiées avant toute mesure (`analyser.entree` du contrat) ; le premier
     /// écart fait refuser tout l'appel.
-    static func lireAAnalyser(_ texte: String) throws -> [AAnalyser] {
+    static func lireAAnalyser(_ texte: String) throws -> (photos: [AAnalyser], catalogue: String?) {
         let prefixe = "Arguments de --analyser : "
         func refus(_ detail: String) -> Refus { Refus(raison: "arguments", texte: prefixe + detail) }
         guard let objet = (try? JSONCoding.parse(texte))?.object else {
             throw refus("le JSON ne se lit pas (un objet { photos: [ … ] } attendu).")
+        }
+        var catalogue: String?
+        if let valeur = objet["catalogue"] {
+            guard let texte = valeur.string, !texte.isEmpty else { throw refus("catalogue est le chemin du catalogue (absent : sans empreinte du sens).") }
+            catalogue = texte
         }
         guard let liste = objet["photos"]?.array, !liste.isEmpty else {
             throw refus("photos est un tableau de 1 à \(maxPhotosAnalyse) photos.")
@@ -158,7 +269,7 @@ public enum Suivi {
         guard liste.count <= maxPhotosAnalyse else {
             throw Refus(raison: "trop_de_photos", texte: "Au plus \(maxPhotosAnalyse) photos par appel de --analyser (\(liste.count) reçues).")
         }
-        return try liste.enumerated().map { index, element in
+        let photos: [AAnalyser] = try liste.enumerated().map { index, element in
             let rang = "photos[\(index + 1)]"
             guard let photo = element.object else { throw refus("\(rang) est un objet { id, vignette, iso, cache, retouchee, objectif }.") }
             guard let id = photo["id"]?.int else { throw refus("\(rang).id est un nombre (l'id de l'original).") }
@@ -180,9 +291,16 @@ public enum Suivi {
                 guard let texte = valeur.string else { throw refus("\(rang).objectif est un texte (absent : inconnu).") }
                 objectif = texte
             }
+            func texteFacultatif(_ cle: String) throws -> String? {
+                guard let valeur = photo[cle] else { return nil }
+                guard let texte = valeur.string, !texte.isEmpty else { throw refus("\(rang).\(cle) est un texte (absent : inconnu).") }
+                return texte
+            }
             return AAnalyser(id: id, vignette: vignette, iso: iso, cache: try booleen("cache"), retouchee: try booleen("retouchee"),
-                             objectif: objectif)
+                             objectif: objectif, uuid: try texteFacultatif("uuid"), date: try texteFacultatif("date"),
+                             sensSeul: try booleen("sens_seul"))
         }
+        return (photos, catalogue)
     }
 
     /// Une photo qui ne s'analyse pas : `{ id, raison, texte }`.

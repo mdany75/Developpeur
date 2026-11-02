@@ -191,6 +191,9 @@ ditto "${PLUGIN_DIR}" "${STAGE}/${PLUGIN_NAME}"
 find "${STAGE}/${PLUGIN_NAME}" \( -name '.DS_Store' -o -name '._*' \) -delete
 cp "${ROOT_DIR}/install.sh" "${ROOT_DIR}/uninstall.sh" "${ROOT_DIR}/README.md" \
     "${ROOT_DIR}/CHANGELOG.md" "${ROOT_DIR}/LICENSE" "${STAGE}/"
+# Le vocabulaire du tokeniseur de CLIP (recherche par le sens, 1.6 ; licence MIT), qu'install.sh copie
+# dans Developpeur/Modeles s'il y manque.
+cp "${ROOT_DIR}/Resources/clip/bpe_simple_vocab_16e6.txt.gz" "${STAGE}/"
 chmod 755 "${STAGE}/install.sh" "${STAGE}/uninstall.sh"
 
 # --- 5. Signature -------------------------------------------------------------

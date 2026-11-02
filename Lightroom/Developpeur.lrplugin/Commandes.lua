@@ -65,7 +65,10 @@
 --                photos?|selection?, etape, raison?, confirme}
 --                                         → lister, créer (dans « Claude »), ajouter, retirer des photos ;
 --                                          renommer, deplacer, criteres d'une collection ; mot_cle
---   chercher    {critères…, exportee?, tri?, limite, decalage?} → photos du catalogue qui y répondent
+--   chercher    {critères…, exportee?, tri?, limite, decalage?, parmi?, originaux?} → photos du catalogue qui y
+--                                          répondent ; parmi (1.6, recherche par le sens) : seulement ces ids,
+--                                          dans leur ordre (5 000 au plus), parmi = true dans la réponse ;
+--                                          originaux : une copie virtuelle compte pour son original
 --   copieVirtuelle {photos?|selection?, nom?, afficher?, confirme} → copies virtuelles nommées
 --   montrer     {photos?|selection?, module?, vue?, source_dossier?, source_collection?, filtre?,
 --                filtre_preset?, remettre_filtre?} → photos sélectionnées et affichées dans Lightroom ;

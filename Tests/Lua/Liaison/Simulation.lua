@@ -1022,7 +1022,13 @@ function catalogue:getTargetPhotos()
     return S.selection
 end
 
+-- Un identifiant qui n'est pas un nombre est refusé (supposé, comme toute fonction du SDK qui attend
+-- un nombre) : la recherche parmi des photos données (1.6) le convertit d'abord ; une photo sortie
+-- du catalogue n'est plus rendue.
 function catalogue:getPhotoByLocalId(id)
+    if type(id) ~= 'number' then
+        error("getPhotoByLocalId : un nombre est attendu", 2)
+    end
     return S.photos[id]
 end
 

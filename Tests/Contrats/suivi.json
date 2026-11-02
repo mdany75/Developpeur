@@ -62,7 +62,7 @@
         "drapeau": "« retenue », « aucun » ou « rejetee » (famille)",
         "retouchee_par_claude": "booléen (famille)",
         "classement_le": "nombre : os.time du dernier changement de note, drapeau ou retouchee_par_claude (ou de leur première lecture) ; une lecture qui ne change rien ne le change pas (correctif 1.3.8 : Releve.reclasser ne réécrit pas tout le relevé à chaque ouverture de la fenêtre Suivi)",
-        "analyse": "absente : en file ; réussie : { le, regles, cherches, defauts, genre, regles_genre } (codes de --analyser, dans l'ordre des codes ; genre : un code de analyser.genres, et regles_genre, depuis le correctif 1.3.8, absents d'une analyse d'avant lui) ; manquée : { le, erreur (la raison de --analyser, ou « pas_de_reponse »), essais, abandonnee (seulement vrai) }"
+        "analyse": "absente : en file ; réussie : { le, regles, cherches, defauts, genre, regles_genre } (codes de --analyser, dans l'ordre des codes ; genre : un code de analyser.genres, et regles_genre, depuis le correctif 1.3.8, absents d'une analyse d'avant lui ; regles_sens, depuis la 1.6 : l'empreinte du sens rangée dans l'index, analyser.sens) ; manquée : { le, erreur (la raison de --analyser, ou « pas_de_reponse »), essais, abandonnee (seulement vrai) }"
       }
     },
     "analyser": {
@@ -104,6 +104,13 @@
         "liste": [["sport", "Sport"], ["evenement", "Fêtes et événements"], ["famille", "Famille et groupes"], ["portrait", "Portrait"], ["macro", "Macro et gros plans"], ["animaux", "Animaux"], ["nourriture", "Nourriture"], ["vehicules", "Véhicules"], ["ville", "Ville et architecture"], ["paysage", "Paysage"], ["autre", "Autre"]]
       },
       "raisons_par_photo": {"vignette_absente": "pas de fichier au chemin donné", "vignette_illisible": "le fichier n'est pas une image lisible", "vignette_petite": "grand côté sous 900 px"},
+      "sens": {
+        "_note": "La recherche par le sens (1.6) : l'empreinte MobileCLIP S2 de la vignette, rangée par le connecteur dans l'index du catalogue (Developpeur/Index/<empreinte du chemin>/, IndexSens.swift), jamais dans suivi.json : rien du Suivi ne part chez Claude, find_photos lit l'index seul. Seulement quand le connecteur la fait : le module le demande une fois par séance (--sens-etat), et n'envoie rien du sens sans regles_sens ; un connecteur sans le modèle répond comme avant la 1.6.",
+        "etat": "/usr/bin/perl -e 'alarm 20; exec @ARGV' <connecteur> --sens-etat '{\"catalogue\": <chemin>}' : { ok, regles_sens, modele, indexees } quand les fichiers du modèle sont là, sinon { ok, manquants } ; un connecteur d'avant la 1.6 : l'aide sur stderr et le code 2 (rien ne change).",
+        "entree": "catalogue (le chemin du catalogue ouvert, cat:getPath()) ; par photo : uuid (de l'original), date (prise_de_vue.le, « AAAA-MM-JJ HH:MM », absente sans date : le jour sert aux dates de find_photos), sens_seul (vrai : l'analyse est à jour sauf l'empreinte, qui seule se fait ; absent : faux).",
+        "sortie": "regles_sens (nombre : Sens.regles, 1) ; par photo analysée : sens vrai (rangée) ou sens_raison (texte) ; une photo sens_seul : { id, sens: true }, ou { id, raison: « sens » ou « sens_absent », texte }.",
+        "dans_le_registre": "analyse.regles_sens : les regles_sens de la réponse quand sens est vrai ; une analyse réussie sans regles_sens (ou de règles plus anciennes) se refait pour l'empreinte seule (sens_seul), ses défauts, son genre et son heure gardés, quand le connecteur fait l'empreinte ; une réponse sans regles_sens alors qu'il l'avait dite : plus demandée de la séance."
+      },
       "limites": "20 photos au plus par appel (le module en envoie 10) ; deux mesures à la fois (Vision, ToolHandler.parallelMeasures). Sans réponse avant l'alarme : le module compte un essai à chaque photo du lot (erreur « pas_de_reponse »).",
       "codes_de_sortie": "0 : ok vrai (même quand des photos ont une raison) ; 1 : ok faux, avec sa ligne ; 2 : nombre d'arguments faux (l'aide sur stderr, rien sur stdout)."
     },

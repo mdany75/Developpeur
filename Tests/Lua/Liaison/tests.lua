@@ -3086,6 +3086,48 @@ test("Bibliothèque : recherche dans un dossier ou une collection", function()
     egal(Commandes.executer('chercher', { collection = 'Choix', dossier = '/Photos/2026/06' }).total, 1)
 end)
 
+-- La recherche par le sens (1.6) : le connecteur classe l'index et donne `parmi`, les mieux classées
+-- dans leur ordre ; le module y applique les autres critères, garde l'ordre (tri aucun), décrit la page
+-- et dit parmi = true. Les dates sont filtrées par le connecteur : un critère d'après coup seul ne
+-- fait pas refuser (la base est donnée). Une photo sortie du catalogue est sautée ; originaux : une
+-- copie virtuelle compte pour son original, une fois.
+test("Bibliothèque : recherche parmi des photos données (recherche par le sens), dans leur ordre, avec les autres critères", function()
+    local a, b, c = photoRaw(), photoJpeg(), photoFuji()
+    a.brut.rating, b.brut.rating, c.brut.rating = 2, 4, 5
+    a.brut.focalLength, b.brut.focalLength, c.brut.focalLength = 23, 56, 56
+    local ids = { c.localIdentifier, a.localIdentifier, b.localIdentifier }
+    local r = Commandes.executer('chercher', { parmi = ids, tri = 'aucun' })
+    egal(r.parmi, true, "le connecteur sait que parmi est appliqué")
+    egal(r.total, 3)
+    egal(r.photos[1].id, c.localIdentifier, "l'ordre donné (la pertinence)")
+    egal(r.photos[2].id, a.localIdentifier)
+    egal(r.photos[3].id, b.localIdentifier)
+    r = Commandes.executer('chercher', { parmi = ids, tri = 'aucun', note_min = 4 })
+    egal(r.total, 2, "les autres critères parmi elles")
+    egal(r.photos[1].id, c.localIdentifier)
+    r = Commandes.executer('chercher', { parmi = ids, tri = 'aucun', focale_min = 50 })
+    egal(r.total, 2, "un filtre après coup seul : pas de refus, la base est donnée")
+    egal(Commandes.executer('chercher', { parmi = ids, tri = 'aucun', limite = 1, decalage = 1 }).photos[1].id, a.localIdentifier, "la page")
+    -- Une photo sortie du catalogue depuis son empreinte : sautée.
+    S.photos[a.localIdentifier] = nil
+    egal(Commandes.executer('chercher', { parmi = ids, tri = 'aucun' }).total, 2)
+    -- Une copie virtuelle : son original avec originaux, une seule fois.
+    local copie = S.copieVirtuelle(c, 90)
+    r = Commandes.executer('chercher', { parmi = { 90, c.localIdentifier }, originaux = true, tri = 'aucun' })
+    egal(r.total, 1)
+    egal(r.photos[1].id, c.localIdentifier)
+    egal(Commandes.executer('chercher', { parmi = { 90 }, tri = 'aucun' }).photos[1].id, copie.localIdentifier, "sans originaux, la copie")
+    -- Sans parmi : rien ne change (pas de clé parmi, le refus du filtre seul reste).
+    egal(Commandes.executer('chercher', { note_min = 1 }).parmi, nil)
+    echoue(function() Commandes.executer('chercher', { focale_min = 50 }) end, "Préciser la recherche")
+    -- Au plus MAX_TRI.
+    local trop = {}
+    for i = 1, 5001 do trop[i] = i end
+    echoue(function() Commandes.executer('chercher', { parmi = trop }) end, "Au plus 5000")
+    -- Un identifiant qui n'est pas un nombre est sauté (getPhotoByLocalId ne reçoit que des nombres).
+    egal(Commandes.executer('chercher', { parmi = { 'x', b.localIdentifier }, tri = 'aucun' }).total, 1)
+end)
+
 test("Bibliothèque : copie virtuelle nommée, sélection remise", function()
     local original = photoRaw()
     local autre = photoJpeg()

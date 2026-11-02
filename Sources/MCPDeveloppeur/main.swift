@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import DeveloppeurKit
 
@@ -57,7 +58,14 @@ func usage(erreur: Bool = false) {
             mcp-developpeur --analyser '<json>'
                 le Suivi (fenêtre Claude) : les défauts de la prise de vue mesurés sur les vignettes du cache de
                 Lightroom données (exposition, hautes lumières, netteté, bruit à ISO élevé, yeux fermés), comme le tri ;
-                ni Lightroom ni l'original ; 20 photos au plus, une ligne JSON (Tests/Contrats/suivi.json)
+                ni Lightroom ni l'original ; 20 photos au plus, une ligne JSON (Tests/Contrats/suivi.json) ; depuis la 1.6,
+                avec catalogue et uuid, l'empreinte du sens (MobileCLIP) rangée dans Developpeur/Index
+            mcp-developpeur --sens-etat '{"catalogue": …}'   le Suivi : ce connecteur fait-il l'empreinte du sens ? (une ligne JSON)
+            mcp-developpeur --preparer-sens ["phrase"]   compile MobileCLIP S2, dit sa description, les jetons et les temps
+            mcp-developpeur --sens-essai (--collection <nom> | --dossier <chemin> | --ids 1,2,… | --images <dossier>)
+                [--nombre 200] [--requetes '["a dog", …]'] [--garder <dossier>]
+                un lot de vignettes dans un index temporaire, puis les requêtes (telles quelles et « a photo of … ») ;
+                lecture seule ; une ligne JSON, l'avancement sur stderr
             mcp-developpeur --graphiques '<json>' <dossier>
                 le Suivi : les tuiles et les neuf graphiques d'une période d'après suivi.json (et carnet.json), lus
                 seulement, dessinés en PNG 2x dans le dossier, puis une ligne JSON avec les rectangles des barres
@@ -118,7 +126,21 @@ func outils() -> ToolHandler {
         fibo.garderDans = URL(fileURLWithPath: garde)
     }
     tools.fibo = fibo
+    // La recherche par le sens (1.6) : le vrai MobileCLIP de ce Mac, ouvert au premier usage.
+    tools.sens = moteurSens()
     return tools
+}
+
+/// La recherche par le sens (1.6) : MobileCLIP S2 (Developpeur/Modeles, sinon le cache de Hugging
+/// Face) et les index de Developpeur/Index ; pour le serveur, --call et --analyser seulement.
+func moteurSens() -> Suivi.IndexeurSens {
+    Suivi.IndexeurSens(manquants: { Sens.trouver().manquants }) {
+        let trouves = Sens.trouver()
+        guard let fichiers = trouves.fichiers else {
+            throw LightroomError.invalid("Recherche par le sens : il manque \(trouves.manquants.joined(separator: " ; ")).")
+        }
+        return try EncodeurMobileCLIP(fichiers: fichiers)
+    }
 }
 
 func serve() {
@@ -282,10 +304,103 @@ case "--focus":
 case "--analyser":
     // Le Suivi (correctif 1.3.7, Releve.lua) : les défauts mesurés sur les vignettes d'un lot, sous
     // l'alarme de 60 s de perl ; une ligne JSON, code 1 pour un refus de tout l'appel.
+    // Depuis la 1.6, l'empreinte du sens aussi, quand les fichiers de MobileCLIP sont là.
     guard arguments.count == 2 else { usage(erreur: true); exit(2) }
-    let analyse = Suivi.analyser(arguments[1])
+    let analyse = Suivi.analyser(arguments[1], sens: Sens.trouver().fichiers != nil ? moteurSens() : nil)
     print(line: JSONCoding.line(analyse.ligne))
     exit(analyse.code)
+case "--sens-etat":
+    // Le Suivi (1.6, Releve.lua, une fois par séance) : ce connecteur fait-il l'empreinte du sens ?
+    // Rien n'est calculé ni compilé ; une ligne JSON.
+    guard arguments.count == 2 else { usage(erreur: true); exit(2) }
+    let etat = Suivi.etatSens(arguments[1], fichiers: Sens.trouver())
+    print(line: JSONCoding.line(etat.ligne))
+    exit(etat.code)
+case "--preparer-sens":
+    // Développement (constat C2 de la 1.6) : compile les deux modèles de MobileCLIP (sous le runtime
+    // durci de l'exécutable signé), dit leur description, le temps de la compilation, les jetons et le
+    // vecteur d'une phrase, et le temps d'une image ; ni Lightroom ni photo.
+    let trouves = Sens.trouver()
+    guard let fichiers = trouves.fichiers else {
+        print(line: JSONCoding.line(["ok": false, "manquants": .array(trouves.manquants.map(JSONValue.string))]))
+        exit(1)
+    }
+    do {
+        let debut = Date()
+        let encodeur = try EncodeurMobileCLIP(fichiers: fichiers)
+        let ouverture = Date().timeIntervalSince(debut)
+        let phrase = arguments.count > 1 ? arguments[1] : "a photo of a dog"
+        let jetons = try TokeniseurCLIP(vocabulaire: fichiers.vocabulaire).jetons(phrase)
+        var t = Date()
+        let texte = try encodeur.vecteur(texte: phrase)
+        let msTexte = Date().timeIntervalSince(t) * 1000
+        // Une image noire de la taille d'une vignette du Suivi : le temps d'une image.
+        guard let noire = CGContext(data: nil, width: 1024, height: 683, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                    bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)?.makeImage() else { exit(1) }
+        t = Date()
+        let image = try encodeur.vecteur(image: noire)
+        let msImage = Date().timeIntervalSince(t) * 1000
+        print(line: JSONCoding.line([
+            "ok": true, "fichiers": ["image": .string(fichiers.image.path), "texte": .string(fichiers.texte.path), "vocabulaire": .string(fichiers.vocabulaire.path)],
+            "description": encodeur.description, "ouverture_s": .number((ouverture * 10).rounded() / 10),
+            "compilation_s": .number((encodeur.secondesDeCompilation * 10).rounded() / 10),
+            "phrase": .string(phrase), "jetons": .array(jetons.filter { $0 != 0 }.map { .number(Double($0)) }),
+            "vecteur_texte_debut": .array(texte.prefix(8).map { .number((Double($0) * 10000).rounded() / 10000) }),
+            "texte_ms": .number(msTexte.rounded()), "image_ms": .number(msImage.rounded()),
+            "cosinus_texte_image_noire": .number(Double(zip(texte, image).reduce(0) { $0 + $1.0 * $1.1 })),
+        ]))
+    } catch {
+        print(line: JSONCoding.line(["ok": false, "erreur": .string(error.localizedDescription)]))
+        exit(1)
+    }
+case "--sens-essai":
+    // Développement (constat C4 de la 1.6) : un petit lot de vignettes dans un index temporaire, puis
+    // des requêtes (EssaiSens) ; lecture seule. Une ligne JSON finale ; l'avancement sur stderr.
+    var source: EssaiSens.Source?
+    var nombre = 200
+    var requetes = EssaiSens.requetesParDefaut
+    var garder: URL?
+    var reste = arguments.dropFirst()
+    func suivant() -> String {
+        guard let valeur = reste.first else { usage(); exit(2) }
+        reste = reste.dropFirst()
+        return valeur
+    }
+    while let option = reste.first {
+        reste = reste.dropFirst()
+        switch option {
+        case "--collection": source = .collection(suivant())
+        case "--dossier": source = .dossier(suivant())
+        case "--ids": source = .ids(suivant().split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) })
+        case "--images": source = .images(URL(fileURLWithPath: suivant()))
+        case "--nombre": nombre = Int(suivant()) ?? 200
+        case "--requetes":
+            guard let liste = (try? JSONCoding.parse(suivant()))?.array?.compactMap(\.string), !liste.isEmpty else { usage(); exit(2) }
+            requetes = liste
+        case "--garder": garder = URL(fileURLWithPath: suivant())
+        default: usage(); exit(2)
+        }
+    }
+    guard let source else { usage(); exit(2) }
+    let trouves = Sens.trouver()
+    guard let fichiers = trouves.fichiers else {
+        print(line: JSONCoding.line(["ok": false, "manquants": .array(trouves.manquants.map(JSONValue.string))]))
+        exit(1)
+    }
+    let dossierIndex = garder ?? FileManager.default.temporaryDirectory.appendingPathComponent("sens-essai-\(ProcessInfo.processInfo.processIdentifier)")
+    do {
+        let encodeur = try EncodeurMobileCLIP(fichiers: fichiers)
+        let lightroom: LightroomServing? = { if case .images = source { return nil }; return LightroomBridge.fromEnvironment() }()
+        let essai = EssaiSens(lightroom: lightroom, encodeur: encodeur, dossier: dossierIndex) { log($0) }
+        var resultat = try essai.lancer(source: source, nombre: nombre, requetes: requetes).object ?? [:]
+        resultat["compilation_s"] = .number((encodeur.secondesDeCompilation * 10).rounded() / 10)
+        if garder == nil { try? FileManager.default.removeItem(at: dossierIndex); resultat["index"] = "effacé (--garder <dossier> pour le garder)" }
+        print(line: JSONCoding.line(.object(resultat)))
+    } catch {
+        if garder == nil { try? FileManager.default.removeItem(at: dossierIndex) }
+        print(line: JSONCoding.line(["ok": false, "erreur": .string(error.localizedDescription)]))
+        exit(1)
+    }
 case "--graphiques":
     // Le Suivi (FenetreSuivi.lua) : les graphiques d'une période, dessinés dans le dossier donné, sous
     // l'alarme de 20 s de perl ; une ligne JSON (le module la lit dans un fichier), code 1 pour un refus.

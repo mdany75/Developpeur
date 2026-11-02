@@ -110,6 +110,17 @@ toucher :
   (`preparerContrainte`) ; le cadre est mémorisé avant et relu après (`relireCadres`), car
   Lightroom le change sans qu'on l'écrive.
 
+## Recherche par le sens (1.6)
+
+- MobileCLIP S2 en CoreML (`Sens.swift`), tokeniseur de CLIP en Swift (`TokeniseurCLIP`, vérifié
+  par `Tests/Contrats/jetons-clip.json`), index par catalogue hors du catalogue (`IndexSens.swift` :
+  vecteurs fp16 contigus et SQLite), rempli par `--analyser` pendant le Suivi ; `find_photos` avec
+  `query` ou `similar_to` (`Tools+Sens.swift`, `docs/SPEC.md`). `ToolHandler.sens` et le `sens` de
+  `Suivi.analyser` sont nil par défaut : seul main.swift pose le vrai modèle, jamais `swift test`.
+- Les dates d'une recherche par le sens se filtrent d'après l'index (le module refuse un filtre de
+  date seul) ; le module reçoit `parmi` et répond `parmi = true`. Le chemin du catalogue ne part
+  jamais chez Claude. Le seuil de pertinence est provisoire (`--sens-essai`).
+
 ## Catalogue et notation
 
 - Le catalogue des réglages (noms, plages, libellés) n'existe qu'à un endroit :

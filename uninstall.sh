@@ -110,7 +110,7 @@ else
         rmdir "${DEST_DIR}" 2>/dev/null && printf 'Supprimé : %s\n' "${DEST_DIR}"
     fi
     GARDES=()
-    [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, mes demandes, profils de publication, consommation, notes proposées, carnet de progrès et leçons, suivi des photos ouvertes, avant/après des étapes, photos de Fibo 2 non importées)")
+    [[ -d "${DEST_DIR}" ]] && GARDES+=("${DEST_DIR} (guide de style, conversations, mes demandes, profils de publication, consommation, notes proposées, carnet de progrès et leçons, suivi des photos ouvertes, index et modèles de la recherche par le sens, avant/après des étapes, photos de Fibo 2 non importées)")
     [[ -d "${JOURNAUX}" ]] && GARDES+=("${JOURNAUX} (journaux)")
     if [[ ${#GARDES[@]} -gt 0 ]]; then
         printf 'Gardé pour vous :\n'

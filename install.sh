@@ -70,6 +70,16 @@ xattr -d com.apple.quarantine "${DEST}.nouveau" 2>/dev/null || true
 mv -f "${DEST}.nouveau" "${DEST}"
 printf 'Serveur installé : %s (version %s)\n' "${DEST}" "$("${DEST}" --version)"
 
+# La recherche par le sens (1.6) : le vocabulaire du tokeniseur de CLIP, à côté des modèles de
+# MobileCLIP (qui ne viennent pas avec l'archive : hf download apple/coreml-mobileclip) ; jamais
+# remplacé s'il est déjà là.
+VOCABULAIRE="${HERE}/bpe_simple_vocab_16e6.txt.gz"
+if [[ -f "${VOCABULAIRE}" && ! -f "${DEST_DIR}/Modeles/bpe_simple_vocab_16e6.txt.gz" ]]; then
+    mkdir -p "${DEST_DIR}/Modeles"
+    cp "${VOCABULAIRE}" "${DEST_DIR}/Modeles/"
+    printf 'Vocabulaire de la recherche par le sens : %s\n' "${DEST_DIR}/Modeles"
+fi
+
 # --- 2. Module Lightroom ------------------------------------------------------
 
 mkdir -p "${MODULES_DIR}"

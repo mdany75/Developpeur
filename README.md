@@ -862,6 +862,13 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
 - Chercher dans tout le catalogue : texte, mot-clé, note, drapeau, libellé de couleur, appareil,
   objectif, ISO, focale (« mes photos au 56 mm », avec un autre critère), format, dates, dossier,
   collection, photos retouchées ou non par Claude, retenues jamais exportées.
+- Chercher par ce que montre la photo, même sans mot-clé (« la plage au coucher du soleil avec le
+  chien, l'été 2019 »), ou « d'autres photos comme celle-ci » : `find_photos` avec `query` ou
+  `similar_to`, combinés aux autres critères. Le calcul se fait sur votre Mac (MobileCLIP S2 d'Apple,
+  à télécharger une fois : `hf download apple/coreml-mobileclip`), sur les vignettes que le Suivi
+  analyse déjà, en arrière-plan ; aucune image ne part chez Claude. Seules les photos déjà analysées
+  par le Suivi sont dans l'index ; `get_status` dit combien. Une personne nommée dans la vue Personnes
+  de Lightroom se cherche par son nom en mot-clé.
 - Classer : note, drapeau, libellé de couleur, titre, légende, droits d'auteur, texte alternatif et
   description longue rédigés d'après la photo, champs IPTC (lieu, événement, personnes), mots-clés
   rangés dans votre hiérarchie (« Lieux > Canada > Montréal »), paramètre prédéfini de métadonnées.

@@ -140,6 +140,11 @@ local Releve = {
     regles = nil,
     reglesGenre = nil,
     sansGenre = false,
+    -- La recherche par le sens (1.6) : les règles de l'empreinte que ce connecteur fait (regles_sens de
+    -- --sens-etat, demandé une fois par séance, ou d'une réponse de --analyser) ; nil : il n'en fait pas,
+    -- ou pas encore demandé (sondeSens faux) ; rien du sens ne part alors à --analyser.
+    reglesSens = nil,
+    sondeSens = false,
     -- La dernière erreur de la tâche (une vue non rangée, un lot non analysé, la tâche arrêtée),
     -- aussi dite au journal ; nil sans erreur (diagnostic).
     derniereErreur = nil,
@@ -171,6 +176,8 @@ Releve.ESSAIS_ANALYSE = 3
 Releve.TAILLE_VIGNETTE = 1024
 -- Alarme de perl pour --analyser (secondes) : dix vignettes mesurées, Vision deux à la fois.
 Releve.ALARME = 60
+-- --sens-etat ne calcule rien : une réponse en moins d'une seconde.
+Releve.ALARME_SENS = 20
 -- Attente entre deux regards pendant que Claude travaille (secondes).
 Releve.PAUSE = 2
 -- Délai avant de réessayer une analyse manquée (une vignette de 256 px juste après une retouche :
@@ -375,7 +382,7 @@ local function normaliserAnalyse(a)
     end
     if type(a.cherches) == 'table' then
         return { le = nombre(a.le) or 0, regles = nombre(a.regles), cherches = codes(a.cherches), defauts = codes(a.defauts),
-            genre = texte(a.genre), regles_genre = texte(a.genre) and nombre(a.regles_genre) or nil }
+            genre = texte(a.genre), regles_genre = texte(a.genre) and nombre(a.regles_genre) or nil, regles_sens = nombre(a.regles_sens) }
     end
     if texte(a.erreur) then
         return { le = nombre(a.le) or 0, erreur = a.erreur, essais = math.max(1, math.floor(nombre(a.essais) or 1)),
@@ -499,6 +506,7 @@ function Releve.oublier()
     Releve.file, Releve.rangs, Releve.sansRefaire, Releve.reclassement, Releve.revues = nil, nil, nil, false, nil
     Releve.prochaineVerification, Releve.regles, Releve.connecteurAbsentDit, Releve.derniereErreur = 0, nil, nil, nil
     Releve.reglesGenre, Releve.sansGenre = nil, false
+    Releve.reglesSens, Releve.sondeSens = nil, false
     Releve.aEcrire, Releve.ecritLe, Releve.arrete = false, nil, false
     Releve.reessais, Releve.selectionPosee = {}, 0
 end
@@ -1429,12 +1437,63 @@ local function quand(cle, e, maintenant)
         elseif a.genre == nil and not Releve.sansGenre then
             return 0
         end
+        -- L'empreinte du sens (1.6), seulement quand le connecteur la fait (Releve.reglesSens).
+        if Releve.reglesSens and (a.regles_sens or 0) < Releve.reglesSens then
+            return 0
+        end
         return nil
     end
     if a.abandonnee then
         return nil
     end
     return math.max(0, (a.le or 0) + Releve.DELAI_REESSAI - maintenant)
+end
+
+-- Seule l'empreinte du sens manque à cette analyse réussie (ses défauts et son genre sont à jour) :
+-- --analyser ne fait qu'elle (sens_seul).
+local function seulementSens(e)
+    local a = e.analyse
+    if not (a and a.cherches and Releve.reglesSens and (a.regles_sens or 0) < Releve.reglesSens) then
+        return false
+    end
+    if Releve.regles and (a.regles or 0) < Releve.regles then
+        return false
+    end
+    if Releve.reglesGenre then
+        return (a.regles_genre or 0) >= Releve.reglesGenre
+    end
+    return a.genre ~= nil or Releve.sansGenre
+end
+
+-- Une copie neuve d'une analyse réussie, avec ces changements.
+local function analyseAvec(a, changements)
+    local copie = { le = a.le, regles = a.regles, cherches = a.cherches, defauts = a.defauts, genre = a.genre,
+        regles_genre = a.regles_genre, regles_sens = a.regles_sens }
+    for cle, valeur in pairs(changements) do
+        copie[cle] = valeur
+    end
+    return copie
+end
+
+-- Demande au connecteur, une fois par séance, s'il fait l'empreinte du sens (`--sens-etat`, sous
+-- l'alarme de perl, 1.6) : regles_sens rendu, les analyses sans empreinte entrent dans la file. Un
+-- connecteur d'avant la 1.6 ne connaît pas l'option : rien ne change.
+local function sonderSens(connecteur, chemin)
+    Releve.sondeSens = true
+    local dossier = LrPathUtils.child(Chemins.temporaire(), 'Suivi')
+    Fichiers.creerDossier(dossier)
+    local reponse = LrPathUtils.child(dossier, string.format('sens-%d.json', os.time()))
+    LrTasks.execute(string.format("/usr/bin/perl -e 'alarm %d; exec @ARGV' %s --sens-etat %s > %s 2>/dev/null", Releve.ALARME_SENS,
+        q(connecteur), q(Json.encode({ catalogue = chemin })), q(reponse)))
+    local ok, json = pcall(Json.decode, Fichiers.lire(reponse) or '')
+    Fichiers.supprimer(reponse)
+    local regles = ok and type(json) == 'table' and json.ok == true and nombre(json.regles_sens) or nil
+    if regles then
+        Releve.reglesSens = regles
+        Releve.file = nil
+        Journal.noter(string.format("Suivi : recherche par le sens (règles %d) ; %s photo(s) déjà dans l'index.", regles,
+            tostring(nombre(json.indexees) or 0)))
+    end
 end
 
 -- La file du catalogue ouvert, triée : la photo active de la dernière vue d'abord, puis les plus
@@ -1610,10 +1669,10 @@ end
 
 -- Lance `mcp-developpeur --analyser` sur la liste des photos du lot ; rend la réponse décodée (à
 -- lire seulement : elle porte des métatables), ou nil sans réponse lisible.
-local function demanderAnalyse(connecteur, liste, dossier)
+local function demanderAnalyse(connecteur, liste, dossier, catalogue)
     local reponse = LrPathUtils.child(dossier, 'reponse.json')
     LrTasks.execute(string.format("/usr/bin/perl -e 'alarm %d; exec @ARGV' %s --analyser %s > %s 2>/dev/null", Releve.ALARME,
-        q(connecteur), q(Json.encode({ photos = liste })), q(reponse)))
+        q(connecteur), q(Json.encode({ photos = liste, catalogue = catalogue })), q(reponse)))
     local contenu = Fichiers.lire(reponse) or ''
     local ok, json = pcall(Json.decode, contenu)
     if ok and type(json) == 'table' then
@@ -1657,15 +1716,24 @@ local function analyserLot(c, cles, connecteur)
             end
         end
         local e = c.photos[entrees[i]]
-        liste[#liste + 1] = { id = id, vignette = LrPathUtils.child(dossier, string.format('%d.jpg', id)),
+        local element = { id = id, vignette = LrPathUtils.child(dossier, string.format('%d.jpg', id)),
             iso = e and e.prise_de_vue and e.prise_de_vue.iso or nil, cache = true, retouchee = retoucheeParClaude(photo, lus[i]) or nil,
             objectif = e and e.prise_de_vue and texte(e.prise_de_vue.objectif) or nil }
+        -- La recherche par le sens (1.6), seulement quand le connecteur fait l'empreinte : l'uuid et
+        -- le jour de la prise de vue pour l'index, et sens_seul quand l'analyse est à jour sauf elle.
+        if Releve.reglesSens and e then
+            element.uuid = e.uuid
+            element.date = e.prise_de_vue and texte(e.prise_de_vue.le) or nil
+            element.sens_seul = seulementSens(e) or nil
+        end
+        liste[#liste + 1] = element
     end
     if not Releve.allume or Releve.occupe() then
         Fichiers.supprimer(dossier)
         return false
     end
-    local json = #photos > 0 and demanderAnalyse(connecteur, liste, dossier) or nil
+    local sensDemande = Releve.reglesSens ~= nil
+    local json = #photos > 0 and demanderAnalyse(connecteur, liste, dossier, sensDemande and cheminCatalogue() or nil) or nil
     Fichiers.supprimer(dossier)
     if not Releve.allume then
         return false
@@ -1706,6 +1774,20 @@ local function analyserLot(c, cles, connecteur)
                 Releve.sansGenre = true
                 Releve.file = nil
             end
+            -- L'empreinte du sens (1.6) : des règles plus récentes refont la file ; demandée et pas
+            -- rendue (le modèle a disparu), plus demandée de la séance.
+            local reglesSens = nombre(json.regles_sens)
+            if reglesSens then
+                if not Releve.reglesSens or reglesSens > Releve.reglesSens then
+                    Releve.file = nil
+                end
+                Releve.reglesSens = math.max(Releve.reglesSens or 0, reglesSens)
+            elseif sensDemande then
+                Releve.reglesSens = nil
+                Releve.file = nil
+                Journal.noter("Suivi : le connecteur ne fait plus l'empreinte du sens ; plus demandée de la séance.")
+            end
+            json.regles_sens = reglesSens
             for _, r in ipairs(type(json.photos) == 'table' and json.photos or {}) do
                 if type(r) == 'table' and nombre(r.id) then
                     resultats[cleDe(nombre(r.id))] = r
@@ -1733,11 +1815,13 @@ local function analyserLot(c, cles, connecteur)
                 local avant = e.analyse
                 local genre = texte(r.genre)
                 local genreRegles = genre and json.regles_genre or nil
+                -- L'empreinte du sens rangée dans l'index (1.6) : ses règles ; sinon celles d'avant.
+                local sensRegles = r.sens == true and json.regles_sens or (avant and avant.cherches and avant.regles_sens) or nil
                 if avant and avant.cherches and (avant.regles or 0) >= (json.regles or 0) then
                     -- Une analyse refaite pour le genre seul (ses règles de défauts sont à jour) : les
                     -- défauts de la première analyse restent, la photo a pu être retouchée depuis.
                     e.analyse = { le = avant.le, regles = avant.regles, cherches = avant.cherches, defauts = avant.defauts,
-                        genre = genre or avant.genre, regles_genre = genre and genreRegles or avant.regles_genre }
+                        genre = genre or avant.genre, regles_genre = genre and genreRegles or avant.regles_genre, regles_sens = sensRegles }
                 else
                     local cherches = codes(r.cherches)
                     local dedans = {}
@@ -1751,8 +1835,12 @@ local function analyserLot(c, cles, connecteur)
                         end
                     end
                     e.analyse = { le = maintenant, regles = json.regles, cherches = cherches, defauts = defauts, genre = genre,
-                        regles_genre = genreRegles }
+                        regles_genre = genreRegles, regles_sens = r.sens == true and json.regles_sens or nil }
                 end
+                changee(e)
+            elseif type(r) == 'table' and r.sens == true and json.regles_sens and e.analyse and e.analyse.cherches then
+                -- L'empreinte seule (sens_seul, 1.6) : l'analyse reste, avec les règles du sens.
+                e.analyse = analyseAvec(e.analyse, { regles_sens = json.regles_sens })
                 changee(e)
             else
                 manquee(cle, e, type(r) == 'table' and texte(r.raison) or 'pas_de_reponse', maintenant)
@@ -1835,6 +1923,10 @@ local function viderFile()
                     return
                 end
             else
+                if not Releve.sondeSens then
+                    LrTasks.pcall(sonderSens, connecteur, chemin)
+                    Releve.sondeSens = true
+                end
                 local c = tableDu(chemin, false)
                 local lot, attente = prochainLot(c, os.time())
                 if not lot then
