@@ -2,7 +2,8 @@
 -- hors de Lightroom (LuaJIT, Lightroom simulé par Simulation.lua) : liste (cible exigée, note,
 -- 5000 au plus, dates refusées au-delà de 5000), lire (250 au plus, rien d'écrit, une lecture des
 -- réglages par photo, clés de Claude dans l'espace de etatSimple, reprises de Dany, copie virtuelle
--- avec la mémoire de son original, Essais, vidéos).
+-- avec la mémoire de son original ou retouchée ensuite par Claude, redressement de Claude, Essais,
+-- vidéos).
 -- Lancé par scripts/tester-module.sh (essais à part de la liaison).
 
 local dossierTests = (arg and arg[0] or ''):match('(.*/)') or './'
@@ -128,6 +129,42 @@ test("habitudes lire : une copie virtuelle qui porte la mémoire de son original
     egal(#p.reprises, 0, "pas de reprise lue dans la mémoire d'une autre photo")
     -- L'original, lui, a sa reprise.
     egal(ensemble(lire({ 1 }).photos[1].reprises).Exposure2012, true)
+end)
+
+test("habitudes lire : une copie virtuelle retouchée ensuite par Claude garde aussi les clés de Claude de son original", function()
+    local original = photoRaw()
+    S.active = original
+    appliquer({ reglages = { Highlights2012 = -40 } })
+    local copie = S.copieVirtuelle(original, 8, 'Copie 1')
+    copie.brut.rating = 4
+    S.active = copie
+    appliquer({ photos = { 8 }, reglages = { Exposure2012 = 0.3 } })
+    local avantCopie = Json.decode(copie.proprietes.avantClaude)
+    egal(avantCopie.Highlights2012, nil, "la mémoire de la copie ne garde que sa propre retouche")
+    local p = lire({ 8 }).photos[1]
+    egal(p.memoire_autre, false, "la copie a sa propre mémoire")
+    local claude = ensemble(p.claude)
+    egal(claude.Exposure2012, true)
+    egal(claude.Highlights2012, true, "le −40 hérité de l'original est de Claude")
+    -- Une copie sans aucune mémoire, d'un original retouché par Claude : les clés de l'original.
+    local nue = S.copieVirtuelle(original, 9, 'Copie 2')
+    nue.proprietes = {}
+    egal(ensemble(lire({ 9 }).photos[1].claude).Highlights2012, true)
+    -- Une copie d'une photo jamais retouchée par Claude n'a aucune clé de Claude.
+    local autre = photoNotee(30, 4)
+    S.copieVirtuelle(autre, 31, 'Copie 1')
+    egal(#lire({ 31 }).photos[1].claude, 0)
+end)
+
+test("habitudes lire : un redressement de Claude est à Claude sous les clés du recadrage, valeurs lues", function()
+    local photo = photoFuji()
+    photo.brut.rating = 4
+    S.active = photo
+    appliquer({ recadrage = { angle = 1.2 } })
+    local p = Commandes.executer('habitudes', { mode = 'lire', photos = { photo.localIdentifier },
+        cles = { 'CropAngle', 'CropLeft', 'CropTop', 'CropRight', 'CropBottom' } }).photos[1]
+    egal(ensemble(p.claude).CropAngle, true, "le redressement de Claude")
+    egal(type(p.valeurs.CropAngle), 'number', "la valeur se lit (le serveur en tire « recadrée »)")
 end)
 
 test("habitudes lire : une photo d'Essais (ou dont l'original y est) est marquée ; une vidéo n'est pas lue", function()

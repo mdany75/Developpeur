@@ -6366,7 +6366,17 @@ reviennent ; la main rendue toutes les 25 photos ; 250 photos au plus par lectur
 - Copie virtuelle qui porte la mémoire d'une autre photo (`memoire_autre`, par
   `proprietaireMemoire` ou `Photos.memoireEtrangere` pour une mémoire sans propriétaire) : ses
   réglages viennent de l'original, les clés de Claude de cette mémoire restent écartées, sans
-  reprise.
+  reprise. Une copie virtuelle qui a sa propre mémoire (Claude l'a retouchée ensuite : `garder` a
+  effacé la mémoire héritée, et le nouvel `avantClaude` n'a que cette retouche) ou aucune y ajoute
+  les clés de Claude de l'`avantClaude` de son original (`masterPhoto`, une lecture groupée de
+  plus) : ses valeurs héritées en viennent. Une copie faite avant la retouche de l'original est
+  ainsi sous-comptée, jamais mal attribuée.
+- Recadrage : lu par ses cinq clés (`CropLeft`, `CropTop`, `CropRight`, `CropBottom`,
+  `CropAngle`, `DevelopCatalogue.cropKeys`), jamais par `HasCrop` : Claude ne range dans
+  `avantClaude` que ces cinq clés quand il recadre ou redresse, et la présence de `HasCrop` dans
+  `getDevelopSettings` n'est pas constatée. Recadrée par Dany (`Habitudes.recadree`) : un bord ou
+  l'angle hors du cadre neutre (0, 0, 1, 1, 0°, à 0,001 près), sauf si Claude a touché une de ces
+  clés et que Dany n'en a repris aucune (un redressement change aussi les bords).
 - Limite connue : une reprise suivie d'une autre retouche de Claude ne se voit plus
   (`apresClaude` ne garde que le dernier état) : la valeur reste à Claude (sous-compté plutôt que
   mal attribué). Les retouches des anciens outils (MCP Lightroom 2.7, Claude pour Lightroom 1.6.1)
@@ -6377,14 +6387,17 @@ Développeur › Essais (elles ou leur original, `Carnet.photosDesEssais`), copi
 nom commence par « Claude », réglages illisibles, ancien processus (`ProcessVersion` dont la
 version de `DevelopCatalogue.processVersions` est sous 3, PV 2012 = « 6.7 »), photos sans retouche
 de Dany (aucun réglage mesuré hors de sa valeur neutre, ni masque, ni retouche, ni recadrage ; les
-corrections d'objectif et la balance ne comptent pas).
+corrections d'objectif et la balance, teinte comprise, ne comptent pas).
 
 **Statistiques** (par appareil ; par tranche d'ISO ≤ 800, ≤ 1 600, ≤ 3 200, > 3 200 pour Sharpness,
 SharpenDetail, LuminanceSmoothing, ColorNoiseReduction, GrainAmount) : chaque valeur se mesure
 par son **écart à la valeur neutre** (`DevelopSetting.neutral`, `rawDefaults` pour un RAW ou un
 DNG : netteté 40 et bruit de couleur 25) ; photos lues, part touchée (écart non nul), médiane, P25
 et P75 des écarts touchés, part du sens majoritaire, jours de prise de vue distincts des photos
-touchées. Jamais la température. Profils (avec le Look), balance telle quelle, corrections
+touchées. Jamais la température, ni la teinte d'un RAW ou d'un DNG (`Habitudes.mesuree`) :
+Lightroom la range en valeur absolue (en balance « Telle quelle », la teinte du boîtier, +5 à +15
+sur un Fujifilm, qui dépend de la scène) ; hors RAW, elle est relative (0 = telle quelle) et se
+mesure. Profils (avec le Look), balance telle quelle, corrections
 d'objectif, recadrage et masques : des parts, sans phrase.
 
 **Une phrase** seulement si tout tient (seuils **provisoires**, `Habitudes.minPhotos = 20`,
@@ -6424,18 +6437,24 @@ phrases retenues. Un processus neuf, sans la limite de 60 s.
 3. Aucune écriture : `--dump <id>` et l'`editCount` (`--module reglages '{"photo": <id>}'`) d'une
    copie d'Essais notée 4 ★, avant et après `--habitudes '{"collection": "Essais", "rating_min": 1}'` :
    identiques ; le guide de style inchangé ; rien dans l'Historique.
-4. `ProcessVersion` d'une photo d'avant 2012 au catalogue, s'il y en a (format « 5.7 » attendu,
+4. Le recadrage et la teinte : `--dump <id>` d'une copie d'Essais recadrée à la main, d'une autre
+   redressée par Claude (`crop.angle`), et d'un RAF jamais retouché : `CropLeft`…`CropAngle`
+   présents dans les trois (valeurs neutres 0, 0, 1, 1, 0 sur la dernière), et `Tint` du RAF non
+   nul en « As Shot » (ce qui justifie de ne pas la mesurer). Dans le relevé, `recadrees` ne doit
+   pas compter la copie redressée par Claude. Si `HasCrop` apparaît, le noter ici (rien à changer).
+5. `ProcessVersion` d'une photo d'avant 2012 au catalogue, s'il y en a (format « 5.7 » attendu,
    d'après `processVersions`), et `cameraModel` formaté tel que `find_photos` le prend
    (« X-H2S ») : les appareils du relevé doivent porter ce nom.
-5. Dans la fenêtre Claude, sur Essais : « comment je règle d'habitude mes belles photos ? » : un
+6. Dans la fenêtre Claude, sur Essais : « comment je règle d'habitude mes belles photos ? » : un
    seul appel `remember_style` avec `habits` (plus un rappel s'il dit « pas fini »), des phrases
    proposées, rien ajouté sans accord.
 
 Tests : `HabitudesTests` (quantiles, attribution, écart au neutre selon le format, seuils, rafale,
-dispersion, deux sens, ISO, photos écartées, 8 phrases, nombres, taille, lots de 250, 5000 au plus,
+dispersion, deux sens, ISO, photos écartées, teinte d'un RAW, recadrage de Claude ou de Dany, 8 phrases, nombres, taille, lots de 250, 5000 au plus,
 guide inchangé, annulation, refus, longueur de la description) ; `essais-habitudes.lua` (aucune
 écriture, une lecture des réglages par photo, clés de Claude dans l'espace de `etatSimple`,
-reprise, copie virtuelle avec la mémoire de son original, Essais, vidéo, 250 au plus, cible exigée,
+reprise, copie virtuelle avec la mémoire de son original, copie retouchée ensuite par Claude,
+redressement de Claude, Essais, vidéo, 250 au plus, cible exigée,
 5000 au plus, dates refusées au-delà de 5000) ; la simulation compte chaque `getDevelopSettings`.
 
 ## 1.4 : une sortie entière, du tri à l'harmonisation

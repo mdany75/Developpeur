@@ -331,7 +331,10 @@ end
 -- de Claude (correctionsUtilisateur, sur les réglages déjà lus). Une copie virtuelle qui porte la
 -- mémoire d'une autre photo (memoire_autre) garde les clés de Claude de cette mémoire (ses réglages
 -- viennent de là), sans reprises : mieux vaut écarter une valeur de Dany que lui prêter une valeur
--- de Claude. Un seul getDevelopSettings par photo.
+-- de Claude. Une copie virtuelle qui a sa propre mémoire (Claude l'a retouchée depuis, et `garder`
+-- a effacé celle héritée) ou aucune y ajoute les clés de Claude de son original : ses réglages
+-- hérités en viennent (une copie faite avant la retouche de l'original est sous-comptée).
+-- Un seul getDevelopSettings par photo.
 local MAX_HABITUDES_LUES = 250
 local MAX_HABITUDES_LISTE = 5000
 -- Clés de avantClaude (noms de Lightroom) → clés de etatSimple. Les clés de la mémoire qui ne sont
@@ -343,19 +346,25 @@ local CLES_HABITUDES = {
 }
 local HORS_REGLAGES = { Suppression = true, Amelioration = true, Bibliotheque = true, Rotation = true, etape_id = true }
 
-local function clesDeClaude(texte)
+-- Les clés de Claude de ces mémoires (textes de avantClaude), réunies et triées.
+local function clesDeClaude(...)
     local liste = Json.tableau()
-    if type(texte) ~= 'string' or texte == '' then
-        return liste
-    end
-    local ok, avant = pcall(Json.decode, texte)
-    if not ok or type(avant) ~= 'table' then
-        return liste
-    end
-    local cles = {}
-    for cle in pairs(avant) do
-        if type(cle) == 'string' and not HORS_REGLAGES[cle] then
-            cles[#cles + 1] = CLES_HABITUDES[cle] or cle
+    local vues, cles = {}, {}
+    for i = 1, select('#', ...) do
+        local texte = select(i, ...)
+        if type(texte) == 'string' and texte ~= '' then
+            local ok, avant = pcall(Json.decode, texte)
+            if ok and type(avant) == 'table' then
+                for cle in pairs(avant) do
+                    if type(cle) == 'string' and not HORS_REGLAGES[cle] then
+                        local nom = CLES_HABITUDES[cle] or cle
+                        if not vues[nom] then
+                            vues[nom] = true
+                            cles[#cles + 1] = nom
+                        end
+                    end
+                end
+            end
         end
     end
     table.sort(cles)
@@ -421,6 +430,20 @@ local function lireHabitudes(params)
     brutes = okB and type(brutes) == 'table' and brutes or {}
     formatees = okF and type(formatees) == 'table' and formatees or {}
     champs = okM and type(champs) == 'table' and champs or {}
+    -- La mémoire des originaux des copies virtuelles (une seule lecture groupée).
+    local originaux, vus = {}, {}
+    for _, photo in ipairs(photos) do
+        local b = brutes[photo] or {}
+        if b.isVirtualCopy == true and b.masterPhoto and not vus[b.masterPhoto] then
+            vus[b.masterPhoto] = true
+            originaux[#originaux + 1] = b.masterPhoto
+        end
+    end
+    local memoiresOriginaux = {}
+    if #originaux > 0 then
+        local okO, lus = LrTasks.pcall(cat.batchGetPropertyForPlugin, cat, originaux, _PLUGIN, { 'avantClaude' })
+        memoiresOriginaux = okO and type(lus) == 'table' and lus or {}
+    end
     local essais = Carnet.photosDesEssais()
     for i, photo in ipairs(photos) do
         local b, f, m = brutes[photo] or {}, formatees[photo] or {}, champs[photo] or {}
@@ -445,6 +468,10 @@ local function lireHabitudes(params)
         end
         local etrangere = memoireDUneAutre(photo, m, b.uuid)
         entree.memoire_autre = etrangere
+        if b.isVirtualCopy == true and b.masterPhoto and not etrangere then
+            local o = memoiresOriginaux[b.masterPhoto] or {}
+            entree.claude = clesDeClaude(m.avantClaude, o.avantClaude)
+        end
         if not entree.video then
             local lu, reglages = LrTasks.pcall(photo.getDevelopSettings, photo)
             if lu and type(reglages) == 'table' then

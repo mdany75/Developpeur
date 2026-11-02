@@ -35,7 +35,8 @@ public enum Habitudes {
 
     // MARK: Clés lues
 
-    /// Réglages numériques mesurés (jamais la température, qui dépend de la scène).
+    /// Réglages numériques mesurés (jamais la température, qui dépend de la scène ; la teinte
+    /// seulement hors RAW : voir `mesuree`).
     static let clesNumeriques = [
         "Exposure2012", "Contrast2012", "Highlights2012", "Shadows2012", "Whites2012", "Blacks2012",
         "Texture", "Clarity2012", "Dehaze", "Vibrance", "Saturation", "Tint",
@@ -44,9 +45,12 @@ public enum Habitudes {
     ]
     /// Les réglages qui se lisent aussi par tranche d'ISO (détail, bruit, grain).
     static let clesISO: Set<String> = ["Sharpness", "SharpenDetail", "LuminanceSmoothing", "ColorNoiseReduction", "GrainAmount"]
-    /// Lus pour les parts (profil, balance, corrections d'objectif, recadrage, masques).
-    static let clesParts = ["CameraProfile", "Look.Name", "WhiteBalance", "ProcessVersion", "LensProfileEnable", "HasCrop",
-                            "#MaskGroupBasedCorrections", "#RetouchAreas"]
+    /// Lus pour les parts (profil, balance, corrections d'objectif, recadrage, masques). Le recadrage
+    /// se lit par ses cinq clés (`DevelopCatalogue.cropKeys`), celles que Claude garde dans
+    /// `avantClaude` quand il recadre ou redresse, jamais par `HasCrop` (aucune écriture de Claude
+    /// ne la range, et sa présence dans `getDevelopSettings` n'est pas constatée).
+    static let clesParts = ["CameraProfile", "Look.Name", "WhiteBalance", "ProcessVersion", "LensProfileEnable",
+                            "#MaskGroupBasedCorrections", "#RetouchAreas"] + DevelopCatalogue.cropKeys
     /// Toutes les clés envoyées au module (celles de son `etatSimple`).
     public static var cles: [String] { clesNumeriques + clesParts }
 
@@ -113,6 +117,29 @@ public enum Habitudes {
     /// Écart minimal compté comme « touché » (les arrondis de Lightroom).
     static let epsilon = 1e-6
 
+    /// Ce réglage se mesure-t-il par son écart à la valeur neutre sur cette photo ? Pas la teinte d'un
+    /// RAW : Lightroom la range en valeur absolue (en balance « Telle quelle », la teinte du boîtier,
+    /// qui dépend de la scène, comme la température) ; hors RAW, elle est relative (0 = telle quelle).
+    static func mesuree(_ cle: String, _ p: Photo) -> Bool {
+        !(cle == "Tint" && p.raw)
+    }
+
+    /// Le cadre neutre : aucun recadrage, aucun redressement.
+    static let cadreNeutre: [String: Double] = ["CropAngle": 0, "CropLeft": 0, "CropTop": 0, "CropRight": 1, "CropBottom": 1]
+    /// Écart au cadre neutre compté comme un recadrage (bords de 0 à 1, angle en degrés).
+    static let epsilonCadre = 1e-3
+
+    /// La photo est-elle recadrée ou redressée par l'utilisateur ? nil si aucune clé du cadre n'est
+    /// lue. Un cadre dont Claude a touché une clé (avantClaude) est à Claude, sauf si l'utilisateur a
+    /// repris une de ces clés à la main depuis : un redressement change aussi les bords.
+    static func recadree(_ p: Photo) -> Bool? {
+        let lues = DevelopCatalogue.cropKeys.compactMap { cle in nombre(p.valeurs[cle]).map { (cle, $0) } }
+        guard !lues.isEmpty else { return nil }
+        let cles = Set(DevelopCatalogue.cropKeys)
+        if !p.claude.isDisjoint(with: cles), p.reprises.isDisjoint(with: cles) { return false }
+        return lues.contains { cle, v in abs(v - (cadreNeutre[cle] ?? 0)) > epsilonCadre }
+    }
+
     /// Les raisons d'écarter une photo avant tout calcul, ou nil.
     static func ecartee(_ p: Photo) -> String? {
         if p.video { return "videos" }
@@ -127,15 +154,16 @@ public enum Habitudes {
     }
 
     /// Une valeur de l'utilisateur hors de sa valeur neutre, un masque, une retouche ou un recadrage ?
-    /// Les corrections d'objectif et la balance ne comptent pas (un réglage d'importation les pose).
+    /// Les corrections d'objectif et la balance (teinte comprise) ne comptent pas (un réglage
+    /// d'importation ou le boîtier les pose).
     static func retouchee(_ p: Photo) -> Bool {
-        for cle in clesNumeriques where deDany(p, cle) {
+        for cle in clesNumeriques where cle != "Tint" && deDany(p, cle) {
             if let v = nombre(p.valeurs[cle]), abs(v - neutre(cle, raw: p.raw)) > epsilon { return true }
         }
-        for cle in ["#MaskGroupBasedCorrections", "#RetouchAreas", "HasCrop"] where deDany(p, cle) {
+        for cle in ["#MaskGroupBasedCorrections", "#RetouchAreas"] where deDany(p, cle) {
             if let v = nombre(p.valeurs[cle]), v > 0 { return true }
         }
-        return false
+        return recadree(p) == true
     }
 
     // MARK: Statistiques
@@ -187,7 +215,7 @@ public enum Habitudes {
         var lues = 0
         var ecarts: [Double] = []
         var jours = Set<String>()
-        for p in photos where deDany(p, cle) {
+        for p in photos where deDany(p, cle) && mesuree(cle, p) {
             guard let v = nombre(p.valeurs[cle]) else { continue }
             lues += 1
             let ecart = v - neutre(cle, raw: p.raw)
@@ -351,7 +379,8 @@ public enum Habitudes {
         })
         if let v = part(photos, "WhiteBalance", { $0.string == "As Shot" }) { o["balance_telle_quelle"] = Bilan.arrondi(v, parts: 100) }
         if let v = part(photos, "LensProfileEnable", { (nombre($0) ?? 0) > 0 }) { o["corrections_objectif"] = Bilan.arrondi(v, parts: 100) }
-        if let v = part(photos, "HasCrop", { (nombre($0) ?? 0) > 0 }) { o["recadrees"] = Bilan.arrondi(v, parts: 100) }
+        let cadres = photos.compactMap(recadree)
+        if !cadres.isEmpty { o["recadrees"] = Bilan.arrondi(Double(cadres.filter { $0 }.count) / Double(cadres.count), parts: 100) }
         if let v = part(photos, "#MaskGroupBasedCorrections", { (nombre($0) ?? 0) > 0 }) { o["avec_masques"] = Bilan.arrondi(v, parts: 100) }
         let reglages = g.reglages.sorted { $0.touche != $1.touche ? $0.touche > $1.touche : $0.cle < $1.cle }
         o["reglages"] = .array((detaille ? reglages : Array(reglages.filter { $0.touchees > 0 }.prefix(maxReglages))).map { json($0, detaille: detaille) })
@@ -367,7 +396,7 @@ public enum Habitudes {
         "Écarts à la valeur neutre de chaque réglage (médiane, quartiles P25 et P75 des photos touchées). Une phrase seulement pour un réglage lu sur au moins \(minPhotos) photos, touché sur au moins \(minJours) jours de prise de vue et \(Int(toucheMin * 100)) % des photos, dans le même sens au moins \(Int(sensMin * 100)) % du temps, sans grande dispersion (seuils provisoires). Rien n'est ajouté : proposer chaque phrase à l'utilisateur, puis remember_style avec preference, category (rubrique) et confirm = true seulement après son accord."
     }
 
-    static let aSavoir = "Ce que Claude a touché est écarté, sauf ce que l'utilisateur a repris à la main depuis sa dernière retouche (une reprise suivie d'une autre retouche de Claude ne se voit plus : sous-compté plutôt que mal attribué). Les retouches des anciens outils (MCP Lightroom, Claude pour Lightroom) et un paramètre d'importation ne se distinguent pas des siennes. Écartées : vidéos, photos de Développeur › Essais, copies virtuelles « Claude », ancien processus, photos sans retouche."
+    static let aSavoir = "Ce que Claude a touché est écarté, sauf ce que l'utilisateur a repris à la main depuis sa dernière retouche (une reprise suivie d'une autre retouche de Claude ne se voit plus : sous-compté plutôt que mal attribué). Les retouches des anciens outils (MCP Lightroom, Claude pour Lightroom) et un paramètre d'importation ne se distinguent pas des siennes. Une copie virtuelle garde les clés de Claude de son original. Écartées : vidéos, photos de Développeur › Essais, copies virtuelles « Claude », ancien processus, photos sans retouche."
 
     /// Ce que remember_style rend (plafonné : appareils, réglages et phrases les plus parlants).
     static func json(_ a: Analyse, note: Int, detaille: Bool = false) -> JSONValue {

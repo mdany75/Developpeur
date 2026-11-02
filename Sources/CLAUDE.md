@@ -73,7 +73,9 @@ toucher :
 - Une longue série passe par le `ContexteAppel` : `avancer` après chaque lot, `verifier` avant.
 - **Habitudes** (`Habitudes.swift`, `remember_style` avec `habits`, 1.6) : lecture seule, rien au
   guide sans accord ; attribution par les clés de Claude rendues dans l'espace de `etatSimple`
-  (`Lecture.habitudes`) ; écarts à la valeur neutre (`rawDefaults` pour un RAW) ; seuils
+  (`Lecture.habitudes`, plus celles de l'original pour une copie virtuelle) ; recadrage par les
+  clés `Crop*`, jamais `HasCrop` ; ni température ni teinte d'un RAW ; écarts à la valeur neutre
+  (`rawDefaults` pour un RAW) ; seuils
   provisoires, à fixer par `--habitudes` (`docs/SPEC.md`, 1.6 : tes habitudes en chiffres).
 
 ## Boîtier

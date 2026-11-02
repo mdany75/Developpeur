@@ -114,6 +114,49 @@ final class HabitudesTests: XCTestCase {
         XCTAssertEqual(analyse.groupes.first?.photos.map(\.id), [5, 7])
     }
 
+    func testTeinteDUnRawNonMesureeNiRetouche() {
+        // Un RAW noté sans retouche, balance « Telle quelle » : Lightroom rend la teinte du boîtier
+        // (+6 à +12), pas 0. Ni une retouche, ni une habitude.
+        let raws = serie(30, jours: 6) { i in ["Tint": .number(Double(6 + i % 7)), "WhiteBalance": "As Shot", "ProcessVersion": "15.4"] }
+        let analyse = Habitudes.analyser(raws, trouvees: 30, note: 4)
+        XCTAssertEqual(analyse.ecartees, ["sans_retouche": 30])
+        XCTAssertTrue(analyse.phrases.isEmpty)
+        XCTAssertNil(Habitudes.statistique("Tint", raws), "la teinte d'un RAW ne se mesure pas")
+        // Mêlée à une vraie retouche, elle ne fait pas de phrase non plus.
+        let retouches = serie(30, jours: 6) { i in ["Tint": .number(Double(6 + i % 7)), "Highlights2012": -30] }
+        XCTAssertFalse(Habitudes.analyser(retouches, trouvees: 30, note: 4).phrases.contains { $0.phrase.contains("Teinte") })
+        // Hors RAW, la teinte est relative (0 = telle quelle) : elle se mesure.
+        let jpeg = (0..<30).map { photo($0 + 1, ["Tint": 8, "Highlights2012": -30], jour: 1 + $0 % 6, raw: false) }
+        XCTAssertEqual(Habitudes.statistique("Tint", jpeg)?.touchees, 30)
+        // Mais seule, elle ne fait pas une photo retouchée (la balance ne compte pas).
+        XCTAssertEqual(Habitudes.ecartee(photo(99, ["Tint": 8], raw: false)), "sans_retouche")
+    }
+
+    func testRecadrageLuParSesClesEtAttribue() {
+        let cadre: [String: JSONValue] = ["CropLeft": 0.05, "CropTop": 0, "CropRight": 0.95, "CropBottom": 1, "CropAngle": 0]
+        let redresse: [String: JSONValue] = ["CropLeft": 0.02, "CropTop": 0.02, "CropRight": 0.98, "CropBottom": 0.98, "CropAngle": 1.2]
+        let neutre: [String: JSONValue] = ["CropLeft": 0, "CropTop": 0, "CropRight": 1, "CropBottom": 1, "CropAngle": 0]
+        XCTAssertTrue(Habitudes.cles.contains("CropAngle"))
+        XCTAssertFalse(Habitudes.cles.contains("HasCrop"), "HasCrop n'est jamais rangée par Claude")
+        // Un recadrage seul de Dany : une retouche.
+        XCTAssertNil(Habitudes.ecartee(photo(1, cadre)))
+        XCTAssertEqual(Habitudes.recadree(photo(2, neutre)), false)
+        XCTAssertNil(Habitudes.recadree(photo(3, [:])))
+        // Un redressement de Claude (crop.angle : avantClaude a CropAngle, Lightroom change les bords) :
+        // pas à Dany, la photo reste sans retouche.
+        let deClaude = photo(4, redresse, claude: ["CropAngle"])
+        XCTAssertEqual(Habitudes.recadree(deClaude), false)
+        XCTAssertEqual(Habitudes.ecartee(deClaude), "sans_retouche")
+        // Repris à la main par Dany depuis : à lui.
+        XCTAssertEqual(Habitudes.recadree(photo(5, redresse, claude: ["CropAngle"], reprises: ["CropLeft"])), true)
+        // La part « recadrees » ne compte pas les recadrages de Claude.
+        let photos = (0..<10).map { i in
+            photo(10 + i, redresse.merging(["Highlights2012": -30]) { a, _ in a }, jour: 1 + i, claude: i < 8 ? ["CropAngle", "CropLeft"] : [])
+        }
+        let json = Habitudes.json(Habitudes.analyser(photos, trouvees: 10, note: 4), note: 4)
+        XCTAssertEqual(json["groupes"]?.array?.first?["recadrees"]?.double ?? -1, 0.2, accuracy: 1e-9)
+    }
+
     func testAuPlusHuitPhrasesLesPlusFortesDAbord() {
         let cles = ["Highlights2012", "Shadows2012", "Whites2012", "Blacks2012", "Contrast2012", "Texture", "Clarity2012", "Dehaze", "Vibrance", "Saturation"]
         let photos = serie(40) { i in
