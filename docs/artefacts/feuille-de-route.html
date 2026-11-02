@@ -72,7 +72,7 @@
 <main class="page">
   <header class="entete">
     <h1>Feuille de route de Développeur</h1>
-    <p class="sous">Ce qui vient après la version 1.6, dans l'ordre où le faire. Mise à jour le 2 novembre 2026 au matin, après la nuit de travail sur la 1.6. Chaque chantier est vérifié dans le code : ce qui existe déjà, ce qu'il faut construire, la taille et le risque.</p>
+    <p class="sous">Ce qui vient après la version 1.6.3, dans l'ordre où le faire. Mise à jour le 2 novembre 2026 après-midi : la 1.6.3 publiée, et dix recommandations ajoutées (étapes 6 et 7). Chaque chantier est vérifié dans le code : ce qui existe déjà, ce qu'il faut construire, la taille et le risque.</p>
     <div class="encadre fait"><p><b>Mise à jour du 2 novembre 2026, 13 h :</b> la 1.6.3 est publiée (tag v1.6.3, Release) et livre les trois chantiers « Plus tard » : les espèces, le masque mal gardé retiré, la liste « À constater » triée.</p></div>
     <div class="encadre fait"><p><b>En résumé :</b> la 1.6 est publiée (tag v1.6, Release) : nouveau nom « Développeur IA pour Lightroom », garde-fous, recherche par le sens, rendu d'une autre photo, habitudes en chiffres, masques relus et relevé des seuils. Ce qui reste demande surtout ton œil : l'étape « À faire avec toi » ci-dessous.</p></div>
   </header>
@@ -216,11 +216,95 @@
     </section>
 
     <section class="etape">
-      <div class="etape-tete"><h2>Écartées</h2><span class="quand">idées de lightroom-mcp que Développeur n'a pas besoin de reprendre</span></div>
+      <div class="etape-tete"><span class="num">6</span><h2>Recommandations après la 1.6.3 : prochaine version</h2><span class="quand">ajoutées le 2 novembre 2026, vérifiées dans le code</span></div>
+      <div class="encadre"><p>Quatre relecteurs ont cherché dans le code, chacun sous un angle : nouveautés, qualité de la retouche, fiabilité, manques pour un photographe amateur. Un cinquième a vérifié chaque idée (pas déjà faite, preuve juste) et gardé les dix plus solides. Les petites d'abord, toutes à risque faible ou moyen.</p></div>
+      <div class="chantiers">
+        <article class="chantier">
+          <h3>Ton guide de style suivi aussi dans la fenêtre Claude et la Demande rapide</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 5/5</span></div>
+          <p>Dans le connecteur, les invites de retouche finissent par ton guide de style. Dans la fenêtre Claude et la Demande rapide, les boutons envoient leur propre texte sans le guide, et seul le style « À ma façon » le fait lire. On ferait lire ton guide (<code>remember_style read</code>) au début de chaque retouche de la fenêtre, avec un essai qui le vérifie, tout en restant sous 7 500 caractères.</p>
+          <p class="deja">Consignes.lua ne cite le guide qu'à la peau (l. 54), aux suggestions (l. 70) et au style « À ma façon » (l. 196-198) ; aucune lecture du guide pour les boutons Retouche pro, Portrait ou Paysage.</p>
+        </article>
+        <article class="chantier">
+          <h3>Recherche par le sens : ne rien rendre quand rien ne ressemble</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Aujourd'hui, la meilleure photo passe toujours, même quand ce que tu cherches n'existe pas (des chats pour « coucher de soleil »). On ajouterait un plancher sur le score brut (vers 0,17) : en dessous, une liste vide et la phrase « rien ne ressemble vraiment à … ». Le score brut serait rendu pour le prochain relevé, avec un test sur un faux index.</p>
+          <p class="deja">Sens.swift n'a que candidatsMax (l. 33) et aucun plancher ; la pertinence reste relative (0 à la médiane, 1 à la meilleure).</p>
+        </article>
+        <article class="chantier">
+          <h3>Tirage : vérifier les pixels et la proportion avant d'exporter</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Pour un tirage, Développeur calcule le grand côté voulu mais ne le compare jamais à la taille réelle de la photo recadrée, et l'export n'agrandit pas. Un oiseau très recadré partirait donc en 30x45 à 113 ppp sans avertissement. On dirait la résolution réelle, on proposerait un format plus petit ou la super résolution sous 240 ppp, et on signalerait un format dont la proportion diffère du recadrage.</p>
+          <p class="deja">Tools+Livraison.swift (l. 63-75) calcule seulement grandCote à partir des cm et du ppp ; Livraison.lua:130 pose LR_size_doNotEnlarge = true ; aucune comparaison avec les dimensions recadrées.</p>
+        </article>
+        <article class="chantier">
+          <h3>Ajustements d'un clic choisis d'après la proposition</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>La boîte Ajuster montre toujours les quatre mêmes boutons (« Moins chaud », « Peau plus naturelle », « Garder le ciel », « Plus de contraste »), même sur un paysage sans personne. On les choisirait d'après ce que touche la proposition en attente, avec les deux sens (plus chaud ou moins chaud, plus clair ou plus sombre…), six au plus, et la liste actuelle en repli.</p>
+          <p class="deja">Consignes.ajustementsRapides est une liste fixe de quatre boutons (Consignes.lua:322).</p>
+        </article>
+        <article class="chantier">
+          <h3>Fixer les seuils des espèces sur une collection, sans rien exporter</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Les quatre seuils des espèces restent provisoires tant que tu n'as pas jugé de vraies photos. Or <code>--especes-essai</code> ne lit qu'un dossier de JPEG, alors que <code>--sens-essai</code> lit déjà une collection ou des ids. On lui donnerait les mêmes options, en lecture seule, avec une planche où tu coches juste ou faux pour fixer les seuils.</p>
+          <p class="deja">main.swift:72 : <code>--especes-essai</code> &lt;dossier de JPEG&gt; seulement ; main.swift:66 : <code>--sens-essai</code> accepte déjà --collection, --dossier, --ids et --images.</p>
+        </article>
+        <article class="chantier">
+          <h3>Retouche pro sur une sélection : une référence par lumière, puis harmoniser</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Sur plusieurs photos, le bouton Retouche pro les retouche une à une, ce qui est long et donne une série inégale. On formerait d'abord les groupes de lumière (<code>match_series</code> avec <code>groups</code>), on retoucherait la référence de chaque groupe, puis on copierait et harmoniserait les autres. Les photos seules dans leur groupe resteraient retouchées une à une.</p>
+          <p class="deja">Consignes.surLaSelection (Consignes.lua:359-361) envoie « pour toutes les photos sélectionnées, une à une » ; <code>match_series</code> <code>groups</code> existe déjà côté connecteur (Tools+Serie.swift).</p>
+        </article>
+        <article class="chantier">
+          <h3>Ménage : vider Temporaire/PhotoActive et les dimensions-*.txt au chargement</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Les vignettes de la photo active et de Focus s'accumulent sans fin dans <code>Temporaire/PhotoActive</code> (137 Mo chez toi depuis le 20 octobre). On les viderait au chargement du module, avec les <code>dimensions-*.txt</code>. Un essai vérifierait que chaque dossier temporaire du code est vidé ou porte une exception écrite.</p>
+          <p class="deja">Menage.TEMPORAIRES = { 'Groupes', 'Rapide', 'Suivi', 'Fibo' } (Menage.lua:35), sans PhotoActive ni <code>dimensions-*.txt</code>.</p>
+        </article>
+        <article class="chantier">
+          <h3>File des outils : garder le résultat d'un long appel malgré une lecture entre-temps</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Dans Claude Desktop, un appel de plus de 50 s garde son résultat pour l'appel répété, mais n'importe quelle commande suivante l'efface, même <code>get_status</code>. Pour <code>generative_edit</code> (environ 5 min), Fibo 2 tournerait deux fois. Les outils de lecture seule ne feraient plus tomber le résultat gardé, avec un test dans <code>FileOutilsTests</code>.</p>
+          <p class="deja">FileOutils.swift:76 : « if let precedent = orphelin, precedent !== appel { orphelin = nil } » pour toute commande, sans distinguer les lectures.</p>
+        </article>
+      </div>
+    </section>
+    <section class="etape">
+      <div class="etape-tete"><span class="num">7</span><h2>Recommandations : ensuite</h2><span class="quand">plus grandes, après la prochaine version</span></div>
+      <div class="chantiers">
+        <article class="chantier">
+          <h3>Garder l'espèce de chaque photo dans l'index du Suivi</h3>
+          <div class="marques"><span class="pastille moyenne">Grande</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 5/5</span></div>
+          <p>Une recherche d'espèce sur tout le catalogue ne regarde que 200 photos, reclassées à chaque appel : le « cardinal rouge » donnait 0 photo le 2 novembre. Le Suivi, qui fait déjà l'empreinte MobileCLIP, passerait aussi la vignette à BioCLIP 2 et rangerait les 3 espèces les plus probables dans l'index. Les seuils des espèces doivent d'abord être fixés.</p>
+          <p class="deja">Especes.candidatsMax = 200 (Especes.swift:63) ; rien n'est gardé entre deux recherches et le Suivi ne connaît pas les espèces.</p>
+        </article>
+        <article class="chantier">
+          <h3>suivi.json : ne plus réécrire tout le fichier pendant l'analyse</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
+          <p>Pendant une analyse, le Suivi réécrit <code>suivi.json</code> en entier (65 Mo chez toi) au plus toutes les 60 s, soit des Go écrits par heure sur le SSD. Un petit journal des changements, rejoué à la lecture, éviterait ces réécritures sans changer le format du fichier. Il faut un essai à 250 000 entrées, d'où son risque moyen.</p>
+          <p class="deja">Releve.lua (l. 60, 194-207) : écriture complète à chaque fois, DELAI_ECRITURE_MAX au plus ; aucun journal d'ajouts.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="etape">
+      <div class="etape-tete"><h2>Écartées</h2><span class="quand">idées de lightroom-mcp, et recommandations du 2 novembre 2026 qui ne valent pas une version</span></div>
       <div class="ecartees">
         <div class="ecartee"><b>Quasi-doublons par empreinte dHash</b><p>Le tri regroupe déjà les rafales et les piles par l'empreinte de Vision, plus fine qu'un dHash, et nomme la meilleure de chaque groupe.</p></div>
         <div class="ecartee"><b>Plage de couleur copiée d'une autre photo</b><p><code>copy_settings</code> copie déjà les plages de couleur, et Développeur recalcule un prélèvement sur chaque photo. Le seul vrai risque, les prélèvements multiples, est réglé dans la 1.5.</p></div>
         <div class="ecartee"><b>Mode lecture seule</b><p>La pause fait déjà « Claude regarde, ne retouche pas », et tu travailles en mode Appliquer. Une case qui survit au relancement de Lightroom se ferait vite si tu la demandes un jour.</p></div>
+        <div class="ecartee"><b>Espèces : tenir compte du lieu de la photo</b><p>Écartée le 2 novembre 2026 : La liste est déjà centrée sur « Amérique du Nord et voyages » (en-tête de especes.tsv), donc le gain est plus faible qu'annoncé, et ajouter une colonne région à relire pour 3 926 lignes coûte cher : à revoir une fois les seuils fixés.</p></div>
+        <div class="ecartee"><b>Mot-clé d'espèce bien rangé, avec son nom latin en synonyme</b><p>Écartée le 2 novembre 2026 : C'est juste (seuls les mots de Vision reçoivent un synonyme, Tools+Bibliotheque.swift:272), mais cela dépend du chemin de mots-clés à décider avec Dany. On le fera avec les espèces dans l'index du Suivi.</p></div>
+        <div class="ecartee"><b>Proposer la référence de match_look parmi les belles photos</b><p>Écartée le 2 novembre 2026 : Faisable déjà sans changer le code (<code>find_photos</code> similar_to avec rating_min, puis match_look) : une phrase de description suffit, sans intérêt pour une version.</p></div>
+        <div class="ecartee"><b>Une vue de la photo qui sert à noter et à diagnostiquer</b><p>Écartée le 2 novembre 2026 : Le double <code>view_photo</code> n'est pas constaté dans les journaux, et Consignes.texte est presque plein : à vérifier pendant la recette avant d'y toucher.</p></div>
+        <div class="ecartee"><b>Un effort de réflexion propre à la Demande rapide</b><p>Écartée le 2 novembre 2026 : Gain non mesuré et préférence de plus dans le Gestionnaire. La fenêtre Consommation doit d'abord montrer que l'effort max ralentit vraiment la Demande rapide.</p></div>
+        <div class="ecartee"><b>Styles appliqués sans refus prévisible du plafond de dose</b><p>Écartée le 2 novembre 2026 : Le refus est déjà prévu et se rattrape en un aller-retour (Consignes.lua:230-233) : petit gain, intérêt faible.</p></div>
+        <div class="ecartee"><b>Plafonds des consignes : une seule constante et la marge affichée par la CI</b><p>Écartée le 2 novembre 2026 : Rangement interne, sans effet pour Dany ; à faire en passant la prochaine fois qu'on touche aux consignes.</p></div>
+        <div class="ecartee"><b>Conversations : taille visible et images allégées</b><p>Écartée le 2 novembre 2026 : 55 Mo en treize jours, ce n'est pas urgent ; l'idée reste valable plus tard, mais elle passe après le ménage de Temporaire.</p></div>
+        <div class="ecartee"><b>Invite et bouton « Faune » pour les oiseaux et les animaux</b><p>Écartée le 2 novembre 2026 : Utile, mais il faut un bouton de plus dans des consignes presque pleines, et sa recette dépend des seuils des espèces encore provisoires : après les deux étapes des espèces.</p></div>
+        <div class="ecartee"><b>Copie virtuelle recadrée au format de la destination</b><p>Écartée le 2 novembre 2026 : crop accepte déjà « 4:5 » et Claude peut le proposer à la demande ; un flux automatique dans Publication est plus lourd que le gain.</p></div>
+        <div class="ecartee"><b>Profil « Écran et télé 4K » dans Publication</b><p>Écartée le 2 novembre 2026 : Rien n'indique que Dany diffuse sur une télé 4K, et export_photos sait déjà exporter à 3 840 px sur demande : à reprendre seulement s'il le demande.</p></div>
+        <div class="ecartee"><b>Restaurer une vieille photo de famille numérisée</b><p>Écartée le 2 novembre 2026 : Aucun signe que Dany numérise d'anciens tirages, et la méthode actuelle couvre déjà l'essentiel.</p></div>
       </div>
     </section>
 

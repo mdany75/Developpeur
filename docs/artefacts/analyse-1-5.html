@@ -46,6 +46,8 @@
   .grand { background: var(--gris-doux); color: var(--texte); }
   .type { background: var(--bleu-doux); color: var(--bleu); }
   .fait { background: var(--vert-doux); color: var(--vert); }
+  .partiel { background: var(--orange-doux); color: var(--orange); }
+  .ouvert { background: var(--gris-doux); color: var(--texte); }
   table { width: 100%; border-collapse: collapse; background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; overflow: hidden; }
   th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--filet); vertical-align: top; overflow-wrap: anywhere; }
   th { background: var(--carte); font-size: 13px; color: var(--gris); }
@@ -57,7 +59,7 @@
 <body>
 <div class="page">
 <h1>Analyse du connecteur et du module Développeur</h1>
-<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Mise à jour le 1<sup>er</sup> novembre 2026 avec la 1.5.</p>
+<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Revérifiée constat par constat dans le code de la 1.6.3, le 2 novembre 2026 : chaque carte porte son état (fait, en partie, ouvert).</p>
 
 <div class="encadre"><b>Verdict.</b> La base est solide : 585 tests Swift, des tests Lua sur un SDK simulé, un jeton de liaison bien conçu, une couverture très large des réglages du module Développeur. Les gains viennent maintenant de trois endroits : <b>alléger ce que le modèle lit</b> (23 000 caractères de descriptions), <b>fiabiliser le pont</b> avec Lightroom, et <b>protéger la photo de l'empilement</b> de réglages.</div>
 
@@ -69,7 +71,7 @@
 <div class="encadre"><b>Livré avec la 1.5.1 (1<sup>er</sup> novembre 2026).</b> Les consignes du connecteur ne citent plus de <code>preview</code> pour <code>preview_settings</code> (le constat de l'Analyse), et un test vérifie chaque paramètre qu'elles nomment · Fibo 2 change un objet entier par un masque d'objet de Lightroom · règle du titre de la fenêtre corrigée.</div>
 
 <div class="bilan">
-  <div class="chiffre"><b>36</b><span>outils exposés depuis la 1.5 (35 à l'analyse), ≈ 6 à 7 000 jetons à chaque session</span></div>
+  <div class="chiffre"><b>37</b><span>outils exposés depuis la 1.6 (35 à l'analyse) ; leur liste pèse 55 à 60 000 jetons à chaque session, schémas compris</span></div>
   <div class="chiffre"><b>56</b><span>constats classés par impact</span></div>
   <div class="chiffre"><b>3</b><span>erreurs réelles à corriger tout de suite, toutes corrigées</span></div>
   <div class="chiffre"><b>1 931</b><span>lignes de notes retirées (CLAUDE.md, CHANGELOG, README)</span></div>
@@ -86,60 +88,68 @@
 <p>Mots-clés, lieu et légende existent comme outils, sans invite ni bouton dans la Demande rapide. <b>Faire :</b> invite « Classer » + 4ᵉ bouton, en « Proposer d'abord » par défaut.</p></div>
 
 <h2>2. Le connecteur MCP (ce que le modèle voit)</h2>
-<div class="carte"><h3>Ciblage des photos différent d'un outil à l'autre <span class="pastille type">modifier</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
-<p>Trois formes : <code>photo_id</code> seul (12 outils), <code>photo_ids</code> + <code>selection</code> (6 outils), <code>collection</code>/<code>folder</code> (tri, planche, export). Quatre outils refusent plusieurs photos sans que le schéma le dise.</p><p><b>Faire :</b> un seul vocabulaire, ou « une seule » écrit dans le schéma, avec un test de cohérence.</p></div>
-<div class="carte"><h3>tools/list trop lourd <span class="pastille type">améliorer</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
-<p><code>view_photo</code> ≈ 1 825 caractères, <code>export_photos</code> ≈ 1 288, <code>propose_ratings</code> ≈ 1 200… <b>Faire :</b> budget global testé (≈ 16 000), plafond de 1 000 par outil, détails de procédure déplacés vers les ressources <code>developpeur://</code>.</p></div>
-<div class="carte"><h3>Fusionner ce qui sert le même moment <span class="pastille type">améliorer</span><span class="pastille moyen">moyen</span></h3>
-<p><code>list_profiles</code> + <code>list_presets</code> → <code>list_looks</code> ; <code>compare_variants</code> + <code>choose_variant</code> → <code>variants</code> ; <code>export_photos</code> avec <code>action</code> (liste, dossier, export). Scinder <code>set_metadata</code> en classement (quotidien) et métadonnées (rare).</p></div>
-<div class="carte"><h3>Erreurs sans code lisible par le modèle <span class="pastille type">améliorer</span><span class="pastille moyen">moyen</span></h3>
-<p><b>Faire :</b> <code>{code, reessayable, action}</code> en <code>structuredContent</code> (liaison_fermee, mode_proposer, original_introuvable, delai…) et des <code>outputSchema</code> pour les cinq sorties clés.</p></div>
-<div class="carte"><h3>Détails de cohérence <span class="pastille faible">faible</span></h3>
-<p><code>step_name</code> obligatoire alors que <code>reason</code> ne l'est pas · pagination en trois dialectes (<code>limit</code>/<code>offset</code> partout, défaut 50) · <code>remove_distractions</code> promet « reflets » mais couvre aussi la poussière (retrait seulement) · branche « outil inconnu » inatteignable.</p></div>
+<div class="carte"><h3>Ciblage des photos différent d'un outil à l'autre <span class="pastille ouvert">ouvert</span><span class="pastille fort">fort</span></h3>
+<p>Toujours cinq formes : <code>photo_id</code> seul (14 outils), <code>photo_ids</code> + <code>selection</code> (16), <code>photo_ids</code> seul (<code>show_photo</code>), <code>photo_id</code> + <code>photo_ids</code> (<code>match_look</code>, nouveau), <code>collection</code>/<code>folder</code> (9). Le schéma de <code>photo_id</code> ne dit pas « une seule photo », et aucun test ne vérifie le vocabulaire. <b>Reste :</b> un seul vocabulaire, ou « une seule » écrit dans le schéma, avec un test.</p>
+<p class="preuve">Tools.swift:195-197 · Tools.swift:420-431</p></div>
+<div class="carte"><h3>tools/list trop lourd <span class="pastille ouvert">ouvert</span><span class="pastille fort">fort</span></h3>
+<p>La liste a grossi : 26 610 caractères de descriptions (23 000 à l'analyse), 8 outils au-dessus de 1 000 (<code>view_photo</code> 1 823, <code>add_mask</code> 1 716, <code>match_series</code> 1 270…). Avec les schémas, <code>tools/list</code> pèse environ 219 000 caractères, soit 55 à 60 000 jetons à chaque session : le schéma de masque est recopié dans <code>add_mask</code> (19 839) et <code>generative_edit</code> (13 777). <b>Reste :</b> budget global testé, schéma de masque partagé, détails vers les ressources <code>developpeur://</code>.</p>
+<p class="preuve">tools/list du connecteur 1.6.3 · MCPServerTests.swift:275</p></div>
+<div class="carte"><h3>Fusionner ce qui sert le même moment <span class="pastille ouvert">ouvert</span><span class="pastille moyen">moyen</span></h3>
+<p>Aucune fusion : <code>list_profiles</code> et <code>list_presets</code>, <code>compare_variants</code> et <code>choose_variant</code> restent à part ; <code>export_photos</code> se règle par drapeaux ; <code>set_metadata</code> a 20 paramètres, du classement au GPS.</p>
+<p class="preuve">Tools.swift:186-193</p></div>
+<div class="carte"><h3>Erreurs sans code lisible par le modèle <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
+<p>Déjà là avant l'analyse : 14 outils déclarent leur sortie (<code>outputSchema</code>, <code>structuredContent</code>). Les erreurs restent du texte seul : pas de <code>{code, reessayable, action}</code>, et le code « jeton » ou « arrêt » du module ne remonte pas au modèle.</p>
+<p class="preuve">Tools.swift:517-551 · LightroomBridge.swift:41-42</p></div>
+<div class="carte"><h3>Détails de cohérence <span class="pastille ouvert">ouvert</span><span class="pastille faible">faible</span></h3>
+<p><code>step_name</code> exigé par le schéma alors qu'un nom par défaut est pris quand il manque, <code>reason</code> exigé nulle part · pagination en trois formes (défauts 50, 100, 200, tranche de 30) · branche « outil inconnu » gardée comme filet, jamais testée. <b>Fait :</b> <code>remove_distractions</code> nomme déjà la poussière depuis la 1.0 (le constat était sans fondement).</p>
+<p class="preuve">Tools.swift:568-579 · MCPServer.swift:171-173</p></div>
 
 <h2>3. Le module Lightroom (Lua) et le pont</h2>
-<div class="carte"><h3>Réponse perdue : aucune trace, aucune reprise <span class="pastille type">améliorer</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
-<p><b>Faire :</b> journaliser la réponse abandonnée, garder les 20 derniers résultats par id, commande « reprendre ». Un identifiant de session aléatoire (nonce) évite qu'un compteur entre en collision entre deux sessions.</p></div>
-<div class="carte"><h3>Aucune annulation, pas de progression pour les commandes seules <span class="pastille type">ajouter</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
-<p><b>Faire :</b> un <code>LrProgressScope</code> « Claude : commande » dès 3 s, avec croix ; lectures et rendus s'arrêtent à la croix.</p></div>
-<div class="carte"><h3>Prise occupée : cinq essais puis échec définitif <span class="pastille type">améliorer</span><span class="pastille moyen">moyen</span><span class="pastille petit">petit</span></h3>
-<p><b>Faire :</b> attente croissante (1 à 30 s), état « en attente du port » dans le voyant, port en préférence.</p></div>
-<div class="carte"><h3>Autres <span class="pastille moyen">moyen</span></h3>
-<p>Rappels de <code>LrSocket</code> jamais exercés par les tests · compatibilité découverte à l'usage (ajouter un objet <code>capacites</code> à <code>get_status</code>) · fenêtre figée à 1 623 × 1 200 (mode compact) · dossiers d'aperçus jamais balayés · corrections manuelles détectées par comparaison, sans observateur.</p></div>
+<div class="carte"><h3>Réponse perdue : aucune trace, aucune reprise <span class="pastille fait">fait en 1.6</span><span class="pastille fort">fort</span></h3>
+<p>Le module garde ses 20 dernières réponses (10 min, 64 Ko au plus) sous un identifiant de commande tiré par le serveur, qui règle aussi la question du nonce ; le serveur reprend une réponse perdue sans jamais rejouer une écriture.</p>
+<p class="preuve">Liaison.lua:113-115, 473-531 · LightroomBridge.swift:218-251 · essais-reprise.lua</p></div>
+<div class="carte"><h3>Aucune annulation, pas de progression pour les commandes seules <span class="pastille fait">fait en 1.6</span><span class="pastille fort">fort</span></h3>
+<p>Après 3 s, une commande seule ouvre la barre « Claude : … » avec sa croix ; elle s'arrête au prochain point sûr, jamais au milieu d'une écriture.</p>
+<p class="preuve">Progression.lua:10-39 · Rendu.lua:126</p></div>
+<div class="carte"><h3>Prise occupée : cinq essais puis échec définitif <span class="pastille ouvert">ouvert</span><span class="pastille moyen">moyen</span></h3>
+<p>Toujours cinq essais à 1 s d'écart, puis l'erreur reste ; ni attente croissante ni état « en attente du port » dans le voyant. Le port en préférence est sans objet : les ports restent fixes par règle du projet.</p></div>
+<div class="carte"><h3>Autres <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
+<p>Les fausses prises des tests passent par <code>LrSocket.bind</code> depuis la 1.2, mais <code>onError</code>, <code>onClosed</code> et <code>onMessage</code> ne sont jamais déclenchés · <code>get_status</code> dit versions, plafonds, index du sens et espèces, sans objet <code>capacites</code> · fenêtre toujours à 1 623 × 1 200, sans mode compact · aperçus jamais lus laissés dans le dossier temporaire du système, et <code>Temporaire/PhotoActive</code> jamais vidé (137 Mo) · corrections de Dany lues par comparaison, sans observateur.</p></div>
 
 <h2>4. La retouche : qualité et garde-fous</h2>
-<div class="carte"><h3>Pas de plafond dur sur Clarté, Dehaze, Texture, netteté locale <span class="pastille type">ajouter</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
-<p><b>Faire :</b> une table de doses par réglage et par type de masque (comme pour la peau) ; au-delà, refuser ou exiger une demande explicite.</p></div>
-<div class="carte"><h3>Empilement : le nombre de passes n'est pas contrôlé <span class="pastille type">améliorer</span><span class="pastille fort">fort</span><span class="pastille moyen-e">moyen</span></h3>
-<p><b>Faire :</b> cumul par session et par réglage, renvoyé avec une alerte (Clarté > 25, Dehaze > 20, Saturation/Vibrance > 30).</p></div>
-<div class="carte"><h3>match_series n'harmonise que exposition, balance des blancs, contraste <span class="pastille type">ajouter</span><span class="pastille fort">fort</span><span class="pastille grand">grand</span></h3>
-<p><b>Faire :</b> ajouter saturation et ombres/noirs, déjà mesurés dans le bilan.</p></div>
-<div class="carte"><h3>Le guide de style est de la prose que personne n'applique en chiffres <span class="pastille type">améliorer</span><span class="pastille fort">fort</span><span class="pastille grand">grand</span></h3>
-<p><b>Faire :</b> un « style numérique » (profil préféré par scène, décalages moyens, courbe signature, grain) proposé comme point de départ.</p></div>
-<div class="carte"><h3>Fragilités à réparer <span class="pastille moyen">moyen</span><span class="pastille petit">petit</span></h3>
-<p>Apprentissage : rubrique fausse (test <code>contains</code> au lieu du préfixe exact) · parseur des effets locaux qui s'arrête à la première accolade fermante (tables imbriquées) · seuils réglés sur huit copies d'essai : monter un jeu de 40 photos avec vérité terrain.</p></div>
+<div class="carte"><h3>Pas de plafond dur sur Clarté, Dehaze, Texture, netteté locale <span class="pastille partiel">en partie (1.6)</span><span class="pastille fort">fort</span></h3>
+<p>Fait pour la photo entière : plafonds sur la valeur finale (Clarté 25, Correction du voile 20, Texture et Vibrance 30), refus sauf demande claire. <b>Reste :</b> une table de doses par type de masque et un plafond de netteté locale : <code>add_mask</code> n'en a aucun, seule la peau a ses doses.</p>
+<p class="preuve">Peau.swift</p></div>
+<div class="carte"><h3>Empilement : le nombre de passes n'est pas contrôlé <span class="pastille partiel">en partie (1.6)</span><span class="pastille fort">fort</span></h3>
+<p>Les plafonds jugent la valeur cumulée de toutes les passes ; le bilan de <code>view_photo</code> signale la dérive ; les consignes limitent à deux passes correctives. <b>Reste :</b> un compte des passes et un cumul par réglage renvoyés en chiffres.</p></div>
+<div class="carte"><h3>match_series n'harmonise que exposition, balance des blancs, contraste <span class="pastille partiel">en partie (1.6)</span><span class="pastille fort">fort</span></h3>
+<p><code>match_look</code> (1.6) reprend la couleur des tons et la Vibrance d'une référence. <code>match_series</code> reste à trois réglages ; ombres et noirs ne s'harmonisent nulle part.</p></div>
+<div class="carte"><h3>Le guide de style est de la prose que personne n'applique en chiffres <span class="pastille partiel">en partie (1.6)</span><span class="pastille fort">fort</span></h3>
+<p><code>remember_style</code> avec <code>habits</code> lit tes réglages de 4 ★ et plus, par appareil et ISO, et en tire des phrases pour le guide après ton accord. <b>Reste :</b> un « style numérique » proposé comme point de départ (profil par scène, courbe signature).</p></div>
+<div class="carte"><h3>Fragilités à réparer <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
+<p>Toujours ouverts : la rubrique de l'apprentissage par <code>contains</code> (<code>LuminanceSmoothing</code> tombe dans « color ») et le parseur des effets locaux coupé à la première accolade. En partie : l'outil du relevé des seuils (1.6) a fixé quatre seuils sur tes photos, mais il n'y a pas encore de jeu fixe d'environ 40 photos annotées qui les rejoue.</p></div>
 
 <h2>5. Le parcours du photographe</h2>
 <table>
-<tr><th>Manque ou excès</th><th>Proposition</th><th>Impact · effort</th></tr>
-<tr><td>Aucun geste d'import</td><td>Invite « Nouvelle sortie » : tri, groupes de lumière, notation des photos ajoutées</td><td>fort · moyen</td></tr>
-<tr><td>Pas d'avant/après de la photo entière</td><td>Bouton « Avant Claude / Maintenant » dans l'Aperçu</td><td>moyen · moyen</td></tr>
-<tr><td>Export sans livraison type</td><td>Bouton « Partager » (écran, courriel, Instagram, impression)</td><td>moyen · petit</td></tr>
-<tr><td>Notation sans revue rapide</td><td>« Accepter tout sauf les rejets », « Voir les 2 ★ et plus »</td><td>moyen · moyen</td></tr>
-<tr><td>Raccourcis : manipulation système</td><td>Expliquer au premier lancement : Fichier › Module externe - Extras</td><td>moyen · petit</td></tr>
-<tr><td>Suivi surdimensionné (≈ 8 657 lignes Lua)</td><td>Garder photos par mois, notes, 3 défauts ; retirer calendrier et champ Du/au</td><td>fort · grand</td></tr>
-<tr><td>Onze genres de photo, peu fiables</td><td>Garder portrait, paysage, famille, animaux ; le reste sous « Autre »</td><td>moyen · moyen</td></tr>
+<tr><th>Manque ou excès</th><th>État au 2 novembre 2026</th><th>Impact · effort</th></tr>
+<tr><td>Aucun geste d'import (« Nouvelle sortie »)</td><td><span class="pastille ouvert">ouvert</span> Tri, groupes de lumière et notation existent séparément ; rien ne les enchaîne.</td><td>fort · moyen</td></tr>
+<tr><td>Pas d'avant/après de la photo entière</td><td><span class="pastille partiel">en partie</span> Claude le montre en fin de retouche (1.3.7) et un clic sur une étape montre le sien ; il manque un bouton « Avant Claude / Maintenant » à tout moment.</td><td>moyen · moyen</td></tr>
+<tr><td>Export sans livraison type</td><td><span class="pastille partiel">en partie</span> La fenêtre Publication a ses profils Web, Instagram et Impression ; il manque « Partager » dans la fenêtre Claude et un profil Courriel.</td><td>moyen · petit</td></tr>
+<tr><td>Notation sans revue rapide</td><td><span class="pastille ouvert">ouvert</span> La carte Note accepte une photo à la fois ; le reste se demande à Claude en mots.</td><td>moyen · moyen</td></tr>
+<tr><td>Raccourcis : manipulation système</td><td><span class="pastille ouvert">ouvert</span> Expliqué dans le Gestionnaire et le README, pas au premier lancement.</td><td>moyen · petit</td></tr>
+<tr><td>Suivi surdimensionné</td><td><span class="pastille ouvert">ouvert</span> Rien d'allégé : calendrier et champs Du/au toujours là ; <code>Releve.lua</code> est passé de 1 886 à 2 040 lignes.</td><td>fort · grand</td></tr>
+<tr><td>Onze genres de photo, peu fiables</td><td><span class="pastille ouvert">ouvert</span> Toujours onze, seuils provisoires.</td><td>moyen · moyen</td></tr>
 </table>
 
 <h2>6. Qualité logicielle et livraison</h2>
 <table>
-<tr><th>Constat</th><th>Proposition</th></tr>
-<tr><td>Installation sans retour arrière</td><td>Garder <code>.precedent</code>, tester <code>--version</code> avant le <code>mv</code></td></tr>
-<tr><td>Mise à jour sans contrôle d'intégrité, tributaire de <code>gh</code></td><td>Publier <code>.sha256</code>, repli sur l'API publique GitHub</td></tr>
-<tr><td>Code de recette dans le binaire livré</td><td>Cible <code>RecetteKit</code> séparée</td></tr>
-<tr><td>Pont local : le jeton ne protège pas d'un processus du même compte</td><td>Confirmation « depuis Lightroom » pour export, rejets, retour à l'original</td></tr>
-<tr><td>Fichiers Lua et <code>MotsClesVision.swift</code> très gros</td><td>Découper <code>Fenetre.lua</code> par écran, mots-clés en ressource JSON</td></tr>
-<tr><td>Pas de workflow de publication</td><td>Tag <code>v*</code> qui refuse si tag ≠ Info.plist</td></tr>
+<tr><th>Constat</th><th>État au 2 novembre 2026</th></tr>
+<tr><td>Installation sans retour arrière</td><td><span class="pastille ouvert">ouvert</span> Aucun <code>.precedent</code> ; le serveur est remplacé avant de tester <code>--version</code>.</td></tr>
+<tr><td>Mise à jour sans contrôle d'intégrité, tributaire de <code>gh</code></td><td><span class="pastille ouvert">ouvert</span> Pas de <code>.sha256</code>, pas de repli sur l'API publique.</td></tr>
+<tr><td>Code de recette dans le binaire livré</td><td><span class="pastille ouvert">ouvert</span> Recette et relevé (environ 4 000 lignes) toujours dans <code>DeveloppeurKit</code>.</td></tr>
+<tr><td>Pont local : le jeton ne protège pas d'un processus du même compte</td><td><span class="pastille ouvert">ouvert</span> « Confirmer dans Lightroom » n'existe qu'en mode Proposer d'abord ; rien de propre à l'export, aux rejets ou au retour à l'original.</td></tr>
+<tr><td>Fichiers Lua et <code>MotsClesVision.swift</code> très gros</td><td><span class="pastille ouvert">ouvert</span> <code>Fenetre.lua</code> : 4 554 lignes ; module Lua : 36 298 lignes (34 197 en 1.4).</td></tr>
+<tr><td>Pas de workflow de publication</td><td><span class="pastille partiel">en partie (1.6.2)</span> La CI compare les numéros de version et compile en release ; rien ne se lance sur un tag <code>v*</code>.</td></tr>
 </table>
 
 <h2>7. Alléger la relecture (nettoyage des notes)</h2>
@@ -154,13 +164,15 @@
 </table>
 <p class="sous">À ne pas toucher : <code>.build</code> (793 Mo, cache de compilation régénérable, à vider seulement si tu veux de la place) et <code>build/Developpeur.zip</code>.</p>
 
+
 <h2>Ordre conseillé</h2>
 <table>
-<tr><th>Vague</th><th>Contenu</th></tr>
-<tr><td>1 · Cette semaine</td><td>Les 3 corrections rapides · garde-fous de dose et cumul · progression et annulation · nonce et reprise</td></tr>
-<tr><td>2 · Ensuite</td><td>Budget de descriptions · fusion des outils · codes d'erreur · invites Classer / Nouvelle sortie / Partager · retour arrière de l'installation</td></tr>
-<tr><td>3 · Plus tard</td><td>Style numérique · harmonisation de série élargie · allègement du Suivi · découpage de <code>Fenetre.lua</code></td></tr>
+<tr><th>Vague</th><th>Contenu</th><th>État</th></tr>
+<tr><td>1 · Cette semaine</td><td>Les 3 corrections rapides · garde-fous de dose et cumul · progression et annulation · nonce et reprise</td><td><span class="pastille fait">faite</span> en 1.5.1, 1.6 et 1.6.2</td></tr>
+<tr><td>2 · Ensuite</td><td>Budget de descriptions · fusion des outils · codes d'erreur · invites Classer / Nouvelle sortie / Partager · retour arrière de l'installation</td><td><span class="pastille partiel">en partie</span> seule l'invite Classer est faite (1.6.2)</td></tr>
+<tr><td>3 · Plus tard</td><td>Style numérique · harmonisation de série élargie · allègement du Suivi · découpage de <code>Fenetre.lua</code></td><td><span class="pastille partiel">en partie</span> habitudes en chiffres et <code>match_look</code> (1.6)</td></tr>
 </table>
+<p class="sous">Les nouvelles recommandations du 2 novembre 2026 sont dans la page Feuille de route de Développeur, étape « Recommandations après la 1.6.3 ».</p>
 </div>
 </body>
 </html>
