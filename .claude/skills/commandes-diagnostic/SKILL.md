@@ -194,6 +194,16 @@ journal ; reprise si relancée ; Lightroom peut rendre des aperçus manquants), 
 Seuils, commandes exactes et règles de décision : `docs/SPEC.md`, Relevé des seuils provisoires
 (1.6). En arrière-plan, sortie dans un fichier.
 
+## Relevé des seuils des espèces (1.6.3)
+
+`./.build/release/mcp-developpeur --especes-essai --collection "<nom>" [--nombre 200] [--espece <nom
+ou groupe>] > especes.json 2> especes.log` (ou `--dossier`, `--ids`, `--images <dossier de JPEG>` sans
+Lightroom ; lecture seule, vignettes de 512 px comme `--sens-essai`). La planche
+(`planche-especes.html`, chemin dans `planche` ; `--planche <dossier>` pour la placer) s'ouvre dans un
+navigateur : Dany clique Juste ou Faux sous chaque photo, puis « Copier le jugement » dans un fichier
+JSON ; `--especes-essai --jugement <fichier.json>` (seul : ni modèle ni Lightroom) dit, pour la porte,
+le score et l'écart au 2e, le seuil qui sépare le mieux justes et faux, comparé au seuil provisoire.
+
 ## Relevé du carnet
 
 `./.build/debug/mcp-developpeur --constats <id>… [<fichier.jpg>…]` (pour fixer les seuils du carnet
