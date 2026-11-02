@@ -6245,21 +6245,27 @@ end)
 
 test("simulation : un radial sans la forme constatée est refusé (Flipped, MaskInverted)", function()
     local photo = photoRaw()
-    local function radial(champ, valeur)
-        local m = Locaux.radial(0.2, 0.2, 0.8, 0.8, 0, 80, 'Claude · Bords', true)
+    local function radial(champ, valeur, inverse)
+        local m = Locaux.radial(0.2, 0.2, 0.8, 0.8, 0, 80, 'Claude · Bords', inverse ~= false)
         m[champ] = valeur
         return { MaskGroupBasedCorrections = { Locaux.correction('Claude · Bords', 1, { LocalExposure2012 = -0.075 }, { m }) } }
     end
+    -- Flipped faux n'est admis qu'avec MaskInverted vrai : la forme que Lightroom range au calcul d'un
+    -- radial inversé (constaté le 2 novembre 2026) ; sans inversion, refusé.
     local refus = {
-        { 'Flipped', nil, "Flipped = true" }, { 'Flipped', false, "Flipped = true" }, { 'Flipped', 'true', "Flipped = true" },
+        { 'Flipped', nil, "Flipped = true" }, { 'Flipped', false, "Flipped = true", false }, { 'Flipped', 'true', "Flipped = true" },
         { 'MaskInverted', nil, "MaskInverted vrai ou faux" }, { 'MaskInverted', 1, "MaskInverted vrai ou faux" },
     }
     for _, cas in ipairs(refus) do
         S.ecritureEnCours = true
-        echoue(function() photo:applyDevelopSettings(radial(cas[1], cas[2]), 'essai') end, cas[3])
-        echoue(function() photo:applyDevelopPreset({ nom = 'essai', reglages = radial(cas[1], cas[2]) }) end, cas[3])
+        echoue(function() photo:applyDevelopSettings(radial(cas[1], cas[2], cas[4]), 'essai') end, cas[3])
+        echoue(function() photo:applyDevelopPreset({ nom = 'essai', reglages = radial(cas[1], cas[2], cas[4]) }) end, cas[3])
         S.ecritureEnCours = false
     end
+    S.ecritureEnCours = true
+    photo:applyDevelopSettings(radial('Flipped', false), 'essai')
+    S.ecritureEnCours = false
+    egal(photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1].Flipped, false, "inversé, calculé par Lightroom : admis")
     -- Un composant d'un masque combiné est vérifié de même.
     local sujet = Locaux.masqueIA(1, nil, 'Claude · Sujet', false)
     local bords = Locaux.combiner(Locaux.radial(0.2, 0.2, 0.8, 0.8, 0, 80, nil, false), 'intersecter', true)
@@ -6296,7 +6302,9 @@ test("masquer : le radial inversé garde la forme constatée, par applyDevelopSe
     })
     egal(photo.appliques[#photo.appliques].preset ~= nil, true, "avec un masque IA : par un paramètre prédéfini")
     m = photo.reglages.MaskGroupBasedCorrections[2].CorrectionMasks[1]
-    egal(m.What, 'Mask/CircularGradient') egal(m.Flipped, true) egal(m.MaskInverted, true)
+    -- Écrit Flipped vrai ; Lightroom, qui calcule les masques du paramètre prédéfini dès l'écriture,
+    -- le range faux sur un radial inversé (constaté le 2 novembre 2026).
+    egal(m.What, 'Mask/CircularGradient') egal(m.Flipped, false) egal(m.MaskInverted, true)
 
     -- Si Locaux.radial changeait de forme (ici sans Flipped), la simulation refuserait l'écriture.
     local radial = Locaux.radial
@@ -6331,7 +6339,7 @@ test("radial : composant intersecté, dupliqué inversé et copié, toujours Fli
     })
     local composant = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[2]
     egal(composant.What, 'Mask/CircularGradient')
-    egal(composant.Flipped, true, "composant intersecté : Flipped gardé")
+    egal(composant.Flipped, false, "composant intersecté (MaskInverted) : Flipped rangé faux au calcul (supposé comme pour un radial inversé, constaté le 2 novembre 2026)")
     egal(composant.MaskBlendMode, 1) egal(composant.MaskInverted, true, "l'intersection passe par MaskInverted")
 
     -- edit_mask, dupliquer inversé : la copie d'un radial s'inverse par MaskInverted seul.
@@ -6363,6 +6371,27 @@ test("radial : composant intersecté, dupliqué inversé et copié, toujours Fli
     local copie = cible.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1]
     egal(copie.What, 'Mask/CircularGradient')
     egal(copie.Flipped, true, "copié : Flipped gardé") egal(copie.MaskInverted, true, "copié : toujours inversé")
+end)
+
+-- Constaté le 2 novembre 2026 (Lightroom Classic 15.6) : un radial inversé calculé par Lightroom porte
+-- Flipped faux. Sa copie inversée par edit_mask (dupliquer) reprend la forme du module : Flipped vrai,
+-- MaskInverted faux, jamais Flipped faux sans MaskInverted (forme non relevée, refusée par la simulation).
+test("radial : la copie inversée d'un radial inversé calculé par Lightroom reprend Flipped vrai", function()
+    local photo = photoFuji()
+    S.active = photo
+    S.negatifCharge = true
+    Commandes.executer('masquer', {
+        masques = Json.tableau({ { type = 'radial', centre_x = 0.5, centre_y = 0.5, rayon_x = 0.3, fondu = 80, inverser = true,
+            nom = 'Claude · Bords', locaux = { LocalExposure2012 = -0.075 } } }),
+        etape = 'bords',
+    })
+    local masques = photo.reglages.MaskGroupBasedCorrections
+    egal(masques[1].CorrectionMasks[1].Flipped, false, "calculé par Lightroom")
+    Commandes.executer('masques', { action = 'dupliquer', masque = 1, inverser = true, nom = 'Centre' })
+    masques = photo.reglages.MaskGroupBasedCorrections
+    egal(#masques, 2)
+    egal(masques[2].CorrectionMasks[1].MaskInverted, false)
+    egal(masques[2].CorrectionMasks[1].Flipped, true, "la copie non inversée agit dans l'ellipse")
 end)
 
 A.bilan()

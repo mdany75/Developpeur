@@ -294,7 +294,8 @@ public final class Recette {
             return "bande de \(Self.nombre(bande.hauteur)) px (attendue \(Self.nombre(attendue))), centrée à \(Self.nombre(bande.centre)) ; annulé"
         }
         // Masques relus (1.6) : sur la version où les formes ont été relevées, aucune forme bien
-        // écrite ne doit sortir en « écart » (tolérances provisoires de Locaux.TOLERANCES_FORMES).
+        // écrite ne doit sortir en « écart » (tolérances de Locaux.TOLERANCES_FORMES, constatées le
+        // 2 novembre 2026).
         try etape(photo, "masques relus : dégradé, radial, pinceau et plage gardés tels qu'écrits") {
             var arguments = Self.argumentsMasquesRelus
             arguments["photo_ids"] = [photoID]

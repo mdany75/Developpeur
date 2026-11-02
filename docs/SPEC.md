@@ -3520,12 +3520,16 @@ pouvaient être mal rangées. Depuis la 1.6, chaque `masquer` relit ce que Light
   `CorrectionID`, puis composant de même rang.
 - **Comparaison** (`Locaux.comparerFormes`, pure) : seules les clés écrites par le module —
   `ZeroX/Y`, `FullX/Y` ; `Left`, `Top`, `Right`, `Bottom`, `Angle` (modulo 180 : une ellipse est
-  symétrique), `Feather`, `Midpoint`, `Roundness`, `Flipped` ; `Radius`, `Flow`, `CenterWeight`,
-  `Dabs` (même nombre, mêmes lettres `r f h d M`, positions des touches) ; nombre de traits
-  (`Masks`) ; `CorrectionRangeMask.Type`, `ColorAmount`, `LumRange`, `DepthRange`, `PointModels`
-  (modèle et position), `CorrectionReferenceX/Y` ; `MaskInverted`, `MaskActive` (vrai et 1
+  symétrique), `Feather`, `Midpoint`, `Roundness`, `Flipped` (pas sur un radial inversé :
+  Lightroom le range faux au calcul) ; `Radius`, `Flow`, `CenterWeight`, `Dabs` (même nombre de
+  touches `f d M`, mêmes lettres, positions ; les touches `r` et `h`, que Lightroom retire au
+  calcul, ne se comparent pas : `Radius` et `CenterWeight` les portent) ; nombre de traits
+  (`Masks`), sauf des traits rangés en table compressée (`MaskBrushTable`, illisible : pas
+  comparés) ; `CorrectionRangeMask.Type`, `ColorAmount`, `LumRange`, `DepthRange`, `PointModels`
+  (modèle et position), `CorrectionReferenceX/Y` tant qu'ils sont là (Lightroom les retire au
+  calcul ; le prélèvement reste dans `PointModels`) ; `MaskInverted`, `MaskActive` (vrai et 1
   pareils), `MaskBlendMode`, `What`, et le nombre de composants. Les clés que Lightroom ajoute
-  (`MaskDigest`, `InputDigest`, `Version`…) sont ignorées.
+  (`MaskDigest`, `InputDigest`, `Version`, `LuminanceDepthSampleInfo`…) sont ignorées.
 - **Verdicts** (`masques_relus` de chaque photo, dans l'ordre des masques relus) : `gardé` (aux
   tolérances près, rien n'est dit) ; `écart` (au moins une clé hors tolérance, ou perdue, ou une
   structure changée : `ecarts` les donne, `composant`, `cle`, `ecrit`, `relu`, `ecart`, `genre`
@@ -3545,8 +3549,10 @@ pouvaient être mal rangées. Depuis la 1.6, chaque `masquer` relit ce que Light
   reste entier sinon (un `écart`, `absent`, `à relire`, ou un module sans `masques_relus`).
   `get_status` garde l'avertissement entier. La description d'`add_mask` le dit en une phrase,
   avant le résumé du tireur ; rien dans les consignes du connecteur ni de la fenêtre.
-- **Simulation** (`Tests/Lua/Liaison/Simulation.lua`) : aucune règle de constat encore (aucun
-  relevé fait) ; une « version future » pour les essais seulement, **pas un constat** :
+- **Simulation** (`Tests/Lua/Liaison/Simulation.lua`) : la règle du constat du 2 novembre 2026,
+  `calculerFormes` (les formes calculées par Lightroom : toujours par le paramètre prédéfini, par
+  `applyDevelopSettings` avec `S.negatifCharge`), et une « version future » pour les essais
+  seulement, **pas un constat** :
   `S.formesIgnorees` (clés perdues), `S.arrondiFormes` (arrondi à n décimales), `S.angleFormes`
   (angle rangé de 0 à 180). Essais : `Tests/Lua/Liaison/essais-masques-relus.lua`.
 - **Recette** (`Recette.swift`, après l'étape du pinceau) : « masques relus : dégradé, radial,
@@ -3556,12 +3562,14 @@ pouvaient être mal rangées. Depuis la 1.6, chaque `masquer` relit ce que Light
   puis annule : sur la 15.6, aucune bonne forme ne sort en écart avec les tolérances provisoires.
   Un angle écrit hors de ±180 ne vient que de l'angle du recadrage ajouté par `Plans.lua`.
 
-**Tolérances provisoires** (`Locaux.TOLERANCES_FORMES`, `provisoires = true`) : position 1e-4 en
-part de l'image (0,6 px sur 6 240), rayon du pinceau compris (`Radius` et touche `r`, une part du
-grand côté : 0,005 relu 0,0059 est un écart) ; angle 0,01° ; valeur 1e-3 en relatif,
+**Tolérances** (`Locaux.TOLERANCES_FORMES`, `provisoires = false`, constatées le 2 novembre 2026,
+voir « À constater ») : position 4e-5 en part de l'image (0,25 px sur 6 240 ; 10 fois l'écart
+maximal relevé, 4e-6), rayon du pinceau compris (`Radius`, une part du grand côté : 0,005 relu
+0,0059 est un écart) ; angle 0,01°, modulo 180 ; valeur 1e-3 en relatif,
 |x − y| / max(|x|, 1e-3) (`plancher` : un écart absolu de 1e-6 pour les valeurs presque nulles),
-pour `Feather`, `Midpoint`, `Roundness`, `Flow`, `CenterWeight`, touches `f` et `h`,
-`ColorAmount`, `LumRange`, `DepthRange` et les modèles de `PointModels`. Pas encore constatées.
+pour `Feather`, `Midpoint`, `Roundness`, `Flow`, `CenterWeight`, touche `f`, `ColorAmount`,
+`LumRange`, `DepthRange` et les modèles de `PointModels` (relevé : 1,4e-6). Ni bornage avant
+l'écriture, ni repli par nom et rang : Lightroom ne borne rien et garde `CorrectionID`.
 
 **Relevé de développement** : `DEVELOPPEUR_RELEVE_FORMES=1` dans l'environnement du serveur
 (`main.swift` pose `ToolHandler.releveFormes` ; jamais dans les tests ni par défaut) fait envoyer
@@ -3623,6 +3631,64 @@ normalisation de l'angle (modulo 180 ou autre), `.valeur` et `.plancher`, et, si
 avant l'écriture ; chaque constat devient une règle de `Simulation.lua` avec son essai, et
 `provisoires` passe à faux. Le retrait d'un masque mal gardé (structure seule, en une écriture
 groupée avec `verifierPersonnes`) reste pour plus tard, sur une vraie 16.x.
+
+**Constaté le 2 novembre 2026** (Lightroom Classic 15.6, module et serveur de `main`, relevé
+`DEVELOPPEUR_RELEVE_FORMES`) sur quatre nouvelles copies d'Essais remises à l'origine : A
+53810054 (`DSCF2402.RAF`, X-H2S paysage 6 240 × 4 160, correction d'objectif : positions
+recalées), B 53810103 (`20200718_161742.raf`, X-T20 vertical), C 53810151
+(`20200710_193347.jpg`), D 53810193 (copie de A recadrée de 20°). Appels 1 (six formes, chemin
+`applyDevelopSettings`) sur A, B, C ; 2 (ciel, dégradé, pinceau, objet par trait et par cadre,
+couleur, chemin du paramètre prédéfini) sur A et C ; 3 (bords : dégradé de 0,02 à 0,98 et de
+−0,05 à 1,05, pinceau le long des bords, radial centré hors de l'image) sur A ; 4 (angle du
+recadrage : radiaux 170° et −30°, écrits 190° et −10°) sur D ; persistance : `--dump` après
+`view_photo`, puis après avoir quitté et relancé Lightroom. Tout défait ensuite
+(`revert_to_original`).
+
+- **Deux formes rangées** : telle qu'écrite (B et C, appel 1 : aucun écart au-delà de l'arrondi),
+  ou **calculée** par Lightroom, toujours par le paramètre prédéfini (appel 2) et par
+  `applyDevelopSettings` quand le négatif de la photo est déjà chargé (A : une copie de la photo
+  affichée), sinon au premier affichage dans le module Développement (B, affiché par `show_photo`
+  après la relance : il prend alors la forme calculée). Ni `view_photo` ni la relance de Lightroom
+  ne changent rien. La forme calculée : touches `r` et `h` des traits retirées (`Radius` et
+  `CenterWeight` gardés) ; `Flipped` rangé faux sur un radial inversé (`MaskInverted` reste vrai ;
+  non inversé, vrai) ; `CorrectionReferenceX/Y` d'une plage de couleurs retirés
+  (`PointModels` garde le prélèvement) ; `LuminanceDepthSampleInfo` ajouté à une plage de
+  luminance ; `CorrectionReferenceX/Y` ajoutés à chaque correction (hors des composants, non
+  comparés). Avant la correction, ces quatre formes sortaient en « écart » sur A.
+- **Pinceau en table compressée** : un trait de 404 touches (appel 3) est rangé sans `Masks`, en
+  `MaskBrushTable` (empreinte), `BrushTable_<empreinte>` (texte compressé) et
+  `MaskBrushUncompressedBytes` (3 728) ; deux traits de 27 et 15 touches restent lisibles. Le seuil
+  n'est pas relevé (la simulation suppose 300 touches, `S.seuilTableBrosse`) : les traits compressés
+  ne se comparent pas.
+- **Arrondi** : six chiffres significatifs (0,1297298562 rangé 0,12973 ; 1,000646 rangé 1,00065) ;
+  écart maximal de position 4e-6 (au-delà de 1), 5e-7 dans l'image ; `Radius` 0,0133333 rangé
+  0,013333 ; `Flow` 0,7 rangé 0,699999 (1,4e-6 en relatif) ; `Feather`, `Midpoint`, `Roundness`,
+  `CenterWeight`, `ColorAmount`, `LumRange` et `PointModels` tels qu'écrits.
+- **Angle** : rangé tel qu'écrit, −160 (200 n'est pas permis par le schéma), −30, et 190 sur la
+  photo recadrée de 20° (ni 10 ni −170) : la comparaison modulo 180 reste juste.
+- **Booléens** : `true` et `false`, jamais 1 ou 0 (le relu les garde booléens).
+- **Bords** : rien n'est borné (un dégradé jusqu'à 1,00065, un radial de bord gauche négatif,
+  gardés) : pas de bornage avant l'écriture. Le schéma d'`add_mask` refuse un point de pinceau hors
+  de 0…1 ; un dégradé ou un radial peut sortir de l'image.
+- **CorrectionID** gardé sur les deux chemins (chaque masque retrouvé par son identifiant) : pas de
+  repli par nom et rang.
+- **Masques IA** : `ReferencePoint` réécrit (0,5 ; 0,5 écrit, 0,944 ; 0,035 relu pour le ciel ;
+  objet par cadre : 0,4998 ; 0,5001 relu 0,524 ; 0,391), `ErrorReason` retiré, `MaskDigest`,
+  `InputDigest`, `FullMaskSize`, `Origin`… ajoutés : leur exclusion de la comparaison est
+  confirmée. Un objet par trait sur A n'a rien trouvé (retiré par le module, non relu).
+- **Verdicts** : avec la correction (comparateur, tolérances), tous les masques relus de ces
+  appels sortent « gardé » ; la recette « masques relus » reste à passer par l'orchestrateur.
+
+Règles et essais : `calculerFormes` de `Simulation.lua` (et `verifierMasques` : `Flipped` faux
+admis avec `MaskInverted` vrai seulement), essais « constat 15.6 » d'`essais-masques-relus.lua`,
+radial inversé de `tests.lua`. Conséquence : une copie inversée d'`edit_mask` (`dupliquer`) d'un
+radial pose `Flipped = true` (la copie d'un radial inversé calculé, `Flipped` faux, n'agirait
+sinon peut-être pas dans l'ellipse ; non relevé). La forme d'un radial fait à la main (question 3
+de la liste du 20 octobre) : celle d'un radial calculé, sans doute, `Flipped` faux s'il est
+inversé ; non relevée à la main.
+
+**À faire avec Dany** : rien pour les tolérances. Restent : le seuil de la table compressée d'un
+pinceau, et l'effet d'un radial `Flipped` faux sans inversion (jamais écrit par le module).
 
 ## Peau (1.2)
 

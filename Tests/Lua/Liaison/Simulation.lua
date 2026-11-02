@@ -349,8 +349,10 @@ end
 -- - dégradé radial (constaté le 20 octobre 2026, sur un portrait, à −2 IL et sans fondu) : la forme
 --   de Locaux.radial, Mask/CircularGradient avec Flipped = true, agit dans l'ellipse ; avec en plus
 --   MaskInverted = true, hors de l'ellipse seulement (coins −69 à −31, centre −0,3). L'inversion
---   passe par MaskInverted seul : Flipped est toujours vrai, inversé ou non. Un radial sans Flipped
---   n'a pas été relevé (il agirait peut-être à l'envers) : la simulation le refuse.
+--   passe par MaskInverted seul : le module écrit Flipped vrai, inversé ou non. Au calcul du masque,
+--   Lightroom range Flipped faux sur un radial inversé (constaté le 2 novembre 2026, calculerFormes) :
+--   cette forme seule est admise. Un radial sans Flipped, ou Flipped faux sans MaskInverted, n'a pas
+--   été relevé (il agirait peut-être à l'envers) : la simulation le refuse.
 -- Catégories d'une personne précise, de sous-type 0 (relevées dans Lightroom) : la personne entière
 -- (20036) et ses parties ; le sous-type 0 sert aussi à l'arrière-plan (22) et au paysage (5000x).
 local CATEGORIES_PERSONNE = { [20036] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true,
@@ -391,7 +393,10 @@ local function verifierMasques(reglages)
         end
         for _, m in ipairs(correction.CorrectionMasks or {}) do
             if m.What == 'Mask/CircularGradient' then
-                assert(m.Flipped == true, "Mask/CircularGradient : Flipped = true, la forme constatée (l'inversion passe par MaskInverted seul)")
+                -- Flipped faux seulement avec MaskInverted vrai : la forme que Lightroom range au calcul
+                -- d'un radial inversé (constaté le 2 novembre 2026) ; le module écrit toujours vrai.
+                assert(m.Flipped == true or (m.Flipped == false and m.MaskInverted == true),
+                    "Mask/CircularGradient : Flipped = true, la forme constatée (l'inversion passe par MaskInverted seul)")
                 assert(type(m.MaskInverted) == 'boolean', "Mask/CircularGradient : MaskInverted vrai ou faux (l'inversion constatée)")
             end
             local geste = type(m.Gesture) == 'table' and m.Gesture[1]
@@ -477,6 +482,76 @@ local function altererFormes(reglages)
     end
 end
 
+-- Constaté le 2 novembre 2026 dans Lightroom Classic 15.6 (relevé DEVELOPPEUR_RELEVE_FORMES sur
+-- des copies d'Essais, docs/SPEC.md, Masques relus, « À constater ») : quand Lightroom calcule un
+-- masque, il range ses formes sans IA autrement qu'écrites. Toujours par le paramètre prédéfini
+-- (les masques IA s'y calculent) ; par applyDevelopSettings seulement sur une photo dont le négatif
+-- est déjà chargé (S.negatifCharge : une copie de la photo affichée), sinon au premier affichage
+-- dans Développement. Ni view_photo ni la relance de Lightroom ne changent rien d'autre.
+--   positions, rayon, flux, dureté : six chiffres significatifs (1,000646 rangé 1,00065) ;
+--   touches « r » et « h » d'un trait retirées (Radius et CenterWeight les portent) ;
+--   radial inversé (MaskInverted vrai) : Flipped rangé faux ;
+--   plage de couleurs : CorrectionReferenceX et Y retirés (le prélèvement reste dans PointModels) ;
+--   plage de luminance : LuminanceDepthSampleInfo ajouté ;
+--   un pinceau de beaucoup de touches : ses traits rangés en table compressée (MaskBrushTable,
+--     sans Masks ; relevé sur 404 touches, pas sur 27 : S.seuilTableBrosse, 300 supposé).
+-- Aucune position n'est bornée, l'angle reste tel qu'écrit (190 compris), CorrectionID est gardé.
+local function chiffres6(x)
+    return tonumber(string.format('%.6g', x))
+end
+
+local function calculerComposant(m)
+    if type(m) ~= 'table' or m.What == 'Mask/Image' then
+        return
+    end
+    for _, cle in ipairs({ 'ZeroX', 'ZeroY', 'FullX', 'FullY', 'Left', 'Top', 'Right', 'Bottom', 'Radius', 'Flow', 'CenterWeight' }) do
+        if type(m[cle]) == 'number' then
+            m[cle] = chiffres6(m[cle])
+        end
+    end
+    if type(m.Dabs) == 'table' then
+        local gardees = {}
+        for _, touche in ipairs(m.Dabs) do
+            local lettre = tostring(touche):match('^(%S+)')
+            if lettre ~= 'r' and lettre ~= 'h' then
+                gardees[#gardees + 1] = touche
+            end
+        end
+        m.Dabs = gardees
+    end
+    if m.What == 'Mask/CircularGradient' and (m.MaskInverted == true or m.MaskInverted == 1) then
+        m.Flipped = false
+    end
+    if m.What == 'Mask/RangeMask' then
+        m.CorrectionReferenceX, m.CorrectionReferenceY = nil, nil
+        local plage = m.CorrectionRangeMask
+        if type(plage) == 'table' and plage.Type == 2 and plage.LuminanceDepthSampleInfo == nil then
+            plage.LuminanceDepthSampleInfo = '0 0.792012 0.140317'
+        end
+    end
+    if m.What == 'Mask/Aggregate' and type(m.Masks) == 'table' then
+        local total = 0
+        for _, trait in ipairs(m.Masks) do
+            calculerComposant(trait)
+            total = total + #(type(trait.Dabs) == 'table' and trait.Dabs or {})
+        end
+        if total >= (S.seuilTableBrosse or 300) then
+            m.MaskBrushTable = 'BABF292B5AAC117F827C27E033BFA091'
+            m['BrushTable_' .. m.MaskBrushTable] = 'compressé'
+            m.MaskBrushUncompressedBytes = total * 9
+            m.Masks = nil
+        end
+    end
+end
+
+local function calculerFormes(reglages)
+    for _, correction in ipairs(type(reglages.MaskGroupBasedCorrections) == 'table' and reglages.MaskGroupBasedCorrections or {}) do
+        for _, m in ipairs(type(correction.CorrectionMasks) == 'table' and correction.CorrectionMasks or {}) do
+            calculerComposant(m)
+        end
+    end
+end
+
 -- meta : métadonnées formatées (getFormattedMetadata) ; brut : métadonnées brutes
 -- (getRawMetadata), qui reprennent meta pour les clés absentes.
 -- Champs IPTC qu'écrit setRawMetadata (outre le titre, la légende et les droits d'auteur).
@@ -553,6 +628,9 @@ function S.Photo(id, reglages, meta, brut)
         end
         verifierMasques(self.reglages)
         if reglages.MaskGroupBasedCorrections ~= nil then
+            if S.negatifCharge then
+                calculerFormes(self.reglages)
+            end
             altererFormes(self.reglages)
         end
         deriverTaches(self)
@@ -785,6 +863,11 @@ function S.Photo(id, reglages, meta, brut)
         end
         verifierMasques(self.reglages)
         if preset.reglages.MaskGroupBasedCorrections ~= nil then
+            -- Formes calculées avec les masques IA, dès l'écriture (S.calculDiffere : la simulation
+            -- ne les calcule pas plus tard).
+            if not S.calculDiffere then
+                calculerFormes(self.reglages)
+            end
             altererFormes(self.reglages)
         end
         perimerLook(self, preset.reglages)
@@ -2546,6 +2629,8 @@ function S.reinitialiser()
     S.masquesVidesRetires = 0
     -- « Version future » des formes de masques (altererFormes) : aucune par défaut.
     S.formesIgnorees, S.arrondiFormes, S.angleFormes = nil, nil, nil
+    -- Formes calculées dès l'écriture par applyDevelopSettings (constat du 2 novembre 2026) : non.
+    S.negatifCharge, S.seuilTableBrosse = nil, nil
     S.barres = {}
     S.surveillances = {}
     S.dureeRendu = 0

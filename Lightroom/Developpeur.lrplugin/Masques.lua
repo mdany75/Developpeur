@@ -237,7 +237,13 @@ function Masques.masques(params)
         local nouveau = sansPrefixe(params.nom)
         copie.CorrectionName = "Claude · " .. (nouveau ~= '' and nouveau or (sansPrefixe(nom) .. " (copie)"))
         if params.inverser and type(copie.CorrectionMasks) == 'table' and copie.CorrectionMasks[1] then
-            copie.CorrectionMasks[1].MaskInverted = copie.CorrectionMasks[1].MaskInverted ~= true
+            local premier = copie.CorrectionMasks[1]
+            premier.MaskInverted = premier.MaskInverted ~= true
+            -- Un radial inversé que Lightroom a calculé porte Flipped faux (constaté le 2 novembre
+            -- 2026) : sa copie reprend la forme du module, Flipped vrai, l'inversion par MaskInverted.
+            if premier.What == 'Mask/CircularGradient' then
+                premier.Flipped = true
+            end
         end
         table.insert(liste, i + 1, copie)
         apres = string.format("%s (+ « %s »%s)", pluriel(#liste, "masque", "masques"), copie.CorrectionName, params.inverser and ", inversé" or "")

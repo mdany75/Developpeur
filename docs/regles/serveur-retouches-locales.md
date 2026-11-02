@@ -16,9 +16,11 @@ Sorti de `Sources/CLAUDE.md` le 31 octobre 2026 ; à lire avant de toucher à `a
   avec `Flipped = true` toujours, inversé par `MaskInverted` seul (`Locaux.radial` ; inversé, il
   n'agit que hors de l'ellipse : coins −31 à −69, centre −0,3 sur 255, à −2 IL sans fondu ; non
   inversé, centre −45 ; constaté le 20 octobre 2026), y compris en composant combiné, en copie
-  inversée d'`edit_mask` et copié vers une autre photo. La simulation vérifie chacune (pour le
-  radial : `Flipped == true` et un `MaskInverted` booléen). La forme d'un radial fait à la main
-  n'est pas relevée, ni l'effet d'un radial sans `Flipped`.
+  inversée d'`edit_mask` et copié vers une autre photo. Au calcul du masque, Lightroom range
+  `Flipped` faux sur un radial inversé (constaté le 2 novembre 2026) : la copie inversée
+  d'`edit_mask` repose `Flipped = true`. La simulation vérifie chacune (pour le radial :
+  `Flipped == true`, ou faux avec `MaskInverted` vrai, et un `MaskInverted` booléen). L'effet d'un
+  radial sans `Flipped`, ou `Flipped` faux sans inversion, n'est pas relevé.
 - Le dosage de la peau n'existe qu'à un endroit : `Peau` (`Peau.swift` : `parDefaut`, « Peau du
   visage lisse », texture −20 et clarté −10 ; `lite`, « Adoucir la peau (Lite) », −35 et −15 ;
   `intensiteReduite`, `amount` 50 pour un homme ou une personne âgée ; rien pour un enfant ;

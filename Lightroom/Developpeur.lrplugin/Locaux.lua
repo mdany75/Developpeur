@@ -718,20 +718,31 @@ end
 -- ReferencePoint et leur geste au calcul (verifierPersonnes et masquesIAEnEchec les suivent).
 -- Seules les clés écrites par le module comptent, pas celles que Lightroom ajoute (MaskDigest…).
 --
--- Tolérances PROVISOIRES, pas encore constatées (docs/SPEC.md, Masques relus, « À constater ») :
--- le relevé DEVELOPPEUR_RELEVE_FORMES sur de nouvelles copies d'Essais les fixera.
---   position : écart absolu en part de l'image (1e-4 : 0,6 px sur 6240), rayon du pinceau compris
---     (Radius et touche « r », une part du grand côté) ;
---   angle : degrés, l'angle d'une ellipse comparé modulo 180 (elle est symétrique) ;
+-- Tolérances constatées le 2 novembre 2026 dans Lightroom Classic 15.6 (docs/SPEC.md, Masques
+-- relus, « À constater ») : relevé DEVELOPPEUR_RELEVE_FORMES sur de nouvelles copies d'Essais (RAW
+-- X-H2S paysage, RAW X-T20 vertical, JPEG ; chemins applyDevelopSettings et paramètre prédéfini).
+--   position : écart absolu en part de l'image, rayon du pinceau compris (Radius, une part du grand
+--     côté) : Lightroom range six chiffres significatifs (1,000646 relu 1,00065 : 4e-6, l'écart
+--     maximal relevé) ; 10 fois cet écart, 4e-5 (0,25 px sur 6240) ;
+--   angle : degrés, l'angle d'une ellipse comparé modulo 180 (elle est symétrique) ; Lightroom
+--     range l'angle tel qu'écrit (−160, −30, et 190 sur une photo recadrée de 20°), sans bornage ;
 --   valeur : écart relatif |x − y| / max(|x|, plancher) (fondu, flux, dureté, étendue, plages) ;
---     le plancher (1e-3) ne sert qu'aux valeurs presque nulles (écart absolu de 1e-6 en dessous).
-Locaux.TOLERANCES_FORMES = { position = 1e-4, angle = 0.01, valeur = 1e-3, plancher = 1e-3, provisoires = true }
+--     relevé : 1,4e-6 (flux 0,7 relu 0,699999) ; le plancher (1e-3) ne sert qu'aux valeurs presque
+--     nulles (écart absolu de 1e-6 en dessous).
+-- Aucune position n'est bornée (un dégradé hors de l'image reste hors de l'image) : pas de bornage
+-- avant l'écriture. CorrectionID gardé sur les deux chemins : pas de repli par nom et rang.
+Locaux.TOLERANCES_FORMES = { position = 4e-5, angle = 0.01, valeur = 1e-3, plancher = 1e-3, provisoires = false }
 
 local POSITIONS_FORMES = {
     ['Mask/Gradient'] = { 'ZeroX', 'ZeroY', 'FullX', 'FullY' },
     ['Mask/CircularGradient'] = { 'Left', 'Top', 'Right', 'Bottom' },
-    ['Mask/RangeMask'] = { 'CorrectionReferenceX', 'CorrectionReferenceY' },
     ['Mask/Paint'] = { 'Radius' },
+}
+-- Clés que Lightroom retire au calcul du masque (constaté le 2 novembre 2026, 15.6) : comparées
+-- seulement quand elles sont encore là. Le prélèvement d'une plage de couleurs reste dans
+-- PointModels.
+local POSITIONS_RETIREES_AU_CALCUL = {
+    ['Mask/RangeMask'] = { 'CorrectionReferenceX', 'CorrectionReferenceY' },
 }
 local VALEURS_FORMES = {
     ['Mask/CircularGradient'] = { 'Feather', 'Midpoint', 'Roundness' },
@@ -825,27 +836,45 @@ function Locaux.comparerFormes(ecrits, relus, tol)
             nombre(k, cle .. '[' .. i .. ']', x[i], y[i], genres[i] or 'valeur')
         end
     end
-    -- Touches d'un trait (Dabs) : même nombre et mêmes lettres ; « f », « h » comparés en valeurs,
-    -- « r » (rayon, part du grand côté), « d x y » ou « M x y » en positions.
+    -- Touches d'un trait (Dabs) : même nombre et mêmes lettres ; « f » comparé en valeur, « d x y »
+    -- ou « M x y » en positions. Les touches « r » (rayon) et « h » (dureté) ne se comparent pas :
+    -- Lightroom les retire au calcul du masque (constaté le 2 novembre 2026, 15.6), Radius et
+    -- CenterWeight les portent. Le rang dit est celui de la touche écrite.
+    local function sansRayonNiDurete(liste)
+        local gardees = {}
+        for i, touche in ipairs(liste) do
+            local lettre = tostring(touche):match('^(%S+)')
+            if lettre ~= 'r' and lettre ~= 'h' then
+                gardees[#gardees + 1] = { rang = i, texte = tostring(touche) }
+            end
+        end
+        return gardees
+    end
     local function touches(k, a, b)
         if type(a) ~= 'table' then
             return
         end
-        if type(b) ~= 'table' or #a ~= #b then
-            dire(k, 'Dabs', #a .. ' touches', type(b) == 'table' and (#b .. ' touches') or 'absent', nil, 'structure')
+        if type(b) ~= 'table' then
+            dire(k, 'Dabs', #a .. ' touches', 'absent', nil, 'structure')
             return
         end
-        for i = 1, #a do
-            local la, ra = tostring(a[i]):match('^(%S+)%s*(.*)$')
-            local lb, rb = tostring(b[i]):match('^(%S+)%s*(.*)$')
+        local ta, tb = sansRayonNiDurete(a), sansRayonNiDurete(b)
+        if #ta ~= #tb then
+            dire(k, 'Dabs', #ta .. ' touches', #tb .. ' touches', nil, 'structure')
+            return
+        end
+        for i = 1, #ta do
+            local cle = 'Dabs[' .. ta[i].rang .. ']'
+            local la, ra = ta[i].texte:match('^(%S+)%s*(.*)$')
+            local lb, rb = tb[i].texte:match('^(%S+)%s*(.*)$')
             local x, y = nombresDe(ra), nombresDe(rb)
             if la ~= lb or #x ~= #y then
-                dire(k, 'Dabs[' .. i .. ']', tostring(a[i]), tostring(b[i]), nil, 'structure')
+                dire(k, cle, ta[i].texte, tb[i].texte, nil, 'structure')
                 return
             end
-            local genre = (la == 'd' or la == 'M' or la == 'r') and 'position' or 'valeur'
+            local genre = (la == 'd' or la == 'M') and 'position' or 'valeur'
             for j = 1, #x do
-                nombre(k, 'Dabs[' .. i .. ']', x[j], y[j], genre)
+                nombre(k, cle, x[j], y[j], genre)
             end
         end
     end
@@ -854,8 +883,11 @@ function Locaux.comparerFormes(ecrits, relus, tol)
             dire(k, 'What', tostring(a.What), type(b) == 'table' and tostring(b.What) or 'absent', nil, 'structure')
             return
         end
+        -- Un radial inversé : Lightroom range Flipped faux au calcul du masque (constaté le 2 novembre
+        -- 2026, 15.6 ; MaskInverted reste vrai) ; il ne se compare pas.
+        local flippedRecalcule = a.What == 'Mask/CircularGradient' and booleen(a.MaskInverted) == true
         for _, cle in ipairs(BOOLEENS_FORMES) do
-            if a[cle] ~= nil and booleen(a[cle]) ~= booleen(b[cle]) then
+            if a[cle] ~= nil and not (cle == 'Flipped' and flippedRecalcule) and booleen(a[cle]) ~= booleen(b[cle]) then
                 dire(k, cle, tostring(a[cle]), tostring(b[cle]), nil, 'structure')
             end
         end
@@ -865,6 +897,11 @@ function Locaux.comparerFormes(ecrits, relus, tol)
         for _, cle in ipairs(POSITIONS_FORMES[a.What] or {}) do
             nombre(k, cle, a[cle], b[cle], 'position')
         end
+        for _, cle in ipairs(POSITIONS_RETIREES_AU_CALCUL[a.What] or {}) do
+            if b[cle] ~= nil then
+                nombre(k, cle, a[cle], b[cle], 'position')
+            end
+        end
         for _, cle in ipairs(VALEURS_FORMES[a.What] or {}) do
             nombre(k, cle, a[cle], b[cle], 'valeur')
         end
@@ -872,6 +909,10 @@ function Locaux.comparerFormes(ecrits, relus, tol)
             nombre(k, 'Angle', a.Angle, b.Angle, 'angle')
         elseif a.What == 'Mask/Paint' then
             touches(k, a.Dabs, b.Dabs)
+        elseif a.What == 'Mask/Aggregate' and b.Masks == nil and b.MaskBrushTable ~= nil then
+            -- Traits rangés par Lightroom en table compressée (MaskBrushTable, constaté le 2 novembre
+            -- 2026, 15.6, sur un trait de 404 touches ; pas sur 27) : illisibles, pas comparés.
+            return
         elseif a.What == 'Mask/Aggregate' then
             local ma, mb = type(a.Masks) == 'table' and a.Masks or {}, type(b.Masks) == 'table' and b.Masks or {}
             if #ma ~= #mb then

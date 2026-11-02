@@ -224,7 +224,8 @@ end)
 
 test("Locaux.comparerFormes : IA ignorée, angle modulo 180, booléens 0/1, touches, couleurs, plages, tolérances", function()
     local tol = Locaux.TOLERANCES_FORMES
-    egal(tol.provisoires, true, "tolérances provisoires, à fixer par le constat")
+    egal(tol.provisoires, false, "tolérances constatées le 2 novembre 2026")
+    proche(tol.position, 4e-5, "10 fois l'écart maximal relevé (4e-6 : six chiffres significatifs)")
     -- Un objet dont Lightroom a déplacé ReferencePoint et retiré le geste : pas comparé.
     local objet = { What = 'Mask/Image', ReferencePoint = '0.200000 0.300000', Gesture = { { What = 'Mask/Paint' } } }
     egal(#Locaux.comparerFormes({ objet }, { { What = 'Mask/Image', ReferencePoint = '0.500000 0.500000' } }), 0)
@@ -266,11 +267,11 @@ test("Locaux.comparerFormes : IA ignorée, angle modulo 180, booléens 0/1, touc
     e = Locaux.comparerFormes({ pinceau }, { avec(pinceau, { Masks = { deplace } }) })
     egal(e[1].cle, 'Dabs[5]') egal(e[1].genre, 'position')
     -- Rayon d'un pinceau fin (part du grand côté) : 0,005 relu 0,0059 (18 % plus large), écart de
-    -- position, pour Radius comme pour la touche « r ».
+    -- position sur Radius ; la touche « r » ne se compare pas (Lightroom la retire au calcul).
     local fin = avec(trait, { Radius = 0.005, Dabs = { 'r 0.005000', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000', 'd 0.210000 0.310000' } })
     local large = avec(fin, { Radius = 0.0059, Dabs = { 'r 0.005900', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000', 'd 0.210000 0.310000' } })
     e = Locaux.comparerFormes({ avec(pinceau, { Masks = { fin } }) }, { avec(pinceau, { Masks = { large } }) })
-    egal(#e, 2) egal(e[1].cle, 'Radius') egal(e[1].genre, 'position') egal(e[2].cle, 'Dabs[1]') egal(e[2].genre, 'position')
+    egal(#e, 1) egal(e[1].cle, 'Radius') egal(e[1].genre, 'position')
     egal(#Locaux.comparerFormes({ avec(pinceau, { Masks = { fin } }) }, { avec(pinceau, { Masks = { avec(fin, { Radius = 0.005004 }) } }) }), 0,
         "0,02 px sur 6240 : gardé")
     e = Locaux.comparerFormes({ pinceau }, { avec(pinceau, { Masks = {} }) })
@@ -295,6 +296,95 @@ test("Locaux.comparerFormes : IA ignorée, angle modulo 180, booléens 0/1, touc
     local lineaire = { What = 'Mask/Gradient', ZeroX = 0.5, ZeroY = 0.4, FullX = 0.5, FullY = 0 }
     e = Locaux.comparerFormes({ lineaire }, { avec(lineaire, { ZeroX = false }) })
     egal(e[1].cle, 'ZeroX') egal(e[1].genre, 'structure')
+end)
+
+-- Constats du 2 novembre 2026 (Lightroom Classic 15.6, relevé DEVELOPPEUR_RELEVE_FORMES sur des
+-- copies d'Essais) : au calcul du masque, Lightroom retire les touches « r » et « h », range Flipped
+-- faux sur un radial inversé, retire CorrectionReferenceX/Y d'une plage de couleurs, range un long
+-- pinceau en table compressée, garde six chiffres significatifs ; rien n'est borné ; l'angle reste
+-- tel qu'écrit. Aucune de ces formes calculées n'est un écart.
+local function formesConstat()
+    return Json.tableau({
+        { type = 'radial', centre_x = 0.543211, centre_y = 0.487655, rayon_x = 0.234567, angle = -30, fondu = 37,
+          inverser = true, nom = 'Claude · Rond inversé', locaux = { LocalExposure2012 = -0.1 } },
+        { type = 'pinceau', nom = 'Claude · Pinceau', locaux = { LocalExposure2012 = 0.15 },
+          traits = { { points = { { 0.2, 0.3 }, { 0.234567, 0.345678 } }, rayon = 0.02, flux = 0.7, durete = 30 },
+                     { points = { { 0.6, 0.6 }, { 0.62, 0.64 } }, rayon = 0.035, flux = 0.7, durete = 30 } } },
+        { type = 'pinceau', nom = 'Claude · Pinceau auto', locaux = { LocalExposure2012 = 0.1 }, auto = true,
+          traits = { { points = { { 0.41, 0.62 }, { 0.456789, 0.654321 } }, rayon = 0.015, flux = 0.55, durete = 80 } } },
+        { type = 'luminance', min = 0.7, max = 1, fondu = 0.1, nom = 'Claude · Plage', locaux = { LocalHighlights2012 = -0.3 } },
+        { type = 'lineaire', de_x = -0.05, de_y = -0.05, a_x = 1.000646, a_y = 1.05, nom = 'Claude · Hors image', locaux = {} },
+    })
+end
+
+test("masques relus (constat 15.6) : formes calculées dès l'écriture (négatif chargé) : toutes gardées", function()
+    local photo = fuji()
+    S.negatifCharge = true
+    local resultat = Commandes.executer('masquer', { masques = formesConstat(), etape = 'formes' })
+    local corrections = photo.reglages.MaskGroupBasedCorrections
+    local inverse = corrections[1].CorrectionMasks[1]
+    egal(inverse.Flipped, false, "simulation : Flipped rangé faux sur le radial inversé")
+    egal(inverse.MaskInverted, true)
+    local trait = corrections[2].CorrectionMasks[1].Masks[1]
+    egal(tostring(trait.Dabs[1]):sub(1, 1), 'f', "simulation : touches « r » et « h » retirées")
+    egal(corrections[4].CorrectionMasks[1].CorrectionRangeMask.LuminanceDepthSampleInfo ~= nil, true)
+    proche(corrections[5].CorrectionMasks[1].ZeroX, 1.00065, "six chiffres significatifs, pas de bornage")
+    for _, nom in ipairs({ 'Claude · Rond inversé', 'Claude · Pinceau', 'Claude · Pinceau auto', 'Claude · Plage', 'Claude · Hors image' }) do
+        egal(verdicts(resultat)[nom].verdict, 'gardé', nom)
+    end
+    egal(remarque(resultat, "pas gardé tel qu'écrit"), false)
+end)
+
+test("masques relus (constat 15.6) : sans calcul à l'écriture, les mêmes formes restent gardées telles qu'écrites", function()
+    local photo = fuji()
+    local resultat = Commandes.executer('masquer', { masques = formesConstat(), etape = 'formes' })
+    egal(photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1].Flipped, true, "rangé tel qu'écrit")
+    for _, v in ipairs(resultat.resultats[1].masques_relus) do
+        egal(v.verdict, 'gardé', v.nom)
+    end
+end)
+
+test("masques relus (constat 15.6) : chemin du paramètre prédéfini, plage de couleurs sans CorrectionReferenceX/Y : gardée", function()
+    local photo = fuji()
+    local resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'ia', soustype = 2, nom = 'Claude · Ciel', locaux = { LocalExposure2012 = -0.1 } },
+        { type = 'couleur', prelevements = { { x = 0.4997944, y = 0.2099602, modele = { 0.67433, 0.457151, 0.427596 } } }, etendue = 0.37, nom = 'Claude · Couleur',
+          locaux = { LocalSaturation = -0.05 } },
+        { type = 'pinceau', nom = 'Claude · Pinceau', locaux = { LocalExposure2012 = 0.15 },
+          traits = { { points = { { 0.2, 0.3 }, { 0.25, 0.35 } }, rayon = 0.02, flux = 0.7, durete = 30 } } },
+    }), etape = 'masques' })
+    local couleur
+    for _, c in ipairs(photo.reglages.MaskGroupBasedCorrections) do
+        if c.CorrectionName == 'Claude · Couleur' then couleur = c.CorrectionMasks[1] end
+    end
+    egal(couleur.CorrectionReferenceX, nil, "simulation : retiré au calcul")
+    egal(verdicts(resultat)['Claude · Couleur'].verdict, 'gardé')
+    egal(verdicts(resultat)['Claude · Pinceau'].verdict, 'gardé')
+end)
+
+test("masques relus (constat 15.6) : un long trait rangé en table compressée (MaskBrushTable) : gardé, traits non relus", function()
+    local photo = fuji()
+    S.negatifCharge, S.seuilTableBrosse = true, 20
+    local resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'pinceau', nom = 'Claude · Bord', locaux = { LocalExposure2012 = 0.1 },
+          traits = { { points = { { 0.02, 0.02 }, { 0.98, 0.02 }, { 0.98, 0.98 } }, rayon = 0.02, flux = 0.7, durete = 30 } } },
+    }), etape = 'formes' })
+    local agregat = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1]
+    egal(agregat.Masks, nil, "simulation : traits compressés")
+    egal(agregat.MaskBrushTable ~= nil, true)
+    egal(verdicts(resultat)['Claude · Bord'].verdict, 'gardé')
+end)
+
+test("masques relus (constat 15.6) : un radial à 170° sur une photo recadrée de 20° s'écrit et se range 190°", function()
+    local photo = fuji()
+    photo.reglages.CropAngle = 20
+    S.negatifCharge = true
+    local resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'radial', centre_x = 0.5, centre_y = 0.5, rayon_x = 0.2, angle = 170, nom = 'Claude · Rond penché',
+          locaux = { LocalExposure2012 = 0.1 } },
+    }), etape = 'formes' })
+    proche(photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1].Angle, 190, "angle gardé tel qu'écrit")
+    egal(verdicts(resultat)['Claude · Rond penché'].verdict, 'gardé')
 end)
 
 A.bilan()
