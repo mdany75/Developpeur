@@ -3562,7 +3562,10 @@ pouvaient être mal rangées. Depuis la 1.6, chaque `masquer` relit ce que Light
   précise, « Objets et personnes précises non relus : vérifier le premier avec view_photo. ») ;
   depuis la 1.6.3, quand ils sont tous `gardé` ou `retiré` avec au moins un `retiré`, « Lightroom
   Classic X : dégradés, pinceaux et plages relus, les masques que Lightroom n'a pas gardés tels
-  qu'écrits sont retirés (masques_relus) : les reposer autrement, et le dire à l'utilisateur. » ;
+  qu'écrits sont retirés (masques_relus) : les reposer autrement, vérifier le premier reposé
+  (add_mask avec mask_map, ou view_photo) avant d'en poser d'autres, et le dire à l'utilisateur. »
+  (un `retiré` prouve que cette version range mal les formes : le masque reposé se vérifie, comme
+  dans l'avertissement entier) ;
   il reste entier sinon (un `écart` dont le retrait a échoué, `absent`, `à relire`, ou un module
   sans `masques_relus`). `get_status` garde l'avertissement entier. La description d'`add_mask` le
   dit en une phrase (« un masque que Lightroom n'a pas gardé tel qu'écrit est retiré et dit, à
@@ -3618,7 +3621,13 @@ Lightroom Classic ; sur la 15.6, les 36 formes du relevé sont toutes `gardé` (
   **une** écriture de plus pour toute la commande, « Claude · masque retiré » (une ligne de
   l'Historique de Lightroom et une opération d'Édition › Annuler, comme « Claude · personne non
   reconnue » de `verifierPersonnes`), mais **dans l'étape de Claude** : ni étape de mémoire ni
-  entrée de journal de plus, même `etape_id`. `undo_last` défait donc le tout d'un coup (l'état
+  entrée de journal de plus, même `etape_id`. Le changement des masques (`changements` de la
+  réponse, ligne de la fenêtre de la liaison) et l'entrée de l'étape au journal (`journalClaude`,
+  `export_journal`), écrits avant le retrait, sont refaits sans les masques retirés
+  (`Retouche.corrigerChangements` : « 3 masques (+ …) » au lieu de « 4 masques (+ …, X) » ; plus de
+  changement des masques si tous les masques ajoutés sont retirés), et l'entrée porte la `note`
+  « Masque retiré après l'écriture (Lightroom ne l'a pas gardé tel qu'écrit) : « X ». » (écriture
+  privée de la mémoire, sans opération d'Annuler). `undo_last` défait donc le tout d'un coup (l'état
   d'avant de l'étape n'a pas le masque) ; `noterEtatFinal`, qui vient après, garde l'état sans le
   masque (le retrait n'est pas pris pour une correction de Dany). Un ⌘Z de Dany défait d'abord le
   retrait seul (le masque mal gardé revient), puis l'étape.

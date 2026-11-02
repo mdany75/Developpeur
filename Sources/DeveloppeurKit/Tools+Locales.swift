@@ -555,7 +555,8 @@ extension ToolHandler {
     /// L'avertissement de version d'un appel d'add_mask, d'après la relecture des formes du module
     /// (1.6, `masques_relus` de chaque photo) : nil sans masque à position ou sur la version
     /// relevée ; une phrase courte si chaque forme relue est « gardé » ou « retiré » (1.6.3 : le
-    /// module retire un masque mal gardé et le dit ; la phrase dit alors de le reposer autrement) ;
+    /// module retire un masque mal gardé et le dit ; la phrase dit alors de le reposer autrement, et
+    /// de vérifier le premier reposé avant d'en poser d'autres, cette version rangeant mal ses formes) ;
     /// l'avertissement entier sinon (un écart dont le retrait a échoué, un absent, un « à relire »,
     /// ou un module sans relecture). Les objets et les personnes précises ne sont pas relus (masques
     /// IA) : la phrase courte le dit. get_status garde l'avertissement entier.
@@ -568,7 +569,7 @@ extension ToolHandler {
             ([masque] + (masque["composants"]?.array ?? [])).contains { ["objet", "personne"].contains($0["type"]?.string) }
         }
         let gardes = verdicts.contains("retiré")
-            ? "les masques que Lightroom n'a pas gardés tels qu'écrits sont retirés (masques_relus) : les reposer autrement, et le dire à l'utilisateur."
+            ? "les masques que Lightroom n'a pas gardés tels qu'écrits sont retirés (masques_relus) : les reposer autrement, vérifier le premier reposé (add_mask avec mask_map, ou view_photo) avant d'en poser d'autres, et le dire à l'utilisateur."
             : "gardés tels qu'écrits."
         return "Lightroom Classic \(version) : dégradés, pinceaux et plages relus, " + gardes
             + (iaPlaces ? " Objets et personnes précises non relus : vérifier le premier avec view_photo." : "")

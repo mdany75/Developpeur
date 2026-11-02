@@ -11,6 +11,10 @@
   encore en calcul, introuvable, IA ou déjà sur la photo n'est jamais retiré ; un retrait que
   Lightroom refuse est dit, sans rien défaire d'autre. Sur Lightroom Classic 15.6, toutes les
   formes relevées sont gardées telles qu'écrites : rien n'y est retiré en pratique.
+- Après un tel retrait, les changements de la réponse, le journal (`export_journal`) et la fenêtre
+  de la liaison ne citent plus le masque retiré parmi les masques ajoutés, et l'entrée du journal
+  dit le retrait. Sur une autre version que la 15.6, Claude vérifie le premier masque reposé
+  (carte du masque ou `view_photo`) avant d'en poser d'autres.
 
 ## 1.6.2 — 2026-11-02
 

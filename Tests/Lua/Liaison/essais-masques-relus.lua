@@ -121,6 +121,37 @@ test("masques relus : touches d'un pinceau perdues : « écart » de structure, 
     egal(noms(photo), 'Claude · Dégradé, Claude · Rond, Claude · Plage', "le reste de la retouche reste")
 end)
 
+test("masques relus : après un retrait, changements, journal (export_journal) et fenêtre de la liaison disent ce qui reste", function()
+    local photo = fuji()
+    S.formesIgnorees = { 'Dabs' }
+    local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    egal(verdicts(resultat)['Claude · Pinceau'].verdict, 'retiré')
+    local attendu = "3 masques (+ Claude · Dégradé, Claude · Rond, Claude · Plage)"
+    local changements = resultat.resultats[1].changements
+    egal(#changements, 1)
+    egal(changements[1].cle, 'MaskGroupBasedCorrections')
+    egal(changements[1].avant, "0 masque")
+    egal(changements[1].apres, attendu, "la réponse ne cite plus le masque retiré")
+    local journal = Json.decode(photo.proprietes.journalClaude)
+    local entree = journal[#journal]
+    egal(entree.changements[1].apres, attendu, "le journal ne cite plus le masque retiré")
+    egal(entree.note, "Masque retiré après l'écriture (Lightroom ne l'a pas gardé tel qu'écrit) : « Claude · Pinceau ».",
+        "le journal dit le retrait")
+    egal(tostring(require('Liaison').derniersReglages):find("Claude · Pinceau", 1, true), nil, "fenêtre de la liaison")
+
+    -- Tous les masques ajoutés retirés : plus de changement des masques, le journal le dit.
+    photo = fuji()
+    S.formesIgnorees = { 'ZeroX' }
+    resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'lineaire', de_x = 0.5, de_y = 0, a_x = 0.5, a_y = 0.3, nom = 'Claude · Haut', locaux = { LocalExposure2012 = -0.2 } },
+    }), etape = 'formes' })
+    egal(verdicts(resultat)['Claude · Haut'].verdict, 'retiré')
+    egal(#resultat.resultats[1].changements, 0, "aucun masque ajouté ne reste")
+    journal = Json.decode(photo.proprietes.journalClaude)
+    egal(#journal[#journal].changements, 0)
+    egal(contient({ journal[#journal].note }, "« Claude · Haut »"), true)
+end)
+
 test("masques relus : retiré dans l'étape de Claude : une seule étape en mémoire, undo_last défait le tout, l'état laissé est sans le masque", function()
     local photo = fuji()
     photo.reglages.Exposure2012 = 0.3

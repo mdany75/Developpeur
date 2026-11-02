@@ -585,6 +585,8 @@ final class ToolsAvancesTests: XCTestCase {
         let retire = try XCTUnwrap(ToolHandler.alerteFormes("16.0", reponse: reponse(["retiré"]), masks: [radial]))
         XCTAssertTrue(retire.hasPrefix("Lightroom Classic 16.0 : dégradés, pinceaux et plages relus, les masques que Lightroom"), retire)
         XCTAssertTrue(retire.contains("les reposer autrement"), retire)
+        XCTAssertTrue(retire.contains("vérifier le premier reposé (add_mask avec mask_map, ou view_photo) avant d'en poser d'autres"),
+                      "un retrait prouve que cette version range mal les formes : vérifier le suivant")
         XCTAssertEqual(ToolHandler.alerteFormes("16.0", reponse: reponse(["écart"]), masks: [radial]),
                        ToolHandler.avertissementFormesMasques("16.0"), "un retrait échoué garde son verdict « écart » : l'avertissement entier")
         XCTAssertNil(ToolHandler.alerteFormes("15.6", reponse: reponse(["retiré"]), masks: [radial]), "rien sur la version relevée")

@@ -19,6 +19,7 @@ local Recalage = require 'Recalage'
 local Reglages = require 'Reglages'
 
 local brut, decrire, dimensionsAffichees = Photos.brut, Photos.decrire, Photos.dimensionsAffichees
+local garder = Photos.garder
 local orientationAffichage, photoParId = Photos.orientationAffichage, Photos.photoParId
 local photosVisees, photoVisee = Photos.photosVisees, Photos.photoVisee
 local afficher, CLES_CADRE, estRaw = Reglages.afficher, Reglages.CLES_CADRE, Reglages.estRaw
@@ -30,7 +31,7 @@ local noterChangement, nouveauPlan = Plans.noterChangement, Plans.nouveauPlan
 local preparer, preparerContrainte = Plans.preparer, Plans.preparerContrainte
 local preparerCopie, preparerMasques = Plans.preparerCopie, Plans.preparerMasques
 local preparerTaches = Plans.preparerTaches
-local calculerIA, ecrire = Ecriture.calculerIA, Ecriture.ecrire
+local calculerIA, ecrire, ecrireMemoire = Ecriture.calculerIA, Ecriture.ecrire, Ecriture.ecrireMemoire
 local completerEtapes, ecrirePlans = Ecriture.completerEtapes, Ecriture.ecrirePlans
 local modeTexte, nomEtape, noterEtatFinal = Ecriture.modeTexte, Ecriture.nomEtape, Ecriture.noterEtatFinal
 local relireCadres, resultatsPlans = Ecriture.relireCadres, Ecriture.resultatsPlans
@@ -249,8 +250,67 @@ end
 -- mémoire de plus : undo_last défait le tout d'un coup (l'état d'avant de l'étape n'a pas le
 -- masque), et noterEtatFinal, qui vient après, garde l'état sans le masque. Le retrait est relu : un
 -- masque encore là (écriture refusée, ou Lightroom qui l'a gardé) reste « écart » avec
--- retrait = « échoué », et c'est dit ; le reste de la retouche n'est jamais touché.
+-- retrait = « échoué », et c'est dit ; le reste de la retouche n'est jamais touché. Le changement
+-- des masques (réponse, fenêtre de la liaison) et l'entrée de l'étape au journal (export_journal),
+-- écrits avant le retrait, sont refaits sans les masques retirés, et l'entrée dit le retrait (note).
 local ETAPE_RETRAIT = "Claude · masque retiré"
+
+-- Refait le changement des masques et l'entrée du journal de l'étape sans les masques retirés
+-- (noms), puis garde le journal (mémoire seule).
+local function corrigerChangements(plans)
+    local journaux = {}
+    for _, plan in ipairs(plans) do
+        if plan.retires and #plan.retires > 0 then
+            local restants = {}
+            for _, nom in ipairs(plan.masquesAjoutes or {}) do
+                restants[#restants + 1] = nom
+            end
+            for _, nom in ipairs(plan.retires) do
+                for i, ajoute in ipairs(restants) do
+                    if ajoute == nom then
+                        table.remove(restants, i)
+                        break
+                    end
+                end
+            end
+            -- Le même tableau que l'entrée du journal (Ecriture.ecrirePlans).
+            for i = #plan.changements, 1, -1 do
+                local changement = plan.changements[i]
+                if changement.cle == 'MaskGroupBasedCorrections' then
+                    if #restants == 0 then
+                        table.remove(plan.changements, i)
+                    else
+                        changement.apres = pluriel((plan.masquesExistants or 0) + #restants, "masque", "masques")
+                            .. " (+ " .. table.concat(restants, ", ") .. ")"
+                    end
+                    break
+                end
+            end
+            local cites = {}
+            for _, nom in ipairs(plan.retires) do
+                cites[#cites + 1] = "« " .. nom .. " »"
+            end
+            local texte = string.format("%s après l'écriture (Lightroom ne l'a pas gardé tel qu'écrit) : %s.",
+                #cites > 1 and "Masques retirés" or "Masque retiré", table.concat(cites, ", "))
+            if plan.entreeJournal then
+                plan.entreeJournal.note = plan.entreeJournal.note and (plan.entreeJournal.note .. " " .. texte) or texte
+                journaux[#journaux + 1] = plan
+            end
+        end
+    end
+    if #journaux > 0 then
+        -- Un journal non gardé (Lightroom occupé) ne fait pas échouer la commande : l'étape et le
+        -- retrait sont écrits, la réponse les dit.
+        local fait, erreur = LrTasks.pcall(ecrireMemoire, "Claude · journal", function()
+            for _, plan in ipairs(journaux) do
+                garder(plan.photo, 'journalClaude', Json.encode(Json.tableau(plan.journal)))
+            end
+        end)
+        if not fait then
+            Liaison.noter("Journal du retrait non gardé : " .. tostring(erreur))
+        end
+    end
+end
 
 local function retirerMalGardes(plans)
     local aRetirer = {}
@@ -288,6 +348,8 @@ local function retirerMalGardes(plans)
         for _, mal in ipairs(plan.malGardes) do
             if not restants[tostring(mal.id)] then
                 mal.entree.verdict = 'retiré'
+                plan.retires = plan.retires or {}
+                plan.retires[#plan.retires + 1] = mal.nom
                 noter(plan, string.format("Masque « %s » : Lightroom ne l'a pas gardé tel qu'écrit (%s) ; il est retiré%s, le reste de "
                     .. "la retouche est gardé. Le reposer autrement (une autre forme ou un autre type de masque) s'il manque, et le dire "
                     .. "à l'utilisateur.", mal.nom, mal.details, mal.composants > 1 and " avec ses composants" or ""))
@@ -299,6 +361,7 @@ local function retirerMalGardes(plans)
             end
         end
     end
+    corrigerChangements(plans)
 end
 
 -- Les formes sans IA de chaque photo (Plans.preparerMasques, formesEcrites), relues dans Lightroom et
