@@ -15,9 +15,10 @@ Dans cet ordre :
    `Resources/Info.plist`, `VERSION` dans `Lightroom/Developpeur.lrplugin/Info.lua` et
    `Liaison.VERSION` dans `Liaison.lua` (et l'essai « Versions » de `Tests/Lua/Fenetre/tests.lua`,
    qui attend le numéro de `Info.lua`) ; ajouter la section `## X.Y — AAAA-MM-JJ` dans
-   `CHANGELOG.md`, écrite pour l'utilisateur. `build.sh` refuse si les trois numéros diffèrent ou si
-   cette section n'est pas la plus récente des sections numérotées (« ## Non publié » peut rester
-   au-dessus).
+   `CHANGELOG.md`, écrite pour l'utilisateur. `scripts/verifier-versions.sh` (lancé par `build.sh`
+   et par la CI) refuse si les trois numéros diffèrent ou si cette section n'est pas la plus récente
+   des sections numérotées (« ## Non publié » peut rester au-dessus) : le lancer seul pour vérifier
+   avant le commit.
 2. `git add -A && git commit -m "Version X.Y" && git push origin main`
 3. `./build.sh --install` (produit `build/Developpeur.zip`, signé Developer ID et notarisé : attend
    la réponse d'Apple, quelques minutes ; met l'installation à jour). Puis relancer Lightroom et
