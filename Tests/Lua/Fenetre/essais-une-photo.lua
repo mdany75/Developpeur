@@ -754,7 +754,7 @@ essai("Groupe de plus de 500 photos : compté sur toute la sélection par les le
     end
 end)
 
-essai("Chargement du module : les dossiers temporaires des groupes et des demandes rapides s'effacent ; rien d'autre de Temporaire ni des conversations", function()
+essai("Chargement du module : les dossiers temporaires des groupes et des demandes rapides s'effacent, et les vignettes de la fenêtre (PhotoActive, Pourquoi) ; jamais les conversations", function()
     depart({})
     photo(991)
     local c = gardee(991, 'Gardée')
@@ -777,8 +777,8 @@ essai("Chargement du module : les dossiers temporaires des groupes et des demand
     S.taches[#S.taches]()
     egal(false, Fichiers.existe(temporaire .. '/Groupes'), 'les images des groupes effacées')
     egal(false, Fichiers.existe(temporaire .. '/Rapide'), 'celles des demandes rapides aussi')
-    vrai(Fichiers.existe(temporaire .. '/PhotoActive/x/vignette.jpg'), "l'aperçu de la photo active reste")
-    vrai(Fichiers.existe(temporaire .. '/Pourquoi/991/avant.jpg'), 'Pourquoi ? reste')
+    egal(false, Fichiers.existe(temporaire .. '/PhotoActive'), "les vignettes de la photo active aussi (chantier « ménage »)")
+    egal(false, Fichiers.existe(temporaire .. '/Pourquoi'), 'les copies de l\'onglet Aperçu aussi')
     vrai(Fichiers.existe(Stockage.fichier(c.id)), 'les conversations restent')
     egal(0, require('Menage').temporaires(), 'rien de plus')
 end)
