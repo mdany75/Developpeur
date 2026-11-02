@@ -135,5 +135,9 @@ ou à `--graphiques`.
   dans l'entrée, `uuid`, `date` et `sens_seul` (`seulementSens`) par photo ; une analyse sans
   `regles_sens` à jour entre dans la file (`quand`) et se refait pour l'empreinte seule, ses défauts,
   son genre et son heure gardés (`analyseAvec`) ; une réponse sans `regles_sens` alors qu'il l'avait
-  dite : plus demandée de la séance. L'empreinte va dans `Developpeur/Index` (le connecteur), jamais
-  dans `suivi.json` ; seul `analyse.regles_sens` y est rangé.
+  dite (modèle disparu, ou qui ne s'ouvre pas : `sens_erreur`) : plus demandée de la séance.
+  `a_compiler` de `--sens-etat` : `--compiler-sens` une fois (`ALARME_COMPILATION`), puis la question
+  reposée. L'empreinte va dans `Developpeur/Index` (le connecteur), jamais dans `suivi.json` ; seuls
+  `analyse.regles_sens` et `analyse.index_sens` (la génération de l'index) y sont rangés : une
+  analyse d'une autre génération que `Releve.indexSens` (index effacé ou refait), ou sans génération,
+  refait son empreinte seule (`sensAFaire`).

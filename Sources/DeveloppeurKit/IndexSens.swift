@@ -50,28 +50,76 @@ public final class IndexSens {
     }
 
     /// Ouvre (et crée au besoin) l'index pour y écrire, pour ce modèle. Un index d'un autre modèle est
-    /// refait.
+    /// refait ; un index illisible (base abîmée, vecteurs effacés à côté de leurs lignes) aussi, à neuf,
+    /// plutôt que d'échouer à chaque photo. Chaque index neuf ou refait reçoit une nouvelle
+    /// `generation` : le module la garde avec chaque analyse (`index_sens`) et refait l'empreinte des
+    /// photos d'une autre génération (un index perdu se remplit de nouveau).
     public init(ecrire dossier: URL, modele: String, dimension: Int, catalogue: String? = nil) throws {
         self.dossier = dossier
         self.modele = modele
         self.dimension = dimension
         try FileManager.default.createDirectory(at: dossier, withIntermediateDirectories: true)
+        do {
+            try preparerEcriture(catalogue: catalogue)
+        } catch {
+            // Illisible : refait à neuf, une fois.
+            sqlite3_close(base)
+            base = nil
+            effacerFichiers()
+            try preparerEcriture(catalogue: catalogue)
+        }
+    }
+
+    private func effacerFichiers() {
+        let fm = FileManager.default
+        for nom in ["index.sqlite", "index.sqlite-wal", "index.sqlite-shm", "vecteurs.f16"] {
+            try? fm.removeItem(at: dossier.appendingPathComponent(nom))
+        }
+    }
+
+    private func preparerEcriture(catalogue: String?) throws {
         try ouvrirBase(lecture: false)
         try executer("PRAGMA journal_mode=WAL")
         try executer("CREATE TABLE IF NOT EXISTS meta (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL)")
         try executer("CREATE TABLE IF NOT EXISTS photos (rang INTEGER PRIMARY KEY, uuid TEXT NOT NULL UNIQUE, id INTEGER NOT NULL, jour TEXT, le REAL NOT NULL)")
         try executer("CREATE INDEX IF NOT EXISTS photos_id ON photos(id)")
         let meta = lireMeta()
+        var neuf = meta["generation"] == nil
         if let autre = meta["modele"], autre != modele || meta["dimension"] != String(dimension) {
             // Un autre modèle : ses vecteurs ne se comparent pas aux nouveaux.
-            try executer("DELETE FROM photos")
-            try? FileManager.default.removeItem(at: fichierVecteurs)
+            try viderPhotos()
+            neuf = true
+        } else if let fin = rangMax(), fin >= 0 {
+            // Des lignes sans leurs vecteurs (vecteurs.f16 effacé ou coupé) : refait.
+            let taille = (try? FileManager.default.attributesOfItem(atPath: fichierVecteurs.path)[.size] as? Int) ?? 0
+            if taille < (fin + 1) * dimension * 2 {
+                try viderPhotos()
+                neuf = true
+            }
         }
         try ecrireMeta("modele", modele)
         try ecrireMeta("dimension", String(dimension))
         try ecrireMeta("regles", String(Sens.regles))
+        if neuf { try ecrireMeta("generation", UUID().uuidString) }
         if let catalogue { try ecrireMeta("catalogue", catalogue) }
     }
+
+    private func viderPhotos() throws {
+        try executer("DELETE FROM photos")
+        try? FileManager.default.removeItem(at: fichierVecteurs)
+    }
+
+    /// Le plus grand rang rangé (nil : aucune ligne).
+    private func rangMax() -> Int? {
+        guard let r = try? preparer("SELECT MAX(rang) FROM photos") else { return nil }
+        defer { sqlite3_finalize(r) }
+        guard sqlite3_step(r) == SQLITE_ROW, sqlite3_column_type(r, 0) != SQLITE_NULL else { return nil }
+        return Int(sqlite3_column_int64(r, 0))
+    }
+
+    /// La génération de cet index : tirée à sa création, et à chaque fois qu'il est refait (nil : un
+    /// index sans génération, à refaire par l'écrivain).
+    public var generation: String? { lireMeta()["generation"] }
 
     /// Ouvre l'index pour le lire ; nil s'il n'existe pas ou ne se lit pas.
     public init?(lire dossier: URL) {

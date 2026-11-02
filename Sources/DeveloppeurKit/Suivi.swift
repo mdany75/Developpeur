@@ -148,13 +148,24 @@ public enum Suivi {
         }
     }
 
+    /// Le temps d'ouvrir l'encodeur d'images (déjà compilé) et l'index, une fois par appel, avant les
+    /// mesures et hors de leur délai : dépassé, l'appel se fait sans l'empreinte (ni `regles_sens`).
+    /// PROVISOIRE : à relever par `--preparer-sens` (`ouverture_s`, docs/SPEC.md, À constater).
+    public static let delaiOuvertureSens: TimeInterval = 10
+
     /// `--analyser '<json>'` : une ligne `{ok, regles, regles_genre, photos}` (une photo par photo
     /// reçue, dans le même ordre), ou un refus de tout l'appel. `mesurer` et les délais se remplacent pour les essais.
-    /// Avec `sens` (le connecteur a le modèle) et un `catalogue` dans l'entrée, l'empreinte de chaque
-    /// photo qui porte son `uuid` est rangée dans l'index du catalogue, et la ligne dit `regles_sens`
-    /// (chaque photo : `sens` vrai, ou `sens_raison`). Sans eux, la ligne est celle d'avant la 1.6.
+    /// Avec `sens` (le connecteur a le modèle) et un `catalogue` dans l'entrée, l'encodeur et l'index
+    /// s'ouvrent d'abord, hors du délai des photos (`delaiOuvertureSens`) ; ouverts, la ligne dit
+    /// `regles_sens` et `index_sens` (la génération de l'index), et l'empreinte de chaque photo qui
+    /// porte son `uuid` se range après ses défauts (chaque photo : `sens` vrai, ou `sens_raison`) : une
+    /// empreinte en retard ne fait pas perdre les défauts mesurés. Pas ouverts (erreur ou délai) : ni
+    /// `regles_sens` ni empreinte, et `sens_erreur` dit pourquoi (le module n'en demande plus de la
+    /// séance). Sans `sens` ni catalogue, la ligne est celle d'avant la 1.6.
     public static func analyser(_ texte: String, delaiParPhoto: TimeInterval = delaiParPhoto, delaiTotal: TimeInterval = delaiAnalyse,
+                                delaiOuverture: TimeInterval = delaiOuvertureSens,
                                 mesurer: @escaping (AAnalyser) -> JSONValue = analyserPhoto, sens: IndexeurSens? = nil) -> Reponse {
+        let debut = Date()
         let photos: [AAnalyser]
         let catalogue: String?
         do {
@@ -166,22 +177,37 @@ public enum Suivi {
         }
         var ligne: [String: JSONValue] = ["ok": true, "regles": .number(Double(reglesAnalyse)), "regles_genre": .number(Double(Genre.regles))]
         var mesure = mesurer
+        let partiels = Partiels()
         if let sens, let catalogue {
-            let empreintes = Empreintes(sens: sens, catalogue: catalogue)
-            ligne["regles_sens"] = .number(Double(Sens.regles))
-            mesure = { photo in
-                let mesuree: JSONValue = photo.sensSeul ? ["id": .number(Double(photo.id))] : mesurer(photo)
-                guard mesuree["raison"] == nil, var r = mesuree.object else { return mesuree }
-                guard photo.uuid != nil else {
-                    return photo.sensSeul ? sansAnalyse(photo.id, "arguments", "Arguments de --analyser : sens_seul sans uuid.") : .object(r)
+            switch ouvrirSens(sens, catalogue: catalogue, delai: delaiOuverture) {
+            case .success(let empreintes):
+                ligne["regles_sens"] = .number(Double(Sens.regles))
+                if let generation = empreintes.index.generation { ligne["index_sens"] = .string(generation) }
+                mesure = { photo in
+                    let mesuree: JSONValue = photo.sensSeul ? ["id": .number(Double(photo.id))] : mesurer(photo)
+                    guard mesuree["raison"] == nil, var r = mesuree.object else { return mesuree }
+                    guard photo.uuid != nil else {
+                        return photo.sensSeul ? sansAnalyse(photo.id, "arguments", "Arguments de --analyser : sens_seul sans uuid.") : .object(r)
+                    }
+                    if !photo.sensSeul {
+                        // Les défauts gardés si l'empreinte n'a pas fini à temps.
+                        var repli = r
+                        repli["sens_raison"] = "delai"
+                        partiels.ranger(.object(repli), id: photo.id)
+                    }
+                    if let raison = empreintes.ranger(photo) {
+                        if photo.sensSeul { return sansAnalyse(photo.id, "sens", raison) }
+                        r["sens_raison"] = .string(raison)
+                    } else {
+                        r["sens"] = true
+                    }
+                    return .object(r)
                 }
-                if let raison = empreintes.ranger(photo) {
-                    if photo.sensSeul { return sansAnalyse(photo.id, "sens", raison) }
-                    r["sens_raison"] = .string(raison)
-                } else {
-                    r["sens"] = true
+            case .failure(let raison):
+                ligne["sens_erreur"] = .string(raison.texte)
+                mesure = { photo in
+                    photo.sensSeul ? sansAnalyse(photo.id, "sens", raison.texte) : mesurer(photo)
                 }
-                return .object(r)
             }
         } else if photos.contains(where: \.sensSeul) {
             let absent = mesurer
@@ -189,42 +215,66 @@ public enum Suivi {
                 photo.sensSeul ? sansAnalyse(photo.id, "sens_absent", "Recherche par le sens absente de ce connecteur (modèle introuvable).") : absent(photo)
             }
         }
-        ligne["photos"] = .array(mesurerBorne(photos, mesurer: mesure, parPhoto: delaiParPhoto, total: delaiTotal))
+        let reste = max(1, delaiTotal - Date().timeIntervalSince(debut))
+        let mesurees = mesurerBorne(photos, mesurer: mesure, parPhoto: delaiParPhoto, total: reste)
+        ligne["photos"] = .array(zip(photos, mesurees).map { photo, valeur in
+            valeur["raison"]?.string == "delai" ? (partiels.lire(photo.id) ?? valeur) : valeur
+        })
         return Reponse(ligne: .object(ligne), code: 0)
     }
 
-    /// L'encodeur et l'index d'un appel de --analyser, ouverts à la première photo, un calcul à la
-    /// fois (deux mesures tournent ensemble).
-    final class Empreintes: @unchecked Sendable {
-        let sens: IndexeurSens
-        let catalogue: String
-        private let verrou = NSLock()
-        private var ouvert: (encodeur: EncodeurSens, index: IndexSens)?
-        private var erreur: String?
+    struct EchecSens: Error { var texte: String }
 
-        init(sens: IndexeurSens, catalogue: String) {
-            self.sens = sens
-            self.catalogue = catalogue
+    /// L'encodeur et l'index, ouverts une fois avant les mesures, en `delai` secondes au plus (une
+    /// ouverture plus longue continue sans retenir l'appel ; le processus s'arrête avec elle).
+    static func ouvrirSens(_ sens: IndexeurSens, catalogue: String, delai: TimeInterval) -> Result<Empreintes, EchecSens> {
+        final class Boite: @unchecked Sendable { var valeur: Result<Empreintes, EchecSens>? }
+        let boite = Boite()
+        let fini = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let encodeur = try sens.ouvrir()
+                let index = try IndexSens(ecrire: IndexSens.dossier(catalogue: catalogue, racine: sens.racine), modele: encodeur.modele,
+                                          dimension: encodeur.dimension, catalogue: catalogue)
+                boite.valeur = .success(Empreintes(encodeur: encodeur, index: index))
+            } catch {
+                boite.valeur = .failure(EchecSens(texte: error.localizedDescription))
+            }
+            fini.signal()
+        }
+        guard fini.wait(timeout: .now() + delai) == .success, let valeur = boite.valeur else {
+            return .failure(EchecSens(texte: "Le modèle de la recherche par le sens ne s'est pas ouvert en \(Bilan.nombre(delai, decimales: 0)) s."))
+        }
+        return valeur
+    }
+
+    /// Les défauts mesurés d'une photo, gardés avant son empreinte.
+    final class Partiels: @unchecked Sendable {
+        private let verrou = NSLock()
+        private var valeurs: [Int: JSONValue] = [:]
+        func ranger(_ valeur: JSONValue, id: Int) { verrou.lock(); valeurs[id] = valeur; verrou.unlock() }
+        func lire(_ id: Int) -> JSONValue? { verrou.lock(); defer { verrou.unlock() }; return valeurs[id] }
+    }
+
+    /// L'encodeur et l'index d'un appel de --analyser, déjà ouverts ; un calcul à la fois (deux
+    /// mesures tournent ensemble).
+    final class Empreintes: @unchecked Sendable {
+        let encodeur: EncodeurSens
+        let index: IndexSens
+        private let verrou = NSLock()
+
+        init(encodeur: EncodeurSens, index: IndexSens) {
+            self.encodeur = encodeur
+            self.index = index
         }
 
         /// Range l'empreinte de la photo ; nil si c'est fait, sinon la raison.
         func ranger(_ photo: AAnalyser) -> String? {
             guard let uuid = photo.uuid else { return "sans uuid" }
-            verrou.lock(); defer { verrou.unlock() }
-            if ouvert == nil, erreur == nil {
-                do {
-                    let encodeur = try sens.ouvrir()
-                    let index = try IndexSens(ecrire: IndexSens.dossier(catalogue: catalogue, racine: sens.racine), modele: encodeur.modele,
-                                              dimension: encodeur.dimension, catalogue: catalogue)
-                    ouvert = (encodeur, index)
-                } catch {
-                    erreur = error.localizedDescription
-                }
-            }
-            guard let (encodeur, index) = ouvert else { return erreur ?? "modèle absent" }
             guard let donnees = try? Data(contentsOf: URL(fileURLWithPath: photo.vignette)), let image = PreviewImages.image(donnees) else {
                 return "vignette illisible"
             }
+            verrou.lock(); defer { verrou.unlock() }
             do {
                 try index.ranger(uuid: uuid, id: photo.id, jour: photo.date, vecteur: try encodeur.vecteur(image: image))
                 return nil
@@ -235,17 +285,30 @@ public enum Suivi {
     }
 
     /// `--sens-etat '<json>'` : ce que le module demande une fois par séance (Releve.lua) pour savoir
-    /// si ce connecteur fait l'empreinte du sens : `{ok, regles_sens, modele, indexees}` quand les
-    /// fichiers du modèle sont là, sinon `{ok, manquants}` (sans regles_sens : le module n'en demande
-    /// pas). Rien n'est calculé ni compilé ; `catalogue` (facultatif) : le nombre de photos de son index.
-    public static func etatSens(_ texte: String, fichiers: (fichiers: Sens.Fichiers?, manquants: [String]), racine: URL = Sens.racineIndex) -> Reponse {
+    /// si ce connecteur fait l'empreinte du sens : `{ok, regles_sens, modele, indexees, generation}`
+    /// quand l'encodeur d'images, déjà compilé, s'ouvre (`ouvrir`, essayé ici : un modèle qui ne
+    /// s'ouvre pas ne fait pas remettre toute la bibliothèque en file) ; `{ok, a_compiler: true}` quand
+    /// il n'est pas encore compilé (le module lance alors `--compiler-sens`, sous sa propre alarme) ;
+    /// `{ok, erreur}` s'il ne s'ouvre pas ; `{ok, manquants}` sans les fichiers. Sans regles_sens, le
+    /// module n'en demande pas. `catalogue` (facultatif) : le nombre de photos de son index et sa
+    /// génération (absente : pas d'index).
+    public static func etatSens(_ texte: String, fichiers: (fichiers: Sens.Fichiers?, manquants: [String]), racine: URL = Sens.racineIndex,
+                                ouvrir: (() throws -> EncodeurSens)? = nil) -> Reponse {
         let catalogue = (try? JSONCoding.parse(texte))?["catalogue"]?.string
-        guard fichiers.fichiers != nil else {
+        guard let trouves = fichiers.fichiers else {
             return Reponse(ligne: ["ok": true, "manquants": .array(fichiers.manquants.map(JSONValue.string))], code: 0)
+        }
+        guard trouves.imageCompilee else { return Reponse(ligne: ["ok": true, "a_compiler": true], code: 0) }
+        if let ouvrir {
+            do { _ = try ouvrir() } catch {
+                return Reponse(ligne: ["ok": true, "erreur": .string(error.localizedDescription)], code: 0)
+            }
         }
         var ligne: [String: JSONValue] = ["ok": true, "regles_sens": .number(Double(Sens.regles)), "modele": .string(Sens.nomModele)]
         if let catalogue {
-            ligne["indexees"] = .number(Double(IndexSens(lire: IndexSens.dossier(catalogue: catalogue, racine: racine))?.nombre ?? 0))
+            let index = IndexSens(lire: IndexSens.dossier(catalogue: catalogue, racine: racine))
+            ligne["indexees"] = .number(Double(index?.nombre ?? 0))
+            if let generation = index?.generation { ligne["generation"] = .string(generation) }
         }
         return Reponse(ligne: .object(ligne), code: 0)
     }

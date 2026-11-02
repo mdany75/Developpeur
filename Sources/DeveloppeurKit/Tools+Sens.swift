@@ -84,29 +84,66 @@ extension ToolHandler {
             let pertinence = meilleur > mediane ? Double((score - mediane) / (meilleur - mediane)) : 1
             if pertinence < Sens.seuilPertinenceProvisoire { break }
             candidats.append((ligne.id, min(1, pertinence)))
-            if candidats.count >= Sens.candidatsMax { break }
         }
         guard !candidats.isEmpty else { return Self.resultatSens([], index: index, candidats: 0) }
 
-        // 4. Les autres critères, par le module, parmi les candidates.
+        // 4. Les autres critères, par le module, parmi les candidates, par tranches de
+        //    `trancheSens` (5 000, MAX_TRI du module) dans l'ordre de pertinence, jusqu'à remplir la
+        //    page : une collection, un mot-clé ou une note qui ne gardent que des photos classées loin
+        //    ne rendent pas une liste vide. Au plus `Sens.tranchesMax` tranches ; au-delà, la liste
+        //    est dite coupée.
         var params = criteres
         params.removeValue(forKey: "date_debut")
         params.removeValue(forKey: "date_fin")
-        params["parmi"] = .array(candidats.map { .number(Double($0.id)) })
         if params["tri"] == nil { params["tri"] = "aucun" }
-        var reponse = try lightroom.send("chercher", params, timeout: Self.libraryTimeout).object ?? [:]
-        guard reponse["parmi"]?.bool == true else {
-            throw LightroomError.invalid("Le module Lightroom installé ne connaît pas la recherche par le sens : installer la même version que le connecteur.")
+        let limite = params["limite"]?.int ?? Self.defaultSearchLimit
+        let decalage = params["decalage"]?.int ?? 0
+        let tranche = max(1, trancheSens)
+        var page: [JSONValue] = []
+        var trouvees = 0, lues = 0, tranchesLues = 0
+        var reponse: [String: JSONValue] = [:]
+        var remarques: [JSONValue] = []
+        while lues < candidats.count, tranchesLues < Sens.tranchesMax, trouvees < decalage + limite {
+            let ids = candidats[lues..<min(candidats.count, lues + tranche)].map { JSONValue.number(Double($0.id)) }
+            params["parmi"] = .array(ids)
+            params["decalage"] = .number(Double(max(0, decalage - trouvees)))
+            params["limite"] = .number(Double(max(1, limite - page.count)))
+            let morceau = try lightroom.send("chercher", params, timeout: Self.libraryTimeout).object ?? [:]
+            guard morceau["parmi"]?.bool == true else {
+                throw LightroomError.invalid("Le module Lightroom installé ne connaît pas la recherche par le sens : installer la même version que le connecteur.")
+            }
+            if reponse.isEmpty { reponse = morceau }
+            for remarque in morceau["remarques"]?.array ?? [] where !remarques.contains(remarque) { remarques.append(remarque) }
+            page += (morceau["photos"]?.array ?? []).prefix(limite - page.count)
+            trouvees += morceau["total"]?.int ?? 0
+            lues += ids.count
+            tranchesLues += 1
         }
         reponse.removeValue(forKey: "parmi")
+        reponse["total"] = .number(Double(trouvees))
+        reponse["decalage"] = .number(Double(decalage))
+        reponse["renvoyees"] = .number(Double(page.count))
+        reponse["photos"] = .array(page)
+        if lues < candidats.count {
+            if trouvees >= decalage + limite {
+                remarques.append(.string("Total d'au moins \(trouvees) : les candidates suivantes (\(candidats.count - lues), moins pertinentes) ne sont pas encore lues ; la page suivante (offset) les lit."))
+            } else {
+                remarques.append(.string("Liste coupée : seules les \(lues) candidates les plus pertinentes sur \(candidats.count) ont passé les autres critères ; une phrase plus précise, ou une date, resserre la recherche."))
+            }
+        }
+        if tranchesLues > 1, params["tri"]?.string != "aucun" {
+            remarques.append(.string("Tri appliqué par tranches de \(tranche) candidates, de la plus pertinente à la moins pertinente."))
+        }
+        reponse["remarques"] = .array(remarques)
+        let photos = page
         let pertinences = Dictionary(candidats.map { ($0.id, $0.pertinence) }, uniquingKeysWith: { a, _ in a })
-        let photos = (reponse["photos"]?.array ?? []).map { photo -> JSONValue in
+        let marquees = photos.map { photo -> JSONValue in
             guard var objet = photo.object, let id = objet["id"]?.int, let p = pertinences[id] else { return photo }
             objet["pertinence"] = .number((p * 100).rounded() / 100)
             return .object(objet)
         }
-        reponse["photos"] = .array(photos)
-        let bloc = Self.resultatSens(photos, index: index, candidats: candidats.count)
+        reponse["photos"] = .array(marquees)
+        let bloc = Self.resultatSens(marquees, index: index, candidats: candidats.count)
         reponse["recherche_par_le_sens"] = bloc["recherche_par_le_sens"]
         return .object(reponse)
     }

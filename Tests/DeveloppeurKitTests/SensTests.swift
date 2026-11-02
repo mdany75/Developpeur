@@ -10,10 +10,13 @@ final class FauxEncodeur: EncodeurSens {
     let dimension = 4
     var textes: [String] = []
     var images = 0
+    /// Le temps d'une image (une empreinte en retard).
+    var attenteImage: TimeInterval = 0
     init(modele: String = Sens.nomModele) { self.modele = modele }
 
     func vecteur(image: CGImage) throws -> [Float] {
         images += 1
+        if attenteImage > 0 { Thread.sleep(forTimeInterval: attenteImage) }
         var pixel = [UInt8](repeating: 0, count: 4)
         let contexte = CGContext(data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
@@ -174,16 +177,125 @@ final class SensTests: XCTestCase {
         let sansCatalogue: JSONValue = ["photos": [["id": 1, "vignette": .string(rouge), "cache": true, "uuid": "U1"]]]
         reponse = Suivi.analyser(JSONCoding.line(sansCatalogue), mesurer: mesurer, sens: Suivi.IndexeurSens(racine: dossier) { FauxEncodeur() })
         XCTAssertNil(reponse.ligne["regles_sens"])
-        // Un encodeur qui ne s'ouvre pas : regles_sens dit, chaque photo a sa raison.
+        // Un encodeur qui ne s'ouvre pas : ni regles_sens (le module n'en demande plus de la séance, au
+        // lieu de remettre toute la bibliothèque en file à chaque séance), ni raison par photo
+        // analysée ; l'erreur dite dans la ligne ; l'empreinte seule a sa raison.
         reponse = Suivi.analyser(JSONCoding.line(entree), mesurer: mesurer,
                                  sens: Suivi.IndexeurSens(racine: dossier) { throw LightroomError.invalid("modèle cassé") })
-        XCTAssertEqual(reponse.ligne["photos"]?.array?.first?["sens_raison"], "modèle cassé")
+        XCTAssertNil(reponse.ligne["regles_sens"], "pas annoncé sans encodeur")
+        XCTAssertNil(reponse.ligne["index_sens"])
+        XCTAssertEqual(reponse.ligne["sens_erreur"], "modèle cassé")
+        XCTAssertNil(reponse.ligne["photos"]?.array?.first?["sens_raison"])
+        XCTAssertEqual(reponse.ligne["photos"]?.array?.first?["genre"], "autre", "les défauts mesurés quand même")
         XCTAssertEqual(reponse.ligne["photos"]?.array?.last?["raison"], "sens")
         // Les types de l'entrée.
         reponse = Suivi.analyser(#"{"catalogue": 3, "photos": [{"id": 1, "vignette": "/x.jpg"}]}"#, mesurer: mesurer)
         XCTAssertEqual(reponse.code, 1)
         reponse = Suivi.analyser(#"{"photos": [{"id": 1, "vignette": "/x.jpg", "uuid": 4}]}"#, mesurer: mesurer)
         XCTAssertEqual(reponse.code, 1)
+    }
+
+    func testLOuvertureDuModeleSeFaitHorsDuDelaiDesPhotos() throws {
+        let rouge = try vignette("1.jpg", rouge: 230, vert: 20, bleu: 20)
+        let mesurer: (Suivi.AAnalyser) -> JSONValue = { p in ["id": .number(Double(p.id)), "cherches": [], "defauts": [], "genre": "autre", "mesures": [:]] }
+        let entree: JSONValue = ["catalogue": "/C.lrcat", "photos": [
+            ["id": 1, "vignette": .string(rouge), "cache": true, "uuid": "U1"],
+            ["id": 2, "vignette": .string(rouge), "cache": true, "uuid": "U2"],
+        ]]
+        // Une ouverture (chargement du modèle) plus longue que le délai d'une photo : les photos ne la paient pas.
+        let lent = Suivi.IndexeurSens(racine: dossier) { Thread.sleep(forTimeInterval: 0.6); return FauxEncodeur() }
+        var reponse = Suivi.analyser(JSONCoding.line(entree), delaiParPhoto: 0.3, delaiTotal: 5, delaiOuverture: 3, mesurer: mesurer, sens: lent)
+        XCTAssertEqual(reponse.ligne["regles_sens"]?.int, Sens.regles)
+        for photo in try XCTUnwrap(reponse.ligne["photos"]?.array) {
+            XCTAssertNil(photo["raison"], "\(photo)")
+            XCTAssertEqual(photo["sens"], true)
+        }
+        // Plus longue que son propre délai : sans l'empreinte, ni regles_sens ; les défauts mesurés.
+        let tropLent = Suivi.IndexeurSens(racine: dossier) { Thread.sleep(forTimeInterval: 1); return FauxEncodeur() }
+        reponse = Suivi.analyser(JSONCoding.line(entree), delaiParPhoto: 0.3, delaiTotal: 5, delaiOuverture: 0.1, mesurer: mesurer, sens: tropLent)
+        XCTAssertNil(reponse.ligne["regles_sens"])
+        XCTAssertTrue(reponse.ligne["sens_erreur"]?.string?.contains("ne s'est pas ouvert") == true)
+        XCTAssertEqual(reponse.ligne["photos"]?.array?.compactMap { $0["genre"]?.string }, ["autre", "autre"])
+    }
+
+    func testUneEmpreinteEnRetardNeFaitPasPerdreLesDefauts() throws {
+        let rouge = try vignette("1.jpg", rouge: 230, vert: 20, bleu: 20)
+        let mesurer: (Suivi.AAnalyser) -> JSONValue = { p in ["id": .number(Double(p.id)), "cherches": ["flou"], "defauts": ["flou"], "genre": "autre", "mesures": [:]] }
+        let encodeur = FauxEncodeur()
+        encodeur.attenteImage = 0.8
+        let entree: JSONValue = ["catalogue": "/C.lrcat", "photos": [["id": 1, "vignette": .string(rouge), "cache": true, "uuid": "U1"]]]
+        let reponse = Suivi.analyser(JSONCoding.line(entree), delaiParPhoto: 0.3, delaiTotal: 5, mesurer: mesurer,
+                                     sens: Suivi.IndexeurSens(racine: dossier) { encodeur })
+        let photo = try XCTUnwrap(reponse.ligne["photos"]?.array?.first)
+        XCTAssertNil(photo["raison"], "les défauts gardés : \(photo)")
+        XCTAssertEqual(photo["defauts"], ["flou"])
+        XCTAssertEqual(photo["sens_raison"], "delai", "seule l'empreinte manque")
+        XCTAssertNil(photo["sens"])
+    }
+
+    func testLaGenerationDeLIndex() throws {
+        let rouge = try vignette("1.jpg", rouge: 230, vert: 20, bleu: 20)
+        let mesurer: (Suivi.AAnalyser) -> JSONValue = { p in ["id": .number(Double(p.id)), "cherches": [], "defauts": [], "genre": "autre", "mesures": [:]] }
+        let entree: JSONValue = ["catalogue": "/C.lrcat", "photos": [["id": 1, "vignette": .string(rouge), "cache": true, "uuid": "U1"]]]
+        let sens = Suivi.IndexeurSens(racine: dossier) { FauxEncodeur() }
+        let premiere = try XCTUnwrap(Suivi.analyser(JSONCoding.line(entree), mesurer: mesurer, sens: sens).ligne["index_sens"]?.string)
+        XCTAssertEqual(Suivi.analyser(JSONCoding.line(entree), mesurer: mesurer, sens: sens).ligne["index_sens"]?.string, premiere, "la même tant que l'index reste")
+        let url = URL(fileURLWithPath: "/x")
+        let fichiers = Sens.Fichiers(image: url, texte: url, vocabulaire: url, modeles: url)
+        XCTAssertEqual(Suivi.etatSens(#"{"catalogue": "/C.lrcat"}"#, fichiers: (fichiers, []), racine: dossier).ligne["generation"]?.string, premiere)
+        // L'index effacé (de la place faite) : --sens-etat ne rend plus de génération, et le suivant en tire une autre.
+        let dossierIndex = IndexSens.dossier(catalogue: "/C.lrcat", racine: dossier)
+        try FileManager.default.removeItem(at: dossierIndex)
+        XCTAssertNil(Suivi.etatSens(#"{"catalogue": "/C.lrcat"}"#, fichiers: (fichiers, []), racine: dossier).ligne["generation"])
+        let deuxieme = try XCTUnwrap(Suivi.analyser(JSONCoding.line(entree), mesurer: mesurer, sens: sens).ligne["index_sens"]?.string)
+        XCTAssertNotEqual(deuxieme, premiere)
+        // Un index refait pour un autre modèle : une autre génération.
+        let autre = try IndexSens(ecrire: dossierIndex, modele: "autre", dimension: 4)
+        XCTAssertNotEqual(autre.generation, deuxieme)
+        XCTAssertNotNil(autre.generation)
+    }
+
+    func testUnIndexIllisibleSeRefaitANeuf() throws {
+        let dossierIndex = dossier.appendingPathComponent("i")
+        let index = try IndexSens(ecrire: dossierIndex, modele: "m", dimension: 4)
+        try index.ranger(uuid: "u1", id: 1, jour: nil, vecteur: [1, 0, 0, 0])
+        let avant = try XCTUnwrap(index.generation)
+        // La base abîmée.
+        try Data(repeating: 0x5A, count: 4096).write(to: dossierIndex.appendingPathComponent("index.sqlite"))
+        try? FileManager.default.removeItem(at: dossierIndex.appendingPathComponent("index.sqlite-wal"))
+        try? FileManager.default.removeItem(at: dossierIndex.appendingPathComponent("index.sqlite-shm"))
+        let refait = try IndexSens(ecrire: dossierIndex, modele: "m", dimension: 4)
+        XCTAssertEqual(refait.nombre, 0)
+        XCTAssertNotEqual(refait.generation, avant)
+        try refait.ranger(uuid: "u1", id: 1, jour: nil, vecteur: [1, 0, 0, 0])
+        XCTAssertEqual(refait.classer([1, 0, 0, 0]).first?.ligne.id, 1)
+        // Les vecteurs effacés à côté de leurs lignes : refait aussi.
+        let generation = refait.generation
+        try FileManager.default.removeItem(at: dossierIndex.appendingPathComponent("vecteurs.f16"))
+        let sansVecteurs = try IndexSens(ecrire: dossierIndex, modele: "m", dimension: 4)
+        XCTAssertEqual(sansVecteurs.nombre, 0)
+        XCTAssertNotEqual(sansVecteurs.generation, generation)
+        // Un index sain garde sa génération.
+        try sansVecteurs.ranger(uuid: "u2", id: 2, jour: nil, vecteur: [0, 1, 0, 0])
+        XCTAssertEqual(try IndexSens(ecrire: dossierIndex, modele: "m", dimension: 4).generation, sansVecteurs.generation)
+    }
+
+    func testSensEtatNAnnonceQuUnModeleCompileQuiSOuvre() throws {
+        let paquet = URL(fileURLWithPath: "/x/mobileclip_s2_image.mlpackage")
+        let url = URL(fileURLWithPath: "/x")
+        // Pas encore compilé : le module lance --compiler-sens ; rien d'annoncé.
+        let aCompiler = Suivi.etatSens("{}", fichiers: (Sens.Fichiers(image: paquet, texte: paquet, vocabulaire: url, modeles: url), []), racine: dossier)
+        XCTAssertNil(aCompiler.ligne["regles_sens"])
+        XCTAssertEqual(aCompiler.ligne["a_compiler"], true)
+        XCTAssertFalse(Sens.Fichiers(image: paquet, texte: paquet, vocabulaire: url, modeles: url).imageCompilee)
+        // Compilé mais qui ne s'ouvre pas : l'erreur, sans regles_sens.
+        let compile = URL(fileURLWithPath: "/x/mobileclip_s2_image.mlmodelc")
+        let fichiers = Sens.Fichiers(image: compile, texte: paquet, vocabulaire: url, modeles: url)
+        let casse = Suivi.etatSens("{}", fichiers: (fichiers, []), racine: dossier) { throw LightroomError.invalid("compilation refusée") }
+        XCTAssertNil(casse.ligne["regles_sens"])
+        XCTAssertEqual(casse.ligne["erreur"], "compilation refusée")
+        // Qui s'ouvre : annoncé.
+        XCTAssertEqual(Suivi.etatSens("{}", fichiers: (fichiers, []), racine: dossier) { FauxEncodeur() }.ligne["regles_sens"]?.int, Sens.regles)
     }
 
     func testSensEtat() throws {
@@ -338,6 +450,44 @@ final class SensTests: XCTestCase {
         result = vieux.call(name: "find_photos", arguments: ["query": "red"])
         XCTAssertTrue(result.isError)
         XCTAssertTrue(result.text.contains("même version"), result.text)
+    }
+
+    func testLesCandidatesPassentParTranchesJusquaRemplirLaPage() throws {
+        let lightroom = FakeLightroom()
+        let tools = try outils(lightroom)
+        tools.trancheSens = 1
+        // Une collection qui ne garde que la photo 2, classée deuxième (au-delà de la première tranche).
+        lightroom.onSend = { commande, params in
+            guard commande == "chercher" else { return }
+            let ids = (params["parmi"]?.array ?? []).compactMap(\.int).filter { $0 == 2 }
+            lightroom.replies["chercher"] = ["parmi": true, "total": .number(Double(ids.count)), "decalage": 0, "renvoyees": .number(Double(ids.count)),
+                                            "photos": .array(ids.map { ["id": .number(Double($0))] }), "remarques": []]
+        }
+        let result = tools.call(name: "find_photos", arguments: ["query": "red", "collection": "Chalet 2015"])
+        XCTAssertFalse(result.isError, result.text)
+        let structure = try XCTUnwrap(result.structured)
+        XCTAssertEqual(structure["photos"]?.array?.compactMap { $0["id"]?.int }, [2], "trouvée dans la deuxième tranche")
+        XCTAssertEqual(structure["total"], 1)
+        let appels = chercher(lightroom)
+        XCTAssertEqual(appels.map { $0["parmi"]?.array?.compactMap(\.int) ?? [] }, [[1], [2]])
+        XCTAssertEqual(appels.last?["collection"], "Chalet 2015")
+        // La page remplie dès la première tranche : la suite n'est pas lue, le total est un minimum.
+        // (Le module compte toutes les photos gardées et rend la page d'après decalage et limite.)
+        lightroom.calls = []
+        lightroom.onSend = { commande, params in
+            guard commande == "chercher" else { return }
+            let ids = (params["parmi"]?.array ?? []).compactMap(\.int)
+            let page = ids.dropFirst(params["decalage"]?.int ?? 0).prefix(params["limite"]?.int ?? 50)
+            lightroom.replies["chercher"] = ["parmi": true, "total": .number(Double(ids.count)), "photos": .array(page.map { ["id": .number(Double($0))] })]
+        }
+        let page = tools.call(name: "find_photos", arguments: ["query": "red", "limit": 1])
+        XCTAssertEqual(chercher(lightroom).count, 1)
+        XCTAssertTrue(page.text.contains("au moins 1"), page.text)
+        // La suite (offset 1) : la deuxième tranche donne la deuxième photo.
+        lightroom.calls = []
+        let suite = tools.call(name: "find_photos", arguments: ["query": "red", "limit": 1, "offset": 1])
+        XCTAssertEqual(suite.structured?["photos"]?.array?.compactMap { $0["id"]?.int }, [2])
+        XCTAssertEqual(chercher(lightroom).last?["decalage"], 0, "décalage pris dans les tranches déjà lues")
     }
 
     func testSansQueryRienNeChange() throws {

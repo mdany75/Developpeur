@@ -61,6 +61,7 @@ func usage(erreur: Bool = false) {
                 ni Lightroom ni l'original ; 20 photos au plus, une ligne JSON (Tests/Contrats/suivi.json) ; depuis la 1.6,
                 avec catalogue et uuid, l'empreinte du sens (MobileCLIP) rangée dans Developpeur/Index
             mcp-developpeur --sens-etat '{"catalogue": …}'   le Suivi : ce connecteur fait-il l'empreinte du sens ? (une ligne JSON)
+            mcp-developpeur --compiler-sens   compile MobileCLIP S2 dans Developpeur/Modeles (install.sh, le Suivi)
             mcp-developpeur --preparer-sens ["phrase"]   compile MobileCLIP S2, dit sa description, les jetons et les temps
             mcp-developpeur --sens-essai (--collection <nom> | --dossier <chemin> | --ids 1,2,… | --images <dossier>)
                 [--nombre 200] [--requetes '["a dog", …]'] [--garder <dossier>]
@@ -304,18 +305,37 @@ case "--focus":
 case "--analyser":
     // Le Suivi (correctif 1.3.7, Releve.lua) : les défauts mesurés sur les vignettes d'un lot, sous
     // l'alarme de 60 s de perl ; une ligne JSON, code 1 pour un refus de tout l'appel.
-    // Depuis la 1.6, l'empreinte du sens aussi, quand les fichiers de MobileCLIP sont là.
+    // Depuis la 1.6, l'empreinte du sens aussi, quand l'encodeur d'images de MobileCLIP est déjà
+    // compilé (jamais de compilation sous l'alarme : --compiler-sens la fait).
     guard arguments.count == 2 else { usage(erreur: true); exit(2) }
-    let analyse = Suivi.analyser(arguments[1], sens: Sens.trouver().fichiers != nil ? moteurSens() : nil)
+    let analyse = Suivi.analyser(arguments[1], sens: Sens.trouver().fichiers?.imageCompilee == true ? moteurSens() : nil)
     print(line: JSONCoding.line(analyse.ligne))
     exit(analyse.code)
 case "--sens-etat":
     // Le Suivi (1.6, Releve.lua, une fois par séance) : ce connecteur fait-il l'empreinte du sens ?
-    // Rien n'est calculé ni compilé ; une ligne JSON.
+    // Rien n'est compilé ni calculé : l'encodeur d'images, déjà compilé, est seulement ouvert (un
+    // modèle qui ne s'ouvre pas n'est pas annoncé) ; une ligne JSON.
     guard arguments.count == 2 else { usage(erreur: true); exit(2) }
-    let etat = Suivi.etatSens(arguments[1], fichiers: Sens.trouver())
+    let trouvesEtat = Sens.trouver()
+    let etat = Suivi.etatSens(arguments[1], fichiers: trouvesEtat, ouvrir: trouvesEtat.fichiers.map { fichiers in { try EncodeurMobileCLIP(fichiers: fichiers) } })
     print(line: JSONCoding.line(etat.ligne))
     exit(etat.code)
+case "--compiler-sens":
+    // install.sh, et le Suivi (Releve.lua, une fois par séance, quand --sens-etat dit a_compiler,
+    // sous sa propre alarme) : compile les deux encodeurs de MobileCLIP dans Developpeur/Modeles ;
+    // une ligne JSON {ok, compilation_s} ou {ok: false, manquants | erreur}.
+    let aCompiler = Sens.trouver()
+    guard let fichiers = aCompiler.fichiers else {
+        print(line: JSONCoding.line(["ok": false, "manquants": .array(aCompiler.manquants.map(JSONValue.string))]))
+        exit(1)
+    }
+    do {
+        let secondes = try EncodeurMobileCLIP.compiler(fichiers)
+        print(line: JSONCoding.line(["ok": true, "compilation_s": .number((secondes * 10).rounded() / 10)]))
+    } catch {
+        print(line: JSONCoding.line(["ok": false, "erreur": .string(error.localizedDescription)]))
+        exit(1)
+    }
 case "--preparer-sens":
     // Développement (constat C2 de la 1.6) : compile les deux modèles de MobileCLIP (sous le runtime
     // durci de l'exécutable signé), dit leur description, le temps de la compilation, les jetons et le

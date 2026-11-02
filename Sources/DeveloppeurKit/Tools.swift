@@ -116,6 +116,9 @@ public final class ToolHandler {
     public var sens: Suivi.IndexeurSens?
     /// L'encodeur, ouvert au premier usage et gardé pour le processus.
     var encodeurSens: EncodeurSens?
+    /// Les candidates d'une recherche par le sens passées au module par appel (Sens.candidatsMax ;
+    /// moins dans les essais).
+    var trancheSens = Sens.candidatsMax
     /// Le calcul de Fibo 2 en cours, que main.swift arrête à la fin de l'entrée (TravailFibo).
     public let travailFibo = TravailFibo()
     /// Version de ce serveur (celle du Info.plist ; « dev » en développement : pas de comparaison).

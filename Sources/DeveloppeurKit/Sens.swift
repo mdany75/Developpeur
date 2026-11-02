@@ -31,6 +31,10 @@ public enum Sens {
     /// Les photos les mieux classées qui passent au module pour les autres critères (MAX_TRI du module,
     /// au-delà duquel il refuse de filtrer après coup les dates, la focale ou les copies).
     public static let candidatsMax = 5000
+    /// Les tranches de `candidatsMax` candidates qu'une recherche lit au plus (50 000 photos) pour
+    /// remplir une page quand les autres critères (collection, mot-clé, note…) en écartent beaucoup.
+    /// PROVISOIRE : le temps d'une tranche dans le module est à relever (docs/SPEC.md, À constater).
+    public static let tranchesMax = 10
 
     // MARK: Fichiers
 
@@ -42,6 +46,11 @@ public enum Sens {
         public var vocabulaire: URL
         /// Où ranger les modèles compilés (Developpeur/Modeles).
         public var modeles: URL
+
+        /// L'encodeur d'images est déjà compilé (.mlmodelc) : le Suivi peut l'ouvrir sous son délai.
+        /// Un .mlpackage se compile d'abord par `--compiler-sens` (install.sh, ou le Suivi une fois par
+        /// séance, sous sa propre alarme), jamais dans `--analyser`.
+        public var imageCompilee: Bool { image.pathExtension != "mlpackage" }
     }
 
     /// Developpeur/Modeles : les modèles compilés et le vocabulaire.
@@ -180,6 +189,15 @@ public final class EncodeurMobileCLIP: EncodeurSens {
             try fm.moveItem(at: provisoire, to: cible)
         }
         return cible
+    }
+
+    /// Compile les deux encodeurs dans Developpeur/Modeles (rien si c'est déjà fait) ; le temps pris.
+    /// `--compiler-sens` seulement (install.sh, le Suivi sous sa propre alarme), jamais `swift test`.
+    public static func compiler(_ fichiers: Sens.Fichiers) throws -> Double {
+        let debut = Date()
+        _ = try compile(fichiers.image, dans: fichiers.modeles)
+        _ = try compile(fichiers.texte, dans: fichiers.modeles)
+        return Date().timeIntervalSince(debut)
     }
 
     /// Ce que disent les deux modèles (noms, types, formes), pour `--preparer-sens`.

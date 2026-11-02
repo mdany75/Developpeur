@@ -120,6 +120,13 @@ toucher :
 - Les dates d'une recherche par le sens se filtrent d'après l'index (le module refuse un filtre de
   date seul) ; le module reçoit `parmi` et répond `parmi = true`. Le chemin du catalogue ne part
   jamais chez Claude. Le seuil de pertinence est provisoire (`--sens-essai`).
+- **Jamais de compilation ni d'ouverture du modèle dans le délai d'une photo** : `--compiler-sens`
+  compile (install.sh, le Suivi sous sa propre alarme) ; `--analyser` ouvre l'encodeur et l'index une
+  fois avant les mesures (`Suivi.delaiOuvertureSens`), et sans eux ne rend pas `regles_sens` ;
+  l'empreinte se calcule après les défauts, qui restent si elle est en retard. `--sens-etat`
+  n'annonce qu'un modèle compilé qui s'ouvre. L'index porte une `generation` (refait : une autre).
+- `find_photos` par le sens passe les candidates au module par tranches de `Sens.candidatsMax`
+  jusqu'à remplir la page (`Sens.tranchesMax`), et dit un total minimum ou une liste coupée.
 
 ## Catalogue et notation
 
