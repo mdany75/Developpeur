@@ -74,6 +74,97 @@ extension ToolHandler {
         let grandCote = min(20000, Int((max(nombres[0], nombres[1]) / 2.54 * Double(ppp)).rounded()))
         return (grandCote, ppp, papier, (nombres[0], nombres[1]))
     }
+
+    /// Résolution sous laquelle un tirage se voit flou de près : on avertit, sans bloquer.
+    static let tiragePppMin = 240
+    /// Écart de proportion entre la photo recadrée et le format au-delà duquel le laboratoire
+    /// rogne ou borde la photo.
+    static let tirageEcartProportion = 0.02
+    /// Photos d'une livraison dont on vérifie la taille pour un tirage (une lecture par photo).
+    static let tirageVerifieesMax = 50
+    /// Formats de tirage courants, en centimètres (petit côté, grand côté).
+    static let formatsTirage: [(Double, Double)] = [
+        (10, 15), (13, 18), (15, 20), (18, 24), (20, 25), (20, 30), (24, 30), (30, 40), (30, 45), (40, 50), (40, 60),
+        (50, 70), (50, 75), (60, 90),
+    ]
+
+    /// Largeur et hauteur en pixels d'un texte de Lightroom (`croppedDimensions` formaté :
+    /// « 6240 x 4160 », séparateur de milliers éventuel) ; nil s'il ne se lit pas.
+    static func pixelsLus(_ texte: String?) -> (Int, Int)? {
+        guard let texte else { return nil }
+        let parties = texte.lowercased().split(whereSeparator: { $0 == "x" || $0 == "×" })
+        guard parties.count == 2 else { return nil }
+        let nombres = parties.compactMap { Int(String($0.filter(\.isNumber))) }
+        guard nombres.count == 2, nombres.allSatisfy({ $0 > 0 }) else { return nil }
+        return (nombres[0], nombres[1])
+    }
+
+    static func cm(_ valeur: Double) -> String {
+        DevelopCatalogue.format((valeur * 10).rounded() / 10).replacingOccurrences(of: ".", with: ",")
+    }
+
+    /// Ce que vaut une photo recadrée (largeur × hauteur en pixels) pour un tirage de ce format à
+    /// cette résolution : la résolution réelle (pixels du grand côté / pouces du grand côté), et
+    /// les avertissements (sous 240 ppp : un format plus petit qui tient à 240 ppp et la super
+    /// résolution ; proportion différente de plus de 2 % : rognée ou bordée). Rien n'est bloqué.
+    static func verifierTirage(fichier: String, pixels: (Int, Int), format: (Double, Double), ppp: Int) -> (pppReel: Int, avertissements: [String]) {
+        let grandPx = Double(max(pixels.0, pixels.1)), petitPx = Double(min(pixels.0, pixels.1))
+        let grandCm = max(format.0, format.1), petitCm = min(format.0, format.1)
+        let pppReel = Int((grandPx / (grandCm / 2.54)).rounded())
+        let nomFormat = "\(cm(format.0))x\(cm(format.1)) cm"
+        var avertissements: [String] = []
+        if pppReel < tiragePppMin {
+            let proportionPhoto = grandPx / max(petitPx, 1)
+            let tient = formatsTirage.filter { $0.1 / 2.54 * Double(tiragePppMin) <= grandPx + 0.5 }
+            let memeProportion = tient.filter { abs(($0.1 / $0.0) / proportionPhoto - 1) <= tirageEcartProportion }
+            let maxCm = grandPx / Double(tiragePppMin) * 2.54
+            var phrase = "\(fichier) : \(Int(grandPx)) × \(Int(petitPx)) px recadrée, soit \(pppReel) ppp réels en \(nomFormat) (\(ppp) ppp demandés) : "
+                + "sous \(tiragePppMin) ppp, le tirage sera flou de près ; Lightroom n'agrandit pas, le fichier gardera \(Int(grandPx)) px."
+            if let plusPetit = (memeProportion.last ?? tient.last) {
+                phrase += " Plus petit format qui tient à \(tiragePppMin) ppp : \(cm(plusPetit.0))x\(cm(plusPetit.1)) cm (grand côté de \(cm(maxCm)) cm au plus)."
+            } else {
+                phrase += " À \(tiragePppMin) ppp, le grand côté tient sur \(cm(maxCm)) cm au plus."
+            }
+            let pppSuper = Int((grandPx * 2 / (grandCm / 2.54)).rounded())
+            phrase += " Ou la super résolution d'abord (enhance_photo avec super_resolution = true, deux fois plus de pixels) : \(pppSuper) ppp en \(nomFormat)."
+            avertissements.append(phrase)
+        }
+        let proportionPhoto = grandPx / max(petitPx, 1), proportionFormat = grandCm / petitCm
+        let ecart = abs(proportionPhoto / proportionFormat - 1)
+        if ecart > tirageEcartProportion {
+            avertissements.append("\(fichier) : proportion \(cm(proportionPhoto)):1 recadrée, \(cm(proportionFormat)):1 pour \(nomFormat) "
+                + "(écart de \(Int((ecart * 100).rounded())) %) : le laboratoire la rognera ou ajoutera des bandes ; "
+                + "pour choisir ce qui part, la recadrer à la proportion du format avant (sur une copie virtuelle « tirage »).")
+        }
+        return (pppReel, avertissements)
+    }
+
+    /// Vérifie la taille recadrée de chaque photo d'un tirage (les `tirageVerifieesMax` premières),
+    /// lue par la commande `reglages` du module (`recadrage.dimensions`, croppedDimensions de
+    /// Lightroom). Une photo illisible est seulement comptée.
+    func verifierTirages(_ ids: [Int], print objet: [String: JSONValue]) throws -> [String: JSONValue] {
+        let t = try Self.tirage(objet)
+        var photos: [JSONValue] = [], avertissements: [String] = [], illisibles = 0
+        for id in ids.prefix(Self.tirageVerifieesMax) {
+            let lue = try? lightroom.send("reglages", ["photo": .number(Double(id)), "cles": []], timeout: 30)
+            guard let lue, let pixels = Self.pixelsLus(lue["recadrage"]?["dimensions"]?.string) else { illisibles += 1; continue }
+            let fichier = lue["photo"]?["fichier"]?.string ?? "photo \(id)"
+            let v = Self.verifierTirage(fichier: fichier, pixels: pixels, format: t.cm, ppp: t.ppp)
+            avertissements += v.avertissements
+            photos.append(["photo": .string(fichier), "pixels": .string("\(pixels.0) × \(pixels.1)"), "ppp_reels": .number(Double(v.pppReel))])
+        }
+        var resultat: [String: JSONValue] = [
+            "format": .string("\(Self.cm(t.cm.0))x\(Self.cm(t.cm.1)) cm à \(t.ppp) ppp"),
+            "resolution_reelle": .array(photos),
+        ]
+        if !avertissements.isEmpty {
+            resultat["avertissements"] = .array(avertissements.map(JSONValue.string))
+            resultat["a_dire"] = "Avertissement seulement : la livraison n'est pas bloquée. Le dire à l'utilisateur avec ce qui est proposé."
+        }
+        if illisibles > 0 { resultat["non_verifiees"] = .number(Double(illisibles)) }
+        if ids.count > Self.tirageVerifieesMax { resultat["au_dela_non_verifiees"] = .number(Double(ids.count - Self.tirageVerifieesMax)) }
+        return resultat
+    }
     static let sharpeningAmounts = ["low", "standard", "high"]
     /// Filigrane simple des droits d'auteur de la photo (identifiant de Lightroom).
     static let simpleCopyrightWatermark = "<simpleCopyrightWatermark>"
@@ -103,7 +194,7 @@ extension ToolHandler {
                     ("long_edge", prop("integer", "Grand côté en pixels (sinon pleine résolution).")),
                     ("short_edge", prop("integer", "Petit côté en pixels.")),
                     ("megapixels", prop("number", "Taille en mégapixels (5 = environ 2740 × 1830 pour un 3:2).")),
-                    ("print", objectProp("Un tirage (1.3.5) : size, le format en cm (« 20x30 », « 30x45 », « 13x18 »…), donne le grand côté à ppi (défaut \(Self.tiragePpp), de 240 à 600) ; paper, matte ou glossy (défaut), la netteté de sortie de ce papier. long_edge et sharpening donnés à part l'emportent. Un tirage sort souvent plus sombre et plus doux que l'écran : avant, sur une copie virtuelle « tirage », remonter un peu les ombres (Shadows +5 à +10), si la photo le demande. Le profil du laboratoire se choisit dans la fenêtre d'exportation de Lightroom (open_dialog) : un module ne peut pas le poser.", [
+                    ("print", objectProp("Un tirage (1.3.5) : size, le format en cm (« 20x30 », « 30x45 », « 13x18 »…), donne le grand côté à ppi (défaut \(Self.tiragePpp), de 240 à 600) ; paper, matte ou glossy (défaut), la netteté de sortie de ce papier. long_edge et sharpening donnés à part l'emportent. Le résultat (tirage) dit la résolution réelle de chaque photo recadrée ; sous \(Self.tiragePppMin) ppp ou proportion autre que le format, un avertissement à dire (format plus petit, super résolution), sans blocage. Un tirage sort souvent plus sombre et plus doux que l'écran : avant, sur une copie virtuelle « tirage », remonter un peu les ombres (Shadows +5 à +10), si la photo le demande. Le profil du laboratoire se choisit dans la fenêtre d'exportation de Lightroom (open_dialog) : un module ne peut pas le poser.", [
                         "size": prop("string", "Format en centimètres, largeur x hauteur : « 20x30 »."),
                         "ppi": prop("integer", "Résolution en pixels par pouce (défaut \(Self.tiragePpp))."),
                         "paper": enumProp(["matte", "glossy"], "Papier : mat ou brillant (défaut glossy)."),
@@ -178,6 +269,10 @@ extension ToolHandler {
         var lourds: [String] = []
         let limiteOctets = reglages["poids_max_ko"]?.double.map { $0 * 1024 }
         var dossierLivre = commun["dossier"]?.string
+        // Un tirage : la taille réelle de chaque photo recadrée, avant de livrer ; un avertissement
+        // seulement, dit aussi quand le mode « Proposer d'abord » arrête la livraison.
+        var tirage: [String: JSONValue]?
+        if let objet = args.object("print"), reglages["resolution"] != nil { tirage = try verifierTirages(ids, print: objet) }
         avancer(0, sur: ids.count, "Livraison de \(ids.count) photo\(ids.count > 1 ? "s" : "")", titre: "livraison")
         for debut in stride(from: 0, to: ids.count, by: parLot) {
             try contexte.verifier()
@@ -186,7 +281,13 @@ extension ToolHandler {
             params["photos"] = .array(lot.map { .number(Double($0)) })
             params["sequence"] = .number(Double(depart + debut))
             params["suite"] = .bool(debut > 0)
-            let reponse = try lightroom.send("exporter", params, timeout: Self.exportTimeout)
+            let reponse: JSONValue
+            do {
+                reponse = try lightroom.send("exporter", params, timeout: Self.exportTimeout)
+            } catch LightroomError.plugin(let message) where debut == 0 && tirage?["avertissements"] != nil {
+                let avertissements = (tirage?["avertissements"]?.array ?? []).compactMap(\.string)
+                throw LightroomError.plugin(message + " Tirage, à dire aussi : " + avertissements.joined(separator: " "))
+            }
             if dossierLivre == nil { dossierLivre = reponse["dossier"]?.string }
             for item in reponse["fichiers"]?.array ?? [] {
                 if let chemin = item["chemin"]?.string {
@@ -218,6 +319,7 @@ extension ToolHandler {
         if fichiers.count > 50 { resultat["fichiers_non_listes"] = .number(Double(fichiers.count - 50)) }
         if !echecs.isEmpty { resultat["echecs"] = .array(echecs) }
         if let profil { resultat["profil"] = .string(profil.nom) }
+        if let tirage { resultat["tirage"] = .object(tirage) }
         if let modele { resultat["modele_noms"] = .string(modele.name) }
         if depuisApercus > 0 {
             resultat["depuis_apercus_dynamiques"] = .string("\(depuisApercus) photo\(depuisApercus > 1 ? "s" : "") livrée\(depuisApercus > 1 ? "s" : "") depuis l'aperçu dynamique (original débranché).")
