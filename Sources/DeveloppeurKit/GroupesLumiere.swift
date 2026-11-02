@@ -61,8 +61,11 @@ public enum GroupesLumiere {
     /// (0,8 à 1). Provisoire.
     public static let distanceMemeLieu = 0.7
     /// Écart de la lumière de la scène, en IL, qui fait une autre lumière (le soleil et l'ombre
-    /// d'un arbre en sont à 2 ou 3 ; une scène à contre-jour bien exposée à moins). Provisoire.
-    public static let ecartIL = 2.5
+    /// d'un arbre en sont à 2 ou 3). Relevé des seuils du 2 novembre 2026 (lot A6, 10 journées du
+    /// X-H2S, Lightroom Classic 15.6) : 95e centile de |ΔIL| entre deux photos à moins de 60 s, même
+    /// flash, 0,99 sur 797 paires (1,07 sans flash) ; arrondi à 0,5 au-dessus, 1,5 au moins (règle
+    /// de décision). Une lumière qui baisse de plus d'une demi-IL en 3 minutes se coupe désormais.
+    public static let ecartIL = 1.5
     /// Photos du groupe dont la médiane de la lumière fait le repère (une lumière qui baisse peu à
     /// peu, un coucher de soleil, reste un groupe).
     public static let fenetreLumiere = 5

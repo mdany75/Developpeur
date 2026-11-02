@@ -89,15 +89,32 @@ final class GroupesLumiereTests: XCTestCase {
     }
 
     func testUneLumiereQuiBaissePeuAPeuResteUnGroupe() {
-        // Un coucher de soleil : une demi-IL de moins toutes les 3 minutes, sur 30 minutes (5 IL en
-        // tout), sans pause : la médiane des dernières photos suit.
-        let prises = (0..<11).map { i in Self.prise(i + 1, minutes: Double(i) * 3, vitesse: 1.0 / 250 * pow(2, Double(i) / 2)) }
+        // Un coucher de soleil : un tiers d'IL de moins toutes les 3 minutes, sur 30 minutes (3,3 IL
+        // en tout), sans pause : la médiane des dernières photos suit.
+        let prises = (0..<11).map { i in Self.prise(i + 1, minutes: Double(i) * 3, vitesse: 1.0 / 250 * pow(2, Double(i) / 3)) }
         XCTAssertEqual(GroupesLumiere.former(prises) { _, _ in nil }.count, 1)
         // L'ombre d'un arbre, 3 IL plus sombre, d'un coup : une autre lumière ; puis retour au soleil.
         let ombre = [Self.prise(1, minutes: 0), Self.prise(2, minutes: 1), Self.prise(3, minutes: 2, vitesse: 1.0 / 30),
                      Self.prise(4, minutes: 3, vitesse: 1.0 / 30), Self.prise(5, minutes: 4)]
         XCTAssertEqual(Self.ids(GroupesLumiere.former(ombre) { _, _ in nil }, ombre), [[1, 2], [3, 4], [5]])
-        // Une IL et demie d'écart (un contre-jour exposé autrement) ne coupe pas.
+        // Une IL d'écart (un contre-jour exposé autrement) ne coupe pas.
+        let contre = [Self.prise(1, minutes: 0), Self.prise(2, minutes: 1, vitesse: 1.0 / 125), Self.prise(3, minutes: 2)]
+        XCTAssertEqual(GroupesLumiere.former(contre) { _, _ in nil }.count, 1)
+    }
+
+    /// Relevé des seuils du 2 novembre 2026 (lot A6, Lightroom Classic 15.6) : à moins de 60 s, même
+    /// flash, 95 % des photos d'une journée restent à moins d'une IL de la précédente (0,99 sur 797
+    /// paires) ; `ecartIL` passe de 2,5 à 1,5 (règle : arrondi à 0,5 au-dessus, 1,5 au moins).
+    func testLEcartDeLumiereRelevePourLesGroupes() {
+        XCTAssertEqual(GroupesLumiere.ecartIL, 1.5)
+        // Deux IL de moins d'un coup (l'ombre d'un auvent) : une autre lumière, que 2,5 laissait passer.
+        let auvent = [Self.prise(1, minutes: 0), Self.prise(2, minutes: 1), Self.prise(3, minutes: 2, vitesse: 1.0 / 60),
+                      Self.prise(4, minutes: 3, vitesse: 1.0 / 60)]
+        let groupes = GroupesLumiere.former(auvent) { _, _ in nil }
+        XCTAssertEqual(Self.ids(groupes, auvent), [[1, 2], [3, 4]])
+        guard case .lumiere(let ecart) = groupes[1].coupure else { return XCTFail("\(groupes[1].coupure)") }
+        XCTAssertEqual(ecart, -log2(250.0 / 60), accuracy: 0.01)
+        // Une IL et demie juste sous le seuil (1,47 IL) reste un groupe.
         let contre = [Self.prise(1, minutes: 0), Self.prise(2, minutes: 1, vitesse: 1.0 / 90), Self.prise(3, minutes: 2)]
         XCTAssertEqual(GroupesLumiere.former(contre) { _, _ in nil }.count, 1)
     }
@@ -196,14 +213,21 @@ final class GroupesLumiereTests: XCTestCase {
     func testLEcartEtLAlerteDuTeint() throws {
         let reference = Teint.Mesure(l: 70, a: 14, b: 20, pixels: 300)
         let proche = Teint.Mesure(l: 68, a: 15, b: 21, pixels: 300)
-        let loin = Teint.Mesure(l: 68, a: 14, b: 28, pixels: 300)
+        let loin = Teint.Mesure(l: 68, a: 14, b: 30, pixels: 300)
         XCTAssertEqual(Teint.ecart(proche, reference), hypot(1, 1), accuracy: 1e-9)
         XCTAssertFalse(Teint.alerte(avant: 1.4, apres: 4.9), "sous l'écart visible")
         XCTAssertFalse(Teint.alerte(avant: 6, apres: 7), "déjà loin avant : l'harmonisation ne l'a pas éloignée de 2")
-        XCTAssertTrue(Teint.alerte(avant: 1.4, apres: 8))
+        XCTAssertTrue(Teint.alerte(avant: 1.4, apres: 10))
+        // Relevé des seuils du 2 novembre 2026 (lot A8) : la peau varie d'elle-même de 8,1 a*b* (90e
+        // centile, 121 paires à moins de 2 min) ; 7 ne se signale plus, ni une hausse de 4.
+        XCTAssertEqual(Teint.ecartVisible, 8.1)
+        XCTAssertEqual(Teint.hausseAlerte, 4.05, accuracy: 1e-9)
+        XCTAssertFalse(Teint.alerte(avant: 1.4, apres: 7), "sous l'écart relevé")
+        XCTAssertFalse(Teint.alerte(avant: 5, apres: 9), "une hausse de 4 reste sous la moitié de 8,1")
+        XCTAssertEqual(Teint.deplacementVisible, 5, "match_look garde son seuil, à juger avec Dany")
         let temoin = try XCTUnwrap(Teint.json(reference: reference, avant: proche, apres: loin))
         XCTAssertEqual(temoin["ecart_avant"]?.double ?? 0, 1.4, accuracy: 0.05)
-        XCTAssertEqual(temoin["ecart_apres"]?.double ?? 0, 8, accuracy: 0.05)
+        XCTAssertEqual(temoin["ecart_apres"]?.double ?? 0, 10, accuracy: 0.05)
         XCTAssertTrue(temoin["a_verifier"]?.string?.contains("view_photo avec region sur le visage") == true)
         XCTAssertNil(Teint.json(reference: reference, avant: proche, apres: proche)?["a_verifier"])
         XCTAssertNil(Teint.json(reference: nil, avant: proche, apres: nil), "sans peau sur la référence, pas de témoin")

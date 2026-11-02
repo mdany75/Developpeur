@@ -32,10 +32,19 @@ public enum Teint {
     public static let visageMin = Eclairage.visageMin
     /// Pixels de peau au moins (le visage pris à 1 024 px en a des centaines dès 4 % de largeur).
     public static let pixelsMin = 60
-    /// Écart a*b* de la peau avec celle de la référence qui se voit (provisoire).
-    public static let ecartVisible = 5.0
-    /// Hausse de cet écart par l'harmonisation qui fait vérifier (provisoire).
-    public static let hausseAlerte = 2.0
+    /// Écart a*b* de la peau avec celle de la référence qui se voit, pour le témoin de `match_series`.
+    /// Relevé des seuils du 2 novembre 2026 (lot A8, Lightroom Classic 15.6) : 90e centile de l'écart
+    /// a*b* de la peau entre deux photos d'une même suite de portraits à moins de 2 min, 8,1 sur 121
+    /// paires de 32 suites (médiane 3,3) : sous cet écart, la peau varie d'elle-même d'une photo à
+    /// l'autre (règle de décision).
+    public static let ecartVisible = 8.1
+    /// Hausse de cet écart par l'harmonisation qui fait vérifier : la moitié de `ecartVisible`, 1,5 au
+    /// moins (règle de décision du relevé A8).
+    public static let hausseAlerte = max(1.5, ecartVisible / 2)
+    /// Déplacement a*b* de la peau par `match_look` qui se voit (passe 2 et `a_verifier`). Provisoire :
+    /// le relevé A8 mesure la variation d'une photo à l'autre, pas ce qu'un étalonnage fait à la même
+    /// peau ; à juger avec Dany (la peau à 2,5 et 5,2 se voit-elle ?).
+    public static let deplacementVisible = 5.0
 
     /// Le milieu du visage, sans les yeux ni le menton : les joues et le nez (comme l'éclairage).
     static func interieur(_ visage: CGRect) -> CGRect {

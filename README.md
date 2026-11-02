@@ -832,7 +832,7 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
 - Harmoniser une sortie entière par lumière (1.4) : Claude la partage d'abord en groupes de photos
   prises sous la même lumière, d'après l'heure de prise de vue (une pause de plus de 10 minutes,
   sauf au même lieu dans l'heure, selon Vision), le flash qui s'allume ou s'éteint, et la lumière de
-  la scène (l'ouverture, la vitesse, l'ISO et la compensation : plus de 2,5 IL d'écart avec les
+  la scène (l'ouverture, la vitesse, l'ISO et la compensation : 1,5 IL d'écart ou plus avec les
   dernières photos du groupe). Deux boîtiers sur la même scène restent ensemble. Pour chaque groupe,
   il propose une photo de référence (une photo qu'il a déjà retouchée, sinon la mieux classée au tri,
   avec un visage si le groupe en a), sans rien changer ; puis il la retouche et harmonise les autres

@@ -1,0 +1,205 @@
+<title>Relevé des seuils 1.6</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Mise en page : une colonne ; en tête ce qui change et ce qui attend Dany, puis un tableau par seuil. */
+  :root {
+    --texte: #1D1D1F; --gris: #63666B; --bleu: #0A64D8; --mono: #3D3D45;
+    --vert: #1F7A35; --orange: #A85A00; --rouge: #B3261E;
+    --fond: #FFFFFF; --volet: #F1F2F4; --filet: #E0E2E6;
+    --vert-doux: #E6F2E9; --orange-doux: #FCEFDF; --bleu-doux: #E3EEFC; --rouge-doux: #FBE9E7; --gris-doux: #E9EAED;
+    --police: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    --police-titre: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    --police-code: Menlo, ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --texte: #E8E8E8; --gris: #9EA1A7; --bleu: #5AA2F6; --mono: #C8C8D0;
+      --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+      --fond: #1F2023; --volet: #17181A; --filet: #34363B;
+      --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #2C2E33;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --texte: #E8E8E8; --gris: #9EA1A7; --bleu: #5AA2F6; --mono: #C8C8D0;
+    --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+    --fond: #1F2023; --volet: #17181A; --filet: #34363B;
+    --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #2C2E33;
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--volet); color: var(--texte); font: 15px/1.55 var(--police); }
+  code { font-family: var(--police-code); font-size: .86em; color: var(--mono); background: var(--gris-doux); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .page { max-width: 900px; margin: 0 auto; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 30px; }
+  h1 { margin: 0 0 6px; font: 700 30px/1.2 var(--police-titre); text-wrap: balance; }
+  h2 { margin: 0; font: 650 20px/1.3 var(--police-titre); text-wrap: balance; }
+  h3 { margin: 0; font: 600 16px/1.35 var(--police-titre); }
+  p { margin: 0; max-width: 72ch; }
+  .sous { color: var(--gris); }
+  .entete { display: grid; gap: 10px; }
+  .encadre { background: var(--bleu-doux); border-radius: 10px; padding: 12px 16px; display: grid; gap: 6px; }
+  .encadre.fait { background: var(--vert-doux); }
+  .encadre.dany { background: var(--orange-doux); }
+  .encadre ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+  section { display: grid; gap: 12px; }
+  .seuil { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
+  .seuil-tete { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .tableau { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 7px 10px; border-top: 1px solid var(--filet); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--gris); font-weight: 600; border-top: none; }
+  .note { color: var(--gris); font-size: 13.5px; }
+  .pastille { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .fixe { background: var(--vert-doux); color: var(--vert); }
+  .propose { background: var(--bleu-doux); color: var(--bleu); }
+  .provisoire { background: var(--orange-doux); color: var(--orange); }
+  .garde { background: var(--gris-doux); color: var(--texte); }
+  .chiffres { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .chiffre { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 10px 14px; }
+  .chiffre b { display: block; font: 700 22px/1.2 var(--police-titre); font-variant-numeric: tabular-nums; }
+  .chiffre span { color: var(--gris); font-size: 13px; }
+</style>
+
+<div class="page">
+  <header class="entete">
+    <h1>Relevé des seuils 1.6</h1>
+    <p class="sous">Mesuré la nuit du 2 novembre 2026 dans Lightroom Classic 15.6, sur tes photos du X-H2S, du X-T4 et du X-T20, en lecture seulement : rien n'a été écrit dans le catalogue. Lightroom a seulement recalculé des aperçus, comme tu l'avais permis.</p>
+  </header>
+
+  <div class="chiffres">
+    <div class="chiffre"><b>4 980</b><span>photos tirées dans 8 lots</span></div>
+    <div class="chiffre"><b>52 min</b><span>collecte (8 min) et mesure (44 min)</span></div>
+    <div class="chiffre"><b>+406 Mo</b><span>dans les aperçus de Lightroom</span></div>
+    <div class="chiffre"><b>2 sur 8</b><span>seuils fixés (A6 et A8)</span></div>
+  </div>
+
+  <div class="encadre fait">
+    <h3>Ce qui change dans le code</h3>
+    <ul>
+      <li><b>Groupes de lumière</b> (<code>match_series</code>) : une nouvelle lumière commence à 1,5 IL d'écart au lieu de 2,5. Sur 10 journées, 30 coupures par la lumière au lieu de 8.</li>
+      <li><b>Témoin du teint</b> (<code>match_series</code>) : la peau se signale à 8,1 d'écart a*b* au lieu de 5, et si l'harmonisation l'éloigne d'au moins 4,05 au lieu de 2.</li>
+      <li><code>match_look</code> garde son propre seuil de 5 pour la peau qui bouge : ce n'est pas la même mesure, et c'est à juger avec toi.</li>
+    </ul>
+  </div>
+
+  <div class="encadre dany">
+    <h3>Ce qui attend ta décision ou ton œil</h3>
+    <ul>
+      <li><b>A2, sous-exposition</b> : je propose un L* médian de 25 au lieu de 28. Comme A1, A2 et A3 font refaire toute l'analyse du Suivi (10 à 20 h), rien n'est changé sans ton accord.</li>
+      <li><b>A4, gamme</b> : je propose <code>ecretageMin</code> à 0,13 au lieu de 0,1.</li>
+      <li>À juger à l'œil avec toi : les recadrages du bruit (A1), le ciel brûlé (A3), les points chauds (A5), l'éclairage mixte (A7), et les paires « même lieu » (A6).</li>
+      <li>Les essais B1 (bilan de <code>view_photo</code>) et B2 (alertes des masques) se font dans Lightroom sur ton ordre.</li>
+    </ul>
+  </div>
+
+  <section>
+    <h2>Avant les seuils : la collecte</h2>
+    <div class="seuil">
+      <div class="tableau">
+        <table>
+          <thead><tr><th>Question</th><th>Constat</th></tr></thead>
+          <tbody>
+            <tr><td>Photos d'avant 2018</td><td>Aucune : les trois boîtiers commencent en juillet 2020. Le lot d'essai a pris les 10 plus anciennes (X-T20, juillet 2020).</td></tr>
+            <tr><td>Durée d'une commande de 10 photos</td><td>0,5 s à 1 024 px, 0,3 s à 1 344 px, 1,0 s à 2 048 px</td></tr>
+            <tr><td>Taille rendue par Lightroom</td><td>1 500 px quand on demande 1 024 ou 1 344 ; 3 000 px quand on demande 2 048</td></tr>
+            <tr><td>Heure à la seconde</td><td>Lue sur toutes les photos (4 980 sur 4 980)</td></tr>
+            <tr><td>Lots de 15 photos sous les 60 s du module</td><td>Oui, très largement : 0,9 s au plus à 1 024 px, 2,8 s à 2 048 px</td></tr>
+            <tr><td>Aperçus (<code>Previews.lrdata</code>)</td><td>+64 Ko pour le lot d'essai, +406 Mo pour toute la collecte (surtout A1 à 2 048 px)</td></tr>
+            <tr><td>Vignettes couchées, autres photos, notes d'auteur inconnu</td><td>Aucune. 145 notes posées par Claude écartées des statistiques par note.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Condition d'A1 et A2 (20 photos comparées entre la vignette du relevé et l'aperçu de <code>view_photo</code>) : le L* médian concorde (écart médian 0 %), le bruit non (plus de 20 % d'écart sur 10 photos sur 20, jusqu'à 11,1 contre 1,05). Le bruit d'A1 se juge donc sur l'aperçu.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Seuil par seuil</h2>
+
+    <div class="seuil">
+      <div class="seuil-tete"><h3>A1 · ISO du bruit fort</h3><span class="pastille garde">gardé</span></div>
+      <div class="tableau"><table>
+        <thead><tr><th>Constante</th><th>Actuelle</th><th>Relevée</th><th>Effectif</th><th>Décision</th></tr></thead>
+        <tbody><tr><td><code>isoEleve</code></td><td>1 600</td><td>aucune tranche ne remplit la règle</td><td>1 575 vignettes ; 260 aperçus (20 par tranche)</td><td>Gardé à 1 600, provisoire</td></tr></tbody>
+      </table></div>
+      <p class="note">À faible ISO, la texture passe déjà pour du bruit : la tranche « moins de 800 » a 33 à 48 % de bruit fort sur les vignettes, 10 à 50 % sur les aperçus. La règle demande trois fois cette part. Seule la tranche 6 400 et plus du X-H2S y arrive (65 % contre 10 %), hors des crans prévus. Les vignettes à 3 000 px d'A1 sont prêtes pour les 8 recadrages par tranche à juger avec toi.</p>
+    </div>
+
+    <div class="seuil">
+      <div class="seuil-tete"><h3>A2 · Sous-exposition</h3><span class="pastille propose">proposé</span></div>
+      <div class="tableau"><table>
+        <thead><tr><th>Constante</th><th>Actuelle</th><th>Relevée</th><th>Effectif</th><th>Décision</th></tr></thead>
+        <tbody>
+          <tr><td><code>medianeSousExposee</code></td><td>28</td><td>25</td><td>90 photos notées 3 ★ ou plus par toi</td><td>Proposé, à ta décision</td></tr>
+          <tr><td><code>p95SousExposee</code></td><td>80</td><td>80</td><td>idem</td><td>Gardé</td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">À 28, 5,6 % de tes photos bien notées sont dites sous-exposées ; à 25, 3,3 %, et 90 % des 347 photos signalées du lot restent signalées. Avec les lots choisis sur la famille et les soirées (229 photos), il faudrait descendre vers 18. Reste à faire avec toi : juger 50 vraies sous-expositions à l'œil.</p>
+    </div>
+
+    <div class="seuil">
+      <div class="seuil-tete"><h3>A3 · Ciel brûlé</h3><span class="pastille provisoire">provisoire</span></div>
+      <div class="tableau"><table>
+        <thead><tr><th>Constante</th><th>Actuelle</th><th>Relevée</th><th>Effectif</th><th>Décision</th></tr></thead>
+        <tbody><tr><td><code>partBlancPurHaut</code></td><td>3 %</td><td>à juger à l'œil</td><td>589 signalées, 200 paysages non signalés</td><td>Gardé, provisoire</td></tr></tbody>
+      </table></div>
+      <p class="note">Blanc pur du tiers haut : médiane 10,8 %, 95e centile 44 % chez les signalées ; 0,1 % chez les paysages non signalés. La règle prend le 95e centile des photos jugées sans ciel brûlé : il faut d'abord trier les signalées à l'œil.</p>
+    </div>
+
+    <div class="seuil">
+      <div class="seuil-tete"><h3>A4 · Couleurs hors gamme</h3><span class="pastille propose">proposé</span></div>
+      <div class="tableau"><table>
+        <thead><tr><th>Constante</th><th>Actuelle</th><th>Relevée</th><th>Effectif</th><th>Décision</th></tr></thead>
+        <tbody>
+          <tr><td><code>ecretageMin</code></td><td>0,1 %</td><td>0,13 %</td><td>100 portraits témoins</td><td>Proposé</td></tr>
+          <tr><td><code>basGamme</code>, <code>chromaGamme</code></td><td>220, 30</td><td>à juger à l'œil</td><td>490</td><td>Gardés, provisoires</td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">La borne basse change à peine le compte (13 à 15 % des photos de 200 à 240) ; la chroma le fait passer de 14 à 11 %. Seul un désaccord avec l'œil sur 50 photos les ferait changer.</p>
+    </div>
+
+    <div class="seuil">
+      <div class="seuil-tete"><h3>A5 · Points chauds</h3><span class="pastille provisoire">provisoire</span></div>
+      <div class="tableau"><table>
+        <thead><tr><th>Constante</th><th>Actuelle</th><th>Relevée</th><th>Effectif</th><th>Décision</th></tr></thead>
+        <tbody><tr><td><code>ecartMediane</code>, <code>lMin</code>, <code>partMin</code>, <code>partMax</code></td><td>20, 70, 0,3, 20</td><td>à juger zone par zone</td><td>250</td><td>Gardés, à faire avec toi</td></tr></tbody>
+      </table></div>
+      <p class="note">1,07 zone par photo aux seuils actuels ; de 0,74 (écart 25, L* 75) à 1,46 (écart 15, L* 65). <code>partMin</code> à 0,2 ferait monter à 1,69.</p>
+    </div>
+
+    <div class="seuil">
+      <div class="seuil-tete"><h3>A6 · Groupes de lumière</h3><span class="pastille fixe">fixé</span></div>
+      <div class="tableau"><table>
+        <thead><tr><th>Constante</th><th>Actuelle</th><th>Relevée</th><th>Effectif</th><th>Décision</th></tr></thead>
+        <tbody>
+          <tr><td><code>ecartIL</code></td><td>2,5 IL</td><td>1,5 IL (95e centile 0,99, plancher 1,5)</td><td>797 paires à moins de 60 s</td><td>Fixé à 1,5</td></tr>
+          <tr><td><code>pauseMax</code></td><td>10 min</td><td>pas de creux lisible</td><td>15 paires entre 5 et 30 min</td><td>Gardé, provisoire</td></tr>
+          <tr><td><code>distanceMemeLieu</code></td><td>0,7</td><td>à juger en planches</td><td>926 paires</td><td>Gardé, à faire avec toi</td></tr>
+          <tr><td><code>pauseMemeLieu</code></td><td>1 h</td><td>—</td><td>—</td><td>Gardé</td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">Sans les photos au flash, le 95e centile est de 1,07 : la valeur arrondie reste 1,5. Effet : un coucher de soleil qui perd une demi-IL toutes les 3 minutes se coupe maintenant en plusieurs groupes.</p>
+    </div>
+
+    <div class="seuil">
+      <div class="seuil-tete"><h3>A7 · Éclairage mixte</h3><span class="pastille provisoire">provisoire</span></div>
+      <div class="tableau"><table>
+        <thead><tr><th>Constante</th><th>Actuelle</th><th>Relevée</th><th>Effectif</th><th>Décision</th></tr></thead>
+        <tbody><tr><td><code>seuilTonal</code>, <code>partMinGroupe</code></td><td>8, 20 %</td><td>à trier à l'œil</td><td>180 candidates</td><td>Gardés, à faire avec toi</td></tr></tbody>
+      </table></div>
+      <p class="note">Les 180 candidates sont passées à la lecture de l'éclairage : 44 lues mixtes (29 sur 120 en soirée, 15 sur 60 en plein jour). Il faut d'abord en choisir 60 à l'œil (lampe et fenêtre, soleil et ombre, une seule lumière) et que tu les confirmes.</p>
+    </div>
+
+    <div class="seuil">
+      <div class="seuil-tete"><h3>A8 · Témoin du teint</h3><span class="pastille fixe">fixé</span></div>
+      <div class="tableau"><table>
+        <thead><tr><th>Constante</th><th>Actuelle</th><th>Relevée</th><th>Effectif</th><th>Décision</th></tr></thead>
+        <tbody>
+          <tr><td><code>ecartVisible</code></td><td>5</td><td>8,1 (90e centile)</td><td>121 paires, 32 suites de portraits</td><td>Fixé à 8,1</td></tr>
+          <tr><td><code>hausseAlerte</code></td><td>2</td><td>4,05 (la moitié)</td><td>idem</td><td>Fixé à 4,05</td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">D'une photo à la suivante, à moins de 2 minutes, la peau varie déjà de 3,3 en médiane. Les autres lots disent la même chose : 7,3 sur 547 paires (A6), 11,4 sur 234 (A1). <code>match_look</code> garde 5 (<code>deplacementVisible</code>).</p>
+    </div>
+  </section>
+</div>

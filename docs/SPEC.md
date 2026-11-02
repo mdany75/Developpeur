@@ -6812,7 +6812,7 @@ dans l'ordre donné ; la première d'entre elles commence un groupe, `sansDate`)
 groupe, dans cet ordre de raison :
 
 1. le flash change (les deux connus ; inconnu, il ne coupe pas) ;
-2. la lumière de la scène s'écarte de 2,5 IL ou plus (`ecartIL`) de la médiane des 5 dernières photos
+2. la lumière de la scène s'écarte de 1,5 IL ou plus (`ecartIL`, relevé A6 du 2 novembre 2026) de la médiane des 5 dernières photos
    du groupe (`fenetreLumiere`) qui ne sont pas au flash : `Prise.lumiere`, en IL à 100 ISO,
    log2(N²/t) − log2(ISO/100) plus la compensation (une photo éclaircie d'une IL a reçu une IL de
    plus d'une scène qui n'a pas changé) ; jamais pour une photo au flash (l'éclair fait la lumière).
@@ -6857,11 +6857,11 @@ du visage, sans autre rendu), aux bornes de peau de l'éclairage (L* de 25 à 92
 composante écrêtée), 60 pixels au moins ; médianes de L*, a*, b*. Sans visage sur la référence, aucune
 autre photo ne se lit (pas de Vision de plus) et `reference.teint` le dit. Sinon chaque photo a son
 `teint` : écart a*b* et angle de teinte avant, et après l'harmonisation ; `a_verifier` (sur la photo et
-dans la liste du résultat) quand l'écart, après, atteint 5 (`ecartVisible`) et a grandi d'au moins 2
-(`hausseAlerte`) : à regarder par `view_photo` avec `region` sur le visage. Un témoin, jamais la
+dans la liste du résultat) quand l'écart, après, atteint 8,1 (`ecartVisible`) et a grandi d'au moins 4,05
+(`hausseAlerte`, relevé A8 du 2 novembre 2026) : à regarder par `view_photo` avec `region` sur le visage. Un témoin, jamais la
 correction : deux personnes n'ont pas la même peau, et les tons neutres décident. Sur une photo sans
-assez de tons neutres (sa balance reste), une remarque dit quand la peau diffère de 5 ou plus. Seuils
-provisoires ; Vision ne voit aucun visage dans les images fabriquées des tests (la lecture d'un vrai
+assez de tons neutres (sa balance reste), une remarque dit quand la peau diffère de 8,1 ou plus. Seuils
+relevés (lot A8) ; Vision ne voit aucun visage dans les images fabriquées des tests (la lecture d'un vrai
 visage, par `Teint.lire`, reste à constater sur l'essai).
 
 **Le tri d'une sortie entière.** `cull_photos` trie 1 000 photos par appel (500 avant, et avec
@@ -8209,9 +8209,9 @@ Tous dans `Sources/DeveloppeurKit/`. « Lot » : le lot de `--echantillons` qui 
 | A3 | Carnet.swift:51 | `partBlancPurHaut = 3` (%) | Défaut « ciel brûlé » | A3 |
 | A4 | Mesures.swift:58 | `basGamme = 220`, `chromaGamme = 30`, `ecretageMin = 0,1`, `natureNette = 2` | Écrêtage par la gamme et sa nature (gamme, luminance, mixte) dans `view_photo` | A4 |
 | A5 | PointsChauds.swift:16, 19 | `ecartMediane = 20`, `lMin = 70`, `partMin = 0,3`, `partMax = 20` | Zones claires hors du sujet de `view_photo` | A5 |
-| A6 | GroupesLumiere.swift:56, 58, 62, 65 | `pauseMax = 600 s`, `pauseMemeLieu = 3 600 s`, `distanceMemeLieu = 0,7`, `ecartIL = 2,5` | Coupures des groupes de lumière (`match_series` avec `groups`) | A6 |
+| A6 | GroupesLumiere.swift:56, 58, 62, 68 | `pauseMax = 600 s`, `pauseMemeLieu = 3 600 s`, `distanceMemeLieu = 0,7`, `ecartIL = 2,5` (1,5 depuis le relevé du 2 nov. 2026) | Coupures des groupes de lumière (`match_series` avec `groups`) | A6 |
 | A7 | Eclairage.swift:269, 272 | `seuilTonal = 8`, `partMinGroupe = 20` (`toleranceNeutre = 10`, ligne 267, et `pixelsMinPeau = 20`, ligne 299, gardés) | Éclairage mixte lu par zone tonale et par groupes de cases | A7 |
-| A8 | Teint.swift:36, 38 (et 34) | `ecartVisible = 5`, `hausseAlerte = 2` (`pixelsMin = 60` gardé) | Témoin du teint de `match_series` (`a_verifier`) | A8 |
+| A8 | Teint.swift:40, 43 (et 34) | `ecartVisible = 5`, `hausseAlerte = 2` (8,1 et 4,05 depuis le relevé du 2 nov. 2026 ; `match_look` garde 5 par `deplacementVisible`) (`pixelsMin = 60` gardé) | Témoin du teint de `match_series` (`a_verifier`) | A8 |
 | B1 | Bilan.swift:127, 96 | `baisseNetteteMin = 3`, `hausseBruitMin = 0,1` ; `ecartNettetePct = 10`, `ecartBruit = 0,1`, `ecartEcretage = 0,3`, `ecartSaturee = 1` | « regression » et écart visible du bilan de `view_photo` | B1 (hors `--mesures` : session du connecteur, copies d'Essais) |
 | B2 | CarteMasque.swift:20, 23, 26, 29 | `partVide = 0,5`, `partTotale = 95`, `debordVisage = 0,25`, `cielBas = 0,6`, `sujetVisages = 0,2`, `sujetLarge = 40` | Alertes de `mask_map` | B2 (hors `--mesures` : session du connecteur, copies d'Essais) |
 
@@ -8330,6 +8330,52 @@ tiré d'un autre catalogue, ou `suivi.json` en retard).
    juger le rendu témoin à l'œil ; copies remises à l'origine à la fin.
 7. Chaque seuil reçoit la valeur que donne sa règle ; le compte rendu (artefact) les présente avant
    tout changement de code.
+
+
+**Constaté le 2 novembre 2026** (Lightroom Classic 15.6, exécutable de développement, catalogue
+`/Volumes/Photos/Lightroom Catalog/Lightroom Catalog.lrcat` ; compte rendu
+`docs/artefacts/releve-seuils.html`). Rien n'a été écrit dans le catalogue (`vignettes`, `journal`
+et les aperçus de `--constats` seulement).
+
+0. Tirage (graine 20261101) : 4 980 photos, A1 1 575, A2 547, A3 789, A4 490, A5 250, A6 936,
+   A7 180, A8 213. Moins de 30 : X-T20 à ISO 3 200-6 399 (10) et 6 400 et plus (5) ; chaque suite
+   d'A8 (3 à 6 photos ; la décision se prend sur les paires mises ensemble). **Aucune photo d'avant
+   2018** : les trois boîtiers commencent en juillet 2020 ; le lot d'essai a pris les 10 plus
+   anciennes d'A1 (X-T20, juillet 2020).
+1. Lot d'essai de 10, `--par 10` : 0,5 s à 1 024, 0,3 s à 1 344, 1,0 s à 2 048 par commande. Lightroom
+   rend **1 500 px** pour 1 024 et 1 344 (et 1 560 pour certaines), **3 000 px** pour 2 048 (`cote` lit
+   la vraie taille, ce que couvre déjà `testLaCollecteDemandeParLotsCopieEtRetireLesJPEGTemporaires`) ;
+   `date_secondes` vrai partout (« 2020-07-10 20:40:38.000 » se lit, aucun format à ajouter à
+   `Tri.date`). Collecte entière en `--par 15` : 8 min pour les 9 collectes, la plus longue commande
+   0,9 s à 1 024, 2,8 s à 2 048 : **`--par 15` tient très largement** sous les 60 s. `Previews.lrdata`
+   +64 Ko au lot d'essai, +406 Mo pour toutes les collectes (surtout A1 à 2 048). Aucune vignette
+   couchée (elles arrivent à l'endroit), aucune « autre photo », aucune note d'auteur inconnu ;
+   145 notes posées par Claude écartées. Mesure : 44 min pour les 8 lots (0,43 s par photo).
+2. Condition A1 et A2 (20 photos d'A1, `mesures.csv` contre `--constats`) : le L* médian concorde
+   (écart médian 0 %, au plus 9 %) ; **le bruit non** : plus de 20 % d'écart sur 10 photos sur 20, la
+   vignette en voit plus (jusqu'à 11,1 contre 1,05, texture à faible ISO). A1 se décide donc outil par
+   outil. Sur 260 aperçus (`--constats`, 20 par tranche), la règle ne donne aucune tranche valable
+   (X-T4 et X-T20 : « moins de 800 » à 50 et 30 % ; X-H2S : seule la tranche 6 400 et plus, hors des
+   crans) : `isoEleve` reste à 1 600, provisoire (recadrages à juger avec Dany).
+3. **A6 `ecartIL` fixé à 1,5** (règle chiffrée) : 95e centile de |ΔIL| à moins de 60 s, même flash,
+   0,99 sur 797 paires (1,07 sans flash), arrondi à 0,5 au-dessus, 1,5 au moins. Simulé sur les
+   936 photos d'A6 (lumière seule) : 30 coupures au lieu de 8. Un coucher de soleil qui perd une
+   demi-IL toutes les 3 minutes se coupe désormais (test `testUneLumiereQuiBaissePeuAPeuResteUnGroupe`
+   ramené à un tiers d'IL) ; test `testLEcartDeLumiereRelevePourLesGroupes` (2 IL d'un coup coupent).
+   `pauseMax` (9 et 6 paires entre 5 et 30 min : moins de 30), `distanceMemeLieu` (planches à
+   juger) et `pauseMemeLieu` restent provisoires.
+4. **A8 `ecartVisible` fixé à 8,1, `hausseAlerte` à 4,05** (la moitié) : 90e centile de l'écart a*b*
+   de la peau à moins de 2 min, 121 paires de 32 suites (médiane 3,3 ; A6 donne 7,3 sur 547, A1 11,4
+   sur 234). `match_look` gardait le même seuil pour le déplacement de la peau, qui n'est pas la même
+   mesure : il passe à `Teint.deplacementVisible` (5, provisoire, à juger avec Dany). Test
+   `testLEcartEtLAlerteDuTeint` (7 ne se signale plus, ni une hausse de 4).
+5. Proposés seulement (décision de Dany, `reglesAnalyse`) : A2 `medianeSousExposee` 25 (au lieu de
+   28 : 3,3 % des 90 photos notées 3 étoiles ou plus par Dany des lots sans choix de genre ni d'heure,
+   contre 5,6 % ; 90 % des 347 signalées d'A2 gardées, l'œil sur 50 photos reste à faire) ; A3 rien
+   (le 95e centile des photos sans ciel brûlé demande l'œil) ; A4 `ecretageMin` 0,13 (90e centile de
+   `gamme_pct` du portrait témoin, 100 photos ; `basGamme` et `chromaGamme` : l'œil). A5 et A7
+   attendent les planches de Dany (A7 : 180 candidates passées à `--eclairage`, 44 lues mixtes à la
+   borne 12). B1 et B2 non faits (essai sur l'ordre de Dany).
 
 ## Bibliothèque
 
@@ -9745,7 +9791,7 @@ change. `contexte.verifier()` avant chaque photo et chaque passe, `avancer` apr�
 
 **Peau** (`protect_skin`, défaut vrai) : les visages ne guident pas la mesure ; la peau du plus
 grand visage (`Teint.mesurer`, mêmes cadres avant et après) se lit avant et après la passe 1 ; si
-elle a bougé d'au moins `Teint.ecartVisible` (5, provisoire), la passe 2 remet les tons moyens à la
+elle a bougé d'au moins `Teint.deplacementVisible` (5, provisoire), la passe 2 remet les tons moyens à la
 moitié de leur changement, et le résultat le fait vérifier (`teint.a_verifier`, `a_verifier`).
 
 **Réponse** : `reference` (signature JSON, teint), puis par photo `ecart_avant` et `ecart_apres`
@@ -9791,7 +9837,7 @@ rendus, 58 étapes) : le défaire ensuite (revert_to_original).
 5. **Un essai réel** : `--call match_look '{"reference_id": <référence>, "photo_id": <copie>}'`
    (plan seulement), puis avec `"confirm": true` sur une copie d'Essais, défait ensuite : deux passes
    au plus, `rapproche_pct`, `limites`, et le rendu à l'œil côte à côte. Avec un portrait
-   (`protect_skin`), le déplacement de la peau (`teint.deplacement_ab`) fixe `Teint.ecartVisible`
+   (`protect_skin`), le déplacement de la peau (`teint.deplacement_ab`) fixe `Teint.deplacementVisible`
    pour match_look.
 6. **Scènes différentes** (fixe `Reference.seuilScenes`) : la distance des bandes lue entre une
    référence de forêt et une photo de plage, et entre deux photos de même scène.
@@ -9835,7 +9881,7 @@ sur les copies d'Essais 53810562 `XH2S0496.RAF (Essai étalonnage)` et 53811131 
    pas copié la saturation (scènes à 79 %), mais la passe 2 jugeait les scènes sur l'écart restant
    (65 %, l'étalonnage rapproche les bandes) et posait Vibrance −20 : la peau a bougé de 5,2.
    **Corrigé** : `ecartVise` garde les scènes du départ (test `testLaPasse2JugeLesScenesAuDepart`) ;
-   refait, la peau bouge de 2,5, `rapproche_pct` 68. `Teint.ecartVisible` (5) reste provisoire :
+   refait, la peau bouge de 2,5, `rapproche_pct` 68. `Teint.deplacementVisible` (5) reste provisoire :
    deux mesures seulement, et juger si 2,5 ou 5,2 se voient demande l'œil de Dany.
 6. Scènes (plans, distance des bandes, désormais dite `scenes_pct` dans l'écart, test
    `testLEcartDitLaDistanceDesScenes`) : forêt contre plage 91 %, pont d'automne contre portrait 76
@@ -9843,7 +9889,7 @@ sur les copies d'Essais 53810562 `XH2S0496.RAF (Essai étalonnage)` et 53811131 
    44 %, un sentier 53 %, un camping à quelques minutes 59 et 68 %. **`seuilScenes` = 72**.
 
 Restent provisoires : `saturationMax` (25 / 40) et `vibranceMaxPasse` (20 ; avec la pente de 18,
-3 de chroma suffisent à l'atteindre) ; `Teint.ecartVisible` pour match_look (à faire avec Dany :
+3 de chroma suffisent à l'atteindre) ; `Teint.deplacementVisible` pour match_look (à faire avec Dany :
 la peau à 2,5 et 5,2 se voit-elle ?) ; le rendu à l'œil côte à côte (à faire avec Dany) ; une
 référence au rendu marqué (Dany n'en a pas) ; la chroma des couleurs vives que l'étalonnage
 déplace (3) ; l'ordre du traitement (étalonnage avant ou après le profil).

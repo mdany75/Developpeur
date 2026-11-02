@@ -198,7 +198,7 @@ extension ToolHandler {
                     var suite = Reference.traduire(Reference.ecartVise(reste: reste, avant: ecartAvant, force: options.force),
                                                    etat: mesuree.etat, options: entiere, pentes: pentes)
                     // La peau a bougé d'un écart qui se voit : la passe 2 rend la moitié du changement des tons moyens.
-                    if let p0 = photo.peau, let p1 = mesuree.peau, Teint.ecart(p1, p0) >= Teint.ecartVisible {
+                    if let p0 = photo.peau, let p1 = mesuree.peau, Teint.ecart(p1, p0) >= Teint.deplacementVisible {
                         let cles = Reference.clesZones[1]
                         let gain = pentes.gain[1]
                         let v0 = Reference.vecteur(teinte: photo.etat.valeur(cles.teinte), saturation: photo.etat.valeur(cles.saturation), gain: gain)
@@ -228,7 +228,7 @@ extension ToolHandler {
                         let ecart = Teint.ecart(p1, p0)
                         teint["apres"] = Teint.jsonReference(p1)
                         teint["deplacement_ab"] = .number((ecart * 10).rounded() / 10)
-                        if moyensReduits || ecart >= Teint.ecartVisible {
+                        if moyensReduits || ecart >= Teint.deplacementVisible {
                             let texte = "La peau a bougé (écart a*b* \(PhotoTriee.r(ecart)))\(moyensReduits ? " : la passe 2 a rendu la moitié du changement des tons moyens" : "") ; vérifier à l'œil, view_photo avec region sur le visage."
                             teint["a_verifier"] = .string(texte)
                             aVerifier.append(["id": .number(Double(photo.id)), "fichier": photo.fichier, "pourquoi": .string(texte)])

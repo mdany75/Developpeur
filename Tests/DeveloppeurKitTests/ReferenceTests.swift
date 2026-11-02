@@ -399,7 +399,7 @@ final class ReferenceTests: XCTestCase {
         XCTAssertNotNil(fait["photos"]?.array?.first?["reglages"]?.string)
     }
 
-    /// La peau protégée : la passe 1 déplace la peau de plus de `Teint.ecartVisible` ; la passe 2
+    /// La peau protégée : la passe 1 déplace la peau de plus de `Teint.deplacementVisible` ; la passe 2
     /// rend la moitié du changement des tons moyens, et le résultat le fait vérifier.
     func testLaPeauQuiBougeReduitLesTonsMoyens() throws {
         let visage = CGRect(x: 0.4, y: 0.2, width: 0.3, height: 0.6)
