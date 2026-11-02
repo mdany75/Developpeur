@@ -183,6 +183,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `presets` | `filtre?`, `limite` | `total`, `presets` (dossier, nom, UUID) |
 | `creerPreset` | `nom`, `photo?`, `cles`, `inclure` | `reglages` de la photo, dont le serveur fait un fichier XMP |
 | `journal` | `photos?` ou `selection?` | par photo : `entrees` (date, étape, raison, changements ou note ; `etape_id` depuis la 1.3) ; de la 1.3 à la 1.3.5, `detaille` (pour `photo_lesson`) y ajoutait la photo décrite en entier et `prise_de_vue_plus` : retiré au correctif 1.3.6 (voir Leçon de la photo) |
+| `habitudes` (1.6) | `mode` : `liste` (`note_min`, `appareil?`, `collection?`, `dossier?`, `date_debut?`, `date_fin?`, `limite` ≤ 5000 ; une collection, un dossier ou un appareil exigé) ou `lire` (`photos`, 250 au plus ; `cles`, celles de `etatSimple`) | `liste` : `{total, photos: [id…]}` ; `lire` : par photo `{id, appareil, iso, jour, format, virtuelle, copie, essai, video, valeurs, claude, reprises, memoire_autre}` et `introuvables` ; lecture seule, rejouable (voir 1.6 : tes habitudes en chiffres) |
 | `diagnostic` | `modules?`, `methodes?`, `cles?`, `valeurs?` | fonctions offertes par le SDK de cette version de Lightroom : celles des modules, des méthodes cherchées par leur nom sur le catalogue, la photo active, le premier mot-clé, la première collection et le premier ensemble (sans les appeler), et le type des métadonnées brutes de la photo active ; avec `valeurs`, des valeurs lues sans rien écrire : jeu de libellés, filtre de la Bibliothèque et ses paramètres prédéfinis, original et aperçu dynamique de la photo active |
 | `annuler` | `photos?` ou `selection?` | par photo : étape annulée et réglages remis ; depuis la 1.3, `etape_id` de l'étape défaite (null pour une étape d'avant la 1.3) |
 | `revenir` | `photos?` ou `selection?` | par photo : réglages remis à l'état d'avant Claude |
@@ -6547,6 +6548,148 @@ Correctif 1.3.6 :
     d'actions, à droite, et sa fenêtre pré-remplie (sans objet depuis le correctif 1.3.6 : la ligne
     de Claude et le bouton sont retirés) ; le bandeau de 324 (deux lignes) ; le temps
     d'ouverture de la fenêtre avec 86 vues de plus.
+
+## 1.6 : tes habitudes en chiffres (`remember_style` avec `habits`)
+
+Chantier « style » de la 1.6, version réduite décidée d'après la critique du plan (1er novembre
+2026) : lecture seule, sans cache, sans genre ni comparaison avec les photos moins bien notées.
+`learn` voit ce que Dany corrige chez Claude ; `habits` voit ce qu'il fait seul sur ses belles photos.
+
+**L'outil.** `remember_style` avec `habits = true`, et `rating_min` (1 à 5, défaut 4), `camera`,
+`collection`, `folder` (sous-dossiers compris), `date_from`, `date_to`. Une collection, un dossier
+ou un appareil est exigé (sans cela, tout le catalogue) ; `photo_ids` et `selection` sont refusés.
+Pas de nouvel outil (le compte reste à 36), rien dans `ServerInfo.instructions` ni
+`Consignes.texte` : tout est dans la description de `habits` et dans la réponse.
+
+**Le déroulé** (`ToolHandler.lireHabitudes`, `Habitudes.swift`, pur) :
+
+1. `habitudes {mode: liste, note_min, appareil?, collection?, dossier?, date_debut?, date_fin?,
+   limite: 5000}` : la recherche de `Bibliotheque.resultatsRecherche` (rendue publique), sans tri,
+   dans l'ordre de Lightroom ; `{total, photos: [id…]}`, 5000 ids au plus. Au-delà de 5000 photos
+   trouvées, un filtre de date est refusé par la recherche elle-même (« … c'est plus que 5000.
+   Préciser la recherche. ») ; sans date, les 5000 premières seulement, et la réponse le dit
+   (`echantillon`).
+2. Par lots de 250 : `habitudes {mode: lire, photos, cles: Habitudes.cles}` → pour chaque photo
+   `{id, appareil, iso, jour, format, virtuelle, copie, essai, video, valeurs, claude, reprises,
+   memoire_autre}`, `introuvables` à part. `contexte.verifier()` avant chaque lot, `avancer`
+   après (barre de progression de Lightroom au-delà de 250 photos).
+3. Les statistiques et au plus 8 phrases ; rien n'est écrit, ni au catalogue ni au guide.
+
+Plus de 50 s : la réponse d'attente de `FileOutils` (« pas fini »), la lecture continue et le
+rappel avec les mêmes arguments reprend le résultat. Les autres outils attendent pendant ce temps
+(un seul appel à la fois) : la description le dit. `habitudes` est dans `LightroomBridge.lectures`
+(rejouée une fois si la liaison se coupe).
+
+**Côté module** (`Lecture.habitudes`, sans nouveau fichier) : aucune écriture, ni ordinaire ni
+privée ; lectures groupées (`batchGetRawMetadata` : uuid, isoSpeedRating, dateTimeOriginal,
+fileFormat, isVirtualCopy, masterPhoto ; `batchGetFormattedMetadata` : cameraModel, copyName ;
+`batchGetPropertyForPlugin` : avantClaude, proprietaireMemoire) ; un seul `getDevelopSettings` par
+photo (aucun pour une vidéo), passé par `Ecriture.etatSimple`, dont seules les clés demandées
+reviennent ; la main rendue toutes les 25 photos ; 250 photos au plus par lecture.
+
+**Attribution Claude ou Dany.**
+
+- `claude` : les clés de `avantClaude` (lu brut, même dans une mémoire d'une autre photo),
+  rendues dans l'espace de `etatSimple` : `MaskGroupBasedCorrections` → `#MaskGroupBasedCorrections`,
+  `RetouchAreas` → `#RetouchAreas`, `PointColors`, `RedEyeInfo`, `DepthBasedCorrections` de même,
+  `Look` → `Look.Name` ; `Suppression`, `Amelioration`, `Bibliotheque`, `Rotation`, `etape_id`
+  écartées (pas des réglages). Sans cette table, un masque de Claude comptait pour Dany.
+- `reprises` : `Ecriture.correctionsUtilisateur(photo, reglages)` (second paramètre facultatif :
+  les réglages déjà lus ; l'ancien appel reste), seulement sur sa propre mémoire.
+- Une valeur est à Dany si Claude ne l'a pas touchée, ou s'il l'a reprise depuis.
+- Copie virtuelle qui porte la mémoire d'une autre photo (`memoire_autre`, par
+  `proprietaireMemoire` ou `Photos.memoireEtrangere` pour une mémoire sans propriétaire) : ses
+  réglages viennent de l'original, les clés de Claude de cette mémoire restent écartées, sans
+  reprise. Une copie virtuelle qui a sa propre mémoire (Claude l'a retouchée ensuite : `garder` a
+  effacé la mémoire héritée, et le nouvel `avantClaude` n'a que cette retouche) ou aucune y ajoute
+  les clés de Claude de l'`avantClaude` de son original (`masterPhoto`, une lecture groupée de
+  plus) : ses valeurs héritées en viennent. Une copie faite avant la retouche de l'original est
+  ainsi sous-comptée, jamais mal attribuée.
+- Recadrage : lu par ses cinq clés (`CropLeft`, `CropTop`, `CropRight`, `CropBottom`,
+  `CropAngle`, `DevelopCatalogue.cropKeys`), jamais par `HasCrop` : Claude ne range dans
+  `avantClaude` que ces cinq clés quand il recadre ou redresse, et la présence de `HasCrop` dans
+  `getDevelopSettings` n'est pas constatée. Recadrée par Dany (`Habitudes.recadree`) : un bord ou
+  l'angle hors du cadre neutre (0, 0, 1, 1, 0°, à 0,001 près), sauf si Claude a touché une de ces
+  clés et que Dany n'en a repris aucune (un redressement change aussi les bords).
+- Limite connue : une reprise suivie d'une autre retouche de Claude ne se voit plus
+  (`apresClaude` ne garde que le dernier état) : la valeur reste à Claude (sous-compté plutôt que
+  mal attribué). Les retouches des anciens outils (MCP Lightroom 2.7, Claude pour Lightroom 1.6.1)
+  et d'un paramètre d'importation comptent pour Dany. La réponse le dit (`a_savoir`).
+
+**Photos écartées avant tout calcul** (comptées dans `ecartees`) : vidéos, photos de
+Développeur › Essais (elles ou leur original, `Carnet.photosDesEssais`), copies virtuelles dont le
+nom commence par « Claude », réglages illisibles, ancien processus (`ProcessVersion` dont la
+version de `DevelopCatalogue.processVersions` est sous 3, PV 2012 = « 6.7 »), photos sans retouche
+de Dany (aucun réglage mesuré hors de sa valeur neutre, ni masque, ni retouche, ni recadrage ; les
+corrections d'objectif et la balance, teinte comprise, ne comptent pas).
+
+**Statistiques** (par appareil ; par tranche d'ISO ≤ 800, ≤ 1 600, ≤ 3 200, > 3 200 pour Sharpness,
+SharpenDetail, LuminanceSmoothing, ColorNoiseReduction, GrainAmount) : chaque valeur se mesure
+par son **écart à la valeur neutre** (`DevelopSetting.neutral`, `rawDefaults` pour un RAW ou un
+DNG : netteté 40 et bruit de couleur 25) ; photos lues, part touchée (écart non nul), médiane, P25
+et P75 des écarts touchés, part du sens majoritaire, jours de prise de vue distincts des photos
+touchées. Jamais la température, ni la teinte d'un RAW ou d'un DNG (`Habitudes.mesuree`) :
+Lightroom la range en valeur absolue (en balance « Telle quelle », la teinte du boîtier, +5 à +15
+sur un Fujifilm, qui dépend de la scène) ; hors RAW, elle est relative (0 = telle quelle) et se
+mesure. Profils (avec le Look), balance telle quelle, corrections
+d'objectif, recadrage et masques : des parts, sans phrase.
+
+**Une phrase** seulement si tout tient (seuils **provisoires**, `Habitudes.minPhotos = 20`,
+`minJours = 5`, `toucheMin = 0.4`, `sensMin = 0.8`, `diviseurPas = 40`) : au moins 20 photos lues,
+touché sur au moins 5 jours et 40 % des photos, dans le même sens au moins 80 % du temps,
+P75 − P25 ≤ max(|médiane|, (max − min) / 40 de la plage du réglage). Une phrase par tranche d'ISO
+seulement si le réglage n'en a pas pour tout l'appareil. Au plus 8, les plus fortes (part touchée ×
+même sens) d'abord. Chaque phrase : `rubrique`, `constat` (« Sur tes X-H2S notées 4 ★ et plus
+(312 photos, 41 jours de prise de vue), tu baisses Hautes lumières sur 88 % d'entre elles, de −35
+en médiane (de −50 à −20 pour la moitié), dans le même sens 97 % du temps. »), `phrase_proposee`
+(« X-H2S : Hautes lumières plus bas, autour de −35. ») et `force`. Elle n'entre au guide que par
+`remember_style` avec `preference`, `category` et `confirm = true`, après l'accord de Dany.
+
+**Réponse** plafonnée : 4 appareils (les autres nommés dans `autres_appareils`), 8 réglages par
+appareil, 3 par tranche d'ISO, 3 profils ; environ 17 Ko au pire (`HabitudesTests`).
+
+**Relevé des seuils** (développement, lecture seule) : `mcp-developpeur --habitudes '<arguments
+de remember_style sans habits>'` fait la même lecture et rend tout, sans plafond : chaque appareil,
+chaque réglage et chaque tranche avec `photos`, `touchees`, `touche`, `mediane`, `p25`, `p75`,
+`meme_sens`, `jours`, `pas` et `seuils_manques` (photos, jours, touche, sens, dispersion), puis les
+phrases retenues. Un processus neuf, sans la limite de 60 s.
+
+**À constater** (l'orchestrateur, Lightroom ouvert, liaison démarrée ; lecture seule) :
+
+1. Le relevé sur les deux appareils de Dany, sortie dans un fichier, en arrière-plan :
+   `swift build && ./.build/debug/mcp-developpeur --habitudes '{"camera": "X-H2S"}' > releve-xh2s.json`,
+   puis `'{"camera": "X-T20"}'`, et `'{"camera": "X-H2S", "rating_min": 5}'`. Si la recherche
+   trouve plus de 5000 photos, le relevé ne lit que les 5000 premières (`echantillon`) : refaire sur
+   un dossier d'une année (`folder`). Regarder : combien de photos sont écartées et pourquoi
+   (`sans_retouche` surtout), `valeurs_de_claude_ecartees`, puis pour chaque réglage les
+   `seuils_manques` : un réglage que Dany touche vraiment par habitude (hautes lumières, ombres,
+   réduction du bruit à ISO élevé) doit passer ; un réglage au hasard ou laissé par défaut, non.
+   Ce relevé fixe `minPhotos`, `minJours`, `toucheMin`, `sensMin` et `diviseurPas` ; les phrases
+   sorties se montrent à Dany (« est-ce bien toi ? ») avant de lever le mot « provisoires ».
+2. La durée : le temps total du relevé divisé par `photos_lues` (estimé 3 à 10 ms par photo) ; si un
+   lot de 250 dépasse 120 s (délai de `habitudes lire`), réduire `Habitudes.lot`.
+3. Aucune écriture : `--dump <id>` et l'`editCount` (`--module reglages '{"photo": <id>}'`) d'une
+   copie d'Essais notée 4 ★, avant et après `--habitudes '{"collection": "Essais", "rating_min": 1}'` :
+   identiques ; le guide de style inchangé ; rien dans l'Historique.
+4. Le recadrage et la teinte : `--dump <id>` d'une copie d'Essais recadrée à la main, d'une autre
+   redressée par Claude (`crop.angle`), et d'un RAF jamais retouché : `CropLeft`…`CropAngle`
+   présents dans les trois (valeurs neutres 0, 0, 1, 1, 0 sur la dernière), et `Tint` du RAF non
+   nul en « As Shot » (ce qui justifie de ne pas la mesurer). Dans le relevé, `recadrees` ne doit
+   pas compter la copie redressée par Claude. Si `HasCrop` apparaît, le noter ici (rien à changer).
+5. `ProcessVersion` d'une photo d'avant 2012 au catalogue, s'il y en a (format « 5.7 » attendu,
+   d'après `processVersions`), et `cameraModel` formaté tel que `find_photos` le prend
+   (« X-H2S ») : les appareils du relevé doivent porter ce nom.
+6. Dans la fenêtre Claude, sur Essais : « comment je règle d'habitude mes belles photos ? » : un
+   seul appel `remember_style` avec `habits` (plus un rappel s'il dit « pas fini »), des phrases
+   proposées, rien ajouté sans accord.
+
+Tests : `HabitudesTests` (quantiles, attribution, écart au neutre selon le format, seuils, rafale,
+dispersion, deux sens, ISO, photos écartées, teinte d'un RAW, recadrage de Claude ou de Dany, 8 phrases, nombres, taille, lots de 250, 5000 au plus,
+guide inchangé, annulation, refus, longueur de la description) ; `essais-habitudes.lua` (aucune
+écriture, une lecture des réglages par photo, clés de Claude dans l'espace de `etatSimple`,
+reprise, copie virtuelle avec la mémoire de son original, copie retouchée ensuite par Claude,
+redressement de Claude, Essais, vidéo, 250 au plus, cible exigée,
+5000 au plus, dates refusées au-delà de 5000) ; la simulation compte chaque `getDevelopSettings`.
 
 ## 1.4 : une sortie entière, du tri à l'harmonisation
 

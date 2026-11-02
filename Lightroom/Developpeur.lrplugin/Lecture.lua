@@ -2,11 +2,13 @@
 -- paramètres prédéfinis, diagnostic du SDK, journal.
 
 local LrApplication = import 'LrApplication'
+local LrDate = import 'LrDate'
 local LrPathUtils = import 'LrPathUtils'
 local LrTasks = import 'LrTasks'
 
 local Amelioration = require 'Amelioration'
 local Bibliotheque = require 'Bibliotheque'
+local Carnet = require 'Carnet'
 local Ecriture = require 'Ecriture'
 local Json = require 'Json'
 local Liaison = require 'Liaison'
@@ -313,6 +315,202 @@ function Lecture.journal(params)
         }
     end
     return { photos = photos }
+end
+
+-- Habitudes (1.6, remember_style avec habits) : les réglages des photos notées de Dany, en lecture
+-- seule (aucune écriture, ni ordinaire ni privée), pour que le serveur en tire ses habitudes.
+--   habitudes {mode = 'liste', note_min, appareil?, collection?, dossier?, date_debut?, date_fin?,
+--              limite} → {total, photos = [id…]} : la recherche de Bibliotheque (dossier avec ses
+--              sous-dossiers), dans l'ordre de Lightroom, au plus `limite` (5000) ; au-delà de 5000
+--              photos, la recherche refuse elle-même un filtre de date.
+--   habitudes {mode = 'lire', photos = [id…] (250 au plus), cles = [clé de etatSimple…]} →
+--              {photos = [{id, appareil, iso, jour, format, virtuelle, copie, essai, video,
+--              valeurs, claude, reprises, memoire_autre}], introuvables}
+-- `claude` : les clés que Claude a touchées (avantClaude), rendues dans l'espace de etatSimple
+-- (CLES_HABITUDES) ; `reprises` : celles que Dany a reprises à la main depuis la dernière commande
+-- de Claude (correctionsUtilisateur, sur les réglages déjà lus). Une copie virtuelle qui porte la
+-- mémoire d'une autre photo (memoire_autre) garde les clés de Claude de cette mémoire (ses réglages
+-- viennent de là), sans reprises : mieux vaut écarter une valeur de Dany que lui prêter une valeur
+-- de Claude. Une copie virtuelle qui a sa propre mémoire (Claude l'a retouchée depuis, et `garder`
+-- a effacé celle héritée) ou aucune y ajoute les clés de Claude de son original : ses réglages
+-- hérités en viennent (une copie faite avant la retouche de l'original est sous-comptée).
+-- Un seul getDevelopSettings par photo.
+local MAX_HABITUDES_LUES = 250
+local MAX_HABITUDES_LISTE = 5000
+-- Clés de avantClaude (noms de Lightroom) → clés de etatSimple. Les clés de la mémoire qui ne sont
+-- pas des réglages (Suppression, Amelioration, Bibliotheque, Rotation, etape_id) n'y entrent pas.
+local CLES_HABITUDES = {
+    MaskGroupBasedCorrections = '#MaskGroupBasedCorrections', RetouchAreas = '#RetouchAreas',
+    PointColors = '#PointColors', RedEyeInfo = '#RedEyeInfo', DepthBasedCorrections = '#DepthBasedCorrections',
+    Look = 'Look.Name',
+}
+local HORS_REGLAGES = { Suppression = true, Amelioration = true, Bibliotheque = true, Rotation = true, etape_id = true }
+
+-- Les clés de Claude de ces mémoires (textes de avantClaude), réunies et triées.
+local function clesDeClaude(...)
+    local liste = Json.tableau()
+    local vues, cles = {}, {}
+    for i = 1, select('#', ...) do
+        local texte = select(i, ...)
+        if type(texte) == 'string' and texte ~= '' then
+            local ok, avant = pcall(Json.decode, texte)
+            if ok and type(avant) == 'table' then
+                for cle in pairs(avant) do
+                    if type(cle) == 'string' and not HORS_REGLAGES[cle] then
+                        local nom = CLES_HABITUDES[cle] or cle
+                        if not vues[nom] then
+                            vues[nom] = true
+                            cles[#cles + 1] = nom
+                        end
+                    end
+                end
+            end
+        end
+    end
+    table.sort(cles)
+    for _, cle in ipairs(cles) do
+        liste[#liste + 1] = cle
+    end
+    return liste
+end
+
+local function listeHabitudes(params)
+    if not params.collection and not params.dossier and not params.appareil then
+        error("Habitudes : une collection, un dossier ou un appareil (sans cela, tout le catalogue).", 0)
+    end
+    local note = tonumber(params.note_min) or 4
+    local photos = Bibliotheque.resultatsRecherche({ note_min = note, appareil = params.appareil, collection = params.collection,
+        dossier = params.dossier, sous_dossiers = true, date_debut = params.date_debut, date_fin = params.date_fin, tri = 'aucun' })
+    local limite = math.min(tonumber(params.limite) or MAX_HABITUDES_LISTE, MAX_HABITUDES_LISTE)
+    local ids = Json.tableau()
+    for i = 1, math.min(#photos, limite) do
+        ids[#ids + 1] = photos[i].localIdentifier
+    end
+    Liaison.noter(string.format("Habitudes : %d photo(s) notée(s) %d ★ et plus", #photos, note))
+    return { total = #photos, photos = ids }
+end
+
+-- La mémoire de la photo est-elle celle d'une autre (copie virtuelle) ? Le propriétaire le dit ;
+-- une mémoire sans propriétaire (d'avant ce champ) se juge par Photos.memoireEtrangere.
+local function memoireDUneAutre(photo, champs, uuid)
+    local proprietaire = champs.proprietaireMemoire
+    if type(proprietaire) == 'string' and proprietaire ~= '' then
+        return proprietaire ~= uuid
+    end
+    if type(champs.avantClaude) == 'string' and champs.avantClaude ~= '' then
+        return Photos.memoireEtrangere(photo) == true
+    end
+    return false
+end
+
+local function lireHabitudes(params)
+    local demandes = type(params.photos) == 'table' and params.photos or {}
+    if #demandes > MAX_HABITUDES_LUES then
+        error(string.format("Habitudes : %d photos au plus par lecture.", MAX_HABITUDES_LUES), 0)
+    end
+    local cles = type(params.cles) == 'table' and params.cles or {}
+    local cat = catalogue()
+    local photos, introuvables = {}, Json.tableau()
+    for _, id in ipairs(demandes) do
+        local ok, photo = LrTasks.pcall(cat.getPhotoByLocalId, cat, tonumber(id))
+        if ok and photo then
+            photos[#photos + 1] = photo
+        else
+            introuvables[#introuvables + 1] = id
+        end
+    end
+    local resultat = Json.tableau()
+    if #photos == 0 then
+        return { photos = resultat, introuvables = introuvables }
+    end
+    local okB, brutes = LrTasks.pcall(cat.batchGetRawMetadata, cat, photos,
+        { 'uuid', 'isoSpeedRating', 'dateTimeOriginal', 'fileFormat', 'isVirtualCopy', 'masterPhoto' })
+    local okF, formatees = LrTasks.pcall(cat.batchGetFormattedMetadata, cat, photos, { 'cameraModel', 'copyName' })
+    local okM, champs = LrTasks.pcall(cat.batchGetPropertyForPlugin, cat, photos, _PLUGIN, { 'avantClaude', 'proprietaireMemoire' })
+    brutes = okB and type(brutes) == 'table' and brutes or {}
+    formatees = okF and type(formatees) == 'table' and formatees or {}
+    champs = okM and type(champs) == 'table' and champs or {}
+    -- La mémoire des originaux des copies virtuelles (une seule lecture groupée).
+    local originaux, vus = {}, {}
+    for _, photo in ipairs(photos) do
+        local b = brutes[photo] or {}
+        if b.isVirtualCopy == true and b.masterPhoto and not vus[b.masterPhoto] then
+            vus[b.masterPhoto] = true
+            originaux[#originaux + 1] = b.masterPhoto
+        end
+    end
+    local memoiresOriginaux = {}
+    if #originaux > 0 then
+        local okO, lus = LrTasks.pcall(cat.batchGetPropertyForPlugin, cat, originaux, _PLUGIN, { 'avantClaude' })
+        memoiresOriginaux = okO and type(lus) == 'table' and lus or {}
+    end
+    local essais = Carnet.photosDesEssais()
+    for i, photo in ipairs(photos) do
+        local b, f, m = brutes[photo] or {}, formatees[photo] or {}, champs[photo] or {}
+        local t = tonumber(b.dateTimeOriginal)
+        local format = b.fileFormat
+        local entree = {
+            id = photo.localIdentifier,
+            appareil = (type(f.cameraModel) == 'string' and f.cameraModel ~= '') and f.cameraModel or Json.null,
+            iso = tonumber(b.isoSpeedRating) or Json.null,
+            jour = t and LrDate.timeToUserFormat(t, '%Y-%m-%d') or Json.null,
+            format = format or Json.null,
+            virtuelle = b.isVirtualCopy == true,
+            copie = (type(f.copyName) == 'string' and f.copyName ~= '') and f.copyName or Json.null,
+            video = format == 'VIDEO',
+            claude = clesDeClaude(m.avantClaude),
+            reprises = Json.tableau(),
+        }
+        if essais then
+            entree.essai = Carnet.estDansLesEssais(essais, photo, b.isVirtualCopy == true and b.masterPhoto or nil)
+        else
+            entree.essai = Carnet.estPhotoDEssai(photo)
+        end
+        local etrangere = memoireDUneAutre(photo, m, b.uuid)
+        entree.memoire_autre = etrangere
+        if b.isVirtualCopy == true and b.masterPhoto and not etrangere then
+            local o = memoiresOriginaux[b.masterPhoto] or {}
+            entree.claude = clesDeClaude(m.avantClaude, o.avantClaude)
+        end
+        if not entree.video then
+            local lu, reglages = LrTasks.pcall(photo.getDevelopSettings, photo)
+            if lu and type(reglages) == 'table' then
+                local etat = Ecriture.etatSimple(reglages)
+                local valeurs = {}
+                for _, cle in ipairs(cles) do
+                    local v = etat[tostring(cle)]
+                    if v ~= nil then
+                        valeurs[tostring(cle)] = v
+                    end
+                end
+                entree.valeurs = valeurs
+                if not etrangere and #entree.claude > 0 then
+                    local okC, corrections = LrTasks.pcall(Ecriture.correctionsUtilisateur, photo, reglages)
+                    if okC and type(corrections) == 'table' then
+                        for _, c in ipairs(corrections.changements or {}) do
+                            entree.reprises[#entree.reprises + 1] = c.cle
+                        end
+                    end
+                end
+            else
+                entree.erreur = "réglages illisibles"
+            end
+        end
+        resultat[#resultat + 1] = entree
+        if i % 25 == 0 then
+            Photos.rendreLaMain()
+        end
+    end
+    return { photos = resultat, introuvables = introuvables }
+end
+
+function Lecture.habitudes(params)
+    if params.mode == 'liste' then
+        return listeHabitudes(params)
+    elseif params.mode == 'lire' then
+        return lireHabitudes(params)
+    end
+    error("Habitudes : mode « liste » ou « lire ».", 0)
 end
 
 return Lecture
