@@ -152,7 +152,7 @@ essai('Consignes : invites Portrait, Paysage et Noir et blanc, éclaircir et ass
     vrai(not vues.retouche_pro.message:find('tireur', 1, true), 'retouche pro inchangée')
     -- La méthode reste au connecteur (en-tête de Consignes.lua) : rien dans les consignes.
     vrai(not Consignes.texte:find('tireur', 1, true), 'consignes sans la méthode du tireur')
-    egal(7, #Consignes.invites)
+    egal(8, #Consignes.invites)
 end)
 
 essai('Consignes : invite Composition (1.3), avant Sports, sans chiffre ; le cadre proposé, jamais appliqué', function()
@@ -160,7 +160,7 @@ essai('Consignes : invite Composition (1.3), avant Sports, sans chiffre ; le cad
     for _, invite in ipairs(Consignes.invites) do
         ids[#ids + 1] = invite.id
     end
-    egal('retouche_pro portrait paysage noir_et_blanc iso_eleve composition sports', table.concat(ids, ' '))
+    egal('retouche_pro portrait paysage noir_et_blanc iso_eleve composition sports classer', table.concat(ids, ' '))
     local composition = Consignes.invites[6]
     egal('Composition', composition.titre)
     egal(nil, composition.modele, 'le modèle des préférences')
@@ -169,6 +169,25 @@ essai('Consignes : invite Composition (1.3), avant Sports, sans chiffre ; le cad
         contient(composition.message, morceau, 'invite Composition')
     end
     vrai(not composition.message:find('%d'), 'invite Composition sans chiffre')
+end)
+
+essai("Consignes : invite Classer (après la 1.6), la dernière ; mots-clés, lieu et légende proposés, rien d'écrit sans accord", function()
+    local classer = Consignes.invite('classer')
+    egal(Consignes.invites[#Consignes.invites], classer, 'la dernière invite')
+    egal('Classer', classer.titre)
+    egal(nil, classer.modele, 'le modèle des préférences')
+    for _, morceau in ipairs({ 'photo active', "sans rien écrire d'abord", 'view_photo', 'get_settings', 'list_keywords',
+        "un lieu seulement s'il est sûr", 'position GPS', 'jamais deviné', 'légende courte', 'attends mon accord avant set_metadata',
+        'même en mode Appliquer' }) do
+        contient(classer.message, morceau, 'invite Classer')
+    end
+    vrai(not classer.message:find('%d'), 'invite Classer sans chiffre')
+    local bas = classer.message:lower()
+    for _, mot in ipairs({ 'client', 'galerie', 'concours', 'mariage', 'photoshop', 'note', 'libellé' }) do
+        vrai(not bas:find(mot, 1, true), 'invite Classer sans « ' .. mot .. ' »')
+    end
+    -- Pour la Demande rapide : chaque photo sélectionnée.
+    contient(Consignes.surLaSelection(classer.message), 'Classe chaque photo', 'Classer sur la sélection')
 end)
 
 essai('Consignes : le texte de la fenêtre, lu à chaque demande, fait 7 500 caractères au plus (1.3)', function()

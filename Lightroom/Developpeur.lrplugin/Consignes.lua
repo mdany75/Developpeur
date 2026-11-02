@@ -133,12 +133,20 @@ Consignes.invites = {
     { id = 'iso_eleve', titre = "ISO élevé",
         message = "Retouche cette photo prise à ISO élevé : le bruit d'abord (débruitage IA s'il est fort), puis les ombres, les couleurs et la netteté, sans lisser les détails." },
     -- Composition (1.3) : lue sur l'image entière (read_composition), le cadre proposé et montré,
-    -- appliqué seulement par Accepter ; sans chiffre, comme les autres invites. Avant Sports : Sports
-    -- reste la dernière invite (le menu Style est sous le champ, avec son étiquette).
+    -- appliqué seulement par Accepter ; sans chiffre, comme les autres invites. Avant Sports (le menu
+    -- Style est sous le champ, avec son étiquette).
     { id = 'composition', titre = "Composition",
         message = "Lis la composition de la photo active (horizon, tiers, espace devant le sujet) et propose un recadrage, sans l'appliquer ; dis la règle en une phrase." },
     { id = 'sports', titre = "Sports",
         message = "Retouche cette photo de sport : le sujet en action d'abord (exposition, contraste et netteté sur lui), couleurs fidèles des maillots et du terrain, arrière-plan calmé ; bruit si l'ISO est élevé ; recadrage serré sur l'action seulement s'il y gagne nettement, et dis-le." },
+    -- Classer (correctif après la 1.6, point « Le Suivi et le classement : fonctions faites, mais
+    -- sans bouton » de la page Analyse) : mots-clés, lieu et légende proposés, jamais écrits sans
+    -- l'accord de Dany, quel que soit le mode du module (« Proposer d'abord » par défaut). Le lieu
+    -- seulement s'il est sûr (position GPS ou mot-clé de lieu déjà posé). Après Sports, la dernière
+    -- invite ; aussi le 4ᵉ bouton de la Demande rapide (FenetreRapide.ACTIONS). Pendant du
+    -- connecteur : l'invite classer (Prompts.classer).
+    { id = 'classer', titre = "Classer",
+        message = "Classe la photo active, sans rien écrire d'abord : regarde-la (view_photo) et lis son classement (get_settings), puis propose des mots-clés, en reprenant ceux du catalogue (list_keywords), un lieu seulement s'il est sûr (position GPS ou mot-clé de lieu déjà posé, jamais deviné) et une légende courte. Montre ta proposition et attends mon accord avant set_metadata, même en mode Appliquer." },
 }
 
 -- Les styles du menu Style (sous les invites) : leur définition part avec chaque demande.
@@ -328,8 +336,8 @@ Consignes.rapidePhoto = "[Demande rapide] Une seule demande, faite depuis la fen
 -- Les boutons de la Demande rapide, à gauche du champ (FenetreRapide.ACTIONS, demandés par Dany le
 -- 24 octobre 2026), visent toutes les photos sélectionnées, comme une demande tapée : le premier
 -- les note et pose les notes de Claude (le clic vaut la demande, comme « note ces photos ») ; les
--- deux autres reprennent les invites Retouche pro et Portrait (Consignes.invite : une seule copie
--- de leurs messages), pour chaque photo sélectionnée (Consignes.surLaSelection).
+-- trois autres reprennent les invites Retouche pro, Portrait et Classer (Consignes.invite : une
+-- seule copie de leurs messages), pour chaque photo sélectionnée (Consignes.surLaSelection).
 Consignes.noterRapide = "Note chaque photo sélectionnée selon le standard de notation, même déjà évaluée : cull_photos avec selection = true, view_photo avec af_point = true sur chacune (plus de 30 photos : planche par planche, puce Notes de tes consignes), puis propose_ratings avec apply = true pour poser les notes. Dis chaque note posée et sa raison en une phrase."
 
 function Consignes.invite(id)

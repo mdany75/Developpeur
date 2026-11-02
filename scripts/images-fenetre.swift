@@ -456,6 +456,15 @@ func dessins(_ p: Palette) -> [String: Dessin] {
         ]),
         etincelle,
     ])
+    // Classer (après la 1.6) : une étiquette à son œillet, deux lignes de légende dessus, à l'encre du
+    // texte, avec la même étincelle.
+    d["rapide-classer"] = ensemble([
+        icone(boite: B24, couleur: p["texte"], trait: 1.4, traits: [
+            trace("M2.5 7.5A1.5 1.5 0 0 1 4 6H11.2L19.5 14.3L12.8 21L2.5 10.7Z"), cercle(6.2, 9.3, 1.2),
+            trace("M9.6 12.6L13.6 16.6"), trace("M11.6 10.6L15.6 14.6"),
+        ]),
+        etincelle,
+    ])
 
     return d
 }

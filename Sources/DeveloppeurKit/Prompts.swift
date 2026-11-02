@@ -35,7 +35,7 @@ public enum Prompts {
         return texte
     }
 
-    public static let all: [PromptTemplate] = [retouchePro, aMaFacon, harmoniserSerie, triSeance, noter, portrait, paysage, noirEtBlanc, nuitIsoEleve, partage]
+    public static let all: [PromptTemplate] = [retouchePro, aMaFacon, harmoniserSerie, triSeance, noter, classer, portrait, paysage, noirEtBlanc, nuitIsoEleve, partage]
 
     private static let styleArgument = PromptTemplate.Argument(
         name: "style",
@@ -169,6 +169,29 @@ public enum Prompts {
             Standard de notation (aussi : ressource developpeur://notation, propose_ratings avec read_standard) :
 
             \(Notation.standard)
+            """
+        })
+
+    /// Classer (après la 1.6) : mots-clés, lieu et légende proposés, écrits seulement après l'accord
+    /// de l'utilisateur, quel que soit le mode du module (« Proposer d'abord » par défaut). Pendant
+    /// du bouton Classer de la fenêtre Claude et de la Demande rapide (Consignes.lua).
+    public static let classer = PromptTemplate(
+        name: "classer",
+        description: "Classer des photos : mots-clés (ceux du catalogue d'abord), lieu seulement s'il est sûr et légende courte, proposés ; rien n'est écrit sans l'accord de l'utilisateur.",
+        arguments: [
+            .init(name: "photos", description: "Quelles photos : « la photo active » (défaut), « la sélection », une collection ou un dossier."),
+        ],
+        render: { arguments in
+            let quoi = argument(arguments, "photos").map { "Photos : \($0)." } ?? "Photos : la photo active de Lightroom (ou la sélection, si l'utilisateur le dit)."
+            return """
+            Classe des photos de Lightroom Classic : propose des mots-clés, un lieu et une légende, sans rien écrire avant l'accord de l'utilisateur, même en mode Appliquer. \(quoi) Ce sont ses photos personnelles : des mots simples, pour les retrouver.
+
+            1. view_photo sur chaque photo (Vision : sujets, scène) et get_settings › classement : mots-clés, légende, champs IPTC et position GPS déjà posés.
+            2. Mots-clés : list_keywords (query) pour reprendre ceux du catalogue, avec leur chemin (« Lieux > Canada > Montréal ») ; un nouveau mot-clé seulement s'il manque, au bon endroit de la hiérarchie. Quelques mots justes (sujet, scène, saison, activité), pas une liste.
+            3. Lieu (iptc : sublocation, city, state, country) seulement s'il est sûr : d'après la position GPS de la photo ou un mot-clé de lieu déjà posé ; jamais deviné d'après l'image. Sans rien de sûr, ne propose pas de lieu et dis-le.
+            4. Légende (caption) : une phrase courte qui dit ce que montre la photo ; une légende déjà écrite par l'utilisateur reste, sauf s'il demande de la changer.
+            5. Montre la proposition, photo par photo (mots-clés à ajouter, lieu, légende), et attends son accord ; il peut en retirer ou en changer.
+            6. Après son accord seulement : set_metadata (mots-clés à ajouter, iptc, caption) avec une reason, et confirm = true en mode « Proposer d'abord » ; undo_last défait le classement d'une photo.
             """
         })
 

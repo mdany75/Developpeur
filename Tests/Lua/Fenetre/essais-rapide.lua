@@ -234,6 +234,59 @@ essai("Les boutons à icône à gauche du champ, sans ♻ ; le titre de la fenê
     vrai(FenetreRapide.reinitialiser == nil, 'plus de reinitialiser')
 end)
 
+essai("Le 4ᵉ bouton, Classer : sa demande part avec le message de l'invite classer, pour chaque photo ; le bouton n'écrit rien au catalogue", function()
+    local classer = Consignes.invite('classer')
+    egal(4, #FenetreRapide.ACTIONS, 'quatre boutons à icône')
+    local action = FenetreRapide.ACTIONS[4]
+    egal('rapide-classer', action.icone)
+    egal(Consignes.surLaSelection(classer.message), action.message, "le message de l'invite classer, pour chaque photo")
+    contient(action.tooltip, "rien d'écrit sans ton accord", 'infobulle')
+    -- Plusieurs photos sélectionnées ; toute écriture au catalogue (ordinaire ou privée) et tout
+    -- champ ou mot-clé posé sur une photo est compté.
+    photo(971)
+    photo(972)
+    depart({})
+    choisir(971, 972)
+    local ecritures, poses = 0, {}
+    S.catalogue.withWriteAccessDo = function() ecritures = ecritures + 1 end
+    for _, id in ipairs({ 971, 972 }) do
+        for _, f in ipairs({ 'setRawMetadata', 'addKeyword', 'removeKeyword' }) do
+            photos[id][f] = function() poses[#poses + 1] = f end
+        end
+    end
+    local privees = S.ecrituresPrivees or 0
+    local bouton, taches
+    S.pendantFenetre = function(args)
+        local pas = FenetreRapide.CARRE + FenetreRapide.ESPACE
+        for _, v in ipairs(vues(args.contents)) do
+            if v.vue.genre == 'square_button' and v.vue.args.image_name and v.marge == 3 * pas then
+                bouton = v.vue
+            end
+        end
+        vrai(bouton, 'le 4ᵉ carré, à la suite des trois autres')
+        egal(FenetreRapide.CARRE, bouton.args.width, 'même taille')
+        egal(FenetreRapide.HAUTEUR_DEMANDE, bouton.args.height, 'même hauteur')
+        egal(action.tooltip, bouton.args.tooltip)
+        contient(bouton.args.image_name, 'rapide-classer', 'son icône')
+        taches = #S.taches
+        bouton.args.action()
+    end
+    FenetreRapide.afficher()
+    S.pendantFenetre = nil
+    vrai(taches and #S.taches > taches, 'la demande part dans une tâche')
+    local recu = #recus
+    S.taches[taches + 1]()
+    vrai(#recus > recu, 'Claude Code reçoit la demande')
+    local message = recus[#recus].message
+    contient(message, Consignes.surLaSelection(classer.message), "le texte de l'invite classer")
+    contient(message, Consignes.rapide, 'comme une demande rapide sur plusieurs photos')
+    egal(0, ecritures, 'aucune écriture au catalogue')
+    egal(privees, S.ecrituresPrivees or 0, 'aucune écriture privée')
+    egal(0, #poses, 'aucun champ ni mot-clé posé')
+    repondre('Proposition : mots-clés « lac », « automne ».')
+    S.catalogue.withWriteAccessDo = nil
+end)
+
 essai("Le texte de la fenêtre vide (case Autre photo cochée comprise) tient en entier dans la zone du résultat, sans ▼", function()
     depart({})
     contient(FenetreRapide.VIDE, 'Pour une photo seule (case Autre photo cochée), elle part dans sa conversation')

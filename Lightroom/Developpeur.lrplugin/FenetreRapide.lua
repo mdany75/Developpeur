@@ -1,7 +1,7 @@
 -- FenetreRapide.lua : la fenêtre Demande rapide (Fichier ou Bibliothèque › Module externe - Extras
 -- › Demande rapide, ⌘⌃⌥C ; demandée par Dany le 22 octobre 2026) : le résultat page par page, une
--- demande de 3 lignes, à sa gauche trois boutons à icône (noter, Retouche pro, Portrait ; 24 octobre
--- 2026), à sa droite ▲, ▼ et Envoyer, dans une fenêtre d'environ 1 000 × 250 points ; Retour envoie,
+-- demande de 3 lignes, à sa gauche quatre boutons à icône (noter, Retouche pro, Portrait ; 24 octobre
+-- 2026 ; Classer après la 1.6), à sa droite ▲, ▼ et Envoyer, dans une fenêtre d'environ 1 000 × 250 points ; Retour envoie,
 -- comme dans la fenêtre Claude (champ à `immediate = false` : Retour le valide). Depuis le correctif
 -- 1.3.6 (« une photo, une conversation », décidé avec Dany le 25 octobre 2026), une demande sur une
 -- photo seule part dans la conversation de la photo, la même que la fenêtre Claude, gardée, où elle
@@ -50,11 +50,15 @@ FenetreRapide.FLECHE = 14
 -- Les boutons à gauche de la demande, carrés de la hauteur de sa boîte, chacun une demande toute
 -- faite pour toutes les photos sélectionnées (demandés par Dany le 24 octobre 2026, à droite de ♻,
 -- puis à sa place quand il est retiré le même soir) : noter et poser les notes de Claude, Retouche
--- pro et Portrait (les messages des invites de la fenêtre Claude, pour chaque photo). Icônes de
--- Dispositions.IMAGES ; ESPACE : l'écart entre deux carrés (un carré de 55 a un cadre de 57).
+-- pro et Portrait (les messages des invites de la fenêtre Claude, pour chaque photo) ; puis Classer
+-- (après la 1.6, point « Le Suivi et le classement » de la page Analyse) : mots-clés, lieu et
+-- légende proposés, rien d'écrit sans l'accord de Dany (l'invite le demande, quel que soit le mode
+-- du module) ; le bouton lui-même n'écrit rien. Icônes de Dispositions.IMAGES ; ESPACE : l'écart
+-- entre deux carrés (un carré de 55 a un cadre de 57). Quatre carrés laissent au champ 654 points.
 FenetreRapide.CARRE = FenetreRapide.HAUTEUR_DEMANDE
 FenetreRapide.ESPACE = 6
 local retouchePro, portrait = Consignes.invite('retouche_pro'), Consignes.invite('portrait')
+local classer = Consignes.invite('classer')
 FenetreRapide.ACTIONS = {
     { icone = 'rapide-noter', message = Consignes.noterRapide,
         tooltip = "Noter les photos sélectionnées : Claude pose ses notes (0 à 5 ★, ou rejet)" },
@@ -62,6 +66,8 @@ FenetreRapide.ACTIONS = {
         tooltip = retouchePro.titre .. ", pour chaque photo sélectionnée : " .. retouchePro.message },
     { icone = 'rapide-portrait', message = Consignes.surLaSelection(portrait.message),
         tooltip = portrait.titre .. ", pour chaque photo sélectionnée : " .. portrait.message },
+    { icone = 'rapide-classer', message = Consignes.surLaSelection(classer.message),
+        tooltip = "Classer les photos sélectionnées : mots-clés, lieu et légende proposés, rien d'écrit sans ton accord" },
 }
 -- La zone du résultat : toute la hauteur au-dessus de la demande (relevé le 22 octobre 2026 : 988 ×
 -- 248 pour 984 × 214, d'où 996 × 216 pour 1 000 × 250), sans barre de défilement : ▲ et ▼ y

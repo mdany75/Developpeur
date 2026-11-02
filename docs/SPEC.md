@@ -494,8 +494,8 @@ passe. Ce qui reste à voir est dans À constater dans Lightroom (1.2).
 
 ## Consignes et invites
 
-`ServerInfo.instructions` donne à Claude la méthode de travail ; les dix invites de
-`Prompts.swift` (`retouche_pro`, `a_ma_facon`, `harmoniser_serie`, `tri_seance`, `noter`, `portrait`,
+`ServerInfo.instructions` donne à Claude la méthode de travail ; les onze invites de
+`Prompts.swift` (`retouche_pro`, `a_ma_facon`, `harmoniser_serie`, `tri_seance`, `noter`, `classer`, `portrait`,
 `paysage`, `noir_et_blanc`, `nuit_iso_eleve`, `partage`) l'appliquent à un cas, `retouche_pro` et
 `harmoniser_serie` pas à pas, `noter` passe par passe selon le standard de notation (voir
 Notation). Depuis le correctif 1.3.2, les consignes disent « noter : propose_ratings (0 à 5 ★,
@@ -1522,7 +1522,7 @@ droite l'activité de Claude (orange) ou le relevé du forfait. Un clic sur une 
 `Fenetre.sorteDeClic` (`Fenetre.clics`) : image, ligne du carnet, leçon, étape, sinon détail de
 l'outil.
 
-**Saisie** (`Vues.saisie`) : les sept invites en carrés (bezel 24, `Vues.invites` ; ni « ★ Noter »
+**Saisie** (`Vues.saisie`) : les huit invites en carrés (Classer, la dernière, après la 1.6) (bezel 24, `Vues.invites` ; ni « ★ Noter »
 ni séparateur), le champ de demande sur deux lignes (`immediate = false`), puis 📎 et 📋 (carrés à
 icône seule, `image_name`), l'étiquette « Style » et son menu (décision de Dany après le lot B3 :
 comme la maquette, à la place du « sans étiquette » du 20 octobre 2026), le menu Mes demandes (280,
@@ -2328,12 +2328,17 @@ change). Ses pièces sont superposées (`place = 'overlapping'`) et placées par
 `margin_left` : le résultat page par page (`FenetreRapide.montrer`, `Fil.couper`, 9 lignes de 13
 points ; ▲ ▼ en `push_button` mini, une page moins une ligne par clic), la demande de trois lignes
 (`immediate = false` : Retour l'envoie après `FenetreRapide.DELAI_ENVOI`, 0,3 s, sauf un clic qui
-suit), puis ▲ ▼ et Envoyer à sa droite. À sa gauche, trois carrés à icône de 55
-(`FenetreRapide.CARRE`, `FenetreRapide.ACTIONS`, demandés par Dany le 24 octobre 2026 : images
-`rapide-noter`, `rapide-retouche`, `rapide-portrait`), chacun une demande toute faite par
-`FenetreRapide.demander`, le champ laissé tel quel : noter (`Consignes.noterRapide` :
-`propose_ratings` avec `apply`, le clic vaut la demande), Retouche pro et Portrait
-(`Consignes.invite`, pour chaque photo par `Consignes.surLaSelection`). Le bouton ♻ (une
+suit), puis ▲ ▼ et Envoyer à sa droite. À sa gauche, quatre carrés à icône de 55
+(`FenetreRapide.CARRE`, `FenetreRapide.ACTIONS`, demandés par Dany le 24 octobre 2026, Classer après
+la 1.6 : images `rapide-noter`, `rapide-retouche`, `rapide-portrait`, `rapide-classer`), chacun une
+demande toute faite par `FenetreRapide.demander`, le champ laissé tel quel : noter
+(`Consignes.noterRapide` : `propose_ratings` avec `apply`, le clic vaut la demande), Retouche pro,
+Portrait et Classer (`Consignes.invite`, pour chaque photo par `Consignes.surLaSelection`). Classer
+(pendant du connecteur : l'invite `classer`) fait proposer mots-clés (`list_keywords` d'abord), lieu
+(seulement d'après la position GPS ou un mot-clé de lieu déjà posé) et légende courte, et rien
+n'est écrit (`set_metadata`) sans l'accord de Dany, quel que soit le mode du module ; le bouton
+lui-même n'écrit rien au catalogue (`essais-rapide.lua`). Sur plusieurs photos, la conversation
+n'est pas gardée : l'accord se donne par une nouvelle demande. Le champ garde 654 points. Le bouton ♻ (une
 conversation neuve, du 22 au 24 octobre 2026) est retiré : une autre photo active ou une autre
 sélection efface la réponse (`FenetreRapide.suivreSelection`, `Lightroom.photos` toutes les 2 s,
 `Moteur.oublierRapide`), le champ gardé ; une sélection changée pendant le travail de Claude ou
