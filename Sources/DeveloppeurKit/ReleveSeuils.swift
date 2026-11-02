@@ -9,15 +9,16 @@ import Vision
 /// `docs/SPEC.md`, Relevé des seuils provisoires). Quatre temps, chacun sa sous-commande :
 ///
 /// 1. `--echantillons <suivi.json> <dossier>` : tire les lots de photos dans le relevé du Suivi,
-///    lu seulement (originaux Fujifilm, sans les photos retouchées par Claude), au hasard mais de
-///    façon reproductible (graine fixe). Ni Lightroom ni image.
+///    lu seulement (originaux Fujifilm d'un seul catalogue, sans les photos retouchées par Claude),
+///    au hasard mais de façon reproductible (graine fixe). Ni Lightroom ni image.
 /// 2. `--collecter <lot.json> <dossier>` : demande au module les vignettes du lot (commande
 ///    `vignettes`, par lots de 10 à 20, 1 024 px par défaut), les copie dans le dossier puis retire
-///    les JPEG temporaires du module ; garde ce que le catalogue dit de chaque photo (heure exacte,
+///    les JPEG temporaires du module, chaque vignette couchée remise à l'endroit comme le fait le
+///    Suivi (`Images.redresser`) ; garde ce que le catalogue dit de chaque photo (heure exacte,
 ///    ISO, ouverture, vitesse, compensation, flash : la description de `vignettes`, pas
-///    `suivi.json`, qui est à la minute et sans compensation ni flash) et si sa note vient de Claude
-///    (commande `journal`). Deux lectures seulement : rien n'est écrit dans le catalogue ; Lightroom
-///    peut rendre un aperçu qui manque.
+///    `suivi.json`, qui est à la minute et sans compensation ni flash) et si la note de sa famille
+///    vient de Claude (commande `journal`, inconnu s'il échoue). Deux lectures seulement : rien
+///    n'est écrit dans le catalogue ; Lightroom peut rendre un aperçu qui manque.
 /// 3. `--mesurer <dossier>` : mesure les vignettes copiées, sans Lightroom : les mesures du Suivi
 ///    (`Suivi.analyserPhoto`), l'écrêtage par la gamme rejoué à d'autres bornes, les points chauds
 ///    rejoués à d'autres seuils, la peau du plus grand visage (Teint), et, d'une photo à la suivante
@@ -74,10 +75,15 @@ public enum ReleveSeuils {
         rest.removeFirst()
         // Options communes : --graine, --taille, --par.
         var graine = graineDefaut, taille = tailleDefaut, parLot = parLotDefaut
+        var catalogueDemande: String?
         var positionnels: [String] = []
         while !rest.isEmpty {
             let item = rest.removeFirst()
             switch item {
+            case "--catalogue":
+                guard let valeur = rest.first else { return refus("--catalogue attend le chemin d'un catalogue de suivi.json.") }
+                rest.removeFirst()
+                catalogueDemande = valeur
             case "--graine", "--taille", "--par":
                 guard let valeur = rest.first.flatMap({ Int($0) }) else { return refus("\(item) attend un nombre entier.") }
                 rest.removeFirst()
@@ -98,8 +104,13 @@ public enum ReleveSeuils {
                 guard positionnels.count == 2 else { return refus("--echantillons <suivi.json> <dossier>") }
                 let donnees = try Data(contentsOf: URL(fileURLWithPath: positionnels[0]))
                 let suivi = try JSONCoding.parse(donnees)
-                let lots = echantillons(suivi, graine: graine)
-                try ecrireLots(lots, graine: graine, dans: URL(fileURLWithPath: positionnels[1]), dire: dire)
+                let catalogue: String
+                switch choisirCatalogue(suivi, catalogueDemande) {
+                case .success(let chemin): catalogue = chemin
+                case .failure(let erreur): return refus(erreur.localizedDescription)
+                }
+                let lots = echantillons(suivi, graine: graine, catalogue: catalogue)
+                try ecrireLots(lots, graine: graine, catalogue: catalogue, dans: URL(fileURLWithPath: positionnels[1]), dire: dire)
             case "--collecter":
                 guard positionnels.count == 2 else { return refus("--collecter <lot.json> <dossier>") }
                 let lot = try JSONCoding.parse(Data(contentsOf: URL(fileURLWithPath: positionnels[0])))
@@ -130,7 +141,7 @@ public enum ReleveSeuils {
     }
 
     public static let aide = """
-    mcp-developpeur --mesures --echantillons <suivi.json> <dossier> [--graine <n>]
+    mcp-developpeur --mesures --echantillons <suivi.json> <dossier> [--graine <n>] [--catalogue <chemin du .lrcat>]
     mcp-developpeur --mesures --collecter <lot.json> <dossier> [--taille <px, 1024>] [--par <10 à 20, 15>]
     mcp-developpeur --mesures --mesurer <dossier>
     mcp-developpeur --mesures --fichiers <dossier> <fichier.jpg>…
@@ -141,6 +152,13 @@ public enum ReleveSeuils {
     /// Une photo du relevé du Suivi, candidate à un lot.
     struct Candidate: Equatable {
         var id: Int
+        /// L'uuid et le nom du fichier de l'original dans suivi.json : la collecte vérifie que l'id
+        /// désigne encore la même photo dans le catalogue ouvert.
+        var uuid: String? = nil
+        var fichier: String? = nil
+        /// Les copies virtuelles de la famille (`vues` de suivi.json) : la note de suivi.json est la
+        /// plus haute de la famille, la collecte lit donc aussi leur journal.
+        var copies: [Int] = []
         var appareil: String
         var iso: Double?
         /// « 2015-07-25 18:08 » (à la minute) ; seulement pour tirer.
@@ -176,21 +194,48 @@ public enum ReleveSeuils {
         return appareils.first { $0 == nom }
     }
 
-    /// Les originaux Fujifilm du relevé du Suivi, triés par id, sans ceux que Claude a retouchés.
-    static func candidates(_ suivi: JSONValue) -> [Candidate] {
+    struct ErreurCatalogue: LocalizedError {
+        var errorDescription: String?
+    }
+
+    /// Le catalogue de suivi.json dont tirer les lots : celui que donne `--catalogue`, sinon le seul.
+    /// Plusieurs catalogues sans `--catalogue` : refus, car leurs identifiants se recouvrent (un id
+    /// tiré d'un autre catalogue désignerait une autre photo dans le catalogue ouvert).
+    static func choisirCatalogue(_ suivi: JSONValue, _ demande: String?) -> Result<String, ErreurCatalogue> {
+        let chemins = (suivi["catalogues"]?.object ?? [:]).keys.sorted()
+        if let demande {
+            return chemins.contains(demande) ? .success(demande)
+                : .failure(ErreurCatalogue(errorDescription: "Catalogue absent de suivi.json : \(demande). Catalogues : \(chemins.joined(separator: " ; "))."))
+        }
+        switch chemins.count {
+        case 1: return .success(chemins[0])
+        case 0: return .failure(ErreurCatalogue(errorDescription: "suivi.json n'a aucun catalogue."))
+        default:
+            return .failure(ErreurCatalogue(errorDescription: "suivi.json a \(chemins.count) catalogues : choisir celui qui est ouvert dans Lightroom par --catalogue <chemin> (\(chemins.joined(separator: " ; ")))."))
+        }
+    }
+
+    /// Les originaux Fujifilm du catalogue `catalogue` de suivi.json (nil : le seul, sinon aucun),
+    /// triés par id, sans ceux que Claude a retouchés.
+    static func candidates(_ suivi: JSONValue, catalogue: String? = nil) -> [Candidate] {
+        guard let chemin = catalogue ?? (try? choisirCatalogue(suivi, nil).get()),
+              let photos = suivi["catalogues"]?[chemin]?["photos"]?.object else { return [] }
         var liste: [Candidate] = []
-        for (_, catalogue) in suivi["catalogues"]?.object ?? [:] {
-            for (cle, entree) in catalogue["photos"]?.object ?? [:] {
-                guard entree["retouchee_par_claude"]?.bool != true,
-                      let id = entree["original"]?.int ?? Int(cle),
-                      let appareil = appareilReleve(entree["prise_de_vue"]?["appareil"]?.string) else { continue }
-                let analyse = entree["analyse"]
-                liste.append(Candidate(id: id, appareil: appareil, iso: entree["prise_de_vue"]?["iso"]?.double,
-                                       le: entree["prise_de_vue"]?["le"]?.string, note: entree["note"]?.int,
-                                       genre: analyse?["genre"]?.string,
-                                       cherches: Set((analyse?["cherches"]?.array ?? []).compactMap(\.string)),
-                                       defauts: Set((analyse?["defauts"]?.array ?? []).compactMap(\.string))))
+        for (cle, entree) in photos {
+            guard entree["retouchee_par_claude"]?.bool != true,
+                  let id = entree["original"]?.int ?? Int(cle),
+                  let appareil = appareilReleve(entree["prise_de_vue"]?["appareil"]?.string) else { continue }
+            let analyse = entree["analyse"]
+            let copies = (entree["vues"]?.array ?? []).compactMap { vue -> Int? in
+                guard vue["copie_virtuelle"]?.bool == true, let v = vue["id"]?.int, v != id else { return nil }
+                return v
             }
+            liste.append(Candidate(id: id, uuid: entree["uuid"]?.string, fichier: entree["fichier"]?.string,
+                                   copies: copies.sorted(), appareil: appareil, iso: entree["prise_de_vue"]?["iso"]?.double,
+                                   le: entree["prise_de_vue"]?["le"]?.string, note: entree["note"]?.int,
+                                   genre: analyse?["genre"]?.string,
+                                   cherches: Set((analyse?["cherches"]?.array ?? []).compactMap(\.string)),
+                                   defauts: Set((analyse?["defauts"]?.array ?? []).compactMap(\.string))))
         }
         return liste.sorted { $0.id < $1.id }
     }
@@ -226,8 +271,8 @@ public enum ReleveSeuils {
     /// (le X-T4 compris), A2 sous-exposition, A3 ciel brûlé, A4 couleurs hors gamme, A5 points chauds,
     /// A6 journées entières (groupes de lumière), A7 candidates de l'éclairage mixte (à trier à
     /// l'œil), A8 suites de portraits (teint). Une photo n'est qu'une fois dans un lot.
-    static func echantillons(_ suivi: JSONValue, graine: UInt64) -> [Lot] {
-        let tout = candidates(suivi)
+    static func echantillons(_ suivi: JSONValue, graine: UInt64, catalogue: String? = nil) -> [Lot] {
+        let tout = candidates(suivi, catalogue: catalogue)
         var lots: [Lot] = []
         func nouveau(_ nom: String, _ but: String, _ remplir: (inout Hasard, inout [(photo: Candidate, groupe: String)], (Candidate) -> Bool) -> Void) {
             var hasard = Hasard(etat: graine &+ UInt64(lots.count + 1) &* 0x2545_F491_4F6C_DD1D)
@@ -323,12 +368,15 @@ public enum ReleveSeuils {
         return lots
     }
 
-    static func json(_ lot: Lot, graine: UInt64) -> JSONValue {
-        [
+    static func json(_ lot: Lot, graine: UInt64, catalogue: String? = nil) -> JSONValue {
+        var lotJSON: [String: JSONValue] = [
             "lot": .string(lot.nom), "but": .string(lot.but), "graine": .number(Double(graine)),
             "photos": .array(lot.photos.map { element in
                 var objet: [String: JSONValue] = ["id": .number(Double(element.photo.id)), "groupe": .string(element.groupe),
                                                   "appareil": .string(element.photo.appareil)]
+                if let uuid = element.photo.uuid { objet["uuid"] = .string(uuid) }
+                if let fichier = element.photo.fichier { objet["fichier"] = .string(fichier) }
+                if !element.photo.copies.isEmpty { objet["copies"] = .array(element.photo.copies.map { .number(Double($0)) }) }
                 if let iso = element.photo.iso { objet["iso"] = .number(iso) }
                 if let le = element.photo.le { objet["le"] = .string(le) }
                 if let note = element.photo.note { objet["note_suivi"] = .number(Double(note)) }
@@ -337,16 +385,19 @@ public enum ReleveSeuils {
                 return .object(objet)
             }),
         ]
+        if let catalogue { lotJSON["catalogue"] = .string(catalogue) }
+        return .object(lotJSON)
     }
 
-    static func ecrireLots(_ lots: [Lot], graine: UInt64, dans dossier: URL, dire: (String) -> Void) throws {
+    static func ecrireLots(_ lots: [Lot], graine: UInt64, catalogue: String? = nil, dans dossier: URL, dire: (String) -> Void) throws {
         let dossierLots = dossier.appendingPathComponent("lots")
         try FileManager.default.createDirectory(at: dossierLots, withIntermediateDirectories: true)
         var texte: [String] = ["Échantillons du relevé des seuils (graine \(graine)), tirés de suivi.json, lu seulement :",
-                               "originaux \(appareils.joined(separator: ", ")) sans les photos retouchées par Claude."]
+                               "originaux \(appareils.joined(separator: ", ")) sans les photos retouchées par Claude"
+                                   + (catalogue.map { ", catalogue \($0) seulement." } ?? ".")]
         for lot in lots {
             let fichier = dossierLots.appendingPathComponent("\(lot.nom).json")
-            try Data(JSONCoding.pretty(json(lot, graine: graine)).utf8).write(to: fichier)
+            try Data(JSONCoding.pretty(json(lot, graine: graine, catalogue: catalogue)).utf8).write(to: fichier)
             texte.append("")
             texte.append("\(lot.nom) : \(lot.photos.count) photos — \(lot.but)")
             var ordre: [String] = [], compte: [String: Int] = [:]
@@ -372,6 +423,12 @@ public enum ReleveSeuils {
         public var dejaLa = 0
         public var erreurs = 0
         public var notesDeClaude = 0
+        /// Photos dont le journal n'a pas pu se lire : qui a posé la note reste inconnu.
+        public var notesInconnues = 0
+        /// Vignettes couchées remises à l'endroit (comme le Suivi, Images.redresser).
+        public var redressees = 0
+        /// Ids qui désignent une autre photo que celle du lot (autre catalogue, photo remplacée).
+        public var autresPhotos = 0
         public var abandon = false
     }
 
@@ -385,23 +442,151 @@ public enum ReleveSeuils {
         }
     }
 
+    /// Qui a posé la note d'une famille (l'original et ses copies virtuelles) : `parClaude` nil
+    /// quand le journal n'a pas pu se lire (`erreur` dit pourquoi).
+    struct EtatNote: Equatable {
+        var parClaude: Bool?
+        var erreur: String?
+    }
+
+    /// Le journal de chaque famille, d'abord d'une seule commande pour tout le lot, puis famille par
+    /// famille si elle échoue ou laisse une photo de côté : `Lecture.journal` échoue en entier dès
+    /// qu'un seul id est introuvable (`Photos.photoParId`), alors que `vignettes` traite chaque photo
+    /// à part. Une famille dont le journal échoue encore reste inconnue, jamais « note de Dany ».
+    static func lireNotes(_ familles: [(id: Int, copies: [Int])], lightroom: LightroomServing) -> [Int: EtatNote] {
+        func demander(_ ids: [Int]) throws -> [Int: Bool] {
+            let reponse = try lightroom.send("journal", ["photos": .array(ids.map { .number(Double($0)) })], timeout: 60)
+            var lus: [Int: Bool] = [:]
+            for photo in reponse["photos"]?.array ?? [] {
+                if let id = photo["photo"]?["id"]?.int { lus[id] = noteParClaude(photo["entrees"]?.array ?? []) }
+            }
+            return lus
+        }
+        func etat(_ famille: (id: Int, copies: [Int]), _ lus: [Int: Bool]) -> EtatNote? {
+            let membres = [famille.id] + famille.copies
+            guard membres.allSatisfy({ lus[$0] != nil }) else { return nil }
+            return EtatNote(parClaude: membres.contains { lus[$0] == true })
+        }
+        guard !familles.isEmpty else { return [:] }
+        var etats: [Int: EtatNote] = [:]
+        var erreurLot: String?
+        do {
+            let lus = try demander(familles.flatMap { [$0.id] + $0.copies })
+            for famille in familles { etats[famille.id] = etat(famille, lus) }
+        } catch {
+            erreurLot = error.localizedDescription
+        }
+        for famille in familles where etats[famille.id] == nil {
+            do {
+                let lus = try demander([famille.id] + famille.copies)
+                etats[famille.id] = etat(famille, lus)
+                    ?? EtatNote(parClaude: nil, erreur: "journal incomplet (une photo de la famille manque à la réponse)")
+            } catch {
+                etats[famille.id] = EtatNote(parClaude: nil, erreur: error.localizedDescription + (erreurLot.map { " (lot entier : \($0))" } ?? ""))
+            }
+        }
+        return etats
+    }
+
     static func nombre(_ valeur: Double?) -> JSONValue { valeur.map { $0.isFinite ? JSONValue.number($0) : .null } ?? .null }
 
     /// Le grand côté d'un JPEG, lu dans son en-tête.
     static func cote(_ donnees: Data) -> Int? {
+        dimensions(donnees).map { max($0.largeur, $0.hauteur) }
+    }
+
+    static func dimensions(_ donnees: Data) -> (largeur: Int, hauteur: Int)? {
         guard let source = CGImageSourceCreateWithData(donnees as CFData, nil),
               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let l = props[kCGImagePropertyPixelWidth] as? Int, let h = props[kCGImagePropertyPixelHeight] as? Int else { return nil }
-        return max(l, h)
+        return (l, h)
+    }
+
+    // MARK: Vignette remise à l'endroit (comme le Suivi)
+
+    /// Écart toléré entre deux proportions, en logarithme : `Images.ECART_PROPORTIONS` du module.
+    static let ecartProportions = 0.08
+
+    /// Le quart de tour qui manque à une vignette de `largeur` × `hauteur` (90 ou 270 degrés dans le
+    /// sens des aiguilles d'une montre, ceux de `sips -r`), ou nil : la règle exacte
+    /// d'`Images.rotationManquante` du module (constat du 25 oct. 2026, « Une vignette toujours à
+    /// l'endroit ») sur la `geometrie` de la description de `vignettes` (dimensions affichées,
+    /// orientation, cadre). Le Suivi redresse ainsi chaque vignette avant `Suivi.analyserPhoto`.
+    static func quartManquant(largeur: Int, hauteur: Int, geometrie: JSONValue?) -> Int? {
+        guard largeur > 0, hauteur > 0, let g = geometrie, let orientation = g["orientation"]?.string,
+              let quart = ["BC": 90, "DA": 270][orientation],
+              let la0 = g["largeur"]?.double, let ha0 = g["hauteur"]?.double, la0 > 0, ha0 > 0 else { return nil }
+        // Geometrie.contexte puis Geometrie.apercu : le cadre dans le repère du fichier, tourné.
+        let lf = ha0, hf = la0 // BC et DA sont des quarts de tour (Recadrage.tournee)
+        let cadre = g["cadre"]
+        let gauche = cadre?["CropLeft"]?.double ?? 0, haut = cadre?["CropTop"]?.double ?? 0
+        let droite = cadre?["CropRight"]?.double ?? 1, bas = cadre?["CropBottom"]?.double ?? 1
+        let r = (cadre?["CropAngle"]?.double ?? 0) * .pi / 180
+        let dx = (droite - gauche) * lf, dy = (bas - haut) * hf
+        let w = dx * cos(r) + dy * sin(r), h = -dx * sin(r) + dy * cos(r)
+        let (la, ha) = (h, w)
+        guard la > 0, ha > 0 else { return nil }
+        let ecart = log(Double(largeur) / Double(hauteur)), affichee = log(la / ha)
+        let debout = abs(ecart - affichee), couchee = abs(ecart + affichee)
+        if debout <= ecartProportions && debout <= couchee { return nil }
+        if couchee < debout && couchee <= ecartProportions { return quart }
+        let entiere = log(la0 / ha0)
+        let deboutEntiere = abs(ecart - entiere), coucheeEntiere = abs(ecart + entiere)
+        if coucheeEntiere < deboutEntiere && coucheeEntiere <= ecartProportions { return quart }
+        return nil
+    }
+
+    /// L'image tournée de `degres` (90 ou 270) dans le sens des aiguilles d'une montre.
+    static func tourner(_ image: CGImage, degres: Int) -> CGImage? {
+        let largeur = image.height, hauteur = image.width
+        guard let espace = CGColorSpace(name: CGColorSpace.sRGB),
+              let contexte = CGContext(data: nil, width: largeur, height: hauteur, bitsPerComponent: 8, bytesPerRow: 0,
+                                       space: espace, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+        // Repère de CoreGraphics : l'origine en bas à gauche, l'angle positif à gauche.
+        if degres == 90 {
+            contexte.translateBy(x: 0, y: CGFloat(hauteur))
+            contexte.rotate(by: -.pi / 2)
+        } else {
+            contexte.translateBy(x: CGFloat(largeur), y: 0)
+            contexte.rotate(by: .pi / 2)
+        }
+        contexte.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return contexte.makeImage()
+    }
+
+    /// La vignette remise à l'endroit, et le quart de tour appliqué (nil : rien à tourner, ou
+    /// illisible, et la vignette telle quelle).
+    static func redresser(_ donnees: Data, geometrie: JSONValue?) -> (donnees: Data, quart: Int?) {
+        guard let d = dimensions(donnees), let quart = quartManquant(largeur: d.largeur, hauteur: d.hauteur, geometrie: geometrie),
+              let image = PreviewImages.image(donnees), let tournee = tourner(image, degres: quart),
+              let jpeg = PreviewImages.jpeg(tournee, quality: 0.95) else { return (donnees, nil) }
+        return (jpeg, quart)
+    }
+
+    /// L'id désigne-t-il encore la photo du lot ? Le Suivi vérifie l'uuid avant d'analyser
+    /// (Releve.lua, analyserLot) ; la description de `vignettes` n'a pas d'uuid : la collecte compare
+    /// l'uuid s'il y est, sinon le nom du fichier. Rend la raison d'un écart, ou nil.
+    static func autrePhoto(attendue: JSONValue?, description: JSONValue) -> String? {
+        if let a = attendue?["uuid"]?.string, let b = description["uuid"]?.string, a != b {
+            return "autre photo à cet identifiant (uuid \(b), \(a) dans le lot) : le lot vient-il d'un autre catalogue ?"
+        }
+        if let a = attendue?["fichier"]?.string, let b = description["fichier"]?.string, a.lowercased() != b.lowercased() {
+            return "autre photo à cet identifiant (\(b), \(a) dans le lot) : le lot vient-il d'un autre catalogue ?"
+        }
+        return nil
     }
 
     /// Ce que la collecte garde d'une photo : son lot et son groupe, la description du module
-    /// (heure exacte, prise de vue en nombres), la note et qui l'a posée, la vignette copiée.
-    static func ligneCatalogue(id: Int, lot: String, groupe: String?, description: JSONValue?, notePosee: Bool,
-                               vignette: String?, cote: Int?, taille: Int, erreur: String?, duree: Double) -> JSONValue {
+    /// (heure exacte, prise de vue en nombres), la note de l'original, celle de la famille
+    /// (`note_suivi` du lot : la plus haute, copies virtuelles comprises) et qui l'a posée (nil :
+    /// inconnu, `journal_erreur`), la vignette copiée et son quart de tour.
+    static func ligneCatalogue(id: Int, lot: String, attendue: JSONValue?, description: JSONValue?, note: EtatNote?,
+                               vignette: String?, cote: Int?, quart: Int? = nil, taille: Int, erreur: String?, duree: Double) -> JSONValue {
         var objet: [String: JSONValue] = ["id": .number(Double(id)), "lot": .string(lot), "taille": .number(Double(taille)),
                                           "duree_lot_s": .number((duree * 10).rounded() / 10)]
-        if let groupe { objet["groupe"] = .string(groupe) }
+        if let groupe = attendue?["groupe"]?.string { objet["groupe"] = .string(groupe) }
+        let noteSuivi = attendue?["note_suivi"]?.int
+        if let noteSuivi { objet["note_suivi"] = .number(Double(noteSuivi)) }
         if let d = description {
             for cle in ["fichier", "appareil", "objectif", "date", "format"] { if let v = d[cle]?.string { objet[cle] = .string(v) } }
             let dateLue = Tri.date(d["date"]?.string)
@@ -415,31 +600,40 @@ public enum ReleveSeuils {
             var photo = PhotoTriee(id: id, fichier: d["fichier"]?.string ?? "")
             photo.date = dateLue
             objet["lumiere_il"] = nombre(ToolHandler.prise(d, photo: photo).lumiere.map { ($0 * 100).rounded() / 100 })
-            if let note = d["note"]?.int { objet["note"] = .number(Double(note)) }
+            if let n = d["note"]?.int {
+                objet["note"] = .number(Double(n))
+                objet["note_famille"] = .number(Double(max(n, noteSuivi ?? 0)))
+            }
             objet["retouchee_par_claude"] = .bool(d["retouchee_par_claude"]?.bool == true)
         }
-        objet["note_par_claude"] = .bool(notePosee)
+        if let parClaude = note?.parClaude { objet["note_par_claude"] = .bool(parClaude) }
+        if let e = note?.erreur { objet["journal_erreur"] = .string(e) }
         if let vignette { objet["vignette"] = .string(vignette) }
         if let cote { objet["cote"] = .number(Double(cote)) }
+        if let quart { objet["quart_de_tour"] = .number(Double(quart)) }
         if let erreur { objet["erreur"] = .string(erreur) }
         return .object(objet.filter { !$0.value.isNull })
     }
 
     /// `--collecter` : les vignettes du lot, par commandes de `parLot` photos, copiées dans
-    /// `<dossier>/vignettes/<taille>/<id>.jpg`, le JPEG temporaire du module retiré aussitôt (et son
-    /// dossier s'il est vide) ; une ligne par photo dans `<dossier>/catalogue.jsonl`. Une photo déjà
-    /// copiée à cette taille (`catalogue.jsonl` et fichier présents) n'est pas redemandée : la
-    /// collecte se reprend. Seules commandes : `vignettes` et `journal` (des lectures).
+    /// `<dossier>/vignettes/<taille>/<id>.jpg` après le même quart de tour que le Suivi (une vignette
+    /// couchée remise à l'endroit), le JPEG temporaire du module retiré aussitôt (et son dossier
+    /// s'il est vide) ; une ligne par photo dans `<dossier>/catalogue.jsonl`. Un id qui désigne une
+    /// autre photo que celle du lot (nom de fichier différent) est en erreur, sans vignette. Une
+    /// photo déjà copiée à cette taille (`catalogue.jsonl` et fichier présents) n'est pas
+    /// redemandée : la collecte se reprend. Seules commandes : `vignettes` et `journal` (des
+    /// lectures), le journal de toute la famille (original et copies du lot).
     static func collecter(lot: JSONValue, dans dossier: URL, lightroom: LightroomServing, taille: Int, parLot: Int,
                           dire: (String) -> Void) throws -> BilanCollecte {
         let nomLot = lot["lot"]?.string ?? "lot"
-        var groupes: [Int: String] = [:], ids: [Int] = []
+        var attendues: [Int: JSONValue] = [:], ids: [Int] = []
         for element in lot["photos"]?.array ?? [] {
-            guard let id = element["id"]?.int ?? element.int, groupes[id] == nil, !ids.contains(id) else { continue }
+            guard let id = element["id"]?.int ?? element.int, attendues[id] == nil else { continue }
             ids.append(id)
-            if let groupe = element["groupe"]?.string { groupes[id] = groupe }
+            attendues[id] = element.object != nil ? element : .object([:])
         }
         guard !ids.isEmpty else { throw LightroomError.invalid("Le lot n'a aucune photo (photos : [{id, groupe}, …]).") }
+        func copies(_ id: Int) -> [Int] { (attendues[id]?["copies"]?.array ?? []).compactMap(\.int).filter { $0 != id } }
         let fm = FileManager.default
         let relatif = "vignettes/\(taille)"
         let dossierVignettes = dossier.appendingPathComponent(relatif)
@@ -470,39 +664,48 @@ public enum ReleveSeuils {
             do {
                 let reponse = try lightroom.send("vignettes", ["photos": .array(lotIds.map { .number(Double($0)) }), "taille": .number(Double(taille))],
                                                  timeout: delaiVignettes)
-                var notes: [Int: Bool] = [:]
-                if let journal = try? lightroom.send("journal", ["photos": .array(lotIds.map { .number(Double($0)) })], timeout: 60) {
-                    for photo in journal["photos"]?.array ?? [] {
-                        if let id = photo["photo"]?["id"]?.int { notes[id] = noteParClaude(photo["entrees"]?.array ?? []) }
-                    }
-                }
-                let duree = Date().timeIntervalSince(depart)
                 var vues = Set<Int>()
+                var copiees: [(id: Int, item: JSONValue, chemin: String?, cote: Int?, quart: Int?, erreur: String?)] = []
                 for item in reponse["photos"]?.array ?? [] {
-                    guard let id = item["id"]?.int else { continue }
+                    guard let id = item["id"]?.int, !vues.contains(id) else { continue }
                     vues.insert(id)
-                    var erreur = item["erreur"]?.string, chemin: String?, cote: Int?
+                    var erreur = item["erreur"]?.string, chemin: String?, cote: Int?, quart: Int?
+                    let autre = autrePhoto(attendue: attendues[id], description: item)
                     if let temporaire = item["vignette"]?.string {
                         do {
                             // readPreview lit puis retire le JPEG du module (et son dossier, vide).
                             let donnees = try ToolHandler.readPreview(temporaire)
-                            let nom = "\(relatif)/\(id).jpg"
-                            try donnees.write(to: dossier.appendingPathComponent(nom))
-                            chemin = nom
-                            cote = Self.cote(donnees)
-                            bilan.copiees += 1
+                            if autre == nil {
+                                let redressee = redresser(donnees, geometrie: item["geometrie"])
+                                let nom = "\(relatif)/\(id).jpg"
+                                try redressee.donnees.write(to: dossier.appendingPathComponent(nom))
+                                chemin = nom
+                                cote = Self.cote(redressee.donnees)
+                                quart = redressee.quart
+                                if quart != nil { bilan.redressees += 1 }
+                                bilan.copiees += 1
+                            }
                         } catch {
                             erreur = error.localizedDescription
                         }
                     }
+                    if let autre { erreur = autre; bilan.autresPhotos += 1 }
                     if chemin == nil { bilan.erreurs += 1; erreur = erreur ?? "pas de vignette" }
-                    if notes[id] == true { bilan.notesDeClaude += 1 }
-                    lignes.append(ligneCatalogue(id: id, lot: nomLot, groupe: groupes[id], description: item, notePosee: notes[id] == true,
-                                                 vignette: chemin, cote: cote, taille: taille, erreur: erreur, duree: duree))
+                    copiees.append((id, item, chemin, cote, quart, erreur))
+                }
+                // Le journal des seules photos copiées (avec leurs copies virtuelles) : un id
+                // introuvable ferait échouer la commande entière.
+                let notes = lireNotes(copiees.filter { $0.chemin != nil }.map { ($0.id, copies($0.id)) }, lightroom: lightroom)
+                let duree = Date().timeIntervalSince(depart)
+                for c in copiees {
+                    let note = notes[c.id]
+                    if note?.parClaude == true { bilan.notesDeClaude += 1 }
+                    if c.chemin != nil && note?.parClaude == nil { bilan.notesInconnues += 1 }
+                    lignes.append(ligneCatalogue(id: c.id, lot: nomLot, attendue: attendues[c.id], description: autrePhoto(attendue: attendues[c.id], description: c.item) == nil ? c.item : nil, note: note, vignette: c.chemin, cote: c.cote, quart: c.quart, taille: taille, erreur: c.erreur, duree: duree))
                 }
                 for id in lotIds where !vues.contains(id) {
                     bilan.erreurs += 1
-                    lignes.append(ligneCatalogue(id: id, lot: nomLot, groupe: groupes[id], description: nil, notePosee: notes[id] == true,
+                    lignes.append(ligneCatalogue(id: id, lot: nomLot, attendue: attendues[id], description: nil, note: nil,
                                                  vignette: nil, cote: nil, taille: taille, erreur: "absente de la réponse du module", duree: duree))
                 }
                 echecsDeSuite = 0
@@ -511,7 +714,7 @@ public enum ReleveSeuils {
             } catch {
                 echecsDeSuite += 1
                 bilan.erreurs += lotIds.count
-                lignes = lotIds.map { ligneCatalogue(id: $0, lot: nomLot, groupe: groupes[$0], description: nil, notePosee: false, vignette: nil,
+                lignes = lotIds.map { ligneCatalogue(id: $0, lot: nomLot, attendue: attendues[$0], description: nil, note: nil, vignette: nil,
                                                      cote: nil, taille: taille, erreur: error.localizedDescription,
                                                      duree: Date().timeIntervalSince(depart)) }
                 dire("✘ lot \(rang + 1)/\(nombreLots) : \(error.localizedDescription)")
@@ -523,7 +726,11 @@ public enum ReleveSeuils {
                 break
             }
         }
-        dire("Collecte finie : \(bilan.copiees) vignette(s) copiée(s), \(bilan.erreurs) erreur(s), \(bilan.notesDeClaude) note(s) posée(s) par Claude (écartées du résumé). Ensuite : --mesures --mesurer \(dossier.path)")
+        dire("Collecte finie : \(bilan.copiees) vignette(s) copiée(s) (\(bilan.redressees) remise(s) à l'endroit), \(bilan.erreurs) erreur(s)"
+            + (bilan.autresPhotos > 0 ? " dont \(bilan.autresPhotos) id(s) d'une autre photo" : "")
+            + ", \(bilan.notesDeClaude) note(s) posée(s) par Claude (écartées du résumé)"
+            + (bilan.notesInconnues > 0 ? ", \(bilan.notesInconnues) note(s) d'auteur inconnu, journal illisible (écartées aussi)" : "")
+            + ". Ensuite : --mesures --mesurer \(dossier.path)")
         return bilan
     }
 
@@ -773,7 +980,8 @@ public enum ReleveSeuils {
         ("appareil", { $0["appareil"] }), ("iso", { $0["iso"] }), ("tranche_iso", { l in tranche(l["iso"]?.double).map(JSONValue.string) }),
         ("date", { $0["date"] }), ("date_secondes", { $0["date_secondes"] }), ("ouverture", { $0["ouverture"] }),
         ("vitesse", { $0["vitesse"] }), ("compensation", { $0["compensation"] }), ("flash", { $0["flash"] }),
-        ("lumiere_il", { $0["lumiere_il"] }), ("note", { $0["note"] }), ("note_par_claude", { $0["note_par_claude"] }),
+        ("lumiere_il", { $0["lumiere_il"] }), ("note", { $0["note"] }), ("note_suivi", { $0["note_suivi"] }),
+        ("note_famille", { $0["note_famille"] }), ("note_par_claude", { $0["note_par_claude"] }), ("quart_de_tour", { $0["quart_de_tour"] }),
         ("retouchee_par_claude", { $0["retouchee_par_claude"] }), ("cote", { $0["cote"] }), ("duree_lot_s", { $0["duree_lot_s"] }),
         ("mediane_l", { $0["suivi"]?["mesures"]?["mediane_l"] }), ("p95_l", { $0["suivi"]?["mesures"]?["p95_l"] }),
         ("blanc_pur", { $0["suivi"]?["mesures"]?["blanc_pur"] }), ("blanc_pur_haut", { $0["suivi"]?["mesures"]?["blanc_pur_haut"] }),
@@ -827,6 +1035,12 @@ public enum ReleveSeuils {
         let retouchees = lignes.filter { $0["retouchee_par_claude"]?.bool == true && $0["erreur"] == nil }
         let valides = lignes.filter { $0["erreur"] == nil && $0["suivi"]?["mesures"] != nil && $0["retouchee_par_claude"]?.bool != true }
         let notesClaude = valides.filter { $0["note_par_claude"]?.bool == true }.count
+        // Une ligne du catalogue sans note_par_claude : journal illisible, auteur de la note inconnu.
+        let notesInconnues = valides.filter { $0["lot"] != nil && $0["note_par_claude"] == nil }.count
+        let notesEcart = valides.filter { l in
+            guard let a = l["note"]?.int, let b = l["note_suivi"]?.int else { return false }
+            return a != b
+        }.count
         let petites = valides.filter { ($0["cote"]?.int ?? 0) < ToolHandler.minimumCullSide }.count
         let avecDate = lignes.filter { $0["date"] != nil }
         let datesSecondes = avecDate.filter { Tri.date($0["date"]?.string) != nil }.count
@@ -835,7 +1049,10 @@ public enum ReleveSeuils {
             return ("\(d)", d)
         }, by: \.0).values.compactMap { $0.first?.1 }
         texte.append("Résumé du relevé des seuils : \(lignes.count) photo(s), \(valides.count) mesurée(s).")
-        texte.append("Écartées : \(erreurs.count) erreur(s) ou vignette(s) non mesurée(s), \(retouchees.count) retouchée(s) par Claude ; \(notesClaude) note(s) posée(s) par Claude (mesures gardées, note écartée).")
+        texte.append("Écartées : \(erreurs.count) erreur(s) ou vignette(s) non mesurée(s), \(retouchees.count) retouchée(s) par Claude ; \(notesClaude) note(s) posée(s) par Claude (mesures gardées, note écartée) ; \(notesInconnues) note(s) d'auteur inconnu (journal illisible, écartées des notes).")
+        if notesEcart > 0 {
+            texte.append("Note de l'original autre que celle de suivi.json (la plus haute de la famille, copies virtuelles comprises) : \(notesEcart) photo(s) ; les notes se lisent sur la famille (note_famille).")
+        }
         texte.append("Vignettes sous \(ToolHandler.minimumCullSide) px : \(petites) (le Suivi ne les analyse pas).")
         if !avecDate.isEmpty { texte.append("Heure à la seconde lue par Tri.date : \(pct(datesSecondes, avecDate.count)).") }
         if !durees.isEmpty {
@@ -846,6 +1063,8 @@ public enum ReleveSeuils {
         json["erreurs"] = .number(Double(erreurs.count))
         json["retouchees_par_claude"] = .number(Double(retouchees.count))
         json["notes_par_claude"] = .number(Double(notesClaude))
+        json["notes_inconnues"] = .number(Double(notesInconnues))
+        json["notes_autres_que_suivi"] = .number(Double(notesEcart))
         json["vignettes_petites"] = .number(Double(petites))
         json["dates_a_la_seconde"] = .number(Double(datesSecondes))
 
@@ -908,11 +1127,12 @@ public enum ReleveSeuils {
             guard let appareil = appareilReleve(l["appareil"]?.string) ?? l["appareil"]?.string, let t = tranche(l["iso"]?.double) else { return nil }
             return "\(appareil) ISO \(t)"
         }
-        // Les notes de Dany seulement.
-        let notees = valides.filter { $0["note_par_claude"]?.bool != true && ($0["note"]?.int ?? 0) >= 3 }
+        // Les notes de Dany seulement : un journal lu qui n'a aucune note de Claude dans la famille
+        // (note_par_claude faux, jamais absent), et la note de la famille, comme au tirage.
+        let notees = valides.filter { $0["note_par_claude"]?.bool == false && (($0["note_famille"] ?? $0["note"])?.int ?? 0) >= 3 }
         if !notees.isEmpty {
             texte.append("")
-            texte.append("Notées 3 étoiles ou plus par Dany (notes de Claude écartées) : \(notees.count) photo(s)")
+            texte.append("Notées 3 étoiles ou plus par Dany (famille ; notes de Claude et d'auteur inconnu écartées) : \(notees.count) photo(s)")
             let stat = statistiques(notees)
             texte += stat.lignes
             json["notees_3_etoiles_par_dany"] = stat.json

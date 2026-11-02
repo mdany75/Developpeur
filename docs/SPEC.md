@@ -7462,10 +7462,15 @@ Le relevé se fait ensuite sur les photos de Dany ; les valeurs se fixent après
 `ReleveSeuilsTests` (faux module, jamais le vrai Lightroom). Quatre sous-commandes, chacune écrit
 dans un dossier donné ; seule `--collecter` ouvre la liaison :
 
-- `--mesures --echantillons <suivi.json> <dossier> [--graine <n>]` : lit `suivi.json` (lecture
-  seule, sans Lightroom ni image) et tire les lots A1 à A8 dans `<dossier>/lots/<lot>.json`
-  (`{lot, but, graine, photos: [{id, groupe, appareil, iso, le, note_suivi, genre,
-  defauts_suivi}]}`), plus `echantillons.txt` (effectifs par groupe ; « moins de 30 » marqué).
+- `--mesures --echantillons <suivi.json> <dossier> [--graine <n>] [--catalogue <chemin>]` : lit
+  `suivi.json` (lecture seule, sans Lightroom ni image) et tire les lots A1 à A8 dans
+  `<dossier>/lots/<lot>.json` (`{lot, but, graine, catalogue, photos: [{id, uuid, fichier, copies,
+  groupe, appareil, iso, le, note_suivi, genre, defauts_suivi}]}`), plus `echantillons.txt`
+  (effectifs par groupe ; « moins de 30 » marqué). **Un seul catalogue** de `suivi.json` : le seul,
+  ou celui de `--catalogue` (refus s'il y en a plusieurs sans l'option : leurs `localIdentifier`
+  se recouvrent, un id d'un autre catalogue désignerait une autre photo du catalogue ouvert).
+  `copies` : les copies virtuelles de la famille (`vues`), car `note_suivi` est la plus haute de la
+  famille (`lireClassements` : original et copies hors Essais).
   Seulement les originaux des X-H2S, X-T4 et X-T20 (« FUJIFILM X-T4 » compris), sans les photos
   retouchées par Claude ; une photo une fois par lot ; hasard reproductible (SplitMix64, graine
   20261101 par défaut). `le` de `suivi.json` est à la minute : il ne sert qu'à tirer (heure de la
@@ -7473,14 +7478,26 @@ dans un dossier donné ; seule `--collecter` ouvre la liaison :
 - `--mesures --collecter <lot.json> <dossier> [--taille <px>] [--par <n>]` : demande au module les
   vignettes du lot, `--par` photos par commande `vignettes` (10 à 20, 15 par défaut : 50
   dépasseraient les 60 s du module quand des aperçus manquent), à `--taille` px (128 à 2 048,
-  1 024 par défaut) ; copie chaque JPEG dans `<dossier>/vignettes/<taille>/<id>.jpg` puis retire le
-  JPEG temporaire du module et son dossier vide (`ToolHandler.readPreview`) ; demande le `journal`
-  des mêmes photos ; écrit une ligne par photo dans `<dossier>/catalogue.jsonl` : `id`, `lot`,
-  `groupe`, `fichier`, `appareil`, `objectif`, `date` (texte de Lightroom) et `date_secondes`
-  (lue à la seconde par `Tri.date`), `iso` (`sensibilite`), `ouverture`, `vitesse`,
-  `compensation`, `flash` (la description de `vignettes`, `prise_de_vue` en nombres), `lumiere_il`
-  (`GroupesLumiere.Prise.lumiere`), `note`, `note_par_claude`, `retouchee_par_claude`, `vignette`,
-  `cote` (grand côté réel du JPEG), `taille`, `duree_lot_s`, `erreur`. Seules commandes :
+  1 024 par défaut) ; **remet à l'endroit une vignette couchée** comme le Suivi avant son analyse
+  (`Images.redresser`, constat du 25 oct. 2026 « Une vignette toujours à l'endroit » :
+  `ReleveSeuils.quartManquant` reprend `Images.rotationManquante` sur la `geometrie` de la
+  description, puis un quart de tour en CoreGraphics, JPEG à 0,95) ; copie chaque JPEG dans
+  `<dossier>/vignettes/<taille>/<id>.jpg` puis retire le JPEG temporaire du module et son dossier
+  vide (`ToolHandler.readPreview`). Un id dont le fichier n'est plus celui du lot (`fichier`, sans
+  la casse ; l'uuid si la description en porte un, ce qu'elle ne fait pas aujourd'hui) est en
+  erreur « autre photo », sans vignette ni description. Puis le `journal` des photos copiées **et
+  de leurs copies virtuelles** (`copies` du lot) : d'une commande pour le lot, puis famille par
+  famille si elle échoue (`Lecture.journal` échoue en entier dès qu'un id est introuvable,
+  `Photos.photoParId`) ; une famille dont le journal échoue encore garde `note_par_claude`
+  **absent** (inconnu) et `journal_erreur`, jamais « note de Dany ». Une ligne par photo dans
+  `<dossier>/catalogue.jsonl` : `id`, `lot`, `groupe`, `fichier`, `appareil`, `objectif`, `date`
+  (texte de Lightroom) et `date_secondes` (lue à la seconde par `Tri.date`), `iso` (`sensibilite`),
+  `ouverture`, `vitesse`, `compensation`, `flash` (la description de `vignettes`, `prise_de_vue` en
+  nombres), `lumiere_il` (`GroupesLumiere.Prise.lumiere`), `note` (l'original seul),
+  `note_suivi` (du lot), `note_famille` (la plus haute des deux), `note_par_claude` (une note de
+  Claude dans le journal de la famille), `journal_erreur`, `retouchee_par_claude`, `vignette`,
+  `quart_de_tour` (90 ou 270, s'il a fallu tourner), `cote` (grand côté réel du JPEG), `taille`,
+  `duree_lot_s`, `erreur`. Seules commandes :
   `vignettes` et `journal`, deux lectures (`LightroomBridge.lectures`) ; rien n'est écrit dans le
   catalogue. Mais **Lightroom rend un aperçu qui manque** (`requestJpegThumbnail`) : il lit alors
   l'original et écrit dans `Previews.lrdata` (accord de Dany pour le relevé, 1er nov. 2026).
@@ -7506,9 +7523,14 @@ dans un dossier donné ; seule `--collecter` ouvre la liaison :
 
 Le **résumé** écarte les erreurs, les vignettes non mesurées (sous 900 px : le Suivi ne les analyse
 pas) et les photos retouchées par Claude ; il compte les **notes posées par Claude**
-(`note_par_claude` : une entrée `classement` du journal qui change la note, par `propose_ratings`,
-`set_metadata` ou la carte Note) et les écarte des statistiques par note (« Notées 3 étoiles ou
-plus par Dany »). Par groupe du lot, puis par boîtier et tranche ISO du catalogue : bruit (médiane,
+(`note_par_claude` : une entrée `classement` du journal de la famille qui change la note, par
+`propose_ratings`, `set_metadata` ou la carte Note) et les **notes d'auteur inconnu** (journal
+illisible), et les écarte toutes deux des statistiques par note (« Notées 3 étoiles ou plus par
+Dany » : `note_par_claude` faux, et `note_famille` d'au moins 3, la note du tirage) ; il compte
+aussi les photos dont la note de l'original diffère de `note_suivi`. Limite : la note des copies
+n'est pas relue au moment de la collecte (`note_suivi` peut dater du dernier passage du Suivi), et
+le journal d'une copie des Essais compte aussi (une note de Claude y écarte la famille : prudent).
+Par groupe du lot, puis par boîtier et tranche ISO du catalogue : bruit (médiane,
 90e centile, part ≥ 1,5 et ≥ 0,6), sous-exposition, ciel brûlé et flou trouvés sur cherchés, L*
 médian (10e centile, médiane), 95e centile de L*, blanc pur du tiers haut (95e centile), gamme
 (90e centile, nature « gamme »), zones chaudes par photo, peau lue ; puis la gamme et les points
@@ -7536,8 +7558,8 @@ Tous dans `Sources/DeveloppeurKit/`. « Lot » : le lot de `--echantillons` qui 
 | A6 | GroupesLumiere.swift:56, 58, 62, 65 | `pauseMax = 600 s`, `pauseMemeLieu = 3 600 s`, `distanceMemeLieu = 0,7`, `ecartIL = 2,5` | Coupures des groupes de lumière (`match_series` avec `groups`) | A6 |
 | A7 | Eclairage.swift:269, 272 | `seuilTonal = 8`, `partMinGroupe = 20` (`toleranceNeutre = 10`, ligne 267, et `pixelsMinPeau = 20`, ligne 299, gardés) | Éclairage mixte lu par zone tonale et par groupes de cases | A7 |
 | A8 | Teint.swift:36, 38 (et 34) | `ecartVisible = 5`, `hausseAlerte = 2` (`pixelsMin = 60` gardé) | Témoin du teint de `match_series` (`a_verifier`) | A8 |
-| B1 | Bilan.swift:127, 96 | `baisseNetteteMin = 3`, `hausseBruitMin = 0,1` ; `ecartNettetePct = 10`, `ecartBruit = 0,1`, `ecartEcretage = 0,3`, `ecartSaturee = 1` | « regression » et écart visible du bilan de `view_photo` | essai dans Lightroom, sur l'ordre de Dany |
-| B2 | CarteMasque.swift:20, 23, 26, 29 | `partVide = 0,5`, `partTotale = 95`, `debordVisage = 0,25`, `cielBas = 0,6`, `sujetVisages = 0,2`, `sujetLarge = 40` | Alertes de `mask_map` | essai dans Lightroom, avec le chantier « masques relus » |
+| B1 | Bilan.swift:127, 96 | `baisseNetteteMin = 3`, `hausseBruitMin = 0,1` ; `ecartNettetePct = 10`, `ecartBruit = 0,1`, `ecartEcretage = 0,3`, `ecartSaturee = 1` | « regression » et écart visible du bilan de `view_photo` | B1 (hors `--mesures` : session du connecteur, copies d'Essais) |
+| B2 | CarteMasque.swift:20, 23, 26, 29 | `partVide = 0,5`, `partTotale = 95`, `debordVisage = 0,25`, `cielBas = 0,6`, `sujetVisages = 0,2`, `sujetLarge = 40` | Alertes de `mask_map` | B2 (hors `--mesures` : session du connecteur, copies d'Essais) |
 
 Laissés pour plus tard (lot C) : `IntentionBoitier.seuilSombreVoulue` et `seuilClaireVoulue`
 (±0,6 : il faudrait ouvrir des RAF sur /Volumes/Photos, et la demande d'autorisation de macOS
@@ -7583,6 +7605,23 @@ valeur.
   perdues que par lui.
 - **A8 teint** : `ecartVisible` = 90e centile de l'écart a*b* de la peau à moins de 2 min
   (`ecart_peau_2min_p90`) ; `hausseAlerte` = la moitié, 1,5 au moins.
+- **B1 bilan de `view_photo`** (relevé B1 ci-dessous : 8 copies, chacune vue deux fois sans
+  changement, puis après chaque retouche témoin). Les écarts visibles (`ecartNettetePct`,
+  `ecartBruit`, `ecartEcretage`, `ecartSaturee`) : au moins 2 fois le 95e centile de l'écart entre
+  deux vues sans changement (le plancher), et au plus la plus petite retouche témoin jugée visible à
+  l'œil sur 2 copies sur 3 (zoom à 100 % pour netteté et bruit) ; entre les deux, la valeur actuelle
+  si elle y tient, sinon la borne la plus proche. `baisseNetteteMin` : la plus petite baisse de
+  netteté (en points) que donne une retouche jugée visiblement plus molle sur 2 copies sur 3
+  (Texture −20, −40, −60 ; réduction du bruit de luminance 30, 60) ; `hausseBruitMin` : de même pour
+  le grain (Grain 15, 30, 50). Au plus 1 « regression » sur 8 vues sans changement, sinon le seuil
+  monte jusque-là. Moins de 6 copies jugées : valeur gardée.
+- **B2 alertes de `mask_map`** (relevé B2 ci-dessous : 40 masques sur des copies d'Essais, chacun
+  jugé à l'œil sur son rendu témoin : juste, presque vide, presque total, déborde sur un visage,
+  inversé). Chaque seuil prend la valeur qui donne au plus 1 fausse alerte sur 20 masques justes et
+  au moins 4 alertes sur 5 masques fautifs du même type, d'après la part, le débord, la hauteur du
+  ciel et la couverture des visages que la carte rend pour chaque masque ; un type de faute vu moins
+  de 5 fois garde sa valeur (le compte rendu le dit). Le chantier « masques relus » s'en sert ; il
+  ne change pas ces seuils sans ce relevé.
 
 Quand A1, A2 ou A3 changent : `Suivi.reglesAnalyse` passe de 1 à 2, et le module refait **toute**
 l'analyse de chaque entrée (vignette et Vision : environ 84 600 photos, de 10 à 20 h en tâche de
@@ -7598,8 +7637,14 @@ du dépôt, jamais celui qui est installé ; en arrière-plan, sortie dans un fi
 ```
 B=/Users/danymenard/Developer/Developpeur/.build/debug/mcp-developpeur
 R=<dossier de travail du relevé>
-$B --mesures --echantillons "$HOME/Library/Application Support/Developpeur/suivi.json" "$R"
+$B --mesures --echantillons "$HOME/Library/Application Support/Developpeur/suivi.json" "$R" \
+   [--catalogue <chemin du .lrcat ouvert, si suivi.json en a plusieurs>]
 ```
+
+Après chaque collecte, la console dit combien de vignettes ont été remises à l'endroit, combien
+d'ids désignaient une autre photo et combien de notes restent d'auteur inconnu : plus de 2 % d'« autre
+photo », ou plus de 5 % de notes inconnues dans A2 ou A5, se signalent dans le compte rendu (lot
+tiré d'un autre catalogue, ou `suivi.json` en retard).
 
 1. **Premier lot d'essai** : un lot de 10 photos anciennes (avant 2018) pris dans `lots/A1.json`,
    en `--par 10` à 1 024, 1 344 et 2 048 px (`--taille`) : durée par commande (console,
@@ -7614,7 +7659,22 @@ $B --mesures --echantillons "$HOME/Library/Application Support/Developpeur/suivi
    `$B --constats <id>…` (aperçu à 1 344 px, lecture seule).
 4. **A3, A5, A6, A7** : planches à juger à l'œil (Claude, puis Dany pour A5 et A7) ; A7 : les 60
    photos retenues passées à `$B --eclairage "$R/A7/vignettes/1344/<id>.jpg"…`.
-5. Chaque seuil reçoit la valeur que donne sa règle ; le compte rendu (artefact) les présente avant
+5. **B1 (bilan)** : pas par `--call` (chaque appel est un nouveau processus, le bilan y repart de
+   zéro), mais dans une session de Claude Code où le connecteur du dépôt (`.build/debug`) est
+   inscrit, sur 8 **nouvelles** copies virtuelles remises à l'origine puis rangées dans Essais (une
+   par genre : paysage, portrait, intérieur, nuit, macro, ISO 6400, contre-jour, neige). Par copie :
+   `view_photo` deux fois sans rien changer (le plancher : les `ecarts` de la seconde) ; puis, une
+   à une, chaque retouche témoin par `apply_settings` (Texture −20, −40, −60 ; réduction du bruit de
+   luminance 30, 60 ; Grain 15, 30, 50 ; Exposition +0,3, +0,7 ; Saturation +15, +30), `view_photo`
+   (relever `bilan.ecarts` et `regression`, garder l'image à 100 % pour le jugement), puis
+   `undo_last`. Copies remises à l'origine à la fin. Le relevé va dans un CSV (copie, retouche,
+   netteté %, bruit, écrêtage, part saturée, regression, visible oui ou non).
+6. **B2 (masques)** : même session, 40 masques sur 10 nouvelles copies d'Essais (ciel, sujet,
+   personne, arrière-plan, objet, combinés « ciel sans le bâtiment », radial), `add_mask` avec
+   `mask_map = true` (rien n'est gardé, aucun `undo_last` à faire) ; relever pour chaque masque la part, le débord
+   sur les visages, la hauteur du centre du ciel et la couverture des visages, et les `alertes` ;
+   juger le rendu témoin à l'œil ; copies remises à l'origine à la fin.
+7. Chaque seuil reçoit la valeur que donne sa règle ; le compte rendu (artefact) les présente avant
    tout changement de code.
 
 ## Bibliothèque
