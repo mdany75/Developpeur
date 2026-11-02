@@ -20,7 +20,7 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 
 ### La fenêtre Claude dans Lightroom
 
-- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur IA v1.6.2 » dans sa barre de titre
+- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur IA v1.6.3 » dans sa barre de titre
   (la version du module installé) : Fichier ›
   Module externe - Extras › Ouvrir la fenêtre Claude (même entrée dans le menu Bibliothèque, et
   raccourci ⌃⌥C une fois posé). Elle reste ouverte pendant que vous travaillez, dans tous les

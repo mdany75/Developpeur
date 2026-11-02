@@ -1,6 +1,9 @@
 # Changements
 
-## Non publié
+## 1.6.3 — 2026-11-02
+
+La 1.6.3 reconnaît les espèces (oiseaux, animaux, fleurs, arbres, champignons) par leur nom, retire
+tout de suite un masque que Lightroom n'a pas gardé tel qu'écrit, et trie les points à vérifier.
 
 ### Ajouté
 - Les espèces : Claude reconnaît un oiseau, un animal, une fleur, un arbre ou un champignon par son
