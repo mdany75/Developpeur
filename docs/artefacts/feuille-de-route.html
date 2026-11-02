@@ -62,7 +62,14 @@
   .ecartee b { font-weight: 600; }
   .ecartee p { margin: 0; font-size: 14px; color: var(--gris); }
   .livre { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; }
-  .livre ul { <main class="page">
+  .livre h2 { margin: 0; font-family: var(--police-titre); font-size: 18px; }
+  .livre ul { margin: 0; padding-left: 4px; list-style: none; display: grid; gap: 6px; }
+  .coche { color: var(--vert); font-weight: 700; margin-right: 4px; }
+  .pied { margin-top: 30px; font-size: 13px; color: var(--gris); max-width: 72ch; }
+  @media (max-width: 520px) { h1 { font-size: 25px; } }
+</style>
+
+<main class="page">
   <header class="entete">
     <h1>Feuille de route de Développeur</h1>
     <p class="sous">Ce qui vient après la version 1.5, dans l'ordre où le faire. Mise à jour le 1<sup>er</sup> novembre 2026, d'après la nuit de travail sur la 1.5, la comparaison avec lightroom-mcp et la page <a href="https://claude.ai/artifact/9kQ7kKQk5VuXrrAWFrvVKS">Analyse du Développeur</a>. Chaque chantier est vérifié dans le code : ce qui existe déjà, ce qu'il faut construire, la taille et le risque.</p>
@@ -186,13 +193,6 @@
         <div class="ecartee"><b>Quasi-doublons par empreinte dHash</b><p>Le tri regroupe déjà les rafales et les piles par l'empreinte de Vision, plus fine qu'un dHash, et nomme la meilleure de chaque groupe.</p></div>
         <div class="ecartee"><b>Plage de couleur copiée d'une autre photo</b><p><code>copy_settings</code> copie déjà les plages de couleur, et Développeur recalcule un prélèvement sur chaque photo. Le seul vrai risque, les prélèvements multiples, est réglé dans la 1.5.</p></div>
         <div class="ecartee"><b>Mode lecture seule</b><p>La pause fait déjà « Claude regarde, ne retouche pas », et tu travailles en mode Appliquer. Une case qui survit au relancement de Lightroom se ferait vite si tu la demandes un jour.</p></div>
-      </div>
-    </section>
-
-  </div>
-
-  <p class="pied">Taille : petite, quelques heures ; moyenne, une journée ou deux, tests compris. Le risque vise les photos et le catalogue : tout essai se fait sur des copies d'Essais, sur ton ordre, et se défait ensuite. Source : <code>docs/artefacts/feuille-de-route.html</code>.</p>
-</main> tu la demandes un jour.</p></div>
       </div>
     </section>
 
