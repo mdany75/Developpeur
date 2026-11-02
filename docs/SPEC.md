@@ -9620,13 +9620,13 @@ de `Reference.clesLues`), réduit à 512 px et dessiné en sRGB, donne sa signat
   écartées et dites) ;
 - pour chaque zone tonale (ombres L* < 40, tons moyens de 40 à 70, hautes lumières > 70, entre
   L* 8 et 97, comme `Eclairage.limitesTonales`), les médianes de a* et b* de ses pixels **peu
-  saturés** (C* < `Reference.chromaZone`, 30, provisoire), non écrêtés (une composante au blanc,
+  saturés** (C* < `Reference.chromaZone`, 20, relevé le 2 novembre 2026), non écrêtés (une composante au blanc,
   ou les trois au noir : pas une seule au noir, sinon une ombre sarcelle profonde, dont le rouge
   tombe à 0 bien avant L* 20, ne serait lue que sur sa partie claire ; revue), hors des visages agrandis
   de 10 % (Vision, `ToolHandler.detecterVisages`, si `protect_skin`) ; une zone se lit à partir de
   3 % de l'image et 150 pixels. La mesure d'`Eclairage` (C* < 12 autour du point neutre) ne
   convenait pas : un rendu marqué pousse justement ses gris au-delà de 12 (critique du plan,
-  bloquant) ; les couleurs vives des objets (C* ≥ 30) restent hors de la mesure ;
+  bloquant) ; les couleurs vives des objets (C* ≥ 20) restent hors de la mesure ;
 - la chroma médiane et le P90 (même pixels, visages écartés), et la part de chaque bande de la TSL
   parmi les pixels de C* ≥ 15 ;
 - la chroma médiane des seuls pixels **colorés** (C* ≥ `chromaZone`, ceux que la couleur des
@@ -9664,7 +9664,7 @@ part commune (avec elle si la balance se copie).
   moins, `Measurements.seuilChroma`), 20 par passe au plus, sous le plafond de dose de la Vibrance
   (30, `DevelopCatalogue.plafondsDose`, sans `strong_dose_requested`), jamais au-delà sauf pour la
   ramener vers zéro ; pas copiée quand les scènes diffèrent (répartitions par bande à plus de
-  `seuilScenes`, 60 %, provisoire).
+  `seuilScenes`, 72 %, relevé le 2 novembre 2026 ; jugée sur l'écart du départ, aussi à la passe 2).
 
 **Passes** (`Tools+Reference.swift`). Sans `confirm`, le plan (`reglages_proposes`,
 `rien_n_est_applique`). Avec `confirm`, au plus deux passes, chacune **une seule écriture absolue**
@@ -9729,8 +9729,60 @@ rendus, 58 étapes) : le défaire ensuite (revert_to_original).
 6. **Scènes différentes** (fixe `Reference.seuilScenes`) : la distance des bandes lue entre une
    référence de forêt et une photo de plage, et entre deux photos de même scène.
 
+**Constaté le 2 novembre 2026** (Lightroom Classic 15.6, exécutable de développement ; relevés
+sur les copies d'Essais 53810562 `XH2S0496.RAF (Essai étalonnage)` et 53811131 `DSCF2402.RAF
+(Essai match_look peau)`, remises à l'origine ensuite ; références de Dany lues seulement) :
+
+1. Signature (références : trois photos du 4 octobre 2026 à l'étalonnage de Dany, ombres 210/6 et
+   hautes lumières 45/10, un noir et blanc viré 40/12 · 45/6, et un photogramme fabriqué par des
+   bandes noires de 152 px autour d'un aperçu). À C* < 12, les ombres d'un paysage d'automne ne se
+   lisent pas ; à 20, les trois zones se lisent partout ; dès 30, son feuillage orange tire les
+   ombres (b* −8,2 à 20, +3,7 à 30, +24 à 45). **`chromaZone` = 20** (test
+   `testUnFeuillageTerneNeTirePasLesOmbres`). Le noir et blanc viré se lit pareil à toutes les
+   bornes (a*b* sous 3,5, couleurs vives « non lue ») ; les bandes noires sont dites et écartées
+   (même signature que l'aperçu sans bandes, à 2 de b* près aux ombres) ; les visages, écartés.
+   `partMinZone` (3 %) et `pixelsMinZone` (150) gardés : la plus petite zone lue à 20 faisait 6 %.
+   Aucune référence de Dany n'est un rendu marqué (son étalonnage le plus fort : saturation 12).
+2. Balayage (copie du RAW X-H2S, profils Camera PROVIA/Standard puis Adobe Couleur, Fusion 50) :
+   angles a*b* à saturation 25, d'une zone et d'un profil à l'autre à 6° près : teinte 0 → 10°,
+   60 → 98°, 120 → 156°, 180 → 191°, 240 → 281°, 300 → 336° (**`ancresTeinte`**) ; gain moyen des
+   six teintes, ombres 0,41, tons moyens 0,33, hautes lumières 0,26 (**`gainDepart`**), mais de 0,17
+   à 0,56 selon la teinte (vert et magenta les plus forts, jaune et bleu les plus faibles), que la
+   passe 2 corrige. Presque linéaire de 12 à 50 (teinte 30) aux ombres (0,25 à 0,29) et aux tons
+   moyens (0,21 à 0,23), moins aux hautes lumières (0,14 à 0,18 à 12, 0,19 à 0,21 à 50). Débordement avec Fusion 50 : les ombres et les hautes
+   lumières déplacent les tons moyens de 40 à 45 % de leur propre décalage, les tons moyens les
+   ombres de 20 % ; la passe 2 le rattrape (essai réel : elle a posé des ombres chaudes contre le
+   bleu des tons moyens débordé).
+3. Vibrance (même balayage, chroma des couleurs vives) : −30 ôte 5,2 (PROVIA) et 4,4 (Adobe
+   Couleur), +30 n'ajoute que 1,9 et 1,4 : **une pente par sens**, `vibranceParChromaHausse` 18 et
+   `vibranceParChromaBaisse` 6 (test `testLaVibranceMonteEtBaisseSelonSaPente`). Les lignes
+   d'étalonnage seul ne laissent PAS la chroma des couleurs vives sous 1 : jusqu'à 4,6 à saturation
+   25 (ombres 60 et 120, tons moyens 120) ; sous le seuil de 3 (`Measurements.seuilChroma`) pour les
+   saturations de Dany (6 à 12), pas au-delà : reste à traiter (voir plus bas).
+4. `EnableSplitToning` vaut déjà `true` sur toutes les photos lues (RAW, JPEG, ProcessVersion 11 et
+   15.4) ; `apply_settings` d'une seule `SplitToningShadowSaturation` (25, teinte 200) change bien
+   le rendu (ombres Δa −6,5, Δb −3,7) : rien à écrire de plus.
+5. Essai réel (référence 53671472, pont d'automne de Dany ; copie 53810562) : deux passes,
+   `rapproche_pct` 39 (distance 3,3 → 2,0 ; exposition 1,45 → 0,55 IL), Contraste et Vibrance à
+   leurs bornes (`limites`). Sur le portrait (copie 53811131, même référence) : la passe 1 n'avait
+   pas copié la saturation (scènes à 79 %), mais la passe 2 jugeait les scènes sur l'écart restant
+   (65 %, l'étalonnage rapproche les bandes) et posait Vibrance −20 : la peau a bougé de 5,2.
+   **Corrigé** : `ecartVise` garde les scènes du départ (test `testLaPasse2JugeLesScenesAuDepart`) ;
+   refait, la peau bouge de 2,5, `rapproche_pct` 68. `Teint.ecartVisible` (5) reste provisoire :
+   deux mesures seulement, et juger si 2,5 ou 5,2 se voient demande l'œil de Dany.
+6. Scènes (plans, distance des bandes, désormais dite `scenes_pct` dans l'écart, test
+   `testLEcartDitLaDistanceDesScenes`) : forêt contre plage 91 %, pont d'automne contre portrait 76
+   et 79 % ; même sortie : la même photo autrement développée 3 %, deux photos du même jour 43 et
+   44 %, un sentier 53 %, un camping à quelques minutes 59 et 68 %. **`seuilScenes` = 72**.
+
+Restent provisoires : `saturationMax` (25 / 40) et `vibranceMaxPasse` (20 ; avec la pente de 18,
+3 de chroma suffisent à l'atteindre) ; `Teint.ecartVisible` pour match_look (à faire avec Dany :
+la peau à 2,5 et 5,2 se voit-elle ?) ; le rendu à l'œil côte à côte (à faire avec Dany) ; une
+référence au rendu marqué (Dany n'en a pas) ; la chroma des couleurs vives que l'étalonnage
+déplace (3) ; l'ordre du traitement (étalonnage avant ou après le profil).
+
 Le rendu non linéaire de l'étalonnage (Fusion, profil) ne s'imite pas dans `swift test` : le faux
-rendu des tests (gain réel 0,3 contre 0,2 au modèle) vérifie seulement que la passe 2 corrige
+rendu des tests (gain réel 0,6, plus fort que le modèle) vérifie seulement que la passe 2 corrige
 d'après la mesure. L'ordre du traitement (étalonnage avant ou après le profil) n'est pas constaté.
 
 ## Mode HDR

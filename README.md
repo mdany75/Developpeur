@@ -828,8 +828,7 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   Il dit zone par zone ce qui s'est rapproché. Les visages ne guident pas la mesure, et si la peau
   bouge nettement, il en reprend la moitié et vous le signale ; les doses restent modérées
   (saturation de l'étalonnage 25 au plus, Vibrance sous son plafond). D'abord le plan ; rien ne
-  change sans votre accord. Une image hors du catalogue : l'importer d'abord. Pentes provisoires,
-  à relever dans Lightroom.
+  change sans votre accord. Une image hors du catalogue : l'importer d'abord.
 - Harmoniser une sortie entière par lumière (1.4) : Claude la partage d'abord en groupes de photos
   prises sous la même lumière, d'après l'heure de prise de vue (une pause de plus de 10 minutes,
   sauf au même lieu dans l'heure, selon Vision), le flash qui s'allume ou s'éteint, et la lumière de

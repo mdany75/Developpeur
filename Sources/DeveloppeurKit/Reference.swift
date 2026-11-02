@@ -14,9 +14,9 @@ import Foundation
 /// ne verdit pas les ombres d'une plage. Pur, sans Lightroom : `Tools+Reference` le branche.
 ///
 /// Les pentes (teinte de Lightroom → angle a*b*, a*b* par point de saturation, Vibrance par unité de
-/// chroma) sont PROVISOIRES, choisies hors de Lightroom : à relever par `--etalonnage --balayage` sur
-/// une copie d'Essais (docs/SPEC.md, Étalonnage d'après une référence, À constater). La passe 2
-/// corrige d'après ce que la passe 1 a montré.
+/// chroma) sont relevées par `--etalonnage --balayage` sur une copie d'Essais (2 novembre 2026,
+/// docs/SPEC.md, Étalonnage d'après une référence, À constater). La passe 2 corrige d'après ce que
+/// la passe 1 a montré.
 public enum Reference {
     /// Les zones tonales, dans l'ordre, et leurs noms dans le résultat.
     static let zones = ["ombres", "tons_moyens", "hautes_lumieres"]
@@ -34,9 +34,11 @@ public enum Reference {
     /// et `lumineuxMax` (plus sombre ou plus clair, la couleur ne se lit pas).
     static let limites = Eclairage.limitesTonales
     static let lumineuxMin = 8.0, lumineuxMax = 97.0
-    /// C* sous lequel un pixel dit la couleur de sa zone. PROVISOIRE (choisi hors de Lightroom) : à
-    /// relever par `--etalonnage` sur de vraies références (bornes 12 à 45).
-    static let chromaZone = 30.0
+    /// C* sous lequel un pixel dit la couleur de sa zone. Constaté le 2 novembre 2026 (`--etalonnage`
+    /// sur quatre références de Dany et un photogramme) : à 12, les ombres d'un paysage d'automne ne se
+    /// lisent pas ; dès 30, son feuillage orange tire les ombres (b* −8 à 20, +4 à 30, +24 à 45). 20
+    /// est la plus petite borne qui lit les trois zones partout.
+    static let chromaZone = 20.0
     /// Bornes du relevé de la signature.
     static let bornesReleve: [Double] = [12, 20, 30, 45]
     /// Une zone se lit à partir de cette part de l'image (en %) et de ce nombre de pixels.
@@ -48,8 +50,11 @@ public enum Reference {
     /// C* à partir duquel un pixel compte dans la répartition par bande de la TSL.
     static let chromaBandes = 15.0
     /// Distance entre les répartitions par bande (0 à 100 %) au-delà de laquelle les scènes
-    /// diffèrent : la saturation ne se copie pas. PROVISOIRE.
-    static let seuilScenes = 60.0
+    /// diffèrent : la saturation ne se copie pas. Constaté le 2 novembre 2026 (plans de match_look) :
+    /// scènes différentes, 76 à 91 % (forêt contre plage 91, pont d'automne contre portrait en salle
+    /// 76 et 79) ; photos d'une même sortie, de 3 % (la même photo autrement développée) à 68 % (un
+    /// camping, à quelques minutes, autre sujet) : 72, à mi-chemin, sépare les deux.
+    static let seuilScenes = 72.0
     /// Écart a*b* d'une zone (ou distance) sous lequel rien ne se corrige : celui de match_series.
     static let seuilZone = ToolHandler.seuilDominante
     /// Saturation de l'étalonnage par zone, au plus (40 avec strong_dose_requested). PROVISOIRE : une
@@ -225,7 +230,10 @@ public enum Reference {
     }
 
     /// L'écart qu'une passe suivante doit encore combler pour atteindre `force` de l'écart du départ :
-    /// ce qui reste, moins la part laissée exprès (1 − force) de l'écart du départ.
+    /// ce qui reste, moins la part laissée exprès (1 − force) de l'écart du départ. Les scènes se
+    /// jugent au départ : l'étalonnage de la passe 1 rapproche les répartitions par bande (constaté le
+    /// 2 novembre 2026, un portrait d'après un pont d'automne : 79 % avant, 65 % après), et la passe 2
+    /// copiait alors la saturation que la passe 1 avait écartée (Vibrance −20, la peau a bougé de 5,2).
     static func ecartVise(reste: Ecart, avant: Ecart, force: Double) -> Ecart {
         let laisse = 1 - force
         return Ecart(exposition: reste.exposition - laisse * avant.exposition, contraste: reste.contraste - laisse * avant.contraste,
@@ -233,7 +241,7 @@ public enum Reference {
                          guard let r = reste.zones[z] else { return nil }
                          return r - laisse * (avant.zones[z] ?? .zero)
                      },
-                     chroma: reste.chroma.map { $0 - laisse * (avant.chroma ?? 0) }, scenes: reste.scenes)
+                     chroma: reste.chroma.map { $0 - laisse * (avant.chroma ?? 0) }, scenes: avant.scenes)
     }
 
     /// La part commune aux zones lues : une dominante de toute l'image, donc la balance. Pas leur
@@ -272,16 +280,25 @@ public enum Reference {
 
     // MARK: Traduction
 
-    /// Teinte de Lightroom (0 à 360, roue de l'étalonnage) → angle a*b* (degrés). Ancres PROVISOIRES :
-    /// les angles L*a*b* des primaires et secondaires sRGB (rouge 40°, jaune 102°, vert 136°, cyan
-    /// 196°, bleu 306°, magenta 328°) ; à relever par `--etalonnage --balayage`.
+    /// Teinte de Lightroom (0 à 360, roue de l'étalonnage) → angle a*b* (degrés). Constaté le 2 novembre
+    /// 2026 (`--etalonnage --balayage`, copie d'un RAW X-H2S, profils PROVIA et Adobe Couleur, Fusion
+    /// 50) : angle mesuré à saturation 25, moyenne des trois zones et des deux profils (écarts de 6°
+    /// au plus d'une zone ou d'un profil à l'autre).
     static let ancresTeinte: [(lightroom: Double, lab: Double)] = [
-        (0, 40), (60, 102), (120, 136), (180, 196), (240, 306), (300, 328), (360, 400),
+        (0, 10), (60, 98), (120, 156), (180, 191), (240, 281), (300, 336), (360, 370),
     ]
-    /// a*b* gagné dans sa zone par point de saturation de l'étalonnage, par zone. PROVISOIRE.
-    static let gainDepart = [0.2, 0.2, 0.2]
-    /// Vibrance par unité de chroma médiane. PROVISOIRE.
-    static let vibranceParChromaDepart = 2.0
+    /// a*b* gagné dans sa zone par point de saturation de l'étalonnage, par zone. Constaté le même jour
+    /// (moyenne des six teintes, deux profils) : ombres 0,41, tons moyens 0,33, hautes lumières 0,26 ;
+    /// de 0,17 à 0,56 selon la teinte (vert et magenta les plus forts, jaune et bleu les plus faibles),
+    /// que la passe 2 corrige. Presque linéaire de 12 à 50 (ombres 0,25 à 0,29 ; tons moyens 0,21 à
+    /// 0,23), moins aux hautes lumières (0,14 à 0,18 à 12, 0,19 à 0,21 à 50).
+    static let gainDepart = [0.41, 0.33, 0.26]
+    /// Vibrance par unité de chroma des couleurs vives, selon le sens. Constaté le 2 novembre 2026
+    /// (`--balayage`, X-H2S) : −30 de Vibrance ôte 5,2 de chroma en PROVIA, 4,4 en Adobe Couleur (5,8
+    /// et 6,9 par unité) ; +30 n'en ajoute que 1,9 et 1,4 (15,6 et 21,1) : la Vibrance ménage les
+    /// couleurs déjà vives en montant, pas en baissant.
+    static let vibranceParChromaHausse = 18.0, vibranceParChromaBaisse = 6.0
+    static func vibranceParChromaDepart(hausse: Bool) -> Double { hausse ? vibranceParChromaHausse : vibranceParChromaBaisse }
 
     static func angleLab(teinte: Double) -> Double {
         let h = teinte.truncatingRemainder(dividingBy: 360) + (teinte < 0 ? 360 : 0)
@@ -312,7 +329,8 @@ public enum Reference {
     /// Les pentes d'une photo : départ provisoire, puis corrigées d'après la passe 1.
     struct Pentes: Equatable {
         var gain = Reference.gainDepart
-        var vibranceParChroma = Reference.vibranceParChromaDepart
+        /// nil : la pente de départ du sens voulu (`vibranceParChromaDepart`) ; sinon, celle de la passe 1.
+        var vibranceParChroma: Double?
         var serie = ToolHandler.PentesSerie()
         init() {}
     }
@@ -397,7 +415,8 @@ public enum Reference {
                 limites.append("Les couleurs des deux scènes diffèrent (\(Int(ecart.scenes.rounded())) % de répartition par bande) : la saturation n'est pas copiée.")
             } else if let chroma = ecart.chroma, abs(chroma) >= Measurements.seuilChroma {
                 let actuelle = etat.valeur("Vibrance")
-                let delta = min(max(chroma * pentes.vibranceParChroma * k, -vibranceMaxPasse), vibranceMaxPasse)
+                let pente = pentes.vibranceParChroma ?? vibranceParChromaDepart(hausse: chroma > 0)
+                let delta = min(max(chroma * pente * k, -vibranceMaxPasse), vibranceMaxPasse)
                 var finale = min(max(actuelle + delta, -100), 100)
                 let plafond = DevelopCatalogue.plafondsDose.first { $0.key == "Vibrance" }?.max ?? 30
                 if !options.doseForte, abs(finale) > plafond, abs(finale) > abs(actuelle) {
@@ -444,7 +463,8 @@ public enum Reference {
         if let v1 = apres["Vibrance"], let c0 = mesureAvant.chromaCouleurs, let c1 = mesureApres.chromaCouleurs {
             let curseur = v1 - avant.valeur("Vibrance"), mesure = c1 - c0
             if abs(mesure) >= 0.5, curseur / mesure > 0 {
-                nouvelles.vibranceParChroma = min(max(curseur / mesure, vibranceParChromaDepart / 4), vibranceParChromaDepart * 4)
+                let depart = vibranceParChromaDepart(hausse: curseur > 0)
+                nouvelles.vibranceParChroma = min(max(curseur / mesure, depart / 4), depart * 4)
             }
         }
         return nouvelles
@@ -483,6 +503,9 @@ public enum Reference {
             objet["commune"] = ["a": arrondi(c.a), "b": arrondi(c.b), "lecture": "part commune aux zones (balance) : copiée seulement avec adjust white_balance"]
         }
         objet["distance"] = distance(e, balance: balance).map { arrondi($0) } ?? "pas de zones comparables"
+        // Distance des répartitions par bande (0 à 100 %) : au-delà de `seuilScenes`, la saturation
+        // ne se copie pas ; dite pour qu'un essai réel la lise (relevé du 2 novembre 2026).
+        objet["scenes_pct"] = arrondi(e.scenes, 0)
         return .object(objet)
     }
 }

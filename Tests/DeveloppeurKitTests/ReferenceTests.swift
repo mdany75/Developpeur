@@ -40,8 +40,8 @@ final class ReferenceTests: XCTestCase {
             let l = min(max(12 + 80 * Double(x) / Double(largeur - 1) + exposition, 0), 100)
             let decalage = l < 40 ? ombres : (l < 70 ? moyens : hautes)
             if let peau, peau.contains(CGPoint(x: (Double(x) + 0.5) / Double(largeur), y: (Double(y) + 0.5) / Double(hauteur))) {
-                // Une peau (L* 62), décalée comme les tons moyens.
-                return srgb(62, 14 + moyens.a, 18 + moyens.b)
+                // Une peau pâle (L* 62, C* 16 : sous chromaZone, elle tirerait la zone), décalée comme les tons moyens.
+                return srgb(62, 10 + moyens.a, 13 + moyens.b)
             }
             return srgb(l, decalage.a, decalage.b)
         }
@@ -126,6 +126,20 @@ final class ReferenceTests: XCTestCase {
         XCTAssertGreaterThan(s.bandes[3], 80, "mais compte dans la répartition par bande (vert)")
     }
 
+    /// Constaté le 2 novembre 2026 (`--etalonnage`, un paysage d'automne de Dany) : à C* < 30, le
+    /// feuillage orange des ombres (C* 20 à 30) tirait leur b* de −8 à +4 ; à 20, il reste dehors.
+    func testUnFeuillageTerneNeTirePasLesOmbres() throws {
+        let gris = Self.degrade()
+        let s = Self.signature { x, y in
+            let l = 12 + 80 * Double(x) / 299
+            // Un tiers de la hauteur : un feuillage orange terne (C* ≈ 25) dans les ombres.
+            return l < 40 && y < 70 ? Self.srgb(l, 12, 22) : gris(x, y)
+        }
+        let ombres = try XCTUnwrap(s.zones[0])
+        XCTAssertEqual(ombres.b, 0, accuracy: 1, "le feuillage (C* 25) reste hors de la couleur des ombres")
+        XCTAssertLessThan(Reference.chromaZone, hypot(12, 22))
+    }
+
     func testLesBandesNoiresDUnPhotogrammeSontEcartees() {
         let avec = Self.signature(Self.degrade(bandes: 25))
         let sans = Self.signature(Self.degrade())
@@ -154,7 +168,9 @@ final class ReferenceTests: XCTestCase {
         for teinte in stride(from: 0.0, to: 360, by: 15) {
             XCTAssertEqual(Reference.teinteLightroom(angle: Reference.angleLab(teinte: teinte)), teinte, accuracy: 0.01, "\(teinte)")
         }
-        XCTAssertEqual(Reference.angleLab(teinte: 0), 40, accuracy: 0.01)
+        // Ancres relevées le 2 novembre 2026 (balayage) : le rouge de Lightroom (0) tombe à 10° en a*b*.
+        XCTAssertEqual(Reference.angleLab(teinte: 0), 10, accuracy: 0.01)
+        XCTAssertEqual(Reference.angleLab(teinte: 200), 221, accuracy: 0.01, "191 + 20/60 × 90")
     }
 
     func testUnEcartNulNeDonneAucunReglage() {
@@ -167,16 +183,17 @@ final class ReferenceTests: XCTestCase {
         let ombres = try XCTUnwrap(reglages["SplitToningShadowHue"]), hautes = try XCTUnwrap(reglages["SplitToningHighlightHue"])
         XCTAssertTrue((150...260).contains(ombres), "ombres bleu-vert : \(ombres)")
         XCTAssertTrue((0...70).contains(hautes), "hautes lumières orange : \(hautes)")
-        // 0,6 × 7,2 / 0,2 ≈ 22.
-        XCTAssertEqual(reglages["SplitToningShadowSaturation"] ?? 0, 22, accuracy: 1)
+        // 0,6 × 7,2 / 0,41 ≈ 11 (gain relevé des ombres).
+        XCTAssertEqual(reglages["SplitToningShadowSaturation"] ?? 0, 0.6 * hypot(4, 6) / Reference.gainDepart[0], accuracy: 1)
         XCTAssertNil(reglages["ColorGradeMidtoneSat"], "tons moyens au milieu : rien")
         XCTAssertNil(reglages["ColorGradeShadowHue"], "la clé que Lightroom refuse n'est jamais écrite")
         let (fort, _) = Reference.traduire(ecart([.init(a: -2, b: -3), .zero, .init(a: 2, b: 3)]), etat: neutre, options: { var o = Reference.Options(); o.force = 1; return o }(), pentes: .init())
-        XCTAssertEqual(fort["SplitToningShadowSaturation"] ?? 0, 18, accuracy: 1, "strength 1 : 3,6 / 0,2")
+        XCTAssertEqual(fort["SplitToningShadowSaturation"] ?? 0, hypot(2, 3) / Reference.gainDepart[0], accuracy: 1, "strength 1 : 3,6 / 0,41")
         // Écriture absolue : la valeur finale part de l'étalonnage déjà posé (même teinte : la saturation s'ajoute).
         let posee = Reference.Etat(reglages: ["SplitToningShadowHue": ombres, "SplitToningShadowSaturation": 10], raw: false)
         let (ensuite, _) = Reference.traduire(ecart([.init(a: -4, b: -6), .zero, .init(a: 4, b: 6)]), etat: posee, options: .init(), pentes: .init())
-        XCTAssertEqual(ensuite["SplitToningShadowSaturation"] ?? 0, 32 > Reference.saturationMax ? Reference.saturationMax : 32, accuracy: 1)
+        let somme = 10 + 0.6 * hypot(4, 6) / Reference.gainDepart[0]
+        XCTAssertEqual(ensuite["SplitToningShadowSaturation"] ?? 0, min(somme, Reference.saturationMax), accuracy: 1)
     }
 
     /// Critique du plan (important) : sans white_balance, un écart égal dans les trois zones (une
@@ -227,7 +244,8 @@ final class ReferenceTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(pareil["SplitToningShadowSaturation"] ?? 50, 50, "ni coupé à 25 ni augmenté au-delà")
         XCTAssertLessThanOrEqual(pareil["SplitToningShadowSaturation"] ?? 50, 50)
         let (moins, _) = Reference.traduire(ecart([-10 * direction, .zero, .zero]), etat: etat, options: .init(), pentes: .init())
-        XCTAssertEqual(moins["SplitToningShadowSaturation"] ?? 0, 20, accuracy: 1, "baisser : libre (10 − 6 = 4 a*b*, soit 20)")
+        let g = Reference.gainDepart[0]
+        XCTAssertEqual(moins["SplitToningShadowSaturation"] ?? 0, (50 * g - 6) / g, accuracy: 1, "baisser : libre (50 × 0,41 − 6 a*b*, soit 35)")
     }
 
     func testVibranceBorneeEtJamaisSaturation() {
@@ -243,6 +261,39 @@ final class ReferenceTests: XCTestCase {
         let (scenes, notes) = Reference.traduire(ecart([nil, nil, nil], chroma: 20, scenes: 80), etat: etat, options: .init(), pentes: .init())
         XCTAssertNil(scenes["Vibrance"], "scènes différentes : la saturation ne se copie pas")
         XCTAssertTrue(notes.contains { $0.contains("scènes diffèrent") })
+    }
+
+    /// Constaté le 2 novembre 2026 (balayage, X-H2S) : −30 de Vibrance ôte 5 à 7 de chroma aux couleurs
+    /// vives, +30 n'en ajoute que 1,4 à 1,9. La pente de départ suit le sens voulu.
+    func testLaVibranceMonteEtBaisseSelonSaPente() {
+        let (monte, _) = Reference.traduire(ecart([nil, nil, nil], chroma: 3), etat: neutre, options: .init(), pentes: .init())
+        XCTAssertEqual(monte["Vibrance"] ?? 0, Reference.vibranceMaxPasse, "3 de chroma en plus : 0,6 × 3 × 18 ≈ 32, borné à 20 par passe")
+        let (baisse, _) = Reference.traduire(ecart([nil, nil, nil], chroma: -3), etat: neutre, options: .init(), pentes: .init())
+        XCTAssertEqual(baisse["Vibrance"] ?? 0, (-3 * 0.6 * Reference.vibranceParChromaBaisse).rounded(), "3 de chroma en moins : −0,6 × 3 × 6 ≈ −11")
+        // Une pente observée à la passe 1 remplace celle du départ.
+        var observees = Reference.Pentes()
+        observees.vibranceParChroma = 4
+        XCTAssertEqual(Reference.traduire(ecart([nil, nil, nil], chroma: 3), etat: neutre, options: .init(), pentes: observees).reglages["Vibrance"],
+                       (3 * 0.6 * 4).rounded())
+    }
+
+    /// Constaté le 2 novembre 2026 (portrait d'après un pont d'automne) : l'étalonnage de la passe 1
+    /// rapproche les répartitions par bande (79 % → 65 %) ; la passe 2 juge les scènes sur l'écart du
+    /// départ et ne copie pas la saturation que la passe 1 avait écartée.
+    func testLaPasse2JugeLesScenesAuDepart() {
+        let avant = ecart([nil, nil, nil], chroma: -12, scenes: 79), reste = ecart([nil, nil, nil], chroma: 3, scenes: 65)
+        let vise = Reference.ecartVise(reste: reste, avant: avant, force: 0.6)
+        XCTAssertEqual(vise.scenes, 79)
+        XCTAssertNil(Reference.traduire(vise, etat: neutre, options: .init(), pentes: .init()).reglages["Vibrance"])
+        // Scènes proches (relevé : même sortie, 3 à 68 %) sous le seuil, forêt contre plage (91 %) au-dessus.
+        XCTAssertLessThan(68, Reference.seuilScenes)
+        XCTAssertGreaterThan(76, Reference.seuilScenes)
+    }
+
+    /// Relevé du 2 novembre 2026 : l'écart dit la distance des scènes (scenes_pct), pour que l'essai réel la lise.
+    func testLEcartDitLaDistanceDesScenes() {
+        let json = Reference.ecartJSON(ecart([.zero, .zero, .zero], scenes: 43.4), balance: false)
+        XCTAssertEqual(json["scenes_pct"]?.double, 43)
     }
 
     func testSaturationDeLEtalonnageBornee() {
@@ -269,8 +320,8 @@ final class ReferenceTests: XCTestCase {
 
     /// Le faux module : la photo 1 (référence) a des ombres sarcelle et des hautes lumières orange ;
     /// la photo 2, grise, se rend d'après ses réglages, avec un gain réel de `gainReel` a*b* par point
-    /// de saturation (le modèle de match_look en suppose 0,2 : la passe 2 corrige).
-    func brancherRendu(gainReel: Double = 0.3, reference: [Reference.Vecteur] = [.init(a: -3, b: -4), .zero, .init(a: 3, b: 4)],
+    /// de saturation (plus fort que le modèle de match_look, `Reference.gainDepart` : la passe 2 corrige).
+    func brancherRendu(gainReel: Double = 0.6, reference: [Reference.Vecteur] = [.init(a: -3, b: -4), .zero, .init(a: 3, b: 4)],
                        peau: CGRect? = nil) -> () -> [String: Double] {
         var etat: [String: Double] = [:]
         let verrou = NSLock()
@@ -336,7 +387,7 @@ final class ReferenceTests: XCTestCase {
         let avant = try XCTUnwrap(ligne["ecart_avant"]?["distance"]?.double), apres = try XCTUnwrap(ligne["ecart_apres"]?["distance"]?.double)
         XCTAssertLessThan(apres, avant / 3, "la photo s'est rapprochée de la référence")
         XCTAssertGreaterThan(ligne["rapproche_pct"]?.double ?? 0, 60)
-        // Le gain réel (0,3) est plus fort que le modèle (0,2) : la passe 2 baisse la saturation.
+        // Le gain réel (0,6) est plus fort que le modèle (0,41 aux ombres) : la passe 2 baisse la saturation.
         let s1 = try XCTUnwrap(ecritures[0].params["reglages"]?["SplitToningShadowSaturation"]?.double)
         XCTAssertLessThan(etat()["SplitToningShadowSaturation"] ?? 99, s1)
     }

@@ -99,4 +99,4 @@ au suivi d'une longue série (`ContexteAppel`).
   Au plus deux passes, chacune UNE écriture absolue (valeurs finales d'après les réglages relus),
   `sans_avant_apres` ; la passe 2 vise `strength` de l'écart du départ. Peau qui bouge de
   `Teint.ecartVisible` : moitié du changement des tons moyens, `a_verifier`. La fenêtre le traite
-  comme `match_series` (`Conversation.SERIES`). Pentes provisoires : `--etalonnage`.
+  comme `match_series` (`Conversation.SERIES`). Pentes, `chromaZone` et `seuilScenes` relevés par `--etalonnage` le 2 novembre 2026 (SPEC) ; `Teint.ecartVisible` reste provisoire.

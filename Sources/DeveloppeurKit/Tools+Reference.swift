@@ -263,7 +263,7 @@ extension ToolHandler {
         var resultat: [String: JSONValue] = [
             "reference": .object(referenceJSON),
             "photos": .array(lignes),
-            "base": .string("Écarts « référence moins photo » : exposition en IL (L* médiane), contraste (L* P95 − P5), chroma médiane des pixels colorés (C* ≥ \(Int(Reference.chromaZone))), et pour chaque zone (ombres L* < \(Int(Reference.limites[0])), tons moyens, hautes lumières > \(Int(Reference.limites[1]))) la médiane a* (vert − / magenta +) et b* (bleu − / jaune +) de ses pixels peu saturés (C* < \(Int(Reference.chromaZone))), visages écartés, sans la part commune aux zones (médiane des trois) sauf avec white_balance ; distance = moyenne a*b* des zones. Pentes provisoires : la passe 2 corrige d'après la mesure."),
+            "base": .string("Écarts « référence moins photo » : exposition en IL (L* médiane), contraste (L* P95 − P5), chroma médiane des pixels colorés (C* ≥ \(Int(Reference.chromaZone))), et pour chaque zone (ombres L* < \(Int(Reference.limites[0])), tons moyens, hautes lumières > \(Int(Reference.limites[1]))) la médiane a* (vert − / magenta +) et b* (bleu − / jaune +) de ses pixels peu saturés (C* < \(Int(Reference.chromaZone))), visages écartés, sans la part commune aux zones (médiane des trois) sauf avec white_balance ; distance = moyenne a*b* des zones. Pentes relevées dans Lightroom (gain de l'étalonnage selon la teinte, de 0,17 à 0,56) : la passe 2 corrige d'après la mesure."),
         ]
         if !aVerifier.isEmpty { resultat["a_verifier"] = .array(aVerifier) }
         if let arret {

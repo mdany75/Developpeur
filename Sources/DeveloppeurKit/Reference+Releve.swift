@@ -39,7 +39,7 @@ extension Reference {
         func dire(_ ligne: String) { lignes.append(ligne); sortie(ligne) }
         let e = Eclairage.texte
         dire("Relevé de l'étalonnage : zones L* < \(Int(limites[0])), \(Int(limites[0])) à \(Int(limites[1])), > \(Int(limites[1])) ; "
-            + "chromaZone \(Eclairage.nombre(chromaZone)) (provisoire) ; bornes \(bornesReleve.map(Eclairage.nombre).joined(separator: ", "))"
+            + "chromaZone \(Eclairage.nombre(chromaZone)) ; bornes \(bornesReleve.map(Eclairage.nombre).joined(separator: ", "))"
             + (avecBalayage ? " ; balayage de \(balayage.count) rendus par photo (deux étapes « Claude · essai » chacun, copies virtuelles seulement)" : " ; lecture seule"))
         if avecBalayage, !fichiers.isEmpty { dire("(le balayage ne vaut que pour les photos de Lightroom : les fichiers sont lus tels quels)") }
 
