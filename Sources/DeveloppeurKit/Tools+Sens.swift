@@ -14,7 +14,8 @@ import Foundation
 ///    rangé (date_from, date_to : le module refuserait un filtre de date seul, ou au-delà de 5 000
 ///    photos), la photo de `similar_to` écartée ; pertinence relative : 0 au score médian de
 ///    l'index, 1 au meilleur ; sous `Sens.seuilPertinenceProvisoire`, écartée ; au plus
-///    `Sens.candidatsMax` ;
+///    `Sens.candidatsMax` ; une phrase dont la meilleure photo (dans les dates) a un score brut sous
+///    `Sens.plancherScoreBrutProvisoire` ne rend rien (« Rien ne ressemble vraiment… ») ;
 /// 4. `chercher` avec `parmi` (ces originaux, dans l'ordre de pertinence), les autres critères, le
 ///    tri (`aucun` : la pertinence), la page : le module garde l'ordre, décrit la page et compte
 ///    `total` parmi elles (une photo sortie du catalogue depuis son empreinte ne compte pas).
@@ -64,7 +65,7 @@ extension ToolHandler {
         // 3. Le classement, les dates, la pertinence.
         let classees = index.classer(vecteur)
         guard let meilleur = classees.first(where: { !exclus.contains($0.ligne.id) })?.score else {
-            return Self.resultatSens([], index: index, candidats: 0)
+            return Self.resultatSens([], index: index, candidats: 0, query: query)
         }
         let mediane = classees[classees.count / 2].score
         let debut = args.string("date_from").map { String($0.prefix(10)) }
@@ -74,18 +75,27 @@ extension ToolHandler {
                 throw LightroomError.invalid("« \(nom) » invalide : une date AAAA-MM-JJ est attendue.")
             }
         }
-        var candidats: [(id: Int, pertinence: Double)] = []
+        var candidats: [(id: Int, pertinence: Double, score: Float)] = []
+        var meilleurScoreBrut: Float?
         for (ligne, score) in classees where !exclus.contains(ligne.id) {
             if debut != nil || fin != nil {
                 guard let jour = ligne.jour else { continue }
                 if let debut, jour < debut { continue }
                 if let fin, jour > fin { continue }
             }
+            // Le plancher : une phrase dont la meilleure photo (dans les dates) ressemble trop peu ne
+            // rend rien, même si la pertinence relative la ferait passer.
+            if meilleurScoreBrut == nil {
+                meilleurScoreBrut = score
+                if query != nil, score < Sens.plancherScoreBrutProvisoire { break }
+            }
             let pertinence = meilleur > mediane ? Double((score - mediane) / (meilleur - mediane)) : 1
             if pertinence < Sens.seuilPertinenceProvisoire { break }
-            candidats.append((ligne.id, min(1, pertinence)))
+            candidats.append((ligne.id, min(1, pertinence), score))
         }
-        guard !candidats.isEmpty else { return Self.resultatSens([], index: index, candidats: 0) }
+        guard !candidats.isEmpty else {
+            return Self.resultatSens([], index: index, candidats: 0, query: query, meilleurScoreBrut: meilleurScoreBrut)
+        }
 
         // 4. Les autres critères, par le module, parmi les candidates, par tranches de
         //    `trancheSens` (5 000, MAX_TRI du module) dans l'ordre de pertinence, jusqu'à remplir la
@@ -136,26 +146,38 @@ extension ToolHandler {
         }
         reponse["remarques"] = .array(remarques)
         let photos = page
-        let pertinences = Dictionary(candidats.map { ($0.id, $0.pertinence) }, uniquingKeysWith: { a, _ in a })
+        let pertinences = Dictionary(candidats.map { ($0.id, ($0.pertinence, $0.score)) }, uniquingKeysWith: { a, _ in a })
         let marquees = photos.map { photo -> JSONValue in
-            guard var objet = photo.object, let id = objet["id"]?.int, let p = pertinences[id] else { return photo }
+            guard var objet = photo.object, let id = objet["id"]?.int, let (p, score) = pertinences[id] else { return photo }
             objet["pertinence"] = .number((p * 100).rounded() / 100)
+            // Le score brut (cosinus), pour le prochain relevé du plancher et du seuil.
+            objet["score_brut"] = .number((Double(score) * 1000).rounded() / 1000)
             return .object(objet)
         }
         reponse["photos"] = .array(marquees)
-        let bloc = Self.resultatSens(marquees, index: index, candidats: candidats.count)
+        let bloc = Self.resultatSens(marquees, index: index, candidats: candidats.count, meilleurScoreBrut: meilleurScoreBrut)
         reponse["recherche_par_le_sens"] = bloc["recherche_par_le_sens"]
         return .object(reponse)
     }
 
-    /// Le bloc `recherche_par_le_sens` (et, sans candidate, toute la réponse).
-    static func resultatSens(_ photos: [JSONValue], index: IndexSens, candidats: Int) -> JSONValue {
-        let bloc: JSONValue = [
+    /// Le bloc `recherche_par_le_sens` (et, sans candidate, toute la réponse : avec une phrase dont la
+    /// meilleure photo reste sous le plancher, « Rien ne ressemble vraiment… » dans `remarques`).
+    static func resultatSens(_ photos: [JSONValue], index: IndexSens, candidats: Int, query: String? = nil, meilleurScoreBrut: Float? = nil) -> JSONValue {
+        var bloc: [String: JSONValue] = [
             "modele": .string(index.modele), "photos_indexees": .number(Double(index.nombre)), "candidates": .number(Double(candidats)),
-            "remarque": .string("Seules les photos déjà analysées par le Suivi sont dans l'index ; pertinence relative (1 = la meilleure), seuil provisoire \(Bilan.nombre(Sens.seuilPertinenceProvisoire, decimales: 1)). À vérifier à l'œil."),
+            "remarque": .string("Seules les photos déjà analysées par le Suivi sont dans l'index ; pertinence relative (1 = la meilleure), seuil provisoire \(Bilan.nombre(Sens.seuilPertinenceProvisoire, decimales: 1)) ; score_brut : le cosinus, plancher provisoire \(Bilan.nombre(Double(Sens.plancherScoreBrutProvisoire), decimales: 2)). À vérifier à l'œil."),
         ]
-        return ["total": .number(Double(photos.count)), "decalage": 0, "renvoyees": .number(Double(photos.count)), "photos": .array(photos),
-                "recherche_par_le_sens": bloc]
+        var remarques: [JSONValue] = []
+        if let meilleurScoreBrut {
+            bloc["meilleur_score_brut"] = .number((Double(meilleurScoreBrut) * 1000).rounded() / 1000)
+            if let query, photos.isEmpty, meilleurScoreBrut < Sens.plancherScoreBrutProvisoire {
+                remarques.append(.string("Rien ne ressemble vraiment à « \(query) » parmi les \(index.nombre) photos indexées (meilleur score brut \(Bilan.nombre(Double(meilleurScoreBrut), decimales: 2)), sous le plancher provisoire \(Bilan.nombre(Double(Sens.plancherScoreBrutProvisoire), decimales: 2))) : aucune photo rendue. Le dire tel quel ; une autre phrase, ou les autres critères, peuvent chercher autrement."))
+            }
+        }
+        var reponse: [String: JSONValue] = ["total": .number(Double(photos.count)), "decalage": 0, "renvoyees": .number(Double(photos.count)), "photos": .array(photos),
+                                            "recherche_par_le_sens": .object(bloc)]
+        if !remarques.isEmpty { reponse["remarques"] = .array(remarques) }
+        return .object(reponse)
     }
 
     /// L'encodeur, ouvert une fois par processus.

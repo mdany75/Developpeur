@@ -4,7 +4,7 @@ import XCTest
 
 /// Un faux encodeur (jamais le vrai MobileCLIP) : une image donne sa couleur moyenne (rouge, vert,
 /// bleu, et un peu d'une quatrième composante), un texte l'axe de son mot (« red », « green »,
-/// « blue », sinon le quatrième).
+/// « blue », sinon le quatrième ; « unicorn » : l'opposé du rouge, hors sujet).
 final class FauxEncodeur: EncodeurSens {
     let modele: String
     let dimension = 4
@@ -26,6 +26,8 @@ final class FauxEncodeur: EncodeurSens {
 
     func vecteur(texte: String) throws -> [Float] {
         textes.append(texte)
+        // Hors sujet : aucune photo de l'index n'y ressemble (score brut 0 au mieux).
+        if texte.contains("unicorn") { return [-1, 0, 0, 0] }
         if texte.contains("red") { return [1, 0, 0, 0] }
         if texte.contains("green") { return [0, 1, 0, 0] }
         if texte.contains("blue") { return [0, 0, 1, 0] }
@@ -387,6 +389,47 @@ final class SensTests: XCTestCase {
         // L'encodeur s'ouvre une fois par processus.
         _ = tools.call(name: "find_photos", arguments: ["query": "green"])
         XCTAssertEqual(chercher(lightroom).last?["parmi"]?.array?.first?.int, 3)
+    }
+
+    /// Avant le plancher, la meilleure photo passait toujours (pertinence relative : 1 à la meilleure),
+    /// même quand rien ne ressemblait (relevé du 2 nov. 2026 : 21 photos fausses pour « a sunset »).
+    func testUnePhraseHorsSujetNeRendRienEtLeDit() throws {
+        let lightroom = FakeLightroom()
+        let tools = try outils(lightroom)
+        let result = tools.call(name: "find_photos", arguments: ["query": "a purple unicorn"])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertTrue(chercher(lightroom).isEmpty, "rien à passer au module")
+        let structure = try XCTUnwrap(result.structured)
+        XCTAssertEqual(structure["photos"]?.array?.count, 0)
+        XCTAssertEqual(structure["total"], 0)
+        let remarques = try XCTUnwrap(structure["remarques"]?.array).compactMap(\.string)
+        XCTAssertTrue(remarques.contains { $0.contains("Rien ne ressemble vraiment à « a purple unicorn »") }, "\(remarques)")
+        let meilleur = try XCTUnwrap(structure["recherche_par_le_sens"]?["meilleur_score_brut"]?.double)
+        XCTAssertLessThan(meilleur, Double(Sens.plancherScoreBrutProvisoire))
+        // Le plancher vaut aussi dans les dates : la meilleure de la période compte.
+        lightroom.calls = []
+        let periode = tools.call(name: "find_photos", arguments: ["query": "green", "date_from": "2021-01-01", "date_to": "2021-12-31"])
+        XCTAssertEqual(periode.structured?["photos"]?.array?.count, 0, "en 2021, seule la rouge foncé : rien de vert")
+        XCTAssertTrue(periode.text.contains("Rien ne ressemble vraiment"), periode.text)
+        XCTAssertTrue(chercher(lightroom).isEmpty)
+    }
+
+    func testUnePhraseProcheGardeSesPhotosAvecLeurScoreBrut() throws {
+        let lightroom = FakeLightroom()
+        let tools = try outils(lightroom)
+        let result = tools.call(name: "find_photos", arguments: ["query": "red"])
+        XCTAssertFalse(result.isError, result.text)
+        let structure = try XCTUnwrap(result.structured)
+        let photos = try XCTUnwrap(structure["photos"]?.array)
+        XCTAssertEqual(photos.first?["id"], 1)
+        let brut = try XCTUnwrap(photos.first?["score_brut"]?.double)
+        XCTAssertGreaterThan(brut, 0.9, "le cosinus de la rouge avec « red »")
+        XCTAssertNotNil(photos.first?["pertinence"], "la forme d'avant reste")
+        for photo in photos { XCTAssertNotNil(photo["score_brut"], "\(photo)") }
+        XCTAssertNil(structure["remarques"]?.array?.compactMap(\.string).first { $0.contains("Rien ne ressemble") })
+        XCTAssertEqual(structure["recherche_par_le_sens"]?["meilleur_score_brut"]?.double ?? 0, brut, accuracy: 0.001)
+        // similar_to n'a pas de plancher (image contre image).
+        XCTAssertFalse(try XCTUnwrap(tools.call(name: "find_photos", arguments: ["similar_to": 4]).structured?["photos"]?.array).isEmpty)
     }
 
     func testLesDatesSeFiltrentDApresLIndexSansLesEnvoyerAuModule() throws {
