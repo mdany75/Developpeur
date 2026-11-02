@@ -186,8 +186,8 @@ public enum Prompts {
             return """
             Classe des photos de Lightroom Classic : propose des mots-clés, un lieu et une légende, sans rien écrire avant l'accord de l'utilisateur, même en mode Appliquer. \(quoi) Ce sont ses photos personnelles : des mots simples, pour les retrouver.
 
-            1. view_photo sur chaque photo (Vision : sujets, scène) et get_settings › classement : mots-clés, légende, champs IPTC et position GPS déjà posés.
-            2. Mots-clés : list_keywords (query) pour reprendre ceux du catalogue, avec leur chemin (« Lieux > Canada > Montréal ») ; un nouveau mot-clé seulement s'il manque, au bon endroit de la hiérarchie. Quelques mots justes (sujet, scène, saison, activité), pas une liste.
+            1. view_photo sur chaque photo (Vision : sujets, scène ; species = true pour un animal, une plante ou un champignon) et get_settings › classement : mots-clés, légende, champs IPTC et position GPS déjà posés.
+            2. Mots-clés : list_keywords (query) pour reprendre ceux du catalogue, avec leur chemin (« Lieux > Canada > Montréal ») ; un nouveau mot-clé seulement s'il manque, au bon endroit de la hiérarchie. Quelques mots justes (sujet, scène, saison, activité), pas une liste. Le nom d'une espèce seulement si view_photo › espece l'a trouvée (trouvee vrai), en le disant « probable » ; jamais un nom de plus_proches.
             3. Lieu (iptc : sublocation, city, state, country) seulement s'il est sûr : repris d'un champ de lieu ou d'un mot-clé de lieu déjà posé. La position GPS seule ne nomme pas le lieu (aucun outil ne la traduit en ville ou en pays) : donne ses coordonnées et laisse l'utilisateur nommer le lieu ; jamais deviné, ni d'après l'image ni d'après les coordonnées. Sans rien de sûr, ne propose pas de lieu et dis-le.
             4. Légende (caption) : une phrase courte qui dit ce que montre la photo ; une légende déjà écrite par l'utilisateur (get_settings › classement › legende) reste, sauf s'il demande de la changer.
             5. Montre la proposition, photo par photo (mots-clés à ajouter, lieu, légende), et attends son accord ; il peut en retirer ou en changer.

@@ -128,6 +128,12 @@ public final class ToolHandler {
     public var sens: Suivi.IndexeurSens?
     /// L'encodeur, ouvert au premier usage et gardé pour le processus.
     var encodeurSens: EncodeurSens?
+    /// Les espèces (1.6.3, find_photos et view_photo avec species ; get_status) : BioCLIP 2 et la
+    /// liste. Nil par défaut (species refuse alors sans rien lancer) : seul main.swift le pose (serve()
+    /// et --call) ; les essais passent un faux encodeur, jamais le vrai modèle.
+    public var especes: MoteurEspeces?
+    /// Le classeur des espèces, ouvert au premier usage et gardé pour le processus.
+    var classeurEspeces: ClasseurEspeces?
     /// Les candidates d'une recherche par le sens passées au module par appel (Sens.candidatsMax ;
     /// moins dans les essais).
     var trancheSens = Sens.candidatsMax
@@ -496,6 +502,7 @@ public final class ToolHandler {
             etat["sauvegardes"] = sauvegardes
         }
         if let index = etatIndexSens(catalogue: chemin) { etat["recherche_par_le_sens"] = index }
+        if let bloc = etatEspeces() { etat["especes"] = bloc }
         return .object(etat)
     }
 

@@ -139,6 +139,21 @@ toucher :
 - `find_photos` par le sens passe les candidates au module par tranches de `Sens.candidatsMax`
   jusqu'à remplir la page (`Sens.tranchesMax`), et dit un total minimum ou une liste coupée.
 
+## Espèces (BioCLIP 2, 1.6.3)
+
+- BioCLIP 2 en CoreML (`Especes.swift`, `Tools+Especes.swift`), converti par
+  `scripts/preparer-bioclip.sh` (cosinus avec PyTorch d'au moins 0,99, sinon rien d'installé), lu par
+  `EncodeurMobileCLIP` (même tokeniseur, `Tests/Contrats/jetons-bioclip.json`). La liste
+  (`Resources/especes/especes.tsv`) n'existe qu'à un endroit : un nom douteux se retire, jamais ne se
+  devine ; ni doublon ni cultivar (`EspecesTests`). Ses vecteurs se gardent
+  (`Modeles/bioclip2_especes.cache`), refaits quand la liste ou le modèle changent.
+- `ToolHandler.especes` est nil par défaut : seul main.swift pose le vrai modèle, jamais `swift test`.
+  Sans lui, `species` refuse sans rien envoyer au module.
+- BioCLIP 2 ne sait pas dire qu'une image ne montre rien de vivant : la porte MobileCLIP
+  (`Especes.porteNature`) passe d'abord. Tous les seuils sont provisoires (`--especes-essai`).
+- Un mot-clé d'espèce ne s'écrit jamais sans l'accord de Dany ; `view_photo` ne dit l'espèce que sur
+  demande (`species`), jamais sur un avant/après.
+
 ## Catalogue et notation
 
 - Le catalogue des réglages (noms, plages, libellés) n'existe qu'à un endroit :

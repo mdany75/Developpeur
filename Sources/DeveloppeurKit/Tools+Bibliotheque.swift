@@ -63,10 +63,11 @@ extension ToolHandler {
         let search = searchCriteriaProperties
         return [
             tool("find_photos",
-                 "Cherche des photos dans tout le catalogue Lightroom (pas seulement la sélection) : texte, mot-clé, note, drapeau, libellé de couleur, appareil, objectif, ISO, format, dates, dossier, collection, retouchées ou non par Claude, exportées ou jamais ; et par ce que montre l'image (query, similar_to), sans mot-clé posé. Les critères se cumulent. Une personne nommée dans la vue Personnes de Lightroom : son nom en keyword. Renvoie le nombre total et une page de photos (id, fichier, prise de vue, note, drapeau, libellé, pile de Lightroom), triées par date de prise de vue (par pertinence avec query ou similar_to). Les identifiants servent aux autres outils (photo_ids).",
+                 "Cherche des photos dans tout le catalogue Lightroom (pas seulement la sélection) : texte, mot-clé, note, drapeau, libellé de couleur, appareil, objectif, ISO, format, dates, dossier, collection, retouchées ou non par Claude, exportées ou jamais ; et par ce que montre l'image (query, similar_to) ou l'espèce d'un animal ou d'une plante (species), sans mot-clé posé. Les critères se cumulent. Une personne nommée dans la vue Personnes de Lightroom : son nom en keyword. Renvoie le nombre total et une page de photos (id, fichier, prise de vue, note, drapeau, libellé, pile de Lightroom), triées par date de prise de vue (par pertinence avec query ou similar_to ; par score avec species). Les identifiants servent aux autres outils (photo_ids).",
                  properties: search + [
                     ("query", prop("string", "Ce que montre la photo, en anglais (traduire la demande) : « beach at sunset with a dog ». Cherche par le sens de l'image, sur ce Mac, dans l'index que remplit le Suivi (seulement les photos déjà analysées) ; chaque photo reçoit pertinence (1 = la meilleure, relative : pas une certitude, vérifier à l'œil).")),
                     ("similar_to", prop("integer", "Photos qui ressemblent à celle-ci (son id), par le même index.")),
+                    ("species", prop("string", "Un animal, une plante ou un champignon par son nom, en français ou en latin (« Cardinal rouge », « Acer saccharum »), ou un groupe (oiseau, mammifère, papillon, fleur, arbre, champignon, animal, plante), reconnu sur l'image par BioCLIP 2, sur ce Mac. Chaque photo reçoit espece (la plus probable, avec sa confiance) et score ; seuils provisoires, à vérifier à l'œil. Sans index du sens, avec un autre critère (collection, dossier, dates).")),
                     ("date_from", prop("string", "Prises de vue depuis ce jour inclus (AAAA-MM-JJ).")),
                     ("date_to", prop("string", "Prises de vue jusqu'à ce jour inclus (AAAA-MM-JJ).")),
                     ("folder", prop("string", "Dossier, par son chemin complet (sous-dossiers compris, sauf include_subfolders = false).")),
@@ -242,10 +243,13 @@ extension ToolHandler {
             guard (1...5_000).contains(value) else { throw LightroomError.invalid("« \(key) » : une focale en millimètres, de 1 à 5000.") }
             params[moduleKey] = .number(value)
         }
-        if params.isEmpty, !parLeSens { throw LightroomError.invalid("Aucun critère de recherche.") }
+        let parEspece = args.has("species")
+        if params.isEmpty, !parLeSens, !parEspece { throw LightroomError.invalid("Aucun critère de recherche.") }
         let limit = try intValue(args, "limit", range: 1...Int.max)?.int ?? Self.defaultSearchLimit
         params["limite"] = .number(Double(min(limit, Self.maxSearchLimit)))
         if let offset = try intValue(args, "offset", range: 0...Int.max) { params["decalage"] = offset }
+        // Les espèces (1.6.3) : leurs candidates, puis BioCLIP 2 (Tools+Especes.swift).
+        if parEspece { return try findPhotosParEspece(args, params) }
         if parLeSens { return try findPhotosParLeSens(args, params) }
         return try lightroom.send("chercher", params, timeout: Self.libraryTimeout)
     }

@@ -31,6 +31,7 @@ extension ToolHandler {
                     ], required: ["x", "y", "width", "height"])),
                     ("compare", enumProp(Self.comparaisons.map(\.parametre), "Avant/après côte à côte : before_claude = l'état d'avant la première retouche de Claude ; previous_step = avant la dernière retouche. L'Historique de Lightroom garde deux étapes « Claude · comparaison » (l'état d'avant, puis l'état actuel remis) : la photo revient telle qu'elle était. En fin de retouche, before_claude garde aussi le rendu ; rendu_reproductible (une retouche repartie de l'origine) : l'écart avec la précédente, à dire.")),
                     ("af_point", prop("boolean", "true = le point de mise au point de l'appareil dessiné sur l'image ou le zoom (region) : cadre AF rouge, point au centre (manquée : point_af.appareil) ; fichiers Fujifilm seulement. Pour noter, ou montrer la mise au point. Sans lui, point_af le donne en chiffres (avec la netteté autour ; sur un zoom, dans_la_zone) ; l'utilisateur peut le vouloir dessiné en tout temps.")),
+                    ("species", prop("boolean", "true = « espece » : l'animal, la plante ou le champignon le plus probable (nom français et latin, confiance), d'après BioCLIP 2 sur ce Mac, seulement au-dessus d'un seuil provisoire ; sur un zoom (region), celui de la zone. Pour classer : le nom en mot-clé seulement s'il est sûr, après l'accord de l'utilisateur.")),
                  ],
                  required: []),
             tool("measure_angle",
@@ -122,12 +123,16 @@ extension ToolHandler {
             info["reglages"] = Self.grouped(settings, onlyChanged: true, raw: raw)
         }
         Self.describeProcessVersion(&info)
+        // L'image dont species dit l'espèce (1.6.3) : l'aperçu entier ou le zoom, avant tout carré.
+        let especeDemandee = args.bool("species") == true
+        var imageEspece: CGImage?
 
         if let region {
             guard let piece = PreviewImages.crop(image, region: region) else {
                 throw LightroomError.plugin("Zone trop petite ou aperçu illisible.")
             }
             image = piece.data
+            if especeDemandee { imageEspece = PreviewImages.image(piece.data) }
             info["zoom"] = [
                 "pourcentage": .number(Double(piece.zoom)),
                 "pixels": .string("\(piece.width) × \(piece.height)"),
@@ -199,6 +204,7 @@ extension ToolHandler {
                 info["rendu_reproductible"] = comparaison
             }
         } else if let decodee = PreviewImages.image(image) {
+            imageEspece = decodee
             // Un seul décodage du JPEG ; une seule réduction à 512 px pour les mesures, les tons
             // neutres suivis du bilan et l'éclairage ; le détail à 1024 px ; Vision une fois.
             let reduite = PreviewImages.scaled(decodee, maxSide: Measurements.maxSide)
@@ -272,6 +278,9 @@ extension ToolHandler {
                 info["intention_boitier"] = intention.json(raw: raw, profil: raw ? profilDuBoitier(intention, appareil: result["appareil"]) : nil,
                                                            profilActuel: result["profil"]?.string)
             }
+        }
+        if especeDemandee {
+            info["espece"] = compare != nil ? ["trouvee": false, "remarque": "pas sur un avant/après : view_photo sans compare"] : especeDeLImage(imageEspece)
         }
         return ToolResult(content: [Self.imageContent(image), .text(JSONCoding.pretty(.object(info)))])
     }

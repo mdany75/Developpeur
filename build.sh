@@ -182,6 +182,9 @@ cp "${ROOT_DIR}/install.sh" "${ROOT_DIR}/uninstall.sh" "${ROOT_DIR}/README.md" \
 # Le vocabulaire du tokeniseur de CLIP (recherche par le sens, 1.6 ; licence MIT), qu'install.sh copie
 # dans Developpeur/Modeles s'il y manque.
 cp "${ROOT_DIR}/Resources/clip/bpe_simple_vocab_16e6.txt.gz" "${STAGE}/"
+# La liste des espèces (1.6.3), qu'install.sh copie dans Developpeur/Modeles (BioCLIP 2 lui-même ne
+# vient pas avec l'archive : scripts/preparer-bioclip.sh).
+cp "${ROOT_DIR}/Resources/especes/especes.tsv" "${STAGE}/"
 chmod 755 "${STAGE}/install.sh" "${STAGE}/uninstall.sh"
 
 # --- 5. Signature -------------------------------------------------------------

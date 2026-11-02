@@ -1,5 +1,27 @@
 # Changements
 
+## Non publié
+
+### Ajouté
+- Les espèces : Claude reconnaît un oiseau, un animal, une fleur, un arbre ou un champignon par son
+  nom. « Mes photos de cardinal rouge », « les oiseaux de mes vacances » : `find_photos` avec
+  `species` (un nom en français ou en latin, ou un groupe : oiseau, mammifère, papillon, fleur,
+  arbre, champignon, animal, plante…), combiné aux autres critères ; « quel est cet oiseau ? » :
+  `view_photo` avec `species`, sur la photo entière ou sur un zoom. La liste compte 3 928 espèces
+  d'Amérique du Nord et des voyages les plus photographiés (Europe, Caraïbes, Mexique, Amérique du
+  Sud, safari, Asie, Océanie), chacune avec son nom français et son nom scientifique. Tout se calcule
+  sur votre Mac (BioCLIP 2, licence MIT ; MobileCLIP vérifie d'abord que la photo montre bien un
+  animal ou une plante) : aucune image ne part. L'espèce n'est dite que si elle est probable, avec sa
+  confiance (seuils provisoires, à vérifier à l'œil), et un mot-clé d'espèce ne s'écrit qu'avec votre
+  accord ; l'invite Classer la propose quand elle est sûre.
+- `scripts/preparer-bioclip.sh` installe le modèle (850 Mo dans
+  `~/Library/Application Support/Developpeur/Modeles/`) : téléchargement, conversion pour votre Mac,
+  comparaison avec l'original, dans un dossier temporaire effacé ensuite. L'installation copie la
+  liste des espèces et prépare ses vecteurs (une quinzaine de secondes, une fois). Sans le modèle,
+  tout marche comme avant et `get_status` le dit.
+- `mcp-developpeur --especes-essai <dossier de JPEG>` (développement) : l'espèce de chaque image,
+  sans Lightroom, pour juger le modèle et relever les seuils sur vos photos.
+
 ## 1.6.2 — 2026-11-02
 
 La 1.6.2 ajoute Classer : Claude propose des mots-clés, un lieu et une légende, et n'écrit rien

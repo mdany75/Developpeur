@@ -67,6 +67,11 @@ func usage(erreur: Bool = false) {
                 [--nombre 200] [--requetes '["a dog", …]'] [--garder <dossier>]
                 un lot de vignettes dans un index temporaire, puis les requêtes (telles quelles et « a photo of … ») ;
                 lecture seule ; une ligne JSON, l'avancement sur stderr
+            mcp-developpeur --preparer-especes   ouvre BioCLIP 2 (Developpeur/Modeles, scripts/preparer-bioclip.sh),
+                calcule et garde les vecteurs de la liste des espèces s'ils manquent (install.sh) ; une ligne JSON avec les temps
+            mcp-developpeur --especes-essai <dossier de JPEG> [--espece <nom ou groupe>] [--nombre 200]
+                développement : l'espèce la plus probable de chaque image du dossier (et les trois premières), le temps
+                par image, et avec --espece le score de l'espèce ou du groupe cherché ; ni Lightroom ni catalogue
             mcp-developpeur --graphiques '<json>' <dossier>
                 le Suivi : les tuiles et les neuf graphiques d'une période d'après suivi.json (et carnet.json), lus
                 seulement, dessinés en PNG 2x dans le dossier, puis une ligne JSON avec les rectangles des barres
@@ -147,6 +152,8 @@ func outils() -> ToolHandler {
     tools.fibo = fibo
     // La recherche par le sens (1.6) : le vrai MobileCLIP de ce Mac, ouvert au premier usage.
     tools.sens = moteurSens()
+    // Les espèces (1.6.3) : le vrai BioCLIP 2 de ce Mac, ouvert au premier usage.
+    tools.especes = moteurEspeces()
     // Développement : l'écrit et le relu des masques d'add_mask (DEVELOPPEUR_RELEVE_FORMES=1).
     tools.releveFormes = ProcessInfo.processInfo.environment["DEVELOPPEUR_RELEVE_FORMES"] == "1"
     return tools
@@ -162,6 +169,28 @@ func moteurSens() -> Suivi.IndexeurSens {
         }
         return try EncodeurMobileCLIP(fichiers: fichiers)
     }
+}
+
+/// Les espèces (1.6.3) : BioCLIP 2 et la liste dans Developpeur/Modeles ; pour le serveur, --call et
+/// les options des espèces seulement.
+func moteurEspeces() -> ToolHandler.MoteurEspeces {
+    ToolHandler.MoteurEspeces(manquants: { Especes.trouver().manquants }) { try ouvrirEspeces().classeur }
+}
+
+/// Le classeur des espèces et le temps de son ouverture (encodeur, liste, vecteurs relus ou calculés).
+func ouvrirEspeces(avancement: ((Int, Int) -> Void)? = nil) throws -> (classeur: ClasseurEspeces, fichiers: Especes.Fichiers, secondes: Double) {
+    let trouves = Especes.trouver()
+    guard let fichiers = trouves.fichiers else {
+        throw LightroomError.invalid("Espèces : il manque \(trouves.manquants.joined(separator: " ; ")).")
+    }
+    let debut = Date()
+    let encodeur = try EncodeurMobileCLIP(fichiers: fichiers.sens, modele: Especes.nomModele)
+    let liste = try Especes.Liste(fichier: fichiers.liste)
+    // La porte « animal ou plante ? » : MobileCLIP, s'il est là (Especes.porteNature).
+    let porte = Sens.trouver().fichiers.flatMap { try? EncodeurMobileCLIP(fichiers: $0) }
+    let classeur = try ClasseurEspeces.ouvrir(liste: liste, encodeur: encodeur, cache: fichiers.cache,
+                                              empreinteModele: Especes.empreinteModele(fichiers.texte), porte: porte, avancement: avancement)
+    return (classeur, fichiers, Date().timeIntervalSince(debut))
 }
 
 func serve() {
@@ -438,6 +467,93 @@ case "--sens-essai":
         print(line: JSONCoding.line(.object(resultat)))
     } catch {
         if garder == nil { try? FileManager.default.removeItem(at: dossierIndex) }
+        print(line: JSONCoding.line(["ok": false, "erreur": .string(error.localizedDescription)]))
+        exit(1)
+    }
+case "--preparer-especes":
+    // install.sh (1.6.3) : BioCLIP 2 ouvert, les vecteurs de la liste calculés et gardés s'ils manquent
+    // ou si la liste ou le modèle ont changé ; une ligne JSON, l'avancement sur stderr.
+    do {
+        let ouvert = try ouvrirEspeces { fait, total in log("vecteurs des espèces : \(fait) sur \(total)") }
+        print(line: JSONCoding.line([
+            "ok": true, "especes": .number(Double(ouvert.classeur.liste.especes.count)), "dimension": .number(Double(ouvert.classeur.dimension)),
+            "depuis_le_cache": .bool(ouvert.classeur.depuisLeCache), "ouverture_s": .number((ouvert.secondes * 10).rounded() / 10),
+            "cache": .string(ouvert.fichiers.cache.path),
+        ]))
+    } catch {
+        print(line: JSONCoding.line(["ok": false, "erreur": .string(error.localizedDescription), "manquants": .array(Especes.trouver().manquants.map(JSONValue.string))]))
+        exit(1)
+    }
+case "--especes-essai":
+    // Développement (1.6.3) : l'espèce de chaque JPEG d'un dossier, sans Lightroom, pour juger BioCLIP 2
+    // et relever les seuils provisoires ; une ligne JSON finale.
+    var reste = arguments.dropFirst()
+    var dossierImages: URL?
+    var demandeEspece: String?
+    var nombreImages = 200
+    while let option = reste.first {
+        reste = reste.dropFirst()
+        switch option {
+        case "--espece": guard let v = reste.first else { usage(); exit(2) }; demandeEspece = v; reste = reste.dropFirst()
+        case "--nombre": guard let v = reste.first, let n = Int(v) else { usage(); exit(2) }; nombreImages = n; reste = reste.dropFirst()
+        default: dossierImages = URL(fileURLWithPath: option)
+        }
+    }
+    guard let dossierImages else { usage(); exit(2) }
+    do {
+        let ouvert = try ouvrirEspeces { fait, total in log("vecteurs des espèces : \(fait) sur \(total)") }
+        let classeur = ouvert.classeur
+        var cible: Especes.Cible?
+        if let demandeEspece {
+            guard let c = classeur.liste.resoudre(demandeEspece) else {
+                print(line: JSONCoding.line(["ok": false, "erreur": .string("« \(demandeEspece) » inconnu"), "proches": .array(classeur.liste.suggestions(demandeEspece).map(JSONValue.string))]))
+                exit(1)
+            }
+            cible = c
+        }
+        let fichiers = ((try? FileManager.default.contentsOfDirectory(at: dossierImages, includingPropertiesForKeys: nil)) ?? [])
+            .filter { ["jpg", "jpeg", "png", "heic"].contains($0.pathExtension.lowercased()) }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }.prefix(nombreImages)
+        var lignes: [JSONValue] = []
+        var durees: [Double] = []
+        for url in fichiers {
+            guard let data = try? Data(contentsOf: url), let image = PreviewImages.image(data) else {
+                lignes.append(["fichier": .string(url.lastPathComponent), "erreur": "illisible"])
+                continue
+            }
+            let t = Date()
+            let resultat = try classeur.classer(image: image)
+            durees.append(Date().timeIntervalSince(t))
+            var ligne: [String: JSONValue] = ["fichier": .string(url.lastPathComponent), "espece": classeur.json(resultat),
+                                              "nature": resultat.nature.map { .number(($0 * 1000).rounded() / 1000) } ?? .null,
+                                              "trois_premieres": .array(resultat.meilleures(3).map { m in
+                                                  let e = classeur.liste.especes[m.indice]
+                                                  return ["nom": .string(e.nom), "latin": .string(e.latin), "probabilite": .number((m.probabilite * 1000).rounded() / 1000)]
+                                              })]
+            if let cible {
+                let indices: [Int]
+                switch cible {
+                case .espece(let i): indices = [i]
+                case .groupe(let g): indices = classeur.liste.indices(g)
+                }
+                ligne["score_cherche"] = .number((resultat.somme(indices) * 1000).rounded() / 1000)
+            }
+            lignes.append(.object(ligne))
+            log("\(url.lastPathComponent) : \(classeur.liste.especes[resultat.meilleures(1).first?.indice ?? 0].nom)")
+        }
+        let premiere = durees.first ?? 0
+        let suivantes = durees.dropFirst()
+        print(line: JSONCoding.line([
+            "ok": true, "modele": .string(Especes.nomModele), "especes": .number(Double(classeur.liste.especes.count)),
+            "ouverture_s": .number((ouvert.secondes * 10).rounded() / 10), "depuis_le_cache": .bool(classeur.depuisLeCache),
+            "seuils_provisoires": ["confiance": .number(Especes.seuilConfianceProvisoire), "recherche": .number(Especes.seuilRechercheProvisoire),
+                                   "groupe": .number(Especes.seuilGroupeProvisoire), "porte": .number(Especes.seuilPorteProvisoire)],
+            "porte": .bool(classeur.aUnePorte),
+            "temps": ["premiere_image_ms": .number((premiere * 1000).rounded()),
+                      "image_ms_moyen": .number(suivantes.isEmpty ? 0 : (suivantes.reduce(0, +) / Double(suivantes.count) * 1000).rounded())],
+            "images": .array(lignes),
+        ]))
+    } catch {
         print(line: JSONCoding.line(["ok": false, "erreur": .string(error.localizedDescription)]))
         exit(1)
     }

@@ -18,7 +18,7 @@ public protocol EncodeurSens: AnyObject {
 /// apple-ascl, usage personnel accepté par Dany) calcule une empreinte de 512 nombres par vignette
 /// pendant l'analyse du Suivi (`--analyser`, Suivi.swift), rangée dans un index par catalogue
 /// (IndexSens.swift) ; find_photos (`query`, `similar_to`) y classe les photos. Aucune image ne part
-/// chez Claude : il reçoit des identifiants et une pertinence. Ni espèces ni BioCLIP (1.6.1).
+/// chez Claude : il reçoit des identifiants et une pertinence. Les espèces (BioCLIP 2, 1.6.3) : Especes.swift.
 public enum Sens {
     /// La version des règles de l'empreinte : le module la range dans `analyse.regles_sens`, et une
     /// réponse de règles plus récentes fait refaire l'empreinte (une autre découpe, un autre modèle).
@@ -125,8 +125,10 @@ public enum Sens {
 /// dans la description du modèle : aucun n'est écrit en dur, sauf en repli. Un .mlpackage se compile
 /// au premier usage (`MLModel.compileModel`), la copie compilée rangée dans Developpeur/Modeles (à
 /// constater sous le runtime durci : `--preparer-sens`). Jamais dans `swift test`.
+/// Il sert aussi à BioCLIP 2 (les espèces, 1.6.3, Especes.swift) : mêmes entrées (`image`, `text` de
+/// 77 jetons du même tokeniseur), sortie `embedding`, sous le nom `Especes.nomModele`.
 public final class EncodeurMobileCLIP: EncodeurSens {
-    public let modele = Sens.nomModele
+    public let modele: String
     public private(set) var dimension: Int
     let encodeurImage: MLModel
     /// Le temps des compilations faites (0 : déjà compilés), pour `--preparer-sens`.
@@ -136,14 +138,15 @@ public final class EncodeurMobileCLIP: EncodeurSens {
     public enum Erreur: Error, LocalizedError {
         case modele(String)
         public var errorDescription: String? {
-            switch self { case .modele(let detail): return "MobileCLIP : \(detail)" }
+            switch self { case .modele(let detail): return "Modèle CoreML : \(detail)" }
         }
     }
 
     /// L'encodeur d'images s'ouvre tout de suite ; celui de texte et le tokeniseur au premier texte
     /// (`--analyser`, lancé à chaque lot du Suivi, n'en a pas besoin).
-    public init(fichiers: Sens.Fichiers) throws {
+    public init(fichiers: Sens.Fichiers, modele: String = Sens.nomModele) throws {
         self.fichiers = fichiers
+        self.modele = modele
         let debut = Date()
         let image = try Self.compile(fichiers.image, dans: fichiers.modeles)
         encodeurImage = try MLModel(contentsOf: image, configuration: Self.configuration)

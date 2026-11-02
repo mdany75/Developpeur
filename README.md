@@ -895,6 +895,16 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   analyse déjà, en arrière-plan ; aucune image ne part chez Claude. Seules les photos déjà analysées
   par le Suivi sont dans l'index ; `get_status` dit combien. Une personne nommée dans la vue Personnes
   de Lightroom se cherche par son nom en mot-clé.
+- Reconnaître un oiseau, un animal, une fleur, un arbre ou un champignon par son nom : « mes photos
+  de cardinal rouge », « les oiseaux du voyage au Costa Rica » (`find_photos` avec `species`, un nom
+  en français ou en latin, ou un groupe : oiseau, fleur, arbre, champignon…), ou « quel est cet
+  oiseau ? » (`view_photo` avec `species`). Près de 4 000 espèces d'Amérique du Nord et des voyages
+  les plus courants (Europe, Caraïbes, Mexique, safari…), reconnues sur votre Mac par BioCLIP 2
+  (licence MIT) ; aucune image ne part. Claude dit l'espèce seulement quand elle est probable, avec sa
+  confiance, à vérifier à l'œil ; il n'écrit un mot-clé d'espèce qu'avec votre accord. Le modèle
+  (850 Mo) s'installe depuis le dépôt : `scripts/preparer-bioclip.sh` (il faut `uv` : `brew install
+  uv`), puis `./build.sh --install`. Sans lui, tout le reste marche comme avant ; `get_status` dit
+  s'il est là.
 - Classer : note, drapeau, libellé de couleur, titre, légende, droits d'auteur, texte alternatif et
   description longue rédigés d'après la photo, champs IPTC (lieu, événement, personnes), mots-clés
   rangés dans votre hiérarchie (« Lieux > Canada > Montréal »), paramètre prédéfini de métadonnées.

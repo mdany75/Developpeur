@@ -88,6 +88,20 @@ if [[ -f "${DEST_DIR}/Modeles/bpe_simple_vocab_16e6.txt.gz" ]]; then
         printf 'Recherche par le sens : modèles non compilés (%s)\n' "${COMPILE:-pas de réponse}"
     fi
 fi
+# Les espèces (1.6.3) : la liste, remplacée à chaque installation (elle change avec la version) ;
+# avec BioCLIP 2 déjà installé (scripts/preparer-bioclip.sh, depuis le dépôt), les vecteurs de la
+# liste se calculent ici s'ils manquent ou si la liste a changé. Sans le modèle, rien de plus.
+if [[ -f "${HERE}/especes.tsv" ]]; then
+    mkdir -p "${DEST_DIR}/Modeles"
+    cp "${HERE}/especes.tsv" "${DEST_DIR}/Modeles/especes.tsv"
+fi
+if [[ -d "${DEST_DIR}/Modeles/bioclip2_image.mlmodelc" ]]; then
+    if ESPECES="$("${DEST}" --preparer-especes 2>/dev/null)"; then
+        printf 'Espèces : BioCLIP 2 prêt (%s)\n' "${ESPECES}"
+    else
+        printf 'Espèces : BioCLIP 2 non prêt (%s)\n' "${ESPECES:-pas de réponse}"
+    fi
+fi
 
 # --- 2. Module Lightroom ------------------------------------------------------
 

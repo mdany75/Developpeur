@@ -7941,8 +7941,8 @@ dans un intérieur, une nappe, un ciel blanc derrière un portrait.
 
 ## 1.6 : recherche par le sens
 
-Chantier « sens » (plan et critique adverse du 1er novembre 2026 ; périmètre réduit par Dany : sans
-espèces ni BioCLIP, renvoyés à la 1.6.1). Dany tape une phrase (« la plage au coucher du soleil avec
+Chantier « sens » (plan et critique adverse du 1er novembre 2026 ; périmètre réduit par Dany : les
+espèces et BioCLIP renvoyés à plus tard, faits ensuite : « Espèces (BioCLIP 2, 1.6.3) »). Dany tape une phrase (« la plage au coucher du soleil avec
 le chien, l'été 2019 ») : Claude la traduit en anglais et appelle `find_photos` avec `query` ; ou
 « d'autres photos comme celle-ci » : `similar_to`. Les autres critères s'y ajoutent. Tout se calcule
 sur le Mac, d'après les vignettes que le Suivi lit déjà ; Claude ne reçoit que des identifiants et
@@ -8114,6 +8114,92 @@ Par l'orchestrateur, avant la publication ; aucune commande n'écrit au catalogu
    écarte beaucoup (`collection` ou `keyword` d'une personne) sur tout le catalogue : le temps d'une
    tranche de 5 000 dans le module (journal « Recherche pour Claude ») fixe **`Sens.tranchesMax`**
    (provisoire 10 ; que dix tranches tiennent sous 50 s, sinon moins).
+
+## Espèces (BioCLIP 2, 1.6.3)
+
+Chantier « Les espèces (BioCLIP 2) » de la feuille de route (5 · Plus tard), décidé par Dany le
+2 novembre 2026 : reconnaître un oiseau, un animal, une fleur, un arbre ou un champignon par son nom,
+en plus de la recherche par le sens. Tout se calcule sur le Mac ; aucune image ne part.
+
+**Modèle.** BioCLIP 2 (`imageomics/bioclip-2` de Hugging Face, licence MIT ; ViT-L/14, entrée 224 ×
+224, vecteurs de 768, `logit_scale.exp()` = 100 ; prétraitement de CLIP : moyenne 0,4815 0,4578
+0,4082, écart type 0,2686 0,2613 0,2758, redimension bicubique par le petit côté puis découpe
+centrale). `scripts/preparer-bioclip.sh` (environnement Python 3.12 jetable par `uv`, torch 2.7.0,
+open_clip 3.3, coremltools 9.0, poids de 1,7 Go ; tout dans un dossier de travail effacé à la fin)
+télécharge le modèle, convertit les deux encodeurs en ML Program fp16 (`scripts/bioclip/convertir.py` :
+l'attention de PyTorch réécrite en opérations simples, aucune des deux voies de
+`nn.MultiheadAttention` ne se convertissant ; normalisation de CLIP faite dans le modèle, entrée
+`image` RVB ramenée à [0, 1] par CoreML ; entrée `text` [1, 77] int32 ; sortie `embedding`), compare
+leurs vecteurs à ceux de PyTorch (fp32) et refuse d'installer sous un cosinus de 0,99, puis compile
+`bioclip2_image.mlmodelc` (608 Mo) et `bioclip2_text.mlmodelc` (247 Mo) dans Developpeur/Modeles.
+**Constaté le 2 nov. 2026** (Mac de Dany) : cosinus minimal 0,99999 sur 8 images et 26 phrases ;
+conversion 6 s et 3 s ; image 15 ms, texte 6 ms (CoreML depuis Python). Le tokeniseur de BioCLIP 2
+est celui de CLIP (`SimpleTokenizer`, même vocabulaire BPE) : `TokeniseurCLIP` sert tel quel,
+vérifié par `Tests/Contrats/jetons-bioclip.json` (écrit par le script avec open_clip).
+`EncodeurMobileCLIP` sert aux deux modèles (nom `Especes.nomModele` pour BioCLIP).
+
+**Liste.** `Resources/especes/especes.tsv` : « Amérique du Nord et voyages », 3 928 espèces (groupe,
+nom français courant, nom scientifique), relue le 2 nov. 2026 (noms douteux retirés plutôt que
+devinés ; pas de cultivar) ; oiseaux 1 137, fleurs 756, mammifères 421, arbres 324, insectes 188,
+champignons 163, papillons 162, plantes 160, poissons 158, arbustes 152, reptiles 130, invertébrés
+79, amphibiens 70, araignées 28. `EspecesTests` vérifie qu'il n'y a ni doublon ni champ vide. Copiée
+dans Developpeur/Modeles par l'installation (remplacée à chaque fois). Phrase de chaque espèce :
+« a photo of <nom scientifique>. » (`Especes.phrase`, le classement zéro-coup de la fiche du modèle).
+Les vecteurs de texte de toute la liste se calculent une fois (`--preparer-especes`, install.sh :
+13 s pour 3 928 noms) et se gardent dans `Modeles/bioclip2_especes.cache` (5,9 Mo, en 16 bits),
+refaits si la liste, la phrase ou le modèle changent (`Especes.empreinteModele` : taille et date des
+fichiers compilés) ; relus en 0,3 s.
+
+**Classement.** Le vecteur de l'image contre ceux de la liste, softmax à l'échelle 100 : une
+probabilité par espèce. **La porte « animal ou plante ? »** : BioCLIP 2 ne sait pas dire qu'une image
+ne montre rien de vivant (constaté : une capture d'écran a un cosinus de 0,66 avec « a photo of
+Coturnix coturnix. » et de 0,47 avec « a screenshot » ; les oiseaux, le quart de la liste, y prenaient
+plus de 0,5 ; des phrases « hors liste » ajoutées à BioCLIP n'y changeaient rien). MobileCLIP
+classe donc d'abord l'image entre `Especes.porteNature` et `Especes.porteAutre` ; sous
+`seuilPorteProvisoire` (0,5), ni espèce ni résultat de recherche. Sans MobileCLIP, pas de porte.
+
+**Outils.**
+- `view_photo` avec `species` = true : `espece` (nom, latin, groupe, confiance, `autres`) si la plus
+  probable passe `Especes.seuilConfianceProvisoire` (0,5) ; sinon `trouvee` faux et `plus_proches`,
+  à ne pas proposer. Sur un zoom (`region`), l'espèce de la zone ; pas sur un avant/après.
+- `find_photos` avec `species` (une espèce en français ou en latin, ou un groupe : oiseau, mammifère,
+  reptile, amphibien, poisson, papillon, insecte, araignée, invertébré, fleur, arbre, arbuste,
+  champignon, plante, animal ; leurs pluriels et noms anglais) : candidates par l'index du sens
+  (phrase anglaise du groupe, `Especes.candidatsSens` = 2 000, dates d'après l'index) avec les autres
+  critères, ou sans index par les autres critères seuls (alors exigés) ; au plus
+  `Especes.candidatsMax` (200) vignettes de 512 px (`vignettes`), classées une à une ; gardées si la
+  porte les laisse passer et si l'espèce passe `seuilRechercheProvisoire` (0,15) ou le groupe (somme
+  de ses espèces) `seuilGroupeProvisoire` (0,5), triées par `score`. Une espèce inconnue est refusée
+  avec des noms proches. Rien n'est écrit.
+- `get_status` : `especes` (`installee`, `manquants`).
+- L'invite `classer` demande `species` = true pour un animal ou une plante, et le nom en mot-clé
+  seulement si `trouvee`, dit « probable », après l'accord de Dany (comme tout le classement).
+- Sans le modèle, `species` refuse sans rien lancer et tout le reste marche comme avant.
+- `--especes-essai <dossier de JPEG> [--espece <nom ou groupe>]` (développement) : l'espèce, les trois
+  premières, la porte et le temps de chaque image, sans Lightroom.
+
+**Mesuré le 2 nov. 2026** (exécutable release, Mac de Dany, 24 images de profil de macOS, /Library/User
+Pictures) : 41 ms par image (porte et BioCLIP), 1,4 s pour la première ; ouverture 1,1 s (vecteurs
+relus). Bonnes espèces au-dessus du seuil : pygargue à tête blanche 0,98, ara rouge 0,87, manchot
+royal 0,90, zèbre des plaines 0,98, pavot de Californie 0,995, tournesol 0,94, pissenlit 0,85, dahlia
+0,88, figuier de Barbarie 0,81, nénuphar 0,65, rudbeckie hérissée 0,69 ; deux roses rendues « Rose de
+Chine » (genre juste) ; la chouette rendue « chouette à lunettes » (0,95), à vérifier. La porte écarte
+la Terre, l'éclair, le ballon, les dunes (Zen), la guitare ; le dollar des sables aussi (0,34) alors que
+BioCLIP le reconnaissait (0,44). Une fleur de dessin ou une feuille seule restent sous le seuil.
+
+### À constater (espèces)
+
+1. **La qualité sur les vraies photos de Dany** : `mcp-developpeur --especes-essai <dossier de JPEG
+   exportés de ses oiseaux, fleurs, animaux de voyage>` (lecture seule) ; pour chaque photo, l'espèce
+   juste ou non, et sa confiance : fixe **`seuilConfianceProvisoire`**, **`seuilRechercheProvisoire`**,
+   **`seuilGroupeProvisoire`** et **`seuilPorteProvisoire`** (provisoires, 0,5, 0,15, 0,5 et 0,5), et
+   dit s'il faut ajouter des espèces à la liste (celles que Dany photographie et qui manquent). Un
+   petit oiseau loin dans le cadre se juge sur un zoom (`view_photo` avec `region` et `species`).
+2. **`find_photos` avec `species` dans Lightroom** (Essais ou un dossier choisi avec Dany) : le temps
+   de 200 vignettes de 512 px et de leur classement doit tenir sous les 50 s d'un appel (sinon
+   abaisser `Especes.candidatsMax`) ; un groupe (« oiseau ») et une espèce (« Cardinal rouge »).
+3. **Après `./build.sh --install`** : `--preparer-especes` sous le runtime durci (`depuis_le_cache`,
+   `ouverture_s`), et `get_status` › `especes` › `installee`.
 
 ## Relevé des seuils provisoires (1.6)
 

@@ -1,0 +1,148 @@
+{
+ "source": "open_clip.get_tokenizer('imageomics/bioclip-2'), contexte 77",
+ "phrases": [
+  {
+   "texte": "a photo of Cardinalis cardinalis.",
+   "jetons": [
+    49406,
+    320,
+    1125,
+    539,
+    8457,
+    20114,
+    8457,
+    20114,
+    269,
+    49407
+   ]
+  },
+  {
+   "texte": "a photo of Haliaeetus leucocephalus.",
+   "jetons": [
+    49406,
+    320,
+    1125,
+    539,
+    9860,
+    5548,
+    1169,
+    718,
+    15691,
+    622,
+    685,
+    19962,
+    718,
+    269,
+    49407
+   ]
+  },
+  {
+   "texte": "a photo of Danaus plexippus.",
+   "jetons": [
+    49406,
+    320,
+    1125,
+    539,
+    2257,
+    7630,
+    926,
+    2467,
+    604,
+    718,
+    269,
+    49407
+   ]
+  },
+  {
+   "texte": "a photo of Acer saccharum.",
+   "jetons": [
+    49406,
+    320,
+    1125,
+    539,
+    25809,
+    3632,
+    1054,
+    1008,
+    269,
+    49407
+   ]
+  },
+  {
+   "texte": "a photo of Amanita muscaria.",
+   "jetons": [
+    49406,
+    320,
+    1125,
+    539,
+    548,
+    18544,
+    670,
+    4171,
+    1073,
+    269,
+    49407
+   ]
+  },
+  {
+   "texte": "a photo of Panthera leo.",
+   "jetons": [
+    49406,
+    320,
+    1125,
+    539,
+    22825,
+    320,
+    8312,
+    269,
+    49407
+   ]
+  },
+  {
+   "texte": "a photo of Rudbeckia hirta.",
+   "jetons": [
+    49406,
+    320,
+    1125,
+    539,
+    35256,
+    6899,
+    8712,
+    4959,
+    1397,
+    269,
+    49407
+   ]
+  },
+  {
+   "texte": "a photo of a bird.",
+   "jetons": [
+    49406,
+    320,
+    1125,
+    539,
+    320,
+    3329,
+    269,
+    49407
+   ]
+  },
+  {
+   "texte": "a photo of Æsculus × carnea.",
+   "jetons": [
+    49406,
+    320,
+    1125,
+    539,
+    42495,
+    8181,
+    7158,
+    16165,
+    17053,
+    320,
+    269,
+    49407
+   ]
+  }
+ ]
+}

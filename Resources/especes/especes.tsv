@@ -1,0 +1,3935 @@
+# Liste des espèces de Développeur (1.6.3) : « Amérique du Nord et voyages ».
+# Une ligne par espèce : groupe, nom français courant, nom scientifique (genre espèce), séparés par
+# une tabulation. Groupes : oiseau, mammifère, reptile, amphibien, poisson, papillon, insecte,
+# araignée, invertébré, fleur, arbre, arbuste, champignon, plante. BioCLIP 2 reçoit
+# « a photo of <nom scientifique>. » (Especes.phrase). Relue le 2 nov. 2026 ; un nom douteux se
+# retire plutôt que se deviner. Copiée dans Developpeur/Modeles par l'installation ; changée, les
+# vecteurs de texte gardés se refont (Especes.vecteursTexte).
+oiseau	Dendrocygne à ventre noir	Dendrocygna autumnalis
+oiseau	Dendrocygne fauve	Dendrocygna bicolor
+oiseau	Oie rieuse	Anser albifrons
+oiseau	Oie des neiges	Anser caerulescens
+oiseau	Oie de Ross	Anser rossii
+oiseau	Bernache cravant	Branta bernicla
+oiseau	Bernache de Hutchins	Branta hutchinsii
+oiseau	Bernache du Canada	Branta canadensis
+oiseau	Cygne tuberculé	Cygnus olor
+oiseau	Cygne trompette	Cygnus buccinator
+oiseau	Cygne siffleur	Cygnus columbianus
+oiseau	Canard branchu	Aix sponsa
+oiseau	Sarcelle à ailes bleues	Spatula discors
+oiseau	Sarcelle cannelle	Spatula cyanoptera
+oiseau	Canard souchet	Spatula clypeata
+oiseau	Canard chipeau	Mareca strepera
+oiseau	Canard siffleur	Mareca penelope
+oiseau	Canard d'Amérique	Mareca americana
+oiseau	Canard colvert	Anas platyrhynchos
+oiseau	Canard noir	Anas rubripes
+oiseau	Canard brun	Anas fulvigula
+oiseau	Canard pilet	Anas acuta
+oiseau	Sarcelle d'hiver	Anas crecca
+oiseau	Fuligule à dos blanc	Aythya valisineria
+oiseau	Fuligule à tête rouge	Aythya americana
+oiseau	Fuligule à collier	Aythya collaris
+oiseau	Fuligule milouinan	Aythya marila
+oiseau	Petit Fuligule	Aythya affinis
+oiseau	Eider à duvet	Somateria mollissima
+oiseau	Eider à tête grise	Somateria spectabilis
+oiseau	Arlequin plongeur	Histrionicus histrionicus
+oiseau	Macreuse à front blanc	Melanitta perspicillata
+oiseau	Macreuse brune	Melanitta deglandi
+oiseau	Macreuse noire	Melanitta americana
+oiseau	Harelde kakawi	Clangula hyemalis
+oiseau	Petit Garrot	Bucephala albeola
+oiseau	Garrot à œil d'or	Bucephala clangula
+oiseau	Garrot d'Islande	Bucephala islandica
+oiseau	Harle couronné	Lophodytes cucullatus
+oiseau	Grand Harle	Mergus merganser
+oiseau	Harle huppé	Mergus serrator
+oiseau	Érismature rousse	Oxyura jamaicensis
+oiseau	Colin de Virginie	Colinus virginianus
+oiseau	Colin de Californie	Callipepla californica
+oiseau	Colin de Gambel	Callipepla gambelii
+oiseau	Colin écaillé	Callipepla squamata
+oiseau	Colin des montagnes	Oreortyx pictus
+oiseau	Dindon sauvage	Meleagris gallopavo
+oiseau	Gélinotte huppée	Bonasa umbellus
+oiseau	Tétras du Canada	Canachites canadensis
+oiseau	Tétras sombre	Dendragapus obscurus
+oiseau	Lagopède des saules	Lagopus lagopus
+oiseau	Lagopède alpin	Lagopus muta
+oiseau	Lagopède à queue blanche	Lagopus leucura
+oiseau	Tétras à queue fine	Tympanuchus phasianellus
+oiseau	Tétras des prairies	Tympanuchus cupido
+oiseau	Tétras des armoises	Centrocercus urophasianus
+oiseau	Faisan de Colchide	Phasianus colchicus
+oiseau	Perdrix grise	Perdix perdix
+oiseau	Grèbe à bec bigarré	Podilymbus podiceps
+oiseau	Grèbe esclavon	Podiceps auritus
+oiseau	Grèbe jougris	Podiceps grisegena
+oiseau	Grèbe à cou noir	Podiceps nigricollis
+oiseau	Grèbe élégant	Aechmophorus occidentalis
+oiseau	Grèbe à face blanche	Aechmophorus clarkii
+oiseau	Pigeon biset	Columba livia
+oiseau	Pigeon à queue barrée	Patagioenas fasciata
+oiseau	Pigeon à couronne blanche	Patagioenas leucocephala
+oiseau	Tourterelle turque	Streptopelia decaocto
+oiseau	Colombe inca	Columbina inca
+oiseau	Colombe à queue noire	Columbina passerina
+oiseau	Colombe à ailes blanches	Zenaida asiatica
+oiseau	Tourterelle triste	Zenaida macroura
+oiseau	Géocoucou de Californie	Geococcyx californianus
+oiseau	Coulicou à bec jaune	Coccyzus americanus
+oiseau	Coulicou à bec noir	Coccyzus erythropthalmus
+oiseau	Ani à bec lisse	Crotophaga ani
+oiseau	Ani à bec cannelé	Crotophaga sulcirostris
+oiseau	Engoulevent d'Amérique	Chordeiles minor
+oiseau	Engoulevent de Nuttall	Phalaenoptilus nuttallii
+oiseau	Engoulevent bois-pourri	Antrostomus vociferus
+oiseau	Engoulevent de Caroline	Antrostomus carolinensis
+oiseau	Martinet ramoneur	Chaetura pelagica
+oiseau	Martinet à gorge blanche	Aeronautes saxatalis
+oiseau	Martinet sombre	Cypseloides niger
+oiseau	Colibri à gorge rubis	Archilochus colubris
+oiseau	Colibri à gorge noire	Archilochus alexandri
+oiseau	Colibri d'Anna	Calypte anna
+oiseau	Colibri de Costa	Calypte costae
+oiseau	Colibri roux	Selasphorus rufus
+oiseau	Colibri d'Allen	Selasphorus sasin
+oiseau	Colibri à queue large	Selasphorus platycercus
+oiseau	Colibri calliope	Selasphorus calliope
+oiseau	Colibri à large bec	Cynanthus latirostris
+oiseau	Colibri de Rivoli	Eugenes fulgens
+oiseau	Râle de Virginie	Rallus limicola
+oiseau	Râle élégant	Rallus elegans
+oiseau	Râle tapageur	Rallus crepitans
+oiseau	Marouette de Caroline	Porzana carolina
+oiseau	Gallinule d'Amérique	Gallinula galeata
+oiseau	Talève violacée	Porphyrio martinica
+oiseau	Foulque d'Amérique	Fulica americana
+oiseau	Grue du Canada	Antigone canadensis
+oiseau	Grue blanche	Grus americana
+oiseau	Échasse d'Amérique	Himantopus mexicanus
+oiseau	Avocette d'Amérique	Recurvirostra americana
+oiseau	Huîtrier d'Amérique	Haematopus palliatus
+oiseau	Huîtrier de Bachman	Haematopus bachmani
+oiseau	Pluvier argenté	Pluvialis squatarola
+oiseau	Pluvier bronzé	Pluvialis dominica
+oiseau	Pluvier kildir	Charadrius vociferus
+oiseau	Pluvier semipalmé	Charadrius semipalmatus
+oiseau	Pluvier siffleur	Charadrius melodus
+oiseau	Pluvier neigeux	Charadrius nivosus
+oiseau	Pluvier de Wilson	Charadrius wilsonia
+oiseau	Pluvier montagnard	Charadrius montanus
+oiseau	Maubèche des champs	Bartramia longicauda
+oiseau	Courlis corlieu	Numenius phaeopus
+oiseau	Courlis à long bec	Numenius americanus
+oiseau	Barge hudsonienne	Limosa haemastica
+oiseau	Barge marbrée	Limosa fedoa
+oiseau	Tournepierre à collier	Arenaria interpres
+oiseau	Tournepierre noir	Arenaria melanocephala
+oiseau	Bécasseau maubèche	Calidris canutus
+oiseau	Bécasseau du ressac	Calidris virgata
+oiseau	Bécasseau à échasses	Calidris himantopus
+oiseau	Bécasseau sanderling	Calidris alba
+oiseau	Bécasseau variable	Calidris alpina
+oiseau	Bécasseau violet	Calidris maritima
+oiseau	Bécasseau de Baird	Calidris bairdii
+oiseau	Bécasseau minuscule	Calidris minutilla
+oiseau	Bécasseau à croupion blanc	Calidris fuscicollis
+oiseau	Bécasseau roussâtre	Calidris subruficollis
+oiseau	Bécasseau à poitrine cendrée	Calidris melanotos
+oiseau	Bécasseau semipalmé	Calidris pusilla
+oiseau	Bécasseau d'Alaska	Calidris mauri
+oiseau	Bécassin roux	Limnodromus griseus
+oiseau	Bécassin à long bec	Limnodromus scolopaceus
+oiseau	Bécasse d'Amérique	Scolopax minor
+oiseau	Bécassine de Wilson	Gallinago delicata
+oiseau	Phalarope de Wilson	Phalaropus tricolor
+oiseau	Phalarope à bec étroit	Phalaropus lobatus
+oiseau	Phalarope à bec large	Phalaropus fulicarius
+oiseau	Chevalier grivelé	Actitis macularius
+oiseau	Chevalier solitaire	Tringa solitaria
+oiseau	Chevalier errant	Tringa incana
+oiseau	Grand Chevalier	Tringa melanoleuca
+oiseau	Chevalier semipalmé	Tringa semipalmata
+oiseau	Petit Chevalier	Tringa flavipes
+oiseau	Labbe pomarin	Stercorarius pomarinus
+oiseau	Labbe parasite	Stercorarius parasiticus
+oiseau	Labbe à longue queue	Stercorarius longicaudus
+oiseau	Grand Labbe	Stercorarius skua
+oiseau	Mergule nain	Alle alle
+oiseau	Guillemot marmette	Uria aalge
+oiseau	Guillemot de Brünnich	Uria lomvia
+oiseau	Petit Pingouin	Alca torda
+oiseau	Guillemot à miroir	Cepphus grylle
+oiseau	Guillemot colombin	Cepphus columba
+oiseau	Guillemot marbré	Brachyramphus marmoratus
+oiseau	Starique de Cassin	Ptychoramphus aleuticus
+oiseau	Macareux rhinocéros	Cerorhinca monocerata
+oiseau	Macareux moine	Fratercula arctica
+oiseau	Macareux cornu	Fratercula corniculata
+oiseau	Macareux huppé	Fratercula cirrhata
+oiseau	Mouette tridactyle	Rissa tridactyla
+oiseau	Mouette blanche	Pagophila eburnea
+oiseau	Mouette de Sabine	Xema sabini
+oiseau	Mouette de Bonaparte	Chroicocephalus philadelphia
+oiseau	Mouette rieuse	Chroicocephalus ridibundus
+oiseau	Mouette pygmée	Hydrocoloeus minutus
+oiseau	Mouette rosée	Rhodostethia rosea
+oiseau	Mouette atricille	Leucophaeus atricilla
+oiseau	Mouette de Franklin	Leucophaeus pipixcan
+oiseau	Goéland de Heermann	Larus heermanni
+oiseau	Goéland à bec cerclé	Larus delawarensis
+oiseau	Goéland de Californie	Larus californicus
+oiseau	Goéland argenté	Larus argentatus
+oiseau	Goéland arctique	Larus glaucoides
+oiseau	Goéland brun	Larus fuscus
+oiseau	Goéland bourgmestre	Larus hyperboreus
+oiseau	Goéland marin	Larus marinus
+oiseau	Goéland d'Audubon	Larus occidentalis
+oiseau	Goéland à ailes grises	Larus glaucescens
+oiseau	Goéland cendré	Larus canus
+oiseau	Petite Sterne	Sternula antillarum
+oiseau	Sterne bridée	Onychoprion anaethetus
+oiseau	Sterne fuligineuse	Onychoprion fuscatus
+oiseau	Sterne hansel	Gelochelidon nilotica
+oiseau	Sterne caspienne	Hydroprogne caspia
+oiseau	Guifette noire	Chlidonias niger
+oiseau	Sterne de Dougall	Sterna dougallii
+oiseau	Sterne pierregarin	Sterna hirundo
+oiseau	Sterne arctique	Sterna paradisaea
+oiseau	Sterne de Forster	Sterna forsteri
+oiseau	Sterne royale	Thalasseus maximus
+oiseau	Sterne caugek	Thalasseus sandvicensis
+oiseau	Sterne élégante	Thalasseus elegans
+oiseau	Bec-en-ciseaux noir	Rynchops niger
+oiseau	Plongeon catmarin	Gavia stellata
+oiseau	Plongeon du Pacifique	Gavia pacifica
+oiseau	Plongeon huard	Gavia immer
+oiseau	Plongeon à bec blanc	Gavia adamsii
+oiseau	Albatros de Laysan	Phoebastria immutabilis
+oiseau	Albatros à pieds noirs	Phoebastria nigripes
+oiseau	Océanite de Wilson	Oceanites oceanicus
+oiseau	Océanite cul-blanc	Hydrobates leucorhous
+oiseau	Fulmar boréal	Fulmarus glacialis
+oiseau	Puffin majeur	Ardenna gravis
+oiseau	Puffin fuligineux	Ardenna grisea
+oiseau	Puffin des Anglais	Puffinus puffinus
+oiseau	Puffin cendré	Calonectris diomedea
+oiseau	Tantale d'Amérique	Mycteria americana
+oiseau	Frégate superbe	Fregata magnificens
+oiseau	Fou masqué	Sula dactylatra
+oiseau	Fou brun	Sula leucogaster
+oiseau	Fou à pieds bleus	Sula nebouxii
+oiseau	Fou à pieds rouges	Sula sula
+oiseau	Fou de Bassan	Morus bassanus
+oiseau	Anhinga d'Amérique	Anhinga anhinga
+oiseau	Cormoran de Brandt	Urile penicillatus
+oiseau	Cormoran pélagique	Urile pelagicus
+oiseau	Grand Cormoran	Phalacrocorax carbo
+oiseau	Cormoran à aigrettes	Nannopterum auritum
+oiseau	Cormoran vigua	Nannopterum brasilianum
+oiseau	Pélican d'Amérique	Pelecanus erythrorhynchos
+oiseau	Pélican brun	Pelecanus occidentalis
+oiseau	Butor d'Amérique	Botaurus lentiginosus
+oiseau	Petit Blongios	Ixobrychus exilis
+oiseau	Grand Héron	Ardea herodias
+oiseau	Grande Aigrette	Ardea alba
+oiseau	Aigrette neigeuse	Egretta thula
+oiseau	Aigrette bleue	Egretta caerulea
+oiseau	Aigrette tricolore	Egretta tricolor
+oiseau	Aigrette roussâtre	Egretta rufescens
+oiseau	Héron garde-bœufs	Ardea ibis
+oiseau	Héron vert	Butorides virescens
+oiseau	Bihoreau gris	Nycticorax nycticorax
+oiseau	Bihoreau violacé	Nyctanassa violacea
+oiseau	Ibis blanc	Eudocimus albus
+oiseau	Ibis falcinelle	Plegadis falcinellus
+oiseau	Ibis à face blanche	Plegadis chihi
+oiseau	Spatule rosée	Platalea ajaja
+oiseau	Urubu noir	Coragyps atratus
+oiseau	Urubu à tête rouge	Cathartes aura
+oiseau	Condor de Californie	Gymnogyps californianus
+oiseau	Balbuzard pêcheur	Pandion haliaetus
+oiseau	Élanion à queue blanche	Elanus leucurus
+oiseau	Milan à queue fourchue	Elanoides forficatus
+oiseau	Aigle royal	Aquila chrysaetos
+oiseau	Milan du Mississippi	Ictinia mississippiensis
+oiseau	Busard d'Amérique	Circus hudsonius
+oiseau	Épervier brun	Accipiter striatus
+oiseau	Épervier de Cooper	Astur cooperii
+oiseau	Autour des palombes	Astur atricapillus
+oiseau	Pygargue à tête blanche	Haliaeetus leucocephalus
+oiseau	Buse à épaulettes	Buteo lineatus
+oiseau	Petite Buse	Buteo platypterus
+oiseau	Buse de Swainson	Buteo swainsoni
+oiseau	Buse à queue blanche	Geranoaetus albicaudatus
+oiseau	Buse à queue rousse	Buteo jamaicensis
+oiseau	Buse pattue	Buteo lagopus
+oiseau	Buse rouilleuse	Buteo regalis
+oiseau	Buse de Harris	Parabuteo unicinctus
+oiseau	Buse grise	Buteo plagiatus
+oiseau	Effraie des clochers	Tyto alba
+oiseau	Petit-duc maculé	Megascops asio
+oiseau	Petit-duc des montagnes	Megascops kennicottii
+oiseau	Grand-duc d'Amérique	Bubo virginianus
+oiseau	Harfang des neiges	Bubo scandiacus
+oiseau	Chouette épervière	Surnia ulula
+oiseau	Chevêchette naine	Glaucidium gnoma
+oiseau	Chevêchette des saguaros	Micrathene whitneyi
+oiseau	Chevêche des terriers	Athene cunicularia
+oiseau	Chouette rayée	Strix varia
+oiseau	Chouette tachetée	Strix occidentalis
+oiseau	Chouette lapone	Strix nebulosa
+oiseau	Hibou moyen-duc	Asio otus
+oiseau	Hibou des marais	Asio flammeus
+oiseau	Nyctale de Tengmalm	Aegolius funereus
+oiseau	Petite Nyctale	Aegolius acadicus
+oiseau	Trogon élégant	Trogon elegans
+oiseau	Martin-pêcheur d'Amérique	Megaceryle alcyon
+oiseau	Martin-pêcheur à ventre roux	Megaceryle torquata
+oiseau	Martin-pêcheur vert	Chloroceryle americana
+oiseau	Pic de Lewis	Melanerpes lewis
+oiseau	Pic à tête rouge	Melanerpes erythrocephalus
+oiseau	Pic glandivore	Melanerpes formicivorus
+oiseau	Pic de Gila	Melanerpes uropygialis
+oiseau	Pic à front doré	Melanerpes aurifrons
+oiseau	Pic à ventre roux	Melanerpes carolinus
+oiseau	Pic de Williamson	Sphyrapicus thyroideus
+oiseau	Pic maculé	Sphyrapicus varius
+oiseau	Pic à nuque rouge	Sphyrapicus nuchalis
+oiseau	Pic à poitrine rouge	Sphyrapicus ruber
+oiseau	Pic à dos rayé	Picoides dorsalis
+oiseau	Pic à dos noir	Picoides arcticus
+oiseau	Pic mineur	Dryobates pubescens
+oiseau	Pic chevelu	Dryobates villosus
+oiseau	Pic à face blanche	Dryobates borealis
+oiseau	Pic arlequin	Dryobates scalaris
+oiseau	Pic de Nuttall	Dryobates nuttallii
+oiseau	Pic à tête blanche	Dryobates albolarvatus
+oiseau	Pic flamboyant	Colaptes auratus
+oiseau	Pic chrysoïde	Colaptes chrysoides
+oiseau	Grand Pic	Dryocopus pileatus
+oiseau	Caracara huppé	Caracara plancus
+oiseau	Crécerelle d'Amérique	Falco sparverius
+oiseau	Faucon émerillon	Falco columbarius
+oiseau	Faucon gerfaut	Falco rusticolus
+oiseau	Faucon pèlerin	Falco peregrinus
+oiseau	Faucon des prairies	Falco mexicanus
+oiseau	Perruche ondulée	Melopsittacus undulatus
+oiseau	Conure veuve	Myiopsitta monachus
+oiseau	Moucherolle à côtés olive	Contopus cooperi
+oiseau	Pioui de l'Ouest	Contopus sordidulus
+oiseau	Pioui de l'Est	Contopus virens
+oiseau	Moucherolle à ventre jaune	Empidonax flaviventris
+oiseau	Moucherolle vert	Empidonax virescens
+oiseau	Moucherolle des aulnes	Empidonax alnorum
+oiseau	Moucherolle des saules	Empidonax traillii
+oiseau	Moucherolle tchébec	Empidonax minimus
+oiseau	Moucherolle de Hammond	Empidonax hammondii
+oiseau	Moucherolle côtier	Empidonax difficilis
+oiseau	Moucherolle noir	Sayornis nigricans
+oiseau	Moucherolle phébi	Sayornis phoebe
+oiseau	Moucherolle à ventre roux	Sayornis saya
+oiseau	Moucherolle vermillon	Pyrocephalus rubinus
+oiseau	Tyran à gorge cendrée	Myiarchus cinerascens
+oiseau	Tyran huppé	Myiarchus crinitus
+oiseau	Tyran à queue rousse	Myiarchus tyrannulus
+oiseau	Tyran quiquivi	Pitangus sulphuratus
+oiseau	Tyran mélancolique	Tyrannus melancholicus
+oiseau	Tyran de Cassin	Tyrannus vociferans
+oiseau	Tyran de l'Ouest	Tyrannus verticalis
+oiseau	Tyran tritri	Tyrannus tyrannus
+oiseau	Tyran gris	Tyrannus dominicensis
+oiseau	Tyran à longue queue	Tyrannus forficatus
+oiseau	Pie-grièche migratrice	Lanius ludovicianus
+oiseau	Pie-grièche boréale	Lanius borealis
+oiseau	Viréo aux yeux blancs	Vireo griseus
+oiseau	Viréo de Bell	Vireo bellii
+oiseau	Viréo à gorge jaune	Vireo flavifrons
+oiseau	Viréo de Cassin	Vireo cassinii
+oiseau	Viréo à tête bleue	Vireo solitarius
+oiseau	Viréo de Hutton	Vireo huttoni
+oiseau	Viréo de Philadelphie	Vireo philadelphicus
+oiseau	Viréo mélodieux	Vireo gilvus
+oiseau	Viréo aux yeux rouges	Vireo olivaceus
+oiseau	Mésangeai du Canada	Perisoreus canadensis
+oiseau	Geai vert	Psilorhinus morio
+oiseau	Geai acahé	Cyanocorax yncas
+oiseau	Geai de Steller	Cyanocitta stelleri
+oiseau	Geai bleu	Cyanocitta cristata
+oiseau	Geai à gorge blanche	Aphelocoma californica
+oiseau	Geai de Floride	Aphelocoma coerulescens
+oiseau	Geai du Mexique	Aphelocoma wollweberi
+oiseau	Geai des pinèdes	Gymnorhinus cyanocephalus
+oiseau	Cassenoix d'Amérique	Nucifraga columbiana
+oiseau	Pie d'Amérique	Pica hudsonia
+oiseau	Pie à bec jaune	Pica nuttalli
+oiseau	Corneille d'Amérique	Corvus brachyrhynchos
+oiseau	Corneille de rivage	Corvus ossifragus
+oiseau	Grand Corbeau	Corvus corax
+oiseau	Corbeau à cou blanc	Corvus cryptoleucus
+oiseau	Mésange à tête noire	Poecile atricapillus
+oiseau	Mésange de Caroline	Poecile carolinensis
+oiseau	Mésange de Gambel	Poecile gambeli
+oiseau	Mésange à dos marron	Poecile rufescens
+oiseau	Mésange à tête brune	Poecile hudsonicus
+oiseau	Mésange bicolore	Baeolophus bicolor
+oiseau	Mésange à plumet noir	Baeolophus atricristatus
+oiseau	Mésange unicolore	Baeolophus inornatus
+oiseau	Alouette hausse-col	Eremophila alpestris
+oiseau	Hirondelle noire	Progne subis
+oiseau	Hirondelle bicolore	Tachycineta bicolor
+oiseau	Hirondelle à face blanche	Tachycineta thalassina
+oiseau	Hirondelle à ailes hérissées	Stelgidopteryx serripennis
+oiseau	Hirondelle de rivage	Riparia riparia
+oiseau	Hirondelle à front blanc	Petrochelidon pyrrhonota
+oiseau	Hirondelle à front brun	Petrochelidon fulva
+oiseau	Hirondelle rustique	Hirundo rustica
+oiseau	Mésange buissonnière	Psaltriparus minimus
+oiseau	Auripare verdin	Auriparus flaviceps
+oiseau	Sittelle à poitrine rousse	Sitta canadensis
+oiseau	Sittelle à poitrine blanche	Sitta carolinensis
+oiseau	Sittelle pygmée	Sitta pygmaea
+oiseau	Sittelle à tête brune	Sitta pusilla
+oiseau	Grimpereau brun	Certhia americana
+oiseau	Troglodyte des rochers	Salpinctes obsoletus
+oiseau	Troglodyte des canyons	Catherpes mexicanus
+oiseau	Troglodyte familier	Troglodytes aedon
+oiseau	Troglodyte des forêts	Troglodytes hiemalis
+oiseau	Troglodyte de Baird	Troglodytes pacificus
+oiseau	Troglodyte à bec court	Cistothorus stellaris
+oiseau	Troglodyte des marais	Cistothorus palustris
+oiseau	Troglodyte de Caroline	Thryothorus ludovicianus
+oiseau	Troglodyte de Bewick	Thryomanes bewickii
+oiseau	Troglodyte des cactus	Campylorhynchus brunneicapillus
+oiseau	Gobemoucheron gris-bleu	Polioptila caerulea
+oiseau	Gobemoucheron à queue noire	Polioptila melanura
+oiseau	Cincle d'Amérique	Cinclus mexicanus
+oiseau	Roitelet à couronne dorée	Regulus satrapa
+oiseau	Roitelet à couronne rubis	Corthylio calendula
+oiseau	Merlebleu de l'Est	Sialia sialis
+oiseau	Merlebleu de l'Ouest	Sialia mexicana
+oiseau	Merlebleu azuré	Sialia currucoides
+oiseau	Solitaire de Townsend	Myadestes townsendi
+oiseau	Grive fauve	Catharus fuscescens
+oiseau	Grive à joues grises	Catharus minimus
+oiseau	Grive de Bicknell	Catharus bicknelli
+oiseau	Grive à dos olive	Catharus ustulatus
+oiseau	Grive solitaire	Catharus guttatus
+oiseau	Grive des bois	Hylocichla mustelina
+oiseau	Merle d'Amérique	Turdus migratorius
+oiseau	Grive à collier	Ixoreus naevius
+oiseau	Moqueur chat	Dumetella carolinensis
+oiseau	Moqueur à bec courbe	Toxostoma curvirostre
+oiseau	Moqueur roux	Toxostoma rufum
+oiseau	Moqueur de Californie	Toxostoma redivivum
+oiseau	Moqueur des armoises	Oreoscoptes montanus
+oiseau	Moqueur polyglotte	Mimus polyglottos
+oiseau	Étourneau sansonnet	Sturnus vulgaris
+oiseau	Jaseur boréal	Bombycilla garrulus
+oiseau	Jaseur d'Amérique	Bombycilla cedrorum
+oiseau	Phainopepla luisant	Phainopepla nitens
+oiseau	Moineau domestique	Passer domesticus
+oiseau	Moineau friquet	Passer montanus
+oiseau	Pipit d'Amérique	Anthus rubescens
+oiseau	Pipit de Sprague	Anthus spragueii
+oiseau	Gros-bec errant	Coccothraustes vespertinus
+oiseau	Durbec des sapins	Pinicola enucleator
+oiseau	Roselin gris	Leucosticte tephrocotis
+oiseau	Roselin familier	Haemorhous mexicanus
+oiseau	Roselin pourpré	Haemorhous purpureus
+oiseau	Roselin de Cassin	Haemorhous cassinii
+oiseau	Sizerin flammé	Acanthis flammea
+oiseau	Sizerin blanchâtre	Acanthis hornemanni
+oiseau	Bec-croisé des sapins	Loxia curvirostra
+oiseau	Bec-croisé bifascié	Loxia leucoptera
+oiseau	Tarin des pins	Spinus pinus
+oiseau	Chardonneret mineur	Spinus psaltria
+oiseau	Chardonneret de Lawrence	Spinus lawrencei
+oiseau	Chardonneret jaune	Spinus tristis
+oiseau	Plectrophane lapon	Calcarius lapponicus
+oiseau	Plectrophane à ventre noir	Calcarius ornatus
+oiseau	Plectrophane de Smith	Calcarius pictus
+oiseau	Plectrophane des neiges	Plectrophenax nivalis
+oiseau	Bruant de Cassin	Peucaea cassinii
+oiseau	Bruant des plaines	Spizella pallida
+oiseau	Bruant à ailes rousses	Peucaea carpalis
+oiseau	Bruant sauterelle	Ammodramus savannarum
+oiseau	Bruant à gorge noire	Amphispiza bilineata
+oiseau	Bruant à joues marron	Chondestes grammacus
+oiseau	Bruant hudsonien	Spizelloides arborea
+oiseau	Bruant familier	Spizella passerina
+oiseau	Bruant de Brewer	Spizella breweri
+oiseau	Bruant des champs	Spizella pusilla
+oiseau	Bruant fauve	Passerella iliaca
+oiseau	Junco ardoisé	Junco hyemalis
+oiseau	Junco aux yeux jaunes	Junco phaeonotus
+oiseau	Bruant à couronne blanche	Zonotrichia leucophrys
+oiseau	Bruant à face noire	Zonotrichia querula
+oiseau	Bruant à couronne dorée	Zonotrichia atricapilla
+oiseau	Bruant à gorge blanche	Zonotrichia albicollis
+oiseau	Bruant des prés	Passerculus sandwichensis
+oiseau	Bruant de Le Conte	Ammospiza leconteii
+oiseau	Bruant de Nelson	Ammospiza nelsoni
+oiseau	Bruant maritime	Ammospiza maritima
+oiseau	Bruant vespéral	Pooecetes gramineus
+oiseau	Bruant chanteur	Melospiza melodia
+oiseau	Bruant de Lincoln	Melospiza lincolnii
+oiseau	Bruant des marais	Melospiza georgiana
+oiseau	Tohi à queue verte	Pipilo chlorurus
+oiseau	Tohi tacheté	Pipilo maculatus
+oiseau	Tohi à flancs roux	Pipilo erythrophthalmus
+oiseau	Tohi de Californie	Melozone crissalis
+oiseau	Tohi d'Abert	Melozone aberti
+oiseau	Paruline polyglotte	Icteria virens
+oiseau	Goglu des prés	Dolichonyx oryzivorus
+oiseau	Sturnelle de l'Ouest	Sturnella neglecta
+oiseau	Sturnelle des prés	Sturnella magna
+oiseau	Oriole des vergers	Icterus spurius
+oiseau	Oriole masqué	Icterus cucullatus
+oiseau	Oriole à gros bec	Icterus gularis
+oiseau	Oriole de Bullock	Icterus bullockii
+oiseau	Oriole de Baltimore	Icterus galbula
+oiseau	Oriole jaune-verdâtre	Icterus parisorum
+oiseau	Carouge à tête jaune	Xanthocephalus xanthocephalus
+oiseau	Carouge à épaulettes	Agelaius phoeniceus
+oiseau	Carouge de Californie	Agelaius tricolor
+oiseau	Vacher à tête brune	Molothrus ater
+oiseau	Vacher luisant	Molothrus bonariensis
+oiseau	Quiscale rouilleux	Euphagus carolinus
+oiseau	Quiscale de Brewer	Euphagus cyanocephalus
+oiseau	Quiscale bronzé	Quiscalus quiscula
+oiseau	Quiscale des marais	Quiscalus major
+oiseau	Quiscale à longue queue	Quiscalus mexicanus
+oiseau	Paruline couronnée	Seiurus aurocapilla
+oiseau	Paruline vermivore	Helmitheros vermivorum
+oiseau	Paruline hochequeue	Parkesia motacilla
+oiseau	Paruline des ruisseaux	Parkesia noveboracensis
+oiseau	Paruline à ailes dorées	Vermivora chrysoptera
+oiseau	Paruline à ailes bleues	Vermivora cyanoptera
+oiseau	Paruline noir et blanc	Mniotilta varia
+oiseau	Paruline orangée	Protonotaria citrea
+oiseau	Paruline obscure	Leiothlypis peregrina
+oiseau	Paruline verdâtre	Leiothlypis celata
+oiseau	Paruline à joues grises	Leiothlypis ruficapilla
+oiseau	Paruline de Virginia	Leiothlypis virginiae
+oiseau	Paruline à gorge grise	Oporornis agilis
+oiseau	Paruline triste	Geothlypis philadelphia
+oiseau	Paruline des buissons	Geothlypis tolmiei
+oiseau	Paruline du Kentucky	Geothlypis formosa
+oiseau	Paruline masquée	Geothlypis trichas
+oiseau	Paruline à capuchon	Setophaga citrina
+oiseau	Paruline flamboyante	Setophaga ruticilla
+oiseau	Paruline de Kirtland	Setophaga kirtlandii
+oiseau	Paruline tigrée	Setophaga tigrina
+oiseau	Paruline azurée	Setophaga cerulea
+oiseau	Paruline à collier	Setophaga americana
+oiseau	Paruline à tête cendrée	Setophaga magnolia
+oiseau	Paruline à poitrine baie	Setophaga castanea
+oiseau	Paruline à gorge orangée	Setophaga fusca
+oiseau	Paruline jaune	Setophaga petechia
+oiseau	Paruline à flancs marron	Setophaga pensylvanica
+oiseau	Paruline rayée	Setophaga striata
+oiseau	Paruline bleue	Setophaga caerulescens
+oiseau	Paruline à couronne rousse	Setophaga palmarum
+oiseau	Paruline des pins	Setophaga pinus
+oiseau	Paruline à croupion jaune	Setophaga coronata
+oiseau	Paruline à gorge jaune	Setophaga dominica
+oiseau	Paruline des prés	Setophaga discolor
+oiseau	Paruline grise	Setophaga nigrescens
+oiseau	Paruline de Townsend	Setophaga townsendi
+oiseau	Paruline à tête jaune	Setophaga occidentalis
+oiseau	Paruline à gorge noire	Setophaga virens
+oiseau	Paruline du Canada	Cardellina canadensis
+oiseau	Paruline à calotte noire	Cardellina pusilla
+oiseau	Paruline à face rouge	Cardellina rubrifrons
+oiseau	Paruline à ailes blanches	Myioborus pictus
+oiseau	Piranga à tête rouge	Piranga ludoviciana
+oiseau	Piranga vermillon	Piranga rubra
+oiseau	Piranga écarlate	Piranga olivacea
+oiseau	Piranga orangé	Piranga flava
+oiseau	Cardinal rouge	Cardinalis cardinalis
+oiseau	Cardinal pyrrhuloxia	Cardinalis sinuatus
+oiseau	Cardinal à poitrine rose	Pheucticus ludovicianus
+oiseau	Cardinal à tête noire	Pheucticus melanocephalus
+oiseau	Guiraca bleu	Passerina caerulea
+oiseau	Passerin azuré	Passerina amoena
+oiseau	Passerin indigo	Passerina cyanea
+oiseau	Passerin varié	Passerina versicolor
+oiseau	Passerin nonpareil	Passerina ciris
+oiseau	Dickcissel d'Amérique	Spiza americana
+oiseau	Oie cendrée	Anser anser
+oiseau	Oie des moissons	Anser fabalis
+oiseau	Bernache nonnette	Branta leucopsis
+oiseau	Ouette d'Égypte	Alopochen aegyptiaca
+oiseau	Tadorne de Belon	Tadorna tadorna
+oiseau	Tadorne casarca	Tadorna ferruginea
+oiseau	Canard mandarin	Aix galericulata
+oiseau	Fuligule milouin	Aythya ferina
+oiseau	Fuligule morillon	Aythya fuligula
+oiseau	Nette rousse	Netta rufina
+oiseau	Harle piette	Mergellus albellus
+oiseau	Cygne chanteur	Cygnus cygnus
+oiseau	Cygne noir	Cygnus atratus
+oiseau	Perdrix rouge	Alectoris rufa
+oiseau	Caille des blés	Coturnix coturnix
+oiseau	Grand Tétras	Tetrao urogallus
+oiseau	Tétras lyre	Lyrurus tetrix
+oiseau	Paon bleu	Pavo cristatus
+oiseau	Grèbe huppé	Podiceps cristatus
+oiseau	Grèbe castagneux	Tachybaptus ruficollis
+oiseau	Pigeon ramier	Columba palumbus
+oiseau	Pigeon colombin	Columba oenas
+oiseau	Tourterelle des bois	Streptopelia turtur
+oiseau	Coucou gris	Cuculus canorus
+oiseau	Engoulevent d'Europe	Caprimulgus europaeus
+oiseau	Martinet noir	Apus apus
+oiseau	Martinet à ventre blanc	Tachymarptis melba
+oiseau	Râle d'eau	Rallus aquaticus
+oiseau	Gallinule poule-d'eau	Gallinula chloropus
+oiseau	Foulque macroule	Fulica atra
+oiseau	Grue cendrée	Grus grus
+oiseau	Échasse blanche	Himantopus himantopus
+oiseau	Avocette élégante	Recurvirostra avosetta
+oiseau	Huîtrier pie	Haematopus ostralegus
+oiseau	Vanneau huppé	Vanellus vanellus
+oiseau	Grand Gravelot	Charadrius hiaticula
+oiseau	Petit Gravelot	Charadrius dubius
+oiseau	Pluvier doré	Pluvialis apricaria
+oiseau	Courlis cendré	Numenius arquata
+oiseau	Barge à queue noire	Limosa limosa
+oiseau	Barge rousse	Limosa lapponica
+oiseau	Combattant varié	Calidris pugnax
+oiseau	Chevalier gambette	Tringa totanus
+oiseau	Chevalier aboyeur	Tringa nebularia
+oiseau	Chevalier guignette	Actitis hypoleucos
+oiseau	Bécassine des marais	Gallinago gallinago
+oiseau	Bécasse des bois	Scolopax rusticola
+oiseau	Goéland leucophée	Larus michahellis
+oiseau	Goéland railleur	Chroicocephalus genei
+oiseau	Mouette mélanocéphale	Ichthyaetus melanocephalus
+oiseau	Sterne naine	Sternula albifrons
+oiseau	Cigogne blanche	Ciconia ciconia
+oiseau	Cigogne noire	Ciconia nigra
+oiseau	Cormoran huppé	Gulosus aristotelis
+oiseau	Héron cendré	Ardea cinerea
+oiseau	Héron pourpré	Ardea purpurea
+oiseau	Aigrette garzette	Egretta garzetta
+oiseau	Crabier chevelu	Ardeola ralloides
+oiseau	Butor étoilé	Botaurus stellaris
+oiseau	Blongios nain	Ixobrychus minutus
+oiseau	Spatule blanche	Platalea leucorodia
+oiseau	Ibis sacré	Threskiornis aethiopicus
+oiseau	Flamant rose	Phoenicopterus roseus
+oiseau	Pélican blanc	Pelecanus onocrotalus
+oiseau	Vautour fauve	Gyps fulvus
+oiseau	Vautour moine	Aegypius monachus
+oiseau	Gypaète barbu	Gypaetus barbatus
+oiseau	Vautour percnoptère	Neophron percnopterus
+oiseau	Bondrée apivore	Pernis apivorus
+oiseau	Milan royal	Milvus milvus
+oiseau	Milan noir	Milvus migrans
+oiseau	Busard des roseaux	Circus aeruginosus
+oiseau	Busard Saint-Martin	Circus cyaneus
+oiseau	Épervier d'Europe	Accipiter nisus
+oiseau	Autour d'Europe	Astur gentilis
+oiseau	Buse variable	Buteo buteo
+oiseau	Aigle botté	Hieraaetus pennatus
+oiseau	Circaète Jean-le-Blanc	Circaetus gallicus
+oiseau	Pygargue à queue blanche	Haliaeetus albicilla
+oiseau	Faucon crécerelle	Falco tinnunculus
+oiseau	Faucon hobereau	Falco subbuteo
+oiseau	Faucon crécerellette	Falco naumanni
+oiseau	Chouette hulotte	Strix aluco
+oiseau	Chevêche d'Athéna	Athene noctua
+oiseau	Grand-duc d'Europe	Bubo bubo
+oiseau	Petit-duc scops	Otus scops
+oiseau	Martin-pêcheur d'Europe	Alcedo atthis
+oiseau	Guêpier d'Europe	Merops apiaster
+oiseau	Rollier d'Europe	Coracias garrulus
+oiseau	Huppe fasciée	Upupa epops
+oiseau	Pic vert	Picus viridis
+oiseau	Pic noir	Dryocopus martius
+oiseau	Pic épeiche	Dendrocopos major
+oiseau	Pic épeichette	Dryobates minor
+oiseau	Pic mar	Dendrocoptes medius
+oiseau	Torcol fourmilier	Jynx torquilla
+oiseau	Alouette des champs	Alauda arvensis
+oiseau	Alouette lulu	Lullula arborea
+oiseau	Cochevis huppé	Galerida cristata
+oiseau	Hirondelle de fenêtre	Delichon urbicum
+oiseau	Hirondelle rousseline	Cecropis daurica
+oiseau	Pipit farlouse	Anthus pratensis
+oiseau	Pipit des arbres	Anthus trivialis
+oiseau	Bergeronnette grise	Motacilla alba
+oiseau	Bergeronnette printanière	Motacilla flava
+oiseau	Bergeronnette des ruisseaux	Motacilla cinerea
+oiseau	Cincle plongeur	Cinclus cinclus
+oiseau	Troglodyte mignon	Troglodytes troglodytes
+oiseau	Accenteur mouchet	Prunella modularis
+oiseau	Rougegorge familier	Erithacus rubecula
+oiseau	Rossignol philomèle	Luscinia megarhynchos
+oiseau	Gorgebleue à miroir	Luscinia svecica
+oiseau	Rougequeue noir	Phoenicurus ochruros
+oiseau	Rougequeue à front blanc	Phoenicurus phoenicurus
+oiseau	Tarier pâtre	Saxicola rubicola
+oiseau	Tarier des prés	Saxicola rubetra
+oiseau	Traquet motteux	Oenanthe oenanthe
+oiseau	Monticole bleu	Monticola solitarius
+oiseau	Merle noir	Turdus merula
+oiseau	Grive musicienne	Turdus philomelos
+oiseau	Grive draine	Turdus viscivorus
+oiseau	Grive litorne	Turdus pilaris
+oiseau	Grive mauvis	Turdus iliacus
+oiseau	Merle à plastron	Turdus torquatus
+oiseau	Fauvette à tête noire	Sylvia atricapilla
+oiseau	Fauvette des jardins	Sylvia borin
+oiseau	Fauvette grisette	Curruca communis
+oiseau	Fauvette mélanocéphale	Curruca melanocephala
+oiseau	Rousserolle effarvatte	Acrocephalus scirpaceus
+oiseau	Phragmite des joncs	Acrocephalus schoenobaenus
+oiseau	Pouillot véloce	Phylloscopus collybita
+oiseau	Pouillot fitis	Phylloscopus trochilus
+oiseau	Roitelet huppé	Regulus regulus
+oiseau	Roitelet à triple bandeau	Regulus ignicapilla
+oiseau	Gobemouche gris	Muscicapa striata
+oiseau	Gobemouche noir	Ficedula hypoleuca
+oiseau	Mésange charbonnière	Parus major
+oiseau	Mésange bleue	Cyanistes caeruleus
+oiseau	Mésange noire	Periparus ater
+oiseau	Mésange huppée	Lophophanes cristatus
+oiseau	Mésange nonnette	Poecile palustris
+oiseau	Mésange à longue queue	Aegithalos caudatus
+oiseau	Panure à moustaches	Panurus biarmicus
+oiseau	Sittelle torchepot	Sitta europaea
+oiseau	Tichodrome échelette	Tichodroma muraria
+oiseau	Grimpereau des jardins	Certhia brachydactyla
+oiseau	Loriot d'Europe	Oriolus oriolus
+oiseau	Pie-grièche écorcheur	Lanius collurio
+oiseau	Pie-grièche grise	Lanius excubitor
+oiseau	Geai des chênes	Garrulus glandarius
+oiseau	Pie bavarde	Pica pica
+oiseau	Choucas des tours	Coloeus monedula
+oiseau	Corbeau freux	Corvus frugilegus
+oiseau	Corneille noire	Corvus corone
+oiseau	Corneille mantelée	Corvus cornix
+oiseau	Crave à bec rouge	Pyrrhocorax pyrrhocorax
+oiseau	Chocard à bec jaune	Pyrrhocorax graculus
+oiseau	Cassenoix moucheté	Nucifraga caryocatactes
+oiseau	Étourneau unicolore	Sturnus unicolor
+oiseau	Pinson des arbres	Fringilla coelebs
+oiseau	Pinson du Nord	Fringilla montifringilla
+oiseau	Verdier d'Europe	Chloris chloris
+oiseau	Chardonneret élégant	Carduelis carduelis
+oiseau	Tarin des aulnes	Spinus spinus
+oiseau	Linotte mélodieuse	Linaria cannabina
+oiseau	Serin cini	Serinus serinus
+oiseau	Bouvreuil pivoine	Pyrrhula pyrrhula
+oiseau	Grosbec casse-noyaux	Coccothraustes coccothraustes
+oiseau	Bruant jaune	Emberiza citrinella
+oiseau	Bruant zizi	Emberiza cirlus
+oiseau	Bruant des roseaux	Emberiza schoeniclus
+oiseau	Bruant proyer	Emberiza calandra
+oiseau	Bruant ortolan	Emberiza hortulana
+oiseau	Moineau espagnol	Passer hispaniolensis
+oiseau	Perruche à collier	Psittacula krameri
+oiseau	Ibis rouge	Eudocimus ruber
+oiseau	Flamant des Caraïbes	Phoenicopterus ruber
+oiseau	Pélican thage	Pelecanus thagus
+oiseau	Grande Frégate	Fregata minor
+oiseau	Phaéton à bec rouge	Phaethon aethereus
+oiseau	Phaéton à bec jaune	Phaethon lepturus
+oiseau	Noddi brun	Anous stolidus
+oiseau	Sterne blanche	Gygis alba
+oiseau	Colibri madère	Eulampis jugularis
+oiseau	Colibri falle-vert	Eulampis holosericeus
+oiseau	Colibri huppé	Orthorhyncus cristatus
+oiseau	Colibri à tête bleue	Cyanophaia bicolor
+oiseau	Colibri à tête noire	Trochilus polytmus
+oiseau	Colibri d'Elena	Mellisuga helenae
+oiseau	Ariane à ventre gris	Amazilia tzacatl
+oiseau	Ariane du Yucatan	Amazilia yucatanensis
+oiseau	Colibri à gorge pourprée	Lampornis calolaemus
+oiseau	Colibri thalassin	Colibri thalassinus
+oiseau	Dryade à queue fourchue	Thalurania colombica
+oiseau	Ermite à longue queue	Phaethornis longirostris
+oiseau	Sucrier à ventre jaune	Coereba flaveola
+oiseau	Sporophile grand-chanteur	Tiaris olivaceus
+oiseau	Sporophile cici	Melanospiza bicolor
+oiseau	Quiscale merle	Quiscalus lugubris
+oiseau	Quiscale noir	Quiscalus niger
+oiseau	Moqueur des savanes	Mimus gilvus
+oiseau	Moqueur corossol	Margarops fuscatus
+oiseau	Moqueur grivotte	Allenia fusca
+oiseau	Trembleur brun	Cinclocerthia ruficauda
+oiseau	Tyran janeau	Tyrannus caudifasciatus
+oiseau	Élénie siffleuse	Elaenia martinica
+oiseau	Tourterelle à queue carrée	Zenaida aurita
+oiseau	Colombe à croissants	Geotrygon montana
+oiseau	Pic de la Guadeloupe	Melanerpes herminieri
+oiseau	Pic des Antilles	Melanerpes superciliaris
+oiseau	Pic de Hoffmann	Melanerpes hoffmannii
+oiseau	Pic du Yucatan	Melanerpes pygmaeus
+oiseau	Tangara évêque	Thraupis episcopus
+oiseau	Tangara des palmiers	Thraupis palmarum
+oiseau	Tangara à tête baie	Tangara gyrola
+oiseau	Tangara à croupion rouge	Ramphocelus passerinii
+oiseau	Tangara à ventre rouge	Ramphocelus dimidiatus
+oiseau	Calliste à galons rouges	Tangara arthus
+oiseau	Calliste septicolore	Tangara chilensis
+oiseau	Guit-guit saï	Cyanerpes cyaneus
+oiseau	Guit-guit émeraude	Chlorophanes spiza
+oiseau	Organiste louis-d'or	Euphonia violacea
+oiseau	Chlorospin des buissons	Chlorospingus flavopectus
+oiseau	Saltator gris	Saltator coerulescens
+oiseau	Oropendola de Montezuma	Psarocolius montezuma
+oiseau	Cassique à dos jaune	Cacicus cela
+oiseau	Oriole troupiale	Icterus icterus
+oiseau	Oriole à dos rayé	Icterus pustulatus
+oiseau	Tyran pirate	Legatus leucophaius
+oiseau	Tyran sociable	Myiozetetes similis
+oiseau	Moucherolle royal	Onychorhynchus coronatus
+oiseau	Manakin à col blanc	Manacus candei
+oiseau	Manakin à longue queue	Chiroxiphia linearis
+oiseau	Batara rayé	Thamnophilus doliatus
+oiseau	Grimpar à bec ivoire	Xiphorhynchus flavigaster
+oiseau	Momot à sourcils bleus	Eumomota superciliosa
+oiseau	Momot de Lesson	Momotus lessonii
+oiseau	Jacamar à queue rousse	Galbula ruficauda
+oiseau	Toucan à carène	Ramphastos sulfuratus
+oiseau	Toucan tocard	Ramphastos ambiguus
+oiseau	Toucan toco	Ramphastos toco
+oiseau	Araçari à collier	Pteroglossus torquatus
+oiseau	Toucanet émeraude	Aulacorhynchus prasinus
+oiseau	Quetzal resplendissant	Pharomachrus mocinno
+oiseau	Trogon de Masséna	Trogon massena
+oiseau	Trogon de Cuba	Priotelus temnurus
+oiseau	Todier de Cuba	Todus multicolor
+oiseau	Todier de la Jamaïque	Todus todus
+oiseau	Ara rouge	Ara macao
+oiseau	Ara chloroptère	Ara chloropterus
+oiseau	Ara bleu	Ara ararauna
+oiseau	Ara militaire	Ara militaris
+oiseau	Amazone à front blanc	Amazona albifrons
+oiseau	Amazone à front rouge	Amazona autumnalis
+oiseau	Amazone de Cuba	Amazona leucocephala
+oiseau	Amazone à tête jaune	Amazona oratrix
+oiseau	Conure à front orange	Eupsittula canicularis
+oiseau	Conure aztèque	Eupsittula nana
+oiseau	Conure verte	Psittacara holochlorus
+oiseau	Pione à couronne blanche	Pionus senilis
+oiseau	Ortalide chacamel	Ortalis vetula
+oiseau	Pénélope panachée	Penelope purpurascens
+oiseau	Grand Hocco	Crax rubra
+oiseau	Dindon ocellé	Meleagris ocellata
+oiseau	Tinamou de Boucard	Crypturellus boucardi
+oiseau	Jacana du Mexique	Jacana spinosa
+oiseau	Jacana noir	Jacana jacana
+oiseau	Caurale soleil	Eurypyga helias
+oiseau	Savacou huppé	Cochlearius cochlearius
+oiseau	Onoré du Mexique	Tigrisoma mexicanum
+oiseau	Jabiru d'Amérique	Jabiru mycteria
+oiseau	Kamichi cornu	Anhima cornuta
+oiseau	Urubu à tête jaune	Cathartes burrovianus
+oiseau	Sarcoramphe roi	Sarcoramphus papa
+oiseau	Harpie féroce	Harpia harpyja
+oiseau	Buse à gros bec	Rupornis magnirostris
+oiseau	Buse noire	Buteogallus anthracinus
+oiseau	Caracara à tête jaune	Milvago chimachima
+oiseau	Faucon des chauves-souris	Falco rufigularis
+oiseau	Macagua rieur	Herpetotheres cachinnans
+oiseau	Grand Ibijau	Nyctibius grandis
+oiseau	Ibijau gris	Nyctibius griseus
+oiseau	Engoulevent pauraqué	Nyctidromus albicollis
+oiseau	Chevêchette brune	Glaucidium brasilianum
+oiseau	Chouette à lunettes	Pulsatrix perspicillata
+oiseau	Coq de roche orange	Rupicola rupicola
+oiseau	Hoazin huppé	Opisthocomus hoazin
+oiseau	Nandou d'Amérique	Rhea americana
+oiseau	Manchot de Magellan	Spheniscus magellanicus
+oiseau	Manchot des Galapagos	Spheniscus mendiculus
+oiseau	Manchot de Humboldt	Spheniscus humboldti
+oiseau	Manchot papou	Pygoscelis papua
+oiseau	Manchot Adélie	Pygoscelis adeliae
+oiseau	Manchot à jugulaire	Pygoscelis antarcticus
+oiseau	Manchot royal	Aptenodytes patagonicus
+oiseau	Manchot empereur	Aptenodytes forsteri
+oiseau	Gorfou sauteur	Eudyptes chrysocome
+oiseau	Albatros hurleur	Diomedea exulans
+oiseau	Albatros à sourcils noirs	Thalassarche melanophris
+oiseau	Albatros des Galapagos	Phoebastria irrorata
+oiseau	Cormoran aptère	Nannopterum harrisi
+oiseau	Condor des Andes	Vultur gryphus
+oiseau	Autruche d'Afrique	Struthio camelus
+oiseau	Pintade de Numidie	Numida meleagris
+oiseau	Francolin à cou roux	Pternistis afer
+oiseau	Francolin de Swainson	Pternistis swainsonii
+oiseau	Outarde kori	Ardeotis kori
+oiseau	Grue royale	Balearica regulorum
+oiseau	Grue couronnée	Balearica pavonina
+oiseau	Messager sagittaire	Sagittarius serpentarius
+oiseau	Bucorve du Sud	Bucorvus leadbeateri
+oiseau	Calao à bec rouge	Tockus erythrorhynchus
+oiseau	Calao leucomèle	Tockus leucomelas
+oiseau	Calao trompette	Bycanistes bucinator
+oiseau	Rollier à longs brins	Coracias caudatus
+oiseau	Guêpier écarlate	Merops nubicoides
+oiseau	Guêpier nain	Merops pusillus
+oiseau	Guêpier à front blanc	Merops bullockoides
+oiseau	Martin-pêcheur pie	Ceryle rudis
+oiseau	Martin-pêcheur huppé	Corythornis cristatus
+oiseau	Martin-chasseur à tête grise	Halcyon leucocephala
+oiseau	Martin-chasseur du Sénégal	Halcyon senegalensis
+oiseau	Coliou rayé	Colius striatus
+oiseau	Touraco de Livingstone	Tauraco livingstonii
+oiseau	Touraco concolore	Corythaixoides concolor
+oiseau	Barbican promépic	Trachyphonus vaillantii
+oiseau	Irrisor moqueur	Phoeniculus purpureus
+oiseau	Huppe d'Afrique	Upupa africana
+oiseau	Choucador superbe	Lamprotornis superbus
+oiseau	Choucador à oreillons bleus	Lamprotornis chalybaeus
+oiseau	Choucador de Burchell	Lamprotornis australis
+oiseau	Piqueboeuf à bec rouge	Buphagus erythrorynchus
+oiseau	Piqueboeuf à bec jaune	Buphagus africanus
+oiseau	Tisserin gendarme	Ploceus cucullatus
+oiseau	Travailleur à bec rouge	Quelea quelea
+oiseau	Euplecte ignicolore	Euplectes orix
+oiseau	Veuve dominicaine	Vidua macroura
+oiseau	Cordonbleu à joues rouges	Uraeginthus bengalus
+oiseau	Bulbul des jardins	Pycnonotus barbatus
+oiseau	Souimanga à poitrine rouge	Chalcomitra senegalensis
+oiseau	Souimanga malachite	Nectarinia famosa
+oiseau	Drongo brillant	Dicrurus adsimilis
+oiseau	Gonolek de Barbarie	Laniarius barbarus
+oiseau	Bagadais casqué	Prionops plumatus
+oiseau	Inséparable de Fischer	Agapornis fischeri
+oiseau	Inséparable rosegorge	Agapornis roseicollis
+oiseau	Perroquet gris	Psittacus erithacus
+oiseau	Vautour africain	Gyps africanus
+oiseau	Vautour oricou	Torgos tracheliotos
+oiseau	Vautour à tête blanche	Trigonoceps occipitalis
+oiseau	Aigle bateleur	Terathopius ecaudatus
+oiseau	Aigle martial	Polemaetus bellicosus
+oiseau	Aigle ravisseur	Aquila rapax
+oiseau	Aigle de Verreaux	Aquila verreauxii
+oiseau	Pygargue vocifère	Haliaeetus vocifer
+oiseau	Autour chanteur	Melierax canorus
+oiseau	Élanion blanc	Elanus caeruleus
+oiseau	Grand-duc de Verreaux	Bubo lacteus
+oiseau	Ombrette africaine	Scopus umbretta
+oiseau	Bec-ouvert africain	Anastomus lamelligerus
+oiseau	Marabout d'Afrique	Leptoptilos crumenifer
+oiseau	Jabiru d'Afrique	Ephippiorhynchus senegalensis
+oiseau	Tantale ibis	Mycteria ibis
+oiseau	Ibis hagedash	Bostrychia hagedash
+oiseau	Bec-en-sabot du Nil	Balaeniceps rex
+oiseau	Héron goliath	Ardea goliath
+oiseau	Héron mélanocéphale	Ardea melanocephala
+oiseau	Petit Flamant	Phoeniconaias minor
+oiseau	Canard armé	Plectropterus gambensis
+oiseau	Dendrocygne veuf	Dendrocygna viduata
+oiseau	Jacana à poitrine dorée	Actophilornis africanus
+oiseau	Vanneau armé	Vanellus armatus
+oiseau	Vanneau à tête blanche	Vanellus albiceps
+oiseau	Vanneau couronné	Vanellus coronatus
+oiseau	Vanneau éperonné	Vanellus spinosus
+oiseau	Œdicnème vermiculé	Burhinus vermiculatus
+oiseau	Ganga namaqua	Pterocles namaqua
+oiseau	Tourterelle du Cap	Streptopelia capicola
+oiseau	Tourterelle maillée	Spilopelia senegalensis
+oiseau	Manchot du Cap	Spheniscus demersus
+oiseau	Fou du Cap	Morus capensis
+oiseau	Paon spicifère	Pavo muticus
+oiseau	Coq bankiva	Gallus gallus
+oiseau	Martin triste	Acridotheres tristis
+oiseau	Bulbul orphée	Pycnonotus jocosus
+oiseau	Shama à croupion blanc	Copsychus malabaricus
+oiseau	Calao rhinocéros	Buceros rhinoceros
+oiseau	Calao bicorne	Buceros bicornis
+oiseau	Martin-chasseur de Smyrne	Halcyon smyrnensis
+oiseau	Guêpier d'Orient	Merops orientalis
+oiseau	Rollier indien	Coracias benghalensis
+oiseau	Grue du Japon	Grus japonensis
+oiseau	Ibis nippon	Nipponia nippon
+oiseau	Faisan doré	Chrysolophus pictus
+oiseau	Faisan vénéré	Syrmaticus reevesii
+oiseau	Émeu d'Australie	Dromaius novaehollandiae
+oiseau	Casoar à casque	Casuarius casuarius
+oiseau	Kiwi austral	Apteryx australis
+oiseau	Martin-chasseur géant	Dacelo novaeguineae
+oiseau	Cacatoès à huppe jaune	Cacatua galerita
+oiseau	Cacatoès rosalbin	Eolophus roseicapilla
+oiseau	Loriquet arc-en-ciel	Trichoglossus moluccanus
+oiseau	Perruche calopsitte	Nymphicus hollandicus
+oiseau	Ménure superbe	Menura novaehollandiae
+oiseau	Cassican flûteur	Gymnorhina tibicen
+oiseau	Pélican à lunettes	Pelecanus conspicillatus
+oiseau	Ibis à cou noir	Threskiornis molucca
+oiseau	Cygne à col noir	Cygnus melancoryphus
+oiseau	Nestor kéa	Nestor notabilis
+oiseau	Strigops kakapo	Strigops habroptilus
+oiseau	Oie néné	Branta sandvicensis
+oiseau	Iiwi rouge	Drepanis coccinea
+oiseau	Paroare huppé	Paroaria coronata
+oiseau	Bulbul à ventre rouge	Pycnonotus cafer
+oiseau	Diamant mandarin	Taeniopygia guttata
+oiseau	Serin des Canaries	Serinus canaria
+mammifère	Opossum d'Amérique	Didelphis virginiana
+mammifère	Tatou à neuf bandes	Dasypus novemcinctus
+mammifère	Musaraigne cendrée	Sorex cinereus
+mammifère	Grande Musaraigne	Blarina brevicauda
+mammifère	Taupe à nez étoilé	Condylura cristata
+mammifère	Taupe à queue glabre	Scalopus aquaticus
+mammifère	Petite Chauve-souris brune	Myotis lucifugus
+mammifère	Grande Chauve-souris brune	Eptesicus fuscus
+mammifère	Chauve-souris cendrée	Lasiurus cinereus
+mammifère	Chauve-souris rousse	Lasiurus borealis
+mammifère	Molosse du Brésil	Tadarida brasiliensis
+mammifère	Pica d'Amérique	Ochotona princeps
+mammifère	Pica à collier	Ochotona collaris
+mammifère	Lapin à queue blanche	Sylvilagus floridanus
+mammifère	Lapin de Nuttall	Sylvilagus nuttallii
+mammifère	Lapin du désert	Sylvilagus audubonii
+mammifère	Lapin des marais	Sylvilagus palustris
+mammifère	Lièvre d'Amérique	Lepus americanus
+mammifère	Lièvre arctique	Lepus arcticus
+mammifère	Lièvre de Californie	Lepus californicus
+mammifère	Lièvre de Townsend	Lepus townsendii
+mammifère	Marmotte commune	Marmota monax
+mammifère	Marmotte des Rocheuses	Marmota caligata
+mammifère	Marmotte à ventre jaune	Marmota flaviventris
+mammifère	Marmotte de l'île de Vancouver	Marmota vancouverensis
+mammifère	Tamia rayé	Tamias striatus
+mammifère	Tamia mineur	Neotamias minimus
+mammifère	Tamia amène	Neotamias amoenus
+mammifère	Spermophile de Franklin	Poliocitellus franklinii
+mammifère	Spermophile de Richardson	Urocitellus richardsonii
+mammifère	Spermophile de Columbia	Urocitellus columbianus
+mammifère	Spermophile arctique	Urocitellus parryii
+mammifère	Spermophile rayé	Ictidomys tridecemlineatus
+mammifère	Spermophile à mante dorée	Callospermophilus lateralis
+mammifère	Spermophile de Californie	Otospermophilus beecheyi
+mammifère	Chien de prairie à queue noire	Cynomys ludovicianus
+mammifère	Écureuil roux	Tamiasciurus hudsonicus
+mammifère	Écureuil de Douglas	Tamiasciurus douglasii
+mammifère	Écureuil gris	Sciurus carolinensis
+mammifère	Écureuil fauve	Sciurus niger
+mammifère	Écureuil d'Abert	Sciurus aberti
+mammifère	Écureuil gris de l'Ouest	Sciurus griseus
+mammifère	Grand Polatouche	Glaucomys sabrinus
+mammifère	Petit Polatouche	Glaucomys volans
+mammifère	Castor du Canada	Castor canadensis
+mammifère	Rat musqué	Ondatra zibethicus
+mammifère	Souris sylvestre	Peromyscus maniculatus
+mammifère	Souris à pattes blanches	Peromyscus leucopus
+mammifère	Campagnol des champs	Microtus pennsylvanicus
+mammifère	Campagnol à dos roux de Gapper	Clethrionomys gapperi
+mammifère	Souris sauteuse des champs	Zapus hudsonius
+mammifère	Porc-épic d'Amérique	Erethizon dorsatum
+mammifère	Rat surmulot	Rattus norvegicus
+mammifère	Rat noir	Rattus rattus
+mammifère	Souris grise	Mus musculus
+mammifère	Rat des bois à queue touffue	Neotoma cinerea
+mammifère	Ragondin	Myocastor coypus
+mammifère	Coyote	Canis latrans
+mammifère	Loup gris	Canis lupus
+mammifère	Loup roux	Canis rufus
+mammifère	Renard roux	Vulpes vulpes
+mammifère	Renard arctique	Vulpes lagopus
+mammifère	Renard véloce	Vulpes velox
+mammifère	Renard nain	Vulpes macrotis
+mammifère	Renard gris	Urocyon cinereoargenteus
+mammifère	Ours noir	Ursus americanus
+mammifère	Ours brun	Ursus arctos
+mammifère	Grizzli	Ursus arctos horribilis
+mammifère	Ours blanc	Ursus maritimus
+mammifère	Raton laveur	Procyon lotor
+mammifère	Bassaris rusé	Bassariscus astutus
+mammifère	Coati à nez blanc	Nasua narica
+mammifère	Moufette rayée	Mephitis mephitis
+mammifère	Moufette tachetée de l'Est	Spilogale putorius
+mammifère	Belette à longue queue	Neogale frenata
+mammifère	Hermine	Mustela erminea
+mammifère	Belette pygmée	Mustela nivalis
+mammifère	Vison d'Amérique	Neogale vison
+mammifère	Putois d'Amérique	Mustela nigripes
+mammifère	Martre d'Amérique	Martes americana
+mammifère	Pékan	Pekania pennanti
+mammifère	Carcajou	Gulo gulo
+mammifère	Blaireau d'Amérique	Taxidea taxus
+mammifère	Loutre de rivière	Lontra canadensis
+mammifère	Loutre de mer	Enhydra lutris
+mammifère	Lynx du Canada	Lynx canadensis
+mammifère	Lynx roux	Lynx rufus
+mammifère	Couguar	Puma concolor
+mammifère	Ocelot	Leopardus pardalis
+mammifère	Jaguar	Panthera onca
+mammifère	Jaguarondi	Herpailurus yagouaroundi
+mammifère	Otarie de Californie	Zalophus californianus
+mammifère	Otarie de Steller	Eumetopias jubatus
+mammifère	Otarie à fourrure du Nord	Callorhinus ursinus
+mammifère	Otarie des Galapagos	Zalophus wollebaeki
+mammifère	Morse	Odobenus rosmarus
+mammifère	Phoque commun	Phoca vitulina
+mammifère	Phoque gris	Halichoerus grypus
+mammifère	Phoque du Groenland	Pagophilus groenlandicus
+mammifère	Phoque annelé	Pusa hispida
+mammifère	Phoque à capuchon	Cystophora cristata
+mammifère	Phoque barbu	Erignathus barbatus
+mammifère	Éléphant de mer du Nord	Mirounga angustirostris
+mammifère	Éléphant de mer du Sud	Mirounga leonina
+mammifère	Phoque moine de Hawaï	Neomonachus schauinslandi
+mammifère	Léopard de mer	Hydrurga leptonyx
+mammifère	Wapiti	Cervus canadensis
+mammifère	Cerf de Virginie	Odocoileus virginianus
+mammifère	Cerf mulet	Odocoileus hemionus
+mammifère	Orignal	Alces alces
+mammifère	Caribou	Rangifer tarandus
+mammifère	Antilocapre d'Amérique	Antilocapra americana
+mammifère	Bison d'Amérique	Bison bison
+mammifère	Bœuf musqué	Ovibos moschatus
+mammifère	Chèvre de montagne	Oreamnos americanus
+mammifère	Mouflon d'Amérique	Ovis canadensis
+mammifère	Mouflon de Dall	Ovis dalli
+mammifère	Pécari à collier	Dicotyles tajacu
+mammifère	Lamantin des Caraïbes	Trichechus manatus
+mammifère	Baleine à bosse	Megaptera novaeangliae
+mammifère	Baleine bleue	Balaenoptera musculus
+mammifère	Rorqual commun	Balaenoptera physalus
+mammifère	Petit rorqual	Balaenoptera acutorostrata
+mammifère	Baleine grise	Eschrichtius robustus
+mammifère	Baleine noire de l'Atlantique Nord	Eubalaena glacialis
+mammifère	Baleine boréale	Balaena mysticetus
+mammifère	Baleine franche australe	Eubalaena australis
+mammifère	Cachalot	Physeter macrocephalus
+mammifère	Béluga	Delphinapterus leucas
+mammifère	Narval	Monodon monoceros
+mammifère	Épaulard	Orcinus orca
+mammifère	Grand dauphin	Tursiops truncatus
+mammifère	Dauphin commun	Delphinus delphis
+mammifère	Dauphin à flancs blancs	Lagenorhynchus acutus
+mammifère	Dauphin à bec blanc	Lagenorhynchus albirostris
+mammifère	Dauphin tacheté de l'Atlantique	Stenella frontalis
+mammifère	Dauphin à long bec	Stenella longirostris
+mammifère	Marsouin commun	Phocoena phocoena
+mammifère	Marsouin de Dall	Phocoenoides dalli
+mammifère	Globicéphale noir	Globicephala melas
+mammifère	Hérisson d'Europe	Erinaceus europaeus
+mammifère	Taupe d'Europe	Talpa europaea
+mammifère	Musaraigne carrelet	Sorex araneus
+mammifère	Pipistrelle commune	Pipistrellus pipistrellus
+mammifère	Grand Murin	Myotis myotis
+mammifère	Oreillard roux	Plecotus auritus
+mammifère	Grand Rhinolophe	Rhinolophus ferrumequinum
+mammifère	Lapin de garenne	Oryctolagus cuniculus
+mammifère	Lièvre d'Europe	Lepus europaeus
+mammifère	Lièvre variable	Lepus timidus
+mammifère	Écureuil d'Europe	Sciurus vulgaris
+mammifère	Marmotte des Alpes	Marmota marmota
+mammifère	Loir gris	Glis glis
+mammifère	Lérot	Eliomys quercinus
+mammifère	Muscardin	Muscardinus avellanarius
+mammifère	Castor d'Europe	Castor fiber
+mammifère	Mulot sylvestre	Apodemus sylvaticus
+mammifère	Campagnol roussâtre	Clethrionomys glareolus
+mammifère	Rat des moissons	Micromys minutus
+mammifère	Hamster d'Europe	Cricetus cricetus
+mammifère	Chat forestier	Felis silvestris
+mammifère	Lynx boréal	Lynx lynx
+mammifère	Lynx pardelle	Lynx pardinus
+mammifère	Blaireau européen	Meles meles
+mammifère	Loutre d'Europe	Lutra lutra
+mammifère	Martre des pins	Martes martes
+mammifère	Fouine	Martes foina
+mammifère	Putois d'Europe	Mustela putorius
+mammifère	Genette commune	Genetta genetta
+mammifère	Chacal doré	Canis aureus
+mammifère	Cerf élaphe	Cervus elaphus
+mammifère	Daim européen	Dama dama
+mammifère	Chevreuil européen	Capreolus capreolus
+mammifère	Cerf sika	Cervus nippon
+mammifère	Sanglier	Sus scrofa
+mammifère	Bouquetin des Alpes	Capra ibex
+mammifère	Bouquetin ibérique	Capra pyrenaica
+mammifère	Chamois	Rupicapra rupicapra
+mammifère	Isard	Rupicapra pyrenaica
+mammifère	Mouflon méditerranéen	Ovis gmelini
+mammifère	Bison d'Europe	Bison bonasus
+mammifère	Renne	Rangifer tarandus tarandus
+mammifère	Magot	Macaca sylvanus
+mammifère	Lion	Panthera leo
+mammifère	Léopard	Panthera pardus
+mammifère	Tigre	Panthera tigris
+mammifère	Panthère des neiges	Panthera uncia
+mammifère	Guépard	Acinonyx jubatus
+mammifère	Serval	Leptailurus serval
+mammifère	Caracal	Caracal caracal
+mammifère	Hyène tachetée	Crocuta crocuta
+mammifère	Hyène brune	Parahyaena brunnea
+mammifère	Hyène rayée	Hyaena hyaena
+mammifère	Protèle	Proteles cristatus
+mammifère	Lycaon	Lycaon pictus
+mammifère	Chacal à chabraque	Lupulella mesomelas
+mammifère	Otocyon	Otocyon megalotis
+mammifère	Fennec	Vulpes zerda
+mammifère	Mangouste rayée	Mungos mungo
+mammifère	Mangouste naine	Helogale parvula
+mammifère	Suricate	Suricata suricatta
+mammifère	Ratel	Mellivora capensis
+mammifère	Éléphant de savane d'Afrique	Loxodonta africana
+mammifère	Éléphant de forêt d'Afrique	Loxodonta cyclotis
+mammifère	Éléphant d'Asie	Elephas maximus
+mammifère	Rhinocéros blanc	Ceratotherium simum
+mammifère	Rhinocéros noir	Diceros bicornis
+mammifère	Rhinocéros indien	Rhinoceros unicornis
+mammifère	Hippopotame amphibie	Hippopotamus amphibius
+mammifère	Girafe	Giraffa camelopardalis
+mammifère	Girafe réticulée	Giraffa reticulata
+mammifère	Okapi	Okapia johnstoni
+mammifère	Zèbre des plaines	Equus quagga
+mammifère	Zèbre de Grévy	Equus grevyi
+mammifère	Zèbre de montagne	Equus zebra
+mammifère	Buffle d'Afrique	Syncerus caffer
+mammifère	Gnou bleu	Connochaetes taurinus
+mammifère	Gnou à queue blanche	Connochaetes gnou
+mammifère	Impala	Aepyceros melampus
+mammifère	Gazelle de Thomson	Eudorcas thomsonii
+mammifère	Gazelle de Grant	Nanger granti
+mammifère	Springbok	Antidorcas marsupialis
+mammifère	Topi	Damaliscus lunatus
+mammifère	Bubale	Alcelaphus buselaphus
+mammifère	Cobe à croissant	Kobus ellipsiprymnus
+mammifère	Cobe lechwe	Kobus leche
+mammifère	Cobe de Buffon	Kobus kob
+mammifère	Grand koudou	Tragelaphus strepsiceros
+mammifère	Nyala	Tragelaphus angasii
+mammifère	Guib harnaché	Tragelaphus scriptus
+mammifère	Sitatunga	Tragelaphus spekii
+mammifère	Éland du Cap	Taurotragus oryx
+mammifère	Hippotrague noir	Hippotragus niger
+mammifère	Hippotrague rouan	Hippotragus equinus
+mammifère	Oryx gazelle	Oryx gazella
+mammifère	Oryx beïsa	Oryx beisa
+mammifère	Dik-dik de Kirk	Madoqua kirkii
+mammifère	Steenbok	Raphicerus campestris
+mammifère	Ourébi	Ourebia ourebi
+mammifère	Céphalophe de Grimm	Sylvicapra grimmia
+mammifère	Oréotrague	Oreotragus oreotragus
+mammifère	Gérénuk	Litocranius walleri
+mammifère	Phacochère commun	Phacochoerus africanus
+mammifère	Potamochère roux	Potamochoerus porcus
+mammifère	Daman des rochers	Procavia capensis
+mammifère	Oryctérope du Cap	Orycteropus afer
+mammifère	Pangolin de Temminck	Smutsia temminckii
+mammifère	Babouin chacma	Papio ursinus
+mammifère	Babouin olive	Papio anubis
+mammifère	Babouin jaune	Papio cynocephalus
+mammifère	Gélada	Theropithecus gelada
+mammifère	Singe vervet	Chlorocebus pygerythrus
+mammifère	Colobe guéréza	Colobus guereza
+mammifère	Gorille des montagnes	Gorilla beringei beringei
+mammifère	Gorille de l'Ouest	Gorilla gorilla
+mammifère	Chimpanzé	Pan troglodytes
+mammifère	Bonobo	Pan paniscus
+mammifère	Orang-outan de Bornéo	Pongo pygmaeus
+mammifère	Galago du Sénégal	Galago senegalensis
+mammifère	Maki catta	Lemur catta
+mammifère	Propithèque de Verreaux	Propithecus verreauxi
+mammifère	Indri	Indri indri
+mammifère	Aye-aye	Daubentonia madagascariensis
+mammifère	Fossa	Cryptoprocta ferox
+mammifère	Dromadaire	Camelus dromedarius
+mammifère	Chameau de Bactriane	Camelus bactrianus
+mammifère	Lama	Lama glama
+mammifère	Alpaga	Vicugna pacos
+mammifère	Vigogne	Vicugna vicugna
+mammifère	Guanaco	Lama guanicoe
+mammifère	Paresseux à trois doigts	Bradypus variegatus
+mammifère	Paresseux à deux doigts d'Hoffmann	Choloepus hoffmanni
+mammifère	Grand fourmilier	Myrmecophaga tridactyla
+mammifère	Tamandua du Mexique	Tamandua mexicana
+mammifère	Capucin à face blanche	Cebus imitator
+mammifère	Singe hurleur à manteau	Alouatta palliata
+mammifère	Singe-araignée de Geoffroy	Ateles geoffroyi
+mammifère	Saïmiri à dos roux	Saimiri oerstedii
+mammifère	Agouti d'Amérique centrale	Dasyprocta punctata
+mammifère	Capybara	Hydrochoerus hydrochaeris
+mammifère	Tapir de Baird	Tapirus bairdii
+mammifère	Tapir terrestre	Tapirus terrestris
+mammifère	Kinkajou	Potos flavus
+mammifère	Margay	Leopardus wiedii
+mammifère	Otarie à crinière	Otaria flavescens
+mammifère	Orang-outan de Sumatra	Pongo abelii
+mammifère	Macaque japonais	Macaca fuscata
+mammifère	Macaque rhésus	Macaca mulatta
+mammifère	Macaque à longue queue	Macaca fascicularis
+mammifère	Nasique	Nasalis larvatus
+mammifère	Gibbon à mains blanches	Hylobates lar
+mammifère	Panda géant	Ailuropoda melanoleuca
+mammifère	Petit panda	Ailurus fulgens
+mammifère	Ours lippu	Melursus ursinus
+mammifère	Ours malais	Helarctos malayanus
+mammifère	Ours à collier	Ursus thibetanus
+mammifère	Cerf axis	Axis axis
+mammifère	Sambar	Rusa unicolor
+mammifère	Nilgaut	Boselaphus tragocamelus
+mammifère	Buffle d'Asie	Bubalus bubalis
+mammifère	Yack	Bos mutus
+mammifère	Kangourou roux	Osphranter rufus
+mammifère	Kangourou gris de l'Est	Macropus giganteus
+mammifère	Wallaby de Bennett	Notamacropus rufogriseus
+mammifère	Quokka	Setonix brachyurus
+mammifère	Koala	Phascolarctos cinereus
+mammifère	Wombat commun	Vombatus ursinus
+mammifère	Diable de Tasmanie	Sarcophilus harrisii
+mammifère	Ornithorynque	Ornithorhynchus anatinus
+mammifère	Échidné à nez court	Tachyglossus aculeatus
+mammifère	Phalanger-renard	Trichosurus vulpecula
+mammifère	Dingo	Canis dingo
+mammifère	Renard volant à tête grise	Pteropus poliocephalus
+mammifère	Chien domestique	Canis familiaris
+mammifère	Chat domestique	Felis catus
+mammifère	Cheval domestique	Equus caballus
+mammifère	Âne	Equus asinus
+mammifère	Vache domestique	Bos taurus
+mammifère	Mouton domestique	Ovis aries
+mammifère	Chèvre domestique	Capra hircus
+mammifère	Porc domestique	Sus domesticus
+mammifère	Lapin domestique	Oryctolagus cuniculus domesticus
+mammifère	Cochon d'Inde	Cavia porcellus
+mammifère	Hamster doré	Mesocricetus auratus
+mammifère	Furet	Mustela furo
+mammifère	Cheval de Przewalski	Equus ferus przewalskii
+reptile	Tortue serpentine	Chelydra serpentina
+reptile	Tortue alligator	Macrochelys temminckii
+reptile	Tortue peinte	Chrysemys picta
+reptile	Tortue géographique	Graptemys geographica
+reptile	Tortue mouchetée	Emydoidea blandingii
+reptile	Tortue des bois	Glyptemys insculpta
+reptile	Tortue ponctuée	Clemmys guttata
+reptile	Tortue musquée	Sternotherus odoratus
+reptile	Tortue molle à épines	Apalone spinifera
+reptile	Tortue à oreilles rouges	Trachemys scripta elegans
+reptile	Tortue de Floride	Trachemys scripta
+reptile	Tortue boîte de Caroline	Terrapene carolina
+reptile	Tortue à dos diamanté	Malaclemys terrapin
+reptile	Gophère polyphème	Gopherus polyphemus
+reptile	Tortue du désert	Gopherus agassizii
+reptile	Tortue luth	Dermochelys coriacea
+reptile	Tortue caouanne	Caretta caretta
+reptile	Tortue verte	Chelonia mydas
+reptile	Tortue imbriquée	Eretmochelys imbricata
+reptile	Tortue olivâtre	Lepidochelys olivacea
+reptile	Tortue de Kemp	Lepidochelys kempii
+reptile	Tortue d'Hermann	Testudo hermanni
+reptile	Tortue grecque	Testudo graeca
+reptile	Cistude d'Europe	Emys orbicularis
+reptile	Tortue géante des Galapagos	Chelonoidis niger
+reptile	Tortue géante des Seychelles	Aldabrachelys gigantea
+reptile	Tortue léopard	Stigmochelys pardalis
+reptile	Tortue sillonnée	Centrochelys sulcata
+reptile	Alligator d'Amérique	Alligator mississippiensis
+reptile	Crocodile américain	Crocodylus acutus
+reptile	Crocodile du Nil	Crocodylus niloticus
+reptile	Crocodile marin	Crocodylus porosus
+reptile	Caïman à lunettes	Caiman crocodilus
+reptile	Gavial du Gange	Gavialis gangeticus
+reptile	Anolis vert	Anolis carolinensis
+reptile	Anolis brun	Anolis sagrei
+reptile	Anolis de la Guadeloupe	Anolis marmoratus
+reptile	Anolis de Porto Rico	Anolis cristatellus
+reptile	Iguane vert	Iguana iguana
+reptile	Iguane des Petites Antilles	Iguana delicatissima
+reptile	Iguane noir	Ctenosaura similis
+reptile	Iguane marin	Amblyrhynchus cristatus
+reptile	Iguane terrestre des Galapagos	Conolophus subcristatus
+reptile	Iguane rhinocéros	Cyclura cornuta
+reptile	Iguane du désert	Dipsosaurus dorsalis
+reptile	Chuckwalla	Sauromalus ater
+reptile	Monstre de Gila	Heloderma suspectum
+reptile	Lézard perlé	Heloderma horridum
+reptile	Lézard cornu à queue plate	Phrynosoma mcallii
+reptile	Lézard cornu du Texas	Phrynosoma cornutum
+reptile	Lézard à collier	Crotaphytus collaris
+reptile	Lézard des clôtures	Sceloporus undulatus
+reptile	Lézard des palissades de l'Ouest	Sceloporus occidentalis
+reptile	Lézard-alligator du Sud	Elgaria multicarinata
+reptile	Scinque pentaligne	Plestiodon fasciatus
+reptile	Scinque de Gilbert	Plestiodon gilberti
+reptile	Basilic vert	Basiliscus plumifrons
+reptile	Basilic commun	Basiliscus basiliscus
+reptile	Gecko tokay	Gekko gecko
+reptile	Hémidactyle verruqueux	Hemidactylus turcicus
+reptile	Gecko léopard	Eublepharis macularius
+reptile	Gecko diurne de Madagascar	Phelsuma madagascariensis
+reptile	Lézard des murailles	Podarcis muralis
+reptile	Lézard des souches	Lacerta agilis
+reptile	Lézard vivipare	Zootoca vivipara
+reptile	Lézard vert occidental	Lacerta bilineata
+reptile	Lézard ocellé	Timon lepidus
+reptile	Tarente de Maurétanie	Tarentola mauritanica
+reptile	Orvet fragile	Anguis fragilis
+reptile	Caméléon commun	Chamaeleo chamaeleon
+reptile	Caméléon panthère	Furcifer pardalis
+reptile	Caméléon casqué	Chamaeleo calyptratus
+reptile	Agame des colons	Agama agama
+reptile	Agame barbu	Pogona vitticeps
+reptile	Varan du Nil	Varanus niloticus
+reptile	Varan de Komodo	Varanus komodoensis
+reptile	Varan malais	Varanus salvator
+reptile	Dragon d'eau chinois	Physignathus cocincinus
+reptile	Moloch hérissé	Moloch horridus
+reptile	Lézard à collerette	Chlamydosaurus kingii
+reptile	Couleuvre rayée	Thamnophis sirtalis
+reptile	Couleuvre à ventre rouge	Storeria occipitomaculata
+reptile	Couleuvre brune	Storeria dekayi
+reptile	Couleuvre verte	Opheodrys vernalis
+reptile	Couleuvre verte rugueuse	Opheodrys aestivus
+reptile	Couleuvre à collier	Diadophis punctatus
+reptile	Couleuvre tachetée	Lampropeltis triangulum
+reptile	Couleuvre royale de Californie	Lampropeltis californiae
+reptile	Couleuvre obscure	Pantherophis spiloides
+reptile	Couleuvre agile	Coluber constrictor
+reptile	Couleuvre d'eau	Nerodia sipedon
+reptile	Couleuvre fouisseuse de l'Est	Heterodon platirhinos
+reptile	Couleuvre des blés	Pantherophis guttatus
+reptile	Serpent-taureau	Pituophis catenifer
+reptile	Serpent indigo	Drymarchon couperi
+reptile	Serpent corail	Micrurus fulvius
+reptile	Mocassin d'eau	Agkistrodon piscivorus
+reptile	Mocassin à tête cuivrée	Agkistrodon contortrix
+reptile	Crotale des bois	Crotalus horridus
+reptile	Crotale diamantin de l'Est	Crotalus adamanteus
+reptile	Crotale diamantin de l'Ouest	Crotalus atrox
+reptile	Crotale des prairies	Crotalus viridis
+reptile	Crotale cornu	Crotalus cerastes
+reptile	Massasauga	Sistrurus catenatus
+reptile	Fer-de-lance	Bothrops asper
+reptile	Bothrops lancéolé	Bothrops lanceolatus
+reptile	Vipère de Schlegel	Bothriechis schlegelii
+reptile	Boa constricteur	Boa constrictor
+reptile	Anaconda vert	Eunectes murinus
+reptile	Python royal	Python regius
+reptile	Python de Seba	Python sebae
+reptile	Python molure	Python molurus
+reptile	Python réticulé	Malayopython reticulatus
+reptile	Python vert	Morelia viridis
+reptile	Couleuvre à collier d'Europe	Natrix helvetica
+reptile	Couleuvre vipérine	Natrix maura
+reptile	Couleuvre d'Esculape	Zamenis longissimus
+reptile	Couleuvre verte et jaune	Hierophis viridiflavus
+reptile	Coronelle lisse	Coronella austriaca
+reptile	Vipère aspic	Vipera aspis
+reptile	Vipère péliade	Vipera berus
+reptile	Cobra royal	Ophiophagus hannah
+reptile	Cobra indien	Naja naja
+reptile	Cobra égyptien	Naja haje
+reptile	Mamba noir	Dendroaspis polylepis
+reptile	Mamba vert de l'Est	Dendroaspis angusticeps
+reptile	Vipère heurtante	Bitis arietans
+reptile	Boomslang	Dispholidus typus
+reptile	Serpent de mer à bandes	Laticauda colubrina
+reptile	Tuatara	Sphenodon punctatus
+amphibien	Ouaouaron	Lithobates catesbeianus
+amphibien	Grenouille verte	Lithobates clamitans
+amphibien	Grenouille léopard	Lithobates pipiens
+amphibien	Grenouille des bois	Lithobates sylvaticus
+amphibien	Grenouille des marais	Lithobates palustris
+amphibien	Grenouille du Nord	Lithobates septentrionalis
+amphibien	Grenouille à pattes rouges	Rana aurora
+amphibien	Rainette crucifère	Pseudacris crucifer
+amphibien	Rainette faux-grillon	Pseudacris triseriata
+amphibien	Rainette du Pacifique	Pseudacris regilla
+amphibien	Rainette versicolore	Dryophytes versicolor
+amphibien	Rainette verte	Dryophytes cinereus
+amphibien	Rainette grise de Cope	Dryophytes chrysoscelis
+amphibien	Rainette cubaine	Osteopilus septentrionalis
+amphibien	Coqui commun	Eleutherodactylus coqui
+amphibien	Hylode de Johnstone	Eleutherodactylus johnstonei
+amphibien	Crapaud d'Amérique	Anaxyrus americanus
+amphibien	Crapaud de Fowler	Anaxyrus fowleri
+amphibien	Crapaud de l'Ouest	Anaxyrus boreas
+amphibien	Crapaud buffle	Rhinella marina
+amphibien	Crapaud du Colorado	Incilius alvarius
+amphibien	Crapaud pied-en-bêche de l'Est	Scaphiopus holbrookii
+amphibien	Salamandre maculée	Ambystoma maculatum
+amphibien	Salamandre à points bleus	Ambystoma laterale
+amphibien	Salamandre tigrée	Ambystoma tigrinum
+amphibien	Salamandre marbrée	Ambystoma opacum
+amphibien	Axolotl	Ambystoma mexicanum
+amphibien	Salamandre cendrée	Plethodon cinereus
+amphibien	Salamandre sombre du Nord	Desmognathus fuscus
+amphibien	Salamandre à deux lignes	Eurycea bislineata
+amphibien	Salamandre pourpre	Gyrinophilus porphyriticus
+amphibien	Salamandre rouge	Pseudotriton ruber
+amphibien	Salamandre à quatre orteils	Hemidactylium scutatum
+amphibien	Triton vert	Notophthalmus viridescens
+amphibien	Triton rugueux	Taricha granulosa
+amphibien	Triton de Californie	Taricha torosa
+amphibien	Necture tacheté	Necturus maculosus
+amphibien	Ménopome	Cryptobranchus alleganiensis
+amphibien	Grenouille rousse	Rana temporaria
+amphibien	Grenouille agile	Rana dalmatina
+amphibien	Grenouille rieuse	Pelophylax ridibundus
+amphibien	Grenouille verte d'Europe	Pelophylax esculentus
+amphibien	Rainette verte d'Europe	Hyla arborea
+amphibien	Rainette méridionale	Hyla meridionalis
+amphibien	Crapaud commun	Bufo bufo
+amphibien	Crapaud calamite	Epidalea calamita
+amphibien	Crapaud vert	Bufotes viridis
+amphibien	Sonneur à ventre jaune	Bombina variegata
+amphibien	Alyte accoucheur	Alytes obstetricans
+amphibien	Pélobate brun	Pelobates fuscus
+amphibien	Salamandre tachetée	Salamandra salamandra
+amphibien	Salamandre noire	Salamandra atra
+amphibien	Triton crêté	Triturus cristatus
+amphibien	Triton marbré	Triturus marmoratus
+amphibien	Triton alpestre	Ichthyosaura alpestris
+amphibien	Triton palmé	Lissotriton helveticus
+amphibien	Triton ponctué	Lissotriton vulgaris
+amphibien	Protée anguillard	Proteus anguinus
+amphibien	Dendrobate à tapirer	Dendrobates tinctorius
+amphibien	Dendrobate doré	Dendrobates auratus
+amphibien	Dendrobate fraise	Oophaga pumilio
+amphibien	Phyllobate terrible	Phyllobates terribilis
+amphibien	Rainette aux yeux rouges	Agalychnis callidryas
+amphibien	Rainette de White	Ranoidea caerulea
+amphibien	Grenouille cornue d'Argentine	Ceratophrys ornata
+amphibien	Grenouille tomate	Dyscophus antongilii
+amphibien	Mantelle dorée	Mantella aurantiaca
+amphibien	Grenouille de verre	Hyalinobatrachium fleischmanni
+amphibien	Xénope lisse	Xenopus laevis
+amphibien	Salamandre géante du Japon	Andrias japonicus
+poisson	Omble de fontaine	Salvelinus fontinalis
+poisson	Omble chevalier	Salvelinus alpinus
+poisson	Touladi	Salvelinus namaycush
+poisson	Truite arc-en-ciel	Oncorhynchus mykiss
+poisson	Truite fardée	Oncorhynchus clarkii
+poisson	Truite brune	Salmo trutta
+poisson	Saumon atlantique	Salmo salar
+poisson	Saumon chinook	Oncorhynchus tshawytscha
+poisson	Saumon coho	Oncorhynchus kisutch
+poisson	Saumon rouge	Oncorhynchus nerka
+poisson	Saumon rose	Oncorhynchus gorbuscha
+poisson	Saumon kéta	Oncorhynchus keta
+poisson	Grand corégone	Coregonus clupeaformis
+poisson	Ombre arctique	Thymallus arcticus
+poisson	Grand brochet	Esox lucius
+poisson	Maskinongé	Esox masquinongy
+poisson	Doré jaune	Sander vitreus
+poisson	Perchaude	Perca flavescens
+poisson	Perche commune	Perca fluviatilis
+poisson	Sandre	Sander lucioperca
+poisson	Achigan à petite bouche	Micropterus dolomieu
+poisson	Achigan à grande bouche	Micropterus salmoides
+poisson	Crapet-soleil	Lepomis gibbosus
+poisson	Crapet arlequin	Lepomis macrochirus
+poisson	Crapet de roche	Ambloplites rupestris
+poisson	Marigane noire	Pomoxis nigromaculatus
+poisson	Barbotte brune	Ameiurus nebulosus
+poisson	Barbue de rivière	Ictalurus punctatus
+poisson	Esturgeon jaune	Acipenser fulvescens
+poisson	Esturgeon noir	Acipenser oxyrinchus
+poisson	Lépisosté osseux	Lepisosteus osseus
+poisson	Lépisosté alligator	Atractosteus spatula
+poisson	Poisson-castor	Amia calva
+poisson	Anguille d'Amérique	Anguilla rostrata
+poisson	Anguille européenne	Anguilla anguilla
+poisson	Carpe commune	Cyprinus carpio
+poisson	Carpe koï	Cyprinus rubrofuscus
+poisson	Poisson rouge	Carassius auratus
+poisson	Tanche	Tinca tinca
+poisson	Gardon	Rutilus rutilus
+poisson	Silure glane	Silurus glanis
+poisson	Meunier noir	Catostomus commersonii
+poisson	Lotte	Lota lota
+poisson	Alose savoureuse	Alosa sapidissima
+poisson	Bar rayé	Morone saxatilis
+poisson	Morue franche	Gadus morhua
+poisson	Aiglefin	Melanogrammus aeglefinus
+poisson	Maquereau bleu	Scomber scombrus
+poisson	Hareng atlantique	Clupea harengus
+poisson	Capelan	Mallotus villosus
+poisson	Thon rouge de l'Atlantique	Thunnus thynnus
+poisson	Thon jaune	Thunnus albacares
+poisson	Espadon	Xiphias gladius
+poisson	Marlin bleu	Makaira nigricans
+poisson	Voilier de l'Atlantique	Istiophorus albicans
+poisson	Coryphène commune	Coryphaena hippurus
+poisson	Tarpon	Megalops atlanticus
+poisson	Banane de mer	Albula vulpes
+poisson	Barracuda	Sphyraena barracuda
+poisson	Flétan de l'Atlantique	Hippoglossus hippoglossus
+poisson	Flétan du Pacifique	Hippoglossus stenolepis
+poisson	Plie canadienne	Hippoglossoides platessoides
+poisson	Turbot	Scophthalmus maximus
+poisson	Lompe	Cyclopterus lumpus
+poisson	Baudroie d'Amérique	Lophius americanus
+poisson	Poisson-lune	Mola mola
+poisson	Hippocampe moucheté	Hippocampus guttulatus
+poisson	Hippocampe rayé	Hippocampus erectus
+poisson	Dragon de mer feuillu	Phycodurus eques
+poisson	Poisson-clown à trois bandes	Amphiprion percula
+poisson	Poisson-clown à bande blanche	Amphiprion ocellaris
+poisson	Chirurgien bleu	Paracanthurus hepatus
+poisson	Chirurgien jaune	Zebrasoma flavescens
+poisson	Chirurgien à poitrine blanche	Acanthurus leucosternon
+poisson	Chirurgien bleu des Caraïbes	Acanthurus coeruleus
+poisson	Idole des Maures	Zanclus cornutus
+poisson	Poisson-papillon à quatre yeux	Chaetodon capistratus
+poisson	Poisson-papillon à bec	Chelmon rostratus
+poisson	Poisson-papillon cocher	Heniochus acuminatus
+poisson	Poisson-ange royal	Pygoplites diacanthus
+poisson	Poisson-ange empereur	Pomacanthus imperator
+poisson	Poisson-ange français	Pomacanthus paru
+poisson	Poisson-ange gris	Pomacanthus arcuatus
+poisson	Poisson-ange royal des Caraïbes	Holacanthus ciliaris
+poisson	Poisson-ange bicolore	Centropyge bicolor
+poisson	Demoiselle bleue	Chrysiptera cyanea
+poisson	Demoiselle à trois points	Dascyllus trimaculatus
+poisson	Demoiselle bicolore	Stegastes partitus
+poisson	Sergent-major	Abudefduf saxatilis
+poisson	Chromis bleu	Chromis cyanea
+poisson	Mérou rouge	Epinephelus morio
+poisson	Mérou de Nassau	Epinephelus striatus
+poisson	Mérou géant	Epinephelus itajara
+poisson	Mérou brun	Epinephelus marginatus
+poisson	Vivaneau à queue jaune	Ocyurus chrysurus
+poisson	Vivaneau rouge	Lutjanus campechanus
+poisson	Gorette	Haemulon flavolineatum
+poisson	Poisson-perroquet bleu	Scarus coeruleus
+poisson	Poisson-perroquet feu	Sparisoma viride
+poisson	Poisson-perroquet à bosse	Bolbometopon muricatum
+poisson	Labre nettoyeur	Labroides dimidiatus
+poisson	Napoléon	Cheilinus undulatus
+poisson	Girelle commune	Coris julis
+poisson	Poisson-trompette	Aulostomus maculatus
+poisson	Poisson-cochon	Lactophrys triqueter
+poisson	Poisson-coffre jaune	Ostracion cubicus
+poisson	Baliste-clown	Balistoides conspicillum
+poisson	Baliste royal	Balistes vetula
+poisson	Baliste Picasso	Rhinecanthus aculeatus
+poisson	Poisson-ballon à taches blanches	Arothron hispidus
+poisson	Porc-épic des mers	Diodon hystrix
+poisson	Poisson-lion	Pterois volitans
+poisson	Poisson-pierre	Synanceia verrucosa
+poisson	Rascasse rouge	Scorpaena scrofa
+poisson	Poisson-mandarin	Synchiropus splendidus
+poisson	Gobie néon	Elacatinus oceanops
+poisson	Gramma royal	Gramma loreto
+poisson	Poisson-écureuil	Holocentrus adscensionis
+poisson	Poisson-soldat	Myripristis jacobus
+poisson	Murène verte	Gymnothorax funebris
+poisson	Murène tachetée	Gymnothorax moringa
+poisson	Murène ruban	Rhinomuraena quaesita
+poisson	Anguille jardinière	Heteroconger hassi
+poisson	Raie manta	Mobula birostris
+poisson	Raie léopard	Aetobatus narinari
+poisson	Pastenague américaine	Hypanus americanus
+poisson	Requin-baleine	Rhincodon typus
+poisson	Grand requin blanc	Carcharodon carcharias
+poisson	Requin-tigre	Galeocerdo cuvier
+poisson	Requin-marteau halicorne	Sphyrna lewini
+poisson	Grand requin-marteau	Sphyrna mokarran
+poisson	Requin-citron	Negaprion brevirostris
+poisson	Requin de récif à pointes noires	Carcharhinus melanopterus
+poisson	Requin de récif à pointes blanches	Triaenodon obesus
+poisson	Requin gris de récif	Carcharhinus amblyrhynchos
+poisson	Requin-nourrice	Ginglymostoma cirratum
+poisson	Requin pèlerin	Cetorhinus maximus
+poisson	Requin-taureau	Carcharias taurus
+poisson	Requin du Groenland	Somniosus microcephalus
+poisson	Aiguillat commun	Squalus acanthias
+poisson	Petite roussette	Scyliorhinus canicula
+poisson	Guppy	Poecilia reticulata
+poisson	Combattant	Betta splendens
+poisson	Néon bleu	Paracheirodon innesi
+poisson	Scalaire	Pterophyllum scalare
+poisson	Discus	Symphysodon aequifasciatus
+poisson	Piranha à ventre rouge	Pygocentrus nattereri
+poisson	Arapaïma	Arapaima gigas
+poisson	Tilapia du Nil	Oreochromis niloticus
+poisson	Perche du Nil	Lates niloticus
+poisson	Poisson-tigre goliath	Hydrocynus goliath
+poisson	Dorade royale	Sparus aurata
+poisson	Loup de mer	Dicentrarchus labrax
+poisson	Rouget de roche	Mullus surmuletus
+poisson	Sardine commune	Sardina pilchardus
+poisson	Anchois européen	Engraulis encrasicolus
+poisson	Saint-Pierre	Zeus faber
+poisson	Grondin rouge	Chelidonichthys cuculus
+papillon	Monarque	Danaus plexippus
+papillon	Reine	Danaus gilippus
+papillon	Vice-roi	Limenitis archippus
+papillon	Amiral	Limenitis arthemis
+papillon	Papillon tigré du Canada	Papilio canadensis
+papillon	Grand porte-queue	Papilio cresphontes
+papillon	Papillon tigré de l'Est	Papilio glaucus
+papillon	Papillon du céleri	Papilio polyxenes
+papillon	Papillon tigré de l'Ouest	Papilio rutulus
+papillon	Papillon du sassafras	Papilio troilus
+papillon	Porte-queue de l'aristoloche	Battus philenor
+papillon	Voilier zébré	Protographium marcellus
+papillon	Piéride du chou	Pieris rapae
+papillon	Piéride de la moutarde	Pieris oleracea
+papillon	Coliade du trèfle	Colias philodice
+papillon	Coliade de la luzerne	Colias eurytheme
+papillon	Soufré des nuages	Phoebis sennae
+papillon	Belle-dame	Vanessa cardui
+papillon	Vanesse de Virginie	Vanessa virginiensis
+papillon	Vulcain	Vanessa atalanta
+papillon	Morio	Nymphalis antiopa
+papillon	Petite tortue	Aglais urticae
+papillon	Vanesse de Milbert	Aglais milberti
+papillon	Paon-du-jour	Aglais io
+papillon	Vanesse des pruniers	Nymphalis polychloros
+papillon	Robert-le-diable	Polygonia c-album
+papillon	Polygone virgule	Polygonia comma
+papillon	Polygone à queue violacée	Polygonia interrogationis
+papillon	Polygone gris	Polygonia progne
+papillon	Croissant nordique	Phyciodes cocyta
+papillon	Croissant perlé	Phyciodes tharos
+papillon	Damier de Baltimore	Euphydryas phaeton
+papillon	Grande Argynne	Speyeria cybele
+papillon	Argynne aphrodite	Speyeria aphrodite
+papillon	Argynne de l'Atlantique	Speyeria atlantis
+papillon	Fritillaire panachée	Euptoieta claudia
+papillon	Papillon du micocoulier	Asterocampa celtis
+papillon	Satyre perlé	Enodia anthedon
+papillon	Bleu porte-queue de l'Est	Cupido comyntas
+papillon	Azuré printanier	Celastrina ladon
+papillon	Bleuet argenté	Glaucopsyche lygdamus
+papillon	Cuivré d'Amérique	Lycaena hypophlaeas
+papillon	Porte-queue gris	Strymon melinus
+papillon	Hespérie à taches argentées	Epargyreus clarus
+papillon	Hespérie des graminées	Thymelicus lineola
+papillon	Hespérie tachetée	Pyrgus communis
+papillon	Hespérie de Peck	Polites peckius
+papillon	Hespérie de Juvénal	Erynnis juvenalis
+papillon	Héliconius zébré	Heliconius charithonia
+papillon	Flambeau	Dryas iulia
+papillon	Héliconius érato	Heliconius erato
+papillon	Héliconius melpomène	Heliconius melpomene
+papillon	Morpho bleu	Morpho peleides
+papillon	Morpho ménélas	Morpho menelaus
+papillon	Papillon hibou	Caligo memnon
+papillon	Papillon de verre	Greta oto
+papillon	Papillon 88	Diaethria anna
+papillon	Papillon malachite	Siproeta stelenes
+papillon	Mars changeant	Apatura iris
+papillon	Petit Mars changeant	Apatura ilia
+papillon	Grand Sylvain	Limenitis populi
+papillon	Petit Sylvain	Limenitis camilla
+papillon	Tabac d'Espagne	Argynnis paphia
+papillon	Grand Nacré	Speyeria aglaja
+papillon	Petit Nacré	Issoria lathonia
+papillon	Damier du plantain	Melitaea cinxia
+papillon	Damier de la succise	Euphydryas aurinia
+papillon	Carte géographique	Araschnia levana
+papillon	Machaon	Papilio machaon
+papillon	Flambé	Iphiclides podalirius
+papillon	Apollon	Parnassius apollo
+papillon	Diane	Zerynthia polyxena
+papillon	Piéride du navet	Pieris napi
+papillon	Piéride de la rave	Pieris brassicae
+papillon	Gazé	Aporia crataegi
+papillon	Aurore	Anthocharis cardamines
+papillon	Citron	Gonepteryx rhamni
+papillon	Cléopâtre	Gonepteryx cleopatra
+papillon	Souci	Colias crocea
+papillon	Myrtil	Maniola jurtina
+papillon	Tircis	Pararge aegeria
+papillon	Demi-deuil	Melanargia galathea
+papillon	Amaryllis	Pyronia tithonus
+papillon	Fadet commun	Coenonympha pamphilus
+papillon	Mégère	Lasiommata megera
+papillon	Petit Sylvandre	Hipparchia alcyone
+papillon	Azuré commun	Polyommatus icarus
+papillon	Azuré bleu céleste	Lysandra bellargus
+papillon	Azuré des nerpruns	Celastrina argiolus
+papillon	Cuivré commun	Lycaena phlaeas
+papillon	Thécla de la ronce	Callophrys rubi
+papillon	Hespérie de la houque	Thymelicus sylvestris
+papillon	Ornithoptère de Priam	Ornithoptera priamus
+papillon	Ornithoptère de Rajah Brooke	Trogonoptera brookiana
+papillon	Grand Ulysse	Papilio ulysses
+papillon	Papillon citron d'Asie	Papilio demoleus
+papillon	Monarque africain	Danaus chrysippus
+papillon	Papillon feuille	Kallima inachus
+papillon	Bombyx du mûrier	Bombyx mori
+papillon	Saturnie cécropia	Hyalophora cecropia
+papillon	Polyphème d'Amérique	Antheraea polyphemus
+papillon	Lune	Actias luna
+papillon	Papillon impérial	Eacles imperialis
+papillon	Saturnie royale	Citheronia regalis
+papillon	Saturnie io	Automeris io
+papillon	Grand Paon de nuit	Saturnia pyri
+papillon	Petit Paon de nuit	Saturnia pavonia
+papillon	Isabelle de France	Graellsia isabellae
+papillon	Atlas	Attacus atlas
+papillon	Sphinx colibri	Macroglossum stellatarum
+papillon	Sphinx de la tomate	Manduca quinquemaculata
+papillon	Sphinx du tabac	Manduca sexta
+papillon	Sphinx bourdon	Hemaris thysbe
+papillon	Sphinx tête-de-mort	Acherontia atropos
+papillon	Sphinx du laurier-rose	Daphnis nerii
+papillon	Sphinx du tilleul	Mimas tiliae
+papillon	Moro-sphinx de la vigne	Deilephila elpenor
+papillon	Écaille martre	Arctia caja
+papillon	Écaille chinée	Euplagia quadripunctaria
+papillon	Écaille isabelle	Pyrrharctia isabella
+papillon	Zygène de la filipendule	Zygaena filipendulae
+papillon	Bombyx disparate	Lymantria dispar
+papillon	Livrée des forêts	Malacosoma disstria
+papillon	Phalène du bouleau	Biston betularia
+papillon	Pyrale du buis	Cydalima perspectalis
+papillon	Mite des vêtements	Tineola bisselliella
+insecte	Abeille domestique	Apis mellifera
+insecte	Bourdon fébrile	Bombus impatiens
+insecte	Bourdon tricolore	Bombus ternarius
+insecte	Bourdon terrestre	Bombus terrestris
+insecte	Bourdon des pierres	Bombus lapidarius
+insecte	Bourdon des champs	Bombus pascuorum
+insecte	Bourdon américain	Bombus pensylvanicus
+insecte	Abeille charpentière de l'Est	Xylocopa virginica
+insecte	Xylocope violet	Xylocopa violacea
+insecte	Osmie cornue	Osmia cornuta
+insecte	Osmie bleue des vergers	Osmia lignaria
+insecte	Guêpe commune	Vespula vulgaris
+insecte	Guêpe germanique	Vespula germanica
+insecte	Frelon européen	Vespa crabro
+insecte	Frelon asiatique	Vespa velutina
+insecte	Frelon géant asiatique	Vespa mandarinia
+insecte	Guêpe à taches blanches	Dolichovespula maculata
+insecte	Poliste gaulois	Polistes dominula
+insecte	Faucon des tarentules	Pepsis formosa
+insecte	Fourmi charpentière noire	Camponotus pennsylvanicus
+insecte	Fourmi rousse des bois	Formica rufa
+insecte	Fourmi de feu	Solenopsis invicta
+insecte	Fourmi champignonniste	Atta cephalotes
+insecte	Coccinelle à sept points	Coccinella septempunctata
+insecte	Coccinelle asiatique	Harmonia axyridis
+insecte	Coccinelle à deux points	Adalia bipunctata
+insecte	Coccinelle maculée	Coleomegilla maculata
+insecte	Scarabée japonais	Popillia japonica
+insecte	Cétoine dorée	Cetonia aurata
+insecte	Hanneton commun	Melolontha melolontha
+insecte	Lucane cerf-volant	Lucanus cervus
+insecte	Lucane élan	Lucanus elaphus
+insecte	Scarabée rhinocéros européen	Oryctes nasicornis
+insecte	Dynaste hercule	Dynastes hercules
+insecte	Scarabée goliath	Goliathus goliatus
+insecte	Bousier sacré	Scarabaeus sacer
+insecte	Carabe doré	Carabus auratus
+insecte	Calosome sycophante	Calosoma sycophanta
+insecte	Cicindèle à six points	Cicindela sexguttata
+insecte	Cicindèle champêtre	Cicindela campestris
+insecte	Doryphore de la pomme de terre	Leptinotarsa decemlineata
+insecte	Criocère du lis	Lilioceris lilii
+insecte	Chrysomèle du peuplier	Chrysomela populi
+insecte	Longicorne asiatique	Anoplophora glabripennis
+insecte	Rosalie des Alpes	Rosalia alpina
+insecte	Grand capricorne	Cerambyx cerdo
+insecte	Longicorne de l'asclépiade	Tetraopes tetrophthalmus
+insecte	Agrile du frêne	Agrilus planipennis
+insecte	Taupin oculé	Alaus oculatus
+insecte	Luciole de Pennsylvanie	Photuris pennsylvanica
+insecte	Luciole commune	Photinus pyralis
+insecte	Ver luisant	Lampyris noctiluca
+insecte	Nécrophore américain	Nicrophorus americanus
+insecte	Gendarme	Pyrrhocoris apterus
+insecte	Punaise arlequin	Murgantia histrionica
+insecte	Punaise diabolique	Halyomorpha halys
+insecte	Punaise à bandes rouges	Graphosoma italicum
+insecte	Punaise de l'asclépiade	Oncopeltus fasciatus
+insecte	Punaise réduve masquée	Reduvius personatus
+insecte	Cigale caniculaire	Neotibicen canicularis
+insecte	Cigale périodique	Magicicada septendecim
+insecte	Cigale plébéienne	Lyristes plebejus
+insecte	Cercope sanguin	Cercopis vulnerata
+insecte	Fulgore porte-lanterne	Fulgora laternaria
+insecte	Fulgore tacheté	Lycorma delicatula
+insecte	Mante religieuse	Mantis religiosa
+insecte	Mante chinoise	Tenodera sinensis
+insecte	Mante orchidée	Hymenopus coronatus
+insecte	Phasme commun	Diapheromera femorata
+insecte	Phyllie géante	Phyllium giganteum
+insecte	Criquet migrateur	Locusta migratoria
+insecte	Criquet pèlerin	Schistocerca gregaria
+insecte	Criquet à pattes rouges	Melanoplus femurrubrum
+insecte	Criquet de Caroline	Dissosteira carolina
+insecte	Grande sauterelle verte	Tettigonia viridissima
+insecte	Sauterelle à ailes rondes	Amblycorypha oblongifolia
+insecte	Grillon champêtre	Gryllus campestris
+insecte	Grillon des champs	Gryllus pennsylvanicus
+insecte	Grillon d'arbre neigeux	Oecanthus fultoni
+insecte	Courtilière commune	Gryllotalpa gryllotalpa
+insecte	Perce-oreille européen	Forficula auricularia
+insecte	Blatte germanique	Blattella germanica
+insecte	Blatte américaine	Periplaneta americana
+insecte	Termite subterranéen de l'Est	Reticulitermes flavipes
+insecte	Libellule déprimée	Libellula depressa
+insecte	Libellule à quatre taches	Libellula quadrimaculata
+insecte	Libellule gracieuse	Libellula pulchella
+insecte	Pachydiplax longipenne	Pachydiplax longipennis
+insecte	Sympétrum sanguin	Sympetrum sanguineum
+insecte	Sympétrum strié	Sympetrum striolatum
+insecte	Sympétrum à face blanche	Sympetrum obtrusum
+insecte	Anax empereur	Anax imperator
+insecte	Anax précoce	Anax junius
+insecte	Aeschne bleue	Aeshna cyanea
+insecte	Aeschne des joncs	Aeshna juncea
+insecte	Orthétrum réticulé	Orthetrum cancellatum
+insecte	Crocothémis écarlate	Crocothemis erythraea
+insecte	Cordulégastre annelé	Cordulegaster boltonii
+insecte	Caloptéryx éclatant	Calopteryx splendens
+insecte	Caloptéryx vierge	Calopteryx virgo
+insecte	Caloptéryx bistré	Calopteryx maculata
+insecte	Agrion jouvencelle	Coenagrion puella
+insecte	Agrion élégant	Ischnura elegans
+insecte	Agrion vertical	Ischnura verticalis
+insecte	Agrion porte-coupe	Enallagma cyathigerum
+insecte	Petite nymphe au corps de feu	Pyrrhosoma nymphula
+insecte	Leste fiancé	Lestes sponsa
+insecte	Éphémère commune	Ephemera danica
+insecte	Fourmilion commun	Myrmeleon formicarius
+insecte	Ascalaphe soufré	Libelloides coccajus
+insecte	Chrysope verte	Chrysoperla carnea
+insecte	Mouche domestique	Musca domestica
+insecte	Mouche verte	Lucilia sericata
+insecte	Mouche à viande	Calliphora vomitoria
+insecte	Syrphe ceinturé	Episyrphus balteatus
+insecte	Éristale gluante	Eristalis tenax
+insecte	Volucelle zonée	Volucella zonaria
+insecte	Grand bombyle	Bombylius major
+insecte	Asile frelon	Asilus crabroniformis
+insecte	Taon des bœufs	Tabanus bovinus
+insecte	Moustique commun	Culex pipiens
+insecte	Moustique tigre	Aedes albopictus
+insecte	Tipule des prairies	Tipula paludosa
+insecte	Drosophile	Drosophila melanogaster
+insecte	Puceron du rosier	Macrosiphum rosae
+araignée	Épeire diadème	Araneus diadematus
+araignée	Épeire fasciée	Argiope bruennichi
+araignée	Argiope jaune et noire	Argiope aurantia
+araignée	Argiope à bandes	Argiope trifasciata
+araignée	Épeire des fenêtres	Zygiella x-notata
+araignée	Néphile dorée	Trichonephila clavipes
+araignée	Épeire épineuse	Gasteracantha cancriformis
+araignée	Araignée-crabe variable	Misumena vatia
+araignée	Araignée sauteuse audacieuse	Phidippus audax
+araignée	Saltique arlequin	Salticus scenicus
+araignée	Araignée-paon	Maratus volans
+araignée	Lycose de Caroline	Hogna carolinensis
+araignée	Pisaure admirable	Pisaura mirabilis
+araignée	Dolomède à bandes	Dolomedes tenebrosus
+araignée	Dolomède des marais	Dolomedes triton
+araignée	Tégénaire domestique	Eratigena atrica
+araignée	Pholque phalangide	Pholcus phalangioides
+araignée	Veuve noire	Latrodectus mactans
+araignée	Malmignatte	Latrodectus tredecimguttatus
+araignée	Recluse brune	Loxosceles reclusa
+araignée	Argyronète aquatique	Argyroneta aquatica
+araignée	Mygale à genoux rouges du Mexique	Brachypelma hamorii
+araignée	Mygale goliath	Theraphosa blondi
+araignée	Mygale du Texas	Aphonopelma hentzi
+araignée	Faucheux commun	Phalangium opilio
+araignée	Scorpion languedocien	Buthus occitanus
+araignée	Scorpion empereur	Pandinus imperator
+araignée	Tique à pattes noires	Ixodes scapularis
+invertébré	Scolopendre géante	Scolopendra gigantea
+invertébré	Mille-pattes américain géant	Narceus americanus
+invertébré	Escargot de Bourgogne	Helix pomatia
+invertébré	Petit-gris	Cornu aspersum
+invertébré	Escargot des haies	Cepaea nemoralis
+invertébré	Escargot géant africain	Lissachatina fulica
+invertébré	Limace léopard	Limax maximus
+invertébré	Grande limace rouge	Arion rufus
+invertébré	Limace banane	Ariolimax columbianus
+invertébré	Ver de terre commun	Lumbricus terrestris
+invertébré	Sangsue médicinale	Hirudo medicinalis
+invertébré	Écrevisse à taches rouges	Faxonius rusticus
+invertébré	Écrevisse de Louisiane	Procambarus clarkii
+invertébré	Homard d'Amérique	Homarus americanus
+invertébré	Homard européen	Homarus gammarus
+invertébré	Langouste blanche	Panulirus argus
+invertébré	Crabe vert	Carcinus maenas
+invertébré	Crabe bleu	Callinectes sapidus
+invertébré	Crabe des neiges	Chionoecetes opilio
+invertébré	Crabe dormeur	Cancer pagurus
+invertébré	Crabe dormeur du Pacifique	Metacarcinus magister
+invertébré	Crabe royal	Paralithodes camtschaticus
+invertébré	Crabe des cocotiers	Birgus latro
+invertébré	Crabe sally-pied-léger	Grapsus grapsus
+invertébré	Crabe violoniste	Minuca pugnax
+invertébré	Crabe fantôme	Ocypode quadrata
+invertébré	Bernard-l'ermite des Caraïbes	Coenobita clypeatus
+invertébré	Limule	Limulus polyphemus
+invertébré	Crevette mante paon	Odontodactylus scyllarus
+invertébré	Krill antarctique	Euphausia superba
+invertébré	Balane commune	Semibalanus balanoides
+invertébré	Moule bleue	Mytilus edulis
+invertébré	Huître creuse	Crassostrea gigas
+invertébré	Huître américaine	Crassostrea virginica
+invertébré	Coquille Saint-Jacques	Pecten maximus
+invertébré	Pétoncle géant	Placopecten magellanicus
+invertébré	Mye commune	Mya arenaria
+invertébré	Bénitier géant	Tridacna gigas
+invertébré	Conque reine	Aliger gigas
+invertébré	Buccin commun	Buccinum undatum
+invertébré	Patelle commune	Patella vulgata
+invertébré	Bigorneau	Littorina littorea
+invertébré	Ormeau rouge	Haliotis rufescens
+invertébré	Nautile	Nautilus pompilius
+invertébré	Pieuvre commune	Octopus vulgaris
+invertébré	Pieuvre géante du Pacifique	Enteroctopus dofleini
+invertébré	Seiche commune	Sepia officinalis
+invertébré	Calmar de récif	Sepioteuthis sepioidea
+invertébré	Nudibranche espagnol	Flabellinopsis iodinea
+invertébré	Lièvre de mer	Aplysia punctata
+invertébré	Étoile de mer commune	Asterias rubens
+invertébré	Étoile de mer ocre	Pisaster ochraceus
+invertébré	Étoile de mer coussin	Oreaster reticulatus
+invertébré	Étoile de mer bleue	Linckia laevigata
+invertébré	Couronne d'épines	Acanthaster planci
+invertébré	Oursin vert	Strongylocentrotus droebachiensis
+invertébré	Oursin pourpre	Strongylocentrotus purpuratus
+invertébré	Oursin diadème	Diadema antillarum
+invertébré	Oursin violet	Paracentrotus lividus
+invertébré	Dollar des sables	Echinarachnius parma
+invertébré	Concombre de mer	Holothuria forskali
+invertébré	Méduse lune	Aurelia aurita
+invertébré	Méduse à crinière de lion	Cyanea capillata
+invertébré	Physalie	Physalia physalis
+invertébré	Vélelle	Velella velella
+invertébré	Méduse œuf au plat	Cotylorhiza tuberculata
+invertébré	Méduse pélagique	Pelagia noctiluca
+invertébré	Anémone de mer verte	Anthopleura xanthogrammica
+invertébré	Anémone tomate	Actinia equina
+invertébré	Anémone géante	Condylactis gigantea
+invertébré	Anémone magnifique	Heteractis magnifica
+invertébré	Corail corne d'élan	Acropora palmata
+invertébré	Corail corne de cerf	Acropora cervicornis
+invertébré	Corail cerveau	Diploria labyrinthiformis
+invertébré	Corail rouge	Corallium rubrum
+invertébré	Gorgone éventail	Gorgonia ventalina
+invertébré	Éponge tonneau géante	Xestospongia muta
+invertébré	Ver sapin de Noël	Spirobranchus giganteus
+invertébré	Ver plumeau	Sabellastarte magnifica
+fleur	Trille rouge	Trillium erectum
+fleur	Trille blanc	Trillium grandiflorum
+fleur	Trille ondulé	Trillium undulatum
+fleur	Trille penché	Trillium cernuum
+fleur	Érythrone d'Amérique	Erythronium americanum
+fleur	Érythrone à grandes fleurs	Erythronium grandiflorum
+fleur	Sanguinaire du Canada	Sanguinaria canadensis
+fleur	Hépatique d'Amérique	Hepatica americana
+fleur	Hépatique à lobes aigus	Hepatica acutiloba
+fleur	Claytonie de Virginie	Claytonia virginica
+fleur	Claytonie de Caroline	Claytonia caroliniana
+fleur	Dicentre à capuchon	Dicentra cucullaria
+fleur	Dicentre du Canada	Dicentra canadensis
+fleur	Ancolie du Canada	Aquilegia canadensis
+fleur	Ancolie bleue	Aquilegia coerulea
+fleur	Populage des marais	Caltha palustris
+fleur	Anémone du Canada	Anemone canadensis
+fleur	Anémone pulsatille d'Amérique	Pulsatilla patens
+fleur	Anémone à cinq folioles	Anemone quinquefolia
+fleur	Renoncule âcre	Ranunculus acris
+fleur	Renoncule rampante	Ranunculus repens
+fleur	Ficaire	Ficaria verna
+fleur	Actée rouge	Actaea rubra
+fleur	Actée à gros pédicelles	Actaea pachypoda
+fleur	Cimicaire à grappes	Actaea racemosa
+fleur	Pigamon pubescent	Thalictrum pubescens
+fleur	Clématite de Virginie	Clematis virginiana
+fleur	Aconit napel	Aconitum napellus
+fleur	Pied-d'alouette des champs	Consolida regalis
+fleur	Podophylle pelté	Podophyllum peltatum
+fleur	Caulophylle faux-pigamon	Caulophyllum thalictroides
+fleur	Violette du Canada	Viola canadensis
+fleur	Violette cucullée	Viola cucullata
+fleur	Violette pubescente	Viola pubescens
+fleur	Violette odorante	Viola odorata
+fleur	Violette de Rivinus	Viola riviniana
+fleur	Pensée sauvage	Viola tricolor
+fleur	Quatre-temps	Cornus canadensis
+fleur	Maïanthème du Canada	Maianthemum canadense
+fleur	Smilacine à grappes	Maianthemum racemosum
+fleur	Sceau-de-Salomon pubescent	Polygonatum pubescens
+fleur	Uvulaire grandiflore	Uvularia grandiflora
+fleur	Clintonie boréale	Clintonia borealis
+fleur	Streptope rose	Streptopus lanceolatus
+fleur	Médéole de Virginie	Medeola virginiana
+fleur	Lis du Canada	Lilium canadense
+fleur	Lis de Philadelphie	Lilium philadelphicum
+fleur	Lis du Michigan	Lilium michiganense
+fleur	Lis tigré	Lilium lancifolium
+fleur	Lis martagon	Lilium martagon
+fleur	Hémérocalle fauve	Hemerocallis fulva
+fleur	Iris versicolore	Iris versicolor
+fleur	Iris des marais	Iris pseudacorus
+fleur	Iris de Sibérie	Iris sibirica
+fleur	Bermudienne à feuilles étroites	Sisyrinchium angustifolium
+fleur	Cypripède acaule	Cypripedium acaule
+fleur	Cypripède royal	Cypripedium reginae
+fleur	Cypripède jaune	Cypripedium parviflorum
+fleur	Sabot de Vénus	Cypripedium calceolus
+fleur	Calypso bulbeux	Calypso bulbosa
+fleur	Aréthuse bulbeuse	Arethusa bulbosa
+fleur	Calopogon tubéreux	Calopogon tuberosus
+fleur	Pogonie langue-de-serpent	Pogonia ophioglossoides
+fleur	Platanthère frangée	Platanthera blephariglottis
+fleur	Platanthère psycodes	Platanthera psycodes
+fleur	Spiranthe penchée	Spiranthes cernua
+fleur	Goodyérie pubescente	Goodyera pubescens
+fleur	Épipactis petit-hellébore	Epipactis helleborine
+fleur	Orchis pourpre	Orchis purpurea
+fleur	Orchis mâle	Orchis mascula
+fleur	Orchis militaire	Orchis militaris
+fleur	Orchis bouc	Himantoglossum hircinum
+fleur	Orchis pyramidal	Anacamptis pyramidalis
+fleur	Orchis tacheté	Dactylorhiza maculata
+fleur	Orchis de Fuchs	Dactylorhiza fuchsii
+fleur	Ophrys abeille	Ophrys apifera
+fleur	Ophrys mouche	Ophrys insectifera
+fleur	Ophrys araignée	Ophrys sphegodes
+fleur	Céphalanthère à grandes fleurs	Cephalanthera damasonium
+fleur	Néottie nid-d'oiseau	Neottia nidus-avis
+fleur	Gymnadénie moucheron	Gymnadenia conopsea
+fleur	Nigritelle noire	Gymnadenia nigra
+fleur	Monotrope uniflore	Monotropa uniflora
+fleur	Pyrole à feuilles rondes	Pyrola rotundifolia
+fleur	Chimaphile à ombelle	Chimaphila umbellata
+fleur	Linnée boréale	Linnaea borealis
+fleur	Mitchella rampant	Mitchella repens
+fleur	Gaulthérie couchée	Gaultheria procumbens
+fleur	Épigée rampante	Epigaea repens
+fleur	Sarracénie pourpre	Sarracenia purpurea
+fleur	Sarracénie jaune	Sarracenia flava
+fleur	Droséra à feuilles rondes	Drosera rotundifolia
+fleur	Dionée attrape-mouche	Dionaea muscipula
+fleur	Utriculaire vulgaire	Utricularia vulgaris
+fleur	Nénuphar à fleurs panachées	Nuphar variegata
+fleur	Nénuphar jaune	Nuphar lutea
+fleur	Nymphéa odorant	Nymphaea odorata
+fleur	Nymphéa blanc	Nymphaea alba
+fleur	Lotus sacré	Nelumbo nucifera
+fleur	Lotus d'Amérique	Nelumbo lutea
+fleur	Nénuphar géant d'Amazonie	Victoria amazonica
+fleur	Jacinthe d'eau	Pontederia crassipes
+fleur	Pontédérie cordée	Pontederia cordata
+fleur	Sagittaire latifoliée	Sagittaria latifolia
+fleur	Plantain d'eau	Alisma plantago-aquatica
+fleur	Butome à ombelle	Butomus umbellatus
+plante	Quenouille à larges feuilles	Typha latifolia
+plante	Quenouille à feuilles étroites	Typha angustifolia
+fleur	Calla des marais	Calla palustris
+fleur	Arisème petit-prêcheur	Arisaema triphyllum
+fleur	Symplocarpe fétide	Symplocarpus foetidus
+fleur	Lysichite jaune	Lysichiton americanus
+fleur	Gouet maculé	Arum maculatum
+fleur	Salicaire commune	Lythrum salicaria
+fleur	Épilobe à feuilles étroites	Chamaenerion angustifolium
+fleur	Épilobe hirsute	Epilobium hirsutum
+fleur	Onagre bisannuelle	Oenothera biennis
+fleur	Onagre rose	Oenothera speciosa
+fleur	Onagre du désert	Oenothera deltoides
+fleur	Circée de Lutèce	Circaea lutetiana
+fleur	Asclépiade commune	Asclepias syriaca
+fleur	Asclépiade incarnate	Asclepias incarnata
+fleur	Asclépiade tubéreuse	Asclepias tuberosa
+fleur	Apocyn à feuilles d'androsème	Apocynum androsaemifolium
+fleur	Pervenche mineure	Vinca minor
+fleur	Gentiane d'Andrews	Gentiana andrewsii
+fleur	Gentianopsis frangé	Gentianopsis crinita
+fleur	Gentiane acaule	Gentiana acaulis
+fleur	Gentiane jaune	Gentiana lutea
+fleur	Gentiane printanière	Gentiana verna
+fleur	Petite centaurée	Centaurium erythraea
+fleur	Ményanthe trifolié	Menyanthes trifoliata
+fleur	Phlox divariqué	Phlox divaricata
+fleur	Phlox paniculé	Phlox paniculata
+fleur	Phlox subulé	Phlox subulata
+fleur	Polémoine bleue	Polemonium caeruleum
+fleur	Gilia écarlate	Ipomopsis aggregata
+fleur	Hydrophylle de Virginie	Hydrophyllum virginianum
+fleur	Phacélie de Californie	Phacelia campanularia
+fleur	Némophile de Menzies	Nemophila menziesii
+fleur	Mertensie de Virginie	Mertensia virginica
+fleur	Myosotis des marais	Myosotis scorpioides
+fleur	Myosotis des champs	Myosotis arvensis
+fleur	Vipérine commune	Echium vulgare
+fleur	Bourrache officinale	Borago officinalis
+fleur	Consoude officinale	Symphytum officinale
+fleur	Pulmonaire officinale	Pulmonaria officinalis
+fleur	Cynoglosse officinale	Cynoglossum officinale
+fleur	Liseron des haies	Calystegia sepium
+fleur	Liseron des champs	Convolvulus arvensis
+fleur	Morelle douce-amère	Solanum dulcamara
+fleur	Belladone	Atropa belladonna
+fleur	Datura stramoine	Datura stramonium
+fleur	Molène vulgaire	Verbascum thapsus
+fleur	Linaire vulgaire	Linaria vulgaris
+fleur	Digitale pourpre	Digitalis purpurea
+fleur	Digitale jaune	Digitalis grandiflora
+fleur	Chélone glabre	Chelone glabra
+fleur	Mimule à fleurs entrouvertes	Erythranthe ringens
+fleur	Mimule jaune	Erythranthe guttata
+fleur	Penstémon digitale	Penstemon digitalis
+fleur	Castilléjie écarlate	Castilleja coccinea
+fleur	Pédiculaire du Canada	Pedicularis canadensis
+fleur	Mélampyre linéaire	Melampyrum lineare
+fleur	Euphraise officinale	Euphrasia officinalis
+fleur	Rhinanthe crête-de-coq	Rhinanthus minor
+fleur	Véronique officinale	Veronica officinalis
+fleur	Véronique petit-chêne	Veronica chamaedrys
+fleur	Véronique de Virginie	Veronicastrum virginicum
+plante	Plantain majeur	Plantago major
+plante	Plantain lancéolé	Plantago lanceolata
+fleur	Monarde fistuleuse	Monarda fistulosa
+fleur	Monarde écarlate	Monarda didyma
+fleur	Physostégie de Virginie	Physostegia virginiana
+fleur	Brunelle commune	Prunella vulgaris
+fleur	Lierre terrestre	Glechoma hederacea
+fleur	Lamier pourpre	Lamium purpureum
+fleur	Lamier blanc	Lamium album
+fleur	Ortie royale	Galeopsis tetrahit
+fleur	Bugle rampante	Ajuga reptans
+fleur	Menthe du Canada	Mentha canadensis
+fleur	Menthe aquatique	Mentha aquatica
+fleur	Origan commun	Origanum vulgare
+fleur	Thym serpolet	Thymus serpyllum
+fleur	Sauge des prés	Salvia pratensis
+fleur	Agastache fenouil	Agastache foeniculum
+fleur	Népéta chataire	Nepeta cataria
+fleur	Scutellaire latériflore	Scutellaria lateriflora
+fleur	Verveine hastée	Verbena hastata
+fleur	Verveine officinale	Verbena officinalis
+fleur	Lobélie cardinale	Lobelia cardinalis
+fleur	Lobélie siphilitique	Lobelia siphilitica
+fleur	Lobélie gonflée	Lobelia inflata
+fleur	Campanule à feuilles rondes	Campanula rotundifolia
+fleur	Campanule raiponce	Campanula rapunculus
+fleur	Campanule gantelée	Campanula trachelium
+fleur	Campanule fausse-raiponce	Campanula rapunculoides
+fleur	Raiponce en épi	Phyteuma spicatum
+fleur	Jasione des montagnes	Jasione montana
+fleur	Impatiente du Cap	Impatiens capensis
+fleur	Impatiente pâle	Impatiens pallida
+fleur	Balsamine de l'Himalaya	Impatiens glandulifera
+fleur	Géranium maculé	Geranium maculatum
+fleur	Géranium de Robert	Geranium robertianum
+fleur	Géranium des prés	Geranium pratense
+fleur	Géranium sanguin	Geranium sanguineum
+fleur	Oxalide de montagne	Oxalis montana
+fleur	Oxalide d'Europe	Oxalis stricta
+fleur	Oxalide petite-oseille	Oxalis acetosella
+fleur	Lin vivace	Linum perenne
+fleur	Polygale paucifolié	Polygaloides paucifolia
+fleur	Millepertuis commun	Hypericum perforatum
+fleur	Mauve musquée	Malva moschata
+fleur	Mauve sylvestre	Malva sylvestris
+fleur	Guimauve officinale	Althaea officinalis
+fleur	Ketmie des marais	Hibiscus moscheutos
+fleur	Hélianthème nummulaire	Helianthemum nummularium
+fleur	Ciste cotonneux	Cistus albidus
+fleur	Pavot somnifère	Papaver somniferum
+fleur	Coquelicot	Papaver rhoeas
+fleur	Pavot de Californie	Eschscholzia californica
+fleur	Pavot d'Islande	Papaver nudicaule
+fleur	Chélidoine	Chelidonium majus
+fleur	Moutarde des champs	Sinapis arvensis
+fleur	Barbarée vulgaire	Barbarea vulgaris
+fleur	Cardamine des prés	Cardamine pratensis
+fleur	Dentaire à deux feuilles	Cardamine diphylla
+fleur	Julienne des dames	Hesperis matronalis
+fleur	Alliaire officinale	Alliaria petiolata
+fleur	Bourse-à-pasteur	Capsella bursa-pastoris
+plante	Cresson de fontaine	Nasturtium officinale
+fleur	Saponaire officinale	Saponaria officinalis
+fleur	Silène enflé	Silene vulgaris
+fleur	Silène de Virginie	Silene virginica
+fleur	Compagnon blanc	Silene latifolia
+fleur	Compagnon rouge	Silene dioica
+fleur	Lychnis fleur-de-coucou	Silene flos-cuculi
+fleur	Nielle des blés	Agrostemma githago
+fleur	Stellaire holostée	Rabelera holostea
+fleur	Mouron des oiseaux	Stellaria media
+fleur	Céraiste des champs	Cerastium arvense
+fleur	Œillet des Chartreux	Dianthus carthusianorum
+fleur	Œillet deltoïde	Dianthus deltoides
+fleur	Pourpier potager	Portulaca oleracea
+fleur	Renouée persicaire	Persicaria maculosa
+fleur	Renouée bistorte	Bistorta officinalis
+plante	Renouée du Japon	Reynoutria japonica
+plante	Petite oseille	Rumex acetosella
+plante	Patience crépue	Rumex crispus
+plante	Phytolaque d'Amérique	Phytolacca americana
+fleur	Saxifrage de Pennsylvanie	Micranthes pensylvanica
+fleur	Saxifrage à feuilles opposées	Saxifraga oppositifolia
+fleur	Tiarelle cordifoliée	Tiarella cordifolia
+fleur	Mitrelle à deux feuilles	Mitella diphylla
+fleur	Parnassie des marais	Parnassia palustris
+fleur	Orpin âcre	Sedum acre
+fleur	Joubarbe des toits	Sempervivum tectorum
+fleur	Fraisier des champs	Fragaria virginiana
+fleur	Fraisier des bois	Fragaria vesca
+fleur	Potentille ansérine	Argentina anserina
+fleur	Potentille dressée	Potentilla recta
+fleur	Benoîte des ruisseaux	Geum rivale
+fleur	Benoîte à trois fleurs	Geum triflorum
+fleur	Reine-des-prés	Filipendula ulmaria
+fleur	Aigremoine eupatoire	Agrimonia eupatoria
+fleur	Dryade à huit pétales	Dryas octopetala
+fleur	Lupin vivace	Lupinus perennis
+fleur	Lupin polyphylle	Lupinus polyphyllus
+fleur	Lupin du Texas	Lupinus texensis
+fleur	Lupin arctique	Lupinus arcticus
+fleur	Trèfle rouge	Trifolium pratense
+fleur	Trèfle blanc	Trifolium repens
+fleur	Trèfle hybride	Trifolium hybridum
+fleur	Trèfle des champs	Trifolium arvense
+fleur	Mélilot blanc	Melilotus albus
+fleur	Mélilot jaune	Melilotus officinalis
+fleur	Luzerne cultivée	Medicago sativa
+fleur	Lotier corniculé	Lotus corniculatus
+fleur	Vesce jargeau	Vicia cracca
+fleur	Gesse des prés	Lathyrus pratensis
+fleur	Gesse maritime	Lathyrus japonicus
+fleur	Coronille bigarrée	Securigera varia
+fleur	Baptisie australe	Baptisia australis
+fleur	Apios d'Amérique	Apios americana
+fleur	Desmodie du Canada	Desmodium canadense
+fleur	Pois de senteur sauvage	Lathyrus sylvestris
+fleur	Carotte sauvage	Daucus carota
+fleur	Berce laineuse	Heracleum maximum
+fleur	Berce du Caucase	Heracleum mantegazzianum
+fleur	Cigüe maculée	Conium maculatum
+fleur	Panais sauvage	Pastinaca sativa
+fleur	Angélique noire-pourprée	Angelica atropurpurea
+fleur	Panicaut champêtre	Eryngium campestre
+fleur	Panicaut maritime	Eryngium maritimum
+plante	Aralie à tige nue	Aralia nudicaulis
+plante	Ginseng à cinq folioles	Panax quinquefolius
+fleur	Primevère farineuse	Primula farinosa
+fleur	Primevère officinale	Primula veris
+fleur	Primevère acaule	Primula vulgaris
+fleur	Trientale boréale	Lysimachia borealis
+fleur	Lysimaque terrestre	Lysimachia terrestris
+fleur	Lysimaque commune	Lysimachia vulgaris
+fleur	Mouron rouge	Lysimachia arvensis
+fleur	Gyroselle de Meade	Primula meadia
+fleur	Cyclamen de Naples	Cyclamen hederifolium
+fleur	Soldanelle des Alpes	Soldanella alpina
+fleur	Edelweiss	Leontopodium nivale
+fleur	Arnica des montagnes	Arnica montana
+fleur	Marguerite blanche	Leucanthemum vulgare
+fleur	Pâquerette	Bellis perennis
+fleur	Achillée millefeuille	Achillea millefolium
+fleur	Tanaisie vulgaire	Tanacetum vulgare
+fleur	Camomille matricaire	Matricaria chamomilla
+fleur	Pissenlit	Taraxacum officinale
+fleur	Tussilage	Tussilago farfara
+fleur	Chicorée sauvage	Cichorium intybus
+fleur	Épervière orangée	Pilosella aurantiaca
+fleur	Épervière piloselle	Pilosella officinarum
+fleur	Salsifis des prés	Tragopogon pratensis
+fleur	Laiteron des champs	Sonchus arvensis
+fleur	Porcelle enracinée	Hypochaeris radicata
+fleur	Bardane mineure	Arctium minus
+fleur	Chardon vulgaire	Cirsium vulgare
+fleur	Chardon des champs	Cirsium arvense
+fleur	Chardon penché	Carduus nutans
+fleur	Chardon-Marie	Silybum marianum
+fleur	Centaurée noire	Centaurea nigra
+fleur	Centaurée maculée	Centaurea stoebe
+fleur	Bleuet des champs	Centaurea cyanus
+fleur	Centaurée jacée	Centaurea jacea
+fleur	Cardère sauvage	Dipsacus fullonum
+fleur	Knautie des champs	Knautia arvensis
+fleur	Scabieuse colombaire	Scabiosa columbaria
+fleur	Valériane officinale	Valeriana officinalis
+fleur	Verge d'or du Canada	Solidago canadensis
+fleur	Verge d'or rugueuse	Solidago rugosa
+fleur	Verge d'or toujours verte	Solidago sempervirens
+fleur	Verge d'or bicolore	Solidago bicolor
+fleur	Verge d'or commune	Solidago virgaurea
+fleur	Aster de Nouvelle-Angleterre	Symphyotrichum novae-angliae
+fleur	Aster ponceau	Symphyotrichum puniceum
+fleur	Aster à feuilles cordées	Symphyotrichum cordifolium
+fleur	Aster lancéolé	Symphyotrichum lanceolatum
+fleur	Aster de New York	Symphyotrichum novi-belgii
+fleur	Aster à grandes feuilles	Eurybia macrophylla
+fleur	Aster à ombelles	Doellingeria umbellata
+fleur	Vergerette annuelle	Erigeron annuus
+fleur	Vergerette de Philadelphie	Erigeron philadelphicus
+fleur	Rudbeckie hérissée	Rudbeckia hirta
+fleur	Rudbeckie laciniée	Rudbeckia laciniata
+fleur	Rudbeckie trilobée	Rudbeckia triloba
+fleur	Échinacée pourpre	Echinacea purpurea
+fleur	Échinacée pâle	Echinacea pallida
+fleur	Ratibida colonnaire	Ratibida columnifera
+fleur	Hélénie automnale	Helenium autumnale
+fleur	Héliopsis faux-hélianthe	Heliopsis helianthoides
+fleur	Tournesol commun	Helianthus annuus
+fleur	Topinambour	Helianthus tuberosus
+fleur	Hélianthe géant	Helianthus giganteus
+fleur	Silphium perfolié	Silphium perfoliatum
+fleur	Plante-boussole	Silphium laciniatum
+fleur	Coréopsis lancéolé	Coreopsis lanceolata
+fleur	Coréopsis des teinturiers	Coreopsis tinctoria
+fleur	Gaillarde vivace	Gaillardia aristata
+fleur	Gaillarde peinte	Gaillardia pulchella
+fleur	Eupatoire maculée	Eutrochium maculatum
+fleur	Eupatoire perfoliée	Eupatorium perfoliatum
+fleur	Eupatoire chanvrine	Eupatorium cannabinum
+fleur	Liatris à épi	Liatris spicata
+fleur	Liatris rude	Liatris aspera
+fleur	Vernonie de New York	Vernonia noveboracensis
+fleur	Immortelle blanche	Anaphalis margaritacea
+fleur	Antennaire à feuilles de plantain	Antennaria plantaginifolia
+plante	Petite herbe à poux	Ambrosia artemisiifolia
+plante	Armoise vulgaire	Artemisia vulgaris
+fleur	Séneçon doré	Packera aurea
+fleur	Séneçon jacobée	Jacobaea vulgaris
+fleur	Pétasite hybride	Petasites hybridus
+fleur	Grande camomille	Tanacetum parthenium
+fleur	Pyrèthre de Dalmatie	Tanacetum cinerariifolium
+fleur	Encelia farineuse	Encelia farinosa
+fleur	Pavot de Coulter	Romneya coulteri
+fleur	Mauve du désert	Sphaeralcea ambigua
+fleur	Verveine des sables	Abronia villosa
+fleur	Lis du désert	Hesperocallis undulata
+fleur	Pivoine sauvage	Paeonia officinalis
+fleur	Hellébore fétide	Helleborus foetidus
+fleur	Hellébore noir	Helleborus niger
+fleur	Perce-neige	Galanthus nivalis
+fleur	Nivéole de printemps	Leucojum vernum
+fleur	Jonquille	Narcissus pseudonarcissus
+fleur	Narcisse des poètes	Narcissus poeticus
+fleur	Ail des ours	Allium ursinum
+fleur	Ail des bois	Allium tricoccum
+fleur	Ail penché	Allium cernuum
+fleur	Muscari à grappe	Muscari neglectum
+fleur	Jacinthe des bois	Hyacinthoides non-scripta
+fleur	Scille à deux feuilles	Scilla bifolia
+fleur	Crocus de printemps	Crocus vernus
+fleur	Colchique d'automne	Colchicum autumnale
+fleur	Fritillaire pintade	Fritillaria meleagris
+fleur	Tulipe sauvage	Tulipa sylvestris
+fleur	Muguet	Convallaria majalis
+fleur	Asphodèle blanc	Asphodelus albus
+fleur	Glaïeul des moissons	Gladiolus italicus
+fleur	Anémone sylvie	Anemone nemorosa
+fleur	Anémone pulsatille	Pulsatilla vulgaris
+fleur	Bouton d'or	Ranunculus bulbosus
+fleur	Adonis d'été	Adonis aestivalis
+fleur	Nigelle de Damas	Nigella damascena
+fleur	Ancolie commune	Aquilegia vulgaris
+fleur	Trolle d'Europe	Trollius europaeus
+fleur	Hépatique noble	Hepatica nobilis
+fleur	Rhododendron ferrugineux	Rhododendron ferrugineum
+fleur	Callune	Calluna vulgaris
+fleur	Bruyère cendrée	Erica cinerea
+fleur	Bruyère des neiges	Erica carnea
+fleur	Lavande vraie	Lavandula angustifolia
+fleur	Lavande papillon	Lavandula stoechas
+arbuste	Romarin	Salvia rosmarinus
+fleur	Thym commun	Thymus vulgaris
+fleur	Coquelourde des jardins	Silene coronaria
+fleur	Fumeterre officinale	Fumaria officinalis
+fleur	Corydale creuse	Corydalis cava
+fleur	Ail rose	Allium roseum
+fleur	Iris des jardins	Iris germanica
+fleur	Iris nain	Iris pumila
+fleur	Grande marguerite	Leucanthemum maximum
+fleur	Souci des champs	Calendula arvensis
+fleur	Chrysanthème des moissons	Glebionis segetum
+fleur	Matricaire inodore	Tripleurospermum inodorum
+fleur	Inule aunée	Inula helenium
+fleur	Pulicaire dysentérique	Pulicaria dysenterica
+fleur	Cirse laineux	Cirsium eriophorum
+fleur	Onopordon acanthe	Onopordum acanthium
+fleur	Carline acaule	Carlina acaulis
+fleur	Raiponce orbiculaire	Phyteuma orbiculare
+fleur	Orchis à larges feuilles	Dactylorhiza majalis
+plante	Linaigrette à feuilles étroites	Eriophorum angustifolium
+plante	Linaigrette vaginée	Eriophorum vaginatum
+fleur	Silène acaule	Silene acaulis
+fleur	Pavot des Alpes	Papaver alpinum
+fleur	Pavot arctique	Papaver radicatum
+fleur	Épilobe à feuilles larges	Chamaenerion latifolium
+fleur	Gentiane des neiges	Gentiana nivalis
+fleur	Androsace des Alpes	Androsace alpina
+fleur	Aster des Alpes	Aster alpinus
+fleur	Chardon bleu des Alpes	Eryngium alpinum
+fleur	Lis orangé	Lilium bulbiferum
+fleur	Lis des Pyrénées	Lilium pyrenaicum
+fleur	Paradisie faux-lis	Paradisea liliastrum
+fleur	Joubarbe à toile d'araignée	Sempervivum arachnoideum
+fleur	Saxifrage paniculée	Saxifraga paniculata
+fleur	Primevère auricule	Primula auricula
+fleur	Primevère hirsute	Primula hirsuta
+fleur	Daphné bois-joli	Daphne mezereum
+fleur	Orpin rose	Rhodiola rosea
+fleur	Benoîte des montagnes	Geum montanum
+fleur	Potentille dorée	Potentilla aurea
+fleur	Renoncule des glaciers	Ranunculus glacialis
+fleur	Linaire des Alpes	Linaria alpina
+fleur	Géranium des bois	Geranium sylvaticum
+fleur	Campanule barbue	Campanula barbata
+fleur	Pédiculaire verticillée	Pedicularis verticillata
+fleur	Bartsie des Alpes	Bartsia alpina
+fleur	Myosotis alpestre	Myosotis alpestris
+fleur	Lupin de Californie	Lupinus succulentus
+fleur	Mimule cardinal	Erythranthe cardinalis
+fleur	Ancolie de Sibérie	Aquilegia sibirica
+fleur	Pied-d'alouette de Menzies	Delphinium menziesii
+fleur	Camassie commune	Camassia quamash
+fleur	Érythrone des montagnes	Erythronium montanum
+fleur	Balsamorhize sagittée	Balsamorhiza sagittata
+plante	Bouteloua gracile	Bouteloua gracilis
+plante	Herbe à bison	Bouteloua dactyloides
+plante	Barbon de Gérard	Andropogon gerardi
+plante	Panic érigé	Panicum virgatum
+plante	Roseau commun	Phragmites australis
+plante	Folle avoine	Avena fatua
+plante	Fléole des prés	Phleum pratense
+plante	Herbe de la pampa	Cortaderia selloana
+fleur	Sénevé blanc	Sinapis alba
+fleur	Coquelicot douteux	Papaver dubium
+fleur	Bleuet de montagne	Centaurea montana
+fleur	Œillet sauvage	Dianthus armeria
+fleur	Rose trémière	Alcea rosea
+fleur	Rose de Damas	Rosa damascena
+fleur	Rosier rugueux	Rosa rugosa
+fleur	Églantier	Rosa canina
+fleur	Rosier de Provins	Rosa gallica
+fleur	Rosier multiflore	Rosa multiflora
+fleur	Pivoine de Chine	Paeonia lactiflora
+fleur	Pivoine arbustive	Paeonia suffruticosa
+fleur	Tulipe des jardins	Tulipa gesneriana
+fleur	Jacinthe d'Orient	Hyacinthus orientalis
+fleur	Muscari d'Arménie	Muscari armeniacum
+fleur	Crocus de Tommasini	Crocus tommasinianus
+fleur	Safran	Crocus sativus
+fleur	Narcisse à bouquet	Narcissus tazetta
+fleur	Perce-neige d'Elwes	Galanthus elwesii
+fleur	Scille de Sibérie	Scilla siberica
+fleur	Chionodoxa de Lucile	Scilla luciliae
+fleur	Fritillaire impériale	Fritillaria imperialis
+fleur	Ail d'ornement	Allium giganteum
+fleur	Ail à fleur étoilée	Allium cristophii
+fleur	Lis royal	Lilium regale
+fleur	Lis doré du Japon	Lilium auratum
+fleur	Lis de Madone	Lilium candidum
+fleur	Lis du Japon	Lilium speciosum
+fleur	Lis de Pâques	Lilium longiflorum
+fleur	Hémérocalle jaune	Hemerocallis lilioasphodelus
+fleur	Agapanthe	Agapanthus africanus
+fleur	Glaïeul	Gladiolus × hortulanus
+fleur	Crocosmia	Crocosmia × crocosmiiflora
+fleur	Freesia	Freesia refracta
+fleur	Dahlia des jardins	Dahlia pinnata
+fleur	Dahlia écarlate	Dahlia coccinea
+fleur	Canna des jardins	Canna indica
+fleur	Bégonia tubéreux	Begonia × tuberhybrida
+fleur	Bégonia des jardins	Begonia semperflorens
+fleur	Cyclamen de Perse	Cyclamen persicum
+fleur	Hippeastrum	Hippeastrum puniceum
+fleur	Amaryllis belladone	Amaryllis belladonna
+fleur	Arum d'Éthiopie	Zantedeschia aethiopica
+fleur	Anémone du Japon	Anemone hupehensis
+fleur	Anémone des fleuristes	Anemone coronaria
+fleur	Renoncule des fleuristes	Ranunculus asiaticus
+fleur	Pied-d'alouette des jardins	Delphinium elatum
+fleur	Ancolie hybride	Aquilegia × hybrida
+fleur	Cœur-de-Marie	Lamprocapnos spectabilis
+fleur	Hosta	Hosta plantaginea
+fleur	Astilbe d'Arends	Astilbe × arendsii
+fleur	Heuchère sanguine	Heuchera sanguinea
+fleur	Bergénia à feuilles cordées	Bergenia cordifolia
+fleur	Brunnera à grandes feuilles	Brunnera macrophylla
+fleur	Pulmonaire à feuilles étroites	Pulmonaria angustifolia
+fleur	Lamier maculé	Lamium maculatum
+fleur	Alchémille commune	Alchemilla mollis
+fleur	Géranium vivace	Geranium × magnificum
+fleur	Népéta de Faassen	Nepeta × faassenii
+fleur	Sauge des bois	Salvia nemorosa
+fleur	Sauge splendide	Salvia splendens
+fleur	Sauge farineuse	Salvia farinacea
+fleur	Sauge ananas	Salvia elegans
+fleur	Sauge de Graham	Salvia greggii
+fleur	Sauge officinale	Salvia officinalis
+fleur	Lavande dentée	Lavandula dentata
+fleur	Lavandin	Lavandula × intermedia
+fleur	Pérovskia	Salvia yangii
+fleur	Monarde hybride	Monarda × media
+fleur	Épiaire laineuse	Stachys byzantina
+fleur	Phlox des jardins	Phlox drummondii
+fleur	Campanule des Carpates	Campanula carpatica
+fleur	Campanule à grosses fleurs	Platycodon grandiflorus
+fleur	Campanule à fleurs de pêcher	Campanula persicifolia
+fleur	Œillet des fleuristes	Dianthus caryophyllus
+fleur	Œillet de poète	Dianthus barbatus
+fleur	Œillet mignardise	Dianthus plumarius
+fleur	Gypsophile paniculée	Gypsophila paniculata
+fleur	Coquelourde rose	Lychnis chalcedonica
+fleur	Pavot d'Orient	Papaver orientale
+fleur	Pavot bleu de l'Himalaya	Meconopsis betonicifolia
+fleur	Iris barbu	Iris × germanica
+fleur	Iris du Japon	Iris ensata
+fleur	Iris réticulé	Iris reticulata
+fleur	Lupin Russell	Lupinus × regalis
+fleur	Pois de senteur	Lathyrus odoratus
+fleur	Glycine de Chine	Wisteria sinensis
+fleur	Glycine du Japon	Wisteria floribunda
+fleur	Capucine	Tropaeolum majus
+fleur	Clématite hybride	Clematis × jackmanii
+fleur	Clématite des montagnes	Clematis montana
+fleur	Chèvrefeuille des bois	Lonicera periclymenum
+fleur	Chèvrefeuille de Brown	Lonicera × brownii
+fleur	Bignone	Campsis radicans
+fleur	Passiflore bleue	Passiflora caerulea
+fleur	Passiflore comestible	Passiflora edulis
+fleur	Ipomée pourpre	Ipomoea purpurea
+fleur	Ipomée tricolore	Ipomoea tricolor
+fleur	Bougainvillée	Bougainvillea glabra
+fleur	Bougainvillée spectabilis	Bougainvillea spectabilis
+fleur	Jasmin officinal	Jasminum officinale
+fleur	Jasmin d'hiver	Jasminum nudiflorum
+fleur	Jasmin étoilé	Trachelospermum jasminoides
+fleur	Mandevilla	Mandevilla sanderi
+fleur	Tournesol mexicain	Tithonia rotundifolia
+fleur	Zinnia élégant	Zinnia elegans
+fleur	Cosmos bipenné	Cosmos bipinnatus
+fleur	Cosmos soufré	Cosmos sulphureus
+fleur	Cosmos chocolat	Cosmos atrosanguineus
+fleur	Œillet d'Inde	Tagetes patula
+fleur	Rose d'Inde	Tagetes erecta
+fleur	Souci officinal	Calendula officinalis
+fleur	Gazania	Gazania rigens
+fleur	Gerbéra	Gerbera jamesonii
+fleur	Marguerite du Cap	Dimorphotheca ecklonis
+fleur	Marguerite d'Afrique du Sud	Arctotis venusta
+fleur	Anthémis des teinturiers	Cota tinctoria
+fleur	Marguerite de Paris	Argyranthemum frutescens
+fleur	Chrysanthème des fleuristes	Chrysanthemum × morifolium
+fleur	Aster de Chine	Callistephus chinensis
+fleur	Aster d'automne	Symphyotrichum dumosum
+fleur	Rudbeckie Goldsturm	Rudbeckia fulgida
+fleur	Échinacée paradoxale	Echinacea paradoxa
+fleur	Hélénie hybride	Helenium × hybridum
+fleur	Achillée filipendule	Achillea filipendulina
+fleur	Immortelle à bractées	Xerochrysum bracteatum
+fleur	Ageratum du Mexique	Ageratum houstonianum
+fleur	Centaurée des montagnes	Centaurea dealbata
+fleur	Echinops	Echinops ritro
+fleur	Bleuet vivace	Cyanus montanus
+fleur	Pétunia	Petunia × atkinsiana
+fleur	Calibrachoa	Calibrachoa parviflora
+fleur	Tabac d'ornement	Nicotiana alata
+fleur	Muflier	Antirrhinum majus
+fleur	Nemesia	Nemesia strumosa
+fleur	Torenia	Torenia fournieri
+fleur	Lobélie érine	Lobelia erinus
+fleur	Impatiente de Walléria	Impatiens walleriana
+fleur	Impatiente de Nouvelle-Guinée	Impatiens hawkeri
+fleur	Balsamine des jardins	Impatiens balsamina
+fleur	Pensée des jardins	Viola × wittrockiana
+fleur	Violette cornue	Viola cornuta
+fleur	Myosotis des forêts	Myosotis sylvatica
+fleur	Héliotrope du Pérou	Heliotropium arborescens
+fleur	Verveine des jardins	Glandularia × hybrida
+fleur	Verveine de Buenos Aires	Verbena bonariensis
+fleur	Lantana	Lantana camara
+fleur	Pentas	Pentas lanceolata
+fleur	Pourpier à grandes fleurs	Portulaca grandiflora
+fleur	Ficoïde glaciale	Mesembryanthemum crystallinum
+fleur	Griffe de sorcière	Carpobrotus edulis
+fleur	Belle-de-jour	Convolvulus tricolor
+fleur	Belle-de-nuit	Mirabilis jalapa
+fleur	Célosie argentée	Celosia argentea
+fleur	Crête-de-coq	Celosia cristata
+fleur	Amarante queue-de-renard	Amaranthus caudatus
+fleur	Gomphréna	Gomphrena globosa
+fleur	Cléome	Cleome hassleriana
+fleur	Alysse odorante	Lobularia maritima
+fleur	Giroflée des murailles	Erysimum cheiri
+fleur	Giroflée des jardins	Matthiola incana
+fleur	Ibéris toujours vert	Iberis sempervirens
+fleur	Aubriète	Aubrieta deltoidea
+fleur	Corbeille-d'argent	Arabis caucasica
+fleur	Corbeille d'or	Aurinia saxatilis
+fleur	Œillet d'Espagne	Dianthus chinensis
+fleur	Coréopsis verticillé	Coreopsis verticillata
+fleur	Gaillarde hybride	Gaillardia × grandiflora
+fleur	Kniphofia	Kniphofia uvaria
+fleur	Eremurus	Eremurus robustus
+fleur	Lis des Incas	Alstroemeria aurea
+fleur	Amour en cage	Alkekengi officinarum
+fleur	Monnaie-du-pape	Lunaria annua
+fleur	Rose de Noël	Helleborus × hybridus
+fleur	Primevère des jardins	Primula × polyantha
+fleur	Primevère denticulée	Primula denticulata
+fleur	Primevère du Japon	Primula japonica
+fleur	Bergenia	Bergenia crassifolia
+fleur	Anthurium	Anthurium andraeanum
+fleur	Spathiphyllum	Spathiphyllum wallisii
+fleur	Orchidée papillon	Phalaenopsis amabilis
+fleur	Cattleya	Cattleya labiata
+fleur	Dendrobium	Dendrobium nobile
+fleur	Vanda bleue	Vanda coerulea
+fleur	Oncidium	Oncidium flexuosum
+fleur	Paphiopedilum	Paphiopedilum insigne
+fleur	Vanillier	Vanilla planifolia
+fleur	Oiseau de paradis	Strelitzia reginae
+fleur	Héliconia bec-de-perroquet	Heliconia psittacorum
+fleur	Héliconia homard	Heliconia rostrata
+fleur	Rose de porcelaine	Etlingera elatior
+fleur	Gingembre rouge	Alpinia purpurata
+fleur	Gingembre papillon	Hedychium coronarium
+fleur	Hibiscus de Chine	Hibiscus rosa-sinensis
+fleur	Hibiscus écarlate	Hibiscus coccineus
+fleur	Frangipanier	Plumeria rubra
+fleur	Frangipanier blanc	Plumeria obtusa
+fleur	Laurier-rose	Nerium oleander
+fleur	Gardénia	Gardenia jasminoides
+fleur	Ixora	Ixora coccinea
+fleur	Allamanda	Allamanda cathartica
+fleur	Ylang-ylang	Cananga odorata
+fleur	Guzmania	Guzmania lingulata
+fleur	Ananas	Ananas comosus
+fleur	Tillandsia	Tillandsia cyanea
+fleur	Fleur de tiaré	Gardenia taitensis
+fleur	Flamboyant	Delonix regia
+fleur	Arbre corail	Erythrina crista-galli
+fleur	Protée royale	Protea cynaroides
+fleur	Leucospermum	Leucospermum cordifolium
+fleur	Banksia	Banksia integrifolia
+fleur	Patte de kangourou	Anigozanthos manglesii
+fleur	Rafflesia	Rafflesia arnoldii
+fleur	Arum titan	Amorphophallus titanum
+fleur	Fuchsia	Fuchsia magellanica
+fleur	Fuchsia hybride	Fuchsia × hybrida
+fleur	Géranium des fleuristes	Pelargonium × hortorum
+fleur	Géranium-lierre	Pelargonium peltatum
+fleur	Géranium odorant	Pelargonium graveolens
+fleur	Violette africaine	Streptocarpus ionanthus
+fleur	Kalanchoé	Kalanchoe blossfeldiana
+fleur	Cactus de Noël	Schlumbergera truncata
+fleur	Poinsettia	Euphorbia pulcherrima
+fleur	Couronne du Christ	Euphorbia milii
+fleur	Clivia	Clivia miniata
+fleur	Hoya	Hoya carnosa
+fleur	Jacinthe des bois espagnole	Hyacinthoides hispanica
+fleur	Nénuphar rustique	Nymphaea × marliacea
+fleur	Lotus bleu	Nymphaea caerulea
+fleur	Iris d'eau	Iris laevigata
+plante	Fougère-à-l'autruche	Matteuccia struthiopteris
+plante	Osmonde royale	Osmunda regalis
+plante	Osmonde cannelle	Osmundastrum cinnamomeum
+plante	Onoclée sensible	Onoclea sensibilis
+plante	Fougère aigle	Pteridium aquilinum
+plante	Polypode de Virginie	Polypodium virginianum
+plante	Polypode commun	Polypodium vulgare
+plante	Capillaire du Canada	Adiantum pedatum
+plante	Capillaire de Montpellier	Adiantum capillus-veneris
+plante	Fougère mâle	Dryopteris filix-mas
+plante	Dryoptère spinuleuse	Dryopteris carthusiana
+plante	Fougère femelle	Athyrium filix-femina
+plante	Polystic faux-acrostic	Polystichum acrostichoides
+plante	Scolopendre	Asplenium scolopendrium
+plante	Fougère arborescente	Cyathea cooperi
+plante	Fougère de Boston	Nephrolepis exaltata
+plante	Prêle des champs	Equisetum arvense
+plante	Prêle d'hiver	Equisetum hyemale
+plante	Lycopode foncé	Dendrolycopodium obscurum
+plante	Sphaigne	Sphagnum magellanicum
+plante	Polytric commun	Polytrichum commune
+plante	Lichen des rennes	Cladonia rangiferina
+plante	Usnée barbue	Usnea barbata
+plante	Lichen jaune des murs	Xanthoria parietina
+plante	Mousse espagnole	Tillandsia usneoides
+plante	Lierre grimpant	Hedera helix
+plante	Vigne vierge	Parthenocissus quinquefolia
+plante	Vigne vierge à trois pointes	Parthenocissus tricuspidata
+plante	Herbe à puce	Toxicodendron radicans
+plante	Sumac à vernis	Toxicodendron vernix
+plante	Vigne des rivages	Vitis riparia
+plante	Vigne cultivée	Vitis vinifera
+plante	Houblon	Humulus lupulus
+plante	Ortie dioïque	Urtica dioica
+plante	Chiendent	Elymus repens
+plante	Bambou doré	Phyllostachys aurea
+plante	Bambou géant	Dendrocalamus giganteus
+plante	Papyrus	Cyperus papyrus
+plante	Riz	Oryza sativa
+plante	Blé tendre	Triticum aestivum
+plante	Maïs	Zea mays
+plante	Canne à sucre	Saccharum officinarum
+plante	Lavande de mer	Limonium carolinianum
+plante	Salicorne d'Europe	Salicornia europaea
+plante	Ammophile à ligule courte	Ammophila breviligulata
+plante	Oyat	Ammophila arenaria
+plante	Zostère marine	Zostera marina
+plante	Varech géant	Macrocystis pyrifera
+plante	Fucus vésiculeux	Fucus vesiculosus
+plante	Laminaire sucrée	Saccharina latissima
+plante	Monstera	Monstera deliciosa
+plante	Philodendron	Philodendron hederaceum
+plante	Pothos	Epipremnum aureum
+plante	Caladium	Caladium bicolor
+plante	Oreille d'éléphant	Colocasia esculenta
+plante	Dieffenbachia	Dieffenbachia seguine
+plante	Calathea	Goeppertia ornata
+plante	Plante à prière	Maranta leuconeura
+plante	Figuier lyre	Ficus lyrata
+plante	Caoutchouc	Ficus elastica
+plante	Sansevière	Dracaena trifasciata
+plante	Dragonnier de Madagascar	Dracaena marginata
+plante	Plante araignée	Chlorophytum comosum
+plante	Aspidistra	Aspidistra elatior
+plante	Coléus	Coleus scutellarioides
+plante	Pilea	Pilea peperomioides
+plante	Peperomia	Peperomia obtusifolia
+plante	Agave d'Amérique	Agave americana
+plante	Agave bleu	Agave tequilana
+plante	Aloès vrai	Aloe vera
+plante	Aloès arborescent	Aloe arborescens
+plante	Yucca filamenteux	Yucca filamentosa
+plante	Arbre de Josué	Yucca brevifolia
+plante	Saguaro	Carnegiea gigantea
+plante	Cactus tonneau	Ferocactus wislizeni
+plante	Figuier de Barbarie	Opuntia ficus-indica
+plante	Oponce de l'Est	Opuntia humifusa
+plante	Cholla ours en peluche	Cylindropuntia bigelovii
+plante	Cactus tuyau d'orgue	Stenocereus thurberi
+plante	Cierge du Pérou	Cereus repandus
+plante	Coussin de belle-mère	Echinocactus grusonii
+plante	Mammillaire	Mammillaria elongata
+plante	Ocotillo	Fouquieria splendens
+plante	Pitaya	Selenicereus undatus
+plante	Reine de la nuit	Selenicereus grandiflorus
+plante	Plante jade	Crassula ovata
+plante	Échévéria	Echeveria elegans
+plante	Haworthia	Haworthiopsis attenuata
+plante	Lithops	Lithops lesliei
+plante	Orpin d'automne	Hylotelephium spectabile
+plante	Sédum rampant	Sedum spurium
+plante	Euphorbe characias	Euphorbia characias
+plante	Euphorbe des bois	Euphorbia amygdaloides
+plante	Bananier	Musa acuminata
+plante	Bananier du Japon	Musa basjoo
+plante	Ricin	Ricinus communis
+plante	Gunnera	Gunnera manicata
+plante	Rhubarbe	Rheum rhabarbarum
+plante	Fraisier cultivé	Fragaria × ananassa
+plante	Tomate	Solanum lycopersicum
+plante	Pomme de terre	Solanum tuberosum
+plante	Piment	Capsicum annuum
+plante	Aubergine	Solanum melongena
+plante	Citrouille	Cucurbita pepo
+plante	Courge musquée	Cucurbita moschata
+plante	Concombre	Cucumis sativus
+plante	Melon	Cucumis melo
+plante	Pastèque	Citrullus lanatus
+plante	Haricot commun	Phaseolus vulgaris
+plante	Petit pois	Pisum sativum
+plante	Laitue	Lactuca sativa
+plante	Chou commun	Brassica oleracea
+plante	Colza	Brassica napus
+plante	Carotte	Daucus carota subsp. sativus
+plante	Betterave	Beta vulgaris
+plante	Oignon	Allium cepa
+plante	Ail	Allium sativum
+plante	Poireau	Allium porrum
+plante	Ciboulette	Allium schoenoprasum
+plante	Asperge	Asparagus officinalis
+plante	Artichaut	Cynara scolymus
+plante	Basilic	Ocimum basilicum
+plante	Persil	Petroselinum crispum
+plante	Coriandre	Coriandrum sativum
+plante	Aneth	Anethum graveolens
+plante	Fenouil	Foeniculum vulgare
+plante	Menthe verte	Mentha spicata
+plante	Mélisse	Melissa officinalis
+plante	Estragon	Artemisia dracunculus
+plante	Tabac	Nicotiana tabacum
+plante	Coton	Gossypium hirsutum
+plante	Lin cultivé	Linum usitatissimum
+plante	Caféier	Coffea arabica
+plante	Cacaoyer	Theobroma cacao
+plante	Théier	Camellia sinensis
+fleur	Rose des jardins	Rosa × hybrida
+arbre	Érable à sucre	Acer saccharum
+arbre	Érable rouge	Acer rubrum
+arbre	Érable argenté	Acer saccharinum
+arbre	Érable noir	Acer nigrum
+arbre	Érable de Pennsylvanie	Acer pensylvanicum
+arbre	Érable à épis	Acer spicatum
+arbre	Érable à Giguère	Acer negundo
+arbre	Érable de Norvège	Acer platanoides
+arbre	Érable sycomore	Acer pseudoplatanus
+arbre	Érable champêtre	Acer campestre
+arbre	Érable du Japon	Acer palmatum
+arbre	Érable à grandes feuilles	Acer macrophyllum
+arbre	Érable circiné	Acer circinatum
+arbre	Érable de l'Amour	Acer ginnala
+arbre	Chêne rouge	Quercus rubra
+arbre	Chêne blanc	Quercus alba
+arbre	Chêne à gros fruits	Quercus macrocarpa
+arbre	Chêne bicolore	Quercus bicolor
+arbre	Chêne des marais	Quercus palustris
+arbre	Chêne écarlate	Quercus coccinea
+arbre	Chêne noir	Quercus velutina
+arbre	Chêne de Virginie	Quercus virginiana
+arbre	Chêne de Garry	Quercus garryana
+arbre	Chêne pédonculé	Quercus robur
+arbre	Chêne sessile	Quercus petraea
+arbre	Chêne vert	Quercus ilex
+arbre	Chêne-liège	Quercus suber
+arbre	Chêne pubescent	Quercus pubescens
+arbre	Chêne chevelu	Quercus cerris
+arbre	Hêtre à grandes feuilles	Fagus grandifolia
+arbre	Hêtre commun	Fagus sylvatica
+arbre	Châtaignier d'Amérique	Castanea dentata
+arbre	Châtaignier commun	Castanea sativa
+arbre	Bouleau à papier	Betula papyrifera
+arbre	Bouleau jaune	Betula alleghaniensis
+arbre	Bouleau gris	Betula populifolia
+arbre	Bouleau flexible	Betula lenta
+arbre	Bouleau noir	Betula nigra
+arbre	Bouleau verruqueux	Betula pendula
+arbre	Bouleau pubescent	Betula pubescens
+arbre	Aulne rugueux	Alnus incana subsp. rugosa
+arbre	Aulne glutineux	Alnus glutinosa
+arbre	Aulne rouge	Alnus rubra
+arbre	Charme de Caroline	Carpinus caroliniana
+arbre	Charme commun	Carpinus betulus
+arbre	Ostryer de Virginie	Ostrya virginiana
+arbre	Noisetier commun	Corylus avellana
+arbre	Noyer noir	Juglans nigra
+arbre	Noyer cendré	Juglans cinerea
+arbre	Noyer commun	Juglans regia
+arbre	Caryer ovale	Carya ovata
+arbre	Caryer cordiforme	Carya cordiformis
+arbre	Pacanier	Carya illinoinensis
+arbre	Frêne blanc	Fraxinus americana
+arbre	Frêne rouge	Fraxinus pennsylvanica
+arbre	Frêne noir	Fraxinus nigra
+arbre	Frêne élevé	Fraxinus excelsior
+arbre	Frêne à fleurs	Fraxinus ornus
+arbre	Orme d'Amérique	Ulmus americana
+arbre	Orme rouge	Ulmus rubra
+arbre	Orme champêtre	Ulmus minor
+arbre	Orme de Sibérie	Ulmus pumila
+arbre	Micocoulier occidental	Celtis occidentalis
+arbre	Micocoulier de Provence	Celtis australis
+arbre	Tilleul d'Amérique	Tilia americana
+arbre	Tilleul à petites feuilles	Tilia cordata
+arbre	Tilleul à grandes feuilles	Tilia platyphyllos
+arbre	Peuplier faux-tremble	Populus tremuloides
+arbre	Peuplier à grandes dents	Populus grandidentata
+arbre	Peuplier baumier	Populus balsamifera
+arbre	Peuplier deltoïde	Populus deltoides
+arbre	Peuplier noir	Populus nigra
+arbre	Peuplier blanc	Populus alba
+arbre	Tremble	Populus tremula
+arbre	Saule noir	Salix nigra
+arbre	Saule pleureur	Salix babylonica
+arbre	Saule blanc	Salix alba
+arbre	Saule marsault	Salix caprea
+arbre	Saule discolore	Salix discolor
+arbre	Cerisier tardif	Prunus serotina
+arbre	Cerisier de Pennsylvanie	Prunus pensylvanica
+arbre	Cerisier sauvage	Prunus avium
+arbre	Cerisier du Japon	Prunus serrulata
+arbre	Cerisier Yoshino	Prunus × yedoensis
+arbre	Prunier d'Amérique	Prunus americana
+arbre	Prunier domestique	Prunus domestica
+arbre	Prunier myrobolan	Prunus cerasifera
+arbre	Pêcher	Prunus persica
+arbre	Abricotier	Prunus armeniaca
+arbre	Amandier	Prunus dulcis
+arbre	Pommier domestique	Malus domestica
+arbre	Pommier sauvage	Malus sylvestris
+arbre	Pommier odorant	Malus coronaria
+arbre	Poirier commun	Pyrus communis
+arbre	Poirier de Chine	Pyrus calleryana
+arbre	Sorbier d'Amérique	Sorbus americana
+arbre	Sorbier des oiseleurs	Sorbus aucuparia
+arbre	Alisier blanc	Aria edulis
+arbre	Cormier	Cormus domestica
+arbre	Amélanchier du Canada	Amelanchier canadensis
+arbre	Aubépine ergot-de-coq	Crataegus crus-galli
+arbre	Aubépine monogyne	Crataegus monogyna
+arbre	Cognassier	Cydonia oblonga
+arbre	Néflier	Mespilus germanica
+arbre	Robinier faux-acacia	Robinia pseudoacacia
+arbre	Févier d'Amérique	Gleditsia triacanthos
+arbre	Chicot du Canada	Gymnocladus dioicus
+arbre	Gainier du Canada	Cercis canadensis
+arbre	Arbre de Judée	Cercis siliquastrum
+arbre	Cytise faux-ébénier	Laburnum anagyroides
+arbre	Sophora du Japon	Styphnolobium japonicum
+arbre	Mimosa d'hiver	Acacia dealbata
+arbre	Albizia	Albizia julibrissin
+arbre	Caroubier	Ceratonia siliqua
+arbre	Tulipier de Virginie	Liriodendron tulipifera
+arbre	Magnolia à grandes fleurs	Magnolia grandiflora
+arbre	Magnolia de Soulange	Magnolia × soulangeana
+arbre	Magnolia étoilé	Magnolia stellata
+arbre	Magnolia acuminé	Magnolia acuminata
+arbre	Sassafras	Sassafras albidum
+arbre	Laurier-sauce	Laurus nobilis
+arbre	Avocatier	Persea americana
+arbre	Camphrier	Camphora officinarum
+arbre	Liquidambar	Liquidambar styraciflua
+arbre	Platane d'Occident	Platanus occidentalis
+arbre	Platane commun	Platanus × hispanica
+arbre	Ginkgo	Ginkgo biloba
+arbre	Marronnier d'Inde	Aesculus hippocastanum
+arbre	Marronnier rouge	Aesculus × carnea
+arbre	Marronnier glabre	Aesculus glabra
+arbre	Catalpa commun	Catalpa bignonioides
+arbre	Catalpa de l'Ouest	Catalpa speciosa
+arbre	Paulownia	Paulownia tomentosa
+arbre	Mûrier blanc	Morus alba
+arbre	Mûrier noir	Morus nigra
+arbre	Mûrier rouge	Morus rubra
+arbre	Oranger des Osages	Maclura pomifera
+arbre	Figuier commun	Ficus carica
+arbre	Banian	Ficus benghalensis
+arbre	Figuier des pagodes	Ficus religiosa
+arbre	Arbre à caoutchouc	Hevea brasiliensis
+arbre	Nyssa sylvestre	Nyssa sylvatica
+arbre	Cornouiller fleuri	Cornus florida
+arbre	Cornouiller de Nuttall	Cornus nuttallii
+arbre	Cornouiller à feuilles alternes	Cornus alternifolia
+arbre	Cornouiller du Japon	Cornus kousa
+arbre	Cornouiller mâle	Cornus mas
+arbre	Ailante glanduleux	Ailanthus altissima
+arbre	Sumac vinaigrier	Rhus typhina
+arbre	Arbre à perruque	Cotinus coggygria
+arbre	Pistachier	Pistacia vera
+arbre	Pistachier lentisque	Pistacia lentiscus
+arbre	Manguier	Mangifera indica
+arbre	Anacardier	Anacardium occidentale
+arbre	Olivier	Olea europaea
+arbre	Lilas des Indes	Lagerstroemia indica
+arbre	Eucalyptus commun	Eucalyptus globulus
+arbre	Eucalyptus arc-en-ciel	Eucalyptus deglupta
+arbre	Eucalyptus des rivières	Eucalyptus camaldulensis
+arbre	Mélaleuque	Melaleuca quinquenervia
+arbre	Goyavier	Psidium guajava
+arbre	Grenadier	Punica granatum
+arbre	Oranger	Citrus × sinensis
+arbre	Citronnier	Citrus × limon
+arbre	Limettier	Citrus × aurantiifolia
+arbre	Pamplemoussier	Citrus × paradisi
+arbre	Mandarinier	Citrus reticulata
+arbre	Bigaradier	Citrus × aurantium
+arbre	Kumquat	Citrus japonica
+arbre	Néflier du Japon	Eriobotrya japonica
+arbre	Kaki	Diospyros kaki
+arbre	Plaqueminier de Virginie	Diospyros virginiana
+arbre	Asiminier trilobé	Asimina triloba
+arbre	Papayer	Carica papaya
+arbre	Arbre à pain	Artocarpus altilis
+arbre	Jacquier	Artocarpus heterophyllus
+arbre	Corossolier	Annona muricata
+arbre	Durian	Durio zibethinus
+arbre	Ramboutan	Nephelium lappaceum
+arbre	Litchi	Litchi chinensis
+arbre	Tamarinier	Tamarindus indica
+arbre	Fromager	Ceiba pentandra
+arbre	Baobab africain	Adansonia digitata
+arbre	Baobab de Grandidier	Adansonia grandidieri
+arbre	Acacia tortillis	Vachellia tortilis
+arbre	Acacia jaune	Vachellia xanthophloea
+arbre	Arbre à saucisses	Kigelia africana
+arbre	Marula	Sclerocarya birrea
+arbre	Mopane	Colophospermum mopane
+arbre	Jacaranda	Jacaranda mimosifolia
+arbre	Tulipier du Gabon	Spathodea campanulata
+arbre	Tabebuia rose	Handroanthus impetiginosus
+arbre	Arbre du voyageur	Ravenala madagascariensis
+arbre	Palétuvier rouge	Rhizophora mangle
+arbre	Palétuvier noir	Avicennia germinans
+arbre	Raisinier bord de mer	Coccoloba uvifera
+arbre	Mancenillier	Hippomane mancinella
+arbre	Gommier rouge	Bursera simaruba
+arbre	Acajou des Antilles	Swietenia mahagoni
+arbre	Cocotier	Cocos nucifera
+arbre	Palmier dattier	Phoenix dactylifera
+arbre	Palmier des Canaries	Phoenix canariensis
+arbre	Palmier royal de Cuba	Roystonea regia
+arbre	Palmier de Californie	Washingtonia filifera
+arbre	Palmier du Mexique	Washingtonia robusta
+arbre	Palmier nain	Chamaerops humilis
+arbre	Palmier à chanvre	Trachycarpus fortunei
+arbre	Palmier sabal	Sabal palmetto
+arbre	Palmier à huile	Elaeis guineensis
+arbre	Palmier bouteille	Hyophorbe lagenicaulis
+arbre	Palmier aréquier	Dypsis lutescens
+arbre	Cycas du Japon	Cycas revoluta
+arbre	Dragonnier des Canaries	Dracaena draco
+arbre	Tamaris	Tamarix gallica
+arbre	Filao	Casuarina equisetifolia
+arbre	Pin blanc	Pinus strobus
+arbre	Pin rouge	Pinus resinosa
+arbre	Pin gris	Pinus banksiana
+arbre	Pin rigide	Pinus rigida
+arbre	Pin ponderosa	Pinus ponderosa
+arbre	Pin tordu	Pinus contorta
+arbre	Pin à sucre	Pinus lambertiana
+arbre	Pin de Jeffrey	Pinus jeffreyi
+arbre	Pin à écorce blanche	Pinus albicaulis
+arbre	Pin de Bristlecone	Pinus longaeva
+arbre	Pin des marais	Pinus palustris
+arbre	Pin à encens	Pinus taeda
+arbre	Pin pignon d'Amérique	Pinus edulis
+arbre	Pin sylvestre	Pinus sylvestris
+arbre	Pin noir d'Autriche	Pinus nigra
+arbre	Pin maritime	Pinus pinaster
+arbre	Pin parasol	Pinus pinea
+arbre	Pin d'Alep	Pinus halepensis
+arbre	Pin cembro	Pinus cembra
+arbre	Pin mugo	Pinus mugo
+arbre	Pin des Canaries	Pinus canariensis
+arbre	Pin de Monterey	Pinus radiata
+arbre	Épinette blanche	Picea glauca
+arbre	Épinette noire	Picea mariana
+arbre	Épinette rouge	Picea rubens
+arbre	Épinette bleue	Picea pungens
+arbre	Épinette d'Engelmann	Picea engelmannii
+arbre	Épinette de Sitka	Picea sitchensis
+arbre	Épicéa commun	Picea abies
+arbre	Épicéa de Serbie	Picea omorika
+arbre	Sapin baumier	Abies balsamea
+arbre	Sapin de Fraser	Abies fraseri
+arbre	Sapin subalpin	Abies lasiocarpa
+arbre	Sapin grandissime	Abies grandis
+arbre	Sapin noble	Abies procera
+arbre	Sapin du Colorado	Abies concolor
+arbre	Sapin pectiné	Abies alba
+arbre	Sapin de Nordmann	Abies nordmanniana
+arbre	Sapin de Corée	Abies koreana
+arbre	Douglas vert	Pseudotsuga menziesii
+arbre	Pruche du Canada	Tsuga canadensis
+arbre	Pruche de l'Ouest	Tsuga heterophylla
+arbre	Mélèze laricin	Larix laricina
+arbre	Mélèze d'Europe	Larix decidua
+arbre	Mélèze occidental	Larix occidentalis
+arbre	Thuya occidental	Thuja occidentalis
+arbre	Thuya géant	Thuja plicata
+arbre	Cyprès jaune	Callitropsis nootkatensis
+arbre	Cyprès de Leyland	Cupressus × leylandii
+arbre	Cyprès de Lawson	Chamaecyparis lawsoniana
+arbre	Cyprès de Provence	Cupressus sempervirens
+arbre	Cyprès de Monterey	Cupressus macrocarpa
+arbre	Cyprès chauve	Taxodium distichum
+arbre	Métaséquoia	Metasequoia glyptostroboides
+arbre	Séquoia géant	Sequoiadendron giganteum
+arbre	Séquoia à feuilles d'if	Sequoia sempervirens
+arbre	Cryptoméria du Japon	Cryptomeria japonica
+arbre	Genévrier de Virginie	Juniperus virginiana
+arbre	Genévrier commun	Juniperus communis
+arbre	Genévrier des Rocheuses	Juniperus scopulorum
+arbre	If du Canada	Taxus canadensis
+arbre	If commun	Taxus baccata
+arbre	If de l'Ouest	Taxus brevifolia
+arbre	Cèdre du Liban	Cedrus libani
+arbre	Cèdre de l'Atlas	Cedrus atlantica
+arbre	Cèdre de l'Himalaya	Cedrus deodara
+arbre	Araucaria du Chili	Araucaria araucana
+arbre	Pin de Norfolk	Araucaria heterophylla
+arbre	Kauri	Agathis australis
+arbre	Wollemia	Wollemia nobilis
+arbuste	Sureau du Canada	Sambucus canadensis
+arbuste	Sureau rouge	Sambucus racemosa
+arbuste	Sureau noir	Sambucus nigra
+arbuste	Viorne trilobée	Viburnum trilobum
+arbuste	Viorne obier	Viburnum opulus
+arbuste	Viorne flexible	Viburnum lentago
+arbuste	Viorne à feuilles d'aulne	Viburnum lantanoides
+arbuste	Viorne lantane	Viburnum lantana
+arbuste	Viorne tin	Viburnum tinus
+arbuste	Viorne de Carles	Viburnum carlesii
+arbuste	Cornouiller stolonifère	Cornus sericea
+arbuste	Cornouiller sanguin	Cornus sanguinea
+arbuste	Noisetier à long bec	Corylus cornuta
+arbuste	Hamamélis de Virginie	Hamamelis virginiana
+arbuste	Hamamélis hybride	Hamamelis × intermedia
+arbuste	Amélanchier à feuilles d'aulne	Amelanchier alnifolia
+arbuste	Aronia noir	Aronia melanocarpa
+arbuste	Cerisier de Virginie	Prunus virginiana
+arbuste	Prunellier	Prunus spinosa
+arbuste	Laurier-cerise	Prunus laurocerasus
+arbuste	Ronce commune	Rubus fruticosus
+arbuste	Framboisier	Rubus idaeus
+arbuste	Ronce odorante	Rubus odoratus
+arbuste	Chicouté	Rubus chamaemorus
+arbuste	Spirée à larges feuilles	Spiraea latifolia
+arbuste	Spirée tomenteuse	Spiraea tomentosa
+arbuste	Spirée de Van Houtte	Spiraea × vanhouttei
+arbuste	Spirée du Japon	Spiraea japonica
+arbuste	Physocarpe à feuilles d'obier	Physocarpus opulifolius
+arbuste	Potentille frutescente	Dasiphora fruticosa
+arbuste	Cotonéaster horizontal	Cotoneaster horizontalis
+arbuste	Buisson ardent	Pyracantha coccinea
+arbuste	Cognassier du Japon	Chaenomeles speciosa
+arbuste	Kerria du Japon	Kerria japonica
+arbuste	Rosier sauvage	Rosa blanda
+arbuste	Rosier de Virginie	Rosa virginiana
+arbuste	Bleuet à feuilles étroites	Vaccinium angustifolium
+arbuste	Bleuetier en corymbe	Vaccinium corymbosum
+arbuste	Airelle rouge	Vaccinium vitis-idaea
+arbuste	Myrtille	Vaccinium myrtillus
+arbuste	Canneberge à gros fruits	Vaccinium macrocarpon
+arbuste	Thé du Labrador	Rhododendron groenlandicum
+arbuste	Kalmia à feuilles étroites	Kalmia angustifolia
+arbuste	Kalmia à larges feuilles	Kalmia latifolia
+arbuste	Rhododendron du Canada	Rhododendron canadense
+arbuste	Rhododendron de Catawba	Rhododendron catawbiense
+arbuste	Rhododendron pontique	Rhododendron ponticum
+arbuste	Azalée du Japon	Rhododendron japonicum
+arbuste	Azalée des Indes	Rhododendron simsii
+arbuste	Andromède polifolia	Andromeda polifolia
+arbuste	Cassandre caliculé	Chamaedaphne calyculata
+arbuste	Raisin d'ours	Arctostaphylos uva-ursi
+arbuste	Manzanita	Arctostaphylos manzanita
+arbuste	Arbousier	Arbutus unedo
+arbuste	Arbousier de Menzies	Arbutus menziesii
+arbuste	Pieris du Japon	Pieris japonica
+arbuste	Camélia du Japon	Camellia japonica
+arbuste	Camélia d'automne	Camellia sasanqua
+arbuste	Hortensia	Hydrangea macrophylla
+arbuste	Hydrangée arborescente	Hydrangea arborescens
+arbuste	Hydrangée paniculée	Hydrangea paniculata
+arbuste	Hydrangée à feuilles de chêne	Hydrangea quercifolia
+arbuste	Hydrangée grimpante	Hydrangea petiolaris
+arbuste	Seringat	Philadelphus coronarius
+arbuste	Deutzia	Deutzia gracilis
+arbuste	Weigela	Weigela florida
+arbuste	Forsythia	Forsythia × intermedia
+arbuste	Lilas commun	Syringa vulgaris
+arbuste	Lilas du Japon	Syringa reticulata
+arbuste	Troène commun	Ligustrum vulgare
+arbuste	Troène du Japon	Ligustrum japonicum
+arbuste	Osmanthe odorant	Osmanthus fragrans
+arbuste	Buddleia de David	Buddleja davidii
+arbuste	Callicarpe	Callicarpa bodinieri
+arbuste	Caryoptéris	Caryopteris × clandonensis
+arbuste	Vitex	Vitex agnus-castus
+arbuste	Hibiscus de Syrie	Hibiscus syriacus
+arbuste	Mauve en arbre	Lavatera thuringiaca
+arbuste	Abutilon	Callianthe megapotamica
+arbuste	Chèvrefeuille de Tartarie	Lonicera tatarica
+arbuste	Chèvrefeuille du Canada	Lonicera canadensis
+arbuste	Chèvrefeuille grimpant	Lonicera sempervirens
+arbuste	Symphorine blanche	Symphoricarpos albus
+arbuste	Dièreville chèvrefeuille	Diervilla lonicera
+arbuste	Céphalanthe occidental	Cephalanthus occidentalis
+arbuste	Houx verticillé	Ilex verticillata
+arbuste	Houx commun	Ilex aquifolium
+arbuste	Houx crénelé	Ilex crenata
+arbuste	Houx d'Amérique	Ilex opaca
+arbuste	Fusain ailé	Euonymus alatus
+arbuste	Fusain d'Europe	Euonymus europaeus
+arbuste	Fusain du Japon	Euonymus japonicus
+arbuste	Buis commun	Buxus sempervirens
+arbuste	Mahonia à feuilles de houx	Berberis aquifolium
+arbuste	Épine-vinette commune	Berberis vulgaris
+arbuste	Épine-vinette de Thunberg	Berberis thunbergii
+arbuste	Nandina	Nandina domestica
+arbuste	Daphné odorant	Daphne odora
+arbuste	Argousier	Hippophae rhamnoides
+arbuste	Shépherdie du Canada	Shepherdia canadensis
+arbuste	Olivier de Bohême	Elaeagnus angustifolia
+arbuste	Myrique baumier	Myrica gale
+arbuste	Comptonie voyageuse	Comptonia peregrina
+arbuste	Sumac aromatique	Rhus aromatica
+arbuste	Nerprun cathartique	Rhamnus cathartica
+arbuste	Nerprun bourdaine	Frangula alnus
+arbuste	Ceanothus	Ceanothus thyrsiflorus
+arbuste	Thé de New Jersey	Ceanothus americanus
+arbuste	Groseillier à grappes	Ribes rubrum
+arbuste	Cassis	Ribes nigrum
+arbuste	Groseillier à maquereau	Ribes uva-crispa
+arbuste	Groseillier sanguin	Ribes sanguineum
+arbuste	Gadellier américain	Ribes americanum
+arbuste	Genêt à balais	Cytisus scoparius
+arbuste	Ajonc d'Europe	Ulex europaeus
+arbuste	Genêt d'Espagne	Spartium junceum
+arbuste	Baguenaudier	Colutea arborescens
+arbuste	Caragana de Sibérie	Caragana arborescens
+arbuste	Amorpha buissonnant	Amorpha fruticosa
+arbuste	Saule arctique	Salix arctica
+arbuste	Saule nain	Salix herbacea
+arbuste	Bouleau nain	Betula nana
+arbuste	Aulne crispé	Alnus alnobetula
+arbuste	Myrte commun	Myrtus communis
+arbuste	Callistemon	Melaleuca citrina
+arbuste	Grevillea	Grevillea robusta
+arbuste	Leptospermum	Leptospermum scoparium
+arbuste	Hébé	Veronica speciosa
+arbuste	Pittosporum	Pittosporum tobira
+arbuste	Photinia	Photinia × fraseri
+arbuste	Skimmia	Skimmia japonica
+arbuste	Aucuba du Japon	Aucuba japonica
+arbuste	Fatsia du Japon	Fatsia japonica
+arbuste	Choisya	Choisya ternata
+arbuste	Ciste pourpre	Cistus × purpureus
+arbuste	Santoline	Santolina chamaecyparissus
+arbuste	Hélichryse italienne	Helichrysum italicum
+arbuste	Armoise argentée	Artemisia ludoviciana
+arbuste	Armoise tridentée	Artemisia tridentata
+arbuste	Créosotier	Larrea tridentata
+arbuste	Mesquite	Neltuma glandulosa
+arbuste	Jojoba	Simmondsia chinensis
+arbuste	Hibiscus muable	Hibiscus mutabilis
+arbuste	Croton	Codiaeum variegatum
+arbuste	Brugmansia	Brugmansia × candida
+arbuste	Plumbago du Cap	Plumbago auriculata
+arbuste	Bois-d'Inde	Pimenta racemosa
+arbuste	Caféier de Libéria	Coffea liberica
+arbuste	Cotonnier arborescent	Gossypium arboreum
+arbuste	Lédon des marais	Rhododendron tomentosum
+champignon	Amanite tue-mouches	Amanita muscaria
+champignon	Amanite phalloïde	Amanita phalloides
+champignon	Amanite vireuse	Amanita virosa
+champignon	Amanite bisporigère	Amanita bisporigera
+champignon	Amanite panthère	Amanita pantherina
+champignon	Amanite rougissante	Amanita rubescens
+champignon	Amanite des Césars	Amanita caesarea
+champignon	Amanite jaune de Frost	Amanita frostiana
+champignon	Amanite engainée	Amanita vaginata
+champignon	Amanite citrine	Amanita citrina
+champignon	Cèpe de Bordeaux	Boletus edulis
+champignon	Cèpe noir	Boletus aereus
+champignon	Cèpe réticulé	Boletus reticulatus
+champignon	Bolet bai	Imleria badia
+champignon	Bolet à pied rouge	Neoboletus erythropus
+champignon	Bolet Satan	Rubroboletus satanas
+champignon	Bolet orangé	Leccinum aurantiacum
+champignon	Bolet rude	Leccinum scabrum
+champignon	Bolet jaune	Suillus luteus
+champignon	Bolet élégant	Suillus grevillei
+champignon	Bolet amer	Tylopilus felleus
+champignon	Bolet à pied creux	Suillus cavipes
+champignon	Bolet poivré	Chalciporus piperatus
+champignon	Girolle	Cantharellus cibarius
+champignon	Chanterelle cinabre	Cantharellus cinnabarinus
+champignon	Chanterelle en tube	Craterellus tubaeformis
+champignon	Trompette de la mort	Craterellus cornucopioides
+champignon	Pied-de-mouton	Hydnum repandum
+champignon	Hydne hérisson	Hericium erinaceus
+champignon	Hydne corail	Hericium coralloides
+champignon	Morille commune	Morchella esculenta
+champignon	Morille conique	Morchella elata
+champignon	Fausse morille	Gyromitra esculenta
+champignon	Helvelle crépue	Helvella crispa
+champignon	Pézize orangée	Aleuria aurantia
+champignon	Pézize écarlate	Sarcoscypha coccinea
+champignon	Pézize écarlate d'Amérique	Sarcoscypha austriaca
+champignon	Truffe noire	Tuber melanosporum
+champignon	Truffe blanche d'Alba	Tuber magnatum
+champignon	Pleurote en huître	Pleurotus ostreatus
+champignon	Pleurote du panicaut	Pleurotus eryngii
+champignon	Pleurote en forme de corne	Pleurotus cornucopiae
+champignon	Shiitake	Lentinula edodes
+champignon	Champignon de Paris	Agaricus bisporus
+champignon	Rosé des prés	Agaricus campestris
+champignon	Agaric des bois	Agaricus sylvicola
+champignon	Agaric jaunissant	Agaricus xanthodermus
+champignon	Agaric champêtre géant	Agaricus augustus
+champignon	Coprin chevelu	Coprinus comatus
+champignon	Coprin noir d'encre	Coprinopsis atramentaria
+champignon	Coprin micacé	Coprinellus micaceus
+champignon	Coprin pie	Coprinopsis picacea
+champignon	Coulemelle	Macrolepiota procera
+champignon	Lépiote déguenillée	Chlorophyllum rachodes
+champignon	Lépiote à lames vertes	Chlorophyllum molybdites
+champignon	Armillaire couleur de miel	Armillaria mellea
+champignon	Pholiote changeante	Kuehneromyces mutabilis
+champignon	Pholiote écailleuse	Pholiota squarrosa
+champignon	Hypholome en touffe	Hypholoma fasciculare
+champignon	Strophaire vert-de-gris	Stropharia aeruginosa
+champignon	Strophaire rouge vineux	Stropharia rugosoannulata
+champignon	Clitocybe nébuleux	Clitocybe nebularis
+champignon	Clitocybe odorant	Clitocybe odora
+champignon	Clitocybe en entonnoir	Infundibulicybe gibba
+champignon	Clitocybe de l'olivier	Omphalotus olearius
+champignon	Clitocybe lumineux	Omphalotus illudens
+champignon	Pied bleu	Lepista nuda
+champignon	Laqué améthyste	Laccaria amethystina
+champignon	Laqué laqué	Laccaria laccata
+champignon	Mousseron de la Saint-Georges	Calocybe gambosa
+champignon	Faux mousseron	Marasmius oreades
+champignon	Collybie à pied velouté	Flammulina velutipes
+champignon	Collybie des chênes	Gymnopus dryophilus
+champignon	Mycène pure	Mycena pura
+champignon	Mycène à lait de sang	Mycena haematopus
+champignon	Mycène casquée	Mycena galericulata
+champignon	Tricholome équestre	Tricholoma equestre
+champignon	Tricholome terreux	Tricholoma terreum
+champignon	Matsutake	Tricholoma matsutake
+champignon	Hygrophore perroquet	Gliophorus psittacinus
+champignon	Hygrophore conique	Hygrocybe conica
+champignon	Hygrophore écarlate	Hygrocybe coccinea
+champignon	Russule émétique	Russula emetica
+champignon	Russule charbonnière	Russula cyanoxantha
+champignon	Russule verdoyante	Russula virescens
+champignon	Russule noircissante	Russula nigricans
+champignon	Lactaire poivré	Lactifluus piperatus
+champignon	Lactaire délicieux	Lactarius deliciosus
+champignon	Lactaire indigo	Lactarius indigo
+champignon	Lactaire à toison	Lactarius torminosus
+champignon	Lactaire à lait abondant	Lactifluus volemus
+champignon	Lactaire des sapinières	Lactarius deterrimus
+champignon	Champignon homard	Hypomyces lactifluorum
+champignon	Cortinaire couleur de rocou	Cortinarius orellanus
+champignon	Cortinaire violet	Cortinarius violaceus
+champignon	Cortinaire semi-sanguin	Cortinarius semisanguineus
+champignon	Inocybe de Patouillard	Inocybe erubescens
+champignon	Paxille enroulé	Paxillus involutus
+champignon	Gomphide glutineux	Gomphidius glutinosus
+champignon	Clavaire chou-fleur	Sparassis crispa
+champignon	Clavaire dorée	Ramaria aurea
+champignon	Clavaire en pilon	Clavariadelphus pistillaris
+champignon	Clavaire crêtée	Clavulina coralloides
+champignon	Polypore soufré	Laetiporus sulphureus
+champignon	Polypore soufré à pores blancs	Laetiporus cincinnatus
+champignon	Polypore en touffe	Grifola frondosa
+champignon	Polypore géant	Meripilus giganteus
+champignon	Polypore écailleux	Cerioporus squamosus
+champignon	Polypore du bouleau	Fomitopsis betulina
+champignon	Amadouvier	Fomes fomentarius
+champignon	Ganoderme aplani	Ganoderma applanatum
+champignon	Ganoderme luisant	Ganoderma lucidum
+champignon	Ganoderme de la pruche	Ganoderma tsugae
+champignon	Tramète versicolore	Trametes versicolor
+champignon	Tramète rouge cinabre	Trametes cinnabarina
+champignon	Polypore marginé	Fomitopsis pinicola
+champignon	Langue-de-bœuf	Fistulina hepatica
+champignon	Stérée hirsute	Stereum hirsutum
+champignon	Schizophylle commun	Schizophyllum commune
+champignon	Chaga	Inonotus obliquus
+champignon	Oreille de Judas	Auricularia auricula-judae
+champignon	Trémelle mésentérique	Tremella mesenterica
+champignon	Trémelle en fuseau	Calocera viscosa
+champignon	Phallus impudique	Phallus impudicus
+champignon	Satyre des chiens	Mutinus caninus
+champignon	Clathre rouge	Clathrus ruber
+champignon	Anthurus d'Archer	Clathrus archeri
+champignon	Vesse-de-loup perlée	Lycoperdon perlatum
+champignon	Vesse-de-loup en poire	Apioperdon pyriforme
+champignon	Vesse-de-loup géante	Calvatia gigantea
+champignon	Scléroderme commun	Scleroderma citrinum
+champignon	Géastre à trois couches	Geastrum triplex
+champignon	Nid d'oiseau strié	Cyathus striatus
+champignon	Xylaire du bois	Xylaria hypoxylon
+champignon	Xylaire polymorphe	Xylaria polymorpha
+champignon	Cordyceps militaire	Cordyceps militaris
+champignon	Ergot du seigle	Claviceps purpurea
+champignon	Psilocybe lancéolé	Psilocybe semilanceata
+champignon	Panéole des moissons	Panaeolina foenisecii
+champignon	Plutée couleur de cerf	Pluteus cervinus
+champignon	Volvaire soyeuse	Volvariella bombycina
+champignon	Entolome livide	Entoloma sinuatum
+champignon	Lait de loup	Lycogala epidendrum
+champignon	Fleur de tan	Fuligo septica
+oiseau	Grand Géocoucou	Geococcyx velox
+oiseau	Colibri de Mulsant	Chaetocercus mulsant
+oiseau	Colibri à oreilles blanches	Basilinna leucotis
+oiseau	Viréo à moustaches	Vireo altiloquus
+oiseau	Paruline à gorge jaune des Bahamas	Setophaga flavescens
+oiseau	Tangara de Cabanis	Tangara cabanisi
+oiseau	Tangara à cinq couleurs	Tangara cyanicollis
+oiseau	Pic ouentou	Dryocopus lineatus
+oiseau	Pic à bec ivoire	Campephilus principalis
+oiseau	Tyran pirate de Cuba	Tyrannus cubensis
+oiseau	Coulicou manioc	Coccyzus minor
+oiseau	Engoulevent à collier roux	Antrostomus ridgwayi
+oiseau	Martinet à collier blanc	Streptoprocne zonaris
+oiseau	Busard pâle	Circus macrourus
+oiseau	Aigle impérial	Aquila heliaca
+oiseau	Aigle ibérique	Aquila adalberti
+oiseau	Aigle pomarin	Clanga pomarina
+oiseau	Faucon sacre	Falco cherrug
+oiseau	Faucon kobez	Falco vespertinus
+oiseau	Outarde barbue	Otis tarda
+oiseau	Outarde canepetière	Tetrax tetrax
+oiseau	Œdicnème criard	Burhinus oedicnemus
+oiseau	Glaréole à collier	Glareola pratincola
+oiseau	Gravelot à collier interrompu	Charadrius alexandrinus
+oiseau	Pluvier guignard	Eudromias morinellus
+oiseau	Bécasseau minute	Calidris minuta
+oiseau	Bécasseau cocorli	Calidris ferruginea
+oiseau	Chevalier arlequin	Tringa erythropus
+oiseau	Chevalier sylvain	Tringa glareola
+oiseau	Chevalier cul-blanc	Tringa ochropus
+oiseau	Goéland pontique	Larus cachinnans
+oiseau	Guifette moustac	Chlidonias hybrida
+oiseau	Guifette leucoptère	Chlidonias leucopterus
+oiseau	Puffin yelkouan	Puffinus yelkouan
+oiseau	Océanite tempête	Hydrobates pelagicus
+oiseau	Ganga cata	Pterocles alchata
+oiseau	Pigeon biset domestique	Columba livia domestica
+oiseau	Coucou geai	Clamator glandarius
+oiseau	Pic tridactyle	Picoides tridactylus
+oiseau	Pic cendré	Picus canus
+oiseau	Pic à dos blanc	Dendrocopos leucotos
+oiseau	Alouette calandre	Melanocorypha calandra
+oiseau	Alouette calandrelle	Calandrella brachydactyla
+oiseau	Hirondelle de rochers	Ptyonoprogne rupestris
+oiseau	Pipit spioncelle	Anthus spinoletta
+oiseau	Pipit rousseline	Anthus campestris
+oiseau	Rossignol progné	Luscinia luscinia
+oiseau	Traquet oreillard	Oenanthe hispanica
+oiseau	Monticole de roche	Monticola saxatilis
+oiseau	Bouscarle de Cetti	Cettia cetti
+oiseau	Cisticole des joncs	Cisticola juncidis
+oiseau	Locustelle tachetée	Locustella naevia
+oiseau	Rousserolle turdoïde	Acrocephalus arundinaceus
+oiseau	Hypolaïs polyglotte	Hippolais polyglotta
+oiseau	Fauvette pitchou	Curruca undata
+oiseau	Fauvette babillarde	Curruca curruca
+oiseau	Pouillot siffleur	Phylloscopus sibilatrix
+oiseau	Pouillot de Bonelli	Phylloscopus bonelli
+oiseau	Gobemouche à collier	Ficedula albicollis
+oiseau	Rémiz penduline	Remiz pendulinus
+oiseau	Mésange boréale	Poecile montanus
+oiseau	Pie-grièche à tête rousse	Lanius senator
+oiseau	Pie-grièche méridionale	Lanius meridionalis
+oiseau	Pie bleue ibérique	Cyanopica cooki
+oiseau	Étourneau roselin	Pastor roseus
+oiseau	Moineau soulcie	Petronia petronia
+oiseau	Niverolle alpine	Montifringilla nivalis
+oiseau	Venturon montagnard	Carduelis citrinella
+oiseau	Roselin cramoisi	Carpodacus erythrinus
+oiseau	Bruant fou	Emberiza cia
+oiseau	Bruant mélanocéphale	Emberiza melanocephala
+oiseau	Accenteur alpin	Prunella collaris
+oiseau	Gélinotte des bois	Tetrastes bonasia
+oiseau	Perdrix bartavelle	Alectoris graeca
+oiseau	Francolin noir	Francolinus francolinus
+oiseau	Talève sultane	Porphyrio porphyrio
+oiseau	Marouette ponctuée	Porzana porzana
+oiseau	Râle des genêts	Crex crex
+oiseau	Grue demoiselle	Grus virgo
+oiseau	Flamant du Chili	Phoenicopterus chilensis
+oiseau	Cigogne épiscopale	Ciconia episcopus
+oiseau	Héron crabier	Ardeola grayii
+oiseau	Aigrette intermédiaire	Ardea intermedia
+oiseau	Pélican gris	Pelecanus rufescens
+oiseau	Dendrocygne à lunules	Dendrocygna eytoni
+oiseau	Canard à bosse	Sarkidiornis melanotos
+oiseau	Sarcelle hottentote	Spatula hottentota
+oiseau	Canard à bec rouge	Anas erythrorhyncha
+oiseau	Coucal du Sénégal	Centropus senegalensis
+oiseau	Coucal de Burchell	Centropus burchellii
+oiseau	Martin-pêcheur azuré	Ceyx azureus
+oiseau	Guêpier de Perse	Merops persicus
+oiseau	Guêpier à gorge rouge	Merops bulocki
+oiseau	Barbican à collier	Lybius torquatus
+oiseau	Calao longibande	Bycanistes subcylindricus
+oiseau	Souimanga à longue queue	Nectarinia johnstoni
+oiseau	Moineau doré	Passer luteus
+oiseau	Moineau gris	Passer griseus
+oiseau	Tisserin baya	Ploceus philippinus
+oiseau	Bulbul à oreillons blancs	Pycnonotus leucotis
+oiseau	Shama dayal	Copsychus saularis
+oiseau	Loriot de Chine	Oriolus chinensis
+oiseau	Drongo royal	Dicrurus macrocercus
+oiseau	Martin des berges	Acridotheres ginginianus
+oiseau	Mainate religieux	Gracula religiosa
+oiseau	Perruche alexandre	Psittacula eupatria
+oiseau	Faisan de Lady Amherst	Chrysolophus amherstiae
+oiseau	Tragopan de Temminck	Tragopan temminckii
+oiseau	Lophophore resplendissant	Lophophorus impejanus
+oiseau	Calao pie	Anthracoceros albirostris
+oiseau	Brève à ailes bleues	Pitta moluccensis
+oiseau	Garrulaxe à huppe blanche	Garrulax leucolophus
+oiseau	Rossignol du Japon	Leiothrix lutea
+oiseau	Zostérops du Japon	Zosterops japonicus
+oiseau	Bouscarle chanteuse	Horornis diphone
+oiseau	Bergeronnette du Japon	Motacilla grandis
+oiseau	Pie à ailes azur	Cyanopica cyanus
+oiseau	Gobemouche narcisse	Ficedula narcissina
+oiseau	Grue moine	Grus monacha
+oiseau	Grue antigone	Antigone antigone
+oiseau	Cygne de Bewick	Cygnus columbianus bewickii
+oiseau	Kookaburra à ailes bleues	Dacelo leachii
+oiseau	Martin-chasseur sacré	Todiramphus sanctus
+oiseau	Cacatoès corella	Cacatua sanguinea
+oiseau	Cacatoès banksien	Calyptorhynchus banksii
+oiseau	Perruche omnicolore	Platycercus eximius
+oiseau	Perruche de Pennant	Platycercus elegans
+oiseau	Méliphage à oreillons blancs	Nesoptilotis leucotis
+oiseau	Mérion superbe	Malurus cyaneus
+oiseau	Mérion splendide	Malurus splendens
+oiseau	Rhipidure hochequeue	Rhipidura leucophrys
+oiseau	Jardinier satiné	Ptilonorhynchus violaceus
+oiseau	Grand Paradisier	Paradisaea apoda
+oiseau	Manchot pygmée	Eudyptula minor
+oiseau	Manchot antipode	Megadyptes antipodes
+oiseau	Tui cravate-frisée	Prosthemadera novaeseelandiae
+oiseau	Talève australe	Porphyrio melanotus
+oiseau	Takahé du Sud	Porphyrio hochstetteri
+oiseau	Fou austral	Morus serrator
+oiseau	Albatros royal du Nord	Diomedea sanfordi
+oiseau	Pétrel géant	Macronectes giganteus
+oiseau	Damier du Cap	Daption capense
+oiseau	Bec-en-fourreau neigeux	Chionis albus
+oiseau	Cormoran impérial	Leucocarbo atriceps
+oiseau	Labbe antarctique	Stercorarius antarcticus
+oiseau	Sterne antarctique	Sterna vittata
+oiseau	Ibis à face noire	Theristicus melanopis
+oiseau	Caracara austral	Phalcoboenus australis
+oiseau	Ouette de Magellan	Chloephaga picta
+oiseau	Brassemer de Magellan	Tachyeres pteneres
+oiseau	Flamant de James	Phoenicoparrus jamesi
+oiseau	Colibri géant	Patagona gigas
+oiseau	Toucan à bec rouge	Ramphastos tucanus
+oiseau	Ara hyacinthe	Anodorhynchus hyacinthinus
+oiseau	Pénélope à front noir	Penelope obscura
+oiseau	Picumne à tête ocellée	Picumnus temminckii
+oiseau	Fournier roux	Furnarius rufus
+oiseau	Tyran des savanes	Tyrannus savana
+oiseau	Moqueur à long bec	Mimus longicaudatus
+oiseau	Paroare dominicain	Paroaria dominicana
+oiseau	Ara de Lafresnaye	Ara rubrogenys
+oiseau	Géospize à bec moyen	Geospiza fortis
+oiseau	Moqueur des Galapagos	Mimus parvulus
+oiseau	Fou de Nazca	Sula granti
+oiseau	Mouette à queue fourchue	Creagrus furcatus
+oiseau	Héron des laves	Butorides sundevalli
+mammifère	Cerf à queue noire	Odocoileus hemionus columbianus
+mammifère	Cerf des marais	Blastocerus dichotomus
+mammifère	Huemul	Hippocamelus bisulcus
+mammifère	Pudu	Pudu puda
+mammifère	Mara de Patagonie	Dolichotis patagonum
+mammifère	Viscache des plaines	Lagostomus maximus
+mammifère	Chinchilla	Chinchilla lanigera
+mammifère	Coati roux	Nasua nasua
+mammifère	Raton crabier	Procyon cancrivorus
+mammifère	Loutre géante	Pteronura brasiliensis
+mammifère	Ours à lunettes	Tremarctos ornatus
+mammifère	Loup à crinière	Chrysocyon brachyurus
+mammifère	Renard de Magellan	Lycalopex culpaeus
+mammifère	Tatou à six bandes	Euphractus sexcinctus
+mammifère	Singe hurleur noir	Alouatta caraya
+mammifère	Tamarin empereur	Saguinus imperator
+mammifère	Ouistiti commun	Callithrix jacchus
+mammifère	Tamarin lion doré	Leontopithecus rosalia
+mammifère	Capucin brun	Sapajus apella
+mammifère	Saki à face blanche	Pithecia pithecia
+mammifère	Dugong	Dugong dugon
+mammifère	Otarie à fourrure australe	Arctocephalus australis
+mammifère	Otarie de Hooker	Phocarctos hookeri
+mammifère	Dauphin sombre	Lagenorhynchus obscurus
+mammifère	Baleine de Bryde	Balaenoptera edeni
+mammifère	Rorqual boréal	Balaenoptera borealis
+mammifère	Fausse orque	Pseudorca crassidens
+mammifère	Dauphin de Risso	Grampus griseus
+mammifère	Baleine à bec de Cuvier	Ziphius cavirostris
+mammifère	Wallaby agile	Notamacropus agilis
+mammifère	Wallaby des rochers à pieds jaunes	Petrogale xanthopus
+mammifère	Kangourou arboricole de Lumholtz	Dendrolagus lumholtzi
+mammifère	Wombat à nez poilu du Sud	Lasiorhinus latifrons
+mammifère	Pseudocheire commun	Pseudocheirus peregrinus
+mammifère	Petit phalanger volant	Petaurus breviceps
+mammifère	Numbat	Myrmecobius fasciatus
+mammifère	Bandicoot à nez long	Perameles nasuta
+mammifère	Bilby	Macrotis lagotis
+mammifère	Chat marsupial à queue tachetée	Dasyurus maculatus
+mammifère	Tarsier des Philippines	Carlito syrichta
+mammifère	Loris lent	Nycticebus coucang
+mammifère	Langur de Hanuman	Semnopithecus entellus
+mammifère	Macaque à bonnet	Macaca radiata
+mammifère	Macaque crabier noir	Macaca nigra
+mammifère	Rhinopithèque de Roxellane	Rhinopithecus roxellana
+mammifère	Siamang	Symphalangus syndactylus
+mammifère	Panthère nébuleuse	Neofelis nebulosa
+mammifère	Chat-léopard du Bengale	Prionailurus bengalensis
+mammifère	Dhole	Cuon alpinus
+mammifère	Chien viverrin	Nyctereutes procyonoides
+mammifère	Civette palmiste	Paradoxurus hermaphroditus
+mammifère	Binturong	Arctictis binturong
+mammifère	Mangouste indienne	Urva edwardsii
+mammifère	Tapir de Malaisie	Tapirus indicus
+mammifère	Rhinocéros de Sumatra	Dicerorhinus sumatrensis
+mammifère	Gaur	Bos gaurus
+mammifère	Banteng	Bos javanicus
+mammifère	Antilope cervicapre	Antilope cervicapra
+mammifère	Muntjac indien	Muntiacus muntjak
+mammifère	Cerf porcin	Axis porcinus
+mammifère	Chevrotain malais	Tragulus javanicus
+mammifère	Saïga	Saiga tatarica
+mammifère	Ibex de Nubie	Capra nubiana
+mammifère	Markhor	Capra falconeri
+mammifère	Takin	Budorcas taxicolor
+mammifère	Bharal	Pseudois nayaur
+mammifère	Écureuil de Prévost	Callosciurus prevostii
+mammifère	Porc-épic à crête	Hystrix cristata
+mammifère	Gerboise	Jaculus jaculus
+mammifère	Gerbille de Mongolie	Meriones unguiculatus
+mammifère	Rat-taupe nu	Heterocephalus glaber
+mammifère	Daman des arbres	Dendrohyrax arboreus
+mammifère	Galago de Garnett	Otolemur garnettii
+mammifère	Colobe bai	Piliocolobus badius
+mammifère	Cercopithèque à diadème	Cercopithecus mitis
+mammifère	Mandrill	Mandrillus sphinx
+mammifère	Hylochère	Hylochoerus meinertzhageni
+mammifère	Bongo	Tragelaphus eurycerus
+mammifère	Addax	Addax nasomaculatus
+mammifère	Oryx algazelle	Oryx dammah
+mammifère	Gazelle dorcas	Gazella dorcas
+mammifère	Damalisque à front blanc	Damaliscus pygargus
+mammifère	Cobe des roseaux	Redunca arundinum
+mammifère	Chat des sables	Felis margarita
+mammifère	Chat à pieds noirs	Felis nigripes
+mammifère	Loutre à joues blanches du Cap	Aonyx capensis
+mammifère	Zorille	Ictonyx striatus
+mammifère	Renard du Cap	Vulpes chama
+mammifère	Écureuil terrestre du Cap	Xerus inauris
+mammifère	Lièvre sauteur du Cap	Pedetes capensis
+mammifère	Roussette paillée africaine	Eidolon helvum
+mammifère	Lémur vari noir et blanc	Varecia variegata
+mammifère	Lémur brun	Eulemur fulvus
+mammifère	Microcèbe murin	Microcebus murinus
+mammifère	Tenrec commun	Tenrec ecaudatus
+insecte	Leucorrhine à front blanc	Leucorrhinia intacta
+insecte	Aeschne du Canada	Aeshna canadensis
+insecte	Cordulie à taches jaunes	Somatochlora flavomaculata
+insecte	Agrion joli	Coenagrion pulchellum
+insecte	Agrion de Mercure	Coenagrion mercuriale
+insecte	Agrion délicat	Ceriagrion tenellum
+insecte	Gomphe vulgaire	Gomphus vulgatissimus
+insecte	Libellule fauve	Libellula fulva
+insecte	Trithémis annelé	Trithemis annulata
+insecte	Pantala flavescent	Pantala flavescens
+insecte	Hanneton de la Saint-Jean	Amphimallon solstitiale
+insecte	Trichie fasciée	Trichius fasciatus
+insecte	Clairon des abeilles	Trichodes apiarius
+insecte	Lepture tachetée	Rutpela maculata
+insecte	Lepture rouge	Stictoleptura rubra
+insecte	Capricorne des maisons	Hylotrupes bajulus
+insecte	Cantharide officinale	Lytta vesicatoria
+insecte	Méloé violet	Meloe violaceus
+insecte	Téléphore fauve	Rhagonycha fulva
+insecte	Chrysomèle du romarin	Chrysolina americana
+insecte	Charançon du chêne	Curculio glandium
+insecte	Grande punaise des bois	Pentatoma rufipes
+insecte	Punaise verte	Palomena prasina
+insecte	Punaise ornée	Eurydema ornata
+insecte	Cigale grise	Cicada orni
+insecte	Cicadelle écumeuse	Philaenus spumarius
+insecte	Mante pédieuse	Empusa pennata
+insecte	Œdipode turquoise	Oedipoda caerulescens
+insecte	Œdipode rouge	Oedipoda germanica
+insecte	Criquet des pâtures	Pseudochorthippus parallelus
+insecte	Decticelle chagrinée	Platycleis albopunctata
+insecte	Éphippigère des vignes	Ephippiger diurnus
+insecte	Sauterelle cymbalière	Tylopsis lilifolia
+insecte	Frelon des bois	Dolichovespula sylvestris
+insecte	Guêpe des sables	Ammophila sabulosa
+insecte	Scolie des jardins	Megascolia maculata
+insecte	Sirex géant	Urocerus gigas
+insecte	Abeille mellifère noire	Apis mellifera mellifera
+insecte	Abeille cotonnière	Anthidium manicatum
+insecte	Anthophore plumeuse	Anthophora plumipes
+insecte	Andrène fauve	Andrena fulva
+insecte	Mégachile du rosier	Megachile centuncularis
+insecte	Bourdon des jardins	Bombus hortorum
+insecte	Bourdon des prés	Bombus pratorum
+insecte	Bourdon à ceinture orange	Bombus rufocinctus
+insecte	Mouche-scorpion	Panorpa communis
+insecte	Raphidie	Phaeostigma notata
+insecte	Bombyle tacheté	Bombylius discolor
+insecte	Tachinaire hérissée	Tachina fera
+insecte	Mouche bleue de la viande	Calliphora vicina
+insecte	Mouche de Saint-Marc	Bibio marci
+insecte	Syrphe du groseillier	Syrphus ribesii
+insecte	Hélophile suspendue	Helophilus pendulus
+insecte	Grande phrygane	Phryganea grandis
+insecte	Perle marginée	Perla marginata
+insecte	Scarabée vert du figuier	Cotinis nitida
+insecte	Coccinelle à neuf points	Coccinella novemnotata
+insecte	Coccinelle convergente	Hippodamia convergens
+insecte	Hanneton de juin	Phyllophaga anxia
+insecte	Punaise à quatre lignes	Poecilocapsus lineatus
+insecte	Punaise de la courge	Anasa tristis
+insecte	Fourmi à miel	Myrmecocystus mexicanus
+insecte	Mante de Caroline	Stagmomantis carolina
+papillon	Papillon tigré à deux queues	Papilio multicaudata
+papillon	Papillon zébré africain	Graphium policenes
+papillon	Machaon du Japon	Papilio xuthus
+papillon	Papillon de Corse	Papilio hospiton
+papillon	Thaïs	Zerynthia rumina
+papillon	Semi-Apollon	Parnassius mnemosyne
+papillon	Piéride du lotier	Leptidea sinapis
+papillon	Fluoré	Colias alfacariensis
+papillon	Échiquier	Carterocephalus palaemon
+papillon	Sylvaine	Ochlodes sylvanus
+papillon	Petite Violette	Boloria dia
+papillon	Mélitée orangée	Melitaea didyma
+papillon	Nacré de la ronce	Brenthis daphne
+papillon	Pacha à deux queues	Charaxes jasius
+papillon	Silène	Brintesia circe
+papillon	Moiré sylvicole	Erebia aethiops
+papillon	Céphale	Coenonympha arcania
+papillon	Thécla du chêne	Favonius quercus
+papillon	Cuivré écarlate	Lycaena hippothoe
+papillon	Cuivré des marais	Lycaena dispar
+papillon	Azuré du serpolet	Phengaris arion
+papillon	Argus bleu-nacré	Lysandra coridon
+papillon	Écaille du séneçon	Tyria jacobaeae
+papillon	Écaille marbrée	Callimorpha dominula
+papillon	Bombyx du chêne	Lasiocampa quercus
+papillon	Feuille morte du chêne	Gastropacha quercifolia
+papillon	Sphinx du liseron	Agrius convolvuli
+papillon	Sphinx du peuplier	Laothoe populi
+papillon	Sphinx demi-paon	Smerinthus ocellata
+papillon	Sphinx du troène	Sphinx ligustri
+papillon	Sphinx gazé	Hemaris fuciformis
+papillon	Sphinx de Pandorus	Eumorpha pandorus
+papillon	Sphinx blanc-ligné	Hyles lineata
+papillon	Papillon-lune de Chine	Actias dubernardi
+papillon	Uranie de Madagascar	Chrysiridia rhipheus
+papillon	Bombyx de la ronce	Macrothylacia rubi
+fleur	Ail des cerfs	Allium victorialis
+fleur	Asaret du Canada	Asarum canadense
+fleur	Aster de Lindley	Symphyotrichum ciliolatum
+fleur	Galane oblique	Chelone obliqua
+fleur	Lysimaque ciliée	Lysimachia ciliata
+fleur	Smilacine étoilée	Maianthemum stellatum
+fleur	Aralie à grappes	Aralia racemosa
+fleur	Orchis à feuille ronde	Galearis rotundifolia
+fleur	Cypripède blanc	Cypripedium candidum
+fleur	Iris de Virginie	Iris virginica
+fleur	Hélianthe divariqué	Helianthus divaricatus
+fleur	Rudbeckie pourpre des prairies	Echinacea angustifolia
+fleur	Vergerette du Canada	Erigeron canadensis
+fleur	Chicorée des Alpes	Cicerbita alpina
+fleur	Grande gentiane	Gentiana purpurea
+fleur	Gentiane croisette	Gentiana cruciata
+fleur	Orchis vanillé	Gymnadenia rhellicani
+fleur	Ophrys bécasse	Ophrys scolopax
+fleur	Sérapias en cœur	Serapias cordigera
+fleur	Limodore à feuilles avortées	Limodorum abortivum
+fleur	Orchis singe	Orchis simia
+fleur	Orchis homme-pendu	Orchis anthropophora
+fleur	Ciste de Montpellier	Cistus monspeliensis
+fleur	Ciste à feuilles de sauge	Cistus salviifolius
+fleur	Coquelicot cornu	Glaucium flavum
+fleur	Lis maritime	Pancratium maritimum
+fleur	Liseron de mer	Calystegia soldanella
+fleur	Giroflée des dunes	Matthiola sinuata
+fleur	Silène de France	Silene gallica
+fleur	Bourrache de Crète	Borago pygmaea
+fleur	Iris de Dalmatie	Iris pallida
+fleur	Iris jaune bâtard	Iris graminea
+fleur	Asphodèle fistuleux	Asphodelus fistulosus
+fleur	Narcisse jonquille	Narcissus jonquilla
+fleur	Armérie maritime	Armeria maritima
+fleur	Criste marine	Crithmum maritimum
+fleur	Chou marin	Crambe maritima
+arbuste	Buddleia à feuilles alternes	Buddleja alternifolia
+fleur	Œillet de Montpellier	Dianthus hyssopifolius
+fleur	Hémérocalle citrine	Hemerocallis citrina
+fleur	Lis turban	Lilium pomponium
+fleur	Fritillaire des Pyrénées	Fritillaria pyrenaica
+fleur	Ramonde des Pyrénées	Ramonda myconi
+fleur	Saxifrage à longues feuilles	Saxifraga longifolia
+fleur	Androsace des Pyrénées	Androsace pyrenaica
+fleur	Linaigrette de Scheuchzer	Eriophorum scheuchzeri
+fleur	Hibiscus de Hawaï	Hibiscus brackenridgei
+fleur	Gingembre coquille	Alpinia zerumbet
+fleur	Costus rouge	Costus woodsonii
+fleur	Orchidée bambou	Arundina graminifolia
+fleur	Rose de Chine	Rosa chinensis
+fleur	Pivoine des montagnes	Paeonia ostii
+fleur	Chrysanthème des Indes	Chrysanthemum indicum
+fleur	Hosta du Japon	Hosta sieboldiana
+fleur	Iris du Japon sauvage	Iris japonica
+fleur	Lis araignée	Lycoris radiata
+fleur	Pavot bleu du Tibet	Meconopsis grandis
+fleur	Primevère de Chine	Primula malacoides
+fleur	Protée à fleur de roi	Protea neriifolia
+fleur	Strelitzia blanc	Strelitzia nicolai
+fleur	Marguerite de Namaqualand	Dimorphotheca sinuata
+fleur	Ixia	Ixia viridiflora
+fleur	Bulbine	Bulbine frutescens
+fleur	Aloès du Cap	Aloe ferox
+fleur	Euryops	Euryops pectinatus
+fleur	Waratah	Telopea speciosissima
+fleur	Pois du désert de Sturt	Swainsona formosa
+fleur	Pied-de-kangourou noir	Macropidia fuliginosa
+fleur	Lupin de Nootka	Lupinus nootkatensis
+arbre	Cerisier de Sargent	Prunus sargentii
+arbre	Prunier du Japon	Prunus mume
+arbre	Érable du Père David	Acer davidii
+arbre	Érable à feuilles de vigne	Acer cissifolium
+arbre	Érable de Montpellier	Acer monspessulanum
+arbre	Chêne des Canaries	Quercus canariensis
+arbre	Chêne kermès	Quercus coccifera
+arbre	Chêne de Hongrie	Quercus frainetto
+arbre	Arbousier de Chypre	Arbutus andrachne
+arbre	Pin de Corse	Pinus nigra subsp. laricio
+arbre	Pin de Bosnie	Pinus heldreichii
+arbre	Sapin de Céphalonie	Abies cephalonica
+arbre	Genévrier thurifère	Juniperus thurifera
+arbre	Genévrier de Phénicie	Juniperus phoenicea
+arbre	Thuya de Barbarie	Tetraclinis articulata
+arbre	Arganier	Sideroxylon spinosum
+arbre	Dattier du désert	Balanites aegyptiaca
+arbre	Acacia faux-gommier	Senegalia senegal
+arbre	Arbre à encens	Boswellia sacra
+arbre	Arbre à myrrhe	Commiphora myrrha
+arbre	Sycomore	Ficus sycomorus
+arbre	Figuier étrangleur	Ficus aurea
+arbre	Arbre à pluie	Samanea saman
+arbre	Bois de Pernambouc	Paubrasilia echinata
+arbre	Kapokier rouge	Bombax ceiba
+arbre	Teck	Tectona grandis
+arbre	Bois de santal	Santalum album
+arbre	Neem	Azadirachta indica
+plante	Bambou de Moso	Phyllostachys edulis
+arbre	Érable de Shirasawa	Acer shirasawanum
+arbre	Chêne à feuilles dentées	Quercus dentata
+arbre	Sophora de Nouvelle-Zélande	Sophora microphylla
+arbre	Pohutukawa	Metrosideros excelsa
+arbre	Rimu	Dacrydium cupressinum
+plante	Fougère arborescente argentée	Alsophila dealbata
+arbre	Arbre bouteille du Queensland	Brachychiton rupestris
+arbre	Eucalyptus citronné	Corymbia citriodora
+arbre	Eucalyptus des neiges	Eucalyptus pauciflora
+arbre	Boab	Adansonia gregorii
+arbre	Palmier de Madagascar	Pachypodium lamerei
+arbre	Baobab za	Adansonia za
+champignon	Psathyrelle de Candolle	Candolleomyces candolleanus
+champignon	Lépiote excoriée	Macrolepiota excoriata
+champignon	Hydne imbriqué	Sarcodon imbricatus
+champignon	Hygrophore des prés	Cuphophyllus pratensis
+champignon	Mycène rose	Mycena rosea
+champignon	Strophaire semi-globuleux	Protostropharia semiglobata
+champignon	Bolet à pied orange	Leccinum versipelle
+champignon	Bolet radicant	Caloboletus radicans
+champignon	Bolet indigotier	Gyroporus cyanescens
+champignon	Pholiote du peuplier	Cyclocybe cylindracea
+champignon	Pleurote du peuplier	Pleurotus populinus
+champignon	Gyromitre géant	Gyromitra gigas
+champignon	Pézize veinée	Disciotis venosa
+champignon	Langue de chat	Pseudohydnum gelatinosum
+champignon	Calocère visqueuse	Calocera cornea
+champignon	Phallus indusié	Phallus indusiatus
+champignon	Aséroé rouge	Aseroe rubra
+champignon	Vesse-de-loup hérissée	Lycoperdon echinatum
+champignon	Clavaire jaune	Ramaria flava
