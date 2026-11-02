@@ -7555,6 +7555,141 @@ d'intérêt de plus de la moitié de l'image ne compte pas). Cinq zones au plus,
 Rien n'est corrigé d'office : la lecture le dit. Seuils provisoires : à relever sur une fenêtre
 dans un intérieur, une nappe, un ciel blanc derrière un portrait.
 
+## 1.6 : recherche par le sens
+
+Chantier « sens » (plan et critique adverse du 1er novembre 2026 ; périmètre réduit par Dany : sans
+espèces ni BioCLIP, renvoyés à la 1.6.1). Dany tape une phrase (« la plage au coucher du soleil avec
+le chien, l'été 2019 ») : Claude la traduit en anglais et appelle `find_photos` avec `query` ; ou
+« d'autres photos comme celle-ci » : `similar_to`. Les autres critères s'y ajoutent. Tout se calcule
+sur le Mac, d'après les vignettes que le Suivi lit déjà ; Claude ne reçoit que des identifiants et
+une pertinence.
+
+**Modèle.** MobileCLIP S2 d'Apple en CoreML (`apple/coreml-mobileclip`, licence apple-ascl, usage
+personnel accepté par Dany ; téléchargé le 1er novembre 2026 dans le cache de Hugging Face :
+`mobileclip_s2_image.mlpackage`, 68 Mo, entrée `image`, sortie `final_emb_1` ; `mobileclip_s2_text.mlpackage`,
+121 Mo, entrée `text` « already tokenized », sortie `final_emb_1`), lu par `Sens.trouver`
+(Developpeur/Modeles d'abord, les copies compilées `.mlmodelc`, sinon le dernier instantané du cache).
+`EncodeurMobileCLIP` (Sens.swift) lit noms et formes dans la description du modèle, compile un
+`.mlpackage` (copie rangée d'un coup dans Developpeur/Modeles) par `--compiler-sens` (install.sh, ou
+le Suivi une fois par séance sous sa propre alarme), jamais dans `--analyser`, découpe l'image au
+centre par la contrainte de CoreML et ramène chaque vecteur à la norme 1. Le tokeniseur BPE de CLIP
+est écrit en Swift (`TokeniseurCLIP`, sans dépendance), vérifié par `TokeniseurCLIPTests` sur vingt
+phrases (Tests/Contrats/jetons-clip.json, calculés par une seconde implémentation en Python) ; son
+vocabulaire (MIT) est dans Resources/clip, copié par `install.sh` dans Developpeur/Modeles s'il y
+manque. Rien de cela ne tourne dans `swift test` : `ToolHandler.sens` et le paramètre `sens` de
+`Suivi.analyser` sont nil par défaut, posés par main.swift seulement ; les essais passent un faux
+encodeur et un dossier temporaire.
+
+**Index** (`IndexSens.swift`), hors du catalogue, un par catalogue :
+`Developpeur/Index/<24 premiers chiffres du sha256 du chemin du catalogue>/` ; `vecteurs.f16` (les
+empreintes à la suite, 16 bits, 512 × 2 octets par photo, environ 256 Mo pour 250 000 photos),
+projeté en mémoire et classé par blocs de 4 096 (vImage puis vDSP), sans copie permanente en 32 bits ;
+`index.sqlite` (WAL : une ligne par original, `rang` dans le fichier, `uuid`, `id`, `jour` de la prise
+de vue à l'heure locale, `le` ; `meta` : modèle, dimension, règles, catalogue, `generation`). Un écrivain à la fois
+(verrou flock), le vecteur avant sa ligne ; la même photo garde sa place, une autre photo sous le même
+id fait sortir l'ancienne ; un index d'un autre modèle ou d'une autre dimension se refait ; un index
+illisible (base abîmée, `vecteurs.f16` effacé ou plus court que ses lignes) se refait à neuf au lieu
+d'échouer à chaque photo. Chaque index neuf ou refait tire une `generation` (un uuid) : le module la
+garde avec chaque analyse (`analyse.index_sens`) et refait l'empreinte d'une analyse d'une autre
+génération, ou de toutes quand `--sens-etat` n'en rend pas (index effacé) : un index perdu se
+remplit de nouveau. Rien du
+Suivi (suivi.json) ne part chez Claude ; l'index ne porte que des vecteurs, des ids, des uuid et des
+jours.
+
+**Remplissage : par l'analyse du Suivi** (critique adverse : pas de seconde passe sur la
+bibliothèque). Releve.lua demande une fois par séance `--sens-etat` (sous `perl alarm 20`), qui
+ouvre l'encodeur d'images déjà compilé sans rien calculer : `regles_sens` et `generation` seulement
+s'il s'ouvre ; `a_compiler` (pas encore compilé) fait lancer `--compiler-sens` une fois (sous
+`perl alarm 300`, `Releve.ALARME_COMPILATION`, provisoire), puis la question se repose ; `erreur`
+(compilé mais qui ne s'ouvre pas : runtime durci, paquet abîmé) : rien du sens de la séance, rien
+remis en file. Avec `regles_sens` dans la réponse, chaque lot de `--analyser` porte `catalogue` et, par photo,
+`uuid`, `date` (prise_de_vue.le) et `sens_seul` quand l'analyse est à jour sauf l'empreinte ; le
+connecteur range l'empreinte de la vignette de 1 024 px qu'il mesure déjà (la même file, les mêmes
+lots, la même pause pendant que Claude travaille ou que la liaison sert) ; le module range
+`analyse.regles_sens` et `analyse.index_sens`. `--analyser` ouvre l'encodeur et l'index une fois,
+avant les mesures et hors du délai de 15 s par photo (`Suivi.delaiOuvertureSens`, 10 s,
+**provisoire**), seulement si l'encodeur d'images est déjà compilé ; pas ouverts (erreur ou délai) :
+ni `regles_sens` ni empreinte, `sens_erreur` dit pourquoi, et le module n'en demande plus de la
+séance. L'empreinte se calcule après les défauts : une empreinte qui n'a pas fini à temps rend les
+défauts mesurés avec `sens_raison` « delai », jamais la photo entière en `delai`. Une bibliothèque déjà analysée refait l'empreinte seule (ses défauts, son
+genre et son heure gardés, comme le genre au correctif 1.3.8). Un connecteur d'avant la 1.6 ou sans le
+modèle : `--sens-etat` sans `regles_sens` (ou l'aide et le code 2), rien du sens ne part, la ligne de
+`--analyser` est celle d'avant ; un connecteur qui ne la rend plus : plus demandée de la séance.
+Contrat : Tests/Contrats/suivi.json, `regles.analyser.sens`. Comme le Suivi, l'index ne couvre que
+les photos vues dans la fenêtre Claude ou la Demande rapide (pas les vidéos ni les Essais).
+
+**Recherche** (`Tools+Sens.swift`, `find_photos` avec `query` ou `similar_to`) : `etat` pour le chemin
+du catalogue (relu à chaque appel : un autre catalogue, un autre index), le vecteur de la phrase (ou
+celui rangé de la photo ; une copie virtuelle ou une photo hors de l'index : son original, par
+`chercher` avec `parmi` et `originaux`), tout l'index classé, les dates filtrées ici d'après `jour`
+(le module refuserait un filtre de date seul, ou au-delà de 5 000 photos : `resultatsRecherche`), la
+photo de `similar_to` écartée. Pertinence relative : 0 au score médian de l'index, 1 au meilleur ;
+sous `Sens.seuilPertinenceProvisoire` (0,5, **provisoire**) la photo ne sort pas. Puis `chercher`
+avec `parmi` par tranches de `Sens.candidatsMax` (5 000, MAX_TRI du module) dans l'ordre de
+pertinence, jusqu'à remplir la page (`offset` et `limit` comptés à travers les tranches), au plus
+`Sens.tranchesMax` (10, **provisoire**) : une collection ou un mot-clé qui ne gardent que des photos
+classées loin ne rendent plus une liste vide. Une page remplie avant la dernière tranche : `total`
+est un minimum, dit dans `remarques` ; des tranches non lues faute de place : « Liste coupée » ; un
+`sort` autre que la pertinence sur plusieurs tranches : tri par tranche, dit aussi. Chaque appel porte
+les autres critères et `tri = 'aucun'` par défaut : le module garde l'ordre, applique les
+critères (y compris ceux d'après coup, sans refus : la base est donnée), saute une photo sortie du
+catalogue, décrit la page et répond `parmi = true` (un module d'avant la 1.6 est refusé, « installer
+la même version »). Chaque photo reçoit `pertinence` (au centième) ; un bloc `recherche_par_le_sens`
+(modèle, photos indexées, candidates, remarque). Une copie virtuelle compte pour son original : ses
+critères se lisent sur l'original. Refus sans rien envoyer : pas de recherche par le sens installée,
+`query` vide, `query` et `similar_to` ensemble, `sort = relevance` sans eux ; après `etat` : aucune
+photo indexée pour ce catalogue, un index d'un autre modèle. `get_status` dit `recherche_par_le_sens`
+(installée ou ce qui manque, photos indexées du catalogue ouvert, dernière empreinte), jamais le chemin
+du catalogue.
+
+**Personnes** (constat C1 du 1er novembre 2026) : les noms de la vue Personnes sont des mots-clés
+ordinaires de premier niveau (« Nicolas Ménard », 7 554 photos) : `keyword` suffit, une phrase dans la
+description de `find_photos`, aucun code.
+
+**Consignes** : rien d'ajouté à `ServerInfo.instructions` ni à `Consignes.texte` ; la description de
+`find_photos` et de `query` porte la traduction en anglais et la pertinence relative.
+
+### À constater (recherche par le sens)
+
+Par l'orchestrateur, avant la publication ; aucune commande n'écrit au catalogue.
+
+1. **Compilation et description sous le runtime durci** (C2) : après `./build.sh --install`,
+   `~/Library/Application\ Support/Developpeur/mcp-developpeur --preparer-sens "a photo of a dog" >
+   preparer.json` ; regarder `ok`, `compilation_s`, `description` (entrée `image` 256 × 256 ? entrée
+   `text` [1, 77] en int32 ? sortie de 512), `jetons` (49406 320 1125 539 320 1929 49407), `texte_ms`,
+   `image_ms`, `ouverture_s`. Les `.mlmodelc` doivent être dans Developpeur/Modeles ensuite.
+   Puis, une seconde fois (déjà compilé) : `ouverture_s` fixe **`Suivi.delaiOuvertureSens`**
+   (provisoire 10 s ; viser trois fois le temps relevé, sous 20 s pour garder les 50 s de l'appel) et
+   dit si `Releve.ALARME_SENS` (20 s) suffit à `--sens-etat`, qui ouvre l'encodeur d'images. Avant :
+   `mcp-developpeur --compiler-sens` sur une installation sans `.mlmodelc` (les retirer d'abord de
+   Developpeur/Modeles, ils se refont) : `compilation_s` fixe **`Releve.ALARME_COMPILATION`**
+   (provisoire 300 s ; viser trois fois le temps relevé).
+2. **Jetons contre open_clip** (critique adverse) : dans un env jetable, `open_clip.tokenize` et
+   l'encodeur de texte d'open_clip (MobileCLIP-S2, `datacompdr`) sur les phrases de
+   Tests/Contrats/jetons-clip.json ; cosinus avec `vecteur_texte_debut` et les vecteurs de
+   `--preparer-sens` d'au moins 0,999. Sinon : la découpe ou le nettoyage du tokeniseur à revoir.
+3. **Qualité sur les photos de Dany** (C4 réduit) : `mcp-developpeur --sens-essai --collection
+   "<collection de 200 photos variées choisie avec Dany>" --nombre 200 --requetes '[…10 phrases
+   de Dany, en anglais…]' > essai.json 2>essai.log` (Lightroom ouvert, liaison démarrée, en
+   arrière-plan ; lecture seule) ; pour chaque requête, regarder si les photos que Dany attend sont
+   dans `premieres` (10) de `telle_quelle` et de `avec_prefixe` (« a photo of … »), et à quelle
+   `pertinence` la dernière bonne photo tombe. Fixe **`Sens.seuilPertinenceProvisoire`** (la
+   pertinence sous laquelle il n'y a plus de bonne photo) et décide si `query` se préfixe de « a photo
+   of » (alors dans `Tools+Sens.swift`). Regarder aussi `temps.encodage_ms_moyen` (le coût ajouté à
+   chaque photo du Suivi) et `semblables`.
+4. **Le Suivi qui remplit l'index** : Lightroom relancé (Releve.lua change), la fenêtre Claude ouverte
+   sur une sélection de quelques centaines de photos déjà analysées : le journal du module dit
+   « Suivi : recherche par le sens (règles 1) » ; `get_status` voit `photos_indexees` monter ; un lot
+   de 10 en empreinte seule reste sous l'alarme de 60 s (la première compilation comprise, ou faire
+   d'abord le point 1) ; `du -sh ~/Library/Application\ Support/Developpeur/Index`. Dans le
+   journal, aucune photo en `delai` ni `sens_erreur` (« ne fait plus l'empreinte du sens »).
+5. **Une recherche dans la fenêtre Claude** sur la collection Essais (rien n'est écrit) : « retrouve
+   les photos de neige » ; puis avec une date et une note ; le temps de `find_photos` à froid (premier
+   appel du processus : l'ouverture de l'encodeur de texte). Puis une recherche avec un critère qui
+   écarte beaucoup (`collection` ou `keyword` d'une personne) sur tout le catalogue : le temps d'une
+   tranche de 5 000 dans le module (journal « Recherche pour Claude ») fixe **`Sens.tranchesMax`**
+   (provisoire 10 ; que dix tranches tiennent sous 50 s, sinon moins).
+
 ## Bibliothèque
 
 `Bibliotheque.lua` ; outils `find_photos`, `set_metadata`, `list_keywords`, `manage_collections`,

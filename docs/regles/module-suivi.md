@@ -127,3 +127,17 @@ ou à `--graphiques`.
   outil ne lit `suivi.json`. Reste à constater dans Lightroom : `batchGetRawMetadata` avec
   `masterPhoto` et `virtualCopies` (sinon une à une), `focalLength` en nombre (un texte « 23 mm » se
   lit aussi), une vignette de 1 024 rendue pour l'analyse.
+
+- **La recherche par le sens** (1.6, `docs/SPEC.md`, 1.6 : recherche par le sens) : le Suivi remplit
+  l'index du sens sans seconde passe. `Releve.sondeSens` : `--sens-etat` une fois par séance (alarme
+  `ALARME_SENS`, 20 s) ; sans `regles_sens` (connecteur d'avant la 1.6, modèle absent), rien du sens
+  ne part à `--analyser` (son entrée reste celle du contrat). Avec `Releve.reglesSens` : `catalogue`
+  dans l'entrée, `uuid`, `date` et `sens_seul` (`seulementSens`) par photo ; une analyse sans
+  `regles_sens` à jour entre dans la file (`quand`) et se refait pour l'empreinte seule, ses défauts,
+  son genre et son heure gardés (`analyseAvec`) ; une réponse sans `regles_sens` alors qu'il l'avait
+  dite (modèle disparu, ou qui ne s'ouvre pas : `sens_erreur`) : plus demandée de la séance.
+  `a_compiler` de `--sens-etat` : `--compiler-sens` une fois (`ALARME_COMPILATION`), puis la question
+  reposée. L'empreinte va dans `Developpeur/Index` (le connecteur), jamais dans `suivi.json` ; seuls
+  `analyse.regles_sens` et `analyse.index_sens` (la génération de l'index) y sont rangés : une
+  analyse d'une autre génération que `Releve.indexSens` (index effacé ou refait), ou sans génération,
+  refait son empreinte seule (`sensAFaire`).

@@ -63,8 +63,10 @@ extension ToolHandler {
         let search = searchCriteriaProperties
         return [
             tool("find_photos",
-                 "Cherche des photos dans tout le catalogue Lightroom (pas seulement la sélection) : texte, mot-clé, note, drapeau, libellé de couleur, appareil, objectif, ISO, format, dates, dossier, collection, retouchées ou non par Claude, exportées ou jamais. Les critères se cumulent. Renvoie le nombre total et une page de photos (id, fichier, prise de vue, note, drapeau, libellé, pile de Lightroom), triées par date de prise de vue. Les identifiants servent aux autres outils (photo_ids).",
+                 "Cherche des photos dans tout le catalogue Lightroom (pas seulement la sélection) : texte, mot-clé, note, drapeau, libellé de couleur, appareil, objectif, ISO, format, dates, dossier, collection, retouchées ou non par Claude, exportées ou jamais ; et par ce que montre l'image (query, similar_to), sans mot-clé posé. Les critères se cumulent. Une personne nommée dans la vue Personnes de Lightroom : son nom en keyword. Renvoie le nombre total et une page de photos (id, fichier, prise de vue, note, drapeau, libellé, pile de Lightroom), triées par date de prise de vue (par pertinence avec query ou similar_to). Les identifiants servent aux autres outils (photo_ids).",
                  properties: search + [
+                    ("query", prop("string", "Ce que montre la photo, en anglais (traduire la demande) : « beach at sunset with a dog ». Cherche par le sens de l'image, sur ce Mac, dans l'index que remplit le Suivi (seulement les photos déjà analysées) ; chaque photo reçoit pertinence (1 = la meilleure, relative : pas une certitude, vérifier à l'œil).")),
+                    ("similar_to", prop("integer", "Photos qui ressemblent à celle-ci (son id), par le même index.")),
                     ("date_from", prop("string", "Prises de vue depuis ce jour inclus (AAAA-MM-JJ).")),
                     ("date_to", prop("string", "Prises de vue jusqu'à ce jour inclus (AAAA-MM-JJ).")),
                     ("folder", prop("string", "Dossier, par son chemin complet (sous-dossiers compris, sauf include_subfolders = false).")),
@@ -74,7 +76,7 @@ extension ToolHandler {
                     ("focal_min", prop("number", "Focale minimale en millimètres, telle que l'appareil l'a notée (sans équivalent 24 × 36). Avec un autre critère.")),
                     ("focal_max", prop("number", "Focale maximale en millimètres. Avec un autre critère.")),
                     ("exported", prop("boolean", "false = seulement les photos jamais exportées (retenues à exporter : flag pick et exported false) ; true = seulement celles déjà exportées. Avec un autre critère. D'après Lightroom ; un aperçu de Claude ne compte pas comme une exportation.")),
-                    ("sort", enumProp(Self.searchSorts.map(\.name), "Ordre : date (défaut), date_desc, rating (meilleures d'abord) ou none.")),
+                    ("sort", enumProp(Self.searchSorts.map(\.name) + ["relevance"], "Ordre : date (défaut), date_desc, rating (meilleures d'abord), none ; relevance (défaut avec query ou similar_to).")),
                     ("include_keywords", prop("boolean", "true = donner aussi les mots-clés de chaque photo.")),
                     ("limit", prop("integer", "Photos par page (défaut \(Self.defaultSearchLimit), maximum \(Self.maxSearchLimit)).")),
                     ("offset", prop("integer", "Photos à sauter (page suivante : offset + limit).")),
@@ -228,7 +230,11 @@ extension ToolHandler {
             }
             params["copies_virtuelles"] = .string(value)
         }
-        if let sort = try enumValue(args, "sort", Self.searchSorts) { params["tri"] = sort }
+        // La recherche par le sens (1.6) : son tri par défaut, la pertinence (Tools+Sens.swift).
+        let parLeSens = args.has("query") || args.has("similar_to")
+        if args.string("sort") == "relevance" {
+            guard parLeSens else { throw LightroomError.invalid("« sort » relevance va avec query ou similar_to.") }
+        } else if let sort = try enumValue(args, "sort", Self.searchSorts) { params["tri"] = sort }
         if args.bool("include_keywords") == true { params["mots_cles_details"] = true }
         if let exported = args.bool("exported") { params["exportee"] = .bool(exported) }
         for (key, moduleKey) in [("focal_min", "focale_min"), ("focal_max", "focale_max")] {
@@ -236,10 +242,11 @@ extension ToolHandler {
             guard (1...5_000).contains(value) else { throw LightroomError.invalid("« \(key) » : une focale en millimètres, de 1 à 5000.") }
             params[moduleKey] = .number(value)
         }
-        if params.isEmpty { throw LightroomError.invalid("Aucun critère de recherche.") }
+        if params.isEmpty, !parLeSens { throw LightroomError.invalid("Aucun critère de recherche.") }
         let limit = try intValue(args, "limit", range: 1...Int.max)?.int ?? Self.defaultSearchLimit
         params["limite"] = .number(Double(min(limit, Self.maxSearchLimit)))
         if let offset = try intValue(args, "offset", range: 0...Int.max) { params["decalage"] = offset }
+        if parLeSens { return try findPhotosParLeSens(args, params) }
         return try lightroom.send("chercher", params, timeout: Self.libraryTimeout)
     }
 

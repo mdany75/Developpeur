@@ -113,6 +113,16 @@ public final class ToolHandler {
     /// `lireEcran` : seul main.swift le pose (serve() et --call), avec `Fibo()` ; les tests passent un
     /// faux exécutable et des dossiers temporaires, jamais le vrai mflux.
     public var fibo: Fibo?
+    /// La recherche par le sens (1.6, find_photos avec query ou similar_to ; get_status) : l'encodeur
+    /// MobileCLIP et la racine des index. Nil par défaut (la recherche par le sens refuse alors sans
+    /// rien lancer) : seul main.swift le pose (serve() et --call) ; les essais passent un faux encodeur
+    /// et un dossier temporaire, jamais le vrai modèle.
+    public var sens: Suivi.IndexeurSens?
+    /// L'encodeur, ouvert au premier usage et gardé pour le processus.
+    var encodeurSens: EncodeurSens?
+    /// Les candidates d'une recherche par le sens passées au module par appel (Sens.candidatsMax ;
+    /// moins dans les essais).
+    var trancheSens = Sens.candidatsMax
     /// Le calcul de Fibo 2 en cours, que main.swift arrête à la fin de l'entrée (TravailFibo).
     public let travailFibo = TravailFibo()
     /// Version de ce serveur (celle du Info.plist ; « dev » en développement : pas de comparaison).
@@ -470,10 +480,12 @@ public final class ToolHandler {
         var limites = etat["limites"]?.object ?? [:]
         limites["plafonds_dose"] = .object(Dictionary(uniqueKeysWithValues: DevelopCatalogue.plafondsDose.map { ($0.key, JSONValue.number($0.max)) }))
         etat["limites"] = .object(limites)
-        // Le chemin du catalogue sert aux sauvegardes, pas à Claude (1.3.5).
-        if let chemin = etat.removeValue(forKey: "chemin_catalogue")?.string, let sauvegardes = lireSauvegardes(chemin) {
+        // Le chemin du catalogue sert aux sauvegardes et à l'index du sens, pas à Claude (1.3.5).
+        let chemin = etat.removeValue(forKey: "chemin_catalogue")?.string
+        if let chemin, let sauvegardes = lireSauvegardes(chemin) {
             etat["sauvegardes"] = sauvegardes
         }
+        if let index = etatIndexSens(catalogue: chemin) { etat["recherche_par_le_sens"] = index }
         return .object(etat)
     }
 

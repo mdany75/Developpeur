@@ -1520,11 +1520,65 @@ local function chercherPhotos(desc)
     return photos or {}
 end
 
+-- La recherche par le sens (1.6) : les photos de ces identifiants (les mieux classées par le
+-- connecteur, dans leur ordre), au plus MAX_TRI ; une photo sortie du catalogue est sautée ; avec
+-- `originaux`, une copie virtuelle compte pour son original (une seule fois).
+local function photosParmi(ids, originaux)
+    if #ids > MAX_TRI then
+        echouer(string.format("Au plus %d photos dans « parmi » (%d reçues).", MAX_TRI, #ids))
+    end
+    local cat = catalogue()
+    local photos, vues = {}, {}
+    for i, id in ipairs(ids) do
+        local numero = tonumber(id)
+        local ok, photo = false, nil
+        if numero then
+            ok, photo = LrTasks.pcall(cat.getPhotoByLocalId, cat, numero)
+        end
+        if ok and photo then
+            local lu, uuid = LrTasks.pcall(photo.getRawMetadata, photo, 'uuid')
+            if lu and type(uuid) == 'string' and uuid ~= '' then
+                if originaux then
+                    local okC, copie = LrTasks.pcall(photo.getRawMetadata, photo, 'isVirtualCopy')
+                    local okM, maitre = LrTasks.pcall(photo.getRawMetadata, photo, 'masterPhoto')
+                    if okC and copie == true and okM and type(maitre) == 'table' then
+                        photo = maitre
+                    end
+                end
+                if not vues[photo.localIdentifier] then
+                    vues[photo.localIdentifier] = true
+                    photos[#photos + 1] = photo
+                end
+            end
+        end
+        if i % 200 == 0 then
+            Photos.rendreLaMain()
+        end
+    end
+    return photos
+end
+
 -- Photos qui répondent à la recherche, filtrées et triées ; et les remarques.
 local function resultatsRecherche(params)
     local desc, apres = recherche(params)
     local base, remarques = nil, Json.tableau()
-    if params.dossier then
+    if type(params.parmi) == 'table' then
+        base = photosParmi(params.parmi, params.originaux == true)
+    end
+    if base and params.dossier then
+        local dans = {}
+        for _, photo in ipairs(trouverDossier(params.dossier):getPhotos(params.sous_dossiers ~= false)) do
+            dans[photo.localIdentifier] = true
+        end
+        local communes = {}
+        for _, photo in ipairs(base) do
+            if dans[photo.localIdentifier] then
+                communes[#communes + 1] = photo
+            end
+        end
+        base = communes
+    end
+    if params.dossier and not base then
         base = trouverDossier(params.dossier):getPhotos(params.sous_dossiers ~= false)
     end
     if params.collection then
@@ -1660,7 +1714,10 @@ function Bibliotheque.chercher(params)
         liste[#liste + 1] = d
     end
     Liaison.noter(string.format("Recherche pour Claude : %d photo(s)", #photos))
-    return { total = #photos, decalage = decalage, renvoyees = #liste, photos = liste, remarques = remarques }
+    -- `parmi` (1.6) : le connecteur sait que ce module l'a appliqué (un module d'avant chercherait
+    -- dans tout le catalogue).
+    return { total = #photos, decalage = decalage, renvoyees = #liste, photos = liste, remarques = remarques,
+        parmi = type(params.parmi) == 'table' or nil }
 end
 
 -- Collections (commande « collections ») : lister, créer (dans l'ensemble « Claude » par défaut,

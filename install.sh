@@ -70,6 +70,25 @@ xattr -d com.apple.quarantine "${DEST}.nouveau" 2>/dev/null || true
 mv -f "${DEST}.nouveau" "${DEST}"
 printf 'Serveur installé : %s (version %s)\n' "${DEST}" "$("${DEST}" --version)"
 
+# La recherche par le sens (1.6) : le vocabulaire du tokeniseur de CLIP, à côté des modèles de
+# MobileCLIP (qui ne viennent pas avec l'archive : hf download apple/coreml-mobileclip) ; jamais
+# remplacé s'il est déjà là.
+VOCABULAIRE="${HERE}/bpe_simple_vocab_16e6.txt.gz"
+if [[ -f "${VOCABULAIRE}" && ! -f "${DEST_DIR}/Modeles/bpe_simple_vocab_16e6.txt.gz" ]]; then
+    mkdir -p "${DEST_DIR}/Modeles"
+    cp "${VOCABULAIRE}" "${DEST_DIR}/Modeles/"
+    printf 'Vocabulaire de la recherche par le sens : %s\n' "${DEST_DIR}/Modeles"
+fi
+# Les modèles de MobileCLIP compilés ici, une fois (rien s'ils le sont déjà), pour que le Suivi ne
+# compile jamais sous son alarme ; sans les modèles, rien (la recherche par le sens reste absente).
+if [[ -f "${DEST_DIR}/Modeles/bpe_simple_vocab_16e6.txt.gz" ]]; then
+    if COMPILE="$("${DEST}" --compiler-sens 2>/dev/null)"; then
+        printf 'Recherche par le sens : modèles compilés (%s)\n' "${COMPILE}"
+    else
+        printf 'Recherche par le sens : modèles non compilés (%s)\n' "${COMPILE:-pas de réponse}"
+    fi
+fi
+
 # --- 2. Module Lightroom ------------------------------------------------------
 
 mkdir -p "${MODULES_DIR}"

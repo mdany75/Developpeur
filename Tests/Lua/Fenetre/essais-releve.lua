@@ -173,10 +173,20 @@ end
 -- macro donne « macro »), « regles2 » (de même, règles 2), « genre2 » (de même, règles du genre 2, le
 -- genre « ville »), « sansgenre » (un connecteur d'avant le correctif 1.3.8 : ni genre ni
 -- regles_genre), « muet » (rien : l'alarme, ou un vieux connecteur), « refus » (ok faux). Une vignette
--- absente le dit, comme le vrai.
+-- absente le dit, comme le vrai. La recherche par le sens (1.6) : « sens » (--sens-etat rend
+-- regles_sens 1 ; --analyser, avec catalogue, rend sens vrai à chaque photo analysée et l'empreinte
+-- seule pour sens_seul), « sensperdu » (--sens-etat le dit, --analyser ne le fait plus),
+-- « sensacompiler » (--sens-etat dit a_compiler tant que --compiler-sens n'a pas été lancé, puis
+-- comme « sens »), « sensferme » (le modèle compilé ne s'ouvre pas : --sens-etat rend erreur, sans
+-- regles_sens ; --analyser comme « contrat »). La génération de l'index (comme IndexSens) : le
+-- fichier faux-generation ; absent, --sens-etat n'en rend pas et --analyser en tire une (« G1 », ou
+-- celle de faux-generation-suivante). Les autres modes refusent --sens-etat (un connecteur d'avant
+-- la 1.6).
 local CONNECTEUR = S.home .. '/bin/mcp-developpeur'
 local RECUS = S.home .. '/analyser-recus.txt'
 local MODE = S.home .. '/faux-mode'
+local SENS_RECUS = S.home .. '/sens-recus.txt'
+local GENERATION = S.home .. '/faux-generation'
 do
     local luajit = S.lireCommande('command -v luajit'):gsub('%s+$', '')
     local script = S.home .. '/bin/faux-analyser.lua'
@@ -190,6 +200,44 @@ local function lire(chemin)
     f:close()
     return t
 end
+local mode = (lire(%q) or 'contrat'):gsub('%%s+$', '')
+local SENS_RECUS, GENERATION = %q, %q
+local COMPILE = GENERATION .. '-compile'
+local function noterSens(ligne)
+    local f = io.open(SENS_RECUS, 'ab')
+    f:write(ligne, '\n')
+    f:close()
+end
+-- La recherche par le sens (1.6) : --sens-etat et --compiler-sens seulement dans les modes « sens »
+-- (un connecteur d'avant la 1.6 ne connaît pas l'option : l'aide et le code 2).
+if arg[1] == '--compiler-sens' and #arg == 1 and mode:find('^sens') then
+    noterSens('{"compiler": true}')
+    local f = io.open(COMPILE, 'wb')
+    f:write('oui')
+    f:close()
+    print(Json.encode({ ok = true, compilation_s = 30 }))
+    os.exit(0)
+end
+if arg[1] == '--sens-etat' and #arg == 2 and mode:find('^sens') then
+    noterSens(arg[2])
+    if mode == 'sensacompiler' and not lire(COMPILE) then
+        print(Json.encode({ ok = true, a_compiler = true }))
+    elseif mode == 'sensferme' then
+        print(Json.encode({ ok = true, erreur = 'MobileCLIP : compilation refusée' }))
+    else
+        local generation = lire(GENERATION)
+        print(Json.encode({ ok = true, regles_sens = 1, modele = 'MobileCLIP-S2', indexees = generation and 5 or 0, generation = generation }))
+    end
+    os.exit(0)
+end
+local sensActif = mode == 'sens' or mode == 'sensacompiler'
+local generation = lire(GENERATION)
+if sensActif and not generation then
+    generation = lire(GENERATION .. '-suivante') or 'G1'
+    local f = io.open(GENERATION, 'wb')
+    f:write(generation)
+    f:close()
+end
 if arg[1] ~= '--analyser' or #arg ~= 2 then
     io.stderr:write('usage : mcp-developpeur --analyser <json>\n')
     os.exit(2)
@@ -197,7 +245,6 @@ end
 local recus = io.open(%q, 'ab')
 recus:write(arg[2], '\n')
 recus:close()
-local mode = (lire(%q) or 'contrat'):gsub('%%s+$', '')
 if mode == 'muet' then os.exit(0) end
 if mode == 'refus' then
     print(Json.encode({ ok = false, raison = 'arguments', texte = "Arguments de --analyser : refusés par l'essai." }))
@@ -210,7 +257,9 @@ local entree = Json.decode(arg[2])
 local photos = Json.tableau()
 for _, p in ipairs(entree.photos) do
     local lot = p.vignette:match('(.*)/[^/]*$')
-    if not lire(p.vignette) then
+    if p.sens_seul and sensActif then
+        photos[#photos + 1] = { id = p.id, sens = true }
+    elseif not lire(p.vignette) then
         photos[#photos + 1] = { id = p.id, raison = 'vignette_absente', texte = 'Vignette introuvable : ' .. p.vignette .. '.' }
     elseif sorties[p.id] then
         local s = sorties[p.id]
@@ -229,9 +278,15 @@ for _, p in ipairs(entree.photos) do
             mesures = { cote = 1024 } }
     end
 end
+if sensActif and entree.catalogue then
+    for _, r in ipairs(photos) do
+        if not r.raison then r.sens = true end
+    end
+end
 print(Json.encode({ ok = true, regles = mode == 'regles2' and 2 or 1, regles_genre = mode == 'genre2' and 2 or mode ~= 'sansgenre' and 1 or nil,
+    regles_sens = sensActif and entree.catalogue and 1 or nil, index_sens = sensActif and entree.catalogue and generation or nil,
     photos = photos }))
-]==], S.plugin, RECUS, MODE, CONTRAT_CHEMIN))
+]==], S.plugin, MODE, SENS_RECUS, GENERATION, RECUS, CONTRAT_CHEMIN))
     Fichiers.ecrire(CONNECTEUR, string.format('#!/bin/sh\nexec %s %s "$@"\n', S.q(luajit), S.q(script)))
     S.executer('chmod +x ' .. S.q(CONNECTEUR))
 end
@@ -402,7 +457,7 @@ S.catalogue.getChildCollectionSets = function() return { S.ensembleDeveloppeur, 
 -- Aides ------------------------------------------------------------------------------------------
 
 local function supprimerSuivi()
-    S.executer('rm -f ' .. S.q(Chemins.racine()) .. '/suivi*.json ' .. S.q(RECUS))
+    S.executer('rm -f ' .. S.q(Chemins.racine()) .. '/suivi*.json ' .. S.q(RECUS) .. ' ' .. S.q(GENERATION) .. '*')
     S.executer('rm -rf ' .. S.q(Chemins.temporaire() .. '/Suivi'))
 end
 
@@ -2101,6 +2156,163 @@ essai("Le genre (correctif 1.3.8) : rangé avec l'analyse ; une analyse d'avant 
     egal(0, Releve.refaireFile())
     egal('paysage', Releve.entree(38001).analyse.genre)
     egal(1, Releve.entree(38001).analyse.regles_genre)
+end)
+
+-- Les appels de --sens-etat reçus par le faux connecteur, décodés.
+local function sensRecus()
+    local liste = {}
+    for ligne in (Fichiers.lire(SENS_RECUS) or ''):gmatch('[^\n]+') do
+        liste[#liste + 1] = Json.decode(ligne)
+    end
+    return liste
+end
+
+essai("La recherche par le sens (1.6) : --sens-etat une fois par séance ; avec regles_sens, l'uuid, le jour et le catalogue partent à --analyser, regles_sens se range ; une bibliothèque déjà analysée refait l'empreinte seule (sens_seul), ses défauts et son heure gardés ; un connecteur sans sens ne change rien", function()
+    depart()
+    S.executer('rm -f ' .. S.q(SENS_RECUS))
+    -- Un connecteur d'avant la 1.6 (mode contrat : --sens-etat refusé) : l'entrée de --analyser sans rien du sens.
+    photo(39001, { prise = '2019-07-14 18:30' })
+    photo(39002)
+    voir(39001, 39002)
+    vider()
+    egal(true, Releve.sondeSens, 'demandé une fois')
+    egal(nil, Releve.reglesSens, 'pas de sens')
+    local r = recus()[1]
+    egal(nil, r.catalogue, 'pas de catalogue')
+    egal(nil, r.photos[1].uuid, "pas d'uuid")
+    egal(nil, entree(39001).analyse.regles_sens)
+    -- La séance suivante, un connecteur de la 1.6 : la bibliothèque déjà analysée refait l'empreinte seule.
+    Releve.oublier()
+    Releve.allume = true
+    mode('sens')
+    local leAvant = entree(39001).analyse.le
+    Releve.prochaineVerification = 0
+    vider()
+    egal(1, #sensRecus(), '--sens-etat une seule fois')
+    egal(CATALOGUE, sensRecus()[1].catalogue, 'avec le catalogue')
+    egal(1, Releve.reglesSens)
+    local appels = recus()
+    local dernier = appels[#appels]
+    egal(CATALOGUE, dernier.catalogue, 'le catalogue part à --analyser')
+    local parId = {}
+    for _, p in ipairs(dernier.photos) do parId[p.id] = p end
+    egal('UUID-39001', parId[39001].uuid)
+    egal('2019-07-14 18:30', parId[39001].date, 'la date de la prise de vue (le jour pour les dates de find_photos)')
+    egal(nil, parId[39002].date, 'sans date : absente')
+    egal(true, parId[39001].sens_seul, "l'analyse est à jour : l'empreinte seule")
+    local a = entree(39001).analyse
+    egal(1, a.regles_sens, 'regles_sens rangé')
+    egal(leAvant, a.le, "l'heure de l'analyse gardée")
+    vrai(a.cherches ~= nil and a.genre ~= nil, 'ses défauts et son genre gardés')
+    -- Tout a son empreinte : rien de refait ; relu du disque, regles_sens reste.
+    local n = #recus()
+    Releve.revoir()
+    voir(39001)
+    vider()
+    egal(n, #recus(), 'rien de refait')
+    Releve.oublier()
+    egal(1, entree(39001).analyse.regles_sens, 'relu du disque')
+    -- Une photo neuve, avec le sens : analysée et indexée d'un coup (pas sens_seul).
+    Releve.allume = true
+    photo(39003)
+    voir(39003)
+    vider()
+    appels = recus()
+    local neuve = appels[#appels].photos[1]
+    egal(39003, neuve.id)
+    egal(nil, neuve.sens_seul, 'une analyse entière')
+    egal('UUID-39003', neuve.uuid)
+    egal(1, entree(39003).analyse.regles_sens)
+    -- Le connecteur ne fait plus l'empreinte (modèle retiré) : plus demandée de la séance.
+    mode('sensperdu')
+    photo(39004)
+    voir(39004)
+    vider()
+    egal(nil, Releve.reglesSens, 'plus de sens de la séance')
+    egal(nil, entree(39004).analyse.regles_sens)
+    vrai(entree(39004).analyse.cherches ~= nil, "l'analyse rangée quand même")
+    vrai(journalContient("ne fait plus l'empreinte du sens"), 'dit au journal')
+end)
+
+essai("La recherche par le sens : l'index a une génération ; un index effacé (pas de génération) ou refait (une autre) fait refaire l'empreinte seule de toutes les photos, au lieu de les tenir pour indexées", function()
+    depart()
+    S.executer('rm -f ' .. S.q(SENS_RECUS))
+    mode('sens')
+    photo(39101)
+    voir(39101)
+    vider()
+    egal('G1', Releve.indexSens, 'la génération de la réponse')
+    egal('G1', entree(39101).analyse.index_sens, 'rangée avec l\'analyse')
+    egal(1, entree(39101).analyse.regles_sens)
+    -- Rien de refait tant que l'index reste.
+    local n = #recus()
+    Releve.oublier()
+    Releve.allume = true
+    Releve.prochaineVerification = 0
+    vider()
+    egal('G1', Releve.indexSens, 'dite par --sens-etat')
+    egal(n, #recus(), 'rien de refait')
+    -- L'index effacé : --sens-etat ne rend plus de génération ; l'empreinte seule refaite, dans un index neuf.
+    S.executer('rm -f ' .. S.q(GENERATION))
+    Fichiers.ecrire(GENERATION .. '-suivante', 'G2')
+    Releve.oublier()
+    Releve.allume = true
+    Releve.prochaineVerification = 0
+    vider()
+    local appels = recus()
+    vrai(#appels > n, 'refaite')
+    egal(true, appels[#appels].photos[1].sens_seul, "l'empreinte seule")
+    egal('G2', entree(39101).analyse.index_sens)
+    egal('G2', Releve.indexSens)
+    -- L'index refait pendant la séance (une autre génération rendue par --analyser) : les autres photos refont la leur.
+    Fichiers.ecrire(GENERATION, 'G3')
+    photo(39102)
+    voir(39102)
+    vider()
+    egal('G3', Releve.indexSens)
+    egal('G3', entree(39102).analyse.index_sens)
+    egal('G3', entree(39101).analyse.index_sens, 'refaite dans le nouvel index')
+    -- Relu du disque.
+    Releve.oublier()
+    egal('G3', entree(39101).analyse.index_sens, 'relu du disque')
+end)
+
+essai("La recherche par le sens : un modèle pas encore compilé se compile une fois (--compiler-sens, sous sa propre alarme), puis la question se repose ; un modèle qui ne s'ouvre pas n'est pas annoncé : rien du sens ne part, rien n'est remis en file", function()
+    depart()
+    S.executer('rm -f ' .. S.q(SENS_RECUS))
+    mode('sensacompiler')
+    photo(39201)
+    voir(39201)
+    vider()
+    local sens = sensRecus()
+    egal(3, #sens, '--sens-etat, --compiler-sens, --sens-etat')
+    egal(true, sens[2].compiler)
+    egal(CATALOGUE, sens[3].catalogue)
+    egal(1, Releve.reglesSens, 'annoncé après la compilation')
+    egal(1, entree(39201).analyse.regles_sens)
+    vrai(journalContient('compilation du modèle'), 'dit au journal')
+    -- Déjà compilé à la séance suivante : pas de nouvelle compilation.
+    Releve.oublier()
+    Releve.allume = true
+    Releve.prochaineVerification = 0
+    vider()
+    egal(4, #sensRecus(), '--sens-etat seul')
+    -- Un modèle compilé qui ne s'ouvre pas : pas de regles_sens ; ni catalogue ni uuid à --analyser,
+    -- et les analyses ne sont pas remises en file pour l'empreinte.
+    Releve.oublier()
+    Releve.allume = true
+    mode('sensferme')
+    Releve.prochaineVerification = 0
+    local n = #recus()
+    photo(39202)
+    voir(39202)
+    vider()
+    egal(nil, Releve.reglesSens)
+    local appels = recus()
+    egal(n + 1, #appels, 'la photo neuve seule')
+    egal(nil, appels[#appels].catalogue)
+    egal(nil, appels[#appels].photos[1].uuid)
+    vrai(journalContient("ne s'ouvre pas"), 'dit au journal')
 end)
 
 essai("Le genre : des règles du genre plus récentes le font refaire seul (défauts gardés) ; un connecteur sans genre (d'avant le correctif 1.3.8) ne fait rien refaire en boucle ; un genre refait qui échoue garde l'analyse d'avant", function()
