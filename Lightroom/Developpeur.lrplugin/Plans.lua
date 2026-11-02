@@ -753,8 +753,99 @@ local function noterMelangeSansEffet(plan, demandeAuto)
     end
 end
 
+-- La valeur finale d'un réglage global demandé (commande « appliquer ») : relative ou absolue,
+-- ramenée dans sa plage, bornée par les limites du Gestionnaire (variation d'exposition,
+-- saturation), arrondie. `remarque` reçoit chaque ajustement.
+local function cibleDuReglage(cle, params, actuels, raw, plages, prefs, remarque)
+    local demande = tonumber(params.reglages[cle])
+    if demande == nil then
+        echouer("Valeur invalide pour " .. cle .. " : un nombre est attendu.")
+    end
+    local reelle = cleReelle(cle, raw)
+    local actuel = valeurActuelle(actuels, reelle)
+    local base = actuel or 0
+    local cible = params.relatif and (base + demande) or demande
+
+    local mini, maxi = bornes(cle, plages, raw)
+    local bornee = math.min(math.max(cible, mini), maxi)
+    if bornee ~= cible then
+        remarque(string.format("%s : %s ramené à %s (plage %s à %s pour cette photo).",
+            cle, afficher(cible), afficher(bornee), afficher(mini), afficher(maxi)))
+        cible = bornee
+    end
+
+    if cle == 'Exposure2012' then
+        local ecart = tonumber(prefs.variationExpositionMax) or 2
+        if math.abs(cible - base) > ecart then
+            local limitee = cible > base and base + ecart or base - ecart
+            remarque(string.format("Exposure2012 : variation limitée à ±%s IL par retouche (réglage du module) ; %s au lieu de %s.",
+                afficher(ecart), afficher(limitee), afficher(cible)))
+            cible = limitee
+        end
+    elseif cle == 'Saturation' then
+        local maximum = tonumber(prefs.saturationMax) or 30
+        if math.abs(cible) > maximum then
+            local limitee = cible > 0 and maximum or -maximum
+            remarque(string.format("Saturation : limitée à ±%s (réglage du module) ; %s au lieu de %s.",
+                afficher(maximum), afficher(limitee), afficher(cible)))
+            cible = limitee
+        end
+    end
+    return reelle, actuel, arrondir(cle, cible)
+end
+
+-- Plafonds de dose (1.6, envoyés par le serveur dans `plafonds`) : Clarté, Correction du voile,
+-- Texture, Vibrance, Saturation. Jugés sur la valeur FINALE de la photo (les passes se cumulent),
+-- en valeur absolue (une Clarté de −40 est aussi forte qu'une de +40). Une valeur qui ne s'éloigne
+-- pas de zéro par rapport à l'actuelle (la ramener vers le plafond) n'est jamais refusée. Rend le
+-- plafond dépassé, ou nil.
+local function depassement(cle, params, actuel, cible)
+    local plafond = type(params.plafonds) == 'table' and tonumber(params.plafonds[cle]) or nil
+    if not plafond or math.abs(cible) <= plafond or math.abs(cible) <= math.abs(actuel or 0) then
+        return nil
+    end
+    return plafond
+end
+
+-- Avant toute écriture (rotation comprise) : refuse la commande si un réglage global dépasserait
+-- son plafond de dose sur l'une des photos, sans `dose_forte` (strong_dose_requested, posé
+-- seulement sur demande de l'utilisateur). Rien n'est écrit.
+local function verifierDoses(photos, params, prefs)
+    if params.dose_forte == true or type(params.plafonds) ~= 'table' or type(params.reglages) ~= 'table' then
+        return
+    end
+    local exces = {}
+    for _, photo in ipairs(photos) do
+        local actuels = photo:getDevelopSettings()
+        local raw = estRaw(photo, actuels)
+        local plages = type(params.plages) == 'table' and params.plages or {}
+        local cles = {}
+        for cle in pairs(params.plafonds) do
+            if params.reglages[cle] ~= nil then
+                cles[#cles + 1] = cle
+            end
+        end
+        table.sort(cles)
+        for _, cle in ipairs(cles) do
+            local _, actuel, cible = cibleDuReglage(cle, params, actuels, raw, plages, prefs, function() end)
+            local plafond = depassement(cle, params, actuel, cible)
+            if plafond then
+                local nom = #photos > 1 and (" (" .. (meta(photo, 'fileName') or ("photo " .. tostring(photo.localIdentifier))) .. ")") or ""
+                exces[#exces + 1] = string.format("%s vaudrait %s%s, plafond %s", cle, afficher(cible), nom, afficher(plafond))
+            end
+        end
+    end
+    if #exces > 0 then
+        echouer("Dose trop forte, rien n'a été fait : " .. table.concat(exces, " ; ") .. ". Plafonds sur la valeur "
+            .. "finale de la photo (les passes s'additionnent), en plus comme en moins. Rester en dessous ; "
+            .. "les dépasser seulement si l'utilisateur l'a demandé en mots clairs : strong_dose_requested = true.")
+    end
+end
+
 -- Retouche globale (commande « appliquer »).
 local function preparer(photo, params, prefs)
+    -- Plafonds de dose : vérifiés avant tout (une proposition ou une variante aussi).
+    verifierDoses({ photo }, params, prefs)
     local plan = nouveauPlan(photo)
     local actuels, raw = plan.actuels, plan.raw
     local plages = type(params.plages) == 'table' and params.plages or {}
@@ -789,42 +880,14 @@ local function preparer(photo, params, prefs)
     table.sort(cles)
 
     for _, cle in ipairs(cles) do
-        local demande = tonumber(params.reglages[cle])
-        if demande == nil then
-            echouer("Valeur invalide pour " .. cle .. " : un nombre est attendu.")
+        local reelle, actuel, cible = cibleDuReglage(cle, params, actuels, raw, plages, prefs, function(texte)
+            noter(plan, texte)
+        end)
+        local plafond = depassement(cle, params, actuel, cible)
+        if plafond and params.dose_forte == true then
+            noter(plan, string.format("%s : %s, au-delà du plafond de %s, à la demande de l'utilisateur (strong_dose_requested) : "
+                .. "vérifier avec view_photo (halos, grain, couleurs criardes).", cle, afficher(cible), afficher(plafond)))
         end
-        local reelle = cleReelle(cle, raw)
-        local actuel = valeurActuelle(actuels, reelle)
-        local base = actuel or 0
-        local cible = params.relatif and (base + demande) or demande
-
-        local mini, maxi = bornes(cle, plages, raw)
-        local bornee = math.min(math.max(cible, mini), maxi)
-        if bornee ~= cible then
-            noter(plan, string.format("%s : %s ramené à %s (plage %s à %s pour cette photo).",
-                cle, afficher(cible), afficher(bornee), afficher(mini), afficher(maxi)))
-            cible = bornee
-        end
-
-        if cle == 'Exposure2012' then
-            local ecart = tonumber(prefs.variationExpositionMax) or 2
-            if math.abs(cible - base) > ecart then
-                local limitee = cible > base and base + ecart or base - ecart
-                noter(plan, string.format("Exposure2012 : variation limitée à ±%s IL par retouche (réglage du module) ; %s au lieu de %s.",
-                    afficher(ecart), afficher(limitee), afficher(cible)))
-                cible = limitee
-            end
-        elseif cle == 'Saturation' then
-            local maximum = tonumber(prefs.saturationMax) or 30
-            if math.abs(cible) > maximum then
-                local limitee = cible > 0 and maximum or -maximum
-                noter(plan, string.format("Saturation : limitée à ±%s (réglage du module) ; %s au lieu de %s.",
-                    afficher(maximum), afficher(limitee), afficher(cible)))
-                cible = limitee
-            end
-        end
-
-        cible = arrondir(cle, cible)
         noterChangement(plan, actuels, reelle, cle, actuel, cible)
         if booleens[cle] and plan.nouveaux[reelle] ~= nil then
             plan.nouveaux[reelle] = cible ~= 0
@@ -1375,6 +1438,7 @@ Plans.preparerContrainte = preparerContrainte
 Plans.preparerCopie = preparerCopie
 Plans.preparerMasques = preparerMasques
 Plans.preparerTaches = preparerTaches
+Plans.verifierDoses = verifierDoses
 Plans.presetObjectifParDefaut = presetObjectifParDefaut
 
 return Plans

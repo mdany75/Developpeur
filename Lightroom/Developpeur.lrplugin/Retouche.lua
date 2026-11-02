@@ -78,6 +78,8 @@ function Retouche.appliquer(params)
     local etape = nomEtape(params, "retouche")
     local photos = photosVisees(params)
     verifierProtection(photos, prefs, params, 'apply_settings')
+    -- Plafonds de dose, sur toutes les photos, avant la rotation : un refus n'écrit rien.
+    Plans.verifierDoses(photos, params, prefs)
     -- Rotation d'un quart de tour : avant le plan, qui se calcule sur la nouvelle orientation.
     local rotations = {}
     if params.rotation then

@@ -97,6 +97,7 @@ extension ToolHandler {
             ])),
             ("process_version", prop("integer", "Version de processus : \(DevelopCatalogue.currentProcessVersion.version) (l'actuelle) met à jour une photo d'une version ancienne (3 à 5 ; get_settings et view_photo la signalent). Le rendu peut changer nettement : toujours le montrer d'abord (preview_settings), et apply_settings exige confirm = true. Un instantané « Claude · avant version de processus » est pris avant. Une photo en version 1 ou 2 (2003, 2010) se met à jour à la main dans Lightroom : un module ne peut pas convertir ses curseurs.")),
             ("relative", prop("boolean", "true = les valeurs de settings s'ajoutent aux valeurs actuelles (sans effet sur le reste).")),
+            ("strong_dose_requested", prop("boolean", DevelopCatalogue.demandeDoseForte)),
         ]
     }
 
@@ -603,6 +604,10 @@ extension ToolHandler {
         params["plages"] = DevelopCatalogue.ranges(for: Array(values.keys))
         params["libelles"] = DevelopCatalogue.labels(for: labelled)
         params["relatif"] = .bool(relative)
+        // Plafonds de dose (1.6) : le module les juge sur la valeur finale de chaque photo.
+        let plafonds = DevelopCatalogue.plafonds(for: Array(values.keys))
+        if !plafonds.isEmpty { params["plafonds"] = .object(plafonds) }
+        if args.bool("strong_dose_requested") == true { params["dose_forte"] = true }
         return (params, notes)
     }
 

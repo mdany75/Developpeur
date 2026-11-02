@@ -1078,6 +1078,16 @@ module) pour suivre ce que la fenêtre Claude consomme de votre forfait.
 
 ![La fenêtre de la liaison](docs/suivi.png)
 
+### Doses plafonnées
+
+- Pour garder un rendu naturel, Claude ne pousse pas de lui-même la Clarté au-delà de 25, la
+  Correction du voile au-delà de 20, la Texture, la Vibrance ou la Saturation au-delà de 30, en
+  plus comme en moins. Le plafond porte sur la valeur finale de la photo : plusieurs passes qui
+  s'additionnent sont refusées de même. Rien n'est alors changé, et le message nomme le réglage,
+  la valeur et le plafond ; une proposition (« Proposer d'abord ») le dit aussi. Demandez
+  clairement un effet plus fort (« plus de clarté, franchement ») et Claude le pose, en le
+  signalant. Ramener un réglage posé à la main vers le plafond n'est jamais refusé.
+
 ### « Proposer d'abord »
 
 - Dans ce mode (Gestionnaire de modules externes, section Liaison avec Claude, « Avant
@@ -1378,7 +1388,7 @@ fenêtre Claude attendent la fin.
   Développeur. Pas de réponse à temps : les graphiques d'avant restent, et se refont à l'analyse
   suivante ou à l'ouverture suivante. Le détail est dans `~/Library/Logs/Developpeur/conversation.log`.
 - **Une retouche refusée** : le message dit pourquoi (mode « Proposer d'abord », photo protégée,
-  plafond de photos, liaison en pause). Le diagnostic du Gestionnaire de modules externes et les
+  plafond de photos, liaison en pause, dose trop forte). Le diagnostic du Gestionnaire de modules externes et les
   journaux `~/Library/Logs/Developpeur/module.log` (liaison) et `conversation.log` (fenêtre Claude)
   aident à comprendre un échec.
 

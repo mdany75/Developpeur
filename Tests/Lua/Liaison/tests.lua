@@ -293,6 +293,60 @@ test("appliquer : bornes, température d'un JPEG et limites de sécurité", func
     egal(contient(resultat.resultats[1].remarques, "Saturation : limitée à ±20"), true)
 end)
 
+test("appliquer : plafonds de dose sur la valeur finale, refus sans dose_forte, rien d'écrit", function()
+    local photo = photoRaw()
+    photo.reglages.Clarity2012 = 15
+    S.active = photo
+    local plafonds = { Clarity2012 = 25, Dehaze = 20, Texture = 30, Vibrance = 30, Saturation = 30 }
+    local plages = { Clarity2012 = { -100, 100 }, Dehaze = { -100, 100 }, Vibrance = { -100, 100 } }
+    -- Une deuxième passe relative qui s'empile : 15 + 15 = 30, au-delà de 25.
+    echoue(function()
+        appliquer({ reglages = { Clarity2012 = 15 }, relatif = true, plages = plages, plafonds = plafonds })
+    end, "Clarity2012 vaudrait 30, plafond 25")
+    egal(photo.reglages.Clarity2012, 15, "rien d'écrit")
+    egal(#S.ecritures, 0, "aucune écriture")
+    -- En moins aussi (valeur absolue), et chaque dépassement est nommé.
+    echoue(function()
+        appliquer({ reglages = { Dehaze = -35, Vibrance = 40 }, plages = plages, plafonds = plafonds })
+    end, "Dehaze vaudrait -35, plafond 20 ; Vibrance vaudrait 40, plafond 30")
+    -- Une rotation demandée avec un dépassement ne tourne rien.
+    local orientation = photo.brut.orientation
+    echoue(function()
+        appliquer({ rotation = 'droite', reglages = { Dehaze = 30 }, plages = plages, plafonds = plafonds })
+    end, "strong_dose_requested")
+    egal(photo.brut.orientation, orientation, "aucune rotation")
+    egal(#S.ecritures, 0, "aucune écriture")
+    -- Sous le plafond : posé.
+    appliquer({ reglages = { Clarity2012 = 10 }, relatif = true, plages = plages, plafonds = plafonds })
+    egal(photo.reglages.Clarity2012, 25)
+    -- Demandé par l'utilisateur : posé, avec une remarque.
+    local resultat = appliquer({ reglages = { Clarity2012 = 45 }, plages = plages, plafonds = plafonds, dose_forte = true })
+    egal(photo.reglages.Clarity2012, 45)
+    egal(contient(resultat.resultats[1].remarques, "au-delà du plafond de 25, à la demande de l'utilisateur"), true)
+    -- Déjà au-delà (à la main) : ramener vers le plafond n'est jamais refusé.
+    appliquer({ reglages = { Clarity2012 = 35 }, plages = plages, plafonds = plafonds })
+    egal(photo.reglages.Clarity2012, 35)
+    -- Sans plafonds (autre commande du serveur), rien n'est jugé.
+    appliquer({ reglages = { Dehaze = 50 }, plages = plages })
+    egal(photo.reglages.Dehaze, 50)
+end)
+
+test("essayer : une proposition au-delà d'un plafond de dose est refusée aussi, photo intacte", function()
+    local photo = photoRaw()
+    S.active = photo
+    S.prefs.mode = 'proposer'
+    echoue(function()
+        Commandes.executer('essayer', { action = 'appliquer', reglages = { Vibrance = 45 },
+            plages = { Vibrance = { -100, 100 } }, plafonds = { Vibrance = 30 }, taille = 800 })
+    end, "Vibrance vaudrait 45, plafond 30")
+    egal(#photo.appliques, 0, "rien d'appliqué")
+    egal(#S.rendus, 0, "rien de rendu")
+    local resultat = Commandes.executer('essayer', { action = 'appliquer', reglages = { Vibrance = 45 },
+        plages = { Vibrance = { -100, 100 } }, plafonds = { Vibrance = 30 }, dose_forte = true, taille = 800 })
+    egal(contient(resultat.remarques, "Vibrance : 45, au-delà du plafond de 30"), true, Json.encode(resultat.remarques))
+    egal(photo.reglages.Vibrance, 0, "remise comme avant")
+end)
+
 test("appliquer en relatif sur plusieurs photos", function()
     local a = photoRaw()
     local b = S.Photo(3, { Temperature = 4800, Exposure2012 = -0.5, WhiteBalance = 'Custom' }, { fileName = 'B.NEF', fileFormat = 'RAW' })

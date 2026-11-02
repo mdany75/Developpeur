@@ -449,6 +449,10 @@ public final class ToolHandler {
         if let ecran = lireEcran() {
             etat["ecran"] = Ecran.nommer(ecran)
         }
+        // Les plafonds de dose (1.6), du serveur, à côté des limites du Gestionnaire.
+        var limites = etat["limites"]?.object ?? [:]
+        limites["plafonds_dose"] = .object(Dictionary(uniqueKeysWithValues: DevelopCatalogue.plafondsDose.map { ($0.key, JSONValue.number($0.max)) }))
+        etat["limites"] = .object(limites)
         // Le chemin du catalogue sert aux sauvegardes, pas à Claude (1.3.5).
         if let chemin = etat.removeValue(forKey: "chemin_catalogue")?.string, let sauvegardes = lireSauvegardes(chemin) {
             etat["sauvegardes"] = sauvegardes

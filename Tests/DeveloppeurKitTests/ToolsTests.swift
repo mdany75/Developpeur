@@ -59,6 +59,53 @@ final class ToolsTests: XCTestCase {
         XCTAssertEqual(fake.lastParams["confirme"]?.bool, true)
     }
 
+    /// Plafonds de dose (1.6) : envoyés au module pour les seuls réglages plafonnés demandés, qui
+    /// les juge sur la valeur finale ; strong_dose_requested devient dose_forte.
+    func testApplySendsDoseCapsAndStrongDoseOnlyWhenAsked() throws {
+        _ = tools.call(name: "apply_settings", arguments: [
+            "settings": ["Clarity2012": 15, "Exposure2012": 0.2, "Saturation": -10], "step_name": "passe 2", "relative": true,
+        ])
+        XCTAssertEqual(fake.lastParams["plafonds"], ["Clarity2012": 25, "Saturation": 30])
+        XCTAssertNil(fake.lastParams["dose_forte"])
+
+        _ = tools.call(name: "apply_settings", arguments: [
+            "settings": ["Dehaze": 35, "Texture": 40, "Vibrance": 10], "step_name": "effet fort", "strong_dose_requested": true,
+        ])
+        XCTAssertEqual(fake.lastParams["plafonds"], ["Dehaze": 20, "Texture": 30, "Vibrance": 30])
+        XCTAssertEqual(fake.lastParams["dose_forte"]?.bool, true)
+
+        _ = tools.call(name: "apply_settings", arguments: ["settings": ["Exposure2012": 0.2], "step_name": "lumière"])
+        XCTAssertNil(fake.lastParams["plafonds"], "aucun réglage plafonné")
+    }
+
+    func testPreviewSendsDoseCapsToo() throws {
+        _ = tools.call(name: "preview_settings", arguments: ["settings": ["Clarity2012": 40]])
+        let essai = try XCTUnwrap(fake.calls.last { $0.command == "essayer" })
+        XCTAssertEqual(essai.params["plafonds"], ["Clarity2012": 25])
+        XCTAssertNil(essai.params["dose_forte"])
+    }
+
+    func testStrongDoseRequestedIsDescribedLikeSmoothingRequested() throws {
+        let definitions = tools.definitions
+        for nom in ["apply_settings", "preview_settings"] {
+            let outil = try XCTUnwrap(definitions.first { $0["name"]?.string == nom })
+            let texte = try XCTUnwrap(outil["inputSchema"]?["properties"]?["strong_dose_requested"]?["description"]?.string, nom)
+            XCTAssertTrue(texte.contains("seulement si l'utilisateur l'a demandé en mots clairs"), texte)
+            XCTAssertTrue(texte.contains("Jamais de toi-même"), texte)
+            XCTAssertTrue(texte.contains("Clarity2012 25, Dehaze 20, Texture 30, Vibrance 30, Saturation 30"), texte)
+        }
+    }
+
+    func testStatusGivesDoseCapsNextToModuleLimits() throws {
+        fake.replies["etat"] = ["limites": ["saturation_max": 30, "variation_exposition_max": 2]]
+        let result = tools.call(name: "get_status", arguments: [:])
+        XCTAssertFalse(result.isError, result.text)
+        let etat = try JSONCoding.parse(result.text)
+        XCTAssertEqual(etat["limites"]?["saturation_max"], 30)
+        XCTAssertEqual(etat["limites"]?["plafonds_dose"]?["Dehaze"], 20)
+        XCTAssertEqual(etat["limites"]?["plafonds_dose"]?["Clarity2012"], 25)
+    }
+
     func testApplyTargetsPhotoIDs() {
         _ = tools.call(name: "apply_settings", arguments: [
             "settings": ["Vibrance": 12], "step_name": "x", "photo_ids": [3, "7"], "selection": true,

@@ -418,6 +418,34 @@ public enum DevelopCatalogue {
         return .object(object)
     }
 
+    /// Plafonds de dose des réglages globaux (1.6) : au-delà, un rendu qui « se voit » (halos,
+    /// grain, couleurs criardes). Jugés par le module sur la valeur finale de la photo (les passes
+    /// s'additionnent), en valeur absolue (une Clarté de −40 adoucit autant qu'une de +40 durcit) ;
+    /// ramener une valeur vers zéro n'est jamais refusé. Au-delà : refus, rien d'écrit, sauf
+    /// `strong_dose_requested`. La limite de saturation du Gestionnaire de modules externes
+    /// (`saturation_max`, 30 par défaut) reste appliquée avant, comme toujours. Les réglages
+    /// locaux des masques ont leurs propres doses (`Prompts.Tireur`, `Peau`).
+    public static let plafondsDose: [(key: String, max: Double)] = [
+        ("Clarity2012", 25), ("Dehaze", 20), ("Texture", 30), ("Vibrance", 30), ("Saturation", 30),
+    ]
+
+    /// Les plafonds envoyés au module pour les clés demandées (vide si aucune n'en a).
+    public static func plafonds(for keys: [String]) -> [String: JSONValue] {
+        var object: [String: JSONValue] = [:]
+        for (key, max) in plafondsDose where keys.contains(key) { object[key] = .number(max) }
+        return object
+    }
+
+    /// « Clarity2012 25, Dehaze 20… », pour les descriptions et get_status.
+    public static var plafondsTexte: String {
+        plafondsDose.map { "\($0.key) \(format($0.max))" }.joined(separator: ", ")
+    }
+
+    /// La description de strong_dose_requested (apply_settings, preview_settings, variantes).
+    public static var demandeDoseForte: String {
+        "true seulement si l'utilisateur l'a demandé en mots clairs (ou son guide de style) : un effet fort. Jamais de toi-même. Sans lui, une valeur finale (passes cumulées, en plus comme en moins) au-delà de \(plafondsTexte) est refusée, rien n'est écrit."
+    }
+
     /// Libellés français envoyés au module Lightroom, pour sa fenêtre de la liaison.
     public static func labels(for keys: [String]) -> JSONValue {
         var object: [String: JSONValue] = [:]

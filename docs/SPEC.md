@@ -7696,7 +7696,23 @@ créé (si la version de Lightroom le permet et que l'option est cochée).
 - Pause (fenêtre de la liaison) : Claude peut regarder, pas retoucher ; l'utilisateur peut toujours
   annuler depuis Lightroom.
 - Limites réglables : variation de l'exposition par retouche (2 IL par défaut), saturation
-  absolue (±30 par défaut).
+  absolue (±30 par défaut), ramenées à la limite et signalées.
+- Plafonds de dose (1.6, `DevelopCatalogue.plafondsDose`, seule table) : `Clarity2012` 25,
+  `Dehaze` 20, `Texture` 30, `Vibrance` 30, `Saturation` 30. Le serveur les envoie (`plafonds`)
+  avec chaque commande `appliquer` qui passe par `developParameters` (apply_settings,
+  preview_settings, compare_variants, et match_series pour ce qu'il pose) ; le module les juge sur
+  la valeur **finale** de chaque photo (relative ou absolue, ramenée dans sa plage et sous les
+  limites du Gestionnaire : les passes s'additionnent), **en valeur absolue** (une Clarté de −40
+  pour adoucir est aussi forte qu'une de +40). Une valeur qui ne s'éloigne pas de zéro par rapport
+  à l'actuelle n'est jamais refusée (ramener une Clarté de 50, posée à la main, à 35). Au-delà :
+  refus qui nomme chaque réglage, sa valeur et son plafond (et la photo, s'il y en a plusieurs),
+  avant toute écriture, rotation comprise (`Plans.verifierDoses`, aussi au début de
+  `Plans.preparer`, donc pour `essayer` : la proposition le signale de même, rien n'est rendu).
+  `strong_dose_requested` (`dose_forte` vers le module), seulement si l'utilisateur l'a demandé en
+  mots clairs ou son guide de style, lève le plafond ; le résultat le dit en remarque, avec quoi
+  vérifier. `get_status` les donne dans `limites.plafonds_dose`. Hors plafonds : `copy_settings`
+  (il recopie l'état d'une photo de l'utilisateur, pas une dose de Claude), les paramètres
+  prédéfinis, et les réglages locaux des masques (leurs doses : `Prompts.Tireur`, `Peau`).
 - Écritures groupées : une commande sur plusieurs photos est une seule opération (⌘Z).
 - « Confirmer dans Lightroom » (`accordDansLightroom`) : en mode « Proposer d'abord », `confirme`
   ne suffit pas ; la proposition attend dans la fenêtre de la liaison (Accepter, Refuser), et un
@@ -8676,6 +8692,35 @@ entière devient vert foncé, sans reste orange, reflets, jante et pneu gardés,
 liseré ; la main et le poncho intacts. Pour changer un objet entier : `mask` `kind: object`
 plutôt qu'une `region`, qui doit couvrir l'objet au jugé. Puis `undo_last` : photo retirée, TIFF
 à la Corbeille, copie d'origine active.
+
+Constaté le 1er novembre 2026 au soir (cinq essais réels en qualité équilibrée, nouvelles copies
+d'Essais de DSCF2402.RAF, 53806874 à 53807110, Lightroom Classic 15.6) :
+- **Guidage, même graine** (179195990, même masque d'objet et même instruction, guidage 3, 5 et
+  8) : la même graine ne redonne pas la même voiture quand le guidage change, le dessin de la
+  carrosserie change d'un essai à l'autre ; la teinte, les reflets et la lumière de la salle restent
+  justes aux trois. À 3, carrosserie plus sobre ; à 8, plus de reflets et de détails, et une petite
+  plaque comme une étiquette sur l'aile malgré la liste à éviter (texte, logo). Le défaut de 5 reste
+  le bon choix ; un guidage plus haut, seulement sur demande. Durées pareilles (199 à 201 s de Fibo
+  2, 312 à 316 s en tout).
+- **Liste à éviter enrichie** (`avoid` « chrome trim, racing stripes, visible brand logo », guidage
+  5, même graine) : ajoutée à la fin de l'exclusion ; voiture sans enjoliveur chromé, sans bande ni
+  logo, carrosserie lisse. Comparée au rendu de base (même graine, sans `avoid`), le dessin change
+  aussi : l'effet d'un mot de la liste ne s'isole pas à graine égale.
+- **Vêtement** (`mask` `person_part` `clothes`, « replace the black textured coat with a
+  camel-coloured wool coat… », graine 42) : 272 s ; masque 15,6 % de la photo, 17,2 % changés ;
+  manteau de laine camel crédible, chemise blanche, mains, bague et cheveux gardés ; rien hors du
+  masque.
+- **Fond** (`mask` `background`, « a quiet autumn park… », graine 42) : 250 s ; masque 79,2 %,
+  80,8 % changés ; parc d'automne cohérent (lumière chaude du soir, feuilles au sol), contour des
+  cheveux et du poncho propre ; `dominante_globale` jaune et magenta ensuite, normale pour la scène
+  (à ne pas corriger d'office). Vision voit un second « visage » sur les mains jointes, déjà vu sur
+  l'original : pas une personne recopiée, `a_verifier` vide à raison.
+- Seuil de la zone changée (0,10) : la part changée dépasse le masque d'environ 1,1 à 1,6 point
+  sur les trois masques (objet, vêtement, fond), la marge du bord fondu ; aucune tache changée loin
+  du masque. Reste à voir : une personne recopiée assez grande pour `a_verifier`.
+Puis `undo_last` sur les cinq photos de Fibo 2 : retirées, TIFF à la Corbeille ; copies remises à
+l'origine. Constats de rendu de Fibo 2 : ni `swift test` (faux mflux) ni la simulation ne peuvent
+les imiter, aucun code n'en dépend ; la recette ne lance pas Fibo 2 (cinq minutes par rendu).
 
 ## Variantes (`essayer` avec `instantane`, `variantes`)
 
