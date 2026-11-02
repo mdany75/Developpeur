@@ -72,11 +72,31 @@
 <main class="page">
   <header class="entete">
     <h1>Feuille de route de Développeur</h1>
-    <p class="sous">Ce qui vient après la version 1.5, dans l'ordre où le faire. Mise à jour le 1<sup>er</sup> novembre 2026, d'après la nuit de travail sur la 1.5, la comparaison avec lightroom-mcp et la page <a href="https://claude.ai/artifact/9kQ7kKQk5VuXrrAWFrvVKS">Analyse du Développeur</a>. Chaque chantier est vérifié dans le code : ce qui existe déjà, ce qu'il faut construire, la taille et le risque.</p>
-    <div class="encadre"><p><b>En résumé :</b> le correctif 1.5.1 est publié ; viennent ensuite les constats de Fibo 2 qui manquent, puis la 1.6 avec les garde-fous que l'Analyse jugeait les plus utiles. Le reste attend une vraie raison.</p></div>
+    <p class="sous">Ce qui vient après la version 1.6, dans l'ordre où le faire. Mise à jour le 2 novembre 2026 au matin, après la nuit de travail sur la 1.6. Chaque chantier est vérifié dans le code : ce qui existe déjà, ce qu'il faut construire, la taille et le risque.</p>
+    <div class="encadre fait"><p><b>En résumé :</b> la 1.6 est publiée (tag v1.6, Release) : nouveau nom « Développeur IA pour Lightroom », garde-fous, recherche par le sens, rendu d'une autre photo, habitudes en chiffres, masques relus et relevé des seuils. Ce qui reste demande surtout ton œil : l'étape « À faire avec toi » ci-dessous.</p></div>
   </header>
 
   <div class="etapes">
+
+
+    <section class="etape">
+      <div class="etape-tete"><h2>Livré dans la 1.6</h2><span class="quand">publiée le 2 novembre 2026 au matin (tag v1.6)</span></div>
+      <div class="livre">
+        <ul>
+          <li><span class="coche">✓</span> <b>Nouveau nom</b> : « Développeur IA pour Lightroom » dans le Gestionnaire de modules externes, « Développeur IA v1.6 » dans la barre de la fenêtre Claude (vérifié à l'écran). Tes réglages sont gardés.</li>
+          <li><span class="coche">✓</span> <b>Plafonds de dose</b> : Clarté 25, Correction du voile 20, Texture et Vibrance 30, sur la valeur finale de la photo ; plus fort seulement si tu le demandes clairement.</li>
+          <li><span class="coche">✓</span> <b>Barre et croix</b> pour une commande longue, qui n'arrête que cette commande.</li>
+          <li><span class="coche">✓</span> <b>Réponses gardées</b> : une réponse perdue en route est reprise, jamais la retouche refaite.</li>
+          <li><span class="coche">✓</span> <b>Recherche par le sens</b> (<code>find_photos</code> avec <code>query</code> ou <code>similar_to</code>), MobileCLIP S2 d'Apple sur ton Mac. Un défaut trouvé à l'installation (le modèle ne se compilait pas depuis le cache de Hugging Face) est corrigé ; ouverture en 1 s.</li>
+          <li><span class="coche">✓</span> <b>Le rendu d'une autre photo</b> (<code>match_look</code>, 37<sup>e</sup> outil), pentes relevées dans Lightroom 15.6 sur des copies d'Essais.</li>
+          <li><span class="coche">✓</span> <b>Tes habitudes en chiffres</b> (<code>remember_style</code> avec <code>habits</code>), en lecture seule.</li>
+          <li><span class="coche">✓</span> <b>Masques relus</b> après l'écriture : tolérances relevées (36 formes sur 36 « gardé »), rien retiré.</li>
+          <li><span class="coche">✓</span> <b>Relevé des seuils</b> : outil <code>--mesures</code> et premier relevé ; groupes de lumière à 1,5 IL, témoin du teint à 8 points. Compte rendu : page Relevé des seuils provisoires.</li>
+          <li><span class="coche">✓</span> Recette réussie (87 étapes) et demande dans la fenêtre Claude réussie (ciel orageux rendu plus dramatique par un masque Ciel, doses modérées), défaite.</li>
+        </ul>
+      </div>
+    </section>
+
 
     <section class="etape">
       <div class="etape-tete"><h2>Livré dans la 1.5</h2><span class="quand">publiée le 1<sup>er</sup> novembre 2026 au matin (tag v1.5)</span></div>
@@ -94,31 +114,8 @@
     </section>
 
     <section class="etape">
-      <div class="etape-tete"><span class="num">1</span><h2>Correctif 1.5.1 : trois défauts trouvés en chemin</h2><span class="quand">fait le 1<sup>er</sup> novembre</span></div>
-      <div class="encadre fait"><p><b>Publié : 1.5.1, le 1<sup>er</sup> novembre 2026</b> (tag v1.5.1, Release). Consignes corrigées et un test qui vérifie chaque paramètre cité ; Fibo 2 avec un masque d'objet : la voiture change en entier, sans reste orange (319 s), et la description de <code>generative_edit</code> le dit ; règle du titre corrigée. Recette réussie (86 étapes) et demande dans la fenêtre Claude réussie, défaite.</p></div>
-      <div class="chantiers">
-        <article class="chantier">
-          <h3>Les consignes citent un paramètre qui n'existe pas</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Les consignes du connecteur disent « preview_settings, preview = true ». Or <code>preview_settings</code> n'a pas de paramètre <code>preview</code> : un Claude qui suit la consigne en mode « Proposer d'abord » se fait refuser l'appel. La page Analyse l'avait signalé le 27 octobre ; c'est toujours là.</p>
-          <p class="deja">Travail : corriger la phrase de <code>ServerInfo.swift</code>, et un test qui vérifie que chaque paramètre cité dans les consignes existe dans l'outil nommé. Les consignes sont presque pleines : la phrase doit rester aussi courte.</p>
-        </article>
-        <article class="chantier">
-          <h3>Fibo 2 : changer un objet entier avec un masque d'objet</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Cette nuit, la zone rectangulaire était plus étroite que la voiture : un bout est resté orange. <code>generative_edit</code> accepte déjà un masque de Lightroom comme zone, objet compris (<code>mask</code> avec <code>kind: object</code> et son cadre) : Lightroom trouve tout l'objet, et Fibo 2 change l'objet entier.</p>
-          <p class="deja">Travail : un essai réel sur une copie d'Essais (même voiture, masque d'objet), puis une phrase dans la description de l'outil (« un objet : mask kind object plutôt que region »), qui est à sa limite de 1 200 caractères.</p>
-        </article>
-        <article class="chantier">
-          <h3>Le titre de la fenêtre dans CLAUDE.md</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 2/5</span></div>
-          <p><code>CLAUDE.md</code> dit que la barre de titre affiche « Développeur v1.4 ». Elle affiche le numéro installé (« Développeur v1.5 » ce matin) : la règle doit le dire sans numéro.</p>
-          <p class="deja">Documentation seulement.</p>
-        </article>
-      </div>
-    </section>
-    <section class="etape">
-      <div class="etape-tete"><span class="num">2</span><h2>Constats de Fibo 2 qui manquent</h2><span class="quand">à l'usage, sur des copies d'Essais</span></div>
+      <div class="etape-tete"><span class="num">2</span><h2>Constats de Fibo 2 qui manquent</h2><span class="quand">fait le 1<sup>er</sup> novembre au soir</span></div>
+      <div class="encadre fait"><p><b>Fait :</b> guidage 3, 5 et 8 à la même graine (à 8, une plaque apparaît : 5 gardé), liste à éviter, un vêtement (272 s) et un fond (250 s) changés par masque ; le seuil de la zone changée tient sur ces photos. Constats dans <code>docs/SPEC.md</code>. Reste : une personne recopiée assez grande pour que Claude la signale.</p></div>
       <div class="chantiers">
         <article class="chantier">
           <h3>La liste à éviter et le guidage</h3>
@@ -135,7 +132,8 @@
       </div>
     </section>
     <section class="etape">
-      <div class="etape-tete"><span class="num">3</span><h2>Version 1.6 : les garde-fous de l'Analyse</h2><span class="quand">après le correctif</span></div>
+      <div class="etape-tete"><span class="num">3</span><h2>Version 1.6 : les garde-fous de l'Analyse</h2><span class="quand">publiée dans la 1.6</span></div>
+      <div class="encadre fait"><p><b>Publié dans la 1.6</b>, le 2 novembre 2026, avec les cinq chantiers que tu as ajoutés.</p></div>
       <div class="chantiers">
         <article class="chantier">
           <h3>Plafonds de dose et cumul des passes</h3>
@@ -158,31 +156,47 @@
       </div>
     </section>
     <section class="etape">
-      <div class="etape-tete"><span class="num">4</span><h2>Plus tard</h2><span class="quand">quand une vraie raison se présente</span></div>
+      <div class="etape-tete"><span class="num">4</span><h2>À faire avec toi</h2><span class="quand">ce qui demande ton œil ou ta décision</span></div>
       <div class="chantiers">
         <article class="chantier">
-          <h3>Relever les seuils provisoires</h3>
-          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Le bruit cherché à ISO 1 600 ou plus, la netteté et le bruit du bilan, les couleurs hors gamme, les points chauds, le contrôle des masques, les groupes de lumière. Réglés sur tes vraies photos Fujifilm, ils donneraient moins de fausses alertes et moins d'oublis.</p>
-          <p class="deja">D'abord un relevé en lecture seule (<code>--constats</code>, <code>--eclairage</code>, les comptes du Suivi), puis un compte rendu, et seulement ensuite les changements.</p>
+          <h3>Tes habitudes : « est-ce bien toi ? »</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Le relevé de tes photos notées a donné quelques phrases (par exemple tes hautes lumières sur le X-H2S). Tu me dis si elles te ressemblent ; alors seulement les seuils cessent d'être provisoires. Une question aussi : Contraste +6 et Saturation +4 viennent-ils d'un préréglage à toi ?</p>
         </article>
         <article class="chantier">
-          <h3>Ton style en chiffres</h3>
-          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Comment tu règles d'habitude tes photos de 4 ★ et plus, par appareil et selon l'ISO, proposé en quelques phrases pour ton guide de style. Ça complète <code>learn</code>, qui voit ce que tu corriges chez Claude.</p>
-          <p class="deja">Difficulté : séparer tes retouches de celles de Claude ; des moyennes sur des scènes très différentes en disent peu.</p>
-        </article>
-        <article class="chantier">
-          <h3>Masques relus après l'écriture, avec retour en arrière</h3>
+          <h3>Les seuils qui feraient refaire les analyses du Suivi</h3>
           <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 3/5</span></div>
-          <p>Après chaque dégradé ou pinceau, le module relirait ce que Lightroom a gardé et retirerait un masque mal posé. L'avertissement de la 1.5 couvre le cas courant ; la forme complète, à la prochaine grande mise à jour de Lightroom Classic.</p>
-          <p class="deja">Il faut d'abord constater la tolérance réelle, pour ne pas retirer de bons masques à cause d'un arrondi.</p>
+          <p>Bruit à ISO élevé (1 600 gardé), sous-exposition (25 proposé au lieu de 28), ciel brûlé, couleurs hors gamme (0,13 proposé), points chauds, éclairage mixte : changer les trois premiers fait refaire toutes les analyses du Suivi (10 à 20 h). Les autres demandent de juger des planches à l'œil. Tout est dans la page du relevé.</p>
+        </article>
+        <article class="chantier">
+          <h3>La recherche par le sens, avec tes phrases</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>L'index se remplit à mesure que le Suivi voit tes photos. Quand il en aura quelques centaines, essaie « retrouve les photos de neige » dans la fenêtre Claude : tes résultats diront où mettre le seuil de pertinence (0,5 provisoire).</p>
+        </article>
+        <article class="chantier">
+          <h3>Le rendu d'une autre photo, à l'œil</h3>
+          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 3/5</span></div>
+          <p>Mesuré, mais pas encore jugé côte à côte par toi, ni sur une référence au rendu marqué (ton étalonnage le plus fort est à saturation 12). Et le témoin de la peau pour <code>match_look</code> reste à 5, provisoire.</p>
+        </article>
+      </div>
+    </section>
+    <section class="etape">
+      <div class="etape-tete"><span class="num">5</span><h2>Plus tard</h2><span class="quand">1.6.1 ou 1.7</span></div>
+      <div class="chantiers">
+        <article class="chantier">
+          <h3>Les espèces (BioCLIP 2)</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 2/5</span></div>
+          <p>Reconnaître un oiseau ou une fleur par son nom, en plus de la recherche par le sens. Laissé hors de la 1.6, comme tu l'as choisi.</p>
+        </article>
+        <article class="chantier">
+          <h3>Retirer un masque mal gardé</h3>
+          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 2/5</span></div>
+          <p>La 1.6 signale seulement. Le retrait se fera sur une vraie version 16 de Lightroom Classic, quand les formes changeront.</p>
         </article>
         <article class="chantier">
           <h3>Trier la liste « À constater dans Lightroom »</h3>
           <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span><span class="pastille interet">Intérêt 2/5</span></div>
-          <p>Dans <code>docs/SPEC.md</code>, 62 points restent ouverts pour la 1.3, dont plusieurs sans objet. Une liste courte et à jour dirait quoi vérifier à la prochaine recette.</p>
-          <p class="deja">Documentation seulement.</p>
+          <p>Dans <code>docs/SPEC.md</code>, plusieurs points de la 1.3 sont sans objet. Une liste courte dirait quoi vérifier à la prochaine recette.</p>
         </article>
       </div>
     </section>
