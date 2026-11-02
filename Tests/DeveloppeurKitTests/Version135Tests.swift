@@ -143,6 +143,53 @@ final class Version135Tests: XCTestCase {
         XCTAssertEqual(fake.calls.first { $0.command == "exporter" }?.params["reglages"]?["taille"]?["valeur"]?.int, 2000)
     }
 
+    /// Un oiseau très recadré (1 600 × 1 067 px) en 30x45 : 90 ppp réels, un avertissement avec un
+    /// format plus petit qui tient à 240 ppp et la super résolution ; la livraison part quand même.
+    func testUnTirageTropGrandPourLaPhotoRecadreeEstSignale() throws {
+        XCTAssertEqual(ToolHandler.pixelsLus("6240 x 4160")?.0, 6240)
+        XCTAssertEqual(ToolHandler.pixelsLus("6 240 × 4 160")?.1, 4160, "séparateur de milliers")
+        XCTAssertNil(ToolHandler.pixelsLus("inconnu"))
+
+        let petit = ToolHandler.verifierTirage(fichier: "oiseau.raf", pixels: (1600, 1067), format: (30, 45), ppp: 300)
+        XCTAssertEqual(petit.pppReel, 90, "1600 px sur 45 cm (17,7 po)")
+        XCTAssertEqual(petit.avertissements.count, 1, petit.avertissements.joined())
+        XCTAssertTrue(petit.avertissements[0].contains("90 ppp réels"), petit.avertissements[0])
+        XCTAssertTrue(petit.avertissements[0].contains("10x15 cm"), "1600 px à 240 ppp : 16,9 cm au plus, " + petit.avertissements[0])
+        XCTAssertTrue(petit.avertissements[0].contains("super_resolution"), petit.avertissements[0])
+        // Assez de pixels et la même proportion : rien à dire.
+        let grand = ToolHandler.verifierTirage(fichier: "paysage.raf", pixels: (6240, 4160), format: (20, 30), ppp: 300)
+        XCTAssertEqual(grand.pppReel, 528)
+        XCTAssertTrue(grand.avertissements.isEmpty, grand.avertissements.joined())
+        // Un 3:2 en 20x25 (4:5) : rogné ou bordé.
+        let proportion = ToolHandler.verifierTirage(fichier: "paysage.raf", pixels: (6240, 4160), format: (20, 25), ppp: 300)
+        XCTAssertEqual(proportion.avertissements.count, 1)
+        XCTAssertTrue(proportion.avertissements[0].contains("rognera"), proportion.avertissements[0])
+        // Un écart sous 2 % (un 3:2 en 13x19,5) : rien.
+        XCTAssertTrue(ToolHandler.verifierTirage(fichier: "a", pixels: (6000, 4000), format: (13, 19.6), ppp: 300).avertissements.isEmpty)
+
+        // Par export_photos : la taille recadrée lue par « reglages », dite au résultat, sans bloquer.
+        fake.replies["reglages"] = ["photo": ["id": 5, "fichier": "oiseau.raf"], "recadrage": ["recadree": true, "dimensions": "1600 x 1067"]]
+        fake.onSend = { [unowned fake] command, params in
+            guard command == "exporter" else { return }
+            fake?.replies["exporter"] = ["dossier": "/Volumes/Photos/Tirages", "fichiers": .array((params["photos"]?.array ?? []).map { ["photo": ["id": $0], "chemin": "/Volumes/Photos/Tirages/oiseau.jpg"] })]
+        }
+        let result = tools.call(name: "export_photos", arguments: ["photo_ids": [5], "folder": "/Volumes/Photos/Tirages",
+                                                                    "print": ["size": "30x45"], "confirm": true])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertTrue(fake.commands.contains("exporter"), "un avertissement ne bloque pas la livraison")
+        XCTAssertEqual(fake.calls.first { $0.command == "reglages" }?.params["photo"]?.int, 5)
+        XCTAssertTrue(result.text.contains("90 ppp réels"), result.text)
+        XCTAssertTrue(result.text.contains("ppp_reels"), result.text)
+
+        // Mode « Proposer d'abord » : le refus du module porte aussi l'avertissement.
+        fake.calls.removeAll()
+        fake.onSend = nil
+        fake.errors["exporter"] = LightroomError.plugin("Mode « Proposer d'abord » actif dans Lightroom : rien n'a été livré.")
+        let refus = tools.call(name: "export_photos", arguments: ["photo_ids": [5], "folder": "/Volumes/Photos/Tirages", "print": ["size": "30x45"]])
+        XCTAssertTrue(refus.isError)
+        XCTAssertTrue(refus.text.contains("Proposer d'abord") && refus.text.contains("90 ppp réels"), refus.text)
+    }
+
     // MARK: Apprendre de tes corrections
 
     func testUneRegleSeulementSiFrequenteEtConstante() {

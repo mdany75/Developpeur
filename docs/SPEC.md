@@ -9064,6 +9064,16 @@ Constaté le 18 octobre 2026 (copie d'essai RAW passée en mode HDR, puis remise
   essais et gardé) apparaît en bas à droite ; celui des droits d'auteur ne dessine rien sur une
   photo sans droits d'auteur (même image qu'une livraison sans filigrane).
 
+Tirage (`print`) : avant de livrer, le serveur lit la taille recadrée de chaque photo (les 50
+premières, `tirageVerifieesMax`) par la commande `reglages` (`recadrage.dimensions`, le
+`croppedDimensions` formaté de Lightroom, rien d'ajouté au module) et rend `tirage` : la résolution
+réelle (pixels du grand côté / pouces du grand côté du format). Sous 240 ppp, un avertissement
+propose le plus grand format courant qui tient à 240 ppp (de même proportion d'abord) et la super
+résolution (`enhance_photo`) ; une proportion qui diffère du format de plus de 2 % est dite
+(rognée ou bordée par le laboratoire). Rien n'est bloqué (`LR_size_doNotEnlarge` garde les pixels
+de la photo) ; un refus du module (mode « Proposer d'abord ») porte aussi l'avertissement. À
+constater : que `croppedDimensions` suive la super résolution et le recadrage tout juste posé.
+
 ### Livraisons types, noms exacts, dossier choisi (2.5)
 
 Les livraisons types sont les services Disque dur (`com.adobe.ag.export.file`) : `livraison` lit
