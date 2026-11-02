@@ -1,5 +1,50 @@
 # Changements
 
+## 1.6 — 2026-11-02
+
+La 1.6 change de nom : le module s'appelle maintenant « Développeur IA pour Lightroom ». Claude
+retrouve vos photos par ce qu'elles montrent, même sans mot-clé (« la plage au coucher du soleil
+avec le chien »), et donne à une photo le rendu d'une autre de vos photos. Il lit vos habitudes de
+réglage en chiffres, relit chaque masque qu'il pose, et ne pousse plus de lui-même les réglages qui
+durcissent une photo. Une commande longue montre sa barre avec une croix pour l'arrêter, et une
+réponse de Lightroom perdue en route n'est plus jamais refaite.
+
+### Ajouté
+- Recherche par le sens : `find_photos` avec `query` (ce que montre la photo, en mots) ou
+  `similar_to` (« d'autres photos comme celle-ci »), combinés aux autres critères et aux dates.
+  Calcul sur votre Mac (MobileCLIP S2 d'Apple), sur les vignettes que le Suivi analyse déjà ; aucune
+  image ne part chez Claude. L'index ne compte que les photos déjà vues par le Suivi ; `get_status`
+  dit combien. Une personne nommée dans la vue Personnes se cherche par son nom en mot-clé. Seuil de
+  pertinence encore provisoire.
+- Le rendu d'une autre photo : `match_look` (le 37e outil) mesure le rendu d'une de vos photos
+  retouchées (tons, couleur des ombres, des tons moyens et des hautes lumières, saturation), le
+  traduit en réglages ordinaires, remesure et corrige une seconde fois au besoin, et dit zone par
+  zone ce qui s'est rapproché. D'abord le plan ; rien ne change sans votre accord. Pentes relevées
+  dans Lightroom 15.6.
+- Vos habitudes en chiffres : `remember_style` avec `habits` lit, sans rien écrire, ce que vous
+  réglez vous-même sur vos photos les mieux notées, par appareil et par tranche d'ISO, et en tire
+  quelques phrases à ajouter au guide de style seulement avec votre accord. Seuils provisoires, à
+  confirmer avec vous.
+- Masques relus : chaque dégradé, radial, pinceau ou plage que Claude pose est relu tout de suite
+  dans Lightroom et comparé à ce qui a été écrit ; un écart est signalé, rien n'est retiré.
+  Tolérances relevées dans Lightroom 15.6.
+- Plafonds de dose : Claude ne pousse pas de lui-même la Clarté au-delà de 25, la Correction du
+  voile au-delà de 20, la Texture ou la Vibrance au-delà de 30 (la Saturation suit votre limite du
+  Gestionnaire), sur la valeur finale de la photo. Demandez clairement un effet plus fort et il le
+  pose, en le signalant.
+- Une commande longue du module montre sa barre dans Lightroom, avec une croix qui n'arrête que
+  cette commande, proprement, jamais au milieu d'une écriture.
+- Réponses gardées : le module garde ses vingt dernières réponses, et le connecteur reprend celle
+  qui s'est perdue au lieu de refaire la retouche.
+
+### Changé
+- Nom affiché « Développeur IA pour Lightroom » dans le Gestionnaire de modules externes, et
+  « Développeur IA v1.6 » dans la barre de titre de la fenêtre Claude ; vos réglages sont gardés.
+- Harmoniser une série par lumière : deux photos à plus de 1,5 IL d'écart de lumière ne vont plus
+  dans le même groupe (2,5 avant), d'après le relevé de vos sorties.
+- Témoin du teint de `match_series` : une peau qui bouge de moins de 8 points n'est plus signalée
+  (5 avant), d'après le relevé de vos portraits.
+
 ## 1.5.1 — 2026-11-01
 
 Un petit correctif de la 1.5. Les consignes que Claude reçoit citaient un réglage qui n'existe pas
