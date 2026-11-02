@@ -10,12 +10,15 @@
 #
 #   dossier de travail : environnement Python (uv, Python 3.12, torch, open_clip_torch,
 #     coremltools), poids téléchargés (1,7 Go) et .mlpackage ; par défaut un dossier temporaire,
-#     effacé à la fin sauf si BIOCLIP_GARDER=1.
+#     effacé en entier à la fin sauf si BIOCLIP_GARDER=1. Un dossier donné garde son compte rendu
+#     (le reste en est effacé de même).
 #   dossier d'images : des JPEG pour la comparaison (par défaut, les captures de docs/ et des
 #     images synthétiques). Jamais des originaux du catalogue.
 #
 # Le compte rendu (tailles, temps, écart PyTorch/CoreML, jetons du tokeniseur) s'écrit dans
-# <dossier de travail>/compte-rendu.json et sur la sortie. Le connecteur relit ensuite les modèles
+# <dossier de travail>/compte-rendu.json et sur la sortie. Les jetons du tokeniseur sont comparés au
+# contrat des essais (Tests/Contrats/jetons-bioclip.json), qui ne se réécrit qu'avec
+# BIOCLIP_CONTRAT=1 : le dépôt ne change pas à chaque passage. Le connecteur relit ensuite les modèles
 # par lui-même : `mcp-developpeur --preparer-especes` calcule le cache des vecteurs de la liste.
 # Il faut /opt/homebrew/bin/uv (brew install uv) ; aucun droit d'administrateur.
 
@@ -23,6 +26,8 @@ set -euo pipefail
 # torch 2.7.0 : la dernière version que coremltools a éprouvée (2.15 l'avertit, 2 nov. 2026).
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+TEMPORAIRE=0
+[[ -n "${1:-}" ]] || TEMPORAIRE=1
 TRAVAIL="${1:-$(mktemp -d "${TMPDIR:-/tmp}/bioclip.XXXXXX")}"
 IMAGES="${2:-}"
 MODELES="${DEVELOPPEUR_MODELES:-${HOME}/Library/Application Support/Developpeur/Modeles}"
@@ -35,7 +40,11 @@ mkdir -p "${TRAVAIL}"
 TRAVAIL="$(cd "${TRAVAIL}" && pwd -P)"
 nettoyer() {
     if [[ "${BIOCLIP_GARDER:-0}" != "1" ]]; then
-        rm -rf "${TRAVAIL}/venv" "${TRAVAIL}/cache" "${TRAVAIL}/modele" "${TRAVAIL}/coreml"
+        if [[ "${TEMPORAIRE}" == "1" ]]; then
+            rm -rf "${TRAVAIL}"
+        else
+            rm -rf "${TRAVAIL}/venv" "${TRAVAIL}/cache" "${TRAVAIL}/modele" "${TRAVAIL}/coreml" "${TRAVAIL}/jetons-bioclip.json"
+        fi
     fi
 }
 trap nettoyer EXIT
@@ -63,8 +72,17 @@ printf '3. Conversion, comparaison et compilation\n'
 "${TRAVAIL}/venv/bin/python" -I "${ROOT_DIR}/scripts/bioclip/convertir.py" \
     --modele "${TRAVAIL}/modele" --sortie "${TRAVAIL}/coreml" --modeles "${MODELES}" \
     --images "${IMAGES:-${ROOT_DIR}/docs}" --especes "${ROOT_DIR}/Resources/especes/especes.tsv" \
-    --contrat "${ROOT_DIR}/Tests/Contrats/jetons-bioclip.json" \
+    --contrat "${TRAVAIL}/jetons-bioclip.json" \
     --compte-rendu "${TRAVAIL}/compte-rendu.json"
+
+CONTRAT="${ROOT_DIR}/Tests/Contrats/jetons-bioclip.json"
+if [[ "${BIOCLIP_CONTRAT:-0}" == "1" ]]; then
+    cp "${TRAVAIL}/jetons-bioclip.json" "${CONTRAT}"
+    printf 'Contrat des essais réécrit : %s\n' "${CONTRAT}"
+elif ! cmp -s "${TRAVAIL}/jetons-bioclip.json" "${CONTRAT}"; then
+    printf 'Attention : le tokeniseur de BioCLIP 2 ne rend plus les jetons du contrat des essais (%s) ;\n' "${CONTRAT}"
+    printf 'relancer avec BIOCLIP_CONTRAT=1 pour le réécrire, puis swift test.\n'
+fi
 
 printf 'Modèles installés :\n'
 du -sh "${MODELES}"/bioclip2_*.mlmodelc

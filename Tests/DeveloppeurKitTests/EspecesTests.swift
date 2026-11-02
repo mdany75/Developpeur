@@ -218,7 +218,8 @@ final class EspecesTests: XCTestCase {
 
     // MARK: Outils
 
-    func outils(_ lightroom: FakeLightroom, avecIndex: Bool = true, porte: EncodeurSens? = nil) throws -> ToolHandler {
+    /// `totalSansParmi` : le total que rendent les autres critères seuls (sinon les 4 photos).
+    func outils(_ lightroom: FakeLightroom, avecIndex: Bool = true, porte: EncodeurSens? = nil, totalSansParmi: Int? = nil) throws -> ToolHandler {
         let tools = ToolHandler(lightroom: lightroom)
         let c = try classeur(porte: porte)
         tools.especes = ToolHandler.MoteurEspeces { c }
@@ -234,7 +235,8 @@ final class EspecesTests: XCTestCase {
             switch commande {
             case "chercher":
                 let ids = (params["parmi"]?.array ?? [1, 2, 3, 4]).compactMap(\.int)
-                var reponse: [String: JSONValue] = ["total": .number(Double(ids.count)),
+                let total = params["parmi"] == nil ? (totalSansParmi ?? ids.count) : ids.count
+                var reponse: [String: JSONValue] = ["total": .number(Double(total)),
                                                    "photos": .array(ids.map { ["id": .number(Double($0)), "fichier": .string("P\($0).RAF")] })]
                 if params["parmi"] != nil { reponse["parmi"] = true }
                 lightroom.replies["chercher"] = .object(reponse)
@@ -254,10 +256,14 @@ final class EspecesTests: XCTestCase {
 
     func testFindPhotosParEspeceAvecLIndexDuSens() throws {
         let lightroom = FakeLightroom()
-        let tools = try outils(lightroom)
+        // Les autres critères gardent trop de photos : l'index les classe.
+        let tools = try outils(lightroom, totalSansParmi: 5000)
         let result = tools.call(name: "find_photos", arguments: ["species": "Cardinal rouge", "rating_min": 2, "date_from": "2020-02-01"])
         XCTAssertFalse(result.isError, result.text)
-        let chercher = try XCTUnwrap(lightroom.calls.first { $0.command == "chercher" }?.params)
+        let appels = lightroom.calls.filter { $0.command == "chercher" }
+        XCTAssertEqual(appels.count, 2, "les autres critères seuls, puis parmi l'index")
+        XCTAssertNil(appels[0].params["parmi"])
+        let chercher = appels[1].params
         XCTAssertEqual(chercher["note_min"], 2, "les autres critères au module")
         XCTAssertEqual(chercher["limite"]?.int, Especes.candidatsMax)
         XCTAssertNil(chercher["date_debut"], "les dates filtrées d'après l'index")
@@ -272,12 +278,52 @@ final class EspecesTests: XCTestCase {
         XCTAssertEqual(structure["total"], 1)
         XCTAssertEqual(structure["especes"]?["examinees"], 3)
         XCTAssertNil(structure["parmi"])
+        let remarques = (structure["remarques"]?.array ?? []).compactMap(\.string)
+        XCTAssertTrue(remarques.contains { $0.contains("pas encore vues") && $0.contains("5000 photos des autres critères") }, "\(remarques)")
+        XCTAssertTrue(remarques.contains { $0.contains("MobileCLIP") }, "sans porte, la réponse le dit : \(remarques)")
+        XCTAssertEqual(structure["especes"]?["porte"], false)
         XCTAssertFalse(result.text.contains("/C.lrcat"), "le chemin du catalogue ne part pas chez Claude")
         // Les vignettes lues sont effacées.
         let restantes = try FileManager.default.contentsOfDirectory(atPath: dossier.path).filter { $0.hasSuffix(".jpg") }
         XCTAssertTrue(restantes.isEmpty, "\(restantes)")
         // Rien n'est écrit.
         XCTAssertTrue(lightroom.commands.allSatisfy { ["etat", "chercher", "vignettes"].contains($0) }, "\(lightroom.commands)")
+    }
+
+    /// Constat de relecture : avec l'index, une collection de peu de photos était limitée aux 2 000
+    /// photos indexées les plus proches du groupe dans tout le catalogue ; ses photos pas encore
+    /// analysées n'étaient jamais examinées. Toutes le sont désormais, sans l'index.
+    func testUneCollectionDePeuDePhotosEstExamineeEntiere() throws {
+        let lightroom = FakeLightroom()
+        let tools = try outils(lightroom)
+        let result = tools.call(name: "find_photos", arguments: ["species": "oiseau", "collection": "Costa Rica"])
+        XCTAssertFalse(result.isError, result.text)
+        let appels = lightroom.calls.filter { $0.command == "chercher" }
+        XCTAssertEqual(appels.count, 1)
+        XCTAssertNil(appels[0].params["parmi"], "pas de présélection par l'index")
+        XCTAssertEqual(result.structured?["especes"]?["examinees"], 4)
+        XCTAssertFalse(lightroom.commands.contains("etat"), "l'index n'est pas ouvert")
+    }
+
+    /// Sans autre critère, l'index classe tout le catalogue et la réponse dit que les photos pas
+    /// encore analysées ne sont pas examinées.
+    func testSansAutreCritereLIndexDitCeQuIlNeVoitPas() throws {
+        let lightroom = FakeLightroom()
+        let tools = try outils(lightroom, porte: FaussePorte())
+        let result = tools.call(name: "find_photos", arguments: ["species": "oiseau"])
+        XCTAssertFalse(result.isError, result.text)
+        XCTAssertEqual(Set(try XCTUnwrap(lightroom.calls.first { $0.command == "chercher" }?.params["parmi"]?.array).compactMap(\.int)), [1, 2, 3, 4])
+        let remarques = (result.structured?["remarques"]?.array ?? []).compactMap(\.string)
+        XCTAssertTrue(remarques.contains { $0.contains("pas encore vues") && $0.contains("4 dans l'index") }, "\(remarques)")
+        XCTAssertFalse(remarques.contains { $0.contains("MobileCLIP") }, "avec la porte, rien à dire")
+        XCTAssertEqual(result.structured?["especes"]?["porte"], true)
+    }
+
+    func testLInvertebreSeChercheAussiParLesEscargots() {
+        let groupe = Especes.groupe(nom: "invertébré")!
+        XCTAssertTrue(groupe.phrases.contains("a photo of a sea creature"))
+        XCTAssertTrue(groupe.phrases.contains("a photo of a snail"))
+        XCTAssertTrue(groupe.phrases.contains("a photo of an insect"))
     }
 
     func testFindPhotosParGroupeSansIndexDemandeUnAutreCritere() throws {
@@ -348,6 +394,10 @@ final class EspecesTests: XCTestCase {
         XCTAssertEqual(avec["espece"]?["nom"], "Cardinal rouge")
         XCTAssertEqual(avec["espece"]?["modele"], .string(Especes.nomModele))
         XCTAssertTrue(avec["espece"]?["remarque"]?.string?.contains("accord") == true)
+        // Constat de relecture : l'aperçu 3:2 n'est lu que sur son carré central, et la réponse le dit.
+        XCTAssertEqual(avec["espece"]?["lu_sur"], "carré central")
+        XCTAssertTrue(avec["espece"]?["remarque"]?.string?.contains("region") == true)
+        XCTAssertTrue(avec["espece"]?["remarque"]?.string?.contains("MobileCLIP") == true, "sans porte, dit")
         // Sans le modèle : dit, sans erreur.
         tools.especes = nil
         try apercu()

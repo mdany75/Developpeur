@@ -767,7 +767,7 @@ oiseau	Trembleur brun	Cinclocerthia ruficauda
 oiseau	Tyran janeau	Tyrannus caudifasciatus
 oiseau	Élénie siffleuse	Elaenia martinica
 oiseau	Tourterelle à queue carrée	Zenaida aurita
-oiseau	Colombe à croissants	Geotrygon montana
+oiseau	Colombe rouviolette	Geotrygon montana
 oiseau	Pic de la Guadeloupe	Melanerpes herminieri
 oiseau	Pic des Antilles	Melanerpes superciliaris
 oiseau	Pic de Hoffmann	Melanerpes hoffmannii
@@ -1926,7 +1926,7 @@ araignée	Lycose de Caroline	Hogna carolinensis
 araignée	Pisaure admirable	Pisaura mirabilis
 araignée	Dolomède à bandes	Dolomedes tenebrosus
 araignée	Dolomède des marais	Dolomedes triton
-araignée	Tégénaire domestique	Eratigena atrica
+araignée	Tégénaire noire	Eratigena atrica
 araignée	Pholque phalangide	Pholcus phalangioides
 araignée	Veuve noire	Latrodectus mactans
 araignée	Malmignatte	Latrodectus tredecimguttatus
@@ -1935,10 +1935,10 @@ araignée	Argyronète aquatique	Argyroneta aquatica
 araignée	Mygale à genoux rouges du Mexique	Brachypelma hamorii
 araignée	Mygale goliath	Theraphosa blondi
 araignée	Mygale du Texas	Aphonopelma hentzi
-araignée	Faucheux commun	Phalangium opilio
-araignée	Scorpion languedocien	Buthus occitanus
-araignée	Scorpion empereur	Pandinus imperator
-araignée	Tique à pattes noires	Ixodes scapularis
+invertébré	Faucheux commun	Phalangium opilio
+invertébré	Scorpion languedocien	Buthus occitanus
+invertébré	Scorpion empereur	Pandinus imperator
+invertébré	Tique à pattes noires	Ixodes scapularis
 invertébré	Scolopendre géante	Scolopendra gigantea
 invertébré	Mille-pattes américain géant	Narceus americanus
 invertébré	Escargot de Bourgogne	Helix pomatia
@@ -3861,7 +3861,7 @@ fleur	Hosta du Japon	Hosta sieboldiana
 fleur	Iris du Japon sauvage	Iris japonica
 fleur	Lis araignée	Lycoris radiata
 fleur	Pavot bleu du Tibet	Meconopsis grandis
-fleur	Primevère de Chine	Primula malacoides
+fleur	Primevère malacoïde	Primula malacoides
 fleur	Protée à fleur de roi	Protea neriifolia
 fleur	Strelitzia blanc	Strelitzia nicolai
 fleur	Marguerite de Namaqualand	Dimorphotheca sinuata

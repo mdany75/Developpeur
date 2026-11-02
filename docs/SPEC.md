@@ -8125,7 +8125,8 @@ en plus de la recherche par le sens. Tout se calcule sur le Mac ; aucune image n
 224, vecteurs de 768, `logit_scale.exp()` = 100 ; prétraitement de CLIP : moyenne 0,4815 0,4578
 0,4082, écart type 0,2686 0,2613 0,2758, redimension bicubique par le petit côté puis découpe
 centrale). `scripts/preparer-bioclip.sh` (environnement Python 3.12 jetable par `uv`, torch 2.7.0,
-open_clip 3.3, coremltools 9.0, poids de 1,7 Go ; tout dans un dossier de travail effacé à la fin)
+open_clip 3.3, coremltools 9.0, poids de 1,7 Go ; tout dans un dossier temporaire effacé en entier à
+la fin, ou, dans un dossier de travail donné, tout effacé sauf `compte-rendu.json`)
 télécharge le modèle, convertit les deux encodeurs en ML Program fp16 (`scripts/bioclip/convertir.py` :
 l'attention de PyTorch réécrite en opérations simples, aucune des deux voies de
 `nn.MultiheadAttention` ne se convertissant ; normalisation de CLIP faite dans le modèle, entrée
@@ -8135,14 +8136,15 @@ leurs vecteurs à ceux de PyTorch (fp32) et refuse d'installer sous un cosinus d
 **Constaté le 2 nov. 2026** (Mac de Dany) : cosinus minimal 0,99999 sur 8 images et 26 phrases ;
 conversion 6 s et 3 s ; image 15 ms, texte 6 ms (CoreML depuis Python). Le tokeniseur de BioCLIP 2
 est celui de CLIP (`SimpleTokenizer`, même vocabulaire BPE) : `TokeniseurCLIP` sert tel quel,
-vérifié par `Tests/Contrats/jetons-bioclip.json` (écrit par le script avec open_clip).
+vérifié par `Tests/Contrats/jetons-bioclip.json` (le script le compare aux jetons d'open_clip et ne le
+réécrit qu'avec `BIOCLIP_CONTRAT=1`).
 `EncodeurMobileCLIP` sert aux deux modèles (nom `Especes.nomModele` pour BioCLIP).
 
 **Liste.** `Resources/especes/especes.tsv` : « Amérique du Nord et voyages », 3 928 espèces (groupe,
 nom français courant, nom scientifique), relue le 2 nov. 2026 (noms douteux retirés plutôt que
 devinés ; pas de cultivar) ; oiseaux 1 137, fleurs 756, mammifères 421, arbres 324, insectes 188,
 champignons 163, papillons 162, plantes 160, poissons 158, arbustes 152, reptiles 130, invertébrés
-79, amphibiens 70, araignées 28. `EspecesTests` vérifie qu'il n'y a ni doublon ni champ vide. Copiée
+83, amphibiens 70, araignées 24 (scorpions, faucheux et tique rangés parmi les invertébrés). `EspecesTests` vérifie qu'il n'y a ni doublon ni champ vide. Copiée
 dans Developpeur/Modeles par l'installation (remplacée à chaque fois). Phrase de chaque espèce :
 « a photo of <nom scientifique>. » (`Especes.phrase`, le classement zéro-coup de la fiche du modèle).
 Les vecteurs de texte de toute la liste se calculent une fois (`--preparer-especes`, install.sh :
@@ -8156,22 +8158,28 @@ ne montre rien de vivant (constaté : une capture d'écran a un cosinus de 0,66 
 Coturnix coturnix. » et de 0,47 avec « a screenshot » ; les oiseaux, le quart de la liste, y prenaient
 plus de 0,5 ; des phrases « hors liste » ajoutées à BioCLIP n'y changeaient rien). MobileCLIP
 classe donc d'abord l'image entre `Especes.porteNature` et `Especes.porteAutre` ; sous
-`seuilPorteProvisoire` (0,5), ni espèce ni résultat de recherche. Sans MobileCLIP, pas de porte.
+`seuilPorteProvisoire` (0,5), ni espèce ni résultat de recherche. Sans MobileCLIP, pas de porte :
+`view_photo` et `find_photos` le disent (`porte` faux et une remarque), `get_status` aussi.
 
 **Outils.**
 - `view_photo` avec `species` = true : `espece` (nom, latin, groupe, confiance, `autres`) si la plus
   probable passe `Especes.seuilConfianceProvisoire` (0,5) ; sinon `trouvee` faux et `plus_proches`,
-  à ne pas proposer. Sur un zoom (`region`), l'espèce de la zone ; pas sur un avant/après.
+  à ne pas proposer. Les encodeurs lisent le carré central (`centerCrop`) : sur un aperçu allongé,
+  `lu_sur` = « carré central » et la remarque conseille un zoom sur un sujet près d'un bord. Sur un
+  zoom (`region`), l'espèce de la zone ; pas sur un avant/après.
 - `find_photos` avec `species` (une espèce en français ou en latin, ou un groupe : oiseau, mammifère,
   reptile, amphibien, poisson, papillon, insecte, araignée, invertébré, fleur, arbre, arbuste,
-  champignon, plante, animal ; leurs pluriels et noms anglais) : candidates par l'index du sens
-  (phrase anglaise du groupe, `Especes.candidatsSens` = 2 000, dates d'après l'index) avec les autres
-  critères, ou sans index par les autres critères seuls (alors exigés) ; au plus
+  champignon, plante, animal ; leurs pluriels et noms anglais) : candidates par les autres critères
+  seuls s'ils gardent au plus `Especes.candidatsMax` photos (toutes examinées, que le Suivi les ait
+  analysées ou non) ; sinon par l'index du sens (la meilleure des phrases anglaises du groupe,
+  `Groupe.phrases`, sur tout l'index ; dates d'après l'index), les autres critères appliqués par le
+  module parmi elles par tranches de `trancheSens` (comme `query`), et la réponse dit que les photos
+  pas encore analysées ne sont pas examinées ; sans index, un autre critère est exigé. Au plus
   `Especes.candidatsMax` (200) vignettes de 512 px (`vignettes`), classées une à une ; gardées si la
   porte les laisse passer et si l'espèce passe `seuilRechercheProvisoire` (0,15) ou le groupe (somme
   de ses espèces) `seuilGroupeProvisoire` (0,5), triées par `score`. Une espèce inconnue est refusée
   avec des noms proches. Rien n'est écrit.
-- `get_status` : `especes` (`installee`, `manquants`).
+- `get_status` : `especes` (`installee`, `manquants` ; `porte` une fois le classeur ouvert).
 - L'invite `classer` demande `species` = true pour un animal ou une plante, et le nom en mot-clé
   seulement si `trouvee`, dit « probable », après l'accord de Dany (comme tout le classement).
 - Sans le modèle, `species` refuse sans rien lancer et tout le reste marche comme avant.

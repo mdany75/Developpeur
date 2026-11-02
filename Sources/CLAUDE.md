@@ -150,7 +150,12 @@ toucher :
 - `ToolHandler.especes` est nil par défaut : seul main.swift pose le vrai modèle, jamais `swift test`.
   Sans lui, `species` refuse sans rien envoyer au module.
 - BioCLIP 2 ne sait pas dire qu'une image ne montre rien de vivant : la porte MobileCLIP
-  (`Especes.porteNature`) passe d'abord. Tous les seuils sont provisoires (`--especes-essai`).
+  (`Especes.porteNature`) passe d'abord ; sans elle, la réponse le dit (`remarqueSansPorte`). Tous
+  les seuils sont provisoires (`--especes-essai`).
+- `find_photos` avec `species` : les autres critères seuls d'abord, s'ils gardent au plus
+  `candidatsMax` photos (toutes examinées, indexées ou non) ; sinon l'index du sens, par tranches,
+  et la réponse dit que les photos pas encore analysées ne sont pas examinées. `view_photo` lit le
+  carré central (`lu_sur`).
 - Un mot-clé d'espèce ne s'écrit jamais sans l'accord de Dany ; `view_photo` ne dit l'espèce que sur
   demande (`species`), jamais sur un avant/après.
 

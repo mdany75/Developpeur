@@ -7,7 +7,8 @@
   nom. « Mes photos de cardinal rouge », « les oiseaux de mes vacances » : `find_photos` avec
   `species` (un nom en français ou en latin, ou un groupe : oiseau, mammifère, papillon, fleur,
   arbre, champignon, animal, plante…), combiné aux autres critères ; « quel est cet oiseau ? » :
-  `view_photo` avec `species`, sur la photo entière ou sur un zoom. La liste compte 3 928 espèces
+  `view_photo` avec `species`, sur le carré central de la photo (la réponse le dit : un sujet près
+  d'un bord se juge sur un zoom) ou sur un zoom. La liste compte 3 928 espèces
   d'Amérique du Nord et des voyages les plus photographiés (Europe, Caraïbes, Mexique, Amérique du
   Sud, safari, Asie, Océanie), chacune avec son nom français et son nom scientifique. Tout se calcule
   sur votre Mac (BioCLIP 2, licence MIT ; MobileCLIP vérifie d'abord que la photo montre bien un
@@ -16,11 +17,27 @@
   accord ; l'invite Classer la propose quand elle est sûre.
 - `scripts/preparer-bioclip.sh` installe le modèle (850 Mo dans
   `~/Library/Application Support/Developpeur/Modeles/`) : téléchargement, conversion pour votre Mac,
-  comparaison avec l'original, dans un dossier temporaire effacé ensuite. L'installation copie la
+  comparaison avec l'original, dans un dossier temporaire effacé en entier ensuite (sans toucher au
+  dépôt : le contrat du tokeniseur ne se réécrit qu'avec `BIOCLIP_CONTRAT=1`). L'installation copie la
   liste des espèces et prépare ses vecteurs (une quinzaine de secondes, une fois). Sans le modèle,
   tout marche comme avant et `get_status` le dit.
 - `mcp-developpeur --especes-essai <dossier de JPEG>` (développement) : l'espèce de chaque image,
   sans Lightroom, pour juger le modèle et relever les seuils sur vos photos.
+
+### Corrigé (relecture des espèces)
+- `find_photos` avec `species` et une collection, un dossier ou un mot-clé qui gardent au plus 200
+  photos : toutes sont examinées, même celles que le Suivi n'a pas encore analysées. Avant, seules
+  comptaient les 2 000 photos du catalogue entier les plus proches du groupe dans l'index de la
+  recherche par le sens. Au-delà de 200 photos, l'index les classe toujours, mais la réponse dit
+  maintenant que les photos pas encore analysées ne sont pas examinées.
+- Sans MobileCLIP, rien ne vérifie qu'une image montre un animal ou une plante : `find_photos`,
+  `view_photo` et `get_status` le disent désormais (une capture d'écran pouvait sortir comme oiseau
+  sans avertissement).
+- Les invertébrés se cherchent aussi par les escargots, les limaces, les vers, les mille-pattes, les
+  scorpions et les insectes, plus seulement par les créatures marines.
+- Noms corrigés : Geotrygon montana est la Colombe rouviolette (pas la Colombe à croissants),
+  Eratigena atrica la Tégénaire noire, Primula malacoides la Primevère malacoïde ; les scorpions,
+  le faucheux et la tique ne sortent plus d'une recherche d'araignées.
 
 ## 1.6.2 — 2026-11-02
 

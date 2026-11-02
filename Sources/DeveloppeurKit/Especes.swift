@@ -34,7 +34,8 @@ public enum Especes {
     /// Coturnix coturnix. » et de 0,47 avec « a screenshot » ; les oiseaux, le quart de la liste,
     /// y prenaient plus de 0,5). MobileCLIP, un CLIP général, classe donc d'abord l'image entre ces
     /// phrases (softmax, échelle 100) ; la part des phrases de `porteNature` doit passer
-    /// `seuilPorteProvisoire`. Sans MobileCLIP, pas de porte (et la réponse le dit).
+    /// `seuilPorteProvisoire`. Sans MobileCLIP, pas de porte : find_photos et view_photo le disent
+    /// (`porte` faux et une remarque, `ToolHandler.remarqueSansPorte`).
     public static let porteNature = [
         "a photo of a bird", "a photo of an animal", "a photo of an insect", "a photo of a butterfly", "a photo of a fish",
         "a photo of a reptile", "a photo of a frog", "a photo of a flower", "a photo of a plant", "a photo of a tree",
@@ -60,22 +61,23 @@ public enum Especes {
     public static let seuilGroupeProvisoire = 0.5
     /// Les photos examinées au plus par une recherche (leurs vignettes, classées une à une).
     public static let candidatsMax = 200
-    /// Les photos les plus proches de la phrase du groupe dans l'index du sens, passées au module
-    /// avec les autres critères, avant les `candidatsMax` examinées.
-    public static let candidatsSens = 2000
     /// La taille des vignettes demandées au module (BioCLIP lit 224 × 224, découpe centrale).
     public static let tailleVignette = 512
 
     // MARK: Groupes
 
     /// Un groupe de la liste, ses autres noms (français et anglais, pluriels) et la phrase anglaise
-    /// qui le cherche dans l'index du sens (MobileCLIP).
+    /// qui le cherche dans l'index du sens (MobileCLIP), avec d'autres au besoin : un groupe disparate
+    /// (« invertébré » : crabes, escargots, vers, insectes) se cherche par la meilleure de ses phrases.
     public struct Groupe: Equatable {
         public var nom: String
         public var alias: [String]
         public var phrase: String
         /// Les groupes de la liste qu'il réunit (« plante » : fleur, arbre, arbuste, plante).
         public var membres: [String]
+        public var autresPhrases: [String] = []
+        /// Les phrases qui le cherchent dans l'index du sens : une photo y vaut son meilleur score.
+        public var phrases: [String] { [phrase] + autresPhrases }
     }
 
     /// Les groupes de base, ceux qu'une ligne de la liste peut porter.
@@ -90,17 +92,22 @@ public enum Especes {
         Groupe(nom: "poisson", alias: ["poissons", "fish"], phrase: "a photo of a fish", membres: ["poisson"]),
         Groupe(nom: "papillon", alias: ["papillons", "butterfly", "butterflies", "moth"], phrase: "a photo of a butterfly", membres: ["papillon"]),
         Groupe(nom: "insecte", alias: ["insectes", "insect", "insects"], phrase: "a photo of an insect", membres: ["insecte", "papillon"]),
-        Groupe(nom: "araignée", alias: ["araignées", "spider", "spiders", "arachnide"], phrase: "a photo of a spider", membres: ["araignée"]),
+        Groupe(nom: "araignée", alias: ["araignées", "spider", "spiders"], phrase: "a photo of a spider", membres: ["araignée"]),
+        // Invertébré de base : la mer (crabes, coquillages, méduses), mais aussi escargots, limaces,
+        // vers, mille-pattes, scorpions, tiques ; le groupe réunit en plus insectes et araignées.
         Groupe(nom: "invertébré", alias: ["invertébrés", "invertebrate", "invertebrates"], phrase: "a photo of a sea creature",
-               membres: ["invertébré", "insecte", "papillon", "araignée"]),
+               membres: ["invertébré", "insecte", "papillon", "araignée"],
+               autresPhrases: ["a photo of a snail", "a photo of a slug", "a photo of a worm", "a photo of a centipede",
+                               "a photo of a scorpion", "a photo of an insect", "a photo of a spider"]),
         Groupe(nom: "fleur", alias: ["fleurs", "flower", "flowers"], phrase: "a photo of a flower", membres: ["fleur"]),
         Groupe(nom: "arbre", alias: ["arbres", "tree", "trees"], phrase: "a photo of a tree", membres: ["arbre"]),
         Groupe(nom: "arbuste", alias: ["arbustes", "shrub", "shrubs", "bush"], phrase: "a photo of a shrub", membres: ["arbuste"]),
         Groupe(nom: "champignon", alias: ["champignons", "mushroom", "mushrooms", "fungus"], phrase: "a photo of a mushroom", membres: ["champignon"]),
         Groupe(nom: "plante", alias: ["plantes", "plant", "plants", "végétal"], phrase: "a photo of a plant",
-               membres: ["plante", "fleur", "arbre", "arbuste"]),
+               membres: ["plante", "fleur", "arbre", "arbuste"], autresPhrases: ["a photo of a flower", "a photo of a tree"]),
         Groupe(nom: "animal", alias: ["animaux", "animals", "faune", "wildlife"], phrase: "a photo of an animal",
-               membres: ["oiseau", "mammifère", "reptile", "amphibien", "poisson", "papillon", "insecte", "araignée", "invertébré"]),
+               membres: ["oiseau", "mammifère", "reptile", "amphibien", "poisson", "papillon", "insecte", "araignée", "invertébré"],
+               autresPhrases: ["a photo of a bird", "a photo of a fish", "a photo of an insect", "a photo of a sea creature"]),
     ]
 
     /// Le groupe d'une ligne de la liste.
