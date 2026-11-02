@@ -52,6 +52,94 @@ d'office par le connecteur sur la vignette de son original, sans Claude ni jeton
 le connecteur (`--graphiques`) ; Publication… et Consommation… reviennent dans l'en-tête de la
 fenêtre Claude ; `PriseDeVue` gagne `yeux_fermes`. Voir Correctif 1.3.7.
 
+## À vérifier à la prochaine recette
+
+Les seuls points encore ouverts des sections « À constater » de ce document, triées le 2 novembre
+2026 (Développeur 1.6.2). Chaque section garde son historique et marque ses points **fait**, **sans
+objet** (la fonction est retirée : Séance, Atelier et Panneau, Mode, leçon, « Je le fais », écran lu,
+proposition à l'ouverture…) ou **ouvert**. Ce que les étapes de `--recette` vérifient à chaque version
+(liaison fermée, peau, masques relus, carte du masque, note posée puis annulée, point de mise au
+point, composition, avant/après d'une étape, éclairage mixte, groupes de lumière…) n'est pas repris
+ici. Un point constaté passe dans sa section, avec sa règle dans la simulation de sa suite et son
+test, puis sort de cette liste. Tout essai sur une nouvelle copie d'Essais remise à l'origine,
+défait ensuite.
+
+**Liaison et commandes longues**
+
+- Réponse perdue reprise par le serveur, une seule écriture à l'Historique — à la main dans Lightroom ([Réponse perdue](#réponse-perdue-reprise-au-module-après-la-151)).
+- Barre et croix d'une commande longue, deux barres sous un rendu `LrExportSession` — à la main dans Lightroom ([Barre et arrêt](#barre-et-arrêt-dune-commande-longue)).
+- Liaison fermée : POST `curl` refusé, « commandes refusées : N » au diagnostic, aide « jeton privé » du voyant — à la main dans Lightroom ([1.2, point 1](#à-constater-dans-lightroom-12) ; [fenêtre, point 15](#à-constater-dans-lightroom-11-111-et-après)).
+- Accord dans Lightroom en « Proposer d'abord » : `propose_ratings` avec `apply`, `--eclairage --essai`, Fibo 2 (un seul accord) — à la main dans Lightroom ([fenêtre, point 8](#à-constater-dans-lightroom-11-111-et-après) ; [1.2, point 5](#à-constater-dans-lightroom-12) ; [Fibo 2](#reste-à-constater)).
+
+**Masques, peau, éclairage, boîtier**
+
+- Masques relus : seuil de la table compressée d'un pinceau, radial `Flipped` faux sans inversion — à la main dans Lightroom ([masques relus](#à-constater-masques-relus-16)).
+- Peau d'un groupe (personnes reconnues sur 53709833), panneau Masque d'un effet intégré — à la main dans Lightroom ([1.2, point 2](#à-constater-dans-lightroom-12)).
+- Éclaircir et assombrir : bords sur un intérieur (53709628), fondu du radial du sujet, doses — avec Dany (à l'œil) ([1.2, point 3](#à-constater-dans-lightroom-12)).
+- Éclairage mixte : balance de 53709912 jugée par `--eclairage --essai`, anneau autour d'un visage, durée — à la main dans Lightroom ([1.2, point 5](#à-constater-dans-lightroom-12)).
+- Bilan : dominante accentuée sur une correction voulue, taille et durée de `view_photo` — à la main dans Lightroom ([1.2, point 6](#à-constater-dans-lightroom-12)).
+- Lecture du boîtier : `--boitier` contre exiftool (noir et blanc, priorité à la plage dynamique, compensations, DR200 et DR400) — à la main, dans le Terminal de Dany ([1.2, point 4](#à-constater-dans-lightroom-12)).
+
+**Seuils provisoires**
+
+- A1 `isoEleve` (recadrages par tranche), A2 (l'œil sur 50 sous-expositions), A3, A4 (`basGamme`, `chromaGamme`) — avec Dany (à l'œil) ([relevé](#à-constater-relevé-fait-par-lorchestrateur-après-la-16-construite)).
+- A5 points chauds, A6 (`pauseMax`, `distanceMemeLieu`), A7 éclairage mixte (et un intérieur à lampe et fenêtre à ranger dans Essais) — avec Dany (à l'œil, sur planches) ([relevé](#à-constater-relevé-fait-par-lorchestrateur-après-la-16-construite)).
+- B1 bilan de `view_photo`, B2 alertes de `mask_map` — à la main dans Lightroom (session de Claude Code, sur l'ordre de Dany) ([relevé, points 5 et 6](#à-constater-relevé-fait-par-lorchestrateur-après-la-16-construite)).
+- Lot C (intention du boîtier à ±0,6 IL, composition, rendus, apprentissage, genres, délais du Suivi et de Fibo 2) — à la main dans Lightroom ([seuils provisoires](#les-seuils-provisoires)).
+
+**Recherche par le sens**
+
+- Jetons et vecteurs de texte contre open_clip — à la main, hors de Lightroom ([sens, point 2](#à-constater-recherche-par-le-sens)).
+- Seuil de pertinence (et plancher de score brut) sur ses propres phrases, index rempli — avec Dany (à l'œil) ([sens, point 3](#à-constater-recherche-par-le-sens)).
+- Le Suivi qui remplit l'index ; une recherche dans la fenêtre Claude, `Sens.tranchesMax` — à la main dans Lightroom ([sens, points 4 et 5](#à-constater-recherche-par-le-sens)).
+
+**Étalonnage (`match_look`) et habitudes**
+
+- Peau déplacée de 2,5 ou 5,2 (`Teint.deplacementVisible`), rendu côte à côte — avec Dany (à l'œil) ([match_look](#à-constater-match_look)).
+- `saturationMax`, `vibranceMaxPasse`, chroma des couleurs vives déplacée par l'étalonnage, ordre du traitement, référence au rendu marqué — à la main dans Lightroom (`--etalonnage --balayage`) ([match_look](#à-constater-match_look)).
+- Phrases des habitudes (« est-ce bien toi ? ») avant de lever « provisoires » — avec Dany ([habitudes](#16--tes-habitudes-en-chiffres-remember_style-avec-habits)).
+- « Comment je règle d'habitude mes belles photos ? » dans la fenêtre Claude — à la main dans Lightroom ([habitudes, point 6](#16--tes-habitudes-en-chiffres-remember_style-avec-habits)).
+
+**Notation et sortie entière**
+
+- « Note la série » sur une grande sélection après le correctif du 26 octobre (planches jusqu'à la dernière, durée, ligne d'état, 500 notes posées avec `apply`), `match_series` avec `groups` sur 500 photos — à la main dans Lightroom ([1.4, points 2 et 6](#14--une-sortie-entière-du-tri-à-lharmonisation) ; [fenêtre, point 2](#à-constater-dans-lightroom-11-111-et-après)).
+- Claude Desktop : `outputSchema` de `propose_ratings`, invite `noter` — à la main dans Claude Desktop ([fenêtre, points 1 et 10](#à-constater-dans-lightroom-11-111-et-après)).
+
+**Suivi**
+
+- Clics sur les calques (une barre de centaines de photos), calendrier (calques, menus, fermeture au clic), champs Du et au validés, période gardée — à la main dans Lightroom ([1.3.7, points 5, 12 et 13](#correctif-137--le-suivi-en-graphiques)).
+- Pause de l'analyse pendant une Retouche pro, Claude Desktop et la recette ; rechargement du module pendant une analyse — à la main dans Lightroom ([1.3.7, points 3 et 7](#correctif-137--le-suivi-en-graphiques)).
+- Toute la bibliothèque (88 071 photos) dans la fenêtre Claude, la Demande rapide et la fenêtre Suivi ; coût de `LrTasks.yield`, mémoire de Lightroom — à la main dans Lightroom (Moniteur d'activité) ([1.3.7, points 8 à 10](#correctif-137--le-suivi-en-graphiques)).
+
+**Fenêtre Claude**
+
+- Carte Note : étoiles, retrait, 5 ★, Retenir, Rejeter, Laisser, « Accepter N ★ », « Voir à 100 % », rangée du bas — à la main dans Lightroom ([1.3, points 5, 8, 12 et 21](#à-constater-dans-lightroom-13)).
+- Proposition : « Obtenir » (grisé, onglet), « Appliquée par Claude », « Remplacée » — à la main dans Lightroom ([1.3.6, point 7](#correctif-136--une-photo-une-conversation) ; [1.3, point 21](#à-constater-dans-lightroom-13)).
+- Clic sur une étape qui change d'onglet puis pose l'image, retour à Focus, Agrandir à 2 000 × 1 250 — à la main dans Lightroom ([1.3.6, points 11 et 12](#correctif-136--une-photo-une-conversation)).
+- Plusieurs photos (conversation de groupe, résumé de 500 photos), « Repartir à neuf », un seul Claude Code pour la fenêtre et la Demande rapide — à la main dans Lightroom ([1.3.6, points 3, 4 et 6](#correctif-136--une-photo-une-conversation)).
+- Avec le vrai Claude : `compare = before_claude` et `rendu_reproductible`, résumé des réglages (JPEG, paramètre prédéfini à l'importation), résumé en haut du fil, `editCount` à 0, modèle ou effort changé (`--resume`) — à la main dans Lightroom ([1.3.6, points 2, 8, 13 et 15](#correctif-136--une-photo-une-conversation) ; [fenêtre, point 10](#à-constater-dans-lightroom-11-111-et-après)).
+- Mes demandes : choix, Ajouter…, Renommer…, Supprimer…, menu fermé sans choix — à la main dans Lightroom ([1.3, point 23](#à-constater-dans-lightroom-13)).
+- Onglet Focus : autre marque, HEIF, original déplacé, copie recadrée ou tournée, recadrage du boîtier, zone de 5 × 5, aperçu commun sans image après une retouche — à la main dans Lightroom ([1.3, point 22](#à-constater-dans-lightroom-13) ; [Onglet Focus](#onglet-focus-demandé-par-dany-le-22-octobre-2026)).
+- Cadre de mise au point : rouge, photo tournée ou recadrée, zoom (`region`), case « Mise au point » — à la main dans Lightroom ([fenêtre, points 12 et 13](#à-constater-dans-lightroom-11-111-et-après)).
+- Composition : `--horizon` sur une copie au vrai horizon (mer, lac, plaine) — dans la recette, une fois la copie choisie avec Dany et rangée dans Essais ; le cadre dans Agrandir à la main ([1.3, point 16](#à-constater-dans-lightroom-13)).
+- Gestionnaire (menus Modèle et Effort, cases), infobulles et bandeau, infobulle orange du voyant Lightroom — à la main dans Lightroom ([fenêtre, point 11](#à-constater-dans-lightroom-11-111-et-après) ; [1.3, point 7](#à-constater-dans-lightroom-13) ; [1.3.6, point 1](#correctif-136--une-photo-une-conversation)).
+- Apparence sombre — avec Dany, quand il bascule son Mac ([1.3, point 11](#à-constater-dans-lightroom-13)).
+- Photo active remise après une variante ou une copie virtuelle, et par la recette à sa fin — à la main dans Lightroom, puis à décider avec Dany ([1.3, point 18](#à-constater-dans-lightroom-13)).
+- Claude Desktop seul fenêtre fermée (aucune image d'étape), ménage du dossier `Etapes`, `sensibilite` dans l'aperçu (`point_af`, JPEG) — à la main dans Lightroom ([1.3, points 13 et 20](#à-constater-dans-lightroom-13)).
+- Descriptions d'outils longues gardées entières par une session — à la main (session de Claude Code) ([1.2, point 8](#à-constater-dans-lightroom-12)).
+
+**Correctif 1.3.5**
+
+- `cameraSerialNumber`, noms des dossiers de Backups, `tmutil isexcluded` sur un volume externe, `LR_size_resolution`, une vidéo dans une collection — à la main dans Lightroom ([Correctif 1.3.5](#correctif-135--huit-chantiers-de-la-feuille-de-route)).
+- Recettes des styles — avec Dany (à l'œil) ([Correctif 1.3.5](#correctif-135--huit-chantiers-de-la-feuille-de-route)).
+
+**Fibo 2** (sur la demande de Dany ; la recette ne lance pas Fibo 2)
+
+- Ajout au catalogue : chemin déjà présent, photo relue dans la même écriture, photo d'essai rangée dans Essais, « Copies virtuelles seulement » — à la main dans Lightroom ([Reste à constater](#reste-à-constater)).
+- Qualité rapide à plusieurs modifications, SeedVR2 contre la mise à la taille, progression, marge de contexte — à la main dans Lightroom ([SeedVR2](#recadrage-plusieurs-modifications-seedvr2-29-octobre-2026)).
+- Masque : rendus pleine taille (durée), témoins sur un noir et un blanc brûlé, personne non reconnue, seuils du nettoyage et du fondu — à la main dans Lightroom ([Masque de Lightroom](#masque-de-lightroom-mask-29-octobre-2026)).
+- Fiche FIBO-vlm (mémoire, effet sur le rendu), masque peint au pinceau, `HF_HUB_OFFLINE`, personne recopiée assez grande pour `a_verifier` — avec Dany (à l'œil) ([Fiche de FIBO-vlm](#fiche-de-fibo-vlm-exclusion-qualité-équilibrée-guidage-masque-peint-29-octobre-2026) ; [Photo de référence](#photo-de-référence-reference-30-octobre-2026)).
+
 ## Architecture
 
 Deux pièces :
@@ -333,7 +421,7 @@ dans Lightroom si elle a été appliquée »), alors qu'elle était souvent fait
   pendant que le serveur est parti se perd sans erreur (`S.perdues`), supposé et non constaté ; la
   reprise n'utilise aucune commande du système, et `LrTasks.execute` n'imite toujours que les deux
   du jeton.
-- **À constater dans Lightroom** : une réponse perdue reprise (par exemple un `add_mask` long
+- **À constater dans Lightroom** (encore **ouvert** au 2 novembre 2026) : une réponse perdue reprise (par exemple un `add_mask` long
   pendant lequel la prise des réponses se coupe) ; qu'un envoi de `LrSocket` vers un serveur parti se perd bien sans erreur ; et que
   l'Historique ne montre l'écriture qu'une fois.
 
@@ -387,7 +475,8 @@ Lightroom quand elle dure (`Progression.lua`, chantier signalé « fort » par l
   jamais bloquées par l'arrêt d'un appel (correctif de revue).
 - La simulation de la liaison garde la tâche de surveillance (`S.surveillances`) et en fait un tour
   à chaque `LrTasks.sleep` et à chaque quart de seconde d'un rendu (`S.dureeRendu`,
-  `S.pendantRendu` pour cliquer la croix). À constater dans Lightroom : la barre et sa croix à
+  `S.pendantRendu` pour cliquer la croix). À constater dans Lightroom (encore **ouvert** au 2 novembre
+  2026) : la barre et sa croix à
   l'écran pendant un long rendu, l'arrêt à la fin du rendu, et si un rendu par `LrExportSession`
   montre déjà une barre de Lightroom (deux barres l'une sous l'autre).
 
@@ -2865,16 +2954,18 @@ Lightroom (1.2), sauf ce qui tient à la fenêtre (points 15 et 16 ci-dessous).
 Restent à voir, à l'usage ; ce qui sera constaté passera dans sa section, avec sa règle dans la
 simulation de sa suite.
 
-1. Claude Desktop accepte l'`outputSchema` de `propose_ratings` (`propositions`, `refusees`,
+Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou encore **ouvert** ; les points ouverts sont repris, une ligne chacun, dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
+
+1. **En partie fait** (Claude Code : les notes se lisent dans le fil, « Notes proposées », en 1.4 et sur la capture de la 1.6.2) ; **ouvert** pour Claude Desktop. Claude Desktop accepte l'`outputSchema` de `propose_ratings` (`propositions`, `refusees`,
    `posees`, `erreur_pose` de type texte ou null, `standard` ; plus de `seance` depuis la 1.1.1)
    et lit `structuredContent` ; Claude Code 2.1.303 rend le `tool_result` de `propose_ratings` en
    texte JSON `{propositions, refusees, posees?}`, comme l'attend `Conversation.notesLues`.
-2. Planche de 30 vignettes (`contact_sheet`) : poids réel, et lisibilité de l'Impact à environ
+2. **En partie fait** (26 octobre 2026 : « note la série » sur 951 photos, `cull_photos` et planches) ; **ouvert** : la durée de 500 notes posées avec `apply` (avec le point 6 de la 1.4). Planche de 30 vignettes (`contact_sheet`) : poids réel, et lisibilité de l'Impact à environ
    208 × 139 px par photo. Plafonds de `cull_photos` sur une vraie séance (rejets proposés, photos
    presque noires « à vérifier », doublons de rafale plafonnés à 3). Durée de la commande
    `notation` pour 500 propositions, et pour 500 notes posées avec `apply` (dans les 60 s de
    `notationTimeout`).
-3. Rendu de ⚑ dans les lignes du fil (Menlo 11). Les largeurs de `Metriques.lua` viennent de
+3. **Sans objet depuis la 1.3** (fenêtre B : segments, plus de colonnes superposées ; le rendu des lignes et les clics passent aux points 3 et 8 de la liste de la 1.3). Rendu de ⚑ dans les lignes du fil (Menlo 11). Les largeurs de `Metriques.lua` viennent de
    NSString : vérifier qu'aucune ligne n'est coupée autrement, ni dans les textes de la carte Note
    et de la Proposition, coupés de même (1.1.1). Onglets par vues simples : les boutons d'un
    onglet couvert (Accepter, Changer… et ▲ ▼ de la carte Note sous la colonne Proposition ;
@@ -2885,23 +2976,23 @@ simulation de sa suite.
    au bord droit de la rangée (`fill_horizontal`) ; la ponctuation haute gardée avec son mot. Un
    clic sur un bouton radio ou un choix dans un `popup_menu` valide-t-il le champ de demande, et
    avant ou après l'observateur qui annule l'envoi ?
-4. Réouverture : sans objet après la 1.1.1 (une seule disposition, plus de réouverture : voir
+4. **Sans objet** (1.1.1). Réouverture : sans objet après la 1.1.1 (une seule disposition, plus de réouverture : voir
    Disposition). Constatée en 1.1 par le menu Disposition ; celle de la 1.1.1, par la boucle
    (`Fenetre.periodique`) après un changement dans le Gestionnaire, n'a pas été vue.
-5. Menu des conversations (`popup_menu` de l'Atelier et du Panneau) : sans objet après la 1.1.1,
+5. **Sans objet** (1.1.1). Menu des conversations (`popup_menu` de l'Atelier et du Panneau) : sans objet après la 1.1.1,
    retiré avec eux.
-6. Hauteurs et largeurs réelles de la Conversation claire, seule disposition, dans sa seule
+6. **Sans objet depuis la 1.3** (fenêtre B : points 1 à 3 de la liste de la 1.3). Hauteurs et largeurs réelles de la Conversation claire, seule disposition, dans sa seule
    taille : 42 lignes de fil (le centre à la hauteur de la colonne de droite : boutons radio,
    aperçu, carte Note ; la liste des conversations, `D.hauteurListe`, au niveau du champ de
    demande), et les rangées de boutons, dont les invites et le Style sur une seule rangée. Le
    cadre enregistré (`DeveloppeurClaude-conversation-grande-1`) repris de la 1.1.1, lui-même
    repris de la grande taille de la 1.1 (`-grande-`).
-7. Carte Note de bout en bout : Accepter (dans une tâche) et Changer… (fenêtre modale, 0 à 5 ★)
+7. **Sans objet depuis la 1.3** (carte Note B, des étoiles à la place d'Accepter et Changer… : point 12 de la liste de la 1.3). Carte Note de bout en bout : Accepter (dans une tâche) et Changer… (fenêtre modale, 0 à 5 ★)
    écrivent par `Bibliotheque.noter` depuis une tâche de la fenêtre (`setRawMetadata` de
    `rating` et `pickStatus`). La note posée se relit dans la carte. Lecture de
    `catalog:getPath()` depuis les tâches de la fenêtre. Le message « Lightroom est occupé »
    s'affiche si Claude Desktop écrit au même moment.
-8. `propose_ratings` avec `apply` (« note ces photos ») : notes posées, une opération ⌘Z
+8. **En partie fait** (étape de la recette « note proposée… puis posée sur demande et annulée » depuis la 1.1.1 ; notes posées sur une série en 1.4) ; **ouvert** : l'accord dans Lightroom en « Proposer d'abord », la note gardée après « Revenir à « Avant Claude » ». `propose_ratings` avec `apply` (« note ces photos ») : notes posées, une opération ⌘Z
    « Claude · notation » par écriture, une étape par photo que `undo_last` défait une à une ; la
    pause de la liaison l'arrête ; en « Proposer d'abord » avec « Confirmer dans Lightroom »
    (`accordDansLightroom`), l'accord de la fenêtre de la liaison (`depuisLightroom` faux), et le
@@ -2909,11 +3000,11 @@ simulation de sa suite.
    pendant l'appel, puis « Notes posées » et « posée » (ou « Notes non posées » et la raison), la
    carte Note « acceptée ». Une note posée reste après « Revenir à « Avant Claude » » sur une
    photo que Claude a aussi retouchée.
-9. Nouvelle conversation par photo : une autre photo choisie à la main commence une conversation ;
+9. **Sans objet depuis le correctif 1.3.6** (une photo, une conversation : point 2 de sa liste). Nouvelle conversation par photo : une autre photo choisie à la main commence une conversation ;
    `show_photo` ou un tri du vrai Claude n'en commence pas, et les 4 s après la fin du travail
    (`Moteur.finTravail`) suffisent ; une photo choisie fenêtre fermée compte à la réouverture, et
    une fenêtre fermée pendant que Claude travaillait retrouve sa conversation.
-10. Avec le vrai Claude : `consignes.md` de la session bien lu ; `--model fable` et `--effort`
+10. **En partie fait** (à l'usage depuis le correctif 1.3.6 ; capture de la 1.6.2 : la note d'abord, sans `apply`, « Notes proposées ») ; **ouvert** : un autre modèle ou effort en cours de conversation (`--resume`), l'invite `noter` de Claude Desktop. Avec le vrai Claude : `consignes.md` de la session bien lu ; `--model fable` et `--effort`
     acceptés dans la fenêtre ; un autre modèle ou un autre effort relance Claude Code à la demande
     suivante par `--resume` (temps de démarrage, bonne session, coût du cache, grilles de recalage
     perdues) ; Claude note d'abord chaque photo qu'il traite (`cull_photos`, `view_photo` avec
@@ -2922,32 +3013,32 @@ simulation de sa suite.
     note par `set_metadata` sans demande ; les lignes « Notes proposées » et « Notes posées »
     s'affichent dans le fil. Dans Claude Desktop, l'invite `noter` sans précision note la
     sélection.
-11. Gestionnaire de modules externes (le menu Disposition s'y affichait en 1.1, constaté) : les
+11. **En partie fait** (« À l'ouverture » sans objet depuis le correctif 1.3.6 ; `notation.json` de centaines de propositions : 951 photos en 1.4) ; **ouvert** : les menus et les cases du Gestionnaire. Gestionnaire de modules externes (le menu Disposition s'y affichait en 1.1, constaté) : les
     menus Modèle et Effort, les cases « Autre photo » et, après la 1.1.1, « À l'ouverture » de la
     section Fenêtre Claude, et la case « Mise au point » de la section Liaison s'affichent et
     s'écrivent ; plus de menu Taille, ni, après la 1.1.1, de menu Disposition. Coût de la
     réécriture de `notation.json` à chaque décision avec quelques centaines de propositions.
-12. Point de mise au point dans `view_photo` (1.1.1) : sur un RAF de Fujifilm (X-T20 de la recette,
+12. **En partie fait** (étape de la recette « point de mise au point dessiné pour noter », X-T20 ; le dessin est celui de l'onglet Focus depuis la 1.3.2) ; **ouvert** : photo tournée ou recadrée, cadre rouge, zoom (`region`), case « Mise au point ». Point de mise au point dans `view_photo` (1.1.1) : sur un RAF de Fujifilm (X-T20 de la recette,
     X-H2S), le carré à la place du collimateur, photo tournée ou recadrée comprise ; rouge pour
     une mise au point signalée manquée ; dessiné sans `af_point` quand la case « Mise au point »
     est cochée ; une lecture bloquée par une demande d'autorisation de macOS saute le point, puis
     reprend quand l'utilisateur a répondu. Après la 1.1.1, sur un zoom (`region`) : le carré dans
     la zone quand le point y tombe (`dans_la_zone`), à sa place sur le zoom ; `dans_la_zone` faux
     et pas de carré quand il tombe ailleurs.
-13. Aperçu de la photo active marqué (après la 1.1.1) : sur un RAF de Fujifilm (X-T20, X-H2S),
+13. **En partie fait** (le connecteur lancé par Lightroom lit l'original sans gêner : onglet Focus, captures de la 1.4 et de la 1.6.2) ; **ouvert** : le cadre de l'aperçu sur une photo tournée ou recadrée, et en rouge. Aperçu de la photo active marqué (après la 1.1.1) : sur un RAF de Fujifilm (X-T20, X-H2S),
     `mcp-developpeur --marquer-af` lancé par Lightroom (`LrTasks.execute`) dessine le carré à sa
     place sur la vignette, photo tournée ou recadrée comprise, rouge pour une mise au point
     signalée manquée ; Agrandir le montre ; le temps ajouté à l'ouverture (lecture bornée à 2 s).
     Une demande d'autorisation de macOS pour le connecteur lancé par Lightroom : la vignette
     reste-t-elle sans carré, sans bloquer la fenêtre ? Une autre marque : rien n'est lancé.
-14. Proposition préparée à l'ouverture (après la 1.1.1 ; sans objet depuis le correctif 1.3.6,
+14. **Sans objet** (correctif 1.3.6). Proposition préparée à l'ouverture (après la 1.1.1 ; sans objet depuis le correctif 1.3.6,
     voir Obtenir une proposition), avec le vrai Claude : la demande part à
     l'ouverture et au rappel par le menu ou ⌃⌥C, sur une conversation vide seulement ; Claude
     note d'abord la photo, puis appelle `preview_settings` sans rien appliquer ; la proposition
     attend dans l'onglet Proposition, la carte Note devant ; rien ne part quand la case « À
     l'ouverture » est décochée ou que la conversation a déjà des messages. Coût en jetons d'une
     demande à chaque photo nouvelle (fenêtre Consommation).
-15. Voyant Écran (1.2) : `mcp-developpeur --ecran`, lancé par Lightroom (`LrTasks.execute`,
+15. **Sans objet depuis le correctif 1.3.6** (voyant Écran retiré ; ni la fenêtre ni Claude ne lisent plus l'écran) ; **ouvert** : seulement l'aide « jeton privé » du voyant Lightroom quand le jeton n'a pas pu être écrit. Voyant Écran (1.2) : `mcp-developpeur --ecran`, lancé par Lightroom (`LrTasks.execute`,
     connecteur signé au runtime durci), voit-il l'écran de la session, en moins de 5 s, sans demande
     d'autorisation de macOS (ne jamais y répondre à la place de Dany) ? La langue que lit ce
     processus (`Locale.preferredLanguages`) doit être fr-CA, pour que la boîte « Claude · écran »
@@ -2957,7 +3048,7 @@ simulation de sa suite.
     plupart des écrans d'amateur) gêne-t-il Dany ? Le repli serait le gris (`neutre`), le texte
     gardé (`Lightroom.decrireEcran`). L'aide « jeton privé » du voyant Lightroom quand le jeton n'a
     pas pu être écrit.
-16. Consignes de la 1.2 avec le vrai Claude : les boutons Portrait, Paysage et Noir et blanc mènent
+16. **Fait** (capture de la 1.6.2 : un seul `add_mask` « éclaircir et assombrir », le bilan dans le résumé, la peau lissée à sa dose légère sans `smoothing_requested` ; l'écran : sans objet depuis le correctif 1.3.6). Consignes de la 1.2 avec le vrai Claude : les boutons Portrait, Paysage et Noir et blanc mènent
     à un seul `add_mask` « éclaircir et assombrir » suivi de `view_photo` avec
     `compare = previous_step` ; Claude dit une seule fois, quand il demande l'avis de Dany sur la
     peau ou les couleurs, que l'écran n'est pas étalonné ; le résumé de fin donne les chiffres du
@@ -3701,6 +3792,8 @@ inversé ; non relevée à la main.
 
 **À faire avec Dany** : rien pour les tolérances. Restent : le seuil de la table compressée d'un
 pinceau, et l'effet d'un radial `Flipped` faux sans inversion (jamais écrit par le module).
+
+Trié le 2 novembre 2026 : le relevé est **fait** ; l'étape « masques relus » de la recette passe (recette de la 1.6.2 : 4 formes relues, toutes « gardé ») ; restent **ouverts** les deux points ci-dessus, repris dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
 
 ## Peau (1.2)
 
@@ -5733,14 +5826,16 @@ constaté passera dans sa section, avec sa règle dans la simulation de sa suite
 (un constat de rendu n'en a pas). Ce qui tient à la fenêtre Claude est aux points 15 et 16 de sa
 liste (Fenêtre Claude › À constater dans Lightroom).
 
-1. Liaison fermée : le jeton change entre Arrêter et Démarrer la liaison. Un POST `curl` vers
+Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou encore **ouvert** ; les points ouverts sont repris, une ligne chacun, dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
+
+1. **En partie fait** (20 et 21 octobre 2026, étape « liaison fermée » de la recette ; la fenêtre marche sans réglage ; un connecteur d'avant la 1.2 : sans objet, plus installé) ; **ouvert** : le POST `curl` et le diagnostic du Gestionnaire. Liaison fermée : le jeton change entre Arrêter et Démarrer la liaison. Un POST `curl` vers
    127.0.0.1:54770 : ses en-têtes comptés comme lignes illisibles (une note par 10 s), son corps
    refusé faute de jeton, rien dans l'Historique ; le diagnostic du Gestionnaire de modules externes
    dit « Jeton : présent (…) ; commandes refusées : N ». La durée de la commande `etat` ne change pas
    (`DEVELOPPEUR_VERBOSE=1`). Un Claude Desktop resté ouvert sur un connecteur d'avant la 1.2 reçoit
    « Liaison fermée : cette commande ne porte pas le jeton… », puis marche une fois relancé ; la
    fenêtre Claude marche sans réglage ; `--status` dit l'état du jeton.
-2. Peau : « un masque par personne » dans un groupe (sur 53709833, Vision ne voit que 2 personnes
+2. **En partie fait** (étapes de la peau de la recette, passées à chaque version depuis la 1.2) ; **ouvert** : les personnes d'un groupe que Lightroom reconnaît (53709833), le panneau Masque d'un effet intégré. Peau : « un masque par personne » dans un groupe (sur 53709833, Vision ne voit que 2 personnes
    sur 4 : lesquelles Lightroom reconnaît-il pour `kind` `person` et `part` `face_skin` ?) ; sur
    53709677, le masque de la personne a été retiré à la recette du 20 octobre 2026, peut-être par
    le défaut de la personne seule corrigé depuis (voir Masques : pistes de la 2.1) : à réessayer ;
@@ -5749,14 +5844,14 @@ liste (Fenêtre Claude › À constater dans Lightroom).
    pas faire passer la netteté maximale sous 35 (une régression « nette à douce » à tort). Le panneau
    Masque montre-t-il les curseurs d'un effet intégré, sans nom d'effet (« Peau du visage lisse »
    n'est pas dans le menu Effet de Lightroom) ?
-3. Éclaircir et assombrir : la forme des bords sur un intérieur (53709628), décentrée sur la zone
+3. **En partie fait** (radial fait à la main : règle de la simulation assouplie au constat des masques relus du 2 novembre 2026, `Flipped` faux admis avec `MaskInverted`) ; **ouvert** : la forme sur un intérieur, le fondu du radial du sujet, les doses avec Dany. Éclaircir et assombrir : la forme des bords sur un intérieur (53709628), décentrée sur la zone
    d'intérêt ; le radial du sujet (fondu 80 à 100), écrit sur 53709912 puis défait : ni halo, ni
    peau écrêtée ; les doses (−0,3 à −0,7, +0,2 à +0,4, −0,3 à −0,5 IL, venues de la feuille de
    route), jugées par Dany sur l'avant/après d'un portrait, d'un paysage et d'un intérieur ; la
    forme d'un radial fait à la main (`get_settings` avec `all_keys`) : `Flipped` toujours vrai ?
    Sinon, assouplir la règle de la simulation. Les seuils de la recette (`FormeBords`,
    `Recette.ecartIdentique`, l'inversion) restent provisoires.
-4. Lecture du boîtier : `--boitier` sur les originaux des essais (X-H2S : DSCF2402, DSCF4245,
+4. **Ouvert** (les seuils de ±0,6 IL sont au lot C du Relevé des seuils). Lecture du boîtier : `--boitier` sur les originaux des essais (X-H2S : DSCF2402, DSCF4245,
    DSCF1595, DSCF8755 ; X-T4 : DSCF8880 ; X-T20 : 20200718_161742.raf et 20200710_193347.jpg),
    comparé à exiftool, dans le Terminal de Dany (jamais répondre à une demande d'autorisation de
    macOS à sa place). En noir et blanc, FilmMode (0x1401) est-il absent et la simulation dans
@@ -5770,7 +5865,7 @@ liste (Fenêtre Claude › À constater dans Lightroom).
    après l'essai réel : Claude ne remonte pas une nuit voulue sombre. Après un profil de simulation
    posé à la main, `profil` de la réponse `apercu` le nomme-t-il, pour que « le profil actuel est
    la simulation » sorte ? La durée de `view_photo` avec la lecture (moins d'une seconde visée).
-5. Éclairage mixte : `toleranceNeutre` (10), `seuilTonal` (8), `partMinGroupe` (20 %) et
+5. **En partie repris** par le Relevé des seuils (A7 : `seuilTonal`, `partMinGroupe`, planches de Dany) ; **ouvert** : la balance de 53709912 (`--eclairage --essai`), l'anneau, l'accord par essai, la durée. Éclairage mixte : `toleranceNeutre` (10), `seuilTonal` (8), `partMinGroupe` (20 %) et
    `pixelsMinPeau` (20) sont provisoires, et seul le portrait est mixte parmi les copies d'essai :
    un intérieur vraiment éclairé par une lampe et une fenêtre est à ajouter avec Dany (une copie
    virtuelle rangée dans « Développeur › Essais »). La balance proposée (Temperature 5558, Tint 15
@@ -5779,7 +5874,7 @@ liste (Fenêtre Claude › À constater dans Lightroom).
    5 000 K, ne valent pas si loin. L'anneau autour d'un visage lit-il la lumière qui l'éclaire ?
    `--essai` en mode « Proposer d'abord » avec l'accord dans Lightroom coché demande un accord par
    essai. La durée de la mesure en version optimisée (moins de 50 ms visés).
-6. Bilan : les seuils de netteté et de bruit (`baisseNetteteMin` 3, `hausseBruitMin` 0,1,
+6. **En partie repris** par le Relevé des seuils (B1, pas encore fait) ; les coins vides : étape « Upright complet et perspective, cadre sans coins vides » de la recette ; **ouvert** : la dominante accentuée sur une correction voulue, la taille et la durée de `view_photo`. Bilan : les seuils de netteté et de bruit (`baisseNetteteMin` 3, `hausseBruitMin` 0,1,
    `baisseBruitDebruitage` 30 %, `ecartNettetePct` 10 %, `ecartBruit` 0,1), par deux vues avant et
    après une étape écrite puis défaite : débruitage 30 et 50 sur 53709724 (pas 53709833, qui porte
    déjà la réduction du bruit de son original), Shadows +60, Exposure +1, Sharpness +60, Grain 25.
@@ -5793,7 +5888,7 @@ liste (Fenêtre Claude › À constater dans Lightroom).
    mixte, le 21 octobre 2026 ; la lecture du boîtier, 300 à 1 300 caractères, se répète à chaque
    vue) et sa durée en version optimisée (environ 0,9 s en débogage, sur un aperçu de 1 344 px
    d'un portrait à quatre visages, avec Vision, le détail, l'éclairage et le bilan).
-7. Écran : des profils standard (sRGB IEC61966-2.1, puis Display P3, choisis par Dany dans les
+7. **Sans objet depuis le correctif 1.3.6** (ni la fenêtre ni Claude ne lisent plus l'écran ; `--ecran` sert au développement seulement) ; `testEnteteLuDansLesOctets` passe sur le runner macos-15 de GitHub (CI de `swift test`, 1.6.2). Écran : des profils standard (sRGB IEC61966-2.1, puis Display P3, choisis par Dany dans les
    Réglages système, puis le sien remis : classe `standard`) ; un profil fait à l'œil (assistant
    d'Apple : emplacement, créateur, `vcgt`, classe `oeil`) ; un vrai profil de sonde (DisplayCAL,
    Calibrite, i1Profiler, Spyder : créateur, `vcgt`, textes desc, cprt et meta), et un profil de
@@ -5803,7 +5898,7 @@ liste (Fenêtre Claude › À constater dans Lightroom).
    « usine ». `testEnteteLuDansLesOctets` sur le runner macos-15 de GitHub (« lppa »). La remarque
    d'écran arrive à Claude au premier aperçu, une fois, dans Claude Desktop et dans la fenêtre ;
    `--status` dit l'écran.
-8. Consignes et descriptions : une session de Claude Code voit les consignes du connecteur entières
+8. **Ouvert** (rien ne le montre sans regarder dans une session ; `CLAUDE.md` en tient compte : l'essentiel en tête des longues descriptions). Consignes et descriptions : une session de Claude Code voit les consignes du connecteur entières
    (3 768 caractères) et les descriptions d'outils longues (`add_mask` 1 559, `view_photo` 1 783)
    sans les couper : pour une description d'outil, jamais constaté.
 
@@ -6482,72 +6577,74 @@ l'étape sautée) sont dans la section de chaque chantier. Restent à voir (et, 
 du 22 octobre 2026, la liste à la fin). Au correctif 1.3.6, les points 6 (le Mode), 14 (Leçon), 15
 (Je le fais) et 17 (la page du carnet dans le fil) sont sans objet, et le point 1 vaut pour la
 fenêtre de 1 623 × 1 200 (cadre `…-grande-5`) ; ce qui reste à voir du correctif est dans
-Correctif 1.3.6 :
+Correctif 1.3.6.
 
-1. La fenêtre B entière : la taille réelle (1 948 × 1 200, contenu 1 946 × 1 166, cadre
+Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou encore **ouvert** ; les points ouverts sont repris, une ligne chacun, dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
+
+1. **Fait** (vue par Dany à son essai du 25 octobre 2026, puis aux captures de la 1.4 et de la 1.6.2, à 1 623 × 1 200). La fenêtre B entière : la taille réelle (1 948 × 1 200, contenu 1 946 × 1 166, cadre
    `…-grande-4` ; D7 mesuré à 1 280 × 800 et à 1 497 × 1 200), sa place sur l'écran de
    3 440 × 1 440 (sous la barre des menus, hors du Dock), le temps d'ouverture avec 2 317 vues ;
    comparée côte à côte avec la maquette : fonds, filets, panneau, cartes, segments, polices,
    couleurs, alignements. Puis caler sur la capture `barreTitre`, `margeDialogue`, `hauteurLigne`,
    les marges, `criteres`, `propLignes`, `etapeLignes`, `leconLignes` et les hauteurs des images
    (`Dispositions.IMAGES`, images régénérées), et `Fenetre.FORME` si le contenu rapetisse.
-2. Les hauteurs données à des `f:row` et `f:column` (en-tête, fil, barre, grille, liste) et au champ
+2. **Fait** (captures de la 1.4 et de la 1.6.2). Les hauteurs données à des `f:row` et `f:column` (en-tête, fil, barre, grille, liste) et au champ
    Rechercher : respectées, marges comprises ? `place_vertical = 0.5` (titre blanc du bouton bleu,
    pastilles, Mode, Style, bandeau) ; les rangées sans `fill_horizontal`.
-3. Les 42 lignes de 21 du fil et la marge du bas ; la colonne auteur, l'heure une ligne plus bas ; le
+3. **Fait** (captures ; « Pourquoi ? » : sans objet depuis le correctif 1.3.6, un clic sur l'étape le remplace). Les 42 lignes de 21 du fil et la marge du bas ; la colonne auteur, l'heure une ligne plus bas ; le
    texte riche d'une ligne d'appel (Menlo 11 dans du 12, largeur réelle contre `Metriques`) ;
    « Pourquoi ? » en police 11 explicite dans la case de 21 ; les boutons d'actions et le clic du
    texte quand ils sont cachés ; aucun clignotement d'un genre à l'autre (`transform`).
-4. Lisibilité des lignes de 648 points (environ 103 caractères ; une réponse ordinaire de Claude
+4. **Fait** (capture de la 1.6.2 ; centre élargi au correctif 1.3.6). Lisibilité des lignes de 648 points (environ 103 caractères ; une réponse ordinaire de Claude
    va à 108) : un centre de 680 à 720 garderait moins de 100 caractères (une seule valeur,
    `TAILLES.centre`).
-5. Les cartes de 40 et 41 lignes en 12 (interligne de 15 constaté sur 12 lignes) et la grille de 35
+5. **En partie sans objet** (« J'ai fini » : Je le fais retiré) ; la carte Focus vue aux captures ; **ouvert** : la carte Note, avec le point 12. Les cartes de 40 et 41 lignes en 12 (interligne de 15 constaté sur 12 lignes) et la grille de 35
    lignes de 16 de la carte Note ; leurs boutons au-dessus du bas ; textes 12 et emphases
    colorées ; les largeurs des carrés (« Laisser rejetée », « J'ai fini »).
-6. Le Mode : la valeur reposée au 2e tour de la boucle (D12) dessine-t-elle « Je le fais » inactif
+6. **Sans objet** (correctif 1.3.6). Le Mode : la valeur reposée au 2e tour de la boucle (D12) dessine-t-elle « Je le fais » inactif
    et coché à la première ouverture ? Le `transform` de `Fenetre.lierRadio` sur un radio déjà coché.
    Le menu Style choisi après une demande tapée sans Retour (la simulation sait choisir dans un
    `popup_menu` depuis Mes demandes, `S.choisir`, mais le menu Style n'annule l'envoi qu'à un
    changement de valeur : son observateur, sans `Fenetre.lierRadio`).
-7. Les infobulles liées (cases de la liste, bandeau) ; le bandeau de deux lignes dans une rangée de
+7. **Ouvert.** Les infobulles liées (cases de la liste, bandeau) ; le bandeau de deux lignes dans une rangée de
    boutons de 26 ; les messages raccourcis entiers à l'écran.
-8. Les clics sur les calques (cases, segments, étoiles, Envoyer, Accepter) ; Arrêter ou Envoyer
+8. **En partie fait** (segments, Envoyer et Arrêter à l'usage) ; **ouvert** : les étoiles et Accepter, avec le point 12. Les clics sur les calques (cases, segments, étoiles, Envoyer, Accepter) ; Arrêter ou Envoyer
    quand l'autre est masqué ; les deux « Voir à 100 % » superposés.
-9. La vignette JPEG de 996 × 664 dans un `f:picture` de 498 × 332 (réduite et nette) ; l'aperçu
+9. **Fait** (captures de la 1.4 et de la 1.6.2). La vignette JPEG de 996 × 664 dans un `f:picture` de 498 × 332 (réduite et nette) ; l'aperçu
    bord à bord dans le panneau ; les grandes images en 2x (panneau de 1 056 × 2 292 px, cartes de
    996 × 1 358 et 996 × 1 118).
-10. La légende de la photo active (`Lightroom.legende` : copie, appareil, date à l'heure locale) et
+10. **Fait** (capture de la 1.6.2 : copie, appareil, date, et « Active : »). La légende de la photo active (`Lightroom.legende` : copie, appareil, date à l'heure locale) et
     `infoPhoto`, en texte riche, `truncation = 'middle'` sur un nom long.
-11. L'apparence sombre, seulement si Dany bascule lui-même son Mac : panneau, cartes, sélection,
+11. **Ouvert** (avec Dany). L'apparence sombre, seulement si Dany bascule lui-même son Mac : panneau, cartes, sélection,
     image « aucun aperçu », titre éteint #7F8EA3 sur #2B3F5C, emphase ambre, teintes de l'état de
     la note ; et la fenêtre quand son apparence diffère de celle de macOS (icônes `image_name` sur
     un bouton natif, titres des radios sur les aplats) ; `Chemins.ressource('images/sombre/…')`
     passé à `LrPathUtils.child`. Le menu Apparence avec une préférence inconnue : vide ou le premier
     élément ?
-12. Carte Note : les étoiles posent la note (une étape « Claude · notation » que `undo_last` défait),
+12. **Ouvert.** Carte Note : les étoiles posent la note (une étape « Claude · notation » que `undo_last` défait),
     un clic sur la note posée la retire, 5 ★ se posent ; Retenir et Rejeter ; Laisser n'écrit rien
     et grise Accepter ; « Accepter N ★ » change son titre blanc ; « Voir à 100 % » après une vraie
     notation avec un zoom. Sur une copie d'Essais, défait ensuite.
-13. Pourquoi ? : une capture avec la fenêtre ouverte et la photo active ; `match_series` sans capture
+13. **En partie fait** (étape de la recette « avant/après d'une étape gardé sans autre rendu (Pourquoi ?) » ; le clic sur l'étape, à l'usage) ; **ouvert** : Claude Desktop seul, fenêtre fermée, et le ménage du dossier `Etapes`. Pourquoi ? : une capture avec la fenêtre ouverte et la photo active ; `match_series` sans capture
     (`sans_avant_apres`) ; Claude Desktop seul, fenêtre fermée : aucune capture ; une capture pendant
     un `preview_settings` d'un autre client ; le ménage du dossier `Etapes` au chargement suivant ;
     la capture sautée pour calculs IA (sans modèles IA, non provocable) ; le déclencheur exact de
     `MaskGroupBasedCorrections` vide ; les images de l'étape dans l'aperçu, Voir l'avant, Agrandir.
-14. Leçon : avec le vrai Claude, la leçon en fin de retouche, une seule, rien après une proposition
+14. **Sans objet** (correctif 1.3.6). Leçon : avec le vrai Claude, la leçon en fin de retouche, une seule, rien après une proposition
     seule ; la bascule vers l'onglet Leçon pendant un vrai travail, et son absence quand une
     proposition attend ; « [Sans leçon] » respecté ; dans Claude Desktop, `photo_lesson` appelé par
     les invites (sinon, le repli des consignes du connecteur) ; le format d'une compensation non
     nulle ; les seuils des indices jugés contre une vraie retouche.
-15. Je le fais : les noms des sections de Réglages de base ; un vrai exercice, avec des changements
+15. **Sans objet** (correctif 1.3.6). Je le fais : les noms des sections de Réglages de base ; un vrai exercice, avec des changements
     faits à la main (Exposition, Ombres, masque IA Ciel, courbe), la liste cochée sans saccade
     toutes les 2 s, la reprise après 15 minutes, `corrections_utilisateur`, la comparaison et un
     `MaskGroupBasedCorrections` vide sans fenêtre IA ; le survol de « Claude · ma version » dans le
     Navigateur ; les tolérances sur les trois premiers exercices de Dany.
-16. Composition : `--horizon` avec une copie d'Essais qui a un vrai horizon net (mer, lac, plaine ;
+16. **En partie fait** (étapes de composition de la recette) ; **ouvert** : `--horizon` sur une copie au vrai horizon (à ajouter aux Essais), le cadre dans Agrandir. Composition : `--horizon` avec une copie d'Essais qui a un vrai horizon net (mer, lac, plaine ;
     à ajouter à la collection) ; les étapes « Claude · composition » à l'Historique ; le dessin du
     cadre (tiers à 0,35 %) dans l'aperçu de 405 et dans Agrandir, sur fond clair et sombre ; le
     roulis de Vision sur d'autres faux visages ; la zone d'intérêt sur des paysages sans sujet.
-17. Carnet : la page dans la grille du fil (tableau Menlo aligné, « — », mois accentués) ; la
+17. **Sans objet** (correctifs 1.3.6 et 1.3.8 : page du carnet dans le fil, fenêtre des photos d'un défaut et « Retirer du carnet… » retirées ; les seuils du carnet passent au Relevé des seuils, A1 à A3). Carnet : la page dans la grille du fil (tableau Menlo aligné, « — », mois accentués) ; la
     fenêtre des photos d'un défaut (`otherVerb` de `presentModalDialog`, jamais employé ailleurs,
     puis `LrDialogs.confirm` dans la même tâche) ; « Retirer du carnet… » sur une vraie photo
     désignée par Dany ; « Demander à Claude ce qu'il en pense » ; la durée de `Carnet.resumer` et
@@ -6555,15 +6652,15 @@ Correctif 1.3.6 :
     sous-exposition, de la neige ou un haut blanc, une photo voulue sombre à −2/3 IL, du DR400, un
     horizon penché) ; le plancher de texture sur un ciel uni, un mur, de la neige, et une vraie mise
     au point manquée sur un sujet.
-18. La photo active et la sélection revenues après un débruitage, son annulation, une variante, une
+18. **En partie fait** (étape « débruitage » de la recette) ; **ouvert** : après une variante et une copie virtuelle, et la photo active d'avant la recette (à décider avec Dany). La photo active et la sélection revenues après un débruitage, son annulation, une variante, une
     copie virtuelle et le TIFF réimporté retiré par la recette (l'étape « débruitage » de la recette
     le vérifie ; pas encore les autres) ; `DELAI_SOURCE` (3 s) suffisant pour une collection ;
     aucune ligne « Photo active d'avant non remise » au journal. La recette ne remet pas à la fin la
     photo active d'avant elle (`show_photo` la change) : à décider.
-19. Le registre des notes après la recette : la proposition de la copie RAW remise telle qu'avant
+19. **Fait** (la recette remet le registre depuis la 1.3, passée à chaque version ; la proposition laissée « acceptee » le 21 octobre ne touche qu'une copie d'essai : sans objet). Le registre des notes après la recette : la proposition de la copie RAW remise telle qu'avant
     l'étape (`notation remettre`) ; celle laissée « acceptee » le 21 octobre 2026, avant la
     correction, à remettre « à vérifier » une fois.
-20. Correctif 1.3.1. Constaté le 22 octobre 2026 (recette de la 1.3.1, 86 étapes, et essai dans la
+20. **En partie fait** (`isoEleve` : repris par le Relevé des seuils, A1 ; Accepter après une proposition appliquée : corrigé au correctif 1.3.2 ; leçon : sans objet ; le JPEG 53709534 : écart connu du processus 2010, sans effet) ; **ouvert** : `sensibilite` dans l'aperçu avec `point_af` et pour un JPEG. Correctif 1.3.1. Constaté le 22 octobre 2026 (recette de la 1.3.1, 86 étapes, et essai dans la
     fenêtre Claude sur le portrait d'essai, défait ensuite) : `sensibilite` en nombre dans le
     journal détaillé d'un RAF de X-H2S (ISO 160) ; la leçon de la copie d'essai refusée par
     l'outil puis rangée pour la recette ; `cull_photos` sans cible sur la photo active et
@@ -6575,7 +6672,7 @@ Correctif 1.3.6 :
     53709534 rendu sans `Brightness`, `Contrast` et `Exposure` (réglages du processus 2010, sans
     effet en 15.4) et avec `MaskGroupBasedCorrections = {}` après la recette, ce que sa
     référence n'avait pas.
-21. Correctif 1.3.2 (non publié ; essais dans les simulations seulement). La proposition dépassée
+21. **En partie sans objet** (proposition à l'ouverture, leçon et Je le fais retirées au correctif 1.3.6) ; **ouvert** : « Appliquée par Claude » et « Remplacée » après « Obtenir », la rangée du bas de la carte Note (point 12). Correctif 1.3.2 (non publié ; essais dans les simulations seulement). La proposition dépassée
     (voir Proposition dépassée par une étape de Claude) : refaire l'essai du 22 octobre 2026 sur une
     copie d'essai (proposition préparée à l'ouverture, « Applique ta proposition, puis termine par
     la leçon de la photo. ») : la carte dit « Appliquée par Claude (étape « … ») », Accepter (bleu
@@ -6588,7 +6685,7 @@ Correctif 1.3.6 :
     Changer… et Accepter (les cinq boutons et ▲ ▼ tiennent-ils dans les 498 points ?), « Accepter
     5 ★ » quand Claude propose 5 ★ ; Claude qui propose 5 ★ à une photo qui le mérite, sans jamais
     poser ni changer un libellé de couleur.
-22. L'onglet Focus (non publié ; essais dans les simulations, et `--boitier` et `--focus` sur
+22. **En partie fait** (captures de la 1.4 et de la 1.6.2 : segment Focus, carte en trois blocs, cadres de DSCF2402, textes de Lightroom en français) ; **ouvert** : une autre marque, un HEIF, un original déplacé, une copie recadrée ou tournée, un recadrage du boîtier, une zone de 5 × 5. L'onglet Focus (non publié ; essais dans les simulations, et `--boitier` et `--focus` sur
     DSCF2402.RAF hors de Lightroom ; voir Onglet Focus). Après un nouveau démarrage de Lightroom
     (images nouvelles, aucun fichier `.lua` nouveau : un rechargement du module suffit) : le
     segment « Focus » entre Aperçu et Proposition (largeur, libellé, les cinq segments centrés), en
@@ -6608,7 +6705,7 @@ Correctif 1.3.6 :
     cliquée) ; un HEIF de l'appareil et un original déplacé (« non lue (format pas encore lu…) »,
     « non lue (original introuvable) ») ; une photo prise en recadrage 1,25× ou au viseur sport
     (les positions décalées ou non par rapport à l'image de Lightroom).
-23. Mes demandes (non publié ; essais dans les simulations seulement ; voir Mes demandes). Après un
+23. **En partie fait** (captures : le menu à droite de Style ; « ＋ Garder la demande » : sans objet depuis le correctif 1.3.6) ; **ouvert** : les choix, Ajouter…, Renommer…, Supprimer…, le menu fermé sans choix. Mes demandes (non publié ; essais dans les simulations seulement ; voir Mes demandes). Après un
     rechargement du module (aucun fichier `.lua` nouveau) : le menu à droite de Style, à 280, sa
     flèche et son titre « Mes demandes » ; ses séparateurs et « Aucune demande gardée » grisé
     (relevés dans `AgViewUtils`, jamais vus) ; « Nom — description » coupé à la largeur du menu, la
@@ -6736,7 +6833,9 @@ phrases retenues. Un processus neuf, sans la limite de 60 s.
 
 **À constater** (l'orchestrateur, Lightroom ouvert, liaison démarrée ; lecture seule) :
 
-1. Le relevé sur les deux appareils de Dany, sortie dans un fichier, en arrière-plan :
+Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou encore **ouvert** ; les points ouverts sont repris, une ligne chacun, dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
+
+1. **Fait** (2 novembre 2026, ci-dessous) ; **ouvert** : les phrases à montrer à Dany avant de lever « provisoires ». Le relevé sur les deux appareils de Dany, sortie dans un fichier, en arrière-plan :
    `swift build && ./.build/debug/mcp-developpeur --habitudes '{"camera": "X-H2S"}' > releve-xh2s.json`,
    puis `'{"camera": "X-T20"}'`, et `'{"camera": "X-H2S", "rating_min": 5}'`. Si la recherche
    trouve plus de 5000 photos, le relevé ne lit que les 5000 premières (`echantillon`) : refaire sur
@@ -6746,20 +6845,20 @@ phrases retenues. Un processus neuf, sans la limite de 60 s.
    réduction du bruit à ISO élevé) doit passer ; un réglage au hasard ou laissé par défaut, non.
    Ce relevé fixe `minPhotos`, `minJours`, `toucheMin`, `sensMin` et `diviseurPas` ; les phrases
    sorties se montrent à Dany (« est-ce bien toi ? ») avant de lever le mot « provisoires ».
-2. La durée : le temps total du relevé divisé par `photos_lues` (estimé 3 à 10 ms par photo) ; si un
+2. **Fait** (2 novembre 2026). La durée : le temps total du relevé divisé par `photos_lues` (estimé 3 à 10 ms par photo) ; si un
    lot de 250 dépasse 120 s (délai de `habitudes lire`), réduire `Habitudes.lot`.
-3. Aucune écriture : `--dump <id>` et l'`editCount` (`--module reglages '{"photo": <id>}'`) d'une
+3. **Fait** (2 novembre 2026). Aucune écriture : `--dump <id>` et l'`editCount` (`--module reglages '{"photo": <id>}'`) d'une
    copie d'Essais notée 4 ★, avant et après `--habitudes '{"collection": "Essais", "rating_min": 1}'` :
    identiques ; le guide de style inchangé ; rien dans l'Historique.
-4. Le recadrage et la teinte : `--dump <id>` d'une copie d'Essais recadrée à la main, d'une autre
+4. **Fait** (2 novembre 2026). Le recadrage et la teinte : `--dump <id>` d'une copie d'Essais recadrée à la main, d'une autre
    redressée par Claude (`crop.angle`), et d'un RAF jamais retouché : `CropLeft`…`CropAngle`
    présents dans les trois (valeurs neutres 0, 0, 1, 1, 0 sur la dernière), et `Tint` du RAF non
    nul en « As Shot » (ce qui justifie de ne pas la mesurer). Dans le relevé, `recadrees` ne doit
    pas compter la copie redressée par Claude. Si `HasCrop` apparaît, le noter ici (rien à changer).
-5. `ProcessVersion` d'une photo d'avant 2012 au catalogue, s'il y en a (format « 5.7 » attendu,
+5. **Fait** (2 novembre 2026). `ProcessVersion` d'une photo d'avant 2012 au catalogue, s'il y en a (format « 5.7 » attendu,
    d'après `processVersions`), et `cameraModel` formaté tel que `find_photos` le prend
    (« X-H2S ») : les appareils du relevé doivent porter ce nom.
-6. Dans la fenêtre Claude, sur Essais : « comment je règle d'habitude mes belles photos ? » : un
+6. **Ouvert.** Dans la fenêtre Claude, sur Essais : « comment je règle d'habitude mes belles photos ? » : un
    seul appel `remember_style` avec `habits` (plus un rappel s'il dit « pas fini »), des phrases
    proposées, rien ajouté sans accord.
 
@@ -6924,17 +7023,19 @@ que la demande n'est pas partie ; `Moteur.texteCible`).
 **À constater dans Lightroom** (l'essai de la 1.4, sur une vraie sortie d'au moins 500 photos en
 copies virtuelles) :
 
-1. `getRawMetadata` : `aperture`, `shutterSpeed`, `exposureBias` en nombres et `flash` booléen sur des
+Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou encore **ouvert** ; les points ouverts sont repris, une ligne chacun, dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
+
+1. **Fait** (relevé des seuils du 2 novembre 2026 : ouverture, vitesse, compensation et flash lus sur 4 980 photos, lot A6). `getRawMetadata` : `aperture`, `shutterSpeed`, `exposureBias` en nombres et `flash` booléen sur des
    RAF et des JPEG (X-H2S, X-T4, X-T20), et rien pour une photo sans Exif ;
-2. les groupes : les coupures d'une vraie sortie jugées à l'œil (les seuils de la pause, de la lumière
+2. **En partie repris** par le Relevé des seuils (A6 : `ecartIL` fixé ; `pauseMax` et `distanceMemeLieu` à juger avec Dany) ; **ouvert** : la durée de `match_series` avec `groups` sur 500 photos. les groupes : les coupures d'une vraie sortie jugées à l'œil (les seuils de la pause, de la lumière
    et du même lieu) ; la durée de `match_series` avec `groups` sur 500 photos (celle du tri) ;
-3. le témoin du teint sur de vrais visages : peau lue, écarts entre photos d'une même personne et de
+3. **Fait** (relevé A8 du 2 novembre 2026 : `ecartVisible` 8,1 et `hausseAlerte` 4,05, sur 121 paires). le témoin du teint sur de vrais visages : peau lue, écarts entre photos d'une même personne et de
    deux personnes, alertes justes ou fausses ;
-4. `cull_photos` sur 1 000 photos d'un coup (durée, réponse d'attente de Claude Desktop) et par
+4. **Fait** (26 octobre 2026 : « note la série » sur 951 photos, d'où `plafonds_par_motif` et les planches). `cull_photos` sur 1 000 photos d'un coup (durée, réponse d'attente de Claude Desktop) et par
    tranches avec `offset` ; `selection` avec `decalage` sur une grande sélection ;
-5. la tuile « Photos analysées » et son détail dans la fenêtre Suivi (coupé par « … » au-delà de la
+5. **Fait** (capture `suivi-graphiques.png` du 28 octobre 2026). la tuile « Photos analysées » et son détail dans la fenêtre Suivi (coupé par « … » au-delà de la
    tuile, l'infobulle le donne en entier) ;
-6. « note la série » sur une grande sélection dans la fenêtre Claude et la Demande rapide : le tri
+6. **Ouvert** (à refaire après le correctif du 26 octobre : `MAX_MCP_OUTPUT_TOKENS`, planches jusqu'à la dernière, ligne d'état). « note la série » sur une grande sélection dans la fenêtre Claude et la Demande rapide : le tri
    reçu en entier (`MAX_MCP_OUTPUT_TOKENS` lu par la version de Claude Code installée), les planches
    jusqu'à la dernière, la durée, et la photo en cours dans la ligne d'état.
 
@@ -7683,49 +7784,51 @@ le 26 octobre 2026, au soir ; même correctif, numéro gardé, pas encore publi�
 
 **À constater dans Lightroom** (les simulations ne le peuvent pas) :
 
-1. `getRawMetadata('focalLength')` rend un nombre (un texte « 23 mm » se lit aussi) ;
+Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou encore **ouvert** ; les points ouverts sont repris, une ligne chacun, dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
+
+1. **Fait** (le graphique des focales est rempli, capture du 28 octobre 2026). `getRawMetadata('focalLength')` rend un nombre (un texte « 23 mm » se lit aussi) ;
    `batchGetRawMetadata` accepte `masterPhoto` et `virtualCopies`, et `virtualCopies` rend les
    copies d'un original (sinon le module lit photo par photo).
-2. Une vignette de 1 024 px se rend pour l'analyse, juste après une importation et après une
+2. **Fait** (2 670 photos analysées au 28 octobre 2026, environ 84 600 au relevé des seuils du 2 novembre). Une vignette de 1 024 px se rend pour l'analyse, juste après une importation et après une
    retouche (sinon la raison et le réessai 10 minutes plus tard).
-3. Une sélection de 300 photos analysée en quelques minutes, sans gêner Dany ni Claude ; la pause
+3. **En partie fait** (l'analyse, à l'usage) ; **ouvert** : la pause pendant une Retouche pro, Claude Desktop et la recette. Une sélection de 300 photos analysée en quelques minutes, sans gêner Dany ni Claude ; la pause
    pendant une Retouche pro, Claude Desktop et la recette ; la reprise après une fermeture de
    Lightroom.
-4. La fenêtre Suivi de 1 310 × 1 062 (1 028 jusqu'au graphique des genres) ouverte à cette taille, en claire et en sombre ; les images
+4. **Fait** en claire (capture du 28 octobre 2026) ; la sombre avec le point 11 de la liste de la 1.3. La fenêtre Suivi de 1 310 × 1 062 (1 028 jusqu'au graphique des genres) ouverte à cette taille, en claire et en sombre ; les images
    liées par leur chemin qui se rafraîchissent ; une infobulle sur deux lignes.
-5. Les 87 calques (76 avant les genres) qui reçoivent les clics à travers les colonnes poussées par leurs marges ;
+5. **Ouvert.** Les 87 calques (76 avant les genres) qui reçoivent les clics à travers les colonnes poussées par leurs marges ;
    `catalog.kAllPhotos` ; la sélection en grille d'une barre de plusieurs centaines de photos.
-6. Les trois boutons de l'en-tête à leur place, Publication… et Consommation… qui ouvrent leurs
+6. **Fait** (captures de la 1.4 et de la 1.6.2). Les trois boutons de l'en-tête à leur place, Publication… et Consommation… qui ouvrent leurs
    fenêtres.
-7. Un rechargement du module pendant une analyse : l'ancienne instance qui s'arrête sans réécrire
+7. **Ouvert.** Un rechargement du module pendant une analyse : l'ancienne instance qui s'arrête sans réécrire
    le relevé.
-8. Correctif 1.3.8 : toute la bibliothèque de Dany (88 071 photos, Toutes les photographies, tout
+8. **Ouvert.** Correctif 1.3.8 : toute la bibliothèque de Dany (88 071 photos, Toutes les photographies, tout
    sélectionner) ouverte dans la fenêtre Claude et dans la Demande rapide sans figer Lightroom :
    `getTargetPhotos` de 88 000 photos, que `Lightroom.photos` rappelle toutes les 2 s dans chaque
    fenêtre ouverte, la vue rangée par lectures groupées, les résumés de groupe
    (`Historique.lireGroupe`, `lireResumeGroupe`) et leur durée.
-9. Correctif 1.3.8 : le coût de `LrTasks.yield` dans Lightroom, et `LrTasks.canYield` vrai dans les
+9. **Ouvert.** Correctif 1.3.8 : le coût de `LrTasks.yield` dans Lightroom, et `LrTasks.canYield` vrai dans les
    tâches du Suivi, de la fenêtre Suivi et des résumés (un yield refusé sous un `pcall` simple ne
    ferait que laisser le travail d'un seul morceau) ; les écritures du relevé espacées comme prévu
    (le journal et la date de `suivi.json`).
-10. Correctif 1.3.8 : la fenêtre Suivi sur toute la bibliothèque (`--graphiques` à 85 000 originaux,
+10. **Ouvert.** Correctif 1.3.8 : la fenêtre Suivi sur toute la bibliothèque (`--graphiques` à 85 000 originaux,
     le reclassement en arrière-plan, un clic sur une barre de milliers de photos par
     `setSelectedPhotos`), et la mémoire de Lightroom avant et après (Moniteur d'activité).
-11. Correctif 1.3.8 : l'analyse d'office de toute la bibliothèque en quelques heures (environ 3 photos
+11. **Fait** (`suivi.json` d'environ 84 600 photos au relevé des seuils du 2 novembre 2026). Correctif 1.3.8 : l'analyse d'office de toute la bibliothèque en quelques heures (environ 3 photos
     par seconde), sa reprise après une fermeture de Lightroom, et un réessai 10 minutes plus tard au
     milieu de la file.
-12. Correctif 1.3.8 : les champs « Du » et « au » dans une fenêtre flottante, validés par Retour et
+12. **En partie fait** (capture du 28 octobre 2026 : période, champs Du et au, graphique des notes de 0 ★ à 5 ★ entier) ; **ouvert** : la validation par Retour et à la sortie du champ, la période gardée après un lancement. Correctif 1.3.8 : les champs « Du » et « au » dans une fenêtre flottante, validés par Retour et
     quand on les quitte, leur observateur appelé tout de suite (le champ réécrit au propre, ou remis
     après un refus), la période gardée après un lancement de Lightroom ; le graphique des notes, ses
     libellés « 0 ★ » à « 5 ★ » dessinés en entier, et ses six calques.
-13. Correctif 1.3.8 : le calendrier, une fenêtre modale ouverte depuis la fenêtre Suivi flottante ;
+13. **Ouvert** (seuls ses boutons sont vus, à la capture). Correctif 1.3.8 : le calendrier, une fenêtre modale ouverte depuis la fenêtre Suivi flottante ;
     ses 42 calques qui reçoivent les clics ; `LrDialogs.stopModalWithResult` qui la ferme au clic sur
     un jour (sinon « Choisir ») ; ses menus, ses couleurs en claire et en sombre ; l'icône sur le
     bouton carré à droite de chaque champ.
-14. Correctif 1.3.8 : le genre de toute la bibliothèque repassé en arrière-plan (environ 10 heures),
+14. **Fait** (capture du 28 octobre 2026 : genres de 2 848 photos, nourriture, macro et fêtes compris). Correctif 1.3.8 : le genre de toute la bibliothèque repassé en arrière-plan (environ 10 heures),
     sans figer Lightroom, et le graphique des genres sur les vraies photos de Dany (la nourriture, le
     macro, les fêtes et la nuit, que le relevé n'avait pas).
-15. Correctif 1.3.8 : les quatre boutons de l'en-tête sur la rangée du titre, de la même taille ; le
+15. **Fait** (captures de la 1.4 et de la 1.6.2). Correctif 1.3.8 : les quatre boutons de l'en-tête sur la rangée du titre, de la même taille ; le
     fil sans l'historique, le résumé en tête.
 
 ## Correctif 1.3.6 : une photo, une conversation
@@ -7810,62 +7913,64 @@ tests, dont 1 sauté sans `DEVELOPPEUR_ECRAN_REEL=1`, 0 échec (aucun fichier Sw
 Dany a vu la fenêtre de 1 623 × 1 200 à son essai, d'où ses retours ; rien d'eux n'a encore été vu
 dans Lightroom. Reste à constater :
 
-1. La fenêtre de 1 623 × 1 200 (contenu 1 621 × 1 166, cadre `…-grande-5`) : vue par Dany à son
+Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou encore **ouvert** ; les points ouverts sont repris, une ligne chacun, dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
+
+1. **En partie fait** (captures de la 1.4 et de la 1.6.2 : en-tête, voyants, photo active, quatre boutons, segments, « Développeur IA v1.6.2 ») ; **ouvert** : l'infobulle orange d'une version à mettre à jour, la sombre (point 11 de la liste de la 1.3). La fenêtre de 1 623 × 1 200 (contenu 1 621 × 1 166, cadre `…-grande-5`) : vue par Dany à son
    essai du 25 octobre 2026, d'où ses retours ; après eux, l'en-tête avec « Repartir à neuf » (carré
    de bezel 22), les deux voyants, la photo active et le bouton Suivi au bout de la rangée (carré
    small de 56 : sa place sous « Repartir à neuf » est à faire confirmer à Dany), l'infobulle du
    voyant Lightroom sur une seule ligne (versions et mode), orange avec une version à mettre à
    jour ; les quatre segments refaits (Focus, Note, Aperçu, Proposition), en claire et en sombre ;
    « Développeur v1.3.6 » dans la barre de titre.
-2. Une photo, une conversation dans le vrai Lightroom : la conversation d'une photo qui revient à
+2. **En partie fait** (Dany travaille ainsi depuis le 25 octobre 2026) ; **ouvert** : `editCount` d'une photo jamais développée, le temps et le coût de `--resume`. Une photo, une conversation dans le vrai Lightroom : la conversation d'une photo qui revient à
    chaque choix ; une photo neuve et son historique (le journal de Claude, les reprises à la main
    lues par `Ecriture.correctionsUtilisateur`), « Depuis la dernière fois » après une étape faite
    par Claude Desktop et après une reprise à la main ; `editCount` et `lastEditTime` tels que
    Lightroom les rend (une photo jamais développée a-t-elle `editCount` à 0 ?) ; aucun fichier
    pour 300 photos parcourues ; la reprise de session (`--resume`) au retour sur une photo, son
    temps et son coût en cache ; Claude qui repart de l'historique joint, sans le répéter.
-3. Plusieurs photos : la conversation de groupe, son résumé sur une sélection de 500 photos et plus
+3. **Ouvert.** Plusieurs photos : la conversation de groupe, son résumé sur une sélection de 500 photos et plus
    (durée des lectures groupées), la photo active changée sans changer de conversation, le dossier
    `Temporaire/Groupes` effacé en la quittant et au chargement suivant.
-4. « Repartir à neuf » : la conversation d'avant mise de côté, qui ne revient plus ; grisé pendant
+4. **Ouvert.** « Repartir à neuf » : la conversation d'avant mise de côté, qui ne revient plus ; grisé pendant
    le travail et sur un groupe.
-5. Les conversations d'avant le correctif rattachées à leur photo au premier chargement (la plus
+5. **Sans objet** (une seule fois, au premier chargement du correctif). Les conversations d'avant le correctif rattachées à leur photo au premier chargement (la plus
    récente seule), celles des groupes plus montrées, rien d'effacé.
-6. La Demande rapide sur une photo seule : la conversation de la photo reprise, la mention
+6. **En partie fait** (à l'usage et aux captures de la 1.4 et de la 1.6.2) ; **ouvert** : un seul Claude Code (refus de part et d'autre). La Demande rapide sur une photo seule : la conversation de la photo reprise, la mention
    « Demande rapide » dans le fil de la fenêtre Claude ouverte sur elle, son titre donné à la
    première demande de la fenêtre ; sur plusieurs photos, le résumé du groupe ; un seul Claude Code
    (refus de part et d'autre, « pour la Demande rapide » dans la barre).
-7. « Obtenir » dans l'onglet Proposition (à la place de la proposition à l'ouverture, qui ne
+7. **Ouvert.** « Obtenir » dans l'onglet Proposition (à la place de la proposition à l'ouverture, qui ne
    vient plus) : la rangée ▲ ▼, Obtenir, Refuser, Ajuster… et Accepter sous la carte ; grisé
    pendant le travail de Claude (fenêtre ou Demande rapide), pour plusieurs photos ou aucune et
    quand une proposition attend ; avec le vrai Claude, la demande dans la conversation de la photo
    (reprise, ou neuve gardée), la phrase courte au fil, la note d'abord puis `preview_settings`,
    et la fenêtre qui passe à l'onglet Proposition.
-8. Avec le vrai Claude, une retouche finie dans la fenêtre par `view_photo` avec
+8. **Ouvert.** Avec le vrai Claude, une retouche finie dans la fenêtre par `view_photo` avec
    `compare = before_claude` avant le résumé ; `rendu_reproductible` après un retour à l'origine et
    une seconde retouche, et l'écart dit à la fin seulement.
-9. La fenêtre Suivi (à la place de l'onglet) : son texte riche est remplacé par les graphiques au
+9. **Sans objet** (correctifs 1.3.7 et 1.3.8). La fenêtre Suivi (à la place de l'onglet) : son texte riche est remplacé par les graphiques au
    correctif 1.3.7 (voir son À constater) ; « Photos d'un défaut… », sa fenêtre et « Retirer du
    carnet… » sont sans objet (retirés au correctif 1.3.8) ; restent les leçons d'avant restées dans
    `carnet.json` après une écriture.
-10. Publication… et Consommation… par le menu seulement : sans objet, leurs boutons reviennent dans
+10. **Sans objet** (correctif 1.3.7). Publication… et Consommation… par le menu seulement : sans objet, leurs boutons reviennent dans
     l'en-tête au correctif 1.3.7 (décision de Dany du 25 octobre 2026).
-11. Les retours de Dany dans le vrai Lightroom : un clic sur une ligne d'étape ou d'image qui change
+11. **Ouvert.** Les retours de Dany dans le vrai Lightroom : un clic sur une ligne d'étape ou d'image qui change
     d'onglet puis pose l'image (des observateurs de propriétés synchrones, supposés) ; la fenêtre
     ouverte sur Focus, et ramenée à Focus à chaque autre photo choisie (et pas pour Obtenir ni
     « Repartir à neuf ») ; une image de Claude qui ouvre Aperçu pendant une retouche, sans gêner la
     proposition ni la note ; le pourquoi de l'étape qui précède une image, et la carte qui suit
     ◀ ▶.
-12. Agrandir à 2 000 × 1 250 : la fenêtre modale entière sur l'écran de Dany (environ 1 330 de haut
+12. **Ouvert.** Agrandir à 2 000 × 1 250 : la fenêtre modale entière sur l'écran de Dany (environ 1 330 de haut
     avec la barre de titre et Fermer, pour 1 440), l'avant/après côte à côte et sa légende, une image
     plus petite agrandie ; la photo active et Focus redemandées en grand au clic (une vignette de
     2 048, sinon un rendu juste après une retouche), une photo verticale debout partout.
-13. Le résumé des réglages sur de vraies photos de Dany retouchées à la main, et sur un JPEG : le
+13. **Ouvert.** Le résumé des réglages sur de vraies photos de Dany retouchées à la main, et sur un JPEG : le
     profil par défaut d'un JPEG (Embedded, supposé), une photo importée avec un paramètre prédéfini
     (`editCount` à 0), et Claude qui en tient compte sans le répéter.
-14. Plus rien sur l'étalonnage : `get_status` dans Claude Desktop ne dit que le nom de l'écran, et
+14. **Fait** (règle du code : ni la fenêtre ni Claude ne lisent plus l'écran). Plus rien sur l'étalonnage : `get_status` dans Claude Desktop ne dit que le nom de l'écran, et
     aucune remarque d'écran au premier aperçu d'une session.
-15. Le résumé en haut du fil : les textes que rendent les lectures groupées de Lightroom 15.6 pour la
+15. **Ouvert.** Le résumé en haut du fil : les textes que rendent les lectures groupées de Lightroom 15.6 pour la
     focale, l'ouverture, la vitesse et l'ISO (supposés ceux de `getFormattedMetadata`), la date à
     l'heure locale, sa durée sur une sélection de 500 photos et plus, le résumé qui reste entre
     l'historique et la première demande pendant que Claude écrit, refait à la fin du tour sans
@@ -7887,7 +7992,8 @@ disque, que ni Lightroom ni Claude ne demandent) ; d'où le repli par `tmutil de
 le nom des dossiers de sauvegarde « AAAA-MM-JJ HHMM » dans Backups (celui de Lightroom Classic,
 supposé) ; `tmutil isexcluded` sur un volume externe, sans demande d'autorisation de macOS ;
 `LR_size_resolution` dans le fichier livré (300 ppp) ; une vidéo dans une collection, sautée par le
-tri et la livraison. Les recettes des styles sont des recettes de départ, choisies par Claude
+tri et la livraison (trié le 2 novembre 2026 : tout est encore **ouvert**, repris dans À vérifier à la
+prochaine recette). Les recettes des styles sont des recettes de départ, choisies par Claude
 hors de Lightroom : à juger à l'œil sur de vraies photos et à ajuster avec Dany. Le rendu
 reproductible se gardait à la fin de `photo_lesson` ; depuis le correctif 1.3.6, au `view_photo`
 avec `compare = before_claude` (voir Correctif 1.3.6).
@@ -7915,7 +8021,9 @@ standard de notation le dit (plancher technique).
 plus bas est sous 220 et son C* d'au moins 30, sinon par la luminance. La lecture dit la
 correction qui va : Hautes lumières ou Blancs pour la luminance ; TSL de la bande la plus touchée
 (teinte TSV la plus proche des huit bandes de Lightroom) ou profil pour la gamme, en disant que
-baisser les Hautes lumières éteindrait la photo. Seuils provisoires, choisis hors de Lightroom.
+baisser les Hautes lumières éteindrait la photo. Seuils provisoires, choisis hors de Lightroom
+(repris par le Relevé des seuils, A4 : `ecretageMin` à 0,13 depuis la 1.6.1 ; `basGamme` et
+`chromaGamme` attendent l'œil).
 
 **Carte du masque** (`CarteMasque.swift`, `ToolHandler.cartesDesMasques`, `add_mask` avec
 `mask_map`). Lightroom ne dit pas où porte un masque : le serveur fait rendre la photo avec chaque
@@ -7929,7 +8037,9 @@ blocs JPEG du bord ne bougeant que de 1 à 3 (supposé, à constater). Puis Visi
 Chaque rendu témoin laisse ses deux étapes « Claude · essai » dans l'Historique, comme toute
 proposition. À constater dans Lightroom : l'écart hors du masque (zéro attendu), un masque IA
 calculé pour le témoin comme pour la vraie écriture, la durée par masque ; l'étape « carte du
-masque » de `--portrait` en est le premier relevé.
+masque » de `--portrait` en est le premier relevé (**fait** : elle passe à chaque recette depuis la
+1.3.4, la dernière à la 1.6.2, 10 s, peau 78,3 % du visage, arrière-plan 0 % ; les seuils des
+alertes passent au relevé B2 du Relevé des seuils).
 
 **Points chauds** (`PointsChauds.swift`, clé `points_chauds` des mesures de `view_photo`, aperçu
 entier seulement). Grille de 24 cases sur le grand côté ; une case chaude dépasse la médiane de L*
@@ -7937,7 +8047,8 @@ de 20 et atteint 70 ; les cases voisines forment une zone, gardée entre 0,3 % e
 écartée si 30 % de son cadre tombe dans un visage ou la zone d'intérêt de Vision (une zone
 d'intérêt de plus de la moitié de l'image ne compte pas). Cinq zones au plus, de la plus forte.
 Rien n'est corrigé d'office : la lecture le dit. Seuils provisoires : à relever sur une fenêtre
-dans un intérieur, une nappe, un ciel blanc derrière un portrait.
+dans un intérieur, une nappe, un ciel blanc derrière un portrait (repris par le Relevé des seuils,
+A5 : planches de Dany).
 
 ## 1.6 : recherche par le sens
 
@@ -8037,7 +8148,9 @@ description de `find_photos`, aucun code.
 
 Par l'orchestrateur, avant la publication ; aucune commande n'écrit au catalogue.
 
-1. **Compilation et description sous le runtime durci** (C2) : après `./build.sh --install`,
+Trié le 2 novembre 2026 : chaque point dit s'il est **fait**, **sans objet** ou encore **ouvert** ; les points ouverts sont repris, une ligne chacun, dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
+
+1. **Fait** (2 novembre 2026). **Compilation et description sous le runtime durci** (C2) : après `./build.sh --install`,
    `~/Library/Application\ Support/Developpeur/mcp-developpeur --preparer-sens "a photo of a dog" >
    preparer.json` ; regarder `ok`, `compilation_s`, `description` (entrée `image` 256 × 256 ? entrée
    `text` [1, 77] en int32 ? sortie de 512), `jetons` (49406 320 1125 539 320 1929 49407), `texte_ms`,
@@ -8057,7 +8170,7 @@ Par l'orchestrateur, avant la publication ; aucune commande n'écrit au catalogu
    1,1 s, puis 0,1 s ; texte 1 484 ms au premier appel, 142 ms ensuite ; image 13 à 19 ms.
    `Suivi.delaiOuvertureSens` (10 s) et `Releve.ALARME_COMPILATION` (300 s) gardent une large marge :
    inchangés.
-2. **Jetons contre open_clip** (critique adverse) : dans un env jetable, `open_clip.tokenize` et
+2. **Ouvert.** **Jetons contre open_clip** (critique adverse) : dans un env jetable, `open_clip.tokenize` et
    l'encodeur de texte d'open_clip (MobileCLIP-S2, `datacompdr`) sur les phrases de
    Tests/Contrats/jetons-clip.json ; cosinus avec `vecteur_texte_debut` et les vecteurs de
    `--preparer-sens` d'au moins 0,999. Sinon : la découpe ou le nettoyage du tokeniseur à revoir.
@@ -8065,7 +8178,7 @@ Par l'orchestrateur, avant la publication ; aucune commande n'écrit au catalogu
    `datacompdr`). Les jetons restent vérifiés par la seconde implémentation en Python sur le vrai
    vocabulaire (`TokeniseurCLIPTests`) et les jetons de « a photo of a dog » par le point 1 ; le
    cosinus des vecteurs de texte avec open_clip n'est pas constaté.
-3. **Qualité sur les photos de Dany** (C4 réduit) : `mcp-developpeur --sens-essai --collection
+3. **En partie fait** (2 novembre 2026, 196 photos : pas de préfixe) ; **ouvert**, avec Dany : le seuil de pertinence. **Qualité sur les photos de Dany** (C4 réduit) : `mcp-developpeur --sens-essai --collection
    "<collection de 200 photos variées choisie avec Dany>" --nombre 200 --requetes '[…10 phrases
    de Dany, en anglais…]' > essai.json 2>essai.log` (Lightroom ouvert, liaison démarrée, en
    arrière-plan ; lecture seule) ; pour chaque requête, regarder si les photos que Dany attend sont
@@ -8102,13 +8215,13 @@ Par l'orchestrateur, avant la publication ; aucune commande n'écrit au catalogu
    laquelle il n'y a plus de bonne photo » ne donne pas de valeur nette). **À faire avec Dany** :
    refaire le relevé sur l'index du Suivi rempli (point 4) avec ses propres phrases, et juger s'il
    faut ajouter un plancher de score brut (vers 0,18) pour ne rien rendre quand rien ne répond.
-4. **Le Suivi qui remplit l'index** : Lightroom relancé (Releve.lua change), la fenêtre Claude ouverte
+4. **Ouvert.** **Le Suivi qui remplit l'index** : Lightroom relancé (Releve.lua change), la fenêtre Claude ouverte
    sur une sélection de quelques centaines de photos déjà analysées : le journal du module dit
    « Suivi : recherche par le sens (règles 1) » ; `get_status` voit `photos_indexees` monter ; un lot
    de 10 en empreinte seule reste sous l'alarme de 60 s (la première compilation comprise, ou faire
    d'abord le point 1) ; `du -sh ~/Library/Application\ Support/Developpeur/Index`. Dans le
    journal, aucune photo en `delai` ni `sens_erreur` (« ne fait plus l'empreinte du sens »).
-5. **Une recherche dans la fenêtre Claude** sur la collection Essais (rien n'est écrit) : « retrouve
+5. **Ouvert.** **Une recherche dans la fenêtre Claude** sur la collection Essais (rien n'est écrit) : « retrouve
    les photos de neige » ; puis avec une date et une note ; le temps de `find_photos` à froid (premier
    appel du processus : l'ouverture de l'encodeur de texte). Puis une recherche avec un critère qui
    écarte beaucoup (`collection` ou `keyword` d'une personne) sur tout le catalogue : le temps d'une
@@ -8312,20 +8425,20 @@ d'ids désignaient une autre photo et combien de notes restent d'auteur inconnu 
 photo », ou plus de 5 % de notes inconnues dans A2 ou A5, se signalent dans le compte rendu (lot
 tiré d'un autre catalogue, ou `suivi.json` en retard).
 
-1. **Premier lot d'essai** : un lot de 10 photos anciennes (avant 2018) pris dans `lots/A1.json`,
+1. **Fait** (2 novembre 2026, ci-dessous). **Premier lot d'essai** : un lot de 10 photos anciennes (avant 2018) pris dans `lots/A1.json`,
    en `--par 10` à 1 024, 1 344 et 2 048 px (`--taille`) : durée par commande (console,
    `duree_lot_s`), taille réelle (`cote`), heure à la seconde (`date_secondes` ; sinon le format de
    `date` à ajouter à `Tri.date`), et si `Previews.lrdata` grossit (`du -sh` avant et après). Il
    dit si `--par 15` tient sous les 60 s du module.
-2. **Collecte** de chaque lot : `$B --mesures --collecter "$R/lots/A1.json" "$R/A1"` (A1 à A8 ;
+2. **Fait** (2 novembre 2026). **Collecte** de chaque lot : `$B --mesures --collecter "$R/lots/A1.json" "$R/A1"` (A1 à A8 ;
    A1 aussi en `--taille 2048` dans `"$R/A1-2048"` pour 8 recadrages par tranche ; A7 en
    `--taille 1344`, la taille de l'aperçu de `view_photo`), puis
    `$B --mesures --mesurer "$R/A1"`.
-3. **A1 et A2, condition** : 20 photos de `A1` comparées entre `mesures.csv` et
+3. **Fait** (2 novembre 2026). **A1 et A2, condition** : 20 photos de `A1` comparées entre `mesures.csv` et
    `$B --constats <id>…` (aperçu à 1 344 px, lecture seule).
-4. **A3, A5, A6, A7** : planches à juger à l'œil (Claude, puis Dany pour A5 et A7) ; A7 : les 60
+4. **En partie fait** (A6 fixé) ; **ouvert**, avec Dany : les planches d'A3, A5, A6 et A7. **A3, A5, A6, A7** : planches à juger à l'œil (Claude, puis Dany pour A5 et A7) ; A7 : les 60
    photos retenues passées à `$B --eclairage "$R/A7/vignettes/1344/<id>.jpg"…`.
-5. **B1 (bilan)** : pas par `--call` (chaque appel est un nouveau processus, le bilan y repart de
+5. **Ouvert** (sur l'ordre de Dany). **B1 (bilan)** : pas par `--call` (chaque appel est un nouveau processus, le bilan y repart de
    zéro), mais dans une session de Claude Code où le connecteur du dépôt (`.build/debug`) est
    inscrit, sur 8 **nouvelles** copies virtuelles remises à l'origine puis rangées dans Essais (une
    par genre : paysage, portrait, intérieur, nuit, macro, ISO 6400, contre-jour, neige). Par copie :
@@ -8335,12 +8448,12 @@ tiré d'un autre catalogue, ou `suivi.json` en retard).
    (relever `bilan.ecarts` et `regression`, garder l'image à 100 % pour le jugement), puis
    `undo_last`. Copies remises à l'origine à la fin. Le relevé va dans un CSV (copie, retouche,
    netteté %, bruit, écrêtage, part saturée, regression, visible oui ou non).
-6. **B2 (masques)** : même session, 40 masques sur 10 nouvelles copies d'Essais (ciel, sujet,
+6. **Ouvert** (sur l'ordre de Dany). **B2 (masques)** : même session, 40 masques sur 10 nouvelles copies d'Essais (ciel, sujet,
    personne, arrière-plan, objet, combinés « ciel sans le bâtiment », radial), `add_mask` avec
    `mask_map = true` (rien n'est gardé, aucun `undo_last` à faire) ; relever pour chaque masque la part, le débord
    sur les visages, la hauteur du centre du ciel et la couverture des visages, et les `alertes` ;
    juger le rendu témoin à l'œil ; copies remises à l'origine à la fin.
-7. Chaque seuil reçoit la valeur que donne sa règle ; le compte rendu (artefact) les présente avant
+7. **En partie fait** (A2, A4, A6, A8 changés en 1.6 et 1.6.1 ; compte rendu `docs/artefacts/releve-seuils.html`). Chaque seuil reçoit la valeur que donne sa règle ; le compte rendu (artefact) les présente avant
    tout changement de code.
 
 
@@ -8392,6 +8505,8 @@ et les aperçus de `--constats` seulement).
    `Suivi.reglesAnalyse` à 2 (le module refait toute l'analyse du Suivi) ; A4 `ecretageMin` passe à
    0,13. Tests `testUneImageSombreSansPartieClaireEstSousExposeeSaufVoulueSombre` (26 ne se dit plus
    sous-exposée) et `testLaNatureNeSeDitQuAuDelaDuSeuilReleve`. Reste l'œil sur 50 sous-expositions.
+
+Trié le 2 novembre 2026 : restent **ouverts** A1 (recadrages), A2 (l'œil sur 50 sous-expositions), A3, A4 (`basGamme`, `chromaGamme`), A5, A6 (`pauseMax`, `distanceMemeLieu`), A7 (planches de Dany), B1, B2 et le lot C : voir [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
 
 ## Bibliothèque
 
@@ -9001,19 +9116,19 @@ un trait d'un pixel retiré, dans la zone changée ; la zone donnée prise en en
 
 Dans Lightroom :
 
-- la place de la photo dans la pile, repliée ou non (`catalog:addPhoto` avec la pile `'above'` sur
+- **Fait** (29 octobre 2026) : la place de la photo dans la pile, repliée ou non (`catalog:addPhoto` avec la pile `'above'` sur
   l'original : constaté le 29 octobre 2026) ;
-- la photo ajoutée illisible dans l'écriture qui l'a créée, et relue juste après ;
-- un chemin déjà au catalogue refusé par `addPhoto` ;
-- la valeur de retour de `LrFileUtils.copy` (la copie dans le dossier de l'original a réussi :
+- **Ouvert** : la photo ajoutée illisible dans l'écriture qui l'a créée, et relue juste après ;
+- **Ouvert** : un chemin déjà au catalogue refusé par `addPhoto` ;
+- **Fait** (29 octobre 2026) : la valeur de retour de `LrFileUtils.copy` (la copie dans le dossier de l'original a réussi :
   constaté le 29 octobre 2026) ;
-- la nouvelle photo rendue active et sélectionnée quand la source affichée est une collection
+- **Ouvert** : la nouvelle photo rendue active et sélectionnée quand la source affichée est une collection
   (Essais) (active depuis le dossier de l'original : constaté le 29 octobre 2026) ;
-- `addPhoto` sans pile (photo d'essai), puis la photo ajoutée à la collection Essais dans
+- **Ouvert** : `addPhoto` sans pile (photo d'essai), puis la photo ajoutée à la collection Essais dans
   l'écriture suivante ;
-- sous « Copies virtuelles seulement », `createVirtualCopies` sur la photo importée juste après son
+- **Ouvert** : sous « Copies virtuelles seulement », `createVirtualCopies` sur la photo importée juste après son
   ajout, et la copie rendue active ;
-- l'accord dans Lightroom demandé une seule fois (exportation puis importation).
+- **Ouvert** : l'accord dans Lightroom demandé une seule fois (exportation puis importation).
 
 Constaté le 29 octobre 2026 (essai réel, détails sous « Constaté à l'essai réel » plus bas) :
 `addPhoto` empilé au-dessus de l'original, dans son dossier, et la nouvelle photo rendue active ;
@@ -9022,10 +9137,10 @@ compris).
 
 Côté Fibo 2, reste :
 
-- le seuil de la zone changée (`seuilEcart`) sur d'autres sorties : Fibo peut décaler un peu les
+- **Fait** (1er novembre 2026 au soir : la part changée ne dépasse le masque que de 1,1 à 1,6 point) : le seuil de la zone changée (`seuilEcart`) sur d'autres sorties : Fibo peut décaler un peu les
   couleurs de toute l'image ;
-- la durée en qualité rapide, et celle du premier téléchargement du modèle ;
-- la mémoire en pointe du connecteur sur une grande photo.
+- **En partie fait** (qualité rapide : 41 s, 29 octobre 2026 au soir ; le premier téléchargement : sans objet, déjà fait) : la durée en qualité rapide, et celle du premier téléchargement du modèle ;
+- **Fait** (1er novembre 2026 : environ 12,4 Go en qualité équilibrée, sur 26 Mpx) : la mémoire en pointe du connecteur sur une grande photo.
 
 ### Recadrage, plusieurs modifications, SeedVR2 (29 octobre 2026)
 
@@ -9174,13 +9289,13 @@ la remise à l'origine.
 
 Reste à constater (les essais passent par de faux scripts qui écrivent un PNG) :
 
-- la mémoire en pointe de SeedVR2 7B avec `--low-ram` ;
-- la durée en qualité rapide, avec deux à quatre modifications, et le temps restant annoncé contre
+- **Fait** (1er novembre 2026 : 12,4 Go en tout, SeedVR2 compris) : la mémoire en pointe de SeedVR2 7B avec `--low-ram` ;
+- **Ouvert** : la durée en qualité rapide, avec deux à quatre modifications, et le temps restant annoncé contre
   le temps vrai ;
-- SeedVR2 7B contre la mise à la taille ordinaire sur la même zone, et ses bornes (× 4, 16 Mpx) ;
-- la progression de SeedVR2, lue sur ses barres tqdm hors chargement (approximative), et son poids
+- **Ouvert** : SeedVR2 7B contre la mise à la taille ordinaire sur la même zone, et ses bornes (× 4, 16 Mpx) ;
+- **Ouvert** : la progression de SeedVR2, lue sur ses barres tqdm hors chargement (approximative), et son poids
   de 15 % dans la barre ;
-- la marge de contexte (`margeContexte`, `contexteMin`) sur d'autres photos (une zone contre un
+- **Ouvert** : la marge de contexte (`margeContexte`, `contexteMin`) sur d'autres photos (une zone contre un
   bord, une zone allongée).
 
 ### Masque de Lightroom (`mask`, 29 octobre 2026)
@@ -9373,7 +9488,9 @@ Le test ne borne strictement la durée (30 s) que compilé pour la publication ;
 (la machine virtuelle des tests GitHub est plusieurs fois plus lente que le Mac Studio). Ni le
 décodage des JPEG pleine taille ni la recomposition ne sont dans ces chiffres.
 
-Reste à constater dans Lightroom : les deux rendus pleine taille d'`essayer` sur 26 Mpx (leur durée,
+Reste à constater dans Lightroom (trié le 2 novembre 2026 : l'alignement au TIFF exporté et le bord
+doux sont **faits**, 29 octobre au soir et 31 octobre ; le reste est **ouvert**) : les deux rendus pleine
+taille d'`essayer` sur 26 Mpx (leur durée,
 leurs JPEG, le calcul du masque IA avant chacun), leur alignement au pixel avec le TIFF exporté
 (même cadre, même taille), les deux témoins sur un noir pur, un fond très sombre et un blanc brûlé,
 le bord doux dans un essai réel (cheveux), une personne non reconnue
@@ -9509,7 +9626,8 @@ default` dans `fibo2_core.py`), et Fibo 2 Studio ne passe rien par défaut. Elle
 cette légende, jamais en mots libres (`Generatif.legendeExclusion` : les clés de la légende nulle,
 dans son ordre, vides, les termes sous `aesthetics.artifacts`, comme le négatif de génération de la
 fiche du modèle, `TEXT_TO_IMAGE_NEGATIVE` ; JSON compact écrit à la main). Le guidage pousse entre la
-fiche et cette légende : son effet sur le rendu reste à constater (même graine, avec et sans). Hors Turbo seulement : Turbo est distillé sans guidage (CFG), Fibo 2 Studio ne la
+fiche et cette légende : son effet sur le rendu reste à constater (même graine, avec et sans ; **fait**
+le 1er novembre 2026 au soir, plus bas : la même graine ne redonne pas le même dessin). Hors Turbo seulement : Turbo est distillé sans guidage (CFG), Fibo 2 Studio ne la
 lui passe pas, et mflux ne la lit qu'au guidage au-dessus de 1 (`GUIDANCE_OPTIONS`). La réponse la
 dit par modification (`exclusion`) ; en Turbo, `remarque_guidage` dit qu'`avoid` (et `guidance`)
 n'ont pas servi.
@@ -9564,7 +9682,8 @@ renverrait à `kind` et `add_mask`.
 Le réglage léger de FIBO-vlm a réussi son essai réel de bout en bout dans `generative_edit` le
 29 octobre 2026 au soir (Turbo, arrière-plan de Times Square : fiche en 35 s, appel en 74 s,
 environ 10 Go résidents pendant la fiche) : `structured_prompt` est vrai par défaut depuis.
-Provisoire et reste à constater : la mémoire en pointe de la fiche dans le connecteur (mesurée hors
+Provisoire et reste à constater (trié le 2 novembre 2026 : la qualité équilibrée et la phrase
+d'exclusion sont **faites** le 1er novembre ; le reste est **ouvert**) : la mémoire en pointe de la fiche dans le connecteur (mesurée hors
 de lui seulement ; `dureeFicheEstimee`, `delaiFiche`), l'effet de la fiche sur le rendu, le rendu de la qualité équilibrée sur de vraies photos de Dany,
 l'effet de la phrase d'exclusion par défaut, le masque peint au pinceau dans un vrai Lightroom (sa
 copie dans le témoin rendue comme le sien, son bord doux lu), et `HF_HUB_OFFLINE` avec le modèle du
@@ -9613,8 +9732,8 @@ de l'arrière-plan, référence la copie d'essai de la dune DSCF1595, graine 42)
 36 s de Fibo 2 ; entrée 1 248 × 832, sortie alignée sur elle (la femme au même endroit, intacte) ;
 le décor de la dune repris en entier (ciel, arbres, sable, voiture téléguidée, et le petit
 personnage au loin, recopié lui aussi : trop petit pour un visage) ; aucune seconde tête ; bord des
-cheveux doux. Reste à constater : hors Turbo (exclusion et guidage), un vêtement, une personne
-recopiée assez grande pour `a_verifier`.
+cheveux doux. Reste à constater : hors Turbo (exclusion et guidage), un vêtement (**faits** le 1er
+novembre 2026), une personne recopiée assez grande pour `a_verifier` (**ouvert**).
 
 Constaté le 1er novembre 2026 (essai réel en qualité équilibrée, nouvelle copie d'essai « Essai Fibo
 équilibrée » de DSCF2402.RAF, `region` sur la voiture orange en bas à gauche, 0 ; 0,74 ; 0,2 ×
@@ -9828,7 +9947,7 @@ copies virtuelles d'« Développeur › Essais » remises à l'origine, sortie d
 arrière-plan, jamais tronquée ; `--balayage` laisse deux étapes « Claude · essai » par rendu (29
 rendus, 58 étapes) : le défaire ensuite (revert_to_original).
 
-1. **Signature de vraies références** (fixe `Reference.chromaZone`, `partMinZone`,
+1. **Fait** (2 novembre 2026, ci-dessous). **Signature de vraies références** (fixe `Reference.chromaZone`, `partMinZone`,
    `pixelsMinZone`, `seuilBandeNoire`) : `./.build/debug/mcp-developpeur --etalonnage <id>…
    [<fichier.jpg>…]`, lecture seule, sur 3 ou 4 références retouchées par Dany (un rendu marqué
    ombres froides / hautes lumières chaudes, un noir et blanc viré, une photo sans gris) et un
@@ -9836,26 +9955,26 @@ rendus, 58 étapes) : le défaire ensuite (revert_to_original).
    trois zones lues, leur a*b* stable d'une borne à l'autre au-delà de 20, la part lue, les bandes
    noires dites. Garder la plus petite borne qui lit les trois zones sans que la couleur d'un
    objet (feuillage, ciel) ne tire une zone.
-2. **Teinte et saturation de l'étalonnage → a*b*** (fixe `Reference.ancresTeinte`,
+2. **Fait** (2 novembre 2026). **Teinte et saturation de l'étalonnage → a*b*** (fixe `Reference.ancresTeinte`,
    `gainDepart`) : `--etalonnage <copie> --balayage` sur une copie d'un RAW X-H2S avec sa
    simulation, puis Adobe Couleur si le temps le permet. Le résumé donne, par zone et teinte (0 à
    300 de 60 en 60, saturation 25), l'angle a*b* mesuré (→ `ancresTeinte`) et le gain par point
    (→ `gainDepart`, moyenne par zone) ; les saturations 12, 25, 50 à la teinte 30 disent si le
    gain est linéaire ; les décalages des autres zones, le débordement (Fusion 50).
-3. **Vibrance → chroma des couleurs vives** (fixe `Reference.vibranceParChromaDepart`) : même
+3. **Fait** (2 novembre 2026) ; **ouvert** : la chroma des couleurs vives que l'étalonnage déplace. **Vibrance → chroma des couleurs vives** (fixe `Reference.vibranceParChromaDepart`) : même
    balayage, lignes Vibrance ±30 (`vibranceParChroma` du résumé, sur la chroma des pixels de
    C* ≥ `chromaZone`) ; noter la différence entre −30 et +30, et, sur les lignes d'étalonnage
    seul, que « Δ chroma des couleurs vives » reste sous 1 (sinon la Vibrance recompterait
    l'étalonnage). Sur une photo sans couleurs vives, la ligne dit « non lue ».
-4. **EnableSplitToning** : `--dump <copie>` après un `apply_settings` d'une seule
+4. **Fait** (2 novembre 2026). **EnableSplitToning** : `--dump <copie>` après un `apply_settings` d'une seule
    `SplitToningShadowSaturation` (sur une copie remise à l'origine) : `EnableSplitToning = true`
    posé par Lightroom, et le rendu change bien (sinon l'écrire avec l'étalonnage).
-5. **Un essai réel** : `--call match_look '{"reference_id": <référence>, "photo_id": <copie>}'`
+5. **Fait** (2 novembre 2026) ; **ouvert**, avec Dany : le rendu côte à côte et `Teint.deplacementVisible`. **Un essai réel** : `--call match_look '{"reference_id": <référence>, "photo_id": <copie>}'`
    (plan seulement), puis avec `"confirm": true` sur une copie d'Essais, défait ensuite : deux passes
    au plus, `rapproche_pct`, `limites`, et le rendu à l'œil côte à côte. Avec un portrait
    (`protect_skin`), le déplacement de la peau (`teint.deplacement_ab`) fixe `Teint.deplacementVisible`
    pour match_look.
-6. **Scènes différentes** (fixe `Reference.seuilScenes`) : la distance des bandes lue entre une
+6. **Fait** (2 novembre 2026). **Scènes différentes** (fixe `Reference.seuilScenes`) : la distance des bandes lue entre une
    référence de forêt et une photo de plage, et entre deux photos de même scène.
 
 **Constaté le 2 novembre 2026** (Lightroom Classic 15.6, exécutable de développement ; relevés
@@ -9913,6 +10032,8 @@ déplace (3) ; l'ordre du traitement (étalonnage avant ou après le profil).
 Le rendu non linéaire de l'étalonnage (Fusion, profil) ne s'imite pas dans `swift test` : le faux
 rendu des tests (gain réel 0,6, plus fort que le modèle) vérifie seulement que la passe 2 corrige
 d'après la mesure. L'ordre du traitement (étalonnage avant ou après le profil) n'est pas constaté.
+
+Trié le 2 novembre 2026 : les six relevés sont **faits** ; les « Restent provisoires » ci-dessus sont **ouverts** et repris dans [À vérifier à la prochaine recette](#à-vérifier-à-la-prochaine-recette).
 
 ## Mode HDR
 

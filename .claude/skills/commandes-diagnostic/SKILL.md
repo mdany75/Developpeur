@@ -88,6 +88,11 @@ l'étape du témoin à une seule lumière ne vient que si le RAW de `--recette` 
 sortie dans un fichier, en arrière-plan, jamais tronquée (`| head` coupe la recette au milieu d'une
 étape) ; puis l'essai dans la fenêtre Claude (skill `publier-version`, étape 3)
 
+Ce qui reste à voir dans Lightroom, hors des étapes de la recette : `docs/SPEC.md`, À vérifier à la
+prochaine recette (les seuls points encore ouverts des sections « À constater », un par ligne, avec
+leur lien et la façon de les voir : dans la recette, à la main dans Lightroom, ou avec Dany). Un
+point constaté passe dans sa section et sort de cette liste.
+
 ## Réglages à plat
 
 `./.build/debug/mcp-developpeur --dump [<id>]` (une clé par ligne, pour `diff` avant et après une
