@@ -174,7 +174,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?`, `entier?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier ; après la 1.1.1, sur un zoom `region` aussi, jamais sur un avant/après), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`, et depuis la 1.3.1 `sensibilite`, l'ISO en nombre, pour le carnet de progrès), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point ; avec `point_af` aussi (1.2), `etapes_claude` (`nombre`, `derniere` : les étapes de Claude gardées pour la photo, `etapesClaude`, lues seulement), pour le bilan de `view_photo` (voir Bilan d'une passe à l'autre) ; de la 1.3 à la 1.3.5, `comparer = versionClaude` rendait la version de Claude d'un exercice « Je le fais » et `exercice`, retirés au correctif 1.3.6 avec lui (voir Je le fais) : `comparer` ne vaut plus que `avantClaude` ou `etapePrecedente` ; avec `entier` (1.3, `read_composition`), l'image entière sans son cadre, `image_entiere` = vrai, `dimensions` {`largeur`, `hauteur`}, `cadre_actuel` (absent sans recadrage), refusé avec `comparer` ou `point_af` (voir Composition lue) |
 | `appliquer` | `photos?` ou `selection?`, `reglages`, `booleens?`, `looks_traitement?`, `profil?`, `profil_marque?`, `profil_variantes?`, `profil_look?`, `recadrage?`, `recalages?`, `courbes?`, `couleurs_ponctuelles?`, `balance?`, `auto_ton?`, `preset?`, `plages`, `libelles`, `relatif`, `etape`, `raison?`, `confirme` | par photo : `changements` (`cle`, `avant`, `apres`) et `remarques` ; `a_recadrer` et `etape_ecrite` quand un cadre demandé reste à placer (voir Recadrage) |
 | `recadrer` | `photos`, `recadrage`, `recalages`, `completer?`, `etape`, `raison?`, `confirme` | comme `appliquer` (changements du cadre seulement) |
-| `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme`, `releve_formes?` (développement : `DEVELOPPEUR_RELEVE_FORMES=1`) | comme `appliquer`, plus `lightroom` (la version) et, par photo, `masques_relus` (`nom`, `verdict`, `ecarts?`) et, avec `releve_formes`, `releve_formes` ; voir Masques relus après l'écriture (1.6) |
+| `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme`, `releve_formes?` (développement : `DEVELOPPEUR_RELEVE_FORMES=1`) | comme `appliquer`, plus `lightroom` (la version) et, par photo, `masques_relus` (`nom`, `verdict`, `ecarts?`, `retrait?` depuis la 1.6.3) et, avec `releve_formes`, `releve_formes` ; voir Masques relus après l'écriture (1.6) |
 | `ameliorer` | `photo?`, `ameliorations` (`nom` : `denoise`, `rawDetails` ou `superRes`, `actif`, `intensite?`), `libelles`, `etape`, `raison?`, `confirme` | comme `appliquer`, plus `amelioration` (état après le calcul) |
 | `retoucher` | `photo?`, `taches`, `yeux`, `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
 | `geometrie` | `photo?`, `photos?` ou `selection?`, `rendre?`, `taille?` | `photos` : par photo, `active` (correction géométrique), `transformation` (Upright, perspective ou distorsion manuelle), `empreinte` ; avec `rendre`, `chemin_corrige` et `chemin_origine` (voir Recalage de la géométrie) |
@@ -3512,7 +3512,9 @@ majuscules ou non, même répété) perd ce préfixe avant : il n'est jamais dou
 ## Masques relus après l'écriture (1.6)
 
 Chantier « masques » de la 1.6, réduit par Dany le 1er novembre 2026 : les masques relus
-**signalent sans retirer**. Jusqu'à la 1.5, seul l'avertissement de version
+**signalaient sans retirer**. Depuis la 1.6.3 (décision de Dany du 2 novembre 2026, « le retirer
+et le dire »), un masque mal gardé est retiré et dit : voir Retrait d'un masque mal gardé
+(1.6.3), plus bas. Jusqu'à la 1.5, seul l'avertissement de version
 (`ToolHandler.avertissementFormesMasques`, une autre version que la 15.6) disait que les formes
 pouvaient être mal rangées. Depuis la 1.6, chaque `masquer` relit ce que Lightroom a gardé.
 
@@ -3545,28 +3547,38 @@ pouvaient être mal rangées. Depuis la 1.6, chaque `masquer` relit ce que Light
 - **Verdicts** (`masques_relus` de chaque photo, dans l'ordre des masques relus) : `gardé` (aux
   tolérances près, rien n'est dit) ; `écart` (au moins une clé hors tolérance, ou perdue, ou une
   structure changée : `ecarts` les donne, `composant`, `cle`, `ecrit`, `relu`, `ecart`, `genre`
-  `structure`, `position`, `angle` ou `valeur` ; une remarque « Masque « X » : Lightroom ne l'a pas
-  gardé tel qu'écrit (… trois écarts au plus) ; le vérifier avec view_photo et dire à l'utilisateur
-  s'il est mal placé (rien n'est retiré). ») ; `absent` (correction introuvable, et dite ; un
+  `structure`, `position`, `angle` ou `valeur`) : depuis la 1.6.3, le masque est retiré et le
+  verdict devient `retiré` (voir plus bas) ; il ne reste `écart` que si le retrait a échoué
+  (`retrait` = `échoué`) ; `absent` (correction introuvable, et dite ; un
   masque que le module a retiré lui-même — masque vide, personne non reconnue — n'est pas relu) ;
   `à relire` (des masques IA de la photo attendent encore leur calcul, ou la liste changeait
   encore à la dernière lecture : Lightroom peut la réécrire au premier rendu ; les écarts vus
-  restent dits).
-- **Rien n'est retiré** dans la 1.6 : ni écriture, ni étape de plus ; `undo_last` défait l'étape
-  comme avant.
+  restent dits, « … (pas retiré : Lightroom le calculait encore). », jamais retirés).
+- **Rien n'était retiré** dans la 1.6 (jusqu'à la 1.6.2) : ni écriture, ni étape de plus ; la
+  remarque d'un écart finissait par « (rien n'est retiré) ».
 - **Serveur** (`ToolHandler.alerteFormes`) : sur une autre version que la 15.6, l'avertissement
   devient « Lightroom Classic X : dégradés, pinceaux et plages relus, gardés tels qu'écrits. »
   quand **tous** les verdicts de l'appel sont `gardé` (avec, s'il y a un objet ou une personne
-  précise, « Objets et personnes précises non relus : vérifier le premier avec view_photo. ») ; il
-  reste entier sinon (un `écart`, `absent`, `à relire`, ou un module sans `masques_relus`).
-  `get_status` garde l'avertissement entier. La description d'`add_mask` le dit en une phrase,
-  avant le résumé du tireur ; rien dans les consignes du connecteur ni de la fenêtre.
+  précise, « Objets et personnes précises non relus : vérifier le premier avec view_photo. ») ;
+  depuis la 1.6.3, quand ils sont tous `gardé` ou `retiré` avec au moins un `retiré`, « Lightroom
+  Classic X : dégradés, pinceaux et plages relus, les masques que Lightroom n'a pas gardés tels
+  qu'écrits sont retirés (masques_relus) : les reposer autrement, vérifier le premier reposé
+  (add_mask avec mask_map, ou view_photo) avant d'en poser d'autres, et le dire à l'utilisateur. »
+  (un `retiré` prouve que cette version range mal les formes : le masque reposé se vérifie, comme
+  dans l'avertissement entier) ;
+  il reste entier sinon (un `écart` dont le retrait a échoué, `absent`, `à relire`, ou un module
+  sans `masques_relus`). `get_status` garde l'avertissement entier. La description d'`add_mask` le
+  dit en une phrase (« un masque que Lightroom n'a pas gardé tel qu'écrit est retiré et dit, à
+  reposer autrement »), avant le résumé du tireur ; rien dans les consignes du connecteur ni de la
+  fenêtre.
 - **Simulation** (`Tests/Lua/Liaison/Simulation.lua`) : la règle du constat du 2 novembre 2026,
   `calculerFormes` (les formes calculées par Lightroom : toujours par le paramètre prédéfini, par
   `applyDevelopSettings` avec `S.negatifCharge`), et une « version future » pour les essais
   seulement, **pas un constat** :
   `S.formesIgnorees` (clés perdues), `S.arrondiFormes` (arrondi à n décimales), `S.angleFormes`
-  (angle rangé de 0 à 180). Essais : `Tests/Lua/Liaison/essais-masques-relus.lua`.
+  (angle rangé de 0 à 180) ; pour le retrait (1.6.3), `S.retraitMasques` (`erreur` : l'écriture
+  « Claude · masque retiré » échoue ; `ignore` : Lightroom garde la liste d'avant), pas un constat
+  non plus. Essais : `Tests/Lua/Liaison/essais-masques-relus.lua`.
 - **Recette** (`Recette.swift`, après l'étape du pinceau) : « masques relus : dégradé, radial,
   pinceau et plage gardés tels qu'écrits » pose quatre formes aux valeurs riches
   (`Recette.argumentsMasquesRelus`, angle −160 : le schéma d'`add_mask` refuse tout angle hors de
@@ -3590,6 +3602,49 @@ masque de l'appel, IA compris, `nom`, `correction_id`, `compare` (relu ou non), 
 composants tels qu'envoyés) et `relu` (ceux que Lightroom a gardés à la dernière lecture, ou
 « absent »). La comparaison ne dépend donc ni de la géométrie (correction d'objectif, recalage) ni
 d'un calcul refait hors de Lightroom.
+
+### Retrait d'un masque mal gardé (1.6.3)
+
+Décision de Dany du 2 novembre 2026 : « le retirer et le dire ». Sur toutes les versions de
+Lightroom Classic ; sur la 15.6, les 36 formes du relevé sont toutes `gardé` (constat du 2 novembre
+2026) : le retrait ne s'y déclenche donc jamais en pratique.
+
+- **Ce qui est retiré** (`Retouche.retirerMalGardes`, après `relireFormes`, avant
+  `noterEtatFinal`) : chaque masque au verdict **final** `écart`, en entier, avec tous ses
+  composants s'il est combiné (un ciel moins un dégradé mal gardé part entier : ne garder que le
+  ciel changerait le masque). Jamais un `absent`, ni un `à relire` (Lightroom calcule encore), ni
+  un masque IA seul ou un objet (jamais relus), ni un masque déjà sur la photo (celui de Dany, ou
+  repris par `existant` : seuls les masques nouveaux de l'appel sont relus). Le reste de la
+  retouche ne change pas.
+- **Quelle étape** : l'écart ne se voit qu'une fois l'étape écrite et relue (lectures stables de
+  `relireFormes`) : le retrait ne peut donc pas entrer dans l'écriture de l'étape. Il se fait en
+  **une** écriture de plus pour toute la commande, « Claude · masque retiré » (une ligne de
+  l'Historique de Lightroom et une opération d'Édition › Annuler, comme « Claude · personne non
+  reconnue » de `verifierPersonnes`), mais **dans l'étape de Claude** : ni étape de mémoire ni
+  entrée de journal de plus, même `etape_id`. Le changement des masques (`changements` de la
+  réponse, ligne de la fenêtre de la liaison) et l'entrée de l'étape au journal (`journalClaude`,
+  `export_journal`), écrits avant le retrait, sont refaits sans les masques retirés
+  (`Retouche.corrigerChangements` : « 3 masques (+ …) » au lieu de « 4 masques (+ …, X) » ; plus de
+  changement des masques si tous les masques ajoutés sont retirés), et l'entrée porte la `note`
+  « Masque retiré après l'écriture (Lightroom ne l'a pas gardé tel qu'écrit) : « X ». » (écriture
+  privée de la mémoire, sans opération d'Annuler). `undo_last` défait donc le tout d'un coup (l'état
+  d'avant de l'étape n'a pas le masque) ; `noterEtatFinal`, qui vient après, garde l'état sans le
+  masque (le retrait n'est pas pris pour une correction de Dany). Un ⌘Z de Dany défait d'abord le
+  retrait seul (le masque mal gardé revient), puis l'étape.
+- **Ce qui est dit** : le verdict devient `retiré` (les `ecarts` restent) et la remarque « Masque
+  « X » : Lightroom ne l'a pas gardé tel qu'écrit (… trois écarts au plus) ; il est retiré [avec
+  ses composants], le reste de la retouche est gardé. Le reposer autrement (une autre forme ou un
+  autre type de masque) s'il manque, et le dire à l'utilisateur. »
+- **Retrait échoué** : l'écriture passe par `LrTasks.pcall` et la liste est relue ensuite. Un
+  masque encore là (écriture refusée, Lightroom occupé, ou liste gardée telle quelle) reste
+  `écart` avec `retrait` = `échoué`, et la remarque dit « … et ne l'a pas laissé retirer (raison) ;
+  le vérifier avec view_photo et dire à l'utilisateur s'il est mal placé (undo_last défait toute
+  l'étape). » ; rien d'autre n'est défait, la réponse de l'étape est rendue.
+- **Sans constat possible aujourd'hui** : aucune version de Lightroom connue ne range mal une
+  forme ; la « version future » de la simulation (`S.formesIgnorees`, `S.arrondiFormes`,
+  `S.retraitMasques`) provoque l'écart et l'échec du retrait pour les essais. À la première version
+  qui change les formes (16.x), une recette dira si le retrait se fait comme prévu (étape « masques
+  relus » de `Recette.swift` : un `retiré` y serait déjà un échec, puisqu'elle attend `gardé`).
 
 ### À constater (masques relus, 1.6)
 
@@ -3641,8 +3696,8 @@ masques IA (ReferencePoint réécrit : confirme leur exclusion). Ce que ce relev
 `Locaux.TOLERANCES_FORMES.position` (10 × l'écart maximal relevé, 1e-5 au moins), `.angle` et la
 normalisation de l'angle (modulo 180 ou autre), `.valeur` et `.plancher`, et, si Lightroom borne, un bornage
 avant l'écriture ; chaque constat devient une règle de `Simulation.lua` avec son essai, et
-`provisoires` passe à faux. Le retrait d'un masque mal gardé (structure seule, en une écriture
-groupée avec `verifierPersonnes`) reste pour plus tard, sur une vraie 16.x.
+`provisoires` passe à faux. Le retrait d'un masque mal gardé, prévu ici pour une vraie 16.x, est
+fait dans la 1.6.3 pour toutes les versions (voir Retrait d'un masque mal gardé).
 
 **Constaté le 2 novembre 2026** (Lightroom Classic 15.6, module et serveur de `main`, relevé
 `DEVELOPPEUR_RELEVE_FORMES`) sur quatre nouvelles copies d'Essais remises à l'origine : A

@@ -19,6 +19,7 @@ local Recalage = require 'Recalage'
 local Reglages = require 'Reglages'
 
 local brut, decrire, dimensionsAffichees = Photos.brut, Photos.decrire, Photos.dimensionsAffichees
+local garder = Photos.garder
 local orientationAffichage, photoParId = Photos.orientationAffichage, Photos.photoParId
 local photosVisees, photoVisee = Photos.photosVisees, Photos.photoVisee
 local afficher, CLES_CADRE, estRaw = Reglages.afficher, Reglages.CLES_CADRE, Reglages.estRaw
@@ -30,7 +31,7 @@ local noterChangement, nouveauPlan = Plans.noterChangement, Plans.nouveauPlan
 local preparer, preparerContrainte = Plans.preparer, Plans.preparerContrainte
 local preparerCopie, preparerMasques = Plans.preparerCopie, Plans.preparerMasques
 local preparerTaches = Plans.preparerTaches
-local calculerIA, ecrire = Ecriture.calculerIA, Ecriture.ecrire
+local calculerIA, ecrire, ecrireMemoire = Ecriture.calculerIA, Ecriture.ecrire, Ecriture.ecrireMemoire
 local completerEtapes, ecrirePlans = Ecriture.completerEtapes, Ecriture.ecrirePlans
 local modeTexte, nomEtape, noterEtatFinal = Ecriture.modeTexte, Ecriture.nomEtape, Ecriture.noterEtatFinal
 local relireCadres, resultatsPlans = Ecriture.relireCadres, Ecriture.resultatsPlans
@@ -228,13 +229,149 @@ local function nombreFormes(v)
     return (texte:gsub('%.', ','))
 end
 
+-- Les écarts d'un masque, trois au plus, pour sa remarque.
+local function detailsEcarts(ecarts)
+    local details = {}
+    for i, e in ipairs(ecarts) do
+        if i <= 3 then
+            details[#details + 1] = string.format("%s : %s écrit, %s relu", e.cle, nombreFormes(e.ecrit), nombreFormes(e.relu))
+        end
+    end
+    return table.concat(details, " ; ") .. (#ecarts > 3 and string.format(" ; %d autres écarts", #ecarts - 3) or "")
+end
+
+-- Masques mal gardés retirés (1.6.3, décision de Dany du 2 novembre 2026 : « le retirer et le
+-- dire ») : chaque masque au verdict final « écart » (ni « absent », ni « à relire » ; jamais un
+-- masque IA seul ni un masque déjà sur la photo, qui ne sont pas relus) est retiré en entier, avec
+-- ses composants s'il est combiné, en une écriture pour toute la commande, après la relecture.
+-- Cette écriture ne peut pas rejoindre celle de l'étape (l'écart ne se voit qu'une fois l'étape
+-- écrite et relue) : elle fait sa propre ligne « Claude · masque retiré » dans l'Historique de
+-- Lightroom (et son ⌘Z), comme verifierPersonnes, mais reste dans l'étape de Claude, sans étape de
+-- mémoire de plus : undo_last défait le tout d'un coup (l'état d'avant de l'étape n'a pas le
+-- masque), et noterEtatFinal, qui vient après, garde l'état sans le masque. Le retrait est relu : un
+-- masque encore là (écriture refusée, ou Lightroom qui l'a gardé) reste « écart » avec
+-- retrait = « échoué », et c'est dit ; le reste de la retouche n'est jamais touché. Le changement
+-- des masques (réponse, fenêtre de la liaison) et l'entrée de l'étape au journal (export_journal),
+-- écrits avant le retrait, sont refaits sans les masques retirés, et l'entrée dit le retrait (note).
+local ETAPE_RETRAIT = "Claude · masque retiré"
+
+-- Refait le changement des masques et l'entrée du journal de l'étape sans les masques retirés
+-- (noms), puis garde le journal (mémoire seule).
+local function corrigerChangements(plans)
+    local journaux = {}
+    for _, plan in ipairs(plans) do
+        if plan.retires and #plan.retires > 0 then
+            local restants = {}
+            for _, nom in ipairs(plan.masquesAjoutes or {}) do
+                restants[#restants + 1] = nom
+            end
+            for _, nom in ipairs(plan.retires) do
+                for i, ajoute in ipairs(restants) do
+                    if ajoute == nom then
+                        table.remove(restants, i)
+                        break
+                    end
+                end
+            end
+            -- Le même tableau que l'entrée du journal (Ecriture.ecrirePlans).
+            for i = #plan.changements, 1, -1 do
+                local changement = plan.changements[i]
+                if changement.cle == 'MaskGroupBasedCorrections' then
+                    if #restants == 0 then
+                        table.remove(plan.changements, i)
+                    else
+                        changement.apres = pluriel((plan.masquesExistants or 0) + #restants, "masque", "masques")
+                            .. " (+ " .. table.concat(restants, ", ") .. ")"
+                    end
+                    break
+                end
+            end
+            local cites = {}
+            for _, nom in ipairs(plan.retires) do
+                cites[#cites + 1] = "« " .. nom .. " »"
+            end
+            local texte = string.format("%s après l'écriture (Lightroom ne l'a pas gardé tel qu'écrit) : %s.",
+                #cites > 1 and "Masques retirés" or "Masque retiré", table.concat(cites, ", "))
+            if plan.entreeJournal then
+                plan.entreeJournal.note = plan.entreeJournal.note and (plan.entreeJournal.note .. " " .. texte) or texte
+                journaux[#journaux + 1] = plan
+            end
+        end
+    end
+    if #journaux > 0 then
+        -- Un journal non gardé (Lightroom occupé) ne fait pas échouer la commande : l'étape et le
+        -- retrait sont écrits, la réponse les dit.
+        local fait, erreur = LrTasks.pcall(ecrireMemoire, "Claude · journal", function()
+            for _, plan in ipairs(journaux) do
+                garder(plan.photo, 'journalClaude', Json.encode(Json.tableau(plan.journal)))
+            end
+        end)
+        if not fait then
+            Liaison.noter("Journal du retrait non gardé : " .. tostring(erreur))
+        end
+    end
+end
+
+local function retirerMalGardes(plans)
+    local aRetirer = {}
+    for _, plan in ipairs(plans) do
+        if plan.malGardes and #plan.malGardes > 0 then
+            local ids, reste = {}, {}
+            for _, mal in ipairs(plan.malGardes) do
+                ids[tostring(mal.id)] = true
+            end
+            for _, correction in ipairs(pourLightroom(plan.photo:getDevelopSettings().MaskGroupBasedCorrections or {})) do
+                if not ids[tostring(correction.CorrectionID)] then
+                    reste[#reste + 1] = correction
+                end
+            end
+            aRetirer[#aRetirer + 1] = { plan = plan, reste = reste }
+        end
+    end
+    if #aRetirer == 0 then
+        return
+    end
+    local fait, erreur = LrTasks.pcall(ecrire, ETAPE_RETRAIT, function()
+        for _, r in ipairs(aRetirer) do
+            r.plan.photo:applyDevelopSettings({ MaskGroupBasedCorrections = r.reste }, ETAPE_RETRAIT)
+        end
+    end)
+    if not fait then
+        Liaison.noter("Masques mal gardés non retirés : " .. tostring(erreur))
+    end
+    for _, r in ipairs(aRetirer) do
+        local plan = r.plan
+        local restants = {}
+        for _, correction in ipairs(plan.photo:getDevelopSettings().MaskGroupBasedCorrections or {}) do
+            restants[tostring(correction.CorrectionID)] = true
+        end
+        for _, mal in ipairs(plan.malGardes) do
+            if not restants[tostring(mal.id)] then
+                mal.entree.verdict = 'retiré'
+                plan.retires = plan.retires or {}
+                plan.retires[#plan.retires + 1] = mal.nom
+                noter(plan, string.format("Masque « %s » : Lightroom ne l'a pas gardé tel qu'écrit (%s) ; il est retiré%s, le reste de "
+                    .. "la retouche est gardé. Le reposer autrement (une autre forme ou un autre type de masque) s'il manque, et le dire "
+                    .. "à l'utilisateur.", mal.nom, mal.details, mal.composants > 1 and " avec ses composants" or ""))
+            else
+                mal.entree.retrait = 'échoué'
+                noter(plan, string.format("Masque « %s » : Lightroom ne l'a pas gardé tel qu'écrit (%s), et ne l'a pas laissé retirer%s ; "
+                    .. "le vérifier avec view_photo et dire à l'utilisateur s'il est mal placé (undo_last défait toute l'étape).",
+                    mal.nom, mal.details, fait and "" or " (" .. Liaison.messageErreur(erreur) .. ")"))
+            end
+        end
+    end
+    corrigerChangements(plans)
+end
+
 -- Les formes sans IA de chaque photo (Plans.preparerMasques, formesEcrites), relues dans Lightroom et
 -- comparées à l'écrit (Locaux.comparerFormes) : verdict « gardé » (aux arrondis près), « écart »,
 -- « absent » (correction introuvable), ou « à relire » (masques IA pas encore calculés, ou liste
--- encore changeante : Lightroom peut la réécrire au premier rendu). Rien n'est retiré : les écarts
--- et les absents sont dits (remarques) ; les verdicts vont dans la réponse (masques_relus). Avec
--- releve_formes (développement, DEVELOPPEUR_RELEVE_FORMES du serveur), la réponse porte aussi
--- l'écrit et le relu de chaque masque de l'appel, IA compris, pour le constat.
+-- encore changeante : Lightroom peut la réécrire au premier rendu). Les « écart » vont à
+-- retirerMalGardes (plan.malGardes) ; les absents et les écarts « à relire » sont dits (remarques),
+-- sans retrait ; les verdicts vont dans la réponse (masques_relus). Avec releve_formes
+-- (développement, DEVELOPPEUR_RELEVE_FORMES du serveur), la réponse porte aussi l'écrit et le relu
+-- de chaque masque de l'appel, IA compris, pour le constat.
 local function relireFormes(plans, params)
     local suivis = {}
     for _, plan in ipairs(plans) do
@@ -259,7 +396,7 @@ local function relireFormes(plans, params)
         for _, ecrite in ipairs(plan.formesEcrites) do
             if ecrite.formes and not plan.retiresParModule[tostring(ecrite.id)] then
                 local relue = parId[tostring(ecrite.id)]
-                local v = { nom = ecrite.nom, verdict = 'absent', ecarts = {} }
+                local v = { nom = ecrite.nom, id = ecrite.id, composants = #(ecrite.masques or {}), verdict = 'absent', ecarts = {} }
                 if relue then
                     v.ecarts = Locaux.comparerFormes(ecrite.masques, relue.CorrectionMasks)
                     v.verdict = #v.ecarts > 0 and 'écart' or 'gardé'
@@ -296,18 +433,23 @@ local function relireFormes(plans, params)
     for _, plan in ipairs(suivis) do
         local lecture = lectures[plan]
         local relus = Json.tableau()
+        plan.malGardes = {}
         for _, v in ipairs(lecture.verdicts) do
             local entree = { nom = v.nom, verdict = v.verdict }
+            local aRelire = v.verdict ~= 'absent' and (lecture.enAttente or not stables[plan])
+            if aRelire then
+                entree.verdict = 'à relire'
+            end
             if #v.ecarts > 0 then
-                local details = {}
-                for i, e in ipairs(v.ecarts) do
-                    if i <= 3 then
-                        details[#details + 1] = string.format("%s : %s écrit, %s relu", e.cle, nombreFormes(e.ecrit), nombreFormes(e.relu))
-                    end
+                if aRelire then
+                    noter(plan, string.format("Masque « %s » : Lightroom ne l'a pas gardé tel qu'écrit (%s) ; le vérifier avec view_photo "
+                        .. "et dire à l'utilisateur s'il est mal placé (pas retiré : Lightroom le calculait encore).", v.nom,
+                        detailsEcarts(v.ecarts)))
+                else
+                    -- Retiré, et dit, par retirerMalGardes.
+                    plan.malGardes[#plan.malGardes + 1] = { id = v.id, nom = v.nom, composants = v.composants,
+                        details = detailsEcarts(v.ecarts), entree = entree }
                 end
-                noter(plan, string.format("Masque « %s » : Lightroom ne l'a pas gardé tel qu'écrit (%s%s) ; le vérifier avec view_photo "
-                    .. "et dire à l'utilisateur s'il est mal placé (rien n'est retiré).", v.nom, table.concat(details, " ; "),
-                    #v.ecarts > 3 and string.format(" ; %d autres écarts", #v.ecarts - 3) or ""))
                 local ecarts = Json.tableau()
                 for _, e in ipairs(v.ecarts) do
                     ecarts[#ecarts + 1] = e
@@ -316,9 +458,6 @@ local function relireFormes(plans, params)
             elseif v.verdict == 'absent' then
                 noter(plan, string.format("Masque « %s » : absent après l'écriture, Lightroom ne l'a pas gardé ; le vérifier avec view_photo "
                     .. "(undo_last remet l'état d'avant).", v.nom))
-            end
-            if v.verdict ~= 'absent' and (lecture.enAttente or not stables[plan]) then
-                entree.verdict = 'à relire'
             end
             relus[#relus + 1] = entree
         end
@@ -383,6 +522,7 @@ function Retouche.masquer(params)
         end
     end
     relireFormes(plans, params)
+    retirerMalGardes(plans)
     noterEtatFinal(photos, etape)
     reponse = reponse or {}
     reponse.mode = modeTexte(prefs)

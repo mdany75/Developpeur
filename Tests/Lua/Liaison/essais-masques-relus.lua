@@ -3,8 +3,10 @@
 -- (commande masquer), les seules formes sans IA (dégradé linéaire, radial, pinceau, plages de
 -- couleurs, de luminance ou de profondeur) sont relues et comparées à l'écrit
 -- (Locaux.comparerFormes, tolérances provisoires Locaux.TOLERANCES_FORMES) ; verdicts « gardé »,
--- « écart », « absent », « à relire » dans masques_relus ; écarts et absents dits en remarques ;
--- rien n'est jamais retiré. Les masques IA (sujet, ciel, personne, objet) ne se comparent pas.
+-- « écart », « absent », « à relire » dans masques_relus ; écarts et absents dits en remarques.
+-- Depuis la 1.6.3, un masque en « écart » est retiré (verdict « retiré »), en une écriture
+-- « Claude · masque retiré » dans l'étape de Claude, et dit ; ni un absent, ni un « à relire », ni
+-- un masque déjà sur la photo. Les masques IA (sujet, ciel, personne, objet) ne se comparent pas.
 -- Les écarts viennent de la « version future » de la simulation (S.formesIgnorees,
 -- S.arrondiFormes, S.angleFormes), qui n'est pas un constat. Lancé par scripts/tester-module.sh.
 
@@ -56,6 +58,15 @@ local function remarque(resultat, morceau)
     return contient(resultat.resultats[1].remarques, morceau)
 end
 
+-- Les noms des masques de la photo, dans l'ordre.
+local function noms(photo)
+    local liste = {}
+    for _, correction in ipairs(photo.reglages.MaskGroupBasedCorrections or {}) do
+        liste[#liste + 1] = correction.CorrectionName
+    end
+    return table.concat(liste, ', ')
+end
+
 test("masques relus : quatre formes gardées telles qu'écrites, sans remarque ni écriture de plus", function()
     local photo = fuji()
     local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
@@ -72,7 +83,7 @@ test("masques relus : quatre formes gardées telles qu'écrites, sans remarque n
     egal(resultat.resultats[1].releve_formes, nil, "le relevé seulement avec releve_formes")
 end)
 
-test("masques relus : un arrondi sous la tolérance reste « gardé », au-delà c'est un « écart » dit, sans retrait", function()
+test("masques relus : un arrondi sous la tolérance reste « gardé », au-delà le masque est retiré et dit (1.6.3)", function()
     fuji()
     S.arrondiFormes = 5
     local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
@@ -84,26 +95,116 @@ test("masques relus : un arrondi sous la tolérance reste « gardé », au-delà
     S.arrondiFormes = 2
     resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
     local degrade = verdicts(resultat)['Claude · Dégradé']
-    egal(degrade.verdict, 'écart')
-    egal(degrade.ecarts[1].genre, 'position')
+    egal(degrade.verdict, 'retiré')
+    egal(degrade.ecarts[1].genre, 'position', "les écarts restent dans la réponse")
     egal(degrade.ecarts[1].cle, 'ZeroX')
     egal(remarque(resultat, "Masque « Claude · Dégradé » : Lightroom ne l'a pas gardé tel qu'écrit (ZeroX : 0,876543 écrit, 0,88 relu"), true)
-    egal(remarque(resultat, "rien n'est retiré"), true)
-    egal(#photo.reglages.MaskGroupBasedCorrections, 4, "aucun masque retiré")
-    egal(#S.ecritures, ecritures + 1, "aucune écriture de retrait")
+    egal(remarque(resultat, "il est retiré, le reste de la retouche est gardé. Le reposer autrement"), true)
+    egal(remarque(resultat, "rien n'est retiré"), false)
+    egal(verdicts(resultat)['Claude · Plage'].verdict, 'gardé', "la plage n'a rien d'arrondi")
+    egal(noms(photo), 'Claude · Plage', "seuls les masques en écart sont retirés")
+    egal(#S.ecritures, ecritures + 2, "l'étape, puis une seule écriture de retrait pour la commande")
+    egal(S.ecritures[#S.ecritures], 'Claude · masque retiré')
 end)
 
-test("masques relus : touches d'un pinceau perdues : « écart » de structure, le masque reste", function()
+test("masques relus : touches d'un pinceau perdues : « écart » de structure, le pinceau seul est retiré", function()
     local photo = fuji()
     S.formesIgnorees = { 'Dabs' }
     local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
     local pinceau = verdicts(resultat)['Claude · Pinceau']
-    egal(pinceau.verdict, 'écart')
+    egal(pinceau.verdict, 'retiré')
     egal(pinceau.ecarts[1].genre, 'structure')
     egal(pinceau.ecarts[1].cle, 'Dabs')
     egal(pinceau.ecarts[1].relu, 'absent')
     egal(verdicts(resultat)['Claude · Dégradé'].verdict, 'gardé', "les autres formes, gardées")
     egal(remarque(resultat, "Dabs : "), true)
+    egal(noms(photo), 'Claude · Dégradé, Claude · Rond, Claude · Plage', "le reste de la retouche reste")
+end)
+
+test("masques relus : après un retrait, changements, journal (export_journal) et fenêtre de la liaison disent ce qui reste", function()
+    local photo = fuji()
+    S.formesIgnorees = { 'Dabs' }
+    local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    egal(verdicts(resultat)['Claude · Pinceau'].verdict, 'retiré')
+    local attendu = "3 masques (+ Claude · Dégradé, Claude · Rond, Claude · Plage)"
+    local changements = resultat.resultats[1].changements
+    egal(#changements, 1)
+    egal(changements[1].cle, 'MaskGroupBasedCorrections')
+    egal(changements[1].avant, "0 masque")
+    egal(changements[1].apres, attendu, "la réponse ne cite plus le masque retiré")
+    local journal = Json.decode(photo.proprietes.journalClaude)
+    local entree = journal[#journal]
+    egal(entree.changements[1].apres, attendu, "le journal ne cite plus le masque retiré")
+    egal(entree.note, "Masque retiré après l'écriture (Lightroom ne l'a pas gardé tel qu'écrit) : « Claude · Pinceau ».",
+        "le journal dit le retrait")
+    egal(tostring(require('Liaison').derniersReglages):find("Claude · Pinceau", 1, true), nil, "fenêtre de la liaison")
+
+    -- Tous les masques ajoutés retirés : plus de changement des masques, le journal le dit.
+    photo = fuji()
+    S.formesIgnorees = { 'ZeroX' }
+    resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'lineaire', de_x = 0.5, de_y = 0, a_x = 0.5, a_y = 0.3, nom = 'Claude · Haut', locaux = { LocalExposure2012 = -0.2 } },
+    }), etape = 'formes' })
+    egal(verdicts(resultat)['Claude · Haut'].verdict, 'retiré')
+    egal(#resultat.resultats[1].changements, 0, "aucun masque ajouté ne reste")
+    journal = Json.decode(photo.proprietes.journalClaude)
+    egal(#journal[#journal].changements, 0)
+    egal(contient({ journal[#journal].note }, "« Claude · Haut »"), true)
+end)
+
+test("masques relus : retiré dans l'étape de Claude : une seule étape en mémoire, undo_last défait le tout, l'état laissé est sans le masque", function()
+    local photo = fuji()
+    photo.reglages.Exposure2012 = 0.3
+    S.formesIgnorees = { 'Dabs' }
+    local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    local id = resultat.resultats[1].etape_id
+    egal(verdicts(resultat)['Claude · Pinceau'].verdict, 'retiré')
+    local etapes = Json.decode(photo.proprietes.etapesClaude)
+    egal(#etapes, 1, "pas d'étape de mémoire pour le retrait")
+    egal(etapes[1].id, id)
+    local apres = Json.decode(photo.proprietes.apresClaude)
+    egal(apres.reglages['#MaskGroupBasedCorrections'], 3, "l'état laissé par Claude est relu après le retrait")
+    local annulation = Commandes.executer('annuler', {})
+    egal(annulation.resultats[1].annulee, true)
+    egal(annulation.resultats[1].etape_id, id, "undo_last défait l'étape de l'écriture et du retrait")
+    egal(#(photo.reglages.MaskGroupBasedCorrections or {}), 0, "aucun masque de l'étape ne reste")
+    egal(photo.reglages.Exposure2012, 0.3, "le reste de la photo, intact")
+end)
+
+test("masques relus : un masque combiné en écart est retiré avec ses composants ; un masque déjà sur la photo reste", function()
+    local photo = fuji()
+    Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'lineaire', de_x = 0.5, de_y = 0, a_x = 0.5, a_y = 0.3, nom = 'Claude · Haut de Dany', locaux = {} },
+    }), etape = 'avant' })
+    S.formesIgnorees = { 'ZeroX' }
+    local resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'ia', soustype = 2, nom = 'Claude · Ciel sans le bas', locaux = { LocalExposure2012 = -0.1 },
+          composants = { { mode = 'soustraire', type = 'lineaire', de_x = 0.5, de_y = 1, a_x = 0.5, a_y = 0.7, nom = 'Bas' } } },
+        { type = 'ia', soustype = 2, nom = 'Claude · Ciel', locaux = { LocalExposure2012 = -0.1 } },
+    }), etape = 'masques' })
+    egal(verdicts(resultat)['Claude · Ciel sans le bas'].verdict, 'retiré')
+    egal(verdicts(resultat)['Claude · Ciel'], nil, "un masque IA seul n'est pas relu")
+    egal(remarque(resultat, "il est retiré avec ses composants"), true)
+    egal(noms(photo), 'Claude · Haut de Dany, Claude · Ciel', "le masque déjà là (même perdu par la version future) et le ciel restent")
+end)
+
+test("masques relus : retrait refusé par Lightroom : verdict « écart », retrait « échoué », dit, rien d'autre ne casse", function()
+    local photo = fuji()
+    S.formesIgnorees, S.retraitMasques = { 'Dabs' }, 'erreur'
+    local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    local pinceau = verdicts(resultat)['Claude · Pinceau']
+    egal(pinceau.verdict, 'écart')
+    egal(pinceau.retrait, 'échoué')
+    egal(remarque(resultat, "et ne l'a pas laissé retirer (Lightroom refuse cette liste de masques"), true)
+    egal(remarque(resultat, "undo_last défait toute l'étape"), true)
+    egal(#photo.reglages.MaskGroupBasedCorrections, 4, "l'étape reste entière")
+    egal(type(resultat.resultats[1].etape_id), 'string', "la réponse de l'étape est rendue")
+
+    photo = fuji()
+    S.retraitMasques = 'ignore'
+    resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    egal(verdicts(resultat)['Claude · Pinceau'].retrait, 'échoué', "un masque encore là après le retrait : relu, et dit")
+    egal(remarque(resultat, "et ne l'a pas laissé retirer ;"), true)
     egal(#photo.reglages.MaskGroupBasedCorrections, 4)
 end)
 
@@ -172,6 +273,8 @@ test("masques relus : une correction que Lightroom n'a pas gardée est « absent
     egal(verdicts(resultat)['Claude · Dégradé'].verdict, 'absent')
     egal(remarque(resultat, "Masque « Claude · Dégradé » : absent après l'écriture"), true)
     egal(verdicts(resultat)['Claude · Rond'].verdict, 'gardé')
+    egal(#photo.reglages.MaskGroupBasedCorrections, 3, "rien de plus n'est retiré")
+    egal(S.ecritures[#S.ecritures] ~= 'Claude · masque retiré', true, "aucune écriture de retrait")
 end)
 
 test("masques relus : une liste encore changeante après les relectures dit « à relire », en quatre lectures au plus", function()
@@ -188,6 +291,8 @@ test("masques relus : une liste encore changeante après les relectures dit « �
     local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
     egal(verdicts(resultat)['Claude · Dégradé'].verdict, 'à relire')
     egal(verdicts(resultat)['Claude · Dégradé'].ecarts[1].cle, 'ZeroX', "l'écart vu reste dit")
+    egal(remarque(resultat, "pas retiré : Lightroom le calculait encore"), true)
+    egal(#photo.reglages.MaskGroupBasedCorrections, 4, "un masque « à relire » n'est jamais retiré")
     egal(S.attentes - avant, 3, "trois attentes de 0,3 s au plus pour toute la commande")
 end)
 

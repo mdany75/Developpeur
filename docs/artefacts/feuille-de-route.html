@@ -90,7 +90,7 @@
           <li><span class="coche">✓</span> <b>Recherche par le sens</b> (<code>find_photos</code> avec <code>query</code> ou <code>similar_to</code>), MobileCLIP S2 d'Apple sur ton Mac. Un défaut trouvé à l'installation (le modèle ne se compilait pas depuis le cache de Hugging Face) est corrigé ; ouverture en 1 s.</li>
           <li><span class="coche">✓</span> <b>Le rendu d'une autre photo</b> (<code>match_look</code>, 37<sup>e</sup> outil), pentes relevées dans Lightroom 15.6 sur des copies d'Essais.</li>
           <li><span class="coche">✓</span> <b>Tes habitudes en chiffres</b> (<code>remember_style</code> avec <code>habits</code>), en lecture seule.</li>
-          <li><span class="coche">✓</span> <b>Masques relus</b> après l'écriture : tolérances relevées (36 formes sur 36 « gardé »), rien retiré.</li>
+          <li><span class="coche">✓</span> <b>Masques relus</b> après l'écriture : tolérances relevées (36 formes sur 36 « gardé »), rien retiré dans la 1.6 (depuis la 1.6.3, un masque mal gardé est retiré et dit).</li>
           <li><span class="coche">✓</span> <b>Relevé des seuils</b> : outil <code>--mesures</code> et premier relevé ; groupes de lumière à 1,5 IL, témoin du teint à 8 points. Compte rendu : page Relevé des seuils provisoires.</li>
           <li><span class="coche">✓</span> Recette réussie (87 étapes) et demande dans la fenêtre Claude réussie (ciel orageux rendu plus dramatique par un masque Ciel, doses modérées), défaite.</li>
         </ul>
@@ -189,9 +189,9 @@
           <p>Reconnaître un oiseau ou une fleur par son nom, en plus de la recherche par le sens. Laissé hors de la 1.6, comme tu l'as choisi.</p>
         </article>
         <article class="chantier">
-          <h3>Retirer un masque mal gardé</h3>
+          <h3><span class="coche">✓</span> Retirer un masque mal gardé</h3>
           <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 2/5</span></div>
-          <p>La 1.6 signale seulement. Le retrait se fera sur une vraie version 16 de Lightroom Classic, quand les formes changeront.</p>
+          <p>Fait pour la 1.6.3 (pas encore publiée), sur ta décision du 2 novembre : sur toutes les versions de Lightroom Classic, un masque que Lightroom ne garde pas tel qu'écrit est retiré, dans l'étape de Claude, et Claude te le dit et le repose autrement. Le journal le note ; <code>undo_last</code> défait toujours l'étape entière.</p>
         </article>
         <article class="chantier">
           <h3>Trier la liste « À constater dans Lightroom »</h3>

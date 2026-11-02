@@ -594,6 +594,15 @@ function S.Photo(id, reglages, meta, brut)
     function photo:applyDevelopSettings(reglages, nom)
         assert(S.ecritureEnCours, "applyDevelopSettings hors de withWriteAccessDo")
         verifierSansMetatable(reglages, 'reglages')
+        -- Retrait d'un masque mal gardé (Retouche.retirerMalGardes, 1.6.3), pour les essais
+        -- seulement, pas un constat : S.retraitMasques = 'erreur' (l'écriture échoue) ou 'ignore'
+        -- (Lightroom garde la liste d'avant, sans erreur).
+        if S.retraitMasques and nom == 'Claude · masque retiré' then
+            if S.retraitMasques == 'erreur' then
+                error("Lightroom refuse cette liste de masques (simulation)", 2)
+            end
+            return
+        end
         self:modifiee()
         -- La mémoire du module garde l'état du débruitage sous Amelioration : ce n'est pas un réglage.
         assert(reglages.Amelioration == nil, "clé Amelioration passée à applyDevelopSettings")
@@ -2629,6 +2638,8 @@ function S.reinitialiser()
     S.masquesVidesRetires = 0
     -- « Version future » des formes de masques (altererFormes) : aucune par défaut.
     S.formesIgnorees, S.arrondiFormes, S.angleFormes = nil, nil, nil
+    -- Retrait d'un masque mal gardé refusé ou ignoré (Retouche.retirerMalGardes) : non.
+    S.retraitMasques = nil
     -- Formes calculées dès l'écriture par applyDevelopSettings (constat du 2 novembre 2026) : non.
     S.negatifCharge, S.seuilTableBrosse = nil, nil
     S.barres = {}

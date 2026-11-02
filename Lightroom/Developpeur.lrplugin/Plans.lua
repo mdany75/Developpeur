@@ -1208,6 +1208,8 @@ local function preparerMasques(photo, params)
     end
     if #ajoutes > 0 then
         plan.avant.MaskGroupBasedCorrections = pourLightroom(existants)
+        -- Gardés pour Retouche.retirerMalGardes, qui refait ce changement sans les masques retirés.
+        plan.masquesExistants, plan.masquesAjoutes = #existants, ajoutes
         plan.changements[#plan.changements + 1] = {
             cle = 'MaskGroupBasedCorrections',
             avant = resume('MaskGroupBasedCorrections', existants),

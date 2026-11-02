@@ -39,6 +39,20 @@
   Eratigena atrica la Tégénaire noire, Primula malacoides la Primevère malacoïde ; les scorpions,
   le faucheux et la tique ne sortent plus d'une recherche d'araignées.
 
+### Changé
+- Masques relus : un dégradé, un radial, un pinceau ou une plage que Lightroom n'a pas gardé tel
+  que Claude l'a écrit n'est plus seulement signalé, il est retiré tout de suite (en entier, avec
+  ses composants s'il est combiné) ; le reste de la retouche reste en place, et Claude vous le dit
+  et peut le reposer autrement. Le retrait fait une ligne « Claude · masque retiré » dans
+  l'Historique, mais reste dans l'étape de Claude : `undo_last` défait le tout d'un coup. Un masque
+  encore en calcul, introuvable, IA ou déjà sur la photo n'est jamais retiré ; un retrait que
+  Lightroom refuse est dit, sans rien défaire d'autre. Sur Lightroom Classic 15.6, toutes les
+  formes relevées sont gardées telles qu'écrites : rien n'y est retiré en pratique.
+- Après un tel retrait, les changements de la réponse, le journal (`export_journal`) et la fenêtre
+  de la liaison ne citent plus le masque retiré parmi les masques ajoutés, et l'entrée du journal
+  dit le retrait. Sur une autre version que la 15.6, Claude vérifie le premier masque reposé
+  (carte du masque ou `view_photo`) avant d'en poser d'autres.
+
 ## 1.6.2 — 2026-11-02
 
 La 1.6.2 ajoute Classer : Claude propose des mots-clés, un lieu et une légende, et n'écrit rien
