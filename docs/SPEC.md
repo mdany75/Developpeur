@@ -8912,18 +8912,28 @@ de `Reference.clesLues`), réduit à 512 px et dessiné en sRGB, donne sa signat
   écartées et dites) ;
 - pour chaque zone tonale (ombres L* < 40, tons moyens de 40 à 70, hautes lumières > 70, entre
   L* 8 et 97, comme `Eclairage.limitesTonales`), les médianes de a* et b* de ses pixels **peu
-  saturés** (C* < `Reference.chromaZone`, 30, provisoire), non écrêtés, hors des visages agrandis
+  saturés** (C* < `Reference.chromaZone`, 30, provisoire), non écrêtés (une composante au blanc,
+  ou les trois au noir : pas une seule au noir, sinon une ombre sarcelle profonde, dont le rouge
+  tombe à 0 bien avant L* 20, ne serait lue que sur sa partie claire ; revue), hors des visages agrandis
   de 10 % (Vision, `ToolHandler.detecterVisages`, si `protect_skin`) ; une zone se lit à partir de
   3 % de l'image et 150 pixels. La mesure d'`Eclairage` (C* < 12 autour du point neutre) ne
   convenait pas : un rendu marqué pousse justement ses gris au-delà de 12 (critique du plan,
   bloquant) ; les couleurs vives des objets (C* ≥ 30) restent hors de la mesure ;
 - la chroma médiane et le P90 (même pixels, visages écartés), et la part de chaque bande de la TSL
-  parmi les pixels de C* ≥ 15.
+  parmi les pixels de C* ≥ 15 ;
+- la chroma médiane des seuls pixels **colorés** (C* ≥ `chromaZone`, ceux que la couleur des
+  zones laisse de côté ; 3 % de l'image et 150 pixels au moins, sinon « non lue ») : la saturation
+  des objets. L'étalonnage teinte les gris et fait monter la chroma de toute l'image ; mesurée là,
+  la Vibrance copierait une seconde fois ce que l'étalonnage copie déjà (revue).
 
 **Écart** « référence moins photo » : exposition en IL (luminance de la L* médiane, ±3), contraste
-(P95 − P5), chroma médiane, a*b* de chaque zone, et distance des répartitions par bande (0 à
-100 %). La part commune aux trois zones (leur moyenne) est une dominante de toute l'image, donc la
-balance : elle ne se copie qu'avec `adjust` `white_balance` (Temperature et Tint par les pentes de
+(P95 − P5), chroma des pixels colorés (non comparée si l'une des deux ne la lit pas), a*b* de
+chaque zone, et distance des répartitions par bande (0 à 100 %). La part commune aux zones est une
+dominante de toute l'image, donc la balance. Ce n'est pas leur moyenne (revue, bloquant) : une
+référence aux seules ombres froides déplacerait la moyenne, et les tons moyens et les hautes
+lumières, pareils sur les deux photos, prendraient la couleur complémentaire. Trois zones lues :
+la médiane de a* et de b* (une zone à part ne la déplace pas) ; deux dont les tons moyens : les
+tons moyens ; ombres et hautes lumières seules : leur moyenne (le partage reste ambigu). Elle elle ne se copie qu'avec `adjust` `white_balance` (Temperature et Tint par les pentes de
 `match_series`) ; sinon seul le partage entre zones se copie (un écart égal dans les trois zones
 ne donne rien ; une seule zone lue, rien). Distance = moyenne a*b* des zones comparées, sans la
 part commune (avec elle si la balance se copie).
@@ -8938,9 +8948,11 @@ part commune (avec elle si la balance se copie).
   `ColorGradeMidtoneHue/Sat`, `SplitToningHighlightHue/Saturation` ; jamais `ColorGradeShadowHue`
   ni l'étalonnage global. Saturation de 25 au plus par zone (`Reference.saturationMax`, 40 avec
   `strong_dose_requested`), borne propre à match_look : `DevelopCatalogue.plafondsDose` jugerait
-  aussi les recettes de styles d'apply_settings. Fusion ou Équilibre hors de 50 et 0 : dit dans
+  aussi les recettes de styles d'apply_settings ; une saturation déjà posée au-delà (copy_settings
+  depuis la référence, un paramètre prédéfini) n'est jamais coupée : la borne est le plus grand de
+  25 et de la valeur actuelle, et baisser reste libre (revue). Fusion ou Équilibre hors de 50 et 0 : dit dans
   `limites` (le modèle vise moins juste, la passe 2 mesurée corrige) ;
-- saturation : Vibrance seulement (jamais Saturation), d'après l'écart de chroma médiane (3 au
+- saturation : Vibrance seulement (jamais Saturation), d'après l'écart de chroma des pixels colorés (3 au
   moins, `Measurements.seuilChroma`), 20 par passe au plus, sous le plafond de dose de la Vibrance
   (30, `DevelopCatalogue.plafondsDose`, sans `strong_dose_requested`), jamais au-delà sauf pour la
   ramener vers zéro ; pas copiée quand les scènes diffèrent (répartitions par bande à plus de
@@ -8963,7 +8975,12 @@ moitié de leur changement, et le résultat le fait vérifier (`teint.a_verifier
 
 **Réponse** : `reference` (signature JSON, teint), puis par photo `ecart_avant` et `ecart_apres`
 (par zone sans la part commune, `commune`, `distance`), `reglages_proposes`, `etapes`,
-`rapproche_pct`, `limites`, `teint` ; `base` dit la mesure. La fenêtre Claude traite match_look
+`rapproche_pct`, `limites`, `teint` ; `base` dit la mesure. Une photo en erreur (aperçu non rendu,
+original absent) ne fait pas échouer la série : sa ligne porte `erreur` et les `etapes` déjà
+écrites, et la suite est traitée ; un arrêt dans Lightroom rend le résultat partiel (`arrete`,
+photos non traitées) dès qu'une étape est écrite, sinon l'erreur ; la seule photo demandée en
+erreur sans rien d'écrit, l'erreur comme avant. Les vidéos de `photo_ids` s'écartent d'après les
+`vignettes` (comme le tri), avant tout aperçu (`videos_ecartees`). La fenêtre Claude traite match_look
 comme match_series (`Conversation.SERIES`) : pas de repère pendant l'appel, étapes lues dans
 `photos[].etapes`, propositions closes sur les photos retouchées.
 
@@ -8988,8 +9005,11 @@ rendus, 58 étapes) : le défaire ensuite (revert_to_original).
    300 de 60 en 60, saturation 25), l'angle a*b* mesuré (→ `ancresTeinte`) et le gain par point
    (→ `gainDepart`, moyenne par zone) ; les saturations 12, 25, 50 à la teinte 30 disent si le
    gain est linéaire ; les décalages des autres zones, le débordement (Fusion 50).
-3. **Vibrance → chroma médiane** (fixe `Reference.vibranceParChromaDepart`) : même balayage, lignes
-   Vibrance ±30 (`vibranceParChroma` du résumé) ; noter la différence entre −30 et +30.
+3. **Vibrance → chroma des couleurs vives** (fixe `Reference.vibranceParChromaDepart`) : même
+   balayage, lignes Vibrance ±30 (`vibranceParChroma` du résumé, sur la chroma des pixels de
+   C* ≥ `chromaZone`) ; noter la différence entre −30 et +30, et, sur les lignes d'étalonnage
+   seul, que « Δ chroma des couleurs vives » reste sous 1 (sinon la Vibrance recompterait
+   l'étalonnage). Sur une photo sans couleurs vives, la ligne dit « non lue ».
 4. **EnableSplitToning** : `--dump <copie>` après un `apply_settings` d'une seule
    `SplitToningShadowSaturation` (sur une copie remise à l'origine) : `EnableSplitToning = true`
    posé par Lightroom, et le rendu change bien (sinon l'écrire avec l'étalonnage).

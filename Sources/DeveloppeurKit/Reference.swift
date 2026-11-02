@@ -80,6 +80,10 @@ public enum Reference {
         var zones: [Zone?]
         var chromaMediane: Double
         var chromaP90: Double
+        /// Chroma médiane des seuls pixels colorés (C* ≥ `chromaZone`, ceux que la couleur des zones
+        /// laisse de côté) : la saturation des objets, que l'étalonnage ne fait presque pas bouger
+        /// (il teinte les gris). nil : trop peu de couleurs vives pour la lire.
+        var chromaCouleurs: Double?
         /// Part des pixels colorés (C* ≥ `chromaBandes`) par bande de la TSL, en %.
         var bandes: [Double]
         var remarques: [String]
@@ -112,7 +116,7 @@ public enum Reference {
             v.insetBy(dx: -Eclairage.margeVisage * v.width, dy: -Eclairage.margeVisage * v.height)
         }
         if !exclus.isEmpty { remarques.append("visages écartés de la couleur des zones") }
-        var tons: [Double] = [], chromas: [Double] = []
+        var tons: [Double] = [], chromas: [Double] = [], vives: [Double] = []
         var parZone: [[(Double, Double)]] = [[], [], []]
         var bandes = [Int](repeating: 0, count: PhotoMeasurements.bandes.count), colores = 0
         for y in cadre.y0..<cadre.y1 {
@@ -122,7 +126,10 @@ public enum Reference {
                 let fx = (Double(x) + 0.5) / Double(largeur), fy = (Double(y) + 0.5) / Double(hauteur)
                 if exclus.contains(where: { $0.contains(CGPoint(x: fx, y: fy)) }) { continue }
                 let rouge = rgba[i * 4], vert = rgba[i * 4 + 1], bleu = rgba[i * 4 + 2]
-                guard max(rouge, vert, bleu) < Eclairage.composanteMax, min(rouge, vert, bleu) > Eclairage.composanteMin,
+                // Écrêtés : une composante au blanc, ou les trois au noir. Pas une seule au noir : une
+                // ombre profonde teintée (sarcelle) a son rouge à 0 bien avant L* 20, et l'écarter
+                // ferait lire la couleur des ombres sur leur seule partie claire.
+                guard max(rouge, vert, bleu) < Eclairage.composanteMax, max(rouge, vert, bleu) > Eclairage.composanteMin,
                       l[i] >= lumineuxMin, l[i] <= lumineuxMax else { continue }
                 let chroma = hypot(a[i], b[i])
                 chromas.append(chroma)
@@ -130,7 +137,7 @@ public enum Reference {
                     bandes[PhotoMeasurements.bande(rouge, vert, bleu)] += 1
                     colores += 1
                 }
-                guard chroma < chromaZone else { continue }
+                guard chroma < chromaZone else { vives.append(chroma); continue }
                 let zone = l[i] < limites[0] ? 0 : (l[i] < limites[1] ? 1 : 2)
                 parZone[zone].append((a[i], b[i]))
             }
@@ -138,6 +145,7 @@ public enum Reference {
         guard !tons.isEmpty else { return nil }
         tons.sort()
         chromas.sort()
+        vives.sort()
         func centile(_ triees: [Double], _ p: Double) -> Double {
             guard !triees.isEmpty else { return 0 }
             return triees[min(triees.count - 1, max(0, Int((p / 100 * Double(triees.count - 1)).rounded())))]
@@ -150,10 +158,13 @@ public enum Reference {
             guard valeurs.count >= pixelsMinZone, part >= partMinZone else { return nil }
             return Zone(a: Eclairage.mediane(valeurs.map(\.0)), b: Eclairage.mediane(valeurs.map(\.1)), part: part, pixels: valeurs.count)
         }
+        let colorees = vives.count >= pixelsMinZone && Double(vives.count) * 100 / total >= partMinZone
+        if !colorees { remarques.append("trop peu de couleurs vives : saturation non lue") }
         for (index, zone) in zones.enumerated() where zone == nil {
             remarques.append("\(nomZone(index)) : pas assez de pixels peu saturés, couleur non lue")
         }
         return Signature(centiles: centiles, zones: zones, chromaMediane: centile(chromas, 50), chromaP90: centile(chromas, 90),
+                         chromaCouleurs: colorees ? centile(vives, 50) : nil,
                          bandes: bandes.map { colores > 0 ? Double($0) * 100 / Double(colores) : 0 }, remarques: remarques)
     }
 
@@ -187,7 +198,8 @@ public enum Reference {
         var contraste: Double
         /// Écart a*b* de chaque zone (nil si l'une des deux images ne la lit pas).
         var zones: [Vecteur?]
-        var chroma: Double
+        /// Écart de chroma des pixels colorés (nil si l'une des deux images ne la lit pas).
+        var chroma: Double?
         var scenes: Double
     }
 
@@ -209,7 +221,7 @@ public enum Reference {
             return Vecteur(a: r.a - p.a, b: r.b - p.b)
         }
         return Ecart(exposition: min(max(log2(yRef / y), -3), 3), contraste: reference.contraste - photo.contraste, zones: zones,
-                     chroma: reference.chromaMediane - photo.chromaMediane, scenes: distanceBandes(photo.bandes, reference.bandes))
+                     chroma: reference.chromaCouleurs.flatMap { r in photo.chromaCouleurs.map { r - $0 } }, scenes: distanceBandes(photo.bandes, reference.bandes))
     }
 
     /// L'écart qu'une passe suivante doit encore combler pour atteindre `force` de l'écart du départ :
@@ -221,14 +233,26 @@ public enum Reference {
                          guard let r = reste.zones[z] else { return nil }
                          return r - laisse * (avant.zones[z] ?? .zero)
                      },
-                     chroma: reste.chroma - laisse * avant.chroma, scenes: reste.scenes)
+                     chroma: reste.chroma.map { $0 - laisse * (avant.chroma ?? 0) }, scenes: reste.scenes)
     }
 
-    /// La part commune aux zones lues : une dominante de toute l'image, donc la balance.
+    /// La part commune aux zones lues : une dominante de toute l'image, donc la balance. Pas leur
+    /// moyenne : une seule zone teintée (des ombres froides seules) déplacerait la moyenne, et les
+    /// deux autres zones, pourtant pareilles sur les deux photos, recevraient la couleur
+    /// complémentaire. Trois zones lues : la médiane de a* et de b* (une zone à part ne la déplace
+    /// pas) ; deux, dont les tons moyens : les tons moyens ; les ombres et les hautes lumières seules :
+    /// leur moyenne (le partage reste ambigu) ; une seule : elle-même.
     static func commune(_ zones: [Vecteur?]) -> Vecteur? {
         let lues = zones.compactMap { $0 }
-        guard !lues.isEmpty else { return nil }
-        return (1 / Double(lues.count)) * lues.reduce(.zero, +)
+        switch lues.count {
+        case 0: return nil
+        case 3:
+            func mediane(_ v: [Double]) -> Double { v.sorted()[1] }
+            return Vecteur(a: mediane(lues.map(\.a)), b: mediane(lues.map(\.b)))
+        default:
+            if lues.count == 2, zones.count == 3, let moyens = zones[1] { return moyens }
+            return (1 / Double(lues.count)) * lues.reduce(.zero, +)
+        }
     }
 
     /// L'écart de chaque zone sans la part commune : le partage entre les zones, ce que l'étalonnage
@@ -340,9 +364,12 @@ public enum Reference {
                 let actuel = vecteur(teinte: etat.valeur(cles.teinte), saturation: etat.valeur(cles.saturation), gain: gain)
                 let vise = actuel + k * ecartZone
                 var saturation = vise.norme / gain
-                if saturation > maxSat {
-                    limites.append("Saturation des \(nomZone(z)) arrêtée à \(Int(maxSat))\(options.doseForte ? "" : " (borne de match_look ; 40 avec strong_dose_requested, sur demande)").")
-                    saturation = maxSat
+                // La borne ne coupe pas un étalonnage déjà posé au-delà (celui de l'utilisateur, ou
+                // copié de la référence) : jamais plus que max(borne, valeur actuelle), baisser libre.
+                let borne = max(maxSat, etat.valeur(cles.saturation))
+                if saturation > borne {
+                    limites.append("Saturation des \(nomZone(z)) arrêtée à \(Int(borne))\(borne > maxSat ? " (sa valeur actuelle : match_look ne l'augmente pas au-delà de \(Int(maxSat)))" : (options.doseForte ? "" : " (borne de match_look ; 40 avec strong_dose_requested, sur demande)")).")
+                    saturation = borne
                 }
                 let teinte = teinteLightroom(angle: atan2(vise.b, vise.a) * 180 / .pi).rounded()
                 finales[cles.teinte] = teinte >= 360 ? 0 : teinte
@@ -368,9 +395,9 @@ public enum Reference {
         if options.saturation {
             if ecart.scenes > seuilScenes {
                 limites.append("Les couleurs des deux scènes diffèrent (\(Int(ecart.scenes.rounded())) % de répartition par bande) : la saturation n'est pas copiée.")
-            } else if abs(ecart.chroma) >= Measurements.seuilChroma {
+            } else if let chroma = ecart.chroma, abs(chroma) >= Measurements.seuilChroma {
                 let actuelle = etat.valeur("Vibrance")
-                let delta = min(max(ecart.chroma * pentes.vibranceParChroma * k, -vibranceMaxPasse), vibranceMaxPasse)
+                let delta = min(max(chroma * pentes.vibranceParChroma * k, -vibranceMaxPasse), vibranceMaxPasse)
                 var finale = min(max(actuelle + delta, -100), 100)
                 let plafond = DevelopCatalogue.plafondsDose.first { $0.key == "Vibrance" }?.max ?? 30
                 if !options.doseForte, abs(finale) > plafond, abs(finale) > abs(actuelle) {
@@ -412,8 +439,10 @@ public enum Reference {
             guard rapport > 0 else { continue }
             nouvelles.gain[z] = min(max(pentes.gain[z] * rapport, gainDepart[z] / 4), gainDepart[z] * 4)
         }
-        if let v1 = apres["Vibrance"] {
-            let curseur = v1 - avant.valeur("Vibrance"), mesure = mesureApres.chromaMediane - mesureAvant.chromaMediane
+        // La Vibrance, sur la chroma des seuls pixels colorés : un étalonnage changé dans la même passe
+        // teinte les gris, pas eux (sinon toute la chroma gagnée irait au compte de la Vibrance).
+        if let v1 = apres["Vibrance"], let c0 = mesureAvant.chromaCouleurs, let c1 = mesureApres.chromaCouleurs {
+            let curseur = v1 - avant.valeur("Vibrance"), mesure = c1 - c0
             if abs(mesure) >= 0.5, curseur / mesure > 0 {
                 nouvelles.vibranceParChroma = min(max(curseur / mesure, vibranceParChromaDepart / 4), vibranceParChromaDepart * 4)
             }
@@ -431,7 +460,8 @@ public enum Reference {
     static func signatureJSON(_ s: Signature) -> JSONValue {
         var tons: [String: JSONValue] = [:]
         for p in [5, 25, 50, 75, 95] { tons["P\(p)"] = arrondi(s.centiles[p] ?? 0) }
-        var objet: [String: JSONValue] = ["tons_L": .object(tons), "chroma_mediane": arrondi(s.chromaMediane), "chroma_P90": arrondi(s.chromaP90)]
+        var objet: [String: JSONValue] = ["tons_L": .object(tons), "chroma_mediane": arrondi(s.chromaMediane), "chroma_P90": arrondi(s.chromaP90),
+                                          "chroma_couleurs_vives": s.chromaCouleurs.map { arrondi($0) } ?? "non lue"]
         for (z, nom) in zones.enumerated() {
             objet[nom] = s.zones[z].map { ["a": arrondi($0.a), "b": arrondi($0.b), "part_pct": arrondi($0.part, 0)] } ?? "non lue"
         }
@@ -444,7 +474,7 @@ public enum Reference {
 
     static func ecartJSON(_ e: Ecart, balance: Bool) -> JSONValue {
         var objet: [String: JSONValue] = ["exposition_IL": .number((e.exposition * 20).rounded() / 20), "contraste": arrondi(e.contraste),
-                                          "chroma": arrondi(e.chroma)]
+                                          "chroma": e.chroma.map { arrondi($0) } ?? "non comparée"]
         let rel = balance ? e.zones : relatives(e.zones)
         for (z, nom) in zones.enumerated() {
             objet[nom] = rel[z].map { ["a": arrondi($0.a), "b": arrondi($0.b)] } ?? "non comparée"

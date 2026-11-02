@@ -101,13 +101,23 @@ extension ToolHandler {
             let serie = try seriesPhotosSansVideos(args, maximum: Self.maxLookPhotos + 1)
             let sans = serie.ids.filter { $0 != reference }
             laissees = max(0, serie.total - serie.ids.count - serie.videos) + max(0, sans.count - Self.maxLookPhotos)
-            ids = Array(sans.prefix(Self.maxLookPhotos)).map { $0 }
+            var gardees = Array(sans.prefix(Self.maxLookPhotos))
             videos = serie.videos
+            // Des photo_ids ne sont pas décrits par la série : leurs vidéos se lisent aux vignettes
+            // (comme le tri), et s'écartent avant toute écriture.
+            if serie.videos == 0, args.has("photo_ids"), !gardees.isEmpty,
+               let decrites = (try? lightroom.send("vignettes", ["photos": .array(gardees.map { .number(Double($0)) }), "taille": 64],
+                                                   timeout: 120))?["photos"]?.array {
+                let enVideo = Set(decrites.filter(Self.estVideo).compactMap { $0["id"]?.int })
+                gardees.removeAll { enVideo.contains($0) }
+                videos += enVideo.count
+            }
+            ids = gardees.map { $0 }
         } else {
             ids = [args.int("photo_id")]
         }
         if ids.count == 1, ids[0] == reference { throw LightroomError.invalid("La photo à traiter est la référence elle-même.") }
-        guard !ids.isEmpty else { throw LightroomError.invalid("Aucune photo à traiter (la référence est écartée).") }
+        guard !ids.isEmpty else { throw LightroomError.invalid("Aucune photo à traiter (la référence et les vidéos sont écartées).") }
 
         let confirme = args.bool("confirm") == true
         let titre = "rendu de la référence"
@@ -118,117 +128,151 @@ extension ToolHandler {
         fait += 1
         var lignes: [JSONValue] = []
         var aVerifier: [JSONValue] = []
+        var arret: Error?
         for cible in ids {
-            try contexte.verifier()
-            var pentes = Reference.Pentes()
-            let photo = try lireRendu(cible, peau: peau)
-            if photo.id == reference { throw LightroomError.invalid("La photo active est la référence elle-même : donner photo_id.") }
-            fait += 1
-            avancer(fait, sur: total, "Mesure de \(photo.fichier.string ?? "la photo \(photo.id)")", titre: titre)
-            let ecartAvant = Reference.ecart(photo: photo.signature, reference: ref.signature)
-            var (reglages, limites) = Reference.traduire(ecartAvant, etat: photo.etat, options: options, pentes: pentes)
-            var ligne: [String: JSONValue] = ["id": .number(Double(photo.id)), "fichier": photo.fichier,
-                                              "ecart_avant": Reference.ecartJSON(ecartAvant, balance: options.balance)]
-            if photo.signature.remarques.contains(where: { $0.hasPrefix("bandes") }) {
-                limites.append("Bandes noires écartées de la mesure de la photo.")
-            }
-            if reglages.isEmpty {
-                ligne["reglages"] = "aucun : déjà proche de la référence (ou rien de comparable)"
-                if !limites.isEmpty { ligne["limites"] = .array(limites.map(JSONValue.string)) }
-                lignes.append(.object(ligne))
-                continue
-            }
-            ligne["reglages_proposes"] = .object(reglages.mapValues { .number(($0 * 100).rounded() / 100) })
-            guard confirme else {
-                if !limites.isEmpty { ligne["limites"] = .array(limites.map(JSONValue.string)) }
-                lignes.append(.object(ligne))
-                continue
-            }
+            // Une photo en erreur (aperçu non rendu, original absent) ne fait pas échouer les autres :
+            // sa ligne le dit, avec les étapes déjà écrites ; un arrêt dans Lightroom rend le résultat
+            // partiel ; un appel annulé par le client, une erreur sur la seule photo demandée sans
+            // écriture : l'erreur, comme avant.
             var etapes: [JSONValue] = []
-            var mesuree = photo
-            var moyensReduits = false
-            for passe in 1...2 {
+            var lue: (id: Int, fichier: JSONValue)?
+            do {
                 try contexte.verifier()
-                let nom = "\(args.string("step_name").map(Self.withoutClaudePrefix).flatMap { $0.isEmpty ? nil : $0 } ?? "rendu de référence") : passe \(passe)"
-                var reglagesArgs: [String: JSONValue] = ["settings": .object(reglages.mapValues { .number($0) })]
-                if options.doseForte { reglagesArgs["strong_dose_requested"] = true }
-                var (params, _) = try developParameters(Arguments(raw: reglagesArgs))
-                params["photos"] = [.number(Double(photo.id))]
-                var ecriture = writeParameters(Arguments(raw: ["step_name": .string(nom), "reason": args.raw["reason"] ?? .null, "confirm": true]),
-                                               defaultStep: nom)
-                ecriture["raison"] = ecriture["raison"] ?? .string("Rendu de la photo de référence.")
-                params.merge(ecriture) { _, new in new }
-                params["sans_avant_apres"] = true
-                let reponse = try lightroom.send("appliquer", params, timeout: 180)
-                if let remarques = reponse["resultats"]?.array?.first?["remarques"]?.array, !remarques.isEmpty {
-                    limites += remarques.compactMap(\.string)
-                }
-                etapes.append(.string("Claude · " + nom))
-                let avant = mesuree
-                mesuree = try lireRendu(photo.id, visages: photo.visages, peau: peau)
+                var pentes = Reference.Pentes()
+                let photo = try lireRendu(cible, peau: peau)
+                lue = (photo.id, photo.fichier)
+                if photo.id == reference { throw LightroomError.invalid("La photo active est la référence elle-même : donner photo_id.") }
                 fait += 1
-                avancer(min(fait, total), sur: total, "\(photo.fichier.string ?? "Photo \(photo.id)") : passe \(passe) mesurée", titre: titre)
-                guard passe == 1 else { break }
-                pentes = Reference.pentesObservees(pentes, avant: avant.etat, apres: reglages, mesureAvant: avant.signature, mesureApres: mesuree.signature)
-                pentes.serie = Self.pentesObservees(pentes.serie, appliquee: Self.delta(reglages, avant.etat, ["Exposure2012", "Contrast2012"]),
-                                                    avant: Self.commeSerie(avant), apres: Self.commeSerie(mesuree))
-                // La passe 2 vise ce qui manque pour combler la part demandée (strength) de l'écart du
-                // départ, pas une part de ce qui reste.
-                let reste = Reference.ecart(photo: mesuree.signature, reference: ref.signature)
-                var entiere = options
-                entiere.force = 1
-                var suite = Reference.traduire(Reference.ecartVise(reste: reste, avant: ecartAvant, force: options.force),
-                                               etat: mesuree.etat, options: entiere, pentes: pentes)
-                // La peau a bougé d'un écart qui se voit : la passe 2 rend la moitié du changement des tons moyens.
-                if let p0 = photo.peau, let p1 = mesuree.peau, Teint.ecart(p1, p0) >= Teint.ecartVisible {
-                    let cles = Reference.clesZones[1]
-                    let gain = pentes.gain[1]
-                    let v0 = Reference.vecteur(teinte: photo.etat.valeur(cles.teinte), saturation: photo.etat.valeur(cles.saturation), gain: gain)
-                    let v1 = Reference.vecteur(teinte: mesuree.etat.valeur(cles.teinte), saturation: mesuree.etat.valeur(cles.saturation), gain: gain)
-                    let moitie = v0 + 0.5 * (v1 - v0)
-                    if (v1 - v0).norme > 0 {
-                        suite.reglages[cles.teinte] = moitie.norme > 0 ? Reference.teinteLightroom(angle: atan2(moitie.b, moitie.a) * 180 / .pi).rounded().truncatingRemainder(dividingBy: 360) : mesuree.etat.valeur(cles.teinte)
-                        suite.reglages[cles.saturation] = (moitie.norme / gain).rounded()
-                        moyensReduits = true
-                    }
+                avancer(fait, sur: total, "Mesure de \(photo.fichier.string ?? "la photo \(photo.id)")", titre: titre)
+                let ecartAvant = Reference.ecart(photo: photo.signature, reference: ref.signature)
+                var (reglages, limites) = Reference.traduire(ecartAvant, etat: photo.etat, options: options, pentes: pentes)
+                var ligne: [String: JSONValue] = ["id": .number(Double(photo.id)), "fichier": photo.fichier,
+                                                  "ecart_avant": Reference.ecartJSON(ecartAvant, balance: options.balance)]
+                if photo.signature.remarques.contains(where: { $0.hasPrefix("bandes") }) {
+                    limites.append("Bandes noires écartées de la mesure de la photo.")
                 }
-                suite.reglages = suite.reglages.filter { $0.value != mesuree.etat.valeur($0.key) }
-                guard !suite.reglages.isEmpty else { break }
-                reglages = suite.reglages
-                limites += suite.limites.filter { !limites.contains($0) }
-            }
-            let ecartApres = Reference.ecart(photo: mesuree.signature, reference: ref.signature)
-            ligne["etapes"] = .array(etapes)
-            ligne["ecart_apres"] = Reference.ecartJSON(ecartApres, balance: options.balance)
-            if let d0 = Reference.distance(ecartAvant, balance: options.balance), d0 > 0, let d1 = Reference.distance(ecartApres, balance: options.balance) {
-                ligne["rapproche_pct"] = .number(((1 - d1 / d0) * 100).rounded())
-            }
-            if !limites.isEmpty { ligne["limites"] = .array(limites.map(JSONValue.string)) }
-            if let p0 = photo.peau {
-                var teint: [String: JSONValue] = ["avant": Teint.jsonReference(p0)]
-                if let p1 = mesuree.peau {
-                    let ecart = Teint.ecart(p1, p0)
-                    teint["apres"] = Teint.jsonReference(p1)
-                    teint["deplacement_ab"] = .number((ecart * 10).rounded() / 10)
-                    if moyensReduits || ecart >= Teint.ecartVisible {
-                        let texte = "La peau a bougé (écart a*b* \(PhotoTriee.r(ecart)))\(moyensReduits ? " : la passe 2 a rendu la moitié du changement des tons moyens" : "") ; vérifier à l'œil, view_photo avec region sur le visage."
-                        teint["a_verifier"] = .string(texte)
-                        aVerifier.append(["id": .number(Double(photo.id)), "fichier": photo.fichier, "pourquoi": .string(texte)])
-                    }
+                if reglages.isEmpty {
+                    ligne["reglages"] = "aucun : déjà proche de la référence (ou rien de comparable)"
+                    if !limites.isEmpty { ligne["limites"] = .array(limites.map(JSONValue.string)) }
+                    lignes.append(.object(ligne))
+                    continue
                 }
-                ligne["teint"] = .object(teint)
+                ligne["reglages_proposes"] = .object(reglages.mapValues { .number(($0 * 100).rounded() / 100) })
+                guard confirme else {
+                    if !limites.isEmpty { ligne["limites"] = .array(limites.map(JSONValue.string)) }
+                    lignes.append(.object(ligne))
+                    continue
+                }
+                var mesuree = photo
+                var moyensReduits = false
+                for passe in 1...2 {
+                    try contexte.verifier()
+                    let nom = "\(args.string("step_name").map(Self.withoutClaudePrefix).flatMap { $0.isEmpty ? nil : $0 } ?? "rendu de référence") : passe \(passe)"
+                    var reglagesArgs: [String: JSONValue] = ["settings": .object(reglages.mapValues { .number($0) })]
+                    if options.doseForte { reglagesArgs["strong_dose_requested"] = true }
+                    var (params, _) = try developParameters(Arguments(raw: reglagesArgs))
+                    params["photos"] = [.number(Double(photo.id))]
+                    var ecriture = writeParameters(Arguments(raw: ["step_name": .string(nom), "reason": args.raw["reason"] ?? .null, "confirm": true]),
+                                                   defaultStep: nom)
+                    ecriture["raison"] = ecriture["raison"] ?? .string("Rendu de la photo de référence.")
+                    params.merge(ecriture) { _, new in new }
+                    params["sans_avant_apres"] = true
+                    let reponse = try lightroom.send("appliquer", params, timeout: 180)
+                    if let remarques = reponse["resultats"]?.array?.first?["remarques"]?.array, !remarques.isEmpty {
+                        limites += remarques.compactMap(\.string)
+                    }
+                    etapes.append(.string("Claude · " + nom))
+                    let avant = mesuree
+                    mesuree = try lireRendu(photo.id, visages: photo.visages, peau: peau)
+                    fait += 1
+                    avancer(min(fait, total), sur: total, "\(photo.fichier.string ?? "Photo \(photo.id)") : passe \(passe) mesurée", titre: titre)
+                    guard passe == 1 else { break }
+                    pentes = Reference.pentesObservees(pentes, avant: avant.etat, apres: reglages, mesureAvant: avant.signature, mesureApres: mesuree.signature)
+                    pentes.serie = Self.pentesObservees(pentes.serie, appliquee: Self.delta(reglages, avant.etat, ["Exposure2012", "Contrast2012"]),
+                                                        avant: Self.commeSerie(avant), apres: Self.commeSerie(mesuree))
+                    // La passe 2 vise ce qui manque pour combler la part demandée (strength) de l'écart du
+                    // départ, pas une part de ce qui reste.
+                    let reste = Reference.ecart(photo: mesuree.signature, reference: ref.signature)
+                    var entiere = options
+                    entiere.force = 1
+                    var suite = Reference.traduire(Reference.ecartVise(reste: reste, avant: ecartAvant, force: options.force),
+                                                   etat: mesuree.etat, options: entiere, pentes: pentes)
+                    // La peau a bougé d'un écart qui se voit : la passe 2 rend la moitié du changement des tons moyens.
+                    if let p0 = photo.peau, let p1 = mesuree.peau, Teint.ecart(p1, p0) >= Teint.ecartVisible {
+                        let cles = Reference.clesZones[1]
+                        let gain = pentes.gain[1]
+                        let v0 = Reference.vecteur(teinte: photo.etat.valeur(cles.teinte), saturation: photo.etat.valeur(cles.saturation), gain: gain)
+                        let v1 = Reference.vecteur(teinte: mesuree.etat.valeur(cles.teinte), saturation: mesuree.etat.valeur(cles.saturation), gain: gain)
+                        let moitie = v0 + 0.5 * (v1 - v0)
+                        if (v1 - v0).norme > 0 {
+                            suite.reglages[cles.teinte] = moitie.norme > 0 ? Reference.teinteLightroom(angle: atan2(moitie.b, moitie.a) * 180 / .pi).rounded().truncatingRemainder(dividingBy: 360) : mesuree.etat.valeur(cles.teinte)
+                            suite.reglages[cles.saturation] = (moitie.norme / gain).rounded()
+                            moyensReduits = true
+                        }
+                    }
+                    suite.reglages = suite.reglages.filter { $0.value != mesuree.etat.valeur($0.key) }
+                    guard !suite.reglages.isEmpty else { break }
+                    reglages = suite.reglages
+                    limites += suite.limites.filter { !limites.contains($0) }
+                }
+                let ecartApres = Reference.ecart(photo: mesuree.signature, reference: ref.signature)
+                ligne["etapes"] = .array(etapes)
+                ligne["ecart_apres"] = Reference.ecartJSON(ecartApres, balance: options.balance)
+                if let d0 = Reference.distance(ecartAvant, balance: options.balance), d0 > 0, let d1 = Reference.distance(ecartApres, balance: options.balance) {
+                    ligne["rapproche_pct"] = .number(((1 - d1 / d0) * 100).rounded())
+                }
+                if !limites.isEmpty { ligne["limites"] = .array(limites.map(JSONValue.string)) }
+                if let p0 = photo.peau {
+                    var teint: [String: JSONValue] = ["avant": Teint.jsonReference(p0)]
+                    if let p1 = mesuree.peau {
+                        let ecart = Teint.ecart(p1, p0)
+                        teint["apres"] = Teint.jsonReference(p1)
+                        teint["deplacement_ab"] = .number((ecart * 10).rounded() / 10)
+                        if moyensReduits || ecart >= Teint.ecartVisible {
+                            let texte = "La peau a bougé (écart a*b* \(PhotoTriee.r(ecart)))\(moyensReduits ? " : la passe 2 a rendu la moitié du changement des tons moyens" : "") ; vérifier à l'œil, view_photo avec region sur le visage."
+                            teint["a_verifier"] = .string(texte)
+                            aVerifier.append(["id": .number(Double(photo.id)), "fichier": photo.fichier, "pourquoi": .string(texte)])
+                        }
+                    }
+                    ligne["teint"] = .object(teint)
+                }
+                lignes.append(.object(ligne))
+            } catch let erreur as AppelAnnule {
+                throw erreur
+            } catch {
+                let partiel = error is ArretDansLightroom || error is CommandeArretee
+                if ids.count == 1, etapes.isEmpty, !partiel { throw error }
+                if !partiel || !etapes.isEmpty {
+                    var ligne: [String: JSONValue] = ["id": lue.map { .number(Double($0.id)) } ?? cible.map { .number(Double($0)) } ?? .null,
+                                                      "erreur": .string(error.localizedDescription)]
+                    if let fichier = lue?.fichier, fichier != .null { ligne["fichier"] = fichier }
+                    if !etapes.isEmpty { ligne["etapes"] = .array(etapes) }
+                    lignes.append(.object(ligne))
+                }
+                if partiel {
+                    arret = error
+                    break
+                }
             }
-            lignes.append(.object(ligne))
         }
+        // Arrêté sans rien d'écrit : l'arrêt, comme une erreur.
+        if let arret, !lignes.contains(where: { $0["etapes"] != nil }) { throw arret }
         var referenceJSON: [String: JSONValue] = ["id": .number(Double(reference)), "fichier": ref.fichier,
                                                   "signature": Reference.signatureJSON(ref.signature)]
         if peau { referenceJSON["teint"] = Teint.jsonReference(ref.peau) }
         var resultat: [String: JSONValue] = [
             "reference": .object(referenceJSON),
             "photos": .array(lignes),
-            "base": .string("Écarts « référence moins photo » : exposition en IL (L* médiane), contraste (L* P95 − P5), chroma médiane, et pour chaque zone (ombres L* < \(Int(Reference.limites[0])), tons moyens, hautes lumières > \(Int(Reference.limites[1]))) la médiane a* (vert − / magenta +) et b* (bleu − / jaune +) de ses pixels peu saturés (C* < \(Int(Reference.chromaZone))), visages écartés, sans la part commune aux zones sauf avec white_balance ; distance = moyenne a*b* des zones. Pentes provisoires : la passe 2 corrige d'après la mesure."),
+            "base": .string("Écarts « référence moins photo » : exposition en IL (L* médiane), contraste (L* P95 − P5), chroma médiane des pixels colorés (C* ≥ \(Int(Reference.chromaZone))), et pour chaque zone (ombres L* < \(Int(Reference.limites[0])), tons moyens, hautes lumières > \(Int(Reference.limites[1]))) la médiane a* (vert − / magenta +) et b* (bleu − / jaune +) de ses pixels peu saturés (C* < \(Int(Reference.chromaZone))), visages écartés, sans la part commune aux zones (médiane des trois) sauf avec white_balance ; distance = moyenne a*b* des zones. Pentes provisoires : la passe 2 corrige d'après la mesure."),
         ]
         if !aVerifier.isEmpty { resultat["a_verifier"] = .array(aVerifier) }
+        if let arret {
+            let restantes = ids.count - lignes.count
+            resultat["arrete"] = .string(arret.localizedDescription + (restantes > 0 ? " \(restantes) photo(s) non traitée(s)." : ""))
+        }
+        if lignes.contains(where: { $0["erreur"] != nil && $0["etapes"] != nil }) {
+            resultat["etapes_ecrites"] = "Une photo en erreur a gardé les étapes de photos[].etapes : undo_last les défait ; ne pas la repasser sans le dire."
+        }
         if laissees > 0 {
             resultat["photos_non_traitees"] = .string("\(laissees) photo(s) laissée(s) de côté : au plus \(Self.maxLookPhotos) par appel ; la suite par photo_ids, ou copy_settings depuis une photo traitée puis match_series.")
         }

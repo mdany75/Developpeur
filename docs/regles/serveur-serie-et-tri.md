@@ -87,10 +87,15 @@ au suivi d'une longue série (`ContexteAppel`).
   `Tools+Reference.swift`) : `reference_id` seulement (pas de fichier externe dans la 1.6). La
   couleur d'une zone se lit sur ses pixels peu saturés (C* < `chromaZone`), jamais par la mesure
   des tons presque neutres d'`Eclairage` (C* < 12 : elle écarte le rendu à copier) ; visages
-  écartés. Seul le partage entre zones se copie : la part commune est la balance, copiée seulement
-  avec `white_balance`. Clés : `SplitToning*` (ombres, hautes lumières), `ColorGradeMidtone*` ;
+  écartés ; un pixel n'est écarté au noir que si ses trois composantes y sont (une ombre teintée
+  profonde compte). Seul le partage entre zones se copie : la part commune est la balance, copiée
+  seulement avec `white_balance` ; jamais la moyenne des zones (une seule zone teintée donnerait
+  la couleur complémentaire aux autres) : médiane des trois, ou les tons moyens. Clés : `SplitToning*` (ombres, hautes lumières), `ColorGradeMidtone*` ;
   jamais `ColorGradeShadowHue` (refusée par Lightroom). Tons par Exposition et Contraste seulement.
-  Vibrance seule, sous `plafondsDose` ; saturation de l'étalonnage sous `Reference.saturationMax`.
+  Vibrance seule, sous `plafondsDose`, d'après la chroma des seuls pixels colorés (C* ≥
+  `chromaZone` : l'étalonnage teinte les gris, la Vibrance ne doit pas le recompter) ; saturation
+  de l'étalonnage sous max(`Reference.saturationMax`, valeur actuelle). Une photo en erreur ne
+  fait pas échouer la série (ligne `erreur` avec ses `etapes`) ; vidéos de `photo_ids` écartées.
   Au plus deux passes, chacune UNE écriture absolue (valeurs finales d'après les réglages relus),
   `sans_avant_apres` ; la passe 2 vise `strength` de l'écart du départ. Peau qui bouge de
   `Teint.ecartVisible` : moitié du changement des tons moyens, `a_verifier`. La fenêtre le traite

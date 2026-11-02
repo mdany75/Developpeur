@@ -72,6 +72,51 @@ final class ReferenceTests: XCTestCase {
         XCTAssertGreaterThan(hypot(ombres.a, ombres.b), Eclairage.chromaMax)
     }
 
+    /// Revue (important) : une ombre sarcelle profonde a son rouge à 0 bien avant L* 20 ; écarter
+    /// les pixels dont une composante est au noir ferait lire la couleur des ombres sur leur seule
+    /// partie claire. Ici la teinte monte vers le noir (la plus forte à L* 8) : la médiane lue est
+    /// celle de toute la zone.
+    func testLesOmbresProfondesTeinteesComptent() throws {
+        let s = Self.signature { x, _ in
+            let l = 8 + 84 * Double(x) / 299
+            guard l < 40 else { return Self.srgb(l, 0, 0) }
+            let k = (40 - l) / 32
+            return Self.srgb(l, -10 * k, -13 * k)
+        }
+        let ombres = try XCTUnwrap(s.zones[0])
+        // Médiane de k sur la zone : 0,5.
+        XCTAssertEqual(ombres.a, -5, accuracy: 0.5, "les ombres profondes, où la teinte est la plus forte, comptent")
+        XCTAssertEqual(ombres.b, -6.5, accuracy: 0.5)
+        // Le noir bouché (les trois composantes à 0) reste écarté.
+        let noir = Self.signature { x, y in y < 100 ? (0, 0, 0) : Self.srgb(8 + 84 * Double(x) / 299, 0, 0) }
+        XCTAssertEqual(noir.zones[0]?.pixels ?? 0, Self.signature { x, _ in Self.srgb(8 + 84 * Double(x) / 299, 0, 0) }.zones[0].map { $0.pixels / 2 } ?? -1,
+                       accuracy: 2)
+    }
+
+    /// Revue (important) : l'étalonnage de la référence teinte les gris et fait monter la chroma
+    /// médiane de toute l'image ; la saturation se lit sur les seuls pixels colorés, sinon la
+    /// Vibrance copierait une seconde fois ce que l'étalonnage copie déjà.
+    func testLEtalonnageDeLaReferenceNeDonnePasDeVibrance() {
+        let grise = Self.degrade(), etalonnee = Self.degrade(ombres: .init(a: -3, b: -4), hautes: .init(a: 3, b: 4))
+        let neutre = Reference.Etat(reglages: [:], raw: false)
+        // Sans couleurs vives : la saturation ne se compare pas.
+        let seule = Reference.ecart(photo: Self.signature(grise), reference: Self.signature(etalonnee))
+        XCTAssertNil(seule.chroma)
+        XCTAssertNil(Reference.traduire(seule, etat: neutre, options: .init(), pentes: .init()).reglages["Vibrance"])
+        // Avec un même vert vif sur les deux : l'étalonnage seul ne donne aucune Vibrance.
+        func avecVert(_ fond: @escaping (Int, Int) -> (UInt8, UInt8, UInt8), chroma: Double) -> (Int, Int) -> (UInt8, UInt8, UInt8) {
+            { x, y in y < 100 ? Self.srgb(55, -chroma * 0.79, chroma * 0.61) : fond(x, y) }
+        }
+        let meme = Reference.ecart(photo: Self.signature(avecVert(grise, chroma: 57)), reference: Self.signature(avecVert(etalonnee, chroma: 57)))
+        XCTAssertEqual(meme.chroma ?? 99, 0, accuracy: 0.5)
+        let (reglages, _) = Reference.traduire(meme, etat: neutre, options: .init(), pentes: .init())
+        XCTAssertNil(reglages["Vibrance"], "la référence n'a que de l'étalonnage")
+        XCTAssertNotNil(reglages["SplitToningShadowHue"])
+        // Un vert plus vif sur la référence : la Vibrance monte.
+        let plus = Reference.ecart(photo: Self.signature(avecVert(grise, chroma: 40)), reference: Self.signature(avecVert(etalonnee, chroma: 57)))
+        XCTAssertGreaterThan(Reference.traduire(plus, etat: neutre, options: .init(), pentes: .init()).reglages["Vibrance"] ?? 0, 0)
+    }
+
     func testLesCouleursVivesDesObjetsNeGuidentPasLaZone() throws {
         // La moitié haute : un vert vif (C* ≈ 57) ; le bas : le dégradé gris.
         let gris = Self.degrade()
@@ -145,6 +190,44 @@ final class ReferenceTests: XCTestCase {
         XCTAssertGreaterThan(balance["Temperature"] ?? 0, 5000, "plus jaune : réchauffer")
         XCTAssertNil(balance["ColorGradeGlobalHue"], "jamais par l'étalonnage global")
         XCTAssertNil(Reference.distance(ecart([.init(a: 3, b: 5), nil, nil]), balance: false), "une seule zone : pas de partage")
+    }
+
+    /// Revue (bloquant) : une référence aux seules ombres froides. La part commune n'est pas la
+    /// moyenne des zones : les tons moyens et les hautes lumières, pareils sur les deux photos, ne
+    /// reçoivent aucun étalonnage (avec la moyenne, ils prenaient la couleur complémentaire).
+    func testUneSeuleZoneTeinteeNeTouchePasLesAutres() throws {
+        let seule = ecart([.init(a: -3, b: -6), .zero, .zero])
+        let (reglages, _) = Reference.traduire(seule, etat: neutre, options: .init(), pentes: .init())
+        XCTAssertEqual(Set(reglages.keys), ["SplitToningShadowHue", "SplitToningShadowSaturation"], "\(reglages)")
+        XCTAssertEqual(Reference.commune(seule.zones), .zero)
+        XCTAssertEqual(Reference.distance(seule, balance: false) ?? 0, hypot(3, 6) / 3, accuracy: 0.01, "les deux autres zones ne comptent pas d'écart")
+        // De même pour des tons moyens seuls, et deux zones lues dont les tons moyens.
+        XCTAssertEqual(Set(Reference.traduire(ecart([.zero, .init(a: 6, b: -8), .zero]), etat: neutre, options: .init(), pentes: .init()).reglages.keys),
+                       ["ColorGradeMidtoneHue", "ColorGradeMidtoneSat"])
+        XCTAssertEqual(Set(Reference.traduire(ecart([.init(a: -3, b: -6), .zero, nil]), etat: neutre, options: .init(), pentes: .init()).reglages.keys),
+                       ["SplitToningShadowHue", "SplitToningShadowSaturation"])
+        // Une dominante commune plus une zone à part : la balance est la dominante.
+        XCTAssertEqual(Reference.commune([.init(a: 2, b: 3), .init(a: 2, b: 3), .init(a: -5, b: -4)]), .init(a: 2, b: 3))
+        // Sur l'outil : rien d'écrit sur les tons moyens ni les hautes lumières.
+        _ = brancherRendu(reference: [.init(a: -3, b: -6), .zero, .zero])
+        let plan = try appel(["reference_id": 1, "photo_id": 2])
+        let proposes = try XCTUnwrap(plan["photos"]?.array?.first?["reglages_proposes"]?.object)
+        XCTAssertNil(proposes["ColorGradeMidtoneSat"])
+        XCTAssertNil(proposes["SplitToningHighlightSaturation"])
+        XCTAssertNotNil(proposes["SplitToningShadowSaturation"])
+    }
+
+    /// Revue (important) : un étalonnage déjà posé au-delà de la borne (copy_settings depuis la
+    /// référence, un paramètre prédéfini) n'est pas coupé à 25 ; il peut baisser librement.
+    func testUnEtalonnageDejaFortNestPasCoupe() {
+        let etat = Reference.Etat(reglages: ["SplitToningShadowHue": 200, "SplitToningShadowSaturation": 50], raw: false)
+        let angle = Reference.angleLab(teinte: 200) * .pi / 180
+        let direction = Reference.Vecteur(a: cos(angle), b: sin(angle))
+        let (pareil, _) = Reference.traduire(ecart([2 * direction, .zero, .zero]), etat: etat, options: .init(), pentes: .init())
+        XCTAssertGreaterThanOrEqual(pareil["SplitToningShadowSaturation"] ?? 50, 50, "ni coupé à 25 ni augmenté au-delà")
+        XCTAssertLessThanOrEqual(pareil["SplitToningShadowSaturation"] ?? 50, 50)
+        let (moins, _) = Reference.traduire(ecart([-10 * direction, .zero, .zero]), etat: etat, options: .init(), pentes: .init())
+        XCTAssertEqual(moins["SplitToningShadowSaturation"] ?? 0, 20, accuracy: 1, "baisser : libre (10 − 6 = 4 a*b*, soit 20)")
     }
 
     func testVibranceBorneeEtJamaisSaturation() {
@@ -285,6 +368,60 @@ final class ReferenceTests: XCTestCase {
         _ = brancherRendu(gainReel: 0.3, reference: [.zero, .init(a: 12, b: -15), .zero], peau: visage)
         let libre = try appel(["reference_id": 1, "photo_id": 2, "adjust": ["color_grading"], "protect_skin": false])
         XCTAssertNil(libre["photos"]?.array?.first?["teint"])
+    }
+
+    /// Revue (important) : une photo en erreur ne fait pas échouer la série ; les étapes déjà écrites
+    /// sur les autres sont rendues (photos[].etapes), et la suite est traitée.
+    func testUnePhotoEnErreurNArretePasLesAutres() throws {
+        _ = brancherRendu()
+        let base = fake.onSend
+        fake.onSend = { [unowned fake] command, params in
+            guard let fake else { return }
+            if command == "apercu", params["photo"]?.int == 3 {
+                fake.errors["apercu"] = LightroomError.plugin("Lightroom n'a pas pu rendre l'aperçu.")
+            } else {
+                if command == "apercu" { fake.errors["apercu"] = nil }
+                base?(command, params)
+            }
+        }
+        let fait = try appel(["reference_id": 1, "photo_ids": [2, 3, 4], "confirm": true])
+        let lignes = try XCTUnwrap(fait["photos"]?.array)
+        XCTAssertEqual(lignes.compactMap { $0["id"]?.int }, [2, 3, 4])
+        XCTAssertEqual(lignes[0]["etapes"]?.array?.count, 2, "les étapes de la photo 2 sont dites")
+        XCTAssertNotNil(lignes[1]["erreur"]?.string)
+        XCTAssertNil(lignes[1]["etapes"])
+        XCTAssertNil(lignes[2]["erreur"], "la photo 4 est traitée")
+        // La seule photo demandée en erreur, sans rien d'écrit : l'erreur, comme avant.
+        XCTAssertTrue(tools.call(name: "match_look", arguments: ["reference_id": 1, "photo_id": 3, "confirm": true]).isError)
+    }
+
+    func testUnArretDansLightroomRendLeResultatPartiel() throws {
+        _ = brancherRendu()
+        let base = fake.onSend
+        fake.onSend = { [unowned fake] command, params in
+            guard let fake else { return }
+            if command == "apercu", params["photo"]?.int == 3 {
+                fake.errors["apercu"] = CommandeArretee(message: "Arrêtée par l'utilisateur.")
+            } else {
+                base?(command, params)
+            }
+        }
+        let fait = try appel(["reference_id": 1, "photo_ids": [2, 3, 4], "confirm": true])
+        let lignes = try XCTUnwrap(fait["photos"]?.array)
+        XCTAssertEqual(lignes.compactMap { $0["id"]?.int }, [2], "la photo 4 n'est pas partie")
+        XCTAssertEqual(lignes[0]["etapes"]?.array?.count, 2)
+        XCTAssertTrue(fait["arrete"]?.string?.contains("2 photo(s) non traitée(s)") == true, fait["arrete"]?.string ?? "")
+    }
+
+    /// Revue (important) : des photo_ids ne sont pas décrits par la série ; une vidéo s'écarte par
+    /// la lecture des vignettes, avant tout aperçu et toute écriture.
+    func testLesVideosDePhotoIdsSontEcartees() throws {
+        _ = brancherRendu()
+        fake.replies["vignettes"] = ["photos": [["id": 3, "format": "VIDEO"], ["id": 2, "format": "RAW"]]]
+        let fait = try appel(["reference_id": 1, "photo_ids": [2, 3]])
+        XCTAssertFalse(fake.calls.contains { $0.command == "apercu" && $0.params["photo"]?.int == 3 })
+        XCTAssertEqual(fait["photos"]?.array?.compactMap { $0["id"]?.int }, [2])
+        XCTAssertNotNil(fait["videos_ecartees"])
     }
 
     func testArgumentsRefuses() {

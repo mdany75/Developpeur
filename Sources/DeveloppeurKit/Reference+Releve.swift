@@ -51,7 +51,7 @@ extension Reference {
         func signatureTexte(_ s: Signature) -> String {
             let bandes = s.bandes.enumerated().filter { $0.element >= 10 }.sorted { $0.element > $1.element }
                 .map { "\(PhotoMeasurements.bandes[$0.offset].nom) \(e($0.element, 0)) %" }.joined(separator: ", ")
-            return zonesTexte(s) + " ; chroma médiane \(e(s.chromaMediane, 1)), P90 \(e(s.chromaP90, 1)) ; L* P5 \(e(s.centiles[5] ?? 0, 1)) P50 \(e(s.mediane, 1)) P95 \(e(s.centiles[95] ?? 0, 1))"
+            return zonesTexte(s) + " ; chroma médiane \(e(s.chromaMediane, 1)), P90 \(e(s.chromaP90, 1)), couleurs vives \(s.chromaCouleurs.map { e($0, 1) } ?? "non lue") ; L* P5 \(e(s.centiles[5] ?? 0, 1)) P50 \(e(s.mediane, 1)) P95 \(e(s.centiles[95] ?? 0, 1))"
                 + (bandes.isEmpty ? "" : " ; bandes \(bandes)") + (s.remarques.isEmpty ? "" : " ; " + s.remarques.joined(separator: " ; "))
         }
 
@@ -116,12 +116,13 @@ extension Reference {
                         propre = "angle \(e(angle, 0))°, gain \(e(d.norme / sat, 3))"
                     }
                 }
-                let chroma = s.chromaMediane - depart.chromaMediane
-                dire("  \(essai.nom) : " + morceaux.joined(separator: " · ") + " ; Δ chroma médiane \(e(chroma, 2))"
+                // La Vibrance se juge sur les couleurs vives (Signature.chromaCouleurs), comme match_look.
+                let chroma = (s.chromaCouleurs ?? 0) - (depart.chromaCouleurs ?? 0)
+                dire("  \(essai.nom) : " + morceaux.joined(separator: " · ") + " ; Δ chroma des couleurs vives \(depart.chromaCouleurs == nil ? "non lue" : e(chroma, 2))"
                     + (essai.zone != nil ? " ; dans sa zone : \(propre)" : ""))
                 if essai.zone != nil {
                     resume.append("\(essai.nom)\t\(propre)")
-                } else if let v = essai.reglages["Vibrance"], abs(chroma) > 0.01 {
+                } else if let v = essai.reglages["Vibrance"], depart.chromaCouleurs != nil, abs(chroma) > 0.01 {
                     resume.append("\(essai.nom)\tvibranceParChroma \(e(v / chroma, 2))")
                 }
             }
