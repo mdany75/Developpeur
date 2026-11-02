@@ -82,8 +82,10 @@ final class FileOutilsTests: XCTestCase {
         XCTAssertEqual(fake.commands.filter { $0 == "essayer" }.count, 2)
     }
 
-    /// Une autre commande lancée entre-temps peut changer la photo : le résultat gardé ne vaut plus.
-    func testKeptResultIsDroppedWhenAnotherCommandRuns() throws {
+    /// Une lecture entre deux (get_status) ne change pas la photo : le résultat gardé reste offert
+    /// au même appel répété, sans le refaire. Avant, n'importe quelle commande l'effaçait : un
+    /// generative_edit de 5 minutes (Fibo 2) aurait tourné deux fois.
+    func testKeptResultSurvivesAReadBetweenTheTwoCalls() throws {
         let porte = DispatchSemaphore(value: 0)
         let fake = slowPreview(porte)
         let server = TestSupport.makeServer(fake)
@@ -94,10 +96,47 @@ final class FileOutilsTests: XCTestCase {
         server.toolBudget = 5
         let status = try call(server, toolLine(id: 2, "get_status"))
         XCTAssertEqual(status["result"]?["isError"]?.bool, false, "lancé une fois le rendu fini")
+        let selection = try call(server, toolLine(id: 3, "list_selection"))
+        XCTAssertEqual(selection["id"]?.int, 3)
+        let again = try call(server, toolLine(id: 4, "add_mask", maskPreview))
+        XCTAssertTrue(hasImage(again))
+        XCTAssertTrue(texts(again).contains("Résultat de l'appel précédent de add_mask"), texts(again))
+        XCTAssertEqual(fake.commands, ["essayer", "etat", "selection"], "l'aperçu n'est pas refait")
+    }
+
+    /// Une commande qui écrit entre deux peut changer la photo : le résultat gardé ne vaut plus.
+    func testKeptResultIsDroppedWhenAWriteRuns() throws {
+        let porte = DispatchSemaphore(value: 0)
+        let fake = slowPreview(porte)
+        let server = TestSupport.makeServer(fake)
+        server.toolBudget = 0.3
+
+        _ = try call(server, toolLine(id: 1, "add_mask", maskPreview))
         porte.signal()
-        let again = try call(server, toolLine(id: 3, "add_mask", maskPreview))
+        server.toolBudget = 5
+        _ = try call(server, toolLine(id: 2, "get_status"))
+        _ = try call(server, toolLine(id: 3, "undo_last"))
+        XCTAssertEqual(fake.commands, ["essayer", "etat", "annuler"])
+        porte.signal()
+        let again = try call(server, toolLine(id: 4, "add_mask", maskPreview))
         XCTAssertFalse(texts(again).contains("Résultat de l'appel précédent"))
-        XCTAssertEqual(fake.commands, ["essayer", "etat", "essayer"])
+        XCTAssertEqual(fake.commands, ["essayer", "etat", "annuler", "essayer"])
+    }
+
+    /// Les commandes qui laissent le résultat gardé : les outils en lecture seule (readOnlyHint),
+    /// get_status et la lecture d'une ressource ; jamais un outil qui écrit.
+    func testOnlyReadsKeepTheResult() {
+        for nom in ToolHandler.readOnlyTools {
+            XCTAssertTrue(FileOutils.laisseLeResultatGarde(nom), nom)
+        }
+        for nom in ["get_status", "resources/read", "view_photo", "list_selection", "find_photos", "contact_sheet"] {
+            XCTAssertTrue(FileOutils.laisseLeResultatGarde(nom), nom)
+        }
+        for nom in ["apply_settings", "preview_settings", "add_mask", "edit_mask", "generative_edit", "set_metadata",
+                    "undo_last", "revert_to_original", "propose_ratings", "manage_collections", "show_photo",
+                    "copy_settings", "create_virtual_copy", "export_photos", "remember_style"] {
+            XCTAssertFalse(FileOutils.laisseLeResultatGarde(nom), nom)
+        }
     }
 
     /// Claude Code donne un jeton de progression et relance sa garde d'inactivité à chaque

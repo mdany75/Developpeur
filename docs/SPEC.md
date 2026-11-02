@@ -368,7 +368,11 @@ fois vers le module, dans l'ordre d'arrivée, sur un fil à part (le serveur con
 - commencé mais pas fini, il répond d'attendre (« n'est pas fini après 50 s… rappeler avec
   exactement les mêmes arguments ») ; la commande continue, et son résultat est gardé 5 minutes
   pour le même appel répété (même outil, mêmes arguments), qui le reçoit dès qu'il est prêt, avec
-  une ligne qui le dit, sans rien refaire ; une autre commande qui commence entre-temps l'efface ;
+  une ligne qui le dit, sans rien refaire ; une commande qui écrit et commence entre-temps
+  l'efface, car elle change peut-être la photo ; une lecture le laisse
+  (`FileOutils.laisseLeResultatGarde` : les outils `readOnlyHint` de `ToolHandler.readOnlyTools`,
+  plus `get_status` et `resources/read`), pour qu'un `get_status` entre deux ne fasse pas refaire
+  un `generative_edit` d'environ 5 minutes (après la 1.6.3) ;
 - pas encore commencé (il attendait la fin d'un autre), il n'est pas lancé du tout, et la réponse
   le dit : sinon la fin d'une proposition, qui remet la photo comme avant, pourrait effacer une
   retouche appliquée entre-temps.
