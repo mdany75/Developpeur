@@ -27,8 +27,9 @@
 --                preset?, quantite_preset?, melange_nb_auto?, profil_objectif?, reperes?, rotation?,
 --                instantane_avant?, version_processus?, plages, libelles, relatif, etape, raison?, confirme} ; a_recadrer dans un résultat :
 --                cadre demandé à placer sur la nouvelle géométrie (commande recadrer)
---   masquer     {photos?|selection?, masques, etape, raison?, confirme} → ajoute des masques
---                                          (un masque peut porter des composants combinés)
+--   masquer     {photos?|selection?, masques, etape, raison?, confirme, releve_formes?} → ajoute des masques
+--                                          (un masque peut porter des composants combinés) ; formes
+--                                          sans IA relues (masques_relus), signalées, jamais retirées
 --   retoucher   {photo?, taches, yeux, etape, raison?, confirme}       → taches et yeux rouges
 --   ameliorer   {photo?, ameliorations, etape, raison?, confirme} → débruitage, détails bruts,
 --                                          super résolution, calculés par Lightroom

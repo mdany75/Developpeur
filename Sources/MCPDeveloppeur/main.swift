@@ -118,6 +118,8 @@ func outils() -> ToolHandler {
         fibo.garderDans = URL(fileURLWithPath: garde)
     }
     tools.fibo = fibo
+    // Développement : l'écrit et le relu des masques d'add_mask (DEVELOPPEUR_RELEVE_FORMES=1).
+    tools.releveFormes = ProcessInfo.processInfo.environment["DEVELOPPEUR_RELEVE_FORMES"] == "1"
     return tools
 }
 

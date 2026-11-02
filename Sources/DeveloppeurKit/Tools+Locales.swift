@@ -225,7 +225,7 @@ extension ToolHandler {
         ]
         return [
             tool("add_mask",
-                 "Ajoute des masques avec leurs réglages locaux, en une étape « Claude · <step_name> » : masques IA (sujet, ciel, arrière-plan, parties d'une personne, éléments de paysage, objet désigné par un cadre ou un trait) que Lightroom calcule pour chaque photo, dégradés linéaires et radiaux, plage de luminance, pinceau (dodge and burn, le long de traits), et masques combinés (combine : ajouter, soustraire ou intersecter d'autres zones, par exemple le ciel sans le bâtiment). Les positions se donnent dans l'image telle que la montre view_photo ; le serveur recale celles des dégradés, des traits et des objets sur la correction d'objectif, Upright et la perspective. Effets de Lightroom (effect), courbe du masque (tone_curve). Les masques déjà présents restent ; undo_last retire ceux de l'étape. Respecte le mode « Proposer d'abord » (confirm). " + Prompts.Tireur.resume,
+                 "Ajoute des masques avec leurs réglages locaux, en une étape « Claude · <step_name> » : masques IA (sujet, ciel, arrière-plan, parties d'une personne, éléments de paysage, objet désigné par un cadre ou un trait) que Lightroom calcule pour chaque photo, dégradés linéaires et radiaux, plage de luminance, pinceau (dodge and burn, le long de traits), et masques combinés (combine : ajouter, soustraire ou intersecter d'autres zones, par exemple le ciel sans le bâtiment). Les positions se donnent dans l'image telle que la montre view_photo ; le serveur recale celles des dégradés, des traits et des objets sur la correction d'objectif, Upright et la perspective. Effets de Lightroom (effect), courbe du masque (tone_curve). Les masques déjà présents restent ; undo_last retire ceux de l'étape. Respecte le mode « Proposer d'abord » (confirm). Les formes sans IA sont relues après l'écriture : un écart se dit, rien n'est retiré (masques_relus). " + Prompts.Tireur.resume,
                  properties: [("masks", ["type": "array", "items": mask, "minItems": 1, "maxItems": .number(Double(Self.maxMasks)),
                                          "description": "Masques à ajouter."])]
                     + [("mask_map", prop("boolean", "true = carte du masque, une seule photo : un rendu témoin par masque (\(CarteMasque.maxMasques) au plus, rien n'est gardé) dit où il porte, en image et en chiffres, avec des alertes : presque vide, presque total, déborde sur un visage, semble inversé. Pour un masque IA près d'un visage, un ciel découpé, une personne, un masque combiné ; les alertes se corrigent avant d'aller plus loin."))]
@@ -357,12 +357,14 @@ extension ToolHandler {
             resultat = try preview(params, args: args, notes: notes)
         } else {
             params.merge(writeParameters(args, defaultStep: "masques")) { _, new in new }
+            if releveFormes { params["releve_formes"] = true }
             let reponse = try lightroom.send("masquer", params, timeout: 180)
             // La version de Lightroom vient avec la réponse : une autre que celle des formes relevées
-            // se dit (versionFormesMasques), sans rien refuser.
+            // se dit (versionFormesMasques), sans rien refuser ; plus court quand la relecture du
+            // module (masques_relus) a tout trouvé gardé.
             if let version = reponse["lightroom"]?.string {
                 versionLightroom = version
-                if masks.contains(where: Self.positionne), let alerte = Self.avertissementFormesMasques(version) {
+                if let alerte = Self.alerteFormes(version, reponse: reponse, masks: masks) {
                     notes.append(.string(alerte))
                 }
             }
@@ -548,6 +550,23 @@ extension ToolHandler {
         let numeros = { (texte: String) in texte.split(separator: ".").prefix(2).map { Int($0.prefix { $0.isNumber }) ?? 0 } }
         guard !version.isEmpty, numeros(version) != numeros(versionFormesMasques) else { return nil }
         return "Lightroom Classic \(version) : les formes des dégradés, pinceaux, objets, plages de couleurs et personnes précises ont été relevées dans la \(versionFormesMasques). Vérifier le premier masque de ce genre (add_mask avec mask_map, ou view_photo) avant d'en poser d'autres, et dire à l'utilisateur s'il est mal placé."
+    }
+
+    /// L'avertissement de version d'un appel d'add_mask, d'après la relecture des formes du module
+    /// (1.6, `masques_relus` de chaque photo) : nil sans masque à position ou sur la version
+    /// relevée ; une phrase courte si chaque forme relue est « gardé » ; l'avertissement entier
+    /// sinon (un écart, un absent, un « à relire », ou un module sans relecture). Les objets et les
+    /// personnes précises ne sont pas relus (masques IA) : la phrase courte le dit. get_status garde
+    /// l'avertissement entier.
+    static func alerteFormes(_ version: String, reponse: JSONValue, masks: [JSONValue]) -> String? {
+        guard masks.contains(where: Self.positionne), let alerte = Self.avertissementFormesMasques(version) else { return nil }
+        let relus = (reponse["resultats"]?.array ?? []).flatMap { $0["masques_relus"]?.array ?? [] }
+        guard !relus.isEmpty, relus.allSatisfy({ $0["verdict"]?.string == "gardé" }) else { return alerte }
+        let iaPlaces = masks.contains { masque in
+            ([masque] + (masque["composants"]?.array ?? [])).contains { ["objet", "personne"].contains($0["type"]?.string) }
+        }
+        return "Lightroom Classic \(version) : dégradés, pinceaux et plages relus, gardés tels qu'écrits."
+            + (iaPlaces ? " Objets et personnes précises non relus : vérifier le premier avec view_photo." : "")
     }
 
     /// Un masque (ou l'un de ses composants) a-t-il une position dans l'image : dégradé linéaire

@@ -711,4 +711,207 @@ function Locaux.sansCalculsIA(corrections)
     return corrections
 end
 
+-- Masques relus après l'écriture (1.6, Retouche.relireFormes) ------------------------------------
+-- Les formes que le module écrit sans IA (dégradé linéaire, radial, pinceau, plage de couleurs, de
+-- luminance ou de profondeur) se comparent à ce que Lightroom a gardé. Les composants IA
+-- (Mask/Image : sujet, ciel, personne, objet) ne se comparent jamais : Lightroom réécrit leur
+-- ReferencePoint et leur geste au calcul (verifierPersonnes et masquesIAEnEchec les suivent).
+-- Seules les clés écrites par le module comptent, pas celles que Lightroom ajoute (MaskDigest…).
+--
+-- Tolérances PROVISOIRES, pas encore constatées (docs/SPEC.md, Masques relus, « À constater ») :
+-- le relevé DEVELOPPEUR_RELEVE_FORMES sur de nouvelles copies d'Essais les fixera.
+--   position : écart absolu en part de l'image (1e-4 : 0,6 px sur 6240) ;
+--   angle : degrés, l'angle d'une ellipse comparé modulo 180 (elle est symétrique) ;
+--   valeur : écart relatif (fondu, rayon, flux, dureté, étendue, plages).
+Locaux.TOLERANCES_FORMES = { position = 1e-4, angle = 0.01, valeur = 1e-3, provisoires = true }
+
+local POSITIONS_FORMES = {
+    ['Mask/Gradient'] = { 'ZeroX', 'ZeroY', 'FullX', 'FullY' },
+    ['Mask/CircularGradient'] = { 'Left', 'Top', 'Right', 'Bottom' },
+    ['Mask/RangeMask'] = { 'CorrectionReferenceX', 'CorrectionReferenceY' },
+}
+local VALEURS_FORMES = {
+    ['Mask/CircularGradient'] = { 'Feather', 'Midpoint', 'Roundness' },
+    ['Mask/Paint'] = { 'Radius', 'Flow', 'CenterWeight' },
+}
+local BOOLEENS_FORMES = { 'MaskInverted', 'MaskActive', 'Flipped' }
+
+-- Un composant que la relecture compare : pas un masque IA.
+function Locaux.formeComparable(m)
+    return type(m) == 'table' and m.What ~= nil and m.What ~= 'Mask/Image'
+end
+
+-- Une correction dont au moins un composant se compare.
+function Locaux.aDesFormes(correction)
+    local masques = type(correction) == 'table' and correction.CorrectionMasks
+    for _, m in ipairs(type(masques) == 'table' and masques or {}) do
+        if Locaux.formeComparable(m) then
+            return true
+        end
+    end
+    return false
+end
+
+local function nombresDe(texte)
+    local liste = {}
+    for mot in tostring(texte or ''):gmatch('%S+') do
+        liste[#liste + 1] = tonumber(mot) or mot
+    end
+    return liste
+end
+
+-- Un booléen écrit vrai ou faux, que Lightroom peut ranger 1 ou 0.
+local function booleen(v)
+    if v == true or v == 1 or v == '1' or v == 'true' then
+        return true
+    elseif v == false or v == 0 or v == '0' or v == 'false' or v == nil then
+        return false
+    end
+    return v
+end
+
+-- Écart entre deux angles d'une ellipse, en degrés, modulo 180.
+local function ecartAngle(a, b)
+    local d = math.abs(a - b) % 180
+    return math.min(d, 180 - d)
+end
+
+-- Les écarts entre les composants écrits et relus d'une correction (deux listes CorrectionMasks,
+-- au même rang), dans l'ordre : { composant, cle, ecrit, relu, ecart?, genre } ; genre 'structure'
+-- (clé perdue, autre forme, autre nombre de composants, de traits ou de touches), 'position',
+-- 'angle' ou 'valeur'. Une liste vide : gardé aux arrondis près.
+function Locaux.comparerFormes(ecrits, relus, tol)
+    tol = tol or Locaux.TOLERANCES_FORMES
+    local ecarts = {}
+    local function dire(k, cle, ecrit, relu, ecart, genre)
+        ecarts[#ecarts + 1] = { composant = k, cle = cle, ecrit = ecrit, relu = relu, ecart = ecart, genre = genre }
+    end
+    local function nombre(k, cle, a, b, genre)
+        local x, y = tonumber(a), tonumber(b)
+        if x == nil then
+            return
+        end
+        if y == nil then
+            dire(k, cle, x, b == nil and 'absent' or tostring(b), nil, 'structure')
+            return
+        end
+        local ecart
+        if genre == 'angle' then
+            ecart = ecartAngle(x, y)
+        elseif genre == 'valeur' then
+            ecart = math.abs(x - y) / math.max(1, math.abs(x))
+        else
+            ecart = math.abs(x - y)
+        end
+        if ecart > (tol[genre] or 0) then
+            dire(k, cle, x, y, ecart, genre)
+        end
+    end
+    -- Les nombres d'un texte (« c1 c2 c3 x y 0 », LumRange) : même nombre, puis chacun, du genre
+    -- de son rang (valeur sinon).
+    local function texte(k, cle, a, b, genres)
+        if a == nil then
+            return
+        end
+        local x, y = nombresDe(a), nombresDe(b)
+        if b == nil or #x ~= #y then
+            dire(k, cle, tostring(a), b == nil and 'absent' or tostring(b), nil, 'structure')
+            return
+        end
+        for i = 1, #x do
+            nombre(k, cle .. '[' .. i .. ']', x[i], y[i], genres[i] or 'valeur')
+        end
+    end
+    -- Touches d'un trait (Dabs) : même nombre et mêmes lettres ; « r », « f », « h » comparés en
+    -- valeurs, « d x y » ou « M x y » en positions.
+    local function touches(k, a, b)
+        if type(a) ~= 'table' then
+            return
+        end
+        if type(b) ~= 'table' or #a ~= #b then
+            dire(k, 'Dabs', #a .. ' touches', type(b) == 'table' and (#b .. ' touches') or 'absent', nil, 'structure')
+            return
+        end
+        for i = 1, #a do
+            local la, ra = tostring(a[i]):match('^(%S+)%s*(.*)$')
+            local lb, rb = tostring(b[i]):match('^(%S+)%s*(.*)$')
+            local x, y = nombresDe(ra), nombresDe(rb)
+            if la ~= lb or #x ~= #y then
+                dire(k, 'Dabs[' .. i .. ']', tostring(a[i]), tostring(b[i]), nil, 'structure')
+                return
+            end
+            local genre = (la == 'd' or la == 'M') and 'position' or 'valeur'
+            for j = 1, #x do
+                nombre(k, 'Dabs[' .. i .. ']', x[j], y[j], genre)
+            end
+        end
+    end
+    local function composant(k, a, b)
+        if type(b) ~= 'table' or b.What ~= a.What then
+            dire(k, 'What', tostring(a.What), type(b) == 'table' and tostring(b.What) or 'absent', nil, 'structure')
+            return
+        end
+        for _, cle in ipairs(BOOLEENS_FORMES) do
+            if a[cle] ~= nil and booleen(a[cle]) ~= booleen(b[cle]) then
+                dire(k, cle, tostring(a[cle]), tostring(b[cle]), nil, 'structure')
+            end
+        end
+        if a.MaskBlendMode ~= nil and tonumber(a.MaskBlendMode) ~= tonumber(b.MaskBlendMode) then
+            dire(k, 'MaskBlendMode', tostring(a.MaskBlendMode), tostring(b.MaskBlendMode), nil, 'structure')
+        end
+        for _, cle in ipairs(POSITIONS_FORMES[a.What] or {}) do
+            nombre(k, cle, a[cle], b[cle], 'position')
+        end
+        for _, cle in ipairs(VALEURS_FORMES[a.What] or {}) do
+            nombre(k, cle, a[cle], b[cle], 'valeur')
+        end
+        if a.What == 'Mask/CircularGradient' then
+            nombre(k, 'Angle', a.Angle, b.Angle, 'angle')
+        elseif a.What == 'Mask/Paint' then
+            touches(k, a.Dabs, b.Dabs)
+        elseif a.What == 'Mask/Aggregate' then
+            local ma, mb = type(a.Masks) == 'table' and a.Masks or {}, type(b.Masks) == 'table' and b.Masks or {}
+            if #ma ~= #mb then
+                dire(k, 'Masks', #ma .. ' traits', #mb .. ' traits', nil, 'structure')
+                return
+            end
+            for i = 1, #ma do
+                composant(k .. '.' .. i, ma[i], mb[i])
+            end
+        end
+        local plageEcrite = a.CorrectionRangeMask
+        if type(plageEcrite) == 'table' then
+            local plageRelue = b.CorrectionRangeMask
+            if type(plageRelue) ~= 'table' or tonumber(plageEcrite.Type) ~= tonumber(plageRelue.Type) then
+                dire(k, 'CorrectionRangeMask.Type', tostring(plageEcrite.Type),
+                    type(plageRelue) == 'table' and tostring(plageRelue.Type) or 'absent', nil, 'structure')
+                return
+            end
+            nombre(k, 'ColorAmount', plageEcrite.ColorAmount, plageRelue.ColorAmount, 'valeur')
+            texte(k, 'LumRange', plageEcrite.LumRange, plageRelue.LumRange, {})
+            texte(k, 'DepthRange', plageEcrite.DepthRange, plageRelue.DepthRange, {})
+            local pa = type(plageEcrite.PointModels) == 'table' and plageEcrite.PointModels or nil
+            local pb = type(plageRelue.PointModels) == 'table' and plageRelue.PointModels or {}
+            if pa and #pa ~= #pb then
+                dire(k, 'PointModels', #pa .. ' couleurs', #pb .. ' couleurs', nil, 'structure')
+            elseif pa then
+                for i = 1, #pa do
+                    texte(k, 'PointModels[' .. i .. ']', pa[i], pb[i], { 'valeur', 'valeur', 'valeur', 'position', 'position', 'valeur' })
+                end
+            end
+        end
+    end
+    ecrits, relus = type(ecrits) == 'table' and ecrits or {}, type(relus) == 'table' and relus or {}
+    if #ecrits ~= #relus then
+        dire('0', 'CorrectionMasks', #ecrits .. ' composants', #relus .. ' composants', nil, 'structure')
+        return ecarts
+    end
+    for k, a in ipairs(ecrits) do
+        if Locaux.formeComparable(a) then
+            composant(tostring(k), a, relus[k])
+        end
+    end
+    return ecarts
+end
+
 return Locaux

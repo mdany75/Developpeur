@@ -427,6 +427,56 @@ local function verifierMasques(reglages)
     end
 end
 
+-- Une « version future » de Lightroom, pour les essais de la relecture des masques (1.6) : ce n'est
+-- PAS un constat (Lightroom Classic 15.6 garde les formes telles qu'écrites jusqu'au relevé
+-- DEVELOPPEUR_RELEVE_FORMES, docs/SPEC.md, Masques relus). Sur les seuls composants sans IA (pas
+-- Mask/Image), à chaque écriture de masques :
+--   S.formesIgnorees = { 'Dabs', 'ZeroX' } : ces clés sont perdues ;
+--   S.arrondiFormes = n : positions, fondus, rayons et touches arrondis à n décimales ;
+--   S.angleFormes = true : l'angle d'un radial rangé de 0 à 180 (une ellipse est symétrique).
+local function arrondi(x, n)
+    local e = 10 ^ n
+    return math.floor(x * e + 0.5) / e
+end
+
+local function altererComposant(m)
+    if type(m) ~= 'table' or m.What == 'Mask/Image' then
+        return
+    end
+    for _, cle in ipairs(S.formesIgnorees or {}) do
+        m[cle] = nil
+    end
+    if S.arrondiFormes then
+        for _, cle in ipairs({ 'ZeroX', 'ZeroY', 'FullX', 'FullY', 'Left', 'Top', 'Right', 'Bottom', 'Radius', 'Feather' }) do
+            if type(m[cle]) == 'number' then
+                m[cle] = arrondi(m[cle], S.arrondiFormes)
+            end
+        end
+        for i, touche in ipairs(type(m.Dabs) == 'table' and m.Dabs or {}) do
+            m.Dabs[i] = tostring(touche):gsub('%-?%d+%.%d+', function(n)
+                return string.format('%.' .. S.arrondiFormes .. 'f', arrondi(tonumber(n), S.arrondiFormes))
+            end)
+        end
+    end
+    if S.angleFormes and type(m.Angle) == 'number' then
+        m.Angle = m.Angle % 180
+    end
+    for _, sous in ipairs(type(m.Masks) == 'table' and m.Masks or {}) do
+        altererComposant(sous)
+    end
+end
+
+local function altererFormes(reglages)
+    if not (S.formesIgnorees or S.arrondiFormes or S.angleFormes) then
+        return
+    end
+    for _, correction in ipairs(type(reglages.MaskGroupBasedCorrections) == 'table' and reglages.MaskGroupBasedCorrections or {}) do
+        for _, m in ipairs(correction.CorrectionMasks or {}) do
+            altererComposant(m)
+        end
+    end
+end
+
 -- meta : métadonnées formatées (getFormattedMetadata) ; brut : métadonnées brutes
 -- (getRawMetadata), qui reprennent meta pour les clés absentes.
 -- Champs IPTC qu'écrit setRawMetadata (outre le titre, la légende et les droits d'auteur).
@@ -498,6 +548,9 @@ function S.Photo(id, reglages, meta, brut)
             self.reglages.LensProfileSetup = 'Custom'
         end
         verifierMasques(self.reglages)
+        if reglages.MaskGroupBasedCorrections ~= nil then
+            altererFormes(self.reglages)
+        end
         deriverTaches(self)
         perimerLook(self, reglages)
         rangerLookAdaptatif(self, reglages, false)
@@ -727,6 +780,9 @@ function S.Photo(id, reglages, meta, brut)
             end
         end
         verifierMasques(self.reglages)
+        if preset.reglages.MaskGroupBasedCorrections ~= nil then
+            altererFormes(self.reglages)
+        end
         perimerLook(self, preset.reglages)
         rangerLookAdaptatif(self, preset.reglages, true)
         -- Dans Lightroom, le calcul vient peu après, à l'affichage de la photo : S.calculDiffere le
@@ -2431,6 +2487,8 @@ function S.reinitialiser()
     S.quantitesPresets = {}
     S.rotations = {}
     S.masquesVidesRetires = 0
+    -- « Version future » des formes de masques (altererFormes) : aucune par défaut.
+    S.formesIgnorees, S.arrondiFormes, S.angleFormes = nil, nil, nil
     S.barres = {}
     S.sauvegardeDemandee = false
     S.filtre = { filtersActive = false }

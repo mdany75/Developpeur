@@ -1212,7 +1212,10 @@ un modèle de couleur approché : Claude en vérifie la sélection sur l'aperçu
 qu'une couleur (deux font planter Lightroom 15.6), une autre couleur s'y ajoute en seconde plage.
 Les formes des dégradés, pinceaux, objets et plages de couleurs ont été relevées dans Lightroom
 Classic 15.6 : sous une autre version, `get_status` et `add_mask` le disent, et Claude vérifie le
-premier masque de ce genre.
+premier masque de ce genre. Depuis la 1.6, chaque dégradé, pinceau ou plage que Claude pose est
+relu tout de suite dans Lightroom et comparé à ce qui a été écrit : un masque que Lightroom n'a pas
+gardé tel quel est signalé à Claude, qui le vérifie et vous le dit ; rien n'est retiré de
+lui-même. Les objets et les personnes ne sont pas relus ainsi (Lightroom les recalcule).
 
 ## Installer
 
