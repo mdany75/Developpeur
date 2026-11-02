@@ -178,7 +178,9 @@ public final class EncodeurMobileCLIP: EncodeurSens {
         let fm = FileManager.default
         let cible = dossier.appendingPathComponent(url.deletingPathExtension().lastPathComponent + ".mlmodelc", isDirectory: true)
         if fm.fileExists(atPath: cible.path) { return cible }
-        let compile = try MLModel.compileModel(at: url)
+        let copie = try sansLiens(url)
+        defer { try? fm.removeItem(at: copie.deletingLastPathComponent()) }
+        let compile = try MLModel.compileModel(at: copie)
         try fm.createDirectory(at: dossier, withIntermediateDirectories: true)
         let provisoire = dossier.appendingPathComponent(".\(cible.lastPathComponent).\(ProcessInfo.processInfo.processIdentifier)")
         try? fm.removeItem(at: provisoire)
@@ -189,6 +191,30 @@ public final class EncodeurMobileCLIP: EncodeurSens {
             try fm.moveItem(at: provisoire, to: cible)
         }
         return cible
+    }
+
+    /// Une copie du paquet, liens symboliques résolus, dans un dossier temporaire à effacer. Le cache
+    /// de Hugging Face range weight.bin en lien vers ses blobs : `compileModel` le refuse alors
+    /// (« weight.bin doesn't exist », constaté le 2 nov. 2026 sous le runtime durci).
+    static func sansLiens(_ url: URL) throws -> URL {
+        let fm = FileManager.default
+        let copie = fm.temporaryDirectory
+            .appendingPathComponent("developpeur-sens-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent(url.lastPathComponent, isDirectory: true)
+        try fm.createDirectory(at: copie, withIntermediateDirectories: true)
+        for relatif in fm.subpaths(atPath: url.path) ?? [] {
+            let source = url.appendingPathComponent(relatif)
+            let cible = copie.appendingPathComponent(relatif)
+            var dossier: ObjCBool = false
+            guard fm.fileExists(atPath: source.path, isDirectory: &dossier) else { continue }
+            if dossier.boolValue {
+                try fm.createDirectory(at: cible, withIntermediateDirectories: true)
+            } else {
+                try fm.createDirectory(at: cible.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try fm.copyItem(at: source.resolvingSymlinksInPath(), to: cible)
+            }
+        }
+        return copie
     }
 
     /// Compile les deux encodeurs dans Developpeur/Modeles (rien si c'est déjà fait) ; le temps pris.

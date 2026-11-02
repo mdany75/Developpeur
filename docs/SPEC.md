@@ -7935,6 +7935,15 @@ Par l'orchestrateur, avant la publication ; aucune commande n'écrit au catalogu
    `mcp-developpeur --compiler-sens` sur une installation sans `.mlmodelc` (les retirer d'abord de
    Developpeur/Modeles, ils se refont) : `compilation_s` fixe **`Releve.ALARME_COMPILATION`**
    (provisoire 300 s ; viser trois fois le temps relevé).
+   **Constaté le 2 nov. 2026** (connecteur signé au runtime durci, Mac de Dany) : la première
+   compilation échouait (« weight.bin doesn't exist ») parce que le cache de Hugging Face range les
+   poids en liens symboliques ; le paquet se copie maintenant liens résolus avant `compileModel`
+   (`EncodeurMobileCLIP.sansLiens`, test `testLaCopieACompilerResoutLesLiensDuCacheHuggingFace`).
+   Ensuite : `ok`, entrée `image` 256 × 256, entrée `text` [1, 77] int32, sorties de 512, jetons
+   exacts ; compilation des deux encodeurs 0,1 s (CoreML garde son propre cache) ; ouverture à froid
+   1,1 s, puis 0,1 s ; texte 1 484 ms au premier appel, 142 ms ensuite ; image 13 à 19 ms.
+   `Suivi.delaiOuvertureSens` (10 s) et `Releve.ALARME_COMPILATION` (300 s) gardent une large marge :
+   inchangés.
 2. **Jetons contre open_clip** (critique adverse) : dans un env jetable, `open_clip.tokenize` et
    l'encodeur de texte d'open_clip (MobileCLIP-S2, `datacompdr`) sur les phrases de
    Tests/Contrats/jetons-clip.json ; cosinus avec `vecteur_texte_debut` et les vecteurs de

@@ -47,6 +47,30 @@ final class SensTests: XCTestCase {
 
     // MARK: Index
 
+    /// Constaté le 2 nov. 2026 : le cache de Hugging Face range weight.bin en lien symbolique, que
+    /// CoreML refuse de compiler ; la copie à compiler n'a plus aucun lien.
+    func testLaCopieACompilerResoutLesLiensDuCacheHuggingFace() throws {
+        let fm = FileManager.default
+        let racine = fm.temporaryDirectory.appendingPathComponent("sens-liens-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: racine) }
+        let blobs = racine.appendingPathComponent("blobs")
+        let paquet = racine.appendingPathComponent("m.mlpackage")
+        let poids = paquet.appendingPathComponent("Data/weights")
+        try fm.createDirectory(at: blobs, withIntermediateDirectories: true)
+        try fm.createDirectory(at: poids, withIntermediateDirectories: true)
+        try Data("poids".utf8).write(to: blobs.appendingPathComponent("abc"))
+        try fm.createSymbolicLink(atPath: poids.appendingPathComponent("weight.bin").path, withDestinationPath: "../../../blobs/abc")
+        try Data("{}".utf8).write(to: paquet.appendingPathComponent("Manifest.json"))
+        let copie = try EncodeurMobileCLIP.sansLiens(paquet)
+        defer { try? fm.removeItem(at: copie.deletingLastPathComponent()) }
+        let fichier = copie.appendingPathComponent("Data/weights/weight.bin")
+        let attributs = try fm.attributesOfItem(atPath: fichier.path)
+        XCTAssertEqual(attributs[.type] as? FileAttributeType, .typeRegular)
+        XCTAssertEqual(try String(contentsOf: fichier, encoding: .utf8), "poids")
+        XCTAssertTrue(fm.fileExists(atPath: copie.appendingPathComponent("Manifest.json").path))
+        XCTAssertEqual(copie.lastPathComponent, "m.mlpackage")
+    }
+
     func testLIndexRangeClasseEtRelit() throws {
         let index = try IndexSens(ecrire: dossier.appendingPathComponent("i"), modele: "m", dimension: 4, catalogue: "/C.lrcat")
         try index.ranger(uuid: "u1", id: 1, jour: "2019-07-14 18:30", vecteur: Sens.normaliser([1, 0, 0, 0]))
