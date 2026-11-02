@@ -2391,6 +2391,32 @@ essai('Styles : le moteur joint le style choisi', function()
     egal(nil, d.style)
 end)
 
+essai('Styles : le guide de style d\'une invite de retouche, pas redit avec « À ma façon » (relecture du 2 novembre 2026)', function()
+    local Consignes = require 'Consignes'
+    local pro = Consignes.invite('retouche_pro').message
+    local function derniereEntree()
+        local entree = Fichiers.lire(Moteur.session.dossier .. '/entree.jsonl')
+        local derniere
+        for ligne in entree:gmatch('[^\n]+') do derniere = ligne end
+        return derniere
+    end
+    vrai(Moteur.envoyer(pro, { style = 'neutre' }))
+    vrai(attendre(function() return not Moteur.travaille end))
+    vrai(derniereEntree():find('remember_style avec read = true', 1, true), 'un autre style : le guide demandé par l\'invite')
+    vrai(Moteur.envoyer(pro, { style = 'ma_facon' }))
+    vrai(attendre(function() return not Moteur.travaille end))
+    local ligne = derniereEntree()
+    vrai(not ligne:find('remember_style avec read = true', 1, true), 'à ma façon : la phrase de l\'invite retirée')
+    vrai(ligne:find('remember_style avec read', 1, true), 'à ma façon : sa ligne de style le fait lire, une fois')
+    vrai(ligne:find('Retouche la photo active comme un professionnel', 1, true), 'la demande partie')
+    -- Le fil garde la demande telle quelle.
+    local d
+    for _, e in ipairs(Moteur.courante.elements) do
+        if e.genre == 'dany' then d = e end
+    end
+    egal(pro, d.texte)
+end)
+
 -- Chargement et arrêt du module -------------------------------------------------------------
 
 essai('Arret.lua : Claude Code est fermé avec le module (la liaison aussi), le Suivi éteint', function()

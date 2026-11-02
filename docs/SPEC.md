@@ -2427,7 +2427,11 @@ suit), puis ▲ ▼ et Envoyer à sa droite. À sa gauche, quatre carrés à ic�
 la 1.6 : images `rapide-noter`, `rapide-retouche`, `rapide-portrait`, `rapide-classer`), chacun une
 demande toute faite par `FenetreRapide.demander`, le champ laissé tel quel : noter
 (`Consignes.noterRapide` : `propose_ratings` avec `apply`, le clic vaut la demande), Retouche pro,
-Portrait (`Consignes.invite`, pour chaque photo par `Consignes.surLaSelection`) et Classer
+Portrait (`Consignes.invite`, pour chaque photo par `Consignes.surLaSelection` ; Retouche pro, depuis
+la relecture du 2 novembre 2026, par groupes de lumière, `Consignes.retoucheProSurLaSelection` :
+`match_series` avec `groups` sans rien écrire, la référence de chaque groupe retouchée, `copy_settings`
+vers les autres photos du groupe puis `match_series` ; une photo seule dans son groupe, retouchée
+seule) et Classer
 (`Consignes.classerRapide`). L'invite Classer (pendant du connecteur : l'invite `classer`) fait
 proposer mots-clés (`list_keywords` d'abord), lieu (seulement repris d'un champ ou d'un mot-clé de
 lieu déjà posé : aucun outil ne traduit la position GPS en ville ou en pays, Claude donne les
@@ -6389,7 +6393,15 @@ Proposition dit la raison, « Cadre : <résumé> » et ce que montre l'aperçu (
 ou « Rien ne change avant Accepter. » seul), puis les autres réglages. Un vrai clic sur l'onglet
 Proposition remontre l'image de la proposition en attente (`Fenetre.montrerImageProposition`),
 gardée jusqu'à ◀ ▶, une image nouvelle, une autre conversation ou la proposition décidée ; une
-bascule ne la demande pas. Ajuster… offre `Consignes.ajustementsCadre`. Section des consignes
+bascule ne la demande pas. Ajuster… offre `Consignes.ajustementsCadre`. Pour une autre proposition
+(relecture du 2 novembre 2026), les ajustements d'un clic suivent ce qu'elle touche
+(`Conversation.ceQueTouche` : réglages et sens de l'écart, masques proposés par `add_mask` avec
+`preview` depuis la demande de Dany ; `Consignes.ajustementsPour`) : un bouton qui tempère chaque
+changement (une proposition qui réchauffe offre « Moins chaud »), la peau seulement pour un masque
+ou un effet de peau ou l'orange du mélangeur, le ciel de même, six au plus ; la liste fixe
+`Consignes.ajustementsRapides` quand rien n'est reconnu. Chaque invite de retouche (marquée
+`retouche`) finit par `Consignes.LIRE_GUIDE` (lire le guide de style) ; avec le style « À ma façon »,
+qui le fait déjà lire, la phrase est retirée du message à Claude (`Consignes.sansDoublonGuide`). Section des consignes
 « ## Composition ».
 
 **Constaté le 21 octobre 2026** (mesure 5, copies d'Essais, défait ensuite) : `read_composition`

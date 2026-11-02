@@ -1123,6 +1123,89 @@ function Conversation.propositionEnAttente(c)
     return i and c.elements[i] or nil
 end
 
+-- Ce que touche une proposition (relecture du 2 novembre 2026) : pour les ajustements d'un clic
+-- de la boîte Ajuster… (Consignes.ajustementsPour) ---------------------------------------------
+
+-- Un nombre affiché (« -0,35 », « 5500 ») relu ; nil pour « — » ou un texte.
+local function nombreAffiche(v)
+    if type(v) == 'number' then
+        return v
+    end
+    if type(v) ~= 'string' then
+        return nil
+    end
+    return tonumber((v:gsub('−', '-'):gsub(',', '.'):gsub('%s', '')))
+end
+
+-- Les zones d'un masque d'add_mask (et de ses composants ajoutés) : ciel, peau.
+local function zonesDuMasque(m, zones)
+    if type(m) ~= 'table' then
+        return
+    end
+    local function zone(z)
+        if type(z) ~= 'table' or z.mode == 'subtract' then
+            return
+        end
+        if z.kind == 'sky' or (z.kind == 'landscape' and z.part == 'sky') then
+            zones.ciel = true
+        end
+        if (z.kind == 'person' or z.kind == 'person_part') and (z.part == 'face_skin' or z.part == 'body_skin') then
+            zones.peau = true
+        end
+    end
+    zone(m)
+    for _, composant in ipairs(type(m.combine) == 'table' and m.combine or {}) do
+        zone(composant)
+    end
+    if m.smoothing_requested == true or (type(m.effect) == 'string' and m.effect:lower():find('peau', 1, true)) then
+        zones.peau = true
+    end
+end
+
+-- Rend `reglages`, { [clé] = écart (après − avant), ou false quand le sens n'est pas lu } d'après
+-- les changements de la proposition (clé du connecteur, ou libellé de l'entrée relu), et `zones`,
+-- { ciel, peau } des masques proposés (add_mask avec preview = true) depuis la dernière demande de
+-- Dany qui précède la proposition. Sans proposition, deux tables vides.
+function Conversation.ceQueTouche(c, prop)
+    local reglages, zones = {}, {}
+    if not prop then
+        return reglages, zones
+    end
+    local parLibelle = {}
+    for cle, libelle in pairs(Conversation.libelles) do
+        parLibelle[libelle] = cle
+    end
+    for _, ch in ipairs(prop.changements or {}) do
+        local cle = type(ch.cle) == 'string' and ch.cle or parLibelle[ch.libelle] or ch.libelle
+        if type(cle) == 'string' and cle ~= Conversation.LIBELLE_RECADRAGE and cle ~= "Profil" then
+            local avant, apres = nombreAffiche(ch.avant), nombreAffiche(ch.apres)
+            reglages[cle] = (avant and apres) and (apres - avant) or false
+        end
+    end
+    local debut = 1
+    for i, e in ipairs(c and c.elements or {}) do
+        if e == prop then
+            break
+        end
+        if e.genre == 'dany' then
+            debut = i + 1
+        end
+    end
+    for i = debut, #(c and c.elements or {}) do
+        local e = c.elements[i]
+        if e.genre == 'outil' and e.outil == 'add_mask' and type(e.detail) == 'string' then
+            local fin = e.detail:find('\n\n— Réponse —', 1, true)
+            local ok, entree = pcall(Json.decode, fin and e.detail:sub(1, fin - 1) or e.detail)
+            if ok and type(entree) == 'table' and entree.preview == true and type(entree.masks) == 'table' then
+                for _, m in ipairs(entree.masks) do
+                    zonesDuMasque(m, zones)
+                end
+            end
+        end
+    end
+    return reglages, zones
+end
+
 -- Une proposition dépassée par Claude (1.3.2) ---------------------------------------------------
 -- Constaté le 22 octobre 2026 : la proposition préparée à l'ouverture attendait dans l'onglet
 -- Proposition ; Dany a écrit « Applique ta proposition, puis termine par la leçon de la photo »

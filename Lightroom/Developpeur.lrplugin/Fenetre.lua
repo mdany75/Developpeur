@@ -2191,7 +2191,10 @@ function Fenetre.ajuster()
         local q = LrBinding.makePropertyTable(context)
         q.texte = ''
         local rapides = { spacing = 6 }
-        for _, a in ipairs(cadre and Consignes.ajustementsCadre or Consignes.ajustementsRapides) do
+        -- Hors recadrage, choisis d'après ce que touche la proposition (réglages et sens, masques
+        -- proposés), la liste fixe en repli (relecture du 2 novembre 2026).
+        local choix = cadre and Consignes.ajustementsCadre or Consignes.ajustementsPour(Conversation.ceQueTouche(c, prop))
+        for _, a in ipairs(choix) do
             rapides[#rapides + 1] = f:push_button { title = a, action = function()
                 q.texte = Texte.nettoyer(q.texte) == '' and a or (Texte.nettoyer(q.texte) .. ", " .. a:lower())
             end }

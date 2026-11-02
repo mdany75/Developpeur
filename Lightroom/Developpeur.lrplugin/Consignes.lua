@@ -121,6 +121,17 @@ Consignes.texte = Consignes.texte:gsub('\\\n', '')
 -- légende déjà écrite (relecture du 2 novembre 2026 : elle manquait, et Claude l'aurait remplacée).
 local CLASSER = "Classe la photo active, sans rien écrire d'abord : regarde-la (view_photo) et lis son classement (get_settings : mots-clés, légende, lieu et position GPS déjà posés), puis propose des mots-clés, en reprenant ceux du catalogue (list_keywords), un lieu seulement s'il est sûr (repris d'un champ de lieu ou d'un mot-clé de lieu déjà posé ; la position GPS seule ne nomme pas le lieu : donne-la et laisse-moi le nommer, jamais deviné) et une légende courte, sans remplacer celle que j'ai déjà écrite."
 
+-- Le guide de style de Dany, lu au début de chaque retouche lancée par un bouton (invites marquées
+-- `retouche`, fenêtre Claude et Demande rapide ; relecture du 2 novembre 2026 : seuls la peau, les
+-- suggestions et le style « À ma façon » le citaient). En fin de message, pour que le titre tiré de
+-- la demande reste son début ; retiré du message à Claude quand le style « À ma façon », qui le fait
+-- déjà lire, est choisi (Consignes.sansDoublonGuide).
+Consignes.LIRE_GUIDE = "Avant tout, lis mon guide de style (remember_style avec read = true) et suis ses préférences."
+
+local function avecGuide(message)
+    return message .. " " .. Consignes.LIRE_GUIDE
+end
+
 -- Les invites en raccourcis (d'après les invites du connecteur). `modele` : modèle conseillé
 -- (nil : celui choisi dans la fenêtre). Portrait, Paysage et Noir et blanc demandent d'éclaircir
 -- et assombrir comme un tireur, sans chiffres : les doses arrivent à Claude Code par la
@@ -128,22 +139,28 @@ local CLASSER = "Classe la photo active, sans rien écrire d'abord : regarde-la 
 -- invites du connecteur.
 Consignes.invites = {
     { id = 'retouche_pro', titre = "Retouche pro",
-        message = "Retouche la photo active comme un professionnel : diagnostic chiffré, deux passes vérifiées, puis au plus deux passes correctives si un défaut reste." },
+        retouche = true,
+        message = avecGuide("Retouche la photo active comme un professionnel : diagnostic chiffré, deux passes vérifiées, puis au plus deux passes correctives si un défaut reste.") },
     { id = 'portrait', titre = "Portrait",
-        message = "Retouche ce portrait : peau, yeux, dents, arrière-plan, flou d'objectif si la photo s'y prête ; puis éclaircis et assombris comme un tireur pour mener l'œil au visage (doses d'add_mask), et montre l'avant/après de cette étape. Reste naturel." },
+        retouche = true,
+        message = avecGuide("Retouche ce portrait : peau, yeux, dents, arrière-plan, flou d'objectif si la photo s'y prête ; puis éclaircis et assombris comme un tireur pour mener l'œil au visage (doses d'add_mask), et montre l'avant/après de cette étape. Reste naturel.") },
     { id = 'paysage', titre = "Paysage",
-        message = "Retouche ce paysage : horizon, ciel, profondeur, masques de paysage ; puis éclaircis et assombris comme un tireur pour mener l'œil au sujet (doses d'add_mask), et montre l'avant/après de cette étape." },
+        retouche = true,
+        message = avecGuide("Retouche ce paysage : horizon, ciel, profondeur, masques de paysage ; puis éclaircis et assombris comme un tireur pour mener l'œil au sujet (doses d'add_mask), et montre l'avant/après de cette étape.") },
     { id = 'noir_et_blanc', titre = "Noir et blanc",
-        message = "Passe la photo active en noir et blanc : profil, mélangeur, contraste local, puis éclaircis et assombris comme un tireur (doses d'add_mask) avec l'avant/après de cette étape, et grain." },
+        retouche = true,
+        message = avecGuide("Passe la photo active en noir et blanc : profil, mélangeur, contraste local, puis éclaircis et assombris comme un tireur (doses d'add_mask) avec l'avant/après de cette étape, et grain.") },
     { id = 'iso_eleve', titre = "ISO élevé",
-        message = "Retouche cette photo prise à ISO élevé : le bruit d'abord (débruitage IA s'il est fort), puis les ombres, les couleurs et la netteté, sans lisser les détails." },
+        retouche = true,
+        message = avecGuide("Retouche cette photo prise à ISO élevé : le bruit d'abord (débruitage IA s'il est fort), puis les ombres, les couleurs et la netteté, sans lisser les détails.") },
     -- Composition (1.3) : lue sur l'image entière (read_composition), le cadre proposé et montré,
     -- appliqué seulement par Accepter ; sans chiffre, comme les autres invites. Avant Sports (le menu
     -- Style est sous le champ, avec son étiquette).
     { id = 'composition', titre = "Composition",
         message = "Lis la composition de la photo active (horizon, tiers, espace devant le sujet) et propose un recadrage, sans l'appliquer ; dis la règle en une phrase." },
     { id = 'sports', titre = "Sports",
-        message = "Retouche cette photo de sport : le sujet en action d'abord (exposition, contraste et netteté sur lui), couleurs fidèles des maillots et du terrain, arrière-plan calmé ; bruit si l'ISO est élevé ; recadrage serré sur l'action seulement s'il y gagne nettement, et dis-le." },
+        retouche = true,
+        message = avecGuide("Retouche cette photo de sport : le sujet en action d'abord (exposition, contraste et netteté sur lui), couleurs fidèles des maillots et du terrain, arrière-plan calmé ; bruit si l'ISO est élevé ; recadrage serré sur l'action seulement s'il y gagne nettement, et dis-le.") },
     -- Classer (correctif après la 1.6, point « Le Suivi et le classement : fonctions faites, mais
     -- sans bouton » de la page Analyse) : mots-clés, lieu et légende proposés, jamais écrits sans
     -- l'accord de Dany, quel que soit le mode du module (« Proposer d'abord » par défaut). Le lieu
@@ -248,6 +265,21 @@ function Consignes.ligneStyle(valeur)
     return "[Style demandé : " .. s.title .. " — " .. s.definition .. (recette and (". " .. recette) or "") .. "]"
 end
 
+-- Le message à Claude d'une demande, sans la phrase du guide (Consignes.LIRE_GUIDE) quand le style
+-- « À ma façon » est choisi : sa ligne de style le fait déjà lire, en première passe. Le fil garde
+-- la demande telle quelle.
+function Consignes.sansDoublonGuide(texte, style)
+    if style ~= 'ma_facon' or type(texte) ~= 'string' then
+        return texte
+    end
+    local debut, fin = texte:find(Consignes.LIRE_GUIDE, 1, true)
+    if not debut then
+        return texte
+    end
+    local reste = (texte:sub(1, debut - 1) .. " " .. texte:sub(fin + 1)):gsub('%s+', ' '):gsub('^ ', ''):gsub(' $', '')
+    return reste
+end
+
 -- Les modèles proposés (valeur passée à `claude --model`).
 Consignes.modeles = {
     { value = 'fable', title = "Fable · le plus capable" },
@@ -318,8 +350,73 @@ function Consignes.ajuster(texte)
 end
 
 
--- Ajustements d'un clic de la fenêtre Ajuster.
+-- Ajustements d'un clic de la fenêtre Ajuster, en repli : quand on ne sait rien de ce que touche la
+-- proposition (Consignes.ajustementsPour).
 Consignes.ajustementsRapides = { "Moins chaud", "Peau plus naturelle", "Garder le ciel", "Plus de contraste" }
+Consignes.MAX_AJUSTEMENTS = 6
+
+-- Les réglages lus, par l'écart proposé : { clé, bouton si l'écart monte, bouton s'il descend,
+-- bouton quand le sens n'est pas lu (nil : aucun) }. Le bouton tempère le changement proposé (une
+-- proposition qui réchauffe offre « Moins chaud »). Dans cet ordre, avant la peau et le ciel.
+local AJUSTEMENTS_REGLAGES = {
+    { 'Temperature', "Moins chaud", "Plus chaud", "Moins chaud" },
+    { 'Tint', "Moins magenta", "Moins vert" },
+    { 'Exposure2012', "Moins clair", "Plus clair" },
+    { 'Contrast2012', "Moins de contraste", "Plus de contraste", "Plus de contraste" },
+    { 'Shadows2012', "Ombres plus sombres", "Ombres plus claires" },
+    { 'Highlights2012', "Hautes lumières plus sombres", "Hautes lumières plus claires" },
+    { 'Vibrance', "Couleurs plus douces", "Couleurs plus vives" },
+    { 'Saturation', "Couleurs plus douces", "Couleurs plus vives" },
+    { 'Clarity2012', "Moins de clarté", "Plus de clarté" },
+    { 'Dehaze', "Moins de correction du voile", "Plus de correction du voile" },
+}
+
+-- Les clés du mélangeur TSL d'une couleur (orange : la peau ; bleu : le ciel).
+local function cleTSL(cle, couleur)
+    return type(cle) == 'string' and cle:match('^%a+Adjustment' .. couleur .. '$') ~= nil
+end
+
+-- Les ajustements d'un clic choisis d'après ce que touche la proposition en attente
+-- (Conversation.ceQueTouche) : `reglages`, { [clé] = écart (après − avant), ou false quand le sens
+-- n'est pas lu } ; `zones`, { ciel = true, peau = true } des masques proposés avec elle. Le sens de
+-- chaque bouton suit celui du changement ; la peau seulement si la proposition y touche (masque de
+-- peau, effet de peau, orange du mélangeur), le ciel de même (masque du ciel, bleu du mélangeur).
+-- MAX_AJUSTEMENTS au plus ; la liste fixe en repli quand on ne sait rien ou que rien n'est reconnu.
+function Consignes.ajustementsPour(reglages, zones)
+    reglages, zones = reglages or {}, zones or {}
+    local liste, vus = {}, {}
+    local function ajouter(titre)
+        if titre and not vus[titre] and #liste < Consignes.MAX_AJUSTEMENTS then
+            vus[titre] = true
+            liste[#liste + 1] = titre
+        end
+    end
+    for _, r in ipairs(AJUSTEMENTS_REGLAGES) do
+        local ecart = reglages[r[1]]
+        if type(ecart) == 'number' and ecart > 0 then
+            ajouter(r[2])
+        elseif type(ecart) == 'number' and ecart < 0 then
+            ajouter(r[3])
+        elseif ecart == false then
+            ajouter(r[4])
+        end
+    end
+    local peau, ciel = zones.peau == true, zones.ciel == true
+    for cle in pairs(reglages) do
+        peau = peau or cleTSL(cle, 'Orange')
+        ciel = ciel or cleTSL(cle, 'Blue')
+    end
+    if peau then ajouter("Peau plus naturelle") end
+    if ciel then ajouter("Garder le ciel") end
+    if #liste == 0 then
+        local repli = {}
+        for i, a in ipairs(Consignes.ajustementsRapides) do
+            repli[i] = a
+        end
+        return repli
+    end
+    return liste
+end
 
 -- Ceux d'une proposition de recadrage (1.3, Composition lue : preview_settings avec un crop),
 -- à la place des précédents ; Claude relit la composition au besoin (read_composition) et montre
@@ -343,7 +440,8 @@ Consignes.rapidePhoto = "[Demande rapide] Une seule demande, faite depuis la fen
 -- 24 octobre 2026), visent toutes les photos sélectionnées, comme une demande tapée : le premier
 -- les note et pose les notes de Claude (le clic vaut la demande, comme « note ces photos ») ; les
 -- trois autres reprennent les invites Retouche pro, Portrait et Classer (Consignes.invite : une
--- seule copie de leurs messages), pour chaque photo sélectionnée (Consignes.surLaSelection).
+-- seule copie de leurs messages), pour chaque photo sélectionnée (Consignes.surLaSelection ;
+-- Retouche pro par groupes de lumière, Consignes.retoucheProSurLaSelection).
 Consignes.noterRapide = "Note chaque photo sélectionnée selon le standard de notation, même déjà évaluée : cull_photos avec selection = true, view_photo avec af_point = true sur chacune (plus de 30 photos : planche par planche, puce Notes de tes consignes), puis propose_ratings avec apply = true pour poser les notes. Dis chaque note posée et sa raison en une phrase."
 
 function Consignes.invite(id)
@@ -359,6 +457,26 @@ end
 -- l'invite y devient « chaque photo »).
 function Consignes.surLaSelection(message)
     return "Pour toutes les photos sélectionnées dans Lightroom, une à une : " .. (message:gsub('la photo active', 'chaque photo'))
+end
+
+-- Retouche pro sur plusieurs photos (bouton de la Demande rapide ; relecture du 2 novembre 2026) :
+-- par groupes de lumière plutôt qu'une à une. match_series avec groups (rien d'écrit) donne les
+-- groupes et la référence de chacun ; la référence se retouche selon l'invite, ses réglages vont
+-- aux autres photos du groupe (copy_settings), puis match_series les harmonise. Une photo seule
+-- dans son groupe se retouche seule. La phrase du guide (Consignes.LIRE_GUIDE) passe en tête, une
+-- fois pour toute la sélection. Les autres boutons restent « une à une » (Consignes.surLaSelection).
+function Consignes.retoucheProSurLaSelection(message)
+    local debut, fin = message:find(Consignes.LIRE_GUIDE, 1, true)
+    local guide = debut and (Consignes.LIRE_GUIDE .. " ") or ""
+    if debut then
+        message = (message:sub(1, debut - 1) .. message:sub(fin + 1)):gsub('%s+$', '')
+    end
+    local corps = message:gsub('la photo active', 'sa photo de référence'):gsub('^%u', string.lower)
+    return guide .. "Pour toutes les photos sélectionnées dans Lightroom, par groupes de lumière : d'abord match_series "
+        .. "avec groups = true et selection = true (les groupes et la référence de chacun, rien d'écrit). Puis, dans chaque "
+        .. "groupe, " .. corps .. " Ensuite copy_settings de la référence vers les autres photos du groupe, et match_series "
+        .. "(reference_id : la référence) pour les harmoniser. Une photo seule dans son groupe se retouche seule, de la même "
+        .. "façon ; une seule photo sélectionnée : retouche-la, sans groupes."
 end
 
 -- Le 4ᵉ bouton de la Demande rapide, Classer (FenetreRapide.ACTIONS) : proposer seulement, pour

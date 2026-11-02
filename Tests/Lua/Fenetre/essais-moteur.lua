@@ -207,6 +207,126 @@ essai("Consignes : Classer dans la Demande rapide propose seulement, sans attend
     end
 end)
 
+essai('Consignes : chaque invite de retouche fait lire le guide de style, fenêtre Claude et Demande rapide (relecture du 2 novembre 2026)', function()
+    local retouches = {}
+    for _, invite in ipairs(Consignes.invites) do
+        if invite.retouche then
+            retouches[#retouches + 1] = invite.id
+            contient(invite.message, 'remember_style avec read = true', invite.id)
+            -- En fin de message : le titre tiré de la demande reste son début.
+            local debut = invite.message:find(Consignes.LIRE_GUIDE, 1, true)
+            egal(#invite.message - #Consignes.LIRE_GUIDE + 1, debut, invite.id .. ' : le guide en fin de message')
+            -- Une seule fois, même sur la sélection.
+            local _, n = Consignes.surLaSelection(invite.message):gsub('remember_style', '')
+            egal(1, n, invite.id .. ' sur la sélection : une fois')
+        else
+            vrai(not invite.message:find('remember_style', 1, true), invite.id .. ' : pas une retouche, pas de guide')
+        end
+    end
+    egal('retouche_pro portrait paysage noir_et_blanc iso_eleve sports', table.concat(retouches, ' '))
+    local _, n = Consignes.retoucheProSurLaSelection(Consignes.invite('retouche_pro').message):gsub('remember_style', '')
+    egal(1, n, 'Retouche pro par groupes : le guide une fois')
+    -- « À ma façon » le fait déjà lire : la phrase de l'invite est retirée du message à Claude.
+    local pro = Consignes.invite('retouche_pro').message
+    egal(pro, Consignes.sansDoublonGuide(pro, 'neutre'))
+    egal(pro, Consignes.sansDoublonGuide(pro, nil))
+    egal('Retouche la photo active comme un professionnel : diagnostic chiffré, deux passes vérifiées, puis au plus deux passes correctives si un défaut reste.',
+        Consignes.sansDoublonGuide(pro, 'ma_facon'))
+    egal('Bonjour', Consignes.sansDoublonGuide('Bonjour', 'ma_facon'), 'une demande tapée, inchangée')
+    contient(Consignes.ligneStyle('ma_facon'), 'remember_style avec read', 'à ma façon le lit')
+end)
+
+essai('Consignes : Retouche pro sur une sélection, par groupes de lumière ; les autres boutons une à une (relecture du 2 novembre 2026)', function()
+    local m = Consignes.retoucheProSurLaSelection(Consignes.invite('retouche_pro').message)
+    for _, morceau in ipairs({ 'Pour toutes les photos sélectionnées', 'groupes de lumière', 'match_series avec groups = true',
+        "rien d'écrit", 'retouche sa photo de référence comme un professionnel', 'copy_settings de la référence vers les autres photos du groupe',
+        'match_series (reference_id', 'pour les harmoniser', 'Une photo seule dans son groupe se retouche seule' }) do
+        contient(m, morceau, 'Retouche pro sur la sélection')
+    end
+    vrai(not m:find('une à une', 1, true), 'pas une à une')
+    vrai(not m:find('la photo active', 1, true), 'plus de photo active')
+    vrai(m:find('match_series avec groups', 1, true) < m:find('retouche sa photo de référence', 1, true), 'les groupes d\'abord')
+    vrai(m:find('retouche sa photo de référence', 1, true) < m:find('copy_settings', 1, true), 'la référence avant la copie')
+    vrai(m:find('copy_settings', 1, true) < m:find('pour les harmoniser', 1, true), 'la copie avant l\'harmonisation')
+    -- Les autres boutons gardent « une à une ».
+    contient(Consignes.surLaSelection(Consignes.invite('portrait').message), 'une à une', 'Portrait')
+    contient(Consignes.classerRapide, 'une à une', 'Classer')
+end)
+
+essai('Consignes : ajustements d\'un clic choisis d\'après la proposition, six au plus, la liste fixe en repli (relecture du 2 novembre 2026)', function()
+    local fixe = table.concat(Consignes.ajustementsRapides, ' | ')
+    -- Rien de connu : la liste d'avant.
+    egal(fixe, table.concat(Consignes.ajustementsPour(nil, nil), ' | '), 'rien')
+    egal(fixe, table.concat(Consignes.ajustementsPour({}, {}), ' | '), 'tables vides')
+    egal(fixe, table.concat(Consignes.ajustementsPour({ GrainAmount = 10 }, {}), ' | '), 'rien de reconnu')
+    -- Une proposition qui réchauffe : « Moins chaud » ; qui refroidit : « Plus chaud ».
+    egal('Moins chaud', table.concat(Consignes.ajustementsPour({ Temperature = 400 }, {}), ' | '))
+    egal('Plus chaud', table.concat(Consignes.ajustementsPour({ Temperature = -8 }, {}), ' | '))
+    egal('Moins chaud', table.concat(Consignes.ajustementsPour({ Temperature = false }, {}), ' | '), 'sens pas lu')
+    -- Un paysage sans visage : ni peau ; le ciel par son masque.
+    local paysage = Consignes.ajustementsPour({ Exposure2012 = -0.2, Contrast2012 = 12, Vibrance = 10, Dehaze = 8 }, { ciel = true })
+    egal('Plus clair | Moins de contraste | Couleurs plus douces | Moins de correction du voile | Garder le ciel', table.concat(paysage, ' | '))
+    for _, a in ipairs(paysage) do
+        vrai(a ~= 'Peau plus naturelle', 'paysage sans visage : pas de peau')
+    end
+    -- La peau par un masque de peau ou l'orange du mélangeur ; le ciel par le bleu.
+    egal('Peau plus naturelle', table.concat(Consignes.ajustementsPour({}, { peau = true }), ' | '))
+    egal('Peau plus naturelle | Garder le ciel',
+        table.concat(Consignes.ajustementsPour({ SaturationAdjustmentOrange = -5, LuminanceAdjustmentBlue = -10 }, {}), ' | '))
+    -- Six au plus.
+    local tout = Consignes.ajustementsPour({ Temperature = 300, Tint = 5, Exposure2012 = 0.3, Contrast2012 = -10, Shadows2012 = 20,
+        Highlights2012 = -30, Vibrance = 10, Clarity2012 = 5 }, { peau = true, ciel = true })
+    egal(Consignes.MAX_AJUSTEMENTS, #tout)
+    egal(6, Consignes.MAX_AJUSTEMENTS)
+    egal('Moins chaud | Moins magenta | Moins clair | Plus de contraste | Ombres plus sombres | Hautes lumières plus claires', table.concat(tout, ' | '))
+    -- Une table neuve : la liste fixe ne se change pas par le repli.
+    local repli = Consignes.ajustementsPour()
+    repli[1] = 'x'
+    egal('Moins chaud', Consignes.ajustementsRapides[1])
+end)
+
+essai('Conversation : ce que touche une proposition, réglages et sens, masques proposés depuis la demande (relecture du 2 novembre 2026)', function()
+    local Conversation = require 'Conversation'
+    local Json = require 'Json'
+    local function masque(entree, reponse)
+        return { genre = 'outil', outil = 'add_mask', detail = Json.encode(entree) .. '\n\n— Réponse —\n' .. (reponse or '{}') }
+    end
+    -- Une proposition lue par le connecteur : clés, avant et après.
+    local prop = { genre = 'proposition', etat = 'enAttente', changements = {
+        { cle = 'Temperature', libelle = 'Température', avant = '5500', apres = '5900' },
+        { cle = 'Exposure2012', libelle = 'Exposition', avant = '0', apres = '-0,35' },
+    } }
+    local c = { elements = {
+        masque({ preview = true, masks = { { kind = 'person_part', part = 'face_skin' } } }), -- avant la demande : ignoré
+        { genre = 'dany', texte = 'Propose' },
+        masque({ masks = { { kind = 'person_part', part = 'body_skin' } } }), -- posé, pas proposé : ignoré
+        masque({ preview = true, masks = { { kind = 'landscape', part = 'vegetation', combine = { { mode = 'add', kind = 'sky' } } } } }),
+        prop,
+    } }
+    local reglages, zones = Conversation.ceQueTouche(c, prop)
+    egal(400, reglages.Temperature)
+    egal(-0.35, reglages.Exposure2012)
+    egal(true, zones.ciel)
+    egal(nil, zones.peau, 'paysage sans visage : pas de peau')
+    egal('Moins chaud | Plus clair | Garder le ciel', table.concat(Consignes.ajustementsPour(reglages, zones), ' | '))
+    -- Avant la réponse : le libellé de l'entrée relu, le sens inconnu.
+    local avant = { genre = 'proposition', etat = 'enAttente', changements = {
+        { libelle = 'Température', avant = '—', apres = '5900' }, { libelle = 'Recadrage', avant = '—', apres = 'format 4:5' } } }
+    reglages = Conversation.ceQueTouche({ elements = { avant } }, avant)
+    egal(false, reglages.Temperature)
+    egal(nil, reglages.Recadrage)
+    -- Un portrait : la peau par l'effet de peau ou smoothing_requested ; un ciel soustrait ne compte pas.
+    local portrait = { genre = 'proposition', etat = 'enAttente', changements = {} }
+    local _, z = Conversation.ceQueTouche({ elements = { { genre = 'dany' },
+        masque({ preview = true, masks = { { kind = 'subject', smoothing_requested = true, combine = { { mode = 'subtract', kind = 'sky' } } } } }),
+        portrait } }, portrait)
+    egal(true, z.peau)
+    egal(nil, z.ciel, 'ciel soustrait')
+    -- Sans proposition : rien, donc la liste fixe.
+    local r0, z0 = Conversation.ceQueTouche({ elements = {} }, nil)
+    egal(table.concat(Consignes.ajustementsRapides, ' | '), table.concat(Consignes.ajustementsPour(r0, z0), ' | '))
+end)
+
 essai('Consignes : le texte de la fenêtre, lu à chaque demande, fait 7 500 caractères au plus (1.3)', function()
     -- 5 064 caractères à la 1.2 ; les sections de la 1.3 (Raison de chaque étape, Leçon, Je le
     -- fais, Composition, puce Carnet) ont leur part, et ce qui dépasse va aux descriptions des

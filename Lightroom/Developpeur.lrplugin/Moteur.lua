@@ -488,7 +488,10 @@ function Moteur.envoyer(texte, options)
         -- fenêtre : joints une seule fois, à la demande qui les suit (marqués envoyés une fois la
         -- demande partie).
         local historiques = Conversation.historiquesAEnvoyer(c)
-        local message = Conversation.messagePourClaude(c, texte, contexte, Consignes.ligneStyle(options.style), historiques)
+        -- Le guide de style d'une invite de retouche (Consignes.LIRE_GUIDE) n'est pas redit quand
+        -- le style « À ma façon » le fait déjà lire.
+        local message = Conversation.messagePourClaude(c, Consignes.sansDoublonGuide(texte, options.style), contexte,
+            Consignes.ligneStyle(options.style), historiques)
         local affiche = type(options.affiche) == 'string' and Texte.nettoyer(options.affiche) or ''
         Conversation.ajouterDemande(c, affiche ~= '' and affiche or texte, os.time(), chemins, style and style.definition and style.title or nil)
         Moteur.selectionTravail = info.selection

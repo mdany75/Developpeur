@@ -845,7 +845,9 @@ essai("Ajuster… : les ajustements du cadre pour une proposition de recadrage, 
             { '{"changements": [{"cle": "Exposure2012", "avant": 0, "apres": 0.35}]}' }, 'p2.jpg')
         Fenetre.rafraichir()
         vu = ajuster(args, p, function() return 'cancel' end)
-        egal(table.concat(Consignes.ajustementsRapides, ' | '), vu.titres, 'une proposition de tons : les ajustements d\'avant')
+        -- Une proposition de tons qui éclaircit : l'ajustement qui la tempère, choisi d'après elle
+        -- (relecture du 2 novembre 2026 ; avant, la liste fixe Consignes.ajustementsRapides).
+        egal('Moins clair', vu.titres, 'une proposition de tons : les ajustements choisis d\'après elle')
         egal("Ce qu'il faut changer avant d'appliquer :", vu.invite)
         egal(1, #envoyes, 'annulé : rien envoyé')
         egal('enAttente', tons.etat)
