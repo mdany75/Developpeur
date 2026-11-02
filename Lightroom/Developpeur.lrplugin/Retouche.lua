@@ -208,6 +208,132 @@ local function verifierPersonnes(plan)
         ecrire("Claude · personne non reconnue", function()
             plan.photo:applyDevelopSettings({ MaskGroupBasedCorrections = reste }, "Claude · personne non reconnue")
         end)
+        for id in pairs(retires) do
+            plan.retiresParModule[tostring(id)] = true
+        end
+    end
+end
+
+-- Masques relus après l'écriture (1.6) : au plus tant de lectures pour toute la commande, à
+-- RELECTURE_FORMES secondes d'écart, jusqu'à deux lectures pareilles de toutes les photos. Une photo
+-- encore changeante à la dernière dit « à relire ».
+local LECTURES_FORMES, RELECTURE_FORMES = 4, 0.3
+
+-- Un nombre d'une remarque, à six décimales au plus, virgule française.
+local function nombreFormes(v)
+    if type(v) ~= 'number' then
+        return tostring(v)
+    end
+    local texte = Locaux.decimal(v):gsub('0+$', ''):gsub('%.$', '')
+    return (texte:gsub('%.', ','))
+end
+
+-- Les formes sans IA de chaque photo (Plans.preparerMasques, formesEcrites), relues dans Lightroom et
+-- comparées à l'écrit (Locaux.comparerFormes) : verdict « gardé » (aux arrondis près), « écart »,
+-- « absent » (correction introuvable), ou « à relire » (masques IA pas encore calculés, ou liste
+-- encore changeante : Lightroom peut la réécrire au premier rendu). Rien n'est retiré : les écarts
+-- et les absents sont dits (remarques) ; les verdicts vont dans la réponse (masques_relus). Avec
+-- releve_formes (développement, DEVELOPPEUR_RELEVE_FORMES du serveur), la réponse porte aussi
+-- l'écrit et le relu de chaque masque de l'appel, IA compris, pour le constat.
+local function relireFormes(plans, params)
+    local suivis = {}
+    for _, plan in ipairs(plans) do
+        local aRelire = false
+        for _, ecrite in ipairs(plan.formesEcrites or {}) do
+            aRelire = aRelire or ecrite.formes
+        end
+        if aRelire or (params.releve_formes == true and #(plan.formesEcrites or {}) > 0) then
+            suivis[#suivis + 1] = plan
+        end
+    end
+    if #suivis == 0 then
+        return
+    end
+    local function lire(plan)
+        local relues = pourLightroom(plan.photo:getDevelopSettings().MaskGroupBasedCorrections or {})
+        local parId = {}
+        for _, correction in ipairs(relues) do
+            parId[tostring(correction.CorrectionID)] = correction
+        end
+        local verdicts, signature = {}, {}
+        for _, ecrite in ipairs(plan.formesEcrites) do
+            if ecrite.formes and not plan.retiresParModule[tostring(ecrite.id)] then
+                local relue = parId[tostring(ecrite.id)]
+                local v = { nom = ecrite.nom, verdict = 'absent', ecarts = {} }
+                if relue then
+                    v.ecarts = Locaux.comparerFormes(ecrite.masques, relue.CorrectionMasks)
+                    v.verdict = #v.ecarts > 0 and 'écart' or 'gardé'
+                end
+                verdicts[#verdicts + 1] = v
+                signature[#signature + 1] = v.verdict
+                for _, e in ipairs(v.ecarts) do
+                    signature[#signature + 1] = e.composant .. ':' .. e.cle .. '=' .. tostring(e.relu)
+                end
+            end
+        end
+        return { verdicts = verdicts, signature = table.concat(signature, '|'), parId = parId,
+            enAttente = #plan.presetsApres > 0 and Locaux.masquesIAACalculer(relues) }
+    end
+    local lectures, stables = {}, {}
+    for _, plan in ipairs(suivis) do
+        lectures[plan] = lire(plan)
+    end
+    for _ = 2, LECTURES_FORMES do
+        LrTasks.sleep(RELECTURE_FORMES)
+        local toutes = true
+        for _, plan in ipairs(suivis) do
+            if not stables[plan] then
+                local nouvelle = lire(plan)
+                stables[plan] = nouvelle.signature == lectures[plan].signature
+                lectures[plan] = nouvelle
+                toutes = toutes and stables[plan]
+            end
+        end
+        if toutes then
+            break
+        end
+    end
+    for _, plan in ipairs(suivis) do
+        local lecture = lectures[plan]
+        local relus = Json.tableau()
+        for _, v in ipairs(lecture.verdicts) do
+            local entree = { nom = v.nom, verdict = v.verdict }
+            if #v.ecarts > 0 then
+                local details = {}
+                for i, e in ipairs(v.ecarts) do
+                    if i <= 3 then
+                        details[#details + 1] = string.format("%s : %s écrit, %s relu", e.cle, nombreFormes(e.ecrit), nombreFormes(e.relu))
+                    end
+                end
+                noter(plan, string.format("Masque « %s » : Lightroom ne l'a pas gardé tel qu'écrit (%s%s) ; le vérifier avec view_photo "
+                    .. "et dire à l'utilisateur s'il est mal placé (rien n'est retiré).", v.nom, table.concat(details, " ; "),
+                    #v.ecarts > 3 and string.format(" ; %d autres écarts", #v.ecarts - 3) or ""))
+                local ecarts = Json.tableau()
+                for _, e in ipairs(v.ecarts) do
+                    ecarts[#ecarts + 1] = e
+                end
+                entree.ecarts = ecarts
+            elseif v.verdict == 'absent' then
+                noter(plan, string.format("Masque « %s » : absent après l'écriture, Lightroom ne l'a pas gardé ; le vérifier avec view_photo "
+                    .. "(undo_last remet l'état d'avant).", v.nom))
+            end
+            if v.verdict ~= 'absent' and (lecture.enAttente or not stables[plan]) then
+                entree.verdict = 'à relire'
+            end
+            relus[#relus + 1] = entree
+        end
+        if #relus > 0 then
+            plan.masquesRelus = relus
+        end
+        if params.releve_formes == true then
+            local releve = Json.tableau()
+            for _, ecrite in ipairs(plan.formesEcrites) do
+                local relue = lecture.parId[tostring(ecrite.id)]
+                releve[#releve + 1] = { nom = ecrite.nom, correction_id = ecrite.id, compare = ecrite.formes,
+                    ecrit = ecrite.masques, relu = relue and relue.CorrectionMasks or 'absent' }
+            end
+            plan.releveFormes = releve
+        end
     end
 end
 
@@ -229,10 +355,22 @@ function Retouche.masquer(params)
     calculerIA(plans)
     local reponse
     for _, plan in ipairs(plans) do
+        plan.retiresParModule = {}
         -- Masques IA qui n'ont rien trouvé (« Personnes » sur un paysage) : retirés par Lightroom,
         -- une fois calculés ; l'étape garde la liste d'avant (undo_last).
         if #plan.presetsApres > 0 and not Locaux.masquesIAACalculer(plan.photo:getDevelopSettings().MaskGroupBasedCorrections) then
-            Masques.retirerVides(plan)
+            local avant = Masques.retirerVides(plan)
+            if type(avant) == 'table' then
+                local restants = {}
+                for _, correction in ipairs(plan.photo:getDevelopSettings().MaskGroupBasedCorrections or {}) do
+                    restants[tostring(correction.CorrectionID)] = true
+                end
+                for _, correction in ipairs(avant) do
+                    if not restants[tostring(correction.CorrectionID)] then
+                        plan.retiresParModule[tostring(correction.CorrectionID)] = true
+                    end
+                end
+            end
         end
         verifierPersonnes(plan)
         local corrections = plan.photo:getDevelopSettings().MaskGroupBasedCorrections
@@ -244,6 +382,7 @@ function Retouche.masquer(params)
             reponse = { a_savoir = "Lightroom calcule les masques IA au premier rendu : view_photo les montre appliqués." }
         end
     end
+    relireFormes(plans, params)
     noterEtatFinal(photos, etape)
     reponse = reponse or {}
     reponse.mode = modeTexte(prefs)

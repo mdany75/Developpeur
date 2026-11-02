@@ -466,6 +466,9 @@ local function resultatsPlans(plans, etape, params)
             etape_id = plan.etapeId or Json.null,
             changements = plan.changements,
             remarques = plan.notes,
+            -- Masques relus après l'écriture (Retouche.relireFormes), et leur relevé en développement.
+            masques_relus = plan.masquesRelus,
+            releve_formes = plan.releveFormes,
         }
         if #plan.changements > 0 then
             local lignes = {}

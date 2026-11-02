@@ -111,6 +111,11 @@ public final class ToolHandler {
     /// Faux par défaut : seul le serveur lancé par Claude (`serve` de main.swift) le pose ; ni
     /// `--call`, ni la recette, ni les tests ne remplissent le carnet.
     public var noterAuCarnet = false
+    /// Pour le développement seulement (`DEVELOPPEUR_RELEVE_FORMES=1`, posé par main.swift) :
+    /// add_mask demande au module l'écrit et le relu de chaque masque (`releve_formes` de chaque
+    /// photo), pour constater dans Lightroom les tolérances de la relecture des formes
+    /// (`Locaux.TOLERANCES_FORMES`, docs/SPEC.md, Masques relus). Faux par défaut.
+    public var releveFormes = false
     /// Fibo 2 sur ce Mac (generative_edit) : l'exécutable de mflux, le cache du modèle et la racine des
     /// fichiers temporaires. Nil par défaut (generative_edit refuse alors sans rien lancer), comme
     /// `lireEcran` : seul main.swift le pose (serve() et --call), avec `Fibo()` ; les tests passent un

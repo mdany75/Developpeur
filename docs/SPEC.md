@@ -174,7 +174,7 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `apercu` | `photo?`, `taille` (0 = pleine résolution), `cles`, `comparer?`, `point_af?`, `entier?` | `chemin` d'un JPEG sRGB rendu par Lightroom, plus ce que donne `reglages` ; avec `comparer` (`avantClaude` ou `etapePrecedente`), `chemin_avant` ; `a_savoir` si des masques IA n'étaient pas encore calculés (voir Aperçus et masques IA) ; avec `point_af` (1.1.1, `view_photo` sur l'aperçu entier ; après la 1.1.1, sur un zoom `region` aussi, jamais sur un avant/après), la photo décrite comme pour `vignettes` (`chemin_original`, `marque`, `geometrie`, et depuis la 1.3.1 `sensibilite`, l'ISO en nombre, pour le carnet de progrès), `point_af_toujours` (préférence `pointMiseAuPoint`) et `evaluation` (`Notation.resume`) : voir Tri d'une séance › Point de mise au point ; avec `point_af` aussi (1.2), `etapes_claude` (`nombre`, `derniere` : les étapes de Claude gardées pour la photo, `etapesClaude`, lues seulement), pour le bilan de `view_photo` (voir Bilan d'une passe à l'autre) ; de la 1.3 à la 1.3.5, `comparer = versionClaude` rendait la version de Claude d'un exercice « Je le fais » et `exercice`, retirés au correctif 1.3.6 avec lui (voir Je le fais) : `comparer` ne vaut plus que `avantClaude` ou `etapePrecedente` ; avec `entier` (1.3, `read_composition`), l'image entière sans son cadre, `image_entiere` = vrai, `dimensions` {`largeur`, `hauteur`}, `cadre_actuel` (absent sans recadrage), refusé avec `comparer` ou `point_af` (voir Composition lue) |
 | `appliquer` | `photos?` ou `selection?`, `reglages`, `booleens?`, `looks_traitement?`, `profil?`, `profil_marque?`, `profil_variantes?`, `profil_look?`, `recadrage?`, `recalages?`, `courbes?`, `couleurs_ponctuelles?`, `balance?`, `auto_ton?`, `preset?`, `plages`, `libelles`, `relatif`, `etape`, `raison?`, `confirme` | par photo : `changements` (`cle`, `avant`, `apres`) et `remarques` ; `a_recadrer` et `etape_ecrite` quand un cadre demandé reste à placer (voir Recadrage) |
 | `recadrer` | `photos`, `recadrage`, `recalages`, `completer?`, `etape`, `raison?`, `confirme` | comme `appliquer` (changements du cadre seulement) |
-| `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
+| `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme`, `releve_formes?` (développement : `DEVELOPPEUR_RELEVE_FORMES=1`) | comme `appliquer`, plus `lightroom` (la version) et, par photo, `masques_relus` (`nom`, `verdict`, `ecarts?`) et, avec `releve_formes`, `releve_formes` ; voir Masques relus après l'écriture (1.6) |
 | `ameliorer` | `photo?`, `ameliorations` (`nom` : `denoise`, `rawDetails` ou `superRes`, `actif`, `intensite?`), `libelles`, `etape`, `raison?`, `confirme` | comme `appliquer`, plus `amelioration` (état après le calcul) |
 | `retoucher` | `photo?`, `taches`, `yeux`, `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
 | `geometrie` | `photo?`, `photos?` ou `selection?`, `rendre?`, `taille?` | `photos` : par photo, `active` (correction géométrique), `transformation` (Upright, perspective ou distorsion manuelle), `empreinte` ; avec `rendre`, `chemin_corrige` et `chemin_origine` (voir Recalage de la géométrie) |
@@ -3495,6 +3495,133 @@ Lightroom.
 Noms : le serveur nomme chaque masque « Claude · » suivi du nom donné (ou du type), et le module
 nomme chaque étape « Claude · » suivi de `etape`. Un nom qui commence déjà par « Claude · » (en
 majuscules ou non, même répété) perd ce préfixe avant : il n'est jamais doublé.
+
+## Masques relus après l'écriture (1.6)
+
+Chantier « masques » de la 1.6, réduit par Dany le 1er novembre 2026 : les masques relus
+**signalent sans retirer**. Jusqu'à la 1.5, seul l'avertissement de version
+(`ToolHandler.avertissementFormesMasques`, une autre version que la 15.6) disait que les formes
+pouvaient être mal rangées. Depuis la 1.6, chaque `masquer` relit ce que Lightroom a gardé.
+
+- **Ce qui est relu** : les seules formes que le module écrit sans IA — `Mask/Gradient`,
+  `Mask/CircularGradient`, `Mask/Aggregate` et ses `Mask/Paint` (pinceau), `Mask/RangeMask`
+  (couleur, luminance, profondeur), seules ou combinées à un masque IA. Les composants
+  `Mask/Image` (sujet, ciel, arrière-plan, paysage, personne, objet par trait ou par cadre) ne se
+  comparent **jamais** : Lightroom réécrit leur `ReferencePoint` et leur geste au calcul ; ils
+  restent à `verifierPersonnes` et `masquesIAEnEchec` (`ErrorReason`), sans changement. Un masque
+  `existant` (le masque de Dany repris pour `generative_edit`) n'est pas relu.
+- **Écrit** : `Plans.preparerMasques` copie chaque correction nouvelle avant l'écriture
+  (`plan.formesEcrites` : `id`, `nom`, `masques`, `formes` = `Locaux.aDesFormes`).
+- **Lecture stable** (`Retouche.relireFormes`, après `retirerVides` et `verifierPersonnes`, avant
+  `noterEtatFinal`) : une lecture de toutes les photos, une attente de 0,3 s, une seconde
+  lecture ; tant qu'une photo change, une autre attente, quatre lectures au plus pour **toute la
+  commande** (au plus 0,9 s d'attente, quel que soit le nombre de photos). Correspondance par
+  `CorrectionID`, puis composant de même rang.
+- **Comparaison** (`Locaux.comparerFormes`, pure) : seules les clés écrites par le module —
+  `ZeroX/Y`, `FullX/Y` ; `Left`, `Top`, `Right`, `Bottom`, `Angle` (modulo 180 : une ellipse est
+  symétrique), `Feather`, `Midpoint`, `Roundness`, `Flipped` ; `Radius`, `Flow`, `CenterWeight`,
+  `Dabs` (même nombre, mêmes lettres `r f h d M`, positions des touches) ; nombre de traits
+  (`Masks`) ; `CorrectionRangeMask.Type`, `ColorAmount`, `LumRange`, `DepthRange`, `PointModels`
+  (modèle et position), `CorrectionReferenceX/Y` ; `MaskInverted`, `MaskActive` (vrai et 1
+  pareils), `MaskBlendMode`, `What`, et le nombre de composants. Les clés que Lightroom ajoute
+  (`MaskDigest`, `InputDigest`, `Version`…) sont ignorées.
+- **Verdicts** (`masques_relus` de chaque photo, dans l'ordre des masques relus) : `gardé` (aux
+  tolérances près, rien n'est dit) ; `écart` (au moins une clé hors tolérance, ou perdue, ou une
+  structure changée : `ecarts` les donne, `composant`, `cle`, `ecrit`, `relu`, `ecart`, `genre`
+  `structure`, `position`, `angle` ou `valeur` ; une remarque « Masque « X » : Lightroom ne l'a pas
+  gardé tel qu'écrit (… trois écarts au plus) ; le vérifier avec view_photo et dire à l'utilisateur
+  s'il est mal placé (rien n'est retiré). ») ; `absent` (correction introuvable, et dite ; un
+  masque que le module a retiré lui-même — masque vide, personne non reconnue — n'est pas relu) ;
+  `à relire` (des masques IA de la photo attendent encore leur calcul, ou la liste changeait
+  encore à la dernière lecture : Lightroom peut la réécrire au premier rendu ; les écarts vus
+  restent dits).
+- **Rien n'est retiré** dans la 1.6 : ni écriture, ni étape de plus ; `undo_last` défait l'étape
+  comme avant.
+- **Serveur** (`ToolHandler.alerteFormes`) : sur une autre version que la 15.6, l'avertissement
+  devient « Lightroom Classic X : dégradés, pinceaux et plages relus, gardés tels qu'écrits. »
+  quand **tous** les verdicts de l'appel sont `gardé` (avec, s'il y a un objet ou une personne
+  précise, « Objets et personnes précises non relus : vérifier le premier avec view_photo. ») ; il
+  reste entier sinon (un `écart`, `absent`, `à relire`, ou un module sans `masques_relus`).
+  `get_status` garde l'avertissement entier. La description d'`add_mask` le dit en une phrase,
+  avant le résumé du tireur ; rien dans les consignes du connecteur ni de la fenêtre.
+- **Simulation** (`Tests/Lua/Liaison/Simulation.lua`) : aucune règle de constat encore (aucun
+  relevé fait) ; une « version future » pour les essais seulement, **pas un constat** :
+  `S.formesIgnorees` (clés perdues), `S.arrondiFormes` (arrondi à n décimales), `S.angleFormes`
+  (angle rangé de 0 à 180). Essais : `Tests/Lua/Liaison/essais-masques-relus.lua`.
+- **Recette** (`Recette.swift`, après l'étape du pinceau) : « masques relus : dégradé, radial,
+  pinceau et plage gardés tels qu'écrits » pose quatre formes aux valeurs riches
+  (`Recette.argumentsMasquesRelus`, angle −160 : le schéma d'`add_mask` refuse tout angle hors de
+  −180…180, et `RecetteArgumentsTests` passe ces arguments par lui), attend quatre verdicts `gardé`,
+  puis annule : sur la 15.6, aucune bonne forme ne sort en écart avec les tolérances provisoires.
+  Un angle écrit hors de ±180 ne vient que de l'angle du recadrage ajouté par `Plans.lua`.
+
+**Tolérances provisoires** (`Locaux.TOLERANCES_FORMES`, `provisoires = true`) : position 1e-4 en
+part de l'image (0,6 px sur 6 240), rayon du pinceau compris (`Radius` et touche `r`, une part du
+grand côté : 0,005 relu 0,0059 est un écart) ; angle 0,01° ; valeur 1e-3 en relatif,
+|x − y| / max(|x|, 1e-3) (`plancher` : un écart absolu de 1e-6 pour les valeurs presque nulles),
+pour `Feather`, `Midpoint`, `Roundness`, `Flow`, `CenterWeight`, touches `f` et `h`,
+`ColorAmount`, `LumRange`, `DepthRange` et les modèles de `PointModels`. Pas encore constatées.
+
+**Relevé de développement** : `DEVELOPPEUR_RELEVE_FORMES=1` dans l'environnement du serveur
+(`main.swift` pose `ToolHandler.releveFormes` ; jamais dans les tests ni par défaut) fait envoyer
+`releve_formes = true` avec `masquer` ; chaque photo de la réponse porte alors `releve_formes` : par
+masque de l'appel, IA compris, `nom`, `correction_id`, `compare` (relu ou non), `ecrit` (les
+composants tels qu'envoyés) et `relu` (ceux que Lightroom a gardés à la dernière lecture, ou
+« absent »). La comparaison ne dépend donc ni de la géométrie (correction d'objectif, recalage) ni
+d'un calcul refait hors de Lightroom.
+
+### À constater (masques relus, 1.6)
+
+Sur l'ordre de Dany, Lightroom Classic 15.6, liaison démarrée. La relecture vit dans le module :
+le serveur de la branche ne suffit pas (le module 1.5.1 installé ignore `releve_formes` et ne rend
+ni `masques_relus` ni `releve_formes`). Avant tout appel :
+
+1. installer le module et le serveur de la branche, pour l'essai seulement (jamais publiés) :
+   `SKIP_NOTARIZE=1 ./build.sh --install`, puis `swift build` pour `./.build/debug/mcp-developpeur` ;
+2. quitter et relancer Lightroom (la 1.6 ajoute-t-elle un `.lua` ? sinon recharger le module suffit,
+   fenêtres du module fermées) ;
+3. vérifier : un `add_mask` d'essai (un `linear` sur une copie d'Essais, défait ensuite) doit
+   rendre `masques_relus` dans `resultats[0]`, et `releve_formes` avec la variable ; sinon le
+   module chargé n'est pas celui de la branche, s'arrêter ;
+4. en mode « Proposer d'abord », ajouter `"confirm": true` à chaque appel.
+
+Puis, sur **de nouvelles copies virtuelles** faites par `create_virtual_copy`, remises à
+l'origine par `revert_to_original`, **puis** rangées dans « Développeur › Essais » ; défaites
+ensuite (`undo_last` ou `revert_to_original`). Chaque appel en arrière-plan, sortie entière dans
+un fichier du scratchpad :
+
+`DEVELOPPEUR_RELEVE_FORMES=1 ./.build/debug/mcp-developpeur --call add_mask '{…}' > releve-N.json`
+
+Trois copies : A, un RAW X-H2S paysage (6 240 × 4 160) ; B, un RAW X-T20 vertical (orientation
+tournée) ; C, un JPEG. Valeurs « riches » (0,123457 ; 0,876543), angles −160° et −30° (le schéma
+d'`add_mask` refuse tout angle hors de −180…180).
+
+1. **Appel 1, chemin `applyDevelopSettings`** (sans IA), sur A, B, C : un `linear` ; un `radial`
+   d'angle −160 ; un `radial` inversé (`invert`) d'angle −30 ; un `brush` de deux `strokes` de
+   `size` différentes (`flow` 70, `feather` 30) ; un `brush` avec `auto_mask` ; un `luminance`.
+   Six formes.
+2. **Appel 2, chemin du paramètre prédéfini**, sur A et C : un `sky`, un `linear`, un `brush`, un
+   `object` par `strokes`, un `object` par `box`, un `color` (un seul prélèvement). Le preset
+   passe par un fichier : il peut arrondir.
+3. **Appel 3, bords**, sur A : un `linear` et un `brush` près des bords (0,02 et 0,98) puis un peu
+   hors de l'image (−0,05 et 1,05) : Lightroom borne-t-il les valeurs ?
+4. **Angle du recadrage**, sur une nouvelle copie de A recadrée de 20° (`apply_settings`,
+   `crop.angle` 20) : un `radial` d'angle 170, que le module écrit 190 (angle du recadrage
+   ajouté), le seul chemin vers un angle hors de ±180 : Lightroom le range-t-il 190, 10 ou −170 ?
+5. **Persistance** : `--dump <id>` de A après un `view_photo` (premier rendu), puis après avoir
+   quitté et relancé Lightroom : les formes changent-elles au rendu ou à la relecture du
+   catalogue ?
+
+À regarder, pour chaque masque relu : `masques_relus[].verdict` (tous `gardé` attendus sur la 15.6) ;
+dans `releve_formes`, l'écart maximal entre `ecrit` et `relu` de chaque clé (positions, `Dabs`,
+`Angle` : −160 rangé −160, 20 ou 200 ? et 190 de l'appel 4, `Feather`, `Radius` et touche `r`, `LumRange`, `PointModels`), les booléens (vrai ou
+1), un `CorrectionID` gardé ou non (sinon correspondance par nom et rang à prévoir), et les
+masques IA (ReferencePoint réécrit : confirme leur exclusion). Ce que ce relevé fixe :
+`Locaux.TOLERANCES_FORMES.position` (10 × l'écart maximal relevé, 1e-5 au moins), `.angle` et la
+normalisation de l'angle (modulo 180 ou autre), `.valeur` et `.plancher`, et, si Lightroom borne, un bornage
+avant l'écriture ; chaque constat devient une règle de `Simulation.lua` avec son essai, et
+`provisoires` passe à faux. Le retrait d'un masque mal gardé (structure seule, en une écriture
+groupée avec `verifierPersonnes`) reste pour plus tard, sur une vraie 16.x.
 
 ## Peau (1.2)
 

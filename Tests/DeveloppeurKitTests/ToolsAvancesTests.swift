@@ -538,6 +538,50 @@ final class ToolsAvancesTests: XCTestCase {
                                                                         "adjustments": ["Exposure": 0.2]]]]).text.contains("relevées dans"))
     }
 
+    /// Masques relus (1.6) : sur une autre version, l'avertissement devient court quand le module a
+    /// relu chaque forme « gardé » ; il reste entier avec un écart, un « à relire », sans relecture
+    /// (module ancien), et dit les objets non relus.
+    func testAvertissementCourtQuandLesFormesSontGardees() {
+        let radial: JSONValue = ["kind": "radial", "center_x": 0.5, "center_y": 0.5, "radius_x": 0.3, "adjustments": ["Exposure": 0.2]]
+        func reponse(_ verdicts: [String]) -> JSONValue {
+            ["lightroom": "16.0", "resultats": [["masques_relus": .array(verdicts.map { ["nom": "Rond", "verdict": .string($0)] })]]]
+        }
+        fake.replies["masquer"] = reponse(["gardé"])
+        var texte = call("add_mask", ["step_name": "x", "masks": [radial]]).text
+        XCTAssertTrue(texte.contains("relus, gardés tels qu'écrits"), texte)
+        XCTAssertFalse(texte.contains("relevées dans la 15.6"), texte)
+        XCTAssertFalse(texte.contains("Objets et personnes"), texte)
+        XCTAssertTrue(texte.contains("masques_relus"), "les verdicts passent tels quels")
+        for verdicts in [["gardé", "écart"], ["à relire"], ["absent"], []] {
+            fake.replies["masquer"] = reponse(verdicts)
+            texte = call("add_mask", ["step_name": "x", "masks": [radial]]).text
+            XCTAssertTrue(texte.contains("relevées dans la 15.6"), "\(verdicts) : \(texte)")
+        }
+        fake.replies["masquer"] = ["lightroom": "16.0", "resultats": [[:]]]
+        XCTAssertTrue(call("add_mask", ["step_name": "x", "masks": [radial]]).text.contains("relevées dans la 15.6"), "module sans relecture")
+        // Un objet (masque IA à position) avec un dégradé gardé : la phrase courte dit qu'il n'est pas relu.
+        fake.replies["masquer"] = reponse(["gardé"])
+        let objet: JSONValue = ["kind": "object", "box": ["x": 0.2, "y": 0.2, "width": 0.3, "height": 0.3], "adjustments": ["Exposure": 0.2]]
+        texte = call("add_mask", ["step_name": "x", "masks": [radial, objet]]).text
+        XCTAssertTrue(texte.contains("Objets et personnes précises non relus"), texte)
+        // Sur la version relevée : rien.
+        fake.replies["masquer"] = ["lightroom": "15.6", "resultats": [["masques_relus": [["nom": "Rond", "verdict": "écart"]]]]]
+        XCTAssertFalse(call("add_mask", ["step_name": "x", "masks": [radial]]).text.contains("Lightroom Classic 15.6 :"))
+    }
+
+    /// DEVELOPPEUR_RELEVE_FORMES (développement) : add_mask demande au module le relevé des formes ;
+    /// jamais par défaut.
+    func testReleveFormesSeulementEnDeveloppement() {
+        let radial: JSONValue = ["kind": "radial", "center_x": 0.5, "center_y": 0.5, "radius_x": 0.3, "adjustments": ["Exposure": 0.2]]
+        fake.replies["masquer"] = ["lightroom": "15.6", "resultats": []]
+        _ = call("add_mask", ["step_name": "x", "masks": [radial]])
+        XCTAssertEqual(fake.calls.last?.command, "masquer")
+        XCTAssertNil(fake.lastParams["releve_formes"])
+        tools.releveFormes = true
+        _ = call("add_mask", ["step_name": "x", "masks": [radial]])
+        XCTAssertEqual(fake.lastParams["releve_formes"]?.bool, true)
+    }
+
     func testFindPhotosByFocalLength() {
         _ = call("find_photos", ["rating_min": 3, "focal_min": 50, "focal_max": 60])
         XCTAssertEqual(fake.calls.last?.command, "chercher")
@@ -582,5 +626,22 @@ final class ToolsAvancesTests: XCTestCase {
         let names = tools.definitions.compactMap { $0["name"]?.string }
         XCTAssertEqual(names, ToolHandler.toolNames)
         XCTAssertEqual(Set(names).count, names.count)
+    }
+}
+
+/// Les arguments d'une étape de recette passent par le vrai schéma de l'outil, contre
+/// FakeLightroom : une valeur refusée (un angle de 200 hors de −180…180) échoue ici, pas en recette.
+final class RecetteArgumentsTests: XCTestCase {
+    func testMasquesRelusAcceptesParAddMask() throws {
+        let fake = FakeLightroom()
+        fake.replies["masquer"] = ["lightroom": "15.6", "resultats": []]
+        let tools = ToolHandler(lightroom: fake)
+        var arguments = Recette.argumentsMasquesRelus
+        arguments["photo_ids"] = [1]
+        let resultat = tools.call(name: "add_mask", arguments: arguments)
+        XCTAssertFalse(resultat.isError, resultat.text)
+        let masques = try XCTUnwrap(fake.calls.last { $0.command == "masquer" }?.params["masques"]?.array)
+        XCTAssertEqual(masques.count, 4)
+        XCTAssertEqual(masques[1]["angle"]?.double, -160, "un angle permis, que Lightroom range −160, 20 ou 200")
     }
 }

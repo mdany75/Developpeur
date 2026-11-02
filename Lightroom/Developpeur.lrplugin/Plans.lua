@@ -1137,6 +1137,7 @@ end
 -- intersecter), comme Lightroom les range (Locaux.combiner).
 local function preparerMasques(photo, params)
     local plan = nouveauPlan(photo)
+    plan.formesEcrites = {}
     local ctx = contexteGeometrie(photo, plan, params)
     local existants = type(plan.actuels.MaskGroupBasedCorrections) == 'table' and plan.actuels.MaskGroupBasedCorrections or {}
     local liste = pourLightroom(existants)
@@ -1189,6 +1190,10 @@ local function preparerMasques(photo, params)
                         cadre = bornes[numero], trouvees = #bornes }
                 end
             end
+            -- Ce qui est écrit, copié avant l'écriture : relu ensuite (Retouche.relireFormes) ;
+            -- seules les formes sans IA se comparent (Locaux.aDesFormes).
+            plan.formesEcrites[#plan.formesEcrites + 1] = { id = correction.CorrectionID, nom = nom,
+                masques = pourLightroom(masques), formes = Locaux.aDesFormes(correction) }
             liste[#liste + 1] = correction
             ajoutes[#ajoutes + 1] = nom
         end

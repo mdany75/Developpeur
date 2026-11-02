@@ -1,0 +1,300 @@
+-- essais-masques-relus.lua : les masques relus après l'écriture (1.6, chantier « masques »), côté
+-- module, hors de Lightroom (LuaJIT, Lightroom simulé par Simulation.lua). Après add_mask
+-- (commande masquer), les seules formes sans IA (dégradé linéaire, radial, pinceau, plages de
+-- couleurs, de luminance ou de profondeur) sont relues et comparées à l'écrit
+-- (Locaux.comparerFormes, tolérances provisoires Locaux.TOLERANCES_FORMES) ; verdicts « gardé »,
+-- « écart », « absent », « à relire » dans masques_relus ; écarts et absents dits en remarques ;
+-- rien n'est jamais retiré. Les masques IA (sujet, ciel, personne, objet) ne se comparent pas.
+-- Les écarts viennent de la « version future » de la simulation (S.formesIgnorees,
+-- S.arrondiFormes, S.angleFormes), qui n'est pas un constat. Lancé par scripts/tester-module.sh.
+
+local dossierTests = (arg and arg[0] or ''):match('(.*/)') or './'
+local dossierModule = dossierTests .. '../../../Lightroom/Developpeur.lrplugin/'
+package.path = dossierModule .. '?.lua;' .. dossierTests .. '?.lua;' .. package.path
+
+local A = require 'Aides'
+local S = A.S
+local test, egal, proche, echoue, contient = A.test, A.egal, A.proche, A.echoue, A.contient
+
+local Json = require 'Json'
+local Commandes = require 'Commandes'
+local Locaux = require 'Locaux'
+
+-- Un RAW X-H2S de 6240 × 4160, photo active.
+local function fuji(id)
+    local photo = A.photoFuji()
+    if id and id ~= 4 then
+        photo = S.Photo(id, photo.reglages, photo.meta, photo.brut)
+    end
+    S.active, S.selection = photo, { photo }
+    return photo
+end
+
+-- Des formes « riches » (valeurs à six décimales), sans masque IA : le chemin d'applyDevelopSettings.
+local function formes()
+    return Json.tableau({
+        { type = 'lineaire', de_x = 0.123457, de_y = 0.111111, a_x = 0.876543, a_y = 0.432109, nom = 'Claude · Dégradé',
+          locaux = { LocalExposure2012 = -0.2 } },
+        { type = 'radial', centre_x = 0.456789, centre_y = 0.512345, rayon_x = 0.123457, angle = -160, fondu = 50,
+          nom = 'Claude · Rond', locaux = { LocalExposure2012 = 0.1 } },
+        { type = 'pinceau', nom = 'Claude · Pinceau', locaux = { LocalExposure2012 = 0.15 },
+          traits = { { points = { { 0.2, 0.3 }, { 0.25, 0.35 } }, rayon = 0.02, flux = 0.7, durete = 30 },
+                     { points = { { 0.6, 0.6 }, { 0.62, 0.64 } }, rayon = 0.035 } } },
+        { type = 'luminance', min = 0.7, max = 1, fondu = 0.1, nom = 'Claude · Plage', locaux = { LocalHighlights2012 = -0.3 } },
+    })
+end
+
+local function verdicts(resultat, i)
+    local liste = {}
+    for _, v in ipairs(resultat.resultats[i or 1].masques_relus or {}) do
+        liste[v.nom] = v
+    end
+    return liste
+end
+
+local function remarque(resultat, morceau)
+    return contient(resultat.resultats[1].remarques, morceau)
+end
+
+test("masques relus : quatre formes gardées telles qu'écrites, sans remarque ni écriture de plus", function()
+    local photo = fuji()
+    local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    local relus = resultat.resultats[1].masques_relus
+    egal(type(relus), 'table', "masques_relus dans la réponse")
+    egal(#relus, 4)
+    for _, nom in ipairs({ 'Claude · Dégradé', 'Claude · Rond', 'Claude · Pinceau', 'Claude · Plage' }) do
+        egal(verdicts(resultat)[nom].verdict, 'gardé', nom)
+        egal(verdicts(resultat)[nom].ecarts, nil, nom .. " : pas d'écarts sur un masque gardé")
+    end
+    egal(remarque(resultat, "pas gardé tel qu'écrit"), false)
+    egal(#S.ecritures, 1, "une seule écriture : celle de l'étape")
+    egal(#photo.reglages.MaskGroupBasedCorrections, 4)
+    egal(resultat.resultats[1].releve_formes, nil, "le relevé seulement avec releve_formes")
+end)
+
+test("masques relus : un arrondi sous la tolérance reste « gardé », au-delà c'est un « écart » dit, sans retrait", function()
+    fuji()
+    S.arrondiFormes = 5
+    local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    egal(verdicts(resultat)['Claude · Dégradé'].verdict, 'gardé', "arrondi à 1e-5 : sous la tolérance provisoire")
+    egal(verdicts(resultat)['Claude · Pinceau'].verdict, 'gardé')
+
+    local photo = fuji()
+    local ecritures = #S.ecritures
+    S.arrondiFormes = 2
+    resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    local degrade = verdicts(resultat)['Claude · Dégradé']
+    egal(degrade.verdict, 'écart')
+    egal(degrade.ecarts[1].genre, 'position')
+    egal(degrade.ecarts[1].cle, 'ZeroX')
+    egal(remarque(resultat, "Masque « Claude · Dégradé » : Lightroom ne l'a pas gardé tel qu'écrit (ZeroX : 0,876543 écrit, 0,88 relu"), true)
+    egal(remarque(resultat, "rien n'est retiré"), true)
+    egal(#photo.reglages.MaskGroupBasedCorrections, 4, "aucun masque retiré")
+    egal(#S.ecritures, ecritures + 1, "aucune écriture de retrait")
+end)
+
+test("masques relus : touches d'un pinceau perdues : « écart » de structure, le masque reste", function()
+    local photo = fuji()
+    S.formesIgnorees = { 'Dabs' }
+    local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    local pinceau = verdicts(resultat)['Claude · Pinceau']
+    egal(pinceau.verdict, 'écart')
+    egal(pinceau.ecarts[1].genre, 'structure')
+    egal(pinceau.ecarts[1].cle, 'Dabs')
+    egal(pinceau.ecarts[1].relu, 'absent')
+    egal(verdicts(resultat)['Claude · Dégradé'].verdict, 'gardé', "les autres formes, gardées")
+    egal(remarque(resultat, "Dabs : "), true)
+    egal(#photo.reglages.MaskGroupBasedCorrections, 4)
+end)
+
+test("masques relus : l'angle d'un radial se compare modulo 180 (−160° rangé 20° : gardé)", function()
+    fuji()
+    S.angleFormes = true
+    local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    egal(verdicts(resultat)['Claude · Rond'].verdict, 'gardé')
+end)
+
+test("masques relus : un radial à 170° sur une photo recadrée de 20° s'écrit 190°, rangé 10° : gardé", function()
+    -- Le seul chemin vers un angle hors de ±180 : l'angle du recadrage ajouté (Plans.lua), le
+    -- serveur refusant tout angle hors de −180…180.
+    local photo = fuji()
+    photo.reglages.CropAngle = 20
+    S.angleFormes = true
+    local resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'radial', centre_x = 0.5, centre_y = 0.5, rayon_x = 0.2, angle = 170, nom = 'Claude · Rond penché',
+          locaux = { LocalExposure2012 = 0.1 } },
+    }), etape = 'formes' })
+    local masque = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1]
+    proche(masque.Angle, 10, "190° rangé modulo 180 par la version future simulée")
+    egal(verdicts(resultat)['Claude · Rond penché'].verdict, 'gardé')
+end)
+
+test("masques relus : les masques IA (ciel, objet) ne se comparent pas ; un ciel combiné à un dégradé, si", function()
+    local photo = fuji()
+    local resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'ia', soustype = 2, nom = 'Claude · Ciel', locaux = { LocalExposure2012 = -0.1 } },
+        { type = 'objet', nom = 'Claude · Objet', locaux = { LocalExposure2012 = 0.1 },
+          traits = { { points = { { 0.3, 0.3 }, { 0.32, 0.31 } }, rayon = 0.008 } } },
+        { type = 'ia', soustype = 2, nom = 'Claude · Ciel sans le bas', locaux = { LocalExposure2012 = -0.1 },
+          composants = { { mode = 'soustraire', type = 'lineaire', de_x = 0.5, de_y = 1, a_x = 0.5, a_y = 0.7, nom = 'Bas' } } },
+        { type = 'lineaire', de_x = 0.5, de_y = 0, a_x = 0.5, a_y = 0.4, nom = 'Claude · Dégradé', locaux = {} },
+    }), etape = 'masques' })
+    local relus = verdicts(resultat)
+    egal(relus['Claude · Ciel'], nil, "un masque IA seul n'est pas relu")
+    egal(relus['Claude · Objet'], nil, "un objet (Mask/Image, ReferencePoint réécrit) n'est pas relu")
+    egal(relus['Claude · Ciel sans le bas'].verdict, 'gardé', "son dégradé se relit")
+    egal(relus['Claude · Dégradé'].verdict, 'gardé', "chemin du paramètre prédéfini")
+    egal(#photo.reglages.MaskGroupBasedCorrections, 4)
+end)
+
+test("masques relus : masques IA pas encore calculés : « à relire », sans remarque", function()
+    fuji()
+    S.calculDiffere, S.jamaisCalcule, S.modelesIAAbsents = true, true, true
+    local resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'ia', soustype = 2, nom = 'Claude · Ciel', locaux = { LocalExposure2012 = -0.1 } },
+        { type = 'lineaire', de_x = 0.5, de_y = 0, a_x = 0.5, a_y = 0.4, nom = 'Claude · Dégradé', locaux = {} },
+    }), etape = 'masques' })
+    egal(verdicts(resultat)['Claude · Dégradé'].verdict, 'à relire')
+    egal(remarque(resultat, "pas gardé tel qu'écrit"), false)
+end)
+
+test("masques relus : une correction que Lightroom n'a pas gardée est « absent », et dite", function()
+    local photo = fuji()
+    S.pendantAttente = function()
+        local liste = photo.reglages.MaskGroupBasedCorrections or {}
+        for i = #liste, 1, -1 do
+            if liste[i].CorrectionName == 'Claude · Dégradé' then
+                table.remove(liste, i)
+            end
+        end
+    end
+    local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    egal(verdicts(resultat)['Claude · Dégradé'].verdict, 'absent')
+    egal(remarque(resultat, "Masque « Claude · Dégradé » : absent après l'écriture"), true)
+    egal(verdicts(resultat)['Claude · Rond'].verdict, 'gardé')
+end)
+
+test("masques relus : une liste encore changeante après les relectures dit « à relire », en quatre lectures au plus", function()
+    local photo = fuji()
+    S.pendantAttente = function()
+        for _, correction in ipairs(photo.reglages.MaskGroupBasedCorrections or {}) do
+            local m = correction.CorrectionMasks[1]
+            if m.What == 'Mask/Gradient' then
+                m.ZeroX = m.ZeroX + 0.01
+            end
+        end
+    end
+    local avant = S.attentes
+    local resultat = Commandes.executer('masquer', { masques = formes(), etape = 'formes' })
+    egal(verdicts(resultat)['Claude · Dégradé'].verdict, 'à relire')
+    egal(verdicts(resultat)['Claude · Dégradé'].ecarts[1].cle, 'ZeroX', "l'écart vu reste dit")
+    egal(S.attentes - avant, 3, "trois attentes de 0,3 s au plus pour toute la commande")
+end)
+
+test("masques relus : deux photos, chacune ses verdicts, une seule attente pour la commande", function()
+    local p5 = fuji(5)
+    local p4 = fuji()
+    local avant = S.attentes
+    local resultat = Commandes.executer('masquer', { photos = { 4, 5 }, masques = formes(), etape = 'formes' })
+    egal(#resultat.resultats, 2)
+    egal(#resultat.resultats[1].masques_relus, 4)
+    egal(#resultat.resultats[2].masques_relus, 4)
+    egal(verdicts(resultat, 2)['Claude · Pinceau'].verdict, 'gardé')
+    egal(S.attentes - avant, 1, "une lecture, une attente, une seconde lecture, pour les deux photos")
+    egal(#p4.reglages.MaskGroupBasedCorrections, 4)
+    egal(#p5.reglages.MaskGroupBasedCorrections, 4)
+end)
+
+test("masques relus : releve_formes (développement) rend l'écrit et le relu de chaque masque, IA compris", function()
+    fuji()
+    local resultat = Commandes.executer('masquer', { releve_formes = true, masques = Json.tableau({
+        { type = 'ia', soustype = 2, nom = 'Claude · Ciel', locaux = { LocalExposure2012 = -0.1 } },
+        { type = 'lineaire', de_x = 0.123457, de_y = 0, a_x = 0.5, a_y = 0.4, nom = 'Claude · Dégradé', locaux = {} },
+    }), etape = 'masques' })
+    local releve = resultat.resultats[1].releve_formes
+    egal(#releve, 2)
+    egal(releve[1].nom, 'Claude · Ciel')
+    egal(releve[1].compare, false, "un masque IA est relevé, pas comparé")
+    egal(releve[1].relu[1].MaskDigest ~= nil, true, "le relu porte ce que Lightroom a calculé")
+    egal(releve[2].compare, true)
+    proche(releve[2].ecrit[1].FullX, 0.123457 * 1)
+    egal(type(releve[2].correction_id), 'string')
+    egal(Json.decode(Json.encode(resultat)) ~= nil, true, "le relevé passe en JSON")
+end)
+
+test("Locaux.comparerFormes : IA ignorée, angle modulo 180, booléens 0/1, touches, couleurs, plages, tolérances", function()
+    local tol = Locaux.TOLERANCES_FORMES
+    egal(tol.provisoires, true, "tolérances provisoires, à fixer par le constat")
+    -- Un objet dont Lightroom a déplacé ReferencePoint et retiré le geste : pas comparé.
+    local objet = { What = 'Mask/Image', ReferencePoint = '0.200000 0.300000', Gesture = { { What = 'Mask/Paint' } } }
+    egal(#Locaux.comparerFormes({ objet }, { { What = 'Mask/Image', ReferencePoint = '0.500000 0.500000' } }), 0)
+    -- Radial : 200° (possible par l'angle du recadrage ajouté) rangé 20° ou −160°, gardé ; 110°, écart d'angle.
+    local radial = { What = 'Mask/CircularGradient', Left = 0.1, Top = 0.2, Right = 0.3, Bottom = 0.4, Angle = 200, Feather = 50,
+        Midpoint = 50, Roundness = 0, Flipped = true, MaskInverted = false }
+    local function avec(base, changes)
+        local copie = {}
+        for k, v in pairs(base) do copie[k] = v end
+        for k, v in pairs(changes) do copie[k] = v end
+        return copie
+    end
+    egal(#Locaux.comparerFormes({ radial }, { avec(radial, { Angle = 20 }) }), 0)
+    egal(#Locaux.comparerFormes({ radial }, { avec(radial, { Angle = -160 }) }), 0)
+    local e = Locaux.comparerFormes({ radial }, { avec(radial, { Angle = 110 }) })
+    egal(#e, 1) egal(e[1].genre, 'angle') proche(e[1].ecart, 90)
+    -- Booléens rangés 1 ou 0 : pareils ; Flipped perdu : structure.
+    egal(#Locaux.comparerFormes({ radial }, { avec(radial, { Flipped = 1, MaskInverted = 0 }) }), 0)
+    egal(Locaux.comparerFormes({ radial }, { avec(radial, { MaskInverted = true }) })[1].cle, 'MaskInverted')
+    -- Position : sous la tolérance, rien ; au-delà, écart.
+    egal(#Locaux.comparerFormes({ radial }, { avec(radial, { Left = 0.1 + tol.position / 2 }) }), 0)
+    egal(Locaux.comparerFormes({ radial }, { avec(radial, { Left = 0.1 + tol.position * 2 }) })[1].cle, 'Left')
+    -- Fondu : écart relatif.
+    egal(#Locaux.comparerFormes({ radial }, { avec(radial, { Feather = 50.01 }) }), 0)
+    egal(Locaux.comparerFormes({ radial }, { avec(radial, { Feather = 51 }) })[1].genre, 'valeur')
+    -- Une valeur sous 1 se compare aussi en relatif : flux 0,7 relu 0,7008 (0,11 %), écart.
+    local flux = { What = 'Mask/Paint', Flow = 0.7 }
+    egal(Locaux.comparerFormes({ flux }, { avec(flux, { Flow = 0.7008 }) })[1].genre, 'valeur')
+    egal(#Locaux.comparerFormes({ flux }, { avec(flux, { Flow = 0.7004 }) }), 0, "0,06 % : gardé")
+    -- Pinceau : traits et touches.
+    local trait = { What = 'Mask/Paint', Radius = 0.02, Flow = 0.7, CenterWeight = 0.3,
+        Dabs = { 'r 0.020000', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000', 'd 0.210000 0.310000' } }
+    local pinceau = { What = 'Mask/Aggregate', MaskInverted = false, Masks = { trait } }
+    egal(#Locaux.comparerFormes({ pinceau }, { pinceau }), 0)
+    local moins = avec(trait, { Dabs = { 'r 0.020000', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000' } })
+    e = Locaux.comparerFormes({ pinceau }, { avec(pinceau, { Masks = { moins } }) })
+    egal(e[1].cle, 'Dabs') egal(e[1].genre, 'structure') egal(e[1].composant, '1.1')
+    local deplace = avec(trait, { Dabs = { 'r 0.020000', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000', 'd 0.215000 0.310000' } })
+    e = Locaux.comparerFormes({ pinceau }, { avec(pinceau, { Masks = { deplace } }) })
+    egal(e[1].cle, 'Dabs[5]') egal(e[1].genre, 'position')
+    -- Rayon d'un pinceau fin (part du grand côté) : 0,005 relu 0,0059 (18 % plus large), écart de
+    -- position, pour Radius comme pour la touche « r ».
+    local fin = avec(trait, { Radius = 0.005, Dabs = { 'r 0.005000', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000', 'd 0.210000 0.310000' } })
+    local large = avec(fin, { Radius = 0.0059, Dabs = { 'r 0.005900', 'f 0.7000', 'h 0.3000', 'd 0.200000 0.300000', 'd 0.210000 0.310000' } })
+    e = Locaux.comparerFormes({ avec(pinceau, { Masks = { fin } }) }, { avec(pinceau, { Masks = { large } }) })
+    egal(#e, 2) egal(e[1].cle, 'Radius') egal(e[1].genre, 'position') egal(e[2].cle, 'Dabs[1]') egal(e[2].genre, 'position')
+    egal(#Locaux.comparerFormes({ avec(pinceau, { Masks = { fin } }) }, { avec(pinceau, { Masks = { avec(fin, { Radius = 0.005004 }) } }) }), 0,
+        "0,02 px sur 6240 : gardé")
+    e = Locaux.comparerFormes({ pinceau }, { avec(pinceau, { Masks = {} }) })
+    egal(e[1].cle, 'Masks')
+    local auto = avec(trait, { Dabs = { 'r 0.020000', 'f 0.7000', 'h 0.3000', 'M 0.200000 0.300000', 'd 0.210000 0.310000' } })
+    egal(Locaux.comparerFormes({ pinceau }, { avec(pinceau, { Masks = { auto } }) })[1].genre, 'structure', "une autre lettre de touche")
+    -- Plage de couleurs : position du prélèvement, modèle ; plage de luminance.
+    local couleur = { What = 'Mask/RangeMask', CorrectionReferenceX = 0.3, CorrectionReferenceY = 0.4,
+        CorrectionRangeMask = { Type = 1, ColorAmount = 0.5, PointModels = { '0.100000 0.200000 0.300000 0.300000 0.400000 0' } } }
+    egal(#Locaux.comparerFormes({ couleur }, { couleur }), 0)
+    local autre = avec(couleur, { CorrectionRangeMask = { Type = 1, ColorAmount = 0.5, PointModels = { '0.100000 0.200000 0.300000 0.350000 0.400000 0' } } })
+    e = Locaux.comparerFormes({ couleur }, { autre })
+    egal(e[1].cle, 'PointModels[1][4]') egal(e[1].genre, 'position')
+    egal(Locaux.comparerFormes({ couleur }, { avec(couleur, { CorrectionRangeMask = { Type = 2 } }) })[1].cle, 'CorrectionRangeMask.Type')
+    local lum = { What = 'Mask/RangeMask', CorrectionRangeMask = { Type = 2, LumRange = '0.600000 0.700000 1.000000 1.000000' } }
+    egal(#Locaux.comparerFormes({ lum }, { lum }), 0)
+    egal(Locaux.comparerFormes({ lum }, { avec(lum, { CorrectionRangeMask = { Type = 2, LumRange = '0.6 0.7 1' } }) })[1].genre, 'structure')
+    -- Autre nombre de composants, autre forme.
+    egal(Locaux.comparerFormes({ radial, lum }, { radial })[1].cle, 'CorrectionMasks')
+    egal(Locaux.comparerFormes({ radial }, { lum })[1].cle, 'What')
+    -- Clé de position perdue.
+    local lineaire = { What = 'Mask/Gradient', ZeroX = 0.5, ZeroY = 0.4, FullX = 0.5, FullY = 0 }
+    e = Locaux.comparerFormes({ lineaire }, { avec(lineaire, { ZeroX = false }) })
+    egal(e[1].cle, 'ZeroX') egal(e[1].genre, 'structure')
+end)
+
+A.bilan()
