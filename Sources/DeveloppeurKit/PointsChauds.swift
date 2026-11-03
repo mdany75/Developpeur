@@ -123,8 +123,10 @@ public enum PointsChauds {
     /// Les zones nettement plus saturées que le sujet, hors du sujet, des bustes et des zones claires
     /// (une case claire et saturée reste une zone claire), de la plus forte à la plus faible. Un fond
     /// saturé étendu (un ciel bleu vu entre des arbres, en morceaux) n'en donne aucune : comme
-    /// `partMax` pour un grand ciel clair, mais sur toutes les cases saturées ensemble.
-    static func zonesSaturees(_ grille: Grille, sujet: [CGRect], bustes: [CGRect] = []) -> [Zone] {
+    /// `partMax` pour un grand ciel clair, mais sur toutes les cases saturées ensemble. D'autres seuils
+    /// que ceux de `trouver` : pour le relevé (`ReleveSeuils`, zones candidates de la planche).
+    static func zonesSaturees(_ grille: Grille, sujet: [CGRect], bustes: [CGRect] = [],
+                              ecartChroma: Double = ecartChroma, cMin: Double = cMin) -> [Zone] {
         guard grille.chromas.count == grille.moyennes.count, !grille.chromas.isEmpty else { return [] }
         let interet = sujet.filter { $0.width * $0.height <= zoneInteretMax } + bustes
         let dansLeSujet = grille.chromas.indices.filter { c in

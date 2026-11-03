@@ -1,5 +1,27 @@
 # Changements
 
+## 1.6.7 — 2026-11-03
+
+La 1.6.7 vient des essais de la 1.6.6 faits dans Lightroom pendant la nuit : trois petits défauts
+des taches corrigés, et la marge des ombres vérifiée sur sept de vos photos.
+
+### Corrigé
+- Une tache que vous avez faite à la main avec l'outil Supprimer sur un objet détecté : Claude la
+  voyait dans la liste des taches, mais sans savoir où elle était. Il connaît maintenant sa place
+  et sa taille.
+- Après avoir retiré une tache, la liste renumérotée que Claude reçoit tient compte de la
+  correction d'objectif, comme la liste elle-même (les places pouvaient être décalées de quelques
+  pixels).
+- Le résumé d'un retrait de tache disait « (table) » pour les taches de l'outil Supprimer : il dit
+  maintenant combien il en reste.
+
+### Changé
+- Marge des ombres : vérifiée sur sept copies de vos photos, d'ISO 160 à 6 400. Elle n'a jamais
+  promis trop, et sur une photo propre elle est prudente d'environ 0,4 IL. Claude sait aussi ce
+  que cela fait au curseur Ombres : +30 relève les ombres d'environ 0,4 IL, +60 d'environ 0,8 IL.
+- Points chauds saturés : une planche de 150 zones de couleur vive, sur 30 de vos photos, attend
+  votre jugement ; vos réponses régleront les deux seuils, encore provisoires.
+
 ## 1.6.6 — 2026-11-02
 
 La 1.6.6 reprend quatre idées vues chez les autres MCP Lightroom : Claude gère les taches déjà

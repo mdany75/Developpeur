@@ -95,9 +95,8 @@ défait ensuite.
 
 **Taches, bruit et points chauds (1.6.6)**
 
-- `retouch_spots` avec `action` : `list` sur une photo qui porte une tache Supprimer faite à la main (objet détecté) et des taches de Claude, numéros et positions justes ; `remove` d'une tache, `opacity`, `clear` des taches puis des yeux rouges, chacune défaite par `undo_last` (`--dump` identique à l'avant) ; supposé seulement : une liste `RemoveAreas` réécrite sans une tache garde les autres calculs (`pm_patch`) — à la main dans Lightroom.
-- Marge des ombres (`marge_ombres_il` de `view_photo`, provisoire) : relever les Ombres de la marge annoncée sur deux copies d'Essais (ISO bas et ISO 3 200) et lire le bruit des ombres atteint, contre `bruitVisible` — à la main dans Lightroom.
-- Points chauds saturés (`PointsChauds.ecartChroma` 25, `cMin` 35, provisoires) : une planche de portraits et de scènes avec un objet vif derrière le sujet — avec Dany (à l'œil).
+- Points chauds saturés (`PointsChauds.ecartChroma` 25, `cMin` 35, provisoires) : Dany juge la planche du 3 novembre 2026 ([Planche des points chauds](https://claude.ai/artifact/3AMaFfoeL8C56kmx393aiP), 150 zones sur 30 photos, réponses dans sa base `jugements`) ; le couple de seuils qui suit le mieux ses réponses remplace les provisoires — avec Dany (à l'œil) ([relevé](#taches-et-marge-des-ombres-constatées-167)).
+- Marge des ombres sur une photo propre à ISO bas : une formule avec un plancher de texture qui ne monte pas (la marge annoncée y est prudente de 0,4 IL), sur plus de deux photos — à la main dans Lightroom ([relevé](#taches-et-marge-des-ombres-constatées-167)).
 
 **Étalonnage (`match_look`) et habitudes**
 
@@ -292,8 +291,8 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `recadrer` | `photos`, `recadrage`, `recalages`, `completer?`, `etape`, `raison?`, `confirme` | comme `appliquer` (changements du cadre seulement) |
 | `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme`, `releve_formes?` (développement : `DEVELOPPEUR_RELEVE_FORMES=1`) | comme `appliquer`, plus `lightroom` (la version) et, par photo, `masques_relus` (`nom`, `verdict`, `ecarts?`, `retrait?` depuis la 1.6.3) et, avec `releve_formes`, `releve_formes` ; voir Masques relus après l'écriture (1.6) |
 | `ameliorer` | `photo?`, `ameliorations` (`nom` : `denoise`, `rawDetails` ou `superRes`, `actif`, `intensite?`), `libelles`, `etape`, `raison?`, `confirme` | comme `appliquer`, plus `amelioration` (état après le calcul) |
-| `retoucher` | `photo?`, `taches`, `yeux`, `recalages?`, `etape`, `raison?`, `confirme` ; ou (1.6.6) `gestion` = `retirer` ou `opacite` (`numeros`, ceux de `taches` ; `opacite` de 0 à 1) ou `vider` (`vider` = `{taches, yeux}`) : une étape que `undo_last` défait ; après `retirer`, la réponse porte `taches` renumérotées et `a_savoir`. Sur `RemoveAreas`, la liste s'y écrit et `RetouchAreas` en est dérivé sans les objets détectés, comme Lightroom ; une liste vide vide aussi `RetouchInfo` (constat de `Reglages.aRemettre`, simulé) | comme `appliquer` |
-| `taches` | `photo?` | lecture (1.6.6, rejouable) : `taches` numérotées dans l'ordre où Lightroom les lit (`RemoveAreas` s'il en porte, sinon `RetouchAreas`) avec `sorte` (`corriger`, `cloner`, `supprimer`, `objet détecté`), `opacite` (0 à 100, l'échelle de l'action `opacity`), `x`, `y` et `rayon` dans l'aperçu de `view_photo` (`Geometrie.versApercu`, grille de recalage défaite par approximations successives : le serveur la demande comme pour poser une tache ; `hors_cadre`), `yeux_rouges` (nombre), `photo` ; ni étape ni capture (`Etapes.SANS_ATTENTE`), permise en pause et en « Proposer d'abord » |
+| `retoucher` | `photo?`, `taches`, `yeux`, `recalages?`, `etape`, `raison?`, `confirme` ; ou (1.6.6) `gestion` = `retirer` ou `opacite` (`numeros`, ceux de `taches` ; `opacite` de 0 à 1) ou `vider` (`vider` = `{taches, yeux}`) : une étape que `undo_last` défait ; après `retirer`, la réponse porte `taches` renumérotées et `a_savoir`, placées avec les `recalages` que le serveur joint à `retirer` comme à `taches` (1.6.7). Sur `RemoveAreas`, la liste s'y écrit et `RetouchAreas` en est dérivé sans les objets détectés, comme Lightroom ; une liste vide vide aussi `RetouchInfo` (constat de `Reglages.aRemettre`, simulé) | comme `appliquer` |
+| `taches` | `photo?` | lecture (1.6.6, rejouable) : `taches` numérotées dans l'ordre où Lightroom les lit (`RemoveAreas` s'il en porte, sinon `RetouchAreas`) avec `sorte` (`corriger`, `cloner`, `supprimer`, `objet détecté`), `opacite` (0 à 100, l'échelle de l'action `opacity`), `x`, `y` et `rayon` dans l'aperçu (un objet détecté, sans centre : son `ReferencePoint` et la moitié du grand côté de `pm_target_*`, depuis la 1.6.7) de `view_photo` (`Geometrie.versApercu`, grille de recalage défaite par approximations successives : le serveur la demande comme pour poser une tache ; `hors_cadre`), `yeux_rouges` (nombre), `photo` ; ni étape ni capture (`Etapes.SANS_ATTENTE`), permise en pause et en « Proposer d'abord » |
 | `geometrie` | `photo?`, `photos?` ou `selection?`, `rendre?`, `taille?` | `photos` : par photo, `active` (correction géométrique), `transformation` (Upright, perspective ou distorsion manuelle), `empreinte` ; avec `rendre`, `chemin_corrige` et `chemin_origine` (voir Recalage de la géométrie) |
 | `copier` | `source`, `photos?` ou `selection?`, `cles`, `inclure`, `etape`, `raison?`, `confirme` | comme `appliquer`, sans la photo source |
 | `essayer` | `action` (`appliquer`, `masquer`, `retoucher`), `photo?`, `taille` (0 : pleine résolution), `comparer?`, `instantane?`, `entier?`, `temoin?` (un rendu témoin : carte de `mask_map`, masque de Lightroom de `generative_edit` ; aucun accord demandé), et les paramètres de l'action (pour `masquer`, une zone `{type = 'existant', masque = <nom>}` reprend un masque déjà sur la photo dans un masque nouveau : voir Masque peint dans Lightroom) | `chemin` (et `chemin_actuel`), `changements`, `remarques` ; avec `instantane`, l'état proposé est rangé en instantané « Claude · <nom> » avant le rendu (`instantane` dans la réponse) ; la photo est remise comme avant. De la 1.3 à la 1.3.5, `exercice` (« Je le fais ») et `sans_rendu` : retirés au correctif 1.3.6 (voir Je le fais). `entier`, avec un recadrage proposé (action `appliquer`, cadre non retiré) : `cadre_propose` (le cadre que Lightroom a gardé, relu), `dimensions` et `chemin_entier` (troisième étape « Claude · essai : image entière ») ; sans image entière, la remarque « Image entière non rendue : … » (voir Composition lue) |
@@ -8192,6 +8191,82 @@ vêtement du sujet n'est pas une zone qui vole l'œil), et des cases saturées q
 2026). Mêmes zones,
 mêmes filtres, données après les claires, cinq en tout. Le relevé A5 (`PointsChauds.zones`) ne
 compte que les claires. Seuils provisoires, à juger sur planche (À vérifier à la prochaine recette).
+
+## Taches et marge des ombres constatées (1.6.7)
+
+Essais de la nuit du 2 au 3 novembre 2026, demandés par Dany (« tu es autonome, fais les 3 »), sur
+de nouvelles copies d'Essais remises à l'origine, chaque écriture défaite ensuite.
+
+**Constaté dans Lightroom Classic 15.6, taches** (copie 53831320 « Essai taches 1.6.6 » d'un RAF de
+X-H2S de 6240 × 4160, XF16-55, correction d'objectif active) :
+
+1. Une tache faite à la main avec l'outil Supprimer (IA générative décochée, « Détecter les objets »
+   coché : un clic sur un point blanc, puis Supprimer) se range dans `RemoveAreas` seul : `SpotType`
+   `heal_patchmatch`, `Method` `poisson`, un masque `Mask/Image` (`FullMaskSize` 2880,1920,
+   `ReferencePoint` « 0.569430 0.411177 », au point cliqué, et un geste `Mask/Paint` dont la touche
+   `d` est à 0.569333 0.411284), la zone calculée en pixels de l'image entière (`pm_target_*`
+   3506-3625 × 1662-1759, `pm_full_image_*` 6240 × 4160) et son empreinte `pm_patch` ; ni
+   `centerX`, ni cercle, ni entrée dans `RetouchAreas`. `list` la donnait sans position :
+   corrigé en 1.6.7 (`Plans.centreObjet`), règle `S.tacheObjetALaMain` de la simulation de la
+   liaison et essai « une tache faite à la main sur un objet détecté se place… ».
+2. Deux taches de Claude posées ensuite s'ajoutent à `RemoveAreas` (et à `RetouchAreas` dérivé) ;
+   la tache faite à la main garde son `pm_patch`. `list` les place à 0,626 0,434 et 0,552 0,481,
+   les positions données.
+3. `remove` d'une tache de Claude, puis `undo_last` ; `opacity` 50, puis `undo_last` ; `remove` de la
+   tache faite à la main, puis `undo_last` ; `clear` des taches, puis `undo_last` : chaque fois
+   `--dump` identique à l'avant. `clear` des yeux rouges sur une photo qui n'en a pas : aucun
+   changement, aucune étape.
+4. Rendu vu à l'écran : une tache retirée réapparaît, les autres restent effacées, la tache faite à
+   la main comprise (la liste `RemoveAreas` réécrite garde son calcul : le point « supposé » de la
+   1.6.6 est constaté). La tache faite à la main retirée, `RemoveAreas` disparaît des réglages,
+   `RetouchAreas` garde les deux autres, et l'objet réapparaît.
+5. La liste renumérotée qu'`remove` renvoie était placée sans la grille de recalage (0,621 0,436 au
+   lieu de 0,626 0,434, l'écart de la correction d'objectif) : en 1.6.7 le serveur joint la grille
+   au retrait comme à `list` (essai de `ToolsAvancesTests`). Sa ligne `RemoveAreas` disait
+   « (table) », sans libellé : comptée en taches et nommée « Retouches de taches (outil
+   Supprimer) ».
+
+**Constaté dans Lightroom Classic 15.6, marge des ombres** : sept copies d'Essais de RAF de X-H2S
+remises à l'origine, l'exposition relevée de +0,4 à +1,5 IL puis défaite, le bruit des ombres de
+`view_photo` (`bruit.ombres`) relu chaque fois (seuil visible 0,6) :
+
+| ISO | Marge annoncée | Bruit des ombres (base → relevé) |
+|---|---|---|
+| 160 (portrait, Ombres 25 d'origine) | +0,4 IL | 0,53 → 0,54 (+0,4) → 0,62 (+1,0) |
+| 200 (portrait, Ombres 33 d'origine) | +0,4 IL | 0,53 → 0,55 (+0,5) → 0,61 (+1,0) → 0,67 (+1,5) |
+| 400 | −0,2 IL | 0,64 → 0,75 (+0,5) → 0,87 (+1,0) → 1,00 (+1,5) |
+| 640 | −1,1 IL | 0,84 → 0,98 (+0,5) → 1,57 (+1,0) → 2,10 (+1,5) |
+| 800 | −2 IL | 1,40 → 1,87 (+0,5) → 2,42 (+1,0) |
+| 3 200 | −0,7 IL | 0,74 → 0,83 (+0,4) → 1,10 (+1,0) |
+| 6 400 | −1,7 IL | 1,02 → 1,29 (+0,5) → 1,87 (+1,0) |
+
+La marge n'a jamais promis trop : relevée de la marge annoncée, aucune photo n'atteint le bruit
+visible. Sur les deux photos propres, il ne vient que vers +0,85 IL : une part de la mesure y est de
+la texture, qui ne monte pas avec la lumière (un plancher : `bruit² = plancher² + reste² ·
+4^(k/2,2)` les suit à 0,01 près, plancher 0,40 environ). Sur une photo déjà bruitée, le bruit monte
+plus vite que 2^(k/2,2) (exposant effectif de 1,1 à 2,4) : la lecture « déjà au bruit visible »
+reste juste. Le curseur Ombres agit plus que l'exposition dans les ombres : à ISO 3 200, Ombres +30
+donne 0,82 (comme +0,4 IL), +60 donne 0,99, +100 donne 1,39 ; à ISO 160, depuis Ombres 25, +35
+donne 0,58 et +75 donne 0,85. La lecture d'une marge positive le dit depuis la 1.6.7 (« Ombres
++30 ≈ 0,4 IL, +60 ≈ 0,8 IL ; marge prudente »). La formule reste la même : deux photos propres ne
+suffisent pas à fixer le plancher (À vérifier à la prochaine recette). Ce constat de rendu ne
+s'imite pas dans la simulation (le bruit vient du dématriçage de Lightroom) : `AnalyseTests` vérifie
+la lecture.
+
+**Points chauds saturés : la planche.** `--mesures --fichiers` rejoue depuis la 1.6.7 les zones
+saturées à cinq écarts (15 à 35) et cinq C* minimaux (25 à 45) (`saturees_rejouees`) et donne les
+zones candidates (`saturees_candidates`) : celles de tous les couples réunies, chaque cadre une
+fois, avec les couples qui le trouvent tel quel (`seuils` ; revue du 3 novembre 2026 : réunies par
+leur centre, une grande zone d'un seuil bas prenait les couples d'un panneau plus petit qu'elle
+contenait). À seuil bas, les cases saturées passent souvent ensemble `partMax` et aucun couple bas
+ne trouve rien (4 photos sur 40) : d'où la réunion. Sur 40 aperçus de photos de Dany (trouvées par
+le sens : un objet vif derrière une personne, des jouets, un mur coloré, des fleurs…), 30 ont des
+candidates ; la planche réunit encore les cadres qui se recouvrent à 60 % ou plus (les couples
+mis ensemble) : 150 zones, dont 35 trouvées aux seuils actuels. Les couples de chaque zone, hors du
+dépôt (photos de Dany) : `build/planche-points-chauds/seuils-par-zone.json`, clé `<id>` puis numéro
+de zone, comme les documents `<id>-<numéro>` de la base de la planche. La planche (artefact privé, source sans les photos :
+`docs/artefacts/planche-points-chauds.html`) montre chaque zone numérotée ; Dany répond « Attire
+l'œil » ou « Non ». Le couple de seuils qui suit le mieux ses réponses remplace les provisoires.
 
 ## 1.6 : recherche par le sens
 

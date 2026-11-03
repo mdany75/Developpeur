@@ -355,6 +355,7 @@ public enum DevelopCatalogue {
             "PointColors": "Couleur ponctuelle",
             "MaskGroupBasedCorrections": "Masques",
             "RetouchAreas": "Retouches de taches",
+            "RemoveAreas": "Retouches de taches (outil Supprimer)",
             "RedEyeInfo": "Yeux rouges",
             "WhiteBalance": "Balance des blancs (mode)",
             "AutoTone": "Tonalité automatique",

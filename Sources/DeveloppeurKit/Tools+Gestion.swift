@@ -170,7 +170,7 @@ extension ToolHandler {
 
     /// Libellés des changements d'une copie (copy_settings).
     func libellesCopie(_ keys: [String]) -> JSONValue {
-        DevelopCatalogue.labels(for: keys + [DevelopCatalogue.profileKey, "PointColors", "MaskGroupBasedCorrections", "RetouchAreas", "RedEyeInfo",
+        DevelopCatalogue.labels(for: keys + [DevelopCatalogue.profileKey, "PointColors", "MaskGroupBasedCorrections", "RetouchAreas", "RemoveAreas", "RedEyeInfo",
                                              "UprightTransform"]
             + DevelopCatalogue.cropKeys + [DevelopCatalogue.constrainCropKey] + DevelopCatalogue.curveKeys.map(\.key))
     }

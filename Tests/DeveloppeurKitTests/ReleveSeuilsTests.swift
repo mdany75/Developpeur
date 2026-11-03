@@ -491,6 +491,50 @@ final class ReleveSeuilsTests: XCTestCase {
         XCTAssertEqual(PointsChauds.zones(grille, sujet: [], lMin: 93).count, 1)
     }
 
+    func testLesZonesSatureesRejoueesDonnentLeursSeuilsPourLaPlanche() throws {
+        // Un objet orangé modéré derrière un sujet gris : sous les seuils actuels, trouvé plus bas.
+        let data = TestSupport.jpegPixels(width: 600, height: 400) { x, y in x < 150 && y < 100 ? (160, 110, 80) : (95, 95, 95) }
+        let grille = try XCTUnwrap(PointsChauds.lireGrille(try XCTUnwrap(PreviewImages.image(data))))
+        XCTAssertEqual(PointsChauds.zonesSaturees(grille, sujet: []),
+                       PointsChauds.zonesSaturees(grille, sujet: [], ecartChroma: PointsChauds.ecartChroma, cMin: PointsChauds.cMin),
+                       "les seuils par défaut sont ceux de trouver")
+        XCTAssertTrue(PointsChauds.zonesSaturees(grille, sujet: []).isEmpty, "sous les seuils actuels")
+        XCTAssertEqual(PointsChauds.zonesSaturees(grille, sujet: [], ecartChroma: 15, cMin: 25).count, 1)
+
+        let dossier = TestSupport.temporaryDirectory()
+        let fichier = dossier.appendingPathComponent("orange.jpg")
+        try data.write(to: fichier)
+        let sortie = ReleveSeuils.commande(["--fichiers", dossier.appendingPathComponent("sortie").path, fichier.path],
+                                           lightroom: Self.lightroomInterdit)
+        XCTAssertEqual(sortie.code, 0, sortie.lignes.joined(separator: "\n"))
+        let chauds = try XCTUnwrap(ReleveSeuils.lireLignes(dossier.appendingPathComponent("sortie/mesures.jsonl")).first?["points_chauds"])
+        XCTAssertEqual(chauds["saturees_rejouees"]?.object?.count, ReleveSeuils.ecartsSatures.count * ReleveSeuils.cMinsSatures.count)
+        let candidates = try XCTUnwrap(chauds["saturees_candidates"]?.array)
+        XCTAssertEqual(candidates.count, 1, "une zone, gardée une fois quel que soit le nombre de seuils qui la trouvent")
+        let seuils = candidates[0]["seuils"]?.array?.compactMap(\.string) ?? []
+        XCTAssertTrue(seuils.contains("ecart15_c25"), "\(seuils)")
+        XCTAssertFalse(seuils.contains("ecart25_c35"), "les seuils actuels ne la trouvent pas")
+        XCTAssertEqual(Set(seuils).count, seuils.count, "chaque couple une fois")
+
+        // Un panneau rouge vif dans un mur orangé moyen : à seuil bas, une grande zone (le mur et le
+        // panneau) ; aux seuils actuels, le panneau seul. Deux candidates, chacune avec ses couples
+        // (revue du 3 novembre 2026 : le panneau prenait le cadre du mur).
+        let mur = TestSupport.jpegPixels(width: 600, height: 400) { x, y in
+            if x >= 60, x < 140, y >= 40, y < 110 { return (200, 30, 30) }
+            return x < 200 && y < 150 ? (160, 110, 80) : (95, 95, 95)
+        }
+        let fichierMur = dossier.appendingPathComponent("mur.jpg")
+        try mur.write(to: fichierMur)
+        _ = ReleveSeuils.commande(["--fichiers", dossier.appendingPathComponent("sortie-mur").path, fichierMur.path], lightroom: Self.lightroomInterdit)
+        let deux = try XCTUnwrap(ReleveSeuils.lireLignes(dossier.appendingPathComponent("sortie-mur/mesures.jsonl")).first?["points_chauds"]?["saturees_candidates"]?.array)
+        XCTAssertEqual(deux.count, 2, "\(deux)")
+        let actuelles = deux.filter { ($0["seuils"]?.array ?? []).contains(.string("ecart25_c35")) }
+        XCTAssertEqual(actuelles.count, 1)
+        let petite = try XCTUnwrap(actuelles.first?["largeur"]?.double)
+        let autre = try XCTUnwrap(deux.first { !(($0["seuils"]?.array ?? []).contains(.string("ecart25_c35"))) }?["largeur"]?.double)
+        XCTAssertLessThan(petite, autre, "les seuils actuels désignent le panneau, pas le mur")
+    }
+
     func testLaGammeRejoueeRetrouveLaMesureActuelle() throws {
         let image = try XCTUnwrap(PreviewImages.image(Self.fleurs()))
         let mesures = try XCTUnwrap(Measurements.analyze(PreviewImages.scaled(image, maxSide: Measurements.maxSide)))

@@ -51,6 +51,11 @@ public enum ReleveSeuils {
     /// Seuils rejoués des points chauds (A5).
     static let ecartsChauds: [Double] = [15, 20, 25]
     static let lMinsChauds: [Double] = [65, 70, 75]
+    /// Zones saturées rejouées (1.6.7) : écarts au C* du sujet et C* minimaux, autour de
+    /// `PointsChauds.ecartChroma` et `PointsChauds.cMin` ; les candidates, aux plus bas, pour la
+    /// planche que Dany juge.
+    static let ecartsSatures: [Double] = [15, 20, 25, 30, 35]
+    static let cMinsSatures: [Double] = [25, 30, 35, 40, 45]
     static let partsMinChaudes: [Double] = [0.2, 0.3, 0.5]
     static let partsMaxChaudes: [Double] = [15, 20, 30]
 
@@ -907,6 +912,34 @@ public enum ReleveSeuils {
                 rejoue["partmax\(Int(partMax))"] = .number(Double(PointsChauds.zones(grille, sujet: sujet, partMax: partMax).count))
             }
             chauds["rejoue"] = .object(rejoue)
+            let bustes = (vision?.faces.map(\.box) ?? []).map(PointsChauds.buste)
+            // Les candidates : les zones de chaque couple de seuils réunies (un seuil bas peut n'en
+            // donner aucune, toutes les cases saturées ensemble dépassant `partMax`), chaque cadre une
+            // fois, avec les couples qui le trouvent tel quel (revue du 3 novembre 2026 : réunies par
+            // leur centre, une grande zone d'un seuil bas prenait les couples d'une zone plus petite).
+            var satures: [String: JSONValue] = [:]
+            var candidates: [(zone: PointsChauds.Zone, seuils: [String])] = []
+            for ecart in ecartsSatures {
+                for cMin in cMinsSatures {
+                    let cle = "ecart\(Int(ecart))_c\(Int(cMin))"
+                    let zones = PointsChauds.zonesSaturees(grille, sujet: sujet, bustes: bustes, ecartChroma: ecart, cMin: cMin)
+                    satures[cle] = .number(Double(zones.count))
+                    for zone in zones {
+                        if let i = candidates.firstIndex(where: { $0.zone.boite == zone.boite }) {
+                            if !candidates[i].seuils.contains(cle) { candidates[i].seuils.append(cle) }
+                        } else {
+                            candidates.append((zone, [cle]))
+                        }
+                    }
+                }
+            }
+            chauds["saturees_rejouees"] = .object(satures)
+            chauds["saturees_candidates"] = .array(candidates.map { candidate in
+                var objet = PointsChauds.json([candidate.zone])?["zones"]?.array?.first?.object ?? [:]
+                objet["seuils"] = .array(candidate.seuils.map { .string($0) })
+                return .object(objet)
+            })
+            chauds["bustes"] = .array(bustes.map { ["x": r($0.minX, 1000), "y": r($0.minY, 1000), "largeur": r($0.width, 1000), "hauteur": r($0.height, 1000)] })
             ligne["points_chauds"] = .object(chauds)
         }
         // La peau du plus grand visage (Teint), sur la vignette entière.

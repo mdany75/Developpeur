@@ -327,6 +327,24 @@ local function deriverTaches(photo)
     photo.reglages.RetouchAreas = liste
 end
 
+-- Une tache Supprimer faite à la main sur un objet détecté, telle que Lightroom la range. Constaté dans
+-- Lightroom Classic 15.6 le 3 novembre 2026 (copie d'Essais d'un RAF de 6240 × 4160, un clic sur un
+-- point blanc) : un masque Mask/Image sans centre ni cercle, ReferencePoint au point cliqué (« x y »,
+-- de 0 à 1 dans le fichier), la zone calculée en pixels de l'image entière (pm_target_*,
+-- pm_full_image_*), son empreinte pm_patch ; aucune entrée dans RetouchAreas. Retirer une autre
+-- tache par une liste RemoveAreas réécrite laisse cette tache telle quelle (pm_patch compris), et
+-- Lightroom la rend toujours (vu à l'écran).
+function S.tacheObjetALaMain(x, y, cote, largeur, hauteur)
+    largeur, hauteur = largeur or 6240, hauteur or 4160
+    local px, py = x * largeur, y * hauteur
+    return { SpotType = 'heal_patchmatch', Method = 'poisson', Opacity = 1, SourceState = 'sourceAutoComputed',
+        pm_patch = '0E548816C39E9F74C9F074E4B76AF7CF',
+        pm_full_image_left = 0, pm_full_image_top = 0, pm_full_image_right = largeur, pm_full_image_bottom = hauteur,
+        pm_target_left = math.floor(px - cote / 2), pm_target_right = math.floor(px + cote / 2),
+        pm_target_top = math.floor(py - cote / 2), pm_target_bottom = math.floor(py + cote / 2),
+        Masks = { { What = 'Mask/Image', MaskSubType = 0, ReferencePoint = string.format('%f %f', x, y) } } }
+end
+
 -- Profil adaptatif déjà calculé dont l'image change : à recalculer, ce que fait updateAISettings.
 -- Constaté dans Lightroom Classic 15.6 (17 octobre 2026) : après une tache ou un flou d'objectif,
 -- updateAISettings le recalcule (InputDigest changé) ; une rotation ne le change pas (il est calculé

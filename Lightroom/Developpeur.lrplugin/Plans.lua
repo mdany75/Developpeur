@@ -1299,6 +1299,31 @@ local function arrondi(valeur, facteur)
     return math.floor(valeur * facteur + 0.5) / facteur
 end
 
+-- Centre et rayon d'une tache Supprimer à détection d'objet, qui n'a ni centerX ni cercle : son
+-- ReferencePoint (« x y », de 0 à 1 dans le fichier, comme les cercles) et la moitié du grand côté de
+-- sa zone calculée (pm_target_*, en pixels de l'image entière pm_full_image_*), dans l'unité de
+-- radius. Constaté dans Lightroom Classic 15.6 le 3 novembre 2026 : une tache faite à la main sur un
+-- point blanc porte ReferencePoint 0.569430 0.411177, au point cliqué, et pm_target 3506-3625 ×
+-- 1662-1759 sur 6240 × 4160.
+local function centreObjet(t, masque)
+    if masque.What ~= 'Mask/Image' or type(masque.ReferencePoint) ~= 'string' then
+        return nil
+    end
+    local x, y = masque.ReferencePoint:match('^%s*([%-%d%.eE]+)%s+([%-%d%.eE]+)')
+    x, y = tonumber(x), tonumber(y)
+    if not x or not y then
+        return nil
+    end
+    local l, r = tonumber(t.pm_target_left), tonumber(t.pm_target_right)
+    local h, b = tonumber(t.pm_target_top), tonumber(t.pm_target_bottom)
+    local grand = math.max(tonumber(t.pm_full_image_right) or 0, tonumber(t.pm_full_image_bottom) or 0)
+    local taille
+    if l and r and h and b and grand > 0 and r > l and b > h then
+        taille = math.max(r - l, b - h) / 2 / grand
+    end
+    return x, y, taille
+end
+
 -- Les taches d'une photo, numérotées, avec leur position dans l'image de view_photo (commande
 -- « taches », retouch_spots avec list) : rien n'est écrit.
 local function decrireTaches(photo, params)
@@ -1314,13 +1339,16 @@ local function decrireTaches(photo, params)
             opacite = arrondi((tonumber(t.Opacity or t.opacity) or 1) * 100, 1) }
         local cercle = type(t.Masks) == 'table' and type(t.Masks[1]) == 'table' and t.Masks[1] or {}
         local cx, cy = tonumber(t.centerX or cercle.X), tonumber(t.centerY or cercle.Y)
+        local taille = tonumber(t.radius or cercle.SizeX)
+        if not (cx and cy) then
+            cx, cy, taille = centreObjet(t, cercle)
+        end
         if cx and cy then
             local x, y = Geometrie.versApercu(ctx, cx, cy)
             entree.x, entree.y = arrondi(x, 1000), arrondi(y, 1000)
             if x < 0 or x > 1 or y < 0 or y > 1 then
                 entree.hors_cadre = true
             end
-            local taille = tonumber(t.radius or cercle.SizeX)
             if taille then
                 entree.rayon = arrondi(taille * grand / largeur, 10000)
             end

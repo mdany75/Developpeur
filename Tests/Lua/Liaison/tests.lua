@@ -1855,7 +1855,9 @@ test("retoucher avec gestion : une photo qui porte RemoveAreas se gère par là,
     local lues = Commandes.executer('taches', {})
     egal(#lues.taches, 2, "les numéros suivent RemoveAreas, que Lightroom lit d'abord")
     egal(lues.taches[1].sorte, 'objet détecté')
-    egal(lues.taches[1].x, nil, "un objet détecté n'a pas de centre lu")
+    egal(lues.taches[1].x, 0.671, "un objet détecté : son ReferencePoint (essai du 3 novembre 2026)")
+    egal(lues.taches[1].y, 0.123)
+    egal(lues.taches[1].rayon, nil, "sans zone calculée, pas de rayon")
     egal(lues.taches[2].sorte, 'corriger')
     Commandes.executer('retoucher', { gestion = 'retirer', numeros = Json.tableau({ 2 }), etape = 'cercle retiré' })
     egal(#photo.reglages.RemoveAreas, 1)
@@ -1867,6 +1869,39 @@ test("retoucher avec gestion : une photo qui porte RemoveAreas se gère par là,
     Commandes.executer('retoucher', { gestion = 'vider', vider = { taches = true }, etape = 'tout vidé' })
     egal(next(photo.reglages.RemoveAreas), nil, "une liste vide efface les trois")
     egal(next(photo.reglages.RetouchAreas), nil)
+end)
+
+-- Constaté dans Lightroom Classic 15.6 le 3 novembre 2026 : une tache Supprimer faite à la main sur
+-- un objet détecté n'a pas de centre ; list la plaçait sans position.
+test("taches : une tache faite à la main sur un objet détecté se place par son ReferencePoint et sa zone", function()
+    local objet = S.tacheObjetALaMain(0.569430, 0.411177, 119)
+    local cercle = { SpotType = 'heal', Opacity = 1, centerX = 0.62, centerY = 0.44, radius = 0.006, Masks = { { What = 'Mask/Ellipse', X = 0.62, Y = 0.44 } } }
+    local photo = S.Photo(8, { RemoveAreas = { objet, cercle }, RetouchAreas = { cercle }, Exposure2012 = 0 },
+        { fileName = 'DSCF2402.RAF', fileFormat = 'RAW' }, { dimensions = { width = 6240, height = 4160 } })
+    S.active = photo
+    local lues = Commandes.executer('taches', {})
+    egal(lues.taches[1].sorte, 'objet détecté')
+    egal(lues.taches[1].x, 0.569)
+    egal(lues.taches[1].y, 0.411)
+    egal(lues.taches[1].rayon, 0.0095, "la moitié de 119 px sur 6240")
+    egal(lues.taches[1].hors_cadre, nil)
+    -- Recadrée : la position suit l'aperçu, comme celle d'un cercle.
+    photo.reglages.CropLeft, photo.reglages.CropRight = 0.5, 1
+    lues = Commandes.executer('taches', {})
+    egal(lues.taches[1].x, 0.139)
+    -- Un ReferencePoint illisible ne casse pas la lecture : la tache reste listée, sans position.
+    objet.Masks[1].ReferencePoint = 'n/a'
+    lues = Commandes.executer('taches', {})
+    egal(#lues.taches, 2)
+    egal(lues.taches[1].x, nil)
+    -- La réponse d'un retrait compte les taches de RemoveAreas, comme celles de RetouchAreas (le
+    -- libellé vient du serveur, DevelopCatalogue).
+    objet.Masks[1].ReferencePoint = '0.569430 0.411177'
+    local retrait = Commandes.executer('retoucher', { gestion = 'retirer', numeros = Json.tableau({ 2 }), etape = 'cercle retiré' })
+    local vus = {}
+    for _, c in ipairs(retrait.resultats[1].changements) do vus[c.cle] = c end
+    egal(vus.RemoveAreas.apres, '1 tache', "plus « (table) »")
+    egal(photo.reglages.RemoveAreas[1].pm_patch, '0E548816C39E9F74C9F074E4B76AF7CF', "l'objet garde son calcul")
 end)
 
 test("essayer : retirer une tache se montre sans rien écrire", function()

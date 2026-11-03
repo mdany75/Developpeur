@@ -182,6 +182,25 @@ final class RecalageOutilsTests: XCTestCase {
         XCTAssertEqual(fake.calls.map(\.command), ["geometrie", "geometrie", "retoucher"], "géométrie changée : nouveau calcul")
     }
 
+    /// Essai du 3 novembre 2026 dans Lightroom : la liste renumérotée d'un retrait était placée sans
+    /// la grille (0,621 au lieu de 0,626 sous la correction d'objectif). Le retrait la joint comme
+    /// list ; un aperçu, qui ne rend aucune position, ne la calcule pas.
+    func testLeRetraitDUneTachePorteLaGrilleCommeLaListe() throws {
+        XCTAssertFalse(tools.call(name: "retouch_spots", arguments: ["action": "list", "photo_id": 4]).isError)
+        XCTAssertEqual(fake.lastParams["recalages"]?["4"]?["empreinte"]?.string, "e1", "list la porte")
+        fake.calls = []
+        XCTAssertFalse(tools.call(name: "retouch_spots", arguments: ["action": "remove", "spot_numbers": [1], "photo_id": 4]).isError)
+        XCTAssertEqual(fake.calls.map(\.command), ["geometrie", "retoucher"], "la grille de list resert")
+        XCTAssertEqual(fake.lastParams["recalages"]?["4"]?["empreinte"]?.string, "e1", "remove la porte au module")
+        fake.calls = []
+        _ = tools.call(name: "retouch_spots", arguments: ["action": "remove", "spot_numbers": [1], "photo_id": 4, "preview": true])
+        XCTAssertFalse(fake.calls.contains { $0.command == "geometrie" }, "un aperçu ne recale pas")
+        XCTAssertNil(fake.lastParams["recalages"])
+        fake.calls = []
+        _ = tools.call(name: "retouch_spots", arguments: ["action": "opacity", "spot_numbers": [1], "opacity": 50, "photo_id": 4])
+        XCTAssertNil(fake.lastParams["recalages"], "opacity ne rend aucune position")
+    }
+
     func testImageUniformeRemarqueEtPasDeGrille() throws {
         uni = true
         let result = spots()

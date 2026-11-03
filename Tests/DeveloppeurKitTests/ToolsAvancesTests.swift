@@ -378,13 +378,19 @@ final class ToolsAvancesTests: XCTestCase {
         let rendus = fake.calls.filter { $0.command == "geometrie" }.count
 
         _ = call("retouch_spots", ["action": "remove", "spot_numbers": [2, 3], "step_name": "taches retirées"])
-        XCTAssertEqual(fake.calls.filter { $0.command == "geometrie" }.count, rendus, "un numéro, aucune position : aucun recalage")
+        // La liste renumérotée du retrait donne des positions : recalées comme list (essai du 3 novembre
+        // 2026 dans Lightroom : sans la grille, 0,005 d'écart avec list sous la correction d'objectif).
+        XCTAssertEqual(fake.calls.filter { $0.command == "geometrie" }.count, rendus + 1, "remove recale comme list")
         XCTAssertEqual(fake.calls.last?.command, "retoucher")
+        XCTAssertEqual(fake.lastParams["libelles"]?["RemoveAreas"]?.string, "Retouches de taches (outil Supprimer)",
+                       "la ligne RemoveAreas de la réponse a son libellé (elle disait « (table) »)")
         XCTAssertEqual(fake.lastParams["gestion"]?.string, "retirer")
         XCTAssertEqual(fake.lastParams["numeros"]?.array?.compactMap(\.int), [2, 3])
         XCTAssertNil(fake.lastParams["taches"])
 
+        let avantOpacite = fake.calls.filter { $0.command == "geometrie" }.count
         _ = call("retouch_spots", ["action": "opacity", "spot_numbers": [1], "opacity": 40, "step_name": "tache adoucie"])
+        XCTAssertEqual(fake.calls.filter { $0.command == "geometrie" }.count, avantOpacite, "opacity ne rend aucune position : aucun recalage")
         XCTAssertEqual(fake.lastParams["gestion"]?.string, "opacite")
         XCTAssertEqual(fake.lastParams["opacite"]?.double, 0.4, "0 à 100 pour Claude, 0 à 1 pour Lightroom")
 

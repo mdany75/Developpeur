@@ -473,7 +473,7 @@ extension ToolHandler {
         var params: [String: JSONValue] = [
             "taches": .array(try spots.enumerated().map { try spotParameter($1, index: $0) }),
             "yeux": .array(try eyes.enumerated().map { try redEyeParameter($1, index: $0) }),
-            "libelles": DevelopCatalogue.labels(for: ["RetouchAreas", "RedEyeInfo"]),
+            "libelles": DevelopCatalogue.labels(for: ["RetouchAreas", "RemoveAreas", "RedEyeInfo"]),
         ]
         if let id = args.int("photo_id") { params["photo"] = .number(Double(id)) }
         let (grilles, notes) = recalages(params["photo"].map { ["photo": $0] } ?? [:])
@@ -503,8 +503,10 @@ extension ToolHandler {
             params["recalages"] = grilles
             return json(Self.withLabels(try lightroom.send("taches", params, timeout: 60), notes: notes))
         }
-        // Les autres actions désignent les taches par leur numéro : aucune position, aucun recalage.
-        let notes: [JSONValue] = []
+        // Les autres actions désignent les taches par leur numéro. Seul remove rend des positions (la
+        // liste renumérotée) : recalées comme list (essai du 3 novembre 2026 : sans la grille, jusqu'à
+        // 0,005 d'écart avec list sous la correction d'objectif) ; la grille de list resservant.
+        var notes: [JSONValue] = []
         params["gestion"] = .string(gestion)
         switch action.name {
         case "clear":
@@ -525,7 +527,14 @@ extension ToolHandler {
                 params["opacite"] = .number(opacity / 100)
             }
         }
-        params["libelles"] = DevelopCatalogue.labels(for: ["RetouchAreas", "RedEyeInfo"])
+        // Après les vérifications : une demande refusée n'envoie rien au module ; un aperçu ne rend
+        // aucune position (revue du 3 novembre 2026), il ne recale pas.
+        if action.name == "remove", args.bool("preview") != true {
+            let (grilles, remarques) = recalages(params["photo"].map { ["photo": $0] } ?? [:])
+            params["recalages"] = grilles
+            notes = remarques
+        }
+        params["libelles"] = DevelopCatalogue.labels(for: ["RetouchAreas", "RemoveAreas", "RedEyeInfo"])
         if args.bool("preview") == true {
             params["action"] = "retoucher"
             params["etape"] = .string(args.string("step_name") ?? "taches")

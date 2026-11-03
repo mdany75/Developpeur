@@ -115,7 +115,11 @@ final class AnalyseTests: XCTestCase {
         XCTAssertEqual(bruit["marge_ombres_il"]?.double, 2.2)
         let lecture = try XCTUnwrap(bruit["marge_lecture"]?.string)
         XCTAssertTrue(lecture.contains("2,2") && lecture.contains("provisoire") && !lecture.contains("faible"), lecture)
-        XCTAssertTrue(mesure(ombres: 0.3, part: 0.05).json["bruit"]?["marge_lecture"]?.string?.contains("confiance faible") == true)
+        // Relevé du 3 novembre 2026 dans Lightroom : le curseur Ombres en IL, et une marge prudente.
+        XCTAssertTrue(lecture.contains("Ombres +30 ≈ 0,4 IL") && lecture.contains("prudente"), lecture)
+        let faible = try XCTUnwrap(mesure(ombres: 0.3, part: 0.05).json["bruit"]?["marge_lecture"]?.string)
+        XCTAssertTrue(faible.contains("confiance faible"), faible)
+        XCTAssertFalse(faible.contains("prudente"), "peu d'aplats sombres : le relevé n'a pas montré de réserve")
         // Au bruit visible, pas encore fort : pas d'enhance_photo, que le projet réserve à bruitFort.
         let visible = try XCTUnwrap(mesure(ombres: 0.9).json["bruit"]?["marge_lecture"]?.string)
         XCTAssertFalse(visible.contains("enhance_photo"), visible)

@@ -540,6 +540,33 @@ public final class Recette {
             try verifier(vue["a_savoir"] == nil, "calculs en attente au rendu : \(vue["a_savoir"]?.string ?? "")")
             return "remplissage \(tache?["pm_patch"] != nil ? "calculé dès la retouche" : "calculé avant le rendu"), sans IA générative ; annulée"
         }
+        // 1.6.7 (essai du 3 novembre 2026) : la liste renumérotée d'un retrait se place comme list,
+        // grille de recalage comprise ; chaque retouche se défait.
+        try etape(photo, "taches déjà posées : list, remove recalé comme list, puis annulés") {
+            let raison: [String: JSONValue] = ["step_name": "recette", "confirm": true, "reason": "Recette automatisée du module."]
+            _ = try appel("retouch_spots", raison.merging(["photo_id": photoID, "spots": [["x": 0.3, "y": 0.3, "radius": 0.008],
+                                                          ["x": 0.5, "y": 0.6, "radius": 0.008], ["x": 0.7, "y": 0.4, "radius": 0.008]]]) { $1 })
+            let liste = try appel("retouch_spots", ["photo_id": photoID, "action": "list"]).0["taches"]?.array ?? []
+            let (retrait, _) = try appel("retouch_spots", raison.merging(["photo_id": photoID, "action": "remove",
+                                                                          "spot_numbers": [.number(Double(liste.count - 2))]]) { $1 })
+            let reste = retrait["taches"]?.array ?? []
+            _ = try appel("undo_last", ["photo_ids": [photoID]])
+            _ = try appel("undo_last", ["photo_ids": [photoID]])
+            try verifierEgal(try etat(id), auto)
+            try verifier(liste.count >= 3 && reste.count == liste.count - 1, "\(liste.count) taches lues, \(reste.count) après le retrait")
+            // Les deux dernières de list sont les deux dernières du reste, aux mêmes places.
+            var ecart = 0.0
+            for k in 1...2 {
+                let a = liste[liste.count - k], b = reste[reste.count - k]
+                for cle in ["x", "y"] {
+                    let va = a[cle]?.double, vb = b[cle]?.double
+                    try verifier(va != nil && vb != nil, "\(cle) manquant dans list ou dans le retrait")
+                    ecart = max(ecart, abs(va! - vb!))
+                }
+            }
+            try verifier(ecart <= 0.0015, "places du retrait écartées de list de \(ecart)")
+            return "\(liste.count) taches lues, une retirée, places du reste identiques à list (écart \(ecart)) ; annulées"
+        }
         try etape(photo, "annulation") {
             _ = try appel("undo_last", ["photo_ids": [.number(Double(id))]])
             try verifierEgal(try etat(id), deuxMasques)

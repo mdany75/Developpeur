@@ -485,7 +485,8 @@ cadre.
   données de prise de vue et des mesures : luminosité (L*, centiles), écrêtage des hautes lumières
   (aussi canal par canal) et des ombres, contraste, saturation, dominante des tons neutres,
   netteté par zone et bruit. Avant de relever les ombres, Claude sait de combien d'IL elles
-  peuvent l'être avant que leur bruit se voie (1.6.6, estimation provisoire).
+  peuvent l'être avant que leur bruit se voie (1.6.6, estimation prudente vérifiée sur sept de vos
+  photos en 1.6.7), et ce que cela fait au curseur Ombres (+30 ≈ 0,4 IL).
 - La dominante de toute l'image : quand la photo entière tire nettement vers une couleur (un
   portrait à l'ombre des arbres, bleu sous la lumière du ciel ; une lampe), Claude le voit, avec la
   balance qui la ramène au neutre. Les tons presque neutres seuls la sous-estimaient : sous une
@@ -675,7 +676,8 @@ cadre.
   l'outil Supprimer sans IA générative ; corriger des yeux rouges. Depuis la 1.6.6, Claude voit aussi
   les taches déjà posées (les siennes et les vôtres), numérotées, et peut en retirer une, changer
   son opacité, ou vider toutes les taches ou tous les yeux rouges, en une étape que « Défaire » de
-  Claude annule.
+  Claude annule. Depuis la 1.6.7, il sait aussi où est une tache que vous avez faite à la main sur un
+  objet détecté.
 - Des positions justes malgré la correction d'objectif, Upright ou la perspective : le connecteur
   mesure le déplacement sur deux rendus de la photo et recale chaque position.
 

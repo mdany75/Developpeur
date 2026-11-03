@@ -164,7 +164,7 @@ local function resume(cle, valeur)
         return lookVide(valeur) and "aucune" or tostring(valeur.Name)
     elseif cle == 'MaskGroupBasedCorrections' then
         return pluriel(compter(valeur), "masque", "masques")
-    elseif cle == 'RetouchAreas' or cle == 'RetouchInfo' then
+    elseif cle == 'RetouchAreas' or cle == 'RetouchInfo' or cle == 'RemoveAreas' then
         return pluriel(compter(valeur), "tache", "taches")
     elseif cle == 'RedEyeInfo' then
         return pluriel(compter(valeur), "œil", "yeux")

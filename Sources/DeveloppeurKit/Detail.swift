@@ -104,7 +104,14 @@ public struct DetailMeasurements: Equatable {
     func lectureMarge(_ marge: Double) -> String {
         let faible = (shadowShare ?? 1) < Self.partOmbresFiable
         let fin = " (estimation provisoire" + (faible ? ", confiance faible : peu d'aplats sombres)" : ")")
-        if marge > 0 { return "ombres relevables d'environ \(Bilan.nombre(marge)) IL avant un bruit visible" + fin }
+        // Relevé du 3 novembre 2026 (sept copies d'Essais, ISO 160 à 6 400) : la marge n'a jamais promis
+        // trop ; sur une photo propre, le bruit visible venait 0,4 IL plus tard ; le curseur Ombres
+        // relevait les ombres d'environ 0,4 IL à +30 et 0,8 IL à +60.
+        // « prudente » seulement là où le relevé l'a vu : assez d'aplats sombres (revue du 3 novembre 2026).
+        if marge > 0 {
+            return "ombres relevables d'environ \(Bilan.nombre(marge)) IL avant un bruit visible (Ombres +30 ≈ 0,4 IL, +60 ≈ 0,8 IL"
+                + (faible ? ")" : " ; marge prudente)") + fin
+        }
         if (shadowNoise ?? 0) >= Self.bruitFort { return "ombres déjà très bruitées : ne pas les relever avant enhance_photo" + fin }
         return "ombres déjà au bruit visible : les relever le rendra plus visible (vérifier par un zoom à 100 %)" + fin
     }
