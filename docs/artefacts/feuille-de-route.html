@@ -73,45 +73,13 @@
 <main class="page">
   <header class="entete">
     <h1>Feuille de route de Développeur</h1>
-    <p class="sous">Seulement ce qui reste à faire, dans l'ordre. Ménage du 2 novembre 2026, 20 h : ce qui est livré (jusqu'à la 1.6.4) et les idées écartées sont retirés ; ce qui est livré reste dans le <code>CHANGELOG.md</code> et les Releases GitHub.</p>
+    <p class="sous">Seulement ce qui reste à faire, dans l'ordre. Mise à jour du 2 novembre 2026, 22 h : la 1.6.5 est publiée et retirée d'ici ; ce qui est livré (jusqu'à la 1.6.5) et les idées écartées sont retirés ; ce qui est livré reste dans le <code>CHANGELOG.md</code> et les Releases GitHub.</p>
   </header>
 
   <div class="etapes">
 
     <section class="etape">
-      <div class="etape-tete"><span class="num">1</span><h2>En construction : la 1.6.5</h2><span class="quand">demandée le 2 novembre 2026</span></div>
-      <div class="chantiers">
-        <article class="chantier">
-          <h3>Une proposition la plus complète possible</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span></div>
-          <p>Obtenir (onglet Proposition) demandera tous les panneaux utiles d'après la photo (profil, objectif, balance, tonalité, présence, couleurs, étalonnage, courbe, détail, vignetage), les retouches locales (ciel, sujet, peau) et un recadrage seulement s'il y gagne, ton guide de style lu d'abord ; rien n'est appliqué avant Accepter.</p>
-        </article>
-        <article class="chantier">
-          <h3>Demande rapide : 12 lignes de résultat</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span></div>
-          <p>Le résultat montre 12 lignes à la fois au lieu de 9 ; la fenêtre grandit d'autant.</p>
-        </article>
-        <article class="chantier">
-          <h3>Demande rapide : un bouton « Proposer et appliquer »</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille moyen">Risque moyen</span></div>
-          <p>Un 5ᵉ bouton à icône : Claude prépare la même proposition complète et l'applique tout de suite, pour la photo active ou chaque photo sélectionnée, puis dit ce qui a changé. En mode « Proposer d'abord », il propose seulement, et tu acceptes dans la fenêtre Claude.</p>
-        </article>
-        <article class="chantier">
-          <h3><code>match_look</code> : ne plus copier l'exposition d'une scène très différente</h3>
-          <div class="marques"><span class="pastille petite">Petite</span><span class="pastille faible">Risque faible</span></div>
-          <p>Constaté le 2 novembre : le rendu d'une dune claire posé sur un diplôme au fond noir a monté l'exposition de +1,8 IL, photo délavée. L'exposition changera de 0,5 IL au plus, et le reste de l'écart sera dit (il vient de la scène).</p>
-        </article>
-        <article class="chantier">
-          <h3><code>suivi.json</code> : ne plus réécrire tout le fichier pendant l'analyse</h3>
-          <div class="marques"><span class="pastille moyenne">Moyenne</span><span class="pastille moyen">Risque moyen</span><span class="pastille interet">Intérêt 4/5</span></div>
-          <p>Pendant une analyse, le Suivi réécrit <code>suivi.json</code> en entier (65 Mo chez toi) au plus toutes les 60 s, soit des Go écrits par heure sur le SSD. Un petit journal des changements, rejoué à la lecture, éviterait ces réécritures sans changer le format du fichier. Essai à 250 000 entrées.</p>
-          <p class="deja">Releve.lua (l. 60, 194-207).</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="etape">
-      <div class="etape-tete"><span class="num">2</span><h2>À faire avec toi</h2><span class="quand">ce qui demande ton œil ou ta décision</span></div>
+      <div class="etape-tete"><span class="num">1</span><h2>À faire avec toi</h2><span class="quand">ce qui demande ton œil ou ta décision</span></div>
       <div class="chantiers">
         <article class="chantier">
           <h3>Recherche par le sens : déclarer les seuils fixés ?</h3>
@@ -136,13 +104,13 @@
         <article class="chantier">
           <h3>À regarder dans Lightroom</h3>
           <div class="marques"><span class="pastille interet">Un coup d'œil</span></div>
-          <p>La boîte Ajuster… quand elle montre six boutons (lisible, pas trop large) ; un vrai tirage sur une copie très recadrée (l'avertissement de résolution) ; le témoin de la peau de <code>match_look</code> (5, provisoire) sur un portrait ; Fibo 2 sur une personne recopiée assez grande pour que Claude la signale.</p>
+          <p>La boîte Ajuster… quand elle montre six boutons (lisible, pas trop large) ; un vrai tirage sur une copie très recadrée (l'avertissement de résolution) ; le témoin de la peau de <code>match_look</code> (5, provisoire) sur un portrait ; le bouton « Proposer et appliquer » en mode « Proposer d'abord » sur une photo seule ; le journal du Suivi pendant une vraie analyse (<code>suivi.json</code> garde sa date) ; Fibo 2 sur une personne recopiée assez grande pour que Claude la signale.</p>
         </article>
       </div>
     </section>
 
     <section class="etape">
-      <div class="etape-tete"><span class="num">3</span><h2>Ensuite</h2><span class="quand">plus grands, après la 1.6.5</span></div>
+      <div class="etape-tete"><span class="num">2</span><h2>Ensuite</h2><span class="quand">plus grands</span></div>
       <div class="chantiers">
         <article class="chantier">
           <h3>Garder l'espèce de chaque photo dans l'index du Suivi</h3>
