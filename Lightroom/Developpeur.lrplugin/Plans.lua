@@ -1272,6 +1272,144 @@ local function preparerTaches(photo, params)
     return plan
 end
 
+-- Les taches telles que Lightroom les lit : RemoveAreas s'il en porte (outil Supprimer), sinon
+-- RetouchAreas (getRetouchKey, docs/SPEC.md, Suppression des distractions). Les numéros de
+-- retouch_spots (list, remove, opacity) sont ceux de cette liste.
+local function tachesLues(reglages)
+    local supprimer = reglages.RemoveAreas
+    if type(supprimer) == 'table' and next(supprimer) ~= nil then
+        return 'RemoveAreas', supprimer
+    end
+    return 'RetouchAreas', type(reglages.RetouchAreas) == 'table' and reglages.RetouchAreas or {}
+end
+
+-- Tache de l'outil Supprimer à détection d'objet : Lightroom ne la dérive pas dans RetouchAreas.
+local function tacheObjet(tache)
+    for _, m in ipairs(type(tache) == 'table' and type(tache.Masks) == 'table' and tache.Masks or {}) do
+        if type(m) == 'table' and m.What == 'Mask/Image' then
+            return true
+        end
+    end
+    return false
+end
+
+local SORTES_TACHE = { heal = 'corriger', clone = 'cloner', heal_patchmatch = 'supprimer' }
+
+local function arrondi(valeur, facteur)
+    return math.floor(valeur * facteur + 0.5) / facteur
+end
+
+-- Les taches d'une photo, numérotées, avec leur position dans l'image de view_photo (commande
+-- « taches », retouch_spots avec list) : rien n'est écrit.
+local function decrireTaches(photo, params)
+    local plan = nouveauPlan(photo)
+    local ctx = contexteGeometrie(photo, plan, params)
+    local largeur, grand = Geometrie.apercu(ctx), math.max(ctx.lf, ctx.hf)
+    local _, lues = tachesLues(plan.actuels)
+    local taches = Json.tableau()
+    for i, t in ipairs(lues) do
+        local sorte = t.SpotType or t.spotType
+        local entree = { numero = i, sorte = tacheObjet(t) and 'objet détecté' or SORTES_TACHE[sorte] or tostring(sorte or 'inconnue'),
+            -- De 0 à 100, l'échelle de retouch_spots (opacity) et du curseur de Lightroom.
+            opacite = arrondi((tonumber(t.Opacity or t.opacity) or 1) * 100, 1) }
+        local cercle = type(t.Masks) == 'table' and type(t.Masks[1]) == 'table' and t.Masks[1] or {}
+        local cx, cy = tonumber(t.centerX or cercle.X), tonumber(t.centerY or cercle.Y)
+        if cx and cy then
+            local x, y = Geometrie.versApercu(ctx, cx, cy)
+            entree.x, entree.y = arrondi(x, 1000), arrondi(y, 1000)
+            if x < 0 or x > 1 or y < 0 or y > 1 then
+                entree.hors_cadre = true
+            end
+            local taille = tonumber(t.radius or cercle.SizeX)
+            if taille then
+                entree.rayon = arrondi(taille * grand / largeur, 10000)
+            end
+        end
+        taches[#taches + 1] = entree
+    end
+    return { taches = taches, yeux_rouges = type(plan.actuels.RedEyeInfo) == 'table' and #plan.actuels.RedEyeInfo or 0 }
+end
+
+-- Une liste de taches vide ne les retire pas (Reglages.aRemettre) : l'ancienne forme RetouchInfo
+-- se vide aussi ; son avant n'est gardé que si la photo la portait.
+local function viderAncienneForme(plan)
+    plan.nouveaux.RetouchInfo = {}
+    if plan.actuels.RetouchInfo ~= nil and plan.avant.RetouchInfo == nil then
+        plan.avant.RetouchInfo = pourLightroom(plan.actuels.RetouchInfo)
+    end
+end
+
+-- Écrit la nouvelle liste là où Lightroom la lit : RemoveAreas, avec RetouchAreas dérivé comme le
+-- fait Lightroom (sans les taches à détection d'objet), ou RetouchAreas seul.
+local function noterTaches(plan, cle, liste)
+    if cle == 'RemoveAreas' then
+        local derivees = {}
+        for _, t in ipairs(liste) do
+            if not tacheObjet(t) then
+                derivees[#derivees + 1] = pourLightroom(t)
+            end
+        end
+        noterTable(plan, 'RemoveAreas', liste, {})
+        noterTable(plan, 'RetouchAreas', derivees, {})
+    else
+        noterTable(plan, 'RetouchAreas', liste, {})
+    end
+    if #liste == 0 then
+        viderAncienneForme(plan)
+    end
+end
+
+-- Taches déjà posées (commande « retoucher » avec gestion, 1.6.6, comparaison Automaat du
+-- 2 novembre 2026) : retirer ou changer l'opacité de taches numérotées, ou vider toutes les
+-- taches ou tous les yeux rouges. Une étape « Claude · » que undo_last défait.
+local function preparerGestionTaches(photo, params)
+    local plan = nouveauPlan(photo)
+    local cle, lues = tachesLues(plan.actuels)
+    if params.gestion == 'vider' then
+        local quoi = type(params.vider) == 'table' and params.vider or {}
+        if quoi.taches and #lues > 0 then
+            if cle == 'RemoveAreas' then
+                noterTable(plan, 'RemoveAreas', {}, {})
+            end
+            noterTaches(plan, 'RetouchAreas', {})
+        end
+        if quoi.yeux then
+            noterTable(plan, 'RedEyeInfo', {}, {})
+        end
+        return plan
+    end
+    if params.gestion ~= 'retirer' and params.gestion ~= 'opacite' then
+        error("Gestion inconnue pour les taches : " .. tostring(params.gestion), 0)
+    end
+    local numeros = {}
+    for _, n in ipairs(type(params.numeros) == 'table' and params.numeros or {}) do
+        n = tonumber(n)
+        if not n or n < 1 or n > #lues or n % 1 ~= 0 then
+            error(string.format("Tache n° %s introuvable : la photo en porte %d (retouch_spots avec list).", tostring(n), #lues), 0)
+        end
+        numeros[n] = true
+    end
+    if next(numeros) == nil then
+        error("Aucune tache désignée : leurs numéros (retouch_spots avec list).", 0)
+    end
+    local opacite = tonumber(params.opacite)
+    if params.gestion == 'opacite' and (not opacite or opacite < 0 or opacite > 1) then
+        error("Opacité attendue de 0 à 1.", 0)
+    end
+    local liste = {}
+    for i, t in ipairs(lues) do
+        if not (params.gestion == 'retirer' and numeros[i]) then
+            local copie = pourLightroom(t)
+            if numeros[i] then
+                copie.Opacity, copie.opacity = opacite, opacite
+            end
+            liste[#liste + 1] = copie
+        end
+    end
+    noterTaches(plan, cle, liste)
+    return plan
+end
+
 -- Copie des réglages d'une photo source (commande « copier »).
 local function preparerCopie(source, photo, params)
     local plan = nouveauPlan(photo)
@@ -1367,7 +1505,11 @@ local function preparerCopie(source, photo, params)
         end
     end
     if inclure.taches then
-        noterTable(plan, 'RetouchAreas', pourLightroom(deSource.RetouchAreas or {}), {})
+        local taches = pourLightroom(deSource.RetouchAreas or {})
+        -- Une source sans taches : la liste vide ne les retirerait pas seule (revue du 2 novembre 2026).
+        if noterTable(plan, 'RetouchAreas', taches, {}) and next(taches) == nil then
+            viderAncienneForme(plan)
+        end
     end
     -- Upright exact (« Transformations Upright » de la fenêtre Copier de Lightroom) : les matrices que
     -- Lightroom a calculées pour la source (UprightTransform_*) et ce qui les accompagne, au lieu du
@@ -1450,6 +1592,8 @@ Plans.preparerContrainte = preparerContrainte
 Plans.preparerCopie = preparerCopie
 Plans.preparerMasques = preparerMasques
 Plans.preparerTaches = preparerTaches
+Plans.preparerGestionTaches = preparerGestionTaches
+Plans.decrireTaches = decrireTaches
 Plans.verifierDoses = verifierDoses
 Plans.presetObjectifParDefaut = presetObjectifParDefaut
 

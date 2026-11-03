@@ -35,6 +35,10 @@
 --                                          (un masque peut porter des composants combinés) ; formes
 --                                          sans IA relues (masques_relus) ; une mal gardée, retirée et dite
 --   retoucher   {photo?, taches, yeux, etape, raison?, confirme}       → taches et yeux rouges
+--                ou {photo?, gestion = retirer|opacite|vider, numeros?, opacite?, vider?, etape, raison?,
+--                confirme} → taches déjà posées (1.6.6)
+--   taches      {photo?, recalages?}  → lecture : taches numérotées (position dans l'aperçu, rayon,
+--                                          sorte, opacité) et nombre d'yeux rouges
 --   ameliorer   {photo?, ameliorations, etape, raison?, confirme} → débruitage, détails bruts,
 --                                          super résolution, calculés par Lightroom
 --   copier      {source, photos?|selection?, cles, inclure, etape, raison?, confirme}
@@ -204,6 +208,7 @@ local table_commandes = {
     recadrer = Retouche.recadrer,
     masquer = Retouche.masquer,
     retoucher = Retouche.retoucher,
+    taches = Retouche.taches,
     ameliorer = Amelioration.ameliorer,
     copier = Retouche.copier,
     essayer = Rendu.essayer,

@@ -577,7 +577,7 @@ function Rendu.essayer(params)
     if params.action == 'masquer' then
         plan = preparerMasques(photo, params)
     elseif params.action == 'retoucher' then
-        plan = preparerTaches(photo, params)
+        plan = (params.gestion and Plans.preparerGestionTaches or preparerTaches)(photo, params)
     else
         plan = preparer(photo, params, prefs)
     end

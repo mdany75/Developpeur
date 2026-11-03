@@ -13,15 +13,53 @@ public enum PresetXMP {
     /// Ce qui ne s'écrit pas dans un paramètre prédéfini (masques, taches, couleurs ponctuelles).
     static let unsupported: Set<String> = ["MaskGroupBasedCorrections", "RetouchAreas", "RetouchInfo", "RedEyeInfo", "PointColors"]
 
-    /// Écrit le fichier et renvoie son chemin, avec les clés laissées de côté.
+    /// Écrit le fichier et renvoie son chemin, le nom gardé, les clés laissées de côté, et ce qui
+    /// occupait déjà le nom de fichier (`occupe`) : le nom affiché de l'autre paramètre prédéfini.
+    /// Rien n'est jamais écrasé sans `replace` : le nouveau prend « Nom (2) », « Nom (3) »…
+    /// (comparaison Automaat, 2 nov. 2026 : l'ancien se perdait sans le dire). Deux noms peuvent
+    /// donner le même fichier (« / » devient « - », la casse ne compte pas sur APFS) : `replace` ne
+    /// remplace que le paramètre qui porte ce nom affiché (revue du 2 nov. 2026).
     public static func write(name: String, settings: [String: JSONValue], folder: URL = defaultFolder,
-                             uuid: String = PresetXMP.newUUID()) throws -> (url: URL, skipped: [String]) {
+                             replace: Bool = false,
+                             uuid: String = PresetXMP.newUUID()) throws -> (url: URL, name: String, skipped: [String], occupe: String?) {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let fileName = name.components(separatedBy: CharacterSet(charactersIn: "/:\\?%*|\"<>")).joined(separator: "-")
-        let url = folder.appendingPathComponent(fileName).appendingPathExtension("xmp")
-        let (text, skipped) = document(name: name, settings: settings, uuid: uuid)
+        // Un nom de fichier APFS fait 255 octets au plus : place gardée pour « (n) » et « .xmp ».
+        var base = name
+        while base.utf8.count > maxNameBytes { base.removeLast() }
+        var finalName = base
+        var url = fileURL(base, in: folder)
+        var rank = 2
+        var occupe: String?
+        while FileManager.default.fileExists(atPath: url.path) {
+            let present = displayedName(url)
+            if replace && present == finalName { break }
+            if occupe == nil { occupe = present ?? url.deletingPathExtension().lastPathComponent }
+            finalName = "\(base) (\(rank))"
+            url = fileURL(finalName, in: folder)
+            rank += 1
+        }
+        let (text, skipped) = document(name: finalName, settings: settings, uuid: uuid)
         try text.write(to: url, atomically: true, encoding: .utf8)
-        return (url, skipped)
+        return (url, finalName, skipped, occupe)
+    }
+
+    /// Octets d'un nom avant « (n) » et « .xmp ».
+    static let maxNameBytes = 230
+
+    static func fileURL(_ name: String, in folder: URL) -> URL {
+        let fileName = name.components(separatedBy: CharacterSet(charactersIn: "/:\\?%*|\"<>")).joined(separator: "-")
+        return folder.appendingPathComponent(fileName).appendingPathExtension("xmp")
+    }
+
+    /// Le nom affiché (crs:Name) d'un paramètre prédéfini écrit, ou nil s'il ne se lit pas.
+    static func displayedName(_ url: URL) -> String? {
+        guard let text = try? String(contentsOf: url, encoding: .utf8),
+              let start = text.range(of: "<crs:Name>"),
+              let li = text.range(of: "<rdf:li xml:lang=\"x-default\">", range: start.upperBound..<text.endIndex),
+              let end = text.range(of: "</rdf:li>", range: li.upperBound..<text.endIndex) else { return nil }
+        return String(text[li.upperBound..<end.lowerBound]).replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&lt;", with: "<").replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&apos;", with: "'").replacingOccurrences(of: "&amp;", with: "&")
     }
 
     public static func newUUID() -> String {

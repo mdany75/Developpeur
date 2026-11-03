@@ -367,6 +367,44 @@ final class ToolsAvancesTests: XCTestCase {
         XCTAssertTrue(call("retouch_spots", ["spots": [["x": 0.2, "y": 0.1, "radius": 0.01, "source_x": 0.3]], "step_name": "x"]).isError)
     }
 
+    /// 1.6.6 (comparaison Automaat, 2 nov. 2026) : les taches déjà posées se lisent, se retirent,
+    /// changent d'opacité ou se vident ; avant, retouch_spots ne savait qu'en ajouter.
+    func testRetouchSpotsManagesExistingSpots() throws {
+        let list = call("retouch_spots", ["action": "list", "photo_id": 9])
+        XCTAssertFalse(list.isError, list.text)
+        XCTAssertEqual(fake.calls.last?.command, "taches", "une lecture, sans étape ni recalage")
+        XCTAssertEqual(fake.lastParams["photo"]?.int, 9)
+        XCTAssertTrue(LightroomBridge.lectures.contains("taches"))
+        let rendus = fake.calls.filter { $0.command == "geometrie" }.count
+
+        _ = call("retouch_spots", ["action": "remove", "spot_numbers": [2, 3], "step_name": "taches retirées"])
+        XCTAssertEqual(fake.calls.filter { $0.command == "geometrie" }.count, rendus, "un numéro, aucune position : aucun recalage")
+        XCTAssertEqual(fake.calls.last?.command, "retoucher")
+        XCTAssertEqual(fake.lastParams["gestion"]?.string, "retirer")
+        XCTAssertEqual(fake.lastParams["numeros"]?.array?.compactMap(\.int), [2, 3])
+        XCTAssertNil(fake.lastParams["taches"])
+
+        _ = call("retouch_spots", ["action": "opacity", "spot_numbers": [1], "opacity": 40, "step_name": "tache adoucie"])
+        XCTAssertEqual(fake.lastParams["gestion"]?.string, "opacite")
+        XCTAssertEqual(fake.lastParams["opacite"]?.double, 0.4, "0 à 100 pour Claude, 0 à 1 pour Lightroom")
+
+        _ = call("retouch_spots", ["action": "clear", "clear": ["red_eyes"]])
+        XCTAssertEqual(fake.lastParams["gestion"]?.string, "vider")
+        XCTAssertEqual(fake.lastParams["vider"]?["yeux"]?.bool, true)
+        XCTAssertEqual(fake.lastParams["vider"]?["taches"]?.bool, false)
+        XCTAssertEqual(fake.lastParams["etape"]?.string, "taches", "step_name n'est plus exigé : l'étape par défaut")
+
+        let count = fake.calls.count
+        for bad: [String: JSONValue] in [
+            ["action": "remove"], ["action": "remove", "spot_numbers": [0]], ["action": "opacity", "spot_numbers": [1]],
+            ["action": "opacity", "spot_numbers": [1], "opacity": 140], ["action": "clear"], ["action": "clear", "clear": ["masks"]],
+            ["action": "erase"], ["action": "list", "spots": [["x": 0.5, "y": 0.5, "radius": 0.01]]],
+        ] {
+            XCTAssertTrue(call("retouch_spots", bad).isError, "\(bad)")
+        }
+        XCTAssertEqual(fake.calls.count, count, "rien n'est envoyé au module pour une demande refusée")
+    }
+
     // MARK: Proposition visuelle
 
     func testPreviewSettingsRendersAndComparesWithoutApplying() throws {
@@ -498,6 +536,14 @@ final class ToolsAvancesTests: XCTestCase {
         XCTAssertTrue(xmp.contains("crs:Exposure2012=\"0.3\""))
         XCTAssertTrue(xmp.contains("<rdf:li xml:lang=\"x-default\">Bateau gris</rdf:li>"))
         XCTAssertTrue(xmp.contains("<crs:Look>"))
+        XCTAssertNil(info["remarque"])
+        // Le même nom une seconde fois : l'ancien est gardé et la réponse le dit.
+        let again = try JSONCoding.parse(call("save_preset", ["name": "Bateau gris"]).text)
+        XCTAssertEqual(again["nom"]?.string, "Bateau gris (2)")
+        XCTAssertTrue(again["remarque"]?.string?.contains("replace = true") == true)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file))
+        let replaced = try JSONCoding.parse(call("save_preset", ["name": "Bateau gris", "replace": true]).text)
+        XCTAssertEqual(replaced["fichier"]?.string, file)
         XCTAssertTrue(call("save_preset", ["name": " "]).isError)
         XCTAssertTrue(call("save_preset", ["name": "x", "groups": ["Couleurs"]]).isError)
 

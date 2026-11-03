@@ -540,11 +540,27 @@ function Retouche.retoucher(params)
     local etape = nomEtape(params, "taches")
     local photo = photoVisee(params)
     verifierProtection({ photo }, prefs, params, 'retouch_spots')
-    local plans = { preparerTaches(photo, params) }
+    local plans = { (params.gestion and Plans.preparerGestionTaches or preparerTaches)(photo, params) }
     ecrirePlans(plans, etape, prefs, params)
     calculerIA(plans)
     noterEtatFinal({ photo }, etape)
-    return { mode = modeTexte(prefs), resultats = resultatsPlans(plans, etape, params) }
+    local reponse = { mode = modeTexte(prefs), resultats = resultatsPlans(plans, etape, params) }
+    -- Après un retrait, les numéros se décalent : la liste renumérotée part avec la réponse (revue du
+    -- 2 novembre 2026 : un second remove visait sinon une autre tache).
+    if params.gestion == 'retirer' then
+        reponse.taches = Plans.decrireTaches(photo, params).taches
+        reponse.a_savoir = "Numéros des taches renumérotés : ceux de taches ci-dessous."
+    end
+    return reponse
+end
+
+-- Les taches déjà posées, numérotées (commande « taches », retouch_spots avec list) : une lecture,
+-- permise en pause et en « Proposer d'abord ».
+function Retouche.taches(params)
+    local photo = photoVisee(params)
+    local reponse = Plans.decrireTaches(photo, params)
+    reponse.photo = decrire(photo)
+    return reponse
 end
 
 -- Après une copie : les matrices d'Upright copiées telles quelles sont-elles restées (Lightroom

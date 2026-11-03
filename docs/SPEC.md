@@ -93,6 +93,12 @@ défait ensuite.
 - Seuil de pertinence (et plancher de score brut) sur ses propres phrases, index rempli — avec Dany (à l'œil) ([sens, point 3](#à-constater-recherche-par-le-sens)).
 - Le Suivi qui remplit l'index ; une recherche dans la fenêtre Claude, `Sens.tranchesMax` — à la main dans Lightroom ([sens, points 4 et 5](#à-constater-recherche-par-le-sens)).
 
+**Taches, bruit et points chauds (1.6.6)**
+
+- `retouch_spots` avec `action` : `list` sur une photo qui porte une tache Supprimer faite à la main (objet détecté) et des taches de Claude, numéros et positions justes ; `remove` d'une tache, `opacity`, `clear` des taches puis des yeux rouges, chacune défaite par `undo_last` (`--dump` identique à l'avant) ; supposé seulement : une liste `RemoveAreas` réécrite sans une tache garde les autres calculs (`pm_patch`) — à la main dans Lightroom.
+- Marge des ombres (`marge_ombres_il` de `view_photo`, provisoire) : relever les Ombres de la marge annoncée sur deux copies d'Essais (ISO bas et ISO 3 200) et lire le bruit des ombres atteint, contre `bruitVisible` — à la main dans Lightroom.
+- Points chauds saturés (`PointsChauds.ecartChroma` 25, `cMin` 35, provisoires) : une planche de portraits et de scènes avec un objet vif derrière le sujet — avec Dany (à l'œil).
+
 **Étalonnage (`match_look`) et habitudes**
 
 - Peau déplacée de 2,5 ou 5,2 (`Teint.deplacementVisible`), rendu côte à côte — avec Dany (à l'œil) ([match_look](#à-constater-match_look)).
@@ -286,7 +292,8 @@ correspond pas (arrivée après un délai dépassé) est ignorée.
 | `recadrer` | `photos`, `recadrage`, `recalages`, `completer?`, `etape`, `raison?`, `confirme` | comme `appliquer` (changements du cadre seulement) |
 | `masquer` | `photos?` ou `selection?`, `masques` (chacun avec ses `composants?` combinés et ses `couleurs_ponctuelles?` ; types `ia`, `lineaire`, `radial`, `luminance`, `couleur` avec ses `prelevements` et son `etendue`, `profondeur`, `pinceau`, `objet` avec ses `traits` ou son `rectangle`), `recalages?`, `etape`, `raison?`, `confirme`, `releve_formes?` (développement : `DEVELOPPEUR_RELEVE_FORMES=1`) | comme `appliquer`, plus `lightroom` (la version) et, par photo, `masques_relus` (`nom`, `verdict`, `ecarts?`, `retrait?` depuis la 1.6.3) et, avec `releve_formes`, `releve_formes` ; voir Masques relus après l'écriture (1.6) |
 | `ameliorer` | `photo?`, `ameliorations` (`nom` : `denoise`, `rawDetails` ou `superRes`, `actif`, `intensite?`), `libelles`, `etape`, `raison?`, `confirme` | comme `appliquer`, plus `amelioration` (état après le calcul) |
-| `retoucher` | `photo?`, `taches`, `yeux`, `recalages?`, `etape`, `raison?`, `confirme` | comme `appliquer` |
+| `retoucher` | `photo?`, `taches`, `yeux`, `recalages?`, `etape`, `raison?`, `confirme` ; ou (1.6.6) `gestion` = `retirer` ou `opacite` (`numeros`, ceux de `taches` ; `opacite` de 0 à 1) ou `vider` (`vider` = `{taches, yeux}`) : une étape que `undo_last` défait ; après `retirer`, la réponse porte `taches` renumérotées et `a_savoir`. Sur `RemoveAreas`, la liste s'y écrit et `RetouchAreas` en est dérivé sans les objets détectés, comme Lightroom ; une liste vide vide aussi `RetouchInfo` (constat de `Reglages.aRemettre`, simulé) | comme `appliquer` |
+| `taches` | `photo?` | lecture (1.6.6, rejouable) : `taches` numérotées dans l'ordre où Lightroom les lit (`RemoveAreas` s'il en porte, sinon `RetouchAreas`) avec `sorte` (`corriger`, `cloner`, `supprimer`, `objet détecté`), `opacite` (0 à 100, l'échelle de l'action `opacity`), `x`, `y` et `rayon` dans l'aperçu de `view_photo` (`Geometrie.versApercu`, grille de recalage défaite par approximations successives : le serveur la demande comme pour poser une tache ; `hors_cadre`), `yeux_rouges` (nombre), `photo` ; ni étape ni capture (`Etapes.SANS_ATTENTE`), permise en pause et en « Proposer d'abord » |
 | `geometrie` | `photo?`, `photos?` ou `selection?`, `rendre?`, `taille?` | `photos` : par photo, `active` (correction géométrique), `transformation` (Upright, perspective ou distorsion manuelle), `empreinte` ; avec `rendre`, `chemin_corrige` et `chemin_origine` (voir Recalage de la géométrie) |
 | `copier` | `source`, `photos?` ou `selection?`, `cles`, `inclure`, `etape`, `raison?`, `confirme` | comme `appliquer`, sans la photo source |
 | `essayer` | `action` (`appliquer`, `masquer`, `retoucher`), `photo?`, `taille` (0 : pleine résolution), `comparer?`, `instantane?`, `entier?`, `temoin?` (un rendu témoin : carte de `mask_map`, masque de Lightroom de `generative_edit` ; aucun accord demandé), et les paramètres de l'action (pour `masquer`, une zone `{type = 'existant', masque = <nom>}` reprend un masque déjà sur la photo dans un masque nouveau : voir Masque peint dans Lightroom) | `chemin` (et `chemin_actuel`), `changements`, `remarques` ; avec `instantane`, l'état proposé est rangé en instantané « Claude · <nom> » avant le rendu (`instantane` dans la réponse) ; la photo est remise comme avant. De la 1.3 à la 1.3.5, `exercice` (« Je le fais ») et `sans_rendu` : retirés au correctif 1.3.6 (voir Je le fais). `entier`, avec un recadrage proposé (action `appliquer`, cadre non retiré) : `cadre_propose` (le cadre que Lightroom a gardé, relu), `dimensions` et `chemin_entier` (troisième étape « Claude · essai : image entière ») ; sans image entière, la remarque « Image entière non rendue : … » (voir Composition lue) |
@@ -4091,7 +4098,11 @@ prédéfinis de l'utilisateur s'appliquent par `applyDevelopPreset`, avant les r
 commande. `save_preset` écrit un fichier XMP de paramètre prédéfini (`PresetXMP.swift`) dans
 `~/Library/Application Support/Adobe/CameraRaw/Settings/Claude` : ceux que crée
 `addDevelopPresetForPlugin` restent invisibles dans le panneau. Masques, taches et couleurs
-ponctuelles n'y vont pas.
+ponctuelles n'y vont pas. Un fichier pris n'est jamais écrasé sans `replace = true` (sur demande
+seulement), et `replace` ne remplace que le paramètre qui porte le même nom affiché (`crs:Name`
+relu : « Été / doux » et « Été - doux » font le même fichier, la casse ne compte pas sur APFS) ;
+sinon le nouveau prend « Nom (2) », « Nom (3) »…, nom affiché compris, et `remarque` le dit (1.6.6,
+comparaison Automaat et revue du 2 novembre 2026). Le nom se raccourcit à 230 octets.
 
 ## Mesures
 
@@ -8165,7 +8176,17 @@ de 20 et atteint 70 ; les cases voisines forment une zone, gardée entre 0,3 % e
 d'intérêt de plus de la moitié de l'image ne compte pas). Cinq zones au plus, de la plus forte.
 Rien n'est corrigé d'office : la lecture le dit. Seuils provisoires : à relever sur une fenêtre
 dans un intérieur, une nappe, un ciel blanc derrière un portrait (repris par le Relevé des seuils,
-A5 : planches de Dany).
+A5 : planches de Dany). Depuis la 1.6.6 (comparaison aslanoov et LrC-AVG du 2 novembre 2026),
+aussi les zones saturées (`PointsChauds.zonesSaturees`, `sorte` = `saturée`, `C_moyen`,
+`au_dessus_du_sujet`, ou `au_dessus_de_la_mediane_C` sans sujet) : une case dont le C* moyen
+dépasse de 25 celui des cases du sujet (sans sujet, la médiane de C* de l'image) et atteint 35,
+hors des cases déjà claires. Le sujet comprend le buste sous chaque visage (`PointsChauds.buste` :
+une largeur de visage de chaque côté, trois hauteurs dessous, quelle que soit sa taille : le
+vêtement du sujet n'est pas une zone qui vole l'œil), et des cases saturées qui passent ensemble
+`partMax` sont un fond (un ciel bleu vu entre des arbres) : aucune zone (revue du 2 novembre
+2026). Mêmes zones,
+mêmes filtres, données après les claires, cinq en tout. Le relevé A5 (`PointsChauds.zones`) ne
+compte que les claires. Seuils provisoires, à juger sur planche (À vérifier à la prochaine recette).
 
 ## 1.6 : recherche par le sens
 

@@ -13,6 +13,9 @@ public struct DetailMeasurements: Equatable {
     /// niveaux sur 255 ; `shadowNoise` dans les aplats sombres seulement.
     public var noise: Double
     public var shadowNoise: Double?
+    /// Part des aplats utilisables qui sont sombres (moyenne sous 64) : sous `partOmbresFiable`,
+    /// le bruit des ombres repose sur peu de blocs et sa marge est donnée avec une confiance faible.
+    public var shadowShare: Double? = nil
     /// Grand côté de l'image mesurée, en pixels.
     public var side: Int
     /// Mesure d'un zoom à 100 % (view_photo avec region) : les chiffres servent à comparer deux
@@ -76,6 +79,36 @@ public struct DetailMeasurements: Equatable {
     /// Claude le 21 octobre 2026 sur ces seuls relevés (huit copies d'Essais) : à relever encore.
     static let textureDouteuse = 30.0
 
+    /// Marge des ombres (comparaison par4987, 2 nov. 2026, `estimate_noise.py`) : de combien d'IL
+    /// les ombres peuvent être relevées avant que leur bruit atteigne `bruitVisible`. Relever de k IL
+    /// multiplie la lumière et son bruit par 2^k ; dans les niveaux encodés en sRGB de l'aperçu, où
+    /// le bruit se mesure, le bruit ne monte que comme 2^(k/γ) (γ ≈ 2,2, revue du 2 nov. 2026) :
+    /// γ · log2(bruitVisible ÷ bruit des ombres), bornée de −2 à 4 IL. Estimation provisoire, sans
+    /// seuil nouveau de lecture : le curseur Ombres n'est pas linéaire et la pente réelle reste à
+    /// relever sur des copies d'Essais (`docs/SPEC.md`, À vérifier à la prochaine recette).
+    static let margeOmbresMin = -2.0, margeOmbresMax = 4.0
+    static let gammaSRGB = 2.2
+    /// Sous ce bruit des ombres, l'aperçu JPEG les a lissées (aplats très sombres) : le résidu ne
+    /// dit plus la marge, qui se tait. Provisoire, bien sous les 0,2 d'une image propre.
+    static let bruitOmbresMesurable = 0.05
+    /// Sous cette part d'aplats sombres (10 %, comme le script de par4987), confiance faible.
+    static let partOmbresFiable = 0.1
+
+    public var shadowHeadroom: Double? {
+        guard let shadowNoise, shadowNoise >= Self.bruitOmbresMesurable else { return nil }
+        return min(Self.margeOmbresMax, max(Self.margeOmbresMin, Self.gammaSRGB * log2(Self.bruitVisible / shadowNoise)))
+    }
+
+    /// La lecture de la marge, d'après sa valeur arrondie au dixième (celle que voit Claude) :
+    /// `enhance_photo` seulement au bruit fort, comme le veut `bruitFort` partout ailleurs.
+    func lectureMarge(_ marge: Double) -> String {
+        let faible = (shadowShare ?? 1) < Self.partOmbresFiable
+        let fin = " (estimation provisoire" + (faible ? ", confiance faible : peu d'aplats sombres)" : ")")
+        if marge > 0 { return "ombres relevables d'environ \(Bilan.nombre(marge)) IL avant un bruit visible" + fin }
+        if (shadowNoise ?? 0) >= Self.bruitFort { return "ombres déjà très bruitées : ne pas les relever avant enhance_photo" + fin }
+        return "ombres déjà au bruit visible : les relever le rendra plus visible (vérifier par un zoom à 100 %)" + fin
+    }
+
     public var noiseReading: String {
         let level = max(noise, shadowNoise ?? 0)
         switch level {
@@ -105,6 +138,13 @@ public struct DetailMeasurements: Equatable {
         }
         nettete["lecture"] = .string(sharpnessReading)
         noiseObject["lecture"] = .string(noiseReading)
+        if let brute = shadowHeadroom {
+            let marge = (brute * 10).rounded() / 10
+            noiseObject["marge_ombres_il"] = .number(marge == 0 ? 0 : marge)
+            noiseObject["marge_lecture"] = .string(lectureMarge(marge))
+        } else if let shadowNoise, shadowNoise < Self.bruitOmbresMesurable {
+            noiseObject["marge_lecture"] = "marge des ombres non mesurable : ombres lissées par l'aperçu JPEG, les relever avec prudence (postérisation possible)"
+        }
         return [
             "nettete": .object(nettete),
             "bruit": .object(noiseObject),
@@ -275,7 +315,10 @@ public enum Detail {
         // Les aplats saturés (ciel blanc, noirs bouchés) n'ont pas de bruit visible : écartés.
         let usable = blocks.filter { $0.mean > 8 && $0.mean < 247 }
         let noise = calmNoise(usable) ?? 0
-        let shadowNoise = calmNoise(usable.filter { $0.mean < 64 })
-        return DetailMeasurements(zones: zones, noise: noise, shadowNoise: shadowNoise, side: max(w, h))
+        let shadows = usable.filter { $0.mean < 64 }
+        let shadowNoise = calmNoise(shadows)
+        return DetailMeasurements(zones: zones, noise: noise, shadowNoise: shadowNoise,
+                                  shadowShare: usable.isEmpty ? nil : Double(shadows.count) / Double(usable.count),
+                                  side: max(w, h))
     }
 }

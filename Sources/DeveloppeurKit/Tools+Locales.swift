@@ -244,13 +244,17 @@ extension ToolHandler {
                  ] + writeProperties,
                  required: []),
             tool("retouch_spots",
-                 "Efface des taches (poussières du capteur, petits défauts) et corrige des yeux rouges sur une photo, en une étape « Claude · <step_name> ». Positions dans l'image telle que la montre view_photo ; pour viser juste, regarder d'abord la zone avec view_photo et region (zoom). Yeux rouges : seulement des pupilles rouges vues dans un zoom (sur une pupille sombre, la correction grise l'iris et la paupière), au centre de la pupille vu dans le zoom (Vision peut s'en écarter de quelques pixels sur des yeux plissés), au rayon que donne Vision, puis vérifier par un zoom. Le serveur recale les positions sur la correction d'objectif, Upright et la perspective (deux rendus de plus la première fois). Les retouches déjà présentes restent. Respecte le mode « Proposer d'abord » (confirm).",
+                 "Efface des taches (poussières du capteur, petits défauts) et corrige des yeux rouges sur une photo, en une étape « Claude · <step_name> ». Taches déjà posées (les siennes ou celles de l'utilisateur) : action list les numérote avec leur position et leur opacité (0 à 100) ; remove en retire (tous les numéros en un appel : ensuite ils se décalent, la réponse donne la liste renumérotée), opacity change leur opacité (spot_numbers), clear vide toutes les taches ou tous les yeux rouges, chacune en une étape que undo_last défait ; spots et red_eyes vont sans action. Positions dans l'image telle que la montre view_photo ; pour viser juste, regarder d'abord la zone avec view_photo et region (zoom). Yeux rouges : seulement des pupilles rouges vues dans un zoom (sur une pupille sombre, la correction grise l'iris et la paupière), au centre de la pupille vu dans le zoom (Vision peut s'en écarter de quelques pixels sur des yeux plissés), au rayon que donne Vision, puis vérifier par un zoom. Le serveur recale les positions sur la correction d'objectif, Upright et la perspective (deux rendus de plus la première fois). Les retouches déjà présentes restent. Respecte le mode « Proposer d'abord » (confirm).",
                  properties: [
                     ("photo_id", photoIDProperty),
                     ("spots", ["type": "array", "items": spot, "maxItems": .number(Double(Self.maxSpots)), "description": "Taches à effacer."]),
                     ("red_eyes", ["type": "array", "items": eye, "maxItems": .number(Double(Self.maxRedEyes)), "description": "Yeux rouges à corriger."]),
+                    ("action", enumProp(Self.spotActions.map(\.name), "Taches déjà posées, sans spots ni red_eyes : list (lecture), remove, opacity, clear.")),
+                    ("spot_numbers", ["type": "array", "items": ["type": "integer"], "description": "remove, opacity : numéros des taches (action list, à partir de 1), tous en un appel."]),
+                    ("opacity", prop("number", "opacity : nouvelle opacité, de 0 à 100.")),
+                    ("clear", ["type": "array", "items": enumProp(["spots", "red_eyes"], "Ce qu'il faut vider."), "description": "clear : spots (toutes les taches), red_eyes (tous les yeux rouges), ou les deux."]),
                  ] + writeProperties + previewProperties,
-                 required: ["step_name"]),
+                 required: []),
         ]
     }
 
@@ -258,6 +262,12 @@ extension ToolHandler {
     static let maskActions: [(name: String, module: String, needsMask: Bool)] = [
         ("list", "lister", false), ("hide", "masquer", true), ("show", "afficher", true), ("remove", "retirer", true),
         ("duplicate", "dupliquer", true), ("refine", "affiner", true), ("recompute", "recalculer", true), ("remove_empty", "retirer_vides", false),
+    ]
+
+    /// Actions de retouch_spots sur les taches déjà posées : nom pour Claude, gestion pour le module
+    /// (nil : la lecture, commande « taches »).
+    static let spotActions: [(name: String, module: String?)] = [
+        ("list", nil), ("remove", "retirer"), ("opacity", "opacite"), ("clear", "vider"),
     ]
 
     // MARK: Exécution
@@ -448,8 +458,14 @@ extension ToolHandler {
     func retouchSpots(_ args: Arguments) throws -> ToolResult {
         let spots = args.array("spots") ?? []
         let eyes = args.array("red_eyes") ?? []
+        if let wanted = args.string("action") {
+            guard spots.isEmpty, eyes.isEmpty else {
+                throw LightroomError.invalid("« action » porte sur les taches déjà posées : spots et red_eyes vont sans action.")
+            }
+            return try manageSpots(args, action: wanted)
+        }
         guard !spots.isEmpty || !eyes.isEmpty else {
-            throw LightroomError.invalid("Rien à retoucher : donner spots ou red_eyes.")
+            throw LightroomError.invalid("Rien à retoucher : donner spots ou red_eyes (ou action list pour voir les taches posées).")
         }
         guard spots.count <= Self.maxSpots, eyes.count <= Self.maxRedEyes else {
             throw LightroomError.invalid("Au plus \(Self.maxSpots) taches et \(Self.maxRedEyes) yeux par appel.")
@@ -462,6 +478,54 @@ extension ToolHandler {
         if let id = args.int("photo_id") { params["photo"] = .number(Double(id)) }
         let (grilles, notes) = recalages(params["photo"].map { ["photo": $0] } ?? [:])
         params["recalages"] = grilles
+        if args.bool("preview") == true {
+            params["action"] = "retoucher"
+            params["etape"] = .string(args.string("step_name") ?? "taches")
+            return try preview(params, args: args, notes: notes)
+        }
+        params.merge(writeParameters(args, defaultStep: "taches")) { _, new in new }
+        return json(Self.withLabels(try lightroom.send("retoucher", params, timeout: 120), notes: notes))
+    }
+
+    /// Les taches déjà posées (1.6.6, comparaison Automaat du 2 novembre 2026) : list les lit
+    /// (commande « taches »), remove, opacity et clear les changent en une étape (commande
+    /// « retoucher » avec gestion), dans le respect de « Proposer d'abord ».
+    func manageSpots(_ args: Arguments, action wanted: String) throws -> ToolResult {
+        guard let action = Self.spotActions.first(where: { $0.name == wanted }) else {
+            throw LightroomError.invalid("« action » : \(Self.spotActions.map(\.name).joined(separator: ", ")).")
+        }
+        var params: [String: JSONValue] = [:]
+        if let id = args.int("photo_id") { params["photo"] = .number(Double(id)) }
+        guard let gestion = action.module else {
+            // list rend des positions dans l'aperçu : la grille de recalage les rend justes sous
+            // Upright ou la perspective (deux rendus la première fois seulement, revue du 2 nov. 2026).
+            let (grilles, notes) = recalages(params["photo"].map { ["photo": $0] } ?? [:])
+            params["recalages"] = grilles
+            return json(Self.withLabels(try lightroom.send("taches", params, timeout: 60), notes: notes))
+        }
+        // Les autres actions désignent les taches par leur numéro : aucune position, aucun recalage.
+        let notes: [JSONValue] = []
+        params["gestion"] = .string(gestion)
+        switch action.name {
+        case "clear":
+            let what = Set((args.array("clear") ?? []).compactMap(\.string))
+            guard !what.isEmpty, what.isSubset(of: ["spots", "red_eyes"]) else {
+                throw LightroomError.invalid("« clear » : spots, red_eyes, ou les deux.")
+            }
+            params["vider"] = ["taches": .bool(what.contains("spots")), "yeux": .bool(what.contains("red_eyes"))]
+        default:
+            guard let numbers = try args.intList("spot_numbers"), !numbers.isEmpty, numbers.allSatisfy({ $0 >= 1 }) else {
+                throw LightroomError.invalid("« spot_numbers » : les numéros des taches (retouch_spots avec action list), à partir de 1.")
+            }
+            params["numeros"] = .array(numbers.map { .number(Double($0)) })
+            if action.name == "opacity" {
+                guard let opacity = args.double("opacity"), (0...100).contains(opacity) else {
+                    throw LightroomError.invalid("« opacity » va de 0 à 100.")
+                }
+                params["opacite"] = .number(opacity / 100)
+            }
+        }
+        params["libelles"] = DevelopCatalogue.labels(for: ["RetouchAreas", "RedEyeInfo"])
         if args.bool("preview") == true {
             params["action"] = "retoucher"
             params["etape"] = .string(args.string("step_name") ?? "taches")

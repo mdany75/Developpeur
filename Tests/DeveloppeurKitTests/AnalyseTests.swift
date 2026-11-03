@@ -94,6 +94,47 @@ final class AnalyseTests: XCTestCase {
         XCTAssertNotNil(json["bruit"]?["aplats"])
     }
 
+    /// Comparaison par4987 (2 nov. 2026) : la marge des ombres se dit avant de les relever,
+    /// γ · log2(bruitVisible ÷ bruit des ombres) (niveaux sRGB, revue du 2 nov.), bornée, avec une
+    /// confiance faible sur peu d'aplats sombres, et rien sur des ombres lissées par le JPEG.
+    func testShadowHeadroom() throws {
+        func mesure(ombres: Double?, part: Double? = 0.3) -> DetailMeasurements {
+            DetailMeasurements(zones: Array(repeating: 40, count: 9), noise: 0.3, shadowNoise: ombres, shadowShare: part, side: 1024)
+        }
+        XCTAssertEqual(try XCTUnwrap(mesure(ombres: 0.3).shadowHeadroom), 2.2, accuracy: 1e-9, "0,6 ÷ 0,3 = 2 : 2,2 IL en niveaux sRGB")
+        XCTAssertEqual(mesure(ombres: 0.06).shadowHeadroom, DetailMeasurements.margeOmbresMax)
+        XCTAssertEqual(mesure(ombres: 5).shadowHeadroom, DetailMeasurements.margeOmbresMin)
+        XCTAssertNil(mesure(ombres: nil).shadowHeadroom)
+        XCTAssertNil(mesure(ombres: nil).json["bruit"]?["marge_ombres_il"], "sans aplats sombres, aucune marge")
+        for lisse in [0.0, 0.01] {
+            XCTAssertNil(mesure(ombres: lisse).shadowHeadroom, "ombres lissées par le JPEG : pas de marge de 4 IL")
+            XCTAssertTrue(mesure(ombres: lisse).json["bruit"]?["marge_lecture"]?.string?.contains("non mesurable") == true)
+        }
+
+        let bruit = try XCTUnwrap(mesure(ombres: 0.3).json["bruit"]?.object)
+        XCTAssertEqual(bruit["marge_ombres_il"]?.double, 2.2)
+        let lecture = try XCTUnwrap(bruit["marge_lecture"]?.string)
+        XCTAssertTrue(lecture.contains("2,2") && lecture.contains("provisoire") && !lecture.contains("faible"), lecture)
+        XCTAssertTrue(mesure(ombres: 0.3, part: 0.05).json["bruit"]?["marge_lecture"]?.string?.contains("confiance faible") == true)
+        // Au bruit visible, pas encore fort : pas d'enhance_photo, que le projet réserve à bruitFort.
+        let visible = try XCTUnwrap(mesure(ombres: 0.9).json["bruit"]?["marge_lecture"]?.string)
+        XCTAssertFalse(visible.contains("enhance_photo"), visible)
+        XCTAssertTrue(mesure(ombres: 2).json["bruit"]?["marge_lecture"]?.string?.contains("avant enhance_photo") == true)
+        // À la frontière, la lecture suit le chiffre arrondi : 0, jamais « relevables d'environ 0,0 IL ».
+        let frontiere = try XCTUnwrap(mesure(ombres: 0.595).json["bruit"]?.object)
+        XCTAssertEqual(frontiere["marge_ombres_il"]?.double, 0)
+        XCTAssertFalse(frontiere["marge_lecture"]?.string?.contains("relevables") == true)
+
+        var zoom = mesure(ombres: 0.3)
+        zoom.zoom = true
+        XCTAssertNil(zoom.json["bruit"]?["marge_ombres_il"], "un zoom ne porte pas de seuils de lecture")
+
+        // Mesurée sur une image : le dégradé a des aplats sombres, sa part se calcule.
+        let smooth = try XCTUnwrap(Detail.analyze(Self.gradient()))
+        XCTAssertNotNil(smooth.shadowNoise)
+        XCTAssertEqual(try XCTUnwrap(smooth.shadowShare), 0.24, accuracy: 0.08)
+    }
+
     func testClippingPerChannel() throws {
         let red = try XCTUnwrap(Measurements.analyze(TestSupport.jpeg(red: 255, green: 30, blue: 30)))
         XCTAssertEqual(red.clippedChannels[0], 100, accuracy: 0.1)

@@ -102,9 +102,9 @@ public final class LightroomBridge: LightroomServing {
     /// coupée en plein échange (une écriture ne se reprend pas : elle a peut-être été faite). Les
     /// commandes de la 1.3 : etapes (images des étapes, lues) en est ; carnet n'en est pas, car il
     /// écrit carnet.json (constater, retirer) : rejoué, il le réécrirait. habitudes (1.6) ne fait que
-    /// lire.
+    /// lire. taches (1.6.6) ne fait que lire.
     public static let lectures: Set<String> = ["etat", "selection", "reglages", "apercu", "vignettes", "chercher", "motsCles",
-                                               "presets", "journal", "diagnostic", "livraison", "etapes", "habitudes"]
+                                               "presets", "journal", "diagnostic", "livraison", "etapes", "habitudes", "taches"]
     public var delaiReprise: TimeInterval = 1
     /// Lectures qui coûtent (rendus, vignettes, recherche dans tout le catalogue) : leur réponse
     /// perdue se redemande au module avant de les relancer.
