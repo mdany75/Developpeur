@@ -95,7 +95,6 @@ défait ensuite.
 
 **Taches, bruit et points chauds (1.6.6)**
 
-- Demande rapide à 20 lignes : la fenêtre de 1 000 × 430 tient à l'écran, les 20 lignes ne sont pas coupées (hauteur calculée, pas mesurée), ▼ apparaît au-delà — à la main dans Lightroom.
 - `retouch_spots` avec `action` : `list` sur une photo qui porte une tache Supprimer faite à la main (objet détecté) et des taches de Claude, numéros et positions justes ; `remove` d'une tache, `opacity`, `clear` des taches puis des yeux rouges, chacune défaite par `undo_last` (`--dump` identique à l'avant) ; supposé seulement : une liste `RemoveAreas` réécrite sans une tache garde les autres calculs (`pm_patch`) — à la main dans Lightroom.
 - Marge des ombres (`marge_ombres_il` de `view_photo`, provisoire) : relever les Ombres de la marge annoncée sur deux copies d'Essais (ISO bas et ISO 3 200) et lire le bruit des ombres atteint, contre `bruitVisible` — à la main dans Lightroom.
 - Points chauds saturés (`PointsChauds.ecartChroma` 25, `cMin` 35, provisoires) : une planche de portraits et de scènes avec un objet vif derrière le sujet — avec Dany (à l'œil).
@@ -2455,7 +2454,9 @@ Demande rapide, ⌘⌃⌥C ; demandée par Dany le 22 octobre 2026) : une fenêt
 d'environ 1 000 × 430 (cadre `DeveloppeurRapide-<N>`, 16 aujourd'hui, à augmenter quand la taille
 change). Ses pièces sont superposées (`place = 'overlapping'`) et placées par `margin_top` et
 `margin_left` : le résultat page par page (`FenetreRapide.montrer`, `Fil.couper`, 20 lignes de 13
-points depuis la 1.6.6, 12 en 1.6.5, 9 avant ; ▲ ▼ en `push_button` mini, une page moins une ligne par clic), la demande de trois lignes
+points depuis la 1.6.6, 12 en 1.6.5, 9 avant ; constaté par Dany le 2 novembre 2026 dans Lightroom Classic
+15.6 : la fenêtre tient à l'écran et les 20 lignes ne sont pas coupées, ce que vérifie
+`essais-rapide.lua` par le calcul ; ▲ ▼ en `push_button` mini, une page moins une ligne par clic), la demande de trois lignes
 (`immediate = false` : Retour l'envoie après `FenetreRapide.DELAI_ENVOI`, 0,3 s, sauf un clic qui
 suit), puis ▲ ▼ et Envoyer à sa droite. À sa gauche, cinq carrés à icône de 55
 (`FenetreRapide.CARRE`, `FenetreRapide.ACTIONS`, demandés par Dany le 24 octobre 2026, Classer après
