@@ -2712,6 +2712,42 @@ essai("Le relevé se compacte (suivi.json en entier, le journal effacé) au-del�
     assert(ok, erreur)
 end)
 
+essai("Une grande vue (SEUIL_LIGNES entrées à écrire ou plus) : le relevé se compacte tout de suite, une seule écriture complète, aucun ajout au journal ; une petite vue reste au journal", function()
+    depart()
+    egal(5000, Releve.SEUIL_LIGNES, '5 000 entrées')
+    local seuilLignes, seuil, seuilFin = Releve.SEUIL_LIGNES, Releve.SEUIL_JOURNAL, Releve.SEUIL_JOURNAL_FIN
+    local ok, erreur = pcall(function()
+        prefs.cheminConnecteur = S.home .. '/absent'
+        Releve.SEUIL_LIGNES, Releve.SEUIL_JOURNAL, Releve.SEUIL_JOURNAL_FIN = 20, 1e12, 1e12
+        photo(39450)
+        voir(39450)
+        vider()
+        egal(true, (Releve.compacter()), 'un relevé déjà là, compacté')
+        local ids = {}
+        for i = 1, 25 do
+            ids[i] = 39450 + i
+            photo(ids[i])
+        end
+        local ajouts = Releve.ajoutsJournal
+        egal(1, ecrituresCompletes(function()
+            voir(unpack(ids))
+            vider()
+        end), 'une seule écriture complète')
+        egal(ajouts, Releve.ajoutsJournal, 'aucun ajout au journal')
+        egal(false, Fichiers.existe(Releve.fichierJournal()), 'aucun journal')
+        egal(26, compter(Json.decode(Fichiers.lire(Releve.fichier())).catalogues[CATALOGUE].photos), 'toutes dans suivi.json')
+        -- Une petite vue : au journal.
+        photo(39490)
+        egal(0, ecrituresCompletes(function()
+            voir(39490)
+            vider()
+        end), 'sous SEUIL_LIGNES : au journal')
+        egal(ajouts + 1, Releve.ajoutsJournal)
+    end)
+    Releve.SEUIL_LIGNES, Releve.SEUIL_JOURNAL, Releve.SEUIL_JOURNAL_FIN = seuilLignes, seuil, seuilFin
+    assert(ok, erreur)
+end)
+
 essai("Éteint pendant un ajout au journal (un rechargement du module) : il s'arrête au morceau suivant, rien après ; ce qui n'est pas écrit revient à la suivante, rallumé", function()
     depart()
     prefs.cheminConnecteur = S.home .. '/absent'

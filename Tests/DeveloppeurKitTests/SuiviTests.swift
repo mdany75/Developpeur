@@ -216,6 +216,54 @@ final class SuiviTests: XCTestCase {
         XCTAssertThrowsError(try Suivi.lireReleve(suivi, catalogue: Self.catalogue))
     }
 
+    /// Une compaction entre deux lectures (constaté par la revue le 2 novembre 2026 : --graphiques est
+    /// un autre processus, la tâche du Suivi peut compacter pendant qu'il lit). Le module efface le
+    /// journal puis remplace suivi.json par le relevé entier ; une lecture prise entre les deux ne
+    /// doit jamais rendre l'ancien suivi.json sans son journal, ni avec le journal suivant : elle se
+    /// refait et rend le nouveau relevé.
+    func testCompactionEntreLesLectures() throws {
+        // Avant : suivi.json (1 à 0 étoile, 2) et le journal (1 à 4 étoiles).
+        let suivi = try ecrire([photo(1), photo(2)])
+        let journal = Suivi.cheminJournal(suivi)
+        func ligne(_ objet: [String: JSONValue]) -> String { JSONCoding.line(.object(objet)) + "\n" }
+        let cat = JSONValue.string(Self.catalogue)
+        try ligne(["catalogue": cat, "id": "1", "entree": photo(1, note: 4).1]).write(toFile: journal, atomically: true, encoding: .utf8)
+        // La compaction, faite comme Fichiers.ecrireParMorceaux : le provisoire écrit, le journal
+        // effacé, le provisoire renommé ; puis un ajout au journal nouveau (2 à 5 étoiles).
+        let compacte = try ecrire([photo(1, note: 4), photo(2)], nom: "compacte.json")
+        func compacter(nouveauJournal: Bool) throws {
+            try FileManager.default.moveItem(atPath: compacte, toPath: suivi + ".provisoire")
+            try FileManager.default.removeItem(atPath: journal)
+            _ = rename(suivi + ".provisoire", suivi)
+            if nouveauJournal {
+                try ligne(["catalogue": cat, "id": "2", "entree": photo(2, note: 5).1]).write(toFile: journal, atomically: true, encoding: .utf8)
+            }
+        }
+        var fois = 0
+        let lus = try Suivi.lireReleve(suivi, catalogue: Self.catalogue) {
+            fois += 1
+            if fois == 1 { try? compacter(nouveauJournal: true) }
+        }
+        XCTAssertEqual(fois, 2, "relu une fois, suivi.json remplacé entre les deux lectures")
+        XCTAssertEqual(lus.first { $0.id == 1 }?.note, 4, "rien de l'ancien journal perdu")
+        XCTAssertEqual(lus.first { $0.id == 2 }?.note, 5, "le journal nouveau rejoué")
+
+        // Entre l'effacement et le renommage : le journal manque, le provisoire attend ; la lecture
+        // attend le renommage.
+        _ = try ecrire([photo(1), photo(2)])
+        try ligne(["catalogue": cat, "id": "1", "entree": photo(1, note: 4).1]).write(toFile: journal, atomically: true, encoding: .utf8)
+        _ = try ecrire([photo(1, note: 4), photo(2)], nom: "compacte.json")
+        try FileManager.default.moveItem(atPath: compacte, toPath: suivi + ".provisoire")
+        try FileManager.default.removeItem(atPath: journal)
+        fois = 0
+        let attendus = try Suivi.lireReleve(suivi, catalogue: Self.catalogue) {
+            fois += 1
+            if fois == 2 { _ = rename(suivi + ".provisoire", suivi) }
+        }
+        XCTAssertGreaterThanOrEqual(fois, 2, "relu tant que le provisoire attend")
+        XCTAssertEqual(attendus.first { $0.id == 1 }?.note, 4, "jamais l'ancien suivi.json sans son journal")
+    }
+
     /// Une date d'après le jour de fin (horloge de l'appareil fausse, ou une fin choisie) : hors de la
     /// période, comme une date d'avant le jour de début ; le jour de début et celui de fin sont
     /// compris, à toute heure ; une photo sans date du tout n'est d'aucune période.

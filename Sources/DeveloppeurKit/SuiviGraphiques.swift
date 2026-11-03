@@ -321,8 +321,13 @@ extension Suivi {
     /// La table d'un catalogue dans un fichier de format 1 (`catalogues › <chemin> › photos`) ; nil si
     /// le fichier n'est pas un objet JSON de format 1. Un fichier sans ce catalogue : une table vide.
     static func photosDuCatalogue(_ chemin: String, catalogue: String) -> [String: Any]? {
-        guard let donnees = FileManager.default.contents(atPath: chemin),
-              let racine = (try? JSONSerialization.jsonObject(with: donnees)) as? [String: Any],
+        guard let donnees = FileManager.default.contents(atPath: chemin) else { return nil }
+        return photosDuCatalogue(donnees: donnees, catalogue: catalogue)
+    }
+
+    /// Comme photosDuCatalogue, sur le contenu déjà lu.
+    static func photosDuCatalogue(donnees: Data, catalogue: String) -> [String: Any]? {
+        guard let racine = (try? JSONSerialization.jsonObject(with: donnees)) as? [String: Any],
               nombre(racine["format"]) == 1 else { return nil }
         guard let catalogues = racine["catalogues"] else { return [:] }
         guard let tables = catalogues as? [String: Any] else { return nil }
@@ -334,14 +339,58 @@ extension Suivi {
         URL(fileURLWithPath: chemin).deletingPathExtension().appendingPathExtension("journal").path
     }
 
+    /// suivi.json et son journal, lus ensemble (nil : absent).
+    struct FichiersDuReleve {
+        var suivi: Data?
+        var journal: Data?
+    }
+
+    /// Ce qui distingue un fichier d'une version remplacée (numéro d'inode : un renommage le change ;
+    /// date de modification ; taille) ; nil sans fichier.
+    static func identiteFichier(_ chemin: String) -> [String]? {
+        guard let attributs = try? FileManager.default.attributesOfItem(atPath: chemin) else { return nil }
+        return ["\(attributs[.systemFileNumber] ?? "")", "\((attributs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0)",
+                "\(attributs[.size] ?? "")"]
+    }
+
+    /// Lit suivi.json et son journal d'une même version du relevé (constaté par la revue le 2 novembre
+    /// 2026 : --graphiques et --mesures --echantillons sont d'autres processus, et la tâche du Suivi
+    /// peut compacter pendant qu'ils lisent ; lire suivi.json puis le journal pouvait rendre l'ancien
+    /// suivi.json avec le journal suivant, et tout ce qui n'était qu'au journal effacé revenait en
+    /// arrière). Une compaction (Releve.lua, Fichiers.ecrireParMorceaux) écrit `suivi.json.provisoire`,
+    /// efface le journal, puis renomme le provisoire en suivi.json ; les ajouts au journal ne viennent
+    /// qu'après. D'où : l'identité de suivi.json, le journal, suivi.json, le provisoire, puis
+    /// l'identité de nouveau. suivi.json inchangé entre les deux : le journal lu va avec lui, sauf si
+    /// le journal manque pendant qu'un provisoire attend (effacé, suivi.json pas encore remplacé).
+    /// Sinon, attendre `attente` secondes et relire, `essais` fois au plus (un provisoire resté d'une
+    /// fermeture de Lightroom ne bloque pas : la dernière lecture est rendue). `entreLesLectures`
+    /// (essais seulement) est appelé entre la lecture du journal et celle de suivi.json.
+    static func lireFichiersDuReleve(_ chemin: String, essais: Int = 30, attente: TimeInterval = 0.1,
+                                     entreLesLectures: (() -> Void)? = nil) -> FichiersDuReleve {
+        let journal = cheminJournal(chemin)
+        var lus = FichiersDuReleve()
+        let essais = max(1, essais)
+        for essai in 1...essais {
+            let avant = identiteFichier(chemin)
+            lus.journal = FileManager.default.contents(atPath: journal)
+            entreLesLectures?()
+            lus.suivi = FileManager.default.contents(atPath: chemin)
+            let remplacementAttendu = lus.journal == nil && FileManager.default.fileExists(atPath: chemin + ".provisoire")
+            let stable = avant == identiteFichier(chemin)
+            if (stable && !remplacementAttendu) || essai == essais { return lus }
+            Thread.sleep(forTimeInterval: attente)
+        }
+        return lus
+    }
+
     /// Rejoue le journal du relevé (demandé par Dany le 2 novembre 2026 : Releve.lua n'écrit plus tout
     /// suivi.json pendant l'analyse, seulement les entrées changées, une ligne JSON chacune à la fin
     /// de `suivi.journal`) sur la table du catalogue : chaque ligne, dans l'ordre, remplace
     /// (`entree`) ou retire (`retiree`) l'entrée de son `id` (la dernière gagne) ; une ligne d'un
     /// autre catalogue ne change rien, une ligne qui ne se lit pas (la dernière, coupée par une
     /// coupure de courant) est ignorée. Comme Releve.lua le rejoue (essais-releve.lua).
-    static func rejouerJournal(_ chemin: String, catalogue: String, dans table: inout [String: Any]) {
-        guard let donnees = FileManager.default.contents(atPath: chemin) else { return }
+    static func rejouerJournal(_ donnees: Data?, catalogue: String, dans table: inout [String: Any]) {
+        guard let donnees else { return }
         for ligne in donnees.split(separator: UInt8(ascii: "\n")) {
             guard let objet = (try? JSONSerialization.jsonObject(with: Data(ligne))) as? [String: Any],
                   objet["catalogue"] as? String == catalogue else { continue }
@@ -362,19 +411,19 @@ extension Suivi {
     }
 
     /// Les originaux du relevé pour le catalogue : suivi.json, puis son journal rejoué
-    /// (rejouerJournal) ; vide sans l'un ni l'autre (rien n'est refusé), refus `suivi_illisible` pour
-    /// un suivi.json qui ne se lit pas ou d'un autre format. suivi.json se lit avant le journal :
-    /// Releve.lua efface le journal juste avant de remplacer suivi.json (une compaction), un journal
-    /// lu après n'est jamais plus ancien que le suivi.json lu.
-    static func lireReleve(_ chemin: String, catalogue: String) throws -> [PhotoSuivie] {
+    /// (rejouerJournal), lus ensemble d'une même version (lireFichiersDuReleve) ; vide sans l'un ni
+    /// l'autre (rien n'est refusé), refus `suivi_illisible` pour un suivi.json qui ne se lit pas ou
+    /// d'un autre format.
+    static func lireReleve(_ chemin: String, catalogue: String, entreLesLectures: (() -> Void)? = nil) throws -> [PhotoSuivie] {
+        let lus = lireFichiersDuReleve(chemin, entreLesLectures: entreLesLectures)
         var table: [String: Any] = [:]
-        if FileManager.default.fileExists(atPath: chemin) {
-            guard let lue = photosDuCatalogue(chemin, catalogue: catalogue) else {
+        if let suivi = lus.suivi {
+            guard let lue = photosDuCatalogue(donnees: suivi, catalogue: catalogue) else {
                 throw Refus(raison: "suivi_illisible", texte: "suivi.json illisible (JSON invalide, ou format autre que 1) : rien n'est dessiné.")
             }
             table = lue
         }
-        rejouerJournal(cheminJournal(chemin), catalogue: catalogue, dans: &table)
+        rejouerJournal(lus.journal, catalogue: catalogue, dans: &table)
         let comptes = Set(codes)
         let genres = Set(Genre.codes)
         return table.compactMap { cle, valeur -> PhotoSuivie? in

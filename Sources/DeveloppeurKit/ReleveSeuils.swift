@@ -102,8 +102,7 @@ public enum ReleveSeuils {
             switch mode {
             case "--echantillons":
                 guard positionnels.count == 2 else { return refus("--echantillons <suivi.json> <dossier>") }
-                let donnees = try Data(contentsOf: URL(fileURLWithPath: positionnels[0]))
-                let suivi = try JSONCoding.parse(donnees)
+                let suivi = try lireSuivi(positionnels[0])
                 let catalogue: String
                 switch choisirCatalogue(suivi, catalogueDemande) {
                 case .success(let chemin): catalogue = chemin
@@ -196,6 +195,55 @@ public enum ReleveSeuils {
 
     struct ErreurCatalogue: LocalizedError {
         var errorDescription: String?
+    }
+
+    /// suivi.json avec son journal rejoué (constaté par la revue le 2 novembre 2026 : depuis le
+    /// journal du Suivi, les entrées changées restent dans suivi.journal jusqu'à la compaction ; lu
+    /// seul, suivi.json donnait des lots d'un relevé en retard). Lus ensemble d'une même version
+    /// (Suivi.lireFichiersDuReleve), comme --graphiques ; un journal sans suivi.json se rejoue sur un
+    /// relevé vide ; ni l'un ni l'autre : une erreur.
+    static func lireSuivi(_ chemin: String, entreLesLectures: (() -> Void)? = nil) throws -> JSONValue {
+        let lus = Suivi.lireFichiersDuReleve(chemin, entreLesLectures: entreLesLectures)
+        let suivi: JSONValue
+        if let donnees = lus.suivi {
+            suivi = try JSONCoding.parse(donnees)
+        } else if lus.journal != nil {
+            suivi = ["format": 1, "catalogues": [:]]
+        } else {
+            throw ErreurCatalogue(errorDescription: "suivi.json introuvable : \(chemin).")
+        }
+        return rejouerJournal(lus.journal, sur: suivi)
+    }
+
+    /// Rejoue le journal du Suivi sur suivi.json, comme Releve.lua et Suivi.rejouerJournal : chaque
+    /// ligne, dans l'ordre, remplace (`entree`) ou retire (`retiree`) l'entrée de son `id` dans son
+    /// catalogue (la dernière gagne) ; une ligne qui ne se lit pas (coupée) est ignorée.
+    static func rejouerJournal(_ journal: Data?, sur suivi: JSONValue) -> JSONValue {
+        guard let journal, case .object(var racine) = suivi else { return suivi }
+        var catalogues = racine["catalogues"]?.object ?? [:]
+        // Les tables des photos à part, changées sur place, remises une fois à la fin (sans recopier
+        // tout un catalogue à chaque ligne).
+        var tables: [String: [String: JSONValue]] = [:]
+        for ligne in journal.split(separator: UInt8(ascii: "\n")) {
+            guard let objet = try? JSONCoding.parse(Data(ligne)), let catalogue = objet["catalogue"]?.string,
+                  let id = objet["id"]?.string ?? objet["id"]?.int.map(String.init) else { continue }
+            if tables[catalogue] == nil {
+                guard catalogues[catalogue] != nil || objet["entree"]?.object != nil else { continue }
+                tables[catalogue] = catalogues[catalogue]?["photos"]?.object ?? [:]
+            }
+            if objet["retiree"]?.bool == true {
+                tables[catalogue]?.removeValue(forKey: id)
+            } else if let entree = objet["entree"], entree.object != nil {
+                tables[catalogue]?[id] = entree
+            }
+        }
+        for (catalogue, photos) in tables {
+            var table = catalogues[catalogue]?.object ?? [:]
+            table["photos"] = .object(photos)
+            catalogues[catalogue] = .object(table)
+        }
+        racine["catalogues"] = .object(catalogues)
+        return .object(racine)
     }
 
     /// Le catalogue de suivi.json dont tirer les lots : celui que donne `--catalogue`, sinon le seul.

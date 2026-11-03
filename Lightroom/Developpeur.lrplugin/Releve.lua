@@ -79,9 +79,13 @@
 -- se compacte (suivi.json réécrit en entier, comme avant, puis le journal effacé juste avant que le
 -- nouveau suivi.json remplace l'ancien : Fichiers.ecrireParMorceaux, avantDeRemplacer) seulement :
 -- à la première écriture après une relecture qui a trouvé un journal (le chargement), quand le
--- journal dépasse SEUIL_JOURNAL octets, à la fin de la file (Releve.vider) quand il dépasse
--- SEUIL_JOURNAL_FIN, et pour mettre de côté un relevé illisible. Une coupure entre l'effacement et
--- le remplacement perd au plus le journal (jamais une entrée remise à un état plus ancien).
+-- journal dépasse SEUIL_JOURNAL octets, quand SEUIL_LIGNES entrées attendent (une grande vue : une
+-- seule écriture au lieu du journal puis du relevé entier), à la fin de la file (Releve.vider) quand
+-- il dépasse SEUIL_JOURNAL_FIN, et pour mettre de côté un relevé illisible. Le connecteur lit
+-- suivi.json et le journal d'une même version (Suivi.lireFichiersDuReleve : il relit si suivi.json
+-- est remplacé entre ses deux lectures, ou si le journal manque pendant qu'un provisoire attend).
+-- Une coupure entre l'effacement et le remplacement perd au plus le journal (jamais une entrée
+-- remise à un état plus ancien).
 --
 -- Toute la bibliothèque d'un coup (correctif 1.3.8, demandé par Dany le 26 octobre 2026 : son
 -- catalogue a 88 071 photos, il veut les ouvrir toutes, Toutes les photographies, tout
@@ -234,6 +238,12 @@ Releve.DELAI_ECRITURE_MAX = 60
 -- changées), ou SEUIL_JOURNAL_FIN à la fin de la file (Releve.vider).
 Releve.SEUIL_JOURNAL = 5000000
 Releve.SEUIL_JOURNAL_FIN = 1000000
+-- Une grande vue (constaté par la revue le 2 novembre 2026 : toute la bibliothèque sélectionnée,
+-- 88 000 originaux, partait au journal, une ligne chacune, autant d'octets que suivi.json, puis la
+-- fin de la file compactait : deux fois le relevé écrit au lieu d'une ; et un tel journal se relirait
+-- d'un seul coup) : au moins SEUIL_LIGNES entrées à écrire (changées ou sorties, environ 3,7 Mo de
+-- journal à 740 octets l'entrée, sous SEUIL_JOURNAL), le relevé se compacte tout de suite.
+Releve.SEUIL_LIGNES = 5000
 -- Analyses manquées gardées pour passer devant la file à leur heure (Releve.reessais) ; au-delà,
 -- elles attendent que la file se refasse.
 Releve.MAX_REESSAIS = 1000
@@ -1011,10 +1021,27 @@ end
 
 -- Écrit maintenant (sous le verrou d'enregistrer) : le fichier entier (compaction) si `compacter`, à
 -- la première écriture après une relecture qui a trouvé un journal, pour un relevé illisible à mettre
--- de côté ou un journal de SEUIL_JOURNAL octets ; sinon le journal seul.
+-- de côté, un journal de SEUIL_JOURNAL octets ou SEUIL_LIGNES entrées à écrire (une grande vue) ;
+-- sinon le journal seul.
+-- Le nombre d'entrées à écrire au journal (sorties, puis changées), compté jusqu'à `limite` au plus.
+local function lignesEnAttente(limite)
+    local n = #retirees
+    if n >= limite then
+        return n
+    end
+    for _ in pairs(sales) do
+        n = n + 1
+        if n >= limite then
+            break
+        end
+    end
+    return n
+end
+
 local function ecrireMaintenant(compacter)
     local r = charger()
-    if compacter or compacterAuProchain or r.illisible or tailleJournal >= Releve.SEUIL_JOURNAL then
+    if compacter or compacterAuProchain or r.illisible or tailleJournal >= Releve.SEUIL_JOURNAL
+        or lignesEnAttente(Releve.SEUIL_LIGNES) >= Releve.SEUIL_LIGNES then
         return ecrireLeRegistre()
     end
     return ecrireLeJournal()

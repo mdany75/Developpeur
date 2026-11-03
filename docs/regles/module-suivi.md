@@ -26,14 +26,18 @@ ou à `--graphiques`.
   Le format de `suivi.json` ne change pas. Relecture : `suivi.json`, puis le journal rejoué ligne
   par ligne (la dernière gagne ; une ligne illisible ou coupée ignorée, jamais tout le relevé ; un
   journal sans `suivi.json` se rejoue sur un relevé vide) ; `--graphiques` le rejoue de même
-  (`SuiviGraphiques.lireReleve`, suivi.json lu d'abord). Compaction (`suivi.json` en entier, comme
+  (`SuiviGraphiques.lireReleve`), et `--mesures --echantillons` aussi (`ReleveSeuils.lireSuivi`) ;
+  tous deux lisent `suivi.json` et le journal d'une même version (`Suivi.lireFichiersDuReleve` :
+  identité de `suivi.json`, journal, `suivi.json`, identité de nouveau ; relu si `suivi.json` a été
+  remplacé entre-temps, ou si le journal manque pendant que `suivi.json.provisoire` attend ; revue du
+  2 novembre 2026). Compaction (`suivi.json` en entier, comme
   avant, le journal effacé juste avant que le nouveau remplace l'ancien : `avantDeRemplacer` de
   `Fichiers.ecrireParMorceaux`, un journal qui ne s'efface pas abandonne la compaction) seulement à
   la première écriture après une relecture qui a trouvé un journal (le chargement), au-delà de
-  `SEUIL_JOURNAL` (5 Mo), à la fin de la file au-delà de `SEUIL_JOURNAL_FIN` (1 Mo), pour mettre de
+  `SEUIL_JOURNAL` (5 Mo), dès `SEUIL_LIGNES` (5 000) entrées à écrire (une grande vue : une seule
+  écriture complète au lieu du journal puis du relevé entier), à la fin de la file au-delà de `SEUIL_JOURNAL_FIN` (1 Mo), pour mettre de
   côté un relevé illisible, ou par `Releve.compacter`. Un ajout manqué (erreur) rend ses entrées à
-  la suivante, qui commence par un saut de ligne (`journalCoupe`). `--mesures --echantillons` lit
-  `suivi.json` seul : à lancer Lightroom relancé (le chargement compacte). Qui entre : la sélection que voient `Fenetre.suivreSelection` et
+  la suivante, qui commence par un saut de ligne (`journalCoupe`). Qui entre : la sélection que voient `Fenetre.suivreSelection` et
   `FenetreRapide.suivreSelection` (`Releve.voirSelection` : une même clé ne compte qu'une fois,
   `Releve.revoir` à l'ouverture ou au rappel d'une fenêtre la fait compter même inchangée, une autre
   photo active dans le même groupe ne revoit qu'elle, comme une sélection de plus de `SEUIL_REVOIR`
