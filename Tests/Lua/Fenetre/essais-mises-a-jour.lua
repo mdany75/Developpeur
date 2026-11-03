@@ -389,6 +389,20 @@ essai('Init.lua : les mises à jour par le SSD en dernier dans la tâche du lanc
     vrai(liaison and liaison < maj, 'après le démarrage de la liaison')
 end)
 
+essai('Gestionnaire : MisesAJour.lua qui ne se charge pas (module rechargé sans relancer Lightroom) : les autres sections restent', function()
+    local PluginInfoProvider = require 'PluginInfoProvider'
+    local garde = package.loaded.MisesAJour
+    package.loaded.MisesAJour = nil
+    package.preload.MisesAJour = function() error('Could not load toolkit script: MisesAJour.lua', 0) end
+    local ok, sections = pcall(PluginInfoProvider.sectionsForTopOfDialog, S.modules.LrView.osFactory(), S.modules.LrBinding.makePropertyTable())
+    package.preload.MisesAJour = nil
+    package.loaded.MisesAJour = garde
+    vrai(ok, tostring(sections))
+    egal(4, #sections)
+    egal('Mises à jour par le SSD', sections[4].title)
+    egal('indisponible', sections[4].synopsis)
+end)
+
 print(string.format('\n%d essais réussis, %d en échec', reussis, echecs))
 if os.getenv('GARDER_ESSAI') == nil then
     S.executer('rm -rf ' .. S.q(S.home))

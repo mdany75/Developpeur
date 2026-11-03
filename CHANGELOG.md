@@ -1,16 +1,34 @@
 # Changements
 
-## Non publié
+## 1.7 — 2026-11-03
+
+La 1.7 est faite pour travailler sur deux Mac avec le même SSD : vos données de Développeur
+voyagent avec lui, et le SSD garde la dernière version de tout ce qu'il faut installer, pour que
+l'autre Mac se mette à jour sans rien télécharger.
 
 ### Ajouté
-- Dossier commun « Développeur IA » pour deux Mac et un SSD : Fichier › Gestionnaire de modules
-  externes › Développeur IA pour Lightroom, section Dossier commun, Choisir… s'ouvre sur le SSD
-  Photos ; le choisir lui-même règle « /Volumes/Photos/Développeur IA », créé au besoin. Les
-  conversations, le carnet, le Suivi, les notes et les échanges de Claude Code y sont copiés ; sur
-  l'autre Mac, choisir le même dossier reprend le travail où il avait été laissé.
-- Après l'installation de cette version, **quittez et relancez Lightroom** : un fichier nouveau du
-  module ne se charge pas par « Charger de nouveau le module ext. » (la section Dossier commun le
-  dit alors, les autres restent).
+- **Dossier commun** : Fichier › Gestionnaire de modules externes › Développeur IA pour
+  Lightroom, section Dossier commun, Choisir… s'ouvre sur le SSD Photos ; le choisir lui-même règle
+  « /Volumes/Photos/Développeur IA », créé au besoin. Le guide de style, les conversations, les
+  échanges de Claude Code, le Suivi, le carnet, les notes proposées, Mes demandes, les profils de
+  publication, la consommation, les avant/après, l'index et les modèles du sens et des espèces y
+  vont. Sur ce Mac, vos données y sont copiées, puis mises de côté dans « Avant le dossier
+  commun … » (rien n'est effacé). Sur l'autre Mac, choisir le même dossier reprend le travail où
+  vous l'aviez laissé, même une conversation avec Claude.
+- SSD débranché : Développeur le dit et n'écrit rien ailleurs (le Suivi se met en pause), pour ne
+  jamais avoir deux versions de vos données.
+- **Mises à jour par le SSD** : le SSD garde dans « Développeur IA/Installation » la dernière
+  version de Développeur IA (module et connecteur), Fibo 2 Studio, uv, mflux (installable hors
+  ligne), les modèles de Fibo 2 (environ 68 Go), SAM 2 et Claude Code. Au lancement de Lightroom,
+  le module compare : si le SSD a plus récent, il propose « Mettre à jour depuis le SSD » ; si ce
+  Mac a plus récent, il le dépose sur le SSD, en arrière-plan. Section « Mises à jour par le SSD »
+  du Gestionnaire : Vérifier, Installer depuis le SSD, Déposer sur le SSD. Dans le Terminal :
+  `mcp-developpeur --mises-a-jour`.
+- `get_status` et `--status` disent l'état du dossier commun.
+
+### Après l'installation
+- **Quittez et relancez Lightroom** : deux fichiers nouveaux du module ne se chargent pas par
+  « Charger de nouveau le module ext. ».
 
 ## 1.6.7 — 2026-11-03
 

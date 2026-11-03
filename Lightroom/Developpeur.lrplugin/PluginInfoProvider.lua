@@ -555,7 +555,15 @@ end
 
 local function sectionMisesAJour(f, propertyTable, ligne)
     local bind = LrView.bind
-    local MisesAJour = require 'MisesAJour'
+    -- MisesAJour.lua est nouveau en 1.7 : pris par pcall, comme DossierCommun.lua.
+    local okM, MisesAJour = pcall(require, 'MisesAJour')
+    if not okM or type(MisesAJour) ~= 'table' then
+        return {
+            title = "Mises à jour par le SSD",
+            synopsis = "indisponible",
+            f:static_text { title = "Quittez et relancez Lightroom pour les mises à jour par le SSD (un fichier nouveau du module ne se charge qu'au lancement).", width_in_chars = 66, height_in_lines = 2 },
+        }
+    end
     propertyTable.misesAJour = MisesAJour.refus() or MisesAJour.texteEtat(MisesAJour.derniere)
     return {
         title = "Mises à jour par le SSD",

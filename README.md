@@ -1428,6 +1428,38 @@ délai dépassé), le connecteur la redemande au module, qui garde les vingt der
 retouche faite n'est jamais refaite une seconde fois. Si Lightroom, occupé, n'a pas encore fini,
 Claude le dit et relit la photo un peu plus tard, sans relancer la retouche.
 
+### Deux Mac et un SSD (1.7)
+
+Pour travailler tantôt sur un Mac, tantôt sur l'autre, avec le SSD qui porte le catalogue et les
+photos (jamais les deux Mac en même temps) :
+
+- **Dossier commun** : Fichier › Gestionnaire de modules externes › Développeur IA pour
+  Lightroom › Dossier commun › Choisir…, puis le SSD lui-même : le dossier
+  « /Volumes/Photos/Développeur IA » est créé et réglé. Sur le premier Mac, vos données y sont
+  copiées, puis mises de côté sur le Mac dans « Avant le dossier commun … » (rien n'est effacé).
+  Sur l'autre Mac, choisir le même dossier prend ces données telles quelles. Y vont : guide de
+  style, conversations et échanges de Claude Code (une conversation se reprend sur l'autre Mac),
+  Suivi, carnet, notes proposées, Mes demandes, profils de publication, consommation, avant/après
+  des étapes, index et modèles du sens et des espèces. Restent sur chaque Mac : le connecteur, le
+  jeton de la liaison, les journaux, Fibo 2 et Lightroom lui-même. « Revenir au dossier de ce Mac »
+  retire le réglage sans rien copier.
+- **SSD débranché** : la fenêtre Claude, la Demande rapide, le Suivi et les autres fenêtres le
+  disent et n'écrivent rien sur le Mac ; le Suivi reprend quand le SSD revient.
+- **Mises à jour par le SSD** : « Développeur IA/Installation » garde la dernière version de
+  Développeur IA, Fibo 2 Studio, uv, mflux (installable sans Internet), les modèles de Fibo 2
+  (environ 68 Go), SAM 2 et Claude Code. Au lancement de Lightroom, si le SSD a plus récent que ce
+  Mac, le module propose « Mettre à jour depuis le SSD » ; si ce Mac a plus récent, il le dépose
+  sur le SSD en arrière-plan. La section « Mises à jour par le SSD » du Gestionnaire fait la même
+  chose sur demande, et dans le Terminal :
+
+```bash
+"$HOME/Library/Application Support/Developpeur/mcp-developpeur" --mises-a-jour
+```
+
+  (`--deposer` ou `--installer` pour agir ; rien n'est jamais téléchargé). Après une mise à jour
+  de Développeur IA, quitter et relancer Lightroom, puis ouvrir une nouvelle session de Claude Code
+  (ou relancer Claude Desktop).
+
 ### En cas de problème
 
 - **Liaison coupée après une installation** : relancer Lightroom (le module se recharge à son
