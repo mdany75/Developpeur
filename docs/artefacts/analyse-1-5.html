@@ -59,7 +59,7 @@
 <body>
 <div class="page">
 <h1>Analyse du connecteur et du module Développeur</h1>
-<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Revérifiée dans le code de la 1.6.5, le 2 novembre 2026. Il ne reste ici que ce qui est encore à faire : ce qui est corrigé est retiré (il reste dans le CHANGELOG et l'historique git de cette page).</p>
+<p class="sous">Version 1.4 · 27 octobre 2026 · cinq lectures indépendantes du code, chaque constat a sa preuve (fichier:ligne). Revérifiée dans le code de la 1.6.5, le 2 novembre 2026, puis mise à jour pour la 1.6.6 le même soir. Il ne reste ici que ce qui est encore à faire : ce qui est corrigé est retiré (il reste dans le CHANGELOG et l'historique git de cette page).</p>
 
 <div class="encadre"><b>Verdict.</b> La base est solide : 585 tests Swift, des tests Lua sur un SDK simulé, un jeton de liaison bien conçu, une couverture très large des réglages du module Développeur. Les gains viennent maintenant de trois endroits : <b>alléger ce que le modèle lit</b> (26 610 caractères de descriptions), <b>fiabiliser le pont</b> avec Lightroom, et <b>protéger la photo de l'empilement</b> de réglages.</div>
 
@@ -84,9 +84,9 @@
 <p><b>À faire :</b> regrouper les paires qui vont ensemble et alléger les deux outils à drapeaux.</p>
 <p class="preuve">Tools.swift:186-192 · tools/list du connecteur 1.6.4</p></div>
 <div class="carte"><h3>Détails de cohérence <span class="pastille ouvert">ouvert</span><span class="pastille faible">faible</span></h3>
-<p><code>step_name</code> est exigé par le schéma de cinq outils, alors qu'un nom par défaut est pris quand il manque ; <code>reason</code> n'est exigé nulle part. La pagination change d'un outil à l'autre : <code>limit</code> par défaut à 50 (<code>list_selection</code>, <code>find_photos</code>), 100 (<code>list_presets</code>) ou 200 (<code>list_keywords</code>) ; <code>offset</code> par pages pour <code>find_photos</code>, par tranches pour <code>cull_photos</code>, par planches de 30 pour <code>contact_sheet</code>.</p>
+<p><code>step_name</code> est exigé par le schéma de quatre outils (cinq jusqu'à la 1.6.5 : <code>retouch_spots</code> ne l'exige plus), alors qu'un nom par défaut est pris quand il manque ; <code>reason</code> n'est exigé nulle part. La pagination change d'un outil à l'autre : <code>limit</code> par défaut à 50 (<code>list_selection</code>, <code>find_photos</code>), 100 (<code>list_presets</code>) ou 200 (<code>list_keywords</code>) ; <code>offset</code> par pages pour <code>find_photos</code>, par tranches pour <code>cull_photos</code>, par planches de 30 pour <code>contact_sheet</code>.</p>
 <p><b>À faire :</b> rendre <code>step_name</code> facultatif (ou retirer le défaut), et une même pagination partout.</p>
-<p class="preuve">Tools+Retouche.swift:124, 147, 161 · Tools+Locales.swift:233, 253 · Tools.swift:572-574 · tools/list du connecteur 1.6.4</p></div>
+<p class="preuve">Tools+Retouche.swift:124, 147, 161 · Tools+Locales.swift:233 · Tools.swift:572-574 · tools/list du connecteur 1.6.4</p></div>
 <div class="carte"><h3>Erreurs sans code lisible par le modèle <span class="pastille partiel">en partie</span><span class="pastille moyen">moyen</span></h3>
 <p><b>À faire :</b> les erreurs restent du texte seul, sans <code>{code, reessayable, action}</code>. Le pont lit bien les codes « jeton » et « arret » du module, mais le modèle ne reçoit que le message.</p>
 <p class="preuve">MCPServer.swift:241-244 · Tools.swift:424-429, 435, 475 · LightroomBridge.swift:409-414</p></div>
