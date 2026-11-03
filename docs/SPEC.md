@@ -155,6 +155,13 @@ défait ensuite.
 - Sens : relevé `--sens-essai` sur l'index du Suivi avant de fixer le plancher de 0,17 (une phrase sans réponse rend vide ; la neige à 0,21 passe encore).
 - Espèces : `--especes-essai --collection` sur 200 photos (temps), planche dans Safari (boutons, copie du jugement), puis `--jugement` avec Dany pour fixer les seuils.
 
+**Ajoutés par la 1.6.5**
+
+- Demande rapide : les 12 lignes tiennent sans être coupées (hauteur calculée, pas mesurée) ; le 5ᵉ carré et l'icône `rapide-proposer` en claire et en sombre ; « Proposer et appliquer » en mode Appliquer sur une copie d'Essais (un seul `apply_settings`, les masques, puis `view_photo`), puis en « Proposer d'abord » sur une photo seule (proposition dans l'onglet Proposition, Accepter pose aussi les masques).
+- Obtenir : la proposition couvre plusieurs panneaux sans tout toucher par principe ; temps et consommation.
+- Suivi : pendant une analyse, `suivi.json` garde sa date et `suivi.journal` grandit ; la fenêtre Suivi montre les analyses encore au journal ; au chargement suivant, compaction sans rien perdre ; temps de compaction et de rejeu dans Lightroom ; `io.open` en mode ajout dans Lightroom.
+- `match_look` : refaire le cas du diplôme (dune claire sur fond noir) : exposition +0,5 IL au plus, limite dite.
+
 ## Architecture
 
 Deux pièces :

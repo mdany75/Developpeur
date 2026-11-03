@@ -20,7 +20,7 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
 
 ### La fenêtre Claude dans Lightroom
 
-- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur IA v1.6.4 » dans sa barre de titre
+- Une fenêtre flottante de 1 623 × 1 200 points, « Développeur IA v1.6.5 » dans sa barre de titre
   (la version du module installé) : Fichier ›
   Module externe - Extras › Ouvrir la fenêtre Claude (même entrée dans le menu Bibliothèque, et
   raccourci ⌃⌥C une fois posé). Elle reste ouverte pendant que vous travaillez, dans tous les
@@ -179,7 +179,9 @@ connecteur MCP-Développeur, un serveur MCP (*Model Context Protocol*) écrit en
   à Claude une proposition de retouche de la photo seule active, rendu naturel, dans sa
   conversation (reprise, ou neuve avec son historique, gardée dès cette demande) : Claude note
   d'abord la photo si elle n'est pas encore évaluée, puis montre ce qu'il changerait, sans rien
-  appliquer. Le fil montre « Propose-moi une retouche de cette photo, sans rien appliquer. » ; le
+  appliquer. Depuis la 1.6.5, la proposition est la plus complète possible : votre guide de style lu
+  d'abord, tous les panneaux dont la photo a besoin, les retouches locales proposées (ciel, sujet,
+  peau) et un recadrage seulement s'il y gagne nettement ; Accepter pose aussi ces retouches locales. Le fil montre « Propose-moi une retouche de cette photo, sans rien appliquer. » ; le
   style choisi et les photos jointes partent avec. La proposition arrive dans l'onglet
   Proposition, où la fenêtre passe : Accepter, Refuser ou Ajuster… quand vous le voulez.
   C'est une demande comme une autre, dans le fil et dans le forfait. Obtenir est grisé pendant
@@ -262,13 +264,13 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
 - Claude répond sans noter les photos d'abord, et sans titre.
 - Un seul Claude à la fois : pendant que la fenêtre Claude travaille, la Demande rapide refuse, et
   inversement ; la barre du fil de la fenêtre Claude dit alors « pour la Demande rapide ».
-- Au-dessus, la réponse, page par page : ▲ et ▼, au-dessus d'Envoyer, la font défiler comme les
+- Au-dessus, la réponse, 12 lignes à la fois depuis la 1.6.5 (9 avant) : ▲ et ▼, au-dessus d'Envoyer, la font défiler comme les
   cartes de la fenêtre Claude, sans limite de longueur.
 - Une autre photo ou une autre sélection dans Lightroom efface la réponse, qui parlait d'autres
   photos ; ce que vous avez tapé reste, pour le renvoyer sur les nouvelles. La conversation d'une
   photo, elle, reste gardée : la fenêtre Claude la reprend. Une sélection que Claude change
   lui-même (pendant son travail ou juste après) garde la réponse.
-- À gauche de la demande, quatre boutons font une demande toute faite pour toutes les photos sélectionnées,
+- À gauche de la demande, cinq boutons font une demande toute faite pour toutes les photos sélectionnées,
   sans toucher à ce que vous avez tapé : les étoiles les notent (Claude pose ses notes, de 0 à 5 ★
   ou un rejet, annulables par ⌘Z) ; la photo à l'étincelle fait une retouche pro de chacune, le
   portrait à l'étincelle une retouche de portrait, et l'étiquette à l'étincelle les classe, comme
@@ -280,6 +282,12 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
   sur plusieurs, la proposition n'est pas gardée : passez par l'invite Classer de la fenêtre Claude,
   ou faites une nouvelle demande qui nomme ce qu'il faut écrire (« pose les mots-clés lac et
   automne sur ces photos »).
+- Le cinquième bouton, « Proposer et appliquer » (1.6.5, la photo à la coche) : en mode Appliquer,
+  Claude prépare la retouche la plus complète possible (comme Obtenir) et l'applique tout de suite,
+  réglages et retouches locales, pour la photo active ou chaque photo sélectionnée, puis vérifie et
+  dit en lignes courtes ce qui a changé. En mode « Proposer d'abord », sur une photo seule dont la
+  conversation est gardée, il propose seulement et vous acceptez dans l'onglet Proposition de la
+  fenêtre Claude ; sur plusieurs photos, la fenêtre vous dit d'utiliser Obtenir, sans lancer Claude.
 - Échap ne la ferme pas (une fenêtre flottante de Lightroom ne reçoit pas cette touche) : le bouton
   de fermeture rouge, en haut à gauche.
 
@@ -837,7 +845,9 @@ demandez**, jamais de lui-même ; c'est le seul chemin génératif du Développe
   traduit en réglages ordinaires (Exposition, Contraste, Étalonnage des couleurs, Vibrance ; la
   balance seulement si vous la demandez), puis remesure et corrige une seconde fois s'il le faut.
   Il dit zone par zone ce qui s'est rapproché. Les visages ne guident pas la mesure, et si la peau
-  bouge nettement, il en reprend la moitié et vous le signale ; les doses restent modérées
+  bouge nettement, il en reprend la moitié et vous le signale ; depuis la 1.6.5, l'exposition change
+  de 0,5 IL au plus et le contraste de 30 au plus, car l'écart de clarté vient aussi de la scène
+  (demandez l'exposition à part si vous la voulez) ; les doses restent modérées
   (saturation de l'étalonnage 25 au plus, Vibrance sous son plafond). D'abord le plan ; rien ne
   change sans votre accord. Une image hors du catalogue : l'importer d'abord.
 - Harmoniser une sortie entière par lumière (1.4) : Claude la partage d'abord en groupes de photos
@@ -1228,7 +1238,9 @@ Ce qui reste sur le Mac :
   d'avant le correctif 1.3.6 y restent, sans être montrées), le relevé du Suivi (`suivi.json` :
   une table par catalogue, une entrée par photo originale ouverte, avec sa prise de vue, sa note,
   son drapeau et les codes des défauts de son analyse, 250 000 au plus par catalogue depuis la
-  1.3.8, 20 000 avant, les moins récemment vues sortent au-delà ; environ 50 Mo pour 85 000 photos), le rendu de fin de chaque retouche
+  1.3.8, 20 000 avant, les moins récemment vues sortent au-delà ; environ 50 Mo pour 85 000 photos ; depuis la 1.6.5, pendant
+  l'analyse, seules les photos changées s'ajoutent à `suivi.journal`, rejoué à la lecture et remis
+  dans `suivi.json` au chargement du module ou à la fin d'une analyse), le rendu de fin de chaque retouche
   (`rendus.json`), et l'avant/après des étapes de Claude
   (`Etapes/`, une image avant et une après par étape, de 0,6 à 0,9 Mo ; ménage au chargement du
   module : 30 jours, 500 Mo au plus ; les vignettes de passage de `Temporaire/`, photo active et

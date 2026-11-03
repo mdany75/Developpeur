@@ -1,5 +1,36 @@
 # Changements
 
+## 1.6.5 — 2026-11-02
+
+La 1.6.5 rend la proposition la plus complète possible, ajoute à la Demande rapide 12 lignes de
+résultat et un bouton « Proposer et appliquer », empêche le rendu d'une autre photo de copier sa
+clarté, et ménage le disque pendant l'analyse du Suivi.
+
+### Ajouté
+- Demande rapide : un cinquième bouton, « Proposer et appliquer ». En mode Appliquer, Claude
+  prépare la retouche la plus complète possible pour la photo active ou chaque photo sélectionnée,
+  l'applique (réglages et retouches locales), vérifie la photo, puis dit en lignes courtes ce qui a
+  changé et pourquoi. En mode « Proposer d'abord », sur une photo seule dont la conversation est
+  gardée, il propose seulement et vous acceptez dans l'onglet Proposition de la fenêtre Claude ; sur
+  plusieurs photos, la fenêtre vous dit d'utiliser Obtenir, sans lancer Claude ni dépenser votre
+  forfait.
+
+### Changé
+- Le bouton Obtenir de l'onglet Proposition prépare la proposition la plus complète possible,
+  comme une Retouche pro mais sans rien appliquer : votre guide de style, tous les panneaux dont la
+  photo a besoin, les retouches locales proposées (ciel, sujet, peau) et un recadrage seulement s'il
+  améliore nettement la photo, chaque changement avec sa raison. Accepter pose aussi les retouches
+  locales proposées.
+- La Demande rapide montre 12 lignes de résultat au lieu de 9 ; la fenêtre grandit d'autant.
+- Le rendu d'une autre photo (`match_look`) ne copie plus la clarté d'une scène très différente :
+  l'exposition change de 0,5 IL au plus et le contraste de 30 au plus, les deux passes comprises,
+  et la réponse vous le dit. Constaté le 2 novembre : le rendu d'une dune claire posé sur une photo
+  au fond noir montait l'exposition de +1,8 IL. Demandez l'exposition à part si vous la voulez.
+- Pendant l'analyse, le Suivi ne réécrit plus tout son fichier (plus de 60 Mo pour une grande
+  bibliothèque) chaque minute : il n'ajoute que les photos qui ont changé, dans un petit journal
+  rejoué à la lecture. Après une coupure de courant, seule la dernière photo enregistrée peut se
+  perdre, jamais tout le relevé, et la fenêtre Suivi montre toujours le relevé à jour.
+
 ## 1.6.4 — 2026-11-02
 
 La 1.6.4 fait suivre votre guide de style par tous les boutons de retouche, choisit les ajustements
