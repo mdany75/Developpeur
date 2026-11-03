@@ -329,7 +329,7 @@ end)
 
 -- Demandé par Dany le 2 novembre 2026 : « ajouter un bouton dans [la Demande rapide] qui donne et
 -- applique la proposition rapide ».
-essai("Le 5ᵉ bouton, Proposer et appliquer : la proposition complète, appliquée dans le même tour ; en « Proposer d'abord », proposée seulement", function()
+essai("Le 5ᵉ bouton, Proposer et appliquer : la retouche complète appliquée sans aperçu ; en « Proposer d'abord », proposée seulement si la conversation est gardée, sinon rien ne part à Claude", function()
     local action = FenetreRapide.ACTIONS[5]
     egal('rapide-proposer', action.icone)
     egal('function', type(action.message), 'le texte se fait au clic, d\'après le mode')
@@ -337,10 +337,12 @@ essai("Le 5ᵉ bouton, Proposer et appliquer : la proposition complète, appliqu
     contient(action.tooltip, "En mode « Proposer d'abord », il propose seulement", 'infobulle : le mode')
     photo(981)
     photo(982)
+    photo(983)
     local Preferences = require 'Preferences'
-    local function cliquer()
+    -- `claude` : la demande part-elle à Claude ? Rend son message, ou le texte que la fenêtre montre.
+    local function cliquer(claude, ...)
         depart({})
-        choisir(981, 982)
+        choisir(...)
         local bouton, taches
         S.pendantFenetre = function(args)
             local pas = FenetreRapide.CARRE + FenetreRapide.ESPACE
@@ -362,30 +364,57 @@ essai("Le 5ᵉ bouton, Proposer et appliquer : la proposition complète, appliqu
         vrai(taches and #S.taches > taches, 'la demande part dans une tâche')
         local recu = #recus
         S.taches[taches + 1]()
+        if not claude then
+            egal(recu, #recus, 'rien ne part à Claude')
+            egal(false, Moteur.travaille, 'Claude Code pas lancé')
+            return FenetreRapide.message
+        end
         vrai(#recus > recu, 'Claude Code reçoit la demande')
         local message = recus[#recus].message
         repondre('Fait.')
         return message
     end
     local prefs = Preferences.lire()
-    local avant = prefs.mode
-    prefs.mode = 'appliquer'
-    local m = cliquer()
-    contient(m, Consignes.rapide, 'comme une demande rapide sur plusieurs photos')
-    contient(m, Consignes.PROPOSITION_COMPLETE, 'la proposition la plus complète possible')
-    contient(m, 'Pour toutes les photos sélectionnées dans Lightroom, une à une', 'chaque photo')
-    contient(m, 'apply_settings avec ces réglages et confirm = true', 'appliquée')
-    contient(m, 'add_mask sans preview, avec confirm = true', 'les masques proposés aussi')
-    contient(m, 'lignes courtes', 'dit en lignes courtes')
-    contient(m, Consignes.LIRE_GUIDE, 'le guide de style')
-    prefs.mode = 'proposer'
-    local mp = cliquer()
-    prefs.mode = avant
-    contient(mp, Consignes.PROPOSITION_COMPLETE, 'la même proposition')
-    contient(mp, "n'applique rien (jamais confirm = true)", 'le mode respecté')
-    contient(mp, 'fenêtre Claude', "où l'accepter")
-    absent(mp, 'apply_settings avec ces réglages', 'rien appliqué')
-    absent(mp, 'add_mask sans preview', 'aucun masque posé')
+    local avantMode, avantCase = prefs.mode, prefs.nouvelleParPhoto
+    -- Le mode et la case remis quoi qu'il arrive : un échec ici ne doit pas gâter les essais suivants.
+    local ok, erreur = pcall(function()
+        prefs.mode = 'appliquer'
+        local m = cliquer(true, 981, 982)
+        contient(m, Consignes.rapide, 'comme une demande rapide sur plusieurs photos')
+        contient(m, Consignes.RETOUCHE_COMPLETE, 'la retouche la plus complète possible')
+        contient(m, 'Pour toutes les photos sélectionnées dans Lightroom, une à une', 'chaque photo')
+        contient(m, 'dans un seul apply_settings avec confirm = true', 'appliquée')
+        contient(m, 'par add_mask avec confirm = true, sans preview', 'les masques aussi')
+        contient(m, 'puis view_photo pour vérifier', 'vérifiée')
+        contient(m, 'lignes courtes', 'dit en lignes courtes')
+        contient(m, Consignes.LIRE_GUIDE, 'le guide de style')
+        -- Relecture du 2 novembre 2026 : rien qui contredise l'application, rien de calculé deux fois.
+        absent(m, 'sans rien appliquer', 'pas de consigne contraire')
+        absent(m, 'preview = true', 'pas d\'aperçu à refaire')
+        absent(m, 'preview_settings', 'pas d\'aperçu à refaire')
+        -- « Proposer d'abord », une photo seule gardée dans sa conversation : la proposition complète.
+        prefs.mode, prefs.nouvelleParPhoto = 'proposer', true
+        local mp = cliquer(true, 983)
+        contient(mp, Consignes.rapidePhoto, 'dans la conversation de la photo')
+        contient(mp, Consignes.PROPOSITION_COMPLETE, 'la même proposition qu\'Obtenir')
+        contient(mp, "n'applique rien (jamais confirm = true)", 'le mode respecté')
+        contient(mp, 'cette conversation y est gardée', "où l'accepter")
+        absent(mp, 'apply_settings avec confirm', 'rien appliqué')
+        absent(mp, 'sans preview', 'aucun masque posé')
+        -- Plusieurs photos : rien de gardé, rien ne part à Claude ; la fenêtre dit quoi faire.
+        local t = cliquer(false, 981, 982)
+        egal(Consignes.rapideProposerSeulement, t, 'la fenêtre répond d\'elle-même')
+        contient(t, 'Obtenir puis Accepter')
+        -- Une photo seule, case Autre photo décochée : conversation jetable, rien ne part non plus.
+        prefs.nouvelleParPhoto = false
+        egal(Consignes.rapideProposerSeulement, cliquer(false, 983), 'case décochée : pas gardée')
+        absent(Consignes.rapideProposerSeulement, 'cette conversation y est gardée')
+    end)
+    prefs.mode, prefs.nouvelleParPhoto = avantMode, avantCase
+    FenetreRapide.message = nil
+    if not ok then
+        error(erreur, 0)
+    end
 end)
 
 essai("Le texte de la fenêtre vide (case Autre photo cochée comprise) tient en entier dans la zone du résultat, sans ▼", function()

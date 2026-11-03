@@ -341,11 +341,21 @@ end
 -- add_mask avec preview = true (Conversation.ceQueTouche les lit pour la boîte Ajuster) ; un
 -- recadrage seulement s'il y gagne nettement. Partagée par Obtenir (Consignes.obtenir) et le bouton
 -- « Proposer et appliquer » de la Demande rapide (Consignes.proposerAppliquerRapide).
-Consignes.PROPOSITION_COMPLETE = "comme une Retouche pro, mais sans rien appliquer : view_photo (mesures, bilan, intention_boitier) "
-    .. "pour le diagnostic ; puis, dans un seul preview_settings, tous les panneaux que la photo demande, pas tout par principe "
+-- L'étendue partagée par la proposition (preview) et la retouche appliquée du 5ᵉ bouton de la
+-- Demande rapide : les panneaux que la photo demande.
+local ETENDUE = "tous les panneaux que la photo demande, pas tout par principe "
     .. "(profil, corrections d'objectif et Upright si utile, balance des blancs, tonalité, présence, TSL, étalonnage, courbe, "
-    .. "détail et bruit, vignetage ou radial inversé, jamais les deux) ; les retouches locales utiles (ciel, sujet, peau…) par "
+    .. "détail et bruit, vignetage ou radial inversé, jamais les deux)"
+Consignes.PROPOSITION_COMPLETE = "comme une Retouche pro, mais sans rien appliquer : view_photo (mesures, bilan, intention_boitier) "
+    .. "pour le diagnostic ; puis, dans un seul preview_settings, " .. ETENDUE .. " ; les retouches locales utiles (ciel, sujet, peau…) par "
     .. "add_mask avec preview = true ; un recadrage seulement s'il y gagne nettement. Donne chaque changement avec sa raison courte."
+-- La même étendue, appliquée tout de suite (5ᵉ bouton de la Demande rapide en mode Appliquer ;
+-- relecture du 2 novembre 2026) : ni « sans rien appliquer » ni preview, qui contrediraient la
+-- demande et feraient tout calculer deux fois ; view_photo vérifie, comme la Retouche pro.
+Consignes.RETOUCHE_COMPLETE = "comme une Retouche pro, appliquée dans ce même tour (c'est la demande) : view_photo (mesures, bilan, "
+    .. "intention_boitier) pour le diagnostic ; puis, dans un seul apply_settings avec confirm = true, " .. ETENDUE .. " ; les retouches "
+    .. "locales utiles (ciel, sujet, peau…) par add_mask avec confirm = true, sans preview ; un recadrage seulement s'il y gagne "
+    .. "nettement ; puis view_photo pour vérifier, et une passe corrective seulement si un défaut est constaté."
 
 -- « Obtenir », sous la carte de l'onglet Proposition (Fenetre.obtenir ; décision de Dany du
 -- 25 octobre 2026, à la place de la proposition préparée à l'ouverture de la fenêtre) : `demande`
@@ -505,27 +515,33 @@ end
 Consignes.classerRapide = Consignes.surLaSelection(CLASSER) .. " Dans cette Demande rapide, la demande entière est ta proposition, photo par photo (mots-clés, lieu, légende) : n'appelle pas set_metadata, même en mode Appliquer. Finis en disant comment l'écrire : si cette conversation est gardée (la fenêtre Claude la reprend), en répondant dans la fenêtre Claude ; sinon, elle sera perdue : par l'invite Classer de la fenêtre Claude, photo par photo, ou par une nouvelle demande qui nomme ce qu'il faut écrire."
 
 -- Le 5ᵉ bouton de la Demande rapide, « Proposer et appliquer » (FenetreRapide.ACTIONS ; demandé par
--- Dany le 2 novembre 2026 : « un bouton qui donne et applique la proposition rapide ») : la
--- proposition complète (Consignes.PROPOSITION_COMPLETE), puis appliquée dans le même tour, pour la
--- photo active ou chaque photo sélectionnée une à une (Consignes.surLaSelection), et dite en lignes
+-- Dany le 2 novembre 2026 : « un bouton qui donne et applique la proposition rapide »), pour la
+-- photo active ou chaque photo sélectionnée une à une (Consignes.surLaSelection), dit en lignes
 -- courtes (FenetreRapide.LIGNES_RESULTAT : 12 se lisent sans défiler). `mode` : celui du module
--- (Lightroom.mode, lu au clic). En « Proposer d'abord », le mode n'est pas contourné : Claude propose
--- seulement, sans confirm, et dit d'accepter dans la fenêtre Claude (la conversation d'une photo
--- seule y est gardée ; sur plusieurs, Obtenir puis Accepter, photo par photo).
-function Consignes.proposerAppliquerRapide(mode)
-    local base = "Prépare la proposition de retouche la plus complète possible de la photo active, " .. Consignes.PROPOSITION_COMPLETE
-    local suite
-    if mode == 'proposer' then
-        suite = " Le module est en mode « Proposer d'abord » : n'applique rien (jamais confirm = true), propose seulement. "
-            .. "Finis en lignes courtes, une par changement proposé, avec sa raison ; puis dis comment l'accepter : une photo seule, "
-            .. "par Accepter dans l'onglet Proposition de la fenêtre Claude (cette conversation y est gardée) ; plusieurs photos, "
-            .. "dans la fenêtre Claude, photo par photo, par Obtenir puis Accepter."
-    else
-        suite = " Puis applique-la dans ce même tour, c'est la demande : apply_settings avec ces réglages et confirm = true, "
-            .. "et chaque masque proposé par add_mask sans preview, avec confirm = true. Finis en lignes courtes, une par "
-            .. "changement fait, avec sa raison (douze lignes se lisent sans défiler)."
+-- (Lightroom.mode, lu au clic) ; `gardee` : la conversation de la demande est celle d'une photo
+-- seule, que la fenêtre Claude reprend (Moteur.rapideGardee). Rend le message pour Claude, ou nil
+-- et le texte que la fenêtre montre d'elle-même. En mode Appliquer : la retouche complète appliquée
+-- (Consignes.RETOUCHE_COMPLETE). En « Proposer d'abord », le mode n'est pas contourné : la
+-- proposition complète (Consignes.PROPOSITION_COMPLETE), à accepter dans l'onglet Proposition,
+-- seulement si la conversation est gardée ; sinon rien ne part à Claude (relecture du 2 novembre
+-- 2026) : une proposition jetable serait du forfait perdu, et Consignes.rapide la ferait finir.
+Consignes.rapideProposerSeulement = "Mode « Proposer d'abord » : Proposer et appliquer ne fait que proposer, et la proposition "
+    .. "s'accepte dans la fenêtre Claude, dans la conversation de la photo. Ici, elle ne serait pas gardée : rien n'est demandé "
+    .. "à Claude. Ouvrez la fenêtre Claude et, pour chaque photo, cliquez Obtenir puis Accepter dans l'onglet Proposition ; "
+    .. "ou choisissez une seule photo, case Autre photo cochée dans le Gestionnaire de modules externes."
+function Consignes.proposerAppliquerRapide(mode, gardee)
+    local debut = "Prépare la retouche la plus complète possible de la photo active, "
+    if mode ~= 'proposer' then
+        return Consignes.surLaSelection(avecGuide(debut .. Consignes.RETOUCHE_COMPLETE
+            .. " Finis en lignes courtes, une par changement fait, avec sa raison (douze lignes se lisent sans défiler)."))
     end
-    return Consignes.surLaSelection(avecGuide(base .. suite))
+    if not gardee then
+        return nil, Consignes.rapideProposerSeulement
+    end
+    return avecGuide("Prépare la proposition de retouche la plus complète possible de la photo active, " .. Consignes.PROPOSITION_COMPLETE
+        .. " Le module est en mode « Proposer d'abord » : n'applique rien (jamais confirm = true), propose seulement ; "
+        .. "la proposition entière est la demande de ce tour. Finis en lignes courtes, une par changement proposé, avec sa raison ; "
+        .. "puis dis de l'accepter par Accepter dans l'onglet Proposition de la fenêtre Claude (cette conversation y est gardée).")
 end
 
 -- Ajouté au message envoyé (pas affiché) tant que la conversation n'a pas de titre : la consigne

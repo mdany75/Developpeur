@@ -66,7 +66,9 @@ FenetreRapide.FLECHE = 14
 -- le même tour (Consignes.proposerAppliquerRapide, d'après le mode du module lu au clic : en
 -- « Proposer d'abord », proposée seulement). Icônes de Dispositions.IMAGES ; ESPACE : l'écart
 -- entre deux carrés (un carré de 55 a un cadre de 57). Cinq carrés laissent au champ 593 points
--- (654 avec quatre). `message` : un texte, ou une fonction qui le rend au clic.
+-- (654 avec quatre). `message` : un texte, ou une fonction qui le rend au clic, dans la tâche de
+-- l'envoi, d'après Lightroom.photos() ; elle peut rendre nil et un texte que la fenêtre montre sans
+-- rien demander à Claude (FenetreRapide.envoyer).
 FenetreRapide.CARRE = FenetreRapide.HAUTEUR_DEMANDE
 FenetreRapide.ESPACE = 6
 local retouchePro, portrait = Consignes.invite('retouche_pro'), Consignes.invite('portrait')
@@ -79,10 +81,10 @@ FenetreRapide.ACTIONS = {
         tooltip = portrait.titre .. ", pour chaque photo sélectionnée : " .. portrait.message },
     { icone = 'rapide-classer', message = Consignes.classerRapide,
         tooltip = "Classer les photos sélectionnées : mots-clés, lieu et légende proposés, rien d'écrit sans votre accord" },
-    { icone = 'rapide-proposer', message = function() return Consignes.proposerAppliquerRapide(Lightroom.mode()) end,
+    { icone = 'rapide-proposer', message = function(info) return Consignes.proposerAppliquerRapide(Lightroom.mode(), Moteur.rapideGardee(info)) end,
         tooltip = "Proposer et appliquer : Claude prépare la proposition la plus complète possible (réglages et retouches locales) "
             .. "pour chaque photo sélectionnée, l'applique, puis dit ce qui a changé et pourquoi. En mode « Proposer d'abord », "
-            .. "il propose seulement : à accepter dans la fenêtre Claude." },
+            .. "il propose seulement, pour une photo seule gardée dans sa conversation : à accepter dans la fenêtre Claude." },
 }
 -- La zone du résultat : toute la hauteur au-dessus de la demande (relevé le 22 octobre 2026 : 988 ×
 -- 248 pour 984 × 214, d'où 996 × 216 pour 1 000 × 250 ; 267 de haut pour 1 000 × 300 depuis le
@@ -211,12 +213,23 @@ function FenetreRapide.envoyer(message)
         return
     end
     local texte = message or p.demande or ''
-    if Texte.nettoyer(texte) == '' then
+    if type(texte) ~= 'function' and Texte.nettoyer(texte) == '' then
         return
     end
     FenetreRapide.envoi = true
     FenetreRapide.message = nil
     LrTasks.startAsyncTask(function()
+        if type(texte) == 'function' then
+            -- Le message d'un bouton fait d'après la sélection (le 5ᵉ, Proposer et appliquer) ; nil
+            -- et un texte : la fenêtre répond d'elle-même, Claude n'est pas lancé.
+            local okTexte, fait, montre = LrTasks.pcall(texte, Lightroom.photos())
+            if not okTexte or not fait then
+                FenetreRapide.message = okTexte and montre or tostring(fait)
+                FenetreRapide.envoi = false
+                return
+            end
+            texte = fait
+        end
         local ok, c, raison = LrTasks.pcall(Moteur.envoyerRapide, texte)
         if ok and c then
             if FenetreRapide.p and not message then
@@ -236,9 +249,6 @@ end
 -- valide le champ et annule l'envoi par Retour.
 function FenetreRapide.demander(message)
     FenetreRapide.attente = nil
-    if type(message) == 'function' then
-        message = message()
-    end
     FenetreRapide.envoyer(message)
 end
 

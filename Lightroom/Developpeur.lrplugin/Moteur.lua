@@ -590,6 +590,14 @@ local function marquerRapide(c)
     end
 end
 
+-- Une demande rapide part-elle dans la conversation gardée d'une photo seule (la fenêtre Claude la
+-- reprend) ? Une photo active seule sélectionnée, case Autre photo cochée. `info` :
+-- Lightroom.photos(). Partagé par Moteur.envoyerRapide et le 5ᵉ bouton de la Demande rapide
+-- (Consignes.proposerAppliquerRapide), pour qu'ils restent d'accord (relecture du 2 novembre 2026).
+function Moteur.rapideGardee(info)
+    return info ~= nil and info.active ~= nil and (info.selection or 0) <= 1 and Chemins.prefs().nouvelleParPhoto == true
+end
+
 function Moteur.envoyerRapide(texte)
     texte = Texte.nettoyer(texte)
     if texte == '' then
@@ -619,7 +627,7 @@ function Moteur.envoyerRapide(texte)
             LrTasks.pcall(Fichiers.supprimer, avant.dossier)
         end
         info = Lightroom.photos()
-        photoSeule = info.active ~= nil and (info.selection or 0) <= 1 and Chemins.prefs().nouvelleParPhoto == true
+        photoSeule = Moteur.rapideGardee(info)
         if photoSeule then
             local neuve
             c, neuve = Moteur.conversationPour(info.active.id, info.cle)

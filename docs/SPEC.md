@@ -2464,11 +2464,15 @@ plusieurs photos, la conversation n'est pas gardée, un « attends mon accord »
 si la conversation est gardée (une photo, case Autre photo cochée), sinon par l'invite Classer ou
 une nouvelle demande qui nomme ce qu'il faut écrire. Le bouton lui-même n'écrit rien au catalogue
 (`essais-rapide.lua`). Proposer et appliquer (`Consignes.proposerAppliquerRapide`, d'après
-`Lightroom.mode` lu au clic) : la proposition complète d'Obtenir, appliquée dans le même tour
-(`apply_settings` et `add_mask` sans `preview`, `confirm = true`), pour chaque photo sélectionnée une
-à une, puis dite en lignes courtes ; en « Proposer d'abord », proposée seulement, à accepter dans
-la fenêtre Claude (une photo : sa conversation gardée, onglet Proposition ; plusieurs : Obtenir
-puis Accepter, photo par photo). Le champ garde 593 points (654 avec quatre carrés). Le bouton ♻ (une
+`Lightroom.mode` et `Moteur.rapideGardee` lus au clic) : en mode Appliquer, la retouche de même
+étendue qu'Obtenir appliquée tout de suite (`Consignes.RETOUCHE_COMPLETE` : un seul `apply_settings`
+et `add_mask` sans `preview`, `confirm = true`, puis `view_photo` pour vérifier ; ni « sans rien
+appliquer » ni aperçu, qui contrediraient la demande), pour chaque photo sélectionnée une à une,
+puis dite en lignes courtes ; en « Proposer d'abord », la proposition d'Obtenir seulement si la
+conversation est gardée (une photo, case Autre photo cochée), à accepter dans l'onglet Proposition ;
+sinon rien ne part à Claude et la fenêtre dit d'elle-même d'utiliser Obtenir puis Accepter dans la
+fenêtre Claude (`Consignes.rapideProposerSeulement` : une proposition jetable serait du forfait
+perdu ; relecture du 2 novembre 2026). Le champ garde 593 points (654 avec quatre carrés). Le bouton ♻ (une
 conversation neuve, du 22 au 24 octobre 2026) est retiré : une autre photo active ou une autre
 sélection efface la réponse (`FenetreRapide.suivreSelection`, `Lightroom.photos` toutes les 2 s,
 `Moteur.oublierRapide`), le champ gardé ; une sélection changée pendant le travail de Claude ou
