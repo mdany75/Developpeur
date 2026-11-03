@@ -1983,7 +1983,15 @@ public final class Recette {
             try etape(photo, "retour à l'origine") {
                 remise = true
                 _ = try appel("revert_to_original", ["photo_ids": [.number(Double(id))]])
-                try verifierEgal(try etat(id), depart)
+                // La livraison de la recette est une vraie exportation, que revenir n'efface pas :
+                // une copie neuve, jamais exportée, le devient (recette de la 1.6.6, 2 novembre 2026).
+                let apres = try etat(id)
+                var attendu = depart
+                if var classement = depart.classement.object, let exportee = apres.classement["exportee"] {
+                    classement["exportee"] = exportee
+                    attendu.classement = .object(classement)
+                }
+                try verifierEgal(apres, attendu)
                 return "réglages identiques à ceux du départ" + (try remettreDansLaCollection(id, dansCollection))
             }
         } catch {
