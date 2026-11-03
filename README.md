@@ -264,7 +264,7 @@ Demande rapide (même entrée dans le menu Bibliothèque), ou ⌘⌃⌥C une foi
 - Claude répond sans noter les photos d'abord, et sans titre.
 - Un seul Claude à la fois : pendant que la fenêtre Claude travaille, la Demande rapide refuse, et
   inversement ; la barre du fil de la fenêtre Claude dit alors « pour la Demande rapide ».
-- Au-dessus, la réponse, 12 lignes à la fois depuis la 1.6.5 (9 avant) : ▲ et ▼, au-dessus d'Envoyer, la font défiler comme les
+- Au-dessus, la réponse, 20 lignes à la fois depuis la 1.6.6 (12 en 1.6.5, 9 avant) : ▲ et ▼, au-dessus d'Envoyer, la font défiler comme les
   cartes de la fenêtre Claude, sans limite de longueur.
 - Une autre photo ou une autre sélection dans Lightroom efface la réponse, qui parlait d'autres
   photos ; ce que vous avez tapé reste, pour le renvoyer sur les nouvelles. La conversation d'une

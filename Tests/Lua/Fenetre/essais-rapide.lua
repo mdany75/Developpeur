@@ -291,9 +291,9 @@ essai("Le 4ᵉ bouton, Classer : sa demande part avec Consignes.classerRapide (p
 end)
 
 -- Demandé par Dany le 2 novembre 2026 : « Je veux avoir 12 lignes de Résultat dans [la Demande
--- rapide] ».
-essai("Le résultat montre 12 lignes, qui tiennent dans sa zone sans couper ; cinq carrés laissent au champ 593 points", function()
-    egal(12, FenetreRapide.LIGNES_RESULTAT, '12 lignes')
+-- rapide] », puis le même soir « on pourrait avoir 20 lignes ».
+essai("Le résultat montre 20 lignes, qui tiennent dans sa zone sans couper ; cinq carrés laissent au champ 593 points", function()
+    egal(20, FenetreRapide.LIGNES_RESULTAT, '20 lignes')
     vrai(FenetreRapide.HAUTEUR_RESULTAT >= FenetreRapide.LIGNES_RESULTAT * FenetreRapide.HAUTEUR_LIGNE,
         string.format('%d lignes de %.2f dans %d points', FenetreRapide.LIGNES_RESULTAT, FenetreRapide.HAUTEUR_LIGNE, FenetreRapide.HAUTEUR_RESULTAT))
     egal(FenetreRapide.HAUTEUR - FenetreRapide.ECART - FenetreRapide.HAUTEUR_DEMANDE, FenetreRapide.HAUTEUR_RESULTAT)
@@ -301,7 +301,7 @@ essai("Le résultat montre 12 lignes, qui tiennent dans sa zone sans couper ; ci
     S.pendantFenetre = function(args) contenu, cadre = args.contents, args.save_frame end
     FenetreRapide.afficher()
     S.pendantFenetre = nil
-    egal('DeveloppeurRapide-15', cadre, 'une taille gardée d\'avant ne revient pas')
+    egal('DeveloppeurRapide-16', cadre, 'une taille gardée d\'avant ne revient pas')
     local texte, champ
     for _, v in ipairs(vues(contenu)) do
         if v.vue.genre == 'static_text' and v.vue.args.height_in_lines then
@@ -310,9 +310,9 @@ essai("Le résultat montre 12 lignes, qui tiennent dans sa zone sans couper ; ci
             champ = v.vue.args
         end
     end
-    egal(12, texte.height_in_lines, 'le texte du résultat, sur 12 lignes')
+    egal(20, texte.height_in_lines, 'le texte du résultat, sur 20 lignes')
     egal(593, champ.width, 'la largeur du champ avec cinq carrés')
-    -- Une longue réponse : 12 lignes par page, puis ▼.
+    -- Une longue réponse : 20 lignes par page, puis ▼.
     local lignes = {}
     for i = 1, 30 do
         lignes[i] = 'Ligne ' .. i
@@ -323,7 +323,7 @@ essai("Le résultat montre 12 lignes, qui tiennent dans sa zone sans couper ; ci
     local p = FenetreRapide.p
     FenetreRapide.p, FenetreRapide.page = nil, nil
     local _, n = p.resultat:gsub('\n', '')
-    egal(12, n + 1, '12 lignes montrées')
+    egal(20, n + 1, '20 lignes montrées')
     egal(true, p.descend, '▼ pour la suite')
 end)
 

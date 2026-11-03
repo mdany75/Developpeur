@@ -533,7 +533,7 @@ function Consignes.proposerAppliquerRapide(mode, gardee)
     local debut = "Prépare la retouche la plus complète possible de la photo active, "
     if mode ~= 'proposer' then
         return Consignes.surLaSelection(avecGuide(debut .. Consignes.RETOUCHE_COMPLETE
-            .. " Finis en lignes courtes, une par changement fait, avec sa raison (douze lignes se lisent sans défiler)."))
+            .. " Finis en lignes courtes, une par changement fait, avec sa raison (vingt lignes se lisent sans défiler)."))
     end
     if not gardee then
         return nil, Consignes.rapideProposerSeulement

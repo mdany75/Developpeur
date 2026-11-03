@@ -4,7 +4,7 @@
 
 La 1.6.6 reprend quatre idées vues chez les autres MCP Lightroom : Claude gère les taches déjà
 posées, sait jusqu'où relever les ombres, repère une couleur vive qui vole l'œil, et n'écrase plus
-un paramètre prédéfini.
+un paramètre prédéfini. La Demande rapide montre 20 lignes.
 
 ### Ajouté
 - Taches déjà posées : Claude les voit, les vôtres comme les siennes, numérotées, avec leur place
@@ -20,6 +20,10 @@ un paramètre prédéfini.
   sujet (un parasol rouge derrière un portrait), qui attirent l'œil autant qu'une fenêtre. Le
   vêtement de la personne photographiée n'en est pas, ni un ciel bleu vu entre des arbres. Seuils
   provisoires.
+
+### Changé
+- La Demande rapide montre 20 lignes de résultat au lieu de 12 ; la fenêtre grandit d'autant
+  (environ 1 000 × 430 points).
 
 ### Corrigé
 - Créer un paramètre prédéfini du même nom qu'un autre n'écrase plus l'ancien : le nouveau

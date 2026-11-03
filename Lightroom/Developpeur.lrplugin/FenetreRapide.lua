@@ -2,7 +2,7 @@
 -- › Demande rapide, ⌘⌃⌥C ; demandée par Dany le 22 octobre 2026) : le résultat page par page, une
 -- demande de 3 lignes, à sa gauche cinq boutons à icône (noter, Retouche pro, Portrait ; 24 octobre
 -- 2026 ; Classer après la 1.6 ; Proposer et appliquer le 2 novembre 2026), à sa droite ▲, ▼ et
--- Envoyer, dans une fenêtre d'environ 1 000 × 300 points ; Retour envoie,
+-- Envoyer, dans une fenêtre d'environ 1 000 × 430 points ; Retour envoie,
 -- comme dans la fenêtre Claude (champ à `immediate = false` : Retour le valide). Depuis le correctif
 -- 1.3.6 (« une photo, une conversation », décidé avec Dany le 25 octobre 2026), une demande sur une
 -- photo seule part dans la conversation de la photo, la même que la fenêtre Claude, gardée, où elle
@@ -35,15 +35,17 @@ require('Menage').signaler(function() return FenetreRapide.ouverte == true or Mo
 
 -- Lignes du résultat montrées à la fois (13 points, 16,25 de haut chacune, relevé le 22 octobre
 -- 2026 : 130 pour 8) ; ▲ et ▼ les font défiler. 12 depuis le 2 novembre 2026 (demandé par Dany :
--- « Je veux avoir 12 lignes de Résultat »), 195 points dans les 204 de la zone (9 avant, dans 155).
-FenetreRapide.LIGNES_RESULTAT = 12
+-- « Je veux avoir 12 lignes de Résultat »), 195 points dans les 204 de la zone (9 avant, dans 155) ;
+-- 20 le même soir (Dany : « on pourrait avoir 20 lignes »), 325 points dans les 334 de la zone.
+FenetreRapide.LIGNES_RESULTAT = 20
 FenetreRapide.HAUTEUR_LIGNE = 16.25
 FenetreRapide.LIGNES_DEMANDE = 3
--- Largeur et hauteur du contenu, en points, pour une fenêtre d'environ 1 000 × 300 (barre de titre
+-- Largeur et hauteur du contenu, en points, pour une fenêtre d'environ 1 000 × 430 (barre de titre
 -- et marges de la fenêtre en plus ; relevé à 735 × 202 pour 64 caractères de large ; 218 de haut
--- pour 9 lignes, 49 de plus pour les 3 lignes ajoutées le 2 novembre 2026).
+-- pour 9 lignes, 49 de plus pour les 3 lignes ajoutées le 2 novembre 2026, puis 130 de plus pour
+-- les 8 suivantes, à 16,25 points la ligne, la même marge de 9 points gardée).
 FenetreRapide.LARGEUR = 998
-FenetreRapide.HAUTEUR = 267
+FenetreRapide.HAUTEUR = 397
 -- Le champ de demande de 3 lignes, une boîte de 55 points ; la colonne de droite prend sa hauteur et
 -- sa place. Écart entre le résultat et la boîte.
 FenetreRapide.HAUTEUR_DEMANDE = 55
@@ -88,7 +90,7 @@ FenetreRapide.ACTIONS = {
 }
 -- La zone du résultat : toute la hauteur au-dessus de la demande (relevé le 22 octobre 2026 : 988 ×
 -- 248 pour 984 × 214, d'où 996 × 216 pour 1 000 × 250 ; 267 de haut pour 1 000 × 300 depuis le
--- 2 novembre 2026), sans barre de défilement : ▲ et ▼ y
+-- 2 novembre 2026, 397 pour 1 000 × 430 le même soir), sans barre de défilement : ▲ et ▼ y
 -- changent de page. Le texte se coupe à la largeur du texte, moins la marge de Fil.couper.
 FenetreRapide.HAUTEUR_RESULTAT = FenetreRapide.HAUTEUR - FenetreRapide.ECART - FenetreRapide.HAUTEUR_DEMANDE
 FenetreRapide.LARGEUR_TEXTE = FenetreRapide.LARGEUR - 8
@@ -451,7 +453,7 @@ function FenetreRapide.afficher()
             title = "Claude · Demande rapide",
             contents = contenu,
             -- Le nom change avec la taille du contenu : une taille gardée d'avant ne revient pas.
-            save_frame = 'DeveloppeurRapide-15',
+            save_frame = 'DeveloppeurRapide-16',
             blockTask = true,
             onShow = function(controle) FenetreRapide.controle = controle end,
             windowWillClose = function()
