@@ -1,0 +1,201 @@
+<title>Comparatif MCP Lightroom 1.6.5</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Même système que les pages Panorama et Outils comparés : une colonne large, tableaux défilants, pastilles d'état. */
+  :root {
+    --texte: #1D1D1F; --gris: #6B6B6B; --bleu: #0A64D8; --mono: #3D3D45;
+    --vert: #1F7A35; --orange: #A85A00; --rouge: #B3261E;
+    --fond: #FFFFFF; --volet: #F2F2F2; --carte: #FAFAFA; --filet: #E2E2E2;
+    --vert-doux: #E6F2E9; --orange-doux: #FCEFDF; --bleu-doux: #E3EEFC; --rouge-doux: #FBE9E7; --gris-doux: #EBEBEB;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --texte: #E8E8E8; --gris: #9A9A9A; --bleu: #5AA2F6; --mono: #C8C8D0;
+      --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+      --fond: #1E1E1E; --volet: #2A2A2A; --carte: #262626; --filet: #343434;
+      --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #333333;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --texte: #E8E8E8; --gris: #9A9A9A; --bleu: #5AA2F6; --mono: #C8C8D0;
+    --vert: #3FB950; --orange: #E8963A; --rouge: #F2736B;
+    --fond: #1E1E1E; --volet: #2A2A2A; --carte: #262626; --filet: #343434;
+    --vert-doux: #1F3324; --orange-doux: #3A2A17; --bleu-doux: #1C2C44; --rouge-doux: #3D2220; --gris-doux: #333333;
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { background: var(--volet); }
+  body { margin: 0; background: var(--volet); color: var(--texte); font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  a { color: var(--bleu); text-decoration: none; }
+  a:hover, a:focus-visible { text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--bleu); outline-offset: 2px; border-radius: 3px; }
+  code { font-family: Menlo, ui-monospace, monospace; font-size: .86em; color: var(--mono); background: var(--gris-doux); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .page { max-width: 1180px; margin: 0 auto; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { margin: 0 0 4px; font-size: 30px; line-height: 1.2; text-wrap: balance; }
+  h2 { margin: 40px 0 6px; font-size: 21px; text-wrap: balance; }
+  h3 { margin: 18px 0 6px; font-size: 16px; }
+  .sous { color: var(--gris); margin: 0 0 18px; max-width: 75ch; }
+  p, li { max-width: 80ch; }
+  .bilan { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 20px 0; }
+  .chiffre { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 14px; min-width: 0; }
+  .chiffre b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; }
+  .chiffre span { color: var(--gris); font-size: 13px; }
+  .encadre { background: var(--bleu-doux); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
+  .encadre p { margin: 0; }
+  .pastille { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; display: inline-block; }
+  .ici { background: var(--vert-doux); color: var(--vert); }
+  .eux { background: var(--orange-doux); color: var(--orange); }
+  .egal { background: var(--gris-doux); color: var(--texte); }
+  .seul { background: var(--bleu-doux); color: var(--bleu); }
+  .non { background: var(--rouge-doux); color: var(--rouge); }
+  .table { overflow-x: auto; border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; background: var(--fond); border: 1px solid var(--filet); }
+  .large table { min-width: 1100px; }
+  .moyen table { min-width: 760px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--filet); vertical-align: top; font-size: 13.5px; }
+  th { background: var(--carte); font-size: 12.5px; color: var(--gris); font-weight: 600; }
+  td.rang, td.note { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.note b { font-size: 15px; }
+  tr.nous td { background: var(--vert-doux); }
+  .petit { color: var(--gris); font-size: 12.5px; display: block; margin-top: 2px; }
+  .colonnes { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .colonnes > section { background: var(--fond); border: 1px solid var(--filet); border-radius: 10px; padding: 4px 18px 14px; min-width: 0; }
+  ul.liste { padding-left: 18px; margin: 6px 0 0; }
+  ul.liste li { margin: 0 0 8px; }
+  .pied { color: var(--gris); font-size: 13px; margin-top: 36px; }
+  table.grille td:first-child { font-weight: 600; }
+  @media (max-width: 640px) { th, td { padding: 8px; } h1 { font-size: 25px; } }
+</style>
+
+<main class="page">
+  <h1>Comparatif des MCP Lightroom, 1.6.5</h1>
+  <p class="sous">Cette page compare MCP-Développeur 1.6.5, en construction le 2 novembre 2026, aux 25 MCP Lightroom les plus suivis de la communauté. Tout a été recensé et relu le même jour. Chaque dépôt a été ouvert : son README, mais surtout son code, où ses outils ont été comptés. Les capacités de Développeur ont été relues dans son propre code. Chaque amélioration proposée a ensuite été cherchée dans Développeur, au cas où il la ferait déjà sous un autre nom, et confirmée dans le code du projet d'où elle vient. Les notes sur 10 mesurent l'utilité réelle pour un photographe amateur sur Mac : un projet qui ne tourne que sous Windows est noté bas, même s'il est riche. Les pages précédentes restent valables pour leur date : <a href="https://claude.ai/artifact/VuRGRUGNy4ZzGuYPPrmsQm">Outils comparés</a> (outil par outil avec Automaat) et Panorama des MCP Lightroom (1<sup>er</sup> novembre, 28 serveurs).</p>
+
+  <div class="bilan">
+    <div class="chiffre"><b>40</b><span>vrais MCP Lightroom trouvés le 2 novembre, soit 12 de plus que la veille, surtout des fourches d'Automaat</span></div>
+    <div class="chiffre"><b>25</b><span>retenus, les plus suivis, et relus dans leur code</span></div>
+    <div class="chiffre"><b>18</b><span>différences regroupées puis vérifiées dans le code de Développeur</span></div>
+    <div class="chiffre"><b>12 sur 18</b><span>déjà faites par Développeur sous un autre nom, en tout ou presque</span></div>
+  </div>
+
+  <div class="encadre"><p><strong>En bref.</strong> Développeur reste le seul à mesurer finement la photo : couleur Lab, dominante par zone, bruit, netteté, visages et yeux. Il est aussi le seul à suivre une méthode de retoucheur écrite, à proposer des notes selon un standard, à faire de la retouche générative en local, à offrir une conversation par photo dans Lightroom et à livrer un exécutable notarisé. Automaat et sa fourche playing restent la référence publique (173 étoiles) pour les masques, les jeux d'outils et l'installation en un clic. LrGeniusAI reste le meilleur pour organiser une photothèque. Des 18 différences relevées, 12 existent déjà dans Développeur sous un autre nom. Il en reste quatre utiles à faire (une petite correction, deux mesures, la gestion des taches) et deux à discuter. Les autres ne servent pas un amateur sur Mac.</p></div>
+
+  <h2>Les améliorations à faire</h2>
+  <p class="sous">Classées par utilité. Aucune ne demande d'ajouter quoi que ce soit aux consignes, déjà presque pleines : tout se dit dans la description d'un outil ou dans ses résultats.</p>
+  <div class="table moyen"><table>
+    <thead><tr><th>Amélioration</th><th>Vue chez</th><th>Utilité · effort</th><th>Ce qu'il faudrait faire</th></tr></thead>
+    <tbody>
+      <tr><td><strong><code>save_preset</code> n'écrase plus un préréglage</strong></td><td>Automaat, playing, JeremyGuo, John-owo</td><td><span class="pastille ici">Utile</span> <span class="pastille egal">Petit</span></td><td>Aujourd'hui, <code>PresetXMP.write</code> réécrit sans prévenir un fichier <code>&lt;nom&gt;.xmp</code> du même nom (<code>PresetXMP.swift:23</code>). Il faudrait ajouter « (2) » au nom ou refuser avec un message, avec un test dans les essais de PresetXMP.</td></tr>
+      <tr><td><strong>Marge des ombres en IL</strong> dans <code>view_photo</code></td><td>par4987 (<code>estimate_noise.py</code>)</td><td><span class="pastille ici">Moyenne</span> <span class="pastille egal">Petit</span></td><td>Le bruit des ombres est déjà mesuré (<code>Detail.swift:278</code>), mais il n'est signalé qu'après coup, au bilan. L'idée est d'ajouter <code>marge_ombres_il</code> = log2(bruit visible ÷ bruit des ombres) avant de relever les ombres, avec une confiance faible si les aplats sont rares. Le seuil serait d'abord relevé sur les copies d'Essais, comme le veut la règle des seuils.</td></tr>
+      <tr><td><strong>Gérer les taches posées</strong> : les lister, en retirer une, changer son opacité, tout vider</td><td>Automaat, playing ; lightroom-cli, lightroom-py, par4987 pour le vidage</td><td><span class="pastille ici">Moyenne</span> <span class="pastille eux">Moyen</span></td><td><code>retouch_spots</code> ne fait qu'ajouter, toujours à l'opacité 1 (<code>Locaux.lua:394</code>). Il faudrait lui donner les actions <code>list</code>, <code>remove</code>, <code>opacity</code> et <code>clear</code> (taches ou yeux rouges), comme <code>edit_mask</code> pour les masques. Chacune serait une étape « Claude · » que <code>undo_last</code> défait, dans le respect de « Proposer d'abord ». Les appels du SDK sont déjà relevés dans <code>docs/SPEC.md</code>.</td></tr>
+      <tr><td><strong>Le sujet le plus saturé</strong> dans les points chauds</td><td>aslanoov (<code>attention_check.py</code>), LrC-AVG</td><td><span class="pastille egal">Faible</span> <span class="pastille egal">Petit</span></td><td><code>PointsChauds</code> repère une zone hors du sujet plus claire que lui. Il faudrait qu'il repère aussi une zone nettement plus saturée (C*), qui attire autant l'œil, avec son test.</td></tr>
+      <tr><td><strong>Jeux d'outils et lecture seule</strong></td><td>Automaat, playing, MHPhotos, LrC-AVG, par4987, Denvolatos</td><td><span class="pastille egal">À discuter</span> <span class="pastille eux">Moyen</span></td><td>Les 37 outils sont toujours actifs, et leur liste pèse environ 55 000 à 60 000 jetons par session. Un jeu « classer seulement » ou « lecture seule », réglé dans le Gestionnaire de modules externes comme le mode, allégerait les sessions de tri. Cela touche à la liaison et aux deux clients : c'est à décider avec vous.</td></tr>
+      <tr><td><strong>Défaire une étape précise</strong>, pas seulement la dernière</td><td>Denvolatos (<code>lr_restore</code>), MHPhotos</td><td><span class="pastille egal">À discuter</span> <span class="pastille eux">Moyen</span></td><td>Il faudrait ajouter à <code>undo_last</code> un <code>etape_id</code>. L'étape serait refusée si l'un de ses réglages a changé depuis ; aujourd'hui, Développeur avertit seulement (<code>Annulation.lua:46</code>).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Petites retouches de description, sans nouvel outil</h3>
+  <ul class="liste">
+    <li><code>find_photos</code> : un critère <code>path</code> (chemin complet, par <code>findPhotoByPath</code>, déjà employé dans <code>Livraison.lua</code>), pour retrouver la photo d'un fichier vu dans le Finder.</li>
+    <li><code>edit_mask</code> : accepter <code>photo_ids</code> pour <code>remove_empty</code> et <code>recompute</code>, comme <code>add_mask</code> le fait déjà pour poser un masque sur une série.</li>
+    <li><code>compare_variants</code> : deux ou trois mesures sous chaque case (écrêtage, L* médian), pour faire de vrais balayages d'un curseur.</li>
+    <li><code>choose_variant</code> : pouvoir revenir aussi à « Avant Claude » ou à un instantané que vous avez nommé, sans jamais supprimer les vôtres.</li>
+  </ul>
+
+  <h2>Déjà dans Développeur, sous un autre nom</h2>
+  <p class="sous">Douze différences relevées chez les autres se sont révélées déjà faites une fois vérifiées dans le code.</p>
+  <div class="table moyen"><table>
+    <thead><tr><th>Ce que font les autres</th><th>Vu chez</th><th>Dans Développeur</th></tr></thead>
+    <tbody>
+      <tr><td>Quasi-doublons et rafales</td><td>Automaat, playing, LrGeniusAI, Symphon-y</td><td><code>cull_photos</code> sur une collection ou un dossier entier, par tranches reprenables (empreinte de Vision, heure, boîtier) ; <code>find_photos similar_to</code> dans tout le catalogue. La page Panorama disait « Pas encore » : c'est fait pour l'essentiel.</td></tr>
+      <tr><td>Visages nommés, photos d'une personne</td><td>LrGeniusAI</td><td>Les noms de la vue Personnes de Lightroom sont des mots-clés : <code>find_photos keyword</code>, puis <code>manage_collections</code> (constat C1 du 1<sup>er</sup> novembre).</td></tr>
+      <tr><td>Même masque IA sur une série, masques vides retirés</td><td>Automaat, playing</td><td><code>add_mask</code> avec <code>photo_ids</code> ou <code>selection</code> : recalculé pour chaque photo, les vides retirés.</td></tr>
+      <tr><td>Inverser, intersection, inventaire des masques</td><td>playing, Automaat, jasondentler, 4xiomdev</td><td><code>combine</code> (ajouter, soustraire, intersection), <code>invert</code>, <code>edit_mask list</code> et <code>duplicate</code>, et la carte du masque que Claude voit vraiment.</td></tr>
+      <tr><td>Remise à zéro d'un seul panneau</td><td>lightroom-cli, lightroom-py, par4987</td><td>Le recadrage (<code>crop.reset</code>), un masque, le flou d'objectif, les couleurs ponctuelles, la géométrie, chaque curseur. Seul manque le vidage des taches, inscrit plus haut.</td></tr>
+      <tr><td>Instantanés : lister, appliquer, supprimer</td><td>Automaat, 4xiomdev, aslanoov, lightclaw, starlai</td><td><code>choose_variant</code> (<code>list</code>, <code>choose</code>, <code>delete</code>) sur les instantanés « Claude · », fiable et défaisable ; <code>get_settings</code> lit les noms de tous les instantanés.</td></tr>
+      <tr><td>Balayage d'un curseur, plafond de pas, passes bornées</td><td>ToneRelay, LrC-AVG, Denvolatos</td><td><code>compare_variants</code> (2 à 4 rendus depuis le même état), pentes relevées par <code>--etalonnage --balayage</code>, plafonds de dose, deux passes correctives au plus, « Proposer d'abord ».</td></tr>
+      <tr><td>Zones L*, colorité, contraste, attention</td><td>ToneRelay, LrC-AVG, aslanoov</td><td>Histogramme de L* par tranches, centiles, chroma C*, contraste p95−p5, points chauds, saillance de Vision. CIEDE2000 et la colorité de Hasler ne manquent pas à un amateur.</td></tr>
+      <tr><td>Goûts appris, looks d'après une photo</td><td>LrGeniusAI, aslanoov, LrC-AVG</td><td><code>remember_style</code> (<code>learn</code>, <code>habits</code>), <code>save_preset</code>, <code>match_look</code>, <code>compare_variants</code>.</td></tr>
+      <tr><td>Journal avec anciennes valeurs, écriture jamais rejouée</td><td>Denvolatos, MHPhotos, ToneRelay, OldCatCookie, John-owo</td><td>Pile des étapes « Claude · » avec leurs valeurs d'avant, avertissement si vous avez retouché depuis, résultat gardé pour l'appel répété ; seules les lectures se rejouent.</td></tr>
+      <tr><td>Auto ton, Auto balance, réglage relatif, essai à blanc</td><td>playing, JeremyGuo, saril009, jasondentler</td><td><code>auto_tone</code>, <code>white_balance: "auto"</code>, <code>relative</code> et <code>preview_settings</code> dans <code>apply_settings</code>.</td></tr>
+      <tr><td>Plusieurs sessions de Claude sur une même liaison</td><td>playing, saril009, Denvolatos, OldCatCookie, par4987</td><td>Une connexion courte par commande, un message « liaison occupée », et un verrou commun pour Fibo 2.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Écartés, et pourquoi</h2>
+  <ul class="liste">
+    <li><strong>Annuler et rétablir par l'historique de Lightroom</strong> (4xiomdev, aslanoov, lightclaw) : LrUndo défait la dernière action de tout Lightroom, la vôtre ou celle d'une autre photo comprise. <code>undo_last</code> et <code>revert_to_original</code> le font proprement.</li>
+    <li><strong>Importer des photos</strong> (9 projets) : l'importation de Lightroom le fait mieux (paramètre prédéfini, renommage, sauvegarde), et une copie de fichiers par Claude ferait courir un risque aux originaux de /Volumes/Photos.</li>
+    <li><strong>Détection automatique de la poussière du capteur</strong> (par4987) : Supprimer › Poussière de Lightroom, puis Copier et Coller sur la série, suffit. Si le besoin vient, ce serait un mode d'<code>analyze_photos</code> en Swift, en local.</li>
+    <li><strong>Comparer des préréglages versionnés</strong> (Automaat et fourches, ToneRelay) : c'est utile pour un atelier qui fait évoluer un style vendu, pas pour vous. Seule la correction de l'écrasement est retenue.</li>
+    <li><strong>Windows, Codex, Cursor, VS Code, fichier .mcpb</strong> : vous travaillez sur Mac avec Claude, et <code>build.sh --install</code> installe et inscrit tout. Les binaires des autres ne sont pas signés.</li>
+    <li><strong>Approbation par élicitation MCP</strong> (MHPhotos) et <strong>approbation de chaque passe</strong> (LrC-AVG) : « Proposer d'abord » et <code>confirm = true</code> jouent ce rôle, et vous travaillez en mode Appliquer.</li>
+    <li><strong>Commande brute, Lua ou PowerShell arbitraire</strong> (cyZhu98, 4xiomdev, lightclaw, lightroom-py) : contraire à la liaison fermée.</li>
+  </ul>
+
+  <h2>Ce qui distingue les projets</h2>
+  <p class="sous">Les huit plus complets à côté de Développeur. Le tableau défile de côté sur un écran étroit.</p>
+  <div class="table large"><table class="grille">
+    <thead><tr><th>Capacité</th><th>Développeur</th><th>Automaat</th><th>playing</th><th>LrGeniusAI</th><th>ToneRelay</th><th>aslanoov</th><th>LrC-AVG</th><th>par4987</th><th>lightroom-cli</th></tr></thead>
+    <tbody>
+      <tr><td>Voit la photo développée</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille egal">Chemin</span></td></tr>
+      <tr><td>Mesure la couleur (Lab, dominante)</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille egal">Script</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Mesure le bruit et la netteté</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille egal">Netteté</span></td><td><span class="pastille egal">Netteté</span></td><td><span class="pastille egal">Au tri</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille egal">Netteté</span></td><td><span class="pastille egal">Skill</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Visages et yeux (Vision)</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille ici">Nommés</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Masques IA</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille egal">3 sortes</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td></tr>
+      <tr><td>Dégradés et pinceau placés</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille egal">Pinceau</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td></tr>
+      <tr><td>Recherche par le sens, espèces</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Doublons et rafales</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Notes proposées selon une règle</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille egal">Rejets</span></td><td><span class="pastille egal">Rejets</span></td><td><span class="pastille egal">Esthétique</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille egal">Script</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Méthode de retouche écrite</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille egal">Skill</span></td><td><span class="pastille egal">Skill</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille egal">Opérateur</span></td><td><span class="pastille ici">Skill</span></td><td><span class="pastille ici">Passes</span></td><td><span class="pastille egal">Skill</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Retouche générative</td><td><span class="pastille seul">Fibo 2</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Conversation dans Lightroom</td><td><span class="pastille seul">Fenêtre Claude</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille egal">Navigateur</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille egal">HUD</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Jeton sur la liaison</td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Lecture seule, jeux d'outils</td><td><span class="pastille eux">Non</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille egal">Arrêt</span></td><td><span class="pastille egal">Mode safe</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille egal">Profil edit</span></td><td><span class="pastille egal">Filtre</span></td><td><span class="pastille egal">Essai à blanc</span></td></tr>
+      <tr><td>Gère les taches posées</td><td><span class="pastille eux">Non</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille ici">Oui</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille egal">Vider</span></td></tr>
+      <tr><td>Installation en un clic</td><td><span class="pastille egal">Script</span></td><td><span class="pastille ici">.mcpb</span></td><td><span class="pastille ici">.mcpb</span></td><td><span class="pastille egal">.pkg</span></td><td><span class="pastille egal">Invite</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille ici">.exe</span></td><td><span class="pastille ici">.mcpb</span></td><td><span class="pastille egal">pip</span></td></tr>
+      <tr><td>Exécutable signé et notarisé</td><td><span class="pastille seul">Oui</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td><td><span class="pastille non">Non</span></td></tr>
+      <tr><td>Mac · Windows</td><td>Mac</td><td>Les deux</td><td>Les deux</td><td>Les deux</td><td>Les deux</td><td>Mac</td><td>Windows</td><td>Windows</td><td>Les deux</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Tableau comparatif des 25</h2>
+  <p class="sous">Développeur en première ligne, puis les autres par note. Étoiles et dernier envoi relus le 2 novembre 2026. Les outils sont comptés dans le code, pas repris du README.</p>
+  <div class="table large"><table>
+    <thead><tr><th>Projet</th><th>Note</th><th>Cible</th><th>Architecture</th><th>Outils</th><th>Voit et mesure</th><th>Masques</th><th>Catalogue et recherche</th><th>Sécurité</th><th>Ce qu'il a de plus</th></tr></thead>
+    <tbody>
+      <tr class="nous"><td><strong>MCP-Développeur 1.6.5</strong><span class="petit">mdany75 · MIT · en construction</span></td><td class="note"><b>—</b></td><td>LrC 13.3 et plus, Mac</td><td>Swift natif notarisé, module Lua, TCP 54770/54771, file d'appels</td><td>37, avec 12 invites et 5 ressources</td><td>Aperçu développé jusqu'à 2048 px ; Lab, écrêtage par canal, dominante par zone, bruit, netteté, Vision, bilan</td><td>13 sortes, combinées, effets, courbe, Point Color, relues</td><td>Tout le catalogue, sens (MobileCLIP), espèces (BioCLIP 2), GPS, notation par standard</td><td>Jeton sur chaque ligne, « Proposer d'abord », plafonds de dose</td><td>Fenêtre Claude, Fibo 2 en local, méthode écrite</td></tr>
+      <tr><td><a href="https://github.com/Automaat/lightroom-mcp">Automaat/lightroom-mcp</a><span class="petit">173 ★ · 2 nov. · MIT</span></td><td class="note"><b>8</b></td><td>LrC, Mac et Windows</td><td>Node/TS (Bun), module Lua, TCP 58763/58764</td><td>71 (32 core, 24 develop, 15 masks)</td><td>Aperçu 64 à 2048 px, 20 d'un coup ; histogramme, écrêtage, netteté</td><td>Le plus riche ; masques en lot sur 200 photos ; écritures gardées</td><td>Critères, collections dynamiques, GPS, doublons dHash, import</td><td>Jeton 256 bits, lecture seule, jeux d'outils, <code>confirm</code></td><td>.mcpb, 6 clients, préréglages versionnés, taches gérées</td></tr>
+      <tr><td><a href="https://github.com/LrGenius/LrGeniusAI">LrGeniusAI</a><span class="petit">56 ★ · 2 nov. · AGPL-3.0</span></td><td class="note"><b>7</b></td><td>LrC 14 et plus, Mac et Windows</td><td>Serveur Rust en HTTP, relais stdio, LanceDB, MLX</td><td>19, avec 4 invites</td><td>Aperçu 256 à 2048 px ; note esthétique, genres</td><td>Aucun</td><td>Sens (SigLIP2), visages nommés, espèces, quasi-doublons</td><td>Jeton dans le trousseau, Origin validée, bouton d'arrêt</td><td>Ensembles de résultats passés d'un outil à l'autre, retouche apprise de 5 exemples</td></tr>
+      <tr><td><a href="https://github.com/playing/lightroom-mcp">playing/lightroom-mcp</a><span class="petit">1 ★ · 30 oct. · MIT · fourche d'Automaat</span></td><td class="note"><b>7</b></td><td>LrC, Mac et Windows</td><td>Comme Automaat, plus un « broker » signé partagé entre clients</td><td>73</td><td>Comme Automaat</td><td>Comme Automaat</td><td>Comme Automaat, métadonnées IA privées</td><td>Comme Automaat, broker à défi-réponse</td><td>Plusieurs clients sur une seule connexion au module</td></tr>
+      <tr><td><a href="https://github.com/ReefRuan/tonerelay-lightroom-mcp">ToneRelay</a><span class="petit">6 ★ · 2 nov. · AGPL-3.0</span></td><td class="note"><b>6</b></td><td>LrC, Mac et Windows</td><td>Python, service HTTP 17777 que le module interroge</td><td>58</td><td>Distributions, Lab D65, ΔE CIEDE2000, comparaison de rendus</td><td>Sujet, ciel, fond</td><td>Plusieurs catalogues, dossiers, import, marques défaisables</td><td>Jetons de concurrence, opérations durables, copies virtuelles seulement</td><td>Épisodes rejouables, balayage d'un curseur</td></tr>
+      <tr><td><a href="https://github.com/aslanoov/lightroom-ai-bridge">aslanoov/lightroom-ai-bridge</a><span class="petit">2 ★ · 29 oct. · MIT</span></td><td class="note"><b>6</b></td><td>LrC 15.3 et plus, Mac</td><td>Python, démon partagé, TCP 49463/49464</td><td>46</td><td>Rendu 1024 px ; inclinaison et attention par scripts</td><td>IA et plages ; dégradés non placés</td><td>Faible : sélection, notes</td><td>Jeton 256 bits, JSON strict ; commande brute exposée</td><td>Base de connaissances qui apprend après chaque séance</td></tr>
+      <tr><td><a href="https://github.com/znznzna/lightroom-cli">lightroom-cli</a><span class="petit">27 ★ · 2 nov. · MIT</span></td><td class="note"><b>5</b></td><td>LrC, Mac et Windows</td><td>Python : SDK, CLI <code>lr</code> et FastMCP du même schéma</td><td>120</td><td>Aperçu en chemin ; aucune mesure</td><td>IA, pinceau, gradué, radial, plages</td><td>Critères, collections dynamiques, sélection pilotée</td><td>Aucun jeton ; niveau de risque et essai à blanc par commande</td><td>Ligne de commande et SDK pour scripter sans Claude</td></tr>
+      <tr><td><a href="https://github.com/par4987/lightroom-mcp">par4987/lightroom-mcp</a><span class="petit">1 ★ · 6 oct. · MIT · fourche d'Automaat</span></td><td class="note"><b>5</b></td><td>LrC 13 et plus, Windows</td><td>Node/TS, PowerShell pour le débruitage</td><td>56</td><td>Aperçu 32 à 2048 px ; poussière et bruit par skill Python</td><td>IA, linéaire, radial, plages</td><td>Règles avancées, IPTC en lot, import</td><td>Jeton 256 bits, filtre d'outils</td><td>Poussière du capteur recoupée entre photos, skills évalués</td></tr>
+      <tr><td><a href="https://github.com/blackluzie/mhphotos-lightroom-mcp">MHPhotos</a><span class="petit">0 ★ · 23 oct. · MIT</span></td><td class="note"><b>4,5</b></td><td>LrC 15.6, Mac</td><td>Python, module qui interroge le port 47831</td><td>38, dont 15 pour un site web</td><td>Aperçus 768 px, planche ; aucune mesure</td><td>Aucun</td><td>Critères, GPS en cercle, photos en retard</td><td>Lecture seule par défaut, élicitation MCP, journal d'audit</td><td>Accord demandé par le client avant chaque écriture</td></tr>
+      <tr><td><a href="https://github.com/4xiomdev/lightroom-classic-mcp">4xiomdev</a><span class="petit">5 ★ · 6 mars · MIT</span></td><td class="note"><b>4</b></td><td>LrC, Mac</td><td>Python FastMCP, ports dans /tmp</td><td>59</td><td>Aucun aperçu : chemin de l'original</td><td>IA avec opérations</td><td>Par chemin seulement</td><td>Aucun jeton, commande brute</td><td>Annuler et rétablir par LrUndo, Homebrew</td></tr>
+      <tr><td><a href="https://github.com/drshy-org/lightroom-py">lightroom-py</a><span class="petit">3 ★ · 5 sept. · MIT</span></td><td class="note"><b>4</b></td><td>LrC 15.3, Mac</td><td>Bibliothèque Python, pont aiohttp 8765, SQLite</td><td>15 (80 verbes en CLI)</td><td>Aucun dans le MCP</td><td>CLI seulement</td><td>Lecture SQLite rapide du catalogue</td><td>Jeton ; <code>eval</code> Lua présent</td><td>Catalogue lu directement, Edit-In avec réimport</td></tr>
+      <tr><td><a href="https://github.com/JeremyGuo/lightroom-mcp-unified">JeremyGuo</a><span class="petit">0 ★ · 20 sept. · MIT</span></td><td class="note"><b>4</b></td><td>LrC 15, Mac vérifié</td><td>Node 22, TCP 58773/58774</td><td>31</td><td>Aperçu 64 à 2048 px ; aucune mesure</td><td>Sans géométrie, à finir à la main</td><td>Critères, import</td><td>Jeton, verrou d'instance</td><td>Sonde des API présentes, attente réelle du débruitage</td></tr>
+      <tr><td><a href="https://github.com/saril009/lightroom-mcp">saril009</a><span class="petit">1 ★ · 2 oct. · sans licence</span></td><td class="note"><b>3,5</b></td><td>LrC, Mac</td><td>Node, HTTP 8790 interrogé par le module</td><td>20</td><td>Aperçu ; centiles et écrêtage pour la correction auto</td><td>Aucun</td><td>Critères simples</td><td>Jeton facultatif</td><td>Correction tonale automatique en lot</td></tr>
+      <tr><td><a href="https://github.com/starlai/lightroom-mcp">starlai</a><span class="petit">0 ★ · 5 août · MIT</span></td><td class="note"><b>3,5</b></td><td>LrC 13, Mac et Windows</td><td>Copie d'Automaat 0.9</td><td>41</td><td>Aucun aperçu</td><td>Aucun</td><td>Riche en métadonnées, Collection rapide</td><td>Jeton</td><td>Collection rapide</td></tr>
+      <tr><td><a href="https://github.com/jimjohnbeebe-jpg/LrC_Autonomous_Gateway">LrC-AVG</a><span class="petit">0 ★ · 31 oct. · MIT</span></td><td class="note"><b>3</b></td><td>LrC 15, Windows seulement</td><td>Node/TS, TCP 8765/8766, HUD</td><td>67 (16 en profil edit)</td><td>Aperçu 1600 px ; zones L*, dominante par zone, colorité</td><td>IA, plages, pinceau</td><td>Critères, GPS, import daté</td><td>Jeton, approbation par passe, garde d'écrêtage</td><td>Passes à pas décroissant, sonde de sensibilité, régions protégées</td></tr>
+      <tr><td><a href="https://github.com/noopz/lightroom_mcp">noopz</a><span class="petit">17 ★ · 8 déc. 2025 · Apache-2.0</span></td><td class="note"><b>3</b></td><td>LrC 12, Mac et Windows</td><td>Python FastMCP</td><td>61</td><td>Aperçus ; histogrammes RVB</td><td>Aucun</td><td>Lecture</td><td>Aucun jeton</td><td>Suggestions d'enchaînement par heuristique</td></tr>
+      <tr><td><a href="https://github.com/varunkumar/lightroom-mcp">varunkumar</a><span class="petit">8 ★ · 29 avril · sans licence</span></td><td class="note"><b>3</b></td><td>LrC, Mac et Windows</td><td>Python, fichiers dans /tmp</td><td>12</td><td>Vignette 1500 px</td><td>À tracer à la main</td><td>Aucun</td><td>Aucun</td><td>Aucun port ouvert</td></tr>
+      <tr><td><a href="https://github.com/astrobyte-dev/lightclaw">lightclaw</a><span class="petit">2 ★ · 23 mars · MIT</span></td><td class="note"><b>3</b></td><td>LrC, Mac et Windows</td><td>Fourche de 4xiomdev</td><td>61</td><td>Rendu 1024 px</td><td>IA, sans placement</td><td>Par chemin</td><td>Aucun jeton, PowerShell arbitraire</td><td>Instantanés gérés en entier</td></tr>
+      <tr><td><a href="https://github.com/John-owo/lightroom-mcp">John-owo</a><span class="petit">1 ★ · 9 sept. · MIT</span></td><td class="note"><b>3</b></td><td>LrC, Windows essayé</td><td>Fourche d'Automaat</td><td>20</td><td>Aucun aperçu</td><td>Aucun</td><td>Critères, import</td><td>Jeton, copies virtuelles réconciliées</td><td>XMP de secours sans Lightroom</td></tr>
+      <tr><td><a href="https://github.com/cyZhu98/lightroom-mcp">LightroomForge</a><span class="petit">0 ★ · 18 oct. · Apache-2.0</span></td><td class="note"><b>3</b></td><td>LrC, Windows essayé</td><td>Python, ports dans un fichier</td><td>environ 167</td><td>Aperçu en chemin ; histogrammes</td><td>23 outils, géométrie directe</td><td>15 outils</td><td>Aucun jeton, commande brute</td><td>Un outil par curseur</td></tr>
+      <tr><td><a href="https://github.com/OldCatCookie/lightroom-color-agent">OldCatCookie</a><span class="petit">0 ★ · 22 oct. · MIT</span></td><td class="note"><b>3</b></td><td>LrC 15.2, Mac, Codex seulement</td><td>Plugin Codex, Node</td><td>9</td><td>Rendu, centiles, Lab approché</td><td>Aucun</td><td>Aucun</td><td>Jeton, écriture jamais rejouée</td><td>Passes déléguées à un sous-agent</td></tr>
+      <tr><td><a href="https://github.com/jasondentler/photo-workflow-mcp">jasondentler</a><span class="petit">0 ★ · 1<sup>er</sup> sept. · Apache-2.0</span></td><td class="note"><b>3</b></td><td>LrC 15.1, Mac</td><td>Node/TS, trois ports</td><td>30</td><td>Vignette, souvent périmée</td><td>Géométrie lue et écrite, relue</td><td>Aucun</td><td>Aucun jeton</td><td>Réglage par écart (<code>nudge</code>)</td></tr>
+      <tr><td><a href="https://github.com/synthet/lightroom-mcp">synthet</a><span class="petit">8 ★ · 2 nov. · sans licence</span></td><td class="note"><b>2,5</b></td><td>LrC, Windows surtout</td><td>Python, broker Flask 8085</td><td>47</td><td>Vignette du fichier source, pas du rendu</td><td>Aucun</td><td>Métadonnées, photo par empreinte</td><td>Aucun jeton</td><td>Métadonnées d'un fichier hors catalogue</td></tr>
+      <tr><td><a href="https://github.com/Symphon-y/lightroom-mcp">Symphon-y</a><span class="petit">0 ★ · 24 août · sans licence</span></td><td class="note"><b>2</b></td><td>LrC, Windows</td><td>Node/TS, TCP 58763/58764</td><td>14</td><td>Aperçu 1024 px</td><td>Aucun</td><td>Critères, doublons par métadonnées</td><td>Jeton</td><td>Séance de tri reprenable</td></tr>
+      <tr><td><a href="https://github.com/Denvolatos/lightroom-mcp-win">Denvolatos</a><span class="petit">2 ★ · 2 nov. · MIT</span></td><td class="note"><b>1,5</b></td><td>LrC 15.2, Windows seulement</td><td>Python, HTTP 58770 à 58789</td><td>16</td><td>Aperçu 1024 px ; luminosité, écrêtage</td><td>Aucun</td><td>Sélection</td><td>Lecture seule par fichier, plafond de pas, journal restaurable</td><td>Défaire une modification précise, avec conflit détecté</td></tr>
+      <tr><td><a href="https://github.com/longfin/lr-mcp">longfin/lr-mcp</a><span class="petit">1 ★ · 24 oct. · MIT</span></td><td class="note"><b>1</b></td><td>Lightroom en ligne, pas Classic</td><td>Python, API Partner d'Adobe (OAuth)</td><td>10</td><td>Rendus d'Adobe</td><td>Aucun</td><td>Albums, heure de la journée</td><td>OAuth</td><td>Lightroom en ligne sans Classic ouvert</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Non comparés</h2>
+  <p>Quinze autres vrais MCP Lightroom ont été trouvés mais pas relus : ils ont trop peu d'étoiles, sont inactifs ou ne sont que des fourches sans travail propre. zyt-code/lightroom-thin-mcp, shiyiai, Birni, yopiesuryadi, baramesh/lightroom-mcp-elite, lhy5418/AI-photo-editor, ludi70421, Makashibata02/lightroom-ai-batch, AnthonyLeGourrierec, PaulWaldo, simongaoai-coder, slbryn, kotvaer, zhishui-t, RandScullard. Adobe n'a toujours aucun MCP officiel pour Lightroom Classic.</p>
+
+  <p class="pied">Comparatif fait le 2 novembre 2026, sur la 1.6.5 en construction (1.6.4 publiée) : un recensement, la fiche de Développeur relue dans son code, cinq lectures de cinq dépôts chacune, un regroupement et dix-huit vérifications, soit 26 agents. Les lignes de code citées sont celles de ce jour. Les notes changent de base par rapport à la page Panorama : elles mesurent ici l'utilité pour un amateur sur Mac, d'où la baisse de LrC-AVG (Windows seulement), noté 8 le 1<sup>er</sup> novembre.</p>
+</main>
