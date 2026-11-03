@@ -87,18 +87,60 @@ public final class Installation {
         public var aInstaller: Bool { self == .ssdPlusRecent || self == .absentDuMac || self == .differents }
     }
 
+    /// Un fichier suivi par son contenu et sa date (les `refs/*` des modèles, les fichiers de SAM 2) :
+    /// à chemin égal, le contenu le plus récent l'emporte (`Installation.toleranceDate`).
+    public struct Marque: Equatable {
+        public var valeur: String
+        /// Date de modification, en secondes depuis 1970 (gardée à la copie).
+        public var date: Double
+        public init(valeur: String, date: Double) {
+            self.valeur = valeur
+            self.date = date
+        }
+        var json: JSONValue { ["valeur": .string(valeur), "date": .number(date)] }
+        init?(_ j: JSONValue?) {
+            guard let v = j?["valeur"]?.string, let d = j?["date"]?.double else { return nil }
+            self.init(valeur: v, date: d)
+        }
+    }
+
+    /// Deux dates plus proches que ça sont égales (exFAT et FAT gardent la date à 2 s près).
+    public static let toleranceDate: Double = 2
+
     /// Un côté (le Mac ou le SSD) d'un élément : sa version, l'ensemble qui le décrit quand il n'a pas
-    /// de numéro (modèles : « dépôt@instantané » ; SAM 2 : ses fichiers), et le détail à dire.
+    /// de numéro (modèles : « dépôt@instantané » et « dépôt@instantané:fichier » de chaque fichier de
+    /// l'instantané ; SAM 2 : ses fichiers), ses fichiers marqués (contenu et date : `refs/*` des
+    /// modèles, fichiers de SAM 2), et le détail à dire.
     public struct Cote: Equatable {
         public var version: String
         public var ensemble: Set<String>?
+        public var marques: [String: Marque]
         public var detail: [String: JSONValue]
-        public init(version: String, ensemble: Set<String>? = nil, detail: [String: JSONValue] = [:]) {
+        public init(version: String, ensemble: Set<String>? = nil, marques: [String: Marque] = [:], detail: [String: JSONValue] = [:]) {
             self.version = version
             self.ensemble = ensemble
+            self.marques = marques
             self.detail = detail
         }
     }
+
+    /// Chaque côté a-t-il un fichier marqué plus récent que l'autre (ou que l'autre n'a pas) ?
+    static func marquesPlusRecentes(mac: [String: Marque], ssd: [String: Marque]) -> (mac: Bool, ssd: Bool) {
+        var m = false, s = false
+        for cle in Set(mac.keys).union(ssd.keys) {
+            switch (mac[cle], ssd[cle]) {
+            case (.some, nil): m = true
+            case (nil, .some): s = true
+            case (let a?, let b?) where a.valeur != b.valeur:
+                if a.date > b.date + toleranceDate { m = true } else if b.date > a.date + toleranceDate { s = true }
+            default: break
+            }
+        }
+        return (m, s)
+    }
+
+    static func marquesJSON(_ marques: [String: Marque]) -> JSONValue { .object(marques.mapValues(\.json)) }
+    static func marques(_ j: JSONValue?) -> [String: Marque] { (j?.object ?? [:]).compactMapValues { Marque($0) } }
 
     /// La comparaison : ensembles (inclusion) s'ils existent des deux côtés, sinon numéros (1.6.10 >
     /// 1.6.9, `MiseAJour.plusRecente`) ; deux textes que les numéros ne départagent pas : différents.
@@ -106,10 +148,13 @@ public final class Installation {
         guard let mac else { return ssd == nil ? .absentPartout : .absentDuMac }
         guard let ssd else { return .absentDuSSD }
         if let a = mac.ensemble, let b = ssd.ensemble {
-            if a == b { return .aJour }
-            if a.isSuperset(of: b) { return .macPlusRecent }
-            if b.isSuperset(of: a) { return .ssdPlusRecent }
-            return .differents
+            var etat: Etat = a == b ? .aJour : a.isSuperset(of: b) ? .macPlusRecent : b.isSuperset(of: a) ? .ssdPlusRecent : .differents
+            // Les fichiers marqués : à chemin égal et contenu différent, le plus récent l'emporte.
+            let (macPlus, ssdPlus) = marquesPlusRecentes(mac: mac.marques, ssd: ssd.marques)
+            func joindre(_ e: Etat, _ x: Etat) -> Etat { e == .aJour ? x : (e == x ? e : .differents) }
+            if macPlus { etat = joindre(etat, .macPlusRecent) }
+            if ssdPlus { etat = joindre(etat, .ssdPlusRecent) }
+            return etat
         }
         if mac.version == ssd.version { return .aJour }
         if MiseAJour.plusRecente(mac.version, que: ssd.version) { return .macPlusRecent }
@@ -177,8 +222,7 @@ public final class Installation {
             self.donnees = donnees
             self.domicile = domicile
             self.applications = applications
-            self.uvCandidats = uvCandidats ?? [domicile.appendingPathComponent(".local/bin/uv"),
-                                               URL(fileURLWithPath: "/opt/homebrew/bin/uv"), URL(fileURLWithPath: "/usr/local/bin/uv")]
+            self.uvCandidats = uvCandidats ?? Installation.uvCandidats(domicile: domicile, essai: false)
             self.cacheHF = cacheHF ?? domicile.appendingPathComponent(".cache/huggingface/hub", isDirectory: true)
             self.connecteur = connecteur ?? donnees.racineLocale.appendingPathComponent("mcp-developpeur")
             self.module = module ?? domicile.appendingPathComponent("Library/Application Support/Adobe/Lightroom/Modules/Developpeur.lrplugin", isDirectory: true)
@@ -202,6 +246,13 @@ public final class Installation {
         var versionsClaude: URL { domicile.appendingPathComponent(".local/share/claude/versions", isDirectory: true) }
         var lienClaude: URL { binLocal.appendingPathComponent("claude") }
         var applicationFibo: URL { applications.appendingPathComponent(Installation.nomApplicationFibo, isDirectory: true) }
+    }
+
+    /// Où chercher uv : ~/.local/bin, puis Homebrew. Pour un essai à la main sur un domicile donné
+    /// (`DEVELOPPEUR_DOMICILE`), ce domicile seul : l'uv du vrai Mac ne doit pas répondre à sa place.
+    public static func uvCandidats(domicile: URL, essai: Bool) -> [URL] {
+        let local = domicile.appendingPathComponent(".local/bin/uv")
+        return essai ? [local] : [local, URL(fileURLWithPath: "/opt/homebrew/bin/uv"), URL(fileURLWithPath: "/usr/local/bin/uv")]
     }
 
     public let env: Environnement
@@ -287,7 +338,7 @@ public final class Installation {
         let ensemble = e["ensemble"]?.array.map { Set($0.compactMap(\.string)) }
         var detail: [String: JSONValue] = [:]
         for cle in ["depose_le", "depuis", "taille", "python", "uv", "modeles", "connecteur", "module"] { detail[cle] = e[cle] }
-        return Cote(version: version, ensemble: ensemble, detail: detail)
+        return Cote(version: version, ensemble: ensemble, marques: Self.marques(e["marques"]), detail: detail)
     }
 
     // MARK: Côté Mac
@@ -299,12 +350,13 @@ public final class Installation {
         case .modelesHF:
             let inv = Self.inventaireHF(hub: env.cacheHF, depots: Self.depotsHF)
             guard !inv.ensemble.isEmpty else { return nil }
-            return Cote(version: Self.texteModeles(inv.ensemble), ensemble: inv.ensemble,
+            return Cote(version: Self.texteModeles(inv.ensemble), ensemble: inv.ensemble, marques: inv.marques,
                         detail: ["taille": .number(Double(inv.taille)), "modeles": inv.modelesJSON])
         case .sam2:
-            let inv = Self.inventaireDossier(env.sam2)
+            let inv = Self.inventaireDossier(env.sam2, empreintes: true)
             guard !inv.ensemble.isEmpty else { return nil }
-            return Cote(version: "\(inv.ensemble.count) fichiers de modèles", ensemble: inv.ensemble, detail: ["taille": .number(Double(inv.taille))])
+            return Cote(version: "\(inv.ensemble.count) fichiers de modèles", ensemble: inv.ensemble, marques: inv.marques,
+                        detail: ["taille": .number(Double(inv.taille))])
         case .fibo2studio:
             guard let v = Self.versionApplication(env.applicationFibo) else { return nil }
             return Cote(version: v)
@@ -413,6 +465,15 @@ public final class Installation {
         return r.code == 0 ? Self.versionModule(texte: r.sortie) : nil
     }
 
+    /// Le témoin qu'une archive est d'essai (build.sh sans notarisation ou avec --sans-tests) : elle ne
+    /// va jamais sur le SSD, l'autre Mac la proposerait.
+    public static let temoinEssai = "Developpeur/ESSAI"
+    public static let texteArchiveEssai = "archive d'essai (non notarisée, ou construite avec --sans-tests) : jamais déposée sur le SSD."
+
+    func archiveDEssai(_ zip: URL) -> Bool {
+        env.lancer(URL(fileURLWithPath: "/usr/bin/unzip"), ["-l", zip.path, Self.temoinEssai], nil, 30).code == 0
+    }
+
     // MARK: Comparaison
 
     public struct Ligne {
@@ -451,8 +512,9 @@ public final class Installation {
     }
 
     static func texteModeles(_ ensemble: Set<String>) -> String {
-        let depots = Set(ensemble.compactMap { $0.split(separator: "@").first.map(String.init) })
-        return "\(depots.count) modèle\(depots.count > 1 ? "s" : ""), \(ensemble.count) instantané\(ensemble.count > 1 ? "s" : "")"
+        let instantanes = ensemble.filter { !$0.contains(":") }
+        let depots = Set(instantanes.compactMap { $0.split(separator: "@").first.map(String.init) })
+        return "\(depots.count) modèle\(depots.count > 1 ? "s" : ""), \(instantanes.count) instantané\(instantanes.count > 1 ? "s" : "")"
     }
 
     // MARK: Action
@@ -461,9 +523,19 @@ public final class Installation {
         public var element: Element
         /// « depose », « installe », « rien », « refuse », « echec ».
         public var action: String
+        /// Une phrase, sans retour à la ligne.
         public var texte: String
+        /// Ce qui l'accompagne (les notes d'install.sh), une phrase chacune.
+        public var notes: [String] = []
+        public init(element: Element, action: String, texte: String, notes: [String] = []) {
+            self.element = element
+            self.action = action
+            self.texte = texte
+            self.notes = notes
+        }
         public var json: JSONValue {
-            ["element": .string(element.rawValue), "action": .string(action), "texte": .string(texte)]
+            ["element": .string(element.rawValue), "action": .string(action), "texte": .string(texte),
+             "notes": .array(notes.map(JSONValue.string))]
         }
     }
 
@@ -511,15 +583,19 @@ public final class Installation {
                 continue
             }
             do {
-                let texte = depot ? try self.deposer(element, ligne: ligne, installation: installation, archive: archive)
+                let rendu = depot ? try self.deposer(element, ligne: ligne, installation: installation, archive: archive)
                     : try installer(element, ligne: ligne, installation: installation)
+                // Première ligne : le fait ; les suivantes : ses notes.
+                var lignesRendu = rendu.components(separatedBy: "\n")
+                let texte = lignesRendu.removeFirst()
                 faits.append(Fait(element: element, action: texte.hasPrefix("=") ? "rien" : (depot ? "depose" : "installe"),
-                                  texte: texte.hasPrefix("=") ? String(texte.dropFirst()) : texte))
+                                  texte: texte.hasPrefix("=") ? String(texte.dropFirst()) : texte, notes: lignesRendu.filter { !$0.isEmpty }))
             } catch let refus as Refus {
                 faits.append(Fait(element: element, action: "refuse", texte: "\(element.nom) : \(refus.texte)"))
             } catch {
                 faits.append(Fait(element: element, action: "echec", texte: "\(element.nom) : échec (\(error.localizedDescription))."))
             }
+            if let f = faits.last { journaliser(([(depot ? "dépôt" : "installation") + ", " + f.action + " : " + f.texte] + f.notes.map { "  - " + $0 }).joined(separator: "\n")) }
             // L'état d'après, relu.
             let manifeste = lireManifeste(installation)
             let mac = coteMac(element)
@@ -585,6 +661,7 @@ public final class Installation {
                 throw Refus("il faut l'archive Developpeur.zip (./build.sh --install ou install.sh la déposent ; sinon --archive <Developpeur.zip>).")
             }
             guard let v = versionArchive(zip) else { throw Refus("\(zip.path) n'est pas une archive de Développeur lisible.") }
+            if archiveDEssai(zip) { throw Refus(Self.texteArchiveEssai) }
             if let ssd = ligne.ssd?.version {
                 if ssd == v { return "=Développeur IA \(v) est déjà sur le SSD." }
                 if MiseAJour.plusRecente(ssd, que: v) { throw Refus("le SSD a déjà la \(ssd), plus récente que cette archive (\(v)).") }
@@ -638,21 +715,24 @@ public final class Installation {
             let hub = installation.appendingPathComponent("modeles_hf/hub", isDirectory: true)
             let inv = Self.inventaireHF(hub: env.cacheHF, depots: Self.depotsHF)
             guard !inv.entrees.isEmpty else { throw Refus("aucun des modèles de Fibo n'est dans le cache de Hugging Face de ce Mac.") }
-            try copierArbre(inv.entrees, de: env.cacheHF, vers: hub, element: element)
+            try copierArbre(inv.entrees, de: env.cacheHF, vers: hub, element: element, marques: Set(inv.marques.keys))
+            // L'inventaire du SSD est relu après la pose des liens : seul ce qui est vraiment là est déclaré.
             let surSSD = Self.inventaireHF(hub: hub, depots: Self.depotsHF)
             manifeste[element.rawValue] = entree(version: Self.texteModeles(surSSD.ensemble), fichiers: [("modeles_hf/hub", surSSD.taille, nil)],
-                                                 en: ["ensemble": .array(surSSD.ensemble.sorted().map(JSONValue.string)), "modeles": surSSD.modelesJSON])
+                                                 en: ["ensemble": .array(surSSD.ensemble.sorted().map(JSONValue.string)), "modeles": surSSD.modelesJSON,
+                                                      "marques": Self.marquesJSON(surSSD.marques)])
             try ecrireManifeste(installation, manifeste)
             return "Modèles de Fibo déposés sur le SSD (\(Self.texteModeles(surSSD.ensemble)), \(Self.go(surSSD.taille)))."
 
         case .sam2:
             let cible = installation.appendingPathComponent("sam2/SAM2", isDirectory: true)
-            let inv = Self.inventaireDossier(env.sam2)
+            let inv = Self.inventaireDossier(env.sam2, empreintes: true)
             guard !inv.entrees.isEmpty else { throw Refus("SAM 2 de Fibo 2 Studio est absent de ce Mac.") }
-            try copierArbre(inv.entrees, de: env.sam2, vers: cible, element: element)
-            let surSSD = Self.inventaireDossier(cible)
+            try copierArbre(inv.entrees, de: env.sam2, vers: cible, element: element, marques: Set(inv.marques.keys))
+            let surSSD = Self.inventaireDossier(cible, empreintes: true)
             manifeste[element.rawValue] = entree(version: "\(surSSD.ensemble.count) fichiers de modèles", fichiers: [("sam2/SAM2", surSSD.taille, nil)],
-                                                 en: ["ensemble": .array(surSSD.ensemble.sorted().map(JSONValue.string))])
+                                                 en: ["ensemble": .array(surSSD.ensemble.sorted().map(JSONValue.string)),
+                                                      "marques": Self.marquesJSON(surSSD.marques)])
             try ecrireManifeste(installation, manifeste)
             return "SAM 2 de Fibo 2 Studio déposé sur le SSD (\(Self.go(surSSD.taille)))."
         }
@@ -714,12 +794,17 @@ public final class Installation {
         guard let archivePython else { throw Refus("uv n'a pas gardé l'archive de Python \(mflux.python) (UV_PYTHON_CACHE_DIR).") }
         try? fm.removeItem(at: archives)
         avancer(.mflux, 2, 3, "mflux \(mflux.version) : rangement sur le SSD")
+        // L'uv qui a rempli ce cache part avec lui : un autre uv peut ranger son cache autrement, ou
+        // chercher une autre construction de Python dans le miroir. L'installation se sert de celui-ci.
+        try copierFichier(uv.url.resolvingSymlinksInPath(), vers: partiel.appendingPathComponent("uv"), element: .mflux, mode: 0o755)
         try remplacer(partiel, par: installation.appendingPathComponent("mflux"))
         let final = installation.appendingPathComponent("mflux")
         let cheminArchive = final.appendingPathComponent("python").appendingPathComponent(archivePython)
+        let uvGarde = final.appendingPathComponent("uv")
         manifeste[Element.mflux.rawValue] = entree(version: mflux.version, fichiers: [
             ("mflux/cache", Self.tailleArbre(final.appendingPathComponent("cache")), nil),
             ("mflux/python/" + archivePython, Self.taille(cheminArchive), try Self.sha256(cheminArchive)),
+            ("mflux/uv", Self.taille(uvGarde), try Self.sha256(uvGarde)),
         ], en: ["python": .string(mflux.python), "uv": .string(uv.version)])
         try ecrireManifeste(installation, manifeste)
         avancer(.mflux, 3, 3, "mflux \(mflux.version) déposé")
@@ -747,6 +832,7 @@ public final class Installation {
         case .uv:
             let source = installation.appendingPathComponent("uv/uv")
             try verifierPlace(Self.taille(source), sur: env.binLocal)
+            try verifierEmpreinte("uv/uv", installation: installation, element: element)
             try fm.createDirectory(at: env.binLocal, withIntermediateDirectories: true)
             let cible = env.binLocal.appendingPathComponent("uv")
             try copierFichier(source, vers: cible, element: element, mode: 0o755)
@@ -760,20 +846,28 @@ public final class Installation {
             if env.mfluxEnCours() { throw Refus(Self.texteMfluxEnCours) }
             let hub = installation.appendingPathComponent("modeles_hf/hub", isDirectory: true)
             let inv = Self.inventaireHF(hub: hub, depots: Self.depotsHF)
-            try copierArbre(inv.entrees, de: hub, vers: env.cacheHF, element: element)
+            try copierArbre(inv.entrees, de: hub, vers: env.cacheHF, element: element, marques: Set(inv.marques.keys))
+            // Chaque fichier de chaque instantané du SSD doit maintenant être là, lien compris.
+            let surMac = Self.inventaireHF(hub: env.cacheHF, depots: Self.depotsHF)
+            let manque = inv.ensemble.subtracting(surMac.ensemble)
+            guard manque.isEmpty else {
+                throw Refus("copie incomplète : \(manque.count) fichier\(manque.count > 1 ? "s" : "") des modèles manque\(manque.count > 1 ? "nt" : "") "
+                    + "dans \(env.cacheHF.path) (\(manque.sorted().prefix(3).joined(separator: ", "))) : relancer l'installation.")
+            }
             return "Modèles de Fibo installés dans \(env.cacheHF.path) (\(Self.texteModeles(inv.ensemble)))."
 
         case .sam2:
             if env.fiboStudioOuvert() { throw Refus(Self.texteFiboOuvert) }
             let source = installation.appendingPathComponent("sam2/SAM2", isDirectory: true)
-            try copierArbre(Self.inventaireDossier(source).entrees, de: source, vers: env.sam2, element: element)
+            let inv = Self.inventaireDossier(source, empreintes: true)
+            try copierArbre(inv.entrees, de: source, vers: env.sam2, element: element, marques: Set(inv.marques.keys))
             return "SAM 2 de Fibo 2 Studio installé dans \(env.sam2.path)."
 
         case .fibo2studio:
             if env.fiboStudioOuvert() { throw Refus(Self.texteFiboOuvert) }
             let zip = installation.appendingPathComponent("fibo2studio/Fibo 2 Studio.zip")
             try verifierPlace(Self.taille(zip) * 3, sur: env.applications)
-            try verifierEmpreinte(zip, element: element)
+            try verifierEmpreinte("fibo2studio/Fibo 2 Studio.zip", installation: installation, element: element)
             let partiel = env.applications.appendingPathComponent(".Fibo 2 Studio.partiel", isDirectory: true)
             try? fm.removeItem(at: partiel)
             try fm.createDirectory(at: partiel, withIntermediateDirectories: true)
@@ -791,7 +885,7 @@ public final class Installation {
             guard let fichier = ssd.version.isEmpty ? nil : installation.appendingPathComponent("claude_code/claude-\(ssd.version)"),
                   fm.fileExists(atPath: fichier.path) else { throw Refus("le fichier de Claude Code manque sur le SSD.") }
             try verifierPlace(Self.taille(fichier), sur: env.versionsClaude)
-            try verifierEmpreinte(fichier, element: element)
+            try verifierEmpreinte("claude_code/claude-\(ssd.version)", installation: installation, element: element)
             try fm.createDirectory(at: env.versionsClaude, withIntermediateDirectories: true)
             let cible = env.versionsClaude.appendingPathComponent(ssd.version)
             try copierFichier(fichier, vers: cible, element: element, mode: 0o755)
@@ -806,7 +900,7 @@ public final class Installation {
         case .developpeur:
             let zip = installation.appendingPathComponent("developpeur/Developpeur.zip")
             try verifierPlace(Self.taille(zip) * 4, sur: env.temporaire)
-            try verifierEmpreinte(zip, element: element)
+            try verifierEmpreinte("developpeur/Developpeur.zip", installation: installation, element: element)
             let dossier = env.temporaire.appendingPathComponent("developpeur-\(ssd.version)", isDirectory: true)
             try? fm.removeItem(at: dossier)
             try fm.createDirectory(at: dossier, withIntermediateDirectories: true)
@@ -823,20 +917,43 @@ public final class Installation {
             let s = env.lancer(URL(fileURLWithPath: "/bin/bash"), [script.path], e, 900)
             guard s.code == 0 else { throw Refus("install.sh a échoué : \(Self.fin(s.sortie))") }
             avancer(element, 2, 2, "Développeur IA \(ssd.version) installé")
-            return "Développeur IA \(ssd.version) installé. install.sh dit :\n" + s.sortie.trimmingCharacters(in: .whitespacesAndNewlines)
+            journaliser("install.sh de Développeur IA \(ssd.version) :\n" + s.sortie.trimmingCharacters(in: .whitespacesAndNewlines))
+            // Le fait, puis ses notes (une par ligne : Prochaines étapes et avertissements d'install.sh).
+            return (["Développeur IA \(ssd.version) installé."] + Self.notesInstallSh(s.sortie)).joined(separator: "\n")
         }
     }
 
-    /// mflux hors ligne : Python depuis le miroir `file://` du SSD, puis mflux depuis le cache du SSD
-    /// (`--offline`), réseau coupé ; uv du SSD de préférence (celui qui a rempli le cache).
-    func installerMflux(installation: URL, ssd: Cote) throws -> String {
+    /// L'uv de l'installation de mflux : exactement celui qui a rempli le cache (numéro du manifeste) ;
+    /// d'abord sa copie gardée avec mflux (`mflux/uv`), sinon celui du SSD (`uv/uv`) ou de ce Mac s'ils
+    /// portent ce numéro. Les fichiers du SSD sont vérifiés par leur empreinte avant d'être lancés.
+    func uvPourMflux(installation: URL, ssd: Cote) throws -> URL {
         let fm = FileManager.default
+        guard let voulu = ssd.detail["uv"]?.string else { throw Refus("le manifeste ne dit pas quel uv a rempli le cache de mflux : redéposer mflux.") }
+        let garde = installation.appendingPathComponent("mflux/uv")
+        if fm.isExecutableFile(atPath: garde.path) {
+            try verifierEmpreinte("mflux/uv", installation: installation, element: .mflux)
+            if versionUV(garde) == voulu { return garde }
+        }
+        let uvSSD = installation.appendingPathComponent("uv/uv")
+        if fm.isExecutableFile(atPath: uvSSD.path), versionUV(uvSSD) == voulu {
+            try verifierEmpreinte("uv/uv", installation: installation, element: .uv)
+            return uvSSD
+        }
+        for url in env.uvCandidats where fm.isExecutableFile(atPath: url.path) && versionUV(url) == voulu { return url }
+        throw Refus("il faut uv \(voulu), celui qui a rempli le cache de mflux, et il n'est ni sur le SSD ni sur ce Mac : redéposer mflux depuis l'autre Mac.")
+    }
+
+    /// mflux hors ligne : Python depuis le miroir `file://` du SSD, puis mflux depuis le cache du SSD
+    /// (`--offline`), réseau coupé ; avec l'uv qui a rempli le cache (`uvPourMflux`).
+    func installerMflux(installation: URL, ssd: Cote) throws -> String {
         let dossier = installation.appendingPathComponent("mflux", isDirectory: true)
         guard let python = ssd.detail["python"]?.string else { throw Refus("le manifeste ne dit pas le Python de mflux.") }
-        let uvSSD = installation.appendingPathComponent("uv/uv")
-        let uv: URL
-        if fm.isExecutableFile(atPath: uvSSD.path), versionUV(uvSSD) != nil { uv = uvSSD } else if let u = uvDuMac() { uv = u.url } else {
-            throw Refus("uv est absent de ce Mac et du SSD (déposer uv d'abord).")
+        let uv = try uvPourMflux(installation: installation, ssd: ssd)
+        // L'archive de Python, vérifiée avant que uv ne la décompresse.
+        for f in lireManifeste(installation)[Element.mflux.rawValue]?["fichiers"]?.array ?? [] {
+            if let chemin = f["chemin"]?.string, chemin.hasPrefix("mflux/python/") {
+                try verifierEmpreinte(chemin, installation: installation, element: .mflux)
+            }
         }
         try verifierPlace(Self.tailleArbre(dossier), sur: env.outilsUV)
         var e = environnementUV(cache: dossier.appendingPathComponent("cache"))
@@ -856,11 +973,47 @@ public final class Installation {
         return "mflux \(ssd.version) (Python \(python)) installé hors ligne dans \(env.outilsUV.path)."
     }
 
-    func verifierEmpreinte(_ fichier: URL, element: Element) throws {
-        let manifeste = lireManifeste(fichier.deletingLastPathComponent().deletingLastPathComponent())
-        guard let attendu = manifeste[element.rawValue]?["fichiers"]?.array?.first?["sha256"]?.string else { return }
-        guard try Self.sha256(fichier) == attendu else { throw Refus("le fichier du SSD est abîmé (empreinte SHA-256 différente) : le redéposer depuis l'autre Mac.") }
+    /// Le fichier `chemin` (relatif à Installation) a-t-il l'empreinte que le manifeste lui donne ?
+    /// L'entrée se cherche par son chemin ; un fichier sans empreinte au manifeste passe.
+    func verifierEmpreinte(_ chemin: String, installation: URL, element: Element) throws {
+        let manifeste = lireManifeste(installation)
+        let fichiers = manifeste[element.rawValue]?["fichiers"]?.array ?? []
+        guard let attendu = fichiers.first(where: { $0["chemin"]?.string == chemin })?["sha256"]?.string else { return }
+        guard try Self.sha256(installation.appendingPathComponent(chemin)) == attendu else {
+            throw Refus("le fichier \(chemin) du SSD est abîmé (empreinte SHA-256 différente) : le redéposer depuis l'autre Mac.")
+        }
     }
+
+    /// Les notes d'install.sh pour Dany : chaque point « - … » qui suit « Prochaines étapes : », ses
+    /// lignes de suite jointes en une seule.
+    public static func notesInstallSh(_ sortie: String) -> [String] {
+        let lignes = sortie.components(separatedBy: "\n")
+        guard let debut = lignes.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix("Prochaines étapes") }) else { return [] }
+        var notes: [String] = []
+        for ligne in lignes[(debut + 1)...] {
+            let t = ligne.trimmingCharacters(in: .whitespaces)
+            guard !t.isEmpty else { continue }
+            if t.hasPrefix("- ") {
+                notes.append(String(t.dropFirst(2)))
+            } else if ligne.hasPrefix(" "), !notes.isEmpty {
+                notes[notes.count - 1] += " " + t
+            }
+        }
+        return notes
+    }
+
+    /// Le journal durable des mises à jour (racine locale, `mises-a-jour.journal`) : chaque fait, et la
+    /// sortie complète d'install.sh. Gardé sous 1 Mo (la moitié la plus récente).
+    func journaliser(_ texte: String) {
+        let url = env.donnees.racineLocale.appendingPathComponent(Self.nomJournal)
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        var tout = (try? Data(contentsOf: url)) ?? Data()
+        tout.append(Data("[\(Self.dateISO(env.maintenant()))] \(texte)\n".utf8))
+        if tout.count > 1_000_000 { tout = tout.suffix(500_000) }
+        try? tout.write(to: url, options: .atomic)
+    }
+
+    public static let nomJournal = "mises-a-jour.journal"
 
     static func fin(_ texte: String) -> String {
         let t = texte.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -937,17 +1090,41 @@ public final class Installation {
         public var genre: Genre
     }
 
-    /// Copie un arbre : dossiers, puis fichiers (un fichier déjà là à la même taille est gardé : une
-    /// copie interrompue reprend), puis liens (posés seulement là où rien n'existe). Rien n'est retiré
-    /// de la cible. Place vérifiée avant.
-    func copierArbre(_ entrees: [Entree], de source: URL, vers cible: URL, element: Element) throws {
+    /// Copie un arbre : dossiers, puis fichiers, puis liens (posés seulement là où rien n'existe). Un
+    /// fichier ordinaire déjà là à la même taille est gardé (une copie interrompue reprend : les blobs
+    /// sont nommés par leur empreinte). Un fichier marqué (`marques` : `refs/*` des modèles, fichiers de
+    /// SAM 2, dont le nom ne dit pas le contenu) est gardé s'il a le même contenu, remplacé si la source
+    /// est plus récente, gardé sinon ; sa date suit la source. Rien n'est retiré de la cible, sauf les
+    /// « .partiel » laissés par une copie interrompue (les nôtres) dans les dossiers de l'arbre. Place
+    /// vérifiée avant.
+    func copierArbre(_ entrees: [Entree], de source: URL, vers cible: URL, element: Element, marques: Set<String> = []) throws {
         let fm = FileManager.default
         func existeA(_ url: URL) -> Bool { (try? fm.attributesOfItem(atPath: url.path)) != nil }
+        // Les « .partiel » d'une copie interrompue, dans les dossiers de cet arbre seulement.
+        var dossiersArbre: Set<String> = [""]
+        for e in entrees {
+            if e.genre == .dossier { dossiersArbre.insert(e.chemin) }
+            dossiersArbre.insert((e.chemin as NSString).deletingLastPathComponent)
+        }
+        for d in dossiersArbre {
+            let url = d.isEmpty ? cible : cible.appendingPathComponent(d, isDirectory: true)
+            for nom in (try? fm.contentsOfDirectory(atPath: url.path)) ?? [] where nom.hasSuffix(".partiel") {
+                let f = url.appendingPathComponent(nom)
+                if (try? fm.attributesOfItem(atPath: f.path))?[.type] as? FileAttributeType == .typeRegular { try? fm.removeItem(at: f) }
+            }
+        }
         var aCopier: [(String, Int64)] = []
         for e in entrees {
             if case .fichier(let t) = e.genre {
                 let c = cible.appendingPathComponent(e.chemin)
-                if !(fm.fileExists(atPath: c.path) && Self.taille(c) == t) { aCopier.append((e.chemin, t)) }
+                guard fm.fileExists(atPath: c.path) else { aCopier.append((e.chemin, t)); continue }
+                if marques.contains(e.chemin) {
+                    let s = source.appendingPathComponent(e.chemin)
+                    if Self.taille(c) == t, (try? Self.sha256(c)) == (try? Self.sha256(s)) { continue }
+                    if Self.dateModification(s) > Self.dateModification(c) + Self.toleranceDate { aCopier.append((e.chemin, t)) }
+                } else if Self.taille(c) != t {
+                    aCopier.append((e.chemin, t))
+                }
             }
         }
         let total = aCopier.reduce(0) { $0 + $1.1 }
@@ -959,8 +1136,11 @@ public final class Installation {
         var fait: Int64 = 0
         avancer(element, 0, total, "\(element.nom) : \(Self.go(total)) à copier")
         for (chemin, t) in aCopier {
-            try copierFichier(source.appendingPathComponent(chemin), vers: cible.appendingPathComponent(chemin), element: element,
-                              dejaFait: fait, total: total)
+            let s = source.appendingPathComponent(chemin), c = cible.appendingPathComponent(chemin)
+            try copierFichier(s, vers: c, element: element, dejaFait: fait, total: total)
+            if marques.contains(chemin) {
+                try? fm.setAttributes([.modificationDate: Date(timeIntervalSince1970: Self.dateModification(s))], ofItemAtPath: c.path)
+            }
             fait += t
             avancer(element, fait, total, "\(element.nom) : \(Self.go(fait)) sur \(Self.go(total))")
         }
@@ -977,8 +1157,11 @@ public final class Installation {
 
     public struct InventaireHF {
         public var entrees: [Entree] = []
-        /// « dépôt@instantané » de chaque instantané complet.
+        /// « dépôt@instantané » de chaque instantané complet, et « dépôt@instantané:fichier » de chacun
+        /// de ses fichiers : un instantané à moitié là n'est pas égal à un instantané entier.
         public var ensemble: Set<String> = []
+        /// Les `models--…/refs/<nom>` (la révision suivie) : valeur et date.
+        public var marques: [String: Marque] = [:]
         public var taille: Int64 = 0
         public var modeles: [String: (refs: [String: String], instantanes: [String])] = [:]
         public var modelesJSON: JSONValue {
@@ -1065,16 +1248,19 @@ public final class Installation {
             guard fm.fileExists(atPath: racine.appendingPathComponent(modele).path) else { continue }
             parcourir(modele)
             var refs: [String: String] = [:]
-            for nom in (try? fm.contentsOfDirectory(atPath: racine.appendingPathComponent(modele + "/refs").path)) ?? [] {
-                refs[nom] = (try? String(contentsOf: racine.appendingPathComponent(modele + "/refs/" + nom), encoding: .utf8))?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            for nom in (try? fm.contentsOfDirectory(atPath: racine.appendingPathComponent(modele + "/refs").path)) ?? [] where !ignoree(nom) {
+                let url = racine.appendingPathComponent(modele + "/refs/" + nom)
+                guard let valeur = (try? String(contentsOf: url, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) else { continue }
+                refs[nom] = valeur
+                inv.marques[modele + "/refs/" + nom] = Marque(valeur: valeur, date: dateModification(url))
             }
             var instantanes: [String] = []
             let dossierInstantanes = racine.appendingPathComponent(modele + "/snapshots")
             for rev in (try? fm.contentsOfDirectory(atPath: dossierInstantanes.path)) ?? [] where !ignoree(rev) {
-                if instantaneComplet(dossierInstantanes.appendingPathComponent(rev)) {
+                if let fichiers = fichiersInstantane(dossierInstantanes.appendingPathComponent(rev)) {
                     instantanes.append(rev)
                     inv.ensemble.insert(depot + "@" + rev)
+                    for f in fichiers { inv.ensemble.insert(depot + "@" + rev + ":" + f) }
                 }
             }
             inv.modeles[depot] = (refs, instantanes)
@@ -1090,30 +1276,41 @@ public final class Installation {
 
     /// Un instantané complet : chaque lien qu'il porte mène à un fichier (aucun lien cassé), et il a au
     /// moins un fichier.
-    static func instantaneComplet(_ dossier: URL) -> Bool {
+    static func instantaneComplet(_ dossier: URL) -> Bool { fichiersInstantane(dossier) != nil }
+
+    /// Les fichiers d'un instantané (chemins relatifs), ou nil s'il a un lien cassé ou aucun fichier.
+    /// Les fichiers qui manquent tout à fait (lien jamais posé) ne se voient pas ici : la comparaison
+    /// les voit, car l'ensemble porte chaque fichier.
+    static func fichiersInstantane(_ dossier: URL) -> [String]? {
         let fm = FileManager.default
-        guard let enumerateur = fm.enumerator(at: dossier, includingPropertiesForKeys: [.isSymbolicLinkKey, .isRegularFileKey]) else { return false }
-        var fichiers = 0
+        let base = dossier.standardizedFileURL.path
+        guard let enumerateur = fm.enumerator(at: dossier, includingPropertiesForKeys: [.isSymbolicLinkKey, .isRegularFileKey]) else { return nil }
+        var fichiers: [String] = []
         for case let url as URL in enumerateur {
+            guard !ignoree(url.lastPathComponent) else { continue }
             let v = try? url.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])
+            let chemin = url.standardizedFileURL.path
+            let relatif = chemin.hasPrefix(base + "/") ? String(chemin.dropFirst(base.count + 1)) : url.lastPathComponent
             if v?.isSymbolicLink == true {
-                var dossier: ObjCBool = false
-                guard fm.fileExists(atPath: url.path, isDirectory: &dossier) else { return false }
-                if !dossier.boolValue { fichiers += 1 }
+                var estDossier: ObjCBool = false
+                guard fm.fileExists(atPath: url.path, isDirectory: &estDossier) else { return nil }
+                if !estDossier.boolValue { fichiers.append(relatif) }
             } else if v?.isRegularFile == true {
-                fichiers += 1
+                fichiers.append(relatif)
             }
         }
-        return fichiers > 0
+        return fichiers.isEmpty ? nil : fichiers.sorted()
     }
 
-    /// Un dossier ordinaire (SAM 2) : ses entrées, et l'ensemble « chemin:taille » des fichiers de ses
-    /// .mlpackage (les .mlmodelc, compilés sur chaque Mac, se copient sans compter).
-    public static func inventaireDossier(_ donne: URL) -> (entrees: [Entree], ensemble: Set<String>, taille: Int64) {
+    /// Un dossier ordinaire (SAM 2) : ses entrées, l'ensemble des chemins des fichiers de ses
+    /// .mlpackage (les .mlmodelc, compilés sur chaque Mac, se copient sans compter) et, avec
+    /// `empreintes`, leurs marques (SHA-256 et date) : un nouvel export aux mêmes tailles se voit.
+    public static func inventaireDossier(_ donne: URL, empreintes: Bool = false)
+        -> (entrees: [Entree], ensemble: Set<String>, taille: Int64, marques: [String: Marque]) {
         let fm = FileManager.default
         // Le dossier lui-même peut être un lien (suivi) ; ce qu'il contient, non.
         let dossier = donne.resolvingSymlinksInPath()
-        var entrees: [Entree] = [], ensemble = Set<String>(), taille: Int64 = 0
+        var entrees: [Entree] = [], ensemble = Set<String>(), taille: Int64 = 0, marques: [String: Marque] = [:]
         func parcourir(_ chemin: String) {
             let url = chemin.isEmpty ? dossier : dossier.appendingPathComponent(chemin)
             guard let a = try? fm.attributesOfItem(atPath: url.path), let type = a[.type] as? FileAttributeType else { return }
@@ -1129,15 +1326,23 @@ public final class Installation {
                 let t = (a[.size] as? NSNumber)?.int64Value ?? 0
                 entrees.append(Entree(chemin: chemin, genre: .fichier(t)))
                 taille += t
-                if chemin.contains(".mlpackage/") { ensemble.insert("\(chemin):\(t)") }
+                if chemin.contains(".mlpackage/") {
+                    ensemble.insert(chemin)
+                    if empreintes, let sha = try? sha256(url) { marques[chemin] = Marque(valeur: sha, date: dateModification(url)) }
+                }
             default: return
             }
         }
         parcourir("")
-        return (entrees, ensemble, taille)
+        return (entrees, ensemble, taille, marques)
     }
 
     // MARK: Outils
+
+    /// Date de modification en secondes depuis 1970 (0 : illisible).
+    public static func dateModification(_ url: URL) -> Double {
+        ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+    }
 
     public static func taille(_ url: URL) -> Int64 {
         ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.int64Value ?? -1

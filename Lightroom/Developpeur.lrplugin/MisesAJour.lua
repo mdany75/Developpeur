@@ -57,7 +57,7 @@ end
 function MisesAJour.refus()
     local commun = Chemins.dossierCommun()
     if not commun.regle then
-        return "Aucun dossier commun n'est réglé : les mises à jour par le SSD passent par lui (section Dossier commun, ci-dessous)."
+        return "Aucun dossier commun n'est réglé : les mises à jour par le SSD passent par lui (section Dossier commun, ci-dessus)."
     elseif not commun.present then
         return Chemins.messageAbsent(commun.chemin)
     end
@@ -229,11 +229,25 @@ function MisesAJour.texteFin(r, annule)
         return "Le connecteur n'a rien rendu : relancer la vérification depuis le Gestionnaire de modules externes."
     end
     local lignes = {}
-    for _, f in ipairs(type(r.faits) == 'table' and r.faits or {}) do
+    local faits = type(r.faits) == 'table' and r.faits or {}
+    -- Un refus de tout le bloc (verrou pris, dossier commun disparu) : sans faits, avec son erreur.
+    if #faits == 0 and type(r.erreur) == 'string' and r.erreur ~= '' then
+        return r.erreur
+    end
+    for _, f in ipairs(faits) do
         if type(f) == 'table' and type(f.texte) == 'string' then
-            -- La sortie d'install.sh reste dans le journal du connecteur : la première ligne seulement.
-            lignes[#lignes + 1] = "• " .. (f.texte:match('^[^\n]+') or f.texte)
+            lignes[#lignes + 1] = "• " .. f.texte
+            -- Les notes (avertissements et prochaines étapes d'install.sh) sous leur fait ; la sortie
+            -- complète est dans mises-a-jour.journal de ce Mac.
+            for _, n in ipairs(type(f.notes) == 'table' and f.notes or {}) do
+                if type(n) == 'string' and n ~= '' then
+                    lignes[#lignes + 1] = "   – " .. n
+                end
+            end
         end
+    end
+    if #lignes == 0 then
+        lignes[#lignes + 1] = "Rien n'a changé."
     end
     if type(r.relancer) == 'table' and #r.relancer > 0 then
         lignes[#lignes + 1] = "\nÀ relancer :"
@@ -256,9 +270,77 @@ local function avecBarre(titre, action, liste)
     return r, annule
 end
 
+-- Le refus du verrou du connecteur (une autre mise à jour tourne déjà sur ce Mac : un connecteur resté
+-- après un rechargement du module, build.sh --install) : au lancement, rien à dire.
+MisesAJour.TEXTE_VERROU = "Une autre mise à jour par le SSD est déjà en cours"
+
+local function refusDuVerrou(r)
+    return type(r) == 'table' and r.ok == false and type(r.erreur) == 'string'
+        and r.erreur:find(MisesAJour.TEXTE_VERROU, 1, true) ~= nil
+end
+
+-- Les refus retenus (préférence `misesAJourRefus`, JSON) : { [« action|élément|Mac|SSD »] = texte }.
+-- Un élément refusé (place, réseau…) n'est plus retenté au lancement tant que ni ce Mac ni le SSD ne
+-- changent de version : le Gestionnaire le relance, et sa réussite l'oublie.
+local function signature(action, e)
+    return table.concat({ action, tostring(e.element), version(e.mac) or '', version(e.ssd) or '' }, '|')
+end
+
+function MisesAJour.refusRetenus()
+    local ok, t = pcall(Json.decode, Chemins.prefs().misesAJourRefus or '')
+    return ok and type(t) == 'table' and t or {}
+end
+
+local function retenirRefus(action, liste, r)
+    if type(r) ~= 'table' or type(r.faits) ~= 'table' then
+        return
+    end
+    local retenus = MisesAJour.refusRetenus()
+    local neuf = {}
+    for cle, texte in pairs(retenus) do
+        if type(cle) == 'string' and type(texte) == 'string' then neuf[cle] = texte end
+    end
+    for _, e in ipairs(liste) do
+        -- L'ancien refus de cet élément pour cette action s'oublie, quelle que soit la version.
+        local prefixe = action .. '|' .. tostring(e.element) .. '|'
+        for cle in pairs(retenus) do
+            if type(cle) == 'string' and cle:sub(1, #prefixe) == prefixe then neuf[cle] = nil end
+        end
+        for _, f in ipairs(r.faits) do
+            if type(f) == 'table' and f.element == e.element and (f.action == 'refuse' or f.action == 'echec') then
+                neuf[signature(action, e)] = type(f.texte) == 'string' and f.texte or ''
+            end
+        end
+    end
+    Chemins.prefs().misesAJourRefus = Json.encode(neuf)
+end
+
+-- Ce qui reste à faire au lancement : sans les refus retenus, et Claude Code seulement s'il manque
+-- de l'autre côté ou s'il a une version mineure d'écart (il se met à jour seul en ligne, plusieurs
+-- fois par semaine : sinon une question et un dépôt à presque chaque lancement).
+local function majeureMineure(v)
+    local a, b = tostring(v or ''):match('^(%d+)%.(%d+)')
+    return a and (a .. '.' .. b) or nil
+end
+
+function MisesAJour.pourLeLancement(action, liste)
+    local retenus = MisesAJour.refusRetenus()
+    local garde = {}
+    for _, e in ipairs(liste) do
+        local claude = e.element == 'claude_code'
+        local ecart = not claude or not version(e.mac) or not version(e.ssd)
+            or majeureMineure(version(e.mac)) ~= majeureMineure(version(e.ssd))
+        if ecart and not retenus[signature(action, e)] then
+            garde[#garde + 1] = e
+        end
+    end
+    return garde
+end
+
 -- Installer depuis le SSD : la question d'abord (sauf `sansQuestion`), puis l'installation et ce
--- qu'il faut relancer. Rend vrai si quelque chose a été installé.
-function MisesAJour.installer(liste, sansQuestion)
+-- qu'il faut relancer. Rend vrai si quelque chose a été installé. `auLancement` : rien à dire pour
+-- le refus du verrou.
+function MisesAJour.installer(liste, sansQuestion, auLancement)
     if #liste == 0 then
         return false
     end
@@ -272,26 +354,40 @@ function MisesAJour.installer(liste, sansQuestion)
         end
     end
     local r, annule = avecBarre("Mises à jour depuis le SSD", 'installer', liste)
-    LrDialogs.message("Mises à jour depuis le SSD", MisesAJour.texteFin(r, annule), 'info')
+    retenirRefus('installer', liste, r)
+    if not (auLancement and refusDuVerrou(r)) then
+        LrDialogs.message("Mises à jour depuis le SSD", MisesAJour.texteFin(r, annule), r and r.ok ~= false and 'info' or 'warning')
+    end
     return not annule and type(r) == 'table'
 end
 
 -- Déposer sur le SSD : sans question (Dany l'a demandé : « à chaque mise à jour… tu places sur le
--- SSD la dernière version »), en arrière-plan ; un message seulement en cas d'échec, ou depuis le
--- Gestionnaire (`dire`).
+-- SSD la dernière version »), en arrière-plan ; un message seulement en cas d'échec (jamais pour le
+-- refus du verrou au lancement), ou depuis le Gestionnaire (`dire`). Un refus retenu n'est plus
+-- retenté au lancement (`pourLeLancement`) : le message le dit une fois.
 function MisesAJour.deposer(liste, dire)
     if #liste == 0 then
         return false
     end
     local r, annule = avecBarre("Dépôt sur le SSD : " .. #liste .. " élément" .. (#liste > 1 and "s" or ""), 'deposer', liste)
+    retenirRefus('deposer', liste, r)
+    if not dire and refusDuVerrou(r) then
+        return false
+    end
     if dire or annule or type(r) ~= 'table' or r.ok == false then
-        LrDialogs.message("Dépôt sur le SSD", MisesAJour.texteFin(r, annule), r and r.ok ~= false and 'info' or 'warning')
+        local texte = MisesAJour.texteFin(r, annule)
+        if not dire and type(r) == 'table' and r.ok == false and #(type(r.faits) == 'table' and r.faits or {}) > 0 then
+            texte = texte .. "\n\nCe qui a été refusé ne sera plus retenté au lancement de Lightroom tant que rien ne change : "
+                .. "Fichier › Gestionnaire de modules externes › Mises à jour par le SSD › Déposer sur le SSD le relance."
+        end
+        LrDialogs.message("Dépôt sur le SSD", texte, r and r.ok ~= false and 'info' or 'warning')
     end
     return not annule and type(r) == 'table'
 end
 
--- La vérification complète : comparer, proposer l'installation de ce que le SSD a de plus récent,
--- puis déposer ce que ce Mac a de plus récent. Rend la comparaison (ou nil et la raison).
+-- La vérification du lancement : comparer, proposer l'installation de ce que le SSD a de plus
+-- récent, puis déposer ce que ce Mac a de plus récent, sans les refus retenus ni les petits écarts de
+-- Claude Code (`pourLeLancement`). Rend la comparaison (ou nil et la raison).
 function MisesAJour.verifierEtMettreAJour()
     if MisesAJour.enCours then
         return nil, "Une mise à jour par le SSD est déjà en cours."
@@ -302,8 +398,8 @@ function MisesAJour.verifierEtMettreAJour()
         if not r then
             return nil, raison
         end
-        MisesAJour.installer(MisesAJour.aInstaller(r))
-        local deposer = MisesAJour.aDeposer(r)
+        MisesAJour.installer(MisesAJour.pourLeLancement('installer', MisesAJour.aInstaller(r)), false, true)
+        local deposer = MisesAJour.pourLeLancement('deposer', MisesAJour.aDeposer(r))
         if #deposer > 0 then
             MisesAJour.deposer(deposer)
         end

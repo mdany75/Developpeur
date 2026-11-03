@@ -191,8 +191,10 @@ toucher :
   et son `manifeste.json` ; le module et les scripts passent par lui. **Jamais de téléchargement à
   l'installation** : mflux par `--offline`, Python par le miroir `file://` du SSD, mandataire mort ;
   seul le dépôt de mflux remplit son cache en ligne, dans des dossiers d'outils temporaires.
-- Toute copie par « .partiel » renommé ; un arbre (modèles, SAM 2) ne retire rien et garde un fichier
-  déjà complet ; place, mflux en cours, Fibo 2 Studio ouvert et verrou vérifiés avant. Les modèles
+- Toute copie par « .partiel » renommé ; un arbre (modèles, SAM 2) ne retire rien (sauf nos
+  « .partiel » orphelins) et garde un fichier déjà complet, sauf un fichier marqué (`refs/*`, SAM 2 :
+  contenu et date, le plus récent l'emporte) ; un instantané se compare fichier par fichier ; mflux
+  s'installe avec l'uv qui a rempli son cache (`mflux/uv`) ; place, mflux en cours, Fibo 2 Studio ouvert et verrou vérifiés avant. Les modèles
   copiés sont ceux de `Installation.depotsHF` seulement, en suivant leurs liens (blobs partagés).
 - Les tests passent un domicile, des applications, un faux uv et des vérifications simulées
   (`InstallationTests`) ; jamais le vrai `~`, ni `/Applications`, ni le vrai cache. Un essai à la

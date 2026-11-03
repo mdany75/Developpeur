@@ -189,6 +189,11 @@ cp "${ROOT_DIR}/Resources/clip/bpe_simple_vocab_16e6.txt.gz" "${STAGE}/"
 # vient pas avec l'archive : scripts/preparer-bioclip.sh).
 cp "${ROOT_DIR}/Resources/especes/especes.tsv" "${STAGE}/"
 chmod 755 "${STAGE}/install.sh" "${STAGE}/uninstall.sh"
+# Une archive d'essai (sans notarisation ou --sans-tests) porte le témoin ESSAI : ni install.sh ni le
+# connecteur ne la déposent jamais sur le SSD (Installation.temoinEssai).
+if [[ "${NOTARIZE}" -eq 0 || "${TESTS}" -eq 0 ]]; then
+    printf 'Archive d%sessai : %s. Jamais déposée sur le SSD.\n' "'" "${NOTARIZE_WHY:-sans tests}" > "${STAGE}/ESSAI"
+fi
 
 # --- 5. Signature -------------------------------------------------------------
 

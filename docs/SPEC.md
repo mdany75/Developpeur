@@ -10778,9 +10778,9 @@ côté (`.partiel`) puis remplace l'ancien.
 | Élément | Sur le SSD | Version comparée | Installé sur ce Mac |
 |---|---|---|---|
 | `uv` | `uv/uv` (copie du binaire) | `uv --version` (le plus récent de `~/.local/bin/uv`, `/opt/homebrew/bin/uv`, `/usr/local/bin/uv`) | `~/.local/bin/uv`, si absent ou plus ancien |
-| `mflux` | `mflux/cache/` (cache uv) et `mflux/python/<date>/cpython-<v>+<date>-….tar.gz` | dist-info de `~/.local/share/uv/tools/mflux`, Python de son `pyvenv.cfg` | `uv python install` (miroir `file://`) puis `uv tool install mflux==<v> --offline --force`, réseau coupé |
-| `modeles_hf` | `modeles_hf/hub/` (même structure que le cache) | ensemble « dépôt@instantané » des instantanés complets | `~/.cache/huggingface/hub` (ou `HF_HUB_CACHE`, `HF_HOME`) |
-| `sam2` | `sam2/SAM2/` | ensemble des fichiers des `.mlpackage` (chemin et taille) | `~/Library/Application Support/Fibo 2 Studio/SAM2` |
+| `mflux` | `mflux/cache/` (cache uv), `mflux/python/<date>/cpython-<v>+<date>-….tar.gz` et `mflux/uv` (l'uv qui a rempli le cache) | dist-info de `~/.local/share/uv/tools/mflux`, Python de son `pyvenv.cfg` | avec l'uv du numéro `uv` du manifeste : `uv python install` (miroir `file://`) puis `uv tool install mflux==<v> --offline --force`, réseau coupé |
+| `modeles_hf` | `modeles_hf/hub/` (même structure que le cache) | ensemble « dépôt@instantané » des instantanés complets et « dépôt@instantané:fichier » de chacun de leurs fichiers ; `refs/*` marqués (valeur et date) | `~/.cache/huggingface/hub` (ou `HF_HUB_CACHE`, `HF_HOME`), puis chaque fichier du SSD vérifié présent |
+| `sam2` | `sam2/SAM2/` | ensemble des chemins des fichiers des `.mlpackage`, marqués par leur SHA-256 et leur date | `~/Library/Application Support/Fibo 2 Studio/SAM2` |
 | `fibo2studio` | `fibo2studio/Fibo 2 Studio.zip` (`ditto -c -k --keepParent`) | `CFBundleShortVersionString` | `/Applications` par `ditto -x -k` ; l'ancienne à la Corbeille |
 | `claude_code` | `claude_code/claude-<v>` | lien `~/.local/bin/claude` → `~/.local/share/claude/versions/<v>` | le binaire dans `versions/<v>`, puis le lien ; jamais `~/.claude` |
 | `developpeur` | `developpeur/Developpeur.zip` | la plus ancienne de `mcp-developpeur --version` (connecteur installé) et de l'`Info.lua` du module installé ; dans l'archive, son `Info.lua` (`unzip -p`) | `install.sh` de l'archive décompressée dans `Temporaire/Mises a jour` (`DEVELOPPEUR_DEPUIS_SSD=1`) ; il dit lui-même si Claude Desktop est ouvert |
@@ -10865,6 +10865,40 @@ argument inconnu. `DEVELOPPEUR_DOMICILE` et `DEVELOPPEUR_APPLICATIONS` : essais 
   externes : section « Mises à jour par le SSD » (état, Vérifier, Installer depuis le SSD, Déposer
   sur le SSD). `Temporaire/Mises a jour` et le verrou sont dans `Menage.GARDES` (un dépôt lancé
   avant un rechargement peut encore tourner).
+
+**Revue du 3 novembre 2026** (corrections, chacune avec son test) :
+
+- Un instantané à moitié là (lien d'un fichier jamais posé, téléchargement interrompu) n'est plus
+  égal à l'instantané entier : l'ensemble porte chaque fichier (« dépôt@instantané:chemin ») ;
+  après une installation des modèles, chaque fichier du SSD doit être là, sinon refus.
+- Fichiers marqués (`Installation.Marque`) : les `refs/*` (toujours 40 octets) et les fichiers des
+  `.mlpackage` de SAM 2 (nouvel export aux mêmes tailles) se comparent par leur contenu (SHA-256 ou
+  valeur) et leur date : à chemin égal et contenu différent, le plus récent l'emporte (deux dates à
+  moins de 2 s, `toleranceDate`, sont égales : exFAT). À la copie, un fichier marqué n'est remplacé
+  que par un plus récent, et garde la date de sa source. Le manifeste les porte (`marques`).
+- mflux garde avec lui l'uv qui a rempli son cache (`mflux/uv`, avec son SHA-256) : l'installation
+  prend exactement l'uv du numéro `uv` du manifeste (`mflux/uv`, sinon `uv/uv` ou celui de ce Mac
+  s'ils portent ce numéro), refus clair sinon. `uv/uv`, `mflux/uv` et l'archive de Python sont
+  vérifiés par leur empreinte avant d'être copiés ou lancés (`verifierEmpreinte` cherche l'entrée par
+  son chemin).
+- Les « .partiel » laissés par une copie interrompue dans les dossiers d'un arbre sont retirés à la
+  copie suivante.
+- `DEVELOPPEUR_DOMICILE` : seul l'uv de ce domicile est vu (`Installation.uvCandidats`, jamais celui
+  de Homebrew du vrai Mac). Essai réel refait sur un domicile vraiment sans uv : uv puis mflux
+  installés depuis le faux SSD, `mflux-generate-fibo2-edit --help` répond réseau coupé.
+- install.sh depuis le SSD : le fait dit « Développeur IA x installé. », ses notes (points des
+  Prochaines étapes, avertissements) vont dans `notes` du fait et sous lui dans la fenêtre de fin ;
+  chaque fait et la sortie complète d'install.sh vont au journal durable `mises-a-jour.journal`
+  de la racine locale.
+- Une archive d'essai (build.sh sans notarisation ou avec `--sans-tests`) porte le témoin
+  `Developpeur/ESSAI` : install.sh lancé à la main depuis elle ne la garde ni ne la dépose, et le
+  connecteur refuse de la déposer (`Installation.texteArchiveEssai`).
+- Module : un refus de tout le bloc (`{ok: false, erreur}`) dit son erreur, jamais une fenêtre
+  vide ; au lancement, rien pour le refus du verrou ; un refus d'élément (place, réseau) est dit une
+  fois et retenu (préférence `misesAJourRefus`, par action, élément et versions) : plus retenté au
+  lancement tant que ni ce Mac ni le SSD ne changent de version, le Gestionnaire le relance et sa
+  réussite l'oublie. Claude Code, qui se met à jour seul en ligne, n'est proposé ou déposé au
+  lancement que s'il manque de l'autre côté ou a une version mineure d'écart (`pourLeLancement`).
 
 **Essai réel du 3 novembre 2026** (Mac Studio de Dany, uv 0.13.5, dossiers temporaires du
 bloc-notes de la session, jamais les vrais) :

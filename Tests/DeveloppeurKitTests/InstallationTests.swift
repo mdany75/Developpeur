@@ -70,7 +70,7 @@ final class InstallationTests: XCTestCase {
         let script = #"""
         #!/bin/bash
         J="JOURNAL"
-        printf '%s | offline=%s proxy=%s\n' "$*" "${UV_OFFLINE:-}" "${HTTPS_PROXY:-}" >> "$J"
+        printf '%s | v=VERSION offline=%s proxy=%s\n' "$*" "${UV_OFFLINE:-}" "${HTTPS_PROXY:-}" >> "$J"
         case "$1" in
         --version) echo "uv VERSION (essai)"; exit 0 ;;
         python)
@@ -139,14 +139,18 @@ final class InstallationTests: XCTestCase {
     }
 
     /// Une archive de Développeur : Developpeur/{Developpeur.lrplugin/Info.lua, install.sh}.
-    func archive(version: String) -> URL {
+    func archive(version: String, essai: Bool = false) -> URL {
         let parties = version.split(separator: ".").map(String.init)
-        let dossier = base.appendingPathComponent("archive-\(version)/Developpeur", isDirectory: true)
+        let nom = "archive-\(version)\(essai ? "-essai" : "")"
+        let dossier = base.appendingPathComponent("\(nom)/Developpeur", isDirectory: true)
         ecrire(dossier.appendingPathComponent("Developpeur.lrplugin/Info.lua"),
                "return {\n    VERSION = { major = \(parties[0]), minor = \(parties[1]), revision = \(parties.count > 2 ? parties[2] : "0"), build = 25 },\n}\n")
         ecrire(dossier.appendingPathComponent("install.sh"),
-               "#!/bin/bash\nprintf '%s %s\\n' '\(version)' \"${DEVELOPPEUR_DEPUIS_SSD:-}\" > \"${HOME}/installe.txt\"\necho 'Module Lightroom installé'\n")
-        let zip = base.appendingPathComponent("archive-\(version)/Developpeur.zip")
+               "#!/bin/bash\nprintf '%s %s\\n' '\(version)' \"${DEVELOPPEUR_DEPUIS_SSD:-}\" > \"${HOME}/installe.txt\"\necho 'Module Lightroom installé'\n"
+               + "cat <<FIN\n\nProchaines étapes :\n  - Claude Desktop est ouvert : il réécrira sa configuration\n    sans le connecteur.\n"
+               + "  - Dans Claude Code, ouvrir une nouvelle session.\nFIN\n")
+        if essai { ecrire(dossier.appendingPathComponent("ESSAI"), "Archive d'essai : SKIP_NOTARIZE=1.\n") }
+        let zip = base.appendingPathComponent("\(nom)/Developpeur.zip")
         let r = Installation.lancerProcessus(URL(fileURLWithPath: "/usr/bin/ditto"), ["-c", "-k", "--keepParent", dossier.path, zip.path], nil, 60)
         XCTAssertEqual(r.code, 0, r.sortie)
         return zip
@@ -351,7 +355,15 @@ final class InstallationTests: XCTestCase {
         XCTAssertEqual(try etat(m2, .developpeur), .absentDuMac)
         let (_, installes) = try m2.executer(deposer: false, elements: [.developpeur])
         XCTAssertEqual(installes.first?.action, "installe", installes.first?.texte ?? "")
-        XCTAssertTrue(installes[0].texte.contains("Module Lightroom installé"))
+        // Le fait en une phrase, les notes d'install.sh à part (jamais « install.sh dit : » qui pend),
+        // et toute la sortie au journal durable de ce Mac.
+        XCTAssertEqual(installes[0].texte, "Développeur IA 1.6.10 installé.")
+        XCTAssertEqual(installes[0].notes, ["Claude Desktop est ouvert : il réécrira sa configuration sans le connecteur.",
+                                            "Dans Claude Code, ouvrir une nouvelle session."])
+        XCTAssertEqual(installes[0].json["notes"]?.array?.count, 2)
+        let journal = try String(contentsOf: m2.env.donnees.racineLocale.appendingPathComponent(Installation.nomJournal), encoding: .utf8)
+        XCTAssertTrue(journal.contains("Module Lightroom installé"), journal)
+        XCTAssertTrue(journal.contains("installation, installe : Développeur IA 1.6.10 installé."), journal)
         let marque = try String(contentsOf: m2.env.domicile.appendingPathComponent("installe.txt"), encoding: .utf8)
         XCTAssertEqual(marque, "1.6.10 1\n")
         XCTAssertEqual(Installation.aRelancer(installes).count, 2)
@@ -415,7 +427,10 @@ final class InstallationTests: XCTestCase {
         poserCacheHF(hub)
         let inv = Installation.inventaireHF(hub: hub, depots: Installation.depotsHF)
         let chemins = Set(inv.entrees.map(\.chemin))
-        XCTAssertEqual(inv.ensemble, ["briaai/Fibo-2.0-dev@rev1"], "l'instantané incomplet ne compte pas")
+        XCTAssertEqual(inv.ensemble, ["briaai/Fibo-2.0-dev@rev1", "briaai/Fibo-2.0-dev@rev1:transformer/config.json",
+                                      "briaai/Fibo-2.0-dev@rev1:transformer/poids.safetensors"], "l'instantané incomplet ne compte pas ; chaque fichier compte")
+        XCTAssertEqual(inv.marques["models--briaai--Fibo-2.0-dev/refs/main"]?.valeur, "rev1")
+        XCTAssertEqual(Installation.texteModeles(inv.ensemble), "1 modèle, 1 instantané")
         XCTAssertTrue(chemins.contains("blobs/aa/aaaa"))
         XCTAssertTrue(chemins.contains("blobs/aa/aaaa.refs"))
         XCTAssertTrue(chemins.contains("blobs/.huggingface-shared-blobs"))
@@ -434,7 +449,9 @@ final class InstallationTests: XCTestCase {
         let poidsSSD = hubSSD.appendingPathComponent("models--briaai--Fibo-2.0-dev/snapshots/rev1/transformer/poids.safetensors")
         XCTAssertEqual(try String(contentsOf: poidsSSD, encoding: .utf8).count, 5000, "le lien mène au blob partagé copié")
         XCTAssertFalse(fm.fileExists(atPath: hubSSD.appendingPathComponent("models--Systran--faster-whisper-small").path))
-        XCTAssertEqual(manifeste()["modeles_hf"]?["ensemble"]?.array, ["briaai/Fibo-2.0-dev@rev1"])
+        XCTAssertEqual(manifeste()["modeles_hf"]?["ensemble"]?.array?.first, "briaai/Fibo-2.0-dev@rev1")
+        XCTAssertEqual(manifeste()["modeles_hf"]?["ensemble"]?.array?.count, 3)
+        XCTAssertEqual(manifeste()["modeles_hf"]?["marques"]?["models--briaai--Fibo-2.0-dev/refs/main"]?["valeur"]?.string, "rev1")
         XCTAssertNil(manifeste()["modeles_hf"]?["fichiers"]?.array?.first?["sha256"], "pas d'empreinte sur les modèles : taille et révision")
         XCTAssertEqual(try etat(m1, .modelesHF), .aJour)
 
@@ -450,8 +467,8 @@ final class InstallationTests: XCTestCase {
         lien(fibo2.appendingPathComponent("snapshots/rev2/config.json"), "../../blobs/n0uveau")
         XCTAssertEqual(try etat(m2, .modelesHF), .macPlusRecent)
         _ = try m2.executer(deposer: true, elements: nil)
-        XCTAssertEqual(Set(manifeste()["modeles_hf"]?["ensemble"]?.array?.compactMap(\.string) ?? []),
-                       ["briaai/Fibo-2.0-dev@rev1", "briaai/Fibo-2.0-dev@rev2"])
+        let instantanes: Set<String> = Set((manifeste()["modeles_hf"]?["ensemble"]?.array?.compactMap(\.string) ?? []).filter { !$0.contains(":") })
+        XCTAssertEqual(instantanes, ["briaai/Fibo-2.0-dev@rev1", "briaai/Fibo-2.0-dev@rev2"])
         XCTAssertEqual(try etat(m1, .modelesHF), .ssdPlusRecent)
     }
 
@@ -498,6 +515,11 @@ final class InstallationTests: XCTestCase {
         let build = try String(contentsOf: racine.appendingPathComponent("build.sh"), encoding: .utf8)
         XCTAssertTrue(build.contains(#"DEVELOPPEUR_PAS_DE_DEPOT=1 bash "${STAGE_DIR}/installation/${ARCHIVE_NAME}/install.sh""#))
         XCTAssertTrue(build.contains(#"if [[ "${NOTARIZE}" -eq 1 && "${TESTS}" -eq 1 ]]; then"#))
+        // Le témoin d'une archive d'essai, posé par build.sh, lu par install.sh (lancé à la main).
+        XCTAssertTrue(build.contains(#"if [[ "${NOTARIZE}" -eq 0 || "${TESTS}" -eq 0 ]]; then"#))
+        XCTAssertTrue(build.contains(#"> "${STAGE}/ESSAI""#))
+        XCTAssertTrue(install.contains(#"if [[ -f "${HERE}/ESSAI" && "#))
+        XCTAssertEqual(Installation.temoinEssai, "Developpeur/ESSAI")
         let bioclip = try String(contentsOf: racine.appendingPathComponent("scripts/preparer-bioclip.sh"), encoding: .utf8)
         XCTAssertTrue(bioclip.contains("plutil -extract dossier raw"))
         XCTAssertTrue(bioclip.contains(#"MODELES="${COMMUN%/}/Modeles""#))
@@ -513,5 +535,172 @@ final class InstallationTests: XCTestCase {
         XCTAssertEqual(j["a_deposer"]?.bool, true)
         XCTAssertEqual(j["ssd"], .null)
         XCTAssertTrue(Installation.texte(ligne).hasPrefix("Claude Code : absent du SSD"))
+    }
+
+    // MARK: Constats de la revue (1.7)
+
+    func dater(_ url: URL, _ decalage: TimeInterval) {
+        try? fm.setAttributes([.modificationDate: Date().addingTimeInterval(decalage)], ofItemAtPath: url.path)
+    }
+
+    func lire(_ url: URL) -> String { (try? String(contentsOf: url, encoding: .utf8)) ?? "" }
+
+    /// Un instantané à moitié là (téléchargement interrompu : le lien d'un fichier jamais posé) n'est
+    /// plus égal à l'instantané entier : le SSD est plus récent, et l'installation le complète.
+    func testInstantaneAMoitieLaNEstPasPrisPourEntier() throws {
+        let m1 = mac("un"), m2 = mac("deux")
+        poserCacheHF(m1.env.cacheHF)
+        _ = try m1.executer(deposer: true, elements: [.modelesHF])
+        poserCacheHF(m2.env.cacheHF)
+        let poids = m2.env.cacheHF.appendingPathComponent("models--briaai--Fibo-2.0-dev/snapshots/rev1/transformer/poids.safetensors")
+        try fm.removeItem(at: poids)
+        try fm.removeItem(at: m2.env.cacheHF.appendingPathComponent("blobs/aa/aaaa"))
+        XCTAssertTrue(Installation.instantaneComplet(poids.deletingLastPathComponent().deletingLastPathComponent()), "sans lien cassé, il paraissait complet")
+        XCTAssertEqual(try etat(m2, .modelesHF), .ssdPlusRecent)
+        let (_, faits) = try m2.executer(deposer: false, elements: [.modelesHF])
+        XCTAssertEqual(faits.first?.action, "installe", faits.first?.texte ?? "")
+        XCTAssertEqual(lire(poids).count, 5000)
+        XCTAssertEqual(try etat(m2, .modelesHF), .aJour)
+    }
+
+    /// `refs/main` (40 octets, toujours la même taille) suit la révision la plus récente, dans les deux
+    /// sens ; un refs différent seul se voit à la comparaison ; un refs plus ancien ne remplace pas.
+    func testRefsSuitLaRevisionLaPlusRecente() throws {
+        let m1 = mac("un"), m2 = mac("deux")
+        poserCacheHF(m1.env.cacheHF)
+        let modele = "models--briaai--Fibo-2.0-dev"
+        let refs1 = m1.env.cacheHF.appendingPathComponent(modele + "/refs/main")
+        let refs2 = m2.env.cacheHF.appendingPathComponent(modele + "/refs/main")
+        let refsSSD = ssd.appendingPathComponent("Installation/modeles_hf/hub/" + modele + "/refs/main")
+        ecrire(refs1, "rev1-------------------------------------")
+        dater(refs1, -3600)
+        _ = try m1.executer(deposer: true, elements: [.modelesHF])
+        _ = try m2.executer(deposer: false, elements: [.modelesHF])
+        // Nouvelle révision sur le premier Mac : refs/main change, à la même taille.
+        let fibo = m1.env.cacheHF.appendingPathComponent(modele)
+        ecrire(fibo.appendingPathComponent("blobs/n0uveau"), "nouveau")
+        lien(fibo.appendingPathComponent("snapshots/rev2/config.json"), "../../blobs/n0uveau")
+        ecrire(refs1, "rev2-------------------------------------")
+        XCTAssertEqual(Installation.taille(refs1), Installation.taille(refsSSD))
+        XCTAssertEqual(try etat(m1, .modelesHF), .macPlusRecent)
+        _ = try m1.executer(deposer: true, elements: nil)
+        XCTAssertEqual(lire(refsSSD), "rev2-------------------------------------", "refs/main du SSD suit le dépôt")
+        XCTAssertEqual(try etat(m2, .modelesHF), .ssdPlusRecent)
+        _ = try m2.executer(deposer: false, elements: nil)
+        XCTAssertEqual(lire(refs2), "rev2-------------------------------------", "refs/main du Mac suit l'installation")
+        XCTAssertEqual(try etat(m2, .modelesHF), .aJour)
+        // Même ensemble, seul refs change (le second Mac revient sur rev1, plus tard) : vu.
+        ecrire(refs2, "rev1-------------------------------------")
+        dater(refs2, 60)
+        XCTAssertEqual(try etat(m2, .modelesHF), .macPlusRecent)
+        // L'installation forcée ne remet pas le refs plus ancien du SSD par-dessus.
+        _ = try m2.executer(deposer: false, elements: [.modelesHF])
+        XCTAssertEqual(lire(refs2), "rev1-------------------------------------")
+    }
+
+    /// mflux s'installe avec l'uv qui a rempli son cache (gardé avec lui), même si le SSD n'a plus
+    /// d'uv et que ce Mac en a un autre ; cet uv est vérifié par son empreinte avant d'être lancé.
+    func testMfluxInstalleAvecLUvQuiARempliLeCache() throws {
+        let m1 = mac("un")
+        poserMflux(m1.env.domicile)
+        _ = try m1.executer(deposer: true, elements: [.uv, .mflux])
+        let garde = try XCTUnwrap(manifeste()["mflux"]?["fichiers"]?.array?.first { $0["chemin"]?.string == "mflux/uv" })
+        XCTAssertEqual(garde["sha256"]?.string?.count, 64)
+        XCTAssertEqual(manifeste()["mflux"]?["uv"]?.string, "0.13.5")
+        try fm.removeItem(at: ssd.appendingPathComponent("Installation/uv"))
+        ecrireUV(version: "0.14.0")
+        try? fm.removeItem(at: fauxUV.deletingLastPathComponent().appendingPathComponent("journal"))
+        let m2 = mac("deux")
+        let (_, faits) = try m2.executer(deposer: false, elements: [.mflux])
+        XCTAssertEqual(faits.first?.action, "installe", faits.first?.texte ?? "")
+        let appels = journalUV.split(separator: "\n").filter { $0.hasPrefix("python install") || $0.contains("--offline") }
+        XCTAssertEqual(appels.count, 2, journalUV)
+        XCTAssertTrue(appels.allSatisfy { $0.contains("v=0.13.5") }, journalUV)
+
+        // L'uv gardé abîmé (même taille) : refusé avant d'être lancé, jamais remplacé par un autre uv.
+        let fichier = ssd.appendingPathComponent("Installation/mflux/uv")
+        var octets = try Data(contentsOf: fichier)
+        octets[octets.count - 2] ^= 0x01
+        try octets.write(to: fichier)
+        let m3 = mac("trois")
+        let (_, refus) = try m3.executer(deposer: false, elements: [.mflux])
+        XCTAssertEqual(refus.first?.action, "refuse")
+        XCTAssertTrue(refus[0].texte.contains("mflux/uv") && refus[0].texte.contains("SHA-256"), refus[0].texte)
+        XCTAssertNil(m3.mfluxDuMac())
+    }
+
+    /// uv/uv abîmé sur le SSD (même taille) : refusé, l'uv de ce Mac n'est pas remplacé.
+    func testUvAbimeRefuseALInstallation() throws {
+        let m1 = mac("un")
+        _ = try m1.executer(deposer: true, elements: [.uv])
+        let fichier = ssd.appendingPathComponent("Installation/uv/uv")
+        var octets = try Data(contentsOf: fichier)
+        octets[octets.count - 2] ^= 0x01
+        try octets.write(to: fichier)
+        ecrireUV(version: "0.12.0")
+        let m2 = mac("deux")
+        let (_, faits) = try m2.executer(deposer: false, elements: [.uv])
+        XCTAssertEqual(faits.first?.action, "refuse")
+        XCTAssertTrue(faits[0].texte.contains("SHA-256"), faits[0].texte)
+        XCTAssertFalse(fm.fileExists(atPath: m2.env.binLocal.appendingPathComponent("uv").path))
+    }
+
+    /// SAM 2 réexporté aux mêmes tailles : vu (empreintes), le plus récent remplace l'autre.
+    func testSam2NouvelExportAuxMemesTailles() throws {
+        let m1 = mac("un"), m2 = mac("deux")
+        let poids = "SAM2_1SmallImageEncoderFLOAT16.mlpackage/Data/com.apple.CoreML/weights/weight.bin"
+        ecrire(m1.env.sam2.appendingPathComponent(poids), "ancien")
+        dater(m1.env.sam2.appendingPathComponent(poids), -3600)
+        _ = try m1.executer(deposer: true, elements: [.sam2])
+        _ = try m2.executer(deposer: false, elements: [.sam2])
+        XCTAssertEqual(try etat(m2, .sam2), .aJour)
+        ecrire(m2.env.sam2.appendingPathComponent(poids), "nouvel")
+        XCTAssertEqual(try etat(m2, .sam2), .macPlusRecent, "même taille, autre contenu, plus récent")
+        _ = try m2.executer(deposer: true, elements: nil)
+        XCTAssertEqual(lire(ssd.appendingPathComponent("Installation/sam2/SAM2/" + poids)), "nouvel")
+        XCTAssertEqual(try etat(m1, .sam2), .ssdPlusRecent)
+        _ = try m1.executer(deposer: false, elements: [.sam2])
+        XCTAssertEqual(lire(m1.env.sam2.appendingPathComponent(poids)), "nouvel")
+        XCTAssertEqual(try etat(m1, .sam2), .aJour)
+    }
+
+    /// Les « .partiel » d'une copie interrompue, laissés dans l'arbre, sont retirés à la copie suivante
+    /// même si ce fichier n'est plus à copier ; rien d'autre n'est retiré.
+    func testPartielsOrphelinsRetires() throws {
+        let m1 = mac("un")
+        let source = base.appendingPathComponent("source"), cible = base.appendingPathComponent("cible")
+        ecrire(source.appendingPathComponent("blobs/aa/nouveau"), "n")
+        ecrire(cible.appendingPathComponent("blobs/aa/ancien-de-6-go.partiel"), String(repeating: "x", count: 10_000))
+        ecrire(cible.appendingPathComponent("blobs/aa/autre"), "garde")
+        try m1.copierArbre(Installation.inventaireDossier(source).entrees, de: source, vers: cible, element: .modelesHF)
+        XCTAssertEqual(partiels(cible), [])
+        XCTAssertEqual(lire(cible.appendingPathComponent("blobs/aa/autre")), "garde")
+        XCTAssertEqual(lire(cible.appendingPathComponent("blobs/aa/nouveau")), "n")
+    }
+
+    /// Un essai à la main sur un domicile donné ne voit que l'uv de ce domicile.
+    func testUvCandidatsDUnEssai() {
+        let d = domicile("essai")
+        XCTAssertEqual(Installation.uvCandidats(domicile: d, essai: true), [d.appendingPathComponent(".local/bin/uv")])
+        XCTAssertEqual(Installation.uvCandidats(domicile: d, essai: false).count, 3)
+        let racine = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let main = (try? String(contentsOf: racine.appendingPathComponent("Sources/MCPDeveloppeur/main.swift"), encoding: .utf8)) ?? ""
+        XCTAssertTrue(main.contains("uvCandidats: Installation.uvCandidats(domicile: domicile, essai: essai)"))
+    }
+
+    /// Les notes d'install.sh : chaque point des Prochaines étapes, lignes de suite jointes.
+    func testNotesDInstallSh() {
+        let sortie = "Module installé\n\nProchaines étapes :\n  - Lightroom Classic est ouvert : le quitter.\n    Il apparaît dans le Gestionnaire.\n  - Pour vérifier : --status\n"
+        XCTAssertEqual(Installation.notesInstallSh(sortie), ["Lightroom Classic est ouvert : le quitter. Il apparaît dans le Gestionnaire.", "Pour vérifier : --status"])
+        XCTAssertEqual(Installation.notesInstallSh("rien"), [])
+    }
+
+    /// Une archive d'essai (témoin ESSAI de build.sh) n'est jamais déposée.
+    func testArchiveDEssaiJamaisDeposee() throws {
+        let m1 = mac("un")
+        let (_, faits) = try m1.executer(deposer: true, elements: [.developpeur], archive: archive(version: "1.7", essai: true))
+        XCTAssertEqual(faits.first?.action, "refuse")
+        XCTAssertTrue(faits[0].texte.contains(Installation.texteArchiveEssai), faits[0].texte)
+        XCTAssertNil(manifeste()["developpeur"])
     }
 }

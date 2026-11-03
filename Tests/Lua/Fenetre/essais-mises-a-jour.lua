@@ -93,13 +93,13 @@ local comparaison = {
         element('uv', 'a_jour', '0.13.5', '0.13.5', false, false),
         element('mflux', 'ssd_plus_recent', '0.23.0', '0.24.0', false, true),
         element('fibo2studio', 'absent_du_mac', nil, '2.8.1', false, true),
-        element('claude_code', 'mac_plus_recent', '2.1.303', '2.1.295', true, false),
+        element('claude_code', 'mac_plus_recent', '2.2.3', '2.1.295', true, false),
         element('developpeur', 'mac_plus_recent', '1.7', '1.6.7', true, false),
     },
 }
 Fichiers.ecrire(etat, Json.encode(comparaison))
 Fichiers.ecrire(fin, Json.encode({ ok = true,
-    faits = { { element = 'mflux', action = 'installe', texte = "mflux 0.24.0 installé hors ligne.\ndétail d'install.sh" } },
+    faits = { { element = 'mflux', action = 'installe', texte = "mflux 0.24.0 installé hors ligne." } },
     relancer = { "Fibo 2 Studio : le rouvrir." } }))
 
 local function poserPointeur(dossier)
@@ -121,6 +121,7 @@ local function remettre()
     S.reponseConfirm = nil
     S.barres = {}
     MisesAJour.enCours = false
+    Chemins.prefs().misesAJourRefus = nil
 end
 
 -- Refus --------------------------------------------------------------------------------------------
@@ -207,7 +208,6 @@ essai('au lancement : la question, l\'installation acceptée dans sa barre, puis
     vrai(S.barres[1].annulable and S.barres[1].finie, 'barre annulable, finie')
     egal('Mises à jour depuis le SSD', S.messages[1][1])
     contient(S.messages[1][2], '• mflux 0.24.0 installé hors ligne.')
-    vrai(not S.messages[1][2]:find("détail d'install.sh", 1, true), 'la sortie d\'install.sh reste au journal')
     contient(S.messages[1][2], 'À relancer :\n• Fibo 2 Studio : le rouvrir.')
     egal(1, #S.messages, 'le dépôt réussi ne dit rien')
     egal(false, MisesAJour.enCours)
@@ -288,6 +288,93 @@ essai('Gestionnaire : section Mises à jour par le SSD, état et trois boutons',
     S.taches[#S.taches]()
     egal(0, #appels())
     contient(proprietes.misesAJour, 'Aucun dossier commun')
+end)
+
+-- Constats de la revue (1.7) -----------------------------------------------------------------------
+
+local finNormale = Fichiers.lire(fin)
+
+essai('refus de tout le bloc (verrou, dossier commun disparu) : son erreur, jamais une fenêtre vide ; rien au lancement pour le verrou', function()
+    remettre()
+    poserPointeur(ssd)
+    local verrou = "Une autre mise à jour par le SSD est déjà en cours sur ce Mac : attendre qu'elle finisse."
+    egal(verrou, MisesAJour.texteFin({ ok = false, erreur = verrou }, false))
+    Fichiers.ecrire(fin, Json.encode({ ok = false, erreur = verrou }))
+    -- Depuis le Gestionnaire : dit.
+    MisesAJour.deposer({ { element = 'modeles_hf' } }, true)
+    egal(1, #S.messages)
+    egal(verrou, S.messages[1][2])
+    -- Au lancement : ni pour le dépôt ni pour l'installation acceptée.
+    S.messages = {}
+    S.reponseConfirm = 'ok'
+    MisesAJour.auLancement()
+    egal(0, #S.messages, 'aucune fenêtre pour le verrou au lancement')
+    Fichiers.ecrire(fin, finNormale)
+end)
+
+essai('les notes d\'install.sh sous leur fait, sans deux-points qui pendent', function()
+    local t = MisesAJour.texteFin({ ok = true, faits = { { element = 'developpeur', action = 'installe',
+        texte = "Développeur IA 1.7 installé.", notes = { "Claude Desktop est ouvert : il réécrira sa configuration sans le connecteur." } } } })
+    contient(t, "• Développeur IA 1.7 installé.\n   – Claude Desktop est ouvert : il réécrira sa configuration")
+    vrai(not t:find('dit :', 1, true), 'plus de « install.sh dit : »')
+end)
+
+essai('au lancement : un refus durable dit une fois, puis plus retenté tant que rien ne change ; le Gestionnaire le relance', function()
+    remettre()
+    poserPointeur(ssd)
+    S.reponseConfirm = 'cancel'
+    Fichiers.ecrire(fin, Json.encode({ ok = false, faits = { { element = 'claude_code', action = 'refuse',
+        texte = "Claude Code : place insuffisante sur le disque." } } }))
+    MisesAJour.auLancement()
+    egal(1, #S.messages, 'dit une fois')
+    contient(S.messages[1][2], 'place insuffisante')
+    contient(S.messages[1][2], 'ne sera plus retenté au lancement')
+    -- Lancement suivant : même état, ni dépôt ni fenêtre.
+    S.messages = {}
+    Fichiers.supprimer(journal)
+    MisesAJour.auLancement()
+    egal(0, #S.messages, 'rien de redit')
+    vrai(not table.concat(appels(), '\n'):find('--deposer', 1, true), 'le dépôt refusé n\'est pas relancé')
+    -- Une autre version sur ce Mac : retenté.
+    local autre = Json.decode(Json.encode(comparaison))
+    autre.elements[4].mac.version = '2.3.0'
+    Fichiers.ecrire(etat, Json.encode(autre))
+    Fichiers.supprimer(journal)
+    MisesAJour.auLancement()
+    contient(table.concat(appels(), '\n'), '--deposer claude_code')
+    Fichiers.ecrire(etat, Json.encode(comparaison))
+    -- Le Gestionnaire relance, et sa réussite oublie le refus.
+    Fichiers.ecrire(fin, Json.encode({ ok = true, faits = { { element = 'claude_code', action = 'depose', texte = "Claude Code déposé." } } }))
+    MisesAJour.deposer({ comparaison.elements[4] }, true)
+    egal(nil, next(MisesAJour.refusRetenus()), 'refus oubliés après la réussite')
+    Fichiers.ecrire(fin, finNormale)
+end)
+
+essai('Claude Code au lancement : seulement absent de l\'autre côté ou une version mineure d\'écart', function()
+    local proche = element('claude_code', 'ssd_plus_recent', '2.1.303', '2.1.305', false, true)
+    local loin = element('claude_code', 'ssd_plus_recent', '2.1.303', '2.2.0', false, true)
+    local absent = element('claude_code', 'absent_du_mac', nil, '2.1.305', false, true)
+    local mflux = element('mflux', 'ssd_plus_recent', '0.24.0', '0.24.1', false, true)
+    remettre()
+    local garde = MisesAJour.pourLeLancement('installer', { proche, loin, absent, mflux })
+    egal(3, #garde)
+    egal(loin, garde[1])
+    egal(absent, garde[2])
+    egal(mflux, garde[3], 'les autres éléments, même à un petit écart')
+end)
+
+essai('le refus sans dossier commun renvoie à la section du dessus', function()
+    remettre()
+    Fichiers.supprimer(Chemins.pointeur())
+    contient(MisesAJour.refus(), 'section Dossier commun, ci-dessus')
+    local PluginInfoProvider = require 'PluginInfoProvider'
+    local f = S.modules.LrView.osFactory()
+    local sections = PluginInfoProvider.sectionsForTopOfDialog(f, S.modules.LrBinding.makePropertyTable())
+    local avant
+    for i, s in ipairs(sections) do
+        if s.title == 'Dossier commun' then avant = i end
+        if s.title == 'Mises à jour par le SSD' then vrai(avant and avant < i, 'Dossier commun est au-dessus') end
+    end
 end)
 
 essai('Init.lua : les mises à jour par le SSD en dernier dans la tâche du lancement, à part', function()

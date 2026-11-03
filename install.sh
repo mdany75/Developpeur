@@ -159,9 +159,15 @@ fi
 # l'installera depuis le SSD, sans téléchargement. L'archive : DEVELOPPEUR_ARCHIVE, sinon le
 # Developpeur.zip d'à côté s'il porte cette version, sinon refaite par ditto depuis ce dossier.
 # Rien de tout ça quand l'installation vient du SSD (DEVELOPPEUR_DEPUIS_SSD) ou d'une archive
-# d'essai de build.sh (DEVELOPPEUR_PAS_DE_DEPOT : non notarisée, ou sans tests).
+# d'essai de build.sh (DEVELOPPEUR_PAS_DE_DEPOT : non notarisée, ou sans tests). Une archive d'essai
+# porte aussi le témoin ESSAI (build.sh) : lancé à la main depuis elle, install.sh ne la garde ni ne
+# la dépose (l'autre Mac la proposerait au lancement de Lightroom).
 
 DEPOT_NOTE=""
+if [[ -f "${HERE}/ESSAI" && "${DEVELOPPEUR_DEPUIS_SSD:-0}" != 1 && "${DEVELOPPEUR_PAS_DE_DEPOT:-0}" != 1 ]]; then
+    DEVELOPPEUR_PAS_DE_DEPOT=1
+    DEPOT_NOTE="  - Archive d'essai (non notarisée, ou construite avec --sans-tests) : ni gardée ni déposée sur le SSD."
+fi
 if [[ "${DEVELOPPEUR_DEPUIS_SSD:-0}" != 1 && "${DEVELOPPEUR_PAS_DE_DEPOT:-0}" != 1 ]]; then
     version_lua() { sed -nE 's/.*VERSION = \{ major = ([0-9]+), minor = ([0-9]+), revision = ([0-9]+).*/\1.\2.\3/p' | head -n 1; }
     NOTRE_VERSION="$(version_lua < "${PLUGIN_SOURCE}/Info.lua")"

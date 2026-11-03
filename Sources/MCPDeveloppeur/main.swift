@@ -302,8 +302,11 @@ func environnementInstallation(json: Bool) -> Installation.Environnement {
     let donnees = DossierDonnees(racineLocale: domicile.appendingPathComponent("Library/Application Support/Developpeur", isDirectory: true))
     // Le cache de Hugging Face de Fibo : celui de mflux (HF_HUB_CACHE ou HF_HOME s'ils sont posés).
     let cacheHF = variables["DEVELOPPEUR_DOMICILE"] == nil ? Sens.cacheHuggingFace : nil
+    // Un essai sur un domicile donné ne voit que son uv (jamais celui de Homebrew du vrai Mac).
+    let essai = !(variables["DEVELOPPEUR_DOMICILE"] ?? "").isEmpty
     var dernier = ""
-    return Installation.Environnement(donnees: donnees, domicile: domicile, applications: applications, cacheHF: cacheHF, avancement: { a in
+    return Installation.Environnement(donnees: donnees, domicile: domicile, applications: applications,
+                                      uvCandidats: Installation.uvCandidats(domicile: domicile, essai: essai), cacheHF: cacheHF, avancement: { a in
         if json {
             FileHandle.standardError.write(Data((JSONCoding.line(["avancement": [
                 "element": .string(a.element), "fait": .number(Double(a.fait)), "total": .number(Double(a.total)), "texte": .string(a.texte),
