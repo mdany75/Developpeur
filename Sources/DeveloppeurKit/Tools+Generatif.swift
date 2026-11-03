@@ -58,7 +58,7 @@ public struct Fibo {
 
     /// Un processus mflux ou FIBO-vlm en cours sur ce Mac (`pgrep -f`). Appelé avant tout lancement de
     /// ce serveur : aucun des siens ne tourne encore.
-    static func mfluxEnCours() -> Bool {
+    public static func mfluxEnCours() -> Bool {
         let pgrep = Process()
         pgrep.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
         pgrep.arguments = ["-f", motifAutreCalcul]

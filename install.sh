@@ -18,9 +18,14 @@
 #      l'ancien connecteur « lightroom » (MCP Lightroom) ; Claude Desktop doit être fermé
 #   4. Lightroom fermé seulement : efface les paramètres prédéfinis invisibles que le module crée
 #      (un fichier par masque IA, flou d'objectif ou mode automatique) ; il recrée ceux qu'il utilise
+#   5. mises à jour par le SSD (1.7) : garde l'archive dans Developpeur/Archive et, avec un dossier
+#      commun réglé, la dépose dans son dossier Installation si elle y est plus récente (l'autre Mac
+#      l'installe de là, sans téléchargement) ; ni l'un ni l'autre quand l'installation vient du SSD
+#      (DEVELOPPEUR_DEPUIS_SSD=1) ou d'une archive d'essai de build.sh (DEVELOPPEUR_PAS_DE_DEPOT=1)
 #
-# Ce qui est déjà là reste : guide de style, conversations, profils de publication, registre de
-# consommation et journaux. Le catalogue et les photos ne sont jamais touchés.
+# Les modèles du sens et des espèces vont dans Modeles de la racine des données (le dossier commun
+# s'il est réglé). Ce qui est déjà là reste : guide de style, conversations, profils de publication,
+# registre de consommation et journaux. Le catalogue et les photos ne sont jamais touchés.
 # Aucun droit d'administrateur : rien n'est écrit hors du dossier personnel.
 
 set -euo pipefail
@@ -70,18 +75,30 @@ xattr -d com.apple.quarantine "${DEST}.nouveau" 2>/dev/null || true
 mv -f "${DEST}.nouveau" "${DEST}"
 printf 'Serveur installé : %s (version %s)\n' "${DEST}" "$("${DEST}" --version)"
 
+# Modeles de la racine des données (1.7) : celui du dossier commun s'il est réglé, sinon celui de ce
+# Mac (le connecteur le dit, --racine-donnees). Dossier commun réglé mais introuvable (SSD débranché) :
+# rien n'est écrit dans le Modeles de ce Mac à sa place ; les modèles attendent le SSD.
+MODELES_NOTE=""
+if DONNEES="$("${DEST}" --racine-donnees 2>/dev/null)" && [[ -n "${DONNEES}" ]]; then
+    MODELES="${DONNEES}/Modeles"
+else
+    MODELES=""
+    MODELES_NOTE="  - Le dossier commun est introuvable (SSD débranché ?) : vocabulaire, liste des espèces et modèles
+    compilés non mis à jour. Brancher le SSD, puis relancer install.sh."
+fi
+
 # La recherche par le sens (1.6) : le vocabulaire du tokeniseur de CLIP, à côté des modèles de
 # MobileCLIP (qui ne viennent pas avec l'archive : hf download apple/coreml-mobileclip) ; jamais
 # remplacé s'il est déjà là.
 VOCABULAIRE="${HERE}/bpe_simple_vocab_16e6.txt.gz"
-if [[ -f "${VOCABULAIRE}" && ! -f "${DEST_DIR}/Modeles/bpe_simple_vocab_16e6.txt.gz" ]]; then
-    mkdir -p "${DEST_DIR}/Modeles"
-    cp "${VOCABULAIRE}" "${DEST_DIR}/Modeles/"
-    printf 'Vocabulaire de la recherche par le sens : %s\n' "${DEST_DIR}/Modeles"
+if [[ -n "${MODELES}" && -f "${VOCABULAIRE}" && ! -f "${MODELES}/bpe_simple_vocab_16e6.txt.gz" ]]; then
+    mkdir -p "${MODELES}"
+    cp "${VOCABULAIRE}" "${MODELES}/"
+    printf 'Vocabulaire de la recherche par le sens : %s\n' "${MODELES}"
 fi
 # Les modèles de MobileCLIP compilés ici, une fois (rien s'ils le sont déjà), pour que le Suivi ne
 # compile jamais sous son alarme ; sans les modèles, rien (la recherche par le sens reste absente).
-if [[ -f "${DEST_DIR}/Modeles/bpe_simple_vocab_16e6.txt.gz" ]]; then
+if [[ -n "${MODELES}" && -f "${MODELES}/bpe_simple_vocab_16e6.txt.gz" ]]; then
     if COMPILE="$("${DEST}" --compiler-sens 2>/dev/null)"; then
         printf 'Recherche par le sens : modèles compilés (%s)\n' "${COMPILE}"
     else
@@ -91,11 +108,11 @@ fi
 # Les espèces (1.6.3) : la liste, remplacée à chaque installation (elle change avec la version) ;
 # avec BioCLIP 2 déjà installé (scripts/preparer-bioclip.sh, depuis le dépôt), les vecteurs de la
 # liste se calculent ici s'ils manquent ou si la liste a changé. Sans le modèle, rien de plus.
-if [[ -f "${HERE}/especes.tsv" ]]; then
-    mkdir -p "${DEST_DIR}/Modeles"
-    cp "${HERE}/especes.tsv" "${DEST_DIR}/Modeles/especes.tsv"
+if [[ -n "${MODELES}" && -f "${HERE}/especes.tsv" ]]; then
+    mkdir -p "${MODELES}"
+    cp "${HERE}/especes.tsv" "${MODELES}/especes.tsv"
 fi
-if [[ -d "${DEST_DIR}/Modeles/bioclip2_image.mlmodelc" ]]; then
+if [[ -n "${MODELES}" && -d "${MODELES}/bioclip2_image.mlmodelc" ]]; then
     if ESPECES="$("${DEST}" --preparer-especes 2>/dev/null)"; then
         printf 'Espèces : BioCLIP 2 prêt (%s)\n' "${ESPECES}"
     else
@@ -132,6 +149,52 @@ if [[ -d "${PRESETS_DIR}" ]]; then
         NOMBRE="$(find "${PRESETS_DIR}" -maxdepth 1 -name '*.lrtemplate' | wc -l | tr -d ' ')"
         find "${PRESETS_DIR}" -maxdepth 1 -name '*.lrtemplate' -delete
         printf 'Paramètres prédéfinis invisibles du module effacés : %s fichier(s)\n' "${NOMBRE}"
+    fi
+fi
+
+# --- 5. Mises à jour par le SSD (1.7) ------------------------------------------
+#
+# Cette archive est gardée sur ce Mac (Developpeur/Archive/Developpeur.zip), puis déposée dans le
+# dossier commun (Installation/, par le connecteur) si elle y est plus récente : l'autre Mac
+# l'installera depuis le SSD, sans téléchargement. L'archive : DEVELOPPEUR_ARCHIVE, sinon le
+# Developpeur.zip d'à côté s'il porte cette version, sinon refaite par ditto depuis ce dossier.
+# Rien de tout ça quand l'installation vient du SSD (DEVELOPPEUR_DEPUIS_SSD) ou d'une archive
+# d'essai de build.sh (DEVELOPPEUR_PAS_DE_DEPOT : non notarisée, ou sans tests). Une archive d'essai
+# porte aussi le témoin ESSAI (build.sh) : lancé à la main depuis elle, install.sh ne la garde ni ne
+# la dépose (l'autre Mac la proposerait au lancement de Lightroom).
+
+DEPOT_NOTE=""
+if [[ -f "${HERE}/ESSAI" && "${DEVELOPPEUR_DEPUIS_SSD:-0}" != 1 && "${DEVELOPPEUR_PAS_DE_DEPOT:-0}" != 1 ]]; then
+    DEVELOPPEUR_PAS_DE_DEPOT=1
+    DEPOT_NOTE="  - Archive d'essai (non notarisée, ou construite avec --sans-tests) : ni gardée ni déposée sur le SSD."
+fi
+if [[ "${DEVELOPPEUR_DEPUIS_SSD:-0}" != 1 && "${DEVELOPPEUR_PAS_DE_DEPOT:-0}" != 1 ]]; then
+    version_lua() { sed -nE 's/.*VERSION = \{ major = ([0-9]+), minor = ([0-9]+), revision = ([0-9]+).*/\1.\2.\3/p' | head -n 1; }
+    NOTRE_VERSION="$(version_lua < "${PLUGIN_SOURCE}/Info.lua")"
+    ARCHIVE="${DEVELOPPEUR_ARCHIVE:-}"
+    REFAITE=""
+    VOISINE="$(dirname "${HERE}")/Developpeur.zip"
+    if [[ -z "${ARCHIVE}" && -f "${VOISINE}" ]] \
+        && [[ "$(unzip -p "${VOISINE}" 'Developpeur/Developpeur.lrplugin/Info.lua' 2>/dev/null | version_lua)" == "${NOTRE_VERSION}" ]]; then
+        ARCHIVE="${VOISINE}"
+    fi
+    if [[ -z "${ARCHIVE}" ]]; then
+        REFAITE="$(mktemp -d "${TMPDIR:-/tmp}/developpeur-archive.XXXXXX")"
+        ditto --norsrc --noextattr "${HERE}" "${REFAITE}/Developpeur"
+        ditto -c -k --norsrc --noextattr --keepParent "${REFAITE}/Developpeur" "${REFAITE}/Developpeur.zip"
+        ARCHIVE="${REFAITE}/Developpeur.zip"
+    fi
+    mkdir -p "${DEST_DIR}/Archive"
+    cp -f "${ARCHIVE}" "${DEST_DIR}/Archive/Developpeur.zip.partiel"
+    mv -f "${DEST_DIR}/Archive/Developpeur.zip.partiel" "${DEST_DIR}/Archive/Developpeur.zip"
+    [[ -z "${REFAITE}" ]] || rm -rf "${REFAITE}"
+    if [[ -f "${DEST_DIR}/dossier-commun.json" ]]; then
+        if DEPOT="$("${DEST}" --mises-a-jour --deposer developpeur --archive "${DEST_DIR}/Archive/Developpeur.zip" 2>&1)"; then
+            printf '%s\n' "$(grep -E '^Développeur IA' <<< "${DEPOT}" | tail -n 1)"
+        else
+            DEPOT_NOTE="  - Archive non déposée sur le SSD : $(grep -E 'Développeur IA|Aucun dossier|Le dossier commun|Une autre' <<< "${DEPOT}" | tail -n 1 | sed 's/^\[mcp-developpeur\] //')
+    (mcp-developpeur --mises-a-jour --deposer developpeur, une fois le SSD branché)."
+        fi
     fi
 fi
 
@@ -182,4 +245,10 @@ if [[ -n "${CLAUDE_NOTE}" ]]; then
 fi
 if [[ -n "${PRESETS_NOTE}" ]]; then
     printf '%s\n' "${PRESETS_NOTE}"
+fi
+if [[ -n "${MODELES_NOTE}" ]]; then
+    printf '%s\n' "${MODELES_NOTE}"
+fi
+if [[ -n "${DEPOT_NOTE}" ]]; then
+    printf '%s\n' "${DEPOT_NOTE}"
 fi

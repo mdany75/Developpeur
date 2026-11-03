@@ -38,6 +38,12 @@ func usage(erreur: Bool = false) {
             mcp-developpeur --uninstall  retire l'inscription
             mcp-developpeur --status     inscriptions, module Lightroom, jeton de la liaison, dossier commun, écran, liaison et mise à jour (par gh)
             mcp-developpeur --version
+            mcp-developpeur --mises-a-jour [--json] [--deposer [<élément>…] | --installer [<élément>…]] [--archive <Developpeur.zip>]
+                mises à jour par le SSD (<dossier commun>/Installation, manifeste.json) : compare ce Mac et le SSD pour
+                uv, mflux, modeles_hf, sam2, fibo2studio, claude_code et developpeur ; --deposer copie vers le SSD ce que
+                ce Mac a de plus récent, --installer installe ce que le SSD a de plus récent (sans téléchargement) ;
+                avancement sur stderr, --json : une ligne JSON finale ; code 1 sans dossier commun ou si un élément échoue
+            mcp-developpeur --racine-donnees   la racine des données (le dossier commun s'il est réglé ; install.sh)
 
     Pour la fenêtre Claude et le développement (parlent au module Lightroom directement, sauf --marquer-af, --focus,
     --analyser, --graphiques, --ecran et --boitier) :
@@ -284,6 +290,96 @@ func status() {
     }
 }
 
+/// Le domicile et les applications des mises à jour par le SSD : les vrais, sauf pour un essai à la
+/// main (DEVELOPPEUR_DOMICILE, DEVELOPPEUR_APPLICATIONS : développement seulement, jamais posées par
+/// le module ni par install.sh).
+func environnementInstallation(json: Bool) -> Installation.Environnement {
+    let variables = ProcessInfo.processInfo.environment
+    let domicile = variables["DEVELOPPEUR_DOMICILE"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0, isDirectory: true) }
+        ?? FileManager.default.homeDirectoryForCurrentUser
+    let applications = variables["DEVELOPPEUR_APPLICATIONS"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0, isDirectory: true) }
+        ?? URL(fileURLWithPath: "/Applications", isDirectory: true)
+    let donnees = DossierDonnees(racineLocale: domicile.appendingPathComponent("Library/Application Support/Developpeur", isDirectory: true))
+    // Le cache de Hugging Face de Fibo : celui de mflux (HF_HUB_CACHE ou HF_HOME s'ils sont posés).
+    let cacheHF = variables["DEVELOPPEUR_DOMICILE"] == nil ? Sens.cacheHuggingFace : nil
+    // Un essai sur un domicile donné ne voit que son uv (jamais celui de Homebrew du vrai Mac).
+    let essai = !(variables["DEVELOPPEUR_DOMICILE"] ?? "").isEmpty
+    var dernier = ""
+    return Installation.Environnement(donnees: donnees, domicile: domicile, applications: applications,
+                                      uvCandidats: Installation.uvCandidats(domicile: domicile, essai: essai), cacheHF: cacheHF, avancement: { a in
+        if json {
+            FileHandle.standardError.write(Data((JSONCoding.line(["avancement": [
+                "element": .string(a.element), "fait": .number(Double(a.fait)), "total": .number(Double(a.total)), "texte": .string(a.texte),
+            ]]) + "\n").utf8))
+        } else if a.texte != dernier {
+            dernier = a.texte
+            log(a.texte)
+        }
+    })
+}
+
+/// `--mises-a-jour [--json] [--deposer [<élément>…]] [--installer [<élément>…]] [--archive <zip>]`.
+func misesAJour(_ options: [String]) -> Int32 {
+    var json = false, deposer = false, installer = false
+    var archive: URL?
+    var liste: [Installation.Element] = []
+    var i = 0
+    while i < options.count {
+        let o = options[i]
+        switch o {
+        case "--json": json = true
+        case "--deposer": deposer = true
+        case "--installer": installer = true
+        case "--archive":
+            guard i + 1 < options.count else { usage(erreur: true); return 2 }
+            archive = URL(fileURLWithPath: options[i + 1])
+            i += 1
+        default:
+            guard let e = Installation.Element(rawValue: o) else {
+                log("élément inconnu : \(o) (\(Installation.Element.allCases.map(\.rawValue).joined(separator: ", ")))")
+                return 2
+            }
+            liste.append(e)
+        }
+        i += 1
+    }
+    guard !(deposer && installer) else { log("--deposer et --installer ensemble : l'un ou l'autre"); return 2 }
+    let maj = Installation(environnementInstallation(json: json))
+    do {
+        let installation = try maj.dossierInstallation()
+        var lignes: [Installation.Ligne]
+        var faits: [Installation.Fait] = []
+        if deposer || installer {
+            (lignes, faits) = try maj.executer(deposer: deposer, elements: liste.isEmpty ? nil : liste, archive: archive)
+        } else {
+            lignes = try maj.comparer()
+        }
+        let relancer = Installation.aRelancer(faits)
+        let ok = !faits.contains { $0.action == "refuse" || $0.action == "echec" }
+        if json {
+            print(line: JSONCoding.line([
+                "ok": .bool(ok), "installation": .string(installation.path), "ordinateur": .string(maj.env.nomOrdinateur()),
+                "elements": .array(lignes.map(Installation.json)), "faits": .array(faits.map(\.json)),
+                "relancer": .array(relancer.map(JSONValue.string)),
+            ]))
+        } else {
+            print(line: "Mises à jour par le SSD : \(installation.path)")
+            for l in lignes { print(line: "  " + Installation.texte(l)) }
+            if !faits.isEmpty { print(line: "") }
+            for f in faits { print(line: f.texte) }
+            if !relancer.isEmpty { print(line: "\nÀ relancer :\n" + relancer.map { "  - " + $0 }.joined(separator: "\n")) }
+            if !deposer, !installer {
+                if lignes.contains(where: { $0.etat.aDeposer }) { print(line: "Déposer sur le SSD ce que ce Mac a de plus récent : --mises-a-jour --deposer") }
+                if lignes.contains(where: { $0.etat.aInstaller }) { print(line: "Installer ce que le SSD a de plus récent : --mises-a-jour --installer") }
+            }
+        }
+        return ok ? 0 : 1
+    } catch {
+        if json { print(line: JSONCoding.line(["ok": false, "erreur": .string(error.localizedDescription)])) } else { log(error.localizedDescription) }
+        return 1
+    }
+}
+
 let arguments = Array(CommandLine.arguments.dropFirst())
 
 switch arguments.first {
@@ -314,6 +410,15 @@ case "--uninstall":
     }
 case "--status":
     status()
+case "--mises-a-jour":
+    exit(misesAJour(Array(arguments.dropFirst())))
+case "--racine-donnees":
+    // install.sh : la racine des données (le dossier commun s'il est réglé) sur stdout ; dossier commun
+    // réglé mais introuvable : son refus sur stderr, code 1.
+    do { print(line: try DossierDonnees().racine().path) } catch {
+        log(error.localizedDescription)
+        exit(1)
+    }
 case "--call":
     guard arguments.count >= 2 else { usage(); exit(2) }
     var rest = Array(arguments.dropFirst(2))

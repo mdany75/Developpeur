@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# preparer-bioclip.sh — installe BioCLIP 2 (les espèces, 1.6.3) dans
-# ~/Library/Application Support/Developpeur/Modeles/ : télécharge le modèle imageomics/bioclip-2 de
+# preparer-bioclip.sh — installe BioCLIP 2 (les espèces, 1.6.3) dans Modeles de la racine des
+# données (le dossier commun s'il est réglé, sinon ~/Library/Application Support/Developpeur/) : télécharge le modèle imageomics/bioclip-2 de
 # Hugging Face (licence MIT), convertit ses deux encodeurs en CoreML (fp16), compare leurs vecteurs
 # à ceux de PyTorch (cosinus > 0,99), puis les compile (bioclip2_image.mlmodelc,
 # bioclip2_text.mlmodelc). Tout reste sur ce Mac : aucune image ne part.
@@ -30,10 +30,26 @@ TEMPORAIRE=0
 [[ -n "${1:-}" ]] || TEMPORAIRE=1
 TRAVAIL="${1:-$(mktemp -d "${TMPDIR:-/tmp}/bioclip.XXXXXX")}"
 IMAGES="${2:-}"
-MODELES="${DEVELOPPEUR_MODELES:-${HOME}/Library/Application Support/Developpeur/Modeles}"
 UV="${UV:-/opt/homebrew/bin/uv}"
 
 die() { printf 'Erreur : %s\n' "$1" >&2; exit 1; }
+
+# Modeles de la racine des données (1.7) : celui du dossier commun s'il est réglé (pointeur local
+# dossier-commun.json, lu par plutil), sinon celui de ce Mac ; dossier commun réglé mais introuvable :
+# refus, jamais le Modeles de ce Mac à sa place.
+if [[ -n "${DEVELOPPEUR_MODELES:-}" ]]; then
+    MODELES="${DEVELOPPEUR_MODELES}"
+else
+    MODELES="${HOME}/Library/Application Support/Developpeur/Modeles"
+    POINTEUR="${HOME}/Library/Application Support/Developpeur/dossier-commun.json"
+    if [[ -f "${POINTEUR}" ]]; then
+        COMMUN="$(plutil -extract dossier raw -o - "${POINTEUR}" 2>/dev/null || true)"
+        if [[ -n "${COMMUN}" && "${COMMUN}" == /* ]]; then
+            [[ -d "${COMMUN}" ]] || die "le dossier commun (${COMMUN}) est introuvable : brancher le SSD qui le contient"
+            MODELES="${COMMUN%/}/Modeles"
+        fi
+    fi
+fi
 [[ -x "${UV}" ]] || die "uv introuvable (${UV}) : brew install uv"
 
 mkdir -p "${TRAVAIL}"
