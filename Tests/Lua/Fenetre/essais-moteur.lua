@@ -236,6 +236,33 @@ essai('Consignes : chaque invite de retouche fait lire le guide de style, fenêt
     contient(Consignes.ligneStyle('ma_facon'), 'remember_style avec read', 'à ma façon le lit')
 end)
 
+-- Demandé par Dany le 2 novembre 2026 : « Je veux que la proposition soit le plus complète
+-- possible ».
+essai("Consignes : Obtenir demande la proposition la plus complète possible, sans rien appliquer ; Accepter applique aussi les masques proposés", function()
+    local d = Consignes.obtenir.demande
+    contient(d, 'la plus complète possible', 'Obtenir')
+    contient(d, Consignes.PROPOSITION_COMPLETE, 'le texte partagé')
+    for _, morceau in ipairs({ 'sans rien appliquer', 'view_photo', 'bilan', 'intention_boitier', 'un seul preview_settings',
+        'pas tout par principe', 'profil', "corrections d'objectif et Upright si utile", 'balance des blancs', 'tonalité',
+        'présence', 'TSL', 'étalonnage', 'courbe', 'détail et bruit', 'vignetage ou radial', 'add_mask avec preview = true',
+        'ciel, sujet, peau', "un recadrage seulement s'il y gagne nettement", 'raison courte',
+        "note-la d'abord si elle n'est pas encore évaluée", "onglet Proposition" }) do
+        contient(d, morceau, 'Obtenir')
+    end
+    vrai(not d:find('rendu naturel', 1, true), "plus la proposition « rendu naturel » d'un seul réglage")
+    vrai(not d:find('confirm = true', 1, true), 'Obtenir n\'applique rien')
+    -- Le guide de style en fin de message, comme les boutons de retouche.
+    egal(#d - #Consignes.LIRE_GUIDE + 1, d:find(Consignes.LIRE_GUIDE, 1, true), 'le guide en fin de message')
+    local Texte = require 'Texte'
+    vrai(Texte.longueur(Consignes.obtenir.fil) < Texte.longueur(d) / 2, 'le fil reste court')
+    contient(Consignes.accepter, 'confirm = true', 'Accepter')
+    contient(Consignes.accepter, 'retouches locales proposées (add_mask sans preview, confirm = true)', 'Accepter : les masques aussi')
+    local bas = (d .. Consignes.accepter):lower()
+    for _, mot in ipairs({ 'client', 'galerie', 'concours', 'mariage', 'photoshop' }) do
+        vrai(not bas:find(mot, 1, true), 'sans « ' .. mot .. ' »')
+    end
+end)
+
 essai('Consignes : Retouche pro sur une sélection, par groupes de lumière ; les autres boutons une à une (relecture du 2 novembre 2026)', function()
     local m = Consignes.retoucheProSurLaSelection(Consignes.invite('retouche_pro').message)
     vrai(m:find('confirm = true', 1, true) ~= nil, 'l\'harmonisation de Retouche pro sur une sélection est appliquée (confirm = true)')

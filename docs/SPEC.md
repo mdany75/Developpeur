@@ -1756,10 +1756,16 @@ sinon la plus récente gardée, sinon une neuve avec son historique (voir Une ph
 conversation), gardée sur le disque dès cette demande ; la case Autre photo décochée, Obtenir va
 quand même à la conversation de la photo. Il envoie ensuite `Consignes.obtenir` par
 `Fenetre.envoyer`, comme une demande de Dany (style choisi et photos jointes, modèle et effort des
-préférences) : `demande`, le texte de l'ancienne `Consignes.proposerOuverture` (« Prépare une
-proposition de retouche de la photo active, rendu naturel : note-la d'abord si elle n'est pas
-encore évaluée, puis montre ce que tu changerais avec preview_settings, sans rien appliquer.
-J'accepterai, refuserai ou ajusterai dans l'onglet Proposition. »), part à Claude ; `fil`
+préférences) : `demande` part à Claude ; depuis le 2 novembre 2026 (demandé par Dany : « Je veux
+que la proposition soit le plus complète possible »), la proposition la plus complète possible
+(`Consignes.PROPOSITION_COMPLETE`, guide de style lu d'abord : `Consignes.LIRE_GUIDE`) : la méthode
+d'une Retouche pro sans rien appliquer, `view_photo` (bilan, `intention_boitier`), puis dans un seul
+`preview_settings` tous les panneaux que la photo demande, pas tout par principe (profil,
+corrections d'objectif et Upright si utile, balance, tonalité, présence, TSL, étalonnage, courbe,
+détail et bruit, vignetage ou radial), les retouches locales par `add_mask` avec `preview = true`
+(ciel, sujet, peau…), un recadrage seulement s'il y gagne nettement, chaque changement avec sa
+raison courte (avant : un seul `preview_settings`, « rendu naturel »). `Consignes.accepter`
+applique les réglages et les masques proposés (`add_mask` sans `preview`, `confirm = true`) ; `fil`
 (« Propose-moi une retouche de cette photo, sans rien appliquer. ») est ce que le fil montre et ce
 que la conversation garde sur le disque (option `affiche` de `Fenetre.envoyer` et de
 `Moteur.envoyer`). La proposition qui arrive se montre dans l'onglet Proposition, comme toute autre
@@ -2430,14 +2436,15 @@ photo, rappel par le menu, jamais gardé ni envoyé).
 
 `FenetreRapide.lua` et `MenuRapide.lua` (Fichier ou Bibliothèque › Module externe - Extras ›
 Demande rapide, ⌘⌃⌥C ; demandée par Dany le 22 octobre 2026) : une fenêtre flottante à part,
-d'environ 1 000 × 250 (cadre `DeveloppeurRapide-<N>`, 14 aujourd'hui, à augmenter quand la taille
+d'environ 1 000 × 300 (cadre `DeveloppeurRapide-<N>`, 15 aujourd'hui, à augmenter quand la taille
 change). Ses pièces sont superposées (`place = 'overlapping'`) et placées par `margin_top` et
-`margin_left` : le résultat page par page (`FenetreRapide.montrer`, `Fil.couper`, 9 lignes de 13
-points ; ▲ ▼ en `push_button` mini, une page moins une ligne par clic), la demande de trois lignes
+`margin_left` : le résultat page par page (`FenetreRapide.montrer`, `Fil.couper`, 12 lignes de 13
+points depuis le 2 novembre 2026, 9 avant ; ▲ ▼ en `push_button` mini, une page moins une ligne par clic), la demande de trois lignes
 (`immediate = false` : Retour l'envoie après `FenetreRapide.DELAI_ENVOI`, 0,3 s, sauf un clic qui
-suit), puis ▲ ▼ et Envoyer à sa droite. À sa gauche, quatre carrés à icône de 55
+suit), puis ▲ ▼ et Envoyer à sa droite. À sa gauche, cinq carrés à icône de 55
 (`FenetreRapide.CARRE`, `FenetreRapide.ACTIONS`, demandés par Dany le 24 octobre 2026, Classer après
-la 1.6 : images `rapide-noter`, `rapide-retouche`, `rapide-portrait`, `rapide-classer`), chacun une
+la 1.6, Proposer et appliquer le 2 novembre 2026 : images `rapide-noter`, `rapide-retouche`,
+`rapide-portrait`, `rapide-classer`, `rapide-proposer`), chacun une
 demande toute faite par `FenetreRapide.demander`, le champ laissé tel quel : noter
 (`Consignes.noterRapide` : `propose_ratings` avec `apply`, le clic vaut la demande), Retouche pro,
 Portrait (`Consignes.invite`, pour chaque photo par `Consignes.surLaSelection` ; Retouche pro, depuis
@@ -2456,7 +2463,12 @@ plusieurs photos, la conversation n'est pas gardée, un « attends mon accord »
 (relecture du 2 novembre 2026). Claude finit en disant comment écrire : dans la fenêtre Claude
 si la conversation est gardée (une photo, case Autre photo cochée), sinon par l'invite Classer ou
 une nouvelle demande qui nomme ce qu'il faut écrire. Le bouton lui-même n'écrit rien au catalogue
-(`essais-rapide.lua`). Le champ garde 654 points. Le bouton ♻ (une
+(`essais-rapide.lua`). Proposer et appliquer (`Consignes.proposerAppliquerRapide`, d'après
+`Lightroom.mode` lu au clic) : la proposition complète d'Obtenir, appliquée dans le même tour
+(`apply_settings` et `add_mask` sans `preview`, `confirm = true`), pour chaque photo sélectionnée une
+à une, puis dite en lignes courtes ; en « Proposer d'abord », proposée seulement, à accepter dans
+la fenêtre Claude (une photo : sa conversation gardée, onglet Proposition ; plusieurs : Obtenir
+puis Accepter, photo par photo). Le champ garde 593 points (654 avec quatre carrés). Le bouton ♻ (une
 conversation neuve, du 22 au 24 octobre 2026) est retiré : une autre photo active ou une autre
 sélection efface la réponse (`FenetreRapide.suivreSelection`, `Lightroom.photos` toutes les 2 s,
 `Moteur.oublierRapide`), le champ gardé ; une sélection changée pendant le travail de Claude ou

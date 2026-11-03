@@ -465,6 +465,14 @@ func dessins(_ p: Palette) -> [String: Dessin] {
         ]),
         etincelle,
     ])
+    // Proposer et appliquer (2 novembre 2026) : la même photo, une coche dedans (la proposition
+    // appliquée), à l'encre du texte, avec la même étincelle.
+    d["rapide-proposer"] = ensemble([
+        icone(boite: B24, couleur: p["texte"], trait: 1.4, traits: [
+            cadrePhoto, trace("M5.6 13.4L8.6 16.4L13.6 10.6"),
+        ]),
+        etincelle,
+    ])
 
     return d
 }

@@ -230,12 +230,13 @@ Dispositions.IMAGES = {
     -- (correctif 1.3.8, demandé par Dany le 26 octobre 2026 ; Calendrier.lua).
     calendrier = taille(14, 14),
     -- Les icônes des boutons de la Demande rapide, à gauche du champ (FenetreRapide.ACTIONS ; demandés
-    -- par Dany le 24 octobre 2026) : noter, Retouche pro, Portrait, puis Classer (après la 1.6), dans
-    -- des carrés de 55.
+    -- par Dany le 24 octobre 2026) : noter, Retouche pro, Portrait, puis Classer (après la 1.6) et
+    -- Proposer et appliquer (2 novembre 2026), dans des carrés de 55.
     ['rapide-noter'] = taille(30, 30),
     ['rapide-retouche'] = taille(30, 30),
     ['rapide-portrait'] = taille(30, 30),
     ['rapide-classer'] = taille(30, 30),
+    ['rapide-proposer'] = taille(30, 30),
 }
 
 -- Apparences ------------------------------------------------------------------------------------

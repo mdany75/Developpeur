@@ -1,7 +1,8 @@
 -- FenetreRapide.lua : la fenêtre Demande rapide (Fichier ou Bibliothèque › Module externe - Extras
 -- › Demande rapide, ⌘⌃⌥C ; demandée par Dany le 22 octobre 2026) : le résultat page par page, une
--- demande de 3 lignes, à sa gauche quatre boutons à icône (noter, Retouche pro, Portrait ; 24 octobre
--- 2026 ; Classer après la 1.6), à sa droite ▲, ▼ et Envoyer, dans une fenêtre d'environ 1 000 × 250 points ; Retour envoie,
+-- demande de 3 lignes, à sa gauche cinq boutons à icône (noter, Retouche pro, Portrait ; 24 octobre
+-- 2026 ; Classer après la 1.6 ; Proposer et appliquer le 2 novembre 2026), à sa droite ▲, ▼ et
+-- Envoyer, dans une fenêtre d'environ 1 000 × 300 points ; Retour envoie,
 -- comme dans la fenêtre Claude (champ à `immediate = false` : Retour le valide). Depuis le correctif
 -- 1.3.6 (« une photo, une conversation », décidé avec Dany le 25 octobre 2026), une demande sur une
 -- photo seule part dans la conversation de la photo, la même que la fenêtre Claude, gardée, où elle
@@ -33,13 +34,16 @@ local FenetreRapide = { ouverte = false }
 require('Menage').signaler(function() return FenetreRapide.ouverte == true or Moteur.travaille == true end)
 
 -- Lignes du résultat montrées à la fois (13 points, 16,25 de haut chacune, relevé le 22 octobre
--- 2026 : 130 pour 8 ; dans les 155 de la zone) ; ▲ et ▼ les font défiler.
-FenetreRapide.LIGNES_RESULTAT = 9
+-- 2026 : 130 pour 8) ; ▲ et ▼ les font défiler. 12 depuis le 2 novembre 2026 (demandé par Dany :
+-- « Je veux avoir 12 lignes de Résultat »), 195 points dans les 204 de la zone (9 avant, dans 155).
+FenetreRapide.LIGNES_RESULTAT = 12
+FenetreRapide.HAUTEUR_LIGNE = 16.25
 FenetreRapide.LIGNES_DEMANDE = 3
--- Largeur et hauteur du contenu, en points, pour une fenêtre d'environ 1 000 × 250 (barre de titre
--- et marges de la fenêtre en plus ; relevé à 735 × 202 pour 64 caractères de large).
+-- Largeur et hauteur du contenu, en points, pour une fenêtre d'environ 1 000 × 300 (barre de titre
+-- et marges de la fenêtre en plus ; relevé à 735 × 202 pour 64 caractères de large ; 218 de haut
+-- pour 9 lignes, 49 de plus pour les 3 lignes ajoutées le 2 novembre 2026).
 FenetreRapide.LARGEUR = 998
-FenetreRapide.HAUTEUR = 218
+FenetreRapide.HAUTEUR = 267
 -- Le champ de demande de 3 lignes, une boîte de 55 points ; la colonne de droite prend sa hauteur et
 -- sa place. Écart entre le résultat et la boîte.
 FenetreRapide.HAUTEUR_DEMANDE = 55
@@ -57,8 +61,12 @@ FenetreRapide.FLECHE = 14
 -- par groupes de lumière, Consignes.retoucheProSurLaSelection) ; puis Classer
 -- (après la 1.6, point « Le Suivi et le classement » de la page Analyse) : mots-clés, lieu et
 -- légende proposés seulement (Consignes.classerRapide, quel que soit le mode du module : la Demande
--- rapide n'a rien pour accepter) ; le bouton lui-même n'écrit rien. Icônes de Dispositions.IMAGES ; ESPACE : l'écart
--- entre deux carrés (un carré de 55 a un cadre de 57). Quatre carrés laissent au champ 654 points.
+-- rapide n'a rien pour accepter) ; le bouton lui-même n'écrit rien ; puis Proposer et appliquer
+-- (demandé par Dany le 2 novembre 2026) : la proposition la plus complète possible, appliquée dans
+-- le même tour (Consignes.proposerAppliquerRapide, d'après le mode du module lu au clic : en
+-- « Proposer d'abord », proposée seulement). Icônes de Dispositions.IMAGES ; ESPACE : l'écart
+-- entre deux carrés (un carré de 55 a un cadre de 57). Cinq carrés laissent au champ 593 points
+-- (654 avec quatre). `message` : un texte, ou une fonction qui le rend au clic.
 FenetreRapide.CARRE = FenetreRapide.HAUTEUR_DEMANDE
 FenetreRapide.ESPACE = 6
 local retouchePro, portrait = Consignes.invite('retouche_pro'), Consignes.invite('portrait')
@@ -71,9 +79,14 @@ FenetreRapide.ACTIONS = {
         tooltip = portrait.titre .. ", pour chaque photo sélectionnée : " .. portrait.message },
     { icone = 'rapide-classer', message = Consignes.classerRapide,
         tooltip = "Classer les photos sélectionnées : mots-clés, lieu et légende proposés, rien d'écrit sans votre accord" },
+    { icone = 'rapide-proposer', message = function() return Consignes.proposerAppliquerRapide(Lightroom.mode()) end,
+        tooltip = "Proposer et appliquer : Claude prépare la proposition la plus complète possible (réglages et retouches locales) "
+            .. "pour chaque photo sélectionnée, l'applique, puis dit ce qui a changé et pourquoi. En mode « Proposer d'abord », "
+            .. "il propose seulement : à accepter dans la fenêtre Claude." },
 }
 -- La zone du résultat : toute la hauteur au-dessus de la demande (relevé le 22 octobre 2026 : 988 ×
--- 248 pour 984 × 214, d'où 996 × 216 pour 1 000 × 250), sans barre de défilement : ▲ et ▼ y
+-- 248 pour 984 × 214, d'où 996 × 216 pour 1 000 × 250 ; 267 de haut pour 1 000 × 300 depuis le
+-- 2 novembre 2026), sans barre de défilement : ▲ et ▼ y
 -- changent de page. Le texte se coupe à la largeur du texte, moins la marge de Fil.couper.
 FenetreRapide.HAUTEUR_RESULTAT = FenetreRapide.HAUTEUR - FenetreRapide.ECART - FenetreRapide.HAUTEUR_DEMANDE
 FenetreRapide.LARGEUR_TEXTE = FenetreRapide.LARGEUR - 8
@@ -223,6 +236,9 @@ end
 -- valide le champ et annule l'envoi par Retour.
 function FenetreRapide.demander(message)
     FenetreRapide.attente = nil
+    if type(message) == 'function' then
+        message = message()
+    end
     FenetreRapide.envoyer(message)
 end
 
@@ -425,7 +441,7 @@ function FenetreRapide.afficher()
             title = "Claude · Demande rapide",
             contents = contenu,
             -- Le nom change avec la taille du contenu : une taille gardée d'avant ne revient pas.
-            save_frame = 'DeveloppeurRapide-14',
+            save_frame = 'DeveloppeurRapide-15',
             blockTask = true,
             onShow = function(controle) FenetreRapide.controle = controle end,
             windowWillClose = function()

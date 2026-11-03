@@ -235,7 +235,7 @@ essai("Les boutons à icône à gauche du champ, sans ♻ ; le titre de la fenê
 end)
 
 essai("Le 4ᵉ bouton, Classer : sa demande part avec Consignes.classerRapide (proposer seulement, pour chaque photo) ; le bouton n'écrit rien au catalogue", function()
-    egal(4, #FenetreRapide.ACTIONS, 'quatre boutons à icône')
+    egal(5, #FenetreRapide.ACTIONS, 'cinq boutons à icône (Proposer et appliquer, 2 novembre 2026)')
     local action = FenetreRapide.ACTIONS[4]
     egal('rapide-classer', action.icone)
     egal(Consignes.classerRapide, action.message, 'Classer de la Demande rapide, pour chaque photo')
@@ -288,6 +288,104 @@ essai("Le 4ᵉ bouton, Classer : sa demande part avec Consignes.classerRapide (p
     egal(0, #poses, 'aucun champ ni mot-clé posé')
     repondre('Proposition : mots-clés « lac », « automne ».')
     S.catalogue.withWriteAccessDo = nil
+end)
+
+-- Demandé par Dany le 2 novembre 2026 : « Je veux avoir 12 lignes de Résultat dans [la Demande
+-- rapide] ».
+essai("Le résultat montre 12 lignes, qui tiennent dans sa zone sans couper ; cinq carrés laissent au champ 593 points", function()
+    egal(12, FenetreRapide.LIGNES_RESULTAT, '12 lignes')
+    vrai(FenetreRapide.HAUTEUR_RESULTAT >= FenetreRapide.LIGNES_RESULTAT * FenetreRapide.HAUTEUR_LIGNE,
+        string.format('%d lignes de %.2f dans %d points', FenetreRapide.LIGNES_RESULTAT, FenetreRapide.HAUTEUR_LIGNE, FenetreRapide.HAUTEUR_RESULTAT))
+    egal(FenetreRapide.HAUTEUR - FenetreRapide.ECART - FenetreRapide.HAUTEUR_DEMANDE, FenetreRapide.HAUTEUR_RESULTAT)
+    local contenu, cadre
+    S.pendantFenetre = function(args) contenu, cadre = args.contents, args.save_frame end
+    FenetreRapide.afficher()
+    S.pendantFenetre = nil
+    egal('DeveloppeurRapide-15', cadre, 'une taille gardée d\'avant ne revient pas')
+    local texte, champ
+    for _, v in ipairs(vues(contenu)) do
+        if v.vue.genre == 'static_text' and v.vue.args.height_in_lines then
+            texte = v.vue.args
+        elseif v.vue.genre == 'edit_field' then
+            champ = v.vue.args
+        end
+    end
+    egal(12, texte.height_in_lines, 'le texte du résultat, sur 12 lignes')
+    egal(593, champ.width, 'la largeur du champ avec cinq carrés')
+    -- Une longue réponse : 12 lignes par page, puis ▼.
+    local lignes = {}
+    for i = 1, 30 do
+        lignes[i] = 'Ligne ' .. i
+    end
+    FenetreRapide.p = { }
+    FenetreRapide.page = nil
+    FenetreRapide.montrer(table.concat(lignes, '\n'))
+    local p = FenetreRapide.p
+    FenetreRapide.p, FenetreRapide.page = nil, nil
+    local _, n = p.resultat:gsub('\n', '')
+    egal(12, n + 1, '12 lignes montrées')
+    egal(true, p.descend, '▼ pour la suite')
+end)
+
+-- Demandé par Dany le 2 novembre 2026 : « ajouter un bouton dans [la Demande rapide] qui donne et
+-- applique la proposition rapide ».
+essai("Le 5ᵉ bouton, Proposer et appliquer : la proposition complète, appliquée dans le même tour ; en « Proposer d'abord », proposée seulement", function()
+    local action = FenetreRapide.ACTIONS[5]
+    egal('rapide-proposer', action.icone)
+    egal('function', type(action.message), 'le texte se fait au clic, d\'après le mode')
+    contient(action.tooltip, 'Proposer et appliquer', 'infobulle')
+    contient(action.tooltip, "En mode « Proposer d'abord », il propose seulement", 'infobulle : le mode')
+    photo(981)
+    photo(982)
+    local Preferences = require 'Preferences'
+    local function cliquer()
+        depart({})
+        choisir(981, 982)
+        local bouton, taches
+        S.pendantFenetre = function(args)
+            local pas = FenetreRapide.CARRE + FenetreRapide.ESPACE
+            for _, v in ipairs(vues(args.contents)) do
+                if v.vue.genre == 'square_button' and v.vue.args.image_name and v.marge == 4 * pas then
+                    bouton = v.vue
+                end
+            end
+            vrai(bouton, 'le 5ᵉ carré, à la suite des quatre autres')
+            egal(FenetreRapide.CARRE, bouton.args.width, 'même taille')
+            egal(FenetreRapide.HAUTEUR_DEMANDE, bouton.args.height, 'même hauteur')
+            egal(action.tooltip, bouton.args.tooltip)
+            contient(bouton.args.image_name, 'rapide-proposer', 'son icône')
+            taches = #S.taches
+            bouton.args.action()
+        end
+        FenetreRapide.afficher()
+        S.pendantFenetre = nil
+        vrai(taches and #S.taches > taches, 'la demande part dans une tâche')
+        local recu = #recus
+        S.taches[taches + 1]()
+        vrai(#recus > recu, 'Claude Code reçoit la demande')
+        local message = recus[#recus].message
+        repondre('Fait.')
+        return message
+    end
+    local prefs = Preferences.lire()
+    local avant = prefs.mode
+    prefs.mode = 'appliquer'
+    local m = cliquer()
+    contient(m, Consignes.rapide, 'comme une demande rapide sur plusieurs photos')
+    contient(m, Consignes.PROPOSITION_COMPLETE, 'la proposition la plus complète possible')
+    contient(m, 'Pour toutes les photos sélectionnées dans Lightroom, une à une', 'chaque photo')
+    contient(m, 'apply_settings avec ces réglages et confirm = true', 'appliquée')
+    contient(m, 'add_mask sans preview, avec confirm = true', 'les masques proposés aussi')
+    contient(m, 'lignes courtes', 'dit en lignes courtes')
+    contient(m, Consignes.LIRE_GUIDE, 'le guide de style')
+    prefs.mode = 'proposer'
+    local mp = cliquer()
+    prefs.mode = avant
+    contient(mp, Consignes.PROPOSITION_COMPLETE, 'la même proposition')
+    contient(mp, "n'applique rien (jamais confirm = true)", 'le mode respecté')
+    contient(mp, 'fenêtre Claude', "où l'accepter")
+    absent(mp, 'apply_settings avec ces réglages', 'rien appliqué')
+    absent(mp, 'add_mask sans preview', 'aucun masque posé')
 end)
 
 essai("Le texte de la fenêtre vide (case Autre photo cochée comprise) tient en entier dans la zone du résultat, sans ▼", function()

@@ -334,16 +334,35 @@ function Consignes.itemsEfforts()
     return items(Consignes.efforts)
 end
 
+-- La proposition la plus complète possible (demandé par Dany le 2 novembre 2026 : « Je veux que la
+-- proposition soit le plus complète possible ») : la méthode d'une Retouche pro, sans rien
+-- appliquer. Tous les panneaux que la photo demande (pas tout par principe) dans un seul
+-- preview_settings, qui fait la carte de l'onglet Proposition ; les retouches locales proposées par
+-- add_mask avec preview = true (Conversation.ceQueTouche les lit pour la boîte Ajuster) ; un
+-- recadrage seulement s'il y gagne nettement. Partagée par Obtenir (Consignes.obtenir) et le bouton
+-- « Proposer et appliquer » de la Demande rapide (Consignes.proposerAppliquerRapide).
+Consignes.PROPOSITION_COMPLETE = "comme une Retouche pro, mais sans rien appliquer : view_photo (mesures, bilan, intention_boitier) "
+    .. "pour le diagnostic ; puis, dans un seul preview_settings, tous les panneaux que la photo demande, pas tout par principe "
+    .. "(profil, corrections d'objectif et Upright si utile, balance des blancs, tonalité, présence, TSL, étalonnage, courbe, "
+    .. "détail et bruit, vignetage ou radial inversé, jamais les deux) ; les retouches locales utiles (ciel, sujet, peau…) par "
+    .. "add_mask avec preview = true ; un recadrage seulement s'il y gagne nettement. Donne chaque changement avec sa raison courte."
+
 -- « Obtenir », sous la carte de l'onglet Proposition (Fenetre.obtenir ; décision de Dany du
 -- 25 octobre 2026, à la place de la proposition préparée à l'ouverture de la fenêtre) : `demande`
 -- part à Claude, `fil` est ce que le fil montre de la demande de Dany, court comme une invite.
+-- Depuis le 2 novembre 2026, la proposition la plus complète possible (Consignes.PROPOSITION_COMPLETE),
+-- guide de style lu d'abord, comme les boutons de retouche (Consignes.LIRE_GUIDE).
 Consignes.obtenir = {
     fil = "Propose-moi une retouche de cette photo, sans rien appliquer.",
-    demande = "Prépare une proposition de retouche de la photo active, rendu naturel : note-la d'abord si elle n'est pas encore évaluée, puis montre ce que tu changerais avec preview_settings, sans rien appliquer. J'accepterai, refuserai ou ajusterai dans l'onglet Proposition.",
+    demande = avecGuide("Prépare la proposition de retouche la plus complète possible de la photo active : note-la d'abord si elle n'est pas encore évaluée, puis fais-la "
+        .. Consignes.PROPOSITION_COMPLETE .. " J'accepterai, refuserai ou ajusterai dans l'onglet Proposition."),
 }
 
 -- Réponses aux propositions (boutons du panneau Proposition).
-Consignes.accepter = "J'accepte la proposition : applique-la (confirm = true)."
+-- Accepter applique la proposition entière : les réglages de preview_settings et les retouches
+-- locales proposées avec elle (add_mask avec preview = true), sans preview cette fois (2 novembre
+-- 2026, la proposition complète).
+Consignes.accepter = "J'accepte la proposition : applique-la (confirm = true), réglages et retouches locales proposées (add_mask sans preview, confirm = true)."
 Consignes.refuser = "Je refuse cette proposition : ne l'applique pas. Dis-moi ce que tu proposerais d'autre, sans rien appliquer."
 function Consignes.ajuster(texte)
     return "Ajuste la proposition avant de l'appliquer : " .. texte .. ". Montre-moi la nouvelle proposition."
@@ -484,6 +503,30 @@ end
 -- photos la conversation n'est pas gardée : un « attends mon accord » y serait sans issue (Dany
 -- répondrait dans une conversation neuve, sans la proposition ; relecture du 2 novembre 2026).
 Consignes.classerRapide = Consignes.surLaSelection(CLASSER) .. " Dans cette Demande rapide, la demande entière est ta proposition, photo par photo (mots-clés, lieu, légende) : n'appelle pas set_metadata, même en mode Appliquer. Finis en disant comment l'écrire : si cette conversation est gardée (la fenêtre Claude la reprend), en répondant dans la fenêtre Claude ; sinon, elle sera perdue : par l'invite Classer de la fenêtre Claude, photo par photo, ou par une nouvelle demande qui nomme ce qu'il faut écrire."
+
+-- Le 5ᵉ bouton de la Demande rapide, « Proposer et appliquer » (FenetreRapide.ACTIONS ; demandé par
+-- Dany le 2 novembre 2026 : « un bouton qui donne et applique la proposition rapide ») : la
+-- proposition complète (Consignes.PROPOSITION_COMPLETE), puis appliquée dans le même tour, pour la
+-- photo active ou chaque photo sélectionnée une à une (Consignes.surLaSelection), et dite en lignes
+-- courtes (FenetreRapide.LIGNES_RESULTAT : 12 se lisent sans défiler). `mode` : celui du module
+-- (Lightroom.mode, lu au clic). En « Proposer d'abord », le mode n'est pas contourné : Claude propose
+-- seulement, sans confirm, et dit d'accepter dans la fenêtre Claude (la conversation d'une photo
+-- seule y est gardée ; sur plusieurs, Obtenir puis Accepter, photo par photo).
+function Consignes.proposerAppliquerRapide(mode)
+    local base = "Prépare la proposition de retouche la plus complète possible de la photo active, " .. Consignes.PROPOSITION_COMPLETE
+    local suite
+    if mode == 'proposer' then
+        suite = " Le module est en mode « Proposer d'abord » : n'applique rien (jamais confirm = true), propose seulement. "
+            .. "Finis en lignes courtes, une par changement proposé, avec sa raison ; puis dis comment l'accepter : une photo seule, "
+            .. "par Accepter dans l'onglet Proposition de la fenêtre Claude (cette conversation y est gardée) ; plusieurs photos, "
+            .. "dans la fenêtre Claude, photo par photo, par Obtenir puis Accepter."
+    else
+        suite = " Puis applique-la dans ce même tour, c'est la demande : apply_settings avec ces réglages et confirm = true, "
+            .. "et chaque masque proposé par add_mask sans preview, avec confirm = true. Finis en lignes courtes, une par "
+            .. "changement fait, avec sa raison (douze lignes se lisent sans défiler)."
+    end
+    return Consignes.surLaSelection(avecGuide(base .. suite))
+end
 
 -- Ajouté au message envoyé (pas affiché) tant que la conversation n'a pas de titre : la consigne
 -- seule ne suffit pas (constaté avec Haiku, 19 octobre 2026).
