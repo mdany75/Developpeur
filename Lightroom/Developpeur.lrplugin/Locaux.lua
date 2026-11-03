@@ -836,15 +836,17 @@ function Locaux.comparerFormes(ecrits, relus, tol)
             nombre(k, cle .. '[' .. i .. ']', x[i], y[i], genres[i] or 'valeur')
         end
     end
-    -- Touches d'un trait (Dabs) : même nombre et mêmes lettres ; « f » comparé en valeur, « d x y »
-    -- ou « M x y » en positions. Les touches « r » (rayon) et « h » (dureté) ne se comparent pas :
-    -- Lightroom les retire au calcul du masque (constaté le 2 novembre 2026, 15.6), Radius et
-    -- CenterWeight les portent. Le rang dit est celui de la touche écrite.
+    -- Touches d'un trait (Dabs) : même nombre et mêmes lettres, « d x y » ou « M x y » en positions.
+    -- Les touches « r » (rayon), « h » (dureté) et « f » (flux) ne se comparent pas : Lightroom
+    -- retire les deux premières au calcul du masque (constaté le 2 novembre 2026, 15.6), et « f » quand
+    -- le flux vaut 1 (constaté à la recette de la 1.6.6, le même soir : « f 1.0000 » retiré, 98
+    -- touches relues pour 99, le pinceau retiré à tort ; « f 0.7000 » gardé) ; Radius, CenterWeight
+    -- et Flow les portent. Le rang dit est celui de la touche écrite.
     local function sansRayonNiDurete(liste)
         local gardees = {}
         for i, touche in ipairs(liste) do
             local lettre = tostring(touche):match('^(%S+)')
-            if lettre ~= 'r' and lettre ~= 'h' then
+            if lettre ~= 'r' and lettre ~= 'h' and lettre ~= 'f' then
                 gardees[#gardees + 1] = { rang = i, texte = tostring(touche) }
             end
         end

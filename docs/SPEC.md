@@ -3689,8 +3689,9 @@ pouvaient être mal rangées. Depuis la 1.6, chaque `masquer` relit ce que Light
   `ZeroX/Y`, `FullX/Y` ; `Left`, `Top`, `Right`, `Bottom`, `Angle` (modulo 180 : une ellipse est
   symétrique), `Feather`, `Midpoint`, `Roundness`, `Flipped` (pas sur un radial inversé :
   Lightroom le range faux au calcul) ; `Radius`, `Flow`, `CenterWeight`, `Dabs` (même nombre de
-  touches `f d M`, mêmes lettres, positions ; les touches `r` et `h`, que Lightroom retire au
-  calcul, ne se comparent pas : `Radius` et `CenterWeight` les portent) ; nombre de traits
+  touches `d M`, mêmes lettres, positions ; les touches `r`, `h` et `f`, que Lightroom retire au
+  calcul (`f` quand le flux vaut 1 : recette de la 1.6.6), ne se comparent pas : `Radius`,
+  `CenterWeight` et `Flow` les portent) ; nombre de traits
   (`Masks`), sauf des traits rangés en table compressée (`MaskBrushTable`, illisible : pas
   comparés) ; `CorrectionRangeMask.Type`, `ColorAmount`, `LumRange`, `DepthRange`, `PointModels`
   (modèle et position), `CorrectionReferenceX/Y` tant qu'ils sont là (Lightroom les retire au
@@ -3870,7 +3871,9 @@ recadrage : radiaux 170° et −30°, écrits 190° et −10°) sur D ; persista
   affichée), sinon au premier affichage dans le module Développement (B, affiché par `show_photo`
   après la relance : il prend alors la forme calculée). Ni `view_photo` ni la relance de Lightroom
   ne changent rien. La forme calculée : touches `r` et `h` des traits retirées (`Radius` et
-  `CenterWeight` gardés) ; `Flipped` rangé faux sur un radial inversé (`MaskInverted` reste vrai ;
+  `CenterWeight` gardés), et `f` quand le flux vaut 1 (constaté à la recette de la 1.6.6, le
+  2 novembre 2026 au soir, sur la copie 53828461 de DSCF2402 : un trait dur relu à 98 touches pour
+  99, le pinceau retiré à tort ; `f 0.7000` reste gardé ; simulé, `essais-masques-relus.lua`) ; `Flipped` rangé faux sur un radial inversé (`MaskInverted` reste vrai ;
   non inversé, vrai) ; `CorrectionReferenceX/Y` d'une plage de couleurs retirés
   (`PointModels` garde le prélèvement) ; `LuminanceDepthSampleInfo` ajouté à une plage de
   luminance ; `CorrectionReferenceX/Y` ajoutés à chaque correction (hors des composants, non

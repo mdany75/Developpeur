@@ -489,7 +489,8 @@ end
 -- est déjà chargé (S.negatifCharge : une copie de la photo affichée), sinon au premier affichage
 -- dans Développement. Ni view_photo ni la relance de Lightroom ne changent rien d'autre.
 --   positions, rayon, flux, dureté : six chiffres significatifs (1,000646 rangé 1,00065) ;
---   touches « r » et « h » d'un trait retirées (Radius et CenterWeight les portent) ;
+--   touches « r » et « h » d'un trait retirées (Radius et CenterWeight les portent), et « f » quand
+--     le flux vaut 1 (recette de la 1.6.6, 2 novembre 2026 au soir ; « f 0.7000 » gardé) ;
 --   radial inversé (MaskInverted vrai) : Flipped rangé faux ;
 --   plage de couleurs : CorrectionReferenceX et Y retirés (le prélèvement reste dans PointModels) ;
 --   plage de luminance : LuminanceDepthSampleInfo ajouté ;
@@ -512,8 +513,8 @@ local function calculerComposant(m)
     if type(m.Dabs) == 'table' then
         local gardees = {}
         for _, touche in ipairs(m.Dabs) do
-            local lettre = tostring(touche):match('^(%S+)')
-            if lettre ~= 'r' and lettre ~= 'h' then
+            local lettre, valeur = tostring(touche):match('^(%S+)%s*(%S*)')
+            if lettre ~= 'r' and lettre ~= 'h' and not (lettre == 'f' and tonumber(valeur) == 1) then
                 gardees[#gardees + 1] = touche
             end
         end

@@ -422,6 +422,22 @@ local function formesConstat()
     })
 end
 
+-- Recette de la 1.6.6 (2 novembre 2026 au soir, DSCF2402, relevé DEVELOPPEUR_RELEVE_FORMES) : un trait
+-- dur au flux 1 revenait sans sa touche « f 1.0000 », 98 touches pour 99, et le pinceau était retiré
+-- à tort comme mal gardé.
+test("masques relus (constat 15.6) : un pinceau au flux 1 perd sa touche « f » au calcul : gardé", function()
+    local photo = fuji()
+    S.negatifCharge = true
+    local resultat = Commandes.executer('masquer', { masques = Json.tableau({
+        { type = 'pinceau', nom = 'Claude · Trait dur', locaux = { LocalExposure2012 = -2 },
+          traits = { { points = { { 0.3, 0.5 }, { 0.7, 0.5 } }, rayon = 0.02, flux = 1, durete = 100 } } },
+    }), etape = 'trait dur' })
+    local trait = photo.reglages.MaskGroupBasedCorrections[1].CorrectionMasks[1].Masks[1]
+    egal(tostring(trait.Dabs[1]):sub(1, 1), 'd', "simulation : « f 1.0000 » retiré aussi")
+    egal(verdicts(resultat)['Claude · Trait dur'].verdict, 'gardé')
+    egal(#photo.reglages.MaskGroupBasedCorrections, 1, "le pinceau reste")
+end)
+
 test("masques relus (constat 15.6) : formes calculées dès l'écriture (négatif chargé) : toutes gardées", function()
     local photo = fuji()
     S.negatifCharge = true

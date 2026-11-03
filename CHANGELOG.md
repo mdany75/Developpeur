@@ -28,6 +28,8 @@ un paramètre prédéfini. La Demande rapide montre 20 lignes.
 ### Corrigé
 - Créer un paramètre prédéfini du même nom qu'un autre n'écrase plus l'ancien : le nouveau
   s'appelle « Nom (2) », et Claude vous le dit. Il ne remplace l'ancien que si vous le demandez.
+- Un masque Pinceau au flux de 100 n'est plus retiré à tort comme « mal gardé » : Lightroom range
+  ce trait un peu autrement une fois calculé, et Développeur le prenait pour une erreur.
 - Copier une retouche avec les taches depuis une photo qui n'en a pas retire maintenant vraiment les
   taches de la photo visée : Lightroom les gardait, alors que Claude annonçait « 0 tache ».
 
