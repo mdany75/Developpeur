@@ -48,6 +48,10 @@ Menage.TEMPORAIRES = { 'Groupes', 'Rapide', 'Suivi', 'Fibo', 'PhotoActive', 'Pou
 Menage.GARDES = {
     ['fibo-en-cours.verrou'] = "verrou de generative_edit (Tools+Generatif.swift, flock) : un serveur peut le tenir "
         .. "pendant que le module se charge ; vide, il ne grossit pas",
+    ['Mises a jour'] = "dossier de travail des mises à jour par le SSD (Installation.swift, MisesAJour.lua) : un dépôt lancé "
+        .. "avant le rechargement peut encore tourner (le connecteur survit à Lightroom) ; chacun vide ce qu'il y met",
+    ['mises-a-jour.verrou'] = "verrou des mises à jour par le SSD (Installation.swift, flock) : un connecteur peut le tenir ; "
+        .. "vide, il ne grossit pas",
 }
 
 -- Les débuts de nom des fichiers de passage écrits à la racine de Temporaire, chacun effacé juste

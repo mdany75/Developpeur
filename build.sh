@@ -28,6 +28,9 @@
 #   6. archive « build/Developpeur.zip », notarisée chez Apple
 #   7. installation, seulement avec --install : l'archive est décompressée dans le dossier
 #      temporaire et son install.sh lancé (on installe exactement ce qui sera publié)
+#   8. avec --install, l'archive notarisée et testée seulement : gardée dans
+#      ~/Library/Application Support/Developpeur/Archive et déposée sur le SSD (dossier commun réglé
+#      et présent, mcp-developpeur --mises-a-jour --deposer developpeur)
 #
 # build/ est ignoré par git ; l'archive est publiée en Release GitHub (voir CLAUDE.md).
 # Le script s'arrête à la première erreur et n'écrit que dans build/, .build/ et un dossier
@@ -209,7 +212,28 @@ if [[ "${INSTALL}" -eq 1 ]]; then
     step "Installation depuis build/${ARCHIVE_NAME}.zip"
     mkdir -p "${STAGE_DIR}/installation"
     ditto -x -k "${DIST_DIR}/${ARCHIVE_NAME}.zip" "${STAGE_DIR}/installation"
-    bash "${STAGE_DIR}/installation/${ARCHIVE_NAME}/install.sh"
+    # install.sh ne garde ni ne dépose lui-même cette archive : c'est l'étape 8, et seulement pour une
+    # archive notarisée et testée.
+    DEVELOPPEUR_PAS_DE_DEPOT=1 bash "${STAGE_DIR}/installation/${ARCHIVE_NAME}/install.sh"
+
+    # --- 8. Mises à jour par le SSD (1.7) -------------------------------------
+    #
+    # L'archive notarisée et testée (jamais avec --sans-tests ni SKIP_NOTARIZE) est gardée sur ce Mac
+    # (Developpeur/Archive) et, avec un dossier commun réglé et présent, déposée dans son dossier
+    # Installation : l'autre Mac l'installera depuis le SSD.
+    DEST_DIR="${HOME}/Library/Application Support/Developpeur"
+    if [[ "${NOTARIZE}" -eq 1 && "${TESTS}" -eq 1 ]]; then
+        mkdir -p "${DEST_DIR}/Archive"
+        cp -f "${DIST_DIR}/${ARCHIVE_NAME}.zip" "${DEST_DIR}/Archive/${ARCHIVE_NAME}.zip.partiel"
+        mv -f "${DEST_DIR}/Archive/${ARCHIVE_NAME}.zip.partiel" "${DEST_DIR}/Archive/${ARCHIVE_NAME}.zip"
+        if [[ -f "${DEST_DIR}/dossier-commun.json" ]]; then
+            step "Dépôt sur le SSD (mises à jour par le SSD)"
+            "${DEST_DIR}/${PRODUCT}" --mises-a-jour --deposer developpeur --archive "${DIST_DIR}/${ARCHIVE_NAME}.zip" \
+                || printf 'Archive non déposée sur le SSD (voir ci-dessus) : à refaire SSD branché, par mcp-developpeur --mises-a-jour --deposer developpeur.\n'
+        fi
+    else
+        step "Archive d'essai (${NOTARIZE_WHY:-sans tests}) : ni gardée ni déposée sur le SSD"
+    fi
 fi
 
 step "Terminé"

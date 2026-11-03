@@ -1319,10 +1319,12 @@ essai('Gestionnaire de modules externes : les sections se construisent, menus Mo
     local f = S.modules.LrView.osFactory()
     local proprietes = S.modules.LrBinding.makePropertyTable()
     local sections = PluginInfoProvider.sectionsForTopOfDialog(f, proprietes)
-    -- La troisième section, Dossier commun (3 novembre 2026), a ses essais dans essais-dossier-commun.lua.
-    egal(3, #sections)
+    -- La troisième section, Dossier commun (3 novembre 2026), a ses essais dans essais-dossier-commun.lua ;
+    -- la quatrième, Mises à jour par le SSD (1.7), dans essais-mises-a-jour.lua.
+    egal(4, #sections)
     egal('Liaison avec Claude', sections[1].title)
     egal('Dossier commun', sections[3].title)
+    egal('Mises à jour par le SSD', sections[4].title)
     local section = sections[2]
     egal('Fenêtre Claude', section.title)
     local prefsModule = Chemins.prefs()

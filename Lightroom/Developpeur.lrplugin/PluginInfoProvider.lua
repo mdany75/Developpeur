@@ -9,7 +9,9 @@
 --     « À l'ouverture » sont retirées au correctif 1.3.6, avec la leçon et la proposition préparée à
 --     l'ouverture de la fenêtre.)
 --   - le dossier commun (3 novembre 2026) : chemin, Choisir…, Revenir au dossier de ce Mac
---     (DossierCommun.lua, qui seul écrit le pointeur dossier-commun.json).
+--     (DossierCommun.lua, qui seul écrit le pointeur dossier-commun.json) ;
+--   - les mises à jour par le SSD (1.7) : état, Vérifier, Installer depuis le SSD, Déposer sur le
+--     SSD (MisesAJour.lua ; le travail est fait par le connecteur, --mises-a-jour).
 -- Les deux premières sections lisent et écrivent les mêmes préférences du module (Preferences.lua,
 -- Chemins.prefs).
 
@@ -433,6 +435,85 @@ local function sectionDossierCommun(f, propertyTable, ligne)
     }
 end
 
+-- Mises à jour par le SSD (1.7) : l'état, et les trois boutons, chacun dans sa propre tâche.
+local function actionMisesAJour(propertyTable, quoi)
+    LrTasks.startAsyncTask(function()
+        local MisesAJour = require 'MisesAJour'
+        local refus = MisesAJour.refus()
+        if refus then
+            propertyTable.misesAJour = refus
+            LrDialogs.message("Mises à jour par le SSD", refus, 'info')
+            return
+        end
+        if MisesAJour.enCours then
+            LrDialogs.message("Mises à jour par le SSD", "Une mise à jour par le SSD est déjà en cours.", 'info')
+            return
+        end
+        MisesAJour.enCours = true
+        local ok, erreur = LrTasks.pcall(function()
+            propertyTable.misesAJour = "vérification…"
+            local r, raison = MisesAJour.verifier()
+            if not r then
+                propertyTable.misesAJour = raison
+                LrDialogs.message("Mises à jour par le SSD", tostring(raison), 'warning')
+                return
+            end
+            if quoi == 'installer' then
+                local liste = MisesAJour.aInstaller(r)
+                if #liste == 0 then
+                    LrDialogs.message("Mises à jour par le SSD", "Le SSD n'a rien de plus récent que ce Mac.", 'info')
+                else
+                    MisesAJour.installer(liste)
+                end
+            elseif quoi == 'deposer' then
+                local liste = MisesAJour.aDeposer(r)
+                if #liste == 0 then
+                    LrDialogs.message("Mises à jour par le SSD", "Ce Mac n'a rien de plus récent que le SSD.", 'info')
+                else
+                    MisesAJour.deposer(liste, true)
+                end
+            else
+                local lignes = {}
+                for _, e in ipairs(r.elements or {}) do
+                    lignes[#lignes + 1] = string.format("• %s : %s", tostring(e.nom), tostring(e.etat_texte))
+                end
+                LrDialogs.message("Mises à jour par le SSD", table.concat(lignes, "\n"), 'info')
+            end
+            if quoi ~= 'verifier' then
+                r = MisesAJour.verifier() or r
+            end
+            propertyTable.misesAJour = MisesAJour.texteEtat(r)
+        end)
+        MisesAJour.enCours = false
+        if not ok then
+            LrDialogs.message("Mises à jour par le SSD", tostring(erreur), 'critical')
+        end
+    end)
+end
+
+local function sectionMisesAJour(f, propertyTable, ligne)
+    local bind = LrView.bind
+    local MisesAJour = require 'MisesAJour'
+    propertyTable.misesAJour = MisesAJour.refus() or MisesAJour.texteEtat(MisesAJour.derniere)
+    return {
+        title = "Mises à jour par le SSD",
+        synopsis = bind { key = 'misesAJour', bind_to_object = propertyTable },
+
+        f:static_text {
+            title = "Le dossier commun garde aussi, dans Installation, la dernière version de Développeur IA, de Fibo 2 Studio, de mflux, des modèles de Fibo et de Claude Code : l'autre Mac s'installe depuis le SSD, sans téléchargement. Au lancement de Lightroom, ce Mac dépose ce qu'il a de plus récent et propose ce que le SSD a de plus récent.",
+            width_in_chars = 66, height_in_lines = 4,
+        },
+        ligne("État :", f:static_text {
+            title = bind { key = 'misesAJour', bind_to_object = propertyTable },
+            fill_horizontal = 1,
+        }),
+        ligne("",
+            f:push_button { title = "Vérifier", action = function() actionMisesAJour(propertyTable, 'verifier') end },
+            f:push_button { title = "Installer depuis le SSD", action = function() actionMisesAJour(propertyTable, 'installer') end },
+            f:push_button { title = "Déposer sur le SSD", action = function() actionMisesAJour(propertyTable, 'deposer') end }),
+    }
+end
+
 local function sectionsForTopOfDialog(f, propertyTable)
     local prefs = Chemins.prefs()
     local share = LrView.share
@@ -449,6 +530,7 @@ local function sectionsForTopOfDialog(f, propertyTable)
         sectionLiaison(f, propertyTable, prefs, ligne),
         sectionFenetre(f, prefs, ligne),
         sectionDossierCommun(f, propertyTable, ligne),
+        sectionMisesAJour(f, propertyTable, ligne),
     }
 end
 

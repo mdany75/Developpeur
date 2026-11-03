@@ -139,6 +139,11 @@ défait ensuite.
 - Claude Desktop seul fenêtre fermée (aucune image d'étape), ménage du dossier `Etapes`, `sensibilite` dans l'aperçu (`point_af`, JPEG) — à la main dans Lightroom ([1.3, points 13 et 20](#à-constater-dans-lightroom-13)).
 - Descriptions d'outils longues gardées entières par une session — à la main (session de Claude Code) ([1.2, point 8](#à-constater-dans-lightroom-12)).
 
+**Mises à jour par le SSD (1.7)**
+
+- Le vrai SSD : `--mises-a-jour --deposer` complet (67,6 Go de modèles : durée, place, reprise après un débranchement) ; le deuxième Mac, Wi-Fi coupé : `--installer` complet, puis un vrai `generative_edit` et Fibo 2 Studio (SAM 2) — à la main, sur les deux Mac ([Mises à jour par le SSD](#mises-à-jour-par-le-ssd-17), points 1 et 2).
+- La question au lancement, la barre et sa croix, le message de fin, la section du Gestionnaire, Lightroom quitté pendant un dépôt ; `install.sh` d'une archive téléchargée, `build.sh --install` notarisé ou non ; Fibo 2 Studio installé depuis le SSD et Gatekeeper — à la main dans Lightroom et le Terminal ([Mises à jour par le SSD](#mises-à-jour-par-le-ssd-17), points 3 à 6).
+
 **Correctif 1.3.5**
 
 - `cameraSerialNumber`, noms des dossiers de Backups, `tmutil isexcluded` sur un volume externe, `LR_size_resolution`, une vidéo dans une collection — à la main dans Lightroom ([Correctif 1.3.5](#correctif-135--huit-chantiers-de-la-feuille-de-route)).
@@ -10752,3 +10757,153 @@ les numéros de ligne de Lightroom ne se lisent pas), dans `Export.lrmodule` et 
   temporaire de la session de Claude), ajouté par la réimportation d'essai dans un dossier neuf ;
   le SDK ne retire pas un dossier (clic droit › Supprimer, à la main). Le fichier de filigrane
   « Claude essai filigrane » est gardé pour les essais et la recette.
+
+## Mises à jour par le SSD (1.7)
+
+Demandé par Dany le 3 novembre 2026 : « vu que je travaille sur 2 Mac, faire une validation de mise
+à jour pour avoir toujours la dernière version de Fibo 2, Développeur IA et MCP […] à chaque mise à
+jour, tu places sur le SSD la dernière version incluant les fichiers nécessaires à leur
+utilisation », puis « je veux tout sur le SSD car l'autre Mac peut être connecté par cellulaire ».
+L'autre Mac installe tout depuis le SSD, **sans téléchargement** : seul Claude Code parle au réseau
+pour ses échanges.
+
+**Où.** `<dossier commun>/Installation/`, avec `manifeste.json` (format 1) :
+`{"format": 1, "elements": {"<élément>": {"version", "fichiers": [{"chemin", "taille", "sha256"?}],
+"taille", "depose_le", "depuis", …}}}` ; chemins relatifs à Installation ; `depuis` est le nom de
+l'ordinateur (`scutil --get ComputerName`) ; `sha256` pour les fichiers seuls (archives, binaires,
+archive de Python), jamais pour les arbres (cache de uv, modèles : taille et révisions). Un élément
+annoncé dont un fichier manque ou n'a pas sa taille est **absent du SSD**. Le manifeste s'écrit à
+côté (`.partiel`) puis remplace l'ancien.
+
+| Élément | Sur le SSD | Version comparée | Installé sur ce Mac |
+|---|---|---|---|
+| `uv` | `uv/uv` (copie du binaire) | `uv --version` (le plus récent de `~/.local/bin/uv`, `/opt/homebrew/bin/uv`, `/usr/local/bin/uv`) | `~/.local/bin/uv`, si absent ou plus ancien |
+| `mflux` | `mflux/cache/` (cache uv) et `mflux/python/<date>/cpython-<v>+<date>-….tar.gz` | dist-info de `~/.local/share/uv/tools/mflux`, Python de son `pyvenv.cfg` | `uv python install` (miroir `file://`) puis `uv tool install mflux==<v> --offline --force`, réseau coupé |
+| `modeles_hf` | `modeles_hf/hub/` (même structure que le cache) | ensemble « dépôt@instantané » des instantanés complets | `~/.cache/huggingface/hub` (ou `HF_HUB_CACHE`, `HF_HOME`) |
+| `sam2` | `sam2/SAM2/` | ensemble des fichiers des `.mlpackage` (chemin et taille) | `~/Library/Application Support/Fibo 2 Studio/SAM2` |
+| `fibo2studio` | `fibo2studio/Fibo 2 Studio.zip` (`ditto -c -k --keepParent`) | `CFBundleShortVersionString` | `/Applications` par `ditto -x -k` ; l'ancienne à la Corbeille |
+| `claude_code` | `claude_code/claude-<v>` | lien `~/.local/bin/claude` → `~/.local/share/claude/versions/<v>` | le binaire dans `versions/<v>`, puis le lien ; jamais `~/.claude` |
+| `developpeur` | `developpeur/Developpeur.zip` | la plus ancienne de `mcp-developpeur --version` (connecteur installé) et de l'`Info.lua` du module installé ; dans l'archive, son `Info.lua` (`unzip -p`) | `install.sh` de l'archive décompressée dans `Temporaire/Mises a jour` (`DEVELOPPEUR_DEPUIS_SSD=1`) ; il dit lui-même si Claude Desktop est ouvert |
+
+**Les modèles retenus** (`Installation.depotsHF`) : `briaai/Fibo-2.0-dev` et
+`briaai/Fibo-2.0-edit-turbo` (Développeur et Fibo 2 Studio), `briaai/FIBO-vlm` (la fiche, aux
+deux), `numz/SeedVR2_comfyUI` (`mflux-upscale-seedvr2`, Développeur). Pas Whisper ni rien d'autre du
+cache ; ni MobileCLIP ni BioCLIP 2 (dans `Modeles` du dossier commun) ; SAM 2 de Fibo 2 Studio n'est
+pas dans le cache (`hf download --local-dir` dans son dossier d'Application Support : l'élément
+`sam2`), et `fibo-scene-analyzer` n'est lu par aucun des deux. Relevé le 3 novembre 2026 sur le Mac
+Studio : 4 modèles, 5 instantanés complets, 67,6 Go (le cache de Dany range les gros fichiers dans
+des blobs partagés, `hub/blobs/<xx>/<sha256>`, que les deux Fibo 2 se partagent). La copie suit les
+liens : le dossier de chaque modèle (refs, instantanés, blobs, trees), puis ce que ses liens visent
+hors de lui (blobs partagés et leur `.refs`, `blobs/.huggingface-shared-blobs`, `CACHEDIR.TAG`),
+liens recréés tels quels (relatifs) : le cache de l'autre Mac est valide. Les liens se lisent
+lexicalement (« .. » retiré sans résoudre d'autre lien) ; la racine elle-même peut être un lien.
+
+**Comparaison** (`Installation.comparer`) : un ensemble des deux côtés se compare par inclusion
+(égaux : à jour ; l'un contient l'autre : plus récent ; chacun a ce que l'autre n'a pas :
+« différents », et le dépôt comme l'installation ajoutent ce qui manque, sans rien retirer) ; sinon
+les numéros, composante par composante (1.6.10 > 1.6.9, 1.7 = 1.7.0). États : `a_jour`,
+`ssd_plus_recent`, `mac_plus_recent`, `absent_du_ssd`, `absent_du_mac`, `absent_partout`,
+`differents`.
+
+**La commande** : `mcp-developpeur --mises-a-jour [--json] [--deposer [<élément>…] | --installer
+[<élément>…]] [--archive <Developpeur.zip>]`. Sans option, la comparaison ; `--deposer` copie vers le
+SSD ce que ce Mac a de plus récent (ou que le SSD n'a pas), `--installer` installe ce que le SSD a
+de plus récent (ou que ce Mac n'a pas), dans l'ordre uv, mflux, modeles_hf, sam2, fibo2studio,
+claude_code, developpeur. Avancement sur stderr (lignes de texte ; avec `--json`, des lignes
+`{"avancement": {element, fait, total, texte}}`), puis avec `--json` une ligne finale sur stdout :
+`{ok, installation, ordinateur, elements: [{element, nom, etat, etat_texte, mac, ssd, a_deposer,
+a_installer}], faits: [{element, action, texte}], relancer: […]}` (`action` : depose, installe, rien,
+refuse, echec). Code 1 sans dossier commun (`Installation.texteNonRegle`), dossier commun
+introuvable (`DossierDonnees.texteIntrouvable`) ou un élément refusé ou en échec ; 2 pour un
+argument inconnu. `DEVELOPPEUR_DOMICILE` et `DEVELOPPEUR_APPLICATIONS` : essais à la main seulement.
+`--racine-donnees` dit la racine des données (install.sh).
+
+**Règles.**
+
+- Jamais de téléchargement à l'installation. mflux : Python par `UV_PYTHON_INSTALL_MIRROR`
+  (`file://` vers `mflux/python`, en pourcentages pour les espaces et les accents), puis
+  `--offline` et `UV_OFFLINE=1`, un mandataire mort (`http://127.0.0.1:9`) dans
+  l'environnement (tout accès au réseau échoue), `HF_HUB_OFFLINE=1`, `UV_NO_CONFIG=1`, environnement
+  propre (`HOME`, `PATH` système). uv du SSD de préférence (celui qui a rempli le cache).
+- Le dépôt de mflux est le seul moment où le réseau sert (PyPI et l'archive de Python), sur le Mac
+  qui dépose : uv remplit un cache neuf (`mflux.partiel/cache`) en installant la même version de
+  mflux, avec le même Python, dans des dossiers d'outils **temporaires** (`Temporaire/Mises a
+  jour/mflux-depot`, jamais ceux de ce Mac) ; `UV_PYTHON_CACHE_DIR` garde l'archive de Python,
+  rangée ensuite au chemin du miroir (`<date>/cpython-<v>+<date>-<reste>`).
+- Toute copie passe par un nom « .partiel » renommé à la fin : un fichier (`copierFichier`, par
+  morceaux de 16 Mo, avancement) ; un élément d'un tenant (`<élément>.partiel`, puis l'ancien mis à
+  `.ancien` et retiré une fois le nouveau en place) ; un arbre (modèles, SAM 2) fichier par fichier,
+  un fichier déjà là à la même taille gardé (une copie interrompue reprend), un lien posé seulement
+  là où rien n'existe, rien retiré. Le manifeste ne change qu'à la fin d'un élément.
+- Place libre vérifiée avant (volume de la cible, `volumeAvailableCapacityForImportantUsage`, marge
+  de 1 Go) ; mflux et les modèles refusés si un mflux tourne (`Fibo.mfluxEnCours`) ; Fibo 2 Studio
+  et SAM 2 refusés à l'installation si l'application tourne (Dany s'en sert souvent : jamais
+  quittée à sa place) ; une archive ou un binaire dont le SHA-256 n'est plus celui du manifeste est
+  refusé ; un seul dépôt ou une seule installation à la fois sur ce Mac (`Temporaire/mises-a-jour.verrou`,
+  `flock`).
+- Développeur se dépose depuis une archive : `--archive`, sinon celle qu'install.sh garde
+  (`Developpeur/Archive/Developpeur.zip`) ; une archive plus ancienne que celle du SSD est refusée,
+  la même ne bouge pas. Une archive donnée se dépose même si ce Mac n'a pas encore Développeur.
+- `build.sh --install` : `install.sh` avec `DEVELOPPEUR_PAS_DE_DEPOT=1`, puis, archive notarisée
+  et testée seulement (jamais `--sans-tests` ni `SKIP_NOTARIZE`), l'archive gardée et déposée.
+  `install.sh` seul : l'archive (`DEVELOPPEUR_ARCHIVE`, sinon le `Developpeur.zip` d'à côté s'il
+  porte sa version, sinon refaite par `ditto --norsrc --noextattr` depuis son dossier) gardée, puis
+  déposée si un pointeur existe ; ni l'un ni l'autre avec `DEVELOPPEUR_DEPUIS_SSD=1`.
+- `install.sh`, `scripts/preparer-bioclip.sh` (par `plutil` sur le pointeur) et `--compiler-sens`
+  écrivent les modèles du sens et des espèces dans `Modeles` de la racine des données (dossier commun
+  réglé et présent) ; dossier commun réglé mais introuvable : rien dans le `Modeles` de ce Mac.
+- Le module (`MisesAJour.lua`) : au lancement de Lightroom, en dernier dans la tâche d'`Init.lua`
+  (après le démarrage de la liaison et les ménages), rien sans dossier commun réglé et présent (sans
+  attendre) ; sinon, après `DELAI_LANCEMENT` (45 s), la comparaison sous l'alarme de perl (120 s) ;
+  ce que le SSD a de plus récent : « Mettre à jour depuis le SSD » (`LrDialogs.confirm`, éléments et
+  versions ; Plus tard : rien), installation dans une barre annulable, puis ce qu'il faut relancer
+  (Lightroom pour le module ; Claude Desktop puis une nouvelle session de Claude Code pour le
+  connecteur ; Fibo 2 Studio) ; ce que ce Mac a de plus récent : déposé sans question, dans une barre
+  annulable (un message seulement en cas d'échec ou d'arrêt). Le connecteur tourne à part
+  (`&`, son numéro dans un fichier) : la barre lit sa dernière ligne d'avancement, la croix le
+  termine (`kill`) ; ce qui était à moitié copié reprend la fois suivante. Gestionnaire de modules
+  externes : section « Mises à jour par le SSD » (état, Vérifier, Installer depuis le SSD, Déposer
+  sur le SSD). `Temporaire/Mises a jour` et le verrou sont dans `Menage.GARDES` (un dépôt lancé
+  avant un rechargement peut encore tourner).
+
+**Essai réel du 3 novembre 2026** (Mac Studio de Dany, uv 0.13.5, dossiers temporaires du
+bloc-notes de la session, jamais les vrais) :
+
+1. mflux hors ligne, à la main d'abord : `UV_CACHE_DIR=<faux SSD>/cache UV_PYTHON_CACHE_DIR=<faux
+   SSD>/python-archives UV_TOOL_DIR=… UV_TOOL_BIN_DIR=… UV_PYTHON_INSTALL_DIR=… uv tool install
+   mflux==0.24.0 --python 3.13 --managed-python` (dépôt, en ligne : 6 s), puis sur un « Mac 2 » vide
+   `uv tool install … --offline` : refusé (« No interpreter found for Python 3.13 in managed
+   installations ») : uv ne prend pas Python dans `UV_PYTHON_CACHE_DIR` hors ligne. Avec
+   `UV_PYTHON_INSTALL_MIRROR=file://…` et l'archive au chemin du miroir, réseau coupé (mandataire
+   mort) : `uv python install 3.13.17 --no-bin` (249 ms) puis `uv tool install mflux==0.24.0 --python
+   3.13.17 --managed-python --offline` réussissent, et `mflux-generate-fibo2-edit --help` répond
+   (`usage: mflux-generate-fibo2-edit …`, code 0, `HF_HUB_OFFLINE=1`, réseau coupé). Tailles : cache
+   uv 1,2 Go (1 163 797 240 octets), archive de Python 24 Mo (25 286 365 octets) ; installé : outils
+   1,2 Go, Python 71 Mo.
+2. Puis par la commande, faux SSD « SSD Photos/Développeur partagé » (espaces, accents) :
+   `--deposer uv mflux sam2 fibo2studio claude_code developpeur --archive <build/Developpeur.zip 1.6.7>`
+   depuis un domicile de liens vers les vrais mflux, Claude Code, cache et SAM 2 (lecture seule) ;
+   puis sur un domicile vide `--installer uv mflux sam2 fibo2studio claude_code` : tout installé,
+   mflux hors ligne en 2 s (miroir `file://` à accents compris), `mflux-generate-fibo2-edit --help`
+   répond réseau coupé, `claude --version` dit 2.1.303, Fibo 2 Studio 2.8.1 ; tailles sur le SSD :
+   uv 30 Mo, mflux 1,2 Go, SAM 2 179 Mo, Fibo 2 Studio 1,7 Mo, Claude Code 256 Mo, Développeur 4,3 Mo.
+   Les modèles (67,6 Go) n'ont été que comparés, pas copiés ; Développeur pas installé (son
+   install.sh inscrirait le connecteur dans le vrai Claude Desktop). L'essai a trouvé trois défauts,
+   corrigés avec leur test : taille lue après le renommage (Claude Code annoncé à −1, donc « absent »
+   sur l'autre Mac), version d'un `Info.lua` lue à « Liaison.VERSION » du commentaire, dossier SAM 2
+   donné par un lien.
+
+**À constater** (aussi dans « À vérifier à la prochaine recette ») :
+
+1. Le vrai SSD : choisir le dossier commun, puis `--mises-a-jour --deposer` complet (67,6 Go de
+   modèles : durée, place, reprise après un débranchement en cours de copie).
+2. Le deuxième Mac, Wi-Fi coupé : `--installer` complet, puis un vrai `generative_edit` sur une
+   copie d'Essais, et Fibo 2 Studio (Sélection avec SAM 2, une retouche).
+3. Dans Lightroom : la question au lancement, la barre et sa croix, le message de fin, la section du
+   Gestionnaire, et Lightroom quitté pendant un dépôt (le connecteur continue, le verrou refuse le
+   suivant).
+4. `install.sh` depuis une archive téléchargée (le zip d'à côté), puis refait par ditto : l'archive
+   gardée, déposée, et le connecteur de la 1.7 qui répond `--racine-donnees`.
+5. `build.sh --install` notarisé : l'archive déposée ; `SKIP_NOTARIZE=1` : ni gardée ni déposée.
+6. Fibo 2 Studio installé depuis le SSD : Gatekeeper l'ouvre-t-il sans avertissement (zip refait
+   par ditto, quarantaine absente) ?

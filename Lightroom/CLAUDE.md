@@ -51,6 +51,12 @@ CLAUDE.md principal, qui garde les règles communes à tout le projet. Le détai
   `--resume` et vers lui après la fin (`DEVELOPPEUR_DONNEES`), jamais rien d'autre de `~/.claude`.
   `uninstall.sh` ne touche jamais le dossier commun. Essais : `essais-dossier-commun.lua` des deux
   suites (jamais le vrai `~/.claude` : `CLAUDE_CONFIG_DIR` simulé).
+- Mises à jour par le SSD (1.7, `MisesAJour.lua`) : le module ne copie ni n'installe rien
+  lui-même, il lance `--mises-a-jour` (comparaison sous l'alarme de perl ; dépôt et installation à
+  part, `&`, la croix de la barre fait `kill`). Au lancement : en dernier dans la tâche d'`Init.lua`,
+  rien sans dossier commun réglé et présent ; l'installation seulement après « Mettre à jour » ;
+  jamais Fibo 2 Studio quitté à la place de Dany. Essais : `essais-mises-a-jour.lua` (faux
+  connecteur). `docs/SPEC.md`, Mises à jour par le SSD (1.7).
 
 ## Écritures et mémoire
 
